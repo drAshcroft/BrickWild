@@ -1,7 +1,36 @@
 # Known issues — prioritized backlog
 
-Findings from the architecture review. None of these were changed during the
-file restructure; the restructure moved files only. Ordered by severity.
+Findings from the architecture review. Ordered by severity.
+Items marked FIXED were resolved in commit 9ac1fce.
+
+## FIXED
+
+- **Apse detached from the nave by 3.7–7.4 m in every apse-bearing variant.**
+  `half_cylinder()` puts the drum's flat face at `cy`, but `cy` was computed as
+  `l/2 + r - APSE_EMBED` (full-cylinder maths). Missed because the check that
+  should have caught it recomputed `cy` from the same formula and reduced to
+  `x < x - 0.05` — always false. Voxel connectivity also passed because
+  `_cone_cap` emits a full cone that bridged the void.
+- **Aisles lapped the transept crossing by exactly 0.30 m.** The aisle east
+  limit ignored the `APSE_EMBED` shift applied to the transept.
+- **Added `qa/massing_check.gd`** — no gaps / no overlap / size match, measured
+  from emitted geometry. Run via `tests/massing_test.gd`; also wired into
+  `BlueprintQA`.
+
+## Still open — geometry
+
+### A. The apse roof is a full cone over a half drum
+`_cone_cap` (`src/church/church_builder.gd`) emits full boxes centred on the
+drum, so the roof extends `r + 0.35` in **both** Z directions while the drum it
+caps occupies only `[cy, cy + r]`. Its western half is now buried inside the
+nave. It was this overhang that masked the detached apse from the connectivity
+check. A half-cone matching the drum is the correct primitive.
+
+### B. The blueprint's tower placement disagrees with the mesh by metres
+Mesh tower spans `[-l/2 + 0.6 - tw, -l/2 + 0.6]` — embedded 0.6 m.
+Blueprint tower spans `[-l2 - 0.45·tw, -l2 + 0.55·tw]` — embedded `0.55·tw`,
+which for a 10 m tower is 5.5 m. Same drift class as issue 2 below; the
+massing checks do not cover the blueprint, only the mesh.
 
 ## P1 — Correctness
 
@@ -42,7 +71,7 @@ This breaks the contract stated at `building_spec.gd:3-4`.
 `church_builder.gd` does not have this bug. `church_test.gd` tests determinism
 only by regenerating from seed, so it would not catch it.
 
-### 4. A warning that fires 100% of the time
+### 4. A warning that fires 100% of the time (STILL OPEN)
 `artifacts/qa_out.txt` reports `60/60 variants passed` while emitting 60
 warnings — every variant trips `grounded: eaves/trim dips 0.06-0.11m below
 ground`. The builder's slab half-thickness (`church_builder.gd:286-289`, ±0.12)
