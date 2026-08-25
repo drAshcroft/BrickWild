@@ -73,7 +73,10 @@ const STYLES := {
 	},
 }
 
-func _init(p_seed: int) -> void:
+## The seed passed here is provisional: ChurchGenerator.generate() is the
+## authoritative seeding point and re-seeds both fields. Callers that are about
+## to generate can simply use ChurchSpec.new().
+func _init(p_seed := 0) -> void:
 	seed = p_seed
 	rng = RandomNumberGenerator.new()
 	rng.seed = seed

@@ -33,8 +33,8 @@ static func run() -> SuiteResult:
 				res.fail("too few verts (%d) style=%s seed=%d" % [verts, String(style), sd])
 
 	# determinism: same seed, same geometry
-	var a := ChurchSpec.new(0); a.style = &"gothic"
-	var b := ChurchSpec.new(0); b.style = &"gothic"
+	var a := ChurchSpec.new(); a.style = &"gothic"
+	var b := ChurchSpec.new(); b.style = &"gothic"
 	ChurchGenerator.generate(a, 42)
 	ChurchGenerator.generate(b, 42)
 	res.checked += 1

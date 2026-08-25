@@ -12,7 +12,7 @@ static func styles() -> Array:
 
 ## Build spec number `i` for `style`, generated and ready to build.
 static func spec_at(style: StringName, i: int) -> ChurchSpec:
-	var spec := ChurchSpec.new(0)
+	var spec := ChurchSpec.new()
 	spec.style = style
 	spec.width = 10.0 + i * 0.5
 	spec.length = 18.0 + i * 2.0

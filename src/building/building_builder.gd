@@ -14,9 +14,13 @@ const SURF_TRIM := 3
 
 var spec: BuildingSpec
 var _sts: Array = []          # one SurfaceTool per surface
+var _rng := RandomNumberGenerator.new()
 
 func build(p_spec: BuildingSpec) -> ArrayMesh:
 	spec = p_spec
+	# Re-seed from the spec so a given spec always builds the same mesh, no
+	# matter how many times it has been built before.
+	_rng.seed = p_spec.seed
 	_sts.clear()
 	for i in range(4):
 		var s := SurfaceTool.new()
@@ -36,7 +40,7 @@ func build(p_spec: BuildingSpec) -> ArrayMesh:
 		var fw := w
 		var fd := d
 		if spec.style == &"european" and f > 0 and spec.subtype != "tower_house":
-			var jet := minf(0.35, randf() * 0.3)
+			var jet := minf(0.35, _rand() * 0.3)
 			fw = w + jet * 2.0
 			fd = d + jet * 2.0
 		var y0 := 0.3 + f * fh
@@ -64,8 +68,8 @@ func build(p_spec: BuildingSpec) -> ArrayMesh:
 		add_porch(w, d)
 
 	if spec.chimney:
-		var cx := w * 0.32 * (1.0 if randf() < 0.5 else -1.0)
-		var ch := total_h + spec.roof_pitch * minf(w, d) * 0.6 + randf_range(0.4, 1.0)
+		var cx := w * 0.32 * (1.0 if _rand() < 0.5 else -1.0)
+		var ch := total_h + spec.roof_pitch * minf(w, d) * 0.6 + _rand_range(0.4, 1.0)
 		box(Vector3(0.7, ch, 0.7), Vector3(cx, ch / 2.0, d * 0.28), SURF_WALL)
 		box(Vector3(0.95, 0.22, 0.95), Vector3(cx, ch + 0.11, d * 0.28), SURF_TRIM)
 
@@ -93,11 +97,15 @@ func build(p_spec: BuildingSpec) -> ArrayMesh:
 
 # ---------------------------------------------------------------- helpers
 
-func randf() -> float:
-	return spec.rng.randf()
+## Build-time randomness comes from the builder's OWN generator, re-seeded from
+## the spec on every build. Drawing from spec.rng instead advanced the spec's
+## stream, so building the same spec twice produced different meshes -- and
+## shadowed @GlobalScope.randf while doing it.
+func _rand() -> float:
+	return _rng.randf()
 
-func randf_range(a: float, b: float) -> float:
-	return spec.rng.randf_range(a, b)
+func _rand_range(a: float, b: float) -> float:
+	return _rng.randf_range(a, b)
 
 ## Append an axis-aligned box at pos (center) with size into surface surf.
 ## rot_y: rotation around Y. shear: z += y * shear (for upturned eaves).
@@ -154,8 +162,8 @@ func add_windows_for_floor(f: int, fw: float, fd: float, y0: float, fh: float) -
 			window(sx * (fw / 2.0 + 0.02), wy, 0.0, sx < 0)
 
 func window(x: float, y: float, z: float, flip: bool) -> void:
-	var ww := randf_range(0.55, 0.85)
-	var wh := randf_range(0.8, 1.2)
+	var ww := _rand_range(0.55, 0.85)
+	var wh := _rand_range(0.8, 1.2)
 	var rot := PI if flip else 0.0
 	box(Vector3(ww, wh, 0.06), Vector3(x, y, z), SURF_TRIM, rot)
 	var ft := 0.09
@@ -176,7 +184,7 @@ func add_door(w: float, d: float) -> void:
 	var pos: Vector3 = o[0]
 	var rot: float = o[1]
 	var dh := minf(spec.floor_height * 0.75, 2.3)
-	var dw := randf_range(0.95, 1.25)
+	var dw := _rand_range(0.95, 1.25)
 	var y := dh / 2.0 + 0.3
 	var fwd := Vector3(0, 1, 0).rotated(Vector3.RIGHT, PI / 2.0) # unused placeholder
 	fwd = Vector3(0, 0, 1)
@@ -187,8 +195,8 @@ func add_door(w: float, d: float) -> void:
 		box(Vector3(0.13, dh + 0.1, 0.16), pos + off, SURF_TIMBER, rot)
 
 func add_porch(w: float, d: float) -> void:
-	var pd := randf_range(1.2, 2.0)
-	var pw := w * randf_range(0.5, 0.8)
+	var pd := _rand_range(1.2, 2.0)
+	var pw := w * _rand_range(0.5, 0.8)
 	var zc := d / 2.0 + pd / 2.0 - 0.1
 	box(Vector3(pw + 0.6, 0.25, pd + 0.3), Vector3(0, 0.42, zc), SURF_TIMBER)
 	box(Vector3(pw + 0.9, 0.14, pd + 0.5), Vector3(0, spec.floor_height * 0.62, zc), SURF_ROOF)

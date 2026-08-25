@@ -44,7 +44,7 @@ func regenerate() -> void:
 	variant_list.clear()
 	var base_seed: int = randi()
 	for i in range(VARIANTS):
-		var spec := ChurchSpec.new(base_seed + i * 7919)
+		var spec := ChurchSpec.new()
 		spec.style = _get_style_key()
 		spec.width = width_slider.value
 		spec.length = length_slider.value
@@ -66,9 +66,7 @@ func _show(idx: int) -> void:
 		_mesh_instance.mesh = meshes[idx]
 		# per-surface materials
 		var s: ChurchSpec = specs[idx]
-		var mats := [
-			_mat(s.stone_color), _mat(s.trim_color), _mat(s.roof_color), Color("1a1c20"),
-		]
+		var mats := [s.stone_color, s.trim_color, s.roof_color, Color("1a1c20")]
 		for si in range(4):
 			var m := StandardMaterial3D.new()
 			m.albedo_color = mats[si]
@@ -85,9 +83,6 @@ func _show(idx: int) -> void:
 
 func spec_valid(i: int) -> bool:
 	return i >= 0 and i < specs.size() and meshes[i] != null
-
-func _mat(c: Color) -> Color:
-	return c
 
 func _on_variant_picked(idx: int) -> void:
 	_show(idx)

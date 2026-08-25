@@ -21,5 +21,15 @@ static func run() -> SuiteResult:
 			continue
 		for s in range(mesh.get_surface_count()):
 			total_verts += (mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	# building the same spec twice must produce the same mesh: the builder used
+	# to draw its randomness from spec.rng, advancing it on every build.
+	var spec: BuildingSpec = SpecGenerator.generate(4242)
+	var b := BuildingBuilder.new()
+	res.checked += 1
+	var v1: PackedVector3Array = b.build(spec).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var v2: PackedVector3Array = b.build(spec).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	if v1 != v2:
+		res.fail("rebuilding the same BuildingSpec produced different geometry")
+
 	res.note("%d houses, %d total vertices" % [COUNT, total_verts])
 	return res
