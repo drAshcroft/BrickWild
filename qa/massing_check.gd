@@ -31,11 +31,11 @@ static func _allowance(a: String, b: String) -> float:
 		"nave|transept":
 			return INF                        # the crossing, by definition
 		"nave|tower":
-			return ChurchBuilder.TOWER_EMBED
+			return ChurchGeometry.TOWER_EMBED
 		"apse|nave":
-			return ChurchBuilder.APSE_EMBED
+			return ChurchGeometry.APSE_EMBED
 		"aisle|nave":
-			return 0.15                       # aisle wall laps the nave wall
+			return ChurchGeometry.AISLE_LAP    # aisle wall laps the nave wall
 		"aisle|transept", "aisle|tower":
 			return 0.0                        # aisles are placed to clear both
 		"apse|transept":

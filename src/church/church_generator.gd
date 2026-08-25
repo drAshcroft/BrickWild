@@ -37,6 +37,12 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 	var aisle_opts: Array = s["aisles"]
 	spec.aisles = _pick(r, aisle_opts)
 	spec.aisle_width = clampf(spec.width * r.randf_range(0.18, 0.32), 1.5, 4.0)
+	# Aisles must fit between the tower and the crossing. Deciding it HERE keeps
+	# ChurchBuilder.build() a pure function of its spec -- it used to make this
+	# call itself by writing spec.aisles = 0 mid-build, which meant the QA suite
+	# read the post-mutation value and skipped the very cases that triggered it.
+	if spec.aisles > 0 and not ChurchGeometry.aisle_fits(spec):
+		spec.aisles = 0
 
 	spec.buttresses = _chance(r, s["buttresses"])
 	spec.buttress_count_per_side = r.randi_range(3, 6) if spec.buttresses else 0

@@ -78,15 +78,3 @@ func _init(p_seed: int) -> void:
 	rng = RandomNumberGenerator.new()
 	rng.seed = seed
 
-func rf(a := 0.0, b := 1.0) -> float:
-	return rng.randf_range(a, b)
-
-func chance(p: float) -> bool:
-	return rng.randf() < p
-
-func pick(arr: Array):
-	return arr[rng.randi_range(0, arr.size() - 1)]
-
-## Depth of the transept crossing along Z (used by other sections to abut it).
-func transept_w_depth() -> float:
-	return width * 0.55

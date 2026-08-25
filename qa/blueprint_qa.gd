@@ -366,7 +366,7 @@ func _check_alignment() -> void:
 ##   - aisles/buttresses must stay clear of the tower and transept volumes
 func _check_overlaps() -> void:
 	var l: float = spec.length
-	var TOWER_EMBED: float = ChurchBuilder.TOWER_EMBED
+	var TOWER_EMBED: float = ChurchGeometry.TOWER_EMBED
 	if spec.tower:
 		var front: float = -l / 2.0 + TOWER_EMBED  # intended front-face plane
 		var worst := -INF
@@ -395,7 +395,7 @@ func _check_overlaps() -> void:
 					failures.append("parts_join: aisle (z0=%.2f) slices into tower zone (front %.2f)"
 						% [z0, tower_front])
 			if spec.transept:
-				var crossing: float = l / 2.0 - spec.transept_w_depth()
+				var crossing: float = ChurchGeometry.transept_front_z(spec)
 				if z1 > crossing + 0.05:
 					failures.append("parts_join: aisle (z1=%.2f) slices into transept crossing (starts %.2f)"
 						% [z1, crossing])

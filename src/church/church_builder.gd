@@ -13,8 +13,9 @@ const SURF_OPEN := 3
 
 ## How far attached masses penetrate the host wall, so they read as joined
 ## rather than floating beside it or swallowing the nave.
-const TOWER_EMBED := 0.6   # meters of tower inside the nave's west wall
-const APSE_EMBED := 0.3    # meters of apse inside the nave's east wall
+## Joint depths live in ChurchGeometry so the blueprint reads the same values.
+const TOWER_EMBED := ChurchGeometry.TOWER_EMBED
+const APSE_EMBED := ChurchGeometry.APSE_EMBED
 
 var spec: ChurchSpec
 var _sts: Array = []
@@ -62,7 +63,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	tag("nave")
 	box(Vector3(w, h, l), Vector3(0, h / 2.0, 0), SURF_STONE)
 	_log_mass("nave", AABB(Vector3(-w / 2.0, 0.0, -l / 2.0), Vector3(w, h, l)))
-	gable_roof(w + 0.5, l + 0.4, w * spec.roof_pitch, 0.0, SURF_ROOF)
+	gable_roof(w + 0.5, l + 0.4, w * spec.roof_pitch, 0.0, SURF_ROOF, h)
 	total_height = maxf(total_height, h + w * spec.roof_pitch)
 
 	# ---------- side aisles ----------
@@ -70,29 +71,19 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	if spec.aisles > 0:
 		var aw: float = spec.aisle_width
 		# Aisles fit BETWEEN the tower zone (west) and the transept crossing
-		# (east) so they never slice through either. If there isn't room for a
-		# usable aisle, drop them rather than force them through the crossing.
-		var az0: float = -l / 2.0
-		if spec.tower:
-			az0 = -l / 2.0 + TOWER_EMBED + spec.tower_width  # clear the tower front
-		var az1: float = l / 2.0
-		if spec.transept:
-			# match the transept's own placement, including the APSE_EMBED
-			# shift applied below, or the aisle laps the crossing.
-			az1 = l / 2.0 - spec.transept_w_depth()
-			if spec.apse:
-				az1 -= APSE_EMBED
-		var al: float = az1 - az0
-		if al < 3.0:
-			spec.aisles = 0  # no room; better no aisle than one through the tower
-		var az: float = (az0 + az1) / 2.0
-		if spec.aisles > 0:
+		# (east) so they never slice through either. Whether there is room is
+		# decided in ChurchGenerator: build() must not rewrite its own input.
+		var zr: Vector2 = ChurchGeometry.aisle_z_range(spec)
+		var az0: float = zr.x
+		var al: float = zr.y - zr.x
+		var az: float = (zr.x + zr.y) / 2.0
+		if true:
 			for side_v in [-1.0, 1.0]:
 				var side: float = side_v
-				var ax: float = side * (w / 2.0 + aw / 2.0 - 0.15)
+				var ax: float = ChurchGeometry.aisle_center_x(spec, side)
 				box(Vector3(aw, h * 0.55, al), Vector3(ax, h * 0.275, az), SURF_STONE)
 				_log_mass("aisle_%s" % ("left" if side < 0.0 else "right"),
-					AABB(Vector3(ax - aw / 2.0, 0.0, az - al / 2.0), Vector3(aw, h * 0.55, al)))
+					ChurchGeometry.aisle_aabb(spec, side))
 				_lean_roof(aw + 0.6, al + 0.4, h * 0.55, h * 0.55 + aw * 0.8, side, SURF_ROOF, az)
 				var nwin: int = int(al / 3.0)
 				for i in range(nwin):
@@ -111,12 +102,11 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	tag("transept")
 	if spec.transept:
 		var tz_len: float = spec.transept_len
-		var tz_w: float = w * 0.55
-		var tz_z: float = l / 2.0 - tz_w / 2.0 - APSE_EMBED if spec.apse else l / 2.0 - tz_w / 2.0
+		var tz_w: float = ChurchGeometry.transept_depth(spec)
+		var tz_z: float = ChurchGeometry.transept_center_z(spec)
 		box(Vector3(tz_len, h, tz_w), Vector3(0, h / 2.0, tz_z), SURF_STONE)
-		_log_mass("transept", AABB(Vector3(-tz_len / 2.0, 0.0, tz_z - tz_w / 2.0),
-			Vector3(tz_len, h, tz_w)))
-		gable_roof(tz_len + 0.5, tz_w + 0.4, w * spec.roof_pitch * 0.9, tz_z, SURF_ROOF)
+		_log_mass("transept", ChurchGeometry.transept_aabb(spec))
+		gable_roof(tz_len + 0.5, tz_w + 0.4, w * spec.roof_pitch * 0.9, tz_z, SURF_ROOF, h)
 		for sx_v in [-1.0, 1.0]:
 			window(Vector3(sx_v * (tz_len / 2.0 + 0.02), h * 0.55, tz_z), PI / 2.0,
 				spec.window_w, spec.window_h, spec.window_style)
@@ -132,15 +122,18 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		# nave, dome bulges outward. half_cylinder() sweeps a in [0, PI], so the
 		# drum occupies z in [cy, cy + radius] with its flat face AT cy. cy is
 		# therefore the springing plane itself, not a full cylinder's centre.
-		var cy: float = l / 2.0 - APSE_EMBED
-		_log_part("apse", Vector3(0, h * 0.425, cy + spec.apse_radius * 0.5),
-			Vector3(spec.apse_radius * 2, h * 0.85, spec.apse_radius))
-		# half_cylinder sweeps a in [0, PI] so sin(a) >= 0: the drum occupies
-		# z in [cy, cy + r] with its FLAT FACE at cy -- not [cy - r, cy + r].
-		_log_mass("apse", AABB(Vector3(-spec.apse_radius, 0.0, cy),
-			Vector3(spec.apse_radius * 2.0, h * 0.85, spec.apse_radius)))
-		half_cylinder(spec.apse_radius, h * 0.85, Vector2(0, cy), SURF_STONE)
-		_cone_cap(Vector3(0, h * 0.85, cy), spec.apse_radius + 0.35, spec.apse_radius * 0.9, SURF_ROOF)
+		var cy: float = ChurchGeometry.apse_springing_z(spec)
+		var adrum: AABB = ChurchGeometry.apse_aabb(spec)
+		_log_part("apse", adrum.position + adrum.size / 2.0, adrum.size)
+		_log_mass("apse", adrum)
+		half_cylinder(spec.apse_radius, h * ChurchGeometry.APSE_HEIGHT_RATIO,
+			Vector2(0, cy), SURF_STONE)
+		# The drum is a HALF cylinder, so its roof is a HALF cone: it must cover
+		# z in [cy, cy + r] only. A full cone here would overhang the void west
+		# of the drum -- which is exactly what hid the detached apse from the
+		# voxel connectivity check.
+		_half_cone_cap(Vector3(0, h * ChurchGeometry.APSE_HEIGHT_RATIO, cy),
+			spec.apse_radius + ChurchGeometry.APSE_EAVE, spec.apse_radius * 0.9, SURF_ROOF)
 		for a_v in [-0.6, 0.0, 0.6]:
 			var a: float = a_v
 			var dx: float = sin(a)
@@ -155,9 +148,9 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		var th: float = spec.tower_height
 		# Tower abuts the west wall: only EMBED m penetrates the nave so the
 		# mass reads as joined, not swallowed. Front (east) face at -l/2+EMBED.
-		var lz: float = -l / 2.0 + TOWER_EMBED - tw / 2.0   # tower center Z
+		var lz: float = ChurchGeometry.tower_center_z(spec)
 		box(Vector3(tw, th, tw), Vector3(0, th / 2.0, lz), SURF_STONE)
-		_log_mass("tower", AABB(Vector3(-tw / 2.0, 0.0, lz - tw / 2.0), Vector3(tw, th, tw)))
+		_log_mass("tower", ChurchGeometry.tower_aabb(spec))
 		total_height = maxf(total_height, th)
 		for side_i in range(4):
 			var ang: float = PI / 2.0 * side_i
@@ -192,7 +185,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 			bz0 = -l / 2.0 + TOWER_EMBED + spec.tower_width + 0.4
 		var bz1: float = l / 2.0 - 0.8
 		if spec.transept:
-			bz1 = l / 2.0 - spec.transept_w_depth() - 0.6
+			bz1 = ChurchGeometry.transept_front_z(spec) - 0.6
 		var span_bz: float = maxf(bz1 - bz0, 2.0)
 		for side_v in [-1.0, 1.0]:
 			for i in range(n):
@@ -261,9 +254,6 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 
 # ---------------------------------------------------------------- primitives
 
-func surf(i: int) -> SurfaceTool:
-	return _sts[i]
-
 func box(size: Vector3, pos: Vector3, s: int, rot_y := 0.0) -> void:
 	_log_part("box", pos, size, rot_y)
 	var hx: float = size.x / 2.0
@@ -298,18 +288,23 @@ func box(size: Vector3, pos: Vector3, s: int, rot_y := 0.0) -> void:
 				st.add_vertex(pts[tri[vi]])
 
 ## Gable roof running along Z, centered at x=0.
-func gable_roof(span_x: float, along_z: float, rise: float, z_center: float, s: int) -> void:
+## Gable roof capping a wall whose top is at y_base.
+func gable_roof(span_x: float, along_z: float, rise: float, z_center: float, s: int,
+		y_base := 0.0) -> void:
 	var half_span: float = span_x / 2.0
 	for side_v in [-1.0, 1.0]:
-		_slab(along_z, rise, half_span, side_v, z_center, s)
-	box(Vector3(0.35, 0.25, along_z + 0.2), Vector3(0, rise + 0.1, z_center), s)
+		_slab(along_z, rise, half_span, side_v, z_center, s, y_base)
+	box(Vector3(0.35, 0.25, along_z + 0.2), Vector3(0, y_base + rise + 0.1, z_center), s)
 
-## One sloped roof slab from eave (x=±half_span, y=0) to ridge (x=0, y=rise).
-func _slab(along: float, rise: float, half_span: float, side: float, zc: float, s: int) -> void:
+## One sloped roof slab from eave (x=+/-half_span, y=y_base) to ridge
+## (x=0, y=y_base+rise). y_base is the wall top this roof sits on.
+func _slab(along: float, rise: float, half_span: float, side: float, zc: float,
+		s: int, y_base := 0.0) -> void:
 	var slope_len: float = sqrt(half_span * half_span + rise * rise)
 	var ang: float = atan2(rise, half_span)
 	var mid_x: float = side * half_span / 2.0
-	var t := Transform3D(Basis(Vector3(0, 0, 1), -side * ang), Vector3(mid_x, rise / 2.0, zc))
+	var t := Transform3D(Basis(Vector3(0, 0, 1), -side * ang),
+		Vector3(mid_x, y_base + rise / 2.0, zc))
 	var corners := [
 		Vector3(-slope_len / 2.0, -0.12, -along / 2.0), Vector3(slope_len / 2.0, -0.12, -along / 2.0),
 		Vector3(slope_len / 2.0, 0.12, -along / 2.0), Vector3(-slope_len / 2.0, 0.12, -along / 2.0),
@@ -395,21 +390,29 @@ func _quad_wall(p0: Vector3, p1: Vector3, n0: Vector3, n1: Vector3, height: floa
 	st.set_normal(n1); st.set_uv(Vector2(1, 1)); st.add_vertex(t1)
 	st.set_normal(n0); st.set_uv(Vector2(0, 1)); st.add_vertex(t0)
 
-func _cone_cap(pos: Vector3, radius: float, height: float, s: int) -> void:
+## Conical cap over a HALF cylinder: each step spans z in [pos.z, pos.z + rad]
+## so the roof covers the drum's bulge and nothing west of its flat face.
+func _half_cone_cap(pos: Vector3, radius: float, height: float, s: int) -> void:
 	var steps: int = 4
 	for i in range(steps):
 		var t1: float = float(i + 1) / steps
 		var rad: float = lerpf(radius, 0.15, pow(t1, 0.8))
-		box(Vector3(rad * 2.0, height / steps * 1.5, rad * 2.0),
-			Vector3(pos.x, pos.y + height * t1 - height / steps * 0.5, pos.z), s)
+		var step_h: float = height / steps * 1.5
+		box(Vector3(rad * 2.0, step_h, rad),
+			Vector3(pos.x, pos.y + height * t1 - step_h / 2.0, pos.z + rad / 2.0), s)
+
 
 func _pyramid_roof(base_center: Vector3, width: float, height: float, s: int, tall := false) -> void:
 	var steps: int = 5 if tall else 3
 	for i in range(steps):
 		var t1: float = float(i + 1) / steps
 		var wd: float = lerpf(width, 0.2, pow(t1, 0.85))
-		box(Vector3(wd, height / steps * 1.4, wd),
-			Vector3(base_center.x, base_center.y + height * t1 - height / steps * 0.5, base_center.z), s)
+		# centre each step so its TOP lands on the nominal profile; otherwise the
+		# stack overshoots the height it claims and the elevation under-reports.
+		var step_h: float = height / steps * 1.4
+		box(Vector3(wd, step_h, wd),
+			Vector3(base_center.x, base_center.y + height * t1 - step_h / 2.0,
+				base_center.z), s)
 
 func pinnacle(pos: Vector3) -> void:
 	box(Vector3(0.35, 1.2, 0.35), pos + Vector3(0, 0.6, 0), SURF_STONE)

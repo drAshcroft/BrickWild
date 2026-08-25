@@ -13,6 +13,7 @@ scenes/          .tscn scenes. studio.tscn is the main scene.
 src/
   church/        LIVE feature. spec -> generator -> builder.
     church_spec.gd        data model (seed + locked dims -> ~28 derived fields)
+    church_geometry.gd    WHERE EVERY MASS SITS -- shared by builder and view
     church_generator.gd   seed -> fills the spec
     church_builder.gd     spec -> ArrayMesh (4 surfaces: stone/trim/roof/openings)
   ui/
@@ -37,13 +38,29 @@ sidecar or Godot will mint a new UID and break scene bindings.
 ## Running the tests
 
 ```sh
-godot --headless --script res://tests/church_test.gd        # 60 variants: invariants + determinism
-godot --headless --script res://tests/blueprint_qa_test.gd  # 60 variants through BlueprintQA
-godot --headless --script res://tests/massing_test.gd        # 60 variants: structural correctness
-godot --headless --script res://tests/smoke_test.gd         # 200 building specs (legacy stack)
+godot --headless --script res://tests/run_all.gd              # everything, in order
+godot --headless --script res://tests/run_all.gd -- massing   # one suite
 ```
 
-Each exits nonzero on failure.
+Suites run cheapest-and-most-fundamental first, so a broken contract is
+reported before a slow voxel sweep can bury it. Each assumes the ones above it
+hold:
+
+| # | suite       | asserts                                                |
+|---|-------------|--------------------------------------------------------|
+| 1 | `church`    | inputs survive generation; `build()` is pure and deterministic |
+| 2 | `massing`   | no gaps, no undesigned overlap, sizes match the spec    |
+| 3 | `blueprint` | the drawing agrees with the model                      |
+| 4 | `legacy`    | the superseded house stack still stands                |
+| 5 | `voxelqa`   | rasterized geometric checks (slowest)                  |
+
+The runner exits nonzero if any suite fails. Suite bodies live in
+`tests/suites/` as libraries; `tests/<name>_test.gd` are thin wrappers that run
+one suite each, so both entry points share one implementation.
+
+All suites iterate `TestSweep` -- the same 4 styles x 15 sizes with fixed
+seeds -- so a seed named in one suite's output is the same building in every
+other suite's output.
 
 ## Note on `src/building/`
 
