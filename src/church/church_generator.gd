@@ -76,11 +76,91 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 			spec.roof_color = Color("8a5a40").lerp(Color("6f4436"), r.randf_range(0.0, 1.0))
 	spec.trim_color = spec.stone_color.lightened(0.15)
 
+	# ---- landmark features (docs/LANDMARKS.md) ----
+	# West front: a single tower, or the twin towers of Notre-Dame and Cologne.
+	if spec.tower:
+		spec.west_towers = 2 if _chance(r, s.get("twin_towers", 0.0)) else 1
+		if spec.west_towers == 2:
+			spec.tower_width = minf(spec.tower_width,
+				ChurchGeometry.max_twin_tower_width(spec))
+	else:
+		spec.west_towers = 0
+
+	# Flying buttresses need an aisle roof to spring over.
+	spec.flying_buttresses = _chance(r, s.get("flying", 0.0)) and spec.aisles > 0
+	spec.flyer_tiers = 2 if spec.flying_buttresses and _chance(r, 0.4) else 1
+	if spec.flying_buttresses:
+		spec.buttresses = true   # every flyer needs its pier
+
+	spec.crossing_tower = spec.transept and _chance(r, s.get("crossing_tower", 0.0))
+	spec.crossing_tower_height = 0.0
+	if spec.crossing_tower:
+		spec.crossing_tower_height = spec.height * r.randf_range(1.35, 1.9)
+
+	spec.dome = _chance(r, s.get("dome", 0.0))
+	var shapes: Array = s.get("dome_shapes", [])
+	if spec.dome and shapes.is_empty():
+		spec.dome = false
+	if spec.dome:
+		spec.dome_shape = _pick(r, shapes)
+		spec.dome_radius = spec.width * r.randf_range(0.40, 0.48)
+		spec.dome_drum_height = (spec.dome_radius
+			* ChurchGeometry.DOME_DRUM_RATIO * r.randf_range(0.8, 1.3))
+		spec.dome_lantern = _chance(r, s.get("lantern", 0.25))
+		spec.half_domes = _chance(r, s.get("half_domes", 0.0))
+		spec.exedrae = spec.half_domes and _chance(r, 0.6)
+		# a dome over the crossing replaces a tower there
+		spec.crossing_tower = false
+		spec.crossing_tower_height = 0.0
+	else:
+		spec.dome_shape = &""
+		spec.dome_radius = 0.0
+		spec.dome_drum_height = 0.0
+
+	spec.ambulatory = spec.apse and _chance(r, s.get("ambulatory", 0.0))
+	spec.chapel_arrangement = s.get("chapel_arrangement", &"chevet")
+	# A chevet fans off the apse and so needs one; a cluster rings the central
+	# mass and stands on its own.
+	var can_host: bool = spec.apse or spec.chapel_arrangement == &"cluster"
+	spec.radiating_chapels = _pick(r, s.get("chapels", [0])) if can_host else 0
+	spec.chapel_radius = 0.0
+	if spec.radiating_chapels > 0:
+		var base_r: float = spec.apse_radius if spec.apse else spec.width * 0.5
+		spec.chapel_radius = base_r * r.randf_range(0.30, 0.42)
+		_fit_chapels(spec)
+	spec.narthex = _chance(r, s.get("narthex", 0.0))
+
 	spec.corner_turrets = spec.style == &"gothic" and _chance(r, 0.5)
 	spec.string_course = _chance(r, 0.7)
 
 	spec.variant_name = "%s %s%s" % [
 		_pick(r, FIRST_WORDS).trim_suffix("."), _pick(r, SECOND_WORDS), _pick(r, SUFFIXES)]
+
+## Settle chapel size and count so the alcoves fit their hemicycle and leave
+## each other clear.
+##
+## The two constraints chase each other: a chapel's usable fan angle depends on
+## its radius, and the radius that keeps neighbours apart depends on the fan.
+## Shrinking the radius widens the fan, so iterating converges. If the ring
+## still cannot be made to work, drop chapels until it can -- five alcoves that
+## fit read better than seven that collide.
+static func _fit_chapels(spec: ChurchSpec) -> void:
+	while spec.radiating_chapels > 0:
+		var r: float = spec.chapel_radius
+		for _pass in range(5):
+			r = minf(r, ChurchGeometry.chapel_reach(spec) * 0.42)
+			spec.chapel_radius = r
+			r = minf(r, ChurchGeometry.max_chapel_radius(spec, spec.radiating_chapels))
+		spec.chapel_radius = r
+		if r >= 0.5:
+			break
+		spec.radiating_chapels -= 2 if spec.radiating_chapels > 2 else 1
+	if spec.radiating_chapels <= 0:
+		spec.radiating_chapels = 0
+		spec.chapel_radius = 0.0
+	elif ChurchGeometry.chapel_max_angle(spec) <= 0.01 and spec.radiating_chapels > 1:
+		spec.radiating_chapels = 1
+
 
 static func _chance(r: RandomNumberGenerator, p) -> bool:
 	return r.randf() < float(p)

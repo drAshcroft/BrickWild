@@ -18,7 +18,7 @@ const TOWER_EMBED := ChurchGeometry.TOWER_EMBED
 const APSE_EMBED := ChurchGeometry.APSE_EMBED
 
 var spec: ChurchSpec
-var _sts: Array = []
+var _kit: MeshKit
 var total_height := 0.0
 ## QA log: one entry per primitive placed during build().
 ## {kind:"box", pos:Vector3, size:Vector3, rot_y:float, tag:String}
@@ -38,7 +38,6 @@ func _log_part(kind: String, pos: Vector3, size := Vector3.ZERO, rot_y := 0.0) -
 func _log_mass(mass_name: String, aabb: AABB) -> void:
 	mass_log.append({"name": mass_name, "aabb": aabb.abs()})
 
-
 ## Tag subsequent parts (e.g. "nave", "transept", "tower") for diagnostics.
 func tag(t: String) -> void:
 	_tag = t
@@ -47,11 +46,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	spec = p_spec
 	part_log.clear()
 	mass_log.clear()
-	_sts.clear()
-	for i in range(4):
-		var s := SurfaceTool.new()
-		s.begin(Mesh.PRIMITIVE_TRIANGLES)
-		_sts.append(s)
+	_kit = MeshKit.new(4)
 
 	var w: float = spec.width
 	var l: float = spec.length
@@ -77,19 +72,22 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		var az0: float = zr.x
 		var al: float = zr.y - zr.x
 		var az: float = (zr.x + zr.y) / 2.0
-		if true:
+		# One pair of aisles per ring: single for most, double for Notre-Dame,
+		# and the outer pair of Cologne's five-aisled section.
+		for ring in range(spec.aisles):
+			var ah: float = ChurchGeometry.aisle_height(spec, ring)
 			for side_v in [-1.0, 1.0]:
 				var side: float = side_v
-				var ax: float = ChurchGeometry.aisle_center_x(spec, side)
-				box(Vector3(aw, h * 0.55, al), Vector3(ax, h * 0.275, az), SURF_STONE)
-				_log_mass("aisle_%s" % ("left" if side < 0.0 else "right"),
-					ChurchGeometry.aisle_aabb(spec, side))
-				_lean_roof(aw + 0.6, al + 0.4, h * 0.55, h * 0.55 + aw * 0.8, side, SURF_ROOF, az)
+				var ax: float = ChurchGeometry.aisle_center_x(spec, side, ring)
+				box(Vector3(aw, ah, al), Vector3(ax, ah / 2.0, az), SURF_STONE)
+				_log_mass("aisle_%s_%d" % ["left" if side < 0.0 else "right", ring],
+					ChurchGeometry.aisle_aabb(spec, side, ring))
+				_lean_roof(aw + 0.6, al + 0.4, ah, ah + aw * 0.8, side, SURF_ROOF, az)
 				var nwin: int = int(al / 3.0)
 				for i in range(nwin):
 					var wz: float = az0 + al / float(nwin + 1) * (i + 1)
-					window(Vector3(ax + side * (aw / 2.0 + 0.02), h * 0.28, wz), 0.0,
-						0.7, h * 0.18, spec.window_style)
+					window(Vector3(ax + side * (aw / 2.0 + 0.02), ah * 0.5, wz), 0.0,
+						0.7, ah * 0.33, spec.window_style)
 		if spec.clerestory and spec.aisles > 0:
 			var ncl: int = int(al / 3.5)
 			for i in range(ncl):
@@ -143,36 +141,43 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 
 	# ---------- west tower ----------
 	tag("tower")
-	if spec.tower:
+	for side_v in ChurchGeometry.west_tower_sides(spec):
+		var side: float = side_v
 		var tw: float = spec.tower_width
 		var th: float = spec.tower_height
-		# Tower abuts the west wall: only EMBED m penetrates the nave so the
-		# mass reads as joined, not swallowed. Front (east) face at -l/2+EMBED.
+		# Towers abut the west wall: only EMBED m penetrates the nave so the
+		# mass reads as joined, not swallowed. A pair flanks the nave axis.
 		var lz: float = ChurchGeometry.tower_center_z(spec)
-		box(Vector3(tw, th, tw), Vector3(0, th / 2.0, lz), SURF_STONE)
-		_log_mass("tower", ChurchGeometry.tower_aabb(spec))
+		var lx: float = ChurchGeometry.tower_center_x(spec, side)
+		var mass_name: String = "tower"
+		if spec.west_towers >= 2:
+			mass_name = "tower_%s" % ("left" if side < 0.0 else "right")
+		box(Vector3(tw, th, tw), Vector3(lx, th / 2.0, lz), SURF_STONE)
+		_log_mass(mass_name, ChurchGeometry.tower_aabb(spec, side))
 		total_height = maxf(total_height, th)
 		for side_i in range(4):
 			var ang: float = PI / 2.0 * side_i
 			var off := Vector3(sin(ang) * (tw / 2.0 + 0.02), 0, cos(ang) * (tw / 2.0 + 0.02))
-			window(Vector3(off.x, th - tw * 0.28, lz + off.z), ang,
+			window(Vector3(lx + off.x, th - tw * 0.28, lz + off.z), ang,
 				tw * 0.32, tw * 0.26, &"square")
+		var rise: float = ChurchGeometry.tower_roof_rise(spec)
 		match spec.tower_roof:
 			&"spire":
-				_pyramid_roof(Vector3(0, th, lz), tw + 0.5, tw * spec.spire_pitch * 2.2, SURF_ROOF, true)
-				total_height = maxf(total_height, th + tw * spec.spire_pitch * 2.2)
-				pinnacle(Vector3(0, th + tw * spec.spire_pitch * 2.2, lz))
+				var sp: float = tw * spec.spire_pitch * ChurchGeometry.SPIRE_RISE_FACTOR
+				_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, sp, SURF_ROOF, true)
+				pinnacle(Vector3(lx, th + sp, lz))
 			&"pyramid":
-				_pyramid_roof(Vector3(0, th, lz), tw + 0.5, tw * 0.75, SURF_ROOF, false)
-				total_height = maxf(total_height, th + tw * 0.75)
+				_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, rise, SURF_ROOF, false)
 			&"belfry":
-				_pyramid_roof(Vector3(0, th, lz), tw + 0.5, tw * 0.4, SURF_ROOF, false)
+				_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, rise, SURF_ROOF, false)
 				for cx_v in [-1.0, 1.0]:
 					for cz_v in [-1.0, 1.0]:
 						box(Vector3(0.22, tw * 0.35, 0.22),
-							Vector3(cx_v * (tw / 2.0 - 0.15), th + tw * 0.17, lz + cz_v * (tw / 2.0 - 0.15)), SURF_STONE)
+							Vector3(lx + cx_v * (tw / 2.0 - 0.15), th + tw * 0.17,
+								lz + cz_v * (tw / 2.0 - 0.15)), SURF_STONE)
 			_:
-				box(Vector3(tw + 0.4, 0.3, tw + 0.4), Vector3(0, th + 0.15, lz), SURF_TRIM)
+				box(Vector3(tw + 0.4, 0.3, tw + 0.4), Vector3(lx, th + 0.15, lz), SURF_TRIM)
+		total_height = maxf(total_height, th + rise)
 
 	# ---------- buttresses ----------
 	tag("buttress")
@@ -245,174 +250,243 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	if spec.rose_window:
 		rose(Vector3(0, h * 0.68, l / 2.0 + 0.02))
 
-	var mesh := ArrayMesh.new()
-	for st_v in _sts:
-		var s2: SurfaceTool = st_v
-		s2.generate_normals()
-		s2.commit(mesh)
-	return mesh
+	_build_narthex()
+	_build_ambulatory_and_chapels()
+	_build_flying_buttresses()
+	_build_crossing_tower()
+	_build_dome()
+
+	return _kit.commit()
+
+
+## Entrance vestibule across the west front.
+func _build_narthex() -> void:
+	if not spec.narthex:
+		return
+	tag("narthex")
+	var a: AABB = ChurchGeometry.narthex_aabb(spec)
+	var c: Vector3 = a.position + a.size / 2.0
+	box(a.size, Vector3(c.x, a.size.y / 2.0, c.z), SURF_STONE)
+	_log_mass("narthex", a)
+	gable_roof(a.size.x + 0.4, a.size.z + 0.3, a.size.x * spec.roof_pitch * 0.5,
+		c.z, SURF_ROOF, a.size.y)
+	window(Vector3(0, a.size.y * 0.42, a.position.z - ChurchGeometry.OPENING_EPS),
+		PI, 1.6, a.size.y * 0.5, spec.window_style, true)
+
+
+## The ambulatory carries the aisle around the apse; radiating chapels are the
+## alcoves that open off it. Chartres has seven, Notre-Dame a full ring.
+func _build_ambulatory_and_chapels() -> void:
+	if not spec.apse and spec.radiating_chapels <= 0:
+		return
+	var cy: float = ChurchGeometry.apse_springing_z(spec)
+	if spec.ambulatory and spec.apse:
+		tag("ambulatory")
+		var ar: float = ChurchGeometry.ambulatory_radius(spec)
+		var ah: float = spec.height * ChurchGeometry.AISLE_HEIGHT_RATIO
+		half_cylinder(ar, ah, Vector2(0, cy), SURF_STONE)
+		_log_mass("ambulatory", ChurchGeometry.ambulatory_aabb(spec))
+		_half_cone_cap(Vector3(0, ah, cy), ar + ChurchGeometry.APSE_EAVE,
+			ar * 0.55, SURF_ROOF)
+	if spec.radiating_chapels <= 0:
+		return
+	tag("chapel")
+	var chr_r: float = spec.chapel_radius
+	var chh: float = spec.height * 0.42
+	for i in range(spec.radiating_chapels):
+		var c: Vector3 = ChurchGeometry.chapel_center(spec, i)
+		var a: float = ChurchGeometry.chapel_angle(spec, i)
+		# each alcove is a little apse in its own right, facing outward
+		_kit.revolve(PackedVector2Array([Vector2(chr_r, 0.0), Vector2(chr_r, chh)]),
+			Vector3(c.x, 0.0, c.z), SURF_STONE, 8, PI,
+			ChurchGeometry.chapel_arc_start(spec, i))
+		_log_mass("chapel_%d" % i, ChurchGeometry.chapel_aabb(spec, i))
+		_kit.stepped_taper(Vector3(c.x, chh, c.z), chr_r * 2.0 + 0.2, chr_r * 0.6,
+			SURF_ROOF, 3, 0.15, true, 0.0, 0.8)
+		window(Vector3(c.x + sin(a) * (chr_r + ChurchGeometry.OPENING_EPS), chh * 0.45,
+			c.z + cos(a) * (chr_r + ChurchGeometry.OPENING_EPS)), a,
+			0.6, chh * 0.4, spec.window_style)
+
+
+## Flying buttress: an outer pier, an arch springing from it to the clerestory
+## wall, and a pinnacle weighting the pier. The Gothic signature.
+func _build_flying_buttresses() -> void:
+	if not spec.flying_buttresses:
+		return
+	tag("flyer")
+	var pw: float = ChurchGeometry.FLYER_PIER_W
+	var ph: float = ChurchGeometry.flyer_pier_height(spec)
+	var spring: float = ChurchGeometry.flyer_spring_height(spec)
+	var n: int = maxi(spec.buttress_count_per_side, 1)
+	for side_v in [-1.0, 1.0]:
+		var side: float = side_v
+		var px: float = ChurchGeometry.flyer_pier_x(spec, side)
+		var wall_x: float = side * (spec.width / 2.0)
+		for i in range(n):
+			var pz: float = ChurchGeometry.flyer_z(spec, i)
+			box(Vector3(pw, ph, pw), Vector3(px, ph / 2.0, pz), SURF_STONE)
+			_log_mass("flyer_pier_%s_%d" % ["left" if side < 0.0 else "right", i],
+				AABB(Vector3(px - pw / 2.0, 0.0, pz - pw / 2.0), Vector3(pw, ph, pw)))
+			pinnacle(Vector3(px, ph, pz))
+			# one flyer per tier, each springing higher up the nave wall
+			for tier in range(spec.flyer_tiers):
+				# each lower tier drops by a full share of the wall height, so
+				# stacked flyers stay visibly clear of one another
+				var drop: float = tier * spec.height * ChurchGeometry.FLYER_TIER_DROP
+				var from_y: float = ph - drop
+				var to_y: float = spring - drop
+				var bow: float = absf(px - wall_x) * 0.16
+				_kit.arc_ribbon(Vector3(px, from_y, pz), Vector3(wall_x, to_y, pz),
+					bow, 0.34, pw * 0.6, SURF_STONE)
+				# The arch is what ties an otherwise free-standing pier to the
+				# nave, so it counts as a mass: without it the pier reads as
+				# floating, which is exactly what a flyer is meant to avoid.
+				var x0: float = minf(px, wall_x)
+				var y0: float = minf(from_y, to_y) - 0.2
+				var y1: float = maxf(from_y, to_y) + bow + 0.2
+				_log_mass("flyer_arch_%s_%d_%d"
+					% ["left" if side < 0.0 else "right", i, tier],
+					AABB(Vector3(x0, y0, pz - pw * 0.3),
+						Vector3(absf(px - wall_x), y1 - y0, pw * 0.6)))
+
+
+## A lantern tower over the crossing: the silhouette of Durham and Salisbury.
+func _build_crossing_tower() -> void:
+	if not spec.crossing_tower:
+		return
+	tag("crossing_tower")
+	var a: AABB = ChurchGeometry.crossing_tower_aabb(spec)
+	var side: float = a.size.x
+	var cz: float = ChurchGeometry.crossing_center_z(spec)
+	var th: float = spec.crossing_tower_height
+	# the tower stands on the crossing BAY, so its plan is span x depth --
+	# emitting a square here made the mesh overhang its own logged mass
+	box(Vector3(side, th, a.size.z), Vector3(0, th / 2.0, cz), SURF_STONE)
+	_log_mass("crossing_tower", a)
+	total_height = maxf(total_height, th)
+	for face in range(4):
+		var ang: float = PI / 2.0 * face
+		window(Vector3(sin(ang) * (side / 2.0 + ChurchGeometry.OPENING_EPS),
+			th - side * 0.22,
+			cz + cos(ang) * (a.size.z / 2.0 + ChurchGeometry.OPENING_EPS)),
+			ang, side * 0.22, side * 0.3, spec.window_style)
+	var bay: float = a.size.z
+	_kit.hip_roof(side + 0.4, bay + 0.4, side * 0.42, cz, SURF_ROOF, th)
+	for cx_v in [-1.0, 1.0]:
+		for cz_v in [-1.0, 1.0]:
+			pinnacle(Vector3(cx_v * (side / 2.0 - 0.4), th, cz + cz_v * (bay / 2.0 - 0.4)))
+
+
+## Dome on a drum over the crossing. Hemispherical (Hagia Sophia), onion
+## (St Basil), or carried on an octagonal drum (Florence).
+func _build_dome() -> void:
+	if not spec.dome or spec.dome_radius <= 0.0:
+		return
+	tag("dome")
+	var r: float = spec.dome_radius
+	var cz: float = ChurchGeometry.crossing_center_z(spec)
+	var base: float = ChurchGeometry.dome_base_height(spec)
+	var drum_h: float = spec.dome_drum_height
+	var octagonal: bool = spec.dome_shape == &"octagonal"
+
+	# pendentives: the square-to-round transition the drum sits on
+	box(Vector3(r * 2.0 + 0.6, ChurchGeometry.PENDENTIVE_H, r * 2.0 + 0.6),
+		Vector3(0, base + ChurchGeometry.PENDENTIVE_H / 2.0, cz), SURF_TRIM)
+	_log_mass("pendentive", ChurchGeometry.pendentive_aabb(spec))
+	if octagonal:
+		_kit.prism(r * 1.06, drum_h, 8,
+			Vector3(0, base + ChurchGeometry.PENDENTIVE_H, cz), SURF_STONE, PI / 8.0)
+	else:
+		_kit.prism(r, drum_h, 16, Vector3(0, base + ChurchGeometry.PENDENTIVE_H, cz), SURF_STONE)
+	_log_mass("dome_drum", ChurchGeometry.dome_drum_aabb(spec))
+
+	# the corona of windows that lights every one of these domes
+	var lights: int = 8 if octagonal else 12
+	for i in range(lights):
+		var a: float = TAU / lights * i
+		window(Vector3(sin(a) * (r + ChurchGeometry.OPENING_EPS), base + drum_h * 0.55,
+			cz + cos(a) * (r + ChurchGeometry.OPENING_EPS)), a,
+			r * 0.16, drum_h * 0.45, &"round")
+
+	var top: float = base + ChurchGeometry.PENDENTIVE_H + drum_h
+	var rise: float = ChurchGeometry.dome_shell_rise(spec)
+	var segs: int = 8 if octagonal else 16
+	_kit.revolve(_dome_profile(r, rise), Vector3(0, top, cz), SURF_ROOF, segs,
+		TAU, PI / 8.0 if octagonal else 0.0)
+	total_height = maxf(total_height, top + rise)
+
+	if spec.dome_lantern:
+		var lh: float = r * ChurchGeometry.LANTERN_RATIO
+		_kit.prism(r * 0.16, lh, 8, Vector3(0, top + rise, cz), SURF_STONE)
+		_kit.stepped_taper(Vector3(0, top + rise + lh, cz), r * 0.34,
+			r * ChurchGeometry.LANTERN_CAP_RATIO, SURF_ROOF, 3, 0.1)
+		total_height = maxf(total_height, top + rise + lh)
+
+	# Hagia Sophia braces its dome with half-domes east and west, themselves
+	# carried on smaller semi-domed exedrae.
+	if spec.half_domes:
+		var hr: float = ChurchGeometry.half_dome_radius(spec)
+		for dir_v in [-1.0, 1.0]:
+			var d: float = dir_v
+			var start: float = 0.0 if d > 0.0 else PI
+			_kit.revolve(_dome_profile(hr, hr * 0.85), Vector3(0, base, cz),
+				SURF_ROOF, 10, PI, start)
+			if spec.exedrae:
+				for ex_v in [-1.0, 1.0]:
+					var er: float = hr * 0.4
+					var ec := Vector3(ex_v * hr * 0.5, base * 0.55, cz + d * hr * 0.62)
+					_kit.revolve(PackedVector2Array([Vector2(er, 0.0),
+						Vector2(er, base * 0.3)]), ec, SURF_STONE, 8, PI, start)
+					_kit.revolve(_dome_profile(er, er * 0.8),
+						ec + Vector3(0, base * 0.3, 0), SURF_ROOF, 8, PI, start)
+
+
+## Profile of a dome shell, bottom to top: hemispherical, or the ogee curve
+## that gives an onion dome its shoulder and point.
+func _dome_profile(radius: float, rise: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	if spec.dome_shape == &"onion":
+		# bulges past the springing radius, then draws in to a point
+		var ogee := [Vector2(1.0, 0.0), Vector2(1.14, 0.24), Vector2(1.05, 0.46),
+			Vector2(0.78, 0.68), Vector2(0.42, 0.86), Vector2(0.0, 1.0)]
+		for v in ogee:
+			pts.append(Vector2(radius * v.x, rise * v.y))
+		return pts
+	var steps: int = 6
+	for i in range(steps + 1):
+		var t: float = float(i) / steps
+		pts.append(Vector2(radius * cos(t * PI / 2.0), rise * sin(t * PI / 2.0)))
+	return pts
 
 # ---------------------------------------------------------------- primitives
 
-func box(size: Vector3, pos: Vector3, s: int, rot_y := 0.0) -> void:
+## Structural box. Logged for QA, then handed to the shared kit.
+func box(size: Vector3, pos: Vector3, s: int, rot_y := 0.0, shear := 0.0) -> void:
 	_log_part("box", pos, size, rot_y)
-	var hx: float = size.x / 2.0
-	var hy: float = size.y / 2.0
-	var hz: float = size.z / 2.0
-	var local := [
-		Vector3(-hx, -hy, -hz), Vector3(hx, -hy, -hz), Vector3(hx, hy, -hz), Vector3(-hx, hy, -hz),
-		Vector3(hx, -hy, hz), Vector3(-hx, -hy, hz), Vector3(-hx, hy, hz), Vector3(hx, hy, hz),
-	]
-	var basis := Basis(Vector3.UP, rot_y)
-	var pts: Array = []
-	for c in local:
-		pts.append(pos + basis * c)
-	var quads := [
-		[0, 1, 2, 3], [4, 5, 6, 7],
-		[1, 4, 7, 2], [5, 0, 3, 6],
-		[3, 2, 7, 6], [0, 5, 4, 1],
-	]
-	var normals := [
-		Vector3(0, 0, -1), Vector3(0, 0, 1),
-		Vector3(1, 0, 0), Vector3(-1, 0, 0),
-		Vector3(0, 1, 0), Vector3(0, -1, 0),
-	]
-	var uv3 := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1)]
-	var st: SurfaceTool = _sts[s]
-	for qi in range(quads.size()):
-		var q: Array = quads[qi]
-		for tri in [[q[0], q[1], q[2]], [q[0], q[2], q[3]]]:
-			for vi in range(3):
-				st.set_normal(normals[qi])
-				st.set_uv(uv3[vi])
-				st.add_vertex(pts[tri[vi]])
+	_kit.box(size, pos, s, rot_y, shear)
 
-## Gable roof running along Z, centered at x=0.
-## Gable roof capping a wall whose top is at y_base.
+## Gable capping a wall whose top is at y_base.
 func gable_roof(span_x: float, along_z: float, rise: float, z_center: float, s: int,
 		y_base := 0.0) -> void:
-	var half_span: float = span_x / 2.0
-	for side_v in [-1.0, 1.0]:
-		_slab(along_z, rise, half_span, side_v, z_center, s, y_base)
-	box(Vector3(0.35, 0.25, along_z + 0.2), Vector3(0, y_base + rise + 0.1, z_center), s)
+	_kit.gable_roof(span_x, along_z, rise, z_center, s, y_base)
 
-## One sloped roof slab from eave (x=+/-half_span, y=y_base) to ridge
-## (x=0, y=y_base+rise). y_base is the wall top this roof sits on.
-func _slab(along: float, rise: float, half_span: float, side: float, zc: float,
-		s: int, y_base := 0.0) -> void:
-	var slope_len: float = sqrt(half_span * half_span + rise * rise)
-	var ang: float = atan2(rise, half_span)
-	var mid_x: float = side * half_span / 2.0
-	var t := Transform3D(Basis(Vector3(0, 0, 1), -side * ang),
-		Vector3(mid_x, y_base + rise / 2.0, zc))
-	var corners := [
-		Vector3(-slope_len / 2.0, -0.12, -along / 2.0), Vector3(slope_len / 2.0, -0.12, -along / 2.0),
-		Vector3(slope_len / 2.0, 0.12, -along / 2.0), Vector3(-slope_len / 2.0, 0.12, -along / 2.0),
-		Vector3(-slope_len / 2.0, -0.12, along / 2.0), Vector3(slope_len / 2.0, -0.12, along / 2.0),
-		Vector3(slope_len / 2.0, 0.12, along / 2.0), Vector3(-slope_len / 2.0, 0.12, along / 2.0),
-	]
-	var pts: Array = []
-	for c in corners:
-		pts.append(t * c)
-	# outward normal of the top face: perpendicular to slope, pointing away from ridge
-	var n_top := Vector3(cos(ang) * side, sin(ang), 0)
-	var quads := [[0, 1, 2, 3], [4, 5, 6, 7], [1, 5, 6, 2], [0, 4, 7, 3], [3, 2, 6, 7], [0, 1, 5, 4]]
-	var normals := [Vector3(0, 0, -1), Vector3(0, 0, 1), n_top, -n_top, Vector3(0, 1, 0), Vector3(0, -1, 0)]
-	var uv3 := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1)]
-	var st: SurfaceTool = _sts[s]
-	for qi in range(quads.size()):
-		var q: Array = quads[qi]
-		for tri in [[q[0], q[1], q[2]], [q[0], q[2], q[3]]]:
-			for vi in range(3):
-				st.set_normal(normals[qi])
-				st.set_uv(uv3[vi])
-				st.add_vertex(pts[tri[vi]])
+## Lean-to aisle roof, outer eave at y_base up to y_top against the nave wall.
+func _lean_roof(span: float, along: float, y_base: float, y_top: float, side: float,
+		s: int, zc := 0.0) -> void:
+	_kit.lean_roof(span, along, y_base, y_top, side, s, zc)
 
-## Lean-to aisle roof from y_base (outer eave) up to y_top (against nave wall).
-func _lean_roof(span: float, along: float, y_base: float, y_top: float, side: float, s: int,
-		z_center := 0.0) -> void:
-	var rise: float = y_top - y_base
-	var slope_len: float = sqrt(span * span + rise * rise)
-	var ang: float = atan2(rise, span)
-	var t := Transform3D(Basis(Vector3(0, 0, 1), -side * ang),
-		Vector3(side * (span / 2.0 - 0.15), (y_base + y_top) / 2.0, z_center))
-	var corners := [
-		Vector3(-slope_len / 2.0, -0.1, -along / 2.0), Vector3(slope_len / 2.0, -0.1, -along / 2.0),
-		Vector3(slope_len / 2.0, 0.1, -along / 2.0), Vector3(-slope_len / 2.0, 0.1, -along / 2.0),
-		Vector3(-slope_len / 2.0, -0.1, along / 2.0), Vector3(slope_len / 2.0, -0.1, along / 2.0),
-		Vector3(slope_len / 2.0, 0.1, along / 2.0), Vector3(-slope_len / 2.0, 0.1, along / 2.0),
-	]
-	var pts: Array = []
-	for c in corners:
-		pts.append(t * c)
-	var n_top := Vector3(cos(ang) * side, sin(ang), 0)
-	var quads := [[0, 1, 2, 3], [4, 5, 6, 7], [1, 5, 6, 2], [0, 4, 7, 3]]
-	var normals := [Vector3(0, 0, -1), Vector3(0, 0, 1), n_top, -n_top]
-	var uv3 := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1)]
-	var st: SurfaceTool = _sts[s]
-	for qi in range(quads.size()):
-		var q: Array = quads[qi]
-		for tri in [[q[0], q[1], q[2]], [q[0], q[2], q[3]]]:
-			for vi in range(3):
-				st.set_normal(normals[qi])
-				st.set_uv(uv3[vi])
-				st.add_vertex(pts[tri[vi]])
-
-## Half-cylinder apse bulging toward +Z around center (x, z).
+## Apse drum: flat face at center.y (model Z), bulging to center.y + radius.
 func half_cylinder(radius: float, height: float, center: Vector2, s: int) -> void:
-	var segs: int = 10
-	var st: SurfaceTool = _sts[s]
-	var prev := Vector3(center.x, 0, center.y + radius)
-	var prev_n := Vector3(0, 0, 1)
-	for i in range(1, segs + 1):
-		var a: float = PI - PI / segs * i
-		var p := Vector3(center.x + cos(a) * radius, 0, center.y + sin(a) * radius)
-		var n := Vector3(cos(a), 0, sin(a))
-		_quad_wall(prev, p, prev_n, n, height, st)
-		prev = p
-		prev_n = n
-	for i in range(segs):
-		var a0: float = PI - PI / segs * i
-		var a1: float = PI - PI / segs * (i + 1)
-		var p0 := Vector3(center.x + cos(a0) * radius, height, center.y + sin(a0) * radius)
-		var p1 := Vector3(center.x + cos(a1) * radius, height, center.y + sin(a1) * radius)
-		st.set_normal(Vector3.UP); st.set_uv(Vector2(0, 0)); st.add_vertex(p0)
-		st.set_normal(Vector3.UP); st.set_uv(Vector2(1, 0)); st.add_vertex(p1)
-		st.set_normal(Vector3.UP); st.set_uv(Vector2(1, 1)); st.add_vertex(Vector3(center.x, height, center.y))
+	_kit.half_cylinder(radius, height, center, s)
 
-func _quad_wall(p0: Vector3, p1: Vector3, n0: Vector3, n1: Vector3, height: float, st: SurfaceTool) -> void:
-	var t0: Vector3 = p0 + Vector3(0, height, 0)
-	var t1: Vector3 = p1 + Vector3(0, height, 0)
-	st.set_normal(n0); st.set_uv(Vector2(0, 0)); st.add_vertex(p0)
-	st.set_normal(n1); st.set_uv(Vector2(1, 0)); st.add_vertex(p1)
-	st.set_normal(n1); st.set_uv(Vector2(1, 1)); st.add_vertex(t1)
-	st.set_normal(n0); st.set_uv(Vector2(0, 0)); st.add_vertex(p0)
-	st.set_normal(n1); st.set_uv(Vector2(1, 1)); st.add_vertex(t1)
-	st.set_normal(n0); st.set_uv(Vector2(0, 1)); st.add_vertex(t0)
-
-## Conical cap over a HALF cylinder: each step spans z in [pos.z, pos.z + rad]
-## so the roof covers the drum's bulge and nothing west of its flat face.
+## Conical cap over a HALF cylinder: covers z in [pos.z, pos.z + radius] only,
+## so nothing overhangs the void west of the drum's flat face.
 func _half_cone_cap(pos: Vector3, radius: float, height: float, s: int) -> void:
-	var steps: int = 4
-	for i in range(steps):
-		var t1: float = float(i + 1) / steps
-		var rad: float = lerpf(radius, 0.15, pow(t1, 0.8))
-		var step_h: float = height / steps * 1.5
-		box(Vector3(rad * 2.0, step_h, rad),
-			Vector3(pos.x, pos.y + height * t1 - step_h / 2.0, pos.z + rad / 2.0), s)
+	_kit.stepped_taper(pos, radius * 2.0, height, s, 4, 0.15, true, 0.0, 0.8)
 
-
-func _pyramid_roof(base_center: Vector3, width: float, height: float, s: int, tall := false) -> void:
-	var steps: int = 5 if tall else 3
-	for i in range(steps):
-		var t1: float = float(i + 1) / steps
-		var wd: float = lerpf(width, 0.2, pow(t1, 0.85))
-		# centre each step so its TOP lands on the nominal profile; otherwise the
-		# stack overshoots the height it claims and the elevation under-reports.
-		var step_h: float = height / steps * 1.4
-		box(Vector3(wd, step_h, wd),
-			Vector3(base_center.x, base_center.y + height * t1 - step_h / 2.0,
-				base_center.z), s)
+func _pyramid_roof(base_center: Vector3, width: float, height: float, s: int,
+		tall := false) -> void:
+	_kit.stepped_taper(base_center, width, height, s, 5 if tall else 3, 0.2)
 
 func pinnacle(pos: Vector3) -> void:
 	box(Vector3(0.35, 1.2, 0.35), pos + Vector3(0, 0.6, 0), SURF_STONE)
@@ -426,8 +500,8 @@ func window(pos: Vector3, face: float, w: float, h: float, style: StringName, do
 	_log_part("window", pos)
 	var depth: float = 0.16 if door else 0.1
 	var t := Transform3D(Basis(Vector3.UP, face), pos)
-	var st: SurfaceTool = _sts[SURF_OPEN]
-	_push_poly_box(st, t, Vector3(w, h, depth))
+	var st: SurfaceTool = _kit.surface(SURF_OPEN)
+	_kit.oriented_box(Vector3(w, h, depth), t, SURF_OPEN)
 	if style == &"pointed":
 		var apex := Vector3(0, h * 0.35, 0)
 		var bl := Vector3(-w / 2.0, h / 2.0, 0)
@@ -451,14 +525,17 @@ func window(pos: Vector3, face: float, w: float, h: float, style: StringName, do
 				st.add_vertex(t * p)
 	if not door:
 		var ft: float = 0.12
-		_push_poly_box(st, t, Vector3(w + ft * 2, ft, depth + 0.04), Vector3(0, h / 2.0 + ft / 2.0, 0))
-		_push_poly_box(st, t, Vector3(ft, h, depth + 0.04), Vector3(-w / 2.0 - ft / 2.0, 0, 0))
-		_push_poly_box(st, t, Vector3(ft, h, depth + 0.04), Vector3(w / 2.0 + ft / 2.0, 0, 0))
+		_kit.oriented_box(Vector3(w + ft * 2, ft, depth + 0.04),
+			t.translated_local(Vector3(0, h / 2.0 + ft / 2.0, 0)), SURF_OPEN)
+		_kit.oriented_box(Vector3(ft, h, depth + 0.04),
+			t.translated_local(Vector3(-w / 2.0 - ft / 2.0, 0, 0)), SURF_OPEN)
+		_kit.oriented_box(Vector3(ft, h, depth + 0.04),
+			t.translated_local(Vector3(w / 2.0 + ft / 2.0, 0, 0)), SURF_OPEN)
 
 func rose(pos: Vector3) -> void:
 	_log_part("window", pos)
 	var t := Transform3D(Basis(), pos)
-	var st: SurfaceTool = _sts[SURF_OPEN]
+	var st: SurfaceTool = _kit.surface(SURF_OPEN)
 	var rr: float = minf(spec.width * 0.18, 1.6)
 	var seg: int = 12
 	for i in range(seg):
@@ -471,38 +548,11 @@ func rose(pos: Vector3) -> void:
 			st.set_normal(Vector3(0, 0, 1))
 			st.set_uv(Vector2(0.5, 0.5))
 			st.add_vertex(t * p)
-	var tt: SurfaceTool = _sts[SURF_TRIM]
+	# tracery spokes. These previously pushed 8 raw box corners straight into a
+	# triangle list -- not a multiple of 3, so the spokes were malformed.
 	for i in range(seg):
 		var a: float = TAU / seg * i
 		var bx: Transform3D = t * Transform3D(Basis(Vector3(0, 0, 1), a),
 			Vector3(cos(a) * rr * 0.5, sin(a) * rr * 0.5, -0.03))
-		var cs := _corners_of(Vector3(rr * 0.55, 0.09, 0.08))
-		for c in cs:
-			tt.set_normal(Vector3(0, 0, 1))
-			tt.set_uv(Vector2(0, 0))
-			tt.add_vertex(bx * c)
+		_kit.oriented_box(Vector3(rr * 0.55, 0.09, 0.08), bx, SURF_TRIM)
 
-func _push_poly_box(st: SurfaceTool, t: Transform3D, size: Vector3, offset := Vector3.ZERO) -> void:
-	var cs := _corners_of(size)
-	var pts: Array = []
-	for c in cs:
-		pts.append(t * (c + offset))
-	var quads := [[0, 1, 2, 3], [4, 5, 6, 7], [1, 4, 7, 2], [5, 0, 3, 6], [3, 2, 7, 6], [0, 5, 4, 1]]
-	var normals := [Vector3(0, 0, -1), Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0, 1, 0), Vector3(0, -1, 0)]
-	var uv3 := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1)]
-	for qi in range(quads.size()):
-		var q: Array = quads[qi]
-		for tri in [[q[0], q[1], q[2]], [q[0], q[2], q[3]]]:
-			for vi in range(3):
-				st.set_normal(t.basis * normals[qi])
-				st.set_uv(uv3[vi])
-				st.add_vertex(pts[tri[vi]])
-
-func _corners_of(size: Vector3) -> Array:
-	var hx: float = size.x / 2.0
-	var hy: float = size.y / 2.0
-	var hz: float = size.z / 2.0
-	return [
-		Vector3(-hx, -hy, -hz), Vector3(hx, -hy, -hz), Vector3(hx, hy, -hz), Vector3(-hx, hy, -hz),
-		Vector3(hx, -hy, hz), Vector3(-hx, -hy, hz), Vector3(-hx, hy, hz), Vector3(hx, hy, hz),
-	]

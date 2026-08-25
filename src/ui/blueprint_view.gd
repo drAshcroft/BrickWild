@@ -57,12 +57,26 @@ func _draw_plan(r: Rect2, ink: Color, light: Color) -> void:
 			a.position.z + a.size.z))
 		return Rect2(tl, br - tl)
 
-	# aisles
+	# aisles: one ring per spec.aisles, each lapping the one inside it
 	if spec.aisles > 0:
 		for side in [-1.0, 1.0]:
-			var ar: Rect2 = plan_rect.call(ChurchGeometry.aisle_aabb(spec, side))
-			draw_rect(ar, Color(0.15, 0.28, 0.43, 0.06), true)
-			draw_rect(ar, light, false, 1.0)
+			for ring in range(spec.aisles):
+				var ar: Rect2 = plan_rect.call(ChurchGeometry.aisle_aabb(spec, side, ring))
+				draw_rect(ar, Color(0.15, 0.28, 0.43, 0.06), true)
+				draw_rect(ar, light, false, 1.0)
+
+	# flying buttresses: piers clear of the aisle wall, with a flyer line to the nave
+	if spec.flying_buttresses:
+		var pier_w: float = ChurchGeometry.FLYER_PIER_W * scale
+		for side in [-1.0, 1.0]:
+			var pier_x: float = ChurchGeometry.flyer_pier_x(spec, side)
+			for i in range(maxi(spec.buttress_count_per_side, 1)):
+				var pier_z: float = ChurchGeometry.flyer_z(spec, i)
+				var pc: Vector2 = to_paper.call(Vector2(pier_x, pier_z))
+				draw_rect(Rect2(pc - Vector2(pier_w, pier_w) / 2.0,
+					Vector2(pier_w, pier_w)), ink, false, 1.2)
+				var wall_pt: Vector2 = to_paper.call(Vector2(side * spec.width / 2.0, pier_z))
+				draw_line(pc, wall_pt, light, 1.0)
 
 	# transept
 	if spec.transept:
@@ -76,14 +90,52 @@ func _draw_plan(r: Rect2, ink: Color, light: Color) -> void:
 		var ac: Vector2 = to_paper.call(Vector2(0, ChurchGeometry.apse_springing_z(spec)))
 		draw_arc(ac, spec.apse_radius * scale, -PI / 2.0, PI / 2.0, 16, ink, 2.0)
 
-	# tower
+	# ambulatory: aisle ring carried around the apse
+	if spec.ambulatory:
+		var amc: Vector2 = to_paper.call(Vector2(0, ChurchGeometry.apse_springing_z(spec)))
+		draw_arc(amc, ChurchGeometry.ambulatory_radius(spec) * scale,
+			-PI / 2.0, PI / 2.0, 20, light, 1.2)
+
+	# radiating chapels: small alcoves off the ambulatory (or the apse itself)
+	for i in range(spec.radiating_chapels):
+		var cc3: Vector3 = ChurchGeometry.chapel_center(spec, i)
+		var cc: Vector2 = to_paper.call(Vector2(cc3.x, cc3.z))
+		draw_arc(cc, spec.chapel_radius * scale, 0.0, TAU, 12, light, 1.0)
+
+	# crossing tower: bold outline, same wall-above mark as the west tower
+	if spec.crossing_tower:
+		var ctr: Rect2 = plan_rect.call(ChurchGeometry.crossing_tower_aabb(spec))
+		draw_rect(ctr, ink, false, 2.0)
+		draw_line(ctr.position, ctr.position + ctr.size, light, 1.0)
+		draw_line(Vector2(ctr.position.x + ctr.size.x, ctr.position.y),
+			Vector2(ctr.position.x, ctr.position.y + ctr.size.y), light, 1.0)
+
+	# dome: circle over the crossing, or an octagon for an octagonal drum
+	if spec.dome:
+		var dc: Vector2 = to_paper.call(Vector2(0, ChurchGeometry.crossing_center_z(spec)))
+		var dr: float = spec.dome_radius * scale
+		if spec.dome_shape == &"octagonal":
+			var pts := PackedVector2Array()
+			for k in range(9):
+				var th: float = TAU * float(k) / 8.0
+				pts.append(dc + Vector2(cos(th), sin(th)) * dr)
+			draw_polyline(pts, ink, 1.6)
+		else:
+			draw_arc(dc, dr, 0.0, TAU, 24, ink, 1.6)
+
+	# west tower(s): one pair for twin facades, one for a single tower
 	if spec.tower:
-		var tr: Rect2 = plan_rect.call(ChurchGeometry.tower_aabb(spec))
-		draw_rect(tr, ink, false, 2.0)
-		# diagonals: conventional mark for walls continuing above
-		draw_line(tr.position, tr.position + tr.size, light, 1.0)
-		draw_line(Vector2(tr.position.x + tr.size.x, tr.position.y),
-			Vector2(tr.position.x, tr.position.y + tr.size.y), light, 1.0)
+		for side in ChurchGeometry.west_tower_sides(spec):
+			var tr: Rect2 = plan_rect.call(ChurchGeometry.tower_aabb(spec, side))
+			draw_rect(tr, ink, false, 2.0)
+			# diagonals: conventional mark for walls continuing above
+			draw_line(tr.position, tr.position + tr.size, light, 1.0)
+			draw_line(Vector2(tr.position.x + tr.size.x, tr.position.y),
+				Vector2(tr.position.x, tr.position.y + tr.size.y), light, 1.0)
+
+	# narthex: vestibule across the west front, drawn light like the transept
+	if spec.narthex:
+		draw_rect(plan_rect.call(ChurchGeometry.narthex_aabb(spec)), light, false, 1.0)
 
 	# door on the west face of whatever stands westmost
 	var dz: float = zext.x
@@ -130,9 +182,11 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 	var z_left: float = zx.call(-spec.length / 2.0)
 	var z_right: float = zx.call(spec.length / 2.0)
 
-	# tower at the west end
-	if spec.tower:
-		var ta: AABB = ChurchGeometry.tower_aabb(spec)
+	# tower at the west end -- twin towers overlap in a south elevation, so
+	# only the westmost of them is drawn here (they share height and roof).
+	var tower_sides: Array[float] = ChurchGeometry.west_tower_sides(spec)
+	if spec.tower and tower_sides.size() > 0:
+		var ta: AABB = ChurchGeometry.tower_aabb(spec, tower_sides[0])
 		var th: float = spec.tower_height
 		var t_l: float = zx.call(ta.position.z)
 		var t_r: float = zx.call(ta.position.z + ta.size.z)
@@ -175,6 +229,44 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 		draw_line(Vector2(a_z0, a_top), Vector2(a_z1, a_top), ink, 1.2)
 		draw_arc(Vector2(a_z0, a_top), a_z1 - a_z0, -PI / 2.0, 0.0, 12, ink, 1.6)
 		draw_line(Vector2(a_z1, a_top), Vector2(a_z1, gy), ink, 1.2)
+
+	# crossing tower: the horizontal axis here is Z, so its width is the
+	# crossing bay's depth, not the nave width.
+	if spec.crossing_tower:
+		var cbd: float = ChurchGeometry.crossing_bay_depth(spec)
+		var ccz: float = ChurchGeometry.crossing_center_z(spec)
+		var c_l: float = zx.call(ccz - cbd / 2.0)
+		var c_r: float = zx.call(ccz + cbd / 2.0)
+		draw_rect(Rect2(Vector2(c_l, up.call(spec.crossing_tower_height)),
+			Vector2(c_r - c_l, spec.crossing_tower_height * scale)), ink, false, 1.6)
+
+	# dome: drum + shell, with a lantern box if the style carries one
+	if spec.dome:
+		var dcz: float = zx.call(ChurchGeometry.crossing_center_z(spec))
+		var dr: float = spec.dome_radius * scale
+		var drum_base: float = ChurchGeometry.dome_base_height(spec)
+		var drum_top: float = drum_base + spec.dome_drum_height
+		draw_rect(Rect2(Vector2(dcz - dr, up.call(drum_top)),
+			Vector2(dr * 2.0, spec.dome_drum_height * scale)), ink, false, 1.6)
+		var shell_rise: float = ChurchGeometry.dome_shell_rise(spec)
+		var shell_top: float = drum_top + shell_rise
+		if spec.dome_shape == &"onion":
+			# bulged ogee: swells past the drum width before pinching to the apex
+			draw_polyline(PackedVector2Array([
+				Vector2(dcz - dr, up.call(drum_top)),
+				Vector2(dcz - dr * 1.18, up.call(drum_top + shell_rise * 0.4)),
+				Vector2(dcz - dr * 0.3, up.call(drum_top + shell_rise * 0.85)),
+				Vector2(dcz, up.call(shell_top)),
+				Vector2(dcz + dr * 0.3, up.call(drum_top + shell_rise * 0.85)),
+				Vector2(dcz + dr * 1.18, up.call(drum_top + shell_rise * 0.4)),
+				Vector2(dcz + dr, up.call(drum_top))]), ink, 1.6)
+		else:
+			draw_arc(Vector2(dcz, up.call(drum_top)), dr, PI, TAU, 16, ink, 1.6)
+		if spec.dome_lantern:
+			var lh: float = spec.dome_radius * ChurchGeometry.LANTERN_RATIO * scale
+			var lw: float = dr * 0.35
+			draw_rect(Rect2(Vector2(dcz - lw / 2.0, up.call(shell_top) - lh),
+				Vector2(lw, lh)), ink, false, 1.4)
 
 	# nave side windows -- drawn only when there is no aisle in front of them,
 	# matching ChurchBuilder, which skips them when aisles are present.

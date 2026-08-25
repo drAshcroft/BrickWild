@@ -11,9 +11,9 @@ extends SceneTree
 ##   1 church     - the spec/build contract itself
 ##   2 massing    - structural correctness of what that contract produced
 ##   3 blueprint  - the drawing agrees with the model
-##   4 legacy     - the superseded house stack still stands
+##   4 landmark   - the famous churches this generator must be able to build
 ##   5 voxelqa    - exhaustive rasterized checks (slow)
-const ORDER: Array[String] = ["church", "massing", "blueprint", "legacy", "voxelqa"]
+const ORDER: Array[String] = ["church", "massing", "blueprint", "landmark", "voxelqa"]
 
 
 static func _run_one(key: String) -> SuiteResult:
@@ -24,8 +24,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return MassingSuite.run()
 		"blueprint":
 			return BlueprintMatchSuite.run()
-		"legacy":
-			return LegacyBuildingSuite.run()
+		"landmark":
+			return LandmarkSuite.run()
 		"voxelqa":
 			return BlueprintQASuite.run()
 	return null

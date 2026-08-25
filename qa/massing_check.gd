@@ -25,28 +25,83 @@ var stats: Dictionary = {}
 ## Designed interpenetration per joint, in metres of penetration depth.
 ## A pair absent from this table is expected NOT to overlap at all.
 ## INF marks a crossing that is meant to pass fully through.
-static func _allowance(a: String, b: String) -> float:
+static func _allowance(spec: ChurchSpec, a: String, b: String) -> float:
 	var key: String = "|".join(PackedStringArray([a, b]) if a < b else PackedStringArray([b, a]))
 	match key:
+		# --- crossings and enclosures: designed to pass through one another ---
 		"nave|transept":
 			return INF                        # the crossing, by definition
+		"crossing_tower|nave", "crossing_tower|transept":
+			return INF                        # a lantern stands ON the crossing
+		"dome_drum|nave", "dome_drum|transept":
+			return INF                        # so does a dome
+		"dome_drum|pendentive", "nave|pendentive", "pendentive|transept":
+			return INF                        # the course the drum is carried on
+		"aisle|pendentive", "apse|pendentive", "chapel|pendentive":
+			return INF
+		"aisle|dome_drum", "apse|dome_drum", "chapel|dome_drum":
+			return INF                        # the dome oversails them
+		"crossing_tower|dome_drum":
+			return INF                        # generator never emits both
+		"flyer_arch|flyer_pier", "flyer_arch|nave", "aisle|flyer_arch":
+			return INF                        # the flyer lands on the wall it braces
+		"flyer_arch|transept", "flyer_pier|transept":
+			return INF                        # the bay next to the crossing
+		"ambulatory|apse":
+			return INF                        # the ambulatory wraps the apse
+		"narthex|tower", "narthex|tower_pair":
+			return INF                        # west towers stand in the narthex bay
+
+		# --- abutments: joined, but only as deep as the joint declares ---
 		"nave|tower":
 			return ChurchGeometry.TOWER_EMBED
 		"apse|nave":
 			return ChurchGeometry.APSE_EMBED
+		"ambulatory|nave", "ambulatory|transept":
+			return ChurchGeometry.APSE_EMBED
+		"narthex|nave":
+			return ChurchGeometry.TOWER_EMBED
 		"aisle|nave":
-			return ChurchGeometry.AISLE_LAP    # aisle wall laps the nave wall
+			return ChurchGeometry.AISLE_LAP
+		"aisle|ambulatory":
+			return ChurchGeometry.APSE_EMBED  # the ambulatory continues the aisle
+		"aisle|aisle":
+			return ChurchGeometry.AISLE_LAP   # each ring laps the one inside it
+		"aisle|narthex":
+			return ChurchGeometry.AISLE_LAP
+		"ambulatory|chapel", "apse|chapel":
+			# An alcove is carved INTO the hemicycle it opens off, and both are
+			# curved, so their axis-aligned boxes overlap far more than the
+			# masonry does. Depth here is meaningless; that the chapel reaches
+			# its host at all is checked by the no-gaps pass.
+			return INF
+
+		# --- everything else in this list must not touch at all ---
 		"aisle|transept", "aisle|tower":
 			return 0.0                        # aisles are placed to clear both
 		"apse|transept":
 			return 0.0                        # apse springs from the east wall
 		"apse|tower", "tower|transept":
 			return 0.0                        # opposite ends of the church
+		"chapel|chapel":
+			return 0.0                        # alcoves must not collide
+		"chapel|nave", "chapel|transept", "aisle|chapel":
+			# A clustered ring is set INTO the central mass, so its boxes
+			# overlap by design. A chevet chapel stands off in the apse and
+			# must not reach the nave at all.
+			return INF if spec.chapel_arrangement == &"cluster" else 0.0
+		"tower|tower":
+			return 0.0                        # twin towers stand clear of each other
 	return 0.0
 
 
+## Masses are named per instance (aisle_left_1, chapel_3, tower_right); the
+## allowance table is keyed by family.
 static func _family(n: String) -> String:
-	return "aisle" if n.begins_with("aisle") else n
+	for prefix in ["aisle", "chapel", "flyer_pier", "flyer_arch", "tower"]:
+		if n.begins_with(prefix):
+			return prefix
+	return n
 
 
 ## Separation between two AABBs: 0 if they touch or overlap, else the gap.
@@ -84,7 +139,7 @@ func check(spec: ChurchSpec, builder: ChurchBuilder) -> Dictionary:
 		return _report()
 
 	_check_no_gaps(masses)
-	_check_no_overlap(masses)
+	_check_no_overlap(spec, masses)
 	_check_size_match(spec, builder, masses)
 	return _report()
 
@@ -141,14 +196,14 @@ func _check_no_gaps(masses: Array[Dictionary]) -> void:
 # ------------------------------------------------------------ no overlap
 
 ## Masses may interpenetrate only where a joint declares it, and only that deep.
-func _check_no_overlap(masses: Array[Dictionary]) -> void:
+func _check_no_overlap(spec: ChurchSpec, masses: Array[Dictionary]) -> void:
 	var n: int = masses.size()
 	var worst := 0.0
 	for i in range(n):
 		for j in range(i + 1, n):
 			var an: String = masses[i]["name"]
 			var bn: String = masses[j]["name"]
-			var allowed: float = _allowance(_family(an), _family(bn))
+			var allowed: float = _allowance(spec, _family(an), _family(bn))
 			if is_inf(allowed):
 				continue
 			var pen: float = _penetration(masses[i]["aabb"], masses[j]["aabb"])
@@ -180,11 +235,16 @@ func _check_size_match(spec: ChurchSpec, builder: ChurchBuilder,
 		_expect("nave height", nave.size.y, spec.height)
 		_expect("nave length", nave.size.z, spec.length)
 
-	if spec.tower and by_name.has("tower"):
-		var t: AABB = by_name["tower"]
-		_expect("tower width", t.size.x, spec.tower_width)
-		_expect("tower depth", t.size.z, spec.tower_width)
-		_expect("tower height", t.size.y, spec.tower_height)
+	if spec.tower:
+		for side in ChurchGeometry.west_tower_sides(spec):
+			var key: String = "tower"
+			if spec.west_towers >= 2:
+				key = "tower_%s" % ("left" if side < 0.0 else "right")
+			if by_name.has(key):
+				var t: AABB = by_name[key]
+				_expect("%s width" % key, t.size.x, spec.tower_width)
+				_expect("%s depth" % key, t.size.z, spec.tower_width)
+				_expect("%s height" % key, t.size.y, spec.tower_height)
 
 	if spec.apse and by_name.has("apse"):
 		var a: AABB = by_name["apse"]
@@ -192,19 +252,46 @@ func _check_size_match(spec: ChurchSpec, builder: ChurchBuilder,
 		_expect("apse projection", a.size.z, spec.apse_radius)
 
 	if spec.transept and by_name.has("transept"):
-		var tr: AABB = by_name["transept"]
-		_expect("transept span", tr.size.x, spec.transept_len)
+		_expect("transept span", by_name["transept"].size.x, spec.transept_len)
 
-	if spec.aisles > 0:
-		for side in ["aisle_left", "aisle_right"]:
-			if by_name.has(side):
-				_expect("%s width" % side, by_name[side].size.x, spec.aisle_width)
+	for ring in range(spec.aisles):
+		for side_name in ["left", "right"]:
+			var k: String = "aisle_%s_%d" % [side_name, ring]
+			if by_name.has(k):
+				_expect("%s width" % k, by_name[k].size.x, spec.aisle_width)
 
-	# every mass must stand on the ground plane, not hover above it
+	# A half-drum's AABB spans 2r across its face and r along it, so the exact
+	# span depends on which way the alcove points. Bound it instead.
+	for i in range(spec.radiating_chapels):
+		var ck: String = "chapel_%d" % i
+		if by_name.has(ck):
+			var cb: AABB = by_name[ck]
+			var longest: float = maxf(cb.size.x, cb.size.z)
+			if longest > spec.chapel_radius * 2.0 + TOL:
+				failures.append("size_match: %s spans %.2fm, wider than its %.2fm drum"
+					% [ck, longest, spec.chapel_radius * 2.0])
+			if longest < spec.chapel_radius - TOL:
+				failures.append("size_match: %s spans only %.2fm for a %.2fm radius"
+					% [ck, longest, spec.chapel_radius])
+
+	if spec.dome and by_name.has("dome_drum"):
+		_expect("dome span", by_name["dome_drum"].size.x, spec.dome_radius * 2.0)
+		_expect("dome drum height", by_name["dome_drum"].size.y, spec.dome_drum_height)
+
+	if spec.crossing_tower and by_name.has("crossing_tower"):
+		_expect("crossing tower height", by_name["crossing_tower"].size.y,
+			spec.crossing_tower_height)
+
+	# Every mass must stand on the ground plane -- except the ones that are
+	# carried on the walls below them, which is the whole point of a dome.
+	const CARRIED := ["dome_drum", "pendentive"]
 	for m in masses:
+		var nm: String = m["name"]
+		if nm in CARRIED or nm.begins_with("flyer_arch"):
+			continue
 		var y0: float = m["aabb"].position.y
 		if y0 > TOL:
-			failures.append("size_match: %s floats %.2fm above ground" % [m["name"], y0])
+			failures.append("size_match: %s floats %.2fm above ground" % [nm, y0])
 
 
 func _expect(what: String, got: float, want: float) -> void:
