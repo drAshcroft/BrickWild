@@ -43,7 +43,7 @@ const BUTTRESS_INSET := 0.05   # buttresses bury this far into the wall they bra
 # ---- landmark features ----
 const TWIN_TOWER_GAP := 0.6      # clear air between paired west towers
 const FLYER_PIER_GAP := 0.9      # gap between aisle wall and flyer pier
-const FLYER_PIER_W := 0.9        # flyer pier plan size
+const FLYER_PIER_W := 0.9        # minimum flyer pier plan size
 const FLYER_TIER_DROP := 0.34    # vertical gap between stacked flyers, x height
 const CHAPEL_LAP := 0.25         # chapel mouth buried in the wall it opens off
 const AMBULATORY_W := 0.55       # ambulatory width, x apse radius
@@ -274,6 +274,20 @@ static func dome_plan_radius(spec: ChurchSpec) -> float:
 	return maxf(shell, dome_mass_radius(spec))
 
 
+## Drum height needed for the dome to clear the roofs around it.
+##
+## A gable over a wide nave can out-rise a dome entirely -- at Hagia Sophia's
+## proportions the ridge reached 62 m against a 61 m dome, so the roof swallowed
+## it. The dome is the point of these buildings, so the drum grows until the
+## dome sits clear.
+static func min_drum_height(spec: ChurchSpec) -> float:
+	if not spec.dome:
+		return 0.0
+	var clearance: float = nave_ridge_height(spec) + spec.height * 0.12
+	var without_drum: float = dome_base_height(spec) + PENDENTIVE_H + dome_shell_rise(spec)
+	return maxf(clearance - without_drum, spec.dome_radius * 0.25)
+
+
 ## Rise of the dome shell above the top of its drum.
 static func dome_shell_rise(spec: ChurchSpec) -> float:
 	match spec.dome_shape:
@@ -474,12 +488,27 @@ static func narthex_aabb(spec: ChurchSpec) -> AABB:
 
 # ------------------------------------------------------ flying buttresses
 
+## Flying buttresses have to be sized to the building they brace. Fixed
+## metre values made them read as fence posts against a 33 m cathedral wall.
+static func flyer_pier_width(spec: ChurchSpec) -> float:
+	return clampf(spec.width * 0.17, FLYER_PIER_W, 4.5)
+
+
+static func flyer_arch_thickness(spec: ChurchSpec) -> float:
+	return clampf(spec.height * 0.05, 0.35, 2.2)
+
+
+## Pinnacles, finials and the like scale off the wall height for the same reason.
+static func ornament_scale(spec: ChurchSpec) -> float:
+	return clampf(spec.height * 0.075, 1.0, 4.5)
+
+
 ## X offset of the flyer pier: clear of the outermost aisle wall.
 static func flyer_pier_x(spec: ChurchSpec, side: float) -> float:
 	var outer: float = spec.width / 2.0
 	if spec.aisles > 0:
 		outer = aisle_outer_x(spec)
-	return side * (outer + FLYER_PIER_GAP + FLYER_PIER_W / 2.0)
+	return side * (outer + FLYER_PIER_GAP + flyer_pier_width(spec) / 2.0)
 
 
 static func flyer_pier_height(spec: ChurchSpec) -> float:
@@ -491,13 +520,48 @@ static func flyer_spring_height(spec: ChurchSpec) -> float:
 	return spec.height * 0.78
 
 
-static func flyer_z(spec: ChurchSpec, i: int) -> float:
-	var n: int = maxi(spec.buttress_count_per_side, 1)
+## Bay range the flyer PIERS occupy, inset so a pier never overhangs the bay
+## it braces and never crowds the apse or ambulatory at the east end.
+static func flyer_span(spec: ChurchSpec) -> Vector2:
 	var zr: Vector2 = aisle_z_range(spec) if spec.aisles > 0 else Vector2(
-		-spec.length / 2.0 + 1.0, spec.length / 2.0 - 1.0)
-	if n == 1:
+		-spec.length / 2.0, spec.length / 2.0)
+	if spec.apse:
+		var east: float = apse_springing_z(spec)
+		if spec.ambulatory:
+			east -= ambulatory_radius(spec) - spec.apse_radius
+		zr.y = minf(zr.y, east)
+	var inset: float = flyer_pier_width(spec) / 2.0 + 0.4
+	return Vector2(zr.x + inset, zr.y - inset)
+
+
+## How many flyers actually fit along that span without their piers touching.
+## The pier grew with the building, so a fixed count started colliding.
+static func flyer_count(spec: ChurchSpec) -> int:
+	var zr: Vector2 = flyer_span(spec)
+	var usable: float = maxf(zr.y - zr.x, 0.0)
+	var pitch: float = flyer_pier_width(spec) + 0.6
+	var fits: int = int(usable / pitch) + 1
+	return clampi(mini(spec.buttress_count_per_side, fits), 1, 12)
+
+
+## Vertical drop to the next tier down.
+##
+## Stacked flyers must clear one another, and an arch is as deep as its span
+## makes it: the bow plus the thickness of the ribbon at both ends. Deriving
+## the drop from that is what keeps two-tier buttresses from merging.
+static func flyer_tier_drop(spec: ChurchSpec) -> float:
+	var reach: float = absf(flyer_pier_x(spec, 1.0)) - spec.width / 2.0
+	var arch_h: float = absf(flyer_spring_height(spec) - flyer_pier_height(spec)) \
+		+ reach * 0.16 + flyer_arch_thickness(spec) * 2.0
+	return maxf(spec.height * FLYER_TIER_DROP, arch_h + 0.6)
+
+
+static func flyer_z(spec: ChurchSpec, i: int) -> float:
+	var n: int = flyer_count(spec)
+	var zr: Vector2 = flyer_span(spec)
+	if n <= 1:
 		return (zr.x + zr.y) / 2.0
-	return lerpf(zr.x + 1.0, zr.y - 1.0, float(i) / float(n - 1))
+	return lerpf(zr.x, zr.y, float(i) / float(n - 1))
 
 
 # ------------------------------------------------------------- envelope
@@ -550,6 +614,11 @@ static func mass_length_extent(spec: ChurchSpec) -> Vector2:
 		var c: AABB = chapel_aabb(spec, i)
 		z1 = maxf(z1, c.position.z + c.size.z)
 		z0 = minf(z0, c.position.z)
+	if spec.flying_buttresses:
+		var fs: Vector2 = flyer_span(spec)
+		var half: float = flyer_pier_width(spec) / 2.0
+		z0 = minf(z0, fs.x - half)
+		z1 = maxf(z1, fs.y + half)
 	if spec.dome:
 		var dz: float = crossing_center_z(spec)
 		var dr: float = dome_mass_radius(spec)
@@ -593,7 +662,7 @@ static func width_extent(spec: ChurchSpec) -> float:
 	if spec.buttresses:
 		w = maxf(w, spec.width + bp * 2.0)
 	if spec.flying_buttresses:
-		w = maxf(w, (absf(flyer_pier_x(spec, 1.0)) + FLYER_PIER_W / 2.0) * 2.0)
+		w = maxf(w, (absf(flyer_pier_x(spec, 1.0)) + flyer_pier_width(spec) / 2.0) * 2.0)
 	if spec.ambulatory:
 		w = maxf(w, ambulatory_radius(spec) * 2.0)
 	for i in range(spec.radiating_chapels):

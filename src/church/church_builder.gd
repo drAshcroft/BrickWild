@@ -58,7 +58,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	tag("nave")
 	box(Vector3(w, h, l), Vector3(0, h / 2.0, 0), SURF_STONE)
 	_log_mass("nave", AABB(Vector3(-w / 2.0, 0.0, -l / 2.0), Vector3(w, h, l)))
-	gable_roof(w + 0.5, l + 0.4, w * spec.roof_pitch, 0.0, SURF_ROOF, h)
+	_roof_the_nave(w, l, h)
 	total_height = maxf(total_height, h + w * spec.roof_pitch)
 
 	# ---------- side aisles ----------
@@ -165,7 +165,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 			&"spire":
 				var sp: float = tw * spec.spire_pitch * ChurchGeometry.SPIRE_RISE_FACTOR
 				_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, sp, SURF_ROOF, true)
-				pinnacle(Vector3(lx, th + sp, lz))
+				pinnacle(Vector3(lx, th + sp, lz), ChurchGeometry.ornament_scale(spec))
 			&"pyramid":
 				_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, rise, SURF_ROOF, false)
 			&"belfry":
@@ -259,6 +259,30 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	return _kit.commit()
 
 
+## The nave roof, in one run or two.
+##
+## A dome is the roof over its own crossing, so the gable has to stop either
+## side of it. Running one gable the whole length instead drove the ridge
+## straight through the dome and buried it.
+func _roof_the_nave(w: float, l: float, h: float) -> void:
+	var rise: float = w * spec.roof_pitch
+	if not spec.dome:
+		gable_roof(w + 0.5, l + 0.4, rise, 0.0, SURF_ROOF, h)
+		return
+	var dz: float = ChurchGeometry.crossing_center_z(spec)
+	var dr: float = ChurchGeometry.dome_mass_radius(spec)
+	var runs := [
+		[-l / 2.0 - 0.2, dz - dr],      # west of the crossing
+		[dz + dr, l / 2.0 + 0.2],       # east of it
+	]
+	for run in runs:
+		var z0: float = run[0]
+		var z1: float = run[1]
+		if z1 - z0 < 1.0:
+			continue
+		gable_roof(w + 0.5, z1 - z0, rise, (z0 + z1) / 2.0, SURF_ROOF, h)
+
+
 ## Entrance vestibule across the west front.
 func _build_narthex() -> void:
 	if not spec.narthex:
@@ -314,10 +338,12 @@ func _build_flying_buttresses() -> void:
 	if not spec.flying_buttresses:
 		return
 	tag("flyer")
-	var pw: float = ChurchGeometry.FLYER_PIER_W
+	var pw: float = ChurchGeometry.flyer_pier_width(spec)
 	var ph: float = ChurchGeometry.flyer_pier_height(spec)
+	var arch_t: float = ChurchGeometry.flyer_arch_thickness(spec)
+	var orn: float = ChurchGeometry.ornament_scale(spec)
 	var spring: float = ChurchGeometry.flyer_spring_height(spec)
-	var n: int = maxi(spec.buttress_count_per_side, 1)
+	var n: int = ChurchGeometry.flyer_count(spec)
 	for side_v in [-1.0, 1.0]:
 		var side: float = side_v
 		var px: float = ChurchGeometry.flyer_pier_x(spec, side)
@@ -327,27 +353,27 @@ func _build_flying_buttresses() -> void:
 			box(Vector3(pw, ph, pw), Vector3(px, ph / 2.0, pz), SURF_STONE)
 			_log_mass("flyer_pier_%s_%d" % ["left" if side < 0.0 else "right", i],
 				AABB(Vector3(px - pw / 2.0, 0.0, pz - pw / 2.0), Vector3(pw, ph, pw)))
-			pinnacle(Vector3(px, ph, pz))
+			pinnacle(Vector3(px, ph, pz), orn)
 			# one flyer per tier, each springing higher up the nave wall
 			for tier in range(spec.flyer_tiers):
 				# each lower tier drops by a full share of the wall height, so
 				# stacked flyers stay visibly clear of one another
-				var drop: float = tier * spec.height * ChurchGeometry.FLYER_TIER_DROP
+				var drop: float = tier * ChurchGeometry.flyer_tier_drop(spec)
 				var from_y: float = ph - drop
 				var to_y: float = spring - drop
 				var bow: float = absf(px - wall_x) * 0.16
 				_kit.arc_ribbon(Vector3(px, from_y, pz), Vector3(wall_x, to_y, pz),
-					bow, 0.34, pw * 0.6, SURF_STONE)
+					bow, arch_t, pw * 0.72, SURF_STONE)
 				# The arch is what ties an otherwise free-standing pier to the
 				# nave, so it counts as a mass: without it the pier reads as
 				# floating, which is exactly what a flyer is meant to avoid.
 				var x0: float = minf(px, wall_x)
-				var y0: float = minf(from_y, to_y) - 0.2
-				var y1: float = maxf(from_y, to_y) + bow + 0.2
+				var y0: float = minf(from_y, to_y) - arch_t
+				var y1: float = maxf(from_y, to_y) + bow + arch_t
 				_log_mass("flyer_arch_%s_%d_%d"
 					% ["left" if side < 0.0 else "right", i, tier],
-					AABB(Vector3(x0, y0, pz - pw * 0.3),
-						Vector3(absf(px - wall_x), y1 - y0, pw * 0.6)))
+					AABB(Vector3(x0, y0, pz - pw * 0.36),
+						Vector3(absf(px - wall_x), y1 - y0, pw * 0.72)))
 
 
 ## A lantern tower over the crossing: the silhouette of Durham and Salisbury.
@@ -374,7 +400,8 @@ func _build_crossing_tower() -> void:
 	_kit.hip_roof(side + 0.4, bay + 0.4, side * 0.42, cz, SURF_ROOF, th)
 	for cx_v in [-1.0, 1.0]:
 		for cz_v in [-1.0, 1.0]:
-			pinnacle(Vector3(cx_v * (side / 2.0 - 0.4), th, cz + cz_v * (bay / 2.0 - 0.4)))
+			pinnacle(Vector3(cx_v * (side / 2.0 - 0.4), th, cz + cz_v * (bay / 2.0 - 0.4)),
+				ChurchGeometry.ornament_scale(spec))
 
 
 ## Dome on a drum over the crossing. Hemispherical (Hagia Sophia), onion
@@ -488,10 +515,11 @@ func _pyramid_roof(base_center: Vector3, width: float, height: float, s: int,
 		tall := false) -> void:
 	_kit.stepped_taper(base_center, width, height, s, 5 if tall else 3, 0.2)
 
-func pinnacle(pos: Vector3) -> void:
-	box(Vector3(0.35, 1.2, 0.35), pos + Vector3(0, 0.6, 0), SURF_STONE)
-	box(Vector3(0.55, 0.16, 0.55), pos + Vector3(0, 0.08, 0), SURF_TRIM)
-	_pyramid_roof(pos + Vector3(0, 1.2, 0), 0.4, 0.6, SURF_ROOF, false)
+## `sc` scales the whole finial: a 1.8 m pinnacle is invisible on a cathedral.
+func pinnacle(pos: Vector3, sc := 1.0) -> void:
+	box(Vector3(0.35 * sc, 1.2 * sc, 0.35 * sc), pos + Vector3(0, 0.6 * sc, 0), SURF_STONE)
+	box(Vector3(0.55 * sc, 0.16 * sc, 0.55 * sc), pos + Vector3(0, 0.08 * sc, 0), SURF_TRIM)
+	_pyramid_roof(pos + Vector3(0, 1.2 * sc, 0), 0.4 * sc, 0.6 * sc, SURF_ROOF, false)
 
 # ---------------------------------------------------------------- openings
 

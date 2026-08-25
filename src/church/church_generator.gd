@@ -106,6 +106,11 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 		spec.dome_radius = spec.width * r.randf_range(0.40, 0.48)
 		spec.dome_drum_height = (spec.dome_radius
 			* ChurchGeometry.DOME_DRUM_RATIO * r.randf_range(0.8, 1.3))
+		# a domed church carries a shallow roof: a steep gable over a wide nave
+		# out-tops the dome and hides it
+		spec.roof_pitch = r.randf_range(0.26, 0.40)
+		spec.dome_drum_height = maxf(spec.dome_drum_height,
+			ChurchGeometry.min_drum_height(spec))
 		spec.dome_lantern = _chance(r, s.get("lantern", 0.25))
 		spec.half_domes = _chance(r, s.get("half_domes", 0.0))
 		spec.exedrae = spec.half_domes and _chance(r, 0.6)
