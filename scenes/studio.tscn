@@ -1,0 +1,151 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/ui/studio.gd" id="1"]
+[ext_resource type="Script" path="res://src/ui/blueprint_view.gd" id="2"]
+
+[sub_resource type="Environment" id="env1"]
+background_mode=1
+background_color=Color(0.75,0.82,0.9,1)
+ambient_light_source=2
+ambient_light_color=Color(0.8,0.85,0.95,1)
+ambient_light_energy=0.7
+
+[node name="Studio" type="Control"]
+layout_mode=3
+anchors_preset=15
+anchor_right=1.0
+anchor_bottom=1.0
+script = ExtResource("1")
+
+[node name="HSplit" type="HSplitContainer" parent="."]
+layout_mode=1
+anchors_preset=15
+anchor_right=1.0
+anchor_bottom=1.0
+split_offset=-380
+
+[node name="LeftPanel" type="PanelContainer" parent="HSplit"]
+layout_mode=2
+custom_minimum_size=Vector2(240, 0)
+
+[node name="Margin" type="MarginContainer" parent="HSplit/LeftPanel"]
+layout_mode=2
+theme_override_constants/margin_left=12
+theme_override_constants/margin_top=12
+theme_override_constants/margin_right=12
+theme_override_constants/margin_bottom=12
+
+[node name="Grid" type="GridContainer" parent="HSplit/LeftPanel/Margin"]
+layout_mode=2
+columns=2
+theme_override_constants/h_separation=10
+theme_override_constants/v_separation=14
+
+[node name="Title" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+text="Church Blueprint Studio"
+theme_override_font_sizes/font_size=17
+
+[node name="Spacer" type="Control" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+
+[node name="WidthLabel" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+text="Nave width (m)"
+
+[node name="WidthSlider" type="HSlider" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+custom_minimum_size=Vector2(120, 20)
+min_value=6.0
+max_value=24.0
+step=0.5
+value=10.0
+
+[node name="LengthLabel" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+text="Nave length (m)"
+
+[node name="LengthSlider" type="HSlider" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+custom_minimum_size=Vector2(120, 20)
+min_value=10.0
+max_value=60.0
+step=1.0
+value=22.0
+
+[node name="HeightLabel" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+text="Eaves height (m)"
+
+[node name="HeightSlider" type="HSlider" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+custom_minimum_size=Vector2(120, 20)
+min_value=6.0
+max_value=30.0
+step=0.5
+value=12.0
+
+[node name="StyleLabel" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+text="Style"
+
+[node name="StyleOption" type="OptionButton" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+
+[node name="Hint" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+text="RMB-drag orbits the view.
+Mouse wheel zooms."
+theme_override_colors/font_color=Color(0.5,0.55,0.6,1)
+
+[node name="CenterCol" type="VBoxContainer" parent="HSplit"]
+layout_mode=2
+
+[node name="InfoLabel" type="Label" parent="HSplit/CenterCol"]
+layout_mode=2
+text=""
+theme_override_font_sizes/font_size=14
+
+[node name="ViewportPanel" type="PanelContainer" parent="HSplit/CenterCol"]
+layout_mode=2
+size_flags_vertical=3
+
+[node name="SubViewport" type="SubViewport" parent="HSplit/CenterCol/ViewportPanel"]
+render_target_update_mode=4
+size=Vector2i(800, 500)
+own_world_3d=true
+handle_input_locally=false
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="HSplit/CenterCol/ViewportPanel/SubViewport"]
+environment=SubResource("env1")
+
+[node name="Sun" type="DirectionalLight3D" parent="HSplit/CenterCol/ViewportPanel/SubViewport"]
+transform=Transform3D(0.766044, 0.413176, -0.492404, 0, 0.766044, 0.642788, 0.642788, -0.398702, 0.586824, -20, 30, 20)
+shadow_enabled=true
+
+[node name="CamRig" type="Camera3D" parent="HSplit/CenterCol/ViewportPanel/SubViewport"]
+
+[node name="ChurchRoot" type="Node3D" parent="HSplit/CenterCol/ViewportPanel/SubViewport"]
+
+[node name="BPPanel" type="PanelContainer" parent="HSplit/CenterCol"]
+layout_mode=2
+custom_minimum_size=Vector2(0, 300)
+
+[node name="BlueprintView" type="Control" parent="HSplit/CenterCol/BPPanel"]
+layout_mode=2
+script = ExtResource("2")
+
+[node name="RightPanel" type="PanelContainer" parent="HSplit"]
+layout_mode=2
+custom_minimum_size=Vector2(230, 0)
+
+[node name="VBox" type="VBoxContainer" parent="HSplit/RightPanel"]
+layout_mode=2
+
+[node name="ListLabel" type="Label" parent="HSplit/RightPanel/VBox"]
+layout_mode=2
+text="Variants"
+
+[node name="VariantList" type="ItemList" parent="HSplit/RightPanel/VBox"]
+layout_mode=2
+size_flags_vertical=3

@@ -1,0 +1,16 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="BigGlade"
+run/main_scene="res://scenes/studio.tscn"
+config/features=PackedStringArray("4.5")
+
+[rendering]
+
+renderer/rendering_method="mobile"
+
+[debug]
+
+gdscript/warnings/untyped_declaration=0

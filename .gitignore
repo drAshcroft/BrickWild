@@ -1,0 +1,12 @@
+# Godot
+.godot/
+*.tmp
+export_presets.cfg
+
+# Generated test / QA output
+artifacts/
+
+# Tooling caches
+.waterfree/
+__pycache__/
+*.pyc

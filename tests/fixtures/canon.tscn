@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[node name="Root" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+
+[node name="HSplit" type="HSplitContainer" parent="."]
+layout_mode = 0
+
+[node name="LeftPanel" type="PanelContainer" parent="HSplit"]
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="HSplit/LeftPanel"]
+layout_mode = 2
+
+[node name="Grid" type="GridContainer" parent="HSplit/LeftPanel/Margin"]
+layout_mode = 2
+columns = 2
+
+[node name="Lbl" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode = 2
+text = "hi"
