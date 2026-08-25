@@ -22,10 +22,21 @@ var total_height := 0.0
 ## QA log: one entry per primitive placed during build().
 ## {kind:"box", pos:Vector3, size:Vector3, rot_y:float, tag:String}
 var part_log: Array = []
+## QA log: one entry per STRUCTURAL MASS (the load-bearing volumes a person
+## would name when describing the building). Unlike part_log this records the
+## true world-space AABB of the volume as actually emitted, so correctness
+## checks measure geometry rather than re-deriving it from the spec.
+## {name:String, aabb:AABB}
+var mass_log: Array[Dictionary] = []
 var _tag := ""
 
 func _log_part(kind: String, pos: Vector3, size := Vector3.ZERO, rot_y := 0.0) -> void:
 	part_log.append({"kind": kind, "pos": pos, "size": size, "rot_y": rot_y, "tag": _tag})
+
+## Record a structural mass by its true world AABB.
+func _log_mass(mass_name: String, aabb: AABB) -> void:
+	mass_log.append({"name": mass_name, "aabb": aabb.abs()})
+
 
 ## Tag subsequent parts (e.g. "nave", "transept", "tower") for diagnostics.
 func tag(t: String) -> void:
@@ -34,6 +45,7 @@ func tag(t: String) -> void:
 func build(p_spec: ChurchSpec) -> ArrayMesh:
 	spec = p_spec
 	part_log.clear()
+	mass_log.clear()
 	_sts.clear()
 	for i in range(4):
 		var s := SurfaceTool.new()
@@ -49,6 +61,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	# ---------- nave ----------
 	tag("nave")
 	box(Vector3(w, h, l), Vector3(0, h / 2.0, 0), SURF_STONE)
+	_log_mass("nave", AABB(Vector3(-w / 2.0, 0.0, -l / 2.0), Vector3(w, h, l)))
 	gable_roof(w + 0.5, l + 0.4, w * spec.roof_pitch, 0.0, SURF_ROOF)
 	total_height = maxf(total_height, h + w * spec.roof_pitch)
 
@@ -64,7 +77,11 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 			az0 = -l / 2.0 + TOWER_EMBED + spec.tower_width  # clear the tower front
 		var az1: float = l / 2.0
 		if spec.transept:
-			az1 = l / 2.0 - spec.transept_w_depth()  # abut the crossing
+			# match the transept's own placement, including the APSE_EMBED
+			# shift applied below, or the aisle laps the crossing.
+			az1 = l / 2.0 - spec.transept_w_depth()
+			if spec.apse:
+				az1 -= APSE_EMBED
 		var al: float = az1 - az0
 		if al < 3.0:
 			spec.aisles = 0  # no room; better no aisle than one through the tower
@@ -74,6 +91,8 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 				var side: float = side_v
 				var ax: float = side * (w / 2.0 + aw / 2.0 - 0.15)
 				box(Vector3(aw, h * 0.55, al), Vector3(ax, h * 0.275, az), SURF_STONE)
+				_log_mass("aisle_%s" % ("left" if side < 0.0 else "right"),
+					AABB(Vector3(ax - aw / 2.0, 0.0, az - al / 2.0), Vector3(aw, h * 0.55, al)))
 				_lean_roof(aw + 0.6, al + 0.4, h * 0.55, h * 0.55 + aw * 0.8, side, SURF_ROOF, az)
 				var nwin: int = int(al / 3.0)
 				for i in range(nwin):
@@ -95,6 +114,8 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		var tz_w: float = w * 0.55
 		var tz_z: float = l / 2.0 - tz_w / 2.0 - APSE_EMBED if spec.apse else l / 2.0 - tz_w / 2.0
 		box(Vector3(tz_len, h, tz_w), Vector3(0, h / 2.0, tz_z), SURF_STONE)
+		_log_mass("transept", AABB(Vector3(-tz_len / 2.0, 0.0, tz_z - tz_w / 2.0),
+			Vector3(tz_len, h, tz_w)))
 		gable_roof(tz_len + 0.5, tz_w + 0.4, w * spec.roof_pitch * 0.9, tz_z, SURF_ROOF)
 		for sx_v in [-1.0, 1.0]:
 			window(Vector3(sx_v * (tz_len / 2.0 + 0.02), h * 0.55, tz_z), PI / 2.0,
@@ -108,10 +129,16 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	tag("apse")
 	if spec.apse:
 		# Apse springs FROM the east wall: flat face sits APSE_EMBED inside the
-		# nave, dome bulges outward. Center = wall + radius - embed.
-		var cy: float = l / 2.0 + spec.apse_radius - APSE_EMBED
-		_log_part("apse", Vector3(0, h * 0.425, cy - spec.apse_radius * 0.5),
-			Vector3(spec.apse_radius * 2, h * 0.85, spec.apse_radius * 2))
+		# nave, dome bulges outward. half_cylinder() sweeps a in [0, PI], so the
+		# drum occupies z in [cy, cy + radius] with its flat face AT cy. cy is
+		# therefore the springing plane itself, not a full cylinder's centre.
+		var cy: float = l / 2.0 - APSE_EMBED
+		_log_part("apse", Vector3(0, h * 0.425, cy + spec.apse_radius * 0.5),
+			Vector3(spec.apse_radius * 2, h * 0.85, spec.apse_radius))
+		# half_cylinder sweeps a in [0, PI] so sin(a) >= 0: the drum occupies
+		# z in [cy, cy + r] with its FLAT FACE at cy -- not [cy - r, cy + r].
+		_log_mass("apse", AABB(Vector3(-spec.apse_radius, 0.0, cy),
+			Vector3(spec.apse_radius * 2.0, h * 0.85, spec.apse_radius)))
 		half_cylinder(spec.apse_radius, h * 0.85, Vector2(0, cy), SURF_STONE)
 		_cone_cap(Vector3(0, h * 0.85, cy), spec.apse_radius + 0.35, spec.apse_radius * 0.9, SURF_ROOF)
 		for a_v in [-0.6, 0.0, 0.6]:
@@ -130,6 +157,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		# mass reads as joined, not swallowed. Front (east) face at -l/2+EMBED.
 		var lz: float = -l / 2.0 + TOWER_EMBED - tw / 2.0   # tower center Z
 		box(Vector3(tw, th, tw), Vector3(0, th / 2.0, lz), SURF_STONE)
+		_log_mass("tower", AABB(Vector3(-tw / 2.0, 0.0, lz - tw / 2.0), Vector3(tw, th, tw)))
 		total_height = maxf(total_height, th)
 		for side_i in range(4):
 			var ang: float = PI / 2.0 * side_i

@@ -52,6 +52,7 @@ func check(p_spec: ChurchSpec, p_mesh: ArrayMesh, p_builder: ChurchBuilder) -> D
 	_check_alignment()
 	_check_overlaps()
 	_check_proportions()
+	_check_massing()
 
 	stats["parts"] = builder.part_log.size()
 	stats["voxels_solid"] = _count_solid()
@@ -361,12 +362,11 @@ func _check_alignment() -> void:
 ## Sections must JOIN, not swallow each other. Whole-section AABBs legitimately
 ## interlock (aisles hug the nave), so we test the specific known offenders:
 ##   - tower front face must stop just inside the nave's west wall (TOWER_EMBED)
-##   - apse flat face must stop just inside the nave's east wall (APSE_EMBED)
+##   - apse join is measured by MassingCheck (see _check_massing)
 ##   - aisles/buttresses must stay clear of the tower and transept volumes
 func _check_overlaps() -> void:
 	var l: float = spec.length
 	var TOWER_EMBED: float = ChurchBuilder.TOWER_EMBED
-	var APSE_EMBED: float = ChurchBuilder.APSE_EMBED
 	if spec.tower:
 		var front: float = -l / 2.0 + TOWER_EMBED  # intended front-face plane
 		var worst := -INF
@@ -382,13 +382,6 @@ func _check_overlaps() -> void:
 				% [worst, front])
 		if worst < front - 0.5:
 			warnings.append("parts_join: tower front %.2f detached from nave wall (%.2f)" % [worst, front])
-	if spec.apse:
-		# apse dome must not reach deeper into the nave than APSE_EMBED + slack
-		var cy: float = l / 2.0 + spec.apse_radius - APSE_EMBED
-		var inner: float = cy - spec.apse_radius
-		if inner < l / 2.0 - APSE_EMBED - 0.05:
-			failures.append("parts_join: apse reaches z=%.2f, deeper than %.2f into nave"
-				% [inner, l / 2.0 - APSE_EMBED])
 	if spec.aisles > 0:
 		for p in builder.part_log:
 			if p["tag"] != "aisle" or p["kind"] != "box":
@@ -439,3 +432,16 @@ func _bbox_str() -> String:
 		for v in verts:
 			mn = mn.min(v); mx = mx.max(v)
 	return "%.1fx%.1fx%.1f @(%0.1f,%0.1f,%0.1f)" % [mx.x - mn.x, mx.y - mn.y, mx.z - mn.z, mn.x, mn.y, mn.z]
+
+
+## Structural correctness: no gaps, no undesigned overlaps, sizes match spec.
+## Delegates to MassingCheck, which measures the emitted masses rather than
+## re-deriving them from the spec.
+func _check_massing() -> void:
+	var rep: Dictionary = MassingCheck.new().check(spec, builder)
+	for f in rep["failures"]:
+		failures.append(f)
+	for w in rep["warnings"]:
+		warnings.append(w)
+	stats["masses"] = rep["stats"].get("masses", 0)
+	stats["worst_penetration"] = rep["stats"].get("worst_penetration", 0.0)

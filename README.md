@@ -21,6 +21,7 @@ src/
   building/      SUPERSEDED first draft (houses, not churches). See note below.
 qa/
   blueprint_qa.gd         voxelizing mesh-validation library (BlueprintQA)
+  massing_check.gd        structural correctness: no gaps, no overlap, size match
 tests/           headless SceneTree runners
   fixtures/               scene fixtures used/produced by tooling
 tools/           one-off authoring scripts, not tests
@@ -38,6 +39,7 @@ sidecar or Godot will mint a new UID and break scene bindings.
 ```sh
 godot --headless --script res://tests/church_test.gd        # 60 variants: invariants + determinism
 godot --headless --script res://tests/blueprint_qa_test.gd  # 60 variants through BlueprintQA
+godot --headless --script res://tests/massing_test.gd        # 60 variants: structural correctness
 godot --headless --script res://tests/smoke_test.gd         # 200 building specs (legacy stack)
 ```
 
@@ -57,3 +59,19 @@ Its colour pipeline is also incomplete: `wall_color`, `timber_color`,
 `spec_generator.gd` and read by nothing, so the house grid renders untextured.
 
 Decide whether to finish it or delete it; it should not stay in this state.
+
+## Structural correctness
+
+`qa/massing_check.gd` checks three properties over the building's structural
+masses, and runs both standalone (`tests/massing_test.gd`) and as part of
+`BlueprintQA`:
+
+- **no gaps** - every mass touches the assembly; nothing floats
+- **no overlap** - masses interpenetrate only at joints designed to, and only
+  as deep as that joint declares (see the `_allowance` table)
+- **size match** - emitted masses match the dimensions the spec asked for
+
+It measures `ChurchBuilder.mass_log`, which records the true world AABB of each
+volume as emitted. That distinction matters: the check it replaced re-derived
+the apse position from the same formula the builder used, so it compared a
+formula against itself and could never fail.
