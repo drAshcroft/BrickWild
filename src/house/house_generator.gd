@@ -27,6 +27,10 @@ static func generate(spec: HouseSpec, p_seed: int) -> HousePlan:
 	spec.porch = _chance(r, s["porch"])
 	spec.chimney = _chance(r, s["chimney"])
 	spec.window_shutters = _chance(r, s["shutters"])
+	spec.timber_frame = _chance(r, s["timber"])
+	spec.stud_pitch = r.randf_range(float(s["studs"][0]), float(s["studs"][1]))
+	spec.frame_braces = spec.timber_frame and _chance(r, s["braces"])
+	spec.frame_rail = spec.timber_frame and _chance(r, s["rail"])
 	spec.clutter = r.randf_range(float(s["clutter"][0]), float(s["clutter"][1]))
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)

@@ -208,7 +208,15 @@ func _check_program(plan: HousePlan) -> void:
 	for kind in demands:
 		for i in plan.rooms_of(kind):
 			for cat in demands[kind]:
-				if not _room_has(plan, i, cat):
+				if _room_has(plan, i, cat):
+					continue
+				if plan.was_dropped(i, cat):
+					warnings.append("programme: a %s's %s could not fit a %s beside everything else it needed"
+						% [String(spec.trade), String(kind), cat])
+				elif not _could_hold(plan, i, cat):
+					warnings.append("programme: a %s's %s is too small for a %s"
+						% [String(spec.trade), String(kind), cat])
+				else:
 					failures.append("programme: a %s's %s has no %s"
 						% [String(spec.trade), String(kind), cat])
 
@@ -246,6 +254,12 @@ func _check_against_wall(plan: HousePlan) -> void:
 		if p.get("mounted", false) or p["host"] >= 0:
 			continue
 		if not PropCatalog.has_tag(p["key"], PropCatalog.WALL):
+			continue
+		if p.get("free_standing", false):
+			# the furnisher could find no wall for it and said so; a workbench
+			# out in the room is a compromise, not a defect
+			warnings.append("against: %s stands free -- no wall in the room would take it"
+				% _who(plan, f))
 			continue
 		var gap: float = _back_gap(plan, p)
 		if gap > HouseGeometry.WALL_GAP + HouseGeometry.BED_HEAD_TOL:

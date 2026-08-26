@@ -34,6 +34,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_floor()
 	_build_exterior_walls()
 	_build_partitions()
+	_build_timber_frame()
 	if with_roof:
 		_build_roof()
 	_build_porch()
@@ -62,21 +63,7 @@ func _build_exterior_walls() -> void:
 		var from: Vector2 = run["from"]
 		var to: Vector2 = run["to"]
 		var normal: Vector2 = run["normal"]
-		var openings: Array[Dictionary] = []
-		for d in plan.doors:
-			if not d["exterior"]:
-				continue
-			if not _on_run(from, to, normal, d["pos"], d["normal"]):
-				continue
-			openings.append({"t": _along(from, to, d["pos"]), "w": float(d["width"]),
-				"bottom": 0.0, "top": HouseGeometry.DOOR_H, "kind": "door",
-				"normal": normal})
-		for w in plan.windows:
-			if not _on_run(from, to, normal, w["pos"], w["normal"]):
-				continue
-			openings.append({"t": _along(from, to, w["pos"]), "w": float(w["width"]),
-				"bottom": float(w["sill"]), "top": float(w["head"]), "kind": "window",
-				"normal": normal})
+		var openings: Array[Dictionary] = _openings_on(from, to, normal)
 		_wall_run(from, to, HouseGeometry.WALL_T, h, openings, SURF_WALL)
 		var a: AABB = _run_aabb(from, to, HouseGeometry.WALL_T, h)
 		_log_mass("wall_%s" % String(run["side"]), a)
@@ -121,6 +108,28 @@ func _build_partitions() -> void:
 			_wall_run(from, to, HouseGeometry.INNER_WALL_T, h, openings, SURF_WALL)
 			_log_mass("partition_%d_%d" % [i, j],
 				_run_aabb(from, to, HouseGeometry.INNER_WALL_T, h))
+
+
+## Every door and window cut into one exterior wall run, as distances along it.
+## Shared by the wall builder and the timber frame, so a stud can never be
+## planted across a window the wall knows about.
+func _openings_on(from: Vector2, to: Vector2, normal: Vector2) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for d in plan.doors:
+		if not d["exterior"]:
+			continue
+		if not _on_run(from, to, normal, d["pos"], d["normal"]):
+			continue
+		out.append({"t": _along(from, to, d["pos"]), "w": float(d["width"]),
+			"bottom": 0.0, "top": HouseGeometry.DOOR_H, "kind": "door",
+			"normal": normal})
+	for w in plan.windows:
+		if not _on_run(from, to, normal, w["pos"], w["normal"]):
+			continue
+		out.append({"t": _along(from, to, w["pos"]), "w": float(w["width"]),
+			"bottom": float(w["sill"]), "top": float(w["head"]), "kind": "window",
+			"normal": normal})
+	return out
 
 
 ## One wall, with its openings cut out of it.
@@ -233,6 +242,133 @@ static func _run_aabb(from: Vector2, to: Vector2, thick: float, height: float) -
 	return AABB(Vector3(a.x, 0.0, a.y), Vector3(b.x - a.x, height, b.y - a.y))
 
 
+# ---------------------------------------------------------------- timber
+
+## Exposed beams on the outside walls: the half-timbering that makes a
+## plastered box read as medieval.
+##
+## Laid out the way a carpenter would lay it out rather than as a pattern
+## stamped on the wall -- sill along the bottom, wall plate along the top,
+## heavier posts at the corners, studs between them at the style's own
+## spacing, a mid rail at sill height, and a brace across each corner. The
+## studs read the same opening list the wall itself was built from, so one can
+## never end up planted across a window.
+func _build_timber_frame() -> void:
+	if not spec.timber_frame:
+		return
+	tag("timber")
+	var h: float = spec.height
+	for run in HouseGeometry.exterior_runs(spec):
+		var from: Vector2 = run["from"]
+		var to: Vector2 = run["to"]
+		var normal: Vector2 = run["normal"]
+		var seg: Vector2 = to - from
+		var length: float = seg.length()
+		if length < 0.5:
+			continue
+		var dir: Vector2 = seg / length
+		var yaw: float = atan2(-dir.y, dir.x)
+		var openings: Array[Dictionary] = _openings_on(from, to, normal)
+
+		# sill and wall plate, the full length of the wall
+		_beam(from, dir, yaw, normal, length / 2.0, length,
+			0.0, HouseGeometry.SILL_BEAM_H)
+		_beam(from, dir, yaw, normal, length / 2.0, length,
+			h - HouseGeometry.PLATE_H, h)
+		if spec.frame_rail:
+			var rail_y: float = HouseGeometry.WINDOW_SILL - HouseGeometry.RAIL_H
+			_rail_between(from, dir, yaw, normal, length, openings,
+				rail_y, rail_y + HouseGeometry.RAIL_H)
+
+		# corner posts, then studs between them
+		var post: float = HouseGeometry.POST_W
+		for t in [post / 2.0, length - post / 2.0]:
+			_beam(from, dir, yaw, normal, t, post, 0.0, h, post * 0.55)
+		var pitch: float = spec.stud_pitch
+		var bays: int = maxi(int((length - post * 2.0) / pitch), 1)
+		for i in range(1, bays):
+			var t2: float = post + (length - post * 2.0) * float(i) / float(bays)
+			if _blocked_by_opening(openings, t2, HouseGeometry.BEAM_W):
+				continue
+			_beam(from, dir, yaw, normal, t2, HouseGeometry.BEAM_W,
+				HouseGeometry.SILL_BEAM_H, h - HouseGeometry.PLATE_H)
+
+		if spec.frame_braces:
+			_corner_braces(from, dir, yaw, normal, length, h, openings)
+
+
+## A horizontal beam broken by the openings it runs into: it passes over a
+## window head or under a sill where it can, and stops at a doorway.
+func _rail_between(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
+		length: float, openings: Array[Dictionary], y0: float, y1: float) -> void:
+	var cuts: Array = []
+	for op in openings:
+		if float(op["bottom"]) > y1 or float(op["top"]) < y0:
+			continue          # the rail passes clear above or below it
+		cuts.append([float(op["t"]) - float(op["w"]) / 2.0,
+			float(op["t"]) + float(op["w"]) / 2.0])
+	cuts.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	var cursor := 0.0
+	for cut in cuts:
+		var lo: float = float(cut[0])
+		if lo > cursor + 0.1:
+			_beam(from, dir, yaw, normal, (cursor + lo) / 2.0, lo - cursor, y0, y1)
+		cursor = maxf(cursor, float(cut[1]))
+	if cursor < length - 0.1:
+		_beam(from, dir, yaw, normal, (cursor + length) / 2.0, length - cursor, y0, y1)
+
+
+## The diagonals that stop a timber frame racking, one across each corner of
+## the wall. Emitted as a tilted beam, which is what they are.
+func _corner_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
+		length: float, h: float, openings: Array[Dictionary]) -> void:
+	var run: float = minf(HouseGeometry.BRACE_RUN, length * 0.3)
+	var rise: float = run * 1.15
+	if rise > h - HouseGeometry.PLATE_H - HouseGeometry.SILL_BEAM_H:
+		return
+	for side in [1.0, -1.0]:
+		var foot: float = HouseGeometry.POST_W + run if side > 0.0 \
+			else length - HouseGeometry.POST_W - run
+		if _blocked_by_opening(openings, foot, run):
+			continue
+		var mid_t: float = foot - side * run / 2.0
+		var mid_y: float = h - HouseGeometry.PLATE_H - rise / 2.0
+		var span: float = sqrt(run * run + rise * rise)
+		var tilt: float = atan2(rise, run) * side
+		var p: Vector2 = from + dir * mid_t + normal * _proud(HouseGeometry.BEAM_D)
+		var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, mid_y, p.y))
+		xf = xf * Transform3D(Basis(Vector3(0, 0, 1), tilt), Vector3.ZERO)
+		_kit.oriented_box(Vector3(span, HouseGeometry.BEAM_W * 0.9,
+			HouseGeometry.BEAM_D), xf, SURF_TRIM)
+
+
+## Is a beam of this width going to land on a door or a window?
+static func _blocked_by_opening(openings: Array[Dictionary], t: float,
+		width: float) -> bool:
+	for op in openings:
+		var half: float = float(op["w"]) / 2.0 + width / 2.0 + HouseGeometry.STUD_CLEAR
+		if absf(t - float(op["t"])) < half:
+			return true
+	return false
+
+
+## One beam, standing proud of the wall face it is fixed to.
+func _beam(from: Vector2, dir: Vector2, yaw: float, normal: Vector2, t: float,
+		length: float, y0: float, y1: float, depth := 0.0) -> void:
+	if length <= 0.02 or y1 - y0 <= 0.02:
+		return
+	var d: float = depth if depth > 0.0 else HouseGeometry.BEAM_D
+	var p: Vector2 = from + dir * t + normal * _proud(d)
+	var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, (y0 + y1) / 2.0, p.y))
+	_kit.oriented_box(Vector3(length, y1 - y0, d), xf, SURF_TRIM)
+
+
+## How far out from the wall centre-line a beam of this depth sits: against the
+## plaster, with a hair of overlap so no seam shows.
+static func _proud(depth: float) -> float:
+	return HouseGeometry.WALL_T / 2.0 + depth / 2.0 - 0.015
+
+
 # ------------------------------------------------------------------- roof
 
 func _build_roof() -> void:
@@ -246,6 +382,31 @@ func _build_roof() -> void:
 	var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(0.0, spec.height, 0.0))
 	_kit.ridge_roof(xf, span + 0.7, along + 0.5, rise, SURF_ROOF, SURF_WALL, span, along)
 	total_height = maxf(total_height, spec.height + rise)
+	if spec.timber_frame:
+		_gable_frame(xf, span, along, rise)
+
+
+## The frame in the gable end: a king post up to the ridge with a strut either
+## side of it. A blank plastered triangle over a framed wall is the one thing
+## that gives away a frame drawn rather than built.
+func _gable_frame(xf: Transform3D, span: float, along: float, rise: float) -> void:
+	var half: float = span / 2.0
+	for end_v in [-1.0, 1.0]:
+		var z: float = end_v * (along / 2.0 + HouseGeometry.BEAM_D / 2.0 - 0.01)
+		# king post
+		_kit.oriented_box(Vector3(HouseGeometry.BEAM_W, rise * 0.94,
+			HouseGeometry.BEAM_D),
+			xf * Transform3D(Basis(), Vector3(0.0, rise * 0.47, z)), SURF_TRIM)
+		# a strut either side, following the pitch of the roof above it
+		for side in [-1.0, 1.0]:
+			var run: float = half * 0.55
+			var lift: float = rise * 0.5
+			var length: float = sqrt(run * run + lift * lift)
+			var tilt: float = -atan2(lift, run) * side
+			var t := xf * Transform3D(Basis(Vector3(0, 0, 1), tilt),
+				Vector3(side * run / 2.0, lift / 2.0, z))
+			_kit.oriented_box(Vector3(length, HouseGeometry.BEAM_W * 0.85,
+				HouseGeometry.BEAM_D), t, SURF_TRIM)
 
 
 func _build_porch() -> void:
@@ -294,7 +455,10 @@ func _build_chimney() -> void:
 	# house. On a steeply pitched hut the ridge is six metres up, and a chimney
 	# built to that reads as a factory.
 	var top: float = spec.height + minf(HouseGeometry.roof_rise(spec), 2.0) + 0.9
-	box(Vector3(s, top, s), Vector3(c.x, top / 2.0, c.y), SURF_WALL)
+	# stone rather than plaster: a chimney is the one part of a timber-framed
+	# house that is neither, and the floor colour is the nearest thing this
+	# palette has to masonry
+	box(Vector3(s, top, s), Vector3(c.x, top / 2.0, c.y), SURF_FLOOR)
 	_log_mass("chimney", AABB(Vector3(c.x - s / 2.0, 0.0, c.y - s / 2.0),
 		Vector3(s, top, s)))
 	box(Vector3(s + 0.2, 0.16, s + 0.2), Vector3(c.x, top + 0.08, c.y), SURF_TRIM)

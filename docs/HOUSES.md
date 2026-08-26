@@ -41,6 +41,7 @@ cottage has always done.
 | a bedroom that is still a through-route is renamed | a room people traipse through is not a bedroom |
 | a room with no exterior wall becomes a store | it can never have a window |
 | every habitable room gets a window, narrow if need be | a room with no daylight is worse than a window near a corner |
+| a room that still cannot be given one becomes a store | a kitchen whose only outside wall is taken up by the back door is not a kitchen |
 
 ## Furnishing
 
@@ -64,6 +65,19 @@ it from. That second rectangle is what makes the walking check possible.
 `opt: 1.0` marks a piece the room is not that room without. Those are placed
 first, without a dice roll, and the passes that thin a room out will not touch
 them. Everything else is dressing and can be taken back out.
+
+## Outside
+
+The walls are half-timbered: a sill along the bottom, a wall plate along the
+top, heavier posts at the corners, studs between them at the style's own
+spacing, a mid rail at sill height, braces across the corners, and a king post
+with struts in each gable. The studs read the same opening list the wall itself
+was built from, so one can never be planted across a window.
+
+`stud_pitch` is what separates the styles. A town house is close-studded at
+half a metre, which was expensive and meant to look it; a farmhouse is nearer
+a metre and a half. The chimney is stone rather than plaster, because it is the
+one part of a timber-framed house that is neither.
 
 ## The harness
 

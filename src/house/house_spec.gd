@@ -31,7 +31,16 @@ var trim_color: Color
 var roof_color: Color
 var floor_color: Color
 var window_shutters: bool
+var timber_frame: bool            # exposed beams on the outside walls
+var stud_pitch: float             # metres between studs; smaller is grander
+var frame_braces: bool            # diagonal braces across the corners
+var frame_rail: bool              # a mid rail at sill height
 var clutter: float                # 0..1, how heavily rooms get dressed
+
+## Styles carry their own timber: `timber` is the chance of an exposed frame at
+## all, `studs` the spacing between uprights (a town house is close-studded,
+## which was expensive and meant to look it), `braces` the chance of diagonals
+## across the corners and `rail` of a mid rail at sill height.
 
 ## Trades a fantasy household might practise, and the workshop fittings each
 ## one asks for. `room` is the extra room kind the trade needs; the recipes
@@ -48,6 +57,7 @@ const TRADES := {
 const STYLES := {
 	&"cottage": {
 		"label": "Cottage",
+		"timber": 0.95, "studs": [0.95, 1.5], "braces": 0.8, "rail": 0.5,
 		"roof_pitch": [0.85, 1.2], "porch": 0.5, "chimney": 0.9, "shutters": 0.7,
 		"wall": ["e6ddc8", "cfc3a8"], "trim": ["6b5236", "4a3826"],
 		"roof": ["6a4a34", "4e3626"], "floor": ["8a7a5e", "6f6148"],
@@ -55,6 +65,7 @@ const STYLES := {
 	},
 	&"farmhouse": {
 		"label": "Farmhouse",
+		"timber": 0.9, "studs": [1.1, 1.7], "braces": 0.85, "rail": 0.4,
 		"roof_pitch": [0.7, 1.0], "porch": 0.7, "chimney": 0.95, "shutters": 0.5,
 		"wall": ["d9d2bd", "bcb49c"], "trim": ["7a6242", "56452e"],
 		"roof": ["7b6a4a", "5c4e35"], "floor": ["7d6f56", "615641"],
@@ -62,6 +73,7 @@ const STYLES := {
 	},
 	&"townhouse": {
 		"label": "Townhouse",
+		"timber": 1.0, "studs": [0.45, 0.7], "braces": 0.3, "rail": 0.9,
 		"roof_pitch": [1.0, 1.4], "porch": 0.2, "chimney": 1.0, "shutters": 0.35,
 		"wall": ["cfc9bd", "b3ac9e"], "trim": ["4b4238", "342e28"],
 		"roof": ["4a4f57", "353a41"], "floor": ["8e7f63", "6b5f49"],
@@ -69,6 +81,7 @@ const STYLES := {
 	},
 	&"longhall": {
 		"label": "Long Hall",
+		"timber": 0.85, "studs": [1.0, 1.6], "braces": 0.9, "rail": 0.35,
 		"roof_pitch": [0.9, 1.25], "porch": 0.35, "chimney": 0.8, "shutters": 0.3,
 		"wall": ["c9b899", "ab9877"], "trim": ["5a4429", "3e2f1d"],
 		"roof": ["50412c", "39301f"], "floor": ["7a6a4f", "5b4f3a"],
@@ -76,6 +89,7 @@ const STYLES := {
 	},
 	&"witch_hut": {
 		"label": "Witch's Hut",
+		"timber": 0.8, "studs": [0.8, 1.4], "braces": 0.6, "rail": 0.5,
 		"roof_pitch": [1.2, 1.7], "porch": 0.25, "chimney": 1.0, "shutters": 0.6,
 		"wall": ["b6b2a0", "938f7e"], "trim": ["46402f", "2e2a1e"],
 		"roof": ["3f4a3a", "2c352a"], "floor": ["6c6250", "51493c"],

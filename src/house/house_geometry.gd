@@ -45,6 +45,22 @@ const PATH_MIN := 0.70        # narrowest gap that still counts as a way through
 const DOOR_CLEAR := 0.85      # clear floor in front of a door, BOTH sides
 const NAV_CELL := 0.12        # walkability grid resolution
 
+# ---- timber framing ----
+##
+## Half-timbering is the one thing that makes a plastered box read as medieval,
+## and it is almost free: a frame of beams standing proud of the wall face, in
+## the trim colour, laid out the way a carpenter would lay it out. Sill at the
+## bottom, wall plate at the top, posts at the corners, studs between them, a
+## mid rail at sill height, and a brace across each corner.
+const BEAM_W := 0.15          # a stud, seen face on
+const BEAM_D := 0.085         # how far a beam stands proud of the plaster
+const POST_W := 0.22          # corner posts are heavier than the studs
+const PLATE_H := 0.2          # the beam along the top of a wall
+const SILL_BEAM_H := 0.18     # and the one along the bottom
+const RAIL_H := 0.15          # the mid rail
+const STUD_CLEAR := 0.1       # air kept between a stud and an opening
+const BRACE_RUN := 1.15       # how far a corner brace reaches along the wall
+
 # ---- furnishing ----
 const WALL_GAP := 0.06        # how close a wall-hugging piece sits to the wall
 const FURNITURE_DENSITY_MAX := 0.42   # of a room's floor, before it reads as a junk shop

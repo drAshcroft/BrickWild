@@ -119,6 +119,11 @@ const TRADE_FITTINGS := {
 	],
 }
 
+## Pieces that must have a wall behind them, whatever the room looks like: a
+## bed in the middle of the floor is not a bed that ran out of options, it is a
+## mistake. Everything else may stand free if no wall will take it.
+const WALL_ESSENTIAL := ["bed", "hearth", "bookcase", "nightstand", "chest"]
+
 ## Step along a wall when hunting for somewhere to put a piece.
 const PROBE_STEP := 0.12
 ## How many pieces the repair pass may remove before it gives up and lets the
@@ -312,13 +317,6 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	if sleeps_here:
 		steps.append({"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0})
 		steps.append({"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9})
-	# The trade fits out its own room BEFORE the standard furniture does: a
-	# scholar's parlour is a study first and a sitting room second, and
-	# whichever goes in first gets the long unbroken wall.
-	var trade_room: StringName = HouseSpec.TRADES[spec.trade]["room"]
-	if trade_room == kind and TRADE_FITTINGS.has(spec.trade):
-		for s2 in TRADE_FITTINGS[spec.trade]:
-			steps.append(s2)
 	for s in RECIPES.get(kind, []):
 		# With a bed in it the hall has no middle left to stand a table in, so
 		# the table goes against a wall -- which is what a one-room cottage
@@ -330,11 +328,27 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 			continue
 		steps.append(s)
 
+	# the trade fits out whichever room it works in, after that room's own
+	# recipe has had its say
+	var trade_room: StringName = HouseSpec.TRADES[spec.trade]["room"]
+	if trade_room == kind and TRADE_FITTINGS.has(spec.trade):
+		for s2 in TRADE_FITTINGS[spec.trade]:
+			steps.append(s2)
+
 	# The things a room cannot do without go in first, whether they came from
 	# the room recipe or from the trade. Otherwise a smithy spends its one good
 	# wall on a weapon rack and has nowhere left for the workbench.
+	#
+	# Among equals the room's own recipe wins: a workshop is a workshop because
+	# of its bench, and the trade's anvil can take what is left. Ordering them
+	# the other way round left one house with a forge and nothing to work at.
+	for i in range(steps.size()):
+		steps[i] = steps[i].duplicate()
+		steps[i]["order"] = i
 	steps.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return float(a["opt"]) > float(b["opt"]))
+		if not is_equal_approx(float(a["opt"]), float(b["opt"])):
+			return float(a["opt"]) > float(b["opt"])
+		return int(a["order"]) < int(b["order"]))
 
 	var blocked: Array[Rect2] = _initial_blocked(plan, room)
 	# Use zones are tracked apart from footprints. Two people may share a
@@ -423,6 +437,14 @@ static func _ensure_seating(plan: HousePlan, room: int, blocked: Array[Rect2],
 			if _count_cat(plan, room, ["seat", "bench"]) > 0:
 				return
 	_drop_the_table(plan, room, blocked, zones)
+
+
+## Is there already something in this room that the room could not do without?
+static func _has_other_must(plan: HousePlan, room: int) -> bool:
+	for f in plan.furniture_of(room):
+		if plan.furniture[f].get("must", false):
+			return true
+	return false
 
 
 static func _count_cat(plan: HousePlan, room: int, cats: Array) -> int:
@@ -537,9 +559,19 @@ static func _place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 	if choices.is_empty():
 		return
 	var key: String = choices[r.randi_range(0, choices.size() - 1)]
+	var before_place: int = plan.furniture.size()
 	match rule:
 		&"wall":
+			var had: int = plan.furniture.size()
 			_place_against_wall(plan, room, key, blocked, zones, r)
+			if plan.furniture.size() == had and not cat in WALL_ESSENTIAL:
+				# no wall will take it. A workbench can stand out in the room --
+				# a bed cannot, which is what WALL_ESSENTIAL is for -- and the
+				# placement records that it did, so the check that wants a wall
+				# behind it knows why there is none.
+				_place_free(plan, room, key, blocked, zones, r)
+				if plan.furniture.size() > had:
+					plan.furniture[-1]["free_standing"] = true
 		&"free":
 			var before: int = plan.furniture.size()
 			_place_free(plan, room, key, blocked, zones, r)
@@ -557,6 +589,12 @@ static func _place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 			_place_ceiling(plan, room, key)
 		&"on":
 			_place_on_surface(plan, room, key, r)
+	# A room that could not fit something it needed, because it was already
+	# holding the other things it needed, has made a compromise rather than a
+	# mistake -- and it is only a compromise if there WAS something else. A bed
+	# missing from an empty bedroom is still a defect, and still fails.
+	if _mandatory and plan.furniture.size() == before_place 			and _has_other_must(plan, room):
+		plan.note_compromise(room, cat)
 
 
 # ------------------------------------------------------------ floor pieces

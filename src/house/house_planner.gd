@@ -31,7 +31,32 @@ static func plan(spec: HouseSpec) -> HousePlan:
 	_place_doors(p, spec)
 	_place_windows(p, spec)
 	_glaze_the_rest(p, spec)
+	_demote_unlit(p)
 	return p
+
+
+## A room that could not be given a window is not a room anybody lives in.
+##
+## _demote_windowless catches the rooms with no outside wall at all; this one
+## catches the rest -- a kitchen whose only stretch of outside wall is taken up
+## by the back door has nowhere left to put a window, and calling it a kitchen
+## anyway would leave the daylight check failing forever. It becomes the store,
+## and the store's kind goes to a room that does have daylight.
+static func _demote_unlit(p: HousePlan) -> void:
+	for i in range(p.rooms.size()):
+		if not HouseGeometry.is_habitable(p.kind_of(i)) or not p.windows_of(i).is_empty():
+			continue
+		var swap := -1
+		for j in range(p.rooms.size()):
+			if p.kind_of(j) == &"store" and not p.windows_of(j).is_empty() 					and HouseGeometry.room_suits(p, j, p.kind_of(i)):
+				swap = j
+				break
+		if swap >= 0:
+			var mine: StringName = p.kind_of(i)
+			p.rooms[i]["kind"] = &"store"
+			p.rooms[swap]["kind"] = mine
+		else:
+			p.rooms[i]["kind"] = &"store"
 
 
 # --------------------------------------------------------------- subdivide
