@@ -1,0 +1,276 @@
+class_name HousePlanCheck
+extends RefCounted
+## Is this a plan of a house, or just a box with lines in it?
+##
+## Everything here is measured off the plan the builder actually built from.
+## The rules are the ones a person would notice being broken:
+##
+##   TILING     the rooms fill the interior exactly -- no overlaps, no leftover
+##              slivers of floor that belong to nobody
+##   SHAPE      no room is smaller or thinner than the thing it claims to be
+##   WAY IN     exactly one front door, on an exterior wall
+##   CONNECTED  every room is reachable from the front door through doors
+##   PRIVACY    no room is reachable ONLY by walking through a bedroom
+##   OPENINGS   doors and windows fit the wall they are cut into, clear of the
+##              corners and of each other
+##   DAYLIGHT   every room people live in has a window, and enough glass in it
+##   OUTSIDE    windows are on exterior walls; you cannot look from the kitchen
+##              into the bedroom through a pane of glass
+##
+## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {...}}
+
+const TOL := 0.02
+
+var failures: Array[String] = []
+var warnings: Array[String] = []
+var stats: Dictionary = {}
+
+
+func check(plan: HousePlan) -> Dictionary:
+	failures.clear()
+	warnings.clear()
+	stats.clear()
+	stats["rooms"] = plan.room_count()
+	stats["doors"] = plan.doors.size()
+	stats["windows"] = plan.windows.size()
+
+	_check_tiling(plan)
+	_check_shapes(plan)
+	_check_entrance(plan)
+	_check_connectivity(plan)
+	_check_privacy(plan)
+	_check_door_openings(plan)
+	_check_windows(plan)
+	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
+		"stats": stats}
+
+
+# ------------------------------------------------------------------ tiling
+
+## The rooms must partition the interior: no overlap, and nothing left over.
+func _check_tiling(plan: HousePlan) -> void:
+	var n: int = plan.room_count()
+	if n == 0:
+		failures.append("tiling: the house has no rooms")
+		return
+	var inner: Rect2 = HouseGeometry.interior_rect(plan.spec)
+	var sum := 0.0
+	for i in range(n):
+		var a: Rect2 = plan.rooms[i]["rect"]
+		sum += a.size.x * a.size.y
+		if not inner.grow(TOL).encloses(a):
+			failures.append("tiling: room %d (%s) sticks out of the interior"
+				% [i, String(plan.kind_of(i))])
+		for j in range(i + 1, n):
+			var b: Rect2 = plan.rooms[j]["rect"]
+			var over: Rect2 = a.intersection(b)
+			if over.size.x > TOL and over.size.y > TOL:
+				failures.append("tiling: rooms %d (%s) and %d (%s) overlap by %.2f x %.2fm"
+					% [i, String(plan.kind_of(i)), j, String(plan.kind_of(j)),
+						over.size.x, over.size.y])
+	var want: float = inner.size.x * inner.size.y
+	stats["interior_area"] = snappedf(want, 0.01)
+	if absf(sum - want) > 0.05 * want:
+		failures.append("tiling: rooms cover %.1f m2 of a %.1f m2 interior -- there is floor nobody owns"
+			% [sum, want])
+
+
+func _check_shapes(plan: HousePlan) -> void:
+	for i in range(plan.room_count()):
+		var kind: StringName = plan.kind_of(i)
+		var f: Rect2 = HouseGeometry.room_floor_rect(plan, i)
+		var who := "room %d (%s)" % [i, String(kind)]
+		if not HouseGeometry.room_suits(plan, i, kind):
+			failures.append("shape: %s is %.1f x %.1fm, too small to be a %s"
+				% [who, f.size.x, f.size.y, String(kind)])
+		if HouseGeometry.room_aspect(plan, i) > HouseGeometry.ROOM_ASPECT_MAX:
+			warnings.append("shape: %s is %.1f x %.1fm -- that is a corridor, not a room"
+				% [who, f.size.x, f.size.y])
+		if plan.doors_of(i).is_empty():
+			failures.append("shape: %s has no door at all" % who)
+
+
+# ---------------------------------------------------------------- the way in
+
+func _check_entrance(plan: HousePlan) -> void:
+	var fronts := 0
+	var exteriors := 0
+	var inner: Rect2 = HouseGeometry.interior_rect(plan.spec)
+	for d in plan.doors:
+		if not d["exterior"]:
+			continue
+		exteriors += 1
+		if d.get("front", false):
+			fronts += 1
+		if d["b"] != -1:
+			failures.append("way in: an exterior door claims to lead to room %d" % d["b"])
+		# an exterior door has to be ON an exterior wall
+		var pos: Vector2 = d["pos"]
+		var n: Vector2 = d["normal"]
+		var on_wall: bool = (absf(n.x) > 0.5 and (absf(pos.x - inner.position.x) < TOL
+				or absf(pos.x - inner.end.x) < TOL)) \
+			or (absf(n.y) > 0.5 and (absf(pos.y - inner.position.y) < TOL
+				or absf(pos.y - inner.end.y) < TOL))
+		if not on_wall:
+			failures.append("way in: exterior door at %v is not on an exterior wall" % pos)
+	if fronts != 1:
+		failures.append("way in: %d front doors -- a house has exactly one" % fronts)
+	stats["exterior_doors"] = exteriors
+
+
+func _check_connectivity(plan: HousePlan) -> void:
+	var start: int = plan.entrance_room()
+	if start < 0:
+		failures.append("connected: no front door to start from")
+		return
+	var seen: Dictionary = plan.reachable_rooms(start)
+	stats["rooms_reached"] = seen.size()
+	for i in range(plan.room_count()):
+		if not seen.has(i):
+			failures.append("connected: room %d (%s) cannot be reached from the front door"
+				% [i, String(plan.kind_of(i))])
+
+
+## You should not have to walk through somebody's bedroom to get anywhere.
+## Reachability is recomputed refusing to pass THROUGH a bedroom; anything that
+## drops out is a room that has been put behind a bed.
+func _check_privacy(plan: HousePlan) -> void:
+	var start: int = plan.entrance_room()
+	if start < 0:
+		return
+	var polite: Dictionary = plan.reachable_rooms(start, &"bedroom")
+	for i in range(plan.room_count()):
+		if plan.kind_of(i) == &"bedroom":
+			continue
+		if not polite.has(i):
+			failures.append("privacy: the only way into room %d (%s) is through a bedroom"
+				% [i, String(plan.kind_of(i))])
+
+
+# --------------------------------------------------------------- openings
+
+## A door has to fit the wall it is cut into, with masonry either side of it.
+func _check_door_openings(plan: HousePlan) -> void:
+	for di in range(plan.doors.size()):
+		var d: Dictionary = plan.doors[di]
+		var run: Array = _wall_run_for(plan, d)
+		if run.is_empty():
+			failures.append("opening: door %d is not on any wall the rooms share" % di)
+			continue
+		var t: float = float(run[0])
+		var length: float = float(run[1])
+		var w: float = float(d["width"])
+		var m: float = HouseGeometry.DOOR_CORNER_MARGIN
+		if t - w / 2.0 < -TOL or t + w / 2.0 > length + TOL:
+			failures.append("opening: door %d hangs off the end of its wall" % di)
+		elif t - w / 2.0 < m - TOL or t + w / 2.0 > length - m + TOL:
+			warnings.append("opening: door %d is within %.2fm of a corner"
+				% [di, HouseGeometry.DOOR_CORNER_MARGIN])
+		for dj in range(di + 1, plan.doors.size()):
+			var e: Dictionary = plan.doors[dj]
+			if not _same_wall(d, e):
+				continue
+			var gap: float = (Vector2(d["pos"]) - Vector2(e["pos"])).length()
+			if gap < (w + float(e["width"])) / 2.0 + 0.1:
+				failures.append("opening: doors %d and %d are cut into the same stretch of wall"
+					% [di, dj])
+
+
+## Windows: outside walls only, clear of the corners, clear of each other and
+## of the doors, and enough of them to light the room.
+func _check_windows(plan: HousePlan) -> void:
+	var inner: Rect2 = HouseGeometry.interior_rect(plan.spec)
+	for wi in range(plan.windows.size()):
+		var w: Dictionary = plan.windows[wi]
+		var pos: Vector2 = w["pos"]
+		var n: Vector2 = w["normal"]
+		var on_wall: bool = (absf(n.x) > 0.5 and (absf(pos.x - inner.position.x) < TOL
+				or absf(pos.x - inner.end.x) < TOL)) \
+			or (absf(n.y) > 0.5 and (absf(pos.y - inner.position.y) < TOL
+				or absf(pos.y - inner.end.y) < TOL))
+		if not on_wall:
+			failures.append("window %d at %v is in a partition, not an outside wall"
+				% [wi, pos])
+			continue
+		# and on the stretch of that wall its own room owns
+		var rect: Rect2 = plan.rooms[w["room"]]["rect"]
+		var t: float = pos.x if absf(n.y) > 0.5 else pos.y
+		var lo: float = rect.position.x if absf(n.y) > 0.5 else rect.position.y
+		var hi: float = rect.end.x if absf(n.y) > 0.5 else rect.end.y
+		var half: float = float(w["width"]) / 2.0
+		if t - half < lo - TOL or t + half > hi + TOL:
+			failures.append("window %d is cut into room %d's wall but sits outside the room"
+				% [wi, w["room"]])
+		if float(w["sill"]) < 0.5:
+			failures.append("window %d has a %.2fm sill -- that is a doorway"
+				% [wi, float(w["sill"])])
+		if float(w["head"]) > plan.spec.height - 0.1:
+			failures.append("window %d reaches %.2fm, through a %.2fm wall"
+				% [wi, float(w["head"]), plan.spec.height])
+		for wj in range(wi + 1, plan.windows.size()):
+			var o: Dictionary = plan.windows[wj]
+			if not _same_wall(w, o):
+				continue
+			if (Vector2(w["pos"]) - Vector2(o["pos"])).length() \
+					< (float(w["width"]) + float(o["width"])) / 2.0 + 0.05:
+				failures.append("windows %d and %d overlap on the same wall" % [wi, wj])
+		for d in plan.doors:
+			if not _same_wall(w, d):
+				continue
+			if (Vector2(w["pos"]) - Vector2(d["pos"])).length() \
+					< (float(w["width"]) + float(d["width"])) / 2.0 + 0.05:
+				failures.append("window %d is cut through a doorway" % wi)
+
+	for i in range(plan.room_count()):
+		var kind: StringName = plan.kind_of(i)
+		if not HouseGeometry.is_habitable(kind):
+			continue
+		var wins: Array[int] = plan.windows_of(i)
+		if wins.is_empty():
+			failures.append("daylight: room %d (%s) has no window" % [i, String(kind)])
+			continue
+		var glass := 0.0
+		for k in wins:
+			glass += HouseGeometry.window_area(plan.windows[k])
+		var area: float = HouseGeometry.room_area(plan, i)
+		if glass < area * HouseGeometry.GLAZING_MIN - 0.01:
+			warnings.append("daylight: room %d (%s) has %.2f m2 of glass for %.1f m2 of floor"
+				% [i, String(kind), glass, area])
+
+
+# ----------------------------------------------------------------- helpers
+
+## Where an opening sits on its wall: [distance along, wall length]. For an
+## interior door that is the shared edge of the two rooms; for an exterior one
+## it is the room's own stretch of the outside wall.
+static func _wall_run_for(plan: HousePlan, d: Dictionary) -> Array:
+	var a: int = d["a"]
+	var b: int = d["b"]
+	if b >= 0:
+		var edge: Array = HousePlanner._shared_edge(plan, a, b)
+		if edge.is_empty():
+			return []
+		var t0: float = edge[2]
+		var t1: float = edge[3]
+		var pos: Vector2 = d["pos"]
+		var along: float = pos.y if Vector2(edge[0]).x > 0.5 else pos.x
+		return [along - t0, t1 - t0]
+	var rect: Rect2 = plan.rooms[a]["rect"]
+	var n: Vector2 = d["normal"]
+	if absf(n.y) > 0.5:
+		return [float(d["pos"].x) - rect.position.x, rect.size.x]
+	return [float(d["pos"].y) - rect.position.y, rect.size.y]
+
+
+## Two openings are on the same wall when their normals share an axis and they
+## lie on the same line.
+static func _same_wall(a: Dictionary, b: Dictionary) -> bool:
+	var na: Vector2 = a["normal"]
+	var nb: Vector2 = b["normal"]
+	if (absf(na.x) > 0.5) != (absf(nb.x) > 0.5):
+		return false
+	var pa: Vector2 = a["pos"]
+	var pb: Vector2 = b["pos"]
+	if absf(na.x) > 0.5:
+		return absf(pa.x - pb.x) < 0.05
+	return absf(pa.y - pb.y) < 0.05

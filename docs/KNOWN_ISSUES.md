@@ -1,7 +1,10 @@
 # Known issues
 
-Status after commits d2eb18b, 9ac1fce, ede3e99 and the follow-up.
-All 5 suites pass: 443 checks, 0 failures, 0 warnings.
+Status after the house generator landed. All 15 suites pass; the house suites
+alone are 385 checks. The house warnings that remain are the two the harness is
+designed to report rather than hide: rooms with less glass than the daylight
+rule asks for, and rooms that gave up a piece of furniture so the rooms beyond
+them could be reached.
 
 ## Fixed
 
@@ -48,7 +51,44 @@ All 5 suites pass: 443 checks, 0 failures, 0 warnings.
   polyline that began and ended at the same point.
 - Duplicated 4×15 test fixture folded into `TestSweep`.
 
+## Fixed by the castle work
+
+- **The box emitter and the stepped taper were written four times over**
+  (issue 2 below). Both live in `MeshKit` now, and `core/mass_builder.gd`
+  holds the logs and the kit for both builders.
+- **The voxel rasterizer existed once, inside `BlueprintQA`.** It is
+  `qa/voxel_grid.gd` now, and the castle sweep uses it. Its voxel size is
+  chosen per building: a 300 m fortress at half-metre voxels is 24 million
+  cells, and the dilation pass alone outran every other suite combined.
+- **`revolve()` emitted the degenerate apex ring of every cone and dome.**
+  Zero-area triangles can only carry an invented normal; they are dropped now,
+  which also took the church normals warnings from 72 down to 40.
+- **The three structural rules were welded to the church.** They are
+  `qa/mass_rules.gd`, parameterised by a joint table; `MassingCheck` and
+  `CastleMassingCheck` supply their own.
+
 ## Open
+
+### 0. The blueprint sheet only draws churches
+The Studio shows a room-by-room contents list for a house and a note for a
+castle, but `BlueprintView` still only draws a plan and elevation for a
+`ChurchSpec`. A house plan is the obvious next sheet to draw -- the rooms,
+doors and windows are all in `HousePlan` already.
+
+### 0b. Houses are one storey
+No stairs, no loft, no cellar below ground. The room programme, the nav check
+and the archetypes all assume a single floor; a second storey would need a
+stair as a room kind and a nav check that knows how to climb it.
+
+### 0c. The full suite takes about nine minutes
+The house suites generate every house three times over -- once per suite -- and
+generating a house now includes walking it. Caching the sweep between suites
+would cut it to a third.
+
+### 0d. Interiors are lit by the sun alone
+`HouseAssembler` places lamps, sconces and candles as models, but no
+`OmniLight3D` goes with them, so a house photographed with its roof on is dark
+inside. The furnishing check already knows which props are lights.
 
 ### 1. `src/building/` is a superseded draft awaiting a decision
 `building_spec.gd`, `spec_generator.gd`, `building_builder.gd`, `main.gd`,

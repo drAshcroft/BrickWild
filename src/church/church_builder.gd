@@ -1,5 +1,5 @@
 class_name ChurchBuilder
-extends RefCounted
+extends MassBuilder
 ## ChurchSpec -> ArrayMesh. Massing-first: nave box, optional aisles, transept,
 ## apse (half-cylinder), west tower + roof, then window/door/trim detailing.
 ##
@@ -18,37 +18,10 @@ const TOWER_EMBED := ChurchGeometry.TOWER_EMBED
 const APSE_EMBED := ChurchGeometry.APSE_EMBED
 
 var spec: ChurchSpec
-var _kit: MeshKit
-var total_height := 0.0
-## QA log: one entry per primitive placed during build().
-## {kind:"box", pos:Vector3, size:Vector3, rot_y:float, tag:String}
-var part_log: Array = []
-## QA log: one entry per STRUCTURAL MASS (the load-bearing volumes a person
-## would name when describing the building). Unlike part_log this records the
-## true world-space AABB of the volume as actually emitted, so correctness
-## checks measure geometry rather than re-deriving it from the spec.
-## {name:String, aabb:AABB}
-var mass_log: Array[Dictionary] = []
-var _tag := ""
-
-func _log_part(kind: String, pos: Vector3, size := Vector3.ZERO, rot_y := 0.0,
-		facing := Vector3.ZERO) -> void:
-	part_log.append({"kind": kind, "pos": pos, "size": size, "rot_y": rot_y,
-		"facing": facing, "tag": _tag})
-
-## Record a structural mass by its true world AABB.
-func _log_mass(mass_name: String, aabb: AABB) -> void:
-	mass_log.append({"name": mass_name, "aabb": aabb.abs()})
-
-## Tag subsequent parts (e.g. "nave", "transept", "tower") for diagnostics.
-func tag(t: String) -> void:
-	_tag = t
 
 func build(p_spec: ChurchSpec) -> ArrayMesh:
 	spec = p_spec
-	part_log.clear()
-	mass_log.clear()
-	_kit = MeshKit.new(4)
+	begin(4)
 
 	var w: float = spec.width
 	var l: float = spec.length
@@ -269,7 +242,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	_build_crossing_tower()
 	_build_dome()
 
-	return _kit.commit()
+	return commit()
 
 
 ## The nave roof, in one run or two.
@@ -500,11 +473,6 @@ func _dome_profile(radius: float, rise: float) -> PackedVector2Array:
 	return pts
 
 # ---------------------------------------------------------------- primitives
-
-## Structural box. Logged for QA, then handed to the shared kit.
-func box(size: Vector3, pos: Vector3, s: int, rot_y := 0.0, shear := 0.0) -> void:
-	_log_part("box", pos, size, rot_y)
-	_kit.box(size, pos, s, rot_y, shear)
 
 ## Gable capping a wall whose top is at y_base.
 func gable_roof(span_x: float, along_z: float, rise: float, z_center: float, s: int,

@@ -1,21 +1,22 @@
 class_name MassingCheck
 extends RefCounted
-## Correctness checks over a church's structural masses.
+## Correctness checks over a CHURCH's structural masses.
 ##
-## Three properties, all measured from the geometry the builder actually
-## emitted (via ChurchBuilder.mass_log) rather than re-derived from the spec.
-## Re-deriving is what made the older parts_join check a tautology: it compared
-## a formula against itself and could never fail.
+## The three structural rules themselves live in MassRules, which the castle
+## checker uses too. What belongs here is only what is specific to a church:
+## its joint table, and the dimensions its spec asked for.
 ##
-##   NO GAPS     every mass touches the assembly; nothing floats
-##   NO OVERLAP  masses interpenetrate only at joints designed to, and only
-##               as deep as that joint declares
+##   NO GAPS     every mass touches the assembly; nothing floats     (MassRules)
+##   NO OVERLAP  only designed joints interpenetrate, only that deep (MassRules)
 ##   SIZE MATCH  emitted masses match the dimensions the spec asked for
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {...}}
 
-const TOL := 0.05          # metres of slack on every comparison
-const JOIN_TOL := 0.02     # max separation still counted as "touching"
+const TOL := MassRules.TOL
+## Mass name prefixes that fold to a family for the joint table.
+const FAMILIES := ["aisle", "chapel", "flyer_pier", "flyer_arch", "tower"]
+## Masses carried on the walls below them rather than standing on the ground.
+const CARRIED := ["dome_drum", "pendentive", "flyer_arch"]
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -95,38 +96,6 @@ static func _allowance(spec: ChurchSpec, a: String, b: String) -> float:
 	return 0.0
 
 
-## Masses are named per instance (aisle_left_1, chapel_3, tower_right); the
-## allowance table is keyed by family.
-static func _family(n: String) -> String:
-	for prefix in ["aisle", "chapel", "flyer_pier", "flyer_arch", "tower"]:
-		if n.begins_with(prefix):
-			return prefix
-	return n
-
-
-## Separation between two AABBs: 0 if they touch or overlap, else the gap.
-static func _separation(a: AABB, b: AABB) -> float:
-	var s := 0.0
-	for axis in range(3):
-		var lo: float = maxf(a.position[axis], b.position[axis])
-		var hi: float = minf(a.position[axis] + a.size[axis], b.position[axis] + b.size[axis])
-		s = maxf(s, lo - hi)
-	return maxf(s, 0.0)
-
-
-## Penetration depth of two overlapping AABBs: the shallowest axis of overlap.
-## Zero when they merely touch or are apart.
-static func _penetration(a: AABB, b: AABB) -> float:
-	var d := INF
-	for axis in range(3):
-		var lo: float = maxf(a.position[axis], b.position[axis])
-		var hi: float = minf(a.position[axis] + a.size[axis], b.position[axis] + b.size[axis])
-		if hi <= lo:
-			return 0.0
-		d = minf(d, hi - lo)
-	return d
-
-
 func check(spec: ChurchSpec, builder: ChurchBuilder) -> Dictionary:
 	failures.clear()
 	warnings.clear()
@@ -138,86 +107,28 @@ func check(spec: ChurchSpec, builder: ChurchBuilder) -> Dictionary:
 		failures.append("massing: builder logged no structural masses")
 		return _report()
 
-	_check_no_gaps(masses)
-	_check_no_overlap(spec, masses)
+	var g: Dictionary = MassRules.gaps(masses, "nave")
+	_add(g["failures"])
+	stats["masses_joined"] = g["joined"]
+
+	var o: Dictionary = MassRules.overlaps(masses,
+		func(a: String, b: String) -> float: return _allowance(spec, a, b), FAMILIES)
+	_add(o["failures"])
+	stats["worst_penetration"] = o["worst"]
+
+	_add(MassRules.grounded(masses, CARRIED))
 	_check_size_match(spec, builder, masses)
 	return _report()
+
+
+func _add(msgs) -> void:
+	for m in msgs:
+		failures.append(str(m))
 
 
 func _report() -> Dictionary:
 	return {"ok": failures.is_empty(), "failures": failures,
 		"warnings": warnings, "stats": stats}
-
-
-# --------------------------------------------------------------- no gaps
-
-## Every mass must be reachable from the nave through touching neighbours.
-## A detached mass is reported with the size of its gap.
-func _check_no_gaps(masses: Array[Dictionary]) -> void:
-	var n: int = masses.size()
-	var start := -1
-	for i in range(n):
-		if masses[i]["name"] == "nave":
-			start = i
-			break
-	if start < 0:
-		failures.append("no_gaps: no nave mass to anchor the assembly")
-		return
-
-	var seen := {start: true}
-	var stack: Array[int] = [start]
-	while not stack.is_empty():
-		var cur: int = stack.pop_back()
-		for j in range(n):
-			if seen.has(j):
-				continue
-			if _separation(masses[cur]["aabb"], masses[j]["aabb"]) <= JOIN_TOL:
-				seen[j] = true
-				stack.append(j)
-
-	stats["masses_joined"] = seen.size()
-	for i in range(n):
-		if seen.has(i):
-			continue
-		# nearest neighbour, to describe the gap usefully
-		var best := INF
-		var near := ""
-		for j in range(n):
-			if i == j:
-				continue
-			var s: float = _separation(masses[i]["aabb"], masses[j]["aabb"])
-			if s < best:
-				best = s
-				near = masses[j]["name"]
-		failures.append("no_gaps: %s floats free -- nearest mass (%s) is %.2fm away"
-			% [masses[i]["name"], near, best])
-
-
-# ------------------------------------------------------------ no overlap
-
-## Masses may interpenetrate only where a joint declares it, and only that deep.
-func _check_no_overlap(spec: ChurchSpec, masses: Array[Dictionary]) -> void:
-	var n: int = masses.size()
-	var worst := 0.0
-	for i in range(n):
-		for j in range(i + 1, n):
-			var an: String = masses[i]["name"]
-			var bn: String = masses[j]["name"]
-			var allowed: float = _allowance(spec, _family(an), _family(bn))
-			if is_inf(allowed):
-				continue
-			var pen: float = _penetration(masses[i]["aabb"], masses[j]["aabb"])
-			if pen <= 0.0:
-				continue
-			worst = maxf(worst, pen)
-			if pen > allowed + TOL:
-				if allowed <= 0.0:
-					failures.append("no_overlap: %s and %s interpenetrate %.2fm; they must not touch"
-						% [an, bn, pen])
-				else:
-					failures.append("no_overlap: %s into %s by %.2fm, joint allows %.2fm"
-						% [an, bn, pen, allowed])
-	stats["worst_penetration"] = snappedf(worst, 0.01)
 
 
 # ------------------------------------------------------------ size match
@@ -281,17 +192,6 @@ func _check_size_match(spec: ChurchSpec, builder: ChurchBuilder,
 	if spec.crossing_tower and by_name.has("crossing_tower"):
 		_expect("crossing tower height", by_name["crossing_tower"].size.y,
 			spec.crossing_tower_height)
-
-	# Every mass must stand on the ground plane -- except the ones that are
-	# carried on the walls below them, which is the whole point of a dome.
-	const CARRIED := ["dome_drum", "pendentive"]
-	for m in masses:
-		var nm: String = m["name"]
-		if nm in CARRIED or nm.begins_with("flyer_arch"):
-			continue
-		var y0: float = m["aabb"].position.y
-		if y0 > TOL:
-			failures.append("size_match: %s floats %.2fm above ground" % [nm, y0])
 
 
 func _expect(what: String, got: float, want: float) -> void:

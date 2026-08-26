@@ -4,6 +4,7 @@ extends SceneTree
 ##
 ##   Run everything:  godot --headless --script res://tests/run_all.gd
 ##   Run one suite:   godot --headless --script res://tests/run_all.gd -- massing
+##   Run several:     godot --headless --script res://tests/run_all.gd -- castle cmassing
 ##
 ## Exits nonzero if any suite fails.
 
@@ -13,8 +14,19 @@ extends SceneTree
 ##   3 massing    - structural correctness of what that contract produced
 ##   4 blueprint  - the drawing agrees with the model
 ##   5 landmark   - the famous churches this generator must be able to build
-##   6 voxelqa    - exhaustive rasterized checks (slow)
-const ORDER: Array[String] = ["church", "normals", "massing", "blueprint", "landmark", "voxelqa"]
+##   6 castle     - the castle spec/build contract, tier by tier
+##   7 cnormals   - the castle's surfaces and openings
+##   8 cmassing   - structural correctness of what the castle contract produced
+##   9 clandmark  - the famous fortifications this generator must be able to build
+##  10 voxelqa    - exhaustive rasterized checks of the churches (slow)
+##  11 cvoxelqa   - the same, for the castles (slow)
+##  12 house      - the house spec/plan/build contract
+##  13 assets     - the prop catalogue still describes the props
+##  14 houseqa    - plan, furnishing and circulation of every house
+##  15 harchetype - the dwellings this generator must be able to furnish
+const ORDER: Array[String] = ["church", "normals", "massing", "blueprint", "landmark",
+	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa",
+	"house", "assets", "houseqa", "harchetype"]
 
 
 static func _run_one(key: String) -> SuiteResult:
@@ -29,8 +41,26 @@ static func _run_one(key: String) -> SuiteResult:
 			return BlueprintMatchSuite.run()
 		"landmark":
 			return LandmarkSuite.run()
+		"castle":
+			return CastleSuite.run()
+		"cnormals":
+			return CastleNormalsSuite.run()
+		"cmassing":
+			return CastleMassingSuite.run()
+		"clandmark":
+			return CastleLandmarkSuite.run()
 		"voxelqa":
 			return BlueprintQASuite.run()
+		"cvoxelqa":
+			return CastleQASuite.run()
+		"house":
+			return HouseSuite.run()
+		"assets":
+			return HouseAssetsSuite.run()
+		"houseqa":
+			return HouseQASuite.run()
+		"harchetype":
+			return HouseArchetypeSuite.run()
 	return null
 
 

@@ -39,6 +39,37 @@ func _init() -> void:
 		manifest.append({"key": shot["file"].get_basename(), "title": shot["title"],
 			"caption": shot["caption"], "file": shot["file"], "kind": "detail"})
 
+	# ---- the landmark castles, three-quarter view from the GATE side ----
+	# Every one of these puts its entrance at -Z, so the yaws below sit the
+	# camera on that side: a castle shot from behind is a wall.
+	for entry in _castles():
+		var cspec: CastleSpec = _castle_spec(entry)
+		var cfile: String = "castle_%s.jpg" % entry["key"]
+		await _shoot_castle(cspec, cfile, entry.get("yaw", 0.72),
+			entry.get("pitch", -0.30), entry.get("zoom", 1.0))
+		manifest.append(_describe_castle(entry, cspec, cfile))
+
+	# ---- the furnished houses, roof off ----
+	for entry in _houses():
+		var made: Array = _house_plan(entry)
+		var hfile: String = "house_%s.jpg" % entry["key"]
+		await _shoot_house(made[1], hfile, entry.get("yaw", 0.9),
+			entry.get("pitch", -0.78), entry.get("zoom", 0.78))
+		manifest.append(_describe_house(entry, made[0], made[1], hfile))
+	# a close-up of one room, to show the furniture rather than the plan
+	var close: Array = _house_plan(_houses()[4])
+	await _shoot_house(close[1], "house_room.jpg", 1.5, -0.42, 0.34)
+	manifest.append({"key": "house_room", "title": "The common room",
+		"caption": "Table, benches drawn up to it, tableware set on it, sconces on the wall -- each placed by a rule and then checked.",
+		"file": "house_room.jpg", "kind": "house"})
+
+	# and one of them from outside, with its roof on
+	var street: Array = _house_plan(_houses()[1])
+	await _shoot_house(street[1], "house_exterior.jpg", 2.4, -0.22, 1.0, false)
+	manifest.append({"key": "house_exterior", "title": "A cottage from the lane",
+		"caption": "The same generator with the roof left on: thatch, chimney, porch and shuttered windows.",
+		"file": "house_exterior.jpg", "kind": "house"})
+
 	# ---- blueprint sheets ----
 	for entry in _landmarks():
 		if not entry.get("sheet", false):
@@ -217,6 +248,165 @@ func _force_features(spec: ChurchSpec, key: String) -> void:
 		spec.buttress_count_per_side = maxi(spec.buttress_count_per_side, 5)
 
 
+## The famous fortifications, from docs/CASTLES.md. Same rows the castle
+## landmark suite builds, so a portrait here is a picture of a tested building.
+func _castles() -> Array[Dictionary]:
+	return [
+		{"key": "bodiam", "style": &"edwardian", "tier": &"castle",
+			"title": "Bodiam Castle", "w": 55.0, "l": 50.0, "h": 18.0, "seed": 6001,
+			"feat": "quadrangular plan, four drum towers, twin-towered gatehouse",
+			"yaw": 2.45, "pitch": -0.26},
+		{"key": "krak", "style": &"crusader", "tier": &"fortress",
+			"title": "Krak des Chevaliers", "w": 300.0, "l": 140.0, "h": 20.0,
+			"seed": 6002, "feat": "concentric: two enceintes and a battered talus",
+			"yaw": 2.30, "pitch": -0.17, "zoom": 0.86},
+		{"key": "chambord", "style": &"french_chateau", "tier": &"fortress",
+			"title": "Chateau de Chambord", "w": 156.0, "l": 117.0, "h": 32.0,
+			"seed": 6003, "feat": "corner drums under conical roofs, dormered ranges",
+			"yaw": 2.55, "pitch": -0.24},
+		{"key": "caernarfon", "style": &"edwardian", "tier": &"castle",
+			"title": "Caernarfon Castle", "w": 170.0, "l": 60.0, "h": 12.0,
+			"seed": 6004, "feat": "polygonal mural towers along a long curtain",
+			"yaw": 2.05, "pitch": -0.16, "zoom": 0.88},
+		{"key": "himeji", "style": &"japanese", "tier": &"castle",
+			"title": "Himeji Castle", "w": 60.0, "l": 50.0, "h": 15.0, "seed": 6005,
+			"feat": "tiered tenshu on a battered stone base",
+			"yaw": 2.50, "pitch": -0.24},
+		{"key": "neuschwanstein", "style": &"bavarian", "tier": &"castle",
+			"title": "Neuschwanstein", "w": 150.0, "l": 40.0, "h": 25.0,
+			"seed": 6006, "feat": "a ridge of ranges under tall conical spires",
+			"yaw": 2.10, "pitch": -0.20},
+		{"key": "stokesay", "style": &"norman", "tier": &"manor",
+			"title": "Stokesay Castle", "w": 30.0, "l": 24.0, "h": 10.0, "seed": 6007,
+			"feat": "fortified manor: a hall between two towers",
+			"yaw": 2.60, "pitch": -0.26},
+		{"key": "longhouse", "style": &"norman", "tier": &"house",
+			"title": "Medieval longhouse", "w": 6.5, "l": 18.0, "h": 4.5,
+			"seed": 6008, "feat": "one range, one ridge, one chimney stack",
+			"yaw": 2.35, "pitch": -0.22},
+	]
+
+
+func _castle_spec(entry: Dictionary) -> CastleSpec:
+	var spec := CastleSpec.new()
+	spec.style = entry["style"]
+	spec.tier_override = entry["tier"]
+	spec.width = entry["w"]
+	spec.length = entry["l"]
+	spec.height = entry["h"]
+	CastleGenerator.generate(spec, entry["seed"])
+	# the suite owns what makes each landmark itself; reusing it here is what
+	# keeps the portraits honest about what is actually tested
+	CastleLandmarkSuite._force_features(entry["key"], spec)
+	return spec
+
+
+func _describe_castle(entry: Dictionary, spec: CastleSpec, file: String) -> Dictionary:
+	var bits: Array[String] = []
+	if spec.corner_towers:
+		bits.append("corner towers")
+	if spec.side_towers > 0:
+		bits.append("%d mural towers/side" % spec.side_towers)
+	if spec.gatehouse:
+		bits.append("twin-towered gatehouse" if spec.gate_towers else "gatehouse")
+	if spec.inner_ward:
+		bits.append("inner ward + causeway")
+	if spec.barbican:
+		bits.append("barbican")
+	if spec.keep:
+		bits.append("%s keep" % String(spec.keep_shape))
+	if spec.hall:
+		bits.append("great hall")
+	if spec.chapel:
+		bits.append("chapel")
+	if spec.wings > 0:
+		bits.append("%d cross wing%s" % [spec.wings, "s" if spec.wings > 1 else ""])
+	if spec.courtyard:
+		bits.append("courtyard range")
+	if spec.chimneys > 0:
+		bits.append("%d chimney stacks" % spec.chimneys)
+	return {
+		"key": "castle_" + entry["key"], "title": entry["title"], "file": file,
+		"kind": "castle", "tier": String(spec.tier), "famous_for": entry["feat"],
+		"dims": "%.0f x %.0f x %.0f m site" % [spec.width, spec.length, spec.height],
+		"height": "%.1f m to the top" % CastleGeometry.total_height(spec),
+		"built": ", ".join(bits),
+		"variant": spec.variant_name,
+	}
+
+
+## The furnished dwellings, from docs/HOUSES.md. Same archetypes the house
+## suite builds, so a portrait here is a picture of a tested house.
+func _houses() -> Array[Dictionary]:
+	return [
+		{"key": "one_room_cottage", "style": &"cottage", "trade": &"none",
+			"title": "One-room cottage", "w": 5.5, "l": 7.0, "h": 2.4, "seed": 8101,
+			"feat": "one room: the bed in the corner, the table by the door",
+			"yaw": 0.8, "pitch": -0.85},
+		{"key": "family_cottage", "style": &"cottage", "trade": &"none",
+			"title": "Family cottage", "w": 8.0, "l": 10.5, "h": 2.6, "seed": 8102,
+			"feat": "hall, kitchen and a bedroom off the back",
+			"yaw": 0.9, "pitch": -0.8},
+		{"key": "smithy", "style": &"longhall", "trade": &"smith",
+			"title": "Smith's house", "w": 11.0, "l": 13.0, "h": 2.8, "seed": 8103,
+			"feat": "a forge in the workshop: anvil, bench, weapon stand",
+			"yaw": 0.95, "pitch": -0.8},
+		{"key": "alchemist", "style": &"witch_hut", "trade": &"alchemist",
+			"title": "Alchemist's house", "w": 9.5, "l": 12.0, "h": 2.7, "seed": 8104,
+			"feat": "bookcase, cauldron and a bench of bottles",
+			"yaw": 0.75, "pitch": -0.82},
+		{"key": "inn", "style": &"townhouse", "trade": &"innkeeper",
+			"title": "Village inn", "w": 13.0, "l": 16.0, "h": 2.9, "seed": 8105,
+			"feat": "common room, parlour, guest rooms and a cellar",
+			"yaw": 1.05, "pitch": -0.85},
+		{"key": "farmhouse", "style": &"farmhouse", "trade": &"farmer",
+			"title": "Farmhouse", "w": 10.0, "l": 13.0, "h": 2.7, "seed": 8106,
+			"feat": "stores of barrels and crates off the kitchen",
+			"yaw": 0.85, "pitch": -0.82},
+	]
+
+
+## A house for a portrait -- and it is put through the same harness the suites
+## use before it is photographed. A render is documentation, and documenting a
+## house that would fail its own checks is worse than not documenting one.
+func _house_plan(entry: Dictionary) -> Array:
+	var spec := HouseSpec.new()
+	spec.style = entry["style"]
+	spec.trade = entry["trade"]
+	spec.width = entry["w"]
+	spec.length = entry["l"]
+	spec.height = entry["h"]
+	var plan: HousePlan = HouseGenerator.generate(spec, entry["seed"])
+	var builder := HouseBuilder.new()
+	builder.build(plan)
+	var rep: Dictionary = HouseQA.new().check(plan, builder)
+	if not rep["ok"]:
+		printerr("  %s FAILS its own checks:" % entry["key"])
+		for f in rep["failures"]:
+			printerr("     " + str(f))
+	var rooms: Array[String] = []
+	for i in range(plan.room_count()):
+		rooms.append("%s(%d)" % [String(plan.kind_of(i)), plan.furniture_of(i).size()])
+	print("  %-18s %s" % [entry["key"], ", ".join(rooms)])
+	return [spec, plan]
+
+
+func _describe_house(entry: Dictionary, spec: HouseSpec, plan: HousePlan,
+		file: String) -> Dictionary:
+	var rooms: Array[String] = []
+	for i in range(plan.room_count()):
+		rooms.append(String(plan.kind_of(i)))
+	return {
+		"key": "house_" + entry["key"], "title": entry["title"], "file": file,
+		"kind": "house", "trade": String(spec.trade), "famous_for": entry["feat"],
+		"dims": "%.1f x %.1f m" % [spec.width, spec.length],
+		"built": "%s; %d doors, %d windows, %d pieces of furniture"
+			% [", ".join(rooms), plan.doors.size(), plan.windows.size(),
+				plan.furniture.size()],
+		"variant": spec.variant_name,
+	}
+
+
 # -------------------------------------------------------------------- stage
 
 func _build_stage() -> void:
@@ -281,10 +471,49 @@ func _build_stage() -> void:
 
 func _shoot_church(spec: ChurchSpec, file: String, yaw: float, pitch: float,
 		zoom := 1.0, focus := Vector3.INF, frame_radius := 0.0) -> void:
-	var builder := ChurchBuilder.new()
-	var mesh: ArrayMesh = builder.build(spec)
+	await _shoot_mesh(ChurchBuilder.new().build(spec),
+		[spec.stone_color, spec.trim_color, spec.roof_color, Color("15171b")],
+		file, yaw, pitch, zoom, focus, frame_radius)
+
+
+func _shoot_castle(spec: CastleSpec, file: String, yaw: float, pitch: float,
+		zoom := 1.0) -> void:
+	await _shoot_mesh(CastleBuilder.new().build(spec),
+		[spec.stone_color, spec.trim_color, spec.roof_color, Color("15171b")],
+		file, yaw, pitch, zoom)
+
+
+## A furnished house: the shell plus every prop in it, framed from above so the
+## rooms can be read. The roof comes off for these -- a furnished interior
+## cannot be photographed through its own thatch.
+func _shoot_house(plan: HousePlan, file: String, yaw: float, pitch: float,
+		zoom := 1.0, cutaway := true) -> void:
+	_mesh_inst.mesh = null
+	var node: Node3D = HouseAssembler.build(plan, cutaway)
+	_root3d.add_child(node)
+	await process_frame
+	var aabb: AABB = _node_aabb(node)
+	var centre: Vector3 = aabb.get_center()
+	var radius: float = maxf(aabb.size.length() / 2.0, 1.0)
+	var dist: float = radius / tan(deg_to_rad(_cam.fov) / 2.0) * 1.12 * zoom
+	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
+	_cam.position = centre + dir * dist
+	_cam.look_at(centre, Vector3.UP)
+	await _capture(file)
+	node.queue_free()
+
+
+## The bounds of an assembled scene, props included.
+static func _node_aabb(node: Node) -> AABB:
+	return SceneBounds.of_node(node)
+
+
+## Frame a built mesh and save one image. Both generators hand this the same
+## four surfaces, so the stage does not need to know which it is looking at.
+func _shoot_mesh(mesh: ArrayMesh, cols: Array, file: String, yaw: float,
+		pitch: float, zoom := 1.0, focus := Vector3.INF,
+		frame_radius := 0.0) -> void:
 	_mesh_inst.mesh = mesh
-	var cols := [spec.stone_color, spec.trim_color, spec.roof_color, Color("15171b")]
 	for i in range(mesh.get_surface_count()):
 		var m := StandardMaterial3D.new()
 		m.albedo_color = cols[i]

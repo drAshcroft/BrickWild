@@ -100,6 +100,13 @@ static func _face_normal(a: Vector3, b: Vector3, c: Vector3) -> Vector3:
 	return n.normalized() if n.length_squared() > 0.0 else Vector3.UP
 
 
+## A triangle with no area: two of its corners coincide. The apex ring of a
+## cone is a whole row of them, and a zero-area triangle can only carry an
+## invented normal, so emitters drop these rather than shipping them.
+static func _degenerate(a: Vector3, b: Vector3, c: Vector3) -> bool:
+	return (c - a).cross(b - a).length_squared() < 1e-12
+
+
 # ------------------------------------------------------------------- roofs
 
 ## One sloped roof slab: eave at (x = +/-half_span, y = y_base), ridge at
@@ -113,7 +120,7 @@ func slab(along: float, rise: float, half_span: float, side: float, zc: float,
 	oriented_box(Vector3(slope_len, thickness, along), t, surf)
 
 
-## Two-sided gable capping a wall whose top is at y_base.
+## Two-sided gable capping a wall whose top is at y_base, ridge along Z.
 ##
 ## end_surf >= 0 also walls in the triangle under each slope. Without those the
 ## roof was two floating planes and you looked straight into the void along the
@@ -122,18 +129,39 @@ func slab(along: float, rise: float, half_span: float, side: float, zc: float,
 func gable_roof(span_x: float, along_z: float, rise: float, z_center: float,
 		surf: int, y_base := 0.0, end_surf := -1, end_span := 0.0,
 		end_along := 0.0, end_thick := 0.3) -> void:
+	ridge_roof(Transform3D(Basis(), Vector3(0.0, y_base, z_center)),
+		span_x, along_z, rise, surf, end_surf, end_span, end_along, end_thick)
+
+
+## The same roof, placed by an arbitrary transform. Local space has the wall top
+## at y = 0 and the ridge running along local Z, so a yaw of PI/2 turns a range
+## that runs across X instead of along it -- which is most of a manor.
+##
+## gable_roof() is this function with the identity basis; keeping one
+## implementation is what stops the two drifting, as the four copies of the box
+## emitter once did.
+func ridge_roof(xf: Transform3D, span_x: float, along_z: float, rise: float,
+		surf: int, end_surf := -1, end_span := 0.0, end_along := 0.0,
+		end_thick := 0.3) -> void:
+	var half: float = span_x / 2.0
+	var slope_len: float = sqrt(half * half + rise * rise)
+	var ang: float = atan2(rise, half)
 	for side in [-1.0, 1.0]:
-		slab(along_z, rise, span_x / 2.0, side, z_center, surf, y_base)
-	box(Vector3(0.35, 0.25, along_z + 0.2), Vector3(0, y_base + rise + 0.1, z_center), surf)
-	if end_surf >= 0:
-		var ex: float = (end_span if end_span > 0.0 else span_x) / 2.0
-		var ez: float = (end_along if end_along > 0.0 else along_z) / 2.0
-		# The tympanum rises to the ridge over the wall, not over the eave, so
-		# its apex is scaled by how far the wall stops short of the slab edge.
-		var apex: float = rise * (ex / (span_x / 2.0))
-		for end_v in [-1.0, 1.0]:
-			var zf: float = z_center + end_v * ez
-			gable_end(ex, apex, y_base, zf - end_v * end_thick, zf, end_surf)
+		var t: Transform3D = xf * Transform3D(Basis(Vector3(0, 0, 1), -side * ang),
+			Vector3(side * half / 2.0, rise / 2.0, 0.0))
+		oriented_box(Vector3(slope_len, 0.24, along_z), t, surf)
+	oriented_box(Vector3(0.35, 0.25, along_z + 0.2),
+		xf * Transform3D(Basis(), Vector3(0.0, rise + 0.1, 0.0)), surf)
+	if end_surf < 0:
+		return
+	var ex: float = (end_span if end_span > 0.0 else span_x) / 2.0
+	var ez: float = (end_along if end_along > 0.0 else along_z) / 2.0
+	# The tympanum rises to the ridge over the wall, not over the eave, so its
+	# apex is scaled by how far the wall stops short of the slab edge.
+	var apex: float = rise * (ex / half)
+	for end_v in [-1.0, 1.0]:
+		var zf: float = end_v * ez
+		gable_end_at(xf, ex, apex, zf - end_v * end_thick, zf, end_surf)
 
 
 ## The triangular wall under a gable: apex over x = 0 at y_base + rise, extruded
@@ -141,18 +169,25 @@ func gable_roof(span_x: float, along_z: float, rise: float, z_center: float,
 ## out along their own side of the extrusion rather than both the same way.
 func gable_end(half_span: float, rise: float, y_base: float,
 		z_back: float, z_front: float, surf: int) -> void:
+	gable_end_at(Transform3D(Basis(), Vector3(0.0, y_base, 0.0)),
+		half_span, rise, z_back, z_front, surf)
+
+
+## gable_end() in the local space of `xf`, whose origin is the wall top.
+func gable_end_at(xf: Transform3D, half_span: float, rise: float,
+		z_back: float, z_front: float, surf: int) -> void:
 	var lo: float = minf(z_back, z_front)
 	var hi: float = maxf(z_back, z_front)
 	var xy := [
-		Vector2(-half_span, y_base),
-		Vector2(half_span, y_base),
-		Vector2(0.0, y_base + rise),
+		Vector2(-half_span, 0.0),
+		Vector2(half_span, 0.0),
+		Vector2(0.0, rise),
 	]
 	var at_lo: Array = []
 	var at_hi: Array = []
 	for p in xy:
-		at_lo.append(Vector3(p.x, p.y, lo))
-		at_hi.append(Vector3(p.x, p.y, hi))
+		at_lo.append(xf * Vector3(p.x, p.y, lo))
+		at_hi.append(xf * Vector3(p.x, p.y, hi))
 	var st: SurfaceTool = _sts[surf]
 	_tri(st, at_lo[0], at_lo[1], at_lo[2])      # faces -Z
 	_tri(st, at_hi[0], at_hi[2], at_hi[1])      # faces +Z
@@ -178,16 +213,29 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> v
 ## Cannibalised from the house builder, the only place it existed.
 func hip_roof(span_x: float, along_z: float, rise: float, z_center: float,
 		surf: int, y_base := 0.0) -> void:
+	hip_roof_at(Transform3D(Basis(), Vector3(0.0, y_base, z_center)),
+		span_x, along_z, rise, surf)
+
+
+## hip_roof() placed by an arbitrary transform; local origin is the wall top.
+func hip_roof_at(xf: Transform3D, span_x: float, along_z: float, rise: float,
+		surf: int) -> void:
+	var half: float = span_x / 2.0
+	var slope_len_x: float = sqrt(half * half + rise * rise)
+	var ang_x: float = atan2(rise, half)
 	for side in [-1.0, 1.0]:
-		slab(along_z * 0.72, rise, span_x / 2.0, side, z_center, surf, y_base)
+		var t: Transform3D = xf * Transform3D(Basis(Vector3(0, 0, 1), -side * ang_x),
+			Vector3(side * half / 2.0, rise / 2.0, 0.0))
+		oriented_box(Vector3(slope_len_x, 0.24, along_z * 0.72), t, surf)
 	var half_along: float = along_z / 2.0
 	var slope_len: float = sqrt(half_along * half_along + rise * rise)
 	var ang: float = atan2(rise, half_along)
 	for end_v in [-1.0, 1.0]:
-		var t := Transform3D(Basis(Vector3(1, 0, 0), end_v * ang),
-			Vector3(0, y_base + rise / 2.0, z_center + end_v * half_along / 2.0))
-		oriented_box(Vector3(span_x * 0.72, 0.24, slope_len), t, surf)
-	box(Vector3(0.35, 0.25, along_z * 0.4), Vector3(0, y_base + rise + 0.1, z_center), surf)
+		var t2: Transform3D = xf * Transform3D(Basis(Vector3(1, 0, 0), end_v * ang),
+			Vector3(0.0, rise / 2.0, end_v * half_along / 2.0))
+		oriented_box(Vector3(span_x * 0.72, 0.24, slope_len), t2, surf)
+	oriented_box(Vector3(0.35, 0.25, along_z * 0.4),
+		xf * Transform3D(Basis(), Vector3(0.0, rise + 0.1, 0.0)), surf)
 
 
 ## Lean-to (single pitch) roof, from an outer eave up to a wall.
@@ -264,6 +312,8 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 			# and sharing the first triangle's normal with the second left a
 			# visible crease running up every ring of every revolved surface.
 			for tri in [[0, 1, 2], [0, 2, 3]]:
+				if _degenerate(v[tri[0]], v[tri[1]], v[tri[2]]):
+					continue
 				var n: Vector3 = _face_normal(v[tri[0]], v[tri[1]], v[tri[2]])
 				for vi in tri:
 					st.set_normal(n)
@@ -286,6 +336,33 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 						st.set_normal(cn)
 						st.set_uv(Vector2(0, 0))
 						st.add_vertex(q[vi])
+
+
+## Battered drum with a capped top: the shaft of every castle tower.
+##
+## `sides` chooses the plan -- 4 is a square tower, 8 polygonal, 12 or more a
+## round one -- and `rot` turns a flat face outward. One primitive for all three
+## shapes is what keeps a square tower from drifting away from a round one.
+## base_r/top_r are CIRCUMradii; a wider base is the talus.
+func drum(center: Vector3, base_r: float, top_r: float, height: float, surf: int,
+		sides := 12, rot := 0.0) -> void:
+	revolve(PackedVector2Array([Vector2(base_r, 0.0), Vector2(top_r, height)]),
+		center, surf, sides, TAU, rot)
+	var st: SurfaceTool = _sts[surf]
+	var top: Vector3 = center + Vector3(0, height, 0)
+	for s in range(sides):
+		var a0: float = rot + TAU * float(s) / sides
+		var a1: float = rot + TAU * float(s + 1) / sides
+		var p0: Vector3 = top + Vector3(cos(a0) * top_r, 0, sin(a0) * top_r)
+		var p1: Vector3 = top + Vector3(cos(a1) * top_r, 0, sin(a1) * top_r)
+		_tri(st, p0, p1, top)
+
+
+## Cone: the conical cap of a drum tower, the spire of a round turret.
+func cone(radius: float, height: float, center: Vector3, surf: int,
+		segments := 12) -> void:
+	revolve(PackedVector2Array([Vector2(radius, 0.0), Vector2(0.0, height)]),
+		center, surf, segments, TAU)
 
 
 ## Half cylinder hugging +Z from center: flat face at center.y (model Z),

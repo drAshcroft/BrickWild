@@ -3,6 +3,9 @@ extends RefCounted
 ## 2. Normals: every triangle carries a finite unit normal that agrees with its
 ##    own winding, and every opening looks OUT of the wall it is cut into.
 ##
+## check_mesh() and check_openings() take any MassBuilder, so the castle suite
+## holds its buildings to the same two rules without a second copy of them.
+##
 ## This suite exists because two whole classes of defect were invisible to the
 ## massing checks -- which only ever measured AABBs, and an AABB cannot tell a
 ## window from a window turned sideways:
@@ -42,8 +45,8 @@ static func run() -> SuiteResult:
 			if mesh == null:
 				res.fail("no mesh, " + where)
 				continue
-			_check_mesh(res, mesh, where)
-			var frac: float = _check_openings(res, builder, where)
+			check_mesh(res, mesh, where)
+			var frac: float = check_openings(res, builder, where)
 			if frac < worst_out:
 				worst_out = frac
 				worst_out_at = where
@@ -53,7 +56,7 @@ static func run() -> SuiteResult:
 
 
 ## Per-surface attribute integrity and winding agreement.
-static func _check_mesh(res: SuiteResult, mesh: ArrayMesh, where: String) -> void:
+static func check_mesh(res: SuiteResult, mesh: ArrayMesh, where: String) -> void:
 	for s in range(mesh.get_surface_count()):
 		var arrays: Array = mesh.surface_get_arrays(s)
 		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
@@ -123,7 +126,7 @@ static func _check_mesh(res: SuiteResult, mesh: ArrayMesh, where: String) -> voi
 ## side of the opening: a window that faces the right way has stone behind it
 ## and open air in front, whichever mass the stone happens to belong to.
 ## Returns the fraction that passed.
-static func _check_openings(res: SuiteResult, builder: ChurchBuilder,
+static func check_openings(res: SuiteResult, builder: MassBuilder,
 		where: String) -> float:
 	var total := 0
 	var good := 0
@@ -169,7 +172,7 @@ static func _check_openings(res: SuiteResult, builder: ChurchBuilder,
 
 ## Is p inside any structural mass? When `unless_also` is given, masses that
 ## contain that point too are ignored.
-static func _in_solid(builder: ChurchBuilder, p: Vector3,
+static func _in_solid(builder: MassBuilder, p: Vector3,
 		unless_also := Vector3.INF) -> bool:
 	for m in builder.mass_log:
 		var box: AABB = (m["aabb"] as AABB).grow(-SKIN)
@@ -181,7 +184,7 @@ static func _in_solid(builder: ChurchBuilder, p: Vector3,
 	return false
 
 
-static func _near_any_mass(builder: ChurchBuilder, p: Vector3) -> bool:
+static func _near_any_mass(builder: MassBuilder, p: Vector3) -> bool:
 	for m in builder.mass_log:
 		if _dist_to_aabb(m["aabb"], p) <= NEAR:
 			return true

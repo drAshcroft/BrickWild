@@ -8,13 +8,28 @@ extends Control
 ## drawing silently drifted from the model it claimed to depict.
 
 var spec: ChurchSpec
+## Shown instead of a sheet when there is nothing to draw -- a castle, for now.
+var note: String = ""
 
 func setup(p_spec: ChurchSpec) -> void:
 	spec = p_spec
+	note = ""
+	queue_redraw()
+
+## Put the sheet away and say why. Leaving the previous church's plan on screen
+## while the viewport showed a castle was worse than drawing nothing.
+func show_note(text: String) -> void:
+	spec = null
+	note = text
 	queue_redraw()
 
 func _draw() -> void:
 	if spec == null:
+		if note != "":
+			draw_rect(Rect2(Vector2.ZERO, size), Color("f4f7fa"), true)
+			draw_multiline_string(ThemeDB.fallback_font, Vector2(14, 28), note,
+				HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 13,
+				-1, Color(0.15, 0.28, 0.43, 0.75))
 		return
 	draw_rect(Rect2(Vector2.ZERO, size), Color("f4f7fa"), true)
 	var ink := Color("27476e")

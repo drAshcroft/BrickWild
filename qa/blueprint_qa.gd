@@ -20,7 +20,7 @@ extends RefCounted
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {...}}
 
-const VOX := 0.5            # voxel size in meters for solid/flood tests
+const VOX := VoxelGrid.VOX  # voxel size in meters for solid/flood tests
 const EPS := 0.05
 
 var spec: ChurchSpec
@@ -30,10 +30,9 @@ var failures: Array = []
 var warnings: Array = []
 var stats: Dictionary = {}
 
-# Voxel grid state
-var _ox := 0.0; var _oy := 0.0; var _oz := 0.0
-var _nx := 0; var _ny := 0; var _nz := 0
-var _solid: Array = []      # Array of PackedByteArray, _solid[y][x*_nz+z]
+## The rasterized copy of the mesh. VoxelGrid owns the grid itself; this file
+## owns what the church means by a defect.
+var _grid: VoxelGrid
 
 func check(p_spec: ChurchSpec, p_mesh: ArrayMesh, p_builder: ChurchBuilder) -> Dictionary:
 	spec = p_spec
@@ -55,7 +54,7 @@ func check(p_spec: ChurchSpec, p_mesh: ArrayMesh, p_builder: ChurchBuilder) -> D
 	_check_massing()
 
 	stats["parts"] = builder.part_log.size()
-	stats["voxels_solid"] = _count_solid()
+	stats["voxels_solid"] = _grid.count_solid()
 	stats["bbox"] = _bbox_str()
 	var ok := failures.is_empty()
 	return {"ok": ok, "failures": failures, "warnings": warnings, "stats": stats}
@@ -64,116 +63,8 @@ func check(p_spec: ChurchSpec, p_mesh: ArrayMesh, p_builder: ChurchBuilder) -> D
 # ------------------------------------------------------------------ rasterize
 
 func _rasterize() -> void:
-	var mn := Vector3(INF, INF, INF)
-	var mx := -Vector3(INF, INF, INF)
-	for s in range(mesh.get_surface_count()):
-		var verts: PackedVector3Array = mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]
-		for v in verts:
-			mn = mn.min(v); mx = mx.max(v)
-	# expand by one voxel so boundary geometry rasterizes fully
-	_ox = floorf(mn.x / VOX) * VOX - VOX
-	_oy = floorf(mn.y / VOX) * VOX - VOX
-	_oz = floorf(mn.z / VOX) * VOX - VOX
-	_nx = int(ceil((mx.x - _ox) / VOX)) + 2
-	_ny = int(ceil((mx.y - _oy) / VOX)) + 2
-	_nz = int(ceil((mx.z - _oz) / VOX)) + 2
-	_solid.clear()
-	for _y in range(_ny):
-		_solid.append(PackedByteArray())
-		_solid[_y].resize(_nx * _nz)
-
-	for s in range(mesh.get_surface_count()):
-		if s == ChurchBuilder.SURF_OPEN:
-			continue  # openings are recesses, not structure
-		var arrays: Array = mesh.surface_get_arrays(s)
-		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-		var idx_v = arrays[Mesh.ARRAY_INDEX]
-		var idx: PackedInt32Array = idx_v if idx_v != null else PackedInt32Array()
-		if idx.is_empty():
-			idx.resize(verts.size())
-			for k in range(verts.size()):
-				idx[k] = k
-		var i := 0
-		while i + 2 < idx.size():
-			_mark_tri(verts[idx[i]], verts[idx[i + 1]], verts[idx[i + 2]])
-			i += 3
-	_dilate()
-
-## Surfaces are hollow shells; dilate by one voxel so every wall has real
-## thickness in the grid and touching geometry merges into one mass.
-func _dilate() -> void:
-	var out: Array = []
-	for y in range(_ny):
-		out.append(PackedByteArray())
-		out[y].resize(_nx * _nz)
-	for y in range(_ny):
-		for x in range(_nx):
-			for z in range(_nz):
-				if _solid[y][x * _nz + z] == 1:
-					for dy in range(-1, 2):
-						var yy := y + dy
-						if yy < 0 or yy >= _ny:
-							continue
-						for dx in range(-1, 2):
-							var xx := x + dx
-							if xx < 0 or xx >= _nx:
-								continue
-							for dz in range(-1, 2):
-								var zz := z + dz
-								if zz >= 0 and zz < _nz:
-									out[yy][xx * _nz + zz] = 1
-	_solid = out
-
-func _mark_tri(a: Vector3, b: Vector3, c: Vector3) -> void:
-	# conservative triangle rasterization into voxels (sampled along edges + interior)
-	var steps := int(maxf(maxf((b - a).length(), (c - b).length()), (a - c).length()) / (VOX * 0.5)) + 1
-	for i in range(steps + 1):
-		var t0: float = float(i) / steps
-		var pa: Vector3 = a.lerp(b, t0)
-		var pc: Vector3 = a.lerp(c, t0)
-		var inner := int(pc.distance_to(pa) / (VOX * 0.5)) + 1
-		for j in range(inner):
-			var p: Vector3 = pa.lerp(pc, float(j) / inner)
-			_set_voxel_world(p)
-
-func _set_voxel_world(p: Vector3) -> void:
-	var x := int(floor((p.x - _ox) / VOX))
-	var y := int(floor((p.y - _oy) / VOX))
-	var z := int(floor((p.z - _oz) / VOX))
-	if x >= 0 and x < _nx and y >= 0 and y < _ny and z >= 0 and z < _nz:
-		_solid[y][x * _nz + z] = 1
-
-func _get_voxel(x: int, y: int, z: int) -> bool:
-	if x < 0 or x >= _nx or y < 0 or y >= _ny or z < 0 or z >= _nz:
-		return false
-	return _solid[y][x * _nz + z] == 1
-
-func _count_solid() -> int:
-	var n := 0
-	for y in range(_ny):
-		n += _count_byte(_solid[y])
-	return n
-
-func _count_byte(arr: PackedByteArray) -> int:
-	var n := 0
-	for b in arr:
-		if b == 1:
-			n += 1
-	return n
-
-func _world_of(x: int, y: int, z: int) -> Vector3:
-	return Vector3(_ox + (x + 0.5) * VOX, _oy + (y + 0.5) * VOX, _oz + (z + 0.5) * VOX)
-
-## Is there solid masonry in any of the 26 neighbors?
-func _has_neighbor(x: int, y: int, z: int) -> bool:
-	for dx in range(-1, 2):
-		for dy in range(-1, 2):
-			for dz in range(-1, 2):
-				if dx == 0 and dy == 0 and dz == 0:
-					continue
-				if _get_voxel(x + dx, y + dy, z + dz):
-					return true
-	return false
+	_grid = VoxelGrid.new()
+	_grid.rasterize(mesh, ChurchBuilder.SURF_OPEN)
 
 
 # ---------------------------------------------------------------------- checks
@@ -191,13 +82,13 @@ func _check_footprint() -> void:
 		failures.append("footprint_preserved: nave box missing from part log")
 		return
 	# verify against voxels: solid cells must cover the nave extent on the ground plane
-	var need_x0 := _vx(-w / 2.0); var need_x1 := _vx(w / 2.0)
-	var need_z0 := _vz(-l / 2.0); var need_z1 := _vz(l / 2.0)
-	var gy := _vy(0.5)  # just above ground
+	var need_x0 := _grid.vx(-w / 2.0); var need_x1 := _grid.vx(w / 2.0)
+	var need_z0 := _grid.vz(-l / 2.0); var need_z1 := _grid.vz(l / 2.0)
+	var gy := _grid.vy(0.5)  # just above ground
 	var missing := 0
 	for gx in range(need_x0, need_x1 + 1):
 		for gz in range(need_z0, need_z1 + 1):
-			if not _get_voxel(gx, gy, gz):
+			if not _grid.get_voxel(gx, gy, gz):
 				missing += 1
 	if missing > 0:
 		failures.append("footprint_preserved: %d ground-plane voxels missing inside nave footprint" % missing)
@@ -235,12 +126,12 @@ func _check_vertices() -> void:
 func _check_connected_mass() -> void:
 	var seed := Vector3i(-1, -1, -1)
 	# find a solid voxel inside the nave footprint near ground level
-	var gy := _vy(0.6)
+	var gy := _grid.vy(0.6)
 	for dx in range(0, int(spec.width / VOX)):
 		for dz in range(0, int(spec.length / VOX)):
-			var cand := Vector3i(_vx(-spec.width / 2.0) + dx, gy,
-				_vz(-spec.length / 2.0) + dz)
-			if _get_voxel(cand.x, cand.y, cand.z):
+			var cand := Vector3i(_grid.vx(-spec.width / 2.0) + dx, gy,
+				_grid.vz(-spec.length / 2.0) + dz)
+			if _grid.get_voxel(cand.x, cand.y, cand.z):
 				seed = cand
 				break
 		if seed.x >= 0:
@@ -248,38 +139,14 @@ func _check_connected_mass() -> void:
 	if seed.x < 0:
 		failures.append("connected_mass: no solid voxel found in nave footprint")
 		return
-	var visited := {}
-	var stack: Array = [seed]
-	visited[seed] = true
-	while not stack.is_empty():
-		var cur: Vector3i = stack.pop_back()
-		for d in [Vector3i.LEFT, Vector3i.RIGHT, Vector3i.UP, Vector3i.DOWN,
-				Vector3i.FORWARD, Vector3i.BACK]:
-			var nxt: Vector3i = cur + d
-			if visited.has(nxt):
-				continue
-			if _get_voxel(nxt.x, nxt.y, nxt.z):
-				visited[nxt] = true
-				stack.append(nxt)
-	var total := _count_solid()
+	var visited: Dictionary = _grid.flood_from(seed)
+	var total := _grid.count_solid()
 	stats["reachable_fraction"] = snappedf(float(visited.size()) / maxf(total, 1), 0.001)
 	if visited.size() < total - 8:
-		# find an example of orphan region for diagnostics
-		var example := Vector3i.ZERO
-		for y in range(_ny):
-			var done := false
-			for x in range(_nx):
-				for z in range(_nz):
-					if _get_voxel(x, y, z) and not visited.has(Vector3i(x, y, z)):
-						example = Vector3i(x, y, z)
-						done = true
-						break
-				if done:
-					break
-			if done:
-				break
+		# an example orphan, for diagnostics
+		var example: Vector3i = _grid.first_unvisited(visited)
 		failures.append("connected_mass: %d/%d solid voxels unreachable from nave (orphan near %s)"
-			% [total - visited.size(), total, str(_world_of(example.x, example.y, example.z))])
+			% [total - visited.size(), total, str(_grid.world_of(example.x, example.y, example.z))])
 
 func _check_openings() -> void:
 	# Every opening must sit embedded in masonry AND not cut all the way through.
@@ -290,8 +157,8 @@ func _check_openings() -> void:
 		checked += 1
 		var pos: Vector3 = p["pos"]
 		var tag: String = p["tag"]
-		var gi := Vector3i(_vx(pos.x), _vy(pos.y), _vz(pos.z))
-		if not _get_voxel(gi.x, gi.y, gi.z) and not _has_neighbor(gi.x, gi.y, gi.z):
+		var gi := Vector3i(_grid.vx(pos.x), _grid.vy(pos.y), _grid.vz(pos.z))
+		if not _grid.get_voxel(gi.x, gi.y, gi.z) and not _grid.has_neighbor(gi.x, gi.y, gi.z):
 			failures.append("openings_embedded: %s opening at (%.1f,%.1f,%.1f) floats outside masonry"
 				% [tag, pos.x, pos.y, pos.z])
 			continue
@@ -300,10 +167,10 @@ func _check_openings() -> void:
 		# is NO solid masonry within reach on EITHER side, this cut tunnels
 		# clean through the whole building — e.g. a window placed where walls
 		# don't exist, or a section rotated so its wall misses the nave.
-		var solid_right := _ray_hits_solid(gi, Vector3i.RIGHT)
-		var solid_left := _ray_hits_solid(gi, Vector3i.LEFT)
-		var solid_back := _ray_hits_solid(gi, Vector3i.BACK)
-		var solid_fwd := _ray_hits_solid(gi, Vector3i.FORWARD)
+		var solid_right := _grid.ray_hits_solid(gi, Vector3i.RIGHT)
+		var solid_left := _grid.ray_hits_solid(gi, Vector3i.LEFT)
+		var solid_back := _grid.ray_hits_solid(gi, Vector3i.BACK)
+		var solid_fwd := _grid.ray_hits_solid(gi, Vector3i.FORWARD)
 		if not solid_left and not solid_right:
 			failures.append("openings_embedded: opening at (%.1f,%.1f,%.1f) [%s] cuts through - no masonry on either X side"
 				% [pos.x, pos.y, pos.z, tag])
@@ -312,16 +179,6 @@ func _check_openings() -> void:
 				% [pos.x, pos.y, pos.z, tag])
 	if checked == 0:
 		warnings.append("openings_embedded: no openings logged")
-
-## Does the ray from v along dir hit solid masonry before leaving the grid?
-func _ray_hits_solid(v: Vector3i, dir: Vector3i) -> bool:
-	var x: int = v.x + dir.x; var y: int = v.y + dir.y; var z: int = v.z + dir.z
-	while x >= 0 and x < _nx and y >= 0 and y < _ny and z >= 0 and z < _nz:
-		if _get_voxel(x, y, z):
-			return true
-		x += dir.x; y += dir.y; z += dir.z
-	return false
-
 
 func _check_alignment() -> void:
 	# Structural boxes must be axis-aligned (no arbitrary rotation) and their
@@ -417,13 +274,6 @@ func _check_proportions() -> void:
 
 
 # --------------------------------------------------------------------- helpers
-
-func _vx(wx: float) -> int:
-	return clampi(int(floor((wx - _ox) / VOX)), 0, _nx - 1)
-func _vy(wy: float) -> int:
-	return clampi(int(floor((wy - _oy) / VOX)), 0, _ny - 1)
-func _vz(wz: float) -> int:
-	return clampi(int(floor((wz - _oz) / VOX)), 0, _nz - 1)
 
 func _bbox_str() -> String:
 	var mn := Vector3(INF, INF, INF); var mx := -Vector3(INF, INF, INF)

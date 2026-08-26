@@ -43,10 +43,17 @@ theme_override_constants/v_separation=14
 
 [node name="Title" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
 layout_mode=2
-text="Church Blueprint Studio"
+text="Blueprint Studio"
 theme_override_font_sizes/font_size=17
 
 [node name="Spacer" type="Control" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+
+[node name="KindLabel" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+text="Kind"
+
+[node name="KindOption" type="OptionButton" parent="HSplit/LeftPanel/Margin/Grid"]
 layout_mode=2
 
 [node name="WidthLabel" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
@@ -92,6 +99,13 @@ text="Style"
 [node name="StyleOption" type="OptionButton" parent="HSplit/LeftPanel/Margin/Grid"]
 layout_mode=2
 
+[node name="TradeLabel" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+text="Trade"
+
+[node name="TradeOption" type="OptionButton" parent="HSplit/LeftPanel/Margin/Grid"]
+layout_mode=2
+
 [node name="Hint" type="Label" parent="HSplit/LeftPanel/Margin/Grid"]
 layout_mode=2
 text="RMB-drag orbits the view.
@@ -129,7 +143,7 @@ shadow_enabled=true
 
 [node name="CamRig" type="Camera3D" parent="HSplit/CenterCol/ViewportPanel/SubViewport"]
 
-[node name="ChurchRoot" type="Node3D" parent="HSplit/CenterCol/ViewportPanel/SubViewport"]
+[node name="ModelRoot" type="Node3D" parent="HSplit/CenterCol/ViewportPanel/SubViewport"]
 
 [node name="BPPanel" type="PanelContainer" parent="HSplit/CenterCol"]
 layout_mode=2

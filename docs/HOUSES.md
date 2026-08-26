@@ -1,0 +1,174 @@
+# Furnished houses
+
+The third generator. A church is judged by its silhouette and a castle by its
+plan, but a house is judged from the inside: whether the rooms make sense,
+whether the furniture makes sense, and whether a person can walk through it.
+So most of the work here is in the harness.
+
+## The pipeline
+
+```
+HouseSpec ─▶ HousePlanner ─▶ HouseFurnisher ─▶ HouseBuilder  ─▶ ArrayMesh (shell)
+ size,        rooms,          furniture,        walls with      +
+ style,       doors,          use zones         real openings   HouseAssembler
+ trade        windows                                           ─▶ prop instances
+```
+
+`HousePlan` is the one thing all of them agree about. The planner and the
+furnisher write it; the builder turns it into a shell; the four checks in `qa/`
+read it and judge it; `HouseAssembler` is the only place that ever loads a
+model. That split is why the whole harness runs headless in milliseconds per
+house — the checks work in metres and rectangles and never touch the art.
+
+## Rooms
+
+The interior is split by cutting the biggest room in two, over and over, until
+the floor area has run out of rooms to hold. Then the rooms are NAMED by how
+public they are, which is the oldest rule in domestic planning: the hall takes
+the front door, the kitchen sits next to it, and bedrooms go as far from the
+door as the plan allows. Doors go on a spanning tree rooted at the hall, pushed
+out to the ends of the walls they are cut into so both rooms keep a long
+unbroken wall to put furniture against.
+
+A room too small or too thin for the kind it was given is renamed rather than
+squeezed: a 2 × 6 m room has the floor area of a bedroom and cannot hold a bed,
+so it becomes a store, and the bed goes to the hall — which is what a one-room
+cottage has always done.
+
+| Rule | Why |
+|---|---|
+| bedrooms are leaves of the door tree | nobody should walk through a bedroom to reach the kitchen |
+| a bedroom that is still a through-route is renamed | a room people traipse through is not a bedroom |
+| a room with no exterior wall becomes a store | it can never have a window |
+| every habitable room gets a window, narrow if need be | a room with no daylight is worse than a window near a corner |
+
+## Furnishing
+
+Each room kind has a recipe of steps, and each step is a rule rather than a
+coordinate:
+
+| rule | means |
+|---|---|
+| `wall` | a bed, a cabinet, a bookcase wants its back to a wall |
+| `free` | a table wants room all round it |
+| `around` | seats belong at a table, facing it, with room to push back |
+| `corner` | barrels and crates go where nobody walks |
+| `mounted` | shelves, racks and sconces hang at head height |
+| `ceiling` | the chandelier hangs over the middle of the room |
+| `on` | a mug belongs on a table, never on the floor |
+
+Every placement records the floor it occupies **and the floor a person needs to
+use it** — the pull-back space behind a chair, the side of a bed you get into
+it from. That second rectangle is what makes the walking check possible.
+
+`opt: 1.0` marks a piece the room is not that room without. Those are placed
+first, without a dice roll, and the passes that thin a room out will not touch
+them. Everything else is dressing and can be taken back out.
+
+## The harness
+
+Five suites, run with
+`godot --headless --path . --script res://tests/house_test.gd`.
+
+**`qa/house_plan_check.gd` — is this a plan of a house?**
+rooms tile the interior exactly; no room is smaller or thinner than the thing
+it claims to be; exactly one front door, on an exterior wall; every room
+reachable from it through doors; no room reachable only through a bedroom;
+doors and windows fit the wall they are cut into, clear of the corners and of
+each other; windows on exterior walls only; every habitable room has daylight.
+
+**`qa/house_furnish_check.gd` — does the furnishing make sense?**
+nothing is inside a wall or inside anything else; everything that must sit on a
+surface is on one, at its height and within its top; nothing stands in the
+swing of a door; nothing tall stands across a window; a bedroom has a bed, a
+kitchen a hearth, a hall somewhere to sit, a smithy an anvil; the pieces that
+want a wall have one behind them; seats are at a table and facing it; every
+room has something to see by; and the feng shui rule the brief asked for —
+**the commanding position**: the bed's head against solid wall, out of the line
+of the door, with a side you can get in from.
+
+**`qa/house_nav_check.gd` — can a person walk through it?**
+This one puts a body in the building. It rasterizes the floor at 12 cm, blocks
+out the walls and the furniture, shrinks the free floor by a person's own
+half-width with a distance transform, and walks: from the doorstep, through the
+doors, into every room, and up to every use zone. A house passes only if every
+room can be entered, both sides of every door can be stood on, and every piece
+of furniture somebody is meant to use can be reached.
+
+`ascii_map()` prints what the walker saw — `#` blocked, `.` too tight to stand
+in, `:` standable but never reached, ` ` reached. Reading a reachability
+failure off a list of room numbers is guesswork; reading it off the map takes a
+second.
+
+**`qa/house_qa.gd`** runs all three plus the shell rules from `MassRules`.
+**`tests/suites/house_assets_suite.gd`** re-measures every model and compares
+it against `assets/props/catalog.json`, so a swapped asset fails loudly rather
+than quietly moving the furniture.
+
+## The generator checks its own work
+
+Rules that place one piece at a time cannot see the finished room, and three
+sound decisions in a row still add up to a barrel in the only gap between the
+table and the wall. So the furnisher walks the house itself:
+
+1. after each room is furnished, if the house has stopped being walkable, the
+   room that just changed loses its largest optional piece — and it is that
+   room, because everything before it was sound;
+2. at the end, while the house still fails, it tries removing each candidate in
+   turn and keeps whichever actually opens up the most floor. Measured, not
+   guessed: what blocks a bedroom is usually in the parlour you would cross to
+   reach it.
+
+A piece the room cannot do without is only removed when nothing else helps, and
+when one goes the plan **records it**. The furnishing check reads that record
+and reports "the parlour gave up its table so the rooms beyond it could be
+reached" as a warning rather than as a defect — a generator that quietly drops
+furniture is hiding a bug; one that writes down what it dropped and why is
+reporting a compromise.
+
+## Archetypes
+
+`tests/suites/house_archetype_suite.gd` is the house equivalent of the church
+and castle landmark suites. A fantasy dwelling has no Chartres to be measured
+against, so the sweep uses archetypes — each built at 75%, 100%, 140% and 190%
+of its size, each required to contain the rooms and the defining fittings that
+make it that kind of house, and each put through the whole harness.
+
+| Archetype | Style | Size (m) | Must contain |
+|---|---|---|---|
+| One-room cottage | Cottage | 5.5 × 7 | a bed |
+| Family cottage | Cottage | 8 × 10.5 | hall, table, seat |
+| Farmhouse | Farmhouse | 10 × 13 | hall, barrels or crates |
+| Smithy | Long Hall | 11 × 13 | hall, workshop, anvil, workbench |
+| Alchemist | Witch's Hut | 9.5 × 12 | hall, workshop, bookcase, workbench |
+| Inn | Townhouse | 13 × 16 | hall, parlour, bedroom, table, seating |
+| Scholar's house | Townhouse | 10 × 12 | hall, parlour, bookcase |
+
+An archetype declares what a house must CONTAIN, never where anything goes.
+The layout is the generator's business, and the moment a test says where the
+bed is, it stops testing the generator and starts testing itself.
+
+## Assets
+
+Quaternius **Fantasy Props MegaKit** (Standard licence), copied into
+`assets/props/fantasy/` from `C:/Projects/itch_assets`. 94 models, three shared
+trim textures. `tools/build_prop_catalog.gd` measures every one of them into
+`assets/props/catalog.json`; `src/house/prop_catalog.gd` says what each one IS
+— what it is for, whether it wants a wall behind it, how much room a person
+needs in front of it. Sizes are never authored by hand there, because a guessed
+footprint is how furniture ends up half inside a wall.
+
+## Sources for the rules
+
+- Merrell et al., *Interactive Furniture Layout Using Interior Design
+  Guidelines* (SIGGRAPH 2011) — the idea of encoding design guidelines as
+  scored terms: clearance, circulation, pairwise relationships, alignment.
+  https://graphics.stanford.edu/projects/furniture/
+- Ordinary interior-design clearances: a 36 in main walkway, 30 in beside a
+  bed, 36 in of pull-back behind a dining chair, 36 in of approach at a door.
+  https://roomsketch3d.com/help/dimensions/clearance-around-furniture
+- Feng shui bed placement, the commanding position, and why a bed is not put in
+  line with the door or under a window.
+  https://fengshuireport.com/blog/bed-placement-feng-shui
+- Privacy gradients and adjacency in procedural floor plans.
+  https://graphics.tudelft.nl/~rafa/myPapers/bidarra.GAMEON10.pdf
