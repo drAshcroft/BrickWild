@@ -23,7 +23,12 @@ func _init(surface_count: int) -> void:
 func commit() -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	for s in _sts:
-		s.generate_normals()
+		# No generate_normals() here. Every emitter below already sets a correct
+		# per-face normal, and generate_normals() SMOOTHS across a whole surface:
+		# one smooth group covers the entire building, so a wall corner was being
+		# averaged with whatever roof slab happened to share the vertex. Flat
+		# masonry shaded like a lump. It was also the only thing hiding the
+		# inverted _face_normal below.
 		s.commit(mesh)
 	return mesh
 
@@ -76,16 +81,22 @@ func _emit_box(pts: Array, surf: int) -> void:
 	for q in quads:
 		# Every vertex must carry a normal: SurfaceTool locks its attribute set
 		# on the first vertex, and callers mix their own set_normal() calls in.
-		var n: Vector3 = _face_normal(pts[q[0]], pts[q[1]], pts[q[2]])
 		for tri in [[q[0], q[1], q[2]], [q[0], q[2], q[3]]]:
+			var n: Vector3 = _face_normal(pts[tri[0]], pts[tri[1]], pts[tri[2]])
 			for vi in range(3):
 				st.set_normal(n)
 				st.set_uv(uvs[vi])
 				st.add_vertex(pts[tri[vi]])
 
 
+## Outward normal for a triangle wound (a, b, c).
+##
+## Godot's front faces are CLOCKWISE, so the outward normal is (c-a) x (b-a) --
+## the opposite hand from the usual CCW formula this used to carry. The windings
+## here were right all along; the normals they were paired with pointed into the
+## building, and generate_normals() overwrote them before anyone could see.
 static func _face_normal(a: Vector3, b: Vector3, c: Vector3) -> Vector3:
-	var n: Vector3 = (b - a).cross(c - a)
+	var n: Vector3 = (c - a).cross(b - a)
 	return n.normalized() if n.length_squared() > 0.0 else Vector3.UP
 
 
@@ -103,11 +114,64 @@ func slab(along: float, rise: float, half_span: float, side: float, zc: float,
 
 
 ## Two-sided gable capping a wall whose top is at y_base.
+##
+## end_surf >= 0 also walls in the triangle under each slope. Without those the
+## roof was two floating planes and you looked straight into the void along the
+## ridge; a gabled roof is only gabled once its ends are closed. end_span /
+## end_along are the WALL's footprint, not the roof's -- the slabs overhang.
 func gable_roof(span_x: float, along_z: float, rise: float, z_center: float,
-		surf: int, y_base := 0.0) -> void:
+		surf: int, y_base := 0.0, end_surf := -1, end_span := 0.0,
+		end_along := 0.0, end_thick := 0.3) -> void:
 	for side in [-1.0, 1.0]:
 		slab(along_z, rise, span_x / 2.0, side, z_center, surf, y_base)
 	box(Vector3(0.35, 0.25, along_z + 0.2), Vector3(0, y_base + rise + 0.1, z_center), surf)
+	if end_surf >= 0:
+		var ex: float = (end_span if end_span > 0.0 else span_x) / 2.0
+		var ez: float = (end_along if end_along > 0.0 else along_z) / 2.0
+		# The tympanum rises to the ridge over the wall, not over the eave, so
+		# its apex is scaled by how far the wall stops short of the slab edge.
+		var apex: float = rise * (ex / (span_x / 2.0))
+		for end_v in [-1.0, 1.0]:
+			var zf: float = z_center + end_v * ez
+			gable_end(ex, apex, y_base, zf - end_v * end_thick, zf, end_surf)
+
+
+## The triangular wall under a gable: apex over x = 0 at y_base + rise, extruded
+## between the two z planes. Emitted as a closed prism, wound so the caps face
+## out along their own side of the extrusion rather than both the same way.
+func gable_end(half_span: float, rise: float, y_base: float,
+		z_back: float, z_front: float, surf: int) -> void:
+	var lo: float = minf(z_back, z_front)
+	var hi: float = maxf(z_back, z_front)
+	var xy := [
+		Vector2(-half_span, y_base),
+		Vector2(half_span, y_base),
+		Vector2(0.0, y_base + rise),
+	]
+	var at_lo: Array = []
+	var at_hi: Array = []
+	for p in xy:
+		at_lo.append(Vector3(p.x, p.y, lo))
+		at_hi.append(Vector3(p.x, p.y, hi))
+	var st: SurfaceTool = _sts[surf]
+	_tri(st, at_lo[0], at_lo[1], at_lo[2])      # faces -Z
+	_tri(st, at_hi[0], at_hi[2], at_hi[1])      # faces +Z
+	for i in range(3):
+		var j: int = (i + 1) % 3
+		_quad(st, at_lo[i], at_hi[i], at_hi[j], at_lo[j])
+
+
+func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
+	var n: Vector3 = _face_normal(a, b, c)
+	for p in [a, b, c]:
+		st.set_normal(n)
+		st.set_uv(Vector2(0.5, 0.5))
+		st.add_vertex(p)
+
+
+func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+	_tri(st, a, b, c)
+	_tri(st, a, c, d)
 
 
 ## Hipped roof: side slabs plus sloped ends, so all four sides fall away.
@@ -196,8 +260,11 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 				center + Vector3(cos(a1) * p1.x, p1.y, sin(a1) * p1.x),
 				center + Vector3(cos(a0) * p1.x, p1.y, sin(a0) * p1.x),
 			]
-			var n: Vector3 = _face_normal(v[0], v[1], v[2])
+			# Per TRIANGLE, not per quad: four points on a dome are not coplanar,
+			# and sharing the first triangle's normal with the second left a
+			# visible crease running up every ring of every revolved surface.
 			for tri in [[0, 1, 2], [0, 2, 3]]:
+				var n: Vector3 = _face_normal(v[tri[0]], v[tri[1]], v[tri[2]])
 				for vi in tri:
 					st.set_normal(n)
 					st.set_uv(Vector2(float(s) / segments, float(i) / rings))
@@ -213,8 +280,8 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 					center + Vector3(0, profile[i + 1].y, 0),
 					center + Vector3(0, profile[i].y, 0),
 				]
-				var cn: Vector3 = _face_normal(q[0], q[1], q[2])
 				for tri in [[0, 1, 2], [0, 2, 3]]:
+					var cn: Vector3 = _face_normal(q[tri[0]], q[tri[1]], q[tri[2]])
 					for vi in tri:
 						st.set_normal(cn)
 						st.set_uv(Vector2(0, 0))

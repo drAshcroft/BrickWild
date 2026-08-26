@@ -9,17 +9,20 @@ extends SceneTree
 
 ## Order is deliberate: each suite assumes the ones above it hold.
 ##   1 church     - the spec/build contract itself
-##   2 massing    - structural correctness of what that contract produced
-##   3 blueprint  - the drawing agrees with the model
-##   4 landmark   - the famous churches this generator must be able to build
-##   5 voxelqa    - exhaustive rasterized checks (slow)
-const ORDER: Array[String] = ["church", "massing", "blueprint", "landmark", "voxelqa"]
+##   2 normals    - the surfaces face the way they are meant to
+##   3 massing    - structural correctness of what that contract produced
+##   4 blueprint  - the drawing agrees with the model
+##   5 landmark   - the famous churches this generator must be able to build
+##   6 voxelqa    - exhaustive rasterized checks (slow)
+const ORDER: Array[String] = ["church", "normals", "massing", "blueprint", "landmark", "voxelqa"]
 
 
 static func _run_one(key: String) -> SuiteResult:
 	match key:
 		"church":
 			return ChurchSuite.run()
+		"normals":
+			return NormalsSuite.run()
 		"massing":
 			return MassingSuite.run()
 		"blueprint":

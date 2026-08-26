@@ -31,8 +31,10 @@ var part_log: Array = []
 var mass_log: Array[Dictionary] = []
 var _tag := ""
 
-func _log_part(kind: String, pos: Vector3, size := Vector3.ZERO, rot_y := 0.0) -> void:
-	part_log.append({"kind": kind, "pos": pos, "size": size, "rot_y": rot_y, "tag": _tag})
+func _log_part(kind: String, pos: Vector3, size := Vector3.ZERO, rot_y := 0.0,
+		facing := Vector3.ZERO) -> void:
+	part_log.append({"kind": kind, "pos": pos, "size": size, "rot_y": rot_y,
+		"facing": facing, "tag": _tag})
 
 ## Record a structural mass by its true world AABB.
 func _log_mass(mass_name: String, aabb: AABB) -> void:
@@ -83,18 +85,23 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 				_log_mass("aisle_%s_%d" % ["left" if side < 0.0 else "right", ring],
 					ChurchGeometry.aisle_aabb(spec, side, ring))
 				_lean_roof(aw + 0.6, al + 0.4, ah, ah + aw * 0.8, side, SURF_ROOF, az)
-				var nwin: int = int(al / 3.0)
-				for i in range(nwin):
-					var wz: float = az0 + al / float(nwin + 1) * (i + 1)
-					window(Vector3(ax + side * (aw / 2.0 + 0.02), ah * 0.5, wz), 0.0,
-						0.7, ah * 0.33, spec.window_style)
+				# Only the OUTERMOST ring gets side windows. Every ring used to,
+				# so on a double-aisled church the inner ring's windows were cut
+				# into a wall the outer ring stands hard against -- glazing that
+				# looks into the next aisle's masonry.
+				if ring == spec.aisles - 1:
+					var nwin: int = int(al / 3.0)
+					for i in range(nwin):
+						var wz: float = az0 + al / float(nwin + 1) * (i + 1)
+						window(Vector3(ax + side * (aw / 2.0 + 0.02), ah * 0.5, wz),
+							side * PI / 2.0, 0.7, ah * 0.33, spec.window_style)
 		if spec.clerestory and spec.aisles > 0:
 			var ncl: int = int(al / 3.5)
 			for i in range(ncl):
 				var cz: float = az0 + al / float(ncl + 1) * (i + 1)
 				for side_v2 in [-1.0, 1.0]:
-					window(Vector3(side_v2 * (w / 2.0 + 0.02), h * 0.78, cz), 0.0,
-						0.55, 0.7, &"round")
+					window(Vector3(side_v2 * (w / 2.0 + 0.02), h * 0.78, cz),
+						side_v2 * PI / 2.0, 0.55, 0.7, &"round")
 
 	# ---------- transept ----------
 	tag("transept")
@@ -104,10 +111,11 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		var tz_z: float = ChurchGeometry.transept_center_z(spec)
 		box(Vector3(tz_len, h, tz_w), Vector3(0, h / 2.0, tz_z), SURF_STONE)
 		_log_mass("transept", ChurchGeometry.transept_aabb(spec))
-		gable_roof(tz_len + 0.5, tz_w + 0.4, w * spec.roof_pitch * 0.9, tz_z, SURF_ROOF, h)
+		gable_roof(tz_len + 0.5, tz_w + 0.4, w * spec.roof_pitch * 0.9, tz_z, SURF_ROOF, h,
+			tz_len, tz_w)
 		for sx_v in [-1.0, 1.0]:
-			window(Vector3(sx_v * (tz_len / 2.0 + 0.02), h * 0.55, tz_z), PI / 2.0,
-				spec.window_w, spec.window_h, spec.window_style)
+			window(Vector3(sx_v * (tz_len / 2.0 + 0.02), h * 0.55, tz_z),
+				sx_v * PI / 2.0, spec.window_w, spec.window_h, spec.window_style)
 		if spec.corner_turrets:
 			for sx_v in [-1.0, 1.0]:
 				pinnacle(Vector3(sx_v * (tz_len / 2.0 - 0.3), h + 0.4, tz_z - tz_w / 2.0 + 0.3))
@@ -220,8 +228,11 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 
 	# ---------- main door ----------
 	tag("door")
+	# Only a SINGLE axial tower carries the door out to its own west face. Twin
+	# towers flank the axis, so that same offset left the door hanging in the
+	# gap between them with no wall behind it at all.
 	var door_z: float = -l / 2.0 - 0.02
-	if spec.tower:
+	if spec.tower and spec.west_towers == 1:
 		door_z = -l / 2.0 + TOWER_EMBED - spec.tower_width - 0.02
 	var door_h: float = minf(h * 0.32, 3.4)
 	match spec.door_style:
@@ -242,13 +253,15 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		for i in range(nw2):
 			var wz2: float = -l / 2.0 + l / float(nw2 + 1) * (i + 1)
 			for sx_v in [-1.0, 1.0]:
-				window(Vector3(sx_v * (w / 2.0 + 0.02), h * 0.58, wz2), 0.0,
-					spec.window_w, spec.window_h, spec.window_style)
+				window(Vector3(sx_v * (w / 2.0 + 0.02), h * 0.58, wz2),
+					sx_v * PI / 2.0, spec.window_w, spec.window_h, spec.window_style)
 
 	# ---------- rose window ----------
 	tag("facade")
 	if spec.rose_window:
-		rose(Vector3(0, h * 0.68, l / 2.0 + 0.02))
+		# The west front is at -Z: that is where the door and the towers are.
+		# The rose was at +l/2, i.e. the east end, buried against the apse.
+		rose(Vector3(0, h * 0.68, -l / 2.0 - 0.02), PI)
 
 	_build_narthex()
 	_build_ambulatory_and_chapels()
@@ -267,7 +280,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 func _roof_the_nave(w: float, l: float, h: float) -> void:
 	var rise: float = w * spec.roof_pitch
 	if not spec.dome:
-		gable_roof(w + 0.5, l + 0.4, rise, 0.0, SURF_ROOF, h)
+		gable_roof(w + 0.5, l + 0.4, rise, 0.0, SURF_ROOF, h, w, l)
 		return
 	var dz: float = ChurchGeometry.crossing_center_z(spec)
 	var dr: float = ChurchGeometry.dome_mass_radius(spec)
@@ -280,7 +293,8 @@ func _roof_the_nave(w: float, l: float, h: float) -> void:
 		var z1: float = run[1]
 		if z1 - z0 < 1.0:
 			continue
-		gable_roof(w + 0.5, z1 - z0, rise, (z0 + z1) / 2.0, SURF_ROOF, h)
+		gable_roof(w + 0.5, z1 - z0, rise, (z0 + z1) / 2.0, SURF_ROOF, h,
+			w, z1 - z0 - 0.4)
 
 
 ## Entrance vestibule across the west front.
@@ -293,7 +307,7 @@ func _build_narthex() -> void:
 	box(a.size, Vector3(c.x, a.size.y / 2.0, c.z), SURF_STONE)
 	_log_mass("narthex", a)
 	gable_roof(a.size.x + 0.4, a.size.z + 0.3, a.size.x * spec.roof_pitch * 0.5,
-		c.z, SURF_ROOF, a.size.y)
+		c.z, SURF_ROOF, a.size.y, a.size.x, a.size.z)
 	window(Vector3(0, a.size.y * 0.42, a.position.z - ChurchGeometry.OPENING_EPS),
 		PI, 1.6, a.size.y * 0.5, spec.window_style, true)
 
@@ -494,8 +508,9 @@ func box(size: Vector3, pos: Vector3, s: int, rot_y := 0.0, shear := 0.0) -> voi
 
 ## Gable capping a wall whose top is at y_base.
 func gable_roof(span_x: float, along_z: float, rise: float, z_center: float, s: int,
-		y_base := 0.0) -> void:
-	_kit.gable_roof(span_x, along_z, rise, z_center, s, y_base)
+		y_base := 0.0, end_span := 0.0, end_along := 0.0) -> void:
+	_kit.gable_roof(span_x, along_z, rise, z_center, s, y_base,
+		SURF_STONE if end_span > 0.0 else -1, end_span, end_along)
 
 ## Lean-to aisle roof, outer eave at y_base up to y_top against the nave wall.
 func _lean_roof(span: float, along: float, y_base: float, y_top: float, side: float,
@@ -525,17 +540,32 @@ func pinnacle(pos: Vector3, sc := 1.0) -> void:
 
 ## Dark recessed opening facing local +Z, rotated by `face` around Y.
 func window(pos: Vector3, face: float, w: float, h: float, style: StringName, door := false) -> void:
-	_log_part("window", pos)
+	# Facing is logged so the normals suite can prove the opening looks OUT of
+	# the wall. Windows on the +/-X walls were once all given face = 0, which
+	# stood them edge-on to the wall like panels bolted across it.
+	_log_part("window", pos, Vector3(w, h, 0.0), face,
+		Basis(Vector3.UP, face) * Vector3(0, 0, 1))
 	var depth: float = 0.16 if door else 0.1
+	# `pos` is the wall face. The recess box is centred, so it has to be pushed
+	# half its depth INTO the wall -- left on `pos` it read as a panel glued to
+	# the outside instead of an opening cut into it.
 	var t := Transform3D(Basis(Vector3.UP, face), pos)
+	var t_in: Transform3D = t.translated_local(Vector3(0, 0, -depth / 2.0))
 	var st: SurfaceTool = _kit.surface(SURF_OPEN)
-	_kit.oriented_box(Vector3(w, h, depth), t, SURF_OPEN)
+	_kit.oriented_box(Vector3(w, h, depth), t_in, SURF_OPEN)
+	# Heads are drawn on the face plane. Two things were wrong with every one of
+	# them: the normal was the LOCAL +Z written straight out as a world vector,
+	# so a rotated window lit as though it faced down the nave, and the fan was
+	# wound counter-clockwise -- back-facing, so Godot culled it outright.
+	var face_n: Vector3 = t.basis * Vector3(0, 0, 1)
 	if style == &"pointed":
-		var apex := Vector3(0, h * 0.35, 0)
+		# The apex sat at 0.35h, BELOW the opening's own top edge at 0.5h, so the
+		# "pointed" head pointed down into the glass.
+		var apex := Vector3(0, h / 2.0 + w * 0.35, 0)
 		var bl := Vector3(-w / 2.0, h / 2.0, 0)
 		var br := Vector3(w / 2.0, h / 2.0, 0)
-		for p in [bl, br, apex]:
-			st.set_normal(Vector3(0, 0, 1))
+		for p in [bl, apex, br]:
+			st.set_normal(face_n)
 			st.set_uv(Vector2(0.5, 0.5))
 			st.add_vertex(t * p)
 	elif style == &"round":
@@ -547,22 +577,23 @@ func window(pos: Vector3, face: float, w: float, h: float, style: StringName, do
 			var c := Vector3(0, h / 2.0, 0)
 			var p0 := Vector3(cos(a0) * rr, h / 2.0 + sin(a0) * rr * 0.5, 0)
 			var p1 := Vector3(cos(a1) * rr, h / 2.0 + sin(a1) * rr * 0.5, 0)
-			for p in [c, p0, p1]:
-				st.set_normal(Vector3(0, 0, 1))
+			for p in [c, p1, p0]:
+				st.set_normal(face_n)
 				st.set_uv(Vector2(0.5, 0.5))
 				st.add_vertex(t * p)
 	if not door:
 		var ft: float = 0.12
 		_kit.oriented_box(Vector3(w + ft * 2, ft, depth + 0.04),
-			t.translated_local(Vector3(0, h / 2.0 + ft / 2.0, 0)), SURF_OPEN)
+			t_in.translated_local(Vector3(0, h / 2.0 + ft / 2.0, 0)), SURF_OPEN)
 		_kit.oriented_box(Vector3(ft, h, depth + 0.04),
-			t.translated_local(Vector3(-w / 2.0 - ft / 2.0, 0, 0)), SURF_OPEN)
+			t_in.translated_local(Vector3(-w / 2.0 - ft / 2.0, 0, 0)), SURF_OPEN)
 		_kit.oriented_box(Vector3(ft, h, depth + 0.04),
-			t.translated_local(Vector3(w / 2.0 + ft / 2.0, 0, 0)), SURF_OPEN)
+			t_in.translated_local(Vector3(w / 2.0 + ft / 2.0, 0, 0)), SURF_OPEN)
 
-func rose(pos: Vector3) -> void:
-	_log_part("window", pos)
-	var t := Transform3D(Basis(), pos)
+func rose(pos: Vector3, face := 0.0) -> void:
+	var basis := Basis(Vector3.UP, face)
+	_log_part("window", pos, Vector3.ZERO, face, basis * Vector3(0, 0, 1))
+	var t := Transform3D(basis, pos)
 	var st: SurfaceTool = _kit.surface(SURF_OPEN)
 	var rr: float = minf(spec.width * 0.18, 1.6)
 	var seg: int = 12
@@ -572,8 +603,8 @@ func rose(pos: Vector3) -> void:
 		var c := Vector3.ZERO
 		var p0 := Vector3(cos(a0) * rr, sin(a0) * rr, 0)
 		var p1 := Vector3(cos(a1) * rr, sin(a1) * rr, 0)
-		for p in [c, p0, p1]:
-			st.set_normal(Vector3(0, 0, 1))
+		for p in [c, p1, p0]:
+			st.set_normal(basis * Vector3(0, 0, 1))
 			st.set_uv(Vector2(0.5, 0.5))
 			st.add_vertex(t * p)
 	# tracery spokes. These previously pushed 8 raw box corners straight into a
