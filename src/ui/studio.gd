@@ -29,6 +29,13 @@ const KINDS := {
 		"length": {"min": 8.0, "max": 400.0, "step": 1.0, "value": 50.0},
 		"height": {"min": 3.0, "max": 40.0, "step": 0.5, "value": 18.0},
 	},
+	&"temple": {
+		"label": "Temple", "size_label": "Temple", "height_label": "Hall height (m)",
+		# from a shrine to something you could lose a village in
+		"width": {"min": 14.0, "max": 60.0, "step": 1.0, "value": 26.0},
+		"length": {"min": 22.0, "max": 100.0, "step": 1.0, "value": 44.0},
+		"height": {"min": 6.0, "max": 26.0, "step": 0.5, "value": 12.0},
+	},
 	&"house": {
 		"label": "House", "size_label": "House", "height_label": "Ceiling (m)",
 		# from a one-room hut to a house with the full room programme
@@ -76,10 +83,6 @@ func _ready() -> void:
 	length_slider.value_changed.connect(func(_v): regenerate())
 	height_slider.value_changed.connect(func(_v): regenerate())
 	style_opt.item_selected.connect(func(_i): regenerate())
-	for trade_key in HouseSpec.TRADES:
-		trade_opt.add_item(HouseSpec.TRADES[trade_key]["label"])
-		trade_opt.set_item_metadata(trade_opt.item_count - 1, trade_key)
-	trade_opt.select(0)
 	trade_opt.item_selected.connect(func(_i): regenerate())
 	variant_list.item_selected.connect(_on_variant_picked)
 	_on_kind_changed()
@@ -95,6 +98,8 @@ func _styles() -> Dictionary:
 			return CastleSpec.STYLES
 		&"house":
 			return HouseSpec.STYLES
+		&"temple":
+			return TempleSpec.FORMS
 	return ChurchSpec.STYLES
 
 
@@ -102,8 +107,22 @@ func _get_style_key() -> StringName:
 	return style_opt.get_item_metadata(style_opt.selected)
 
 
+## The second dropdown: a trade for a house, a cult for a temple.
+##
+## Falls back to the first entry of whichever table the current kind uses. The
+## dropdown is rebuilt every time the kind changes, and for one frame in the
+## middle of that it holds nothing -- which is enough to hand a house a trade
+## that does not exist.
+func _second_key() -> StringName:
+	if trade_opt.item_count > 0 and trade_opt.selected >= 0:
+		var meta = trade_opt.get_item_metadata(trade_opt.selected)
+		if meta != null:
+			return meta
+	return &"none" if _kind() == &"house" else &"blood"
+
+
 func _trade() -> StringName:
-	return trade_opt.get_item_metadata(trade_opt.selected)
+	return _second_key()
 
 
 ## Re-range the sliders and re-fill the style list for the chosen kind. The
@@ -128,8 +147,18 @@ func _on_kind_changed() -> void:
 		style_opt.add_item(_styles()[style_key]["label"])
 		style_opt.set_item_metadata(style_opt.item_count - 1, style_key)
 	style_opt.select(0)
-	# only a house has a trade: a cathedral does not take up blacksmithing
-	trade_opt.visible = _kind() == &"house"
+	# The second dropdown is what the building is FOR: a household trade for a
+	# house, a cult for a temple, and nothing at all for a church or a castle.
+	trade_opt.clear()
+	if _kind() == &"house" or _kind() == &"temple":
+		var table: Dictionary = HouseSpec.TRADES if _kind() == &"house" \
+			else TempleSpec.CULTS
+		for key in table:
+			trade_opt.add_item(table[key]["label"])
+			trade_opt.set_item_metadata(trade_opt.item_count - 1, key)
+		trade_opt.select(0)
+	trade_label.text = "Trade" if _kind() == &"house" else "Cult"
+	trade_opt.visible = trade_opt.item_count > 0
 	trade_label.visible = trade_opt.visible
 	_suspend_regen = false
 	regenerate()
@@ -157,6 +186,15 @@ func regenerate() -> void:
 ## for a church or castle, and [spec, mesh, plan] for a house -- a house is not
 ## finished until its furniture is in, and the furniture is not mesh.
 func _build(seed_value: int) -> Array:
+	if _kind() == &"temple":
+		var tspec := TempleSpec.new()
+		tspec.form = _get_style_key()
+		tspec.cult = _second_key()
+		tspec.width = width_slider.value
+		tspec.length = length_slider.value
+		tspec.height = height_slider.value
+		TempleGenerator.generate(tspec, seed_value)
+		return [tspec, TempleBuilder.new().build(tspec)]
 	if _kind() == &"house":
 		var hspec := HouseSpec.new()
 		hspec.style = _get_style_key()
@@ -191,7 +229,10 @@ func _show(idx: int) -> void:
 		_mesh_instance.queue_free()
 	var mesh: ArrayMesh = meshes[idx]
 	var s = specs[idx]
-	if s is HouseSpec:
+	if s is TempleSpec:
+		# the roof comes off, and every brazier gets a light of its own
+		_mesh_instance = TempleAssembler.build(s, true)
+	elif s is HouseSpec:
 		# a house is assembled rather than built: the shell plus an instance of
 		# the real model for every stick of furniture in it, and the roof left
 		# off so there is something to see
@@ -215,6 +256,8 @@ func _show(idx: int) -> void:
 		bp_view.setup(s)
 	elif s is HouseSpec:
 		bp_view.show_note(_house_sheet(plans[idx]))
+	elif s is TempleSpec:
+		bp_view.show_note(_temple_sheet(s))
 	else:
 		# The sheet is drawn from ChurchGeometry and has no castle counterpart
 		# yet; say so rather than leaving the last church's plan on screen.
@@ -240,8 +283,37 @@ func _house_sheet(plan: HousePlan) -> String:
 	return "\n".join(lines)
 
 
+## What the temple is and what is in it. The rite is the interesting part, so
+## the sheet lists the things the checks care about.
+func _temple_sheet(s: TempleSpec) -> String:
+	var bits: Array[String] = ["%s of %s"
+		% [TempleSpec.FORMS[s.form]["label"], TempleSpec.CULTS[s.cult]["label"]]]
+	bits.append("hall %.0f x %.0f x %.0f m" % [s.width, s.length, s.height])
+	bits.append("the god: a %s, %.1f m to its crown"
+		% [String(s.idol_kind), TempleGeometry.idol_apex(s)])
+	bits.append("altar %.1f x %.1f m on a dais of %d steps"
+		% [s.altar_w, s.altar_l, s.dais_steps])
+	if s.pit:
+		bits.append("a pit %.1f m across, bridged on the axis" % (s.pit_radius * 2.0))
+	if s.cells > 0:
+		bits.append("%d cells off the aisles" % s.cells)
+	bits.append("%d columns" % TempleGeometry.column_positions(s).size())
+	if s.terraces > 0:
+		bits.append("%d terraces, twin stairs to the summit" % s.terraces)
+	if s.obelisks:
+		bits.append("obelisks at the gate")
+	if s.spire:
+		bits.append("a spire over the sanctum")
+	return "\n".join(bits)
+
+
 ## One line describing what was actually generated.
 func _describe(s) -> String:
+	if s is TempleSpec:
+		return "%s -- %s of %s\n%.0f x %.0f m, %.0f m to the ceiling, %.0f m to the crown of the god" % [
+			s.variant_name, TempleSpec.FORMS[s.form]["label"],
+			TempleSpec.CULTS[s.cult]["label"], s.width, s.length, s.height,
+			TempleGeometry.total_height(s)]
 	if s is HouseSpec:
 		var bits: Array[String] = []
 		for kind in [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour", &"store"]:

@@ -12,6 +12,10 @@ extends RefCounted
 ##     inside a wall, and the house suite re-measures the meshes to prove the
 ##     file still describes them.
 ##
+## The temple generator draws on the same catalogue: a cauldron is a brazier
+## when it stands in a nave, and a cage is a cage wherever it is. Only the
+## rules that place them differ.
+##
 ## Local axes of a placed prop: it faces local -Z (the direction a person using
 ## it stands), so a piece against a wall has the wall behind it at +Z. `face`
 ## corrects a model that was authored pointing some other way.
@@ -87,6 +91,15 @@ const PROPS := {
 	"Lantern_Wall": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI},
 	"Torch_Metal": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI},
 	"Chandelier": {"cat": "chandelier", "tags": [CEILING, LIGHT], "zone": 0.0},
+
+	# ---- what a temple is fitted out with ----
+	"Cage_Small": {"cat": "cage", "tags": [], "zone": 0.6},
+	"Chain_Coil": {"cat": "chain", "tags": [CORNER], "zone": 0.0},
+	"Rope_1": {"cat": "chain", "tags": [CORNER], "zone": 0.0},
+	"Vase_Rubble_Medium": {"cat": "rubble", "tags": [CORNER], "zone": 0.0},
+	"Table_Knife": {"cat": "blade", "tags": [ON_SURFACE], "zone": 0.0},
+	"Sword_Bronze": {"cat": "blade", "tags": [ON_SURFACE], "zone": 0.0},
+	"Axe_Bronze": {"cat": "blade", "tags": [ON_SURFACE], "zone": 0.0},
 
 	# ---- things that live on a surface ----
 	"Mug": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},

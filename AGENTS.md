@@ -17,10 +17,13 @@ godot --headless --path . --script res://tests/run_all.gd
 #   churches: church | normals | massing | blueprint | landmark | voxelqa
 #   castles:  castle | cnormals | cmassing | clandmark | cvoxelqa
 #   houses:   house | assets | houseqa | harchetype
+#   temples:  temple | rite | tarchetype
 godot --headless --path . --script res://tests/run_all.gd -- normals
 godot --headless --path . --script res://tests/run_all.gd -- castle cmassing
 # the house suites alone (they are the slow ones: ~5 minutes)
 godot --headless --path . --script res://tests/house_test.gd
+# the temple suites alone
+godot --headless --path . --script res://tests/temple_test.gd
 
 # after changing anything in assets/props/, re-measure the catalogue
 godot --headless --path . --script res://tools/build_prop_catalog.gd
@@ -66,6 +69,13 @@ godot --headless --path . --editor --quit
 * Furniture sizes are measured, never authored. `tools/build_prop_catalog.gd`
   writes `assets/props/catalog.json`; the house assets suite re-measures the
   models and fails if they have drifted.
+* Walking a building is `qa/walk_grid.gd`: rectangles of floor, rectangles of
+  obstruction, a start point. Both the house nav check and the temple rite
+  check use it -- do not grow a second copy of the distance transform.
+* A temple is judged by its AXIS. `qa/temple_rite_check.gd` is ten rules about
+  the line from the gate to the god, and every one of them has caught a real
+  defect. If a change makes one of them noisy, the change is probably wrong.
+* `TempleRiteCheck.ascii_map()` marks the Gate, Altar and Idol.
 * `HouseNavCheck.ascii_map()` prints the walkability grid. Reach for it before
   theorising about a reachability failure -- it shows the blockage in a second.
 * The furnisher calls the nav check on itself, per room and again at the end,

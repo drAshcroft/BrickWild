@@ -70,6 +70,22 @@ func _init() -> void:
 		"caption": "The same generator with the roof left on: thatch, chimney, porch and shuttered windows.",
 		"file": "house_exterior.jpg", "kind": "house"})
 
+	# ---- the temples, from the door and from above ----
+	for entry in _temples():
+		var tspec: TempleSpec = _temple_spec(entry)
+		await _shoot_temple(tspec, "temple_%s.jpg" % entry["key"], &"axis")
+		manifest.append(_describe_temple(entry, tspec, "temple_%s.jpg" % entry["key"]))
+	var plan_shot: TempleSpec = _temple_spec(_temples()[0])
+	await _shoot_temple(plan_shot, "temple_plan.jpg", &"aerial")
+	manifest.append({"key": "temple_plan", "title": "The plan from above",
+		"caption": "Roof off: the axis from gate to altar to idol, columns flanking it, the pit bridged on the line, cells down the aisles.",
+		"file": "temple_plan.jpg", "kind": "temple"})
+	var out_shot: TempleSpec = _temple_spec(_temples()[2])
+	await _shoot_temple(out_shot, "temple_exterior.jpg", &"exterior")
+	manifest.append({"key": "temple_exterior", "title": "From the road",
+		"caption": "The same generator with its roof on.",
+		"file": "temple_exterior.jpg", "kind": "temple"})
+
 	# ---- blueprint sheets ----
 	for entry in _landmarks():
 		if not entry.get("sheet", false):
@@ -407,6 +423,64 @@ func _describe_house(entry: Dictionary, spec: HouseSpec, plan: HousePlan,
 	}
 
 
+## The temples, from docs/TEMPLES.md. Same archetypes the temple suite builds.
+func _temples() -> Array[Dictionary]:
+	return [
+		{"key": "bloodpit_basilica", "needs": ["pit", "cells"], "form": &"basilica", "cult": &"blood",
+			"title": "Bloodpit Basilica", "w": 26.0, "l": 46.0, "h": 13.0,
+			"seed": 7301, "feat": "a nave of columns, a hole in the floor, cages down the aisles"},
+		{"key": "starless_pylon", "needs": ["obelisks"], "form": &"pylon", "cult": &"void",
+			"title": "Temple of the Starless Deep", "w": 34.0, "l": 58.0, "h": 15.0,
+			"seed": 7302, "feat": "obelisks, a court, a forest of columns, a small dark room"},
+		{"key": "ashen_ziggurat", "needs": [], "form": &"ziggurat", "cult": &"flame",
+			"title": "Ziggurat of the Ashen Crown", "w": 40.0, "l": 46.0, "h": 16.0,
+			"seed": 7303, "feat": "a stepped mountain with the fire on top of it"},
+		{"key": "coiled_rotunda", "needs": ["pit"], "form": &"rotunda", "cult": &"serpent",
+			"title": "Rotunda of the Coiled Fang", "w": 32.0, "l": 34.0, "h": 12.0,
+			"seed": 7304, "feat": "a ring of columns round a hole, the altar bridged over it"},
+		{"key": "ossuary_basilica", "needs": ["cells"], "form": &"basilica", "cult": &"bone",
+			"title": "The Ossuary", "w": 24.0, "l": 42.0, "h": 12.0,
+			"seed": 7305, "feat": "a cairn of skulls where the reredos should be"},
+	]
+
+
+func _temple_spec(entry: Dictionary) -> TempleSpec:
+	var spec := TempleSpec.new()
+	spec.form = entry["form"]
+	spec.cult = entry["cult"]
+	spec.width = entry["w"]
+	spec.length = entry["l"]
+	spec.height = entry["h"]
+	TempleGenerator.generate(spec, entry["seed"])
+	# the suite owns what makes each temple itself; reusing it here keeps a
+	# portrait honest about what is actually tested
+	TempleArchetypeSuite._force(spec, entry.get("needs", []))
+	var builder := TempleBuilder.new()
+	builder.build(spec)
+	var rep: Dictionary = TempleQA.new().check(spec, builder)
+	if not rep["ok"]:
+		printerr("  %s FAILS its own rite:" % entry["key"])
+		for f in rep["failures"]:
+			printerr("     " + str(f))
+	return spec
+
+
+func _describe_temple(entry: Dictionary, spec: TempleSpec, file: String) -> Dictionary:
+	return {
+		"key": "temple_" + entry["key"], "title": entry["title"], "file": file,
+		"kind": "temple", "famous_for": entry["feat"],
+		"dims": "%.0f x %.0f x %.0f m" % [spec.width, spec.length, spec.height],
+		"height": "%.1f m to the crown of the god" % TempleGeometry.idol_apex(spec),
+		"built": "%s of %s; a %s idol, %d columns%s%s"
+			% [TempleSpec.FORMS[spec.form]["label"],
+				TempleSpec.CULTS[spec.cult]["label"], String(spec.idol_kind),
+				TempleGeometry.column_positions(spec).size(),
+				", a bridged pit" if spec.pit else "",
+				", %d cells" % spec.cells if spec.cells > 0 else ""],
+		"variant": spec.variant_name,
+	}
+
+
 # -------------------------------------------------------------------- stage
 
 func _build_stage() -> void:
@@ -506,6 +580,72 @@ func _shoot_house(plan: HousePlan, file: String, yaw: float, pitch: float,
 ## The bounds of an assembled scene, props included.
 static func _node_aabb(node: Node) -> AABB:
 	return SceneBounds.of_node(node)
+
+
+## A temple. Three shots, and the first is the one that matters: standing in
+## the gate, looking down the axis at the god, which is the view the whole plan
+## exists to stage -- and the view the rite check spends three of its rules on.
+func _shoot_temple(spec: TempleSpec, file: String, mode: StringName) -> void:
+	_mesh_inst.mesh = null
+	# A ziggurat keeps its roof: the god is on the summit, so the money shot is
+	# the mountain from the foot of the stair rather than a room with the lid
+	# off. Cutting it away would remove the very thing you came to look at.
+	var mountain: bool = spec.form == &"ziggurat"
+	var node: Node3D = TempleAssembler.build(spec, mode != &"exterior" and not mountain)
+	_root3d.add_child(node)
+	_dim(mode != &"exterior")
+	await process_frame
+	var idol: Vector3 = TempleGeometry.idol_center(spec)
+	match mode:
+		&"axis":
+			# where the harness stands to check the sightline: a step inside the
+			# threshold for three of the forms, the foot of the great stair for
+			# the fourth. Shooting from anywhere else would be photographing a
+			# view no rule has ever tested.
+			var eye: Vector2 = TempleGeometry.sight_point(spec)
+			var back: float = 0.0
+			if mountain:
+				# far enough out that the whole climb is in frame
+				back = TempleGeometry.total_height(spec) * 1.9
+			_cam.position = Vector3(0.0, 1.75, eye.y + 0.2 - back)
+			_cam.look_at(Vector3(0.0, idol.y + spec.idol_height * 0.45, idol.z),
+				Vector3.UP)
+		&"aerial":
+			var r: Rect2 = TempleGeometry.plan_extent(spec)
+			var span: float = maxf(r.size.x, r.size.y)
+			_cam.position = Vector3(span * 0.42, span * 1.05, -span * 0.35)
+			_cam.look_at(Vector3(0.0, 0.0, r.get_center().y), Vector3.UP)
+		_:
+			var aabb: AABB = SceneBounds.of_node(node)
+			var radius: float = maxf(aabb.size.length() / 2.0, 1.0)
+			var dist: float = radius / tan(deg_to_rad(_cam.fov) / 2.0) * 1.05
+			var dir := Vector3(sin(2.5) * cos(-0.22), 0.22, cos(2.5) * cos(-0.22))
+			_cam.position = aabb.get_center() + dir * dist
+			_cam.look_at(aabb.get_center(), Vector3.UP)
+	await _capture(file)
+	node.queue_free()
+	_dim(false)
+
+
+## Turn the daylight down. A temple lit like a meadow is not a temple, and the
+## braziers the rite check insists on are the point of the picture.
+func _dim(dark: bool) -> void:
+	var sun := true
+	for child in _root3d.get_children():
+		if child is DirectionalLight3D:
+			var lamp := child as DirectionalLight3D
+			if sun:
+				lamp.light_energy = 0.35 if dark else 1.5
+				sun = false
+			else:
+				lamp.light_energy = 0.12 if dark else 0.35
+		elif child is WorldEnvironment:
+			var env: Environment = (child as WorldEnvironment).environment
+			env.ambient_light_energy = 0.3 if dark else 1.0
+			var sky_mat: ProceduralSkyMaterial = env.sky.sky_material
+			sky_mat.sky_top_color = Color("161a24") if dark else Color("6b8cb5")
+			sky_mat.sky_horizon_color = Color("2a2733") if dark else Color("cfd8e0")
+			sky_mat.ground_horizon_color = Color("1d1c22") if dark else Color("9aa0a0")
 
 
 ## Frame a built mesh and save one image. Both generators hand this the same

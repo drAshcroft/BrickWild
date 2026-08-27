@@ -24,9 +24,13 @@ extends SceneTree
 ##  13 assets     - the prop catalogue still describes the props
 ##  14 houseqa    - plan, furnishing and circulation of every house
 ##  15 harchetype - the dwellings this generator must be able to furnish
+##  16 temple     - the temple spec/build contract and its surfaces
+##  17 rite       - would a rite work in it: axis, sightline, procession, fire
+##  18 tarchetype - the temples a fantasy author would ask for
 const ORDER: Array[String] = ["church", "normals", "massing", "blueprint", "landmark",
 	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa",
-	"house", "assets", "houseqa", "harchetype"]
+	"house", "assets", "houseqa", "harchetype",
+	"temple", "rite", "tarchetype"]
 
 
 static func _run_one(key: String) -> SuiteResult:
@@ -61,6 +65,12 @@ static func _run_one(key: String) -> SuiteResult:
 			return HouseQASuite.run()
 		"harchetype":
 			return HouseArchetypeSuite.run()
+		"temple":
+			return TempleSuite.run()
+		"rite":
+			return TempleQASuite.run()
+		"tarchetype":
+			return TempleArchetypeSuite.run()
 	return null
 
 

@@ -1,7 +1,7 @@
 # Known issues
 
-Status after the house generator landed. All 15 suites pass; the house suites
-alone are 385 checks. The house warnings that remain are the two the harness is
+Status after the temple generator landed. All 18 suites pass; the house and
+temple suites between them are more than half the checks. The house warnings that remain are the two the harness is
 designed to report rather than hide: rooms with less glass than the daylight
 rule asks for, and rooms that gave up a piece of furniture so the rooms beyond
 them could be reached.
@@ -79,6 +79,11 @@ doors and windows are all in `HousePlan` already.
 No stairs, no loft, no cellar below ground. The room programme, the nav check
 and the archetypes all assume a single floor; a second storey would need a
 stair as a room kind and a nav check that knows how to climb it.
+
+### 0aa. A temple is one storey and has no crypt
+The rite runs at ground level. A stair down to an undercroft, or up to a
+gallery over the nave, would need the walking check to understand levels --
+which is the same thing the houses want for a second storey.
 
 ### 0c. The full suite takes about nine minutes
 The house suites generate every house three times over -- once per suite -- and
