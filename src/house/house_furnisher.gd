@@ -150,6 +150,14 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 	relax(plan)
 
 
+## Vertical origin of a room. Older hand-authored plans have no `storey`, so
+## they remain ordinary ground-floor plans.
+static func _storey_base(plan: HousePlan, room: int) -> float:
+	if room < 0 or room >= plan.rooms.size():
+		return 0.0
+	return float(HousePlan.record_storey(plan.rooms[room])) * plan.spec.height
+
+
 ## Furnish, then walk the house, then take something out and walk it again.
 ##
 ## Rules that place one piece at a time cannot see what the room will look like
@@ -285,6 +293,7 @@ static func _without(plan: HousePlan, f: int) -> HousePlan:
 	trial.rooms = plan.rooms
 	trial.doors = plan.doors
 	trial.windows = plan.windows
+	trial.stairs = plan.stairs
 	trial.furniture = plan.furniture.duplicate()
 	trial.furniture.remove_at(f)
 	return trial
@@ -538,6 +547,19 @@ static func _initial_blocked(plan: HousePlan, room: int) -> Array[Rect2]:
 		var door: Dictionary = plan.doors[d]
 		for side in [-1.0, 1.0]:
 			out.append(HouseGeometry.door_clear_rect(door, side))
+	# A stair landing is circulation infrastructure, not furniture space. Keep
+	# both landings clear while placing rooms on either end of the stair.
+	for stair in plan.stairs:
+		if int(stair.get("a", -1)) == room:
+			if stair.has("lower_rect"):
+				out.append(Rect2(stair["lower_rect"]))
+			elif stair.has("rect"):
+				out.append(Rect2(stair["rect"]))
+		if int(stair.get("b", -1)) == room:
+			if stair.has("upper_rect"):
+				out.append(Rect2(stair["upper_rect"]))
+			elif stair.has("rect"):
+				out.append(Rect2(stair["rect"]))
 	return out
 
 
@@ -827,7 +849,8 @@ static func _place_mounted(plan: HousePlan, room: int, key: String,
 				continue
 			var yaw: float = _yaw_facing(n)
 			plan.furniture.append({
-				"key": key, "room": room, "pos": Vector3(pos.x, y, pos.y), "yaw": yaw,
+				"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
+				"pos": Vector3(pos.x, _storey_base(plan, room) + y, pos.y), "yaw": yaw,
 				"rect": Rect2(pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 				"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
 				"mounted": true, "scale": 1.0,
@@ -855,7 +878,8 @@ static func _place_ceiling(plan: HousePlan, room: int, key: String) -> void:
 		return                                   # no room to hang anything
 	var c: Vector2 = floor_rect.get_center()
 	plan.furniture.append({
-		"key": key, "room": room, "pos": Vector3(c.x, plan.spec.height, c.y),
+		"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
+		"pos": Vector3(c.x, _storey_base(plan, room) + plan.spec.height, c.y),
 		"yaw": 0.0, "rect": Rect2(c - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
 		"mounted": true, "scale": 1.0,
@@ -875,7 +899,8 @@ static func _place_on_surface(plan: HousePlan, room: int, key: String,
 		return
 	var host: int = hosts[r.randi_range(0, hosts.size() - 1)]
 	var host_rect: Rect2 = plan.furniture[host]["rect"]
-	var top: float = PropCatalog.surface_height(plan.furniture[host]["key"]) \
+	var top: float = float(plan.furniture[host]["pos"].y) \
+		+ PropCatalog.surface_height(plan.furniture[host]["key"]) \
 		* float(plan.furniture[host].get("scale", 1.0))
 	var foot: Vector2 = PropCatalog.footprint(key)
 	var margin := 0.06
@@ -898,7 +923,8 @@ static func _place_on_surface(plan: HousePlan, room: int, key: String,
 		if clash:
 			continue
 		plan.furniture.append({
-			"key": key, "room": room, "pos": Vector3(p.x, top, p.y),
+			"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
+			"pos": Vector3(p.x, top, p.y),
 			"yaw": r.randf() * TAU, "rect": rect, "zone": Rect2(), "host": host,
 			"cat": PropCatalog.category(key), "mounted": false, "scale": 1.0,
 		})
@@ -986,6 +1012,12 @@ static func _commit(plan: HousePlan, room: int, cand: Dictionary,
 	if cand.is_empty():
 		return
 	cand["room"] = room
+	cand["storey"] = HousePlan.record_storey(plan.rooms[room])
+	var pos: Vector3 = cand["pos"]
+	# Candidates are planar (Y=0) while searching. Stamp world elevation only
+	# after the placement is accepted, keeping all rectangle logic 2D.
+	pos.y += _storey_base(plan, room)
+	cand["pos"] = pos
 	cand["must"] = _mandatory
 	plan.furniture.append(cand)
 	blocked.append(cand["rect"])

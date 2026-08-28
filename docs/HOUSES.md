@@ -20,6 +20,20 @@ read it and judge it; `HouseAssembler` is the only place that ever loads a
 model. That split is why the whole harness runs headless in milliseconds per
 house — the checks work in metres and rectangles and never touch the art.
 
+## Storeys and roofs
+
+`HouseSpec.storeys` requests one, two or three levels; `height` remains the
+floor-to-ceiling height of each level. Rooms, doors, windows and furniture keep
+flat stable IDs but carry a zero-based `storey`. `HousePlan.stairs` is the
+vertical part of the room graph, with a landing footprint on both adjoining
+levels. This keeps the building representation useful without loading a scene
+or inspecting emitted triangles.
+
+The builder repeats floor, wall, partition and timber bands at their planned
+elevations, cuts the stair openings, and emits the stair flights. A single
+pitched roof is attached to the top wall band. Cutaway assembly remains an
+explicit presentation option; ordinary API instantiation includes the roof.
+
 ## Rooms
 
 The interior is split by cutting the biggest room in two, over and over, until

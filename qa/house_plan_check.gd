@@ -35,12 +35,14 @@ func check(plan: HousePlan) -> Dictionary:
 	stats["windows"] = plan.windows.size()
 
 	_check_tiling(plan)
+	_check_storeys(plan)
 	_check_shapes(plan)
 	_check_entrance(plan)
 	_check_connectivity(plan)
 	_check_privacy(plan)
 	_check_door_openings(plan)
 	_check_windows(plan)
+	_check_stairs(plan)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
 		"stats": stats}
 
@@ -54,15 +56,18 @@ func _check_tiling(plan: HousePlan) -> void:
 		failures.append("tiling: the house has no rooms")
 		return
 	var inner: Rect2 = HouseGeometry.interior_rect(plan.spec)
-	var sum := 0.0
+	var sums := {}
 	for i in range(n):
 		var a: Rect2 = plan.rooms[i]["rect"]
-		sum += a.size.x * a.size.y
+		var level := HousePlan.record_storey(plan.rooms[i])
+		sums[level] = float(sums.get(level, 0.0)) + a.size.x * a.size.y
 		if not inner.grow(TOL).encloses(a):
 			failures.append("tiling: room %d (%s) sticks out of the interior"
 				% [i, String(plan.kind_of(i))])
 		for j in range(i + 1, n):
 			var b: Rect2 = plan.rooms[j]["rect"]
+			if HousePlan.record_storey(plan.rooms[i]) != HousePlan.record_storey(plan.rooms[j]):
+				continue
 			var over: Rect2 = a.intersection(b)
 			if over.size.x > TOL and over.size.y > TOL:
 				failures.append("tiling: rooms %d (%s) and %d (%s) overlap by %.2f x %.2fm"
@@ -70,9 +75,27 @@ func _check_tiling(plan: HousePlan) -> void:
 						over.size.x, over.size.y])
 	var want: float = inner.size.x * inner.size.y
 	stats["interior_area"] = snappedf(want, 0.01)
-	if absf(sum - want) > 0.05 * want:
-		failures.append("tiling: rooms cover %.1f m2 of a %.1f m2 interior -- there is floor nobody owns"
-			% [sum, want])
+	for level in sums:
+		var sum: float = float(sums[level])
+		if absf(sum - want) > 0.05 * want:
+			failures.append("tiling: storey %d rooms cover %.1f m2 of a %.1f m2 interior -- there is floor nobody owns"
+				% [int(level), sum, want])
+
+
+## Every requested storey has rooms, and no record may silently use a level
+## outside the spec.  The `get` fallback keeps old hand-authored plans valid.
+func _check_storeys(plan: HousePlan) -> void:
+	var wanted: int = clampi(int(plan.spec.storeys), 1, 3)
+	var seen := {}
+	for room in plan.rooms:
+		var level := HousePlan.record_storey(room)
+		if level < 0 or level >= wanted:
+			failures.append("storeys: room has invalid storey %d (wanted 0..%d)" % [level, wanted - 1])
+		seen[level] = true
+	for level in range(wanted):
+		if not seen.has(level):
+			failures.append("storeys: storey %d has no rooms" % level)
+	stats["storeys"] = wanted
 
 
 func _check_shapes(plan: HousePlan) -> void:
@@ -86,7 +109,12 @@ func _check_shapes(plan: HousePlan) -> void:
 		if HouseGeometry.room_aspect(plan, i) > HouseGeometry.ROOM_ASPECT_MAX:
 			warnings.append("shape: %s is %.1f x %.1fm -- that is a corridor, not a room"
 				% [who, f.size.x, f.size.y])
-		if plan.doors_of(i).is_empty():
+		var has_vertical_access := false
+		for stair in plan.stairs:
+			if int(stair.get("a", -1)) == i or int(stair.get("b", -1)) == i:
+				has_vertical_access = true
+				break
+		if plan.doors_of(i).is_empty() and not has_vertical_access:
 			failures.append("shape: %s has no door at all" % who)
 
 
@@ -99,6 +127,8 @@ func _check_entrance(plan: HousePlan) -> void:
 	for d in plan.doors:
 		if not d["exterior"]:
 			continue
+		if HousePlan.record_storey(d) != 0:
+			failures.append("way in: exterior door is on storey %d, not ground level" % HousePlan.record_storey(d))
 		exteriors += 1
 		if d.get("front", false):
 			fronts += 1
@@ -129,6 +159,44 @@ func _check_connectivity(plan: HousePlan) -> void:
 		if not seen.has(i):
 			failures.append("connected: room %d (%s) cannot be reached from the front door"
 				% [i, String(plan.kind_of(i))])
+
+
+## Stairs are the only legal edge between levels.  Check both their metadata
+## and coverage of every adjacent pair; door_graph() then checks reachability.
+func _check_stairs(plan: HousePlan) -> void:
+	var wanted: int = clampi(int(plan.spec.storeys), 1, 3)
+	var interior: Rect2 = HouseGeometry.interior_rect(plan.spec)
+	var pairs := {}
+	for si in range(plan.stairs.size()):
+		var stair: Dictionary = plan.stairs[si]
+		var lo: int = int(stair.get("storey", 0))
+		var hi: int = int(stair.get("to_storey", lo + 1))
+		if hi != lo + 1 or lo < 0 or hi >= wanted:
+			failures.append("stairs: stair %d does not join adjacent valid storeys (%d to %d)" % [si, lo, hi])
+			continue
+		var a: int = int(stair.get("a", -1))
+		var b: int = int(stair.get("b", -1))
+		if a < 0 or b < 0 or a >= plan.room_count() or b >= plan.room_count():
+			failures.append("stairs: stair %d references an invalid room" % si)
+			continue
+		if HousePlan.record_storey(plan.rooms[a]) != lo or HousePlan.record_storey(plan.rooms[b]) != hi:
+			failures.append("stairs: stair %d endpoints are not on storeys %d and %d" % [si, lo, hi])
+		for key in ["rect", "lower_rect", "upper_rect"]:
+			if not stair.has(key) or Rect2(stair[key]).size.x <= 0.0 or Rect2(stair[key]).size.y <= 0.0:
+				failures.append("stairs: stair %d has no usable %s landing" % [si, key])
+			elif not interior.grow(TOL).encloses(Rect2(stair[key])):
+				failures.append("stairs: stair %d %s lies outside the interior" % [si, key])
+		if stair.has("lower_rect") and stair.has("upper_rect"):
+			var lower: Rect2 = stair["lower_rect"]
+			var upper: Rect2 = stair["upper_rect"]
+			if not lower.position.is_equal_approx(upper.position) \
+					or not lower.size.is_equal_approx(upper.size):
+				failures.append("stairs: stair %d landings must share one vertical stairwell" % si)
+		pairs[lo] = true
+	for lo in range(wanted - 1):
+		if not pairs.has(lo):
+			failures.append("stairs: no transition from storey %d to %d" % [lo, lo + 1])
+	stats["stairs"] = plan.stairs.size()
 
 
 ## You should not have to walk through somebody's bedroom to get anywhere.
@@ -182,6 +250,8 @@ func _check_windows(plan: HousePlan) -> void:
 	var inner: Rect2 = HouseGeometry.interior_rect(plan.spec)
 	for wi in range(plan.windows.size()):
 		var w: Dictionary = plan.windows[wi]
+		if HousePlan.record_storey(w) != HousePlan.record_storey(plan.rooms[int(w["room"])]):
+			failures.append("window %d is tagged for the wrong storey" % wi)
 		var pos: Vector2 = w["pos"]
 		var n: Vector2 = w["normal"]
 		var on_wall: bool = (absf(n.x) > 0.5 and (absf(pos.x - inner.position.x) < TOL
@@ -265,6 +335,8 @@ static func _wall_run_for(plan: HousePlan, d: Dictionary) -> Array:
 ## Two openings are on the same wall when their normals share an axis and they
 ## lie on the same line.
 static func _same_wall(a: Dictionary, b: Dictionary) -> bool:
+	if HousePlan.record_storey(a) != HousePlan.record_storey(b):
+		return false
 	var na: Vector2 = a["normal"]
 	var nb: Vector2 = b["normal"]
 	if (absf(na.x) > 0.5) != (absf(nb.x) > 0.5):

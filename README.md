@@ -12,7 +12,7 @@ Godot tools can generate the family-specific representation first, then choose
 when to emit a mesh:
 
 ```gdscript
-var request := BuildingRequest.house(1234, &"cottage", &"smith", 9.0, 12.0, 2.6)
+var request := BuildingRequest.house(1234, &"townhouse", &"smith", 9.0, 12.0, 2.6, 2)
 var building: GeneratedBuilding = BigGlade.generate(request)
 if building.is_ok():
 	var plan: HousePlan = building.plan
@@ -26,6 +26,11 @@ call site keeps the vocabulary of that building family. Generation is seeded,
 does not mutate the request, and does not emit geometry until `build_mesh()`.
 `placement()` reports measured bounds, footprint, identity and the local -Z
 front. The third `instantiate()` argument opts into shell-only collision.
+
+House requests accept one to three explicit storeys. `height` remains the
+floor-to-ceiling height of each storey. The retained `HousePlan` labels rooms,
+openings and furniture by storey and records the stair links between floors;
+the builder emits those levels and puts one pitched roof above the top level.
 
 ## Addon installation
 
@@ -106,7 +111,7 @@ hold:
 | `library` | public request, representation, mesh and scene contract |
 | `church`, `castle`, `house`, `temple` | family generation purity and determinism |
 | `normals`, `massing`, `blueprint`, `cnormals`, `cmassing` | emitted geometry and drawing agreement |
-| `voxelqa`, `cvoxelqa`, `houseqa`, `rite` | spatial, circulation and ritual correctness |
+| `voxelqa`, `cvoxelqa`, `houseqa`, `hmultistory`, `rite` | spatial, circulation and ritual correctness |
 | `landmark`, `clandmark`, `harchetype`, `tarchetype` | named reference buildings and archetypes |
 | `assets` | measured prop catalogue still matches imported models |
 

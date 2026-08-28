@@ -25,6 +25,9 @@ static func run() -> SuiteResult:
 	var bad_trade := BuildingRequest.house(1)
 	bad_trade.purpose = &"dragon_tamer"
 	_check_invalid(res, bad_trade, &"unknown_trade")
+	var bad_storeys := BuildingRequest.house(1)
+	bad_storeys.storeys = 4
+	_check_invalid(res, bad_storeys, &"storeys_out_of_range")
 	var bad_size := BuildingRequest.temple(1)
 	bad_size.width = 0.0
 	_check_invalid(res, bad_size, &"invalid_dimension")
@@ -40,11 +43,41 @@ static func run() -> SuiteResult:
 	res.checked += 1
 	if descriptor.get("api_version") != BigGlade.API_VERSION \
 			or (descriptor.get("styles", []) as Array).is_empty() \
-			or (descriptor.get("purposes", []) as Array).is_empty():
+			or (descriptor.get("purposes", []) as Array).is_empty() \
+			or not descriptor.has("storeys"):
 		res.fail("house descriptor is incomplete")
 	descriptor["width"]["min"] = -1.0
 	if BigGlade.describe_kind(&"house")["width"]["min"] < 0.0:
 		res.fail("describe_kind returned mutable library state")
+
+	# Storeys are an explicit house input and survive both the detached request
+	# copy and the generated model. This deliberately stops before mesh emission:
+	# the shell tests own the geometry contract, while this suite checks the API
+	# and plan representation.
+	var stacked_request := BuildingRequest.house(505, &"cottage", &"none",
+		9.0, 12.0, 2.6, 2)
+	var stacked_copy := stacked_request.copy()
+	res.checked += 1
+	if stacked_request.storeys != 2 or stacked_copy.storeys != 2:
+		res.fail("house storeys did not survive request copy")
+	var stacked: GeneratedBuilding = BigGlade.generate(stacked_request)
+	res.checked += 1
+	var stacked_spec: HouseSpec = stacked.spec as HouseSpec
+	if not stacked.is_ok() or stacked_spec == null or stacked_spec.storeys != 2 \
+			or stacked.plan == null:
+		res.fail("two-storey house did not transfer storeys into its model")
+	else:
+		var plan: HousePlan = stacked.plan
+		var floors := {}
+		for room in plan.rooms:
+			floors[int(room.get("storey", 0))] = true
+		var exterior_upper := false
+		for door in plan.doors:
+			if door.get("storey", 0) > 0 and door["exterior"]:
+				exterior_upper = true
+		if floors.size() != 2 or plan.stairs.size() != 1 or exterior_upper \
+				or plan.reachable_rooms(plan.entrance_room()).size() != plan.room_count():
+			res.fail("two-storey plan lacks complete upper-floor circulation")
 	return res
 
 

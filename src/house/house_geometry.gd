@@ -243,9 +243,12 @@ static func roof_rise(spec: HouseSpec) -> float:
 
 
 static func total_height(spec: HouseSpec) -> float:
-	var top: float = spec.height + roof_rise(spec)
+	var raw_storeys = spec.get("storeys")
+	var storeys: int = maxi(1, int(raw_storeys)) if raw_storeys != null else 1
+	var wall_top: float = spec.height * storeys
+	var top: float = wall_top + roof_rise(spec)
 	if spec.chimney:
-		top = maxf(top, spec.height + minf(roof_rise(spec), 2.0) + 1.06)
+		top = maxf(top, wall_top + minf(roof_rise(spec), 2.0) + 1.06)
 	return top
 
 

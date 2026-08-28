@@ -13,6 +13,9 @@ var length: float
 var height: float
 var style: StringName
 var purpose: StringName = &""
+## Number of house storeys. Kept on the request (rather than inferred from
+## height) so callers can ask for a taller house without changing ceiling scale.
+var storeys: int = 1
 
 
 static func church(p_seed: int, p_style: StringName = &"romanesque",
@@ -27,8 +30,9 @@ static func castle(p_seed: int, p_style: StringName = &"norman",
 
 static func house(p_seed: int, p_style: StringName = &"cottage",
 		p_trade: StringName = &"none", p_width := 8.0, p_length := 10.0,
-		p_height := 2.6) -> BuildingRequest:
-	return _make(&"house", p_seed, p_style, p_trade, p_width, p_length, p_height)
+		p_height := 2.6, p_storeys: int = 1) -> BuildingRequest:
+	return _make(&"house", p_seed, p_style, p_trade, p_width, p_length, p_height,
+		p_storeys)
 
 
 static func temple(p_seed: int, p_form: StringName = &"basilica",
@@ -40,12 +44,12 @@ static func temple(p_seed: int, p_form: StringName = &"basilica",
 ## A detached copy lets the library retain the request without retaining
 ## mutable caller-owned state.
 func copy() -> BuildingRequest:
-	return _make(kind, seed, style, purpose, width, length, height)
+	return _make(kind, seed, style, purpose, width, length, height, storeys)
 
 
 static func _make(p_kind: StringName, p_seed: int, p_style: StringName,
 		p_purpose: StringName, p_width: float, p_length: float,
-		p_height: float) -> BuildingRequest:
+		p_height: float, p_storeys: int = 1) -> BuildingRequest:
 	var out := BuildingRequest.new()
 	out.kind = p_kind
 	out.seed = p_seed
@@ -54,4 +58,5 @@ static func _make(p_kind: StringName, p_seed: int, p_style: StringName,
 	out.width = p_width
 	out.length = p_length
 	out.height = p_height
+	out.storeys = p_storeys
 	return out

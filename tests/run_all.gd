@@ -24,13 +24,14 @@ extends SceneTree
 ##  13 house      - the house spec/plan/build contract
 ##  14 assets     - the prop catalogue still describes the props
 ##  15 houseqa    - plan, furnishing and circulation of every house
-##  16 harchetype - the dwellings this generator must be able to furnish
-##  17 temple     - the temple spec/build contract and its surfaces
-##  18 rite       - would a rite work in it: axis, sightline, procession, fire
-##  19 tarchetype - the temples a fantasy author would ask for
+##  16 hmultistory- explicit levels, stairs, elevations and top roof
+##  17 harchetype - the dwellings this generator must be able to furnish
+##  18 temple     - the temple spec/build contract and its surfaces
+##  19 rite       - would a rite work in it: axis, sightline, procession, fire
+##  20 tarchetype - the temples a fantasy author would ask for
 const ORDER: Array[String] = ["library", "church", "normals", "massing", "blueprint", "landmark",
 	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa",
-	"house", "assets", "houseqa", "harchetype",
+	"house", "assets", "houseqa", "hmultistory", "harchetype",
 	"temple", "rite", "tarchetype"]
 
 
@@ -66,6 +67,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return HouseAssetsSuite.run()
 		"houseqa":
 			return HouseQASuite.run()
+		"hmultistory":
+			return HouseMultistorySuite.run()
 		"harchetype":
 			return HouseArchetypeSuite.run()
 		"temple":

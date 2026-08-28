@@ -17,6 +17,7 @@ var trade: StringName = &"none"   # what the household does for a living
 var width: float = 8.0            # X, metres, outside face to outside face
 var length: float = 10.0          # Z
 var height: float = 2.6           # floor to ceiling
+var storeys: int = 1              # stacked floors, 1..3; height is per storey
 
 # ---- derived from seed + style ----
 var variant_name: String

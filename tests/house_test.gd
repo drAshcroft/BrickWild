@@ -5,7 +5,7 @@ extends SceneTree
 
 func _init() -> void:
 	var suites: Array[SuiteResult] = [HouseSuite.run(), HouseAssetsSuite.run(),
-		HouseQASuite.run(), HouseArchetypeSuite.run()]
+		HouseQASuite.run(), HouseMultistorySuite.run(), HouseArchetypeSuite.run()]
 	var failed := 0
 	for res in suites:
 		for n in res.notes:

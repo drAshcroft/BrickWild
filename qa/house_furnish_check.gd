@@ -55,6 +55,7 @@ func check(plan: HousePlan) -> Dictionary:
 	stats["furniture"] = plan.furniture.size()
 
 	_check_placed(plan)
+	_check_vertical(plan)
 	_check_supported(plan)
 	_check_doorways(plan)
 	_check_windows(plan)
@@ -104,10 +105,33 @@ func _check_placed(plan: HousePlan) -> void:
 			var pb: Dictionary = plan.furniture[b]
 			if pb.get("mounted", false) or pb["host"] >= 0:
 				continue
+			if HousePlan.record_storey(pa) != HousePlan.record_storey(pb):
+				continue
 			var over: Rect2 = Rect2(pa["rect"]).intersection(pb["rect"])
 			if over.size.x > TOL and over.size.y > TOL:
 				failures.append("placed: %s and %s stand in the same %.2f x %.2fm of floor"
 					% [_who(plan, a), _who(plan, b), over.size.x, over.size.y])
+
+
+## Furniture is planned in X/Z rectangles, but its model must occupy the room's
+## vertical band.  This catches an upper-storey placement left at Y=0 and a
+## prop accidentally hanging through the ceiling.
+func _check_vertical(plan: HousePlan) -> void:
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		var room: int = int(p.get("room", -1))
+		if room < 0 or room >= plan.room_count():
+			failures.append("vertical: furniture %d references no room" % f)
+			continue
+		var level := HousePlan.record_storey(plan.rooms[room])
+		if HousePlan.record_storey(p) != level:
+			failures.append("vertical: %s is tagged for storey %d, room is on %d"
+				% [_who(plan, f), HousePlan.record_storey(p), level])
+		var base: float = float(level) * plan.spec.height
+		var y: float = float(p["pos"].y)
+		if y < base - TOL or y > base + plan.spec.height + TOL:
+			failures.append("vertical: %s origin Y %.2f outside storey %d band %.2f..%.2f"
+				% [_who(plan, f), y, level, base, base + plan.spec.height])
 
 
 ## A prop that must sit on a surface must actually be on one, at its height and
@@ -129,7 +153,10 @@ func _check_supported(plan: HousePlan) -> void:
 			failures.append("supported: %s is set on a %s, which has no top"
 				% [_who(plan, f), host_key])
 			continue
-		var top: float = PropCatalog.surface_height(host_key) \
+		if HousePlan.record_storey(plan.furniture[host]) != HousePlan.record_storey(p):
+			failures.append("supported: %s is hosted by a different storey" % _who(plan, f))
+		var top: float = float(plan.furniture[host]["pos"].y) \
+			+ PropCatalog.surface_height(host_key) \
 			* float(plan.furniture[host].get("scale", 1.0))
 		if absf(float(p["pos"].y) - top) > 0.02:
 			failures.append("supported: %s floats %.2fm above the %s it sits on"
@@ -148,6 +175,8 @@ func _check_doorways(plan: HousePlan) -> void:
 		var rect: Rect2 = p["rect"]
 		for d in range(plan.doors.size()):
 			var door: Dictionary = plan.doors[d]
+			if HousePlan.record_storey(door) != HousePlan.record_storey(p):
+				continue
 			for side in [-1.0, 1.0]:
 				var clear: Rect2 = HouseGeometry.door_clear_rect(door, side)
 				var over: Rect2 = clear.intersection(rect)

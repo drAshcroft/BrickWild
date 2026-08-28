@@ -32,6 +32,8 @@ static func plan(spec: HouseSpec) -> HousePlan:
 	_place_windows(p, spec)
 	_glaze_the_rest(p, spec)
 	_demote_unlit(p)
+	if spec.storeys > 1:
+		_clone_upper_storeys(p, spec)
 	return p
 
 
@@ -95,7 +97,7 @@ static func _subdivide(p: HousePlan, spec: HouseSpec) -> void:
 			return a.position.y < b.position.y
 		return a.position.x < b.position.x)
 	for rect in rects:
-		p.rooms.append({"kind": &"hall", "rect": rect})
+		p.rooms.append({"kind": &"hall", "rect": rect, "storey": 0})
 
 
 static func _can_split(rect: Rect2) -> bool:
@@ -265,6 +267,8 @@ static func _largest(p: HousePlan) -> int:
 ## Where two rooms meet, and how much of that wall they share.
 ## Returns [] when they do not touch along a usable run.
 static func _shared_edge(p: HousePlan, i: int, j: int) -> Array:
+	if p.storey_of_room(i) != p.storey_of_room(j):
+		return []
 	var a: Rect2 = p.rooms[i]["rect"]
 	var b: Rect2 = p.rooms[j]["rect"]
 	var eps := 0.01
@@ -427,7 +431,7 @@ static func _add_inner_door(p: HousePlan, a: int, b: int, edge: Array) -> void:
 			t = t1 - m
 	var pos: Vector2 = Vector2(line, t) if normal.x > 0.5 else Vector2(t, line)
 	p.doors.append({"a": a, "b": b, "pos": pos, "normal": normal, "width": w,
-		"exterior": false, "front": false})
+		"exterior": false, "front": false, "storey": p.storey_of_room(a)})
 
 
 ## The front door, on the hall's own stretch of the front wall.
@@ -455,7 +459,8 @@ static func _place_front_door(p: HousePlan, spec: HouseSpec, hall: int) -> void:
 	var m: float = HouseGeometry.DOOR_CORNER_MARGIN + w / 2.0
 	var x: float = clampf(rect.get_center().x, rect.position.x + m, rect.end.x - m)
 	p.doors.append({"a": room, "b": -1, "pos": Vector2(x, inner.position.y),
-		"normal": Vector2(0, -1), "width": w, "exterior": true, "front": true})
+		"normal": Vector2(0, -1), "width": w, "exterior": true, "front": true,
+		"storey": p.storey_of_room(room)})
 
 
 ## A back door out of the kitchen or the store, for the yard.
@@ -472,7 +477,8 @@ static func _place_back_door(p: HousePlan, spec: HouseSpec) -> void:
 				continue
 			var x: float = clampf(rect.get_center().x, rect.position.x + m, rect.end.x - m)
 			p.doors.append({"a": i, "b": -1, "pos": Vector2(x, inner.end.y),
-				"normal": Vector2(0, 1), "width": w, "exterior": true, "front": false})
+				"normal": Vector2(0, 1), "width": w, "exterior": true, "front": false,
+				"storey": p.storey_of_room(i)})
 			return
 
 
@@ -561,11 +567,12 @@ static func _squeeze_window(p: HousePlan, room: int, side: Dictionary) -> bool:
 		for k in range(steps + 1):
 			var t: float = lerpf(t0, t1, float(k) / float(steps))
 			var pos: Vector2 = Vector2(line, t) if absf(normal.x) > 0.5 else Vector2(t, line)
-			if _crowds(p, pos, normal, width):
+			if _crowds(p, pos, normal, width, p.storey_of_room(room)):
 				continue
 			p.windows.append({"room": room, "pos": pos, "normal": normal,
 				"width": width, "sill": HouseGeometry.WINDOW_SILL,
-				"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H})
+				"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H,
+				"storey": p.storey_of_room(room)})
 			return true
 	return false
 
@@ -573,14 +580,17 @@ static func _squeeze_window(p: HousePlan, room: int, side: Dictionary) -> bool:
 ## Is there already an opening too close to this one? The last-resort pass
 ## keeps only the masonry a lintel needs between two openings, rather than the
 ## comfortable spacing the first pass asks for.
-static func _crowds(p: HousePlan, pos: Vector2, normal: Vector2, width: float) -> bool:
+static func _crowds(p: HousePlan, pos: Vector2, normal: Vector2, width: float,
+		storey := 0) -> bool:
 	for d in p.doors:
-		if not _same_wall(d["pos"], d["normal"], pos, normal):
+		if not _same_wall(d["pos"], d["normal"], pos, normal,
+				HousePlan.record_storey(d), storey):
 			continue
 		if (Vector2(d["pos"]) - pos).length() < (float(d["width"]) + width) / 2.0 + 0.22:
 			return true
 	for w in p.windows:
-		if not _same_wall(w["pos"], w["normal"], pos, normal):
+		if not _same_wall(w["pos"], w["normal"], pos, normal,
+				HousePlan.record_storey(w), storey):
 			continue
 		if (Vector2(w["pos"]) - pos).length() < (float(w["width"]) + width) / 2.0 + 0.22:
 			return true
@@ -607,13 +617,14 @@ static func _windows_along(p: HousePlan, spec: HouseSpec, room: int, side: Dicti
 		var t: float = lerpf(t0 + HouseGeometry.WINDOW_W / 2.0,
 			t1 - HouseGeometry.WINDOW_W / 2.0, f)
 		var pos: Vector2 = Vector2(line, t) if absf(normal.x) > 0.5 else Vector2(t, line)
-		if _clashes_with_door(p, pos, normal):
+		if _clashes_with_door(p, pos, normal, p.storey_of_room(room)):
 			continue
-		if _clashes_with_window(p, pos, normal):
+		if _clashes_with_window(p, pos, normal, p.storey_of_room(room)):
 			continue
 		p.windows.append({"room": room, "pos": pos, "normal": normal,
 			"width": HouseGeometry.WINDOW_W, "sill": HouseGeometry.WINDOW_SILL,
-			"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H})
+			"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H,
+			"storey": p.storey_of_room(room)})
 		var got := 0.0
 		for wi in p.windows_of(room):
 			got += HouseGeometry.window_area(p.windows[wi])
@@ -621,9 +632,11 @@ static func _windows_along(p: HousePlan, spec: HouseSpec, room: int, side: Dicti
 			return
 
 
-static func _clashes_with_door(p: HousePlan, pos: Vector2, normal: Vector2) -> bool:
+static func _clashes_with_door(p: HousePlan, pos: Vector2, normal: Vector2,
+		storey := 0) -> bool:
 	for d in p.doors:
-		if not _same_wall(d["pos"], d["normal"], pos, normal):
+		if not _same_wall(d["pos"], d["normal"], pos, normal,
+				HousePlan.record_storey(d), storey):
 			continue
 		var gap: float = (d["pos"] - pos).length()
 		if gap < (float(d["width"]) + HouseGeometry.WINDOW_W) / 2.0 + 0.3:
@@ -631,9 +644,11 @@ static func _clashes_with_door(p: HousePlan, pos: Vector2, normal: Vector2) -> b
 	return false
 
 
-static func _clashes_with_window(p: HousePlan, pos: Vector2, normal: Vector2) -> bool:
+static func _clashes_with_window(p: HousePlan, pos: Vector2, normal: Vector2,
+		storey := 0) -> bool:
 	for w in p.windows:
-		if not _same_wall(w["pos"], w["normal"], pos, normal):
+		if not _same_wall(w["pos"], w["normal"], pos, normal,
+				HousePlan.record_storey(w), storey):
 			continue
 		if (w["pos"] - pos).length() < HouseGeometry.WINDOW_W + HouseGeometry.WINDOW_MIN_GAP - 0.05:
 			return true
@@ -642,9 +657,87 @@ static func _clashes_with_window(p: HousePlan, pos: Vector2, normal: Vector2) ->
 
 ## Two openings are on the same wall when they share a normal axis and lie on
 ## the same line.
-static func _same_wall(pa: Vector2, na: Vector2, pb: Vector2, nb: Vector2) -> bool:
+static func _same_wall(pa: Vector2, na: Vector2, pb: Vector2, nb: Vector2,
+		storey_a := 0, storey_b := 0) -> bool:
+	if int(storey_a) != int(storey_b):
+		return false
 	if absf(na.x) != absf(nb.x):
 		return false
 	if absf(na.x) > 0.5:
 		return absf(pa.x - pb.x) < 0.02
 	return absf(pa.y - pb.y) < 0.02
+
+
+# ---------------------------------------------------------- stacked storeys
+
+## The first storey is deliberately planned by the original path above. Higher
+## storeys reuse that finished partition, naming and glazing result instead of
+## consuming more RNG or inventing a second floor-plan algorithm. Exterior doors
+## stay on the ground floor; each upper level gets the same interior doors and
+## windows, then a deterministic hall-to-hall stair link.
+static func _clone_upper_storeys(p: HousePlan, spec: HouseSpec) -> void:
+	var base_rooms: Array[int] = p.rooms_on_storey(0)
+	var base_doors: Array[Dictionary] = []
+	for door in p.doors:
+		if not door["exterior"] and p.storey_of_room(int(door["a"])) == 0:
+			base_doors.append(door)
+	var base_windows: Array[Dictionary] = p.windows.duplicate()
+	var hall_by_storey: Dictionary = {}
+	for room in base_rooms:
+		if p.kind_of(room) == &"hall":
+			hall_by_storey[0] = room
+			break
+	if not hall_by_storey.has(0) and not base_rooms.is_empty():
+		hall_by_storey[0] = base_rooms[0]
+
+	for storey in range(1, spec.storeys):
+		var remap: Dictionary = {}
+		for source in base_rooms:
+			var room := p.rooms[source].duplicate()
+			room["storey"] = storey
+			var target: int = p.rooms.size()
+			p.rooms.append(room)
+			remap[source] = target
+			if p.kind_of(source) == &"hall":
+				hall_by_storey[storey] = target
+
+		for source_door in base_doors:
+			var door := source_door.duplicate()
+			door["a"] = remap[int(source_door["a"])]
+			door["b"] = remap[int(source_door["b"])]
+			door["storey"] = storey
+			p.doors.append(door)
+		for source_window in base_windows:
+			var window := source_window.duplicate()
+			window["room"] = remap[int(source_window["room"])]
+			window["storey"] = storey
+			p.windows.append(window)
+
+		# Link adjacent levels so every upper floor has a real route from the
+		# front door, including the third storey, without treating a stair as a
+		# horizontal door.
+		var lower_hall: int = int(hall_by_storey.get(storey - 1,
+			hall_by_storey[0]))
+		var upper_hall: int = int(hall_by_storey.get(storey, -1))
+		if upper_hall >= 0:
+			_add_stair(p, lower_hall, upper_hall, storey - 1, storey)
+
+
+## Add one stair in the hall equivalent on each of two adjacent levels. The
+## landing is kept as an explicit rectangle so layered navigation and a future
+## builder can agree on the opening without deriving it from the mesh.
+static func _add_stair(p: HousePlan, lower_room: int, upper_room: int,
+		lower_storey: int, upper_storey: int) -> void:
+	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(p, lower_room)
+	var width: float = minf(1.0, maxf(HouseGeometry.PATH_MIN, floor_rect.size.x - 0.3))
+	var run: float = minf(2.4, maxf(HouseGeometry.PATH_MIN, floor_rect.size.y - 0.3))
+	var centre := floor_rect.get_center()
+	var footprint := Rect2(centre - Vector2(width, run) / 2.0,
+		Vector2(width, run))
+	p.stairs.append({
+		"a": lower_room, "b": upper_room,
+		"storey": lower_storey, "to_storey": upper_storey,
+		"pos": centre, "lower_pos": centre, "upper_pos": centre,
+		"rect": footprint, "lower_rect": footprint, "upper_rect": footprint,
+		"width": width, "run": run,
+	})

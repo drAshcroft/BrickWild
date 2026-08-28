@@ -49,7 +49,7 @@ func _init() -> void:
 			entry.get("pitch", -0.30), entry.get("zoom", 1.0))
 		manifest.append(_describe_castle(entry, cspec, cfile))
 
-	# ---- the furnished houses, roof off ----
+	# ---- furnished cutaways, plus one roof-on multistory exterior ----
 	for entry in _houses():
 		var made: Array = _house_plan(entry)
 		var hfile: String = "house_%s.jpg" % entry["key"]
@@ -64,9 +64,9 @@ func _init() -> void:
 		"file": "house_room.jpg", "kind": "house"})
 
 	# and one of them from outside, with its roof on
-	var street: Array = _house_plan(_houses()[1])
+	var street: Array = _house_plan(_houses()[4])
 	await _shoot_house(street[1], "house_exterior.jpg", 2.4, -0.22, 1.0, false)
-	manifest.append({"key": "house_exterior", "title": "A cottage from the lane",
+	manifest.append({"key": "house_exterior", "title": "A two-storey inn from the lane",
 		"caption": "The same generator with the roof left on: thatch, chimney, porch and shuttered windows.",
 		"file": "house_exterior.jpg", "kind": "house"})
 
@@ -372,7 +372,8 @@ func _houses() -> Array[Dictionary]:
 			"feat": "bookcase, cauldron and a bench of bottles",
 			"yaw": 0.75, "pitch": -0.82},
 		{"key": "inn", "style": &"townhouse", "trade": &"innkeeper",
-			"title": "Village inn", "w": 13.0, "l": 16.0, "h": 2.9, "seed": 8105,
+			"title": "Village inn", "w": 13.0, "l": 16.0, "h": 2.9, "storeys": 2,
+			"seed": 8105,
 			"feat": "common room, parlour, guest rooms and a cellar",
 			"yaw": 1.05, "pitch": -0.85},
 		{"key": "farmhouse", "style": &"farmhouse", "trade": &"farmer",
@@ -392,6 +393,7 @@ func _house_plan(entry: Dictionary) -> Array:
 	spec.width = entry["w"]
 	spec.length = entry["l"]
 	spec.height = entry["h"]
+	spec.storeys = int(entry.get("storeys", 1))
 	var plan: HousePlan = HouseGenerator.generate(spec, entry["seed"])
 	var builder := HouseBuilder.new()
 	builder.build(plan)

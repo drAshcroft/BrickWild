@@ -18,6 +18,10 @@ const VARIANTS := 6
 @onready var width_slider: HSlider = $HSplit/LeftPanel/Margin/Grid/WidthSlider
 @onready var length_slider: HSlider = $HSplit/LeftPanel/Margin/Grid/LengthSlider
 @onready var height_slider: HSlider = $HSplit/LeftPanel/Margin/Grid/HeightSlider
+@onready var storeys_slider: HSlider = $HSplit/LeftPanel/Margin/Grid/StoreysSlider
+@onready var storeys_label: Label = $HSplit/LeftPanel/Margin/Grid/StoreysLabel
+@onready var cutaway_button: CheckButton = $HSplit/LeftPanel/Margin/Grid/CutawayButton
+@onready var cutaway_label: Label = $HSplit/LeftPanel/Margin/Grid/CutawayLabel
 @onready var width_label: Label = $HSplit/LeftPanel/Margin/Grid/WidthLabel
 @onready var length_label: Label = $HSplit/LeftPanel/Margin/Grid/LengthLabel
 @onready var height_label: Label = $HSplit/LeftPanel/Margin/Grid/HeightLabel
@@ -52,6 +56,8 @@ func _ready() -> void:
 	width_slider.value_changed.connect(func(_v): regenerate())
 	length_slider.value_changed.connect(func(_v): regenerate())
 	height_slider.value_changed.connect(func(_v): regenerate())
+	storeys_slider.value_changed.connect(func(_v): regenerate())
+	cutaway_button.toggled.connect(func(_v): _show(current))
 	style_opt.item_selected.connect(func(_i): regenerate())
 	trade_opt.item_selected.connect(func(_i): regenerate())
 	variant_list.item_selected.connect(_on_variant_picked)
@@ -112,6 +118,17 @@ func _on_kind_changed() -> void:
 	width_label.text = "%s width (m)" % cfg["size_label"]
 	length_label.text = "%s length (m)" % cfg["size_label"]
 	height_label.text = cfg["height_label"]
+	var has_storeys: bool = cfg.has("storeys")
+	storeys_label.visible = has_storeys
+	storeys_slider.visible = has_storeys
+	cutaway_label.visible = has_storeys
+	cutaway_button.visible = has_storeys
+	if has_storeys:
+		var storey_cfg: Dictionary = cfg["storeys"]
+		storeys_slider.min_value = storey_cfg["min"]
+		storeys_slider.max_value = storey_cfg["max"]
+		storeys_slider.step = storey_cfg["step"]
+		storeys_slider.value = storey_cfg["value"]
 	style_opt.clear()
 	for style_key in _styles():
 		style_opt.add_item(_styles()[style_key]["label"])
@@ -169,7 +186,8 @@ func _build(seed_value: int) -> GeneratedBuilding:
 			width_slider.value, length_slider.value, height_slider.value)
 	elif _kind() == &"house":
 		request = BuildingRequest.house(seed_value, _get_style_key(), _trade(),
-			width_slider.value, length_slider.value, height_slider.value)
+			width_slider.value, length_slider.value, height_slider.value,
+			int(storeys_slider.value))
 	elif _kind() == &"castle":
 		request = BuildingRequest.castle(seed_value, _get_style_key(),
 			width_slider.value, length_slider.value, height_slider.value)
@@ -187,7 +205,8 @@ func _show(idx: int) -> void:
 		_mesh_instance.queue_free()
 	var mesh: ArrayMesh = meshes[idx]
 	var s = specs[idx]
-	_mesh_instance = BigGlade.instantiate(buildings[idx], true)
+	var cutaway: bool = cutaway_button.button_pressed if s is HouseSpec else true
+	_mesh_instance = BigGlade.instantiate(buildings[idx], cutaway)
 	viewport.get_node("ModelRoot").add_child(_mesh_instance)
 	variant_list.select(idx)
 	info_label.text = _describe(s)
@@ -208,16 +227,16 @@ func _show(idx: int) -> void:
 ## The room list, in place of a blueprint sheet: which rooms the plan came out
 ## with, how big they are, and what is in them.
 func _house_sheet(plan: HousePlan) -> String:
-	var lines: Array[String] = ["%s -- %s, %d rooms"
+	var lines: Array[String] = ["%s -- %s, %d rooms on %d storey%s"
 		% [plan.spec.variant_name, HouseSpec.TRADES[plan.spec.trade]["label"],
-			plan.room_count()]]
+			plan.room_count(), plan.spec.storeys, "" if plan.spec.storeys == 1 else "s"]]
 	for i in range(plan.room_count()):
 		var f: Rect2 = HouseGeometry.room_floor_rect(plan, i)
 		var items: Array[String] = []
 		for fi in plan.furniture_of(i):
 			items.append(String(plan.furniture[fi]["key"]).replace("_", " "))
-		lines.append("%-9s %.1f x %.1f m  %d doors, %d windows\n    %s"
-			% [String(plan.kind_of(i)), f.size.x, f.size.y,
+		lines.append("L%d %-9s %.1f x %.1f m  %d doors, %d windows\n    %s"
+			% [plan.storey_of_room(i) + 1, String(plan.kind_of(i)), f.size.x, f.size.y,
 				plan.doors_of(i).size(), plan.windows_of(i).size(),
 				", ".join(items) if not items.is_empty() else "-"])
 	return "\n".join(lines)
@@ -260,9 +279,10 @@ func _describe(s) -> String:
 			var n: int = s_plan_rooms(kind)
 			if n > 0:
 				bits.append("%d %s" % [n, String(kind)] if n > 1 else String(kind))
-		return "%s -- %s %s\n%.1f x %.1f m, ceiling %.1f m -- %s" % [
+		return "%s -- %s %s\n%.1f x %.1f m, %d storey%s at %.1f m -- %s" % [
 			s.variant_name, HouseSpec.STYLES[s.style]["label"],
-			HouseSpec.TRADES[s.trade]["label"], s.width, s.length, s.height,
+			HouseSpec.TRADES[s.trade]["label"], s.width, s.length, s.storeys,
+			"" if s.storeys == 1 else "s", s.height,
 			", ".join(bits)]
 	if s is CastleSpec:
 		var bits: Array[String] = []

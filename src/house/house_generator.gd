@@ -20,6 +20,7 @@ const SUFFIXES := ["", "", " Cottage", " House", " Lodge", " Steading"]
 static func generate(spec: HouseSpec, p_seed: int) -> HousePlan:
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
+	spec.storeys = clampi(spec.storeys, 1, 3)
 	var s: Dictionary = HouseSpec.STYLES[spec.style]
 	var r := spec.rng
 
@@ -51,6 +52,13 @@ static func generate(spec: HouseSpec, p_seed: int) -> HousePlan:
 
 	var plan: HousePlan = HousePlanner.plan(spec)
 	HouseFurnisher.furnish(plan, spec)
+	# HouseFurnisher deliberately works from room IDs and legacy 2D rectangles.
+	# Stamp the explicit level on its records here so consumers can already
+	# distinguish stacked placements without changing that independent placer.
+	for placement in plan.furniture:
+		var room: int = int(placement.get("room", -1))
+		placement["storey"] = plan.storey_of_room(room) if room >= 0 \
+			and room < plan.rooms.size() else 0
 	return plan
 
 

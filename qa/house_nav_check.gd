@@ -26,6 +26,7 @@ var stats: Dictionary = {}
 
 var _plan: HousePlan
 var _grid: WalkGrid
+var _grids: Dictionary = {}
 
 ## Which rooms could not be walked to, and which pieces of furniture could not
 ## be reached. The furnisher reads these to thin a room out until it works, so
@@ -53,6 +54,10 @@ func check(plan: HousePlan) -> Dictionary:
 	if not _grid.flood_from(inside):
 		failures.append("nav: there is nowhere to stand inside the front door")
 		return _report()
+	# Propagate walkability through stair landings. Each level keeps its own
+	# WalkGrid (the distance transform remains shared and 2D); a stair is the
+	# explicit edge between those grids.
+	_flood_storeys(inside)
 	stats["walkable_area"] = snappedf(_grid.walkable_area(), 0.1)
 	stats["reached_cells"] = _grid.reached_cells()
 
@@ -74,19 +79,72 @@ func _report() -> Dictionary:
 ## it belongs to no room, which is exactly what a wall is.
 func _rasterize() -> void:
 	var bounds: Rect2 = HouseGeometry.interior_rect(_plan.spec).grow(HouseGeometry.WALL_T)
-	_grid = WalkGrid.new()
-	_grid.setup(bounds, HouseGeometry.NAV_CELL)
+	_grids.clear()
+	var wanted: int = clampi(int(_plan.spec.storeys), 1, 3)
+	for level in range(wanted):
+		var grid := WalkGrid.new()
+		grid.setup(bounds, HouseGeometry.NAV_CELL)
+		_grids[level] = grid
+	_grid = _grids[0]
 	for i in range(_plan.room_count()):
-		_grid.add_floor(HouseGeometry.room_floor_rect(_plan, i))
+		var level := HousePlan.record_storey(_plan.rooms[i])
+		if _grids.has(level):
+			_grids[level].add_floor(HouseGeometry.room_floor_rect(_plan, i))
 	for d in _plan.doors:
-		_grid.add_floor(_door_gap(d))
+		var level := HousePlan.record_storey(d)
+		if _grids.has(level):
+			_grids[level].add_floor(_door_gap(d))
 	for p in _plan.furniture:
 		if p.get("mounted", false) or p["host"] >= 0:
 			continue
 		if not PropCatalog.blocks_floor(p["key"]):
 			continue
-		_grid.add_obstacle(p["rect"])
-	_grid.build(HouseGeometry.PERSON_RADIUS)
+		var level := HousePlan.record_storey(p)
+		if _grids.has(level):
+			_grids[level].add_obstacle(p["rect"])
+	for level in _grids:
+		_grids[level].build(HouseGeometry.PERSON_RADIUS)
+
+
+func _flood_storeys(inside: Vector2) -> void:
+	var reachable_levels := {}
+	var seeds := {0: inside}
+	var pending: Array[int] = [0]
+	while not pending.is_empty():
+		var level: int = pending.pop_front()
+		var grid: WalkGrid = _grids[level]
+		if not grid.flood_from(seeds[level]):
+			continue
+		reachable_levels[level] = true
+		for stair in _plan.stairs:
+			var lo: int = int(stair.get("storey", 0))
+			var hi: int = int(stair.get("to_storey", lo + 1))
+			if lo != level or hi != lo + 1 or not _grids.has(hi):
+				continue
+			var landing: Rect2 = _stair_rect(stair, false)
+			if not grid.reached(landing):
+				continue
+			var upper: Rect2 = _stair_rect(stair, true)
+			if not seeds.has(hi):
+				seeds[hi] = upper.get_center()
+				pending.append(hi)
+		if level == 0:
+			_grid = grid
+	for level in range(clampi(int(_plan.spec.storeys), 1, 3)):
+		if not reachable_levels.has(level):
+			failures.append("nav: storey %d cannot be reached through stairs" % level)
+
+
+static func _stair_rect(stair: Dictionary, upper: bool) -> Rect2:
+	var key := "upper_rect" if upper else "lower_rect"
+	if stair.has(key):
+		return Rect2(stair[key])
+	return Rect2(stair.get("rect", Rect2()))
+
+
+func _grid_for(record: Dictionary) -> WalkGrid:
+	var level := HousePlan.record_storey(record)
+	return _grids.get(level, _grid)
 
 
 ## The hole a door makes: its width, right through the wall it is cut into.
@@ -115,11 +173,13 @@ func _room_body(i: int) -> Rect2:
 
 
 ## A picture of what the walker saw, for diagnosing a reachability failure.
-func ascii_map() -> String:
+func ascii_map(storey := 0) -> String:
 	var marks := {}
 	for d in range(_plan.doors.size()):
-		marks[Vector2(_plan.doors[d]["pos"])] = str(d)
-	return _grid.ascii_map(marks)
+		if HousePlan.record_storey(_plan.doors[d]) == storey:
+			marks[Vector2(_plan.doors[d]["pos"])] = str(d)
+	var grid: WalkGrid = _grids.get(storey, _grid)
+	return grid.ascii_map(marks)
 
 
 # ---------------------------------------------------------------- checks
@@ -128,12 +188,12 @@ func _check_rooms() -> void:
 	var reached := 0
 	for i in range(_plan.room_count()):
 		var f: Rect2 = _room_body(i)
-		if _grid.reached(f):
+		if _grid_for(_plan.rooms[i]).reached(f):
 			reached += 1
 			continue
 		# say WHY: no standable floor at all, or standable but cut off
 		unreached_rooms.append(i)
-		if _grid.standable(f):
+		if _grid_for(_plan.rooms[i]).standable(f):
 			failures.append("nav: room %d (%s) has floor to stand on but no way to walk to it"
 				% [i, String(_plan.kind_of(i))])
 		else:
@@ -148,7 +208,7 @@ func _check_doors() -> void:
 		var sides: Array = [-1.0, 1.0] if not door["exterior"] else [-1.0]
 		for side in sides:
 			var t: Vector2 = HouseGeometry.door_threshold(door, side)
-			if not _grid.reached(Rect2(t - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
+			if not _grid_for(door).reached(Rect2(t - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 					HouseGeometry.PERSON_RADIUS):
 				failures.append("nav: door %d cannot be used from its %s side"
 					% [d, "inner" if side < 0.0 else "outer"])
@@ -171,7 +231,7 @@ func _check_use_zones() -> void:
 		if zone.size.x <= 0.0:
 			continue
 		checked += 1
-		if _grid.reached(zone, HouseGeometry.PERSON_RADIUS * 0.5):
+		if _grid_for(p).reached(zone, HouseGeometry.PERSON_RADIUS * 0.5):
 			reached += 1
 		else:
 			unreachable_items.append(f)
@@ -185,7 +245,9 @@ func _check_use_zones() -> void:
 ## a warning; a whole corner of a room is a failure, and _check_rooms will have
 ## said so already.
 func _check_islands() -> void:
-	var area: float = _grid.stranded_area()
+	var area := 0.0
+	for grid in _grids.values():
+		area += grid.stranded_area()
 	stats["stranded_area"] = snappedf(area, 0.01)
 	if area > ISLAND_MIN_AREA:
 		warnings.append("nav: %.1f m2 of floor is walkable but cut off from the rest of the house"

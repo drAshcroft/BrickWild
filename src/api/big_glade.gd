@@ -32,6 +32,7 @@ const _DESCRIPTORS := {
 		"width": {"min": 5.0, "max": 20.0, "step": 0.5, "value": 9.0},
 		"length": {"min": 6.0, "max": 26.0, "step": 0.5, "value": 12.0},
 		"height": {"min": 2.2, "max": 3.6, "step": 0.1, "value": 2.6},
+		"storeys": {"min": 1, "max": 3, "step": 1, "value": 1},
 	},
 }
 
@@ -92,6 +93,7 @@ static func generate(request: BuildingRequest) -> GeneratedBuilding:
 			var spec := HouseSpec.new()
 			_copy_size_and_style(out.request, spec)
 			spec.trade = out.request.purpose
+			spec.storeys = out.request.storeys
 			out.plan = HouseGenerator.generate(spec, out.request.seed)
 			out.spec = spec
 		&"temple":
@@ -216,6 +218,10 @@ static func _validate(out: GeneratedBuilding) -> void:
 						String(field), limits["min"], limits["max"], String(request.kind)])
 	if not known_kind:
 		return
+	if request.kind == &"house":
+		if request.storeys < 1 or request.storeys > 3:
+			_add_error(out, &"storeys_out_of_range", &"storeys",
+				"storeys must be between 1 and 3 for a house.")
 
 	match request.kind:
 		&"church":

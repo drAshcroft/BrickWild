@@ -14,17 +14,25 @@ extends RefCounted
 
 var spec: HouseSpec
 
-## {"kind": StringName, "rect": Rect2}
+## {"kind": StringName, "rect": Rect2, "storey": int}
 var rooms: Array[Dictionary] = []
 ## {"a": int, "b": int (-1 outdoors), "pos": Vector2, "normal": Vector2,
-##  "width": float, "exterior": bool}
+##  "width": float, "exterior": bool, "storey": int}
 var doors: Array[Dictionary] = []
 ## {"room": int, "pos": Vector2, "normal": Vector2, "width": float,
-##  "sill": float, "head": float}
+##  "sill": float, "head": float, "storey": int}
 var windows: Array[Dictionary] = []
 ## {"key": String, "room": int, "pos": Vector3, "yaw": float, "rect": Rect2,
-##  "zone": Rect2, "host": int, "cat": String}
+##  "zone": Rect2, "host": int, "cat": String, "storey": int}
 var furniture: Array[Dictionary] = []
+## Vertical circulation. `a`/`b` are the lower/upper room IDs; `storey` and
+## `to_storey` identify the two levels. Rectangles are plan-space footprints on
+## each landing, so a layered nav check can use them without a 3D rasterizer.
+## {"a": int, "b": int, "storey": int, "to_storey": int,
+##  "pos": Vector2, "lower_pos": Vector2, "upper_pos": Vector2,
+##  "rect": Rect2, "lower_rect": Rect2, "upper_rect": Rect2,
+##  "width": float, "run": float}
+var stairs: Array[Dictionary] = []
 ## Things a room should have had and does not, because keeping them would have
 ## blocked the way through the house: {room: [category, ...]}.
 ##
@@ -53,6 +61,24 @@ func room_count() -> int:
 
 func kind_of(i: int) -> StringName:
 	return rooms[i]["kind"]
+
+
+## Storey index for any plan record, with zero as the compatibility default for
+## hand-authored one-storey plans from before vertical houses existed.
+static func record_storey(record: Dictionary) -> int:
+	return int(record.get("storey", 0))
+
+
+func storey_of_room(i: int) -> int:
+	return record_storey(rooms[i])
+
+
+func rooms_on_storey(storey: int) -> Array[int]:
+	var out: Array[int] = []
+	for i in range(rooms.size()):
+		if storey_of_room(i) == storey:
+			out.append(i)
+	return out
 
 
 func rooms_of(kind: StringName) -> Array[int]:
@@ -118,6 +144,15 @@ func door_graph() -> Dictionary:
 		var a: int = d["a"]
 		var b: int = d["b"]
 		if b < 0 or a < 0:
+			continue
+		if storey_of_room(a) != storey_of_room(b):
+			continue
+		g[a].append(b)
+		g[b].append(a)
+	for stair in stairs:
+		var a: int = int(stair["a"])
+		var b: int = int(stair["b"])
+		if a < 0 or b < 0 or a >= rooms.size() or b >= rooms.size():
 			continue
 		g[a].append(b)
 		g[b].append(a)
