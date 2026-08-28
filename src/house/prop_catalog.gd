@@ -20,7 +20,11 @@ extends RefCounted
 ## it stands), so a piece against a wall has the wall behind it at +Z. `face`
 ## corrects a model that was authored pointing some other way.
 
-const CATALOG_PATH := "res://assets/props/catalog.json"
+const SOURCE_ASSET_ROOT := "res://assets/props/"
+const ADDON_ASSET_ROOT := "res://addons/big_glade/assets/props/"
+const CATALOG_FILE := "catalog.json"
+
+static var _resolved_asset_root := ""
 
 # ---- placement rules a prop can carry ----
 const WALL := "wall"              # wants its back to a wall
@@ -128,13 +132,34 @@ const PROPS := {
 static var _sizes: Dictionary = {}
 
 
+## BigGlade can run from this repository or from its conventional Godot addon
+## location. Resolve once from the catalogue itself so callers do not need to
+## configure paths and another project's unrelated res://assets folder cannot
+## be mistaken for BigGlade's art when the addon is installed.
+static func asset_root() -> String:
+	if not _resolved_asset_root.is_empty():
+		return _resolved_asset_root
+	for root in [ADDON_ASSET_ROOT, SOURCE_ASSET_ROOT]:
+		if FileAccess.file_exists(root + CATALOG_FILE):
+			_resolved_asset_root = root
+			return root
+	# Keep the conventional package path in the error that follows. This also
+	# makes scene_path() deterministic when an installation is incomplete.
+	return ADDON_ASSET_ROOT
+
+
+static func catalog_path() -> String:
+	return asset_root() + CATALOG_FILE
+
+
 static func _load() -> void:
 	if not _sizes.is_empty():
 		return
-	var f := FileAccess.open(CATALOG_PATH, FileAccess.READ)
+	var path := catalog_path()
+	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		push_error("PropCatalog: no measured catalogue at %s -- run tools/build_prop_catalog.gd"
-			% CATALOG_PATH)
+		push_error(("PropCatalog: no measured catalogue at %s -- install the complete addon "
+			+ "or run tools/build_prop_catalog.gd in the source project") % path)
 		return
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	f.close()
@@ -259,4 +284,4 @@ static func min_scale(key: String) -> float:
 
 
 static func scene_path(key: String) -> String:
-	return "res://assets/props/fantasy/%s.gltf" % key
+	return asset_root() + "fantasy/%s.gltf" % key

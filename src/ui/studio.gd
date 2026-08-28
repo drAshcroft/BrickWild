@@ -13,38 +13,6 @@ extends Control
 
 const VARIANTS := 6
 
-## Slider ranges and starting sizes per kind. A castle site is an order of
-## magnitude bigger than a nave, and the same slider cannot serve both.
-const KINDS := {
-	&"church": {
-		"label": "Church", "size_label": "Nave", "height_label": "Eaves height (m)",
-		"width": {"min": 6.0, "max": 24.0, "step": 0.5, "value": 10.0},
-		"length": {"min": 10.0, "max": 60.0, "step": 1.0, "value": 22.0},
-		"height": {"min": 6.0, "max": 30.0, "step": 0.5, "value": 12.0},
-	},
-	&"castle": {
-		"label": "Castle", "size_label": "Site", "height_label": "Wall height (m)",
-		# the full ladder: a 6 x 9 m cottage up to a 320 x 400 m fortress
-		"width": {"min": 6.0, "max": 320.0, "step": 1.0, "value": 55.0},
-		"length": {"min": 8.0, "max": 400.0, "step": 1.0, "value": 50.0},
-		"height": {"min": 3.0, "max": 40.0, "step": 0.5, "value": 18.0},
-	},
-	&"temple": {
-		"label": "Temple", "size_label": "Temple", "height_label": "Hall height (m)",
-		# from a shrine to something you could lose a village in
-		"width": {"min": 14.0, "max": 60.0, "step": 1.0, "value": 26.0},
-		"length": {"min": 22.0, "max": 100.0, "step": 1.0, "value": 44.0},
-		"height": {"min": 6.0, "max": 26.0, "step": 0.5, "value": 12.0},
-	},
-	&"house": {
-		"label": "House", "size_label": "House", "height_label": "Ceiling (m)",
-		# from a one-room hut to a house with the full room programme
-		"width": {"min": 5.0, "max": 20.0, "step": 0.5, "value": 9.0},
-		"length": {"min": 6.0, "max": 26.0, "step": 0.5, "value": 12.0},
-		"height": {"min": 2.2, "max": 3.6, "step": 0.1, "value": 2.6},
-	},
-}
-
 @onready var viewport: SubViewport = $HSplit/CenterCol/ViewportPanel/SubViewport
 @onready var bp_view: BlueprintView = $HSplit/CenterCol/BPPanel/BlueprintView
 @onready var width_slider: HSlider = $HSplit/LeftPanel/Margin/Grid/WidthSlider
@@ -63,6 +31,7 @@ const KINDS := {
 
 var specs: Array = []
 var meshes: Array[ArrayMesh] = []
+var buildings: Array[GeneratedBuilding] = []
 var current := 0
 var _mesh_instance: Node3D
 var plans: Array = []
@@ -75,8 +44,9 @@ var _suspend_regen := false
 
 
 func _ready() -> void:
-	for kind_key in KINDS:
-		kind_opt.add_item(KINDS[kind_key]["label"])
+	for kind_key in BigGlade.kinds():
+		var descriptor: Dictionary = BigGlade.describe_kind(kind_key)
+		kind_opt.add_item(descriptor["label"])
 		kind_opt.set_item_metadata(kind_opt.item_count - 1, kind_key)
 	kind_opt.item_selected.connect(func(_i): _on_kind_changed())
 	width_slider.value_changed.connect(func(_v): regenerate())
@@ -129,7 +99,7 @@ func _trade() -> StringName:
 ## sliders are moved as a batch with regeneration suspended, so switching kind
 ## rebuilds once instead of once per slider.
 func _on_kind_changed() -> void:
-	var cfg: Dictionary = KINDS[_kind()]
+	var cfg: Dictionary = BigGlade.describe_kind(_kind())
 	_suspend_regen = true
 	for pair in [[width_slider, "width"], [length_slider, "length"],
 			[height_slider, "height"]]:
@@ -170,55 +140,43 @@ func regenerate() -> void:
 	specs.clear()
 	meshes.clear()
 	plans.clear()
+	buildings.clear()
 	variant_list.clear()
 	var base_seed: int = randi()
 	for i in range(VARIANTS):
-		var made: Array = _build(base_seed + i * 7919)
-		specs.append(made[0])
-		meshes.append(made[1])
-		plans.append(made[2] if made.size() > 2 else null)
-		variant_list.add_item(made[0].variant_name)
+		var made: GeneratedBuilding = _build(base_seed + i * 7919)
+		if not made.is_ok():
+			push_error("BigGlade generation failed: %s" % made.errors)
+			continue
+		var mesh: ArrayMesh = BigGlade.build_mesh(made)
+		buildings.append(made)
+		specs.append(made.spec)
+		meshes.append(mesh)
+		plans.append(made.plan)
+		variant_list.add_item(made.name())
+	if buildings.is_empty():
+		return
 	current = clampi(current, 0, VARIANTS - 1)
 	_show(current)
 
 
-## Generate and build one variant of the current kind. Returns [spec, mesh]
-## for a church or castle, and [spec, mesh, plan] for a house -- a house is not
-## finished until its furniture is in, and the furniture is not mesh.
-func _build(seed_value: int) -> Array:
+## Generate one variant through the public API. Mesh and scene emission happen
+## separately so the retained representation is available to other tools.
+func _build(seed_value: int) -> GeneratedBuilding:
+	var request: BuildingRequest
 	if _kind() == &"temple":
-		var tspec := TempleSpec.new()
-		tspec.form = _get_style_key()
-		tspec.cult = _second_key()
-		tspec.width = width_slider.value
-		tspec.length = length_slider.value
-		tspec.height = height_slider.value
-		TempleGenerator.generate(tspec, seed_value)
-		return [tspec, TempleBuilder.new().build(tspec)]
-	if _kind() == &"house":
-		var hspec := HouseSpec.new()
-		hspec.style = _get_style_key()
-		hspec.trade = _trade()
-		hspec.width = width_slider.value
-		hspec.length = length_slider.value
-		hspec.height = height_slider.value
-		var plan: HousePlan = HouseGenerator.generate(hspec, seed_value)
-		return [hspec, HouseBuilder.new().build(plan), plan]
-	if _kind() == &"castle":
-		var cspec := CastleSpec.new()
-		cspec.style = _get_style_key()
-		cspec.width = width_slider.value
-		cspec.length = length_slider.value
-		cspec.height = height_slider.value
-		CastleGenerator.generate(cspec, seed_value)
-		return [cspec, CastleBuilder.new().build(cspec)]
-	var spec := ChurchSpec.new()
-	spec.style = _get_style_key()
-	spec.width = width_slider.value
-	spec.length = length_slider.value
-	spec.height = height_slider.value
-	ChurchGenerator.generate(spec, seed_value)
-	return [spec, ChurchBuilder.new().build(spec)]
+		request = BuildingRequest.temple(seed_value, _get_style_key(), _second_key(),
+			width_slider.value, length_slider.value, height_slider.value)
+	elif _kind() == &"house":
+		request = BuildingRequest.house(seed_value, _get_style_key(), _trade(),
+			width_slider.value, length_slider.value, height_slider.value)
+	elif _kind() == &"castle":
+		request = BuildingRequest.castle(seed_value, _get_style_key(),
+			width_slider.value, length_slider.value, height_slider.value)
+	else:
+		request = BuildingRequest.church(seed_value, _get_style_key(),
+			width_slider.value, length_slider.value, height_slider.value)
+	return BigGlade.generate(request)
 
 
 func _show(idx: int) -> void:
@@ -229,25 +187,7 @@ func _show(idx: int) -> void:
 		_mesh_instance.queue_free()
 	var mesh: ArrayMesh = meshes[idx]
 	var s = specs[idx]
-	if s is TempleSpec:
-		# the roof comes off, and every brazier gets a light of its own
-		_mesh_instance = TempleAssembler.build(s, true)
-	elif s is HouseSpec:
-		# a house is assembled rather than built: the shell plus an instance of
-		# the real model for every stick of furniture in it, and the roof left
-		# off so there is something to see
-		_mesh_instance = HouseAssembler.build(plans[idx], true)
-	else:
-		var inst := MeshInstance3D.new()
-		inst.mesh = mesh
-		# per-surface materials: stone, trim, roof, openings
-		var mats := [s.stone_color, s.trim_color, s.roof_color, Color("1a1c20")]
-		for si in range(mesh.get_surface_count()):
-			var m := StandardMaterial3D.new()
-			m.albedo_color = mats[si]
-			m.roughness = 0.9
-			inst.set_surface_override_material(si, m)
-		_mesh_instance = inst
+	_mesh_instance = BigGlade.instantiate(buildings[idx], true)
 	viewport.get_node("ModelRoot").add_child(_mesh_instance)
 	variant_list.select(idx)
 	info_label.text = _describe(s)

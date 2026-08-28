@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "package_version": "0.1.0",
+  "metadata": [
+    {
+      "source": "packaging/big_glade/plugin.cfg",
+      "destination": "plugin.cfg"
+    },
+    {
+      "source": "packaging/big_glade/plugin.gd",
+      "destination": "plugin.gd"
+    },
+    {
+      "source": "packaging/big_glade/README.md",
+      "destination": "README.md"
+    },
+    {
+      "source": "packaging/big_glade/VERSION",
+      "destination": "VERSION"
+    }
+  ],
+  "scripts": [
+    { "source": "src/api/big_glade.gd", "destination": "api/big_glade.gd" },
+    { "source": "src/api/building_request.gd", "destination": "api/building_request.gd" },
+    { "source": "src/api/generated_building.gd", "destination": "api/generated_building.gd" },
+    { "source": "core/mass_builder.gd", "destination": "core/mass_builder.gd" },
+    { "source": "core/mesh_kit.gd", "destination": "core/mesh_kit.gd" },
+    { "source": "src/castle/castle_builder.gd", "destination": "families/castle/castle_builder.gd" },
+    { "source": "src/castle/castle_generator.gd", "destination": "families/castle/castle_generator.gd" },
+    { "source": "src/castle/castle_geometry.gd", "destination": "families/castle/castle_geometry.gd" },
+    { "source": "src/castle/castle_spec.gd", "destination": "families/castle/castle_spec.gd" },
+    { "source": "src/church/church_builder.gd", "destination": "families/church/church_builder.gd" },
+    { "source": "src/church/church_generator.gd", "destination": "families/church/church_generator.gd" },
+    { "source": "src/church/church_geometry.gd", "destination": "families/church/church_geometry.gd" },
+    { "source": "src/church/church_spec.gd", "destination": "families/church/church_spec.gd" },
+    { "source": "src/house/house_assembler.gd", "destination": "families/house/house_assembler.gd" },
+    { "source": "src/house/house_builder.gd", "destination": "families/house/house_builder.gd" },
+    { "source": "src/house/house_furnisher.gd", "destination": "families/house/house_furnisher.gd" },
+    { "source": "src/house/house_generator.gd", "destination": "families/house/house_generator.gd" },
+    { "source": "src/house/house_geometry.gd", "destination": "families/house/house_geometry.gd" },
+    { "source": "src/house/house_plan.gd", "destination": "families/house/house_plan.gd" },
+    { "source": "src/house/house_planner.gd", "destination": "families/house/house_planner.gd" },
+    { "source": "src/house/house_spec.gd", "destination": "families/house/house_spec.gd" },
+    { "source": "src/house/prop_catalog.gd", "destination": "families/house/prop_catalog.gd" },
+    { "source": "src/temple/temple_assembler.gd", "destination": "families/temple/temple_assembler.gd" },
+    { "source": "src/temple/temple_builder.gd", "destination": "families/temple/temple_builder.gd" },
+    { "source": "src/temple/temple_generator.gd", "destination": "families/temple/temple_generator.gd" },
+    { "source": "src/temple/temple_geometry.gd", "destination": "families/temple/temple_geometry.gd" },
+    { "source": "src/temple/temple_spec.gd", "destination": "families/temple/temple_spec.gd" },
+    { "source": "qa/house_nav_check.gd", "destination": "runtime/navigation/house_nav_check.gd" },
+    { "source": "qa/walk_grid.gd", "destination": "runtime/navigation/walk_grid.gd" }
+  ],
+  "files": [
+    {
+      "source": "assets/props/catalog.json",
+      "destination": "assets/props/catalog.json"
+    }
+  ],
+  "trees": [
+    {
+      "source": "assets/props/fantasy",
+      "destination": "assets/props/fantasy",
+      "exclude_suffixes": [".import"]
+    }
+  ]
+}

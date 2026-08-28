@@ -6,6 +6,43 @@ A seed plus a handful of user-locked dimensions produce a spec; the spec
 produces an `ArrayMesh`; a 2D blueprint sheet is drawn alongside it from the
 same geometry. Six styles, from a Romanesque parish church to Hagia Sophia.
 
+## Library API
+
+Godot tools can generate the family-specific representation first, then choose
+when to emit a mesh:
+
+```gdscript
+var request := BuildingRequest.house(1234, &"cottage", &"smith", 9.0, 12.0, 2.6)
+var building: GeneratedBuilding = BigGlade.generate(request)
+if building.is_ok():
+	var plan: HousePlan = building.plan
+	var mesh: ArrayMesh = BigGlade.build_mesh(building)
+	var placement: Dictionary = BigGlade.placement(building)
+	var furnished_scene: Node3D = BigGlade.instantiate(building, false, true)
+```
+
+Use `BuildingRequest.church()`, `.castle()`, `.house()` or `.temple()` so each
+call site keeps the vocabulary of that building family. Generation is seeded,
+does not mutate the request, and does not emit geometry until `build_mesh()`.
+`placement()` reports measured bounds, footprint, identity and the local -Z
+front. The third `instantiate()` argument opts into shell-only collision.
+
+## Addon installation
+
+To use BigGlade from another Godot project, install the relocatable addon with
+the repository's PowerShell installer (Godot 4.5 or newer):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\install_big_glade_addon.ps1 `
+  -TargetProject C:\path\to\GodotProject
+```
+
+The installer places the package at `res://addons/big_glade`, is safe to run
+again, and leaves unrelated files there untouched. Run the destination project
+once in the editor after installation so Godot imports the bundled props and
+registers the addon's scripts. See `packaging/big_glade/README.md` for the
+package details and managed-file behavior.
+
 Main scene: `res://scenes/studio.tscn` (Church Blueprint Studio).
 
 ## Layout
@@ -16,6 +53,7 @@ core/
   mesh_kit.gd           mesh primitives shared by every builder: boxes, slabs,
                         gable/hip roofs, tapers, surfaces of revolution, arches
 src/
+  api/           the public request, generated result and BigGlade facade
   church/        the generator, in pipeline order
     church_spec.gd        data model (seed + locked dims -> derived fields)
     church_geometry.gd    WHERE EVERY MASS SITS -- shared by builder and view
@@ -63,13 +101,14 @@ Suites run cheapest-and-most-fundamental first, so a broken contract is
 reported before a slow voxel sweep can bury it. Each assumes the ones above it
 hold:
 
-| # | suite | asserts |
-|---|-------------|--------------------------------------------------------|
-| 1 | `church`    | inputs survive generation; `build()` is pure and deterministic |
-| 2 | `massing`   | no gaps, no undesigned overlap, sizes match the spec    |
-| 3 | `blueprint` | the drawing agrees with the model                      |
-| 4 | `landmark`  | the famous churches build, at four scales each         |
-| 5 | `voxelqa`   | rasterised geometric checks (slowest)                  |
+| suites | asserts |
+|---|---|
+| `library` | public request, representation, mesh and scene contract |
+| `church`, `castle`, `house`, `temple` | family generation purity and determinism |
+| `normals`, `massing`, `blueprint`, `cnormals`, `cmassing` | emitted geometry and drawing agreement |
+| `voxelqa`, `cvoxelqa`, `houseqa`, `rite` | spatial, circulation and ritual correctness |
+| `landmark`, `clandmark`, `harchetype`, `tarchetype` | named reference buildings and archetypes |
+| `assets` | measured prop catalogue still matches imported models |
 
 The runner exits nonzero if any suite fails. Suite bodies live in
 `tests/suites/` as libraries; `tests/<name>_test.gd` are thin wrappers that run

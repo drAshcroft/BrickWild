@@ -9,25 +9,26 @@ extends SceneTree
 ## Exits nonzero if any suite fails.
 
 ## Order is deliberate: each suite assumes the ones above it hold.
-##   1 church     - the spec/build contract itself
-##   2 normals    - the surfaces face the way they are meant to
-##   3 massing    - structural correctness of what that contract produced
-##   4 blueprint  - the drawing agrees with the model
-##   5 landmark   - the famous churches this generator must be able to build
-##   6 castle     - the castle spec/build contract, tier by tier
-##   7 cnormals   - the castle's surfaces and openings
-##   8 cmassing   - structural correctness of what the castle contract produced
-##   9 clandmark  - the famous fortifications this generator must be able to build
-##  10 voxelqa    - exhaustive rasterized checks of the churches (slow)
-##  11 cvoxelqa   - the same, for the castles (slow)
-##  12 house      - the house spec/plan/build contract
-##  13 assets     - the prop catalogue still describes the props
-##  14 houseqa    - plan, furnishing and circulation of every house
-##  15 harchetype - the dwellings this generator must be able to furnish
-##  16 temple     - the temple spec/build contract and its surfaces
-##  17 rite       - would a rite work in it: axis, sightline, procession, fire
-##  18 tarchetype - the temples a fantasy author would ask for
-const ORDER: Array[String] = ["church", "normals", "massing", "blueprint", "landmark",
+##   1 library    - the public request/generate/build contract
+##   2 church     - the spec/build contract itself
+##   3 normals    - the surfaces face the way they are meant to
+##   4 massing    - structural correctness of what that contract produced
+##   5 blueprint  - the drawing agrees with the model
+##   6 landmark   - the famous churches this generator must be able to build
+##   7 castle     - the castle spec/build contract, tier by tier
+##   8 cnormals   - the castle's surfaces and openings
+##   9 cmassing   - structural correctness of what the castle contract produced
+##  10 clandmark  - the famous fortifications this generator must be able to build
+##  11 voxelqa    - exhaustive rasterized checks of the churches (slow)
+##  12 cvoxelqa   - the same, for the castles (slow)
+##  13 house      - the house spec/plan/build contract
+##  14 assets     - the prop catalogue still describes the props
+##  15 houseqa    - plan, furnishing and circulation of every house
+##  16 harchetype - the dwellings this generator must be able to furnish
+##  17 temple     - the temple spec/build contract and its surfaces
+##  18 rite       - would a rite work in it: axis, sightline, procession, fire
+##  19 tarchetype - the temples a fantasy author would ask for
+const ORDER: Array[String] = ["library", "church", "normals", "massing", "blueprint", "landmark",
 	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa",
 	"house", "assets", "houseqa", "harchetype",
 	"temple", "rite", "tarchetype"]
@@ -35,6 +36,8 @@ const ORDER: Array[String] = ["church", "normals", "massing", "blueprint", "land
 
 static func _run_one(key: String) -> SuiteResult:
 	match key:
+		"library":
+			return LibrarySuite.run()
 		"church":
 			return ChurchSuite.run()
 		"normals":
