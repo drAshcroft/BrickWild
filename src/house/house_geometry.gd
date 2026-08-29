@@ -75,7 +75,12 @@ const ROOM_ASPECT_MAX := 3.4
 ## Floor area a room of each kind needs to be worth calling that.
 const MIN_AREA := {
 	&"hall": 9.0, &"kitchen": 6.0, &"bedroom": 11.0, &"workshop": 8.0,
-	&"store": 2.4, &"parlour": 8.0,
+	&"store": 2.4, &"parlour": 8.0, &"sales_floor": 9.0,
+	&"stable": 11.0, &"tack_room": 5.0, &"dining_room": 10.0,
+	&"guest_room": 9.0, &"office": 6.0, &"records": 5.0,
+	&"council_chamber": 12.0, &"meeting_hall": 12.0,
+	&"lobby": 16.0, &"lounge": 10.0, &"suite": 14.0,
+	&"gallery": 8.0, &"laundry": 7.0,
 }
 
 ## And the narrowest it may be. Area alone is not enough: a bed is 1.9 x 2.4 m
@@ -85,7 +90,12 @@ const MIN_AREA := {
 ## hall, which is what a one-room cottage has always done.
 const MIN_SIDE := {
 	&"hall": 2.6, &"kitchen": 2.2, &"bedroom": 3.3, &"workshop": 2.6,
-	&"store": 1.6, &"parlour": 2.6,
+	&"store": 1.6, &"parlour": 2.6, &"sales_floor": 2.8,
+	&"stable": 3.0, &"tack_room": 2.1, &"dining_room": 2.8,
+	&"guest_room": 3.0, &"office": 2.2, &"records": 2.0,
+	&"council_chamber": 3.0, &"meeting_hall": 3.0,
+	&"lobby": 3.2, &"lounge": 2.8, &"suite": 3.4,
+	&"gallery": 2.4, &"laundry": 2.4,
 }
 
 
@@ -97,7 +107,11 @@ static func room_suits(plan: HousePlan, i: int, kind: StringName) -> bool:
 	return minf(f.size.x, f.size.y) >= float(MIN_SIDE.get(kind, 1.6))
 
 ## Rooms people live in. A store room needs neither a window nor a chair.
-const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour"]
+const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour",
+	&"sales_floor", &"stable", &"tack_room", &"dining_room", &"guest_room",
+	&"office", &"records", &"council_chamber", &"meeting_hall", &"lobby",
+	&"lounge", &"suite", &"gallery", &"laundry"]
+
 
 
 # ------------------------------------------------------------------- shell

@@ -74,6 +74,10 @@ func _styles() -> Dictionary:
 			return CastleSpec.STYLES
 		&"house":
 			return HouseSpec.STYLES
+		&"shop":
+			return HouseSpec.STYLES
+		&"hotel":
+			return HotelSpec.HOTEL_STYLES
 		&"temple":
 			return TempleSpec.FORMS
 	return ChurchSpec.STYLES
@@ -94,7 +98,11 @@ func _second_key() -> StringName:
 		var meta = trade_opt.get_item_metadata(trade_opt.selected)
 		if meta != null:
 			return meta
-	return &"none" if _kind() == &"house" else &"blood"
+	if _kind() == &"house":
+		return &"none"
+	if _kind() == &"shop":
+		return &"general_store"
+	return &"blood"
 
 
 func _trade() -> StringName:
@@ -134,17 +142,16 @@ func _on_kind_changed() -> void:
 		style_opt.add_item(_styles()[style_key]["label"])
 		style_opt.set_item_metadata(style_opt.item_count - 1, style_key)
 	style_opt.select(0)
-	# The second dropdown is what the building is FOR: a household trade for a
-	# house, a cult for a temple, and nothing at all for a church or a castle.
+	# The second dropdown is what the building is FOR. Its options come from the
+	# public descriptor so Studio does not maintain a second family vocabulary.
 	trade_opt.clear()
-	if _kind() == &"house" or _kind() == &"temple":
-		var table: Dictionary = HouseSpec.TRADES if _kind() == &"house" \
-			else TempleSpec.CULTS
-		for key in table:
-			trade_opt.add_item(table[key]["label"])
-			trade_opt.set_item_metadata(trade_opt.item_count - 1, key)
+	for option in cfg.get("purposes", []):
+		trade_opt.add_item(option["label"])
+		trade_opt.set_item_metadata(trade_opt.item_count - 1, option["id"])
+	if trade_opt.item_count > 0:
 		trade_opt.select(0)
-	trade_label.text = "Trade" if _kind() == &"house" else "Cult"
+	trade_label.text = "Trade" if _kind() == &"house" else ("Business" \
+		if _kind() == &"shop" else "Cult")
 	trade_opt.visible = trade_opt.item_count > 0
 	trade_label.visible = trade_opt.visible
 	_suspend_regen = false
@@ -188,6 +195,13 @@ func _build(seed_value: int) -> GeneratedBuilding:
 		request = BuildingRequest.house(seed_value, _get_style_key(), _trade(),
 			width_slider.value, length_slider.value, height_slider.value,
 			int(storeys_slider.value))
+	elif _kind() == &"shop":
+		request = BuildingRequest.shop(seed_value, _second_key(), _get_style_key(),
+			width_slider.value, length_slider.value, height_slider.value,
+			int(storeys_slider.value))
+	elif _kind() == &"hotel":
+		request = BuildingRequest.hotel(seed_value, _get_style_key(),
+			width_slider.value, length_slider.value, height_slider.value)
 	elif _kind() == &"castle":
 		request = BuildingRequest.castle(seed_value, _get_style_key(),
 			width_slider.value, length_slider.value, height_slider.value)
@@ -227,8 +241,15 @@ func _show(idx: int) -> void:
 ## The room list, in place of a blueprint sheet: which rooms the plan came out
 ## with, how big they are, and what is in them.
 func _house_sheet(plan: HousePlan) -> String:
+	var purpose: String
+	if plan.spec is HotelSpec:
+		purpose = HotelSpec.HOTEL_STYLES[(plan.spec as HotelSpec).style]["label"]
+	elif plan.spec is ShopSpec:
+		purpose = ShopSpec.BUSINESSES[(plan.spec as ShopSpec).business]["label"]
+	else:
+		purpose = HouseSpec.TRADES[plan.spec.trade]["label"]
 	var lines: Array[String] = ["%s -- %s, %d rooms on %d storey%s"
-		% [plan.spec.variant_name, HouseSpec.TRADES[plan.spec.trade]["label"],
+		% [plan.spec.variant_name, purpose,
 			plan.room_count(), plan.spec.storeys, "" if plan.spec.storeys == 1 else "s"]]
 	for i in range(plan.room_count()):
 		var f: Rect2 = HouseGeometry.room_floor_rect(plan, i)
@@ -273,6 +294,20 @@ func _describe(s) -> String:
 			s.variant_name, TempleSpec.FORMS[s.form]["label"],
 			TempleSpec.CULTS[s.cult]["label"], s.width, s.length, s.height,
 			TempleGeometry.total_height(s)]
+	if s is HotelSpec:
+		return "%s -- %s\n%.0f x %.0f m, %d guest floors at %.1f m -- %d facade bays, %d dormers, twin cupolas" % [
+			s.variant_name, HotelSpec.HOTEL_STYLES[s.style]["label"], s.width,
+			s.length, s.storeys, s.height, s.facade_bays, s.dormer_count]
+	if s is ShopSpec:
+		var rooms: Array[String] = []
+		for room in (plans[current] as HousePlan).rooms:
+			var label := String(room["kind"])
+			if not label in rooms:
+				rooms.append(label)
+		return "%s -- %s %s\n%.1f x %.1f m, %d storey%s at %.1f m -- %s" % [
+			s.variant_name, HouseSpec.STYLES[s.style]["label"],
+			ShopSpec.BUSINESSES[s.business]["label"], s.width, s.length, s.storeys,
+			"" if s.storeys == 1 else "s", s.height, ", ".join(rooms)]
 	if s is HouseSpec:
 		var bits: Array[String] = []
 		for kind in [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour", &"store"]:

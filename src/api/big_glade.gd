@@ -7,7 +7,7 @@ extends RefCounted
 ## later renderers and serializers can grow behind it without changing callers.
 
 const API_VERSION := 1
-const _KINDS: Array[StringName] = [&"church", &"castle", &"house", &"temple"]
+const _KINDS: Array[StringName] = [&"church", &"castle", &"house", &"shop", &"hotel", &"temple"]
 const _DESCRIPTORS := {
 	&"church": {
 		"label": "Church", "size_label": "Nave", "height_label": "Eaves height (m)",
@@ -34,6 +34,20 @@ const _DESCRIPTORS := {
 		"height": {"min": 2.2, "max": 3.6, "step": 0.1, "value": 2.6},
 		"storeys": {"min": 1, "max": 3, "step": 1, "value": 1},
 	},
+	&"shop": {
+		"label": "Shop / Civic Building", "size_label": "Building", "height_label": "Ceiling (m)",
+		"width": {"min": 7.0, "max": 24.0, "step": 0.5, "value": 11.0},
+		"length": {"min": 8.0, "max": 32.0, "step": 0.5, "value": 14.0},
+		"height": {"min": 2.4, "max": 4.2, "step": 0.1, "value": 2.8},
+		"storeys": {"min": 1, "max": 3, "step": 1, "value": 1},
+	},
+	&"hotel": {
+		"label": "Grand Hotel", "size_label": "Hotel", "height_label": "Floor height (m)",
+		"width": {"min": 30.0, "max": 80.0, "step": 1.0, "value": 48.0},
+		"length": {"min": 16.0, "max": 42.0, "step": 1.0, "value": 24.0},
+		"height": {"min": 3.0, "max": 4.5, "step": 0.1, "value": 3.6},
+		"storeys": {"min": 3, "max": 3, "step": 1, "value": 3},
+	},
 }
 
 
@@ -59,6 +73,11 @@ static func describe_kind(kind: StringName) -> Dictionary:
 		&"house":
 			style_table = HouseSpec.STYLES
 			purpose_table = HouseSpec.TRADES
+		&"shop":
+			style_table = HouseSpec.STYLES
+			purpose_table = ShopSpec.BUSINESSES
+		&"hotel":
+			style_table = HotelSpec.HOTEL_STYLES
 		&"temple":
 			style_table = TempleSpec.FORMS
 			purpose_table = TempleSpec.CULTS
@@ -96,6 +115,18 @@ static func generate(request: BuildingRequest) -> GeneratedBuilding:
 			spec.storeys = out.request.storeys
 			out.plan = HouseGenerator.generate(spec, out.request.seed)
 			out.spec = spec
+		&"shop":
+			var spec := ShopSpec.new()
+			_copy_size_and_style(out.request, spec)
+			spec.business = out.request.purpose
+			spec.storeys = out.request.storeys
+			out.plan = ShopGenerator.generate(spec, out.request.seed)
+			out.spec = spec
+		&"hotel":
+			var spec := HotelSpec.new()
+			_copy_size_and_style(out.request, spec)
+			out.plan = HotelGenerator.generate(spec, out.request.seed)
+			out.spec = spec
 		&"temple":
 			var spec := TempleSpec.new()
 			spec.form = out.request.style
@@ -116,6 +147,8 @@ static func build_mesh(building: GeneratedBuilding) -> ArrayMesh:
 		return ChurchBuilder.new().build(building.spec as ChurchSpec)
 	if building.spec is CastleSpec:
 		return CastleBuilder.new().build(building.spec as CastleSpec)
+	if building.spec is HotelSpec:
+		return HotelBuilder.new().build(building.plan)
 	if building.spec is HouseSpec:
 		return HouseBuilder.new().build(building.plan)
 	if building.spec is TempleSpec:
@@ -155,7 +188,11 @@ static func instantiate(building: GeneratedBuilding, cutaway := false,
 	if building == null or not building.is_ok():
 		return null
 	var root: Node3D
-	if building.spec is HouseSpec:
+	if building.spec is HotelSpec:
+		root = HotelAssembler.build(building.plan, cutaway)
+	elif building.spec is ShopSpec:
+		root = ShopAssembler.build(building.plan, cutaway)
+	elif building.spec is HouseSpec:
 		root = HouseAssembler.build(building.plan, cutaway)
 	elif building.spec is TempleSpec:
 		root = TempleAssembler.build(building.spec as TempleSpec, cutaway)
@@ -218,7 +255,7 @@ static func _validate(out: GeneratedBuilding) -> void:
 						String(field), limits["min"], limits["max"], String(request.kind)])
 	if not known_kind:
 		return
-	if request.kind == &"house":
+	if request.kind == &"house" or request.kind == &"shop":
 		if request.storeys < 1 or request.storeys > 3:
 			_add_error(out, &"storeys_out_of_range", &"storeys",
 				"storeys must be between 1 and 3 for a house.")
@@ -235,6 +272,14 @@ static func _validate(out: GeneratedBuilding) -> void:
 			if not HouseSpec.TRADES.has(request.purpose):
 				_add_error(out, &"unknown_trade", &"purpose",
 					"Unknown house trade '%s'." % String(request.purpose))
+		&"shop":
+			_validate_style(out, HouseSpec.STYLES, &"style")
+			if not ShopSpec.BUSINESSES.has(request.purpose):
+				_add_error(out, &"unknown_business", &"purpose",
+					"Unknown shop business '%s'." % String(request.purpose))
+		&"hotel":
+			_validate_style(out, HotelSpec.HOTEL_STYLES, &"style")
+			_validate_empty_purpose(out)
 		&"temple":
 			_validate_style(out, TempleSpec.FORMS, &"form")
 			if not TempleSpec.CULTS.has(request.purpose):

@@ -11,6 +11,8 @@ static func run() -> SuiteResult:
 		BuildingRequest.church(101, &"gothic", 10.0, 22.0, 12.0),
 		BuildingRequest.castle(202, &"norman", 55.0, 50.0, 18.0),
 		BuildingRequest.house(303, &"cottage", &"none", 9.0, 12.0, 2.6),
+		BuildingRequest.shop(353, &"blacksmith", &"longhall", 11.0, 14.0, 2.8),
+		BuildingRequest.hotel(373, &"grand_budapest", 48.0, 24.0, 3.6),
 		BuildingRequest.temple(404, &"basilica", &"blood", 26.0, 44.0, 12.0),
 	]
 	for request in requests:
@@ -28,6 +30,9 @@ static func run() -> SuiteResult:
 	var bad_storeys := BuildingRequest.house(1)
 	bad_storeys.storeys = 4
 	_check_invalid(res, bad_storeys, &"storeys_out_of_range")
+	var bad_business := BuildingRequest.shop(1)
+	bad_business.purpose = &"dragon_tamer"
+	_check_invalid(res, bad_business, &"unknown_business")
 	var bad_size := BuildingRequest.temple(1)
 	bad_size.width = 0.0
 	_check_invalid(res, bad_size, &"invalid_dimension")
@@ -98,7 +103,7 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	if made.spec.get("width") != request.width or made.spec.get("length") != request.length \
 			or made.spec.get("height") != request.height:
 		res.fail("generated dimensions differ from request, " + where)
-	if request.kind == &"house":
+	if request.kind in [&"house", &"shop", &"hotel"]:
 		if made.plan == null or made.plan.spec != made.spec:
 			res.fail("house result did not retain its plan, " + where)
 	elif made.plan != null:
@@ -110,7 +115,7 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 		res.fail("facade emitted a bad mesh, " + where)
 	elif not _same_mesh(mesh, legacy[2]):
 		res.fail("facade mesh differs from legacy pipeline, " + where)
-	if request.kind == &"house":
+	if request.kind in [&"house", &"shop", &"hotel"]:
 		var old_plan: HousePlan = legacy[1]
 		if made.plan.rooms != old_plan.rooms or made.plan.doors != old_plan.doors \
 				or made.plan.windows != old_plan.windows \
@@ -122,7 +127,7 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	var again_mesh: ArrayMesh = BigGlade.build_mesh(again)
 	if made.name() != again.name() or not _same_mesh(mesh, again_mesh):
 		res.fail("facade is not deterministic, " + where)
-	if request.kind == &"house" and made.plan.furniture != again.plan.furniture:
+	if request.kind in [&"house", &"shop", &"hotel"] and made.plan.furniture != again.plan.furniture:
 		res.fail("facade furnishing is not deterministic, " + where)
 
 	# Dispatch follows the retained representation, not the mutable request
@@ -144,7 +149,7 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	var scene_b: Node3D = BigGlade.instantiate(made, true)
 	if scene_a == null or scene_b == null or scene_a == scene_b:
 		res.fail("facade did not create fresh scene instances, " + where)
-	elif request.kind == &"house" and scene_a.get_node_or_null("Furniture") == null:
+	elif request.kind in [&"house", &"shop", &"hotel"] and scene_a.get_node_or_null("Furniture") == null:
 		res.fail("assembled house omitted its furniture, " + where)
 	elif request.kind == &"temple" and scene_a.get_node_or_null("Dressing") == null:
 		res.fail("assembled temple omitted its dressing, " + where)
@@ -177,6 +182,17 @@ static func _legacy(request: BuildingRequest) -> Array:
 			spec.trade = request.purpose
 			var plan: HousePlan = HouseGenerator.generate(spec, request.seed)
 			return [spec, plan, HouseBuilder.new().build(plan)]
+		&"shop":
+			var spec := ShopSpec.new()
+			_copy_inputs(request, spec)
+			spec.business = request.purpose
+			var plan: HousePlan = ShopGenerator.generate(spec, request.seed)
+			return [spec, plan, HouseBuilder.new().build(plan)]
+		&"hotel":
+			var spec := HotelSpec.new()
+			_copy_inputs(request, spec)
+			var plan: HousePlan = HotelGenerator.generate(spec, request.seed)
+			return [spec, plan, HotelBuilder.new().build(plan)]
 		&"temple":
 			var spec := TempleSpec.new()
 			spec.form = request.style

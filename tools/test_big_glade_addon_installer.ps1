@@ -61,7 +61,7 @@ function Invoke-GodotFixture {
 
 try {
     $sourceManifest = [IO.File]::ReadAllText($sourceManifestPath) | ConvertFrom-Json
-    Assert-Equal 29 @($sourceManifest.scripts).Count `
+    Assert-Equal 40 @($sourceManifest.scripts).Count `
         'Addon runtime script closure changed unexpectedly'
     foreach ($script in @($sourceManifest.scripts)) {
         $scriptSource = Join-Path $sourceRoot ([string]$script.source)

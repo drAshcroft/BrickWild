@@ -89,6 +89,109 @@ const RECIPES := {
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
 		{"cat": "tool", "rule": &"on", "n": [1, 2], "opt": 0.8},
 	],
+	&"sales_floor": [
+		{"cat": "counter", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 0.8},
+		{"cat": "shelf", "rule": &"mounted", "n": [1, 3], "opt": 0.9},
+		{"cat": "crate", "rule": &"corner", "n": [1, 2], "opt": 0.7},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+		{"cat": "trinket", "rule": &"on", "n": [1, 2], "opt": 0.7},
+	],
+	&"stable": [
+		{"cat": "stall", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "barrel", "rule": &"corner", "n": [1, 2], "opt": 0.8},
+		{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 0.8},
+		{"cat": "rack", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+	],
+	&"tack_room": [
+		{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "rack", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+		{"cat": "chest", "rule": &"wall", "n": [0, 1], "opt": 0.6},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.8},
+	],
+	&"dining_room": [
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "seat", "rule": &"around", "n": [2, 4], "opt": 1.0},
+		{"cat": "bench", "rule": &"around", "n": [0, 1], "opt": 0.7},
+		{"cat": "barrel", "rule": &"corner", "n": [1, 2], "opt": 0.7},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+		{"cat": "tableware", "rule": &"on", "n": [2, 4], "opt": 0.95},
+	],
+	&"guest_room": [
+		{"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.8},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.8},
+	],
+	&"office": [
+		{"cat": "workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "seat", "rule": &"around", "n": [1, 1], "opt": 0.8},
+		{"cat": "books", "rule": &"on", "n": [1, 2], "opt": 0.8},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
+	],
+	&"records": [
+		{"cat": "bookcase", "rule": &"wall", "n": [1, 2], "opt": 1.0},
+		{"cat": "lectern", "rule": &"free", "n": [0, 1], "opt": 0.7},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
+	],
+	&"council_chamber": [
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "seat", "rule": &"around", "n": [3, 5], "opt": 1.0},
+		{"cat": "banner", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+		{"cat": "sconce", "rule": &"mounted", "n": [2, 3], "opt": 0.9},
+	],
+	&"meeting_hall": [
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "bench", "rule": &"around", "n": [2, 3], "opt": 1.0},
+		{"cat": "banner", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+		{"cat": "sconce", "rule": &"mounted", "n": [2, 3], "opt": 0.9},
+	],
+	&"lobby": [
+		{"cat": "counter", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 0.85},
+		{"cat": "seat", "rule": &"around", "n": [2, 4], "opt": 0.9},
+		{"cat": "bench", "rule": &"around", "n": [1, 2], "opt": 0.8},
+		{"cat": "banner", "rule": &"mounted", "n": [1, 2], "opt": 0.95},
+		{"cat": "chandelier", "rule": &"ceiling", "n": [1, 1], "opt": 1.0},
+		{"cat": "trinket", "rule": &"on", "n": [1, 2], "opt": 0.8},
+	],
+	&"lounge": [
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "seat", "rule": &"around", "n": [2, 4], "opt": 1.0},
+		{"cat": "bookcase", "rule": &"wall", "n": [1, 2], "opt": 0.8},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.95},
+		{"cat": "tableware", "rule": &"on", "n": [1, 3], "opt": 0.8},
+	],
+	&"suite": [
+		{"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "nightstand", "rule": &"wall", "n": [1, 1], "opt": 0.9},
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 0.85},
+		{"cat": "seat", "rule": &"around", "n": [1, 2], "opt": 0.9},
+		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.8},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.95},
+	],
+	&"gallery": [
+		{"cat": "bookcase", "rule": &"wall", "n": [1, 2], "opt": 0.8},
+		{"cat": "banner", "rule": &"mounted", "n": [2, 3], "opt": 0.95},
+		{"cat": "sconce", "rule": &"mounted", "n": [2, 3], "opt": 1.0},
+		{"cat": "lectern", "rule": &"free", "n": [0, 1], "opt": 0.55},
+	],
+	&"laundry": [
+		{"cat": "workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 0.9},
+		{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 0.8},
+		{"cat": "bucket", "rule": &"corner", "n": [1, 2], "opt": 0.8},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
+	],
+}
+
+const SHOP_FITTINGS := {
+	&"blacksmith": [{"cat": "anvil", "rule": &"free", "n": [1, 1], "opt": 1.0}],
+	&"bakery": [{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0}],
+	&"butcher": [{"cat": "blade", "rule": &"on", "n": [1, 2], "opt": 1.0}],
+	&"apothecary": [{"cat": "alchemy", "rule": &"on", "n": [2, 4], "opt": 1.0}],
+	&"tailor": [{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 0.8}],
+	&"carpenter": [{"cat": "rack", "rule": &"mounted", "n": [1, 1], "opt": 1.0}],
 }
 
 ## What a trade adds to its workshop, on top of the generic bench and crates.
@@ -322,7 +425,8 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	# A house with no room big enough to be a bedroom sleeps in its hall, which
 	# is what a one-room cottage has always done. The bed goes in first, before
 	# the table has taken the good wall.
-	var sleeps_here: bool = kind == &"hall" and not plan.has_kind(&"bedroom")
+	var sleeps_here: bool = not spec is ShopSpec and kind == &"hall" \
+		and not plan.has_kind(&"bedroom")
 	if sleeps_here:
 		steps.append({"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0})
 		steps.append({"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9})
@@ -339,9 +443,12 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 
 	# the trade fits out whichever room it works in, after that room's own
 	# recipe has had its say
-	var trade_room: StringName = HouseSpec.TRADES[spec.trade]["room"]
-	if trade_room == kind and TRADE_FITTINGS.has(spec.trade):
-		for s2 in TRADE_FITTINGS[spec.trade]:
+	var trade_room: StringName = HouseSpec.TRADES[spec.trade]["room"] \
+		if not spec is ShopSpec else (spec as ShopSpec).front_room()
+	var fittings: Array = TRADE_FITTINGS.get(spec.trade, []) if not spec is ShopSpec \
+		else SHOP_FITTINGS.get((spec as ShopSpec).business, [])
+	if trade_room == kind:
+		for s2 in fittings:
 			steps.append(s2)
 
 	# The things a room cannot do without go in first, whether they came from

@@ -2,8 +2,8 @@ class_name GeneratedBuilding
 extends RefCounted
 ## The engine-native representation produced by BigGlade.generate().
 ##
-## `spec` remains family-specific. Houses additionally retain their HousePlan,
-## because the plan -- not the shell mesh -- is the house's representation.
+## `spec` remains family-specific. Houses, shops, and hotels additionally retain
+## their HousePlan, because the plan -- not the shell mesh -- is their representation.
 
 var request: BuildingRequest
 var spec: RefCounted

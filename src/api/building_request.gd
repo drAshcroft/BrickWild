@@ -4,7 +4,8 @@ extends RefCounted
 ##
 ## Prefer the family-named factories below. They keep `style` and `purpose`
 ## transport-friendly while preserving the vocabulary callers actually use:
-## a temple has a form and cult; a house has a style and trade.
+## a temple has a form and cult; a house has a style and trade; a shop has a
+## shell style and business.
 
 var kind: StringName
 var seed: int
@@ -13,8 +14,8 @@ var length: float
 var height: float
 var style: StringName
 var purpose: StringName = &""
-## Number of house storeys. Kept on the request (rather than inferred from
-## height) so callers can ask for a taller house without changing ceiling scale.
+## Number of plan-based storeys (houses and shops). Kept on the request rather
+## than inferred from height, so callers can change levels without ceiling scale.
 var storeys: int = 1
 
 
@@ -33,6 +34,18 @@ static func house(p_seed: int, p_style: StringName = &"cottage",
 		p_height := 2.6, p_storeys: int = 1) -> BuildingRequest:
 	return _make(&"house", p_seed, p_style, p_trade, p_width, p_length, p_height,
 		p_storeys)
+
+
+static func shop(p_seed: int, p_business: StringName = &"general_store",
+		p_style: StringName = &"townhouse", p_width := 11.0, p_length := 14.0,
+		p_height := 2.8, p_storeys: int = 1) -> BuildingRequest:
+	return _make(&"shop", p_seed, p_style, p_business, p_width, p_length, p_height,
+		p_storeys)
+
+
+static func hotel(p_seed: int, p_style: StringName = &"grand_budapest",
+		p_width := 48.0, p_length := 24.0, p_height := 3.6) -> BuildingRequest:
+	return _make(&"hotel", p_seed, p_style, &"", p_width, p_length, p_height, 3)
 
 
 static func temple(p_seed: int, p_form: StringName = &"basilica",

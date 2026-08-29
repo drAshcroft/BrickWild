@@ -73,8 +73,8 @@ const PROPS := {
 	# ---- hearth and kitchen ----
 	"Cauldron": {"cat": "hearth", "tags": [WALL], "zone": 0.8},
 	"Pot_1": {"cat": "cookware", "tags": [CORNER], "zone": 0.0},
-	"Bucket_Wooden_1": {"cat": "cookware", "tags": [CORNER], "zone": 0.0},
 	"Bucket_Metal": {"cat": "cookware", "tags": [CORNER], "zone": 0.0},
+	"Bucket_Wooden_1": {"cat": "bucket", "tags": [CORNER], "zone": 0.0},
 
 	# ---- trade fittings ----
 	"Anvil": {"cat": "anvil", "tags": [], "zone": 0.9},
@@ -83,6 +83,8 @@ const PROPS := {
 	"Dummy": {"cat": "stand", "tags": [], "zone": 0.7},
 	"BookStand": {"cat": "lectern", "tags": [SURFACE], "zone": 0.7},
 	"Stall_Empty": {"cat": "counter", "tags": [WALL, SURFACE], "zone": 0.9},
+	"Stall_Cart_Empty": {"cat": "stall", "tags": [], "zone": 0.9},
+	"Bag": {"cat": "sack", "tags": [CORNER], "zone": 0.0},
 
 	# ---- shelves and wall furniture ----
 	"Shelf_Simple": {"cat": "shelf", "tags": [WALL_MOUNTED, SURFACE], "zone": 0.0, "face": PI},
@@ -123,6 +125,7 @@ const PROPS := {
 	"Vase_2": {"cat": "vase", "tags": [ON_SURFACE], "zone": 0.0},
 	"Vase_4": {"cat": "vase", "tags": [ON_SURFACE], "zone": 0.0},
 	"Whetstone": {"cat": "tool", "tags": [ON_SURFACE], "zone": 0.0},
+	"Carrot": {"cat": "food", "tags": [ON_SURFACE], "zone": 0.0},
 	"Key_Metal": {"cat": "trinket", "tags": [ON_SURFACE], "zone": 0.0},
 	"Coin_Pile": {"cat": "trinket", "tags": [ON_SURFACE], "zone": 0.0},
 }

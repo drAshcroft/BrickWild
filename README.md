@@ -21,7 +21,7 @@ if building.is_ok():
 	var furnished_scene: Node3D = BigGlade.instantiate(building, false, true)
 ```
 
-Use `BuildingRequest.church()`, `.castle()`, `.house()` or `.temple()` so each
+Use `BuildingRequest.church()`, `.castle()`, `.house()`, `.shop()`, `.hotel()` or `.temple()` so each
 call site keeps the vocabulary of that building family. Generation is seeded,
 does not mutate the request, and does not emit geometry until `build_mesh()`.
 `placement()` reports measured bounds, footprint, identity and the local -Z
@@ -31,6 +31,16 @@ House requests accept one to three explicit storeys. `height` remains the
 floor-to-ceiling height of each storey. The retained `HousePlan` labels rooms,
 openings and furniture by storey and records the stair links between floors;
 the builder emits those levels and puts one pitched roof above the top level.
+
+Shop requests use the same tested plan-first representation and accept a
+business plus a house shell style. Available businesses include blacksmith,
+stable, restaurant, tavern, inn, bakery, butcher, apothecary, general store,
+tailor, carpenter, town hall, and guildhall. See `docs/SHOPS.md`.
+
+`BuildingRequest.hotel()` builds a Grand Budapest-inspired landmark with a
+furnished three-storey plan, broad symmetrical pink facade, raised central
+pavilion, mansard roof, dormers, balconies, and paired cupolas. See
+`docs/HOTELS.md`.
 
 ## Addon installation
 
@@ -109,10 +119,10 @@ hold:
 | suites | asserts |
 |---|---|
 | `library` | public request, representation, mesh and scene contract |
-| `church`, `castle`, `house`, `temple` | family generation purity and determinism |
+| `church`, `castle`, `house`, `shop`, `hotel`, `temple` | family generation purity and determinism |
 | `normals`, `massing`, `blueprint`, `cnormals`, `cmassing` | emitted geometry and drawing agreement |
 | `voxelqa`, `cvoxelqa`, `houseqa`, `hmultistory`, `rite` | spatial, circulation and ritual correctness |
-| `landmark`, `clandmark`, `harchetype`, `tarchetype` | named reference buildings and archetypes |
+| `landmark`, `clandmark`, `harchetype`, `sarchetype`, `hlandmark`, `tarchetype` | named reference buildings and archetypes |
 | `assets` | measured prop catalogue still matches imported models |
 
 The runner exits nonzero if any suite fails. Suite bodies live in

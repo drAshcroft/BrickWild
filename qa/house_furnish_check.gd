@@ -34,6 +34,19 @@ const REQUIRED := {
 	&"hall": ["table"],
 	&"parlour": ["table"],
 	&"workshop": ["workbench"],
+	&"sales_floor": ["counter"],
+	&"stable": ["stall"],
+	&"tack_room": ["storage"],
+	&"dining_room": ["table"],
+	&"guest_room": ["bed"],
+	&"office": ["workbench"],
+	&"records": ["bookcase"],
+	&"council_chamber": ["table"],
+	&"meeting_hall": ["table"],
+	&"lobby": ["counter"],
+	&"lounge": ["table"],
+	&"suite": ["bed"],
+	&"laundry": ["workbench"],
 }
 
 ## And what a trade must have in the room it works in.
@@ -41,6 +54,11 @@ const TRADE_REQUIRED := {
 	&"smith": {&"workshop": ["anvil"]},
 	&"alchemist": {&"workshop": ["bookcase"]},
 	&"scholar": {&"parlour": ["bookcase"]},
+}
+
+const BUSINESS_REQUIRED := {
+	&"blacksmith": {&"workshop": ["anvil"]},
+	&"bakery": {&"kitchen": ["hearth"]},
 }
 
 var failures: Array[String] = []
@@ -210,7 +228,7 @@ func _check_program(plan: HousePlan) -> void:
 		var kind: StringName = plan.kind_of(i)
 		var cats: Array = REQUIRED.get(kind, [])
 		# a house with nowhere to call a bedroom sleeps in the hall
-		if kind == &"hall" and not plan.has_kind(&"bedroom"):
+		if not spec is ShopSpec and kind == &"hall" and not plan.has_kind(&"bedroom"):
 			cats = cats + ["bed"]
 		for cat in cats:
 			if _room_has(plan, i, cat):
@@ -233,7 +251,8 @@ func _check_program(plan: HousePlan) -> void:
 				else:
 					warnings.append("programme: room %d (%s) has a table and no room for a seat"
 						% [i, String(kind)])
-	var demands: Dictionary = TRADE_REQUIRED.get(spec.trade, {})
+	var demands: Dictionary = BUSINESS_REQUIRED.get((spec as ShopSpec).business, {}) \
+		if spec is ShopSpec else TRADE_REQUIRED.get(spec.trade, {})
 	for kind in demands:
 		for i in plan.rooms_of(kind):
 			for cat in demands[kind]:
@@ -241,13 +260,17 @@ func _check_program(plan: HousePlan) -> void:
 					continue
 				if plan.was_dropped(i, cat):
 					warnings.append("programme: a %s's %s could not fit a %s beside everything else it needed"
-						% [String(spec.trade), String(kind), cat])
+						% [_purpose(spec), String(kind), cat])
 				elif not _could_hold(plan, i, cat):
 					warnings.append("programme: a %s's %s is too small for a %s"
-						% [String(spec.trade), String(kind), cat])
+						% [_purpose(spec), String(kind), cat])
 				else:
 					failures.append("programme: a %s's %s has no %s"
-						% [String(spec.trade), String(kind), cat])
+						% [_purpose(spec), String(kind), cat])
+
+
+static func _purpose(spec: HouseSpec) -> String:
+	return String((spec as ShopSpec).business) if spec is ShopSpec else String(spec.trade)
 
 
 ## Could ANY prop of this category physically fit in the room, footprint and
