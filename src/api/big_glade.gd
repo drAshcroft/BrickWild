@@ -158,8 +158,12 @@ static func build_mesh(building: GeneratedBuilding) -> ArrayMesh:
 
 ## Placement facts shared by scene-based consumers. All families use local -Z
 ## as their public front: house doors, church entrances and castle gates are
-## authored on that edge. `bounds` is measured from the emitted architecture,
-## not merely copied from the requested envelope.
+## authored on that edge. `bounds` is measured from the emitted architecture
+## (roof eaves, porches, chimney stacks and all) and is what fire gaps and
+## canopies should clear; `footprint` is the walls' own outline -- narrower
+## than `bounds` -- and is what `door` sits on the -Z edge of. Neither is
+## merely copied from the requested envelope: both are read from the plan/spec
+## that produced the mesh.
 static func placement(building: GeneratedBuilding) -> Dictionary:
 	var mesh: ArrayMesh = build_mesh(building)
 	if mesh == null:
@@ -171,12 +175,90 @@ static func placement(building: GeneratedBuilding) -> Dictionary:
 		"seed": building.request.seed,
 		"name": building.name(),
 		"bounds": bounds,
-		"footprint": Rect2(
-			Vector2(bounds.position.x, bounds.position.z),
-			Vector2(bounds.size.x, bounds.size.z)
-		),
+		"footprint": _footprint(building),
 		"front": Vector3(0.0, 0.0, -1.0),
+		"door": _door(building),
 	}
+
+
+## The walls' own outline in XZ, local space -- narrower than `bounds` because
+## `bounds` also covers roof eaves, porches and chimney stacks (house/shop/
+## hotel), battlements and towers (castle), or a facade tower's own footprint
+## (church). `door` always sits on this rect's -Z edge, by construction:
+##  - house, shop, hotel: HouseGeometry.interior_rect(spec), the same rect
+##    HousePlanner places the front door's z on (HousePlan.entrance()'s "pos").
+##  - castle: CastleGeometry.enceinte_rect(spec, 0), the outer ring the
+##    gatehouse is cut into.
+##  - temple: TempleGeometry.site_rect(spec), the outer wall face the gate is
+##    cut through -- used uniformly across forms, including the ziggurat,
+##    whose gate void is voxel-recessed behind the outermost terrace but whose
+##    public-facing gate is still this edge.
+##  - church: the nave rect, EXCEPT when a single axial tower carries the door
+##    out past the nave's own west wall (see `_church_door_z`): then the front
+##    edge follows the door out to that tower's own west face, since the tower
+##    is a real mass of the building, not applique on the nave.
+static func _footprint(building: GeneratedBuilding) -> Rect2:
+	var spec: RefCounted = building.spec
+	if building.plan != null:
+		return HouseGeometry.interior_rect(building.plan.spec)
+	if spec is ChurchSpec:
+		var church := spec as ChurchSpec
+		var front_z: float = _church_door_z(church)
+		return Rect2(Vector2(-church.width / 2.0, front_z),
+			Vector2(church.width, church.length / 2.0 - front_z))
+	if spec is CastleSpec:
+		return CastleGeometry.enceinte_rect(spec as CastleSpec, 0)
+	if spec is TempleSpec:
+		return TempleGeometry.site_rect(spec as TempleSpec)
+	return Rect2()
+
+
+## Where a family's front door sits, in the same local space as `bounds`. Each
+## family authors its entrance on its own -Z-facing front, so this is read from
+## the plan/spec that produced the mesh rather than re-detected from geometry:
+##  - house, shop, hotel: HousePlan.entrance()'s door position (a HouseGenerator/
+##    ShopGenerator/HotelGenerator all return a HousePlan).
+##  - church: the west door offset ChurchBuilder itself places on -Z, including
+##    the single-axial-tower case where the door rides out on the tower's own
+##    west face.
+##  - castle: the outer ring's gatehouse, CastleGeometry.gatehouse_aabb(spec, 0).
+##  - temple: the gate on the site's front edge (TempleGeometry.site_rect);
+##    used uniformly across forms, including the ziggurat, whose gate void is
+##    voxel-recessed behind the outermost terrace but whose public-facing gate
+##    is still this edge.
+static func _door(building: GeneratedBuilding) -> Vector3:
+	var spec: RefCounted = building.spec
+	if building.plan != null:
+		var plan: HousePlan = building.plan
+		var d: int = plan.entrance()
+		if d >= 0:
+			var pos: Vector2 = plan.doors[d]["pos"]
+			return Vector3(pos.x, 1.0, pos.y)
+		return Vector3(0.0, 1.0, 0.0)
+	if spec is ChurchSpec:
+		var church := spec as ChurchSpec
+		return Vector3(0.0, ChurchGeometry.door_height(church) / 2.0, _church_door_z(church))
+	if spec is CastleSpec:
+		var castle := spec as CastleSpec
+		var g: AABB = CastleGeometry.gatehouse_aabb(castle, 0)
+		return Vector3(0.0, g.size.y / 2.0, g.position.z)
+	if spec is TempleSpec:
+		var temple := spec as TempleSpec
+		var r: Rect2 = TempleGeometry.site_rect(temple)
+		var gh: float = minf(TempleGeometry.GATE_H, temple.height - 0.6)
+		return Vector3(0.0, gh / 2.0, r.position.y)
+	return Vector3.ZERO
+
+
+## ChurchBuilder's own door_z formula (see its "main door" section): the west
+## door sits on the nave's own front wall, UNLESS a single axial tower carries
+## it out to that tower's own west face instead.
+static func _church_door_z(church: ChurchSpec) -> float:
+	var l: float = church.length
+	var door_z: float = -l / 2.0 - 0.02
+	if church.tower and church.west_towers == 1:
+		door_z = -l / 2.0 + ChurchGeometry.TOWER_EMBED - church.tower_width - 0.02
+	return door_z
 
 
 ## Create a fresh scene instance. Houses and temples include their prop models;

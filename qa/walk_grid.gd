@@ -46,6 +46,18 @@ func add_obstacle(rect: Rect2) -> void:
 	_fill(rect, 0)
 
 
+## Same as add_floor(Rect2), but for any polygon -- a round tower or an
+## octagonal chapter house rasterises through here (GEO-001). One scanline
+## loop over the polygon's bounding box, same shape as _fill: a cell counts
+## as covered when its centre is inside the polygon.
+func add_floor_poly(poly: PackedVector2Array) -> void:
+	_fill_poly(poly, 1)
+
+
+func add_obstacle_poly(poly: PackedVector2Array) -> void:
+	_fill_poly(poly, 0)
+
+
 ## Shrink the free floor by `radius`, in one two-pass chamfer distance
 ## transform rather than by testing a disc of cells around every cell -- the
 ## disc is the obvious way and 25 times the work, which matters when a
@@ -245,6 +257,22 @@ func _fill(rect: Rect2, value: int) -> void:
 		for z in range(z0, z1 + 1):
 			# a cell counts as covered when its centre is inside the rectangle
 			if rect.has_point(world_of(x, z)):
+				_free[x * nz + z] = value
+
+
+func _fill_poly(poly: PackedVector2Array, value: int) -> void:
+	if poly.size() < 3:
+		return
+	var bounds: Rect2 = Poly.bounding_rect(poly)
+	if bounds.size.x <= 0.0 or bounds.size.y <= 0.0:
+		return
+	var x0: int = clampi(int(floor((bounds.position.x - origin.x) / cell)), 0, nx - 1)
+	var x1: int = clampi(int(ceil((bounds.end.x - origin.x) / cell)), 0, nx - 1)
+	var z0: int = clampi(int(floor((bounds.position.y - origin.y) / cell)), 0, nz - 1)
+	var z1: int = clampi(int(ceil((bounds.end.y - origin.y) / cell)), 0, nz - 1)
+	for x in range(x0, x1 + 1):
+		for z in range(z0, z1 + 1):
+			if Poly.contains_point(poly, world_of(x, z)):
 				_free[x * nz + z] = value
 
 

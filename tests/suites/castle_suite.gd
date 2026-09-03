@@ -68,6 +68,55 @@ static func run() -> SuiteResult:
 	if m1 != m2:
 		res.fail("rebuilding the same spec produced different geometry")
 
+	# ---- the plan ----
+	# enceinte_rect() is the contract every rectangle-shaped rule in
+	# CastleGeometry is written against, so a polygonal plan is only allowed to
+	# exist if its bounding box is still exactly that rectangle.
+	for n in range(CastleGeometry.POLY_MIN_SIDES, CastleGeometry.POLY_MAX_SIDES + 1):
+		var ps := CastleSpec.new()
+		ps.style = &"edwardian"
+		ps.width = 70.0
+		ps.length = 95.0
+		ps.height = 16.0
+		ps.plan_override = &"polygon"
+		ps.sides_override = n
+		CastleGenerator.generate(ps, 7700 + n)
+		res.checked += 1
+		if ps.plan_kind != &"polygon" or ps.sides != n:
+			res.fail("plan_override did not hold: got %s/%d, asked for polygon/%d"
+				% [String(ps.plan_kind), ps.sides, n])
+			continue
+		for ring in CastleGeometry.rings(ps):
+			var poly: PackedVector2Array = CastleGeometry.enceinte_polygon(ps, ring)
+			if poly.size() != n:
+				res.fail("N=%d: enceinte_polygon returned %d vertices" % [n, poly.size()])
+				continue
+			var bounds: Rect2 = CastleGeometry.polygon_bbox(poly)
+			var rect: Rect2 = CastleGeometry.enceinte_rect(ps, ring)
+			if not (bounds.position.is_equal_approx(rect.position)
+					and bounds.size.is_equal_approx(rect.size)):
+				res.fail("N=%d ring %d: polygon bounds %s, enceinte_rect %s"
+					% [n, ring, str(bounds), str(rect)])
+			# the gate edge: flat, facing -Z, and at the front of the site
+			if not is_equal_approx(poly[0].y, poly[1].y) 					or not is_equal_approx(poly[0].y, rect.position.y):
+				res.fail("N=%d ring %d: edge 0 is not the flat facing -Z" % [n, ring])
+		# a polygonal castle is still a castle: walls, towers, a way in
+		var pb := CastleBuilder.new()
+		pb.build(ps)
+		if not pb.has_mass("wall_0_front_left") or not pb.has_mass("wall_0_back") 				or not pb.has_mass("gate_0") or not pb.has_mass("tower_0_corner_%d" % (n - 1)):
+			res.fail("N=%d: the polygonal enceinte is missing a wall, a gate or a tower" % n)
+
+	# a forced rectangle is the four-sided case of the same construction
+	var rs := CastleSpec.new()
+	rs.style = &"edwardian"
+	rs.width = 70.0
+	rs.length = 95.0
+	rs.plan_override = &"rect"
+	CastleGenerator.generate(rs, 7711)
+	res.checked += 1
+	if CastleGeometry.plan_sides(rs) != 4 			or CastleGeometry.enceinte_polygon(rs, 0).size() != 4:
+		res.fail("plan_override = rect did not produce the four-sided plan")
+
 	# the tier rule itself, at the boundaries it is defined by
 	res.checked += 1
 	var bands := [[10.0, 10.0, &"house"], [20.0, 20.0, &"manor"],

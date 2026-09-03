@@ -20,6 +20,9 @@ func check(plan: HousePlan, builder: HouseBuilder) -> Dictionary:
 	var failures: Array[String] = []
 	var warnings: Array[String] = []
 	var stats := {}
+	# which rule belongs to which section of the report; the parts that name
+	# their groups (the furnishing check does) hand them up unchanged
+	var groups := {}
 
 	for part in [
 		HousePlanCheck.new().check(plan),
@@ -32,6 +35,8 @@ func check(plan: HousePlan, builder: HouseBuilder) -> Dictionary:
 			warnings.append(str(w))
 		for k in part["stats"]:
 			stats[k] = part["stats"][k]
+		for g in part.get("groups", {}):
+			groups[g] = part["groups"][g]
 
 	if builder != null:
 		for f2 in _check_shell(plan, builder):
@@ -42,7 +47,7 @@ func check(plan: HousePlan, builder: HouseBuilder) -> Dictionary:
 			failures.append(f4)
 		stats["masses"] = builder.mass_log.size()
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
-		"stats": stats}
+		"stats": stats, "groups": groups}
 
 
 ## The shell: every mass stands on the ground and touches the rest of the

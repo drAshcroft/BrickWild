@@ -37,6 +37,8 @@ static func run() -> SuiteResult:
 		_check_elevations(res, plan, who)
 		_check_stairs(res, plan, who)
 		_check_roof(res, builder, spec, who)
+		_check_chimney(res, plan, builder, who)
+		_check_upstairs_programme(res, plan, who)
 
 		# Generation and mesh emission must remain deterministic with vertical
 		# records included, not merely with the old furniture positions.
@@ -68,7 +70,139 @@ static func run() -> SuiteResult:
 		var y: float = float(p["pos"].y)
 		if HousePlan.record_storey(p) != 0 or y < -0.03 or y > one.height + 0.03:
 			res.fail("one-storey furniture left its ground-floor band at Y=%.2f" % y)
+	_programme_sweep(res)
 	return res
+
+
+## How public a room upstairs is, lowest first. The landing is circulation --
+## everybody on the floor crosses it -- so it takes the room that is nobody's
+## private ground; a store is not somewhere anybody sleeps, so it outranks a
+## bedroom even though it is nobody's parlour either.
+const UPSTAIRS_RANK := {&"parlour": 0, &"store": 1, &"bedroom": 2}
+
+
+## The upper-storey programme, over the whole case.
+##
+## Everything a person would notice about an upstairs: the service rooms stayed
+## downstairs, somebody sleeps up here, the room you step off the stair into is
+## not somebody's bedroom, no upper room opens straight onto the street, the
+## fire is on the ground floor and the upper windows were cut for the rooms
+## that are actually up there.
+static func _check_upstairs_programme(res: SuiteResult, plan: HousePlan, who: String) -> void:
+	res.checked += 1
+	var beds := 0
+	for i in range(plan.room_count()):
+		var storey: int = plan.storey_of_room(i)
+		var kind: StringName = plan.kind_of(i)
+		if storey == 0:
+			continue
+		if kind in [&"kitchen", &"hall", &"workshop"]:
+			res.fail("%s: room %d is a %s on storey %d" % [who, i, String(kind), storey])
+		if kind in HouseGeometry.SLEEPING:
+			if storey == 1:
+				beds += 1
+			if plan.windows_of(i).is_empty():
+				res.fail("%s: the %s in room %d on storey %d has no window"
+					% [who, String(kind), i, storey])
+	if beds < 1:
+		res.fail("%s: storey 1 has nowhere to sleep" % who)
+
+	# the landing is the most public room on its floor
+	for storey in range(1, int(plan.spec.storeys)):
+		var landing := -1
+		for stair in plan.stairs:
+			if int(stair.get("to_storey", -1)) == storey:
+				landing = int(stair.get("b", -1))
+		if landing < 0:
+			res.fail("%s: storey %d has no stair landing" % [who, storey])
+			continue
+		var mine: int = int(UPSTAIRS_RANK.get(plan.kind_of(landing), 9))
+		for i in plan.rooms_on_storey(storey):
+			if int(UPSTAIRS_RANK.get(plan.kind_of(i), 9)) < mine:
+				res.fail("%s: the landing (room %d, %s) is less public than room %d (%s)"
+					% [who, landing, String(plan.kind_of(landing)), i, String(plan.kind_of(i))])
+
+	# nothing upstairs opens onto the street
+	for di in range(plan.doors.size()):
+		var d: Dictionary = plan.doors[di]
+		if not d["exterior"]:
+			continue
+		if plan.storey_of_room(int(d["a"])) != 0:
+			res.fail("%s: exterior door %d opens out of storey %d"
+				% [who, di, plan.storey_of_room(int(d["a"]))])
+	var front: int = plan.entrance()
+	if front >= 0:
+		# the stair is not a door: it is the only thing that may join two
+		# levels, and the whole point of the programme is that what is up it
+		# is not another room off the entrance hall
+		var hall: int = int(plan.doors[front]["a"])
+		for d in plan.doors:
+			var far: int = int(d["b"]) if int(d["a"]) == hall else int(d["a"])
+			if int(d["a"]) != hall and int(d["b"]) != hall:
+				continue
+			if far >= 0 and plan.storey_of_room(far) != 0:
+				res.fail("%s: room %d on storey %d shares a door with the front door's room"
+					% [who, far, plan.storey_of_room(far)])
+
+	# the fire, and everything belonging to it, is a ground-floor thing
+	for f in plan.furniture:
+		if String(f.get("cat", "")) == "hearth" and int(f.get("storey", 0)) != 0:
+			res.fail("%s: hearth furniture on storey %d" % [who, int(f.get("storey", 0))])
+
+
+## Two hundred seeds of two-storey house, every style and a spread of
+## footprints: the plan check must pass all of them, and must not have to warn
+## that a floor which could have had a bedroom did not get one.
+##
+## The planner is called directly rather than through HouseGenerator: this is a
+## sweep of the LAYOUT, and furnishing two hundred houses to look at their room
+## names would cost minutes for nothing. The three cases above are the ones
+## that go all the way through the furnisher and the builder.
+static func _programme_sweep(res: SuiteResult) -> void:
+	var styles: Array = HouseSweep.styles()
+	var upstairs_beds := 0
+	var ground_beds := 0
+	var service_up := 0
+	for n in range(200):
+		var spec := HouseSpec.new(41000 + n)
+		spec.style = styles[n % styles.size()]
+		spec.width = 9.0 + float(n % 5) * 1.5
+		spec.length = 10.0 + float(n % 7) * 1.6
+		spec.height = 2.6
+		spec.storeys = 2
+		var inner: Rect2 = HouseGeometry.interior_rect(spec)
+		spec.room_count = HouseSpec.rooms_for(inner.size.x * inner.size.y)
+		var programme: Array[StringName] = []
+		for kind in HouseSpec.PROGRAM:
+			programme.append(kind)
+		spec.program = programme
+		spec.back_door = n % 3 == 0
+		spec.chimney = true
+		var plan: HousePlan = HousePlanner.plan(spec)
+		res.checked += 1
+		var who := "programme sweep seed=%d %s" % [spec.seed, String(spec.style)]
+		var rep: Dictionary = HousePlanCheck.new().check(plan)
+		for f in rep["failures"]:
+			res.fail("%s: %s" % [who, str(f)])
+		for w in rep["warnings"]:
+			if str(w).begins_with("upstairs_programme:"):
+				res.fail("%s: %s" % [who, str(w)])
+		var up := 0
+		for i in plan.rooms_on_storey(1):
+			if plan.kind_of(i) == &"bedroom":
+				up += 1
+			elif plan.kind_of(i) in [&"kitchen", &"hall", &"workshop"]:
+				service_up += 1
+		if up == 0:
+			res.fail("%s: no bedroom on storey 1" % who)
+		upstairs_beds += up
+		for i in plan.rooms_on_storey(0):
+			if plan.kind_of(i) == &"bedroom":
+				ground_beds += 1
+	if service_up != 0:
+		res.fail("programme sweep: %d service rooms above the ground floor" % service_up)
+	res.note("programme  200 two-storey houses, %d bedrooms upstairs, %d spare-room bedrooms down"
+		% [upstairs_beds, ground_beds])
 
 
 static func _check_elevations(res: SuiteResult, plan: HousePlan, who: String) -> void:
@@ -113,7 +247,26 @@ static func _check_roof(res: SuiteResult, builder: HouseBuilder, spec: HouseSpec
 		res.fail("%s: roof top %.2f is below top wall band" % [who, top])
 
 
+## One house, one chimney, however many floors it has: the hearth is a ground
+## floor thing and the plan says so, so a three-storey house must not grow a
+## stack per cloned kitchen.
+static func _check_chimney(res: SuiteResult, plan: HousePlan, builder: HouseBuilder,
+		who: String) -> void:
+	var stacks := 0
+	for m in builder.mass_log:
+		if String(m["name"]) == "chimney":
+			stacks += 1
+	var want: int = 1 if plan.spec.chimney else 0
+	if stacks != want:
+		res.fail("%s: %d chimneys logged, wanted %d" % [who, stacks, want])
+	if plan.hearth.is_empty():
+		return
+	if plan.storey_of_room(plan.hearth_room()) != 0:
+		res.fail("%s: the hearth is on storey %d, not the ground floor"
+			% [who, plan.storey_of_room(plan.hearth_room())])
+
+
 static func _same_plan(a: HousePlan, b: HousePlan) -> bool:
 	return a.rooms == b.rooms and a.doors == b.doors and a.windows == b.windows \
 		and a.stairs == b.stairs and a.furniture == b.furniture \
-		and a.compromises == b.compromises
+		and a.compromises == b.compromises and a.hearth == b.hearth

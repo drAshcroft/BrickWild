@@ -569,15 +569,22 @@ func _build_chimney() -> void:
 		return
 	tag("chimney")
 	var s: float = HouseGeometry.chimney_size(spec)
-	var host: int = _hearth_room()
 	var r: Rect2 = HouseGeometry.site_rect(spec)
 	var c := Vector2(r.end.x + s / 2.0 - 0.15, 0.0)
+	# The planner owns the hearth: the stack rises on the wall it named, so the
+	# fire below is always at the foot of this flue. Nothing here chooses.
+	var host: int = plan.hearth_room()
 	if host >= 0:
 		var f: Rect2 = HouseGeometry.room_floor_rect(plan, host)
-		# put the stack on whichever long wall of the hearth room is outside
-		var on_right: bool = absf(f.end.x - HouseGeometry.interior_rect(spec).end.x) < 0.02
-		c = Vector2(r.end.x + s / 2.0 - 0.15 if on_right else r.position.x - s / 2.0 + 0.15,
-			f.get_center().y)
+		match plan.hearth_wall():
+			0:
+				c = Vector2(f.get_center().x, r.position.y - s / 2.0 + 0.15)
+			1:
+				c = Vector2(f.get_center().x, r.end.y + s / 2.0 - 0.15)
+			2:
+				c = Vector2(r.position.x - s / 2.0 + 0.15, f.get_center().y)
+			_:
+				c = Vector2(r.end.x + s / 2.0 - 0.15, f.get_center().y)
 	# A stack clears the roof beside it, not the ridge at the far end of the
 	# house. On a steeply pitched hut the ridge is six metres up, and a chimney
 	# built to that reads as a factory.
@@ -593,10 +600,3 @@ func _build_chimney() -> void:
 	total_height = maxf(total_height, top + 0.16)
 
 
-## The room the chimney serves: the kitchen if there is one, else the hall.
-func _hearth_room() -> int:
-	for kind in [&"kitchen", &"hall", &"workshop"]:
-		var rooms: Array[int] = plan.rooms_of(kind)
-		if not rooms.is_empty():
-			return rooms[0]
-	return -1

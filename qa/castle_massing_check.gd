@@ -22,8 +22,24 @@ var stats: Dictionary = {}
 ## Designed interpenetration per joint, in metres of penetration depth. A pair
 ## absent from this table is expected NOT to overlap at all; INF marks a
 ## crossing meant to pass fully through.
-static func _allowance(a: String, b: String) -> float:
+static func _allowance(a: String, b: String, polygonal := false) -> float:
 	var key: String = "|".join(PackedStringArray([a, b]) if a < b else PackedStringArray([b, a]))
+	if polygonal:
+		# A slanted run is a rotated box, and the AABB the mass log has to
+		# record for it is a box round a box. Two runs meeting at a vertex, and
+		# a range built against a run, therefore "interpenetrate" in a way that
+		# says nothing about the masonry -- the vertex towers are what actually
+		# resolve those joints, and the voxel sweep is what proves the wall line
+		# is continuous. Only these AABB-of-a-diagonal pairs are relaxed.
+		match key:
+			"wall|wall":
+				return INF
+			"hall|wall", "chapel|wall", "keep|wall":
+				return INF
+			"keep|tower", "chapel|tower", "hall|tower":
+				# a vertex tower IS part of the run it stands on, so a range built
+				# against that run meets the tower along with it
+				return INF
 	match key:
 		# --- the enceinte: walls die into the towers and gate that stud them ---
 		"tower|wall", "gate|wall", "gate|tower":
@@ -79,8 +95,10 @@ func check(spec: CastleSpec, builder: CastleBuilder) -> Dictionary:
 	_add(g["failures"])
 	stats["masses_joined"] = g["joined"]
 
+	var polygonal: bool = CastleGeometry.is_polygonal(spec)
 	var o: Dictionary = MassRules.overlaps(masses,
-		func(a: String, b: String) -> float: return _allowance(a, b), FAMILIES)
+		func(a: String, b: String) -> float: return _allowance(a, b, polygonal),
+		FAMILIES)
 	_add(o["failures"])
 	stats["worst_penetration"] = o["worst"]
 

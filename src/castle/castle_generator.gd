@@ -34,6 +34,19 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	spec.tier = spec.tier_override if spec.tier_override != &"" \
 		else CastleSpec.tier_for(spec.width, spec.length)
 	var enclosed: bool = spec.tier == &"castle" or spec.tier == &"fortress"
+
+	# ---- the plan ----
+	# Drawn from CastleSpec.plan_for, which has a generator of its own: the
+	# shape of the enceinte must not consume `spec.rng`, or choosing a hexagon
+	# would silently redesign every tower, gate and keep after it.
+	var plan: Dictionary = CastleSpec.plan_for(spec.style, spec.tier, p_seed)
+	spec.plan_kind = spec.plan_override if spec.plan_override != &"" \
+		else plan["kind"]
+	spec.sides = 4
+	if spec.plan_kind == &"polygon":
+		spec.sides = clampi(spec.sides_override if spec.sides_override > 0 \
+			else int(plan["sides"]), CastleGeometry.POLY_MIN_SIDES,
+			CastleGeometry.POLY_MAX_SIDES)
 	var short_side: float = minf(spec.width, spec.length)
 
 	# ---- walls ----
@@ -104,6 +117,45 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 		_pick(r, TIER_SUFFIXES[spec.tier])]
 
 
+## Re-settle everything that depends on the SHAPE of the enceinte, for a spec
+## that has already been generated. Forcing a plan kind on afterwards -- which
+## the landmark suite does, because a real castle's plan is not a coin flip --
+## changes how long every run of wall is and how much ground the ward encloses,
+## and a spec whose towers no longer fit the edges they stand on is exactly the
+## input CastleBuilder must never be handed.
+##
+## It clamps and never randomizes, so it cannot move a design that was already
+## fitted, and it is deliberately NOT called from generate(): the fitting there
+## runs in its own order and this must not perturb it.
+static func refit(spec: CastleSpec) -> void:
+	if not CastleGeometry.is_enclosed(spec):
+		return
+	_fit_towers(spec)
+	if spec.inner_ward:
+		_fit_ward_gap(spec)
+	var b: Rect2 = CastleGeometry.bailey_rect(spec)
+	var cap: Vector2 = CastleGeometry.max_keep_size(spec)
+	spec.keep_w = minf(spec.keep_w, cap.x)
+	spec.keep_l = minf(spec.keep_l, cap.y)
+	if spec.keep_shape == &"round" or spec.keep_shape == &"shell" 			or spec.keep_shape == &"tiered":
+		var side: float = minf(spec.keep_w, spec.keep_l)
+		spec.keep_w = side
+		spec.keep_l = side
+	spec.keep = spec.keep_w >= 3.0 and spec.keep_l >= 3.0
+	if not spec.keep:
+		spec.keep_w = 0.0
+		spec.keep_l = 0.0
+		spec.keep_height = 0.0
+	else:
+		spec.keep_height = maxf(spec.keep_height,
+			CastleGeometry.tower_height(spec, CastleGeometry.inner_ring(spec)) * 1.2)
+	spec.hall_w = minf(spec.hall_w, b.size.x * 0.3)
+	spec.hall_l = minf(spec.hall_l, CastleGeometry.max_range_length(spec))
+	spec.hall = spec.hall_l >= 4.0 and spec.hall_w >= 3.5
+	spec.chapel = spec.chapel and spec.hall 			and b.size.x > spec.hall_w * 2.0 + CastleGeometry.BAILEY_CLEAR * 2.0
+	spec.gate_width = minf(spec.gate_width, CastleGeometry.max_gate_width(spec, 0))
+
+
 ## Shrink the towers until a pair of them fits on the same wall with a run of
 ## masonry left between. A tower sized off the short side alone still collided
 ## once the batter spread its foot, which is why this measures the base.
@@ -114,6 +166,12 @@ static func _fit_towers(spec: CastleSpec) -> void:
 		var s: float = CastleGeometry.tower_base_half(spec, 0)
 		var need: float = 4.0 * s + CastleGeometry.MIN_WALL_RUN
 		var have: float = minf(spec.width, spec.length)
+		if CastleGeometry.is_polygonal(spec):
+			# two vertex towers share every edge, and an octagon's edge is under
+			# half the site width: sized off the site alone they would meet in
+			# the middle of every run.
+			need = 2.5 * s + CastleGeometry.MIN_WALL_RUN
+			have = minf(have, CastleGeometry.min_edge_length(spec, 0))
 		if need <= have:
 			break
 		spec.tower_size = maxf(spec.tower_size * (have / need) * 0.98, 1.0)
@@ -124,6 +182,9 @@ static func _fit_towers(spec: CastleSpec) -> void:
 			var rect: Rect2 = CastleGeometry.enceinte_rect(spec, 1)
 			var need2: float = 4.0 * si + CastleGeometry.MIN_WALL_RUN
 			var have2: float = minf(rect.size.x, rect.size.y)
+			if CastleGeometry.is_polygonal(spec):
+				need2 = 2.5 * si + CastleGeometry.MIN_WALL_RUN
+				have2 = minf(have2, CastleGeometry.min_edge_length(spec, 1))
 			if need2 <= have2:
 				break
 			spec.tower_size = maxf(spec.tower_size * (have2 / need2) * 0.98, 1.0)

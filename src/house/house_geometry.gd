@@ -112,6 +112,10 @@ const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour",
 	&"office", &"records", &"council_chamber", &"meeting_hall", &"lobby",
 	&"lounge", &"suite", &"gallery", &"laundry"]
 
+## Rooms someone sleeps in. Nobody should have to walk through one of these
+## to reach anywhere else -- not just the house's own "bedroom".
+const SLEEPING := [&"bedroom", &"guest_room", &"suite"]
+
 
 
 # ------------------------------------------------------------------- shell

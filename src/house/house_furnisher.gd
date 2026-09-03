@@ -111,7 +111,8 @@ const RECIPES := {
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.8},
 	],
 	&"dining_room": [
-		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "table", "rule": &"row", "n": [1, 3], "min_n": 1, "pitch": 2.2,
+			"aisle": 1.0, "seat_clearance": 1.15, "along": "wall", "opt": 1.0},
 		{"cat": "seat", "rule": &"around", "n": [2, 4], "opt": 1.0},
 		{"cat": "bench", "rule": &"around", "n": [0, 1], "opt": 0.7},
 		{"cat": "barrel", "rule": &"corner", "n": [1, 2], "opt": 0.7},
@@ -190,7 +191,10 @@ const SHOP_FITTINGS := {
 	&"bakery": [{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0}],
 	&"butcher": [{"cat": "blade", "rule": &"on", "n": [1, 2], "opt": 1.0}],
 	&"apothecary": [{"cat": "alchemy", "rule": &"on", "n": [2, 4], "opt": 1.0}],
-	&"tailor": [{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 0.8}],
+	# 1.0 like every other trade's own fitting: the shop archetype asks for a
+	# tailor's sacks by name, and a defining fitting placed on a dice roll is a
+	# tailor with nothing in it one time in five.
+	&"tailor": [{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 1.0}],
 	&"carpenter": [{"cat": "rack", "rule": &"mounted", "n": [1, 1], "opt": 1.0}],
 }
 
@@ -244,6 +248,47 @@ const SCALE_STEPS := [1.0, 0.88, 0.76, 0.62]
 ## How much of a room a piece has to span before the gap left beside it counts
 ## as the only way past rather than as somewhere to step round.
 const BAR_FRACTION := 0.55
+
+# ---- affinity: how strongly a piece's wishes outweigh a coin toss ----
+## The dice are the last word only between placements the rules cannot tell
+## apart. Before LAY-002 the jitter was 0.5 against a 0.6 centring term, which
+## is not a tie-break, it is the decision.
+const JITTER := 0.1
+## Beyond this many metres "near" and "far" stop caring.
+const AFF_REACH := 4.0
+const NEAR_W := 2.0
+const FAR_W := 2.0
+## Clutter out of the traffic. Softened rather than clamped, so that of four
+## corners the one furthest from every door always scores highest.
+const DOOR_W := 4.0
+const DOOR_SOFT := 3.0
+const DAYLIGHT_W := 2.5
+## How hard a daylit piece is pushed along the wall to stand beside the window
+## rather than square across it, and over what distance.
+const BESIDE_W := 1.5
+const BESIDE_REACH := 1.5
+## The penalty for a wall a piece asked not to be on -- big enough that any
+## other wall wins, small enough that the piece still goes in if none does.
+const WRONG_WALL := 3.0
+## How close a back has to be to a wall to count as standing against it.
+const BACK_TOL := 0.14
+## A table draws up to the fire: it stands off the middle of the room toward
+## the hearth wall by this fraction of the room's half-depth, and wants no
+## more than that -- a table in the fireplace is not a table by the fire.
+const FOCUS_W := 6.0
+const FOCUS_WANT := 0.36
+## A shelf over the bench it serves; a chandelier over the table.
+const OVER_W := 5.0
+## A pair of sconces, mirrored about the door or the fire.
+const FLANK_W := 6.0
+const FLANK_IDEAL := 0.9
+## Wall a pair needs either side of what it flanks: the lamp's own half width
+## and the clearance _on_opening() keeps around a door, with a little over.
+const FLANK_REACH := 1.5
+const FLANK_TOL := 0.6
+## Step along a wall when hunting for somewhere to hang something. Finer than
+## PROBE_STEP because the mirror of a sconce is judged in centimetres.
+const MOUNT_STEP := 0.06
 
 
 static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
@@ -398,8 +443,30 @@ static func _without(plan: HousePlan, f: int) -> HousePlan:
 	trial.windows = plan.windows
 	trial.stairs = plan.stairs
 	trial.furniture = plan.furniture.duplicate()
-	trial.furniture.remove_at(f)
+	# Whatever stands ON the piece goes with it, the way _reindex_hosts() takes
+	# it when the removal is real. Asking "would taking the table out help?"
+	# with the bench still drawn up to it answers no every time, which is how a
+	# parlour cut in half by a table and its bench survived every repair pass.
+	var doomed: Array[int] = _hosted_by(plan, f)
+	doomed.append(f)
+	doomed.sort()
+	for k in range(doomed.size() - 1, -1, -1):
+		trial.furniture.remove_at(doomed[k])
 	return trial
+
+
+## Everything set on a piece, and everything set on those, by index.
+static func _hosted_by(plan: HousePlan, f: int) -> Array[int]:
+	var out: Array[int] = []
+	var front: Array[int] = [f]
+	while not front.is_empty():
+		var cur: int = front.pop_back()
+		for i in range(plan.furniture.size()):
+			if int(plan.furniture[i]["host"]) != cur or i in out:
+				continue
+			out.append(i)
+			front.append(i)
+	return out
 
 
 ## Removing a placement shifts every index after it, and things set ON that
@@ -483,6 +550,9 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		if not must and r.randf() > float(step["opt"]) * lerpf(0.75, 1.15, spec.clutter):
 			continue
 		_mandatory = must
+		if step["rule"] == &"row":
+			_place_row(plan, room, step, blocked, zones, r)
+			continue
 		var lo: int = int(step["n"][0])
 		var hi: int = int(step["n"][1])
 		var want: int = lo if hi <= lo else r.randi_range(lo, hi)
@@ -492,8 +562,13 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		# A table nobody can sit at is worse than no table: it takes the middle
 		# of the room and gives nothing back. If not one seat would go round it,
 		# the table goes instead, and the plan records why.
+		#
+		# A row is the exception: it is placed and judged as a row (straight,
+		# pitched, its own shared aisle), and "around" finding nowhere to draw
+		# a chair up to ONE end of a long trestle is not the same failure as a
+		# free-standing table nobody can reach at all.
 		if step["rule"] == &"around" and _count_cat(plan, room, ["seat", "bench"]) \
-				== seats_before and _count_cat(plan, room, ["table"]) > 0:
+				== seats_before and _count_freestanding_tables(plan, room) > 0:
 			_drop_the_table(plan, room, blocked, zones)
 	_ensure_seating(plan, room, blocked, zones, r)
 	_ensure_light(plan, room, r)
@@ -571,6 +646,16 @@ static func _count_cat(plan: HousePlan, room: int, cats: Array) -> int:
 	return n
 
 
+## Tables that stand on their own, as opposed to ones placed as part of a row.
+static func _count_freestanding_tables(plan: HousePlan, room: int) -> int:
+	var n := 0
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(p["key"]) == "table" and String(p.get("row", "")) == "":
+			n += 1
+	return n
+
+
 ## Take the table back out, and free the floor it was holding.
 static func _drop_the_table(plan: HousePlan, room: int, blocked: Array[Rect2],
 		zones: Array[Rect2]) -> void:
@@ -626,6 +711,7 @@ static func could_place(plan: HousePlan, room: int, cat: String) -> bool:
 	probe.rooms = plan.rooms
 	probe.doors = plan.doors
 	probe.windows = plan.windows
+	probe.hearth = plan.hearth
 	probe.furniture = []
 	var r := RandomNumberGenerator.new()
 	r.seed = 1
@@ -701,6 +787,11 @@ static func _place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 				_place_free(plan, room, key, blocked, zones, r)
 				if plan.furniture.size() > had:
 					plan.furniture[-1]["free_standing"] = true
+			elif plan.furniture.size() == had and _forced_wall(plan, room, key) >= 0:
+				# the wall the flue rises on would not take it, and a fire
+				# under no chimney is worse than no fire: the room goes
+				# without and writes down that it did
+				plan.note_compromise(room, cat)
 		&"free":
 			var before: int = plan.furniture.size()
 			_place_free(plan, room, key, blocked, zones, r)
@@ -736,6 +827,7 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 	var best: Dictionary = {}
 	var best_score := -INF
 	var extra: Array[Rect2] = _window_blocks(plan, room, key)
+	var hearth_only: int = _forced_wall(plan, room, key)
 	for wi in range(walls.size()):
 		var wall: Dictionary = walls[wi]
 		var n: Vector2 = wall["normal"]
@@ -771,19 +863,561 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 			if cand.is_empty():
 				continue
 			var mid: float = 1.0 - absf(t - run / 2.0) / maxf(run / 2.0, 0.01)
-			var score: float = mid * 0.6 + r.randf() * 0.5 + float(wi) * 0.01
-			if PropCatalog.category(key) == "bed":
-				score += _bed_bonus(plan, room, cand)
+			var score: float = mid * 0.6 + r.randf() * JITTER + float(wi) * 0.01
+			score += _affinity(plan, room, cand)
+			if hearth_only >= 0 and wi != hearth_only:
+				# the flue rises on one wall only, so a hearth on any other is
+				# not a worse placement but no placement at all
+				score = -INF
 			if score > best_score:
 				best_score = score
 				best = cand
 	_commit(plan, room, best, blocked, zones)
 
 
+## N copies of the same prop, evenly spaced along a line, all facing the same
+## shared aisle: beds in a barracks, pews in a chapel, trestles in a hall.
+##
+## This is `_place_against_wall`'s own fit test (a candidate footprint clear
+## of the floor already spoken for) run along a straight run instead of
+## slid one piece at a time -- so the row it finds is straight and evenly
+## pitched by construction, not by measuring afterwards. `along: "wall"`
+## (the default) tries each wall of the room in turn, backs to it, the way a
+## row of pews or beds does; `along: "axis"` runs the row down the middle of
+## the room instead, for a row nothing is backed onto, such as trestle tables
+## with an aisle down both sides.
+##
+## If fewer than `min_n` fit, nothing is placed and the room records the
+## compromise, the same as any other step that could not be met.
+static func _place_row(plan: HousePlan, room: int, step: Dictionary,
+		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
+	var cat: String = String(step["cat"])
+	var choices: Array[String] = PropCatalog.of_category(cat)
+	if choices.is_empty():
+		return
+	var key: String = choices[r.randi_range(0, choices.size() - 1)]
+	var n_max: int = int(step["n"][1])
+	var n_want: int = n_max if n_max > 0 else 999
+	var min_n: int = int(step.get("min_n", step["n"][0]))
+	var pitch: float = float(step.get("pitch", 0.0))
+	var aisle: float = maxf(float(step.get("aisle", HouseGeometry.PATH_MIN)), HouseGeometry.PATH_MIN)
+	# Room left in front of the row before the aisle starts: a trestle table's
+	# aisle is the walkway past the benches, not the space the benches stand
+	# and pull back in, and a later "around" step needs that space left clear
+	# of the aisle zone or it will never find anywhere to seat anyone.
+	var seat_gap: float = float(step.get("seat_clearance", 0.0))
+	var along_mode: String = String(step.get("along", "wall"))
+	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var extra: Array[Rect2] = _window_blocks(plan, room, key)
+	var lines: Array[Dictionary] = []
+	if along_mode == "axis":
+		# Down the middle of the room, along its longer side, facing outward
+		# to one side -- the trestle-table case, where nothing backs onto a
+		# wall and the aisle is what the row is FOR.
+		var c: Vector2 = floor_rect.get_center()
+		var horizontal: bool = floor_rect.size.x >= floor_rect.size.y
+		var a: Vector2 = c - (Vector2(floor_rect.size.x / 2.0, 0.0) if horizontal
+			else Vector2(0.0, floor_rect.size.y / 2.0))
+		var b: Vector2 = c + (Vector2(floor_rect.size.x / 2.0, 0.0) if horizontal
+			else Vector2(0.0, floor_rect.size.y / 2.0))
+		var n2: Vector2 = Vector2(0.0, 1.0) if horizontal else Vector2(1.0, 0.0)
+		lines = [{"from": a, "to": b, "normal": n2}]
+	else:
+		lines = HouseGeometry.room_walls(plan, room)
+	var best_row: Array = []
+	var best_zone := Rect2()
+	var best_score := -INF
+	# Largest size first, the same as every other placer here: a row of
+	# full-size tables is a better fit than a row of shrunk ones, and a small
+	# room should only get the shrunk row if the full-size one will not go in
+	# at all.
+	for sc in _scales(key):
+		for wi in range(lines.size()):
+			var wall: Dictionary = lines[wi]
+			var n: Vector2 = wall["normal"]
+			var yaw: float = _yaw_facing(n)
+			var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw) * sc
+			var along := Vector2(n.y, -n.x).abs()
+			var span: float = along.x * foot.x + along.y * foot.y
+			var depth: float = absf(n.x) * foot.x + absf(n.y) * foot.y
+			var a2: Vector2 = wall["from"]
+			var b2: Vector2 = wall["to"]
+			var run: float = (b2 - a2).length()
+			var use_pitch: float = maxf(pitch, span + 0.1) if pitch > 0.01 else span + 0.3
+			if run < span:
+				continue
+			var out: float = depth / 2.0 + HouseGeometry.WALL_GAP
+			var max_count: int = mini(n_want, int((run + 0.001) / use_pitch))
+			var row: Array = []
+			# Fewer copies first only if the full count will not go in anywhere;
+			# and for each count, slide the row along the wall -- a door swing
+			# or a window sill in the middle of the wall should cost the row a
+			# few centimetres of centring, not the whole row.
+			for count in range(max_count, min_n - 1, -1):
+				if count < 1:
+					continue
+				var span_len: float = float(count - 1) * use_pitch + span
+				var slack: float = run - span_len
+				if slack < -0.001:
+					continue
+				var slides: int = maxi(int(slack / PROBE_STEP), 0)
+				for si in range(slides + 1):
+					var shift: float = -slack / 2.0 + (slack * float(si) / float(maxi(slides, 1)))
+					var start_t: float = span / 2.0 + slack / 2.0 + shift
+					var try_row: Array = []
+					for i in range(count):
+						var t: float = start_t + float(i) * use_pitch
+						var centre: Vector2 = a2 + along * t + n * out
+						var cand: Dictionary = _candidate(key, centre, yaw, 1.0, sc)
+						if not _fits(cand, floor_rect, blocked, zones, extra):
+							break
+						try_row.append(cand)
+					if try_row.size() == count:
+						row = try_row
+						break
+				if not row.is_empty():
+					break
+			if row.size() < min_n:
+				continue
+			# One aisle the whole row shares, deep enough to walk and wide enough
+			# to cover every copy actually placed -- not the run the wall offered,
+			# so a short row does not claim an aisle it never reaches the end of.
+			var first: Rect2 = row[0]["rect"]
+			var last: Rect2 = row[row.size() - 1]["rect"]
+			var row_c: Vector2 = (first.get_center() + last.get_center()) / 2.0
+			var row_len: float = (last.get_center() - first.get_center()).length() + span
+			var facing: Vector2 = _facing_of(yaw)
+			var across: Vector2 = Vector2(facing.y, -facing.x).abs()
+			var half_span: Vector2 = across * (row_len / 2.0)
+			# The aisle the recipe asked for first; failing that, the narrowest
+			# the nav check will still call a way through -- a shallow room
+			# should not lose its whole row of trestles for want of a few
+			# centimetres it was never going to spare.
+			var aisle_rect := Rect2()
+			for try_aisle in [aisle, HouseGeometry.PATH_MIN]:
+				var aisle_a: Vector2 = row_c + facing * (out + seat_gap)
+				var aisle_b: Vector2 = row_c + facing * (out + seat_gap + try_aisle)
+				var ra: Vector2 = aisle_a - half_span
+				var rb: Vector2 = aisle_b + half_span
+				var candidate_rect := Rect2(ra.min(rb), (rb - ra).abs())
+				if not floor_rect.grow(0.02).encloses(candidate_rect):
+					continue
+				var clash := false
+				for bz in blocked:
+					if bz.intersects(candidate_rect):
+						clash = true
+						break
+				if clash:
+					continue
+				aisle_rect = candidate_rect
+				break
+			if aisle_rect.size.x <= 0.0:
+				continue
+			# scale is the primary ordering: a smaller-scale row never beats a
+			# larger one, however many more copies it manages to fit
+			var score: float = sc * 1000.0 + float(row.size()) * 10.0 + r.randf()
+			if score > best_score:
+				best_score = score
+				best_row = row
+				best_zone = aisle_rect
+		if not best_row.is_empty():
+			break
+	if best_row.size() < min_n:
+		if float(step["opt"]) >= 1.0 and _has_other_must(plan, room):
+			plan.note_compromise(room, cat)
+		return
+	var row_group: String = "%d_%s_%d" % [room, cat, plan.furniture.size()]
+	for cand in best_row:
+		cand["zone"] = best_zone
+		cand["row"] = row_group
+		_commit(plan, room, cand, blocked, zones)
+
+
+## The one wall a piece may stand against, or -1 when any will do. The planner
+## names the hearth wall (HousePlan.hearth) and the builder raises the chimney
+## on it, so a hearth anywhere else is a fire with no flue: every other wall
+## scores -INF rather than a penalty that a lucky roll could overcome.
+static func _forced_wall(plan: HousePlan, room: int, key: String) -> int:
+	if PropCatalog.category(key) != "hearth":
+		return -1
+	if plan.hearth_room() != room:
+		return -1
+	return plan.hearth_wall()
+
+
+## What a piece WANTS, over and above fitting: one number per candidate
+## position, read from the `affinity` block PropCatalog carries per prop.
+##
+## Before this, every placer ended in "does it fit, plus a random number", and
+## the random number was half the score. A dozen rules that anybody would say
+## out loud -- the bench goes by the window, the bookcase does not go by the
+## fire, the barrels go where nobody walks, the second sconce mirrors the
+## first -- are all one expression here, so the placers stay five short
+## searches over the positions the room allows.
+##
+## Pure: the same plan, room and candidate always give the same score. Nothing
+## in here draws on an RNG, which is what lets the checks re-derive it.
+static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
+	var key: String = String(cand["key"])
+	var aff: Dictionary = PropCatalog.affinity(key)
+	if aff.is_empty():
+		return 0.0
+	var rect: Rect2 = cand["rect"]
+	var c: Vector2 = rect.get_center()
+	var wall: int = _back_wall_index(plan, room, rect)
+	var score := 0.0
+
+	# daylight: a workbench wants the window wall, a bookcase wants any other
+	if aff.has("daylight"):
+		var want: float = float(aff["daylight"])
+		if wall >= 0:
+			if _wall_has_window(plan, room, wall):
+				score += want * DAYLIGHT_W
+				# Beside the window, not across it. A bench dead in front of
+				# the glass has the same light and leaves no wall above it
+				# for the shelf that serves it -- worth a nudge along the
+				# wall, never worth a different wall.
+				if want > 0.0:
+					score -= BESIDE_W * _window_crowding(plan, room, rect, wall)
+		else:
+			var wd: float = _nearest_window_dist(plan, room, c)
+			if wd >= 0.0:
+				score += want * DAYLIGHT_W * clampf(1.0 - wd / AFF_REACH, 0.0, 1.0)
+
+	for near_cat in aff.get("near", []):
+		var nd: float = _nearest_cat_dist(plan, room, String(near_cat), c)
+		if nd >= 0.0:
+			score += NEAR_W * clampf(1.0 - nd / AFF_REACH, 0.0, 1.0)
+	for far_cat in aff.get("far", []):
+		var fd: float = _nearest_cat_dist(plan, room, String(far_cat), c)
+		if fd >= 0.0:
+			score += FAR_W * (fd / (fd + AFF_REACH))
+
+	# Out of the traffic. Softened rather than clamped: of four corners the one
+	# furthest from every door has to score strictly highest, however big the
+	# room is, or the rule decides nothing in a large one.
+	if bool(aff.get("away_from_doors", false)):
+		var dd: float = _nearest_door_dist(plan, room, c)
+		if dd < INF:
+			score += DOOR_W * (dd / (dd + DOOR_SOFT))
+
+	if wall >= 0 and bool(aff.get("avoid_window_wall", false)) \
+			and _wall_has_window(plan, room, wall):
+		score -= WRONG_WALL
+	if wall >= 0 and bool(aff.get("avoid_hearth_wall", false)) \
+			and plan.hearth_room() == room and plan.hearth_wall() == wall:
+		score -= WRONG_WALL
+
+	if String(aff.get("focus", "")) == "hearth":
+		# the placer looks the fire up once for the whole search; a caller
+		# scoring a single candidate has not, and pays for it here
+		var h := Vector2(INF, INF)
+		if cand.has("focus_point"):
+			h = cand["focus_point"]
+		else:
+			h = _hearth_point(plan, room)
+		score += _focus_bonus(plan, room, c, h)
+	if aff.has("over"):
+		score += _over_bonus(plan, room, cand, aff["over"])
+	if aff.has("flank"):
+		score += _flank_bonus(plan, room, cand)
+	if PropCatalog.category(key) == "bed":
+		score += _bed_bonus(plan, room, cand)
+	return score
+
+
+## The four walls of a room, in the order HouseGeometry.room_walls() gives
+## them, as inward normals.
+static func _wall_normal(wi: int) -> Vector2:
+	return [Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0)][wi]
+
+
+## Which wall a rectangle has its back to, or -1 when it stands free. Measured
+## rather than passed in, because _affinity() is handed a candidate and has to
+## give the same answer wherever the candidate came from.
+static func _back_wall_index(plan: HousePlan, room: int, rect: Rect2) -> int:
+	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var gaps := [rect.position.y - f.position.y, f.end.y - rect.end.y,
+		rect.position.x - f.position.x, f.end.x - rect.end.x]
+	var best := -1
+	var best_gap := BACK_TOL
+	for i in range(4):
+		if float(gaps[i]) < best_gap:
+			best_gap = float(gaps[i])
+			best = i
+	return best
+
+
+## How squarely this piece stands in front of the glass, 1 for dead centre and
+## 0 once it is BESIDE_REACH along the wall from it. Continuous rather than a
+## yes-or-no: a bench nudged just clear of the window still leaves no room for
+## the shelf that serves it, because a shelf is kept a shelf-width off the
+## opening as well.
+static func _window_crowding(plan: HousePlan, room: int, rect: Rect2,
+		wi: int) -> float:
+	var n: Vector2 = _wall_normal(wi)
+	var along := Vector2(n.y, -n.x).abs()
+	var c: float = rect.get_center().dot(along)
+	var worst := 0.0
+	for w in plan.windows_of(room):
+		var win: Dictionary = plan.windows[w]
+		if Vector2(win["normal"]).dot(n) > -0.9:
+			continue
+		var d: float = absf(c - Vector2(win["pos"]).dot(along))
+		worst = maxf(worst, clampf(1.0 - d / BESIDE_REACH, 0.0, 1.0))
+	return worst
+
+
+## A window record carries the OUTWARD normal of the wall it pierces, so it
+## belongs to the wall whose inward normal is its opposite.
+static func _wall_has_window(plan: HousePlan, room: int, wi: int) -> bool:
+	var n: Vector2 = _wall_normal(wi)
+	for w in plan.windows_of(room):
+		if Vector2(plan.windows[w]["normal"]).dot(n) < -0.9:
+			return true
+	return false
+
+
+static func _nearest_window_dist(plan: HousePlan, room: int, c: Vector2) -> float:
+	var best := -1.0
+	for w in plan.windows_of(room):
+		var d: float = c.distance_to(Vector2(plan.windows[w]["pos"]))
+		if best < 0.0 or d < best:
+			best = d
+	return best
+
+
+static func _nearest_door_dist(plan: HousePlan, room: int, c: Vector2) -> float:
+	var best := INF
+	for d in plan.doors_of(room):
+		best = minf(best, c.distance_to(Vector2(plan.doors[d]["pos"])))
+	return best
+
+
+## Distance to the nearest piece of a category standing in this room, or -1
+## when the room holds none. The fire is the exception: the planner names its
+## wall before any furniture exists, so a bookcase can be kept away from it
+## even while the hearth is still only a plan.
+static func _nearest_cat_dist(plan: HousePlan, room: int, cat: String,
+		c: Vector2) -> float:
+	var best := -1.0
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(p["key"]) != cat:
+			continue
+		var d: float = c.distance_to(Rect2(p["rect"]).get_center())
+		if best < 0.0 or d < best:
+			best = d
+	if cat == "hearth" and best < 0.0:
+		var h: Vector2 = _hearth_point(plan, room)
+		if h.is_finite():
+			best = c.distance_to(h)
+	return best
+
+
+## Where the fire in this room is, or an infinite vector when there is none:
+## the hearth itself if it has been placed, otherwise the middle of the wall
+## the planner gave the chimney.
+static func _hearth_point(plan: HousePlan, room: int) -> Vector2:
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(p["key"]) == "hearth":
+			return Rect2(p["rect"]).get_center()
+	if plan.hearth_room() != room or plan.hearth_wall() < 0:
+		return Vector2(INF, INF)
+	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
+	var wall: Dictionary = walls[plan.hearth_wall()]
+	return (Vector2(wall["from"]) + Vector2(wall["to"])) / 2.0
+
+
+## A table in a room with a fire in it does not sit in the middle of the room:
+## it draws up toward the fire. Rewarded up to FOCUS_WANT of the room's half
+## depth and no further, so the table stops where a table would stop.
+static func _focus_bonus(plan: HousePlan, room: int, c: Vector2,
+		h: Vector2) -> float:
+	if not h.is_finite():
+		return 0.0
+	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var mid: Vector2 = f.get_center()
+	var dir: Vector2 = h - mid
+	if dir.length() < 0.01:
+		return 0.0
+	dir = dir.normalized()
+	var half: float = absf(dir.x) * f.size.x / 2.0 + absf(dir.y) * f.size.y / 2.0
+	var want: float = maxf(FOCUS_WANT * half, 0.05)
+	return FOCUS_W * clampf((c - mid).dot(dir) / want, 0.0, 1.0)
+
+
+## Above something: a chandelier over the table it lights, a shelf over the
+## bench it serves. The ceiling case is a distance, the wall case is how much
+## of the shelf actually overhangs the piece, along the wall they share.
+static func _over_bonus(plan: HousePlan, room: int, cand: Dictionary,
+		cats: Array) -> float:
+	var key: String = String(cand["key"])
+	var rect: Rect2 = cand["rect"]
+	var c: Vector2 = rect.get_center()
+	var hanging: bool = PropCatalog.has_tag(key, PropCatalog.CEILING)
+	var wall: int = _back_wall_index(plan, room, rect)
+	var n: Vector2 = _wall_normal(wall) if wall >= 0 else Vector2(1, 0)
+	var along := Vector2(n.y, -n.x).abs()
+	var width: float = maxf(PropCatalog.size(key).x, 0.05)
+	var best := 0.0
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if not PropCatalog.category(p["key"]) in cats:
+			continue
+		if p.get("mounted", false) or int(p["host"]) >= 0:
+			continue
+		var host: Rect2 = p["rect"]
+		if hanging:
+			best = maxf(best, clampf(1.0 - c.distance_to(host.get_center()) / 2.0, 0.0, 1.0))
+			continue
+		if wall < 0 or _back_wall_index(plan, room, host) != wall:
+			continue
+		var span: float = maxf(host.end.dot(along) - host.position.dot(along), 0.05)
+		var lo: float = maxf(c.dot(along) - width / 2.0, host.position.dot(along))
+		var hi: float = minf(c.dot(along) + width / 2.0, host.end.dot(along))
+		# against the narrower of the two: a shelf half a metre wider than the
+		# bench it serves still hangs over the whole of it
+		best = maxf(best, clampf((hi - lo) / minf(width, span), 0.0, 1.0))
+	return OVER_W * best
+
+
+## Sconces come in pairs, one either side of the door or the fire. The pair's
+## station -- how far out from the centre the two of them hang -- is settled
+## once, by _flank_anchor(), so the first lamp cannot take a spot its mate is
+## unable to answer. The first is scored on reaching that station and the
+## second on mirroring the first, which is what makes the pair read as a pair
+## rather than as two lamps that happen to share a wall.
+static func _flank_bonus(plan: HousePlan, room: int, cand: Dictionary) -> float:
+	var key: String = String(cand["key"])
+	var cat: String = PropCatalog.category(key)
+	# The widest lamp of the kind, not this one: the two halves of a pair are
+	# drawn separately and need not be the same prop, and a station worked out
+	# from one width is a station the other cannot answer.
+	#
+	# The placer hands the anchor in, having found it once for the whole wall
+	# search; a caller that has not is given the same answer the slow way.
+	var anchor: Dictionary = cand.get("flank_anchor", {})
+	if anchor.is_empty():
+		anchor = _flank_anchor(plan, room, _widest_of(cat), cat)
+	if anchor.is_empty():
+		return 0.0
+	var rect: Rect2 = cand["rect"]
+	var wall: int = _back_wall_index(plan, room, rect)
+	if wall < 0:
+		return 0.0
+	var n: Vector2 = _wall_normal(wall)
+	if n.dot(Vector2(anchor["normal"])) < 0.9:
+		return -1.0                  # the pair belongs on the wall the door is in
+	var along := Vector2(n.y, -n.x)
+	var t: float = (rect.get_center() - Vector2(anchor["pos"])).dot(along)
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(p["key"]) != cat or not p.get("mounted", false):
+			continue
+		var mate: Rect2 = p["rect"]
+		if _back_wall_index(plan, room, mate) != wall:
+			continue
+		# mirrored means the two offsets cancel: same distance, opposite sides
+		var t2: float = (mate.get_center() - Vector2(anchor["pos"])).dot(along)
+		return FLANK_W * clampf(1.0 - absf(t + t2) / FLANK_TOL, 0.0, 1.0)
+	var dist: float = float(anchor.get("dist", FLANK_IDEAL))
+	return FLANK_W * 0.5 * clampf(1.0 - absf(absf(t) - dist) / FLANK_TOL, 0.0, 1.0)
+
+
+## The widest prop of a category, so a rule that has to hold for a pair drawn
+## from it does not depend on which of them was drawn first.
+static func _widest_of(cat: String) -> float:
+	var w := 0.05
+	for k in PropCatalog.of_category(cat):
+		w = maxf(w, PropCatalog.size(k).x)
+	return w
+
+
+## What a pair of sconces is arranged about, and how far out the two of them
+## stand: the fire if the room has one, otherwise a door, and failing both the
+## middle of a wall -- a room whose only door is jammed into a corner has no
+## symmetry to hang a pair about, and two lamps evenly set out on one wall
+## still read as a pair where two lamps dropped wherever they fit do not.
+##
+## An anchor is only taken if BOTH stations are real wall: inside the room and
+## clear of every other opening. Skipping that test is how one lamp ended up
+## an arm's length from the door and its mate a metre and a half the other
+## way, on the far side of a second doorway.
+static func _flank_anchor(plan: HousePlan, room: int, width: float,
+		cat: String) -> Dictionary:
+	var candidates: Array[Dictionary] = []
+	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	for i in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[i]
+		if PropCatalog.category(p["key"]) != "hearth":
+			continue
+		var wi: int = _back_wall_index(plan, room, Rect2(p["rect"]))
+		if wi < 0:
+			continue
+		var n: Vector2 = _wall_normal(wi)
+		var hc: Vector2 = Rect2(p["rect"]).get_center()
+		var q: Vector2 = f.position if wi == 0 or wi == 2 else f.end
+		# the point on the wall in line with the fire, so the pair is measured
+		# along the wall it hangs on rather than out into the room
+		var on_wall: Vector2 = hc + n * ((q - hc).dot(n))
+		var reach: float = (absf(n.y) * Rect2(p["rect"]).size.x
+			+ absf(n.x) * Rect2(p["rect"]).size.y) / 2.0
+		candidates.append({"pos": on_wall, "normal": n, "reach": reach})
+	for d in plan.doors_of(room):
+		var door: Dictionary = plan.doors[d]
+		var dn: Vector2 = door["normal"]
+		if (f.get_center() - Vector2(door["pos"])).dot(dn) < 0.0:
+			dn = -dn
+		candidates.append({"pos": door["pos"], "normal": dn,
+			"reach": float(door["width"]) / 2.0})
+	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
+	for wi2 in range(walls.size()):
+		candidates.append({
+			"pos": (Vector2(walls[wi2]["from"]) + Vector2(walls[wi2]["to"])) / 2.0,
+			"normal": Vector2(walls[wi2]["normal"]), "reach": 0.0,
+		})
+	for cand in candidates:
+		var dist: float = _flank_station(plan, room, cand, width, cat)
+		if dist > 0.0:
+			cand["dist"] = dist
+			return cand
+	return {}
+
+
+## How far either side of an anchor a pair can actually hang, or 0 when it
+## cannot. Nearest first: a pair belongs close about what it flanks.
+static func _flank_station(plan: HousePlan, room: int, anchor: Dictionary,
+		width: float, cat: String) -> float:
+	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var n: Vector2 = anchor["normal"]
+	var pos: Vector2 = anchor["pos"]
+	var along := Vector2(n.y, -n.x)
+	var axis := along.abs()
+	var lo: float = f.position.dot(axis) + width / 2.0 + 0.2
+	var hi: float = f.end.dot(axis) - width / 2.0 - 0.2
+	var t: float = pos.dot(axis)
+	var first: float = maxf(float(anchor["reach"]) + width / 2.0 + 0.2, FLANK_IDEAL)
+	var d: float = first
+	while d <= maxf(hi - lo, 0.0):
+		var ok := true
+		for side in [-1.0, 1.0]:
+			var p: Vector2 = pos + along * (d * side)
+			if p.dot(axis) < lo or p.dot(axis) > hi 					or _on_opening(plan, room, p, n, width) 					or _crowds_mounted(plan, room, p, width, cat):
+				# the pair's own half already hanging there does not count
+				ok = false
+				break
+		if ok:
+			return d
+		d += MOUNT_STEP
+	return 0.0
+
+
 ## Feng shui, and common sense: you want to see the door from the bed, but you
 ## do not want the bed in the doorway. The commanding position is out of the
 ## line of the door, with the headboard against solid wall -- which is also
-## simply where a bed is out of the way.
+## simply where a bed is out of the way. Folded into _affinity() by LAY-002.
 static func _bed_bonus(plan: HousePlan, room: int, cand: Dictionary) -> float:
 	var bonus := 0.0
 	for d in plan.doors_of(room):
@@ -810,10 +1444,15 @@ static func _place_free(plan: HousePlan, room: int, key: String,
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var extra: Array[Rect2] = _window_blocks(plan, room, key)
 	var result := {"best": {}, "score": -INF}
+	# Where the fire is does not change while the table hunts for a spot, and
+	# the hunt looks at thousands of spots. Found once here and carried on the
+	# candidate; leaving it inside the grid made every table in the sweep walk
+	# the room's furniture list a few thousand times.
+	var focus: Vector2 = _hearth_point(plan, room)
 	for yaw in [0.0, PI / 2.0]:
 		for sc in _scales(key):
 			_free_at_scale(plan, room, key, yaw, sc, floor_rect, blocked, zones,
-				extra, r, result)
+				extra, r, result, focus)
 	_commit(plan, room, result["best"], blocked, zones)
 
 
@@ -822,7 +1461,8 @@ static func _place_free(plan: HousePlan, room: int, key: String,
 ## and nesting them all in one function made the body unreadable.
 static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 		sc: float, floor_rect: Rect2, blocked: Array[Rect2], zones: Array[Rect2],
-		extra: Array[Rect2], r: RandomNumberGenerator, result: Dictionary) -> void:
+		extra: Array[Rect2], r: RandomNumberGenerator, result: Dictionary,
+		focus := Vector2(INF, INF)) -> void:
 	var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw) * sc
 	var pad: float = HouseGeometry.PATH_MIN * 0.5
 	var lo := Vector2(floor_rect.position.x + foot.x / 2.0 + pad,
@@ -840,9 +1480,11 @@ static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 			var cand: Dictionary = _candidate(key, centre, yaw, 1.0, sc)
 			if not _fits(cand, floor_rect, blocked, zones, extra):
 				continue
+			cand["focus_point"] = focus
 			# the middle of the room, at the biggest size that fits there
 			var d: float = centre.distance_to(floor_rect.get_center())
-			var score: float = -d + r.randf() * 0.35 + sc * 4.0
+			var score: float = -d + r.randf() * JITTER + sc * 4.0 \
+				+ _affinity(plan, room, cand)
 			if score > float(result["score"]):
 				result["score"] = score
 				result["best"] = cand
@@ -860,7 +1502,16 @@ static func _place_corner(plan: HousePlan, room: int, key: String,
 		Vector2(floor_rect.position.x + foot.x / 2.0 + g, floor_rect.end.y - foot.y / 2.0 - g),
 		Vector2(floor_rect.end.x - foot.x / 2.0 - g, floor_rect.end.y - foot.y / 2.0 - g),
 	]
-	for ci in _shuffled([0, 1, 2, 3], r):
+	var extra: Array[Rect2] = _window_blocks(plan, room, key)
+	var best: Dictionary = {}
+	var best_score := -INF
+	# All four corners are scored rather than shuffled: a barrel belongs in
+	# the corner nobody walks through, and which one that is depends on
+	# where the doors are, not on the roll of a die.
+	for ci in range(4):
+		var jitter: float = r.randf() * JITTER
+		var found: Dictionary = {}
+		var slid := 0.0
 		# slide out of the corner along both walls until it fits
 		for slide in range(6):
 			for dir in [Vector2(1, 0), Vector2(0, 1)]:
@@ -868,10 +1519,20 @@ static func _place_corner(plan: HousePlan, room: int, key: String,
 				var sign_z: float = 1.0 if ci == 0 or ci == 1 else -1.0
 				var off := Vector2(dir.x * sign_x, dir.y * sign_z) * (float(slide) * 0.25)
 				var cand: Dictionary = _candidate(key, corners[ci] + off, 0.0)
-				if _fits(cand, floor_rect, blocked, zones,
-						_window_blocks(plan, room, key)):
-					_commit(plan, room, cand, blocked, zones)
-					return
+				if _fits(cand, floor_rect, blocked, zones, extra):
+					found = cand
+					slid = float(slide)
+					break
+			if not found.is_empty():
+				break
+		if found.is_empty():
+			continue
+		# a piece slid a long way out of the corner is not in the corner
+		var score: float = _affinity(plan, room, found) + jitter - slid * 0.05
+		if score > best_score:
+			best_score = score
+			best = found
+	_commit(plan, room, best, blocked, zones)
 
 
 ## Seats at a table, facing it, with pull-back space behind them.
@@ -939,30 +1600,77 @@ static func _place_mounted(plan: HousePlan, room: int, key: String,
 	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
 	var y: float = HouseGeometry.SCONCE_HEIGHT if PropCatalog.category(key) == "sconce" \
 		else HouseGeometry.SHELF_HEIGHT
-	for wi in _shuffled([0, 1, 2, 3], r):
+	var width: float = PropCatalog.size(key).x
+	# Worked out once, not once per candidate: where a pair of these hangs is
+	# a fact about the room, and _flank_anchor() scans the walls to find it.
+	# Leaving it inside the scoring loop made the house suites four times as
+	# slow for an answer that never changed.
+	var anchor: Dictionary = _flank_anchor(plan, room,
+		_widest_of(PropCatalog.category(key)), PropCatalog.category(key)) 		if PropCatalog.affinity(key).has("flank") else {}
+	var best_pos := Vector2.ZERO
+	var best_yaw := 0.0
+	var best_score := -INF
+	# Every clear stretch of every wall is scored. A shelf wants the wall
+	# above the bench it serves and a sconce wants to mirror its mate about
+	# the door; neither is findable by trying six positions at random.
+	for wi in range(walls.size()):
 		var wall: Dictionary = walls[wi]
 		var n: Vector2 = wall["normal"]
 		var a: Vector2 = wall["from"]
 		var b: Vector2 = wall["to"]
 		var run: float = (b - a).length()
 		var along: Vector2 = (b - a) / maxf(run, 0.01)
-		var width: float = PropCatalog.size(key).x
 		if run < width + 0.4:
 			continue
-		for tries in range(6):
-			var t: float = lerpf(width / 2.0 + 0.2, run - width / 2.0 - 0.2, r.randf())
+		var lo: float = width / 2.0 + 0.2
+		var hi: float = run - width / 2.0 - 0.2
+		var steps: int = maxi(int((hi - lo) / MOUNT_STEP), 1)
+		for s in range(steps + 1):
+			var t: float = lerpf(lo, hi, float(s) / float(steps))
 			var pos: Vector2 = a + along * t
 			if _on_opening(plan, room, pos, n, width):
 				continue
-			var yaw: float = _yaw_facing(n)
-			plan.furniture.append({
-				"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
-				"pos": Vector3(pos.x, _storey_base(plan, room) + y, pos.y), "yaw": yaw,
+			if _crowds_mounted(plan, room, pos, width):
+				continue
+			var cand := {
+				"key": key, "pos": Vector3(pos.x, 0.0, pos.y),
 				"rect": Rect2(pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
-				"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
-				"mounted": true, "scale": 1.0,
-			})
-			return
+				"host": -1, "mounted": true, "flank_anchor": anchor,
+			}
+			var score: float = _affinity(plan, room, cand) + r.randf() * JITTER
+			if score > best_score:
+				best_score = score
+				best_pos = pos
+				best_yaw = _yaw_facing(n)
+	if best_score == -INF:
+		return
+	plan.furniture.append({
+		"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
+		"pos": Vector3(best_pos.x, _storey_base(plan, room) + y, best_pos.y),
+		"yaw": best_yaw,
+		"rect": Rect2(best_pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
+		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
+		"mounted": true, "scale": 1.0,
+	})
+
+
+## Is something already hanging here? Nothing else on a wall keeps mounted
+## pieces apart -- they have no footprint on the floor for _fits() to test --
+## and now that every one of them is scored rather than dropped at random, two
+## shelves that both want the wall over the bench would hang in one another.
+static func _crowds_mounted(plan: HousePlan, room: int, pos: Vector2,
+		width: float, ignore_cat := "") -> bool:
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if not p.get("mounted", false):
+			continue
+		if not ignore_cat.is_empty() and PropCatalog.category(p["key"]) == ignore_cat:
+			continue
+		var other: float = maxf(PropCatalog.size(p["key"]).x, 0.05)
+		var c := Vector2(p["pos"].x, p["pos"].z)
+		if c.distance_to(pos) < (width + other) / 2.0 + 0.1:
+			return true
+	return false
 
 
 ## Is this stretch of wall taken up by a door or a window?
@@ -983,7 +1691,29 @@ static func _place_ceiling(plan: HousePlan, room: int, key: String) -> void:
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	if minf(floor_rect.size.x, floor_rect.size.y) < 2.6:
 		return                                   # no room to hang anything
-	var c: Vector2 = floor_rect.get_center()
+	# The middle of the room, unless there is a table to hang over -- which
+	# is what a chandelier is for, and is decided by the same scorer as
+	# everything else rather than by a special case here.
+	var spots: Array[Vector2] = [floor_rect.get_center()]
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if p.get("mounted", false) or int(p["host"]) >= 0:
+			continue
+		var pc: Vector2 = Rect2(p["rect"]).get_center()
+		if floor_rect.grow(0.05).has_point(pc):
+			spots.append(pc)
+	var c: Vector2 = spots[0]
+	var best_score := -INF
+	for spot in spots:
+		var cand := {
+			"key": key, "pos": Vector3(spot.x, 0.0, spot.y),
+			"rect": Rect2(spot - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
+			"host": -1, "mounted": true,
+		}
+		var score: float = _affinity(plan, room, cand)
+		if score > best_score:
+			best_score = score
+			c = spot
 	plan.furniture.append({
 		"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
 		"pos": Vector3(c.x, _storey_base(plan, room) + plan.spec.height, c.y),
@@ -1145,18 +1875,6 @@ static func _scales(key: String) -> Array:
 	return out
 
 
-## A deterministic shuffle: Array.shuffle() draws on the global RNG, which
-## would make the same seed furnish differently from one run to the next.
-static func _shuffled(items: Array, r: RandomNumberGenerator) -> Array:
-	var out: Array = items.duplicate()
-	for i in range(out.size() - 1, 0, -1):
-		var j: int = r.randi_range(0, i)
-		var tmp = out[i]
-		out[i] = out[j]
-		out[j] = tmp
-	return out
-
-
 ## No dead slivers.
 ##
 ## The gap between a piece and each wall must be either nothing -- the piece is
@@ -1174,6 +1892,17 @@ static func _no_slivers(rect: Rect2, floor_rect: Rect2) -> bool:
 		gaps.append(rect.position.x - floor_rect.position.x)
 		gaps.append(floor_rect.end.x - rect.end.x)
 	if bars_z:
+		gaps.append(rect.position.y - floor_rect.position.y)
+		gaps.append(floor_rect.end.y - rect.end.y)
+	# And the ways round its ENDS. A table across most of the width of a room
+	# is got past at its sides, not behind it, so those are the gaps that have
+	# to be walkable -- a parlour with a bench drawn up to such a table is cut
+	# in two by 49 cm of floor either side, and every repair pass in the world
+	# will not open it again.
+	if bars_z:
+		gaps.append(rect.position.x - floor_rect.position.x)
+		gaps.append(floor_rect.end.x - rect.end.x)
+	if bars_x:
 		gaps.append(rect.position.y - floor_rect.position.y)
 		gaps.append(floor_rect.end.y - rect.end.y)
 	for g in gaps:

@@ -34,6 +34,7 @@ static func plan(spec: HouseSpec) -> HousePlan:
 	_demote_unlit(p)
 	if spec.storeys > 1:
 		_clone_upper_storeys(p, spec)
+	_choose_hearth(p, spec)
 	return p
 
 
@@ -44,12 +45,13 @@ static func plan(spec: HouseSpec) -> HousePlan:
 ## by the back door has nowhere left to put a window, and calling it a kitchen
 ## anyway would leave the daylight check failing forever. It becomes the store,
 ## and the store's kind goes to a room that does have daylight.
-static func _demote_unlit(p: HousePlan) -> void:
-	for i in range(p.rooms.size()):
+static func _demote_unlit(p: HousePlan, only: Array[int] = []) -> void:
+	var rooms: Array[int] = only if not only.is_empty() else _all_rooms(p)
+	for i in rooms:
 		if not HouseGeometry.is_habitable(p.kind_of(i)) or not p.windows_of(i).is_empty():
 			continue
 		var swap := -1
-		for j in range(p.rooms.size()):
+		for j in rooms:
 			if p.kind_of(j) == &"store" and not p.windows_of(j).is_empty() 					and HouseGeometry.room_suits(p, j, p.kind_of(i)):
 				swap = j
 				break
@@ -171,9 +173,19 @@ static func _name_rooms(p: HousePlan, spec: HouseSpec) -> void:
 	# the rest of the program, most public first, over the remaining rooms
 	# ordered from the door backwards
 	var queue: Array[StringName] = []
+	var deferred: Array[StringName] = []
 	for kind in spec.program:
-		if kind != &"hall":
+		if kind == &"hall":
+			continue
+		# A house with an upstairs sleeps upstairs. The ground floor keeps the
+		# public and service programme -- hall, kitchen, parlour, workshop,
+		# store -- and a bedroom only lands down here when the rooms outlast
+		# the kinds that want them.
+		if kind == &"bedroom" and _has_upstairs(spec) and _can_sleep_upstairs(p):
+			deferred.append(kind)
+		else:
 			queue.append(kind)
+	queue.append_array(deferred)
 	var rest: Array[int] = []
 	for i in order:
 		if i != hall:
@@ -249,6 +261,13 @@ static func _push_bedrooms_back(p: HousePlan, order: Array[int]) -> void:
 						break
 			if swapped:
 				break
+
+
+static func _all_rooms(p: HousePlan) -> Array[int]:
+	var out: Array[int] = []
+	for i in range(p.rooms.size()):
+		out.append(i)
+	return out
 
 
 static func _largest(p: HousePlan) -> int:
@@ -486,9 +505,10 @@ static func _place_back_door(p: HousePlan, spec: HouseSpec) -> void:
 
 ## Windows on every exterior wall a room owns, enough of them to light it.
 ## Stores get one at most; a pantry does not need a view.
-static func _place_windows(p: HousePlan, spec: HouseSpec) -> void:
+static func _place_windows(p: HousePlan, spec: HouseSpec, only: Array[int] = []) -> void:
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
-	for i in range(p.rooms.size()):
+	var rooms: Array[int] = only if not only.is_empty() else _all_rooms(p)
+	for i in rooms:
 		var kind: StringName = p.kind_of(i)
 		var rect: Rect2 = p.rooms[i]["rect"]
 		var area: float = HouseGeometry.room_area(p, i)
@@ -524,9 +544,10 @@ static func _place_windows(p: HousePlan, spec: HouseSpec) -> void:
 ## the doors and of its own neighbours, and on a short wall with a door in it
 ## there is nowhere left. A room with no daylight is worse than a window close
 ## to a corner, so this pass tries again with the margins pulled in.
-static func _glaze_the_rest(p: HousePlan, spec: HouseSpec) -> void:
+static func _glaze_the_rest(p: HousePlan, spec: HouseSpec, only: Array[int] = []) -> void:
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
-	for i in range(p.room_count()):
+	var rooms: Array[int] = only if not only.is_empty() else _all_rooms(p)
+	for i in rooms:
 		if not HouseGeometry.is_habitable(p.kind_of(i)):
 			continue
 		if not p.windows_of(i).is_empty():
@@ -671,10 +692,15 @@ static func _same_wall(pa: Vector2, na: Vector2, pb: Vector2, nb: Vector2,
 # ---------------------------------------------------------- stacked storeys
 
 ## The first storey is deliberately planned by the original path above. Higher
-## storeys reuse that finished partition, naming and glazing result instead of
-## consuming more RNG or inventing a second floor-plan algorithm. Exterior doors
-## stay on the ground floor; each upper level gets the same interior doors and
-## windows, then a deterministic hall-to-hall stair link.
+## storeys reuse that finished partition -- the walls have to line up, a
+## partition cannot start in mid-air -- but NOT its programme. A cloned kitchen
+## upstairs is a second fire with no flue and a hall with no front door; what
+## belongs up a stair is where the household sleeps.
+##
+## So each upper storey keeps the cloned rectangles and the cloned interior
+## doors, and is then NAMED afresh from the stair landing outwards, private
+## programme first, and GLAZED afresh by those new kinds. Exterior doors stay
+## on the ground floor; the stair is the only way between levels.
 static func _clone_upper_storeys(p: HousePlan, spec: HouseSpec) -> void:
 	var base_rooms: Array[int] = p.rooms_on_storey(0)
 	var base_doors: Array[Dictionary] = []
@@ -682,6 +708,7 @@ static func _clone_upper_storeys(p: HousePlan, spec: HouseSpec) -> void:
 		if not door["exterior"] and p.storey_of_room(int(door["a"])) == 0:
 			base_doors.append(door)
 	var base_windows: Array[Dictionary] = p.windows.duplicate()
+	var dwelling: bool = _has_upstairs(spec)
 	var hall_by_storey: Dictionary = {}
 	for room in base_rooms:
 		if p.kind_of(room) == &"hall":
@@ -692,12 +719,14 @@ static func _clone_upper_storeys(p: HousePlan, spec: HouseSpec) -> void:
 
 	for storey in range(1, spec.storeys):
 		var remap: Dictionary = {}
+		var mine: Array[int] = []
 		for source in base_rooms:
 			var room := p.rooms[source].duplicate()
 			room["storey"] = storey
 			var target: int = p.rooms.size()
 			p.rooms.append(room)
 			remap[source] = target
+			mine.append(target)
 			if p.kind_of(source) == &"hall":
 				hall_by_storey[storey] = target
 
@@ -707,11 +736,6 @@ static func _clone_upper_storeys(p: HousePlan, spec: HouseSpec) -> void:
 			door["b"] = remap[int(source_door["b"])]
 			door["storey"] = storey
 			p.doors.append(door)
-		for source_window in base_windows:
-			var window := source_window.duplicate()
-			window["room"] = remap[int(source_window["room"])]
-			window["storey"] = storey
-			p.windows.append(window)
 
 		# Link adjacent levels so every upper floor has a real route from the
 		# front door, including the third storey, without treating a stair as a
@@ -722,18 +746,235 @@ static func _clone_upper_storeys(p: HousePlan, spec: HouseSpec) -> void:
 		if upper_hall >= 0:
 			_add_stair(p, lower_hall, upper_hall, storey - 1, storey)
 
+		if dwelling and upper_hall >= 0:
+			_name_upstairs(p, mine, upper_hall)
+			_place_windows(p, spec, mine)
+			_glaze_the_rest(p, spec, mine)
+			_demote_unlit(p, mine)
+		else:
+			# A shop or any other building that brought its own room programme
+			# keeps the old copy-the-ground-floor behaviour.
+			for source_window in base_windows:
+				var window := source_window.duplicate()
+				window["room"] = remap[int(source_window["room"])]
+				window["storey"] = storey
+				p.windows.append(window)
+
+	if dwelling:
+		# The upper floors are full of bedrooms now, so the privacy rules have
+		# to be re-run over the whole house: a store you can only reach across
+		# somebody's bed is the same defect upstairs as down.
+		_open_up_privacy(p)
+		_ensure_bedrooms_upstairs(p, spec)
+		_demote_through_bedrooms(p)
+		_ensure_a_bed(p)
+
+
+## Would the upper storey be able to hold a bedroom at all?
+##
+## The upper floors are clones of the ground partition, so this is the same
+## question asked of the rooms in front of us. A narrow cottage whose rooms are
+## all too thin for a bed does not get its bedrooms deferred upstairs -- it
+## would end up with nowhere at all to sleep, and a house with no bedroom puts
+## the bed in the hall.
+static func _can_sleep_upstairs(p: HousePlan) -> bool:
+	for i in range(p.rooms.size()):
+		if HouseGeometry.room_suits(p, i, &"bedroom"):
+			return true
+	return false
+
+
+## Is this a plain dwelling, the kind that sleeps upstairs?
+##
+## A ShopSpec (and anything else that hands the planner its own programme
+## through `room_program`) means the storeys were asked for by a building that
+## already knows what goes on each of them, so leave its floors alone. Duck
+## typing rather than a class test, so the house package keeps no dependency on
+## the shop package.
+static func _has_upstairs(spec: HouseSpec) -> bool:
+	return int(spec.storeys) > 1 and not spec.has_method("room_program")
+
+
+## Name one upper storey, private-first, with the stair landing as its pole.
+##
+## Downstairs the front door is the public end of the house and the plan is
+## ordered away from it. Upstairs the stair is the front door: the room you
+## step off it into is the one everybody crosses, so it takes the most public
+## kind the floor has, and the rooms nobody crosses -- the leaves of the door
+## tree, which was cloned from the ground floor along with the walls -- are
+## where the household sleeps.
+##
+## Naming by the tree rather than by distance alone is what keeps the privacy
+## rule true by construction: a bedroom is only ever a leaf, so no room is ever
+## put behind a bed.
+static func _name_upstairs(p: HousePlan, mine: Array[int], landing: int) -> void:
+	var order: Array[int] = _upstairs_order(p, mine, landing)
+	var leaf: Dictionary = _leaves(p, mine, landing)
+	for i in order:
+		# the landing, and any room crossed to reach another, is public ground;
+		# only a dead end is somebody's own
+		var private: bool = i != landing and bool(leaf.get(i, false))
+		var kind: StringName = &"bedroom" if private else &"parlour"
+		if not HouseGeometry.room_suits(p, i, kind):
+			kind = &"store"
+		p.rooms[i]["kind"] = kind
+
+
+## The rooms of one upper storey, most public first: by how far they sit from
+## the stairwell, which is the same measure `_name_rooms` takes from the front
+## door downstairs.
+static func _upstairs_order(p: HousePlan, mine: Array[int], landing: int) -> Array[int]:
+	var pole: Vector2 = HouseGeometry.room_floor_rect(p, landing).get_center()
+	for stair in p.stairs:
+		if int(stair.get("b", -1)) == landing:
+			pole = Rect2(stair["upper_rect"]).get_center()
+			break
+	var dist := {}
+	for i in mine:
+		dist[i] = HouseGeometry.room_floor_rect(p, i).get_center().distance_to(pole)
+	var order: Array[int] = mine.duplicate()
+	order.sort_custom(func(a: int, b: int) -> bool: return dist[a] < dist[b])
+	return order
+
+
+## Which rooms of one storey are dead ends -- reached from the landing and
+## leading nowhere further. Those, and only those, may be bedrooms.
+static func _leaves(p: HousePlan, mine: Array[int], landing: int) -> Dictionary:
+	var adj := {}
+	for i in mine:
+		adj[i] = []
+	for d in p.doors:
+		var a: int = int(d["a"])
+		var b: int = int(d["b"])
+		if b < 0 or not adj.has(a) or not adj.has(b):
+			continue
+		adj[a].append(b)
+		adj[b].append(a)
+	var seen := {landing: true}
+	var queue: Array[int] = [landing]
+	var children := {landing: 0}
+	while not queue.is_empty():
+		var cur: int = queue.pop_front()
+		for nb in adj[cur]:
+			if seen.has(nb):
+				continue
+			seen[nb] = true
+			children[cur] = int(children.get(cur, 0)) + 1
+			children[nb] = int(children.get(nb, 0))
+			queue.append(nb)
+	var out := {}
+	for i in mine:
+		# a room the tree never reached is nobody's route either
+		out[i] = int(children.get(i, 0)) == 0
+	return out
+
+
+## An upper storey with nobody sleeping on it is not what the stair was for.
+##
+## `_name_upstairs` will only make a dead end a bedroom, and on a narrow plan
+## every dead end is too thin for a bed while the landing is not. Rather than
+## leave the floor as a parlour and a cupboard, try the rooms again from the
+## far end: take the first one that can hold a bed AND still leaves every other
+## room reachable without crossing it. On a two-room floor whose only bedroom
+## candidate is the landing itself that finds nothing, which is the right
+## answer -- a bedroom you have to walk through to reach the back room is the
+## defect this whole pass exists to avoid.
+static func _ensure_bedrooms_upstairs(p: HousePlan, spec: HouseSpec) -> void:
+	var start: int = p.entrance_room()
+	for storey in range(1, int(spec.storeys)):
+		var mine: Array[int] = p.rooms_on_storey(storey)
+		var slept := false
+		for i in mine:
+			if p.kind_of(i) in HouseGeometry.SLEEPING:
+				slept = true
+				break
+		if slept:
+			continue
+		var landing: int = _landing_of(p, storey)
+		var order: Array[int] = _upstairs_order(p, mine, landing)
+		order.reverse()               # furthest from the stair first
+		for i in order:
+			if not HouseGeometry.room_suits(p, i, &"bedroom"):
+				continue
+			var was: StringName = p.kind_of(i)
+			p.rooms[i]["kind"] = &"bedroom"
+			_open_up_privacy(p)
+			if _privacy_holds(p, start):
+				break
+			p.rooms[i]["kind"] = was
+
+
+## The room an upper storey is entered into: the top of its stair.
+static func _landing_of(p: HousePlan, storey: int) -> int:
+	for stair in p.stairs:
+		if int(stair.get("to_storey", -1)) == storey:
+			return int(stair.get("b", -1))
+	var mine: Array[int] = p.rooms_on_storey(storey)
+	return mine[0] if not mine.is_empty() else -1
+
+
+## A house has to have somewhere to sleep.
+##
+## The programme sends the bedrooms upstairs, and a floor of rooms too thin for
+## a bed can send none of them back. Rather than leave a dwelling with no bed
+## at all -- which the furnisher then has to squeeze into the hall, and often
+## cannot -- promote the best candidate: the highest, most private room that
+## can hold a bed and that nobody has to walk through to get anywhere.
+static func _ensure_a_bed(p: HousePlan) -> void:
+	for i in range(p.rooms.size()):
+		if p.kind_of(i) in HouseGeometry.SLEEPING:
+			return
+	var start: int = p.entrance_room()
+	var order: Array[int] = _all_rooms(p)
+	order.sort_custom(func(a: int, b: int) -> bool:
+		if p.storey_of_room(a) != p.storey_of_room(b):
+			return p.storey_of_room(a) > p.storey_of_room(b)
+		return HouseGeometry.room_area(p, a) > HouseGeometry.room_area(p, b))
+	for i in order:
+		if i == start or p.kind_of(i) == &"hall":
+			continue
+		if not HouseGeometry.room_suits(p, i, &"bedroom"):
+			continue
+		var was: StringName = p.kind_of(i)
+		p.rooms[i]["kind"] = &"bedroom"
+		if _privacy_holds(p, start):
+			return
+		p.rooms[i]["kind"] = was
+
+
+## Can every room still be reached without crossing somewhere somebody sleeps?
+static func _privacy_holds(p: HousePlan, start: int) -> bool:
+	if start < 0:
+		return true
+	var polite: Dictionary = p.reachable_rooms(start, HouseGeometry.SLEEPING)
+	for i in range(p.rooms.size()):
+		if p.kind_of(i) == &"bedroom":
+			continue
+		if not polite.has(i):
+			return false
+	return true
+
 
 ## Add one stair in the hall equivalent on each of two adjacent levels. The
 ## landing is kept as an explicit rectangle so layered navigation and a future
 ## builder can agree on the opening without deriving it from the mesh.
+##
+## The stairwell runs along the room's LONG axis. Laid the other way it spans
+## the short one and walls the room in half: a 4.9 x 3.0 m hall with a 2.4 m
+## well across it has two 2 m stubs either side of the well and no way past the
+## table, which is how a smith's workshop ended up unreachable from his own
+## front door. (Moving it off the middle and against a wall is LAY-005.)
 static func _add_stair(p: HousePlan, lower_room: int, upper_room: int,
 		lower_storey: int, upper_storey: int) -> void:
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(p, lower_room)
-	var width: float = minf(1.0, maxf(HouseGeometry.PATH_MIN, floor_rect.size.x - 0.3))
-	var run: float = minf(2.4, maxf(HouseGeometry.PATH_MIN, floor_rect.size.y - 0.3))
+	var along_x: bool = floor_rect.size.x > floor_rect.size.y
+	var long_side: float = maxf(floor_rect.size.x, floor_rect.size.y)
+	var short_side: float = minf(floor_rect.size.x, floor_rect.size.y)
+	var run: float = minf(2.4, maxf(HouseGeometry.PATH_MIN, long_side - 0.3))
+	var width: float = minf(1.0, maxf(HouseGeometry.PATH_MIN, short_side - 0.3))
 	var centre := floor_rect.get_center()
-	var footprint := Rect2(centre - Vector2(width, run) / 2.0,
-		Vector2(width, run))
+	var size := Vector2(run, width) if along_x else Vector2(width, run)
+	var footprint := Rect2(centre - size / 2.0, size)
 	p.stairs.append({
 		"a": lower_room, "b": upper_room,
 		"storey": lower_storey, "to_storey": upper_storey,
@@ -741,3 +982,118 @@ static func _add_stair(p: HousePlan, lower_room: int, upper_room: int,
 		"rect": footprint, "lower_rect": footprint, "upper_rect": footprint,
 		"width": width, "run": run,
 	})
+
+
+## Decide once, here, which wall the fire and the flue share.
+##
+## The builder used to pick the chimney's wall and the furnisher used to pick
+## the hearth's, so as often as not the fire stood against a partition while
+## the stack rose from the other side of the house. The plan owns the position
+## now -- HouseGeometry owns the shell, HousePlanner owns the hearth -- and the
+## builder, the furnisher and the check all read this one record.
+##
+## The room is the kitchen, else the hall, else the workshop, always on the
+## ground floor (there is one chimney per house, however many storeys). The
+## wall is the exterior wall of that room with the longest clear run left over
+## once its doors and windows have taken their share, so the hearth the
+## furnisher is forced onto it actually fits.
+static func _choose_hearth(p: HousePlan, spec: HouseSpec) -> void:
+	p.hearth = {}
+	var room := -1
+	for kind in [&"kitchen", &"hall", &"workshop"]:
+		for i in p.rooms_of(kind):
+			if p.storey_of_room(i) != 0:
+				continue
+			if _hearth_walls(p, spec, i).is_empty():
+				continue
+			room = i
+			break
+		if room >= 0:
+			break
+	if room < 0:
+		return
+	var walls: Array[int] = _hearth_walls(p, spec, room)
+	var best: int = walls[0]
+	var best_run := -INF
+	for wi in walls:
+		var run: float = _clear_wall_run(p, room, wi)
+		if run > best_run:
+			best_run = run
+			best = wi
+	p.hearth = {"room": room, "wall": best}
+
+
+## Which of a room's four walls are on the outside of the house. A chimney
+## rises up the outside face; one on a partition would come out through the
+## middle of the roof over another room.
+static func _hearth_walls(p: HousePlan, spec: HouseSpec, i: int) -> Array[int]:
+	var inner: Rect2 = HouseGeometry.interior_rect(spec)
+	var rect: Rect2 = p.rooms[i]["rect"]
+	var out: Array[int] = []
+	# same order as HouseGeometry.room_walls: front, back, left, right
+	if absf(rect.position.y - inner.position.y) < 0.01:
+		out.append(0)
+	if absf(rect.end.y - inner.end.y) < 0.01:
+		out.append(1)
+	if absf(rect.position.x - inner.position.x) < 0.01:
+		out.append(2)
+	if absf(rect.end.x - inner.end.x) < 0.01:
+		out.append(3)
+	return out
+
+
+## The longest UNBROKEN stretch of a wall, once its doors and windows have
+## taken theirs. Total clear length is the wrong measure: a wall with a window
+## in the middle has plenty of room and nowhere to put a hearth.
+static func _clear_wall_run(p: HousePlan, room: int, wi: int) -> float:
+	var wall: Dictionary = HouseGeometry.room_walls(p, room)[wi]
+	var from: Vector2 = wall["from"]
+	var to: Vector2 = wall["to"]
+	var horizontal: bool = absf(wall["normal"].y) > 0.5
+	var lo: float = from.x if horizontal else from.y
+	var hi: float = to.x if horizontal else to.y
+	var line: float = from.y if horizontal else from.x
+	var cuts: Array[Vector2] = []          # (start, end) along the wall
+	for d in p.doors_of(room):
+		var door: Dictionary = p.doors[d]
+		if HousePlan.record_storey(door) != p.storey_of_room(room):
+			continue
+		if (absf(door["normal"].y) > 0.5) != horizontal:
+			continue
+		var at: float = door["pos"].x if horizontal else door["pos"].y
+		var across: float = door["pos"].y if horizontal else door["pos"].x
+		if absf(across - line) > 0.5:
+			continue
+		var half: float = float(door["width"]) / 2.0 + HouseGeometry.DOOR_CLEAR
+		cuts.append(Vector2(at - half, at + half))
+	for w in p.windows_of(room):
+		var win: Dictionary = p.windows[w]
+		if (absf(win["normal"].y) > 0.5) != horizontal:
+			continue
+		var at_w: float = win["pos"].x if horizontal else win["pos"].y
+		var across_w: float = win["pos"].y if horizontal else win["pos"].x
+		if absf(across_w - line) > 0.5:
+			continue
+		var half_w: float = float(win["width"]) / 2.0 + 0.15
+		cuts.append(Vector2(at_w - half_w, at_w + half_w))
+	# A door in a wall at right angles to this one eats the end of it: the
+	# floor it swings over lies along this wall's last stretch.
+	for d2 in p.doors_of(room):
+		var side_door: Dictionary = p.doors[d2]
+		if HousePlan.record_storey(side_door) != p.storey_of_room(room):
+			continue
+		if (absf(side_door["normal"].y) > 0.5) == horizontal:
+			continue
+		var along: float = side_door["pos"].x if horizontal else side_door["pos"].y
+		var off: float = side_door["pos"].y if horizontal else side_door["pos"].x
+		if absf(off - line) > HouseGeometry.DOOR_CLEAR + 0.6:
+			continue
+		cuts.append(Vector2(along - HouseGeometry.DOOR_CLEAR,
+			along + HouseGeometry.DOOR_CLEAR))
+	cuts.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+	var best := 0.0
+	var cursor: float = lo
+	for cut in cuts:
+		best = maxf(best, cut.x - cursor)
+		cursor = maxf(cursor, cut.y)
+	return maxf(best, hi - cursor)

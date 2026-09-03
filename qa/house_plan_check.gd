@@ -16,6 +16,9 @@ extends RefCounted
 ##   DAYLIGHT   every room people live in has a window, and enough glass in it
 ##   OUTSIDE    windows are on exterior walls; you cannot look from the kitchen
 ##              into the bedroom through a pane of glass
+##   UPSTAIRS   a dwelling's service and public rooms are on the ground floor:
+##              no kitchen, hall or workshop up a stair, and one hearth, down
+##              here, where the chimney is
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {...}}
 
@@ -43,8 +46,16 @@ func check(plan: HousePlan) -> Dictionary:
 	_check_door_openings(plan)
 	_check_windows(plan)
 	_check_stairs(plan)
+	_check_upstairs_programme(plan)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
 		"stats": stats}
+
+
+## Rooms that belong on the ground floor of a dwelling and nowhere else. The
+## kitchen and the workshop are where the fire is, and there is one chimney per
+## house; the hall is the room the front door opens into, and the front door is
+## at ground level.
+const GROUND_FLOOR_ONLY: Array[StringName] = [&"kitchen", &"hall", &"workshop"]
 
 
 # ------------------------------------------------------------------ tiling
@@ -199,20 +210,51 @@ func _check_stairs(plan: HousePlan) -> void:
 	stats["stairs"] = plan.stairs.size()
 
 
-## You should not have to walk through somebody's bedroom to get anywhere.
-## Reachability is recomputed refusing to pass THROUGH a bedroom; anything that
-## drops out is a room that has been put behind a bed.
+## You should not have to walk through somebody's bedroom -- or a guest room,
+## or a suite -- to get anywhere. Reachability is recomputed refusing to pass
+## THROUGH any sleeping room; anything that drops out is a room that has been
+## put behind a bed.
 func _check_privacy(plan: HousePlan) -> void:
 	var start: int = plan.entrance_room()
 	if start < 0:
 		return
-	var polite: Dictionary = plan.reachable_rooms(start, &"bedroom")
+	var polite: Dictionary = plan.reachable_rooms(start, HouseGeometry.SLEEPING)
 	for i in range(plan.room_count()):
+		# A bedroom is the private endpoint a house's own occupant sleeps in --
+		# its own reachability was never in scope (a house does not put one
+		# bedroom's only door behind another). A hotel's other sleeping kinds
+		# are not exempt: a guest_room or suite reachable only through a
+		# DIFFERENT sleeping room is exactly the corridor-through-a-bedroom
+		# problem this check exists to catch.
 		if plan.kind_of(i) == &"bedroom":
 			continue
 		if not polite.has(i):
-			failures.append("privacy: the only way into room %d (%s) is through a bedroom"
-				% [i, String(plan.kind_of(i))])
+			failures.append("privacy: the only way into room %d (%s) is through a %s"
+				% [i, String(plan.kind_of(i)), _sleeping_room_on_path(plan, start, i)])
+
+
+## Names the sleeping room a plain (unrestricted) shortest path from `start`
+## to `dest` has to cross, for a readable failure message.
+func _sleeping_room_on_path(plan: HousePlan, start: int, dest: int) -> String:
+	var g: Dictionary = plan.door_graph()
+	var parent := {start: -1}
+	var stack: Array[int] = [start]
+	while not stack.is_empty():
+		var cur: int = stack.pop_back()
+		if cur == dest:
+			break
+		for nb in g[cur]:
+			if not parent.has(nb):
+				parent[nb] = cur
+				stack.append(nb)
+	if not parent.has(dest):
+		return "sleeping room"
+	var node: int = parent[dest]
+	while node != -1 and node != start:
+		if plan.kind_of(node) in HouseGeometry.SLEEPING:
+			return String(plan.kind_of(node))
+		node = parent[node]
+	return "sleeping room"
 
 
 # --------------------------------------------------------------- openings
@@ -306,6 +348,72 @@ func _check_windows(plan: HousePlan) -> void:
 		if glass < area * HouseGeometry.GLAZING_MIN - 0.01:
 			warnings.append("daylight: room %d (%s) has %.2f m2 of glass for %.1f m2 of floor"
 				% [i, String(kind), glass, area])
+
+
+# ------------------------------------------------------- upstairs programme
+
+## What is upstairs is not a copy of what is downstairs.
+##
+## The upper floors reuse the ground partition -- the walls have to line up --
+## and it used to reuse its NAMES too, which gave a house two kitchens, two
+## halls, a second front-door-less entrance hall and a fire with no flue over
+## the first one. A dwelling keeps its service and public programme on the
+## ground floor and sleeps upstairs.
+##
+## A building that brought its own room programme (a shop, a hotel: anything
+## whose spec can answer `room_program`) is exempt -- an inn's kitchen is on
+## whatever floor its own planner put it on, and that is not this rule's
+## business.
+func _check_upstairs_programme(plan: HousePlan) -> void:
+	if int(plan.spec.storeys) <= 1 or plan.spec.has_method("room_program"):
+		return
+	var beds := 0
+	for i in range(plan.room_count()):
+		var storey: int = plan.storey_of_room(i)
+		var kind: StringName = plan.kind_of(i)
+		if storey <= 0:
+			continue
+		if kind in GROUND_FLOOR_ONLY:
+			failures.append("upstairs_programme: room %d is a %s on storey %d -- that belongs on the ground floor"
+				% [i, String(kind), storey])
+		if kind in HouseGeometry.SLEEPING:
+			beds += 1
+	stats["upstairs_bedrooms"] = beds
+	var hearth: int = plan.hearth_room()
+	if hearth >= 0 and plan.storey_of_room(hearth) != 0:
+		failures.append("upstairs_programme: the hearth is in room %d on storey %d -- the chimney rises from the ground floor"
+			% [hearth, plan.storey_of_room(hearth)])
+	if beds == 0 and _could_sleep_upstairs(plan):
+		# a warning, not a failure: on a narrow plan the only room upstairs
+		# that can hold a bed is the landing itself, and a bedroom you have to
+		# cross to reach the back room is the worse defect of the two
+		warnings.append("upstairs_programme: nobody sleeps on the %d upper storeys of this house"
+			% [int(plan.spec.storeys) - 1])
+
+
+## Is there a room above the ground floor that could have been a bedroom
+## without putting anybody's route through it?
+func _could_sleep_upstairs(plan: HousePlan) -> bool:
+	var start: int = plan.entrance_room()
+	if start < 0:
+		return false
+	for i in range(plan.room_count()):
+		if plan.storey_of_room(i) <= 0:
+			continue
+		if not HouseGeometry.room_suits(plan, i, &"bedroom"):
+			continue
+		var was: StringName = plan.rooms[i]["kind"]
+		plan.rooms[i]["kind"] = &"bedroom"
+		var polite: Dictionary = plan.reachable_rooms(start, HouseGeometry.SLEEPING)
+		plan.rooms[i]["kind"] = was
+		var stranded := false
+		for j in range(plan.room_count()):
+			if j != i and not polite.has(j):
+				stranded = true
+				break
+		if not stranded:
+			return true
+	return false
 
 
 # ----------------------------------------------------------------- helpers

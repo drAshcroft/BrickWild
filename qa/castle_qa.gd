@@ -165,17 +165,25 @@ func _check_enceinte() -> void:
 		var breaks := 0
 		var samples := 0
 		var step: float = _grid.vox
-		# the centre-line rectangle, inset half a wall thickness from the face
-		var x0: float = rect.position.x + t / 2.0
-		var x1: float = rect.end.x - t / 2.0
-		var z0: float = rect.position.y + t / 2.0
-		var z1: float = rect.end.y - t / 2.0
-		var runs := [
-			{"from": Vector3(x0, y, z0), "to": Vector3(x1, y, z0), "gate": true},
-			{"from": Vector3(x0, y, z1), "to": Vector3(x1, y, z1), "gate": false},
-			{"from": Vector3(x0, y, z0), "to": Vector3(x0, y, z1), "gate": false},
-			{"from": Vector3(x1, y, z0), "to": Vector3(x1, y, z1), "gate": false},
-		]
+		# the centre-line of the enceinte, inset half a wall thickness from the
+		# outer face. On the rectangular plan that is the site rectangle; on a
+		# polygonal one it is the polygon, walked edge by edge.
+		var runs := []
+		var line: PackedVector2Array = CastleGeometry.offset_polygon(
+			CastleGeometry.enceinte_polygon(spec, r), t / 2.0)
+		var gate_edge: int = 0
+		if not CastleGeometry.is_polygonal(spec):
+			var x0: float = rect.position.x + t / 2.0
+			var x1: float = rect.end.x - t / 2.0
+			var z0: float = rect.position.y + t / 2.0
+			var z1: float = rect.end.y - t / 2.0
+			line = PackedVector2Array([Vector2(x0, z0), Vector2(x1, z0),
+				Vector2(x1, z1), Vector2(x0, z1)])
+		for e in range(line.size()):
+			var a2: Vector2 = line[e]
+			var b2: Vector2 = line[(e + 1) % line.size()]
+			runs.append({"from": Vector3(a2.x, y, a2.y),
+				"to": Vector3(b2.x, y, b2.y), "gate": e == gate_edge})
 		for run in runs:
 			var a: Vector3 = run["from"]
 			var b: Vector3 = run["to"]

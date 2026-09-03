@@ -10,6 +10,8 @@ extends SceneTree
 
 ## Order is deliberate: each suite assumes the ones above it hold.
 ##   1 library    - the public request/generate/build contract
+##   1a placement - placement()'s door contract and Placement.world_rect
+##   1b poly      - polygon geometry helpers and WalkGrid rasterisation
 ##   2 church     - the spec/build contract itself
 ##   3 normals    - the surfaces face the way they are meant to
 ##   4 massing    - structural correctness of what that contract produced
@@ -33,18 +35,26 @@ extends SceneTree
 ##  22 temple     - the temple spec/build contract and its surfaces
 ##  23 rite       - would a rite work in it: axis, sightline, procession, fire
 ##  24 tarchetype - the temples a fantasy author would ask for
-const ORDER: Array[String] = ["library", "church", "normals", "massing", "blueprint", "landmark",
+##  25 village    - VillageSpec's derived fields and VillagePlan's helpers/purity
+##  26 vsite      - the site planner: through road, common, landmark slot, streets
+##  27 vlot       - the lot planner: frontages, setbacks, fire gaps, corner lots
+const ORDER: Array[String] = ["library", "placement", "poly", "church", "normals", "massing", "blueprint", "landmark",
 	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa",
 	"house", "assets", "houseqa", "hmultistory", "harchetype",
 	"shop", "sarchetype",
 	"hotel", "hlandmark",
-	"temple", "rite", "tarchetype"]
+	"temple", "rite", "tarchetype",
+	"village", "vsite", "vlot"]
 
 
 static func _run_one(key: String) -> SuiteResult:
 	match key:
 		"library":
 			return LibrarySuite.run()
+		"placement":
+			return PlacementSuite.run()
+		"poly":
+			return PolySuite.run()
 		"church":
 			return ChurchSuite.run()
 		"normals":
@@ -91,6 +101,12 @@ static func _run_one(key: String) -> SuiteResult:
 			return TempleQASuite.run()
 		"tarchetype":
 			return TempleArchetypeSuite.run()
+		"village":
+			return VillageSuite.run()
+		"vsite":
+			return VillageSiteSuite.run()
+		"vlot":
+			return VillageLotSuite.run()
 	return null
 
 

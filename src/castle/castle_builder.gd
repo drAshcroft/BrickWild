@@ -159,25 +159,21 @@ func _build_enclosure() -> void:
 
 
 func _build_ring(r: int) -> void:
-	tag("curtain")
-	var t: float = CastleGeometry.wall_thickness(spec, r)
-	for which in CastleGeometry.wall_names(spec, r):
-		var a: AABB = CastleGeometry.wall_aabb(spec, r, which)
-		if a.size.x < CastleGeometry.MIN_WALL_RUN and a.size.z < CastleGeometry.MIN_WALL_RUN:
-			continue
-		var outward: Vector3 = _wall_outward(which)
-		_battered_wall(a, t, outward)
-		_log_mass("wall_%d_%s" % [r, String(which)], a)
-		_wall_top(a, outward, t)
-		_wall_slits(a, outward, t, r)
-		total_height = maxf(total_height, a.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+	if CastleGeometry.is_polygonal(spec):
+		_build_ring_walls_poly(r)
+	else:
+		_build_ring_walls_rect(r)
 
 	tag("tower")
 	var i := 0
-	for c in CastleGeometry.corner_tower_centers(spec, r):
-		# a corner tower's free faces are the two on the diagonal
-		_tower(c, r, "tower_%d_corner_%d" % [r, i],
-			Vector3(signf(c.x), 0.0, signf(c.z)).normalized())
+	for c in CastleGeometry.vertex_tower_centers(spec, r):
+		# a vertex tower's free faces are the ones on the outward bisector
+		var away := Vector3(signf(c.x), 0.0, signf(c.z)).normalized()
+		if CastleGeometry.is_polygonal(spec):
+			var mid: Vector2 = CastleGeometry.polygon_bbox(
+				CastleGeometry.enceinte_polygon(spec, r)).get_center()
+			away = Vector3(c.x - mid.x, 0.0, c.z - mid.y).normalized()
+		_tower(c, r, "tower_%d_corner_%d" % [r, i], away)
 		i += 1
 	i = 0
 	for slot in CastleGeometry.side_tower_slots(spec, r):
@@ -203,6 +199,87 @@ func _build_ring(r: int) -> void:
 			_opening(Vector3(x, g.size.y * 0.72, g.position.z - CastleGeometry.OPENING_EPS),
 				PI, 0.4, 0.6, &"square")
 		total_height = maxf(total_height, g.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+
+
+## The four axis-aligned runs of a rectangular enceinte -- the N = 4 plan, kept
+## on its own path because every box in it lands on an axis and there is no
+## reason to put it through a rotation that would only round it.
+func _build_ring_walls_rect(r: int) -> void:
+	tag("curtain")
+	var t: float = CastleGeometry.wall_thickness(spec, r)
+	for which in CastleGeometry.wall_names(spec, r):
+		var a: AABB = CastleGeometry.wall_aabb(spec, r, which)
+		if a.size.x < CastleGeometry.MIN_WALL_RUN and a.size.z < CastleGeometry.MIN_WALL_RUN:
+			continue
+		var outward: Vector3 = _wall_outward(which)
+		_battered_wall(a, t, outward)
+		_log_mass("wall_%d_%s" % [r, String(which)], a)
+		_wall_top(a, outward, t)
+		_wall_slits(a, outward, t, r)
+		total_height = maxf(total_height, a.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+
+
+## The runs of a polygonal enceinte: the same battered wall, wall walk,
+## crenellations and slits, but aligned to the edge instead of to an axis.
+## Every box is emitted rotated about Y, and every opening is placed on the
+## rotated FACE -- on a hexagon the difference between the wall and its bounding
+## box is metres, so an opening on the box hangs in open air.
+func _build_ring_walls_poly(r: int) -> void:
+	tag("curtain")
+	for seg in CastleGeometry.wall_segments(spec, r):
+		_wall_run(seg, r)
+
+
+func _wall_run(seg: Dictionary, r: int) -> void:
+	var t: float = CastleGeometry.wall_thickness(spec, r)
+	var tb: float = CastleGeometry.wall_base_thickness(spec, r)
+	var h: float = CastleGeometry.wall_height(spec, r)
+	var run: float = seg["length"]
+	var yaw: float = seg["yaw"]
+	var outward: Vector3 = seg["outward"]
+	# the inner face, which is vertical at every course
+	var mid: Vector2 = ((seg["a"] as Vector2) + (seg["b"] as Vector2)) / 2.0
+	var inner := Vector3(mid.x - outward.x * t, 0.0, mid.y - outward.z * t)
+	for i in range(BATTER_STEPS):
+		var y0: float = h * float(i) / BATTER_STEPS
+		var y1: float = h * float(i + 1) / BATTER_STEPS
+		var th: float = lerpf(tb, t, (y0 + y1) / 2.0 / h)
+		box(Vector3(run, y1 - y0, th),
+			inner + outward * (th / 2.0) + Vector3(0.0, (y0 + y1) / 2.0, 0.0),
+			SURF_STONE, yaw)
+	_log_mass("wall_%d_%s" % [r, String(seg["name"])],
+		CastleGeometry.segment_aabb(spec, r, seg))
+
+	# wall walk and merlons, following the run's own top face
+	var walk: Vector3 = inner + outward * (t / 2.0) + Vector3(0.0, h + CastleGeometry.PARAPET_RISE / 2.0, 0.0)
+	box(Vector3(run, CastleGeometry.PARAPET_RISE, t + 0.3), walk, SURF_TRIM, yaw)
+	if spec.battlements:
+		var edge: Vector3 = inner + outward * (t - spec.merlon_h * 0.35)
+		var along := Vector3(cos(yaw), 0.0, -sin(yaw)) * (run / 2.0)
+		_crenellate_run(edge - along, edge + along, h + CastleGeometry.PARAPET_RISE,
+			spec.merlon_h * 0.7, yaw, SURF_TRIM)
+	_run_slits(seg, r)
+	total_height = maxf(total_height, h + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+
+
+## Arrow slits down a slanted run, on the battered face itself.
+func _run_slits(seg: Dictionary, r: int) -> void:
+	var t: float = CastleGeometry.wall_thickness(spec, r)
+	var tb: float = CastleGeometry.wall_base_thickness(spec, r)
+	var h: float = CastleGeometry.wall_height(spec, r)
+	var run: float = seg["length"]
+	var outward: Vector3 = seg["outward"]
+	var mid: Vector2 = ((seg["a"] as Vector2) + (seg["b"] as Vector2)) / 2.0
+	var inner := Vector3(mid.x - outward.x * t, 0.0, mid.y - outward.z * t)
+	var y: float = h * 0.62
+	var th: float = lerpf(tb, t, y / h)
+	var face: Vector3 = inner + outward * (th + CastleGeometry.OPENING_EPS)
+	var along := Vector3(cos(seg["yaw"]), 0.0, -sin(seg["yaw"])) * run
+	var n: int = clampi(int(run / SLIT_BAY), 1, 24)
+	for i in range(n):
+		var f: float = (float(i) + 1.0) / (float(n) + 1.0) - 0.5
+		_opening(face + along * f + Vector3(0.0, y, 0.0), seg["yaw"], 0.32, 1.5,
+			&"slit")
 
 
 ## The keep: a great square tower, a drum, a shell keep on its own plinth, or
@@ -458,6 +535,23 @@ func _crenellate(from_p: Vector3, to_p: Vector3, y: float, thick: float,
 		var size := Vector3(CastleGeometry.MERLON_W if along_x else thick,
 			spec.merlon_h, thick if along_x else CastleGeometry.MERLON_W)
 		box(size, Vector3(p.x, y + spec.merlon_h / 2.0, p.z), surf)
+
+
+## Merlons along a run that does not lie on an axis: same pitch, but each
+## merlon is turned to sit square on the parapet it stands on.
+func _crenellate_run(from_p: Vector3, to_p: Vector3, y: float, thick: float,
+		yaw: float, surf: int) -> void:
+	var seg: Vector3 = to_p - from_p
+	var run: float = seg.length()
+	var pitch: float = CastleGeometry.MERLON_W + CastleGeometry.MERLON_GAP
+	var n: int = int(run / pitch)
+	if n <= 0:
+		return
+	var dir: Vector3 = seg / run
+	for i in range(n):
+		var p: Vector3 = from_p + dir * (pitch * (float(i) + 0.5))
+		box(Vector3(CastleGeometry.MERLON_W, spec.merlon_h, thick),
+			Vector3(p.x, y + spec.merlon_h / 2.0, p.z), surf, yaw)
 
 
 ## Merlons round the top of a block, on all four sides.

@@ -22,6 +22,18 @@ extends RefCounted
 ## the ones everybody already follows:
 ##   COMMAND    the bed's head is against solid wall, and the bed does not sit
 ##              in the line of the door
+##   HEARTH     the fire is on the wall the planner gave the chimney, so the
+##              smoke has somewhere to go
+## and one rule per affinity in PropCatalog, each of them a sentence and a
+## measurement (LAY-003):
+##   WORKBENCH_DAYLIGHT  a bench is worked at in the light
+##   BOOKCASE_HEAT       books keep off the chimney wall
+##   BED_WINDOW          you do not sleep with your head under the window
+##   TABLE_FOCUS         the table draws up toward the fire
+##   SCONCE_PAIR         two lamps are a pair, not a scatter
+##   SHELF_OVER          a shelf hangs over the bench it serves
+##   CHANDELIER_OVER     the chandelier hangs over the table
+##   CORNER_CLUTTER      barrels stand out of the traffic
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {...}}
 
@@ -61,6 +73,18 @@ const BUSINESS_REQUIRED := {
 	&"bakery": {&"kitchen": ["hearth"]},
 }
 
+## Which rule each message prefix belongs to, so a report can group a house's
+## complaints the way this file is laid out rather than by guessing at the
+## words. HouseQA passes it straight through.
+const GROUPS := {
+	"physical": ["placed", "vertical", "supported", "doorway", "daylight"],
+	"programme": ["programme", "light", "density"],
+	"arrangement": ["against", "seating", "row"],
+	"feng shui": ["command", "hearth", "workbench_daylight", "bookcase_heat",
+		"bed_window", "table_focus", "sconce_pair", "shelf_over",
+		"chandelier_over", "corner_clutter"],
+}
+
 var failures: Array[String] = []
 var warnings: Array[String] = []
 var stats: Dictionary = {}
@@ -83,8 +107,18 @@ func check(plan: HousePlan) -> Dictionary:
 	_check_light(plan)
 	_check_density(plan)
 	_check_command_position(plan)
+	_check_hearth(plan)
+	_check_row(plan)
+	_check_workbench_daylight(plan)
+	_check_bookcase_heat(plan)
+	_check_bed_window(plan)
+	_check_table_focus(plan)
+	_check_sconce_pair(plan)
+	_check_shelf_over(plan)
+	_check_chandelier_over(plan)
+	_check_corner_clutter(plan)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
-		"stats": stats}
+		"stats": stats, "groups": GROUPS}
 
 
 static func _who(plan: HousePlan, f: int) -> String:
@@ -453,3 +487,657 @@ func _check_command_position(plan: HousePlan) -> void:
 		elif not room_rect.grow(0.05).encloses(zone):
 			failures.append("command: the only side of the %s you could get in from is inside a wall"
 				% _who(plan, f))
+
+
+## A fire needs a flue. HousePlan.hearth is the one record of where the two of
+## them meet: the planner names a room and a wall, the builder raises the stack
+## on it, and the furnisher stands the hearth against it. This rule is what
+## proves the three of them still agree.
+func _check_hearth(plan: HousePlan) -> void:
+	var lit: Array[int] = []
+	for f in range(plan.furniture.size()):
+		if PropCatalog.category(plan.furniture[f]["key"]) == "hearth":
+			lit.append(f)
+	var room: int = plan.hearth_room()
+	if room < 0:
+		for f in lit:
+			failures.append("hearth: the %s stands in a house with no chimney planned"
+				% _who(plan, f))
+		return
+	var wall: int = plan.hearth_wall()
+	var wants_one: bool = "hearth" in REQUIRED.get(plan.kind_of(room), [])
+	var here: Array[int] = []
+	for f in lit:
+		if plan.furniture[f]["room"] == room:
+			here.append(f)
+	if here.is_empty() and wants_one:
+		if plan.was_dropped(room, "hearth") or not _could_hold(plan, room, "hearth"):
+			warnings.append("hearth: room %d has the chimney on wall %d and no fire under it"
+				% [room, wall])
+		else:
+			failures.append("hearth: room %d has the chimney on wall %d and no fire under it"
+				% [room, wall])
+	for f in here:
+		var on: int = _wall_of(plan, plan.furniture[f])
+		if on != wall:
+			failures.append("hearth: the hearth in room %d stands on wall %d but the chimney is on wall %d"
+				% [room, on, wall])
+
+
+## Which of the room's four walls a piece has its back to, indexed the way
+## HouseGeometry.room_walls() indexes them. Its facing says it: a piece in a
+## corner touches two walls and only one of them is behind it.
+static func _wall_of(_plan: HousePlan, p: Dictionary) -> int:
+	var yaw: float = float(p["yaw"])
+	var back := Vector2(sin(yaw), cos(yaw))
+	if absf(back.y) >= absf(back.x):
+		return 1 if back.y > 0.0 else 0
+	return 3 if back.x > 0.0 else 2
+
+
+## A row is straight, evenly pitched, all facing the same way, and every
+## copy's use zone is the same shared aisle strip. `HouseFurnisher._place_row`
+## builds a row that way by construction; this measures the result the way
+## every other rule here is measured -- from the placements alone, trusting
+## nothing about how they got there.
+const ROW_STRAIGHT_TOL := 0.05
+const ROW_PITCH_TOL := 0.02
+
+func _check_row(plan: HousePlan) -> void:
+	var groups: Dictionary = {}
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		var group: String = String(p.get("row", ""))
+		if group == "":
+			continue
+		if not groups.has(group):
+			groups[group] = []
+		groups[group].append(f)
+	for group in groups:
+		_check_one_row(plan, groups[group])
+
+
+func _check_one_row(plan: HousePlan, members: Array) -> void:
+	if members.size() < 2:
+		return
+	var pts: Array[Vector2] = []
+	var yaw0: float = float(plan.furniture[members[0]]["yaw"])
+	var zone0: Rect2 = plan.furniture[members[0]]["zone"]
+	var who0: String = _who(plan, members[0])
+	for f in members:
+		var p: Dictionary = plan.furniture[f]
+		pts.append(Rect2(p["rect"]).get_center())
+		if not is_equal_approx(float(p["yaw"]), yaw0) \
+				and absf(float(p["yaw"]) - yaw0) > 0.01:
+			failures.append("row: %s does not face the same way as %s"
+				% [_who(plan, f), who0])
+		var zone: Rect2 = p["zone"]
+		if not zone.is_equal_approx(zone0):
+			failures.append("row: %s does not share the same aisle as %s"
+				% [_who(plan, f), who0])
+	# collinearity: how far each centre strays from the line through the two ends
+	var a: Vector2 = pts[0]
+	var b: Vector2 = pts[pts.size() - 1]
+	var along: Vector2 = (b - a)
+	var len: float = along.length()
+	if len > 0.01:
+		var dir: Vector2 = along / len
+		var normal := Vector2(-dir.y, dir.x)
+		for i in range(pts.size()):
+			var off: float = absf((pts[i] - a).dot(normal))
+			if off > ROW_STRAIGHT_TOL:
+				failures.append("row: %s is %.2fm off the line of its row"
+					% [_who(plan, members[i]), off])
+	# even pitch: consecutive centres (sorted along the row) the same distance apart
+	var order: Array = members.duplicate()
+	order.sort_custom(func(x: int, y: int) -> bool:
+		return Rect2(plan.furniture[x]["rect"]).get_center().distance_to(a) \
+			< Rect2(plan.furniture[y]["rect"]).get_center().distance_to(a))
+	var pitches: Array[float] = []
+	for i in range(1, order.size()):
+		var d: float = Rect2(plan.furniture[order[i]]["rect"]).get_center() \
+			.distance_to(Rect2(plan.furniture[order[i - 1]]["rect"]).get_center())
+		pitches.append(d)
+	if pitches.size() > 1:
+		var ref: float = pitches[0]
+		for i in range(1, pitches.size()):
+			if absf(pitches[i] - ref) > ROW_PITCH_TOL:
+				failures.append("row: the pitch between %s varies (%.2fm vs %.2fm)"
+					% [who0, pitches[i], ref])
+	# the shared aisle has to be real floor, deep enough to walk, and every
+	# member's own use zone has to be exactly it -- not a private zone that
+	# happens to overlap
+	if zone0.size.x > 0.0:
+		var depth: float = minf(zone0.size.x, zone0.size.y)
+		if depth < HouseGeometry.PATH_MIN - TOL:
+			failures.append("row: the aisle behind %s is only %.2fm wide"
+				% [who0, depth])
+
+
+## Which of the room's four walls a rectangle has its BACK to, or -1 when it
+## stands free of all of them. Measured from the gaps, the way LAY-002's
+## placer measures it -- yaw says which way a piece looks, not what it is
+## pushed up against, and a corner piece looks whichever way it was authored.
+const FS_BACK_TOL := 0.14
+
+static func _fs_back_wall(plan: HousePlan, room: int, rect: Rect2) -> int:
+	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var gaps := [rect.position.y - f.position.y, f.end.y - rect.end.y,
+		rect.position.x - f.position.x, f.end.x - rect.end.x]
+	var best := -1
+	var best_gap := FS_BACK_TOL
+	for i in range(4):
+		if float(gaps[i]) < best_gap:
+			best_gap = float(gaps[i])
+			best = i
+	return best
+
+
+static func _fs_wall_normal(wi: int) -> Vector2:
+	return [Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0)][wi]
+
+
+static func _fs_wall_lit(plan: HousePlan, room: int, wi: int) -> bool:
+	for w in plan.windows_of(room):
+		if Vector2(plan.windows[w]["normal"]).dot(_fs_wall_normal(wi)) < -0.9:
+			return true
+	return false
+
+
+## Every feng shui rule below reports the same way: a piece the furnisher had
+## to compromise over -- one it dropped for walkability, or one it could find
+## no wall for -- is a warning, and anything else is a defect. Exactly the
+## shape the programme rule uses.
+func _fs_report(plan: HousePlan, p: Dictionary, cat: String, msg: String) -> void:
+	if p.get("free_standing", false) or plan.was_dropped(int(p["room"]), cat):
+		warnings.append(msg)
+	else:
+		failures.append(msg)
+
+
+## A bench is worked at, and a person works in the light. A workbench in a room
+## with a window backs onto the wall that window is in, or at the very least
+## stands within reach of it.
+## Generated houses satisfy the strict form (the window wall itself) in 100% of
+## cases, so this fails outright.
+const FS_WINDOW_REACH := 2.5
+
+func _check_workbench_daylight(plan: HousePlan) -> void:
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(p["key"]) != "workbench":
+			continue
+		if p.get("mounted", false) or int(p["host"]) >= 0:
+			continue
+		var room: int = int(p["room"])
+		if plan.windows_of(room).is_empty():
+			continue
+		var wi: int = _fs_back_wall(plan, room, p["rect"])
+		if wi >= 0 and _fs_wall_lit(plan, room, wi):
+			continue
+		var c: Vector2 = Rect2(p["rect"]).get_center()
+		var near := INF
+		for w in plan.windows_of(room):
+			near = minf(near, c.distance_to(Vector2(plan.windows[w]["pos"])))
+		if near <= FS_WINDOW_REACH:
+			continue
+		_fs_report(plan, p, "workbench",
+			"workbench_daylight: %s works %.2fm from the nearest window, with its back to a blind wall"
+			% [_who(plan, f), near])
+
+
+## Heat and parchment do not mix: a bookcase keeps off the wall the chimney is
+## in. No generated house has ever put one there; the rule is kept honest by
+## the records-room fixture, where the fire is walked round all four walls.
+func _check_bookcase_heat(plan: HousePlan) -> void:
+	var room: int = plan.hearth_room()
+	if room < 0 or plan.hearth_wall() < 0:
+		return
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(p["key"]) != "bookcase":
+			continue
+		if p.get("mounted", false) or int(p["host"]) >= 0:
+			continue
+		if _fs_back_wall(plan, room, p["rect"]) != plan.hearth_wall():
+			continue
+		_fs_report(plan, p, "bookcase",
+			"bookcase_heat: %s stands against wall %d, which is the chimney wall"
+			% [_who(plan, f), plan.hearth_wall()])
+
+
+## You do not sleep with the draught and the daylight at your head. A bed takes
+## any wall in the room except the one the window is in.
+## Generated houses hold this in 100% of cases, so it fails outright.
+func _check_bed_window(plan: HousePlan) -> void:
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(p["key"]) != "bed":
+			continue
+		if p.get("mounted", false) or int(p["host"]) >= 0:
+			continue
+		var room: int = int(p["room"])
+		if plan.windows_of(room).is_empty():
+			continue
+		var wi: int = _fs_back_wall(plan, room, p["rect"])
+		if wi < 0 or not _fs_wall_lit(plan, room, wi):
+			continue
+		_fs_report(plan, p, "bed",
+			"bed_window: the head of %s is under the window in wall %d"
+			% [_who(plan, f), wi])
+
+
+## The table in the room with the fire in it is drawn up toward the fire, not
+## pushed away from it: its centre sits off the middle of the room, along the
+## line to the hearth.
+##
+## Tolerance. LAY-002's placer achieves the full offset (0.30 of the room's
+## half-depth, the figure `_affinity_sweep` measures) in 89.5% of cases. The
+## rest are halls where the fire side of the room is already taken -- by the
+## seats drawn round it, by the dresser, by the stair -- and the table is where
+## the floor was. Measured on the offset alone those are indistinguishable from
+## a table that simply ignored the fire, so the offset decides the warning and
+## the FLOOR decides the defect: a table on the far side of the room whose
+## mirror image on the fire side is empty floor could have stood by the fire
+## and did not.
+const FS_FOCUS_WANT := 0.30
+const FS_FOCUS_FAIL := -0.15
+
+func _check_table_focus(plan: HousePlan) -> void:
+	var room: int = plan.hearth_room()
+	if room < 0 or plan.hearth_wall() < 0:
+		return
+	var f_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var focus := Vector2(INF, INF)
+	for i in plan.furniture_of(room):
+		if PropCatalog.category(plan.furniture[i]["key"]) == "hearth":
+			focus = Rect2(plan.furniture[i]["rect"]).get_center()
+	if not focus.is_finite():
+		var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
+		focus = (Vector2(walls[plan.hearth_wall()]["from"])
+			+ Vector2(walls[plan.hearth_wall()]["to"])) / 2.0
+	var mid: Vector2 = f_rect.get_center()
+	var dir: Vector2 = focus - mid
+	if dir.length() < 0.01:
+		return
+	dir = dir.normalized()
+	var half: float = absf(dir.x) * f_rect.size.x / 2.0 + absf(dir.y) * f_rect.size.y / 2.0
+	for i2 in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[i2]
+		if PropCatalog.category(p["key"]) != "table" or p.get("mounted", false):
+			continue
+		if int(p["host"]) >= 0 or String(p.get("row", "")) != "":
+			continue
+		var off: float = (Rect2(p["rect"]).get_center() - mid).dot(dir)
+		if off >= FS_FOCUS_WANT * half:
+			continue
+		if off >= FS_FOCUS_FAIL * half:
+			warnings.append("table_focus: %s stands %.2fm toward the fire, short of the %.2fm the room allows"
+				% [_who(plan, i2), off, FS_FOCUS_WANT * half])
+		elif _fs_mirror_free(plan, room, i2, dir, -off):
+			_fs_report(plan, p, "table",
+				"table_focus: %s stands %.2fm on the far side of the room from the fire"
+				% [_who(plan, i2), -off])
+		else:
+			warnings.append("table_focus: %s stands %.2fm on the far side of the room from the fire, and the fire side of it is full"
+				% [_who(plan, i2), -off])
+
+
+## Could this piece have stood the same distance the OTHER side of the middle
+## of the room, toward the fire? Its own seats move with it, so they do not
+## count as being in its way.
+static func _fs_mirror_free(plan: HousePlan, room: int, me: int, dir: Vector2,
+		back: float) -> bool:
+	var rect: Rect2 = plan.furniture[me]["rect"]
+	var moved: Rect2 = Rect2(rect.position + dir * (2.0 * back), rect.size)
+	if not HouseGeometry.room_floor_rect(plan, room).grow(0.05).encloses(moved):
+		return false
+	for f in plan.furniture_of(room):
+		if f == me:
+			continue
+		var q: Dictionary = plan.furniture[f]
+		if q.get("mounted", false) or int(q["host"]) >= 0:
+			continue
+		var cat: String = PropCatalog.category(q["key"])
+		if cat == "seat" or cat == "bench":
+			continue
+		var over: Rect2 = Rect2(q["rect"]).intersection(moved)
+		if over.size.x > TOL and over.size.y > TOL:
+			return false
+		var zone: Rect2 = q["zone"]
+		if zone.size.x > 0.0:
+			var zover: Rect2 = zone.intersection(moved)
+			if zover.size.x > TOL and zover.size.y > TOL:
+				return false
+	# and it would have to be out of the way of every door, which is the other
+	# reason the placer leaves the middle of a hall alone
+	for d in plan.doors_of(room):
+		for side in [-1.0, 1.0]:
+			var clear: Rect2 = HouseGeometry.door_clear_rect(plan.doors[d], side)
+			var dover: Rect2 = clear.intersection(moved)
+			if dover.size.x > TOL and dover.size.y > TOL:
+				return false
+	return true
+
+
+## Two lamps in a room are a pair: one wall, and the same distance either side
+## of something -- the door, the fire, or the middle of the wall they share.
+## One lamp is a lamp and three are a scatter; only a pair can be lopsided.
+##
+## Tolerance. LAY-002 measures the strict form -- same wall AND mirrored -- at
+## 96%; the shortfall is rooms with no wall long enough to hang a pair on,
+## where the furnisher has no station to mirror about and puts the two lamps
+## wherever there is masonry. So a pair that is half right (same wall, or
+## mirrored across two of them) warns, and a pair that is neither is a defect
+## only when some wall of the room could actually have carried the two of them
+## either side of its door, its fire or its own middle.
+const FS_MIRROR_TOL := 0.15
+## The station a pair hangs at, matching the furnisher's own FLANK_IDEAL and
+## FLANK_REACH: it settles on one station for the whole room before it hangs
+## either lamp, so a room where only some far wider or narrower spacing would
+## have fitted is a room where it had no pair to hang.
+const FS_PAIR_MIN := 0.9
+const FS_PAIR_MAX := 2.1
+
+func _check_sconce_pair(plan: HousePlan) -> void:
+	for room in range(plan.room_count()):
+		var sc: Array[int] = []
+		for i in plan.furniture_of(room):
+			if PropCatalog.category(plan.furniture[i]["key"]) == "sconce":
+				sc.append(i)
+		if sc.size() != 2:
+			continue
+		var w1: int = _fs_back_wall(plan, room, plan.furniture[sc[0]]["rect"])
+		var w2: int = _fs_back_wall(plan, room, plan.furniture[sc[1]]["rect"])
+		var same: bool = w1 >= 0 and w1 == w2
+		var f_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+		var n: Vector2 = _fs_wall_normal(w1 if w1 >= 0 else 0)
+		var along := Vector2(n.y, -n.x)
+		var anchors: Array[Vector2] = [(f_rect.position + f_rect.end) / 2.0]
+		for i2 in plan.furniture_of(room):
+			if PropCatalog.category(plan.furniture[i2]["key"]) == "hearth":
+				anchors.append(Rect2(plan.furniture[i2]["rect"]).get_center())
+		for d in plan.doors_of(room):
+			anchors.append(plan.doors[d]["pos"])
+		var t1: float = Rect2(plan.furniture[sc[0]]["rect"]).get_center().dot(along)
+		var t2: float = Rect2(plan.furniture[sc[1]]["rect"]).get_center().dot(along)
+		var mirrored := false
+		for a in anchors:
+			if absf(t1 + t2 - 2.0 * a.dot(along)) <= FS_MIRROR_TOL:
+				mirrored = true
+		if same and mirrored:
+			continue
+		var where := "lopsided on wall %d" % w1 if same else "on walls %d and %d" % [w1, w2]
+		var msg := "sconce_pair: the two lamps in room %d (%s) are %s" \
+			% [room, String(plan.kind_of(room)), where]
+		if same or mirrored or not _fs_pair_fits(plan, room):
+			warnings.append(msg)
+		else:
+			failures.append(msg)
+
+
+## Could a pair have hung on one wall at all? The same question again, asked
+## of two lamps at once: a wall, a station on it -- its door, its fire or its
+## own middle -- and two spots the same distance either side of that station,
+## both far enough from the lamp's own width, both clear of the openings and of
+## what is already on the wall. A room with no such wall has no pair to be had,
+## and the two lamps it was given hang wherever there was masonry.
+static func _fs_pair_fits(plan: HousePlan, room: int) -> bool:
+	# the WIDEST lamp in the catalogue, not the one that was hung: the
+	# furnisher works its station out from that (_widest_of), because the two
+	# halves of a pair need not be the same prop, so a station this room could
+	# not have offered the widest is a station it never had
+	var width := 0.05
+	for key in PropCatalog.of_category("sconce"):
+		width = maxf(width, PropCatalog.size(key).x)
+	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
+	for wi in range(walls.size()):
+		var a: Vector2 = walls[wi]["from"]
+		var b: Vector2 = walls[wi]["to"]
+		var run: float = (b - a).length()
+		if run < width + 0.4:
+			continue
+		var along: Vector2 = (b - a) / run
+		var lo: float = width / 2.0 + 0.2
+		var hi: float = run - width / 2.0 - 0.2
+		var anchors: Array[float] = [run / 2.0]
+		for d in plan.doors_of(room):
+			var dp: Vector2 = plan.doors[d]["pos"]
+			if absf((dp - a).cross(along)) < 0.2:
+				anchors.append((dp - a).dot(along))
+		for f2 in plan.furniture_of(room):
+			if PropCatalog.category(plan.furniture[f2]["key"]) != "hearth":
+				continue
+			if _fs_back_wall(plan, room, plan.furniture[f2]["rect"]) != wi:
+				continue
+			anchors.append((Rect2(plan.furniture[f2]["rect"]).get_center() - a).dot(along))
+		for anchor in anchors:
+			var gap: float = maxf(width + 0.1, FS_PAIR_MIN)
+			while gap <= minf(run / 2.0, FS_PAIR_MAX):
+				var t1: float = anchor - gap
+				var t2: float = anchor + gap
+				if t1 >= lo and t2 <= hi:
+					var p1: Vector2 = a + along * t1
+					var p2: Vector2 = a + along * t2
+					var ok1: bool = not _fs_on_opening(plan, room, p1, width) and not _fs_crowded(plan, room, p1, width, "sconce")
+					var ok2: bool = not _fs_on_opening(plan, room, p2, width) and not _fs_crowded(plan, room, p2, width, "sconce")
+					if ok1 and ok2:
+						return true
+				gap += 0.06
+	return false
+
+
+## A shelf serves the bench or counter under it: it hangs on the same wall,
+## over the piece it belongs to.
+##
+## Tolerance. The strict form -- half the shelf's width over the host's span,
+## which is what `_affinity_sweep` counts -- holds in 85.5% of generated rooms.
+## The rest are benches with nothing hangable over them: the window the bench
+## was put under (workbench_daylight, above, asks for exactly that wall), or
+## the rack, banner or lamp that took the stretch first. So a shelf that missed
+## its bench is a defect only when the wall over that bench was empty and
+## waiting, and a warning when something else already had it.
+const FS_SHELF_COVER := 0.5
+## Masonry a shelf needs either side of an opening before it counts as free.
+const FS_SHELF_CLEAR := 0.3
+
+func _check_shelf_over(plan: HousePlan) -> void:
+	for room in range(plan.room_count()):
+		var hosts: Array[int] = []
+		var shelves: Array[int] = []
+		for i in plan.furniture_of(room):
+			var cat: String = PropCatalog.category(plan.furniture[i]["key"])
+			if cat == "workbench" or cat == "counter":
+				hosts.append(i)
+			elif cat == "shelf":
+				shelves.append(i)
+		if hosts.is_empty() or shelves.is_empty():
+			continue
+		var best_cover := 0.0
+		var best_dist := INF
+		for s in shelves:
+			var p: Dictionary = plan.furniture[s]
+			var sc: Vector2 = Rect2(p["rect"]).get_center()
+			var wi: int = _fs_back_wall(plan, room, p["rect"])
+			for h in hosts:
+				var host: Rect2 = plan.furniture[h]["rect"]
+				var near := Vector2(clampf(sc.x, host.position.x, host.end.x),
+					clampf(sc.y, host.position.y, host.end.y))
+				best_dist = minf(best_dist, sc.distance_to(near))
+				var hw: int = _fs_back_wall(plan, room, host)
+				if hw < 0 or hw != wi:
+					continue
+				var axis := Vector2(_fs_wall_normal(hw).y, -_fs_wall_normal(hw).x).abs()
+				var width: float = maxf(PropCatalog.size(p["key"]).x, 0.05)
+				var span: float = maxf(host.end.dot(axis) - host.position.dot(axis), 0.05)
+				var c: float = sc.dot(axis)
+				var over: float = minf(c + width / 2.0, host.end.dot(axis)) \
+					- maxf(c - width / 2.0, host.position.dot(axis))
+				best_cover = maxf(best_cover, over / minf(width, span))
+		if best_cover >= FS_SHELF_COVER:
+			continue
+		var widest := 0.05
+		for s2 in shelves:
+			widest = maxf(widest, PropCatalog.size(plan.furniture[s2]["key"]).x)
+		var free := false
+		for h2 in hosts:
+			if _fs_could_hang_over(plan, room, plan.furniture[h2]["rect"], widest):
+				free = true
+		var msg := "shelf_over: no shelf in room %d (%s) hangs over the bench it serves (%.0f%% cover, %.2fm away)" \
+			% [room, String(plan.kind_of(room)), best_cover * 100.0, best_dist]
+		if free:
+			failures.append(msg)
+		else:
+			warnings.append(msg)
+
+
+## Could a shelf have hung over this bench at all? Not "is the wall bare" but
+## the question the placer itself asks: is there a station on the bench's wall,
+## clear of the doors and windows by the margin `_on_opening()` keeps and clear
+## of whatever else is already screwed up there, from which the shelf would
+## cover the bench. A bench under the window it was put beside, or a wall run
+## shorter than the shelf, has no such station -- and a check that called that
+## a defect would be reporting the size of the room again.
+static func _fs_could_hang_over(plan: HousePlan, room: int, host: Rect2,
+		width: float) -> bool:
+	var wi: int = _fs_back_wall(plan, room, host)
+	if wi < 0:
+		return false
+	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
+	var a: Vector2 = walls[wi]["from"]
+	var b: Vector2 = walls[wi]["to"]
+	var run: float = (b - a).length()
+	if run < width + 0.4:
+		return false
+	var along: Vector2 = (b - a) / run
+	var axis: Vector2 = along.abs()
+	var span: float = maxf(host.end.dot(axis) - host.position.dot(axis), 0.05)
+	var lo: float = width / 2.0 + 0.2
+	var hi: float = run - width / 2.0 - 0.2
+	var t: float = lo
+	while t <= hi + 0.001:
+		var pos: Vector2 = a + along * t
+		var clear_here: bool = not _fs_on_opening(plan, room, pos, width)
+		if clear_here and not _fs_crowded(plan, room, pos, width, "shelf"):
+			var c: float = pos.dot(axis)
+			var hi_edge: float = minf(c + width / 2.0, host.end.dot(axis))
+			var lo_edge: float = maxf(c - width / 2.0, host.position.dot(axis))
+			var over: float = hi_edge - lo_edge
+			if over / minf(width, span) >= FS_SHELF_COVER:
+				return true
+		t += 0.06
+	return false
+
+
+## The two clearances `HouseFurnisher._place_mounted` keeps, measured the same
+## way: nothing may hang across an opening, and nothing may hang into what is
+## already on the wall.
+static func _fs_on_opening(plan: HousePlan, room: int, pos: Vector2,
+		width: float) -> bool:
+	for d in plan.doors_of(room):
+		var door: Dictionary = plan.doors[d]
+		if Vector2(door["pos"]).distance_to(pos) < (float(door["width"]) + width) / 2.0 + 0.15:
+			return true
+	for w in plan.windows_of(room):
+		var win: Dictionary = plan.windows[w]
+		if Vector2(win["pos"]).distance_to(pos) < (float(win["width"]) + width) / 2.0 + 0.15:
+			return true
+	return false
+
+
+static func _fs_crowded(plan: HousePlan, room: int, pos: Vector2, width: float,
+		ignore_cat: String) -> bool:
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if not p.get("mounted", false):
+			continue
+		if PropCatalog.category(p["key"]) == ignore_cat:
+			continue
+		var other: float = maxf(PropCatalog.size(p["key"]).x, 0.05)
+		var c := Vector2(p["pos"].x, p["pos"].z)
+		if c.distance_to(pos) < (width + other) / 2.0 + 0.1:
+			return true
+	return false
+
+
+## A chandelier hangs over the table, not over the middle of a room whose table
+## stands somewhere else. Generated houses hold this in 100% of cases, so
+## anything outside the tolerance is a defect.
+const FS_CHANDELIER_TOL := 0.35
+
+func _check_chandelier_over(plan: HousePlan) -> void:
+	for room in range(plan.room_count()):
+		var tables: Array[int] = []
+		for i in plan.furniture_of(room):
+			var p: Dictionary = plan.furniture[i]
+			if PropCatalog.category(p["key"]) == "table" and not p.get("mounted", false):
+				tables.append(i)
+		if tables.is_empty():
+			continue
+		for i2 in plan.furniture_of(room):
+			var q: Dictionary = plan.furniture[i2]
+			if PropCatalog.category(q["key"]) != "chandelier":
+				continue
+			var c := Vector2(q["pos"].x, q["pos"].z)
+			var near := INF
+			for t in tables:
+				near = minf(near, c.distance_to(Rect2(plan.furniture[t]["rect"]).get_center()))
+			if near <= FS_CHANDELIER_TOL:
+				continue
+			_fs_report(plan, q, "chandelier",
+				"chandelier_over: %s hangs %.2fm from the nearest table"
+				% [_who(plan, i2), near])
+
+
+## Barrels, crates and sacks belong out of the traffic: a corner piece stands
+## no nearer than a metre to a door.
+##
+## Tolerance. In the traffic means in the LINE of the door as well as near it:
+## a crate half a metre in front of a doorway is what the rule is about, and a
+## crate the same distance away but tucked against the jamb, beside the opening
+## rather than across it, is a warning. (The doorway rule already guarantees
+## neither of them stands in the swing.) A room whose every corner is inside
+## the metre is a room too small to obey the rule at all, and warns too.
+const FS_CLUTTER_CLEAR := 1.0
+
+func _check_corner_clutter(plan: HousePlan) -> void:
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		if not PropCatalog.has_tag(p["key"], PropCatalog.CORNER):
+			continue
+		if p.get("mounted", false) or int(p["host"]) >= 0:
+			continue
+		var room: int = int(p["room"])
+		var doors: Array[int] = plan.doors_of(room)
+		if doors.is_empty():
+			continue
+		var c: Vector2 = Rect2(p["rect"]).get_center()
+		var d := INF
+		for di in doors:
+			d = minf(d, c.distance_to(Vector2(plan.doors[di]["pos"])))
+		if d >= FS_CLUTTER_CLEAR:
+			continue
+		var f_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+		var roomy := false
+		for corner in [f_rect.position, Vector2(f_rect.end.x, f_rect.position.y),
+				Vector2(f_rect.position.x, f_rect.end.y), f_rect.end]:
+			var cd := INF
+			for di2 in doors:
+				cd = minf(cd, Vector2(corner).distance_to(Vector2(plan.doors[di2]["pos"])))
+			if cd >= FS_CLUTTER_CLEAR:
+				roomy = true
+		var across := false
+		for di3 in doors:
+			var door: Dictionary = plan.doors[di3]
+			var dn: Vector2 = door["normal"]
+			var side: float = absf((c - Vector2(door["pos"])).dot(Vector2(dn.y, -dn.x)))
+			var half_r: float = (absf(dn.y) * Rect2(p["rect"]).size.x
+				+ absf(dn.x) * Rect2(p["rect"]).size.y) / 2.0
+			if c.distance_to(Vector2(door["pos"])) < FS_CLUTTER_CLEAR 					and side < float(door["width"]) / 2.0 + half_r:
+				across = true
+		var msg := "corner_clutter: %s stands %.2fm from a door, in the traffic" \
+			% [_who(plan, f), d]
+		if roomy and across:
+			_fs_report(plan, p, PropCatalog.category(p["key"]), msg)
+		else:
+			warnings.append(msg)

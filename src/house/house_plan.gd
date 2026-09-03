@@ -41,6 +41,24 @@ var stairs: Array[Dictionary] = []
 ## reads this and downgrades exactly those complaints to warnings, so a real
 ## missing bed still fails.
 var compromises: Dictionary = {}
+## Where the fire is: {"room": int, "wall": int}, or empty when the house has
+## no hearth room at all. The wall index is into HouseGeometry.room_walls().
+##
+## One owner for the position, the way ChurchGeometry owns the massing:
+## HousePlanner decides it, HouseBuilder raises the stack on it and
+## HouseFurnisher stands the hearth against it, so the fire and the flue are
+## never on different walls again.
+var hearth: Dictionary = {}
+
+
+## The room the chimney serves, or -1 when no hearth was planned.
+func hearth_room() -> int:
+	return int(hearth.get("room", -1)) if not hearth.is_empty() else -1
+
+
+## The wall of that room the fire and the flue share, or -1.
+func hearth_wall() -> int:
+	return int(hearth.get("wall", -1)) if not hearth.is_empty() else -1
 
 
 ## Was `cat` given up in this room for the sake of getting about?
@@ -160,14 +178,17 @@ func door_graph() -> Dictionary:
 
 
 ## Rooms reachable from `start` through doors, optionally refusing to pass
-## THROUGH rooms of a given kind (they can still be the destination).
-func reachable_rooms(start: int, no_pass_kind := &"") -> Dictionary:
+## THROUGH rooms of one kind (a single StringName) or several (an Array of
+## StringNames). The refused kinds can still be the destination, just not a
+## room walked through to get somewhere else.
+func reachable_rooms(start: int, no_pass_kind: Variant = &"") -> Dictionary:
+	var no_pass: Array = no_pass_kind if no_pass_kind is Array else [no_pass_kind]
 	var seen := {start: true}
 	var stack: Array[int] = [start]
 	var g: Dictionary = door_graph()
 	while not stack.is_empty():
 		var cur: int = stack.pop_back()
-		if no_pass_kind != &"" and cur != start and kind_of(cur) == no_pass_kind:
+		if cur != start and kind_of(cur) in no_pass:
 			continue          # you may enter it, but not walk on through
 		for nb in g[cur]:
 			if not seen.has(nb):

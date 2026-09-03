@@ -35,7 +35,7 @@ const WALL_MOUNTED := "wall_mounted"   # hangs on a wall, no footprint on the fl
 const CEILING := "ceiling"        # hangs from the ceiling
 const LIGHT := "light"            # counts toward a room being lit
 
-## key -> {cat, tags, zone, face}
+## key -> {cat, tags, zone, face, affinity}
 ##   cat   what the piece is, which is what a room's recipe asks for
 ##   zone  metres of clear floor a person needs in front of it to use it;
 ##         0 means it is furniture you walk past, not furniture you use
@@ -44,65 +44,67 @@ const LIGHT := "light"            # counts toward a room being lit
 ##         with their mass on the +Z side of their mounting point, and the
 ##         convention here is that a prop faces -Z, so without the half turn a
 ##         shelf hangs inside the wall it is screwed to.
+##   affinity  optional; see affinity() below. Where the piece WANTS to be,
+##         as opposed to where it merely fits.
 const PROPS := {
 	# ---- beds ----
-	"Bed_Twin1": {"cat": "bed", "tags": [WALL], "zone": 0.75},
-	"Bed_Twin2": {"cat": "bed", "tags": [WALL], "zone": 0.75},
+	"Bed_Twin1": {"cat": "bed", "tags": [WALL], "zone": 0.75, "affinity": {"avoid_window_wall": true}},
+	"Bed_Twin2": {"cat": "bed", "tags": [WALL], "zone": 0.75, "affinity": {"avoid_window_wall": true}},
 
 	# ---- tables and seats ----
-	"Table_Large": {"cat": "table", "tags": [SURFACE], "zone": 0.0},
-	"Workbench": {"cat": "workbench", "tags": [WALL, SURFACE], "zone": 0.9},
-	"Workbench_Drawers": {"cat": "workbench", "tags": [WALL, SURFACE], "zone": 0.9},
+	"Table_Large": {"cat": "table", "tags": [SURFACE], "zone": 0.0, "affinity": {"focus": "hearth"}},
+	"Workbench": {"cat": "workbench", "tags": [WALL, SURFACE], "zone": 0.9, "affinity": {"daylight": 1.0}},
+	"Workbench_Drawers": {"cat": "workbench", "tags": [WALL, SURFACE], "zone": 0.9, "affinity": {"daylight": 1.0}},
 	"Chair_1": {"cat": "seat", "tags": [], "zone": 0.55},
 	"Stool": {"cat": "seat", "tags": [], "zone": 0.5},
 	"Bench": {"cat": "bench", "tags": [], "zone": 0.55},
 
 	# ---- storage ----
 	"Cabinet": {"cat": "storage", "tags": [WALL, SURFACE], "zone": 0.7},
-	"Bookcase_2": {"cat": "bookcase", "tags": [WALL], "zone": 0.7},
-	"Chest_Wood": {"cat": "chest", "tags": [WALL], "zone": 0.6},
+	"Bookcase_2": {"cat": "bookcase", "tags": [WALL], "zone": 0.7, "affinity": {"daylight": -1.0, "far": ["hearth"], "avoid_hearth_wall": true}},
+	"Chest_Wood": {"cat": "chest", "tags": [WALL], "zone": 0.6, "affinity": {"away_from_doors": true}},
 	"Nightstand_Shelf": {"cat": "nightstand", "tags": [WALL, SURFACE], "zone": 0.4},
-	"Barrel": {"cat": "barrel", "tags": [CORNER], "zone": 0.0},
-	"Barrel_Apples": {"cat": "barrel", "tags": [CORNER], "zone": 0.0},
-	"Crate_Wooden": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0},
-	"Crate_Metal": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0},
-	"FarmCrate_Apple": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0},
-	"FarmCrate_Carrot": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0},
-	"FarmCrate_Empty": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0},
+	"Barrel": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Barrel_Apples": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Crate_Wooden": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Crate_Metal": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"FarmCrate_Apple": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"FarmCrate_Carrot": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"FarmCrate_Empty": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
 
 	# ---- hearth and kitchen ----
 	"Cauldron": {"cat": "hearth", "tags": [WALL], "zone": 0.8},
-	"Pot_1": {"cat": "cookware", "tags": [CORNER], "zone": 0.0},
-	"Bucket_Metal": {"cat": "cookware", "tags": [CORNER], "zone": 0.0},
-	"Bucket_Wooden_1": {"cat": "bucket", "tags": [CORNER], "zone": 0.0},
+	"Pot_1": {"cat": "cookware", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Bucket_Metal": {"cat": "cookware", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Bucket_Wooden_1": {"cat": "bucket", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 
 	# ---- trade fittings ----
 	"Anvil": {"cat": "anvil", "tags": [], "zone": 0.9},
 	"Anvil_Log": {"cat": "anvil", "tags": [], "zone": 0.9},
 	"WeaponStand": {"cat": "stand", "tags": [WALL], "zone": 0.6},
 	"Dummy": {"cat": "stand", "tags": [], "zone": 0.7},
-	"BookStand": {"cat": "lectern", "tags": [SURFACE], "zone": 0.7},
+	"BookStand": {"cat": "lectern", "tags": [SURFACE], "zone": 0.7, "affinity": {"daylight": 1.0}},
 	"Stall_Empty": {"cat": "counter", "tags": [WALL, SURFACE], "zone": 0.9},
 	"Stall_Cart_Empty": {"cat": "stall", "tags": [], "zone": 0.9},
-	"Bag": {"cat": "sack", "tags": [CORNER], "zone": 0.0},
+	"Bag": {"cat": "sack", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 
 	# ---- shelves and wall furniture ----
-	"Shelf_Simple": {"cat": "shelf", "tags": [WALL_MOUNTED, SURFACE], "zone": 0.0, "face": PI},
-	"Shelf_Arch": {"cat": "shelf", "tags": [WALL_MOUNTED, SURFACE], "zone": 0.0, "face": PI},
-	"Shelf_Small_Bottles": {"cat": "shelf", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
+	"Shelf_Simple": {"cat": "shelf", "tags": [WALL_MOUNTED, SURFACE], "zone": 0.0, "face": PI, "affinity": {"over": ["workbench", "counter"]}},
+	"Shelf_Arch": {"cat": "shelf", "tags": [WALL_MOUNTED, SURFACE], "zone": 0.0, "face": PI, "affinity": {"over": ["workbench", "counter"]}},
+	"Shelf_Small_Bottles": {"cat": "shelf", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI, "affinity": {"over": ["workbench", "counter"]}},
 	"Peg_Rack": {"cat": "rack", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
 	"Shield_Wooden": {"cat": "trophy", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
 	"Banner_1": {"cat": "banner", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
 	"Banner_2": {"cat": "banner", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
-	"Lantern_Wall": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI},
-	"Torch_Metal": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI},
-	"Chandelier": {"cat": "chandelier", "tags": [CEILING, LIGHT], "zone": 0.0},
+	"Lantern_Wall": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI, "affinity": {"flank": "door"}},
+	"Torch_Metal": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI, "affinity": {"flank": "door"}},
+	"Chandelier": {"cat": "chandelier", "tags": [CEILING, LIGHT], "zone": 0.0, "affinity": {"over": ["table"]}},
 
 	# ---- what a temple is fitted out with ----
 	"Cage_Small": {"cat": "cage", "tags": [], "zone": 0.6},
-	"Chain_Coil": {"cat": "chain", "tags": [CORNER], "zone": 0.0},
-	"Rope_1": {"cat": "chain", "tags": [CORNER], "zone": 0.0},
-	"Vase_Rubble_Medium": {"cat": "rubble", "tags": [CORNER], "zone": 0.0},
+	"Chain_Coil": {"cat": "chain", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Rope_1": {"cat": "chain", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Vase_Rubble_Medium": {"cat": "rubble", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"Table_Knife": {"cat": "blade", "tags": [ON_SURFACE], "zone": 0.0},
 	"Sword_Bronze": {"cat": "blade", "tags": [ON_SURFACE], "zone": 0.0},
 	"Axe_Bronze": {"cat": "blade", "tags": [ON_SURFACE], "zone": 0.0},
@@ -257,6 +259,22 @@ static func has_tag(key: String, tag: String) -> bool:
 ## Metres of clear floor a person needs in front of the piece to use it.
 static func zone_depth(key: String) -> float:
 	return float(PROPS[key]["zone"]) if PROPS.has(key) else 0.0
+
+
+## What a piece WANTS, over and above fitting: the wall with the daylight on
+## it, the corner nobody walks through, the space above the bench it serves.
+## Optional, and read only by HouseFurnisher._affinity(), which turns it into
+## one number per candidate position. Keys, all optional:
+##   near/far            [category] -- be close to / away from these pieces
+##   daylight            +1 wants a window wall, -1 wants a dark one
+##   away_from_doors     true for the clutter that belongs out of the traffic
+##   avoid_window_wall   true when the piece would block the light
+##   avoid_hearth_wall   true when heat would ruin it
+##   focus               "hearth" -- stand off centre, toward the fire
+##   over                [category] -- hang above one of these
+##   flank               "door" -- come in a mirrored pair about the opening
+static func affinity(key: String) -> Dictionary:
+	return PROPS[key].get("affinity", {}) if PROPS.has(key) else {}
 
 
 static func face_offset(key: String) -> float:

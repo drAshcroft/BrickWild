@@ -18,10 +18,24 @@ var length: float = 50.0    # site length, metres (Z); the gate is at -Z
 var height: float = 10.0    # main wall / eaves height, metres
 ## Force a tier instead of deriving it from the footprint. &"" means derive.
 var tier_override: StringName = &""
+## Force a plan kind instead of deriving it from style and tier. &"" derives.
+var plan_override: StringName = &""
+## Force the side count of a polygonal plan. 0 derives it.
+var sides_override: int = 0
 
 # ---- derived from seed + style ----
 var tier: StringName             # &"house", &"manor", &"castle", &"fortress"
 var variant_name: String
+
+# ---- the plan ----
+## Shape of the enceinte: &"rect" (an axis-aligned rectangle, the plan every
+## castle used to have) or &"polygon" (a regular N-gon with a flat edge facing
+## the gate). A rectangle IS the N = 4 polygon; `plan_kind` only says whether
+## the builder may take the axis-aligned shortcut.
+var plan_kind: StringName = &"rect"
+## Sides of the enceinte: 4 for &"rect", POLY_MIN_SIDES..POLY_MAX_SIDES for
+## &"polygon".
+var sides: int = 4
 
 # curtain walls (castle and fortress)
 var curtain: bool
@@ -93,6 +107,40 @@ static func tier_for(w: float, l: float) -> StringName:
 		if area <= float(row["max_area"]):
 			return row["tier"]
 	return &"fortress"
+
+
+## How likely each style is to lay its enceinte out as a polygon rather than a
+## rectangle, and which side counts it would use. Only the walled tiers have an
+## enceinte to shape at all, so the table is consulted for castle and fortress.
+## Caernarfon and Conwy are polygonal, Castel del Monte is a regular octagon;
+## a Norman motte castle and a Japanese hirajiro are rectangular, and stay so.
+const PLANS := {
+	&"norman": {"polygon": 0.0, "sides": [6]},
+	&"edwardian": {"polygon": 0.5, "sides": [6, 8]},
+	&"crusader": {"polygon": 0.35, "sides": [5, 6]},
+	&"french_chateau": {"polygon": 0.25, "sides": [6, 8]},
+	&"bavarian": {"polygon": 0.35, "sides": [5, 6, 7]},
+	&"japanese": {"polygon": 0.0, "sides": [8]},
+	&"moorish": {"polygon": 0.3, "sides": [6, 8]},
+}
+
+
+## The plan a (style, tier, seed) asks for, as {"kind": StringName, "sides":
+## int}. Pure, and deliberately drawn from its OWN generator rather than from
+## spec.rng: a castle's plan must not shift every other random decision the
+## generator makes, or adding this feature would have redesigned every existing
+## castle. An unwalled tier is a building, not an enceinte, so it stays rect.
+static func plan_for(style: StringName, tier: StringName, p_seed: int) -> Dictionary:
+	var rect := {"kind": &"rect", "sides": 4}
+	if tier != &"castle" and tier != &"fortress":
+		return rect
+	var row: Dictionary = PLANS.get(style, {"polygon": 0.0, "sides": [6]})
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("%s|%s|%d" % [String(style), String(tier), p_seed])
+	if r.randf() >= float(row["polygon"]):
+		return rect
+	var opts: Array = row["sides"]
+	return {"kind": &"polygon", "sides": int(opts[r.randi_range(0, opts.size() - 1)])}
 
 
 const STYLES := {
