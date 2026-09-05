@@ -47,11 +47,28 @@ var _fit_dist := 40.0
 var _suspend_regen := false
 
 
+## The village is planned, not generated through BigGlade: it is a plan of
+## BigGlade buildings on lots. It gets its own entry, its own controls
+## (population and wealth) and its own assembler.
+const VILLAGE := &"village"
+const VILLAGE_VARIANTS := 2
+const VILLAGE_CFG := {
+	"label": "Village", "size_label": "Village", "height_label": "",
+	"width": {"min": 12, "max": 500, "step": 1, "value": 40},
+	"length": {"min": 0, "max": 100, "step": 5, "value": 35},
+	"height": {"min": 1, "max": 1, "step": 1, "value": 1},
+}
+
+
 func _ready() -> void:
 	for kind_key in BigGlade.kinds():
+		if kind_key == &"world" and WorldFamilies.families().is_empty():
+			continue          # a registry with no families is nothing to show yet
 		var descriptor: Dictionary = BigGlade.describe_kind(kind_key)
 		kind_opt.add_item(descriptor["label"])
 		kind_opt.set_item_metadata(kind_opt.item_count - 1, kind_key)
+	kind_opt.add_item("Village")
+	kind_opt.set_item_metadata(kind_opt.item_count - 1, VILLAGE)
 	kind_opt.item_selected.connect(func(_i): _on_kind_changed())
 	width_slider.value_changed.connect(func(_v): regenerate())
 	length_slider.value_changed.connect(func(_v): regenerate())
@@ -69,6 +86,11 @@ func _kind() -> StringName:
 
 
 func _styles() -> Dictionary:
+	if _kind() == VILLAGE:
+		var cultures := {}
+		for c in VillageSpec.CULTURES:
+			cultures[c] = {"label": String(c).capitalize()}
+		return cultures
 	match _kind():
 		&"castle":
 			return CastleSpec.STYLES
@@ -113,7 +135,14 @@ func _trade() -> StringName:
 ## sliders are moved as a batch with regeneration suspended, so switching kind
 ## rebuilds once instead of once per slider.
 func _on_kind_changed() -> void:
-	var cfg: Dictionary = BigGlade.describe_kind(_kind())
+	var village: bool = _kind() == VILLAGE
+	var cfg: Dictionary = VILLAGE_CFG if village else BigGlade.describe_kind(_kind())
+	if village:
+		var purposes: Array[Dictionary] = []
+		for p in VillageSpec.PURPOSES:
+			purposes.append({"id": p, "label": String(p).capitalize()})
+		cfg = cfg.duplicate(true)
+		cfg["purposes"] = purposes
 	_suspend_regen = true
 	for pair in [[width_slider, "width"], [length_slider, "length"],
 			[height_slider, "height"]]:
@@ -126,6 +155,11 @@ func _on_kind_changed() -> void:
 	width_label.text = "%s width (m)" % cfg["size_label"]
 	length_label.text = "%s length (m)" % cfg["size_label"]
 	height_label.text = cfg["height_label"]
+	if village:
+		width_label.text = "Population"
+		length_label.text = "Wealth (%)"
+	height_label.visible = not village
+	height_slider.visible = not village
 	var has_storeys: bool = cfg.has("storeys")
 	storeys_label.visible = has_storeys
 	storeys_slider.visible = has_storeys
@@ -151,7 +185,7 @@ func _on_kind_changed() -> void:
 	if trade_opt.item_count > 0:
 		trade_opt.select(0)
 	trade_label.text = "Trade" if _kind() == &"house" else ("Business" \
-		if _kind() == &"shop" else "Cult")
+		if _kind() == &"shop" else ("Purpose" if village else "Cult"))
 	trade_opt.visible = trade_opt.item_count > 0
 	trade_label.visible = trade_opt.visible
 	_suspend_regen = false
@@ -167,6 +201,9 @@ func regenerate() -> void:
 	buildings.clear()
 	variant_list.clear()
 	var base_seed: int = randi()
+	if _kind() == VILLAGE:
+		_regenerate_village(base_seed)
+		return
 	for i in range(VARIANTS):
 		var made: GeneratedBuilding = _build(base_seed + i * 7919)
 		if not made.is_ok():
@@ -181,6 +218,37 @@ func regenerate() -> void:
 	if buildings.is_empty():
 		return
 	current = clampi(current, 0, VARIANTS - 1)
+	_show(current)
+
+
+## Two villages planned from the sliders: population, wealth, culture and
+## purpose. Every building in them is generated through BigGlade by the lot
+## planner, so this is slower than a single building -- a few seconds each.
+func _regenerate_village(base_seed: int) -> void:
+	for i in range(VILLAGE_VARIANTS):
+		var spec := VillageSpec.new(base_seed + i * 7919)
+		spec.population = int(width_slider.value)
+		spec.wealth = clampf(length_slider.value / 100.0, 0.0, 1.0)
+		spec.culture = _get_style_key()
+		spec.purpose = _second_key() if _second_key() in VillageSpec.PURPOSES else &"farming"
+		if spec.enclosure == &"wall" and not spec.valid():
+			spec.enclosure = &"none"
+		spec.generate(spec.seed)
+		if not spec.valid():
+			push_error("village spec invalid: %s" % str(spec.errors()))
+			continue
+		var plan: VillagePlan = VillageLotPlanner.plan(spec)
+		if plan.roads.is_empty():
+			push_error("no site planner for the %s form yet" % String(spec.form))
+			continue
+		specs.append(spec)
+		meshes.append(VillageAssembler.ground_mesh(plan))
+		plans.append(plan)
+		buildings.append(null)
+		variant_list.add_item("%s (%s, %d buildings)" % [spec.variant_name, String(spec.form), plan.buildings.size()])
+	if specs.is_empty():
+		return
+	current = clampi(current, 0, specs.size() - 1)
 	_show(current)
 
 
@@ -220,12 +288,17 @@ func _show(idx: int) -> void:
 	var mesh: ArrayMesh = meshes[idx]
 	var s = specs[idx]
 	var cutaway: bool = cutaway_button.button_pressed if s is HouseSpec else true
-	_mesh_instance = BigGlade.instantiate(buildings[idx], cutaway)
+	if s is VillageSpec:
+		_mesh_instance = VillageAssembler.build(plans[idx], cutaway_button.button_pressed)
+	else:
+		_mesh_instance = BigGlade.instantiate(buildings[idx], cutaway)
 	viewport.get_node("ModelRoot").add_child(_mesh_instance)
 	variant_list.select(idx)
 	info_label.text = _describe(s)
 	_frame(mesh)
-	if s is ChurchSpec:
+	if s is VillageSpec:
+		bp_view.show_note(VillageAssembler.sheet(plans[idx]))
+	elif s is ChurchSpec:
 		bp_view.setup(s)
 	elif s is HouseSpec:
 		bp_view.show_note(_house_sheet(plans[idx]))
@@ -289,6 +362,11 @@ func _temple_sheet(s: TempleSpec) -> String:
 
 ## One line describing what was actually generated.
 func _describe(s) -> String:
+	if s is VillageSpec:
+		var plan: VillagePlan = plans[current]
+		return "%s -- a %s village of %d, %s, %s\n%d households, %d buildings on a %.0f x %.0f m site" % [
+			s.variant_name, String(s.form), s.population, String(s.culture),
+			String(s.purpose), s.households, plan.buildings.size(), plan.site.size.x, plan.site.size.y]
 	if s is TempleSpec:
 		return "%s -- %s of %s\n%.0f x %.0f m, %.0f m to the ceiling, %.0f m to the crown of the god" % [
 			s.variant_name, TempleSpec.FORMS[s.form]["label"],
