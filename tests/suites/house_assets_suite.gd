@@ -34,6 +34,13 @@ static func run() -> SuiteResult:
 			res.fail("%s measures %.3f x %.3f x %.3f, the catalogue says %.3f x %.3f x %.3f"
 				% [key, measured.size.x, measured.size.y, measured.size.z,
 					want.x, want.y, want.z])
+		# The flame is where the catalogue says it is (LAY-011): a lamp whose
+		# light hangs a metre from its model is a lamp somebody re-exported.
+		if PropCatalog.has_tag(key, PropCatalog.LIGHT):
+			var flame := Vector3(measured.get_center().x, measured.end.y, measured.get_center().z)
+			if (flame - PropCatalog.light_offset(key)).length() > TOL:
+				res.fail("%s has its flame at %v and the catalogue says %v"
+					% [key, flame, PropCatalog.light_offset(key)])
 		# A prop whose feet are not at its own origin has to be sat down by the
 		# assembler, which reads the offset from the catalogue. What matters is
 		# that the catalogue KNOWS -- an unrecorded offset is a floating chair.
@@ -44,6 +51,8 @@ static func run() -> SuiteResult:
 			else:
 				res.warn("%s has its feet %.2fm from its origin; the assembler drops it"
 					% [key, measured.position.y])
+
+	_check_lights(res)
 
 	# and every category a recipe asks for must have something in it
 	for kind in HouseFurnisher.RECIPES:
@@ -59,3 +68,43 @@ static func run() -> SuiteResult:
 				res.fail("the %s fittings ask for a '%s' and the catalogue has none"
 					% [String(trade), String(step2["cat"])])
 	return res
+
+
+## Lights that light (LAY-011): an assembled house, shop and hotel carry one
+## OmniLight3D for every piece of furniture the catalogue tags LIGHT, no more
+## and no fewer, and every one of them stands inside the building.
+static func _check_lights(res: SuiteResult) -> void:
+	var plans: Array = []
+	var house := HouseSpec.new()
+	house.style = &"cottage"
+	house.width = 9.0
+	house.length = 11.0
+	plans.append(["house", HouseGenerator.generate(house, 81001), HouseAssembler.build(HouseGenerator.generate(house, 81001))])
+	var shop := ShopSpec.new()
+	shop.business = &"tavern"
+	shop.width = 12.0
+	shop.length = 15.0
+	var shop_plan: HousePlan = ShopGenerator.generate(shop, 81002)
+	plans.append(["shop", shop_plan, ShopAssembler.build(shop_plan)])
+	var hotel := HotelSpec.new()
+	var hotel_plan: HousePlan = HotelGenerator.generate(hotel, 81003)
+	plans.append(["hotel", hotel_plan, HotelAssembler.build(hotel_plan)])
+	for row in plans:
+		var plan: HousePlan = row[1]
+		var root: Node3D = row[2]
+		var want := 0
+		for p in plan.furniture:
+			if PropCatalog.has_tag(p["key"], PropCatalog.LIGHT):
+				want += 1
+		var got: Array[Node] = root.find_children("*", "OmniLight3D", true, false)
+		res.checked += 1
+		if got.size() != want:
+			res.fail("%s: %d lights for %d lamps, sconces and candles" % [row[0], got.size(), want])
+		var extent: Rect2 = HouseGeometry.interior_rect(plan.spec).grow(HouseGeometry.WALL_T)
+		var top: float = plan.spec.height * float(plan.spec.storeys) + 0.5
+		for l in got:
+			var pos: Vector3 = (l as Node3D).position
+			if not extent.has_point(Vector2(pos.x, pos.z)) or pos.y < -0.1 or pos.y > top:
+				res.fail("%s: a light at %v is outside the building" % [row[0], pos])
+				break
+		root.free()

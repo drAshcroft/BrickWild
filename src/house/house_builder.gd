@@ -48,7 +48,7 @@ func _build_floor() -> void:
 	tag("floor")
 	var r: Rect2 = HouseGeometry.site_rect(spec)
 	var t: float = HouseGeometry.FLOOR_T
-	for level in range(_storeys()):
+	for level in _levels():
 		var y0 := float(level) * spec.height
 		var a := AABB(Vector3(r.position.x, y0, r.position.y),
 			Vector3(r.size.x, t, r.size.y))
@@ -57,8 +57,24 @@ func _build_floor() -> void:
 			_emit_floor_around(r, opening, y0, t, level)
 		else:
 			box(a.size, a.position + a.size / 2.0, SURF_FLOOR)
-			_log_mass("floor" if _storeys() == 1 else "floor_%d" % level, a)
+			_log_mass("floor" if _levels().size() == 1 else "floor_%d" % level, a, y0)
+	_build_pits()
 	_emit_stairs()
+
+
+## A storey below the ground is dug, not raised (INT-016): the pit is logged
+## as a negative mass, `dug`, the size of the site and a storey deep, so the
+## structural rules know there is earth outside the cellar's walls rather
+## than air. The walls and floor inside it stand on the pit floor.
+func _build_pits() -> void:
+	var r: Rect2 = HouseGeometry.site_rect(spec)
+	for level in _levels():
+		if level >= 0:
+			continue
+		var y0 := float(level) * spec.height
+		var pit := AABB(Vector3(r.position.x - HouseGeometry.WALL_T, y0, r.position.y - HouseGeometry.WALL_T),
+			Vector3(r.size.x + 2.0 * HouseGeometry.WALL_T, spec.height, r.size.y + 2.0 * HouseGeometry.WALL_T))
+		mass_log.append({"name": "pit_%d" % level, "aabb": pit, "ground": y0, "kind": "dug"})
 
 
 func _emit_floor_around(r: Rect2, hole: Rect2, y0: float, t: float,
@@ -78,12 +94,12 @@ func _emit_floor_around(r: Rect2, hole: Rect2, y0: float, t: float,
 			var size := Vector3(p.size.x, t, p.size.y)
 			var centre := Vector3(p.get_center().x, y0 + t / 2.0, p.get_center().y)
 			box(size, centre, SURF_FLOOR)
-			_log_mass("floor_%d_%d" % [level, emitted], AABB(centre - size / 2.0, size))
+			_log_mass("floor_%d_%d" % [level, emitted], AABB(centre - size / 2.0, size), y0)
 			emitted += 1
 
 
 func _stair_opening(level: int) -> Rect2:
-	if level <= 0:
+	if level <= _lowest():
 		return Rect2()
 	var stairs = plan.get("stairs")
 	if stairs == null:
@@ -118,16 +134,22 @@ func _emit_stairs() -> void:
 			stair.get("from_storey", stair.get("from_level", 0))))
 		var steps := maxi(4, int(stair.get("steps", 10)))
 		var step_h := spec.height / float(steps)
-		var run: float = footprint.size.y
+		# the flight climbs along the footprint's long side, which is the axis
+		# the planner laid the well on (it runs the room's long way, LAY-005)
+		var along_x: bool = footprint.size.x > footprint.size.y
+		var run: float = footprint.size.x if along_x else footprint.size.y
 		for s in range(steps):
-			var z: float = footprint.position.y + run * (float(s) + 0.5) / steps
+			var t: float = run * (float(s) + 0.5) / steps
 			var h := step_h * float(s + 1)
-			var step_size := Vector3(footprint.size.x, h, run / steps)
-			var step_center := Vector3(footprint.get_center().x,
-				from_level * spec.height + h / 2.0, z)
+			var step_size := Vector3(run / steps, h, footprint.size.y) if along_x \
+				else Vector3(footprint.size.x, h, run / steps)
+			var step_center := Vector3(footprint.position.x + t,
+					from_level * spec.height + h / 2.0, footprint.get_center().y) \
+				if along_x else Vector3(footprint.get_center().x,
+					from_level * spec.height + h / 2.0, footprint.position.y + t)
 			box(step_size, step_center, SURF_FLOOR)
 			_log_mass("stair_%d_step_%d" % [index, s],
-				AABB(step_center - step_size / 2.0, step_size))
+				AABB(step_center - step_size / 2.0, step_size), from_level * spec.height)
 
 
 # ------------------------------------------------------------------ walls
@@ -135,7 +157,7 @@ func _emit_stairs() -> void:
 func _build_exterior_walls() -> void:
 	tag("wall")
 	var h: float = spec.height
-	for level in range(_storeys()):
+	for level in _levels():
 		var y0 := float(level) * h
 		for run in HouseGeometry.exterior_runs(spec):
 			var from: Vector2 = run["from"]
@@ -144,15 +166,15 @@ func _build_exterior_walls() -> void:
 			var openings: Array[Dictionary] = _openings_on(from, to, normal, level)
 			_wall_run(from, to, HouseGeometry.WALL_T, h, openings, SURF_WALL, y0)
 			var a: AABB = _run_aabb(from, to, HouseGeometry.WALL_T, h, y0)
-			var suffix := "" if _storeys() == 1 else "_%d" % level
-			_log_mass("wall_%s%s" % [String(run["side"]), suffix], a)
+			var suffix := "" if _levels().size() == 1 else "_%d" % level
+			_log_mass("wall_%s%s" % [String(run["side"]), suffix], a, y0)
 	total_height = maxf(total_height, h * _storeys())
 
 
 func _build_partitions() -> void:
 	tag("partition")
 	var h: float = spec.height
-	for level in range(_storeys()):
+	for level in _levels():
 		var y0 := float(level) * h
 		var seen := {}
 		for i in range(plan.room_count()):
@@ -193,9 +215,9 @@ func _build_partitions() -> void:
 						"bottom": 0.0, "top": HouseGeometry.DOOR_H, "kind": "door",
 						"normal": normal})
 				_wall_run(from, to, HouseGeometry.INNER_WALL_T, h, openings, SURF_WALL, y0)
-				var suffix := "" if _storeys() == 1 else "_%d" % level
+				var suffix := "" if _levels().size() == 1 else "_%d" % level
 				_log_mass("partition_%d_%d%s" % [i, j, suffix],
-					_run_aabb(from, to, HouseGeometry.INNER_WALL_T, h, y0))
+					_run_aabb(from, to, HouseGeometry.INNER_WALL_T, h, y0), y0)
 
 
 ## Every door and window cut into one exterior wall run, as distances along it.
@@ -219,7 +241,8 @@ func _openings_on(from: Vector2, to: Vector2, normal: Vector2, level := 0) -> Ar
 		if not _on_run(from, to, normal, w["pos"], w["normal"]):
 			continue
 		out.append({"t": _along(from, to, w["pos"]), "w": float(w["width"]),
-			"bottom": float(w["sill"]), "top": float(w["head"]), "kind": "window",
+			"bottom": float(w["sill"]), "top": float(w["head"]),
+			"kind": "hatch" if w.get("hatch", false) else "window",
 			"normal": normal})
 	return out
 
@@ -336,9 +359,24 @@ static func _run_aabb(from: Vector2, to: Vector2, thick: float, height: float,
 
 
 ## Plans made before the upper-floor schema default all records to ground level.
+## Storeys above the ground; the roof and the chimney are measured off them.
 func _storeys() -> int:
 	var raw = spec.get("storeys")
 	return maxi(1, int(raw)) if raw != null else 1
+
+
+## Storeys dug below the ground (INT-016), 0 for a house without a cellar.
+func _lowest() -> int:
+	var raw = spec.get("cellars")
+	return -maxi(0, int(raw)) if raw != null else 0
+
+
+## Every level the shell is built on, lowest first.
+func _levels() -> Array[int]:
+	var out: Array[int] = []
+	for level in range(_lowest(), _storeys()):
+		out.append(level)
+	return out
 
 
 static func _has_storey_metadata(record: Dictionary) -> bool:
@@ -575,16 +613,23 @@ func _build_chimney() -> void:
 	# fire below is always at the foot of this flue. Nothing here chooses.
 	var host: int = plan.hearth_room()
 	if host >= 0:
-		var f: Rect2 = HouseGeometry.room_floor_rect(plan, host)
+		# along the wall, the stack stands where the fire does: over the
+		# focus once the furnisher has written the hearth back to it, else
+		# over the middle of the clear run the planner chose the wall for
+		var span: Vector2 = HousePlanner.clear_wall_span(plan, host, plan.hearth_wall())
+		var along: float = (span.x + span.y) / 2.0
+		if plan.focus_room() == host and plan.focus_cat() == "hearth" \
+				and plan.focus_pos().is_finite():
+			along = plan.focus_pos().x if plan.hearth_wall() <= 1 else plan.focus_pos().y
 		match plan.hearth_wall():
 			0:
-				c = Vector2(f.get_center().x, r.position.y - s / 2.0 + 0.15)
+				c = Vector2(along, r.position.y - s / 2.0 + 0.15)
 			1:
-				c = Vector2(f.get_center().x, r.end.y + s / 2.0 - 0.15)
+				c = Vector2(along, r.end.y + s / 2.0 - 0.15)
 			2:
-				c = Vector2(r.position.x - s / 2.0 + 0.15, f.get_center().y)
+				c = Vector2(r.position.x - s / 2.0 + 0.15, along)
 			_:
-				c = Vector2(r.end.x + s / 2.0 - 0.15, f.get_center().y)
+				c = Vector2(r.end.x + s / 2.0 - 0.15, along)
 	# A stack clears the roof beside it, not the ridge at the far end of the
 	# house. On a steeply pitched hut the ridge is six metres up, and a chimney
 	# built to that reads as a factory.

@@ -49,6 +49,17 @@ var compromises: Dictionary = {}
 ## HouseFurnisher stands the hearth against it, so the fire and the flue are
 ## never on different walls again.
 var hearth: Dictionary = {}
+## What the house is arranged around: {"room": int, "cat": String,
+## "pos": Vector2, "facing": float, "faces_door": bool}, or empty.
+##
+## The temple's axis (gate -> altar -> idol) is a focus with rules about it; a
+## hall's hearth, a shop's counter, a smithy's forge, a throne are the same
+## idea. The planner names the room, the category and where it should stand;
+## the furnisher pins that piece there, records where it actually put it, and
+## scores tables and seats toward it; HouseFurnishCheck's `focus` rule reads
+## the record back and proves the piece is there and, when `faces_door` is
+## set, that it looks at the way in. (INT-002)
+var focus: Dictionary = {}
 
 
 ## The room the chimney serves, or -1 when no hearth was planned.
@@ -59,6 +70,33 @@ func hearth_room() -> int:
 ## The wall of that room the fire and the flue share, or -1.
 func hearth_wall() -> int:
 	return int(hearth.get("wall", -1)) if not hearth.is_empty() else -1
+
+
+## The room the focus stands in, or -1 when the plan has none.
+func focus_room() -> int:
+	return int(focus.get("room", -1)) if not focus.is_empty() else -1
+
+
+## The prop category that IS the focus: "hearth", "counter", "anvil", ...
+func focus_cat() -> String:
+	return String(focus.get("cat", "")) if not focus.is_empty() else ""
+
+
+## Where it stands, in plan space (X, Z).
+func focus_pos() -> Vector2:
+	return Vector2(focus.get("pos", Vector2(INF, INF))) if not focus.is_empty() \
+		else Vector2(INF, INF)
+
+
+## The yaw it looks along; HouseFurnisher._facing_of() turns it into a vector.
+func focus_facing() -> float:
+	return float(focus.get("facing", 0.0)) if not focus.is_empty() else 0.0
+
+
+## Must the focus look at the door people come in by? A counter does, a
+## fireplace does not.
+func focus_faces_door() -> bool:
+	return bool(focus.get("faces_door", false)) if not focus.is_empty() else false
 
 
 ## Was `cat` given up in this room for the sake of getting about?

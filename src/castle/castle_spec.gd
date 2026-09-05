@@ -36,6 +36,28 @@ var plan_kind: StringName = &"rect"
 ## Sides of the enceinte: 4 for &"rect", POLY_MIN_SIDES..POLY_MAX_SIDES for
 ## &"polygon".
 var sides: int = 4
+## The tower house (CAS-006; plan_kind &"tower_house"): the house tier grown
+## up instead of out. `tower_storeys` 4-6; `tower_type` &"bologna" (a slender
+## shaft on a base of 10 m or less, four times as tall as wide) or
+## &"scottish" (broader, twice as tall as wide); `jog` &"none", &"l" or &"z"
+## for the second mass sharing a wall with the shaft.
+var tower_storeys: int = 4
+var tower_type: StringName = &"bologna"
+var jog: StringName = &"none"
+## The ridge castle (CAS-007; plan_kind &"ridge"): ranges strung along a
+## polyline spine with a tower at every bend and both ends, and no bailey.
+## `ridge_points` is how many vertices the spine has (3-6); the ranges are
+## `hall_w` wide and `tower_storeys` tall.
+var ridge_points: int = 4
+## The motte and bailey (CAS-005; plan_kind &"motte_bailey"): a mound behind
+## the bailey with a shell keep on its flat top, joined to the bailey by a
+## curtain climbing the slope. `motte_height` 6-15 m by tier, `motte_batter`
+## the slope in degrees (30-40); the keep's outer diameters are keep_w and
+## keep_l and its wall `shell_thickness`.
+## 0 until the generator (or a refit onto this plan kind) sizes the mound.
+var motte_height: float = 0.0
+var motte_batter: float = 35.0
+var shell_thickness: float = 1.2
 
 # curtain walls (castle and fortress)
 var curtain: bool
@@ -51,6 +73,12 @@ var tower_height: float
 var tower_roof: StringName       # &"cone", &"pyramid", &"flat", &"tiered"
 var corner_towers: bool
 var side_towers: int             # extra towers per long side, between corners
+## The great tower (CAS-002): one vertex tower of the outer ring that is
+## bigger than the rest -- the Eagle Tower, the Torre de la Vela -- as the
+## index of the vertex it stands on, or -1 for none; and how much bigger, in
+## [1.5, 2.0] across. Its height grows with it (CastleGeometry.tower_height_at).
+var great_tower: int = -1
+var great_tower_scale: float = 1.0
 
 # gate
 var gatehouse: bool
@@ -66,6 +94,9 @@ var ward_gap: float              # clear ground between the two curtains
 # buildings inside, or the whole building at house/manor tier
 var keep: bool
 var keep_shape: StringName       # &"square", &"round", &"shell", &"tiered"
+## How far east (+) or west (-) of the axis the keep stands, in metres; the
+## White Tower is in the south-east corner of its ward. 0 is on the axis.
+var keep_offset: float = 0.0
 var keep_w: float
 var keep_l: float
 var keep_height: float
@@ -109,17 +140,63 @@ static func tier_for(w: float, l: float) -> StringName:
 	return &"fortress"
 
 
+## How likely each walled style is to have a great tower at all. Drawn from a
+## generator of its own (see plan_for) so the rest of the design is unmoved.
+const GREAT_TOWER_CHANCE := {
+	&"norman": 0.7, &"edwardian": 0.75, &"crusader": 0.5, &"french_chateau": 0.4,
+	&"bavarian": 0.6, &"japanese": 0.3, &"moorish": 0.7,
+}
+
+
+## The great tower a (style, tier, seed) asks for, as {"vertex": int,
+## "scale": float}; vertex -1 means none. Pure and on its own generator, like
+## plan_for, so switching it on did not redesign every castle after it.
+static func great_tower_for(style: StringName, tier: StringName, p_seed: int,
+		vertices: int) -> Dictionary:
+	var none := {"vertex": -1, "scale": 1.0}
+	if (tier != &"castle" and tier != &"fortress") or vertices <= 0:
+		return none
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("great|%s|%s|%d" % [String(style), String(tier), p_seed])
+	if r.randf() >= float(GREAT_TOWER_CHANCE.get(style, 0.5)):
+		return none
+	return {"vertex": r.randi_range(0, vertices - 1), "scale": r.randf_range(1.5, 2.0)}
+
+
+## How likely each style is to build a tall enough house or manor site as a
+## tower house rather than as a range (CAS-006). Only asked when the height
+## the user locked is at least twice the longer side: a tower is a tower
+## because of its proportion, and a squat one is a house.
+const TOWER_HOUSE_CHANCE := {
+	&"norman": 0.6, &"edwardian": 0.4, &"crusader": 0.3, &"french_chateau": 0.3,
+	&"bavarian": 0.5, &"japanese": 0.0, &"moorish": 0.5,
+}
+
+
+## Whether a (style, tier, seed) on a site this tall grows into a tower house,
+## on its own generator like plan_for.
+static func tower_house_for(style: StringName, tier: StringName, p_seed: int,
+		w: float, l: float, h: float) -> bool:
+	if tier != &"house" and tier != &"manor":
+		return false
+	if h < 2.0 * maxf(w, l):
+		return false
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("tower|%s|%s|%d" % [String(style), String(tier), p_seed])
+	return r.randf() < float(TOWER_HOUSE_CHANCE.get(style, 0.3))
+
+
 ## How likely each style is to lay its enceinte out as a polygon rather than a
 ## rectangle, and which side counts it would use. Only the walled tiers have an
 ## enceinte to shape at all, so the table is consulted for castle and fortress.
 ## Caernarfon and Conwy are polygonal, Castel del Monte is a regular octagon;
 ## a Norman motte castle and a Japanese hirajiro are rectangular, and stay so.
 const PLANS := {
-	&"norman": {"polygon": 0.0, "sides": [6]},
+	&"norman": {"polygon": 0.0, "sides": [6], "motte": 0.45},
 	&"edwardian": {"polygon": 0.5, "sides": [6, 8]},
 	&"crusader": {"polygon": 0.35, "sides": [5, 6]},
 	&"french_chateau": {"polygon": 0.25, "sides": [6, 8]},
-	&"bavarian": {"polygon": 0.35, "sides": [5, 6, 7]},
+	&"bavarian": {"polygon": 0.2, "sides": [5, 6, 7], "ridge": 0.45},
 	&"japanese": {"polygon": 0.0, "sides": [8]},
 	&"moorish": {"polygon": 0.3, "sides": [6, 8]},
 }
@@ -137,6 +214,15 @@ static func plan_for(style: StringName, tier: StringName, p_seed: int) -> Dictio
 	var row: Dictionary = PLANS.get(style, {"polygon": 0.0, "sides": [6]})
 	var r := RandomNumberGenerator.new()
 	r.seed = hash("%s|%s|%d" % [String(style), String(tier), p_seed])
+	# a ridge castle first (CAS-007): Neuschwanstein is a ridge before it is
+	# anything else, and only on a site long enough to string ranges along
+	var ridge: float = float(row.get("ridge", 0.0))
+	if ridge > 0.0 and r.randf() < ridge:
+		return {"kind": &"ridge", "sides": 4}
+	# a motte and bailey (CAS-005): the Norman plan before the stone one
+	var motte: float = float(row.get("motte", 0.0))
+	if motte > 0.0 and r.randf() < motte:
+		return {"kind": &"motte_bailey", "sides": 4}
 	if r.randf() >= float(row["polygon"]):
 		return rect
 	var opts: Array = row["sides"]

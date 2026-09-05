@@ -35,16 +35,23 @@ const DOMINANCE := 2.0
 ## And at least this share of the height of the room it stands in.
 const IDOL_SHARE := 0.4
 
+## The ten rules, in the order they run. A family may replace one through
+## `check(spec, builder, overrides)` (RuleSet, INT-020): a replacement is
+## called with (spec, builder).
+const RULES: Array[StringName] = [&"axis", &"sightline", &"procession", &"approach",
+	&"congregation", &"dominance", &"symmetry", &"fire", &"pit", &"cells"]
+
 var failures: Array[String] = []
 var warnings: Array[String] = []
 var stats: Dictionary = {}
+var replaced: Dictionary = {}
 
 var _spec: TempleSpec
 var _builder: TempleBuilder
 var _grid: WalkGrid
 
 
-func check(spec: TempleSpec, builder: TempleBuilder) -> Dictionary:
+func check(spec: TempleSpec, builder: TempleBuilder, overrides: Dictionary = {}) -> Dictionary:
 	failures.clear()
 	warnings.clear()
 	stats.clear()
@@ -52,18 +59,10 @@ func check(spec: TempleSpec, builder: TempleBuilder) -> Dictionary:
 	_builder = builder
 
 	_walk()
-	_check_axis()
-	_check_sightline()
-	_check_procession()
-	_check_approach()
-	_check_congregation()
-	_check_dominance()
-	_check_symmetry()
-	_check_fire()
-	_check_pit()
-	_check_cells()
+	replaced = RuleSet.run(self, RULES, {}, overrides, [], [spec, builder],
+		failures, warnings)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
-		"stats": stats}
+		"stats": stats, "replaced": replaced}
 
 
 # ------------------------------------------------------------------ walking
@@ -116,6 +115,12 @@ func _check_axis() -> void:
 
 ## You have to be able to see the god from the door.
 ##
+## The house equivalent of this axis is `HousePlan.focus` (INT-002): the
+## hearth, counter or anvil a room is arranged around, pinned by the planner,
+## scored toward by the furnisher and proved by HouseFurnishCheck's `focus`
+## rule. This check is not rewritten on top of it -- a temple's focus is a
+## line, not a point -- but the two are the same idea.
+##
 ## The line is cast from a person's eye at the gate to the idol's upper half,
 ## and every structural mass is tested against it -- everything except the idol
 ## itself, the floor it all stands on, and the altar and dais, which are meant
@@ -133,7 +138,7 @@ func _check_sightline() -> void:
 		var name: String = m["name"]
 		if _exempt_from_sightline(name):
 			continue
-		if _segment_hits(from, to, m["aabb"]):
+		if Sightline.hits(from, to, m["aabb"]):
 			blocked.append(name)
 	stats["sightline_blockers"] = blocked.size()
 	if not blocked.is_empty():
@@ -148,30 +153,8 @@ static func _exempt_from_sightline(name: String) -> bool:
 	return false
 
 
-## Does a segment pass through a box? Slab method, which is the shortest honest
-## way to answer it.
-static func _segment_hits(from: Vector3, to: Vector3, box: AABB) -> bool:
-	var d: Vector3 = to - from
-	var t0 := 0.0
-	var t1 := 1.0
-	for axis in range(3):
-		var lo: float = box.position[axis]
-		var hi: float = lo + box.size[axis]
-		if absf(d[axis]) < 0.00001:
-			if from[axis] < lo or from[axis] > hi:
-				return false
-			continue
-		var ta: float = (lo - from[axis]) / d[axis]
-		var tb: float = (hi - from[axis]) / d[axis]
-		if ta > tb:
-			var swap: float = ta
-			ta = tb
-			tb = swap
-		t0 = maxf(t0, ta)
-		t1 = minf(t1, tb)
-		if t0 > t1:
-			return false
-	return true
+## The segment-against-boxes test itself lives in qa/sightline.gd, shared with
+## the house focus rule and the courtyard checks (INT-020).
 
 
 # --------------------------------------------------------------- procession

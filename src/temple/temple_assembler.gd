@@ -79,14 +79,18 @@ static func _instance(p: Dictionary) -> Node3D:
 ## pitch black in the render would be a harness lying to itself.
 static func _light_the_fires(root: Node3D, builder: TempleBuilder,
 		spec: TempleSpec) -> void:
+	# the same lamp the houses get (LightKit, LAY-011), at the measured flame
+	# of each brazier, in the cult's colour and with a brazier's reach
+	var reach: float = TempleGeometry.LIGHT_REACH * 1.5 / float(LightKit.TABLE["brazier"]["reach"])
 	for p in builder.prop_log:
 		if p["kind"] != &"light":
 			continue
-		var lamp := OmniLight3D.new()
-		lamp.light_color = spec.glow_color
-		lamp.light_energy = 2.4
-		lamp.omni_range = TempleGeometry.LIGHT_REACH * 1.5
-		lamp.omni_attenuation = 1.4
+		var key: String = p["key"]
+		var s: float = float(p.get("scale", 1.0))
 		var pos: Vector3 = p["pos"]
-		lamp.position = Vector3(pos.x, pos.y + 1.0, pos.z)
+		var drop: float = PropCatalog.floor_offset(key) * s
+		var yaw: float = float(p.get("yaw", 0.0)) + PropCatalog.face_offset(key)
+		var lamp: OmniLight3D = LightKit.for_prop(key, Vector3(pos.x, pos.y - drop, pos.z),
+			yaw, s, spec.glow_color, reach)
+		lamp.light_energy = 2.4
 		root.add_child(lamp)

@@ -38,13 +38,16 @@ extends SceneTree
 ##  25 village    - VillageSpec's derived fields and VillagePlan's helpers/purity
 ##  26 vsite      - the site planner: through road, common, landmark slot, streets
 ##  27 vlot       - the lot planner: frontages, setbacks, fire gaps, corner lots
+##  28 vcheck     - the village checks: scale, roads, lots, places (VIL-006..009)
+##  29 world      - the buildings of the wider world (WORLD_BUILDINGS), as
+##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "church", "normals", "massing", "blueprint", "landmark",
 	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa",
 	"house", "assets", "houseqa", "hmultistory", "harchetype",
 	"shop", "sarchetype",
 	"hotel", "hlandmark",
 	"temple", "rite", "tarchetype",
-	"village", "vsite", "vlot"]
+	"village", "vsite", "vlot", "vcheck", "world", "warchetype"]
 
 
 static func _run_one(key: String) -> SuiteResult:
@@ -107,6 +110,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return VillageSiteSuite.run()
 		"vlot":
 			return VillageLotSuite.run()
+		"vcheck":
+			return VillageCheckSuite.run()
+		"world", "warchetype":
+			return WorldArchetypeSuite.run()
 	return null
 
 

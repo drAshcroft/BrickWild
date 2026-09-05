@@ -44,6 +44,11 @@ func _init() -> void:
 				snappedf(aabb.get_center().y, 0.001),
 				snappedf(aabb.get_center().z, 0.001)],
 			"floor": snappedf(aabb.position.y, 0.001),
+			# where a light goes if this prop is one: the top centre of the
+			# model, which is where the flame of every lamp in this pack is
+			"light": [snappedf(aabb.get_center().x, 0.001),
+				snappedf(aabb.end.y, 0.001),
+				snappedf(aabb.get_center().z, 0.001)],
 		}
 
 	var f := FileAccess.open(OUT, FileAccess.WRITE)

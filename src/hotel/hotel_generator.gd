@@ -31,7 +31,7 @@ static func generate(spec: HotelSpec, p_seed: int) -> HousePlan:
 	spec.frame_braces = false
 	spec.frame_rail = false
 	spec.clutter = r.randf_range(0.58, 0.78)
-	spec.room_count = 6
+	spec.room_count = HotelPlanner.rooms_on_level(spec, 0)
 	spec.program = HotelPlanner.GROUND_KINDS.duplicate()
 	spec.wall_color = Color(style["wall"][0]).lerp(Color(style["wall"][1]), r.randf())
 	spec.trim_color = Color(style["trim"][0]).lerp(Color(style["trim"][1]), r.randf())

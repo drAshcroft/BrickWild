@@ -39,7 +39,45 @@ const LANDMARKS: Array[Dictionary] = [
 		"width": 200.0, "length": 70.0, "height": 16.0},
 	{"key": "windsor", "style": &"norman", "tier": &"fortress",
 		"width": 200.0, "length": 120.0, "height": 18.0},
+	# WORLD_BUILDINGS 5: the Merchant's tower, a Bologna tower house
+	{"key": "merchants_tower", "style": &"norman", "tier": &"house",
+		"width": 8.0, "length": 8.0, "height": 45.0},
+	# CAS-011: ten more, each forcing a feature the generator could not make
+	{"key": "tower_of_london", "style": &"norman", "tier": &"fortress",
+		"width": 130.0, "length": 110.0, "height": 10.0},
+	{"key": "conwy", "style": &"edwardian", "tier": &"castle",
+		"width": 100.0, "length": 40.0, "height": 15.0},
+	{"key": "carcassonne", "style": &"french_chateau", "tier": &"fortress",
+		"width": 300.0, "length": 180.0, "height": 10.0},
+	{"key": "malbork", "style": &"norman", "tier": &"fortress",
+		"width": 320.0, "length": 140.0, "height": 15.0},
+	{"key": "castel_del_monte", "style": &"crusader", "tier": &"castle",
+		"width": 56.0, "length": 56.0, "height": 24.0},
+	{"key": "edinburgh", "style": &"edwardian", "tier": &"castle",
+		"width": 200.0, "length": 100.0, "height": 15.0},
+	{"key": "eilean_donan", "style": &"norman", "tier": &"castle",
+		"width": 60.0, "length": 50.0, "height": 12.0},
+	{"key": "caerphilly", "style": &"edwardian", "tier": &"fortress",
+		"width": 240.0, "length": 200.0, "height": 12.0},
+	{"key": "dover", "style": &"norman", "tier": &"fortress",
+		"width": 200.0, "length": 150.0, "height": 15.0},
+	{"key": "mont_saint_michel", "style": &"french_chateau", "tier": &"fortress",
+		"width": 120.0, "length": 80.0, "height": 40.0},
 ]
+
+## Rows whose defining feature needs a plan kind the generator does not have
+## yet, and the task that would add it. They are built at every scale so a
+## crash is still caught, and their feature assertion is reported as an
+## expected failure rather than a defect; when the task lands and the row
+## passes, it comes off this list.
+const EXPECTED_FAIL := {
+	"conwy": "two wards side by side (no backlog task yet)",
+	"malbork": "three wards in a line, brick (no backlog task yet)",
+	"edinburgh": "terraced baileys (INT-016)",
+	"eilean_donan": "island and causeway: a water plan kind (no backlog task yet)",
+	"caerphilly": "two moats: a water plan kind (no backlog task yet)",
+	"mont_saint_michel": "a church on a terraced ring (INT-016, WLD church composition)",
+}
 
 
 static func run() -> SuiteResult:
@@ -65,7 +103,17 @@ static func run() -> SuiteResult:
 
 			if spec.tier != landmark["tier"]:
 				res.fail("%s: tier_override did not hold (%s)" % [who, String(spec.tier)])
-			_check_required_masses(key, spec, builder, who, res, scale)
+			if EXPECTED_FAIL.has(key):
+				# the massing still has to be sound; only the feature is excused
+				var probe := SuiteResult.new("probe")
+				_check_required_masses(key, spec, builder, who, probe, scale)
+				if probe.failures.is_empty():
+					res.note("  %s: expected to fail (%s) and passed -- take it off EXPECTED_FAIL"
+						% [who, String(EXPECTED_FAIL[key])])
+				elif is_equal_approx(scale, 1.0):
+					res.note("  %s: expected-fail, blocked by %s" % [key, String(EXPECTED_FAIL[key])])
+			else:
+				_check_required_masses(key, spec, builder, who, res, scale)
 			var rep: Dictionary = CastleMassingCheck.new().check(spec, builder)
 			for f in rep["failures"]:
 				res.fail("%s: %s" % [who, str(f)])
@@ -93,9 +141,12 @@ static func _check_castel_del_monte(res: SuiteResult) -> void:
 		spec.length = 56.0 * scale
 		spec.height = 24.0 * scale
 		CastleGenerator.generate(spec, _seed_for("castel_del_monte", scale))
-		# a square site, so the octagon is regular and the mirrors are exact
+		# a square site, so the octagon is regular and the mirrors are exact;
+		# eight towers of one size, so no great tower (CAS-002)
 		spec.corner_towers = true
 		spec.gate_towers = false
+		spec.great_tower = -1
+		spec.great_tower_scale = 1.0
 		_force_plan(spec, &"polygon", 8)
 
 		var builder := CastleBuilder.new()
@@ -167,15 +218,28 @@ static func _force_features(key: String, spec: CastleSpec) -> void:
 			spec.side_towers = maxi(spec.side_towers, 1)
 		"caernarfon":
 			# the polygonal enceinte itself: a walled circuit that turns at every
-			# tower rather than at four corners
+			# tower rather than at four corners -- and the Eagle Tower at the
+			# west end, 28 m to the parapet at full size (CAS-002)
 			_force_plan(spec, &"polygon", 7)
 			spec.tower_shape = &"polygonal"
 			spec.corner_towers = true
 			spec.gate_towers = true
+			spec.great_tower = 1
+			spec.great_tower_scale = 1.6
+			spec.tower_height = 28.0 * (spec.height / 12.0) \
+				/ CastleGeometry.great_tower_height_factor(spec.great_tower_scale)
+			CastleGenerator.refit(spec)
 		"neuschwanstein":
+			# a ridge of ranges (CAS-007), the northern tower to 65 m at
+			# full size, spires and dormers
+			_force_plan(spec, &"ridge", 0)
 			spec.tower_roof = &"cone"
 			spec.corner_towers = true
 			spec.dormers = true
+			spec.great_tower = CastleGeometry.spine(spec).size() - 1
+			spec.great_tower_scale = 2.0
+			spec.tower_height = 65.0 * (spec.height / 25.0) \
+				/ CastleGeometry.great_tower_height_factor(spec.great_tower_scale)
 		"himeji":
 			spec.keep_shape = &"tiered"
 			spec.tower_roof = &"tiered"
@@ -192,9 +256,94 @@ static func _force_features(key: String, spec: CastleSpec) -> void:
 			spec.tower_shape = &"square"
 			spec.tower_roof = &"flat"
 			spec.side_towers = maxi(spec.side_towers, 2)
+			# the Torre de la Vela: 16 x 16 m in plan and 26.8 m high, at the
+			# back corner of the alcazaba (CAS-002)
+			spec.great_tower = 3
+			spec.great_tower_scale = 2.0
+			spec.tower_size = 8.0 * (spec.height / 16.0) / spec.great_tower_scale
+			spec.tower_height = 26.8 * (spec.height / 16.0) \
+				/ CastleGeometry.great_tower_height_factor(spec.great_tower_scale)
+			CastleGenerator.refit(spec)
 		"windsor":
+			# a motte and bailey (CAS-005): the Round Tower, 30.5 x 27.5 m
+			# inside its shell, on the mound behind the upper ward
+			_force_plan(spec, &"motte_bailey", 4)
 			spec.keep_shape = &"shell"
 			spec.corner_towers = true
+			var sc: float = spec.height / 18.0
+			# the motte itself is 15 m; the refit keeps the mound as given and
+			# only pulls the keep in when the site cannot hold the two
+			spec.motte_height = 15.0 * sc
+			spec.motte_batter = 35.0
+			spec.keep_w = 30.5 * sc + 2.0 * spec.shell_thickness
+			spec.keep_l = 27.5 * sc + 2.0 * spec.shell_thickness
+			spec.keep_height = maxf(spec.keep_height, 20.0 * sc - spec.motte_height)
+			CastleGenerator.refit(spec)
+		"merchants_tower":
+			spec.plan_kind = &"tower_house"
+			spec.jog = &"l"
+			CastleGenerator.refit(spec)
+		"tower_of_london":
+			# concentric, with the White Tower -- a great square keep -- in
+			# the south-east of the inner ward rather than on the axis
+			_force_plan(spec, &"rect", 4)
+			_force_concentric(spec)
+			spec.keep_shape = &"square"
+			spec.chapel = false
+			_square_keep(spec)
+			spec.keep_offset = CastleGeometry.bailey_rect(spec).size.x * 0.2
+			CastleGenerator.refit(spec)
+		"conwy":
+			# eight towers, two wards side by side
+			_force_plan(spec, &"rect", 4)
+			spec.tower_shape = &"round"
+			spec.corner_towers = true
+			spec.side_towers = maxi(spec.side_towers, 2)
+		"carcassonne":
+			# a double wall with a town inside: the inner ward is most of
+			# the outer
+			_force_plan(spec, &"rect", 4)
+			_force_concentric(spec)
+			spec.keep = false
+		"malbork":
+			_force_plan(spec, &"rect", 4)
+			spec.keep_shape = &"square"
+		"castel_del_monte":
+			spec.corner_towers = true
+			spec.gate_towers = false
+			spec.great_tower = -1
+			spec.great_tower_scale = 1.0
+			spec.tower_shape = &"polygonal"
+			_force_plan(spec, &"polygon", 8)
+		"edinburgh":
+			_force_plan(spec, &"ridge", 0)
+			spec.corner_towers = true
+		"eilean_donan":
+			_force_plan(spec, &"rect", 4)
+			spec.keep_shape = &"square"
+		"caerphilly":
+			_force_plan(spec, &"rect", 4)
+			_force_concentric(spec)
+		"dover":
+			# concentric, with a great square keep on the axis
+			_force_plan(spec, &"rect", 4)
+			_force_concentric(spec)
+			spec.keep_shape = &"square"
+			_square_keep(spec)
+			spec.keep_height = maxf(spec.keep_height, CastleGeometry.wall_height(spec, 0) * 1.5)
+			CastleGenerator.refit(spec)
+		"mont_saint_michel":
+			_force_plan(spec, &"rect", 4)
+
+
+## A great square keep is square: the generator sizes a keep off the ward's
+## two sides, which makes an oblong one, so the landmarks that are square in
+## plan take the smaller side for both.
+static func _square_keep(spec: CastleSpec) -> void:
+	var cap: Vector2 = CastleGeometry.max_keep_size(spec)
+	var side: float = minf(minf(spec.keep_w, spec.keep_l), minf(cap.x, cap.y))
+	spec.keep_w = side
+	spec.keep_l = side
 
 
 ## Force the plan kind a real landmark has, then settle the sizes that depend
@@ -240,6 +389,9 @@ static func _check_required_masses(key: String, spec: CastleSpec,
 			_require(builder, who, res, "keep", "residential range in the courtyard")
 		"caernarfon":
 			_require(builder, who, res, "tower_0_corner_6", "a tower at every angle of the circuit")
+			var eagle: AABB = builder.mass_aabb("tower_0_corner_1")
+			if absf(eagle.size.y - 28.0 * scale) > 0.1:
+				res.fail("%s: the Eagle Tower is %.1fm to the parapet, wants %.1f" % [who, eagle.size.y, 28.0 * scale])
 			for seg in CastleGeometry.wall_segments(spec, 0):
 				_require(builder, who, res, "wall_0_%s" % String(seg["name"]),
 					"curtain following the polygon")
@@ -247,6 +399,17 @@ static func _check_required_masses(key: String, spec: CastleSpec,
 		"neuschwanstein":
 			_require(builder, who, res, "tower_0_corner_0", "corner towers with spires")
 			_require(builder, who, res, "hall", "palas range")
+			if spec.plan_kind != &"ridge":
+				res.fail("%s: the plan is %s, not a ridge" % [who, String(spec.plan_kind)])
+			var run: float = CastleGeometry.spine_length(spec)
+			if run < 120.0 * scale - 0.1:
+				res.fail("%s: the spine runs %.1fm, wants %.0f" % [who, run, 120.0 * scale])
+			var north: AABB = builder.mass_aabb("tower_0_corner_%d" % (CastleGeometry.spine(spec).size() - 1))
+			if absf(north.size.y - 65.0 * scale) > 0.1:
+				res.fail("%s: the northern tower is %.1fm, wants %.1f" % [who, north.size.y, 65.0 * scale])
+			for banned in ["wall_0", "gate_0", "keep", "chapel"]:
+				if builder.has_mass(banned):
+					res.fail("%s: a ridge castle has a %s mass" % [who, banned])
 		"himeji":
 			_require(builder, who, res, "keep", "tiered tenshu")
 		"chambord":
@@ -261,8 +424,90 @@ static func _check_required_masses(key: String, spec: CastleSpec,
 				res.fail("%s: at full size Krak must be concentric, and is not" % who)
 		"alhambra":
 			_require(builder, who, res, "tower_0_side_0", "square mural towers")
+			_require(builder, who, res, "tower_0_corner_3", "the Torre de la Vela")
+			var vela: AABB = builder.mass_aabb("tower_0_corner_3")
+			if absf(vela.size.y - 26.8 * scale) > 0.1:
+				res.fail("%s: the Torre de la Vela is %.1fm high, wants %.1f" % [who, vela.size.y, 26.8 * scale])
+			var side: float = CastleGeometry.tower_half_at(spec, 0, 3) * 2.0
+			if absf(side - 16.0 * scale) > 0.1:
+				res.fail("%s: the Torre de la Vela is %.1fm square, wants %.1f" % [who, side, 16.0 * scale])
 		"windsor":
 			_require(builder, who, res, "keep", "shell keep")
+			_require(builder, who, res, "motte", "the mound")
+			_require(builder, who, res, "climb", "the curtain up the mound")
+			var shell: AABB = builder.mass_aabb("keep_shell")
+			var inner_w: float = shell.size.x - 2.0 * spec.shell_thickness
+			var inner_l: float = shell.size.z - 2.0 * spec.shell_thickness
+			if absf(inner_w - 30.5 * scale) > 0.1 or absf(inner_l - 27.5 * scale) > 0.1:
+				res.fail("%s: the Round Tower is %.1f x %.1fm inside, wants %.1f x %.1f"
+					% [who, inner_w, inner_l, 30.5 * scale, 27.5 * scale])
+		"tower_of_london":
+			_require(builder, who, res, "wall_1_back", "the inner curtain")
+			_require(builder, who, res, "keep", "the White Tower")
+			var white: AABB = builder.mass_aabb("keep")
+			if absf(white.size.x - white.size.z) > white.size.x * 0.25:
+				res.fail("%s: the White Tower is not square (%.1f x %.1f)" % [who, white.size.x, white.size.z])
+			var off: float = white.position.x + white.size.x / 2.0
+			if absf(off) < CastleGeometry.bailey_rect(spec).size.x * 0.1:
+				res.fail("%s: the keep stands on the axis (x=%.1f); the White Tower is off it" % [who, off])
+		"conwy":
+			var towers := 0
+			for m in builder.mass_log:
+				if String(m["name"]).begins_with("tower_0_"):
+					towers += 1
+			if towers < 8:
+				res.fail("%s: %d towers, Conwy has eight" % [who, towers])
+			# two wards side by side: not nested, and not one
+			if not builder.has_mass("wall_1_back") or spec.inner_ward:
+				res.fail("%s: the wards are nested or single; Conwy's stand side by side" % who)
+		"carcassonne":
+			_require(builder, who, res, "wall_1_back", "the inner wall")
+			var outer: Rect2 = CastleGeometry.enceinte_rect(spec, 0)
+			var inner_r: Rect2 = CastleGeometry.enceinte_rect(spec, 1)
+			var ratio: float = (inner_r.size.x * inner_r.size.y) / maxf(outer.size.x * outer.size.y, 1.0)
+			if ratio < 0.4:
+				res.fail("%s: the inner area is %.0f%% of the outer, wants 40%%" % [who, ratio * 100.0])
+		"malbork":
+			res.fail("%s: three wards in a line are not a plan kind yet" % who)
+		"castel_del_monte":
+			_require(builder, who, res, "tower_0_corner_7", "eight vertex towers")
+			if CastleGeometry.plan_sides(spec) != 8:
+				res.fail("%s: not an octagon" % who)
+		"edinburgh":
+			if spec.plan_kind != &"ridge":
+				res.fail("%s: not a ridge" % who)
+			res.fail("%s: terraced baileys are not built yet (INT-016)" % who)
+		"eilean_donan":
+			res.fail("%s: water on all sides and a causeway are not a plan kind yet" % who)
+		"caerphilly":
+			res.fail("%s: two moats are not a plan kind yet" % who)
+		"dover":
+			_require(builder, who, res, "wall_1_back", "the inner curtain")
+			_require(builder, who, res, "keep", "the great keep")
+			var great: AABB = builder.mass_aabb("keep")
+			if absf(great.size.x - great.size.z) > great.size.x * 0.25:
+				res.fail("%s: the keep is not square" % who)
+			if great.size.y < CastleGeometry.wall_height(spec, 0) * 1.5 - 0.1:
+				res.fail("%s: the keep is %.1fm over a %.1fm curtain; a great keep is 1.5x" % [who, great.size.y, CastleGeometry.wall_height(spec, 0)])
+		"mont_saint_michel":
+			res.fail("%s: a church on a terraced ring is not built yet" % who)
+		"merchants_tower":
+			_require(builder, who, res, "storey_3", "four storeys and more")
+			_require(builder, who, res, "platform", "a roof platform")
+			_require(builder, who, res, "wing_jog_0", "the L jog")
+			var doors := 0
+			for p in builder.part_log:
+				if p["kind"] == "window" and p["tag"] == "door":
+					doors += 1
+			if doors != 1:
+				res.fail("%s: %d raised doors, wants one" % [who, doors])
+			for f in TowerCheck.new().check(spec, builder)["failures"]:
+				res.fail("%s: %s" % [who, str(f)])
+			# the Bologna type at full size, Scottish once the base passes 10 m
+			var want: StringName = &"bologna" if spec.width <= 10.0 else &"scottish"
+			if spec.tower_type != want:
+				res.fail("%s: a %.0fm base should be the %s type, got %s"
+					% [who, spec.width, String(want), String(spec.tower_type)])
 
 
 static func _require(builder: CastleBuilder, who: String, res: SuiteResult,

@@ -48,9 +48,14 @@ func _log_part(kind: String, pos: Vector3, size := Vector3.ZERO, rot_y := 0.0,
 		"facing": facing, "tag": _tag})
 
 
-## Record a structural mass by its true world AABB.
-func _log_mass(mass_name: String, aabb: AABB) -> void:
-	mass_log.append({"name": mass_name, "aabb": aabb.abs()})
+## Record a structural mass by its true world AABB. `ground` is the level the
+## mass stands on when it is not the ground plane (INT-016): a cellar wall
+## stands on the pit floor a storey down.
+func _log_mass(mass_name: String, aabb: AABB, ground := 0.0) -> void:
+	var row := {"name": mass_name, "aabb": aabb.abs()}
+	if absf(ground) > 0.0001:
+		row["ground"] = ground
+	mass_log.append(row)
 
 
 ## Structural box. Logged for QA, then handed to the shared kit.

@@ -44,6 +44,8 @@ static func run() -> SuiteResult:
 	_check_invalid(res, outside, &"dimension_out_of_range")
 	_check_invalid(res, null, &"request_required")
 
+	_check_contract(res, requests)
+
 	var descriptor: Dictionary = BigGlade.describe_kind(&"house")
 	res.checked += 1
 	if descriptor.get("api_version") != BigGlade.API_VERSION \
@@ -242,3 +244,55 @@ static func _check_invalid(res: SuiteResult, request: BuildingRequest,
 static func _request_fingerprint(request: BuildingRequest) -> Array:
 	return [request.kind, request.seed, request.style, request.purpose,
 		request.width, request.length, request.height]
+
+
+## The compatibility contract README.md promises: the version on every
+## descriptor and placement, four surfaces in one order, the front on -Z with
+## the door on the footprint's -Z edge, and the same request generated twice
+## giving the same placement, name and mesh.
+static func _check_contract(res: SuiteResult, requests: Array[BuildingRequest]) -> void:
+	res.checked += 1
+	if BigGlade.API_VERSION != 1:
+		res.fail("contract: API_VERSION is %d; README documents 1" % BigGlade.API_VERSION)
+	for kind in BigGlade.kinds():
+		res.checked += 1
+		var d: Dictionary = BigGlade.describe_kind(kind)
+		if d.get("api_version") != BigGlade.API_VERSION or not d.has("styles") \
+				or not d.has("width") or not d.has("length") or not d.has("height"):
+			res.fail("contract: describe_kind(%s) lacks the version or an envelope" % String(kind))
+	var world: Dictionary = BigGlade.describe_kind(&"world")
+	res.checked += 1
+	if not world.has("families"):
+		res.fail("contract: the world descriptor lists no families field")
+	var no_family := BuildingRequest.new()
+	no_family.kind = &"world"
+	no_family.style = &"no_such_family"
+	no_family.width = 10.0
+	no_family.length = 10.0
+	no_family.height = 5.0
+	_check_invalid(res, no_family, &"unknown_family")
+	for request in requests:
+		var a: GeneratedBuilding = BigGlade.generate(request)
+		var b: GeneratedBuilding = BigGlade.generate(request)
+		res.checked += 1
+		if a == null or b == null or not a.is_ok() or not b.is_ok():
+			res.fail("contract: %s did not generate" % String(request.kind))
+			continue
+		var pa: Dictionary = BigGlade.placement(a)
+		var pb: Dictionary = BigGlade.placement(b)
+		for key in ["api_version", "kind", "seed", "name", "bounds", "footprint", "front", "door"]:
+			if not pa.has(key):
+				res.fail("contract: placement(%s) has no %s" % [String(request.kind), key])
+		if pa != pb:
+			res.fail("contract: %s seed %d placed differently twice" % [String(request.kind), request.seed])
+		if pa.get("front") != Vector3(0.0, 0.0, -1.0):
+			res.fail("contract: %s's front is not -Z" % String(request.kind))
+		var fp: Rect2 = pa.get("footprint", Rect2())
+		var door: Vector3 = pa.get("door", Vector3.ZERO)
+		if absf(door.z - fp.position.y) > 0.6:
+			res.fail("contract: %s's door is %.2fm off the footprint's -Z edge" % [String(request.kind), door.z - fp.position.y])
+		var mesh: ArrayMesh = BigGlade.build_mesh(a)
+		if mesh == null or mesh.get_surface_count() != 4:
+			res.fail("contract: %s's mesh does not have four surfaces" % String(request.kind))
+		elif not _same_mesh(mesh, BigGlade.build_mesh(b)):
+			res.fail("contract: %s seed %d built two different meshes" % [String(request.kind), request.seed])

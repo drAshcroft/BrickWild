@@ -63,6 +63,7 @@ const CORNER_RADIUS := 10.0
 const KIND_PRIORITY := {&"church": 0, &"manor": 1, &"shop": 2, &"townhouse": 3, &"farm": 4, &"cottage": 5}
 
 const LANE_HALF := 1.25 + 0.5   ## a lane's carriageway half-width plus its verge
+const SMITHY_CLEAR := 12.0      ## the smithy from the church and the tavern (VILLAGES 6)
 const SITE_MARGIN := 2.0        ## no lot within this of the site edge
 const AREA_EPS := 0.05          ## m^2 of overlap that counts as an overlap
 const COLLINEAR_EPS := 0.1      ## §5's "on the road edge", in metres
@@ -73,11 +74,96 @@ const MAX_SLIDES := 90
 ## Site plan + lots + buildings, from the spec alone. The whole of VIL-004.
 ## Returns a fresh plan; `spec` is not modified.
 static func plan(spec: VillageSpec) -> VillagePlan:
+	var requests: Array[BuildingRequest] = VillageProgrammer.programme(spec)
 	var out: VillagePlan = VillageSitePlanner.plan(spec)
 	if out.roads.is_empty():
 		return out
-	cut(out, VillageProgrammer.programme(spec))
+	# every request is generated and measured ONCE; the retries below only
+	# redo the geometry
+	var jobs: Array[Dictionary] = measure_all(requests)
+	# every household gets a lot (VIL-006 "housed"): when the form's own
+	# roads run out of frontage, the site planner is asked for more lanes,
+	# two at a time, until nothing is left unplaced or the site is full
+	var unplaced: int = cut_measured(out, jobs)
+	for attempt in RETRIES:
+		if unplaced <= 0:
+			break
+		var again: VillagePlan = VillageSitePlanner.plan(spec, int(attempt[0]), float(attempt[1]))
+		var left: int = cut_measured(again, jobs)
+		if left < unplaced:
+			out = again
+			unplaced = left
+	_trim_lanes(out)
 	return out
+
+
+## What the planner tries, in order, when the form's own frontage will not
+## house everyone: more back lanes first, then more ground with more lanes.
+## Farms with their six-metre fire gaps and seven-metre setbacks are what
+## push a small village up this list.
+const RETRIES := [[2, 1.0], [4, 1.0], [4, 1.15], [6, 1.15], [6, 1.3], [8, 1.3],
+	[8, 1.45], [10, 1.45], [10, 1.6], [12, 1.75], [12, 2.0]]
+
+
+const MAX_EXTRA_LANES := 12
+
+
+## A lane goes somewhere (VILLAGES 9.2): after the lots are cut, every lane
+## that dead-ends is cut back to its last lot, and one with no lot at all is
+## taken up. The service lanes of the landmark and the manor are theirs.
+static func _trim_lanes(plan: VillagePlan) -> void:
+	var r: int = plan.roads.size() - 1
+	while r >= 0:
+		var road: Dictionary = plan.roads[r]
+		if road["class"] != &"lane":
+			r -= 1
+			continue
+		var pts: PackedVector2Array = road["points"]
+		if pts.size() != 2:
+			r -= 1
+			continue
+		var reserved := false
+		for lot in plan.lots:
+			if int(lot["road"]) == r and (bool(lot["landmark"]) or lot["class"] == &"manor"):
+				reserved = true
+		if reserved:
+			r -= 1
+			continue
+		# the far end on another road is not a dead end
+		var far: Vector2 = pts[1]
+		var joined := false
+		for j in range(plan.roads.size()):
+			if j != r and VillageSitePlanner._on_polyline(far, plan.roads[j]["points"]):
+				joined = true
+		if joined:
+			r -= 1
+			continue
+		var dir: Vector2 = (pts[1] - pts[0]).normalized()
+		var reach := 0.0
+		var any := false
+		for lot in plan.lots:
+			if int(lot["road"]) != r:
+				continue
+			any = true
+			for p in lot["poly"]:
+				reach = maxf(reach, (Vector2(p) - pts[0]).dot(dir))
+		if not any:
+			_drop_road(plan, r)
+		else:
+			var length: float = clampf(reach + 0.5, VillageSitePlanner.LANE_MIN_LENGTH,
+				pts[0].distance_to(pts[1]))
+			road["points"] = PackedVector2Array([pts[0], pts[0] + dir * length])
+		r -= 1
+
+
+static func _drop_road(plan: VillagePlan, r: int) -> void:
+	plan.roads.remove_at(r)
+	for lot in plan.lots:
+		if int(lot["road"]) > r:
+			lot["road"] = int(lot["road"]) - 1
+	for g in plan.gate_crossings:
+		if int(g["road"]) > r:
+			g["road"] = int(g["road"]) - 1
 
 
 ## Cut lots into an already-sited `plan` for `requests`, generating and
@@ -87,6 +173,14 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 static func cut(plan: VillagePlan, requests: Array[BuildingRequest]) -> int:
 	if plan == null or plan.roads.is_empty():
 		return requests.size()
+	var jobs: Array[Dictionary] = measure_all(requests)
+	return cut_measured(plan, jobs) + (requests.size() - jobs.size())
+
+
+## Generate and measure every request, in order, dropping the ones that do
+## not generate. The jobs carry everything the cutting needs and nothing is
+## written to them, so one set serves every retry.
+static func measure_all(requests: Array[BuildingRequest]) -> Array[Dictionary]:
 	var jobs: Array[Dictionary] = []
 	for i in range(requests.size()):
 		var job: Dictionary = measure(requests[i])
@@ -95,11 +189,27 @@ static func cut(plan: VillagePlan, requests: Array[BuildingRequest]) -> int:
 		job["order"] = i
 		job["class"] = lot_class(requests[i])
 		jobs.append(job)
+	return jobs
+
+
+## Cut lots for already-measured jobs. Returns the number left unplaced.
+static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
+	if plan == null or plan.roads.is_empty():
+		return measured.size()
+	var jobs: Array[Dictionary] = measured.duplicate()
+	# the landmark and the lord first, then the trades, then the households
+	# biggest first -- placed nearest the common first, which is the wealth
+	# gradient (VILLAGES 6)
 	jobs.sort_custom(func(a, b) -> bool:
-		var pa: int = int(KIND_PRIORITY.get(a["class"], 9))
-		var pb: int = int(KIND_PRIORITY.get(b["class"], 9))
+		var pa: int = mini(int(KIND_PRIORITY.get(a["class"], 9)), 3)
+		var pb: int = mini(int(KIND_PRIORITY.get(b["class"], 9)), 3)
 		if pa != pb:
 			return pa < pb
+		if pa == 3:
+			var aa: float = float(a["footprint"].size.x) * float(a["footprint"].size.y)
+			var ab: float = float(b["footprint"].size.x) * float(b["footprint"].size.y)
+			if absf(aa - ab) > 0.01:
+				return aa > ab
 		return int(a["order"]) < int(b["order"]))
 
 	var ctx: Dictionary = _context(plan)
@@ -124,7 +234,7 @@ static func cut(plan: VillagePlan, requests: Array[BuildingRequest]) -> int:
 				continue
 		if _place_on_road(plan, ctx, job, _open_roads(plan, [landmark_lane, manor_lane])):
 			placed += 1
-	return requests.size() - placed
+	return jobs.size() - placed
 
 
 ## Everything the legality checks need that depends only on the ROADS: the
@@ -280,7 +390,26 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary, 
 	var frontage: float = 2.0 * float(job["half_w"]) + maxf(gap, 1.0)
 	var setback: float = _setback(rule, job)
 	var depth: float = setback + float(job["back"]) + float(rule["yard"])
+	# Every candidate frontage on the road, nearest the common first: the
+	# programmer hands the households over biggest first, so the big houses
+	# end up round the common and the cottages at the ends of the streets --
+	# the wealth gradient of VILLAGES 6.
+	var cc: Vector2 = plan.site.get_center()
+	if not plan.commons.is_empty():
+		cc = Poly.bounding_rect(plan.commons[0]["poly"]).get_center()
+	# the smithy stands on the through road (VILLAGES 6): that road alone
+	# first, and the rest only if it has no room at all
+	var req0: BuildingRequest = job["request"]
+	if req0.kind == &"shop" and req0.purpose == &"blacksmith":
+		var through: Array = []
+		for r0 in roads:
+			if plan.roads[r0]["class"] == &"through":
+				through.append(r0)
+		if not through.is_empty() and roads.size() > through.size():
+			if _place_on_road(plan, ctx, job, through):
+				return true
 	for r in roads:
+		var spots: Array = []
 		for e in ctx["edges"]:
 			if int(e["road"]) != r:
 				continue
@@ -288,12 +417,28 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary, 
 			var m: float = 0.0
 			var slides: int = 0
 			while m <= run and slides < MAX_SLIDES:
-				var lot: Dictionary = _make_lot(e, m, frontage, depth, setback)
-				if _lot_is_legal(plan, ctx, lot, job, gap):
-					_commit(plan, lot, job, rule)
-					return true
+				var origin: Vector2 = e["a"] if float(e["side"]) > 0.0 else e["b"]
+				var mid: Vector2 = origin + (e["dir"] as Vector2) * m
+				spots.append({"e": e, "m": m, "d": mid.distance_to(cc)})
 				m += STEP
 				slides += 1
+		spots.sort_custom(func(a, b) -> bool: return float(a["d"]) < float(b["d"]))
+		# the smithy stands downwind (+x) of the common (VILLAGES 6)
+		var req: BuildingRequest = job["request"]
+		if req.kind == &"shop" and req.purpose == &"blacksmith":
+			var east: Array = []
+			for spot in spots:
+				var origin2: Vector2 = spot["e"]["a"] if float(spot["e"]["side"]) > 0.0 else spot["e"]["b"]
+				var mid2: Vector2 = origin2 + (spot["e"]["dir"] as Vector2) * float(spot["m"])
+				if mid2.x >= cc.x:
+					east.append(spot)
+			if not east.is_empty():
+				spots = east
+		for spot in spots:
+			var lot: Dictionary = _make_lot(spot["e"], float(spot["m"]), frontage, depth, setback)
+			if _lot_is_legal(plan, ctx, lot, job, gap):
+				_commit(plan, lot, job, rule)
+				return true
 	return false
 
 
@@ -369,10 +514,21 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 	for way in ctx["carriageways"]:
 		if _overlaps(mine, way):
 			return false
+	var req: BuildingRequest = job["request"]
+	var loud: bool = req.kind == &"shop" and req.purpose == &"blacksmith"
+	var quiet: bool = req.kind in [&"church", &"temple"] or (req.kind == &"shop" and req.purpose == &"tavern")
 	for b in plan.buildings:
 		var theirs: PackedVector2Array = Placement.world_rect(
 			b["placement"], b["transform"], false)
 		var want: float = maxf(gap, fire_gap(b["class"], plan.spec))
+		# fire, noise and the smell: the smithy stands SMITHY_CLEAR from the
+		# church and the tavern, whichever of them came first (VILLAGES 6)
+		var other: BuildingRequest = b["request"]
+		var other_loud: bool = other.kind == &"shop" and other.purpose == &"blacksmith"
+		var other_quiet: bool = other.kind in [&"church", &"temple"] \
+			or (other.kind == &"shop" and other.purpose == &"tavern")
+		if (loud and other_quiet) or (quiet and other_loud):
+			want = maxf(want, SMITHY_CLEAR)
 		if _poly_distance(mine, theirs) < want - 1e-3:
 			return false
 	return true

@@ -154,13 +154,23 @@ static func _append_shops(out: Array[BuildingRequest], spec: VillageSpec, styles
 			_seed_for(spec, "bakery"), &"bakery", styles["house"], 11.0, 14.0, 2.8, 1))
 
 
+## Households come in sizes (VILLAGES 6, "hovels and big houses"): the
+## first households are the biggest and the last the one-room cottages, a
+## spread of HOUSE_SIZE_SPREAD either way about the wealth's own size. The
+## lot planner places them in this order, nearest the common first, which is
+## the wealth gradient the PlaceCheck measures.
+const HOUSE_SIZE_SPREAD := 0.22
+
 static func _make_house(spec: VillageSpec, styles: Dictionary, rng: RandomNumberGenerator, i: int) -> BuildingRequest:
 	var trade := _trade_for(spec, i)
 	var style := _house_style(spec, styles, rng)
 	var storeys := _storeys_for(spec.wealth, rng)
 	var w: float = lerp(7.0, 10.0, clampf(spec.wealth, 0.0, 1.0))
 	var l: float = lerp(9.0, 13.0, clampf(spec.wealth, 0.0, 1.0))
-	return BuildingRequest.house(_seed_for(spec, "house|%d" % i), style, trade, w, l, 2.6, storeys)
+	var t: float = 0.5 if spec.households <= 1 else 1.0 - float(i) / float(spec.households - 1)
+	var size: float = 1.0 + HOUSE_SIZE_SPREAD * (2.0 * t - 1.0)
+	return BuildingRequest.house(_seed_for(spec, "house|%d" % i), style, trade,
+		snappedf(w * size, 0.1), snappedf(l * size, 0.1), 2.6, storeys)
 
 
 ## §4: "wealth sets storeys (1 below 0.3, 2 above 0.6)"; between the two, the

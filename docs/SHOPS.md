@@ -22,8 +22,23 @@ connections.
 
 The defining fixtures are semantic rather than coordinate-based: a blacksmith
 must contain an anvil and workbench, a stable a stall and feed storage, a shop
-a counter, a dining room a table and seats, and a civic hall a meeting table.
-Optional dressing is removed when necessary to preserve circulation.
+a counter, a dining room a table and seats, a tailor a cutting table under a
+rack with the shop's shelf behind, a carpenter a bench to saw on under a rack
+of tools, and a civic hall a meeting table. Optional dressing is removed when
+necessary to preserve circulation.
+
+Each business also says what its front is (`ShopSpec.BUSINESSES`): `door_w`,
+the width of the street door (a horse needs 1.5 m, a forge opens to the
+street through 2.4 m); `front_open`, a shopfront hatch cut in the street wall
+beside the door from counter height to the door head, which the builder
+frames like a window; and `focus`, the fixture the front room is arranged
+around -- the counter, the bar, the anvil -- and whether it must face the
+door. The focus becomes `HousePlan.focus`, the furnisher pins that piece
+there and turns it to the door, and the `focus` rule of the furnishing check
+proves it. The archetype suite adds `shopfront_rules`: the street door opens
+into the front room and is as wide as the trade needs, the smithy's forge is
+on the chimney wall under one chimney, the shopfront hatch is there, and the
+tavern's casks stand behind its bar.
 
 ## Harness evaluation
 

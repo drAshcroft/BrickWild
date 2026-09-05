@@ -46,6 +46,11 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 10.0, "length": 12.0, "height": 2.8,
 		"rooms": [&"hall", &"parlour"], "cats": ["bookcase"],
 		"about": "a study lined with books"},
+	# INT-016: a storey dug below the ground, reached down a stair from the hall
+	{"key": "cellar_house", "style": &"townhouse", "trade": &"innkeeper",
+		"width": 9.0, "length": 11.0, "height": 2.7, "cellars": 1,
+		"rooms": [&"hall"], "cats": ["barrel|crate"],
+		"about": "a house over a cellar: barrels below, a stair down from the hall"},
 ]
 
 
@@ -61,6 +66,7 @@ static func run() -> SuiteResult:
 			spec.width = float(row["width"]) * scale
 			spec.length = float(row["length"]) * scale
 			spec.height = float(row["height"])
+			spec.cellars = int(row.get("cellars", 0))
 			var plan: HousePlan = HouseGenerator.generate(spec, _seed_for(key, scale))
 			var builder := HouseBuilder.new()
 			builder.build(plan)
@@ -90,6 +96,25 @@ static func run() -> SuiteResult:
 				res.fail("%s: %s" % [who, str(f)])
 			for w in rep["warnings"]:
 				res.warn("%s: %s" % [who, str(w)])
+			# a cellar is a storey: rooms on it, a pit dug for it, a stair
+			# down to it, and the walk reaching it (INT-016)
+			if spec.cellars > 0:
+				if plan.rooms_on_storey(-1).is_empty():
+					res.fail("%s: no rooms in the cellar" % who)
+				if not builder.has_mass("pit_-1"):
+					res.fail("%s: no pit dug for the cellar" % who)
+				var down := false
+				for stair in plan.stairs:
+					if int(stair.get("storey", 0)) == -1:
+						down = true
+				if not down:
+					res.fail("%s: no stair down to the cellar" % who)
+				var cellar_barrels := 0
+				for p in plan.furniture:
+					if HousePlan.record_storey(p) == -1:
+						cellar_barrels += 1
+				if cellar_barrels == 0:
+					res.warn("%s: the cellar is empty" % who)
 			if res.failures.size() > before:
 				defects += 1
 		res.note("  %-17s %d scales, %d defects -- %s"

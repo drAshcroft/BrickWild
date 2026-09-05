@@ -90,11 +90,6 @@ The house suites generate every house three times over -- once per suite -- and
 generating a house now includes walking it. Caching the sweep between suites
 would cut it to a third.
 
-### 0d. Interiors are lit by the sun alone
-`HouseAssembler` places lamps, sconces and candles as models, but no
-`OmniLight3D` goes with them, so a house photographed with its roof on is dark
-inside. The furnishing check already knows which props are lights.
-
 ### 1. `src/building/` is a superseded draft awaiting a decision
 `building_spec.gd`, `spec_generator.gd`, `building_builder.gd`, `main.gd`,
 `scenes/main.tscn` and the legacy suite are an earlier house generator. It

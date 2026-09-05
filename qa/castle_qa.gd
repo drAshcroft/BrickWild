@@ -20,17 +20,26 @@ const EPS := 0.05
 ## How far off the wall centre-line a perimeter sample may find its masonry.
 const WALL_PROBE := 1
 
+## The five rules, in order; a family may replace one through
+## `check(spec, mesh, builder, overrides)` (RuleSet, INT-020).
+const RULES: Array[StringName] = [&"no_nan", &"grounded", &"connected_mass",
+	&"openings_embedded", &"enceinte_closed"]
+const METHODS := {&"no_nan": "_check_vertices", &"grounded": "_check_ground",
+	&"openings_embedded": "_check_openings", &"enceinte_closed": "_check_enceinte"}
+
 var spec: CastleSpec
 var mesh: ArrayMesh
 var builder: CastleBuilder
 var failures: Array = []
 var warnings: Array = []
 var stats: Dictionary = {}
+var replaced: Dictionary = {}
 
 var _grid: VoxelGrid
 
 
-func check(p_spec: CastleSpec, p_mesh: ArrayMesh, p_builder: CastleBuilder) -> Dictionary:
+func check(p_spec: CastleSpec, p_mesh: ArrayMesh, p_builder: CastleBuilder,
+		overrides: Dictionary = {}) -> Dictionary:
 	spec = p_spec
 	mesh = p_mesh
 	builder = p_builder
@@ -40,17 +49,13 @@ func check(p_spec: CastleSpec, p_mesh: ArrayMesh, p_builder: CastleBuilder) -> D
 
 	_grid = VoxelGrid.new()
 	_grid.rasterize(mesh, CastleBuilder.SURF_OPEN, _voxel_size())
-
-	_check_vertices()
-	_check_ground()
-	_check_connected_mass()
-	_check_openings()
-	_check_enceinte()
+	replaced = RuleSet.run(self, RULES, METHODS, overrides, [],
+		[spec, mesh, builder], failures, warnings)
 
 	stats["parts"] = builder.part_log.size()
 	stats["voxels_solid"] = _grid.count_solid()
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
-		"stats": stats}
+		"stats": stats, "replaced": replaced}
 
 
 ## Voxel size for this design: coarse enough that a 300 m fortress rasterizes

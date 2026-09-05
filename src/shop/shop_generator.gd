@@ -18,6 +18,9 @@ static func generate(spec: ShopSpec, p_seed: int) -> HousePlan:
 	spec.roof_pitch = r.randf_range(float(style["roof_pitch"][0]), float(style["roof_pitch"][1]))
 	spec.porch = r.randf() < float(style["porch"])
 	spec.chimney = r.randf() < float(style["chimney"])
+	# a smithy or a bakehouse is its fire: the flue is not a dice roll
+	if spec.business in [&"blacksmith", &"bakery"]:
+		spec.chimney = true
 	spec.window_shutters = r.randf() < float(style["shutters"])
 	spec.timber_frame = r.randf() < float(style["timber"])
 	spec.stud_pitch = r.randf_range(float(style["studs"][0]), float(style["studs"][1]))

@@ -7,7 +7,7 @@ extends RefCounted
 ## later renderers and serializers can grow behind it without changing callers.
 
 const API_VERSION := 1
-const _KINDS: Array[StringName] = [&"church", &"castle", &"house", &"shop", &"hotel", &"temple"]
+const _KINDS: Array[StringName] = [&"church", &"castle", &"house", &"shop", &"hotel", &"temple", &"world"]
 const _DESCRIPTORS := {
 	&"church": {
 		"label": "Church", "size_label": "Nave", "height_label": "Eaves height (m)",
@@ -48,6 +48,15 @@ const _DESCRIPTORS := {
 		"height": {"min": 3.0, "max": 4.5, "step": 0.1, "value": 3.6},
 		"storeys": {"min": 3, "max": 3, "step": 1, "value": 3},
 	},
+	# the buildings of the wider world (WLD-000): `style` is the family and
+	# `purpose` its sub-kind; WorldFamilies is the registry and every family
+	# narrows this envelope with its own
+	&"world": {
+		"label": "World building", "size_label": "Building", "height_label": "Height (m)",
+		"width": {"min": 4.0, "max": 120.0, "step": 0.5, "value": 20.0},
+		"length": {"min": 4.0, "max": 120.0, "step": 0.5, "value": 30.0},
+		"height": {"min": 2.2, "max": 40.0, "step": 0.1, "value": 6.0},
+	},
 }
 
 
@@ -81,6 +90,19 @@ static func describe_kind(kind: StringName) -> Dictionary:
 		&"temple":
 			style_table = TempleSpec.FORMS
 			purpose_table = TempleSpec.CULTS
+		&"world":
+			# families and their sub-kinds, with each family's own envelope
+			var families: Array[Dictionary] = []
+			var kinds: Array[Dictionary] = []
+			for f in WorldFamilies.families():
+				families.append({"id": f, "label": WorldFamilies.FAMILIES[f]["label"],
+					"envelope": WorldFamilies.envelope(f), "kinds": WorldFamilies.kinds_of(f)})
+				for k in WorldFamilies.kinds_of(f):
+					kinds.append({"id": k, "label": String(k).capitalize()})
+			out["styles"] = families
+			out["purposes"] = kinds
+			out["families"] = families
+			return out
 	out["styles"] = _options(style_table)
 	out["purposes"] = _options(purpose_table)
 	return out
@@ -136,6 +158,10 @@ static func generate(request: BuildingRequest) -> GeneratedBuilding:
 			spec.height = out.request.height
 			TempleGenerator.generate(spec, out.request.seed)
 			out.spec = spec
+		&"world":
+			if not WorldFamilies.generate(out.request, out):
+				_add_error(out, &"family_not_built", &"style",
+					"World family '%s' has no generator yet." % String(out.request.style))
 	return out
 
 
@@ -153,6 +179,8 @@ static func build_mesh(building: GeneratedBuilding) -> ArrayMesh:
 		return HouseBuilder.new().build(building.plan)
 	if building.spec is TempleSpec:
 		return TempleBuilder.new().build(building.spec as TempleSpec)
+	if building.request.kind == &"world":
+		return WorldFamilies.build_mesh(building)
 	return null
 
 
@@ -367,6 +395,22 @@ static func _validate(out: GeneratedBuilding) -> void:
 			if not TempleSpec.CULTS.has(request.purpose):
 				_add_error(out, &"unknown_cult", &"purpose",
 					"Unknown temple cult '%s'." % String(request.purpose))
+		&"world":
+			if not WorldFamilies.has_family(request.style):
+				_add_error(out, &"unknown_family", &"style",
+					"Unknown world family '%s'." % String(request.style))
+			elif not request.purpose in WorldFamilies.kinds_of(request.style):
+				_add_error(out, &"unknown_kind", &"purpose",
+					"Unknown %s kind '%s'." % [String(request.style), String(request.purpose)])
+			else:
+				var env: Dictionary = WorldFamilies.envelope(request.style)
+				for field in [&"width", &"length", &"height"]:
+					var value: float = request.get(field)
+					var lim: Dictionary = env[field]
+					if value < float(lim["min"]) or value > float(lim["max"]):
+						_add_error(out, &"dimension_out_of_range", field,
+							"%s must be between %s and %s metres for a %s." % [
+								String(field), lim["min"], lim["max"], String(request.style)])
 
 
 static func _validate_style(out: GeneratedBuilding, table: Dictionary,

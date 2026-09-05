@@ -42,7 +42,14 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
 		shell.set_surface_override_material(i, m)
 	root.add_child(shell)
+	furnish(root, plan)
+	return root
 
+
+## The furniture, and the light every lamp among it gives off (LAY-011).
+## Shared with the shop and hotel assemblers so a house is dressed and lit
+## the same way whatever it is called.
+static func furnish(root: Node3D, plan: HousePlan) -> void:
 	var props := Node3D.new()
 	props.name = "Furniture"
 	root.add_child(props)
@@ -50,7 +57,7 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 		var node: Node3D = _instance(p)
 		if node != null:
 			props.add_child(node)
-	return root
+	root.add_child(LightKit.light_the_plan(plan))
 
 
 ## One piece of furniture, placed as the plan says.

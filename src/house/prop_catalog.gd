@@ -52,7 +52,7 @@ const PROPS := {
 	"Bed_Twin2": {"cat": "bed", "tags": [WALL], "zone": 0.75, "affinity": {"avoid_window_wall": true}},
 
 	# ---- tables and seats ----
-	"Table_Large": {"cat": "table", "tags": [SURFACE], "zone": 0.0, "affinity": {"focus": "hearth"}},
+	"Table_Large": {"cat": "table", "tags": [SURFACE], "zone": 0.0, "affinity": {"focus": "hearth", "face": "focus"}},
 	"Workbench": {"cat": "workbench", "tags": [WALL, SURFACE], "zone": 0.9, "affinity": {"daylight": 1.0}},
 	"Workbench_Drawers": {"cat": "workbench", "tags": [WALL, SURFACE], "zone": 0.9, "affinity": {"daylight": 1.0}},
 	"Chair_1": {"cat": "seat", "tags": [], "zone": 0.55},
@@ -64,8 +64,8 @@ const PROPS := {
 	"Bookcase_2": {"cat": "bookcase", "tags": [WALL], "zone": 0.7, "affinity": {"daylight": -1.0, "far": ["hearth"], "avoid_hearth_wall": true}},
 	"Chest_Wood": {"cat": "chest", "tags": [WALL], "zone": 0.6, "affinity": {"away_from_doors": true}},
 	"Nightstand_Shelf": {"cat": "nightstand", "tags": [WALL, SURFACE], "zone": 0.4},
-	"Barrel": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
-	"Barrel_Apples": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Barrel": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true, "near": ["counter"]}},
+	"Barrel_Apples": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true, "near": ["counter"]}},
 	"Crate_Wooden": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"Crate_Metal": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"FarmCrate_Apple": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
@@ -79,8 +79,8 @@ const PROPS := {
 	"Bucket_Wooden_1": {"cat": "bucket", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 
 	# ---- trade fittings ----
-	"Anvil": {"cat": "anvil", "tags": [], "zone": 0.9},
-	"Anvil_Log": {"cat": "anvil", "tags": [], "zone": 0.9},
+	"Anvil": {"cat": "anvil", "tags": [], "zone": 0.9, "affinity": {"near": ["hearth"]}},
+	"Anvil_Log": {"cat": "anvil", "tags": [], "zone": 0.9, "affinity": {"near": ["hearth"]}},
 	"WeaponStand": {"cat": "stand", "tags": [WALL], "zone": 0.6},
 	"Dummy": {"cat": "stand", "tags": [], "zone": 0.7},
 	"BookStand": {"cat": "lectern", "tags": [SURFACE], "zone": 0.7, "affinity": {"daylight": 1.0}},
@@ -248,6 +248,20 @@ static func floor_offset(key: String) -> float:
 	return float(_sizes[key]["floor"])
 
 
+## Where the flame is, relative to the model's own origin: the measured top
+## centre of the model. LightKit hangs the OmniLight3D there. Falls back to
+## the top of the bounding box for a catalogue measured before LAY-011.
+static func light_offset(key: String) -> Vector3:
+	_load()
+	if not _sizes.has(key):
+		return Vector3.ZERO
+	if _sizes[key].has("light"):
+		var l: Array = _sizes[key]["light"]
+		return Vector3(float(l[0]), float(l[1]), float(l[2]))
+	var c: Vector3 = centre_offset(key)
+	return Vector3(c.x, floor_offset(key) + height(key), c.z)
+
+
 static func category(key: String) -> String:
 	return PROPS[key]["cat"] if PROPS.has(key) else ""
 
@@ -273,6 +287,9 @@ static func zone_depth(key: String) -> float:
 ##   focus               "hearth" -- stand off centre, toward the fire
 ##   over                [category] -- hang above one of these
 ##   flank               "door" -- come in a mirrored pair about the opening
+##   near: ["focus"]     stand close to HousePlan.focus, in the focus room
+##   face: "focus"       lie broadside to the focus: a table's long axis at
+##                       right angles to the focus's facing (INT-002)
 static func affinity(key: String) -> Dictionary:
 	return PROPS[key].get("affinity", {}) if PROPS.has(key) else {}
 

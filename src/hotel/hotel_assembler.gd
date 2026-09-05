@@ -21,11 +21,5 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 		material.cull_mode = BaseMaterial3D.CULL_DISABLED
 		shell.set_surface_override_material(i, material)
 	root.add_child(shell)
-	var props := Node3D.new()
-	props.name = "Furniture"
-	root.add_child(props)
-	for placement in plan.furniture:
-		var node: Node3D = HouseAssembler._instance(placement)
-		if node != null:
-			props.add_child(node)
+	HouseAssembler.furnish(root, plan)
 	return root

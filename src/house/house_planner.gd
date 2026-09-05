@@ -34,7 +34,10 @@ static func plan(spec: HouseSpec) -> HousePlan:
 	_demote_unlit(p)
 	if spec.storeys > 1:
 		_clone_upper_storeys(p, spec)
+	if spec.cellars > 0:
+		_dig_cellars(p, spec)
 	_choose_hearth(p, spec)
+	_choose_focus(p, spec)
 	return p
 
 
@@ -142,8 +145,47 @@ static func _split(rect: Rect2, r: RandomNumberGenerator) -> Array:
 
 # ------------------------------------------------------------- name rooms
 
-## Assign kinds by publicness: the hall takes the front, bedrooms go to the
-## back, and anything too small for the kind it was given becomes a store.
+## How strongly each kind is drawn to the two poles of a house (LAY-006): the
+## FRONT, where the door and the street are, and the SERVICE end at the back,
+## where the yard, the well and the midden are. The hall and the parlour want
+## the front; the kitchen and the store want the back, so the back door lands
+## on the kitchen where it belongs; a bedroom wants neither, and is pushed
+## away from both. A kind not listed here sits in the middle. One pole was
+## the old rule and it put the kitchen beside the front door, because it was
+## second in the programme and second nearest the door was the best it could
+## be given.
+const KIND_POLES := {
+	&"hall": {"front": 1.0, "service": 0.0},
+	&"parlour": {"front": 0.8, "service": -0.2},
+	&"dining_room": {"front": 0.8, "service": 0.0},
+	&"sales_floor": {"front": 1.0, "service": 0.0},
+	&"workshop": {"front": 0.5, "service": 0.2},
+	&"kitchen": {"front": -0.2, "service": 1.0},
+	&"store": {"front": -0.2, "service": 0.7},
+	&"tack_room": {"front": 0.0, "service": 0.5},
+	&"office": {"front": -0.2, "service": 0.3},
+	&"records": {"front": -0.3, "service": 0.3},
+	&"bedroom": {"front": -1.0, "service": -0.3},
+	&"guest_room": {"front": -1.0, "service": -0.3},
+	&"suite": {"front": -1.0, "service": -0.3},
+}
+
+
+## How well room `i` answers what `kind` wants of the two poles: 1 at a pole
+## it is drawn to, 0 at the far corner from it, negative where it is pushed.
+static func _pole_score(p: HousePlan, spec: HouseSpec, i: int, kind: StringName) -> float:
+	var inner: Rect2 = HouseGeometry.interior_rect(spec)
+	var c: Vector2 = HouseGeometry.room_floor_rect(p, i).get_center()
+	var front := Vector2(inner.get_center().x, inner.position.y)
+	var back := Vector2(inner.get_center().x, inner.end.y)
+	var reach: float = maxf(inner.size.length(), 0.01)
+	var w: Dictionary = KIND_POLES.get(kind, {"front": 0.0, "service": 0.0})
+	return float(w["front"]) * (1.0 - c.distance_to(front) / reach) \
+		+ float(w["service"]) * (1.0 - c.distance_to(back) / reach)
+
+
+## Assign kinds by publicness: the hall takes the front, the kitchen the back,
+## bedrooms go away from both, and anything nothing wanted becomes a store.
 static func _name_rooms(p: HousePlan, spec: HouseSpec) -> void:
 	var n: int = p.rooms.size()
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
@@ -160,10 +202,16 @@ static func _name_rooms(p: HousePlan, spec: HouseSpec) -> void:
 	order.sort_custom(func(a: int, b: int) -> bool: return dist[a] < dist[b])
 
 	# the hall is the front-most room that can hold a hall; if none can, the
-	# biggest room takes it, because a house must have somewhere to come in to
+	# biggest room takes it, because a house must have somewhere to come in to.
+	# A shop's hall becomes its public room afterwards, so it is measured
+	# against what that room has to be -- a meeting hall wants a wider room
+	# than a cottage hall does
+	var hall_kind: StringName = &"hall"
+	if spec.has_method("front_room"):
+		hall_kind = spec.front_room()
 	var hall := -1
 	for i in order:
-		if HouseGeometry.room_suits(p, i, &"hall"):
+		if HouseGeometry.room_suits(p, i, hall_kind) and HouseGeometry.room_suits(p, i, &"hall"):
 			hall = i
 			break
 	if hall < 0:
@@ -191,15 +239,33 @@ static func _name_rooms(p: HousePlan, spec: HouseSpec) -> void:
 		if i != hall:
 			rest.append(i)
 
+	# Each kind takes the room that best answers its two poles among those
+	# that can hold it; ties go to the room nearer the door, which is the old
+	# one-pole order. The kinds the service pole pulls hardest -- the kitchen
+	# -- choose first, or a bedroom, which merely wants to be far from the
+	# front, would take the back room the kitchen needs. What nothing claimed
+	# is the store.
 	for i in rest:
-		var kind: StringName = queue.pop_front() if not queue.is_empty() else &"store"
-		# a room too small for what it was going to be becomes a store, and the
-		# kind it could not hold goes back for a bigger room later in the list
-		if not HouseGeometry.room_suits(p, i, kind):
-			if kind != &"store":
-				queue.push_front(kind)
-			kind = &"store"
-		p.rooms[i]["kind"] = kind
+		p.rooms[i]["kind"] = &"store"
+	var ordered: Array[StringName] = []
+	for kind in queue:
+		if float(KIND_POLES.get(kind, {"service": 0.0})["service"]) >= 0.9:
+			ordered.append(kind)
+	for kind2 in queue:
+		if not kind2 in ordered:
+			ordered.append(kind2)
+	for kind in ordered:
+		var best := -1
+		var best_score := -INF
+		for i in rest:
+			if p.kind_of(i) != &"store" or not HouseGeometry.room_suits(p, i, kind):
+				continue
+			var score: float = _pole_score(p, spec, i, kind)
+			if score > best_score + 0.0001:
+				best_score = score
+				best = i
+		if best >= 0:
+			p.rooms[best]["kind"] = kind
 
 	# bedrooms belong at the back: swap the front-most bedroom with the
 	# back-most non-bedroom whenever that improves the arrangement
@@ -247,9 +313,11 @@ static func _push_bedrooms_back(p: HousePlan, order: Array[int]) -> void:
 			for b in range(order.size() - 1, a, -1):
 				var ra: int = order[a]
 				var rb: int = order[b]
-				# ra is nearer the door than rb
+				# ra is nearer the door than rb; and a service room at the
+				# back is there because the back is where it belongs (LAY-006)
 				if p.kind_of(ra) == &"bedroom" and p.kind_of(rb) != &"bedroom" \
-						and p.kind_of(rb) != &"hall":
+						and p.kind_of(rb) != &"hall" \
+						and float(KIND_POLES.get(p.kind_of(rb), {"service": 0.0})["service"]) < 0.5:
 					var ka: StringName = p.kind_of(ra)
 					var kb: StringName = p.kind_of(rb)
 					# only swap when both rooms can hold the other's kind
@@ -336,7 +404,7 @@ static func _place_doors(p: HousePlan, spec: HouseSpec) -> void:
 				# prefer hanging a room off a public one, and prefer the widest
 				# wall to hang it on
 				var score: float = run
-				if p.kind_of(i) == &"bedroom" or p.kind_of(i) == &"store":
+				if p.kind_of(i) in HouseGeometry.SLEEPING or p.kind_of(i) == &"store":
 					score -= 100.0        # only route through these as a last resort
 				if p.kind_of(i) == &"hall":
 					score += 20.0
@@ -363,7 +431,7 @@ static func _open_up_privacy(p: HousePlan) -> void:
 	if start < 0:
 		return
 	for guard in range(6):
-		var polite: Dictionary = p.reachable_rooms(start, &"bedroom")
+		var polite: Dictionary = p.reachable_rooms(start, HouseGeometry.SLEEPING)
 		var stranded := -1
 		for i in range(p.rooms.size()):
 			if p.kind_of(i) != &"bedroom" and not polite.has(i):
@@ -373,7 +441,7 @@ static func _open_up_privacy(p: HousePlan) -> void:
 			return
 		var added := false
 		for j in range(p.rooms.size()):
-			if j == stranded or p.kind_of(j) == &"bedroom" or not polite.has(j):
+			if j == stranded or p.kind_of(j) in HouseGeometry.SLEEPING or not polite.has(j):
 				continue
 			var edge: Array = _shared_edge(p, j, stranded)
 			if edge.is_empty():
@@ -474,7 +542,11 @@ static func _place_front_door(p: HousePlan, spec: HouseSpec, hall: int) -> void:
 		if best >= 0:
 			room = best
 			rect = p.rooms[room]["rect"]
-	var w: float = HouseGeometry.DOOR_W
+	# as wide as the spec asks (a stable door, a forge opening), unless the
+	# wall is too short for it, in which case the ordinary leaf
+	var w: float = spec.front_door_width()
+	if rect.size.x < w + 2.0 * HouseGeometry.DOOR_CORNER_MARGIN + 0.2:
+		w = HouseGeometry.DOOR_W
 	var m: float = HouseGeometry.DOOR_CORNER_MARGIN + w / 2.0
 	var x: float = clampf(rect.get_center().x, rect.position.x + m, rect.end.x - m)
 	p.doors.append({"a": room, "b": -1, "pos": Vector2(x, inner.position.y),
@@ -482,9 +554,21 @@ static func _place_front_door(p: HousePlan, spec: HouseSpec, hall: int) -> void:
 		"storey": p.storey_of_room(room)})
 
 
-## A back door out of the kitchen or the store, for the yard.
+## A back door out of the kitchen or the store, for the yard -- and never in
+## line with the front door (LAY-006). Two doors facing each other across the
+## house make the plan read as a corridor with rooms off it, and the feng shui
+## phrasing is that everything rushes straight through. So the door goes to
+## the end of its wall furthest from the front door, and a room whose wall
+## cannot get it out of the line is passed over for the next.
 static func _place_back_door(p: HousePlan, spec: HouseSpec) -> void:
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
+	var front: int = p.entrance()
+	var fx: float = inner.get_center().x
+	var fw: float = HouseGeometry.DOOR_W
+	if front >= 0:
+		fx = float(p.doors[front]["pos"].x)
+		fw = float(p.doors[front]["width"])
+	var fallback := {}
 	for kind in [&"kitchen", &"store", &"hall"]:
 		for i in p.rooms_of(kind):
 			var rect: Rect2 = p.rooms[i]["rect"]
@@ -494,11 +578,20 @@ static func _place_back_door(p: HousePlan, spec: HouseSpec) -> void:
 			var m: float = HouseGeometry.DOOR_CORNER_MARGIN + w / 2.0
 			if rect.size.x < m * 2.0:
 				continue
-			var x: float = clampf(rect.get_center().x, rect.position.x + m, rect.end.x - m)
-			p.doors.append({"a": i, "b": -1, "pos": Vector2(x, inner.end.y),
+			var lo: float = rect.position.x + m
+			var hi: float = rect.end.x - m
+			var x: float = lo if absf(lo - fx) >= absf(hi - fx) else hi
+			var door := {"a": i, "b": -1, "pos": Vector2(x, inner.end.y),
 				"normal": Vector2(0, 1), "width": w, "exterior": true, "front": false,
-				"storey": p.storey_of_room(i)})
-			return
+				"storey": p.storey_of_room(i)}
+			if absf(x - fx) >= (w + fw) / 2.0 + 0.05:
+				p.doors.append(door)
+				return
+			if fallback.is_empty():
+				fallback = door
+	# no room could get its door out of the line: a back door facing the
+	# front door across the house is worse than none, so none it is
+	spec.back_door = false
 
 
 # ---------------------------------------------------------------- windows
@@ -687,6 +780,51 @@ static func _same_wall(pa: Vector2, na: Vector2, pb: Vector2, nb: Vector2,
 	if absf(na.x) > 0.5:
 		return absf(pa.x - pb.x) < 0.02
 	return absf(pa.y - pb.y) < 0.02
+
+
+# ------------------------------------------------------------------ cellars
+
+## Storeys below the ground (INT-016): the ground partition again, dug down,
+## every room a store, joined by the ground floor's interior doors and by a
+## stair down from the hall. No windows, no exterior doors: a cellar is
+## entered from the house.
+static func _dig_cellars(p: HousePlan, spec: HouseSpec) -> void:
+	var base_rooms: Array[int] = p.rooms_on_storey(0)
+	var base_doors: Array[Dictionary] = []
+	for door in p.doors:
+		if not door["exterior"] and p.storey_of_room(int(door["a"])) == 0:
+			base_doors.append(door)
+	var hall: int = base_rooms[0]
+	for room in base_rooms:
+		if p.kind_of(room) == &"hall":
+			hall = room
+			break
+	for storey in range(-1, -spec.cellars - 1, -1):
+		var remap: Dictionary = {}
+		var under_hall := -1
+		for source in base_rooms:
+			var room := p.rooms[source].duplicate()
+			room["storey"] = storey
+			room["kind"] = &"store"
+			var target: int = p.rooms.size()
+			p.rooms.append(room)
+			remap[source] = target
+			if source == hall:
+				under_hall = target
+		for source_door in base_doors:
+			var door := source_door.duplicate()
+			door["a"] = remap[int(source_door["a"])]
+			door["b"] = remap[int(source_door["b"])]
+			door["storey"] = storey
+			p.doors.append(door)
+		# the stair down: from the room above (the hall, or the cellar room
+		# above this one) into the cellar under it
+		var above: int = hall
+		if storey < -1:
+			for s in p.stairs:
+				if int(s.get("storey", 0)) == storey + 1:
+					above = int(s.get("a", hall))
+		_add_stair(p, under_hall, above, storey, storey + 1)
 
 
 # ---------------------------------------------------------- stacked storeys
@@ -963,7 +1101,17 @@ static func _privacy_holds(p: HousePlan, start: int) -> bool:
 ## the short one and walls the room in half: a 4.9 x 3.0 m hall with a 2.4 m
 ## well across it has two 2 m stubs either side of the well and no way past the
 ## table, which is how a smith's workshop ended up unreachable from his own
-## front door. (Moving it off the middle and against a wall is LAY-005.)
+## front door.
+##
+## And it stands AGAINST A WALL, out of the line of the front door (LAY-005).
+## The middle of the hall is the one place a stair should never take: it faces
+## whoever comes in head-on -- the oldest fault in the feng shui of a house,
+## and the oldest complaint of an estate agent -- and it stands where the
+## table would have stood. So the well is slid along each wall that runs the
+## room's long way, and the spot is chosen that keeps clear of every door's
+## swing, of the strip the front door opens onto, and of the windows, and is
+## furthest from the front door among those. HousePlanCheck's `stair_line`
+## rule measures the result.
 static func _add_stair(p: HousePlan, lower_room: int, upper_room: int,
 		lower_storey: int, upper_storey: int) -> void:
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(p, lower_room)
@@ -972,9 +1120,39 @@ static func _add_stair(p: HousePlan, lower_room: int, upper_room: int,
 	var short_side: float = minf(floor_rect.size.x, floor_rect.size.y)
 	var run: float = minf(2.4, maxf(HouseGeometry.PATH_MIN, long_side - 0.3))
 	var width: float = minf(1.0, maxf(HouseGeometry.PATH_MIN, short_side - 0.3))
-	var centre := floor_rect.get_center()
 	var size := Vector2(run, width) if along_x else Vector2(width, run)
-	var footprint := Rect2(centre - size / 2.0, size)
+	# the long way first; across the room only if the long way has no spot
+	# that keeps out of the front door's line -- a stair along the front wall
+	# of a narrow hall cannot help crossing it
+	var run2: float = minf(2.4, maxf(HouseGeometry.PATH_MIN, short_side - 0.3))
+	var width2: float = minf(1.0, maxf(HouseGeometry.PATH_MIN, long_side - 0.3))
+	var size2 := Vector2(width2, run2) if along_x else Vector2(run2, width2)
+	var found: Dictionary = _stair_spot(p, lower_room, floor_rect, size)
+	var other: Dictionary = _stair_spot(p, lower_room, floor_rect, size2)
+	if int(other["strict"]) < int(found["strict"]):
+		found = other
+		run = run2
+		width = width2
+	# a hall too narrow for the stair to keep out of the door's line either
+	# way moves the DOOR instead: to the end of its wall away from the stair
+	if int(found["strict"]) >= 2 and _slide_front_door(p, lower_room, found["rect"]):
+		var again: Dictionary = _stair_spot(p, lower_room, floor_rect, size)
+		var again2: Dictionary = _stair_spot(p, lower_room, floor_rect, size2)
+		if int(again2["strict"]) < int(again["strict"]):
+			again = again2
+			run = run2
+			width = width2
+		else:
+			run = minf(2.4, maxf(HouseGeometry.PATH_MIN, long_side - 0.3))
+			width = minf(1.0, maxf(HouseGeometry.PATH_MIN, short_side - 0.3))
+		found = again
+	if int(found["strict"]) >= 2:
+		# nowhere in this hall keeps the stair out of the door's line, and
+		# the door could not move: written down, so the check reports a
+		# compromise rather than a defect
+		p.note_compromise(lower_room, "stair")
+	var footprint: Rect2 = found["rect"]
+	var centre: Vector2 = footprint.get_center()
 	p.stairs.append({
 		"a": lower_room, "b": upper_room,
 		"storey": lower_storey, "to_storey": upper_storey,
@@ -982,6 +1160,161 @@ static func _add_stair(p: HousePlan, lower_room: int, upper_room: int,
 		"rect": footprint, "lower_rect": footprint, "upper_rect": footprint,
 		"width": width, "run": run,
 	})
+
+
+## Slide the front door along its wall to the end away from `stair`, when
+## that end is clear of windows and would not put it in line with the back
+## door. True when the door moved.
+static func _slide_front_door(p: HousePlan, room: int, stair: Rect2) -> bool:
+	var d: int = p.entrance()
+	if d < 0 or int(p.doors[d]["a"]) != room:
+		return false
+	var door: Dictionary = p.doors[d]
+	if absf(float(door["normal"].y)) < 0.5:
+		return false
+	var rect: Rect2 = p.rooms[room]["rect"]
+	var w: float = float(door["width"])
+	var m: float = HouseGeometry.DOOR_CORNER_MARGIN + w / 2.0
+	var lo: float = rect.position.x + m
+	var hi: float = rect.end.x - m
+	if hi <= lo:
+		return false
+	var far: float = lo if stair.get_center().x > rect.get_center().x else hi
+	var near: float = hi if far == lo else lo
+	for x in [far, near]:
+		if absf(x - float(door["pos"].x)) < 0.3:
+			continue
+		# not in line with the back door
+		var lined := false
+		for od in p.doors:
+			if od == door or not od["exterior"]:
+				continue
+			if Vector2(od["normal"]).dot(Vector2(door["normal"])) > -0.9:
+				continue
+			if absf(float(od["pos"].x) - x) < (w + float(od["width"])) / 2.0 + 0.05:
+				lined = true
+		if lined:
+			continue
+		# a window in the way slides to where the door was, if that is clear
+		var blocked := false
+		var moves := {}
+		for wi in p.windows_of(room):
+			var win: Dictionary = p.windows[wi]
+			if absf(float(win["normal"].y)) < 0.5 or absf(float(win["pos"].y) - float(door["pos"].y)) > 0.5:
+				continue
+			var reach: float = (w + float(win["width"])) / 2.0 + 0.15
+			if absf(float(win["pos"].x) - x) >= reach:
+				continue
+			var wx: float = float(door["pos"].x)
+			var ok: bool = wx - float(win["width"]) / 2.0 >= rect.position.x + HouseGeometry.WINDOW_CORNER_MARGIN \
+				and wx + float(win["width"]) / 2.0 <= rect.end.x - HouseGeometry.WINDOW_CORNER_MARGIN \
+				and absf(wx - x) >= reach
+			for wj in p.windows_of(room):
+				if wj == wi:
+					continue
+				var o: Dictionary = p.windows[wj]
+				if absf(float(o["normal"].y)) < 0.5 or absf(float(o["pos"].y) - float(win["pos"].y)) > 0.5:
+					continue
+				if absf(float(o["pos"].x) - wx) < (float(o["width"]) + float(win["width"])) / 2.0 + HouseGeometry.WINDOW_MIN_GAP:
+					ok = false
+			if not ok:
+				blocked = true
+				break
+			moves[wi] = wx
+		if blocked:
+			continue
+		for wi2 in moves:
+			p.windows[wi2]["pos"] = Vector2(float(moves[wi2]), float(p.windows[wi2]["pos"].y))
+		door["pos"] = Vector2(x, float(door["pos"].y))
+		return true
+	return false
+
+
+## The strip of floor a door opens onto, its own width, straight across the
+## room to the far wall. Both the planner and HousePlanCheck measure the
+## stair against it.
+static func door_line(p: HousePlan, room: int, door: Dictionary) -> Rect2:
+	var f: Rect2 = HouseGeometry.room_floor_rect(p, room)
+	var pos: Vector2 = door["pos"]
+	var n: Vector2 = door["normal"]
+	var half: float = float(door["width"]) / 2.0
+	if absf(n.y) > 0.5:
+		return Rect2(Vector2(pos.x - half, f.position.y), Vector2(half * 2.0, f.size.y))
+	return Rect2(Vector2(f.position.x, pos.y - half), Vector2(f.size.x, half * 2.0))
+
+
+## Where the stair goes: against one of the walls its run lies along, at the
+## spot that is clear of the doors' swings, the front door's line and the
+## windows and, of those, furthest from the front door. Each rule is dropped
+## in turn only if nothing satisfies it, and a wall is never given up -- the
+## last resort is the wall with the fewest openings, at the end furthest from
+## the door. Returns {"rect": Rect2, "strict": int}, the strictness level the
+## spot was found at (0 = every rule held).
+static func _stair_spot(p: HousePlan, room: int, f: Rect2, size: Vector2) -> Dictionary:
+	var along_x: bool = size.x >= size.y
+	var swings: Array[Rect2] = []
+	var lines: Array[Rect2] = []
+	var glass: Array[Rect2] = []
+	var front := Vector2(f.get_center().x, f.position.y)
+	var storey: int = p.storey_of_room(room)
+	var entrance: int = p.entrance()
+	for d in p.doors_of(room):
+		var door: Dictionary = p.doors[d]
+		if HousePlan.record_storey(door) != storey:
+			continue
+		for side in [-1.0, 1.0]:
+			swings.append(HouseGeometry.door_clear_rect(door, side))
+		if d == entrance:
+			lines.append(door_line(p, room, door))
+			front = door["pos"]
+	for w in p.windows_of(room):
+		glass.append(HouseGeometry.window_clear_rect(p.windows[w]))
+	# the two walls the run lies along; the stair's long edge is on one of them
+	var walls: Array[Rect2] = []
+	if along_x:
+		walls.append(Rect2(Vector2(f.position.x, f.position.y), size))
+		walls.append(Rect2(Vector2(f.position.x, f.end.y - size.y), size))
+	else:
+		walls.append(Rect2(Vector2(f.position.x, f.position.y), size))
+		walls.append(Rect2(Vector2(f.end.x - size.x, f.position.y), size))
+	var travel: float = (f.size.x - size.x) if along_x else (f.size.y - size.y)
+	var steps: int = maxi(int(travel / 0.1), 1)
+	# strictness falls away one rule at a time: swings, then the door lines,
+	# then the windows
+	for strict in range(4):
+		var best := Rect2()
+		var best_score := -INF
+		for base in walls:
+			for s in range(steps + 1):
+				var t: float = travel * float(s) / float(steps)
+				var rect := Rect2(base.position + (Vector2(t, 0.0) if along_x
+					else Vector2(0.0, t)), size)
+				if strict < 3 and _hits_any(rect, swings):
+					continue
+				if strict < 2 and _hits_any(rect, lines):
+					continue
+				if strict < 1 and _hits_any(rect, glass):
+					continue
+				var score: float = rect.get_center().distance_to(front)
+				# a well must leave the way past it: the short way across the
+				# room, beside the stair, has to stay a path wide
+				var beside: float = (f.size.y - size.y) if along_x else (f.size.x - size.x)
+				if beside < HouseGeometry.PATH_MIN:
+					score -= 100.0
+				if score > best_score:
+					best_score = score
+					best = rect
+		if best.size.x > 0.0:
+			return {"rect": best, "strict": strict}
+	return {"rect": Rect2(f.get_center() - size / 2.0, size), "strict": 4}
+
+
+static func _hits_any(rect: Rect2, others: Array[Rect2]) -> bool:
+	for o in others:
+		var over: Rect2 = rect.intersection(o)
+		if over.size.x > 0.02 and over.size.y > 0.02:
+			return true
+	return false
 
 
 ## Decide once, here, which wall the fire and the flue share.
@@ -1042,10 +1375,78 @@ static func _hearth_walls(p: HousePlan, spec: HouseSpec, i: int) -> Array[int]:
 	return out
 
 
+## What the house is arranged around. For a house it is the fire: the focus
+## stands in the hearth room, on the hearth wall, at the middle of the clear
+## run the chimney was chosen for, looking into the room. A shop overrides
+## this with its counter, forge or bar (ShopPlanner), which must also face the
+## door; a fireplace need not. The furnisher pins the piece to `pos`, and
+## writes back where it actually stood, so the check that reads this record
+## is comparing the plan with the furniture and not the plan with itself.
+static func _choose_focus(p: HousePlan, _spec: HouseSpec) -> void:
+	p.focus = {}
+	var room: int = p.hearth_room()
+	var wi: int = p.hearth_wall()
+	if room < 0 or wi < 0:
+		return
+	p.focus = focus_on_wall(p, room, wi, "hearth", false)
+
+
+## A focus record for a piece backed to wall `wi` of `room`: at the middle of
+## the wall's longest clear run, looking along the wall's inward normal.
+static func focus_on_wall(p: HousePlan, room: int, wi: int, cat: String,
+		faces_door: bool, prefer := INF) -> Dictionary:
+	var wall: Dictionary = HouseGeometry.room_walls(p, room)[wi]
+	var n: Vector2 = wall["normal"]
+	var span: Vector2 = clear_wall_span(p, room, wi)
+	var from: Vector2 = wall["from"]
+	var horizontal: bool = absf(n.y) > 0.5
+	var mid: float = (span.x + span.y) / 2.0
+	# a piece that must look at the door stands square across from it, as
+	# near its line as the clear runs of the wall allow: of every run wide
+	# enough, the one that gets nearest
+	if is_finite(prefer):
+		var best := INF
+		for s in clear_wall_spans(p, room, wi):
+			if s.y - s.x < 1.2:
+				continue
+			var at: float = clampf(prefer, s.x + 0.6, s.y - 0.6)
+			if absf(at - prefer) < best:
+				best = absf(at - prefer)
+				mid = at
+	var pos: Vector2 = Vector2(mid, from.y) if horizontal else Vector2(from.x, mid)
+	return {"room": room, "cat": cat, "pos": pos,
+		"facing": atan2(-n.x, -n.y), "faces_door": faces_door}
+
+
+## A focus record for a piece standing free in `room`: at the middle of the
+## floor, looking along `facing` (a unit vector in plan space).
+static func focus_in_room(p: HousePlan, room: int, cat: String,
+		facing: Vector2, faces_door: bool) -> Dictionary:
+	var f: Rect2 = HouseGeometry.room_floor_rect(p, room)
+	return {"room": room, "cat": cat, "pos": f.get_center(),
+		"facing": atan2(-facing.x, -facing.y), "faces_door": faces_door}
+
+
 ## The longest UNBROKEN stretch of a wall, once its doors and windows have
 ## taken theirs. Total clear length is the wrong measure: a wall with a window
 ## in the middle has plenty of room and nowhere to put a hearth.
 static func _clear_wall_run(p: HousePlan, room: int, wi: int) -> float:
+	var span: Vector2 = clear_wall_span(p, room, wi)
+	return span.y - span.x
+
+
+## The longest unbroken stretch itself, as (start, end) along the wall's own
+## axis -- X for a front or back wall, Z for a side wall.
+static func clear_wall_span(p: HousePlan, room: int, wi: int) -> Vector2:
+	var best := Vector2.ZERO
+	for span in clear_wall_spans(p, room, wi):
+		if span.y - span.x > best.y - best.x:
+			best = span
+	return best
+
+
+## Every unbroken stretch of a wall, as (start, end) along its own axis.
+static func clear_wall_spans(p: HousePlan, room: int, wi: int) -> Array[Vector2]:
 	var wall: Dictionary = HouseGeometry.room_walls(p, room)[wi]
 	var from: Vector2 = wall["from"]
 	var to: Vector2 = wall["to"]
@@ -1090,10 +1491,33 @@ static func _clear_wall_run(p: HousePlan, room: int, wi: int) -> float:
 			continue
 		cuts.append(Vector2(along - HouseGeometry.DOOR_CLEAR,
 			along + HouseGeometry.DOOR_CLEAR))
+	# A stair standing against this wall (LAY-005) takes its stretch of it too:
+	# a hearth pinned under the well would have no chimney breast to sit in.
+	for stair in p.stairs:
+		var srect := Rect2()
+		if int(stair.get("a", -1)) == room:
+			srect = Rect2(stair.get("lower_rect", stair.get("rect", Rect2())))
+		elif int(stair.get("b", -1)) == room:
+			srect = Rect2(stair.get("upper_rect", stair.get("rect", Rect2())))
+		if srect.size.x <= 0.0:
+			continue
+		var touches: bool = (absf(srect.position.y - line) < 0.1 or absf(srect.end.y - line) < 0.1) \
+			if horizontal else (absf(srect.position.x - line) < 0.1 or absf(srect.end.x - line) < 0.1)
+		if not touches:
+			continue
+		if horizontal:
+			cuts.append(Vector2(srect.position.x - 0.1, srect.end.x + 0.1))
+		else:
+			cuts.append(Vector2(srect.position.y - 0.1, srect.end.y + 0.1))
 	cuts.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
-	var best := 0.0
+	var spans: Array[Vector2] = []
 	var cursor: float = lo
 	for cut in cuts:
-		best = maxf(best, cut.x - cursor)
+		if cut.x - cursor > 0.05:
+			spans.append(Vector2(cursor, cut.x))
 		cursor = maxf(cursor, cut.y)
-	return maxf(best, hi - cursor)
+	if hi - cursor > 0.05:
+		spans.append(Vector2(cursor, hi))
+	if spans.is_empty():
+		spans.append(Vector2(lo, lo))
+	return spans

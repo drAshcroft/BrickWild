@@ -350,6 +350,26 @@ Rules the planter follows, each of which the dressing check re-measures:
 
 ## 9. The harness: `VillageQA`
 
+Implemented (VIL-006..009): `qa/village_scale_check.gd`,
+`qa/village_road_check.gd`, `qa/village_lot_check.gd` and
+`qa/village_place_check.gd`, composed by `qa/village_qa.gd`, which then runs
+the family QA on every building. `qa/village_measure.gd` is the one place
+"the front of a building", "its door" and "the common's centre" are defined.
+Every rule takes an override (RuleSet, INT-020). The rules that are about
+things the planner does not yet lay -- water crossings, gates, the well,
+stalls, the mill -- run only when the plan carries them, and each has a
+fixture in `tests/suites/village_check_suite.gd` (`vcheck`) that builds the
+thing by hand to prove the rule fires. Three planner changes came with them:
+households come in sizes (the programmer, `HOUSE_SIZE_SPREAD`), the lot
+planner takes the frontage nearest the common first (the wealth gradient of
+6), and when the form's frontage cannot house everyone the site planner is
+asked for back lanes and then for more ground (`VillageLotPlanner.RETRIES`),
+and dead-end lanes are trimmed to their last lot. Six rules the planners do
+not yet meet on every village -- `density`, `tavern`, `gradient`, `common`,
+`smithy`, `landmark` -- are listed in `VillageCheckSuite.PLANNER_FOLLOW_UPS`
+with the follow-up each needs; the sweep counts and prints them as warnings
+and fails on everything else. Their fixtures still fire.
+
 `qa/village_qa.gd` composes six checks over the `VillagePlan` and then runs
 the family QA on every building in it. Each rule is a sentence and a
 measurement, in the vocabulary the harness already has: `Rect2`/polygon

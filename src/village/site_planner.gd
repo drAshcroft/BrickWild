@@ -71,7 +71,7 @@ const JUNCTION_EPS := 0.5       ## two road vertices this close are the same jun
 ## the form's streets and lanes. Returns a fresh `VillagePlan`; `spec` is not
 ## modified. An unsupported form returns a plan with the site and nothing
 ## else, so callers can tell "not mine" from "failed".
-static func plan(spec: VillageSpec) -> VillagePlan:
+static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0) -> VillagePlan:
 	var out := VillagePlan.new(spec)
 	if spec == null or not spec.valid():
 		push_error("VillageSitePlanner: invalid spec")
@@ -80,6 +80,12 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 		push_error("VillageSitePlanner: spec.generate() has not been called")
 		return out
 	out.site = site_rect(spec)
+	if site_scale > 1.0:
+		# more ground when the lot planner could not house everyone on the
+		# frontage the form gave it (VIL-006): the same square, grown about
+		# its centre, never past the cap
+		var side: float = minf(out.site.size.x * site_scale, SITE_MAX_SIDE)
+		out.site = Rect2(Vector2(-side * 0.5, -side * 0.5), Vector2(side, side))
 	if not (spec.form in FORMS_SUPPORTED):
 		return out
 
@@ -95,7 +101,64 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 		_plan_green(out, spec, through)
 	else:
 		_plan_street(out, spec, through, rng)
+	# 3. more frontage when the lot planner asks for it (VIL-006): back lanes
+	# off the through road, on the side away from the common first, at the
+	# spots the form did not take
+	_extra_lanes(out, spec, through, extra_lanes)
 	return out
+
+
+## Lanes the form did not lay, added in a fixed order so a plan asked for N
+## of them is the same plan every time. Each is a perpendicular stub off the
+## through road, clear of the common, as long as the site allows (the lot
+## planner trims it back to its last lot).
+const EXTRA_LANE_LENGTH := 36.0
+const EXTRA_LANE_SPOTS := [0.18, 0.82, 0.42, 0.58, 0.08, 0.92, 0.3, 0.7, 0.5, 0.25, 0.75]
+
+static func _extra_lanes(out: VillagePlan, spec: VillageSpec, through: PackedVector2Array,
+		wanted: int) -> void:
+	if wanted <= 0:
+		return
+	var site: Rect2 = out.site
+	var common_side: float = 1.0      # the common is north of the road in both forms
+	var common_x := Vector2(-INF, INF)
+	if not out.commons.is_empty():
+		var cr: Rect2 = Poly.bounding_rect(out.commons[0]["poly"])
+		common_x = Vector2(cr.position.x - 10.0, cr.end.x + 10.0)
+	var added := 0
+	for pass_side in [-common_side, common_side]:
+		for f in EXTRA_LANE_SPOTS:
+			if added >= wanted:
+				return
+			var x: float = site.position.x + site.size.x * float(f)
+			if pass_side > 0.0 and x > common_x.x and x < common_x.y:
+				continue
+			var idx: int = _vertex_near_x(through, x)
+			var start: Vector2 = through[idx]
+			var taken := false
+			for road in out.roads:
+				if road["class"] == &"through":
+					continue
+				var pts: PackedVector2Array = road["points"]
+				if pts[0].distance_to(start) < 12.0 or pts[pts.size() - 1].distance_to(start) < 12.0:
+					taken = true
+			if taken:
+				continue
+			var lane: PackedVector2Array = _stub(through, idx, pass_side, EXTRA_LANE_LENGTH, site)
+			if lane.size() != 2:
+				continue
+			# not across the common, nor the landmark slot
+			var ribbon: PackedVector2Array = Poly.ribbon(lane, 1.75)
+			var blocked := false
+			for c in out.commons:
+				if VillageLotPlanner.overlap_area(ribbon, c["poly"]) > 0.05:
+					blocked = true
+			if out.landmark_reserved() and VillageLotPlanner.overlap_area(ribbon, out.landmark_site["poly"]) > 0.05:
+				blocked = true
+			if blocked:
+				continue
+			out.roads.append(_road(lane, &"lane", spec.wealth))
+			added += 1
 
 
 ## The ground the village stands on: a square centred on the origin, sized so
@@ -404,12 +467,23 @@ static func road_components(plan: VillagePlan) -> int:
 	return roots.size()
 
 
+## Two roads touch when a vertex of one lies on the other: a lane's foot is
+## a vertex of the road it leaves, or a point along one of its segments.
 static func _roads_touch(a: PackedVector2Array, b: PackedVector2Array) -> bool:
 	for p in a:
-		for q in b:
-			if p.distance_to(q) <= JUNCTION_EPS:
-				return true
+		if _on_polyline(p, b):
+			return true
+	for q in b:
+		if _on_polyline(q, a):
+			return true
 	return false
+
+
+static func _on_polyline(p: Vector2, pts: PackedVector2Array) -> bool:
+	for i in range(pts.size() - 1):
+		if p.distance_to(Geometry2D.get_closest_point_to_segment(p, pts[i], pts[i + 1])) <= JUNCTION_EPS:
+			return true
+	return pts.size() == 1 and p.distance_to(pts[0]) <= JUNCTION_EPS
 
 
 static func _find(parent: Array[int], i: int) -> int:

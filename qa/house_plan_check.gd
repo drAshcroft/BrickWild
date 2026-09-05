@@ -24,31 +24,32 @@ extends RefCounted
 
 const TOL := 0.02
 
+## Every rule, in the order it runs, by the name its messages carry. A family
+## may replace one through `check(plan, overrides)` (RuleSet, INT-020).
+const RULES: Array[StringName] = [&"tiling", &"storeys", &"shape", &"way_in",
+	&"connected", &"privacy", &"opening", &"window", &"stairs", &"stair_line",
+	&"doors_in_line", &"upstairs_programme"]
+const METHODS := {&"shape": "_check_shapes", &"way_in": "_check_entrance",
+	&"connected": "_check_connectivity", &"opening": "_check_door_openings",
+	&"window": "_check_windows"}
+
 var failures: Array[String] = []
 var warnings: Array[String] = []
 var stats: Dictionary = {}
+var replaced: Dictionary = {}
 
 
-func check(plan: HousePlan) -> Dictionary:
+func check(plan: HousePlan, overrides: Dictionary = {}) -> Dictionary:
 	failures.clear()
 	warnings.clear()
 	stats.clear()
 	stats["rooms"] = plan.room_count()
 	stats["doors"] = plan.doors.size()
 	stats["windows"] = plan.windows.size()
-
-	_check_tiling(plan)
-	_check_storeys(plan)
-	_check_shapes(plan)
-	_check_entrance(plan)
-	_check_connectivity(plan)
-	_check_privacy(plan)
-	_check_door_openings(plan)
-	_check_windows(plan)
-	_check_stairs(plan)
-	_check_upstairs_programme(plan)
+	replaced = RuleSet.run(self, RULES, METHODS, overrides, [plan], [plan],
+		failures, warnings)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
-		"stats": stats}
+		"stats": stats, "replaced": replaced}
 
 
 ## Rooms that belong on the ground floor of a dwelling and nowhere else. The
@@ -97,16 +98,26 @@ func _check_tiling(plan: HousePlan) -> void:
 ## outside the spec.  The `get` fallback keeps old hand-authored plans valid.
 func _check_storeys(plan: HousePlan) -> void:
 	var wanted: int = clampi(int(plan.spec.storeys), 1, 3)
+	var lowest: int = _lowest(plan)
 	var seen := {}
 	for room in plan.rooms:
 		var level := HousePlan.record_storey(room)
-		if level < 0 or level >= wanted:
-			failures.append("storeys: room has invalid storey %d (wanted 0..%d)" % [level, wanted - 1])
+		if level < lowest or level >= wanted:
+			failures.append("storeys: room has invalid storey %d (wanted %d..%d)" % [level, lowest, wanted - 1])
 		seen[level] = true
-	for level in range(wanted):
+	for level in range(lowest, wanted):
 		if not seen.has(level):
 			failures.append("storeys: storey %d has no rooms" % level)
 	stats["storeys"] = wanted
+	stats["cellars"] = -lowest
+
+
+## The lowest storey a plan may have: 0, or -cellars for a spec that digs
+## (INT-016). Old hand-authored specs have no cellars field.
+static func _lowest(plan: HousePlan) -> int:
+	if plan.spec.has_method("lowest_storey"):
+		return int(plan.spec.lowest_storey())
+	return 0
 
 
 func _check_shapes(plan: HousePlan) -> void:
@@ -176,13 +187,14 @@ func _check_connectivity(plan: HousePlan) -> void:
 ## and coverage of every adjacent pair; door_graph() then checks reachability.
 func _check_stairs(plan: HousePlan) -> void:
 	var wanted: int = clampi(int(plan.spec.storeys), 1, 3)
+	var lowest: int = _lowest(plan)
 	var interior: Rect2 = HouseGeometry.interior_rect(plan.spec)
 	var pairs := {}
 	for si in range(plan.stairs.size()):
 		var stair: Dictionary = plan.stairs[si]
 		var lo: int = int(stair.get("storey", 0))
 		var hi: int = int(stair.get("to_storey", lo + 1))
-		if hi != lo + 1 or lo < 0 or hi >= wanted:
+		if hi != lo + 1 or lo < lowest or hi >= wanted:
 			failures.append("stairs: stair %d does not join adjacent valid storeys (%d to %d)" % [si, lo, hi])
 			continue
 		var a: int = int(stair.get("a", -1))
@@ -204,7 +216,7 @@ func _check_stairs(plan: HousePlan) -> void:
 					or not lower.size.is_equal_approx(upper.size):
 				failures.append("stairs: stair %d landings must share one vertical stairwell" % si)
 		pairs[lo] = true
-	for lo in range(wanted - 1):
+	for lo in range(lowest, wanted - 1):
 		if not pairs.has(lo):
 			failures.append("stairs: no transition from storey %d to %d" % [lo, lo + 1])
 	stats["stairs"] = plan.stairs.size()
@@ -454,3 +466,63 @@ static func _same_wall(a: Dictionary, b: Dictionary) -> bool:
 	if absf(na.x) > 0.5:
 		return absf(pa.x - pb.x) < 0.05
 	return absf(pa.y - pb.y) < 0.05
+
+
+## The stair stands against a wall of the room it rises from, and its foot is
+## out of the line of the front door (LAY-005). A stair in the middle of the
+## hall faces whoever comes in head-on and takes the table's place; a stair
+## across the door line is the first thing you walk into. Measured from the
+## stair's footprint and the door alone, the way the planner measures it.
+const STAIR_WALL_TOL := 0.06
+
+func _check_stair_line(plan: HousePlan) -> void:
+	var front: int = plan.entrance()
+	for si in range(plan.stairs.size()):
+		var stair: Dictionary = plan.stairs[si]
+		var room: int = int(stair.get("a", -1))
+		if room < 0 or room >= plan.room_count():
+			continue
+		var rect: Rect2 = Rect2(stair.get("lower_rect", stair.get("rect", Rect2())))
+		if rect.size.x <= 0.0:
+			continue
+		var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+		var gap: float = minf(minf(rect.position.y - f.position.y, f.end.y - rect.end.y),
+			minf(rect.position.x - f.position.x, f.end.x - rect.end.x))
+		if gap > STAIR_WALL_TOL:
+			failures.append("stair_line: stair %d stands %.2fm off every wall of room %d (%s)"
+				% [si, gap, room, String(plan.kind_of(room))])
+		if front < 0 or int(plan.doors[front]["a"]) != room:
+			continue
+		var line: Rect2 = HousePlanner.door_line(plan, room, plan.doors[front])
+		var over: Rect2 = line.intersection(rect)
+		if over.size.x > TOL and over.size.y > TOL:
+			var msg := "stair_line: the foot of stair %d lies in the line of the front door" % si
+			if plan.was_dropped(room, "stair"):
+				warnings.append(msg)
+			else:
+				failures.append(msg)
+
+
+## The front door and the back door are not in line (LAY-006): two exterior
+## doors on opposite walls whose openings overlap, measured along the wall,
+## make the house a corridor with rooms off it. Measured from the doors alone.
+func _check_doors_in_line(plan: HousePlan) -> void:
+	for di in range(plan.doors.size()):
+		var d: Dictionary = plan.doors[di]
+		if not d["exterior"]:
+			continue
+		for dj in range(di + 1, plan.doors.size()):
+			var e: Dictionary = plan.doors[dj]
+			if not e["exterior"]:
+				continue
+			var dn: Vector2 = d["normal"]
+			var en: Vector2 = e["normal"]
+			if dn.dot(en) > -0.9:
+				continue
+			var along := Vector2(absf(dn.y), absf(dn.x))
+			var a: float = Vector2(d["pos"]).dot(along)
+			var b: float = Vector2(e["pos"]).dot(along)
+			var overlap: float = (float(d["width"]) + float(e["width"])) / 2.0 - absf(a - b)
+			if overlap > TOL:
+				failures.append("doors_in_line: doors %d and %d face each other across the house, %.2fm of them in line"
+					% [di, dj, overlap])

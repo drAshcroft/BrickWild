@@ -33,6 +33,11 @@ static func run() -> SuiteResult:
 	_hearth_sweep(res)
 	_row_fixture(res)
 	_upstairs_programme_fixture(res)
+	_stair_fixture(res)
+	_stair_sweep(res)
+	_doors_in_line_fixture(res)
+	_poles_sweep(res)
+	_rule_override_fixture(res)
 	_affinity_sweep(res)
 	_affinity_variety(res)
 	_affinity_fixture(res)
@@ -84,6 +89,214 @@ static func _upstairs_programme_fixture(res: SuiteResult) -> void:
 ## The hearth rule, shown to fire. A house is planned properly, its furniture
 ## thrown away and one hearth stood against a wall the chimney is NOT on: if
 ## the rule does not complain about that, it is not measuring anything.
+## Rule replacement, shown to work (INT-020): the furnishing check with its
+## daylight rule replaced by a no_windows rule fails a plan that has a window
+## and passes one that has none, reports the replacement by name, and refuses
+## a rule switched off with nothing in its place.
+static func _rule_override_fixture(res: SuiteResult) -> void:
+	var no_windows := {"name": "no_windows", "call": func(p: HousePlan) -> Array:
+		var out: Array = []
+		for w in range(p.windows.size()):
+			out.append("room %d has a window" % int(p.windows[w]["room"]))
+		return out}
+	var lit := _fs_plan(&"hall", 75001)
+	res.checked += 1
+	var rep: Dictionary = HouseFurnishCheck.new().check(lit, {"daylight": no_windows})
+	if not "daylight -> no_windows: room 0 has a window" in rep["failures"]:
+		res.fail("override fixture: the replaced daylight rule did not fail a lit room: %s" % str(rep["failures"]))
+	if String(rep.get("replaced", {}).get("daylight", "")) != "no_windows":
+		res.fail("override fixture: the report does not say daylight was replaced")
+	var dark := _fs_plan(&"hall", 75002)
+	dark.windows = []
+	res.checked += 1
+	var rep2: Dictionary = HouseFurnishCheck.new().check(dark, {"daylight": no_windows})
+	for f in rep2["failures"]:
+		if String(f).begins_with("daylight"):
+			res.fail("override fixture: the replaced daylight rule failed a dark room: %s" % String(f))
+	res.checked += 1
+	var rep3: Dictionary = HouseFurnishCheck.new().check(lit, {"daylight": null})
+	if not "rules: daylight was switched off with no replacement" in rep3["failures"]:
+		res.fail("override fixture: switching a rule off was not refused")
+	res.checked += 1
+	var qa: Dictionary = HouseQA.new().check(lit, null, {"no_such_rule": no_windows})
+	if not "rules: no house rule is called no_such_rule" in qa["failures"]:
+		res.fail("override fixture: an override for a rule nobody has was not refused")
+
+
+## The doors_in_line rule, shown to fire (LAY-006): one room, a front door
+## and a back door cut into opposite walls at the same x.
+static func _doors_in_line_fixture(res: SuiteResult) -> void:
+	var plan := _fs_plan(&"hall", 73001)
+	var inner: Rect2 = HouseGeometry.interior_rect(plan.spec)
+	plan.doors.append({"a": 0, "b": -1, "pos": Vector2(inner.get_center().x + 0.3, inner.position.y),
+		"normal": Vector2(0, -1), "width": 0.9, "exterior": true, "front": false,
+		"storey": 0})
+	res.checked += 1
+	var rep: Dictionary = HousePlanCheck.new().check(plan)
+	var want := "doors_in_line: doors 0 and 1 face each other across the house, 0.60m of them in line"
+	if not want in rep["failures"]:
+		res.fail("doors in line fixture: wanted\n    %s\n  got: %s" % [want, str(rep["failures"])])
+
+
+## Two hundred one-storey houses with a back door, every style: the back door
+## is on the kitchen four times in five and never on a bedroom or a parlour,
+## the kitchen touches the back wall four times in five, and no house has its
+## two doors in line (LAY-006).
+static func _poles_sweep(res: SuiteResult) -> void:
+	var styles: Array = HouseSweep.styles()
+	var trades: Array = HouseSweep.trades()
+	var houses := 0
+	var on_kitchen := 0
+	var on_store := 0
+	var on_other := 0
+	var kitchens := 0
+	var kitchens_back := 0
+	var in_line := 0
+	for n in range(200):
+		var spec := HouseSpec.new()
+		spec.style = styles[n % styles.size()]
+		spec.trade = trades[n % trades.size()]
+		spec.width = 8.0 + float(n % 5) * 1.5
+		spec.length = 9.0 + float(n % 7) * 1.5
+		spec.storeys = 1
+		HouseGenerator.generate(spec, 74000 + n)
+		if spec.room_count < 3:
+			continue
+		spec.back_door = true
+		var plan: HousePlan = HousePlanner.plan(spec)
+		res.checked += 1
+		houses += 1
+		var back := -1
+		for d in range(plan.doors.size()):
+			if plan.doors[d]["exterior"] and not plan.doors[d].get("front", false):
+				back = d
+		if back >= 0:
+			var kind: StringName = plan.kind_of(int(plan.doors[back]["a"]))
+			if kind == &"kitchen":
+				on_kitchen += 1
+			elif kind == &"store":
+				on_store += 1
+			else:
+				on_other += 1
+				res.fail("poles sweep: seed=%d the back door opens out of the %s" % [spec.seed, String(kind)])
+		var inner: Rect2 = HouseGeometry.interior_rect(spec)
+		for i in plan.rooms_of(&"kitchen"):
+			kitchens += 1
+			if absf(Rect2(plan.rooms[i]["rect"]).end.y - inner.end.y) < 0.01:
+				kitchens_back += 1
+		var rep: Dictionary = HousePlanCheck.new().check(plan)
+		for m in rep["failures"]:
+			if String(m).begins_with("doors_in_line:"):
+				in_line += 1
+				res.fail("poles sweep: seed=%d %s" % [spec.seed, String(m)])
+	res.note("poles       %d houses: back door on kitchen %d, store %d, other %d; kitchen on back wall %d/%d"
+		% [houses, on_kitchen, on_store, on_other, kitchens_back, kitchens])
+	if houses > 0 and float(on_kitchen) / float(houses) < 0.8:
+		res.fail("poles sweep: the back door is on the kitchen in only %d of %d houses" % [on_kitchen, houses])
+	if kitchens > 0 and float(kitchens_back) / float(kitchens) < 0.8:
+		res.fail("poles sweep: the kitchen touches the back wall in only %d of %d houses" % [kitchens_back, kitchens])
+
+
+## The stair_line rule, shown to fire (LAY-005): a two-storey house is planned
+## properly, then its stair is dragged back to the middle of the hall, in the
+## line of the front door, where it used to stand.
+static func _stair_fixture(res: SuiteResult) -> void:
+	var spec := HouseSpec.new()
+	spec.style = HouseSweep.styles()[0]
+	spec.width = 8.0
+	spec.length = 9.0
+	spec.storeys = 2
+	var plan: HousePlan = HouseGenerator.generate(spec, 71001)
+	res.checked += 1
+	if plan.stairs.is_empty():
+		res.fail("stair fixture: a two-storey house was planned with no stair")
+		return
+	var stair: Dictionary = plan.stairs[0]
+	var room: int = int(stair["a"])
+	var front: int = plan.entrance()
+	var in_hall: bool = front >= 0 and int(plan.doors[front]["a"]) == room
+	if not in_hall:
+		res.warn("stair fixture: the stair rises from room %d and the front door opens into another; the door-line half of the fixture cannot run" % room)
+	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var size: Vector2 = Rect2(stair["rect"]).size
+	var centred := Rect2(f.get_center() - size / 2.0, size)
+	if in_hall:
+		var line: Rect2 = HousePlanner.door_line(plan, room, plan.doors[front])
+		centred.position.x = clampf(line.get_center().x - size.x / 2.0,
+			f.position.x, f.end.x - size.x)
+	for key in ["rect", "lower_rect", "upper_rect"]:
+		stair[key] = centred
+	stair["pos"] = centred.get_center()
+	stair["lower_pos"] = centred.get_center()
+	stair["upper_pos"] = centred.get_center()
+	var rep: Dictionary = HousePlanCheck.new().check(plan)
+	var saw_wall := false
+	var saw_line := false
+	for m in rep["failures"]:
+		if String(m).begins_with("stair_line:") and "off every wall" in String(m):
+			saw_wall = true
+		if String(m).begins_with("stair_line:") and "line of the front door" in String(m):
+			saw_line = true
+	if not saw_wall:
+		res.fail("stair fixture: a stair in the middle of the hall was not reported off the walls")
+	if in_hall and not saw_line:
+		res.fail("stair fixture: a stair in the line of the front door was not reported")
+
+
+## Two hundred two-storey houses: the stair touches a wall and keeps out of the
+## front door's line in every one, and the hall still has its table in almost
+## every one -- the stair against the wall is what leaves the middle free.
+static func _stair_sweep(res: SuiteResult) -> void:
+	var styles: Array = HouseSweep.styles()
+	var trades: Array = HouseSweep.trades()
+	var on_wall := 0
+	var off_line := 0
+	var halls := 0
+	var tables := 0
+	var n_stairs := 0
+	for n in range(200):
+		var spec := HouseSpec.new()
+		spec.style = styles[n % styles.size()]
+		spec.trade = trades[n % trades.size()]
+		spec.width = 6.0 + float(n % 5) * 2.0
+		spec.length = 7.0 + float(n % 7) * 1.8
+		spec.storeys = 2
+		var plan: HousePlan = HouseGenerator.generate(spec, 72000 + n)
+		res.checked += 1
+		var rep: Dictionary = HousePlanCheck.new().check(plan)
+		for si in range(plan.stairs.size()):
+			n_stairs += 1
+			var wall_ok := true
+			var line_ok := true
+			for m in rep["failures"]:
+				if not String(m).begins_with("stair_line: ") or not ("stair %d " % si) in String(m):
+					continue
+				if "off every wall" in String(m):
+					wall_ok = false
+				if "line of the front door" in String(m):
+					line_ok = false
+			if wall_ok:
+				on_wall += 1
+			if line_ok:
+				off_line += 1
+		for i in plan.rooms_of(&"hall"):
+			if plan.storey_of_room(i) != 0:
+				continue
+			halls += 1
+			for fi in plan.furniture_of(i):
+				if PropCatalog.category(plan.furniture[fi]["key"]) == "table":
+					tables += 1
+					break
+	res.note("stair       %d/%d against a wall, %d/%d out of the door line, %d/%d halls with a table"
+		% [on_wall, n_stairs, off_line, n_stairs, tables, halls])
+	if on_wall < n_stairs:
+		res.fail("stair sweep: %d of %d stairs stand off every wall" % [n_stairs - on_wall, n_stairs])
+	if off_line < n_stairs:
+		res.fail("stair sweep: %d of %d stairs stand in the line of the front door" % [n_stairs - off_line, n_stairs])
+	if halls > 0 and float(tables) / float(halls) < 0.95:
+		res.fail("stair sweep: only %d of %d two-storey halls have a table" % [tables, halls])
+
+
 static func _hearth_fixture(res: SuiteResult) -> void:
 	var spec := HouseSpec.new()
 	spec.width = 11.0
@@ -247,7 +460,7 @@ static func _row_of(key: String, foot: Vector2, cat: String, base_z: float,
 const AFFINITY_WANT := {
 	"corner_clutter": 0.90, "sconce_pair": 0.90, "chandelier_over": 0.98,
 	"workbench_daylight": 0.98, "bed_window": 0.98, "table_focus": 0.75,
-	"shelf_over": 0.70,
+	"shelf_over": 0.70, "table_face": 0.90,
 }
 
 
@@ -488,6 +701,14 @@ static func _aff_table(plan: HousePlan, room: int, f: Rect2, tally: Dictionary) 
 			continue
 		_aff_hit(tally, "table_focus",
 			(Rect2(p["rect"]).get_center() - mid).dot(dir) >= 0.30 * half)
+		# and it lies broadside to the focus: long axis at right angles to
+		# the line the fire looks along, within 20 degrees (INT-002)
+		var size: Vector2 = Rect2(p["rect"]).size
+		if plan.focus_room() == room and absf(size.x - size.y) >= 0.1:
+			var axis := Vector2(1, 0) if size.x > size.y else Vector2(0, 1)
+			var yaw: float = plan.focus_facing()
+			var look := Vector2(-sin(yaw), -cos(yaw))
+			_aff_hit(tally, "table_face", absf(axis.dot(look)) <= sin(deg_to_rad(20.0)))
 
 
 ## Two different seeds must still furnish a room differently. The whole point
@@ -585,6 +806,8 @@ static func _feng_shui_fixtures(res: SuiteResult) -> void:
 	_fs_shelf_over(res)
 	_fs_chandelier_over(res)
 	_fs_corner_clutter(res)
+	_fs_focus_pos(res)
+	_fs_focus_door(res)
 
 
 ## One room, one front door in the far wall (wall 1) and one window in the near
@@ -754,13 +977,39 @@ static func _fs_corner_clutter(res: SuiteResult) -> void:
 		"corner_clutter: %s in room 0 (kitchen) stands 0.50m from a door, in the traffic" % key)
 
 
+## The fire two metres from where the plan said the room was arranged around.
+static func _fs_focus_pos(res: SuiteResult) -> void:
+	var key: String = PropCatalog.of_category("hearth")[0]
+	var plan := _fs_plan(&"hall", 8109)
+	plan.hearth = {"room": 0, "wall": 0}
+	var at: Vector2 = _fs_against(plan, key, 0, 0.0)
+	plan.focus = {"room": 0, "cat": "hearth", "pos": at, "facing": 0.0,
+		"faces_door": false}
+	plan.furniture = [_fs_piece(key, _fs_against(plan, key, 0, 2.0))]
+	_fs_expect(res, plan,
+		"focus: %s in room 0 (hall) stands 2.00m from the focus the plan recorded" % key)
+
+
+## A counter with its back to the door it is supposed to serve: the plan says
+## the counter must face the entrance, and this one stands against the door's
+## own wall looking into the room.
+static func _fs_focus_door(res: SuiteResult) -> void:
+	var key: String = PropCatalog.of_category("counter")[0]
+	var plan := _fs_plan(&"sales_floor", 8110)
+	var at: Vector2 = _fs_against(plan, key, 1, 3.0)
+	plan.focus = {"room": 0, "cat": "counter", "pos": at, "facing": 0.0,
+		"faces_door": true}
+	plan.furniture = [_fs_piece(key, at)]
+	_fs_expect(res, plan, "focus: the counter in room 0 faces away from the door")
+
+
 ## The whole feng shui section over 200 generated houses, every style, one and
 ## two storeys: no rule may fail on a house the generator meant to build. The
 ## warnings the tolerances produce are the rooms too small or too odd to obey
 ## a rule, and are counted rather than hidden.
 const FENG_SHUI_RULES := ["workbench_daylight", "bookcase_heat", "bed_window",
 	"table_focus", "sconce_pair", "shelf_over", "chandelier_over",
-	"corner_clutter", "command", "hearth"]
+	"corner_clutter", "command", "hearth", "focus"]
 
 static func _feng_shui_sweep(res: SuiteResult) -> void:
 	var styles: Array = HouseSweep.styles()

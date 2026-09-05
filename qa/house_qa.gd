@@ -16,17 +16,22 @@ extends RefCounted
 const SHELL_CARRIED: Array = ["roof"]
 
 
-func check(plan: HousePlan, builder: HouseBuilder) -> Dictionary:
+## `overrides` lets a family replace a rule of the plan or furnishing check
+## by name (RuleSet, INT-020); the report says which under "replaced".
+func check(plan: HousePlan, builder: HouseBuilder, overrides: Dictionary = {}) -> Dictionary:
 	var failures: Array[String] = []
 	var warnings: Array[String] = []
 	var stats := {}
 	# which rule belongs to which section of the report; the parts that name
 	# their groups (the furnishing check does) hand them up unchanged
 	var groups := {}
+	var replaced := {}
+	for bad in RuleSet.unknown(overrides, [HousePlanCheck.RULES, HouseFurnishCheck.RULES]):
+		failures.append("rules: no house rule is called %s" % bad)
 
 	for part in [
-		HousePlanCheck.new().check(plan),
-		HouseFurnishCheck.new().check(plan),
+		HousePlanCheck.new().check(plan, overrides),
+		HouseFurnishCheck.new().check(plan, overrides),
 		HouseNavCheck.new().check(plan),
 	]:
 		for f in part["failures"]:
@@ -37,6 +42,8 @@ func check(plan: HousePlan, builder: HouseBuilder) -> Dictionary:
 			stats[k] = part["stats"][k]
 		for g in part.get("groups", {}):
 			groups[g] = part["groups"][g]
+		for r in part.get("replaced", {}):
+			replaced[r] = part["replaced"][r]
 
 	if builder != null:
 		for f2 in _check_shell(plan, builder):
@@ -47,7 +54,7 @@ func check(plan: HousePlan, builder: HouseBuilder) -> Dictionary:
 			failures.append(f4)
 		stats["masses"] = builder.mass_log.size()
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
-		"stats": stats, "groups": groups}
+		"stats": stats, "groups": groups, "replaced": replaced}
 
 
 ## The shell: every mass stands on the ground and touches the rest of the
@@ -58,22 +65,34 @@ static func _check_shell(plan: HousePlan, builder: HouseBuilder) -> Array[String
 	if masses.is_empty():
 		out.append("shell: the builder logged no structural masses")
 		return out
-	var anchor := "floor"
+	# the ground floor slab, or its first piece when a stair down to a cellar
+	# has cut a hole in it (INT-016)
+	var anchor := ""
 	for m0 in masses:
-		if m0["name"] == "floor":
-			anchor = "floor"
+		var nm0: String = m0["name"]
+		if nm0 == "floor" or nm0 == "floor_0":
+			anchor = nm0
 			break
-		if m0["name"] == "floor_0":
-			anchor = "floor_0"
+		if anchor == "" and nm0.begins_with("floor_0"):
+			anchor = nm0
+	if anchor == "":
+		anchor = "floor"
 	var gaps: Dictionary = MassRules.gaps(masses, anchor)
 	for f in gaps["failures"]:
 		out.append(str(f))
 	var carried: Array = SHELL_CARRIED.duplicate()
 	# Ground-floor plans retain the original strict grounding rule. Upper
 	# storeys are intentionally carried by the walls/floors below; gaps() still
-	# requires every one to join the structural assembly.
+	# requires every one to join the structural assembly. Every mass carries
+	# its own ground level (a cellar's is a storey down, INT-016), so the
+	# per-storey masses are measured against that rather than exempted.
 	if int(plan.spec.storeys) > 1:
-		carried += ["floor_", "wall_", "partition_", "roof", "stair_"]
+		carried += ["roof", "stair_"]
+		for m in masses:
+			var nm: String = m["name"]
+			if (nm.begins_with("floor_") or nm.begins_with("wall_") or nm.begins_with("partition_")) \
+					and not m.has("ground"):
+				carried.append(nm)
 	for g in MassRules.grounded(masses, carried):
 		out.append(str(g))
 	# and the rooms the mesh was built from must be the rooms the plan claims
@@ -94,6 +113,9 @@ static func _check_shell(plan: HousePlan, builder: HouseBuilder) -> Array[String
 static func _check_vertical_shell(plan: HousePlan, builder: HouseBuilder) -> Array[String]:
 	var out: Array[String] = []
 	var wanted: int = clampi(int(plan.spec.storeys), 1, 3)
+	var lowest := 0
+	if plan.spec.has_method("lowest_storey"):
+		lowest = int(plan.spec.lowest_storey())
 	var floor_names := {}
 	var roofs: Array[AABB] = []
 	for m in builder.mass_log:
@@ -102,10 +124,14 @@ static func _check_vertical_shell(plan: HousePlan, builder: HouseBuilder) -> Arr
 			floor_names[nm] = true
 		if nm.begins_with("roof"):
 			roofs.append(m["aabb"])
-	for level in range(wanted):
-		if level == 0 and (floor_names.has("floor") or floor_names.has("floor_0")):
+	for level in range(lowest, wanted):
+		var ground_slab := floor_names.has("floor") or floor_names.has("floor_0")
+		for floor_name0 in floor_names:
+			if String(floor_name0).begins_with("floor_0"):
+				ground_slab = true
+		if level == 0 and ground_slab:
 			continue
-		if level > 0:
+		if level != 0:
 			var prefix := "floor_%d" % level
 			var found_level := false
 			for floor_name in floor_names:
@@ -114,7 +140,7 @@ static func _check_vertical_shell(plan: HousePlan, builder: HouseBuilder) -> Arr
 					break
 			if found_level:
 				continue
-		if wanted > 1:
+		if wanted > 1 or lowest < 0:
 			out.append("shell: missing floor mass for storey %d" % level)
 	if roofs.is_empty():
 		out.append("shell: house has no logged roof mass")

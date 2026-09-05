@@ -187,15 +187,32 @@ const RECIPES := {
 }
 
 const SHOP_FITTINGS := {
-	&"blacksmith": [{"cat": "anvil", "rule": &"free", "n": [1, 1], "opt": 1.0}],
+	# the forge first, on the chimney wall the planner chose, and the anvil
+	# beside it (its affinity says so) facing the door (the plan's focus)
+	&"blacksmith": [
+		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "anvil", "rule": &"free", "n": [1, 1], "opt": 1.0},
+	],
 	&"bakery": [{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0}],
 	&"butcher": [{"cat": "blade", "rule": &"on", "n": [1, 2], "opt": 1.0}],
 	&"apothecary": [{"cat": "alchemy", "rule": &"on", "n": [2, 4], "opt": 1.0}],
 	# 1.0 like every other trade's own fitting: the shop archetype asks for a
 	# tailor's sacks by name, and a defining fitting placed on a dice roll is a
 	# tailor with nothing in it one time in five.
-	&"tailor": [{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 1.0}],
-	&"carpenter": [{"cat": "rack", "rule": &"mounted", "n": [1, 1], "opt": 1.0}],
+	# a tailor cuts at a table under a rack of cloth with the shelf of the
+	# sales floor behind; a carpenter works at his bench with a rack of tools
+	# over it and a bench to saw on (LAY-009)
+	&"tavern": [{"cat": "barrel", "rule": &"corner", "n": [1, 2], "opt": 1.0}],
+	&"tailor": [
+		{"cat": "rack", "rule": &"mounted", "n": [1, 1], "opt": 1.0},
+		{"cat": "shelf", "rule": &"mounted", "n": [1, 1], "opt": 1.0},
+		{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 1.0},
+	],
+	&"carpenter": [
+		{"cat": "rack", "rule": &"mounted", "n": [1, 1], "opt": 1.0},
+		{"cat": "bench", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "crate", "rule": &"corner", "n": [1, 2], "opt": 0.9},
+	],
 }
 
 ## What a trade adds to its workshop, on top of the generic bench and crates.
@@ -289,6 +306,16 @@ const FLANK_TOL := 0.6
 ## Step along a wall when hunting for somewhere to hang something. Finer than
 ## PROBE_STEP because the mirror of a sconce is judged in centimetres.
 const MOUNT_STEP := 0.06
+## The focus piece is pinned to HousePlan.focus: it loses this much per metre
+## it stands from the point the planner chose, which beats the wall-middle
+## term and the jitter within a hand's breadth. A piece that must look at the
+## door is pushed to face it by FACE_W; a table in the focus room is pushed to
+## lie broadside to the focus by the same weight. (INT-002)
+const PIN_W := 4.0
+const FACE_W := 6.0
+## How far off the planner's point the focus piece may stand and still count
+## as being there. HouseFurnishCheck measures with the same figure.
+const FOCUS_TOL := 0.3
 
 
 static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
@@ -518,6 +545,23 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		for s2 in fittings:
 			steps.append(s2)
 
+	# The focus is the one piece the room is arranged around, so it goes in
+	# whether or not the recipe happened to list it: a tavern's bar is not in
+	# the dining-room recipe, a great hall's high table is not in any.
+	if plan.focus_room() == room and plan.focus_cat() != "":
+		var listed := false
+		for s3 in steps:
+			if String(s3["cat"]) == plan.focus_cat():
+				listed = true
+		if not listed:
+			var choices: Array[String] = PropCatalog.of_category(plan.focus_cat())
+			if not choices.is_empty():
+				var wants_wall: bool = PropCatalog.has_tag(choices[0], PropCatalog.WALL)
+				# and it goes in FIRST: the bar takes the wall across from the
+				# door before the row of tables can take it
+				steps.insert(0, {"cat": plan.focus_cat(),
+					"rule": &"wall" if wants_wall else &"free", "n": [1, 1], "opt": 1.0})
+
 	# The things a room cannot do without go in first, whether they came from
 	# the room recipe or from the trade. Otherwise a smithy spends its one good
 	# wall on a weapon rack and has nowhere left for the workbench.
@@ -712,6 +756,7 @@ static func could_place(plan: HousePlan, room: int, cat: String) -> bool:
 	probe.doors = plan.doors
 	probe.windows = plan.windows
 	probe.hearth = plan.hearth
+	probe.focus = plan.focus.duplicate()
 	probe.furniture = []
 	var r := RandomNumberGenerator.new()
 	r.seed = 1
@@ -719,7 +764,11 @@ static func could_place(plan: HousePlan, room: int, cat: String) -> bool:
 	var zones: Array[Rect2] = []
 	for key in choices:
 		var before: int = probe.furniture.size()
-		for rule in [&"wall", &"free", &"corner"]:
+		# a bed, a hearth or a bookcase is only ever placed against a wall
+		# (WALL_ESSENTIAL): a room that could take one in its middle and
+		# nowhere else cannot take one
+		var rules: Array = [&"wall"] if cat in WALL_ESSENTIAL else [&"wall", &"free", &"corner"]
+		for rule in rules:
 			match rule:
 				&"wall":
 					_place_against_wall(probe, room, key, blocked, zones, r)
@@ -809,11 +858,20 @@ static func _place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 			_place_ceiling(plan, room, key)
 		&"on":
 			_place_on_surface(plan, room, key, r)
+	# The first focus piece placed writes back where it actually stood, so the
+	# check compares the plan with the furniture rather than with itself.
+	if plan.furniture.size() > before_place and plan.focus_room() == room \
+			and plan.focus_cat() == cat and not plan.focus.get("placed", false):
+		var placed: Dictionary = plan.furniture[-1]
+		plan.focus["pos"] = Rect2(placed["rect"]).get_center()
+		plan.focus["facing"] = float(placed["yaw"])
+		plan.focus["placed"] = true
 	# A room that could not fit something it needed, because it was already
 	# holding the other things it needed, has made a compromise rather than a
 	# mistake -- and it is only a compromise if there WAS something else. A bed
 	# missing from an empty bedroom is still a defect, and still fails.
-	if _mandatory and plan.furniture.size() == before_place 			and _has_other_must(plan, room):
+	if _mandatory and plan.furniture.size() == before_place \
+			and _has_other_must(plan, room):
 		plan.note_compromise(room, cat)
 
 
@@ -1061,7 +1119,9 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 	var key: String = String(cand["key"])
 	var aff: Dictionary = PropCatalog.affinity(key)
 	if aff.is_empty():
-		return 0.0
+		# a counter or a cauldron has no wishes of its own, but it may still
+		# be the piece the plan is arranged around
+		return _pin_bonus(plan, room, cand)
 	var rect: Rect2 = cand["rect"]
 	var c: Vector2 = rect.get_center()
 	var wall: int = _back_wall_index(plan, room, rect)
@@ -1123,7 +1183,52 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 		score += _flank_bonus(plan, room, cand)
 	if PropCatalog.category(key) == "bed":
 		score += _bed_bonus(plan, room, cand)
+	if String(aff.get("face", "")) == "focus":
+		score += _broadside_bonus(plan, room, rect)
+	return score + _pin_bonus(plan, room, cand)
+
+
+## The focus piece itself: pinned to the point the planner chose, and turned
+## to look at the door when the plan says it must. Every other piece scores 0
+## here, so this is outside the affinity block -- a hearth has no affinity of
+## its own and is still the focus of the room it is in.
+static func _pin_bonus(plan: HousePlan, room: int, cand: Dictionary) -> float:
+	if plan.focus_room() != room or plan.focus.get("placed", false):
+		return 0.0
+	if PropCatalog.category(String(cand["key"])) != plan.focus_cat():
+		return 0.0
+	var rect: Rect2 = cand["rect"]
+	var c: Vector2 = rect.get_center()
+	var score: float = -PIN_W * c.distance_to(plan.focus_pos())
+	if plan.focus_faces_door():
+		var door: int = focus_door(plan, room)
+		if door >= 0:
+			var to: Vector2 = Vector2(plan.doors[door]["pos"]) - c
+			if to.length() > 0.01:
+				score += FACE_W * _facing_of(float(cand["yaw"])).dot(to.normalized())
 	return score
+
+
+## A table in the focus room lies broadside to the focus: its long axis at
+## right angles to the line the focus looks along, so a side of it faces the
+## fire. A square table has no long axis and no preference.
+static func _broadside_bonus(plan: HousePlan, room: int, rect: Rect2) -> float:
+	if plan.focus_room() != room or plan.focus_cat() == "table":
+		return 0.0
+	if absf(rect.size.x - rect.size.y) < 0.1:
+		return 0.0
+	var axis := Vector2(1, 0) if rect.size.x > rect.size.y else Vector2(0, 1)
+	return FACE_W * (1.0 - absf(axis.dot(_facing_of(plan.focus_facing()))))
+
+
+## The door the focus is judged against: the front door when it opens into
+## this room, else the room's first door, else -1.
+static func focus_door(plan: HousePlan, room: int) -> int:
+	var e: int = plan.entrance()
+	if e >= 0 and int(plan.doors[e]["a"]) == room:
+		return e
+	var doors: Array[int] = plan.doors_of(room)
+	return doors[0] if not doors.is_empty() else -1
 
 
 ## The four walls of a room, in the order HouseGeometry.room_walls() gives
@@ -1200,6 +1305,10 @@ static func _nearest_door_dist(plan: HousePlan, room: int, c: Vector2) -> float:
 ## even while the hearth is still only a plan.
 static func _nearest_cat_dist(plan: HousePlan, room: int, cat: String,
 		c: Vector2) -> float:
+	if cat == "focus":
+		if plan.focus_room() != room or not plan.focus_pos().is_finite():
+			return -1.0
+		return c.distance_to(plan.focus_pos())
 	var best := -1.0
 	for f in plan.furniture_of(room):
 		var p: Dictionary = plan.furniture[f]
@@ -1449,7 +1558,14 @@ static func _place_free(plan: HousePlan, room: int, key: String,
 	# candidate; leaving it inside the grid made every table in the sweep walk
 	# the room's furniture list a few thousand times.
 	var focus: Vector2 = _hearth_point(plan, room)
-	for yaw in [0.0, PI / 2.0]:
+	# A footprint turned half round is the same footprint, so two yaws cover
+	# every rectangle -- unless the piece must LOOK somewhere, in which case
+	# all four matter.
+	var yaws: Array = [0.0, PI / 2.0]
+	if plan.focus_room() == room and plan.focus_faces_door() \
+			and PropCatalog.category(key) == plan.focus_cat():
+		yaws = [0.0, PI / 2.0, PI, -PI / 2.0]
+	for yaw in yaws:
 		for sc in _scales(key):
 			_free_at_scale(plan, room, key, yaw, sc, floor_rect, blocked, zones,
 				extra, r, result, focus)

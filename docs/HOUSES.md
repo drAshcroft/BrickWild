@@ -34,6 +34,21 @@ elevations, cuts the stair openings, and emits the stair flights. A single
 pitched roof is attached to the top wall band. Cutaway assembly remains an
 explicit presentation option; ordinary API instantiation includes the roof.
 
+### Cellars
+
+`HouseSpec.cellars` (0 or 1) digs a storey below the ground (INT-016): the
+ground partition again at storey -1, every room a store, joined by the
+ground floor's interior doors and a stair down from the hall. The builder
+logs a `pit` mass, a storey deep and the size of the site, as a negative
+mass of kind `dug`, and the cellar's floor and walls stand on the pit floor:
+every mass carries its own `ground` level, which `MassRules.grounded`
+measures against instead of the ground plane. `MassRules.overlaps` treats
+two masses below the ground as earth against earth and lets only a stair
+reach from above into one. The nav check floods down the stair as it floods
+up, and the plan check's storey and stair rules run from the lowest storey.
+The `cellar_house` archetype exercises it. There is no trapdoor model in the
+prop set, so the hatch is the stairwell itself.
+
 ## Rooms
 
 The interior is split by cutting the biggest room in two, over and over, until
@@ -111,9 +126,24 @@ surface is on one, at its height and within its top; nothing stands in the
 swing of a door; nothing tall stands across a window; a bedroom has a bed, a
 kitchen a hearth, a hall somewhere to sit, a smithy an anvil; the pieces that
 want a wall have one behind them; seats are at a table and facing it; every
-room has something to see by; and the feng shui rule the brief asked for —
-**the commanding position**: the bed's head against solid wall, out of the line
-of the door, with a side you can get in from.
+room has something to see by; and the feng shui rules, each a sentence and a
+measurement — **the commanding position** (the bed's head against solid wall,
+out of the line of the door, with a side you can get in from), **the hearth**
+on the wall the planner gave the chimney, and one per affinity in the prop
+catalogue: the workbench in the daylight, the bookcase off the chimney wall,
+the bed off the window wall, the table drawn up to the fire, sconces in a
+mirrored pair, the shelf over the bench, the chandelier over the table,
+barrels out of the traffic. Last, **the focus**: `HousePlan.focus` names the
+one piece the plan is arranged around (the fire in a house, the counter, bar
+or anvil in a shop) and where it stands; the furnisher pins it there and turns
+it to the door when the family says so, and the rule proves the piece is
+there and looking the right way. It is the temple's axis rule brought indoors.
+
+**Lights that light.** Every prop the catalogue tags `LIGHT` gets an
+`OmniLight3D` from `core/light_kit.gd` when the house is assembled, at the
+model's measured flame (`light` in `catalog.json`), with range and energy from
+a per-category table; the temple's braziers use the same kit. The assets suite
+re-measures the flame and counts the lights against the plan.
 
 **`qa/house_nav_check.gd` — can a person walk through it?**
 This one puts a body in the building. It rasterizes the floor at 12 cm, blocks
@@ -127,6 +157,16 @@ of furniture somebody is meant to use can be reached.
 in, `:` standable but never reached, ` ` reached. Reading a reachability
 failure off a list of room numbers is guesswork; reading it off the map takes a
 second.
+
+**Replacing a rule.** Every check lists its `RULES` and takes an `overrides`
+dictionary (`check(plan, overrides)`, `HouseQA.check(plan, builder,
+overrides)`) mapping a rule name to a replacement Callable, so a family that
+is a correct building and breaks a rule -- a hammam has no windows -- replaces
+the rule with the one it obeys rather than switching it off. The replaced
+rule's messages carry both names (`daylight -> hammam.blind: ...`), the report
+lists them under `replaced`, and a rule named with nothing in its place is an
+error. `qa/sightline.gd` is the shared can-you-see-it test the temple's
+sightline rule and the house focus rule both cast.
 
 **`qa/house_qa.gd`** runs all three plus the shell rules from `MassRules`.
 **`tests/suites/house_assets_suite.gd`** re-measures every model and compares

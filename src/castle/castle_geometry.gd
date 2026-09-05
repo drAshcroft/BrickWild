@@ -51,8 +51,18 @@ const PORCH_DEPTH := 1.6
 
 # ------------------------------------------------------------------- tiers
 
+## A walled tier with an enceinte to walk round. A ridge castle (CAS-007) is
+## a walled tier with none: its ranges are its walls.
 static func is_enclosed(spec: CastleSpec) -> bool:
-	return spec.tier == &"castle" or spec.tier == &"fortress"
+	return (spec.tier == &"castle" or spec.tier == &"fortress") and not is_ridge(spec)
+
+
+static func is_ridge(spec: CastleSpec) -> bool:
+	return spec.plan_kind == &"ridge" and (spec.tier == &"castle" or spec.tier == &"fortress")
+
+
+static func is_motte(spec: CastleSpec) -> bool:
+	return spec.plan_kind == &"motte_bailey" and is_enclosed(spec)
 
 
 ## Index of the innermost enceinte: 1 when there is an inner ward, else 0.
@@ -84,6 +94,208 @@ static func plan_sides(spec: CastleSpec) -> int:
 ## True when the ring has slanted runs, i.e. when it is not the N = 4 case.
 static func is_polygonal(spec: CastleSpec) -> bool:
 	return plan_sides(spec) > 4
+
+
+# ------------------------------------------------------------ ridge castle
+
+## A ridge castle (CAS-007): Neuschwanstein, Edinburgh, Hohenzollern. Ranges
+## strung along a polyline SPINE down the site's long axis, a tower at every
+## bend and at both ends, and no enclosed bailey at all -- the ranges are the
+## walls. The spine zigzags: consecutive vertices sit either side of the axis
+## so every interior vertex turns by RIDGE_BEND_MIN..RIDGE_BEND_MAX, and the
+## lateral swing is held inside the site with room for the ranges' width and
+## the towers.
+const RIDGE_BEND_MIN := 0.2618        # 15 deg
+const RIDGE_BEND_MAX := 0.7854        # 45 deg
+const RIDGE_STOREY_H := 4.5
+const RIDGE_RANGE_W_MIN := 8.0
+const RIDGE_RANGE_W_MAX := 14.0
+const RIDGE_DIVE := 0.6              # how far a range dives into its tower, x tower half
+
+## The spine, as (x, z) points in order along the long axis.
+static func spine(spec: CastleSpec) -> PackedVector2Array:
+	var along_x: bool = spec.width >= spec.length
+	var total: float = spec.width if along_x else spec.length
+	var across: float = spec.length if along_x else spec.width
+	var margin: float = tower_base_half(spec, 0)
+	var run: float = maxf(total - 2.0 * margin, 4.0)
+	var hw: float = maxf(across / 2.0 - spec.hall_w / 2.0 - margin * 0.5, 0.25)
+	# the fewest points that keep the bend at least RIDGE_BEND_MIN with the
+	# swing the site allows: a zigzag of pitch p and amplitude a bends by
+	# 2 atan(2a / p) at every vertex
+	var half_min: float = tan(RIDGE_BEND_MIN / 2.0)
+	var n_min: int = clampi(int(ceil(run * half_min / (2.0 * hw))) + 1, 3, 6)
+	var n: int = clampi(maxi(spec.ridge_points, n_min), 3, 6)
+	var p: float = run / float(n - 1)
+	var phi: float = clampf(atan(2.0 * hw / p), RIDGE_BEND_MIN / 2.0, RIDGE_BEND_MAX / 2.0)
+	var a: float = minf(p * tan(phi) / 2.0, hw)
+	var out := PackedVector2Array()
+	for i in range(n):
+		var u: float = -run / 2.0 + p * float(i)
+		var v: float = a * (1.0 if i % 2 == 1 else -1.0)
+		out.append(Vector2(u, v) if along_x else Vector2(v, u))
+	return out
+
+
+static func spine_length(spec: CastleSpec) -> float:
+	var pts: PackedVector2Array = spine(spec)
+	var total := 0.0
+	for i in range(pts.size() - 1):
+		total += pts[i].distance_to(pts[i + 1])
+	return total
+
+
+## The bend at interior vertex `i`, in radians.
+static func spine_bend(spec: CastleSpec, i: int) -> float:
+	var pts: PackedVector2Array = spine(spec)
+	if i <= 0 or i >= pts.size() - 1:
+		return 0.0
+	var d0: Vector2 = (pts[i] - pts[i - 1]).normalized()
+	var d1: Vector2 = (pts[i + 1] - pts[i]).normalized()
+	return absf(d0.angle_to(d1))
+
+
+## The ranges, one per segment, as {"name", "from", "to", "yaw", "length",
+## "width", "height", "dir": Vector2, "normal": Vector2}. Each dives into the
+## towers at both ends. The longest is the hall -- the Palas.
+static func ridge_ranges(spec: CastleSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var pts: PackedVector2Array = spine(spec)
+	var dive: float = tower_half(spec, 0) * RIDGE_DIVE
+	var longest := -1
+	var longest_len := -1.0
+	for i in range(pts.size() - 1):
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[i + 1]
+		var dir: Vector2 = (b - a).normalized()
+		var length: float = a.distance_to(b) + 2.0 * dive
+		out.append({"name": "range_%d" % i, "from": a - dir * dive, "to": b + dir * dive,
+			"dir": dir, "normal": Vector2(-dir.y, dir.x),
+			"yaw": atan2(-dir.y, dir.x), "length": length, "width": spec.hall_w,
+			"height": spec.height})
+		if length > longest_len:
+			longest_len = length
+			longest = i
+	if longest >= 0:
+		out[longest]["name"] = "hall"
+	return out
+
+
+## World AABB of a range: the box round its rotated box.
+static func ridge_range_aabb(seg: Dictionary) -> AABB:
+	var a: Vector2 = seg["from"]
+	var b: Vector2 = seg["to"]
+	var n: Vector2 = (seg["normal"] as Vector2) * (float(seg["width"]) / 2.0)
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for p in [a + n, a - n, b + n, b - n]:
+		lo = lo.min(p)
+		hi = hi.max(p)
+	return AABB(Vector3(lo.x, 0.0, lo.y), Vector3(hi.x - lo.x, float(seg["height"]), hi.y - lo.y))
+
+
+## Tower centres at every vertex of the spine, with the way each one looks:
+## outward along the axis at the ends, out of the bend at the bends.
+static func ridge_tower_centers(spec: CastleSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var pts: PackedVector2Array = spine(spec)
+	var n: int = pts.size()
+	for i in range(n):
+		var away: Vector2
+		if i == 0:
+			away = (pts[0] - pts[1]).normalized()
+		elif i == n - 1:
+			away = (pts[n - 1] - pts[n - 2]).normalized()
+		else:
+			var d0: Vector2 = (pts[i] - pts[i - 1]).normalized()
+			var d1: Vector2 = (pts[i + 1] - pts[i]).normalized()
+			away = (d0 - d1).normalized()
+			if away.length() < 0.5:
+				away = Vector2(-d0.y, d0.x)
+		out.append({"pos": Vector3(pts[i].x, 0.0, pts[i].y), "away": Vector3(away.x, 0.0, away.y)})
+	return out
+
+
+static func ridge_storeys(spec: CastleSpec) -> int:
+	return clampi(int(spec.height / RIDGE_STOREY_H), 3, 5)
+
+
+# -------------------------------------------------------------- tower house
+
+## A tower house (CAS-006) is an unwalled tier whose one block goes up: the
+## site rectangle is its footprint, spec.height its wall-top, and the walls
+## thicken toward the foot, so each storey is a slightly wider box than the
+## one above. There is no curtain, no porch and no annexe; the way in is a
+## door a storey up, and the roof is a fighting platform.
+const TOWER_FOOT_RATIO := 1.5      # wall thickness at the foot, x at the top
+const TOWER_LIFT_MIN := 2.0        # lowest an opening may sit
+const TOWER_PLATFORM_H := 0.6      # the roof slab
+const TOWER_PLATFORM_OVER := 0.3   # its machicolated overhang
+const TOWER_JOG_W := 0.45          # jog width, x tower width
+const TOWER_JOG_D := 0.4           # jog projection, x tower length
+const TOWER_JOG_H := 0.85          # jog height, x tower height
+
+static func is_tower_house(spec: CastleSpec) -> bool:
+	return spec.plan_kind == &"tower_house" and not is_enclosed(spec)
+
+
+static func tower_house_aabb(spec: CastleSpec) -> AABB:
+	var rect: Rect2 = enceinte_rect(spec, 0)
+	return AABB(Vector3(rect.position.x, 0.0, rect.position.y),
+		Vector3(rect.size.x, spec.height, rect.size.y))
+
+
+static func tower_storey_height(spec: CastleSpec) -> float:
+	return spec.height / float(maxi(spec.tower_storeys, 1))
+
+
+## Wall thickness at storey `s`: TOWER_FOOT_RATIO x the top's at the foot,
+## falling evenly to the spec's own thickness at the top storey.
+static func tower_wall_thickness(spec: CastleSpec, s: int) -> float:
+	var n: int = maxi(spec.tower_storeys, 1)
+	var f: float = 0.0 if n <= 1 else float(s) / float(n - 1)
+	return spec.wall_thickness * lerpf(TOWER_FOOT_RATIO, 1.0, f)
+
+
+## The box storey `s` occupies: the interior is the same all the way up, so a
+## thicker wall is a wider box.
+static func tower_storey_aabb(spec: CastleSpec, s: int) -> AABB:
+	var t: AABB = tower_house_aabb(spec)
+	var extra: float = tower_wall_thickness(spec, s) - spec.wall_thickness
+	var sh: float = tower_storey_height(spec)
+	return AABB(Vector3(t.position.x - extra, float(s) * sh, t.position.z - extra),
+		Vector3(t.size.x + 2.0 * extra, sh, t.size.z + 2.0 * extra))
+
+
+static func tower_platform_aabb(spec: CastleSpec) -> AABB:
+	var t: AABB = tower_house_aabb(spec)
+	var o: float = TOWER_PLATFORM_OVER
+	return AABB(Vector3(t.position.x - o, t.size.y, t.position.z - o),
+		Vector3(t.size.x + 2.0 * o, TOWER_PLATFORM_H, t.size.z + 2.0 * o))
+
+
+## The sill of the one raised door: a storey up, and never below the lift.
+static func tower_door_sill(spec: CastleSpec) -> float:
+	return clampf(tower_storey_height(spec), TOWER_LIFT_MIN, 4.0)
+
+
+## The jog: an L plan has one block off the front-right corner, projecting
+## toward the gate and sharing the front wall; a Z plan adds its mirror off
+## the back-left corner. Each laps the shaft by WING_LAP.
+static func tower_jog_aabbs(spec: CastleSpec) -> Array[AABB]:
+	var out: Array[AABB] = []
+	if spec.jog != &"l" and spec.jog != &"z":
+		return out
+	var t: AABB = tower_house_aabb(spec)
+	var jw: float = t.size.x * TOWER_JOG_W
+	var jd: float = t.size.z * TOWER_JOG_D
+	var jh: float = t.size.y * TOWER_JOG_H
+	out.append(AABB(Vector3(t.position.x + t.size.x - jw, 0.0,
+		t.position.z - jd + WING_LAP), Vector3(jw, jh, jd)))
+	if spec.jog == &"z":
+		out.append(AABB(Vector3(t.position.x, 0.0,
+			t.position.z + t.size.z - WING_LAP), Vector3(jw, jh, jd)))
+	return out
 
 
 ## The enceinte of ring `r` as a closed polygon in plan, at wall-top level:
@@ -335,8 +547,8 @@ static func vertex_tower_centers(spec: CastleSpec, r: int) -> Array[Vector3]:
 	var poly: PackedVector2Array = enceinte_polygon(spec, r)
 	var n: int = poly.size()
 	var t: float = wall_thickness(spec, r)
-	var s: float = tower_base_half(spec, r)
 	for i in range(n):
+		var s: float = tower_base_half_at(spec, r, i)
 		var v: Vector2 = poly[i]
 		var n0: Vector2 = edge_outward(poly[(i + n - 1) % n], v)
 		var n1: Vector2 = edge_outward(v, poly[(i + 1) % n])
@@ -347,13 +559,104 @@ static func vertex_tower_centers(spec: CastleSpec, r: int) -> Array[Vector3]:
 
 # ------------------------------------------------------------------- walls
 
-## Plan rectangle of ring `r`, at wall-top level: position = (x0, z0).
+## Plan rectangle of ring `r`, at wall-top level: position = (x0, z0). On a
+## motte and bailey the ring is the BAILEY, the front part of the site; the
+## mound takes the back.
 static func enceinte_rect(spec: CastleSpec, r: int) -> Rect2:
 	var site := Rect2(Vector2(-spec.width / 2.0, -spec.length / 2.0),
 		Vector2(spec.width, spec.length))
+	if is_motte(spec):
+		site.size.y = bailey_length(spec)
 	if r <= 0:
 		return site
 	return site.grow(-spec.ward_gap)
+
+
+# ---------------------------------------------------------- motte and bailey
+
+## A motte and bailey (CAS-005): Windsor, Arundel, Lewes. The bailey is a
+## walled ring at the front of the site; behind it a mound -- a truncated
+## cone, MOTTE_BATTER degrees of slope -- carries the shell keep on its flat
+## top, and one run of curtain climbs the slope from the bailey's back wall
+## to the keep, so the two are one defence. The mound's toe reaches a little
+## way into the bailey, which is where the ditch would be.
+const MOTTE_BERM := 1.5              # flat top left round the keep
+const MOTTE_TOE := 0.2               # of the base radius, inside the bailey
+const MOTTE_MIN_BAILEY := 12.0       # the bailey keeps at least this depth
+const KEEP_DOMINANCE := 1.2          # keep top, x bailey curtain height
+
+static func motte_top_radius(spec: CastleSpec) -> float:
+	return maxf(spec.keep_w, spec.keep_l) / 2.0 + MOTTE_BERM
+
+
+static func motte_base_radius(spec: CastleSpec) -> float:
+	return motte_top_radius(spec) + spec.motte_height / tan(deg_to_rad(clampf(spec.motte_batter, 20.0, 60.0)))
+
+
+## How deep the bailey is, front to back: the site less the mound.
+static func bailey_length(spec: CastleSpec) -> float:
+	var rb: float = motte_base_radius(spec)
+	return maxf(spec.length - rb * (2.0 - MOTTE_TOE), MOTTE_MIN_BAILEY)
+
+
+static func motte_center(spec: CastleSpec) -> Vector2:
+	var rb: float = motte_base_radius(spec)
+	return Vector2(0.0, -spec.length / 2.0 + bailey_length(spec) + rb * (1.0 - MOTTE_TOE))
+
+
+static func motte_aabb(spec: CastleSpec) -> AABB:
+	if not is_motte(spec):
+		return AABB()
+	var rb: float = motte_base_radius(spec)
+	var c: Vector2 = motte_center(spec)
+	return AABB(Vector3(c.x - rb, 0.0, c.y - rb), Vector3(2.0 * rb, spec.motte_height, 2.0 * rb))
+
+
+## The shell keep on the flat top: an oval ring keep_w x keep_l outside.
+static func shell_keep_aabb(spec: CastleSpec) -> AABB:
+	if not is_motte(spec):
+		return AABB()
+	var c: Vector2 = motte_center(spec)
+	return AABB(Vector3(c.x - spec.keep_w / 2.0, spec.motte_height, c.y - spec.keep_l / 2.0),
+		Vector3(spec.keep_w, spec.keep_height, spec.keep_l))
+
+
+## The curtain climbing the mound: from the middle of the bailey's back wall
+## at the ground to the keep's front face at the top, as {"from": Vector3,
+## "to": Vector3, "thickness", "height"}.
+static func climb_wall(spec: CastleSpec) -> Dictionary:
+	if not is_motte(spec):
+		return {}
+	var rect: Rect2 = enceinte_rect(spec, 0)
+	var t: float = wall_thickness(spec, 0)
+	var keep: AABB = shell_keep_aabb(spec)
+	return {"from": Vector3(0.0, 0.0, rect.end.y - t / 2.0),
+		"to": Vector3(0.0, spec.motte_height, keep.position.z + spec.shell_thickness / 2.0),
+		"thickness": t * 0.8, "height": wall_height(spec, 0) * 0.7}
+
+
+## The box round the climbing wall.
+static func climb_aabb(spec: CastleSpec) -> AABB:
+	var w: Dictionary = climb_wall(spec)
+	if w.is_empty():
+		return AABB()
+	var a: Vector3 = w["from"]
+	var b: Vector3 = w["to"]
+	var dir: Vector3 = (b - a).normalized()
+	var up := Vector3(0.0, dir.z, -dir.y).normalized()
+	if up.y < 0.0:
+		up = -up
+	var t: float = float(w["thickness"])
+	var h: float = float(w["height"])
+	var lo := Vector3(INF, INF, INF)
+	var hi := Vector3(-INF, -INF, -INF)
+	for p in [a, b]:
+		for sy in [0.0, 1.0]:
+			for sx in [-0.5, 0.5]:
+				var q: Vector3 = p + up * (h * sy) + Vector3(t * sx, 0.0, 0.0)
+				lo = lo.min(q)
+				hi = hi.max(q)
+	return AABB(lo, hi - lo)
 
 
 static func wall_height(spec: CastleSpec, r: int) -> float:
@@ -461,6 +764,52 @@ static func tower_height(spec: CastleSpec, r: int) -> float:
 	return spec.tower_height * (INNER_HEIGHT_RATIO if r > 0 else 1.0)
 
 
+# ---- the great tower (CAS-002) ----
+## How much bigger vertex tower `i` of ring `r` is across than the others:
+## the great tower's scale on the outer ring, 1 everywhere else. Every size
+## below has an `_at` form that reads this; the plain form is the ordinary
+## tower, which is what the side and gate towers and the fitting use.
+static func tower_scale_at(spec: CastleSpec, r: int, i: int) -> float:
+	if r == 0 and i >= 0 and i == spec.great_tower:
+		return maxf(spec.great_tower_scale, 1.0)
+	return 1.0
+
+
+## A tower 1.5-2x wider is not 1.5-2x taller: it rises three quarters as
+## fast as it widens, which keeps the Eagle Tower a tower and not a spire.
+static func great_tower_height_factor(scale: float) -> float:
+	return 1.0 + (maxf(scale, 1.0) - 1.0) * 0.75
+
+
+static func tower_half_at(spec: CastleSpec, r: int, i: int) -> float:
+	return tower_half(spec, r) * tower_scale_at(spec, r, i)
+
+
+static func tower_height_at(spec: CastleSpec, r: int, i: int) -> float:
+	return tower_height(spec, r) * great_tower_height_factor(tower_scale_at(spec, r, i))
+
+
+static func tower_base_half_at(spec: CastleSpec, r: int, i: int) -> float:
+	var half: float = tower_half_at(spec, r, i)
+	return half + minf(batter_spread(spec, tower_height_at(spec, r, i)), half * TOWER_BATTER_CAP)
+
+
+static func tower_roof_rise_at(spec: CastleSpec, r: int, i: int) -> float:
+	return tower_roof_rise(spec, r) * tower_scale_at(spec, r, i)
+
+
+## The vertex tower of ring 0 that is the great tower, or -1. On a ridge the
+## vertices are the spine's.
+static func great_tower_index(spec: CastleSpec) -> int:
+	if not spec.corner_towers or spec.great_tower < 0:
+		return -1
+	if is_ridge(spec):
+		return spec.great_tower if spec.great_tower < spine(spec).size() else -1
+	if not is_enclosed(spec):
+		return -1
+	return spec.great_tower if spec.great_tower < plan_sides(spec) else -1
+
+
 ## Half-plan-size at the foot. The tower's inner face is pinned to the wall's
 ## inner face at the BASE, so the talus spreads outward into the open air and
 ## never intrudes on the bailey behind it.
@@ -502,12 +851,14 @@ static func corner_tower_centers(spec: CastleSpec, r: int) -> Array[Vector3]:
 		return out
 	var rect: Rect2 = enceinte_rect(spec, r)
 	var t: float = wall_thickness(spec, r)
-	var s: float = tower_base_half(spec, r)
+	var i := 0
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
+			var s: float = tower_base_half_at(spec, r, i)
 			var x: float = (rect.end.x - t + s) if sx > 0.0 else (rect.position.x + t - s)
 			var z: float = (rect.end.y - t + s) if sz > 0.0 else (rect.position.y + t - s)
 			out.append(Vector3(x, 0.0, z))
+			i += 1
 	return out
 
 
@@ -521,10 +872,13 @@ static func side_tower_slots(spec: CastleSpec, r: int) -> Array[Dictionary]:
 	var rect: Rect2 = enceinte_rect(spec, r)
 	var t: float = wall_thickness(spec, r)
 	var s: float = tower_base_half(spec, r)
-	# keep clear of the corner towers at both ends of the run
-	var margin: float = 2.0 * s + MIN_WALL_RUN
-	var z0: float = rect.position.y + margin
-	var z1: float = rect.end.y - margin
+	# keep clear of the corner towers at both ends of the run -- the great
+	# tower, when a corner is one, takes more of it (corners are indexed
+	# front-left, back-left, front-right, back-right)
+	var s_front: float = maxf(tower_base_half_at(spec, r, 0), tower_base_half_at(spec, r, 2))
+	var s_back: float = maxf(tower_base_half_at(spec, r, 1), tower_base_half_at(spec, r, 3))
+	var z0: float = rect.position.y + 2.0 * s_front + MIN_WALL_RUN
+	var z1: float = rect.end.y - 2.0 * s_back - MIN_WALL_RUN
 	if z1 - z0 < 2.0 * s:
 		return out
 	# Only as many as the run can actually carry. Spacing the requested count
@@ -556,15 +910,17 @@ static func min_ward_gap(spec: CastleSpec) -> float:
 	# gap at which the two towers' footprints finally clear each other -- the
 	# rings' towers meeting in the middle of the ward is what the no-overlap
 	# rule caught on a hexagon.
-	var s0: float = tower_base_half(spec, 0)
 	var s1: float = tower_base_half(spec, 1)
-	# how much further out the outer ring's tower stands than the inner's
-	var c: float = (s0 - wall_thickness(spec, 0)) - (s1 - wall_thickness(spec, 1))
-	var want: float = s0 + s1 + 0.25
 	var poly: PackedVector2Array = enceinte_polygon(spec, 0)
 	var n: int = poly.size()
 	var need := 0.0
 	for i in range(n):
+		# at this vertex's own size: the great tower's box reaches further
+		# into the ward along the axes than an ordinary one's
+		var s0: float = tower_base_half_at(spec, 0, i)
+		# how much further out the outer ring's tower stands than the inner's
+		var c: float = (s0 - wall_thickness(spec, 0)) - (s1 - wall_thickness(spec, 1))
+		var want: float = s0 + s1 + 0.25
 		var v: Vector2 = poly[i]
 		var u := Vector2(v.x * 2.0 / maxf(spec.width, 0.001),
 			v.y * 2.0 / maxf(spec.length, 0.001))
@@ -588,11 +944,12 @@ static func _ward_gap_flat(spec: CastleSpec) -> float:
 		- wall_thickness(spec, 0) + MIN_WALL_RUN
 
 
-## Base footprint of a tower centred at `c`.
-static func tower_aabb(spec: CastleSpec, r: int, c: Vector3) -> AABB:
-	var s: float = tower_base_half(spec, r)
+## Base footprint of a tower centred at `c`; `i` is its vertex index, so the
+## great tower is logged at its own size.
+static func tower_aabb(spec: CastleSpec, r: int, c: Vector3, i := -1) -> AABB:
+	var s: float = tower_base_half_at(spec, r, i)
 	return AABB(Vector3(c.x - s, 0.0, c.z - s),
-		Vector3(s * 2.0, tower_height(spec, r), s * 2.0))
+		Vector3(s * 2.0, tower_height_at(spec, r, i), s * 2.0))
 
 
 ## Rise of whatever caps a tower, above its parapet.
@@ -644,8 +1001,11 @@ static func gate_tower_centers(spec: CastleSpec, r: int) -> Array[Vector3]:
 		# corner tower is worse than a plain one.
 		if gw < 1.2 * s:
 			return out
+		var vi := 0
 		for v in vertex_tower_centers(spec, r):
-			if absf(absf(v.x) - gx) < 2.0 * s and absf(v.z - z) < 2.0 * s:
+			var sv: float = tower_base_half_at(spec, r, vi)
+			vi += 1
+			if absf(absf(v.x) - gx) < s + sv and absf(v.z - z) < s + sv:
 				return out
 	for sx in [-1.0, 1.0]:
 		out.append(Vector3(sx * gx, 0.0, z))
@@ -726,8 +1086,23 @@ static func keep_aabb(spec: CastleSpec) -> AABB:
 	if not spec.keep:
 		return AABB()
 	var z1: float = ward_back_z(spec, spec.keep_w / 2.0) + RANGE_LAP
-	return AABB(Vector3(-spec.keep_w / 2.0, 0.0, z1 - spec.keep_l),
+	var x: float = keep_offset_x(spec)
+	return AABB(Vector3(x - spec.keep_w / 2.0, 0.0, z1 - spec.keep_l),
 		Vector3(spec.keep_w, spec.keep_height, spec.keep_l))
+
+
+## The keep's offset off the axis, kept inside the bailey with BAILEY_CLEAR
+## to spare and clear of the hall and chapel ranges along the side walls.
+static func keep_offset_x(spec: CastleSpec) -> float:
+	if absf(spec.keep_offset) < 0.001:
+		return 0.0
+	var b: Rect2 = bailey_rect(spec)
+	var room: float = b.size.x / 2.0 - spec.keep_w / 2.0 - BAILEY_CLEAR
+	if spec.hall and spec.keep_offset < 0.0:
+		room -= spec.hall_w
+	if spec.chapel and spec.keep_offset > 0.0:
+		room -= spec.hall_w
+	return clampf(spec.keep_offset, -maxf(room, 0.0), maxf(room, 0.0))
 
 
 ## Largest keep footprint the bailey can hold and still leave a courtyard.
@@ -759,6 +1134,51 @@ static func chapel_aabb(spec: CastleSpec) -> AABB:
 	var x1: float = ward_edge_x(spec, 1.0, z1 - l, z1) + RANGE_LAP
 	return AABB(Vector3(x1 - spec.hall_w, 0.0, z1 - l),
 		Vector3(spec.hall_w, spec.hall_height * 0.85, l))
+
+
+## The apse on the chapel (CAS-003): a half-drum on the chapel's free short
+## end -- the one toward the gate, since the other end meets the keep --
+## embedded APSE_EMBED into the chapel the way the church's apse is embedded
+## in its nave. Logged as `apse`.
+const APSE_RATIO := 0.4          # apse radius, x chapel width
+const APSE_EMBED := 0.3
+const APSE_HEIGHT_RATIO := 0.85
+
+## The apse radius: APSE_RATIO of the chapel's width, reduced until the apse
+## stands inside the ward on a plan whose walls close in toward the gate, and
+## 0 when even a small one would not.
+static func apse_radius(spec: CastleSpec) -> float:
+	var chapel: AABB = chapel_aabb(spec)
+	if chapel.size.x <= 0.0:
+		return 0.0
+	var r: float = chapel.size.x * APSE_RATIO
+	var cx: float = chapel.position.x + chapel.size.x / 2.0
+	var z_face: float = chapel.position.z + APSE_EMBED
+	var b: Rect2 = bailey_rect(spec)
+	for _step in range(8):
+		var front: float = z_face - r
+		var fits: bool = front >= b.position.y - 0.01
+		if fits and is_polygonal(spec):
+			var poly: PackedVector2Array = inner_polygon(spec, inner_ring(spec))
+			var hw: float = poly_half_width(poly, front)
+			fits = hw > 0.0 and absf(cx) + r <= hw - 0.05
+		if fits:
+			return r
+		r *= 0.85
+		if r < chapel.size.x * 0.2:
+			return 0.0
+	return 0.0
+
+
+static func apse_aabb(spec: CastleSpec) -> AABB:
+	var chapel: AABB = chapel_aabb(spec)
+	var r: float = apse_radius(spec)
+	if chapel.size.x <= 0.0 or r <= 0.0:
+		return AABB()
+	var cx: float = chapel.position.x + chapel.size.x / 2.0
+	var z_face: float = chapel.position.z + APSE_EMBED
+	return AABB(Vector3(cx - r, 0.0, z_face - r),
+		Vector3(2.0 * r, chapel.size.y * APSE_HEIGHT_RATIO, r + APSE_EMBED))
 
 
 ## The plane interior ranges start from: the keep's front face when there is a
@@ -821,7 +1241,7 @@ static func manor_front_range_aabb(spec: CastleSpec) -> AABB:
 ## Entrance block. A courtyard manor puts it through the front range; an open
 ## court puts a porch on the main range, facing the court.
 static func porch_aabb(spec: CastleSpec) -> AABB:
-	if is_enclosed(spec):
+	if is_enclosed(spec) or is_tower_house(spec) or is_ridge(spec):
 		return AABB()
 	var rect: Rect2 = enceinte_rect(spec, 0)
 	var pw: float = clampf(spec.width * 0.18, 2.0, 6.0)
@@ -842,7 +1262,7 @@ static func porch_aabb(spec: CastleSpec) -> AABB:
 ## the same corner is how a generator produces a house with a flue inside its
 ## pantry.
 static func annexe_aabb(spec: CastleSpec) -> AABB:
-	if spec.tier != &"house" or spec.wings <= 0:
+	if spec.tier != &"house" or spec.wings <= 0 or is_tower_house(spec):
 		return AABB()
 	var rect: Rect2 = enceinte_rect(spec, 0)
 	var aw: float = rect.size.x * HOUSE_ANNEXE_W
@@ -866,7 +1286,7 @@ static func wing_sides(spec: CastleSpec) -> Array[float]:
 ## fortified manor house like Stokesay.
 static func manor_tower_centers(spec: CastleSpec) -> Array[Vector3]:
 	var out: Array[Vector3] = []
-	if is_enclosed(spec) or not spec.corner_towers or spec.wings <= 0:
+	if is_enclosed(spec) or is_ridge(spec) or not spec.corner_towers or spec.wings <= 0:
 		return out
 	var s: float = tower_base_half(spec, 0)
 	for side in wing_sides(spec):
@@ -918,6 +1338,9 @@ static func total_height(spec: CastleSpec) -> float:
 		for r in rings(spec):
 			top = maxf(top, wall_height(spec, r) + PARAPET_RISE + spec.merlon_h)
 			top = maxf(top, tower_height(spec, r) + tower_roof_rise(spec, r))
+			var gi: int = great_tower_index(spec)
+			if r == 0 and gi >= 0:
+				top = maxf(top, tower_height_at(spec, r, gi) + tower_roof_rise_at(spec, r, gi))
 			if gate_width(spec, r) > 0.0:
 				top = maxf(top, gate_height(spec, r) + PARAPET_RISE + spec.merlon_h)
 	if spec.keep:
@@ -929,22 +1352,65 @@ static func total_height(spec: CastleSpec) -> float:
 		top = maxf(top, chimney_aabb(spec, 0).size.y)
 	if not manor_tower_centers(spec).is_empty():
 		top = maxf(top, tower_height(spec, 0) + tower_roof_rise(spec, 0))
+	if is_tower_house(spec):
+		top = maxf(top, spec.height + TOWER_PLATFORM_H + spec.merlon_h)
+	if is_motte(spec):
+		top = maxf(top, spec.motte_height + spec.keep_height + PARAPET_RISE + spec.merlon_h)
+	if is_ridge(spec):
+		top = maxf(top, spec.height + spec.hall_w * spec.roof_pitch * 0.5)
+		var ti := 0
+		for _c in ridge_tower_centers(spec):
+			top = maxf(top, tower_height_at(spec, 0, ti) + tower_roof_rise_at(spec, 0, ti))
+			ti += 1
 	return top
 
 
 ## Everything the design covers in plan, batter and towers included.
 static func plan_extent(spec: CastleSpec) -> Rect2:
 	var e: Rect2 = enceinte_rect(spec, 0)
+	if is_ridge(spec):
+		for seg in ridge_ranges(spec):
+			var ra: AABB = ridge_range_aabb(seg)
+			e = e.expand(Vector2(ra.position.x, ra.position.z))
+			e = e.expand(Vector2(ra.end.x, ra.end.z))
+		var ri := 0
+		for tc in ridge_tower_centers(spec):
+			var sv: float = tower_base_half_at(spec, 0, ri)
+			ri += 1
+			var c: Vector3 = tc["pos"]
+			e = e.expand(Vector2(c.x - sv, c.z - sv))
+			e = e.expand(Vector2(c.x + sv, c.z + sv))
+		return e
+	if is_tower_house(spec):
+		var foot: AABB = tower_storey_aabb(spec, 0)
+		e = e.expand(Vector2(foot.position.x, foot.position.z))
+		e = e.expand(Vector2(foot.end.x, foot.end.z))
+		var top: AABB = tower_platform_aabb(spec)
+		e = e.expand(Vector2(top.position.x, top.position.z))
+		e = e.expand(Vector2(top.end.x, top.end.z))
+		for j in tower_jog_aabbs(spec):
+			e = e.expand(Vector2(j.position.x, j.position.z))
+			e = e.expand(Vector2(j.end.x, j.end.z))
+		return e
 	if is_enclosed(spec):
 		e = e.grow(batter_spread(spec, wall_height(spec, 0)))
 		var s: float = tower_base_half(spec, 0)
-		var spots: Array[Vector3] = vertex_tower_centers(spec, 0)
-		spots.append_array(gate_tower_centers(spec, 0))
+		var vi := 0
+		for v in vertex_tower_centers(spec, 0):
+			var sv: float = tower_base_half_at(spec, 0, vi)
+			vi += 1
+			e = e.expand(Vector2(v.x - sv, v.z - sv))
+			e = e.expand(Vector2(v.x + sv, v.z + sv))
+		var spots: Array[Vector3] = gate_tower_centers(spec, 0)
 		for slot in side_tower_slots(spec, 0):
 			spots.append(slot["pos"])
 		for c in spots:
 			e = e.expand(Vector2(c.x - s, c.z - s))
 			e = e.expand(Vector2(c.x + s, c.z + s))
+	if is_motte(spec):
+		var m: AABB = motte_aabb(spec)
+		e = e.expand(Vector2(m.position.x, m.position.z))
+		e = e.expand(Vector2(m.end.x, m.end.z))
 	var ms: float = tower_base_half(spec, 0)
 	for c in manor_tower_centers(spec):
 		e = e.expand(Vector2(c.x - ms, c.z - ms))

@@ -34,6 +34,12 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 	begin(4)
 	total_height = spec.height
 
+	if CastleGeometry.is_tower_house(spec):
+		_build_tower_house()
+		return commit()
+	if CastleGeometry.is_ridge(spec):
+		_build_ridge()
+		return commit()
 	match spec.tier:
 		&"house":
 			_build_house()
@@ -42,6 +48,191 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 		_:
 			_build_enclosure()
 	return commit()
+
+
+# -------------------------------------------------------- motte and bailey
+
+## The mound, the shell keep on it and the curtain that climbs to it.
+func _build_motte() -> void:
+	var m: AABB = CastleGeometry.motte_aabb(spec)
+	var c: Vector2 = CastleGeometry.motte_center(spec)
+	var rb: float = CastleGeometry.motte_base_radius(spec)
+	var rt: float = CastleGeometry.motte_top_radius(spec)
+	tag("motte")
+	_kit.drum(Vector3(c.x, 0.0, c.y), rb, rt, spec.motte_height, SURF_STONE, 24)
+	_log_mass("motte", m)
+
+	tag("keep")
+	var k: AABB = CastleGeometry.shell_keep_aabb(spec)
+	var base := Vector3(c.x, spec.motte_height, c.y)
+	var t: float = spec.shell_thickness
+	_kit.oval_ring(base, k.size.x / 2.0, k.size.z / 2.0, t, k.size.y, SURF_STONE, 28)
+	_log_mass("keep_shell", k)
+	# the parapet, merlon by merlon round the oval
+	if spec.battlements:
+		var n := 28
+		for i in range(n):
+			var a: float = TAU * float(i) / n
+			var p := base + Vector3(cos(a) * (k.size.x / 2.0 - t / 2.0), k.size.y + spec.merlon_h / 2.0,
+				sin(a) * (k.size.z / 2.0 - t / 2.0))
+			box(Vector3(CastleGeometry.MERLON_W, spec.merlon_h, minf(t, 0.6)), p, SURF_TRIM, -a)
+	# a door in the keep, on the side the climb arrives
+	_opening(base + Vector3(0.0, 1.6, -(k.size.z / 2.0 + CastleGeometry.OPENING_EPS)),
+		PI, minf(k.size.x * 0.12, 1.6), 2.6, &"arched", true)
+	total_height = maxf(total_height, spec.motte_height + k.size.y + spec.merlon_h)
+
+	tag("climb")
+	var w: Dictionary = CastleGeometry.climb_wall(spec)
+	var a: Vector3 = w["from"]
+	var b: Vector3 = w["to"]
+	var dir: Vector3 = (b - a).normalized()
+	var length: float = a.distance_to(b)
+	var up := Vector3(0.0, dir.z, -dir.y).normalized()
+	if up.y < 0.0:
+		up = -up
+	var h: float = float(w["height"])
+	var th: float = float(w["thickness"])
+	var centre: Vector3 = a + dir * (length / 2.0) + up * (h / 2.0)
+	var xf := Transform3D(Basis(Vector3.RIGHT, up, dir), centre)
+	_kit.oriented_box(Vector3(th, h, length), xf, SURF_STONE)
+	_log_mass("climb", CastleGeometry.climb_aabb(spec))
+
+
+# ------------------------------------------------------------ ridge castle
+
+## Ranges along the spine, each a rotated block under its own ridge roof with
+## a row of windows a storey, diving into the tower at either end; a tower at
+## every vertex. No curtain, no gate, no bailey: the ranges are the walls.
+func _build_ridge() -> void:
+	var storeys: int = CastleGeometry.ridge_storeys(spec)
+	var sh: float = spec.height / float(storeys)
+	for seg in CastleGeometry.ridge_ranges(spec):
+		var name: String = seg["name"]
+		tag("hall" if name == "hall" else "range")
+		var a: Vector2 = seg["from"]
+		var b: Vector2 = seg["to"]
+		var mid: Vector2 = (a + b) / 2.0
+		var yaw: float = seg["yaw"]
+		var length: float = seg["length"]
+		var width: float = seg["width"]
+		var height: float = seg["height"]
+		box(Vector3(length, height, width), Vector3(mid.x, height / 2.0, mid.y), SURF_STONE, yaw)
+		_log_mass(name, CastleGeometry.ridge_range_aabb(seg))
+		# the roof runs along the range: local Z of the roof transform is the
+		# direction of the segment
+		var dir: Vector2 = seg["dir"]
+		var rise: float = width * spec.roof_pitch * 0.5
+		var xf := Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.y)), Vector3(mid.x, height, mid.y))
+		_kit.ridge_roof(xf, width + EAVE, length + EAVE * 0.8, rise, SURF_ROOF, SURF_STONE, width, length)
+		if spec.dormers:
+			_ridge_dormers(mid, dir, length, width, height, rise)
+		total_height = maxf(total_height, height + rise)
+		# windows: a row a storey on both long faces, on the rotated face
+		var n: Vector2 = seg["normal"]
+		var count: int = clampi(int(length / 3.5), 1, 24)
+		for s in range(storeys):
+			var y: float = (float(s) + 0.55) * sh
+			for side in [1.0, -1.0]:
+				var face_n: Vector2 = n * side
+				var ang: float = atan2(face_n.x, face_n.y)
+				for i in range(count):
+					var t: float = (float(i) + 1.0) / (float(count) + 1.0) - 0.5
+					var p: Vector2 = mid + dir * (length * t) + face_n * (width / 2.0 + CastleGeometry.OPENING_EPS)
+					_opening(Vector3(p.x, y, p.y), ang, spec.window_w, spec.window_h, spec.window_style)
+	tag("tower")
+	var i2 := 0
+	for tc in CastleGeometry.ridge_tower_centers(spec):
+		_tower(tc["pos"], 0, "tower_0_corner_%d" % i2, tc["away"], i2)
+		i2 += 1
+
+
+## Dormers along a rotated range, either side of its ridge.
+func _ridge_dormers(mid: Vector2, dir: Vector2, length: float, width: float,
+		height: float, rise: float) -> void:
+	var n := Vector2(-dir.y, dir.x)
+	var count: int = clampi(int(length / 6.0), 1, 8)
+	var dw: float = minf(1.4, width * 0.2)
+	var yaw: float = atan2(-dir.y, dir.x)
+	for side in [-1.0, 1.0]:
+		for i in range(count):
+			var t: float = (float(i) + 1.0) / (float(count) + 1.0) - 0.5
+			var p: Vector2 = mid + dir * (length * t) + n * (side * width * 0.26)
+			box(Vector3(dw, dw * 1.5, dw), Vector3(p.x, height + rise * 0.45 + dw * 0.75, p.y),
+				SURF_ROOF, yaw)
+
+
+# ------------------------------------------------------------- tower house
+
+## One tall block, storey by storey, each a little wider than the one above
+## (the walls thicken toward the foot); a fighting platform on top; a raised
+## door on the front face and rows of windows above it; and the jog off one
+## corner. The `hall` mass is the shaft as a whole -- the anchor every
+## unwalled tier is measured from -- and each storey is logged as its own
+## mass so TowerCheck can read the wall thickness off the foot and the top.
+func _build_tower_house() -> void:
+	var t: AABB = CastleGeometry.tower_house_aabb(spec)
+	tag("hall")
+	_log_mass("hall", t)
+	tag("storey")
+	var n: int = maxi(spec.tower_storeys, 1)
+	for s in range(n):
+		var a: AABB = CastleGeometry.tower_storey_aabb(spec, s)
+		_box_aabb(a, SURF_STONE)
+		_log_mass("storey_%d" % s, a)
+	tag("platform")
+	var p: AABB = CastleGeometry.tower_platform_aabb(spec)
+	_box_aabb(p, SURF_STONE)
+	_log_mass("platform", p)
+	_crenellate_rect(p, p.position.y + p.size.y, SURF_TRIM)
+	total_height = maxf(total_height, p.position.y + p.size.y + spec.merlon_h)
+
+	# the way in: one door, a storey up, on the front face of the storey it
+	# opens into
+	tag("door")
+	var sill: float = CastleGeometry.tower_door_sill(spec)
+	var door_h: float = minf(CastleGeometry.tower_storey_height(spec) * 0.7, 2.6)
+	var door_storey: int = clampi(int(sill / CastleGeometry.tower_storey_height(spec)), 0, n - 1)
+	var ds: AABB = CastleGeometry.tower_storey_aabb(spec, door_storey)
+	_opening(Vector3(t.position.x + t.size.x / 2.0, sill + door_h / 2.0,
+		ds.position.z - CastleGeometry.OPENING_EPS), PI, minf(t.size.x * 0.25, 1.4),
+		door_h, &"arched", true)
+
+	# windows on every storey above the lift, on all four faces of that
+	# storey's own box -- never on the ground storey, which is blind
+	tag("window")
+	for s2 in range(n):
+		var a2: AABB = CastleGeometry.tower_storey_aabb(spec, s2)
+		var y: float = a2.position.y + a2.size.y * 0.55
+		if y - spec.window_h / 2.0 < CastleGeometry.TOWER_LIFT_MIN:
+			continue
+		var only: Array = []
+		if s2 == door_storey:
+			only = [Vector3(0, 0, 1), Vector3(-1, 0, 0), Vector3(1, 0, 0)]
+		_face_openings(a2, y, spec.window_style, only, 3.5)
+
+	tag("wing")
+	var j := 0
+	for jog in CastleGeometry.tower_jog_aabbs(spec):
+		# the face it shares with the shaft is buried; the jog looks the
+		# other three ways, and only above the lift
+		var buried := Vector3(0, 0, 1) if j == 0 else Vector3(0, 0, -1)
+		var faces: Array = []
+		for f in [Vector3(0, 0, -1), Vector3(0, 0, 1), Vector3(-1, 0, 0), Vector3(1, 0, 0)]:
+			if (f as Vector3).dot(buried) < 0.9:
+				faces.append(f)
+		_box_aabb(jog, SURF_STONE)
+		_log_mass("wing_jog_%d" % j, jog)
+		var jp := AABB(Vector3(jog.position.x - 0.2, jog.position.y + jog.size.y, jog.position.z - 0.2),
+			Vector3(jog.size.x + 0.4, 0.4, jog.size.z + 0.4))
+		_box_aabb(jp, SURF_STONE)
+		_crenellate_rect(jp, jp.position.y + jp.size.y, SURF_TRIM)
+		var rows: int = maxi(int(jog.size.y / CastleGeometry.tower_storey_height(spec)), 1)
+		for row in range(rows):
+			var jy: float = (float(row) + 0.55) * CastleGeometry.tower_storey_height(spec)
+			if jy - spec.window_h / 2.0 < CastleGeometry.TOWER_LIFT_MIN or jy > jog.size.y - 0.5:
+				continue
+			_face_openings(jog, jy, spec.window_style, faces, 3.5)
+		j += 1
 
 
 # ------------------------------------------------------------------- house
@@ -146,16 +337,45 @@ func _build_enclosure() -> void:
 	tag("keep")
 	if spec.keep:
 		_build_keep()
+	if CastleGeometry.is_motte(spec):
+		_build_motte()
 
+	# The hall and the chapel look into the bailey (CAS-003): windows on the
+	# courtyard face and the free short end, none through the curtain they
+	# stand against, and a row of them rather than one every five metres.
 	tag("hall")
 	var hall: AABB = CastleGeometry.hall_aabb(spec)
 	if hall.size.x > 0.0:
-		_range(hall, "hall", SURF_STONE, true)
+		_range(hall, "hall", SURF_STONE, true, [Vector3(1, 0, 0), Vector3(0, 0, -1)], RANGE_BAY)
 
 	tag("chapel")
 	var chapel: AABB = CastleGeometry.chapel_aabb(spec)
 	if chapel.size.x > 0.0:
-		_range(chapel, "chapel", SURF_STONE, true)
+		_range(chapel, "chapel", SURF_STONE, true, [Vector3(-1, 0, 0)], RANGE_BAY)
+		_build_apse()
+
+
+## The chapel's apse: a half-drum on the end toward the gate, under a half
+## cone, embedded in the chapel the way the church's is in its nave.
+func _build_apse() -> void:
+	var a: AABB = CastleGeometry.apse_aabb(spec)
+	if a.size.x <= 0.0:
+		return
+	tag("apse")
+	var r: float = CastleGeometry.apse_radius(spec)
+	var h: float = a.size.y
+	var origin := Vector3(a.position.x + a.size.x / 2.0, 0.0, a.position.z + a.size.z)
+	# the half of a revolve that lies at -Z: angles PI .. 2PI
+	_kit.revolve(PackedVector2Array([Vector2(r, 0.0), Vector2(r, h)]), origin,
+		SURF_STONE, 10, PI, PI)
+	_kit.revolve(PackedVector2Array([Vector2(r * 1.08, h), Vector2(0.0, h + r * 0.9)]),
+		origin, SURF_ROOF, 10, PI, PI)
+	_log_mass("apse", a)
+	_log_part("apse", a.position + a.size / 2.0, a.size)
+	# one window on the axis of the apse, looking out toward the gate
+	_opening(origin + Vector3(0.0, h * 0.5, -(r + CastleGeometry.OPENING_EPS)),
+		PI, spec.window_w, spec.window_h, spec.window_style)
+	total_height = maxf(total_height, h + r * 0.9)
 
 
 func _build_ring(r: int) -> void:
@@ -173,7 +393,7 @@ func _build_ring(r: int) -> void:
 			var mid: Vector2 = CastleGeometry.polygon_bbox(
 				CastleGeometry.enceinte_polygon(spec, r)).get_center()
 			away = Vector3(c.x - mid.x, 0.0, c.z - mid.y).normalized()
-		_tower(c, r, "tower_%d_corner_%d" % [r, i], away)
+		_tower(c, r, "tower_%d_corner_%d" % [r, i], away, i)
 		i += 1
 	i = 0
 	for slot in CastleGeometry.side_tower_slots(spec, r):
@@ -322,9 +542,17 @@ func _build_keep() -> void:
 
 # --------------------------------------------------------------- primitives
 
+## Metres of bailey-facing wall per window on a hall or chapel: a row of
+## windows, not one every five metres.
+const RANGE_BAY := 3.0
+
+
 ## A block, its roof, and a window in each long face: the shape of every range
-## in the design, whether it is a hall, a wing or a whole house.
-func _range(a: AABB, mass_name: String, surf: int, roofed: bool) -> void:
+## in the design, whether it is a hall, a wing or a whole house. `faces` limits
+## the windows to the listed outward normals (empty = every face); `bay` is
+## the metres of wall per window.
+func _range(a: AABB, mass_name: String, surf: int, roofed: bool,
+		faces: Array = [], bay := 5.0) -> void:
 	_box_aabb(a, surf)
 	_log_mass(mass_name, a)
 	var cx: float = a.position.x + a.size.x / 2.0
@@ -341,13 +569,14 @@ func _range(a: AABB, mass_name: String, surf: int, roofed: bool) -> void:
 		total_height = maxf(total_height, a.size.y + rise)
 		if spec.dormers:
 			_dormers(a, along_x, rise)
-	_face_openings(a, a.size.y * 0.5, spec.window_style)
+	_face_openings(a, a.size.y * 0.5, spec.window_style, faces, bay)
 
 
 ## Windows in the middle of each of a block's four faces, facing out of it.
 ## Bays are spaced off the face, so a long range gets a row and a small annexe
 ## gets one.
-func _face_openings(a: AABB, y: float, style: StringName) -> void:
+func _face_openings(a: AABB, y: float, style: StringName, only: Array = [],
+		bay := 5.0) -> void:
 	var eps: float = CastleGeometry.OPENING_EPS
 	var faces := [
 		{"n": Vector3(0, 0, -1), "len": a.size.x, "ang": PI},
@@ -358,8 +587,15 @@ func _face_openings(a: AABB, y: float, style: StringName) -> void:
 	var c := Vector3(a.position.x + a.size.x / 2.0, y, a.position.z + a.size.z / 2.0)
 	for f in faces:
 		var n: Vector3 = f["n"]
+		if not only.is_empty():
+			var wanted := false
+			for o in only:
+				if (o as Vector3).dot(n) > 0.9:
+					wanted = true
+			if not wanted:
+				continue
 		var run: float = f["len"]
-		var count: int = clampi(int(run / 5.0), 1, 8)
+		var count: int = clampi(int(run / bay), 1, 12)
 		var half: Vector3 = Vector3(a.size.x, 0.0, a.size.z) / 2.0
 		var face_c: Vector3 = c + Vector3(n.x * (half.x + eps), 0.0, n.z * (half.z + eps))
 		var along := Vector3(n.z, 0.0, -n.x)      # the face's own long axis
@@ -479,19 +715,22 @@ func _wall_slits(a: AABB, outward: Vector3, top_thick: float, r: int) -> void:
 
 ## One castle tower: a battered shaft, its cap, its parapet and its slits. The
 ## shape (round, square, polygonal) is a segment count on the same primitive.
-func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3) -> void:
+## `vertex` is the tower's index on its ring, so the great tower (CAS-002)
+## is built at its own size; -1 for a side or gate tower.
+func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
+		vertex := -1) -> void:
 	var sides: int = CastleGeometry.tower_sides(spec)
 	var rot: float = CastleGeometry.tower_rotation(spec)
-	var h: float = CastleGeometry.tower_height(spec, r)
+	var h: float = CastleGeometry.tower_height_at(spec, r, vertex)
 	var top_r: float = CastleGeometry.tower_radius_for(spec,
-		CastleGeometry.tower_half(spec, r))
+		CastleGeometry.tower_half_at(spec, r, vertex))
 	var base_r: float = CastleGeometry.tower_radius_for(spec,
-		CastleGeometry.tower_base_half(spec, r))
+		CastleGeometry.tower_base_half_at(spec, r, vertex))
 	_kit.drum(c, base_r, top_r, h, SURF_STONE, sides, rot)
-	_log_mass(mass_name, CastleGeometry.tower_aabb(spec, r, c))
+	_log_mass(mass_name, CastleGeometry.tower_aabb(spec, r, c, vertex))
 	_log_part("tower", c + Vector3(0, h / 2.0, 0), Vector3(top_r * 2.0, h, top_r * 2.0))
 
-	var rise: float = CastleGeometry.tower_roof_rise(spec, r)
+	var rise: float = CastleGeometry.tower_roof_rise_at(spec, r, vertex)
 	match spec.tower_roof:
 		&"cone":
 			_kit.cone(top_r * 1.08, rise, c + Vector3(0, h, 0), SURF_ROOF, sides)

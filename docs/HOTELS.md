@@ -27,10 +27,20 @@ mesh surfaces so callers can replace the materials without rebuilding geometry.
 
 ## Interior
 
-Every hotel carries 18 rooms over three walkable storeys. The ground level has
-the lobby, dining room, lounge, kitchen, office, and stores. Upper levels have
-guest rooms, suites, galleries, laundries, and a central stair spine. Furniture
-uses the same measured prop catalogue and clearance-aware placer as houses.
+A hotel is a corridor building. Every level has one **gallery** running the
+full length of the plan, and rooms off it on both sides: two facade bays to a
+room, so the room count follows the elevation's rhythm rather than a
+constant. The ground floor keeps the public programme along the street --
+dining room, lobby under the centre pavilion, lounge -- and the service
+programme along the yard -- kitchen with the back door, office, laundry,
+store, and any cells left over as ground-floor guest rooms. Above, the front
+rank is guest rooms with the suite in the middle and the back rank is guest
+rooms all along. Every guest room and suite has exactly one door, onto the
+gallery; the stairs rise in the gallery, against its back wall, as near the
+axis as the doors allow, and join gallery to gallery. `HotelQA` measures all
+of that (`gallery`, `bays`) on top of the house harness, whose privacy rule
+is what the old six-room level used to fail. Furniture uses the same measured
+prop catalogue and clearance-aware placer as houses.
 
 ## Harness
 

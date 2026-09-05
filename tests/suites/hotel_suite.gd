@@ -17,8 +17,13 @@ static func run() -> SuiteResult:
 			var where := "style=%s seed=%d" % [String(style), seed]
 			if plan.spec != spec or spec.seed != seed or spec.storeys != 3:
 				res.fail("identity or storeys changed, " + where)
-			if plan.room_count() != 18 or plan.stairs.size() != 2:
-				res.fail("expected 18 rooms and two stairs, " + where)
+			var want_rooms := 0
+			for storey in range(3):
+				want_rooms += HotelPlanner.rooms_on_level(spec, storey)
+			if plan.room_count() != want_rooms or plan.stairs.size() != 2:
+				res.fail("expected %d rooms (from %d bays) and two stairs, got %d and %d, %s"
+					% [want_rooms, spec.facade_bays, plan.room_count(),
+					plan.stairs.size(), where])
 			if plan.furniture.size() != before:
 				res.fail("build mutated furnishings, " + where)
 			if mesh == null or mesh.get_surface_count() != 4:
@@ -35,41 +40,28 @@ static func run() -> SuiteResult:
 			or pa.windows != pb.windows or pa.furniture != pb.furniture:
 		res.fail("same hotel seed produced different plans")
 
-	_check_expected_privacy_failure(res)
+	_check_gallery_plan(res)
 	return res
 
 
-## EXPECTED-FAIL (LAY-007 proof / LAY-008 tracker): the current
-## `HotelPlanner._connect_level` hard-codes doors 0<->3 and 2<->5 on every
-## level, so guest room 3 is reachable only through guest room 0, and room 5
-## only through suite 2 -- both sleeping rooms under LAY-007's
-## `HouseGeometry.SLEEPING`. `HousePlanCheck._check_privacy` now catches this;
-## until LAY-008 replaces the fixed 6-room level with a gallery corridor, the
-## failure below is EXPECTED. If it stops appearing, LAY-008 has landed --
-## delete this block (and the plain "expects" comment) rather than leaving a
-## check that always trivially passes.
-static func _check_expected_privacy_failure(res: SuiteResult) -> void:
-	var spec := HotelSpec.new()
-	var plan := HotelGenerator.generate(spec, 41001)
-	var report: Dictionary = HousePlanCheck.new().check(plan)
-	res.checked += 1
-	var saw_room_3 := false
-	var saw_room_5 := false
-	for f in report["failures"]:
-		var msg: String = str(f)
-		if not msg.begins_with("privacy:"):
-			continue
-		for storey in range(1, spec.storeys):
-			var room3 := storey * 6 + 3
-			var room5 := storey * 6 + 5
-			if ("room %d " % room3) in msg:
-				saw_room_3 = true
-			if ("room %d " % room5) in msg:
-				saw_room_5 = true
-	if not (saw_room_3 and saw_room_5):
-		res.fail("LAY-007 proof: expected the CURRENT hotel planner to fail " +
-			"privacy on upper-level guest rooms 3 and 5 (LAY-008 not yet " +
-			"landed); it did not -- if LAY-008 landed, delete this expected-fail check")
-	else:
-		res.note("expected-fail confirmed: hotel privacy fails on rooms 3 and 5 " +
-			"per level until LAY-008 (see qa/house_plan_check.gd _check_privacy)")
+## The gallery plan (LAY-008), measured: the privacy rule that used to fail on
+## the fixed six-room level is silent, every level has one gallery down its
+## length, every sleeping room has one door and it opens onto the gallery or
+## the lobby, and the room count follows the facade's bays.
+static func _check_gallery_plan(res: SuiteResult) -> void:
+	for seed in [41001, 41002, 41003]:
+		var spec := HotelSpec.new()
+		spec.width = 30.0 + float(seed % 3) * 12.0
+		spec.length = 16.0 + float(seed % 3) * 8.0
+		var plan := HotelGenerator.generate(spec, seed)
+		var report: Dictionary = HousePlanCheck.new().check(plan)
+		res.checked += 1
+		for f in report["failures"]:
+			if str(f).begins_with("privacy:"):
+				res.fail("seed=%d %s" % [seed, str(f)])
+		var builder := HotelBuilder.new()
+		builder.build(plan)
+		var qa: Dictionary = HotelQA.new().check(plan, builder)
+		for f in qa["failures"]:
+			if str(f).begins_with("gallery:") or str(f).begins_with("bays:"):
+				res.fail("seed=%d %s" % [seed, str(f)])

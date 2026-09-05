@@ -18,6 +18,7 @@ var width: float = 8.0            # X, metres, outside face to outside face
 var length: float = 10.0          # Z
 var height: float = 2.6           # floor to ceiling
 var storeys: int = 1              # stacked floors, 1..3; height is per storey
+var cellars: int = 0              # storeys dug below the ground, 0..1 (INT-016)
 
 # ---- derived from seed + style ----
 var variant_name: String
@@ -107,6 +108,25 @@ const PROGRAM := [&"hall", &"bedroom", &"kitchen", &"bedroom", &"store", &"parlo
 ## room less than this reads as a rabbit hutch, so the room count follows the
 ## floor area rather than the other way round.
 const AREA_PER_ROOM := 15.0
+
+
+## The lowest storey index: -cellars. Storeys run lowest_storey() .. storeys - 1.
+func lowest_storey() -> int:
+	return -maxi(cellars, 0)
+
+
+## Every storey index, lowest first.
+func storey_indices() -> Array[int]:
+	var out: Array[int] = []
+	for s in range(lowest_storey(), maxi(storeys, 1)):
+		out.append(s)
+	return out
+
+
+## The width of the front door leaf. A dwelling's is HouseGeometry.DOOR_W;
+## a shop's depends on what comes through it (ShopSpec.door_w, LAY-009).
+func front_door_width() -> float:
+	return HouseGeometry.DOOR_W
 
 
 ## How many rooms an interior of this size can carry.

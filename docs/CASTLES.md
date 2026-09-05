@@ -29,18 +29,48 @@ building on the way down.
 | Hampton Court range | French Château | 40 x 28 x 11 | manor | Tudor **courtyard house**: ranges on all four sides of a base court, a **forest of chimney stacks** |
 | Bodiam Castle | Edwardian | 55 x 50 x 18 | castle | textbook **quadrangular castle**: four **round drum towers** 9 m across and 18 m high, walls ~2 m thick, **twin-towered gatehouse**, moat |
 | Caernarfon Castle | Edwardian | 170 x 60 x 12 | castle | **polygonal** rather than cylindrical towers -- seven of them -- two twin-towered gates, curtain to 12 m, walls 6 m thick in places; Eagle Tower 28 m to the parapet |
-| Neuschwanstein | Bavarian Romantic | 150 x 40 x 25 | castle | a **150 m ridge of ranges**, slender stair towers under tall **conical spires**, the northern one 65 m |
+| Neuschwanstein | Bavarian Romantic | 150 x 40 x 25 | castle | a **150 m ridge of ranges** (`plan_kind = ridge`, spine >= 120 m), slender stair towers under tall **conical spires**, the northern one 65 m (the great tower at the far end of the spine) |
 | Himeji Castle | Japanese | 60 x 50 x 15 | castle | **tiered tenshu**: a 15 m battered stone base carrying a 31.5 m timber keep, five storeys outside and seven within, with yagura turrets |
 | Château de Chambord | French Château | 156 x 117 x 32 | fortress | 156 m facades, an enceinte round a 44 m-square **keep**, **round corner towers** under conical roofs, a **dormered roofscape**, 56 m tall |
 | Krak des Chevaliers | Crusader | 300 x 140 x 20 | fortress | the **concentric** castle: two enceintes, 300 m at its longest and 140 at its widest, outer curtain ~9 m tall and 3 m thick with seven round towers 8-10 m across, inner walls over 4 m thick, and a great **battered talus** |
 | Alhambra (Alcazaba) | Moorish | 200 x 70 x 16 | fortress | **square mural towers** and flat roofs; the Torre de la Vela is 16 x 16 m in plan and 26.8 m high |
-| Windsor Castle (upper ward) | Norman | 200 x 120 x 18 | fortress | a **shell keep** -- the Round Tower, 30.5 x 27.5 m internally, 20 m above the ward -- inside a walled bailey |
+| Windsor Castle (upper ward) | Norman | 200 x 120 x 18 | fortress | a **motte and bailey** (`plan_kind = motte_bailey`): the **shell keep** -- the Round Tower, 30.5 x 27.5 m internally, 20 m above the ward -- on its mound behind a walled bailey |
+| Merchant's tower (Bologna type) | Norman | 8 x 8 x 45 | house | a **tower house**: one shaft four storeys and more, a raised door, walls thicker at the foot, a fighting platform on top, an L jog |
+| Tower of London | Norman | 130 x 110 x 10 | fortress | **concentric**, with the White Tower -- a **square keep** 36 x 32 m, 27 m high -- standing **off the axis** in the south-east of the inner ward (`keep_offset`) |
+| Conwy Castle | Edwardian | 100 x 40 x 15 | castle | **eight towers**; **two wards side by side**, not nested -- *expected-fail: no side-by-side plan kind yet* |
+| Cité de Carcassonne | French Château | 300 x 180 x 10 | fortress | a **double wall** round a town: the inner enclosure is at least 40 % of the outer |
+| Malbork Castle | Norman | 320 x 140 x 15 | fortress | **three wards in a line**, in brick -- *expected-fail: no in-line wards plan kind yet* |
+| Castel del Monte | Crusader | 56 x 56 x 24 | castle | a regular **octagon** with an **octagonal tower at every angle**, mirror-symmetric across both axes |
+| Edinburgh Castle | Edwardian | 200 x 100 x 15 | castle | a **ridge** of ranges, **terraced** up the rock -- *expected-fail: terraces need INT-016* |
+| Eilean Donan | Norman | 60 x 50 x 12 | castle | an **island** with **water on every side** and one **causeway** -- *expected-fail: no water plan kind yet* |
+| Caerphilly Castle | Edwardian | 240 x 200 x 12 | fortress | concentric inside **two moats** -- *expected-fail: no water plan kind yet* |
+| Dover Castle | Norman | 200 x 150 x 15 | fortress | **concentric** with a **great square keep** on the axis, half as tall again as its curtain |
+| Mont-Saint-Michel | French Château | 120 x 80 x 40 | fortress | an abbey **church on top of a terraced ring** -- *expected-fail: INT-016 and a church composed from ChurchGeometry* |
+
+## Plan kinds
+
+`CastleSpec.plan_kind` says what SHAPE the design is; the tier says how much
+of it there is.
+
+| plan kind | tiers | what it is |
+|---|---|---|
+| `rect` | all | an axis-aligned enceinte (or a house range); the N = 4 polygon |
+| `polygon` | castle, fortress | a regular N-gon (5-8 sides) with a flat edge facing the gate and a tower at every vertex |
+| `motte_bailey` | castle, fortress | a walled bailey at the front of the site and a mound behind it: a truncated cone 30-40 degrees steep, 6-15 m high by tier, with an oval **shell keep** on its flat top and one run of curtain climbing the slope from the bailey's back wall to the keep. The keep tops the bailey's curtain by 1.2x. The massing check's `motte` rule proves the keep stands on the top, nothing else stands on the slope, and the climb joins both ends: Windsor, Arundel, Lewes |
+| `ridge` | castle, fortress | ranges strung along a polyline spine down the site's long axis (3-6 points, bending 15-45 degrees at every vertex), each under its own roof with a row of windows a storey, a tower at every bend and both ends, and no bailey, gate or keep: Neuschwanstein, Edinburgh, Hohenzollern. The massing check's `ridge` rule counts the ranges and the towers against the spine |
+| `tower_house` | house, manor | the house tier grown up instead of out: one shaft of 4-6 storeys, a raised door, walls half as thick again at the foot, a roof platform, an L or Z jog and no curtain. Only a site at least twice as tall as it is wide can be one. `qa/tower_check.gd` measures it: `slender`, `lift`, `foot`, `no_gaps`, `grounded` |
 
 ## Feature checklist this drives
 
 - curtain walls with a battered talus, a wall walk and crenellations
 - towers: round drums, square towers, polygonal towers; conical, pyramidal,
-  flat and tiered caps
+  flat and tiered caps; one **great tower** per walled castle (`great_tower`,
+  a vertex of the outer ring, 1.5-2x the others across and taller with it:
+  the Eagle Tower, the Torre de la Vela), which the massing check requires to
+  stand alone above the rest
+- the hall and the chapel look **into the bailey**: a row of windows on the
+  courtyard face, none through the curtain behind, and an **apse** on the
+  chapel's free end
 - gatehouses with flanking drums, murder holes and a barbican outwork
 - concentric planning: an inner ward, and the causeway that ties it to the
   outer gate
@@ -80,3 +110,13 @@ that it IS concentric at full size.
 - https://en.wikipedia.org/wiki/Hampton_Court_Palace
 - https://www.alhambradegranada.org/en/info/alcazaba/watchtower.asp
 - https://castlestudiesgroup.org.uk/wp-content/uploads/2024/10/Shell-Keeps-Catalogue1-Windsor-low-res-07-09.pdf
+- https://en.wikipedia.org/wiki/Tower_of_London
+- https://en.wikipedia.org/wiki/Conwy_Castle
+- https://en.wikipedia.org/wiki/Cit%C3%A9_de_Carcassonne
+- https://en.wikipedia.org/wiki/Malbork_Castle
+- https://en.wikipedia.org/wiki/Castel_del_Monte,_Apulia
+- https://en.wikipedia.org/wiki/Edinburgh_Castle
+- https://en.wikipedia.org/wiki/Eilean_Donan
+- https://en.wikipedia.org/wiki/Caerphilly_Castle
+- https://en.wikipedia.org/wiki/Dover_Castle
+- https://en.wikipedia.org/wiki/Mont-Saint-Michel_Abbey

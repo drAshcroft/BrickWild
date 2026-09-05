@@ -42,6 +42,43 @@ furnished three-storey plan, broad symmetrical pink facade, raised central
 pavilion, mansard roof, dormers, balconies, and paired cupolas. See
 `docs/HOTELS.md`.
 
+## Compatibility and reproducibility
+
+What a caller of the library may rely on, and what it may not.
+
+- **Godot.** The source project targets Godot 4.5; the packaged addon is
+  proved against Godot 4.6 double-precision builds by the installer harness.
+  Pure GDScript, no C# and no GDExtension.
+- **API version.** `BigGlade.API_VERSION` is `1`, and every `describe_kind()`
+  and `placement()` result carries it. Additive changes (a new kind, a new
+  descriptor field, a new placement key) keep the number; a change that
+  removes or renames a field, or alters what an existing field means, raises
+  it. `BuildingRequest`'s public fields (`kind`, `seed`, `style`, `purpose`,
+  `width`, `length`, `height`, `storeys`) are the request contract.
+- **Coordinates.** Metres. `+X` right, `+Y` up, `+Z` back; every family's
+  public front is local `-Z`, its door on the `-Z` edge of
+  `placement().footprint`, and the ground plane is `y = 0` (a cellar's pit is
+  below it). `placement().bounds` is the emitted architecture's AABB.
+- **Materials.** Every family's mesh has four surfaces, in this order:
+  wall/stone, trim, roof, floor/openings. `instantiate()` assigns a
+  `StandardMaterial3D` per surface from the spec's colours; callers that
+  build their own materials should key them by surface index.
+- **Serialization.** Plans and specs are plain data (`Dictionary`,
+  `Rect2`, `Vector2`, `StringName`). A record may gain keys between
+  releases; readers must ignore keys they do not know. Keys are never
+  removed without the API version changing.
+- **Seeds.** Within one API version, the same request (kind, seed, style,
+  purpose, sizes, storeys) produces the same representation, the same
+  `placement()` and the same mesh, on the same Godot version. Seeded output
+  is **not** guaranteed stable across releases: a generator change that
+  re-arranges a house is a change to every seed, and it is made
+  deliberately. A caller that needs a building to stay put should keep the
+  plan it was given, not the request.
+
+`tests/suites/library_suite.gd` holds the smoke contract for all of this:
+the version, the descriptors, the placement keys, and the same request
+generated twice.
+
 ## Addon installation
 
 To use BigGlade from another Godot project, install the relocatable addon with

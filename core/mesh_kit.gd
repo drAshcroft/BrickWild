@@ -385,7 +385,30 @@ func half_cylinder(radius: float, height: float, center: Vector2, surf: int,
 		st.set_uv(Vector2(1, 1)); st.add_vertex(c)
 
 
-## Straight-sided prism: octagonal drums, crossing lanterns.
+## A hollow ring in plan, elliptical: the wall of a shell keep. `rx`/`rz` are
+## the OUTER semi-axes; the wall is `thickness` thick, `height` tall, and
+## closed with a flat top. Emitted as flat quads per segment, outside,
+## inside and top, each with its own normal.
+func oval_ring(center: Vector3, rx: float, rz: float, thickness: float,
+		height: float, surf: int, segments := 24) -> void:
+	var st: SurfaceTool = _sts[surf]
+	var irx: float = maxf(rx - thickness, 0.05)
+	var irz: float = maxf(rz - thickness, 0.05)
+	for s in range(segments):
+		var a0: float = TAU * float(s) / segments
+		var a1: float = TAU * float(s + 1) / segments
+		var o0 := center + Vector3(cos(a0) * rx, 0.0, sin(a0) * rz)
+		var o1 := center + Vector3(cos(a1) * rx, 0.0, sin(a1) * rz)
+		var i0 := center + Vector3(cos(a0) * irx, 0.0, sin(a0) * irz)
+		var i1 := center + Vector3(cos(a1) * irx, 0.0, sin(a1) * irz)
+		var up := Vector3(0.0, height, 0.0)
+		# outside face, wound so it looks outward; inside face the other way
+		_quad(st, o0, o0 + up, o1 + up, o1)
+		_quad(st, i1, i1 + up, i0 + up, i0)
+		# the top, and the ground ring so the shell is closed
+		_quad(st, o0 + up, i0 + up, i1 + up, o1 + up)
+		_quad(st, o1, i1, i0, o0)
+
 func prism(radius: float, height: float, sides: int, center: Vector3, surf: int,
 		rot := 0.0) -> void:
 	revolve(PackedVector2Array([Vector2(radius, 0.0), Vector2(radius, height)]),

@@ -34,6 +34,9 @@ extends RefCounted
 ##   SHELF_OVER          a shelf hangs over the bench it serves
 ##   CHANDELIER_OVER     the chandelier hangs over the table
 ##   CORNER_CLUTTER      barrels stand out of the traffic
+## and the one the temple taught (INT-002):
+##   FOCUS               the piece the plan is arranged around stands where
+##                       the plan says, and looks at the door when it must
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {...}}
 
@@ -82,43 +85,37 @@ const GROUPS := {
 	"arrangement": ["against", "seating", "row"],
 	"feng shui": ["command", "hearth", "workbench_daylight", "bookcase_heat",
 		"bed_window", "table_focus", "sconce_pair", "shelf_over",
-		"chandelier_over", "corner_clutter"],
+		"chandelier_over", "corner_clutter", "focus"],
 }
+
+## Every rule, in the order it runs, by the name its messages carry. A family
+## may replace one through `check(plan, overrides)` (RuleSet, INT-020).
+const RULES: Array[StringName] = [&"placed", &"vertical", &"supported", &"doorway",
+	&"daylight", &"programme", &"against", &"seating", &"light", &"density",
+	&"command", &"hearth", &"row", &"workbench_daylight", &"bookcase_heat",
+	&"bed_window", &"table_focus", &"sconce_pair", &"shelf_over",
+	&"chandelier_over", &"corner_clutter", &"focus"]
+## Where a rule's method is not simply "_check_" + its name.
+const METHODS := {&"doorway": "_check_doorways", &"daylight": "_check_windows",
+	&"programme": "_check_program", &"against": "_check_against_wall",
+	&"command": "_check_command_position"}
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
 var stats: Dictionary = {}
+## {rule: replacement name} for the rules a family replaced this run.
+var replaced: Dictionary = {}
 
 
-func check(plan: HousePlan) -> Dictionary:
+func check(plan: HousePlan, overrides: Dictionary = {}) -> Dictionary:
 	failures.clear()
 	warnings.clear()
 	stats.clear()
 	stats["furniture"] = plan.furniture.size()
-
-	_check_placed(plan)
-	_check_vertical(plan)
-	_check_supported(plan)
-	_check_doorways(plan)
-	_check_windows(plan)
-	_check_program(plan)
-	_check_against_wall(plan)
-	_check_seating(plan)
-	_check_light(plan)
-	_check_density(plan)
-	_check_command_position(plan)
-	_check_hearth(plan)
-	_check_row(plan)
-	_check_workbench_daylight(plan)
-	_check_bookcase_heat(plan)
-	_check_bed_window(plan)
-	_check_table_focus(plan)
-	_check_sconce_pair(plan)
-	_check_shelf_over(plan)
-	_check_chandelier_over(plan)
-	_check_corner_clutter(plan)
+	replaced = RuleSet.run(self, RULES, METHODS, overrides, [plan], [plan],
+		failures, warnings)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
-		"stats": stats, "groups": GROUPS}
+		"stats": stats, "groups": GROUPS, "replaced": replaced}
 
 
 static func _who(plan: HousePlan, f: int) -> String:
@@ -397,10 +394,20 @@ func _check_seating(plan: HousePlan) -> void:
 		var to_table: Vector2 = near - seat_c
 		if to_table.length() < 0.01:
 			continue        # tucked right under it; it can only be facing it
-		if to_table.length() < 0.01:
-			continue
 		var yaw: float = float(p["yaw"])
 		var facing := Vector2(-sin(yaw), -cos(yaw))
+		# a bench across the narrow end of a table is wider than the end it
+		# faces, so its centre's nearest point is the table's corner: what
+		# counts is that looking straight ahead from the seat you see table
+		var across := Vector2(-facing.y, facing.x)
+		var half_w: float = (absf(across.x) * Rect2(p["rect"]).size.x
+			+ absf(across.y) * Rect2(p["rect"]).size.y) / 2.0
+		var sees := false
+		for t in [-0.8, -0.4, 0.0, 0.4, 0.8]:
+			if _ray_hits_rect(seat_c + across * (half_w * t), facing, host_rect.grow(0.05), 1.6):
+				sees = true
+		if sees:
+			continue
 		if facing.dot(to_table.normalized()) < 0.5:
 			failures.append("seating: %s has its back to the table it is drawn up to"
 				% _who(plan, f))
@@ -722,9 +729,25 @@ func _check_bed_window(plan: HousePlan) -> void:
 		var wi: int = _fs_back_wall(plan, room, p["rect"])
 		if wi < 0 or not _fs_wall_lit(plan, room, wi):
 			continue
-		_fs_report(plan, p, "bed",
-			"bed_window: the head of %s is under the window in wall %d"
-			% [_who(plan, f), wi])
+		var msg := "bed_window: the head of %s is under the window in wall %d" % [_who(plan, f), wi]
+		# a room whose every other wall is glazed or carries the chimney has
+		# no dark wall to offer the bed: that is the room, not the placer
+		var dark := false
+		var span: float = maxf(Rect2(p["rect"]).size.x, Rect2(p["rect"]).size.y)
+		for other in range(4):
+			if other == wi or _fs_wall_lit(plan, room, other):
+				continue
+			if plan.hearth_room() == room and plan.hearth_wall() == other:
+				continue
+			# and long enough, clear of its doors, to take the bed
+			var run: Vector2 = HousePlanner.clear_wall_span(plan, room, other)
+			if run.y - run.x < span + 0.1:
+				continue
+			dark = true
+		if dark:
+			_fs_report(plan, p, "bed", msg)
+		else:
+			warnings.append(msg)
 
 
 ## The table in the room with the fire in it is drawn up toward the fire, not
@@ -1141,3 +1164,119 @@ func _check_corner_clutter(plan: HousePlan) -> void:
 			_fs_report(plan, p, PropCatalog.category(p["key"]), msg)
 		else:
 			warnings.append(msg)
+
+
+## The plan names one piece the room is arranged around -- the fire in a hall,
+## the counter in a shop, the anvil in a smithy -- and where it stands. This
+## is the temple's axis rule brought indoors: the focus exists, it is where
+## the plan says (the furnisher writes back where it put it, so this is the
+## plan against the furniture, not the plan against itself), and when the
+## family says it must -- a counter, a bar -- it looks at the way in.
+const FOCUS_TOL := 0.3
+const FOCUS_FACE_DEG := 45.0
+
+func _check_focus(plan: HousePlan) -> void:
+	var room: int = plan.focus_room()
+	if room < 0 or room >= plan.room_count():
+		return
+	var cat: String = plan.focus_cat()
+	if cat == "":
+		return
+	var pieces: Array[int] = []
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(p["key"]) != cat:
+			continue
+		if p.get("mounted", false) or int(p["host"]) >= 0:
+			continue
+		pieces.append(f)
+	if pieces.is_empty():
+		if plan.was_dropped(room, cat) or not _could_hold(plan, room, cat):
+			warnings.append("focus: room %d (%s) gave up the %s it was arranged around"
+				% [room, String(plan.kind_of(room)), cat])
+		else:
+			failures.append("focus: room %d (%s) has no %s to be arranged around"
+				% [room, String(plan.kind_of(room)), cat])
+		return
+	var pos: Vector2 = plan.focus_pos()
+	var best: int = pieces[0]
+	var best_d := INF
+	for f2 in pieces:
+		var d: float = Rect2(plan.furniture[f2]["rect"]).get_center().distance_to(pos)
+		if d < best_d:
+			best_d = d
+			best = f2
+	if pos.is_finite() and best_d > FOCUS_TOL:
+		failures.append("focus: %s stands %.2fm from the focus the plan recorded"
+			% [_who(plan, best), best_d])
+	if not plan.focus_faces_door():
+		return
+	var door: int = HouseFurnisher.focus_door(plan, room)
+	if door < 0:
+		return
+	var c: Vector2 = Rect2(plan.furniture[best]["rect"]).get_center()
+	var to: Vector2 = Vector2(plan.doors[door]["pos"]) - c
+	if to.length() < 0.01:
+		return
+	var yaw: float = float(plan.furniture[best]["yaw"])
+	var facing := Vector2(-sin(yaw), -cos(yaw))
+	var off: float = rad_to_deg(acos(clampf(facing.dot(to.normalized()), -1.0, 1.0)))
+	# a counter set square to the door's wall a little way along it looks at
+	# the doorway well enough: the customer walks in and sees its front
+	var squarely: bool = facing.dot(Vector2(plan.doors[door]["normal"])) > 0.9
+	if off > FOCUS_FACE_DEG and not squarely:
+		failures.append("focus: the %s in room %d faces away from the door" % [cat, room])
+	# and it can be SEEN from the door: the temple's sightline rule, cast from
+	# a person's eye inside the doorway to the top of the piece, past every
+	# other piece standing in the room (Sightline, INT-020)
+	var d: Dictionary = plan.doors[door]
+	var base: float = float(plan.storey_of_room(room)) * plan.spec.height
+	var inside: Vector2 = Vector2(d["pos"]) - Vector2(d["normal"]) * 0.5 \
+		if int(d["a"]) == room else Vector2(d["pos"]) + Vector2(d["normal"]) * 0.5
+	var eye := Vector3(inside.x, base + 1.6, inside.y)
+	var top: float = base + PropCatalog.height(plan.furniture[best]["key"]) \
+		* float(plan.furniture[best].get("scale", 1.0)) * 0.9
+	var aim := Vector3(c.x, top, c.y)
+	var boxes: Array = []
+	var names: Array[String] = []
+	for f3 in plan.furniture_of(room):
+		if f3 == best:
+			continue
+		var q: Dictionary = plan.furniture[f3]
+		if q.get("mounted", false) or int(q["host"]) >= 0:
+			continue
+		var qr: Rect2 = q["rect"]
+		var qh: float = PropCatalog.height(q["key"]) * float(q.get("scale", 1.0))
+		boxes.append(AABB(Vector3(qr.position.x, base, qr.position.y),
+			Vector3(qr.size.x, qh, qr.size.y)))
+		names.append(String(q["key"]))
+	var hit: Array[int] = Sightline.blockers(eye, aim, boxes)
+	if not hit.is_empty():
+		warnings.append("focus: the %s in room %d cannot be seen from the door past the %s"
+			% [cat, room, names[hit[0]]])
+
+
+## Does a ray from `from` along `dir`, no longer than `reach`, cross `rect`?
+static func _ray_hits_rect(from: Vector2, dir: Vector2, rect: Rect2, reach: float) -> bool:
+	var to: Vector2 = from + dir.normalized() * reach
+	var t0 := 0.0
+	var t1 := 1.0
+	var d: Vector2 = to - from
+	for axis in range(2):
+		var lo: float = rect.position[axis]
+		var hi: float = rect.end[axis]
+		if absf(d[axis]) < 0.00001:
+			if from[axis] < lo or from[axis] > hi:
+				return false
+			continue
+		var ta: float = (lo - from[axis]) / d[axis]
+		var tb: float = (hi - from[axis]) / d[axis]
+		if ta > tb:
+			var swap: float = ta
+			ta = tb
+			tb = swap
+		t0 = maxf(t0, ta)
+		t1 = minf(t1, tb)
+		if t0 > t1:
+			return false
+	return true

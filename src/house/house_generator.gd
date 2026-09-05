@@ -21,6 +21,7 @@ static func generate(spec: HouseSpec, p_seed: int) -> HousePlan:
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
 	spec.storeys = clampi(spec.storeys, 1, 3)
+	spec.cellars = clampi(spec.cellars, 0, 1)
 	var s: Dictionary = HouseSpec.STYLES[spec.style]
 	var r := spec.rng
 

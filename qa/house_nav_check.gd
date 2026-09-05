@@ -80,8 +80,7 @@ func _report() -> Dictionary:
 func _rasterize() -> void:
 	var bounds: Rect2 = HouseGeometry.interior_rect(_plan.spec).grow(HouseGeometry.WALL_T)
 	_grids.clear()
-	var wanted: int = clampi(int(_plan.spec.storeys), 1, 3)
-	for level in range(wanted):
+	for level in _levels():
 		var grid := WalkGrid.new()
 		grid.setup(bounds, HouseGeometry.NAV_CELL)
 		_grids[level] = grid
@@ -116,23 +115,47 @@ func _flood_storeys(inside: Vector2) -> void:
 		if not grid.flood_from(seeds[level]):
 			continue
 		reachable_levels[level] = true
+		# a stair is walked both ways: up from its lower landing, and down
+		# from its upper one into a cellar (INT-016)
 		for stair in _plan.stairs:
 			var lo: int = int(stair.get("storey", 0))
 			var hi: int = int(stair.get("to_storey", lo + 1))
-			if lo != level or hi != lo + 1 or not _grids.has(hi):
+			if hi != lo + 1:
 				continue
-			var landing: Rect2 = _stair_rect(stair, false)
-			if not grid.reached(landing):
+			var other := -999
+			var here: Rect2
+			var there: Rect2
+			if lo == level and _grids.has(hi):
+				other = hi
+				here = _stair_rect(stair, false)
+				there = _stair_rect(stair, true)
+			elif hi == level and _grids.has(lo):
+				other = lo
+				here = _stair_rect(stair, true)
+				there = _stair_rect(stair, false)
+			else:
 				continue
-			var upper: Rect2 = _stair_rect(stair, true)
-			if not seeds.has(hi):
-				seeds[hi] = upper.get_center()
-				pending.append(hi)
+			if not grid.reached(here):
+				continue
+			if not seeds.has(other):
+				seeds[other] = there.get_center()
+				pending.append(other)
 		if level == 0:
 			_grid = grid
-	for level in range(clampi(int(_plan.spec.storeys), 1, 3)):
+	for level in _levels():
 		if not reachable_levels.has(level):
 			failures.append("nav: storey %d cannot be reached through stairs" % level)
+
+
+## Every level the plan has, cellars included (INT-016).
+func _levels() -> Array[int]:
+	var out: Array[int] = []
+	var lowest := 0
+	if _plan.spec.has_method("lowest_storey"):
+		lowest = int(_plan.spec.lowest_storey())
+	for level in range(lowest, clampi(int(_plan.spec.storeys), 1, 3)):
+		out.append(level)
+	return out
 
 
 static func _stair_rect(stair: Dictionary, upper: bool) -> Rect2:

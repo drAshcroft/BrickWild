@@ -48,10 +48,14 @@ static func _allowance(a: String, b: String) -> float:
 	return float(JOINTS.get(key, 0.0))
 
 
-func check(spec: TempleSpec, builder: TempleBuilder) -> Dictionary:
+## `overrides` lets a family replace one of the rite's rules by name
+## (RuleSet, INT-020); the report says which under "replaced".
+func check(spec: TempleSpec, builder: TempleBuilder, overrides: Dictionary = {}) -> Dictionary:
 	var failures: Array[String] = []
 	var warnings: Array[String] = []
 	var stats := {}
+	for bad in RuleSet.unknown(overrides, [TempleRiteCheck.RULES]):
+		failures.append("rules: no temple rule is called %s" % bad)
 
 	var masses: Array[Dictionary] = builder.mass_log
 	stats["masses"] = masses.size()
@@ -73,7 +77,7 @@ func check(spec: TempleSpec, builder: TempleBuilder) -> Dictionary:
 	for g in MassRules.grounded(masses, ["bridge"]):
 		failures.append(str(g))
 
-	var rite: Dictionary = TempleRiteCheck.new().check(spec, builder)
+	var rite: Dictionary = TempleRiteCheck.new().check(spec, builder, overrides)
 	for f2 in rite["failures"]:
 		failures.append(str(f2))
 	for w in rite["warnings"]:
@@ -82,4 +86,4 @@ func check(spec: TempleSpec, builder: TempleBuilder) -> Dictionary:
 		stats[k] = rite["stats"][k]
 
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
-		"stats": stats}
+		"stats": stats, "replaced": rite.get("replaced", {})}

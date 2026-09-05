@@ -106,7 +106,17 @@ static func overlaps(masses: Array[Dictionary], allow: Callable,
 		for j in range(i + 1, n):
 			var an: String = masses[i]["name"]
 			var bn: String = masses[j]["name"]
+			# two masses below ground are earth against earth (INT-016); a
+			# mass above ground may reach into one below only if it is a
+			# stair, which is what a stair down to a cellar does
+			var neg_i: bool = is_negative(masses[i])
+			var neg_j: bool = is_negative(masses[j])
+			if neg_i and neg_j:
+				continue
 			var allowed: float = allow.call(family(an, prefixes), family(bn, prefixes))
+			if neg_i != neg_j:
+				var above: String = bn if neg_i else an
+				allowed = INF if above.begins_with("stair") else 0.0
 			if is_inf(allowed):
 				continue
 			var pen: float = penetration(masses[i]["aabb"], masses[j]["aabb"])
@@ -123,10 +133,16 @@ static func overlaps(masses: Array[Dictionary], allow: Callable,
 	return {"failures": failures, "worst": snappedf(worst, 0.01)}
 
 
-## Every mass stands on the ground plane, except those whose names begin with
-## one of `carried` -- the members held up by the walls below them, which is the
+## Every mass stands on the ground, except those whose names begin with one
+## of `carried` -- the members held up by the walls below them, which is the
 ## whole point of a dome or a flyer arch.
-static func grounded(masses: Array[Dictionary], carried: Array) -> Array[String]:
+##
+## The ground is `ground_y` for the building (0 for every caller that has
+## not said otherwise), or the mass's own `ground` field when it carries one
+## (INT-016): a cellar's walls stand on the floor of the pit they are dug in,
+## a terrace's on the terrace. A mass is grounded when its base is within
+## tolerance of its own ground level.
+static func grounded(masses: Array[Dictionary], carried: Array, ground_y := 0.0) -> Array[String]:
 	var failures: Array[String] = []
 	for m in masses:
 		var nm: String = m["name"]
@@ -138,6 +154,13 @@ static func grounded(masses: Array[Dictionary], carried: Array) -> Array[String]
 		if exempt:
 			continue
 		var y0: float = (m["aabb"] as AABB).position.y
-		if y0 > TOL:
-			failures.append("size_match: %s floats %.2fm above ground" % [nm, y0])
+		var floor_y: float = float(m.get("ground", ground_y))
+		if y0 > floor_y + TOL:
+			failures.append("size_match: %s floats %.2fm above ground" % [nm, y0 - floor_y])
 	return failures
+
+
+## A mass dug below the ground plane: its top is at or under the ground.
+static func is_negative(m: Dictionary) -> bool:
+	var a: AABB = m["aabb"]
+	return a.position.y + a.size.y <= TOL

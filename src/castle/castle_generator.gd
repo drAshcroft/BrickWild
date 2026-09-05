@@ -42,11 +42,26 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	var plan: Dictionary = CastleSpec.plan_for(spec.style, spec.tier, p_seed)
 	spec.plan_kind = spec.plan_override if spec.plan_override != &"" \
 		else plan["kind"]
+	if spec.plan_override == &"" and CastleSpec.tower_house_for(spec.style, spec.tier,
+			p_seed, spec.width, spec.length, spec.height):
+		spec.plan_kind = &"tower_house"
 	spec.sides = 4
 	if spec.plan_kind == &"polygon":
 		spec.sides = clampi(spec.sides_override if spec.sides_override > 0 \
 			else int(plan["sides"]), CastleGeometry.POLY_MIN_SIDES,
 			CastleGeometry.POLY_MAX_SIDES)
+	# a tower house is a proportion before it is a plan: a site not twice as
+	# tall as it is wide is a house, whatever was asked for
+	if spec.plan_kind == &"tower_house" and (enclosed
+			or spec.height < 2.0 * maxf(spec.width, spec.length)):
+		spec.plan_kind = &"rect"
+	# a ridge needs a walled tier and a site long enough to string ranges on
+	if spec.plan_kind == &"ridge" and (not enclosed
+			or maxf(spec.width, spec.length) < 3.0 * CastleGeometry.RIDGE_RANGE_W_MIN):
+		spec.plan_kind = &"rect"
+	# a ridge castle has no enceinte: nothing below that is about the curtain,
+	# the gate or the bailey applies to it
+	enclosed = CastleGeometry.is_enclosed(spec)
 	var short_side: float = minf(spec.width, spec.length)
 
 	# ---- walls ----
@@ -64,6 +79,12 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	spec.tower_size = clampf(short_side * r.randf_range(0.055, 0.085), 2.0, 8.0)
 	spec.corner_towers = enclosed or (spec.tier == &"manor" and _chance(r, 0.5))
 	spec.side_towers = _pick(r, s["side_towers"]) if enclosed else 0
+	# one tower bigger than the rest (CAS-002), on its own generator so the
+	# rest of the design does not move
+	var great: Dictionary = CastleSpec.great_tower_for(spec.style, spec.tier, p_seed,
+		CastleGeometry.plan_sides(spec) if enclosed else 0)
+	spec.great_tower = int(great["vertex"])
+	spec.great_tower_scale = float(great["scale"])
 	_fit_towers(spec)
 
 	# ---- gate ----
@@ -76,8 +97,10 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	# ---- inner ward: a fortress is a castle with a second enceinte ----
 	spec.inner_ward = false
 	spec.ward_gap = 0.0
-	if spec.tier == &"fortress":
+	if spec.tier == &"fortress" and spec.plan_kind != &"motte_bailey":
 		_fit_inner_ward(spec, r)
+	if spec.plan_kind == &"motte_bailey" and enclosed:
+		_fit_motte(spec, r)
 
 	# ---- what stands inside, or IS the building ----
 	spec.keep = enclosed
@@ -99,6 +122,19 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 				CastleGeometry.max_chimneys(spec))
 		_:
 			_fit_bailey_buildings(spec, r)
+	if spec.plan_kind == &"tower_house":
+		_fit_tower_house(spec, r)
+	if CastleGeometry.is_motte(spec):
+		# the keep is on the mound, not in the bailey
+		spec.keep = false
+		spec.keep_w = spec.keep_w if spec.keep_w > 0.0 else 8.0
+		_fit_motte_keep(spec)
+	if CastleGeometry.is_ridge(spec):
+		_fit_ridge(spec, r)
+		var great_r: Dictionary = CastleSpec.great_tower_for(spec.style, spec.tier, p_seed,
+			CastleGeometry.spine(spec).size())
+		spec.great_tower = int(great_r["vertex"])
+		spec.great_tower_scale = float(great_r["scale"])
 
 	# ---- openings ----
 	spec.window_style = s["windows"]
@@ -128,27 +164,50 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 ## fitted, and it is deliberately NOT called from generate(): the fitting there
 ## runs in its own order and this must not perturb it.
 static func refit(spec: CastleSpec) -> void:
+	if spec.plan_kind == &"tower_house" and not CastleGeometry.is_enclosed(spec):
+		var r := RandomNumberGenerator.new()
+		r.seed = spec.seed
+		_fit_tower_house(spec, r)
+		return
+	if CastleGeometry.is_ridge(spec):
+		var r2 := RandomNumberGenerator.new()
+		r2.seed = spec.seed
+		_fit_ridge(spec, r2)
+		return
 	if not CastleGeometry.is_enclosed(spec):
 		return
+	if CastleGeometry.is_motte(spec):
+		spec.inner_ward = false
+		spec.ward_gap = 0.0
+		var r3 := RandomNumberGenerator.new()
+		r3.seed = spec.seed
+		if spec.motte_height <= 0.0:
+			_fit_motte(spec, r3)
+		_fit_motte_keep(spec)
+		spec.keep = false
 	_fit_towers(spec)
 	if spec.inner_ward:
 		_fit_ward_gap(spec)
 	var b: Rect2 = CastleGeometry.bailey_rect(spec)
-	var cap: Vector2 = CastleGeometry.max_keep_size(spec)
-	spec.keep_w = minf(spec.keep_w, cap.x)
-	spec.keep_l = minf(spec.keep_l, cap.y)
-	if spec.keep_shape == &"round" or spec.keep_shape == &"shell" 			or spec.keep_shape == &"tiered":
-		var side: float = minf(spec.keep_w, spec.keep_l)
-		spec.keep_w = side
-		spec.keep_l = side
-	spec.keep = spec.keep_w >= 3.0 and spec.keep_l >= 3.0
-	if not spec.keep:
-		spec.keep_w = 0.0
-		spec.keep_l = 0.0
-		spec.keep_height = 0.0
-	else:
-		spec.keep_height = maxf(spec.keep_height,
-			CastleGeometry.tower_height(spec, CastleGeometry.inner_ring(spec)) * 1.2)
+	if not CastleGeometry.is_motte(spec):
+		# the keep in the bailey; a motte's shell keep is on the mound and
+		# was fitted to it above
+		var cap: Vector2 = CastleGeometry.max_keep_size(spec)
+		spec.keep_w = minf(spec.keep_w, cap.x)
+		spec.keep_l = minf(spec.keep_l, cap.y)
+		if spec.keep_shape == &"round" or spec.keep_shape == &"shell" \
+				or spec.keep_shape == &"tiered":
+			var side: float = minf(spec.keep_w, spec.keep_l)
+			spec.keep_w = side
+			spec.keep_l = side
+		spec.keep = spec.keep_w >= 3.0 and spec.keep_l >= 3.0
+		if not spec.keep:
+			spec.keep_w = 0.0
+			spec.keep_l = 0.0
+			spec.keep_height = 0.0
+		else:
+			spec.keep_height = maxf(spec.keep_height,
+				CastleGeometry.tower_height(spec, CastleGeometry.inner_ring(spec)) * 1.2)
 	spec.hall_w = minf(spec.hall_w, b.size.x * 0.3)
 	spec.hall_l = minf(spec.hall_l, CastleGeometry.max_range_length(spec))
 	spec.hall = spec.hall_l >= 4.0 and spec.hall_w >= 3.5
@@ -164,13 +223,17 @@ static func _fit_towers(spec: CastleSpec) -> void:
 		return
 	for _pass in range(6):
 		var s: float = CastleGeometry.tower_base_half(spec, 0)
-		var need: float = 4.0 * s + CastleGeometry.MIN_WALL_RUN
+		# the worst edge has the great tower at one end and an ordinary one
+		# at the other
+		var gi: int = CastleGeometry.great_tower_index(spec)
+		var sg: float = CastleGeometry.tower_base_half_at(spec, 0, gi) if gi >= 0 else s
+		var need: float = 2.0 * s + 2.0 * sg + CastleGeometry.MIN_WALL_RUN
 		var have: float = minf(spec.width, spec.length)
 		if CastleGeometry.is_polygonal(spec):
 			# two vertex towers share every edge, and an octagon's edge is under
 			# half the site width: sized off the site alone they would meet in
 			# the middle of every run.
-			need = 2.5 * s + CastleGeometry.MIN_WALL_RUN
+			need = 1.25 * s + 1.25 * sg + CastleGeometry.MIN_WALL_RUN
 			have = minf(have, CastleGeometry.min_edge_length(spec, 0))
 		if need <= have:
 			break
@@ -280,6 +343,93 @@ static func _fit_bailey_buildings(spec: CastleSpec, r: RandomNumberGenerator) ->
 	spec.chapel = spec.hall and _chance(r, 0.6) \
 		and b.size.x > spec.hall_w * 2.0 + CastleGeometry.BAILEY_CLEAR * 2.0
 	spec.chimneys = 0
+
+
+## The motte and bailey (CAS-005): the mound's height by tier and its slope
+## by seed, the shell keep sized to the site, and both shrunk until the
+## bailey in front keeps its depth and the mound its footprint.
+static func _fit_motte(spec: CastleSpec, r: RandomNumberGenerator) -> void:
+	var short_side: float = minf(spec.width, spec.length)
+	spec.motte_batter = r.randf_range(30.0, 40.0)
+	spec.motte_height = r.randf_range(6.0, 10.0) if spec.tier == &"castle" \
+		else r.randf_range(10.0, 15.0)
+	spec.motte_height = minf(spec.motte_height, short_side * 0.2)
+	spec.shell_thickness = clampf(spec.wall_thickness * 0.8, 0.8, 3.0)
+	var d: float = clampf(short_side * r.randf_range(0.22, 0.32), 6.0, 40.0)
+	spec.keep_w = d
+	spec.keep_l = d * r.randf_range(0.85, 1.0)
+	spec.keep_shape = &"shell"
+	spec.keep = false
+	_fit_motte_keep(spec)
+
+
+## Settle the keep's height and pull the mound in until it fits the site:
+## the bailey keeps MOTTE_MIN_BAILEY of depth and the mound stays inside the
+## site's width.
+static func _fit_motte_keep(spec: CastleSpec) -> void:
+	spec.keep_height = maxf(spec.keep_height,
+		CastleGeometry.wall_height(spec, 0) * CastleGeometry.KEEP_DOMINANCE + 1.0 - spec.motte_height)
+	spec.keep_height = maxf(spec.keep_height, spec.height * 0.6)
+	for _pass in range(12):
+		var rb: float = CastleGeometry.motte_base_radius(spec)
+		var fits: bool = 2.0 * rb <= spec.width * 0.95 \
+			and spec.length - rb * (2.0 - CastleGeometry.MOTTE_TOE) >= CastleGeometry.MOTTE_MIN_BAILEY
+		if fits:
+			break
+		spec.keep_w *= 0.9
+		spec.keep_l *= 0.9
+		spec.motte_height *= 0.92
+	spec.keep_height = maxf(spec.keep_height, spec.height * 0.6)
+
+
+## The ridge castle (CAS-007): ranges 8-14 m wide and as tall as the wall
+## height, towers wide enough to stand proud of the ranges that dive into
+## them, no curtain, no gate, no keep, no bailey buildings.
+static func _fit_ridge(spec: CastleSpec, r: RandomNumberGenerator) -> void:
+	var short_side: float = minf(spec.width, spec.length)
+	spec.hall_w = clampf(short_side * 0.3, CastleGeometry.RIDGE_RANGE_W_MIN,
+		CastleGeometry.RIDGE_RANGE_W_MAX)
+	spec.hall_w = minf(spec.hall_w, short_side * 0.45)
+	spec.hall_l = 0.0
+	spec.hall_height = spec.height
+	spec.hall = true
+	spec.keep = false
+	spec.keep_w = 0.0
+	spec.keep_l = 0.0
+	spec.keep_height = 0.0
+	spec.chapel = false
+	spec.curtain = false
+	spec.gatehouse = false
+	spec.gate_towers = false
+	spec.barbican = false
+	spec.inner_ward = false
+	spec.ward_gap = 0.0
+	spec.corner_towers = true
+	spec.side_towers = 0
+	spec.tower_storeys = CastleGeometry.ridge_storeys(spec)
+	spec.ridge_points = r.randi_range(3, 6)
+	spec.tower_size = clampf(spec.hall_w * 0.55, 2.0, 8.0)
+	spec.tower_height = maxf(spec.tower_height, spec.height * 1.25)
+
+
+## The tower house (CAS-006): storeys by height, the type by proportion --
+## Bologna when the shaft is slender enough and its base small enough, else
+## Scottish -- and a jog by seed. No wings, no annexe, no chimney stacks, no
+## porch: the way in is a door a storey up.
+static func _fit_tower_house(spec: CastleSpec, r: RandomNumberGenerator) -> void:
+	var base: float = maxf(spec.width, spec.length)
+	spec.tower_storeys = clampi(int(spec.height / 4.5), 4, 6)
+	spec.tower_type = &"bologna" if (base <= 10.0 and spec.height >= 4.0 * base) \
+		else &"scottish"
+	spec.jog = _pick(r, [&"none", &"l", &"l", &"z"])
+	spec.wings = 0
+	spec.courtyard = false
+	spec.chimneys = 0
+	spec.corner_towers = false
+	# thick enough at the top for the foot to be half as thick again and still
+	# leave an interior
+	spec.wall_thickness = clampf(spec.wall_thickness, 0.6, minf(spec.width, spec.length) * 0.15)
+	spec.merlon_h = clampf(spec.height * 0.03, 0.5, 1.2)
 
 
 static func _chance(r: RandomNumberGenerator, p) -> bool:

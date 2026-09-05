@@ -16,6 +16,7 @@ func check(plan: HousePlan, builder: HotelBuilder) -> Dictionary:
 
 	_check_proportions(spec, failures)
 	_check_program(plan, failures)
+	_check_gallery(plan, spec, failures)
 	_check_landmarks(spec, builder, failures)
 	_check_symmetry(builder, failures)
 	var stats: Dictionary = shared["stats"].duplicate()
@@ -50,6 +51,55 @@ static func _check_program(plan: HousePlan, failures: Array[String]) -> void:
 				break
 		if not found:
 			failures.append("programme: hotel has no %s fitting" % category)
+
+
+## The corridor plan (LAY-008): every level has exactly one gallery running
+## at least nine tenths of the building's length and wide enough to pass in;
+## every guest room and suite has exactly one door and it opens onto the
+## gallery or the lobby; the rooms on the two sides of the gallery are within
+## one of each other and follow the facade's bays rather than a constant.
+static func _check_gallery(plan: HousePlan, spec: HotelSpec, failures: Array[String]) -> void:
+	var inner: Rect2 = HouseGeometry.interior_rect(spec)
+	for storey in range(spec.storeys):
+		var galleries: Array[int] = []
+		for i in plan.rooms_on_storey(storey):
+			if plan.kind_of(i) == &"gallery":
+				galleries.append(i)
+		if galleries.size() != 1:
+			failures.append("gallery: storey %d has %d galleries, wants one" % [storey, galleries.size()])
+			continue
+		var g: Rect2 = plan.rooms[galleries[0]]["rect"]
+		if g.size.x < inner.size.x * 0.9:
+			failures.append("gallery: storey %d gallery runs %.1fm of a %.1fm building" % [storey, g.size.x, inner.size.x])
+		if g.size.y < 1.5:
+			failures.append("gallery: storey %d gallery is only %.2fm wide" % [storey, g.size.y])
+		var front := 0
+		var back := 0
+		for i in plan.rooms_on_storey(storey):
+			if i == galleries[0]:
+				continue
+			var r: Rect2 = plan.rooms[i]["rect"]
+			if r.end.y <= g.position.y + 0.01:
+				front += 1
+			elif r.position.y >= g.end.y - 0.01:
+				back += 1
+		if storey > 0 and absi(front - back) > 1:
+			failures.append("bays: storey %d has %d rooms in front of the gallery and %d behind" % [storey, front, back])
+		if storey > 0 and maxi(front, back) != HotelPlanner.rooms_per_side(spec):
+			failures.append("bays: storey %d has %d rooms a side for %d facade bays" % [storey, maxi(front, back), spec.facade_bays])
+	for i in range(plan.room_count()):
+		if not plan.kind_of(i) in [&"guest_room", &"suite"]:
+			continue
+		var doors: Array[int] = plan.doors_of(i)
+		if doors.size() != 1:
+			failures.append("gallery: room %d (%s) has %d doors, wants one" % [i, String(plan.kind_of(i)), doors.size()])
+			continue
+		var d: Dictionary = plan.doors[doors[0]]
+		var other: int = int(d["b"]) if int(d["a"]) == i else int(d["a"])
+		var onto: String = String(plan.kind_of(other)) if other >= 0 else "the street"
+		if other < 0 or not plan.kind_of(other) in [&"gallery", &"lobby"]:
+			failures.append("gallery: room %d (%s) opens onto %s, not the gallery"
+				% [i, String(plan.kind_of(i)), onto])
 
 
 static func _check_landmarks(spec: HotelSpec, builder: HotelBuilder,
