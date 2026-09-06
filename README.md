@@ -82,6 +82,23 @@ business plus a house shell style. Available businesses include blacksmith,
 stable, restaurant, tavern, inn, bakery, butcher, apothecary, general store,
 tailor, carpenter, town hall, and guildhall. See `docs/SHOPS.md`.
 
+A **village** is asked for the same way (`kind = &"village"`), and comes back
+as a `VillagePlan` on `GeneratedBuilding.village` — roads, lots and the
+`BuildingRequest`s standing on them. Its two numbers are not metres: the
+request's `width` carries the population and its `length` the wealth as a
+percentage, which is why the descriptor publishes `width_label` and
+`length_label`. `build_mesh()` gives the ground, roads, water, edge and
+built props; `instantiate()` gives all of that plus every building, prop,
+plant and light. See `docs/VILLAGES.md`.
+
+```gdscript
+var request := BigGlade.default_request(&"village", 9101)
+request.width = 40.0          # people
+request.style = &"english"    # culture
+var made := BigGlade.generate(request)
+var plan: VillagePlan = made.village
+```
+
 `BuildingRequest.hotel()` builds a Grand Budapest-inspired landmark with a
 furnished three-storey plan, broad symmetrical pink facade, raised central
 pavilion, mansard roof, dormers, balconies, and paired cupolas. See

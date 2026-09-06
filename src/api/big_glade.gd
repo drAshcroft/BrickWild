@@ -76,6 +76,7 @@ static func generate_document(request: BuildingRequest) -> BuildingDocument:
 		return out
 	out.spec = made.spec
 	out.plan = made.plan
+	out.village = made.village
 	out.placement = placement(made)
 	return out
 

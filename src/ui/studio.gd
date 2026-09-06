@@ -48,9 +48,11 @@ var _fit_dist := 40.0
 var _suspend_regen := false
 
 
-## The village is planned, not generated through BigGlade: it is a plan of
-## BigGlade buildings on lots. It gets its own entry, its own controls
-## (population and wealth) and its own assembler.
+## The village is a registered kind now (VIL-019), so it comes out of
+## `BigGlade.kinds()` with the rest and is not added by hand. It keeps its own
+## controls (the sliders are a population and a wealth, not metres) and its
+## own preview path, which shows two villages rather than six buildings
+## because planning one is a few seconds of work.
 const VILLAGE := &"village"
 const VILLAGE_VARIANTS := 2
 const VILLAGE_CFG := {
@@ -68,8 +70,6 @@ func _ready() -> void:
 		var descriptor: Dictionary = BigGlade.describe_kind(kind_key)
 		kind_opt.add_item(descriptor["label"])
 		kind_opt.set_item_metadata(kind_opt.item_count - 1, kind_key)
-	kind_opt.add_item("Village")
-	kind_opt.set_item_metadata(kind_opt.item_count - 1, VILLAGE)
 	kind_opt.item_selected.connect(func(_i): _on_kind_changed())
 	width_slider.value_changed.connect(func(_v): regenerate())
 	length_slider.value_changed.connect(func(_v): regenerate())

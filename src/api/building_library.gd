@@ -27,7 +27,7 @@ const API_VERSION := 1
 
 ## Every kind, in the order a menu should show them.
 const KINDS: Array[StringName] = [&"church", &"castle", &"house", &"shop",
-	&"hotel", &"temple", &"world"]
+	&"hotel", &"temple", &"world", &"village"]
 
 ## One row per kind:
 ##   label        what the kind is called
@@ -98,11 +98,34 @@ const KIND_ROWS := {
 		"length": {"min": 4.0, "max": 120.0, "step": 0.5, "value": 30.0},
 		"height": {"min": 2.2, "max": 40.0, "step": 0.1, "value": 6.0},
 	},
+	# A village is not measured in metres (VIL-019). Its two numbers are the
+	# population and the wealth, and they ride on `width` and `length`
+	# because those are the request's own number fields -- `width_label` and
+	# `length_label` say so, so a caller filling a form from the descriptor
+	# asks for the right thing. `height` is unused and pinned to 1.
+	&"village": {
+		"label": "Village", "size_label": "Village",
+		"height_label": "", "style_label": "Culture", "purpose_label": "Purpose",
+		"width": {"min": 12, "max": 500, "step": 1, "value": 40},
+		"length": {"min": 0, "max": 100, "step": 5, "value": 35},
+		"height": {"min": 1, "max": 1, "step": 1, "value": 1},
+		"width_label": "Population", "length_label": "Wealth (%)",
+	},
 }
 
 ## The dimensions every kind has. `storeys` is separate: it is an integer, and
 ## only the plan-based families carry one.
 const DIMENSIONS: Array[StringName] = [&"width", &"length", &"height"]
+
+
+## What a kind calls one of its dimension fields, for an error a person will
+## read. Everything is metres except the village, whose `width` is a
+## population and whose `length` is a percentage -- and telling somebody that
+## a population must be between 12 and 500 METRES is telling them nothing.
+static func _field_word(kind: StringName, field: StringName) -> String:
+	var row: Dictionary = KIND_ROWS.get(kind, {})
+	var named: String = String(row.get("%s_label" % String(field), ""))
+	return named if not named.is_empty() else "%s in metres" % String(field)
 
 
 static func kinds() -> Array[StringName]:
@@ -128,6 +151,8 @@ static func styles(kind: StringName) -> Dictionary:
 			return HotelSpec.HOTEL_STYLES
 		&"temple":
 			return TempleSpec.FORMS
+		&"village":
+			return _named(VillageSpec.CULTURES)
 	return {}
 
 
@@ -140,7 +165,20 @@ static func purposes(kind: StringName) -> Dictionary:
 			return ShopSpec.BUSINESSES
 		&"temple":
 			return TempleSpec.CULTS
+		&"village":
+			return _named(VillageSpec.PURPOSES)
 	return {}
+
+
+## A plain list of ids as an option table. The village's cultures and
+## purposes are lists rather than tables of labelled rows, so they are given
+## their labels here rather than the spec growing a table it has no other
+## use for.
+static func _named(ids: Array) -> Dictionary:
+	var out := {}
+	for id in ids:
+		out[id] = {"label": String(id).capitalize()}
+	return out
 
 
 ## The option-discovery contract, and the only shape a caller has to know:
@@ -237,8 +275,9 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 			var limits: Dictionary = KIND_ROWS[request.kind][field]
 			if value < float(limits["min"]) or value > float(limits["max"]):
 				out.append(_error(&"dimension_out_of_range", field,
-					"%s must be between %s and %s metres for a %s." % [
-						String(field), limits["min"], limits["max"], String(request.kind)]))
+					"%s must be between %s and %s for a %s." % [
+						_field_word(request.kind, field), limits["min"], limits["max"],
+						String(request.kind)]))
 	if not known:
 		return out
 	var row: Dictionary = KIND_ROWS[request.kind]

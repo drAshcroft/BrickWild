@@ -79,6 +79,8 @@ static func for_building(building) -> BuildingFamilyAdapter:
 		return of(&"castle")
 	if spec is TempleSpec:
 		return of(&"temple")
+	if spec is VillageSpec:
+		return of(&"village")
 	# a family whose spec is its own: the world kind, and whatever comes next
 	return of(building.request.kind) if building.request != null else null
 
@@ -93,6 +95,7 @@ static func of(kind: StringName) -> BuildingFamilyAdapter:
 			&"hotel": HotelFamily.new(),
 			&"temple": TempleFamily.new(),
 			&"world": WorldFamily.new(),
+			&"village": VillageFamily.new(),
 		}
 	return _registry.get(kind, null)
 
@@ -278,6 +281,56 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func build_mesh(building) -> ArrayMesh:
 		return WorldFamilies.build_mesh(building)
+
+
+# ------------------------------------------------------------ the villages
+
+## A village asked for like any building (VIL-019).
+##
+## Its inputs are not a width and a length, so the request's dimension fields
+## carry the two numbers a person actually chooses -- `width` is the
+## POPULATION and `length` is the WEALTH as a percentage. That is not a
+## liberty taken here: it is the mapping the Studio has used for the village
+## since it grew a village entry, and `BuildingLibrary` labels the sliders
+## accordingly so nobody has to guess.
+##
+## `style` is the culture and `purpose` is the purpose, exactly as they are
+## for every other family.
+class VillageFamily extends BuildingFamilyAdapter:
+	func generate(request: BuildingRequest, out) -> bool:
+		var spec := VillageSpec.new(request.seed)
+		spec.population = int(round(request.width))
+		spec.wealth = clampf(request.length / 100.0, 0.0, 1.0)
+		spec.culture = request.style
+		spec.purpose = request.purpose
+		if not spec.valid():
+			return false
+		spec.generate(request.seed)
+		var plan: VillagePlan = VillageLotPlanner.plan(spec)
+		if plan.roads.is_empty():
+			return false          # a form with no planner yet
+		out.spec = spec
+		out.village = plan
+		return true
+
+	func build_mesh(building) -> ArrayMesh:
+		return VillageBuilder.new().build(building.village)
+
+	func instantiate(building, cutaway: bool) -> Node3D:
+		return VillageAssembler.build(building.village, cutaway)
+
+	## The ground the village stands on.
+	func footprint(building) -> Rect2:
+		return building.village.site
+
+	## Where you arrive. Every family's front is its local -Z, so a village's
+	## is the middle of the -Z edge of its own site -- the point on that edge
+	## nearest the common, which is what a road coming in would aim at.
+	func door(building) -> Vector3:
+		var plan: VillagePlan = building.village
+		var site: Rect2 = plan.site
+		var x: float = VillageMeasure.common_centre(plan).x
+		return Vector3(clampf(x, site.position.x, site.end.x), 1.0, site.position.y)
 
 
 # ----------------------------------------------------------------- shared

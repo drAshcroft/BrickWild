@@ -38,6 +38,8 @@ var request: BuildingRequest
 var spec: RefCounted
 ## The plan families' own plan (house, shop, hotel); null for the rest.
 var plan: HousePlan
+## The village kind's own plan (VIL-019); null for the rest.
+var village: VillagePlan
 ## `BigGlade.placement()` for this building: bounds, footprint, front, door.
 var placement: Dictionary = {}
 ## Why this is not a building, when it is not. Same shape as
@@ -61,6 +63,8 @@ func name() -> String:
 ## rest. This is what a builder is handed, and the reason a document can be
 ## built from without losing anything.
 func payload() -> RefCounted:
+	if village != null:
+		return village
 	return plan if plan != null else spec
 
 

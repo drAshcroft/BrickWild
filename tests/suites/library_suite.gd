@@ -46,6 +46,7 @@ static func run() -> SuiteResult:
 
 	_check_contract(res, requests)
 	_check_documents(res, requests)
+	_check_village_kind(res)
 
 	var descriptor: Dictionary = BigGlade.describe_kind(&"house")
 	res.checked += 1
@@ -87,6 +88,65 @@ static func run() -> SuiteResult:
 				or plan.reachable_rooms(plan.entrance_room()).size() != plan.room_count():
 			res.fail("two-storey plan lacks complete upper-floor circulation")
 	return res
+
+
+## VIL-019: a village asked for like any other building.
+##
+## Its two numbers ride on `width` and `length` -- a population and a wealth,
+## not metres -- and the descriptor's `width_label`/`length_label` say so.
+## Everything else about it is the same contract every family keeps: it
+## generates, it builds a mesh, its placement puts its door on the -Z edge of
+## its own footprint, and it assembles to a scene.
+static func _check_village_kind(res: SuiteResult) -> void:
+	res.checked += 1
+	if not &"village" in BigGlade.kinds():
+		res.fail("village: the kind is not registered")
+		return
+	var d: Dictionary = BigGlade.describe_kind(&"village")
+	res.checked += 1
+	if d.get("width_label", "") != "Population" or d.get("style_label") != "Culture" 			or (d.get("styles", []) as Array).size() != VillageSpec.CULTURES.size() 			or (d.get("purposes", []) as Array).size() != VillageSpec.PURPOSES.size():
+		res.fail("village: the descriptor does not publish its own controls: %s" % d)
+	# a population out of range is refused in the village's own words
+	var small: BuildingRequest = BigGlade.default_request(&"village", 1)
+	small.width = 9.0
+	var refused: GeneratedBuilding = BigGlade.generate(small)
+	res.checked += 1
+	if refused.is_ok() or not str(refused.errors).contains("Population"):
+		res.fail("village: a population of 9 was not refused in its own words: %s"
+			% refused.errors)
+
+	var request: BuildingRequest = BigGlade.default_request(&"village", 9101)
+	request.style = &"english"
+	request.purpose = &"farming"
+	request.width = 40.0
+	var made: GeneratedBuilding = BigGlade.generate(request)
+	res.checked += 1
+	if not made.is_ok() or made.village == null or made.village.buildings.is_empty():
+		res.fail("village: the kind did not generate a village: %s" % made.errors)
+		return
+	res.checked += 1
+	if made.representation() != made.village:
+		res.fail("village: the generated representation is not its plan")
+	var mesh: ArrayMesh = BigGlade.build_mesh(made)
+	res.checked += 1
+	if mesh == null or mesh.get_surface_count() == 0:
+		res.fail("village: the kind emitted no mesh")
+	var pl: Dictionary = BigGlade.placement(made)
+	res.checked += 1
+	if pl.get("kind") != &"village" or pl.get("front") != Vector3(0.0, 0.0, -1.0):
+		res.fail("village: placement identity or orientation is wrong: %s" % pl)
+	var fp: Rect2 = pl.get("footprint", Rect2())
+	var door: Vector3 = pl.get("door", Vector3.ZERO)
+	res.checked += 1
+	if absf(door.z - fp.position.y) > 0.6:
+		res.fail("village: its gate is %.2fm off the -Z edge of its own site"
+			% (door.z - fp.position.y))
+	var scene: Node3D = BigGlade.instantiate(made)
+	res.checked += 1
+	if scene == null or scene.get_node_or_null("Buildings") == null:
+		res.fail("village: the kind assembled to nothing")
+	if scene != null:
+		scene.free()
 
 
 ## API-003, the middle stage: a document is the same building as the

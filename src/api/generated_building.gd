@@ -8,6 +8,11 @@ extends RefCounted
 var request: BuildingRequest
 var spec: RefCounted
 var plan: HousePlan
+## The village kind's own representation (VIL-019). A village is a plan of
+## BigGlade buildings on lots, so it needs its own field rather than the
+## house plan's -- and `representation()` hands back whichever a family
+## actually filled.
+var village: VillagePlan
 var errors: Array[Dictionary] = []
 var warnings: Array[Dictionary] = []
 
@@ -21,6 +26,8 @@ func is_ok() -> bool:
 
 
 func representation() -> RefCounted:
+	if village != null:
+		return village
 	if plan != null:
 		return plan
 	return spec
