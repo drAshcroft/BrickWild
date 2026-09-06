@@ -12,6 +12,11 @@ extends RefCounted
 ## QA log: one entry per primitive placed during build().
 ## {kind:String, pos:Vector3, size:Vector3, rot_y:float, facing:Vector3, tag:String}
 var part_log: Array = []
+## QA log: one entry per PROP the building is dressed with, in the form
+## PropCatalog.placement() returns. Empty on a family that emits no dressing.
+## Like the other two logs it records what the builder ACTUALLY placed, which
+## is what DressingCheck measures and what the assembler instantiates.
+var prop_log: Array[Dictionary] = []
 ## QA log: one entry per STRUCTURAL MASS -- the load-bearing volumes a person
 ## would name when describing the building. Unlike part_log this records the
 ## true world-space AABB of the volume as emitted.
@@ -29,6 +34,7 @@ var _tag := ""
 func begin(surface_count: int) -> void:
 	part_log.clear()
 	mass_log.clear()
+	prop_log.clear()
 	total_height = 0.0
 	_kit = MeshKit.new(surface_count)
 

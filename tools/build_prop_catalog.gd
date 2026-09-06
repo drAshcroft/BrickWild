@@ -1,5 +1,6 @@
 extends SceneTree
-## Measures every prop in assets/props/fantasy and writes assets/props/catalog.json.
+## Measures every prop in every pack under assets/props and writes
+## assets/props/catalog.json.
 ##
 ## The furnisher needs a footprint for each piece before it can place it, and
 ## guessing those numbers is how furniture ends up half inside a wall. So they
@@ -9,25 +10,30 @@ extends SceneTree
 ##
 ## Run: godot --headless --path . --script res://tools/build_prop_catalog.gd
 
-const PROP_DIR := "res://assets/props/fantasy"
 const OUT := "res://assets/props/catalog.json"
 
 
 func _init() -> void:
 	var rows := {}
-	var dir := DirAccess.open(PROP_DIR)
-	if dir == null:
-		printerr("no prop directory at %s" % PROP_DIR)
-		quit(1)
-		return
-	var names: Array[String] = []
-	for f in dir.get_files():
-		if f.ends_with(".gltf"):
-			names.append(f.get_basename())
-	names.sort()
+	# Which packs there are, what they are called on disk and what they ship as
+	# is PropCatalog.PACKS -- one table, so a pack cannot be measured from one
+	# folder and loaded from another.
+	var paths: Array[String] = []
+	for pack_name in PropCatalog.PACKS:
+		var row: Dictionary = PropCatalog.PACKS[pack_name]
+		var pack_dir: String = "res://assets/props/%s" % row["dir"]
+		var dir := DirAccess.open(pack_dir)
+		if dir == null:
+			printerr("no prop directory at %s" % pack_dir)
+			continue
+		var suffix: String = ".%s" % row["ext"]
+		for f in dir.get_files():
+			if f.ends_with(suffix):
+				paths.append("%s/%s" % [pack_dir, f])
+	paths.sort()
 
-	for prop_name in names:
-		var path: String = "%s/%s.gltf" % [PROP_DIR, prop_name]
+	for path in paths:
+		var prop_name: String = path.get_file().get_basename()
 		var packed: PackedScene = load(path)
 		if packed == null:
 			printerr("could not load %s" % path)
@@ -54,5 +60,6 @@ func _init() -> void:
 	var f := FileAccess.open(OUT, FileAccess.WRITE)
 	f.store_string(JSON.stringify(rows, "\t", true))
 	f.close()
-	print("measured %d props -> %s" % [rows.size(), OUT])
+	print("measured %d props from %d packs -> %s"
+		% [rows.size(), PropCatalog.PACKS.size(), OUT])
 	quit(0)

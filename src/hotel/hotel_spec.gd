@@ -27,13 +27,14 @@ var facade_bays: int = 15
 var centre_fraction: float = 0.34
 var roof_rise: float = 5.4
 var ornament: float = 0.95
-var dormer_count: int = 9
 var balconies: int = 3
 var cupolas: bool = true
 
 
 func _init(p_seed := 0) -> void:
 	super(p_seed)
+	# dormer_count is HouseSpec's now; a hotel simply has more of them
+	dormer_count = 9
 	style = &"grand_budapest"
 	trade = &"none"
 	storeys = 3

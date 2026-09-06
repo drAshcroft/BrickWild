@@ -35,6 +35,28 @@ static func generate(spec: HouseSpec, p_seed: int) -> HousePlan:
 	spec.frame_rail = spec.timber_frame and _chance(r, s["rail"])
 	spec.clutter = r.randf_range(float(s["clutter"][0]), float(s["clutter"][1]))
 
+	# exterior architectural variety
+	var plinth_range: Array = s.get("plinth", [0.35, 0.55])
+	spec.plinth_height = r.randf_range(float(plinth_range[0]), float(plinth_range[1]))
+	spec.stone_ground_floor = spec.storeys > 1 and _chance(r, float(s.get("stone_ground", 0.15)))
+	spec.jetty = spec.storeys > 1 and _chance(r, float(s.get("jetty", 0.5)))
+	spec.jetty_depth = r.randf_range(0.24, 0.32)
+	var roof_types: Array = s.get("roof_types", [&"gable", &"half_hipped"])
+	spec.roof_type = _pick(r, roof_types)
+	spec.dormers = (spec.storeys > 1 or spec.length >= 12.0) and _chance(r, float(s.get("dormers", 0.4)))
+	spec.dormer_count = clampi(int(spec.length / 5.0), 1, 3) if spec.dormers else 0
+	var framing_patterns: Array = s.get("framing", [&"square_panel", &"arch_brace"])
+	spec.framing_pattern = _pick(r, framing_patterns)
+	var trusses: Array = s.get("truss", [&"king_post", &"queen_post"])
+	spec.gable_truss = _pick(r, trusses)
+	spec.bargeboards = _chance(r, float(s.get("bargeboards", 0.85)))
+	spec.window_mullions = true
+	spec.window_hoods = _chance(r, 0.6)
+	spec.chimney_style = s.get("chimney_style", &"stepped")
+	var pots_range: Array = s.get("pots", [1, 2])
+	spec.chimney_pots = r.randi_range(int(pots_range[0]), int(pots_range[1]))
+	spec.exterior_props = true
+
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y
 	spec.room_count = HouseSpec.rooms_for(area)

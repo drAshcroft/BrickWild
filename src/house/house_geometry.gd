@@ -61,6 +61,16 @@ const RAIL_H := 0.15          # the mid rail
 const STUD_CLEAR := 0.1       # air kept between a stud and an opening
 const BRACE_RUN := 1.15       # how far a corner brace reaches along the wall
 
+# ---- exterior details ----
+const PLINTH_EXTRA := 0.04    # how far the masonry plinth stands proud of the wall
+const MULLION_W := 0.08       # width of window timber mullion
+const MULLION_D := 0.12       # depth of window timber mullion
+const HOOD_PROJECTION := 0.12 # dripstone hood moulding projection
+const BARGEBOARD_W := 0.16    # verge board width along gable slope
+const CHIMNEY_BASE_EXTRA := 0.35 # stepped chimney base extra thickness
+const CHIMNEY_POT_R := 0.13   # terracotta flue pot radius
+const CHIMNEY_POT_H := 0.55   # flue pot height
+
 # ---- furnishing ----
 const WALL_GAP := 0.06        # how close a wall-hugging piece sits to the wall
 const FURNITURE_DENSITY_MAX := 0.42   # of a room's floor, before it reads as a junk shop

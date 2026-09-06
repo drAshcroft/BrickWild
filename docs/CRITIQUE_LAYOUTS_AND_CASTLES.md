@@ -249,6 +249,13 @@ Shorter items, each visible in the renders:
   village: stables, kitchen, smithy, well, granary. These are *houses*, and
   section 3 says how to put them there.
 
+  *Partly done.* `CastleFurnisher` now deals a working yard round the inside
+  of the curtain -- a cart, an anvil and its fire, a training dummy, a weapon
+  stand, barrels, crates, sacks and rope -- and dresses the hall, chapel and
+  keep with props. That is the smithy as a **prop group**, not as a building
+  with an inside; the ask above, bailey buildings as `HousePlan`s, still
+  stands.
+
 ## 3. Fantasy buildings with interiors
 
 ### 3.1 The pattern that already works
@@ -327,6 +334,10 @@ Needing a representation upgrade first:
    `OmniLight3D`. `TempleAssembler` already does it; lift it into the shared
    assembler. Until then every interior render with the roof on is black,
    which hides most of the feng shui work from the person judging it.
+
+   *Done.* `LightKit` does it for the houses, shops and hotel, and
+   `ShellAssembler` does it for the churches and castles: a light per flame,
+   at the prop's measured `light_offset`, from the one per-category table.
 
 ## 4. Suggested order
 

@@ -32,8 +32,10 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	total_height = spec.height
 
 	_build_floor()
+	_build_plinth()
 	_build_exterior_walls()
 	_build_partitions()
+	_build_jetty()
 	_build_timber_frame()
 	if with_roof:
 		_build_roof()
@@ -152,6 +154,41 @@ func _emit_stairs() -> void:
 				AABB(step_center - step_size / 2.0, step_size), from_level * spec.height)
 
 
+# ------------------------------------------------------------------ plinth
+
+func _build_plinth() -> void:
+	tag("plinth")
+	var plinth_h: float = minf(spec.plinth_height, HouseGeometry.WINDOW_SILL - 0.18)
+	if plinth_h <= 0.05 or (spec.stone_ground_floor and _storeys() > 1):
+		return
+	var thick: float = HouseGeometry.WALL_T + HouseGeometry.PLINTH_EXTRA * 2.0
+	for run in HouseGeometry.exterior_runs(spec):
+		var from: Vector2 = run["from"]
+		var to: Vector2 = run["to"]
+		var normal: Vector2 = run["normal"]
+		var openings: Array[Dictionary] = []
+		# Leave gaps for exterior doors on level 0
+		for d in plan.doors:
+			if _opening_storey(d) != 0 and _has_storey_metadata(d):
+				continue
+			if not d["exterior"]:
+				continue
+			if not _on_run(from, to, normal, d["pos"], d["normal"]):
+				continue
+			openings.append({"t": _along(from, to, d["pos"]), "w": float(d["width"]) + 0.12,
+				"bottom": 0.0, "top": plinth_h + 0.05, "kind": "door", "normal": normal})
+		_wall_run(from, to, thick, plinth_h, openings, SURF_FLOOR, 0.0)
+		# Chamfered stone water-table moulding at the top of the plinth
+		var seg: Vector2 = to - from
+		var run_len: float = seg.length()
+		if run_len > 0.1:
+			var dir: Vector2 = seg / run_len
+			var yaw: float = atan2(-dir.y, dir.x)
+			var pmid: Vector2 = (from + to) / 2.0 + normal * (HouseGeometry.PLINTH_EXTRA * 0.5)
+			var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(pmid.x, plinth_h, pmid.y))
+			_kit.oriented_box(Vector3(run_len + HouseGeometry.PLINTH_EXTRA * 2.0, 0.06, thick + 0.04), xf, SURF_FLOOR)
+
+
 # ------------------------------------------------------------------ walls
 
 func _build_exterior_walls() -> void:
@@ -159,16 +196,53 @@ func _build_exterior_walls() -> void:
 	var h: float = spec.height
 	for level in _levels():
 		var y0 := float(level) * h
+		var surf: int = SURF_FLOOR if (spec.stone_ground_floor and level == 0) else SURF_WALL
 		for run in HouseGeometry.exterior_runs(spec):
 			var from: Vector2 = run["from"]
 			var to: Vector2 = run["to"]
 			var normal: Vector2 = run["normal"]
 			var openings: Array[Dictionary] = _openings_on(from, to, normal, level)
-			_wall_run(from, to, HouseGeometry.WALL_T, h, openings, SURF_WALL, y0)
+			_wall_run(from, to, HouseGeometry.WALL_T, h, openings, surf, y0)
 			var a: AABB = _run_aabb(from, to, HouseGeometry.WALL_T, h, y0)
 			var suffix := "" if _levels().size() == 1 else "_%d" % level
 			_log_mass("wall_%s%s" % [String(run["side"]), suffix], a, y0)
 	total_height = maxf(total_height, h * _storeys())
+
+
+# ------------------------------------------------------------------ jetty
+
+func _build_jetty() -> void:
+	if not spec.jetty or _storeys() <= 1:
+		return
+	tag("jetty")
+	var r: Rect2 = HouseGeometry.site_rect(spec)
+	var j_depth: float = spec.jetty_depth
+	var bressummer_y: float = spec.height
+	var beam_h := 0.22
+	var beam_w := 0.20
+
+	# 1. Bressummer beam running along the front wall at y = spec.height
+	var bw_len: float = r.size.x + 0.35
+	box(Vector3(bw_len, beam_h, beam_w),
+		Vector3(0.0, bressummer_y - beam_h / 2.0, r.position.y - j_depth / 2.0), SURF_TRIM)
+
+	# 2. Exposed floor joist ends projecting under the bressummer
+	var joist_spacing := 0.65
+	var joist_count := maxi(int(r.size.x / joist_spacing), 3)
+	for i in range(joist_count + 1):
+		var jx: float = r.position.x + float(i) * (r.size.x / float(joist_count))
+		box(Vector3(0.12, 0.14, j_depth + 0.10),
+			Vector3(jx, bressummer_y - beam_h - 0.07, r.position.y - j_depth / 2.0), SURF_TRIM)
+
+	# 3. Carved knee brackets / corner corbels supporting the bressummer
+	for px in [r.position.x + 0.35, r.end.x - 0.35]:
+		var bracket_span: float = minf(j_depth * 1.2, 0.35)
+		var bracket_lift: float = bracket_span * 1.4
+		var span_len: float = sqrt(bracket_span * bracket_span + bracket_lift * bracket_lift)
+		var tilt: float = atan2(bracket_lift, bracket_span)
+		var xf := Transform3D(Basis(), Vector3(px, bressummer_y - beam_h - bracket_lift / 2.0, r.position.y - j_depth / 2.0))
+		xf = xf * Transform3D(Basis(Vector3(1, 0, 0), -tilt), Vector3.ZERO)
+		_kit.oriented_box(Vector3(0.15, span_len, 0.12), xf, SURF_TRIM)
 
 
 func _build_partitions() -> void:
@@ -319,13 +393,45 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 		var sill_xf := Transform3D(Basis(Vector3.UP, yaw),
 			Vector3(mid.x, y_offset + bottom - jamb / 2.0, mid.y))
 		_kit.oriented_box(Vector3(w + jamb * 2.0, jamb, thick + 0.12), sill_xf, SURF_TRIM)
-		if spec.window_shutters and op["kind"] == "window":
-			for side2 in [-1.0, 1.0]:
-				var sp: Vector2 = from + dir * (t + side2 * (w * 0.75)) \
-					+ normal * (thick / 2.0 + 0.03)
-				var sxf := Transform3D(Basis(Vector3.UP, yaw),
-					Vector3(sp.x, y_offset + (bottom + top) / 2.0, sp.y))
-				_kit.oriented_box(Vector3(w * 0.45, top - bottom, 0.05), sxf, SURF_TRIM)
+		if op["kind"] == "window":
+			# Inset dark lattice glazing panel
+			var pane_xf := Transform3D(Basis(Vector3.UP, yaw),
+				Vector3(mid.x, y_offset + (bottom + top) / 2.0, mid.y))
+			_kit.oriented_box(Vector3(w, top - bottom, 0.04), pane_xf, SURF_ROOF)
+
+			# Vertical timber mullions for wide windows (2-light / 3-light)
+			if spec.window_mullions and w >= 0.8:
+				if w >= 1.35:
+					for mside in [-1.0, 1.0]:
+						var mp: Vector2 = from + dir * (t + mside * (w / 3.0))
+						var mxf := Transform3D(Basis(Vector3.UP, yaw),
+							Vector3(mp.x, y_offset + (bottom + top) / 2.0, mp.y))
+						_kit.oriented_box(Vector3(HouseGeometry.MULLION_W, top - bottom, thick + 0.06), mxf, SURF_TRIM)
+				else:
+					var mxf := Transform3D(Basis(Vector3.UP, yaw),
+						Vector3(mid.x, y_offset + (bottom + top) / 2.0, mid.y))
+					_kit.oriented_box(Vector3(HouseGeometry.MULLION_W, top - bottom, thick + 0.06), mxf, SURF_TRIM)
+
+			# Dripstone hood moulding over window head
+			if spec.window_hoods:
+				var hood_xf := Transform3D(Basis(Vector3.UP, yaw),
+					Vector3(mid.x, y_offset + top + jamb + 0.05, mid.y))
+				_kit.oriented_box(Vector3(w + jamb * 2.4, 0.07, thick + HouseGeometry.HOOD_PROJECTION * 2.0),
+					hood_xf, SURF_TRIM)
+
+			# Board-and-batten shutters with strap hinges
+			if spec.window_shutters:
+				for side2 in [-1.0, 1.0]:
+					var sp: Vector2 = from + dir * (t + side2 * (w * 0.75)) \
+						+ normal * (thick / 2.0 + 0.03)
+					var sxf := Transform3D(Basis(Vector3.UP, yaw),
+						Vector3(sp.x, y_offset + (bottom + top) / 2.0, sp.y))
+					_kit.oriented_box(Vector3(w * 0.45, top - bottom, 0.05), sxf, SURF_TRIM)
+					# Horizontal strap hinges
+					for hy in [0.25, 0.75]:
+						var hxf := Transform3D(Basis(Vector3.UP, yaw),
+							Vector3(sp.x, y_offset + bottom + (top - bottom) * hy, sp.y + normal.y * 0.01))
+						_kit.oriented_box(Vector3(w * 0.40, 0.04, 0.07), hxf, SURF_TRIM)
 
 
 ## Is an opening on this wall run: same line, and between its ends?
@@ -410,9 +516,15 @@ func _build_timber_frame() -> void:
 func _build_timber_frame_level(level := 0) -> void:
 	if not spec.timber_frame:
 		return
+	if spec.stone_ground_floor and level == 0:
+		_build_stone_quoins(level)
+		return
 	tag("timber")
 	var h: float = spec.height
 	var y0 := float(level) * h
+	var plinth_offset := (minf(spec.plinth_height, HouseGeometry.WINDOW_SILL - 0.18) if (level == 0 and not spec.stone_ground_floor and spec.plinth_height > 0.05) else 0.0)
+	var y_sill := plinth_offset
+
 	for run in HouseGeometry.exterior_runs(spec):
 		var from: Vector2 = run["from"]
 		var to: Vector2 = run["to"]
@@ -427,7 +539,7 @@ func _build_timber_frame_level(level := 0) -> void:
 
 		# sill and wall plate, the full length of the wall
 		_beam(from, dir, yaw, normal, length / 2.0, length,
-			0.0, HouseGeometry.SILL_BEAM_H, 0.0, y0)
+			y_sill, y_sill + HouseGeometry.SILL_BEAM_H, 0.0, y0)
 		_beam(from, dir, yaw, normal, length / 2.0, length,
 			h - HouseGeometry.PLATE_H, h, 0.0, y0)
 		if spec.frame_rail:
@@ -438,7 +550,7 @@ func _build_timber_frame_level(level := 0) -> void:
 		# corner posts, then studs between them
 		var post: float = HouseGeometry.POST_W
 		for t in [post / 2.0, length - post / 2.0]:
-			_beam(from, dir, yaw, normal, t, post, 0.0, h, post * 0.55, y0)
+			_beam(from, dir, yaw, normal, t, post, y_sill, h, post * 0.55, y0)
 		var pitch: float = spec.stud_pitch
 		var bays: int = maxi(int((length - post * 2.0) / pitch), 1)
 		for i in range(1, bays):
@@ -446,10 +558,82 @@ func _build_timber_frame_level(level := 0) -> void:
 			if _blocked_by_opening(openings, t2, HouseGeometry.BEAM_W):
 				continue
 			_beam(from, dir, yaw, normal, t2, HouseGeometry.BEAM_W,
-				HouseGeometry.SILL_BEAM_H, h - HouseGeometry.PLATE_H, 0.0, y0)
+				y_sill + HouseGeometry.SILL_BEAM_H, h - HouseGeometry.PLATE_H, 0.0, y0)
 
-		if spec.frame_braces:
-			_corner_braces(from, dir, yaw, normal, length, h, openings, y0)
+		# Bracing patterns
+		match spec.framing_pattern:
+			&"saltire":
+				_saltire_braces(from, dir, yaw, normal, length, h, openings, y0, y_sill)
+			&"arch_brace":
+				_arch_braces(from, dir, yaw, normal, length, h, openings, y0, y_sill)
+			_:
+				if spec.frame_braces:
+					_corner_braces(from, dir, yaw, normal, length, h, openings, y0)
+
+
+func _build_stone_quoins(level: int) -> void:
+	tag("quoins")
+	var h: float = spec.height
+	var y0 := float(level) * h
+	var r: Rect2 = HouseGeometry.site_rect(spec)
+	var corners := [
+		Vector2(r.position.x, r.position.y),
+		Vector2(r.end.x, r.position.y),
+		Vector2(r.position.x, r.end.y),
+		Vector2(r.end.x, r.end.y),
+	]
+	var quoin_h := 0.38
+	var courses := int(h / quoin_h)
+	for c in corners:
+		for i in range(courses):
+			var qw := 0.42 if (i % 2 == 0) else 0.56
+			var qd := 0.56 if (i % 2 == 0) else 0.42
+			box(Vector3(qw, quoin_h - 0.04, qd),
+				Vector3(c.x, y0 + float(i) * quoin_h + quoin_h / 2.0, c.y), SURF_FLOOR)
+
+
+func _saltire_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
+		length: float, h: float, openings: Array[Dictionary], y_offset: float, y_sill: float) -> void:
+	var post: float = HouseGeometry.POST_W
+	var pitch: float = spec.stud_pitch
+	var bays: int = maxi(int((length - post * 2.0) / pitch), 1)
+	var bay_w: float = (length - post * 2.0) / float(bays)
+	var bottom: float = y_sill + HouseGeometry.SILL_BEAM_H
+	var top: float = h - HouseGeometry.PLATE_H
+	var bay_h: float = top - bottom
+	var brace_len: float = sqrt(bay_w * bay_w + bay_h * bay_h)
+	var tilt: float = atan2(bay_h, bay_w)
+
+	for i in range(bays):
+		var t_center: float = post + float(i + 0.5) * bay_w
+		if _blocked_by_opening(openings, t_center, bay_w * 0.75):
+			continue
+		for sign in [1.0, -1.0]:
+			var p: Vector2 = from + dir * t_center + normal * _proud(HouseGeometry.BEAM_D)
+			var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, y_offset + (bottom + top) / 2.0, p.y))
+			xf = xf * Transform3D(Basis(Vector3(0, 0, 1), tilt * sign), Vector3.ZERO)
+			_kit.oriented_box(Vector3(brace_len * 0.95, HouseGeometry.BEAM_W * 0.72,
+				HouseGeometry.BEAM_D * 0.88), xf, SURF_TRIM)
+
+
+func _arch_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
+		length: float, h: float, openings: Array[Dictionary], y_offset: float, y_sill: float) -> void:
+	var run: float = minf(HouseGeometry.BRACE_RUN * 1.1, length * 0.28)
+	var rise: float = run * 1.2
+	if rise > h - HouseGeometry.PLATE_H - y_sill:
+		return
+	for side in [1.0, -1.0]:
+		var foot: float = HouseGeometry.POST_W + run if side > 0.0 else length - HouseGeometry.POST_W - run
+		if _blocked_by_opening(openings, foot, run):
+			continue
+		var mid_t: float = foot - side * run / 2.0
+		var mid_y: float = h - HouseGeometry.PLATE_H - rise / 2.0
+		var span: float = sqrt(run * run + rise * rise)
+		var tilt: float = atan2(rise, run) * side
+		var p: Vector2 = from + dir * mid_t + normal * _proud(HouseGeometry.BEAM_D)
+		var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, y_offset + mid_y, p.y))
+		xf = xf * Transform3D(Basis(Vector3(0, 0, 1), tilt), Vector3.ZERO)
+		_kit.oriented_box(Vector3(span, HouseGeometry.BEAM_W * 0.9, HouseGeometry.BEAM_D), xf, SURF_TRIM)
 
 
 ## A horizontal beam broken by the openings it runs into: it passes over a
@@ -539,7 +723,22 @@ func _build_roof() -> void:
 	var along: float = r.size.x if along_x else r.size.y
 	var wall_top := spec.height * _storeys()
 	var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(0.0, wall_top, 0.0))
-	_kit.ridge_roof(xf, span + 0.7, along + 0.5, rise, SURF_ROOF, SURF_WALL, span, along)
+
+	if spec.roof_type == &"hipped":
+		_kit.hip_roof_at(xf, span + 0.7, along + 0.5, rise, SURF_ROOF)
+	elif spec.roof_type == &"half_hipped":
+		_kit.ridge_roof(xf, span + 0.7, along + 0.5, rise, SURF_ROOF, SURF_WALL, span, along)
+		var hip_span := span * 0.55
+		var hip_rise := rise * 0.35
+		var hip_slope := sqrt(hip_rise * hip_rise + (span * 0.28) * (span * 0.28))
+		var hip_ang := atan2(hip_rise, span * 0.28)
+		for end_v in [-1.0, 1.0]:
+			var ht := xf * Transform3D(Basis(Vector3(1, 0, 0), end_v * hip_ang),
+				Vector3(0.0, rise * 0.82, end_v * (along / 2.0 - 0.05)))
+			_kit.oriented_box(Vector3(hip_span, 0.24, hip_slope), ht, SURF_ROOF)
+	else:
+		_kit.ridge_roof(xf, span + 0.7, along + 0.5, rise, SURF_ROOF, SURF_WALL, span, along)
+
 	var overhang_x := 0.25 if along_x else 0.35
 	var overhang_z := 0.35 if along_x else 0.25
 	_log_mass("roof" if _storeys() == 1 else "roof_%d" % (_storeys() - 1),
@@ -547,31 +746,139 @@ func _build_roof() -> void:
 			Vector3(r.size.x + overhang_x * 2.0, rise + 0.25,
 				r.size.y + overhang_z * 2.0)))
 	total_height = maxf(total_height, wall_top + rise)
-	if spec.timber_frame:
+
+	if spec.timber_frame and spec.roof_type != &"hipped":
 		_gable_frame(xf, span, along, rise)
+	if spec.roof_type != &"hipped":
+		_build_bargeboards(xf, span, along, rise)
+	_build_eaves_tails(xf, span, along, rise)
+	if spec.dormers:
+		_build_dormers(xf, span, along, rise)
 
 
-## The frame in the gable end: a king post up to the ridge with a strut either
-## side of it. A blank plastered triangle over a framed wall is the one thing
-## that gives away a frame drawn rather than built.
+func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float) -> void:
+	if not spec.bargeboards:
+		return
+	tag("bargeboards")
+	var half := span / 2.0
+	var slope_len := sqrt(half * half + rise * rise) + 0.35
+	var ang := atan2(rise, half)
+	var bb_w: float = HouseGeometry.BARGEBOARD_W
+	var bb_thick := 0.05
+	for end_v in [-1.0, 1.0]:
+		var z: float = float(end_v) * (along / 2.0 + 0.28)
+		for side in [-1.0, 1.0]:
+			var bx: float = float(side) * half / 2.0
+			var by: float = rise / 2.0
+			var t := xf * Transform3D(Basis(Vector3(0, 0, 1), -float(side) * ang), Vector3(bx, by, z))
+			_kit.oriented_box(Vector3(slope_len, bb_w, bb_thick), t, SURF_TRIM)
+		# Carved apex finial at the ridge
+		_kit.oriented_box(Vector3(0.12, 0.55, 0.12),
+			xf * Transform3D(Basis(), Vector3(0.0, rise + 0.22, z)), SURF_TRIM)
+		# Drop pendants at the eaves
+		for side in [-1.0, 1.0]:
+			_kit.oriented_box(Vector3(0.09, 0.24, 0.09),
+				xf * Transform3D(Basis(), Vector3(float(side) * (half + 0.15), -0.05, z)), SURF_TRIM)
+
+
+func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float) -> void:
+	tag("eaves")
+	var half := span / 2.0
+	var tail_spacing := 0.75
+	var count := maxi(int(along / tail_spacing), 3)
+	for side in [-1.0, 1.0]:
+		var ex: float = float(side) * (half + 0.15)
+		for i in range(count + 1):
+			var ez: float = -along / 2.0 + float(i) * (along / float(count))
+			_kit.oriented_box(Vector3(0.12, 0.09, 0.22),
+				xf * Transform3D(Basis(), Vector3(ex, -0.05, ez)), SURF_TRIM)
+
+
+func _build_dormers(xf: Transform3D, span: float, along: float, rise: float) -> void:
+	if not spec.dormers or spec.dormer_count <= 0:
+		return
+	tag("dormer")
+	var count: int = spec.dormer_count
+	var half := span / 2.0
+	var dw := 0.95
+	var dh := 1.15
+	var dd := 1.25
+	var d_rise := 0.45
+	var dormer_x: float = -half * 0.52
+	var dormer_y: float = rise * 0.40
+
+	var spacing: float = (along * 0.65) / float(count + 1)
+	for i in range(count):
+		var dz: float = -along * 0.32 + float(i + 1) * spacing
+		var dormer_center := Vector3(dormer_x, dormer_y, dz)
+		# Cheek walls (sides)
+		for side in [-1.0, 1.0]:
+			_kit.oriented_box(Vector3(dd, dh, 0.08),
+				xf * Transform3D(Basis(), dormer_center + Vector3(0.0, dh / 2.0, side * dw / 2.0)), SURF_WALL)
+		# Front face with window trim
+		_kit.oriented_box(Vector3(0.08, dh, dw),
+			xf * Transform3D(Basis(), dormer_center + Vector3(-dd / 2.0, dh / 2.0, 0.0)), SURF_TRIM)
+		# Inset glazed window pane
+		_kit.oriented_box(Vector3(0.04, dh * 0.68, dw * 0.65),
+			xf * Transform3D(Basis(), dormer_center + Vector3(-dd / 2.0 - 0.01, dh * 0.52, 0.0)), SURF_ROOF)
+		# Miniature gabled rooflet
+		var r_xf: Transform3D = xf * Transform3D(Basis(Vector3.UP, PI / 2.0), dormer_center + Vector3(0.0, dh, 0.0))
+		_kit.ridge_roof(r_xf, dw + 0.25, dd + 0.25, d_rise, SURF_ROOF, SURF_WALL, dw, dd)
+
+
 func _gable_frame(xf: Transform3D, span: float, along: float, rise: float) -> void:
 	var half: float = span / 2.0
 	for end_v in [-1.0, 1.0]:
 		var z: float = end_v * (along / 2.0 + HouseGeometry.BEAM_D / 2.0 - 0.01)
-		# king post
-		_kit.oriented_box(Vector3(HouseGeometry.BEAM_W, rise * 0.94,
-			HouseGeometry.BEAM_D),
-			xf * Transform3D(Basis(), Vector3(0.0, rise * 0.47, z)), SURF_TRIM)
-		# a strut either side, following the pitch of the roof above it
-		for side in [-1.0, 1.0]:
-			var run: float = half * 0.55
-			var lift: float = rise * 0.5
-			var length: float = sqrt(run * run + lift * lift)
-			var tilt: float = -atan2(lift, run) * side
-			var t := xf * Transform3D(Basis(Vector3(0, 0, 1), tilt),
-				Vector3(side * run / 2.0, lift / 2.0, z))
-			_kit.oriented_box(Vector3(length, HouseGeometry.BEAM_W * 0.85,
-				HouseGeometry.BEAM_D), t, SURF_TRIM)
+		# Tie beam across the base of the gable
+		_kit.oriented_box(Vector3(span, HouseGeometry.PLATE_H, HouseGeometry.BEAM_D),
+			xf * Transform3D(Basis(), Vector3(0.0, HouseGeometry.PLATE_H / 2.0, z)), SURF_TRIM)
+
+		match spec.gable_truss:
+			&"queen_post":
+				var qx: float = half * 0.42
+				var collar_h: float = rise * 0.52
+				for qside in [-1.0, 1.0]:
+					_kit.oriented_box(Vector3(HouseGeometry.BEAM_W, collar_h, HouseGeometry.BEAM_D),
+						xf * Transform3D(Basis(), Vector3(qside * qx, collar_h / 2.0, z)), SURF_TRIM)
+				_kit.oriented_box(Vector3(qx * 2.2, HouseGeometry.BEAM_W * 0.9, HouseGeometry.BEAM_D),
+					xf * Transform3D(Basis(), Vector3(0.0, collar_h, z)), SURF_TRIM)
+				for qside in [-1.0, 1.0]:
+					var srun: float = half * 0.45
+					var slift: float = rise * 0.38
+					var slen: float = sqrt(srun * srun + slift * slift)
+					var stilt: float = -atan2(slift, srun) * qside
+					var st := xf * Transform3D(Basis(Vector3(0, 0, 1), stilt),
+						Vector3(qside * (qx + srun / 2.0), collar_h + slift / 2.0, z))
+					_kit.oriented_box(Vector3(slen, HouseGeometry.BEAM_W * 0.8, HouseGeometry.BEAM_D), st, SURF_TRIM)
+			&"collar_strut":
+				var collar_h: float = rise * 0.45
+				var cspan: float = span * 0.55
+				_kit.oriented_box(Vector3(cspan, HouseGeometry.BEAM_W * 0.9, HouseGeometry.BEAM_D),
+					xf * Transform3D(Basis(), Vector3(0.0, collar_h, z)), SURF_TRIM)
+				_kit.oriented_box(Vector3(HouseGeometry.BEAM_W, rise - collar_h, HouseGeometry.BEAM_D),
+					xf * Transform3D(Basis(), Vector3(0.0, collar_h + (rise - collar_h) / 2.0, z)), SURF_TRIM)
+				for side in [-1.0, 1.0]:
+					var srun: float = half * 0.35
+					var slift: float = collar_h * 0.9
+					var slen: float = sqrt(srun * srun + slift * slift)
+					var stilt: float = -atan2(slift, srun) * side
+					var st := xf * Transform3D(Basis(Vector3(0, 0, 1), stilt),
+						Vector3(side * srun / 2.0, collar_h / 2.0, z))
+					_kit.oriented_box(Vector3(slen, HouseGeometry.BEAM_W * 0.8, HouseGeometry.BEAM_D), st, SURF_TRIM)
+			_: # &"king_post"
+				_kit.oriented_box(Vector3(HouseGeometry.BEAM_W, rise * 0.94,
+					HouseGeometry.BEAM_D),
+					xf * Transform3D(Basis(), Vector3(0.0, rise * 0.47, z)), SURF_TRIM)
+				for side in [-1.0, 1.0]:
+					var run: float = half * 0.55
+					var lift: float = rise * 0.5
+					var length: float = sqrt(run * run + lift * lift)
+					var tilt: float = -atan2(lift, run) * side
+					var t := xf * Transform3D(Basis(Vector3(0, 0, 1), tilt),
+						Vector3(side * run / 2.0, lift / 2.0, z))
+					_kit.oriented_box(Vector3(length, HouseGeometry.BEAM_W * 0.85,
+						HouseGeometry.BEAM_D), t, SURF_TRIM)
 
 
 func _build_porch() -> void:
@@ -586,8 +893,6 @@ func _build_porch() -> void:
 	var w: float = float(door["width"]) + 1.1
 	var c: Vector2 = door["pos"] + door["normal"] * (depth / 2.0)
 	var head: float = HouseGeometry.DOOR_H + 0.35
-	# a step for the porch to stand on: without it the posts are two sticks in
-	# the garden, which is exactly what the no-gaps check called them
 	var step := AABB(Vector3(c.x - w / 2.0, 0.0, c.y - depth / 2.0 - 0.1),
 		Vector3(w, HouseGeometry.FLOOR_T, depth + 0.2 + HouseGeometry.WALL_T))
 	box(step.size, step.position + step.size / 2.0, SURF_FLOOR)
@@ -609,13 +914,8 @@ func _build_chimney() -> void:
 	var s: float = HouseGeometry.chimney_size(spec)
 	var r: Rect2 = HouseGeometry.site_rect(spec)
 	var c := Vector2(r.end.x + s / 2.0 - 0.15, 0.0)
-	# The planner owns the hearth: the stack rises on the wall it named, so the
-	# fire below is always at the foot of this flue. Nothing here chooses.
 	var host: int = plan.hearth_room()
 	if host >= 0:
-		# along the wall, the stack stands where the fire does: over the
-		# focus once the furnisher has written the hearth back to it, else
-		# over the middle of the clear run the planner chose the wall for
 		var span: Vector2 = HousePlanner.clear_wall_span(plan, host, plan.hearth_wall())
 		var along: float = (span.x + span.y) / 2.0
 		if plan.focus_room() == host and plan.focus_cat() == "hearth" \
@@ -630,18 +930,42 @@ func _build_chimney() -> void:
 				c = Vector2(r.position.x - s / 2.0 + 0.15, along)
 			_:
 				c = Vector2(r.end.x + s / 2.0 - 0.15, along)
-	# A stack clears the roof beside it, not the ridge at the far end of the
-	# house. On a steeply pitched hut the ridge is six metres up, and a chimney
-	# built to that reads as a factory.
+
 	var wall_top: float = spec.height * _storeys()
 	var top: float = wall_top + minf(HouseGeometry.roof_rise(spec), 2.0) + 0.9
-	# stone rather than plaster: a chimney is the one part of a timber-framed
-	# house that is neither, and the floor colour is the nearest thing this
-	# palette has to masonry
-	box(Vector3(s, top, s), Vector3(c.x, top / 2.0, c.y), SURF_FLOOR)
+
+	# Stepped chimney stack
+	var base_h: float = minf(top * 0.45, 2.5)
+	if spec.chimney_style == &"stepped":
+		var base_s: float = s + HouseGeometry.CHIMNEY_BASE_EXTRA
+		box(Vector3(base_s, base_h, base_s), Vector3(c.x, base_h / 2.0, c.y), SURF_FLOOR)
+		var sh_h := 0.25
+		box(Vector3(base_s - 0.08, sh_h, base_s - 0.08), Vector3(c.x, base_h + sh_h / 2.0, c.y), SURF_FLOOR)
+		var flue_h: float = top - (base_h + sh_h)
+		if flue_h > 0.05:
+			box(Vector3(s, flue_h, s), Vector3(c.x, base_h + sh_h + flue_h / 2.0, c.y), SURF_FLOOR)
+	else:
+		box(Vector3(s, top, s), Vector3(c.x, top / 2.0, c.y), SURF_FLOOR)
+
 	_log_mass("chimney", AABB(Vector3(c.x - s / 2.0, 0.0, c.y - s / 2.0),
 		Vector3(s, top, s)))
-	box(Vector3(s + 0.2, 0.16, s + 0.2), Vector3(c.x, top + 0.08, c.y), SURF_TRIM)
-	total_height = maxf(total_height, top + 0.16)
+	box(Vector3(s + 0.22, 0.18, s + 0.22), Vector3(c.x, top + 0.09, c.y), SURF_TRIM)
+	total_height = maxf(total_height, top + 0.18)
+
+	# Flue pots at the top
+	var pot_r: float = HouseGeometry.CHIMNEY_POT_R
+	var pot_h: float = HouseGeometry.CHIMNEY_POT_H
+	var pots: int = clampi(spec.chimney_pots, 1, 2)
+	if pots == 1:
+		_kit.drum(Vector3(c.x, top + 0.18, c.y), pot_r, pot_r, pot_h, SURF_FLOOR, 10)
+		_kit.drum(Vector3(c.x, top + 0.18 + pot_h - 0.06, c.y), pot_r * 1.15, pot_r * 1.15, 0.06, SURF_TRIM, 10)
+	else:
+		var off: float = s * 0.22
+		for pside in [-1.0, 1.0]:
+			var px: float = c.x + (off * pside if plan.hearth_wall() <= 1 else 0.0)
+			var pz: float = c.y + (off * pside if plan.hearth_wall() > 1 else 0.0)
+			_kit.drum(Vector3(px, top + 0.18, pz), pot_r, pot_r, pot_h, SURF_FLOOR, 10)
+			_kit.drum(Vector3(px, top + 0.18 + pot_h - 0.06, pz), pot_r * 1.15, pot_r * 1.15, 0.06, SURF_TRIM, 10)
+	total_height = maxf(total_height, top + 0.18 + pot_h)
 
 

@@ -36,10 +36,10 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 
 	if CastleGeometry.is_tower_house(spec):
 		_build_tower_house()
-		return commit()
+		return _dressed()
 	if CastleGeometry.is_ridge(spec):
 		_build_ridge()
-		return commit()
+		return _dressed()
 	match spec.tier:
 		&"house":
 			_build_house()
@@ -47,6 +47,15 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 			_build_manor()
 		_:
 			_build_enclosure()
+	return _dressed()
+
+
+## The garrison moves in. The dressing is prop PLACEMENTS rather than geometry,
+## so it costs the mesh nothing and CastleAssembler is the only thing that ever
+## loads a model. Every tier leaves through here, so no tier can be given a
+## shell and then quietly forgotten.
+func _dressed() -> ArrayMesh:
+	prop_log = CastleFurnisher.dress(spec)
 	return commit()
 
 

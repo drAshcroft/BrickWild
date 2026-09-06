@@ -10,3 +10,6 @@ artifacts/
 .waterfree/
 __pycache__/
 *.pyc
+
+# Art packs: BigGlade is private and props are not published with it
+assets/props/dungeon/

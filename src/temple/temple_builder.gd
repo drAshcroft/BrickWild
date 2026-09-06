@@ -21,14 +21,11 @@ const SURF_ROOF := 2
 const SURF_DARK := 3
 
 var spec: TempleSpec
-## {key, pos: Vector3, yaw, scale, kind: StringName}
-var prop_log: Array[Dictionary] = []
 
 
 func build(p_spec: TempleSpec) -> ArrayMesh:
 	spec = p_spec
 	begin(4)
-	prop_log.clear()
 	total_height = spec.height
 
 	_build_floor()

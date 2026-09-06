@@ -141,14 +141,17 @@ func _build_palace_roof() -> void:
 	_log_mass("roof", AABB(
 		Vector3(-hs.width * 0.5 - 0.5, top, -hs.length * 0.5 - 0.5),
 		Vector3(hs.width + 1.0, hs.roof_rise + 4.0, hs.length + 1.0)))
-	_build_dormers(top, hs)
+	_build_hotel_dormers(top, hs)
 	if hs.cupolas:
 		_build_cupola(-HotelGeometry.tower_x(hs), top, hs)
 		_build_cupola(HotelGeometry.tower_x(hs), top, hs)
 	total_height = maxf(total_height, HotelGeometry.total_height(hs))
 
 
-func _build_dormers(top: float, hs: HotelSpec) -> void:
+## The hotel's own dormers: a long even row across a mansard, which is not
+## the same piece of architecture as HouseBuilder._build_dormers -- that one
+## sets them on one pitch of a cottage roof, in the roof's own frame.
+func _build_hotel_dormers(top: float, hs: HotelSpec) -> void:
 	var z := -hs.length * 0.5 - 0.3
 	var run := hs.width * 0.76
 	for i in range(hs.dormer_count):

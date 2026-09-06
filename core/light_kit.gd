@@ -21,6 +21,10 @@ const TABLE := {
 	"sconce": {"reach": 6.5, "energy": 1.7},
 	"chandelier": {"reach": 10.0, "energy": 2.4},
 	"brazier": {"reach": 8.0, "energy": 2.2},
+	# A cauldron IS the brazier in this pack: the church and the castle stand
+	# them on the wall walk and at the chancel step, and a fire in a bowl
+	# throws a fire in a bowl worth of light wherever it is standing.
+	"hearth": {"reach": 8.0, "energy": 2.2},
 	"lamp": {"reach": 6.0, "energy": 1.5},
 }
 const DEFAULT := {"reach": 5.0, "energy": 1.3}

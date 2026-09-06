@@ -39,6 +39,23 @@ var frame_braces: bool            # diagonal braces across the corners
 var frame_rail: bool              # a mid rail at sill height
 var clutter: float                # 0..1, how heavily rooms get dressed
 
+# ---- exterior architectural variety ----
+var plinth_height: float = 0.45   # masonry foundation dwarf wall height
+var stone_ground_floor: bool = false # entire ground level is stone masonry
+var jetty: bool = false           # whether upper storeys overhang the lower storey
+var jetty_depth: float = 0.28     # cantilever overhang depth in metres
+var roof_type: StringName = &"gable" # &"gable", &"half_hipped", &"hipped"
+var dormers: bool = false         # dormer windows on roof slope
+var dormer_count: int = 0         # number of dormers
+var framing_pattern: StringName = &"close_studding" # &"close_studding", &"square_panel", &"saltire", &"arch_brace"
+var gable_truss: StringName = &"king_post" # &"king_post", &"queen_post", &"collar_strut"
+var bargeboards: bool = true      # decorative verge boards along gables
+var window_mullions: bool = true  # vertical timber bars dividing windows
+var window_hoods: bool = false    # dripstone hood mouldings over window heads
+var chimney_style: StringName = &"stepped" # &"stepped", &"straight", &"louver"
+var chimney_pots: int = 1         # terracotta flue pots at the crown
+var exterior_props: bool = true   # rain barrels, firewood, trade signs
+
 ## Styles carry their own timber: `timber` is the chance of an exposed frame at
 ## all, `studs` the spacing between uprights (a town house is close-studded,
 ## which was expensive and meant to look it), `braces` the chance of diagonals
@@ -64,6 +81,10 @@ const STYLES := {
 		"wall": ["e6ddc8", "cfc3a8"], "trim": ["6b5236", "4a3826"],
 		"roof": ["6a4a34", "4e3626"], "floor": ["8a7a5e", "6f6148"],
 		"clutter": [0.5, 0.8],
+		"plinth": [0.35, 0.55], "roof_types": [&"gable", &"half_hipped"],
+		"framing": [&"square_panel", &"arch_brace"], "truss": [&"king_post", &"collar_strut"],
+		"jetty": 0.3, "dormers": 0.35, "bargeboards": 0.85, "stone_ground": 0.1,
+		"chimney_style": &"stepped", "pots": [1, 1],
 	},
 	&"farmhouse": {
 		"label": "Farmhouse",
@@ -72,6 +93,10 @@ const STYLES := {
 		"wall": ["d9d2bd", "bcb49c"], "trim": ["7a6242", "56452e"],
 		"roof": ["7b6a4a", "5c4e35"], "floor": ["7d6f56", "615641"],
 		"clutter": [0.6, 0.95],
+		"plinth": [0.35, 0.6], "roof_types": [&"half_hipped", &"gable", &"hipped"],
+		"framing": [&"square_panel", &"arch_brace"], "truss": [&"collar_strut", &"king_post"],
+		"jetty": 0.4, "dormers": 0.4, "bargeboards": 0.8, "stone_ground": 0.15,
+		"chimney_style": &"stepped", "pots": [1, 2],
 	},
 	&"townhouse": {
 		"label": "Townhouse",
@@ -80,6 +105,10 @@ const STYLES := {
 		"wall": ["cfc9bd", "b3ac9e"], "trim": ["4b4238", "342e28"],
 		"roof": ["4a4f57", "353a41"], "floor": ["8e7f63", "6b5f49"],
 		"clutter": [0.35, 0.6],
+		"plinth": [0.45, 0.75], "roof_types": [&"gable", &"half_hipped"],
+		"framing": [&"close_studding", &"saltire"], "truss": [&"queen_post", &"collar_strut"],
+		"jetty": 0.9, "dormers": 0.6, "bargeboards": 0.95, "stone_ground": 0.35,
+		"chimney_style": &"stepped", "pots": [1, 2],
 	},
 	&"longhall": {
 		"label": "Long Hall",
@@ -88,6 +117,10 @@ const STYLES := {
 		"wall": ["c9b899", "ab9877"], "trim": ["5a4429", "3e2f1d"],
 		"roof": ["50412c", "39301f"], "floor": ["7a6a4f", "5b4f3a"],
 		"clutter": [0.5, 0.85],
+		"plinth": [0.4, 0.65], "roof_types": [&"gable", &"half_hipped"],
+		"framing": [&"arch_brace", &"square_panel"], "truss": [&"queen_post", &"king_post"],
+		"jetty": 0.3, "dormers": 0.3, "bargeboards": 0.9, "stone_ground": 0.2,
+		"chimney_style": &"stepped", "pots": [1, 2],
 	},
 	&"witch_hut": {
 		"label": "Witch's Hut",
@@ -96,6 +129,10 @@ const STYLES := {
 		"wall": ["b6b2a0", "938f7e"], "trim": ["46402f", "2e2a1e"],
 		"roof": ["3f4a3a", "2c352a"], "floor": ["6c6250", "51493c"],
 		"clutter": [0.75, 1.0],
+		"plinth": [0.25, 0.45], "roof_types": [&"gable"],
+		"framing": [&"arch_brace", &"square_panel"], "truss": [&"king_post"],
+		"jetty": 0.2, "dormers": 0.2, "bargeboards": 0.6, "stone_ground": 0.05,
+		"chimney_style": &"stepped", "pots": [1, 1],
 	},
 }
 

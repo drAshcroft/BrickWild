@@ -242,6 +242,11 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	_build_crossing_tower()
 	_build_dome()
 
+	# The masons are finished; the parish moves in. The dressing is prop
+	# PLACEMENTS rather than geometry, so it costs the mesh nothing and
+	# ChurchAssembler is the only thing that ever loads a model.
+	prop_log = ChurchFurnisher.dress(spec)
+
 	return commit()
 
 

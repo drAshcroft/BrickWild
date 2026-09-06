@@ -104,6 +104,8 @@ scenes/          studio.tscn, the main scene
 core/
   mesh_kit.gd           mesh primitives shared by every builder: boxes, slabs,
                         gable/hip roofs, tapers, surfaces of revolution, arches
+  mass_builder.gd       the three logs every check reads: parts, masses, props
+  shell_assembler.gd    a built shell + its dressing -> a scene, with lights
 src/
   api/           the public request, generated result and BigGlade facade
   church/        the generator, in pipeline order
@@ -111,12 +113,16 @@ src/
     church_geometry.gd    WHERE EVERY MASS SITS -- shared by builder and view
     church_generator.gd   seed -> fills the spec
     church_builder.gd     spec -> ArrayMesh (stone / trim / roof / openings)
+    church_furnisher.gd   spec -> prop placements: pews, altar, banners, fire
+    church_assembler.gd   the only file that loads a model
   ui/
     studio.gd             sliders, variants, materials, camera
     blueprint_view.gd     draws the plan and south elevation
 qa/
   blueprint_qa.gd         voxelising mesh-validation library
   massing_check.gd        no gaps, no overlap, size match
+  dressing_check.gd       the props are known, inside, clear of each other,
+                          and not blocking the aisle or the gate
 tests/           headless suites; run_all.gd runs them in order
   suites/               the suite libraries themselves
   fixtures/             scene fixtures used by tooling
@@ -142,6 +148,19 @@ Driven by the reference churches in `docs/LANDMARKS.md`:
 | Multiple aisle rings (single, double, five-aisled) | Notre-Dame, Cologne |
 | Narthex, pendentives, transept crossing, apse, rose windows | throughout |
 
+A built church is also **furnished**. `ChurchFurnisher` puts an altar at the
+east end with a chalice, candles and standing candelabra; pews in two blocks
+either side of a processional aisle, pitched down the nave and dropped where
+they would stand in the crossing; a lectern and a brazier at the chancel step;
+torches and banners along the nave walls at the same bay as the windows;
+lamps hung over the aisle; a font inside the west door and a coil of bell rope
+in the tower. Aisles get their own light and the parish chest.
+
+None of it is placed by a coordinate. The pews are pitched, the sconces are
+spaced by the bay, and every piece is sized against the nave it is going in --
+so a chapel and a cathedral are furnished by the same rules and neither has a
+number written down for it.
+
 ## Running the tests
 
 ```sh
@@ -161,6 +180,7 @@ hold:
 | `voxelqa`, `cvoxelqa`, `houseqa`, `hmultistory`, `rite` | spatial, circulation and ritual correctness |
 | `landmark`, `clandmark`, `harchetype`, `sarchetype`, `hlandmark`, `tarchetype` | named reference buildings and archetypes |
 | `assets` | measured prop catalogue still matches imported models |
+| `dressing` | churches and castles are furnished, and you can still walk through them |
 
 The runner exits nonzero if any suite fails. Suite bodies live in
 `tests/suites/` as libraries; `tests/<name>_test.gd` are thin wrappers that run

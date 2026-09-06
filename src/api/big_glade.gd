@@ -289,8 +289,9 @@ static func _church_door_z(church: ChurchSpec) -> float:
 	return door_z
 
 
-## Create a fresh scene instance. Houses and temples include their prop models;
-## churches and castles receive the same material treatment as the Studio.
+## Create a fresh scene instance. Every family includes its prop models: a
+## house and a hotel their furniture, a temple its braziers and cages, a church
+## its pews and candelabra, a castle its trestles, banners and courtyard.
 ## When `with_collision` is true, only the generated architectural shell gets
 ## trimesh collision; furniture and dressing remain visual details.
 static func instantiate(building: GeneratedBuilding, cutaway := false,
@@ -306,6 +307,10 @@ static func instantiate(building: GeneratedBuilding, cutaway := false,
 		root = HouseAssembler.build(building.plan, cutaway)
 	elif building.spec is TempleSpec:
 		root = TempleAssembler.build(building.spec as TempleSpec, cutaway)
+	elif building.spec is ChurchSpec:
+		root = ChurchAssembler.build(building.spec as ChurchSpec, cutaway)
+	elif building.spec is CastleSpec:
+		root = CastleAssembler.build(building.spec as CastleSpec, cutaway)
 	else:
 		var mesh: ArrayMesh = build_mesh(building)
 		if mesh == null:

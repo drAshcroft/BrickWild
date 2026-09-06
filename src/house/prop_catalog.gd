@@ -24,6 +24,20 @@ const SOURCE_ASSET_ROOT := "res://assets/props/"
 const ADDON_ASSET_ROOT := "res://addons/big_glade/assets/props/"
 const CATALOG_FILE := "catalog.json"
 
+## The art packs the props come from: which folder, and what the models are
+## shipped as. A prop names its pack in PROPS; anything that does not name one
+## is in `fantasy`, which is where every prop was until the dungeon kit arrived.
+##
+## Two packs rather than one because they ship different formats -- Quaternius
+## exports the Fantasy Props MegaKit as glTF and the Dungeon Kit as FBX only --
+## and because both contain a Barrel, a Crate and a Chest. The dungeon files are
+## prefixed on disk so a catalogue key is still globally unique.
+const PACKS := {
+	"fantasy": {"dir": "fantasy", "ext": "gltf"},
+	"dungeon": {"dir": "dungeon", "ext": "fbx"},
+}
+const DEFAULT_PACK := "fantasy"
+
 static var _resolved_asset_root := ""
 
 # ---- placement rules a prop can carry ----
@@ -66,6 +80,7 @@ const PROPS := {
 	"Nightstand_Shelf": {"cat": "nightstand", "tags": [WALL, SURFACE], "zone": 0.4},
 	"Barrel": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true, "near": ["counter"]}},
 	"Barrel_Apples": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true, "near": ["counter"]}},
+	"Barrel_Holder": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true, "near": ["counter"]}},
 	"Crate_Wooden": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"Crate_Metal": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"FarmCrate_Apple": {"cat": "crate", "tags": [CORNER, SURFACE], "zone": 0.0, "affinity": {"away_from_doors": true}},
@@ -81,6 +96,9 @@ const PROPS := {
 	# ---- trade fittings ----
 	"Anvil": {"cat": "anvil", "tags": [], "zone": 0.9, "affinity": {"near": ["hearth"]}},
 	"Anvil_Log": {"cat": "anvil", "tags": [], "zone": 0.9, "affinity": {"near": ["hearth"]}},
+	# A pickaxe is a metre of haft: it leans in a corner, and the "tool" category
+	# is placed ON a surface, so it cannot go there.
+	"Pickaxe_Bronze": {"cat": "big_tool", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"WeaponStand": {"cat": "stand", "tags": [WALL], "zone": 0.6},
 	"Dummy": {"cat": "stand", "tags": [], "zone": 0.7},
 	"BookStand": {"cat": "lectern", "tags": [SURFACE], "zone": 0.7, "affinity": {"daylight": 1.0}},
@@ -96,14 +114,21 @@ const PROPS := {
 	"Shield_Wooden": {"cat": "trophy", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
 	"Banner_1": {"cat": "banner", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
 	"Banner_2": {"cat": "banner", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
+	"Banner_1_Cloth": {"cat": "banner", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
+	"Banner_2_Cloth": {"cat": "banner", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
 	"Lantern_Wall": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI, "affinity": {"flank": "door"}},
 	"Torch_Metal": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI, "affinity": {"flank": "door"}},
 	"Chandelier": {"cat": "chandelier", "tags": [CEILING, LIGHT], "zone": 0.0, "affinity": {"over": ["table"]}},
+	# Its own category: a candelabrum is a metre and a third of standing iron, so
+	# it cannot join "candle", which every recipe places ON a table.
+	"CandleStick_Stand": {"cat": "candelabrum", "tags": [LIGHT], "zone": 0.0},
 
 	# ---- what a temple is fitted out with ----
 	"Cage_Small": {"cat": "cage", "tags": [], "zone": 0.6},
 	"Chain_Coil": {"cat": "chain", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"Rope_1": {"cat": "chain", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Rope_2": {"cat": "chain", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
+	"Rope_3": {"cat": "chain", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"Vase_Rubble_Medium": {"cat": "rubble", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"Table_Knife": {"cat": "blade", "tags": [ON_SURFACE], "zone": 0.0},
 	"Sword_Bronze": {"cat": "blade", "tags": [ON_SURFACE], "zone": 0.0},
@@ -113,23 +138,90 @@ const PROPS := {
 	"Mug": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
 	"Chalice": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
 	"Table_Plate": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
+	"Table_Fork": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
+	"Table_Spoon": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
+	"Pot_1_Lid": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
 	"Bottle_1": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
 	"Candle_1": {"cat": "candle", "tags": [ON_SURFACE, LIGHT], "zone": 0.0},
 	"CandleStick": {"cat": "candle", "tags": [ON_SURFACE, LIGHT], "zone": 0.0},
 	"CandleStick_Triple": {"cat": "candle", "tags": [ON_SURFACE, LIGHT], "zone": 0.0},
+	"Candle_2": {"cat": "candle", "tags": [ON_SURFACE, LIGHT], "zone": 0.0},
 	"Book_Stack_1": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
 	"Book_Stack_2": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
 	"BookGroup_Small_1": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
+	"Book_5": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
+	"Book_7": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
+	"Book_Simplified_Single": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
+	"BookGroup_Small_2": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
+	"BookGroup_Small_3": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
+	"BookGroup_Medium_1": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
+	"BookGroup_Medium_2": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
+	"BookGroup_Medium_3": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
 	"Scroll_1": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
+	"Scroll_2": {"cat": "books", "tags": [ON_SURFACE], "zone": 0.0},
 	"Potion_1": {"cat": "alchemy", "tags": [ON_SURFACE], "zone": 0.0},
 	"Potion_2": {"cat": "alchemy", "tags": [ON_SURFACE], "zone": 0.0},
 	"SmallBottles_1": {"cat": "alchemy", "tags": [ON_SURFACE], "zone": 0.0},
+	"SmallBottle": {"cat": "alchemy", "tags": [ON_SURFACE], "zone": 0.0},
+	"Potion_4": {"cat": "alchemy", "tags": [ON_SURFACE], "zone": 0.0},
 	"Vase_2": {"cat": "vase", "tags": [ON_SURFACE], "zone": 0.0},
 	"Vase_4": {"cat": "vase", "tags": [ON_SURFACE], "zone": 0.0},
 	"Whetstone": {"cat": "tool", "tags": [ON_SURFACE], "zone": 0.0},
 	"Carrot": {"cat": "food", "tags": [ON_SURFACE], "zone": 0.0},
 	"Key_Metal": {"cat": "trinket", "tags": [ON_SURFACE], "zone": 0.0},
 	"Coin_Pile": {"cat": "trinket", "tags": [ON_SURFACE], "zone": 0.0},
+	"Coin_Pile_2": {"cat": "trinket", "tags": [ON_SURFACE], "zone": 0.0},
+	"Coin": {"cat": "trinket", "tags": [ON_SURFACE], "zone": 0.0},
+	"Key_Gold": {"cat": "trinket", "tags": [ON_SURFACE], "zone": 0.0},
+	"Pouch_Large": {"cat": "trinket", "tags": [ON_SURFACE], "zone": 0.0},
+
+	# ---- the Dungeon Kit ----
+	# A second pack (PACKS above), for the things a church and a castle want and
+	# the MegaKit has none of: statues, an altar rail, standing columns, wall
+	# flags, floor candles.
+	#
+	# Their categories are deliberately their OWN. A dungeon flag is half again
+	# the size of a MegaKit banner and cut from a chunkier pack; dropping it into
+	# "banner" would let a hotel lobby draw one, and the two art styles would be
+	# in the same room by accident rather than by choice. Only the church and
+	# castle furnishers ask for these categories.
+	"Dungeon_Statue_Stag": {"pack": "dungeon", "cat": "statue", "tags": [], "zone": 0.8},
+	"Dungeon_Statue_Fox": {"pack": "dungeon", "cat": "statue", "tags": [], "zone": 0.8},
+	"Dungeon_Column_Round": {"pack": "dungeon", "cat": "column", "tags": [], "zone": 0.0},
+	"Dungeon_Column_Square": {"pack": "dungeon", "cat": "column", "tags": [], "zone": 0.0},
+	"Dungeon_Column_Round_Short": {"pack": "dungeon", "cat": "column", "tags": [], "zone": 0.0},
+	"Dungeon_Rail_Straight": {"pack": "dungeon", "cat": "rail", "tags": [], "zone": 0.0},
+	"Dungeon_Rail_Corner": {"pack": "dungeon", "cat": "rail", "tags": [], "zone": 0.0},
+	"Dungeon_Rail_Divider": {"pack": "dungeon", "cat": "rail", "tags": [], "zone": 0.0},
+	# Modelled centred on their own mounting point, so no `face` correction --
+	# unlike every wall prop in the MegaKit. PropCatalog.mount_yaw() reads the
+	# difference rather than assuming it.
+	"Dungeon_Flag_Wall": {"pack": "dungeon", "cat": "war_banner", "tags": [WALL_MOUNTED], "zone": 0.0},
+	"Dungeon_Flag_Wall2": {"pack": "dungeon", "cat": "war_banner", "tags": [WALL_MOUNTED], "zone": 0.0},
+	"Dungeon_Flag_GothicArch": {"pack": "dungeon", "cat": "arch_flag", "tags": [WALL_MOUNTED], "zone": 0.0},
+	"Dungeon_Flag_RoundArch": {"pack": "dungeon", "cat": "arch_flag", "tags": [WALL_MOUNTED], "zone": 0.0},
+	"Dungeon_Candles_1": {"pack": "dungeon", "cat": "floor_candles", "tags": [LIGHT], "zone": 0.0},
+	"Dungeon_Candles_2": {"pack": "dungeon", "cat": "floor_candles", "tags": [LIGHT], "zone": 0.0},
+	"Dungeon_Torch": {"pack": "dungeon", "cat": "wall_torch", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0},
+	"Dungeon_Bookcase_Empty": {"pack": "dungeon", "cat": "tall_bookcase", "tags": [WALL], "zone": 0.7},
+	"Dungeon_Bookcase_Full": {"pack": "dungeon", "cat": "tall_bookcase", "tags": [WALL], "zone": 0.7},
+	"Dungeon_Chest": {"pack": "dungeon", "cat": "reliquary", "tags": [WALL], "zone": 0.6},
+	"Dungeon_Chest_Gold": {"pack": "dungeon", "cat": "reliquary", "tags": [WALL], "zone": 0.6},
+	"Dungeon_Cart": {"pack": "dungeon", "cat": "wagon", "tags": [], "zone": 0.9},
+	"Dungeon_Barrel": {"pack": "dungeon", "cat": "cask", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Crate": {"pack": "dungeon", "cat": "cask", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Pot1": {"pack": "dungeon", "cat": "urn", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Pot2": {"pack": "dungeon", "cat": "urn", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Pot3": {"pack": "dungeon", "cat": "urn", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Pot1_Broken": {"pack": "dungeon", "cat": "urn", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Pot2_Broken": {"pack": "dungeon", "cat": "urn", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Pot3_Broken": {"pack": "dungeon", "cat": "urn", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Brick": {"pack": "dungeon", "cat": "rubble", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Bricks": {"pack": "dungeon", "cat": "rubble", "tags": [CORNER], "zone": 0.0},
+	"Dungeon_Skull": {"pack": "dungeon", "cat": "relic", "tags": [], "zone": 0.0},
+	"Dungeon_Trapdoor": {"pack": "dungeon", "cat": "hatch", "tags": [], "zone": 0.0},
+	"Dungeon_BearTrap_Closed": {"pack": "dungeon", "cat": "trap", "tags": [], "zone": 0.0},
+	"Dungeon_BearTrap_Open": {"pack": "dungeon", "cat": "trap", "tags": [], "zone": 0.0},
 }
 
 ## Measured sizes, loaded once and shared. Static so the whole sweep pays for
@@ -229,6 +321,20 @@ static func footprint_yawed(key: String, yaw: float) -> Vector2:
 	return f
 
 
+## Plan footprint after ANY yaw: the axis-aligned box the turned piece needs.
+##
+## footprint_yawed() knows quarter turns only, which is every turn the house
+## furnisher makes -- rooms are rectangles and furniture is square to them. A
+## range on a ridge castle runs at whatever angle its spine does, and a trestle
+## in one is turned 22 degrees; asking footprint_yawed() about that gets the
+## UNTURNED footprint back, which is a box the piece does not occupy.
+static func footprint_rotated(key: String, yaw: float) -> Vector2:
+	var f: Vector2 = footprint(key)
+	var c: float = absf(cos(yaw))
+	var s: float = absf(sin(yaw))
+	return Vector2(f.x * c + f.y * s, f.x * s + f.y * c)
+
+
 static func height(key: String) -> float:
 	return size(key).y
 
@@ -321,5 +427,60 @@ static func min_scale(key: String) -> float:
 	return float(SHRINKABLE.get(category(key), 1.0))
 
 
+static func pack(key: String) -> String:
+	return String(PROPS[key].get("pack", DEFAULT_PACK)) if PROPS.has(key) \
+		else DEFAULT_PACK
+
+
 static func scene_path(key: String) -> String:
-	return asset_root() + "fantasy/%s.gltf" % key
+	var row: Dictionary = PACKS.get(pack(key), PACKS[DEFAULT_PACK])
+	return asset_root() + "%s/%s.%s" % [row["dir"], key, row["ext"]]
+
+
+## The yaw that points a prop face down `d` (a direction in plan). A prop faces
+## its own local -Z, which a yaw of y turns to (-sin y, -cos y).
+static func yaw_facing(d: Vector2) -> float:
+	if d.length_squared() < 0.000001:
+		return 0.0
+	return atan2(-d.x, -d.y)
+
+
+## The yaw to store for a wall piece so that it ends up facing `inward`, off the
+## wall it hangs on.
+##
+## Every wall prop in the MegaKit is modelled with its mass behind its mounting
+## point and carries a half-turn `face` correction; the Dungeon Kit flags are
+## modelled centred on theirs and carry none. Reading the correction from the
+## catalogue rather than assuming PI is what lets both hang the right way round
+## on the same wall.
+static func mount_yaw(key: String, inward: Vector2) -> float:
+	return yaw_facing(inward) - face_offset(key)
+
+
+## Where a placed prop mass actually sits in plan, which is not always where its
+## origin is: the stag statue carries its mass half a metre off its own pivot,
+## and a rect centred on the pivot describes a stag that is not there.
+static func plan_centre(key: String, pos: Vector3, yaw: float, scale: float) -> Vector2:
+	var c: Vector3 = centre_offset(key) * scale
+	var turned := Vector2(c.x * cos(yaw) + c.z * sin(yaw),
+		-c.x * sin(yaw) + c.z * cos(yaw))
+	return Vector2(pos.x, pos.z) + turned
+
+
+## One prop placed somewhere, in the form every family that is NOT a HousePlan
+## records its dressing in: the temple, the church and the castle all build a
+## list of these and hand it to their assembler.
+##
+## `rect` is the plan floor the piece actually stands on, computed here rather
+## than left to the checks: a check that re-derives the footprint from the key
+## and the yaw agrees with the placer even when they are both wrong, which is
+## the failure mode this whole harness exists to avoid. A wall-mounted,
+## ceiling-hung or on-surface piece takes no floor and carries an empty rect.
+static func placement(key: String, pos: Vector3, yaw: float, scale: float,
+		kind: StringName) -> Dictionary:
+	var rect := Rect2()
+	if blocks_floor(key):
+		var f: Vector2 = footprint_rotated(key, yaw) * scale
+		rect = Rect2(plan_centre(key, pos, yaw, scale) - f / 2.0, f)
+	return {"key": key, "pos": pos, "yaw": yaw, "scale": scale, "kind": kind,
+		"rect": rect}
