@@ -22,6 +22,7 @@ static func run() -> SuiteResult:
 	_road_fixtures(res, base)
 	_lot_fixtures(res, base)
 	_place_fixtures(res, base)
+	_dress_fixtures(res, base)
 	_sweep(res)
 	return res
 
@@ -384,6 +385,94 @@ static func _place_fixtures(res: SuiteResult, base: VillagePlan) -> void:
 		_move(p13, farm, cc + Vector2(0.0, 0.0), Vector2(0, -1))
 		p13.site = p13.site.grow(60.0)
 		_expect(res, "farms fixture", VillagePlaceCheck.new().check(p13), "farms")
+
+
+# ------------------------------------------------------------------ 9.6
+
+## VIL-015: every DressCheck rule shown to fire on a plan built to break it.
+##
+## Each fixture moves ONE piece of dressing on a copy of a real village, the
+## same way the place fixtures move one building. The rules about things the
+## planner does not lay yet -- fences, fields -- are given the thing by hand,
+## which is the only way to see them fire at all.
+static func _dress_fixtures(res: SuiteResult, base: VillagePlan) -> void:
+	_clean(res, "dressing on a planned village", VillageDressCheck.new().check(base))
+	var far: Vector2 = base.site.position + Vector2(1.0, 1.0)
+
+	# host: a barrel belonging to a building, out in the fields
+	var p := _copy(base)
+	p.props = [{"key": "Barrel", "pos": far, "yaw": 0.0, "host": 0,
+		"rect": Rect2(far - Vector2(0.35, 0.35), Vector2(0.7, 0.7)), "zone": Rect2()}]
+	_expect(res, "dress host fixture", VillageDressCheck.new().check(p), "host")
+
+	# doorways: a barrel on somebody's threshold
+	var p2 := _copy(base)
+	var door: Vector2 = VillageMeasure.door(base.buildings[0])
+	p2.props = [{"key": "Barrel", "pos": door, "yaw": 0.0, "host": 0,
+		"rect": Rect2(door - Vector2(0.35, 0.35), Vector2(0.7, 0.7)), "zone": Rect2()}]
+	p2.plants = []
+	_expect(res, "dress doorways fixture", VillageDressCheck.new().check(p2), "doorways")
+
+	# road: a barrel on the carriageway
+	var p3 := _copy(base)
+	var pts: PackedVector2Array = base.roads[0]["points"]
+	var on_road: Vector2 = pts[pts.size() / 2]
+	p3.props = [{"key": "Barrel", "pos": on_road, "yaw": 0.0, "host": -1,
+		"rect": Rect2(on_road - Vector2(0.35, 0.35), Vector2(0.7, 0.7)),
+		"zone": Rect2(on_road - Vector2(0.5, 0.5), Vector2(1.0, 1.0))}]
+	p3.plants = []
+	_expect(res, "dress road fixture", VillageDressCheck.new().check(p3), "road")
+
+	# canopies: a tree growing out of a house
+	var p4 := _copy(base)
+	var mid: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(base.buildings[0]))
+	p4.props = []
+	p4.plants = [{"key": "Wild_CommonTree_1", "pos": mid, "canopy": 2.5,
+		"trunk": 0.7, "yaw": 0.0}]
+	_expect(res, "dress canopies fixture", VillageDressCheck.new().check(p4), "canopies")
+
+	# green: a wood on the common
+	var common: PackedVector2Array = VillageMeasure.common_poly(base)
+	if not common.is_empty():
+		var p5 := _copy(base)
+		var c: Vector2 = VillageMeasure.centre(common)
+		p5.props = []
+		p5.plants = []
+		for k in range(GREEN_TREES + 1):
+			p5.plants.append({"key": "Wild_CommonTree_1", "pos": c + Vector2(float(k) * 0.5, 0.0),
+				"canopy": 2.5, "trunk": 0.7, "yaw": 0.0})
+		_expect(res, "dress green fixture", VillageDressCheck.new().check(p5), "green")
+
+	# culture: a pine in an english village
+	var p6 := _copy(base)
+	p6.props = []
+	p6.plants = [{"key": "Wild_Pine_1", "pos": far, "canopy": 2.6, "trunk": 1.2, "yaw": 0.0}]
+	_expect(res, "dress culture fixture", VillageDressCheck.new().check(p6), "culture")
+
+	# fields: a strip field inside the village
+	var p7 := _copy(base)
+	p7.props = []
+	p7.plants = []
+	p7.enclosure = Poly.from_rect(base.site.grow(-10.0))
+	p7.fields = [{"kind": &"field", "poly": Poly.from_rect(
+		Rect2(base.site.get_center() - Vector2(6.0, 6.0), Vector2(12.0, 12.0)))}]
+	_expect(res, "dress fields fixture", VillageDressCheck.new().check(p7), "fields")
+
+	# fences: a rail out in the middle of nowhere
+	var p8 := _copy(base)
+	p8.plants = []
+	p8.props = []
+	for k in range(5):
+		var at: Vector2 = base.site.get_center() + Vector2(float(k) * 0.3, 0.0)
+		p8.props.append({"key": "Dungeon_Rail_Straight", "pos": at, "yaw": 0.0,
+			"host": -1, "rect": Rect2(at - Vector2(0.5, 0.1), Vector2(1.0, 0.2)),
+			"zone": Rect2()})
+	_expect(res, "dress fences fixture", VillageDressCheck.new().check(p8), "fences")
+
+
+## The most trees DressCheck allows on a common, read from the check so the
+## fixture cannot drift away from the rule it is proving.
+const GREEN_TREES := VillageDressCheck.GREEN_TREES_MAX
 
 
 # ------------------------------------------------------------------ sweep

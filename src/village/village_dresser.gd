@@ -41,6 +41,13 @@ const ROAD_CLEAR := 0.4
 const TRUNK_CLEAR := 1.0
 ## A canopy may not hang over a roof at all; this is the slack allowed.
 const CANOPY_SLACK := 0.1
+## How many places along a building's front a `wall` or `verge` step is
+## offered, per step out from the wall.
+const FRONT_SPOTS := 6
+## How far apart the trees of the edge band stand. §9.6 walks the edge and
+## refuses a run longer than 25 m with nothing within 6 m of it, so the band
+## is PLANTED ALONG the edge at a pitch rather than scattered near it.
+const EDGE_PITCH := 6.0
 
 ## §7's recipe table, by host. A host is a building (by its programme role),
 ## or one of the places that is not a building at all -- the common, a gate,
@@ -110,9 +117,15 @@ const RECIPES := {
 		{"cat": "crate", "rule": &"bank", "n": [1, 2], "opt": 0.7},
 	],
 	# the edge: what bounds the village, at the culture's own density
+	# `fill` because an edge is as long as the village is round: §9.6 walks
+	# the perimeter and refuses a run over twenty-five metres with nothing
+	# within six of it, so the count cannot be a number in a recipe -- a
+	# fourteen-tree edge round a three-hundred-metre village leaves six
+	# hundred metres of nothing. The rule supplies the places and the step
+	# takes all of them.
 	&"edge": [
 		{"cat": "tree", "rule": &"band", "n": [6, 14], "opt": 1.0, "plant": true,
-			"palette": "edge"},
+			"palette": "edge", "fill": true},
 		{"cat": "ground", "rule": &"band", "n": [4, 10], "opt": 0.6, "plant": true,
 			"palette": "ground"},
 	],
@@ -205,14 +218,30 @@ static func _context(plan: VillagePlan) -> Dictionary:
 	for road in plan.roads:
 		roads.append(VillageSitePlanner.road_ribbon(road, true))
 	var bounds: Array[PackedVector2Array] = []
+	var boxes: Array[Rect2] = []
 	var doors: Array[Rect2] = []
 	for b in plan.buildings:
-		bounds.append(VillageMeasure.bounds_poly(b))
+		var poly: PackedVector2Array = VillageMeasure.bounds_poly(b)
+		bounds.append(poly)
+		boxes.append(Poly.bounding_rect(poly))
 		var d: Vector2 = VillageMeasure.door(b)
 		doors.append(Rect2(d - Vector2(DOOR_CLEAR, DOOR_CLEAR),
 			Vector2(DOOR_CLEAR, DOOR_CLEAR) * 2.0))
+	# Bounding rects beside the polygons, and beside the road ribbons: every
+	# clearance test below rejects on the cheap rect first and only reaches
+	# for `Geometry2D` when the rects actually meet. A village plants
+	# hundreds of pieces and each one was intersecting sixty polygons.
+	var road_boxes: Array[Rect2] = []
+	for ribbon in roads:
+		road_boxes.append(Poly.bounding_rect(ribbon))
 	return {
-		"roads": roads, "bounds": bounds, "doors": doors,
+		"roads": roads, "road_boxes": road_boxes,
+		"bounds": bounds, "boxes": boxes, "doors": doors,
+		# a coarse grid of what has been placed, so "is anything near here"
+		# is a lookup and not a walk of every prop and plant already down. A
+		# village plants hundreds of pieces and the walk made dressing one
+		# slower than planning it.
+		"grid": {},
 		"common": VillageMeasure.common_poly(plan),
 		"palette": PALETTES.get(plan.spec.culture, PALETTES[&"english"]),
 	}
@@ -310,6 +339,8 @@ static func _apply(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 	# either side of the door, then further out from the wall -- and taking
 	# only the first meant one blocked spot lost the piece entirely.
 	var spots: Array[Vector2] = _spots_for(plan, ctx, step, rng, host, role, count)
+	if bool(step.get("fill", false)):
+		count = spots.size()
 	var placed := 0
 	for spot in spots:
 		if placed >= count:
@@ -372,8 +403,14 @@ static func _spots_for(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		rng: RandomNumberGenerator, host: int, role: StringName,
 		count: int) -> Array[Vector2]:
 	match StringName(step["rule"]):
-		&"wall", &"light":
+		&"wall":
 			return _along_front(plan, host, count, 0.0)
+		&"light":
+			# ON the wall, not out in front of it. A shop's setback is
+			# six-tenths of a metre, so the ground a `wall` step steps out
+			# into is the road, and a lamp that wants ground has nowhere to
+			# hang -- which is how a village came out unlit.
+			return _along_front(plan, host, count, -0.4)
 		&"verge":
 			return _along_front(plan, host, count, _verge_offset(plan, host))
 		&"yard":
@@ -418,8 +455,12 @@ static func _along_front(plan: VillagePlan, host: int, count: int,
 	var mid: Vector2 = VillageMeasure.front_mid(b)
 	var dir: Vector2 = VillageMeasure.front_dir(b)
 	var across := Vector2(-dir.y, dir.x)
+	# A fixed spread of candidates, not `count` of them. Every `wall` step of
+	# the same host is offered the same list, so a list only two long meant
+	# the anvil and the barrel took both places and the smithy's own lamp had
+	# nowhere left -- and a village with nothing lit is a village at night.
 	for step_out in range(3):
-		for k in range(count * 2):
+		for k in range(FRONT_SPOTS):
 			var side: float = 1.0 if k % 2 == 0 else -1.0
 			var reach: float = 1.4 + float(k / 2) * 1.1
 			out.append(mid + across * (side * reach)
@@ -597,28 +638,33 @@ static func _edge_band(plan: VillagePlan, rng: RandomNumberGenerator,
 	var want: int = count
 	if plan.spec.purpose == &"forest":
 		want = int(float(count) * FOREST_DENSITY)
-	# Sampled ON the band, not over the whole site and filtered. The band is a
-	# few metres of a site hundreds of metres across, so uniform sampling put
-	# one candidate in ten inside it and a fifty-building village came out
-	# with a single tree at its edge.
-	for k in range(want * 3):
-		var side: int = k % 4
+	# WALKED along the edge at a pitch, not scattered near it. §9.6 walks the
+	# same perimeter and refuses a run longer than twenty-five metres with
+	# nothing within six of it; scattering `want` trees over a site hundreds
+	# of metres round left a hundred and fourteen metres of it bare.
+	#
+	# `want` is a floor, not a cap: the band is as long as the village is
+	# round, and the recipe's count says how densely, not how many.
+	var ring: PackedVector2Array = Poly.from_rect(site.grow(-0.5))
+	var perimeter: float = Poly.polyline_length(ring) + ring[0].distance_to(ring[ring.size() - 1])
+	var pitch: float = EDGE_PITCH
+	if plan.spec.purpose == &"forest":
+		pitch *= 0.5
+	var steps: int = maxi(int(perimeter / pitch), want)
+	var n: int = ring.size()
+	for k in range(steps):
+		var t: float = float(k) / float(steps) * float(n)
+		var seg: int = int(t) % n
+		var a: Vector2 = ring[seg]
+		var b: Vector2 = ring[(seg + 1) % n]
+		var along: Vector2 = a.lerp(b, t - floorf(t))
+		# a little way in from the boundary, and jittered so a planted edge
+		# does not read as a fence of trees
+		var inward: Vector2 = (site.get_center() - along).normalized()
 		var depth: float = rng.randf_range(0.5, maxf(band, 1.5))
-		var p: Vector2
-		match side:
-			0:
-				p = Vector2(site.position.x + depth,
-					rng.randf_range(site.position.y, site.end.y))
-			1:
-				p = Vector2(site.end.x - depth,
-					rng.randf_range(site.position.y, site.end.y))
-			2:
-				p = Vector2(rng.randf_range(site.position.x, site.end.x),
-					site.position.y + depth)
-			_:
-				p = Vector2(rng.randf_range(site.position.x, site.end.x),
-					site.end.y - depth)
-		if inner.has_point(p):
+		var jitter := Vector2(rng.randf_range(-1.5, 1.5), rng.randf_range(-1.5, 1.5))
+		var p: Vector2 = along + inward * depth + jitter
+		if inner.has_point(p) or not site.has_point(p):
 			continue          # inside the village, not at its edge
 		out.append(p)
 	return out
@@ -642,6 +688,8 @@ static func _place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		plan.plants.append({"key": key, "pos": at,
 			"canopy": PropCatalog.canopy(key), "trunk": trunk,
 			"yaw": snappedf(rng.randf_range(0.0, TAU), 0.001)})
+		_remember(ctx, at, Rect2(at - Vector2(trunk, trunk),
+			Vector2(trunk, trunk) * 2.0), trunk)
 		return true
 	var built: bool = bool(step.get("built", false))
 	var size: Vector2 = Vector2(BUILT[key]["size"]) if built \
@@ -649,12 +697,19 @@ static func _place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 	var zone: float = float(BUILT[key]["zone"]) if built else PropCatalog.zone_depth(key)
 	var yaw: float = _facing(plan, host, at)
 	var rect := Rect2(at - size / 2.0, size)
-	var use := Rect2(at - Vector2(zone, zone), Vector2(zone, zone) * 2.0) 		if zone > 0.0 else Rect2()
-	if not _prop_is_clear(plan, ctx, rect, use):
+	var use := Rect2(at - Vector2(zone, zone), Vector2(zone, zone) * 2.0) \
+		if zone > 0.0 else Rect2()
+	# A lamp hangs on the wall and takes no floor, so it is held only to
+	# being on the site and out of the doorway. Held to the floor rules it
+	# competed for ground with the anvil and the barrel already against that
+	# wall, and the smithy's own lamp lost every time -- which is how a
+	# village came out with nothing lit at all.
+	if not _prop_is_clear(plan, ctx, rect, use, PropCatalog.blocks_floor(key) or built):
 		return false
 	plan.props.append({"key": key, "pos": at, "yaw": snappedf(yaw, 0.001),
 		"host": host, "rect": rect, "zone": use,
 		"built": built, "light": _is_light(key, built)})
+	_remember(ctx, at, rect, maxf(size.x, size.y) * 0.5)
 	return true
 
 
@@ -689,25 +744,42 @@ static func _facing(plan: VillagePlan, host: int, at: Vector2) -> float:
 ## `Poly.intersection_area` clips one convex polygon against another, which a
 ## bowed road ribbon is not; `overlap_area` goes through `Geometry2D` and
 ## does not care.
+## `floors` is false for a piece that hangs on a wall and takes no ground.
+## Such a piece is still held to the site, the doorways and the ROAD -- a
+## lantern over the carriageway is over the carriageway -- but not to the
+## floor it does not occupy. Held to that too it competed for ground with the
+## anvil and the barrel already against its wall and lost every time, which
+## is how a village came out with nothing lit at all.
 static func _prop_is_clear(plan: VillagePlan, ctx: Dictionary, rect: Rect2,
-		zone: Rect2) -> bool:
+		zone: Rect2, floors := true) -> bool:
 	if not plan.site.grow(-0.5).encloses(rect):
 		return false
 	var claim: Rect2 = rect.merge(zone) if zone.size.x > 0.0 else rect
-	var poly: PackedVector2Array = Poly.from_rect(claim.grow(ROAD_CLEAR))
-	for ribbon in ctx["roads"]:
-		if VillageLotPlanner.overlap_area(poly, ribbon) > VillageLotPlanner.AREA_EPS:
-			return false
-	var mine: PackedVector2Array = Poly.from_rect(rect)
-	for b in ctx["bounds"]:
-		if VillageLotPlanner.overlap_area(mine, b) > VillageLotPlanner.AREA_EPS:
+	var wide: Rect2 = claim.grow(ROAD_CLEAR)
+	var poly: PackedVector2Array = Poly.from_rect(wide)
+	var road_boxes: Array[Rect2] = ctx["road_boxes"]
+	var roads: Array[PackedVector2Array] = ctx["roads"]
+	for i in range(roads.size()):
+		if not road_boxes[i].intersects(wide):
+			continue
+		if VillageLotPlanner.overlap_area(poly, roads[i]) > VillageLotPlanner.AREA_EPS:
 			return false
 	for d in ctx["doors"]:
 		if d.intersects(claim):
 			return false
+	if not floors:
+		return true
+	var mine: PackedVector2Array = Poly.from_rect(rect)
+	var boxes: Array[Rect2] = ctx["boxes"]
+	var bounds: Array[PackedVector2Array] = ctx["bounds"]
+	for j in range(bounds.size()):
+		if not boxes[j].intersects(rect):
+			continue
+		if VillageLotPlanner.overlap_area(mine, bounds[j]) > VillageLotPlanner.AREA_EPS:
+			return false
 	var grown: Rect2 = rect.grow(PROP_CLEAR)
-	for p in plan.props:
-		if grown.intersects(p["rect"]):
+	for near in _near(ctx, rect.get_center(), grown.size.length()):
+		if grown.intersects(near["rect"] as Rect2):
 			return false
 	return true
 
@@ -719,26 +791,33 @@ static func _plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
 		trunk: float, canopy: float) -> bool:
 	if not plan.site.has_point(at):
 		return false
-	var stem: PackedVector2Array = Poly.from_rect(
-		Rect2(at - Vector2(trunk, trunk), Vector2(trunk, trunk) * 2.0).grow(TRUNK_CLEAR))
-	for ribbon in ctx["roads"]:
-		if VillageLotPlanner.overlap_area(stem, ribbon) > VillageLotPlanner.AREA_EPS:
+	var stem_rect: Rect2 = Rect2(at - Vector2(trunk, trunk),
+		Vector2(trunk, trunk) * 2.0).grow(TRUNK_CLEAR)
+	var stem: PackedVector2Array = Poly.from_rect(stem_rect)
+	var road_boxes: Array[Rect2] = ctx["road_boxes"]
+	var roads: Array[PackedVector2Array] = ctx["roads"]
+	for i in range(roads.size()):
+		if not road_boxes[i].intersects(stem_rect):
+			continue
+		if VillageLotPlanner.overlap_area(stem, roads[i]) > VillageLotPlanner.AREA_EPS:
 			return false
-	var crown: PackedVector2Array = Poly.from_rect(
-		Rect2(at - Vector2(canopy, canopy), Vector2(canopy, canopy) * 2.0).grow(-CANOPY_SLACK))
-	for b in ctx["bounds"]:
-		if VillageLotPlanner.overlap_area(stem, b) > VillageLotPlanner.AREA_EPS:
+	var crown_rect: Rect2 = Rect2(at - Vector2(canopy, canopy),
+		Vector2(canopy, canopy) * 2.0).grow(-CANOPY_SLACK)
+	var crown: PackedVector2Array = Poly.from_rect(crown_rect)
+	var boxes: Array[Rect2] = ctx["boxes"]
+	var bounds: Array[PackedVector2Array] = ctx["bounds"]
+	for j in range(bounds.size()):
+		if boxes[j].intersects(stem_rect) 				and VillageLotPlanner.overlap_area(stem, bounds[j]) > VillageLotPlanner.AREA_EPS:
 			return false
-		if canopy > 0.0 and VillageLotPlanner.overlap_area(crown, b) > VillageLotPlanner.AREA_EPS:
+		if canopy > 0.0 and boxes[j].intersects(crown_rect) 				and VillageLotPlanner.overlap_area(crown, bounds[j]) > VillageLotPlanner.AREA_EPS:
 			return false
 	for d in ctx["doors"]:
 		if d.has_point(at):
 			return false
-	for p in plan.props:
-		if (p["rect"] as Rect2).grow(trunk).has_point(at):
+	for near in _near(ctx, at, trunk + GRID_CELL):
+		if (near["rect"] as Rect2).grow(trunk).has_point(at):
 			return false
-	for other in plan.plants:
-		if at.distance_to(other["pos"]) < trunk + float(other["trunk"]) + 0.5:
+		if at.distance_to(near["pos"]) < trunk + float(near["radius"]) + 0.5:
 			return false
 	return true
 
@@ -784,6 +863,34 @@ static func _same_edge(a: Vector2, b: Vector2, front: PackedVector2Array) -> boo
 		return false
 	return (a.distance_to(front[0]) < 0.5 and b.distance_to(front[1]) < 0.5) \
 		or (a.distance_to(front[1]) < 0.5 and b.distance_to(front[0]) < 0.5)
+
+
+## How big a bucket of the placement grid is. Wide enough that anything that
+## could clash with a piece is in the piece's own cell or one beside it.
+const GRID_CELL := 6.0
+
+
+## Remember one placement in the grid, so later ones can find it cheaply.
+static func _remember(ctx: Dictionary, at: Vector2, rect: Rect2, radius: float) -> void:
+	var grid: Dictionary = ctx["grid"]
+	var cell := Vector2i(int(floorf(at.x / GRID_CELL)), int(floorf(at.y / GRID_CELL)))
+	if not grid.has(cell):
+		grid[cell] = []
+	(grid[cell] as Array).append({"pos": at, "rect": rect, "radius": radius})
+
+
+## Everything already placed within `reach` of `at`, from the grid.
+static func _near(ctx: Dictionary, at: Vector2, reach: float) -> Array:
+	var grid: Dictionary = ctx["grid"]
+	var out: Array = []
+	var span: int = maxi(int(ceilf(reach / GRID_CELL)), 1)
+	var base := Vector2i(int(floorf(at.x / GRID_CELL)), int(floorf(at.y / GRID_CELL)))
+	for dx in range(-span, span + 1):
+		for dy in range(-span, span + 1):
+			var cell: Vector2i = base + Vector2i(dx, dy)
+			if grid.has(cell):
+				out.append_array(grid[cell])
+	return out
 
 
 ## An RNG named from the spec's seed, so dressing is a pure function of the

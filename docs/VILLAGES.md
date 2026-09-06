@@ -538,6 +538,22 @@ fences, props with footprints and tree trunks as obstacles; person radius
 
 ### 9.6 `DressCheck` — do the props and plants belong?
 
+Implemented as `qa/village_dress_check.gd` (VIL-015). Twelve rules, and each
+has a fixture in `VillageCheckSuite` that breaks exactly it. `fences` and
+`fields` run only when the plan carries them, the way `PlaceCheck` treats the
+mill and the market — the planner does not lay either yet, and their fixtures
+build them by hand so the rules can still be seen to fire.
+
+It found four real gaps in the dresser the first time it ran, all now closed:
+a hundred and fourteen metres of unbounded edge (the band is walked at a
+pitch now, and its count comes from the perimeter and not the recipe), an
+unlit village twice over (a wall lamp was competing for ground with the anvil
+already against that wall, and then landing on the road because a shop's
+setback is six-tenths of a metre — it hangs ON the wall and is held to the
+doorway and the road but not to the floor it does not take), and a village
+whose whole edge was one tree.
+
+
 | Rule | The sentence | The measurement |
 |---|---|---|
 | **host** | every prop belongs to something | every prop lies within its host's lot or the common; a `yard` prop is behind the front line of its building; nothing has no host |
