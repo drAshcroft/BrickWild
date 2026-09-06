@@ -108,14 +108,33 @@ func _check_common(plan: VillagePlan) -> void:
 	for i2 in range(plan.buildings.size()):
 		if VillageLotPlanner.overlap_area(VillageMeasure.bounds_poly(plan.buildings[i2]), common) > VillageLotPlanner.AREA_EPS:
 			failures.append("common: building %d stands on the common" % i2)
+	# Nothing BUILT inside the common but what §7's own recipe for it puts
+	# there: the well, the market stalls, the green tree, a statue, and the
+	# benches and flowers people sit among. A bench on a green is not a
+	# building on it; a house or a workshop would be, and so would a barrel
+	# somebody rolled out of a shop.
 	for p2 in plan.props:
-		var key: String = String(p2["key"]).to_lower()
 		if not Poly.contains_point(common, p2["pos"]):
 			continue
-		if key.begins_with("well") or key.begins_with("stall") or key.begins_with("tree"):
+		if _belongs_on_the_common(String(p2["key"])):
 			continue
 		failures.append("common: %s stands on the common" % String(p2["key"]))
 		break
+
+
+## VILLAGES §7's recipe for the common, as the list of things that may stand
+## on it. Matched on the catalogue key's own words, so a pack that adds a
+## second bench is on the green without this list changing.
+const COMMON_PROPS := ["well", "stall", "tree", "bench", "flower", "statue",
+	"signpost", "lamp_post"]
+
+
+static func _belongs_on_the_common(key: String) -> bool:
+	var lower: String = key.to_lower()
+	for word in COMMON_PROPS:
+		if lower.contains(word):
+			return true
+	return false
 
 
 ## The landmark: the tallest bounds in the village, seen from every gate.

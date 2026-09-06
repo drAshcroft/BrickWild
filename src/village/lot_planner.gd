@@ -90,6 +90,11 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 			out = again
 			unplaced = left
 	_trim_lanes(out)
+	# and what is standing about outside (VIL-013): a planned village is a
+	# dressed one, because the checks that judge the arrangement -- what
+	# stands on the common, what is in a doorway, what is in the road -- are
+	# judging the props as much as the buildings.
+	VillageDresser.dress(out)
 	return out
 
 

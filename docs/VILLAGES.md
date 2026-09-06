@@ -322,6 +322,22 @@ as a pasture.
 
 ### Prop recipes, by host
 
+Implemented as `src/village/village_dresser.gd` (VIL-013), and called at the
+end of `VillageLotPlanner.plan()` -- a planned village is a dressed one,
+because the rules that judge the arrangement (what stands on the common,
+what is in a doorway, what is in the road) are judging the props as much as
+the buildings.
+
+Two things it does that the house furnisher does not. **Plants are kept apart
+from props**, in `plan.plants`, because they are judged differently: a prop is
+a footprint, a plant is a trunk you walk round and a canopy that must not
+hang over a roof, and §8's rules are about those two radii. And **it measures
+with the checks' own functions** -- a prop's ZONE against the road ribbon
+with its verge, through `VillageLotPlanner.overlap_area`, which is exactly
+what `RoadCheck.clear` does. Measuring it any other way put anvils in the
+road: the check tests the zone and the first version tested the anvil, and
+`Poly.intersection_area` clips convex polygons while a road ribbon bends.
+
 Like `HouseFurnisher.RECIPES`, each host has steps of `{cat, rule, n, opt}`
 and the rules mean what they mean indoors, translated:
 
