@@ -22,7 +22,92 @@ static func run() -> SuiteResult:
 	_check_programme_special_trades_gated(res)
 	_check_programme_no_house_family_import(res)
 	_check_programme_culture_styles_build(res)
+	_check_builder(res)
 	return res
+
+
+## VIL-018: what the builder raises and what the assembler instantiates.
+##
+## The plan-based half is checked on a real village; the edge, the gates and
+## the bridges are checked on a plan given an enclosure and a river BY HAND,
+## because the two forms the site planner lays have neither -- and a mass
+## nobody can make is a mass nobody has looked at.
+static func _check_builder(res: SuiteResult) -> void:
+	var spec: VillageSpec = _make_spec(9101, 40)
+	spec.generate(9101)
+	var plan: VillagePlan = VillageLotPlanner.plan(spec)
+	res.checked += 1
+	if plan.roads.is_empty():
+		res.fail("builder: the sample village planned no roads")
+		return
+	var builder := VillageBuilder.new()
+	var mesh: ArrayMesh = builder.build(plan)
+	res.checked += 1
+	if mesh == null or mesh.get_surface_count() == 0:
+		res.fail("builder: the village emitted no mesh")
+		return
+	# the ground the camera frames is the site
+	var box: AABB = mesh.get_aabb()
+	res.checked += 1
+	if absf(box.size.x - plan.site.size.x) > 2.0 or absf(box.size.z - plan.site.size.y) > 2.0:
+		res.fail("builder: the mesh spans %.0f x %.0f m on a %.0f x %.0f m site"
+			% [box.size.x, box.size.z, plan.site.size.x, plan.site.size.y])
+	res.checked += 1
+	if not builder.has_mass("ground"):
+		res.fail("builder: the village has no ground")
+	# every prop the dresser marked `built` is a mass the checks can measure
+	var built := 0
+	for i in range(plan.props.size()):
+		if not bool(plan.props[i].get("built", false)):
+			continue
+		built += 1
+		res.checked += 1
+		if not builder.has_mass(String(plan.props[i]["key"])):
+			res.fail("builder: the plan asks for a %s and no mass was raised for it"
+				% String(plan.props[i]["key"]))
+	res.note("builder: %d surfaces, %d masses, %d built props" % [
+		mesh.get_surface_count(), builder.mass_log.size(), built])
+
+	# the edge, its gates and a bridge: given to a plan by hand
+	var walled_spec: VillageSpec = _make_spec(9101, 40)
+	walled_spec.generate(9101)
+	var walled: VillagePlan = VillageLotPlanner.plan(walled_spec)
+	var edge: Rect2 = walled.site.grow(-6.0)
+	walled.enclosure = Poly.from_rect(edge)
+	walled.spec.enclosure = &"palisade"
+	var through: PackedVector2Array = walled.roads[0]["points"]
+	walled.gate_crossings = [{"pos": Vector2(edge.position.x, through[0].y), "road": 0}]
+	walled.water = [{"kind": &"stream", "poly": Poly.from_rect(
+		Rect2(Vector2(through[through.size() / 2].x - 4.0, walled.site.position.y),
+			Vector2(8.0, walled.site.size.y)))}]
+	var walled_builder := VillageBuilder.new()
+	walled_builder.build(walled)
+	for want in ["palisade", "gate", "bridge"]:
+		res.checked += 1
+		if not walled_builder.has_mass(want):
+			res.fail("builder: a walled village on a river raised no %s" % want)
+
+	# and the assembler brings the models
+	var root: Node3D = VillageAssembler.build(plan)
+	res.checked += 1
+	if root == null:
+		res.fail("builder: the village assembled to nothing")
+		return
+	for group in ["Ground", "Buildings", "Props", "Plants", "Lights"]:
+		res.checked += 1
+		if root.get_node_or_null(group) == null:
+			res.fail("builder: the assembled village has no %s" % group)
+	res.checked += 1
+	if root.get_node("Buildings").get_child_count() != plan.buildings.size():
+		res.fail("builder: %d buildings in the plan, %d in the scene"
+			% [plan.buildings.size(), root.get_node("Buildings").get_child_count()])
+	# a built prop has no model: it is already in the ground mesh
+	var models: int = root.get_node("Props").get_child_count()
+	res.checked += 1
+	if models != plan.props.size() - built:
+		res.fail("builder: %d prop models for %d catalogue props (%d are built)"
+			% [models, plan.props.size() - built, built])
+	root.free()
 
 
 static func _make_spec(p_seed: int, population: int = 80, culture: StringName = &"english",

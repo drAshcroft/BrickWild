@@ -1,23 +1,27 @@
 class_name VillageAssembler
 extends RefCounted
-## Turns a VillagePlan into a scene: the ground, the roads and the common as
-## flat colour, and every building of the plan generated through BigGlade and
-## set down at the transform the lot planner gave it -- furniture and lights
-## included, because `BigGlade.instantiate()` brings them.
+## Turns a VillagePlan into a scene (VIL-018).
 ##
-## The same split as the house and temple assemblers: everything above this
-## file works in metres and polygons and never loads a model.
+## `VillageBuilder` raises everything that is mesh -- the ground, the roads,
+## the water and its bridges, the edge and its gates, and the ten small props
+## no art pack ships. This file adds everything that is a MODEL: every
+## building generated through BigGlade and set down at the transform the lot
+## planner gave it, every catalogue prop the dresser placed, every plant it
+## planted, and an `OmniLight3D` for each light through `LightKit`, which is
+## the same lamp the house, shop, hotel and temple assemblers hang.
+##
+## The same split as the house and temple assemblers, and the reason the
+## whole village harness runs headless: everything above this file works in
+## metres and polygons and never loads a model.
 
-const GROUND := Color("6f7a4a")
-const ROAD := Color("8a7b62")
-const VERGE := Color("7a7f52")
-const COMMON := Color("5f8a3f")
-const LOT := Color("6a7546")
-const WATER := Color("3e6a8a")
-const SURF_GROUND := 0
-const SURF_ROAD := 1
-const SURF_COMMON := 2
-const SURF_WATER := 3
+const SURF_GROUND := VillageBuilder.SURF_GROUND
+const SURF_ROAD := VillageBuilder.SURF_ROAD
+const SURF_COMMON := VillageBuilder.SURF_COMMON
+const SURF_WATER := VillageBuilder.SURF_WATER
+## A plant is turned by its own yaw and left at the size it was modelled;
+## this is how far into the ground it is pushed so it does not float on a
+## catalogue floor offset.
+const PLANT_SINK := 0.02
 
 
 ## The whole village. `cutaway` takes the roofs off the plan-based buildings.
@@ -29,7 +33,7 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 	ground.mesh = ground_mesh(plan)
 	for i in range(ground.mesh.get_surface_count()):
 		var m := StandardMaterial3D.new()
-		m.albedo_color = [GROUND, ROAD, COMMON, WATER][i]
+		m.albedo_color = Color(String(VillageBuilder.COLOURS.get(i, "808080")))
 		m.roughness = 1.0
 		ground.set_surface_override_material(i, m)
 	root.add_child(ground)
@@ -47,55 +51,87 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 		node.name = "%s_%d" % [String(b["kind"]), i]
 		node.transform = b["transform"]
 		houses.add_child(node)
+	_dressing(root, plan)
 	return root
 
 
-## The ground plane, the roads with their verges, the commons and the water,
-## as one flat mesh whose AABB spans the site -- which is what frames the
-## camera.
+## The dressing: every catalogue prop and plant the dresser placed, and a
+## light for each one the catalogue tags LIGHT. The props the dresser marked
+## `built` are already in the ground mesh -- `VillageBuilder` raised them --
+## so they are skipped here rather than loaded twice.
+static func _dressing(root: Node3D, plan: VillagePlan) -> void:
+	var props := Node3D.new()
+	props.name = "Props"
+	root.add_child(props)
+	var plants := Node3D.new()
+	plants.name = "Plants"
+	root.add_child(plants)
+	var lights := Node3D.new()
+	lights.name = "Lights"
+	root.add_child(lights)
+	for i in range(plan.props.size()):
+		var p: Dictionary = plan.props[i]
+		var key: String = String(p["key"])
+		var at := Vector3(float(p["pos"].x), 0.0, float(p["pos"].y))
+		var yaw: float = float(p.get("yaw", 0.0))
+		if not bool(p.get("built", false)):
+			var node: Node3D = _model(key, at, yaw)
+			if node != null:
+				node.name = "%s_%d" % [key, i]
+				props.add_child(node)
+		# A built prop has no model and still has a flame: the lamp post
+		# carries one. Both kinds are lit from the same place.
+		if bool(p.get("light", false)) or PropCatalog.has_tag(key, PropCatalog.LIGHT):
+			lights.add_child(_light_for(p, key, at, yaw))
+	for j in range(plan.plants.size()):
+		var t: Dictionary = plan.plants[j]
+		var key2: String = String(t["key"])
+		var node2: Node3D = _model(key2,
+			Vector3(float(t["pos"].x), -PLANT_SINK, float(t["pos"].y)),
+			float(t.get("yaw", 0.0)))
+		if node2 != null:
+			node2.name = "%s_%d" % [key2, j]
+			plants.add_child(node2)
+
+
+## One catalogue model, set down on the ground and turned. Null when the
+## catalogue does not know the key or the pack is not installed -- a village
+## missing an art pack should be a village missing its barrels, not a crash.
+static func _model(key: String, at: Vector3, yaw: float) -> Node3D:
+	if not PropCatalog.known(key):
+		return null
+	var path: String = PropCatalog.scene_path(key)
+	if not ResourceLoader.exists(path):
+		return null
+	var packed: PackedScene = load(path)
+	if packed == null:
+		return null
+	var node := packed.instantiate() as Node3D
+	if node == null:
+		return null
+	node.position = at - Vector3(0.0, PropCatalog.floor_offset(key), 0.0)
+	node.rotation.y = yaw + PropCatalog.face_offset(key)
+	return node
+
+
+## The flame of one lit prop. A built lamp post has no catalogue entry to
+## measure, so its light sits at the top of the mass PropKit raised.
+static func _light_for(p: Dictionary, key: String, at: Vector3,
+		yaw: float) -> OmniLight3D:
+	if bool(p.get("built", false)):
+		var rect: Rect2 = p.get("rect", Rect2())
+		var top: float = maxf(rect.size.x, rect.size.y) * 1.6
+		return LightKit.make(at + Vector3(0.0, maxf(top, 2.4), 0.0),
+			LightKit.FLAME, 1.6, 9.0)
+	return LightKit.for_prop(key, at, yaw, 1.0)
+
+
+## The ground, the roads, the water and everything else of the village that
+## is mesh, from `VillageBuilder` -- which is the one place it is decided,
+## the way each family's own builder is for that family. Kept as a function
+## here because every caller of this file already asks for it by this name.
 static func ground_mesh(plan: VillagePlan) -> ArrayMesh:
-	var kit := MeshKit.new(4)
-	var site: Rect2 = plan.site
-	kit.box(Vector3(site.size.x, 0.2, site.size.y),
-		Vector3(site.get_center().x, -0.1, site.get_center().y), SURF_GROUND)
-	for lot in plan.lots:
-		_flat(kit, lot["poly"], 0.005, SURF_GROUND)
-	for road in plan.roads:
-		var pts: PackedVector2Array = road["points"]
-		var half: float = float(road["width"]) * 0.5
-		for i in range(pts.size() - 1):
-			var a: Vector2 = pts[i]
-			var b: Vector2 = pts[i + 1]
-			var d: Vector2 = b - a
-			if d.length() < 0.01:
-				continue
-			var mid: Vector2 = (a + b) / 2.0
-			var yaw: float = atan2(-d.y, d.x)
-			kit.box(Vector3(d.length() + half * 0.5, 0.04, half * 2.0),
-				Vector3(mid.x, 0.02, mid.y), SURF_ROAD, yaw)
-	for c in plan.commons:
-		_flat(kit, c["poly"], 0.03, SURF_COMMON)
-	for w in plan.water:
-		_flat(kit, w["poly"], 0.01, SURF_WATER)
-	return kit.commit()
-
-
-## A polygon as a fan of flat triangles at height `y`, both faces.
-static func _flat(kit: MeshKit, poly: PackedVector2Array, y: float, surf: int) -> void:
-	if poly.size() < 3:
-		return
-	var tris: PackedInt32Array = Geometry2D.triangulate_polygon(poly)
-	var st: SurfaceTool = kit.surface(surf)
-	for t in range(0, tris.size(), 3):
-		var a := Vector3(poly[tris[t]].x, y, poly[tris[t]].y)
-		var b := Vector3(poly[tris[t + 1]].x, y, poly[tris[t + 1]].y)
-		var c := Vector3(poly[tris[t + 2]].x, y, poly[tris[t + 2]].y)
-		for tri in [[a, b, c], [a, c, b]]:
-			var n: Vector3 = (tri[2] - tri[0]).cross(tri[1] - tri[0]).normalized()
-			for v in tri:
-				st.set_normal(n)
-				st.set_uv(Vector2.ZERO)
-				st.add_vertex(v)
+	return VillageBuilder.new().build(plan)
 
 
 ## The village in words: the form, who lives there, what stands on it.
