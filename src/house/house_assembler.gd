@@ -31,16 +31,10 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 	var shell := MeshInstance3D.new()
 	shell.name = "Shell"
 	shell.mesh = mesh
-	var spec: HouseSpec = plan.spec
-	var cols := [spec.wall_color, spec.trim_color, spec.roof_color, spec.floor_color]
-	for i in range(mesh.get_surface_count()):
-		var m := StandardMaterial3D.new()
-		m.albedo_color = cols[i]
-		m.roughness = 0.95
-		# the shell is seen from outside AND from above with the roof off, so
-		# the walls must not vanish when the camera is on their far side
-		m.cull_mode = BaseMaterial3D.CULL_DISABLED
-		shell.set_surface_override_material(i, m)
+	# one material per surface, from ShellAssembler, like every other family
+	# (API-005). The house's roof is not hidden for a cutaway -- the builder
+	# is asked not to emit it at all, which is why `not cutaway` goes in above.
+	ShellAssembler.surface_materials(shell, BuildingFamilyAdapter.colours(plan.spec))
 	root.add_child(shell)
 	furnish(root, plan)
 	return root

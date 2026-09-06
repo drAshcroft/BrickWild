@@ -12,14 +12,7 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 	var shell := MeshInstance3D.new()
 	shell.name = "Shell"
 	shell.mesh = mesh
-	var spec := plan.spec as HotelSpec
-	var colors := [spec.wall_color, spec.trim_color, spec.roof_color, spec.floor_color]
-	for i in range(mesh.get_surface_count()):
-		var material := StandardMaterial3D.new()
-		material.albedo_color = colors[i]
-		material.roughness = 0.88
-		material.cull_mode = BaseMaterial3D.CULL_DISABLED
-		shell.set_surface_override_material(i, material)
+	ShellAssembler.surface_materials(shell, BuildingFamilyAdapter.colours(plan.spec))
 	root.add_child(shell)
 	HouseAssembler.furnish(root, plan)
 	return root

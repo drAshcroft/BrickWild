@@ -151,13 +151,8 @@ static func instantiate(building, cutaway := false,
 		var instance := MeshInstance3D.new()
 		instance.name = building.name()
 		instance.mesh = mesh
-		var colors := [building.spec.get("stone_color"), building.spec.get("trim_color"),
-			building.spec.get("roof_color"), Color("1a1c20")]
-		for surface in range(mesh.get_surface_count()):
-			var material := StandardMaterial3D.new()
-			material.albedo_color = colors[surface]
-			material.roughness = 0.9
-			instance.set_surface_override_material(surface, material)
+		ShellAssembler.surface_materials(instance,
+			BuildingFamilyAdapter.colours(building.spec))
 		root = instance
 	root.set_meta(&"big_glade", true)
 	root.set_meta(&"big_glade_kind", building.request.kind)

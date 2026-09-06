@@ -18,17 +18,12 @@ static func build(spec: TempleSpec, cutaway := false) -> Node3D:
 	var shell := MeshInstance3D.new()
 	shell.name = "Stone"
 	shell.mesh = mesh
-	var cols := [spec.stone_color, spec.trim_color, spec.roof_color, Color("07070a")]
-	for i in range(mesh.get_surface_count()):
-		var m := StandardMaterial3D.new()
-		m.albedo_color = cols[i]
-		m.roughness = 0.95
-		m.cull_mode = BaseMaterial3D.CULL_DISABLED
-		shell.set_surface_override_material(i, m)
-	if cutaway:
-		# the roof surface is simply not drawn: everything else stays, so the
-		# columns still stand and the sightline is still the sightline
-		shell.set_surface_override_material(TempleBuilder.SURF_ROOF, _invisible())
+	# The roof surface is simply not drawn for a cutaway: everything else
+	# stays, so the columns still stand and the sightline is still the
+	# sightline. ShellAssembler does the whole of it (API-005).
+	ShellAssembler.surface_materials(shell, BuildingFamilyAdapter.colours(spec),
+		ShellAssembler.DEFAULT_ROUGHNESS,
+		TempleBuilder.SURF_ROOF if cutaway else -1)
 	root.add_child(shell)
 
 	var props := Node3D.new()
@@ -40,13 +35,6 @@ static func build(spec: TempleSpec, cutaway := false) -> Node3D:
 			props.add_child(node)
 	_light_the_fires(root, builder, spec)
 	return root
-
-
-static func _invisible() -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = Color(0, 0, 0, 0)
-	return m
 
 
 static func _instance(p: Dictionary) -> Node3D:

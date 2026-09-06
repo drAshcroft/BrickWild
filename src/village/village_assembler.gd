@@ -31,11 +31,8 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 	var ground := MeshInstance3D.new()
 	ground.name = "Ground"
 	ground.mesh = ground_mesh(plan)
-	for i in range(ground.mesh.get_surface_count()):
-		var m := StandardMaterial3D.new()
-		m.albedo_color = Color(String(VillageBuilder.COLOURS.get(i, "808080")))
-		m.roughness = 1.0
-		ground.set_surface_override_material(i, m)
+	ShellAssembler.surface_materials(ground,
+		BuildingFamilyAdapter.colours(plan.spec))
 	root.add_child(ground)
 	var houses := Node3D.new()
 	houses.name = "Buildings"

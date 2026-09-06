@@ -12,6 +12,39 @@ extends RefCounted
 ## Nothing above this file loads a model. That is what lets the whole massing
 ## harness run headless in milliseconds per building.
 
+## How rough a wall is. Every family used its own number for no reason any of
+## them could have stated -- 0.88, 0.9, 0.95, 1.0 -- so they use this one and
+## a family that genuinely wants another passes it.
+const DEFAULT_ROUGHNESS := 0.92
+## What a surface with no colour of its own gets.
+const NO_COLOUR := Color("1a1c20")
+
+
+## A material per surface, from the family's own colours (API-005).
+##
+## Every family ends the same way and each had its own copy of this loop: the
+## colours in surface order, roughness, and `CULL_DISABLED` because a shell is
+## a box seen from inside as often as from out and a wall the camera is behind
+## must not vanish. `hide` is the surface a cutaway leaves undrawn, or -1.
+##
+## Materials and not meshes: nothing here loads an asset, so a headless build
+## is unaffected by any of it.
+static func surface_materials(node: MeshInstance3D, colors: Array,
+		roughness := DEFAULT_ROUGHNESS, hide := -1) -> void:
+	if node.mesh == null:
+		return
+	for i in range(node.mesh.get_surface_count()):
+		if i == hide:
+			node.set_surface_override_material(i, invisible())
+			continue
+		var m := StandardMaterial3D.new()
+		var c = colors[i] if i < colors.size() else NO_COLOUR
+		m.albedo_color = c if c is Color else NO_COLOUR
+		m.roughness = roughness
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		node.set_surface_override_material(i, m)
+
+
 ## Build the scene. `cutaway` leaves the roof surface undrawn, which is the
 ## only way to photograph an interior lit by things that are on fire.
 static func build(node_name: String, mesh: ArrayMesh, colors: Array,
@@ -25,16 +58,8 @@ static func build(node_name: String, mesh: ArrayMesh, colors: Array,
 	var shell := MeshInstance3D.new()
 	shell.name = "Shell"
 	shell.mesh = mesh
-	for i in range(mesh.get_surface_count()):
-		var m := StandardMaterial3D.new()
-		m.albedo_color = colors[i] if i < colors.size() else Color("1a1c20")
-		m.roughness = 0.9
-		# A shell is a box seen from inside as often as from out, so a wall the
-		# camera is behind must not vanish.
-		m.cull_mode = BaseMaterial3D.CULL_DISABLED
-		shell.set_surface_override_material(i, m)
-	if cutaway and roof_surface >= 0 and roof_surface < mesh.get_surface_count():
-		shell.set_surface_override_material(roof_surface, _invisible())
+	surface_materials(shell, colors, DEFAULT_ROUGHNESS,
+		roof_surface if cutaway else -1)
 	root.add_child(shell)
 
 	if props.is_empty():
@@ -101,7 +126,8 @@ static func _light_the_fires(root: Node3D, props: Array, glow: Color) -> void:
 			float(p.get("scale", 1.0)), glow))
 
 
-static func _invisible() -> StandardMaterial3D:
+## A material that draws nothing: what a cutaway roof gets.
+static func invisible() -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.albedo_color = Color(0, 0, 0, 0)

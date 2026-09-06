@@ -335,6 +335,45 @@ class VillageFamily extends BuildingFamilyAdapter:
 
 # ----------------------------------------------------------------- shared
 
+## A family's surface colours, in surface order (API-005).
+##
+## Every family's mesh has its surfaces in the same order -- wall/stone, trim,
+## roof, floor/openings -- and every one of them had its own copy of the loop
+## that turned those into materials, with its own roughness for no reason any
+## of them could have stated. `ShellAssembler.surface_materials()` is the one
+## loop now and this is the one place the colours are named, so a caller that
+## wants to build its own materials can ask instead of reaching into a spec
+## it should not know about.
+##
+## Takes the SPEC rather than a generated building, because the assemblers
+## are handed a plan or a spec and never the facade's wrapper.
+static func colours(spec: RefCounted) -> Array:
+	if spec == null:
+		return []
+	if spec is VillageSpec:
+		var ground: Array = []
+		for i in range(VillageBuilder.SURFACES):
+			ground.append(Color(String(VillageBuilder.COLOURS.get(i, "808080"))))
+		return ground
+	if spec is TempleSpec:
+		# a temple's fourth surface is its own darkness, not a floor colour
+		return [spec.get("stone_color"), spec.get("trim_color"),
+			spec.get("roof_color"), TEMPLE_DARK]
+	# house, shop and hotel name their masonry `wall_color`; church, castle
+	# and the world families call the same surface `stone_color`
+	var wall = spec.get("wall_color")
+	if wall == null:
+		wall = spec.get("stone_color")
+	var floor = spec.get("floor_color")
+	if floor == null:
+		floor = ShellAssembler.NO_COLOUR
+	return [wall, spec.get("trim_color"), spec.get("roof_color"), floor]
+
+
+## The inside of a temple, which is not a floor colour and never was.
+const TEMPLE_DARK := Color("07070a")
+
+
 ## The three fields every family names the same way. A family whose spec
 ## calls them something else (the temple's `form`) copies them itself.
 static func _copy_size_and_style(request: BuildingRequest, spec: RefCounted) -> void:

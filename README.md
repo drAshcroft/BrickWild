@@ -123,8 +123,12 @@ What a caller of the library may rely on, and what it may not.
   below it). `placement().bounds` is the emitted architecture's AABB.
 - **Materials.** Every family's mesh has four surfaces, in this order:
   wall/stone, trim, roof, floor/openings. `instantiate()` assigns a
-  `StandardMaterial3D` per surface from the spec's colours; callers that
-  build their own materials should key them by surface index.
+  `StandardMaterial3D` per surface from the spec's colours, through the one
+  loop in `ShellAssembler.surface_materials()`; the colours themselves come
+  from `BuildingFamilyAdapter.colours(spec)`, so a caller that builds its own
+  materials can ask for them by surface index instead of reaching into a spec
+  it should not have to know about. (A village is the one family with more
+  than four: ground, road, common, water, stone, wood, roof, dark.)
 - **Serialization.** Plans and specs are plain data (`Dictionary`,
   `Rect2`, `Vector2`, `StringName`). A record may gain keys between
   releases; readers must ignore keys they do not know. Keys are never
