@@ -46,7 +46,12 @@ print(BigGlade.option_label(&"shop", &"purpose", request.purpose))
 
 `src/api/building_library.gd` owns those tables, and the same rows that
 publish them are the rows a request is validated against, so anything offered
-can be built and anything built was offered. Every request is refused on its
+can be built and anything built was offered. `src/api/building_family_adapter.gd`
+owns the other half — what each family DOES: generate its representation,
+build its mesh, assemble its scene, and answer for its own footprint and
+front door. `BigGlade` is dispatch and nothing else, so a new family is a new
+adapter and a new library row rather than an edit to five `match` statements
+in five different orders. Every request is refused on its
 own terms — with `{"code", "field", "message"}` errors — before a family
 generator sees it.
 

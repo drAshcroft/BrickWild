@@ -51,49 +51,10 @@ static func generate(request: BuildingRequest) -> GeneratedBuilding:
 	if not out.errors.is_empty():
 		return out
 
-	match out.request.kind:
-		&"church":
-			var spec := ChurchSpec.new()
-			_copy_size_and_style(out.request, spec)
-			ChurchGenerator.generate(spec, out.request.seed)
-			out.spec = spec
-		&"castle":
-			var spec := CastleSpec.new()
-			_copy_size_and_style(out.request, spec)
-			CastleGenerator.generate(spec, out.request.seed)
-			out.spec = spec
-		&"house":
-			var spec := HouseSpec.new()
-			_copy_size_and_style(out.request, spec)
-			spec.trade = out.request.purpose
-			spec.storeys = out.request.storeys
-			out.plan = HouseGenerator.generate(spec, out.request.seed)
-			out.spec = spec
-		&"shop":
-			var spec := ShopSpec.new()
-			_copy_size_and_style(out.request, spec)
-			spec.business = out.request.purpose
-			spec.storeys = out.request.storeys
-			out.plan = ShopGenerator.generate(spec, out.request.seed)
-			out.spec = spec
-		&"hotel":
-			var spec := HotelSpec.new()
-			_copy_size_and_style(out.request, spec)
-			out.plan = HotelGenerator.generate(spec, out.request.seed)
-			out.spec = spec
-		&"temple":
-			var spec := TempleSpec.new()
-			spec.form = out.request.style
-			spec.cult = out.request.purpose
-			spec.width = out.request.width
-			spec.length = out.request.length
-			spec.height = out.request.height
-			TempleGenerator.generate(spec, out.request.seed)
-			out.spec = spec
-		&"world":
-			if not WorldFamilies.generate(out.request, out):
-				_add_error(out, &"family_not_built", &"style",
-					"World family '%s' has no generator yet." % String(out.request.style))
+	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.of(out.request.kind)
+	if family == null or not family.generate(out.request, out):
+		_add_error(out, &"family_not_built", &"kind",
+			"'%s' has no generator yet." % String(out.request.kind))
 	return out
 
 
@@ -127,19 +88,8 @@ static func generate_document(request: BuildingRequest) -> BuildingDocument:
 static func build_mesh(building) -> ArrayMesh:
 	if building == null or not building.is_ok():
 		return null
-	if building.spec is ChurchSpec:
-		return ChurchBuilder.new().build(building.spec as ChurchSpec)
-	if building.spec is CastleSpec:
-		return CastleBuilder.new().build(building.spec as CastleSpec)
-	if building.spec is HotelSpec:
-		return HotelBuilder.new().build(building.plan)
-	if building.spec is HouseSpec:
-		return HouseBuilder.new().build(building.plan)
-	if building.spec is TempleSpec:
-		return TempleBuilder.new().build(building.spec as TempleSpec)
-	if building.request.kind == &"world":
-		return WorldFamilies.build_mesh(building)
-	return null
+	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.for_building(building)
+	return family.build_mesh(building) if family != null else null
 
 
 ## Placement facts shared by scene-based consumers. All families use local -Z
@@ -167,84 +117,18 @@ static func placement(building) -> Dictionary:
 	}
 
 
-## The walls' own outline in XZ, local space -- narrower than `bounds` because
-## `bounds` also covers roof eaves, porches and chimney stacks (house/shop/
-## hotel), battlements and towers (castle), or a facade tower's own footprint
-## (church). `door` always sits on this rect's -Z edge, by construction:
-##  - house, shop, hotel: HouseGeometry.interior_rect(spec), the same rect
-##    HousePlanner places the front door's z on (HousePlan.entrance()'s "pos").
-##  - castle: CastleGeometry.enceinte_rect(spec, 0), the outer ring the
-##    gatehouse is cut into.
-##  - temple: TempleGeometry.site_rect(spec), the outer wall face the gate is
-##    cut through -- used uniformly across forms, including the ziggurat,
-##    whose gate void is voxel-recessed behind the outermost terrace but whose
-##    public-facing gate is still this edge.
-##  - church: the nave rect, EXCEPT when a single axial tower carries the door
-##    out past the nave's own west wall (see `_church_door_z`): then the front
-##    edge follows the door out to that tower's own west face, since the tower
-##    is a real mass of the building, not applique on the nave.
+## The walls' own outline and the front door, from the family itself
+## (API-004). Every family authors its entrance on its own -Z-facing front
+## and knows which of its rects the door sits on; the facade asks rather than
+## keeping a chain of `spec is ChurchSpec` of its own.
 static func _footprint(building) -> Rect2:
-	var spec: RefCounted = building.spec
-	if building.plan != null:
-		return HouseGeometry.interior_rect(building.plan.spec)
-	if spec is ChurchSpec:
-		var church := spec as ChurchSpec
-		var front_z: float = _church_door_z(church)
-		return Rect2(Vector2(-church.width / 2.0, front_z),
-			Vector2(church.width, church.length / 2.0 - front_z))
-	if spec is CastleSpec:
-		return CastleGeometry.enceinte_rect(spec as CastleSpec, 0)
-	if spec is TempleSpec:
-		return TempleGeometry.site_rect(spec as TempleSpec)
-	return Rect2()
+	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.for_building(building)
+	return family.footprint(building) if family != null else Rect2()
 
 
-## Where a family's front door sits, in the same local space as `bounds`. Each
-## family authors its entrance on its own -Z-facing front, so this is read from
-## the plan/spec that produced the mesh rather than re-detected from geometry:
-##  - house, shop, hotel: HousePlan.entrance()'s door position (a HouseGenerator/
-##    ShopGenerator/HotelGenerator all return a HousePlan).
-##  - church: the west door offset ChurchBuilder itself places on -Z, including
-##    the single-axial-tower case where the door rides out on the tower's own
-##    west face.
-##  - castle: the outer ring's gatehouse, CastleGeometry.gatehouse_aabb(spec, 0).
-##  - temple: the gate on the site's front edge (TempleGeometry.site_rect);
-##    used uniformly across forms, including the ziggurat, whose gate void is
-##    voxel-recessed behind the outermost terrace but whose public-facing gate
-##    is still this edge.
 static func _door(building) -> Vector3:
-	var spec: RefCounted = building.spec
-	if building.plan != null:
-		var plan: HousePlan = building.plan
-		var d: int = plan.entrance()
-		if d >= 0:
-			var pos: Vector2 = plan.doors[d]["pos"]
-			return Vector3(pos.x, 1.0, pos.y)
-		return Vector3(0.0, 1.0, 0.0)
-	if spec is ChurchSpec:
-		var church := spec as ChurchSpec
-		return Vector3(0.0, ChurchGeometry.door_height(church) / 2.0, _church_door_z(church))
-	if spec is CastleSpec:
-		var castle := spec as CastleSpec
-		var g: AABB = CastleGeometry.gatehouse_aabb(castle, 0)
-		return Vector3(0.0, g.size.y / 2.0, g.position.z)
-	if spec is TempleSpec:
-		var temple := spec as TempleSpec
-		var r: Rect2 = TempleGeometry.site_rect(temple)
-		var gh: float = minf(TempleGeometry.GATE_H, temple.height - 0.6)
-		return Vector3(0.0, gh / 2.0, r.position.y)
-	return Vector3.ZERO
-
-
-## ChurchBuilder's own door_z formula (see its "main door" section): the west
-## door sits on the nave's own front wall, UNLESS a single axial tower carries
-## it out to that tower's own west face instead.
-static func _church_door_z(church: ChurchSpec) -> float:
-	var l: float = church.length
-	var door_z: float = -l / 2.0 - 0.02
-	if church.tower and church.west_towers == 1:
-		door_z = -l / 2.0 + ChurchGeometry.TOWER_EMBED - church.tower_width - 0.02
-	return door_z
+	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.for_building(building)
+	return family.door(building) if family != null else Vector3.ZERO
 
 
 ## Create a fresh scene instance. Every family includes its prop models: a
@@ -256,20 +140,10 @@ static func instantiate(building, cutaway := false,
 		with_collision := false) -> Node3D:
 	if building == null or not building.is_ok():
 		return null
-	var root: Node3D
-	if building.spec is HotelSpec:
-		root = HotelAssembler.build(building.plan, cutaway)
-	elif building.spec is ShopSpec:
-		root = ShopAssembler.build(building.plan, cutaway)
-	elif building.spec is HouseSpec:
-		root = HouseAssembler.build(building.plan, cutaway)
-	elif building.spec is TempleSpec:
-		root = TempleAssembler.build(building.spec as TempleSpec, cutaway)
-	elif building.spec is ChurchSpec:
-		root = ChurchAssembler.build(building.spec as ChurchSpec, cutaway)
-	elif building.spec is CastleSpec:
-		root = CastleAssembler.build(building.spec as CastleSpec, cutaway)
-	else:
+	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.for_building(building)
+	var root: Node3D = family.instantiate(building, cutaway) if family != null else null
+	if root == null:
+		# a family with no assembler of its own: its mesh, in its own colours
 		var mesh: ArrayMesh = build_mesh(building)
 		if mesh == null:
 			return null
@@ -300,13 +174,6 @@ static func _add_architecture_collision(root: Node3D) -> void:
 	for child in root.get_children():
 		if child is MeshInstance3D and child.name in [&"Shell", &"Stone"]:
 			(child as MeshInstance3D).create_trimesh_collision()
-
-
-static func _copy_size_and_style(request: BuildingRequest, spec: RefCounted) -> void:
-	spec.set("style", request.style)
-	spec.set("width", request.width)
-	spec.set("length", request.length)
-	spec.set("height", request.height)
 
 
 ## Every request is refused on its own terms before a family generator sees
