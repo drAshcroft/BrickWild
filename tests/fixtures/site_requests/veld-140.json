@@ -1,0 +1,32 @@
+{
+  "schema": "dmv.site.request",
+  "schema_version": 1,
+  "world_id": "genesis-000001-1024",
+  "which": "story-1",
+  "node": 7,
+  "cell": 271043,
+  "seed": 12297829382473034410,
+  "regime": "royal",
+  "terrain": {
+    "elevation": 0.31,
+    "slope": 0.04,
+    "water_edges": [
+      "north"
+    ],
+    "forest": 0.22,
+    "fertility": 0.61,
+    "rock": "limestone"
+  },
+  "site_m": 400,
+  "city_id": "site:city-0042",
+  "name": "Veld",
+  "population": 420,
+  "wealth": 830.5,
+  "culture": "river-song",
+  "tongue": "orc",
+  "buildings": {
+    "granary": 0.8,
+    "temple": 1.0,
+    "stone-wall": 0.4
+  }
+}

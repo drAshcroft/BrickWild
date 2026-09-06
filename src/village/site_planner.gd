@@ -62,8 +62,36 @@ const LANDMARK_AREA := 240.0    ## a church and its churchyard
 const LANDMARK_AREA_SMALL := 144.0  ## a shrine's, where the population has not earned a church
 const LANDMARK_GAP := 3.0
 
+## How many back lanes a form lays: one per this many households, within
+## these bounds, and no two closer than LANE_PITCH along the through road.
+## See _back_lanes -- a farm can only satisfy §9.4's `farms outside` on a
+## lane or at the very end of the through road, so lanes are what a farming
+## village is short of.
+const HOUSEHOLDS_PER_LANE := 2
+const MAX_BACK_LANES := 8
+## How far apart two back lanes have to be. A farm lot is about twenty-five
+## metres deep and takes that depth PERPENDICULAR to its lane, so two lanes
+## closer than about fifty metres leave no room for a farm on the ground
+## between them -- every candidate lot overlaps the next lane's ribbon, no
+## lot is cut, and `_trim_lanes` then takes the empty lanes up again. Eight
+## lanes at nine metres gave a village with no lanes at all.
+const LANE_PITCH := 50.0
+## Where a field track may leave the through road, tried in this order.
+##
+## The quarter points first, because that is where a track has the site's
+## whole depth to run out through and a farm on it still has ground either
+## side; then progressively nearer the ends, which is where one has to go
+## when the common and its churchyard have taken the middle. Ends-first put
+## the tracks in the corners, where the ground beside them runs out and the
+## farms went back on the through road.
+const TRACK_SPOTS := [0.25, 0.75, 0.12, 0.88, 0.38, 0.62, 0.06, 0.94, 0.5]
+
 const LANE_LENGTH := 22.0
 const LANE_MIN_LENGTH := 12.0
+## The longest a field track runs. Effectively uncapped: `_stub` clamps it to
+## the site boundary, and reaching the boundary is what makes it a way out to
+## the fields rather than a cul-de-sac.
+const LANE_MAX_LENGTH := 400.0
 const JUNCTION_EPS := 0.5       ## two road vertices this close are the same junction
 
 
@@ -81,11 +109,19 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0) -> Vill
 		return out
 	out.site = site_rect(spec)
 	if site_scale > 1.0:
-		# more ground when the lot planner could not house everyone on the
-		# frontage the form gave it (VIL-006): the same square, grown about
-		# its centre, never past the cap
-		var side: float = minf(out.site.size.x * site_scale, SITE_MAX_SIDE)
-		out.site = Rect2(Vector2(-side * 0.5, -side * 0.5), Vector2(side, side))
+		# More ground when the lot planner could not house everyone on the
+		# frontage the form gave it (VIL-006), grown about the centre and
+		# never past the cap -- but ALONG THE ROAD ONLY.
+		#
+		# A village that outgrows itself gets longer, not wider: the frontage
+		# it was short of is on the through road, and stretching across the
+		# road adds ground with no road on it. Squaring it up also cost a
+		# third of the density -- a 1.3 scale is 1.69 times the area both
+		# ways and 1.3 times along one -- and §9.1's `density` rule, at least
+		# 5 % built, is what noticed (VIL-012).
+		var w: float = minf(out.site.size.x * site_scale, SITE_MAX_SIDE)
+		var h: float = out.site.size.y
+		out.site = Rect2(Vector2(-w * 0.5, -h * 0.5), Vector2(w, h))
 	if not (spec.form in FORMS_SUPPORTED):
 		return out
 
@@ -253,16 +289,199 @@ static func _plan_street(out: VillagePlan, spec: VillageSpec, through: PackedVec
 	var rect: Rect2 = _rect_north_of(through, out.roads[0], mid, width, height, COMMON_ROAD_GAP)
 	out.commons.append({"poly": Poly.from_rect(rect), "kind": &"common"})
 
-	# the landmark slot, BEFORE any lot: behind the common, fronting it.
-	_reserve_landmark(out, spec, rect, site)
+	# The common's other three sides (VIL-012). Without them the common has
+	# frontage on ONE edge -- the through road -- and §9.4's `common` rule,
+	# which wants 60 % of its perimeter fronted, measured 57 %. A back street
+	# round the far side is what a village does about that, and it is the
+	# same shape the `green` form's ring already has.
+	#
+	# A street and not a lane, for a reason §9.2 states: a lane's endpoint has
+	# to be on a street or a through road or at a lot, so a ring of three
+	# lanes meeting each other is three dead ends by the road hierarchy's own
+	# definition. A street may end on a street.
+	var ring_y: float = _ring_street(out, spec, through, rect, site)
 
-	# back lanes: perpendicular off the through road, on the far side from the
-	# common, dead-ending at the farms (§5 "may dead-end at a lot").
-	for f in [-0.3, 0.3]:
-		var idx: int = _vertex_near_x(through, site.position.x + site.size.x * (0.5 + f))
-		var lane: PackedVector2Array = _stub(through, idx, -1.0, LANE_LENGTH, site)
-		if lane.size() == 2:
-			out.roads.append(_road(lane, &"lane", spec.wealth))
+	# the landmark slot, BEFORE any lot: behind the common, fronting it, and
+	# beyond the ring so the churchyard is not laid across the road that
+	# fronts it.
+	var behind_ring: float = -INF if ring_y == -INF else ring_y + _ring_half() + LANDMARK_GAP
+	_reserve_landmark(out, spec, rect, site, behind_ring)
+
+	_field_tracks(out, spec, through, site)
+
+
+## The tracks out to the fields: perpendicular stubs off the through road,
+## running right out to the edge of the site (§5, and §8 "strip fields ...
+## each touching a `track`").
+##
+## A `track` and not a `lane`, and the two road rules between them say why.
+## §9.2's `hierarchy` requires every LANE endpoint to be on a street or a
+## through road or at a lot -- the site boundary is none of those -- while
+## its `dead_ends` rule exempts any endpoint ON the boundary and refuses a
+## lane longer than forty metres that is not. A seventy-metre stub out to the
+## fields is one or the other whichever class it is given, and a track is
+## what it actually is.
+##
+## Both forms get them, and one per two households rather than always two
+## (VIL-012). A lane is the only frontage that reaches OUT toward the edge:
+## a lot on the through road stands its own depth back from it and no
+## further, so on a site whose road runs down the middle every farm on it is
+## dead centre between the two long edges, and §9.4's `farms outside` -- a
+## farm within thirty metres of the edge, its yard to the fields -- cannot be
+## met on the through road at all.
+##
+## THE SIDE IS CHOSEN BY WHICH HAS GROUND, not by which is away from the
+## common. The through road is bowed and sits where the site planner put it,
+## which on a `green` village is eighteen metres from the south edge and
+## seventy from the north; lanes sent dutifully to the "far side from the
+## common" ran off the site and were trimmed away again, leaving six farms of
+## eight in the middle of the village. On the common's own side the lanes
+## step round the common and the landmark, which is what `_extra_lanes`
+## already does.
+static func _field_tracks(out: VillagePlan, spec: VillageSpec,
+		through: PackedVector2Array, site: Rect2) -> void:
+	var lo := INF
+	var hi := -INF
+	for p in through:
+		lo = minf(lo, p.y)
+		hi = maxf(hi, p.y)
+	var north: float = site.end.y - hi
+	var south: float = lo - site.position.y
+	var side: float = 1.0 if north > south else -1.0
+	# clear of the common and its landmark when the lanes go their way
+	var busy := Vector2(INF, -INF)
+	if not out.commons.is_empty() and side > 0.0:
+		var cr: Rect2 = Poly.bounding_rect(out.commons[0]["poly"])
+		busy = Vector2(cr.position.x, cr.end.x)
+		if out.landmark_reserved():
+			var lr: Rect2 = Poly.bounding_rect(out.landmark_site["poly"])
+			busy = Vector2(minf(busy.x, lr.position.x), maxf(busy.y, lr.end.x))
+		busy += Vector2(-LANE_PITCH * 0.5, LANE_PITCH * 0.5)
+
+	# As many as the households want, as many as the ground has room for at
+	# LANE_PITCH apart. `- 1` because n lanes spread evenly over a span leave
+	# n + 1 gaps: four lanes on 221 m sit 45 m apart, which is inside the
+	# pitch, and the guard below then throws three of them away.
+	var room: int = int((site.size.x - SITE_MARGIN_M * 2.0) / LANE_PITCH) - 1
+	var lanes: int = clampi(mini(int(spec.households / HOUSEHOLDS_PER_LANE), room),
+		1, MAX_BACK_LANES)
+	# A lane runs as far toward the edge as the ground allows, because that is
+	# the whole reason it exists: a farm takes the spot nearest the boundary
+	# it can find, and a stub that stops twenty-two metres out on a
+	# seventy-metre side leaves it in the middle of the village. `_trim_lanes`
+	# cuts whatever is left over back to the last lot on it.
+	# `_stub` clamps this to the boundary itself, per vertex -- the road is
+	# bowed, so how far a stub has to run to reach the edge depends on which
+	# vertex it leaves from and at what angle. Asking for the side's own
+	# depth left every lane a few metres short of the edge, which is the
+	# difference between a way out to the fields and a seventy-metre
+	# cul-de-sac.
+	var reach: float = LANE_MAX_LENGTH
+	if (north if side > 0.0 else south) < LANE_MIN_LENGTH + SITE_MARGIN_M:
+		return
+	# Candidate positions from the OUTSIDE IN, alternating ends. Evenly
+	# spaced positions do not survive: a street village's common sits mid-
+	# road, and the span it and its churchyard take up swallowed every one of
+	# three evenly spread candidates on seventeen of fifty seeds, leaving the
+	# village no way out to its own fields. Working inward from the ends also
+	# puts the first tracks where the farms want them.
+	var added := 0
+	for f in TRACK_SPOTS:
+		if added >= lanes:
+			break
+		var x: float = site.position.x + site.size.x * f
+		if x > busy.x and x < busy.y:
+			continue
+		var idx: int = _vertex_near_x(through, x)
+		var lane: PackedVector2Array = _stub(through, idx, side, reach, site, true)
+		if lane.size() != 2:
+			continue
+		# On the boundary, never past it. `_stub` aims at the edge along the
+		# road's own normal and a bowed road's normal is not quite vertical,
+		# so the last metre or two can land outside -- which every check that
+		# holds the plan inside its site rightly refuses.
+		lane = PackedVector2Array([lane[0], Vector2(
+			clampf(lane[1].x, site.position.x, site.end.x),
+			clampf(lane[1].y, site.position.y, site.end.y))])
+		if lane[0].distance_to(lane[1]) < LANE_MIN_LENGTH:
+			continue
+		# Not on top of a track or lane already there. Those two only: the
+		# pitch is what a farm lot needs between one and the next, and
+		# measuring it against the ring STREET rejected every back way a
+		# green village could have had.
+		var taken := false
+		for road in out.roads:
+			if not road["class"] in [&"track", &"lane"]:
+				continue
+			var pts: PackedVector2Array = road["points"]
+			if pts[0].distance_to(lane[0]) < LANE_PITCH:
+				taken = true
+		if not taken:
+			out.roads.append(_road(lane, &"track", spec.wealth))
+			added += 1
+
+
+## What has to fit beyond the ring street for it to be worth laying: the
+## churchyard slot it pushes out. Nothing more -- the landmark IS the lot
+## that fronts the common across the ring, and a lot on the ring's outer side
+## has its front edge seven and a half metres from the common's far edge,
+## well inside §9.4's fourteen-metre reach. Asking for a whole further rank
+## of lots as well took the ring away from every village small enough to
+## need it most.
+const RING_LANDMARK_DEPTH := 16.0
+const RING_LOT_BAND := 0.0
+
+
+## Half the ring street's carriageway plus its verge: the strip nothing may
+## stand in, and what the common and the landmark are held clear of.
+static func _ring_half() -> float:
+	return float(ROAD_CLASSES[&"street"]["width"]) * 0.5 \
+		+ float(ROAD_CLASSES[&"street"]["verge"])
+
+
+## A street up one side of the common, across its far side and back down the
+## other, closed at both ends by the through road itself -- so the graph is
+## one component with no dead end, and every side of the common has a road a
+## lot can front. Returns the y of the far side, or -INF when the site has no
+## room for it and the common keeps its single frontage.
+static func _ring_street(out: VillagePlan, spec: VillageSpec, through: PackedVector2Array,
+		common: Rect2, site: Rect2) -> float:
+	var clear: float = _ring_half() + COMMON_ROAD_GAP
+	var far_y: float = common.end.y + clear
+	# Room for the street, the landmark behind it AND a band of lots beyond
+	# that -- not merely for the street itself.
+	#
+	# The band is the whole point. A back street the village cannot build on
+	# is six metres of ground and a landmark pushed eight metres further out,
+	# and on a ninety-metre site that is the difference between housing nine
+	# households and housing three. So a small village keeps its single
+	# frontage on the through road, and its common is fronted on one side;
+	# a village with the ground gets the street and a common fronted all
+	# round. §9.4's `common` rule is a warning on the ones that cannot.
+	if far_y + _ring_half() + LANDMARK_GAP + RING_LANDMARK_DEPTH + RING_LOT_BAND \
+			> site.end.y - SITE_MARGIN_M:
+		return -INF
+	# The legs must stand OUTSIDE the common, not merely near it: the through
+	# road is sampled every ten metres and bends, so the nearest vertex to a
+	# wanted x can be five metres the wrong side of it -- which laid the lane
+	# through the green on seven of fifty street seeds.
+	var ia: int = _vertex_outside_x(through, common.position.x - clear, -1.0)
+	var ib: int = _vertex_outside_x(through, common.end.x + clear, 1.0)
+	if ia < 0 or ib < 0 or ib - ia < 1:
+		return -INF
+	var west := Vector2(through[ia].x, far_y)
+	var east := Vector2(through[ib].x, far_y)
+	if west.x < site.position.x + SITE_MARGIN_M or east.x > site.end.x - SITE_MARGIN_M:
+		return -INF
+	out.roads.append(_road(PackedVector2Array([through[ia], west]), &"street", spec.wealth))
+	out.roads.append(_road(PackedVector2Array([west, east]), &"street", spec.wealth))
+	out.roads.append(_road(PackedVector2Array([east, through[ib]]), &"street", spec.wealth))
+	return far_y
+
+
+## No road or lot within this of the site edge, matching the lot planner's own
+## SITE_MARGIN.
+const SITE_MARGIN_M := 2.0
 
 
 ## `green`: houses round an open green, the through road across one side of
@@ -308,6 +527,7 @@ static func _plan_green(out: VillagePlan, spec: VillageSpec, through: PackedVect
 	out.roads.append(_road(PackedVector2Array([through[ia], nw]), &"street", spec.wealth))
 	out.roads.append(_road(PackedVector2Array([nw, ne]), &"street", spec.wealth))
 	out.roads.append(_road(PackedVector2Array([ne, through[ib]]), &"street", spec.wealth))
+	_field_tracks(out, spec, through, site)
 
 
 ## §9.1's common: >= 150 m^2, growing a little with the households that have
@@ -376,7 +596,16 @@ static func _landmark_dict(rect: Rect2, kind: StringName, beside: bool) -> Dicti
 
 ## A perpendicular stub off `points[i]`, `sign` < 0 pointing south, clipped to
 ## the site. Two points, or empty when there is no room for a lane at all.
-static func _stub(points: PackedVector2Array, i: int, sign: float, length: float, site: Rect2) -> PackedVector2Array:
+## A perpendicular stub off the through road at vertex `i`, running `sign`
+## (+1 north, -1 south) for at most `length` metres.
+##
+## `to_edge` runs it right out to the site boundary instead of stopping three
+## metres short. That is not cosmetic: §9.2 exempts a road endpoint ON the
+## boundary from the dead-end rule, so a back lane that reaches the fields is
+## a way out of the village and a lane that stops short of them is a
+## seventy-metre cul-de-sac the road check rightly refuses.
+static func _stub(points: PackedVector2Array, i: int, sign: float, length: float,
+		site: Rect2, to_edge := false) -> PackedVector2Array:
 	var start: Vector2 = points[i]
 	var a: int = maxi(0, i - 1)
 	var b: int = mini(points.size() - 1, i + 1)
@@ -384,11 +613,29 @@ static func _stub(points: PackedVector2Array, i: int, sign: float, length: float
 	var normal := Vector2(-tangent.y, tangent.x)
 	if signf(normal.y) != signf(sign):
 		normal = -normal
-	var room: float = (start.y - (site.position.y + 3.0)) if sign < 0.0 else ((site.end.y - 3.0) - start.y)
+	var inset: float = 0.0 if to_edge else 3.0
+	var room: float = (start.y - (site.position.y + inset)) if sign < 0.0 		else ((site.end.y - inset) - start.y)
 	var reach: float = minf(length, room / maxf(absf(normal.y), 0.2))
 	if reach < LANE_MIN_LENGTH:
 		return PackedVector2Array()
 	return PackedVector2Array([start, start + normal * reach])
+
+
+## The road vertex nearest `x` but on the far side of it: `side` -1 wants one
+## at or west of `x`, +1 one at or east. -1 when the road never gets there.
+## Never the polyline's own endpoints, which are the gates.
+static func _vertex_outside_x(points: PackedVector2Array, x: float, side: float) -> int:
+	var best := -1
+	var best_d := INF
+	for i in range(1, maxi(1, points.size() - 1)):
+		# how far past `x` this vertex is, ON the wanted side: positive when
+		# it is on that side, and smallest for the nearest one
+		var d: float = (points[i].x - x) * side
+		if d < -0.001 or d >= best_d:
+			continue
+		best_d = d
+		best = i
+	return best
 
 
 static func _vertex_near_x(points: PackedVector2Array, x: float) -> int:

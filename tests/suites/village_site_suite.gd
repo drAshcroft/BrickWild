@@ -203,8 +203,13 @@ static func _judge(plan: VillagePlan, spec: VillageSpec) -> Array[String]:
 		if plan.roads_of_class(&"street").size() != 3:
 			out.append("green form has %d streets, want a ring of 3" % plan.roads_of_class(&"street").size())
 	else:
-		if plan.roads_of_class(&"lane").is_empty():
-			out.append("street form has no lanes")
+		# The back ways out to the fields are `track`s, not lanes (VIL-012):
+		# they run to the site boundary, which §9.2's `hierarchy` rule
+		# forbids a lane to do and its `dead_ends` rule requires of anything
+		# longer than forty metres. A street village must still have some.
+		if plan.roads_of_class(&"track").is_empty() \
+				and plan.roads_of_class(&"lane").is_empty():
+			out.append("street form has no back way out")
 		for i in plan.roads_of_class(&"lane"):
 			var length: float = Poly.polyline_length(plan.roads[i]["points"])
 			if length > 40.0:

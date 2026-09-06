@@ -29,7 +29,91 @@ static func plan(spec: ShopSpec) -> HousePlan:
 	if front >= 0:
 		_cut_shopfront(out, spec, front)
 		_choose_focus(out, spec, front)
+	_open_up_lodging(out)
 	return out
+
+
+## A trade that lets rooms gives every one of them its own way out (LAY-012).
+##
+## The inn's programme is a dining room, a kitchen and a chain of guest
+## rooms, and a chain is exactly what LAY-007's privacy rule forbids: the
+## spanning tree hangs the second guest room off the first, and the only way
+## to the far bed is through somebody else's. The hotel met the same problem
+## and answered it with a gallery every room opens onto (LAY-008); an inn is
+## too small for a gallery of its own, so its programme carries one when it
+## has the rooms for it and this pass guarantees the invariant either way:
+##
+##   EVERY SLEEPING ROOM HAS A DOOR ONTO A ROOM NOBODY SLEEPS IN.
+##
+## Two remedies, in the order a builder would reach for them. Cut a second
+## door from a room you may walk through -- cheap, and what
+## `HousePlanner._open_up_privacy` does for a house. Failing that, the room
+## the others hang off stops pretending to be a guest room and becomes the
+## landing it has been acting as, which is the same demotion
+## `_demote_through_bedrooms` makes for a house's own bedroom.
+static func _open_up_lodging(out: HousePlan) -> void:
+	for guard in range(6):
+		var stranded := -1
+		for i in range(out.room_count()):
+			if out.kind_of(i) in HouseGeometry.SLEEPING and not _has_public_door(out, i):
+				stranded = i
+				break
+		if stranded < 0:
+			return
+		if _cut_public_door(out, stranded):
+			continue
+		var culprit: int = _sleeping_neighbour(out, stranded)
+		if culprit < 0:
+			return
+		out.rooms[culprit]["kind"] = &"gallery" \
+			if HouseGeometry.room_suits(out, culprit, &"gallery") else &"store"
+
+
+## Does this room open onto anything but another bed? Its own door to the
+## street counts: a room you can walk into from outside is nobody's corridor.
+static func _has_public_door(plan: HousePlan, room: int) -> bool:
+	for di in plan.doors_of(room):
+		var door: Dictionary = plan.doors[di]
+		var other: int = int(door["b"]) if int(door["a"]) == room else int(door["a"])
+		if other < 0 or not plan.kind_of(other) in HouseGeometry.SLEEPING:
+			return true
+	return false
+
+
+## Cut a door from `room` into the widest wall it shares with a room nobody
+## sleeps in. False when it shares no such wall wide enough for a door.
+static func _cut_public_door(plan: HousePlan, room: int) -> bool:
+	var best: Array = []
+	var best_run := 0.0
+	var best_j := -1
+	for j in range(plan.room_count()):
+		if j == room or plan.kind_of(j) in HouseGeometry.SLEEPING:
+			continue
+		var edge: Array = HousePlanner._shared_edge(plan, room, j)
+		if edge.is_empty():
+			continue
+		var run: float = edge[3] - edge[2]
+		if run < HouseGeometry.INNER_DOOR_W + HouseGeometry.DOOR_CORNER_MARGIN * 2.0:
+			continue
+		if run > best_run:
+			best_run = run
+			best = edge
+			best_j = j
+	if best_j < 0:
+		return false
+	HousePlanner._add_inner_door(plan, best_j, room, best)
+	return true
+
+
+## The sleeping room `room` hangs off: the one that has to stop being a
+## bedroom for this one to be reachable.
+static func _sleeping_neighbour(plan: HousePlan, room: int) -> int:
+	for di in plan.doors_of(room):
+		var door: Dictionary = plan.doors[di]
+		var other: int = int(door["b"]) if int(door["a"]) == room else int(door["a"])
+		if other >= 0 and plan.kind_of(other) in HouseGeometry.SLEEPING:
+			return other
+	return -1
 
 
 ## The shopfront (LAY-009): a hatch in the street wall of the front room,

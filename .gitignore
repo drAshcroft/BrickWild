@@ -13,3 +13,15 @@ __pycache__/
 
 # Art packs: BigGlade is private and props are not published with it
 assets/props/dungeon/
+
+# The two nature packs, on the same footing as the dungeon kit above: the art
+# is licensed to the machine, not published with the source. The READMEs stay,
+# so where each pack came from and how it was prefixed is on the record.
+assets/props/nature/*
+!assets/props/nature/README.md
+assets/props/wild/*
+!assets/props/wild/README.md
+
+# Suite logs and one-off exports from a working session
+scratch/logs/
+scratch/*.json

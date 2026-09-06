@@ -12,6 +12,7 @@ extends SceneTree
 ##   1 library    - the public request/generate/build contract
 ##   1a placement - placement()'s door contract and Placement.world_rect
 ##   1b poly      - polygon geometry helpers and WalkGrid rasterisation
+##   1c props     - the small props no art pack ships (well, palisade, ...)
 ##   2 church     - the spec/build contract itself
 ##   3 normals    - the surfaces face the way they are meant to
 ##   4 massing    - structural correctness of what that contract produced
@@ -42,7 +43,7 @@ extends SceneTree
 ##  28 vcheck     - the village checks: scale, roads, lots, places (VIL-006..009)
 ##  29 world      - the buildings of the wider world (WORLD_BUILDINGS), as
 ##                  archetype rows; `warchetype` is the same suite
-const ORDER: Array[String] = ["library", "placement", "poly", "church", "normals", "massing", "blueprint", "landmark",
+const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing",
 	"house", "assets", "houseqa", "hmultistory", "harchetype",
 	"shop", "sarchetype",
@@ -59,6 +60,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return PlacementSuite.run()
 		"poly":
 			return PolySuite.run()
+		"props":
+			return PropKitSuite.run()
 		"church":
 			return ChurchSuite.run()
 		"normals":

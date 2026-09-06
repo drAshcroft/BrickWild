@@ -6,106 +6,38 @@ extends RefCounted
 ## boundary keeps every existing family representation and builder intact;
 ## later renderers and serializers can grow behind it without changing callers.
 
-const API_VERSION := 1
-const _KINDS: Array[StringName] = [&"church", &"castle", &"house", &"shop", &"hotel", &"temple", &"world"]
-const _DESCRIPTORS := {
-	&"church": {
-		"label": "Church", "size_label": "Nave", "height_label": "Eaves height (m)",
-		"width": {"min": 6.0, "max": 24.0, "step": 0.5, "value": 10.0},
-		"length": {"min": 10.0, "max": 60.0, "step": 1.0, "value": 22.0},
-		"height": {"min": 6.0, "max": 30.0, "step": 0.5, "value": 12.0},
-	},
-	&"castle": {
-		"label": "Castle", "size_label": "Site", "height_label": "Wall height (m)",
-		"width": {"min": 6.0, "max": 320.0, "step": 1.0, "value": 55.0},
-		"length": {"min": 8.0, "max": 400.0, "step": 1.0, "value": 50.0},
-		"height": {"min": 3.0, "max": 40.0, "step": 0.5, "value": 18.0},
-	},
-	&"temple": {
-		"label": "Temple", "size_label": "Temple", "height_label": "Hall height (m)",
-		"width": {"min": 14.0, "max": 60.0, "step": 1.0, "value": 26.0},
-		"length": {"min": 22.0, "max": 100.0, "step": 1.0, "value": 44.0},
-		"height": {"min": 6.0, "max": 26.0, "step": 0.5, "value": 12.0},
-	},
-	&"house": {
-		"label": "House", "size_label": "House", "height_label": "Ceiling (m)",
-		"width": {"min": 5.0, "max": 20.0, "step": 0.5, "value": 9.0},
-		"length": {"min": 6.0, "max": 26.0, "step": 0.5, "value": 12.0},
-		"height": {"min": 2.2, "max": 3.6, "step": 0.1, "value": 2.6},
-		"storeys": {"min": 1, "max": 3, "step": 1, "value": 1},
-	},
-	&"shop": {
-		"label": "Shop / Civic Building", "size_label": "Building", "height_label": "Ceiling (m)",
-		"width": {"min": 7.0, "max": 24.0, "step": 0.5, "value": 11.0},
-		"length": {"min": 8.0, "max": 32.0, "step": 0.5, "value": 14.0},
-		"height": {"min": 2.4, "max": 4.2, "step": 0.1, "value": 2.8},
-		"storeys": {"min": 1, "max": 3, "step": 1, "value": 1},
-	},
-	&"hotel": {
-		"label": "Grand Hotel", "size_label": "Hotel", "height_label": "Floor height (m)",
-		"width": {"min": 30.0, "max": 80.0, "step": 1.0, "value": 48.0},
-		"length": {"min": 16.0, "max": 42.0, "step": 1.0, "value": 24.0},
-		"height": {"min": 3.0, "max": 4.5, "step": 0.1, "value": 3.6},
-		"storeys": {"min": 3, "max": 3, "step": 1, "value": 3},
-	},
-	# the buildings of the wider world (WLD-000): `style` is the family and
-	# `purpose` its sub-kind; WorldFamilies is the registry and every family
-	# narrows this envelope with its own
-	&"world": {
-		"label": "World building", "size_label": "Building", "height_label": "Height (m)",
-		"width": {"min": 4.0, "max": 120.0, "step": 0.5, "value": 20.0},
-		"length": {"min": 4.0, "max": 120.0, "step": 0.5, "value": 30.0},
-		"height": {"min": 2.2, "max": 40.0, "step": 0.1, "value": 6.0},
-	},
-}
+## The public API version. BuildingLibrary owns the tables this facade
+## publishes and validates against; the version is re-exported here because
+## it is part of what every descriptor and placement carries.
+const API_VERSION := BuildingLibrary.API_VERSION
 
 
 static func kinds() -> Array[StringName]:
-	return _KINDS.duplicate()
+	return BuildingLibrary.kinds()
 
 
-## Public controls and supported envelopes for one family. The returned data is
-## detached from the library's tables so consumers cannot mutate global state.
+## Public controls and supported envelopes for one family: its label, its
+## size envelope, and -- the option-discovery contract -- `styles` and
+## `purposes`, each an ordered array of {"id", "label"}, plus the words this
+## family calls them (`style_label`, `purpose_label`). A caller can fill a
+## menu and build a valid request from this alone, without importing a single
+## family header.
+##
+## The returned data is detached from the library's tables, so consumers
+## cannot mutate global state by editing what they were handed.
 static func describe_kind(kind: StringName) -> Dictionary:
-	if not _DESCRIPTORS.has(kind):
-		return {}
-	var out: Dictionary = _DESCRIPTORS[kind].duplicate(true)
-	out["kind"] = kind
-	out["api_version"] = API_VERSION
-	var style_table: Dictionary
-	var purpose_table: Dictionary = {}
-	match kind:
-		&"church":
-			style_table = ChurchSpec.STYLES
-		&"castle":
-			style_table = CastleSpec.STYLES
-		&"house":
-			style_table = HouseSpec.STYLES
-			purpose_table = HouseSpec.TRADES
-		&"shop":
-			style_table = HouseSpec.STYLES
-			purpose_table = ShopSpec.BUSINESSES
-		&"hotel":
-			style_table = HotelSpec.HOTEL_STYLES
-		&"temple":
-			style_table = TempleSpec.FORMS
-			purpose_table = TempleSpec.CULTS
-		&"world":
-			# families and their sub-kinds, with each family's own envelope
-			var families: Array[Dictionary] = []
-			var kinds: Array[Dictionary] = []
-			for f in WorldFamilies.families():
-				families.append({"id": f, "label": WorldFamilies.FAMILIES[f]["label"],
-					"envelope": WorldFamilies.envelope(f), "kinds": WorldFamilies.kinds_of(f)})
-				for k in WorldFamilies.kinds_of(f):
-					kinds.append({"id": k, "label": String(k).capitalize()})
-			out["styles"] = families
-			out["purposes"] = kinds
-			out["families"] = families
-			return out
-	out["styles"] = _options(style_table)
-	out["purposes"] = _options(purpose_table)
-	return out
+	return BuildingLibrary.describe(kind)
+
+
+## A valid request for a kind, filled from that kind's own default envelope.
+static func default_request(kind: StringName, p_seed: int = 0) -> BuildingRequest:
+	return BuildingLibrary.defaults(kind, p_seed)
+
+
+## The word for one option id, for a caller that has to print it.
+static func option_label(kind: StringName, field: StringName,
+		id: StringName) -> String:
+	return BuildingLibrary.option_label(kind, field, id)
 
 
 ## Generate the family-specific representation without emitting an ArrayMesh.
@@ -165,8 +97,34 @@ static func generate(request: BuildingRequest) -> GeneratedBuilding:
 	return out
 
 
+## The middle stage (API-003): what the building IS, family-native and
+## serialisable, with its placement already measured. `generate()` above is
+## still the whole of the generation -- this wraps its result in the shape
+## that crosses a boundary, and `build_mesh()` below takes either.
+##
+##     request --generate_document--> BuildingDocument --build_mesh--> mesh
+##
+## The payload inside is the family's own plan or spec, untouched, so the
+## mesh built from a document is the same mesh vertex for vertex.
+static func generate_document(request: BuildingRequest) -> BuildingDocument:
+	var made: GeneratedBuilding = generate(request)
+	var out := BuildingDocument.new()
+	out.request = made.request
+	out.errors = made.errors
+	if not made.is_ok():
+		return out
+	out.spec = made.spec
+	out.plan = made.plan
+	out.placement = placement(made)
+	return out
+
+
 ## Emit a fresh mesh from a successful generated representation.
-static func build_mesh(building: GeneratedBuilding) -> ArrayMesh:
+##
+## Takes a `GeneratedBuilding` or a `BuildingDocument` -- the two carry the
+## same three fields the dispatch reads (`spec`, `plan`, `request`), and a
+## document exists precisely so a caller can hold one instead of the other.
+static func build_mesh(building) -> ArrayMesh:
 	if building == null or not building.is_ok():
 		return null
 	if building.spec is ChurchSpec:
@@ -192,7 +150,7 @@ static func build_mesh(building: GeneratedBuilding) -> ArrayMesh:
 ## than `bounds` -- and is what `door` sits on the -Z edge of. Neither is
 ## merely copied from the requested envelope: both are read from the plan/spec
 ## that produced the mesh.
-static func placement(building: GeneratedBuilding) -> Dictionary:
+static func placement(building) -> Dictionary:
 	var mesh: ArrayMesh = build_mesh(building)
 	if mesh == null:
 		return {}
@@ -225,7 +183,7 @@ static func placement(building: GeneratedBuilding) -> Dictionary:
 ##    out past the nave's own west wall (see `_church_door_z`): then the front
 ##    edge follows the door out to that tower's own west face, since the tower
 ##    is a real mass of the building, not applique on the nave.
-static func _footprint(building: GeneratedBuilding) -> Rect2:
+static func _footprint(building) -> Rect2:
 	var spec: RefCounted = building.spec
 	if building.plan != null:
 		return HouseGeometry.interior_rect(building.plan.spec)
@@ -254,7 +212,7 @@ static func _footprint(building: GeneratedBuilding) -> Rect2:
 ##    used uniformly across forms, including the ziggurat, whose gate void is
 ##    voxel-recessed behind the outermost terrace but whose public-facing gate
 ##    is still this edge.
-static func _door(building: GeneratedBuilding) -> Vector3:
+static func _door(building) -> Vector3:
 	var spec: RefCounted = building.spec
 	if building.plan != null:
 		var plan: HousePlan = building.plan
@@ -294,7 +252,7 @@ static func _church_door_z(church: ChurchSpec) -> float:
 ## its pews and candelabra, a castle its trestles, banners and courtyard.
 ## When `with_collision` is true, only the generated architectural shell gets
 ## trimesh collision; furniture and dressing remain visual details.
-static func instantiate(building: GeneratedBuilding, cutaway := false,
+static func instantiate(building, cutaway := false,
 		with_collision := false) -> Node3D:
 	if building == null or not building.is_ok():
 		return null
@@ -351,94 +309,12 @@ static func _copy_size_and_style(request: BuildingRequest, spec: RefCounted) -> 
 	spec.set("height", request.height)
 
 
+## Every request is refused on its own terms before a family generator sees
+## it, against the same rows describe_kind() publishes (API-002).
 static func _validate(out: GeneratedBuilding) -> void:
-	var request := out.request
-	var known_kind := request.kind in _KINDS
-	if not known_kind:
-		_add_error(out, &"unknown_kind", &"kind",
-			"Unknown building kind '%s'." % String(request.kind))
-	for field in [&"width", &"length", &"height"]:
-		var value: float = request.get(field)
-		if not is_finite(value) or value <= 0.0:
-			_add_error(out, &"invalid_dimension", field,
-				"%s must be a positive finite number." % String(field))
-		elif known_kind:
-			var limits: Dictionary = _DESCRIPTORS[request.kind][field]
-			if value < float(limits["min"]) or value > float(limits["max"]):
-				_add_error(out, &"dimension_out_of_range", field,
-					"%s must be between %s and %s metres for a %s." % [
-						String(field), limits["min"], limits["max"], String(request.kind)])
-	if not known_kind:
-		return
-	if request.kind == &"house" or request.kind == &"shop":
-		if request.storeys < 1 or request.storeys > 3:
-			_add_error(out, &"storeys_out_of_range", &"storeys",
-				"storeys must be between 1 and 3 for a house.")
-
-	match request.kind:
-		&"church":
-			_validate_style(out, ChurchSpec.STYLES, &"style")
-			_validate_empty_purpose(out)
-		&"castle":
-			_validate_style(out, CastleSpec.STYLES, &"style")
-			_validate_empty_purpose(out)
-		&"house":
-			_validate_style(out, HouseSpec.STYLES, &"style")
-			if not HouseSpec.TRADES.has(request.purpose):
-				_add_error(out, &"unknown_trade", &"purpose",
-					"Unknown house trade '%s'." % String(request.purpose))
-		&"shop":
-			_validate_style(out, HouseSpec.STYLES, &"style")
-			if not ShopSpec.BUSINESSES.has(request.purpose):
-				_add_error(out, &"unknown_business", &"purpose",
-					"Unknown shop business '%s'." % String(request.purpose))
-		&"hotel":
-			_validate_style(out, HotelSpec.HOTEL_STYLES, &"style")
-			_validate_empty_purpose(out)
-		&"temple":
-			_validate_style(out, TempleSpec.FORMS, &"form")
-			if not TempleSpec.CULTS.has(request.purpose):
-				_add_error(out, &"unknown_cult", &"purpose",
-					"Unknown temple cult '%s'." % String(request.purpose))
-		&"world":
-			if not WorldFamilies.has_family(request.style):
-				_add_error(out, &"unknown_family", &"style",
-					"Unknown world family '%s'." % String(request.style))
-			elif not request.purpose in WorldFamilies.kinds_of(request.style):
-				_add_error(out, &"unknown_kind", &"purpose",
-					"Unknown %s kind '%s'." % [String(request.style), String(request.purpose)])
-			else:
-				var env: Dictionary = WorldFamilies.envelope(request.style)
-				for field in [&"width", &"length", &"height"]:
-					var value: float = request.get(field)
-					var lim: Dictionary = env[field]
-					if value < float(lim["min"]) or value > float(lim["max"]):
-						_add_error(out, &"dimension_out_of_range", field,
-							"%s must be between %s and %s metres for a %s." % [
-								String(field), lim["min"], lim["max"], String(request.style)])
-
-
-static func _validate_style(out: GeneratedBuilding, table: Dictionary,
-		field: StringName) -> void:
-	if not table.has(out.request.style):
-		_add_error(out, &"unknown_%s" % String(field), field,
-			"Unknown %s '%s' for %s." % [String(field), String(out.request.style),
-				String(out.request.kind)])
-
-
-static func _validate_empty_purpose(out: GeneratedBuilding) -> void:
-	if out.request.purpose != &"":
-		_add_error(out, &"unsupported_purpose", &"purpose",
-			"%s requests do not use a purpose." % String(out.request.kind).capitalize())
+	out.errors.append_array(BuildingLibrary.validate(out.request))
 
 
 static func _add_error(out: GeneratedBuilding, code: StringName,
 		field: StringName, message: String) -> void:
 	out.errors.append({"code": code, "field": field, "message": message})
-
-
-static func _options(table: Dictionary) -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
-	for id in table:
-		out.append({"id": id, "label": table[id]["label"]})
-	return out

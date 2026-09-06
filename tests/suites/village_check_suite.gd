@@ -353,6 +353,17 @@ static func _place_fixtures(res: SuiteResult, base: VillagePlan) -> void:
 	# gradient: the biggest houses furthest from the common
 	var p12 := _copy(base)
 	if houses.size() >= 5:
+		# The rule measures the houses free to stand round the common, which
+		# is every house but a farm -- a farm answers to `farms outside`
+		# instead. A farming village is mostly farms, so the fixture makes
+		# these ordinary houses first; otherwise it is holding out a set the
+		# rule does not look at and calling the silence a pass.
+		# a DETACHED request: `_copy` shares them with the base plan, and
+		# every fixture after this one is built from that same base
+		for i in houses:
+			var detached: BuildingRequest = (p12.buildings[i]["request"] as BuildingRequest).copy()
+			detached.purpose = &"none"
+			p12.buildings[i]["request"] = detached
 		var order: Array = houses.duplicate()
 		order.sort_custom(func(a, b) -> bool:
 			return VillageMeasure.centre(VillageMeasure.footprint_poly(p12.buildings[a])).distance_to(cc) \
@@ -381,13 +392,21 @@ static func _place_fixtures(res: SuiteResult, base: VillagePlan) -> void:
 ## site, and the follow-up that would: they are counted and printed here,
 ## and fail a fixture but not the sweep, so the check keeps measuring them
 ## without pretending the planner meets them (VILLAGES 9, 12).
+## The arrangement pass (VIL-012) settled `density` and `common` -- both are
+## gone from this list -- and took `gradient` from seven villages in
+## twenty-four to one and `tavern` from nine to three. What is left is what
+## the planner still cannot always do:
 const PLANNER_FOLLOW_UPS := {
-	"density": "the site planner grows the ground for farms (VIL-006 note); a farm-aware site_rect would keep it tight",
-	"tavern": "the lot planner does not yet steer the tavern toward a gate (VIL-004 follow-up)",
+	"tavern": "the tavern takes the upwind gate and the smithy the downwind edge; on a short through road one of them loses (VIL-004 follow-up)",
 	"gradient": "big lots do not always fit nearest the common (VIL-004 follow-up)",
-	"common": "the green's far side is the churchyard; frontage round it is a site planner matter (VIL-003)",
 	"smithy": "through-road frontage runs out on a small site (VIL-003 follow-up)",
 	"landmark": "no view corridor is kept from the gates (VIL-003 follow-up)",
+	# A farm can only be within thirty metres of the edge on a field track or
+	# at the very end of the through road, and a village with more farms than
+	# track frontage runs out of both. VIL-012 took this from every farm in a
+	# farming village to the last one or two in three villages of twenty-four;
+	# closing it wants tracks on both sides of the road, which is VIL-003's.
+	"farms": "the last farm or two run out of field-track frontage (VIL-003 follow-up)",
 }
 
 static func _sweep(res: SuiteResult) -> void:

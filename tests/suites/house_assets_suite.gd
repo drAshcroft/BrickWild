@@ -27,8 +27,24 @@ static func run() -> SuiteResult:
 			res.fail("%s could not be loaded from %s" % [key, path])
 			continue
 		var node: Node = packed.instantiate()
-		var measured: AABB = SceneBounds.of_node(node)
+		# A plant is measured from its vertices, with a crown and a stem
+		# radius, exactly as the tool measured it -- see
+		# SceneBounds.plant_of_node(). Measuring it the other way here would
+		# fail every tree in the catalogue for being the size it is.
+		var plant := {}
+		if PropCatalog.has_tag(key, PropCatalog.PLANT):
+			plant = SceneBounds.plant_of_node(node)
+		var measured: AABB = plant["box"] if plant.has("box") else SceneBounds.of_node(node)
 		node.queue_free()
+		if not plant.is_empty():
+			res.checked += 1
+			if absf(float(plant["canopy"]) - PropCatalog.canopy(key)) > TOL \
+					or absf(float(plant["trunk"]) - PropCatalog.trunk(key)) > TOL:
+				res.fail("%s has a %.2fm crown over a %.2fm stem; the catalogue says %.2f over %.2f"
+					% [key, plant["canopy"], plant["trunk"],
+						PropCatalog.canopy(key), PropCatalog.trunk(key)])
+			elif PropCatalog.canopy(key) <= 0.0:
+				res.fail("%s is a plant with no measured canopy" % key)
 		var want: Vector3 = PropCatalog.size(key)
 		if (measured.size - want).length() > TOL:
 			res.fail("%s measures %.3f x %.3f x %.3f, the catalogue says %.3f x %.3f x %.3f"

@@ -27,6 +27,46 @@ does not mutate the request, and does not emit geometry until `build_mesh()`.
 `placement()` reports measured bounds, footprint, identity and the local -Z
 front. The third `instantiate()` argument opts into shell-only collision.
 
+### Discovering what to ask for
+
+`BigGlade.describe_kind()` publishes everything a caller needs to build a
+valid request without importing a single family header: the size envelope,
+the labels, and — the option-discovery contract — `styles` and `purposes`,
+each an ordered array of `{"id", "label"}`, alongside the words that family
+calls them (`style_label`, `purpose_label`: a temple has a form and a cult, a
+shop a style and a business).
+
+```gdscript
+var d := BigGlade.describe_kind(&"shop")     # d["purpose_label"] == "Business"
+for option in d["purposes"]:
+	print(option["id"], " ", option["label"])
+var request := BigGlade.default_request(&"shop", 1234)   # valid, from d's own defaults
+print(BigGlade.option_label(&"shop", &"purpose", request.purpose))
+```
+
+`src/api/building_library.gd` owns those tables, and the same rows that
+publish them are the rows a request is validated against, so anything offered
+can be built and anything built was offered. Every request is refused on its
+own terms — with `{"code", "field", "message"}` errors — before a family
+generator sees it.
+
+### Documents: what a building is, before anything draws it
+
+`generate()` hands back the family's own live object. `generate_document()`
+wraps it in the shape that crosses a boundary:
+
+```gdscript
+var doc: BuildingDocument = BigGlade.generate_document(request)
+var mesh: ArrayMesh = BigGlade.build_mesh(doc)      # same mesh, vertex for vertex
+var json := JSON.stringify(doc.to_dict())           # plain data: no BigGlade needed to read it
+```
+
+The payload inside a document is the family's plan or spec **untouched**, so
+building from a document and building from the generation that made it give
+the same mesh; `to_dict()` is the same building as plain dictionaries, arrays
+and numbers, with `placement` already measured. `tools/export_village_plan.gd`
+is the same idea one level up, for a whole village.
+
 House requests accept one to three explicit storeys. `height` remains the
 floor-to-ceiling height of each storey. The retained `HousePlan` labels rooms,
 openings and furniture by storey and records the stair links between floors;

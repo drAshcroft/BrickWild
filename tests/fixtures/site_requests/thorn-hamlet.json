@@ -1,0 +1,29 @@
+{
+  "schema": "dmv.site.request",
+  "schema_version": 1,
+  "world_id": "genesis-000001-1024",
+  "which": "story-1",
+  "node": 7,
+  "cell": 271043,
+  "seed": 12297829382473034410,
+  "regime": "royal",
+  "terrain": {
+    "elevation": 0.6,
+    "slope": 0.12,
+    "water_edges": [],
+    "forest": 0.7,
+    "fertility": 0.3,
+    "rock": "granite"
+  },
+  "site_m": 400,
+  "city_id": "site:city-0101",
+  "name": "Thorn",
+  "population": 26,
+  "wealth": 90.0,
+  "culture": "fjord",
+  "tongue": "dwarf",
+  "buildings": {
+    "palisade": 0.5,
+    "granary": 0.3
+  }
+}

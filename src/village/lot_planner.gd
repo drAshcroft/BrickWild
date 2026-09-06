@@ -58,10 +58,6 @@ const ROAD_RANK := {&"through": 0, &"street": 1, &"lane": 2, &"track": 3, &"path
 ## important road meeting there.
 const CORNER_RADIUS := 10.0
 
-## Placing order: the landmark and the lord first (they get their own lanes),
-## then the trades on the through road, then the households.
-const KIND_PRIORITY := {&"church": 0, &"manor": 1, &"shop": 2, &"townhouse": 3, &"farm": 4, &"cottage": 5}
-
 const LANE_HALF := 1.25 + 0.5   ## a lane's carriageway half-width plus its verge
 const SMITHY_CLEAR := 12.0      ## the smithy from the church and the tavern (VILLAGES 6)
 const SITE_MARGIN := 2.0        ## no lot within this of the site edge
@@ -101,8 +97,21 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 ## house everyone: more back lanes first, then more ground with more lanes.
 ## Farms with their six-metre fire gaps and seven-metre setbacks are what
 ## push a small village up this list.
-const RETRIES := [[2, 1.0], [4, 1.0], [4, 1.15], [6, 1.15], [6, 1.3], [8, 1.3],
-	[8, 1.45], [10, 1.45], [10, 1.6], [12, 1.75], [12, 2.0]]
+##
+## Two changes here are the whole of the density fix (VIL-012), and both are
+## about buying FRONTAGE rather than ground -- §9.1's `density` rule is built
+## area over site area, at least 0.05, and four villages in twenty-four were
+## failing it because a farm that would not fit grew the ground twice over.
+##
+##   * every lane is tried before a single metre of ground is added: a lane
+##     is frontage on ground the village already has.
+##   * the scales run further, because the site now stretches ALONG the road
+##     rather than squaring up (see VillageSitePlanner.plan). A stretch of
+##     2.0 is twice the area and twice the through-road frontage; squaring up
+##     by 1.45 is the same area and only 1.45 times the frontage.
+const RETRIES := [[2, 1.0], [4, 1.0], [6, 1.0], [8, 1.0], [10, 1.0], [12, 1.0],
+	[8, 1.3], [10, 1.3], [12, 1.3], [10, 1.6], [12, 1.6], [12, 2.0],
+	[12, 2.5], [12, 3.0], [12, 3.5]]
 
 
 const MAX_EXTRA_LANES := 12
@@ -129,9 +138,11 @@ static func _trim_lanes(plan: VillagePlan) -> void:
 		if reserved:
 			r -= 1
 			continue
-		# the far end on another road is not a dead end
+		# the far end on another road -- or out on the site boundary, which is
+		# the way to the fields -- is not a dead end, and must not be trimmed
+		# back into one (VILLAGES 9.2)
 		var far: Vector2 = pts[1]
-		var joined := false
+		var joined: bool = VillageMeasure.on_boundary(plan.site, far)
 		for j in range(plan.roads.size()):
 			if j != r and VillageSitePlanner._on_polyline(far, plan.roads[j]["points"]):
 				joined = true
@@ -197,17 +208,21 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	if plan == null or plan.roads.is_empty():
 		return measured.size()
 	var jobs: Array[Dictionary] = measured.duplicate()
-	# the landmark and the lord first, then the trades, then the households
-	# biggest first -- placed nearest the common first, which is the wealth
-	# gradient (VILLAGES 6)
+	for job in jobs:
+		job["siting"] = siting_of(job["request"], job["class"])
+	# The arrangement order (VILLAGES §6): the landmark and the lord first
+	# because they take their own lanes; then the trades that INSIST on where
+	# they stand -- the smithy on the through road at the downwind edge, the
+	# tavern on it by a gate -- while that road is still empty; then the rest
+	# of the trades; then every household, biggest first.
 	jobs.sort_custom(func(a, b) -> bool:
-		var pa: int = mini(int(KIND_PRIORITY.get(a["class"], 9)), 3)
-		var pb: int = mini(int(KIND_PRIORITY.get(b["class"], 9)), 3)
+		var pa: int = _order_of(a)
+		var pb: int = _order_of(b)
 		if pa != pb:
 			return pa < pb
-		if pa == 3:
-			var aa: float = float(a["footprint"].size.x) * float(a["footprint"].size.y)
-			var ab: float = float(b["footprint"].size.x) * float(b["footprint"].size.y)
+		if pa == _ORDER_HOUSE:
+			var aa: float = _floor_area(a)
+			var ab: float = _floor_area(b)
 			if absf(aa - ab) > 0.01:
 				return aa > ab
 		return int(a["order"]) < int(b["order"]))
@@ -216,6 +231,14 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	var placed: int = 0
 	var landmark_lane: int = -1
 	var manor_lane: int = -1
+	# The wealth gradient (VILLAGES §6), enforced rather than hoped for: the
+	# households are handed over biggest first, and no house may stand nearer
+	# the common than a bigger one already does, less `GRADIENT_SLACK`. The
+	# slack is what keeps the rule from emptying a street -- a house that must
+	# be a few metres inside its predecessor still reads as the same rank --
+	# and without the rule at all the correlation came out at -0.24, because a
+	# big house that would not fit near the common let every smaller one past.
+	var gradient_floor := 0.0
 	for job in jobs:
 		var cls: StringName = job["class"]
 		if cls == &"church" and plan.landmark_reserved():
@@ -229,12 +252,53 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 			if manor_lane < 0:
 				manor_lane = _add_manor_lane(plan, job)
 				ctx = _context(plan)
-			if manor_lane >= 0 and _place_on_road(plan, ctx, job, [manor_lane]):
+			if manor_lane >= 0 and _place_on_road(plan, ctx, job, [manor_lane], 0.0) >= 0.0:
 				placed += 1
 				continue
-		if _place_on_road(plan, ctx, job, _open_roads(plan, [landmark_lane, manor_lane])):
+		var floor_for: float = gradient_floor if _order_of(job) == _ORDER_HOUSE else 0.0
+		var got: float = _place_on_road(plan, ctx, job,
+			_open_roads(plan, [landmark_lane, manor_lane]), floor_for)
+		if got >= 0.0:
 			placed += 1
+			if _order_of(job) == _ORDER_HOUSE:
+				gradient_floor = maxf(gradient_floor, got)
 	return jobs.size() - placed
+
+
+## Placing order. Kept as its own function because three things read it: the
+## sort, the gradient rule (which applies to households and nothing else) and
+## the retry accounting.
+const _ORDER_LANDMARK := 0
+const _ORDER_LORD := 1
+const _ORDER_SITED_TRADE := 2   ## the smithy and the tavern: §6 says WHERE
+const _ORDER_TRADE := 3
+const _ORDER_HOUSE := 4
+## Farms last: they want the edge, and taking their frontage after the
+## households have taken theirs is what keeps them out of the middle.
+const _ORDER_FARM := 5
+
+## How far inside an already-placed bigger house a smaller one may stand.
+const GRADIENT_SLACK := 6.0
+
+
+static func _order_of(job: Dictionary) -> int:
+	var cls: StringName = job["class"]
+	match cls:
+		&"church":
+			return _ORDER_LANDMARK
+		&"manor":
+			return _ORDER_LORD
+		&"farm":
+			return _ORDER_FARM
+		&"shop":
+			return _ORDER_SITED_TRADE if bool(job["siting"].get("insists", false)) \
+				else _ORDER_TRADE
+	return _ORDER_HOUSE
+
+
+static func _floor_area(job: Dictionary) -> float:
+	var fp: Rect2 = job["footprint"]
+	return fp.size.x * fp.size.y
 
 
 ## Everything the legality checks need that depends only on the ROADS: the
@@ -383,63 +447,192 @@ static func _open_roads(plan: VillagePlan, reserved: Array) -> Array:
 	return out
 
 
-static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary, roads: Array) -> bool:
+## VILLAGES §6, as a table: where each thing goes, so the arrangement is one
+## readable rule per row instead of a special case buried in the placer.
+##
+##   road      the road class it insists on; empty means any road will do
+##   insists   true for the trades §6 gives a PLACE, not just a road -- they
+##             are placed before the households, while that road is empty
+##   toward    what the candidate frontages are sorted by:
+##               &"common"  nearest the common's centre first (the default:
+##                          the village fills from the middle outward)
+##               &"gate"    nearest a gate first
+##               &"edge"    furthest from the common first
+##               &"outside" nearest the SITE BOUNDARY first, which is not the
+##                          same thing at all once the site stretches along
+##                          its road: the far end of the through road is a
+##                          long way from the common and still dead centre
+##                          between the north and south edges, which is
+##                          exactly where §9.4 says a farm may not stand
+##   side      &"east" or &"west": only frontages that side of the common,
+##             unless there are none at all. The smithy is downwind (+x by
+##             convention) for the fire, the noise and the smell; the tavern
+##             is upwind of it, at the other gate, for the same reason -- and
+##             because the two chasing the same end of the through road is
+##             what made the smithy's twelve-metre clearance from the tavern
+##             fail on a small site.
+##
+## A row's `road` is a preference, not a wall: a thing that cannot find any
+## frontage on the road it wants falls back to the rest, because a village
+## with an unhoused smithy is worse than one with a smithy on a lane.
+## A farm goes to the edge and is NOT part of the wealth gradient. The two
+## rules would otherwise contradict each other -- §9.4's `gradient` wants the
+## big houses in the middle and a farmhouse is a big house -- so each names
+## the set it measures: `gradient` judges the houses free to stand round the
+## common, `farms outside` judges the farms. Mixing them put farms forty
+## metres inside the edge and still only reached a -0.02 correlation.
+const SITING := {
+	&"blacksmith": {"road": &"through", "insists": true, "toward": &"edge", "side": &"east"},
+	&"tavern": {"road": &"through", "insists": true, "toward": &"gate", "side": &"west"},
+	&"inn": {"road": &"through", "toward": &"gate"},
+	&"farm": {"road": &"track", "toward": &"outside"},
+}
+const SITING_DEFAULT := {"toward": &"common"}
+
+
+## The siting rule for one request. Shops answer to their business; everything
+## else to its lot class.
+static func siting_of(request: BuildingRequest, cls: StringName) -> Dictionary:
+	if request != null and request.kind == &"shop" and SITING.has(request.purpose):
+		return SITING[request.purpose]
+	return SITING.get(cls, SITING_DEFAULT)
+
+
+## Place one job. Returns its distance from the common's centre when it was
+## placed and -1 when it was not -- the distance, rather than a bool, because
+## the wealth gradient is enforced by feeding it back in as the next house's
+## `floor` (see cut_measured).
+static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
+		roads: Array, floor_d := 0.0) -> float:
 	var cls: StringName = job["class"]
 	var rule: Dictionary = LOT_RULES.get(cls, LOT_RULES[&"cottage"])
 	var gap: float = fire_gap(cls, plan.spec)
 	var frontage: float = 2.0 * float(job["half_w"]) + maxf(gap, 1.0)
 	var setback: float = _setback(rule, job)
 	var depth: float = setback + float(job["back"]) + float(rule["yard"])
-	# Every candidate frontage on the road, nearest the common first: the
-	# programmer hands the households over biggest first, so the big houses
-	# end up round the common and the cottages at the ends of the streets --
-	# the wealth gradient of VILLAGES 6.
+	var site: Dictionary = job.get("siting", SITING_DEFAULT)
 	var cc: Vector2 = plan.site.get_center()
 	if not plan.commons.is_empty():
 		cc = Poly.bounding_rect(plan.commons[0]["poly"]).get_center()
-	# the smithy stands on the through road (VILLAGES 6): that road alone
-	# first, and the rest only if it has no room at all
-	var req0: BuildingRequest = job["request"]
-	if req0.kind == &"shop" and req0.purpose == &"blacksmith":
-		var through: Array = []
+	var gates: Array[Vector2] = _gates(plan)
+	# The road it insists on, alone, first; the rest only if that road has no
+	# room at all.
+	var want_class: StringName = site.get("road", &"")
+	if want_class != &"":
+		var preferred: Array = []
 		for r0 in roads:
-			if plan.roads[r0]["class"] == &"through":
-				through.append(r0)
-		if not through.is_empty() and roads.size() > through.size():
-			if _place_on_road(plan, ctx, job, through):
-				return true
+			if plan.roads[r0]["class"] == want_class:
+				preferred.append(r0)
+		if not preferred.is_empty() and roads.size() > preferred.size():
+			var got: float = _place_on_road(plan, ctx, job, preferred, floor_d)
+			if got >= 0.0:
+				return got
+	# Every road at once, sorted by what this job is looking for -- not road
+	# by road in rank order taking the first legal spot on each.
+	#
+	# The difference is the whole arrangement. A farm wants the one frontage
+	# nearest the site edge and a house wants the one nearest the common;
+	# walking the roads in rank order gave each of them the best spot on the
+	# THROUGH ROAD, which is neither. Farms ended up at the inner end of one
+	# lane while the outer end of the next stood empty, and houses lined the
+	# through road while the street round the common stood empty -- which is
+	# what §9.4's `common` rule, sixty per cent of the common's edge fronted,
+	# was measuring at fifty.
+	var all: Array = []
 	for r in roads:
-		var spots: Array = []
-		for e in ctx["edges"]:
-			if int(e["road"]) != r:
-				continue
-			var run: float = float(e["length"])
-			var m: float = 0.0
-			var slides: int = 0
-			while m <= run and slides < MAX_SLIDES:
-				var origin: Vector2 = e["a"] if float(e["side"]) > 0.0 else e["b"]
-				var mid: Vector2 = origin + (e["dir"] as Vector2) * m
-				spots.append({"e": e, "m": m, "d": mid.distance_to(cc)})
-				m += STEP
-				slides += 1
-		spots.sort_custom(func(a, b) -> bool: return float(a["d"]) < float(b["d"]))
-		# the smithy stands downwind (+x) of the common (VILLAGES 6)
-		var req: BuildingRequest = job["request"]
-		if req.kind == &"shop" and req.purpose == &"blacksmith":
-			var east: Array = []
+		all.append_array(_spots(ctx, r, cc, gates, plan.site, site))
+	for spots in [_sorted(all, site)]:
+		# the gradient floor: no household nearer the common than a bigger one
+		if floor_d > 0.0:
+			var far: Array = []
 			for spot in spots:
-				var origin2: Vector2 = spot["e"]["a"] if float(spot["e"]["side"]) > 0.0 else spot["e"]["b"]
-				var mid2: Vector2 = origin2 + (spot["e"]["dir"] as Vector2) * float(spot["m"])
-				if mid2.x >= cc.x:
-					east.append(spot)
-			if not east.is_empty():
-				spots = east
+				if float(spot["d"]) >= floor_d - GRADIENT_SLACK:
+					far.append(spot)
+			if not far.is_empty():
+				spots = far
 		for spot in spots:
 			var lot: Dictionary = _make_lot(spot["e"], float(spot["m"]), frontage, depth, setback)
 			if _lot_is_legal(plan, ctx, lot, job, gap):
 				_commit(plan, lot, job, rule)
-				return true
-	return false
+				return float(spot["d"])
+	return -1.0
+
+
+## Every candidate frontage along road `r`, in the order this job wants to
+## try them. `d` is always the distance from the common's centre, whatever
+## the sort was, because that is what the gradient rule measures.
+static func _spots(ctx: Dictionary, r: int, cc: Vector2, gates: Array[Vector2],
+		ground: Rect2, site: Dictionary) -> Array:
+	var spots: Array = []
+	for e in ctx["edges"]:
+		if int(e["road"]) != r:
+			continue
+		var run: float = float(e["length"])
+		var origin: Vector2 = e["a"] if float(e["side"]) > 0.0 else e["b"]
+		var m: float = 0.0
+		var slides: int = 0
+		while m <= run and slides < MAX_SLIDES:
+			var mid: Vector2 = origin + (e["dir"] as Vector2) * m
+			var to_gate := INF
+			for g in gates:
+				to_gate = minf(to_gate, mid.distance_to(g))
+			spots.append({"e": e, "m": m, "mid": mid, "d": mid.distance_to(cc),
+				"gate": to_gate, "edge": _to_edge(ground, mid)})
+			m += STEP
+			slides += 1
+	# which side of the common this trade belongs on: the smithy downwind
+	# (+x by convention) for the fire, the noise and the smell; the tavern
+	# upwind of it (VILLAGES §6)
+	var side: StringName = site.get("side", &"")
+	if side != &"":
+		var want: float = 1.0 if side == &"east" else -1.0
+		var kept: Array = []
+		for spot in spots:
+			if (float(spot["mid"].x) - cc.x) * want >= 0.0:
+				kept.append(spot)
+		if not kept.is_empty():
+			spots = kept
+	return _sorted(spots, site)
+
+
+## Order a list of candidate frontages the way this siting wants them tried.
+## Pulled out of _spots so the same order can be applied across roads.
+static func _sorted(spots: Array, site: Dictionary) -> Array:
+	match StringName(site.get("toward", &"common")):
+		&"gate":
+			spots.sort_custom(func(a, b) -> bool: return float(a["gate"]) < float(b["gate"]))
+		&"edge":
+			spots.sort_custom(func(a, b) -> bool: return float(a["d"]) > float(b["d"]))
+		&"outside":
+			spots.sort_custom(func(a, b) -> bool: return float(a["edge"]) < float(b["edge"]))
+		_:
+			spots.sort_custom(func(a, b) -> bool: return float(a["d"]) < float(b["d"]))
+	return spots
+
+
+## How far inside the site a point is: the distance to the nearest edge of
+## the ground the village stands on. This is the number §9.4's `farms outside`
+## rule measures, so it is the number the planner steers a farm by.
+static func _to_edge(ground: Rect2, p: Vector2) -> float:
+	return minf(minf(p.x - ground.position.x, ground.end.x - p.x),
+		minf(p.y - ground.position.y, ground.end.y - p.y))
+
+
+## Where the village is entered: its gate crossings, or, with no enclosure,
+## the two ends of the through road. The same definition VillageMeasure uses,
+## so the planner is steering by the number the check will measure.
+static func _gates(plan: VillagePlan) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for g in plan.gate_crossings:
+		out.append(g["pos"])
+	if not out.is_empty():
+		return out
+	for r in plan.roads_of_class(&"through"):
+		var pts: PackedVector2Array = plan.roads[r]["points"]
+		if pts.size() >= 2:
+			out.append(pts[0])
+			out.append(pts[pts.size() - 1])
+	return out
 
 
 ## The lot whose front edge is CENTRED `m` metres along the road edge `e`.

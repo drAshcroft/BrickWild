@@ -396,8 +396,26 @@ func _check_churchyard(plan: VillagePlan) -> void:
 
 ## Bigger houses nearer the common: Spearman of house floor area against
 ## distance to the common's centre.
+## The wealth gradient measures the houses that are FREE to stand in the
+## middle, which is every house but a farm.
+##
+## `farms outside` (below) puts a farm within thirty metres of the edge with
+## its yard to the fields -- it is not competing for the ground round the
+## common, and a farmhouse is a big building, so counting farms here asks the
+## planner to satisfy two rules that contradict each other and reads the
+## contradiction as a defect in the gradient. Naming the set each rule
+## measures is the fix; the farms are judged by their own rule, and both are
+## then satisfiable at once.
+##
+## In a farming village most households ARE farms, so this rule often has
+## fewer than five houses left and does not apply. That is correct rather
+## than convenient: a village that is nine farms and a smithy has no wealth
+## gradient to have, and `farms` is the rule that judges where it put them.
 func _check_gradient(plan: VillagePlan) -> void:
-	var houses: Array[int] = plan.buildings_of_kind(&"house")
+	var houses: Array[int] = []
+	for i in plan.buildings_of_kind(&"house"):
+		if (plan.buildings[i]["request"] as BuildingRequest).purpose != &"farmer":
+			houses.append(i)
 	if houses.size() < 5:
 		return
 	var cc: Vector2 = VillageMeasure.common_centre(plan)
@@ -423,9 +441,14 @@ func _check_farms(plan: VillagePlan) -> void:
 			continue
 		var c: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(b))
 		var d: float = VillageMeasure.point_to_poly(c, edge) if not Poly.contains_point(edge, c) else _to_boundary(edge, c)
-		# thirty metres, or a third of the site on a village whose ground has
-		# grown to hold its farms
-		var reach: float = maxf(FARM_TO_EDGE, plan.site.size.x * 0.4)
+		# Thirty metres, or a share of the site on a village whose ground has
+		# grown to hold its farms -- measured on the site's SHORTER side.
+		# A village stretches along its road rather than squaring up
+		# (VIL-012), so a long thin site's width says nothing about how far
+		# inside a farm can get, and scaling by it let a farm stand dead
+		# centre and pass.
+		var reach: float = maxf(FARM_TO_EDGE,
+			minf(plan.site.size.x, plan.site.size.y) * 0.4)
 		if d > reach:
 			failures.append("farms: farm %d stands %.0fm inside the edge, wants <= %.0f" % [i, d, reach])
 		# the yard is behind the house: its back (local +Z) toward the edge

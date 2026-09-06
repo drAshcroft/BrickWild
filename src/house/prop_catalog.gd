@@ -28,13 +28,23 @@ const CATALOG_FILE := "catalog.json"
 ## shipped as. A prop names its pack in PROPS; anything that does not name one
 ## is in `fantasy`, which is where every prop was until the dungeon kit arrived.
 ##
-## Two packs rather than one because they ship different formats -- Quaternius
+## Four packs rather than one because they ship different formats -- Quaternius
 ## exports the Fantasy Props MegaKit as glTF and the Dungeon Kit as FBX only --
-## and because both contain a Barrel, a Crate and a Chest. The dungeon files are
-## prefixed on disk so a catalogue key is still globally unique.
+## and because they collide: the fantasy and dungeon kits each contain a
+## Barrel, a Crate and a Chest, and the two nature kits each contain a
+## DeadTree_1. Every file outside `fantasy` is prefixed on disk so a catalogue
+## key is still globally unique.
+##
+## `nature` is the Nature Kit (birch, maple, the flower clumps) and `wild` the
+## Stylized Nature MegaKit (the common tree, the pines, the twisted trees, the
+## pebbles and the ground cover). `plants` marks those two as things that
+## grow, which is what earns a measured canopy and trunk. A village plants
+## from one culture's palette (VILLAGES 8), not from both kits at once.
 const PACKS := {
 	"fantasy": {"dir": "fantasy", "ext": "gltf"},
 	"dungeon": {"dir": "dungeon", "ext": "fbx"},
+	"nature": {"dir": "nature", "ext": "gltf", "plants": true},
+	"wild": {"dir": "wild", "ext": "gltf", "plants": true},
 }
 const DEFAULT_PACK := "fantasy"
 
@@ -48,6 +58,8 @@ const ON_SURFACE := "on_surface"  # must be set ON a surface, never on the floor
 const WALL_MOUNTED := "wall_mounted"   # hangs on a wall, no footprint on the floor
 const CEILING := "ceiling"        # hangs from the ceiling
 const LIGHT := "light"            # counts toward a room being lit
+const PLANT := "plant"            # grows: measured as a canopy and a trunk
+const GROUND := "ground"          # lies on the ground and is walked over
 
 ## key -> {cat, tags, zone, face, affinity}
 ##   cat   what the piece is, which is what a room's recipe asks for
@@ -222,6 +234,127 @@ const PROPS := {
 	"Dungeon_Trapdoor": {"pack": "dungeon", "cat": "hatch", "tags": [], "zone": 0.0},
 	"Dungeon_BearTrap_Closed": {"pack": "dungeon", "cat": "trap", "tags": [], "zone": 0.0},
 	"Dungeon_BearTrap_Open": {"pack": "dungeon", "cat": "trap", "tags": [], "zone": 0.0},
+
+	# ---- what grows (VILLAGES 7, 8) ----
+	# Two packs, because a culture plants from one palette and not from both:
+	# a norse edge is birch and pine, a moorish one twisted trees and pebbles.
+	# Every one of these carries a measured `canopy` and `trunk` as well as a
+	# box, because a bounding box is the wrong shape for a tree -- see
+	# SceneBounds.radii_of_node(). GROUND marks the ones a person walks over
+	# rather than round.
+	# the Nature Kit's own trees: the birch and the maple of an english,
+	# frankish or norse edge
+	"Nature_BirchTree_1": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_BirchTree_2": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_BirchTree_3": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_BirchTree_4": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_BirchTree_5": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_MapleTree_1": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_MapleTree_2": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_MapleTree_3": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_MapleTree_4": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_MapleTree_5": {"pack": "nature", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	# a blighted edge, and the one dead tree at the back of anybody's wood
+	"Nature_DeadTree_1": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_DeadTree_10": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_DeadTree_2": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_DeadTree_3": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_DeadTree_4": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_DeadTree_5": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_DeadTree_6": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_DeadTree_7": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_DeadTree_8": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Nature_DeadTree_9": {"pack": "nature", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	# hedges and the flowering bush either side of a garden path
+	"Nature_Bush": {"pack": "nature", "cat": "bush", "tags": [PLANT], "zone": 0.0},
+	"Nature_Bush_Flowers": {"pack": "nature", "cat": "bush", "tags": [PLANT], "zone": 0.0},
+	"Nature_Bush_Large": {"pack": "nature", "cat": "bush", "tags": [PLANT], "zone": 0.0},
+	"Nature_Bush_Large_Flowers": {"pack": "nature", "cat": "bush", "tags": [PLANT], "zone": 0.0},
+	"Nature_Bush_Small": {"pack": "nature", "cat": "bush", "tags": [PLANT], "zone": 0.0},
+	"Nature_Bush_Small_Flowers": {"pack": "nature", "cat": "bush", "tags": [PLANT], "zone": 0.0},
+	"Nature_Flower_1": {"pack": "nature", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Nature_Flower_1_Clump": {"pack": "nature", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Nature_Flower_2": {"pack": "nature", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Nature_Flower_2_Clump": {"pack": "nature", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Nature_Flower_3_Clump": {"pack": "nature", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Nature_Flower_4_Clump": {"pack": "nature", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Nature_Flower_5_Clump": {"pack": "nature", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Nature_Grass_Large": {"pack": "nature", "cat": "grass", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Nature_Grass_Large_Extruded": {"pack": "nature", "cat": "grass", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Nature_Grass_Small": {"pack": "nature", "cat": "grass", "tags": [PLANT, GROUND], "zone": 0.0},
+	# ---- the Stylized Nature MegaKit ----
+	# the common tree of the green, the pines of an alpine edge, and the
+	# twisted trees of a moorish or blighted one
+	"Wild_CommonTree_1": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_CommonTree_2": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_CommonTree_3": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_CommonTree_4": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_CommonTree_5": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_Pine_1": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_Pine_2": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_Pine_3": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_Pine_4": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_Pine_5": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_TwistedTree_1": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_TwistedTree_2": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_TwistedTree_3": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_TwistedTree_4": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_TwistedTree_5": {"pack": "wild", "cat": "tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_DeadTree_1": {"pack": "wild", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_DeadTree_2": {"pack": "wild", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_DeadTree_3": {"pack": "wild", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_DeadTree_4": {"pack": "wild", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_DeadTree_5": {"pack": "wild", "cat": "dead_tree", "tags": [PLANT], "zone": 0.0},
+	"Wild_Bush_Common": {"pack": "wild", "cat": "bush", "tags": [PLANT], "zone": 0.0},
+	"Wild_Bush_Common_Flowers": {"pack": "wild", "cat": "bush", "tags": [PLANT], "zone": 0.0},
+	"Wild_Fern_1": {"pack": "wild", "cat": "plant", "tags": [PLANT], "zone": 0.0},
+	"Wild_Plant_1": {"pack": "wild", "cat": "plant", "tags": [PLANT], "zone": 0.0},
+	"Wild_Plant_1_Big": {"pack": "wild", "cat": "plant", "tags": [PLANT], "zone": 0.0},
+	"Wild_Plant_7": {"pack": "wild", "cat": "plant", "tags": [PLANT], "zone": 0.0},
+	"Wild_Plant_7_Big": {"pack": "wild", "cat": "plant", "tags": [PLANT], "zone": 0.0},
+	"Wild_Flower_3_Group": {"pack": "wild", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Flower_3_Single": {"pack": "wild", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Flower_4_Group": {"pack": "wild", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Flower_4_Single": {"pack": "wild", "cat": "flower", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Grass_Common_Short": {"pack": "wild", "cat": "grass", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Grass_Common_Tall": {"pack": "wild", "cat": "grass", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Grass_Wispy_Short": {"pack": "wild", "cat": "grass", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Grass_Wispy_Tall": {"pack": "wild", "cat": "grass", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Clover_1": {"pack": "wild", "cat": "ground_cover", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Clover_2": {"pack": "wild", "cat": "ground_cover", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Petal_1": {"pack": "wild", "cat": "ground_cover", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Petal_2": {"pack": "wild", "cat": "ground_cover", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Petal_3": {"pack": "wild", "cat": "ground_cover", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Petal_4": {"pack": "wild", "cat": "ground_cover", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Petal_5": {"pack": "wild", "cat": "ground_cover", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Mushroom_Common": {"pack": "wild", "cat": "mushroom", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Mushroom_Laetiporus": {"pack": "wild", "cat": "mushroom", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Rock_Medium_1": {"pack": "wild", "cat": "rock", "tags": [PLANT], "zone": 0.0},
+	"Wild_Rock_Medium_2": {"pack": "wild", "cat": "rock", "tags": [PLANT], "zone": 0.0},
+	"Wild_Rock_Medium_3": {"pack": "wild", "cat": "rock", "tags": [PLANT], "zone": 0.0},
+	# what the ground is made of where it is not grass: pebbles on a
+	# moorish verge, stepping stones over a wet one
+	"Wild_Pebble_Round_1": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Round_2": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Round_3": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Round_4": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Round_5": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Square_1": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Square_2": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Square_3": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Square_4": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Square_5": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_Pebble_Square_6": {"pack": "wild", "cat": "pebble", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Round_Small_1": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Round_Small_2": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Round_Small_3": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Round_Thin": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Round_Wide": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Square_Small_1": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Square_Small_2": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Square_Small_3": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Square_Thin": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
+	"Wild_RockPath_Square_Wide": {"pack": "wild", "cat": "stepping_stone", "tags": [PLANT, GROUND], "zone": 0.0},
 }
 
 ## Measured sizes, loaded once and shared. Static so the whole sweep pays for
@@ -404,10 +537,37 @@ static func face_offset(key: String) -> float:
 	return float(PROPS[key].get("face", 0.0)) if PROPS.has(key) else 0.0
 
 
-## Does this prop stand on the floor and get in a person's way?
+## Does this prop stand on the floor and get in a person's way? Ground cover
+## does not: you walk over clover, pebbles and stepping stones, and a village
+## whose verges were obstacles would have no walkable verges.
 static func blocks_floor(key: String) -> bool:
 	return not (has_tag(key, WALL_MOUNTED) or has_tag(key, CEILING)
-		or has_tag(key, ON_SURFACE))
+		or has_tag(key, ON_SURFACE) or has_tag(key, GROUND))
+
+
+## The crown of a plant, as a radius about its own trunk, in metres; 0 for
+## anything that is not one. A tree's bounding box is mostly air, so this --
+## not the box -- is what the dressing check holds off the roofs.
+static func canopy(key: String) -> float:
+	_load()
+	return float(_sizes[key].get("canopy", 0.0)) if _sizes.has(key) else 0.0
+
+
+## The stem where it meets the ground, as a radius. This is a tree's real
+## footprint: what stands in the road, and what the walk grid must go round.
+static func trunk(key: String) -> float:
+	_load()
+	return float(_sizes[key].get("trunk", 0.0)) if _sizes.has(key) else 0.0
+
+
+## Everything that grows, in a stable order -- what a culture's palette is
+## drawn from (VILLAGES 8).
+static func plants() -> Array[String]:
+	var out: Array[String] = []
+	for k in keys():
+		if has_tag(k, PLANT):
+			out.append(k)
+	return out
 
 
 ## How far a piece may be scaled down when the room it is going in cannot take
@@ -430,6 +590,12 @@ static func min_scale(key: String) -> float:
 static func pack(key: String) -> String:
 	return String(PROPS[key].get("pack", DEFAULT_PACK)) if PROPS.has(key) \
 		else DEFAULT_PACK
+
+
+## Does this pack hold things that grow? Only those get a canopy and a trunk
+## measured (tools/build_prop_catalog.gd); a barrel has neither.
+static func is_plant_pack(pack_name: String) -> bool:
+	return bool(PACKS.get(pack_name, {}).get("plants", false))
 
 
 static func scene_path(key: String) -> String:

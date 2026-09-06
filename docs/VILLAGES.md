@@ -247,8 +247,29 @@ as a scatter.
 
 Inventory of `C:\Projects\itch_assets\quaternius`, read on 2026-09-03.
 Everything the village uses goes through the same measured catalogue as the
-houses (`tools/build_prop_catalog.gd` → `catalog.json`), extended with a
-`canopy` radius for trees, and `assets` re-measures it.
+houses (`tools/build_prop_catalog.gd` → `catalog.json`), and `assets`
+re-measures it.
+
+Imported (VIL-011): the **Nature Kit** as pack `nature` and the **Stylized
+Nature MegaKit** as pack `wild` — 104 plants between them — and the
+dungeon-kit village pieces that were still missing (`BridgeSection`,
+`Column_BridgeSupport`, `Wall`, `Wall_Half`, `Wall_Broken`,
+`Doors_RoundArch`). Both nature packs are prefixed on disk (`Nature_*`,
+`Wild_*`) because they each ship a `DeadTree_1`.
+
+A plant is measured differently from a barrel, and `PropCatalog.PACKS` marks
+the two packs `plants` so it is. It gets a **`canopy`** and a **`trunk`**
+radius as well as a box, because a box is the wrong shape for a tree: a
+birch is a two-metre box of empty air round a 16 cm stem, and a village
+planted on the box has no trees within four metres of anything. `canopy` is
+the furthest any vertex reaches from the model's axis; `trunk` is the same
+at or below 1.8 m — what a person walking into it walks into, so a spruce
+whose skirt sweeps the ground measures the skirt and a bush measures the
+bush. Both are taken from the **vertices**, not from each mesh's declared
+bounding box, because two of the Nature Kit's bushes declare one half a
+metre bigger in every direction than the mesh inside it — measure those from
+the box and the bush floats. `SceneBounds.plant_of_node()` is the single
+measurement; the tool writes it down and the `assets` suite takes it again.
 
 **Fantasy Props MegaKit** (already imported for houses) — outdoor use:
 `Stall_Empty`, `Stall_Cart_Empty` (market), `Barrel`, `Barrel_Apples`,
@@ -277,14 +298,27 @@ village kit for: `Rail_Straight`, `Rail_Corner`, `Rail_Divider` (fences),
 `Pebble_Round_1–5`, `Pebble_Square_1–6`, `RockPath_Round_*`,
 `RockPath_Square_*` (stepping stones), `Petal_1–5`.
 
-**Missing from every pack**, and therefore emitted by `MeshKit` so the
-village never depends on an asset that is not there: the **well** (a
-revolve drum, two posts, a little roof), the **signpost**, the **palisade**
-(posts from `box` at a pitch, sharpened by `taper`), the **lamp post**
-(a post carrying `Torch_Metal`), the **haystack** (a revolve dome),
-**fence gates**, the **mill wheel** (a revolve ring), the **mine adit**,
-the **boat** and **drying rack** for the strand, and **animals** — which
-are not built at all; a fence round an empty pasture reads as a pasture.
+**Missing from every pack**, and therefore built rather than loaded, so the
+village never depends on an asset that is not there. Implemented as
+`core/prop_kit.gd` (VIL-010) — a kit of its own over `MeshKit`, the way
+`LightKit` is, because `MeshKit` takes plain sizes and does not know what a
+well is. All ten: the **well** (a revolve drum, two posts, a windlass and a
+little roof), the **signpost**, the **palisade** (posts from `box` at a
+pitch, sharpened by `taper`, with a waling piece), the **lamp post** (a post
+carrying `Torch_Metal`), the **haystack** (a revolve dome), **fence gates**,
+the **mill wheel** (two revolve rings, spokes and paddles), the **mine
+adit**, the **boat** and the **drying rack** for the strand.
+
+Every one returns the world `AABB` of what it emitted, accumulated from the
+pieces as they go out rather than written down beside them — the discipline
+`MassBuilder` keeps for buildings, for the same reason: the walk grid, the
+fire gap and the road-clearance rule all measure that box, so a well whose
+roof hangs out of it is a well people walk through. `PropKitSuite` (`props`
+in the runner) reads the mesh back vertex by vertex and proves it holds; it
+caught three props understating themselves the first time it ran.
+
+**Animals** are still not built at all; a fence round an empty pasture reads
+as a pasture.
 
 ### Prop recipes, by host
 
@@ -364,11 +398,45 @@ households come in sizes (the programmer, `HOUSE_SIZE_SPREAD`), the lot
 planner takes the frontage nearest the common first (the wealth gradient of
 6), and when the form's frontage cannot house everyone the site planner is
 asked for back lanes and then for more ground (`VillageLotPlanner.RETRIES`),
-and dead-end lanes are trimmed to their last lot. Six rules the planners do
-not yet meet on every village -- `density`, `tavern`, `gradient`, `common`,
-`smithy`, `landmark` -- are listed in `VillageCheckSuite.PLANNER_FOLLOW_UPS`
-with the follow-up each needs; the sweep counts and prints them as warnings
-and fails on everything else. Their fixtures still fire.
+and dead-end lanes are trimmed to their last lot.
+
+**The arrangement pass (VIL-012)** then made the planners meet most of §6.
+Where each thing goes is now a table, `VillageLotPlanner.SITING`, one row per
+thing: the road class it insists on, whether it is placed before the
+households (the smithy and the tavern are), what it is drawn to (`common`,
+`gate`, `edge`, `outside`) and which side of the common it belongs on. Six
+changes came with it, and each is a rule the checks were already measuring:
+
+- Candidate frontages are compared **across every road at once** rather than
+  road by road in rank order. A farm wants the one frontage nearest the site
+  edge and a house the one nearest the common; taking the best spot on the
+  through road first gave neither, and left the street round the common
+  empty while the through road filled up (`common` measured 50 %).
+- **The wealth gradient is enforced, not hoped for**: households are handed
+  over biggest first and no house may stand nearer the common than a bigger
+  one already does, less a few metres of slack.
+- **The tavern takes the upwind gate and the smithy the downwind edge**, so
+  the two stop competing for the same end of the through road.
+- **Farms are out of the gradient and into their own rule.** A farmhouse is a
+  big building and `farms outside` puts it at the edge, so counting it in
+  `gradient` asked the planner to satisfy two rules that contradict each
+  other. Each rule now names the set it measures.
+- **Back ways are `track`s that run to the site boundary**, not lanes that
+  stop short of it -- §9.2 forbids a lane to end on the boundary and refuses
+  a dead-end lane over forty metres, and a way out to the fields is neither.
+  They are laid on whichever side of the through road has the ground, one
+  per two households, fifty metres apart (a farm lot is twenty-five metres
+  deep either side).
+- **A village that outgrows itself gets longer, not wider**, and every extra
+  lane is tried before a metre of ground is added -- which is what `density`
+  was measuring.
+
+`density` and `common` now pass on every village in the sweep; `gradient`
+went from seven villages in twenty-four to one and `tavern` from nine to
+three. What is left -- `tavern`, `gradient`, `smithy`, `landmark`, `farms` --
+is listed in `VillageCheckSuite.PLANNER_FOLLOW_UPS` with the follow-up each
+needs; the sweep counts and prints them as warnings and fails on everything
+else. Their fixtures still fire.
 
 `qa/village_qa.gd` composes six checks over the `VillagePlan` and then runs
 the family QA on every building in it. Each rule is a sentence and a
@@ -499,6 +567,52 @@ in §4 are crossed and un-crossed on purpose.
 | Market town | 300 | frankish, market, river, wall | a square with ≥ 8 stalls, a town hall, a guildhall, two taverns, a bridge, a wall |
 | Blight | 40 | blighted, forest, pond, none | a temple, dead trees, mushrooms, a ruin (`Wall_Broken`), no green tree |
 | The cap | 500 | frankish, market, river, wall | passes every rule at the top of the envelope; `buildings ≤ 140` |
+
+---
+
+## 10a. The plan on disk: `tools/export_village_plan.gd`
+
+A `VillagePlan` could only be had in-process from GDScript, which is no use
+to a consumer in another language. `tools/export_village_plan.gd` (VIL-014)
+reads a mythsim **SiteRequest** and writes a **SitePlan** as JSON, headless,
+with no scene, no mesh and no assets:
+
+```
+godot --headless --path . --script res://tools/export_village_plan.gd \
+    -- --request in.json --out out.json
+```
+
+The contract is `C:/Projects/Dm_View/docs/contracts/c1-site.md` and it is
+binding. This is a serialiser over data the planners already produce; the
+work is mapping mythsim's vocabulary onto a `VillageSpec` (its cultures onto
+the seven palettes, its `built` fractions onto a purpose and an enclosure,
+its unbounded wealth onto 0–1) and writing the result out in the agreed
+shape, plus one new field: `building_id`, `"<city_id>/b-<nnn>"`, the join key
+C2 and C4 hang off.
+
+Three things are worth knowing:
+
+- **Byte-identical output**, because DM_View regenerates rather than stores.
+  Every float is snapped to a millimetre before it is written, every list
+  keeps the planner's own order, and the **seed is taken from the request's
+  TEXT** — mythsim seeds are unsigned 64-bit and do not survive a JSON parse
+  as integers.
+- **A city is bigger than a village.** Population is capped at 500 and, above
+  the `gate` form's threshold of 200, *scaled* into 140–199 rather than
+  clamped — the contract's acceptance is that building count rises with
+  population, and clamping 210, 300 and 420 to 199 gave three identical
+  villages.
+- **Every concession is written down.** Only two of §3's seven forms have
+  planners, so a request that derives `gate`, `round`, `strand`, `planted`
+  or `crossroads` is stepped toward one that can be laid, and each step goes
+  into the plan's own `notes` array. `pilgrim` is never substituted in,
+  because it is the one purpose that earns a temple and the contract says a
+  city without one does not get one.
+
+Fixtures are in `tests/fixtures/site_requests/`. Over those five: two runs
+byte-identical, every building inside the site, every building fronting a
+road, counts of 8/42/49/54/58 rising with population and never near the 140
+cap, and the village suites still green on the plans produced.
 
 ---
 

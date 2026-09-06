@@ -25,7 +25,16 @@ const BUSINESSES := {
 		"door_w": 1.0, "focus": {"cat": "counter", "faces_door": true}},
 	&"tavern": {"label": "Tavern", "rooms": [&"dining_room", &"kitchen", &"store", &"office"],
 		"door_w": 1.0, "focus": {"cat": "counter", "faces_door": true}},
-	&"inn": {"label": "Inn", "rooms": [&"dining_room", &"kitchen", &"guest_room", &"guest_room", &"store"],
+	# The gallery is the inn's corridor (LAY-012): with two guest rooms and no
+	# public room between them the planner hangs the second off the first, and
+	# the only way to the far bed is through somebody else's -- which is what
+	# LAY-007's privacy rule forbids and what the hotel's own gallery
+	# (LAY-008) answers. `corridor_at` is the room count below which it is not
+	# worth one: an inn with a single guest room needs no corridor, and
+	# spending a room on one there would cost it the guest room itself.
+	# ShopPlanner._open_up_lodging() holds the invariant either way.
+	&"inn": {"label": "Inn", "rooms": [&"dining_room", &"kitchen", &"gallery", &"guest_room", &"guest_room", &"store"],
+		"corridor": &"gallery", "corridor_at": 5,
 		"door_w": 1.0, "focus": {"cat": "counter", "faces_door": true}},
 	&"bakery": {"label": "Bakery", "rooms": [&"sales_floor", &"kitchen", &"workshop", &"store"],
 		"door_w": 1.0, "front_open": {"width": 1.6}, "focus": {"cat": "counter", "faces_door": true}},
@@ -70,7 +79,14 @@ func focus() -> Dictionary:
 
 
 func room_program(count: int) -> Array[StringName]:
-	var source: Array = BUSINESSES[business]["rooms"]
+	var row: Dictionary = BUSINESSES[business]
+	var source: Array = row["rooms"]
+	# a corridor is only worth a room when the trade has rooms to spare for
+	# it; below that it would displace the very room it exists to serve
+	var at: int = int(row.get("corridor_at", 0))
+	if at > 0 and count < at:
+		source = source.duplicate()
+		source.erase(row["corridor"])
 	var out: Array[StringName] = [&"hall"]
 	for i in range(1, mini(count, source.size())):
 		out.append(source[i])

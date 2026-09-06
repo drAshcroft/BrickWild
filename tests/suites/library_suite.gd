@@ -45,6 +45,7 @@ static func run() -> SuiteResult:
 	_check_invalid(res, null, &"request_required")
 
 	_check_contract(res, requests)
+	_check_documents(res, requests)
 
 	var descriptor: Dictionary = BigGlade.describe_kind(&"house")
 	res.checked += 1
@@ -86,6 +87,73 @@ static func run() -> SuiteResult:
 				or plan.reachable_rooms(plan.entrance_room()).size() != plan.room_count():
 			res.fail("two-storey plan lacks complete upper-floor circulation")
 	return res
+
+
+## API-003, the middle stage: a document is the same building as the
+## generation it came from -- same mesh vertex for vertex, same placement --
+## and it is plain enough to serialise. Parity is the whole point: a document
+## that re-derives anything is a second generator, and two generators drift.
+static func _check_documents(res: SuiteResult, requests: Array[BuildingRequest]) -> void:
+	for request in requests:
+		var where := "kind=%s seed=%d" % [String(request.kind), request.seed]
+		var doc: BuildingDocument = BigGlade.generate_document(request)
+		var made: GeneratedBuilding = BigGlade.generate(request)
+		res.checked += 1
+		if doc == null or not doc.is_ok():
+			res.fail("document: %s did not generate: %s" % [where, doc.errors if doc else "null"])
+			continue
+		if doc.kind() != request.kind or doc.name() != made.name():
+			res.fail("document: identity differs from the generation, " + where)
+		# the payload IS the family's own object -- the plan for a plan
+		# family, the spec for the rest -- and not a copy of one. (Identity
+		# against `made` would be wrong: `made` is a second generation, so a
+		# second object; what matters is that the document did not build a
+		# third representation of its own.)
+		var want_plan: bool = request.kind in [&"house", &"shop", &"hotel"]
+		if want_plan and (doc.plan == null or doc.payload() != doc.plan):
+			res.fail("document: a %s carries no plan as its payload, %s"
+				% [String(request.kind), where])
+		elif not want_plan and (doc.plan != null or doc.payload() != doc.spec):
+			res.fail("document: a %s carries something other than its spec, %s"
+				% [String(request.kind), where])
+
+		res.checked += 1
+		if not _same_mesh(BigGlade.build_mesh(doc), BigGlade.build_mesh(made)):
+			res.fail("document: builds a different mesh from its own generation, " + where)
+		res.checked += 1
+		if doc.placement != BigGlade.placement(made):
+			res.fail("document: placement differs from the generation's, " + where)
+
+		# plain enough to leave the process: JSON must take it whole, and what
+		# comes back must still name the same building
+		res.checked += 1
+		var text: String = JSON.stringify(doc.to_dict())
+		var back: Variant = JSON.parse_string(text)
+		if not (back is Dictionary):
+			res.fail("document: to_dict() did not survive JSON, " + where)
+		elif back["name"] != doc.name() or back["kind"] != String(request.kind) \
+				or int(back["seed"]) != request.seed or not bool(back["ok"]):
+			res.fail("document: the serialised document names another building, " + where)
+		elif not back.has("placement") or not back.has("spec"):
+			res.fail("document: the serialised document has no placement or spec, " + where)
+		elif request.kind in [&"house", &"shop", &"hotel"]:
+			var plan_dict: Dictionary = back.get("plan", {})
+			if (plan_dict.get("rooms", []) as Array).size() != made.plan.room_count() \
+					or (plan_dict.get("doors", []) as Array).size() != made.plan.doors.size() \
+					or (plan_dict.get("furniture", []) as Array).size() != made.plan.furniture.size():
+				res.fail("document: the serialised plan lost rooms, doors or furniture, " + where)
+		elif back.has("plan"):
+			res.fail("document: a %s carries a house plan" % String(request.kind))
+
+	# a refused request is a document that says why and builds nothing
+	var bad := BuildingRequest.house(1)
+	bad.purpose = &"dragon_tamer"
+	var refused: BuildingDocument = BigGlade.generate_document(bad)
+	res.checked += 1
+	if refused.is_ok() or refused.errors.is_empty() or BigGlade.build_mesh(refused) != null:
+		res.fail("document: an invalid request produced a buildable document")
+	elif not refused.placement.is_empty():
+		res.fail("document: a refused document carries a placement")
 
 
 static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:

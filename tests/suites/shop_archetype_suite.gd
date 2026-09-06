@@ -46,7 +46,119 @@ static func run() -> SuiteResult:
 			res.warn("%s: %s" % [String(business), warning])
 		for failure2 in shopfront_rules(spec, plan, builder):
 			res.fail("%s: %s" % [String(business), failure2])
+	_check_lodging(res)
 	return res
+
+
+## LAY-012: nobody walks through a guest room to reach a bed.
+##
+## Two halves, and the fixture is the point of the first. Proving that inns
+## come out right today proves nothing unless the rule can be seen to fire --
+## a check that never fails is a check that is not looking -- so the first
+## half takes a real inn, CHAINS its guest rooms by hand, and asserts the
+## privacy rule catches it and `_open_up_lodging` puts it right. The second
+## half then holds every inn the generator makes to the invariant.
+static func _check_lodging(res: SuiteResult) -> void:
+	var chained: HousePlan = _chained_inn(res)
+	if chained != null:
+		res.checked += 1
+		if not _privacy_failures(chained):
+			res.fail("lodging: a plan whose only way to the far bed is through "
+				+ "the near one passed the privacy rule")
+		ShopPlanner._open_up_lodging(chained)
+		res.checked += 1
+		# The invariant the landing pass owns, and only that. Renaming two
+		# ordinary rooms to guest rooms can leave a THIRD room behind one of
+		# them, which is `HousePlanner._open_up_privacy`'s job and not this
+		# pass's; holding the pass to the whole privacy rule would be holding
+		# it to somebody else's work.
+		for i in range(chained.room_count()):
+			if chained.kind_of(i) in HouseGeometry.SLEEPING \
+					and not ShopPlanner._has_public_door(chained, i):
+				res.fail("lodging: room %d (%s) still opens only onto other beds "
+					% [i, String(chained.kind_of(i))]
+					+ "after the landing pass")
+
+	for size in [[11.0, 14.0], [14.0, 18.0], [18.0, 24.0]]:
+		for storeys in [1, 2]:
+			for s in range(6):
+				var spec := ShopSpec.new()
+				spec.business = &"inn"
+				spec.style = &"townhouse"
+				spec.width = size[0]
+				spec.length = size[1]
+				spec.height = 2.9
+				spec.storeys = storeys
+				var plan: HousePlan = ShopGenerator.generate(spec, 41000 + s * 37)
+				var where := "inn %.0fx%.0f st%d seed %d" % [size[0], size[1], storeys, 41000 + s * 37]
+				res.checked += 1
+				for f in _privacy_failures(plan):
+					res.fail("lodging: %s: %s" % [where, f])
+				for i in range(plan.room_count()):
+					if plan.kind_of(i) in HouseGeometry.SLEEPING \
+							and not ShopPlanner._has_public_door(plan, i):
+						res.fail("lodging: %s: room %d (%s) opens only onto other beds"
+							% [where, i, String(plan.kind_of(i))])
+
+
+## An inn whose guest rooms are in a chain, BUILT BY HAND: two adjoining
+## rooms are named `guest_room`, and every door into the second is taken away
+## except the one from the first.
+##
+## Constructed rather than searched for. The generator does not chain guest
+## rooms any more -- that is the point of LAY-012 -- so a fixture that waits
+## for one would never fire, and a check that never fails is a check that is
+## not looking. The two rooms are real rooms of a real plan, so what is
+## tested is the rule and the remedy, not a hand-drawn rectangle.
+static func _chained_inn(res: SuiteResult) -> HousePlan:
+	var spec := ShopSpec.new()
+	spec.business = &"inn"
+	spec.style = &"townhouse"
+	spec.width = 16.0
+	spec.length = 20.0
+	spec.height = 2.9
+	var plan: HousePlan = ShopGenerator.generate(spec, 41777)
+	# two rooms that adjoin, are not the way in, and could hold a bed
+	var entrance: int = plan.entrance_room()
+	var pair: Array[int] = []
+	for i in range(plan.room_count()):
+		if i == entrance or not HouseGeometry.room_suits(plan, i, &"guest_room"):
+			continue
+		for j in range(i + 1, plan.room_count()):
+			if j == entrance or not HouseGeometry.room_suits(plan, j, &"guest_room"):
+				continue
+			if not HousePlanner._shared_edge(plan, i, j).is_empty():
+				pair = [i, j]
+				break
+		if not pair.is_empty():
+			break
+	res.checked += 1
+	if pair.is_empty():
+		res.fail("lodging: the fixture inn has no two adjoining rooms that could "
+			+ "be guest rooms; the privacy rule cannot be shown to fire")
+		return null
+	var near: int = pair[0]
+	var far: int = pair[1]
+	plan.rooms[near]["kind"] = &"guest_room"
+	plan.rooms[far]["kind"] = &"guest_room"
+	# the far bed keeps exactly one door, and it is the near bed's
+	var kept: Array[Dictionary] = []
+	for door in plan.doors:
+		if int(door["a"]) != far and int(door["b"]) != far:
+			kept.append(door)
+	kept.append({"a": near, "b": far, "pos": plan.rooms[far]["rect"].get_center(),
+		"normal": Vector2(1, 0), "width": HouseGeometry.INNER_DOOR_W,
+		"exterior": false, "front": false, "storey": plan.storey_of_room(far)})
+	plan.doors = kept
+	return plan
+
+
+static func _privacy_failures(plan: HousePlan) -> Array[String]:
+	var out: Array[String] = []
+	for f in HousePlanCheck.new().check(plan)["failures"]:
+		if String(f).begins_with("privacy"):
+			out.append(String(f))
+	return out
 
 
 ## What a trade's front has to be (LAY-009), measured from the plan: the

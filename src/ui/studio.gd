@@ -26,6 +26,7 @@ const VARIANTS := 6
 @onready var length_label: Label = $HSplit/LeftPanel/Margin/Grid/LengthLabel
 @onready var height_label: Label = $HSplit/LeftPanel/Margin/Grid/HeightLabel
 @onready var kind_opt: OptionButton = $HSplit/LeftPanel/Margin/Grid/KindOption
+@onready var style_label: Label = $HSplit/LeftPanel/Margin/Grid/StyleLabel
 @onready var style_opt: OptionButton = $HSplit/LeftPanel/Margin/Grid/StyleOption
 @onready var trade_opt: OptionButton = $HSplit/LeftPanel/Margin/Grid/TradeOption
 @onready var trade_label: Label = $HSplit/LeftPanel/Margin/Grid/TradeLabel
@@ -85,24 +86,34 @@ func _kind() -> StringName:
 	return kind_opt.get_item_metadata(kind_opt.selected)
 
 
-func _styles() -> Dictionary:
+## The style dropdown's options, as the option-discovery contract returns
+## them: [{"id", "label"}]. Studio does not know what a house style or a
+## temple form IS -- it asks the public descriptor, so a style added to a
+## family appears here without this file changing. The village is the one
+## kind that is not a BigGlade kind yet (VIL-013), so it answers for itself.
+func _options(field: StringName) -> Array[Dictionary]:
 	if _kind() == VILLAGE:
-		var cultures := {}
-		for c in VillageSpec.CULTURES:
-			cultures[c] = {"label": String(c).capitalize()}
-		return cultures
-	match _kind():
-		&"castle":
-			return CastleSpec.STYLES
-		&"house":
-			return HouseSpec.STYLES
-		&"shop":
-			return HouseSpec.STYLES
-		&"hotel":
-			return HotelSpec.HOTEL_STYLES
-		&"temple":
-			return TempleSpec.FORMS
-	return ChurchSpec.STYLES
+		var out: Array[Dictionary] = []
+		for c in (VillageSpec.CULTURES if field == &"style" else VillageSpec.PURPOSES):
+			out.append({"id": c, "label": String(c).capitalize()})
+		return out
+	var key: String = "styles" if field == &"style" else "purposes"
+	var listed: Array = BigGlade.describe_kind(_kind()).get(key, [])
+	var typed: Array[Dictionary] = []
+	for row in listed:
+		typed.append(row)
+	return typed
+
+
+## Refill a dropdown from a list of {"id", "label"}, carrying the id as the
+## item's metadata so nothing has to map a display string back to a key.
+static func _fill(opt: OptionButton, rows: Array[Dictionary]) -> void:
+	opt.clear()
+	for row in rows:
+		opt.add_item(String(row["label"]))
+		opt.set_item_metadata(opt.item_count - 1, row["id"])
+	if opt.item_count > 0:
+		opt.select(0)
 
 
 func _get_style_key() -> StringName:
@@ -136,13 +147,8 @@ func _trade() -> StringName:
 ## rebuilds once instead of once per slider.
 func _on_kind_changed() -> void:
 	var village: bool = _kind() == VILLAGE
-	var cfg: Dictionary = VILLAGE_CFG if village else BigGlade.describe_kind(_kind())
-	if village:
-		var purposes: Array[Dictionary] = []
-		for p in VillageSpec.PURPOSES:
-			purposes.append({"id": p, "label": String(p).capitalize()})
-		cfg = cfg.duplicate(true)
-		cfg["purposes"] = purposes
+	var cfg: Dictionary = VILLAGE_CFG.duplicate(true) if village \
+		else BigGlade.describe_kind(_kind())
 	_suspend_regen = true
 	for pair in [[width_slider, "width"], [length_slider, "length"],
 			[height_slider, "height"]]:
@@ -171,21 +177,13 @@ func _on_kind_changed() -> void:
 		storeys_slider.max_value = storey_cfg["max"]
 		storeys_slider.step = storey_cfg["step"]
 		storeys_slider.value = storey_cfg["value"]
-	style_opt.clear()
-	for style_key in _styles():
-		style_opt.add_item(_styles()[style_key]["label"])
-		style_opt.set_item_metadata(style_opt.item_count - 1, style_key)
-	style_opt.select(0)
-	# The second dropdown is what the building is FOR. Its options come from the
-	# public descriptor so Studio does not maintain a second family vocabulary.
-	trade_opt.clear()
-	for option in cfg.get("purposes", []):
-		trade_opt.add_item(option["label"])
-		trade_opt.set_item_metadata(trade_opt.item_count - 1, option["id"])
-	if trade_opt.item_count > 0:
-		trade_opt.select(0)
-	trade_label.text = "Trade" if _kind() == &"house" else ("Business" \
-		if _kind() == &"shop" else ("Purpose" if village else "Cult"))
+	# Both dropdowns are filled from the option-discovery contract, and both
+	# are LABELLED by it too: a temple's are a form and a cult, a shop's a
+	# style and a business. Studio maintains no family vocabulary of its own.
+	_fill(style_opt, _options(&"style"))
+	_fill(trade_opt, _options(&"purpose"))
+	style_label.text = "Culture" if village else String(cfg.get("style_label", "Style"))
+	trade_label.text = "Purpose" if village else String(cfg.get("purpose_label", ""))
 	trade_opt.visible = trade_opt.item_count > 0
 	trade_label.visible = trade_opt.visible
 	_suspend_regen = false
@@ -316,11 +314,11 @@ func _show(idx: int) -> void:
 func _house_sheet(plan: HousePlan) -> String:
 	var purpose: String
 	if plan.spec is HotelSpec:
-		purpose = HotelSpec.HOTEL_STYLES[(plan.spec as HotelSpec).style]["label"]
+		purpose = BigGlade.option_label(&"hotel", &"style", (plan.spec as HotelSpec).style)
 	elif plan.spec is ShopSpec:
-		purpose = ShopSpec.BUSINESSES[(plan.spec as ShopSpec).business]["label"]
+		purpose = BigGlade.option_label(&"shop", &"purpose", (plan.spec as ShopSpec).business)
 	else:
-		purpose = HouseSpec.TRADES[plan.spec.trade]["label"]
+		purpose = BigGlade.option_label(&"house", &"purpose", plan.spec.trade)
 	var lines: Array[String] = ["%s -- %s, %d rooms on %d storey%s"
 		% [plan.spec.variant_name, purpose,
 			plan.room_count(), plan.spec.storeys, "" if plan.spec.storeys == 1 else "s"]]
@@ -340,7 +338,7 @@ func _house_sheet(plan: HousePlan) -> String:
 ## the sheet lists the things the checks care about.
 func _temple_sheet(s: TempleSpec) -> String:
 	var bits: Array[String] = ["%s of %s"
-		% [TempleSpec.FORMS[s.form]["label"], TempleSpec.CULTS[s.cult]["label"]]]
+		% [BigGlade.option_label(&"temple", &"style", s.form), BigGlade.option_label(&"temple", &"purpose", s.cult)]]
 	bits.append("hall %.0f x %.0f x %.0f m" % [s.width, s.length, s.height])
 	bits.append("the god: a %s, %.1f m to its crown"
 		% [String(s.idol_kind), TempleGeometry.idol_apex(s)])
@@ -369,12 +367,12 @@ func _describe(s) -> String:
 			String(s.purpose), s.households, plan.buildings.size(), plan.site.size.x, plan.site.size.y]
 	if s is TempleSpec:
 		return "%s -- %s of %s\n%.0f x %.0f m, %.0f m to the ceiling, %.0f m to the crown of the god" % [
-			s.variant_name, TempleSpec.FORMS[s.form]["label"],
-			TempleSpec.CULTS[s.cult]["label"], s.width, s.length, s.height,
+			s.variant_name, BigGlade.option_label(&"temple", &"style", s.form),
+			BigGlade.option_label(&"temple", &"purpose", s.cult), s.width, s.length, s.height,
 			TempleGeometry.total_height(s)]
 	if s is HotelSpec:
 		return "%s -- %s\n%.0f x %.0f m, %d guest floors at %.1f m -- %d facade bays, %d dormers, twin cupolas" % [
-			s.variant_name, HotelSpec.HOTEL_STYLES[s.style]["label"], s.width,
+			s.variant_name, BigGlade.option_label(&"hotel", &"style", s.style), s.width,
 			s.length, s.storeys, s.height, s.facade_bays, s.dormer_count]
 	if s is ShopSpec:
 		var rooms: Array[String] = []
@@ -383,8 +381,8 @@ func _describe(s) -> String:
 			if not label in rooms:
 				rooms.append(label)
 		return "%s -- %s %s\n%.1f x %.1f m, %d storey%s at %.1f m -- %s" % [
-			s.variant_name, HouseSpec.STYLES[s.style]["label"],
-			ShopSpec.BUSINESSES[s.business]["label"], s.width, s.length, s.storeys,
+			s.variant_name, BigGlade.option_label(&"shop", &"style", s.style),
+			BigGlade.option_label(&"shop", &"purpose", s.business), s.width, s.length, s.storeys,
 			"" if s.storeys == 1 else "s", s.height, ", ".join(rooms)]
 	if s is HouseSpec:
 		var bits: Array[String] = []
@@ -393,8 +391,8 @@ func _describe(s) -> String:
 			if n > 0:
 				bits.append("%d %s" % [n, String(kind)] if n > 1 else String(kind))
 		return "%s -- %s %s\n%.1f x %.1f m, %d storey%s at %.1f m -- %s" % [
-			s.variant_name, HouseSpec.STYLES[s.style]["label"],
-			HouseSpec.TRADES[s.trade]["label"], s.width, s.length, s.storeys,
+			s.variant_name, BigGlade.option_label(&"house", &"style", s.style),
+			BigGlade.option_label(&"house", &"purpose", s.trade), s.width, s.length, s.storeys,
 			"" if s.storeys == 1 else "s", s.height,
 			", ".join(bits)]
 	if s is CastleSpec:
@@ -418,11 +416,11 @@ func _describe(s) -> String:
 		if s.chimneys > 0:
 			bits.append("%d stacks" % s.chimneys)
 		return "%s — %s %s\nSite %.0f×%.0f m, walls %.0f m, %.0f m to the top — %s" % [
-			s.variant_name, CastleSpec.STYLES[s.style]["label"],
+			s.variant_name, BigGlade.option_label(&"castle", &"style", s.style),
 			String(s.tier).capitalize(), s.width, s.length, s.height,
 			CastleGeometry.total_height(s), ", ".join(bits)]
 	return "%s — %s\nNave %.0f×%.0f m, eaves %.0f m%s%s%s" % [
-		s.variant_name, ChurchSpec.STYLES[s.style]["label"],
+		s.variant_name, BigGlade.option_label(&"church", &"style", s.style),
 		s.width, s.length, s.height,
 		", tower" if s.tower else "", ", spire" if s.spire else "",
 		", apse" if s.apse else ""]
