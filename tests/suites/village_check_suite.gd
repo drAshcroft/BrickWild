@@ -23,6 +23,7 @@ static func run() -> SuiteResult:
 	_lot_fixtures(res, base)
 	_place_fixtures(res, base)
 	_dress_fixtures(res, base)
+	_nav_fixtures(res, base)
 	_sweep(res)
 	return res
 
@@ -473,6 +474,66 @@ static func _dress_fixtures(res: SuiteResult, base: VillagePlan) -> void:
 ## The most trees DressCheck allows on a common, read from the check so the
 ## fixture cannot drift away from the rule it is proving.
 const GREEN_TREES := VillageDressCheck.GREEN_TREES_MAX
+
+
+# ------------------------------------------------------------------ 9.5
+
+## VIL-016: every VillageNavCheck rule shown to fire on a plan built to break
+## it. One wall of props across the thing the rule is about, each time.
+static func _nav_fixtures(res: SuiteResult, base: VillagePlan) -> void:
+	_clean(res, "walking a planned village", VillageNavCheck.new().check(base))
+
+	# arrive: wall a building in completely -- a closed ring of crates round
+	# its own bounds, which is the only way to be sure there is no way round
+	var p := _copy(base)
+	var walled: Rect2 = Poly.bounding_rect(
+		VillageMeasure.bounds_poly(base.buildings[1])).grow(1.4)
+	p.props = []
+	var step := 0.8
+	var x: float = walled.position.x
+	while x <= walled.end.x:
+		p.props.append(_block(Vector2(x, walled.position.y), 1.6))
+		p.props.append(_block(Vector2(x, walled.end.y), 1.6))
+		x += step
+	var y0: float = walled.position.y
+	while y0 <= walled.end.y:
+		p.props.append(_block(Vector2(walled.position.x, y0), 1.6))
+		p.props.append(_block(Vector2(walled.end.x, y0), 1.6))
+		y0 += step
+	_expect(res, "nav arrive fixture", VillageNavCheck.new().check(p), "arrive")
+
+	# road: a wall of crates across the through road
+	var p2 := _copy(base)
+	var pts: PackedVector2Array = base.roads[0]["points"]
+	var mid: Vector2 = pts[pts.size() / 2]
+	var dir: Vector2 = (pts[pts.size() / 2 + 1] - mid).normalized()
+	var across := Vector2(-dir.y, dir.x)
+	p2.props = []
+	for k3 in range(-9, 10):
+		p2.props.append(_block(mid + across * (float(k3) * 0.8), 1.6))
+	_expect(res, "nav road fixture", VillageNavCheck.new().check(p2), "road")
+
+	# common: pave the common with crates
+	var common: PackedVector2Array = VillageMeasure.common_poly(base)
+	if not common.is_empty():
+		var p3 := _copy(base)
+		var rect: Rect2 = Poly.bounding_rect(common)
+		p3.props = []
+		var cx: float = rect.position.x
+		while cx <= rect.end.x:
+			var cy: float = rect.position.y
+			while cy <= rect.end.y:
+				p3.props.append(_block(Vector2(cx, cy), 1.6))
+				cy += 1.2
+			cx += 1.2
+		_expect(res, "nav common fixture", VillageNavCheck.new().check(p3), "common")
+
+
+## One crate-sized obstruction, in the shape the nav check reads.
+static func _block(at: Vector2, side: float) -> Dictionary:
+	return {"key": "Crate_Wooden", "pos": at, "yaw": 0.0, "host": -1,
+		"rect": Rect2(at - Vector2(side, side) * 0.5, Vector2(side, side)),
+		"zone": Rect2()}
 
 
 # ------------------------------------------------------------------ sweep

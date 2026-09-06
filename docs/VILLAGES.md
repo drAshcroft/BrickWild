@@ -520,6 +520,31 @@ village is the building most in need of being *looked at*.
 
 ### 9.5 `VillageNavCheck` — can a person walk it?
 
+Implemented as `qa/village_nav_check.gd` (VIL-016), on the same `WalkGrid`
+the house nav check and the temple rite check use. Roads with their verges,
+the common and the lots are floor; buildings, water and the props and plants
+that take FLOOR are obstruction — a wall lamp hangs above head height and
+grass is walked over, and `PropCatalog.blocks_floor` already knows which is
+which. Blocking on every plant made the verges solid and pinched the through
+road to nothing.
+
+Three of its measurements had to be written more carefully than the sentence
+suggests, and each is commented where it lives. A door sits ON the wall and
+the wall is solid, so every rule about a door measures from the first ground
+OUTSIDE it a person can stand on. A through road runs from one edge of the
+site to the other by definition and the grid stops at the site, so the ends
+are not sampled — they measure the width of the world. And a prop's use zone
+is centred on the prop, so asking whether the zone was reached asks whether a
+person can stand inside the well.
+
+`paths` is the one rule that cannot yet be measured as §9.5 states it: the
+site planner lays no `path` roads. It measures the two halves it can — that
+there is standing ground outside every door, and that any `path` that does
+exist stays 1.2 m clear — and says so rather than measuring the straight line
+to the lot's frontage, which on a jettied townhouse starts on the road and
+ends inside a building.
+
+
 `WalkGrid` over the whole site at a cell size chosen per village the way
 `VoxelGrid` chooses its voxel per castle — 0.25 m for a hamlet, 0.5 m at the
 cap, where a 400 m site is 640 k cells — with roads, paths, verges and the common as floor; buildings, water, walls,
