@@ -52,7 +52,12 @@ const COMMON_MIN_AREA := 150.0
 const HAMLET_COMMON_AREA := 30.0
 const HAMLET_POPULATION := 25
 const WELL_PLOT_SIDE := 5.6     ## the hamlet's common shrunk to the well: 31.4 m^2
-const COMMON_ROAD_GAP := 1.5    ## clear metres between the road's verge and the common
+## Clear metres between the road's verge and the common. ZERO: §3 calls the
+## common "a widening of the road", and a metre and a half of ground that is
+## neither road nor common nor lot is a moat -- VIL-016's walk grid takes
+## roads, verges, lots and the common as floor and nothing else, so the well
+## on a hamlet's little green could not be got at from the road at all.
+const COMMON_ROAD_GAP := 0.0
 
 const GREEN_MIN_W := 18.0
 const GREEN_MIN_H := 12.0

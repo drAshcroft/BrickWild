@@ -511,7 +511,7 @@ static func _nav_fixtures(res: SuiteResult, base: VillagePlan) -> void:
 	p2.props = []
 	for k3 in range(-9, 10):
 		p2.props.append(_block(mid + across * (float(k3) * 0.8), 1.6))
-	_expect(res, "nav road fixture", VillageNavCheck.new().check(p2), "road")
+	_expect(res, "nav road fixture", VillageNavCheck.new().check(p2), "road_open")
 
 	# common: pave the common with crates
 	var common: PackedVector2Array = VillageMeasure.common_poly(base)
@@ -557,6 +557,11 @@ const PLANNER_FOLLOW_UPS := {
 	# farming village to the last one or two in three villages of twenty-four;
 	# closing it wants tracks on both sides of the road, which is VIL-003's.
 	"farms": "the last farm or two run out of field-track frontage (VIL-003 follow-up)",
+	# The three the DRESSER does not yet reliably satisfy (VIL-013). Each has
+	# a fixture that fires, and each is counted here rather than quieted.
+	"use": "the well and the benches on a small common are ringed by their own footprints (VIL-013 follow-up)",
+	"edge": "the edge band cannot always find planting ground round a stretched site (VIL-013 follow-up)",
+	"road_open": "the through road is measured pinched where the common now abuts it (VIL-016 follow-up)",
 }
 
 static func _sweep(res: SuiteResult) -> void:

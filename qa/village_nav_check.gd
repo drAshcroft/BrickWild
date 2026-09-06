@@ -11,7 +11,7 @@ extends RefCounted
 ##
 ##   ARRIVE   from any gate you can reach any door
 ##   USE      every prop meant to be used can be got at
-##   ROAD     the through road is never pinched
+##   ROAD_OPEN  the through road is never pinched
 ##   PATHS    a door reaches its road without crossing a yard
 ##   COMMON   the common is mostly standable
 ##   OUTSIDE  the tracks and the mill are reachable from a gate
@@ -22,7 +22,11 @@ extends RefCounted
 ## grid on the cap would be a hundred megabytes and forty seconds, and a
 ## village is not measured in centimetres.
 
-const RULES: Array[StringName] = [&"arrive", &"use", &"road", &"paths",
+## `road_open` and not `road`: `DressCheck` has a `road` rule too (nothing
+## STANDS in the road) and this one is a different sentence (the road is not
+## PINCHED). Two rules whose failures begin with the same word cannot be told
+## apart by anything that reads the report.
+const RULES: Array[StringName] = [&"arrive", &"use", &"road_open", &"paths",
 	&"common", &"outside"]
 
 const PERSON_RADIUS := HouseGeometry.PERSON_RADIUS
@@ -209,12 +213,12 @@ func _check_use(plan: VillagePlan) -> void:
 			% [stranded.size(), ", ".join(stranded.slice(0, 4))])
 
 
-# ------------------------------------------------------------------- road
+# -------------------------------------------------------------- road_open
 
 ## The through road is never pinched: half its own width of clear floor all
 ## along its centreline. A cart has to get through, and a village that has
 ## grown a barrel into its only road has stopped being on the way anywhere.
-func _check_road(plan: VillagePlan) -> void:
+func _check_road_open(plan: VillagePlan) -> void:
 	for r in plan.roads_of_class(&"through"):
 		var road: Dictionary = plan.roads[r]
 		var want: float = float(road["width"]) * ROAD_PINCH
@@ -230,7 +234,7 @@ func _check_road(plan: VillagePlan) -> void:
 				float(road["width"])))
 		stats["road_clear"] = snappedf(narrowest, 0.1)
 		if narrowest < want:
-			failures.append("road: the through road narrows to %.1fm, wants %.1f"
+			failures.append("road_open: the through road narrows to %.1fm, wants %.1f"
 				% [narrowest, want])
 			return
 

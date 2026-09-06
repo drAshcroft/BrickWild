@@ -706,6 +706,8 @@ static func _place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 	# village came out with nothing lit at all.
 	if not _prop_is_clear(plan, ctx, rect, use, PropCatalog.blocks_floor(key) or built):
 		return false
+	if not _host_owns(plan, ctx, host, at):
+		return false
 	plan.props.append({"key": key, "pos": at, "yaw": snappedf(yaw, 0.001),
 		"host": host, "rect": rect, "zone": use,
 		"built": built, "light": _is_light(key, built)})
@@ -744,6 +746,27 @@ static func _facing(plan: VillagePlan, host: int, at: Vector2) -> float:
 ## `Poly.intersection_area` clips one convex polygon against another, which a
 ## bowed road ribbon is not; `overlap_area` goes through `Geometry2D` and
 ## does not care.
+## Ground the host may put something on: its own lot, a road (the verge in
+## front of it is where §7's `verge` rule puts a bench), or the common.
+##
+## §9.6's `host` rule measures exactly this, and without it the placer could
+## put a smithy's anvil on the strip of nothing between a shallow shop lot
+## and the road -- ground that belongs to nobody, that the walk grid does not
+## take as floor, and that the `use` rule then reports as unreachable.
+static func _host_owns(plan: VillagePlan, ctx: Dictionary, host: int,
+		at: Vector2) -> bool:
+	if host < 0:
+		return true          # a place, not a building: the village at large
+	var lot: int = plan.lot_of_building(host)
+	if lot >= 0 and Poly.contains_point(plan.lots[lot]["poly"], at):
+		return true
+	for ribbon in ctx["roads"]:
+		if Poly.contains_point(ribbon, at):
+			return true
+	var common: PackedVector2Array = ctx["common"]
+	return not common.is_empty() and Poly.contains_point(common, at)
+
+
 ## `floors` is false for a piece that hangs on a wall and takes no ground.
 ## Such a piece is still held to the site, the doorways and the ROAD -- a
 ## lantern over the carriageway is over the carriageway -- but not to the
@@ -807,9 +830,17 @@ static func _plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
 	var boxes: Array[Rect2] = ctx["boxes"]
 	var bounds: Array[PackedVector2Array] = ctx["bounds"]
 	for j in range(bounds.size()):
-		if boxes[j].intersects(stem_rect) 				and VillageLotPlanner.overlap_area(stem, bounds[j]) > VillageLotPlanner.AREA_EPS:
+		if not boxes[j].grow(canopy + TRUNK_CLEAR).has_point(at):
+			continue
+		# The CHECK'S measurement, not a rect overlap: `DressCheck.canopies`
+		# asks for the true distance from the trunk to the building, and a
+		# rect that only touches a polygon at a corner has no overlapping
+		# area at all -- so the two disagreed by a few centimetres and the
+		# dresser planted bushes the check then refused.
+		var d: float = VillageMeasure.point_to_poly(at, bounds[j])
+		if Poly.contains_point(bounds[j], at) or d < trunk + TRUNK_CLEAR:
 			return false
-		if canopy > 0.0 and boxes[j].intersects(crown_rect) 				and VillageLotPlanner.overlap_area(crown, bounds[j]) > VillageLotPlanner.AREA_EPS:
+		if canopy > 0.0 and d < canopy:
 			return false
 	for d in ctx["doors"]:
 		if d.has_point(at):

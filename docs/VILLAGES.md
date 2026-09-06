@@ -454,6 +454,25 @@ is listed in `VillageCheckSuite.PLANNER_FOLLOW_UPS` with the follow-up each
 needs; the sweep counts and prints them as warnings and fails on everything
 else. Their fixtures still fire.
 
+`qa/village_qa.gd` now composes all six (VIL-017) -- scale, roads, lots,
+places, dressing and walking -- and then runs the family QA on every building
+in it. The order is §9's own and it is the order a person would look in;
+walking is last because it is the only one that rasterises the whole site,
+and there is no sense grinding a grid over a plan that has already failed to
+be a village. `VillageQA.ascii_map()` draws the walk and
+`VillageQA.dressing_map()` draws what is standing about.
+
+Composing the last two turned three disagreements between the dresser and
+the checks into fixes, all of them the same lesson -- **the placer and the
+check must measure with the same function**: a bench on the verge is on the
+ROAD and not on its lot, and `host` had to say so; the dresser's rect-overlap
+test for a trunk's clearance and the check's true-distance test disagreed by
+centimetres, so the dresser uses the check's; and a prop must stand on ground
+its host owns, which the dresser now refuses to break rather than leaving
+`host` and `use` to report it afterwards. The common also stopped being an
+island: §3 calls it "a widening of the road" and a metre and a half of ground
+that is neither road nor common nor lot is a moat the walk grid cannot cross.
+
 `qa/village_qa.gd` composes six checks over the `VillagePlan` and then runs
 the family QA on every building in it. Each rule is a sentence and a
 measurement, in the vocabulary the harness already has: `Rect2`/polygon

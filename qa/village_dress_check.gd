@@ -104,8 +104,24 @@ func _check_host(plan: VillagePlan) -> void:
 			continue
 		if not common.is_empty() and Poly.contains_point(common, at):
 			continue
-		failures.append("host: %s of building %d stands on neither its lot nor the common"
+		# ...or on the verge in front of its own lot, which is where §7's
+		# `verge` rule puts a bench and a barrel on purpose. The verge is
+		# road, not lot, so a rule that only knew about lots called every one
+		# of them homeless.
+		if _on_a_verge(plan, at):
+			continue
+		failures.append("host: %s of building %d stands on neither its lot, the common nor a verge"
 			% [String(p["key"]), host])
+
+
+## Is this point on a road's verge -- inside the ribbon WITH its verge but
+## outside the carriageway itself? A prop on the carriageway is the `road`
+## rule's business and fails there.
+static func _on_a_verge(plan: VillagePlan, at: Vector2) -> bool:
+	for road in plan.roads:
+		if Poly.contains_point(VillageSitePlanner.road_ribbon(road, true), at):
+			return true
+	return false
 
 
 # --------------------------------------------------------------- doorways
