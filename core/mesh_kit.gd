@@ -142,7 +142,7 @@ func gable_roof(span_x: float, along_z: float, rise: float, z_center: float,
 ## emitter once did.
 func ridge_roof(xf: Transform3D, span_x: float, along_z: float, rise: float,
 		surf: int, end_surf := -1, end_span := 0.0, end_along := 0.0,
-		end_thick := 0.3) -> void:
+		end_thick := 0.3, end_cut := 0.0) -> void:
 	var half: float = span_x / 2.0
 	var slope_len: float = sqrt(half * half + rise * rise)
 	var ang: float = atan2(rise, half)
@@ -161,7 +161,7 @@ func ridge_roof(xf: Transform3D, span_x: float, along_z: float, rise: float,
 	var apex: float = rise * (ex / half)
 	for end_v in [-1.0, 1.0]:
 		var zf: float = end_v * ez
-		gable_end_at(xf, ex, apex, zf - end_v * end_thick, zf, end_surf)
+		gable_end_at(xf, ex, apex, zf - end_v * end_thick, zf, end_surf, end_cut)
 
 
 ## The triangular wall under a gable: apex over x = 0 at y_base + rise, extruded
@@ -174,26 +174,37 @@ func gable_end(half_span: float, rise: float, y_base: float,
 
 
 ## gable_end() in the local space of `xf`, whose origin is the wall top.
+##
+## `cut` truncates the apex at that height, which turns the triangle into a
+## TRAPEZOID: a half hip takes the top off the gable, and the wall has to stop
+## where the hip starts. Left full height, the wall carries on up behind the
+## hip and the hip reads as a stray plane lying across the roof rather than as
+## the end of it.
 func gable_end_at(xf: Transform3D, half_span: float, rise: float,
-		z_back: float, z_front: float, surf: int) -> void:
+		z_back: float, z_front: float, surf: int, cut := 0.0) -> void:
 	var lo: float = minf(z_back, z_front)
 	var hi: float = maxf(z_back, z_front)
-	var xy := [
-		Vector2(-half_span, 0.0),
-		Vector2(half_span, 0.0),
-		Vector2(0.0, rise),
-	]
+	var xy: Array[Vector2] = [Vector2(-half_span, 0.0), Vector2(half_span, 0.0)]
+	if cut > 0.0 and cut < rise:
+		var w: float = half_span * (1.0 - cut / rise)
+		xy.append(Vector2(w, cut))
+		xy.append(Vector2(-w, cut))
+	else:
+		xy.append(Vector2(0.0, rise))
+	var n: int = xy.size()
 	var at_lo: Array = []
 	var at_hi: Array = []
 	for p in xy:
 		at_lo.append(xf * Vector3(p.x, p.y, lo))
 		at_hi.append(xf * Vector3(p.x, p.y, hi))
 	var st: SurfaceTool = _sts[surf]
-	_tri(st, at_lo[0], at_lo[1], at_lo[2])      # faces -Z
-	_tri(st, at_hi[0], at_hi[2], at_hi[1])      # faces +Z
-	for i in range(3):
-		var j: int = (i + 1) % 3
-		_quad(st, at_lo[i], at_hi[i], at_hi[j], at_lo[j])
+	# fanned from corner 0, which is safe: the outline is convex either way
+	for i in range(1, n - 1):
+		_tri(st, at_lo[0], at_lo[i], at_lo[i + 1])      # faces -Z
+		_tri(st, at_hi[0], at_hi[i + 1], at_hi[i])      # faces +Z
+	for i2 in range(n):
+		var j: int = (i2 + 1) % n
+		_quad(st, at_lo[i2], at_hi[i2], at_hi[j], at_lo[j])
 
 
 func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
@@ -209,6 +220,45 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> v
 	_tri(st, a, c, d)
 
 
+## A flat slab of `thickness` through any planar polygon, given its corners in
+## order round the face.
+##
+## Roof slabs are oriented boxes everywhere else, and a box is a rectangle: it
+## cannot be cut back on the diagonal. That is exactly what a hip needs -- the
+## slope beside it has a triangle taken out of its top corner, and the hip
+## fills that triangle. Built from rectangles instead, the two either leave a
+## hole or lie across each other, and both were happening.
+##
+## The polygon must be planar and convex, which every roof face here is.
+func slab_poly(points: PackedVector3Array, thickness: float, surf: int) -> void:
+	var n: int = points.size()
+	if n < 3:
+		return
+	var nrm: Vector3 = (points[1] - points[0]).cross(points[2] - points[0])
+	if nrm.length_squared() < 1e-12:
+		return
+	# wind so the outer face is the upper one
+	var pts: PackedVector3Array = points
+	if nrm.y < 0.0:
+		pts = PackedVector3Array()
+		for i in range(n - 1, -1, -1):
+			pts.append(points[i])
+		nrm = -nrm
+	var off: Vector3 = nrm.normalized() * (thickness / 2.0)
+	var lo: Array = []
+	var hi: Array = []
+	for p in pts:
+		lo.append(p - off)
+		hi.append(p + off)
+	var st: SurfaceTool = _sts[surf]
+	for i2 in range(1, n - 1):
+		_tri(st, lo[0], lo[i2], lo[i2 + 1])
+		_tri(st, hi[0], hi[i2 + 1], hi[i2])
+	for i3 in range(n):
+		var j: int = (i3 + 1) % n
+		_quad(st, lo[i3], hi[i3], hi[j], lo[j])
+
+
 ## Hipped roof: side slabs plus sloped ends, so all four sides fall away.
 ## Cannibalised from the house builder, the only place it existed.
 func hip_roof(span_x: float, along_z: float, rise: float, z_center: float,
@@ -218,23 +268,34 @@ func hip_roof(span_x: float, along_z: float, rise: float, z_center: float,
 
 
 ## hip_roof() placed by an arbitrary transform; local origin is the wall top.
+##
+## Four slabs: two long slopes covering the ridge, and two hips falling to the
+## end walls. The HIPS RUN THE FULL WIDTH, and that is the whole trick -- the
+## slopes have to stop short of the ends or the hips would never show, so
+## whatever the slopes do not reach has to be reached by something. Cutting
+## both pairs back by the same fraction, which is what this did, left the four
+## corners covered by neither: a hole in the roof you could see the floor
+## through, and 4.5% of a farmhouse open to the sky.
 func hip_roof_at(xf: Transform3D, span_x: float, along_z: float, rise: float,
 		surf: int) -> void:
-	var half: float = span_x / 2.0
-	var slope_len_x: float = sqrt(half * half + rise * rise)
-	var ang_x: float = atan2(rise, half)
+	var half_x: float = span_x / 2.0
+	var half_z: float = along_z / 2.0
+	# A hip falls back from each end by as much as the roof is wide, so a
+	# square plan comes almost to a point and a long one keeps a ridge.
+	var ridge: float = maxf(along_z - span_x, along_z * 0.2)
+	var slope_len_x: float = sqrt(half_x * half_x + rise * rise)
+	var ang_x: float = atan2(rise, half_x)
 	for side in [-1.0, 1.0]:
 		var t: Transform3D = xf * Transform3D(Basis(Vector3(0, 0, 1), -side * ang_x),
-			Vector3(side * half / 2.0, rise / 2.0, 0.0))
-		oriented_box(Vector3(slope_len_x, 0.24, along_z * 0.72), t, surf)
-	var half_along: float = along_z / 2.0
-	var slope_len: float = sqrt(half_along * half_along + rise * rise)
-	var ang: float = atan2(rise, half_along)
+			Vector3(side * half_x / 2.0, rise / 2.0, 0.0))
+		oriented_box(Vector3(slope_len_x, 0.24, ridge), t, surf)
+	var slope_len_z: float = sqrt(half_z * half_z + rise * rise)
+	var ang_z: float = atan2(rise, half_z)
 	for end_v in [-1.0, 1.0]:
-		var t2: Transform3D = xf * Transform3D(Basis(Vector3(1, 0, 0), end_v * ang),
-			Vector3(0.0, rise / 2.0, end_v * half_along / 2.0))
-		oriented_box(Vector3(span_x * 0.72, 0.24, slope_len), t2, surf)
-	oriented_box(Vector3(0.35, 0.25, along_z * 0.4),
+		var t2: Transform3D = xf * Transform3D(Basis(Vector3(1, 0, 0), end_v * ang_z),
+			Vector3(0.0, rise / 2.0, end_v * half_z / 2.0))
+		oriented_box(Vector3(span_x, 0.24, slope_len_z), t2, surf)
+	oriented_box(Vector3(0.35, 0.25, ridge),
 		xf * Transform3D(Basis(), Vector3(0.0, rise + 0.1, 0.0)), surf)
 
 

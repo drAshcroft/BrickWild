@@ -713,6 +713,13 @@ static func _proud(depth: float) -> float:
 
 # ------------------------------------------------------------------- roof
 
+## How far the roof runs past the end wall at the gable: the verge.
+const VERGE := 0.25
+## How much of a half-hipped roof is still gable, measured up from the wall
+## head. The rest is hipped off.
+const HIP_CUT := 0.62
+
+
 func _build_roof() -> void:
 	tag("roof")
 	var r: Rect2 = HouseGeometry.site_rect(spec)
@@ -724,20 +731,21 @@ func _build_roof() -> void:
 	var wall_top := spec.height * _storeys()
 	var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(0.0, wall_top, 0.0))
 
+	# Where the gable stops. A plain gable runs to its apex; a half hip -- a
+	# jerkinhead -- takes the top off, and then the WALL, the TRUSS and the
+	# BARGEBOARDS all have to stop on the line the hip starts on.
+	var gable_top: float = rise
+	if spec.roof_type == &"half_hipped":
+		gable_top = rise * HIP_CUT
+
 	if spec.roof_type == &"hipped":
 		_kit.hip_roof_at(xf, span + 0.7, along + 0.5, rise, SURF_ROOF)
 	elif spec.roof_type == &"half_hipped":
-		_kit.ridge_roof(xf, span + 0.7, along + 0.5, rise, SURF_ROOF, SURF_WALL, span, along)
-		var hip_span := span * 0.55
-		var hip_rise := rise * 0.35
-		var hip_slope := sqrt(hip_rise * hip_rise + (span * 0.28) * (span * 0.28))
-		var hip_ang := atan2(hip_rise, span * 0.28)
-		for end_v in [-1.0, 1.0]:
-			var ht := xf * Transform3D(Basis(Vector3(1, 0, 0), end_v * hip_ang),
-				Vector3(0.0, rise * 0.82, end_v * (along / 2.0 - 0.05)))
-			_kit.oriented_box(Vector3(hip_span, 0.24, hip_slope), ht, SURF_ROOF)
+		_half_hipped(xf, span + 0.7, along + 0.5, rise, gable_top)
+		_half_hip_gables(xf, span, along, rise, gable_top)
 	else:
-		_kit.ridge_roof(xf, span + 0.7, along + 0.5, rise, SURF_ROOF, SURF_WALL, span, along)
+		_kit.ridge_roof(xf, span + 0.7, along + 0.5, rise, SURF_ROOF, SURF_WALL,
+			span, along)
 
 	var overhang_x := 0.25 if along_x else 0.35
 	var overhang_z := 0.35 if along_x else 0.25
@@ -748,37 +756,96 @@ func _build_roof() -> void:
 	total_height = maxf(total_height, wall_top + rise)
 
 	if spec.timber_frame and spec.roof_type != &"hipped":
-		_gable_frame(xf, span, along, rise)
+		_gable_frame(xf, span, along, rise, gable_top)
 	if spec.roof_type != &"hipped":
-		_build_bargeboards(xf, span, along, rise)
+		_build_bargeboards(xf, span, along, rise, gable_top)
 	_build_eaves_tails(xf, span, along, rise)
 	if spec.dormers:
 		_build_dormers(xf, span, along, rise)
 
 
-func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float) -> void:
+## A jerkinhead: two long slopes with their top corners cut away, and a hip
+## filling each cut.
+##
+## The cut is what makes it work. A hip is a triangle standing on the top of
+## the gable and reaching the END OF THE RIDGE, so the slope beside it has to
+## give up exactly that triangle -- which a rectangular slab cannot do, and
+## which is why the roof used to have either a hole at the end or an extra
+## plane lying across it. Both faces are stated as polygons and share an edge,
+## so they meet by construction rather than by two sets of numbers agreeing.
+func _half_hipped(xf: Transform3D, span: float, along: float, rise: float,
+		cut: float) -> void:
+	var half: float = span / 2.0
+	var far: float = along / 2.0
+	# The hip takes the same pitch as the slopes, so its run in plan is the
+	# same as the width it has at the wall head.
+	var w: float = half * (1.0 - cut / rise)
+	var z_ridge: float = far - w
+	if w <= 0.05 or z_ridge <= 0.0:
+		_kit.ridge_roof(xf, span, along, rise, SURF_ROOF)
+		return
+	for side in [-1.0, 1.0]:
+		_kit.slab_poly(PackedVector3Array([
+			xf * Vector3(side * half, 0.0, -far),
+			xf * Vector3(side * half, 0.0, far),
+			xf * Vector3(side * w, cut, far),
+			xf * Vector3(0.0, rise, z_ridge),
+			xf * Vector3(0.0, rise, -z_ridge),
+			xf * Vector3(side * w, cut, -far),
+		]), 0.24, SURF_ROOF)
+	for end_v in [-1.0, 1.0]:
+		_kit.slab_poly(PackedVector3Array([
+			xf * Vector3(-w, cut, end_v * far),
+			xf * Vector3(w, cut, end_v * far),
+			xf * Vector3(0.0, rise, end_v * z_ridge),
+		]), 0.24, SURF_ROOF)
+	_kit.oriented_box(Vector3(0.35, 0.25, z_ridge * 2.0),
+		xf * Transform3D(Basis(), Vector3(0.0, rise + 0.1, 0.0)), SURF_ROOF)
+
+
+## The gable under a half hip: a trapezoid, stopping where the hip starts.
+func _half_hip_gables(xf: Transform3D, span: float, along: float, rise: float,
+		cut: float) -> void:
+	var ex: float = span / 2.0
+	var apex: float = rise * (ex / ((span + 0.7) / 2.0))
+	for end_v in [-1.0, 1.0]:
+		var zf: float = end_v * along / 2.0
+		_kit.gable_end_at(xf, ex, apex, zf - end_v * 0.3, zf, SURF_WALL,
+			minf(cut, apex - 0.05))
+
+
+func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
+		top: float) -> void:
 	if not spec.bargeboards:
 		return
 	tag("bargeboards")
 	var half := span / 2.0
-	var slope_len := sqrt(half * half + rise * rise) + 0.35
 	var ang := atan2(rise, half)
 	var bb_w: float = HouseGeometry.BARGEBOARD_W
 	var bb_thick := 0.05
+	var kick := 0.35
+	# where the board finishes: the apex, or the hip line on a half hip
+	var up := Vector2(half * (1.0 - top / rise), top)
 	for end_v in [-1.0, 1.0]:
 		var z: float = float(end_v) * (along / 2.0 + 0.28)
 		for side in [-1.0, 1.0]:
-			var bx: float = float(side) * half / 2.0
-			var by: float = rise / 2.0
-			var t := xf * Transform3D(Basis(Vector3(0, 0, 1), -float(side) * ang), Vector3(bx, by, z))
-			_kit.oriented_box(Vector3(slope_len, bb_w, bb_thick), t, SURF_TRIM)
-		# Carved apex finial at the ridge
-		_kit.oriented_box(Vector3(0.12, 0.55, 0.12),
-			xf * Transform3D(Basis(), Vector3(0.0, rise + 0.22, z)), SURF_TRIM)
+			var a := Vector2(float(side) * half, 0.0)
+			var b := Vector2(float(side) * up.x, up.y)
+			var dir: Vector2 = (a - b).normalized()
+			var foot: Vector2 = a + dir * kick
+			var mid: Vector2 = (foot + b) / 2.0
+			var t := xf * Transform3D(Basis(Vector3(0, 0, 1), -float(side) * ang),
+				Vector3(mid.x, mid.y, z))
+			_kit.oriented_box(Vector3((foot - b).length(), bb_w, bb_thick), t, SURF_TRIM)
+		# A finial stands on an apex. A half hip has none, so it gets none.
+		if is_equal_approx(top, rise):
+			_kit.oriented_box(Vector3(0.12, 0.55, 0.12),
+				xf * Transform3D(Basis(), Vector3(0.0, rise + 0.22, z)), SURF_TRIM)
 		# Drop pendants at the eaves
-		for side in [-1.0, 1.0]:
+		for side2 in [-1.0, 1.0]:
 			_kit.oriented_box(Vector3(0.09, 0.24, 0.09),
-				xf * Transform3D(Basis(), Vector3(float(side) * (half + 0.15), -0.05, z)), SURF_TRIM)
+				xf * Transform3D(Basis(), Vector3(float(side2) * (half + 0.15), -0.05, z)),
+				SURF_TRIM)
 
 
 func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float) -> void:
@@ -826,59 +893,99 @@ func _build_dormers(xf: Transform3D, span: float, along: float, rise: float) -> 
 		_kit.ridge_roof(r_xf, dw + 0.25, dd + 0.25, d_rise, SURF_ROOF, SURF_WALL, dw, dd)
 
 
-func _gable_frame(xf: Transform3D, span: float, along: float, rise: float) -> void:
+## The frame in the gable -- and every member of it stays UNDER THE RAFTERS.
+##
+## Each strut used to be stated as a run, a lift and a tilt that all had to
+## agree with a roof pitch stated somewhere else, and they did not. A
+## queen-post strut ran up-and-OUT from its post while the rafter it braces
+## runs down-and-out, so the strut left the roof and finished three and a half
+## metres out in the open air, reading as a stray roof plane crossing the real
+## ones. Members are stated by their two ENDS now, and the outer end is put ON
+## the rafter line rather than guessed at, so a member cannot escape the roof
+## whatever the pitch turns out to be.
+func _gable_frame(xf: Transform3D, span: float, along: float, rise: float,
+		top: float) -> void:
 	var half: float = span / 2.0
+	# The slabs overhang the wall, so the rafter over the wall face is a little
+	# higher than the wall head: this is the roof's half span, not the wall's.
+	var roof_half: float = (span + 0.7) / 2.0
+	_frame_top = top
 	for end_v in [-1.0, 1.0]:
 		var z: float = end_v * (along / 2.0 + HouseGeometry.BEAM_D / 2.0 - 0.01)
 		# Tie beam across the base of the gable
 		_kit.oriented_box(Vector3(span, HouseGeometry.PLATE_H, HouseGeometry.BEAM_D),
-			xf * Transform3D(Basis(), Vector3(0.0, HouseGeometry.PLATE_H / 2.0, z)), SURF_TRIM)
+			xf * Transform3D(Basis(), Vector3(0.0, HouseGeometry.PLATE_H / 2.0, z)),
+			SURF_TRIM)
 
 		match spec.gable_truss:
 			&"queen_post":
 				var qx: float = half * 0.42
-				var collar_h: float = rise * 0.52
-				for qside in [-1.0, 1.0]:
-					_kit.oriented_box(Vector3(HouseGeometry.BEAM_W, collar_h, HouseGeometry.BEAM_D),
-						xf * Transform3D(Basis(), Vector3(qside * qx, collar_h / 2.0, z)), SURF_TRIM)
-				_kit.oriented_box(Vector3(qx * 2.2, HouseGeometry.BEAM_W * 0.9, HouseGeometry.BEAM_D),
-					xf * Transform3D(Basis(), Vector3(0.0, collar_h, z)), SURF_TRIM)
-				for qside in [-1.0, 1.0]:
-					var srun: float = half * 0.45
-					var slift: float = rise * 0.38
-					var slen: float = sqrt(srun * srun + slift * slift)
-					var stilt: float = -atan2(slift, srun) * qside
-					var st := xf * Transform3D(Basis(Vector3(0, 0, 1), stilt),
-						Vector3(qside * (qx + srun / 2.0), collar_h + slift / 2.0, z))
-					_kit.oriented_box(Vector3(slen, HouseGeometry.BEAM_W * 0.8, HouseGeometry.BEAM_D), st, SURF_TRIM)
+				var collar_h: float = minf(rise * 0.52, _under_rafter(qx, roof_half, rise))
+				for qs in [-1.0, 1.0]:
+					_member(xf, Vector2(qs * qx, 0.0), Vector2(qs * qx, collar_h),
+						z, HouseGeometry.BEAM_W)
+				_member(xf, Vector2(-qx, collar_h), Vector2(qx, collar_h), z,
+					HouseGeometry.BEAM_W * 0.9)
+				# and the strut down from the collar onto the rafter, which is
+				# the direction a rafter actually goes
+				for qs2 in [-1.0, 1.0]:
+					var foot: float = qx + half * 0.45
+					_member(xf, Vector2(qs2 * qx, collar_h),
+						Vector2(qs2 * foot, _under_rafter(foot, roof_half, rise)),
+						z, HouseGeometry.BEAM_W * 0.8)
 			&"collar_strut":
-				var collar_h: float = rise * 0.45
-				var cspan: float = span * 0.55
-				_kit.oriented_box(Vector3(cspan, HouseGeometry.BEAM_W * 0.9, HouseGeometry.BEAM_D),
-					xf * Transform3D(Basis(), Vector3(0.0, collar_h, z)), SURF_TRIM)
-				_kit.oriented_box(Vector3(HouseGeometry.BEAM_W, rise - collar_h, HouseGeometry.BEAM_D),
-					xf * Transform3D(Basis(), Vector3(0.0, collar_h + (rise - collar_h) / 2.0, z)), SURF_TRIM)
+				var ch: float = minf(rise * 0.45,
+					_under_rafter(span * 0.275, roof_half, rise))
+				_member(xf, Vector2(-span * 0.275, ch), Vector2(span * 0.275, ch), z,
+					HouseGeometry.BEAM_W * 0.9)
+				_member(xf, Vector2(0.0, ch),
+					Vector2(0.0, _under_rafter(0.0, roof_half, rise)), z,
+					HouseGeometry.BEAM_W)
 				for side in [-1.0, 1.0]:
-					var srun: float = half * 0.35
-					var slift: float = collar_h * 0.9
-					var slen: float = sqrt(srun * srun + slift * slift)
-					var stilt: float = -atan2(slift, srun) * side
-					var st := xf * Transform3D(Basis(Vector3(0, 0, 1), stilt),
-						Vector3(side * srun / 2.0, collar_h / 2.0, z))
-					_kit.oriented_box(Vector3(slen, HouseGeometry.BEAM_W * 0.8, HouseGeometry.BEAM_D), st, SURF_TRIM)
+					var run: float = half * 0.35
+					_member(xf, Vector2(0.0, 0.0),
+						Vector2(side * run,
+							minf(ch * 0.9, _under_rafter(run, roof_half, rise))),
+						z, HouseGeometry.BEAM_W * 0.8)
 			_: # &"king_post"
-				_kit.oriented_box(Vector3(HouseGeometry.BEAM_W, rise * 0.94,
-					HouseGeometry.BEAM_D),
-					xf * Transform3D(Basis(), Vector3(0.0, rise * 0.47, z)), SURF_TRIM)
-				for side in [-1.0, 1.0]:
-					var run: float = half * 0.55
-					var lift: float = rise * 0.5
-					var length: float = sqrt(run * run + lift * lift)
-					var tilt: float = -atan2(lift, run) * side
-					var t := xf * Transform3D(Basis(Vector3(0, 0, 1), tilt),
-						Vector3(side * run / 2.0, lift / 2.0, z))
-					_kit.oriented_box(Vector3(length, HouseGeometry.BEAM_W * 0.85,
-						HouseGeometry.BEAM_D), t, SURF_TRIM)
+				_member(xf, Vector2(0.0, 0.0),
+					Vector2(0.0, _under_rafter(0.0, roof_half, rise)), z,
+					HouseGeometry.BEAM_W)
+				for side2 in [-1.0, 1.0]:
+					var run2: float = half * 0.55
+					_member(xf, Vector2(0.0, 0.0),
+						Vector2(side2 * run2, _under_rafter(run2, roof_half, rise)),
+						z, HouseGeometry.BEAM_W * 0.85)
+
+
+## The underside of the rafter over `x`, in the gable's own space, with the
+## member's own depth already taken off -- a beam whose centre line lands here
+## does not poke through the slates.
+func _under_rafter(x: float, roof_half: float, rise: float) -> float:
+	return clampf(rise * (1.0 - absf(x) / roof_half) - HouseGeometry.BEAM_W,
+		0.0, maxf(_frame_top - HouseGeometry.BEAM_W, 0.0))
+
+
+## Where the gable the frame stands in stops, set by _gable_frame before it
+## places anything. A truss inside a half-hipped gable may not climb past the
+## hip any more than the wall may.
+var _frame_top := INF
+
+
+## One member of a gable frame, between two points in the gable's own plane.
+##
+## Stating a beam by its ends rather than by a run, a lift and a tilt is the
+## whole point: the three could disagree, and did.
+func _member(xf: Transform3D, a: Vector2, b: Vector2, z: float,
+		width: float) -> void:
+	var d: Vector2 = b - a
+	var run: float = d.length()
+	if run < 0.05:
+		return
+	var mid: Vector2 = (a + b) / 2.0
+	_kit.oriented_box(Vector3(run, width, HouseGeometry.BEAM_D),
+		xf * Transform3D(Basis(Vector3(0, 0, 1), atan2(d.y, d.x)),
+			Vector3(mid.x, mid.y, z)), SURF_TRIM)
 
 
 func _build_porch() -> void:
@@ -907,6 +1014,10 @@ func _build_porch() -> void:
 	_kit.ridge_roof(xf, w, depth + 0.2, 0.42, SURF_ROOF)
 
 
+## How far a flue finishes above the ridge it comes out of.
+const CHIMNEY_CLEAR := 0.6
+
+
 func _build_chimney() -> void:
 	if not spec.chimney:
 		return
@@ -932,7 +1043,12 @@ func _build_chimney() -> void:
 				c = Vector2(r.end.x + s / 2.0 - 0.15, along)
 
 	var wall_top: float = spec.height * _storeys()
-	var top: float = wall_top + minf(HouseGeometry.roof_rise(spec), 2.0) + 0.9
+	# Above the RIDGE, not above an assumed two-metre roof. The old
+	# minf(roof_rise, 2.0) sized every stack as though no roof rose higher than
+	# that, so a longhall with a 5.4 m rise got a flue that stopped two and a
+	# half metres short of its own ridge -- a chimney you could see the roof
+	# over, which both looks wrong and would smoke back down itself.
+	var top: float = wall_top + HouseGeometry.roof_rise(spec) + CHIMNEY_CLEAR
 
 	# Stepped chimney stack
 	var base_h: float = minf(top * 0.45, 2.5)
