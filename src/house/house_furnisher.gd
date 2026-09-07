@@ -146,9 +146,12 @@ const RECIPES := {
 		# either side of a centre aisle, which is the row rule doing what it
 		# was written for (INT-001).
 		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
-		{"cat": "bench", "rule": &"row", "n": [2, 8], "min_n": 2, "pitch": 1.2,
+		# A pitch of 0 lets the rule space the pews by the pew: a bench in
+		# this catalogue is 2.78 m long, and a pitch written for a shorter one
+		# is ignored anyway (use_pitch is never less than the piece and a hand).
+		{"cat": "bench", "rule": &"row", "n": [2, 4], "min_n": 2, "pitch": 0.0,
 			"aisle": 1.2, "seat_clearance": 0.0, "along": "wall", "opt": 1.0},
-		{"cat": "bench", "rule": &"row", "n": [2, 8], "min_n": 2, "pitch": 1.2,
+		{"cat": "bench", "rule": &"row", "n": [2, 4], "min_n": 2, "pitch": 0.0,
 			"aisle": 1.2, "seat_clearance": 0.0, "along": "wall", "opt": 1.0},
 		{"cat": "candelabrum", "rule": &"free", "n": [0, 2], "opt": 0.7},
 		{"cat": "sconce", "rule": &"mounted", "n": [2, 4], "opt": 1.0},
@@ -1155,6 +1158,15 @@ static func _place_row(plan: HousePlan, room: int, step: Dictionary,
 						var t: float = start_t + float(i) * use_pitch
 						var centre: Vector2 = a2 + along * t + n * out
 						var cand: Dictionary = _candidate(key, centre, yaw, 1.0, sc)
+						# A ROW SHARES ONE AISLE, and that aisle is its use
+						# zone -- it is assigned below, once the row is known.
+						# The per-piece zone must not be tested here: a seat
+						# carries its pull-back space BEHIND it, so a pew
+						# backed to a wall has a zone inside the masonry and
+						# not one bench of a row would ever fit. Pews in a
+						# chapel are the case the row rule was written for
+						# (INT-001) and could not do until this line.
+						cand["zone"] = Rect2()
 						if not _fits(cand, floor_rect, blocked, zones, extra):
 							break
 						try_row.append(cand)
