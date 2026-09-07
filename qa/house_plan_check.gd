@@ -128,7 +128,7 @@ func _check_shapes(plan: HousePlan) -> void:
 		if not HouseGeometry.room_suits(plan, i, kind):
 			failures.append("shape: %s is %.1f x %.1fm, too small to be a %s"
 				% [who, f.size.x, f.size.y, String(kind)])
-		if HouseGeometry.room_aspect(plan, i) > HouseGeometry.ROOM_ASPECT_MAX:
+		if HouseGeometry.room_aspect(plan, i) > HouseGeometry.aspect_max(kind):
 			warnings.append("shape: %s is %.1f x %.1fm -- that is a corridor, not a room"
 				% [who, f.size.x, f.size.y])
 		var has_vertical_access := false

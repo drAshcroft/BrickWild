@@ -49,6 +49,28 @@ var compromises: Dictionary = {}
 ## HouseFurnisher stands the hearth against it, so the fire and the flue are
 ## never on different walls again.
 var hearth: Dictionary = {}
+## Floor the PLAN keeps clear, before anything is placed:
+## [{"room": int, "rect": Rect2, "why": String}].
+##
+## A furniture zone is the floor one piece needs to be usable and belongs to
+## that piece. This is the other kind: floor that is kept clear because of what
+## the room is for, and would be kept clear if the room were empty. A great
+## hall keeps the screens passage inside its door clear so the way in is not
+## through the middle of dinner (CAS-010); a temple keeps its processional
+## axis. The furnisher treats these as occupied ground and the nav check
+## requires them walkable, so a passage that was planned is a passage that is
+## there.
+var zones: Array[Dictionary] = []
+## A raised platform in a room: {"room": int, "rect": Rect2, "rise": float}.
+## Empty in a house; a castle's great hall has one at its upper end, with the
+## high table on it and the lord behind that (CAS-010).
+##
+## A dais is a STEP, not a wall. The walk grid takes it as floor -- you walk
+## up onto a dais -- and the only thing that is different about it is that
+## the furniture standing on it is a hand's breadth higher than the rest.
+var dais: Dictionary = {}
+
+
 ## What the house is arranged around: {"room": int, "cat": String,
 ## "pos": Vector2, "facing": float, "faces_door": bool}, or empty.
 ##
@@ -60,6 +82,35 @@ var hearth: Dictionary = {}
 ## the record back and proves the piece is there and, when `faces_door` is
 ## set, that it looks at the way in. (INT-002)
 var focus: Dictionary = {}
+
+
+## The keep-clear zones of one room.
+func zones_of(room: int) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for z in zones:
+		if int(z.get("room", -1)) == room:
+			out.append(Rect2(z["rect"]))
+	return out
+
+
+## The room the dais is in, or -1 when there is none.
+func dais_room() -> int:
+	return int(dais.get("room", -1)) if not dais.is_empty() else -1
+
+
+## The floor of the dais, or an empty rect when there is none.
+func dais_rect() -> Rect2:
+	return dais.get("rect", Rect2()) if not dais.is_empty() else Rect2()
+
+
+## How far the dais stands above the floor of its room, in metres.
+func dais_rise() -> float:
+	return float(dais.get("rise", 0.0)) if not dais.is_empty() else 0.0
+
+
+## Is `p` standing on the dais?
+func on_dais(room: int, p: Vector2) -> bool:
+	return room == dais_room() and dais_rect().has_point(p)
 
 
 ## The room the chimney serves, or -1 when no hearth was planned.

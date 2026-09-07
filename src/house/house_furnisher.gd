@@ -119,6 +119,26 @@ const RECIPES := {
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
 		{"cat": "tableware", "rule": &"on", "n": [2, 4], "opt": 0.95},
 	],
+	&"great_hall": [
+		# In order, because in a hall the order IS the arrangement: the high
+		# table takes the dais, the lord bench goes behind it, the fire takes
+		# its wall, and only then do the trestles take what is left. Run the
+		# other way round, the trestles have the wall the flue rises on.
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "bench", "rule": &"behind", "n": [1, 2], "opt": 1.0},
+		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "table", "rule": &"row", "n": [2, 8], "min_n": 2, "pitch": 2.4,
+			"aisle": 1.0, "seat_clearance": 1.1, "along": "wall", "opt": 1.0},
+		{"cat": "table", "rule": &"row", "n": [2, 8], "min_n": 2, "pitch": 2.4,
+			"aisle": 1.0, "seat_clearance": 1.1, "along": "wall", "opt": 1.0},
+		{"cat": "bench", "rule": &"around", "host": "row", "n": [2, 4], "opt": 1.0},
+		{"cat": "storage", "rule": &"wall", "n": [0, 1], "opt": 0.5},
+		{"cat": "barrel", "rule": &"corner", "n": [1, 2], "opt": 0.6},
+		{"cat": "sconce", "rule": &"mounted", "n": [2, 4], "opt": 1.0},
+		{"cat": "chandelier", "rule": &"ceiling", "n": [1, 1], "opt": 0.8},
+		{"cat": "tableware", "rule": &"on", "n": [2, 6], "opt": 0.9},
+		{"cat": "candle", "rule": &"on", "n": [1, 2], "opt": 0.85},
+	],
 	&"guest_room": [
 		{"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.8},
@@ -250,6 +270,13 @@ const WALL_ESSENTIAL := ["bed", "hearth", "bookcase", "nightstand", "chest"]
 
 ## Step along a wall when hunting for somewhere to put a piece.
 const PROBE_STEP := 0.12
+## And the most probe positions any one search takes along a line or across a
+## floor. Below about fifteen metres it never binds, which is every room in a
+## house -- but a castle great hall is sixty metres across, and at 12 cm that
+## is five hundred offsets on one wall and a quarter of a million across the
+## floor, for an answer that stopped changing after the first few dozen. Past
+## the cap the SPACING opens up; nothing a house is measured on changes.
+const MAX_PROBES := 128
 ## How many pieces the repair pass may remove before it gives up and lets the
 ## checks report the house as it stands.
 const MAX_REPAIRS := 8
@@ -312,6 +339,8 @@ const MOUNT_STEP := 0.06
 ## door is pushed to face it by FACE_W; a table in the focus room is pushed to
 ## lie broadside to the focus by the same weight. (INT-002)
 const PIN_W := 4.0
+## How far either side of the pin a pinned piece is searched for.
+const PIN_SEARCH := 0.9
 const FACE_W := 6.0
 ## How far off the planner's point the focus piece may stand and still count
 ## as being there. HouseFurnishCheck measures with the same figure.
@@ -585,7 +614,18 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	# beside a bed.
 	var zones: Array[Rect2] = []
 	var r: RandomNumberGenerator = spec.rng
-	for step in steps:
+	# The dais belongs to the piece the room is arranged around and to whoever
+	# sits behind it. Those two steps come first and stand ON it; everything
+	# after them treats it as occupied ground, because a barrel on the dais is
+	# a barrel on the lord's table and a row of trestles that runs up onto the
+	# step is a row that has walked over the high table.
+	var close_dais: int = _dais_closes_after(plan, room, steps)
+	var dais_open: bool = close_dais >= 0
+	for si in range(steps.size()):
+		var step: Dictionary = steps[si]
+		if dais_open and si > close_dais:
+			blocked.append(plan.dais_rect())
+			dais_open = false
 		# opt 1.0 means the room is not that room without it. Anything less is a
 		# dressing roll, nudged by how cluttered the household is. Rolling for
 		# the mandatory pieces too is how a bedroom came out with no bed in it
@@ -602,7 +642,8 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		var want: int = lo if hi <= lo else r.randi_range(lo, hi)
 		var seats_before: int = _count_cat(plan, room, ["seat", "bench"])
 		for k in range(want):
-			_place_one(plan, spec, room, String(step["cat"]), step["rule"], blocked, zones, r)
+			_place_one(plan, spec, room, String(step["cat"]), step["rule"],
+				blocked, zones, r, step)
 		# A table nobody can sit at is worse than no table: it takes the middle
 		# of the room and gives nothing back. If not one seat would go round it,
 		# the table goes instead, and the plan records why.
@@ -614,9 +655,26 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		if step["rule"] == &"around" and _count_cat(plan, room, ["seat", "bench"]) \
 				== seats_before and _count_freestanding_tables(plan, room) > 0:
 			_drop_the_table(plan, room, blocked, zones)
+	if dais_open:
+		blocked.append(plan.dais_rect())
 	_ensure_seating(plan, room, blocked, zones, r)
 	_ensure_light(plan, room, r)
 	_keep_the_room_passable(plan, room, blocked, zones)
+
+
+## The last step allowed to put something on the dais: the seat behind the
+## focus if the recipe has one, else the focus itself. -1 when the room has no
+## dais, in which case nothing is closed off at all.
+static func _dais_closes_after(plan: HousePlan, room: int, steps: Array) -> int:
+	if plan.dais_room() != room or plan.dais_rect().size.x <= 0.0:
+		return -1
+	for i in range(steps.size() - 1, -1, -1):
+		if steps[i]["rule"] == &"behind":
+			return i
+	for i2 in range(steps.size()):
+		if String(steps[i2]["cat"]) == plan.focus_cat():
+			return i2
+	return -1
 
 
 ## Check the walking as each room is finished, not only at the end.
@@ -707,6 +765,10 @@ static func _drop_the_table(plan: HousePlan, room: int, blocked: Array[Rect2],
 		var p: Dictionary = plan.furniture[f]
 		if int(p["room"]) != room or PropCatalog.category(p["key"]) != "table":
 			continue
+		# a row is placed and judged as a row; taking one trestle out of the
+		# middle of it would break the very thing the row rule measures
+		if String(p.get("row", "")) != "":
+			continue
 		blocked.erase(p["rect"])
 		plan.note_compromise(room, "table")
 		plan.furniture.remove_at(f)
@@ -785,6 +847,10 @@ static func could_place(plan: HousePlan, room: int, cat: String) -> bool:
 ## every door into this room, and a strip in front of every window.
 static func _initial_blocked(plan: HousePlan, room: int) -> Array[Rect2]:
 	var out: Array[Rect2] = []
+	# Floor the plan itself keeps clear -- a screens passage, a processional
+	# aisle. It is occupied ground before the first piece is placed, so a
+	# passage the plan drew is a passage the furnishing cannot fill in.
+	out.append_array(plan.zones_of(room))
 	for d in plan.doors_of(room):
 		var door: Dictionary = plan.doors[d]
 		for side in [-1.0, 1.0]:
@@ -818,7 +884,7 @@ static func _window_blocks(plan: HousePlan, room: int, key: String) -> Array[Rec
 
 static func _place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		rule: StringName, blocked: Array[Rect2], zones: Array[Rect2],
-		r: RandomNumberGenerator) -> void:
+		r: RandomNumberGenerator, step: Dictionary = {}) -> void:
 	var choices: Array[String] = PropCatalog.of_category(cat)
 	if choices.is_empty():
 		return
@@ -851,7 +917,10 @@ static func _place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		&"corner":
 			_place_corner(plan, room, key, blocked, zones, r)
 		&"around":
-			_place_around(plan, room, key, blocked, zones, r)
+			_place_around(plan, room, key, blocked, zones, r,
+				String(step.get("host", "")) == "row")
+		&"behind":
+			_place_behind(plan, room, key, blocked, zones, r)
 		&"mounted":
 			_place_mounted(plan, room, key, r)
 		&"ceiling":
@@ -903,7 +972,7 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 		var small: float = span * PropCatalog.min_scale(key)
 		if run < small + 0.1:
 			continue
-		var steps: int = maxi(int((run - small) / PROBE_STEP), 1)
+		var steps: int = clampi(int((run - small) / PROBE_STEP), 1, MAX_PROBES)
 		for s in range(steps + 1):
 			var t: float = (small / 2.0) + float(s) * (run - small) / float(steps)
 			var centre: Vector2 = a + along * t + n * (depth / 2.0 + HouseGeometry.WALL_GAP)
@@ -1018,7 +1087,7 @@ static func _place_row(plan: HousePlan, room: int, step: Dictionary,
 				var slack: float = run - span_len
 				if slack < -0.001:
 					continue
-				var slides: int = maxi(int(slack / PROBE_STEP), 0)
+				var slides: int = clampi(int(slack / PROBE_STEP), 0, MAX_PROBES)
 				for si in range(slides + 1):
 					var shift: float = -slack / 2.0 + (slack * float(si) / float(maxi(slides, 1)))
 					var start_t: float = span / 2.0 + slack / 2.0 + shift
@@ -1565,11 +1634,30 @@ static func _place_free(plan: HousePlan, room: int, key: String,
 	if plan.focus_room() == room and plan.focus_faces_door() \
 			and PropCatalog.category(key) == plan.focus_cat():
 		yaws = [0.0, PI / 2.0, PI, -PI / 2.0]
+	# A piece the plan PINS does not need the whole room searched: the pin
+	# already says where it goes, and every probe a stride away from it loses
+	# to the pin anyway. Searching a 12 x 30 m great hall at 12 cm for a table
+	# the plan had already placed cost ten seconds a hall.
+	var pin: Rect2 = _pin_box(plan, room, key)
 	for yaw in yaws:
 		for sc in _scales(key):
 			_free_at_scale(plan, room, key, yaw, sc, floor_rect, blocked, zones,
-				extra, r, result, focus)
+				extra, r, result, focus, pin)
 	_commit(plan, room, result["best"], blocked, zones)
+
+
+## The patch of floor a pinned piece is searched in, or an empty rect when the
+## plan has not pinned this one. A stride either way, so the probe can still
+## slide the piece off a door swing or out of a window.
+static func _pin_box(plan: HousePlan, room: int, key: String) -> Rect2:
+	if plan.focus_room() != room or plan.focus.get("placed", false):
+		return Rect2()
+	if PropCatalog.category(key) != plan.focus_cat():
+		return Rect2()
+	var at: Vector2 = plan.focus_pos()
+	if not at.is_finite():
+		return Rect2()
+	return Rect2(at - Vector2.ONE * PIN_SEARCH, Vector2.ONE * PIN_SEARCH * 2.0)
 
 
 ## One pass of the free-standing search at a single size. Split out only
@@ -1578,17 +1666,20 @@ static func _place_free(plan: HousePlan, room: int, key: String,
 static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 		sc: float, floor_rect: Rect2, blocked: Array[Rect2], zones: Array[Rect2],
 		extra: Array[Rect2], r: RandomNumberGenerator, result: Dictionary,
-		focus := Vector2(INF, INF)) -> void:
+		focus := Vector2(INF, INF), pin := Rect2()) -> void:
 	var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw) * sc
 	var pad: float = HouseGeometry.PATH_MIN * 0.5
 	var lo := Vector2(floor_rect.position.x + foot.x / 2.0 + pad,
 		floor_rect.position.y + foot.y / 2.0 + pad)
 	var hi := Vector2(floor_rect.end.x - foot.x / 2.0 - pad,
 		floor_rect.end.y - foot.y / 2.0 - pad)
+	if pin.size.x > 0.0:
+		lo = lo.max(pin.position)
+		hi = hi.min(pin.end)
 	if lo.x > hi.x or lo.y > hi.y:
 		return
-	var nx: int = maxi(int((hi.x - lo.x) / PROBE_STEP), 1)
-	var nz: int = maxi(int((hi.y - lo.y) / PROBE_STEP), 1)
+	var nx: int = clampi(int((hi.x - lo.x) / PROBE_STEP), 1, MAX_PROBES)
+	var nz: int = clampi(int((hi.y - lo.y) / PROBE_STEP), 1, MAX_PROBES)
 	for ix in range(nx + 1):
 		for iz in range(nz + 1):
 			var centre := Vector2(lerpf(lo.x, hi.x, float(ix) / nx),
@@ -1653,8 +1744,9 @@ static func _place_corner(plan: HousePlan, room: int, key: String,
 
 ## Seats at a table, facing it, with pull-back space behind them.
 static func _place_around(plan: HousePlan, room: int, key: String,
-		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
-	var host: int = _find_host(plan, room, ["table", "workbench", "counter"])
+		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator,
+		want_row := false) -> void:
+	var host: int = _find_host(plan, room, ["table", "workbench", "counter"], want_row)
 	if host < 0:
 		return
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
@@ -1701,11 +1793,89 @@ static func _place_around(plan: HousePlan, room: int, key: String,
 	_commit(plan, room, best, blocked, zones)
 
 
-static func _find_host(plan: HousePlan, room: int, cats: Array) -> int:
+## Which piece a seat is drawn up to.
+##
+## The first one of the right kind, except when the step asks for a row: a
+## great hall seats the trestles, not the high table, and among the trestles it
+## seats whichever has the fewest people at it already, so a second bench goes
+## to the next table rather than crowding the first.
+static func _find_host(plan: HousePlan, room: int, cats: Array,
+		want_row := false) -> int:
+	var pool: Array[int] = []
 	for f in plan.furniture_of(room):
 		if PropCatalog.category(plan.furniture[f]["key"]) in cats:
-			return f
-	return -1
+			pool.append(f)
+	if pool.is_empty():
+		return -1
+	if not want_row:
+		return pool[0]
+	var rows: Array[int] = []
+	for f2 in pool:
+		if String(plan.furniture[f2].get("row", "")) != "":
+			rows.append(f2)
+	# A step that seats a ROW and finds no row seats nobody. Falling back to
+	# the first table in the room put a bench in front of a great hall high
+	# table on every hall too small for its trestles -- which is the one place
+	# in the room nobody sits.
+	if rows.is_empty():
+		return -1
+	var best: int = rows[0]
+	var fewest: int = 1 << 20
+	for f3 in rows:
+		var n := 0
+		for g in plan.furniture_of(room):
+			if int(plan.furniture[g]["host"]) == f3:
+				n += 1
+		if n < fewest:
+			fewest = n
+			best = f3
+	return best
+
+
+## The seat that belongs on the far side of its host, looking the same way it
+## looks: the lord bench behind the high table, the clerk stool behind the
+## counter.
+##
+## `around` puts a chair on whichever side of a table has room, which is right
+## for a kitchen table and wrong for anything with a front and a back. Nobody
+## sits between the high table and the hall. (CAS-010)
+##
+## The bench stands on its own feet -- no `host` -- because it is not drawn up
+## to the table and pushed back in again: it is where the lord sits, the walk
+## has to reach it, and a body crossing the dais has to go round it.
+static func _place_behind(plan: HousePlan, room: int, key: String,
+		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
+	var host: int = _find_host(plan, room, ["table", "workbench", "counter"])
+	if host < 0:
+		return
+	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var host_rect: Rect2 = plan.furniture[host]["rect"]
+	var hc: Vector2 = host_rect.get_center()
+	var yaw: float = float(plan.furniture[host]["yaw"])
+	var back: Vector2 = -_facing_of(yaw)          # away from what the host faces
+	var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw)
+	var half: Vector2 = host_rect.size / 2.0
+	var out: float = absf(back.x) * (half.x + foot.x / 2.0) \
+		+ absf(back.y) * (half.y + foot.y / 2.0) + 0.04
+	var along := Vector2(back.y, -back.x)
+	var run: float = absf(along.x) * host_rect.size.x + absf(along.y) * host_rect.size.y
+	var span: float = absf(along.x) * foot.x + absf(along.y) * foot.y
+	var best: Dictionary = {}
+	var best_score := -INF
+	var steps: int = maxi(int(run / 0.45), 1)
+	for si in range(steps + 1):
+		var t: float = lerpf(-run / 2.0 + span / 2.0, run / 2.0 - span / 2.0,
+			float(si) / float(steps))
+		var centre: Vector2 = hc + back * out + along * t
+		var cand: Dictionary = _candidate(key, centre, yaw)
+		if not _fits(cand, floor_rect, blocked, zones, []):
+			continue
+		# the middle of the table first: that is where the lord sits
+		var score: float = r.randf() * 0.2 - absf(t)
+		if score > best_score:
+			best_score = score
+			best = cand
+	_commit(plan, room, best, blocked, zones)
 
 
 # ---------------------------------------------------- wall and ceiling kit
@@ -1968,8 +2138,12 @@ static func _commit(plan: HousePlan, room: int, cand: Dictionary,
 	cand["storey"] = HousePlan.record_storey(plan.rooms[room])
 	var pos: Vector3 = cand["pos"]
 	# Candidates are planar (Y=0) while searching. Stamp world elevation only
-	# after the placement is accepted, keeping all rectangle logic 2D.
+	# after the placement is accepted, keeping all rectangle logic 2D. A dais
+	# is part of that elevation: the high table stands ON the step, and
+	# everything in plan still measures as though the step were flat floor.
 	pos.y += _storey_base(plan, room)
+	if plan.on_dais(room, Vector2(pos.x, pos.z)):
+		pos.y += plan.dais_rise()
 	cand["pos"] = pos
 	cand["must"] = _mandatory
 	plan.furniture.append(cand)

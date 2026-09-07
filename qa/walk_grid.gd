@@ -21,6 +21,14 @@ var cell := 0.12
 var _free: PackedByteArray = PackedByteArray()   # floor, before the body
 var _walk: PackedByteArray = PackedByteArray()   # floor a person fits on
 var _seen: PackedByteArray = PackedByteArray()   # reached from the start
+## How high the floor of each cell stands, in metres above the storey. Zero
+## almost everywhere; a dais, a step or a terrace edge raises its own cells.
+var _level: PackedFloat32Array = PackedFloat32Array()
+
+## The tallest rise a person walks up without a stair. Two cells of floor whose
+## levels differ by more than this are not neighbours -- a dais is a step you
+## walk onto, a terrace two metres up is a drop you do not. (CAS-010)
+const MAX_STEP := 0.6
 
 
 ## Start a grid covering `bounds`. Everything is blocked until floor is added.
@@ -32,26 +40,49 @@ func setup(bounds: Rect2, cell_size := 0.12) -> void:
 	_free.resize(nx * nz)
 	_walk.resize(nx * nz)
 	_seen.resize(nx * nz)
+	_level.resize(nx * nz)
 	for i in range(_free.size()):
 		_free[i] = 0
 		_walk[i] = 0
 		_seen[i] = 0
+		_level[i] = 0.0
 
 
-func add_floor(rect: Rect2) -> void:
-	_fill(rect, 1)
+func add_floor(rect: Rect2, level := 0.0) -> void:
+	_fill(rect, 1, level)
 
 
 func add_obstacle(rect: Rect2) -> void:
 	_fill(rect, 0)
 
 
+## A raised platform: a dais, a step, a terrace edge. FLOOR, and the reason it
+## has a name of its own is that it would otherwise be reached for as an
+## obstacle -- a castle great hall has a dais at its upper end and a person
+## walks up onto it to reach the high table. What a step is not is a wall.
+##
+## `rise` is how far up it stands. Anything up to MAX_STEP is walked onto;
+## beyond that the grid stops treating the two levels as neighbours, so a
+## mezzanine floor laid down this way is unreachable until a stair is added,
+## which is the honest answer.
+func add_step(rect: Rect2, rise: float) -> void:
+	_fill(rect, 1, rise)
+
+
+## How high the floor stands where `p` is, in metres. Zero off the grid.
+func level_at(p: Vector2) -> float:
+	var c: Vector2i = cell_of(p)
+	if c.x < 0 or c.x >= nx or c.y < 0 or c.y >= nz:
+		return 0.0
+	return _level[c.x * nz + c.y]
+
+
 ## Same as add_floor(Rect2), but for any polygon -- a round tower or an
 ## octagonal chapter house rasterises through here (GEO-001). One scanline
 ## loop over the polygon's bounding box, same shape as _fill: a cell counts
 ## as covered when its centre is inside the polygon.
-func add_floor_poly(poly: PackedVector2Array) -> void:
-	_fill_poly(poly, 1)
+func add_floor_poly(poly: PackedVector2Array, level := 0.0) -> void:
+	_fill_poly(poly, 1, level)
 
 
 func add_obstacle_poly(poly: PackedVector2Array) -> void:
@@ -126,12 +157,17 @@ func flood_from(from: Vector2, search := 0.6) -> bool:
 	_seen[start.x * nz + start.y] = 1
 	while not stack.is_empty():
 		var cur: Vector2i = stack.pop_back()
+		var here: float = _level[cur.x * nz + cur.y]
 		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			var nb: Vector2i = cur + d
 			if nb.x < 0 or nb.x >= nx or nb.y < 0 or nb.y >= nz:
 				continue
 			var idx: int = nb.x * nz + nb.y
 			if _seen[idx] == 1 or _walk[idx] == 0:
+				continue
+			# floor at a different height is still floor, but only within a
+			# stride of the floor you are standing on
+			if absf(_level[idx] - here) > MAX_STEP:
 				continue
 			_seen[idx] = 1
 			stack.append(nb)
@@ -199,8 +235,9 @@ func reached_cells() -> int:
 
 
 ## A picture of what the walker saw: '#' blocked, '.' free but too tight to
-## stand in, ':' standable but never reached, ' ' reached. Marks are world
-## points to label, which is how a failure stops being a list of numbers.
+## stand in, ':' standable but never reached, ' ' reached, '=' reached and
+## raised (a dais). Marks are world points to label, which is how a failure
+## stops being a list of numbers.
 func ascii_map(marks := {}) -> String:
 	var flags := {}
 	for key in marks:
@@ -215,7 +252,7 @@ func ascii_map(marks := {}) -> String:
 			elif at(_free, x, z) == 0:
 				line += "#"
 			elif at(_seen, x, z) == 1:
-				line += " "
+				line += "=" if _level[x * nz + z] > 0.01 else " "
 			elif at(_walk, x, z) == 1:
 				line += ":"
 			else:
@@ -246,7 +283,7 @@ func _dist_at(dist: PackedInt32Array, x: int, z: int) -> int:
 	return dist[x * nz + z]
 
 
-func _fill(rect: Rect2, value: int) -> void:
+func _fill(rect: Rect2, value: int, level := 0.0) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return
 	var x0: int = clampi(int(floor((rect.position.x - origin.x) / cell)), 0, nx - 1)
@@ -258,9 +295,11 @@ func _fill(rect: Rect2, value: int) -> void:
 			# a cell counts as covered when its centre is inside the rectangle
 			if rect.has_point(world_of(x, z)):
 				_free[x * nz + z] = value
+				if value == 1:
+					_level[x * nz + z] = level
 
 
-func _fill_poly(poly: PackedVector2Array, value: int) -> void:
+func _fill_poly(poly: PackedVector2Array, value: int, level := 0.0) -> void:
 	if poly.size() < 3:
 		return
 	var bounds: Rect2 = Poly.bounding_rect(poly)
@@ -274,6 +313,8 @@ func _fill_poly(poly: PackedVector2Array, value: int) -> void:
 		for z in range(z0, z1 + 1):
 			if Poly.contains_point(poly, world_of(x, z)):
 				_free[x * nz + z] = value
+				if value == 1:
+					_level[x * nz + z] = level
 
 
 func _any_in(grid: PackedByteArray, rect: Rect2, grow: float) -> bool:

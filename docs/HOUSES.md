@@ -82,6 +82,8 @@ coordinate:
 | `wall` | a bed, a cabinet, a bookcase wants its back to a wall |
 | `free` | a table wants room all round it |
 | `around` | seats belong at a table, facing it, with room to push back |
+| `behind` | the seat on the far side of a thing with a front and a back: the lord's bench behind the high table, the clerk's stool behind the counter |
+| `row` | N copies along a wall or an axis at one pitch, sharing one aisle: pews, barrack beds, the trestles down a hall |
 | `corner` | barrels and crates go where nobody walks |
 | `mounted` | shelves, racks and sconces hang at head height |
 | `ceiling` | the chandelier hangs over the middle of the room |
@@ -94,6 +96,21 @@ it from. That second rectangle is what makes the walking check possible.
 `opt: 1.0` marks a piece the room is not that room without. Those are placed
 first, without a dice roll, and the passes that thin a room out will not touch
 them. Everything else is dressing and can be taken back out.
+
+**Floor the plan keeps clear.** A use zone is the floor one piece needs and
+belongs to that piece. `HousePlan.zones` is the other kind: floor kept clear
+because of what the room is *for*, and kept clear if the room were empty — the
+screens passage inside a great hall's door, so the way in is not through the
+middle of dinner. The furnisher treats one as occupied ground before the first
+piece is placed, the `clear` rule proves nothing ended up standing in it, and
+the nav check proves it can actually be walked.
+
+**Floor at another height.** `HousePlan.dais` is a raised rectangle in a room:
+`{room, rect, rise}`. It is a step, not a wall — the walk grid keeps a level
+per cell and joins two cells whose floors differ by up to `WalkGrid.MAX_STEP`
+(0.6 m), so a person walks up onto a dais and does not walk off a mezzanine.
+Anything standing on it is placed in plan exactly as if the floor were flat and
+lifted by the rise when it is committed.
 
 ## Outside
 
@@ -151,7 +168,9 @@ out the walls and the furniture, shrinks the free floor by a person's own
 half-width with a distance transform, and walks: from the doorstep, through the
 doors, into every room, and up to every use zone. A house passes only if every
 room can be entered, both sides of every door can be stood on, and every piece
-of furniture somebody is meant to use can be reached.
+of furniture somebody is meant to use can be reached. Its `steps` rule adds the
+two things a plan can ask for that are not furniture: the dais is walked onto,
+and every passage the plan keeps clear is walked.
 
 `ascii_map()` prints what the walker saw — `#` blocked, `.` too tight to stand
 in, `:` standable but never reached, ` ` reached. Reading a reachability

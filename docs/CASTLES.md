@@ -78,6 +78,48 @@ of it there is.
 - domestic ranges: great hall, chapel, cross wings, courtyard ranges, porches,
   dormers, chimney stacks
 
+## The great hall has an inside
+
+`CastleGenerator.hall_plan(spec)` returns the hall range as a **`HousePlan`**:
+one room, in the hall's own frame, whose rectangle is the hall mass footprint
+less the wall it stands inside. `CastleGeometry.hall_aabb()` says where that
+frame sits in the castle.
+
+The point of doing it this way is that nothing new judges it. The hall is a
+house plan, so `HousePlanCheck` measures its room and its openings,
+`HouseFurnisher` furnishes it from a recipe like any other room,
+`HouseFurnishCheck` judges what stands in it and `HouseNavCheck` walks it. What
+makes it a *hall* is six arrangements, each of which is a rule the house
+harness already had a name for:
+
+| | |
+|---|---|
+| the **dais** | a raised rectangle at the end away from the door, a fifth of the hall deep and 0.4 m up. `HousePlan.dais`; the walk grid takes it as a step and a person walks onto it |
+| the **high table** | on the dais, looking down the hall at the door. It is `plan.focus` (INT-002), so the furnisher pins it there and the `focus` rule proves it is there and facing the right way. A hall too narrow to stand a table across does not ask for the view it cannot give |
+| the **lord's bench** | behind the high table, by the `behind` rule — and nobody sits between the high table and the hall |
+| the **trestle rows** | down the length, by the `row` rule (INT-001), benches drawn up to them, each row with its own aisle |
+| the **hearth** | on a long wall, on `plan.hearth.wall`, which is the wall the flue rises on (LAY-001) |
+| the **screens passage** | a strip inside the door recorded in `plan.zones`, which the furnishing may not fill in and the walk has to reach |
+
+A range that is not the size of a hall gets no plan rather than a bad one.
+Under 3 m across or 16 m² it is a lean-to; over 25 m across or 80 m long it is
+not a hall either, because a great hall is one room under one roof spanned by a
+truss and the widest ever built is Westminster at 20.7 m. A fortress range is
+sixty metres across, and that is a courtyard block the massing happens to draw
+as a single mass. Either way the range still gets its mass; what it does not
+get is an inside. A hall that could not fit its second row of trestles records
+a compromise the way any other room does.
+
+The lord's bench stands on its own feet -- no `host` -- because it is not a
+chair drawn up to a table and pushed back in: it is where the lord sits, so the
+walk has to reach it and a body crossing the dais has to go round it. Benches
+drawn up to the trestles keep the house harness's own rule, which is that a
+chair belongs to its table.
+
+`CastleFurnisher` still dresses the hall mass from the prop tables below;
+CAS-013 is the task that switches `CastleBuilder` over to raising every
+interior from its plan instead.
+
 ## Dressing
 
 `CastleFurnisher` fills the shell with props from the same measured catalogue
@@ -106,9 +148,14 @@ a keep would fly four storeys above the only floor there is.
 
 ## What the suites check
 
-`castle`, `castle normals`, `castle massing`, `castle landmark` and
-`castle voxel QA` -- run with
-`godot --headless --path . --script res://tests/run_all.gd -- castle cnormals cmassing clandmark cvoxelqa`.
+`castle`, `castle normals`, `castle massing`, `castle landmark`,
+`great hall` and `castle voxel QA` -- run with
+`godot --headless --path . --script res://tests/run_all.gd -- castle cnormals cmassing clandmark hall cvoxelqa`.
+
+`castle` proves the great hall arrangement on the twelve canonical castles of
+every style and tier; `hall` is the sweep, two hundred halls at sizes the
+canonical set does not visit, and reports the rate at which each part of the
+arrangement actually comes out.
 
 `dressing` (shared with the churches) sweeps the same variants and asks
 whether every prop is a prop the catalogue knows, whether it stands inside

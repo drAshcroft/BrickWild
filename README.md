@@ -243,7 +243,7 @@ hold:
 | `library` | public request, representation, mesh and scene contract |
 | `church`, `castle`, `house`, `shop`, `hotel`, `temple` | family generation purity and determinism |
 | `normals`, `massing`, `blueprint`, `cnormals`, `cmassing` | emitted geometry and drawing agreement |
-| `voxelqa`, `cvoxelqa`, `houseqa`, `hmultistory`, `rite` | spatial, circulation and ritual correctness |
+| `voxelqa`, `cvoxelqa`, `houseqa`, `hmultistory`, `rite`, `hall` | spatial, circulation and ritual correctness |
 | `landmark`, `clandmark`, `harchetype`, `sarchetype`, `hlandmark`, `tarchetype` | named reference buildings and archetypes |
 | `assets` | measured prop catalogue still matches imported models |
 | `dressing` | churches and castles are furnished, and you can still walk through them |

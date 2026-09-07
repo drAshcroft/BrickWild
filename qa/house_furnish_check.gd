@@ -62,6 +62,7 @@ const REQUIRED := {
 	&"lounge": ["table"],
 	&"suite": ["bed"],
 	&"laundry": ["workbench"],
+	&"great_hall": ["table"],
 }
 
 ## And what a trade must have in the room it works in.
@@ -82,7 +83,7 @@ const BUSINESS_REQUIRED := {
 const GROUPS := {
 	"physical": ["placed", "vertical", "supported", "doorway", "daylight"],
 	"programme": ["programme", "light", "density"],
-	"arrangement": ["against", "seating", "row"],
+	"arrangement": ["against", "seating", "row", "clear"],
 	"feng shui": ["command", "hearth", "workbench_daylight", "bookcase_heat",
 		"bed_window", "table_focus", "sconce_pair", "shelf_over",
 		"chandelier_over", "corner_clutter", "focus"],
@@ -92,7 +93,7 @@ const GROUPS := {
 ## may replace one through `check(plan, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"placed", &"vertical", &"supported", &"doorway",
 	&"daylight", &"programme", &"against", &"seating", &"light", &"density",
-	&"command", &"hearth", &"row", &"workbench_daylight", &"bookcase_heat",
+	&"command", &"hearth", &"row", &"clear", &"workbench_daylight", &"bookcase_heat",
 	&"bed_window", &"table_focus", &"sconce_pair", &"shelf_over",
 	&"chandelier_over", &"corner_clutter", &"focus"]
 ## Where a rule's method is not simply "_check_" + its name.
@@ -791,6 +792,14 @@ func _check_table_focus(plan: HousePlan) -> void:
 			continue
 		if int(p["host"]) >= 0 or String(p.get("row", "")) != "":
 			continue
+		# A table the PLAN pinned is where the plan put it. A great hall high
+		# table stands on the dais at the upper end and the fire is on a side
+		# wall behind the trestles: measuring that table against the fire is
+		# measuring the plan against a rule the plan already answered (INT-002).
+		if plan.focus_cat() == "table" and plan.focus_room() == room \
+				and Rect2(p["rect"]).get_center().distance_to(plan.focus_pos()) \
+					< FOCUS_TOL:
+			continue
 		var off: float = (Rect2(p["rect"]).get_center() - mid).dot(dir)
 		if off >= FS_FOCUS_WANT * half:
 			continue
@@ -1206,9 +1215,18 @@ func _check_focus(plan: HousePlan) -> void:
 		if d < best_d:
 			best_d = d
 			best = f2
+	# A room that gave up the piece it was arranged around wrote that down, and
+	# what is left of the category is not that piece: a great hall whose high
+	# table went so the hall could be walked still has its trestles, and
+	# measuring one of THOSE against the dais is measuring the wrong table.
+	var gave_up: bool = plan.was_dropped(room, cat)
 	if pos.is_finite() and best_d > FOCUS_TOL:
-		failures.append("focus: %s stands %.2fm from the focus the plan recorded"
-			% [_who(plan, best), best_d])
+		var said := "focus: %s stands %.2fm from the focus the plan recorded" \
+			% [_who(plan, best), best_d]
+		if gave_up:
+			warnings.append(said + ", and the room gave up the one that stood there")
+			return
+		failures.append(said)
 	if not plan.focus_faces_door():
 		return
 	var door: int = HouseFurnisher.focus_door(plan, room)
@@ -1225,7 +1243,11 @@ func _check_focus(plan: HousePlan) -> void:
 	# the doorway well enough: the customer walks in and sees its front
 	var squarely: bool = facing.dot(Vector2(plan.doors[door]["normal"])) > 0.9
 	if off > FOCUS_FACE_DEG and not squarely:
-		failures.append("focus: the %s in room %d faces away from the door" % [cat, room])
+		var said2 := "focus: the %s in room %d faces away from the door" % [cat, room]
+		if gave_up:
+			warnings.append(said2 + ", and the room gave up the one that faced it")
+		else:
+			failures.append(said2)
 	# and it can be SEEN from the door: the temple's sightline rule, cast from
 	# a person's eye inside the doorway to the top of the piece, past every
 	# other piece standing in the room (Sightline, INT-020)
@@ -1254,6 +1276,35 @@ func _check_focus(plan: HousePlan) -> void:
 	if not hit.is_empty():
 		warnings.append("focus: the %s in room %d cannot be seen from the door past the %s"
 			% [cat, room, names[hit[0]]])
+
+
+## Floor the plan keeps clear stays clear.
+##
+## A screens passage is not furniture, and nothing about the pieces standing in
+## a hall says where it was: only the plan does. So this is the one rule that
+## reads a plan-level zone -- and it reads it against what was actually placed,
+## which is the whole point. A passage the plan drew and the furnishing filled
+## in is a passage that was never there.
+func _check_clear(plan: HousePlan) -> void:
+	for z in plan.zones:
+		var rect: Rect2 = z["rect"]
+		var why: String = String(z.get("why", "clear floor"))
+		var room: int = int(z.get("room", -1))
+		for f in range(plan.furniture.size()):
+			var p: Dictionary = plan.furniture[f]
+			if p.get("mounted", false) or int(p["host"]) >= 0:
+				continue
+			if int(p["room"]) != room:
+				continue
+			if not PropCatalog.blocks_floor(String(p["key"])):
+				continue
+			var r: Rect2 = p["rect"]
+			if not r.intersects(rect):
+				continue
+			var over: Rect2 = r.intersection(rect)
+			if over.size.x * over.size.y < TOL:
+				continue
+			failures.append("clear: %s stands in the %s" % [_who(plan, f), why])
 
 
 ## Does a ray from `from` along `dir`, no longer than `reach`, cross `rect`?

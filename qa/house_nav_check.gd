@@ -13,6 +13,8 @@ extends RefCounted
 ##                the floor in front of the hearth -- all of them walkable and
 ##                all of them connected to the rest of the house
 ##   ISLANDS      no stranded pocket of floor big enough to stand in
+##   STEPS        a dais is floor you walk onto, and the passages the plan
+##                itself keeps clear are passages you can actually walk
 
 ## A stranded pocket smaller than this is a corner behind a barrel, not a room.
 const ISLAND_MIN_AREA := 0.6
@@ -64,6 +66,7 @@ func check(plan: HousePlan) -> Dictionary:
 	_check_rooms()
 	_check_doors()
 	_check_use_zones()
+	_check_steps()
 	_check_islands()
 	return _report()
 
@@ -93,6 +96,14 @@ func _rasterize() -> void:
 		var level := HousePlan.record_storey(d)
 		if _grids.has(level):
 			_grids[level].add_floor(_door_gap(d))
+	# A dais is laid down after the floor it stands on, and as a STEP: floor at
+	# a different height. A rise a person can walk up joins the room; one they
+	# cannot is cut off, and the walk says so rather than pretending. (CAS-010)
+	var dais_room: int = _plan.dais_room()
+	if dais_room >= 0 and dais_room < _plan.room_count():
+		var dl := HousePlan.record_storey(_plan.rooms[dais_room])
+		if _grids.has(dl):
+			_grids[dl].add_step(_plan.dais_rect(), _plan.dais_rise())
 	for p in _plan.furniture:
 		if p.get("mounted", false) or p["host"] >= 0:
 			continue
@@ -262,6 +273,30 @@ func _check_use_zones() -> void:
 				% [p["key"], p["room"], String(_plan.kind_of(p["room"]))])
 	stats["use_zones"] = checked
 	stats["use_zones_reached"] = reached
+
+
+## The dais and every passage the plan keeps clear are places a person is meant
+## to get to. The dais is the harder of the two: it is floor at another height,
+## so reaching it proves the step is a step and not a wall the walk went round.
+func _check_steps() -> void:
+	var room: int = _plan.dais_room()
+	if room >= 0 and room < _plan.room_count():
+		var rect: Rect2 = _plan.dais_rect()
+		var grid: WalkGrid = _grid_for(_plan.rooms[room])
+		if not grid.reached(rect):
+			if grid.standable(rect):
+				failures.append("steps: the dais in room %d (%s) stands %.2fm up and nobody can walk onto it"
+					% [room, String(_plan.kind_of(room)), _plan.dais_rise()])
+			else:
+				failures.append("steps: the dais in room %d (%s) is so full there is nowhere to stand on it"
+					% [room, String(_plan.kind_of(room))])
+	for z in _plan.zones:
+		var zr: int = int(z.get("room", -1))
+		if zr < 0 or zr >= _plan.room_count():
+			continue
+		if not _grid_for(_plan.rooms[zr]).reached(Rect2(z["rect"])):
+			failures.append("steps: the %s in room %d cannot be walked"
+				% [String(z.get("why", "clear floor")), zr])
 
 
 ## Floor a person can stand on, but cannot walk to. A pocket behind a table is
