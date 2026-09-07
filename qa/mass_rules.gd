@@ -51,8 +51,15 @@ static func family(n: String, prefixes: Array) -> String:
 
 
 ## Every mass must be reachable from `anchor` through touching neighbours.
+##
+## Except those whose names begin with one of `free`. This rule is about a mass
+## that FLOATS -- a buttress that reaches nothing, a roof over no wall -- and a
+## building standing on its own in a courtyard is not floating: it is a
+## separate building, and `grounded` is the rule that says it must stand on
+## something. A castle bailey is a yard with sheds in it.
 ## Returns {"failures": [...], "joined": int}.
-static func gaps(masses: Array[Dictionary], anchor: String) -> Dictionary:
+static func gaps(masses: Array[Dictionary], anchor: String,
+		free: Array = []) -> Dictionary:
 	var failures: Array[String] = []
 	var n: int = masses.size()
 	var start := -1
@@ -78,6 +85,8 @@ static func gaps(masses: Array[Dictionary], anchor: String) -> Dictionary:
 	for i in range(n):
 		if seen.has(i):
 			continue
+		if _named(String(masses[i]["name"]), free):
+			continue
 		# nearest neighbour, to describe the gap usefully
 		var best := INF
 		var near := ""
@@ -91,6 +100,14 @@ static func gaps(masses: Array[Dictionary], anchor: String) -> Dictionary:
 		failures.append("no_gaps: %s floats free -- nearest mass (%s) is %.2fm away"
 			% [masses[i]["name"], near, best])
 	return {"failures": failures, "joined": seen.size()}
+
+
+## Does this mass name begin with any of `prefixes`?
+static func _named(name: String, prefixes: Array) -> bool:
+	for p in prefixes:
+		if name.begins_with(String(p)):
+			return true
+	return false
 
 
 ## Masses may interpenetrate only where a joint declares it, and only that deep.

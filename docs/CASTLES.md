@@ -152,6 +152,49 @@ A mass that is not the size of a keep gets no plan: under 3.2 m across it is a
 turret, and over 36 m -- the White Tower is 36 x 32 m -- it is a block the
 massing happens to draw as one volume rather than a tower anybody lives up.
 
+## The bailey is a yard, not a lawn
+
+A castle was a village that happened to have a wall round it. The bailey here
+held the keep, the hall and the chapel and nothing else, which is a picture of
+a castle nobody worked in: no stable for the horses that got you there, no
+kitchen away from the hall it feeds, no smithy, no store, no well.
+
+`CastleGenerator.bailey_buildings(spec)` fills it, and fills it with **shops** --
+the shop family already knows how to plan a stable, a cookshop, a smithy and a
+store, so the bailey invents no building kinds of its own. Each entry is
+`{business, rect, yaw}`; `bailey_shop()` turns one into a generated `ShopSpec`.
+
+| tier | what stands in the yard |
+|---|---|
+| castle | stable, cookshop |
+| fortress | stable, cookshop, smithy, store |
+
+They stand **along the side walls**, marching back from the gate, turned a
+quarter so the front looks across the yard rather than up it. The middle stays
+empty on purpose: `CastleGeometry.gate_axis_strip()` is the way from the gate
+to the keep -- the gate opening plus a wagon either side -- and a yard built
+across the middle is a yard you cannot cross. `bailey_well()` then sinks a
+`PropKit` well in the open ground nearest the centre, six metres clear of
+everything built.
+
+Two rules had to learn that a courtyard building is not part of the
+fortification, and both learned it the same way an existing rule already
+worked:
+
+* `MassRules.gaps` takes a `free` list, as `grounded` already takes `carried`.
+  That rule is about a mass that FLOATS; a building standing on its own in a
+  yard is not floating, it is a separate building, and `grounded` is what says
+  it must stand on something.
+* `CastleQA`'s `connected_mass` seeds its flood from each free-standing
+  building as well as from the curtain. It cannot skip by name -- it works on
+  voxels -- so instead every grounded component gets a seed. Geometry attached
+  to nothing at all is still unreachable from all of them.
+
+`CastleMassingCheck`'s new `bailey_clear` rule measures the LOGGED masses, not
+the layout that produced them: a layout pass that agrees with itself and
+disagrees with the builder is exactly what it is there to catch, and it caught
+three such disagreements while this was being written.
+
 ## Dressing
 
 `CastleFurnisher` fills the shell with props from the same measured catalogue
@@ -163,7 +206,7 @@ the houses use (`assets/props/catalog.json`), and logs them on the builder as
 | great hall | high table on the dais with a chalice and candles, chairs behind it, rows of trestles and benches down the length, a brazier on the long wall, barrels in the low corners |
 | chapel | altar at the apse end, a candelabrum either side, benches facing it, torches on both walls |
 | keep, manor wings, ridge lodgings | a table with stools, a chest, a weapon stand, a barrel, torches and a banner |
-| bailey | a cart, an anvil and its fire, a training dummy, weapon stand, barrels, crates, sacks and rope, dealt round the inside of the curtain |
+| bailey | a cart, an anvil and its fire, a training dummy, weapon stand, barrels, crates, sacks and rope, dealt round the inside of the curtain -- and the yard buildings and well of CAS-012 above |
 | defences | braziers along the wall walk and on every tower top, torches either side of the gate passage |
 
 Two rules the placer will not break. The **way in** -- a corridor the width of

@@ -8,7 +8,8 @@ extends RefCounted
 ##   1. no_nan             all vertices finite and inside sane bounds
 ##   2. grounded           nothing hangs below y = 0
 ##   3. connected_mass     flood fill: every solid voxel reachable from the
-##                         anchor mass, so nothing floats detached
+##                         anchor mass -- or from a building standing on its
+##                         own in the bailey -- so nothing floats detached
 ##   4. openings_embedded  every slit and window sits in masonry and does not
 ##                         tunnel clean through the building
 ##   5. enceinte_closed    the wall line is continuous the whole way round,
@@ -117,6 +118,21 @@ func _check_connected_mass() -> void:
 			% _anchor_name())
 		return
 	var visited: Dictionary = _grid.flood_from(seed)
+	# A building standing on its own in the courtyard is its OWN grounded
+	# component. A stable is not attached to the curtain and is not meant to
+	# be (CAS-012), so the flood is seeded from each of those as well. The rule
+	# keeps its teeth either way: geometry attached to nothing at all is still
+	# unreachable from every seed, and `grounded` is what says a free-standing
+	# building has to stand on the ground.
+	for m in builder.mass_log:
+		var nm: String = m["name"]
+		if not (nm.begins_with("yard_") or nm == "well"):
+			continue
+		var extra: Vector3i = _seed_inside(m["aabb"])
+		if extra.x < 0:
+			continue
+		for k in _grid.flood_from(extra):
+			visited[k] = true
 	var total: int = _grid.count_solid()
 	stats["reachable_fraction"] = snappedf(float(visited.size()) / maxf(total, 1), 0.001)
 	if visited.size() < total - 8:
@@ -124,6 +140,20 @@ func _check_connected_mass() -> void:
 		failures.append("connected_mass: %d/%d solid voxels unreachable from the %s (orphan near %s)"
 			% [total - visited.size(), total, _anchor_name(),
 				str(_grid.world_of(example.x, example.y, example.z))])
+
+
+## A solid voxel somewhere inside `box`, or (-1, -1, -1) when it holds none.
+func _seed_inside(box: AABB) -> Vector3i:
+	for iy in range(4):
+		var y: float = box.position.y + box.size.y * (float(iy) + 0.5) / 4.0
+		for ix in range(5):
+			var x: float = box.position.x + box.size.x * (float(ix) + 0.5) / 5.0
+			for iz in range(5):
+				var z: float = box.position.z + box.size.z * (float(iz) + 0.5) / 5.0
+				var g := Vector3i(_grid.vx(x), _grid.vy(y), _grid.vz(z))
+				if _grid.get_voxel(g.x, g.y, g.z):
+					return g
+	return Vector3i(-1, -1, -1)
 
 
 ## Every opening must sit embedded in masonry AND not cut all the way through.
