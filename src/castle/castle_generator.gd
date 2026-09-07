@@ -779,9 +779,14 @@ static func chapel_plan(spec: CastleSpec) -> HousePlan:
 	# back down the nave at the door -- which is the whole of what an axis is.
 	var mid: Vector2 = floor_rect.get_center()
 	var far: Vector2 = mid + up * (along / 2.0 - ALTAR_SET_IN)
+	# A nave narrower than the altar is long has to stand it lengthwise, and a
+	# table standing lengthwise cannot look down the nave at anything. Ask for
+	# the view only where the room can give it -- the same measurement the
+	# great hall makes of its high table.
+	var faces: bool = across >= _longest_table() + HouseGeometry.PATH_MIN * 2.0
 	plan.focus = {"room": 0, "cat": "table",
 		"pos": Vector2(mid.x, far.y) if lengthwise else Vector2(far.x, mid.y),
-		"facing": atan2(up.x, up.y), "faces_door": true}
+		"facing": atan2(up.x, up.y), "faces_door": faces}
 
 	# The SANCTUARY: the end the altar stands in, and a DAIS rather than a
 	# keep-clear zone, because it belongs TO the altar. A chancel step is a
