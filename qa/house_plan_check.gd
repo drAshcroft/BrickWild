@@ -97,7 +97,7 @@ func _check_tiling(plan: HousePlan) -> void:
 ## Every requested storey has rooms, and no record may silently use a level
 ## outside the spec.  The `get` fallback keeps old hand-authored plans valid.
 func _check_storeys(plan: HousePlan) -> void:
-	var wanted: int = clampi(int(plan.spec.storeys), 1, 3)
+	var wanted: int = clampi(int(plan.spec.storeys), 1, HouseGeometry.MAX_STOREYS)
 	var lowest: int = _lowest(plan)
 	var seen := {}
 	for room in plan.rooms:
@@ -186,7 +186,7 @@ func _check_connectivity(plan: HousePlan) -> void:
 ## Stairs are the only legal edge between levels.  Check both their metadata
 ## and coverage of every adjacent pair; door_graph() then checks reachability.
 func _check_stairs(plan: HousePlan) -> void:
-	var wanted: int = clampi(int(plan.spec.storeys), 1, 3)
+	var wanted: int = clampi(int(plan.spec.storeys), 1, HouseGeometry.MAX_STOREYS)
 	var lowest: int = _lowest(plan)
 	var interior: Rect2 = HouseGeometry.interior_rect(plan.spec)
 	var pairs := {}

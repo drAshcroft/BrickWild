@@ -139,6 +139,19 @@ const RECIPES := {
 		{"cat": "tableware", "rule": &"on", "n": [2, 6], "opt": 0.9},
 		{"cat": "candle", "rule": &"on", "n": [1, 2], "opt": 0.85},
 	],
+	&"lords_chamber": [
+		# The room at the top of a keep: a bed, a fire of its own, and enough
+		# to sit at. The hearth goes in before the bed because the flue is on a
+		# wall the plan named (LAY-001) and the bed can take any other.
+		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9},
+		{"cat": "table", "rule": &"free", "n": [0, 1], "opt": 0.6},
+		{"cat": "seat", "rule": &"around", "n": [1, 2], "opt": 0.8},
+		{"cat": "storage", "rule": &"wall", "n": [0, 1], "opt": 0.6},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+		{"cat": "candle", "rule": &"on", "n": [1, 1], "opt": 0.9},
+	],
 	&"guest_room": [
 		{"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.8},
@@ -542,6 +555,19 @@ static func _reindex_hosts(plan: HousePlan, removed: int) -> void:
 		_reindex_hosts(plan, idx)
 
 
+## Does anybody sleep anywhere in this plan?
+##
+## A hall doubles as a bedroom only when nothing else in the building is one,
+## which is what a one-room cottage does. But &"bedroom" is not the only room
+## people sleep in: a keep lord sleeps in his chamber at the top, and asking
+## for that one name put a bed in his hall as well.
+static func _anybody_sleeps(plan: HousePlan) -> bool:
+	for kind in HouseGeometry.SLEEPING:
+		if plan.has_kind(kind):
+			return true
+	return false
+
+
 static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	var kind: StringName = plan.kind_of(room)
 	var steps: Array = []
@@ -549,7 +575,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	# is what a one-room cottage has always done. The bed goes in first, before
 	# the table has taken the good wall.
 	var sleeps_here: bool = not spec is ShopSpec and kind == &"hall" \
-		and not plan.has_kind(&"bedroom")
+		and not _anybody_sleeps(plan)
 	if sleeps_here:
 		steps.append({"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0})
 		steps.append({"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9})

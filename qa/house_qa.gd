@@ -112,7 +112,7 @@ static func _check_shell(plan: HousePlan, builder: HouseBuilder) -> Array[String
 ## band, which catches a roof accidentally left at the first storey.
 static func _check_vertical_shell(plan: HousePlan, builder: HouseBuilder) -> Array[String]:
 	var out: Array[String] = []
-	var wanted: int = clampi(int(plan.spec.storeys), 1, 3)
+	var wanted: int = clampi(int(plan.spec.storeys), 1, HouseGeometry.MAX_STOREYS)
 	var lowest := 0
 	if plan.spec.has_method("lowest_storey"):
 		lowest = int(plan.spec.lowest_storey())

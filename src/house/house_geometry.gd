@@ -80,6 +80,13 @@ const BED_HEAD_TOL := 0.35    # how far a headboard may sit off its wall
 
 # ---- rooms ----
 const MIN_ROOM_SIDE := 2.1
+## The most storeys the HARNESS will measure. A house stops at three and each
+## family clamps itself to what it is -- but the cap belongs to the checks, not
+## to the house: a castle keep is four storeys of one room each, and a check
+## that stopped counting at three would report its top floor as invalid rather
+## than walk it. (CAS-011)
+const MAX_STOREYS := 4
+
 const ROOM_ASPECT_MAX := 3.4
 ## Except where length IS the room. A great hall is long on purpose --
 ## Westminster is 20.7 x 73 m, three and a half to one -- and a castle range is
@@ -102,6 +109,7 @@ const MIN_AREA := {
 	&"council_chamber": 12.0, &"meeting_hall": 12.0,
 	&"lobby": 16.0, &"lounge": 10.0, &"suite": 14.0,
 	&"gallery": 8.0, &"laundry": 7.0, &"great_hall": 16.0,
+	&"lords_chamber": 10.0,
 }
 
 ## And the narrowest it may be. Area alone is not enough: a bed is 1.9 x 2.4 m
@@ -117,6 +125,7 @@ const MIN_SIDE := {
 	&"council_chamber": 3.0, &"meeting_hall": 3.0,
 	&"lobby": 3.2, &"lounge": 2.8, &"suite": 3.4,
 	&"gallery": 2.4, &"laundry": 2.4, &"great_hall": 3.0,
+	&"lords_chamber": 2.8,
 }
 
 
@@ -131,11 +140,12 @@ static func room_suits(plan: HousePlan, i: int, kind: StringName) -> bool:
 const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour",
 	&"sales_floor", &"stable", &"tack_room", &"dining_room", &"guest_room",
 	&"office", &"records", &"council_chamber", &"meeting_hall", &"lobby",
-	&"lounge", &"suite", &"gallery", &"laundry", &"great_hall"]
+	&"lounge", &"suite", &"gallery", &"laundry", &"great_hall",
+	&"lords_chamber"]
 
 ## Rooms someone sleeps in. Nobody should have to walk through one of these
 ## to reach anywhere else -- not just the house's own "bedroom".
-const SLEEPING := [&"bedroom", &"guest_room", &"suite"]
+const SLEEPING := [&"bedroom", &"guest_room", &"suite", &"lords_chamber"]
 
 
 

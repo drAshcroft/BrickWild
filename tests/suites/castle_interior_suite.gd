@@ -1,6 +1,7 @@
-class_name HallSuite
+class_name CastleInteriorSuite
 extends RefCounted
-## 12b. The great hall interior over a wide band of castles (CAS-010).
+## 12b. The castle interiors -- great hall and keep -- over a wide band of
+##      castles (CAS-010, CAS-011).
 ##
 ## `CastleSuite._great_hall` proves the arrangement -- dais, high table, lord's
 ## bench, trestle rows, hearth, screens passage -- on the twelve canonical
@@ -28,7 +29,7 @@ const WANT := {"dais": 1.0, "high_table": 0.98, "lord": 0.90, "rows": 0.90,
 
 
 static func run() -> SuiteResult:
-	var res := SuiteResult.new("great hall")
+	var res := SuiteResult.new("castle interiors")
 	var tally := {"dais": 0, "high_table": 0, "lord": 0, "rows": 0,
 		"two_rows": 0, "hearth": 0}
 	var halls := 0
@@ -104,4 +105,46 @@ static func run() -> SuiteResult:
 			res.fail("great hall: %s" % line)
 		else:
 			res.note("great hall  %s" % line)
+	_keeps(res)
 	return res
+
+
+## The keeps of the same band of castles (CAS-011).
+##
+## Structure is asserted in the castle suite, on the canonical twelve of every
+## style and tier. What this adds is the SHAPES the canonical set never
+## visits -- and the one thing worth stating as a rate rather than a rule:
+## how often a keep comes out of a castle at all.
+static func _keeps(res: SuiteResult) -> void:
+	var built := 0
+	var levels := {}
+	var styles: Array = CastleSpec.STYLES.keys()
+	var r := RandomNumberGenerator.new()
+	r.seed = 20261101
+	for i in range(COUNT):
+		var spec := CastleSpec.new()
+		spec.style = styles[i % styles.size()]
+		spec.width = r.randf_range(10.0, 90.0)
+		spec.length = spec.width * r.randf_range(1.0, 2.0)
+		spec.height = r.randf_range(6.0, 24.0)
+		var sd: int = 41000 + i
+		CastleGenerator.generate(spec, sd)
+		var plan: HousePlan = CastleGenerator.keep_plan(spec)
+		res.checked += 1
+		if plan.spec == null:
+			continue
+		built += 1
+		levels[plan.spec.storeys] = int(levels.get(plan.spec.storeys, 0)) + 1
+		var who := "keep %s %.0f x %.0fm seed=%d" % [String(spec.style),
+			spec.width, spec.length, sd]
+		for rep in [HousePlanCheck.new().check(plan),
+				HouseFurnishCheck.new().check(plan), HouseNavCheck.new().check(plan)]:
+			for m in rep["failures"]:
+				res.fail("%s: %s" % [who, str(m)])
+			for w in rep["warnings"]:
+				res.warn("%s: %s" % [who, str(w)])
+	res.note("keep        %d of %d castles have one, storeys %s"
+		% [built, COUNT, str(levels)])
+	res.checked += 1
+	if built < COUNT / 5:
+		res.fail("keep: only %d of %d castles produced one" % [built, COUNT])

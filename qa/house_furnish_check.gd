@@ -63,6 +63,7 @@ const REQUIRED := {
 	&"suite": ["bed"],
 	&"laundry": ["workbench"],
 	&"great_hall": ["table"],
+	&"lords_chamber": ["bed"],
 }
 
 ## And what a trade must have in the room it works in.
@@ -253,14 +254,25 @@ func _check_windows(plan: HousePlan) -> void:
 
 # --------------------------------------------------------------- programme
 
+## Does anybody sleep anywhere in this plan?
+static func _anybody_sleeps(plan: HousePlan) -> bool:
+	for kind in HouseGeometry.SLEEPING:
+		if plan.has_kind(kind):
+			return true
+	return false
+
+
 ## A bedroom with no bed is a room, not a bedroom.
 func _check_program(plan: HousePlan) -> void:
 	var spec: HouseSpec = plan.spec
 	for i in range(plan.room_count()):
 		var kind: StringName = plan.kind_of(i)
 		var cats: Array = REQUIRED.get(kind, [])
-		# a house with nowhere to call a bedroom sleeps in the hall
-		if not spec is ShopSpec and kind == &"hall" and not plan.has_kind(&"bedroom"):
+		# A house with nowhere to call a bedroom sleeps in the hall -- but
+		# &"bedroom" is not the only room people sleep in, and a keep whose
+		# lord has a chamber at the top was being told to bed down in its hall
+		# as well. HouseFurnisher asks the same question the same way.
+		if not spec is ShopSpec and kind == &"hall" and not _anybody_sleeps(plan):
 			cats = cats + ["bed"]
 		for cat in cats:
 			if _room_has(plan, i, cat):

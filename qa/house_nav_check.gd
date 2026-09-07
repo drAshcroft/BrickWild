@@ -164,7 +164,7 @@ func _levels() -> Array[int]:
 	var lowest := 0
 	if _plan.spec.has_method("lowest_storey"):
 		lowest = int(_plan.spec.lowest_storey())
-	for level in range(lowest, clampi(int(_plan.spec.storeys), 1, 3)):
+	for level in range(lowest, clampi(int(_plan.spec.storeys), 1, HouseGeometry.MAX_STOREYS)):
 		out.append(level)
 	return out
 

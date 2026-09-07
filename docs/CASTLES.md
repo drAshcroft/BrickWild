@@ -120,6 +120,38 @@ chair belongs to its table.
 CAS-013 is the task that switches `CastleBuilder` over to raising every
 interior from its plan instead.
 
+## The keep has an inside
+
+`CastleGenerator.keep_plan(spec)` returns the keep as a **`HousePlan`** of
+three or four storeys, one room to each, in the keep's own frame;
+`CastleGeometry.keep_aabb()` says where that frame sits.
+
+A keep is the one castle building the house harness already knew how to
+describe -- stacked storeys with a stair against the wall is exactly what
+`HouseSpec.storeys` and `HousePlanner._add_stair` mean -- so the keep borrows
+the harness whole. What it could not borrow is the house's idea of what belongs
+on which floor:
+
+| | |
+|---|---|
+| storey 0 | the **store**: entered from the bailey, and **blind**. No windows at the foot of a keep; that is the point of a keep |
+| storey 1 | the **hall**, up a stair over that store |
+| storey 2 | a **chamber**, on a four-storey keep |
+| the top | the **lord's chamber**, a new kind in `HABITABLE` and `SLEEPING`, with a bed and a fire of its own on `plan.hearth.wall` |
+
+That programme is why `KeepSpec` exists. `HousePlanCheck`'s
+`upstairs_programme` rule keeps a dwelling's hall and its one hearth on the
+ground floor, which is right for a farmhouse and wrong for a keep; the rule
+exempts any spec that can answer `room_program`, the same door a shop and a
+hotel go through, and answering it is the whole of what a `KeepSpec` adds.
+
+One stairwell chains every storey, placed by the house planner's own placer so
+it stands against a wall and out of the line of the door (LAY-005).
+
+A mass that is not the size of a keep gets no plan: under 3.2 m across it is a
+turret, and over 36 m -- the White Tower is 36 x 32 m -- it is a block the
+massing happens to draw as one volume rather than a tower anybody lives up.
+
 ## Dressing
 
 `CastleFurnisher` fills the shell with props from the same measured catalogue
@@ -149,13 +181,13 @@ a keep would fly four storeys above the only floor there is.
 ## What the suites check
 
 `castle`, `castle normals`, `castle massing`, `castle landmark`,
-`great hall` and `castle voxel QA` -- run with
-`godot --headless --path . --script res://tests/run_all.gd -- castle cnormals cmassing clandmark hall cvoxelqa`.
+`castle interiors` and `castle voxel QA` -- run with
+`godot --headless --path . --script res://tests/run_all.gd -- castle cnormals cmassing clandmark interior cvoxelqa`.
 
-`castle` proves the great hall arrangement on the twelve canonical castles of
-every style and tier; `hall` is the sweep, two hundred halls at sizes the
-canonical set does not visit, and reports the rate at which each part of the
-arrangement actually comes out.
+`castle` proves the great hall and the keep on the twelve canonical castles of
+every style and tier; `interior` is the sweep -- two hundred halls and two
+hundred keeps at sizes the canonical set does not visit -- and reports the rate
+at which each part of the arrangement actually comes out.
 
 `dressing` (shared with the churches) sweeps the same variants and asks
 whether every prop is a prop the catalogue knows, whether it stands inside

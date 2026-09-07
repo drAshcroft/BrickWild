@@ -22,6 +22,11 @@ house — the checks work in metres and rectangles and never touch the art.
 
 ## Storeys and roofs
 
+A house asks for one, two or three levels through `HouseSpec.storeys`; the
+CHECKS count up to `HouseGeometry.MAX_STOREYS`, which is four, because a castle
+keep is four storeys of one room each and a check that stopped at three would
+report its top floor as invalid rather than walk it.
+
 `HouseSpec.storeys` requests one, two or three levels; `height` remains the
 floor-to-ceiling height of each level. Rooms, doors, windows and furniture keep
 flat stable IDs but carry a zero-based `storey`. `HousePlan.stairs` is the

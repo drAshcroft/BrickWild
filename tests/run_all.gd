@@ -25,7 +25,7 @@ extends SceneTree
 ##  11 voxelqa    - exhaustive rasterized checks of the churches (slow)
 ##  12 cvoxelqa   - the same, for the castles (slow)
 ## 12a dressing   - what is in the churches and castles, and can you walk past it
-## 12b hall       - the great hall interior, over two hundred castles
+## 12b interior   - the castle interiors, hall and keep, over two hundred castles
 ##  13 house      - the house spec/plan/build contract
 ##  14 assets     - the prop catalogue still describes the props
 ##  15 houseqa    - plan, furnishing and circulation of every house
@@ -45,7 +45,7 @@ extends SceneTree
 ##  29 world      - the buildings of the wider world (WORLD_BUILDINGS), as
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
-	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "hall",
+	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"house", "assets", "houseqa", "hmultistory", "harchetype",
 	"shop", "sarchetype",
 	"hotel", "hlandmark",
@@ -87,8 +87,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return CastleQASuite.run()
 		"dressing":
 			return DressingSuite.run()
-		"hall":
-			return HallSuite.run()
+		"interior":
+			return CastleInteriorSuite.run()
 		"house":
 			return HouseSuite.run()
 		"assets":
