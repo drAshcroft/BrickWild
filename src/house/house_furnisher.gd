@@ -299,6 +299,12 @@ const MAX_TRIALS := 8
 ## Whether the piece being placed right now is one the room cannot do without.
 ## Carried on the placement so the repair pass knows what it may not remove.
 static var _mandatory := false
+## The outline of the room being furnished, when it has one that a rectangle
+## cannot say (GEO-002). Carried here rather than threaded through seven
+## placers, the same way `_mandatory` is: every one of them already tests
+## `_fits`, and this is one more thing `_fits` has to be true of. Empty for a
+## rectangular room, which is every room in a house.
+static var _outline := PackedVector2Array()
 ## Sizes a shrinkable piece is tried at, biggest first: a smaller table is a
 ## compromise, not a preference.
 const SCALE_STEPS := [1.0, 0.88, 0.76, 0.62]
@@ -632,6 +638,8 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 			return float(a["opt"]) > float(b["opt"])
 		return int(a["order"]) < int(b["order"]))
 
+	_outline = plan.outline_of(room) if plan.is_polygonal(room) \
+		else PackedVector2Array()
 	var blocked: Array[Rect2] = _initial_blocked(plan, room)
 	# Use zones are tracked apart from footprints. Two people may share a
 	# gangway, so zones may overlap each other -- but nothing solid may stand
@@ -985,15 +993,18 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 		var wall: Dictionary = walls[wi]
 		var n: Vector2 = wall["normal"]
 		var yaw: float = _yaw_facing(n)
-		var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw)
-		var along := Vector2(n.y, -n.x).abs()      # unit vector along the wall
-		# Which component of the footprint runs ALONG the wall and which runs
-		# INTO it depends on the yaw. Reading them the wrong way round is what
-		# stood a shallow cabinet half a metre off the wall it was backed to.
-		var span: float = along.x * foot.x + along.y * foot.y
-		var depth: float = absf(n.x) * foot.x + absf(n.y) * foot.y
 		var a: Vector2 = wall["from"]
 		var b: Vector2 = wall["to"]
+		# The direction the wall actually runs, not the nearest axis to it.
+		# Taking absf() of the perpendicular was right for the four walls of a
+		# rectangle and meaningless on the diagonal of an octagon, where it
+		# walked the piece off the wall it was meant to be against (GEO-002).
+		var along: Vector2 = (b - a).normalized()
+		# A piece backed to a wall stands across it by its own width and into
+		# the room by its own depth, whichever way the wall runs.
+		var raw: Vector2 = PropCatalog.footprint(key)
+		var span: float = raw.x
+		var depth: float = raw.y
 		var run: float = (b - a).length()
 		var small: float = span * PropCatalog.min_scale(key)
 		if run < small + 0.1:
@@ -2129,6 +2140,11 @@ static func _fits(cand: Dictionary, floor_rect: Rect2, blocked: Array[Rect2],
 	var rect: Rect2 = cand["rect"]
 	if not floor_rect.grow(0.01).encloses(rect):
 		return false
+	# A bounding box is not the room when the room is an octagon: every corner
+	# of the piece has to be inside the outline as well, or the wardrobe ends
+	# up half through the chamfer.
+	if not _inside_outline(rect):
+		return false
 	for b in blocked:
 		# a seat tucked under its own table overlaps it on purpose, so the
 		# table is passed in as the one rectangle this placement may share
@@ -2150,9 +2166,24 @@ static func _fits(cand: Dictionary, floor_rect: Rect2, blocked: Array[Rect2],
 		# but it may not be inside a wall or under other furniture
 		if not floor_rect.grow(0.02).encloses(zone):
 			return false
+		if not _inside_outline(zone):
+			return false
 		for b2 in blocked:
 			if b2.intersects(zone):
 				return false
+	return true
+
+
+## Are all four corners of `rect` inside the room being furnished? True when
+## the room is a plain rectangle -- the enclosing test above has said so
+## already.
+static func _inside_outline(rect: Rect2) -> bool:
+	if _outline.size() < 3:
+		return true
+	for p in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end,
+			Vector2(rect.position.x, rect.end.y)]:
+		if not Poly.contains_point(_outline, p, 0.01):
+			return false
 	return true
 
 

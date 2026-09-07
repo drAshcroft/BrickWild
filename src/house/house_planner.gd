@@ -1295,6 +1295,11 @@ static func _stair_spot(p: HousePlan, room: int, f: Rect2, size: Vector2) -> Dic
 					continue
 				if strict < 1 and _hits_any(rect, glass):
 					continue
+				# A stairwell has to be ON THE FLOOR. In a shaped room the
+				# corners of the bounding box are masonry, and a well set down
+				# in one is a landing nobody can walk to (GEO-002).
+				if not _inside_room(p, room, rect):
+					continue
 				var score: float = rect.get_center().distance_to(front)
 				# a well must leave the way past it: the short way across the
 				# room, beside the stair, has to stay a path wide
@@ -1307,6 +1312,19 @@ static func _stair_spot(p: HousePlan, room: int, f: Rect2, size: Vector2) -> Dic
 		if best.size.x > 0.0:
 			return {"rect": best, "strict": strict}
 	return {"rect": Rect2(f.get_center() - size / 2.0, size), "strict": 4}
+
+
+## Is every corner of `rect` inside the room? True for a rectangular room --
+## the caller has already kept it inside the floor rectangle.
+static func _inside_room(p: HousePlan, room: int, rect: Rect2) -> bool:
+	if not p.is_polygonal(room):
+		return true
+	var poly: PackedVector2Array = p.outline_of(room)
+	for c in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end,
+			Vector2(rect.position.x, rect.end.y)]:
+		if not Poly.contains_point(poly, c, 0.01):
+			return false
+	return true
 
 
 static func _hits_any(rect: Rect2, others: Array[Rect2]) -> bool:

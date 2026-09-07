@@ -179,6 +179,49 @@ static func exterior_runs(spec: HouseSpec) -> Array[Dictionary]:
 	]
 
 
+## The wall centre-lines of a shell that is not a rectangle (GEO-002).
+##
+## Same shape of answer as `exterior_runs`, so the builder does not care which
+## it got: from, to, an OUTWARD normal and a side name. The outline is the
+## clear floor, so the centre-line is the outline pushed out by half a wall --
+## exactly what `exterior_runs` does to the site rectangle.
+static func polygon_runs(outline: PackedVector2Array) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if outline.size() < 3:
+		return out
+	var centre: PackedVector2Array = Poly.offset(outline, WALL_T / 2.0)
+	if centre.size() < 3:
+		centre = outline
+	var turn: float = 1.0 if Poly.signed_area(centre) > 0.0 else -1.0
+	for k in range(centre.size()):
+		var a: Vector2 = centre[k]
+		var b: Vector2 = centre[(k + 1) % centre.size()]
+		var d: Vector2 = b - a
+		if d.length() < 0.001:
+			continue
+		d = d.normalized()
+		out.append({"from": a, "to": b,
+			"normal": -Vector2(-d.y, d.x) * turn, "side": StringName("e%d" % k)})
+	return out
+
+
+## The shell runs for one storey of a plan: the polygon's edges when the storey
+## is shaped, the site rectangle's four sides when it is not.
+static func shell_runs(plan: HousePlan, level: int) -> Array[Dictionary]:
+	for i in range(plan.room_count()):
+		if HousePlan.record_storey(plan.rooms[i]) == level and plan.is_polygonal(i):
+			return polygon_runs(plan.outline_of(i))
+	return exterior_runs(plan.spec)
+
+
+## Does any room of this plan carry an outline?
+static func is_shaped(plan: HousePlan) -> bool:
+	for i in range(plan.room_count()):
+		if plan.is_polygonal(i):
+			return true
+	return false
+
+
 ## Is this plan-space line (on a room's edge) an exterior wall?
 static func is_exterior_edge(spec: HouseSpec, axis: int, value: float) -> bool:
 	var inner: Rect2 = interior_rect(spec)
@@ -194,6 +237,10 @@ static func is_exterior_edge(spec: HouseSpec, axis: int, value: float) -> bool:
 ## this rectangle, never in the raw partition rect, or every wall-hugging piece
 ## would be buried half a partition deep in the wall beside it.
 static func room_floor_rect(plan: HousePlan, i: int) -> Rect2:
+	# An outline is the clear floor already: there is no partition to give half
+	# of, so the floor rectangle is simply what the outline spans.
+	if plan.is_polygonal(i):
+		return Poly.bounding_rect(plan.outline_of(i))
 	var rect: Rect2 = plan.rooms[i]["rect"]
 	var inner: Rect2 = interior_rect(plan.spec)
 	var half: float = INNER_WALL_T / 2.0
@@ -204,7 +251,39 @@ static func room_floor_rect(plan: HousePlan, i: int) -> Rect2:
 	return Rect2(Vector2(x0, z0), Vector2(x1 - x0, z1 - z0))
 
 
+## One wall per edge of an outline, wound so `normal` points into the polygon.
+static func polygon_walls(poly: PackedVector2Array) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var n: int = poly.size()
+	if n < 3:
+		return out
+	# The inward normal of an edge depends on which way round the outline is
+	# wound, and callers should not have to know or care which that was.
+	var turn: float = 1.0 if Poly.signed_area(poly) > 0.0 else -1.0
+	for k in range(n):
+		var a: Vector2 = poly[k]
+		var b: Vector2 = poly[(k + 1) % n]
+		var d: Vector2 = b - a
+		if d.length() < 0.001:
+			continue
+		d = d.normalized()
+		out.append({"from": a, "to": b,
+			"normal": Vector2(-d.y, d.x) * turn})
+	return out
+
+
+## The clear floor of a room as a polygon: its outline, or its floor rectangle
+## when it has none. What furniture has to stay inside and what the walk grid
+## rasterises.
+static func room_floor_poly(plan: HousePlan, i: int) -> PackedVector2Array:
+	if plan.is_polygonal(i):
+		return plan.outline_of(i)
+	return Poly.from_rect(room_floor_rect(plan, i))
+
+
 static func room_area(plan: HousePlan, i: int) -> float:
+	if plan.is_polygonal(i):
+		return Poly.area(plan.outline_of(i))
 	var f: Rect2 = room_floor_rect(plan, i)
 	return f.size.x * f.size.y
 
@@ -220,10 +299,18 @@ static func is_habitable(kind: StringName) -> bool:
 	return kind in HABITABLE
 
 
-## The four walls of a room's clear floor, as
+## The walls of a room's clear floor, as
 ## {"from": Vector2, "to": Vector2, "normal": Vector2} with `normal` pointing
 ## INTO the room. This is what a piece of furniture puts its back against.
+##
+## Four of them for a rectangular room, in the order every table in this
+## project indexes by -- front, back, left, right -- and ONE PER EDGE for a
+## room that carries an outline (GEO-002). The four-sided order is a labelling,
+## not a traversal, which is why the two paths are written out separately: a
+## hearth on "wall 2" means the left wall, and it has to keep meaning that.
 static func room_walls(plan: HousePlan, i: int) -> Array[Dictionary]:
+	if plan.is_polygonal(i):
+		return polygon_walls(plan.outline_of(i))
 	var f: Rect2 = room_floor_rect(plan, i)
 	return [
 		{"from": f.position, "to": Vector2(f.end.x, f.position.y), "normal": Vector2(0, 1)},

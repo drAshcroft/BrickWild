@@ -14,7 +14,19 @@ extends RefCounted
 
 var spec: HouseSpec
 
-## {"kind": StringName, "rect": Rect2, "storey": int}
+## {"kind": StringName, "rect": Rect2, "storey": int,
+##  "outline": PackedVector2Array (optional)}
+##
+## `outline` is the TRUTH about a room's shape when it is there, and `rect`
+## stays as its bounding box so every rectangle-shaped rule still has something
+## to measure. A room WITHOUT one is the four-sided case, which is every room
+## in every house: the outline exists for the shapes a rectangle cannot say --
+## a round tower, an octagonal chapter house, a pagoda (GEO-002).
+##
+## An outline is the CLEAR FLOOR, not a partition centre-line. A rectangular
+## room is cut out of the interior and shares half of each partition with its
+## neighbour; a polygonal room is not produced by cutting, so there is no
+## shared partition to give half of, and what you draw is what you walk on.
 var rooms: Array[Dictionary] = []
 ## {"a": int, "b": int (-1 outdoors), "pos": Vector2, "normal": Vector2,
 ##  "width": float, "exterior": bool, "storey": int}
@@ -168,6 +180,26 @@ func room_count() -> int:
 
 func kind_of(i: int) -> StringName:
 	return rooms[i]["kind"]
+
+
+## The room's shape in plan. A room with no `outline` is its rectangle, so
+## every caller can ask for a polygon and never test for one.
+func outline_of(i: int) -> PackedVector2Array:
+	return room_outline(rooms[i])
+
+
+## The same, for a room record that is not in a plan yet.
+static func room_outline(room: Dictionary) -> PackedVector2Array:
+	var o = room.get("outline")
+	if o != null and (o as PackedVector2Array).size() >= 3:
+		return o
+	return Poly.from_rect(room["rect"])
+
+
+## Is this room something a rectangle cannot describe?
+func is_polygonal(i: int) -> bool:
+	var o = rooms[i].get("outline")
+	return o != null and (o as PackedVector2Array).size() >= 3
 
 
 ## Storey index for any plan record, with zero as the compatibility default for

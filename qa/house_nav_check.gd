@@ -90,7 +90,14 @@ func _rasterize() -> void:
 	_grid = _grids[0]
 	for i in range(_plan.room_count()):
 		var level := HousePlan.record_storey(_plan.rooms[i])
-		if _grids.has(level):
+		if not _grids.has(level):
+			continue
+		# A room shaped by an outline is rasterised as that outline, not as the
+		# box round it: the corners a chamfer cuts off are wall, and a walker
+		# that stood in them would be standing outside the building (GEO-002).
+		if _plan.is_polygonal(i):
+			_grids[level].add_floor_poly(_plan.outline_of(i))
+		else:
 			_grids[level].add_floor(HouseGeometry.room_floor_rect(_plan, i))
 	for d in _plan.doors:
 		var level := HousePlan.record_storey(d)

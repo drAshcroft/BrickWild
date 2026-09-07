@@ -54,6 +54,16 @@ func _build_floor() -> void:
 		var y0 := float(level) * spec.height
 		var a := AABB(Vector3(r.position.x, y0, r.position.y),
 			Vector3(r.size.x, t, r.size.y))
+		var shaped: int = _shaped_room(level)
+		if shaped >= 0:
+			# The floor of a shaped storey is the shape, pushed out to the
+			# middle of its own wall so the slab and the masonry meet.
+			var poly: PackedVector2Array = Poly.offset(plan.outline_of(shaped),
+				HouseGeometry.WALL_T / 2.0)
+			_kit.slab_poly(_lift(poly, y0 + t / 2.0), t, SURF_FLOOR)
+			_log_mass("floor" if _levels().size() == 1 else "floor_%d" % level,
+				AABB(Vector3(a.position.x, y0, a.position.z), a.size), y0)
+			continue
 		var opening := _stair_opening(level)
 		if opening.size.x > 0.01 and opening.size.y > 0.01:
 			_emit_floor_around(r, opening, y0, t, level)
@@ -197,7 +207,7 @@ func _build_exterior_walls() -> void:
 	for level in _levels():
 		var y0 := float(level) * h
 		var surf: int = SURF_FLOOR if (spec.stone_ground_floor and level == 0) else SURF_WALL
-		for run in HouseGeometry.exterior_runs(spec):
+		for run in HouseGeometry.shell_runs(plan, level):
 			var from: Vector2 = run["from"]
 			var to: Vector2 = run["to"]
 			var normal: Vector2 = run["normal"]
@@ -466,6 +476,22 @@ static func _run_aabb(from: Vector2, to: Vector2, thick: float, height: float,
 
 ## Plans made before the upper-floor schema default all records to ground level.
 ## Storeys above the ground; the roof and the chimney are measured off them.
+## The shaped room on `level`, or -1 when that storey is rectangular.
+func _shaped_room(level: int) -> int:
+	for i in range(plan.room_count()):
+		if HousePlan.record_storey(plan.rooms[i]) == level and plan.is_polygonal(i):
+			return i
+	return -1
+
+
+## A plan polygon lifted to a height, for the slab emitters.
+static func _lift(poly: PackedVector2Array, y: float) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	for p in poly:
+		out.append(Vector3(p.x, y, p.y))
+	return out
+
+
 func _storeys() -> int:
 	var raw = spec.get("storeys")
 	return maxi(1, int(raw)) if raw != null else 1

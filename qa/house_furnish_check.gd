@@ -364,21 +364,27 @@ func _check_against_wall(plan: HousePlan) -> void:
 
 
 ## Distance from the back of a piece to the room wall behind it.
+##
+## Measured against the room's OWN WALLS rather than against the box round
+## them. For a rectangle the two are the same thing and the answer does not
+## move; for an octagon the wall behind a cabinet is a diagonal, and measuring
+## to the bounding box reported every piece in the room as standing a metre and
+## a quarter off a wall it was flat against (GEO-002).
 static func _back_gap(plan: HousePlan, p: Dictionary) -> float:
-	var room_rect: Rect2 = HouseGeometry.room_floor_rect(plan, p["room"])
 	var yaw: float = float(p["yaw"])
-	var facing := Vector2(-sin(yaw), -cos(yaw))
-	var back: Vector2 = -facing
-	var rect: Rect2 = p["rect"]
-	var c: Vector2 = rect.get_center()
-	var half: Vector2 = rect.size / 2.0
-	var edge: Vector2 = c + back * Vector2(absf(back.x) * half.x + absf(back.y) * half.y,
-		absf(back.x) * half.x + absf(back.y) * half.y)
-	if absf(back.x) > 0.5:
-		var wall_x: float = room_rect.end.x if back.x > 0.0 else room_rect.position.x
-		return absf(wall_x - edge.x)
-	var wall_z: float = room_rect.end.y if back.y > 0.0 else room_rect.position.y
-	return absf(wall_z - edge.y)
+	var back := Vector2(sin(yaw), cos(yaw))          # the opposite of facing
+	# The piece's OWN depth, not half its axis-aligned box: a cabinet turned
+	# onto a diagonal wall has a box bigger than it is, and measuring from the
+	# corner of that box put it a metre off a wall it was flat against.
+	var foot: Vector2 = PropCatalog.footprint(String(p["key"])) 		* float(p.get("scale", 1.0))
+	var edge: Vector2 = Rect2(p["rect"]).get_center() + back * (foot.y / 2.0)
+	var best := INF
+	for w in HouseGeometry.room_walls(plan, int(p["room"])):
+		var n: Vector2 = w["normal"]                 # points INTO the room
+		if n.dot(back) > -0.5:
+			continue                                 # not the wall behind it
+		best = minf(best, absf((edge - Vector2(w["from"])).dot(n)))
+	return best if is_finite(best) else 0.0
 
 
 ## A chair belongs at a table, facing it. A chair in the middle of the floor
