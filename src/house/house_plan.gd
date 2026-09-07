@@ -37,6 +37,17 @@ var windows: Array[Dictionary] = []
 ## {"key": String, "room": int, "pos": Vector3, "yaw": float, "rect": Rect2,
 ##  "zone": Rect2, "host": int, "cat": String, "storey": int}
 var furniture: Array[Dictionary] = []
+## The holes in the plan: {"rect": Rect2, "storey": int,
+##  "outline": PackedVector2Array (optional)}.
+##
+## A court is FLOOR to the walk grid, SKY to the roof, and OUTSIDE to the
+## daylight rule -- a window onto a courtyard is a window. The rooms and the
+## courts together tile the footprint: what a court takes is not floor nobody
+## owns, it is floor that belongs to the weather (GEO-003).
+##
+## It is what a monastery, an inn with a yard and a caravanserai are, and none
+## of them can be said with rooms alone.
+var courts: Array[Dictionary] = []
 ## Vertical circulation. `a`/`b` are the lower/upper room IDs; `storey` and
 ## `to_storey` identify the two levels. Rectangles are plan-space footprints on
 ## each landing, so a layered nav check can use them without a 3D rasterizer.
@@ -196,6 +207,46 @@ static func room_outline(room: Dictionary) -> PackedVector2Array:
 	return Poly.from_rect(room["rect"])
 
 
+## The court's shape in plan, its rectangle when it has no outline.
+func court_outline(i: int) -> PackedVector2Array:
+	return room_outline(courts[i])
+
+
+## The courts open on one storey. A court is open from its own storey up: a
+## range round a yard has the yard on every floor it rises through.
+func courts_on(storey: int) -> Array[int]:
+	var out: Array[int] = []
+	for i in range(courts.size()):
+		if record_storey(courts[i]) <= storey:
+			out.append(i)
+	return out
+
+
+## Which rooms have a door onto court `ci`.
+func rooms_onto_court(ci: int) -> Array[int]:
+	var out: Array[int] = []
+	var poly: PackedVector2Array = court_outline(ci)
+	for d in doors:
+		var room: int = int(d["a"])
+		if room < 0 or room >= rooms.size() or room in out:
+			continue
+		if record_storey(d) < record_storey(courts[ci]):
+			continue
+		var pos: Vector2 = d["pos"]
+		var n: Vector2 = d["normal"]
+		for side in [1.0, -1.0]:
+			if Poly.contains_point(poly,
+					pos + n * side * (HouseGeometry.WALL_T + 0.05), 0.01):
+				out.append(room)
+				break
+	return out
+
+
+## Is any part of this plan open to the sky?
+func has_court() -> bool:
+	return not courts.is_empty()
+
+
 ## Is this room something a rectangle cannot describe?
 func is_polygonal(i: int) -> bool:
 	var o = rooms[i].get("outline")
@@ -288,6 +339,16 @@ func door_graph() -> Dictionary:
 			continue
 		g[a].append(b)
 		g[b].append(a)
+	# A COURT is a way through. Two ranges that both open onto the same yard
+	# are joined by it: you walk out of one door, across the paving and in at
+	# the other, which is how a cloister works and the only reason a plan of
+	# four ranges round a hole is a building rather than four buildings.
+	for ci in range(courts.size()):
+		var onto: Array[int] = rooms_onto_court(ci)
+		for x in onto:
+			for y in onto:
+				if x != y:
+					g[x].append(y)
 	for stair in stairs:
 		var a: int = int(stair["a"])
 		var b: int = int(stair["b"])

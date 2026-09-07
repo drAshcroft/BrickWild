@@ -99,6 +99,17 @@ func _rasterize() -> void:
 			_grids[level].add_floor_poly(_plan.outline_of(i))
 		else:
 			_grids[level].add_floor(HouseGeometry.room_floor_rect(_plan, i))
+	# A court is FLOOR. You walk out of the hall into the yard and across it to
+	# the kitchen door, and a walk that stopped at the threshold would report
+	# every range round a courtyard as unreachable (GEO-003).
+	for level2 in _levels():
+		if not _grids.has(level2):
+			continue
+		for ci in _plan.courts_on(level2):
+			if _plan.courts[ci].has("outline"):
+				_grids[level2].add_floor_poly(_plan.court_outline(ci))
+			else:
+				_grids[level2].add_floor(Rect2(_plan.courts[ci]["rect"]))
 	for d in _plan.doors:
 		var level := HousePlan.record_storey(d)
 		if _grids.has(level):

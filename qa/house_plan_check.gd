@@ -101,8 +101,32 @@ func _check_tiling(plan: HousePlan) -> void:
 				failures.append("tiling: rooms %d (%s) and %d (%s) overlap by %.2f x %.2fm"
 					% [i, String(plan.kind_of(i)), j, String(plan.kind_of(j)),
 						over.size.x, over.size.y])
+	# A court is a hole in the plan, and the hole is part of the tiling: the
+	# rooms and the courts together fill the interior, and nothing may be built
+	# in a court (GEO-003).
+	for ci in range(plan.courts.size()):
+		var court: Rect2 = plan.courts[ci]["rect"]
+		if not inner.grow(TOL).encloses(court):
+			failures.append("tiling: court %d sticks out of the interior" % ci)
+		var clevel: int = HousePlan.record_storey(plan.courts[ci])
+		for i2 in range(n):
+			if HousePlan.record_storey(plan.rooms[i2]) < clevel:
+				continue
+			var lap: float = Poly.intersection_area(plan.outline_of(i2),
+				plan.court_outline(ci))
+			if lap > TOL:
+				failures.append("tiling: room %d (%s) is built in court %d, by %.2f m2"
+					% [i2, String(plan.kind_of(i2)), ci, lap])
+	var courts_by_level := {}
+	for ci2 in range(plan.courts.size()):
+		var lv: int = HousePlan.record_storey(plan.courts[ci2])
+		var a2: Rect2 = plan.courts[ci2]["rect"]
+		courts_by_level[lv] = float(courts_by_level.get(lv, 0.0)) \
+			+ a2.size.x * a2.size.y
+
 	var want: float = inner.size.x * inner.size.y
 	stats["interior_area"] = snappedf(want, 0.01)
+	stats["courts"] = plan.courts.size()
 	for level in sums:
 		# A storey of rectangles PARTITIONS the interior: every square metre
 		# belongs to some room, and floor nobody owns is a planner bug. A
@@ -112,7 +136,7 @@ func _check_tiling(plan: HousePlan) -> void:
 		# two overlap", which has already been measured above.
 		if shaped.has(level):
 			continue
-		var sum: float = float(sums[level])
+		var sum: float = float(sums[level]) + float(courts_by_level.get(level, 0.0))
 		if absf(sum - want) > 0.05 * want:
 			failures.append("tiling: storey %d rooms cover %.1f m2 of a %.1f m2 interior -- there is floor nobody owns"
 				% [int(level), sum, want])
@@ -180,9 +204,14 @@ func _check_entrance(plan: HousePlan) -> void:
 			fronts += 1
 		if d["b"] != -1:
 			failures.append("way in: an exterior door claims to lead to room %d" % d["b"])
-		# an exterior door has to be ON an exterior wall
+		# a door onto the yard is an exterior door standing well inside the
+		# footprint, and it is not the street door
 		var pos: Vector2 = d["pos"]
 		var n: Vector2 = d["normal"]
+		if _onto_court(plan, pos, n):
+			if d.get("front", false):
+				failures.append("way in: the front door opens onto a court, not the street")
+			continue
 		var on_wall: bool = (absf(n.x) > 0.5 and (absf(pos.x - inner.position.x) < TOL
 				or absf(pos.x - inner.end.x) < TOL)) \
 			or (absf(n.y) > 0.5 and (absf(pos.y - inner.position.y) < TOL
@@ -332,6 +361,11 @@ func _check_windows(plan: HousePlan) -> void:
 			failures.append("window %d is tagged for the wrong storey" % wi)
 		var pos: Vector2 = w["pos"]
 		var n: Vector2 = w["normal"]
+		# A window onto a COURT is a window: the court is open to the sky, so
+		# the wall it is cut into is an outside wall however far inside the
+		# footprint it stands (GEO-003).
+		if _onto_court(plan, pos, n):
+			continue
 		# A shaped room's outside walls are its own edges, and a window on a
 		# diagonal is on an outside wall even though it is nowhere near the
 		# edge of the box round it (GEO-002).
@@ -395,6 +429,30 @@ func _check_windows(plan: HousePlan) -> void:
 
 
 # ------------------------------------------------------- upstairs programme
+
+## Does the line between two doors cross a court?
+static func _across_a_court(plan: HousePlan, a: Vector2, b: Vector2) -> bool:
+	for ci in range(plan.courts.size()):
+		var poly: PackedVector2Array = plan.court_outline(ci)
+		for k in range(9):
+			var t: float = float(k) / 8.0
+			if Poly.contains_point(poly, a.lerp(b, t), 0.01):
+				return true
+	return false
+
+
+## Does an opening at `pos`, facing `n`, look into a court?
+##
+## The step OUT of the wall is what decides it: a window's normal points out of
+## the room it lights, so a pace that way lands in the yard when the yard is
+## what it looks at.
+static func _onto_court(plan: HousePlan, pos: Vector2, n: Vector2) -> bool:
+	var outside: Vector2 = pos + n * (HouseGeometry.WALL_T + 0.05)
+	for ci in range(plan.courts.size()):
+		if Poly.contains_point(plan.court_outline(ci), outside, 0.01):
+			return true
+	return false
+
 
 ## Does `p` sit on an edge of this outline?
 static func _on_outline(poly: PackedVector2Array, p: Vector2) -> bool:
@@ -569,6 +627,12 @@ func _check_doors_in_line(plan: HousePlan) -> void:
 			var along := Vector2(absf(dn.y), absf(dn.x))
 			var a: float = Vector2(d["pos"]).dot(along)
 			var b: float = Vector2(e["pos"]).dot(along)
+			# Two doors facing each other across a YARD are a cloister, not a
+			# corridor. The rule is about a house you can see straight through
+			# from the street; a court is outside, and a range opening onto it
+			# opposite another range is the whole point of the plan (GEO-003).
+			if _across_a_court(plan, Vector2(d["pos"]), Vector2(e["pos"])):
+				continue
 			var overlap: float = (float(d["width"]) + float(e["width"])) / 2.0 - absf(a - b)
 			if overlap > TOL:
 				failures.append("doors_in_line: doors %d and %d face each other across the house, %.2fm of them in line"

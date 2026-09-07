@@ -31,6 +31,7 @@ extends SceneTree
 ##  15 houseqa    - plan, furnishing and circulation of every house
 ##  16 hmultistory- explicit levels, stairs, elevations and top roof
 ##  17 harchetype - the dwellings this generator must be able to furnish
+## 17a court      - buildings round a yard: the court rules and a hundred houses
 ##  18 shop       - the commercial/civic plan/build contract
 ##  19 sarchetype - defining rooms, fittings, and walkability for village trades
 ##  20 hotel      - the palatial hotel plan/build contract
@@ -46,7 +47,7 @@ extends SceneTree
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"house", "assets", "houseqa", "hmultistory", "harchetype",
+	"house", "assets", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hlandmark",
 	"temple", "rite", "tarchetype",
@@ -99,6 +100,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return HouseMultistorySuite.run()
 		"harchetype":
 			return HouseArchetypeSuite.run()
+		"court":
+			return CourtSuite.run()
 		"shop":
 			return ShopSuite.run()
 		"sarchetype":

@@ -54,6 +54,12 @@ func _build_floor() -> void:
 		var y0 := float(level) * spec.height
 		var a := AABB(Vector3(r.position.x, y0, r.position.y),
 			Vector3(r.size.x, t, r.size.y))
+		var holes: Array[int] = plan.courts_on(level)
+		if not holes.is_empty():
+			# The floor is laid round the yard, band by band, so the court is
+			# left as open ground for the walk grid to rasterise.
+			_emit_floor_round_courts(r, y0, t, level, holes)
+			continue
 		var shaped: int = _shaped_room(level)
 		if shaped >= 0:
 			# The floor of a shaped storey is the shape, pushed out to the
@@ -476,6 +482,32 @@ static func _run_aabb(from: Vector2, to: Vector2, thick: float, height: float,
 
 ## Plans made before the upper-floor schema default all records to ground level.
 ## Storeys above the ground; the roof and the chimney are measured off them.
+## The floor of a storey with a yard in it: four bands round the hole, so the
+## court itself is left as ground.
+func _emit_floor_round_courts(r: Rect2, y0: float, t: float, level: int,
+		holes: Array[int]) -> void:
+	var court: Rect2 = plan.courts[holes[0]]["rect"]
+	for band in [
+			Rect2(r.position.x, r.position.y, r.size.x, court.position.y - r.position.y),
+			Rect2(r.position.x, court.end.y, r.size.x, r.end.y - court.end.y),
+			Rect2(r.position.x, court.position.y, court.position.x - r.position.x, court.size.y),
+			Rect2(court.end.x, court.position.y, r.end.x - court.end.x, court.size.y)]:
+		if band.size.x < 0.05 or band.size.y < 0.05:
+			continue
+		box(Vector3(band.size.x, t, band.size.y),
+			Vector3(band.get_center().x, y0 + t / 2.0, band.get_center().y),
+			SURF_FLOOR)
+	_log_mass("floor" if _levels().size() == 1 else "floor_%d" % level,
+		AABB(Vector3(r.position.x, y0, r.position.y),
+			Vector3(r.size.x, t, r.size.y)), y0)
+	# and the yard itself, as paving a hand's breadth down
+	if level == 0:
+		var pav := 0.08
+		box(Vector3(court.size.x, pav, court.size.y),
+			Vector3(court.get_center().x, y0 - pav / 2.0, court.get_center().y),
+			SURF_FLOOR)
+
+
 ## The shaped room on `level`, or -1 when that storey is rectangular.
 func _shaped_room(level: int) -> int:
 	for i in range(plan.room_count()):
@@ -746,7 +778,73 @@ const VERGE := 0.25
 const HIP_CUT := 0.62
 
 
+## A court is SKY. The roof is the footprint MINUS the courts, and with only
+## slabs and boxes to build from, the honest way to say that is to roof each
+## RANGE rather than the whole box: a lean-to falling from the outer wall in
+## to the courtyard eaves, which is what a range round a yard actually has
+## (GEO-003).
+func _build_court_roofs() -> void:
+	tag("roof")
+	var site: Rect2 = HouseGeometry.site_rect(spec)
+	var wall_top: float = spec.height * _storeys()
+	var rise: float = HouseGeometry.roof_rise(spec) * 0.7
+	for ci in range(plan.courts.size()):
+		var court: Rect2 = plan.courts[ci]["rect"]
+		for side in range(4):
+			var band: Rect2
+			var outer: float
+			var inner: float
+			var horizontal: bool = side <= 1
+			match side:
+				0:
+					band = Rect2(site.position.x, site.position.y,
+						site.size.x, court.position.y - site.position.y)
+					outer = site.position.y
+					inner = court.position.y
+				1:
+					band = Rect2(site.position.x, court.end.y,
+						site.size.x, site.end.y - court.end.y)
+					outer = site.end.y
+					inner = court.end.y
+				2:
+					band = Rect2(site.position.x, court.position.y,
+						court.position.x - site.position.x, court.size.y)
+					outer = site.position.x
+					inner = court.position.x
+				_:
+					band = Rect2(court.end.x, court.position.y,
+						site.end.x - court.end.x, court.size.y)
+					outer = site.end.x
+					inner = court.end.x
+			if band.size.x < 0.3 or band.size.y < 0.3:
+				continue
+			# One sloping plate to a range, falling from the outer wall in to
+			# the courtyard eaves -- which is what a cloister range has, and
+			# the only roof shape that leaves the yard open.
+			var lo: float = band.position.x if horizontal else band.position.y
+			var hi: float = band.end.x if horizontal else band.end.y
+			var quad := PackedVector3Array()
+			if horizontal:
+				quad.append(Vector3(lo, wall_top + rise, outer))
+				quad.append(Vector3(hi, wall_top + rise, outer))
+				quad.append(Vector3(hi, wall_top, inner))
+				quad.append(Vector3(lo, wall_top, inner))
+			else:
+				quad.append(Vector3(outer, wall_top + rise, lo))
+				quad.append(Vector3(outer, wall_top + rise, hi))
+				quad.append(Vector3(inner, wall_top, hi))
+				quad.append(Vector3(inner, wall_top, lo))
+			_kit.slab_poly(quad, 0.24, SURF_ROOF)
+			_log_mass("roof_court_%d_%d" % [ci, side],
+				AABB(Vector3(band.position.x, wall_top, band.position.y),
+					Vector3(band.size.x, rise + 0.25, band.size.y)))
+			total_height = maxf(total_height, wall_top + rise)
+
+
 func _build_roof() -> void:
+	if plan.has_court():
+		_build_court_roofs()
+		return
 	tag("roof")
 	var r: Rect2 = HouseGeometry.site_rect(spec)
 	var rise: float = HouseGeometry.roof_rise(spec)
