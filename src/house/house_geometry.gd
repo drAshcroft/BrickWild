@@ -92,7 +92,7 @@ const ROOM_ASPECT_MAX := 3.4
 ## Westminster is 20.7 x 73 m, three and a half to one -- and a castle range is
 ## narrower than that again, so measuring one against a parlour reports every
 ## hall ever built as a corridor.
-const ASPECT_MAX := {&"great_hall": 6.0}
+const ASPECT_MAX := {&"great_hall": 6.0, &"nave": 6.0}
 
 
 ## The longest a room of `kind` may be for its width before it stops being a
@@ -109,7 +109,7 @@ const MIN_AREA := {
 	&"council_chamber": 12.0, &"meeting_hall": 12.0,
 	&"lobby": 16.0, &"lounge": 10.0, &"suite": 14.0,
 	&"gallery": 8.0, &"laundry": 7.0, &"great_hall": 16.0,
-	&"lords_chamber": 10.0,
+	&"lords_chamber": 10.0, &"nave": 12.0,
 }
 
 ## And the narrowest it may be. Area alone is not enough: a bed is 1.9 x 2.4 m
@@ -125,7 +125,7 @@ const MIN_SIDE := {
 	&"council_chamber": 3.0, &"meeting_hall": 3.0,
 	&"lobby": 3.2, &"lounge": 2.8, &"suite": 3.4,
 	&"gallery": 2.4, &"laundry": 2.4, &"great_hall": 3.0,
-	&"lords_chamber": 2.8,
+	&"lords_chamber": 2.8, &"nave": 2.8,
 }
 
 
@@ -141,7 +141,7 @@ const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour",
 	&"sales_floor", &"stable", &"tack_room", &"dining_room", &"guest_room",
 	&"office", &"records", &"council_chamber", &"meeting_hall", &"lobby",
 	&"lounge", &"suite", &"gallery", &"laundry", &"great_hall",
-	&"lords_chamber"]
+	&"lords_chamber", &"nave"]
 
 ## Rooms someone sleeps in. Nobody should have to walk through one of these
 ## to reach anywhere else -- not just the house's own "bedroom".

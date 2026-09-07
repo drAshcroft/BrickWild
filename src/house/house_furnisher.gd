@@ -139,6 +139,22 @@ const RECIPES := {
 		{"cat": "tableware", "rule": &"on", "n": [2, 6], "opt": 0.9},
 		{"cat": "candle", "rule": &"on", "n": [1, 2], "opt": 0.85},
 	],
+	&"nave": [
+		# A chapel is a hall with one thing at the end of it. The altar is a
+		# table, because in this catalogue that is what an altar is -- the
+		# castle dressing has said so since CAS-003 -- and the pews are rows
+		# either side of a centre aisle, which is the row rule doing what it
+		# was written for (INT-001).
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "bench", "rule": &"row", "n": [2, 8], "min_n": 2, "pitch": 1.2,
+			"aisle": 1.2, "seat_clearance": 0.0, "along": "wall", "opt": 1.0},
+		{"cat": "bench", "rule": &"row", "n": [2, 8], "min_n": 2, "pitch": 1.2,
+			"aisle": 1.2, "seat_clearance": 0.0, "along": "wall", "opt": 1.0},
+		{"cat": "candelabrum", "rule": &"free", "n": [0, 2], "opt": 0.7},
+		{"cat": "sconce", "rule": &"mounted", "n": [2, 4], "opt": 1.0},
+		{"cat": "tableware", "rule": &"on", "n": [1, 2], "opt": 0.9},
+		{"cat": "candle", "rule": &"on", "n": [1, 1], "opt": 0.9},
+	],
 	&"lords_chamber": [
 		# The room at the top of a keep: a bed, a fire of its own, and enough
 		# to sit at. The hearth goes in before the bed because the flue is on a
@@ -802,6 +818,12 @@ static func _drop_the_table(plan: HousePlan, room: int, blocked: Array[Rect2],
 		# a row is placed and judged as a row; taking one trestle out of the
 		# middle of it would break the very thing the row rule measures
 		if String(p.get("row", "")) != "":
+			continue
+		# nor the piece the PLAN put there. A table nobody sits at is usually a
+		# table in the way -- but a chapel altar is a table nobody sits at on
+		# purpose, and dropping it is the furnisher overruling the plan that
+		# asked for it (INT-002).
+		if plan.focus_room() == room and plan.focus_cat() == "table" 				and Rect2(p["rect"]).get_center().distance_to(plan.focus_pos()) 					< FOCUS_TOL:
 			continue
 		blocked.erase(p["rect"])
 		plan.note_compromise(room, "table")

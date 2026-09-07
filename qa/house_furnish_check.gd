@@ -64,6 +64,7 @@ const REQUIRED := {
 	&"laundry": ["workbench"],
 	&"great_hall": ["table"],
 	&"lords_chamber": ["bed"],
+	&"nave": ["table"],
 }
 
 ## And what a trade must have in the room it works in.

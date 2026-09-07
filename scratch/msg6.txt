@@ -1,0 +1,48 @@
+INT-005 (part): the chapel gets a nave, and the furnisher stops overruling the plan
+
+PARTIAL. The chapel plan exists and is clean; the pews do not place yet. Left
+in a green tree and written up on the task so it resumes where it stopped.
+
+What is done:
+
+* `nave` is a room kind -- MIN_AREA, MIN_SIDE, HABITABLE, ASPECT_MAX (a nave
+  is long on purpose, like a great hall), REQUIRED and a recipe.
+* `CastleGenerator.chapel_plan(spec)` returns the chapel range as a one-room
+  HousePlan in its own frame, built from the same parts the great hall is: an
+  altar as `plan.focus` at the far end ON THE CENTRE LINE looking back down the
+  nave at the door, and a SANCTUARY at that end.
+* The sanctuary is a `plan.dais`, not a `plan.zones` entry, and that
+  distinction is the whole of it: a zone is floor the plan keeps clear of
+  EVERYTHING, so it kept the altar out of its own sanctuary; a dais is floor
+  that belongs to the focus, which is exactly what a chancel step is.
+* The altar is a Table_Large, because in this catalogue that is what an altar
+  is -- `CastleFurnisher._dress_chapel` has said so since CAS-003.
+
+And one real fix to shared code, which is why this is worth committing on its
+own. `_ensure_seating` drops any table nobody can sit at: right for a kitchen
+table taking the middle of a room, wrong for an altar, which is a table nobody
+sits at ON PURPOSE. `_drop_the_table` now refuses to drop the piece the PLAN
+put there -- the same guard a row table already had, for the same reason. The
+furnisher does not get to overrule the plan that asked for the piece (INT-002).
+
+Without that guard the chapel came out with no altar at all: the altar was
+placed, no chair would go beside it, and the room dropped the table it was
+arranged around.
+
+What is NOT done, and why the task stays open:
+
+* the pews. Two `row` steps of benches are in the recipe and both still record
+  a compromise -- the rows are not placed. The dais is blocked to everything
+  after the altar (CAS-010), so a row and its aisle have to stop short of the
+  sanctuary, and something in `_place_row` is not finding the shorter row. The
+  nave is 7.4 x 11.7 m with 8.7 m of it clear of the sanctuary, so there is
+  room; this is a bug to find, not a size problem.
+* the `TempleRiteCheck` axis/sightline refactor into a static helper callable
+  on an arbitrary (plan, focus, door) triple.
+* castle-suite coverage for the chapel.
+
+house 123, poly 21, multistory 210, courtyard 105 (0 of 100 with defects),
+shops 14: green. `harchetype` keeps its one pre-existing failure
+(one_room_cottage at scale 1.00, filed as e7607125).
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
