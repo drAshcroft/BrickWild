@@ -1,7 +1,7 @@
 House exterior task runbook
 ===========================
 
-These tasks implement the findings in [HOUSE_RULES_EVALUATION.md](HOUSE_RULES_EVALUATION.md). The authoritative live status/dependencies are in the waterfree task store. This file and `docs/tasks/house_exterior_tasks.json` preserve the instructions in the repository, since `.waterfree/` and `artifacts/` are ignored. No fixes are implemented by creating this backlog.
+These tasks implement the findings in [HOUSE_RULES_EVALUATION.md](HOUSE_RULES_EVALUATION.md). The authoritative live status/dependencies are in the waterfree task store. This file and `docs/tasks/house_exterior_tasks.json` preserve the instructions in the repository, since `.waterfree/` and `artifacts/` are ignored. The initial backlog was diagnostic; implementation and remaining scope are now recorded in [HOUSE_ROOF_FIX.md](HOUSE_ROOF_FIX.md) and task aiNotes. Pending does not mean untouched: read those notes before repeating a geometry repair.
 
 Start with `waterfree todos search HOUSE-EXT- --workspace C:/Projects/BigGlade` or `get-ready`. Claim only a ready task, set it executing, and read its dependencies' completion notes. Do not infer completion from old roof tasks: the earlier overhead-coverage repair is complete but its overlapping-slab approach is explicitly superseded by HOUSE-EXT-003.
 
@@ -30,10 +30,10 @@ $godotExe = 'C:/Projects/godot/Godot_v4.5.2-stable_mono_win64/Godot_v4.5.2-stabl
 & $godotExe --headless --path C:/Projects/BigGlade --script res://tools/build_prop_catalog.gd
 & $godotExe --headless --path C:/Projects/BigGlade --script res://tests/run_all.gd -- assets
 # Existing tracked render starting point; do NOT add --headless:
-& $godotExe --path C:/Projects/BigGlade --script res://scratch/shoot_roofs.gd
+& $godotExe --path C:/Projects/BigGlade --script res://tools/render_house_roofs.gd -- --full
 ```
 
-HOUSE-EXT-001 will add durable focused runner/render commands. Until then, `artifacts/eval_house_rules.gd` and `artifacts/probe_house_rules.gd` are useful if present, but not guaranteed in a fresh checkout. Existing images are under `artifacts/house_rules_eval/`. The `roof_farm_*` images are the natural seed; `roof_farm_hip_*` is an explicitly forced-hip control. The basic house suite completed 123 checks without reported failures in the evaluation; houseqa/hmultistory/harchetype did not complete in that run. Do not reuse historical task notes as proof that today's full suite passes.
+HOUSE-EXT-001 now provides `tests/run_all.gd -- hroof hexterior`, `tests/house_roof_test.gd -- --full` and `tools/render_house_roofs.gd -- --full`. Historical `artifacts/eval_house_rules.gd` and `artifacts/probe_house_rules.gd` are useful if present, but not guaranteed in a fresh checkout. Existing images are under `artifacts/house_rules_eval/`. The `roof_farm_*` images are the natural seed; `roof_farm_hip_*` is an explicitly forced-hip control. The basic house suite completed 123 checks without reported failures in the evaluation; houseqa/hmultistory/harchetype did not complete in that run. Do not reuse historical task notes as proof that today's full suite passes.
 
 Read AGENTS.md for the full rules. In particular: a GDScript parse error can hang a headless process; inspect the start of its error log instead of waiting indefinitely. Front faces are clockwise and `MeshKit._face_normal` owns the convention; never call generate_normals to paper over it. HousePlan is the truth, the builder is a pure emitter, and HouseAssembler is the only house model-loading boundary. Measure furniture/prop dimensions; reuse WalkGrid; preserve documented furnishing compromises.
 

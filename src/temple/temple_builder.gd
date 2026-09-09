@@ -312,7 +312,7 @@ func _build_roof() -> void:
 			var along: float = r.size.x if along_x else r.size.y
 			_kit.ridge_roof(Transform3D(Basis(Vector3.UP, yaw), Vector3(0.0, h, 0.0)),
 				span + 1.2, along + 0.8, span * 0.32, SURF_ROOF, SURF_STONE, span, along)
-			total_height = maxf(total_height, h + span * 0.32)
+			total_height = maxf(total_height, TempleGeometry.roof_height(spec))
 		&"flat":
 			box(Vector3(r.size.x + 0.8, 0.5, r.size.y + 0.8),
 				Vector3(0.0, h + 0.25, 0.0), SURF_ROOF)
@@ -320,17 +320,45 @@ func _build_roof() -> void:
 		&"terraced":
 			_build_terraces()
 		&"dome":
-			var ring: float = TempleGeometry.ring_radius(spec) + spec.column_r * 2.0
-			_kit.revolve(_dome_profile(ring, ring * 0.55), Vector3(0.0, h, 0.0),
-				SURF_ROOF, 20, TAU)
-			total_height = maxf(total_height, h + ring * 0.55)
+			_build_dome_roof(r)
+			total_height = maxf(total_height, TempleGeometry.roof_height(spec))
 	if spec.spire:
 		var base: float = TempleGeometry.hall_rect(spec).size.x * TempleGeometry.SPIRE_BASE
 		var z: float = TempleGeometry.dais_rect(spec).get_center().y
+		# The dais can be away from the dome apex or a transverse ridge.
+		# Seat the entire spire footprint on masonry meeting the host roof.
+		var top := TempleGeometry.roof_height(spec)
+		if top > h:
+			box(Vector3(base, top - h, base), Vector3(0, (h + top) * 0.5, z), SURF_STONE)
 		_kit.stepped_taper(Vector3(0.0, TempleGeometry.roof_height(spec), z),
 			base, spec.spire_height, SURF_ROOF, 5, 0.2)
 		total_height = maxf(total_height,
 			TempleGeometry.roof_height(spec) + spec.spire_height)
+
+
+func _build_dome_roof(rect: Rect2) -> void:
+	var radius := TempleGeometry.dome_radius(spec)
+	var rim := PackedVector2Array()
+	for i in range(TempleGeometry.DOME_SEGMENTS):
+		var angle := TAU * i / TempleGeometry.DOME_SEGMENTS
+		rim.append(Vector2(cos(angle), sin(angle)) * radius)
+	var deck := rect.grow(0.4)
+	var outline := PackedVector2Array([deck.position, Vector2(deck.end.x, deck.position.y),
+		deck.end, Vector2(deck.position.x, deck.end.y)])
+	for piece in RoofShape.subtract(outline, rim):
+		var face := PackedVector3Array()
+		for p in piece:
+			face.append(Vector3(p.x, spec.height, p.y))
+		_kit.slab_poly(face, RoofShape.DEPTH, SURF_ROOF, true)
+	# Closed shell with matching upper and lower seams at the deck.
+	var mid := _dome_profile(radius, radius * 0.55)
+	var shell := PackedVector2Array()
+	for p in mid:
+		shell.append(p + Vector2(0, RoofShape.DEPTH * 0.5))
+	for i in range(mid.size() - 1, -1, -1):
+		shell.append(mid[i] - Vector2(0, RoofShape.DEPTH * 0.5))
+	shell.append(shell[0])
+	_kit.revolve(shell, Vector3(0, spec.height, 0), SURF_ROOF, TempleGeometry.DOME_SEGMENTS)
 
 
 ## The lowest terrace as a ring of four slabs, with the doorway left out of the

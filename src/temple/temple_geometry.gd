@@ -527,15 +527,22 @@ static func obstacle_rects(spec: TempleSpec) -> Array[Rect2]:
 
 # ---------------------------------------------------------------- envelope
 
+## The dome and its surrounding deck share this exact polygonal rim.
+const DOME_SEGMENTS := 20
+
+static func dome_radius(spec: TempleSpec) -> float:
+	return ring_radius(spec) + spec.column_r * 2.0
+
+
 static func roof_height(spec: TempleSpec) -> float:
 	match spec.form:
 		&"ziggurat":
 			return terrace_top(spec)
 		&"rotunda":
-			return spec.height + ring_radius(spec) * 0.55
+			return spec.height + dome_radius(spec) * 0.55 + RoofShape.DEPTH * 0.5
 		&"pylon":
-			return spec.height + 1.2
-	return spec.height + hall_rect(spec).size.x * 0.32
+			return spec.height + 0.5
+	return spec.height + minf(spec.width, spec.length) * 0.32 + RoofShape.DEPTH * 0.5
 
 
 static func total_height(spec: TempleSpec) -> float:

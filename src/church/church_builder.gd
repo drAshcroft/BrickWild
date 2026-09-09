@@ -18,10 +18,12 @@ const TOWER_EMBED := ChurchGeometry.TOWER_EMBED
 const APSE_EMBED := ChurchGeometry.APSE_EMBED
 
 var spec: ChurchSpec
+var _roof_volumes: Array[PackedVector3Array] = []
 
 func build(p_spec: ChurchSpec) -> ArrayMesh:
 	spec = p_spec
 	begin(4)
+	_roof_volumes.clear()
 
 	var w: float = spec.width
 	var l: float = spec.length
@@ -33,7 +35,6 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	tag("nave")
 	box(Vector3(w, h, l), Vector3(0, h / 2.0, 0), SURF_STONE)
 	_log_mass("nave", AABB(Vector3(-w / 2.0, 0.0, -l / 2.0), Vector3(w, h, l)))
-	_roof_the_nave(w, l, h)
 	total_height = maxf(total_height, h + w * spec.roof_pitch)
 
 	# ---------- side aisles ----------
@@ -57,7 +58,6 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 				box(Vector3(aw, ah, al), Vector3(ax, ah / 2.0, az), SURF_STONE)
 				_log_mass("aisle_%s_%d" % ["left" if side < 0.0 else "right", ring],
 					ChurchGeometry.aisle_aabb(spec, side, ring))
-				_lean_roof(aw + 0.6, al + 0.4, ah, ah + aw * 0.8, side, SURF_ROOF, az)
 				# Only the OUTERMOST ring gets side windows. Every ring used to,
 				# so on a double-aisled church the inner ring's windows were cut
 				# into a wall the outer ring stands hard against -- glazing that
@@ -84,8 +84,6 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		var tz_z: float = ChurchGeometry.transept_center_z(spec)
 		box(Vector3(tz_len, h, tz_w), Vector3(0, h / 2.0, tz_z), SURF_STONE)
 		_log_mass("transept", ChurchGeometry.transept_aabb(spec))
-		gable_roof(tz_len + 0.5, tz_w + 0.4, w * spec.roof_pitch * 0.9, tz_z, SURF_ROOF, h,
-			tz_len, tz_w)
 		for sx_v in [-1.0, 1.0]:
 			window(Vector3(sx_v * (tz_len / 2.0 + 0.02), h * 0.55, tz_z),
 				sx_v * PI / 2.0, spec.window_w, spec.window_h, spec.window_style)
@@ -241,6 +239,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	_build_flying_buttresses()
 	_build_crossing_tower()
 	_build_dome()
+	preload("church_roofs.gd").emit(spec, _kit, mass_log, _roof_volumes)
 
 	# The masons are finished; the parish moves in. The dressing is prop
 	# PLACEMENTS rather than geometry, so it costs the mesh nothing and
@@ -248,31 +247,6 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	prop_log = ChurchFurnisher.dress(spec)
 
 	return commit()
-
-
-## The nave roof, in one run or two.
-##
-## A dome is the roof over its own crossing, so the gable has to stop either
-## side of it. Running one gable the whole length instead drove the ridge
-## straight through the dome and buried it.
-func _roof_the_nave(w: float, l: float, h: float) -> void:
-	var rise: float = w * spec.roof_pitch
-	if not spec.dome:
-		gable_roof(w + 0.5, l + 0.4, rise, 0.0, SURF_ROOF, h, w, l)
-		return
-	var dz: float = ChurchGeometry.crossing_center_z(spec)
-	var dr: float = ChurchGeometry.dome_mass_radius(spec)
-	var runs := [
-		[-l / 2.0 - 0.2, dz - dr],      # west of the crossing
-		[dz + dr, l / 2.0 + 0.2],       # east of it
-	]
-	for run in runs:
-		var z0: float = run[0]
-		var z1: float = run[1]
-		if z1 - z0 < 1.0:
-			continue
-		gable_roof(w + 0.5, z1 - z0, rise, (z0 + z1) / 2.0, SURF_ROOF, h,
-			w, z1 - z0 - 0.4)
 
 
 ## Entrance vestibule across the west front.
@@ -284,8 +258,6 @@ func _build_narthex() -> void:
 	var c: Vector3 = a.position + a.size / 2.0
 	box(a.size, Vector3(c.x, a.size.y / 2.0, c.z), SURF_STONE)
 	_log_mass("narthex", a)
-	gable_roof(a.size.x + 0.4, a.size.z + 0.3, a.size.x * spec.roof_pitch * 0.5,
-		c.z, SURF_ROOF, a.size.y, a.size.x, a.size.z)
 	window(Vector3(0, a.size.y * 0.42, a.position.z - ChurchGeometry.OPENING_EPS),
 		PI, 1.6, a.size.y * 0.5, spec.window_style, true)
 
@@ -413,7 +385,7 @@ func _build_dome() -> void:
 		Vector3(0, base + ChurchGeometry.PENDENTIVE_H / 2.0, cz), SURF_TRIM)
 	_log_mass("pendentive", ChurchGeometry.pendentive_aabb(spec))
 	if octagonal:
-		_kit.prism(r * 1.06, drum_h, 8,
+		_kit.prism(r * ChurchGeometry.OCTAGONAL_RADIUS_FACTOR, drum_h, 8,
 			Vector3(0, base + ChurchGeometry.PENDENTIVE_H, cz), SURF_STONE, PI / 8.0)
 	else:
 		_kit.prism(r, drum_h, 16, Vector3(0, base + ChurchGeometry.PENDENTIVE_H, cz), SURF_STONE)
@@ -430,8 +402,11 @@ func _build_dome() -> void:
 	var top: float = base + ChurchGeometry.PENDENTIVE_H + drum_h
 	var rise: float = ChurchGeometry.dome_shell_rise(spec)
 	var segs: int = 8 if octagonal else 16
-	_kit.revolve(_dome_profile(r, rise), Vector3(0, top, cz), SURF_ROOF, segs,
-		TAU, PI / 8.0 if octagonal else 0.0)
+	# The octagonal drum uses a circumradius of 1.06r. Its shell must spring
+	# from that same ring; using r left an open slot around all eight sides.
+	preload("church_roofs.gd").dome(_kit, _dome_profile(
+		r * (ChurchGeometry.OCTAGONAL_RADIUS_FACTOR if octagonal else 1.0), rise),
+		Vector3(0, top, cz), segs, _roof_volumes, TAU, PI / 8.0 if octagonal else 0.0)
 	total_height = maxf(total_height, top + rise)
 
 	if spec.dome_lantern:
@@ -448,8 +423,8 @@ func _build_dome() -> void:
 		for dir_v in [-1.0, 1.0]:
 			var d: float = dir_v
 			var start: float = 0.0 if d > 0.0 else PI
-			_kit.revolve(_dome_profile(hr, hr * 0.85), Vector3(0, base, cz),
-				SURF_ROOF, 10, PI, start)
+			preload("church_roofs.gd").dome(_kit, _dome_profile(hr, hr * 0.85),
+				Vector3(0, base, cz), 10, _roof_volumes, PI, start)
 			if spec.exedrae:
 				for ex_v in [-1.0, 1.0]:
 					var er: float = hr * 0.4
@@ -497,7 +472,14 @@ func half_cylinder(radius: float, height: float, center: Vector2, s: int) -> voi
 ## Conical cap over a HALF cylinder: covers z in [pos.z, pos.z + radius] only,
 ## so nothing overhangs the void west of the drum's flat face.
 func _half_cone_cap(pos: Vector3, radius: float, height: float, s: int) -> void:
-	_kit.stepped_taper(pos, radius * 2.0, height, s, 4, 0.15, true, 0.0, 0.8)
+	# Match the drum's ten-sided semicircle. Stacked half-boxes left its
+	# curved shoulders uncovered and put square corners out in empty air.
+	for i in range(10):
+		var a := PI * float(i) / 10.0
+		var b := PI * float(i + 1) / 10.0
+		_kit.slab_poly(PackedVector3Array([pos + Vector3(cos(a) * radius, 0, sin(a) * radius),
+			pos + Vector3(cos(b) * radius, 0, sin(b) * radius), pos + Vector3(0, height, 0)]),
+			RoofShape.DEPTH, s, true)
 
 func _pyramid_roof(base_center: Vector3, width: float, height: float, s: int,
 		tall := false) -> void:

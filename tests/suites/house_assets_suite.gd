@@ -88,7 +88,8 @@ static func run() -> SuiteResult:
 
 ## Lights that light (LAY-011): an assembled house, shop and hotel carry one
 ## OmniLight3D for every piece of furniture the catalogue tags LIGHT, no more
-## and no fewer, and every one of them stands inside the building.
+## and no fewer. Indoor lights stand inside; exterior lights are checked in
+## house_exterior_suite against their assembled models.
 static func _check_lights(res: SuiteResult) -> void:
 	var plans: Array = []
 	var house := HouseSpec.new()
@@ -112,7 +113,7 @@ static func _check_lights(res: SuiteResult) -> void:
 		for p in plan.furniture:
 			if PropCatalog.has_tag(p["key"], PropCatalog.LIGHT):
 				want += 1
-		var got: Array[Node] = root.find_children("*", "OmniLight3D", true, false)
+		var got: Array[Node] = root.get_node("Lights").find_children("*", "OmniLight3D", true, false)
 		res.checked += 1
 		if got.size() != want:
 			res.fail("%s: %d lights for %d lamps, sconces and candles" % [row[0], got.size(), want])

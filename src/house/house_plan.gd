@@ -37,6 +37,10 @@ var windows: Array[Dictionary] = []
 ## {"key": String, "room": int, "pos": Vector3, "yaw": float, "rect": Rect2,
 ##  "zone": Rect2, "host": int, "cat": String, "storey": int}
 var furniture: Array[Dictionary] = []
+## Outdoor props with facade host, measured bounds and independent identity.
+## These never participate in room furnishing or room compromise removal.
+var exterior: Array[Dictionary] = []
+var exterior_omissions: Array[String] = []
 ## The holes in the plan: {"rect": Rect2, "storey": int,
 ##  "outline": PackedVector2Array (optional)}.
 ##

@@ -48,6 +48,7 @@ const FLYER_TIER_DROP := 0.34    # vertical gap between stacked flyers, x height
 const CHAPEL_LAP := 0.25         # chapel mouth buried in the wall it opens off
 const AMBULATORY_W := 0.55       # ambulatory width, x apse radius
 const DOME_DRUM_RATIO := 0.45    # drum height, x dome radius
+const OCTAGONAL_RADIUS_FACTOR := 1.06  # shared circumradius of drum and shell rim
 const PENDENTIVE_H := 0.5        # square-to-round transition under the drum
 const LANTERN_CAP_RATIO := 0.22  # the little roof capping a lantern, x radius
 const LANTERN_RATIO := 0.28      # lantern height, x dome radius

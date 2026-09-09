@@ -131,3 +131,46 @@ static func _half_plane(poly: PackedVector2Array, a: Vector2, b: Vector2) -> Pac
 	if clean.size() > 1 and clean[0].distance_squared_to(clean[clean.size() - 1]) < 1e-10:
 		clean.resize(clean.size() - 1)
 	return clean
+
+
+## Clip a roof face where another roof or solid wall top covers it. Equal
+## planes belong to the earlier face, avoiding doubled skins at range joins.
+static func exposed(face: PackedVector3Array, covers: Array[PackedVector3Array],
+		own_index: int) -> Array[PackedVector2Array]:
+	var pieces: Array[PackedVector2Array] = [footprint(face)]
+	var bounds := _plan_bounds(face)
+	for ci in range(covers.size()):
+		if ci == own_index:
+			continue
+		var cover := covers[ci]
+		if not bounds.intersects(_plan_bounds(cover)):
+			continue
+		var poly := footprint(cover)
+		var hole := PackedVector2Array()
+		var start := poly[-1]
+		var bias := 0.00001 if ci < own_index else -0.00001
+		var ds := plane_height(cover, start) - plane_height(face, start) + bias
+		for end in poly:
+			var de := plane_height(cover, end) - plane_height(face, end) + bias
+			if (de > 0) != (ds > 0):
+				hole.append(start.lerp(end, ds / (ds - de)))
+			if de > 0:
+				hole.append(end)
+			start = end
+			ds = de
+		if Poly.area(hole) < 0.000001:
+			continue
+		var remaining: Array[PackedVector2Array] = []
+		for piece in pieces:
+			remaining.append_array(subtract(piece, hole))
+		pieces = remaining
+		if pieces.is_empty():
+			break
+	return pieces
+
+
+static func _plan_bounds(face: PackedVector3Array) -> Rect2:
+	var rect := Rect2(Vector2(face[0].x, face[0].z), Vector2.ZERO)
+	for p in face:
+		rect = rect.expand(Vector2(p.x, p.z))
+	return rect

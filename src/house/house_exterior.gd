@@ -1,0 +1,209 @@
+class_name HouseExterior
+extends RefCounted
+## Measured exterior dressing, separate from room furniture. No model loads:
+## the plan owns origin, bounds, facade host and keep-clear reservations.
+
+
+static func dress(plan: HousePlan) -> void:
+	plan.exterior.clear()
+	plan.exterior_omissions.clear()
+	if not plan.spec.exterior_props:
+		return
+	if HouseGeometry.is_shaped(plan) or plan.has_court():
+		plan.exterior_omissions.append("Exterior recipes currently require a rectangular house facade.")
+		return
+	var s := plan.spec
+	var service := 3 if posmod(s.seed, 2) == 0 else 2
+	var recipe: Array = [["Lantern_Wall", 0.45, 0, "entrance_light"],
+		["Bench", 0.8, 0, "entrance_seat"],
+		["Barrel", 1.0, service, "storage"], ["Bucket_Wooden_1", 1.0, service, "storage"]]
+	if s.trade == &"farmer" or s.style == &"farmhouse":
+		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"], ["Bench", 0.8, 0, "entrance_seat"],
+			["Barrel_Apples", 1.0, service, "produce"], ["FarmCrate_Carrot", 1.0, service, "produce"],
+			["Bag", 0.9, service, "produce"]]
+	if s.trade == &"smith":
+		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"], ["Bench", 0.7, 0, "entrance_seat"],
+			["Anvil_Log", 1.0, service, "smith_work"], ["Crate_Wooden", 0.8, service, "smith_work"]]
+	elif s.trade == &"alchemist" or s.style == &"witch_hut":
+		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"], ["Cauldron", 0.7, service, "herb_work"],
+			["Pot_1", 1.4, service, "herb_work"], ["Bucket_Wooden_1", 1.0, service, "herb_work"]]
+	elif s.trade == &"innkeeper":
+		recipe.append(["Barrel_Holder", 0.85, service, "inn_storage"])
+	for item in recipe:
+		var key: String = item[0]
+		var scale: float = item[1]
+		var size := PropCatalog.size(key)
+		if size.x <= 0.0 or size.y <= 0.0 or size.z <= 0.0:
+			plan.exterior_omissions.append("%s: missing measured catalogue dimensions" % key)
+			continue
+		var accepted := false
+		var reason := "no clear facade slot"
+		var walls: Array[int] = [int(item[2])]
+		if int(item[2]) != 0:
+			walls.append(1)
+		for wall in walls:
+			for fraction in [0.22, 0.78, 0.38, 0.62, 0.5, 0.12, 0.88]:
+				var placement := _candidate(plan, key, scale, wall, fraction, item[3])
+				reason = conflict(plan, placement, plan.exterior)
+				if not reason.is_empty():
+					continue
+				placement["id"] = "exterior_%d" % plan.exterior.size()
+				plan.exterior.append(placement)
+				accepted = true
+				break
+			if accepted:
+				break
+		if not accepted:
+			plan.exterior_omissions.append("%s: %s" % [key, reason])
+	while not plan.exterior.is_empty() and not access_clear(plan):
+		var removed: Dictionary = plan.exterior.pop_back()
+		plan.exterior_omissions.append("%s: removed to preserve exterior access" % removed["key"])
+
+
+static func _candidate(plan: HousePlan, key: String, scale: float, wall: int,
+		fraction: float, role: String) -> Dictionary:
+	var run: Dictionary = HouseGeometry.exterior_runs(plan.spec)[wall]
+	var normal: Vector2 = run["normal"]
+	var a: Vector2 = run["from"]
+	var b: Vector2 = run["to"]
+	var yaw := atan2(-normal.x, -normal.y)
+	var rotation := Basis(Vector3.UP, yaw + PropCatalog.face_offset(key))
+	var raw := PropCatalog.size(key) * scale
+	var foot := PropCatalog.footprint_rotated(key, yaw + PropCatalog.face_offset(key)) * scale
+	var mounted := PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED)
+	var deep := foot.dot(normal.abs())
+	var outward := HouseGeometry.WALL_T * 0.5 + deep * 0.5 + (-0.005 if mounted else 0.16)
+	var center := a.lerp(b, fraction) + normal * outward
+	var center_y := minf(1.85, plan.spec.height - raw.y * 0.5 - 0.12) if mounted else raw.y * 0.5
+	var off: Vector3 = rotation * (PropCatalog.centre_offset(key) * scale)
+	var pos := Vector3(center.x - off.x, center_y - off.y if mounted else 0.0, center.y - off.z)
+	var bounds := AABB(Vector3(center.x - foot.x * 0.5, center_y - raw.y * 0.5, center.y - foot.y * 0.5),
+		Vector3(foot.x, raw.y, foot.y))
+	return {"key": key, "pos": pos, "yaw": yaw, "scale": scale, "role": role,
+		"host": wall, "storey": 0, "mounted": mounted, "bounds": bounds,
+		"rect": Rect2(Vector2(bounds.position.x, bounds.position.z), foot)}
+
+
+## Derive measured bounds from the actual origin used by HouseAssembler.
+static func bounds_of(p: Dictionary) -> AABB:
+	var key: String = p["key"]
+	var scale: float = p["scale"]
+	var yaw: float = p["yaw"] + PropCatalog.face_offset(key)
+	var pos: Vector3 = p["pos"]
+	if not PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED):
+		pos.y -= PropCatalog.floor_offset(key) * scale
+	var center: Vector3 = pos + Basis(Vector3.UP, yaw) * (PropCatalog.centre_offset(key) * scale)
+	var foot := PropCatalog.footprint_rotated(key, yaw) * scale
+	var size := Vector3(foot.x, PropCatalog.height(key) * scale, foot.y)
+	return AABB(center - size * 0.5, size)
+
+
+static func _opening_box(pos: Vector2, normal: Vector2, width: float,
+		bottom: float, top: float, depth: float) -> AABB:
+	var along := Vector2(normal.y, -normal.x).abs() * width
+	var size := along + normal.abs() * depth
+	var center := pos + normal * (HouseGeometry.WALL_T + depth * 0.5)
+	return AABB(Vector3(center.x - size.x * 0.5, bottom, center.y - size.y * 0.5),
+		Vector3(size.x, top - bottom, size.y))
+
+
+static func conflict(plan: HousePlan, p: Dictionary, placed: Array) -> String:
+	if int(p.get("host", -1)) < 0 or int(p.get("host", -1)) >= 4:
+		return "invalid exterior facade host"
+	var bounds := bounds_of(p)
+	var site := HouseGeometry.site_rect(plan.spec)
+	var building := AABB(Vector3(site.position.x, 0, site.position.y),
+		Vector3(site.size.x, plan.spec.height * plan.spec.storeys, site.size.y))
+	# A mounted bracket can enter the wall by 5 mm; floor props cannot.
+	if bounds.intersects(building.grow(-0.01)):
+		return "intersects the house wall"
+	var host: Dictionary = HouseGeometry.exterior_runs(plan.spec)[int(p["host"])]
+	var normal: Vector2 = host["normal"]
+	var tangent := Vector2(normal.y, -normal.x).abs()
+	var center := Vector2(bounds.get_center().x, bounds.get_center().z)
+	var span := Vector2(bounds.size.x, bounds.size.z).dot(tangent)
+	var host_center: Vector2 = (host["from"] + host["to"]) * 0.5
+	var host_length: float = (host["to"] - host["from"]).length()
+	if absf((center - host_center).dot(tangent)) + span * 0.5 > host_length * 0.5 - 0.06:
+		return "extends beyond its facade"
+	for door in plan.doors:
+		if not door["exterior"] or HousePlan.record_storey(door) != 0:
+			continue
+		var reserved := _opening_box(door["pos"], door["normal"], float(door["width"]) + 1.1,
+			-0.1, HouseGeometry.DOOR_H + 0.25, 3.2)
+		if bounds.intersects(reserved):
+			return "blocks a door approach or porch"
+	for win in plan.windows:
+		var level := HousePlan.record_storey(win) * plan.spec.height
+		var width: float = win["width"] * (2.0 if plan.spec.window_shutters else 1.0) + 0.22
+		if bounds.intersects(_opening_box(win["pos"], win["normal"], width,
+			level + float(win["sill"]) - 0.1, level + float(win["head"]) + 0.25, 0.8)):
+			return "obstructs glazing, shutters or a window hood"
+	if plan.spec.chimney:
+		var c := HouseGeometry.chimney_center(plan)
+		var size := HouseGeometry.chimney_size(plan.spec) + HouseGeometry.CHIMNEY_BASE_EXTRA + 0.12
+		if bounds.intersects(AABB(Vector3(c.x - size * 0.5, 0, c.y - size * 0.5),
+			Vector3(size, 30, size))):
+			return "intersects the chimney"
+	for other in placed:
+		if bounds.grow(0.08).intersects(bounds_of(other)):
+			return "overlaps another exterior prop"
+	return ""
+
+
+static func access_clear(plan: HousePlan) -> bool:
+	if plan.entrance() < 0:
+		return true
+	var site := HouseGeometry.site_rect(plan.spec)
+	var grid := WalkGrid.new()
+	grid.setup(site.grow(4.0), 0.15)
+	grid.add_floor(site.grow(4.0))
+	grid.add_obstacle(site)
+	if plan.spec.chimney:
+		var c := HouseGeometry.chimney_center(plan)
+		var width := HouseGeometry.chimney_size(plan.spec) + HouseGeometry.CHIMNEY_BASE_EXTRA
+		grid.add_obstacle(Rect2(c - Vector2.ONE * width * 0.5, Vector2.ONE * width))
+	if plan.spec.porch:
+		var door: Dictionary = plan.doors[plan.entrance()]
+		var depth := HouseGeometry.porch_depth(plan.spec)
+		var width: float = door["width"] + 1.1
+		var center: Vector2 = door["pos"] + door["normal"] * (depth - 0.12)
+		for side in [-1.0, 1.0]:
+			var post := center + Vector2(side * (width * 0.5 - 0.1), 0)
+			grid.add_obstacle(Rect2(post - Vector2.ONE * 0.07, Vector2.ONE * 0.14))
+	for p in plan.exterior:
+		var b := bounds_of(p)
+		if b.position.y < HouseGeometry.DOOR_H:
+			grid.add_obstacle(Rect2(Vector2(b.position.x,b.position.z), Vector2(b.size.x,b.size.z)))
+	grid.build(HouseGeometry.PERSON_RADIUS)
+	var entrance: Dictionary = plan.doors[plan.entrance()]
+	var start: Vector2 = entrance["pos"] + entrance["normal"] * 3.5
+	if not grid.flood_from(start):
+		return false
+	for door in plan.doors:
+		if door["exterior"] and HousePlan.record_storey(door) == 0:
+			var at: Vector2 = door["pos"] + door["normal"] * (HouseGeometry.WALL_T + 0.4)
+			if not grid.reached(Rect2(at - Vector2.ONE * 0.1, Vector2.ONE * 0.2)):
+				return false
+	return true
+
+
+static func check(plan: HousePlan) -> Array[String]:
+	var failures: Array[String] = []
+	if not plan.spec.exterior_props:
+		return failures
+	var checked: Array = []
+	for p in plan.exterior:
+		var who := "exterior %s role=%s host=%s key=%s" % [p.get("id", "?"),
+			p.get("role", "?"), p.get("host", "?"), p.get("key", "?")]
+		var measured := bounds_of(p)
+		var recorded: AABB = p["bounds"]
+		if measured.position.distance_to(recorded.position) > 0.005 or measured.size.distance_to(recorded.size) > 0.005:
+			failures.append(who + ": recorded bounds differ from measured placement")
+		var reason := conflict(plan, p, checked)
+		if not reason.is_empty():
+			failures.append(who + ": " + reason)
+		checked.append(p)
+	if not plan.exterior.is_empty() and not access_clear(plan):
+		failures.append("exterior: a door cannot be reached from the approach")
+	return failures

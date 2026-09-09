@@ -196,16 +196,15 @@ func _build_plinth() -> void:
 				continue
 			openings.append({"t": _along(from, to, d["pos"]), "w": float(d["width"]) + 0.12,
 				"bottom": 0.0, "top": plinth_h + 0.05, "kind": "door", "normal": normal})
-		_wall_run(from, to, thick, plinth_h, openings, SURF_FLOOR, 0.0)
+		# These are clearances, not additional framed doors. Framing the short
+		# plinth opening used to put a second lintel across the real doorway.
+		_wall_run(from, to, thick, plinth_h, openings, SURF_FLOOR, 0.0, false)
 		# Chamfered stone water-table moulding at the top of the plinth
 		var seg: Vector2 = to - from
 		var run_len: float = seg.length()
 		if run_len > 0.1:
-			var dir: Vector2 = seg / run_len
-			var yaw: float = atan2(-dir.y, dir.x)
-			var pmid: Vector2 = (from + to) / 2.0 + normal * (HouseGeometry.PLINTH_EXTRA * 0.5)
-			var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(pmid.x, plinth_h, pmid.y))
-			_kit.oriented_box(Vector3(run_len + HouseGeometry.PLINTH_EXTRA * 2.0, 0.06, thick + 0.04), xf, SURF_FLOOR)
+			_wall_run(from, to, thick + 0.04, 0.06, openings, SURF_FLOOR,
+				plinth_h - 0.03, false)
 
 
 # ------------------------------------------------------------------ walls
@@ -347,7 +346,7 @@ func _openings_on(from: Vector2, to: Vector2, normal: Vector2, level := 0) -> Ar
 ## place a door on a wall that might run along either axis without writing the
 ## whole thing twice.
 func _wall_run(from: Vector2, to: Vector2, thick: float, height: float,
-		openings: Array[Dictionary], surf: int, y_offset := 0.0) -> void:
+		openings: Array[Dictionary], surf: int, y_offset := 0.0, decorate := true) -> void:
 	var seg: Vector2 = to - from
 	var run: float = seg.length()
 	if run < 0.01:
@@ -371,7 +370,8 @@ func _wall_run(from: Vector2, to: Vector2, thick: float, height: float,
 			_wall_piece(from, dir, yaw, lo, hi, 0.0, bottom, thick, surf, y_offset)
 		if top < height - 0.01:
 			_wall_piece(from, dir, yaw, lo, hi, top, height, thick, surf, y_offset)
-		_opening_trim(from, dir, yaw, t, w, bottom, top, thick, op, y_offset)
+		if decorate:
+			_opening_trim(from, dir, yaw, t, w, bottom, top, thick, op, y_offset)
 		cursor = maxf(cursor, hi)
 	if cursor < run - 0.01:
 		_wall_piece(from, dir, yaw, cursor, run, 0.0, height, thick, surf, y_offset)
@@ -599,8 +599,8 @@ func _build_timber_frame_level(level := 0) -> void:
 		var openings: Array[Dictionary] = _openings_on(from, to, normal, level)
 
 		# sill and wall plate, the full length of the wall
-		_beam(from, dir, yaw, normal, length / 2.0, length,
-			y_sill, y_sill + HouseGeometry.SILL_BEAM_H, 0.0, y0)
+		_rail_between(from, dir, yaw, normal, length, openings,
+			y_sill, y_sill + HouseGeometry.SILL_BEAM_H, y0)
 		_beam(from, dir, yaw, normal, length / 2.0, length,
 			h - HouseGeometry.PLATE_H, h, 0.0, y0)
 		if spec.frame_rail:

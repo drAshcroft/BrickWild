@@ -1,6 +1,8 @@
 House building-rule evaluation — 8 September 2026
 ================================================
 
+**Implementation update (9 September 2026):** Roof topology, wall joins, dormer cuts and door-crossing trim have been repaired, and exterior prop placement now works. See [repair details and validation](HOUSE_ROOF_FIX.md). The findings below preserve the original evaluation, not the current implementation status.
+
 The roof complaint is supported by reproducible geometry defects. The decoration complaint is partly an implementation gap: exterior props are enabled in the specification but are never placed. The existing rules are much stronger for interior planning and circulation than for the exterior envelope and architectural composition.
 
 This evaluation changes no production code. It combines source inspection, six shell variants rendered from four angles each, and targeted mesh/QA probes. The sixth render explicitly forces a hipped roof; the main failing example below is a naturally generated farmhouse.

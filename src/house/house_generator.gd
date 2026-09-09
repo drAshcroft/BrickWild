@@ -62,7 +62,6 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	spec.chimney_style = s.get("chimney_style", &"stepped")
 	var pots_range: Array = s.get("pots", [1, 2])
 	spec.chimney_pots = r.randi_range(int(pots_range[0]), int(pots_range[1]))
-	spec.exterior_props = true
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y
@@ -90,6 +89,7 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 		var room: int = int(placement.get("room", -1))
 		placement["storey"] = plan.storey_of_room(room) if room >= 0 \
 			and room < plan.rooms.size() else 0
+	HouseExterior.dress(plan)
 	return plan
 
 

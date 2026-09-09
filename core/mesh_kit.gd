@@ -142,26 +142,31 @@ func gable_roof(span_x: float, along_z: float, rise: float, z_center: float,
 ## emitter once did.
 func ridge_roof(xf: Transform3D, span_x: float, along_z: float, rise: float,
 		surf: int, end_surf := -1, end_span := 0.0, end_along := 0.0,
-		end_thick := 0.3, end_cut := 0.0) -> void:
-	var half: float = span_x / 2.0
-	var slope_len: float = sqrt(half * half + rise * rise)
-	var ang: float = atan2(rise, half)
-	for side in [-1.0, 1.0]:
-		var t: Transform3D = xf * Transform3D(Basis(Vector3(0, 0, 1), -side * ang),
-			Vector3(side * half / 2.0, rise / 2.0, 0.0))
-		oriented_box(Vector3(slope_len, 0.24, along_z), t, surf)
-	oriented_box(Vector3(0.35, 0.25, along_z + 0.2),
-		xf * Transform3D(Basis(), Vector3(0.0, rise + 0.1, 0.0)), surf)
+		end_thick := 0.3, end_cut := 0.0, deferred_faces: Variant = null) -> void:
+	var roof := RoofShape.faces(span_x, along_z, rise)
+	for face in roof:
+		if deferred_faces != null:
+			deferred_faces.append(xf * face)
+		else:
+			slab_poly(xf * face, RoofShape.DEPTH, surf, true)
 	if end_surf < 0:
 		return
 	var ex: float = (end_span if end_span > 0.0 else span_x) / 2.0
 	var ez: float = (end_along if end_along > 0.0 else along_z) / 2.0
-	# The tympanum rises to the ridge over the wall, not over the eave, so its
-	# apex is scaled by how far the wall stops short of the slab edge.
-	var apex: float = rise * (ex / half)
-	for end_v in [-1.0, 1.0]:
-		var zf: float = end_v * ez
-		gable_end_at(xf, ex, apex, zf - end_v * end_thick, zf, end_surf, end_cut)
+	# Close all four wall heads against the actual underside. Scaling only
+	# the gable apex leaves a strip of daylight under an overhanging roof.
+	var corners := PackedVector2Array([Vector2(-ex, -ez), Vector2(ex, -ez),
+		Vector2(ex, ez), Vector2(-ex, ez)])
+	for i in range(4):
+		var a := corners[i]
+		var b := corners[(i + 1) % 4]
+		var profile := RoofShape.wall_profile(roof, a, b)
+		var inward := Vector3(-(b - a).y, 0, (b - a).x).normalized() * end_thick * 0.5
+		for j in range(profile.size()):
+			if end_cut > 0:
+				profile[j].y = minf(profile[j].y, end_cut)
+			profile[j] += inward
+		slab_poly(xf * profile, end_thick, end_surf)
 
 
 ## The triangular wall under a gable: apex over x = 0 at y_base + rise, extruded
@@ -414,9 +419,9 @@ func drum(center: Vector3, base_r: float, top_r: float, height: float, surf: int
 
 ## Cone: the conical cap of a drum tower, the spire of a round turret.
 func cone(radius: float, height: float, center: Vector3, surf: int,
-		segments := 12) -> void:
+		segments := 12, rotation := 0.0) -> void:
 	revolve(PackedVector2Array([Vector2(radius, 0.0), Vector2(0.0, height)]),
-		center, surf, segments, TAU)
+		center, surf, segments, TAU, rotation)
 
 
 ## Half cylinder hugging +Z from center: flat face at center.y (model Z),

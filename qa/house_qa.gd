@@ -26,6 +26,7 @@ func check(plan: HousePlan, builder: HouseBuilder, overrides: Dictionary = {}) -
 	# their groups (the furnishing check does) hand them up unchanged
 	var groups := {}
 	var replaced := {}
+	failures.append_array(HouseExterior.check(plan))
 	for bad in RuleSet.unknown(overrides, [HousePlanCheck.RULES, HouseFurnishCheck.RULES]):
 		failures.append("rules: no house rule is called %s" % bad)
 

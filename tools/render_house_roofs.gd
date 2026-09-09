@@ -1,6 +1,6 @@
 extends SceneTree
-## Roof close-ups on the SHELL alone -- no furniture, no cutaway -- so nothing
-## in the picture is a prop. Written to artifacts/shots/.
+## Roof and exterior dressing references, written to artifacts/roof_fix/.
+## Use --full to include the slow interior furnishing decisions in the plan.
 ##
 ##   godot --path . --script res://tools/render_house_roofs.gd
 
@@ -27,6 +27,8 @@ func _init() -> void:
 				"storeys": 1, "seed": 4413},
 			{"key": "hall", "style": &"longhall", "w": 12.0, "l": 16.0, "h": 2.7,
 				"storeys": 1, "seed": 4414},
+			{"key": "smith", "style": &"cottage", "trade": &"smith", "w": 9.0, "l": 11.0, "h": 2.7,
+				"storeys": 1, "seed": 4415},
 		]:
 		await _roof_shots(row)
 	print("done")
@@ -40,11 +42,16 @@ func _roof_shots(row: Dictionary) -> void:
 	spec.length = float(row["l"])
 	spec.height = float(row["h"])
 	spec.storeys = int(row["storeys"])
+	spec.trade = row.get("trade", &"none")
 	var plan: HousePlan = HouseGenerator.generate(spec, int(row["seed"]), OS.get_cmdline_user_args().has("--full"))
 	var mesh: ArrayMesh = HouseBuilder.new().build(plan)
 	_set_mesh(mesh, [spec.wall_color, spec.trim_color, spec.roof_color,
 		spec.floor_color])
 	var aabb: AABB = mesh.get_aabb()
+	HouseAssembler.dress_exterior(_root3d, plan)
+	for p in plan.exterior:
+		aabb = aabb.merge(HouseExterior.bounds_of(p))
+	print("  props=%d omissions=%s" % [plan.exterior.size(), plan.exterior_omissions])
 	var c: Vector3 = aabb.get_center()
 	var top: float = aabb.position.y + aabb.size.y
 	var reach: float = maxf(aabb.size.x, aabb.size.z)
@@ -65,6 +72,7 @@ func _roof_shots(row: Dictionary) -> void:
 	await _look(Vector3(c.x - reach * 1.5, top * 1.45, aabb.position.z - reach * 1.5), Vector3(c.x, top * 0.55, c.z), "roof_%s_left.jpg" % key)
 	await _look(Vector3(c.x - reach * 1.5, top * 1.45, aabb.end.z + reach * 1.5), Vector3(c.x, top * 0.55, c.z), "roof_%s_back.jpg" % key)
 	_mesh_inst.mesh = null
+	_root3d.get_node("Exterior").free()
 
 
 # ------------------------------------------------------------------- rigging

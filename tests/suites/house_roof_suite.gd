@@ -6,6 +6,7 @@ static func run(full := false) -> SuiteResult:
 	var res := SuiteResult.new("house roofs")
 	_hip_primitive(res)
 	_subtraction(res)
+	_lowered_gable(res)
 	for kind in [&"gable", &"half_hipped", &"hipped"]:
 		for size in [Vector2(7, 9), Vector2(14, 7), Vector2(8, 8), Vector2(10, 13)]:
 			for pitch in [0.7, 1.6]:
@@ -27,7 +28,7 @@ static func run(full := false) -> SuiteResult:
 				var mesh := builder.build(plan)
 				var who := "%s %s pitch %.1f" % [kind, size, pitch]
 				_check_house(res, plan, mesh, who)
-				var before := mesh.surface_get_arrays(2)[Mesh.ARRAY_VERTEX]
+				var before: PackedVector3Array = mesh.surface_get_arrays(2)[Mesh.ARRAY_VERTEX]
 				var second := builder.build(plan)
 				_expect(res, before == second.surface_get_arrays(2)[Mesh.ARRAY_VERTEX], who + " rebuild changed roof")
 				builder.build(plan, false)
@@ -124,6 +125,30 @@ static func _subtraction(res: SuiteResult) -> void:
 		for j in range(i):
 			_expect(res, Poly.intersection_area(pieces[i], pieces[j]) < 0.0001, "roof cut duplicated a face")
 	_expect(res, absf(area + Poly.area(hole) - 100.0) < 0.0001, "roof cut lost area outside opening")
+
+
+static func _lowered_gable(res: SuiteResult) -> void:
+	var s := HouseSpec.new()
+	s.width = 7
+	s.length = 9
+	s.roof_type = &"gable"
+	s.dormers = false
+	var plan := HousePlanner.plan(s)
+	var original := HouseBuilder.new().build(plan)
+	var mutant := ArrayMesh.new()
+	for surface in original.get_surface_count():
+		var arrays := original.surface_get_arrays(surface)
+		if surface == 0:
+			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			for i in vertices.size():
+				if vertices[i].y > s.height + 0.01:
+					vertices[i].y -= 0.3
+			arrays[Mesh.ARRAY_VERTEX] = vertices
+		mutant.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var result := SuiteResult.new("lowered gable mutation")
+	_check_house(result, plan, mutant, "lowered gable")
+	_expect(res, result.failures.any(func(f: String) -> bool: return f.contains("lateral wall/roof gaps")),
+		"lateral envelope check accepted a lowered gable")
 
 
 static func _check_house(res: SuiteResult, plan: HousePlan, mesh: ArrayMesh, who: String) -> void:

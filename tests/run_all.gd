@@ -46,8 +46,8 @@ extends SceneTree
 ##  29 world      - the buildings of the wider world (WORLD_BUILDINGS), as
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
-	"castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"house", "assets", "houseqa", "hmultistory", "harchetype", "court",
+	"churchroof", "ctroof", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
+	"hroof", "hexterior", "house", "assets", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hlandmark",
 	"temple", "rite", "tarchetype",
@@ -66,6 +66,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return PropKitSuite.run()
 		"church":
 			return ChurchSuite.run()
+		"churchroof":
+			return preload("res://tests/suites/church_roof_suite.gd").run()
+		"ctroof":
+			return preload("res://tests/suites/castle_temple_roof_suite.gd").run()
 		"normals":
 			return NormalsSuite.run()
 		"massing":
@@ -92,6 +96,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return CastleInteriorSuite.run()
 		"house":
 			return HouseSuite.run()
+		"hroof":
+			return preload("res://tests/suites/house_roof_suite.gd").run()
+		"hexterior":
+			return preload("res://tests/suites/house_exterior_suite.gd").run()
 		"assets":
 			return HouseAssetsSuite.run()
 		"houseqa":

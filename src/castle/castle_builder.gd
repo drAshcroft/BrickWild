@@ -27,11 +27,15 @@ const EAVE := 0.5              # roof overhang past the wall it caps
 const SLIT_BAY := 4.5          # metres of wall per arrow slit
 
 var spec: CastleSpec
+var _roof_faces: Array[PackedVector3Array] = []
+var _roof_covers: Array[PackedVector3Array] = []
 
 
 func build(p_spec: CastleSpec) -> ArrayMesh:
 	spec = p_spec
 	begin(4)
+	_roof_faces.clear()
+	_roof_covers.clear()
 	total_height = spec.height
 
 	if CastleGeometry.is_tower_house(spec):
@@ -55,8 +59,30 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 ## loads a model. Every tier leaves through here, so no tier can be given a
 ## shell and then quietly forgotten.
 func _dressed() -> ArrayMesh:
+	_join_roofs()
 	prop_log = CastleFurnisher.dress(spec)
 	return commit()
+
+
+func _join_roofs() -> void:
+	var covers: Array[PackedVector3Array] = _roof_faces.duplicate()
+	covers.append_array(_roof_covers)
+	for mass in mass_log:
+		var name: String = mass["name"]
+		# Curved and battered towers use their own inscribed footprint below.
+		if name.begins_with("tower") or name.begins_with("wall") or name == "keep":
+			continue
+		if not (name in ["hall", "porch", "annexe", "chapel", "range_front"] or name.begins_with("wing") or name.begins_with("chimney") or name.begins_with("yard_")):
+			continue
+		if CastleGeometry.is_ridge(spec) and (name == "hall" or name.begins_with("range")):
+			continue # the AABB is wider than the rotated range
+		var a: AABB = mass["aabb"]
+		covers.append(PackedVector3Array([Vector3(a.position.x, a.end.y, a.position.z),
+			Vector3(a.end.x, a.end.y, a.position.z), a.end, Vector3(a.position.x, a.end.y, a.end.z)]))
+	for i in range(_roof_faces.size()):
+		var face := _roof_faces[i]
+		for piece in RoofShape.exposed(face, covers, i):
+			_kit.slab_poly(RoofShape.lift(piece, face), RoofShape.DEPTH, SURF_ROOF, true)
 
 
 # -------------------------------------------------------- motte and bailey
@@ -132,7 +158,7 @@ func _build_ridge() -> void:
 		var dir: Vector2 = seg["dir"]
 		var rise: float = width * spec.roof_pitch * 0.5
 		var xf := Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.y)), Vector3(mid.x, height, mid.y))
-		_kit.ridge_roof(xf, width + EAVE, length + EAVE * 0.8, rise, SURF_ROOF, SURF_STONE, width, length)
+		_kit.ridge_roof(xf, width + EAVE, length + EAVE * 0.8, rise, SURF_ROOF, SURF_STONE, width, length, 0.3, 0.0, _roof_faces)
 		if spec.dormers:
 			_ridge_dormers(mid, dir, length, width, height, rise)
 		total_height = maxf(total_height, height + rise)
@@ -298,7 +324,7 @@ func _build_porch() -> void:
 	_log_mass("porch", p)
 	var xf := Transform3D(Basis(), Vector3(0.0, p.size.y, p.position.z + p.size.z / 2.0))
 	_kit.ridge_roof(xf, p.size.x + 0.3, p.size.z + 0.3,
-		p.size.x * spec.roof_pitch * 0.4, SURF_ROOF, SURF_STONE, p.size.x, p.size.z)
+		p.size.x * spec.roof_pitch * 0.4, SURF_ROOF, SURF_STONE, p.size.x, p.size.z, 0.3, 0.0, _roof_faces)
 	_opening(Vector3(0.0, p.size.y * 0.42, p.position.z - CastleGeometry.OPENING_EPS),
 		PI, minf(p.size.x * 0.5, 2.0), p.size.y * 0.6, &"arched", true)
 	total_height = maxf(total_height, p.size.y + p.size.x * spec.roof_pitch * 0.4)
@@ -544,8 +570,8 @@ func _build_keep() -> void:
 		_:
 			_box_aabb(k, SURF_STONE)
 			_crenellate_rect(k, k.size.y, SURF_TRIM)
-			_kit.hip_roof(k.size.x * 0.8, k.size.z * 0.8,
-				CastleGeometry.roof_rise(spec, k), c.z, SURF_ROOF, k.size.y)
+			_kit.hip_roof_at(Transform3D(Basis(), c + Vector3(0, k.size.y, 0)),
+				k.size.x * 0.8, k.size.z * 0.8, CastleGeometry.roof_rise(spec, k), SURF_ROOF)
 			_face_openings(k, opening_y, spec.window_style)
 	total_height = maxf(total_height, k.size.y + CastleGeometry.roof_rise(spec, k))
 
@@ -604,7 +630,7 @@ func _range(a: AABB, mass_name: String, surf: int, roofed: bool,
 		var along: float = a.size.x if along_x else a.size.z
 		var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(cx, a.size.y, cz))
 		_kit.ridge_roof(xf, span + EAVE, along + EAVE * 0.8, rise, SURF_ROOF,
-			SURF_STONE, span, along)
+			SURF_STONE, span, along, 0.3, 0.0, _roof_faces)
 		total_height = maxf(total_height, a.size.y + rise)
 		if spec.dormers:
 			_dormers(a, along_x, rise)
@@ -766,13 +792,18 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 	var base_r: float = CastleGeometry.tower_radius_for(spec,
 		CastleGeometry.tower_base_half_at(spec, r, vertex))
 	_kit.drum(c, base_r, top_r, h, SURF_STONE, sides, rot)
+	var cover := PackedVector3Array()
+	for i in range(sides):
+		var angle := rot + TAU * i / sides
+		cover.append(c + Vector3(cos(angle) * top_r, h, sin(angle) * top_r))
+	_roof_covers.append(cover)
 	_log_mass(mass_name, CastleGeometry.tower_aabb(spec, r, c, vertex))
 	_log_part("tower", c + Vector3(0, h / 2.0, 0), Vector3(top_r * 2.0, h, top_r * 2.0))
 
 	var rise: float = CastleGeometry.tower_roof_rise_at(spec, r, vertex)
 	match spec.tower_roof:
 		&"cone":
-			_kit.cone(top_r * 1.08, rise, c + Vector3(0, h, 0), SURF_ROOF, sides)
+			_kit.cone(top_r * 1.08, rise, c + Vector3(0, h, 0), SURF_ROOF, sides, rot)
 		&"pyramid":
 			_kit.stepped_taper(c + Vector3(0, h, 0), top_r * 2.1, rise, SURF_ROOF, 3, 0.2)
 		&"tiered":

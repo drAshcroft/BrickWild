@@ -106,6 +106,11 @@ static func placement(building) -> Dictionary:
 	if mesh == null:
 		return {}
 	var bounds := mesh.get_aabb()
+	# Exterior props must fit in the placement envelope too. They remain
+	# separate from the architectural mesh and the wall footprint.
+	if building.plan != null and building.plan.spec.exterior_props:
+		for p in building.plan.exterior:
+			bounds = bounds.merge(HouseExterior.bounds_of(p))
 	return {
 		"api_version": API_VERSION,
 		"kind": building.request.kind,

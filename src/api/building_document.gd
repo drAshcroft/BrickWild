@@ -161,6 +161,7 @@ static func _plan_dict(from: HousePlan) -> Dictionary:
 	return {
 		"rooms": rooms, "doors": doors, "windows": windows,
 		"furniture": furniture, "stairs": stairs,
+		"exterior": _plain(from.exterior), "exterior_omissions": _plain(from.exterior_omissions),
 		"hearth": from.hearth.duplicate() if not from.hearth.is_empty() else {},
 		"focus": _plain(from.focus),
 		"compromises": _plain(from.compromises),
