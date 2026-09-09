@@ -230,7 +230,21 @@ func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> v
 ## hole or lie across each other, and both were happening.
 ##
 ## The polygon must be planar and convex, which every roof face here is.
-func slab_poly(points: PackedVector3Array, thickness: float, surf: int) -> void:
+func slab_poly(points: PackedVector3Array, thickness: float, surf: int,
+		vertical_depth := false) -> void:
+	# Clipping can retain a repeated corner or a point on a straight edge.
+	# Remove those before choosing a normal and fanning the convex polygon.
+	points = points.duplicate()
+	var changed := true
+	while changed and points.size() >= 3:
+		changed = false
+		for i in range(points.size()):
+			var before := points[(i + points.size() - 1) % points.size()]
+			var after := points[(i + 1) % points.size()]
+			if (points[i] - before).cross(after - points[i]).length_squared() < 1e-12:
+				points.remove_at(i)
+				changed = true
+				break
 	var n: int = points.size()
 	if n < 3:
 		return
@@ -244,7 +258,7 @@ func slab_poly(points: PackedVector3Array, thickness: float, surf: int) -> void:
 		for i in range(n - 1, -1, -1):
 			pts.append(points[i])
 		nrm = -nrm
-	var off: Vector3 = nrm.normalized() * (thickness / 2.0)
+	var off: Vector3 = (Vector3.UP if vertical_depth else nrm.normalized()) * (thickness / 2.0)
 	var lo: Array = []
 	var hi: Array = []
 	for p in pts:
@@ -267,36 +281,15 @@ func hip_roof(span_x: float, along_z: float, rise: float, z_center: float,
 		span_x, along_z, rise, surf)
 
 
-## hip_roof() placed by an arbitrary transform; local origin is the wall top.
-##
-## Four slabs: two long slopes covering the ridge, and two hips falling to the
-## end walls. The HIPS RUN THE FULL WIDTH, and that is the whole trick -- the
-## slopes have to stop short of the ends or the hips would never show, so
-## whatever the slopes do not reach has to be reached by something. Cutting
-## both pairs back by the same fraction, which is what this did, left the four
-## corners covered by neither: a hole in the roof you could see the floor
-## through, and 4.5% of a farmhouse open to the sky.
+## The four roof faces share actual hip/ridge endpoints. Vertical slab
+## depth preserves those joins on both sides of the roof skin.
 func hip_roof_at(xf: Transform3D, span_x: float, along_z: float, rise: float,
 		surf: int) -> void:
-	var half_x: float = span_x / 2.0
-	var half_z: float = along_z / 2.0
-	# A hip falls back from each end by as much as the roof is wide, so a
-	# square plan comes almost to a point and a long one keeps a ridge.
-	var ridge: float = maxf(along_z - span_x, along_z * 0.2)
-	var slope_len_x: float = sqrt(half_x * half_x + rise * rise)
-	var ang_x: float = atan2(rise, half_x)
-	for side in [-1.0, 1.0]:
-		var t: Transform3D = xf * Transform3D(Basis(Vector3(0, 0, 1), -side * ang_x),
-			Vector3(side * half_x / 2.0, rise / 2.0, 0.0))
-		oriented_box(Vector3(slope_len_x, 0.24, ridge), t, surf)
-	var slope_len_z: float = sqrt(half_z * half_z + rise * rise)
-	var ang_z: float = atan2(rise, half_z)
-	for end_v in [-1.0, 1.0]:
-		var t2: Transform3D = xf * Transform3D(Basis(Vector3(1, 0, 0), end_v * ang_z),
-			Vector3(0.0, rise / 2.0, end_v * half_z / 2.0))
-		oriented_box(Vector3(span_x, 0.24, slope_len_z), t2, surf)
-	oriented_box(Vector3(0.35, 0.25, ridge),
-		xf * Transform3D(Basis(), Vector3(0.0, rise + 0.1, 0.0)), surf)
+	for face in RoofShape.faces(span_x, along_z, rise, &"hipped"):
+		var world := PackedVector3Array()
+		for p in face:
+			world.append(xf * p)
+		slab_poly(world, RoofShape.DEPTH, surf, true)
 
 
 ## Lean-to (single pitch) roof, from an outer eave up to a wall.

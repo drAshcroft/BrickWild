@@ -28,6 +28,7 @@
     { "source": "core/light_kit.gd", "destination": "core/light_kit.gd" },
     { "source": "core/mass_builder.gd", "destination": "core/mass_builder.gd" },
     { "source": "core/mesh_kit.gd", "destination": "core/mesh_kit.gd" },
+    { "source": "core/roof_shape.gd", "destination": "core/roof_shape.gd" },
     { "source": "core/poly.gd", "destination": "core/poly.gd" },
     { "source": "src/castle/castle_builder.gd", "destination": "families/castle/castle_builder.gd" },
     { "source": "src/castle/castle_generator.gd", "destination": "families/castle/castle_generator.gd" },

@@ -17,7 +17,7 @@ const SUFFIXES := ["", "", " Cottage", " House", " Lodge", " Steading"]
 
 ## Generate the spec's derived fields, then plan and furnish. Returns the plan,
 ## which is what the builder and every check take from here on.
-static func generate(spec: HouseSpec, p_seed: int) -> HousePlan:
+static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> HousePlan:
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
 	spec.storeys = clampi(spec.storeys, 1, 3)
@@ -43,8 +43,15 @@ static func generate(spec: HouseSpec, p_seed: int) -> HousePlan:
 	spec.jetty_depth = r.randf_range(0.24, 0.32)
 	var roof_types: Array = s.get("roof_types", [&"gable", &"half_hipped"])
 	spec.roof_type = _pick(r, roof_types)
-	spec.dormers = (spec.storeys > 1 or spec.length >= 12.0) and _chance(r, float(s.get("dormers", 0.4)))
-	spec.dormer_count = clampi(int(spec.length / 5.0), 1, 3) if spec.dormers else 0
+	# Read the same roll for a rotated footprint without shifting the historic
+	# RNG stream for subsequent framing, colours and furniture choices.
+	var dormer_rng := RandomNumberGenerator.new()
+	dormer_rng.state = r.state
+	var wants_dormers := _chance(dormer_rng, float(s.get("dormers", 0.4)))
+	if spec.storeys > 1 or spec.length >= 12.0:
+		r.randf()
+	spec.dormers = (spec.storeys > 1 or maxf(spec.width, spec.length) >= 12.0) and wants_dormers
+	spec.dormer_count = clampi(int(maxf(spec.width, spec.length) / 5.0), 1, 3) if spec.dormers else 0
 	var framing_patterns: Array = s.get("framing", [&"square_panel", &"arch_brace"])
 	spec.framing_pattern = _pick(r, framing_patterns)
 	var trusses: Array = s.get("truss", [&"king_post", &"queen_post"])
@@ -74,7 +81,8 @@ static func generate(spec: HouseSpec, p_seed: int) -> HousePlan:
 		_pick(r, SUFFIXES)]
 
 	var plan: HousePlan = HousePlanner.plan(spec)
-	HouseFurnisher.furnish(plan, spec)
+	if with_furniture:
+		HouseFurnisher.furnish(plan, spec)
 	# HouseFurnisher deliberately works from room IDs and legacy 2D rectangles.
 	# Stamp the explicit level on its records here so consumers can already
 	# distinguish stacked placements without changing that independent placer.

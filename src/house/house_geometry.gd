@@ -378,6 +378,95 @@ static func roof_rise(spec: HouseSpec) -> float:
 	return minf(spec.width, spec.length) * spec.roof_pitch * 0.5
 
 
+## Pure plan-space roof layout. Attachments and the emitter read the same
+## face coordinates; rebuilding a mutable spec never leaves cached holes on
+## a former roof. The transform's origin is the top storey's wall head.
+static func roof_layout(plan: HousePlan) -> Dictionary:
+	var s := plan.spec
+	var span := minf(s.width, s.length)
+	var along := maxf(s.width, s.length)
+	var rise := roof_rise(s)
+	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if s.width > s.length else 0.0),
+		Vector3(0, s.height * maxi(s.storeys, 1), 0))
+	var roof := RoofShape.faces(span + 0.7, along + 0.5, rise, s.roof_type)
+	var layout := {"transform": xf, "span": span, "along": along, "rise": rise,
+		"faces": roof, "dormers": []}
+	if not s.dormers or s.dormer_count <= 0 or plan.has_court() or roof.is_empty():
+		return layout
+	var half := (span + 0.7) * 0.5
+	var slope := rise / half
+	var front := -span * 0.5 * 0.62
+	var base := rise + slope * front
+	var eave := minf(base + 1.15, rise - slope * 0.35 - 0.45)
+	if eave - base < 0.65:
+		return layout
+	var dw := 0.95
+	var rh := (dw + 0.25) * 0.5
+	var peak_x := (eave + 0.45 - rise) / slope
+	var side_x := (eave - rise) / slope
+	var cheek_x := (eave + 0.45 * (1.0 - dw * 0.5 / rh) - rise) / slope
+	var spacing := maxf(dw + 0.5, minf(along * 0.22, 2.4))
+	var host := RoofShape.footprint(roof[0])
+	var chimney := chimney_center(plan)
+	var stack_size := chimney_size(s) + CHIMNEY_BASE_EXTRA
+	var stack := Rect2(chimney - Vector2.ONE * (stack_size * 0.5 + 0.15),
+		Vector2.ONE * (stack_size + 0.3))
+	for count in range(mini(s.dormer_count, 3), 0, -1):
+		var fitted: Array[Dictionary] = []
+		for i in range(count):
+			var z := (float(i) - float(count - 1) * 0.5) * spacing
+			var cover := PackedVector2Array([Vector2(front - 0.12, z - rh),
+				Vector2(side_x, z - rh), Vector2(peak_x, z),
+				Vector2(side_x, z + rh), Vector2(front - 0.12, z + rh)])
+			var valid := true
+			var world_cover := PackedVector2Array()
+			for p in cover:
+				if not Poly.contains_point(host, p):
+					valid = false
+				for j in range(host.size()):
+					var edge := host[(j + 1) % host.size()] - host[j]
+					if absf(edge.cross(p - host[j])) / edge.length() < 0.12:
+						valid = false
+				var wp: Vector3 = xf * Vector3(p.x, 0, p.y)
+				world_cover.append(Vector2(wp.x, wp.z))
+			if s.chimney and Poly.bounding_rect(world_cover).intersects(stack):
+				valid = false
+			if not valid:
+				continue
+			var opening := PackedVector2Array([Vector2(front, z - dw * 0.5),
+				Vector2(cheek_x, z - dw * 0.5), Vector2(peak_x, z),
+				Vector2(cheek_x, z + dw * 0.5), Vector2(front, z + dw * 0.5)])
+			fitted.append({"id": "dormer_%d" % i, "face": 0, "storey": s.storeys - 1,
+				"kind": &"dormer", "opening": opening, "front": front, "z": z,
+				"base": base, "eave": eave, "width": dw, "roof_half": rh,
+				"peak_x": peak_x, "side_x": side_x, "cheek_x": cheek_x})
+		if not fitted.is_empty():
+			layout["dormers"] = fitted
+			break
+	return layout
+
+
+## Actual hearth-wall position shared by the chimney and roof attachments.
+static func chimney_center(plan: HousePlan) -> Vector2:
+	var s := chimney_size(plan.spec)
+	var r := site_rect(plan.spec)
+	var c := Vector2(r.end.x + s / 2.0 - 0.15, 0.0)
+	var host := plan.hearth_room()
+	if host < 0:
+		return c
+	var wall := plan.hearth_wall()
+	var run := HousePlanner.clear_wall_span(plan, host, wall)
+	var along := (run.x + run.y) * 0.5
+	if plan.focus_room() == host and plan.focus_cat() == "hearth" and plan.focus_pos().is_finite():
+		along = plan.focus_pos().x if wall <= 1 else plan.focus_pos().y
+	match wall:
+		0: c = Vector2(along, r.position.y - s / 2.0 + 0.15)
+		1: c = Vector2(along, r.end.y + s / 2.0 - 0.15)
+		2: c = Vector2(r.position.x - s / 2.0 + 0.15, along)
+		_: c = Vector2(r.end.x + s / 2.0 - 0.15, along)
+	return c
+
+
 static func total_height(spec: HouseSpec) -> float:
 	var raw_storeys = spec.get("storeys")
 	var storeys: int = maxi(1, int(raw_storeys)) if raw_storeys != null else 1

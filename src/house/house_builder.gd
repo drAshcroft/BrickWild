@@ -20,6 +20,8 @@ const SURF_FLOOR := 3
 
 var plan: HousePlan
 var spec: HouseSpec
+## Actual emitted architectural faces, including cut host pieces and dormer joins.
+var roof_components: Array[Dictionary] = []
 
 
 ## `with_roof` is the one thing a caller may switch off: a furnished interior
@@ -29,6 +31,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	plan = p_plan
 	spec = p_plan.spec
 	begin(4)
+	roof_components.clear()
 	total_height = spec.height
 
 	_build_floor()
@@ -846,96 +849,66 @@ func _build_roof() -> void:
 		_build_court_roofs()
 		return
 	tag("roof")
-	var r: Rect2 = HouseGeometry.site_rect(spec)
-	var rise: float = HouseGeometry.roof_rise(spec)
-	var along_x: bool = r.size.x > r.size.y
-	var yaw: float = PI / 2.0 if along_x else 0.0
-	var span: float = r.size.y if along_x else r.size.x
-	var along: float = r.size.x if along_x else r.size.y
-	var wall_top := spec.height * _storeys()
-	var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(0.0, wall_top, 0.0))
+	var layout := HouseGeometry.roof_layout(plan)
+	var xf: Transform3D = layout["transform"]
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	var span: float = layout["span"]
+	var along: float = layout["along"]
+	var rise: float = layout["rise"]
+	for fi in range(faces.size()):
+		var pieces: Array[PackedVector2Array] = [RoofShape.footprint(faces[fi])]
+		for dormer in layout["dormers"]:
+			if int(dormer["face"]) != fi:
+				continue
+			var next: Array[PackedVector2Array] = []
+			for piece in pieces:
+				next.append_array(RoofShape.subtract(piece, dormer["opening"]))
+			pieces = next
+		for piece in pieces:
+			_roof_face(xf, RoofShape.lift(piece, faces[fi]), SURF_ROOF, "roof_face_%d" % fi)
 
-	# Where the gable stops. A plain gable runs to its apex; a half hip -- a
-	# jerkinhead -- takes the top off, and then the WALL, the TRUSS and the
-	# BARGEBOARDS all have to stop on the line the hip starts on.
-	var gable_top: float = rise
-	if spec.roof_type == &"half_hipped":
-		gable_top = rise * HIP_CUT
+	# Close the wall head to the roof UNDERSIDE on every facade. This also
+	# fills the small raised eave band on hip roofs, not just gable triangles.
+	var h := span * 0.5
+	var f := along * 0.5
+	for run in [[Vector2(-h, -f), Vector2(h, -f), Vector2(0, 1)],
+			[Vector2(-h, f), Vector2(h, f), Vector2(0, -1)],
+			[Vector2(-h, -f), Vector2(-h, f), Vector2(1, 0)],
+			[Vector2(h, -f), Vector2(h, f), Vector2(-1, 0)]]:
+		var profile := RoofShape.wall_profile(faces, run[0], run[1])
+		var inward: Vector2 = run[2] * HouseGeometry.WALL_T * 0.5
+		var shift := Transform3D(Basis(), Vector3(inward.x, 0, inward.y))
+		_roof_face(xf * shift, profile, SURF_WALL, "roof_wall", false, HouseGeometry.WALL_T)
 
-	if spec.roof_type == &"hipped":
-		_kit.hip_roof_at(xf, span + 0.7, along + 0.5, rise, SURF_ROOF)
-	elif spec.roof_type == &"half_hipped":
-		_half_hipped(xf, span + 0.7, along + 0.5, rise, gable_top)
-		_half_hip_gables(xf, span, along, rise, gable_top)
-	else:
-		_kit.ridge_roof(xf, span + 0.7, along + 0.5, rise, SURF_ROOF, SURF_WALL,
-			span, along)
-
-	var overhang_x := 0.25 if along_x else 0.35
-	var overhang_z := 0.35 if along_x else 0.25
-	_log_mass("roof" if _storeys() == 1 else "roof_%d" % (_storeys() - 1),
-		AABB(Vector3(r.position.x - overhang_x, wall_top, r.position.y - overhang_z),
-			Vector3(r.size.x + overhang_x * 2.0, rise + 0.25,
-				r.size.y + overhang_z * 2.0)))
-	total_height = maxf(total_height, wall_top + rise)
-
-	if spec.timber_frame and spec.roof_type != &"hipped":
-		_gable_frame(xf, span, along, rise, gable_top)
+	var ridge_half := along * 0.5 + 0.25
+	if spec.roof_type != &"gable":
+		var cut := RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else 0.0
+		ridge_half = maxf(ridge_half - (span * 0.5 + 0.35) * (1.0 - cut), 0.0)
+	if ridge_half > 0.05:
+		_kit.oriented_box(Vector3(0.22, 0.16, ridge_half * 2.0),
+			xf * Transform3D(Basis(), Vector3(0, rise + 0.14, 0)), SURF_ROOF)
+	var roof_bounds: AABB = xf * AABB(Vector3(-h - 0.35, -RoofShape.DEPTH * 0.5, -f - 0.25),
+		Vector3(span + 0.7, rise + RoofShape.DEPTH * 0.5 + 0.22, along + 0.5))
+	_log_mass("roof" if _storeys() == 1 else "roof_%d" % (_storeys() - 1), roof_bounds)
+	total_height = maxf(total_height, xf.origin.y + rise + 0.22)
 	if spec.roof_type != &"hipped":
-		_build_bargeboards(xf, span, along, rise, gable_top)
+		var wall_peak := RoofShape.height_at(faces, Vector2(0, f))
+		if spec.timber_frame:
+			_gable_frame(xf, span, along, rise, wall_peak)
+		var verge_top := rise * RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else rise
+		_build_bargeboards(xf, span, along, rise, verge_top)
 	_build_eaves_tails(xf, span, along, rise)
-	if spec.dormers:
-		_build_dormers(xf, span, along, rise)
+	_build_dormers(xf, layout["dormers"])
 
 
-## A jerkinhead: two long slopes with their top corners cut away, and a hip
-## filling each cut.
-##
-## The cut is what makes it work. A hip is a triangle standing on the top of
-## the gable and reaching the END OF THE RIDGE, so the slope beside it has to
-## give up exactly that triangle -- which a rectangular slab cannot do, and
-## which is why the roof used to have either a hole at the end or an extra
-## plane lying across it. Both faces are stated as polygons and share an edge,
-## so they meet by construction rather than by two sets of numbers agreeing.
-func _half_hipped(xf: Transform3D, span: float, along: float, rise: float,
-		cut: float) -> void:
-	var half: float = span / 2.0
-	var far: float = along / 2.0
-	# The hip takes the same pitch as the slopes, so its run in plan is the
-	# same as the width it has at the wall head.
-	var w: float = half * (1.0 - cut / rise)
-	var z_ridge: float = far - w
-	if w <= 0.05 or z_ridge <= 0.0:
-		_kit.ridge_roof(xf, span, along, rise, SURF_ROOF)
-		return
-	for side in [-1.0, 1.0]:
-		_kit.slab_poly(PackedVector3Array([
-			xf * Vector3(side * half, 0.0, -far),
-			xf * Vector3(side * half, 0.0, far),
-			xf * Vector3(side * w, cut, far),
-			xf * Vector3(0.0, rise, z_ridge),
-			xf * Vector3(0.0, rise, -z_ridge),
-			xf * Vector3(side * w, cut, -far),
-		]), 0.24, SURF_ROOF)
-	for end_v in [-1.0, 1.0]:
-		_kit.slab_poly(PackedVector3Array([
-			xf * Vector3(-w, cut, end_v * far),
-			xf * Vector3(w, cut, end_v * far),
-			xf * Vector3(0.0, rise, end_v * z_ridge),
-		]), 0.24, SURF_ROOF)
-	_kit.oriented_box(Vector3(0.35, 0.25, z_ridge * 2.0),
-		xf * Transform3D(Basis(), Vector3(0.0, rise + 0.1, 0.0)), SURF_ROOF)
-
-
-## The gable under a half hip: a trapezoid, stopping where the hip starts.
-func _half_hip_gables(xf: Transform3D, span: float, along: float, rise: float,
-		cut: float) -> void:
-	var ex: float = span / 2.0
-	var apex: float = rise * (ex / ((span + 0.7) / 2.0))
-	for end_v in [-1.0, 1.0]:
-		var zf: float = end_v * along / 2.0
-		_kit.gable_end_at(xf, ex, apex, zf - end_v * 0.3, zf, SURF_WALL,
-			minf(cut, apex - 0.05))
+func _roof_face(xf: Transform3D, local: PackedVector3Array, surface: int,
+		role: String, vertical := true, depth := RoofShape.DEPTH) -> void:
+	var world := PackedVector3Array()
+	for p in local:
+		world.append(xf * p)
+	_kit.slab_poly(world, depth, surface, vertical)
+	roof_components.append({"role": role, "points": world, "depth": depth,
+		"vertical": vertical, "surface": surface, "storey": _storeys() - 1})
 
 
 func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
@@ -943,11 +916,11 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 	if not spec.bargeboards:
 		return
 	tag("bargeboards")
-	var half := span / 2.0
+	var half := (span + 0.7) / 2.0
 	var ang := atan2(rise, half)
 	var bb_w: float = HouseGeometry.BARGEBOARD_W
 	var bb_thick := 0.05
-	var kick := 0.35
+	var kick := 0.10
 	# where the board finishes: the apex, or the hip line on a half hip
 	var up := Vector2(half * (1.0 - top / rise), top)
 	for end_v in [-1.0, 1.0]:
@@ -968,7 +941,7 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 		# Drop pendants at the eaves
 		for side2 in [-1.0, 1.0]:
 			_kit.oriented_box(Vector3(0.09, 0.24, 0.09),
-				xf * Transform3D(Basis(), Vector3(float(side2) * (half + 0.15), -0.05, z)),
+				xf * Transform3D(Basis(), Vector3(float(side2) * half, -0.05, z)),
 				SURF_TRIM)
 
 
@@ -985,36 +958,50 @@ func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float)
 				xf * Transform3D(Basis(), Vector3(ex, -0.05, ez)), SURF_TRIM)
 
 
-func _build_dormers(xf: Transform3D, span: float, along: float, rise: float) -> void:
-	if not spec.dormers or spec.dormer_count <= 0:
-		return
-	tag("dormer")
-	var count: int = spec.dormer_count
-	var half := span / 2.0
-	var dw := 0.95
-	var dh := 1.15
-	var dd := 1.25
-	var d_rise := 0.45
-	var dormer_x: float = -half * 0.52
-	var dormer_y: float = rise * 0.40
-
-	var spacing: float = (along * 0.65) / float(count + 1)
-	for i in range(count):
-		var dz: float = -along * 0.32 + float(i + 1) * spacing
-		var dormer_center := Vector3(dormer_x, dormer_y, dz)
-		# Cheek walls (sides)
+func _build_dormers(xf: Transform3D, dormers: Array) -> void:
+	for d in dormers:
+		var front: float = d["front"]
+		var z: float = d["z"]
+		var base: float = d["base"] - RoofShape.DEPTH * 0.5
+		var eave: float = d["eave"]
+		var hw: float = float(d["width"]) * 0.5
+		var rh: float = d["roof_half"]
+		var peak: float = eave + 0.45
+		var side_top := eave + 0.45 * (1.0 - hw / rh) - RoofShape.DEPTH * 0.5
+		var role: String = d["id"]
+		# Rooflets end on the actual valley line, not in a rectangular box
+		# behind the host slope. Cheeks taper to zero at that same intersection.
 		for side in [-1.0, 1.0]:
-			_kit.oriented_box(Vector3(dd, dh, 0.08),
-				xf * Transform3D(Basis(), dormer_center + Vector3(0.0, dh / 2.0, side * dw / 2.0)), SURF_WALL)
-		# Front face with window trim
-		_kit.oriented_box(Vector3(0.08, dh, dw),
-			xf * Transform3D(Basis(), dormer_center + Vector3(-dd / 2.0, dh / 2.0, 0.0)), SURF_TRIM)
-		# Inset glazed window pane
-		_kit.oriented_box(Vector3(0.04, dh * 0.68, dw * 0.65),
-			xf * Transform3D(Basis(), dormer_center + Vector3(-dd / 2.0 - 0.01, dh * 0.52, 0.0)), SURF_ROOF)
-		# Miniature gabled rooflet
-		var r_xf: Transform3D = xf * Transform3D(Basis(Vector3.UP, PI / 2.0), dormer_center + Vector3(0.0, dh, 0.0))
-		_kit.ridge_roof(r_xf, dw + 0.25, dd + 0.25, d_rise, SURF_ROOF, SURF_WALL, dw, dd)
+			_roof_face(xf, PackedVector3Array([
+				Vector3(front - 0.12, eave, z + side * rh),
+				Vector3(d["side_x"], eave, z + side * rh),
+				Vector3(d["peak_x"], peak, z),
+				Vector3(front - 0.12, peak, z)]), SURF_ROOF, role + "_roof")
+			_roof_face(xf, PackedVector3Array([
+				Vector3(front, base, z + side * hw),
+				Vector3(front, side_top, z + side * hw),
+				Vector3(d["cheek_x"], side_top, z + side * hw)]),
+				SURF_WALL, role + "_cheek", false, 0.08)
+		var head := eave - RoofShape.DEPTH * 0.5
+		_roof_face(xf, PackedVector3Array([
+			Vector3(front, head, z - hw), Vector3(front, head, z + hw),
+			Vector3(front, side_top, z + hw),
+			Vector3(front, peak - RoofShape.DEPTH * 0.5, z),
+			Vector3(front, side_top, z - hw)]), SURF_WALL, role + "_gable", false, 0.10)
+		var win_bottom := base + 0.20
+		var win_top := head - 0.13
+		var win_w := float(d["width"]) * 0.65
+		for side in [-1.0, 1.0]:
+			_kit.oriented_box(Vector3(0.10, head - base, hw - win_w * 0.5),
+				xf * Transform3D(Basis(), Vector3(front, (head + base) * 0.5,
+					z + side * (hw + win_w * 0.5) * 0.5)), SURF_TRIM)
+		for band in [[base, win_bottom], [win_top, head]]:
+			_kit.oriented_box(Vector3(0.10, band[1] - band[0], win_w),
+				xf * Transform3D(Basis(), Vector3(front, (band[0] + band[1]) * 0.5, z)), SURF_TRIM)
+		_kit.oriented_box(Vector3(0.04, win_top - win_bottom, win_w),
+			xf * Transform3D(Basis(), Vector3(front - 0.04, (win_top + win_bottom) * 0.5, z)), SURF_ROOF)
+		_kit.oriented_box(Vector3(0.05, win_top - win_bottom, 0.055),
+			xf * Transform3D(Basis(), Vector3(front - 0.065, (win_top + win_bottom) * 0.5, z)), SURF_TRIM)
 
 
 ## The frame in the gable -- and every member of it stays UNDER THE RAFTERS.
@@ -1086,8 +1073,8 @@ func _gable_frame(xf: Transform3D, span: float, along: float, rise: float,
 ## member's own depth already taken off -- a beam whose centre line lands here
 ## does not poke through the slates.
 func _under_rafter(x: float, roof_half: float, rise: float) -> float:
-	return clampf(rise * (1.0 - absf(x) / roof_half) - HouseGeometry.BEAM_W,
-		0.0, maxf(_frame_top - HouseGeometry.BEAM_W, 0.0))
+	return clampf(rise * (1.0 - absf(x) / roof_half) - RoofShape.DEPTH * 0.5 - HouseGeometry.BEAM_W * 0.5 - 0.02,
+		0.0, maxf(_frame_top - RoofShape.DEPTH * 0.5 - HouseGeometry.BEAM_W * 0.5 - 0.02, 0.0))
 
 
 ## Where the gable the frame stands in stops, set by _gable_frame before it
@@ -1147,24 +1134,7 @@ func _build_chimney() -> void:
 		return
 	tag("chimney")
 	var s: float = HouseGeometry.chimney_size(spec)
-	var r: Rect2 = HouseGeometry.site_rect(spec)
-	var c := Vector2(r.end.x + s / 2.0 - 0.15, 0.0)
-	var host: int = plan.hearth_room()
-	if host >= 0:
-		var span: Vector2 = HousePlanner.clear_wall_span(plan, host, plan.hearth_wall())
-		var along: float = (span.x + span.y) / 2.0
-		if plan.focus_room() == host and plan.focus_cat() == "hearth" \
-				and plan.focus_pos().is_finite():
-			along = plan.focus_pos().x if plan.hearth_wall() <= 1 else plan.focus_pos().y
-		match plan.hearth_wall():
-			0:
-				c = Vector2(along, r.position.y - s / 2.0 + 0.15)
-			1:
-				c = Vector2(along, r.end.y + s / 2.0 - 0.15)
-			2:
-				c = Vector2(r.position.x - s / 2.0 + 0.15, along)
-			_:
-				c = Vector2(r.end.x + s / 2.0 - 0.15, along)
+	var c := HouseGeometry.chimney_center(plan)
 
 	var wall_top: float = spec.height * _storeys()
 	# Above the RIDGE, not above an assumed two-metre roof. The old
