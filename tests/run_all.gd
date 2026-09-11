@@ -47,7 +47,7 @@ extends SceneTree
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"hroof", "hexterior", "house", "assets", "houseqa", "hmultistory", "harchetype", "court",
+	"roofprobe", "hroof", "hexterior", "house", "assets", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hlandmark",
 	"temple", "rite", "tarchetype",
@@ -98,6 +98,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return HouseSuite.run()
 		"hroof":
 			return preload("res://tests/suites/house_roof_suite.gd").run()
+		"roofprobe":
+			return preload("res://tests/roof_probe.gd").self_test()
 		"hexterior":
 			return preload("res://tests/suites/house_exterior_suite.gd").run()
 		"assets":

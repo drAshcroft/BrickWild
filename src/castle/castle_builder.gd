@@ -29,6 +29,10 @@ const SLIT_BAY := 4.5          # metres of wall per arrow slit
 var spec: CastleSpec
 var _roof_faces: Array[PackedVector3Array] = []
 var _roof_covers: Array[PackedVector3Array] = []
+var interiors: Array[Dictionary] = []
+var interior_errors: Array[String] = []
+var _planned_interiors := {}
+const Interiors = preload("res://src/castle/castle_interiors.gd")
 
 
 func build(p_spec: CastleSpec) -> ArrayMesh:
@@ -36,6 +40,9 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 	begin(4)
 	_roof_faces.clear()
 	_roof_covers.clear()
+	interiors.clear()
+	interior_errors.clear()
+	_planned_interiors = Interiors.primary(spec)
 	total_height = spec.height
 
 	if CastleGeometry.is_tower_house(spec):
@@ -61,6 +68,14 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 func _dressed() -> ArrayMesh:
 	_join_roofs()
 	prop_log = CastleFurnisher.dress(spec)
+	# Old decorative furniture must not overlap the actual plan's furniture.
+	prop_log = prop_log.filter(func(p: Dictionary) -> bool:
+		for row in interiors:
+			var at: Vector3 = p["pos"]
+			var bounds: AABB = row.bounds
+			if bounds.grow(0.2).has_point(at):
+				return false
+		return true)
 	return commit()
 
 
@@ -544,6 +559,9 @@ func _build_keep() -> void:
 	var k: AABB = CastleGeometry.keep_aabb(spec)
 	var c := Vector3(k.position.x + k.size.x / 2.0, 0.0, k.position.z + k.size.z / 2.0)
 	_log_mass("keep", k)
+	var planned := _planned_interiors.has("keep")
+	if planned:
+		Interiors.emit(self, _planned_interiors["keep"])
 	var opening_y: float = k.size.y * 0.55
 	match spec.keep_shape:
 		&"round", &"shell":
@@ -568,11 +586,13 @@ func _build_keep() -> void:
 				k.size.y - plinth, SURF_ROOF, CastleGeometry.TENSHU_TIERS, 0.14)
 			_shell_openings(c, corner * 0.91, plinth * 0.5, 4, PI / 4.0)
 		_:
-			_box_aabb(k, SURF_STONE)
+			if not planned:
+				_box_aabb(k, SURF_STONE)
 			_crenellate_rect(k, k.size.y, SURF_TRIM)
 			_kit.hip_roof_at(Transform3D(Basis(), c + Vector3(0, k.size.y, 0)),
 				k.size.x * 0.8, k.size.z * 0.8, CastleGeometry.roof_rise(spec, k), SURF_ROOF)
-			_face_openings(k, opening_y, spec.window_style)
+			if not planned:
+				_face_openings(k, opening_y, spec.window_style)
 	total_height = maxf(total_height, k.size.y + CastleGeometry.roof_rise(spec, k))
 
 
@@ -599,7 +619,13 @@ func _build_yard() -> void:
 		var h: float = YARD_WALL_H
 		var a := AABB(Vector3(rect.position.x, 0.0, rect.position.y),
 			Vector3(rect.size.x, h, rect.size.y))
-		_range(a, "yard_%s" % String(b["business"]), SURF_STONE, true, [], RANGE_BAY)
+		var row := Interiors.yard(spec, b)
+		var id := "yard_%s" % String(b["business"])
+		if row.has("errors"):
+			interior_errors.append("%s: %s" % [id, row.errors])
+		else:
+			_planned_interiors[id] = row
+		_range(a, id, SURF_STONE, true, [], RANGE_BAY)
 	var well: Dictionary = CastleGenerator.bailey_well(spec)
 	if well.is_empty():
 		return
@@ -618,7 +644,10 @@ const YARD_WALL_H := 3.2
 
 func _range(a: AABB, mass_name: String, surf: int, roofed: bool,
 		faces: Array = [], bay := 5.0) -> void:
-	_box_aabb(a, surf)
+	if _planned_interiors.has(mass_name):
+		Interiors.emit(self, _planned_interiors[mass_name])
+	else:
+		_box_aabb(a, surf)
 	_log_mass(mass_name, a)
 	var cx: float = a.position.x + a.size.x / 2.0
 	var cz: float = a.position.z + a.size.z / 2.0
@@ -634,7 +663,8 @@ func _range(a: AABB, mass_name: String, surf: int, roofed: bool,
 		total_height = maxf(total_height, a.size.y + rise)
 		if spec.dormers:
 			_dormers(a, along_x, rise)
-	_face_openings(a, a.size.y * 0.5, spec.window_style, faces, bay)
+	if not _planned_interiors.has(mass_name):
+		_face_openings(a, a.size.y * 0.5, spec.window_style, faces, bay)
 
 
 ## Windows in the middle of each of a block's four faces, facing out of it.

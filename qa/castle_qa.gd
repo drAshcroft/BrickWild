@@ -24,7 +24,7 @@ const WALL_PROBE := 1
 ## The five rules, in order; a family may replace one through
 ## `check(spec, mesh, builder, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"no_nan", &"grounded", &"connected_mass",
-	&"openings_embedded", &"enceinte_closed"]
+	&"openings_embedded", &"enceinte_closed", &"interiors", &"lords_walk"]
 const METHODS := {&"no_nan": "_check_vertices", &"grounded": "_check_ground",
 	&"openings_embedded": "_check_openings", &"enceinte_closed": "_check_enceinte"}
 
@@ -35,6 +35,7 @@ var failures: Array = []
 var warnings: Array = []
 var stats: Dictionary = {}
 var replaced: Dictionary = {}
+var buildings: Dictionary = {}
 
 var _grid: VoxelGrid
 
@@ -47,6 +48,7 @@ func check(p_spec: CastleSpec, p_mesh: ArrayMesh, p_builder: CastleBuilder,
 	failures.clear()
 	warnings.clear()
 	stats.clear()
+	buildings.clear()
 
 	_grid = VoxelGrid.new()
 	_grid.rasterize(mesh, CastleBuilder.SURF_OPEN, _voxel_size())
@@ -56,7 +58,74 @@ func check(p_spec: CastleSpec, p_mesh: ArrayMesh, p_builder: CastleBuilder,
 	stats["parts"] = builder.part_log.size()
 	stats["voxels_solid"] = _grid.count_solid()
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
-		"stats": stats, "replaced": replaced}
+		"stats": stats, "replaced": replaced, "buildings": buildings}
+
+
+func _check_interiors() -> void:
+	for error in builder.interior_errors:
+		failures.append("interiors: " + error)
+	for row in builder.interiors:
+		var report := HouseQA.new().check(row.plan, row.builder)
+		buildings[row.id] = report
+		for failure in report.failures:
+			failures.append("interiors[%s]: %s" % [row.id, failure])
+		for warning in report.warnings:
+			warnings.append("interiors[%s]: %s" % [row.id, warning])
+	stats["interior_buildings"] = buildings.size()
+
+
+func _check_lords_walk() -> void:
+	var report := lords_walk(spec, builder)
+	stats["lords_walk"] = report
+	for failure in report.failures:
+		failures.append("lords_walk: " + failure)
+
+
+## Shared WalkGrid handles the bailey, then HouseNavCheck chains the keep's
+## storeys. Logged footprints are obstacles; decorative AABBs are not floors.
+static func lords_walk(s: CastleSpec, b: CastleBuilder) -> Dictionary:
+	var out := {"failures": [], "applicable": false}
+	var keep := {}
+	for row in b.interiors:
+		if row.id == "keep":
+			keep = row
+	if keep.is_empty() or not CastleGeometry.is_enclosed(s):
+		return out
+	out.applicable = true
+	var p: HousePlan = keep.plan
+	var entrance := p.entrance()
+	if entrance < 0:
+		out.failures.append("keep has no entrance")
+		return out
+	var d: Dictionary = p.doors[entrance]
+	var xf: Transform3D = keep.transform
+	var local := Vector2(d.pos) + Vector2(d.normal) * (HouseGeometry.wall_thickness(p.spec) + HouseGeometry.PERSON_RADIUS + 0.15)
+	var point := xf * Vector3(local.x, 0, local.y)
+	var yard := CastleGeometry.bailey_rect(s)
+	var grid := WalkGrid.new()
+	grid.setup(yard.grow(2), maxf(0.12, minf(s.width, s.length) / 500.0))
+	if CastleGeometry.is_polygonal(s):
+		grid.add_floor_poly(CastleGeometry.inner_polygon(s, CastleGeometry.inner_ring(s)))
+	else:
+		grid.add_floor(yard)
+	for mass in b.mass_log:
+		var name: String = mass.name
+		if name == "keep" or name in ["hall", "chapel", "apse", "well"] or name.begins_with("yard_"):
+			var a: AABB = mass.aabb
+			grid.add_obstacle(Rect2(a.position.x, a.position.z, a.size.x, a.size.z))
+	var start := Vector2(yard.get_center().x, yard.position.y + HouseGeometry.PERSON_RADIUS + grid.cell * 2)
+	grid.build(HouseGeometry.PERSON_RADIUS)
+	if not grid.flood_from(start) or not grid.reached(Rect2(Vector2(point.x,point.z) - Vector2.ONE * 0.1, Vector2.ONE * 0.2)):
+		out.failures.append("gate approach %s cannot reach keep door approach %s" % [start, point])
+	var nav := HouseNavCheck.new()
+	var inside := nav.check(p)
+	var lords := p.rooms_of(&"lords_chamber")
+	if lords.is_empty():
+		out.failures.append("keep has no lord's chamber")
+	for room in lords:
+		if room in nav.unreached_rooms or not inside.ok:
+			out.failures.append("keep entrance cannot reach/use lord's chamber %d: %s" % [room, inside.failures])
+	return out
 
 
 ## Voxel size for this design: coarse enough that a 300 m fortress rasterizes

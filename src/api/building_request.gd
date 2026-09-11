@@ -17,6 +17,7 @@ var purpose: StringName = &""
 ## Number of plan-based storeys (houses and shops). Kept on the request rather
 ## than inferred from height, so callers can change levels without ceiling scale.
 var storeys: int = 1
+var material: StringName = &"timber"
 
 
 static func church(p_seed: int, p_style: StringName = &"romanesque",
@@ -57,7 +58,9 @@ static func temple(p_seed: int, p_form: StringName = &"basilica",
 ## A detached copy lets the library retain the request without retaining
 ## mutable caller-owned state.
 func copy() -> BuildingRequest:
-	return _make(kind, seed, style, purpose, width, length, height, storeys)
+	var out := _make(kind, seed, style, purpose, width, length, height, storeys)
+	out.material = material
+	return out
 
 
 static func _make(p_kind: StringName, p_seed: int, p_style: StringName,

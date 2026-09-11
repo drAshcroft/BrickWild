@@ -55,6 +55,8 @@ var window_hoods: bool = false    # dripstone hood mouldings over window heads
 var chimney_style: StringName = &"stepped" # &"stepped", &"straight", &"louver"
 var chimney_pots: int = 1         # terracotta flue pots at the crown
 var exterior_props: bool = true   # rain barrels, firewood, trade signs
+## Chosen before planning, so clear floor, openings and emitted masonry agree.
+var material: StringName = &"timber" # timber | stone
 
 ## Styles carry their own timber: `timber` is the chance of an exposed frame at
 ## all, `studs` the spacing between uprights (a town house is close-studded,

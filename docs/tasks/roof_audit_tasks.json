@@ -1,0 +1,61 @@
+{
+    "schema_version":  1,
+    "tasks":  [
+                  {
+                      "id":  "ce7a0f3b-a089-47f0-ba09-fc263c3abdbd",
+                      "title":  "ROOF-AUDIT-001: Seat hotel dormers on the actual host roof",
+                      "description":  "Confirmed by tools/check_roofs.ps1: hotel grand_budapest and alpine_palace, seeds 42 and 4413, default 48x24m and 3 storeys at 3.6m. There are 28 detached dormer bodies across four fixtures, with rear-edge air gaps 0.777-1.137m. Reproduce: tools/check_roofs.ps1 -Family hotel -Seed 42. In src/hotel/hotel_builder.gd _build_hotel_dormers, fixed z=-length/2-0.3 and y=top+roof_rise*0.42 put the boxes above/outside the host slope. Fit body position, rear join, cheeks and rooflet from the actual roof planes; provide real host openings if these are occupiable dormers. Do not conceal the gap with unrelated filler or weaken attachment tolerance. Inspect artifacts/roof_audit.json dormer_attachment_failures for exact body_bottom, host_top and sample coordinates. Acceptance: all four fixtures have attached bodies and clean front/side/rear joins, no host roof through glazing, and full roof audit plus hotel landmark checks pass. See docs/ROOF_AUDIT.md.",
+                      "targetCoord":  {
+                                          "file":  "src/hotel/hotel_builder.gd",
+                                          "line":  154
+                                      },
+                      "priority":  "P1",
+                      "owner":  {
+                                    "type":  "agent"
+                                },
+                      "status":  "pending"
+                  },
+                  {
+                      "id":  "3ef49d68-b9f9-4836-b0cb-c299cc4046ef",
+                      "title":  "ROOF-AUDIT-002: Classify coincident roof seams and degenerate dome triangles",
+                      "description":  "Audit warnings, not proven exposed holes: churches renaissance/42 has 44 duplicate triangles, russian/42 114, byzantine/4413 50 plus 4 degenerate triangles, renaissance/4413 108, russian/4413 10. Temple rotunda seeds 42 and 4413 each have 2 duplicates. Reproduce tools/check_roofs.ps1 -Family church,temple. Read artifacts/roof_audit.json rows[].mesh_findings: exact surface-2 triangle indices, original duplicate index, and numeric vertices. Church renaissance/42 starts at triangles 2510/2518 near (6.668,14.484,7.183); rotunda starts at 175/654 near (10.405,11.880,-3.381). Inspect src/church/church_roofs.gd clipping/slab caps, ChurchBuilder._dome_profile, TempleBuilder._build_dome_roof and MeshKit.slab_poly/revolve. Separate hidden opposite-facing shared side caps from exposed same-facing z-fighting; do not blindly delete shared boundaries. Acceptance: remove true degenerate faces and exposed duplicates; explicitly document and test legitimate internal seams, retain envelope thickness/culling and fixed regression passes. Details docs/ROOF_AUDIT.md.",
+                      "targetCoord":  {
+                                          "file":  "tests/roof_probe.gd"
+                                      },
+                      "priority":  "P2",
+                      "owner":  {
+                                    "type":  "agent"
+                                },
+                      "status":  "pending"
+                  },
+                  {
+                      "id":  "e4ded847-c914-4743-b983-b5d9f350c34c",
+                      "title":  "ROOF-AUDIT-003: Add explicit roof-region fixtures for remaining coverage gaps",
+                      "description":  "The audit currently checks all six implemented families at default dimensions and every style with seeds 42/4413, plus fixed roof regression matrices. It does not prove roofs over arbitrary court/polygon plans, all castle tiers and open battlements, ziggurat chambers, hotel cupola seams, or placed village buildings. Extend tools/check_roofs.gd with named authored fixture records containing covered polygons, sky openings and occupied-space top heights. Reuse tests/roof_probe.gd coverage; never treat the whole castle or village bounding box as roofed. Start with existing CourtSuite.courtyard and explicit ziggurat hall/terrace geometry, then castle tier size cases. Each region must have a removed-roof negative control and intentional courtyard/battlement positive control. Include case source, dimensions, seed and failing coordinates in JSON, and show unsupported registry entries as uncovered rather than passing. Keep WorldFamilies empty registry explicitly reported until families are implemented. See docs/ROOF_AUDIT.md for complete current limits.",
+                      "targetCoord":  {
+                                          "file":  "tools/check_roofs.gd"
+                                      },
+                      "priority":  "P2",
+                      "owner":  {
+                                    "type":  "agent"
+                                },
+                      "status":  "pending"
+                  },
+                  {
+                      "id":  "298d934e-36c5-4d93-be74-5f5685db26ef",
+                      "title":  "Create cross-family roof audit utility and summarize remaining defects",
+                      "description":  "Unify house, church, castle and temple roof regressions; add complete-building mesh probes and shop/hotel fixtures. Save machine-readable and Markdown reports with exact seeds, dimensions, failing sample coordinates, source locations, and explicit coverage gaps. Prove probes reject broken fixtures and run the audit.",
+                      "targetCoord":  {
+                                          "file":  "tools/check_roofs.gd"
+                                      },
+                      "priority":  "P1",
+                      "owner":  {
+                                    "type":  "agent"
+                                },
+                      "status":  "complete",
+                      "aiNotes":  "Implemented tools/check_roofs.gd plus Windows watchdog wrapper tools/check_roofs.ps1 and reusable tests/roof_probe.gd; roofprobe added to run_all. Full audit: 35103 checks, 4 failure groups (28 floating hotel dormers), 8 warning groups; engine error log empty. Nine probe controls pass independently. Filtered hotel seed 42 run produces 5431 checks and 2 expected failure groups. Reports artifacts/roof_audit.md and .json; durable guide/findings docs/ROOF_AUDIT.md. Follow-up tasks ROOF-AUDIT-001/002/003 retain confirmed defects, warning triage, and explicit coverage gaps. Shop/hotel with_furniture parameter defaults true; audit opts out of interior furnishings."
+                  }
+              ],
+    "report":  "docs/ROOF_AUDIT.md",
+    "date":  "2026-09-09"
+}

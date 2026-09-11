@@ -159,14 +159,18 @@ static func site_rect(spec: HouseSpec) -> Rect2:
 
 ## The ground the rooms partition: inside the exterior walls.
 static func interior_rect(spec: HouseSpec) -> Rect2:
-	return site_rect(spec).grow(-WALL_T)
+	return site_rect(spec).grow(-wall_thickness(spec))
+
+
+static func wall_thickness(spec: HouseSpec) -> float:
+	return 0.6 if spec.material == &"stone" else WALL_T
 
 
 ## The four exterior wall runs, each as
 ## {"from": Vector2, "to": Vector2, "normal": Vector2, "side": StringName}.
 ## `from`/`to` run along the wall's CENTRE LINE, and `normal` points outdoors.
 static func exterior_runs(spec: HouseSpec) -> Array[Dictionary]:
-	var r: Rect2 = site_rect(spec).grow(-WALL_T / 2.0)
+	var r: Rect2 = site_rect(spec).grow(-wall_thickness(spec) / 2.0)
 	return [
 		{"from": Vector2(r.position.x, r.position.y), "to": Vector2(r.end.x, r.position.y),
 			"normal": Vector2(0, -1), "side": &"front"},
@@ -185,11 +189,11 @@ static func exterior_runs(spec: HouseSpec) -> Array[Dictionary]:
 ## it got: from, to, an OUTWARD normal and a side name. The outline is the
 ## clear floor, so the centre-line is the outline pushed out by half a wall --
 ## exactly what `exterior_runs` does to the site rectangle.
-static func polygon_runs(outline: PackedVector2Array) -> Array[Dictionary]:
+static func polygon_runs(outline: PackedVector2Array, thickness := WALL_T) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if outline.size() < 3:
 		return out
-	var centre: PackedVector2Array = Poly.offset(outline, WALL_T / 2.0)
+	var centre: PackedVector2Array = Poly.offset(outline, thickness / 2.0)
 	if centre.size() < 3:
 		centre = outline
 	var turn: float = 1.0 if Poly.signed_area(centre) > 0.0 else -1.0
@@ -210,7 +214,7 @@ static func polygon_runs(outline: PackedVector2Array) -> Array[Dictionary]:
 static func shell_runs(plan: HousePlan, level: int) -> Array[Dictionary]:
 	for i in range(plan.room_count()):
 		if HousePlan.record_storey(plan.rooms[i]) == level and plan.is_polygonal(i):
-			return polygon_runs(plan.outline_of(i))
+			return polygon_runs(plan.outline_of(i), wall_thickness(plan.spec))
 	return exterior_runs(plan.spec)
 
 

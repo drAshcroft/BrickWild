@@ -6,7 +6,7 @@ const NAMES := ["Grand Rose Hotel", "The Zubrowka Palace", "Imperial Alpine Hote
 	"The Pink Crown", "Grand Foxglove Hotel", "The Royal Mendl"]
 
 
-static func generate(spec: HotelSpec, p_seed: int) -> HousePlan:
+static func generate(spec: HotelSpec, p_seed: int, with_furniture := true) -> HousePlan:
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
 	spec.storeys = 3
@@ -40,7 +40,8 @@ static func generate(spec: HotelSpec, p_seed: int) -> HousePlan:
 	spec.variant_name = NAMES[r.randi_range(0, NAMES.size() - 1)]
 
 	var plan := HotelPlanner.plan(spec)
-	HouseFurnisher.furnish(plan, spec)
+	if with_furniture:
+		HouseFurnisher.furnish(plan, spec)
 	for placement in plan.furniture:
 		var room: int = int(placement.get("room", -1))
 		placement["storey"] = plan.storey_of_room(room) if room >= 0 \

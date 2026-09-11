@@ -513,12 +513,12 @@ const WELL_CLEAR := 6.0
 static func _place_in_yard(spec: CastleSpec, yard: Rect2, taken: Array[Rect2],
 		row: Dictionary, r: RandomNumberGenerator) -> Dictionary:
 	var clear: float = CastleGeometry.BAILEY_CLEAR
-	var w: float = float(row["w"])
-	var l: float = float(row["l"])
+	var w: float = maxf(float(row["w"]), 8.0)
+	var l: float = maxf(float(row["l"]), 7.0)
 	# shrink to fit a small ward rather than refuse to stand in one
 	var room_x: float = yard.size.x / 2.0 - YARD_MARGIN * 2.0
-	w = minf(w, maxf(room_x, 2.5))
-	l = minf(l, maxf(yard.size.y * 0.25, 2.5))
+	if room_x < w or yard.size.y - 2.0 * YARD_MARGIN < l:
+		return {} # A quarter-turned public Shop request needs at least 7x8m.
 	for side in ([-1.0, 1.0] if r.randf() < 0.5 else [1.0, -1.0]):
 		var z: float = yard.position.y + YARD_MARGIN + l / 2.0
 		while z + l / 2.0 <= yard.end.y - YARD_MARGIN:
@@ -826,6 +826,8 @@ const CHANCEL_RISE := 0.15
 ## it the way it measures a room.
 static func _chapel_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 	var out := HouseSpec.new(spec.seed ^ 0x43_48_50_4C)
+	out.material = &"stone"
+	out.plinth_height = 0.0
 	out.style = &"longhall"
 	out.width = box.size.x
 	out.length = box.size.z
@@ -934,6 +936,8 @@ const KEEP_WINDOW_PITCH := 5.0
 ## the way it measures a house, and the colours come out as castle masonry.
 static func _keep_spec(spec: CastleSpec, box: AABB, levels: int) -> KeepSpec:
 	var out := KeepSpec.new(spec.seed ^ 0x4B_45_45_50)
+	out.material = &"stone"
+	out.plinth_height = 0.0
 	out.style = &"townhouse"
 	out.width = box.size.x
 	out.length = box.size.z
@@ -1010,6 +1014,8 @@ static func _longest_table() -> float:
 ## rather than as a cottage.
 static func _hall_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 	var out := HouseSpec.new(spec.seed)
+	out.material = &"stone"
+	out.plinth_height = 0.0
 	out.style = &"longhall"
 	out.width = box.size.x
 	out.length = box.size.z

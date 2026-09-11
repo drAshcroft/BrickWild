@@ -8,7 +8,7 @@ const SECOND_WORDS := ["and Anvil", "and Cask", "and Crown", "and Hearth",
 	"and Horseshoe", "and Quill", "at the Bridge", "by the Gate", "on Market Row"]
 
 
-static func generate(spec: ShopSpec, p_seed: int) -> HousePlan:
+static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> HousePlan:
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
 	spec.storeys = clampi(spec.storeys, 1, 3)
@@ -40,7 +40,8 @@ static func generate(spec: ShopSpec, p_seed: int) -> HousePlan:
 		SECOND_WORDS[r.randi() % SECOND_WORDS.size()]]
 
 	var plan := ShopPlanner.plan(spec)
-	ShopFurnisher.furnish(plan, spec)
+	if with_furniture:
+		ShopFurnisher.furnish(plan, spec)
 	for placement in plan.furniture:
 		var room: int = int(placement.get("room", -1))
 		placement["storey"] = plan.storey_of_room(room) if room >= 0 \

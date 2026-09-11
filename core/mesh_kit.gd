@@ -37,6 +37,13 @@ func surface(i: int) -> SurfaceTool:
 	return _sts[i]
 
 
+## Append an independently built shell without losing its explicit normals.
+## Mapping is explicit: a house floor is stone, not a castle's opening slot.
+func append_mesh(mesh: ArrayMesh, transform: Transform3D, mapping: Array[int]) -> void:
+	for s in mesh.get_surface_count():
+		_sts[mapping[s]].append_from(mesh, s, transform)
+
+
 # ------------------------------------------------------------------- boxes
 
 ## Box centred at pos. rot_y turns it about Y; shear slides the top along Z

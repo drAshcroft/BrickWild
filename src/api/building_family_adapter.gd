@@ -124,6 +124,7 @@ class PlanFamily extends BuildingFamilyAdapter:
 class HouseFamily extends PlanFamily:
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := HouseSpec.new()
+		spec.material = request.material
 		_copy_size_and_style(request, spec)
 		spec.trade = request.purpose
 		spec.storeys = request.storeys
@@ -141,6 +142,7 @@ class HouseFamily extends PlanFamily:
 class ShopFamily extends PlanFamily:
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := ShopSpec.new()
+		spec.material = request.material
 		_copy_size_and_style(request, spec)
 		spec.business = request.purpose
 		spec.storeys = request.storeys

@@ -38,8 +38,9 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_plinth()
 	_build_exterior_walls()
 	_build_partitions()
-	_build_jetty()
-	_build_timber_frame()
+	if spec.material != &"stone":
+		_build_jetty()
+		_build_timber_frame()
 	if with_roof:
 		_build_roof()
 	_build_porch()
@@ -68,7 +69,7 @@ func _build_floor() -> void:
 			# The floor of a shaped storey is the shape, pushed out to the
 			# middle of its own wall so the slab and the masonry meet.
 			var poly: PackedVector2Array = Poly.offset(plan.outline_of(shaped),
-				HouseGeometry.WALL_T / 2.0)
+				HouseGeometry.wall_thickness(spec) / 2.0)
 			_kit.slab_poly(_lift(poly, y0 + t / 2.0), t, SURF_FLOOR)
 			_log_mass("floor" if _levels().size() == 1 else "floor_%d" % level,
 				AABB(Vector3(a.position.x, y0, a.position.z), a.size), y0)
@@ -93,8 +94,8 @@ func _build_pits() -> void:
 		if level >= 0:
 			continue
 		var y0 := float(level) * spec.height
-		var pit := AABB(Vector3(r.position.x - HouseGeometry.WALL_T, y0, r.position.y - HouseGeometry.WALL_T),
-			Vector3(r.size.x + 2.0 * HouseGeometry.WALL_T, spec.height, r.size.y + 2.0 * HouseGeometry.WALL_T))
+		var pit := AABB(Vector3(r.position.x - HouseGeometry.wall_thickness(spec), y0, r.position.y - HouseGeometry.wall_thickness(spec)),
+			Vector3(r.size.x + 2.0 * HouseGeometry.wall_thickness(spec), spec.height, r.size.y + 2.0 * HouseGeometry.wall_thickness(spec)))
 		mass_log.append({"name": "pit_%d" % level, "aabb": pit, "ground": y0, "kind": "dug"})
 
 
@@ -180,7 +181,7 @@ func _build_plinth() -> void:
 	var plinth_h: float = minf(spec.plinth_height, HouseGeometry.WINDOW_SILL - 0.18)
 	if plinth_h <= 0.05 or (spec.stone_ground_floor and _storeys() > 1):
 		return
-	var thick: float = HouseGeometry.WALL_T + HouseGeometry.PLINTH_EXTRA * 2.0
+	var thick: float = HouseGeometry.wall_thickness(spec) + HouseGeometry.PLINTH_EXTRA * 2.0
 	for run in HouseGeometry.exterior_runs(spec):
 		var from: Vector2 = run["from"]
 		var to: Vector2 = run["to"]
@@ -220,8 +221,8 @@ func _build_exterior_walls() -> void:
 			var to: Vector2 = run["to"]
 			var normal: Vector2 = run["normal"]
 			var openings: Array[Dictionary] = _openings_on(from, to, normal, level)
-			_wall_run(from, to, HouseGeometry.WALL_T, h, openings, surf, y0)
-			var a: AABB = _run_aabb(from, to, HouseGeometry.WALL_T, h, y0)
+			_wall_run(from, to, HouseGeometry.wall_thickness(spec), h, openings, surf, y0)
+			var a: AABB = _run_aabb(from, to, HouseGeometry.wall_thickness(spec), h, y0)
 			var suffix := "" if _levels().size() == 1 else "_%d" % level
 			_log_mass("wall_%s%s" % [String(run["side"]), suffix], a, y0)
 	total_height = maxf(total_height, h * _storeys())
@@ -468,7 +469,7 @@ static func _on_run(from: Vector2, to: Vector2, normal: Vector2, pos: Vector2,
 	var off: float = absf(rel.dot(Vector2(dir.y, -dir.x)))
 	# an exterior opening is recorded on the INNER face of its wall, so allow
 	# half a wall's slack across the run
-	return off <= HouseGeometry.WALL_T / 2.0 + 0.02 and t >= -0.01 and t <= run + 0.01
+	return off <= HouseGeometry.wall_thickness(spec) / 2.0 + 0.02 and t >= -0.01 and t <= run + 0.01
 
 
 static func _along(from: Vector2, to: Vector2, pos: Vector2) -> float:
@@ -768,8 +769,8 @@ func _beam(from: Vector2, dir: Vector2, yaw: float, normal: Vector2, t: float,
 
 ## How far out from the wall centre-line a beam of this depth sits: against the
 ## plaster, with a hair of overlap so no seam shows.
-static func _proud(depth: float) -> float:
-	return HouseGeometry.WALL_T / 2.0 + depth / 2.0 - 0.015
+func _proud(depth: float) -> float:
+	return HouseGeometry.wall_thickness(spec) / 2.0 + depth / 2.0 - 0.015
 
 
 # ------------------------------------------------------------------- roof
@@ -876,9 +877,9 @@ func _build_roof() -> void:
 			[Vector2(-h, -f), Vector2(-h, f), Vector2(1, 0)],
 			[Vector2(h, -f), Vector2(h, f), Vector2(-1, 0)]]:
 		var profile := RoofShape.wall_profile(faces, run[0], run[1])
-		var inward: Vector2 = run[2] * HouseGeometry.WALL_T * 0.5
+		var inward: Vector2 = run[2] * HouseGeometry.wall_thickness(spec) * 0.5
 		var shift := Transform3D(Basis(), Vector3(inward.x, 0, inward.y))
-		_roof_face(xf * shift, profile, SURF_WALL, "roof_wall", false, HouseGeometry.WALL_T)
+		_roof_face(xf * shift, profile, SURF_WALL, "roof_wall", false, HouseGeometry.wall_thickness(spec))
 
 	var ridge_half := along * 0.5 + 0.25
 	if spec.roof_type != &"gable":
@@ -1112,7 +1113,7 @@ func _build_porch() -> void:
 	var c: Vector2 = door["pos"] + door["normal"] * (depth / 2.0)
 	var head: float = HouseGeometry.DOOR_H + 0.35
 	var step := AABB(Vector3(c.x - w / 2.0, 0.0, c.y - depth / 2.0 - 0.1),
-		Vector3(w, HouseGeometry.FLOOR_T, depth + 0.2 + HouseGeometry.WALL_T))
+		Vector3(w, HouseGeometry.FLOOR_T, depth + 0.2 + HouseGeometry.wall_thickness(spec)))
 	box(step.size, step.position + step.size / 2.0, SURF_FLOOR)
 	_log_mass("porch_step", step)
 	for side in [-1.0, 1.0]:

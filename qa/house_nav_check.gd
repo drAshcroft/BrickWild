@@ -52,7 +52,7 @@ func check(plan: HousePlan) -> Dictionary:
 		return _report()
 	# a step inside the front door: where somebody stands having just come in
 	var inside: Vector2 = Vector2(_plan.doors[door]["pos"]) \
-		- Vector2(_plan.doors[door]["normal"]) * (HouseGeometry.WALL_T * 0.5 + 0.2)
+		- Vector2(_plan.doors[door]["normal"]) * (HouseGeometry.wall_thickness(_plan.spec) * 0.5 + 0.2)
 	if not _grid.flood_from(inside):
 		failures.append("nav: there is nowhere to stand inside the front door")
 		return _report()
@@ -81,7 +81,7 @@ func _report() -> Dictionary:
 ## subtracted. Building it this way round means a partition is blocked because
 ## it belongs to no room, which is exactly what a wall is.
 func _rasterize() -> void:
-	var bounds: Rect2 = HouseGeometry.interior_rect(_plan.spec).grow(HouseGeometry.WALL_T)
+	var bounds: Rect2 = HouseGeometry.interior_rect(_plan.spec).grow(HouseGeometry.wall_thickness(_plan.spec))
 	_grids.clear()
 	for level in _levels():
 		var grid := WalkGrid.new()

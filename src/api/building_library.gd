@@ -288,6 +288,8 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 				"storeys must be between %d and %d for a %s." % [
 					int(limits2["min"]), int(limits2["max"]), String(request.kind)]))
 	_validate_options(request, out)
+	if request.material not in [&"stone", &"timber"]:
+		out.append(_error(&"invalid_material", &"material", "Shell material must be stone or timber."))
 	if request.kind == &"world" and out.is_empty():
 		# a world family narrows the kind's envelope with its own, and owns
 		# which sub-kinds it comes in

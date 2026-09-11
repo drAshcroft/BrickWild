@@ -90,6 +90,7 @@ func to_dict() -> Dictionary:
 			"style": String(request.style), "purpose": String(request.purpose),
 			"width": request.width, "length": request.length,
 			"height": request.height, "storeys": request.storeys,
+			"material": String(request.material),
 		}
 	if not errors.is_empty():
 		out["errors"] = errors.duplicate(true)
