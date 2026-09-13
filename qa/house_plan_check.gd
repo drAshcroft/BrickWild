@@ -212,6 +212,11 @@ func _check_entrance(plan: HousePlan) -> void:
 			if d.get("front", false):
 				failures.append("way in: the front door opens onto a court, not the street")
 			continue
+		var room := int(d.get("a", -1))
+		if room >= 0 and room < plan.room_count() and plan.is_polygonal(room):
+			if not _on_outline(plan.outline_of(room), pos):
+				failures.append("way in: exterior door at %v is not on an exterior wall" % pos)
+			continue
 		var on_wall: bool = (absf(n.x) > 0.5 and (absf(pos.x - inner.position.x) < TOL
 				or absf(pos.x - inner.end.x) < TOL)) \
 			or (absf(n.y) > 0.5 and (absf(pos.y - inner.position.y) < TOL
@@ -262,6 +267,13 @@ func _check_stairs(plan: HousePlan) -> void:
 				failures.append("stairs: stair %d has no usable %s landing" % [si, key])
 			elif not interior.grow(TOL).encloses(Rect2(stair[key])):
 				failures.append("stairs: stair %d %s lies outside the interior" % [si, key])
+			else:
+				var rooms: Array = [a, b] if key == "rect" else [a if key == "lower_rect" else b]
+				for room in rooms:
+					for point in Poly.from_rect(Rect2(stair[key])):
+						if not Poly.contains_point(HouseGeometry.room_floor_poly(plan, room), point, TOL):
+							failures.append("stairs: stair %d %s lies outside room %d's floor" % [si, key, room])
+							break
 		if stair.has("lower_rect") and stair.has("upper_rect"):
 			var lower: Rect2 = stair["lower_rect"]
 			var upper: Rect2 = stair["upper_rect"]
@@ -550,6 +562,16 @@ static func _wall_run_for(plan: HousePlan, d: Dictionary) -> Array:
 		var pos: Vector2 = d["pos"]
 		var along: float = pos.y if Vector2(edge[0]).x > 0.5 else pos.x
 		return [along - t0, t1 - t0]
+	if plan.is_polygonal(a):
+		var pos := Vector2(d["pos"])
+		for wall in HouseGeometry.room_walls(plan, a):
+			var from := Vector2(wall.from)
+			var to := Vector2(wall.to)
+			var nearest := Geometry2D.get_closest_point_to_segment(pos, from, to)
+			if pos.distance_to(nearest) <= TOL \
+					and Vector2(d.normal).dot(-Vector2(wall.normal)) > 0.9:
+				return [from.distance_to(nearest), from.distance_to(to)]
+		return []
 	var rect: Rect2 = plan.rooms[a]["rect"]
 	var n: Vector2 = d["normal"]
 	if absf(n.y) > 0.5:
@@ -590,9 +612,7 @@ func _check_stair_line(plan: HousePlan) -> void:
 		var rect: Rect2 = Rect2(stair.get("lower_rect", stair.get("rect", Rect2())))
 		if rect.size.x <= 0.0:
 			continue
-		var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
-		var gap: float = minf(minf(rect.position.y - f.position.y, f.end.y - rect.end.y),
-			minf(rect.position.x - f.position.x, f.end.x - rect.end.x))
+		var gap := stair_wall_gap(plan, stair)
 		if gap > STAIR_WALL_TOL:
 			failures.append("stair_line: stair %d stands %.2fm off every wall of room %d (%s)"
 				% [si, gap, room, String(plan.kind_of(room))])
@@ -606,6 +626,27 @@ func _check_stair_line(plan: HousePlan) -> void:
 				warnings.append(msg)
 			else:
 				failures.append(msg)
+
+
+## A stair against the wall of a narrowing upper storey may stand away from
+## the lower outside wall. Both landings must still fit their real floors.
+static func stair_wall_gap(plan: HousePlan, stair: Dictionary) -> float:
+	var lower := int(stair.get("a", -1))
+	if lower < 0 or lower >= plan.room_count():
+		return INF
+	var rect := Rect2(stair.get("lower_rect", stair.get("rect", Rect2())))
+	var rooms: Array[int] = [lower]
+	var upper := int(stair.get("b", -1))
+	if upper >= 0 and upper < plan.room_count() \
+			and (plan.is_polygonal(lower) or plan.is_polygonal(upper)):
+		rooms.append(upper)
+	var gap := INF
+	for room in rooms:
+		for wall in HouseGeometry.room_walls(plan, room):
+			for point in Poly.from_rect(rect):
+				var nearest := Geometry2D.get_closest_point_to_segment(point, wall.from, wall.to)
+				gap = minf(gap, point.distance_to(nearest))
+	return gap
 
 
 ## The front door and the back door are not in line (LAY-006): two exterior

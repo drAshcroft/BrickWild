@@ -180,7 +180,7 @@ static func _check_opening_elevations(plan: HousePlan, builder: HouseBuilder) ->
 			var wp: Vector2 = win["pos"]
 			# Plan openings sit on the interior wall face while trim is logged on
 			# the wall centreline, so their plan-space separation is half a wall.
-			if Vector2(pp.x, pp.z).distance_to(wp) < HouseGeometry.WALL_T / 2.0 + 0.04 \
+			if Vector2(pp.x, pp.z).distance_to(wp) < HouseGeometry.wall_thickness(plan.spec) / 2.0 + 0.04 \
 					and absf(pp.y - expected) < 0.06:
 				found = true
 				break

@@ -9,8 +9,10 @@ extends RefCounted
 ## in a few milliseconds per house. Here at the end the rectangles are handed
 ## their meshes.
 ##
-## Two things are corrected as each prop goes in, and both come from the
+## Placement corrections come from the
 ## measured catalogue rather than from guesswork:
+##   * the model's measured centre follows the planned footprint, and a
+##     mounted model's back follows the room's wall face;
 ##   * the model is dropped so its feet sit on the floor, because a few of them
 ##     are modelled hanging below their own origin;
 ##   * the placement's scale is applied, so the small table the furnisher chose
@@ -48,7 +50,7 @@ static func dress_exterior(root: Node3D, plan: HousePlan) -> void:
 	if not plan.spec.exterior_props:
 		return
 	for p in plan.exterior:
-		var node := _instance(p)
+		var node := _instance(p, false)
 		if node == null:
 			push_error("Missing exterior prop model: %s" % p["key"])
 			continue
@@ -73,8 +75,9 @@ static func furnish(root: Node3D, plan: HousePlan) -> void:
 	root.add_child(LightKit.light_the_plan(plan))
 
 
-## One piece of furniture, placed as the plan says.
-static func _instance(p: Dictionary) -> Node3D:
+## One piece of furniture, placed as the plan says. Exterior dressing already
+## records a model origin and opts out of the interior centre convention.
+static func _instance(p: Dictionary, centred := true) -> Node3D:
 	var key: String = p["key"]
 	var path: String = PropCatalog.scene_path(key)
 	if not ResourceLoader.exists(path):
@@ -87,6 +90,9 @@ static func _instance(p: Dictionary) -> Node3D:
 	var scale_factor: float = float(p.get("scale", 1.0))
 	node.scale = Vector3.ONE * scale_factor
 	node.rotation.y = float(p["yaw"]) + PropCatalog.face_offset(key)
+	if centred:
+		node.position = PropCatalog.house_origin(p)
+		return node
 	var pos: Vector3 = p["pos"]
 	# sit it on whatever it stands on: the floor, a table top, or its bracket
 	var drop: float = PropCatalog.floor_offset(key) * scale_factor

@@ -7,6 +7,7 @@ static func run() -> SuiteResult:
 	var res := SuiteResult.new("poly")
 	_check_area(res)
 	_check_edge_point(res)
+	_check_closed_polygon(res)
 	_check_intersection(res)
 	_check_offset(res)
 	_check_hull(res)
@@ -53,6 +54,29 @@ static func _check_intersection(res: SuiteResult) -> void:
 	var overlap: float = Poly.intersection_area(a, b)
 	if not is_equal_approx(overlap, 0.5):
 		res.fail("half-overlapping unit squares intersect at %f, want 0.5" % overlap)
+
+
+static func _check_closed_polygon(res: SuiteResult) -> void:
+	var open := PackedVector2Array([Vector2(0, 0), Vector2(2, 0), Vector2(0, 2)])
+	var hull := Geometry2D.convex_hull(open)
+	var repeated := PackedVector2Array([Vector2(0, 0), Vector2(2, 0), Vector2(2, 0), Vector2(0, 2), Vector2(0, 0)])
+	for row in [
+		[Vector2(0.25, 0.25), true], [Vector2(1, 1), true],
+		[Vector2.ZERO, true], [Vector2(1.5, 1.5), false],
+		[Vector2(2.05, 1), false], [Vector2(-0.05, 1), false]]:
+		res.checked += 1
+		for poly in [open, hull, repeated]:
+			if Poly.contains_point(poly, row[0]) != row[1]:
+				res.fail("closed/repeated polygon misclassified %s (expected %s)" % [row[0], row[1]])
+	var a := WalkGrid.new()
+	var b := WalkGrid.new()
+	for grid in [a, b]:
+		grid.setup(Rect2(-1, -1, 4, 4), 0.12)
+	a.add_floor_poly(open)
+	b.add_floor_poly(hull)
+	res.checked += 1
+	if a._free != b._free:
+		res.fail("closed hull changed polygon floor rasterization")
 
 
 static func _check_offset(res: SuiteResult) -> void:

@@ -171,7 +171,8 @@ static func _great_hall(res: SuiteResult) -> void:
 			continue
 		# the room is the hall range, less the wall it is inside
 		var box: AABB = CastleGeometry.hall_aabb(spec)
-		var want := Vector2(box.size.x, box.size.z) - Vector2.ONE * HouseGeometry.WALL_T * 2.0
+		var want := Vector2(box.size.x, box.size.z) \
+			- Vector2.ONE * HouseGeometry.wall_thickness(plan.spec) * 2.0
 		var floor_rect: Rect2 = plan.rooms[0]["rect"]
 		if not floor_rect.size.is_equal_approx(want):
 			res.fail("%s: the room is %.2f x %.2fm, the range inside its walls is %.2f x %.2fm"
@@ -350,12 +351,9 @@ static func _keep(res: SuiteResult) -> void:
 		var joined := {}
 		for st in plan.stairs:
 			joined[int(st.get("storey", 0))] = true
-			var rect: Rect2 = st["rect"]
-			var f: Rect2 = HouseGeometry.room_floor_rect(plan, int(st["a"]))
-			var touches: bool = absf(rect.position.x - f.position.x) < WALL_TOL \
-				or absf(rect.end.x - f.end.x) < WALL_TOL \
-				or absf(rect.position.y - f.position.y) < WALL_TOL \
-				or absf(rect.end.y - f.end.y) < WALL_TOL
+			# A tapered keep's stair may touch the upper landing wall. Measure
+			# real polygon edges on both floors, never the lower floor's AABB.
+			var touches: bool = HousePlanCheck.stair_wall_gap(plan, st) < WALL_TOL
 			if not touches:
 				res.fail("%s: the stair from storey %d stands off every wall"
 					% [who, int(st.get("storey", 0))])

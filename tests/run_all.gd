@@ -46,8 +46,8 @@ extends SceneTree
 ##  29 world      - the buildings of the wider world (WORLD_BUILDINGS), as
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
-	"churchroof", "ctroof", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"roofprobe", "hroof", "hexterior", "house", "assets", "houseqa", "hmultistory", "harchetype", "court",
+	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
+	"roofprobe", "hroof", "hexterior", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hlandmark",
 	"temple", "rite", "tarchetype",
@@ -80,6 +80,22 @@ static func _run_one(key: String) -> SuiteResult:
 			return LandmarkSuite.run()
 		"castle":
 			return CastleSuite.run()
+		"stoneshell":
+			return preload("res://tests/suites/stone_shell_suite.gd").run()
+		"cwalk":
+			return preload("res://tests/suites/castle_walk_suite.gd").run()
+		"cplanshell":
+			return load("res://tests/suites/castle_plan_shell_suite.gd").run()
+		"crangeplan":
+			return load("res://tests/suites/castle_range_plan_suite.gd").run()
+		"caperture":
+			return load("res://tests/suites/castle_aperture_suite.gd").run()
+		"cshop":
+			return load("res://tests/suites/castle_shop_suite.gd").run()
+		"psconce":
+			return load("res://tests/suites/polygon_sconce_suite.gd").run()
+		"ckfurnish":
+			return load("res://tests/suites/castle_keep_furnishing_suite.gd").run()
 		"cnormals":
 			return CastleNormalsSuite.run()
 		"cmassing":
@@ -104,6 +120,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/house_exterior_suite.gd").run()
 		"assets":
 			return HouseAssetsSuite.run()
+		"hassembly":
+			return load("res://tests/suites/house_assembly_suite.gd").run()
 		"houseqa":
 			return HouseQASuite.run()
 		"hmultistory":
@@ -155,7 +173,10 @@ func _init() -> void:
 	var results: Array[SuiteResult] = []
 	var failed_suites := 0
 	for key in wanted:
+		print("Running %s..." % key)
+		var started := Time.get_ticks_msec()
 		var res: SuiteResult = _run_one(key)
+		res.note("elapsed %.2fs" % ((Time.get_ticks_msec() - started) / 1000.0))
 		results.append(res)
 		if not res.ok():
 			failed_suites += 1

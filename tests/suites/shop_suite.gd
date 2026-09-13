@@ -44,4 +44,41 @@ static func run() -> SuiteResult:
 	if pa.rooms != pb.rooms or pa.doors != pb.doors or pa.windows != pb.windows \
 			or pa.furniture != pb.furniture:
 		res.fail("the same shop request produced two different plans")
+	_internal_room_focus(res)
 	return res
+
+
+## A narrow stone stable enters through its tack room. The stall must face
+## the stable's actual internal doorway, not an imagined centred street door.
+static func _internal_room_focus(res: SuiteResult) -> void:
+	var spec := ShopSpec.new()
+	spec.business = &"stable"
+	spec.style = &"longhall"
+	spec.material = &"stone"
+	spec.width = 7.0
+	spec.length = 8.0
+	spec.height = 3.2
+	var plan := ShopGenerator.generate(spec, 478822315)
+	res.checked += 1
+	if plan.focus_room() == plan.entrance_room():
+		res.fail("internal stable focus fixture no longer exercises an indirect entrance")
+	for report in [HousePlanCheck.new().check(plan), HouseFurnishCheck.new().check(plan),
+			HouseNavCheck.new().check(plan)]:
+		res.checked += 1
+		for failure in report.failures:
+			res.fail("internal stable focus: " + String(failure))
+	var stall := -1
+	for index in plan.furniture_of(plan.focus_room()):
+		if PropCatalog.category(plan.furniture[index].key) == plan.focus_cat():
+			stall = index
+			break
+	res.checked += 1
+	if stall < 0:
+		res.fail("internal stable focus: the stall was removed instead of facing its door")
+		return
+	plan.furniture[stall].yaw += PI
+	var check := HouseFurnishCheck.new()
+	check._check_focus(plan)
+	res.checked += 1
+	if check.failures.is_empty():
+		res.fail("internal stable focus: turning the stall away from its door was not detected")

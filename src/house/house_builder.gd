@@ -70,9 +70,18 @@ func _build_floor() -> void:
 			# middle of its own wall so the slab and the masonry meet.
 			var poly: PackedVector2Array = Poly.offset(plan.outline_of(shaped),
 				HouseGeometry.wall_thickness(spec) / 2.0)
-			_kit.slab_poly(_lift(poly, y0 + t / 2.0), t, SURF_FLOOR)
-			_log_mass("floor" if _levels().size() == 1 else "floor_%d" % level,
-				AABB(Vector3(a.position.x, y0, a.position.z), a.size), y0)
+			var pieces: Array[PackedVector2Array] = [poly]
+			var stair_hole := _stair_opening(level)
+			if stair_hole.has_area():
+				pieces = RoofShape.subtract(poly, Poly.from_rect(stair_hole))
+			for pi in pieces.size():
+				_kit.slab_poly(_lift(pieces[pi], y0 + t / 2.0), t, SURF_FLOOR)
+				var bounds := Poly.bounding_rect(pieces[pi])
+				var floor_name := "floor" if _levels().size() == 1 else "floor_%d" % level
+				if pieces.size() > 1:
+					floor_name += "_%d" % pi
+				_log_mass(floor_name, AABB(Vector3(bounds.position.x, y0, bounds.position.y),
+					Vector3(bounds.size.x, t, bounds.size.y)), y0)
 			continue
 		var opening := _stair_opening(level)
 		if opening.size.x > 0.01 and opening.size.y > 0.01:
@@ -400,6 +409,9 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 	var face: float = atan2(normal.x, normal.y)
 	_log_part("window", Vector3(mid.x, y_offset + (bottom + top) / 2.0, mid.y),
 		Vector3(w, top - bottom, 0.0), face, Vector3(normal.x, 0.0, normal.y))
+	# Keep the legacy log category for house consumers, while allowing family
+	# composition to distinguish an emitted door from an emitted window.
+	part_log[part_log.size() - 1]["opening_kind"] = String(op["kind"])
 	var jamb := 0.09
 	for side in [-1.0, 1.0]:
 		var p: Vector2 = from + dir * (t + side * (w / 2.0 + jamb / 2.0))
@@ -455,7 +467,7 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 
 
 ## Is an opening on this wall run: same line, and between its ends?
-static func _on_run(from: Vector2, to: Vector2, normal: Vector2, pos: Vector2,
+func _on_run(from: Vector2, to: Vector2, normal: Vector2, pos: Vector2,
 		op_normal: Vector2) -> bool:
 	if absf(absf(normal.x) - absf(op_normal.x)) > 0.01:
 		return false

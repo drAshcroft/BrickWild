@@ -13,6 +13,8 @@ func _init(p_name: String) -> void:
 
 func fail(msg: String) -> void:
 	failures.append(msg)
+	if OS.get_environment("BIG_GLADE_TEST_TRACE") == "1":
+		print("failure: %s: %s" % [suite_name, msg])
 
 func warn(msg: String) -> void:
 	warnings.append(msg)

@@ -86,6 +86,8 @@ static func run() -> SuiteResult:
 		var key: String = landmark["key"]
 		var defects := 0
 		for scale in SCALES:
+			if OS.get_environment("BIG_GLADE_TEST_TRACE") == "1":
+				print("castle landmark: %s scale=%.2f seed=%d" % [key, scale, _seed_for(key, scale)])
 			var spec := CastleSpec.new()
 			spec.style = landmark["style"]
 			spec.tier_override = landmark["tier"]

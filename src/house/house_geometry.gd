@@ -276,6 +276,31 @@ static func polygon_walls(poly: PackedVector2Array) -> Array[Dictionary]:
 	return out
 
 
+## The physical room edge nearest the back of a footprint. A mounted item
+## deliberately straddles its wall by a few centimetres, so compare the
+## support of its rectangle rather than its centre to the inward wall plane.
+static func backing_wall(plan: HousePlan, room: int, rect: Rect2, tolerance: float) -> int:
+	var walls := room_walls(plan, room)
+	var best := -1
+	var closest := tolerance
+	var centre := rect.get_center()
+	for index in walls.size():
+		var wall: Dictionary = walls[index]
+		var normal: Vector2 = wall.normal
+		var a: Vector2 = wall.from
+		var b: Vector2 = wall.to
+		var along := (b - a).normalized()
+		var station := (centre - a).dot(along)
+		if station < 0.0 or station > a.distance_to(b):
+			continue
+		var support := (absf(normal.x) * rect.size.x + absf(normal.y) * rect.size.y) * 0.5
+		var gap := absf((centre - a).dot(normal) - support)
+		if gap < closest:
+			closest = gap
+			best = index
+	return best
+
+
 ## The clear floor of a room as a polygon: its outline, or its floor rectangle
 ## when it has none. What furniture has to stay inside and what the walk grid
 ## rasterises.
@@ -365,11 +390,10 @@ static func window_rect(win: Dictionary) -> Rect2:
 static func window_clear_rect(win: Dictionary) -> Rect2:
 	var c: Vector2 = win["pos"]
 	var n: Vector2 = -win["normal"]           # into the room
-	var along := Vector2(n.y, -n.x).abs()
+	var along := Vector2(n.y, -n.x)
 	var half: Vector2 = along * (float(win["width"]) / 2.0)
-	var a: Vector2 = c - half
-	var b: Vector2 = c + half + n * 0.35
-	return Rect2(a.min(b), (b - a).abs())
+	return Poly.bounding_rect(PackedVector2Array([
+		c - half, c + half, c + half + n * 0.35, c - half + n * 0.35]))
 
 
 static func window_area(win: Dictionary) -> float:

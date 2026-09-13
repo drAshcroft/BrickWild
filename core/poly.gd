@@ -41,6 +41,11 @@ static func contains_point(poly: PackedVector2Array, p: Vector2, eps := 1e-6) ->
 	if n < 3:
 		return false
 	for i in range(n):
+		# Geometry2D hulls repeat their first vertex at the end. Such a
+		# zero-length edge cannot establish that an arbitrary point is on the
+		# polygon boundary (its cross product and dot product are always zero).
+		if poly[i].distance_squared_to(poly[(i + 1) % n]) <= eps * eps:
+			continue
 		if _on_segment(poly[i], poly[(i + 1) % n], p, eps):
 			return true
 	var inside := false

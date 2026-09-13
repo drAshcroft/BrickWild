@@ -74,8 +74,9 @@ const GROUND := "ground"          # lies on the ground and is walked over
 ##         as opposed to where it merely fits.
 const PROPS := {
 	# ---- beds ----
-	"Bed_Twin1": {"cat": "bed", "tags": [WALL], "zone": 0.75, "affinity": {"avoid_window_wall": true}},
-	"Bed_Twin2": {"cat": "bed", "tags": [WALL], "zone": 0.75, "affinity": {"avoid_window_wall": true}},
+	# These models have their headboard at raw -Z; the planned back is +Z.
+	"Bed_Twin1": {"cat": "bed", "tags": [WALL], "zone": 0.75, "face": PI, "affinity": {"avoid_window_wall": true}},
+	"Bed_Twin2": {"cat": "bed", "tags": [WALL], "zone": 0.75, "face": PI, "affinity": {"avoid_window_wall": true}},
 
 	# ---- tables and seats ----
 	"Table_Large": {"cat": "table", "tags": [SURFACE], "zone": 0.0, "affinity": {"focus": "hearth", "face": "focus"}},
@@ -446,7 +447,7 @@ static func footprint(key: String) -> Vector2:
 	return Vector2(s.x, s.z)
 
 
-## Footprint after a quarter-turn yaw, which is all the furnisher ever uses.
+## Legacy shortcut for callers restricted to quarter-turn yaws.
 static func footprint_yawed(key: String, yaw: float) -> Vector2:
 	var f: Vector2 = footprint(key)
 	if absf(sin(yaw)) > 0.5:
@@ -456,11 +457,8 @@ static func footprint_yawed(key: String, yaw: float) -> Vector2:
 
 ## Plan footprint after ANY yaw: the axis-aligned box the turned piece needs.
 ##
-## footprint_yawed() knows quarter turns only, which is every turn the house
-## furnisher makes -- rooms are rectangles and furniture is square to them. A
-## range on a ridge castle runs at whatever angle its spine does, and a trestle
-## in one is turned 22 degrees; asking footprint_yawed() about that gets the
-## UNTURNED footprint back, which is a box the piece does not occupy.
+## Polygon rooms and ranges on a castle ridge place props at arbitrary angles.
+## A quarter-turn shortcut can understate their actual measured envelope.
 static func footprint_rotated(key: String, yaw: float) -> Vector2:
 	var f: Vector2 = footprint(key)
 	var c: float = absf(cos(yaw))
@@ -631,6 +629,27 @@ static func plan_centre(key: String, pos: Vector3, yaw: float, scale: float) -> 
 	var turned := Vector2(c.x * cos(yaw) + c.z * sin(yaw),
 		-c.x * sin(yaw) + c.z * cos(yaw))
 	return Vector2(pos.x, pos.z) + turned
+
+
+## HousePlan furniture records measured footprint centres; the other family
+## dressing APIs record model origins. Convert only the HousePlan convention
+## here, sharing the exact pose between its visible model and its light.
+static func house_origin(placement: Dictionary) -> Vector3:
+	var key := String(placement.key)
+	var scale := float(placement.get("scale", 1.0))
+	var yaw := float(placement.yaw)
+	var model_yaw := yaw + face_offset(key)
+	var centre := centre_offset(key) * scale
+	centre.y = 0.0
+	var origin := Vector3(placement.pos) - Basis(Vector3.UP, model_yaw) * centre
+	if has_tag(key, WALL_MOUNTED):
+		# The record is the wall mount, not the middle of the model's depth.
+		# Put the measured back against that face and the body into the room.
+		var depth := footprint_rotated(key, face_offset(key)).y * scale
+		origin += Vector3(-sin(yaw), 0, -cos(yaw)) * depth * 0.5
+	elif not has_tag(key, CEILING):
+		origin.y -= floor_offset(key) * scale
+	return origin
 
 
 ## One prop placed somewhere, in the form every family that is NOT a HousePlan

@@ -142,8 +142,13 @@ func _check_placed(plan: HousePlan) -> void:
 		var rect: Rect2 = p["rect"]
 		if not room_rect.grow(TOL).encloses(rect):
 			failures.append("placed: %s is partly in the wall" % _who(plan, f))
+		if plan.is_polygonal(int(p["room"])):
+			for corner in Poly.from_rect(rect):
+				if not Poly.contains_point(plan.outline_of(int(p["room"])), corner, TOL):
+					failures.append("placed: %s crosses a shaped room wall" % _who(plan, f))
+					break
 		# the size it claims must be the size the asset actually is
-		var want: Vector2 = PropCatalog.footprint_yawed(key, float(p["yaw"])) \
+		var want: Vector2 = PropCatalog.footprint_rotated(key, float(p["yaw"])) \
 			* float(p.get("scale", 1.0))
 		if absf(rect.size.x - want.x) > 0.05 or absf(rect.size.y - want.y) > 0.05:
 			failures.append("placed: %s claims a %.2f x %.2fm footprint, the model is %.2f x %.2fm"
@@ -554,9 +559,20 @@ func _check_hearth(plan: HousePlan) -> void:
 ## Which of the room's four walls a piece has its back to, indexed the way
 ## HouseGeometry.room_walls() indexes them. Its facing says it: a piece in a
 ## corner touches two walls and only one of them is behind it.
-static func _wall_of(_plan: HousePlan, p: Dictionary) -> int:
+static func _wall_of(plan: HousePlan, p: Dictionary) -> int:
 	var yaw: float = float(p["yaw"])
 	var back := Vector2(sin(yaw), cos(yaw))
+	var room := int(p.get("room", -1))
+	if room >= 0 and room < plan.room_count() and plan.is_polygonal(room):
+		var walls := HouseGeometry.room_walls(plan, room)
+		var best := -1
+		var facing := -INF
+		for index in range(walls.size()):
+			var dot := back.dot(-Vector2(walls[index].normal))
+			if dot > facing:
+				best = index
+				facing = dot
+		return best
 	if absf(back.y) >= absf(back.x):
 		return 1 if back.y > 0.0 else 0
 	return 3 if back.x > 0.0 else 2
@@ -898,13 +914,20 @@ func _check_sconce_pair(plan: HousePlan) -> void:
 				sc.append(i)
 		if sc.size() != 2:
 			continue
-		var w1: int = _fs_back_wall(plan, room, plan.furniture[sc[0]]["rect"])
-		var w2: int = _fs_back_wall(plan, room, plan.furniture[sc[1]]["rect"])
+		var w1: int = _fs_pair_wall(plan, room, plan.furniture[sc[0]]["rect"])
+		var w2: int = _fs_pair_wall(plan, room, plan.furniture[sc[1]]["rect"])
 		var same: bool = w1 >= 0 and w1 == w2
 		var f_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
-		var n: Vector2 = _fs_wall_normal(w1 if w1 >= 0 else 0)
+		var n := Vector2.UP
+		if plan.is_polygonal(room) and w1 >= 0:
+			n = HouseGeometry.room_walls(plan, room)[w1].normal
+		elif not plan.is_polygonal(room):
+			n = _fs_wall_normal(w1 if w1 >= 0 else 0)
 		var along := Vector2(n.y, -n.x)
 		var anchors: Array[Vector2] = [(f_rect.position + f_rect.end) / 2.0]
+		if plan.is_polygonal(room) and w1 >= 0:
+			var wall: Dictionary = HouseGeometry.room_walls(plan, room)[w1]
+			anchors.append((Vector2(wall.from) + Vector2(wall.to)) / 2.0)
 		for i2 in plan.furniture_of(room):
 			if PropCatalog.category(plan.furniture[i2]["key"]) == "hearth":
 				anchors.append(Rect2(plan.furniture[i2]["rect"]).get_center())
@@ -925,6 +948,12 @@ func _check_sconce_pair(plan: HousePlan) -> void:
 			warnings.append(msg)
 		else:
 			failures.append(msg)
+
+
+static func _fs_pair_wall(plan: HousePlan, room: int, rect: Rect2) -> int:
+	if plan.is_polygonal(room):
+		return HouseGeometry.backing_wall(plan, room, rect, FS_BACK_TOL)
+	return _fs_back_wall(plan, room, rect)
 
 
 ## Could a pair have hung on one wall at all? The same question again, asked
@@ -959,7 +988,7 @@ static func _fs_pair_fits(plan: HousePlan, room: int) -> bool:
 		for f2 in plan.furniture_of(room):
 			if PropCatalog.category(plan.furniture[f2]["key"]) != "hearth":
 				continue
-			if _fs_back_wall(plan, room, plan.furniture[f2]["rect"]) != wi:
+			if _fs_pair_wall(plan, room, plan.furniture[f2]["rect"]) != wi:
 				continue
 			anchors.append((Rect2(plan.furniture[f2]["rect"]).get_center() - a).dot(along))
 		for anchor in anchors:
@@ -1255,12 +1284,24 @@ func _check_focus(plan: HousePlan) -> void:
 	var to: Vector2 = Vector2(plan.doors[door]["pos"]) - c
 	if to.length() < 0.01:
 		return
+	# Internal doors carry a partition-axis normal, which need not point out
+	# of this room. Measure the room's wall before deciding whether a piece
+	# faces the doorway squarely; the opposite direction is its back.
+	var door_pos := Vector2(plan.doors[door]["pos"])
+	var outward := Vector2(plan.doors[door]["normal"])
+	var nearest := INF
+	for wall in HouseGeometry.room_walls(plan, room):
+		var point := Geometry2D.get_closest_point_to_segment(door_pos, wall.from, wall.to)
+		var distance := door_pos.distance_to(point)
+		if distance < nearest:
+			nearest = distance
+			outward = -Vector2(wall.normal)
 	var yaw: float = float(plan.furniture[best]["yaw"])
 	var facing := Vector2(-sin(yaw), -cos(yaw))
 	var off: float = rad_to_deg(acos(clampf(facing.dot(to.normalized()), -1.0, 1.0)))
 	# a counter set square to the door's wall a little way along it looks at
 	# the doorway well enough: the customer walks in and sees its front
-	var squarely: bool = facing.dot(Vector2(plan.doors[door]["normal"])) > 0.9
+	var squarely: bool = facing.dot(outward) > 0.9
 	if off > FOCUS_FACE_DEG and not squarely:
 		var said2 := "focus: the %s in room %d faces away from the door" % [cat, room]
 		if gave_up:
@@ -1272,8 +1313,7 @@ func _check_focus(plan: HousePlan) -> void:
 	# other piece standing in the room (Sightline, INT-020)
 	var d: Dictionary = plan.doors[door]
 	var base: float = float(plan.storey_of_room(room)) * plan.spec.height
-	var inside: Vector2 = Vector2(d["pos"]) - Vector2(d["normal"]) * 0.5 \
-		if int(d["a"]) == room else Vector2(d["pos"]) + Vector2(d["normal"]) * 0.5
+	var inside: Vector2 = Vector2(d["pos"]) - outward * 0.5
 	var eye := Vector3(inside.x, base + 1.6, inside.y)
 	var top: float = base + PropCatalog.height(plan.furniture[best]["key"]) \
 		* float(plan.furniture[best].get("scale", 1.0)) * 0.9

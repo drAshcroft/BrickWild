@@ -31,6 +31,8 @@
     { "source": "core/roof_shape.gd", "destination": "core/roof_shape.gd" },
     { "source": "core/poly.gd", "destination": "core/poly.gd" },
     { "source": "src/castle/castle_builder.gd", "destination": "families/castle/castle_builder.gd" },
+    { "source": "src/castle/castle_interiors.gd", "destination": "families/castle/castle_interiors.gd" },
+    { "source": "src/castle/castle_keep_plan.gd", "destination": "families/castle/castle_keep_plan.gd" },
     { "source": "src/castle/castle_generator.gd", "destination": "families/castle/castle_generator.gd" },
     { "source": "src/castle/castle_geometry.gd", "destination": "families/castle/castle_geometry.gd" },
     { "source": "src/castle/castle_spec.gd", "destination": "families/castle/castle_spec.gd" },

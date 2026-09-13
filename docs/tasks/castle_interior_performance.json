@@ -1,0 +1,12 @@
+{
+  "key": "CASTLE-INTERIOR-PERF",
+  "title": "Profile and reduce large castle interior generation and QA cost",
+  "description": "INT-007 now emits and furnishes real stone interiors. On 2026-09-13 the complete castle massing sweep took 1798.30 seconds while other suites ran concurrently (artifacts/int007_massing_landmarks.log). Canonical full-QA diagnostics include roughly 60–106 second cases (artifacts/castle_qa_canonical_diagnostic.log and castle_qa_remaining_diagnostic.log). These timings include more than furnishing, so first measure each phase on an otherwise idle machine.\n\nReproduce Norman and Edwardian castle/fortress fixtures and Crusader shell keeps using CastleSweep.spec_at. Record CastleGenerator, CastleInteriors.primary/yard, HouseFurnisher, mesh emission, HouseQA and CastleQA separately. Profile before choosing changes. Candidate hot paths are HouseFurnisher._inside_outline/_fits, mounted affinity searches, could_place and repeated WalkGrid work.\n\nPreserve complete plans, furniture placements, RNG state and real geometry. Do not remove furnishing, coarsen navigation or weaken checks. CastleQA already has a same-resolution corridor pass with mandatory full-site fallback; preserve its seven controls. Existing exact-output prototype and affinity hoisting is documented in artifacts/free_furnisher_comparison.log. See docs/CASTLE_INTERIORS.md for commands and architecture.",
+  "acceptanceCriteria": "Store per-phase profiles and before/after medians for representative small and large cases. Compare complete plans, placements and RNG state on unchanged valid fixtures. All five castle suites and affected house/shop regressions must pass. Report the measured bottleneck and achieved improvement; do not infer furnishing cost from whole-suite time.",
+  "priority": "P2",
+  "phase": "3-interiors",
+  "taskType": "spike",
+  "status": "pending",
+  "owner": {"type": "agent"},
+  "targetCoord": {"file": "src/house/house_furnisher.gd"}
+}

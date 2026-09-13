@@ -33,6 +33,7 @@ var interiors: Array[Dictionary] = []
 var interior_errors: Array[String] = []
 var _planned_interiors := {}
 const Interiors = preload("res://src/castle/castle_interiors.gd")
+const KeepPlan = preload("res://src/castle/castle_keep_plan.gd")
 
 
 func build(p_spec: CastleSpec) -> ArrayMesh:
@@ -335,13 +336,11 @@ func _build_porch() -> void:
 	if p.size.x <= 0.0:
 		return
 	tag("porch")
-	_box_aabb(p, SURF_STONE)
+	_passage(p, minf(p.size.x * 0.5, 2.0), minf(p.size.y - 0.2, HouseGeometry.DOOR_H))
 	_log_mass("porch", p)
 	var xf := Transform3D(Basis(), Vector3(0.0, p.size.y, p.position.z + p.size.z / 2.0))
 	_kit.ridge_roof(xf, p.size.x + 0.3, p.size.z + 0.3,
 		p.size.x * spec.roof_pitch * 0.4, SURF_ROOF, SURF_STONE, p.size.x, p.size.z, 0.3, 0.0, _roof_faces)
-	_opening(Vector3(0.0, p.size.y * 0.42, p.position.z - CastleGeometry.OPENING_EPS),
-		PI, minf(p.size.x * 0.5, 2.0), p.size.y * 0.6, &"arched", true)
 	total_height = maxf(total_height, p.size.y + p.size.x * spec.roof_pitch * 0.4)
 
 
@@ -369,11 +368,9 @@ func _build_enclosure() -> void:
 	tag("barbican")
 	var bar: AABB = CastleGeometry.barbican_aabb(spec)
 	if bar.size.x > 0.0:
-		_box_aabb(bar, SURF_STONE)
+		_passage(bar, minf(bar.size.x * 0.45, 2.4), minf(bar.size.y * 0.55, 5.0))
 		_log_mass("barbican", bar)
 		_crenellate_rect(bar, bar.size.y, SURF_TRIM)
-		_opening(Vector3(0.0, bar.size.y * 0.4, bar.position.z - CastleGeometry.OPENING_EPS),
-			PI, minf(bar.size.x * 0.45, 2.4), bar.size.y * 0.55, &"arched", true)
 
 	tag("link")
 	for side in [-1.0, 1.0]:
@@ -416,16 +413,68 @@ func _build_apse() -> void:
 	var r: float = CastleGeometry.apse_radius(spec)
 	var h: float = a.size.y
 	var origin := Vector3(a.position.x + a.size.x / 2.0, 0.0, a.position.z + a.size.z)
-	# the half of a revolve that lies at -Z: angles PI .. 2PI
-	_kit.revolve(PackedVector2Array([Vector2(r, 0.0), Vector2(r, h)]), origin,
-		SURF_STONE, 10, PI, PI)
+	var aperture := PackedVector2Array()
+	var planned := _planned_interiors.has("chapel")
+	if planned:
+		var row: Dictionary = _planned_interiors["chapel"]
+		var plan: HousePlan = row.plan
+		var entry := plan.entrance()
+		if entry >= 0:
+			var door: Dictionary = plan.doors[entry]
+			var xf: Transform3D = row.transform
+			var normal := xf.basis * Vector3(door.normal.x, 0, door.normal.y)
+			if normal.z < -0.9:
+				var centre := xf * Vector3(door.pos.x, 0, door.pos.y)
+				var half := float(door.width) * 0.5
+				aperture = PackedVector2Array([
+					Vector2(centre.x - half, origin.z - r - 1),
+					Vector2(centre.x + half, origin.z - r - 1),
+					Vector2(centre.x + half, origin.z + 1),
+					Vector2(centre.x - half, origin.z + 1)])
+	if planned:
+		# A partial revolve closes its diameter with a solid radial face, which
+		# sealed the chapel door even after the curved front was cut. The plan's
+		# front wall supplies that closure now. These mitered wall segments have
+		# both masonry faces, 0.6m apart, and retain the original ten outer bays.
+		var inner_r := maxf(r - 0.6 / cos(PI / 20.0), 0.01)
+		for segment in 10:
+			var angle0 := PI + PI * float(segment) / 10.0
+			var angle1 := PI + PI * float(segment + 1) / 10.0
+			var centre := Vector2(origin.x, origin.z)
+			var d0 := Vector2(cos(angle0), sin(angle0))
+			var d1 := Vector2(cos(angle1), sin(angle1))
+			var footprint := PackedVector2Array([centre + d0 * r, centre + d1 * r,
+				centre + d1 * inner_r, centre + d0 * inner_r])
+			var pieces: Array[PackedVector2Array] = [footprint]
+			if not aperture.is_empty():
+				pieces = RoofShape.subtract(footprint, aperture)
+			for piece in pieces:
+				var vertices := PackedVector3Array()
+				for point in piece:
+					vertices.append(Vector3(point.x, h * 0.5, point.y))
+				_kit.slab_poly(vertices, h, SURF_STONE, true)
+			if not aperture.is_empty():
+				var over := Poly.clip_convex(footprint, aperture)
+				var header := PackedVector3Array()
+				for point in over:
+					header.append(Vector3(point.x, (h + HouseGeometry.DOOR_H) * 0.5, point.y))
+				if h > HouseGeometry.DOOR_H:
+					_kit.slab_poly(header, h - HouseGeometry.DOOR_H, SURF_STONE, true)
+	else:
+		# The half of a revolve that lies at -Z: angles PI .. 2PI.
+		_kit.revolve(PackedVector2Array([Vector2(r, 0.0), Vector2(r, h)]), origin,
+			SURF_STONE, 10, PI, PI)
 	_kit.revolve(PackedVector2Array([Vector2(r * 1.08, h), Vector2(0.0, h + r * 0.9)]),
 		origin, SURF_ROOF, 10, PI, PI)
 	_log_mass("apse", a)
 	_log_part("apse", a.position + a.size / 2.0, a.size)
-	# one window on the axis of the apse, looking out toward the gate
-	_opening(origin + Vector3(0.0, h * 0.5, -(r + CastleGeometry.OPENING_EPS)),
-		PI, spec.window_w, spec.window_h, spec.window_style)
+	# Keep the existing high window, but never paint it across the real door.
+	var window_y := h * 0.5
+	if not aperture.is_empty():
+		window_y = maxf(window_y, HouseGeometry.DOOR_H + spec.window_h * 0.5 + 0.2)
+	if window_y + spec.window_h * 0.5 < h:
+		_opening(origin + Vector3(0.0, window_y, -(r + CastleGeometry.OPENING_EPS)),
+			PI, spec.window_w, spec.window_h, spec.window_style)
 	total_height = maxf(total_height, h + r * 0.9)
 
 
@@ -458,18 +507,30 @@ func _build_ring(r: int) -> void:
 	tag("gate")
 	var g: AABB = CastleGeometry.gatehouse_aabb(spec, r)
 	if g.size.x > 0.0:
-		_box_aabb(g, SURF_STONE)
+		var door_h: float = minf(g.size.y * 0.4, 5.0)
+		_passage(g, minf(g.size.x * 0.4, 4.0), door_h)
 		_log_mass("gate_%d" % r, g)
 		_crenellate_rect(g, g.size.y, SURF_TRIM)
-		var door_h: float = minf(g.size.y * 0.4, 5.0)
-		_opening(Vector3(0.0, door_h / 2.0, g.position.z - CastleGeometry.OPENING_EPS),
-			PI, minf(g.size.x * 0.4, 4.0), door_h, &"arched", true)
 		# murder holes read as a band of small openings over the passage
 		for k in range(3):
 			var x: float = lerpf(-g.size.x * 0.3, g.size.x * 0.3, float(k) / 2.0)
 			_opening(Vector3(x, g.size.y * 0.72, g.position.z - CastleGeometry.OPENING_EPS),
 				PI, 0.4, 0.6, &"square")
 		total_height = maxf(total_height, g.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+
+
+## A real tunnel through the gate mass, with no dark collision box sealing it.
+## The top-level gate AABB still describes its full masonry envelope.
+func _passage(bounds: AABB, width: float, height: float) -> void:
+	var centre := bounds.get_center()
+	var side_w := (bounds.size.x - width) * 0.5
+	for side in [-1.0, 1.0]:
+		box(Vector3(side_w, bounds.size.y, bounds.size.z),
+			Vector3(centre.x + side * (width + side_w) * 0.5, centre.y, centre.z), SURF_STONE)
+	box(Vector3(width, bounds.size.y - height, bounds.size.z),
+		Vector3(centre.x, bounds.position.y + (height + bounds.size.y) * 0.5, centre.z), SURF_STONE)
+	_log_part("passage", Vector3(centre.x, bounds.position.y + height * 0.5, centre.z),
+		Vector3(width, height, bounds.size.z))
 
 
 ## The four axis-aligned runs of a rectangular enceinte -- the N = 4 plan, kept
@@ -562,6 +623,9 @@ func _build_keep() -> void:
 	var planned := _planned_interiors.has("keep")
 	if planned:
 		Interiors.emit(self, _planned_interiors["keep"])
+		_build_planned_keep_crown(k)
+		total_height = maxf(total_height, k.end.y + CastleGeometry.roof_rise(spec, k))
+		return
 	var opening_y: float = k.size.y * 0.55
 	match spec.keep_shape:
 		&"round", &"shell":
@@ -594,6 +658,40 @@ func _build_keep() -> void:
 			if not planned:
 				_face_openings(k, opening_y, spec.window_style)
 	total_height = maxf(total_height, k.size.y + CastleGeometry.roof_rise(spec, k))
+
+
+## The plan owns the occupied outline. Crowns cover that same outline and
+## never restore the former solid drum/plinth over the new rooms.
+func _build_planned_keep_crown(k: AABB) -> void:
+	var row: Dictionary = _planned_interiors["keep"]
+	var p: HousePlan = row.plan
+	var xf: Transform3D = row.transform
+	var top_outline := KeepPlan.outer_outline(spec, p.spec.storeys - 1, p.spec.storeys)
+	var roof_y := k.size.y
+	var face := PackedVector3Array()
+	for point in top_outline:
+		face.append(xf * Vector3(point.x, roof_y, point.y))
+	_kit.slab_poly(face, RoofShape.DEPTH, SURF_ROOF, true)
+	if spec.keep_shape in [&"round", &"shell"]:
+		_crenellate_ring(Vector3(k.get_center().x, k.position.y, k.get_center().z),
+			minf(k.size.x,k.size.z) * 0.5, k.size.y, 14, SURF_TRIM)
+	elif spec.keep_shape == &"tiered":
+		# Roof rings cap the exposed shoulders of every receding storey.
+		for level in range(1, p.spec.storeys):
+			var lower := Poly.offset(KeepPlan.outer_outline(spec, level - 1, p.spec.storeys), 0.18)
+			var upper := KeepPlan.outer_outline(spec, level, p.spec.storeys)
+			for piece in RoofShape.subtract(lower, upper):
+				var ring := PackedVector3Array()
+				for point in piece:
+					ring.append(xf * Vector3(point.x, level * p.spec.height, point.y))
+				_kit.slab_poly(ring, RoofShape.DEPTH, SURF_ROOF, true)
+		var bounds := Poly.bounding_rect(top_outline)
+		_kit.hip_roof_at(xf.translated_local(Vector3(0, roof_y, 0)), bounds.size.x + 0.3,
+			bounds.size.y + 0.3, CastleGeometry.roof_rise(spec, k), SURF_ROOF)
+	else:
+		_crenellate_rect(k, k.size.y, SURF_TRIM)
+		_kit.hip_roof_at(xf.translated_local(Vector3(0, roof_y, 0)),
+			k.size.x * 0.8, k.size.z * 0.8, CastleGeometry.roof_rise(spec, k), SURF_ROOF)
 
 
 # --------------------------------------------------------------- primitives

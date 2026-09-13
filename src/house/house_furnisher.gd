@@ -1032,11 +1032,15 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 		var depth: float = raw.y
 		var run: float = (b - a).length()
 		var small: float = span * PropCatalog.min_scale(key)
-		if run < small + 0.1:
+		var bed_on_facet := _outline.size() >= 3 and PropCatalog.category(key) == "bed" \
+			and maxf(absf(n.x), absf(n.y)) > 0.999
+		if run < small + 0.1 and not bed_on_facet:
 			continue
 		var steps: int = clampi(int((run - small) / PROBE_STEP), 1, MAX_PROBES)
 		for s in range(steps + 1):
 			var t: float = (small / 2.0) + float(s) * (run - small) / float(steps)
+			if run < small:
+				t = run * 0.5
 			var centre: Vector2 = a + along * t + n * (depth / 2.0 + HouseGeometry.WALL_GAP)
 			# a bed can be got into from either side, so try both before
 			# deciding this stretch of wall will not do
@@ -1047,6 +1051,19 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 					if _fits(try_cand, floor_rect, blocked, zones, extra):
 						cand = try_cand
 						break
+					if bed_on_facet:
+						# A short polygon facet can hold the bed while the access
+						# strip beside its head clips the next corner. Try a small
+						# setback within the existing headboard-to-wall limit;
+						# the footprint and use zone must both stay on real floor.
+						for inset_step in range(1, 4):
+							var inset := HouseGeometry.BED_HEAD_TOL * float(inset_step) / 3.0
+							try_cand = _candidate(key, centre + n * inset, yaw, zs, sc)
+							if _fits(try_cand, floor_rect, blocked, zones, extra):
+								cand = try_cand
+								break
+						if not cand.is_empty():
+							break
 				if not cand.is_empty():
 					break
 			if cand.is_empty():
@@ -1054,6 +1071,8 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 			var mid: float = 1.0 - absf(t - run / 2.0) / maxf(run / 2.0, 0.01)
 			var score: float = mid * 0.6 + r.randf() * JITTER + float(wi) * 0.01
 			score += _affinity(plan, room, cand)
+			var placed: Vector3 = cand.pos
+			score -= Vector2(placed.x, placed.z).distance_to(centre)
 			if hearth_only >= 0 and wi != hearth_only:
 				# the flue rises on one wall only, so a hearth on any other is
 				# not a worse placement but no placement at all
@@ -1125,7 +1144,7 @@ static func _place_row(plan: HousePlan, room: int, step: Dictionary,
 			var wall: Dictionary = lines[wi]
 			var n: Vector2 = wall["normal"]
 			var yaw: float = _yaw_facing(n)
-			var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw) * sc
+			var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw) * sc
 			var along := Vector2(n.y, -n.x).abs()
 			var span: float = along.x * foot.x + along.y * foot.y
 			var depth: float = absf(n.x) * foot.x + absf(n.y) * foot.y
@@ -1264,7 +1283,13 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 		return _pin_bonus(plan, room, cand)
 	var rect: Rect2 = cand["rect"]
 	var c: Vector2 = rect.get_center()
-	var wall: int = _back_wall_index(plan, room, rect)
+	# Only these preferences inspect a wall. Free-standing tables ask about
+	# the fire/focus instead, so rebuilding the room floor for every table
+	# probe cannot change their score.
+	var wall := -1
+	if aff.has("daylight") or bool(aff.get("avoid_window_wall", false)) \
+			or bool(aff.get("avoid_hearth_wall", false)):
+		wall = _back_wall_index(plan, room, rect)
 	var score := 0.0
 
 	# daylight: a workbench wants the window wall, a bookcase wants any other
@@ -1310,7 +1335,7 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 
 	if String(aff.get("focus", "")) == "hearth":
 		# the placer looks the fire up once for the whole search; a caller
-		# scoring a single candidate has not, and pays for it here
+	# scoring a single candidate has not, and pays for it here
 		var h := Vector2(INF, INF)
 		if cand.has("focus_point"):
 			h = cand["focus_point"]
@@ -1547,17 +1572,19 @@ static func _flank_bonus(plan: HousePlan, room: int, cand: Dictionary) -> float:
 	#
 	# The placer hands the anchor in, having found it once for the whole wall
 	# search; a caller that has not is given the same answer the slow way.
+	# An explicitly empty anchor has already proved no pair station exists.
 	var anchor: Dictionary = cand.get("flank_anchor", {})
-	if anchor.is_empty():
+	if not cand.has("flank_anchor"):
 		anchor = _flank_anchor(plan, room, _widest_of(cat), cat)
 	if anchor.is_empty():
 		return 0.0
 	var rect: Rect2 = cand["rect"]
-	var wall: int = _back_wall_index(plan, room, rect)
+	var wall: int = _flank_wall(plan, room, rect)
 	if wall < 0:
 		return 0.0
-	var n: Vector2 = _wall_normal(wall)
-	if n.dot(Vector2(anchor["normal"])) < 0.9:
+	var n: Vector2 = HouseGeometry.room_walls(plan, room)[wall].normal if plan.is_polygonal(room) else _wall_normal(wall)
+	var same_wall_cos := 0.999 if plan.is_polygonal(room) else 0.9
+	if n.dot(Vector2(anchor["normal"])) < same_wall_cos:
 		return -1.0                  # the pair belongs on the wall the door is in
 	var along := Vector2(n.y, -n.x)
 	var t: float = (rect.get_center() - Vector2(anchor["pos"])).dot(along)
@@ -1566,13 +1593,19 @@ static func _flank_bonus(plan: HousePlan, room: int, cand: Dictionary) -> float:
 		if PropCatalog.category(p["key"]) != cat or not p.get("mounted", false):
 			continue
 		var mate: Rect2 = p["rect"]
-		if _back_wall_index(plan, room, mate) != wall:
+		if _flank_wall(plan, room, mate) != wall:
 			continue
 		# mirrored means the two offsets cancel: same distance, opposite sides
 		var t2: float = (mate.get_center() - Vector2(anchor["pos"])).dot(along)
 		return FLANK_W * clampf(1.0 - absf(t + t2) / FLANK_TOL, 0.0, 1.0)
 	var dist: float = float(anchor.get("dist", FLANK_IDEAL))
 	return FLANK_W * 0.5 * clampf(1.0 - absf(absf(t) - dist) / FLANK_TOL, 0.0, 1.0)
+
+
+static func _flank_wall(plan: HousePlan, room: int, rect: Rect2) -> int:
+	if plan.is_polygonal(room):
+		return HouseGeometry.backing_wall(plan, room, rect, BACK_TOL)
+	return _back_wall_index(plan, room, rect)
 
 
 ## The widest prop of a category, so a rule that has to hold for a pair drawn
@@ -1602,12 +1635,14 @@ static func _flank_anchor(plan: HousePlan, room: int, width: float,
 		var p: Dictionary = plan.furniture[i]
 		if PropCatalog.category(p["key"]) != "hearth":
 			continue
-		var wi: int = _back_wall_index(plan, room, Rect2(p["rect"]))
+		var wi: int = _flank_wall(plan, room, Rect2(p["rect"]))
 		if wi < 0:
 			continue
-		var n: Vector2 = _wall_normal(wi)
+		var n: Vector2 = HouseGeometry.room_walls(plan, room)[wi].normal if plan.is_polygonal(room) else _wall_normal(wi)
 		var hc: Vector2 = Rect2(p["rect"]).get_center()
 		var q: Vector2 = f.position if wi == 0 or wi == 2 else f.end
+		if plan.is_polygonal(room):
+			q = HouseGeometry.room_walls(plan, room)[wi].from
 		# the point on the wall in line with the fire, so the pair is measured
 		# along the wall it hangs on rather than out into the room
 		var on_wall: Vector2 = hc + n * ((q - hc).dot(n))
@@ -1649,11 +1684,25 @@ static func _flank_station(plan: HousePlan, room: int, anchor: Dictionary,
 	var t: float = pos.dot(axis)
 	var first: float = maxf(float(anchor["reach"]) + width / 2.0 + 0.2, FLANK_IDEAL)
 	var d: float = first
+	var host := {}
+	if plan.is_polygonal(room):
+		for wall in HouseGeometry.room_walls(plan, room):
+			if Vector2(wall.normal).dot(n) > 0.999 and absf((pos - Vector2(wall.from)).dot(n)) < 0.05:
+				host = wall
+				break
+		if host.is_empty():
+			return 0.0
 	while d <= maxf(hi - lo, 0.0):
 		var ok := true
 		for side in [-1.0, 1.0]:
 			var p: Vector2 = pos + along * (d * side)
-			if p.dot(axis) < lo or p.dot(axis) > hi 					or _on_opening(plan, room, p, n, width) 					or _crowds_mounted(plan, room, p, width, cat):
+			if not host.is_empty():
+				var edge := Vector2(host.to) - Vector2(host.from)
+				var station := (p - Vector2(host.from)).dot(edge.normalized())
+				if station < width / 2.0 + 0.2 or station > edge.length() - width / 2.0 - 0.2:
+					ok = false
+					break
+			if (host.is_empty() and (p.dot(axis) < lo or p.dot(axis) > hi)) 					or _on_opening(plan, room, p, n, width) 					or _crowds_mounted(plan, room, p, width, cat):
 				# the pair's own half already hanging there does not count
 				ok = false
 				break
@@ -1738,7 +1787,7 @@ static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 		sc: float, floor_rect: Rect2, blocked: Array[Rect2], zones: Array[Rect2],
 		extra: Array[Rect2], r: RandomNumberGenerator, result: Dictionary,
 		focus := Vector2(INF, INF), pin := Rect2()) -> void:
-	var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw) * sc
+	var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw) * sc
 	var pad: float = HouseGeometry.PATH_MIN * 0.5
 	var lo := Vector2(floor_rect.position.x + foot.x / 2.0 + pad,
 		floor_rect.position.y + foot.y / 2.0 + pad)
@@ -1751,11 +1800,30 @@ static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 		return
 	var nx: int = clampi(int((hi.x - lo.x) / PROBE_STEP), 1, MAX_PROBES)
 	var nz: int = clampi(int((hi.y - lo.y) / PROBE_STEP), 1, MAX_PROBES)
+	# The measured model, yaw, scale and category are constant for this pass.
+	# Preserve the same candidates and RNG calls while doing those catalogue
+	# lookups once instead of once at every point of the search grid.
+	var prototype := _candidate(key, Vector2.ZERO, yaw, 1.0, sc)
+	var has_zone := PropCatalog.zone_depth(key) > 0.0
+	# A customer can stand in the clear approach to the shop's entrance while
+	# using its counter or stall. The piece itself must still clear that door;
+	# treating the empty approach as solid furniture forced small stalls to
+	# turn their service side away from the customer.
+	if plan.focus_room() == room and plan.focus_faces_door() \
+			and not plan.focus.get("placed", false) and PropCatalog.category(key) == plan.focus_cat():
+		var entry := focus_door(plan, room)
+		if entry >= 0:
+			prototype["zone_passages"] = [HouseGeometry.door_clear_rect(plan.doors[entry], -1.0),
+				HouseGeometry.door_clear_rect(plan.doors[entry], 1.0)]
 	for ix in range(nx + 1):
 		for iz in range(nz + 1):
 			var centre := Vector2(lerpf(lo.x, hi.x, float(ix) / nx),
 				lerpf(lo.y, hi.y, float(iz) / nz))
-			var cand: Dictionary = _candidate(key, centre, yaw, 1.0, sc)
+			var cand := prototype.duplicate()
+			cand["pos"] = Vector3(centre.x, 0.0, centre.y)
+			cand["rect"] = Rect2(centre - foot / 2.0, foot)
+			if has_zone:
+				cand["zone"] = _zone_rect(key, cand["rect"], yaw)
 			if not _fits(cand, floor_rect, blocked, zones, extra):
 				continue
 			cand["focus_point"] = focus
@@ -1833,7 +1901,7 @@ static func _place_around(plan: HousePlan, room: int, key: String,
 			break
 		for n in sides:
 			var yaw: float = _yaw_facing(-n)        # face back toward the table
-			var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw)
+			var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw)
 			var half: Vector2 = host_rect.size / 2.0
 			var out: float = absf(n.x) * half.x + absf(n.y) * half.y + foot.y / 2.0 + 0.04
 			if tucked:
@@ -1924,7 +1992,7 @@ static func _place_behind(plan: HousePlan, room: int, key: String,
 	var hc: Vector2 = host_rect.get_center()
 	var yaw: float = float(plan.furniture[host]["yaw"])
 	var back: Vector2 = -_facing_of(yaw)          # away from what the host faces
-	var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw)
+	var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw)
 	var half: Vector2 = host_rect.size / 2.0
 	var out: float = absf(back.x) * (half.x + foot.x / 2.0) \
 		+ absf(back.y) * (half.y + foot.y / 2.0) + 0.04
@@ -2130,7 +2198,7 @@ static func _place_on_surface(plan: HousePlan, room: int, key: String,
 ## A placement, before it is known whether it fits.
 static func _candidate(key: String, centre: Vector2, yaw: float,
 		zone_side := 1.0, scale := 1.0) -> Dictionary:
-	var foot: Vector2 = PropCatalog.footprint_yawed(key, yaw) * scale
+	var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw) * scale
 	var rect := Rect2(centre - foot / 2.0, foot)
 	return {
 		"key": key, "pos": Vector3(centre.x, 0.0, centre.y), "yaw": yaw,
@@ -2158,13 +2226,17 @@ static func _zone_rect(key: String, rect: Rect2, yaw: float, side := 1.0) -> Rec
 	elif cat == "bed":
 		dir = Vector2(facing.y, -facing.x) * side  # you get in from the side
 	var c: Vector2 = rect.get_center()
-	var half: Vector2 = rect.size / 2.0
-	var out: float = absf(dir.x) * half.x + absf(dir.y) * half.y
-	var across := Vector2(dir.y, -dir.x).abs()
-	var span: Vector2 = across * (across.x * rect.size.x + across.y * rect.size.y) / 2.0
-	var a: Vector2 = c + dir * out - span
-	var b: Vector2 = c + dir * (out + depth) + span
-	return Rect2(a.min(b), (b - a).abs())
+	var measured := PropCatalog.footprint_rotated(key, yaw)
+	var scale := rect.size.x / maxf(measured.x, 0.001)
+	var raw := PropCatalog.footprint(key) * scale
+	var out: float = raw.x * 0.5 if cat == "bed" else raw.y * 0.5
+	var width: float = raw.y if cat == "bed" else raw.x
+	var span := Vector2(dir.y, -dir.x) * width * 0.5
+	# Bound all four corners of the rotated strip. Bounding just two opposite
+	# corners with an absolute tangent can collapse a diagonal use zone.
+	return Poly.bounding_rect(PackedVector2Array([
+		c + dir * out - span, c + dir * out + span,
+		c + dir * (out + depth) + span, c + dir * (out + depth) - span]))
 
 
 ## Does this candidate fit: inside the room, clear of everything already
@@ -2203,6 +2275,8 @@ static func _fits(cand: Dictionary, floor_rect: Rect2, blocked: Array[Rect2],
 		if not _inside_outline(zone):
 			return false
 		for b2 in blocked:
+			if b2 in cand.get("zone_passages", []):
+				continue
 			if b2.intersects(zone):
 				return false
 	return true

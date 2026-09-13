@@ -28,9 +28,45 @@ static func plan(spec: ShopSpec) -> HousePlan:
 		front = entrance
 	if front >= 0:
 		_cut_shopfront(out, spec, front)
+		_light_workshops(out, spec)
 		_choose_focus(out, spec, front)
 	_open_up_lodging(out)
 	return out
+
+
+## A workshop needs useful light across its work area. A small domestic plan
+## can meet its glazing-area target with one window beside a broad shop door,
+## leaving the only usable bench wall dark. Add cross-light on a free outside
+## side before furnishing, using the normal opening clearances.
+static func _light_workshops(out: HousePlan, spec: ShopSpec) -> void:
+	for room in range(out.room_count()):
+		if out.kind_of(room) != &"workshop":
+			continue
+		var windows := out.windows_of(room)
+		if windows.is_empty():
+			continue
+		var first := Vector2(out.windows[windows[0]].normal)
+		var cross_lit := false
+		for index in windows:
+			if absf(Vector2(out.windows[index].normal).dot(first)) < 0.5:
+				cross_lit = true
+		if cross_lit:
+			continue
+		var rect: Rect2 = out.rooms[room].rect
+		for wall in HouseGeometry.room_walls(out, room):
+			var normal := -Vector2(wall.normal)
+			if absf(normal.dot(first)) > 0.5:
+				continue
+			var horizontal := absf(normal.y) > 0.5
+			var line: float = wall.from.y if horizontal else wall.from.x
+			if not HouseGeometry.is_exterior_edge(spec, 1 if horizontal else 0, line):
+				continue
+			var side := {"normal": normal, "line": line,
+				"t0": rect.position.x if horizontal else rect.position.y,
+				"t1": rect.end.x if horizontal else rect.end.y}
+			HousePlanner._windows_along(out, spec, room, side, INF, windows.size() + 1)
+			if out.windows_of(room).size() > windows.size():
+				break
 
 
 ## A trade that lets rooms gives every one of them its own way out (LAY-012).
@@ -171,10 +207,18 @@ static func _choose_focus(out: HousePlan, spec: ShopSpec, front: int) -> void:
 		return
 	var door_n := Vector2(0, -1)
 	var door_pos := Vector2(INF, INF)
-	var entrance: int = out.entrance()
-	if entrance >= 0 and int(out.doors[entrance]["a"]) == front:
-		door_n = out.doors[entrance]["normal"]
+	# Some small shops enter through a service room. The business focus must
+	# face the doorway into its own room, rather than an imagined street door.
+	var entrance := HouseFurnisher.focus_door(out, front)
+	if entrance >= 0:
 		door_pos = out.doors[entrance]["pos"]
+		var nearest := INF
+		for wall in HouseGeometry.room_walls(out, front):
+			var point := Geometry2D.get_closest_point_to_segment(door_pos, wall.from, wall.to)
+			var distance := door_pos.distance_to(point)
+			if distance < nearest:
+				nearest = distance
+				door_n = -Vector2(wall.normal)
 	if PropCatalog.has_tag(choices[0], PropCatalog.WALL):
 		var walls: Array[Dictionary] = HouseGeometry.room_walls(out, front)
 		var best := -1

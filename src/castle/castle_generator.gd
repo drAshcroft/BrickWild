@@ -590,10 +590,13 @@ static func _hits(rect: Rect2, taken: Array[Rect2]) -> bool:
 static func bailey_shop(spec: CastleSpec, entry: Dictionary) -> ShopSpec:
 	var out := ShopSpec.new()
 	out.business = entry["business"]
+	out.material = &"stone"
+	out.style = &"longhall"
 	var rect: Rect2 = entry["rect"]
-	out.width = rect.size.x
-	out.length = rect.size.y
-	out.height = 2.6
+	# Match the quarter-turned public request used by CastleInteriors.yard.
+	out.width = rect.size.y
+	out.length = rect.size.x
+	out.height = CastleBuilder.YARD_WALL_H
 	ShopGenerator.generate(out, spec.seed ^ int(String(entry["business"]).hash()))
 	return out
 
@@ -648,7 +651,14 @@ static func hall_plan(spec: CastleSpec) -> HousePlan:
 	var up := Vector2(0, 1) if lengthwise else Vector2(1, 0)
 	var run: float = floor_rect.size.y if lengthwise else floor_rect.size.x
 	_hall_door(plan, floor_rect, up)
-	_hall_windows(plan, floor_rect, up, hs)
+	if CastleGeometry.is_enclosed(spec):
+		# The west range is backed by the curtain; only its east face sees
+		# the bailey. Decide this before furnishing so light and wall fittings
+		# use the same openings the stone shell will cut.
+		_courtyard_windows(plan, floor_rect, Vector2.RIGHT, hs,
+			mini(3, int(box.size.z / CastleBuilder.RANGE_BAY)))
+	else:
+		_hall_windows(plan, floor_rect, up, hs)
 
 	# The dais at the upper end: deep enough to stand the high table and the
 	# bench behind it on, and never less than the fifth of the hall that makes
@@ -773,7 +783,8 @@ static func chapel_plan(spec: CastleSpec) -> HousePlan:
 	var lengthwise: bool = floor_rect.size.y >= floor_rect.size.x
 	var up := Vector2(0, 1) if lengthwise else Vector2(1, 0)
 	_hall_door(plan, floor_rect, up)
-	_hall_windows(plan, floor_rect, up, hs)
+	# The chapel is the east range: its west face looks into the bailey.
+	_courtyard_windows(plan, floor_rect, Vector2.LEFT, hs)
 
 	# The altar stands a pace off the end wall, ON THE CENTRE LINE, looking
 	# back down the nave at the door -- which is the whole of what an axis is.
@@ -863,57 +874,7 @@ static func _chapel_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 ## HouseSpec is; `CastleGeometry.keep_aabb` says where that frame sits.
 ## Empty when the castle has no keep, or when the keep is too small to stack.
 static func keep_plan(spec: CastleSpec) -> HousePlan:
-	var plan := HousePlan.new()
-	if not spec.keep:
-		return plan
-	var box: AABB = CastleGeometry.keep_aabb(spec)
-	if box.size.x <= 0.0 or box.size.z <= 0.0:
-		return plan
-	var levels: int = clampi(int(box.size.y / KEEP_STOREY_H), 3,
-		HouseGeometry.MAX_STOREYS)
-	var hs: KeepSpec = _keep_spec(spec, box, levels)
-	var floor_rect: Rect2 = HouseGeometry.interior_rect(hs)
-	if minf(floor_rect.size.x, floor_rect.size.y) < MIN_KEEP_SIDE \
-			or floor_rect.size.x * floor_rect.size.y < MIN_KEEP_AREA:
-		return plan
-	if maxf(floor_rect.size.x, floor_rect.size.y) > MAX_KEEP_SIDE:
-		return plan
-	plan.spec = hs
-
-	for level in range(levels):
-		plan.rooms.append({"kind": hs.kind_on(level), "rect": floor_rect,
-			"storey": level})
-
-	# The way in is at the foot, in the middle of the front wall. A forebuilding
-	# would put it on the first floor instead (CAS-004); there is none yet, so
-	# the keep is entered at the ground the way a hall house is.
-	plan.doors = [{"a": 0, "b": -1,
-		"pos": Vector2(floor_rect.get_center().x, floor_rect.position.y),
-		"normal": Vector2(0, -1), "width": HouseGeometry.DOOR_W,
-		"exterior": true, "front": true, "storey": 0}]
-
-	# Blind at the foot, lit above: one window to each long wall of every room
-	# people live in.
-	for level2 in range(1, levels):
-		if not HouseGeometry.is_habitable(hs.kind_on(level2)):
-			continue
-		# The lord's chamber keeps ONE WALL BLIND, the one facing the fire.
-		# That is where the bed goes, and a bed wants solid wall over its head:
-		# windows down all four sides left every keep in the sweep with its
-		# lord sleeping under one, which the feng shui rule reports every time
-		# and is right to.
-		var blind: int = 3 if hs.kind_on(level2) == &"lords_chamber" else -1
-		_keep_windows(plan, floor_rect, level2, hs, blind)
-
-	# One stairwell, the same well on every landing, against a wall and out of
-	# the line of the door (LAY-005) -- the house planner's own placer.
-	for level3 in range(levels - 1):
-		HousePlanner._add_stair(plan, level3, level3 + 1, level3, level3 + 1)
-
-	# The fire is the lord's, at the top, on the wall the flue rises up.
-	plan.hearth = {"room": levels - 1, "wall": 2}
-	HouseFurnisher.furnish(plan, hs)
-	return plan
+	return load("res://src/castle/castle_keep_plan.gd").generate(spec)
 
 
 ## How much height one storey of a keep wants, and the least a keep may
@@ -941,7 +902,9 @@ static func _keep_spec(spec: CastleSpec, box: AABB, levels: int) -> KeepSpec:
 	out.style = &"townhouse"
 	out.width = box.size.x
 	out.length = box.size.z
-	out.height = clampf(box.size.y / float(levels), 2.6, 4.5)
+	# These storeys are the occupied keep itself; a ceiling-height cap would
+	# strand the lord's chamber beneath an unplanned multi-storey attic.
+	out.height = box.size.y / float(levels)
 	out.storeys = levels
 	out.room_count = levels
 	out.program = out.room_program(levels)
@@ -1076,3 +1039,44 @@ static func _hall_windows(plan: HousePlan, floor_rect: Rect2, up: Vector2,
 			plan.windows.append({"room": 0, "pos": pos, "normal": n,
 				"width": WINDOW_W, "sill": WINDOW_SILL, "head": head,
 				"storey": 0})
+
+
+## Enclosed ranges borrow one wall from the curtain. Their windows belong on
+## the opposite X face even when a short, broad room runs across the range.
+## Window bays share the available wall; a door on that face splits the run.
+static func _courtyard_windows(plan: HousePlan, floor_rect: Rect2, normal: Vector2,
+		hs: HouseSpec, minimum := 1) -> void:
+	var head := minf(WINDOW_SILL + WINDOW_H, hs.height - 0.2)
+	if head - WINDOW_SILL < 0.4:
+		return
+	var margin := HouseGeometry.DOOR_CORNER_MARGIN
+	var gap := 0.2
+	var spans: Array[Vector2] = [Vector2(floor_rect.position.y + margin,
+		floor_rect.end.y - margin)]
+	for door in plan.doors:
+		if not door.exterior or Vector2(door.normal).dot(normal) < 0.9:
+			continue
+		var centre: float = door.pos.y
+		var half := float(door.width) * 0.5 + gap
+		var pieces: Array[Vector2] = []
+		for span in spans:
+			if centre + half <= span.x or centre - half >= span.y:
+				pieces.append(span)
+			else:
+				if centre - half > span.x:
+					pieces.append(Vector2(span.x, centre - half))
+				if centre + half < span.y:
+					pieces.append(Vector2(centre + half, span.y))
+		spans = pieces
+	var wall_x := floor_rect.end.x if normal.x > 0.0 else floor_rect.position.x
+	for span in spans:
+		var run := span.y - span.x
+		var capacity := maxi(int((run + gap) / (WINDOW_W + gap)), 0)
+		if capacity == 0:
+			continue
+		var count := mini(maxi(int(run / WINDOW_PITCH), minimum), capacity)
+		for k in count:
+			var along := lerpf(span.x, span.y, (float(k) + 0.5) / float(count))
+			plan.windows.append({"room": 0, "pos": Vector2(wall_x, along),
+				"normal": normal, "width": WINDOW_W, "sill": WINDOW_SILL,
+				"head": head, "storey": 0})

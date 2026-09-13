@@ -74,12 +74,7 @@ static func light_the_plan(plan: HousePlan) -> Node3D:
 		if not PropCatalog.has_tag(key, PropCatalog.LIGHT):
 			continue
 		var s: float = float(p.get("scale", 1.0))
-		var pos: Vector3 = p["pos"]
-		var drop: float = PropCatalog.floor_offset(key) * s
-		if PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED) \
-				or PropCatalog.has_tag(key, PropCatalog.CEILING):
-			drop = 0.0
-		var origin := Vector3(pos.x, pos.y - drop, pos.z)
+		var origin := PropCatalog.house_origin(p)
 		var lamp: OmniLight3D = for_prop(key, origin,
 			float(p["yaw"]) + PropCatalog.face_offset(key), s)
 		# a flame cannot burn above the ceiling of the room it is in, however

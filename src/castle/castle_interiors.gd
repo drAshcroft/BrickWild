@@ -65,8 +65,36 @@ static func emit(owner: CastleBuilder, row: Dictionary) -> void:
 			builder._wall_run(run.from, run.to, HouseGeometry.wall_thickness(plan.spec),
 				bounds.size.y - occupied_top, [], 0, occupied_top, false)
 	var mesh := builder.commit()
-	owner._kit.append_mesh(mesh, row.transform, [0, 1, 2, 0])
+	# With the house roof disabled, its roof-colour slot contains glazing.
+	# Castle openings have their own material and are excluded from masonry
+	# voxels. SurfaceTool omits empty slots on commit, so a windowless plan's
+	# floor cannot be identified by its committed numeric index alone.
+	var mapping := [CastleBuilder.SURF_STONE, CastleBuilder.SURF_TRIM,
+		CastleBuilder.SURF_OPEN, CastleBuilder.SURF_STONE]
+	var committed_surface := 0
+	for source in mapping.size():
+		var arrays := builder._kit.surface(source).commit_to_arrays()
+		if arrays.is_empty() or arrays[Mesh.ARRAY_VERTEX] == null or arrays[Mesh.ARRAY_VERTEX].is_empty():
+			continue
+		owner._kit.surface(mapping[source]).append_from(mesh, committed_surface, row.transform)
+		committed_surface += 1
+	# Forward openings the child actually emitted, rather than recreating
+	# nominal windows from the spec. Castle QA can then check their actual
+	# position and facade direction alongside the legacy castle openings.
+	var transform: Transform3D = row.transform
+	for part in builder.part_log:
+		var opening_kind := String(part.get("opening_kind", ""))
+		if not opening_kind in ["window", "door"]:
+			continue
+		var imported: Dictionary = part.duplicate(true)
+		var facing := (transform.basis * Vector3(part.facing)).normalized()
+		imported.kind = opening_kind
+		imported.pos = transform * Vector3(part.pos)
+		imported.facing = facing
+		imported.rot_y = atan2(facing.x, facing.z)
+		imported.tag = String(row.id)
+		imported.planned_opening = true
+		owner.part_log.append(imported)
 	row.builder = builder
 	row.mesh = mesh
 	owner.interiors.append(row)
-
