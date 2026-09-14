@@ -28,7 +28,7 @@ extends SceneTree
 ## 12b interior   - the castle interiors, hall and keep, over two hundred castles
 ##  13 house      - the house spec/plan/build contract
 ##  14 assets     - the prop catalogue still describes the props
-##  15 houseqa    - plan, furnishing and circulation of every house
+##  15 houseqa    - quick deterministic house QA; use houseqafull explicitly
 ##  16 hmultistory- explicit levels, stairs, elevations and top roof
 ##  17 harchetype - the dwellings this generator must be able to furnish
 ## 17a court      - buildings round a yard: the court rules and a hundred houses
@@ -49,9 +49,13 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
-	"hotel", "hlandmark",
+	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
 	"village", "vsite", "vlot", "vcheck", "world", "warchetype"]
+
+## Explicit lanes which should not be repeated by the default all-suite run.
+const EXTRA: Array[String] = ["roofquick", "houseqacore", "houseqaplan",
+	"houseqafurnish", "houseqafull"]
 
 
 static func _run_one(key: String) -> SuiteResult:
@@ -124,6 +128,16 @@ static func _run_one(key: String) -> SuiteResult:
 			return load("res://tests/suites/house_assembly_suite.gd").run()
 		"houseqa":
 			return HouseQASuite.run()
+		"houseqacore":
+			return HouseQASuite.run(false, &"core")
+		"houseqaplan":
+			return HouseQASuite.run(false, &"planning")
+		"houseqafurnish":
+			return HouseQASuite.run(false, &"furnishing")
+		"houseqafull":
+			return HouseQASuite.run(true)
+		"roofquick":
+			return preload("res://tests/suites/roof_quick_suite.gd").run()
 		"hmultistory":
 			return HouseMultistorySuite.run()
 		"harchetype":
@@ -136,6 +150,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return ShopArchetypeSuite.run()
 		"hotel":
 			return HotelSuite.run()
+		"hotelroof":
+			return preload("res://tests/suites/hotel_roof_smoke_suite.gd").run()
 		"hlandmark":
 			return HotelLandmarkSuite.run()
 		"temple":
@@ -163,10 +179,10 @@ func _init() -> void:
 	if args.size() > 0:
 		wanted = []
 		for a in args:
-			if a in ORDER:
+			if a in ORDER or a in EXTRA:
 				wanted.append(a)
 			else:
-				printerr("unknown suite '%s'; known: %s" % [a, ", ".join(ORDER)])
+				printerr("unknown suite '%s'; known: %s" % [a, ", ".join(ORDER + EXTRA)])
 				quit(2)
 				return
 

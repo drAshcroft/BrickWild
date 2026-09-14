@@ -20,8 +20,18 @@ godot --headless --path . --script res://tests/run_all.gd
 #   temples:  temple | rite | tarchetype
 godot --headless --path . --script res://tests/run_all.gd -- normals
 godot --headless --path . --script res://tests/run_all.gd -- castle cmassing
-# the house suites alone (they are the slow ones: ~5 minutes)
+# fast roof regression for ordinary roof/emitter changes (target: <30 seconds)
+godot --headless --path . --script res://tests/run_all.gd -- roofquick
+# bounded house QA lane for ordinary task completion (target: <5 minutes)
+godot --headless --path . --script res://tests/run_all.gd -- houseqa
+# narrower house QA lanes: shell/core, planning/circulation, furnishing/rules
+godot --headless --path . --script res://tests/run_all.gd -- houseqacore
+godot --headless --path . --script res://tests/run_all.gd -- houseqaplan
+godot --headless --path . --script res://tests/run_all.gd -- houseqafurnish
+# broader bounded house-family regression
 godot --headless --path . --script res://tests/house_test.gd
+# exhaustive statistical house QA is for nightly/pre-merge use
+godot --headless --path . --script res://tests/run_all.gd -- houseqafull
 # the temple suites alone
 godot --headless --path . --script res://tests/temple_test.gd
 

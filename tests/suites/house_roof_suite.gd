@@ -7,6 +7,7 @@ static func run(full := false) -> SuiteResult:
 	_hip_primitive(res)
 	_subtraction(res)
 	_lowered_gable(res)
+	_gable_profile_and_half_hip(res)
 	for kind in [&"gable", &"half_hipped", &"hipped"]:
 		for size in [Vector2(7, 9), Vector2(14, 7), Vector2(8, 8), Vector2(10, 13)]:
 			for pitch in [0.7, 1.6]:
@@ -498,6 +499,166 @@ static func _lowered_gable(res: SuiteResult) -> void:
 	_check_house(result, plan, mutant, "lowered gable")
 	_expect(res, result.failures.any(func(f: String) -> bool: return f.contains("lateral wall/roof gaps")),
 		"lateral envelope check accepted a lowered gable")
+
+
+## Measure the emitted wall head against the shared roof underside. The old
+## gable apex calculation was short by rise * 0.7 / (span + 0.7), which is
+## about 0.300 m on the longhall fixture; that nominal difference is not an
+## exposed air gap once the actual slab and closure thicknesses are emitted.
+## Keep this as a mesh probe rather than a component-log assertion: the latter
+## belongs to HOUSE-EXT-005.
+static func _gable_profile_and_half_hip(res: SuiteResult) -> void:
+	for size in [Vector2(12.0, 16.0), Vector2(16.0, 12.0)]:
+		var s := HouseSpec.new()
+		s.width = size.x
+		s.length = size.y
+		s.height = 2.7
+		s.roof_pitch = 5.440636 / 6.0
+		s.roof_type = &"gable"
+		s.dormers = false
+		s.chimney = false
+		s.porch = false
+		s.timber_frame = false
+		s.bargeboards = false
+		var plan := HousePlanner.plan(s)
+		var builder := HouseBuilder.new()
+		var mesh := builder.build(plan)
+		var gap := _wall_profile_gap(mesh, plan)
+		_expect(res, gap <= 0.01,
+			"gable orientation %s has %.4fm exposed wall/roof gap" % [size, gap])
+
+	var longhall := HouseSpec.new()
+	longhall.width = 12.0
+	longhall.length = 16.0
+	longhall.height = 2.7
+	longhall.roof_pitch = 5.440636 / 6.0
+	longhall.roof_type = &"gable"
+	longhall.dormers = false
+	longhall.chimney = false
+	longhall.porch = false
+	longhall.timber_frame = false
+	longhall.bargeboards = false
+	var hall_plan := HousePlanner.plan(longhall)
+	var hall_layout := HouseGeometry.roof_layout(hall_plan)
+	var hall_span: float = hall_layout["span"]
+	var hall_rise: float = hall_layout["rise"]
+	var nominal := hall_rise * 0.7 / (hall_span + 0.7)
+	_expect(res, absf(nominal - 0.299878) < 0.001,
+		"longhall nominal profile offset drifted: %.6fm" % nominal)
+	var hall_mesh := HouseBuilder.new().build(hall_plan)
+	var final_gap := _wall_profile_gap(hall_mesh, hall_plan)
+	_expect(res, final_gap <= 0.01 and final_gap < nominal * 0.1,
+		"longhall nominal %.6fm became %.6fm exposed final gap" % [nominal, final_gap])
+
+	# The half hip shares its cut with the gable wall, truss and boards. Probe
+	# the actual trim mesh at both end walls; a member climbing above this
+	# boundary is the old full-height-gable defect in a different costume.
+	var half := HouseSpec.new()
+	half.width = 7.0
+	half.length = 9.0
+	half.height = 2.7
+	half.roof_pitch = 1.0
+	half.roof_type = &"half_hipped"
+	half.dormers = false
+	half.chimney = false
+	half.porch = false
+	half.timber_frame = true
+	half.gable_truss = &"king_post"
+	half.bargeboards = true
+	var half_plan := HousePlanner.plan(half)
+	var half_builder := HouseBuilder.new()
+	var half_mesh := half_builder.build(half_plan)
+	var half_layout := HouseGeometry.roof_layout(half_plan)
+	var half_cut: float = float(half_layout["rise"]) * RoofShape.HALF_HIP
+	var half_xf: Transform3D = half_layout["transform"]
+	var half_local := half_xf.affine_inverse()
+	var trim_top := -INF
+	for tri in _triangles(half_mesh, HouseBuilder.SURF_TRIM):
+		for world_p in tri:
+			var p: Vector3 = half_local * world_p
+			if absf(absf(p.z) - (float(half_layout["along"]) * 0.5)) < 0.38 \
+					and absf(p.x) <= float(half_layout["span"]) * 0.5 + 0.2:
+				trim_top = maxf(trim_top, p.y)
+	_expect(res, is_finite(trim_top) and absf(trim_top - half_cut) <= 0.16,
+		"half-hip trim/truss misses or crosses cut: top %.4f cut %.4f" % [trim_top, half_cut])
+
+	# Full gables alone receive apex finials. The central end-wall trim region
+	# is otherwise empty when timber framing is disabled, making this a direct
+	# emitted-mesh assertion rather than a tag/count convention.
+	var full := HouseSpec.new()
+	full.width = 7.0
+	full.length = 9.0
+	full.height = 2.7
+	full.roof_pitch = 1.0
+	full.roof_type = &"gable"
+	full.dormers = false
+	full.chimney = false
+	full.porch = false
+	full.timber_frame = false
+	full.bargeboards = true
+	var full_plan := HousePlanner.plan(full)
+	var full_mesh := HouseBuilder.new().build(full_plan)
+	var full_layout := HouseGeometry.roof_layout(full_plan)
+	var full_local := (full_layout["transform"] as Transform3D).affine_inverse()
+	var finial_hits := 0
+	var half_finial_hits := 0
+	for tri in _triangles(full_mesh, HouseBuilder.SURF_TRIM):
+		for world_p in tri:
+			var p: Vector3 = full_local * world_p
+			for end_v in [-1.0, 1.0]:
+				var ez: float = end_v * (float(full_layout["along"]) * 0.5 + 0.28)
+				if absf(p.x) <= 0.08 and absf(p.z - ez) <= 0.08 \
+						and p.y >= float(full_layout["rise"]) - 0.08 \
+						and p.y <= float(full_layout["rise"]) + 0.5:
+					finial_hits += 1
+	_expect(res, finial_hits >= 8, "full gable apex finials missing from emitted trim")
+	for tri in _triangles(half_mesh, HouseBuilder.SURF_TRIM):
+		for world_p in tri:
+			var p: Vector3 = half_local * world_p
+			for end_v in [-1.0, 1.0]:
+				var ez: float = end_v * (float(half_layout["along"]) * 0.5 + 0.28)
+				if absf(p.x) <= 0.08 and absf(p.z - ez) <= 0.08 \
+						and p.y >= half_cut + 0.05 and p.y <= half_cut + 0.5:
+					half_finial_hits += 1
+	_expect(res, half_finial_hits == 0, "half-hip emitted an apex finial above its hip cut")
+
+
+static func _wall_profile_gap(mesh: ArrayMesh, plan: HousePlan) -> float:
+	var layout := HouseGeometry.roof_layout(plan)
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	var xf: Transform3D = layout["transform"]
+	var h := float(layout["span"]) * 0.5
+	var f := float(layout["along"]) * 0.5
+	var walls := _triangles(mesh, HouseBuilder.SURF_WALL)
+	var worst := 0.0
+	for edge in [[Vector2(-h,-f), Vector2(h,-f), Vector2(0,-1)],
+			[Vector2(-h,f), Vector2(h,f), Vector2(0,1)],
+			[Vector2(-h,-f), Vector2(-h,f), Vector2(-1,0)],
+			[Vector2(h,-f), Vector2(h,f), Vector2(1,0)]]:
+		for i in range(1, 12):
+			var p: Vector2 = edge[0].lerp(edge[1], float(i) / 12.0)
+			var roof_y := RoofShape.height_at(faces, p) - RoofShape.DEPTH * 0.5
+			if is_nan(roof_y):
+				continue
+			var found := false
+			# Probe the actual wall triangles laterally, from the expected roof
+			# underside downward. This does not assume a dense or vertex-aligned
+			# profile: _hits measures the continuous triangle surface.
+			for step in range(0, 241):
+				var y := roof_y - float(step) * 0.005
+				if y < -0.05:
+					break
+				var outward: Vector2 = edge[2]
+				var a := p + outward * 0.35
+				var b := p - outward * 0.35
+				if not _hits(walls, xf * Vector3(a.x, y, a.y),
+						xf * Vector3(b.x, y, b.y)).is_empty():
+					worst = maxf(worst, float(step) * 0.005)
+					found = true
+					break
+			if not found:
+				worst = maxf(worst, 1.0)
+	return worst
 
 
 static func _check_house(res: SuiteResult, plan: HousePlan, mesh: ArrayMesh, who: String) -> void:

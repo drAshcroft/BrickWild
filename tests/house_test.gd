@@ -1,11 +1,13 @@
 extends SceneTree
 ## The house generator end to end: contract, assets, plan/furnishing/walking,
 ## and the archetypes.
-## Run: godot --headless --script res://tests/house_test.gd
+## Run the bounded lane: godot --headless --script res://tests/house_test.gd
+## Exhaustive statistical sweeps: append -- --full
 
 func _init() -> void:
+	var full := OS.get_cmdline_user_args().has("--full")
 	var suites: Array[SuiteResult] = [HouseSuite.run(), HouseAssetsSuite.run(),
-		HouseQASuite.run(), HouseMultistorySuite.run(), HouseArchetypeSuite.run()]
+		HouseQASuite.run(full), HouseMultistorySuite.run(), HouseArchetypeSuite.run()]
 	var failed := 0
 	for res in suites:
 		for n in res.notes:
