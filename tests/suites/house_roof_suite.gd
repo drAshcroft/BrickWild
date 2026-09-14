@@ -28,6 +28,8 @@ static func run(full := false) -> SuiteResult:
 				var mesh := builder.build(plan)
 				var who := "%s %s pitch %.1f" % [kind, size, pitch]
 				_check_house(res, plan, mesh, who)
+				if kind == &"hipped":
+					_check_builder_hip_surface(res, plan, builder, mesh, who)
 				var before: PackedVector3Array = mesh.surface_get_arrays(2)[Mesh.ARRAY_VERTEX]
 				var second := builder.build(plan)
 				_expect(res, before == second.surface_get_arrays(2)[Mesh.ARRAY_VERTEX], who + " rebuild changed roof")
@@ -48,6 +50,12 @@ static func run(full := false) -> SuiteResult:
 		var builder := HouseBuilder.new()
 		var mesh := builder.build(plan)
 		_check_house(res, plan, mesh, "%s seed=%s" % [row[0], row[1]])
+		if row[0] == &"farmhouse" and int(row[1]) == 4413:
+			_expect(res, s.roof_type == &"hipped",
+				"farmhouse seed=4413 stopped exercising the natural hipped-roof regression")
+		if s.roof_type == &"hipped":
+			_check_builder_hip_surface(res, plan, builder, mesh,
+				"%s seed=%s" % [row[0], row[1]])
 		res.note("%s seed=%d roof=%s fitted_dormers=%d" % [s.style, s.seed, s.roof_type,
 			HouseGeometry.roof_layout(plan)["dormers"].size()])
 	return res
@@ -72,11 +80,13 @@ static func _hits(tris: Array, a: Vector3, b: Vector3) -> Array[Vector3]:
 	return out
 
 
-static func _hip_error(mesh: ArrayMesh, span: float, along: float, rise: float) -> float:
+static func _hip_error(mesh: ArrayMesh, span: float, along: float, rise: float,
+		xf := Transform3D.IDENTITY) -> float:
 	var tris := _triangles(mesh, 0)
 	var error := 0.0
 	var h := span * 0.5
 	var f := along * 0.5
+	var inverse := xf.affine_inverse()
 	# Independent envelope equation: a hip is the lower of its side and end
 	# planes. The old crossed rectangles fail although every X/Z is covered.
 	var end_run := minf(h, f)
@@ -84,21 +94,25 @@ static func _hip_error(mesh: ArrayMesh, span: float, along: float, rise: float) 
 		for iz in range(1, 14):
 			var x := -h + span * float(ix) / 12.0
 			var z := -f + along * float(iz) / 14.0
-			var expected := minf(rise * (1.0 - absf(x) / h), rise * (f - absf(z)) / end_run) + 0.12
-			var hits := _hits(tris, Vector3(x, rise + 2, z), Vector3(x, -1, z))
+			var expected := minf(rise * (1.0 - absf(x) / h), rise * (f - absf(z)) / end_run) \
+				+ RoofShape.DEPTH * 0.5
+			var hits := _hits(tris, xf * Vector3(x, rise + 2, z), xf * Vector3(x, -1, z))
 			var top := -INF
 			for p in hits:
-				top = maxf(top, p.y)
+				top = maxf(top, (inverse * p).y)
 			error = maxf(error, absf(top - expected))
 	return error
 
 
 static func _hip_primitive(res: SuiteResult) -> void:
-	for size in [Vector2(10.7, 13.5), Vector2(8, 8), Vector2(8, 8.02), Vector2(12, 7)]:
-		var kit := MeshKit.new(1)
-		kit.hip_roof_at(Transform3D.IDENTITY, size.x, size.y, 3.6, 0)
-		_expect(res, _hip_error(kit.commit(), size.x, size.y, 3.6) < 0.002,
-			"hip envelope differs from joined face planes: %s" % size)
+	var rotated := Transform3D(Basis(Vector3.UP, 0.63), Vector3(2.5, 1.7, -4.0))
+	for fixture in [
+			{"name": "long ridge", "size": Vector2(10.7, 13.5), "xf": Transform3D.IDENTITY},
+			{"name": "square pyramid", "size": Vector2(8, 8), "xf": Transform3D.IDENTITY},
+			{"name": "near-square", "size": Vector2(8, 8.02), "xf": Transform3D.IDENTITY},
+			{"name": "short plan", "size": Vector2(12, 7), "xf": Transform3D.IDENTITY},
+			{"name": "rotated/translated", "size": Vector2(7, 12), "xf": rotated}]:
+		_check_hip_primitive(res, fixture["size"], fixture["xf"], fixture["name"])
 	# Mutation fixture: retain the previous crossed-slab construction so a
 	# future implementation cannot weaken this into a coverage-only test.
 	var bad := MeshKit.new(1)
@@ -110,8 +124,343 @@ static func _hip_primitive(res: SuiteResult) -> void:
 			Transform3D(Basis(Vector3.FORWARD, side * atan2(rise, h)), Vector3(side * h * 0.5, rise * 0.5, 0)), 0)
 		bad.oriented_box(Vector3(h * 2, 0.24, sqrt(f * f + rise * rise)),
 			Transform3D(Basis(Vector3.RIGHT, side * atan2(rise, f)), Vector3(0, rise * 0.5, side * f * 0.5)), 0)
-	_expect(res, _hip_error(bad.commit(), h * 2, f * 2, rise) > 0.2,
+	var bad_mesh := bad.commit()
+	var cover_spec := HouseSpec.new()
+	cover_spec.width = h * 2.0 - 0.7
+	cover_spec.length = f * 2.0 - 0.5
+	cover_spec.height = 2.6
+	cover_spec.storeys = 1
+	_expect(res, HouseQASuite._roof_cover(bad_mesh, cover_spec) >= 0.999,
+		"old crossed slabs no longer demonstrate the coverage false negative")
+	_expect(res, _hip_error(bad_mesh, h * 2, f * 2, rise) > 0.2,
 		"hip regression failed to reject old crossed slabs")
+	_builder_hip_integration(res)
+
+
+static func _check_hip_primitive(res: SuiteResult, size: Vector2,
+		xf: Transform3D, who: String) -> void:
+	var rise := 3.6
+	var faces := RoofShape.faces(size.x, size.y, rise, &"hipped")
+	_expect(res, faces.size() == 4, "%s hip did not have four faces" % who)
+	var face_geometry_ok := true
+	for i in range(faces.size()):
+		var face: PackedVector3Array = faces[i]
+		if face.size() < 3:
+			face_geometry_ok = false
+			continue
+		for p in face:
+			if not p.is_finite():
+				face_geometry_ok = false
+		for fan in range(1, face.size() - 1):
+			var normal := (face[fan] - face[0]).cross(face[fan + 1] - face[0])
+			if not normal.is_finite() or normal.length_squared() < 0.000001:
+				face_geometry_ok = false
+		for j in range(i):
+			if Poly.intersection_area(RoofShape.footprint(face),
+					RoofShape.footprint(faces[j])) > 0.000001:
+				face_geometry_ok = false
+	_expect(res, face_geometry_ok, "%s hip faces are degenerate or overlap" % who)
+	_check_hip_seams(res, faces, who)
+	var kit := MeshKit.new(1)
+	kit.hip_roof_at(xf, size.x, size.y, rise, 0)
+	var mesh := kit.commit()
+	var expected_kit := MeshKit.new(1)
+	for face in faces:
+		var world := PackedVector3Array()
+		for p in face:
+			world.append(xf * p)
+		expected_kit.slab_poly(world, RoofShape.DEPTH, 0, true)
+	var expected_mesh := expected_kit.commit()
+	_expect(res, _hip_error(mesh, size.x, size.y, rise, xf) < 0.002,
+		"%s envelope differs from joined face planes" % who)
+	var vertices: PackedVector3Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var expected_vertices: PackedVector3Array = expected_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var expected_vertex_count := 0
+	for face in faces:
+		expected_vertex_count += (4 * face.size() - 4) * 3
+	_expect(res, vertices.size() == expected_vertex_count,
+		"%s slab emitter produced an unexpected number of skin/cap triangles" % who)
+	_expect(res, _triangle_count_sets_equal(_triangle_counts(vertices),
+		_triangle_counts(expected_vertices)), "%s emitter added, lost, or duplicated a face" % who)
+	_expect(res, _mesh_edges_closed(vertices), "%s emitted slab mesh has an open edge" % who)
+	_check_hip_winding(res, mesh, faces, xf, who)
+	if who == "long ridge":
+		var arrays := mesh.surface_get_arrays(0)
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var skin_only := PackedVector3Array()
+		var inverse := xf.affine_inverse()
+		for i in range(0, vertices.size(), 3):
+			if absf((inverse.basis * normals[i]).y) <= 0.05:
+				continue
+			for j in range(3):
+				skin_only.append(vertices[i + j])
+		_expect(res, not _mesh_edges_closed(skin_only),
+			"mesh closure check accepted roof skins with every side cap removed")
+		var duplicate := vertices.duplicate()
+		duplicate.append_array(vertices)
+		_expect(res, not _triangle_count_sets_equal(_triangle_counts(duplicate),
+			_triangle_counts(expected_vertices)),
+			"face comparison accepted a duplicated closed hip roof")
+
+
+static func _point_key(p: Vector3) -> String:
+	return "%d:%d:%d" % [roundi(p.x * 100000.0), roundi(p.y * 100000.0),
+		roundi(p.z * 100000.0)]
+
+
+static func _edge_key(a: Vector3, b: Vector3) -> String:
+	var ends: Array[String] = [_point_key(a), _point_key(b)]
+	ends.sort()
+	return ends[0] + "|" + ends[1]
+
+
+static func _triangle_key(a: Vector3, b: Vector3, c: Vector3) -> String:
+	var points: Array[String] = [_point_key(a), _point_key(b), _point_key(c)]
+	points.sort()
+	return "|".join(PackedStringArray(points))
+
+
+static func _triangle_counts(vertices: PackedVector3Array) -> Dictionary:
+	var counts := {}
+	if vertices.size() % 3 != 0:
+		return counts
+	for i in range(0, vertices.size(), 3):
+		var key := _triangle_key(vertices[i], vertices[i + 1], vertices[i + 2])
+		counts[key] = int(counts.get(key, 0)) + 1
+	return counts
+
+
+static func _triangle_count_sets_equal(a: Dictionary, b: Dictionary) -> bool:
+	if a.size() != b.size():
+		return false
+	for key in a:
+		if int(a[key]) != int(b.get(key, 0)):
+			return false
+	return true
+
+
+static func _contains_triangles(actual: PackedVector3Array,
+		expected: PackedVector3Array) -> bool:
+	var actual_counts := _triangle_counts(actual)
+	var expected_counts := _triangle_counts(expected)
+	for key in expected_counts:
+		if int(actual_counts.get(key, 0)) < int(expected_counts[key]):
+			return false
+	return true
+
+
+static func _sloped_triangle_counts(mesh: ArrayMesh, surface: int,
+		min_height: float) -> Dictionary:
+	if surface < 0 or surface >= mesh.get_surface_count():
+		return {}
+	var arrays := mesh.surface_get_arrays(surface)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	if vertices.size() != normals.size() or vertices.size() % 3 != 0:
+		return {}
+	var counts := {}
+	for i in range(0, vertices.size(), 3):
+		var ny := absf(normals[i].y)
+		if ny <= 0.05 or ny >= 0.999 or maxf(vertices[i].y,
+				maxf(vertices[i + 1].y, vertices[i + 2].y)) <= min_height:
+			continue
+		var key := _triangle_key(vertices[i], vertices[i + 1], vertices[i + 2])
+		counts[key] = int(counts.get(key, 0)) + 1
+	return counts
+
+
+static func _polygon_key(points: PackedVector3Array) -> String:
+	var keys := PackedStringArray()
+	for p in points:
+		keys.append(_point_key(p))
+	keys.sort()
+	return "|".join(keys)
+
+
+## A complete triangulated slab has no boundary edges. Coincident caps at a
+## joined hip can raise incidence to four, six, or eight, but it stays even.
+static func _mesh_edges_closed(vertices: PackedVector3Array) -> bool:
+	if vertices.is_empty() or vertices.size() % 3 != 0:
+		return false
+	var edges := {}
+	for i in range(0, vertices.size(), 3):
+		for j in range(3):
+			var a: Vector3 = vertices[i + j]
+			var b: Vector3 = vertices[i + (j + 1) % 3]
+			if not a.is_finite() or not b.is_finite() or a.distance_squared_to(b) < 0.0000000001:
+				return false
+			var key := _edge_key(a, b)
+			edges[key] = int(edges.get(key, 0)) + 1
+	for count in edges.values():
+		if int(count) < 2 or int(count) % 2 != 0:
+			return false
+	return true
+
+
+## Every non-eave edge must be owned by exactly two faces. This catches a
+## hairline ridge/hip crack even when vertical sampling happens to miss it.
+static func _check_hip_seams(res: SuiteResult, faces: Array[PackedVector3Array],
+		who: String) -> void:
+	var edges := {}
+	for face in faces:
+		for i in range(face.size()):
+			var a: Vector3 = face[i]
+			var b: Vector3 = face[(i + 1) % face.size()]
+			var key := _edge_key(a, b)
+			if not edges.has(key):
+				edges[key] = {"count": 0, "a": a, "b": b}
+			edges[key]["count"] = int(edges[key]["count"]) + 1
+	var open_eaves := 0
+	var joined := 0
+	var valid := true
+	for edge in edges.values():
+		var count: int = edge["count"]
+		if count == 1:
+			var a: Vector3 = edge["a"]
+			var b: Vector3 = edge["b"]
+			if absf(a.y) > 0.00001 or absf(b.y) > 0.00001:
+				valid = false
+			open_eaves += 1
+		elif count == 2:
+			joined += 1
+		else:
+			valid = false
+	_expect(res, valid and open_eaves == 4 and joined in [4, 5],
+		"%s hip has an open, duplicated, or unmatched seam" % who)
+
+
+## Stored normals must agree with Godot's clockwise front-face convention.
+## The second half checks that the convention points away from each emitted
+## slab, rather than consistently winding every face toward its interior.
+static func _check_hip_winding(res: SuiteResult, mesh: ArrayMesh,
+		faces: Array[PackedVector3Array], xf: Transform3D, who: String) -> void:
+	var arrays := mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var inverse := xf.affine_inverse()
+	var clockwise := vertices.size() == normals.size() and vertices.size() % 3 == 0
+	var outward := clockwise
+	var depth_ok := clockwise
+	_expect(res, clockwise, "%s mesh has malformed triangle or normal arrays" % who)
+	if not clockwise:
+		_expect(res, false, "%s mesh faces do not point out of their slabs" % who)
+		return
+	for i in range(0, vertices.size(), 3):
+		var expected := MeshKit._face_normal(vertices[i], vertices[i + 1], vertices[i + 2])
+		if expected.dot(normals[i]) < 0.999 or normals[i].dot(normals[i + 1]) < 0.999 \
+				or normals[i].dot(normals[i + 2]) < 0.999:
+			clockwise = false
+		var centre: Vector3 = inverse * ((vertices[i] + vertices[i + 1] + vertices[i + 2]) / 3.0)
+		var normal: Vector3 = (inverse.basis * normals[i]).normalized()
+		if absf(normal.y) > 0.05:
+			var mid_y := RoofShape.height_at(faces, Vector2(centre.x, centre.z))
+			if is_nan(mid_y) or (centre.y - mid_y) * normal.y <= 0.00001:
+				outward = false
+			if is_nan(mid_y) or absf(absf(centre.y - mid_y) - RoofShape.DEPTH * 0.5) > 0.0001:
+				depth_ok = false
+		else:
+			var cap_outward := false
+			var at := Vector2(centre.x, centre.z)
+			for face in faces:
+				var footprint := RoofShape.footprint(face)
+				if not Poly.contains_point(footprint, at, 0.001):
+					continue
+				var face_centre := Vector2.ZERO
+				for p in footprint:
+					face_centre += p
+				face_centre /= float(footprint.size())
+				if (at - face_centre).dot(Vector2(normal.x, normal.z)) > 0.00001:
+					cap_outward = true
+					break
+			if not cap_outward:
+				outward = false
+	_expect(res, clockwise, "%s mesh normals disagree with clockwise winding" % who)
+	_expect(res, outward, "%s mesh faces do not point out of their slabs" % who)
+	_expect(res, depth_ok, "%s mesh does not preserve vertical slab thickness" % who)
+
+
+## HouseBuilder emits descriptor faces through _roof_face rather than calling
+## hip_roof_at. Keep that integration tied to the same shared face endpoints.
+static func _builder_hip_integration(res: SuiteResult) -> void:
+	var spec := HouseSpec.new()
+	spec.width = 10.0
+	spec.length = 13.0
+	spec.height = 2.7
+	spec.storeys = 1
+	spec.roof_pitch = 0.8
+	spec.roof_type = &"hipped"
+	spec.room_count = 1
+	spec.program = [&"hall"]
+	spec.dormers = false
+	spec.chimney = false
+	spec.porch = false
+	spec.timber_frame = false
+	spec.bargeboards = false
+	var plan := HousePlanner.plan(spec)
+	var builder := HouseBuilder.new()
+	var mesh := builder.build(plan)
+	var layout := HouseGeometry.roof_layout(plan)
+	var expected: Array[PackedVector3Array] = layout["faces"]
+	var xf: Transform3D = layout["transform"]
+	var emitted_keys := PackedStringArray()
+	for component in builder.roof_components:
+		if String(component["role"]).begins_with("roof_face_"):
+			emitted_keys.append(_polygon_key(component["points"]))
+	var expected_keys := PackedStringArray()
+	for face in expected:
+		var world := PackedVector3Array()
+		for p in face:
+			world.append(xf * p)
+		expected_keys.append(_polygon_key(world))
+	emitted_keys.sort()
+	expected_keys.sort()
+	_expect(res, emitted_keys == expected_keys,
+		"HouseBuilder hipped faces drifted from RoofShape endpoints")
+	_check_builder_hip_surface(res, plan, builder, mesh, "forced hipped builder")
+	_check_house(res, plan, mesh, "forced hipped builder")
+
+
+## Rebuild every logged roof-surface component in isolation, then require the
+## actual house mesh to contain precisely the same sloped triangles above the
+## wall head. Horizontal ridge caps and vertical glazing remain deliberate.
+static func _check_builder_hip_surface(res: SuiteResult, plan: HousePlan,
+		builder: HouseBuilder, mesh: ArrayMesh, who: String) -> void:
+	var isolated := MeshKit.new(1)
+	var main_footprints: Array[PackedVector2Array] = []
+	var roof_component_count := 0
+	for component in builder.roof_components:
+		if int(component["surface"]) != HouseBuilder.SURF_ROOF:
+			continue
+		roof_component_count += 1
+		var points: PackedVector3Array = component["points"]
+		isolated.slab_poly(points, float(component["depth"]), 0,
+			bool(component["vertical"]))
+		if String(component["role"]).begins_with("roof_face_"):
+			main_footprints.append(RoofShape.footprint(points))
+	var overlap_free := not main_footprints.is_empty()
+	for i in range(main_footprints.size()):
+		for j in range(i):
+			if Poly.intersection_area(main_footprints[i], main_footprints[j]) > 0.000001:
+				overlap_free = false
+	_expect(res, overlap_free, "%s HouseBuilder emitted overlapping main roof faces" % who)
+	if roof_component_count == 0:
+		_expect(res, false, "%s HouseBuilder logged no roof-surface components" % who)
+		return
+	var isolated_mesh := isolated.commit()
+	var isolated_vertices: PackedVector3Array = isolated_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var actual_vertices: PackedVector3Array = mesh.surface_get_arrays(HouseBuilder.SURF_ROOF)[Mesh.ARRAY_VERTEX]
+	_expect(res, _mesh_edges_closed(isolated_vertices),
+		"%s HouseBuilder roof slabs have an open emitted component" % who)
+	_expect(res, _contains_triangles(actual_vertices, isolated_vertices),
+		"%s HouseBuilder roof surface is missing logged component triangles" % who)
+	var wall_top := plan.spec.height * mini(plan.spec.storeys, 3)
+	# Porch roofs can crest a few centimetres above a low single-storey wall.
+	# Main hip triangles all reach well past one slab depth above their eaves.
+	var main_roof_band := wall_top + RoofShape.DEPTH
+	_expect(res, _triangle_count_sets_equal(
+			_sloped_triangle_counts(mesh, HouseBuilder.SURF_ROOF, main_roof_band),
+			_sloped_triangle_counts(isolated_mesh, 0, main_roof_band)),
+		"%s HouseBuilder roof surface has unlogged crossing or duplicate slopes" % who)
 
 
 static func _subtraction(res: SuiteResult) -> void:
