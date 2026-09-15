@@ -20,12 +20,13 @@ const TOL := MassRules.TOL
 ## Mass name prefixes that fold to a family for the joint table below.
 const FAMILIES := ["wall", "tower", "gate", "barbican", "keep", "hall", "chapel",
 	"apse", "wing", "range", "porch", "chimney", "annexe", "link", "storey",
-	"platform", "motte", "climb"]
+	"platform", "balcony", "motte", "climb", "rock", "sky_tower", "sky_bridge"]
 
 ## The rules, in the order they run; a family may replace one through
 ## `check(spec, builder, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"no_gaps", &"no_overlap", &"grounded",
-	&"size_match", &"enclosed", &"great_tower", &"ranges", &"motte", &"bailey_clear"]
+	&"size_match", &"enclosed", &"great_tower", &"ranges", &"motte", &"sky",
+	&"bailey_clear"]
 const METHODS := {&"no_gaps": "_check_gaps", &"no_overlap": "_check_overlaps",
 	&"enclosed": "_check_enclosure"}
 
@@ -48,6 +49,8 @@ static func _allowance(a: String, b: String, polygonal := false, tower_lap := -1
 	# stands on the slope
 	if a == "motte" or b == "motte":
 		return INF
+	if a.begins_with("sky_") or b.begins_with("sky_"):
+		return INF
 	match key:
 		"climb|keep", "climb|wall", "climb|tower":
 			return INF
@@ -57,7 +60,7 @@ static func _allowance(a: String, b: String, polygonal := false, tower_lap := -1
 		# their shared vertex. The towers resolve those joints; the voxel
 		# sweep proves the ridge is continuous.
 		match key:
-			"range|range", "hall|range", "hall|tower", "range|tower":
+			"range|range", "hall|range", "hall|tower", "range|tower", "hall|keep", "keep|range", "keep|tower":
 				return INF
 			"tower|tower":
 				return 0.0
@@ -67,7 +70,9 @@ static func _allowance(a: String, b: String, polygonal := false, tower_lap := -1
 		# the jog laps the shaft like a wing -- deeper into the foot storeys,
 		# which are wider than the shaft by the thickening of their walls
 		match key:
-			"hall|storey", "hall|platform":
+			"hall|storey", "hall|platform", "balcony|hall":
+				return INF
+			"balcony|storey":
 				return INF
 			"storey|storey", "platform|storey":
 				return 0.0
@@ -210,7 +215,7 @@ func _check_bailey_clear(spec: CastleSpec, builder: CastleBuilder) -> void:
 ## Is this mass part of the fortification itself rather than of the yard?
 static func _is_fabric(name: String) -> bool:
 	for p in ["wall_", "tower_", "gate", "barbican", "link_", "moat", "talus",
-			"walk_", "crenel", "causeway"]:
+			"walk_", "crenel", "causeway", "rock"]:
 		if name.begins_with(p):
 			return true
 	return false
@@ -248,6 +253,11 @@ func _check_overlaps(spec: CastleSpec, builder: CastleBuilder) -> void:
 
 func _check_grounded(spec: CastleSpec, builder: CastleBuilder) -> void:
 	var carried: Array = []
+	if CastleGeometry.is_sky(spec):
+		for m in builder.mass_log:
+			var sky_name: String = m["name"]
+			if sky_name.begins_with("sky_tower_") or sky_name.begins_with("sky_bridge_"):
+				carried.append(sky_name)
 	if CastleGeometry.is_motte(spec):
 		carried.append("keep_shell")     # it stands on the mound
 	if CastleGeometry.is_tower_house(spec):
@@ -257,12 +267,16 @@ func _check_grounded(spec: CastleSpec, builder: CastleBuilder) -> void:
 			var nm: String = m["name"]
 			if nm.begins_with("storey_") and nm != "storey_0":
 				carried.append(nm)
+			elif nm.begins_with("balcony_"):
+				carried.append(nm)
 	_add(MassRules.grounded(builder.mass_log, carried))
 
 
 ## The mass everything else must be reachable from. A walled tier is anchored
 ## on its outer curtain; an unwalled one on the hall, which IS the building.
 static func _anchor(spec: CastleSpec) -> String:
+	if CastleGeometry.is_sky(spec):
+		return "rock"
 	return "wall_0_back" if CastleGeometry.is_enclosed(spec) else "hall"
 
 
@@ -351,6 +365,8 @@ func _check_size_match(spec: CastleSpec, builder: CastleBuilder) -> void:
 ## A castle is a wall with something inside it. This is the rule that catches a
 ## "castle" that generated as four towers and a keep standing in open ground.
 func _check_enclosure(spec: CastleSpec, builder: CastleBuilder) -> void:
+	if CastleGeometry.is_sky(spec):
+		return
 	if CastleGeometry.is_ridge(spec):
 		_check_ridge(spec, builder)
 		return
@@ -428,7 +444,7 @@ func _check_great_tower(spec: CastleSpec, builder: CastleBuilder) -> void:
 ## and a chapel has its apse. Read from the parts and masses the builder
 ## logged, so a window it placed on the wrong face is counted on that face.
 func _check_ranges(spec: CastleSpec, builder: CastleBuilder) -> void:
-	if not CastleGeometry.is_enclosed(spec):
+	if not CastleGeometry.is_enclosed(spec) or CastleGeometry.is_sky(spec):
 		return
 	if spec.hall:
 		var hall: AABB = CastleGeometry.hall_aabb(spec)
@@ -480,11 +496,23 @@ func _check_ridge(spec: CastleSpec, builder: CastleBuilder) -> void:
 	if ranges != pts.size() - 1:
 		failures.append("ridge: %d ranges on a spine of %d segments" % [ranges, pts.size() - 1])
 	for i2 in range(pts.size()):
-		if not builder.has_mass("tower_0_corner_%d" % i2):
+		var spire_vertex: bool = spec.style == &"dark" and i2 == pts.size() / 2 \
+			and builder.has_mass("keep")
+		if not spire_vertex and not builder.has_mass("tower_0_corner_%d" % i2):
 			failures.append("ridge: no tower at vertex %d of the spine" % i2)
-	for banned in ["wall_", "gate_", "keep", "chapel", "barbican", "link_"]:
+	var banned_names := ["wall_", "gate_", "chapel", "barbican", "link_"]
+	if spec.style != &"dark":
+		banned_names.append("keep")
+	for banned in banned_names:
 		if builder.has_mass(banned):
 			failures.append("ridge: a ridge castle has no %s mass" % banned)
+	if spec.style == &"dark":
+		var spire: AABB = builder.mass_aabb("keep")
+		if spire.size.y <= 0.0:
+			failures.append("ridge: dark fortress has no spire keep")
+		elif spire.size.y < spec.height * 2.0 - TOL:
+			failures.append("ridge: dark spire is %.1fm high, wants at least twice the %.1fm curtain"
+				% [spire.size.y, spec.height])
 	stats["spine_length"] = snappedf(CastleGeometry.spine_length(spec), 0.1)
 
 
@@ -539,3 +567,35 @@ func _check_motte(spec: CastleSpec, builder: CastleBuilder) -> void:
 			failures.append("motte: the climbing curtain does not meet the bailey's back wall")
 		if MassRules.separation(climb, keep) > MassRules.JOIN_TOL:
 			failures.append("motte: the climbing curtain does not reach the keep")
+
+
+# --------------------------------------------------------------------- sky
+
+func _check_sky(spec: CastleSpec, builder: CastleBuilder) -> void:
+	if not CastleGeometry.is_sky(spec):
+		return
+	var rock: AABB = builder.mass_aabb("rock")
+	var ground: float = CastleGeometry.sky_ground_level(spec)
+	if rock.size.y <= 0.0:
+		failures.append("sky: no inverted rock was built under the citadel")
+		return
+	if absf(rock.end.y - ground) > TOL:
+		failures.append("sky: rock top is at %.2fm, building ground is %.2fm"
+			% [rock.end.y, ground])
+	var minimum_depth: float = maxf(spec.width, spec.length) * 0.5
+	if rock.size.y < minimum_depth - TOL:
+		failures.append("sky: rock tapers %.1fm from citadel to point, wants at least %.1fm"
+			% [rock.size.y, minimum_depth])
+	if absf(rock.position.y) > TOL:
+		failures.append("sky: floating rock point is at y=%.2f, wants world ground at the point only"
+			% rock.position.y)
+	for mass in builder.mass_log:
+		if mass["name"] == "rock":
+			continue
+		var a: AABB = mass["aabb"]
+		if a.position.y <= TOL:
+			failures.append("sky: %s reaches y=%.2f; only the rock may touch world ground"
+				% [mass["name"], a.position.y])
+		if absf(a.position.y - ground) <= TOL \
+				and absf(float(mass.get("ground", 0.0)) - ground) > TOL:
+			failures.append("sky: %s is not grounded on the rock top" % mass["name"])

@@ -49,12 +49,17 @@ const CHIMNEY_RISE := 1.6         # stack standing proud of the ridge
 const PORCH_DEPTH := 1.6
 
 
+static func merlon_width(spec: CastleSpec) -> float:
+	return MERLON_W * 0.5 if spec.merlon_profile == &"spike" else MERLON_W
+
+
 # ------------------------------------------------------------------- tiers
 
 ## A walled tier with an enceinte to walk round. A ridge castle (CAS-007) is
 ## a walled tier with none: its ranges are its walls.
 static func is_enclosed(spec: CastleSpec) -> bool:
-	return (spec.tier == &"castle" or spec.tier == &"fortress") and not is_ridge(spec)
+	return (spec.tier == &"castle" or spec.tier == &"fortress") \
+		and not is_ridge(spec) and not is_sky(spec)
 
 
 static func is_ridge(spec: CastleSpec) -> bool:
@@ -63,6 +68,88 @@ static func is_ridge(spec: CastleSpec) -> bool:
 
 static func is_motte(spec: CastleSpec) -> bool:
 	return spec.plan_kind == &"motte_bailey" and is_enclosed(spec)
+
+
+static func is_sky(spec: CastleSpec) -> bool:
+	return spec.style == &"sky" \
+		and (spec.tier == &"castle" or spec.tier == &"fortress")
+
+
+## The citadel's own ground plane is the broad top of its floating rock.
+static func sky_ground_level(spec: CastleSpec) -> float:
+	return sky_rock_depth(spec) if is_sky(spec) else 0.0
+
+
+## Visible taper below world ground. It is at least half the ring's widest
+## dimension, which keeps the island from reading as a shallow plinth.
+static func sky_rock_depth(spec: CastleSpec) -> float:
+	return maxf(spec.width, spec.length) * 0.55 if is_sky(spec) else 0.0
+
+
+static func sky_rock_radius(spec: CastleSpec) -> float:
+	return sqrt(spec.width * spec.width + spec.length * spec.length) * 0.53
+
+
+static func sky_rock_aabb(spec: CastleSpec) -> AABB:
+	if not is_sky(spec):
+		return AABB()
+	var r: float = sky_rock_radius(spec)
+	var ground: float = sky_ground_level(spec)
+	return AABB(Vector3(-r, 0.0, -r), Vector3(2.0 * r, ground, 2.0 * r))
+
+
+## Uneven turret-islands round the citadel. `bottom` and `top` are local to the
+## rock top; `tail` is the pointed stone hanging below the cylindrical room.
+static func sky_towers(spec: CastleSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not is_sky(spec):
+		return out
+	var poly: PackedVector2Array = enceinte_polygon(spec, 0)
+	var bottoms := [4.0, 10.0, 1.0, 14.0, 6.0, 18.0, 3.0, 12.0]
+	var heights := [22.0, 31.0, 18.0, 27.0, 36.0, 23.0, 30.0, 20.0]
+	var tails := [4.0, 7.0, 1.0, 10.0, 5.0, 12.0, 3.0, 8.0]
+	var radius: float = clampf(minf(spec.width, spec.length) * 0.06, 2.6, 5.5)
+	for i in range(poly.size()):
+		var p: Vector2 = poly[i] * 0.78
+		var bottom: float = bottoms[i % bottoms.size()]
+		var height: float = heights[i % heights.size()] * spec.height / 14.0
+		var tail: float = tails[i % tails.size()] * spec.height / 14.0
+		out.append({"pos": Vector3(p.x, bottom, p.y), "radius": radius,
+			"bottom": bottom, "height": height, "tail": tail,
+			"top": bottom + height,
+			"aabb": AABB(Vector3(p.x - radius, bottom - tail, p.y - radius),
+				Vector3(radius * 2.0, height + tail, radius * 2.0))})
+	return out
+
+
+## Ring links plus skip-one chords: enough arched routes that the citadel reads
+## as a suspended network, not a wall circuit parked on a mound.
+static func sky_bridges(spec: CastleSpec) -> Array[Dictionary]:
+	var towers: Array[Dictionary] = sky_towers(spec)
+	var out: Array[Dictionary] = []
+	var n: int = towers.size()
+	for step in [1, 2]:
+		for i in range(n):
+			if step == 2 and i % 2 == 1:
+				continue
+			var j: int = (i + step) % n
+			var arow: Dictionary = towers[i]
+			var brow: Dictionary = towers[j]
+			var ac: Vector3 = arow["pos"]
+			var bc: Vector3 = brow["pos"]
+			var dir := Vector3(bc.x - ac.x, 0.0, bc.z - ac.z).normalized()
+			var ar: float = arow["radius"]
+			var br: float = brow["radius"]
+			var from_p := Vector3(ac.x, float(arow["bottom"]) + float(arow["height"]) * 0.58, ac.z) + dir * ar
+			var to_p := Vector3(bc.x, float(brow["bottom"]) + float(brow["height"]) * 0.58, bc.z) - dir * br
+			var rise: float = from_p.distance_to(to_p) * (0.18 if step == 1 else 0.28)
+			var lo := from_p.min(to_p)
+			var hi := from_p.max(to_p)
+			hi.y += rise + 0.45
+			out.append({"from": from_p, "to": to_p, "rise": rise,
+				"aabb": AABB(lo - Vector3(0.5, 0.45, 0.5),
+					hi - lo + Vector3(1.0, 0.9, 1.0))})
+	return out
 
 
 ## Index of the innermost enceinte: 1 when there is an inner ward, else 0.
@@ -168,10 +255,12 @@ static func ridge_ranges(spec: CastleSpec) -> Array[Dictionary]:
 		var a: Vector2 = pts[i]
 		var b: Vector2 = pts[i + 1]
 		var dir: Vector2 = (b - a).normalized()
-		var length: float = a.distance_to(b) + 2.0 * dive
+		var span: float = a.distance_to(b)
+		var length: float = span + 2.0 * dive
 		out.append({"name": "range_%d" % i, "from": a - dir * dive, "to": b + dir * dive,
 			"dir": dir, "normal": Vector2(-dir.y, dir.x),
-			"yaw": atan2(-dir.y, dir.x), "length": length, "width": spec.hall_w,
+			"yaw": atan2(-dir.y, dir.x), "length": length, "roof_length": span,
+			"width": spec.hall_w,
 			"height": spec.height})
 		if length > longest_len:
 			longest_len = length
@@ -220,6 +309,23 @@ static func ridge_storeys(spec: CastleSpec) -> int:
 	return clampi(int(spec.height / RIDGE_STOREY_H), 3, 5)
 
 
+## The dark fortress' one spire keep stands at the midpoint of its ridge.
+static func dark_spire_center(spec: CastleSpec) -> Vector3:
+	var pts: PackedVector2Array = spine(spec)
+	if pts.is_empty():
+		return Vector3.ZERO
+	var p: Vector2 = pts[pts.size() / 2]
+	return Vector3(p.x, 0.0, p.y)
+
+
+static func dark_spire_aabb(spec: CastleSpec) -> AABB:
+	if spec.style != &"dark" or not is_ridge(spec) or not spec.keep:
+		return AABB()
+	var c: Vector3 = dark_spire_center(spec)
+	return AABB(Vector3(c.x - spec.keep_w / 2.0, 0.0, c.z - spec.keep_l / 2.0),
+		Vector3(spec.keep_w, spec.keep_height, spec.keep_l))
+
+
 # -------------------------------------------------------------- tower house
 
 ## A tower house (CAS-006) is an unwalled tier whose one block goes up: the
@@ -234,6 +340,9 @@ const TOWER_PLATFORM_OVER := 0.3   # its machicolated overhang
 const TOWER_JOG_W := 0.45          # jog width, x tower width
 const TOWER_JOG_D := 0.4           # jog projection, x tower length
 const TOWER_JOG_H := 0.85          # jog height, x tower height
+const WIZARD_BALCONY_WIDTH := 1.25
+const WIZARD_BALCONY_ARC := TAU * 0.72
+const WIZARD_BALCONY_THICK := 0.28
 
 static func is_tower_house(spec: CastleSpec) -> bool:
 	return spec.plan_kind == &"tower_house" and not is_enclosed(spec)
@@ -272,6 +381,27 @@ static func tower_platform_aabb(spec: CastleSpec) -> AABB:
 	var o: float = TOWER_PLATFORM_OVER
 	return AABB(Vector3(t.position.x - o, t.size.y, t.position.z - o),
 		Vector3(t.size.x + 2.0 * o, TOWER_PLATFORM_H, t.size.z + 2.0 * o))
+
+
+## Three or more partial rings, each one storey higher and turned further
+## round the shaft. Kept pure so builder, massing QA and plan extent agree.
+static func wizard_balconies(spec: CastleSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if spec.style != &"wizard" or not is_tower_house(spec):
+		return out
+	var n: int = clampi(spec.tower_storeys - 1, 3, 5)
+	var sh: float = tower_storey_height(spec)
+	var t: AABB = tower_house_aabb(spec)
+	var inner: float = maxf(t.size.x, t.size.z) * 0.5 - 0.08
+	var radius: float = inner + WIZARD_BALCONY_WIDTH
+	for i in range(n):
+		var y: float = sh * float(i + 1) - WIZARD_BALCONY_THICK * 0.5
+		var start: float = -PI * 0.75 + float(i) * TAU / float(n)
+		out.append({"radius": radius, "width": WIZARD_BALCONY_WIDTH,
+			"y": y, "arc": WIZARD_BALCONY_ARC, "start": start,
+			"aabb": AABB(Vector3(-radius, y, -radius),
+				Vector3(radius * 2.0, WIZARD_BALCONY_THICK, radius * 2.0))})
+	return out
 
 
 ## The sill of the one raised door: a storey up, and never below the lift.
@@ -1361,6 +1491,14 @@ static func ridge_along_x(a: AABB) -> bool:
 
 ## Tallest point of the whole design.
 static func total_height(spec: CastleSpec) -> float:
+	if is_sky(spec):
+		var sky_top := 0.0
+		var i := 0
+		for tower in sky_towers(spec):
+			var roof_h: float = float(tower["radius"]) * (2.0 + float(i % 3) * 0.55)
+			sky_top = maxf(sky_top, float(tower["top"]) + roof_h)
+			i += 1
+		return sky_ground_level(spec) + sky_top
 	var top: float = spec.height
 	if is_enclosed(spec):
 		for r in rings(spec):
@@ -1382,6 +1520,8 @@ static func total_height(spec: CastleSpec) -> float:
 		top = maxf(top, tower_height(spec, 0) + tower_roof_rise(spec, 0))
 	if is_tower_house(spec):
 		top = maxf(top, spec.height + TOWER_PLATFORM_H + spec.merlon_h)
+		if spec.style == &"wizard":
+			top = maxf(top, spec.height + maxf(spec.width, spec.length) * spec.roof_pitch)
 	if is_motte(spec):
 		top = maxf(top, spec.motte_height + spec.keep_height + PARAPET_RISE + spec.merlon_h)
 	if is_ridge(spec):
@@ -1390,12 +1530,17 @@ static func total_height(spec: CastleSpec) -> float:
 		for _c in ridge_tower_centers(spec):
 			top = maxf(top, tower_height_at(spec, 0, ti) + tower_roof_rise_at(spec, 0, ti))
 			ti += 1
-	return top
+		if spec.style == &"dark" and spec.keep:
+			top = maxf(top, spec.keep_height)
+	return top + sky_ground_level(spec)
 
 
 ## Everything the design covers in plan, batter and towers included.
 static func plan_extent(spec: CastleSpec) -> Rect2:
 	var e: Rect2 = enceinte_rect(spec, 0)
+	if is_sky(spec):
+		var rr: float = sky_rock_radius(spec)
+		e = e.merge(Rect2(Vector2(-rr, -rr), Vector2(rr * 2.0, rr * 2.0)))
 	if is_ridge(spec):
 		for seg in ridge_ranges(spec):
 			var ra: AABB = ridge_range_aabb(seg)
@@ -1419,6 +1564,10 @@ static func plan_extent(spec: CastleSpec) -> Rect2:
 		for j in tower_jog_aabbs(spec):
 			e = e.expand(Vector2(j.position.x, j.position.z))
 			e = e.expand(Vector2(j.end.x, j.end.z))
+		for balcony in wizard_balconies(spec):
+			var ba: AABB = balcony["aabb"]
+			e = e.expand(Vector2(ba.position.x, ba.position.z))
+			e = e.expand(Vector2(ba.end.x, ba.end.z))
 		return e
 	if is_enclosed(spec):
 		e = e.grow(batter_spread(spec, wall_height(spec, 0)))

@@ -70,6 +70,9 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	spec.wall_thickness = clampf(spec.height * 0.22, 0.8, minf(5.0, short_side * 0.1))
 	spec.battlements = _chance(r, s["battlements"])
 	spec.merlon_h = clampf(spec.height * 0.09, 0.5, 1.6)
+	spec.merlon_profile = s.get("merlon_profile", &"block")
+	if spec.merlon_profile == &"spike":
+		spec.merlon_h *= 3.0
 	spec.roof_pitch = r.randf_range(float(s["roof_pitch"][0]), float(s["roof_pitch"][1]))
 
 	# ---- towers ----
@@ -131,10 +134,16 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 		_fit_motte_keep(spec)
 	if CastleGeometry.is_ridge(spec):
 		_fit_ridge(spec, r)
-		var great_r: Dictionary = CastleSpec.great_tower_for(spec.style, spec.tier, p_seed,
-			CastleGeometry.spine(spec).size())
-		spec.great_tower = int(great_r["vertex"])
-		spec.great_tower_scale = float(great_r["scale"])
+		if spec.style == &"dark":
+			spec.great_tower = -1
+			spec.great_tower_scale = 1.0
+		else:
+			var great_r: Dictionary = CastleSpec.great_tower_for(spec.style, spec.tier, p_seed,
+				CastleGeometry.spine(spec).size())
+			spec.great_tower = int(great_r["vertex"])
+			spec.great_tower_scale = float(great_r["scale"])
+	if CastleGeometry.is_sky(spec):
+		_fit_sky(spec)
 
 	# ---- openings ----
 	spec.window_style = s["windows"]
@@ -410,6 +419,28 @@ static func _fit_ridge(spec: CastleSpec, r: RandomNumberGenerator) -> void:
 	spec.ridge_points = r.randi_range(3, 6)
 	spec.tower_size = clampf(spec.hall_w * 0.55, 2.0, 8.0)
 	spec.tower_height = maxf(spec.tower_height, spec.height * 1.25)
+	# A forced ridge also has to work at the smallest castle footprint. Pull
+	# the drums in until adjacent spine vertices leave a real range between
+	# their battered feet.
+	for _pass in range(6):
+		var pts: PackedVector2Array = CastleGeometry.spine(spec)
+		var nearest := INF
+		for i in range(pts.size() - 1):
+			nearest = minf(nearest, pts[i].distance_to(pts[i + 1]))
+		var diameter: float = CastleGeometry.tower_base_half(spec, 0) * 2.0
+		var available: float = nearest - CastleGeometry.MIN_WALL_RUN
+		if diameter <= available or available <= 0.0:
+			break
+		spec.tower_size = maxf(1.0, spec.tower_size * available / diameter * 0.98)
+	if spec.style == &"dark":
+		# The ridge still has a tower at every bend; one additional, singular
+		# keep rises from its middle as the silhouette's needle.
+		spec.keep = true
+		spec.keep_shape = &"spire"
+		spec.keep_w = minf(spec.hall_w * 0.9, 10.0)
+		spec.keep_l = spec.keep_w
+		spec.keep_height = maxf(spec.height * 2.0, spec.tower_height * 1.45)
+		spec.chapel = false
 
 
 ## The tower house (CAS-006): storeys by height, the type by proportion --
@@ -422,6 +453,9 @@ static func _fit_tower_house(spec: CastleSpec, r: RandomNumberGenerator) -> void
 	spec.tower_type = &"bologna" if (base <= 10.0 and spec.height >= 4.0 * base) \
 		else &"scottish"
 	spec.jog = _pick(r, [&"none", &"l", &"l", &"z"])
+	if spec.style == &"wizard":
+		spec.jog = &"none"
+		spec.battlements = false
 	spec.wings = 0
 	spec.courtyard = false
 	spec.chimneys = 0
@@ -430,6 +464,27 @@ static func _fit_tower_house(spec: CastleSpec, r: RandomNumberGenerator) -> void
 	# leave an interior
 	spec.wall_thickness = clampf(spec.wall_thickness, 0.6, minf(spec.width, spec.length) * 0.15)
 	spec.merlon_h = clampf(spec.height * 0.03, 0.5, 1.2)
+
+
+static func _fit_sky(spec: CastleSpec) -> void:
+	# Its towers and arched routes are the plan. A conventional curtain, gate,
+	# keep and bailey would turn the floating network back into a ground castle.
+	spec.curtain = false
+	spec.battlements = false
+	spec.corner_towers = false
+	spec.side_towers = 0
+	spec.great_tower = -1
+	spec.gatehouse = false
+	spec.gate_towers = false
+	spec.barbican = false
+	spec.inner_ward = false
+	spec.ward_gap = 0.0
+	spec.keep = false
+	spec.hall = false
+	spec.chapel = false
+	spec.wings = 0
+	spec.courtyard = false
+	spec.chimneys = 0
 
 
 static func _chance(r: RandomNumberGenerator, p) -> bool:

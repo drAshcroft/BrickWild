@@ -317,7 +317,10 @@ func _check_ground() -> void:
 	for s in range(mesh.get_surface_count()):
 		for v in mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX] as PackedVector3Array:
 			mn = minf(mn, v.y)
-	if mn < -0.5:
+	if CastleGeometry.is_sky(spec):
+		if mn < -EPS or mn > 0.5:
+			failures.append("grounded: sky rock point is at %.2fm, wants world y=0" % mn)
+	elif mn < -0.5:
 		failures.append("grounded: geometry dips %.2fm below ground" % (-mn))
 	elif mn < -EPS:
 		warnings.append("grounded: eaves/trim dips %.2fm below ground" % (-mn))
@@ -455,7 +458,8 @@ func _check_enceinte() -> void:
 	for r in CastleGeometry.rings(spec):
 		var rect: Rect2 = CastleGeometry.enceinte_rect(spec, r)
 		var t: float = CastleGeometry.wall_thickness(spec, r)
-		var y: float = CastleGeometry.wall_height(spec, r) * 0.5
+		var y: float = CastleGeometry.sky_ground_level(spec) \
+			+ CastleGeometry.wall_height(spec, r) * 0.5
 		var gw: float = CastleGeometry.gate_width(spec, r)
 		var breaks := 0
 		var samples := 0
@@ -511,4 +515,6 @@ func _solid_near(p: Vector3) -> bool:
 ## The mass the assembly is measured from: the curtain of a walled tier, the
 ## hall of an unwalled one.
 func _anchor_name() -> String:
+	if CastleGeometry.is_sky(spec):
+		return "rock"
 	return "wall_0_back" if CastleGeometry.is_enclosed(spec) else "hall"

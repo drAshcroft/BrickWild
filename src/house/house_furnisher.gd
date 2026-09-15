@@ -2049,9 +2049,13 @@ static func _place_mounted(plan: HousePlan, room: int, key: String,
 			continue
 		var lo: float = width / 2.0 + 0.2
 		var hi: float = run - width / 2.0 - 0.2
-		var steps: int = maxi(int((hi - lo) / MOUNT_STEP), 1)
+		# Keep the same fixed probe phase as HouseFurnishCheck's availability
+		# search. Re-dividing the run into `steps` almost-0.06m intervals can
+		# skip a narrow but valid station between two openings (seed 60068 has
+		# 4cm of wall where the shelf can cover its workbench).
+		var steps: int = maxi(int((hi - lo) / MOUNT_STEP), 0)
 		for s in range(steps + 1):
-			var t: float = lerpf(lo, hi, float(s) / float(steps))
+			var t: float = lo + float(s) * MOUNT_STEP
 			var pos: Vector2 = a + along * t
 			if _on_opening(plan, room, pos, n, width):
 				continue

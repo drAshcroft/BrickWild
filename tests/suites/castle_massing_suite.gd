@@ -31,6 +31,7 @@ static func run() -> SuiteResult:
 	_ridge_fixture(res)
 	_motte_fixture(res)
 	_bailey_fixture(res)
+	_fantasy_fixtures(res)
 	return res
 
 
@@ -297,3 +298,88 @@ static func _bailey_fixture(res: SuiteResult) -> void:
 			caught2 = true
 	if not caught2:
 		res.fail("bailey fixture: a yard building parked across the gate axis was not caught")
+
+
+## CAS-012's three silhouettes, kept small and explicit so their defining
+## geometry cannot disappear while the broad sweep still happens to be green.
+static func _fantasy_fixtures(res: SuiteResult) -> void:
+	var wizard := CastleSpec.new()
+	wizard.style = &"wizard"
+	wizard.width = 9.0
+	wizard.length = 9.0
+	wizard.height = 42.0
+	wizard.tier_override = &"house"
+	CastleGenerator.generate(wizard, 12012)
+	var wb := CastleBuilder.new()
+	wb.build(wizard)
+	res.checked += 1
+	if wizard.plan_kind != &"tower_house" or wizard.tower_storeys < 4 \
+			or wizard.tower_storeys > 6 or wizard.tower_roof != &"cone":
+		res.fail("fantasy wizard: not a 4-6 storey cone-capped tower house")
+	var balconies: Array[AABB] = []
+	for m in wb.mass_log:
+		if String(m.name).begins_with("balcony_"):
+			balconies.append(m.aabb)
+	if balconies.size() < 3:
+		res.fail("fantasy wizard: %d balcony rings, wants at least 3" % balconies.size())
+	for i in range(1, balconies.size()):
+		if balconies[i].position.y <= balconies[i - 1].position.y:
+			res.fail("fantasy wizard: balcony rings do not rise in order")
+	for f in CastleMassingCheck.new().check(wizard, wb).failures:
+		res.fail("fantasy wizard: %s" % f)
+
+	var dark := CastleSpec.new()
+	dark.style = &"dark"
+	dark.width = 40.0
+	dark.length = 55.0
+	dark.height = 14.0
+	dark.tier_override = &"castle"
+	CastleGenerator.generate(dark, 9249)
+	var db := CastleBuilder.new()
+	db.build(dark)
+	res.checked += 1
+	if dark.plan_kind != &"ridge" or dark.chapel or dark.keep_shape != &"spire" \
+			or dark.keep_height < dark.height * 2.0:
+		res.fail("fantasy dark: ridge/no-chapel/double-height spire contract failed")
+	if dark.merlon_profile != &"spike" \
+			or not is_equal_approx(CastleGeometry.merlon_width(dark), CastleGeometry.MERLON_W * 0.5):
+		res.fail("fantasy dark: narrow spike merlon profile was not selected")
+	if not db.part_log.any(func(p): return p.kind == "spike"):
+		res.fail("fantasy dark: builder emitted no spike merlons")
+	for f in CastleMassingCheck.new().check(dark, db).failures:
+		res.fail("fantasy dark: %s" % f)
+
+	var sky := CastleSpec.new()
+	sky.style = &"sky"
+	sky.width = 80.0
+	sky.length = 110.0
+	sky.height = 14.0
+	sky.tier_override = &"castle"
+	CastleGenerator.generate(sky, 12012)
+	var sb := CastleBuilder.new()
+	sb.build(sky)
+	res.checked += 1
+	var rock: AABB = sb.mass_aabb("rock")
+	if sky.plan_kind != &"polygon" or rock.size.y <= 0.0:
+		res.fail("fantasy sky: polygonal ring has no supporting rock")
+	elif rock.size.y < maxf(sky.width, sky.length) * 0.5 \
+			or not is_equal_approx(rock.end.y, CastleGeometry.sky_ground_level(sky)):
+		res.fail("fantasy sky: rock does not taper deeply from its ground plane")
+	var tower_bottoms: Array[float] = []
+	var tower_tops: Array[float] = []
+	var bridges := 0
+	for m in sb.mass_log:
+		if m.name != "rock" and (m.aabb as AABB).position.y <= 0.0:
+			res.fail("fantasy sky: %s touches world ground" % m.name)
+		if String(m.name).begins_with("sky_tower_"):
+			tower_bottoms.append((m.aabb as AABB).position.y)
+			tower_tops.append((m.aabb as AABB).end.y)
+		elif String(m.name).begins_with("sky_bridge_"):
+			bridges += 1
+	if tower_bottoms.size() < 7 or tower_bottoms.min() == tower_bottoms.max() \
+			or tower_tops.min() == tower_tops.max():
+		res.fail("fantasy sky: tower tops and bottoms do not vary")
+	if bridges < tower_bottoms.size():
+		res.fail("fantasy sky: %d arched links for %d towers" % [bridges, tower_bottoms.size()])
+	for f in CastleMassingCheck.new().check(sky, sb).failures:
+		res.fail("fantasy sky: %s" % f)

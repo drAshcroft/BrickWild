@@ -115,6 +115,7 @@ static func run(full: bool = false, group: StringName = &"all") -> SuiteResult:
 		_phase_end("affinity fixture", phase_start)
 		phase_start = _phase_start("feng shui fixtures")
 		_feng_shui_fixtures(res)
+		_seed_60068_shelf_over(res)
 		_phase_end("feng shui fixtures", phase_start)
 		phase_start = _phase_start("feng shui sweep")
 		_feng_shui_sweep(res, sweep_count, full)
@@ -1110,6 +1111,27 @@ static func _feng_shui_fixtures(res: SuiteResult) -> void:
 	_fs_focus_door(res)
 
 
+## Regression for the narrow shelf station between the two workshop windows.
+## The checker and placer both probe mounted positions in 6cm steps; the
+## placer used to redistribute that step over each wall and miss the 4cm-wide
+## valid interval that the checker correctly reported as available.
+static func _seed_60068_shelf_over(res: SuiteResult) -> void:
+	var spec := HouseSpec.new()
+	spec.style = &"longhall"
+	spec.trade = &"alchemist"
+	spec.width = 12.0
+	spec.length = 16.0
+	spec.storeys = 1
+	var plan: HousePlan = HouseGenerator.generate(spec, 60068)
+	res.checked += 1
+	var report: Dictionary = HouseFurnishCheck.new().check(plan)
+	for messages in [report["failures"], report["warnings"]]:
+		for message in messages:
+			if String(message).begins_with("shelf_over:"):
+				res.fail("seed 60068 shelf-over regression: %s" % String(message))
+				return
+
+
 ## One room, one front door in the far wall (wall 1) and one window in the near
 ## wall (wall 0), indexed the way HouseGeometry.room_walls() indexes them.
 static func _fs_plan(kind: StringName, seed: int) -> HousePlan:
@@ -1314,9 +1336,7 @@ const FENG_SHUI_RULES := ["workbench_daylight", "bookcase_heat", "bed_window",
 ## Exact exhaustive-only baseline. Keep this narrow: a changed message, an
 ## additional failure, or an unexpectedly passing seed all fail the suite so
 ## the known defect cannot silently grow or disappear without review.
-const EXPECTED_FULL_FENG_FAILURES := {
-	60068: "shelf_over: no shelf in room 0 (workshop) hangs over the bench it serves (0% cover, 2.43m away)",
-}
+const EXPECTED_FULL_FENG_FAILURES := {}
 
 
 static func _feng_shui_sweep(res: SuiteResult, count: int, full: bool) -> void:

@@ -21,4 +21,30 @@ static func run() -> SuiteResult:
 						res.fail("%s: %s" % [who, str(f)])
 				for w in report["warnings"]:
 					res.warn("%s: %s" % [who, str(w)])
+	_fantasy_fixtures(res)
 	return res
+
+
+## Wizard's required tall proportion is outside the ordinary sweep; keep all
+## three CAS-012 silhouettes together as a fast, named voxel regression.
+static func _fantasy_fixtures(res: SuiteResult) -> void:
+	for row in [
+			{"style": &"wizard", "w": 9.0, "l": 9.0, "h": 42.0, "tier": &"house", "seed": 12012},
+			{"style": &"dark", "w": 40.0, "l": 55.0, "h": 14.0, "tier": &"castle", "seed": 9249},
+			{"style": &"sky", "w": 80.0, "l": 110.0, "h": 14.0, "tier": &"castle", "seed": 12012},
+	]:
+		var spec := CastleSpec.new()
+		spec.style = row.style
+		spec.width = row.w
+		spec.length = row.l
+		spec.height = row.h
+		spec.tier_override = row.tier
+		CastleGenerator.generate(spec, row.seed)
+		var builder := CastleBuilder.new()
+		var mesh := builder.build(spec)
+		var report: Dictionary = CastleQA.new().check(spec, mesh, builder)
+		res.checked += 1
+		for f in report.failures:
+			res.fail("fantasy %s: %s" % [String(row.style), str(f)])
+		for w in report.warnings:
+			res.warn("fantasy %s: %s" % [String(row.style), str(w)])

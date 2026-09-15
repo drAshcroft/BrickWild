@@ -4,7 +4,8 @@ extends RefCounted
 
 static func primary(spec: CastleSpec) -> Dictionary:
 	var out := {}
-	if CastleGeometry.is_ridge(spec) or CastleGeometry.is_tower_house(spec):
+	if CastleGeometry.is_ridge(spec) or CastleGeometry.is_tower_house(spec) \
+			or CastleGeometry.is_sky(spec):
 		return out # Their own multi-range/storey contracts are handled separately.
 	for kind in ["hall", "keep", "chapel"]:
 		var plan: HousePlan

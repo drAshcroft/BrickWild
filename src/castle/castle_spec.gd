@@ -64,6 +64,8 @@ var curtain: bool
 var wall_thickness: float
 var battlements: bool
 var merlon_h: float
+## &"block" for historical crenellation, &"spike" for the dark fortress.
+var merlon_profile: StringName = &"block"
 var batter: float                # talus: how far the wall foot spreads, x height
 
 # towers
@@ -145,6 +147,7 @@ static func tier_for(w: float, l: float) -> StringName:
 const GREAT_TOWER_CHANCE := {
 	&"norman": 0.7, &"edwardian": 0.75, &"crusader": 0.5, &"french_chateau": 0.4,
 	&"bavarian": 0.6, &"japanese": 0.3, &"moorish": 0.7,
+	&"wizard": 0.0, &"dark": 0.0, &"sky": 0.6,
 }
 
 
@@ -170,6 +173,7 @@ static func great_tower_for(style: StringName, tier: StringName, p_seed: int,
 const TOWER_HOUSE_CHANCE := {
 	&"norman": 0.6, &"edwardian": 0.4, &"crusader": 0.3, &"french_chateau": 0.3,
 	&"bavarian": 0.5, &"japanese": 0.0, &"moorish": 0.5,
+	&"wizard": 1.0, &"dark": 0.0, &"sky": 0.0,
 }
 
 
@@ -199,6 +203,12 @@ const PLANS := {
 	&"bavarian": {"polygon": 0.2, "sides": [5, 6, 7], "ridge": 0.45},
 	&"japanese": {"polygon": 0.0, "sides": [8]},
 	&"moorish": {"polygon": 0.3, "sides": [6, 8]},
+	# Fantasy families are signatures, not probabilities. Wizard still needs
+	# the tall house proportion checked by tower_house_for(); the other two
+	# force their defining castle-tier plan.
+	&"wizard": {"polygon": 0.0, "sides": [6]},
+	&"dark": {"polygon": 0.0, "sides": [4], "forced": &"ridge"},
+	&"sky": {"polygon": 1.0, "sides": [7, 8], "forced": &"polygon"},
 }
 
 
@@ -214,6 +224,10 @@ static func plan_for(style: StringName, tier: StringName, p_seed: int) -> Dictio
 	var row: Dictionary = PLANS.get(style, {"polygon": 0.0, "sides": [6]})
 	var r := RandomNumberGenerator.new()
 	r.seed = hash("%s|%s|%d" % [String(style), String(tier), p_seed])
+	if row.has("forced"):
+		var forced: StringName = row["forced"]
+		var opts: Array = row["sides"]
+		return {"kind": forced, "sides": int(opts[r.randi_range(0, opts.size() - 1)])}
 	# a ridge castle first (CAS-007): Neuschwanstein is a ridge before it is
 	# anything else, and only on a site long enough to string ranges along
 	var ridge: float = float(row.get("ridge", 0.0))
@@ -304,6 +318,36 @@ const STYLES := {
 		"roof_pitch": [0.3, 0.45], "windows": &"arched", "dormers": 0.0,
 		"stone": ["c8a882", "ad8c66"], "roof": ["a8613c", "8a4c30"],
 		"chimneys": [0, 1], "wings": [1, 2],
+	},
+	&"wizard": {
+		"label": "Wizard's Tower",
+		"plan_kind": &"tower_house",
+		"tower_shape": &"round", "tower_roof": [&"cone"],
+		"keep_shape": [&"round"], "battlements": 0.0, "batter": 0.04,
+		"side_towers": [0], "gate_towers": 0.0, "barbican": 0.0,
+		"roof_pitch": [1.15, 1.45], "windows": &"arched", "dormers": 0.0,
+		"stone": ["716783", "49405c"], "roof": ["253653", "151f38"],
+		"chimneys": [1], "wings": [0], "merlon_profile": &"block",
+	},
+	&"dark": {
+		"label": "Dark Fortress",
+		"plan_kind": &"ridge",
+		"tower_shape": &"polygonal", "tower_roof": [&"flat"],
+		"keep_shape": [&"spire"], "battlements": 1.0, "batter": 0.12,
+		"side_towers": [1, 2], "gate_towers": 0.8, "barbican": 0.6,
+		"roof_pitch": [0.55, 0.8], "windows": &"slit", "dormers": 0.0,
+		"stone": ["292a32", "111218"], "roof": ["171720", "090a0e"],
+		"chimneys": [0], "wings": [1], "merlon_profile": &"spike",
+	},
+	&"sky": {
+		"label": "Sky Citadel",
+		"plan_kind": &"polygon",
+		"tower_shape": &"polygonal", "tower_roof": [&"cone", &"flat"],
+		"keep_shape": [&"round", &"shell"], "battlements": 0.7, "batter": 0.02,
+		"side_towers": [0, 1], "gate_towers": 0.5, "barbican": 0.0,
+		"roof_pitch": [0.7, 1.0], "windows": &"arched", "dormers": 0.2,
+		"stone": ["d6d8e8", "929ac1"], "roof": ["697caf", "34446e"],
+		"chimneys": [0, 1], "wings": [1], "merlon_profile": &"block",
 	},
 }
 

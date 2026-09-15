@@ -33,6 +33,23 @@ func commit() -> ArrayMesh:
 	return mesh
 
 
+## Copy an emitted mesh with every vertex moved by `offset`. Normals are
+## directions and remain unchanged. Used when a whole procedural building has
+## a local ground plane above world zero, as the sky citadel does.
+static func translated(mesh: ArrayMesh, offset: Vector3) -> ArrayMesh:
+	var out := ArrayMesh.new()
+	for surface in range(mesh.get_surface_count()):
+		var arrays: Array = mesh.surface_get_arrays(surface).duplicate(true)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		for i in range(vertices.size()):
+			vertices[i] += offset
+		arrays[Mesh.ARRAY_VERTEX] = vertices
+		out.add_surface_from_arrays(mesh.surface_get_primitive_type(surface), arrays)
+		out.surface_set_material(surface, mesh.surface_get_material(surface))
+		out.surface_set_name(surface, mesh.surface_get_name(surface))
+	return out
+
+
 func surface(i: int) -> SurfaceTool:
 	return _sts[i]
 
@@ -424,6 +441,78 @@ func cone(radius: float, height: float, center: Vector3, surf: int,
 		center, surf, segments, TAU, rotation)
 
 
+## A thin annular balcony slab. `radius` is the outside edge, `width` reaches
+## inward toward the host tower, and `arc`/`start` can leave an open sector so
+## successive balconies read as a spiral instead of stacked collars. The four
+## skins and both cut ends are closed; a full ring naturally has no cut ends.
+func balcony_ring(radius: float, width: float, y: float, arc: float,
+		surf := 0, center := Vector2.ZERO, start := 0.0, thickness := 0.28,
+		segments := 24) -> void:
+	var outer: float = maxf(radius, 0.05)
+	var inner: float = clampf(outer - width, 0.02, outer - 0.01)
+	var sweep: float = clampf(arc, 0.01, TAU)
+	var n: int = maxi(1, int(ceil(float(segments) * sweep / TAU)))
+	var st: SurfaceTool = _sts[surf]
+	for i in range(n):
+		var a0: float = start + sweep * float(i) / float(n)
+		var a1: float = start + sweep * float(i + 1) / float(n)
+		var ob0 := Vector3(center.x + cos(a0) * outer, y, center.y + sin(a0) * outer)
+		var ob1 := Vector3(center.x + cos(a1) * outer, y, center.y + sin(a1) * outer)
+		var ot0 := ob0 + Vector3.UP * thickness
+		var ot1 := ob1 + Vector3.UP * thickness
+		var ib0 := Vector3(center.x + cos(a0) * inner, y, center.y + sin(a0) * inner)
+		var ib1 := Vector3(center.x + cos(a1) * inner, y, center.y + sin(a1) * inner)
+		var it0 := ib0 + Vector3.UP * thickness
+		var it1 := ib1 + Vector3.UP * thickness
+		_quad(st, ot0, ot1, it1, it0) # top
+		_quad(st, ob1, ob0, ib0, ib1) # underside
+		_quad(st, ob0, ob1, ot1, ot0) # outside rim
+		_quad(st, ib1, ib0, it0, it1) # inside rim
+	if sweep < TAU - 0.001:
+		for a in [start, start + sweep]:
+			var ob := Vector3(center.x + cos(a) * outer, y, center.y + sin(a) * outer)
+			var ib := Vector3(center.x + cos(a) * inner, y, center.y + sin(a) * inner)
+			var flip: bool = is_equal_approx(a, start)
+			if flip:
+				_quad(st, ob, ob + Vector3.UP * thickness,
+					ib + Vector3.UP * thickness, ib)
+			else:
+				_quad(st, ib, ib + Vector3.UP * thickness,
+					ob + Vector3.UP * thickness, ob)
+
+
+## A four-sided pointed merlon. Dimensions are deliberately independent so a
+## narrow dark-fortress spike can still span the depth of its parapet.
+func spike(size: Vector2, height: float, center: Vector3, surf: int,
+		rotation := 0.0) -> void:
+	# Scale a unit square cone in X/Z without teaching revolve about ellipses.
+	var st: SurfaceTool = _sts[surf]
+	var basis := Basis(Vector3.UP, rotation)
+	var base: Array[Vector3] = []
+	for p in [Vector3(-size.x / 2.0, 0, -size.y / 2.0),
+			Vector3(size.x / 2.0, 0, -size.y / 2.0),
+			Vector3(size.x / 2.0, 0, size.y / 2.0),
+			Vector3(-size.x / 2.0, 0, size.y / 2.0)]:
+		base.append(center + basis * p)
+	var apex: Vector3 = center + Vector3.UP * height
+	for i in range(4):
+		_tri(st, base[i], base[(i + 1) % 4], apex)
+	_quad(st, base[3], base[2], base[1], base[0])
+
+
+## A floating-island rock: a broad, capped top at `center.y`, breaking through
+## a few narrowing courses to one point `depth` below it. The emitter owns its
+## top cap so the citadel has an actual surface to stand on.
+func inverted_batter(radius: float, depth: float, center: Vector3, surf: int,
+		segments := 20, rotation := 0.0) -> void:
+	var r: float = maxf(radius, 0.1)
+	var d: float = maxf(depth, 0.1)
+	revolve(PackedVector2Array([
+		Vector2(0.0, -d), Vector2(r * 0.42, -d * 0.58),
+		Vector2(r * 0.76, -d * 0.22), Vector2(r, 0.0), Vector2(0.0, 0.0),
+	]), center, surf, maxi(segments, 5), TAU, rotation)
+
+
 ## Half cylinder hugging +Z from center: flat face at center.y (model Z),
 ## bulging to center.y + radius. Used for apses.
 func half_cylinder(radius: float, height: float, center: Vector2, surf: int,
@@ -461,12 +550,14 @@ func oval_ring(center: Vector3, rx: float, rz: float, thickness: float,
 		var i0 := center + Vector3(cos(a0) * irx, 0.0, sin(a0) * irz)
 		var i1 := center + Vector3(cos(a1) * irx, 0.0, sin(a1) * irz)
 		var up := Vector3(0.0, height, 0.0)
-		# outside face, wound so it looks outward; inside face the other way
-		_quad(st, o0, o0 + up, o1 + up, o1)
-		_quad(st, i1, i1 + up, i0 + up, i0)
-		# the top, and the ground ring so the shell is closed
-		_quad(st, o0 + up, i0 + up, i1 + up, o1 + up)
-		_quad(st, o1, i1, i0, o0)
+		# Godot fronts are clockwise. These orders put the outer skin away from
+		# the centre, the inner skin into the void, and the caps up/down. The old
+		# order paired internally consistent normals with inward-facing fronts,
+		# so winding-only QA passed while backface culling exposed the wizard.
+		_quad(st, o0, o1, o1 + up, o0 + up)
+		_quad(st, i1, i0, i0 + up, i1 + up)
+		_quad(st, o0 + up, o1 + up, i1 + up, i0 + up)
+		_quad(st, o0, i0, i1, o1)
 
 func prism(radius: float, height: float, sides: int, center: Vector3, surf: int,
 		rot := 0.0) -> void:

@@ -108,6 +108,8 @@ static func dress(spec: CastleSpec) -> Array[Dictionary]:
 			else:
 				_dress_chamber(room, out, rng)
 		return out
+	if CastleGeometry.is_sky(spec):
+		return out # open turret-islands have no conventional ground-floor rooms
 	if not CastleGeometry.is_enclosed(spec):
 		# a house or a manor: the range IS the building
 		_dress_hall(_room_of(CastleGeometry.house_range_aabb(spec)), out, rng)
