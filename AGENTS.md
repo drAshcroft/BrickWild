@@ -20,8 +20,9 @@ godot --headless --path . --script res://tests/run_all.gd
 #   temples:  temple | rite | tarchetype
 godot --headless --path . --script res://tests/run_all.gd -- normals
 godot --headless --path . --script res://tests/run_all.gd -- castle cmassing
-# fast roof regression for ordinary roof/emitter changes (target: <30 seconds)
-godot --headless --path . --script res://tests/run_all.gd -- roofquick
+# named lanes -- see the testing protocol below; prefer these to hand-picking
+godot --headless --path . --script res://tests/run_all.gd -- lane:geom
+godot --headless --path . --script res://tests/run_all.gd -- lane:plan
 # bounded house QA lane for ordinary task completion (target: <5 minutes)
 godot --headless --path . --script res://tests/run_all.gd -- houseqa
 # narrower house QA lanes: shell/core, planning/circulation, furnishing/rules
@@ -50,6 +51,58 @@ class is registered, or every suite fails with "Identifier not declared":
 godot --headless --path . --editor --quit
 ```
 
+## Testing protocol
+
+**Pick the lane that matches the edit. Do not run the full sweep per task.**
+
+```
+godot --headless --path . --script res://tests/run_all.gd -- lane:geom
+```
+
+| You touched | Lane | Time |
+|---|---|---|
+| `core/mesh_kit.gd`, `core/mass_builder.gd`, any `*_builder.gd` emitter, roof maths | `lane:geom` | ~30 s |
+| the planner, room programme, doors, circulation | `lane:plan` | ~4 m |
+| the furnisher, prop recipes, assembly, exterior dressing | `lane:dress` | ~10 m |
+| anything under `assets/props/` or `catalog.json` (rebuild the catalogue first) | `lane:assets` | ~6 m |
+| castle / church / temple geometry | `lane:castle`, `lane:church`, `lane:temple` | 3-8 m |
+| nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
+
+The lanes are defined in `LANES` at the top of `tests/run_all.gd`. Lanes and
+bare suite names mix freely and de-duplicate.
+
+**Why not just run everything.** The slow house suites are slow because they
+run the FURNISHER SEARCH, not because they check more. Measured:
+
+| suite | time | checks | checks/sec |
+|---|---|---|---|
+| `roofquick` | 11 s | 2452 | 223 |
+| `hcomponent` | 8 s | 1202 | 150 |
+| `hexterior` | 171 s | 960 | 5.6 |
+| `house` | 366 s | 123 | 0.34 |
+| `court` | 531 s | 105 | 0.20 |
+| `houseqa` | 582 s | 257 | 0.44 |
+
+`house`, `court` and `houseqa` earn their twenty-five minutes when the change
+touched planning or furnishing. After an emitter, a log or a roof-maths change
+they add near-zero coverage over the thirty-second lane.
+
+**For a change that claims to move nothing**, the fingerprint is faster than
+any suite and it is stronger evidence:
+
+```
+git worktree add /tmp/bg_base HEAD
+godot --headless --path /tmp/bg_base --editor --quit    # register class_name
+godot --headless --path /tmp/bg_base --script res://tools/dump_house_vertices.gd > /tmp/base.txt
+godot --headless --path .           --script res://tools/dump_house_vertices.gd > /tmp/new.txt
+diff /tmp/base.txt /tmp/new.txt      # identical => not one vertex moved
+```
+
+**Always redirect a long run to a file.** An agent harness capturing a
+multi-minute headless run into its own buffer loses the summary and reports
+success on a truncated log. `> artifacts/<task>/lane.log 2>&1` and read the
+file.
+
 ## Gotchas
 
 * A GDScript **parse error makes the headless runner hang** rather than exit.
@@ -64,6 +117,16 @@ godot --headless --path . --editor --quit
 * Both generators share `core/mass_builder.gd`: the mesh kit plus `part_log`
   and `mass_log`, which every QA check measures. A builder that logs a mass it
   never emitted is caught by the voxel suites, not the massing ones.
+* `component_log` is the third log: the NAMED exterior parts -- a roof face, a
+  dormer cheek, a verge board, the trim round door 3. Emit them through
+  `component_box` / `component_slab`, never `_kit` directly, or the part is
+  invisible to exterior QA. Each row carries a `host` ("roof", "dormer_1",
+  "porch", "frame_0", "window_7") and a stable `<role>#<n>` id, so a part can
+  be said to have MOVED rather than vanished. `qa/component_check.gd` re-emits
+  every row and requires the mesh to contain exactly those triangles --
+  `tests/fixtures/faulty_house_builder.gd` is the fixture that logs one part
+  and emits another, and proves the check is not a tautology.
+  Run it with `-- hcomponent`.
 * **An opening must be placed on the surface, not on the bounding box.** A
   battered wall, a drum tower and a tiered keep are all narrower than the AABB
   their mass is logged as, so a window placed on the box hangs in the air

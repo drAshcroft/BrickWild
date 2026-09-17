@@ -47,7 +47,7 @@ extends SceneTree
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"roofprobe", "hroof", "hexterior", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
+	"roofprobe", "hroof", "hexterior", "hcomponent", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
@@ -56,6 +56,40 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["roofquick", "houseqacore", "houseqaplan",
 	"houseqafurnish", "houseqafull"]
+
+## LANES -- the suites worth running for a given KIND OF EDIT.
+##
+## The slow house suites are slow because they run the FURNISHER SEARCH, not
+## because they cover more geometry: `house` spends six minutes to make 123
+## checks while `roofquick` makes 2452 in eleven seconds. Running them after an
+## emitter or logging change buys most of half an hour and almost no coverage.
+## So pick the lane that matches what you touched, and leave the rest to a
+## batched sweep.
+##
+## Measured on this machine, September 2026. Times drift; the ORDER of
+## magnitude is the point.
+##
+##   lane:geom    ~30s   mesh kit, emitters, roof maths, the component log
+##   lane:plan    ~4m    the planner, room programme, doors, circulation
+##   lane:dress   ~10m   the furnisher, prop recipes, assembly, exteriors
+##   lane:assets  ~6m    anything under assets/props/ or catalog.json
+##   lane:castle  ~8m    castle geometry, massing, interiors
+##   lane:church  ~6m    church geometry and surfaces
+##   lane:temple  ~3m    temple geometry and the rite rules
+##   lane:sweep   ~40m   everything above; background it, do not wait on it
+##
+## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
+## Lanes and bare suite names can be mixed; duplicates run once.
+const LANES: Dictionary = {
+	"lane:geom": ["roofquick", "hroof", "hcomponent"],
+	"lane:plan": ["house", "houseqaplan", "hmultistory"],
+	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
+	"lane:assets": ["assets", "props", "hassembly"],
+	"lane:castle": ["castle", "cnormals", "cmassing"],
+	"lane:church": ["church", "normals", "massing"],
+	"lane:temple": ["temple", "rite"],
+	"lane:sweep": ORDER,
+}
 
 
 static func _run_one(key: String) -> SuiteResult:
@@ -122,6 +156,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/roof_probe.gd").self_test()
 		"hexterior":
 			return preload("res://tests/suites/house_exterior_suite.gd").run()
+		"hcomponent":
+			return preload("res://tests/suites/house_component_suite.gd").run()
 		"assets":
 			return HouseAssetsSuite.run()
 		"hassembly":
@@ -173,18 +209,36 @@ static func _run_one(key: String) -> SuiteResult:
 	return null
 
 
+## Where a suite sits in the canonical order. EXTRA lanes have no ORDER slot,
+## so they sort after the suite they are a subset of -- close enough, and it
+## keeps "cheapest and most fundamental first" true for mixed selections.
+static func _suite_rank(key: String) -> int:
+	var i := ORDER.find(key)
+	if i >= 0:
+		return i
+	return ORDER.size() + EXTRA.find(key)
+
+
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	var wanted: Array[String] = ORDER.duplicate()
 	if args.size() > 0:
 		wanted = []
 		for a in args:
-			if a in ORDER or a in EXTRA:
-				wanted.append(a)
-			else:
-				printerr("unknown suite '%s'; known: %s" % [a, ", ".join(ORDER + EXTRA)])
-				quit(2)
-				return
+			var expanded: Array = LANES.get(a, [a])
+			for key in expanded:
+				if not (key in ORDER or key in EXTRA):
+					printerr("unknown suite '%s'; known suites: %s; known lanes: %s"
+						% [key, ", ".join(ORDER + EXTRA), ", ".join(LANES.keys())])
+					quit(2)
+					return
+				# A lane and a bare name can ask for the same suite. Run it once,
+				# in the ORDER the runner is built around rather than in the
+				# order they happened to be typed.
+				if not wanted.has(key):
+					wanted.append(key)
+		wanted.sort_custom(func(a2: String, b2: String) -> bool:
+			return _suite_rank(a2) < _suite_rank(b2))
 
 	var results: Array[SuiteResult] = []
 	var failed_suites := 0

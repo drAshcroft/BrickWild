@@ -21,7 +21,11 @@ const SURF_FLOOR := 3
 var plan: HousePlan
 var spec: HouseSpec
 ## Actual emitted architectural faces, including cut host pieces and dormer joins.
+## Each row is also a row of `component_log`; see MassBuilder.
 var roof_components: Array[Dictionary] = []
+## Emission counter that names each opening's surround, so the trim round the
+## third window is identifiably the third window's on every rebuild.
+var _opening_seq := 0
 
 
 ## `with_roof` is the one thing a caller may switch off: a furnished interior
@@ -32,6 +36,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	spec = p_plan.spec
 	begin(4)
 	roof_components.clear()
+	_opening_seq = 0
 	total_height = spec.height
 
 	_build_floor()
@@ -243,6 +248,7 @@ func _build_jetty() -> void:
 	if not spec.jetty or _storeys() <= 1:
 		return
 	tag("jetty")
+	host("jetty", 1)
 	var r: Rect2 = HouseGeometry.site_rect(spec)
 	var j_depth: float = spec.jetty_depth
 	var bressummer_y: float = spec.height
@@ -270,7 +276,8 @@ func _build_jetty() -> void:
 		var tilt: float = atan2(bracket_lift, bracket_span)
 		var xf := Transform3D(Basis(), Vector3(px, bressummer_y - beam_h - bracket_lift / 2.0, r.position.y - j_depth / 2.0))
 		xf = xf * Transform3D(Basis(Vector3(1, 0, 0), -tilt), Vector3.ZERO)
-		_kit.oriented_box(Vector3(0.15, span_len, 0.12), xf, SURF_TRIM)
+		component_box("jetty_bracket", Vector3(0.15, span_len, 0.12), xf, SURF_TRIM)
+	host_end()
 
 
 func _build_partitions() -> void:
@@ -412,24 +419,32 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 	# Keep the legacy log category for house consumers, while allowing family
 	# composition to distinguish an emitted door from an emitted window.
 	part_log[part_log.size() - 1]["opening_kind"] = String(op["kind"])
+	# The surround belongs to THIS opening. HOUSE-EXT-008 and -010 both need to
+	# ask what trim sits beside a given door; a flat list of trim boxes cannot
+	# answer that, and reconstructing the answer from the spec would agree with
+	# a sill that was never split.
+	var outer_host := _comp_host
+	var outer_storey := _comp_storey
+	host("%s_%d" % [String(op["kind"]), _opening_seq], int(y_offset / maxf(spec.height, 0.01) + 0.5))
+	_opening_seq += 1
 	var jamb := 0.09
 	for side in [-1.0, 1.0]:
 		var p: Vector2 = from + dir * (t + side * (w / 2.0 + jamb / 2.0))
 		var xf := Transform3D(Basis(Vector3.UP, yaw),
 			Vector3(p.x, y_offset + (bottom + top) / 2.0, p.y))
-		_kit.oriented_box(Vector3(jamb, top - bottom, thick + 0.04), xf, SURF_TRIM)
+		component_box("opening_jamb", Vector3(jamb, top - bottom, thick + 0.04), xf, SURF_TRIM)
 	var head_xf := Transform3D(Basis(Vector3.UP, yaw),
 		Vector3(mid.x, y_offset + top + jamb / 2.0, mid.y))
-	_kit.oriented_box(Vector3(w + jamb * 2.0, jamb, thick + 0.04), head_xf, SURF_TRIM)
+	component_box("opening_head", Vector3(w + jamb * 2.0, jamb, thick + 0.04), head_xf, SURF_TRIM)
 	if bottom > 0.01:
 		var sill_xf := Transform3D(Basis(Vector3.UP, yaw),
 			Vector3(mid.x, y_offset + bottom - jamb / 2.0, mid.y))
-		_kit.oriented_box(Vector3(w + jamb * 2.0, jamb, thick + 0.12), sill_xf, SURF_TRIM)
+		component_box("opening_sill", Vector3(w + jamb * 2.0, jamb, thick + 0.12), sill_xf, SURF_TRIM)
 		if op["kind"] == "window":
 			# Inset dark lattice glazing panel
 			var pane_xf := Transform3D(Basis(Vector3.UP, yaw),
 				Vector3(mid.x, y_offset + (bottom + top) / 2.0, mid.y))
-			_kit.oriented_box(Vector3(w, top - bottom, 0.04), pane_xf, SURF_ROOF)
+			component_box("opening_glazing", Vector3(w, top - bottom, 0.04), pane_xf, SURF_ROOF)
 
 			# Vertical timber mullions for wide windows (2-light / 3-light)
 			if spec.window_mullions and w >= 0.8:
@@ -438,17 +453,17 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 						var mp: Vector2 = from + dir * (t + mside * (w / 3.0))
 						var mxf := Transform3D(Basis(Vector3.UP, yaw),
 							Vector3(mp.x, y_offset + (bottom + top) / 2.0, mp.y))
-						_kit.oriented_box(Vector3(HouseGeometry.MULLION_W, top - bottom, thick + 0.06), mxf, SURF_TRIM)
+						component_box("opening_mullion", Vector3(HouseGeometry.MULLION_W, top - bottom, thick + 0.06), mxf, SURF_TRIM)
 				else:
 					var mxf := Transform3D(Basis(Vector3.UP, yaw),
 						Vector3(mid.x, y_offset + (bottom + top) / 2.0, mid.y))
-					_kit.oriented_box(Vector3(HouseGeometry.MULLION_W, top - bottom, thick + 0.06), mxf, SURF_TRIM)
+					component_box("opening_mullion", Vector3(HouseGeometry.MULLION_W, top - bottom, thick + 0.06), mxf, SURF_TRIM)
 
 			# Dripstone hood moulding over window head
 			if spec.window_hoods:
 				var hood_xf := Transform3D(Basis(Vector3.UP, yaw),
 					Vector3(mid.x, y_offset + top + jamb + 0.05, mid.y))
-				_kit.oriented_box(Vector3(w + jamb * 2.4, 0.07, thick + HouseGeometry.HOOD_PROJECTION * 2.0),
+				component_box("opening_hood", Vector3(w + jamb * 2.4, 0.07, thick + HouseGeometry.HOOD_PROJECTION * 2.0),
 					hood_xf, SURF_TRIM)
 
 			# Board-and-batten shutters with strap hinges
@@ -458,12 +473,13 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 						+ normal * (thick / 2.0 + 0.03)
 					var sxf := Transform3D(Basis(Vector3.UP, yaw),
 						Vector3(sp.x, y_offset + (bottom + top) / 2.0, sp.y))
-					_kit.oriented_box(Vector3(w * 0.45, top - bottom, 0.05), sxf, SURF_TRIM)
+					component_box("opening_shutter", Vector3(w * 0.45, top - bottom, 0.05), sxf, SURF_TRIM)
 					# Horizontal strap hinges
 					for hy in [0.25, 0.75]:
 						var hxf := Transform3D(Basis(Vector3.UP, yaw),
 							Vector3(sp.x, y_offset + bottom + (top - bottom) * hy, sp.y + normal.y * 0.01))
-						_kit.oriented_box(Vector3(w * 0.40, 0.04, 0.07), hxf, SURF_TRIM)
+						component_box("opening_hinge", Vector3(w * 0.40, 0.04, 0.07), hxf, SURF_TRIM)
+	host(outer_host, outer_storey)
 
 
 ## Is an opening on this wall run: same line, and between its ends?
@@ -594,6 +610,7 @@ func _build_timber_frame_level(level := 0) -> void:
 		_build_stone_quoins(level)
 		return
 	tag("timber")
+	host("frame_%d" % level, level)
 	var h: float = spec.height
 	var y0 := float(level) * h
 	var plinth_offset := (minf(spec.plinth_height, HouseGeometry.WINDOW_SILL - 0.18) if (level == 0 and not spec.stone_ground_floor and spec.plinth_height > 0.05) else 0.0)
@@ -643,6 +660,7 @@ func _build_timber_frame_level(level := 0) -> void:
 			_:
 				if spec.frame_braces:
 					_corner_braces(from, dir, yaw, normal, length, h, openings, y0)
+	host_end()
 
 
 func _build_stone_quoins(level: int) -> void:
@@ -686,8 +704,8 @@ func _saltire_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
 			var p: Vector2 = from + dir * t_center + normal * _proud(HouseGeometry.BEAM_D)
 			var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, y_offset + (bottom + top) / 2.0, p.y))
 			xf = xf * Transform3D(Basis(Vector3(0, 0, 1), tilt * sign), Vector3.ZERO)
-			_kit.oriented_box(Vector3(brace_len * 0.95, HouseGeometry.BEAM_W * 0.72,
-				HouseGeometry.BEAM_D * 0.88), xf, SURF_TRIM)
+			component_box("timber_brace", Vector3(brace_len * 0.95,
+				HouseGeometry.BEAM_W * 0.72, HouseGeometry.BEAM_D * 0.88), xf, SURF_TRIM)
 
 
 func _arch_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
@@ -707,7 +725,8 @@ func _arch_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
 		var p: Vector2 = from + dir * mid_t + normal * _proud(HouseGeometry.BEAM_D)
 		var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, y_offset + mid_y, p.y))
 		xf = xf * Transform3D(Basis(Vector3(0, 0, 1), tilt), Vector3.ZERO)
-		_kit.oriented_box(Vector3(span, HouseGeometry.BEAM_W * 0.9, HouseGeometry.BEAM_D), xf, SURF_TRIM)
+		component_box("timber_brace", Vector3(span, HouseGeometry.BEAM_W * 0.9,
+			HouseGeometry.BEAM_D), xf, SURF_TRIM)
 
 
 ## A horizontal beam broken by the openings it runs into: it passes over a
@@ -754,7 +773,7 @@ func _corner_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
 		var p: Vector2 = from + dir * mid_t + normal * _proud(HouseGeometry.BEAM_D)
 		var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, y_offset + mid_y, p.y))
 		xf = xf * Transform3D(Basis(Vector3(0, 0, 1), tilt), Vector3.ZERO)
-		_kit.oriented_box(Vector3(span, HouseGeometry.BEAM_W * 0.9,
+		component_box("timber_brace", Vector3(span, HouseGeometry.BEAM_W * 0.9,
 			HouseGeometry.BEAM_D), xf, SURF_TRIM)
 
 
@@ -770,13 +789,14 @@ static func _blocked_by_opening(openings: Array[Dictionary], t: float,
 
 ## One beam, standing proud of the wall face it is fixed to.
 func _beam(from: Vector2, dir: Vector2, yaw: float, normal: Vector2, t: float,
-		length: float, y0: float, y1: float, depth := 0.0, y_offset := 0.0) -> void:
+		length: float, y0: float, y1: float, depth := 0.0, y_offset := 0.0,
+		role := "timber") -> void:
 	if length <= 0.02 or y1 - y0 <= 0.02:
 		return
 	var d: float = depth if depth > 0.0 else HouseGeometry.BEAM_D
 	var p: Vector2 = from + dir * t + normal * _proud(d)
 	var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, y_offset + (y0 + y1) / 2.0, p.y))
-	_kit.oriented_box(Vector3(length, y1 - y0, d), xf, SURF_TRIM)
+	component_box(role, Vector3(length, y1 - y0, d), xf, SURF_TRIM)
 
 
 ## How far out from the wall centre-line a beam of this depth sits: against the
@@ -801,6 +821,7 @@ const HIP_CUT := 0.62
 ## (GEO-003).
 func _build_court_roofs() -> void:
 	tag("roof")
+	host("roof", _storeys() - 1)
 	var site: Rect2 = HouseGeometry.site_rect(spec)
 	var wall_top: float = spec.height * _storeys()
 	var rise: float = HouseGeometry.roof_rise(spec) * 0.7
@@ -850,11 +871,13 @@ func _build_court_roofs() -> void:
 				quad.append(Vector3(outer, wall_top + rise, hi))
 				quad.append(Vector3(inner, wall_top, hi))
 				quad.append(Vector3(inner, wall_top, lo))
-			_kit.slab_poly(quad, 0.24, SURF_ROOF)
+			roof_components.append(
+				component_slab("roof_court_%d_%d" % [ci, side], quad, 0.24, SURF_ROOF))
 			_log_mass("roof_court_%d_%d" % [ci, side],
 				AABB(Vector3(band.position.x, wall_top, band.position.y),
 					Vector3(band.size.x, rise + 0.25, band.size.y)))
 			total_height = maxf(total_height, wall_top + rise)
+	host_end()
 
 
 func _build_roof() -> void:
@@ -862,6 +885,7 @@ func _build_roof() -> void:
 		_build_court_roofs()
 		return
 	tag("roof")
+	host("roof", _storeys() - 1)
 	var layout := HouseGeometry.roof_layout(plan)
 	var xf: Transform3D = layout["transform"]
 	var faces: Array[PackedVector3Array] = layout["faces"]
@@ -898,7 +922,7 @@ func _build_roof() -> void:
 		var cut := RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else 0.0
 		ridge_half = maxf(ridge_half - (span * 0.5 + 0.35) * (1.0 - cut), 0.0)
 	if ridge_half > 0.05:
-		_kit.oriented_box(Vector3(0.22, 0.16, ridge_half * 2.0),
+		component_box("ridge_cap", Vector3(0.22, 0.16, ridge_half * 2.0),
 			xf * Transform3D(Basis(), Vector3(0, rise + 0.14, 0)), SURF_ROOF)
 	var roof_bounds: AABB = xf * AABB(Vector3(-h - 0.35, -RoofShape.DEPTH * 0.5, -f - 0.25),
 		Vector3(span + 0.7, rise + RoofShape.DEPTH * 0.5 + 0.22, along + 0.5))
@@ -912,6 +936,7 @@ func _build_roof() -> void:
 		_build_bargeboards(xf, span, along, rise, verge_top)
 	_build_eaves_tails(xf, span, along, rise)
 	_build_dormers(xf, layout["dormers"])
+	host_end()
 
 
 func _roof_face(xf: Transform3D, local: PackedVector3Array, surface: int,
@@ -919,9 +944,10 @@ func _roof_face(xf: Transform3D, local: PackedVector3Array, surface: int,
 	var world := PackedVector3Array()
 	for p in local:
 		world.append(xf * p)
-	_kit.slab_poly(world, depth, surface, vertical)
-	roof_components.append({"role": role, "points": world, "depth": depth,
-		"vertical": vertical, "surface": surface, "storey": _storeys() - 1})
+	# One row, two readers: roof_components is the roof-shaped view the roof
+	# suites already measure, component_log is the whole-exterior view. They
+	# are the SAME dictionary, so they cannot drift apart.
+	roof_components.append(component_slab(role, world, depth, surface, vertical))
 
 
 func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
@@ -946,14 +972,15 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 			var mid: Vector2 = (foot + b) / 2.0
 			var t := xf * Transform3D(Basis(Vector3(0, 0, 1), -float(side) * ang),
 				Vector3(mid.x, mid.y, z))
-			_kit.oriented_box(Vector3((foot - b).length(), bb_w, bb_thick), t, SURF_TRIM)
+			component_box("verge_board", Vector3((foot - b).length(), bb_w, bb_thick),
+				t, SURF_TRIM)
 		# A finial stands on an apex. A half hip has none, so it gets none.
 		if is_equal_approx(top, rise):
-			_kit.oriented_box(Vector3(0.12, 0.55, 0.12),
+			component_box("verge_finial", Vector3(0.12, 0.55, 0.12),
 				xf * Transform3D(Basis(), Vector3(0.0, rise + 0.22, z)), SURF_TRIM)
 		# Drop pendants at the eaves
 		for side2 in [-1.0, 1.0]:
-			_kit.oriented_box(Vector3(0.09, 0.24, 0.09),
+			component_box("verge_pendant", Vector3(0.09, 0.24, 0.09),
 				xf * Transform3D(Basis(), Vector3(float(side2) * half, -0.05, z)),
 				SURF_TRIM)
 
@@ -967,12 +994,16 @@ func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float)
 		var ex: float = float(side) * (half + 0.15)
 		for i in range(count + 1):
 			var ez: float = -along / 2.0 + float(i) * (along / float(count))
-			_kit.oriented_box(Vector3(0.12, 0.09, 0.22),
+			component_box("eave_tail", Vector3(0.12, 0.09, 0.22),
 				xf * Transform3D(Basis(), Vector3(ex, -0.05, ez)), SURF_TRIM)
 
 
 func _build_dormers(xf: Transform3D, dormers: Array) -> void:
+	# A dormer is a BUILDING PART, not three loose boxes on the roof: give it
+	# its own host so QA can ask what dormer_1 is made of, and notice when one
+	# of its pieces goes missing or slides off the slope it sits on.
 	for d in dormers:
+		host(String(d["id"]), _storeys() - 1)
 		var front: float = d["front"]
 		var z: float = d["z"]
 		var base: float = d["base"] - RoofShape.DEPTH * 0.5
@@ -1005,16 +1036,17 @@ func _build_dormers(xf: Transform3D, dormers: Array) -> void:
 		var win_top := head - 0.13
 		var win_w := float(d["width"]) * 0.65
 		for side in [-1.0, 1.0]:
-			_kit.oriented_box(Vector3(0.10, head - base, hw - win_w * 0.5),
+			component_box("dormer_jamb", Vector3(0.10, head - base, hw - win_w * 0.5),
 				xf * Transform3D(Basis(), Vector3(front, (head + base) * 0.5,
 					z + side * (hw + win_w * 0.5) * 0.5)), SURF_TRIM)
 		for band in [[base, win_bottom], [win_top, head]]:
-			_kit.oriented_box(Vector3(0.10, band[1] - band[0], win_w),
+			component_box("dormer_panel", Vector3(0.10, band[1] - band[0], win_w),
 				xf * Transform3D(Basis(), Vector3(front, (band[0] + band[1]) * 0.5, z)), SURF_TRIM)
-		_kit.oriented_box(Vector3(0.04, win_top - win_bottom, win_w),
+		component_box("dormer_glazing", Vector3(0.04, win_top - win_bottom, win_w),
 			xf * Transform3D(Basis(), Vector3(front - 0.04, (win_top + win_bottom) * 0.5, z)), SURF_ROOF)
-		_kit.oriented_box(Vector3(0.05, win_top - win_bottom, 0.055),
+		component_box("dormer_mullion", Vector3(0.05, win_top - win_bottom, 0.055),
 			xf * Transform3D(Basis(), Vector3(front - 0.065, (win_top + win_bottom) * 0.5, z)), SURF_TRIM)
+		host("roof", _storeys() - 1)
 
 
 ## The frame in the gable -- and every member of it stays UNDER THE RAFTERS.
@@ -1037,7 +1069,7 @@ func _gable_frame(xf: Transform3D, span: float, along: float, rise: float,
 	for end_v in [-1.0, 1.0]:
 		var z: float = end_v * (along / 2.0 + HouseGeometry.BEAM_D / 2.0 - 0.01)
 		# Tie beam across the base of the gable
-		_kit.oriented_box(Vector3(span, HouseGeometry.PLATE_H, HouseGeometry.BEAM_D),
+		component_box("gable_tie", Vector3(span, HouseGeometry.PLATE_H, HouseGeometry.BEAM_D),
 			xf * Transform3D(Basis(), Vector3(0.0, HouseGeometry.PLATE_H / 2.0, z)),
 			SURF_TRIM)
 
@@ -1107,7 +1139,7 @@ func _member(xf: Transform3D, a: Vector2, b: Vector2, z: float,
 	if run < 0.05:
 		return
 	var mid: Vector2 = (a + b) / 2.0
-	_kit.oriented_box(Vector3(run, width, HouseGeometry.BEAM_D),
+	component_box("gable_member", Vector3(run, width, HouseGeometry.BEAM_D),
 		xf * Transform3D(Basis(Vector3(0, 0, 1), atan2(d.y, d.x)),
 			Vector3(mid.x, mid.y, z)), SURF_TRIM)
 
@@ -1119,6 +1151,9 @@ func _build_porch() -> void:
 	if d < 0:
 		return
 	tag("porch")
+	# A porch has a roof, and it is NOT the house's roof. Giving it its own
+	# host is what keeps the vertical-shell check counting one main roof.
+	host("porch", 0)
 	var door: Dictionary = plan.doors[d]
 	var depth: float = HouseGeometry.porch_depth(spec)
 	var w: float = float(door["width"]) + 1.1
@@ -1135,7 +1170,13 @@ func _build_porch() -> void:
 		_log_mass("porch_post_%s" % ("left" if side < 0.0 else "right"),
 			AABB(Vector3(p.x - 0.07, 0.0, p.y - 0.07), Vector3(0.14, head, 0.14)))
 	var xf := Transform3D(Basis(), Vector3(c.x, head, c.y))
-	_kit.ridge_roof(xf, w, depth + 0.2, 0.42, SURF_ROOF)
+	var porch_along: float = depth + 0.2
+	component_note("porch_roof", "ridge", SURF_ROOF, {"xf": xf, "span": w,
+		"along": porch_along, "rise": 0.42,
+		"aabb": xf * AABB(Vector3(-w * 0.5, 0.0, -porch_along * 0.5),
+			Vector3(w, 0.42, porch_along))})
+	_kit.ridge_roof(xf, w, porch_along, 0.42, SURF_ROOF)
+	host_end()
 
 
 ## How far a flue finishes above the ridge it comes out of.
