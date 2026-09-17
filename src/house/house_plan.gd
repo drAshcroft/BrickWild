@@ -68,6 +68,27 @@ var stairs: Array[Dictionary] = []
 ## reads this and downgrades exactly those complaints to warnings, so a real
 ## missing bed still fails.
 var compromises: Dictionary = {}
+## AUTHORED holes in the roof: a compluvium over an atrium, an oculus, an open
+## court sky. One shared schema with the dormer openings the roof descriptor
+## fits for itself (HOUSE-EXT-007):
+##
+##   {"id": String, "kind": StringName, "storey": int, "face": int,
+##    "polygon": PackedVector2Array, "room": int}
+##
+## `polygon` is the outline of the HOLE in the roof's own local XZ frame, and
+## `face` indexes the roof descriptor's faces (-1 for a hole that is not on a
+## sloped face). `room` is -1 when the hole belongs to no room, which is every
+## dormer -- a dormer lights an attic, not a planned room.
+##
+## Dormers are NOT stored here. They are fitted from the roof descriptor by
+## HouseGeometry.roof_layout, which recomputes rather than caches so a caller
+## that edits a generated spec cannot retain holes belonging to a former roof.
+## HouseGeometry.roof_openings(plan) is the MERGED view -- authored plus
+## fitted -- and is what every consumer should read.
+##
+## INT-018 owns the compluvium/oculus/court-sky kinds and fills this list.
+## HOUSE-EXT-007 owns only the dormer/sloped-polygon subset and the schema.
+var roof_openings: Array[Dictionary] = []
 ## Where the fire is: {"room": int, "wall": int}, or empty when the house has
 ## no hearth room at all. The wall index is into HouseGeometry.room_walls().
 ##

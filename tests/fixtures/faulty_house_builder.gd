@@ -9,7 +9,12 @@ extends HouseBuilder
 ## that re-derives the roof from the spec agrees with the log and sees nothing
 ## wrong. Only a check that measures the MESH notices.
 
-enum Fault { NONE, REMOVE, MOVE }
+## REMOVE and MOVE leave the log honest and the mesh wrong, which is what
+## ComponentCheck is for. DISPLACE moves BOTH: the builder genuinely built the
+## piece in the wrong place and said so. ComponentCheck cannot see that -- log
+## and mesh agree -- and it is exactly what a rule measuring the log against
+## the roof descriptor is for (RoofOpeningCheck).
+enum Fault { NONE, REMOVE, MOVE, DISPLACE }
 
 ## Which fault to inject, into which role, and into which emission of it.
 var fault: Fault = Fault.NONE
@@ -34,6 +39,8 @@ func component_box(role: String, size: Vector3, xform: Transform3D, surf: int) -
 	_seen += 1
 	if mine != fault_index:
 		return super.component_box(role, size, xform, surf)
+	if fault == Fault.DISPLACE:
+		return super.component_box(role, size, xform.translated(move_by), surf)
 	var row := _log_component(role, "box", surf, {"xf": xform, "size": size})
 	if fault == Fault.MOVE:
 		_kit.oriented_box(size, xform.translated(move_by), surf)
@@ -48,11 +55,13 @@ func component_slab(role: String, points: PackedVector3Array, depth: float,
 	_seen += 1
 	if mine != fault_index:
 		return super.component_slab(role, points, depth, surf, vertical)
+	var shifted := PackedVector3Array()
+	for p in points:
+		shifted.append(p + move_by)
+	if fault == Fault.DISPLACE:
+		return super.component_slab(role, shifted, depth, surf, vertical)
 	var row := _log_component(role, "slab", surf,
 		{"points": points, "depth": depth, "vertical": vertical})
 	if fault == Fault.MOVE:
-		var shifted := PackedVector3Array()
-		for p in points:
-			shifted.append(p + move_by)
 		_kit.slab_poly(shifted, depth, surf, vertical)
 	return row

@@ -418,9 +418,21 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 		Vector3(0, s.height * maxi(s.storeys, 1), 0))
 	var roof := RoofShape.faces(span + 0.7, along + 0.5, rise, s.roof_type)
 	var layout := {"transform": xf, "span": span, "along": along, "rise": rise,
-		"faces": roof, "dormers": []}
-	if not s.dormers or s.dormer_count <= 0 or plan.has_court() or roof.is_empty():
+		"faces": roof, "dormers": [], "rejections": [], "requested": 0}
+	# A candidate that is turned away says WHY. A fitter that silently drops
+	# dormers is indistinguishable from one that never tried, and the count
+	# nobody can explain is the count nobody notices going wrong.
+	var rejections: Array[Dictionary] = []
+	layout["rejections"] = rejections
+	if plan.has_court():
+		rejections.append(_dormer_reject("", 0.0, &"court", "a court is sky; its ranges are roofed separately"))
 		return layout
+	if roof.is_empty():
+		rejections.append(_dormer_reject("", 0.0, &"no_roof", "the roof descriptor produced no faces"))
+		return layout
+	if not s.dormers or s.dormer_count <= 0:
+		return layout
+	layout["requested"] = mini(s.dormer_count, 3)
 	var half := (span + 0.7) * 0.5
 	var dw := 0.95
 	# Where a dormer can sit on a slope is RoofShape's question, not this
@@ -428,6 +440,8 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 	# ends up with dormers a metre above their own roof (ROOF-AUDIT-001).
 	var seat := RoofShape.dormer_seat(half, rise, -span * 0.5 * 0.62, dw)
 	if not bool(seat["fits"]):
+		rejections.append(_dormer_reject("", 0.0, &"no_seat",
+			"pitch %.3f over half-span %.2f leaves no usable dormer face" % [rise / half, half]))
 		return layout
 	var front: float = seat["front"]
 	var base: float = seat["base"]
@@ -444,25 +458,36 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 		Vector2.ONE * (stack_size + 0.3))
 	for count in range(mini(s.dormer_count, 3), 0, -1):
 		var fitted: Array[Dictionary] = []
+		# Rejections belong to the attempt that produced the accepted set. A
+		# candidate turned away while trying three dormers is not a defect if
+		# two then fit; the surviving attempt is the one worth explaining.
+		var attempt_rejections: Array[Dictionary] = []
 		for i in range(count):
 			var z := (float(i) - float(count - 1) * 0.5) * spacing
 			var cover := PackedVector2Array([Vector2(front - 0.12, z - rh),
 				Vector2(side_x, z - rh), Vector2(peak_x, z),
 				Vector2(side_x, z + rh), Vector2(front - 0.12, z + rh)])
-			var valid := true
+			var id := "dormer_%d" % i
+			var reason := &""
+			var detail := ""
 			var world_cover := PackedVector2Array()
 			for p in cover:
-				if not Poly.contains_point(host, p):
-					valid = false
+				if reason == &"" and not Poly.contains_point(host, p):
+					reason = &"off_face"
+					detail = "corner (%.2f, %.2f) is not on the host face" % [p.x, p.y]
 				for j in range(host.size()):
 					var edge := host[(j + 1) % host.size()] - host[j]
-					if absf(edge.cross(p - host[j])) / edge.length() < 0.12:
-						valid = false
+					var gap: float = absf(edge.cross(p - host[j])) / edge.length()
+					if gap < 0.12 and reason in [&"", &"off_face"]:
+						reason = &"near_edge"
+						detail = "corner (%.2f, %.2f) is %.3fm from a hip, ridge or verge" % [p.x, p.y, gap]
 				var wp: Vector3 = xf * Vector3(p.x, 0, p.y)
 				world_cover.append(Vector2(wp.x, wp.z))
 			if s.chimney and Poly.bounding_rect(world_cover).intersects(stack):
-				valid = false
-			if not valid:
+				reason = &"chimney"
+				detail = "footprint meets the chimney stack at %s" % str(stack)
+			if reason != &"":
+				attempt_rejections.append(_dormer_reject(id, z, reason, detail))
 				continue
 			var opening := PackedVector2Array([Vector2(front, z - dw * 0.5),
 				Vector2(cheek_x, z - dw * 0.5), Vector2(peak_x, z),
@@ -473,8 +498,37 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 				"peak_x": peak_x, "side_x": side_x, "cheek_x": cheek_x})
 		if not fitted.is_empty():
 			layout["dormers"] = fitted
-			break
+			rejections.append_array(attempt_rejections)
+			return layout
+		if count == 1:
+			rejections.append_array(attempt_rejections)
 	return layout
+
+
+static func _dormer_reject(id: String, z: float, reason: StringName,
+		detail: String) -> Dictionary:
+	return {"id": id, "z": z, "reason": reason, "detail": detail}
+
+
+## Every hole in the roof, in ONE shape, for every consumer: the dormer
+## openings fitted by roof_layout plus whatever the plan authored (INT-018).
+##
+## Derived, never cached -- see HousePlan.roof_openings for why. Polygons are
+## in the roof's own local XZ frame; transform them with roof_layout's
+## `transform` to get world coordinates.
+static func roof_openings(plan: HousePlan) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	out.append_array(plan.roof_openings)
+	for d in roof_layout(plan)["dormers"]:
+		out.append({"id": String(d["id"]), "kind": &"dormer",
+			"storey": int(d["storey"]), "face": int(d["face"]),
+			"polygon": d["opening"], "room": -1})
+	return out
+
+
+## Why a candidate roof opening was not cut. Same derivation as above.
+static func roof_opening_rejections(plan: HousePlan) -> Array[Dictionary]:
+	return roof_layout(plan)["rejections"]
 
 
 ## Actual hearth-wall position shared by the chimney and roof attachments.

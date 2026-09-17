@@ -47,7 +47,7 @@ extends SceneTree
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"roofprobe", "hroof", "hexterior", "hcomponent", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
+	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
@@ -81,7 +81,7 @@ const EXTRA: Array[String] = ["roofquick", "houseqacore", "houseqaplan",
 ## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 ## Lanes and bare suite names can be mixed; duplicates run once.
 const LANES: Dictionary = {
-	"lane:geom": ["roofquick", "hroof", "hcomponent"],
+	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
@@ -158,6 +158,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/house_exterior_suite.gd").run()
 		"hcomponent":
 			return preload("res://tests/suites/house_component_suite.gd").run()
+		"hopening":
+			return preload("res://tests/suites/house_roof_opening_suite.gd").run()
 		"assets":
 			return HouseAssetsSuite.run()
 		"hassembly":
