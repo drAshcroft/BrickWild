@@ -35,8 +35,6 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	plan = p_plan
 	spec = p_plan.spec
 	begin(4)
-	roof_components.clear()
-	_opening_seq = 0
 	total_height = spec.height
 
 	_build_floor()
@@ -54,6 +52,17 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 
 
 # ------------------------------------------------------------------ floor
+
+## Reset the house's own per-build records alongside the shared logs. This
+## belongs on begin() rather than on build(): HotelBuilder overrides build()
+## and does not call super, so a subclass would otherwise carry the previous
+## run's opening numbering into the next one and its component identities
+## would drift.
+func begin(surface_count: int) -> void:
+	super.begin(surface_count)
+	roof_components.clear()
+	_opening_seq = 0
+
 
 func _build_floor() -> void:
 	tag("floor")

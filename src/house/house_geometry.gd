@@ -422,17 +422,20 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 	if not s.dormers or s.dormer_count <= 0 or plan.has_court() or roof.is_empty():
 		return layout
 	var half := (span + 0.7) * 0.5
-	var slope := rise / half
-	var front := -span * 0.5 * 0.62
-	var base := rise + slope * front
-	var eave := minf(base + 1.15, rise - slope * 0.35 - 0.45)
-	if eave - base < 0.65:
-		return layout
 	var dw := 0.95
-	var rh := (dw + 0.25) * 0.5
-	var peak_x := (eave + 0.45 - rise) / slope
-	var side_x := (eave - rise) / slope
-	var cheek_x := (eave + 0.45 * (1.0 - dw * 0.5 / rh) - rise) / slope
+	# Where a dormer can sit on a slope is RoofShape's question, not this
+	# file's: the hotel asks it too, and asking it twice is how one of them
+	# ends up with dormers a metre above their own roof (ROOF-AUDIT-001).
+	var seat := RoofShape.dormer_seat(half, rise, -span * 0.5 * 0.62, dw)
+	if not bool(seat["fits"]):
+		return layout
+	var front: float = seat["front"]
+	var base: float = seat["base"]
+	var eave: float = seat["eave"]
+	var rh: float = seat["roof_half"]
+	var peak_x: float = seat["peak_x"]
+	var side_x: float = seat["side_x"]
+	var cheek_x: float = seat["cheek_x"]
 	var spacing := maxf(dw + 0.5, minf(along * 0.22, 2.4))
 	var host := RoofShape.footprint(roof[0])
 	var chimney := chimney_center(plan)

@@ -36,6 +36,52 @@ static func faces(span: float, along: float, rise: float,
 	return out
 
 
+## How far below the ridge a dormer's rooflet must stop, so it dies into the
+## host slope instead of bursting through the ridge line.
+const DORMER_RIDGE_KEEP := 0.35
+
+
+## Where a dormer sits on a slope, in the roof's own frame.
+##
+## Everything here is one question asked five ways: at what local X does the
+## host plane reach a given height. Get that wrong and the dormer floats --
+## which is exactly what the hotel did, by choosing a height as a fraction of
+## the rise and never asking the roof where its surface actually was.
+##
+## `front` is the signed local X of the dormer's front face; its sign picks
+## the slope. `lift` is how far the dormer's own eave stands above the host
+## surface at that face, `rooflet` how far its ridge stands above its eave.
+## Returns `fits` false when the slope cannot give the dormer a usable face --
+## a shallow pitch or a front set too near the ridge. Never place a dormer on
+## a seat that does not fit; the caller must not fall back to a fixed height.
+static func dormer_seat(half: float, rise: float, front: float, width: float,
+		lift := 1.15, rooflet := 0.45) -> Dictionary:
+	var seat := {"fits": false}
+	if half <= 0.0 or rise <= 0.0 or absf(front) >= half:
+		return seat
+	var slope: float = rise / half
+	var s: float = signf(front) if absf(front) > 0.0001 else 1.0
+	var base: float = rise - slope * absf(front)
+	var eave: float = minf(base + lift, rise - slope * DORMER_RIDGE_KEEP - rooflet)
+	if eave - base < 0.65:
+		return seat
+	# Local X at which the host plane is exactly this high, on `front`'s side.
+	var at := func(h: float) -> float: return s * (rise - h) / slope
+	var rh: float = (width + 0.25) * 0.5
+	seat["fits"] = true
+	seat["front"] = front
+	seat["width"] = width
+	seat["roof_half"] = rh
+	seat["base"] = base
+	seat["eave"] = eave
+	seat["peak"] = eave + rooflet
+	# where the dormer's eave line, its ridge, and its cheek top meet the host
+	seat["side_x"] = at.call(eave)
+	seat["peak_x"] = at.call(eave + rooflet)
+	seat["cheek_x"] = at.call(eave + rooflet * (1.0 - width * 0.5 / rh))
+	return seat
+
+
 static func footprint(face: PackedVector3Array) -> PackedVector2Array:
 	var out := PackedVector2Array()
 	for p in face:

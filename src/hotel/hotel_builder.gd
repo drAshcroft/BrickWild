@@ -8,6 +8,13 @@ const WINDOW_H := 1.5
 const FRAME := 0.13
 const FACADE_D := 0.12
 
+## How far down the slope a dormer front face sits, as a fraction of the roof
+## half span. Low enough to read as an attic window from the road, far enough
+## from the eave that the slope behind it can still rise to meet the rooflet.
+const DORMER_SET_DOWN := 0.62
+## The dormer opening, and the body that stands in it.
+const DORMER_W := 1.15
+
 
 func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	plan = p_plan
@@ -134,35 +141,182 @@ func _build_palace_roof() -> void:
 	var top := HotelGeometry.wall_top(hs)
 	tag("mansard_roof")
 	# Ridge along X: the dark steep slope is the dominant face seen from the
-	# road, as it is in the reference elevation.
+	# road, as it is in the reference elevation. The roof is turned a quarter
+	# turn to get there, so the roof local X runs across the hotel LENGTH and
+	# its local Z along the hotel WIDTH. Every dormer number below is in that
+	# frame, not in the hotel one.
 	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(0, top, 0))
+	var roof := RoofShape.faces(hs.length + 1.0, hs.width + 1.0, hs.roof_rise)
+	var dormers := _hotel_dormer_seats(hs, roof)
+	# ridge_roof still closes the four wall heads against the actual roof
+	# underside; that part has no dormers in it. Its slopes are deferred so the
+	# dormer openings can be cut out of them first: a dormer with no hole
+	# behind it is a box with the host roof running through its glazing.
+	var deferred: Array[PackedVector3Array] = []
 	_kit.ridge_roof(xf, hs.length + 1.0, hs.width + 1.0, hs.roof_rise,
-		SURF_ROOF, SURF_WALL, hs.length, hs.width)
+		SURF_ROOF, SURF_WALL, hs.length, hs.width, 0.3, 0.0, deferred)
+	for fi in range(roof.size()):
+		var pieces: Array[PackedVector2Array] = [RoofShape.footprint(roof[fi])]
+		for d in dormers:
+			if int(d["face"]) != fi:
+				continue
+			var next: Array[PackedVector2Array] = []
+			for piece in pieces:
+				next.append_array(RoofShape.subtract(piece, d["opening"]))
+			pieces = next
+		for piece in pieces:
+			_kit.slab_poly(xf * RoofShape.lift(piece, roof[fi]),
+				RoofShape.DEPTH, SURF_ROOF, true)
 	_log_mass("roof", AABB(
 		Vector3(-hs.width * 0.5 - 0.5, top, -hs.length * 0.5 - 0.5),
 		Vector3(hs.width + 1.0, hs.roof_rise + 4.0, hs.length + 1.0)))
-	_build_hotel_dormers(top, hs)
+	_build_hotel_dormers(xf, dormers)
 	if hs.cupolas:
 		_build_cupola(-HotelGeometry.tower_x(hs), top, hs)
 		_build_cupola(HotelGeometry.tower_x(hs), top, hs)
 	total_height = maxf(total_height, HotelGeometry.total_height(hs))
 
 
-## The hotel's own dormers: a long even row across a mansard, which is not
-## the same piece of architecture as HouseBuilder._build_dormers -- that one
-## sets them on one pitch of a cottage roof, in the roof's own frame.
-func _build_hotel_dormers(top: float, hs: HotelSpec) -> void:
-	var z := -hs.length * 0.5 - 0.3
-	var run := hs.width * 0.76
+## Where the hotel dormers sit, in the roof own frame.
+##
+## The old version put each box at a fixed z just outside the front wall and
+## lifted it to 42 per cent of the rise -- two numbers with nothing to do with
+## where the roof surface actually is. On a 48x24 palace that left every body
+## between 0.78 m and 1.14 m in the air above its own slope (ROOF-AUDIT-001).
+## The seat now comes from the roof: RoofShape.dormer_seat answers "at what
+## local X is the host plane this high", and every coordinate below is one of
+## its answers.
+func _hotel_dormer_seats(hs: HotelSpec, roof: Array[PackedVector3Array]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if hs.dormer_count <= 0 or roof.is_empty():
+		return out
+	var half: float = (hs.length + 1.0) * 0.5
+	# The dormers face the road, and the road is -Z. The roof quarter turn maps
+	# its +X to the hotel -Z, so the road-facing slope is +X: the face
+	# RoofShape.faces emits second.
+	var seat := RoofShape.dormer_seat(half, hs.roof_rise,
+		half * DORMER_SET_DOWN, DORMER_W)
+	if not bool(seat["fits"]):
+		return out
+	var face_index := 1 if roof.size() > 1 else 0
+	var host: PackedVector2Array = RoofShape.footprint(roof[face_index])
+	var front: float = seat["front"]
+	var rh: float = seat["roof_half"]
+	var hw: float = DORMER_W * 0.5
+	var out_dir: float = signf(front)
+	var run: float = hs.width * 0.76
+	var cupola_r: float = HotelGeometry.cupola_radius(hs) + 0.4
+	var tower_x: float = HotelGeometry.tower_x(hs)
 	for i in range(hs.dormer_count):
-		var x := -run * 0.5 + run * (float(i) + 0.5) / hs.dormer_count
-		if absf(x) < HotelGeometry.centre_width(hs) * 0.25:
+		# The dormers march along the ridge, which is the roof local Z and the
+		# hotel world X.
+		var z := -run * 0.5 + run * (float(i) + 0.5) / float(hs.dormer_count)
+		if absf(z) < HotelGeometry.centre_width(hs) * 0.25:
+			continue      # the centre crown stands here
+		if hs.cupolas and absf(absf(z) - tower_x) < cupola_r + hw:
+			continue      # and a cupola here
+		var cover := PackedVector2Array([
+			Vector2(front + out_dir * 0.12, z - rh),
+			Vector2(seat["side_x"], z - rh), Vector2(seat["peak_x"], z),
+			Vector2(seat["side_x"], z + rh), Vector2(front + out_dir * 0.12, z + rh)])
+		var valid := true
+		for p in cover:
+			if not Poly.contains_point(host, p):
+				valid = false
+			for j in range(host.size()):
+				var edge: Vector2 = host[(j + 1) % host.size()] - host[j]
+				if absf(edge.cross(p - host[j])) / edge.length() < 0.12:
+					valid = false
+		if not valid:
 			continue
+		var row := seat.duplicate()
+		row["id"] = "dormer_%d" % i
+		row["face"] = face_index
+		row["z"] = z
+		row["out"] = out_dir
+		row["opening"] = PackedVector2Array([
+			Vector2(front, z - hw), Vector2(seat["cheek_x"], z - hw),
+			Vector2(seat["peak_x"], z), Vector2(seat["cheek_x"], z + hw),
+			Vector2(front, z + hw)])
+		out.append(row)
+	return out
+
+
+## The hotel dormers: a long even row across a mansard, which is not the same
+## piece of architecture as HouseBuilder._build_dormers -- that one sets them
+## on one pitch of a cottage roof. The SEAT is shared; only the carpentry here
+## differs.
+func _build_hotel_dormers(xf: Transform3D, dormers: Array[Dictionary]) -> void:
+	for d in dormers:
 		tag("dormer")
-		var y := top + hs.roof_rise * 0.42
-		box(Vector3(1.15, 1.6, 0.95), Vector3(x, y, z), SURF_ROOF)
-		box(Vector3(0.62, 0.92, 0.12), Vector3(x, y, z - 0.54), SURF_TRIM)
-		_kit.gable_end(0.72, 0.62, y + 0.8, z - 0.62, 0.18, SURF_TRIM)
+		host(String(d["id"]), maxi(spec.storeys, 1) - 1)
+		var first := component_log.size()
+		var z: float = d["z"]
+		var front: float = d["front"]
+		var out_dir: float = d["out"]
+		var base: float = float(d["base"]) - RoofShape.DEPTH * 0.5
+		var eave: float = d["eave"]
+		var peak: float = d["peak"]
+		var rh: float = d["roof_half"]
+		var hw: float = DORMER_W * 0.5
+		var lift: float = peak - eave
+		var side_top: float = eave + lift * (1.0 - hw / rh) - RoofShape.DEPTH * 0.5
+		var head: float = eave - RoofShape.DEPTH * 0.5
+		# Rooflet: ends on the valley where it meets the host plane, not in a
+		# rectangle buried behind the slope.
+		for side in [-1.0, 1.0]:
+			_slab(xf, "dormer_roof", PackedVector3Array([
+				Vector3(front + out_dir * 0.12, eave, z + side * rh),
+				Vector3(d["side_x"], eave, z + side * rh),
+				Vector3(d["peak_x"], peak, z),
+				Vector3(front + out_dir * 0.12, peak, z)]),
+				RoofShape.DEPTH, SURF_ROOF, true)
+			# Cheeks taper to nothing at that same intersection.
+			_slab(xf, "dormer_cheek", PackedVector3Array([
+				Vector3(front, base, z + side * hw),
+				Vector3(front, side_top, z + side * hw),
+				Vector3(d["cheek_x"], side_top, z + side * hw)]),
+				0.08, SURF_WALL, false)
+		_slab(xf, "dormer_gable", PackedVector3Array([
+			Vector3(front, head, z - hw), Vector3(front, head, z + hw),
+			Vector3(front, side_top, z + hw),
+			Vector3(front, peak - RoofShape.DEPTH * 0.5, z),
+			Vector3(front, side_top, z - hw)]), 0.10, SURF_WALL, false)
+		# The window in it, and the glazing the host roof must not run through.
+		var win_bottom: float = base + 0.20
+		var win_top: float = head - 0.13
+		var win_w: float = DORMER_W * 0.65
+		for side in [-1.0, 1.0]:
+			component_box("dormer_jamb",
+				Vector3(0.10, head - base, hw - win_w * 0.5),
+				xf * Transform3D(Basis(), Vector3(front, (head + base) * 0.5,
+					z + side * (hw + win_w * 0.5) * 0.5)), SURF_TRIM)
+		for band in [[base, win_bottom], [win_top, head]]:
+			component_box("dormer_panel", Vector3(0.10, band[1] - band[0], win_w),
+				xf * Transform3D(Basis(), Vector3(front,
+					(band[0] + band[1]) * 0.5, z)), SURF_TRIM)
+		component_box("dormer_glazing", Vector3(0.04, win_top - win_bottom, win_w),
+			xf * Transform3D(Basis(), Vector3(front + out_dir * 0.04,
+				(win_top + win_bottom) * 0.5, z)), SURF_ROOF)
+		# One part_log row per dormer BODY, measured from the pieces actually
+		# emitted for it. The landmark rule counts dormers, and geometry that
+		# only exists in the mesh is geometry QA cannot count -- which is how
+		# seating the dormers correctly still managed to break that rule.
+		var bounds := AABB()
+		for ci in range(first, component_log.size()):
+			var piece := MassBuilder.component_aabb(component_log[ci])
+			bounds = piece if ci == first else bounds.merge(piece)
+		_log_part("dormer", bounds.get_center(), bounds.size)
+		host_end()
+
+
+## A roof-local polygon slab, emitted and logged in world space.
+func _slab(xf: Transform3D, role: String, local: PackedVector3Array,
+		depth: float, surface: int, vertical: bool) -> void:
+	var world := PackedVector3Array()
+	for p in local:
+		world.append(xf * p)
+	component_slab(role, world, depth, surface, vertical)
 
 
 func _build_cupola(x: float, top: float, hs: HotelSpec) -> void:

@@ -66,7 +66,7 @@ body-bottom height, host-top height and gap in metres.
 
 **35,103 checks; 4 failure groups; 8 warning groups.** The PowerShell wrapper
 returned exit 1 as expected for detected defects, with an empty engine-error
-log. The nine probe controls also passed independently through the wrapper.
+log. All four failure groups were ROOF-AUDIT-001 and are resolved; see below. The nine probe controls also passed independently through the wrapper.
 Counts combine sampled rays with existing suite assertions; failure groups
 are grouped diagnostics, not counts of individual faulty triangles.
 
@@ -80,29 +80,53 @@ are grouped diagnostics, not counts of individual faulty triangles.
 | Temple | 8 | 1,550 | 0 | 2 |
 | Probe controls | — | 9 | 0 | 0 |
 
-### Confirmed: hotel dormers float above the host roof
+### RESOLVED 2026-09-17: hotel dormers floated above the host roof
 
-Task **ROOF-AUDIT-001**, `ce7a0f3b-a089-47f0-ba09-fc263c3abdbd`, P1.
+Task **ROOF-AUDIT-001**, `ce7a0f3b-a089-47f0-ba09-fc263c3abdbd`, P1. Fixed.
 
-Source: `HotelBuilder._build_hotel_dormers` in
-`src/hotel/hotel_builder.gd:154`. All cases are 48x24m, three 3.6m storeys.
+Source was `HotelBuilder._build_hotel_dormers`. It fixed each box at
+`z = -length/2 - 0.3` and `y = wall_top + roof_rise * 0.42` -- two numbers that
+never ask the roof how high its surface is at that point. All cases 48x24 m,
+three 3.6 m storeys.
 
-| Style | Seed | Detached bodies | Rear-edge vertical air gap |
-|---|---:|---:|---:|
-| grand_budapest | 42 | 6 | 0.998m |
-| alpine_palace | 42 | 6 | 0.777m |
-| grand_budapest | 4413 | 8 | 1.137m |
-| alpine_palace | 4413 | 8 | 0.916m |
+| Style | Seed | Detached bodies before | Rear-edge gap before | After |
+|---|---:|---:|---:|---:|
+| grand_budapest | 42 | 6 | 0.998 m | 0 |
+| alpine_palace | 42 | 6 | 0.777 m | 0 |
+| grand_budapest | 4413 | 8 | 1.137 m | 0 |
+| alpine_palace | 4413 | 8 | 0.916 m | 0 |
 
-The builder fixes each box at `z=-length/2-0.3` and
-`y=wall_top+roof_rise*0.42`. Its rear edge does not reach the slope. For the
-first grand_budapest/42 body, X=-16.21333, rear sample Z=-11.845,
-body bottom Y=12.19133, host roof top Y=11.19340.
+The fix moved the dormer-seating maths into `RoofShape.dormer_seat`, which the
+house already had inline and correct -- the hotel's separate copy was the bug.
+The hotel now seats every dormer on the actual host plane in the roof's own
+frame, ends rooflets on the valley line, tapers cheeks to the same
+intersection, and cuts a real opening in the host slope using
+`MeshKit.ridge_roof`'s `deferred_faces` hook, so the roof no longer runs behind
+the glazing. Centre-crown and cupola positions are skipped explicitly.
 
-Fit the dormer body, cheeks and rooflet to the actual slope, with host openings
-if these are occupiable dormers. Validate front/side/rear joins and unobstructed
-glazing; passing attachment alone will not prove those additional properties.
-Retain the strict attachment test and rerun hotel landmark checks after repair.
+Verification:
+
+- `tools/check_roofs.ps1 -Family hotel` -- 10829 checks, 0 failure groups,
+  0 warning groups; `dormer_attachment_failures` empty on all four rows.
+  Baseline for the same command was 4 failure groups / 28 detached bodies.
+- `run_all.gd -- hotel hotelroof hlandmark` -- 3 suites, 18 checks, 0 failures.
+- Before/after renders: `tools/render_hotel_dormers.gd -- --tag=<label>`
+  (must not be headless) writes eave, row and single-dormer views.
+
+Two notes for whoever touches this next:
+
+- The dormer pieces are logged components (`dormer_roof`, `dormer_cheek`,
+  `dormer_gable`, `dormer_jamb`, `dormer_panel`, `dormer_glazing`) hosted on
+  the dormer id, plus ONE `part_log` row per body measured from the pieces
+  actually emitted. The first attempt emitted straight through `_kit`, which
+  left the geometry correct but invisible to `HotelQA._check_landmarks`, and
+  that rule counts `part_log` dormers. Geometry QA cannot count what is only
+  in the mesh.
+- The landmark dormer count clears its threshold with ZERO MARGIN at scales
+  1.00 and 1.30 (6 of 6, 10 of 10). Three dormers are dropped by the
+  centre-crown exclusion, as they were before this fix. Any change to crown
+  width or dormer spacing will trip `landmark: mansard roof has too few
+  dormers` immediately.
 
 ### Warnings: duplicate seams and degenerate faces need classification
 
