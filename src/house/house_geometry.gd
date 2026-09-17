@@ -552,24 +552,223 @@ static func chimney_center(plan: HousePlan) -> Vector2:
 	return c
 
 
+## ---------------------------------------------------------- exterior bounds
+##
+## What the house actually occupies, as opposed to what its walls do. Every
+## number below is the SAME number the builder emits with, named here once:
+## a bound derived from a different constant than the emitter uses is a bound
+## that drifts the first time either changes.
+##
+## Heights are measured from the wall head, which is where the roof's frame
+## sits. A feature that does not apply contributes nothing.
+
+## The roof slab is centred on its mid-plane, so the ridge's top surface is
+## half a slab above the rise. RoofShape.DEPTH owns the thickness.
+const RIDGE_SLAB_TOP := RoofShape.DEPTH * 0.5
+## HouseBuilder._build_roof caps the ridge with a 0.16 m box centred 0.14 m
+## above the rise.
+const RIDGE_CAP_TOP := 0.14 + 0.16 * 0.5
+## A finial stands on the ridge cap: 0.55 m tall, centred on rise + 0.22. Only
+## a FULL gable has one -- a half hip has no apex to stand it on.
+const FINIAL_TOP := 0.22 + 0.55 * 0.5
+## HouseBuilder.CHIMNEY_CLEAR + the crown slab + a flue pot. The chimney is the
+## tallest thing on an ordinary house and the old bound missed all of it.
+const CHIMNEY_TOP := 0.6 + 0.18 + CHIMNEY_POT_H
+## The verge: how far past the roof's own end the boards, pendants and finial
+## stand, and how far the board's foot kicks out past the eave. These are the
+## numbers HouseBuilder._build_bargeboards emits with -- it reads them from
+## here, so a bound cannot disagree with the thing it bounds.
+const VERGE_END_OUT := 0.28
+const VERGE_KICK := 0.10
+const FINIAL_D := 0.12
+const VERGE_PENDANT_D := 0.09
+## How far the roof oversails its walls: RoofShape is built at span + 0.7
+## across and along + 0.5 with the ridge.
+const ROOF_SPAN_OUT := 0.35
+const ROOF_ALONG_OUT := 0.25
+## Stone quoins are 0.56 m deep at their widest course, centred on the corner,
+## so they reach this far past the wall line on BOTH axes.
+const QUOIN_OUT := 0.28
+## Bounds are promised to CONTAIN every shell vertex exactly, and to be no
+## looser than this. Tested both ways.
+const BOUNDS_TOL := 0.16
+
+
+## Does this house have quoined corners instead of a timber ground floor?
+## HouseBuilder._build_timber_frame_level swaps one for the other.
+static func has_quoins(spec: HouseSpec) -> bool:
+	return spec.material != &"stone" and spec.timber_frame and spec.stone_ground_floor
+
+
+## How far the jetty reaches past the front wall.
+##
+## Not jetty_depth: the bressummer is set back half of it, the joist ends
+## project past that, and the knee brackets are TILTED, so how far they swing
+## depends on the bracket's own run and lift. HouseBuilder._build_jetty emits
+## all three from these same numbers.
+static func jetty_front_reach(spec: HouseSpec) -> float:
+	if not spec.jetty or maxi(spec.storeys, 1) <= 1:
+		return 0.0
+	var j: float = spec.jetty_depth
+	var joists: float = j + 0.05
+	var bressummer: float = j * 0.5 + 0.10
+	var run: float = minf(j * 1.2, 0.35)
+	var lift: float = run * 1.4
+	var tilt: float = atan2(lift, run)
+	var length: float = sqrt(run * run + lift * lift)
+	var brackets: float = j * 0.5 + length * 0.5 * sin(tilt) + 0.12 * 0.5 * cos(tilt)
+	return maxf(maxf(joists, bressummer), brackets)
+
+
+## How far above the wall head the roof and its attachments reach. Independent
+## of which wall anything stands on, so it is exact from the spec alone.
+static func roof_top_above_walls(spec: HouseSpec) -> float:
+	var rise: float = roof_rise(spec)
+	var top: float = rise + maxf(RIDGE_SLAB_TOP, RIDGE_CAP_TOP)
+	if spec.bargeboards and spec.roof_type == &"gable":
+		top = maxf(top, rise + FINIAL_TOP)
+	if spec.chimney:
+		top = maxf(top, rise + CHIMNEY_TOP)
+	return top
+
+
+## Exact top of the emitted shell, in world space.
 static func total_height(spec: HouseSpec) -> float:
 	var raw_storeys = spec.get("storeys")
 	var storeys: int = maxi(1, int(raw_storeys)) if raw_storeys != null else 1
 	var wall_top: float = spec.height * storeys
-	var top: float = wall_top + roof_rise(spec)
-	if spec.chimney:
-		top = maxf(top, wall_top + minf(roof_rise(spec), 2.0) + 1.06)
+	var top: float = wall_top + roof_top_above_walls(spec)
+	if spec.porch:
+		# A porch is short, but a single-storey cottage with a shallow roof is
+		# shorter than you would think.
+		top = maxf(top, DOOR_H + 0.35 + 0.42 + RoofShape.DEPTH * 0.5)
 	return top
 
 
-## Everything the house covers in plan, porch and chimney included.
-static func plan_extent(spec: HouseSpec) -> Rect2:
-	var e: Rect2 = site_rect(spec)
-	if spec.porch:
-		e = e.expand(Vector2(0.0, e.position.y - porch_depth(spec)))
+## How far the roof and its verge oversail the walls, as a half-extent on the
+## roof's own two axes: x across the span, y along the ridge.
+##
+## Bargeboards reach past the roof on BOTH axes. Along the ridge they carry the
+## finial, which is the deepest piece. Across the span the board's foot kicks
+## out past the eave and the board itself is tilted to the pitch, so how far it
+## reaches depends on the pitch -- which is why a constant was 0.128 m short on
+## every bargeboarded house.
+static func verge_overhang(spec: HouseSpec) -> Vector2:
+	if not spec.bargeboards or spec.roof_type == &"hipped":
+		return Vector2(ROOF_SPAN_OUT, ROOF_ALONG_OUT)
+	var span: float = minf(spec.width, spec.length)
+	var half: float = (span + 0.7) * 0.5
+	var ang: float = atan2(roof_rise(spec), half)
+	# The board's foot, plus half its width swung out by the tilt. The drop
+	# pendant hangs at the eave itself and is shallower than that.
+	var across: float = maxf(VERGE_KICK * cos(ang) + BARGEBOARD_W * 0.5 * sin(ang),
+		VERGE_PENDANT_D * 0.5)
+	var along: float = VERGE_END_OUT + (FINIAL_D * 0.5 if spec.roof_type == &"gable"
+		else VERGE_PENDANT_D * 0.5)
+	return Vector2(ROOF_SPAN_OUT + across, along)
+
+
+## verge_overhang mapped onto the WORLD axes. The roof turns to follow the
+## longer footprint dimension, so the span overhang lands on the shorter axis.
+static func roof_overhang(spec: HouseSpec) -> Vector2:
+	var v := verge_overhang(spec)
+	return Vector2(v.x, v.y) if spec.width <= spec.length else Vector2(v.y, v.x)
+
+
+## The chimney's own footprint, centred where the hearth actually put it.
+static func chimney_rect(plan: HousePlan) -> Rect2:
+	var spec := plan.spec
+	if not spec.chimney:
+		return Rect2()
+	var c := chimney_center(plan)
+	# The widest course: a stepped base, or the crown that caps either style.
+	var s: float = chimney_size(spec) + 0.22
+	if spec.chimney_style == &"stepped":
+		s = maxf(s, chimney_size(spec) + CHIMNEY_BASE_EXTRA)
+	return Rect2(c - Vector2.ONE * s * 0.5, Vector2.ONE * s)
+
+
+## The porch's own footprint, on the wall the entrance is actually on.
+static func porch_rect(plan: HousePlan) -> Rect2:
+	var spec := plan.spec
+	var d: int = plan.entrance()
+	if not spec.porch or d < 0:
+		return Rect2()
+	var door: Dictionary = plan.doors[d]
+	var depth: float = porch_depth(spec)
+	var w: float = float(door["width"]) + 1.1
+	var normal: Vector2 = door["normal"]
+	# The step runs from the door OUT by depth + 0.1 and back INTO the wall it
+	# is fixed to; only the outward half can leave the footprint. Centring a
+	# rect of the step's full length on the porch instead pushed the bound half
+	# a wall thickness too far out.
+	var out_p: Vector2 = door["pos"] + normal * (depth + 0.1)
+	var in_p: Vector2 = door["pos"] - normal * (0.1 + wall_thickness(spec))
+	var across: Vector2 = Vector2(normal.y, -normal.x) * (w * 0.5)
+	var r := Rect2(out_p + across, Vector2.ZERO)
+	for p in [out_p - across, in_p + across, in_p - across]:
+		r = r.expand(p)
+	return r
+
+
+## EXACT planned exterior bounds of the shell, for a house that has a plan.
+## Contains every emitted vertex and is no looser than BOUNDS_TOL.
+##
+## This is the bound a camera, a placement or a lot check should ask for. The
+## spec-only pair below cannot know which wall the hearth or the entrance
+## chose, so they are deliberately conservative instead.
+static func exterior_bounds(plan: HousePlan) -> AABB:
+	var spec := plan.spec
+	var over := roof_overhang(spec)
+	# Each side grows by the FURTHEST thing on it, not by the sum of everything
+	# on it. Adding the jetty on top of the roof overhang made the front bound
+	# a third of a metre loose, which is a bound that fits nothing.
+	var neg := over
+	var pos := over
+	if has_quoins(spec):
+		neg = neg.max(Vector2.ONE * QUOIN_OUT)
+		pos = pos.max(Vector2.ONE * QUOIN_OUT)
+	neg.y = maxf(neg.y, jetty_front_reach(spec))
+	var r: Rect2 = site_rect(spec).grow_individual(neg.x, neg.y, pos.x, pos.y)
+	for extra in [chimney_rect(plan), porch_rect(plan)]:
+		if extra.size.x > 0.0:
+			r = r.merge(extra)
+	var top: float = total_height(spec)
+	return AABB(Vector3(r.position.x, 0.0, r.position.y),
+		Vector3(r.size.x, top, r.size.y))
+
+
+## CONSERVATIVE spec-only bounds, for callers with no plan. The hearth and the
+## entrance may be on any wall, so every wall is grown by what either could
+## add. A superset of exterior_bounds(), never a subset -- and never presented
+## as exact.
+static func spec_bounds(spec: HouseSpec) -> AABB:
+	var over := roof_overhang(spec)
+	if has_quoins(spec):
+		over = over.max(Vector2.ONE * QUOIN_OUT)
+	# The front is known, but a spec alone cannot say which wall is the front
+	# once the entrance moves, so the jetty reach is applied all round.
+	var all_round: float = maxf(maxf(over.x, over.y), jetty_front_reach(spec))
+	var r: Rect2 = site_rect(spec).grow(all_round)
+	var pad := 0.0
 	if spec.chimney:
-		e = e.expand(Vector2(e.end.x + chimney_size(spec), 0.0))
-	return e
+		pad = maxf(pad, chimney_size(spec) + maxf(CHIMNEY_BASE_EXTRA, 0.22))
+	if spec.porch:
+		pad = maxf(pad, porch_depth(spec) + 0.2 + wall_thickness(spec))
+	r = r.grow(pad)
+	var top: float = total_height(spec)
+	return AABB(Vector3(r.position.x, 0.0, r.position.y),
+		Vector3(r.size.x, top, r.size.y))
+
+
+## Everything the house covers in plan, porch and chimney included.
+## CONSERVATIVE spec-only footprint. Prefer exterior_bounds(plan) when a plan
+## exists: this one does not know which wall the chimney or the porch is on,
+## so it grows every wall by what either could add.
+static func plan_extent(spec: HouseSpec) -> Rect2:
+	var b := spec_bounds(spec)
+	return Rect2(Vector2(b.position.x, b.position.z),
+		Vector2(b.size.x, b.size.z))
 
 
 static func porch_depth(spec: HouseSpec) -> float:

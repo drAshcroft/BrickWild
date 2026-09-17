@@ -968,11 +968,11 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 	var ang := atan2(rise, half)
 	var bb_w: float = HouseGeometry.BARGEBOARD_W
 	var bb_thick := 0.05
-	var kick := 0.10
+	var kick: float = HouseGeometry.VERGE_KICK
 	# where the board finishes: the apex, or the hip line on a half hip
 	var up := Vector2(half * (1.0 - top / rise), top)
 	for end_v in [-1.0, 1.0]:
-		var z: float = float(end_v) * (along / 2.0 + 0.28)
+		var z: float = float(end_v) * (along / 2.0 + HouseGeometry.VERGE_END_OUT)
 		for side in [-1.0, 1.0]:
 			var a := Vector2(float(side) * half, 0.0)
 			var b := Vector2(float(side) * up.x, up.y)
@@ -985,11 +985,13 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 				t, SURF_TRIM)
 		# A finial stands on an apex. A half hip has none, so it gets none.
 		if is_equal_approx(top, rise):
-			component_box("verge_finial", Vector3(0.12, 0.55, 0.12),
+			component_box("verge_finial",
+				Vector3(HouseGeometry.FINIAL_D, 0.55, HouseGeometry.FINIAL_D),
 				xf * Transform3D(Basis(), Vector3(0.0, rise + 0.22, z)), SURF_TRIM)
 		# Drop pendants at the eaves
 		for side2 in [-1.0, 1.0]:
-			component_box("verge_pendant", Vector3(0.09, 0.24, 0.09),
+			component_box("verge_pendant", Vector3(HouseGeometry.VERGE_PENDANT_D,
+				0.24, HouseGeometry.VERGE_PENDANT_D),
 				xf * Transform3D(Basis(), Vector3(float(side2) * half, -0.05, z)),
 				SURF_TRIM)
 

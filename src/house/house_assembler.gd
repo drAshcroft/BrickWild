@@ -106,7 +106,12 @@ static func _instance(p: Dictionary, centred := true) -> Node3D:
 ## The camera framing a house wants: high enough to see over the walls, and
 ## far enough back to hold the whole footprint.
 static func viewing_distance(plan: HousePlan) -> float:
-	var r: Rect2 = HouseGeometry.plan_extent(plan.spec)
+	# The PLAN-AWARE bound, not the spec-only one: this caller has a plan, so
+	# it can know which wall the chimney and the porch are actually on instead
+	# of being padded for all four.
+	var shell: AABB = HouseGeometry.exterior_bounds(plan)
+	var r := Rect2(Vector2(shell.position.x, shell.position.z),
+		Vector2(shell.size.x, shell.size.z))
 	if plan.spec.exterior_props:
 		for p in plan.exterior:
 			var b := HouseExterior.bounds_of(p)
