@@ -106,9 +106,13 @@ the glazing. Centre-crown and cupola positions are skipped explicitly.
 
 Verification:
 
-- `tools/check_roofs.ps1 -Family hotel` -- 10829 checks, 0 failure groups,
-  0 warning groups; `dormer_attachment_failures` empty on all four rows.
-  Baseline for the same command was 4 failure groups / 28 detached bodies.
+- `tools/check_roofs.ps1 -Family hotel` -- 10857 checks, 0 failure groups,
+  0 warning groups; `dormer_attachment_failures` empty on all four rows, with
+  all 28 bodies actually probed. Baseline for the same command was 4 failure
+  groups / 28 detached bodies.
+- `tools/check_roofs.ps1 -Family hotel -Seed 42` -- 5431 checks, 0 failure
+  groups, the same check count as the 5431-check baseline that reported 2
+  failure groups.
 - `run_all.gd -- hotel hotelroof hlandmark` -- 3 suites, 18 checks, 0 failures.
 - Before/after renders: `tools/render_hotel_dormers.gd -- --tag=<label>`
   (must not be headless) writes eave, row and single-dormer views.
@@ -117,11 +121,19 @@ Two notes for whoever touches this next:
 
 - The dormer pieces are logged components (`dormer_roof`, `dormer_cheek`,
   `dormer_gable`, `dormer_jamb`, `dormer_panel`, `dormer_glazing`) hosted on
-  the dormer id, plus ONE `part_log` row per body measured from the pieces
-  actually emitted. The first attempt emitted straight through `_kit`, which
-  left the geometry correct but invisible to `HotelQA._check_landmarks`, and
-  that rule counts `part_log` dormers. Geometry QA cannot count what is only
-  in the mesh.
+  the dormer id, plus ONE `part_log` row per body measured from the emitted
+  cheeks and gable front. Two logging defects were found on the way, and both
+  are worth knowing about:
+  - Emitting straight through `_kit` left the geometry correct but invisible to
+    `HotelQA._check_landmarks`, which counts `part_log` dormers. Loud failure.
+  - Logging the body with `kind = "dormer"` made `_hotel_attachments` select
+    nothing, because it filters `tag == "dormer" and kind == "box"`. The audit
+    then reported zero failures HAVING PROBED ZERO BODIES. Silent false pass;
+    the only tell was the total check count dropping by 12. The record is
+    `kind = "box"` for that reason -- do not rename it.
+  - The record covers the BODY only (cheeks and gable front). The rooflet
+    overhangs the join, and `Probe.attachment` samples the host under the
+    body's REAR edge, so including the rooflet would sample past the join.
 - The landmark dormer count clears its threshold with ZERO MARGIN at scales
   1.00 and 1.30 (6 of 6, 10 of 10). Three dormers are dropped by the
   centre-crown exclusion, as they were before this fix. Any change to crown

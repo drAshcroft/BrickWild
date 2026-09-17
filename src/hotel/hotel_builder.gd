@@ -302,11 +302,26 @@ func _build_hotel_dormers(xf: Transform3D, dormers: Array[Dictionary]) -> void:
 		# emitted for it. The landmark rule counts dormers, and geometry that
 		# only exists in the mesh is geometry QA cannot count -- which is how
 		# seating the dormers correctly still managed to break that rule.
+		#
+		# The record is the BODY: cheeks and gable front, from the front face
+		# back to where the cheeks die into the host. The rooflet overhangs and
+		# must stay out of it, or the attachment probe -- which samples the
+		# host under the body's REAR edge -- would sample past the join.
+		#
+		# kind is "box", not "dormer": tools/check_roofs.gd selects bodies with
+		# `tag == "dormer" and kind == "box"`, and a record it cannot select is
+		# a test that passes by measuring nothing.
 		var bounds := AABB()
+		var found := false
 		for ci in range(first, component_log.size()):
+			var role: String = component_log[ci]["role"]
+			if role != "dormer_cheek" and role != "dormer_gable":
+				continue
 			var piece := MassBuilder.component_aabb(component_log[ci])
-			bounds = piece if ci == first else bounds.merge(piece)
-		_log_part("dormer", bounds.get_center(), bounds.size)
+			bounds = piece if not found else bounds.merge(piece)
+			found = true
+		if found:
+			_log_part("box", bounds.get_center(), bounds.size)
 		host_end()
 
 
