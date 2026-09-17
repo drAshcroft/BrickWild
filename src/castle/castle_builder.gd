@@ -257,7 +257,11 @@ func _build_ridge() -> void:
 		var length: float = seg["length"]
 		var width: float = seg["width"]
 		var height: float = seg["height"]
-		box(Vector3(length, height, width), Vector3(mid.x, height / 2.0, mid.y), SURF_STONE, yaw)
+		var planned: bool = _planned_interiors.has(name)
+		if planned:
+			Interiors.emit(self, _planned_interiors[name])
+		else:
+			box(Vector3(length, height, width), Vector3(mid.x, height / 2.0, mid.y), SURF_STONE, yaw)
 		_log_mass(name, CastleGeometry.ridge_range_aabb(seg))
 		# the roof runs along the range: local Z of the roof transform is the
 		# direction of the segment
@@ -273,7 +277,11 @@ func _build_ridge() -> void:
 		if spec.dormers:
 			_ridge_dormers(mid, dir, length, width, height, rise)
 		total_height = maxf(total_height, height + rise)
-		# windows: a row a storey on both long faces, on the rotated face
+		# windows: a row a storey on both long faces, on the rotated face. A
+		# planned range cuts its own, so adding these too would put a second
+		# set of holes through the same wall.
+		if planned:
+			continue
 		var n: Vector2 = seg["normal"]
 		var count: int = clampi(int(length / 3.5), 1, 24)
 		for s in range(storeys):

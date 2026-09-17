@@ -4,9 +4,10 @@ extends RefCounted
 
 static func primary(spec: CastleSpec) -> Dictionary:
 	var out := {}
-	if CastleGeometry.is_ridge(spec) or CastleGeometry.is_tower_house(spec) \
-			or CastleGeometry.is_sky(spec):
-		return out # Their own multi-range/storey contracts are handled separately.
+	if CastleGeometry.is_ridge(spec):
+		return ridge(spec)
+	if CastleGeometry.is_tower_house(spec) or CastleGeometry.is_sky(spec):
+		return out # Their own multi-storey contracts are handled separately.
 	for kind in ["hall", "keep", "chapel"]:
 		var plan: HousePlan
 		var bounds: AABB
@@ -23,6 +24,31 @@ static func primary(spec: CastleSpec) -> Dictionary:
 		if plan.spec != null:
 			out[kind] = record(kind, plan, bounds)
 	return out
+
+## Every range of a ridge castle, keyed by the mass name the builder logs.
+##
+## The record carries the SEGMENT\'S yaw, so the plan built in the range\'s own
+## frame lands on the masonry the builder emits for it. ridge_range_aabb is
+## centred on the segment midpoint, which is where record() puts the transform.
+static func ridge(spec: CastleSpec) -> Dictionary:
+	var out := {}
+	var segs: Array[Dictionary] = CastleGeometry.ridge_ranges(spec)
+	for i in range(segs.size()):
+		var seg: Dictionary = segs[i]
+		# A segment touches its predecessor at its start and its successor at
+		# its end; the chain\'s two outermost ends open on nothing.
+		var links: Array[int] = []
+		if i > 0:
+			links.append(-1)
+		if i < segs.size() - 1:
+			links.append(1)
+		var plan: HousePlan = CastleGenerator.ridge_range_plan(spec, seg, links)
+		if plan.spec == null:
+			continue
+		out[String(seg["name"])] = record(String(seg["name"]), plan,
+			CastleGeometry.ridge_range_aabb(seg), float(seg["yaw"]))
+	return out
+
 
 static func record(id: String, plan: HousePlan, bounds: AABB, yaw := 0.0) -> Dictionary:
 	var centre := bounds.get_center()

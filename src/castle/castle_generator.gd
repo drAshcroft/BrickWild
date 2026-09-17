@@ -1050,15 +1050,113 @@ static func _hall_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 	return out
 
 
+## ------------------------------------------------------------- ridge ranges
+##
+## A ridge castle is a chain of ranges walking along a spine, each one turned
+## to its own segment. Its rooms therefore cannot come from `hall_aabb`, which
+## is an axis-aligned box somewhere else entirely -- feeding that plan to a
+## rotated range puts every floor, door and prop outside its host.
+##
+## Each range is planned in ITS OWN FRAME: local X runs along the segment,
+## local Z across it, and CastleInteriors.record carries the segment's yaw so
+## the same numbers land on the emitted masonry. The range occupies its ground
+## storey; the masonry above is a roof void, which CastleInteriors.emit already
+## closes with continuous perimeter walling.
+
+## A range narrower or shorter than this is masonry, not a room.
+const MIN_RANGE_SIDE := 3.0
+const MIN_RANGE_RUN := 5.0
+## How far a connecting door sits in from the end a range shares with its
+## neighbour, so the opening is in wall rather than on the corner.
+const RANGE_LINK_INSET := 1.2
+
+
+## One rotated range of a ridge castle, in its own frame. `neighbours` is the
+## count of ranges this one touches (its segment's two ends), used to place the
+## doors that connect the chain.
+static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
+		links: Array[int]) -> HousePlan:
+	var plan := HousePlan.new()
+	var run: float = float(seg["length"])
+	var across: float = float(seg["width"])
+	if run < MIN_RANGE_RUN or across < MIN_RANGE_SIDE:
+		return plan
+	var box := AABB(Vector3(-run * 0.5, 0.0, -across * 0.5),
+		Vector3(run, float(seg["height"]), across))
+	var hs: HouseSpec = _hall_spec(spec, box)
+	var is_hall: bool = String(seg["name"]) == "hall"
+	hs.variant_name = "%s: %s" % [spec.variant_name,
+		"the great hall" if is_hall else "a range"]
+	hs.program = [&"great_hall" if is_hall else &"lords_chamber"]
+	var floor_rect: Rect2 = HouseGeometry.interior_rect(hs)
+	if floor_rect.size.x < MIN_RANGE_RUN or floor_rect.size.y < MIN_RANGE_SIDE:
+		return plan
+	var kind: StringName = hs.program[0]
+	if floor_rect.size.x * floor_rect.size.y < float(HouseGeometry.MIN_AREA[kind]):
+		return plan
+
+	# A long range is BAYS, not one enormous room. A 75 m hall 14 m wide is a
+	# corridor by every rule the house harness has, and rejecting it outright
+	# left the biggest ridge castles hollow. Divide it until each bay is a
+	# room-shaped room, and put a door through every partition.
+	var bays: int = maxi(int(ceil(floor_rect.size.x
+		/ (floor_rect.size.y * HouseGeometry.aspect_max(kind)))), 1)
+	var bay_run: float = floor_rect.size.x / float(bays)
+	if bay_run < MIN_RANGE_RUN or bay_run * floor_rect.size.y \
+			< float(HouseGeometry.MIN_AREA[kind]):
+		return plan
+	plan.spec = hs
+	plan.rooms = []
+	for i in range(bays):
+		# The hall is the bay with the fire in it; the rest are chambers.
+		var bay_kind: StringName = kind if (i == 0 or bays == 1) else &"lords_chamber"
+		if bay_run * floor_rect.size.y < float(HouseGeometry.MIN_AREA[bay_kind]) \
+				or minf(bay_run, floor_rect.size.y) < float(HouseGeometry.MIN_SIDE[bay_kind]):
+			bay_kind = kind
+		plan.rooms.append({"kind": bay_kind, "storey": 0,
+			"rect": Rect2(Vector2(floor_rect.position.x + bay_run * float(i),
+				floor_rect.position.y), Vector2(bay_run, floor_rect.size.y))})
+	for i in range(1, bays):
+		plan.doors.append({"a": i - 1, "b": i,
+			"pos": Vector2(floor_rect.position.x + bay_run * float(i),
+				floor_rect.get_center().y),
+			"normal": Vector2(1, 0), "width": HouseGeometry.INNER_DOOR_W,
+			"exterior": false, "front": false, "storey": 0})
+
+	# The way in is on a LONG face, because a range's ends are where it meets
+	# its neighbours. `up` is across the range, so the door faces out of it.
+	_hall_door(plan, plan.rooms[0]["rect"], Vector2(0, 1))
+	for i in range(bays):
+		_hall_windows(plan, plan.rooms[i]["rect"], Vector2(1, 0), hs)
+
+	# And the doors that make the chain a building rather than a row of sheds:
+	# one in each end the segment shares with another range.
+	for end_v in links:
+		var x: float = floor_rect.position.x + RANGE_LINK_INSET if end_v < 0 \
+			else floor_rect.end.x - RANGE_LINK_INSET
+		plan.doors.append({"a": 0 if end_v < 0 else plan.rooms.size() - 1, "b": -1,
+			"pos": Vector2(x, floor_rect.get_center().y),
+			"normal": Vector2(float(end_v), 0.0),
+			"width": HouseGeometry.INNER_DOOR_W, "exterior": true,
+			"front": false, "storey": 0})
+	if is_hall:
+		plan.hearth = {"room": 0, "wall": 2}
+	hs.room_count = plan.rooms.size()
+	HouseFurnisher.furnish(plan, hs)
+	return plan
+
+
 ## The way in, at the lower end, in the middle of the end wall.
 static func _hall_door(plan: HousePlan, floor_rect: Rect2, up: Vector2) -> void:
 	var lengthwise: bool = up.y > 0.5
 	var mid: Vector2 = floor_rect.get_center()
 	var pos := Vector2(mid.x, floor_rect.position.y) if lengthwise \
 		else Vector2(floor_rect.position.x, mid.y)
-	plan.doors = [{"a": 0, "b": -1, "pos": pos, "normal": -up,
+	# append, not assign: a multi-bay range has already recorded the doors
+	# through its own partitions and this is one more way in, not the only one.
+	plan.doors.append({"a": 0, "b": -1, "pos": pos, "normal": -up,
 		"width": HouseGeometry.DOOR_W, "exterior": true, "front": true,
-		"storey": 0}]
+		"storey": 0})
 
 
 ## Windows down both long walls, evenly spaced and clear of the corners: a
