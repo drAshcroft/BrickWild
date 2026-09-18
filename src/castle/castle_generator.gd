@@ -1139,6 +1139,48 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 			"normal": Vector2(float(end_v), 0.0),
 			"width": HouseGeometry.INNER_DOOR_W, "exterior": true,
 			"front": false, "storey": 0})
+	# A range's door is on a LONG wall, and so are its windows: unlike a hall,
+	# whose door is on an end wall and can never meet one. Drop any window that
+	# lands on top of a door. Two openings in one piece of wall leave the
+	# builder cutting one hole and dressing two, which reads as a wall standing
+	# across the glazing.
+	var clear_windows: Array[Dictionary] = []
+	for wdw in plan.windows:
+		var wp: Vector2 = wdw["pos"]
+		var clash := false
+		for d in plan.doors:
+			var dp: Vector2 = d["pos"]
+			if (wdw["normal"] as Vector2).dot(d["normal"]) < 0.5:
+				continue          # different wall
+			var gap: float = (wp - dp).length()
+			if gap < (float(d["width"]) + HouseGeometry.WINDOW_W) * 0.5 + 0.6:
+				clash = true
+		if not clash:
+			clear_windows.append(wdw)
+	plan.windows = clear_windows
+
+	# The ends of a range are INSIDE ITS TOWERS. ridge_ranges extends every
+	# segment by RIDGE_DIVE x tower_half at both ends so the masonry buries
+	# itself in the vertex towers, and a tower is solid: an opening placed out
+	# there is a window with a tower behind it. Drop the ones that land in the
+	# dive rather than pretend the wall is free.
+	var buried: float = floor_rect.size.x * 0.5 \
+		- (float(seg["roof_length"]) * 0.5 - CastleGeometry.tower_half(spec, 0))
+	if buried > 0.0:
+		var keep_windows: Array[Dictionary] = []
+		for wdw in plan.windows:
+			if absf(float((wdw["pos"] as Vector2).x)) <= floor_rect.size.x * 0.5 - buried:
+				keep_windows.append(wdw)
+		plan.windows = keep_windows
+		var keep_doors: Array[Dictionary] = []
+		for d in plan.doors:
+			# A link door belongs in the dive on purpose: it is how one range
+			# reaches the next THROUGH the tower they share.
+			if absf(float(d["normal"].x)) > 0.5 \
+					or absf(float((d["pos"] as Vector2).x)) <= floor_rect.size.x * 0.5 - buried:
+				keep_doors.append(d)
+		plan.doors = keep_doors
+
 	if is_hall:
 		plan.hearth = {"room": 0, "wall": 2}
 	hs.room_count = plan.rooms.size()

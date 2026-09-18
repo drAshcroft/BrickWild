@@ -277,15 +277,23 @@ func _build_ridge() -> void:
 		if spec.dormers:
 			_ridge_dormers(mid, dir, length, width, height, rise)
 		total_height = maxf(total_height, height + rise)
-		# windows: a row a storey on both long faces, on the rotated face. A
-		# planned range cuts its own, so adding these too would put a second
-		# set of holes through the same wall.
+		# windows: a row a storey on both long faces, on the rotated face.
+		#
+		# A planned range cuts its OWN openings for the storeys it occupies,
+		# and emitting these as well would put two sets of holes through one
+		# wall. It occupies the bottom of the range only -- the masonry above
+		# it is roof void -- so the rows above that stay, or a three-storey
+		# range comes out as a blank slab with one row of slits at its foot.
+		var occupied_top := 0.0
 		if planned:
-			continue
+			var ps: HouseSpec = (_planned_interiors[name].plan as HousePlan).spec
+			occupied_top = ps.height * float(maxi(ps.storeys, 1))
 		var n: Vector2 = seg["normal"]
 		var count: int = clampi(int(length / 3.5), 1, 24)
 		for s in range(storeys):
 			var y: float = (float(s) + 0.55) * sh
+			if planned and y - spec.window_h * 0.5 < occupied_top:
+				continue          # the plan already cut this storey's openings
 			for side in [1.0, -1.0]:
 				var face_n: Vector2 = n * side
 				var ang: float = atan2(face_n.x, face_n.y)
