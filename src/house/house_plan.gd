@@ -14,6 +14,18 @@ extends RefCounted
 
 var spec: HouseSpec
 
+## Optional wider-world family identity.  Courtyard houses deliberately keep
+## using HousePlan so the ordinary shell, furnisher and nav checks remain the
+## single source of truth; these fields carry only the family contract that
+## is not meaningful for a cottage (WLD-001).
+var world_family: StringName = &""
+var world_subkind: StringName = &""
+var view_through: bool = false
+var blind_entry: bool = false
+var canal_wall: StringName = &""
+var water_plane: float = 0.0
+var world_meta: Dictionary = {}
+
 ## {"kind": StringName, "rect": Rect2, "storey": int,
 ##  "outline": PackedVector2Array (optional)}
 ##
@@ -74,6 +86,10 @@ var compromises: Dictionary = {}
 ##
 ##   {"id": String, "kind": StringName, "storey": int, "face": int,
 ##    "polygon": PackedVector2Array, "room": int}
+## Authored compluvia/oculi may use a `rect` shorthand instead of polygon;
+## HouseGeometry.roof_openings derives the polygon (oculus becomes a circle)
+## without mutating the plan. A domus compluvium may also carry `impluvium`
+## for CourtCheck.water's opt-in pool rule.
 ##
 ## `polygon` is the outline of the HOLE in the roof's own local XZ frame, and
 ## `face` indexes the roof descriptor's faces (-1 for a hole that is not on a

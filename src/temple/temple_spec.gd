@@ -28,6 +28,8 @@ var column_rows: int          # rows of columns each side of the processional wa
 var column_bays: int          # how many down the length
 var column_r: float
 var aisle_width: float
+## Authored column plan data.  Every consumer reads this list after generation.
+var columns: Array[Dictionary] = []
 var dais_steps: int
 var dais_height: float
 var altar_w: float

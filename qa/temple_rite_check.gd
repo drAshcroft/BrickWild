@@ -180,10 +180,21 @@ func _check_sightline() -> void:
 	var blocked: Array[String] = []
 	for m in _builder.mass_log:
 		var name: String = m["name"]
+		if name.begins_with("column_"):
+			continue
 		if _exempt_from_sightline(name):
 			continue
 		if Sightline.hits(from, to, m["aabb"]):
 			blocked.append(name)
+	for i in range(_spec.columns.size()):
+		var column: Dictionary = _spec.columns[i]
+		var c: Vector3 = column["pos"]
+		var r: float = float(column["radius"])
+		var h: float = float(column["height"])
+		var aabb := AABB(Vector3(c.x - r * 1.2, 0.0, c.z - r * 1.2),
+			Vector3(r * 2.4, h + TempleGeometry.COLUMN_CAP * r, r * 2.4))
+		if Sightline.hits(from, to, aabb):
+			blocked.append("column_%d" % i)
 	stats["sightline_blockers"] = blocked.size()
 	if not blocked.is_empty():
 		failures.append("sightline: %s stands between the doorway and the idol"
@@ -299,8 +310,23 @@ static func _indoor_mass(name: String) -> bool:
 ## cheapest test there is for whether a plan was composed or merely filled.
 func _check_symmetry() -> void:
 	var offenders: Array[String] = []
+	for i in range(_spec.columns.size()):
+		var column: Dictionary = _spec.columns[i]
+		var p: Vector3 = column["pos"]
+		var mirrored := false
+		for other in _spec.columns:
+			var q: Vector3 = other["pos"]
+			if absf(q.x + p.x) < TOL and absf(q.z - p.z) < TOL \
+				and is_equal_approx(float(other["radius"]), float(column["radius"])) \
+				and is_equal_approx(float(other["height"]), float(column["height"])):
+				mirrored = true
+				break
+		if not mirrored:
+			offenders.append("column_%d" % i)
 	for m in _builder.mass_log:
 		var a: AABB = m["aabb"]
+		if String(m["name"]).begins_with("column_"):
+			continue
 		var c: Vector3 = a.position + a.size / 2.0
 		if absf(c.x) < TOL:
 			# it sits on the axis: then it must be even about it

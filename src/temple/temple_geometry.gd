@@ -242,7 +242,36 @@ static func bridge_rect(spec: TempleSpec) -> Rect2:
 ## signature: two rows down a basilica, a grid in a hypostyle hall, a ring in a
 ## rotunda -- and in every one of them the axis itself is left clear, because a
 ## column in the middle of the processional way is a column in front of the god.
+## The generated positions are retained as a compatibility helper for callers
+## that only need points. Once TempleGenerator has authored `spec.columns`,
+## this returns those plan records rather than deriving a second arrangement.
 static func column_positions(spec: TempleSpec) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	if not spec.columns.is_empty():
+		for column in spec.columns:
+			out.append(column["pos"])
+		return out
+	return _generated_column_positions(spec)
+
+
+static func column_records(spec: TempleSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var positions := _generated_column_positions(spec)
+	var radius := spec.column_r
+	var height := column_height(spec)
+	for i in range(positions.size()):
+		var c: Vector3 = positions[i]
+		var ring := 0
+		if spec.form == &"rotunda":
+			ring = i
+		else:
+			ring = int(floor((absf(c.x) - (axis_half_width(spec) + radius)) \
+			/ maxf(spec.aisle_width + radius * 2.0, 0.01) + 0.5))
+		out.append({"pos": c, "radius": radius, "height": height, "ring": ring})
+	return out
+
+
+static func _generated_column_positions(spec: TempleSpec) -> Array[Vector3]:
 	var out: Array[Vector3] = []
 	match spec.form:
 		&"rotunda":
@@ -517,8 +546,10 @@ static func floor_rects(spec: TempleSpec) -> Array[Rect2]:
 ## point of one.
 static func obstacle_rects(spec: TempleSpec) -> Array[Rect2]:
 	var out: Array[Rect2] = []
-	var r: float = spec.column_r
-	for c in column_positions(spec):
+	var columns: Array[Dictionary] = spec.columns if not spec.columns.is_empty() else column_records(spec)
+	for column in columns:
+		var c: Vector3 = column["pos"]
+		var r: float = float(column["radius"])
 		out.append(Rect2(Vector2(c.x - r, c.z - r), Vector2(r * 2.0, r * 2.0)))
 	out.append(altar_rect(spec))
 	out.append(idol_rect(spec))

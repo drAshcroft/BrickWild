@@ -163,6 +163,8 @@ static func interior_rect(spec: HouseSpec) -> Rect2:
 
 
 static func wall_thickness(spec: HouseSpec) -> float:
+	if spec.wall_thickness_override > 0.0:
+		return spec.wall_thickness_override
 	return 0.6 if spec.material == &"stone" else WALL_T
 
 
@@ -214,8 +216,16 @@ static func polygon_runs(outline: PackedVector2Array, thickness := WALL_T) -> Ar
 static func shell_runs(plan: HousePlan, level: int) -> Array[Dictionary]:
 	for i in range(plan.room_count()):
 		if HousePlan.record_storey(plan.rooms[i]) == level and plan.is_polygonal(i):
-			return polygon_runs(plan.outline_of(i), wall_thickness(plan.spec))
-	return exterior_runs(plan.spec)
+			var thick := float(plan.rooms[i].get("wall_thickness", wall_thickness(plan.spec)))
+			var shaped := polygon_runs(plan.outline_of(i), thick)
+			for run in shaped:
+				run["thickness"] = thick
+			return shaped
+	var rectangular := exterior_runs(plan.spec)
+	var thick := wall_thickness(plan.spec)
+	for run in rectangular:
+		run["thickness"] = thick
+	return rectangular
 
 
 ## Does any room of this plan carry an outline?
@@ -518,11 +528,53 @@ static func _dormer_reject(id: String, z: float, reason: StringName,
 ## `transform` to get world coordinates.
 static func roof_openings(plan: HousePlan) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	out.append_array(plan.roof_openings)
+	for i in range(plan.roof_openings.size()):
+		var authored := _normalise_roof_opening(plan.roof_openings[i], i, plan)
+		if not authored.is_empty():
+			out.append(authored)
 	for d in roof_layout(plan)["dormers"]:
 		out.append({"id": String(d["id"]), "kind": &"dormer",
 			"storey": int(d["storey"]), "face": int(d["face"]),
 			"polygon": d["opening"], "room": -1})
+	return out
+
+
+## Convert the authored shorthand (rect for a compluvium/open court, bounding
+## rect for an oculus) into the one polygon representation consumed by the
+## roof emitter and its checks.  The source plan remains untouched: callers
+## often reuse it for a second roof shape, so this is deliberately derived.
+static func _normalise_roof_opening(raw: Dictionary, index: int,
+		plan: HousePlan) -> Dictionary:
+	var kind: StringName = StringName(raw.get("kind", &"open"))
+	if not kind in [&"compluvium", &"oculus", &"open"]:
+		return {}
+	var poly := PackedVector2Array()
+	if raw.has("polygon"):
+		for p in raw["polygon"]:
+			poly.append(Vector2(p))
+	elif raw.has("rect"):
+		var rect := Rect2(raw["rect"])
+		if rect.size.x <= 0.01 or rect.size.y <= 0.01:
+			return {}
+		if kind == &"oculus":
+			var centre := rect.get_center()
+			var radius := minf(rect.size.x, rect.size.y) * 0.5
+			for n in range(24):
+				var ang := TAU * float(n) / 24.0
+				poly.append(centre + Vector2(cos(ang), sin(ang)) * radius)
+		else:
+			poly = Poly.from_rect(rect)
+	else:
+		return {}
+	if poly.size() < 3 or Poly.area(poly) <= 0.0001:
+		return {}
+	var out: Dictionary = raw.duplicate(true)
+	out["id"] = String(raw.get("id", "%s_%d" % [String(kind), index]))
+	out["kind"] = kind
+	out["storey"] = int(raw.get("storey", maxi(int(plan.spec.storeys) - 1, 0)))
+	out["face"] = int(raw.get("face", -1))
+	out["room"] = int(raw.get("room", -1))
+	out["polygon"] = poly
 	return out
 
 

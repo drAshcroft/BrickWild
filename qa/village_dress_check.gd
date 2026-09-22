@@ -28,7 +28,7 @@ extends RefCounted
 
 const RULES: Array[StringName] = [&"host", &"doorways", &"road", &"stalls",
 	&"fences", &"canopies", &"edge", &"green", &"cover", &"lights",
-	&"fields", &"culture"]
+	&"fields", &"wood", &"culture"]
 
 ## A prop may sit this far outside its host's lot before it is somebody
 ## else's problem: half a metre of slack for a barrel against a wall on the
@@ -284,8 +284,12 @@ func _check_canopies(plan: VillagePlan) -> void:
 ## not -- no run longer than EDGE_RUN_MAX without a building back, a hedge, a
 ## wall or a tree within reach, except where a road or the water crosses it.
 func _check_edge(plan: VillagePlan) -> void:
-	var edge: PackedVector2Array = plan.enclosure if plan.enclosure.size() >= 3 \
-		else Poly.from_rect(plan.site.grow(-1.0))
+	var edge: PackedVector2Array = plan.enclosure
+	if edge.size() < 3 and plan.spec.enclosure != &"none":
+		var derived: Dictionary = VillageEnclosurePlan.build(plan)
+		edge = derived["edge"]
+	if edge.size() < 3:
+		edge = Poly.from_rect(plan.site.grow(-1.0))
 	if edge.size() < 3:
 		return
 	var gates: Array[Vector2] = VillageMeasure.gates(plan)
@@ -320,6 +324,11 @@ func _check_edge(plan: VillagePlan) -> void:
 
 static func _edge_is_held(plan: VillagePlan, gates: Array[Vector2], p: Vector2,
 		boxes: Array[Rect2], polys: Array[PackedVector2Array]) -> bool:
+	# Enclosed villages have a continuous emitted hedge/palisade/wall edge;
+	# DressCheck verifies its geometry in VillageEnclosureCheck and does not
+	# require catalogue trees to duplicate that wall for visual coverage.
+	if plan.spec.enclosure in [&"hedge", &"palisade", &"wall"]:
+		return true
 	for g in gates:
 		if p.distance_to(g) <= EDGE_REACH * 1.5:
 			return true          # a gate is a hole on purpose
@@ -426,8 +435,10 @@ func _check_lights(plan: VillagePlan) -> void:
 func _check_fields(plan: VillagePlan) -> void:
 	if plan.fields.is_empty():
 		return
-	var edge: PackedVector2Array = plan.enclosure if plan.enclosure.size() >= 3 \
-		else PackedVector2Array()
+	var edge: PackedVector2Array = plan.enclosure
+	if edge.size() < 3 and plan.spec.enclosure != &"none":
+		var derived: Dictionary = VillageEnclosurePlan.build(plan)
+		edge = derived["edge"]
 	var tracks: Array[int] = plan.roads_of_class(&"track")
 	for i in range(plan.fields.size()):
 		var poly: PackedVector2Array = plan.fields[i]["poly"]
@@ -445,6 +456,27 @@ func _check_fields(plan: VillagePlan) -> void:
 			failures.append("fields: %s %d touches no track"
 				% [String(plan.fields[i].get("kind", &"field")), i])
 			return
+
+
+## A wood is the far-side landmark, not a few edge trees scattered wherever
+## the dresser happened to find room. The derived point is the shared contract
+## with VillageEnclosurePlan, and every accepted tree must remain outside it.
+func _check_wood(plan: VillagePlan) -> void:
+	if plan.spec.enclosure == &"none":
+		return
+	var derived: Dictionary = VillageEnclosurePlan.build(plan)
+	var edge: PackedVector2Array = derived["edge"]
+	var wood: Vector2 = derived["wood"]
+	var found := false
+	for tree in plan.plants:
+		if float(tree.get("canopy", 0.0)) < 1.0:
+			continue
+		var at: Vector2 = tree["pos"]
+		if at.distance_to(wood) <= 10.0 and not Poly.contains_point(edge, at):
+			found = true
+			break
+	if not found:
+		failures.append("wood: no tree marks the far-side wood outside the enclosure")
 
 
 # ---------------------------------------------------------------- culture

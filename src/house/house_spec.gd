@@ -57,6 +57,10 @@ var chimney_pots: int = 1         # terracotta flue pots at the crown
 var exterior_props: bool = true   # rain barrels, firewood, trade signs
 ## Chosen before planning, so clear floor, openings and emitted masonry agree.
 var material: StringName = &"timber" # timber | stone
+## Optional explicit masonry thickness for non-house shells.  Castle plans
+## carry their measured shell thickness here; the negative value preserves the
+## historical material-derived default for ordinary houses.
+var wall_thickness_override: float = -1.0
 
 ## Styles carry their own timber: `timber` is the chance of an exposed frame at
 ## all, `studs` the spacing between uprights (a town house is close-studded,

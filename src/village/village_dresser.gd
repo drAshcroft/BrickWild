@@ -197,7 +197,9 @@ static func dress(plan: VillagePlan) -> VillagePlan:
 		return plan
 	plan.props.clear()
 	plan.plants.clear()
+	_outer_land(plan)
 	var ctx: Dictionary = _context(plan)
+	_wood(plan, ctx)
 	# hosts in a fixed order: the common first (the well is what everything
 	# else keeps clear of), then the buildings in plan order, then the places
 	for step in [&"common", &"market", &"church", &"gate", &"water", &"strand"]:
@@ -207,6 +209,72 @@ static func dress(plan: VillagePlan) -> VillagePlan:
 	_hedges(plan, ctx)
 	_dress_place(plan, ctx, &"edge")
 	return plan
+
+
+## Materialise dressed land beyond the measured lot hull. This runs after lot
+## cutting, so outside fields cannot influence frontage or building placement.
+static func _outer_land(plan: VillagePlan) -> void:
+	if plan.spec.enclosure == &"none":
+		return
+	var derived: Dictionary = VillageEnclosurePlan.build(plan)
+	var edge: PackedVector2Array = derived["edge"]
+	if edge.size() < 3:
+		return
+	# Existing authored fields are accepted only when wholly beyond the same
+	# measured edge.  Keeping an inside field would make the plan look valid to
+	# the dresser while violating the edge rule in DressCheck.
+	if not plan.fields.is_empty():
+		var outside: Array[Dictionary] = []
+		for field in plan.fields:
+			var field_poly: PackedVector2Array = field["poly"]
+			if VillageLotPlanner.overlap_area(field_poly, edge) <= VillageLotPlanner.AREA_EPS:
+				outside.append(field)
+		plan.fields = outside
+	if plan.fields.is_empty() and plan.spec.purpose in [&"farming", &"forest"]:
+		var site := plan.site
+		var depth: float = clampf(site.size.y * 0.12, 6.0, 14.0)
+		var candidates: Array[Rect2] = []
+		for road in plan.roads:
+			if road["class"] != &"track":
+				continue
+			var points: PackedVector2Array = road["points"]
+			for endpoint in [points[0], points[points.size() - 1]]:
+				var away: Vector2 = (endpoint - site.get_center()).normalized()
+				var centre: Vector2 = endpoint + away * 4.0
+				candidates.append(Rect2(centre - Vector2(6.0, 4.0), Vector2(12.0, 8.0)))
+		candidates.append_array([
+			Rect2(Vector2(site.position.x, site.position.y - depth),
+				Vector2(site.size.x, depth)),
+			Rect2(Vector2(site.position.x, site.end.y),
+				Vector2(site.size.x, depth))])
+		for candidate in candidates:
+			var poly := Poly.from_rect(candidate)
+			if VillageLotPlanner.overlap_area(poly, edge) <= VillageLotPlanner.AREA_EPS:
+				plan.fields.append({"poly": poly, "kind": &"pasture"})
+				break
+
+
+static func _wood(plan: VillagePlan, ctx: Dictionary) -> void:
+	var derived: Dictionary = VillageEnclosurePlan.build(plan)
+	var edge: PackedVector2Array = derived["edge"]
+	if edge.size() < 3:
+		return
+	var centre: Vector2 = derived["wood"]
+	if Poly.contains_point(edge, centre):
+		return
+	var keys: Array[String] = _palette_keys(ctx, "edge")
+	if keys.is_empty():
+		return
+	var key: String = keys[0]
+	var rng := _rng(plan, "wood")
+	for offset: Vector2 in [Vector2(-4.0, 0.0), Vector2(0.0, 3.0), Vector2(4.0, 0.0)]:
+		var at: Vector2 = centre + offset
+		var trunk: float = maxf(PropCatalog.trunk(key), 0.1)
+		if not _plant_is_clear(plan, ctx, at, trunk, PropCatalog.canopy(key)):
+			continue
+		plan.plants.append({"key": key, "pos": at,
+			"canopy": PropCatalog.canopy(key), "trunk": trunk,
+			"yaw": snappedf(rng.randf_range(0.0, TAU), 0.001), "zone": &"wood"})
 
 
 ## What every placement has to keep clear of, gathered once: the road ribbons
@@ -566,11 +634,28 @@ static func _common_centre(plan: VillagePlan, ctx: Dictionary,
 	if common.is_empty():
 		return []
 	var centre: Vector2 = VillageMeasure.centre(common)
-	var out: Array[Vector2] = [centre]
-	# anything after the first stands off the middle, so the green tree does
-	# not try to grow out of the well
+	var bounds: Rect2 = Poly.bounding_rect(common)
+	# The geometric centre can be occupied by a road ribbon on a bowed or
+	# ringed street form.  Keep it as the first candidate, but offer measured
+	# in-common fallbacks so the required well is not silently lost to that
+	# incidental overlap.  `_apply` walks candidates until one is legal.
+	var step_x: float = maxf(1.5, bounds.size.x * 0.28)
+	var step_y: float = maxf(1.5, bounds.size.y * 0.28)
+	var candidates: Array[Vector2] = [centre,
+		centre + Vector2(step_x, 0.0), centre - Vector2(step_x, 0.0),
+		centre + Vector2(0.0, step_y), centre - Vector2(0.0, step_y)]
+	var out: Array[Vector2] = []
+	for p in candidates:
+		if Poly.contains_point(common, p):
+			out.append(p)
+	# Anything after the first stands off the middle, so the green tree does
+	# not try to grow out of the well.  The common recipe normally asks for one
+	# tree, but retaining a few measured candidates keeps optional trees from
+	# consuming the well's fallback slot.
 	for k in range(1, count):
-		out.append(centre + Vector2(GREEN_TREE_CLEAR + float(k), 0.0))
+		var p := centre + Vector2(GREEN_TREE_CLEAR + float(k), 0.0)
+		if Poly.contains_point(common, p):
+			out.append(p)
 	return out
 
 
@@ -646,6 +731,11 @@ static func _edge_band(plan: VillagePlan, rng: RandomNumberGenerator,
 	# `want` is a floor, not a cap: the band is as long as the village is
 	# round, and the recipe's count says how densely, not how many.
 	var ring: PackedVector2Array = Poly.from_rect(site.grow(-0.5))
+	if plan.spec.enclosure != &"none":
+		var derived: Dictionary = VillageEnclosurePlan.build(plan)
+		var derived_edge: PackedVector2Array = derived["edge"]
+		if derived_edge.size() >= 3:
+			ring = derived_edge
 	var perimeter: float = Poly.polyline_length(ring) + ring[0].distance_to(ring[ring.size() - 1])
 	var pitch: float = EDGE_PITCH
 	if plan.spec.purpose == &"forest":

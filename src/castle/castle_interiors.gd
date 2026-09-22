@@ -6,8 +6,20 @@ static func primary(spec: CastleSpec) -> Dictionary:
 	var out := {}
 	if CastleGeometry.is_ridge(spec):
 		return ridge(spec)
-	if CastleGeometry.is_tower_house(spec) or CastleGeometry.is_sky(spec):
-		return out # Their own multi-storey contracts are handled separately.
+	if CastleGeometry.is_tower_house(spec):
+		var tower_plan: HousePlan = CastleTowerPlan.generate(spec, true)
+		if tower_plan.spec != null:
+			out["tower_house"] = record("tower_house", tower_plan,
+				CastleGeometry.tower_house_aabb(spec))
+		return out
+	if CastleGeometry.is_motte(spec):
+		var shell_plan: HousePlan = CastleMottePlan.generate(spec, true)
+		if shell_plan.spec != null:
+			out["keep_shell"] = record("keep_shell", shell_plan,
+				CastleGeometry.shell_keep_aabb(spec))
+		return out
+	if CastleGeometry.is_sky(spec):
+		return out # Sky castles retain their separate multi-storey contract.
 	for kind in ["hall", "keep", "chapel"]:
 		var plan: HousePlan
 		var bounds: AABB
@@ -89,7 +101,8 @@ static func emit(owner: CastleBuilder, row: Dictionary) -> void:
 	# volume is an empty roof void with continuous perimeter masonry.
 	if bounds.size.y > occupied_top + 0.001:
 		for run in HouseGeometry.shell_runs(plan, plan.spec.storeys - 1):
-			builder._wall_run(run.from, run.to, HouseGeometry.wall_thickness(plan.spec),
+			var thick := float(run.get("thickness", HouseGeometry.wall_thickness(plan.spec)))
+			builder._wall_run(run.from, run.to, thick,
 				bounds.size.y - occupied_top, [], 0, occupied_top, false)
 	var mesh := builder.commit()
 	# With the house roof disabled, its roof-colour slot contains glazing.

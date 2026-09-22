@@ -236,6 +236,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	var placed: int = 0
 	var landmark_lane: int = -1
 	var manor_lane: int = -1
+	var stable_lane: int = -1
 	# The wealth gradient (VILLAGES §6), enforced rather than hoped for: the
 	# households are handed over biggest first, and no house may stand nearer
 	# the common than a bigger one already does, less `GRADIENT_SLACK`. The
@@ -260,7 +261,29 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 			if manor_lane >= 0 and _place_on_road(plan, ctx, job, [manor_lane], 0.0) >= 0.0:
 				placed += 1
 				continue
+		elif req_kind(job) == &"stable":
+			if stable_lane < 0:
+				stable_lane = _add_stable_lane(plan)
+				if stable_lane >= 0:
+					ctx = _context(plan)
+			if stable_lane >= 0:
+				job["near_point"] = plan.roads[stable_lane]["points"][1]
+				if _place_on_road(plan, ctx, job, [stable_lane], 0.0) >= 0.0:
+					placed += 1
+					continue
 		var floor_for: float = gradient_floor if _order_of(job) == _ORDER_HOUSE else 0.0
+		# The stable is a companion to the inn, not merely another through-road
+		# shop.  The inn has already been committed by this ordering pass, so
+		# carry its measured centre into the stable's frontage sort.
+		var req: BuildingRequest = job["request"]
+		if req.kind == &"shop" and req.purpose == &"stable" and not job.has("near_point"):
+			for existing in plan.buildings:
+				var existing_req: BuildingRequest = existing["request"]
+				if existing_req.kind == &"shop" and existing_req.purpose == &"inn":
+					var inn_poly: PackedVector2Array = Placement.world_rect(
+						existing["placement"], existing["transform"], false)
+					job["near_point"] = Poly.bounding_rect(inn_poly).get_center()
+					break
 		var got: float = _place_on_road(plan, ctx, job,
 			_open_roads(plan, [landmark_lane, manor_lane]), floor_for)
 		if got >= 0.0:
@@ -304,6 +327,11 @@ static func _order_of(job: Dictionary) -> int:
 static func _floor_area(job: Dictionary) -> float:
 	var fp: Rect2 = job["footprint"]
 	return fp.size.x * fp.size.y
+
+
+static func req_kind(job: Dictionary) -> StringName:
+	var request: BuildingRequest = job["request"]
+	return request.purpose if request.kind == &"shop" else &""
 
 
 ## Everything the legality checks need that depends only on the ROADS: the
@@ -490,6 +518,7 @@ const SITING := {
 	&"blacksmith": {"road": &"through", "insists": true, "toward": &"edge", "side": &"east"},
 	&"tavern": {"road": &"through", "insists": true, "toward": &"gate", "side": &"west"},
 	&"inn": {"road": &"through", "toward": &"gate"},
+	&"stable": {"road": &"through", "toward": &"gate"},
 	&"farm": {"road": &"track", "toward": &"outside"},
 }
 const SITING_DEFAULT := {"toward": &"common"}
@@ -546,7 +575,15 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 	var all: Array = []
 	for r in roads:
 		all.append_array(_spots(ctx, r, cc, gates, plan.site, site))
-	for spots in [_sorted(all, site)]:
+	var ordered: Array = all
+	if job.has("near_point"):
+		var near_point: Vector2 = job["near_point"]
+		ordered.sort_custom(func(a, b) -> bool:
+			return (a["mid"] as Vector2).distance_to(near_point) \
+				< (b["mid"] as Vector2).distance_to(near_point))
+	else:
+		ordered = _sorted(ordered, site)
+	for spots in [ordered]:
 		# the gradient floor: no household nearer the common than a bigger one
 		if floor_d > 0.0:
 			var far: Array = []
@@ -772,6 +809,7 @@ static func _commit(plan: VillagePlan, lot: Dictionary, job: Dictionary, _rule: 
 		"front": lot["front"],
 		"road": int(lot["road"]),
 		"setback": float(lot["setback"]),
+		"normal": lot["normal"],
 		"landmark": bool(lot["landmark"]),
 		"class": job["class"],
 	}
@@ -801,8 +839,16 @@ static func _add_landmark_lane(plan: VillagePlan) -> int:
 		return -1
 	var through: PackedVector2Array = plan.roads[0]["points"]
 	var start_y: float = _polyline_y_at_x(through, lane_x)
-	var end_y: float = rect.end.y + 2.0
-	if end_y - start_y < 8.0:
+	# Most forms put the landmark beyond (positive-y) the common.  A strand
+	# puts water there, so its inland slot is above the common and this service
+	# lane runs in the opposite direction.
+	var end_y: float = rect.end.y + 2.0 if rect.position.y > start_y else rect.position.y - 2.0
+	if plan.spec.form == &"strand" and rect.position.y < start_y:
+		# The church's measured frontage is wider than the reserved slot.  Run
+		# the inland lane beyond the slot so its front can end at the slot's
+		# common-facing edge instead of spilling into the common.
+		end_y = rect.position.y - 40.0
+	if absf(end_y - start_y) < 8.0:
 		return -1
 	var pts := PackedVector2Array([Vector2(lane_x, start_y), Vector2(lane_x, end_y)])
 	var lane: Dictionary = _lane(pts, plan.spec.wealth)
@@ -840,9 +886,19 @@ static func _place_landmark(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 		var origin: Vector2 = e["a"] if float(e["side"]) > 0.0 else e["b"]
 		var dir: Vector2 = e["dir"]
 		var want_t: float = 0.0
-		if absf(dir.y) > 1e-6:
-			want_t = (rect.position.y - 1.0 - origin.y) / dir.y
-		var t: float = clampf(want_t + frontage * 0.5, 0.0, run)
+		var t: float
+		if plan.spec.form == &"strand" and absf(dir.y) > 1e-6:
+			# Align the south end of the measured frontage with the slot's
+			# common-facing edge; the full edge then stays inland of the common.
+			want_t = (rect.end.y - frontage * 0.5 - origin.y) / dir.y
+			# Leave a narrow inland buffer from the common-facing edge: the
+			# measured bounds include eaves beyond the reserved slot.
+			want_t += 9.0 if dir.y < 0.0 else -9.0
+			t = clampf(want_t, 0.0, run)
+		else:
+			if absf(dir.y) > 1e-6:
+				want_t = (rect.position.y - 1.0 - origin.y) / dir.y
+			t = clampf(want_t + frontage * 0.5, 0.0, run)
 		var lot: Dictionary = _make_lot(e, t, frontage, depth, setback)
 		lot["landmark"] = true
 		if _lot_is_legal(plan, ctx, lot, job, gap):
@@ -865,6 +921,8 @@ static func _add_manor_lane(plan: VillagePlan, job: Dictionary) -> int:
 	var end_y: float = plan.site.end.y - SITE_MARGIN
 	if end_y - start_y < float(job["width"]) * 0.5 + 12.0:
 		return -1
+
+
 	var lane: Dictionary = _lane(PackedVector2Array([Vector2(lane_x, start_y), Vector2(lane_x, end_y)]),
 		plan.spec.wealth)
 	var ribbon: PackedVector2Array = VillageSitePlanner.road_ribbon(lane, true)
@@ -880,6 +938,46 @@ static func _add_manor_lane(plan: VillagePlan, job: Dictionary) -> int:
 		if _overlaps(ribbon, lot["poly"]):
 			return -1
 	plan.roads.append(lane)
+	return plan.roads.size() - 1
+
+
+## A stable belongs beside the inn it serves. When ordinary through-road
+## frontage is already occupied, give it a short straight spur from the inn's
+## own road edge. The spur has one segment, so it remains a legal lane rather
+## than introducing a sharp bend at a crossroads.
+static func _add_stable_lane(plan: VillagePlan) -> int:
+	var inns: Array[int] = []
+	for i in range(plan.buildings.size()):
+		var request: BuildingRequest = plan.buildings[i]["request"]
+		if request.kind == &"shop" and request.purpose == &"inn":
+			inns.append(i)
+	if inns.is_empty():
+		return -1
+	var inn: Dictionary = plan.buildings[inns[0]]
+	var lot: Dictionary = plan.lots[int(inn["lot"])]
+	var front: PackedVector2Array = lot["front"]
+	if front.size() < 2:
+		return -1
+	var mid: Vector2 = (front[0] + front[1]) * 0.5
+	var normal: Vector2 = lot["normal"]
+	var road_point := mid
+	var nearest_road_distance: float = INF
+	var road_index: int = int(lot["road"])
+	if road_index >= 0 and road_index < plan.roads.size():
+		var pts: PackedVector2Array = plan.roads[road_index]["points"]
+		for i in range(pts.size() - 1):
+			var candidate: Vector2 = Geometry2D.get_closest_point_to_segment(mid, pts[i], pts[i + 1])
+			if candidate.distance_to(mid) < nearest_road_distance:
+				road_point = candidate
+				nearest_road_distance = candidate.distance_to(mid)
+	var away: Vector2 = -normal.normalized()
+	var end: Vector2 = road_point + away * 21.0
+	if not plan.site.grow(-SITE_MARGIN).has_point(end):
+		away = -away
+		end = road_point + away * 21.0
+	if not plan.site.grow(-SITE_MARGIN).has_point(end):
+		return -1
+	plan.roads.append(_lane(PackedVector2Array([road_point, end]), plan.spec.wealth))
 	return plan.roads.size() - 1
 
 

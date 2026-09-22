@@ -145,7 +145,7 @@ static func _check_vertical_shell(plan: HousePlan, builder: HouseBuilder) -> Arr
 			out.append("shell: missing floor mass for storey %d" % level)
 	if roofs.is_empty():
 		out.append("shell: house has no logged roof mass")
-	elif roofs.size() > 1:
+	elif roofs.size() > 1 and plan.world_family != &"courtyard_house":
 		out.append("shell: %d main roof masses logged; expected exactly one" % roofs.size())
 	var top_wall: float = float(wanted) * plan.spec.height
 	if not roofs.is_empty():
@@ -154,8 +154,13 @@ static func _check_vertical_shell(plan: HousePlan, builder: HouseBuilder) -> Arr
 		for roof in roofs:
 			roof_top = maxf(roof_top, (roof as AABB).end.y)
 			roof_bottom = minf(roof_bottom, (roof as AABB).position.y)
-		if absf(roof_bottom - top_wall) > 0.15:
-			out.append("shell: roof begins at Y %.2f, expected top wall band %.2f" % [roof_bottom, top_wall])
+		var expected_bottom := top_wall
+		if plan.world_family == &"courtyard_house":
+			# The shallow courtyard ring meets the wall head at its inner eave;
+			# only slab depth extends below that support line.
+			expected_bottom = top_wall - 0.12
+		if absf(roof_bottom - expected_bottom) > 0.15:
+			out.append("shell: roof begins at Y %.2f, expected wall band %.2f" % [roof_bottom, expected_bottom])
 	return out
 
 

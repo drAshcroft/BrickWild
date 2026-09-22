@@ -89,6 +89,9 @@ func _check_lords_walk() -> void:
 ## solid gatehouse cannot pass this check. There is no second pathfinder here.
 static func lords_walk(s: CastleSpec, b: CastleBuilder, emitted: ArrayMesh = null) -> Dictionary:
 	var out := {"failures": [], "applicable": false}
+	var special_id := _special_interior_id(s, b)
+	if not special_id.is_empty():
+		return _lords_walk_special(s, b, emitted, special_id)
 	var keep := {}
 	for row in b.interiors:
 		if row.id == "keep":
@@ -167,6 +170,273 @@ static func lords_walk(s: CastleSpec, b: CastleBuilder, emitted: ArrayMesh = nul
 		if room in nav.unreached_rooms or not inside.ok:
 			out.failures.append("keep entrance cannot reach/use lord's chamber %d: %s" % [room, inside.failures])
 	return out
+
+
+## Tower houses and occupied motte shell-keeps do not have the enclosed keep's
+## gate/causeway route.  Their entrances are still a physical contract: the
+## authored door must survive the local-to-world transform, a named chain of
+## approach steps must reach its threshold, and every occupied storey must be
+## usable.  Keep this dispatch here rather than weakening HousePlanCheck for
+## ordinary houses; these are castle-family exceptions with stable ids.
+static func _special_interior_id(s: CastleSpec, b: CastleBuilder) -> String:
+	var wanted := "tower_house" if CastleGeometry.is_tower_house(s) else ("keep_shell" if CastleGeometry.is_motte(s) else "")
+	if wanted.is_empty():
+		return ""
+	return wanted
+
+
+static func _lords_walk_special(s: CastleSpec, b: CastleBuilder,
+		emitted: ArrayMesh, building_id: String) -> Dictionary:
+	var out := {"failures": [], "applicable": true, "building_id": building_id}
+	var row := {}
+	for candidate in b.interiors:
+		if String(candidate.get("id", "")) == building_id:
+			row = candidate
+			break
+	if row.is_empty():
+		out.failures.append("%s: missing interior record" % building_id)
+		return out
+	var plan: HousePlan = row.get("plan")
+	if plan == null or plan.spec == null:
+		out.failures.append("%s: missing occupied HousePlan" % building_id)
+		return out
+	var entrance := plan.entrance()
+	if entrance < 0:
+		out.failures.append("%s: no exterior entrance" % building_id)
+		return out
+	var door: Dictionary = plan.doors[entrance]
+	var actual := emitted if emitted != null else b.commit()
+	var door_report := _special_door_report(building_id, row, b, actual, plan, door)
+	for failure in door_report.failures:
+		out.failures.append(failure)
+	out["door"] = door_report
+	var route := _special_approach_report(building_id, b, row, door)
+	for failure in route.failures:
+		out.failures.append(failure)
+	out["approach"] = route
+	var stairs := _special_stair_report(building_id, plan, actual, row)
+	for failure in stairs.failures:
+		out.failures.append(failure)
+	out["stairs"] = stairs
+	var nav := HouseNavCheck.new().check(plan)
+	out["house_nav"] = nav
+	if not bool(nav.get("ok", false)):
+		for failure in nav.failures:
+			out.failures.append("%s: HouseNavCheck: %s" % [building_id, failure])
+	return out
+
+
+static func _special_door_report(building_id: String, row: Dictionary,
+		b: CastleBuilder, actual: ArrayMesh, plan: HousePlan, door: Dictionary) -> Dictionary:
+	var out := {"failures": [], "matched": false, "clear": false}
+	if not bool(door.get("exterior", false)):
+		out.failures.append("%s: entrance is not exterior" % building_id)
+		return out
+	var level := HousePlan.record_storey(door)
+	if level < 0 or level >= plan.spec.storeys:
+		out.failures.append("%s: entrance storey %d is outside the occupied shaft" % [building_id, level])
+		return out
+	var sill := float(door.get("sill", 0.0))
+	var head := float(door.get("head", HouseGeometry.DOOR_H))
+	if head <= sill or sill < -0.001 or head > plan.spec.height + 0.001:
+		out.failures.append("%s: authored door vertical interval is invalid (%.2f..%.2f)" % [building_id, sill, head])
+		return out
+	var local_y := float(level) * plan.spec.height + (sill + head) * 0.5
+	var xf: Transform3D = row.transform
+	var door_position: Vector2 = door["pos"]
+	var door_normal: Vector2 = door["normal"]
+	var room_thickness := HouseGeometry.wall_thickness(plan.spec)
+	if level >= 0 and level < plan.rooms.size():
+		room_thickness = float(plan.rooms[level].get("wall_thickness", room_thickness))
+	var wall_offset := door_normal * room_thickness * 0.5
+	var expected_local := door_position + wall_offset
+	var expected := xf * Vector3(expected_local.x, local_y, expected_local.y)
+	var expected_facing := (xf.basis * Vector3(door_normal.x, 0.0, door_normal.y)).normalized()
+	if not _door_on_plan_surface(plan, level, door_position, door_normal):
+		out.failures.append("%s: authored entrance is off its room-wall surface" % building_id)
+	var matched_part := {}
+	for part in b.part_log:
+		if String(part.get("tag", "")) != building_id:
+			continue
+		if String(part.get("opening_kind", "")) != "door":
+			continue
+		if not Vector3(part.get("pos", Vector3.ZERO)).is_equal_approx(expected):
+			continue
+		if not Vector3(part.get("facing", Vector3.ZERO)).is_equal_approx(expected_facing):
+			continue
+		var size: Vector3 = part.get("size", Vector3.ZERO)
+		if not is_equal_approx(size.x, float(door.width)) or not is_equal_approx(size.y, head - sill):
+			continue
+		matched_part = part
+		break
+	if matched_part.is_empty():
+		out.failures.append("%s: emitted doorway does not match authored world pose/height/surface" % building_id)
+	else:
+		out.matched = true
+	var clear := _door_ray_clear(actual, expected, expected_facing, room_thickness)
+	out.clear = clear
+	if not clear:
+		out.failures.append("%s: emitted doorway is filled at its authored height" % building_id)
+	return out
+
+
+static func _door_on_plan_surface(plan: HousePlan, level: int, point: Vector2,
+		normal: Vector2) -> bool:
+	var walls := HouseGeometry.room_walls(plan, level)
+	if walls.is_empty():
+		return false
+	for wall in walls:
+		var a: Vector2 = wall["from"]
+		var z: Vector2 = wall["to"]
+		var edge := z - a
+		var t := clampf((point - a).dot(edge) / maxf(edge.length_squared(), 0.0001), 0.0, 1.0)
+		var nearest := a + edge * t
+		var wall_normal := -Vector2(wall["normal"])
+		if nearest.distance_to(point) <= 0.18 and wall_normal.dot(normal.normalized()) >= 0.92:
+			return true
+	return false
+
+
+static func _door_ray_clear(actual: ArrayMesh, point: Vector3, facing: Vector3,
+		wall_thickness: float) -> bool:
+	var reach := maxf(wall_thickness + HouseGeometry.PERSON_RADIUS + 0.3, 1.0)
+	var a := point - facing * reach
+	var z := point + facing * reach
+	for surface in actual.get_surface_count():
+		var arrays := actual.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var count := indices.size() if not indices.is_empty() else vertices.size()
+		for i in range(0, count - 2, 3):
+			var p0 := vertices[indices[i] if not indices.is_empty() else i]
+			var p1 := vertices[indices[i + 1] if not indices.is_empty() else i + 1]
+			var p2 := vertices[indices[i + 2] if not indices.is_empty() else i + 2]
+			if Geometry3D.segment_intersects_triangle(a, z, p0, p1, p2) != null:
+				return false
+	return true
+
+
+static func _special_approach_report(building_id: String, b: CastleBuilder,
+		row: Dictionary, door: Dictionary) -> Dictionary:
+	var out := {"failures": [], "steps": 0, "contiguous": false, "monotonic": false}
+	var kind := "tower_approach_step" if building_id == "tower_house" else "motte_approach_step"
+	var steps: Array[Dictionary] = []
+	for part in b.part_log:
+		if String(part.get("kind", "")) == kind:
+			steps.append(part)
+	out.steps = steps.size()
+	if steps.is_empty():
+		out.failures.append("%s: no %s chain emitted" % [building_id, kind])
+		return out
+	var xf: Transform3D = row.transform
+	var door_world := xf * Vector3(float(door.pos.x), 0.0, float(door.pos.y))
+	var previous := INF
+	var previous_top := 0.0
+	var contiguous := true
+	var monotonic := true
+	var walkable_risers := true
+	for i in range(steps.size()):
+		var centre: Vector3 = steps[i].get("pos", Vector3.ZERO)
+		var size: Vector3 = steps[i].get("size", Vector3.ZERO)
+		var top := centre.y + size.y * 0.5
+		if size.y <= 0.0 or top <= previous_top + 0.001 or top - previous_top > 0.30 + 0.001:
+			walkable_risers = false
+		previous_top = top
+		var distance := Vector2(centre.x, centre.z).distance_to(Vector2(door_world.x, door_world.z))
+		if distance >= previous - 0.001:
+			monotonic = false
+		previous = distance
+		if i > 0:
+			var prior: Vector3 = steps[i - 1].get("pos", Vector3.ZERO)
+			var a: Vector2 = Vector2(prior.x, prior.z)
+			var c: Vector2 = Vector2(centre.x, centre.z)
+			var pa: Vector3 = steps[i - 1].get("size", Vector3.ZERO)
+			var pc: Vector3 = steps[i].get("size", Vector3.ZERO)
+			var reach := Vector2(pa.x, pa.z).length() * 0.5 + Vector2(pc.x, pc.z).length() * 0.5 + HouseGeometry.NAV_CELL
+			if a.distance_to(c) > reach:
+				contiguous = false
+	var last: Vector3 = steps[steps.size() - 1].get("pos", Vector3.ZERO)
+	var last_size: Vector3 = steps[steps.size() - 1].get("size", Vector3.ZERO)
+	if Vector2(last.x, last.z).distance_to(Vector2(door_world.x, door_world.z)) > Vector2(last_size.x, last_size.z).length() * 0.5 + 1.0:
+		contiguous = false
+	out.contiguous = contiguous
+	out.monotonic = monotonic
+	out.walkable_risers = walkable_risers
+	if not contiguous:
+		out.failures.append("%s: %s chain is not contiguous to the door threshold" % [building_id, kind])
+	if not monotonic:
+		out.failures.append("%s: %s chain is not monotonic toward the door" % [building_id, kind])
+	if not walkable_risers:
+		out.failures.append("%s: %s chain has a missing or non-walkable riser" % [building_id, kind])
+	return out
+
+
+static func _special_stair_report(building_id: String, plan: HousePlan,
+		actual: ArrayMesh, row: Dictionary) -> Dictionary:
+	var out := {"failures": [], "expected": maxi(plan.spec.storeys - 1, 0), "actual": plan.stairs.size()}
+	var expected := int(out.expected)
+	if plan.stairs.size() != expected:
+		out.failures.append("%s: missing upper stair (expected %d, got %d)" % [building_id, expected, plan.stairs.size()])
+	for stair in plan.stairs:
+		var lower := int(stair.get("storey", stair.get("a", 0)))
+		var upper := int(stair.get("to_storey", stair.get("b", lower + 1)))
+		if upper != lower + 1:
+			out.failures.append("%s: upper stair transition %d -> %d is invalid" % [building_id, lower, upper])
+			continue
+		if bool(stair.get("filled", false)) or bool(stair.get("blocked", false)):
+			out.failures.append("%s: upper stair %d -> %d is filled" % [building_id, lower, upper])
+		for key in ["lower_rect", "upper_rect"]:
+			var rect := Rect2(stair.get(key, stair.get("rect", Rect2())))
+			if not rect.has_area() or lower < 0 or upper >= plan.rooms.size():
+				out.failures.append("%s: upper stair %d -> %d has an invalid %s landing" % [building_id, lower, upper, key])
+				continue
+			var room_index := lower if key == "lower_rect" else upper
+			if not Poly.contains_point(plan.outline_of(room_index), rect.position, 0.001) \
+				or not Poly.contains_point(plan.outline_of(room_index), rect.end, 0.001):
+				out.failures.append("%s: upper stair %d -> %d %s landing is outside its floor" % [building_id, lower, upper, key])
+		if upper >= 0 and upper < plan.spec.storeys:
+			var upper_rect := Rect2(stair.get("upper_rect", stair.get("rect", Rect2())))
+			if upper_rect.has_area():
+				if not _stair_landing_clear(actual, upper_rect, row.transform,
+					float(upper) * plan.spec.height):
+					out.failures.append("%s: upper stair %d -> %d opening is filled" % [building_id, lower, upper])
+	return out
+
+
+static func _stair_landing_clear(actual: ArrayMesh, rect: Rect2,
+		xf: Transform3D, y: float) -> bool:
+	# A stair flight deliberately occupies part of its upper opening. Probe a
+	# small interior lattice rather than the centreline, which commonly lands on
+	# the final tread. A real opening needs at least one clear point; a filled
+	# landing volume blocks every point.
+	for u in [0.2, 0.5, 0.8]:
+		for v in [0.2, 0.5, 0.8]:
+			var local := rect.position + rect.size * Vector2(float(u), float(v))
+			var world: Vector3 = xf * Vector3(local.x, y, local.y)
+			if _vertical_probe_clear(actual, world):
+				return true
+	return false
+
+
+static func _vertical_probe_clear(actual: ArrayMesh, centre: Vector3) -> bool:
+	# Probe just ABOVE the upper floor plane and through the first-riser band.
+	# The final tread reaches the plane itself, so a symmetric ray falsely
+	# treats an intended stair as filled; the next flight must nevertheless not
+	# occupy the same opening, or it seals this landing on the way up.
+	var a := centre + Vector3.UP * 0.12
+	var z := centre + Vector3.UP * 0.95
+	for surface in actual.get_surface_count():
+		var arrays := actual.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var count := indices.size() if not indices.is_empty() else vertices.size()
+		for i in range(0, count - 2, 3):
+			var p0 := vertices[indices[i] if not indices.is_empty() else i]
+			var p1 := vertices[indices[i + 1] if not indices.is_empty() else i + 1]
+			var p2 := vertices[indices[i + 2] if not indices.is_empty() else i + 2]
+			if Geometry3D.segment_intersects_triangle(a, z, p0, p1, p2) != null:
+				return false
+	return true
 
 
 static func _walk_corridor(full: Rect2, start: Vector2, goal: Vector2, inside: Vector2) -> Rect2:

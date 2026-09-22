@@ -23,6 +23,10 @@ var spec: HouseSpec
 ## Actual emitted architectural faces, including cut host pieces and dormer joins.
 ## Each row is also a row of `component_log`; see MassBuilder.
 var roof_components: Array[Dictionary] = []
+## Evidence emitted for each authored hole. Unlike a structural mass this is
+## intentionally not a solid AABB: CourtCheck and HammamCheck use it to
+## distinguish an empty column from a roof box that merely carries a label.
+var roof_opening_log: Array[Dictionary] = []
 ## Emission counter that names each opening's surround, so the trim round the
 ## third window is identifiably the third window's on every rebuild.
 var _opening_seq := 0
@@ -41,6 +45,8 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_plinth()
 	_build_exterior_walls()
 	_build_partitions()
+	if plan.has_court():
+		_build_court_walls()
 	if spec.material != &"stone":
 		_build_jetty()
 		_build_timber_frame()
@@ -61,6 +67,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 func begin(surface_count: int) -> void:
 	super.begin(surface_count)
 	roof_components.clear()
+	roof_opening_log.clear()
 	_opening_seq = 0
 
 
@@ -82,8 +89,10 @@ func _build_floor() -> void:
 		if shaped >= 0:
 			# The floor of a shaped storey is the shape, pushed out to the
 			# middle of its own wall so the slab and the masonry meet.
+			var room_thick := float(plan.rooms[shaped].get("wall_thickness",
+				HouseGeometry.wall_thickness(spec)))
 			var poly: PackedVector2Array = Poly.offset(plan.outline_of(shaped),
-				HouseGeometry.wall_thickness(spec) / 2.0)
+				room_thick / 2.0)
 			var pieces: Array[PackedVector2Array] = [poly]
 			var stair_hole := _stair_opening(level)
 			if stair_hole.has_area():
@@ -218,8 +227,14 @@ func _build_plinth() -> void:
 				continue
 			if not _on_run(from, to, normal, d["pos"], d["normal"]):
 				continue
+			var interval := _door_interval(d)
+			var plinth_bottom: float = maxf(float(interval[0]), 0.0) if interval[2] else 0.0
+			var plinth_top: float = plinth_h + 0.05 if not interval[2] else minf(float(interval[1]), plinth_h)
+			if plinth_bottom >= plinth_h - 0.001 or plinth_top <= plinth_bottom + 0.001:
+				continue
 			openings.append({"t": _along(from, to, d["pos"]), "w": float(d["width"]) + 0.12,
-				"bottom": 0.0, "top": plinth_h + 0.05, "kind": "door", "normal": normal})
+				"bottom": plinth_bottom, "top": plinth_top,
+				"kind": "door", "normal": normal})
 		# These are clearances, not additional framed doors. Framing the short
 		# plinth opening used to put a second lintel across the real doorway.
 		_wall_run(from, to, thick, plinth_h, openings, SURF_FLOOR, 0.0, false)
@@ -243,9 +258,10 @@ func _build_exterior_walls() -> void:
 			var from: Vector2 = run["from"]
 			var to: Vector2 = run["to"]
 			var normal: Vector2 = run["normal"]
-			var openings: Array[Dictionary] = _openings_on(from, to, normal, level)
-			_wall_run(from, to, HouseGeometry.wall_thickness(spec), h, openings, surf, y0)
-			var a: AABB = _run_aabb(from, to, HouseGeometry.wall_thickness(spec), h, y0)
+			var thick: float = float(run.get("thickness", HouseGeometry.wall_thickness(spec)))
+			var openings: Array[Dictionary] = _openings_on(from, to, normal, level, thick)
+			_wall_run(from, to, thick, h, openings, surf, y0)
+			var a: AABB = _run_aabb(from, to, thick, h, y0)
 			var suffix := "" if _levels().size() == 1 else "_%d" % level
 			_log_mass("wall_%s%s" % [String(run["side"]), suffix], a, y0)
 	total_height = maxf(total_height, h * _storeys())
@@ -329,8 +345,9 @@ func _build_partitions() -> void:
 						continue
 					if not _on_run(from, to, normal, d["pos"], d["normal"]):
 						continue
+					var interval := _door_interval(d)
 					openings.append({"t": _along(from, to, d["pos"]), "w": float(d["width"]),
-						"bottom": 0.0, "top": HouseGeometry.DOOR_H, "kind": "door",
+						"bottom": interval[0], "top": interval[1], "kind": "door",
 						"normal": normal})
 				_wall_run(from, to, HouseGeometry.INNER_WALL_T, h, openings, SURF_WALL, y0)
 				var suffix := "" if _levels().size() == 1 else "_%d" % level
@@ -338,31 +355,94 @@ func _build_partitions() -> void:
 					_run_aabb(from, to, HouseGeometry.INNER_WALL_T, h, y0), y0)
 
 
+## A court edge is an outside wall of its range, even though it is not one of
+## the four site edges.  Emit it explicitly so court doors/windows are real
+## cuts in the shell rather than plan-only annotations (WLD-001/GEO-003).
+func _build_court_walls() -> void:
+	var h: float = spec.height
+	for level in _levels():
+		for ci in range(plan.courts.size()):
+			if HousePlan.record_storey(plan.courts[ci]) > level:
+				continue
+			var court := Rect2(plan.courts[ci]["rect"])
+			var rows := [
+				{"from": Vector2(court.position.x, court.position.y), "to": Vector2(court.end.x, court.position.y), "normal": Vector2(0, 1), "role": &"fauces"},
+				{"from": Vector2(court.position.x, court.end.y), "to": Vector2(court.position.x, court.position.y), "normal": Vector2(1, 0), "role": &"atrium"},
+				{"from": Vector2(court.end.x, court.position.y), "to": Vector2(court.end.x, court.end.y), "normal": Vector2(-1, 0), "role": &"tablinum"},
+				{"from": Vector2(court.end.x, court.end.y), "to": Vector2(court.position.x, court.end.y), "normal": Vector2(0, -1), "role": &"peristyle"},
+			]
+			for row in rows:
+				var from: Vector2 = row["from"]
+				var to: Vector2 = row["to"]
+				var normal: Vector2 = row["normal"]
+				var thick := HouseGeometry.wall_thickness(spec)
+				var openings := _openings_on(from, to, normal, level, thick)
+				_wall_run(from, to, thick, h, openings, SURF_WALL,
+					float(level) * h)
+				_log_mass("court_wall_%d_%d" % [ci, rows.find(row)],
+					_run_aabb(from, to, thick, h, float(level) * h), float(level) * h)
+		if level == 0 and plan.blind_entry:
+			var screen := Rect2(plan.world_meta.get("blind_screen", Rect2()))
+			if screen.has_area():
+				var screen_from := Vector2(screen.position.x, screen.get_center().y)
+				var screen_to := Vector2(screen.end.x, screen.get_center().y)
+				var screen_h: float = minf(h * 0.75, 2.0)
+				_wall_run(screen_from, screen_to, HouseGeometry.INNER_WALL_T,
+					screen_h, [], SURF_WALL, 0.0, false)
+				_log_mass("blind_screen", AABB(Vector3(screen.position.x, 0.0,
+					screen.position.y), Vector3(screen.size.x, screen_h,
+					screen.size.y)), 0.0)
+
+
 ## Every door and window cut into one exterior wall run, as distances along it.
 ## Shared by the wall builder and the timber frame, so a stud can never be
 ## planted across a window the wall knows about.
-func _openings_on(from: Vector2, to: Vector2, normal: Vector2, level := 0) -> Array[Dictionary]:
+func _openings_on(from: Vector2, to: Vector2, normal: Vector2, level := 0,
+		thickness := -1.0) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for d in plan.doors:
 		if _opening_storey(d) != level and _has_storey_metadata(d):
 			continue
-		if not d["exterior"]:
+		if not d["exterior"] and not _is_court_opening(d):
 			continue
-		if not _on_run(from, to, normal, d["pos"], d["normal"]):
+		if not _on_run(from, to, normal, d["pos"], d["normal"], thickness):
+			continue
+		var interval := _door_interval(d)
+		if interval[1] <= interval[0] or interval[0] >= spec.height or interval[1] <= 0.0:
 			continue
 		out.append({"t": _along(from, to, d["pos"]), "w": float(d["width"]),
-			"bottom": 0.0, "top": HouseGeometry.DOOR_H, "kind": "door",
+			"bottom": maxf(interval[0], 0.0), "top": minf(interval[1], spec.height), "kind": "door",
 			"normal": normal})
 	for w in plan.windows:
 		if _opening_storey(w) != level and _has_storey_metadata(w):
 			continue
-		if not _on_run(from, to, normal, w["pos"], w["normal"]):
+		if not _on_run(from, to, normal, w["pos"], w["normal"], thickness):
 			continue
 		out.append({"t": _along(from, to, w["pos"]), "w": float(w["width"]),
 			"bottom": float(w["sill"]), "top": float(w["head"]),
 			"kind": "hatch" if w.get("hatch", false) else "window",
 			"normal": normal})
 	return out
+
+
+func _is_court_opening(opening: Dictionary) -> bool:
+	var pos: Vector2 = opening["pos"]
+	var n: Vector2 = opening["normal"]
+	for court in plan.courts:
+		if Poly.contains_point(Poly.from_rect(Rect2(court["rect"])),
+				pos + n * 0.4, 0.02):
+			return true
+	return false
+
+
+## Door vertical interval within its storey.  The legacy path is deliberately
+## bit-for-bit equivalent: only records that author sill/head opt into a
+## raised or shortened aperture.
+func _door_interval(door: Dictionary) -> Array:
+	var authored := door.has("sill") or door.has("head")
+	var bottom := float(door.get("sill", 0.0))
+	var top := float(door.get("head", HouseGeometry.DOOR_H))
+	return [bottom, top, authored]
 
 
 ## One wall, with its openings cut out of it.
@@ -493,7 +573,7 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 
 ## Is an opening on this wall run: same line, and between its ends?
 func _on_run(from: Vector2, to: Vector2, normal: Vector2, pos: Vector2,
-		op_normal: Vector2) -> bool:
+		op_normal: Vector2, thickness := -1.0) -> bool:
 	if absf(absf(normal.x) - absf(op_normal.x)) > 0.01:
 		return false
 	var seg: Vector2 = to - from
@@ -506,7 +586,8 @@ func _on_run(from: Vector2, to: Vector2, normal: Vector2, pos: Vector2,
 	var off: float = absf(rel.dot(Vector2(dir.y, -dir.x)))
 	# an exterior opening is recorded on the INNER face of its wall, so allow
 	# half a wall's slack across the run
-	return off <= HouseGeometry.wall_thickness(spec) / 2.0 + 0.02 and t >= -0.01 and t <= run + 0.01
+	var slack := HouseGeometry.wall_thickness(spec) if thickness <= 0.0 else thickness
+	return off <= slack / 2.0 + 0.02 and t >= -0.01 and t <= run + 0.01
 
 
 static func _along(from: Vector2, to: Vector2, pos: Vector2) -> float:
@@ -833,59 +914,96 @@ func _build_court_roofs() -> void:
 	host("roof", _storeys() - 1)
 	var site: Rect2 = HouseGeometry.site_rect(spec)
 	var wall_top: float = spec.height * _storeys()
-	var rise: float = HouseGeometry.roof_rise(spec) * 0.7
+	# Courtyard ranges are shallow lean-tos, not a second storey. The ordinary
+	# roof pitch is sized for a full house span; bound this ring to a modest
+	# fraction of the footprint so its outer support fascia stays below 0.7m.
+	var rise: float = minf(HouseGeometry.roof_rise(spec) * 0.12,
+		minf(site.size.x, site.size.y) * 0.04)
+	var shell_t: float = HouseGeometry.wall_thickness(spec)
+	var fascia := [
+		{"size": Vector3(site.size.x, rise, shell_t),
+			"pos": Vector3(site.get_center().x, wall_top + rise * 0.5,
+				site.position.y + shell_t * 0.5)},
+		{"size": Vector3(site.size.x, rise, shell_t),
+			"pos": Vector3(site.get_center().x, wall_top + rise * 0.5,
+				site.end.y - shell_t * 0.5)},
+		{"size": Vector3(shell_t, rise, site.size.y),
+			"pos": Vector3(site.position.x + shell_t * 0.5,
+				wall_top + rise * 0.5, site.get_center().y)},
+		{"size": Vector3(shell_t, rise, site.size.y),
+			"pos": Vector3(site.end.x - shell_t * 0.5,
+				wall_top + rise * 0.5, site.get_center().y)}]
+	for fi in range(fascia.size()):
+		var fs: Vector3 = fascia[fi]["size"]
+		var fp: Vector3 = fascia[fi]["pos"]
+		component_box("court_roof_fascia_%d" % fi, fs,
+			Transform3D(Basis(), fp), SURF_WALL)
+		_log_mass("court_roof_fascia_%d" % fi,
+			AABB(fp - fs * 0.5, fs), wall_top)
 	for ci in range(plan.courts.size()):
+		# A multi-storey courtyard repeats its plan court at each level, but the
+		# building has one roof ring. Emitting every record stacked identical
+		# plates at the top and made the roof look like floating bands.
+		if ci != plan.courts.size() - 1:
+			continue
 		var court: Rect2 = plan.courts[ci]["rect"]
 		for side in range(4):
 			var band: Rect2
-			var outer: float
-			var inner: float
 			var horizontal: bool = side <= 1
 			match side:
 				0:
 					band = Rect2(site.position.x, site.position.y,
 						site.size.x, court.position.y - site.position.y)
-					outer = site.position.y
-					inner = court.position.y
 				1:
 					band = Rect2(site.position.x, court.end.y,
 						site.size.x, site.end.y - court.end.y)
-					outer = site.end.y
-					inner = court.end.y
 				2:
 					band = Rect2(site.position.x, court.position.y,
 						court.position.x - site.position.x, court.size.y)
-					outer = site.position.x
-					inner = court.position.x
 				_:
 					band = Rect2(court.end.x, court.position.y,
 						site.end.x - court.end.x, court.size.y)
-					outer = site.end.x
-					inner = court.end.x
 			if band.size.x < 0.3 or band.size.y < 0.3:
 				continue
 			# One sloping plate to a range, falling from the outer wall in to
 			# the courtyard eaves -- which is what a cloister range has, and
 			# the only roof shape that leaves the yard open.
-			var lo: float = band.position.x if horizontal else band.position.y
-			var hi: float = band.end.x if horizontal else band.end.y
 			var quad := PackedVector3Array()
-			if horizontal:
-				quad.append(Vector3(lo, wall_top + rise, outer))
-				quad.append(Vector3(hi, wall_top + rise, outer))
-				quad.append(Vector3(hi, wall_top, inner))
-				quad.append(Vector3(lo, wall_top, inner))
-			else:
-				quad.append(Vector3(outer, wall_top + rise, lo))
-				quad.append(Vector3(outer, wall_top + rise, hi))
-				quad.append(Vector3(inner, wall_top, hi))
-				quad.append(Vector3(inner, wall_top, lo))
+			# Each range is a trapezoid: its outer edge follows the site wall,
+			# while its inner edge follows only the matching court edge. Adjacent
+			# faces therefore meet at the same outer/court corner endpoints.
+			match side:
+				0:
+					quad = PackedVector3Array([
+						Vector3(site.position.x, wall_top + rise, site.position.y),
+						Vector3(site.end.x, wall_top + rise, site.position.y),
+						Vector3(court.end.x, wall_top, court.position.y),
+						Vector3(court.position.x, wall_top, court.position.y)])
+				1:
+					quad = PackedVector3Array([
+						Vector3(site.end.x, wall_top + rise, site.end.y),
+						Vector3(site.position.x, wall_top + rise, site.end.y),
+						Vector3(court.position.x, wall_top, court.end.y),
+						Vector3(court.end.x, wall_top, court.end.y)])
+				2:
+					quad = PackedVector3Array([
+						Vector3(site.position.x, wall_top + rise, site.end.y),
+						Vector3(site.position.x, wall_top + rise, site.position.y),
+						Vector3(court.position.x, wall_top, court.position.y),
+						Vector3(court.position.x, wall_top, court.end.y)])
+				_:
+					quad = PackedVector3Array([
+						Vector3(site.end.x, wall_top + rise, site.position.y),
+						Vector3(site.end.x, wall_top + rise, site.end.y),
+						Vector3(court.end.x, wall_top, court.end.y),
+						Vector3(court.end.x, wall_top, court.position.y)])
 			roof_components.append(
 				component_slab("roof_court_%d_%d" % [ci, side], quad, 0.24, SURF_ROOF))
 			_log_mass("roof_court_%d_%d" % [ci, side],
-				AABB(Vector3(band.position.x, wall_top, band.position.y),
-					Vector3(band.size.x, rise + 0.25, band.size.y)))
+				AABB(Vector3(band.position.x, wall_top - 0.12, band.position.y),
+					Vector3(band.size.x, rise + 0.24, band.size.y)))
 			total_height = maxf(total_height, wall_top + rise)
+	_record_court_roof_openings(wall_top)
 	host_end()
 
 
@@ -901,6 +1019,10 @@ func _build_roof() -> void:
 	var span: float = layout["span"]
 	var along: float = layout["along"]
 	var rise: float = layout["rise"]
+	var authored := []
+	for op in HouseGeometry.roof_openings(plan):
+		if op["kind"] != &"dormer":
+			authored.append(op)
 	for fi in range(faces.size()):
 		var pieces: Array[PackedVector2Array] = [RoofShape.footprint(faces[fi])]
 		for dormer in layout["dormers"]:
@@ -910,8 +1032,17 @@ func _build_roof() -> void:
 			for piece in pieces:
 				next.append_array(RoofShape.subtract(piece, dormer["opening"]))
 			pieces = next
+		for op in authored:
+			var hole: PackedVector2Array = op["polygon"]
+			if Poly.intersection_area(RoofShape.footprint(faces[fi]), hole) <= 0.0001:
+				continue
+			var next_authored: Array[PackedVector2Array] = []
+			for piece in pieces:
+				next_authored.append_array(RoofShape.subtract(piece, hole))
+			pieces = next_authored
 		for piece in pieces:
 			_roof_face(xf, RoofShape.lift(piece, faces[fi]), SURF_ROOF, "roof_face_%d" % fi)
+	_record_sloped_roof_openings(layout, authored)
 
 	# Close the wall head to the roof UNDERSIDE on every facade. This also
 	# fills the small raised eave band on hip roofs, not just gable triangles.
@@ -931,8 +1062,7 @@ func _build_roof() -> void:
 		var cut := RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else 0.0
 		ridge_half = maxf(ridge_half - (span * 0.5 + 0.35) * (1.0 - cut), 0.0)
 	if ridge_half > 0.05:
-		component_box("ridge_cap", Vector3(0.22, 0.16, ridge_half * 2.0),
-			xf * Transform3D(Basis(), Vector3(0, rise + 0.14, 0)), SURF_ROOF)
+		_emit_ridge_cap_segments(xf, rise, ridge_half, authored)
 	var roof_bounds: AABB = xf * AABB(Vector3(-h - 0.35, -RoofShape.DEPTH * 0.5, -f - 0.25),
 		Vector3(span + 0.7, rise + RoofShape.DEPTH * 0.5 + 0.22, along + 0.5))
 	_log_mass("roof" if _storeys() == 1 else "roof_%d" % (_storeys() - 1), roof_bounds)
@@ -946,6 +1076,99 @@ func _build_roof() -> void:
 	_build_eaves_tails(xf, span, along, rise)
 	_build_dormers(xf, layout["dormers"])
 	host_end()
+
+
+## A centred oculus can cross the ridge. The slope pieces are clipped above,
+## but the decorative ridge cap is a separate solid box, so it must be split
+## around the same local-XZ opening projection or a vertical ray still hits it.
+func _emit_ridge_cap_segments(xf: Transform3D, rise: float,
+		ridge_half: float, authored: Array) -> void:
+	var ranges: Array[Vector2] = [Vector2(-ridge_half, ridge_half)]
+	for op in authored:
+		var hole: Rect2 = Poly.bounding_rect(op["polygon"])
+		if hole.end.x < -0.11 or hole.position.x > 0.11:
+			continue
+		var next: Array[Vector2] = []
+		for span in ranges:
+			if hole.end.y <= span.x or hole.position.y >= span.y:
+				next.append(span)
+				continue
+			if hole.position.y > span.x + 0.02:
+				next.append(Vector2(span.x, minf(hole.position.y, span.y)))
+			if hole.end.y < span.y - 0.02:
+				next.append(Vector2(maxf(hole.end.y, span.x), span.y))
+		ranges = next
+	for span in ranges:
+		if span.y - span.x <= 0.02:
+			continue
+		component_box("ridge_cap", Vector3(0.22, 0.16, span.y - span.x),
+			xf * Transform3D(Basis(), Vector3(0, rise + 0.14,
+			(span.x + span.y) * 0.5)), SURF_ROOF)
+
+
+## Record an authored opening only when it lies on an emitted roof face. A
+## malformed/off-roof request therefore cannot masquerade as proof of a cut.
+func _record_sloped_roof_openings(layout: Dictionary, authored: Array) -> void:
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	var xf: Transform3D = layout["transform"]
+	for op in authored:
+		var poly: PackedVector2Array = op["polygon"]
+		var covered := false
+		for face in faces:
+			if Poly.intersection_area(RoofShape.footprint(face), poly) > 0.0001:
+				covered = true
+				break
+		if not covered:
+			continue
+		var centre := Poly.bounding_rect(poly).get_center()
+		var h := RoofShape.height_at(faces, centre)
+		if not is_finite(h):
+			h = spec.height * _storeys()
+		var world_poly := PackedVector3Array()
+		for p in poly:
+			var ph := RoofShape.height_at(faces, p)
+			if not is_finite(ph):
+				ph = h
+			world_poly.append(xf * Vector3(p.x, ph, p.y))
+		_record_roof_opening(op, world_poly, xf * Vector3(centre.x, h, centre.y))
+
+
+func _record_court_roof_openings(wall_top: float) -> void:
+	for op in HouseGeometry.roof_openings(plan):
+		if op["kind"] == &"dormer":
+			continue
+		var poly: PackedVector2Array = op["polygon"]
+		var inside_court := false
+		for court in plan.courts:
+			if Poly.intersection_area(poly, Poly.from_rect(Rect2(court["rect"]))) > 0.0001:
+				inside_court = true
+				break
+		if not inside_court:
+			continue
+		var centre := Poly.bounding_rect(poly).get_center()
+		_record_roof_opening(op, PackedVector3Array([
+			Vector3(poly[0].x, wall_top, poly[0].y),
+			Vector3(poly[1].x, wall_top, poly[1].y),
+			Vector3(poly[2].x, wall_top, poly[2].y)]),
+			Vector3(centre.x, wall_top, centre.y))
+
+
+func _record_roof_opening(op: Dictionary, world_poly: PackedVector3Array,
+		centre: Vector3) -> void:
+	if world_poly.size() < 3:
+		return
+	var box := AABB(world_poly[0], Vector3.ZERO)
+	for p in world_poly:
+		box = box.expand(p)
+	var row := {"id": String(op["id"]), "kind": op["kind"],
+		"storey": int(op["storey"]), "room": int(op.get("room", -1)),
+		"polygon": op["polygon"], "world_polygon": world_poly,
+		"aabb": box, "center": centre}
+	roof_opening_log.append(row)
+	part_log.append({"kind": "roof_opening", "id": row["id"],
+		"opening_kind": row["kind"], "storey": row["storey"],
+		"room": row["room"], "pos": centre, "size": box.size,
+		"rot_y": 0.0, "facing": Vector3.UP, "tag": _tag})
 
 
 func _roof_face(xf: Transform3D, local: PackedVector3Array, surface: int,
@@ -1242,5 +1465,3 @@ func _build_chimney() -> void:
 			_kit.drum(Vector3(px, top + 0.18, pz), pot_r, pot_r, pot_h, SURF_FLOOR, 10)
 			_kit.drum(Vector3(px, top + 0.18 + pot_h - 0.06, pz), pot_r * 1.15, pot_r * 1.15, 0.06, SURF_TRIM, 10)
 	total_height = maxf(total_height, top + 0.18 + pot_h)
-
-

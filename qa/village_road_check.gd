@@ -108,6 +108,17 @@ func _endpoint_at_lot(plan: VillagePlan, road: int, p: Vector2) -> bool:
 	return false
 
 
+## A round village's single civic lane deliberately terminates inside its
+## common.  It is not a forgotten cul-de-sac: the common is the destination
+## and the form's defining road count is exactly one lane in.
+func _endpoint_on_common(plan: VillagePlan, p: Vector2) -> bool:
+	for common in plan.commons:
+		if Poly.contains_point(common["poly"], p) \
+			or VillageMeasure.point_to_poly(p, common["poly"]) <= 0.75:
+			return true
+	return false
+
+
 func _check_hierarchy(plan: VillagePlan) -> void:
 	for r in range(plan.roads.size()):
 		var road: Dictionary = plan.roads[r]
@@ -116,7 +127,9 @@ func _check_hierarchy(plan: VillagePlan) -> void:
 		for p in [pts[0], pts[pts.size() - 1]]:
 			match cls:
 				&"lane":
-					if not _endpoint_on(plan, r, p, [&"street", &"through"]) and not _endpoint_at_lot(plan, r, p):
+					if not _endpoint_on(plan, r, p, [&"street", &"through"]) \
+						and not _endpoint_at_lot(plan, r, p) \
+						and not _endpoint_on_common(plan, p):
 						failures.append("hierarchy: lane %d ends at %v on nothing -- a lane joins a street or ends at a lot" % [r, p])
 				&"street":
 					if not _endpoint_on(plan, r, p, [&"street", &"through"]):
@@ -132,6 +145,8 @@ func _check_dead_ends(plan: VillagePlan) -> void:
 			if VillageMeasure.on_boundary(plan.site, p):
 				continue
 			if _endpoint_on(plan, r, p, [&"through", &"street", &"lane", &"track", &"path"]):
+				continue
+			if cls == &"lane" and _endpoint_on_common(plan, p):
 				continue
 			# a dead end: only a short lane ending at a lot may
 			if cls != &"lane":

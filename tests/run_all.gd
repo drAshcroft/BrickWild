@@ -46,16 +46,23 @@ extends SceneTree
 ##  29 world      - the buildings of the wider world (WORLD_BUILDINGS), as
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
-	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hbounds", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
+	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
+	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
-	"village", "vsite", "vlot", "vcheck", "world", "warchetype"]
+	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["roofquick", "houseqacore", "houseqaplan",
-	"houseqafurnish", "houseqafull"]
+	"houseqafurnish", "houseqafull", "wld001_domus", "wld001_riad",
+	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
+	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
+	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
+	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
+	"varchetype_thorpe", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
+	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest",
+	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap"]
 
 ## LANES -- the suites worth running for a given KIND OF EDIT.
 ##
@@ -81,13 +88,14 @@ const EXTRA: Array[String] = ["roofquick", "houseqacore", "houseqaplan",
 ## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 ## Lanes and bare suite names can be mixed; duplicates run once.
 const LANES: Dictionary = {
-	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hbounds"],
+	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
-	"lane:castle": ["castle", "cnormals", "cmassing"],
+	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms"],
 	"lane:church": ["church", "normals", "massing"],
 	"lane:temple": ["temple", "rite"],
+	"lane:world": ["wld001"],
 	"lane:sweep": ORDER,
 }
 
@@ -124,6 +132,12 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/castle_walk_suite.gd").run()
 		"cplanshell":
 			return load("res://tests/suites/castle_plan_shell_suite.gd").run()
+		"ctowerplan":
+			return load("res://tests/suites/castle_tower_plan_suite.gd").run()
+		"cmotteplan":
+			return load("res://tests/suites/castle_motte_plan_suite.gd").run()
+		"cforms":
+			return load("res://tests/suites/castle_forms_suite.gd").run()
 		"crangeplan":
 			return load("res://tests/suites/castle_range_plan_suite.gd").run()
 		"caperture":
@@ -160,6 +174,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/house_component_suite.gd").run()
 		"hopening":
 			return preload("res://tests/suites/house_roof_opening_suite.gd").run()
+		"hsky":
+			return preload("res://tests/suites/house_sky_opening_suite.gd").run()
+		"hdoor":
+			return preload("res://tests/suites/house_raised_door_suite.gd").run()
 		"hbounds":
 			return preload("res://tests/suites/house_bounds_suite.gd").run()
 		"assets":
@@ -208,8 +226,51 @@ static func _run_one(key: String) -> SuiteResult:
 			return VillageLotSuite.run()
 		"vcheck":
 			return VillageCheckSuite.run()
+		"vforms":
+			return VillageFormsSuite.run()
+		"venclosure":
+			return preload("res://tests/suites/village_enclosure_suite.gd").run()
+		"varchetype":
+			return VillageArchetypeSuite.run()
+		"varchetype_thorpe":
+			return VillageArchetypeSuite.run_row(&"thorpe")
+		"varchetype_green_village":
+			return VillageArchetypeSuite.run_row(&"green_village")
+		"varchetype_ford":
+			return VillageArchetypeSuite.run_row(&"ford")
+		"varchetype_mill_village":
+			return VillageArchetypeSuite.run_row(&"mill_village")
+		"varchetype_strand":
+			return VillageArchetypeSuite.run_row(&"strand")
+		"varchetype_pine_hold":
+			return VillageArchetypeSuite.run_row(&"pine_hold")
+		"varchetype_mine_camp":
+			return VillageArchetypeSuite.run_row(&"mine_camp")
+		"varchetype_pilgrims_rest":
+			return VillageArchetypeSuite.run_row(&"pilgrims_rest")
+		"varchetype_lords_village":
+			return VillageArchetypeSuite.run_row(&"lords_village")
+		"varchetype_market_town":
+			return VillageArchetypeSuite.run_row(&"market_town")
+		"varchetype_blight":
+			return VillageArchetypeSuite.run_row(&"blight")
+		"varchetype_cap":
+			return VillageArchetypeSuite.run_row(&"cap")
 		"world", "warchetype":
 			return WorldArchetypeSuite.run()
+		"wld001":
+			return preload("res://tests/suites/world_courtyard_suite.gd").run()
+		"wld001_domus":
+			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"domus")
+		"wld001_riad":
+			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"riad")
+		"wld001_palazzo":
+			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"palazzo")
+		"wld001_domus_07", "wld001_domus_10", "wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10", "wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07", "wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19":
+			var pieces := key.split("_")
+			var kind := StringName(pieces[1])
+			var scale := float(pieces[2].left(1) + "." + pieces[2].right(1))
+			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind_scale(kind, scale)
 	return null
 
 

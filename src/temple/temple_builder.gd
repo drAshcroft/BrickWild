@@ -126,14 +126,14 @@ func _gate_void(z: float) -> void:
 # ---------------------------------------------------------------- columns
 
 func _build_columns() -> void:
-	var cols: Array[Vector3] = TempleGeometry.column_positions(spec)
-	if cols.is_empty():
+	if spec.columns.is_empty():
 		return
 	tag("column")
-	var r: float = spec.column_r
-	var h: float = TempleGeometry.column_height(spec)
 	var i := 0
-	for c in cols:
+	for column in spec.columns:
+		var c: Vector3 = column["pos"]
+		var r: float = float(column["radius"])
+		var h: float = float(column["height"])
 		# a shaft that tapers, on a plinth, under a capital: three boxes and a
 		# revolve, which is all a column has ever been
 		box(Vector3(r * 2.4, 0.22, r * 2.4), Vector3(c.x, 0.11, c.z), SURF_STONE)

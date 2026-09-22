@@ -107,6 +107,9 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	spec.variant_name = "The %s%s %s" % [_pick(r, FIRST), _pick(r, SECOND),
 		_pick(r, OF)]
 	spec.variant_name = spec.variant_name.strip_edges()
+	# Materialize the final, fully filtered column arrangement once.  Consumers
+	# must read this authored plan list rather than independently re-deriving it.
+	spec.columns = TempleGeometry.column_records(spec)
 
 
 ## A pit has to leave the procession a way across and the dais a place to

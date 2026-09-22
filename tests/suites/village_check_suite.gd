@@ -470,6 +470,45 @@ static func _dress_fixtures(res: SuiteResult, base: VillagePlan) -> void:
 			"zone": Rect2()})
 	_expect(res, "dress fences fixture", VillageDressCheck.new().check(p8), "fences")
 
+	# VIL-018 positive: the dresser materialises a pasture outside the
+	# measured lot hull for an enclosed farming village, even though the site
+	# planner leaves the enclosure polygon to the later enclosure pass.
+	var enclosed_spec := VillageSpec.new(9217)
+	enclosed_spec.population = 30
+	enclosed_spec.culture = &"english"
+	enclosed_spec.purpose = &"farming"
+	enclosed_spec.enclosure = &"hedge"
+	enclosed_spec.water = &"none"
+	enclosed_spec.wealth = 0.4
+	enclosed_spec.generate(enclosed_spec.seed)
+	var enclosed := VillageLotPlanner.plan(enclosed_spec)
+	if enclosed.fields.is_empty():
+		res.fail("dress fields positive: enclosed farming village has no outside pasture")
+	else:
+		_clean(res, "dress outside pasture", VillageDressCheck.new().check(enclosed))
+		var bad_outer := _copy(enclosed)
+		var derived_outer: Dictionary = VillageEnclosurePlan.build(bad_outer)
+		bad_outer.fields = [{"kind": &"field", "poly": derived_outer["edge"]}]
+		_expect(res, "dress outside pasture negative", VillageDressCheck.new().check(bad_outer), "fields")
+		# Authored inside fields are filtered before dressing, rather than being
+		# silently accepted by the edge rule.
+		var authored := _copy(enclosed)
+		authored.fields = [{"kind": &"field", "poly": derived_outer["edge"]}]
+		VillageDresser.dress(authored)
+		if not authored.fields.is_empty():
+			res.fail("dress fields integration: inside authored field was retained")
+
+		var forest_spec := VillageSpec.new(9218)
+		forest_spec.population = 30
+		forest_spec.culture = &"english"
+		forest_spec.enclosure = &"hedge"
+		forest_spec.water = &"none"
+		forest_spec.wealth = 0.4
+		forest_spec.purpose = &"forest"
+		forest_spec.generate(forest_spec.seed)
+		var forest := VillageLotPlanner.plan(forest_spec)
+		_clean(res, "dress far-side wood", VillageDressCheck.new().check(forest))
+
 
 ## The most trees DressCheck allows on a common, read from the check so the
 ## fixture cannot drift away from the rule it is proving.

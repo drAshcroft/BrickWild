@@ -6,6 +6,7 @@ static func run() -> SuiteResult:
 	_gables(res)
 	_joints(res)
 	_castles(res)
+	_ridge_envelope(res)
 	_temples(res)
 	return res
 
@@ -105,6 +106,58 @@ static func _castles(res: SuiteResult) -> void:
 			var angle := CastleGeometry.tower_rotation(s) + TAU * i / CastleGeometry.tower_sides(s)
 			var p := Vector2(cos(angle), sin(angle)) * radius * 0.995
 			Probe._expect(res, not Probe._heights(roofs, p.x, p.y, height - 0.1, height + 30).is_empty(), "tower cap leaves %s corner uncovered" % shape)
+
+
+## A ridge range roof is a joined envelope, not four independent gables.  The
+## regression checks the actual emitted bridge: every deferred roof face is
+## represented, its eave clears the range wall head, every flat tower owns a
+## deck at the bend, and the merlon blocks sit on that deck.
+static func _ridge_envelope(res: SuiteResult) -> void:
+	var s: CastleSpec = CastleSweep.spec_at(&"norman", &"castle", 0)
+	s.plan_kind = &"ridge"
+	CastleGenerator.refit(s)
+	var b := CastleBuilder.new()
+	var mesh: ArrayMesh = b.build(s)
+	var ranges: Array[Dictionary] = CastleGeometry.ridge_ranges(s)
+	var towers: Array[Dictionary] = CastleGeometry.ridge_tower_centers(s)
+	res.checked += 1
+	Probe._expect(res, b._roof_faces.size() == ranges.size() * 4,
+		"ridge hip envelope lost a roof face at a range join")
+	res.checked += 1
+	Probe._expect(res, b._roof_covers.size() == towers.size(),
+		"ridge tower deck coverage does not match vertex towers")
+	var deck_rows := b.part_log.filter(func(p: Dictionary) -> bool:
+		return String(p.get("kind", "")) == "tower_deck")
+	res.checked += 1
+	Probe._expect(res, deck_rows.size() == towers.size(),
+		"flat ridge towers have no emitted top deck")
+	var min_roof_y := INF
+	var roof_vertices: PackedVector3Array = mesh.surface_get_arrays(CastleBuilder.SURF_ROOF)[Mesh.ARRAY_VERTEX]
+	for p in roof_vertices:
+		min_roof_y = minf(min_roof_y, p.y)
+	res.checked += 1
+	Probe._expect(res, min_roof_y > s.height,
+		"ridge eave shares the range wall-head plane (%.4f vs %.4f)" % [min_roof_y, s.height])
+	if s.battlements:
+		var seated := 0
+		var min_tower_h := INF
+		for ti in range(towers.size()):
+			min_tower_h = minf(min_tower_h, CastleGeometry.tower_height_at(s, 0, ti))
+		for p in b.part_log:
+			if String(p.get("tag", "")) != "tower" or String(p.get("kind", "")) != "box":
+				continue
+			var pos: Vector3 = p["pos"]
+			var size: Vector3 = p["size"]
+			for d in towers:
+				var c: Vector3 = d["pos"]
+				if Vector2(pos.x - c.x, pos.z - c.z).length() < 8.0 \
+						and pos.y - size.y * 0.5 >= min_tower_h - 0.001:
+					seated += 1
+					break
+		res.checked += 1
+		Probe._expect(res, seated > towers.size(),
+			"ridge merlons do not have blocks seated on their tower decks")
+	NormalsSuite.check_mesh(res, mesh, "ridge envelope")
 
 static func _temples(res: SuiteResult) -> void:
 	for form in TempleSpec.FORMS:

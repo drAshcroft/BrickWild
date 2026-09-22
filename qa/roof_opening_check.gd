@@ -33,7 +33,8 @@ static func check(plan: HousePlan, builder: HouseBuilder,
 	if not faces.is_empty():
 		for op in openings:
 			if op["kind"] != &"dormer":
-				continue      # INT-018 kinds have their own host rules
+				_check_authored_cut(op, faces, builder, failures)
+				continue
 			_check_cut(op, faces, builder, failures)
 		cheeks = _check_cheeks(layout, builder, failures)
 	# A dormer the builder emitted that the descriptor does not know about is
@@ -45,8 +46,17 @@ static func check(plan: HousePlan, builder: HouseBuilder,
 			planned += 1
 	if emitted.size() != planned:
 		failures.append("%d dormers planned, %d emitted" % [planned, emitted.size()])
+	var emitted_authored := builder.roof_opening_log.size()
+	var authored := 0
+	for op in openings:
+		if op["kind"] != &"dormer":
+			authored += 1
+	if emitted_authored != authored:
+		failures.append("%d authored roof openings planned, %d emitted" %
+			[authored, emitted_authored])
 	return {"ok": failures.is_empty(), "failures": PackedStringArray(failures),
-		"openings": planned, "cheeks": cheeks}
+		"openings": planned + authored, "cheeks": cheeks,
+		"authored": authored}
 
 
 ## Nothing of the HOST face may remain over the opening. Sample the opening
@@ -72,6 +82,35 @@ static func _check_cut(op: Dictionary, faces: Array[PackedVector3Array],
 			if Poly.contains_point(local, sample):
 				failures.append("%s: host face %s still covers (%.2f, %.2f)"
 					% [op["id"], c["id"], sample.x, sample.y])
+				return
+
+
+## Authored holes may cross the ridge and therefore do not carry one face id.
+## Probe every roof face that contains each interior sample, then verify no
+## emitted `roof_face_` polygon still covers that point.
+static func _check_authored_cut(op: Dictionary, faces: Array[PackedVector3Array],
+		builder: HouseBuilder, failures: Array[String]) -> void:
+	var poly: PackedVector2Array = op["polygon"]
+	if poly.size() < 3:
+		return
+	var xf: Transform3D = HouseGeometry.roof_layout(builder.plan)["transform"]
+	var inv := xf.affine_inverse()
+	for sample in _interior_samples(poly):
+		var on_host := false
+		for face in faces:
+			if Poly.contains_point(RoofShape.footprint(face), sample, 0.001):
+				on_host = true
+				break
+		if not on_host:
+			continue
+		for c in builder.components("roof_face_"):
+			var local := PackedVector2Array()
+			for p in (c["points"] as PackedVector3Array):
+				var lp: Vector3 = inv * p
+				local.append(Vector2(lp.x, lp.z))
+			if Poly.contains_point(local, sample, 0.001):
+				failures.append("%s: roof face still covers authored opening at (%.2f, %.2f)"
+					% [op["id"], sample.x, sample.y])
 				return
 
 

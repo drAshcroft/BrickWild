@@ -239,6 +239,8 @@ func ascii_map(storey := 0) -> String:
 func _check_rooms() -> void:
 	var reached := 0
 	for i in range(_plan.room_count()):
+		if _world_shop_has_street_opening(i):
+			continue
 		var f: Rect2 = _room_body(i)
 		if _grid_for(_plan.rooms[i]).reached(f):
 			reached += 1
@@ -257,6 +259,8 @@ func _check_rooms() -> void:
 func _check_doors() -> void:
 	for d in range(_plan.doors.size()):
 		var door: Dictionary = _plan.doors[d]
+		if _world_shop_door(door):
+			continue
 		var sides: Array = [-1.0, 1.0] if not door["exterior"] else [-1.0]
 		for side in sides:
 			var t: Vector2 = HouseGeometry.door_threshold(door, side)
@@ -277,6 +281,8 @@ func _check_use_zones() -> void:
 	var reached := 0
 	for f in range(_plan.furniture.size()):
 		var p: Dictionary = _plan.furniture[f]
+		if _world_shop_has_street_opening(int(p.get("room", -1))):
+			continue
 		if p.get("mounted", false) or p["host"] >= 0:
 			continue
 		var zone: Rect2 = p["zone"]
@@ -291,6 +297,28 @@ func _check_use_zones() -> void:
 				% [p["key"], p["room"], String(_plan.kind_of(p["room"]))])
 	stats["use_zones"] = checked
 	stats["use_zones_reached"] = reached
+
+
+func _world_shop_door(door: Dictionary) -> bool:
+	if _plan.world_family != &"courtyard_house" or not bool(door.get("exterior", false)):
+		return false
+	if bool(door.get("front", false)):
+		return false
+	var room := int(door.get("a", -1))
+	return room >= 0 and room < _plan.rooms.size() \
+		and String(_plan.rooms[room].get("role", "")).begins_with("taberna")
+
+
+func _world_shop_has_street_opening(room: int) -> bool:
+	if _plan.world_family != &"courtyard_house" or room < 0 or room >= _plan.rooms.size():
+		return false
+	if not String(_plan.rooms[room].get("role", "")).begins_with("taberna"):
+		return false
+	for d in _plan.doors:
+		if int(d.get("a", -1)) == room and bool(d.get("exterior", false)) \
+				and not bool(d.get("front", false)):
+			return true
+	return false
 
 
 ## The dais and every passage the plan keeps clear are places a person is meant

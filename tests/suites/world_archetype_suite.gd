@@ -12,7 +12,16 @@ extends RefCounted
 
 const SCALES: Array[float] = [0.7, 1.0, 1.4, 1.9]
 
-const ARCHETYPES: Array[Dictionary] = []
+const ARCHETYPES: Array[Dictionary] = [
+	{"key": "great_hall_east", "family": &"timber_hall", "kind": &"great_hall",
+		"width": 34.0, "length": 18.0, "height": 20.0,
+		"must": ["platform", "column", "dais", "image", "roof"],
+		"check": &"hall_check", "about": "seven-bay East hall"},
+	{"key": "phoenix_pavilion", "family": &"timber_hall", "kind": &"phoenix_pavilion",
+		"width": 60.0, "length": 12.0, "height": 14.0,
+		"must": ["platform", "column", "dais", "image", "roof", "water", "wing"],
+		"check": &"hall_check", "about": "Phoenix Hall with mirrored wings"},
+]
 
 
 static func run() -> SuiteResult:
@@ -39,6 +48,12 @@ static func run() -> SuiteResult:
 				continue
 			for f in assert_contains(building, row.get("must", [])):
 				res.fail("%s: %s" % [who, f])
+			var mesh: ArrayMesh = BigGlade.build_mesh(building)
+			if mesh == null:
+				res.fail("%s: no timber hall mesh" % who)
+			else:
+				NormalsSuite.check_mesh(res, mesh, who)
+				_opening_rays(res, building.spec as TimberHallSpec, mesh, who)
 			for f2 in _family_check(building, row.get("check", &"")):
 				res.fail("%s: %s" % [who, f2])
 			if res.failures.size() > before:
@@ -46,7 +61,129 @@ static func run() -> SuiteResult:
 		res.note("  %-17s %d scales, %d defects -- %s" % [key, SCALES.size(), defects, String(row.get("about", ""))])
 	if ARCHETYPES.is_empty():
 		res.note("  0 archetypes")
+	_negative_hall_fixtures(res)
 	return res
+
+
+static func _negative_hall_fixtures(res: SuiteResult) -> void:
+	var broken_grid := TimberHallGenerator.generate(&"great_hall", 701, 34.0, 18.0, 20.0)
+	broken_grid.columns[0]["pos"] = broken_grid.columns[0]["pos"] + Vector3(1.0, 0.0, 0.0)
+	var broken_builder := TimberHallBuilder.new()
+	broken_builder.build(broken_grid)
+	var broken_report: Dictionary = HallCheck.check(broken_grid, broken_builder)
+	res.checked += 1
+	if not _has_failure(broken_report, "rings:"):
+		res.fail("negative hall fixture: broken column mirror was accepted")
+	var low_eaves := TimberHallGenerator.generate(&"great_hall", 702, 34.0, 18.0, 20.0)
+	low_eaves.roof_overhang = 0.1
+	var eaves_builder := TimberHallBuilder.new()
+	eaves_builder.build(low_eaves)
+	var eaves_report: Dictionary = HallCheck.check(low_eaves, eaves_builder)
+	res.checked += 1
+	if not _has_failure(eaves_report, "eaves:"):
+		res.fail("negative hall fixture: undersized eaves were accepted")
+	var dry_wing := TimberHallGenerator.generate(&"phoenix_pavilion", 703, 60.0, 12.0, 14.0)
+	dry_wing.water = Rect2(Vector2(-2.0, -1.0), Vector2(4.0, 2.0))
+	var wing_builder := TimberHallBuilder.new()
+	wing_builder.build(dry_wing)
+	var wing_report: Dictionary = HallCheck.check(dry_wing, wing_builder)
+	res.checked += 1
+	if not _has_failure(wing_report, "wings:"):
+		res.fail("negative hall fixture: undersized Phoenix water was accepted")
+	var buried_water := TimberHallGenerator.generate(&"phoenix_pavilion", 706, 60.0, 12.0, 14.0)
+	buried_water.water = Rect2(Vector2(-40.0, -7.0), Vector2(80.0, 5.0))
+	var buried_builder := TimberHallBuilder.new()
+	buried_builder.build(buried_water)
+	var buried_report: Dictionary = HallCheck.check(buried_water, buried_builder)
+	res.checked += 1
+	if buried_report["failures"].is_empty():
+		res.fail("negative hall fixture: buried/overlapping Phoenix water was accepted")
+	var blocked := TimberHallGenerator.generate(&"great_hall", 704, 34.0, 18.0, 20.0)
+	for c in blocked.columns:
+		c["radius"] = 4.0
+	var blocked_builder := TimberHallBuilder.new()
+	blocked_builder.build(blocked)
+	var blocked_report: Dictionary = HallCheck.check(blocked, blocked_builder)
+	res.checked += 1
+	if not _has_failure(blocked_report, "clear:"):
+		res.fail("negative hall fixture: blocked standable area was accepted")
+	var no_brackets := TimberHallGenerator.generate(&"great_hall", 705, 34.0, 18.0, 20.0)
+	var no_bracket_builder := TimberHallBuilder.new()
+	no_bracket_builder.build(no_brackets)
+	no_bracket_builder.part_log = no_bracket_builder.part_log.filter(func(part): return part["kind"] != "bracket")
+	var bracket_report: Dictionary = HallCheck.check(no_brackets, no_bracket_builder)
+	res.checked += 1
+	if not _has_failure(bracket_report, "brackets:"):
+		res.fail("negative hall fixture: missing bracket sets were accepted")
+
+
+static func _has_failure(report: Dictionary, prefix: String) -> bool:
+	for failure in report.get("failures", []):
+		if String(failure).begins_with(prefix):
+			return true
+	return false
+
+
+static func _opening_rays(res: SuiteResult, spec: TimberHallSpec, mesh: ArrayMesh, where: String) -> void:
+	var h := TimberHallGeometry.hall_rect(spec)
+	var door_origin := Vector3(0.0, spec.platform_h + 2.0, h.position.y - 1.0)
+	res.checked += 1
+	if _ray_hits_mesh(mesh, door_origin, Vector3.BACK, 2.5):
+		res.fail("%s: authored door ray is filled" % where)
+	var w: Dictionary = spec.windows[0]
+	var wp: Vector3 = w["pos"]
+	var wn: Vector3 = w["normal"]
+	var window_origin := wp + wn
+	res.checked += 1
+	if _ray_hits_mesh(mesh, window_origin, -wn, 2.5):
+		res.fail("%s: authored window ray is filled" % where)
+	var filled_door := TimberHallBuilder.new()
+	var filled_mesh := filled_door.build(spec, true, true)
+	res.checked += 1
+	if not _ray_hits_mesh(filled_mesh, door_origin, Vector3.BACK, 2.5):
+		res.fail("%s: filled-door negative control was not detected" % where)
+	var filled_window_spec := TimberHallGenerator.generate(spec.kind, spec.seed, spec.width, spec.length, spec.height)
+	filled_window_spec.windows.clear()
+	var filled_window := TimberHallBuilder.new()
+	var filled_window_mesh := filled_window.build(filled_window_spec)
+	res.checked += 1
+	if not _ray_hits_mesh(filled_window_mesh, window_origin, -wn, 2.5):
+		res.fail("%s: filled-window negative control was not detected" % where)
+
+
+static func _ray_hits_mesh(mesh: ArrayMesh, origin: Vector3, direction: Vector3, max_distance: float) -> bool:
+	var d := direction.normalized()
+	for s in range(mesh.get_surface_count()):
+		var arrays := mesh.surface_get_arrays(s)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var triangle_count := indices.size() / 3 if not indices.is_empty() else vertices.size() / 3
+		for i in range(triangle_count):
+			var ia := indices[i * 3] if not indices.is_empty() else i * 3
+			var ib := indices[i * 3 + 1] if not indices.is_empty() else i * 3 + 1
+			var ic := indices[i * 3 + 2] if not indices.is_empty() else i * 3 + 2
+			var a: Vector3 = vertices[ia]
+			var b: Vector3 = vertices[ib]
+			var c: Vector3 = vertices[ic]
+			var edge1 := b - a
+			var edge2 := c - a
+			var pvec := d.cross(edge2)
+			var det := edge1.dot(pvec)
+			if absf(det) < 0.000001:
+				continue
+			var inv_det := 1.0 / det
+			var tvec := origin - a
+			var u := tvec.dot(pvec) * inv_det
+			if u < 0.0 or u > 1.0:
+				continue
+			var qvec := tvec.cross(edge1)
+			var v := d.dot(qvec) * inv_det
+			if v < 0.0 or u + v > 1.0:
+				continue
+			var t := edge2.dot(qvec) * inv_det
+			if t >= 0.0 and t <= max_distance:
+				return true
+	return false
 
 
 static func _seed_for(key: String, scale: float) -> int:
@@ -126,4 +263,8 @@ static func _builder_for(building: GeneratedBuilding):
 		var chb := ChurchBuilder.new()
 		chb.build(building.spec)
 		return chb
+	if building.spec is TimberHallSpec:
+		var thb := TimberHallBuilder.new()
+		thb.build(building.spec)
+		return thb
 	return null

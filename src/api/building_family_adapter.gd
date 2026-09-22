@@ -67,6 +67,8 @@ static var _registry: Dictionary = {}
 ## hotel is a house.
 static func for_building(building) -> BuildingFamilyAdapter:
 	var spec: RefCounted = building.spec
+	if building.plan != null and building.plan.world_family == &"courtyard_house":
+		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
 	if spec is ShopSpec:
@@ -283,6 +285,24 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func build_mesh(building) -> ArrayMesh:
 		return WorldFamilies.build_mesh(building)
+
+	func instantiate(building, cutaway: bool) -> Node3D:
+		if building.plan != null and building.plan.world_family == &"courtyard_house":
+			return HouseAssembler.build(building.plan, cutaway)
+		return null
+
+	func footprint(building) -> Rect2:
+		if building.plan != null and building.plan.world_family == &"courtyard_house":
+			return HouseGeometry.site_rect(building.plan.spec)
+		return Rect2()
+
+	func door(building) -> Vector3:
+		if building.plan != null and building.plan.world_family == &"courtyard_house":
+			var d: int = building.plan.entrance()
+			if d >= 0:
+				var p: Vector2 = building.plan.doors[d]["pos"]
+				return Vector3(p.x, 1.0, p.y)
+		return Vector3.ZERO
 
 
 # ------------------------------------------------------------ the villages

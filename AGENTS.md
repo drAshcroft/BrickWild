@@ -156,3 +156,6 @@ file.
   something a room needs, it records that on the plan and the furnishing check
   downgrades that one complaint to a warning. Do not "fix" a warning of that
   shape by making the check quieter.
+
+## knowledge base
+I want the waterfree knowledge base to become a formost expert on procedural generation of buildings, decorations and villages.  After each session update the knowledge base so it can extend its knowledge to future sessions and act like a living manual for this project. 

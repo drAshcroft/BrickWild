@@ -12,7 +12,22 @@ extends RefCounted
 ## family to its generator; a family with a row and no branch is a family
 ## still being built, and the facade reports it as such.
 
-const FAMILIES := {}
+const FAMILIES := {
+	&"courtyard_house": {
+		"label": "Courtyard house",
+		"kinds": [&"domus", &"riad", &"palazzo"],
+		"width": {"min": 12.0, "max": 30.0},
+		"length": {"min": 15.0, "max": 50.0},
+		"height": {"min": 2.6, "max": 24.0},
+	},
+	&"timber_hall": {
+		"label": "Timber hall",
+		"kinds": [&"great_hall", &"phoenix_pavilion"],
+		"width": {"min": 18.0, "max": 120.0},
+		"length": {"min": 8.0, "max": 42.0},
+		"height": {"min": 10.0, "max": 24.0},
+	}
+}
 
 
 static func families() -> Array[StringName]:
@@ -47,10 +62,25 @@ static func envelope(family: StringName) -> Dictionary:
 ## Generate a world building: fills `out.spec` (and `out.plan` for the
 ## plan-based families). Returns false when the family has no generator
 ## yet, which the facade reports as an error rather than a building.
-static func generate(_request: BuildingRequest, _out: GeneratedBuilding) -> bool:
-	return false
+static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
+	if request.style == &"courtyard_house" and request.purpose in kinds_of(&"courtyard_house"):
+		var made := WorldCourtyardGenerator.generate(request.purpose, request.seed,
+			request.width, request.length, request.height, true)
+		out.spec = made["spec"]
+		out.plan = made["plan"]
+		return true
+	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
+		return false
+	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
+		request.width, request.length, request.height)
+	return true
 
 
 ## Build the mesh for a world building's spec, or null when there is none.
-static func build_mesh(_building: GeneratedBuilding) -> ArrayMesh:
-	return null
+static func build_mesh(building: GeneratedBuilding) -> ArrayMesh:
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"courtyard_house":
+		return HouseBuilder.new().build(building.plan)
+	if building == null or not (building.spec is TimberHallSpec):
+		return null
+	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)

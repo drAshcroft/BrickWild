@@ -236,9 +236,23 @@ func _check_connectivity(plan: HousePlan) -> void:
 	var seen: Dictionary = plan.reachable_rooms(start)
 	stats["rooms_reached"] = seen.size()
 	for i in range(plan.room_count()):
+		if plan.world_family == &"courtyard_house" and _world_shop_has_street_opening(plan, i):
+			continue
 		if not seen.has(i):
 			failures.append("connected: room %d (%s) cannot be reached from the front door"
 				% [i, String(plan.kind_of(i))])
+
+
+static func _world_shop_has_street_opening(plan: HousePlan, room: int) -> bool:
+	if room < 0 or room >= plan.rooms.size():
+		return false
+	if not String(plan.rooms[room].get("role", "")).begins_with("taberna"):
+		return false
+	for d in plan.doors:
+		if int(d.get("a", -1)) == room and bool(d.get("exterior", false)) \
+				and not bool(d.get("front", false)):
+			return true
+	return false
 
 
 ## Stairs are the only legal edge between levels.  Check both their metadata
@@ -304,6 +318,8 @@ func _check_privacy(plan: HousePlan) -> void:
 		# DIFFERENT sleeping room is exactly the corridor-through-a-bedroom
 		# problem this check exists to catch.
 		if plan.kind_of(i) == &"bedroom":
+			continue
+		if plan.world_family == &"courtyard_house" and _world_shop_has_street_opening(plan, i):
 			continue
 		if not polite.has(i):
 			failures.append("privacy: the only way into room %d (%s) is through a %s"
@@ -420,7 +436,8 @@ func _check_windows(plan: HousePlan) -> void:
 			if not _same_wall(w, d):
 				continue
 			if (Vector2(w["pos"]) - Vector2(d["pos"])).length() \
-					< (float(w["width"]) + float(d["width"])) / 2.0 + 0.05:
+					< (float(w["width"]) + float(d["width"])) / 2.0 + 0.05 \
+					and float(w["sill"]) < float(d.get("head", HouseGeometry.DOOR_H)) - 0.02:
 				failures.append("window %d is cut through a doorway" % wi)
 
 	for i in range(plan.room_count()):

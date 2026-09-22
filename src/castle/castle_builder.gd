@@ -173,6 +173,18 @@ func _build_sky_citadel() -> void:
 func _join_roofs() -> void:
 	var covers: Array[PackedVector3Array] = _roof_faces.duplicate()
 	covers.append_array(_roof_covers)
+	if CastleGeometry.is_ridge(spec):
+		# A ridge has deliberate roof overlaps at every vertex: two ranges dive
+		# into the same tower from different headings.  The generic envelope
+		# clipper treats each sloping neighbour as a convex hole and can peel
+		# away the wrong wedge at a bend.  Towers are the structural ownership
+		# boundary, so clip each slope only by the actual tower top footprints;
+		# the two range skins then meet under masonry instead of crossing in the
+		# visible envelope.
+		for face in _roof_faces:
+			for piece in RoofShape.exposed(face, _roof_covers, -1):
+				_kit.slab_poly(RoofShape.lift(piece, face), RoofShape.DEPTH, SURF_ROOF, true)
+		return
 	for mass in mass_log:
 		var name: String = mass["name"]
 		# Curved and battered towers use their own inscribed footprint below.
@@ -207,7 +219,11 @@ func _build_motte() -> void:
 	var k: AABB = CastleGeometry.shell_keep_aabb(spec)
 	var base := Vector3(c.x, spec.motte_height, c.y)
 	var t: float = spec.shell_thickness
-	_kit.oval_ring(base, k.size.x / 2.0, k.size.z / 2.0, t, k.size.y, SURF_STONE, 28)
+	var planned_shell := _planned_interiors.has("keep_shell")
+	if planned_shell:
+		Interiors.emit(self, _planned_interiors["keep_shell"])
+	else:
+		_kit.oval_ring(base, k.size.x / 2.0, k.size.z / 2.0, t, k.size.y, SURF_STONE, 28)
 	_log_mass("keep_shell", k)
 	# the parapet, merlon by merlon round the oval
 	if spec.battlements:
@@ -217,9 +233,11 @@ func _build_motte() -> void:
 			var p := base + Vector3(cos(a) * (k.size.x / 2.0 - t / 2.0), k.size.y + spec.merlon_h / 2.0,
 				sin(a) * (k.size.z / 2.0 - t / 2.0))
 			box(Vector3(CastleGeometry.MERLON_W, spec.merlon_h, minf(t, 0.6)), p, SURF_TRIM, -a)
-	# a door in the keep, on the side the climb arrives
-	_opening(base + Vector3(0.0, 1.6, -(k.size.z / 2.0 + CastleGeometry.OPENING_EPS)),
-		PI, minf(k.size.x * 0.12, 1.6), 2.6, &"arched", true)
+	# The occupied plan owns the shell doorway and its actual cut.  The legacy
+	# painted opening remains only for unplanned callers.
+	if not planned_shell:
+		_opening(base + Vector3(0.0, 1.6, -(k.size.z / 2.0 + CastleGeometry.OPENING_EPS)),
+			PI, minf(k.size.x * 0.12, 1.6), 2.6, &"arched", true)
 	total_height = maxf(total_height, spec.motte_height + k.size.y + spec.merlon_h)
 
 	tag("climb")
@@ -237,6 +255,14 @@ func _build_motte() -> void:
 	var xf := Transform3D(Basis(Vector3.RIGHT, up, dir), centre)
 	_kit.oriented_box(Vector3(th, h, length), xf, SURF_STONE)
 	_log_mass("climb", CastleGeometry.climb_aabb(spec))
+	if planned_shell:
+		var shell_row: Dictionary = _planned_interiors["keep_shell"]
+		var shell_plan: HousePlan = shell_row.plan
+		var shell_door: Dictionary = shell_plan.doors[shell_plan.entrance()]
+		var shell_door_world: Vector3 = shell_row.transform * Vector3(shell_door.pos.x, 0.0, shell_door.pos.y)
+		_motte_approach_steps(w, Vector2(shell_door_world.x, shell_door_world.z))
+	else:
+		_motte_approach_steps(w)
 
 
 # ------------------------------------------------------------ ridge castle
@@ -267,16 +293,25 @@ func _build_ridge() -> void:
 		# direction of the segment
 		var dir: Vector2 = seg["dir"]
 		var rise: float = width * spec.roof_pitch * 0.5
-		var xf := Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.y)), Vector3(mid.x, height, mid.y))
-		# Masonry dives into the vertex towers; roofs stop near their centres.
-		# Extending the roof by the same dive pushed crossed gables through the
-		# far side of every bend and made the joins look broken.
+		# Lift the slab centre by half its thickness: its underside then clears
+		# the wall head by a millimetre instead of sharing the exact eave plane.
+		var roof_base: float = height + RoofShape.DEPTH * 0.5 + 0.01
+		var xf := Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.y)), Vector3(mid.x, roof_base, mid.y))
+		# Masonry dives into the vertex towers.  The roofs are allowed to run
+		# beneath their decks, where the tower footprint owns the join; clipping
+		# them at the outer shoulder would leave a visible wall-head gap.
 		var roof_length: float = float(seg.get("roof_length", length)) + EAVE * 0.25
-		_kit.ridge_roof(xf, width + EAVE, roof_length, rise, SURF_ROOF,
-			SURF_STONE, width, roof_length, 0.3, 0.0, _roof_faces)
+		# A range dies into a vertex tower, so its end is a shallow hip rather
+		# than a freestanding gable wall.  The old gable closures projected past
+		# the tower footprint at every bend; those exposed vertical wedges were
+		# the dark "holes" in the joined envelope.  Keep the hip faces deferred
+		# so the deck below can occlude their buried ends.
+		for face in RoofShape.faces(width + EAVE, roof_length, rise, &"half_hipped"):
+			_roof_faces.append(xf * face)
+		_ridge_end_fascia(xf, width + EAVE, roof_length, rise)
 		if spec.dormers:
 			_ridge_dormers(mid, dir, length, width, height, rise)
-		total_height = maxf(total_height, height + rise)
+		total_height = maxf(total_height, roof_base + rise)
 		# windows: a row a storey on both long faces, on the rotated face.
 		#
 		# A planned range cuts its OWN openings for the storeys it occupies,
@@ -310,6 +345,20 @@ func _build_ridge() -> void:
 		i2 += 1
 	if spec.style == &"dark" and spec.keep:
 		_build_dark_spire()
+
+
+## Close only the two range ends, with a thin roof-coloured fascia.  Passing an
+## end surface to MeshKit.ridge_roof closes all four wall-head edges and makes
+## a second sloping wall along each eave; at a zig-zag bend those end walls are
+## the dark crossing wedges.  The range shell owns the long wall heads, while
+## this fascia owns the exposed underside at each tower shoulder.
+func _ridge_end_fascia(xf: Transform3D, span: float, along: float, rise: float) -> void:
+	var roof := RoofShape.faces(span, along, rise, &"half_hipped")
+	for end_v in [-1.0, 1.0]:
+		var a := Vector2(-span * 0.5, end_v * along * 0.5)
+		var b := Vector2(span * 0.5, end_v * along * 0.5)
+		var profile := RoofShape.wall_profile(roof, a, b)
+		_kit.slab_poly(xf * profile, 0.18, SURF_ROOF, true)
 
 
 ## One revolved needle at the ridge's centre. Its broad lower shoulders dive
@@ -359,16 +408,20 @@ func _build_tower_house() -> void:
 	var t: AABB = CastleGeometry.tower_house_aabb(spec)
 	tag("hall")
 	_log_mass("hall", t)
+	var planned_tower := _planned_interiors.has("tower_house")
+	if planned_tower:
+		Interiors.emit(self, _planned_interiors["tower_house"])
 	tag("storey")
 	var n: int = maxi(spec.tower_storeys, 1)
 	for s in range(n):
 		var a: AABB = CastleGeometry.tower_storey_aabb(spec, s)
-		if spec.style == &"wizard":
-			_kit.oval_ring(a.position + Vector3(a.size.x / 2.0, 0.0, a.size.z / 2.0),
-				a.size.x / 2.0, a.size.z / 2.0,
-				CastleGeometry.tower_wall_thickness(spec, s), a.size.y, SURF_STONE, 24)
-		else:
-			_box_aabb(a, SURF_STONE)
+		if not planned_tower:
+			if spec.style == &"wizard":
+				_kit.oval_ring(a.position + Vector3(a.size.x / 2.0, 0.0, a.size.z / 2.0),
+					a.size.x / 2.0, a.size.z / 2.0,
+					CastleGeometry.tower_wall_thickness(spec, s), a.size.y, SURF_STONE, 24)
+			else:
+				_box_aabb(a, SURF_STONE)
 		_log_mass("storey_%d" % s, a)
 	tag("platform")
 	var p: AABB = CastleGeometry.tower_platform_aabb(spec)
@@ -400,29 +453,37 @@ func _build_tower_house() -> void:
 			_log_mass("balcony_%d" % bi, balcony["aabb"])
 			bi += 1
 
-	# the way in: one door, a storey up, on the front face of the storey it
-	# opens into
-	tag("door")
+	# The plan owns the raised doorway and its sill interval.  Keep the old
+	# opening only for an unplanned tower caller.
 	var sill: float = CastleGeometry.tower_door_sill(spec)
 	var door_h: float = minf(CastleGeometry.tower_storey_height(spec) * 0.7, 2.6)
 	var door_storey: int = clampi(int(sill / CastleGeometry.tower_storey_height(spec)), 0, n - 1)
-	var ds: AABB = CastleGeometry.tower_storey_aabb(spec, door_storey)
-	_opening(Vector3(t.position.x + t.size.x / 2.0, sill + door_h / 2.0,
-		ds.position.z - CastleGeometry.OPENING_EPS), PI, minf(t.size.x * 0.25, 1.4),
-		door_h, &"arched", true)
+	if not planned_tower:
+		tag("door")
+		var ds: AABB = CastleGeometry.tower_storey_aabb(spec, door_storey)
+		_opening(Vector3(t.position.x + t.size.x / 2.0, sill + door_h / 2.0,
+			ds.position.z - CastleGeometry.OPENING_EPS), PI, minf(t.size.x * 0.25, 1.4),
+			door_h, &"arched", true)
+	else:
+		var tower_row: Dictionary = _planned_interiors["tower_house"]
+		var tower_plan: HousePlan = tower_row.plan
+		var tower_door: Dictionary = tower_plan.doors[tower_plan.entrance()]
+		var tower_door_world: Vector3 = tower_row.transform * Vector3(tower_door.pos.x, 0.0, tower_door.pos.y)
+		_tower_approach_steps(t, sill, Vector2(tower_door_world.x, tower_door_world.z))
 
 	# windows on every storey above the lift, on all four faces of that
 	# storey's own box -- never on the ground storey, which is blind
-	tag("window")
-	for s2 in range(n):
-		var a2: AABB = CastleGeometry.tower_storey_aabb(spec, s2)
-		var y: float = a2.position.y + a2.size.y * 0.55
-		if y - spec.window_h / 2.0 < CastleGeometry.TOWER_LIFT_MIN:
-			continue
-		var only: Array = []
-		if s2 == door_storey:
-			only = [Vector3(0, 0, 1), Vector3(-1, 0, 0), Vector3(1, 0, 0)]
-		_face_openings(a2, y, spec.window_style, only, 3.5)
+	if not planned_tower:
+		tag("window")
+		for s2 in range(n):
+			var a2: AABB = CastleGeometry.tower_storey_aabb(spec, s2)
+			var y: float = a2.position.y + a2.size.y * 0.55
+			if y - spec.window_h / 2.0 < CastleGeometry.TOWER_LIFT_MIN:
+				continue
+			var only: Array = []
+			if s2 == door_storey:
+				only = [Vector3(0, 0, 1), Vector3(-1, 0, 0), Vector3(1, 0, 0)]
+			_face_openings(a2, y, spec.window_style, only, 3.5)
 
 	tag("wing")
 	var j := 0
@@ -447,6 +508,110 @@ func _build_tower_house() -> void:
 				continue
 			_face_openings(jog, jy, spec.window_style, faces, 3.5)
 		j += 1
+
+
+## A short, physical stair from the terrain to the raised tower entrance.  The
+## rows are appended far-to-near so route QA can verify the chain without
+## reconstructing it from a mass AABB.
+func _tower_approach_steps(t: AABB, sill: float, door_xz: Vector2) -> void:
+	var count := maxi(4, int(ceil(sill / 0.28)))
+	var depth := clampf(maxf(t.size.z * 0.08, 0.8), 0.8, 1.5)
+	var width := clampf(maxf(t.size.x * 0.28, 2.0), 2.0, 3.6)
+	for i in range(count):
+		var h := sill * float(i + 1) / float(count)
+		var centre := Vector3(door_xz.x,
+			h * 0.5,
+			door_xz.y - depth * (float(count - i) - 0.5))
+		var size := Vector3(width, h, depth)
+		_log_part("tower_approach_step", centre, size, 0.0,
+			Vector3(0.0, 1.0, 0.0))
+		_kit.box(size, centre, SURF_STONE)
+
+
+## Physical steps follow the existing climb from bailey ground to the shell
+## threshold.  They terminate at the plan's inner shell face, in the same
+## local frame as the `keep_shell` interior record.
+func _motte_approach_steps(wall: Dictionary, door_xz := Vector2(INF, INF)) -> void:
+	var from := Vector3(wall["from"])
+	var keep := CastleGeometry.shell_keep_aabb(spec)
+	var centre := CastleGeometry.motte_center(spec)
+	var to := Vector3(centre.x, spec.motte_height,
+		keep.position.z + spec.shell_thickness)
+	if is_finite(door_xz.x) and is_finite(door_xz.y):
+		to.x = door_xz.x
+		to.z = door_xz.y
+	var horizontal := Vector3(to.x - from.x, 0.0, to.z - from.z)
+	var length := horizontal.length()
+	if length <= 0.1:
+		return
+	var direction := horizontal / length
+	var count := maxi(5, int(ceil(to.y / 0.28)))
+	var depth := length / float(count)
+	var width := clampf(maxf(float(wall["thickness"]) * 3.0, 2.0), 2.0, 3.6)
+	# The climb is a solid curtain, not a walkable ramp.  Put the stair flight
+	# in a parallel lane beside it, with its inner edge clear of the curtain;
+	# the last landing remains within route-QA threshold of the shell door.
+	var lane_offset := float(wall["thickness"]) * 0.5 + width * 0.5 + 0.25
+	var has_plan_target := is_finite(door_xz.x) and is_finite(door_xz.y)
+	if not has_plan_target:
+		to.x += lane_offset
+	from.x = to.x
+	# The curtain starts on the front half of the mound, where a y=0 box is
+	# completely buried by the drum.  Extend the same side lane to the drum toe
+	# so the first tread really starts at bailey ground.
+	var mound_centre := CastleGeometry.motte_center(spec)
+	var mound_radius := CastleGeometry.motte_base_radius(spec)
+	var dx := to.x - mound_centre.x
+	var toe_span := sqrt(maxf(mound_radius * mound_radius - dx * dx, 0.0))
+	var toe_z := mound_centre.y - toe_span - 0.8
+	from.z = minf(from.z, toe_z)
+	horizontal = Vector3(to.x - from.x, 0.0, to.z - from.z)
+	length = horizontal.length()
+	direction = horizontal / maxf(length, 0.001)
+	# Match the drum batter as well as the total rise: otherwise the slope can
+	# overtake a nominal 0.28 m riser even when the total-height count is high.
+	var batter := tan(deg_to_rad(clampf(spec.motte_batter, 20.0, 60.0)))
+	count = maxi(count, int(ceil(length * batter / 0.20)))
+	depth = length / float(count)
+	var yaw := atan2(direction.x, direction.z)
+	var previous_top := 0.0
+	for i in range(count):
+		var centre_step := from + direction * (depth * (float(i) + 0.5))
+		# The uphill edge of a wide tread is closer to the drum centre than its
+		# centre sample.  Lift to the highest of all four footprint corners so no
+		# part of the visible top is swallowed by the mound.
+		var half_depth := depth * 0.5
+		var half_width := width * 0.5
+		var surface_y := 0.0
+		for sx in [-half_width, half_width]:
+			for sz in [-half_depth, half_depth]:
+				surface_y = maxf(surface_y,
+					_motte_surface_y(centre_step.x + sx, centre_step.z + sz))
+		var target_top := to.y * float(i + 1) / float(count)
+		var top := maxf(target_top, surface_y + 0.015)
+		# Preserve a strictly rising, walkable chain when a floating-point sample
+		# lands exactly on the batter seam.
+		top = maxf(top, previous_top + 0.002)
+		var base := surface_y + 0.005
+		var h := maxf(top - base, 0.01)
+		centre_step.y = base + h * 0.5
+		var size := Vector3(width, h, depth)
+		_log_part("motte_approach_step", centre_step, size, yaw,
+			Vector3(0.0, 1.0, 0.0))
+		_kit.box(size, centre_step, SURF_STONE, yaw)
+		previous_top = centre_step.y + h * 0.5
+
+
+func _motte_surface_y(x: float, z: float) -> float:
+	var c := CastleGeometry.motte_center(spec)
+	var r := CastleGeometry.motte_base_radius(spec)
+	var top_r := CastleGeometry.motte_top_radius(spec)
+	var radial := Vector2(x - c.x, z - c.y).length()
+	if radial >= r:
+		return 0.0
+	if radial <= top_r:
+		return spec.motte_height
+	return spec.motte_height * (r - radial) / maxf(r - top_r, 0.001)
 
 
 # ------------------------------------------------------------------- house
@@ -1083,10 +1248,22 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 	var base_r: float = CastleGeometry.tower_radius_for(spec,
 		CastleGeometry.tower_base_half_at(spec, r, vertex))
 	_kit.drum(c, base_r, top_r, h, SURF_STONE, sides, rot)
+	# A flat-topped tower needs a real deck under its crenellations.  The old
+	# ring emitted only the merlon blocks, leaving the roof envelope visible
+	# through the open top and making those blocks read as floating.  The deck
+	# is also the ownership plane used to terminate the two range roofs at a
+	# bend, so its top is deliberately above the range eave.
+	var deck_h: float = CastleGeometry.PARAPET_RISE if spec.tower_roof == &"flat" else 0.0
+	var deck_r: float = (top_r + EAVE) if spec.battlements else top_r * 1.12
+	if deck_h > 0.0:
+		_kit.drum(c + Vector3.UP * (h + deck_h * 0.5), deck_r, deck_r, deck_h,
+			SURF_TRIM, sides, rot)
+		_log_part("tower_deck", c + Vector3.UP * (h + deck_h * 0.5),
+			Vector3(deck_r * 2.0, deck_h, deck_r * 2.0), rot)
 	var cover := PackedVector3Array()
 	for i in range(sides):
 		var angle := rot + TAU * i / sides
-		cover.append(c + Vector3(cos(angle) * top_r, h, sin(angle) * top_r))
+		cover.append(c + Vector3(cos(angle) * deck_r, h + deck_h, sin(angle) * deck_r))
 	_roof_covers.append(cover)
 	_log_mass(mass_name, CastleGeometry.tower_aabb(spec, r, c, vertex))
 	_log_part("tower", c + Vector3(0, h / 2.0, 0), Vector3(top_r * 2.0, h, top_r * 2.0))
@@ -1101,10 +1278,8 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 			_kit.tiered_taper(c + Vector3(0, h, 0), top_r * 2.0, rise, SURF_ROOF, 2, 0.15)
 		_:
 			if spec.battlements:
-				_crenellate_ring(c, top_r, h, sides, SURF_TRIM)
-			else:
-				_kit.drum(c + Vector3(0, h, 0), top_r * 1.12, top_r * 1.12,
-					CastleGeometry.PARAPET_RISE, SURF_TRIM, sides, rot)
+				var parapet_r: float = deck_r if spec.tower_shape == &"round" else deck_r * cos(PI / float(sides))
+				_crenellate_ring(c, parapet_r, h + deck_h, sides, SURF_TRIM)
 	total_height = maxf(total_height, h + rise)
 
 	# Slits on the faces that look OUT of the castle, and on the shell rather

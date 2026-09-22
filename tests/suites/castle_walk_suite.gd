@@ -46,7 +46,85 @@ static func run() -> SuiteResult:
 	_edwardian_entry(res)
 	_surface_mapping(res)
 	_opening_logs(res)
+	_special_interior_contracts(res)
 	return res
+
+
+static func _special_interior_contracts(res: SuiteResult) -> void:
+	for building_id in ["tower_house", "keep_shell"]:
+		var row := _special_fixture(building_id)
+		var clean := CastleQA.lords_walk(row.spec, row.builder)
+		_want(res, clean.applicable and clean.failures.is_empty(),
+			building_id + ": strict special route rejected clean synthetic fixture: " + str(clean.failures) + " door=" + str(clean.get("door", {})))
+		var missing_approach := _special_fixture(building_id)
+		missing_approach.builder.part_log = missing_approach.builder.part_log.filter(
+			func(part: Dictionary) -> bool: return String(part.get("kind", "")) != ("tower_approach_step" if building_id == "tower_house" else "motte_approach_step"))
+		_want(res, _has(CastleQA.lords_walk(missing_approach.spec, missing_approach.builder), "no %s chain" % ("tower_approach_step" if building_id == "tower_house" else "motte_approach_step")),
+			building_id + ": missing approach chain escaped strict QA")
+		var filled_door := _special_fixture(building_id)
+		filled_door.builder._kit.box(Vector3(2.0, 2.0, 0.4), Vector3(0, 1.5, -4.0), CastleBuilder.SURF_STONE)
+		_want(res, _has(CastleQA.lords_walk(filled_door.spec, filled_door.builder), "doorway is filled"),
+			building_id + ": filled doorway escaped strict QA")
+		var missing_stair := _special_fixture(building_id)
+		missing_stair.plan.stairs.clear()
+		_want(res, _has(CastleQA.lords_walk(missing_stair.spec, missing_stair.builder), "missing upper stair"),
+			building_id + ": missing upper stair escaped strict QA")
+		var filled_stair := _special_fixture(building_id)
+		filled_stair.builder._kit.box(Vector3(1.2, 0.5, 1.0), Vector3(0, 3.0, 0), CastleBuilder.SURF_STONE)
+		_want(res, _has(CastleQA.lords_walk(filled_stair.spec, filled_stair.builder), "upper stair 0 -> 1 opening is filled"),
+			building_id + ": filled upper stair escaped strict QA")
+
+
+static func _special_fixture(building_id: String) -> Dictionary:
+	var s := CastleSpec.new()
+	s.tier_override = &"castle"
+	s.tier = &"house" if building_id == "tower_house" else &"castle"
+	s.plan_override = &"tower_house" if building_id == "tower_house" else &"motte_bailey"
+	s.plan_kind = s.plan_override
+	s.style = &"wizard" if building_id == "tower_house" else &"norman"
+	s.width = 12.0
+	s.length = 12.0
+	s.height = 6.0
+	s.tower_storeys = 2
+	s.keep_height = 6.0
+	s.keep_w = 12.0
+	s.keep_l = 12.0
+	s.wall_thickness = 0.8
+	s.shell_thickness = 0.8
+	var hs := HouseSpec.new()
+	hs.width = 8.0
+	hs.length = 8.0
+	hs.height = 3.0
+	hs.storeys = 2
+	hs.material = &"stone"
+	hs.plinth_height = 0.0
+	hs.exterior_props = false
+	var p := HousePlan.new()
+	p.spec = hs
+	var floor := HouseGeometry.interior_rect(hs)
+	for level in 2:
+		p.rooms.append({"kind": &"hall", "rect": floor, "storey": level})
+	p.doors.append({"a": 0, "b": -1, "pos": Vector2(0, floor.position.y),
+		"normal": Vector2(0, -1), "width": 1.2, "exterior": true,
+		"front": true, "storey": 0, "sill": 0.8, "head": 2.2})
+	p.stairs.append({"a": 0, "b": 1, "storey": 0, "to_storey": 1,
+		"lower_rect": Rect2(-0.6, -0.5, 1.2, 1.0),
+		"upper_rect": Rect2(-0.6, -0.5, 1.2, 1.0),
+		"rect": Rect2(-0.6, -0.5, 1.2, 1.0)})
+	var b := CastleBuilder.new()
+	b.begin(4)
+	var row := CastleBuilder.Interiors.record(building_id, p,
+		AABB(Vector3(-4, 0, -4), Vector3(8, 6, 8)))
+	b.interiors.append(row)
+	var expected_y := (0.8 + 2.2) * 0.5
+	b.part_log.append({"kind": "door", "opening_kind": "door", "tag": building_id,
+		"pos": Vector3(0, expected_y, -3.7), "size": Vector3(1.2, 1.4, 0),
+		"facing": Vector3(0, 0, -1)})
+	var step_kind := "tower_approach_step" if building_id == "tower_house" else "motte_approach_step"
+	for i in 4:
+		b.part_log.append({"kind": step_kind, "pos": Vector3(0, 0.15 + i * 0.15, -10.0 + i * 2.0),
+			"size": Vector3(2.0, 0.3, 2.0), "tag": building_id})
+	return {"spec": s, "builder": b, "plan": p}
 
 
 static func _fixture(polygon: bool, concentric: bool) -> Dictionary:

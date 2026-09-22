@@ -99,14 +99,27 @@ func _water(plan: VillagePlan) -> void:
 	for r in range(plan.roads.size()):
 		var road: Dictionary = plan.roads[r]
 		var pts: PackedVector2Array = road["points"]
-		for i in range(pts.size() - 1):
-			for w2 in plan.water:
+		for w2 in plan.water:
+			var crossings: Array[Vector2] = []
+			for i in range(pts.size() - 1):
 				var poly: PackedVector2Array = w2["poly"]
-				if not Poly.contains_point(poly, (pts[i] + pts[i + 1]) * 0.5):
+				var span: Variant = _water_span(pts[i], pts[i + 1], poly)
+				if span == null:
 					continue
-				_bridge(pts[i], pts[i + 1], float(road["width"]), made)
-				made += 1
-				break
+				crossings.append(Vector2(span[0]))
+				crossings.append(Vector2(span[1]))
+			if crossings.size() < 2:
+				continue
+			var crossing_a := crossings[0]
+			var crossing_b := crossings[0]
+			for point in crossings:
+				if _road_path_t(pts, point) < _road_path_t(pts, crossing_a): crossing_a = point
+				if _road_path_t(pts, point) > _road_path_t(pts, crossing_b): crossing_b = point
+			if w2.get("kind", &"river") == &"stream":
+				_ford(crossing_a, crossing_b, float(road["width"]), made)
+			else:
+				_bridge(crossing_a, crossing_b, float(road["width"]), made)
+			made += 1
 
 
 ## One bridge deck with its two rails, spanning a segment of road.
@@ -128,6 +141,50 @@ func _bridge(a: Vector2, b: Vector2, width: float, index: int) -> void:
 		AABB(Vector3(mid.x - length * 0.5, 0.0, mid.y - deck * 0.5),
 			Vector3(length, 0.25 + BRIDGE_RAIL, deck)))
 
+func _ford(a: Vector2, b: Vector2, width: float, index: int) -> void:
+	var run: Vector2 = b - a
+	var length: float = maxf(run.length(), width)
+	var mid := (a + b) * 0.5
+	var yaw := atan2(-run.y, run.x)
+	box(Vector3(length, 0.12, width + BRIDGE_MARGIN),
+		Vector3(mid.x, 0.08, mid.y), SURF_STONE, yaw)
+	_log_mass("ford%d" % index,
+		AABB(Vector3(mid.x - length * 0.5, 0.0, mid.y - width * 0.5),
+			Vector3(length, 0.12, width)))
+
+func _water_span(a: Vector2, b: Vector2, poly: PackedVector2Array) -> Variant:
+	var run := b - a
+	var length_sq := maxf(run.length_squared(), 0.0001)
+	var ts: Array[float] = []
+	for p in [a, b]:
+		if Poly.contains_point(poly, p):
+			ts.append(clampf((p - a).dot(run) / length_sq, 0.0, 1.0))
+	for i in range(poly.size()):
+		var hit: Variant = Geometry2D.segment_intersects_segment(a, b,
+			poly[i], poly[(i + 1) % poly.size()])
+		if hit != null:
+			ts.append(clampf((Vector2(hit) - a).dot(run) / length_sq, 0.0, 1.0))
+	if ts.size() < 2:
+		return null
+	ts.sort()
+	return [a + run * ts[0], a + run * ts[ts.size() - 1]]
+
+
+func _road_path_t(points: PackedVector2Array, point: Vector2) -> float:
+	var travelled := 0.0
+	var nearest_distance := INF
+	var best_path := INF
+	for i in range(points.size() - 1):
+		var edge := points[i + 1] - points[i]
+		var length := edge.length()
+		var t := clampf((point - points[i]).dot(edge) / maxf(edge.length_squared(), 0.001), 0.0, 1.0)
+		var distance := point.distance_to(points[i] + edge * t)
+		if distance < nearest_distance:
+			nearest_distance = distance
+			best_path = travelled + length * t
+		travelled += length
+	return best_path
+
 
 # ------------------------------------------------------------------- edge
 
@@ -137,17 +194,24 @@ func _bridge(a: Vector2, b: Vector2, width: float, index: int) -> void:
 ## nothing, and the backs of the outer houses are the edge.
 func _enclosure(plan: VillagePlan) -> void:
 	var kind: StringName = plan.spec.enclosure
-	if not kind in [&"palisade", &"wall"] or plan.enclosure.size() < 3:
+	var derived: Dictionary = VillageEnclosurePlan.build(plan)
+	var edge: PackedVector2Array = plan.enclosure if plan.enclosure.size() >= 3 else derived["edge"]
+	if not kind in [&"hedge", &"palisade", &"wall"] or edge.size() < 3:
 		return
 	var gates: Array[Vector2] = VillageMeasure.gates(plan)
+	if gates.is_empty():
+		for g in derived["gates"]:
+			gates.append(g["pos"])
 	var kit := PropKit.new(_kit, SURF_STONE, SURF_WOOD, SURF_ROOF, SURF_DARK)
-	var n: int = plan.enclosure.size()
+	var n: int = edge.size()
 	var made := 0
 	for i in range(n):
-		var a: Vector2 = plan.enclosure[i]
-		var b: Vector2 = plan.enclosure[(i + 1) % n]
+		var a: Vector2 = edge[i]
+		var b: Vector2 = edge[(i + 1) % n]
 		for run in _minus_gates(a, b, gates):
-			if kind == &"palisade":
+			if kind == &"hedge":
+				_hedge(run[0], run[1], made)
+			elif kind == &"palisade":
 				_log_mass("palisade%d" % made,
 					kit.palisade(run[0], run[1], 0.0, PALISADE_HEIGHT))
 			else:
@@ -157,6 +221,17 @@ func _enclosure(plan: VillagePlan) -> void:
 	for g in range(gates.size()):
 		_log_mass("gate%d" % g, kit.fence_gate(Vector3(gates[g].x, 0.0, gates[g].y),
 			0.0, GATE_WIDTH, PALISADE_HEIGHT * 0.8))
+
+func _hedge(a: Vector2, b: Vector2, index: int) -> void:
+	var run := b - a
+	var length := run.length()
+	if length < 0.5:
+		return
+	var mid := (a + b) * 0.5
+	box(Vector3(length, 1.2, 0.8), Vector3(mid.x, 0.6, mid.y), SURF_COMMON,
+		atan2(-run.y, run.x))
+	_log_mass("hedge%d" % index,
+		AABB(Vector3(mid.x - length * 0.5, 0.0, mid.y - 0.4), Vector3(length, 1.2, 0.8)))
 
 
 ## One run of masonry wall.
