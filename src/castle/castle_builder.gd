@@ -32,8 +32,8 @@ var _roof_covers: Array[PackedVector3Array] = []
 var interiors: Array[Dictionary] = []
 var interior_errors: Array[String] = []
 var _planned_interiors := {}
-const Interiors = preload("res://src/castle/castle_interiors.gd")
-const KeepPlan = preload("res://src/castle/castle_keep_plan.gd")
+const Interiors = preload("castle_interiors.gd")
+const KeepPlan = preload("castle_keep_plan.gd")
 
 
 func build(p_spec: CastleSpec) -> ArrayMesh:
@@ -222,6 +222,7 @@ func _build_motte() -> void:
 	var planned_shell := _planned_interiors.has("keep_shell")
 	if planned_shell:
 		Interiors.emit(self, _planned_interiors["keep_shell"])
+		_motte_flue(_planned_interiors["keep_shell"])
 	else:
 		_kit.oval_ring(base, k.size.x / 2.0, k.size.z / 2.0, t, k.size.y, SURF_STONE, 28)
 	_log_mass("keep_shell", k)
@@ -263,6 +264,25 @@ func _build_motte() -> void:
 		_motte_approach_steps(w, Vector2(shell_door_world.x, shell_door_world.z))
 	else:
 		_motte_approach_steps(w)
+
+
+func _motte_flue(row: Dictionary) -> void:
+	var flue := CastleMottePlan.flue(row.plan, spec.merlon_h + 0.45)
+	if flue.is_empty():
+		return
+	var size: Vector3 = flue.size
+	var xf: Transform3D = row.transform * Transform3D(flue.transform)
+	var previous_tag := _tag
+	tag("keep_shell_flue")
+	host("keep_shell", int(flue.storey))
+	component_box("motte_flue", size, xf, SURF_STONE)
+	var cap := xf.translated(Vector3.UP * (size.y * 0.5 + 0.09))
+	component_box("motte_flue_cap", Vector3(size.x + 0.2, 0.18, size.z + 0.2), cap, SURF_TRIM)
+	host_end()
+	# Like the parapet, this wall-hosted exterior component is checked against
+	# real triangles; it does not replace the shell's occupied-volume mass.
+	total_height = maxf(total_height, cap.origin.y + 0.09)
+	tag(previous_tag)
 
 
 # ------------------------------------------------------------ ridge castle
@@ -692,6 +712,7 @@ func _build_chimneys() -> void:
 func _build_enclosure() -> void:
 	for r in CastleGeometry.rings(spec):
 		_build_ring(r)
+	_build_wall_stairs()
 
 	tag("barbican")
 	var bar: AABB = CastleGeometry.barbican_aabb(spec)
@@ -699,6 +720,7 @@ func _build_enclosure() -> void:
 		_passage(bar, minf(bar.size.x * 0.45, 2.4), minf(bar.size.y * 0.55, 5.0))
 		_log_mass("barbican", bar)
 		_crenellate_rect(bar, bar.size.y, SURF_TRIM)
+	_build_drawbridge()
 
 	tag("link")
 	for side in [-1.0, 1.0]:
@@ -729,6 +751,58 @@ func _build_enclosure() -> void:
 		_range(chapel, "chapel", SURF_STONE, true, [Vector3(-1, 0, 0)], RANGE_BAY)
 		_build_apse()
 	_build_yard()
+
+
+func _build_drawbridge() -> void:
+	var bridge := CastleGeometry.drawbridge_aabb(spec)
+	if bridge.size.z <= 0.0:
+		return
+	tag("drawbridge")
+	host("drawbridge")
+	# Two longitudinal bearers carry transverse planks; the small open joints
+	# read as timber, while every walking lane has continuous support beneath.
+	for side in [-1.0, 1.0]:
+		component_box("drawbridge_bearer", Vector3(0.2, 0.12, bridge.size.z),
+			Transform3D(Basis.IDENTITY, Vector3(side * bridge.size.x * 0.32, 0.06, bridge.get_center().z)), SURF_TRIM)
+	var boards := maxi(2, int(ceil(bridge.size.z / 0.28)))
+	var pitch := bridge.size.z / boards
+	for board in boards:
+		component_box("drawbridge_plank", Vector3(bridge.size.x, 0.1, pitch - 0.008),
+			Transform3D(Basis.IDENTITY, Vector3(0, 0.17, bridge.position.z + (board + 0.5) * pitch)), SURF_ROOF)
+	# Hinges are on the gate sill, clear of the wheel lanes. Upright chains
+	# remain outside the usable deck, so an open bridge is actually passable.
+	for side in [-1.0, 1.0]:
+		component_box("drawbridge_hinge", Vector3(0.22, 0.22, 0.28),
+			Transform3D(Basis.IDENTITY, Vector3(side * (bridge.size.x * 0.5 - 0.11), 0.11, bridge.end.z - 0.14)), SURF_TRIM)
+		var low := Vector3(side * (bridge.size.x * 0.5 + 0.08), 0.22, bridge.position.z + 0.2)
+		var high := Vector3(low.x, 3.0, bridge.end.z)
+		var length := low.distance_to(high)
+		var basis := Basis.looking_at((high - low).normalized(), Vector3.UP)
+		component_box("drawbridge_chain", Vector3(0.06, 0.06, length),
+			Transform3D(basis, (low + high) * 0.5), SURF_TRIM)
+	_log_mass("drawbridge", bridge)
+	host_end()
+
+
+func _build_wall_stairs() -> void:
+	var index := 0
+	for stair in CastleGeometry.wall_stairs(spec):
+		var name := "wall_stair_%d" % index
+		tag(name)
+		host(name)
+		var bounds := AABB()
+		var first := true
+		for piece in preload("castle_access_geometry.gd").pieces(stair):
+			var surface := SURF_TRIM if "rail" in String(piece.role) else SURF_STONE
+			var row := component_box(piece.role, piece.size, piece.xf, surface)
+			bounds = component_aabb(row) if first else bounds.merge(component_aabb(row))
+			first = false
+		_log_mass(name, bounds)
+		mass_log.back()["ring"] = stair.ring
+		mass_log.back()["walk_height"] = stair.height
+		mass_log.back()["footprint"] = stair.poly
+		host_end()
+		index += 1
 
 
 ## The chapel's apse: a half-drum on the end toward the gate, under a half
@@ -836,7 +910,7 @@ func _build_ring(r: int) -> void:
 	var g: AABB = CastleGeometry.gatehouse_aabb(spec, r)
 	if g.size.x > 0.0:
 		var door_h: float = minf(g.size.y * 0.4, 5.0)
-		_passage(g, minf(g.size.x * 0.4, 4.0), door_h)
+		_passage(g, minf(g.size.x * 0.4, 4.0), door_h, r)
 		_log_mass("gate_%d" % r, g)
 		_crenellate_rect(g, g.size.y, SURF_TRIM)
 		# murder holes read as a band of small openings over the passage
@@ -849,12 +923,36 @@ func _build_ring(r: int) -> void:
 
 ## A real tunnel through the gate mass, with no dark collision box sealing it.
 ## The top-level gate AABB still describes its full masonry envelope.
-func _passage(bounds: AABB, width: float, height: float) -> void:
+func _passage(bounds: AABB, width: float, height: float, portcullis_ring := -1) -> void:
 	var centre := bounds.get_center()
 	var side_w := (bounds.size.x - width) * 0.5
 	for side in [-1.0, 1.0]:
-		box(Vector3(side_w, bounds.size.y, bounds.size.z),
-			Vector3(centre.x + side * (width + side_w) * 0.5, centre.y, centre.z), SURF_STONE)
+		if portcullis_ring < 0:
+			box(Vector3(side_w, bounds.size.y, bounds.size.z),
+				Vector3(centre.x + side * (width + side_w) * 0.5, centre.y, centre.z), SURF_STONE)
+		else:
+			# A true slot in the side masonry, with a thin guide at its back.
+			# A dark stripe on an uncut wall would not be a portcullis groove.
+			var slot_width := 0.24
+			var slot_depth := minf(0.18, side_w * 0.3)
+			var slot_z := bounds.position.z + bounds.size.z * 0.3
+			for interval in [Vector2(bounds.position.z, slot_z - slot_width * 0.5),
+				Vector2(slot_z + slot_width * 0.5, bounds.end.z)]:
+				box(Vector3(side_w, bounds.size.y, interval.y - interval.x),
+					Vector3(centre.x + side * (width + side_w) * 0.5, centre.y, (interval.x + interval.y) * 0.5), SURF_STONE)
+			box(Vector3(side_w - slot_depth, bounds.size.y, slot_width),
+				Vector3(centre.x + side * (width + side_w + slot_depth) * 0.5, centre.y, slot_z), SURF_STONE)
+			var name := "portcullis_%d_%s" % [portcullis_ring, "left" if side < 0 else "right"]
+			host(name)
+			var guide_height := minf(height + 0.6, bounds.size.y)
+			var at := Vector3(centre.x + side * (width * 0.5 + slot_depth - 0.02),
+				bounds.position.y + guide_height * 0.5, slot_z)
+			var guide := component_box("portcullis_guide", Vector3(0.04, guide_height, slot_width),
+				Transform3D(Basis.IDENTITY, at), SURF_TRIM)
+			_log_mass(name, component_aabb(guide))
+			_log_part("portcullis_groove", Vector3(centre.x + side * (width + slot_depth) * 0.5,
+				bounds.position.y + height * 0.5, slot_z), Vector3(slot_depth, height, slot_width))
+			host_end()
 	box(Vector3(width, bounds.size.y - height, bounds.size.z),
 		Vector3(centre.x, bounds.position.y + (height + bounds.size.y) * 0.5, centre.z), SURF_STONE)
 	_log_part("passage", Vector3(centre.x, bounds.position.y + height * 0.5, centre.z),
@@ -952,6 +1050,7 @@ func _build_keep() -> void:
 	if planned:
 		Interiors.emit(self, _planned_interiors["keep"])
 		_build_planned_keep_crown(k)
+		_build_forebuilding()
 		total_height = maxf(total_height, k.end.y + CastleGeometry.roof_rise(spec, k))
 		return
 	var opening_y: float = k.size.y * 0.55
@@ -986,6 +1085,62 @@ func _build_keep() -> void:
 			if not planned:
 				_face_openings(k, opening_y, spec.window_style)
 	total_height = maxf(total_height, k.size.y + CastleGeometry.roof_rise(spec, k))
+
+
+## A guarded first-floor entrance: masonry cheeks, real treads and a slate
+## lean-to shelter. No solid envelope is emitted across the route inside it.
+func _build_forebuilding() -> void:
+	var fore := CastleGeometry.forebuilding(spec)
+	if fore.is_empty():
+		return
+	tag("forebuilding")
+	host("forebuilding")
+	var front: Vector2 = fore.front
+	var run: float = fore.run
+	var height: float = fore.height
+	var clear: float = fore.clear
+	var width: float = fore.width
+	var wall: float = fore.wall
+	var bounds := AABB()
+	var first := true
+	for step in int(fore.steps):
+		var top := height * (step + 1) / int(fore.steps)
+		var z := front.y + (step + 0.5) * preload("castle_access_geometry.gd").TREAD
+		var size := Vector3(clear, top, preload("castle_access_geometry.gd").TREAD)
+		var at := Vector3(front.x, top * 0.5, z)
+		var row := component_box("forebuilding_tread", size, Transform3D(Basis.IDENTITY, at), SURF_STONE)
+		_log_part("forebuilding_step", at, size)
+		bounds = component_aabb(row) if first else bounds.merge(component_aabb(row))
+		first = false
+	var landing_start := front.y + run
+	for side in [-1.0, 1.0]:
+		var x := front.x + float(side) * (clear + wall) * 0.5
+		var cheek := component_slab("forebuilding_wall", PackedVector3Array([
+			Vector3(x, 0, front.y), Vector3(x, 0, landing_start),
+			Vector3(x, height + 2.45, landing_start), Vector3(x, 2.45, front.y)]), wall, SURF_STONE, false)
+		bounds = bounds.merge(component_aabb(cheek))
+	var end: Vector2 = fore.at
+	var landing_row := component_box("forebuilding_landing", Vector3(clear, 0.2, end.y - landing_start + 0.05),
+		Transform3D(Basis.IDENTITY, Vector3(front.x, height - 0.1, (landing_start + end.y + 0.05) * 0.5)), SURF_STONE)
+	bounds = bounds.merge(component_aabb(landing_row))
+	var outer: Vector2 = fore.door_outer
+	for side in [-1.0, 1.0]:
+		var cheek := component_box("forebuilding_wall", Vector3(wall, 2.5, outer.y - landing_start),
+			Transform3D(Basis.IDENTITY, Vector3(front.x + side * (clear + wall) * 0.5, height + 1.25, (landing_start + outer.y) * 0.5)), SURF_STONE)
+		bounds = bounds.merge(component_aabb(cheek))
+	var roof_half := width * 0.5 + 0.12
+	for band in [Vector3(front.y - 0.12, landing_start, 0), Vector3(landing_start, outer.y, 1)]:
+		var low := 2.5 if band.z == 0 else height + 2.5
+		var high := height + 2.5
+		var roof := component_slab("forebuilding_roof", PackedVector3Array([
+			Vector3(front.x - roof_half, low, band.x), Vector3(front.x + roof_half, low, band.x),
+			Vector3(front.x + roof_half, high, band.y), Vector3(front.x - roof_half, high, band.y)]), 0.15, SURF_ROOF)
+		bounds = bounds.merge(component_aabb(roof))
+	_log_mass("forebuilding", bounds)
+	mass_log[-1].entry_height = height
+	mass_log[-1].footprint = fore.footprint
+	host_end()
+	tag("keep")
 
 
 ## The plan owns the occupied outline. Crowns cover that same outline and
@@ -1256,7 +1411,7 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 	var deck_h: float = CastleGeometry.PARAPET_RISE if spec.tower_roof == &"flat" else 0.0
 	var deck_r: float = (top_r + EAVE) if spec.battlements else top_r * 1.12
 	if deck_h > 0.0:
-		_kit.drum(c + Vector3.UP * (h + deck_h * 0.5), deck_r, deck_r, deck_h,
+		_kit.drum(c + Vector3.UP * h, deck_r, deck_r, deck_h,
 			SURF_TRIM, sides, rot)
 		_log_part("tower_deck", c + Vector3.UP * (h + deck_h * 0.5),
 			Vector3(deck_r * 2.0, deck_h, deck_r * 2.0), rot)
@@ -1386,6 +1541,7 @@ func _opening(pos: Vector3, face: float, w: float, h: float, style: StringName,
 		door := false) -> void:
 	_log_part("window", pos, Vector3(w, h, 0.0), face,
 		Basis(Vector3.UP, face) * Vector3(0, 0, 1))
+	part_log.back()["door"] = door
 	var depth: float = 0.24 if door else 0.14
 	var t := Transform3D(Basis(Vector3.UP, face), pos)
 	var t_in: Transform3D = t.translated_local(Vector3(0, 0, -depth / 2.0))

@@ -145,11 +145,16 @@ func _check_roof_support(plan: HousePlan, builder: HouseBuilder) -> void:
 	for ri in range(roofs.size()):
 		var roof: AABB = roofs[ri]
 		var supported := false
+		# The court roof slab has vertical depth 0.24 m. Its highest
+		# underside is the outer-wall bearing, including a flat court roof.
+		# A percentage of the AABB height incorrectly asks a flat slab's
+		# supporting wall to enter its upper skin.
+		var bearing := roof.end.y - RoofShape.DEPTH
 		for wall in supports:
 			var overlap_x := minf(roof.end.x, wall.end.x) - maxf(roof.position.x, wall.position.x)
 			var overlap_z := minf(roof.end.z, wall.end.z) - maxf(roof.position.z, wall.position.z)
 			if overlap_x > 0.08 and overlap_z > 0.08 \
-					and wall.end.y >= roof.position.y + roof.size.y * 0.7:
+					and wall.end.y >= bearing - 0.02:
 				supported = true
 				break
 		if not supported:

@@ -18,6 +18,76 @@ var purpose: StringName = &""
 ## than inferred from height, so callers can change levels without ceiling scale.
 var storeys: int = 1
 var material: StringName = &"timber"
+## Village-only landscape controls; vocabulary comes from describe_kind().
+var water: StringName = &"none"
+var enclosure: StringName = &"none"
+var _decode_errors: Array[Dictionary] = []
+
+const SCHEMA := "bigglade.request"
+const SCHEMA_VERSION := 1
+
+
+func to_dict() -> Dictionary:
+	return {"schema": SCHEMA, "schema_version": SCHEMA_VERSION,
+		"kind": String(kind), "seed": str(seed), "style": String(style),
+		"purpose": String(purpose), "width": width, "length": length,
+		"height": height, "storeys": storeys, "material": String(material),
+		"water": String(water), "enclosure": String(enclosure)}
+
+
+func to_json() -> String:
+	return JSON.stringify(to_dict(), "\t", true, true) + "\n"
+
+
+static func from_json(text: String) -> BuildingRequest:
+	var parser := JSON.new()
+	if parser.parse(text) != OK or not parser.data is Dictionary:
+		var bad := BuildingRequest.new()
+		bad._decode_errors.append({"code": "invalid_json", "field": "request",
+			"message": "Expected a JSON object containing a building request."})
+		return bad
+	return from_dict(parser.data)
+
+
+static func from_dict(data: Dictionary) -> BuildingRequest:
+	var out := BuildingRequest.new()
+	if data.get("schema", SCHEMA) != SCHEMA or data.get("schema_version", 1) != SCHEMA_VERSION:
+		out._decode_errors.append({"code": "unsupported_schema", "field": "schema_version",
+			"message": "Only bigglade.request schema 1 is supported."})
+	var kinds: Variant = data.get("kind", "")
+	if kinds is String and StringName(kinds) in BuildingLibrary.kinds():
+		out = BuildingLibrary.defaults(StringName(kinds), 0) if out._decode_errors.is_empty() else out
+	for field in ["kind", "style", "purpose", "material", "water", "enclosure"]:
+		if not data.has(field):
+			continue
+		if not data[field] is String and not data[field] is StringName:
+			out._decode_errors.append(_field_error(field, "must be text"))
+		else:
+			out.set(field, StringName(data[field]))
+	for field in ["width", "length", "height", "storeys"]:
+		if not data.has(field):
+			continue
+		var v: Variant = data[field]
+		if not (v is int or v is float) or not is_finite(float(v)):
+			out._decode_errors.append(_field_error(field, "must be a finite number"))
+		elif field == "storeys" and float(v) != floorf(float(v)):
+			out._decode_errors.append(_field_error(field, "must be an integer"))
+		else:
+			out.set(field, int(v) if field == "storeys" else float(v))
+	var seed_value: Variant = data.get("seed", "0")
+	if seed_value is String and seed_value.is_valid_int() and str(int(seed_value)) == seed_value:
+		out.seed = int(seed_value)
+	elif seed_value is int:
+		out.seed = seed_value
+	elif seed_value is float and is_finite(seed_value) and absf(seed_value) <= 9007199254740991.0 and seed_value == floorf(seed_value):
+		out.seed = int(seed_value)
+	else:
+		out._decode_errors.append(_field_error("seed", "must be a signed 64-bit decimal string or an exact JSON integer"))
+	return out
+
+
+static func _field_error(field: String, reason: String) -> Dictionary:
+	return {"code": "invalid_type", "field": field, "message": "%s %s." % [field, reason]}
 
 
 static func church(p_seed: int, p_style: StringName = &"romanesque",
@@ -60,6 +130,9 @@ static func temple(p_seed: int, p_form: StringName = &"basilica",
 func copy() -> BuildingRequest:
 	var out := _make(kind, seed, style, purpose, width, length, height, storeys)
 	out.material = material
+	out.water = water
+	out.enclosure = enclosure
+	out._decode_errors = _decode_errors.duplicate(true)
 	return out
 
 

@@ -289,13 +289,120 @@ func _check_mill(plan: VillagePlan) -> void:
 		var req: BuildingRequest = plan.buildings[i]["request"]
 		if req.kind == &"shop" and req.purpose == &"bakery" and plan.spec.water != &"none":
 			mills.append(i)
+	for water in plan.water:
+		if water["kind"] == &"race" and not mills.has(int(water.get("host", -1))):
+			failures.append("mill: race names no working mill host=%d" % int(water.get("host", -1)))
 	for i in mills:
 		var touches := false
+		var races: Array[Dictionary] = []
 		for w in plan.water:
 			if VillageMeasure.poly_distance(VillageMeasure.bounds_poly(plan.buildings[i]), w["poly"]) <= 0.5:
 				touches = true
+			if w["kind"] == &"race" and int(w.get("host", -1)) == i:
+				races.append(w)
 		if not touches:
 			failures.append("mill: building %d does not touch the water" % i)
+		if races.size() != 1:
+			failures.append("mill: building %d needs one working race, found %d" % [i, races.size()])
+			continue
+		var race := races[0]
+		var poly: PackedVector2Array = race["poly"]
+		var building := plan.buildings[i]
+		var wall := VillageWaterPlan.mill_walls(building["placement"], building["transform"])
+		if VillageMeasure.poly_distance(poly, wall) > 0.15:
+			failures.append("mill: race host=%d misses the measured wall (tolerance=0.15m)" % i)
+		var natural := false
+		for water in plan.water:
+			if water["kind"] != &"race" and VillageLotPlanner.overlap_area(poly, water["poly"]) > 0.1:
+				natural = true
+		if not natural:
+			failures.append("mill: race host=%d is disconnected from natural water" % i)
+		for road in plan.roads:
+			if VillageLotPlanner.overlap_area(poly, VillageSitePlanner.road_ribbon(road, true)) > 0.05:
+				failures.append("mill: race host=%d cuts across a road" % i)
+		for li in plan.lots.size():
+			if li != int(building["lot"]) and VillageLotPlanner.overlap_area(poly, plan.lots[li]["poly"]) > 0.05:
+				failures.append("mill: race host=%d floods lot=%d" % [i, li])
+		var wheels := 0
+		for prop in plan.props:
+			if prop["key"] != "mill_wheel" or int(prop.get("host", -1)) != i:
+				continue
+			wheels += 1
+			var at: Vector2 = prop["pos"]
+			var gap := VillageMeasure.point_to_poly(at, wall)
+			if not Poly.contains_point(poly, at) or gap < 0.3 or gap > 0.9:
+				failures.append("mill: wheel host=%d leaves race/wall gap=%.3fm tolerance=0.30..0.90m" % [i, gap])
+			if absf(float(prop.get("elevation", 0.0)) - 1.15) > 0.05:
+				failures.append("mill: wheel host=%d axle is not above the water (expected=1.15m)" % i)
+			var closest := Vector2.INF
+			var near := INF
+			for edge in wall.size():
+				var point := Geometry2D.get_closest_point_to_segment(at, wall[edge], wall[(edge + 1) % wall.size()])
+				if point.distance_to(at) < near:
+					near = point.distance_to(at)
+					closest = point
+			var axis := Vector2(sin(float(prop["yaw"])), cos(float(prop["yaw"])))
+			if absf(axis.dot((at - closest).normalized())) < 0.98:
+				failures.append("mill: wheel host=%d axle does not enter its wall (alignment >=0.98)" % i)
+			if not VillageWaterPlan.wheel_openings_clear(building["placement"], building["transform"],
+					at, (at - closest).normalized()):
+				failures.append("mill: wheel host=%d blocks a facade opening" % i)
+		if wheels != 1:
+			failures.append("mill: building %d needs one water wheel, found %d" % [i, wheels])
+
+
+## Probe the actual enclosure mesh where water crosses it. The channel must
+## pass below a culvert, not terminate against a perfectly plausible wall.
+static func check_mill_flow(plan: VillagePlan, mesh: ArrayMesh) -> Array[String]:
+	return _check_water_flow(plan, mesh, true)
+
+
+## Natural water forms the settlement boundary at the shore. Planned bridges
+## have their own geometry checks; their rail posts are legitimate wet obstacles.
+static func check_water_flow(plan: VillagePlan, mesh: ArrayMesh) -> Array[String]:
+	return _check_water_flow(plan, mesh, false)
+
+
+static func _check_water_flow(plan: VillagePlan, mesh: ArrayMesh, races_only: bool) -> Array[String]:
+	var failures: Array[String] = []
+	if plan.spec.enclosure == &"none":
+		return failures
+	var edge: PackedVector2Array = plan.enclosure if plan.enclosure.size() >= 3 else VillageEnclosurePlan.build(plan)["edge"]
+	var triangles: Array = []
+	for surface in mesh.get_surface_count():
+		triangles.append_array(HouseQA._mesh_triangles(mesh, surface))
+	var crossings: Array[PackedVector2Array] = []
+	for crossing in plan.water_crossings:
+		crossings.append(Poly.ribbon(crossing["points"], (float(crossing["width"]) + VillageBuilder.BRIDGE_MARGIN) * 0.5 + 0.4))
+	for water in plan.water:
+		if races_only and water["kind"] != &"race":
+			continue
+		var race: PackedVector2Array = water["poly"]
+		for e in edge.size():
+			var a := edge[e]
+			var b := edge[(e + 1) % edge.size()]
+			var direction := (b - a).normalized()
+			var normal := Vector3(-direction.y, 0, direction.x)
+			var samples := maxi(1, int(ceil(a.distance_to(b) / 0.2)))
+			for sample in samples:
+				var p := a.lerp(b, (float(sample) + 0.5) / float(samples))
+				if not Poly.contains_point(race, p):
+					continue
+				if crossings.any(func(poly: PackedVector2Array) -> bool: return Poly.contains_point(poly, p)):
+					continue
+				var margin := INF
+				for side in race.size():
+					margin = minf(margin, p.distance_to(Geometry2D.get_closest_point_to_segment(p,
+						race[side], race[(side + 1) % race.size()])))
+				if margin < 0.2:
+					continue
+				var centre := Vector3(p.x, 0.32, p.y)
+				for triangle in triangles:
+					if Geometry3D.segment_intersects_triangle(centre - normal * 0.8, centre + normal * 0.8,
+							triangle[0], triangle[1], triangle[2]) != null:
+						failures.append("water_flow: enclosure dams %s host=%d at=%s measured_y=0.32m" % [water["kind"], water.get("host", -1), p])
+						break
+	return failures
 
 
 func _check_market(plan: VillagePlan) -> void:

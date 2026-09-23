@@ -26,6 +26,16 @@ func generate(_request: BuildingRequest, _out) -> bool:
 	return false
 
 
+## Internal placement preparation. Families may omit only work that cannot
+## affect their emitted shell, exterior bounds, footprint or entrance.
+func generate_for_placement(request: BuildingRequest, out) -> bool:
+	return generate(request, out)
+
+
+func placement_metadata(_building, _bounds: AABB) -> Dictionary:
+	return {}
+
+
 ## A fresh mesh from a generated representation.
 func build_mesh(_building) -> ArrayMesh:
 	return null
@@ -39,8 +49,8 @@ func instantiate(_building, _cutaway: bool) -> Node3D:
 
 
 ## The walls' own outline in XZ, local space -- narrower than the mesh's
-## `bounds`, which also covers roof eaves, porches and towers. `door()` sits
-## on this rect's -Z edge by construction.
+## `bounds`, which also covers roof eaves, porches and towers. An open manor's
+## entrance is recessed inside its courtyard; door() retains that true location.
 func footprint(_building) -> Rect2:
 	return Rect2()
 
@@ -110,7 +120,8 @@ static func of(kind: StringName) -> BuildingFamilyAdapter:
 ## generator and the assembler differ.
 class PlanFamily extends BuildingFamilyAdapter:
 	func footprint(building) -> Rect2:
-		return HouseGeometry.interior_rect(building.plan.spec)
+		return HouseGeometry.storey_rect(building.plan,
+			maxi(building.plan.spec.storeys - 1, 0)).grow(-HouseGeometry.wall_thickness(building.plan.spec))
 
 	## `HousePlan.entrance()`'s own door position: the plan says where the
 	## front door is, and the builder cuts it there.
@@ -125,12 +136,23 @@ class PlanFamily extends BuildingFamilyAdapter:
 
 class HouseFamily extends PlanFamily:
 	func generate(request: BuildingRequest, out) -> bool:
+		return _generate_plan(request, out, true)
+
+	func generate_for_placement(request: BuildingRequest, out) -> bool:
+		if not _generate_plan(request, out, false):
+			return false
+		if HouseFurnisher.shell_needs_furnishing(out.plan):
+			HouseFurnisher.prepare_shell_focus(out.plan, out.spec)
+		HouseExterior.dress(out.plan)
+		return true
+
+	func _generate_plan(request: BuildingRequest, out, furnish: bool) -> bool:
 		var spec := HouseSpec.new()
 		spec.material = request.material
 		_copy_size_and_style(request, spec)
 		spec.trade = request.purpose
 		spec.storeys = request.storeys
-		out.plan = HouseGenerator.generate(spec, request.seed)
+		out.plan = HouseGenerator.generate(spec, request.seed, furnish)
 		out.spec = spec
 		return true
 
@@ -143,12 +165,25 @@ class HouseFamily extends PlanFamily:
 
 class ShopFamily extends PlanFamily:
 	func generate(request: BuildingRequest, out) -> bool:
+		return _generate_plan(request, out, true)
+
+	func generate_for_placement(request: BuildingRequest, out) -> bool:
+		if not _generate_plan(request, out, false):
+			return false
+		# Rugs and chimney breasts are emitted shell geometry derived from the
+		# final furnished plan. Shops without either feature retain the cheap
+		# planning path; affected rooms must replay native furnishing exactly.
+		if HouseFurnisher.shell_needs_furnishing(out.plan):
+			HouseFurnisher.prepare_shell_focus(out.plan, out.spec)
+		return true
+
+	func _generate_plan(request: BuildingRequest, out, furnish: bool) -> bool:
 		var spec := ShopSpec.new()
 		spec.material = request.material
 		_copy_size_and_style(request, spec)
 		spec.business = request.purpose
 		spec.storeys = request.storeys
-		out.plan = ShopGenerator.generate(spec, request.seed)
+		out.plan = ShopGenerator.generate(spec, request.seed, furnish)
 		out.spec = spec
 		return true
 
@@ -158,6 +193,22 @@ class ShopFamily extends PlanFamily:
 
 	func instantiate(building, cutaway: bool) -> Node3D:
 		return ShopAssembler.build(building.plan, cutaway)
+
+	func placement_metadata(building, _bounds: AABB) -> Dictionary:
+		if building.spec.business != &"bakery":
+			return {}
+		var openings: Array[Dictionary] = []
+		for window in building.plan.windows:
+			if HousePlan.record_storey(window) == 0:
+				openings.append(window.duplicate(true))
+		for door in building.plan.doors:
+			if door["exterior"] and HousePlan.record_storey(door) == 0:
+				var entry: Dictionary = door.duplicate(true)
+				entry["sill"] = float(door.get("sill", 0.0))
+				entry["head"] = float(door.get("head", HouseGeometry.DOOR_H))
+				openings.append(entry)
+		return {"mill_wall_rect": HouseGeometry.site_rect(building.spec),
+			"mill_openings": openings}
 
 
 class HotelFamily extends PlanFamily:
@@ -238,8 +289,28 @@ class CastleFamily extends BuildingFamilyAdapter:
 
 	func door(building) -> Vector3:
 		var castle := building.spec as CastleSpec
+		# Houses and manors have a porch passage, not a curtain gatehouse.
+		# Its actual mouth can project beyond the site or sit inside an open
+		# courtyard; returning the empty gatehouse placed paths at the origin.
+		var porch: AABB = CastleGeometry.porch_aabb(castle)
+		if porch.size.x > 0.0:
+			return Vector3(porch.get_center().x,
+				minf(porch.size.y - 0.2, HouseGeometry.DOOR_H) * 0.5, porch.position.z)
 		var g: AABB = CastleGeometry.gatehouse_aabb(castle, 0)
 		return Vector3(0.0, g.size.y / 2.0, g.position.z)
+
+	func placement_metadata(building, bounds: AABB) -> Dictionary:
+		var castle := building.spec as CastleSpec
+		var porch: AABB = CastleGeometry.porch_aabb(castle)
+		var fp := footprint(building)
+		if castle.tier != &"manor" or castle.courtyard or porch.size.x <= 0.0 \
+				or porch.position.z <= fp.position.y + 1.0:
+			return {}
+		# This is an open arrival court between wings, not solid floor across
+		# the bounding rectangle. Retain the actual recessed porch entrance.
+		var width: float = minf(porch.size.x * 0.5, 2.0)
+		return {"approach": Rect2(Vector2(porch.get_center().x - width * 0.5,
+			bounds.position.z - 1.0), Vector2(width, porch.position.z - bounds.position.z + 1.0))}
 
 
 # -------------------------------------------------------------- the temples
@@ -262,17 +333,32 @@ class TempleFamily extends BuildingFamilyAdapter:
 	func instantiate(building, cutaway: bool) -> Node3D:
 		return TempleAssembler.build(building.spec as TempleSpec, cutaway)
 
-	## The outer wall face the gate is cut through -- used uniformly across
-	## forms, including the ziggurat, whose gate void is voxel-recessed behind
-	## the outermost terrace but whose public-facing gate is still this edge.
+	## The ziggurat's twin stair flights are physical architecture outside its
+	## terraces. Lots must retain their full depth even though the door recedes.
 	func footprint(building) -> Rect2:
-		return TempleGeometry.site_rect(building.spec as TempleSpec)
+		var temple := building.spec as TempleSpec
+		var rect := TempleGeometry.site_rect(temple)
+		if temple.form == &"ziggurat":
+			rect = rect.merge(TempleGeometry.stair_rect(temple))
+		return rect
 
 	func door(building) -> Vector3:
 		var temple := building.spec as TempleSpec
 		var r: Rect2 = TempleGeometry.site_rect(temple)
 		var gh: float = minf(TempleGeometry.GATE_H, temple.height - 0.6)
 		return Vector3(0.0, gh / 2.0, r.position.y)
+
+	func placement_metadata(building, bounds: AABB) -> Dictionary:
+		var temple := building.spec as TempleSpec
+		if temple.form != &"ziggurat":
+			return {}
+		# The twin summit flights flank an open ground-level processional axis
+		# to the chamber portal. Restore only this native passage through the
+		# bounds rectangle; keep the actual door and both solid stairs intact.
+		var width := minf(TempleGeometry.GATE_W - 2.0 * TempleGeometry.PERSON_RADIUS, 2.0)
+		var front := bounds.position.z - 1.0
+		return {"approach": Rect2(Vector2(-width * 0.5, front),
+			Vector2(width, door(building).z - front))}
 
 
 # ------------------------------------------------ the buildings of the world
@@ -325,6 +411,8 @@ class VillageFamily extends BuildingFamilyAdapter:
 		spec.wealth = clampf(request.length / 100.0, 0.0, 1.0)
 		spec.culture = request.style
 		spec.purpose = request.purpose
+		spec.water = request.water
+		spec.enclosure = request.enclosure
 		if not spec.valid():
 			return false
 		spec.generate(request.seed)

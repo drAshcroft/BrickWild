@@ -34,7 +34,9 @@ function Invoke-GodotFixture {
         '"' + $_.Replace('"', '\"') + '"'
     }) -join ' '
     $startInfo = New-Object Diagnostics.ProcessStartInfo
-    $startInfo.FileName = $GodotPath
+    # The Windows console shim spawns the real engine. Start the engine
+    # directly under redirected pipes so timeout/exit owns the actual child.
+    $startInfo.FileName = $GodotPath -replace '_console\.exe$', '.exe'
     $startInfo.Arguments = $quotedArguments
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
@@ -47,13 +49,14 @@ function Invoke-GodotFixture {
     }
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit(120000)) {
+    if (-not $process.WaitForExit(900000)) {
         $process.Kill()
-        throw 'Godot fixture timed out after 120 seconds'
+        $process.WaitForExit()
+        throw "Godot fixture timed out after 900 seconds:`n$($stdoutTask.Result)`n$($stderrTask.Result)"
     }
     $stdout = $stdoutTask.Result
     $stderr = $stderrTask.Result
-    if ($process.ExitCode -ne 0) {
+    if ($process.ExitCode -ne 0 -or $stderr -match 'SCRIPT ERROR:|ERROR:') {
         throw "Godot fixture failed with exit code $($process.ExitCode):`n$stdout`n$stderr"
     }
     return [pscustomobject]@{ Stdout = $stdout; Stderr = $stderr }
@@ -61,8 +64,16 @@ function Invoke-GodotFixture {
 
 try {
     $sourceManifest = [IO.File]::ReadAllText($sourceManifestPath) | ConvertFrom-Json
-    Assert-Equal 40 @($sourceManifest.scripts).Count `
-        'Addon runtime script closure changed unexpectedly'
+    $manifestSources = @($sourceManifest.scripts | ForEach-Object { [string]$_.source })
+    foreach ($runtimeRoot in @('src', 'core', 'qa')) {
+        foreach ($runtime in Get-ChildItem -LiteralPath (Join-Path $sourceRoot $runtimeRoot) -Recurse -Filter '*.gd') {
+            $relative = $runtime.FullName.Substring($sourceRoot.Length + 1).Replace('\', '/')
+            if ($relative.StartsWith('src/ui/')) { continue }
+            if ($relative -notin $manifestSources) {
+                throw "Manifest omits runtime source: $relative"
+            }
+        }
+    }
     foreach ($script in @($sourceManifest.scripts)) {
         $scriptSource = Join-Path $sourceRoot ([string]$script.source)
         if (-not (Test-Path -LiteralPath $scriptSource -PathType Leaf)) {
@@ -92,9 +103,11 @@ try {
         throw 'Initial install copied no files'
     }
     Assert-Equal 'created' $first.InstalledManifest 'Initial install manifest action'
-    if (@($sourceManifest.trees).Count -ne 1 -or
-            [string]$sourceManifest.trees[0].source -ne 'assets/props/fantasy') {
-        throw 'Manifest does not package the complete Fantasy Props tree'
+    $packTrees = @($sourceManifest.trees | ForEach-Object { [string]$_.source })
+    foreach ($pack in @('fantasy', 'dungeon', 'nature', 'wild')) {
+        if ("assets/props/$pack" -notin $packTrees) {
+            throw "Manifest omits catalogue asset pack: $pack"
+        }
     }
 
     $addonRoot = Join-Path $fixture 'addons/big_glade'
@@ -108,6 +121,9 @@ try {
         'assets/props/fantasy/Anvil.bin',
         'assets/props/fantasy/License_Standard.txt',
         'assets/props/fantasy/README.md',
+        'assets/props/dungeon/License.txt',
+        'assets/props/nature/License.txt',
+        'assets/props/wild/License_Standard.txt',
         'plugin.cfg',
         'VERSION'
     )) {
@@ -182,10 +198,13 @@ func _init() -> void:
 		BuildingRequest.church(101),
 		BuildingRequest.castle(102),
 		BuildingRequest.house(103),
+		BuildingRequest.shop(105),
+		BuildingRequest.hotel(106),
 		BuildingRequest.temple(104),
+		BigGlade.default_request(&"world", 107),
 	]
 	for request in requests:
-		var generated := BigGlade.generate(request)
+		var generated := BigGlade.generate_document(request)
 		if not generated.is_ok():
 			printerr("generation failed: %s" % generated.errors)
 			failed = true
@@ -200,6 +219,10 @@ func _init() -> void:
 			failed = true
 		else:
 			node.free()
+		var restored := BuildingDocument.from_json(generated.to_json())
+		if not restored.is_ok() or BigGlade.build_mesh(restored) == null:
+			printerr("document round trip failed for %s" % request.kind)
+			failed = true
 	for key in PropCatalog.keys():
 		if not ResourceLoader.exists(PropCatalog.scene_path(key)):
 			printerr("prop resource missing: %s" % key)

@@ -20,6 +20,8 @@ const SURF_FLOOR := 3
 
 var plan: HousePlan
 var spec: HouseSpec
+var emitted_mesh: ArrayMesh
+var roof_enabled := false
 ## Actual emitted architectural faces, including cut host pieces and dormer joins.
 ## Each row is also a row of `component_log`; see MassBuilder.
 var roof_components: Array[Dictionary] = []
@@ -39,6 +41,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	plan = p_plan
 	spec = p_plan.spec
 	begin(4)
+	roof_enabled = with_roof
 	total_height = spec.height
 
 	_build_floor()
@@ -54,7 +57,43 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 		_build_roof()
 	_build_porch()
 	_build_chimney()
+	_build_hearth_breast()
+	_build_rugs()
 	return commit()
+
+
+func _build_hearth_breast() -> void:
+	var breast := HouseGeometry.hearth_breast(plan)
+	if breast.is_empty():
+		return
+	var level := int(breast["storey"])
+	var y0 := level * spec.height
+	var centre: Vector2 = breast["centre"]
+	var size := Vector3(breast["width"], spec.height, breast["depth"])
+	var xf := Transform3D(Basis(Vector3.UP, float(breast["yaw"])), Vector3(centre.x, y0 + spec.height * 0.5, centre.y))
+	tag("chimney_breast")
+	host("hearth", level)
+	component_box("chimney_breast", size, xf, SURF_WALL)
+	var rect: Rect2 = breast["rect"]
+	_log_mass("chimney_breast", AABB(Vector3(rect.position.x, y0, rect.position.y), Vector3(rect.size.x, spec.height, rect.size.y)), y0)
+
+
+func _build_rugs() -> void:
+	var st: SurfaceTool = _kit._sts[SURF_FLOOR]
+	for rug in plan.rugs:
+		var rect: Rect2 = rug["rect"]
+		var y := int(rug["storey"]) * spec.height + HouseGeometry.FLOOR_T + 0.002
+		if plan.on_dais(int(rug["room"]), rect.get_center()):
+			y += plan.dais_rise()
+		var points := Poly.from_rect(rect)
+		var uvs := [Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN]
+		st.set_color(Color.BLACK) # Dedicated textile region within the stable floor surface.
+		for index in [0, 1, 2, 0, 2, 3]:
+			st.set_normal(Vector3.UP)
+			st.set_uv(uvs[index])
+			st.add_vertex(Vector3(points[index].x, y, points[index].y))
+		st.set_color(Color.WHITE)
+		_log_part("rug", Vector3(rect.get_center().x, y, rect.get_center().y), Vector3(rect.size.x, 0, rect.size.y))
 
 
 # ------------------------------------------------------------------ floor
@@ -69,13 +108,20 @@ func begin(surface_count: int) -> void:
 	roof_components.clear()
 	roof_opening_log.clear()
 	_opening_seq = 0
+	emitted_mesh = null
+	roof_enabled = false
+
+
+func commit() -> ArrayMesh:
+	emitted_mesh = super.commit()
+	return emitted_mesh
 
 
 func _build_floor() -> void:
 	tag("floor")
-	var r: Rect2 = HouseGeometry.site_rect(spec)
 	var t: float = HouseGeometry.FLOOR_T
 	for level in _levels():
+		var r: Rect2 = HouseGeometry.storey_rect(plan, level)
 		var y0 := float(level) * spec.height
 		var a := AABB(Vector3(r.position.x, y0, r.position.y),
 			Vector3(r.size.x, t, r.size.y))
@@ -270,7 +316,7 @@ func _build_exterior_walls() -> void:
 # ------------------------------------------------------------------ jetty
 
 func _build_jetty() -> void:
-	if not spec.jetty or _storeys() <= 1:
+	if not spec.jetty or _storeys() <= 1 or plan.has_court() or HouseGeometry.is_shaped(plan) or spec.has_method("room_program"):
 		return
 	tag("jetty")
 	host("jetty", 1)
@@ -282,16 +328,16 @@ func _build_jetty() -> void:
 
 	# 1. Bressummer beam running along the front wall at y = spec.height
 	var bw_len: float = r.size.x + 0.35
-	box(Vector3(bw_len, beam_h, beam_w),
-		Vector3(0.0, bressummer_y - beam_h / 2.0, r.position.y - j_depth / 2.0), SURF_TRIM)
+	component_box("jetty_bressummer", Vector3(bw_len, beam_h, beam_w),
+		Transform3D(Basis(), Vector3(0.0, bressummer_y - beam_h / 2.0, r.position.y - j_depth + beam_w / 2.0)), SURF_TRIM)
 
 	# 2. Exposed floor joist ends projecting under the bressummer
 	var joist_spacing := 0.65
 	var joist_count := maxi(int(r.size.x / joist_spacing), 3)
 	for i in range(joist_count + 1):
 		var jx: float = r.position.x + float(i) * (r.size.x / float(joist_count))
-		box(Vector3(0.12, 0.14, j_depth + 0.10),
-			Vector3(jx, bressummer_y - beam_h - 0.07, r.position.y - j_depth / 2.0), SURF_TRIM)
+		component_box("jetty_joist", Vector3(0.12, 0.14, j_depth + 0.10),
+			Transform3D(Basis(), Vector3(jx, bressummer_y - beam_h - 0.07, r.position.y - j_depth / 2.0)), SURF_TRIM)
 
 	# 3. Carved knee brackets / corner corbels supporting the bressummer
 	for px in [r.position.x + 0.35, r.end.x - 0.35]:
@@ -533,7 +579,7 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 			# Inset dark lattice glazing panel
 			var pane_xf := Transform3D(Basis(Vector3.UP, yaw),
 				Vector3(mid.x, y_offset + (bottom + top) / 2.0, mid.y))
-			component_box("opening_glazing", Vector3(w, top - bottom, 0.04), pane_xf, SURF_ROOF)
+			_glazing_box("opening_glazing", Vector3(w, top - bottom, 0.04), pane_xf)
 
 			# Vertical timber mullions for wide windows (2-light / 3-light)
 			if spec.window_mullions and w >= 0.8:
@@ -706,7 +752,7 @@ func _build_timber_frame_level(level := 0) -> void:
 	var plinth_offset := (minf(spec.plinth_height, HouseGeometry.WINDOW_SILL - 0.18) if (level == 0 and not spec.stone_ground_floor and spec.plinth_height > 0.05) else 0.0)
 	var y_sill := plinth_offset
 
-	for run in HouseGeometry.exterior_runs(spec):
+	for run in HouseGeometry.shell_runs(plan, level):
 		var from: Vector2 = run["from"]
 		var to: Vector2 = run["to"]
 		var normal: Vector2 = run["normal"]
@@ -733,11 +779,7 @@ func _build_timber_frame_level(level := 0) -> void:
 		for t in [post / 2.0, length - post / 2.0]:
 			_beam(from, dir, yaw, normal, t, post, y_sill, h, post * 0.55, y0)
 		var pitch: float = spec.stud_pitch
-		var bays: int = maxi(int((length - post * 2.0) / pitch), 1)
-		for i in range(1, bays):
-			var t2: float = post + (length - post * 2.0) * float(i) / float(bays)
-			if _blocked_by_opening(openings, t2, HouseGeometry.BEAM_W):
-				continue
+		for t2 in _facade_studs(length, openings, pitch):
 			_beam(from, dir, yaw, normal, t2, HouseGeometry.BEAM_W,
 				y_sill + HouseGeometry.SILL_BEAM_H, h - HouseGeometry.PLATE_H, 0.0, y0)
 
@@ -751,6 +793,31 @@ func _build_timber_frame_level(level := 0) -> void:
 				if spec.frame_braces:
 					_corner_braces(from, dir, yaw, normal, length, h, openings, y0)
 	host_end()
+
+
+## Opening jambs establish the bays; extra studs subdivide solid wall between
+## those anchors. This keeps the entrance/window rhythm legible at any width.
+static func _facade_studs(length: float, openings: Array[Dictionary], pitch: float) -> Array[float]:
+	var post := HouseGeometry.POST_W
+	var anchors: Array[float] = [post, length - post]
+	for opening in openings:
+		var half: float = float(opening["w"]) * 0.5 + HouseGeometry.STUD_CLEAR + HouseGeometry.BEAM_W * 0.5
+		for at in [float(opening["t"]) - half, float(opening["t"]) + half]:
+			if at > post * 2.0 and at < length - post * 2.0 and not _blocked_by_opening(openings, at, HouseGeometry.BEAM_W):
+				anchors.append(at)
+	anchors.sort()
+	var out: Array[float] = []
+	for i in range(anchors.size() - 1):
+		var a := anchors[i]
+		var b := anchors[i + 1]
+		if i > 0 and (out.is_empty() or a - out.back() > HouseGeometry.BEAM_W * 1.8):
+			out.append(a)
+		var bays := maxi(int(ceil((b - a) / maxf(pitch, 0.3))), 1)
+		for j in range(1, bays):
+			var at := lerpf(a, b, float(j) / bays)
+			if not _blocked_by_opening(openings, at, HouseGeometry.BEAM_W) and (out.is_empty() or at - out.back() > HouseGeometry.BEAM_W * 1.8):
+				out.append(at)
+	return out
 
 
 func _build_stone_quoins(level: int) -> void:
@@ -1182,6 +1249,15 @@ func _roof_face(xf: Transform3D, local: PackedVector3Array, surface: int,
 	roof_components.append(component_slab(role, world, depth, surface, vertical))
 
 
+## Keep the four-slot shell contract, including roof-off builds. A vertex
+## marker selects fixed glazing treatment inside the house roof material;
+## it is not a fifth stream which Godot would compact when the roof is empty.
+func _glazing_box(role: String, size: Vector3, xf: Transform3D) -> void:
+	_kit.surface(SURF_ROOF).set_color(Color.BLACK)
+	component_box(role, size, xf, SURF_ROOF)
+	_kit.surface(SURF_ROOF).set_color(Color.WHITE)
+
+
 func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 		top: float) -> void:
 	if not spec.bargeboards:
@@ -1276,8 +1352,8 @@ func _build_dormers(xf: Transform3D, dormers: Array) -> void:
 		for band in [[base, win_bottom], [win_top, head]]:
 			component_box("dormer_panel", Vector3(0.10, band[1] - band[0], win_w),
 				xf * Transform3D(Basis(), Vector3(front, (band[0] + band[1]) * 0.5, z)), SURF_TRIM)
-		component_box("dormer_glazing", Vector3(0.04, win_top - win_bottom, win_w),
-			xf * Transform3D(Basis(), Vector3(front - 0.04, (win_top + win_bottom) * 0.5, z)), SURF_ROOF)
+		_glazing_box("dormer_glazing", Vector3(0.04, win_top - win_bottom, win_w),
+			xf * Transform3D(Basis(), Vector3(front - 0.04, (win_top + win_bottom) * 0.5, z)))
 		component_box("dormer_mullion", Vector3(0.05, win_top - win_bottom, 0.055),
 			xf * Transform3D(Basis(), Vector3(front - 0.065, (win_top + win_bottom) * 0.5, z)), SURF_TRIM)
 		host("roof", _storeys() - 1)

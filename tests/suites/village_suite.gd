@@ -76,10 +76,11 @@ static func _check_builder(res: SuiteResult) -> void:
 	walled.enclosure = Poly.from_rect(edge)
 	walled.spec.enclosure = &"palisade"
 	var through: PackedVector2Array = walled.roads[0]["points"]
-	walled.gate_crossings = [{"pos": Vector2(edge.position.x, through[0].y), "road": 0}]
-	walled.water = [{"kind": &"stream", "poly": Poly.from_rect(
+	walled.gate_crossings = VillageEnclosurePlan.crossings(walled.roads, walled.enclosure)
+	walled.water = [{"kind": &"river", "poly": Poly.from_rect(
 		Rect2(Vector2(through[through.size() / 2].x - 4.0, walled.site.position.y),
 			Vector2(8.0, walled.site.size.y)))}]
+	walled.water_crossings = VillageWaterPlan.crossings(walled.water, walled.roads)
 	var walled_builder := VillageBuilder.new()
 	walled_builder.build(walled)
 	for want in ["palisade", "gate", "bridge"]:

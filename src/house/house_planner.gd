@@ -38,7 +38,37 @@ static func plan(spec: HouseSpec) -> HousePlan:
 		_dig_cellars(p, spec)
 	_choose_hearth(p, spec)
 	_choose_focus(p, spec)
+	_reserve_upper_flue(p, spec)
 	return p
+
+
+## The hearth fixes the ground-supported stack after the ground windows are
+## fitted. Reserve that same flue on every upper facade, then restore daylight
+## through the usual opening fitter. It is never moved away from its fire.
+static func _reserve_upper_flue(p: HousePlan, spec: HouseSpec) -> void:
+	if not spec.chimney or spec.storeys <= 1 or p.hearth_room() < 0:
+		return
+	var affected: Array[int] = []
+	for i in range(p.windows.size() - 1, -1, -1):
+		var w := p.windows[i]
+		if _flue_blocks(p, w["pos"], w["normal"], HousePlan.record_storey(w), float(w["width"])):
+			var room := int(w["room"])
+			if not affected.has(room):
+				affected.append(room)
+			p.windows.remove_at(i)
+	if not affected.is_empty():
+		_place_windows(p, spec, affected)
+		_glaze_the_rest(p, spec, affected)
+
+
+static func _flue_blocks(p: HousePlan, pos: Vector2, normal: Vector2,
+		storey: int, width := HouseGeometry.WINDOW_W) -> bool:
+	if storey <= 0 or not p.spec.chimney or p.hearth_room() < 0:
+		return false
+	var tangent := Vector2(normal.y, -normal.x).abs()
+	var centre := pos + normal * (HouseGeometry.wall_thickness(p.spec) + 0.05)
+	var size := tangent * (width + 0.25) + normal.abs() * 0.5
+	return HouseGeometry.chimney_rect(p).intersects(Rect2(centre - size * 0.5, size))
 
 
 ## A room that could not be given a window is not a room anybody lives in.
@@ -599,9 +629,9 @@ static func _place_back_door(p: HousePlan, spec: HouseSpec) -> void:
 ## Windows on every exterior wall a room owns, enough of them to light it.
 ## Stores get one at most; a pantry does not need a view.
 static func _place_windows(p: HousePlan, spec: HouseSpec, only: Array[int] = []) -> void:
-	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var rooms: Array[int] = only if not only.is_empty() else _all_rooms(p)
 	for i in rooms:
+		var inner := HouseGeometry.interior_rect(spec, p.storey_of_room(i))
 		var kind: StringName = p.kind_of(i)
 		var rect: Rect2 = p.rooms[i]["rect"]
 		var area: float = HouseGeometry.room_area(p, i)
@@ -638,9 +668,9 @@ static func _place_windows(p: HousePlan, spec: HouseSpec, only: Array[int] = [])
 ## there is nowhere left. A room with no daylight is worse than a window close
 ## to a corner, so this pass tries again with the margins pulled in.
 static func _glaze_the_rest(p: HousePlan, spec: HouseSpec, only: Array[int] = []) -> void:
-	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var rooms: Array[int] = only if not only.is_empty() else _all_rooms(p)
 	for i in rooms:
+		var inner := HouseGeometry.interior_rect(spec, p.storey_of_room(i))
 		if not HouseGeometry.is_habitable(p.kind_of(i)):
 			continue
 		if not p.windows_of(i).is_empty():
@@ -696,6 +726,8 @@ static func _squeeze_window(p: HousePlan, room: int, side: Dictionary) -> bool:
 ## comfortable spacing the first pass asks for.
 static func _crowds(p: HousePlan, pos: Vector2, normal: Vector2, width: float,
 		storey := 0) -> bool:
+	if _flue_blocks(p, pos, normal, storey, width):
+		return true
 	for d in p.doors:
 		if not _same_wall(d["pos"], d["normal"], pos, normal,
 				HousePlan.record_storey(d), storey):
@@ -748,6 +780,8 @@ static func _windows_along(p: HousePlan, spec: HouseSpec, room: int, side: Dicti
 
 static func _clashes_with_door(p: HousePlan, pos: Vector2, normal: Vector2,
 		storey := 0) -> bool:
+	if _flue_blocks(p, pos, normal, storey):
+		return true
 	for d in p.doors:
 		if not _same_wall(d["pos"], d["normal"], pos, normal,
 				HousePlan.record_storey(d), storey):
@@ -861,6 +895,14 @@ static func _clone_upper_storeys(p: HousePlan, spec: HouseSpec) -> void:
 		for source in base_rooms:
 			var room := p.rooms[source].duplicate()
 			room["storey"] = storey
+			var rect: Rect2 = room["rect"]
+			var ground := HouseGeometry.interior_rect(spec)
+			var upper := HouseGeometry.interior_rect(spec, storey)
+			if absf(rect.position.y - ground.position.y) < 0.01:
+				var extra := ground.position.y - upper.position.y
+				rect.position.y -= extra
+				rect.size.y += extra
+				room["rect"] = rect
 			var target: int = p.rooms.size()
 			p.rooms.append(room)
 			remap[source] = target
@@ -1382,7 +1424,7 @@ static func _hearth_walls(p: HousePlan, spec: HouseSpec, i: int) -> Array[int]:
 	var rect: Rect2 = p.rooms[i]["rect"]
 	var out: Array[int] = []
 	# same order as HouseGeometry.room_walls: front, back, left, right
-	if absf(rect.position.y - inner.position.y) < 0.01:
+	if absf(rect.position.y - inner.position.y) < 0.01 and not (spec.jetty and spec.storeys > 1):
 		out.append(0)
 	if absf(rect.end.y - inner.end.y) < 0.01:
 		out.append(1)

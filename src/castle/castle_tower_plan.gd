@@ -19,6 +19,9 @@ const STAIR_WIDTH := 0.9
 ## the same explicit room-programme hook as KeepSpec without changing the
 ## shared house checker.
 class TowerSpec extends HouseSpec:
+	func max_storeys() -> int:
+		return 6
+
 	func room_program(count: int) -> Array[StringName]:
 		var out: Array[StringName] = []
 		for level in range(maxi(count, 1)):

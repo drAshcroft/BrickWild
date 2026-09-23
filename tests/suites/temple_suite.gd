@@ -61,7 +61,40 @@ static func run() -> SuiteResult:
 	if m1 != m2 or bb.prop_log.size() != props1:
 		res.fail("rebuilding the same spec produced a different temple")
 	_column_grid_helper(res)
+	_compact_columns(res)
 	return res
+
+
+static func _compact_columns(res: SuiteResult) -> void:
+	for seed in [731, 42, 4413]:
+		for size in [Vector2(18, 24), Vector2(24, 24), Vector2(24, 30), Vector2(36, 42)]:
+			var spec := TempleSpec.new(seed)
+			spec.form = &"ziggurat"
+			spec.width = size.x
+			spec.length = size.y
+			spec.height = 16
+			TempleGenerator.generate(spec, seed)
+			var builder := TempleBuilder.new()
+			builder.build(spec)
+			var columns: Array[Dictionary] = []
+			for mass in builder.mass_log:
+				if String(mass["name"]).begins_with("column_"):
+					columns.append(mass)
+			var overlap := MassRules.overlaps(columns, func(_a: String, _b: String) -> float: return 0.0, ["column"])
+			res.checked += 1
+			if not overlap["failures"].is_empty():
+				res.fail("compact column capitals collide seed=%d size=%s: %s" % [seed, size, overlap["failures"]])
+			if spec.columns.size() >= 3:
+				spec.columns[2]["pos"] = Vector3(spec.columns[0]["pos"]) + Vector3(0.1, 0, 0)
+				builder.build(spec)
+				columns.clear()
+				for mass in builder.mass_log:
+					if String(mass["name"]).begins_with("column_"):
+						columns.append(mass)
+				var bad := MassRules.overlaps(columns, func(_a: String, _b: String) -> float: return 0.0, ["column"])
+				res.checked += 1
+				if bad["failures"].is_empty():
+					res.fail("compact column collision mutation escaped")
 
 
 static func _column_plan(res: SuiteResult, spec: TempleSpec, builder: TempleBuilder, where: String) -> void:

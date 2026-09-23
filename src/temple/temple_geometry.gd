@@ -118,6 +118,13 @@ static func sanctum_depth(spec: TempleSpec) -> float:
 static func sanctum_rect(spec: TempleSpec) -> Rect2:
 	var h: Rect2 = hall_rect(spec)
 	var d: float = sanctum_depth(spec)
+	if spec.form == &"ziggurat":
+		# The summit god and the chamber altar share one axis. Anchor the
+		# chamber's dais below that real summit, not at the base's rear wall.
+		var summit := terrace_rect(spec, maxi(spec.terraces - 1, 0))
+		var end := summit.end.y - 0.5
+		d = minf(d, end - h.position.y)
+		return Rect2(Vector2(h.position.x, end - d), Vector2(h.size.x, d))
 	return Rect2(Vector2(h.position.x, h.end.y - d), Vector2(h.size.x, d))
 
 
@@ -190,6 +197,10 @@ static func idol_center(spec: TempleSpec) -> Vector3:
 	var s: Rect2 = sanctum_rect(spec)
 	# against the back wall, and never through it
 	var z: float = s.end.y - spec.idol_width / 2.0 - 0.5
+	if spec.form == &"ziggurat":
+		# The coil/plinth is wider than the nominal idol rectangle. Its full
+		# base remains on the highest terrace, with a half-metre rear margin.
+		z = s.end.y - spec.idol_width * 0.7
 	return Vector3(0.0, _idol_base_height(spec), z)
 
 
@@ -392,6 +403,10 @@ static func ring_columns(spec: TempleSpec) -> int:
 
 
 static func column_height(spec: TempleSpec) -> float:
+	if spec.form == &"ziggurat":
+		# Only the lowest terrace is occupied. Its supporting capitals meet
+		# the stone ceiling, not the summit of the whole stepped mountain.
+		return terrace_height(spec) - COLUMN_CAP * spec.column_r
 	return spec.height - COLUMN_CAP * spec.column_r - 0.2
 
 
@@ -457,10 +472,15 @@ static func stair_rects(spec: TempleSpec) -> Array[Rect2]:
 	var r: Rect2 = site_rect(spec)
 	var w: float = clampf(spec.width * 0.18, 2.0, 6.0)
 	var run: float = terrace_top(spec) * 1.25 + 1.0
+	# Keep the existing physical toe while centring each tread correctly.
+	# The uphill end overlaps the summit by half a metre: ending at the base's
+	# front wall left a high, disconnected flight several metres from it.
+	var old_steps := maxi(int(terrace_top(spec) / 0.35), 4)
+	var front := r.position.y - run - (run + 0.3) / (2.0 * old_steps)
+	var back := terrace_rect(spec, maxi(spec.terraces - 1, 0)).position.y + 0.5
 	for side in [-1.0, 1.0]:
 		var x: float = side * (GATE_W / 2.0 + 1.0 + w / 2.0)
-		out.append(Rect2(Vector2(x - w / 2.0, r.position.y - run),
-			Vector2(w, run + 0.3)))
+		out.append(Rect2(Vector2(x - w / 2.0, front), Vector2(w, back - front)))
 	return out
 
 
@@ -484,7 +504,9 @@ static func forecourt_rect(spec: TempleSpec) -> Rect2:
 	if spec.obelisks:
 		depth = maxf(depth, obelisk_height(spec) * 0.14 + 2.4)
 	if spec.form == &"ziggurat":
-		depth = maxf(depth, stair_rect(spec).size.y + 1.0)
+		# Only the part in front of the base needs paving. Extending the
+		# summit landing must not grow the building's outer placement bounds.
+		depth = maxf(depth, terrace_top(spec) * 1.25 + 2.3)
 	if depth <= 0.0:
 		return Rect2()
 	var w: float = minf(r.size.x, GATE_W + 8.0)

@@ -212,6 +212,43 @@ the roads themselves are never lots.
 | **fit** — `placement().bounds` inside the lot | with the fire gap as margin |
 | **yard** — the rest of the lot | garden, orchard, hedge, props by trade |
 
+A terrace is an option for a compact shell, not a promise that every porch
+can touch its neighbour. The lot planner measures the front projection from
+`placement().bounds` and retains any clearance beyond the lot class's maximum
+setback. The same effective gap is checked between neighbours and around the
+lot; road clearance remains a separate geometric check. A narrow townhouse can
+still touch, while a projecting shop front earns space for its porch.
+
+An open manor measures its setback at the facing footprint, because its real
+porch may be recessed behind two wings. Village measurement records that native
+porch door and a separate arrival corridor through the open court, using the
+emitted porch passage width. Navigation keeps the rest of the full bounds solid,
+checks the corridor's clearance, and requires the real door to be reachable.
+Water, props and trees can still block this approach; a blocked-route fixture
+must fail. Closed courtyards and curtain walls do not receive this exception.
+
+Round villages give their outward common frontages radial lot boundaries:
+the side fences extend rays from the common centre, leaving a wider garden
+behind each house. The measured front remains on the street edge and the
+required depth remains intact. Candidate fans still pass the ordinary lot,
+road, water and fire-clearance tests before placement.
+The common-facing trades fill uncovered sectors before taking a second
+frontage on the same side. This keeps a bowed through road from attracting
+every shop while half the round green remains empty.
+Round farms also take common-facing street frontages, with their working
+ground behind them. The northern ring has a broad frontage for the civic
+landmark. A native stepped temple reserves enough site depth for its actual
+stairs, setback and rear yard before lot cutting; stair geometry is never
+discarded to make the building fit. A landmark placed on that frontage
+updates its reservation to the committed lot. Paths ending on the common
+remain connected even when an unused landmark service lane is removed.
+
+A short lane must reach the actual entrance of its final lot, including
+standing room past the door. A wide frontage can extend beyond the lane's
+endpoint while its arrival remains reachable. The inn's stable has enough
+lane for its measured entrance and remains within twenty metres of the inn's
+actual bounds.
+
 Building sizes come from the family's `describe_kind()` envelope, scaled by
 wealth and the household, and every request is sent through
 `BigGlade.generate()`; the lot is sized from the *measured* `placement()`
@@ -308,6 +345,21 @@ pitch, sharpened by `taper`, with a waling piece), the **lamp post** (a post
 carrying `Torch_Metal`), the **haystack** (a revolve dome), **fence gates**,
 the **mill wheel** (two revolve rings, spokes and paddles), the **mine
 adit**, the **boat** and the **drying rack** for the strand.
+
+Mining camps place the adit beside the far end of the through road, facing
+the road and keeping the whole emitted rock-bank and spoil-heap footprint
+on dry land. The final eighteen metres of the road reserve a working yard
+before houses are placed, so a required mine never depends on leftover ground.
+A short dirt apron joins its timber mouth to the carriageway. The plan records that
+polygon as the prop's `approach`; the builder emits it and the walk grid
+adds its floor before cutting out water, buildings and props. Built props
+obstruct walking even when they do not have a catalogue entry. Only the
+native adit's narrow, mesh-verified entrance gap is excluded from its solid
+envelope; water and boundary walls still block it. The mine checks require
+reachability at the timber mouth and reject missing or short aprons, blocked
+approaches, flooded mouths, reversed entrances and footprints smaller than
+the actual emitted berm. The tunnel reveal, iron-studded lintel and two spoil
+heaps are native procedural geometry, and every emitted vertex is measured.
 
 Every one returns the world `AABB` of what it emitted, accumulated from the
 pieces as they go out rather than written down beside them — the discipline

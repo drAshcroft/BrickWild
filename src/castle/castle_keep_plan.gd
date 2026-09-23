@@ -65,13 +65,16 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 	for room_index in range(plan.room_count()):
 		if not HouseGeometry.room_suits(plan, room_index, plan.kind_of(room_index)):
 			return HousePlan.new()
-	var walls := HouseGeometry.room_walls(plan, 0)
+	var entry_level := 1 if CastleGeometry.is_enclosed(spec) else 0
+	hs.entry_storey = entry_level
+	var walls := HouseGeometry.room_walls(plan, entry_level)
 	var front := _facing_wall(walls, Vector2(0, 1))
 	var front_wall: Dictionary = walls[front]
-	plan.doors.append({"a": 0, "b": -1,
+	plan.doors.append({"a": entry_level, "b": -1,
 		"pos": (Vector2(front_wall.from) + Vector2(front_wall.to)) * 0.5,
 		"normal": -Vector2(front_wall.normal), "width": HouseGeometry.DOOR_W,
-		"exterior": true, "front": true, "storey": 0})
+		"exterior": true, "front": true, "storey": entry_level,
+		"sill": HouseGeometry.FLOOR_T, "head": 2.35})
 	for level in range(1, levels):
 		if not HouseGeometry.is_habitable(hs.kind_on(level)):
 			continue
@@ -80,6 +83,12 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 		else:
 			CastleGenerator._keep_windows(plan, floor_rect, level, hs,
 				3 if hs.kind_on(level) == &"lords_chamber" else -1)
+	# The raised entrance owns its opening interval on this wall. Other
+	# facets retain daylight, including on receding and circular keeps.
+	var door: Dictionary = plan.doors[0]
+	plan.windows = plan.windows.filter(func(w): return HousePlan.record_storey(w) != entry_level \
+		or Vector2(w.normal).dot(door.normal) < 0.95 \
+		or Vector2(w.pos).distance_to(door.pos) > (float(w.width) + float(door.width)) * 0.5 + 0.35)
 	for level in range(levels - 1):
 		if shaped:
 			_add_stair(plan, level, level + 1)
@@ -130,7 +139,7 @@ static func _windows(plan: HousePlan, level: int) -> void:
 
 ## A common footprint touches a real wall on either landing and fits BOTH
 ## floors. Sampling against polygon faces avoids placing stairs in AABB corners.
-static func _add_stair(plan: HousePlan, lower: int, upper: int) -> void:
+static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()) -> void:
 	var floor := HouseGeometry.room_floor_rect(plan, upper)
 	var run := minf(2.4, maxf(HouseGeometry.PATH_MIN, maxf(floor.size.x, floor.size.y) - 0.3))
 	var width := minf(1.0, maxf(HouseGeometry.PATH_MIN, minf(floor.size.x, floor.size.y) - 0.3))
@@ -151,7 +160,11 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int) -> void:
 				var rect := Rect2(centre - size * 0.5, size)
 				if not _inside(plan, lower, rect) or not _inside(plan, upper, rect):
 					continue
+				if avoid.size.x > 0.0 and rect.intersects(avoid, true):
+					continue
 				var score := centre.distance_to(front)
+				if avoid.size.x > 0.0:
+					score += centre.distance_to(avoid.get_center())
 				if lower == 0 and _overlap(rect, HousePlanner.door_line(plan, lower, plan.doors[plan.entrance()])):
 					score -= 1000.0
 				for door in plan.doors:

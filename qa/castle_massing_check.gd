@@ -18,7 +18,7 @@ extends RefCounted
 
 const TOL := MassRules.TOL
 ## Mass name prefixes that fold to a family for the joint table below.
-const FAMILIES := ["wall", "tower", "gate", "barbican", "keep", "hall", "chapel",
+const FAMILIES := ["wall_stair", "wall", "tower", "portcullis", "forebuilding", "drawbridge", "gate", "barbican", "keep", "hall", "chapel",
 	"apse", "wing", "range", "porch", "chimney", "annexe", "link", "storey",
 	"platform", "balcony", "motte", "climb", "rock", "sky_tower", "sky_bridge"]
 
@@ -26,7 +26,7 @@ const FAMILIES := ["wall", "tower", "gate", "barbican", "keep", "hall", "chapel"
 ## `check(spec, builder, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"no_gaps", &"no_overlap", &"grounded",
 	&"size_match", &"enclosed", &"great_tower", &"ranges", &"motte", &"sky",
-	&"bailey_clear"]
+	&"bailey_clear", &"facade", &"wall_stairs", &"forebuilding"]
 const METHODS := {&"no_gaps": "_check_gaps", &"no_overlap": "_check_overlaps",
 	&"enclosed": "_check_enclosure"}
 
@@ -42,6 +42,10 @@ var replaced: Dictionary = {}
 static func _allowance(a: String, b: String, polygonal := false, tower_lap := -1.0,
 		ridge := false) -> float:
 	var key: String = "|".join(PackedStringArray([a, b]) if a < b else PackedStringArray([b, a]))
+	# On a receding keep, the forebuilding landing rests on the exposed
+	# ground-storey shoulder. Physical access QA checks the hollow stair route.
+	if key == "forebuilding|keep":
+		return INF
 	# a motte and bailey (CAS-005): the mound is a cone logged as the box
 	# round it, so everything it touches -- the keep on it, the curtain up it,
 	# the bailey's back wall and towers at its toe -- meets that box; the
@@ -99,6 +103,12 @@ static func _allowance(a: String, b: String, polygonal := false, tower_lap := -1
 				# against that run meets the tower along with it
 				return INF
 	match key:
+		"gate|portcullis":
+			return INF # The guide is recessed inside the gatehouse masonry.
+		"wall|wall_stair":
+			# Rotated stair and curtain AABBs overlap although their actual
+			# solids meet at the inner face. The access rule measures treads.
+			return INF
 		# --- the enceinte: walls die into the towers and gate that stud them ---
 		"tower|wall", "gate|wall", "gate|tower":
 			return INF
@@ -153,6 +163,135 @@ func check(spec: CastleSpec, builder: CastleBuilder, overrides: Dictionary = {})
 	replaced = RuleSet.run(self, RULES, METHODS, overrides, [spec, builder],
 		[spec, builder], failures, warnings)
 	return _report()
+
+
+## Count occupied HEIGHT BANDS, not windows: a hundred ground-floor slits
+## cannot stand in for the missing upper rows of a three-storey range.
+## Planned openings here are the child builder's forwarded emission records.
+func _check_facade(spec: CastleSpec, builder: CastleBuilder) -> void:
+	var bands := 0
+	for row in builder.interiors:
+		var plan: HousePlan = row.plan
+		var xf: Transform3D = row.transform
+		var levels: Dictionary = {}
+		for room in plan.rooms:
+			if room.kind in HouseGeometry.HABITABLE:
+				levels[HousePlan.record_storey(room)] = true
+		for level in levels:
+			var bottom := xf.origin.y + int(level) * plan.spec.height
+			var top := bottom + plan.spec.height
+			var found := false
+			for part in builder.part_log:
+				if String(part.get("tag", "")) != String(row.id) or not _facade_window(part):
+					continue
+				var y: float = Vector3(part.pos).y
+				if y > bottom + 0.05 and y < top - 0.05:
+					found = true
+					break
+			bands += 1
+			if not found:
+				failures.append("facade: %s occupied storey %d has no emitted window in height band %.2f..%.2f" % [row.id, int(level), bottom, top])
+	# Ridge ranges retain a tall outer facade above their shorter furnished
+	# plan. Those upper rows belong to the castle emitter and must survive too.
+	if CastleGeometry.is_ridge(spec):
+		var count := CastleGeometry.ridge_storeys(spec)
+		for segment in CastleGeometry.ridge_ranges(spec):
+			var center: Vector2 = (Vector2(segment.from) + Vector2(segment.to)) * 0.5
+			var along: Vector2 = segment.dir
+			var normal: Vector2 = segment.normal
+			var height: float = float(segment.height) / count
+			for level in range(count):
+				var found := false
+				for part in builder.part_log:
+					var label := String(part.get("tag", ""))
+					if not label in [String(segment.name), "range", "hall"] or not _facade_window(part):
+						continue
+					var position: Vector3 = part.pos
+					var offset := Vector2(position.x, position.z) - center
+					if absf(offset.dot(along)) > float(segment.length) * 0.5 + 0.1 \
+							or absf(offset.dot(normal)) > float(segment.width) * 0.5 + 0.2:
+						continue
+					if position.y > level * height + 0.05 and position.y < (level + 1) * height - 0.05:
+						found = true
+						break
+				bands += 1
+				if not found:
+					failures.append("facade: ridge %s storey %d has no emitted window in its height band" % [segment.name, level])
+	stats["facade_bands"] = bands
+
+
+static func _facade_window(part: Dictionary) -> bool:
+	return String(part.get("kind", "")) == "window" and not bool(part.get("door", false))
+
+
+func _check_forebuilding(spec: CastleSpec, builder: CastleBuilder) -> void:
+	if not CastleGeometry.is_enclosed(spec) or not spec.keep or CastleGeometry.is_motte(spec):
+		return
+	var keep := CastleGeometry.keep_aabb(spec)
+	var found := false
+	for mass in builder.mass_log:
+		if mass.name != "forebuilding":
+			continue
+		found = true
+		var box: AABB = mass.aabb
+		if absf(box.position.y) > 0.05 or not box.grow(0.05).intersects(keep):
+			failures.append("forebuilding: protected stair must be grounded and contact the keep")
+		var top := 0.0
+		var tread_count := 0
+		for row in builder.component_log:
+			if row.host == "forebuilding" and row.role == "forebuilding_tread":
+				tread_count += 1
+				top = maxf(top, MassBuilder.component_aabb(row).end.y)
+		if tread_count < 2 or absf(top - float(mass.get("entry_height", -1.0))) > 0.01:
+			failures.append("forebuilding: treads do not reach the protected first-floor entrance")
+		var raised := false
+		for interior in builder.interiors:
+			if interior.id == "keep":
+				var plan: HousePlan = interior.plan
+				raised = plan.entrance() >= 0 and HousePlan.record_storey(plan.doors[plan.entrance()]) == 1
+		if not raised:
+			failures.append("forebuilding: keep has no first-floor exterior entrance")
+	if not found:
+		failures.append("forebuilding: enclosed keep is missing its protected entrance stair")
+
+
+func _check_wall_stairs(spec: CastleSpec, builder: CastleBuilder) -> void:
+	if not CastleGeometry.is_enclosed(spec):
+		return
+	for ring in CastleGeometry.rings(spec):
+		var count := 0
+		var near_gate := false
+		var gate := CastleGeometry.gatehouse_aabb(spec, ring)
+		var target := CastleGeometry.wall_height(spec, ring) + CastleGeometry.PARAPET_RISE
+		for mass in builder.mass_log:
+			if not String(mass.name).begins_with("wall_stair_") or int(mass.get("ring", -1)) != ring:
+				continue
+			count += 1
+			var box: AABB = mass.aabb
+			if absf(box.position.y) > 0.05:
+				failures.append("wall_stairs: %s is not grounded" % mass.name)
+			var rect := Rect2(box.position.x, box.position.z, box.size.x, box.size.z)
+			var gate_rect := Rect2(gate.position.x, gate.position.z, gate.size.x, gate.size.z)
+			near_gate = near_gate or VillageMeasure.poly_distance(Poly.from_rect(rect), Poly.from_rect(gate_rect)) <= 15.0
+			var top := -INF
+			var grounded := false
+			var touches := false
+			for row in builder.component_log:
+				if row.host != mass.name or row.role not in ["wall_stair_tread", "wall_stair_landing"]:
+					continue
+				var emitted := MassBuilder.component_aabb(row)
+				top = maxf(top, emitted.end.y)
+				grounded = grounded or absf(emitted.position.y) <= 0.05
+				if absf(emitted.end.y - target) <= 0.01:
+					for wall in builder.mass_log:
+						if String(wall.name).begins_with("wall_%d_" % ring):
+							touches = touches or emitted.grow(0.16).intersects(wall.aabb)
+			if absf(top - target) > 0.01 or not grounded or not touches:
+				failures.append("wall_stairs: %s has no grounded tread chain contacting the %.2fm curtain walk" % [mass.name, target])
+		if count < 2:
+			failures.append("wall_stairs: ring %d has %d stairs, needs two" % [ring, count])
+		if not near_gate:
+			failures.append("wall_stairs: ring %d has no stair within 15m of its gate" % ring)
 
 
 ## What stands in the bailey keeps its distance (CAS-012).

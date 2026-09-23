@@ -8,11 +8,13 @@ extends Control
 ## drawing silently drifted from the model it claimed to depict.
 
 var spec: ChurchSpec
+var village: VillagePlan
 ## Shown instead of a sheet when there is nothing to draw -- a castle, for now.
 var note: String = ""
 
 func setup(p_spec: ChurchSpec) -> void:
 	spec = p_spec
+	village = null
 	note = ""
 	queue_redraw()
 
@@ -20,10 +22,14 @@ func setup(p_spec: ChurchSpec) -> void:
 ## while the viewport showed a castle was worse than drawing nothing.
 func show_note(text: String) -> void:
 	spec = null
+	village = null
 	note = text
 	queue_redraw()
 
 func _draw() -> void:
+	if village != null:
+		_draw_village()
+		return
 	if spec == null:
 		if note != "":
 			draw_rect(Rect2(Vector2.ZERO, size), Color("f4f7fa"), true)
@@ -46,6 +52,73 @@ func _draw() -> void:
 	var mid_y := size.y * 0.52
 	_draw_plan(Rect2(Vector2(0, 46), Vector2(size.x, mid_y - 56)), ink, light)
 	_draw_elevation(Rect2(Vector2(0, mid_y - 10), Vector2(size.x, size.y - mid_y + 4)), ink, light)
+
+
+func setup_village(plan: VillagePlan) -> void:
+	spec = null
+	village = plan
+	note = ""
+	queue_redraw()
+
+
+## Every layer comes from the retained VillagePlan, in its site frame.
+## No road, lot, entrance or shoreline is inferred from the preview mesh.
+func _draw_village() -> void:
+	draw_rect(Rect2(Vector2.ZERO, size), Color("f3f0e6"), true)
+	if size.x < 100 or size.y < 100 or village.site.size.x <= 0:
+		return
+	var ink := Color("304958")
+	var font := ThemeDB.fallback_font
+	draw_string(font, Vector2(14, 22), "%s / %s" % [village.spec.variant_name, String(village.spec.form).capitalize()], HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 15, ink)
+	draw_string(font, Vector2(14, 40), "%d people  |  %d buildings  |  seed %d" % [village.spec.population, village.buildings.size(), village.spec.seed], HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 11, Color("667773"))
+	var paper := Rect2(22, 54, size.x - 44, size.y - 86)
+	var scale := minf(paper.size.x / village.site.size.x, paper.size.y / village.site.size.y)
+	var centre := paper.get_center()
+	var transform := func(p: Vector2) -> Vector2:
+		return centre + (p - village.site.get_center()) * scale
+	var polygon := func(points: PackedVector2Array) -> PackedVector2Array:
+		var result := PackedVector2Array()
+		for point in points: result.append(transform.call(point))
+		return result
+	for field in village.fields:
+		var points: PackedVector2Array = polygon.call(field["poly"])
+		if points.size() >= 3: draw_colored_polygon(points, Color("e4dcb9"))
+	for common in village.commons:
+		var points: PackedVector2Array = polygon.call(common["poly"])
+		if points.size() >= 3: draw_colored_polygon(points, Color("b4c9a1"))
+	for water in village.water:
+		var points: PackedVector2Array = polygon.call(water["poly"])
+		if points.size() >= 3: draw_colored_polygon(points, Color("98c7d2"))
+	for lot in village.lots:
+		var points: PackedVector2Array = polygon.call(lot["poly"])
+		if points.size() >= 3:
+			draw_colored_polygon(points, Color(0.75, 0.67, 0.5, 0.14))
+			points.append(points[0])
+			draw_polyline(points, Color("a89a7e"), 0.8, true)
+		var front: PackedVector2Array = polygon.call(lot["front"])
+		if front.size() >= 2: draw_polyline(front, Color("d49843"), 2.0, true)
+	for road in village.roads:
+		var points: PackedVector2Array = polygon.call(road["points"])
+		if points.size() >= 2:
+			draw_polyline(points, Color("fdf9ed"), maxf(1.5, road["width"] * scale), true)
+	for building in village.buildings:
+		var points: PackedVector2Array = polygon.call(Placement.world_rect(building["placement"], building["transform"], true))
+		if points.size() >= 3:
+			draw_colored_polygon(points, Color("936651") if building["kind"] != &"church" else Color("6e7685"))
+		var door: Vector3 = building["door"]
+		draw_circle(transform.call(Vector2(door.x, door.z)), 1.7, Color("f7e4a7"))
+	var boundary := VillageEnclosurePlan.build(village)
+	var edge: PackedVector2Array = village.enclosure if not village.enclosure.is_empty() else boundary["edge"]
+	if village.spec.enclosure != &"none" and edge.size() >= 3:
+		var points: PackedVector2Array = polygon.call(edge)
+		points.append(points[0])
+		draw_polyline(points, Color("526749"), 2.2, true)
+	var gates: Array = village.gate_crossings if not village.gate_crossings.is_empty() else boundary["gates"]
+	for gate in gates if village.spec.enclosure != &"none" else []:
+		draw_circle(transform.call(gate["pos"]), 3.0, Color("f3f0e6"))
+	draw_string(font, Vector2(size.x - 32, 24), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ink)
+	draw_line(Vector2(size.x - 27, 32), Vector2(size.x - 27, 48), ink, 1.3)
+	draw_string(font, Vector2(14, size.y - 12), "Roads / cream    Lots / ochre    Fronts / gold    Common / green    Water / blue    Edge / dark green", HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 10, ink)
 
 func _draw_plan(r: Rect2, ink: Color, light: Color) -> void:
 	if r.size.x < 40 or r.size.y < 30:

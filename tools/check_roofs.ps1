@@ -5,7 +5,8 @@ param(
     [Nullable[int]]$Seed = $null,
     [string]$Output = 'artifacts/roof_audit',
     [int]$TimeoutSeconds = 600,
-    [switch]$SelfTest
+    [switch]$SelfTest,
+    [switch]$RegionsOnly
 )
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path $PSScriptRoot -Parent
@@ -21,6 +22,7 @@ $arguments = @('--headless', '--path', ('"' + $workspace + '"'), '--script',
 foreach ($item in $Family) { $arguments += "--family=$item" }
 if ($null -ne $Seed) { $arguments += "--seed=$Seed" }
 if ($SelfTest) { $arguments += '--self-test' }
+if ($RegionsOnly) { $arguments += '--regions-only' }
 $started = [DateTime]::UtcNow
 $process = Start-Process -FilePath $GodotPath -ArgumentList $arguments -WorkingDirectory $workspace `
     -WindowStyle Hidden -PassThru -RedirectStandardOutput ($reportBase + '.log') `

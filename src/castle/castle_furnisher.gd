@@ -129,7 +129,22 @@ static func dress(spec: CastleSpec) -> Array[Dictionary]:
 	_dress_chamber(_room_of(CastleGeometry.keep_aabb(spec)), out, rng)
 	_dress_yard(spec, out)
 	_dress_defences(spec, out)
+	_dress_forebuilding(spec, out)
 	return out
+
+
+static func _dress_forebuilding(spec: CastleSpec, out: Array[Dictionary]) -> void:
+	var fore := CastleGeometry.forebuilding(spec)
+	if fore.is_empty():
+		return
+	for index in 2:
+		var fraction := 0.22 if index == 0 else 0.72
+		var side := -1.0 if index == 0 else 1.0
+		var step := floorf(float(fore.steps) * fraction)
+		var rise := float(fore.height) * (step + 1.0) / float(fore.steps)
+		var pos := Vector3(float(fore.front.x) + side * (float(fore.clear) * 0.5 - 0.08),
+			rise + 1.3, float(fore.front.y) + (step + 0.5) * preload("castle_access_geometry.gd").TREAD)
+		_put(out, SCONCE, pos, _mount_yaw(SCONCE, Vector2(-side, 0)), 0.75, &"light")
 
 
 # --------------------------------------------------------------- great hall
@@ -376,6 +391,11 @@ static func _reserved(spec: CastleSpec) -> Array[Rect2]:
 			out.append(_plan(a).grow(CastleGeometry.BAILEY_CLEAR * 0.5))
 	if CastleGeometry.is_motte(spec):
 		out.append(_plan(CastleGeometry.motte_aabb(spec)))
+	for stair in CastleGeometry.wall_stairs(spec):
+		out.append(stair.footprint.grow(0.3))
+	var fore := CastleGeometry.forebuilding(spec)
+	if not fore.is_empty():
+		out.append(fore.footprint.grow(0.3))
 	# the way in: from the gate, straight up the axis, the whole depth of the
 	# bailey. Nothing stands in it.
 	var bailey: Rect2 = CastleGeometry.bailey_rect(spec)

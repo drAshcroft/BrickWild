@@ -57,10 +57,9 @@ const SHOP_RULES := [
 	{"kind": &"guildhall", "min_pop": 150, "business": &"guildhall"},
 ]
 
-## `bakery` only stands alone (as a `BuildingRequest`) when there is no
-## water; when there is, the mill takes its place, and the mill itself is a
-## `MeshKit` mass (VILLAGES §4), not a `BuildingRequest`, so it is out of
-## this file's scope.
+## A waterside mill keeps the bakery's usable workrooms and storage. The lot
+## planner adds its race and the dresser its wheel; the building is still a
+## measured request, rather than an empty decorative mass.
 const BAKERY_MIN_POP := 50
 ## §4: "a well per 60 people", "a shrine at 20", "a church + store at 60".
 const SHRINE_MIN_POP := 20
@@ -96,11 +95,11 @@ static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 ## rather than to themselves. Excludes `house` (every village has one row of
 ## households, not a "kind" in this earned-set sense) and anything that is
 ## a `MeshKit` mass or a prop rather than a `BuildingRequest` (`well`, the
-## market stalls, the mine adit, the strand racks, the mill mass itself).
-static func earned_kinds(population: int, purpose: StringName, water: StringName) -> Array[StringName]:
+## market stalls, the mine adit, the strand racks, the mill wheel itself).
+static func earned_kinds(population: int, purpose: StringName, water: StringName, culture: StringName = &"english") -> Array[StringName]:
 	var out: Array[StringName] = []
 
-	if purpose == &"pilgrim":
+	if purpose == &"pilgrim" or culture == &"blighted":
 		out.append(&"temple")
 	elif population >= CHURCH_MIN_POP:
 		out.append(&"church")
@@ -116,7 +115,7 @@ static func earned_kinds(population: int, purpose: StringName, water: StringName
 		if earns:
 			out.append(row["kind"])
 
-	if population >= BAKERY_MIN_POP and water == &"none":
+	if population >= BAKERY_MIN_POP:
 		out.append(&"bakery")
 
 	if population >= MANOR_MIN_POP or purpose == &"garrison":
@@ -126,7 +125,12 @@ static func earned_kinds(population: int, purpose: StringName, water: StringName
 
 
 static func _append_landmark(out: Array[BuildingRequest], spec: VillageSpec, styles: Dictionary) -> void:
-	if spec.purpose == &"pilgrim":
+	if spec.culture == &"blighted":
+		# The stepped shrine is this settlement's landmark. Its summit rises
+		# above the witch cottages, while the ritual chamber remains usable.
+		out.append(BuildingRequest.temple(
+			_seed_for(spec, "temple"), styles["temple_form"], styles["temple_cult"], 18.0, 24.0, 14.0))
+	elif spec.purpose == &"pilgrim":
 		out.append(BuildingRequest.temple(
 			_seed_for(spec, "temple"), styles["temple_form"], styles["temple_cult"], 26.0, 44.0, 12.0))
 	elif spec.population >= CHURCH_MIN_POP:
@@ -149,7 +153,7 @@ static func _append_shops(out: Array[BuildingRequest], spec: VillageSpec, styles
 		out.append(BuildingRequest.shop(
 			_seed_for(spec, row["kind"]), row["business"], styles["house"], 11.0, 14.0, 2.8, 1))
 
-	if spec.population >= BAKERY_MIN_POP and spec.water == &"none":
+	if spec.population >= BAKERY_MIN_POP:
 		out.append(BuildingRequest.shop(
 			_seed_for(spec, "bakery"), &"bakery", styles["house"], 11.0, 14.0, 2.8, 1))
 

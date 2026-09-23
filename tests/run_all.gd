@@ -47,14 +47,16 @@ extends SceneTree
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
+	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
 	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["roofquick", "houseqacore", "houseqaplan",
+const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
+	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
+	"roofquick", "houseqacore", "houseqaplan",
 	"houseqafurnish", "houseqafull", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -88,7 +90,7 @@ const EXTRA: Array[String] = ["roofquick", "houseqacore", "houseqaplan",
 ## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 ## Lanes and bare suite names can be mixed; duplicates run once.
 const LANES: Dictionary = {
-	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds"],
+	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
@@ -102,6 +104,18 @@ const LANES: Dictionary = {
 
 static func _run_one(key: String) -> SuiteResult:
 	match key:
+		"vmine":
+			return preload("res://tests/suites/village_adit_suite.gd").run()
+		"varchetypecontracts":
+			return VillageArchetypeSuite.run_contracts()
+		"vwater":
+			return VillageWaterPlanSuite.run()
+		"hjetty":
+			return preload("res://tests/suites/house_jetty_suite.gd").run()
+		"hmaterials":
+			return preload("res://tests/suites/house_material_suite.gd").run()
+		"henvelope":
+			return preload("res://tests/suites/house_envelope_suite.gd").run()
 		"library":
 			return LibrarySuite.run()
 		"placement":
@@ -228,8 +242,18 @@ static func _run_one(key: String) -> SuiteResult:
 			return VillageCheckSuite.run()
 		"vforms":
 			return VillageFormsSuite.run()
+		"vformslayout":
+			return VillageFormsSuite.run_layout()
+		"vformsfull":
+			return VillageFormsSuite.run_full()
+		"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate":
+			return VillageFormsSuite.run_full(StringName(key.trim_prefix("vformsfull_")))
 		"venclosure":
 			return preload("res://tests/suites/village_enclosure_suite.gd").run()
+		"vmill":
+			return preload("res://tests/suites/village_mill_suite.gd").run()
+		"vmillfull":
+			return preload("res://tests/suites/village_mill_suite.gd").run(true)
 		"varchetype":
 			return VillageArchetypeSuite.run()
 		"varchetype_thorpe":

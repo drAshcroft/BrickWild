@@ -30,6 +30,7 @@ static func run() -> SuiteResult:
 				_expect(res, root.get_node("Exterior").get_child_count() == 0, who + " disabled props assembled")
 				root.free()
 	_mutations(res)
+	_head_clearance_and_omissions(res)
 	_sill(res)
 	_api_bounds(res)
 	return res
@@ -118,6 +119,35 @@ static func _sill(res: SuiteResult) -> void:
 				if Geometry3D.segment_intersects_triangle(start, end, t[0], t[1], t[2]) != null:
 					hits += 1
 			_expect(res, hits == 0, "cottage 4412 trim/plinth crosses entrance at %.3f surface %d" % [y, surface])
+
+
+static func _head_clearance_and_omissions(res: SuiteResult) -> void:
+	var s := HouseSpec.new()
+	s.width = 4.0
+	s.length = 5.0
+	var plan := HouseGenerator.generate(s, 4412, false)
+	_expect(res, HouseExterior.access_clear(plan), "small cottage approach is obstructed")
+	_expect(res, not plan.exterior_omissions.is_empty(), "small cottage did not explain unfitted recipe items")
+	var before := var_to_str(plan.exterior_omissions)
+	HouseExterior.dress(plan)
+	_expect(res, before == var_to_str(plan.exterior_omissions), "small cottage omissions are not deterministic")
+	var door: Dictionary = plan.doors[plan.entrance()]
+	# Use the measured wall-lantern body as a synthetic hanging sign: the
+	# clearance rule measures its body, and must not special-case its key.
+	var sign := HouseExterior._candidate(plan, "Lantern_Wall", 0.45, 0, 0.5, "trade_sign")
+	var at: Vector2 = door["pos"] + door["normal"] * 0.65
+	var b := HouseExterior.bounds_of(sign)
+	sign["pos"] += Vector3(at.x - b.get_center().x, 1.6 - b.position.y, at.y - b.get_center().z)
+	sign["id"] = "low_sign"
+	sign["bounds"] = HouseExterior.bounds_of(sign)
+	plan.exterior = [sign]
+	var errors := "\n".join(HouseExterior.check(plan))
+	_expect(res, errors.contains("low_sign role=trade_sign host=0") and errors.contains("door"),
+		"low sign escaped role/host/ID doorway diagnostics")
+	# A high sign clears walking headroom; moving it up must remove the
+	# doorway conflict without changing the expected specification.
+	sign["pos"].y += 1.0
+	_expect(res, not HouseExterior.conflict(plan, sign, []).contains("door"), "high sign falsely blocks approach")
 
 
 static func _api_bounds(res: SuiteResult) -> void:

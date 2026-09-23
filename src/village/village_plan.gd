@@ -66,6 +66,12 @@ var gate_crossings: Array[Dictionary] = []
 ## ("pond"/"stream"/"river"/"coast")}
 var water: Array[Dictionary] = []
 
+## Persistent bridges and fords, after the final roads have been trimmed.
+## {road:int, water:int, water_kind:StringName, kind:StringName (bridge/ford),
+## points:PackedVector2Array (the route including bends), width:float}.
+## Separate from dressing: clearing props must never erase a crossing.
+var water_crossings: Array[Dictionary] = []
+
 ## Strip fields, orchards, pasture outside the enclosure. {"poly":
 ## PackedVector2Array, "kind": StringName ("field"/"orchard"/"pasture")}
 var fields: Array[Dictionary] = []
@@ -155,6 +161,7 @@ func equals(other: VillagePlan) -> bool:
 		and _poly_equal(enclosure, other.enclosure)
 		and _array_of_dict_equal(gate_crossings, other.gate_crossings)
 		and _array_of_dict_equal(water, other.water)
+		and _array_of_dict_equal(water_crossings, other.water_crossings)
 		and _array_of_dict_equal(fields, other.fields)
 		and _array_of_dict_equal(props, other.props)
 		and _array_of_dict_equal(plants, other.plants)

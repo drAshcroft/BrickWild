@@ -23,9 +23,30 @@ the upper floor has a real opening. These shapes share their outer description
 with `castle_keep_plan.gd` rather than treating the keep's bounding box as a room.
 Keep storeys span the complete keep height, including square keeps.
 
+The shared checks ask the plan spec for its supported storey limit: dwellings
+retain four, tower houses allow six, and occupied keeps allow eight. Navigation
+and stair coverage inspect every declared occupied level. Motte rooms keep the
+oval fitted to the mound; fitting the bailey hall cannot flatten that oval into
+a narrow rectangle. Their alternating stairs follow real wall facets, every
+habitable floor has windows, and the top chamber's planned fireplace has an
+emitted wall flue and coping above the parapet. The entrance uses a front facet
+with enough space beside the solid climbing curtain for the entire doorway.
+
+The [motte overview](screenshots/motte_revision_hero.png),
+[furnished entrance](screenshots/motte_revision_entrance.png), and
+[wall flue](screenshots/motte_revision_flue.png) are actual renderer captures.
+Reproduce them with `tools/render_castle_specials.gd -- --motte-revision`.
+`tests/castle_motte_envelope_test.gd` checks 48 seeded fits;
+`tests/castle_motte_native_test.gd -- small compact fortress` checks the furnished
+3-, 7-, and 8-storey fixtures against emitted geometry and navigation.
+
 Planned windows and doors keep their actual emitted positions and facing in
 the castle part log. In enclosed castles, hall and chapel windows face the
 courtyard; their plans establish those windows before furniture is placed.
+The massing `facade` rule measures windows by occupied storey, using those
+emitted records. Ridge ranges also retain their castle-owned upper rows above
+the furnished lower plan. Window count alone cannot satisfy the rule: moving
+every opening into the bottom band fails even when the count is unchanged.
 Voxel QA measures masonry
 at a real window's jambs, head, and sill, while keeping the original backing
 checks for decorative slits on solid castle walls.

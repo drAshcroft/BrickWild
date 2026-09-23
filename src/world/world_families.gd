@@ -77,7 +77,7 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 
 
 ## Build the mesh for a world building's spec, or null when there is none.
-static func build_mesh(building: GeneratedBuilding) -> ArrayMesh:
+static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"courtyard_house":
 		return HouseBuilder.new().build(building.plan)

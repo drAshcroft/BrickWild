@@ -24,7 +24,7 @@ const WALL_PROBE := 1
 ## The rules, in order; a family may replace one through
 ## `check(spec, mesh, builder, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"no_nan", &"grounded", &"connected_mass",
-	&"openings_embedded", &"enceinte_closed", &"interiors", &"lords_walk"]
+	&"openings_embedded", &"enceinte_closed", &"interiors", &"lords_walk", &"gate_access"]
 const METHODS := {&"no_nan": "_check_vertices", &"grounded": "_check_ground",
 	&"openings_embedded": "_check_openings", &"enceinte_closed": "_check_enceinte"}
 
@@ -83,6 +83,53 @@ func _check_lords_walk() -> void:
 		failures.append("lords_walk: " + failure)
 
 
+func _check_gate_access() -> void:
+	var report := gate_access_report(spec, builder, mesh)
+	failures.append_array(report.failures)
+
+
+static func gate_access_report(s: CastleSpec, b: CastleBuilder, actual: ArrayMesh) -> Dictionary:
+	var out := {"failures": []}
+	if not CastleGeometry.is_enclosed(s):
+		return out
+	var triangles: Array = []
+	for surface in actual.get_surface_count():
+		if surface != CastleBuilder.SURF_OPEN:
+			triangles.append_array(HouseQA._mesh_triangles(actual, surface))
+	for ring in CastleGeometry.rings(s):
+		var gate := CastleGeometry.gatehouse_aabb(s, ring)
+		var half := minf(gate.size.x * 0.4, 4.0) * 0.5
+		var slot_z := gate.position.z + gate.size.z * 0.3
+		var count := 0
+		for mass in b.mass_log:
+			if String(mass.name).begins_with("portcullis_%d_" % ring):
+				count += 1
+		if count != 2:
+			out.failures.append("gate_access: ring %d needs a logged portcullis guide pair" % ring)
+		for side in [-1.0, 1.0]:
+			var start := Vector3(float(side) * (half - 0.15), 1.0, slot_z)
+			var slot := Vector3(float(side) * (half + 0.1), 1.0, slot_z)
+			var back := Vector3(float(side) * (half + 0.22), 1.0, slot_z)
+			if _access_ray_hits(triangles, start, slot) or not _access_ray_hits(triangles, start, back):
+				out.failures.append("gate_access: ring %d has no open recessed groove with a solid guide" % ring)
+			if not _access_ray_hits(triangles, start + Vector3.FORWARD * 0.3, slot + Vector3.FORWARD * 0.3):
+				out.failures.append("gate_access: ring %d groove has no adjacent passage masonry" % ring)
+	var bridge := CastleGeometry.drawbridge_aabb(s)
+	if bridge.size.z > 0.0:
+		if not b.mass_log.any(func(m): return m.name == "drawbridge"):
+			out.failures.append("gate_access: ditch or moat gate has no logged drawbridge")
+		var boards := maxi(2, int(ceil(bridge.size.z / 0.28)))
+		for index in boards:
+			var point := Vector3(0, bridge.end.y, bridge.position.z + (index + 0.5) * bridge.size.z / boards)
+			if not _access_ray_hits(triangles, point + Vector3.UP * 0.04, point - Vector3.UP * 0.04):
+				out.failures.append("gate_access: drawbridge is missing emitted walking deck")
+		var from := Vector3(0, 1.0, bridge.position.z - 0.1)
+		var to := Vector3(0, 1.0, bridge.end.z + 0.1)
+		if _access_ray_hits(triangles, from, to):
+			out.failures.append("gate_access: lowered drawbridge route is obstructed")
+	return out
+
+
 ## Start outside the outer gate (and barbican), traverse every ring and its
 ## causeway, then chain the keep's storeys through HouseNavCheck. Structural
 ## triangles at body height block the exterior grid: a painted doorway on a
@@ -105,8 +152,8 @@ static func lords_walk(s: CastleSpec, b: CastleBuilder, emitted: ArrayMesh = nul
 		out.failures.append("keep has no entrance")
 		return out
 	var d: Dictionary = p.doors[entrance]
-	if not bool(d.get("exterior", false)) or HousePlan.record_storey(d) != 0:
-		out.failures.append("keep entrance is not a ground exterior door")
+	if not bool(d.get("exterior", false)) or HousePlan.record_storey(d) != 1:
+		out.failures.append("keep entrance is not a protected first-floor exterior door")
 		return out
 	var xf: Transform3D = keep.transform
 	# HousePlan records exterior doors on the inner wall face.
@@ -122,11 +169,20 @@ static func lords_walk(s: CastleSpec, b: CastleBuilder, emitted: ArrayMesh = nul
 	var approach := Rect2(-gate.size.x * 0.5, front - 2.0, gate.size.x, gate.position.z - front + 2.5)
 	var bounds := CastleGeometry.polygon_bbox(outer).merge(approach).grow(1.0)
 	var actual := emitted if emitted != null else b.commit()
+	var access := forebuilding_report(s, b, actual, keep)
+	out["forebuilding"] = access
+	out.failures.append_array(access.failures)
 	var start := Vector2(0, front - 1.0)
 	var goal := Vector2(point.x, point.z)
 	var inside_local := Vector2(d.pos) - Vector2(d.normal) * (HouseGeometry.wall_thickness(p.spec) * 0.5 + HouseGeometry.PERSON_RADIUS + 0.2)
 	var inside_world := xf * Vector3(inside_local.x, 0, inside_local.y)
 	var inside_point := Vector2(inside_world.x, inside_world.z)
+	var fore := CastleGeometry.forebuilding(s)
+	if not fore.is_empty():
+		# The ground grid reaches the toe. The emitted tread chain and raised
+		# threshold are verified separately at their actual elevations.
+		goal = Vector2(fore.front) + Vector2(fore.normal) * 0.8
+		inside_point = goal
 	out["start"] = start
 	out["keep_approach"] = goal
 	out["door_inside"] = inside_point
@@ -170,6 +226,66 @@ static func lords_walk(s: CastleSpec, b: CastleBuilder, emitted: ArrayMesh = nul
 		if room in nav.unreached_rooms or not inside.ok:
 			out.failures.append("keep entrance cannot reach/use lord's chamber %d: %s" % [room, inside.failures])
 	return out
+
+
+## Probe the emitted stair at body width, not just its bounding envelope.
+## This catches an omitted tread, a filled stair hall, and a low roof while
+## the plan and mass log can still look perfectly plausible.
+static func forebuilding_report(s: CastleSpec, b: CastleBuilder, actual: ArrayMesh,
+		keep: Dictionary) -> Dictionary:
+	var out := {"failures": [], "treads": 0}
+	var plan: HousePlan = keep.plan
+	if plan.entrance() < 0:
+		out.failures.append("forebuilding: keep has no door")
+		return out
+	var door: Dictionary = plan.doors[plan.entrance()]
+	var door_report := _special_door_report("keep", keep, b, actual, plan, door)
+	out.failures.append_array(door_report.failures)
+	var triangles: Array = []
+	for surface in actual.get_surface_count():
+		if surface != CastleBuilder.SURF_OPEN:
+			triangles.append_array(HouseQA._mesh_triangles(actual, surface))
+	var previous := 0.0
+	var last_box := AABB()
+	var landed := false
+	var fore := CastleGeometry.forebuilding(s)
+	var previous_point := Vector3(float(fore.front.x), 0.0, float(fore.front.y) - 0.4)
+	for row in b.component_log:
+		if row.host != "forebuilding" or row.role not in ["forebuilding_tread", "forebuilding_landing"]:
+			continue
+		var box := MassBuilder.component_aabb(row)
+		var centre := box.get_center()
+		centre.y = box.end.y
+		if row.role == "forebuilding_tread":
+			out.treads += 1
+			if box.end.y - previous > 0.201 or box.end.y <= previous:
+				out.failures.append("forebuilding: missing or unwalkable riser")
+			previous = box.end.y
+		else:
+			landed = absf(box.end.y - previous) < 0.01
+		if last_box.size.x > 0 and not last_box.grow(0.005).intersects(box):
+			out.failures.append("forebuilding: disconnected tread or landing")
+		last_box = box
+		for offset in [-0.4, 0.0, 0.4]:
+			var point := centre + Vector3.RIGHT * float(offset)
+			var from := Vector3(previous_point.x + float(offset), point.y + 0.9, previous_point.z)
+			if _access_ray_hits(triangles, from, point + Vector3.UP * 0.9):
+				out.failures.append("forebuilding: approach blocked between treads at %s" % point)
+			if not _access_ray_hits(triangles, point + Vector3.UP * 0.04, point - Vector3.UP * 0.04):
+				out.failures.append("forebuilding: emitted stair floor missing at %s" % point)
+			if _access_ray_hits(triangles, point + Vector3.UP * 0.05, point + Vector3.UP * 1.95):
+				out.failures.append("forebuilding: headroom blocked at %s" % point)
+		previous_point = centre
+	if out.treads < 2 or not landed or absf(previous - plan.spec.height - HouseGeometry.FLOOR_T) > 0.01:
+		out.failures.append("forebuilding: no continuous stair to first-floor landing")
+	return out
+
+
+static func _access_ray_hits(triangles: Array, a: Vector3, z: Vector3) -> bool:
+	for tri in triangles:
+		if Geometry3D.segment_intersects_triangle(a, z, tri[0], tri[1], tri[2]) != null:
+			return true
+	return false
 
 
 ## Tower houses and occupied motte shell-keeps do not have the enclosed keep's

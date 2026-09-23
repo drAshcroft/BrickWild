@@ -105,7 +105,8 @@ const JUNCTION_EPS := 0.5       ## two road vertices this close are the same jun
 ## the form's streets and lanes. Returns a fresh `VillagePlan`; `spec` is not
 ## modified. An unsupported form returns a plan with the site and nothing
 ## else, so callers can tell "not mine" from "failed".
-static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0) -> VillagePlan:
+static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
+		minimum_depth := 0.0, shore_depth := 0.0) -> VillagePlan:
 	var out := VillagePlan.new(spec)
 	if spec == null or not spec.valid():
 		push_error("VillageSitePlanner: invalid spec")
@@ -114,6 +115,12 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0) -> Vill
 		push_error("VillageSitePlanner: spec.generate() has not been called")
 		return out
 	out.site = site_rect(spec)
+	if spec.form == &"round":
+		minimum_depth = maxf(minimum_depth, 2.0 * (6.0 + _round_ring_radius(10.5)
+			+ _ring_half() + LANDMARK_GAP + RING_LANDMARK_DEPTH + SITE_MARGIN_M + 0.25))
+	if minimum_depth > out.site.size.y:
+		var depth := minf(minimum_depth, SITE_MAX_SIDE)
+		out.site = Rect2(Vector2(out.site.position.x, -depth * 0.5), Vector2(out.site.size.x, depth))
 	if site_scale > 1.0:
 		# More ground when the lot planner could not house everyone on the
 		# frontage the form gave it (VIL-006), grown about the centre and
@@ -155,13 +162,16 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0) -> Vill
 		&"round":
 			_plan_round(out, spec, through)
 		&"strand":
-			_plan_strand(out, spec, through)
+			_plan_strand(out, spec, through, shore_depth)
 		&"planted":
 			_plan_planted(out, spec, through)
 		&"gate":
 			_plan_gate(out, spec, through, rng)
 		_:
 			_plan_street(out, spec, through, rng)
+	# Authored forms may move the curved through route relative to their
+	# common. Any extra lanes must join that final route, not its old vertices.
+	through = out.roads[0]["points"]
 	# 3. more frontage when the lot planner asks for it (VIL-006): back lanes
 	# off the through road, on the side away from the common first, at the
 	# spots the form did not take
@@ -179,6 +189,7 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0) -> Vill
 			out.roads, out.commons)
 		for water in water_plan["water"]:
 			out.water.append(water)
+	out.water_crossings = VillageWaterPlan.crossings(out.water, out.roads)
 	return out
 
 
@@ -326,6 +337,12 @@ static func _plan_street(out: VillagePlan, spec: VillageSpec, through: PackedVec
 	var mid: float = 0.0   # the common sits mid-village
 	var rect: Rect2 = _rect_north_of(through, out.roads[0], mid, width, height, COMMON_ROAD_GAP)
 	out.commons.append({"poly": Poly.from_rect(rect), "kind": &"common"})
+	# A bowed road may touch the common only at one corner. That contact has
+	# no pedestrian width after erosion, so give the well a real civic path.
+	var approach := _road(PackedVector2Array([through[_vertex_near_x(through, mid)],
+		rect.get_center() - Vector2(0.0, 1.9)]), &"path", spec.wealth)
+	approach["verge"] = 0.7
+	out.roads.append(approach)
 
 	# The common's other three sides (VIL-012). Without them the common has
 	# frontage on ONE edge -- the through road -- and §9.4's `common` rule,
@@ -358,7 +375,9 @@ static func _plan_crossroads(out: VillagePlan, spec: VillageSpec,
 	var centre := crossing
 	var second := _axis_road(site, true, centre, rng)
 	out.roads.append(_road(second, &"through", spec.wealth))
-	var common := Rect2(centre + Vector2(4.0, 4.0), Vector2(15.0, 10.0))
+	# A small construction margin keeps the measured polygon above 150 m2
+	# after float coordinates are translated to a seeded crossing.
+	var common := Rect2(centre + Vector2(4.0, 4.0), Vector2(15.0, 10.1))
 	common.position.x = minf(common.position.x, site.end.x - 4.0 - common.size.x)
 	common.position.y = minf(common.position.y, site.end.y - 4.0 - common.size.y)
 	out.commons.append({"poly": Poly.from_rect(common), "kind": &"common"})
@@ -377,6 +396,14 @@ static func _plan_round(out: VillagePlan, spec: VillageSpec,
 	var centre := site.get_center() + Vector2(0.0, 6.0)
 	var radius: float = minf(10.5, minf(10.5 + float(spec.households) * 0.08,
 		minf(site.size.x, site.size.y) * 0.16))
+	# Keep the seeded bend, but place it below the round common. A fixed
+	# common over an unshifted positive bow put the approach backwards and
+	# made its two ring junctions nearly parallel or only three metres apart.
+	var through_half: float = float(out.roads[0]["width"]) * 0.5 + float(out.roads[0]["verge"])
+	var target_y: float = centre.y - radius - through_half - 3.0
+	var current_y: float = VillageLotPlanner._polyline_y_at_x(through, centre.x)
+	through = _shift_points(through, Vector2(0.0, target_y - current_y))
+	out.roads[0]["points"] = through
 	var common := _circle_polygon(centre, radius, 16)
 	out.commons.append({"poly": common, "kind": &"common"})
 	var road_at_centre: Vector2 = through[_vertex_near_x(through, centre.x)]
@@ -387,8 +414,7 @@ static func _plan_round(out: VillagePlan, spec: VillageSpec,
 	# The circle's one civic lane is its entrance; a connected street loop gives
 	# ordinary lots frontage on the rest of the perimeter without adding more
 	# authored lanes to the round form.
-	var ring_bounds: Rect2 = bounds.grow(-1.5)
-	var ring_y: float = _ring_street(out, spec, through, ring_bounds, site)
+	var ring_y: float = _ring_street(out, spec, through, bounds, site)
 	var landmark_bottom: float = bounds.end.y + LANDMARK_GAP
 	if ring_y != -INF:
 		landmark_bottom = ring_y + _ring_half() + LANDMARK_GAP
@@ -396,12 +422,11 @@ static func _plan_round(out: VillagePlan, spec: VillageSpec,
 	_field_tracks(out, spec, through, site)
 
 
-## A strand keeps the through road behind one buildable band.  Water occupies
-## the far side of the road, which makes the lot cutter reject the shore-side
-## frontage and leaves a readable single row with the dresser's boats and
-## drying racks on the bank.
+## A strand's single row stands between its inland road and the shore.
+## The measured row depth leaves the full native houses and a working bank
+## on dry ground; a mill can reach water from its rear without crossing a road.
 static func _plan_strand(out: VillagePlan, spec: VillageSpec,
-		through: PackedVector2Array) -> void:
+		through: PackedVector2Array, measured_depth := 0.0) -> void:
 	var site: Rect2 = out.site
 	var shifted := _shift_points(through, Vector2(0.0, -4.0))
 	out.roads[0]["points"] = shifted
@@ -410,9 +435,13 @@ static func _plan_strand(out: VillagePlan, spec: VillageSpec,
 	for p in shifted:
 		road_min_y = minf(road_min_y, p.y)
 		road_max_y = maxf(road_max_y, p.y)
-	var water_height: float = maxf(18.0, site.size.y * 0.30)
-	var water_y: float = minf(road_max_y + 6.0,
-		site.end.y - water_height - 3.0)
+	var row_depth := measured_depth if measured_depth > 0.0 else 28.0
+	var water_height: float = maxf(18.0, site.size.y * 0.20)
+	var water_y: float = road_max_y + 4.5 + row_depth + 2.0
+	var shore_end := water_y + water_height + 3.0
+	if shore_end > site.end.y:
+		out.site.size.y += shore_end - site.end.y
+		site = out.site
 	var water_rect := Rect2(Vector2(site.position.x + 4.0, water_y),
 		Vector2(site.size.x - 8.0, water_height))
 	out.water.append({"poly": Poly.from_rect(water_rect), "kind": &"coast"})
@@ -423,10 +452,17 @@ static func _plan_strand(out: VillagePlan, spec: VillageSpec,
 		if dx < anchor_dx:
 			anchor_dx = dx
 			anchor_y = p.y
-	var common_y: float = maxf(site.position.y + 4.0, anchor_y - 12.0)
-	var common := Rect2(Vector2(site.get_center().x - 11.0, common_y), Vector2(22.0, 12.0))
+	var common_y: float = anchor_y + 4.5
+	var common := Rect2(Vector2(site.get_center().x - 9.0, common_y), Vector2(18.0, 10.0))
 	out.commons.append({"poly": Poly.from_rect(common), "kind": &"common"})
-	_reserve_strand_landmark(out, spec, common, site)
+	var approach := _road(PackedVector2Array([Vector2(0.0, anchor_y),
+		common.get_center() - Vector2(0.0, 1.9)]), &"path", spec.wealth)
+	approach["verge"] = 0.7
+	out.roads.append(approach)
+	# The landmark can occupy the inland civic plot without creating a
+	# second residential row. Its own service lane keeps its native door.
+	var civic := Rect2(Vector2(common.position.x, anchor_y - 5.0), common.size)
+	_reserve_strand_landmark(out, spec, civic, site)
 
 
 ## Rich planted villages get a square and a short rectangular street grid. The
@@ -436,34 +472,56 @@ static func _plan_planted(out: VillagePlan, spec: VillageSpec,
 		through: PackedVector2Array) -> void:
 	var site: Rect2 = out.site
 	var centre := site.get_center()
-	through = _shift_points(through, Vector2(0.0, -32.0))
+	var square_side: float = minf(32.0, site.size.x * 0.24)
+	# The through road fronts the square's south side. Pin its height at the
+	# square rather than shifting its seed-dependent bow by a fixed amount.
+	var at_centre: float = VillageLotPlanner._polyline_y_at_x(through, centre.x)
+	through = _shift_points(through, Vector2(0.0, -square_side * 0.5 - 8.0 - at_centre))
 	out.roads[0]["points"] = through
-	var square_side: float = minf(24.0, site.size.x * 0.24)
 	var square := Rect2(centre - Vector2(square_side, square_side) * 0.5,
 		Vector2(square_side, square_side))
 	out.commons.append({"poly": Poly.from_rect(square), "kind": &"square"})
-	var bottom: float = square.position.y - 16.0
-	var top: float = square.end.y + 8.0
-	var left_x: float = square.position.x - 10.0
-	var right_x: float = square.end.x + 10.0
-	var li: int = _vertex_near_x(through, left_x)
-	var ri: int = _vertex_near_x(through, right_x)
-	var left_start := through[li]
-	var right_start := through[ri]
+	var bottom: float = square.position.y - 38.0
+	var top: float = square.end.y + 4.0
+	var left_x: float = square.position.x - 4.0
+	var right_x: float = square.end.x + 4.0
+	# Exact offsets matter: snapping to a ten-metre road sample could put a
+	# frontage beyond the fourteen-metre reach of the common's perimeter.
+	var left_start := Vector2(left_x, VillageLotPlanner._polyline_y_at_x(through, left_x))
+	var right_start := Vector2(right_x, VillageLotPlanner._polyline_y_at_x(through, right_x))
 	var left_bottom := Vector2(left_start.x, bottom)
 	var right_bottom := Vector2(right_start.x, bottom)
 	var left_top := Vector2(left_start.x, top)
 	var right_top := Vector2(right_start.x, top)
+	var grid_half: float = maxf(48.0, site.size.x * 0.36)
+	var grid_left := centre.x - grid_half
+	var grid_right := centre.x + grid_half
 	out.roads.append(_road(PackedVector2Array([left_start, left_bottom]), &"street", spec.wealth))
-	out.roads.append(_road(PackedVector2Array([left_bottom, right_bottom]), &"street", spec.wealth))
+	out.roads.append(_road(PackedVector2Array([Vector2(grid_left, bottom), Vector2(grid_right, bottom)]), &"street", spec.wealth))
 	# Close both sides of the planted grid.  Without these two connectors the
 	# bottom and top streets are separate islands, and the side of the square
 	# has no legal frontage.
-	out.roads.append(_road(PackedVector2Array([left_bottom, left_top]), &"street", spec.wealth))
-	out.roads.append(_road(PackedVector2Array([right_bottom, right_top]), &"street", spec.wealth))
-	out.roads.append(_road(PackedVector2Array([left_top, right_top]), &"street", spec.wealth))
-	out.roads.append(_road(PackedVector2Array([right_top, right_start]), &"street", spec.wealth))
-	_reserve_landmark(out, spec, square, site, top + LANDMARK_GAP)
+	out.roads.append(_road(PackedVector2Array([left_start, left_top]), &"street", spec.wealth))
+	out.roads.append(_road(PackedVector2Array([right_start, right_top]), &"street", spec.wealth))
+	out.roads.append(_road(PackedVector2Array([Vector2(grid_left, top), Vector2(grid_right, top)]), &"street", spec.wealth))
+	out.roads.append(_road(PackedVector2Array([right_start, right_bottom]), &"street", spec.wealth))
+	# Continue the parallel streets beyond the square into two real blocks.
+	# A square-only loop forced every household back onto an ever-longer
+	# through road: technically a grid, visually another street village.
+	for x in [grid_left, grid_right]:
+		var junction := Vector2(x, VillageLotPlanner._polyline_y_at_x(through, x))
+		out.roads.append(_road(PackedVector2Array([Vector2(x, bottom), junction]), &"street", spec.wealth))
+		out.roads.append(_road(PackedVector2Array([junction, Vector2(x, top)]), &"street", spec.wealth))
+	# A metre of green verge separates the street from the square. Bridge it
+	# with a pedestrian approach: otherwise the walk grid correctly finds a
+	# beautiful but inaccessible island containing the well and market.
+	var approach := _road(PackedVector2Array([Vector2(left_x, centre.y),
+		centre - Vector2(2.0, 0.0)]), &"path", spec.wealth)
+	# Walkable grass shoulders keep the nominal 1.2m path clear after the
+	# pedestrian-radius erosion used by the shared navigation grid.
+	approach["verge"] = 0.7
+	out.roads.append(approach)
+	_reserve_landmark(out, spec, square, site, top + _ring_half() + LANDMARK_GAP)
 
 
 ## Gate villages keep the ordinary common and through road, but the manor's
@@ -473,6 +531,13 @@ static func _plan_planted(out: VillagePlan, spec: VillageSpec,
 static func _plan_gate(out: VillagePlan, spec: VillageSpec,
 		through: PackedVector2Array, rng: RandomNumberGenerator) -> void:
 	_plan_street(out, spec, through, rng)
+	# The lord's own lane and deep forecourt occupy the eastern head of the
+	# village. Field tracks are authored before that measured lot exists, so
+	# keep their exits on the western side instead of slicing through its site.
+	for index in range(out.roads.size() - 1, 0, -1):
+		var road: Dictionary = out.roads[index]
+		if road["class"] == &"track" and road["points"][0].x > out.site.get_center().x:
+			out.roads.remove_at(index)
 
 
 static func _axis_road(site: Rect2, vertical: bool, centre: Vector2,
@@ -664,6 +729,8 @@ static func _ring_street(out: VillagePlan, spec: VillageSpec, through: PackedVec
 	# is a separate, connected street: the corners are real junctions rather
 	# than a short polyline bend, and remain more than eight metres apart.
 	var arc_radius: float = (radius + clear) / cos(PI / 8.0)
+	if spec.form == &"round":
+		arc_radius = _round_ring_radius(radius)
 	var far_y: float = centre.y + arc_radius
 	# Room for the street, the landmark behind it AND a band of lots beyond
 	# that -- not merely for the street itself.
@@ -694,11 +761,26 @@ static func _ring_street(out: VillagePlan, spec: VillageSpec, through: PackedVec
 	for i in range(5):
 		var angle: float = PI - PI * float(i) / 4.0
 		arc.append(centre + Vector2(cos(angle), sin(angle)) * arc_radius)
+	if spec.form == &"round":
+		# A broad northern frontage gives the civic landmark a real address.
+		# Two short diagonal tips cannot receive a measured stepped temple:
+		# its straight front otherwise cuts across the neighbouring road bend.
+		var shoulder := arc_radius * cos(PI / 4.0)
+		arc = PackedVector2Array([west, centre + Vector2(-shoulder, arc_radius),
+			centre + Vector2(shoulder, arc_radius), east])
 	out.roads.append(_road(PackedVector2Array([through[ia], west]), &"street", spec.wealth))
 	for i in range(arc.size() - 1):
 		out.roads.append(_road(PackedVector2Array([arc[i], arc[i + 1]]), &"street", spec.wealth))
 	out.roads.append(_road(PackedVector2Array([east, through[ib]]), &"street", spec.wealth))
 	return far_y
+
+
+## Straight flank frontages need room for actual shop widths between their
+## two junctions. A ring drawn tight against the circular green provides
+## attractive corners but no legal frontage between the road ribbons.
+static func _round_ring_radius(common_radius: float) -> float:
+	return maxf((common_radius + _ring_half() + COMMON_ROAD_GAP) / cos(PI / 8.0),
+		common_radius + _ring_half() + 5.0)
 
 
 ## No road or lot within this of the site edge, matching the lot planner's own

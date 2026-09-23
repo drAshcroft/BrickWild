@@ -152,14 +152,26 @@ const SLEEPING := [&"bedroom", &"guest_room", &"suite", &"lords_chamber"]
 # ------------------------------------------------------------------- shell
 
 ## Outer footprint of the house at wall-top level.
-static func site_rect(spec: HouseSpec) -> Rect2:
-	return Rect2(Vector2(-spec.width / 2.0, -spec.length / 2.0),
+static func site_rect(spec: HouseSpec, level := 0) -> Rect2:
+	var r := Rect2(Vector2(-spec.width / 2.0, -spec.length / 2.0),
 		Vector2(spec.width, spec.length))
+	# A single front cantilever: every upper level shares the same envelope.
+	# Derived family programmes and stone shells do not acquire a house jetty.
+	if level > 0 and spec.jetty and spec.material != &"stone" and not spec.has_method("room_program"):
+		r.position.y -= spec.jetty_depth
+		r.size.y += spec.jetty_depth
+	return r
 
 
 ## The ground the rooms partition: inside the exterior walls.
-static func interior_rect(spec: HouseSpec) -> Rect2:
-	return site_rect(spec).grow(-wall_thickness(spec))
+static func interior_rect(spec: HouseSpec, level := 0) -> Rect2:
+	return site_rect(spec, level).grow(-wall_thickness(spec))
+
+
+## Plan-aware rectangular envelope. Polygon and courtyard families explicitly
+## opt out of the ordinary front cantilever; their outlines own their shape.
+static func storey_rect(plan: HousePlan, level: int) -> Rect2:
+	return site_rect(plan.spec, 0 if plan.has_court() or is_shaped(plan) else level)
 
 
 static func wall_thickness(spec: HouseSpec) -> float:
@@ -171,8 +183,8 @@ static func wall_thickness(spec: HouseSpec) -> float:
 ## The four exterior wall runs, each as
 ## {"from": Vector2, "to": Vector2, "normal": Vector2, "side": StringName}.
 ## `from`/`to` run along the wall's CENTRE LINE, and `normal` points outdoors.
-static func exterior_runs(spec: HouseSpec) -> Array[Dictionary]:
-	var r: Rect2 = site_rect(spec).grow(-wall_thickness(spec) / 2.0)
+static func exterior_runs(spec: HouseSpec, level := 0) -> Array[Dictionary]:
+	var r: Rect2 = site_rect(spec, level).grow(-wall_thickness(spec) / 2.0)
 	return [
 		{"from": Vector2(r.position.x, r.position.y), "to": Vector2(r.end.x, r.position.y),
 			"normal": Vector2(0, -1), "side": &"front"},
@@ -221,7 +233,7 @@ static func shell_runs(plan: HousePlan, level: int) -> Array[Dictionary]:
 			for run in shaped:
 				run["thickness"] = thick
 			return shaped
-	var rectangular := exterior_runs(plan.spec)
+	var rectangular := exterior_runs(plan.spec, 0 if plan.has_court() else level)
 	var thick := wall_thickness(plan.spec)
 	for run in rectangular:
 		run["thickness"] = thick
@@ -256,7 +268,7 @@ static func room_floor_rect(plan: HousePlan, i: int) -> Rect2:
 	if plan.is_polygonal(i):
 		return Poly.bounding_rect(plan.outline_of(i))
 	var rect: Rect2 = plan.rooms[i]["rect"]
-	var inner: Rect2 = interior_rect(plan.spec)
+	var inner := storey_rect(plan, plan.storey_of_room(i)).grow(-wall_thickness(plan.spec))
 	var half: float = INNER_WALL_T / 2.0
 	var x0: float = rect.position.x + (0.0 if absf(rect.position.x - inner.position.x) < 0.01 else half)
 	var x1: float = rect.end.x - (0.0 if absf(rect.end.x - inner.end.x) < 0.01 else half)
@@ -416,16 +428,29 @@ static func roof_rise(spec: HouseSpec) -> float:
 	return minf(spec.width, spec.length) * spec.roof_pitch * 0.5
 
 
+## Art direction, not a structural limit. Broad houses gain roof rise more
+## slowly than width; witch huts deliberately keep their extravagant pitch.
+## Applied only to generated pitch, never to an explicit emitter fixture.
+static func art_pitch_scale(spec: HouseSpec) -> float:
+	var reference := float({&"cottage": 7.0, &"farmhouse": 9.0,
+		&"townhouse": 8.0, &"longhall": 8.0, &"witch_hut": 8.0}.get(spec.style, 8.0))
+	var span := minf(spec.width, spec.length)
+	if span <= reference:
+		return 1.0
+	return pow(reference / span, 0.2 if spec.style == &"witch_hut" else 0.5)
+
+
 ## Pure plan-space roof layout. Attachments and the emitter read the same
 ## face coordinates; rebuilding a mutable spec never leaves cached holes on
 ## a former roof. The transform's origin is the top storey's wall head.
 static func roof_layout(plan: HousePlan) -> Dictionary:
 	var s := plan.spec
-	var span := minf(s.width, s.length)
-	var along := maxf(s.width, s.length)
+	var top := storey_rect(plan, maxi(s.storeys - 1, 0))
+	var span := minf(top.size.x, top.size.y)
+	var along := maxf(top.size.x, top.size.y)
 	var rise := roof_rise(s)
-	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if s.width > s.length else 0.0),
-		Vector3(0, s.height * maxi(s.storeys, 1), 0))
+	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if top.size.x > top.size.y else 0.0),
+		Vector3(top.get_center().x, s.height * maxi(s.storeys, 1), top.get_center().y))
 	var roof := RoofShape.faces(span + 0.7, along + 0.5, rise, s.roof_type)
 	var layout := {"transform": xf, "span": span, "along": along, "rise": rise,
 		"faces": roof, "dormers": [], "rejections": [], "requested": 0}
@@ -584,6 +609,30 @@ static func roof_opening_rejections(plan: HousePlan) -> Array[Dictionary]:
 
 
 ## Actual hearth-wall position shared by the chimney and roof attachments.
+const BREAST_DEPTH := 0.5
+
+## A structural surround authored alongside the actual hearth placement.
+## Its outline keeps diagonal walls honest; rect is only the broad-phase bound.
+static func breast_for_hearth(plan: HousePlan, room: int, item: Dictionary, wall: int) -> Dictionary:
+	var host: Dictionary = room_walls(plan, room)[wall]
+	var normal: Vector2 = host["normal"]
+	var along: Vector2 = (Vector2(host["to"]) - Vector2(host["from"])).normalized()
+	var foot := PropCatalog.footprint(String(item["key"])) * float(item.get("scale", 1.0))
+	var centre: Vector2 = Rect2(item["rect"]).get_center() - normal * (foot.y * 0.5 + BREAST_DEPTH * 0.5)
+	var width := foot.x + 0.4
+	var outline := PackedVector2Array([centre - along * width * 0.5 - normal * BREAST_DEPTH * 0.5,
+		centre + along * width * 0.5 - normal * BREAST_DEPTH * 0.5,
+		centre + along * width * 0.5 + normal * BREAST_DEPTH * 0.5,
+		centre - along * width * 0.5 + normal * BREAST_DEPTH * 0.5])
+	return {"room": room, "storey": plan.storey_of_room(room), "wall": wall,
+		"centre": centre, "normal": normal, "width": width, "depth": BREAST_DEPTH,
+		"outline": outline, "rect": Poly.bounding_rect(outline), "yaw": float(item["yaw"])}
+
+
+static func hearth_breast(plan: HousePlan) -> Dictionary:
+	return plan.hearth.get("breast", {})
+
+
 static func chimney_center(plan: HousePlan) -> Vector2:
 	var s := chimney_size(plan.spec)
 	var r := site_rect(plan.spec)
@@ -708,7 +757,8 @@ static func total_height(spec: HouseSpec) -> float:
 static func verge_overhang(spec: HouseSpec) -> Vector2:
 	if not spec.bargeboards or spec.roof_type == &"hipped":
 		return Vector2(ROOF_SPAN_OUT, ROOF_ALONG_OUT)
-	var span: float = minf(spec.width, spec.length)
+	var top := site_rect(spec, maxi(spec.storeys - 1, 0))
+	var span: float = minf(top.size.x, top.size.y)
 	var half: float = (span + 0.7) * 0.5
 	var ang: float = atan2(roof_rise(spec), half)
 	# The board's foot, plus half its width swung out by the tilt. The drop
@@ -724,7 +774,8 @@ static func verge_overhang(spec: HouseSpec) -> Vector2:
 ## longer footprint dimension, so the span overhang lands on the shorter axis.
 static func roof_overhang(spec: HouseSpec) -> Vector2:
 	var v := verge_overhang(spec)
-	return Vector2(v.x, v.y) if spec.width <= spec.length else Vector2(v.y, v.x)
+	var top := site_rect(spec, maxi(spec.storeys - 1, 0))
+	return Vector2(v.x, v.y) if top.size.x <= top.size.y else Vector2(v.y, v.x)
 
 
 ## The chimney's own footprint, centred where the hearth actually put it.
@@ -772,16 +823,15 @@ static func porch_rect(plan: HousePlan) -> Rect2:
 static func exterior_bounds(plan: HousePlan) -> AABB:
 	var spec := plan.spec
 	var over := roof_overhang(spec)
-	# Each side grows by the FURTHEST thing on it, not by the sum of everything
-	# on it. Adding the jetty on top of the roof overhang made the front bound
-	# a third of a metre loose, which is a bound that fits nothing.
+	# The roof grows from the real top-storey envelope; ground attachments
+	# are merged separately, never added twice to the upper-storey overhang.
 	var neg := over
 	var pos := over
 	if has_quoins(spec):
 		neg = neg.max(Vector2.ONE * QUOIN_OUT)
 		pos = pos.max(Vector2.ONE * QUOIN_OUT)
-	neg.y = maxf(neg.y, jetty_front_reach(spec))
-	var r: Rect2 = site_rect(spec).grow_individual(neg.x, neg.y, pos.x, pos.y)
+	var r: Rect2 = site_rect(spec, maxi(spec.storeys - 1, 0)).grow_individual(neg.x, neg.y, pos.x, pos.y)
+	r = r.merge(site_rect(spec).grow_individual(0, jetty_front_reach(spec), 0, 0))
 	for extra in [chimney_rect(plan), porch_rect(plan)]:
 		if extra.size.x > 0.0:
 			r = r.merge(extra)
@@ -801,7 +851,7 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 	# The front is known, but a spec alone cannot say which wall is the front
 	# once the entrance moves, so the jetty reach is applied all round.
 	var all_round: float = maxf(maxf(over.x, over.y), jetty_front_reach(spec))
-	var r: Rect2 = site_rect(spec).grow(all_round)
+	var r: Rect2 = site_rect(spec, maxi(spec.storeys - 1, 0)).grow(all_round)
 	var pad := 0.0
 	if spec.chimney:
 		pad = maxf(pad, chimney_size(spec) + maxf(CHIMNEY_BASE_EXTRA, 0.22))

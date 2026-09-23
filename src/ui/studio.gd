@@ -54,16 +54,18 @@ var _suspend_regen := false
 ## own preview path, which shows two villages rather than six buildings
 ## because planning one is a few seconds of work.
 const VILLAGE := &"village"
-const VILLAGE_VARIANTS := 2
-const VILLAGE_CFG := {
-	"label": "Village", "size_label": "Village", "height_label": "",
-	"width": {"min": 12, "max": 500, "step": 1, "value": 40},
-	"length": {"min": 0, "max": 100, "step": 5, "value": 35},
-	"height": {"min": 1, "max": 1, "step": 1, "value": 1},
-}
+const VILLAGE_VARIANTS := 1
+var auto_generate := true
+var seed_input: LineEdit
+var water_opt: OptionButton
+var edge_opt: OptionButton
+var water_label: Label
+var edge_label: Label
+var generate_button: Button
 
 
 func _ready() -> void:
+	_add_landscape_controls()
 	for kind_key in BigGlade.kinds():
 		if kind_key == &"world" and WorldFamilies.families().is_empty():
 			continue          # a registry with no families is nothing to show yet
@@ -71,15 +73,55 @@ func _ready() -> void:
 		kind_opt.add_item(descriptor["label"])
 		kind_opt.set_item_metadata(kind_opt.item_count - 1, kind_key)
 	kind_opt.item_selected.connect(func(_i): _on_kind_changed())
-	width_slider.value_changed.connect(func(_v): regenerate())
-	length_slider.value_changed.connect(func(_v): regenerate())
-	height_slider.value_changed.connect(func(_v): regenerate())
-	storeys_slider.value_changed.connect(func(_v): regenerate())
+	width_slider.value_changed.connect(func(_v): _controls_changed())
+	length_slider.value_changed.connect(func(_v): _controls_changed())
+	height_slider.value_changed.connect(func(_v): _controls_changed())
+	storeys_slider.value_changed.connect(func(_v): _controls_changed())
 	cutaway_button.toggled.connect(func(_v): _show(current))
-	style_opt.item_selected.connect(func(_i): regenerate())
-	trade_opt.item_selected.connect(func(_i): regenerate())
+	style_opt.item_selected.connect(func(_i): _controls_changed())
+	trade_opt.item_selected.connect(func(_i): _controls_changed())
 	variant_list.item_selected.connect(_on_variant_picked)
 	_on_kind_changed()
+
+
+func _add_landscape_controls() -> void:
+	var grid: GridContainer = $HSplit/LeftPanel/Margin/Grid
+	water_label = Label.new()
+	water_opt = OptionButton.new()
+	edge_label = Label.new()
+	edge_opt = OptionButton.new()
+	var seed_label := Label.new()
+	seed_label.text = "Seed"
+	seed_input = LineEdit.new()
+	seed_input.text = "42"
+	seed_input.custom_minimum_size.x = 130
+	seed_input.tooltip_text = "Keep the seed to return to the same place."
+	var shuffle := Button.new()
+	shuffle.text = "New seed"
+	generate_button = Button.new()
+	generate_button.text = "Generate"
+	for control in [water_label, water_opt, edge_label, edge_opt, seed_label, seed_input, shuffle, generate_button]:
+		grid.add_child(control)
+		grid.move_child(control, grid.get_node("Hint").get_index())
+	water_opt.item_selected.connect(func(_i): _controls_changed())
+	edge_opt.item_selected.connect(func(_i): _controls_changed())
+	seed_input.text_submitted.connect(func(_text): regenerate())
+	generate_button.pressed.connect(regenerate)
+	shuffle.pressed.connect(func():
+		seed_input.text = str(randi())
+		regenerate())
+
+
+func _controls_changed() -> void:
+	if _suspend_regen:
+		return
+	if _kind() == VILLAGE:
+		var descriptor: Dictionary = BigGlade.describe_kind(VILLAGE)
+		width_label.text = "%s: %d" % [descriptor["width_label"], int(width_slider.value)]
+		length_label.text = "%s: %d" % [descriptor["length_label"], int(length_slider.value)]
+		info_label.text = "Choose Grow village to apply these settings."
+	else:
+		regenerate()
 
 
 func _kind() -> StringName:
@@ -89,15 +131,10 @@ func _kind() -> StringName:
 ## The style dropdown's options, as the option-discovery contract returns
 ## them: [{"id", "label"}]. Studio does not know what a house style or a
 ## temple form IS -- it asks the public descriptor, so a style added to a
-## family appears here without this file changing. The village is the one
-## kind that is not a BigGlade kind yet (VIL-013), so it answers for itself.
+## family appears here without this file changing. The village uses
+## the same public discovery path as every building family.
 func _options(field: StringName) -> Array[Dictionary]:
-	if _kind() == VILLAGE:
-		var out: Array[Dictionary] = []
-		for c in (VillageSpec.CULTURES if field == &"style" else VillageSpec.PURPOSES):
-			out.append({"id": c, "label": String(c).capitalize()})
-		return out
-	var key: String = "styles" if field == &"style" else "purposes"
+	var key: String = {&"style": "styles", &"purpose": "purposes", &"water": "waters", &"enclosure": "enclosures"}.get(field, "")
 	var listed: Array = BigGlade.describe_kind(_kind()).get(key, [])
 	var typed: Array[Dictionary] = []
 	for row in listed:
@@ -147,8 +184,7 @@ func _trade() -> StringName:
 ## rebuilds once instead of once per slider.
 func _on_kind_changed() -> void:
 	var village: bool = _kind() == VILLAGE
-	var cfg: Dictionary = VILLAGE_CFG.duplicate(true) if village \
-		else BigGlade.describe_kind(_kind())
+	var cfg: Dictionary = BigGlade.describe_kind(_kind())
 	_suspend_regen = true
 	for pair in [[width_slider, "width"], [length_slider, "length"],
 			[height_slider, "height"]]:
@@ -162,15 +198,16 @@ func _on_kind_changed() -> void:
 	length_label.text = "%s length (m)" % cfg["size_label"]
 	height_label.text = cfg["height_label"]
 	if village:
-		width_label.text = "Population"
-		length_label.text = "Wealth (%)"
+		width_label.text = cfg["width_label"]
+		length_label.text = cfg["length_label"]
 	height_label.visible = not village
 	height_slider.visible = not village
 	var has_storeys: bool = cfg.has("storeys")
 	storeys_label.visible = has_storeys
 	storeys_slider.visible = has_storeys
-	cutaway_label.visible = has_storeys
-	cutaway_button.visible = has_storeys
+	cutaway_label.visible = has_storeys or village
+	cutaway_button.visible = has_storeys or village
+	cutaway_label.text = "Village view" if village else "House view"
 	if has_storeys:
 		var storey_cfg: Dictionary = cfg["storeys"]
 		storeys_slider.min_value = storey_cfg["min"]
@@ -182,23 +219,39 @@ func _on_kind_changed() -> void:
 	# style and a business. Studio maintains no family vocabulary of its own.
 	_fill(style_opt, _options(&"style"))
 	_fill(trade_opt, _options(&"purpose"))
-	style_label.text = "Culture" if village else String(cfg.get("style_label", "Style"))
-	trade_label.text = "Purpose" if village else String(cfg.get("purpose_label", ""))
+	style_label.text = String(cfg.get("style_label", "Style"))
+	trade_label.text = String(cfg.get("purpose_label", ""))
 	trade_opt.visible = trade_opt.item_count > 0
 	trade_label.visible = trade_opt.visible
+	water_label.visible = village
+	water_opt.visible = village
+	edge_label.visible = village
+	edge_opt.visible = village
+	if village:
+		water_label.text = cfg["water_label"]
+		edge_label.text = cfg["enclosure_label"]
+		_fill(water_opt, _options(&"water"))
+		_fill(edge_opt, _options(&"enclosure"))
+	generate_button.text = "Grow village" if village else "Generate"
 	_suspend_regen = false
+	if village:
+		_controls_changed()
 	regenerate()
 
 
 func regenerate() -> void:
-	if _suspend_regen:
+	if _suspend_regen or not auto_generate:
+		return
+	var seed_text := seed_input.text.strip_edges()
+	if not seed_text.is_valid_int() or str(int(seed_text)) != seed_text:
+		info_label.text = "Enter a whole seed number between -9223372036854775808 and 9223372036854775807."
 		return
 	specs.clear()
 	meshes.clear()
 	plans.clear()
 	buildings.clear()
 	variant_list.clear()
-	var base_seed: int = randi()
+	var base_seed: int = int(seed_input.text)
 	if _kind() == VILLAGE:
 		_regenerate_village(base_seed)
 		return
@@ -219,61 +272,39 @@ func regenerate() -> void:
 	_show(current)
 
 
-## Two villages planned from the sliders: population, wealth, culture and
-## purpose. Every building in them is generated through BigGlade by the lot
-## planner, so this is slower than a single building -- a few seconds each.
+## One inhabited village from the public request, retaining its complete plan.
+## Generation is explicit because changing a slider should not repeatedly
+## furnish every building while a person drags it.
 func _regenerate_village(base_seed: int) -> void:
 	for i in range(VILLAGE_VARIANTS):
-		var spec := VillageSpec.new(base_seed + i * 7919)
-		spec.population = int(width_slider.value)
-		spec.wealth = clampf(length_slider.value / 100.0, 0.0, 1.0)
-		spec.culture = _get_style_key()
-		spec.purpose = _second_key() if _second_key() in VillageSpec.PURPOSES else &"farming"
-		if spec.enclosure == &"wall" and not spec.valid():
-			spec.enclosure = &"none"
-		spec.generate(spec.seed)
-		if not spec.valid():
-			push_error("village spec invalid: %s" % str(spec.errors()))
-			continue
-		var plan: VillagePlan = VillageLotPlanner.plan(spec)
-		if plan.roads.is_empty():
-			push_error("no site planner for the %s form yet" % String(spec.form))
-			continue
-		specs.append(spec)
-		meshes.append(VillageAssembler.ground_mesh(plan))
+		var made := _build(base_seed + i * 7919)
+		if not made.is_ok():
+			info_label.text = str(made.errors[0]["message"])
+			return
+		var plan: VillagePlan = made.village
+		specs.append(made.spec)
+		meshes.append(BigGlade.build_mesh(made))
 		plans.append(plan)
-		buildings.append(null)
-		variant_list.add_item("%s (%s, %d buildings)" % [spec.variant_name, String(spec.form), plan.buildings.size()])
-	if specs.is_empty():
-		return
-	current = clampi(current, 0, specs.size() - 1)
-	_show(current)
+		buildings.append(made)
+		variant_list.add_item("%s (%s, %d buildings)" % [made.name(), String(made.spec.form), plan.buildings.size()])
+	if not specs.is_empty():
+		_show(0)
 
 
 ## Generate one variant through the public API. Mesh and scene emission happen
 ## separately so the retained representation is available to other tools.
 func _build(seed_value: int) -> GeneratedBuilding:
-	var request: BuildingRequest
-	if _kind() == &"temple":
-		request = BuildingRequest.temple(seed_value, _get_style_key(), _second_key(),
-			width_slider.value, length_slider.value, height_slider.value)
-	elif _kind() == &"house":
-		request = BuildingRequest.house(seed_value, _get_style_key(), _trade(),
-			width_slider.value, length_slider.value, height_slider.value,
-			int(storeys_slider.value))
-	elif _kind() == &"shop":
-		request = BuildingRequest.shop(seed_value, _second_key(), _get_style_key(),
-			width_slider.value, length_slider.value, height_slider.value,
-			int(storeys_slider.value))
-	elif _kind() == &"hotel":
-		request = BuildingRequest.hotel(seed_value, _get_style_key(),
-			width_slider.value, length_slider.value, height_slider.value)
-	elif _kind() == &"castle":
-		request = BuildingRequest.castle(seed_value, _get_style_key(),
-			width_slider.value, length_slider.value, height_slider.value)
-	else:
-		request = BuildingRequest.church(seed_value, _get_style_key(),
-			width_slider.value, length_slider.value, height_slider.value)
+	var request := BigGlade.default_request(_kind(), seed_value)
+	request.style = _get_style_key()
+	request.purpose = _second_key() if trade_opt.item_count > 0 else &""
+	request.width = width_slider.value
+	request.length = length_slider.value
+	request.height = height_slider.value
+	if BigGlade.describe_kind(_kind()).has("storeys"):
+		request.storeys = int(storeys_slider.value)
+	if _kind() == VILLAGE:
+		request.water = water_opt.get_item_metadata(water_opt.selected)
+		request.enclosure = edge_opt.get_item_metadata(edge_opt.selected)
 	return BigGlade.generate(request)
 
 
@@ -295,7 +326,7 @@ func _show(idx: int) -> void:
 	info_label.text = _describe(s)
 	_frame(mesh)
 	if s is VillageSpec:
-		bp_view.show_note(VillageAssembler.sheet(plans[idx]))
+		bp_view.setup_village(plans[idx])
 	elif s is ChurchSpec:
 		bp_view.setup(s)
 	elif s is HouseSpec:

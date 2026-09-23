@@ -446,6 +446,9 @@ static func _chapel(res: SuiteResult) -> void:
 		elif sanct.size.x > 0.0 \
 				and not sanct.has_point(Rect2(plan.furniture[altar]["rect"]).get_center()):
 			res.fail("%s: the altar stands off the sanctuary" % who)
+		if altar >= 0:
+			for fault in TempleRiteCheck.plan_sightline_faults(plan, altar, plan.entrance()):
+				res.fail("%s: %s" % [who, fault])
 
 		# the pews: rows either side, with an aisle between them
 		var rows := {}
@@ -460,8 +463,9 @@ static func _chapel(res: SuiteResult) -> void:
 			if int(rows[g2]) < 2:
 				res.fail("%s: row %s is one pew -- that is not a row" % [who, g2])
 
-		for rep in [HousePlanCheck.new().check(plan),
-				HouseFurnishCheck.new().check(plan), HouseNavCheck.new().check(plan)]:
+		var shell := HouseBuilder.new()
+		shell.build(plan)
+		for rep in [HouseQA.new().check(plan, shell)]:
 			for m2 in rep["failures"]:
 				res.fail("%s: %s" % [who, str(m2)])
 			for w in rep["warnings"]:

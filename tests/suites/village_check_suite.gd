@@ -61,6 +61,7 @@ static func _copy(plan: VillagePlan) -> VillagePlan:
 	out.enclosure = plan.enclosure.duplicate()
 	out.gate_crossings = plan.gate_crossings.duplicate(true)
 	out.water = plan.water.duplicate(true)
+	out.water_crossings = plan.water_crossings.duplicate(true)
 	out.fields = plan.fields.duplicate(true)
 	out.props = plan.props.duplicate(true)
 	out.plants = plan.plants.duplicate(true)

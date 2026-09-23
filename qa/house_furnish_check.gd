@@ -136,7 +136,9 @@ func _check_placed(plan: HousePlan) -> void:
 		if not PropCatalog.known(key):
 			failures.append("placed: %s is not in the prop catalogue" % key)
 			continue
-		if p.get("mounted", false) or p["host"] >= 0:
+		# A dining chair has a host to identify its table, but still stands on
+		# the floor. Only props physically placed ON a host skip floor bounds.
+		if p.get("mounted", false) or (p["host"] >= 0 and PropCatalog.has_tag(key, PropCatalog.ON_SURFACE)):
 			continue
 		var room_rect: Rect2 = HouseGeometry.room_floor_rect(plan, p["room"])
 		var rect: Rect2 = p["rect"]
@@ -364,7 +366,9 @@ func _check_against_wall(plan: HousePlan) -> void:
 				% _who(plan, f))
 			continue
 		var gap: float = _back_gap(plan, p)
-		if gap > HouseGeometry.WALL_GAP + HouseGeometry.BED_HEAD_TOL:
+		# Vector2 is float32: allow one micrometre of metric roundoff at
+		# the authored limit, without relaxing the physical backing rule.
+		if gap > HouseGeometry.WALL_GAP + HouseGeometry.BED_HEAD_TOL + BACKING_EPS:
 			failures.append("against: %s stands %.2fm off the wall it should back onto"
 				% [_who(plan, f), gap])
 
@@ -384,6 +388,12 @@ static func _back_gap(plan: HousePlan, p: Dictionary) -> float:
 	# corner of that box put it a metre off a wall it was flat against.
 	var foot: Vector2 = PropCatalog.footprint(String(p["key"])) 		* float(p.get("scale", 1.0))
 	var edge: Vector2 = Rect2(p["rect"]).get_center() + back * (foot.y / 2.0)
+	var breast := HouseGeometry.hearth_breast(plan)
+	if PropCatalog.category(String(p["key"])) == "hearth" and not breast.is_empty() \
+			and int(breast["room"]) == int(p["room"]):
+		var normal: Vector2 = breast["normal"]
+		var face: Vector2 = breast["centre"] + normal * float(breast["depth"]) * 0.5
+		return absf((edge - face).dot(normal))
 	var best := INF
 	for w in HouseGeometry.room_walls(plan, int(p["room"])):
 		var n: Vector2 = w["normal"]                 # points INTO the room
@@ -417,6 +427,9 @@ func _check_seating(plan: HousePlan) -> void:
 			clampf(seat_c.x, host_rect.position.x, host_rect.end.x),
 			clampf(seat_c.y, host_rect.position.y, host_rect.end.y))
 		var to_table: Vector2 = near - seat_c
+		if to_table.length() > 1.6:
+			failures.append("seating: %s is too far from the table it is drawn up to" % _who(plan, f))
+			continue
 		if to_table.length() < 0.01:
 			continue        # tucked right under it; it can only be facing it
 		var yaw: float = float(p["yaw"])
@@ -497,7 +510,7 @@ func _check_command_position(plan: HousePlan) -> void:
 		if PropCatalog.category(p["key"]) != "bed":
 			continue
 		var gap: float = _back_gap(plan, p)
-		if gap > HouseGeometry.WALL_GAP + HouseGeometry.BED_HEAD_TOL:
+		if gap > HouseGeometry.WALL_GAP + HouseGeometry.BED_HEAD_TOL + BACKING_EPS:
 			failures.append("command: the headboard of the %s stands %.2fm off the wall"
 				% [_who(plan, f), gap])
 		var rect: Rect2 = p["rect"]
@@ -662,8 +675,28 @@ func _check_one_row(plan: HousePlan, members: Array) -> void:
 ## placer measures it -- yaw says which way a piece looks, not what it is
 ## pushed up against, and a corner piece looks whichever way it was authored.
 const FS_BACK_TOL := 0.14
+const BACKING_EPS := 0.000001
 
-static func _fs_back_wall(plan: HousePlan, room: int, rect: Rect2) -> int:
+static func _fs_back_wall(plan: HousePlan, room: int, rect: Rect2, piece: Dictionary = {}) -> int:
+	if plan.is_polygonal(room):
+		var walls := HouseGeometry.room_walls(plan, room)
+		var found := -1
+		var nearest := FS_BACK_TOL
+		for i in range(walls.size()):
+			var wall: Dictionary = walls[i]
+			var normal: Vector2 = wall.normal
+			if not piece.is_empty():
+				var yaw: float = float(piece.yaw)
+				if normal.dot(Vector2(-sin(yaw), -cos(yaw))) < 0.999:
+					continue
+			var extent := _fs_projection(rect, normal, piece)
+			var gap: float = absf(extent.x - Vector2(wall.from).dot(normal))
+			if not piece.is_empty() and piece.get("mounted", false):
+				gap = absf((rect.get_center() - Vector2(wall.from)).dot(normal))
+			if gap < nearest:
+				nearest = gap
+				found = i
+		return found
 	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var gaps := [rect.position.y - f.position.y, f.end.y - rect.end.y,
 		rect.position.x - f.position.x, f.end.x - rect.end.x]
@@ -676,13 +709,24 @@ static func _fs_back_wall(plan: HousePlan, room: int, rect: Rect2) -> int:
 	return best
 
 
-static func _fs_wall_normal(wi: int) -> Vector2:
-	return [Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0)][wi]
+static func _fs_wall_normal(plan: HousePlan, room: int, wi: int) -> Vector2:
+	return HouseGeometry.room_walls(plan, room)[wi].normal
+
+
+static func _fs_projection(rect: Rect2, axis: Vector2, piece: Dictionary = {}) -> Vector2:
+	var center := rect.get_center().dot(axis)
+	var half := rect.size.dot(axis.abs()) * 0.5
+	if not piece.is_empty():
+		var yaw: float = float(piece.yaw)
+		var size: Vector2 = PropCatalog.footprint(piece.key) * float(piece.get("scale", 1.0))
+		half = (size.x * absf(Vector2(cos(yaw), -sin(yaw)).dot(axis)) \
+			+ size.y * absf(Vector2(-sin(yaw), -cos(yaw)).dot(axis))) * 0.5
+	return Vector2(center - half, center + half)
 
 
 static func _fs_wall_lit(plan: HousePlan, room: int, wi: int) -> bool:
 	for w in plan.windows_of(room):
-		if Vector2(plan.windows[w]["normal"]).dot(_fs_wall_normal(wi)) < -0.9:
+		if Vector2(plan.windows[w]["normal"]).dot(_fs_wall_normal(plan, room, wi)) < -0.999:
 			return true
 	return false
 
@@ -715,7 +759,7 @@ func _check_workbench_daylight(plan: HousePlan) -> void:
 		var room: int = int(p["room"])
 		if plan.windows_of(room).is_empty():
 			continue
-		var wi: int = _fs_back_wall(plan, room, p["rect"])
+		var wi: int = _fs_back_wall(plan, room, p["rect"], p)
 		if wi >= 0 and _fs_wall_lit(plan, room, wi):
 			continue
 		var c: Vector2 = Rect2(p["rect"]).get_center()
@@ -742,7 +786,7 @@ func _check_bookcase_heat(plan: HousePlan) -> void:
 			continue
 		if p.get("mounted", false) or int(p["host"]) >= 0:
 			continue
-		if _fs_back_wall(plan, room, p["rect"]) != plan.hearth_wall():
+		if _fs_back_wall(plan, room, p["rect"], p) != plan.hearth_wall():
 			continue
 		_fs_report(plan, p, "bookcase",
 			"bookcase_heat: %s stands against wall %d, which is the chimney wall"
@@ -762,7 +806,23 @@ func _check_bed_window(plan: HousePlan) -> void:
 		var room: int = int(p["room"])
 		if plan.windows_of(room).is_empty():
 			continue
-		var wi: int = _fs_back_wall(plan, room, p["rect"])
+		# Measure the headboard plane; the bed's SIDE may also touch a
+		# window wall in a corner without putting glazing behind its head.
+		var yaw: float = float(p.yaw)
+		var back := Vector2(sin(yaw), cos(yaw))
+		var depth: float = PropCatalog.footprint(p.key).y * float(p.get("scale", 1.0))
+		var head: Vector2 = Rect2(p.rect).get_center() + back * depth * 0.5
+		var wi := -1
+		var best := HouseGeometry.BED_HEAD_TOL
+		var walls := HouseGeometry.room_walls(plan, room)
+		for wall_index in range(walls.size()):
+			var wall: Dictionary = walls[wall_index]
+			if Vector2(wall.normal).dot(back) > -0.999:
+				continue
+			var gap := head.distance_to(Geometry2D.get_closest_point_to_segment(head, wall.from, wall.to))
+			if gap < best:
+				best = gap
+				wi = wall_index
 		if wi < 0 or not _fs_wall_lit(plan, room, wi):
 			continue
 		var msg := "bed_window: the head of %s is under the window in wall %d" % [_who(plan, f), wi]
@@ -770,20 +830,49 @@ func _check_bed_window(plan: HousePlan) -> void:
 		# no dark wall to offer the bed: that is the room, not the placer
 		var dark := false
 		var span: float = maxf(Rect2(p["rect"]).size.x, Rect2(p["rect"]).size.y)
-		for other in range(4):
+		for other in range(walls.size()):
 			if other == wi or _fs_wall_lit(plan, room, other):
 				continue
 			if plan.hearth_room() == room and plan.hearth_wall() == other:
 				continue
 			# and long enough, clear of its doors, to take the bed
-			var run: Vector2 = HousePlanner.clear_wall_span(plan, room, other)
-			if run.y - run.x < span + 0.1:
+			if _fs_clear_wall_run(plan, room, other) < span + 0.1:
 				continue
 			dark = true
 		if dark:
 			_fs_report(plan, p, "bed", msg)
 		else:
 			warnings.append(msg)
+
+
+## Length of real masonry available on an edge. The rectangular planner's
+## axis-coordinate span is intentionally retained for rectangular rooms.
+static func _fs_clear_wall_run(plan: HousePlan, room: int, wi: int) -> float:
+	if not plan.is_polygonal(room):
+		var span := HousePlanner.clear_wall_span(plan, room, wi)
+		return span.y - span.x
+	var wall: Dictionary = HouseGeometry.room_walls(plan, room)[wi]
+	var a: Vector2 = wall.from
+	var b: Vector2 = wall.to
+	var normal: Vector2 = wall.normal
+	var along := (b - a).normalized()
+	var length := a.distance_to(b)
+	var cuts: Array[Vector2] = []
+	for door_index in plan.doors_of(room):
+		var door: Dictionary = plan.doors[door_index]
+		var position: Vector2 = door.pos
+		if absf((position - a).dot(normal)) > HouseGeometry.DOOR_CLEAR:
+			continue
+		var station := (position - a).dot(along)
+		var half := float(door.width) * 0.5 + HouseGeometry.DOOR_CLEAR
+		cuts.append(Vector2(station - half, station + half))
+	cuts.sort_custom(func(x: Vector2, y: Vector2): return x.x < y.x)
+	var cursor := 0.0
+	var longest := 0.0
+	for cut in cuts:
+		longest = maxf(longest, clampf(cut.x, 0, length) - cursor)
+		cursor = maxf(cursor, clampf(cut.y, 0, length))
+	return maxf(longest, length - cursor)
 
 
 ## The table in the room with the fire in it is drawn up toward the fire, not
@@ -922,7 +1011,7 @@ func _check_sconce_pair(plan: HousePlan) -> void:
 		if plan.is_polygonal(room) and w1 >= 0:
 			n = HouseGeometry.room_walls(plan, room)[w1].normal
 		elif not plan.is_polygonal(room):
-			n = _fs_wall_normal(w1 if w1 >= 0 else 0)
+			n = _fs_wall_normal(plan, room, w1 if w1 >= 0 else 0)
 		var along := Vector2(n.y, -n.x)
 		var anchors: Array[Vector2] = [(f_rect.position + f_rect.end) / 2.0]
 		if plan.is_polygonal(room) and w1 >= 0:
@@ -1038,21 +1127,23 @@ func _check_shelf_over(plan: HousePlan) -> void:
 		for s in shelves:
 			var p: Dictionary = plan.furniture[s]
 			var sc: Vector2 = Rect2(p["rect"]).get_center()
-			var wi: int = _fs_back_wall(plan, room, p["rect"])
+			var wi: int = _fs_back_wall(plan, room, p["rect"], p)
 			for h in hosts:
 				var host: Rect2 = plan.furniture[h]["rect"]
 				var near := Vector2(clampf(sc.x, host.position.x, host.end.x),
 					clampf(sc.y, host.position.y, host.end.y))
 				best_dist = minf(best_dist, sc.distance_to(near))
-				var hw: int = _fs_back_wall(plan, room, host)
+				var hw: int = _fs_back_wall(plan, room, host, plan.furniture[h])
 				if hw < 0 or hw != wi:
 					continue
-				var axis := Vector2(_fs_wall_normal(hw).y, -_fs_wall_normal(hw).x).abs()
+				var normal := _fs_wall_normal(plan, room, hw)
+				var axis := Vector2(normal.y, -normal.x)
 				var width: float = maxf(PropCatalog.size(p["key"]).x, 0.05)
-				var span: float = maxf(host.end.dot(axis) - host.position.dot(axis), 0.05)
+				var interval := _fs_projection(host, axis, plan.furniture[h])
+				var span: float = maxf(interval.y - interval.x, 0.05)
 				var c: float = sc.dot(axis)
-				var over: float = minf(c + width / 2.0, host.end.dot(axis)) \
-					- maxf(c - width / 2.0, host.position.dot(axis))
+				var over: float = minf(c + width / 2.0, interval.y) \
+					- maxf(c - width / 2.0, interval.x)
 				best_cover = maxf(best_cover, over / minf(width, span))
 		if best_cover >= FS_SHELF_COVER:
 			continue
@@ -1061,7 +1152,7 @@ func _check_shelf_over(plan: HousePlan) -> void:
 			widest = maxf(widest, PropCatalog.size(plan.furniture[s2]["key"]).x)
 		var free := false
 		for h2 in hosts:
-			if _fs_could_hang_over(plan, room, plan.furniture[h2]["rect"], widest):
+			if _fs_could_hang_over(plan, room, plan.furniture[h2], widest):
 				free = true
 		var msg := "shelf_over: no shelf in room %d (%s) hangs over the bench it serves (%.0f%% cover, %.2fm away)" \
 			% [room, String(plan.kind_of(room)), best_cover * 100.0, best_dist]
@@ -1078,9 +1169,10 @@ func _check_shelf_over(plan: HousePlan) -> void:
 ## cover the bench. A bench under the window it was put beside, or a wall run
 ## shorter than the shelf, has no such station -- and a check that called that
 ## a defect would be reporting the size of the room again.
-static func _fs_could_hang_over(plan: HousePlan, room: int, host: Rect2,
+static func _fs_could_hang_over(plan: HousePlan, room: int, piece: Dictionary,
 		width: float) -> bool:
-	var wi: int = _fs_back_wall(plan, room, host)
+	var host: Rect2 = piece.rect
+	var wi: int = _fs_back_wall(plan, room, host, piece)
 	if wi < 0:
 		return false
 	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
@@ -1090,8 +1182,9 @@ static func _fs_could_hang_over(plan: HousePlan, room: int, host: Rect2,
 	if run < width + 0.4:
 		return false
 	var along: Vector2 = (b - a) / run
-	var axis: Vector2 = along.abs()
-	var span: float = maxf(host.end.dot(axis) - host.position.dot(axis), 0.05)
+	var axis: Vector2 = along
+	var interval := _fs_projection(host, axis, piece)
+	var span: float = maxf(interval.y - interval.x, 0.05)
 	var lo: float = width / 2.0 + 0.2
 	var hi: float = run - width / 2.0 - 0.2
 	var t: float = lo
@@ -1100,8 +1193,8 @@ static func _fs_could_hang_over(plan: HousePlan, room: int, host: Rect2,
 		var clear_here: bool = not _fs_on_opening(plan, room, pos, width)
 		if clear_here and not _fs_crowded(plan, room, pos, width, "shelf"):
 			var c: float = pos.dot(axis)
-			var hi_edge: float = minf(c + width / 2.0, host.end.dot(axis))
-			var lo_edge: float = maxf(c - width / 2.0, host.position.dot(axis))
+			var hi_edge: float = minf(c + width / 2.0, interval.y)
+			var lo_edge: float = maxf(c - width / 2.0, interval.x)
 			var over: float = hi_edge - lo_edge
 			if over / minf(width, span) >= FS_SHELF_COVER:
 				return true

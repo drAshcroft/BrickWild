@@ -97,6 +97,17 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	spec.spire_height = spec.height * r.randf_range(0.5, 1.1) if spec.spire else 0.0
 	spec.terraces = _pick(r, f.get("terraces", [3])) if spec.form == &"ziggurat" else 0
 	spec.obelisks = _chance(r, f.get("obelisks", 0.0))
+	if spec.form == &"ziggurat":
+		var summit := TempleGeometry.terrace_rect(spec, spec.terraces - 1)
+		spec.idol_width = minf(spec.idol_width, (minf(summit.size.x, summit.size.y) - 1.0) / 1.4)
+		# Terrace count is drawn here to preserve the seeded draw sequence.
+		# Refit geometry that depends on its final chamber/summit relationship.
+		for guard in 6:
+			if TempleGeometry.sanctum_fits(spec):
+				break
+			spec.idol_width = maxf(spec.idol_width * 0.85, 0.6)
+		if spec.pit:
+			fit_pit(spec)
 
 	# ---- palette ----
 	spec.stone_color = Color(c["stone"][0]).lerp(Color(c["stone"][1]), r.randf())
@@ -109,7 +120,23 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	spec.variant_name = spec.variant_name.strip_edges()
 	# Materialize the final, fully filtered column arrangement once.  Consumers
 	# must read this authored plan list rather than independently re-deriving it.
+	_fit_column_bays(spec)
 	spec.columns = TempleGeometry.column_records(spec)
+
+
+## The final sanctum can leave a short colonnade, especially below a summit.
+## Fit complete capital diameters along that length, preserving symmetric
+## pairs instead of squeezing the originally drawn bay count into collisions.
+static func _fit_column_bays(spec: TempleSpec) -> void:
+	if spec.form == &"rotunda" or spec.column_bays <= 0:
+		return
+	var run := TempleGeometry.sanctum_rect(spec).position.y - 1.0 \
+		- (TempleGeometry.hall_rect(spec).position.y + 1.6)
+	if run < 2.0:
+		spec.column_bays = 0
+		return
+	var pitch := spec.column_r * 2.4 + 0.2
+	spec.column_bays = mini(spec.column_bays, floori(run / pitch) + 1)
 
 
 ## A pit has to leave the procession a way across and the dais a place to

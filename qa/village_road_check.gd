@@ -146,7 +146,7 @@ func _check_dead_ends(plan: VillagePlan) -> void:
 				continue
 			if _endpoint_on(plan, r, p, [&"through", &"street", &"lane", &"track", &"path"]):
 				continue
-			if cls == &"lane" and _endpoint_on_common(plan, p):
+			if cls in [&"lane", &"path"] and _endpoint_on_common(plan, p):
 				continue
 			# a dead end: only a short lane ending at a lot may
 			if cls != &"lane":
@@ -253,58 +253,62 @@ func _check_clear(plan: VillagePlan) -> void:
 				break
 
 
-## Every place a road crosses water has a bridge or a ford whose centre is
-## on the road.
+## Independently subtract the recorded decks from the actual wet road area.
+## A centre point alone cannot prove that a wide or curved road is carried.
 func _check_crossings(plan: VillagePlan) -> void:
-	for w in plan.water:
-		var water: PackedVector2Array = w["poly"]
-		for r in range(plan.roads.size()):
+	var decks: Array[Dictionary] = []
+	for index in plan.water_crossings.size():
+		var crossing: Dictionary = plan.water_crossings[index]
+		var r := int(crossing.get("road", -1))
+		var w := int(crossing.get("water", -1))
+		if r < 0 or r >= plan.roads.size() or w < 0 or w >= plan.water.size():
+			failures.append("crossings: crossing %d has stale road/water indices" % index)
+			continue
+		var expected := &"ford" if plan.water[w]["kind"] == &"stream" else &"bridge"
+		var points: PackedVector2Array = crossing.get("points", PackedVector2Array())
+		var width := float(crossing.get("width", 0.0))
+		if crossing.get("kind") != expected or points.size() < 2 or width + 0.01 < float(plan.roads[r]["width"]):
+			failures.append("crossings: crossing %d has an invalid kind, route or width" % index)
+			continue
+		var on_road := true
+		for i in range(points.size() - 1):
+			for t in [0.0, 0.25, 0.5, 0.75, 1.0]:
+				if VillageMeasure.point_to_polyline(points[i].lerp(points[i + 1], t), plan.roads[r]["points"]) > 0.1:
+					on_road = false
+		if not on_road:
+			failures.append("crossings: crossing %d leaves its road" % index)
+			continue
+		decks.append({"road": r, "water": w, "poly": Poly.ribbon(points, width * 0.5 + 0.4)})
+	for w in plan.water.size():
+		for r in plan.roads.size():
 			var road: Dictionary = plan.roads[r]
-			var way: PackedVector2Array = VillageSitePlanner.road_ribbon(road, false)
-			var wet: Array = Geometry2D.intersect_polygons(way, water)
-			for piece in wet:
-				if Poly.area(piece) < 1.0:
+			var remaining: Array[PackedVector2Array] = Geometry2D.intersect_polygons(
+				VillageSitePlanner.road_ribbon(road, false), plan.water[w]["poly"])
+			for deck in decks:
+				if deck["road"] != r or deck["water"] != w:
 					continue
-				var crossed := false
-				for p in plan.props:
-					var key: String = String(p["key"]).to_lower()
-					if not (key.begins_with("bridge") or key.begins_with("ford")):
-						continue
-					var pos: Vector2 = p["pos"]
-					if Poly.contains_point(piece, pos) \
-							and VillageMeasure.point_to_polyline(pos, road["points"]) <= 1.0:
-						crossed = true
-				if not crossed:
-					failures.append("crossings: %s %d crosses the %s at %v with no bridge or ford"
-						% [String(road["class"]), r, String(w["kind"]), VillageMeasure.centre(piece)])
+				var next: Array[PackedVector2Array] = []
+				for piece in remaining:
+					next.append_array(Geometry2D.clip_polygons(piece, deck["poly"]))
+				remaining = next
+			var uncovered := 0.0
+			for piece in remaining:
+				uncovered += Poly.area(piece)
+			if uncovered > 0.05:
+				failures.append("crossings: %s %d has %.2fm2 of %s without a bridge or ford"
+					% [road["class"], r, uncovered, plan.water[w]["kind"]])
 
 
 ## Roads cross the enclosure only at gates, and every gate is where a road
 ## crosses.
 func _check_gates(plan: VillagePlan) -> void:
 	if plan.enclosure.size() < 3:
+		if plan.spec.enclosure != &"none" and not plan.lots.is_empty():
+			failures.append("gates: enclosed settlement has no persistent boundary")
 		return
-	for r in range(plan.roads.size()):
-		var pts: PackedVector2Array = plan.roads[r]["points"]
-		var n: int = plan.enclosure.size()
-		for i in range(pts.size() - 1):
-			for k in range(n):
-				var hit = Geometry2D.segment_intersects_segment(pts[i], pts[i + 1],
-					plan.enclosure[k], plan.enclosure[(k + 1) % n])
-				if hit == null:
-					continue
-				var gated := false
-				for g in plan.gate_crossings:
-					if (g["pos"] as Vector2).distance_to(hit) <= 1.0:
-						gated = true
-				if not gated:
-					failures.append("gates: %s %d crosses the enclosure at %v with no gate" % [String(plan.roads[r]["class"]), r, hit])
-	for g in plan.gate_crossings:
-		var pos: Vector2 = g["pos"]
-		var road: int = int(g["road"])
-		if road < 0 or road >= plan.roads.size() \
-				or VillageMeasure.point_to_polyline(pos, plan.roads[road]["points"]) > 1.0:
-			failures.append("gates: the gate at %v is not on its road" % pos)
+	failures.append_array(VillageEnclosureCheck.gate_faults(plan, plan.enclosure, plan.gate_crossings))
+	if plan.spec.enclosure != &"none" and not plan.buildings.is_empty() and plan.gate_crossings.is_empty():
+		failures.append("gates: enclosed settlement has no road entrance")
 
 
 ## The plan as a picture: `=` road, `.` common, `#` building, `~` water,

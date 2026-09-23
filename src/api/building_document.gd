@@ -30,6 +30,8 @@ extends RefCounted
 ## one to find out where the door is.
 
 const API_VERSION := BuildingLibrary.API_VERSION
+const SCHEMA := "bigglade.building"
+const SCHEMA_VERSION := 1
 
 ## The request this was generated from -- a detached copy, so a caller that
 ## edits its own request afterwards does not change what was built.
@@ -78,20 +80,15 @@ func payload() -> RefCounted:
 ## consumer of this shape is going to index them positionally anyway.
 func to_dict() -> Dictionary:
 	var out := {
+		"schema": SCHEMA, "schema_version": SCHEMA_VERSION,
 		"api_version": API_VERSION,
 		"kind": String(kind()),
-		"seed": request.seed if request != null else 0,
+		"seed": str(request.seed) if request != null else "0",
 		"name": name(),
 		"ok": is_ok(),
 	}
 	if request != null:
-		out["request"] = {
-			"kind": String(request.kind), "seed": request.seed,
-			"style": String(request.style), "purpose": String(request.purpose),
-			"width": request.width, "length": request.length,
-			"height": request.height, "storeys": request.storeys,
-			"material": String(request.material),
-		}
+		out["request"] = request.to_dict()
 	if not errors.is_empty():
 		out["errors"] = errors.duplicate(true)
 	if not placement.is_empty():
@@ -105,6 +102,79 @@ func to_dict() -> Dictionary:
 		out["spec"] = _spec_dict(spec)
 	if plan != null:
 		out["plan"] = _plan_dict(plan)
+	if village != null:
+		out["village"] = _spec_dict(village)
+	out["state"] = BuildingCodec.encode({"spec": spec, "plan": plan,
+		"village": village, "placement": placement})
+	return out
+
+
+func to_json() -> String:
+	return JSON.stringify(to_dict(), "\t", true, true) + "\n"
+
+
+static func from_json(text: String) -> BuildingDocument:
+	var parser := JSON.new()
+	if parser.parse(text) != OK or not parser.data is Dictionary:
+		return _refused("invalid_json", "document", "Expected a building document JSON object (line %d: %s)." % [parser.get_error_line(), parser.get_error_message()])
+	return from_dict(parser.data)
+
+
+static func from_dict(data: Dictionary) -> BuildingDocument:
+	if data.get("schema", "") != SCHEMA or data.get("schema_version", 0) != SCHEMA_VERSION:
+		return _refused("unsupported_schema", "schema_version", "Only bigglade.building schema 1 is supported.")
+	if not data.get("request") is Dictionary:
+		return _refused("invalid_document", "request", "A document must carry its request.")
+	var out := BuildingDocument.new()
+	out.request = BuildingRequest.from_dict(data["request"])
+	out.errors.append_array(out.request._decode_errors)
+	out.errors.append_array(BuildingLibrary.validate(out.request))
+	if not out.errors.is_empty():
+		return out
+	var codec := BuildingCodec.new()
+	var state: Variant = codec.decode(data.get("state"))
+	out.errors.append_array(codec.errors)
+	if not state is Dictionary or not out.errors.is_empty():
+		if out.errors.is_empty():
+			out.errors.append({"code": "invalid_document", "field": "state", "message": "Missing document state."})
+		return out
+	if not state.get("spec") is RefCounted or not state.get("placement") is Dictionary:
+		return _refused("invalid_document", "state", "The document has no spec or placement.")
+	if state.get("plan") != null and not state["plan"] is HousePlan:
+		return _refused("invalid_document", "plan", "Expected a HousePlan.")
+	if state.get("village") != null and not state["village"] is VillagePlan:
+		return _refused("invalid_document", "village", "Expected a VillagePlan.")
+	out.spec = state["spec"]
+	out.plan = state.get("plan")
+	out.village = state.get("village")
+	out.placement = state["placement"]
+	if out.plan != null:
+		if not out.spec is HouseSpec:
+			return _refused("invalid_document", "spec", "A HousePlan requires a HouseSpec.")
+		out.plan.spec = out.spec
+	if out.village != null:
+		if not out.spec is VillageSpec:
+			return _refused("invalid_document", "spec", "A VillagePlan requires a VillageSpec.")
+		out.village.spec = out.spec
+	var spec_types := {&"church": "ChurchSpec", &"castle": "CastleSpec",
+		&"house": "HouseSpec", &"shop": "ShopSpec", &"hotel": "HotelSpec",
+		&"temple": "TempleSpec", &"village": "VillageSpec"}
+	var actual_type := String(out.spec.get_script().get_global_name())
+	if spec_types.has(out.request.kind) and actual_type != spec_types[out.request.kind]:
+		return _refused("invalid_document", "spec", "Spec type does not match the request family.")
+	if out.spec is HouseSpec and out.plan == null:
+		return _refused("invalid_document", "plan", "Plan families require their generated HousePlan.")
+	if out.spec is VillageSpec and out.village == null:
+		return _refused("invalid_document", "village", "Village documents require their generated VillagePlan.")
+	if out.request.kind == &"world" and not (out.spec is TimberHallSpec or
+			(out.spec is HouseSpec and out.plan != null and out.plan.world_family == &"courtyard_house")):
+		return _refused("invalid_document", "spec", "Unknown world-family state.")
+	return out
+
+
+static func _refused(code: String, field: String, message: String) -> BuildingDocument:
+	var out := BuildingDocument.new()
+	out.errors.append({"code": code, "field": field, "message": message})
 	return out
 
 
@@ -132,41 +202,7 @@ static func _spec_dict(from: RefCounted) -> Dictionary:
 ## stands in them. Every list keeps its own order, because a plan's indices
 ## are its identity -- a door names rooms by number.
 static func _plan_dict(from: HousePlan) -> Dictionary:
-	var rooms: Array = []
-	for room in from.rooms:
-		rooms.append({"kind": str(room["kind"]), "rect": _rect(room["rect"]),
-			"storey": int(room.get("storey", 0))})
-	var doors: Array = []
-	for d in from.doors:
-		doors.append({"a": int(d["a"]), "b": int(d["b"]), "pos": _vec2(d["pos"]),
-			"normal": _vec2(d["normal"]), "width": float(d["width"]),
-			"exterior": bool(d["exterior"]), "storey": int(d.get("storey", 0))})
-	var windows: Array = []
-	for w in from.windows:
-		windows.append({"room": int(w["room"]), "pos": _vec2(w["pos"]),
-			"normal": _vec2(w["normal"]), "width": float(w["width"]),
-			"sill": float(w["sill"]), "head": float(w["head"]),
-			"storey": int(w.get("storey", 0)), "hatch": bool(w.get("hatch", false))})
-	var furniture: Array = []
-	for f in from.furniture:
-		furniture.append({"key": str(f["key"]), "room": int(f["room"]),
-			"pos": _vec3(f["pos"]), "yaw": float(f["yaw"]),
-			"rect": _rect(f["rect"]), "cat": str(f.get("cat", "")),
-			"storey": int(f.get("storey", 0))})
-	var stairs: Array = []
-	for s in from.stairs:
-		stairs.append({"a": int(s["a"]), "b": int(s["b"]),
-			"storey": int(s["storey"]), "to_storey": int(s["to_storey"]),
-			"lower_rect": _rect(s["lower_rect"]), "upper_rect": _rect(s["upper_rect"]),
-			"width": float(s["width"]), "run": float(s["run"])})
-	return {
-		"rooms": rooms, "doors": doors, "windows": windows,
-		"furniture": furniture, "stairs": stairs,
-		"exterior": _plain(from.exterior), "exterior_omissions": _plain(from.exterior_omissions),
-		"hearth": from.hearth.duplicate() if not from.hearth.is_empty() else {},
-		"focus": _plain(from.focus),
-		"compromises": _plain(from.compromises),
-	}
+	return _spec_dict(from)
 
 
 ## Anything at all, as something JSON can hold.
@@ -196,25 +232,34 @@ static func _plain(value: Variant) -> Variant:
 			for key in value:
 				out[str(key)] = _plain(value[key])
 			return out
-		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING:
+		TYPE_OBJECT:
+			if value is BuildingRequest:
+				return value.to_dict()
+			if value is RefCounted and not value is RandomNumberGenerator:
+				var script: Script = value.get_script()
+				if script != null and String(script.get_global_name()) in BuildingCodec.CLASSES:
+					return _plain(BuildingCodec.fields(value))
+			return null
+		TYPE_FLOAT:
+			return value if is_finite(value) else str(value)
+		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_STRING:
 			return value
-	# Anything else a family might one day put on its spec -- a Transform3D, a
-	# Quaternion -- comes out as its own text rather than as something JSON
-	# would refuse. Better a readable string than a serialiser that throws.
+	# Engine values not used by the readable projection still have their exact
+	# representation in `state`; this view uses their stable textual form.
 	return str(value)
 
 
 static func _vec2(v: Vector2) -> Array:
-	return [v.x, v.y]
+	return [_plain(v.x), _plain(v.y)]
 
 
 static func _vec3(v: Vector3) -> Array:
-	return [v.x, v.y, v.z]
+	return [_plain(v.x), _plain(v.y), _plain(v.z)]
 
 
 static func _rect(r: Rect2) -> Array:
-	return [r.position.x, r.position.y, r.size.x, r.size.y]
+	return _vec2(r.position) + _vec2(r.size)
 
 
 static func _aabb(b: AABB) -> Array:
-	return [b.position.x, b.position.y, b.position.z, b.size.x, b.size.y, b.size.z]
+	return _vec3(b.position) + _vec3(b.size)

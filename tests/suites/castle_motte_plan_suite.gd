@@ -7,6 +7,7 @@ static func run() -> SuiteResult:
 	var res := SuiteResult.new("castle motte plan")
 	for scale in [0.5, 1.0, 1.5]:
 		_scale_contract(res, float(scale))
+	_tall_contract(res)
 	var spec := CastleSpec.new()
 	spec.style = &"norman"
 	spec.width = 90.0
@@ -91,10 +92,45 @@ static func _scale_contract(res: SuiteResult, scale: float) -> void:
 	builder.spec = spec
 	builder.begin(4)
 	CastleInteriors.emit(builder, row)
+	builder._motte_flue(row)
+	var mesh := builder.commit()
+	_expect(res, ComponentCheck.check(builder, mesh).failures.is_empty(),
+		"scale %.1f real flue differs from component evidence" % scale)
+	_expect(res, builder.component_log.any(func(component: Dictionary) -> bool:
+		return component.role == "motte_flue"), "scale %.1f lord's flue missing" % scale)
 	var doors: Array = builder.part_log.filter(func(part: Dictionary) -> bool:
 		return String(part.get("opening_kind", "")) == "door" \
 			and String(part.get("tag", "")) == "keep_shell")
 	_expect(res, doors.size() == 1, "scale %.1f shell emission lacks one planned door" % scale)
+	var checks := HousePlanCheck.new().check(plan)
+	_expect(res, checks.failures.is_empty(), "scale %.1f structural plan: %s" % [scale, checks.failures])
+	var navigation := HouseNavCheck.new().check(plan)
+	_expect(res, navigation.failures.is_empty(), "scale %.1f stairs: %s" % [scale, navigation.failures])
+
+
+static func _tall_contract(res: SuiteResult) -> void:
+	var spec := CastleSweep.spec_at(&"norman", &"fortress", 0)
+	var plan := CastleMottePlan.generate(spec, false)
+	_expect(res, plan.spec != null and plan.rooms.size() == 8, "canonical fortress must retain all eight occupied levels")
+	if plan.spec == null: return
+	var check := HousePlanCheck.new().check(plan)
+	_expect(res, check.failures.is_empty(), "eight-storey plan: " + str(check.failures))
+	var nav := HouseNavCheck.new().check(plan)
+	_expect(res, nav.failures.is_empty(), "eight-storey navigation: " + str(nav.failures))
+	_expect(res, plan.windows_of(0).size() > 0, "ground hall needs real daylight openings")
+	_expect(res, plan.hearth_room() == 7, "lord's chamber must name the real flue wall")
+	var flue := CastleMottePlan.flue(plan)
+	var walls := HouseGeometry.room_walls(plan, 7)
+	_expect(res, _point_on_segment(flue.surface_point, walls[flue.wall].from, walls[flue.wall].to), "flue is not on its actual polygon facet")
+	plan.spec.storeys = 9
+	_expect(res, not HousePlanCheck.new().check(plan).failures.is_empty(), "unsupported ninth level escaped the keep limit")
+	plan.spec.storeys = 8
+	plan.stairs.pop_back()
+	var broken := HouseNavCheck.new().check(plan)
+	_expect(res, broken.failures.any(func(message: String) -> bool: return message.contains("storey 7")), "severed top stair escaped navigation above dwelling height")
+	plan = CastleMottePlan.generate(spec, false)
+	plan.windows = plan.windows.filter(func(window: Dictionary) -> bool: return HousePlan.record_storey(window) != 5)
+	_expect(res, HousePlanCheck.new().check(plan).failures.any(func(message: String) -> bool: return message.contains("daylight: room 5")), "missing upper daylight escaped QA")
 
 
 static func _point_on_segment(point: Vector2, a: Vector2, b: Vector2) -> bool:

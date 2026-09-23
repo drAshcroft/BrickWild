@@ -8,6 +8,7 @@ churches, castles and temples. Run it from the repository root:
 .\tools\check_roofs.ps1 -Family hotel -Seed 42
 .\tools\check_roofs.ps1 -Family church,temple -Output artifacts/dome_audit
 .\tools\check_roofs.ps1 -SelfTest -Output artifacts/roof_probe_controls
+.\tools\check_roofs.ps1 -RegionsOnly -Output artifacts/roof_region_contracts
 ```
 
 The wrapper uses the Godot executable documented in AGENTS.md. Override it with
@@ -26,9 +27,9 @@ godot --headless --path . --script res://tests/run_all.gd -- roofprobe
 
 Repeat `--family=` to select several families. Unknown arguments fail with code
 2. The native runner exits 2 for usage/report-write errors. `--self-test` runs
-the probe controls only. The full audit deliberately remains separate from
-`run_all` because it currently reports unresolved defects; `roofprobe` is in
-the regular suite order.
+the probe controls only. `--regions-only` runs the named authored contracts
+without repeating the broad generated matrices. The full audit remains a
+separate reporting tool; `roofprobe` is in the regular suite order.
 
 ## What it measures
 
@@ -50,9 +51,9 @@ the regular suite order.
   test cannot let a floating dormer count as its own supporting roof.
 
 `tests/roof_probe.gd` exposes `inspect`, `coverage` and `attachment` for new
-fixtures. Nine controls establish valid slabs/attachments and detect missing
+fixtures. Eleven controls establish valid slabs/attachments and detect missing
 coverage, covered courtyards, reversed normals, floating dormers and duplicated
-triangles. The older house suite separately retains the crossed-hip and lowered
+triangles, including explicit stone-surface ceiling selection. The older house suite separately retains the crossed-hip and lowered
 gable negative controls.
 
 The generated report is `artifacts/roof_audit.md`, with all numeric evidence in
@@ -140,7 +141,7 @@ Two notes for whoever touches this next:
   width or dormer spacing will trip `landmark: mansard roof has too few
   dormers` immediately.
 
-### Warnings: duplicate seams and degenerate faces need classification
+### Classified roof seams (ROOF-AUDIT-002)
 
 Task **ROOF-AUDIT-002**, `3ef49d68-b9f9-4836-b0cb-c299cc4046ef`, P2.
 
@@ -154,11 +155,28 @@ Task **ROOF-AUDIT-002**, `3ef49d68-b9f9-4836-b0cb-c299cc4046ef`, P2.
 | temple rotunda/42 | 2 | 0 |
 | temple rotunda/4413 | 2 | 0 |
 
-These are **warnings, not proven exposed holes or z-fighting**. Adjacent
-clipped slabs can emit coincident, opposite-facing internal caps. Inspect
-`src/church/church_roofs.gd`, `ChurchBuilder._dome_profile`,
-`TempleBuilder._build_dome_roof`, and `MeshKit.slab_poly/revolve` before removing
-faces. Preserve intentional shell thickness and shared boundaries.
+The table above is the original inventory. The final church/temple audit
+(`artifacts/p1p2_roof_seams/final.json`) passes 8,904 checks, with three warning
+groups and no degenerate faces. Renaissance and Russian fixtures are clean.
+Successive dome clipping left micrometre-wide polygon slivers and repeated
+corners; extruding them created full-depth coincident caps. `ChurchRoofs`
+now removes consecutive edges below 0.1 mm and rejects only fragments whose
+minimum altitude is below 0.1 mm. A real 1 mm strip remains in the control.
+
+`MeshKit.revolve` now rejects zero-area partial-dome caps and winds the far
+cut face outwards. This retains the closed end faces and shell thickness.
+Byzantine/4413 retains 22 opposite-facing cap triangles where closed half-domes
+meet. Both rotunda seeds retain two opposed deck/rim caps whose corresponding
+vertices differ by about 1.43 micrometres. Those are internal shared boundaries,
+not exposed same-facing skins, and are deliberately retained. The probe reports
+normal dot products and actual vertex deltas alongside quantized signatures.
+It distinguishes `opposed_shared_cap`, `same_facing`, `crossed_normals` and
+`quantized_near` instead of treating a rounded coordinate match as proof.
+
+`tests/roof_seams_test.gd` guards real fixture dispositions, synthetic opposite
+and same-facing triangles, thin intentional strips, and outward partial caps.
+The geometry lane plus church normals and castle/temple roof regression passed
+8,992 checks with zero failures and three existing normals warnings.
 
 Useful starting evidence: renaissance/42 duplicates surface-2 triangles
 2510/2518 near (6.668,14.484,7.183); rotunda/42 duplicates 175/654 near
@@ -166,18 +184,81 @@ Useful starting evidence: renaissance/42 duplicates surface-2 triangles
 with two effectively identical apex vertices at Y=15.47923. All offending
 coordinates are in the JSON report.
 
-## Remaining coverage work
+## Authored region contracts (ROOF-AUDIT-003)
 
-**ROOF-AUDIT-003** records these test gaps; they are not counted as passing:
+`tests/roof_region_fixtures.gd` declares each covered polygon, intentional sky
+polygon, occupied-space top and material surface independently of emitted logs.
+The JSON retains those coordinates and exclusions, dimensions, source, seed,
+surface, sample counts and every failing coordinate. Every covered region has
+an actual removed-surface negative control, with the specification unchanged.
 
-- Authored courtyard/polygon houses and arbitrary roof openings. The helper
-  supports their explicit contracts; this generated sweep is rectangular.
-- All castle tier sizes, intentional open battlements and yard regions;
-  complete church peripheral joins; ziggurat chamber/terrace coverage.
-- Hotel cupola seams and the architectural distinction between its current
-  gable profile and a true mansard.
-- Placed village instances, transformed joins and tree/roof interference.
-- World building families: `WorldFamilies.FAMILIES` is currently empty.
+| Contract | Explicit coverage and sky |
+|---|---|
+| Two four-range courts | Every occupied range covered; central yard sees sky |
+| 8- and 14-sided halls | Polygon floor covered except the circular 24-sided oculus |
+| Three ziggurat sizes (18×24, 24×30, 36×42 m) | Base chamber covered by stone surface 0; exposed terraces see sky outside the independently tested stair flights |
+| Ziggurat summit support | Real platform supports the entire idol base; host mesh omits the idol so it cannot support itself |
+| Ziggurat summit stairs | Every actual tread reaches its intended height with risers ≤350 mm; the landing meets the summit; stair-only geometry leaves the chamber below clear |
+| Four castle tiers at two sizes | Native occupied keep outlines and ranges; flat turret decks use trim surface 1; yard/wall walks remain open; the well's little roof is an explicit covered exception |
+| Both hotel styles at two sizes | Cupola coverage plus actual rim-to-tower bearing; a raised roof fails the seam control |
+| Two placed village buildings | Native house/shop roofs and open approaches after real lot placement and rigid transformation |
+
+The contracts and renders exposed several geometry defects. Ziggurat columns used the entire
+mountain height and pierced the upper terraces; their capitals now meet the
+base chamber ceiling. The summit idol used the ground sanctum's rear position
+and floated beyond its platform; its footprint now fits the highest terrace,
+with the chamber dais/altar axis adjusted below it and the pit refitted. A flat
+castle turret deck passed its centre to a primitive that takes its base,
+leaving a 0.125 m gap; the deck now meets the shaft. Actual raised-deck controls
+guard that bearing as well as hotel cupola rims.
+
+Ziggurat flights originally reached full height at the base's front wall, several
+metres short of the summit. They now extend into the summit with a half-metre
+landing overlap and correctly centred treads. The original physical toe and
+forecourt stay fixed; an actual mesh AABB comparison guards placement bounds.
+The extension initially revealed a second problem: solid stair blocks filled
+the chamber beneath. Outdoor sections remain solid to ground, while indoor
+sections start at the chamber ceiling and have separate truthful mass records.
+Alcove caps also respect that ceiling. No overlap rule was relaxed. Actual
+shortened-flight and solid-filled-chamber mutations prove the contact and
+interior checks fail when those defects return.
+
+Final evidence for ROOF-AUDIT-003:
+
+- `artifacts/p1p2_roof_regions/regions_complete.json`: 24 authored cases,
+  11 probe controls, **16,971 checks, zero failures and zero warnings**.
+- `stair_chamber_lane.log`: temple, rite, temple archetypes and castle/temple
+  roofs, **4,196 checks, zero failures**, 11 existing idol-dominance warnings.
+- `geometry_final.log`: required geometry lane, **6,961 checks, zero failures
+  and zero warnings**. The earlier optional `geometry_lane.log` was stopped
+  during the slow broad castle normals sweep and is not a passing lane.
+- `renders/`: six real assembled ziggurat views (front, summit and occupied
+  chamber at 18×24 and 24×30 m). The summit idol is supported, the flights reach
+  the platform, and the chamber remains clear beneath them. The renderer logs
+  the existing Mobile-renderer SSAO warning; all six images were produced and
+  inspected.
+
+The reusable contract guidance is in `docs/ROOF_REGION_CONTRACTS.md` and the
+WaterFree knowledge entry `b1c72898-24d8-4f10-883e-140f21693ce1`.
+
+The clean addon consumer subsequently exposed a compact 24×24×16 m blood
+ziggurat at seed 731: the original random bay count compressed capital pairs
+into overlaps up to 1.20 m after the sanctum moved beneath the summit. The
+generator now fits the final longitudinal run using the actual capital diameter
+(2.4 times shaft radius) plus 0.2 m clearance before authoring `spec.columns`.
+Twelve compact size/seed cases and moved-column negative controls now join
+`TempleSuite`. `compact_columns.log` passes **2,275 checks**, zero failures and
+11 existing dominance warnings; the installed addon smoke also passes
+(`artifacts/p1p2_api/addon_temple4_smoke.log`). This is additional compact-grid
+evidence, not a claim that arbitrary untested roof regions are covered.
+
+These remain uncovered rather than passing: arbitrary court/outline and castle
+shape/size combinations outside the named matrix, complete church peripheral
+joins beyond existing fixed suites, a true hotel mansard profile, other placed
+village families, inter-building roof joins and tree/roof interference.
+`registry_coverage` lists every registered WorldFamilies kind as **uncovered**
+until a dedicated roof contract exists. If the registry is empty, the report
+explicitly says so; an empty registry is never a passing family.
 
 Use explicit covered polygons, sky openings and occupied-space top heights for
 new fixtures. A site's bounding box cannot distinguish rooms from intentional

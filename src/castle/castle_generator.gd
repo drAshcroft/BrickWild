@@ -102,8 +102,10 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	spec.ward_gap = 0.0
 	if spec.tier == &"fortress" and spec.plan_kind != &"motte_bailey":
 		_fit_inner_ward(spec, r)
+	var motte_size := Vector2.ZERO
 	if spec.plan_kind == &"motte_bailey" and enclosed:
 		_fit_motte(spec, r)
+		motte_size = Vector2(spec.keep_w, spec.keep_l)
 
 	# ---- what stands inside, or IS the building ----
 	spec.keep = enclosed
@@ -130,7 +132,11 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	if CastleGeometry.is_motte(spec):
 		# the keep is on the mound, not in the bailey
 		spec.keep = false
-		spec.keep_w = spec.keep_w if spec.keep_w > 0.0 else 8.0
+		# Bailey fitting still consumes its normal draws for the hall/chapel,
+		# but its long narrow keep cap cannot replace the occupied mound oval.
+		spec.keep_w = motte_size.x
+		spec.keep_l = motte_size.y
+		spec.keep_shape = &"shell"
 		_fit_motte_keep(spec)
 	if CastleGeometry.is_ridge(spec):
 		_fit_ridge(spec, r)
@@ -376,6 +382,9 @@ static func _fit_motte(spec: CastleSpec, r: RandomNumberGenerator) -> void:
 ## the bailey keeps MOTTE_MIN_BAILEY of depth and the mound stays inside the
 ## site's width.
 static func _fit_motte_keep(spec: CastleSpec) -> void:
+	var minimum := CastleGeometry.MOTTE_CLEAR_SIDE + 2.0 * spec.shell_thickness
+	spec.keep_w = maxf(spec.keep_w, minimum)
+	spec.keep_l = maxf(spec.keep_l, minimum)
 	spec.keep_height = maxf(spec.keep_height,
 		CastleGeometry.wall_height(spec, 0) * CastleGeometry.KEEP_DOMINANCE + 1.0 - spec.motte_height)
 	spec.keep_height = maxf(spec.keep_height, spec.height * 0.6)
@@ -385,8 +394,10 @@ static func _fit_motte_keep(spec: CastleSpec) -> void:
 			and spec.length - rb * (2.0 - CastleGeometry.MOTTE_TOE) >= CastleGeometry.MOTTE_MIN_BAILEY
 		if fits:
 			break
-		spec.keep_w *= 0.9
-		spec.keep_l *= 0.9
+		# Keep a usable occupied floor. If the mound is too broad, lower its
+		# batter before squeezing away the doorway and both stair landings.
+		spec.keep_w = maxf(spec.keep_w * 0.9, minimum)
+		spec.keep_l = maxf(spec.keep_l * 0.9, minimum)
 		spec.motte_height *= 0.92
 	spec.keep_height = maxf(spec.keep_height, spec.height * 0.6)
 
@@ -871,6 +882,19 @@ static func chapel_plan(spec: CastleSpec) -> HousePlan:
 		sanctuary.position.x = floor_rect.end.x - SANCTUARY_DEPTH
 		sanctuary.size.x = SANCTUARY_DEPTH
 	plan.dais = {"room": 0, "rect": sanctuary, "rise": CHANCEL_RISE}
+	# The processional aisle belongs to the congregation. Reserving actual
+	# floor keeps tall candle stands out of the altar sightline as well as
+	# leaving enough room to walk between the pews.
+	var aisle := floor_rect
+	if lengthwise:
+		aisle.position.x = mid.x - 0.6
+		aisle.size.x = 1.2
+		aisle.size.y = sanctuary.position.y - aisle.position.y
+	else:
+		aisle.position.y = mid.y - 0.6
+		aisle.size.y = 1.2
+		aisle.size.x = sanctuary.position.x - aisle.position.x
+	plan.zones.append({"room": 0, "rect": aisle, "why": "chapel centre aisle"})
 	HouseFurnisher.furnish(plan, hs)
 	return plan
 
@@ -929,7 +953,7 @@ static func _chapel_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 ## HouseSpec is; `CastleGeometry.keep_aabb` says where that frame sits.
 ## Empty when the castle has no keep, or when the keep is too small to stack.
 static func keep_plan(spec: CastleSpec) -> HousePlan:
-	return load("res://src/castle/castle_keep_plan.gd").generate(spec)
+	return preload("castle_keep_plan.gd").generate(spec)
 
 
 ## How much height one storey of a keep wants, and the least a keep may

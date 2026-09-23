@@ -68,7 +68,7 @@ const RECIPES := {
 		{"cat": "sack", "rule": &"yard", "n": [1, 2], "opt": 0.9},
 		{"cat": "wagon", "rule": &"yard", "n": [0, 1], "opt": 0.6},
 		{"cat": "haystack", "rule": &"yard", "n": [1, 1], "opt": 0.8, "built": true},
-		{"cat": "tree", "rule": &"row", "n": [3, 5], "pitch": 5.0, "opt": 0.7, "plant": true},
+		{"cat": "tree", "rule": &"row", "n": [3, 3], "pitch": 5.0, "opt": 1.0, "plant": true, "orchard": true},
 	],
 	&"smithy": [
 		{"cat": "anvil", "rule": &"wall", "n": [1, 1], "opt": 1.0},
@@ -160,9 +160,9 @@ const PALETTES := {
 		"green": ["Wild_TwistedTree_*"], "hedge": ["Wild_Plant_1*", "Wild_Plant_7*"],
 		"ground": ["Wild_Pebble_*", "Wild_Grass_Common_Short"]},
 	# no green tree at all: nothing grows on a blighted common
-	&"blighted": {"edge": ["Nature_DeadTree_*", "Wild_TwistedTree_*"],
+	&"blighted": {"edge": ["Nature_DeadTree_*", "Wild_DeadTree_*"],
 		"green": [], "hedge": ["Wild_Mushroom_*"],
-		"ground": ["Wild_Grass_Wispy_Short", "Wild_Pebble_Square_*"]},
+		"ground": ["Wild_Mushroom_*", "Wild_Pebble_Square_*"]},
 }
 
 ## The props that are BUILT rather than loaded (VIL-010). A recipe step marked
@@ -199,6 +199,9 @@ static func dress(plan: VillagePlan) -> VillagePlan:
 	plan.plants.clear()
 	_outer_land(plan)
 	var ctx: Dictionary = _context(plan)
+	_enclosure_hedge(plan, ctx)
+	_mill_wheels(plan, ctx)
+	_mine_adit(plan, ctx)
 	_wood(plan, ctx)
 	# hosts in a fixed order: the common first (the well is what everything
 	# else keeps clear of), then the buildings in plan order, then the places
@@ -206,9 +209,152 @@ static func dress(plan: VillagePlan) -> VillagePlan:
 		_dress_place(plan, ctx, step)
 	for i in range(plan.buildings.size()):
 		_dress_building(plan, ctx, i)
+	_blight_remnants(plan, ctx)
 	_hedges(plan, ctx)
 	_dress_place(plan, ctx, &"edge")
 	return plan
+
+
+## A hedge is a measured, continuous planted row. Neighbouring bushes may
+## overlap as a hedge, but every road verge, roof and water body stays clear.
+static func _enclosure_hedge(plan: VillagePlan, ctx: Dictionary) -> void:
+	if plan.spec.enclosure != &"hedge" or plan.enclosure.is_empty():
+		return
+	var keys: Array[String] = _palette_keys(ctx, "hedge")
+	if keys.is_empty():
+		return
+	var rng := _rng(plan, "enclosure_hedge")
+	for e in plan.enclosure.size():
+		for run in VillageBuilder._minus_gates(plan.enclosure[e], plan.enclosure[(e + 1) % plan.enclosure.size()], plan.gate_crossings):
+			var a: Vector2 = run[0]
+			var b: Vector2 = run[1]
+			var steps := maxi(1, int(ceil(a.distance_to(b) / 1.6)))
+			for i in steps:
+				var at := a.lerp(b, (float(i) + 0.5) / float(steps))
+				var key := keys[rng.randi() % keys.size()]
+				var radius := maxf(PropCatalog.trunk(key), PropCatalog.canopy(key))
+				var clear := true
+				for water in plan.water:
+					if Poly.contains_point(water["poly"], at) or VillageMeasure.point_to_poly(at, water["poly"]) < radius + 0.3:
+						clear = false
+				for ribbon in ctx["roads"]:
+					if Poly.contains_point(ribbon, at) or VillageMeasure.point_to_poly(at, ribbon) < radius + TRUNK_CLEAR:
+						clear = false
+				for bounds in ctx["bounds"]:
+					if Poly.contains_point(bounds, at) or VillageMeasure.point_to_poly(at, bounds) < radius + TRUNK_CLEAR:
+						clear = false
+				if not clear:
+					continue
+				plan.plants.append({"key": key, "pos": at, "canopy": PropCatalog.canopy(key),
+					"trunk": PropCatalog.trunk(key), "yaw": rng.randf_range(0, TAU), "zone": &"enclosure"})
+				_remember(ctx, at, Rect2(at - Vector2.ONE * radius, Vector2.ONE * radius * 2.0), radius)
+
+
+## The mine mouth sits beside the final through-road segment, inside the
+## boundary and facing the road. PropKit measures the whole piece, including
+## the spoil heaps; the nominal recipe size is too narrow for those heaps.
+static func _mine_adit(plan: VillagePlan, ctx: Dictionary) -> void:
+	if plan.spec.purpose != &"mining":
+		return
+	for road in plan.roads:
+		if road["class"] != &"through":
+			continue
+		var points: PackedVector2Array = road["points"]
+		var end: Vector2 = points[points.size() - 1]
+		var along: Vector2 = (end - points[points.size() - 2]).normalized()
+		var half: float = float(road["width"]) * 0.5 + float(road["verge"])
+		for retreat in [8.0, 10.0, 12.0, 14.0]:
+			var road_at: Vector2 = end - along * retreat
+			for side in [1.0, -1.0]:
+				var normal: Vector2 = Vector2(-along.y, along.x) * float(side)
+				var yaw := snappedf(PropCatalog.yaw_facing(-normal), 0.001)
+				var kit := PropKit.new(MeshKit.new(4), 0, 1, 2, 3)
+				var local: AABB = kit.adit(Vector3.ZERO, yaw)
+				var local_rect := Rect2(Vector2(local.position.x, local.position.z), Vector2(local.size.x, local.size.z))
+				var front := INF
+				for corner in Poly.from_rect(local_rect):
+					front = minf(front, corner.dot(normal))
+				var at: Vector2 = road_at + normal * (half - front + 0.7)
+				var rect := Rect2(at + local_rect.position, local_rect.size)
+				if not _prop_is_clear(plan, ctx, rect, rect):
+					continue
+				# A short working apron joins the verge to the spoil-free front
+				# of the mouth. It is actual dirt and walkable floor, not a QA
+				# reach extension; later obstacles still cut it out normally.
+				var start: Vector2 = road_at + normal * (float(road["width"]) * 0.5 - 0.15)
+				var finish: Vector2 = at + normal * 0.5
+				var apron := PackedVector2Array([start - along * 0.9, start + along * 0.9,
+					finish + along * 0.9, finish - along * 0.9])
+				var dry := true
+				for water in plan.water:
+					if VillageLotPlanner.overlap_area(Poly.from_rect(rect), water["poly"]) > VillageLotPlanner.AREA_EPS \
+							or VillageLotPlanner.overlap_area(apron, water["poly"]) > VillageLotPlanner.AREA_EPS:
+						dry = false
+				if not dry:
+					continue
+				var clear_apron := true
+				for bounds in ctx["bounds"]:
+					if VillageLotPlanner.overlap_area(apron, bounds) > VillageLotPlanner.AREA_EPS:
+						clear_apron = false
+				if not clear_apron:
+					continue
+				var clear_boundary := true
+				for edge in plan.enclosure.size():
+					for run in VillageBuilder._minus_gates(plan.enclosure[edge], plan.enclosure[(edge + 1) % plan.enclosure.size()], plan.gate_crossings):
+						var wall := Poly.ribbon(PackedVector2Array([run[0], run[1]]), VillageBuilder.WALL_THICK * 0.5 + 0.4)
+						if VillageLotPlanner.overlap_area(Poly.from_rect(rect), wall) > VillageLotPlanner.AREA_EPS \
+								or VillageLotPlanner.overlap_area(apron, wall) > VillageLotPlanner.AREA_EPS:
+							clear_boundary = false
+				if not clear_boundary:
+					continue
+				plan.props.append({"key": "adit", "pos": at, "yaw": yaw, "host": -1,
+					"rect": rect, "zone": rect, "built": true, "light": false, "approach": apron})
+				var claim := rect.merge(Poly.bounding_rect(apron))
+				_remember(ctx, at, claim, claim.size.length() * 0.5)
+				return
+
+
+## A small broken wall and fungal colony tell the blighted settlement's
+## story. Use measured owned models, on dry ground and clear of routes.
+static func _blight_remnants(plan: VillagePlan, ctx: Dictionary) -> void:
+	if plan.spec.culture != &"blighted":
+		return
+	var rng := _rng(plan, "blight_remnants")
+	var centres := _scatter(Poly.from_rect(plan.site.grow(-5.0)), rng, 120)
+	for centre in centres:
+		var wet := false
+		for water in plan.water:
+			if Poly.contains_point(water["poly"], centre) or VillageMeasure.point_to_poly(centre, water["poly"]) < 4.0:
+				wet = true
+		if wet:
+			continue
+		if not _place(plan, ctx, {"yaw": 0.0}, "Dungeon_Wall_Broken", centre, rng, -1):
+			continue
+		plan.props[-1]["group"] = "blight_ruin"
+		for offset in [Vector2(2.6, 0), Vector2(-2.6, 0.3)]:
+			if _place(plan, ctx, {"yaw": 0.0}, "Dungeon_Wall_Broken", centre + offset, rng, -1):
+				plan.props[-1]["group"] = "blight_ruin"
+		for offset in [Vector2(-2,-2), Vector2(-1,-2), Vector2(0,-2), Vector2(1,-2),
+			Vector2(2,-2), Vector2(-1,2), Vector2(0,2), Vector2(1,2)]:
+			_place(plan, ctx, {"plant": true}, "Wild_Mushroom_Common", centre + offset, rng, -1)
+		return
+
+
+static func _mill_wheels(plan: VillagePlan, ctx: Dictionary) -> void:
+	for race in plan.water:
+		if race["kind"] != &"race":
+			continue
+		var at: Vector2 = race["wheel"]
+		var normal: Vector2 = race["normal"]
+		var tangent := Vector2(-normal.y, normal.x)
+		var size := tangent.abs() * (VillageWaterPlan.WHEEL_RADIUS * 2.0 + 0.2) + normal.abs() * 0.8
+		var rect := Rect2(at - size * 0.5, size)
+		plan.props.append({"key": "mill_wheel", "pos": at,
+			"yaw": atan2(normal.x, normal.y), "elevation": VillageWaterPlan.WHEEL_AXLE,
+			"radius": VillageWaterPlan.WHEEL_RADIUS,
+			"host": race["host"], "rect": rect, "zone": Rect2(),
+			"built": true, "light": false})
+		_remember(ctx, at, rect, VillageWaterPlan.WHEEL_RADIUS + 0.1)
 
 
 ## Materialise dressed land beyond the measured lot hull. This runs after lot
@@ -397,6 +543,8 @@ static func _apply(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		return
 	var span: Array = step["n"]
 	var count: int = rng.randi_range(int(span[0]), int(span[1]))
+	if role == &"market" and step["cat"] == "stall" and plan.spec.form == &"planted":
+		count = maxi(count, 8)
 	if count <= 0:
 		return
 	var keys: Array[String] = _keys_for(ctx, step)
@@ -414,8 +562,60 @@ static func _apply(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		if placed >= count:
 			break
 		var key: String = keys[rng.randi() % keys.size()]
-		if _place(plan, ctx, step, key, spot, rng, host):
+		var placement_step: Dictionary = step
+		if role == &"market" and step["rule"] == &"row":
+			placement_step = step.duplicate()
+			var common_rect := Poly.bounding_rect(ctx["common"])
+			var along_x: bool = common_rect.size.x >= common_rect.size.y
+			# Rows share an orientation and face the aisle, rather than each
+			# stall looking diagonally toward the village centre.
+			var across: float = spot.y - common_rect.get_center().y if along_x else spot.x - common_rect.get_center().x
+			placement_step["yaw"] = (0.0 if across > 0.0 else PI) if along_x else (PI * 0.5 if across > 0.0 else -PI * 0.5)
+		var accepted := _place(plan, ctx, placement_step, key, spot, rng, host)
+		if not accepted and role == &"edge" and bool(step.get("fill", false)) \
+				and bool(step.get("plant", false)):
+			# A randomly chosen broad crown is not proof that no tree fits.
+			# Try smaller members of the same cultural palette before leaving
+			# a long hole beside a roof or another mature tree.
+			var alternatives: Array[String] = keys.duplicate()
+			alternatives.sort_custom(func(a: String, b: String) -> bool:
+				return PropCatalog.canopy(a) < PropCatalog.canopy(b))
+			for alternative in alternatives:
+				if alternative == key: continue
+				if _place(plan, ctx, placement_step, alternative, spot, rng, host):
+					accepted = true
+					break
+			if not accepted and plan.spec.enclosure == &"none":
+				# A track can graze the boundary for tens of metres. Offer the
+				# inner side of the same visible edge band, rather than either
+				# planting in the track or silently leaving that whole side bare.
+				var inward_spot := _inside_edge(plan.site, spot, 5.0)
+				for alternative in alternatives:
+					if _place(plan, ctx, placement_step, alternative, inward_spot, rng, host):
+						accepted = true
+						break
+		if accepted:
+			if bool(step.get("orchard", false)):
+				plan.plants[-1]["row"] = "orchard:%d" % host
+				plan.plants[-1]["host"] = host
 			placed += 1
+
+
+static func _inside_edge(site: Rect2, spot: Vector2, depth: float) -> Vector2:
+	var edge := Poly.from_rect(site.grow(-1.0))
+	var nearest := Vector2.ZERO
+	var inward := Vector2.ZERO
+	var distance := INF
+	for i in edge.size():
+		var a: Vector2 = edge[i]
+		var b: Vector2 = edge[(i + 1) % edge.size()]
+		var projected := Geometry2D.get_closest_point_to_segment(spot, a, b)
+		if spot.distance_to(projected) >= distance: continue
+		distance = spot.distance_to(projected)
+		nearest = projected
+		inward = Vector2(-(b-a).y, (b-a).x).normalized()
+		if inward.dot(site.get_center()-projected) < 0: inward = -inward
+	return nearest + inward * depth
 
 
 ## Which catalogue keys a step may draw from: a palette slot for a plant, the
@@ -600,17 +800,31 @@ static func _row(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		var along: Vector2 = Vector2(1, 0) if rect.size.x >= rect.size.y else Vector2(0, 1)
 		var across := Vector2(-along.y, along.x)
 		var mid: Vector2 = rect.get_center()
-		for k in range(count):
-			var row: int = k / 3
-			var slot: int = k % 3
-			out.append(mid + along * ((float(slot) - 1.0) * pitch)
-				+ across * ((float(row) - 0.5) * pitch))
+		var columns: int = maxi(3, int(ceil(float(count) / 2.0)))
+		# Offer spare places at the ends so a well or bench cannot silently
+		# reduce an earned market's eight stalls. Two rows leave an open aisle.
+		# Keep side aisles as well as the central aisle. A full-width row
+		# leaves no way round its end once cart footprints and a person's
+		# radius are accounted for, stranding benches beyond the market.
+		columns = mini(columns + 2, int(floor((maxf(rect.size.x, rect.size.y) - 4.0) / pitch)))
+		for slot in range(columns):
+			for row in range(2):
+				out.append(mid + along * ((float(slot) - float(columns - 1) * 0.5) * pitch)
+					+ across * ((float(row) - 0.5) * 8.0))
 		return out
 	if host < 0:
 		return out
 	var b: Dictionary = plan.buildings[host]
 	var behind: Vector2 = -VillageMeasure.front_dir(b)
-	var start: Vector2 = VillageMeasure.centre(VillageMeasure.bounds_poly(b)) + behind * 8.0
+	var bounds := VillageMeasure.bounds_poly(b)
+	var centre := VillageMeasure.centre(bounds)
+	var reach := 0.0
+	for point in bounds:
+		reach = maxf(reach, (point - centre).dot(behind))
+	var crown := 0.0
+	for key in _keys_for(ctx, step):
+		crown = maxf(crown, PropCatalog.canopy(key))
+	var start := centre + behind * (reach + crown + TRUNK_CLEAR)
 	var across2 := Vector2(-behind.y, behind.x)
 	for k in range(count):
 		out.append(start + across2 * ((float(k) - float(count - 1) * 0.5) * pitch))
@@ -772,6 +986,8 @@ static func _place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		key: String, at: Vector2, rng: RandomNumberGenerator, host: int) -> bool:
 	var is_plant: bool = bool(step.get("plant", false))
 	if is_plant:
+		if bool(step.get("orchard", false)) and (host < 0 or not Poly.contains_point(plan.lots[plan.lot_of_building(host)]["poly"], at)):
+			return false
 		var trunk: float = maxf(PropCatalog.trunk(key), 0.1)
 		if not _plant_is_clear(plan, ctx, at, trunk, PropCatalog.canopy(key)):
 			return false
@@ -785,7 +1001,7 @@ static func _place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 	var size: Vector2 = Vector2(BUILT[key]["size"]) if built \
 		else PropCatalog.footprint(key)
 	var zone: float = float(BUILT[key]["zone"]) if built else PropCatalog.zone_depth(key)
-	var yaw: float = _facing(plan, host, at)
+	var yaw: float = float(step.get("yaw", _facing(plan, host, at)))
 	var rect := Rect2(at - size / 2.0, size)
 	var use := Rect2(at - Vector2(zone, zone), Vector2(zone, zone) * 2.0) \
 		if zone > 0.0 else Rect2()
@@ -883,6 +1099,9 @@ static func _prop_is_clear(plan: VillagePlan, ctx: Dictionary, rect: Rect2,
 	if not floors:
 		return true
 	var mine: PackedVector2Array = Poly.from_rect(rect)
+	for w in plan.water:
+		if w["kind"] == &"race" and VillageLotPlanner.overlap_area(mine, w["poly"]) > VillageLotPlanner.AREA_EPS:
+			return false
 	var boxes: Array[Rect2] = ctx["boxes"]
 	var bounds: Array[PackedVector2Array] = ctx["bounds"]
 	for j in range(bounds.size()):
@@ -904,6 +1123,15 @@ static func _plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
 		trunk: float, canopy: float) -> bool:
 	if not plan.site.has_point(at):
 		return false
+	# The green's working space belongs to the well. Large boulders from a
+	# ground palette need the same clearance as trees placed by its green rule.
+	if canopy >= 1.0:
+		for prop in plan.props:
+			if prop["key"] == "well" and at.distance_to(prop["pos"]) < GREEN_TREE_CLEAR:
+				return false
+	for w in plan.water:
+		if w["kind"] == &"race" and VillageMeasure.point_to_poly(at, w["poly"]) < trunk + 0.2:
+			return false
 	var stem_rect: Rect2 = Rect2(at - Vector2(trunk, trunk),
 		Vector2(trunk, trunk) * 2.0).grow(TRUNK_CLEAR)
 	var stem: PackedVector2Array = Poly.from_rect(stem_rect)

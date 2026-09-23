@@ -44,5 +44,14 @@ The installer owns only files listed in `.big_glade_install_manifest.json`.
 Updating the addon removes obsolete files from that prior managed set while
 leaving unrelated files under `addons/big_glade` untouched.
 
-The bundled Fantasy Props MegaKit models are CC0 by Quaternius. Their original
-license and README are included under `assets/props/fantasy`.
+The four bundled Quaternius packs (Fantasy Props MegaKit, Dungeon Kit, Nature
+Kit, and Stylized Nature MegaKit) are CC0. Each pack's original license is
+included under `assets/props/<pack>`. The installer copies the local catalogue's
+complete asset closure; it requires those owned packs in the source checkout.
+
+`example.gd` is a ready-to-attach Node3D script that creates a furnished smith's
+cottage. `PUBLIC_API_TRANSPORT.md` documents lossless request/document JSON,
+structured QA, seeded compatibility, and the repository's headless export tools.
+The installed runtime also includes world-family buildings and village planning.
+Each runtime script ships with its UID sidecar; source Studio and test scripts
+are excluded. The package has no dependency on the source project's directories.

@@ -110,7 +110,7 @@ static func _sweep(res: SuiteResult) -> void:
 ## Built here rather than by HousePlanner, which partitions a rectangle and has
 ## no courtyard mode yet: what GEO-003 delivers is the representation and every
 ## rule that reads it, and this is the shape those rules are for.
-static func courtyard(w: float, l: float, sd: int) -> HousePlan:
+static func courtyard(w: float, l: float, sd: int, with_furniture := true) -> HousePlan:
 	var spec := HouseSpec.new(sd)
 	spec.style = &"townhouse"
 	spec.width = w
@@ -175,5 +175,6 @@ static func courtyard(w: float, l: float, sd: int) -> HousePlan:
 		"sill": HouseGeometry.WINDOW_SILL,
 		"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H, "storey": 0})
 	plan.hearth = {"room": 2, "wall": 2}
-	HouseFurnisher.furnish(plan, spec)
+	if with_furniture:
+		HouseFurnisher.furnish(plan, spec)
 	return plan

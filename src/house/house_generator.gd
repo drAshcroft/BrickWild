@@ -26,6 +26,7 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	var r := spec.rng
 
 	spec.roof_pitch = r.randf_range(float(s["roof_pitch"][0]), float(s["roof_pitch"][1]))
+	spec.roof_pitch *= HouseGeometry.art_pitch_scale(spec)
 	spec.porch = _chance(r, s["porch"])
 	spec.chimney = _chance(r, s["chimney"])
 	spec.window_shutters = _chance(r, s["shutters"])
@@ -41,6 +42,8 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	spec.stone_ground_floor = spec.storeys > 1 and _chance(r, float(s.get("stone_ground", 0.15)))
 	spec.jetty = spec.storeys > 1 and _chance(r, float(s.get("jetty", 0.5)))
 	spec.jetty_depth = r.randf_range(0.24, 0.32)
+	spec.roof_material = &"slate" if spec.style == &"townhouse" else (
+		&"thatch" if spec.style in [&"farmhouse", &"longhall"] else &"shingle")
 	var roof_types: Array = s.get("roof_types", [&"gable", &"half_hipped"])
 	spec.roof_type = _pick(r, roof_types)
 	# Read the same roll for a rotated footprint without shifting the historic

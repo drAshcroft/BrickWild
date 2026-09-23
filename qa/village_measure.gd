@@ -71,6 +71,8 @@ static func gates(plan: VillagePlan) -> Array[Vector2]:
 		out.append(g["pos"])
 	if not out.is_empty():
 		return out
+	if plan.spec.enclosure != &"none":
+		return out
 	for r in plan.roads_of_class(&"through"):
 		var pts: PackedVector2Array = plan.roads[r]["points"]
 		if pts.size() >= 2:

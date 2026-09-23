@@ -1,6 +1,19 @@
 House building-rule evaluation — 8 September 2026
 ================================================
 
+**September 2026 completion:** See [house exterior completion](HOUSE_EXTERIOR_COMPLETION.md)
+for the real storey-footprint jetty, measured dressing/clearances, independent
+glazing and roof courses, style comparison matrix and composed runtime
+envelope QA. The original findings below are preserved as the reproduction
+baseline, not a description of the repaired renderer.
+
+`HOUSE-EXT-010`/`011` resolve planned exterior placement and measured dressing;
+`012`/`013` implement the usable upper floor and its emitted jetty;
+`014` separates glazing from metre-scale roofing; `015` records the five-style
+art direction. `016` composes independent emitted-geometry checks and the
+pairwise regression matrix. Exact counts, warning context, stopped-run
+limitations and the final integration evidence are in the completion report.
+
 **Implementation update (9 September 2026):** Roof topology, wall joins, dormer cuts and door-crossing trim have been repaired, and exterior prop placement now works. See [repair details and validation](HOUSE_ROOF_FIX.md). The findings below preserve the original evaluation, not the current implementation status.
 
 The roof complaint is supported by reproducible geometry defects. The decoration complaint is partly an implementation gap: exterior props are enabled in the specification but are never placed. The existing rules are much stronger for interior planning and circulation than for the exterior envelope and architectural composition.

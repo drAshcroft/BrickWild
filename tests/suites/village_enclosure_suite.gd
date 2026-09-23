@@ -58,6 +58,7 @@ static func run() -> SuiteResult:
 	crossing_plan.roads.append({"points": PackedVector2Array([Vector2(-100, 0), Vector2(100, 0)]),
 		"class": &"through", "width": 6.0, "verge": 2.0, "surface": "road"})
 	crossing_plan.water.append({"poly": Poly.from_rect(Rect2(Vector2(-1.5, -20), Vector2(3.0, 40.0))), "kind": &"stream"})
+	crossing_plan.water_crossings = VillageWaterPlan.crossings(crossing_plan.water, crossing_plan.roads)
 	var crossing_builder := VillageBuilder.new()
 	crossing_builder.build(crossing_plan)
 	res.checked += 1

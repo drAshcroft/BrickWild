@@ -32,6 +32,9 @@ static func run() -> SuiteResult:
 	_motte_fixture(res)
 	_bailey_fixture(res)
 	_fantasy_fixtures(res)
+	var facade: SuiteResult = preload("res://tests/suites/castle_facade_suite.gd").run()
+	res.checked += facade.checked
+	res.failures.append_array(facade.failures)
 	return res
 
 

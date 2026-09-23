@@ -42,6 +42,21 @@ static func option_label(kind: StringName, field: StringName,
 
 ## Generate the family-specific representation without emitting an ArrayMesh.
 static func generate(request: BuildingRequest) -> GeneratedBuilding:
+	return _generate(request, false)
+
+
+## Measure actual architecture for lot planning without retaining an interior.
+## Shops omit furnishing; houses replay the exact prefix that places the hearth
+## and its chimney. All other families use full generation.
+## The returned placement equals placement(generate(request)), including exterior
+## prop bounds. Invalid requests return an empty dictionary. Use generate() when
+## a document, scene or functional interior is needed.
+static func measure(request: BuildingRequest) -> Dictionary:
+	var building := _generate(request, true)
+	return placement(building) if building.is_ok() else {}
+
+
+static func _generate(request: BuildingRequest, placement_only: bool) -> GeneratedBuilding:
 	var out := GeneratedBuilding.new()
 	if request == null:
 		_add_error(out, &"request_required", &"request", "A building request is required.")
@@ -52,7 +67,11 @@ static func generate(request: BuildingRequest) -> GeneratedBuilding:
 		return out
 
 	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.of(out.request.kind)
-	if family == null or not family.generate(out.request, out):
+	var built := false
+	if family != null:
+		built = family.generate_for_placement(out.request, out) if placement_only \
+			else family.generate(out.request, out)
+	if not built:
 		_add_error(out, &"family_not_built", &"kind",
 			"'%s' has no generator yet." % String(out.request.kind))
 	return out
@@ -93,12 +112,18 @@ static func build_mesh(building) -> ArrayMesh:
 	return family.build_mesh(building) if family != null else null
 
 
+## Run the existing family's geometry and functionality checks. This may be
+## expensive (church/castle voxel QA); call it explicitly, never per frame.
+static func check(building) -> Dictionary:
+	return BuildingResult.check(building)
+
+
 ## Placement facts shared by scene-based consumers. All families use local -Z
-## as their public front: house doors, church entrances and castle gates are
-## authored on that edge. `bounds` is measured from the emitted architecture
+## as their public front. `door` is the actual entrance and may be recessed
+## within an open manor courtyard. `bounds` is measured from the emitted architecture
 ## (roof eaves, porches, chimney stacks and all) and is what fire gaps and
 ## canopies should clear; `footprint` is the walls' own outline -- narrower
-## than `bounds` -- and is what `door` sits on the -Z edge of. Neither is
+## than `bounds`. Neither is
 ## merely copied from the requested envelope: both are read from the plan/spec
 ## that produced the mesh.
 static func placement(building) -> Dictionary:
@@ -111,7 +136,7 @@ static func placement(building) -> Dictionary:
 	if building.plan != null and building.plan.spec.exterior_props:
 		for p in building.plan.exterior:
 			bounds = bounds.merge(HouseExterior.bounds_of(p))
-	return {
+	var out := {
 		"api_version": API_VERSION,
 		"kind": building.request.kind,
 		"seed": building.request.seed,
@@ -121,6 +146,10 @@ static func placement(building) -> Dictionary:
 		"front": Vector3(0.0, 0.0, -1.0),
 		"door": _door(building),
 	}
+	var family := BuildingFamilyAdapter.for_building(building)
+	if family != null:
+		out.merge(family.placement_metadata(building, bounds))
+	return out
 
 
 ## The walls' own outline and the front door, from the family itself
@@ -180,6 +209,7 @@ static func _add_architecture_collision(root: Node3D) -> void:
 ## Every request is refused on its own terms before a family generator sees
 ## it, against the same rows describe_kind() publishes (API-002).
 static func _validate(out: GeneratedBuilding) -> void:
+	out.errors.append_array(out.request._decode_errors)
 	out.errors.append_array(BuildingLibrary.validate(out.request))
 
 

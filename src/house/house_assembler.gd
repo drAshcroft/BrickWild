@@ -37,6 +37,10 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 	# (API-005). The house's roof is not hidden for a cutaway -- the builder
 	# is asked not to emit it at all, which is why `not cutaway` goes in above.
 	ShellAssembler.surface_materials(shell, BuildingFamilyAdapter.colours(plan.spec))
+	if plan.spec.material != &"stone" and not plan.spec.has_method("room_program"):
+		ShellAssembler.house_materials(shell, plan.spec)
+	else:
+		ShellAssembler.house_floor_material(shell, plan.spec)
 	root.add_child(shell)
 	furnish(root, plan)
 	dress_exterior(root, plan)

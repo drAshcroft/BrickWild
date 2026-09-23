@@ -45,6 +45,7 @@ var stone_ground_floor: bool = false # entire ground level is stone masonry
 var jetty: bool = false           # whether upper storeys overhang the lower storey
 var jetty_depth: float = 0.28     # cantilever overhang depth in metres
 var roof_type: StringName = &"gable" # &"gable", &"half_hipped", &"hipped"
+var roof_material: StringName = &"shingle" # shingle | slate | thatch, derived without extra RNG draws
 var dormers: bool = false         # dormer windows on roof slope
 var dormer_count: int = 0         # number of dormers
 var framing_pattern: StringName = &"close_studding" # &"close_studding", &"square_panel", &"saltire", &"arch_brace"
@@ -156,6 +157,12 @@ const AREA_PER_ROOM := 15.0
 ## The lowest storey index: -cellars. Storeys run lowest_storey() .. storeys - 1.
 func lowest_storey() -> int:
 	return -maxi(cellars, 0)
+
+
+## Family limit used by structural and walking checks. Keeps override this
+## because their occupied towers legitimately exceed a dwelling's envelope.
+func max_storeys() -> int:
+	return HouseGeometry.MAX_STOREYS
 
 
 ## Every storey index, lowest first.

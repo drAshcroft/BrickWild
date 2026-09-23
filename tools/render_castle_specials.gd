@@ -23,7 +23,10 @@ func _init() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
 	_build_stage()
 	await process_frame
-	if "--motte-only" in OS.get_cmdline_args():
+	var options := OS.get_cmdline_args() + OS.get_cmdline_user_args()
+	if "--motte-revision" in options:
+		await _motte_revision_shots()
+	elif "--motte-only" in options:
 		await _motte_shots()
 	else:
 		await _tower_house_shots()
@@ -52,6 +55,35 @@ func _motte_spec() -> CastleSpec:
 	spec.plan_override = &"motte_bailey"
 	CastleGenerator.generate(spec, 8806)
 	return spec
+
+
+## One assembled small fixture exposes the revised doorway and wall flue.
+func _motte_revision_shots() -> void:
+	var spec := CastleSpec.new()
+	spec.style = &"norman"
+	spec.width = 45.0
+	spec.length = 55.0
+	spec.height = 6.0
+	spec.plan_override = &"motte_bailey"
+	CastleGenerator.generate(spec, 8856)
+	var castle := CastleAssembler.build(spec)
+	_stage.add_child(castle)
+	var keep := CastleGeometry.shell_keep_aabb(spec)
+	var centre := keep.get_center()
+	_cam.position = centre + Vector3(-30.0, 20.0, -34.0)
+	_cam.look_at(centre + Vector3.DOWN * 3.0)
+	await _save("motte_revision_hero.png")
+	var pose := _door_pose(spec, "keep_shell")
+	_cam.position = Vector3(pose.world) + Vector3(pose.normal) * 14.0 + Vector3(5.0, 4.0, 0.0)
+	_cam.look_at(Vector3(pose.world) + Vector3.DOWN * 1.0)
+	await _save("motte_revision_entrance.png")
+	var plan := MottePlan.generate(spec, false)
+	var flue := MottePlan.flue(plan, spec.merlon_h + 0.45)
+	var at := MottePlan.origin(spec) + Transform3D(flue.transform).origin
+	_cam.position = at + Vector3(-10.0, 6.0, -10.0)
+	_cam.look_at(at)
+	await _save("motte_revision_flue.png")
+	castle.free()
 
 
 func _tower_house_shots() -> void:

@@ -202,6 +202,7 @@ const PROPS := {
 	"Dungeon_Statue_Fox": {"pack": "dungeon", "cat": "statue", "tags": [], "zone": 0.8},
 	"Dungeon_Column_Round": {"pack": "dungeon", "cat": "column", "tags": [], "zone": 0.0},
 	"Dungeon_Column_Square": {"pack": "dungeon", "cat": "column", "tags": [], "zone": 0.0},
+	"Dungeon_Wall_Broken": {"pack": "dungeon", "cat": "ruin", "tags": [], "zone": 0.0},
 	"Dungeon_Column_Round_Short": {"pack": "dungeon", "cat": "column", "tags": [], "zone": 0.0},
 	"Dungeon_Rail_Straight": {"pack": "dungeon", "cat": "rail", "tags": [], "zone": 0.0},
 	"Dungeon_Rail_Corner": {"pack": "dungeon", "cat": "rail", "tags": [], "zone": 0.0},
@@ -572,9 +573,9 @@ static func plants() -> Array[String]:
 ## it at full size.
 ##
 ## A fantasy table is whatever the carpenter made, so a smaller one is simply a
-## smaller one -- but a bed is a body long and a barrel holds what it holds, so
-## most things are not on this list. Anything absent is built at the size it
-## was modelled, and the checks hold it to that.
+## smaller one. A bed may become a modest single, but must remain at least
+## two metres long and no less than 88% of its measured model size. Anything
+## else absent from this list is built at the size it was modelled.
 const SHRINKABLE := {
 	"table": 0.62, "bench": 0.6, "workbench": 0.72, "counter": 0.7,
 	"bookcase": 0.8, "storage": 0.8,
@@ -582,6 +583,8 @@ const SHRINKABLE := {
 
 
 static func min_scale(key: String) -> float:
+	if category(key) == "bed":
+		return minf(1.0, maxf(0.88, 2.0 / maxf(footprint(key).y, 0.001)))
 	return float(SHRINKABLE.get(category(key), 1.0))
 
 

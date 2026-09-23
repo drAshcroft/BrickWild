@@ -68,13 +68,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 						var wz: float = az0 + al / float(nwin + 1) * (i + 1)
 						window(Vector3(ax + side * (aw / 2.0 + 0.02), ah * 0.5, wz),
 							side * PI / 2.0, 0.7, ah * 0.33, spec.window_style)
-		if spec.clerestory and spec.aisles > 0:
-			var ncl: int = int(al / 3.5)
-			for i in range(ncl):
-				var cz: float = az0 + al / float(ncl + 1) * (i + 1)
-				for side_v2 in [-1.0, 1.0]:
-					window(Vector3(side_v2 * (w / 2.0 + 0.02), h * 0.78, cz),
-						side_v2 * PI / 2.0, 0.55, 0.7, &"round")
+	_build_clerestory()
 
 	# ---------- transept ----------
 	tag("transept")
@@ -492,6 +486,24 @@ func pinnacle(pos: Vector3, sc := 1.0) -> void:
 	_pyramid_roof(pos + Vector3(0, 1.2 * sc, 0), 0.4 * sc, 0.6 * sc, SURF_ROOF, false)
 
 # ---------------------------------------------------------------- openings
+
+func _build_clerestory() -> void:
+	tag("clerestory")
+	for opening in ChurchGeometry.clerestory_windows(spec):
+		var pos: Vector3 = opening.pos
+		var width: float = opening.width
+		var height: float = opening.height
+		window(pos, opening.face, width, height, spec.window_style)
+		# A slender mullion and pale sill make the tall glazing read as a
+		# deliberate course, while leaving the main silhouette quiet.
+		var xf := Transform3D(Basis(Vector3.UP, opening.face), pos)
+		var mullion: float = clampf(width * 0.06, 0.055, 0.16)
+		host("clerestory_%d" % part_log.size())
+		component_box("clerestory_mullion", Vector3(mullion, height, 0.09),
+			xf.translated_local(Vector3(0, 0, 0.03)), SURF_TRIM)
+		component_box("clerestory_sill", Vector3(width + mullion * 3, mullion, 0.18),
+			xf.translated_local(Vector3(0, -height / 2.0, 0.02)), SURF_TRIM)
+		host_end()
 
 ## Dark recessed opening facing local +Z, rotated by `face` around Y.
 func window(pos: Vector3, face: float, w: float, h: float, style: StringName, door := false) -> void:

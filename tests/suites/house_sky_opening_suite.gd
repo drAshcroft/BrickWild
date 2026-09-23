@@ -5,6 +5,19 @@ extends RefCounted
 
 const Probe := preload("res://tests/roof_probe.gd")
 
+class FloatingCourtRoof extends HouseBuilder:
+	func component_slab(role: String, points: PackedVector3Array, depth: float,
+			surf: int, vertical := true) -> Dictionary:
+		var shifted := points.duplicate()
+		if role.begins_with("roof_court_"):
+			for i in shifted.size():
+				shifted[i].y += 0.3
+		return super.component_slab(role, shifted, depth, surf, vertical)
+	func _log_mass(mass_name: String, aabb: AABB, ground := 0.0) -> void:
+		if mass_name.begins_with("roof_court_"):
+			aabb.position.y += 0.3
+		super._log_mass(mass_name, aabb, ground)
+
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("hsky")
 	_domus(res)
@@ -51,6 +64,13 @@ static func _domus(res: SuiteResult) -> void:
 	_expect(res, _has_prefix(bad_report["failures"], "sky:"),
 		"solid roof failure is attributed to sky")
 	_expect(res, mesh != null, "domus shell builds with roof")
+	var floating := FloatingCourtRoof.new()
+	var floating_mesh := floating.build(plan)
+	_expect(res, ComponentCheck.check(floating, floating_mesh)["ok"],
+		"floating court fixture really emits its moved roof components")
+	var support_report := CourtCheck.new().check(plan, {"builder": floating})
+	_expect(res, _has_prefix(support_report["failures"], "roof_support:"),
+		"actual court roof lifted clear of its bearing is rejected")
 
 
 static func _oculus(res: SuiteResult) -> void:

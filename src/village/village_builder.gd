@@ -51,7 +51,7 @@ const PALISADE_HEIGHT := 2.4
 const GATE_WIDTH := 4.0
 ## A bridge deck is this much wider than the road it carries.
 const BRIDGE_MARGIN := 0.8
-const BRIDGE_RAIL := 0.5
+const BRIDGE_RAIL := 0.9
 
 
 func build(plan: VillagePlan) -> ArrayMesh:
@@ -67,6 +67,22 @@ func build(plan: VillagePlan) -> ArrayMesh:
 	tag("props")
 	_built_props(plan)
 	return commit()
+
+
+## Godot omits empty streams. A village without a common, water or stone
+## must still colour its remaining streams by their authored material slot.
+func commit() -> ArrayMesh:
+	var mesh := ArrayMesh.new()
+	var slots := {}
+	for surface in SURFACES:
+		var before := mesh.get_surface_count()
+		_kit.surface(surface).commit(mesh)
+		if mesh.get_surface_count() > before:
+			mesh.surface_set_name(before, "material_slot:%d" % surface)
+			slots[surface] = before
+	for row in component_log:
+		row["surface"] = slots.get(int(row["surface"]), -1)
+	return mesh
 
 
 # ----------------------------------------------------------------- ground
@@ -89,101 +105,110 @@ func _ground(plan: VillagePlan) -> void:
 		_flat(c["poly"], Y_COMMON, SURF_COMMON)
 
 
-## The water, and a bridge wherever a road crosses it. §9.2's `crossings`
-## rule looks for a `bridge` mass whose centre is on the road's centreline,
-## and this is where one comes from.
+## Emit the final, serialized crossing routes. Each bend shares its mitered
+## edge with the next deck panel, so neither holes nor shortcut chords appear.
 func _water(plan: VillagePlan) -> void:
 	for w in plan.water:
 		_flat(w["poly"], Y_WATER, SURF_WATER)
-	var made := 0
-	for r in range(plan.roads.size()):
-		var road: Dictionary = plan.roads[r]
-		var pts: PackedVector2Array = road["points"]
-		for w2 in plan.water:
-			var crossings: Array[Vector2] = []
-			for i in range(pts.size() - 1):
-				var poly: PackedVector2Array = w2["poly"]
-				var span: Variant = _water_span(pts[i], pts[i + 1], poly)
-				if span == null:
-					continue
-				crossings.append(Vector2(span[0]))
-				crossings.append(Vector2(span[1]))
-			if crossings.size() < 2:
-				continue
-			var crossing_a := crossings[0]
-			var crossing_b := crossings[0]
-			for point in crossings:
-				if _road_path_t(pts, point) < _road_path_t(pts, crossing_a): crossing_a = point
-				if _road_path_t(pts, point) > _road_path_t(pts, crossing_b): crossing_b = point
-			if w2.get("kind", &"river") == &"stream":
-				_ford(crossing_a, crossing_b, float(road["width"]), made)
-			else:
-				_bridge(crossing_a, crossing_b, float(road["width"]), made)
-			made += 1
+		if w["kind"] == &"race":
+			_race_banks(plan, w)
+	for index in plan.water_crossings.size():
+		_crossing(plan.water_crossings[index], index)
 
 
-## One bridge deck with its two rails, spanning a segment of road.
-func _bridge(a: Vector2, b: Vector2, width: float, index: int) -> void:
-	var run: Vector2 = b - a
-	var length: float = run.length()
-	if length < 0.5:
+func _crossing(crossing: Dictionary, index: int) -> void:
+	var points: PackedVector2Array = crossing["points"]
+	if points.size() < 2:
 		return
-	var mid: Vector2 = (a + b) * 0.5
-	var yaw: float = atan2(-run.y, run.x)
-	var deck: float = width + BRIDGE_MARGIN
-	box(Vector3(length, 0.25, deck), Vector3(mid.x, 0.15, mid.y), SURF_WOOD, yaw)
-	for side in [-1.0, 1.0]:
-		var across: Vector2 = Vector2(-run.y, run.x).normalized() * (side * deck * 0.5)
-		box(Vector3(length, BRIDGE_RAIL, 0.12),
-			Vector3(mid.x + across.x, 0.15 + BRIDGE_RAIL * 0.5, mid.y + across.y),
-			SURF_WOOD, yaw)
-	_log_mass("bridge%d" % index,
-		AABB(Vector3(mid.x - length * 0.5, 0.0, mid.y - deck * 0.5),
-			Vector3(length, 0.25 + BRIDGE_RAIL, deck)))
-
-func _ford(a: Vector2, b: Vector2, width: float, index: int) -> void:
-	var run: Vector2 = b - a
-	var length: float = maxf(run.length(), width)
-	var mid := (a + b) * 0.5
-	var yaw := atan2(-run.y, run.x)
-	box(Vector3(length, 0.12, width + BRIDGE_MARGIN),
-		Vector3(mid.x, 0.08, mid.y), SURF_STONE, yaw)
-	_log_mass("ford%d" % index,
-		AABB(Vector3(mid.x - length * 0.5, 0.0, mid.y - width * 0.5),
-			Vector3(length, 0.12, width)))
-
-func _water_span(a: Vector2, b: Vector2, poly: PackedVector2Array) -> Variant:
-	var run := b - a
-	var length_sq := maxf(run.length_squared(), 0.0001)
-	var ts: Array[float] = []
-	for p in [a, b]:
-		if Poly.contains_point(poly, p):
-			ts.append(clampf((p - a).dot(run) / length_sq, 0.0, 1.0))
-	for i in range(poly.size()):
-		var hit: Variant = Geometry2D.segment_intersects_segment(a, b,
-			poly[i], poly[(i + 1) % poly.size()])
-		if hit != null:
-			ts.append(clampf((Vector2(hit) - a).dot(run) / length_sq, 0.0, 1.0))
-	if ts.size() < 2:
-		return null
-	ts.sort()
-	return [a + run * ts[0], a + run * ts[ts.size() - 1]]
-
-
-func _road_path_t(points: PackedVector2Array, point: Vector2) -> float:
-	var travelled := 0.0
-	var nearest_distance := INF
-	var best_path := INF
+	var bridge: bool = crossing["kind"] == &"bridge"
+	var name := "%s%d" % [crossing["kind"], index]
+	var ribbon := Poly.ribbon(points, (float(crossing["width"]) + BRIDGE_MARGIN) * 0.5)
+	var height := 0.15 if bridge else 0.08
+	var depth := 0.25 if bridge else 0.12
+	var surface := SURF_WOOD if bridge else SURF_STONE
+	host(name)
+	var bounds := AABB()
+	var first := true
 	for i in range(points.size() - 1):
-		var edge := points[i + 1] - points[i]
-		var length := edge.length()
-		var t := clampf((point - points[i]).dot(edge) / maxf(edge.length_squared(), 0.001), 0.0, 1.0)
-		var distance := point.distance_to(points[i] + edge * t)
-		if distance < nearest_distance:
-			nearest_distance = distance
-			best_path = travelled + length * t
-		travelled += length
-	return best_path
+		var panel := PackedVector3Array()
+		for vertex in [ribbon[i], ribbon[i + 1], ribbon[ribbon.size() - 2 - i], ribbon[ribbon.size() - 1 - i]]:
+			panel.append(Vector3(vertex.x, height, vertex.y))
+		var row := component_slab("crossing_deck", panel, depth, surface)
+		var emitted := component_aabb(row)
+		bounds = emitted if first else bounds.merge(emitted)
+		first = false
+		if bridge:
+			# Fine board joints and repeated uprights give the bridge a readable
+			# timber scale; all dressing remains outside the road's clear width.
+			var centre_run := points[i + 1] - points[i]
+			var board_count := maxi(1, int(ceil(centre_run.length() / 0.55)))
+			for board in range(1, board_count):
+				var t := float(board) / float(board_count)
+				var left := ribbon[i].lerp(ribbon[i + 1], t)
+				var right := ribbon[ribbon.size() - 1 - i].lerp(ribbon[ribbon.size() - 2 - i], t)
+				var across := right - left
+				var middle := (left + right) * 0.5
+				var joint := Transform3D(Basis(Vector3.UP, atan2(-across.y, across.x)),
+					Vector3(middle.x, height + depth * 0.5 + 0.001, middle.y))
+				var detail := component_box("bridge_board_joint", Vector3(across.length(), 0.002, 0.014), joint, SURF_DARK)
+				bounds = bounds.merge(component_aabb(detail))
+			for side in [0, 1]:
+				var a := ribbon[i] if side == 0 else ribbon[ribbon.size() - 1 - i]
+				var b := ribbon[i + 1] if side == 0 else ribbon[ribbon.size() - 2 - i]
+				var run := b - a
+				var centre := (a + b) * 0.5
+				var rail_top := height + depth * 0.5 + BRIDGE_RAIL
+				var xf := Transform3D(Basis(Vector3.UP, atan2(-run.y, run.x)),
+					Vector3(centre.x, rail_top - 0.06, centre.y))
+				var rail := component_box("bridge_rail", Vector3(run.length(), 0.12, 0.14), xf, SURF_WOOD)
+				bounds = bounds.merge(component_aabb(rail))
+				xf.origin.y -= 0.4
+				component_box("bridge_midrail", Vector3(run.length(), 0.08, 0.10), xf, SURF_WOOD)
+				var posts := maxi(1, int(ceil(run.length() / 1.8)))
+				for post in range(posts + 1):
+					if post == 0 and i > 0:
+						continue # adjacent panels share their corner post
+					var at := a.lerp(b, float(post) / float(posts))
+					var upright := Transform3D(Basis.IDENTITY, Vector3(at.x, rail_top - BRIDGE_RAIL * 0.5, at.y))
+					var pillar := component_box("bridge_post", Vector3(0.18, BRIDGE_RAIL + 0.08, 0.18), upright, SURF_WOOD)
+					bounds = bounds.merge(component_aabb(pillar))
+	# Shallow ramps join the raised deck to the road on either bank.
+	for end in [0, points.size() - 1]:
+		var inside: int = 1 if end == 0 else points.size() - 2
+		var direction := (points[end] - points[inside]).normalized()
+		var across := Vector2(-direction.y, direction.x) * (float(crossing["width"]) + BRIDGE_MARGIN) * 0.5
+		var near := points[end]
+		var far := near + direction * (1.5 if bridge else 0.8)
+		var ramp := PackedVector3Array()
+		var top := height + depth * 0.5
+		for corner in [Vector3(near.x + across.x, top - 0.03, near.y + across.y),
+			Vector3(far.x + across.x, Y_ROAD, far.y + across.y),
+			Vector3(far.x - across.x, Y_ROAD, far.y - across.y),
+			Vector3(near.x - across.x, top - 0.03, near.y - across.y)]:
+			ramp.append(corner)
+		var row := component_slab("crossing_ramp", ramp, 0.06, surface)
+		bounds = bounds.merge(component_aabb(row))
+	_log_mass(name, bounds)
+	host_end()
+
+
+## Low timber retaining edges make the working channel readable at street
+## height. The mouth in natural water remains open, rather than a closed dam.
+func _race_banks(plan: VillagePlan, race: Dictionary) -> void:
+	var poly: PackedVector2Array = race["poly"]
+	for i in poly.size():
+		var a := poly[i]
+		var b := poly[(i + 1) % poly.size()]
+		var mid := (a + b) * 0.5
+		var mouth := false
+		for water in plan.water:
+			if water["kind"] != &"race" and Poly.contains_point(water["poly"], mid):
+				mouth = true
+		if mouth:
+			continue
+		var d := b - a
+		box(Vector3(0.12, 0.18, d.length()), Vector3(mid.x, 0.08, mid.y),
+			SURF_WOOD, atan2(d.x, d.y))
 
 
 # ------------------------------------------------------------------- edge
@@ -198,10 +223,7 @@ func _enclosure(plan: VillagePlan) -> void:
 	var edge: PackedVector2Array = plan.enclosure if plan.enclosure.size() >= 3 else derived["edge"]
 	if not kind in [&"hedge", &"palisade", &"wall"] or edge.size() < 3:
 		return
-	var gates: Array[Vector2] = VillageMeasure.gates(plan)
-	if gates.is_empty():
-		for g in derived["gates"]:
-			gates.append(g["pos"])
+	var gates: Array[Dictionary] = plan.gate_crossings if plan.enclosure.size() >= 3 else derived["gates"]
 	var kit := PropKit.new(_kit, SURF_STONE, SURF_WOOD, SURF_ROOF, SURF_DARK)
 	var n: int = edge.size()
 	var made := 0
@@ -209,18 +231,94 @@ func _enclosure(plan: VillagePlan) -> void:
 		var a: Vector2 = edge[i]
 		var b: Vector2 = edge[(i + 1) % n]
 		for run in _minus_gates(a, b, gates):
-			if kind == &"hedge":
-				_hedge(run[0], run[1], made)
-			elif kind == &"palisade":
-				_log_mass("palisade%d" % made,
-					kit.palisade(run[0], run[1], 0.0, PALISADE_HEIGHT))
-			else:
-				_wall(run[0], run[1], made)
-			made += 1
-	# and a gate in the gap
-	for g in range(gates.size()):
-		_log_mass("gate%d" % g, kit.fence_gate(Vector3(gates[g].x, 0.0, gates[g].y),
-			0.0, GATE_WIDTH, PALISADE_HEIGHT * 0.8))
+			for part in _water_edge_runs(plan, run[0], run[1]):
+				if part["natural"]:
+					continue # The water itself is the boundary; never dam a river or coast.
+				elif part["wet"]:
+					_mill_culvert(part["a"], part["b"], made, kind)
+				elif kind == &"hedge":
+					_hedge(part["a"], part["b"], made)
+				elif kind == &"palisade":
+					_log_mass("palisade%d" % made,
+						kit.palisade(part["a"], part["b"], 0.0, PALISADE_HEIGHT))
+				else:
+					var along: Vector2 = (part["b"] - part["a"]).normalized()
+					var inside := Vector2(-along.y, along.x)
+					if not Poly.contains_point(edge, (part["a"] + part["b"]) * 0.5 + inside * 0.1):
+						inside = -inside
+					_wall(part["a"], part["b"], made, inside)
+				made += 1
+	# An open portal, aligned to the actual boundary. A closed fence panel
+	# across this gap would visually and physically undo the road opening.
+	for g in gates.size():
+		_gate(gates[g], g, kind)
+
+
+func _gate(gate: Dictionary, index: int, kind: StringName) -> void:
+	var at: Vector2 = gate["pos"]
+	var tangent: Vector2 = gate.get("tangent", Vector2.RIGHT)
+	var span := float(gate.get("opening", GATE_WIDTH))
+	var main: bool = gate.get("kind", &"gate") == &"gate"
+	var height := 3.8 if main else 2.8
+	var surface := SURF_STONE if kind == &"wall" else SURF_WOOD
+	var yaw := atan2(-tangent.y, tangent.x)
+	var bounds := AABB()
+	host("gate%d" % index)
+	for side in [-1.0, 1.0]:
+		var centre: Vector2 = at + tangent * side * (span * 0.5 + 0.2)
+		var row := component_box("gate_post", Vector3(0.4, height, 0.55),
+			Transform3D(Basis(Vector3.UP, yaw), Vector3(centre.x, height * 0.5, centre.y)), surface)
+		bounds = component_aabb(row) if side < 0.0 else bounds.merge(component_aabb(row))
+	var lintel := component_box("gate_lintel", Vector3(span + 0.95, 0.3, 0.6),
+		Transform3D(Basis(Vector3.UP, yaw), Vector3(at.x, height - 0.15, at.y)), SURF_WOOD)
+	bounds = bounds.merge(component_aabb(lintel))
+	# A contrasting cap makes the entrance legible above the hedge or stakes.
+	var cap := component_box("gate_cap", Vector3(span + 1.2, 0.12, 0.8),
+		Transform3D(Basis(Vector3.UP, yaw), Vector3(at.x, height + 0.06, at.y)), SURF_ROOF)
+	bounds = bounds.merge(component_aabb(cap))
+	_log_mass("gate%d" % index, bounds)
+	total_height = maxf(total_height, bounds.end.y)
+
+
+static func _water_edge_runs(plan: VillagePlan, a: Vector2, b: Vector2) -> Array:
+	var length := a.distance_to(b)
+	var direction := (b - a).normalized()
+	var cuts: Array[float] = [0.0, length]
+	var waters: Array[PackedVector2Array] = []
+	var natural: Array[PackedVector2Array] = []
+	for water in plan.water:
+		var poly := Poly.offset(water["poly"], WALL_THICK * 0.5 + 0.1)
+		waters.append(poly)
+		if water["kind"] != &"race":
+			natural.append(poly)
+		for i in poly.size():
+			var hit = Geometry2D.segment_intersects_segment(a, b, poly[i], poly[(i + 1) % poly.size()])
+			if hit != null:
+				cuts.append((Vector2(hit) - a).dot(direction))
+	cuts.sort()
+	var out: Array = []
+	for i in range(cuts.size() - 1):
+		if cuts[i + 1] - cuts[i] < 0.001:
+			continue
+		var mid := a + direction * (cuts[i] + cuts[i + 1]) * 0.5
+		var wet := waters.any(func(poly: PackedVector2Array) -> bool: return Poly.contains_point(poly, mid))
+		var shore := natural.any(func(poly: PackedVector2Array) -> bool: return Poly.contains_point(poly, mid))
+		out.append({"a": a + direction * cuts[i], "b": a + direction * cuts[i + 1], "wet": wet, "natural": shore})
+	return out
+
+
+## A small hydraulic opening preserves the wall above it. It is not a road
+## gateway, and the hedge simply stops either side of the working channel.
+func _mill_culvert(a: Vector2, b: Vector2, index: int, kind: StringName) -> void:
+	if kind == &"hedge":
+		return
+	var height := WALL_HEIGHT if kind == &"wall" else PALISADE_HEIGHT
+	var run := b - a
+	var mid := (a + b) * 0.5
+	var surface := SURF_STONE if kind == &"wall" else SURF_WOOD
+	var row := component_box("mill_culvert", Vector3(run.length(), height - 0.6, WALL_THICK),
+		Transform3D(Basis(Vector3.UP, atan2(-run.y, run.x)), Vector3(mid.x, (height + 0.6) * 0.5, mid.y)), surface)
+	_log_mass("mill_culvert%d" % index, component_aabb(row))
 
 func _hedge(a: Vector2, b: Vector2, index: int) -> void:
 	var run := b - a
@@ -228,53 +326,82 @@ func _hedge(a: Vector2, b: Vector2, index: int) -> void:
 	if length < 0.5:
 		return
 	var mid := (a + b) * 0.5
-	box(Vector3(length, 1.2, 0.8), Vector3(mid.x, 0.6, mid.y), SURF_COMMON,
-		atan2(-run.y, run.x))
-	_log_mass("hedge%d" % index,
-		AABB(Vector3(mid.x - length * 0.5, 0.0, mid.y - 0.4), Vector3(length, 1.2, 0.8)))
+	host("hedge%d" % index)
+	var row := component_box("hedge_bank", Vector3(length, 0.45, 0.5),
+		Transform3D(Basis(Vector3.UP, atan2(-run.y, run.x)), Vector3(mid.x, 0.225, mid.y)), SURF_COMMON)
+	_log_mass("hedge%d" % index, component_aabb(row))
 
 
 ## One run of masonry wall.
-func _wall(a: Vector2, b: Vector2, index: int) -> void:
+func _wall(a: Vector2, b: Vector2, index: int, inside: Vector2) -> void:
 	var run: Vector2 = b - a
 	var length: float = run.length()
 	if length < 0.5:
 		return
 	var mid: Vector2 = (a + b) * 0.5
-	box(Vector3(length, WALL_HEIGHT, WALL_THICK),
-		Vector3(mid.x, WALL_HEIGHT * 0.5, mid.y), SURF_STONE, atan2(-run.y, run.x))
-	_log_mass("wall%d" % index,
-		AABB(Vector3(minf(a.x, b.x) - WALL_THICK, 0.0, minf(a.y, b.y) - WALL_THICK),
-			Vector3(absf(run.x) + WALL_THICK * 2.0, WALL_HEIGHT,
-				absf(run.y) + WALL_THICK * 2.0)))
+	var yaw := atan2(-run.y, run.x)
+	host("wall%d" % index)
+	var wall := component_box("enclosure_wall", Vector3(length, WALL_HEIGHT, WALL_THICK),
+		Transform3D(Basis(Vector3.UP, yaw), Vector3(mid.x, WALL_HEIGHT * 0.5, mid.y)), SURF_STONE)
+	_log_mass("wall%d" % index, component_aabb(wall))
+	# A real guard walk with a grounded stair. Leave three metres at each
+	# entrance so an oblique road never clips the inward-projecting platform.
+	if length < 12.0:
+		return
+	var direction := run / length
+	var top := 2.6
+	var stair_run := 3.9
+	var start := a + direction * 3.0 + inside * 1.0
+	for step in 13:
+		var height := top * float(step + 1) / 13.0
+		var at := start + direction * (float(step) + 0.5) * 0.3
+		component_box("wallwalk_stair", Vector3(0.3, height, 1.3),
+			Transform3D(Basis(Vector3.UP, yaw), Vector3(at.x, height * 0.5, at.y)), SURF_STONE)
+	var walk_length := length - 6.0 - stair_run
+	var centre := start + direction * (stair_run + walk_length * 0.5)
+	component_box("wallwalk_deck", Vector3(walk_length, 0.24, 1.4),
+		Transform3D(Basis(Vector3.UP, yaw), Vector3(centre.x, top - 0.12, centre.y)), SURF_WOOD)
+	var posts := maxi(1, int(ceil(walk_length / 2.4)))
+	for post in range(posts + 1):
+		var at := start + direction * (stair_run + walk_length * float(post) / float(posts)) + inside * 0.7
+		component_box("wallwalk_post", Vector3(0.16, top + 0.9, 0.16),
+			Transform3D(Basis(Vector3.UP, yaw), Vector3(at.x, (top + 0.9) * 0.5, at.y)), SURF_WOOD)
+	centre += inside * 0.7
+	component_box("wallwalk_rail", Vector3(walk_length + 0.16, 0.12, 0.12),
+		Transform3D(Basis(Vector3.UP, yaw), Vector3(centre.x, top + 0.84, centre.y)), SURF_WOOD)
 
 
 ## An edge segment cut into the pieces that are NOT a gateway. §9.2's `gates`
 ## rule wants roads to cross the edge only at gates and no other opening in
 ## it, so the openings have to be exactly the gates and nowhere else.
 static func _minus_gates(a: Vector2, b: Vector2,
-		gates: Array[Vector2]) -> Array:
-	var length: float = a.distance_to(b)
+		gates: Array[Dictionary]) -> Array:
+	var length := a.distance_to(b)
 	if length < 0.01:
 		return []
-	var dir: Vector2 = (b - a) / length
-	var cuts: Array[Vector2] = []          # [from, to] along the run, in metres
+	var direction := (b - a) / length
+	var cuts: Array[float] = [0.0, length]
+	var openings: Array[PackedVector2Array] = []
 	for g in gates:
-		var t: float = (g - a).dot(dir)
-		if t < -GATE_WIDTH or t > length + GATE_WIDTH:
-			continue
-		if (a + dir * t).distance_to(g) > GATE_WIDTH:
-			continue
-		cuts.append(Vector2(t - GATE_WIDTH * 0.5, t + GATE_WIDTH * 0.5))
-	cuts.sort_custom(func(x, y) -> bool: return x.x < y.x)
+		var point: Vector2 = g["pos"]
+		var forward: Vector2 = g.get("direction", Vector2.DOWN)
+		var reach := maxf(float(g.get("opening", GATE_WIDTH)), 4.0) + WALL_THICK
+		var poly := Poly.ribbon(PackedVector2Array([point - forward * reach, point + forward * reach]),
+			float(g.get("width", GATE_WIDTH)) * 0.5 + WALL_THICK * 0.5)
+		openings.append(poly)
+		for i in poly.size():
+			var hit = Geometry2D.segment_intersects_segment(a, b, poly[i], poly[(i + 1) % poly.size()])
+			if hit != null:
+				cuts.append(clampf((Vector2(hit) - a).dot(direction), 0.0, length))
+	cuts.sort()
 	var out: Array = []
-	var at := 0.0
-	for cut in cuts:
-		if cut.x - at > 0.5:
-			out.append([a + dir * at, a + dir * cut.x])
-		at = maxf(at, cut.y)
-	if length - at > 0.5:
-		out.append([a + dir * at, b])
+	for i in range(cuts.size() - 1):
+		if cuts[i + 1] - cuts[i] < 0.01:
+			continue
+		var mid := a + direction * (cuts[i] + cuts[i + 1]) * 0.5
+		if openings.any(func(poly): return Poly.contains_point(poly, mid)):
+			continue
+		out.append([a + direction * cuts[i], a + direction * cuts[i + 1]])
 	return out
 
 
@@ -290,8 +417,11 @@ func _built_props(plan: VillagePlan) -> void:
 		if not bool(p.get("built", false)):
 			continue
 		var at := Vector3(float(p["pos"].x), 0.0, float(p["pos"].y))
+		at.y = float(p.get("elevation", 0.0))
 		var yaw: float = float(p.get("yaw", 0.0))
 		var box_of := AABB()
+		if p.has("approach"):
+			_flat(p["approach"], 0.035, SURF_ROAD)
 		match String(p["key"]):
 			"well":
 				box_of = kit.well(at, yaw)
@@ -306,7 +436,7 @@ func _built_props(plan: VillagePlan) -> void:
 			"drying_rack":
 				box_of = kit.drying_rack(at, yaw)
 			"mill_wheel":
-				box_of = kit.mill_wheel(at, yaw)
+				box_of = kit.mill_wheel(at, yaw, float(p.get("radius", 1.8)))
 			"adit":
 				box_of = kit.adit(at, yaw)
 			"fence_gate":

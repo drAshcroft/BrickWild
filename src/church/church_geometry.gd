@@ -212,6 +212,54 @@ static func aisle_height(spec: ChurchSpec, ring := 0) -> float:
 	return spec.height * AISLE_HEIGHT_RATIO * pow(0.82, ring)
 
 
+static func has_clerestory(spec: ChurchSpec) -> bool:
+	return spec.aisles > 0 and (spec.clerestory or spec.flying_buttresses)
+
+
+## Keep the upper nave wall available for glazing. This same spring line is
+## consumed by the roof emitter and by the window course.
+static func aisle_roof_high(spec: ChurchSpec, ring := 0) -> float:
+	var high: float = aisle_height(spec, ring) + spec.aisle_width * 0.8
+	if ring > 0:
+		return minf(high, aisle_height(spec, ring - 1) - RoofShape.DEPTH)
+	var limit: float = spec.height * 0.72 if has_clerestory(spec) else spec.height - RoofShape.DEPTH
+	return minf(high, limit)
+
+
+## One opening in each structural bay, BETWEEN flyers rather than under an
+## arch landing. Rectangle height excludes the pointed/round head.
+static func clerestory_windows(spec: ChurchSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not has_clerestory(spec):
+		return out
+	var centers: Array[float] = []
+	var span: Vector2 = aisle_z_range(spec)
+	var pitch: float
+	if spec.flying_buttresses and flyer_count(spec) >= 2:
+		pitch = flyer_z(spec, 1) - flyer_z(spec, 0)
+		for i in range(flyer_count(spec) - 1):
+			centers.append((flyer_z(spec, i) + flyer_z(spec, i + 1)) * 0.5)
+	else:
+		var count := maxi(1, int((span.y - span.x) / 3.5))
+		pitch = (span.y - span.x) / float(count + 1)
+		for i in range(count):
+			centers.append(span.x + pitch * float(i + 1))
+	var sill: float = aisle_roof_high(spec) + RoofShape.DEPTH + 0.18
+	var head: float = spec.height - 0.22
+	var band: float = head - sill
+	var width: float = minf(pitch * 0.48, band * 0.7)
+	var crown: float = width * (0.35 if spec.window_style == &"pointed" else 0.25)
+	var height: float = band - crown
+	if width < 0.2 or height < 0.25:
+		return out
+	for z in centers:
+		for side in [-1.0, 1.0]:
+			out.append({"pos": Vector3(side * (spec.width / 2.0 + OPENING_EPS),
+				sill + height / 2.0, z), "face": side * PI / 2.0,
+				"width": width, "height": height, "sill": sill, "head": head})
+	return out
+
+
 static func aisle_aabb(spec: ChurchSpec, side: float, ring := 0) -> AABB:
 	var zr: Vector2 = aisle_z_range(spec)
 	var aw: float = spec.aisle_width

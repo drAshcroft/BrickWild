@@ -119,10 +119,12 @@ static func axis_faults(axis_x: float, marks: Array, tol: float) -> Array[String
 ## it. This is the (plan, focus, door) form the chapel uses.
 static func plan_axis_faults(plan: HousePlan, room: int, door: int,
 		tol := 0.05) -> Array[String]:
+	if plan == null or room < 0 or room >= plan.room_count():
+		return ["axis: no room for the ceremonial axis"] as Array[String]
 	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var focus: Vector2 = plan.focus_pos()
 	if not focus.is_finite() or door < 0 or door >= plan.doors.size():
-		return [] as Array[String]
+		return ["axis: the focus or way in is missing"] as Array[String]
 	var way_in: Vector2 = plan.doors[door]["pos"]
 	# the axis runs the length of the room, so "off the line" is measured
 	# across its SHORT side
@@ -139,6 +141,52 @@ static func plan_axis_faults(plan: HousePlan, room: int, door: int,
 		out.append("axis: the %s is beside the way in, not down the room from it"
 			% String(plan.focus_cat()))
 	return out
+
+
+## Named obstacles let temples and furnished rooms use exactly the same ray
+## test, while each supplies its own intentional exemptions.
+static func sightline_blockers(from: Vector3, to: Vector3, obstacles: Array) -> Array[String]:
+	var out: Array[String] = []
+	for obstacle in obstacles:
+		if Sightline.hits(from, to, obstacle["aabb"]):
+			out.append(String(obstacle["name"]))
+	return out
+
+
+## See a placed focus from a room's doorway, including on a raised sanctuary.
+## `focus` is a furniture index: this checks what was placed, not just the
+## point the planner hoped to furnish. Mounted decorations do not hide it.
+static func plan_sightline_faults(plan: HousePlan, focus: int, door: int) -> Array[String]:
+	if plan == null or focus < 0 or focus >= plan.furniture.size() \
+			or door < 0 or door >= plan.doors.size():
+		return ["sightline: the focus or way in is missing"] as Array[String]
+	var target: Dictionary = plan.furniture[focus]
+	var room: int = int(target["room"])
+	var rect: Rect2 = target["rect"]
+	var center: Vector2 = rect.get_center()
+	var entry: Vector2 = plan.doors[door]["pos"]
+	var base: float = plan.storey_of_room(room) * plan.spec.height
+	var inside: Vector2 = entry + (center - entry).normalized() * 0.5
+	var eye := Vector3(inside.x, base + 1.65, inside.y)
+	var height: float = PropCatalog.height(String(target["key"])) * float(target.get("scale", 1.0))
+	var target_y: float = Vector3(target["pos"]).y
+	var aim := Vector3(center.x, target_y + height * 0.75, center.y)
+	var obstacles: Array = []
+	for i in plan.furniture_of(room):
+		if i == focus:
+			continue
+		var piece: Dictionary = plan.furniture[i]
+		if piece.get("mounted", false) or int(piece.get("host", -1)) >= 0:
+			continue
+		var bounds: Rect2 = piece["rect"]
+		var h: float = PropCatalog.height(String(piece["key"])) * float(piece.get("scale", 1.0))
+		obstacles.append({"name": "%s#%d" % [piece["key"], i], "aabb": AABB(
+			Vector3(bounds.position.x, Vector3(piece["pos"]).y, bounds.position.y),
+			Vector3(bounds.size.x, h, bounds.size.y))})
+	var blocked := sightline_blockers(eye, aim, obstacles)
+	if not blocked.is_empty():
+		return ["sightline: %s hides the focus from the doorway" % ", ".join(blocked)] as Array[String]
+	return [] as Array[String]
 
 
 func _check_axis() -> void:
@@ -177,15 +225,14 @@ func _check_sightline() -> void:
 	# god comes out the back of it and reports the wall behind as a blocker
 	var to := Vector3(idol.x, idol.y + _spec.idol_height * 0.7,
 		idol.z - _spec.idol_width / 2.0 - 0.05)
-	var blocked: Array[String] = []
+	var obstacles: Array = []
 	for m in _builder.mass_log:
 		var name: String = m["name"]
 		if name.begins_with("column_"):
 			continue
 		if _exempt_from_sightline(name):
 			continue
-		if Sightline.hits(from, to, m["aabb"]):
-			blocked.append(name)
+		obstacles.append({"name": name, "aabb": m["aabb"]})
 	for i in range(_spec.columns.size()):
 		var column: Dictionary = _spec.columns[i]
 		var c: Vector3 = column["pos"]
@@ -193,8 +240,8 @@ func _check_sightline() -> void:
 		var h: float = float(column["height"])
 		var aabb := AABB(Vector3(c.x - r * 1.2, 0.0, c.z - r * 1.2),
 			Vector3(r * 2.4, h + TempleGeometry.COLUMN_CAP * r, r * 2.4))
-		if Sightline.hits(from, to, aabb):
-			blocked.append("column_%d" % i)
+		obstacles.append({"name": "column_%d" % i, "aabb": aabb})
+	var blocked := sightline_blockers(from, to, obstacles)
 	stats["sightline_blockers"] = blocked.size()
 	if not blocked.is_empty():
 		failures.append("sightline: %s stands between the doorway and the idol"

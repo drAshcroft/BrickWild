@@ -16,13 +16,21 @@ extends HouseSpec
 ## `room_program`, the same door a shop and a hotel go through, and answering
 ## it is the whole of what a KeepSpec adds.
 
-## The storey programme, bottom to top. A keep is entered at its foot into a
-## windowless store, holds its hall over that, and puts the lord at the top;
+## The storey programme, bottom to top. A protected keep enters its hall over
+## a windowless store and puts the lord at the top;
 ## anything in between is a chamber for the household.
 const PROGRAMME := {
 	3: [&"store", &"hall", &"lords_chamber"],
 	4: [&"store", &"hall", &"parlour", &"lords_chamber"],
 }
+
+## CastleQA verifies the physical forebuilding for a raised entry. The
+## default remains ground level for motte shells and existing authored plans.
+var entry_storey: int = 0
+
+
+func max_storeys() -> int:
+	return 8
 
 
 ## What each storey is, bottom to top. Named `room_program` because that is the

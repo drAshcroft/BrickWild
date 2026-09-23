@@ -12,8 +12,7 @@ const WALL_INSET := 0.6
 const WINDOW_SILL := 1.15
 const WINDOW_HEAD := 2.15
 const WINDOW_PITCH := 4.8
-const STAIR_RUN := 2.2
-const STAIR_WIDTH := 1.0
+const KeepPlan = preload("castle_keep_plan.gd")
 
 
 static func origin(spec: CastleSpec) -> Vector3:
@@ -65,28 +64,27 @@ static func generate(spec: CastleSpec, with_furniture := false) -> HousePlan:
 		plan.rooms.append({"kind": kind, "storey": level, "rect": rect,
 			"outline": outline.duplicate(), "floor_y": float(level) * hs.height,
 			"ceiling_y": float(level + 1) * hs.height})
-	# The climb reaches the most-front-facing polygon facet.  Use its midpoint
-	# and exact outward normal so the wall emitter cuts the same edge it logs.
-	var front := _front_wall(plan, 0)
-	var door_width := minf(1.6, inner_radii(spec).x * 0.35)
-	var door_pos := (Vector2(front["from"]) + Vector2(front["to"])) * 0.5
-	# Keep the doorway on the exact facet, but line it up with the stair lane
-	# beside the solid climb curtain rather than behind that curtain.
+	var top_walls := HouseGeometry.room_walls(plan, n - 1)
+	plan.hearth = {"room": n - 1, "wall": KeepPlan._facing_wall(top_walls, Vector2(1, 0))}
+	var door_width := minf(1.6, inner_radii(spec).x * 0.30)
+	# Small ovals have a short central facet: shifting within it may leave the
+	# doorway behind the solid climb curtain. Choose a real adjacent facet when
+	# necessary, keeping the complete opening and stair lane beside the curtain.
 	var climb := CastleGeometry.climb_wall(spec)
 	var stair_width := clampf(maxf(float(climb["thickness"]) * 3.0, 2.0), 2.0, 3.6)
 	var lane_offset := float(climb["thickness"]) * 0.5 + stair_width * 0.5 + 0.25
-	var tangent := (Vector2(front["to"]) - Vector2(front["from"])).normalized()
-	if tangent.x < 0.0:
-		tangent = -tangent
-	var max_shift := maxf((Vector2(front["from"]).distance_to(Vector2(front["to"])) - door_width) * 0.5, 0.0)
-	door_pos += tangent * minf(lane_offset / maxf(absf(tangent.x), 0.1), max_shift)
+	var arrival := _climb_door(plan, door_width, lane_offset, float(climb.thickness) * 0.5)
+	if arrival.is_empty():
+		return HousePlan.new() # An impossible forced site is reported by castle interior QA.
+	var front: Dictionary = arrival.wall
+	var door_pos: Vector2 = arrival.pos
 	var door_normal := -Vector2(front["normal"])
 	plan.doors.append({"a": 0, "b": -1, "pos": door_pos,
 		"normal": door_normal, "width": door_width,
 		"exterior": true, "front": true, "storey": 0, "host": "keep_shell",
 		"surface_point": door_pos, "surface_normal": door_normal,
 		"route": "motte_climb"})
-	for level in range(1, n):
+	for level in range(n):
 		_add_windows(plan, level, outline)
 	for level in range(n - 1):
 		_add_stair(plan, level, level + 1, outline)
@@ -100,6 +98,8 @@ static func _add_windows(plan: HousePlan, level: int, outline: PackedVector2Arra
 	for i in range(SIDES):
 		if i % 2 != level % 2:
 			continue
+		if level == plan.hearth_room() and i == plan.hearth_wall():
+			continue # This solid wall carries the lord's fireplace and flue.
 		var a0 := outline[i]
 		var a1 := outline[(i + 1) % SIDES]
 		var edge := a1 - a0
@@ -108,27 +108,54 @@ static func _add_windows(plan: HousePlan, level: int, outline: PackedVector2Arra
 		# Use the exact outward normal of the polygon edge so HouseBuilder's
 		# opening matcher cuts this same shell run.
 		var normal := -Vector2(walls[i]["normal"])
+		var width := minf(1.2, edge.length() * 0.45)
+		var over_door := false
+		for door in plan.doors:
+			if HousePlan.record_storey(door) == level and Vector2(door.normal).dot(normal) > 0.99 \
+					and Vector2(door.pos).distance_to(pos) < (float(door.width) + width) * 0.5 + 0.08:
+				over_door = true
+		if over_door:
+			continue
 		plan.windows.append({"room": level, "pos": pos, "normal": normal,
-			"width": minf(1.2, edge.length() * 0.45), "sill": WINDOW_SILL,
+			"width": width, "sill": WINDOW_SILL,
 			"head": WINDOW_HEAD, "storey": level, "host": "keep_shell",
 			"surface_point": pos, "surface_normal": normal, "edge": i})
 
 
 static func _add_stair(plan: HousePlan, lower: int, upper: int,
-		outline: PackedVector2Array) -> void:
-	var bounds := Poly.bounding_rect(outline)
-	var min_side := minf(bounds.size.x, bounds.size.y)
-	var width := minf(STAIR_WIDTH, maxf(0.55, min_side * 0.18))
-	var offset := maxf(width * 1.2, min_side * 0.22)
-	var side := 1.0 if lower % 2 == 0 else -1.0
-	var centre := Vector2(side * offset, 0.0)
-	var rect := Rect2(centre - Vector2(width, STAIR_RUN) * 0.5,
-		Vector2(width, STAIR_RUN))
-	plan.stairs.append({"a": lower, "b": upper, "storey": lower,
-		"to_storey": upper, "pos": centre, "lower_pos": centre,
-		"upper_pos": centre, "rect": rect, "lower_rect": rect,
-		"upper_rect": rect, "width": width, "run": STAIR_RUN,
-		"opening": rect, "host": "keep_shell"})
+		_outline: PackedVector2Array) -> void:
+	var previous := Rect2()
+	if not plan.stairs.is_empty():
+		previous = plan.stairs[-1].upper_rect
+	var before := plan.stairs.size()
+	KeepPlan._add_stair(plan, lower, upper, previous)
+	if plan.stairs.size() > before:
+		plan.stairs[-1]["opening"] = plan.stairs[-1].rect
+		plan.stairs[-1]["host"] = "keep_shell"
+
+
+## Local masonry flue on the exact hearth facet. The castle emits it because
+## its shell/parapet, rather than the generic house roof, owns the top height.
+static func flue(plan: HousePlan, clearance := 1.5) -> Dictionary:
+	var room := plan.hearth_room()
+	if room < 0:
+		return {}
+	var wall: Dictionary = HouseGeometry.room_walls(plan, room)[plan.hearth_wall()]
+	var at := (Vector2(wall.from) + Vector2(wall.to)) * 0.5
+	for item in plan.furniture:
+		if int(item.room) == room and PropCatalog.category(item.key) == "hearth":
+			at = Geometry2D.get_closest_point_to_segment(Vector2(item.pos.x, item.pos.z), wall.from, wall.to)
+			break
+	var normal := -Vector2(wall.normal)
+	var thick := HouseGeometry.wall_thickness(plan.spec)
+	var centre := at + normal * (thick * 0.55)
+	var bottom := float(plan.storey_of_room(room)) * plan.spec.height
+	var top := float(plan.spec.storeys) * plan.spec.height + clearance
+	var size := Vector3(0.9, top - bottom, thick + 0.25)
+	var xf := Transform3D(Basis(Vector3.UP, atan2(normal.x, normal.y)),
+		Vector3(centre.x, (bottom + top) * 0.5, centre.y))
+	return {"size": size, "transform": xf, "storey": plan.storey_of_room(room),
+		"wall": plan.hearth_wall(), "surface_point": at}
 
 
 static func validate(plan: HousePlan) -> Dictionary:
@@ -176,17 +203,29 @@ static func _on_ellipse(pos: Vector2, plan: HousePlan) -> bool:
 	return absf(value - 1.0) <= 0.18
 
 
-static func _front_wall(plan: HousePlan, level: int) -> Dictionary:
-	var walls := HouseGeometry.room_walls(plan, level)
-	var best: Dictionary = walls[0] if not walls.is_empty() else {
-		"from": Vector2(-1, 0), "to": Vector2(1, 0), "normal": Vector2(0, 1)}
-	var score := -INF
+static func _climb_door(plan: HousePlan, width: float, lane_x: float,
+		curtain_half: float) -> Dictionary:
+	var walls := HouseGeometry.room_walls(plan, 0)
+	var best := {}
+	var score := INF
 	for wall in walls:
 		var outward := -Vector2(wall["normal"])
-		var candidate := outward.dot(Vector2(0, -1))
-		if candidate > score:
+		if outward.y > -0.45:
+			continue
+		var a: Vector2 = wall.from
+		var edge: Vector2 = Vector2(wall.to) - a
+		var tangent := edge.normalized()
+		var margin := width * 0.5 + 0.18
+		if edge.length() < 2.0 * margin:
+			continue
+		var along := clampf((lane_x - a.x) / tangent.x, margin, edge.length() - margin)
+		var pos := a + tangent * along
+		if pos.x - absf(tangent.x) * width * 0.5 < curtain_half + 0.12:
+			continue
+		var candidate := absf(pos.x - lane_x) + 2.0 * (1.0 + outward.y)
+		if candidate < score:
 			score = candidate
-			best = wall
+			best = {"wall": wall, "pos": pos}
 	return best
 
 

@@ -57,6 +57,12 @@ func _check_tiling(plan: VillagePlan) -> void:
 			if VillageLotPlanner.overlap_area(a, c["poly"]) > VillageLotPlanner.AREA_EPS:
 				failures.append("tiling: lot %d is cut into the %s" % [i, String(c["kind"])])
 		for w in plan.water:
+			var host := int(w.get("host", -1))
+			if w["kind"] == &"race" and host >= 0 and host < plan.buildings.size() \
+					and int(plan.buildings[host]["lot"]) == i:
+				var req: BuildingRequest = plan.buildings[host]["request"]
+				if req.kind == &"shop" and req.purpose == &"bakery":
+					continue # the mill's own working water occupies its service yard
 			if VillageLotPlanner.overlap_area(a, w["poly"]) > VillageLotPlanner.AREA_EPS:
 				failures.append("tiling: lot %d is cut into the %s" % [i, String(w["kind"])])
 
@@ -123,6 +129,11 @@ func _check_setback(plan: VillagePlan) -> void:
 		var front: PackedVector2Array = lot["front"]
 		var rule: Dictionary = VillageLotPlanner.LOT_RULES.get(b["class"], VillageLotPlanner.LOT_RULES[&"cottage"])
 		var door: Vector2 = VillageMeasure.door(b)
+		# A certified open-court approach connects the facing footprint to a
+		# recessed native entrance. Keep the strict front setback and judge
+		# the additional walk separately in VillageNavCheck.
+		if b["placement"].has("approach"):
+			door = VillageMeasure.front_mid(b)
 		var d: Vector2 = (front[1] - front[0]).normalized()
 		var dist: float = absf(d.cross(door - front[0]))
 		if dist < float(rule["set_min"]) - BAND_SLACK or dist > float(rule["set_max"]) + BAND_SLACK:
@@ -134,7 +145,7 @@ func _check_fit(plan: VillagePlan) -> void:
 	for i in range(plan.buildings.size()):
 		var b: Dictionary = plan.buildings[i]
 		var lot: PackedVector2Array = plan.lots[int(b["lot"])]["poly"]
-		var gap: float = VillageLotPlanner.fire_gap(b["class"], plan.spec)
+		var gap: float = VillageLotPlanner.fire_gap(b["class"], plan.spec, b["placement"])
 		if not VillageLotPlanner._poly_contains(lot, VillageMeasure.footprint_poly(b)):
 			failures.append("fit: building %d's walls stand off its lot" % i)
 		elif not VillageLotPlanner._poly_contains(Poly.offset(lot, gap + 0.05), VillageMeasure.bounds_poly(b)):
@@ -145,8 +156,8 @@ func _check_fire_gap(plan: VillagePlan) -> void:
 	for i in range(plan.buildings.size()):
 		var a: PackedVector2Array = VillageMeasure.bounds_poly(plan.buildings[i])
 		for j in range(i + 1, plan.buildings.size()):
-			var want: float = maxf(VillageLotPlanner.fire_gap(plan.buildings[i]["class"], plan.spec),
-				VillageLotPlanner.fire_gap(plan.buildings[j]["class"], plan.spec))
+			var want: float = maxf(VillageLotPlanner.fire_gap(plan.buildings[i]["class"], plan.spec, plan.buildings[i]["placement"]),
+				VillageLotPlanner.fire_gap(plan.buildings[j]["class"], plan.spec, plan.buildings[j]["placement"]))
 			var d: float = VillageMeasure.poly_distance(a, VillageMeasure.bounds_poly(plan.buildings[j]))
 			if d < want - 0.01:
 				failures.append("fire_gap: buildings %d and %d stand %.1fm apart, want %.1f" % [i, j, d, want])

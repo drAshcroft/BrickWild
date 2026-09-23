@@ -578,6 +578,16 @@ static func _roof_fixture(res: SuiteResult) -> void:
 					% [who, out, ROOF_OVERHANG_MAX])
 	res.note("roof        %d houses, roof types %s" % [
 		HouseSweep.styles().size() * 12, str(kinds)])
+	# The real upper envelope is the reference, but moving the emitted roof
+	# beyond it must still fail the same fixed overhang limit.
+	var shifted_spec := HouseSpec.new()
+	shifted_spec.storeys = 2
+	var shifted_plan := HouseGenerator.generate(shifted_spec, 73001, false)
+	var shifted_mesh := MeshKit.translated(HouseBuilder.new().build(shifted_plan),
+		Vector3(shifted_spec.width, 0, shifted_spec.length))
+	res.checked += 1
+	if _roof_reach(shifted_mesh, shifted_spec) <= ROOF_OVERHANG_MAX:
+		res.fail("roof: translated geometry escaped upper-wall overhang check")
 
 
 ## What fraction of the footprint has mesh above the wall head?
@@ -598,7 +608,7 @@ static func _roof_cover(mesh: ArrayMesh, spec: HouseSpec) -> float:
 					if not buckets.has(key):
 						buckets[key] = []
 					buckets[key].append(t)
-	var rect: Rect2 = HouseGeometry.interior_rect(spec)
+	var rect: Rect2 = HouseGeometry.interior_rect(spec, maxi(spec.storeys - 1, 0))
 	var hit := 0
 	var total := 0
 	var z: float = rect.position.y + ROOF_STEP * 0.5
@@ -620,7 +630,7 @@ static func _roof_cover(mesh: ArrayMesh, spec: HouseSpec) -> float:
 ## How far the roof reaches past the wall, measured above half the rise so a
 ## porch canopy cannot be mistaken for it.
 static func _roof_reach(mesh: ArrayMesh, spec: HouseSpec) -> float:
-	var site: Rect2 = HouseGeometry.site_rect(spec)
+	var site: Rect2 = HouseGeometry.site_rect(spec, maxi(spec.storeys - 1, 0))
 	var wall_top: float = spec.height * mini(spec.storeys, 3)
 	var rise: float = HouseGeometry.roof_rise(spec)
 	var out := 0.0
@@ -1230,7 +1240,8 @@ static func _fs_bookcase_heat(res: SuiteResult) -> void:
 static func _fs_bed_window(res: SuiteResult) -> void:
 	var key: String = PropCatalog.of_category("bed")[0]
 	var plan := _fs_plan(&"bedroom", 8103)
-	plan.furniture = [_fs_piece(key, _fs_against(plan, key, 0, 0.0))]
+	# Wall 0 faces into the room along +Z, so the bed must face +Z too.
+	plan.furniture = [_fs_piece(key, _fs_against(plan, key, 0, 0.0), PI)]
 	_fs_expect(res, plan,
 		"bed_window: the head of %s in room 0 (bedroom) is under the window in wall 0" % key)
 

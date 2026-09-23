@@ -189,6 +189,8 @@ static func _named(ids: Array) -> Dictionary:
 ## families are a registry that grows -- so it answers from WorldFamilies
 ## rather than from `styles()`/`purposes()`.
 static func options(kind: StringName, field: StringName) -> Array[Dictionary]:
+	if kind == &"village" and field in [&"water", &"enclosure"]:
+		return _rows(_named(VillageSpec.WATERS if field == &"water" else VillageSpec.ENCLOSURES))
 	if kind == &"world":
 		return _world_options(field)
 	return _rows(styles(kind) if field == &"style" else purposes(kind))
@@ -245,6 +247,11 @@ static func describe(kind: StringName) -> Dictionary:
 	out["api_version"] = API_VERSION
 	out["styles"] = options(kind, &"style")
 	out["purposes"] = options(kind, &"purpose")
+	if kind == &"village":
+		out["waters"] = options(kind, &"water")
+		out["enclosures"] = options(kind, &"enclosure")
+		out["water_label"] = "Water"
+		out["enclosure_label"] = "Edge"
 	if kind == &"world":
 		# a world family narrows the kind's envelope with its own, so the
 		# families are published with theirs attached
@@ -268,7 +275,8 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 			"Unknown building kind '%s'." % String(request.kind)))
 	for field in DIMENSIONS:
 		var value: float = request.get(field)
-		if not is_finite(value) or value <= 0.0:
+		var zero_allowed: bool = request.kind == &"village" and field == &"length"
+		if not is_finite(value) or value < 0.0 or (value == 0.0 and not zero_allowed):
 			out.append(_error(&"invalid_dimension", field,
 				"%s must be a positive finite number." % String(field)))
 		elif known:
@@ -290,6 +298,14 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 	_validate_options(request, out)
 	if request.material not in [&"stone", &"timber"]:
 		out.append(_error(&"invalid_material", &"material", "Shell material must be stone or timber."))
+	if request.kind == &"village":
+		for field in [&"water", &"enclosure"]:
+			if not _has_option(&"village", field, request.get(field)):
+				out.append(_error(&"unknown_option", field, "Unknown village %s '%s'." % [field, request.get(field)]))
+		if request.width != floorf(request.width):
+			out.append(_error(&"invalid_population", &"width", "Population must be a whole number."))
+		if request.enclosure == &"wall" and request.width < VillageSpec.WALL_MIN_POPULATION and request.purpose != &"garrison":
+			out.append(_error(&"invalid_enclosure", &"enclosure", "A wall needs at least %d people or a garrison purpose." % VillageSpec.WALL_MIN_POPULATION))
 	if request.kind == &"world" and out.is_empty():
 		# a world family narrows the kind's envelope with its own, and owns
 		# which sub-kinds it comes in

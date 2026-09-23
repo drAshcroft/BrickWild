@@ -73,6 +73,7 @@ func _check_tiling(plan: HousePlan) -> void:
 	for i in range(n):
 		var a: Rect2 = plan.rooms[i]["rect"]
 		var level := HousePlan.record_storey(plan.rooms[i])
+		inner = HouseGeometry.storey_rect(plan, level).grow(-HouseGeometry.wall_thickness(plan.spec))
 		# The ROOM rectangle, partitions included: this sum is what says the
 		# rooms partition the interior with nothing left over, and the clear
 		# floor inside each room does not add up to that by design.
@@ -128,6 +129,8 @@ func _check_tiling(plan: HousePlan) -> void:
 	stats["interior_area"] = snappedf(want, 0.01)
 	stats["courts"] = plan.courts.size()
 	for level in sums:
+		var level_inner := HouseGeometry.storey_rect(plan, int(level)).grow(-HouseGeometry.wall_thickness(plan.spec))
+		want = level_inner.get_area()
 		# A storey of rectangles PARTITIONS the interior: every square metre
 		# belongs to some room, and floor nobody owns is a planner bug. A
 		# storey with a shaped room does not and should not -- the corners an
@@ -145,7 +148,10 @@ func _check_tiling(plan: HousePlan) -> void:
 ## Every requested storey has rooms, and no record may silently use a level
 ## outside the spec.  The `get` fallback keeps old hand-authored plans valid.
 func _check_storeys(plan: HousePlan) -> void:
-	var wanted: int = clampi(int(plan.spec.storeys), 1, HouseGeometry.MAX_STOREYS)
+	var limit := plan.spec.max_storeys()
+	var wanted: int = clampi(int(plan.spec.storeys), 1, limit)
+	if plan.spec.storeys < 1 or plan.spec.storeys > limit:
+		failures.append("storeys: declared %d exceeds this family's supported 1..%d" % [plan.spec.storeys, limit])
 	var lowest: int = _lowest(plan)
 	var seen := {}
 	for room in plan.rooms:
@@ -197,8 +203,9 @@ func _check_entrance(plan: HousePlan) -> void:
 	for d in plan.doors:
 		if not d["exterior"]:
 			continue
-		if HousePlan.record_storey(d) != 0:
-			failures.append("way in: exterior door is on storey %d, not ground level" % HousePlan.record_storey(d))
+		var entry_level: int = plan.spec.entry_storey if plan.spec is KeepSpec else 0
+		if HousePlan.record_storey(d) != entry_level:
+			failures.append("way in: exterior door is on storey %d, expected entry storey %d" % [HousePlan.record_storey(d), entry_level])
 		exteriors += 1
 		if d.get("front", false):
 			fronts += 1
@@ -258,7 +265,7 @@ static func _world_shop_has_street_opening(plan: HousePlan, room: int) -> bool:
 ## Stairs are the only legal edge between levels.  Check both their metadata
 ## and coverage of every adjacent pair; door_graph() then checks reachability.
 func _check_stairs(plan: HousePlan) -> void:
-	var wanted: int = clampi(int(plan.spec.storeys), 1, HouseGeometry.MAX_STOREYS)
+	var wanted: int = clampi(int(plan.spec.storeys), 1, plan.spec.max_storeys())
 	var lowest: int = _lowest(plan)
 	var interior: Rect2 = HouseGeometry.interior_rect(plan.spec)
 	var pairs := {}
@@ -382,9 +389,9 @@ func _check_door_openings(plan: HousePlan) -> void:
 ## Windows: outside walls only, clear of the corners, clear of each other and
 ## of the doors, and enough of them to light the room.
 func _check_windows(plan: HousePlan) -> void:
-	var inner: Rect2 = HouseGeometry.interior_rect(plan.spec)
 	for wi in range(plan.windows.size()):
 		var w: Dictionary = plan.windows[wi]
+		var inner := HouseGeometry.storey_rect(plan, HousePlan.record_storey(w)).grow(-HouseGeometry.wall_thickness(plan.spec))
 		if HousePlan.record_storey(w) != HousePlan.record_storey(plan.rooms[int(w["room"])]):
 			failures.append("window %d is tagged for the wrong storey" % wi)
 		var pos: Vector2 = w["pos"]

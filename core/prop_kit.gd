@@ -262,22 +262,86 @@ func boat(at: Vector3, yaw := 0.0, length := 4.2, beam := 1.3) -> AABB:
 ## a doorway painted on a hill.
 func adit(at: Vector3, yaw := 0.0, width := 1.8, height := 2.0) -> AABB:
 	_begin()
+	# A low, faceted rock bank gives the mouth somewhere to lead. Three
+	# tapered solids leave an actual opening around the timber frame rather
+	# than placing a black rectangle on an unbroken stone face.
+	var rock_left := PackedVector2Array([Vector2(-1.6, 0.0), Vector2(-0.56, 0.0),
+		Vector2(-0.56, 1.12), Vector2(-0.75, 1.35), Vector2(-1.4, 0.75)])
+	var rock_right := PackedVector2Array([Vector2(0.56, 0.0), Vector2(1.65, 0.0),
+		Vector2(1.48, 0.66), Vector2(0.85, 1.32), Vector2(0.56, 1.12)])
+	var rock_crown := PackedVector2Array([Vector2(-0.56, 1.12), Vector2(0.56, 1.12),
+		Vector2(0.85, 1.32), Vector2(0.1, 1.56), Vector2(-0.75, 1.35)])
+	for shape in [rock_left, rock_right, rock_crown]:
+		var profile := PackedVector2Array()
+		for p in shape: profile.append(Vector2(p.x * width, p.y * height))
+		_adit_rock(profile, at, yaw, 0.22, width * 1.8)
 	var prop := 0.22
 	for side in [-1.0, 1.0]:
 		var p: Vector3 = at + _turn(Vector3(side * (width - prop) / 2.0, 0.0, 0.0), yaw)
 		_box(Vector3(prop, height, prop), p + Vector3(0.0, height / 2.0, 0.0), _wood, yaw)
 	_box(Vector3(width + prop, prop, prop * 1.2),
 		at + Vector3(0.0, height + prop / 2.0, 0.0), _wood, yaw)
-	# the shaft, set back behind the frame
+	for side4 in [-1.0, 1.0]:
+		_box(Vector3(0.09, 0.09, 0.04),
+			at + _turn(Vector3(side4 * (width - prop) * 0.5, height + prop * 0.5, -0.15), yaw), _dark, yaw)
+	# Timber cheeks and a roof reveal the short tunnel before its shadow.
+	for side3 in [-1.0, 1.0]:
+		_box(Vector3(prop * 0.6, height, 1.15),
+			at + _turn(Vector3(side3 * (width - prop) / 2.0, height * 0.5, 0.5), yaw), _wood, yaw)
+	_box(Vector3(width, prop, 1.2), at + _turn(Vector3(0.0, height + prop * 0.5, 0.5), yaw), _wood, yaw)
+	# The shaft shadow is behind the reveal, not flush with the frame.
 	_box(Vector3(width - prop, height - 0.1, 0.3),
-		at + _turn(Vector3(0.0, 0.0, 0.34), yaw) + Vector3(0.0, (height - 0.1) / 2.0, 0.0),
+		at + _turn(Vector3(0.0, 0.0, 1.0), yaw) + Vector3(0.0, (height - 0.1) / 2.0, 0.0),
 		_dark, yaw)
 	# the spoil heaped either side of the mouth
 	for side2 in [-1.0, 1.0]:
-		var s: Vector3 = at + _turn(Vector3(side2 * (width * 0.72), 0.0, -0.4), yaw)
+		var s: Vector3 = at + _turn(Vector3(side2 * (width * 0.86), 0.0, -0.4), yaw)
 		_kit.cone(width * 0.42, height * 0.45, s, _stone, 8)
 		_round(s, width * 0.42, height * 0.45)
 	return _end()
+
+
+## The clear floor between the spoil heaps and timber cheeks. Keep the
+## back short of the solid shaft shadow; the working entrance is a portal,
+## not a claim that the unmodelled underground mine is traversable.
+static func adit_passage(at: Vector2, yaw: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	# Extend forward through the conservative rotated AABB as well as the
+	# actual heaps. No solid native geometry occupies that approach axis.
+	for point in [Vector2(-0.65, -6.0), Vector2(0.65, -6.0), Vector2(0.65, 0.5), Vector2(-0.65, 0.5)]:
+		var turned := Basis(Vector3.UP, yaw) * Vector3(point.x, 0.0, point.y)
+		out.append(at + Vector2(turned.x, turned.z))
+	return out
+
+
+## A polygonal rock shoulder tapering into the bank behind a mine mouth.
+## Its exact emitted vertices, including the turned rear, widen the AABB.
+func _adit_rock(profile: PackedVector2Array, at: Vector3, yaw: float,
+		front_z: float, back_z: float) -> void:
+	var front := PackedVector3Array()
+	var back := PackedVector3Array()
+	for point in profile:
+		var recess := maxf(0.0, absf(point.x) - 1.0) * 0.4 + maxf(0.0, point.y - 2.2) * 0.2
+		front.append(at + _turn(Vector3(point.x, point.y, front_z + recess), yaw))
+		back.append(at + _turn(Vector3(point.x * 0.74, point.y * 0.5, back_z), yaw))
+	for p in front: _widen(AABB(p, Vector3.ZERO))
+	for p in back: _widen(AABB(p, Vector3.ZERO))
+	var triangles := Geometry2D.triangulate_polygon(profile)
+	var surface := _kit.surface(_stone)
+	var outward: Vector3 = _turn(Vector3.FORWARD, yaw)
+	for t in range(0, triangles.size(), 3):
+		var a: int = triangles[t]
+		var b: int = triangles[t + 1]
+		var c: int = triangles[t + 2]
+		if (front[c] - front[a]).cross(front[b] - front[a]).dot(outward) < 0.0:
+			var swap := b
+			b = c
+			c = swap
+		_kit._tri(surface, front[a], front[b], front[c])
+		_kit._tri(surface, back[a], back[c], back[b])
+	for i in profile.size():
+		var j := (i + 1) % profile.size()
+		_kit._quad(surface, front[i], back[i], back[j], front[j])
 
 
 # ----------------------------------------------------------------- internals

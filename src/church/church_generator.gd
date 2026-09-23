@@ -91,6 +91,7 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 	spec.flyer_tiers = 2 if spec.flying_buttresses and _chance(r, 0.4) else 1
 	if spec.flying_buttresses:
 		spec.buttresses = true   # every flyer needs its pier
+		spec.clerestory = true  # the flyers free this upper wall for windows
 
 	spec.crossing_tower = spec.transept and _chance(r, s.get("crossing_tower", 0.0))
 	spec.crossing_tower_height = 0.0

@@ -12,8 +12,8 @@ extends RefCounted
 ## `use_footprint` picks which rect: false (default) is `placement.bounds`
 ## (the full emitted architecture -- roof eaves, porches, towers and all --
 ## for fire gaps and canopies to clear); true is `placement.footprint` (the
-## walls' own outline, narrower, the rect `placement.door` sits on the -Z edge
-## of) for lots that want to hug the building itself.
+## main building footprint, including physical approach stairs). The actual
+## door may be recessed within it, as in a manor court or twin-stair ziggurat.
 static func world_rect(placement: Dictionary, transform: Transform3D,
 		use_footprint := false) -> PackedVector2Array:
 	var rect: Rect2

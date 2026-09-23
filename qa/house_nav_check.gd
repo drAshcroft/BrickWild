@@ -81,9 +81,9 @@ func _report() -> Dictionary:
 ## subtracted. Building it this way round means a partition is blocked because
 ## it belongs to no room, which is exactly what a wall is.
 func _rasterize() -> void:
-	var bounds: Rect2 = HouseGeometry.interior_rect(_plan.spec).grow(HouseGeometry.wall_thickness(_plan.spec))
 	_grids.clear()
 	for level in _levels():
+		var bounds := HouseGeometry.storey_rect(_plan, level)
 		var grid := WalkGrid.new()
 		grid.setup(bounds, HouseGeometry.NAV_CELL)
 		_grids[level] = grid
@@ -130,6 +130,9 @@ func _rasterize() -> void:
 		var level := HousePlan.record_storey(p)
 		if _grids.has(level):
 			_grids[level].add_obstacle(p["rect"])
+	var breast := HouseGeometry.hearth_breast(_plan)
+	if not breast.is_empty() and _grids.has(int(breast["storey"])):
+		_grids[int(breast["storey"])].add_obstacle_poly(breast["outline"])
 	for level in _grids:
 		_grids[level].build(HouseGeometry.PERSON_RADIUS)
 
@@ -182,7 +185,7 @@ func _levels() -> Array[int]:
 	var lowest := 0
 	if _plan.spec.has_method("lowest_storey"):
 		lowest = int(_plan.spec.lowest_storey())
-	for level in range(lowest, clampi(int(_plan.spec.storeys), 1, HouseGeometry.MAX_STOREYS)):
+	for level in range(lowest, clampi(int(_plan.spec.storeys), 1, _plan.spec.max_storeys())):
 		out.append(level)
 	return out
 

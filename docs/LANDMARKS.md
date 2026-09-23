@@ -36,3 +36,8 @@ expected to be able to build. Sources listed at the bottom.
 - https://www.hagiasophia.com/hagia-sophia-dome
 - https://duomo.firenze.it/en/discover/dome
 - https://en.wikipedia.org/wiki/Saint_Basil%27s_Cathedral
+# Clerestory rhythm
+
+Gothic flying buttresses require a visible upper window course. `ChurchGeometry.clerestory_windows()` places one opening between adjacent nave piers, with its sill above the actual aisle roof slab and its crown below the nave eaves. `aisle_roof_high()` is shared by the roofs and window layout, including multiple aisle rings. The builder uses the church's pointed or rounded arch profile, plus a thin mullion and sill.
+
+The landmark suite checks the emitted opening records against roof clearance and pier spacing. `tests/clerestory_test.gd` removes the course deliberately at three scales to prove the check detects a blank clerestory. `tools/render_clerestory.gd` produces Notre-Dame and Cologne close views in `artifacts/church_roofs/`.

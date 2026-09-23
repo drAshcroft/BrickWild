@@ -1,10 +1,12 @@
 class_name PlacementSuite
 extends RefCounted
-## BigGlade.placement()'s `door` contract: every family's door lies on the
+## BigGlade.placement()'s `door` contract: the canonical fixtures' doors lie on the
 ## -Z edge of its own measured `footprint` (the walls' outline -- narrower
 ## than `bounds`, which also covers roof eaves, porches, chimney stacks,
 ## battlements and facade towers), and Placement.world_rect rotates either
 ## rect correctly. VIL-002.
+## Recessed open-manor entrances are covered by castle_placement_test.gd and
+## the village's explicit courtyard approach checks.
 
 const SEEDS := 20
 const TOLERANCE := 0.2

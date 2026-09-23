@@ -404,6 +404,11 @@ static func _buildings(plan: VillagePlan, city_id: String) -> Array:
 		var door: Vector3 = b["door"]
 		out.append({
 			"building_id": "%s/b-%03d" % [city_id, i],
+			"request": req.to_dict(),
+			"transform": {"origin": [xf.origin.x, xf.origin.y, xf.origin.z],
+				"basis": [[xf.basis.x.x, xf.basis.x.y, xf.basis.x.z],
+					[xf.basis.y.x, xf.basis.y.y, xf.basis.y.z],
+					[xf.basis.z.x, xf.basis.z.y, xf.basis.z.z]]},
 			"kind": String(req.kind),
 			"trade": String(req.purpose) if req.purpose != &"" else null,
 			"style": String(req.style),

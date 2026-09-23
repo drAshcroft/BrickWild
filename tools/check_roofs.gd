@@ -6,12 +6,14 @@ const Probe = preload("res://tests/roof_probe.gd")
 const HouseRoofs = preload("res://tests/suites/house_roof_suite.gd")
 const ChurchRoofs = preload("res://tests/suites/church_roof_suite.gd")
 const OtherRoofs = preload("res://tests/suites/castle_temple_roof_suite.gd")
+const Regions = preload("res://tests/roof_region_fixtures.gd")
 const FAMILIES := ["house", "shop", "hotel", "church", "castle", "temple"]
 var rows: Array[Dictionary] = []
 var selected: Array[String] = []
 var seeds: Array[int] = [42, 4413]
 var output := "res://artifacts/roof_audit"
 var controls_only := false
+var regions_only := false
 
 func _init() -> void:
 	for arg in OS.get_cmdline_user_args():
@@ -28,6 +30,8 @@ func _init() -> void:
 			output = arg.trim_prefix("--out=")
 		elif arg == "--self-test":
 			controls_only = true
+		elif arg == "--regions-only":
+			regions_only = true
 		else:
 			_usage("Unknown argument: " + arg)
 			return
@@ -36,13 +40,15 @@ func _init() -> void:
 	call_deferred("_run")
 
 func _usage(message: String) -> void:
-	printerr(message + "\nUsage: --family=house|shop|hotel|church|castle|temple (repeatable) --seed=42 --out=res://artifacts/roof_audit --self-test")
+	printerr(message + "\nUsage: --family=house|shop|hotel|church|castle|temple (repeatable) --seed=42 --out=res://artifacts/roof_audit --self-test --regions-only")
 	quit(2)
 
 func _run() -> void:
 	_suite("controls", Probe.self_test(), "tests/roof_probe.gd", "synthetic valid and broken slabs/dormers")
 	if not controls_only:
 		for family in selected:
+			if regions_only:
+				break
 			print("Checking " + family + " roofs...")
 			match family:
 				"house":
@@ -65,6 +71,13 @@ func _run() -> void:
 					_fixture(family, style, seed)
 				# Yield between seeds so Godot flushes released mesh resources.
 				await process_frame
+		for fixture in Regions.build(selected):
+			print("  Region contract " + fixture["fixture"])
+			var region_row := Regions.evaluate(fixture)
+			rows.append(region_row)
+			for failure in region_row.failures:
+				print("    FAIL " + failure)
+			await process_frame
 	var failures := 0
 	var warnings := 0
 	var checked := 0
@@ -75,7 +88,7 @@ func _run() -> void:
 	var report := {"schema_version": 1, "generated_utc": Time.get_datetime_string_from_system(true),
 		"families": selected if not controls_only else [], "seeds": seeds,
 		"checked": checked, "failure_groups": failures, "warning_groups": warnings,
-		"rows": rows, "coverage_limits": _limits()}
+		"rows": rows, "coverage_limits": _limits(), "registry_coverage": _registry_coverage()}
 	if not _save(report):
 		quit(2)
 		return
@@ -216,11 +229,21 @@ func _hotel_attachments(row: Dictionary, plan: HousePlan, builder: MassBuilder) 
 func _limits() -> Array[String]:
 	return ["Finite deterministic samples, not exhaustive geometric proof or visual approval. Coverage alone cannot detect crossed slabs; the fixed envelope suites supplement it.",
 		"Generated cases use default dimensions and every registered style/form at selected seeds. Fixed regression matrices additionally vary roof size, pitch, rotation and attachments; --seed does not replace their fixed seeds.",
-		"Shops test the default business with every shell style. Hotel dormer attachment is tested; hotel cupola seams and a true mansard profile still need dedicated checks.",
-		"Courtyard/polygon probe support is available, but generated fixtures currently have rectangular plans. Arbitrary shaped houses and intentional roof openings need authored fixtures.",
-		"Castle yard/battlement coverage, church peripheral full-building roof joins, and ziggurat chamber coverage are not inferred from bounding boxes; those require explicit region contracts.",
+		"Shops test the default business with every shell style. Hotel dormer attachment and named cupola rim/bearing seams are tested; a true mansard profile is not implemented or certified.",
+		"Authored courts, 8/14-gon oculi, two ziggurat chamber/terrace sizes, all four castle tiers at two sizes, and hotel cupolas have explicit region contracts. Arbitrary shapes and all tier/shape combinations remain outside this finite matrix.",
+		"Castle yard/battlement sky and occupied ranges/keep plans are measured separately. Ziggurat chamber ceilings use stone surface0. Complete church peripheral full-building joins remain uncovered beyond existing fixed suites.",
 		"WorldFamilies currently has %d registered families. World roofs are not counted as passing when there are no implementations." % WorldFamilies.families().size(),
-		"Villages reuse building families; this run does not check placed village buildings, transformed seams, or tree/roof interference."]
+		"Village fixtures measure two native buildings after real lot placement and transformation when house and shop are selected. Other placed families, inter-building roof joins and tree/roof interference remain uncovered."]
+
+func _registry_coverage() -> Array[Dictionary]:
+	var registry: Array[Dictionary] = []
+	for family in WorldFamilies.families():
+		for kind in WorldFamilies.kinds_of(family):
+			registry.append({"family": "world", "style": String(family), "kind": String(kind),
+				"status": "uncovered", "reason": "No authored roof-region fixture for this registered world kind; not counted as passing."})
+	if registry.is_empty():
+		registry.append({"family": "world", "status": "uncovered", "reason": "Registry is empty; no implemented families to audit."})
+	return registry
 
 func _save(report: Dictionary) -> bool:
 	var path := ProjectSettings.globalize_path(output)
@@ -236,7 +259,7 @@ func _save(report: Dictionary) -> bool:
 	var lines: Array[String] = ["# Roof audit", "", "Generated UTC: " + report.generated_utc, "",
 		"%d checks; **%d failure groups**, %d warning groups. See the JSON companion for every failing sample." % [report.checked, report.failure_groups, report.warning_groups], "",
 		"| Family | Cases / suites | Checks | Failures | Warnings |", "|---|---:|---:|---:|---:|"]
-	for family in ["controls"] + selected:
+	for family in ["controls"] + selected + ["village"]:
 		var counts := [0, 0, 0, 0]
 		for row in rows:
 			if row.family == family:
@@ -259,6 +282,10 @@ func _save(report: Dictionary) -> bool:
 	lines.append_array(["## Coverage limits", ""])
 	for limit in report.coverage_limits:
 		lines.append("- " + limit)
+	lines.append_array(["", "## Registry entries without roof contracts", ""])
+	for entry in report.registry_coverage:
+		lines.append("- **%s** `%s/%s/%s`: %s" % [entry.status,
+			entry.family, entry.get("style", ""), entry.get("kind", ""), entry.reason])
 	var md := FileAccess.open(path + ".md", FileAccess.WRITE)
 	if md == null:
 		printerr("Cannot write " + path + ".md")

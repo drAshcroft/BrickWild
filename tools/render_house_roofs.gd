@@ -11,12 +11,27 @@ var _vp: SubViewport
 var _cam: Camera3D
 var _root3d: Node3D
 var _mesh_inst: MeshInstance3D
+var _evidence: Array[Dictionary] = []
+var _directory := OUT
 
 
 func _init() -> void:
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
+	if OS.get_cmdline_user_args().has("--matrix"):
+		_directory = "res://artifacts/p1p2_house/art_before" if OS.get_cmdline_user_args().has("--before-art") else "res://artifacts/p1p2_house/art_after"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_directory))
 	_stage()
 	await process_frame
+	if OS.get_cmdline_user_args().has("--matrix"):
+		for style in HouseSweep.styles():
+			for i in HouseSweep.SIZES.size():
+				for levels in [1, 2]:
+					var size: Dictionary = HouseSweep.SIZES[i]
+					await _roof_shots({"key": "%s_%d_%d" % [style, i, levels], "style": style,
+						"w": size["w"], "l": size["l"], "h": size["h"], "storeys": levels,
+						"seed": HouseSweep.seed_at(style, &"none", i), "matrix": true})
+		_write_evidence()
+		quit()
+		return
 
 	for row in [
 			{"key": "town", "style": &"townhouse", "w": 9.0, "l": 12.0, "h": 2.7,
@@ -29,9 +44,14 @@ func _init() -> void:
 				"storeys": 1, "seed": 4414},
 			{"key": "smith", "style": &"cottage", "trade": &"smith", "w": 9.0, "l": 11.0, "h": 2.7,
 				"storeys": 1, "seed": 4415},
+			{"key": "witch", "style": &"witch_hut", "trade": &"alchemist", "w": 6.0, "l": 8.0, "h": 2.6,
+				"storeys": 1, "seed": 4416},
+			{"key": "small", "style": &"cottage", "w": 4.0, "l": 5.0, "h": 2.5,
+				"storeys": 1, "seed": 4412},
 		]:
 		await _roof_shots(row)
 	print("done")
+	_write_evidence()
 	quit()
 
 
@@ -44,9 +64,11 @@ func _roof_shots(row: Dictionary) -> void:
 	spec.storeys = int(row["storeys"])
 	spec.trade = row.get("trade", &"none")
 	var plan: HousePlan = HouseGenerator.generate(spec, int(row["seed"]), OS.get_cmdline_user_args().has("--full"))
+	if OS.get_cmdline_user_args().has("--before-art"):
+		spec.roof_pitch /= HouseGeometry.art_pitch_scale(spec)
 	var mesh: ArrayMesh = HouseBuilder.new().build(plan)
-	_set_mesh(mesh, [spec.wall_color, spec.trim_color, spec.roof_color,
-		spec.floor_color])
+	_set_mesh(mesh, BuildingFamilyAdapter.colours(spec))
+	ShellAssembler.house_materials(_mesh_inst, spec)
 	var aabb: AABB = mesh.get_aabb()
 	HouseAssembler.dress_exterior(_root3d, plan)
 	for p in plan.exterior:
@@ -56,9 +78,20 @@ func _roof_shots(row: Dictionary) -> void:
 	var top: float = aabb.position.y + aabb.size.y
 	var reach: float = maxf(aabb.size.x, aabb.size.z)
 	var key: String = String(row["key"])
+	_evidence.append({"key": key, "style": String(spec.style), "seed": spec.seed,
+		"width": spec.width, "length": spec.length, "height": spec.height, "storeys": spec.storeys,
+		"roof": String(spec.roof_type), "material": String(spec.roof_material),
+		"rise": HouseGeometry.roof_rise(spec), "roof_to_wall": HouseGeometry.roof_rise(spec) / (spec.height * spec.storeys),
+		"props": plan.exterior.size(), "omissions": plan.exterior_omissions})
 	print("  %s  aabb %s  roof_type=%s bargeboards=%s truss=%s"
 		% [key, str(aabb), String(spec.roof_type), str(spec.bargeboards),
 			String(spec.gable_truss)])
+	if row.get("matrix", false):
+		await _look(Vector3(c.x - reach * 1.5, top * 1.45, aabb.position.z - reach * 1.5),
+			Vector3(c.x, top * 0.55, c.z), key + ".jpg")
+		_mesh_inst.mesh = null
+		_root3d.get_node("Exterior").free()
+		return
 
 	# square on the gable, from far enough that the whole end reads
 	await _look(Vector3(c.x, top * 0.72, aabb.position.z - reach * 2.1),
@@ -95,8 +128,20 @@ func _look(eye: Vector3, at: Vector3, file: String) -> void:
 	await process_frame
 	await RenderingServer.frame_post_draw
 	var img: Image = _vp.get_texture().get_image()
-	img.save_jpg(OUT + "/" + file, 0.92)
+	img.save_jpg(_directory + "/" + file, 0.92)
 	print("    ", file)
+
+
+func _write_evidence() -> void:
+	var f := FileAccess.open(_directory + "/evidence.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify(_evidence, "\t"))
+	if not OS.get_cmdline_user_args().has("--matrix"):
+		return
+	var html := "<!doctype html><meta charset='utf-8'><title>House art direction</title><style>body{background:#242723;color:#f2efdc;font:16px sans-serif}main{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}img{width:100%}figure{margin:0}figcaption{padding:8px}</style><h1>House silhouette matrix</h1><p>Fixed seeds, camera/light rig and canonical dimensions. Rise ratios are art-direction evidence, not structural limits.</p><main>"
+	for row in _evidence:
+		html += "<figure><img src='%s.jpg'><figcaption>%s | %.1f × %.1f m | %d floors<br>%s / %s | rise %.2f m | roof/wall %.2f</figcaption></figure>" % [row["key"], row["style"], row["width"], row["length"], row["storeys"], row["roof"], row["material"], row["rise"], row["roof_to_wall"]]
+	html += "</main>"
+	FileAccess.open(_directory + "/index.html", FileAccess.WRITE).store_string(html)
 
 
 func _stage() -> void:

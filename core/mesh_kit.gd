@@ -17,6 +17,7 @@ func _init(surface_count: int) -> void:
 	for i in range(surface_count):
 		var s := SurfaceTool.new()
 		s.begin(Mesh.PRIMITIVE_TRIANGLES)
+		s.set_color(Color.WHITE)
 		_sts.append(s)
 
 
@@ -287,12 +288,28 @@ func slab_poly(points: PackedVector3Array, thickness: float, surf: int,
 		lo.append(p - off)
 		hi.append(p + off)
 	var st: SurfaceTool = _sts[surf]
+	# Metre-sized face coordinates, shared by every coplanar clipped piece.
+	# Horizontal U follows the eave; V climbs the slope. Absolute projections
+	# keep courses continuous across triangles and around dormer roof cuts.
+	var uv_u := Vector3.UP.cross(nrm).normalized()
+	if uv_u.length_squared() < 0.001:
+		uv_u = Vector3.RIGHT
+	var uv_v := nrm.normalized().cross(uv_u).normalized()
 	for i2 in range(1, n - 1):
-		_tri(st, lo[0], lo[i2], lo[i2 + 1])
-		_tri(st, hi[0], hi[i2 + 1], hi[i2])
+		_tri_metric(st, lo[0], lo[i2], lo[i2 + 1], uv_u, uv_v)
+		_tri_metric(st, hi[0], hi[i2 + 1], hi[i2], uv_u, uv_v)
 	for i3 in range(n):
 		var j: int = (i3 + 1) % n
 		_quad(st, lo[i3], hi[i3], hi[j], lo[j])
+
+
+func _tri_metric(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3,
+		u: Vector3, v: Vector3) -> void:
+	var normal := _face_normal(a, b, c)
+	for p in [a, b, c]:
+		st.set_normal(normal)
+		st.set_uv(Vector2(p.dot(u), p.dot(v)))
+		st.add_vertex(p)
 
 
 ## Hipped roof: side slabs plus sloped ends, so all four sides fall away.
@@ -407,6 +424,11 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 					center + Vector3(0, profile[i].y, 0),
 				]
 				for tri in [[0, 1, 2], [0, 2, 3]]:
+					if _degenerate(q[tri[0]], q[tri[1]], q[tri[2]]):
+						continue
+					# End cap faces away from the swept arc, opposite the start.
+					if a == start + arc:
+						tri = [tri[0], tri[2], tri[1]]
 					var cn: Vector3 = _face_normal(q[tri[0]], q[tri[1]], q[tri[2]])
 					for vi in tri:
 						st.set_normal(cn)

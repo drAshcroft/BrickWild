@@ -104,11 +104,41 @@ static func build_grid(plan: VillagePlan) -> WalkGrid:
 	# and the lots, which is the ground a person crosses to reach a door
 	for lot in plan.lots:
 		grid.add_floor_poly(lot["poly"])
+	# Built working props may have an emitted dirt apron connecting them to
+	# a verge. Add that real floor before water and all solid obstructions.
+	for p in plan.props:
+		if p.has("approach"):
+			grid.add_floor_poly(p["approach"])
 	# obstruction: what is actually there
 	for b in plan.buildings:
 		grid.add_obstacle_poly(VillageMeasure.bounds_poly(b))
+	# Restore only explicit native arrival courts; the rest of each building's
+	# full measured envelope remains an obstruction. Later props and water can
+	# still block this route and are tested normally.
+	for b in plan.buildings:
+		if not b["placement"].has("approach"):
+			continue
+		var local: PackedVector2Array = Poly.from_rect(b["placement"]["approach"])
+		var world := PackedVector2Array()
+		var xf: Transform3D = b["transform"]
+		for point in local:
+			var p: Vector3 = xf * Vector3(point.x, 0.0, point.y)
+			world.append(Vector2(p.x, p.z))
+		grid.add_floor_poly(world)
 	for w in plan.water:
 		grid.add_obstacle_poly(w["poly"])
+	for crossing in plan.water_crossings:
+		grid.add_floor_poly(Poly.ribbon(crossing["points"],
+			(float(crossing["width"]) + VillageBuilder.BRIDGE_MARGIN) * 0.5),
+			0.275 if crossing["kind"] == &"bridge" else 0.14)
+	# The boundary is a real obstruction. Only its authored gateways and
+	# natural shore gaps are open; a plan must not walk through masonry.
+	if plan.spec.enclosure != &"none":
+		for e in plan.enclosure.size():
+			for run in VillageBuilder._minus_gates(plan.enclosure[e], plan.enclosure[(e + 1) % plan.enclosure.size()], plan.gate_crossings):
+				for part in VillageBuilder._water_edge_runs(plan, run[0], run[1]):
+					if not part["wet"]:
+						grid.add_obstacle_poly(Poly.ribbon(PackedVector2Array([part["a"], part["b"]]), VillageBuilder.WALL_THICK * 0.5))
 	# Props and plants that take FLOOR, and only those. §9.5 says buildings,
 	# water, walls, fences, props with footprints and tree TRUNKS -- a wall
 	# lamp hangs above head height and grass is walked over, and the
@@ -117,8 +147,15 @@ static func build_grid(plan: VillagePlan) -> WalkGrid:
 	# through road to nothing.
 	for p in plan.props:
 		var rect: Rect2 = p.get("rect", Rect2())
-		if rect.size.x > 0.0 and PropCatalog.blocks_floor(String(p["key"])):
-			grid.add_obstacle(rect)
+		if rect.size.x > 0.0 and (bool(p.get("built", false)) or PropCatalog.blocks_floor(String(p["key"]))):
+			if p["key"] == "adit" and bool(p.get("built", false)):
+				# A native mine mouth has a real clear gap between its heaps
+				# and timber cheeks. Subtract only that measured local passage
+				# from this prop, preserving all prior water/wall obstacles.
+				for solid in Geometry2D.clip_polygons(Poly.from_rect(rect), PropKit.adit_passage(p["pos"], p["yaw"])):
+					grid.add_obstacle_poly(solid)
+			else:
+				grid.add_obstacle(rect)
 	for t in plan.plants:
 		var key: String = String(t["key"])
 		var trunk: float = float(t.get("trunk", 0.0))
@@ -206,7 +243,7 @@ func _check_use(plan: VillagePlan) -> void:
 		# asks whether a person can stand inside the well.
 		if not _grid.reached(p.get("rect", Rect2(p["pos"], Vector2.ZERO)),
 				PERSON_RADIUS + 0.4):
-			stranded.append(String(p["key"]))
+			stranded.append("%s at %v (host %d)" % [String(p["key"]), p["pos"], int(p.get("host", -1))])
 	stats["usable_props"] = asked
 	if not stranded.is_empty():
 		failures.append("use: %d props cannot be got at: %s"
@@ -261,6 +298,14 @@ func _check_paths(plan: VillagePlan) -> void:
 		if _threshold(plan, i) == Vector2.INF:
 			pinched.append("%d (%s: no standing ground at its door)"
 				% [i, String(plan.buildings[i]["kind"])])
+		var b: Dictionary = plan.buildings[i]
+		if b["placement"].has("approach"):
+			var approach: Rect2 = b["placement"]["approach"]
+			var xf: Transform3D = b["transform"]
+			var a: Vector3 = xf * Vector3(approach.get_center().x, 0.0, approach.position.y + 0.5)
+			var z: Vector3 = xf * Vector3(approach.get_center().x, 0.0, approach.end.y - 1.0)
+			if _grid.clearance_along(Vector2(a.x, a.z), Vector2(z.x, z.z), 3.0) < PATH_WIDTH:
+				pinched.append("%d (courtyard approach)" % i)
 	var paths: Array[int] = plan.roads_of_class(&"path")
 	stats["paths"] = paths.size()
 	for r in paths:

@@ -63,10 +63,22 @@ static func inspect(mesh: ArrayMesh, bottom: float, surface := 2) -> Dictionary:
 		if seen.has(signature):
 			duplicates += 1
 			var finding := _finding("roof_duplicate", i / 3, a, b, c)
-			finding.first_triangle = seen[signature]
+			finding.first_triangle = seen[signature].triangle
+			var agreement: float = cross.normalized().dot(seen[signature].normal)
+			finding.normal_dot = agreement
+			var max_delta := 0.0
+			for point in [a, b, c]:
+				var nearest := INF
+				for original in seen[signature].points:
+					nearest = minf(nearest, point.distance_to(original))
+				max_delta = maxf(max_delta, nearest)
+			finding.vertex_delta = max_delta
+			finding.classification = "quantized_near" if max_delta > 0.000001 \
+				else "opposed_shared_cap" if agreement < -0.99 \
+				else "same_facing" if agreement > 0.99 else "crossed_normals"
 			out.mesh_findings.append(finding)
 		else:
-			seen[signature] = i / 3
+			seen[signature] = {"triangle": i / 3, "normal": cross.normalized(), "points": [a, b, c]}
 	if out.triangles == 0:
 		out.failures.append("roof_surface: no roof triangles above %.3fm" % bottom)
 	if bad > 0:
@@ -89,10 +101,11 @@ static func _point_key(p: Vector3) -> String:
 ## are explicit sky polygons, not guessed from absent geometry. Every miss
 ## is retained numerically; the console can present only the first few.
 static func coverage(mesh: ArrayMesh, polygon: PackedVector2Array, bottom: float,
-		openings: Array[PackedVector2Array] = [], expect_sky := false, steps := 13) -> Dictionary:
+		openings: Array[PackedVector2Array] = [], expect_sky := false, steps := 13,
+		surface := 2) -> Dictionary:
 	var out := {"checked": 0, "misses": [], "covered": 0}
 	var rect := Poly.bounding_rect(polygon)
-	var tris := Rays._triangles(mesh, 2)
+	var tris := Rays._triangles(mesh, surface)
 	var top := mesh.get_aabb().end.y + 1.0
 	for ix in steps:
 		for iz in steps:
@@ -133,6 +146,14 @@ static func self_test() -> SuiteResult:
 	var footprint := Poly.from_rect(Rect2(-1.9, -1.9, 3.8, 3.8))
 	_expect(res, inspect(good, 1.0).failures.is_empty(), "valid slab rejected")
 	_expect(res, coverage(good, footprint, 1.0).misses.is_empty(), "covered floor rejected")
+	_expect(res, not coverage(good, footprint, 1.0, [], false, 13, 0).misses.is_empty(),
+		"coverage ignored the requested material surface")
+	var stone := MeshKit.new(3)
+	stone.box(Vector3(4, 0.24, 4), Vector3(0, 2, 0), 0)
+	for surface in [1, 2]:
+		stone.box(Vector3.ONE, Vector3(-20, -20, -20), surface)
+	_expect(res, coverage(stone.commit(), footprint, 1.0, [], false, 13, 0).misses.is_empty(),
+		"stone ceiling failed its explicit surface0 contract")
 	_expect(res, not coverage(good, Poly.from_rect(Rect2(-3,-3,6,6)), 1.0).misses.is_empty(), "missing roof region accepted")
 	_expect(res, not coverage(good, footprint, 1.0, [], true).misses.is_empty(), "roof over courtyard accepted")
 	_expect(res, coverage(good, footprint, 1.0, [footprint]).checked == 0, "explicit opening ignored")

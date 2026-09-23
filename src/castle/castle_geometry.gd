@@ -713,6 +713,7 @@ static func enceinte_rect(spec: CastleSpec, r: int) -> Rect2:
 const MOTTE_BERM := 1.5              # flat top left round the keep
 const MOTTE_TOE := 0.2               # of the base radius, inside the bailey
 const MOTTE_MIN_BAILEY := 12.0       # the bailey keeps at least this depth
+const MOTTE_CLEAR_SIDE := 6.4       # occupied floor fits wall stairs and a real doorway
 const KEEP_DOMINANCE := 1.2          # keep top, x bailey curtain height
 
 static func motte_top_radius(spec: CastleSpec) -> float:
@@ -1234,7 +1235,31 @@ static func bailey_obstacles(spec: CastleSpec) -> Array[Rect2]:
 			apse_aabb(spec)]:
 		if box.size.x > 0.01 and box.size.z > 0.01:
 			out.append(Rect2(box.position.x, box.position.z, box.size.x, box.size.z))
+	for stair in wall_stairs(spec):
+		out.append(stair.footprint)
+	var fore := forebuilding(spec)
+	if not fore.is_empty():
+		out.append(fore.footprint)
 	return out
+
+
+static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
+	return preload("castle_access_geometry.gd").wall_stairs(spec)
+
+
+static func forebuilding(spec: CastleSpec) -> Dictionary:
+	return preload("castle_access_geometry.gd").forebuilding(spec)
+
+
+static func drawbridge_aabb(spec: CastleSpec) -> AABB:
+	if not is_enclosed(spec) or (spec.ditch_width <= 0.0 and spec.plan_kind != &"water"):
+		return AABB()
+	var gate := gatehouse_aabb(spec, 0)
+	var bar := barbican_aabb(spec)
+	var front := bar.position.z if bar.size.x > 0.0 else gate.position.z
+	var width := minf(bar.size.x * 0.45, 2.4) if bar.size.x > 0.0 else minf(gate.size.x * 0.4, 4.0)
+	var length := maxf(spec.ditch_width, 4.0)
+	return AABB(Vector3(-width * 0.5, 0, front - length), Vector3(width, 0.22, length))
 
 
 # -------------------------------------------------------------------- keep

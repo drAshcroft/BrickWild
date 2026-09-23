@@ -172,6 +172,10 @@ func generate(p_seed: int) -> void:
 	households = _derive_households(population, seed)
 	form = _derive_form(population, purpose, culture)
 	programme = _derive_programme(population, purpose, water)
+	if culture == &"blighted":
+		programme = programme.filter(func(row): return row["kind"] not in [&"shrine", &"church", &"temple"])
+		programme.append({"kind": &"temple", "min_pop": 0,
+			"request": "ziggurat of the void", "where": "landmark beside the common"})
 	site = _derive_site(programme, enclosure)
 	variant_name = _derive_variant_name(seed)
 

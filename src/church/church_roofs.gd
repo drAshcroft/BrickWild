@@ -67,7 +67,35 @@ static func emit(spec: ChurchSpec, kit: MeshKit, masses: Array[Dictionary],
 				remaining.append_array(RoofShape.subtract(piece, hole))
 			pieces = remaining
 		for piece in pieces:
+			piece = _clean_precision_edges(piece)
+			# Sequential tetrahedron cuts can leave micrometre-wide strips
+			# between the same float32 edge. Extruding them makes a full-depth
+			# duplicate side wall despite their effectively zero roof area.
+			if _precision_sliver(piece):
+				continue
 			kit.slab_poly(RoofShape.lift(piece, face), RoofShape.DEPTH, ChurchBuilder.SURF_ROOF, true)
+
+
+static func _clean_precision_edges(piece: PackedVector2Array) -> PackedVector2Array:
+	var clean := piece.duplicate()
+	var changed := true
+	while changed and clean.size() >= 3:
+		changed = false
+		for i in range(clean.size()):
+			if clean[i].distance_squared_to(clean[(i + 1) % clean.size()]) < 0.00000001:
+				clean.remove_at(i)
+				changed = true
+				break
+	return clean
+
+
+static func _precision_sliver(piece: PackedVector2Array) -> bool:
+	var longest := 0.0
+	for i in range(piece.size()):
+		longest = maxf(longest, piece[i].distance_to(piece[(i + 1) % piece.size()]))
+	# Twice the area divided by the longest edge is a triangle's altitude.
+	# The 0.1mm bound is below architectural detail and matches audit precision.
+	return longest <= 0.0001 or 2.0 * Poly.area(piece) / longest <= 0.0001
 
 
 ## A dome is star-shaped about the centre of its base. Its rendered triangles
@@ -151,12 +179,7 @@ static func _aisle(spec: ChurchSpec, kit: MeshKit, faces: Array[PackedVector3Arr
 	var wall := ChurchGeometry.aisle_aabb(spec, side, ring)
 	var inner := absf(wall.get_center().x) - wall.size.x / 2.0
 	var outer := inner + wall.size.x + 0.3
-	var high := wall.end.y + spec.aisle_width * 0.8
-	if ring > 0:
-		# The next roof meets the inner aisle WALL below its eave.
-		high = minf(high, ChurchGeometry.aisle_height(spec, ring - 1) - RoofShape.DEPTH)
-	else:
-		high = minf(high, spec.height - RoofShape.DEPTH)
+	var high := ChurchGeometry.aisle_roof_high(spec, ring)
 	var z0 := wall.position.z - 0.2
 	var z1 := wall.end.z + 0.2
 	var face := PackedVector3Array([Vector3(side * inner, high, z0),

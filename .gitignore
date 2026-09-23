@@ -25,3 +25,4 @@ assets/props/wild/*
 # Suite logs and one-off exports from a working session
 scratch/logs/
 scratch/*.json
+/docs/screenshots

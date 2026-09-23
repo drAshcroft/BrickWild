@@ -47,6 +47,8 @@ func check(plan: HousePlan, builder: HouseBuilder, overrides: Dictionary = {}) -
 			replaced[r] = part["replaced"][r]
 
 	if builder != null:
+		failures.append_array(check_interior_details(plan, builder))
+		failures.append_array(check_exterior_geometry(plan, builder))
 		for f2 in _check_shell(plan, builder):
 			failures.append(f2)
 		for f3 in _check_vertical_shell(plan, builder):
@@ -56,6 +58,243 @@ func check(plan: HousePlan, builder: HouseBuilder, overrides: Dictionary = {}) -
 		stats["masses"] = builder.mass_log.size()
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
 		"stats": stats, "groups": groups, "replaced": replaced}
+
+
+## Structural interior additions are real occupied space. Legacy hand-authored
+## plans may omit their records; once authored, their mesh and contacts must agree.
+static func check_interior_details(plan: HousePlan, builder: HouseBuilder) -> Array[String]:
+	var errors: Array[String] = []
+	var breast := HouseGeometry.hearth_breast(plan)
+	if builder.emitted_mesh == null:
+		if not breast.is_empty() or not plan.rugs.is_empty():
+			errors.append("interior_details: authored additions have no emitted mesh")
+		return errors
+	if not breast.is_empty():
+		var room := int(breast["room"])
+		var normal: Vector2 = breast["normal"]
+		var centre: Vector2 = breast["centre"]
+		var depth := float(breast["depth"])
+		var y0 := int(breast["storey"]) * plan.spec.height
+		var wall: Dictionary = HouseGeometry.room_walls(plan, room)[int(breast["wall"])]
+		if depth < 0.4 or depth > 0.6 or absf((centre - Vector2(wall["from"])).dot(normal) - depth * 0.5) > 0.02:
+			errors.append("hearth_breast: invalid depth or wall contact")
+		var found := false
+		for mass in builder.mass_log:
+			if String(mass["name"]) == "chimney_breast":
+				found = absf(AABB(mass["aabb"]).size.y - plan.spec.height) < 0.001
+		if not found:
+			errors.append("hearth_breast: missing full-storey structural mass")
+		var triangles := _mesh_triangles(builder.emitted_mesh, HouseBuilder.SURF_WALL)
+		for rise in [0.3, plan.spec.height * 0.5, plan.spec.height - 0.05]:
+			var face := Vector3(centre.x + normal.x * depth * 0.5, y0 + rise, centre.y + normal.y * depth * 0.5)
+			var delta := Vector3(normal.x, 0, normal.y) * 0.02
+			var hit := false
+			for triangle in triangles:
+				if Geometry3D.segment_intersects_triangle(face - delta, face + delta, triangle[0], triangle[1], triangle[2]) != null:
+					hit = true
+					break
+			if not hit:
+				errors.append("hearth_breast: actual masonry missing at " + str(face))
+		for item in plan.furniture:
+			if int(item["room"]) != room:
+				continue
+			if Poly.intersection_area(Poly.from_rect(item["rect"]), breast["outline"]) > 0.002:
+				errors.append("hearth_breast: furniture intersects masonry: " + String(item["key"]))
+			if PropCatalog.category(item["key"]) == "hearth":
+				var width := PropCatalog.footprint(item["key"]).x * float(item.get("scale", 1.0))
+				if float(breast["width"]) < width + 0.399 or HouseFurnishCheck._back_gap(plan, item) > 0.02:
+					errors.append("hearth_breast: measured hearth does not fit or touch its surround")
+	if not plan.rugs.is_empty():
+		if builder.emitted_mesh.get_surface_count() <= HouseBuilder.SURF_FLOOR:
+			errors.append("rug: floor material surface missing")
+			return errors
+		var arrays := builder.emitted_mesh.surface_get_arrays(HouseBuilder.SURF_FLOOR)
+		if arrays[Mesh.ARRAY_COLOR] == null:
+			errors.append("rug: textile material region attributes missing")
+			return errors
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+		var total := 0
+		for i in vertices.size():
+			if colours[i].r < 0.5:
+				total += 1
+		if total != plan.rugs.size() * 6:
+			errors.append("rug: actual textile region does not match planned quad count")
+		for rug in plan.rugs:
+			var rect: Rect2 = rug["rect"]
+			var y := int(rug["storey"]) * plan.spec.height + HouseGeometry.FLOOR_T + 0.002
+			if plan.on_dais(int(rug["room"]), rect.get_center()):
+				y += plan.dais_rise()
+			var count := 0
+			for i in vertices.size():
+				if colours[i].r < 0.5 and absf(vertices[i].y - y) < 0.0001 and rect.grow(0.001).has_point(Vector2(vertices[i].x, vertices[i].z)):
+					count += 1
+			if count < 6:
+				errors.append("rug: no actual quad 2 mm above floor for " + String(rug["id"]))
+	return errors
+
+
+## Geometry-backed exterior rules, also callable by the fast mesh-only lane.
+## Component evidence ties the measured polygons to actual mesh triangles;
+## the envelope rule then compares those polygons with the requested hosts.
+static func check_exterior_geometry(plan: HousePlan, builder: HouseBuilder) -> Array[String]:
+	var failures: Array[String] = []
+	var mesh := builder.emitted_mesh
+	if mesh == null:
+		return failures
+	var who := "exterior seed=%d style=%s " % [plan.spec.seed, plan.spec.style]
+	for f in ComponentCheck.check(builder, mesh)["failures"]:
+		failures.append(who + "components: " + str(f))
+	# Shaped and courtyard hosts have their own outline/sky/support rules;
+	# the rectangular envelope below must never cover their intentional holes.
+	if plan.has_court() or HouseGeometry.is_shaped(plan) or plan.spec.has_method("room_program"):
+		return failures
+	if builder.roof_enabled:
+		for f in RoofOpeningCheck.check(plan, builder, mesh)["failures"]:
+			failures.append(who + "roof_opening: " + str(f))
+		for f in _roof_envelope(plan, builder):
+			failures.append(who + f)
+	var bounds := HouseGeometry.exterior_bounds(plan)
+	if plan.spec.cellars > 0:
+		bounds.position.y -= plan.spec.cellars * plan.spec.height
+		bounds.size.y += plan.spec.cellars * plan.spec.height
+	if not bounds.grow(0.025).encloses(mesh.get_aabb()):
+		failures.append(who + "bounds: actual shell leaves planned exterior (tolerance=0.025m)")
+	if plan.spec.jetty:
+		for f in check_jetty_geometry(plan, mesh):
+			failures.append(who + f)
+	var trim := _mesh_triangles(mesh, HouseBuilder.SURF_TRIM)
+	for di in plan.doors.size():
+		var door: Dictionary = plan.doors[di]
+		if not door["exterior"] or HousePlan.record_storey(door) != 0:
+			continue
+		var pos: Vector2 = door["pos"]
+		var n: Vector2 = door["normal"]
+		var blocked := false
+		for h in [0.35, 0.62, 1.35]:
+			var start := Vector3(pos.x + n.x * 0.8, h, pos.y + n.y * 0.8)
+			var end := Vector3(pos.x - n.x * 0.05, h, pos.y - n.y * 0.05)
+			for tri in trim:
+				if Geometry3D.segment_intersects_triangle(start, end, tri[0], tri[1], tri[2]) != null:
+					blocked = true
+		if blocked:
+			failures.append(who + "door_trim: door=%d storey=0 trim blocks the approach" % di)
+	return failures
+
+
+static func check_jetty_geometry(plan: HousePlan, mesh: ArrayMesh) -> Array[String]:
+	var errors: Array[String] = []
+	var s := plan.spec
+	var vertices: PackedVector3Array = mesh.surface_get_arrays(HouseBuilder.SURF_FLOOR)[Mesh.ARRAY_VERTEX]
+	var walls := _mesh_triangles(mesh, HouseBuilder.SURF_WALL)
+	for level in range(1, s.storeys):
+		var found := INF
+		for v in vertices:
+			if absf(v.y - (float(level) * s.height + HouseGeometry.FLOOR_T)) < 0.001:
+				found = minf(found, v.z)
+		var expected := HouseGeometry.storey_rect(plan, level).position.y
+		if absf(found - expected) > 0.01:
+			errors.append("jetty_floor: storey=%d front=%.3f expected=%.3f tolerance=0.010m" % [level, found, expected])
+		for x in [-s.width * 0.3, 0.0, s.width * 0.3]:
+			var at := Vector3(x, float(level) * s.height + 0.45, expected)
+			var touched := false
+			for tri in walls:
+				if Geometry3D.segment_intersects_triangle(at - Vector3(0, 0, 0.06),
+						at + Vector3(0, 0, 0.06), tri[0], tri[1], tri[2]) != null:
+					touched = true
+					break
+			if not touched:
+				errors.append("jetty_wall: storey=%d x=%.2f expected_z=%.3f tolerance=0.060m" % [level, x, expected])
+	return errors
+
+
+static func _roof_envelope(plan: HousePlan, builder: HouseBuilder) -> Array[String]:
+	var failures: Array[String] = []
+	var layout := HouseGeometry.roof_layout(plan)
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	var inverse: Transform3D = Transform3D(layout["transform"]).affine_inverse()
+	var observed: Dictionary = {}
+	var pieces: Array[PackedVector2Array] = []
+	for row in builder.components("roof_face_"):
+		var face_id := int(String(row["role"]).trim_prefix("roof_face_"))
+		if face_id < 0 or face_id >= faces.size():
+			failures.append("roof_host: component=%s has invalid face=%d" % [row["id"], face_id])
+			continue
+		var poly := PackedVector2Array()
+		var host := RoofShape.footprint(faces[face_id])
+		for world in row["points"]:
+			var p: Vector3 = inverse * world
+			var at := Vector2(p.x, p.z)
+			poly.append(at)
+			var error := absf(p.y - RoofShape.plane_height(faces[face_id], at))
+			if not Poly.contains_point(host, at, 0.015) or error > 0.015:
+				failures.append("roof_host: component=%s host=%d plane_error=%.3f tolerance=0.015m" % [row["id"], face_id, error])
+				break
+		if not observed.has(face_id):
+			observed[face_id] = []
+		observed[face_id].append(poly)
+		for prior in pieces:
+			if Poly.intersection_area(prior, poly) > 0.002:
+				failures.append("roof_overlap: component=%s overlaps another main face (tolerance=0.002m2)" % row["id"])
+		pieces.append(poly)
+	var openings := HouseGeometry.roof_openings(plan)
+	for fi in faces.size():
+		var host := RoofShape.footprint(faces[fi])
+		var box := Poly.bounding_rect(host)
+		for ix in range(1, 6):
+			for iz in range(1, 6):
+				var at := box.position + box.size * Vector2(float(ix) / 6.0, float(iz) / 6.0)
+				if not Poly.contains_point(host, at):
+					continue
+				var intentional := false
+				for opening in openings:
+					if Poly.contains_point(opening["polygon"], at, 0.02):
+						intentional = true
+				if intentional:
+					continue
+				var covered := false
+				for poly in observed.get(fi, []):
+					if Poly.contains_point(poly, at, 0.015):
+						covered = true
+				if not covered:
+					failures.append("roof_envelope: host=%d storey=%d missing sample=%s" % [fi, plan.spec.storeys - 1, at])
+	# Top profile follows the underside at the OUTER wall, while its slab's
+	# centre is shifted half a wall inward. Undo that inset for the query.
+	for row in builder.components("roof_wall"):
+		var local := PackedVector3Array()
+		for world in row["points"]:
+			local.append(inverse * world)
+		var flat_x := true
+		for p in local:
+			flat_x = flat_x and absf(p.x - local[0].x) < 0.005
+		for p in local:
+			if p.y <= 0.001:
+				continue
+			var at := Vector2(p.x, p.z)
+			if flat_x:
+				at.x = signf(p.x) * float(layout["span"]) * 0.5
+			else:
+				at.y = signf(p.z) * float(layout["along"]) * 0.5
+			var expected := RoofShape.height_at(faces, at) - RoofShape.DEPTH * 0.5
+			if absf(p.y - expected) > 0.02:
+				failures.append("roof_wall: component=%s join_error=%.3f tolerance=0.020m" % [row["id"], absf(p.y - expected)])
+	return failures
+
+
+static func _mesh_triangles(mesh: ArrayMesh, surface: int) -> Array:
+	var out: Array = []
+	if surface >= mesh.get_surface_count():
+		return out
+	var arrays := mesh.surface_get_arrays(surface)
+	var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+	if indices.is_empty():
+		for i in range(0, points.size() - 2, 3):
+			out.append([points[i], points[i + 1], points[i + 2]])
+	else:
+		for i in range(0, indices.size() - 2, 3):
+			out.append([points[indices[i]], points[indices[i + 1]], points[indices[i + 2]]])
+	return out
 
 
 ## The shell: every mass stands on the ground and touches the rest of the
@@ -113,7 +352,7 @@ static func _check_shell(plan: HousePlan, builder: HouseBuilder) -> Array[String
 ## band, which catches a roof accidentally left at the first storey.
 static func _check_vertical_shell(plan: HousePlan, builder: HouseBuilder) -> Array[String]:
 	var out: Array[String] = []
-	var wanted: int = clampi(int(plan.spec.storeys), 1, HouseGeometry.MAX_STOREYS)
+	var wanted: int = clampi(int(plan.spec.storeys), 1, plan.spec.max_storeys())
 	var lowest := 0
 	if plan.spec.has_method("lowest_storey"):
 		lowest = int(plan.spec.lowest_storey())

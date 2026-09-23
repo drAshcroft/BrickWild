@@ -49,6 +49,9 @@ var windows: Array[Dictionary] = []
 ## {"key": String, "room": int, "pos": Vector3, "yaw": float, "rect": Rect2,
 ##  "zone": Rect2, "host": int, "cat": String, "storey": int}
 var furniture: Array[Dictionary] = []
+## Walkable textile overlays: {id, table, room, storey, rect}. They never
+## enter furniture obstruction lists; the builder lifts them 2 mm above floor.
+var rugs: Array[Dictionary] = []
 ## Outdoor props with facade host, measured bounds and independent identity.
 ## These never participate in room furnishing or room compromise removal.
 var exterior: Array[Dictionary] = []
@@ -105,7 +108,7 @@ var compromises: Dictionary = {}
 ## INT-018 owns the compluvium/oculus/court-sky kinds and fills this list.
 ## HOUSE-EXT-007 owns only the dormer/sloped-polygon subset and the schema.
 var roof_openings: Array[Dictionary] = []
-## Where the fire is: {"room": int, "wall": int}, or empty when the house has
+## Where the fire is: {"room": int, "wall": int, "breast": Dictionary}, or empty when the house has
 ## no hearth room at all. The wall index is into HouseGeometry.room_walls().
 ##
 ## One owner for the position, the way ChurchGeometry owns the massing:

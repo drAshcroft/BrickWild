@@ -285,6 +285,8 @@ func _build_cells() -> void:
 		return
 	tag("cell")
 	var h: float = minf(spec.height * 0.55, 3.2)
+	if spec.form == &"ziggurat":
+		h = minf(h, TempleGeometry.terrace_height(spec) - 0.35)
 	var i := 0
 	for c in cells:
 		# the alcove reads as a recess: a dark back wall and a lintel over it
@@ -434,22 +436,34 @@ func _build_terraces() -> void:
 	var flights: Array[Rect2] = TempleGeometry.stair_rects(spec)
 	var names := ["stair_left", "stair_right"]
 	for f in range(flights.size()):
-		var s: Rect2 = flights[f]
-		var steps: int = maxi(int(top / 0.35), 4)
-		for i in range(steps):
-			# each step is a block as tall as the height it reaches, so the
-			# flight is solid underneath rather than a floating staircase
-			# the flight rises TOWARD the mountain: the tall end is the one
-			# against it. Inverted, it climbs away into the open air and reads
-			# as a ramp parked beside the building
-			var t: float = float(i) / float(steps)
-			var y: float = top * float(i + 1) / float(steps)
-			var z: float = lerpf(s.position.y, s.end.y, t)
-			box(Vector3(s.size.x, y, s.size.y / float(steps) + 0.05),
-				Vector3(s.get_center().x, y / 2.0, z), SURF_STONE)
-		_log_mass(names[f], AABB(Vector3(s.position.x, 0.0, s.position.y),
-			Vector3(s.size.x, top, s.size.y)))
+		_stair_flight(flights[f], top, names[f])
 	total_height = maxf(total_height, top)
+
+
+func _stair_flight(s: Rect2, top: float, name: String) -> void:
+	var steps := maxi(ceili(top / 0.35), 4)
+	var chamber_front := TempleGeometry.hall_rect(spec).position.y
+	var ceiling := TempleGeometry.terrace_height(spec)
+	var masses := {}
+	for i in range(steps):
+		# Solid blocks rise toward the summit; centres sit halfway along
+		# their treads and no riser exceeds 350 mm, including the landing.
+		var y := top * float(i + 1) / steps
+		var z := lerpf(s.position.y, s.end.y, (float(i) + 0.5) / steps)
+		var half := (s.size.y / steps + 0.05) * 0.5
+		# Outdoor flights are solid to ground. Within the chamber footprint
+		# their masonry starts at the stone ceiling, preserving the room below.
+		for upper in [false, true]:
+			var front := maxf(z - half, chamber_front) if upper else z - half
+			var back := z + half if upper else minf(z + half, chamber_front)
+			var bottom := ceiling if upper else 0.0
+			if back <= front or y <= bottom:
+				continue
+			var bounds := AABB(Vector3(s.position.x, bottom, front), Vector3(s.size.x, y - bottom, back - front))
+			box(bounds.size, bounds.get_center(), SURF_STONE)
+			masses[upper] = AABB(masses[upper]).merge(bounds) if masses.has(upper) else bounds
+	for upper in masses:
+		_log_mass(name + ("_upper" if upper else ""), masses[upper], ceiling if upper else 0.0)
 
 
 # ---------------------------------------------------------------- outworks

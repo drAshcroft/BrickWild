@@ -223,6 +223,14 @@ a keep would fly four storeys above the only floor there is.
 
 ## What the suites check
 
+The chapel is a one-room `HousePlan` with an altar on a raised sanctuary,
+two pew rows and a reserved 1.2 m centre aisle. `TempleRiteCheck` shares its
+axis and sightline primitives with the chapel: the placed altar must remain
+visible from the entrance, including past freestanding candle stands. The
+castle suite runs full `HouseQA` on its emitted shell. The focused
+`tests/chapel_test.gd` also moves the focus off-axis and inserts a tall
+obstruction to prove both checks reject broken arrangements.
+
 `castle`, `castle normals`, `castle massing`, `castle landmark`,
 `castle interiors` and `castle voxel QA` -- run with
 `godot --headless --path . --script res://tests/run_all.gd -- castle cnormals cmassing clandmark interior cvoxelqa`.

@@ -48,6 +48,7 @@ static func run() -> SuiteResult:
 			var before_fail: int = res.failures.size()
 
 			_check_required_masses(key, builder, who, res)
+			_check_clerestory(spec, builder, who, res)
 			var rep: Dictionary = MassingCheck.new().check(spec, builder)
 			for f in rep["failures"]:
 				res.fail("%s: %s" % [who, str(f)])
@@ -58,6 +59,31 @@ static func run() -> SuiteResult:
 				defects += 1
 		res.note("  %-14s %d scales, %d defects" % [key, SCALES.size(), defects])
 	return res
+
+
+## Measured emitted openings must occupy the upper wall on both sides. This
+## catches a missing course even when the nave mass and roof still pass QA.
+static func _check_clerestory(spec: ChurchSpec, builder: ChurchBuilder,
+		who: String, res: SuiteResult) -> void:
+	if not ChurchGeometry.has_clerestory(spec):
+		return
+	var windows: Array = builder.part_log.filter(func(p):
+		return p.kind == "window" and p.tag == "clerestory")
+	var expected: int = ChurchGeometry.clerestory_windows(spec).size()
+	if windows.size() != expected or expected == 0:
+		res.fail("%s: clerestory has %d openings, expected %d" % [who, windows.size(), expected])
+	for opening in windows:
+		var pos: Vector3 = opening.pos
+		var size: Vector3 = opening.size
+		if pos.y - size.y / 2.0 <= ChurchGeometry.aisle_roof_high(spec) + RoofShape.DEPTH:
+			res.fail("%s: clerestory sill is buried in the aisle roof" % who)
+		var crown: float = size.x * (0.35 if spec.window_style == &"pointed" else 0.25)
+		if pos.y + size.y / 2.0 + crown >= spec.height:
+			res.fail("%s: clerestory head reaches the nave eave" % who)
+		if spec.flying_buttresses:
+			for i in range(ChurchGeometry.flyer_count(spec)):
+				if absf(pos.z - ChurchGeometry.flyer_z(spec, i)) < size.x / 2.0 + 0.1:
+					res.fail("%s: clerestory overlaps a flyer landing" % who)
 
 
 ## Deterministic per-(landmark, scale) seed, distinct across the whole table.

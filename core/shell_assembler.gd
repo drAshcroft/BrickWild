@@ -34,15 +34,90 @@ static func surface_materials(node: MeshInstance3D, colors: Array,
 	if node.mesh == null:
 		return
 	for i in range(node.mesh.get_surface_count()):
-		if i == hide:
+		var slot := i
+		if node.mesh is ArrayMesh:
+			var surface_name := (node.mesh as ArrayMesh).surface_get_name(i)
+			if surface_name.begins_with("material_slot:"):
+				slot = int(surface_name.trim_prefix("material_slot:"))
+		if slot == hide:
 			node.set_surface_override_material(i, invisible())
 			continue
 		var m := StandardMaterial3D.new()
-		var c = colors[i] if i < colors.size() else NO_COLOUR
+		var c = colors[slot] if slot >= 0 and slot < colors.size() else NO_COLOUR
 		m.albedo_color = c if c is Color else NO_COLOUR
 		m.roughness = roughness
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
 		node.set_surface_override_material(i, m)
+
+
+## Restrained, metre-scale roof courses. Kept opt-in to ordinary houses;
+## four-surface castle/church/hotel shells retain their material contract.
+static func house_materials(node: MeshInstance3D, spec: HouseSpec) -> void:
+	if DisplayServer.get_name() == "headless":
+		return # Dummy renderer has no shader instances; retain base material.
+	var shader := Shader.new()
+	shader.code = """shader_type spatial;
+render_mode cull_disabled;
+uniform vec4 roof_colour : source_color;
+uniform float course = 0.28;
+uniform float tile_width = 0.36;
+uniform bool thatch = false;
+void fragment() {
+	vec2 p = UV / vec2(tile_width, course);
+	float row = floor(p.y);
+	p.x += mod(row, 2.0) * 0.5;
+	vec2 cell = floor(p);
+	float tint = fract(sin(dot(cell, vec2(12.9898,78.233))) * 43758.5453);
+	vec2 edge = fract(p);
+	float seam = smoothstep(0.015, 0.065, edge.y);
+	if (!thatch) { seam *= smoothstep(0.015, 0.05, edge.x); }
+	float reed = thatch ? 0.96 + 0.04 * sin(UV.x * 115.0) : 1.0;
+	ALBEDO = roof_colour.rgb * mix(0.68, 0.91 + tint * 0.16, seam) * reed;
+	ROUGHNESS = 0.94;
+	if (COLOR.r < 0.5) {
+		ALBEDO = vec3(0.1529, 0.3372, 0.3763);
+		ROUGHNESS = 0.22;
+		METALLIC = 0.25;
+	}
+}
+"""
+	var roof := ShaderMaterial.new()
+	roof.shader = shader
+	roof.set_shader_parameter("roof_colour", spec.roof_color)
+	roof.set_shader_parameter("course", 0.22 if spec.roof_material == &"slate" else 0.30)
+	roof.set_shader_parameter("tile_width", 0.30 if spec.roof_material == &"slate" else 0.42)
+	roof.set_shader_parameter("thatch", spec.roof_material == &"thatch")
+	node.set_surface_override_material(HouseBuilder.SURF_ROOF, roof)
+	house_floor_material(node, spec)
+
+
+## Textiles share the floor material slot, including stone houses. Roofing
+## remains a separate opt-in because family shells own their roof palettes.
+static func house_floor_material(node: MeshInstance3D, spec: HouseSpec) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var textile := Shader.new()
+	textile.code = """shader_type spatial;
+render_mode cull_disabled;
+uniform vec4 floor_colour : source_color;
+uniform vec4 rug_colour : source_color;
+void fragment() {
+	ALBEDO = floor_colour.rgb;
+	ROUGHNESS = 0.94;
+	if (COLOR.r < 0.5) {
+		vec2 edge = min(UV, vec2(1.0) - UV);
+		float border = step(0.055, min(edge.x, edge.y)) * (1.0 - step(0.09, min(edge.x, edge.y)));
+		float weave = 0.96 + 0.04 * sin(UV.x * 540.0) * sin(UV.y * 540.0);
+		ALBEDO = mix(rug_colour.rgb, vec3(0.72, 0.56, 0.30), border * 0.85) * weave;
+	}
+}
+"""
+	var floor_material := ShaderMaterial.new()
+	floor_material.shader = textile
+	floor_material.set_shader_parameter("floor_colour", spec.floor_color)
+	var palette := [Color("703c38"), Color("365b60"), Color("806438")]
+	floor_material.set_shader_parameter("rug_colour", palette[absi(spec.seed) % palette.size()])
+	node.set_surface_override_material(HouseBuilder.SURF_FLOOR, floor_material)
 
 
 ## Build the scene. `cutaway` leaves the roof surface undrawn, which is the

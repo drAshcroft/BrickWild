@@ -65,7 +65,7 @@ func _check_not_a_city(plan: VillagePlan) -> void:
 ## business.
 func _check_earned(plan: VillagePlan) -> void:
 	var spec: VillageSpec = plan.spec
-	var earned: Array[StringName] = VillageProgrammer.earned_kinds(spec.population, spec.purpose, spec.water)
+	var earned: Array[StringName] = VillageProgrammer.earned_kinds(spec.population, spec.purpose, spec.water, spec.culture)
 	var have := {}
 	for b in plan.buildings:
 		var kind: StringName = b["kind"]
