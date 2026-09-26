@@ -69,3 +69,9 @@ and assembly checks with no warnings. `details_dining_final3.log` adds 175
 current-source checks with zero failures, including a native restaurant dining
 room, mutation controls, normals and saved-plan round trips. The public API
 placement parity report supplements that broad run.
+
+LAY-010 was closed on 2026-09-25 after rerunning the focused details test:
+175 checks, zero failures and empty stderr. The API report
+`artifacts/p1p2_api/placement_measure_lay2.log` confirms 354 passing checks
+across 23 house/shop fixtures, including complete shell mesh and placement
+parity. The six reference JPEGs are committed under `artifacts/renders/`.
