@@ -113,7 +113,7 @@ const RECIPES := {
 	],
 	&"strand": [
 		{"cat": "boat", "rule": &"bank", "n": [1, 2], "opt": 1.0, "built": true},
-		{"cat": "drying_rack", "rule": &"bank", "n": [1, 2], "opt": 0.9, "built": true},
+		{"cat": "drying_rack", "rule": &"bank", "n": [1, 2], "opt": 1.0, "built": true},
 		{"cat": "crate", "rule": &"bank", "n": [1, 2], "opt": 0.7},
 	],
 	# the edge: what bounds the village, at the culture's own density
@@ -205,13 +205,16 @@ static func dress(plan: VillagePlan) -> VillagePlan:
 	_wood(plan, ctx)
 	# hosts in a fixed order: the common first (the well is what everything
 	# else keeps clear of), then the buildings in plan order, then the places
-	for step in [&"common", &"market", &"church", &"gate", &"water", &"strand"]:
+	for step in [&"common", &"market", &"church", &"gate", &"water"]:
 		_dress_place(plan, ctx, step)
 	for i in range(plan.buildings.size()):
 		_dress_building(plan, ctx, i)
 	_blight_remnants(plan, ctx)
 	_hedges(plan, ctx)
 	_dress_place(plan, ctx, &"edge")
+	# Shore yards must be reached through the final garden and hedge layout.
+	# An unobstructed apron cannot help when later planting cuts its yard off.
+	_dress_place(plan, ctx, &"strand")
 	return plan
 
 
@@ -320,8 +323,21 @@ static func _blight_remnants(plan: VillagePlan, ctx: Dictionary) -> void:
 	if plan.spec.culture != &"blighted":
 		return
 	var rng := _rng(plan, "blight_remnants")
+	var offsets: Array[Vector2] = [Vector2.ZERO, Vector2(2.6, 0), Vector2(-2.6, 0.3)]
+	var wall_size := PropCatalog.footprint("Dungeon_Wall_Broken")
+	var cluster := Rect2(-wall_size * 0.5, wall_size)
+	for offset in offsets:
+		cluster = cluster.merge(Rect2(offset - wall_size * 0.5, wall_size))
 	var centres := _scatter(Poly.from_rect(plan.site.grow(-5.0)), rng, 120)
 	for centre in centres:
+		# The common is working public ground, even in a blighted village.
+		# Reserve the whole measured group, not only its centre wall.
+		var on_common := false
+		var footprint := Poly.from_rect(Rect2(centre + cluster.position, cluster.size))
+		for common in plan.commons:
+			on_common = on_common or VillageLotPlanner.overlap_area(footprint, common["poly"]) > VillageLotPlanner.AREA_EPS
+		if on_common:
+			continue
 		var wet := false
 		for water in plan.water:
 			if Poly.contains_point(water["poly"], centre) or VillageMeasure.point_to_poly(centre, water["poly"]) < 4.0:
@@ -331,7 +347,7 @@ static func _blight_remnants(plan: VillagePlan, ctx: Dictionary) -> void:
 		if not _place(plan, ctx, {"yaw": 0.0}, "Dungeon_Wall_Broken", centre, rng, -1):
 			continue
 		plan.props[-1]["group"] = "blight_ruin"
-		for offset in [Vector2(2.6, 0), Vector2(-2.6, 0.3)]:
+		for offset in offsets.slice(1):
 			if _place(plan, ctx, {"yaw": 0.0}, "Dungeon_Wall_Broken", centre + offset, rng, -1):
 				plan.props[-1]["group"] = "blight_ruin"
 		for offset in [Vector2(-2,-2), Vector2(-1,-2), Vector2(0,-2), Vector2(1,-2),
@@ -518,6 +534,8 @@ static func _dress_place(plan: VillagePlan, ctx: Dictionary, place: StringName) 
 		&"gate":
 			if VillageMeasure.gates(plan).is_empty():
 				return
+	if place == &"strand":
+		ctx["strand_walk"] = VillageNavCheck.reached_grid(plan)
 	var rng := _rng(plan, "place|%s" % String(place))
 	for step in RECIPES[place]:
 		_apply(plan, ctx, step, rng, -1, place)
@@ -698,6 +716,8 @@ static func _spots_for(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		&"beside":
 			return _beside_gates(plan, count)
 		&"bank":
+			if role == &"strand":
+				return _strand_bank(plan, ctx)
 			return _along_water(plan, rng, count)
 		&"band":
 			return _edge_band(plan, rng, count)
@@ -926,6 +946,68 @@ static func _along_water(plan: VillagePlan, rng: RandomNumberGenerator,
 	return out
 
 
+## Boats belong beside reachable shore yards. Polygon corners alone put
+## them beyond the last lot, with no ground a person could stand on.
+static func _strand_bank(plan: VillagePlan, ctx: Dictionary) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var walk: WalkGrid = ctx["strand_walk"]
+	for water in plan.water:
+		if water["kind"] != &"coast":
+			continue
+		# The working strand includes rear yards within the documented
+		# eighteen-metre bank reach, not only the water polygon's corners.
+		for setback in [1.5, 3.5, 5.5, 7.5, 9.5, 11.5, 13.5, 15.5]:
+			var bank := Poly.offset(water["poly"], setback)
+			for edge in bank.size():
+				var a: Vector2 = bank[edge]
+				var b: Vector2 = bank[(edge + 1) % bank.size()]
+				var steps := maxi(1, int(ceil(a.distance_to(b) / 2.0)))
+				for i in range(steps):
+					var point := a.lerp(b, (float(i) + 0.5) / steps)
+					if walk.reached(Rect2(point, Vector2.ZERO), 8.0):
+						out.append(point)
+	return out
+
+
+## A short, emitted working apron connects the shore to an actual reached
+## yard. It never bridges water or crosses a building, tree or another prop.
+static func _strand_apron(plan: VillagePlan, ctx: Dictionary, rect: Rect2) -> PackedVector2Array:
+	var walk: WalkGrid = ctx["strand_walk"]
+	var options: Array[Dictionary] = []
+	for lot in plan.lots:
+		var poly: PackedVector2Array = lot["poly"]
+		var centre := Poly.bounding_rect(poly).get_center()
+		for edge in poly.size():
+			var near := Geometry2D.get_closest_point_to_segment(rect.get_center(), poly[edge], poly[(edge + 1) % poly.size()])
+			var anchor := near + (centre - near).normalized()
+			var finish := Vector2(clampf(anchor.x, rect.position.x, rect.end.x),
+				clampf(anchor.y, rect.position.y, rect.end.y))
+			var distance := anchor.distance_to(finish)
+			if distance > 8.0 or distance < 0.1 or not walk.reached(Rect2(anchor, Vector2.ZERO), 0.2):
+				continue
+			options.append({"anchor": anchor, "finish": finish, "distance": distance})
+	options.sort_custom(func(a, b) -> bool: return float(a["distance"]) < float(b["distance"]))
+	for option in options:
+		var apron := Poly.ribbon(PackedVector2Array([option["anchor"], option["finish"]]), 1.0)
+		var clear := true
+		for point in apron:
+			clear = clear and plan.site.has_point(point)
+		for water in plan.water:
+			clear = clear and VillageLotPlanner.overlap_area(apron, water["poly"]) <= VillageLotPlanner.AREA_EPS
+		for bounds in ctx["bounds"]:
+			clear = clear and VillageLotPlanner.overlap_area(apron, bounds) <= VillageLotPlanner.AREA_EPS
+		for prop in plan.props:
+			clear = clear and VillageLotPlanner.overlap_area(apron, Poly.from_rect(prop["rect"])) <= VillageLotPlanner.AREA_EPS
+		for plant in plan.plants:
+			var trunk := float(plant.get("trunk", 0.0))
+			if trunk <= 0.0 or not PropCatalog.blocks_floor(String(plant["key"])):
+				continue
+			clear = clear and VillageMeasure.point_to_poly(plant["pos"], apron) > trunk + 0.1
+		if clear:
+			return apron
+	return PackedVector2Array()
+
+
 ## The band outside the enclosure, or just inside the site edge when there is
 ## no enclosure: where the village is bounded by something.
 static func _edge_band(plan: VillagePlan, rng: RandomNumberGenerator,
@@ -968,6 +1050,12 @@ static func _edge_band(plan: VillagePlan, rng: RandomNumberGenerator,
 		var depth: float = rng.randf_range(0.5, maxf(band, 1.5))
 		var jitter := Vector2(rng.randf_range(-1.5, 1.5), rng.randf_range(-1.5, 1.5))
 		var p: Vector2 = along + inward * depth + jitter
+		if plan.spec.form == &"strand" and not site.has_point(p):
+			# A long shore site gives the inward vector little depth near its
+			# far corners. Jitter must not discard several clear edge stations
+			# in a row. Offer the same inner band; normal plant checks still
+			# reject roads, roofs, water and occupied ground there.
+			p = _inside_edge(site, p, 1.5)
 		if inner.has_point(p) or not site.has_point(p):
 			continue          # inside the village, not at its edge
 		out.append(p)
@@ -1001,8 +1089,18 @@ static func _place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 	var size: Vector2 = Vector2(BUILT[key]["size"]) if built \
 		else PropCatalog.footprint(key)
 	var zone: float = float(BUILT[key]["zone"]) if built else PropCatalog.zone_depth(key)
-	var yaw: float = float(step.get("yaw", _facing(plan, host, at)))
+	var yaw: float = snappedf(float(step.get("yaw", _facing(plan, host, at))), 0.001)
 	var rect := Rect2(at - size / 2.0, size)
+	var shore_piece := built and key in ["boat", "drying_rack"] and ctx.has("strand_walk")
+	var shore_obstacle := ctx.has("strand_walk") and (built or PropCatalog.blocks_floor(key))
+	if shore_piece:
+		# These long pieces turn toward the village. Their unrotated recipe
+		# size understates the occupied width after that turn.
+		var kit := PropKit.new(MeshKit.new(4), 0, 1, 2, 3)
+		var bounds: AABB = kit.boat(Vector3.ZERO, yaw) if key == "boat" \
+			else kit.drying_rack(Vector3.ZERO, yaw)
+		size = Vector2(bounds.size.x, bounds.size.z)
+		rect = Rect2(at + Vector2(bounds.position.x, bounds.position.z), size)
 	var use := Rect2(at - Vector2(zone, zone), Vector2(zone, zone) * 2.0) \
 		if zone > 0.0 else Rect2()
 	# A lamp hangs on the wall and takes no floor, so it is held only to
@@ -1014,9 +1112,26 @@ static func _place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		return false
 	if not _host_owns(plan, ctx, host, at):
 		return false
+	var shore_apron := PackedVector2Array()
+	if shore_piece and not (ctx["strand_walk"] as WalkGrid).reached(rect, VillageNavCheck.PERSON_RADIUS + 0.4):
+		shore_apron = _strand_apron(plan, ctx, rect)
+		if shore_apron.is_empty():
+			return false
 	plan.props.append({"key": key, "pos": at, "yaw": snappedf(yaw, 0.001),
 		"host": host, "rect": rect, "zone": use,
 		"built": built, "light": _is_light(key, built)})
+	if not shore_apron.is_empty():
+		plan.props.back()["approach"] = shore_apron
+	if shore_obstacle:
+		var occupied_walk := VillageNavCheck.reached_grid(plan)
+		var all_reached := true
+		for prop in plan.props:
+			if prop["key"] in ["boat", "drying_rack"]:
+				all_reached = all_reached and occupied_walk.reached(prop["rect"], VillageNavCheck.PERSON_RADIUS + 0.4)
+		if not all_reached:
+			plan.props.pop_back()
+			return false
+		ctx["strand_walk"] = occupied_walk
 	_remember(ctx, at, rect, maxf(size.x, size.y) * 0.5)
 	return true
 
@@ -1099,6 +1214,10 @@ static func _prop_is_clear(plan: VillagePlan, ctx: Dictionary, rect: Rect2,
 	if not floors:
 		return true
 	var mine: PackedVector2Array = Poly.from_rect(rect)
+	for prop in plan.props:
+		if prop["key"] in ["boat", "drying_rack"] and prop.has("approach") \
+				and VillageLotPlanner.overlap_area(mine, prop["approach"]) > VillageLotPlanner.AREA_EPS:
+			return false
 	for w in plan.water:
 		if w["kind"] == &"race" and VillageLotPlanner.overlap_area(mine, w["poly"]) > VillageLotPlanner.AREA_EPS:
 			return false
@@ -1130,11 +1249,15 @@ static func _plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
 			if prop["key"] == "well" and at.distance_to(prop["pos"]) < GREEN_TREE_CLEAR:
 				return false
 	for w in plan.water:
-		if w["kind"] == &"race" and VillageMeasure.point_to_poly(at, w["poly"]) < trunk + 0.2:
+		if Poly.contains_point(w["poly"], at) or VillageMeasure.point_to_poly(at, w["poly"]) < trunk + 0.2:
 			return false
 	var stem_rect: Rect2 = Rect2(at - Vector2(trunk, trunk),
 		Vector2(trunk, trunk) * 2.0).grow(TRUNK_CLEAR)
 	var stem: PackedVector2Array = Poly.from_rect(stem_rect)
+	for prop in plan.props:
+		if prop["key"] in ["boat", "drying_rack"] and prop.has("approach") \
+				and VillageLotPlanner.overlap_area(stem, prop["approach"]) > VillageLotPlanner.AREA_EPS:
+			return false
 	var road_boxes: Array[Rect2] = ctx["road_boxes"]
 	var roads: Array[PackedVector2Array] = ctx["roads"]
 	for i in range(roads.size()):

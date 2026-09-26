@@ -36,6 +36,23 @@ static func run() -> SuiteResult:
 			if kind == &"pond" and not result["crossings"].is_empty():
 				res.fail("pond/%d: pond must clear every road ribbon" % seed)
 			res.checked += 1
+		# A garrison's northern manor reservation stays dry. The opposite
+		# shoreline remains one continuous edge at the same authored depth.
+		var garrison := VillageSpec.new(18000 + seed)
+		garrison.population = 50
+		garrison.purpose = &"garrison"
+		garrison.water = &"coast"
+		garrison.generate(garrison.seed)
+		var gate_site := Rect2(-120, -85, 240, 170)
+		var gate_water: Array = VillageWaterPlan.build(garrison, gate_site, [], [])["water"]
+		res.checked += 1
+		if gate_water.size() != 1:
+			res.fail("gate coast/%d: no single shore" % seed)
+		else:
+			var shore := Poly.bounding_rect(gate_water[0]["poly"])
+			if shore.position.y != gate_site.position.y or not is_equal_approx(shore.size.y, gate_site.size.y * 0.20) \
+					or not is_equal_approx(shore.size.x, gate_site.size.x - VillageWaterPlan.SITE_MARGIN * 2.0):
+				res.fail("gate coast/%d: shoreline lost its edge or width" % seed)
 	# Negative: a road wholly away from water must not invent a bridge.
 	var no_cross := VillageSpec.new(32999)
 	no_cross.population = 30

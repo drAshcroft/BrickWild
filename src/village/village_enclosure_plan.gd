@@ -32,7 +32,9 @@ static func build(plan: VillagePlan, edge_band: float = EDGE_BAND) -> Dictionary
 		Vector2(plan.site.position.x + 3.0, plan.site.end.y - 3.0),
 		Vector2(plan.site.end.x - 3.0, plan.site.end.y - 3.0)]
 	for candidate in wood_candidates:
-		if plan.site.has_point(candidate) and not Poly.contains_point(edge, candidate):
+		var wet := plan.water.any(func(water: Dictionary) -> bool:
+			return Poly.contains_point(water["poly"], candidate) or VillageMeasure.point_to_poly(candidate, water["poly"]) < 4.0)
+		if plan.site.has_point(candidate) and not Poly.contains_point(edge, candidate) and not wet:
 			wood = candidate
 			break
 	return {"hull": hull, "edge": edge, "gates": gates, "crossings": crossings,

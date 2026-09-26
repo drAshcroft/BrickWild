@@ -119,6 +119,12 @@ Two things every form shares: the through road, and the common. A form
 without a common is a hamlet, and a hamlet is the `street` form below 25
 people with the common shrunk to the well.
 
+All seven forms have site planners. The five forms added by VIL-017 use
+complete native building measurements for their lots and share the ordinary
+placement, dressing and navigation checks. Their full fifty-seed acceptance
+is still pending; implemented behavior and the required evidence are recorded
+in [VILLAGE_FORMS.md](VILLAGE_FORMS.md).
+
 ```
             green village, 80 people, farming, stream to the north
 
@@ -235,6 +241,9 @@ road, water and fire-clearance tests before placement.
 The common-facing trades fill uncovered sectors before taking a second
 frontage on the same side. This keeps a bowed through road from attracting
 every shop while half the round green remains empty.
+Housing every request does not end a round village's retries if its common
+still lacks frontage. The next site must improve placement or the existing
+common-coverage contract; exhausted retries leave any defect visible to QA.
 Round farms also take common-facing street frontages, with their working
 ground behind them. The northern ring has a broad frontage for the civic
 landmark. A native stepped temple reserves enough site depth for its actual
@@ -248,6 +257,10 @@ standing room past the door. A wide frontage can extend beyond the lane's
 endpoint while its arrival remains reachable. The inn's stable has enough
 lane for its measured entrance and remains within twenty metres of the inn's
 actual bounds.
+Required road addresses stay unplaced when that road is full, allowing the
+next site retry to find legal frontage. The stable's authored companion lane
+has an explicit lane address for that attempt. Other required trades cannot
+silently move to a back lane.
 
 Building sizes come from the family's `describe_kind()` envelope, scaled by
 wealth and the household, and every request is sent through
@@ -725,22 +738,23 @@ Three things are worth knowing:
   keeps the planner's own order, and the **seed is taken from the request's
   TEXT** — mythsim seeds are unsigned 64-bit and do not survive a JSON parse
   as integers.
-- **A city is bigger than a village.** Population is capped at 500 and, above
-  the `gate` form's threshold of 200, *scaled* into 140–199 rather than
-  clamped — the contract's acceptance is that building count rises with
-  population, and clamping 210, 300 and 420 to 199 gave three identical
-  villages.
-- **Every concession is written down.** Only two of §3's seven forms have
-  planners, so a request that derives `gate`, `round`, `strand`, `planted`
-  or `crossroads` is stepped toward one that can be laid, and each step goes
-  into the plan's own `notes` array. `pilgrim` is never substituted in,
-  because it is the one purpose that earns a temple and the contract says a
-  city without one does not get one.
+- **A city is bigger than a village.** The adapter clamps requested
+  population to the supported 12–500 range and records that adjustment.
+  All seven forms now have planners, so a supported `gate`, `round`,
+  `strand`, `planted` or `crossroads` request keeps its derived form and
+  population. The old 140–199 fallback band is no longer used for them.
+- **Every concession is written down.** `_settle_form` first checks the
+  planner's supported forms. Its retained fallback only applies to an
+  unsupported derived form, and records any population or purpose change in
+  `notes`. It never substitutes `pilgrim` into a city that did not earn a
+  temple.
 
-Fixtures are in `tests/fixtures/site_requests/`. Over those five: two runs
-byte-identical, every building inside the site, every building fronting a
-road, counts of 8/42/49/54/58 rising with population and never near the 140
-cap, and the village suites still green on the plans produced.
+Fixtures are in `tests/fixtures/site_requests/`. Their original VIL-014
+acceptance covered byte-identical serialization, buildings inside the site,
+road frontage and counts rising with population under the former form
+fallback. Those historical counts do not certify the newly retained forms;
+VIL-017's native form matrix and VIL-020's archetype matrix supply that
+acceptance.
 
 ---
 

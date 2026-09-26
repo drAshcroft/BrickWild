@@ -49,6 +49,11 @@ static func run(full := false) -> SuiteResult:
 				_expect(res, unplaced == 0, label + " cannot place measured mill")
 				if unplaced > 0:
 					continue
+				# Complete the production post-cut phase before dressing: the
+				# planted hedge needs its persistent boundary, and final crossings
+				# must include the mill race and any added service lane.
+				p.water_crossings = VillageWaterPlan.crossings(p.water, p.roads)
+				VillageEnclosurePlan.author(p)
 				VillageDresser.dress(p)
 				var places := VillagePlaceCheck.new()
 				places._check_mill(p)

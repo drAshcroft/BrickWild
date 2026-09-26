@@ -122,8 +122,12 @@ static func build(spec: VillageSpec, site: Rect2,
 			# Thirty percent consumed that bank on 90m sites, leaving no legal
 			# mill or service yard despite plenty of unused land inland.
 			var depth: float = maxf(18.0, site.size.y * 0.20)
+			# Gate settlements reserve the northern head for the measured
+			# manor and its approach. Put their shore on the opposite edge so
+			# widening the settlement can actually produce dry manor ground.
+			var shore_y := site.position.y if spec.form == &"gate" else site.end.y - depth
 			water.append({"poly": Poly.from_rect(Rect2(
-				Vector2(site.position.x + SITE_MARGIN, site.end.y - depth),
+				Vector2(site.position.x + SITE_MARGIN, shore_y),
 				Vector2(site.size.x - SITE_MARGIN * 2.0, depth))), "kind": &"coast"})
 		&"pond":
 			water.append({"poly": _pond(site, commons, roads), "kind": &"pond"})

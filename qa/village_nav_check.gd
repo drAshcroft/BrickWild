@@ -33,6 +33,9 @@ const PERSON_RADIUS := HouseGeometry.PERSON_RADIUS
 ## §9.5's cell size, by site side. Interpolated between these two.
 const CELL_FINE := 0.25
 const CELL_COARSE := 0.5
+## A two-metre arrival court can lose half its measured width when rotated
+## onto half-metre cells. Measure that bounded route at doorway resolution.
+const CELL_APPROACH := 0.1
 const SITE_FINE := 120.0
 const SITE_COARSE := 400.0
 ## A door is `reached` if any cell within this of it was walked to. A door
@@ -86,6 +89,16 @@ static func cell_for(plan: VillagePlan) -> float:
 	return snappedf(lerpf(CELL_FINE, CELL_COARSE, t), 0.05)
 
 
+## The same reached floor used by QA, for placing usable outdoor furniture.
+## Call after adding a candidate's real footprint so it cannot count ground
+## occupied by that candidate as its own working space.
+static func reached_grid(plan: VillagePlan) -> WalkGrid:
+	var nav := VillageNavCheck.new()
+	nav._grid = build_grid(plan)
+	nav._flood_from_gates(plan)
+	return nav._grid
+
+
 ## The grid itself, public because the builder and the Studio both want to
 ## look at the same walk the check judged.
 ##
@@ -94,8 +107,12 @@ static func cell_for(plan: VillagePlan) -> float:
 ## them, so a barrel on a verge removes the verge under it rather than the
 ## other way round.
 static func build_grid(plan: VillagePlan) -> WalkGrid:
+	return _grid_for_bounds(plan, plan.site, cell_for(plan))
+
+
+static func _grid_for_bounds(plan: VillagePlan, bounds: Rect2, cell_size: float) -> WalkGrid:
 	var grid := WalkGrid.new()
-	grid.setup(plan.site, cell_for(plan))
+	grid.setup(bounds, cell_size)
 	# floor: every road with its verge, and the common
 	for road in plan.roads:
 		grid.add_floor_poly(VillageSitePlanner.road_ribbon(road, true))
@@ -300,11 +317,7 @@ func _check_paths(plan: VillagePlan) -> void:
 				% [i, String(plan.buildings[i]["kind"])])
 		var b: Dictionary = plan.buildings[i]
 		if b["placement"].has("approach"):
-			var approach: Rect2 = b["placement"]["approach"]
-			var xf: Transform3D = b["transform"]
-			var a: Vector3 = xf * Vector3(approach.get_center().x, 0.0, approach.position.y + 0.5)
-			var z: Vector3 = xf * Vector3(approach.get_center().x, 0.0, approach.end.y - 1.0)
-			if _grid.clearance_along(Vector2(a.x, a.z), Vector2(z.x, z.z), 3.0) < PATH_WIDTH:
+			if _approach_clearance(plan, b) < PATH_WIDTH:
 				pinched.append("%d (courtyard approach)" % i)
 	var paths: Array[int] = plan.roads_of_class(&"path")
 	stats["paths"] = paths.size()
@@ -319,6 +332,21 @@ func _check_paths(plan: VillagePlan) -> void:
 	if not pinched.is_empty():
 		failures.append("paths: %d doors or paths are under %.1fm clear: %s"
 			% [pinched.size(), PATH_WIDTH, ", ".join(pinched.slice(0, 4))])
+
+
+## Use the same floor and obstacles as the village flood, cropped around the
+## approach. Only its measurement resolution changes; water, trunks and props
+## still obstruct it, and the global flood still decides whether it is reached.
+static func _approach_clearance(plan: VillagePlan, building: Dictionary) -> float:
+	var approach: Rect2 = building["placement"]["approach"]
+	var xf: Transform3D = building["transform"]
+	var a: Vector3 = xf * Vector3(approach.get_center().x, 0.0, approach.position.y + 0.5)
+	var z: Vector3 = xf * Vector3(approach.get_center().x, 0.0, approach.end.y - 1.0)
+	var start := Vector2(a.x, a.z)
+	var end := Vector2(z.x, z.z)
+	var bounds := Rect2(start, Vector2.ZERO).expand(end).grow(3.0).intersection(plan.site)
+	var local := _grid_for_bounds(plan, bounds, CELL_APPROACH)
+	return local.clearance_along(start, end, 3.0)
 
 
 # ----------------------------------------------------------------- common

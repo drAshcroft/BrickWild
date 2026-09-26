@@ -46,7 +46,7 @@ extends SceneTree
 ##  29 world      - the buildings of the wider world (WORLD_BUILDINGS), as
 ##                  archetype rows; `warchetype` is the same suite
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
-	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
+	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
@@ -54,7 +54,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
+const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "houseqacore", "houseqaplan",
 	"houseqafurnish", "houseqafull", "wld001_domus", "wld001_riad",
@@ -94,7 +94,7 @@ const LANES: Dictionary = {
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
-	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms"],
+	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess"],
 	"lane:church": ["church", "normals", "massing"],
 	"lane:temple": ["temple", "rite"],
 	"lane:world": ["wld001"],
@@ -108,6 +108,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_adit_suite.gd").run()
 		"varchetypecontracts":
 			return VillageArchetypeSuite.run_contracts()
+		"vnativeqa":
+			return preload("res://tests/suites/village_native_qa_suite.gd").run()
 		"vwater":
 			return VillageWaterPlanSuite.run()
 		"hjetty":
@@ -162,6 +164,12 @@ static func _run_one(key: String) -> SuiteResult:
 			return load("res://tests/suites/polygon_sconce_suite.gd").run()
 		"ckfurnish":
 			return load("res://tests/suites/castle_keep_furnishing_suite.gd").run()
+		"caccess":
+			return preload("res://tests/suites/castle_access_suite.gd").run()
+		"cforebuilding":
+			return preload("res://tests/suites/castle_forebuilding_suite.gd").run()
+		"cgateaccess":
+			return preload("res://tests/suites/castle_gate_access_suite.gd").run()
 		"cnormals":
 			return CastleNormalsSuite.run()
 		"cmassing":

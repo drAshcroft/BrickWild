@@ -70,19 +70,27 @@ const AREA_EPS := 0.05          ## m^2 of overlap that counts as an overlap
 const COLLINEAR_EPS := 0.1      ## §5's "on the road edge", in metres
 const STEP := 1.0               ## how far a rejected frontage slides before retrying
 const MAX_SLIDES := 90
+const MANOR_LANE_LEAN := -0.35
+const MANOR_LANE_MAX := 40.0
 
 
 ## Site plan + lots + buildings, from the spec alone. The whole of VIL-004.
 ## Returns a fresh plan; `spec` is not modified.
 static func plan(spec: VillageSpec) -> VillagePlan:
 	var requests: Array[BuildingRequest] = VillageProgrammer.programme(spec)
+	return plan_measured(spec, measure_all(requests))
+
+
+## Reuse native measurements when only the site's water or enclosure changes.
+## The jobs must describe this spec's exact programme. All placement, retries,
+## crossings, enclosure and dressing still run through this one pipeline.
+static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> VillagePlan:
 	var out: VillagePlan = VillageSitePlanner.plan(spec)
 	if out.roads.is_empty():
 		return out
 	# every request is generated and measured ONCE; the retries below only
 	# redo the geometry
-	var jobs: Array[Dictionary] = measure_all(requests)
-	var minimum_depth := _landmark_site_depth(out, jobs)
+	var minimum_depth := maxf(_landmark_site_depth(out, jobs), _manor_site_depth(out, jobs))
 	var shore_depth := _strand_row_depth(jobs) if spec.form == &"strand" else 0.0
 	if minimum_depth > out.site.size.y or shore_depth > 0.0:
 		out = VillageSitePlanner.plan(spec, 0, 1.0, minimum_depth, shore_depth)
@@ -90,9 +98,10 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 	# roads run out of frontage, the site planner is asked for more lanes,
 	# two at a time, until nothing is left unplaced or the site is full
 	var unplaced: int = cut_measured(out, jobs)
+	var common_state := _round_common_state(out)
 	var previous_scale := 1.0
 	for attempt in RETRIES:
-		if unplaced <= 0:
+		if unplaced <= 0 and bool(common_state["ready"]):
 			break
 		# These authored forms deliberately ignore generic extra lanes. Do
 		# not recut an identical site six times before trying more frontage.
@@ -100,10 +109,21 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 			continue
 		previous_scale = float(attempt[1])
 		var again: VillagePlan = VillageSitePlanner.plan(spec, int(attempt[0]), float(attempt[1]), minimum_depth, shore_depth)
+		# Through-road bends grow with retry width. Reserve against the road
+		# actually offered on this attempt, rather than the original narrow site.
+		var retry_depth := _manor_site_depth(again, jobs)
+		if retry_depth > again.site.size.y + 0.001:
+			again = VillageSitePlanner.plan(spec, int(attempt[0]), float(attempt[1]),
+				maxf(minimum_depth, retry_depth), shore_depth)
 		var left: int = cut_measured(again, jobs)
-		if left < unplaced:
+		var next_common := _round_common_state(again)
+		var better_common: bool = (bool(next_common["ready"]) and not bool(common_state["ready"])) \
+			or (bool(next_common["ready"]) == bool(common_state["ready"]) \
+			and float(next_common["coverage"]) > float(common_state["coverage"]))
+		if left < unplaced or (left == unplaced and better_common):
 			out = again
 			unplaced = left
+			common_state = next_common
 	_trim_lanes(out)
 	# Lot cutting can add service lanes, drop roads and add a mill race.
 	# Store crossings only against these final road/water indices.
@@ -115,6 +135,18 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 	# judging the props as much as the buildings.
 	VillageDresser.dress(out)
 	return out
+
+
+## A round settlement must occupy the green, not only house its programme.
+## Keep looking when a fully housed attempt leaves most of its common bare.
+## This is the existing geometric contract; exhausted retries still return
+## the best real plan and independent VillageQA reports any remaining defect.
+static func _round_common_state(plan: VillagePlan) -> Dictionary:
+	if plan.spec.form != &"round":
+		return {"ready": true, "coverage": 1.0}
+	var check := VillagePlaceCheck.new()
+	check._check_common(plan)
+	return {"ready": check.failures.is_empty(), "coverage": check.stats.get("common_fronted", 0.0)}
 
 
 ## The waterfront band's depth comes from complete native row buildings,
@@ -150,6 +182,32 @@ static func _landmark_site_depth(plan: VillagePlan, jobs: Array[Dictionary]) -> 
 		# Keep a small construction margin: Rect2 excludes its upper edge,
 		# and an exactly touching back fence must not lose the whole frontage.
 		needed = maxf(needed, 2.0 * (north_edge + depth + SITE_MARGIN + 0.25))
+	return needed
+
+
+## Width retries cannot fit a broad manor beside its oblique approach if the
+## site remains too shallow. Reserve the northward projection of its complete
+## measured lot: frontage/fire gap along the lane, forecourt and rear yard
+## across it, plus the road verge. This does not change the lane-length limit.
+static func _manor_site_depth(plan: VillagePlan, jobs: Array[Dictionary]) -> float:
+	var direction := Vector2(MANOR_LANE_LEAN, 1.0).normalized()
+	var road_top := 0.0
+	for road in plan.roads:
+		if road["class"] != &"through": continue
+		for point in road["points"]:
+			road_top = maxf(road_top, Vector2(point).y + float(road["width"]) * 0.5 + float(road["verge"]))
+	var needed := 0.0
+	for job in jobs:
+		if job["class"] != &"manor": continue
+		var rule: Dictionary = LOT_RULES[&"manor"]
+		var frontage := float(job["half_w"]) * 2.0 + maxf(fire_gap(&"manor", plan.spec, job["placement"]), 1.0)
+		var depth := _setback(rule, job) + float(job["back"]) + float(rule["yard"])
+		# A frontage midpoint can reach the end of the lane. Its far corner
+		# then extends half a frontage beyond that point; corner clearance
+		# means it cannot be assumed to start directly at the road junction.
+		var north := road_top + direction.y * (MANOR_LANE_MAX + frontage * 0.5) \
+			+ absf(direction.x) * (depth + LANE_HALF)
+		needed = maxf(needed, 2.0 * (north + SITE_MARGIN))
 	return needed
 
 
@@ -334,15 +392,22 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 				ctx = _context(plan)
 			if manor_lane >= 0:
 				placed += 1
-				continue
+			# A manor requires its own approach. Falling through to an ordinary
+			# road counts an invalid placement as success and prevents retries.
+			continue
 		elif req_kind(job) == &"stable":
 			if stable_lane < 0:
 				stable_lane = _add_stable_lane(plan)
 				if stable_lane >= 0:
 					ctx = _context(plan)
 			if stable_lane >= 0:
-				job["near_point"] = plan.roads[stable_lane]["points"][1]
-				if _place_on_road(plan, ctx, job, [stable_lane], 0.0) >= 0.0:
+				# This authored spur belongs to the inn's companion stable.
+				# Its specific lane address overrides the ordinary through-road
+				# preference only for this attempt; the 20m inn clearance remains.
+				var companion := job.duplicate()
+				companion["siting"] = {"road": &"lane", "insists": true, "toward": &"common"}
+				companion["near_point"] = plan.roads[stable_lane]["points"][1]
+				if _place_on_road(plan, ctx, companion, [stable_lane], 0.0) >= 0.0:
 					placed += 1
 					continue
 		var floor_for: float = gradient_floor if _order_of(job) == _ORDER_HOUSE else 0.0
@@ -360,8 +425,11 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 						existing["placement"], existing["transform"], false)
 					job["near_point"] = Poly.bounding_rect(inn_poly).get_center()
 					break
-		var got: float = _place_on_road(plan, ctx, job,
-			_open_roads(plan, [landmark_lane, manor_lane]), floor_for)
+		var allowed := _open_roads(plan, [landmark_lane, manor_lane])
+		var got: float = _place_on_road(plan, ctx, job, allowed, floor_for)
+		if got < 0.0 and req.kind == &"shop" and req.purpose == &"bakery":
+			if _place_pond_mill(plan, ctx, job, allowed):
+				got = 0.0
 		if got >= 0.0:
 			placed += 1
 			if cls == &"church":
@@ -603,9 +671,9 @@ static func _open_roads(plan: VillagePlan, reserved: Array) -> Array:
 ##             what made the smithy's twelve-metre clearance from the tavern
 ##             fail on a small site.
 ##
-## A row's `road` is a preference, not a wall: a thing that cannot find any
-## frontage on the road it wants falls back to the rest, because a village
-## with an unhoused smithy is worse than one with a smithy on a lane.
+## A row's `road` is a preference unless `insists` is true. A required trade
+## address stays unplaced when that road is full, so the planner buys enough
+## frontage on its next site retry rather than declaring a wrong address done.
 ## A farm goes to the edge and is NOT part of the wealth gradient. The two
 ## rules would otherwise contradict each other -- §9.4's `gradient` wants the
 ## big houses in the middle and a farmhouse is a big house -- so each names
@@ -647,8 +715,8 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 	if not plan.commons.is_empty():
 		cc = Poly.bounding_rect(plan.commons[0]["poly"]).get_center()
 	var gates: Array[Vector2] = _gates(plan)
-	# The road it insists on, alone, first; the rest only if that road has no
-	# room at all.
+	# Try the requested road class first. A preference may use other roads;
+	# a required address must instead leave the job unplaced for a site retry.
 	var want_class: StringName = site.get("road", &"")
 	if want_class != &"":
 		var preferred: Array = []
@@ -659,6 +727,10 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 			var got: float = _place_on_road(plan, ctx, job, preferred, floor_d)
 			if got >= 0.0:
 				return got
+			if bool(site.get("insists", false)):
+				return -1.0
+		elif preferred.is_empty() and bool(site.get("insists", false)):
+			return -1.0
 	# Every road at once, sorted by what this job is looking for -- not road
 	# by road in rank order taking the first legal spot on each.
 	#
@@ -734,6 +806,88 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 				_commit(plan, lot, job, rule)
 				return float(spot["d"])
 	return -1.0
+
+
+## A road-clear pond bay can still be too remote for the earned mill's short
+## race. Only after the ordinary placement fails, fit the same pond behind
+## measured mill frontages on the already permitted roads. Move it as little
+## as possible, then prefer the common. No road, prior lot or race is moved.
+static func _place_pond_mill(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
+		roads: Array) -> bool:
+	var pond_index := -1
+	for wi in plan.water.size():
+		if plan.water[wi]["kind"] == &"pond": pond_index = wi
+	if pond_index < 0: return false
+	for water in plan.water:
+		if water["kind"] == &"race" and int(water.get("source", -1)) == pond_index:
+			return false # an existing mill already owns this bank
+	var original: PackedVector2Array = plan.water[pond_index]["poly"]
+	var size := Poly.bounding_rect(original).size
+	var original_centre := Poly.bounding_rect(original).get_center()
+	var common := VillageMeasure.common_centre(plan)
+	var rule: Dictionary = LOT_RULES[job["class"]]
+	var gap := fire_gap(job["class"], plan.spec, job["placement"])
+	var frontage := 2.0 * float(job["half_w"]) + maxf(gap, 1.0)
+	var setback := _setback(rule, job)
+	var depth := setback + float(job["back"]) + float(rule["yard"])
+	var spots: Array = []
+	for road in roads:
+		spots.append_array(_spots(ctx, road, common, _gates(plan), plan.site, job["siting"]))
+	var candidates: Array[Dictionary] = []
+	for spot in spots:
+		var lot := _make_lot(spot["e"], spot["m"], frontage, depth, setback)
+		var xf := _transform_for(lot, job)
+		var walls := VillageWaterPlan.mill_walls(job["placement"], xf)
+		var normal: Vector2 = lot["normal"]
+		var tangent: Vector2 = spot["e"]["dir"]
+		var back := -INF
+		var first := INF
+		var last := -INF
+		for point in walls:
+			back = maxf(back, point.dot(normal))
+			first = minf(first, point.dot(tangent))
+			last = maxf(last, point.dot(tangent))
+		for bank in [2.0, 4.0, 8.0]:
+			var centre: Vector2 = tangent * (first + last) * 0.5 + normal * (back + float(bank))
+			var a := centre - tangent * size.x * 0.5
+			var b := centre + tangent * size.x * 0.5
+			var pond := PackedVector2Array([a, b, b + normal * size.y, a + normal * size.y])
+			if not _pond_mill_clear(plan, ctx, pond, pond_index): continue
+			var pond_centre := centre + normal * size.y * 0.5
+			candidates.append({"lot": lot, "poly": pond,
+				"move": pond_centre.distance_to(original_centre),
+				"common": pond_centre.distance_to(common)})
+	candidates.sort_custom(func(a, b):
+		if not is_equal_approx(float(a["move"]), float(b["move"])):
+			return float(a["move"]) < float(b["move"])
+		return float(a["common"]) < float(b["common"]))
+	for option in candidates:
+		plan.water[pond_index]["poly"] = option["poly"]
+		var candidate: Dictionary = option["lot"].duplicate(true)
+		if _lot_is_legal(plan, ctx, candidate, job, gap):
+			_commit(plan, candidate, job, rule)
+			return true
+		plan.water[pond_index]["poly"] = original
+	return false
+
+
+static func _pond_mill_clear(plan: VillagePlan, ctx: Dictionary,
+		pond: PackedVector2Array, pond_index: int) -> bool:
+	for point in pond:
+		if not plan.site.grow(-VillageWaterPlan.SITE_MARGIN).has_point(point): return false
+	for ribbon in ctx["ribbons"]:
+		if overlap_area(pond, ribbon) > 0.01: return false
+	for common in plan.commons:
+		if overlap_area(pond, common["poly"]) > 0.01: return false
+	for lot in plan.lots:
+		if overlap_area(pond, lot["poly"]) > 0.01: return false
+	for building in plan.buildings:
+		if overlap_area(pond, VillageMeasure.bounds_poly(building)) > 0.01: return false
+	if plan.landmark_reserved() and overlap_area(pond, plan.landmark_site["poly"]) > 0.01:
+		return false
+	for wi in plan.water.size():
+		if wi != pond_index and overlap_area(pond, plan.water[wi]["poly"]) > 0.01: return false
+	return true
 
 
 ## Every candidate frontage along road `r`, in the order this job wants to
@@ -1116,10 +1270,10 @@ static func _add_landmark_lane(plan: VillagePlan) -> int:
 	# lane runs in the opposite direction.
 	var end_y: float = rect.end.y + 2.0 if rect.position.y > start_y else rect.position.y - 2.0
 	if plan.spec.form == &"strand" and rect.position.y < start_y:
-		# The church's measured frontage is wider than the reserved slot.  Run
-		# the inland lane beyond the slot so its front can end at the slot's
-		# common-facing edge instead of spilling into the common.
-		end_y = rect.position.y - 40.0
+		# The church's measured frontage is wider than the reserved slot.
+		# Give it the full legal dead-end length, measured from its junction;
+		# adding forty metres behind the slot made an overlong access road.
+		end_y = start_y - 40.0
 	if absf(end_y - start_y) < 8.0:
 		return -1
 	var pts := PackedVector2Array([Vector2(lane_x, start_y), Vector2(lane_x, end_y)])
@@ -1208,8 +1362,8 @@ static func _manor_lane_at(plan: VillagePlan, job: Dictionary, lane_x: float) ->
 	# Lean the approach toward the common. Its east-side lot then opens
 	# away from the winding through road instead of laying a broad wing and
 	# fire gap back across the neighbouring junctions.
-	var direction := Vector2(-0.35, 1.0).normalized()
-	var length: float = minf(40.0, (plan.site.end.y - SITE_MARGIN - start_y) / direction.y)
+	var direction := Vector2(MANOR_LANE_LEAN, 1.0).normalized()
+	var length: float = minf(MANOR_LANE_MAX, (plan.site.end.y - SITE_MARGIN - start_y) / direction.y)
 	if length < float(job["width"]) * 0.5 + 12.0:
 		return {}
 	var lane: Dictionary = _lane(PackedVector2Array([start, start + direction * length]),

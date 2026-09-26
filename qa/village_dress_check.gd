@@ -324,16 +324,16 @@ func _check_edge(plan: VillagePlan) -> void:
 
 static func _edge_is_held(plan: VillagePlan, gates: Array[Vector2], p: Vector2,
 		boxes: Array[Rect2], polys: Array[PackedVector2Array]) -> bool:
-	# Enclosed villages have a continuous emitted hedge/palisade/wall edge;
-	# DressCheck verifies its geometry in VillageEnclosureCheck and does not
-	# require catalogue trees to duplicate that wall for visual coverage.
-	if plan.spec.enclosure in [&"hedge", &"palisade", &"wall"]:
+	# Masonry and stakes are emitted continuously by VillageBuilder. A hedge
+	# is the dresser's actual planted row: its requested kind alone cannot
+	# prove that any bushes were successfully placed.
+	if plan.spec.enclosure in [&"palisade", &"wall"]:
 		return true
 	for g in gates:
 		if p.distance_to(g) <= EDGE_REACH * 1.5:
 			return true          # a gate is a hole on purpose
 	for t in plan.plants:
-		if p.distance_to(t["pos"]) <= EDGE_REACH:
+		if _visible_edge_plant(t) and p.distance_to(t["pos"]) <= EDGE_REACH:
 			return true
 	for i in range(boxes.size()):
 		if boxes[i].has_point(p) 				and VillageMeasure.point_to_poly(p, polys[i]) <= EDGE_REACH:
@@ -342,6 +342,18 @@ static func _edge_is_held(plan: VillagePlan, gates: Array[Vector2], p: Vector2,
 		if VillageMeasure.point_to_poly(p, w["poly"]) <= EDGE_REACH:
 			return true
 	return false
+
+
+## The catalogue, not an authored radius, proves that a real upright plant
+## would be visible here. Grass, pebbles and unknown model names cannot stand
+## in for the requested shrub row, even when their records follow its edge.
+static func _visible_edge_plant(plant: Dictionary) -> bool:
+	var key := String(plant.get("key", ""))
+	if not PropCatalog.known(key) or not PropCatalog.has_tag(key, PropCatalog.PLANT) \
+			or PropCatalog.has_tag(key, PropCatalog.GROUND):
+		return false
+	var size := PropCatalog.size(key)
+	return size.y >= 0.5 and minf(size.x, size.z) >= 0.25
 
 
 # ------------------------------------------------------------------ green
@@ -469,9 +481,11 @@ func _check_wood(plan: VillagePlan) -> void:
 	var wood: Vector2 = derived["wood"]
 	var found := false
 	for tree in plan.plants:
-		if float(tree.get("canopy", 0.0)) < 1.0:
+		if not _visible_edge_plant(tree) or PropCatalog.canopy(String(tree["key"])) < 1.0:
 			continue
 		var at: Vector2 = tree["pos"]
+		if plan.water.any(func(water: Dictionary) -> bool: return Poly.contains_point(water["poly"], at)):
+			continue
 		if at.distance_to(wood) <= 10.0 and not Poly.contains_point(edge, at):
 			found = true
 			break

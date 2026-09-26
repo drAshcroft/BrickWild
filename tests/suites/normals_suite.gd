@@ -32,6 +32,7 @@ const NEAR := 0.5
 
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("normals")
+	check_skin_probes(res)
 	var worst_out := 1.0
 	var worst_out_at := ""
 	for style in TestSweep.styles():
@@ -176,12 +177,35 @@ static func _in_solid(builder: MassBuilder, p: Vector3,
 		unless_also := Vector3.INF) -> bool:
 	for m in builder.mass_log:
 		var box: AABB = (m["aabb"] as AABB).grow(-SKIN)
+		# Thin trim has no interior after both skins are removed. An inverted
+		# AABB is unsupported, and taking abs() would invent solid material.
+		if box.size.x <= 0.0 or box.size.y <= 0.0 or box.size.z <= 0.0:
+			continue
 		if not box.has_point(p):
 			continue
 		if unless_also != Vector3.INF and box.has_point(unless_also):
 			continue
 		return true
 	return false
+
+
+static func check_skin_probes(res: SuiteResult) -> void:
+	var builder := MassBuilder.new()
+	for axis in range(3):
+		var size := Vector3.ONE
+		size[axis] = SKIN
+		builder.mass_log.assign([{"aabb": AABB(-size * 0.5, size)}])
+		res.checked += 1
+		if _in_solid(builder, Vector3.ZERO):
+			res.fail("thin mass gained an interior after skin removal on axis %d" % axis)
+	builder.mass_log.assign([{"aabb": AABB(-Vector3.ONE, Vector3.ONE * 2.0)}])
+	res.checked += 3
+	if not _in_solid(builder, Vector3.ZERO):
+		res.fail("skin probe lost a real structural interior")
+	if _in_solid(builder, Vector3(0.98, 0, 0)):
+		res.fail("skin probe included the outer skin")
+	if _in_solid(builder, Vector3.ZERO, Vector3(0.5, 0, 0)):
+		res.fail("skin probe counted the opening's own mass as an obstruction")
 
 
 static func _near_any_mass(builder: MassBuilder, p: Vector3) -> bool:

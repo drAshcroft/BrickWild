@@ -4,6 +4,7 @@ extends RefCounted
 ## at three deterministic seeds and 70/100/140 percent of its population.
 
 const SCALES: Array[float] = [0.7, 1.0, 1.4]
+const NativeQA = preload("res://tests/fixtures/native_family_qa_cache.gd")
 
 const ARCHETYPES: Array[Dictionary] = [
 	{"key": &"thorpe", "people": 18, "culture": &"english", "purpose": &"farming", "water": &"none", "edge": &"hedge", "must": [&"houses4", &"well", &"fields", &"no_shop"]},
@@ -79,14 +80,19 @@ static func run_contracts() -> SuiteResult:
 	blight.plants.append({"key": "Wild_TwistedTree_1", "pos": Vector2(3, 0)})
 	res.checked += 1
 	if not _has_plant_category(blight, "tree"): res.fail("living twisted tree escaped blight no-green rule")
+	_check_cap_contracts(res)
+	_check_strand_contracts(res)
+	_check_programme_contracts(res)
 	return res
 
 
 static func _run_selected(requested: StringName) -> SuiteResult:
 	var res := SuiteResult.new("village archetype")
+	var matched := false
 	for row in ARCHETYPES:
 		if requested != &"" and row["key"] != requested:
 			continue
+		matched = true
 		var row_failures := 0
 		for seed_index in range(3):
 			for scale in SCALES:
@@ -98,17 +104,47 @@ static func _run_selected(requested: StringName) -> SuiteResult:
 				spec.water = row["water"]
 				spec.enclosure = row["edge"]
 				spec.wealth = 0.6
-				spec.generate(spec.seed)
 				print("VIL020 START ", String(row["key"]), " seed=", seed_index, " scale=", scale)
-				var plan := VillageLotPlanner.plan(spec)
 				res.checked += 1
 				var who := "%s seed=%d scale=%.1f" % [String(row["key"]), seed_index, scale]
 				var before := res.failures.size()
+				# The cap deliberately crosses the public population limit at
+				# 140%. A refused request is the required outcome, not an empty
+				# village expected to satisfy rules for a populated settlement.
+				if row["key"] == &"cap" and people > VillageSpec.POP_MAX:
+					for failure in _cap_refusal_failures(spec):
+						var message := "%s: %s" % [who, failure]
+						res.fail(message)
+						print("VIL020 FAIL ", message)
+					if res.failures.size() > before: row_failures += 1
+					print("VIL020 DONE ", who, " refusal defects=", res.failures.size() - before)
+					continue
+				spec.generate(spec.seed)
+				var requests := VillageProgrammer.programme(spec)
+				var jobs := preload("res://tests/fixtures/native_measurement_cache.gd").measure(requests)
+				var plan := VillageLotPlanner.plan_measured(spec, jobs)
+				res.checked += 1
+				for failure in _programme_failures(requests, plan):
+					var message := "%s: %s" % [who, failure]
+					res.fail(message)
+					print("VIL020 FAIL ", message)
 				var qa: Dictionary = VillageQA.new().check(plan, {}, false)
 				for failure in qa["failures"]:
 					var message := "%s: QA: %s" % [who, String(failure)]
 					res.fail(message)
 					print("VIL020 FAIL ", message)
+				# Every placed native building still passes its full family QA.
+				# Only exact request/source reports may be reused between cases;
+				# all site, lot, dressing and navigation checks run above afresh.
+				for i in plan.buildings.size():
+					var native := NativeQA.check(plan.buildings[i]["request"])
+					res.checked += 1
+					for failure in native["failures"]:
+						var message := "%s: native building %d: %s" % [who, i, failure]
+						res.fail(message)
+						print("VIL020 FAIL ", message)
+					for warning in native["warnings"]:
+						res.warn("%s: native building %d: %s" % [who, i, warning])
 				for failure2 in _must_failures(row, plan, scale):
 					var message2 := "%s: %s" % [who, failure2]
 					res.fail(message2)
@@ -116,8 +152,113 @@ static func _run_selected(requested: StringName) -> SuiteResult:
 				if res.failures.size() > before:
 					row_failures += 1
 				print("VIL020 DONE ", who, " defects=", res.failures.size() - before)
+				if res.failures.size() > before:
+					var folder := "res://artifacts/village_archetype_failures"
+					DirAccess.make_dir_recursive_absolute(folder)
+					var path := "%s/%s_seed%d_scale%.1f.bin" % [folder, row["key"], seed_index, scale]
+					var file := FileAccess.open(path, FileAccess.WRITE)
+					if file != null:
+						file.store_var(BuildingCodec.encode(plan))
+						print("VIL020 FAILURE PLAN ", path)
+					res.note("stopped at first defective native village; the complete archetype matrix remains required")
+					return res
 		res.note("  %s: %d cases, %d defects" % [String(row["key"]), 9, row_failures])
+	if not matched:
+		res.fail("unknown village archetype: " + String(requested))
 	return res
+
+
+static func _cap_refusal_failures(spec: VillageSpec) -> Array[String]:
+	var out: Array[String] = []
+	if spec.population <= VillageSpec.POP_MAX or spec.valid():
+		out.append("above-cap population was not rejected by the spec")
+	var request := BigGlade.default_request(&"village", spec.seed)
+	request.width = spec.population
+	request.length = spec.wealth * 100.0
+	request.style = spec.culture
+	request.purpose = spec.purpose
+	request.water = spec.water
+	request.enclosure = spec.enclosure
+	var built := BigGlade.generate(request)
+	if built.is_ok() or built.errors.is_empty() or built.spec != null or built.village != null:
+		out.append("public generator built or silently clamped an above-cap village")
+	if built.request == null or built.request.width != float(spec.population):
+		out.append("refused request did not retain the requested population")
+	return out
+
+
+## Count requests as a multiset: equal building totals cannot hide one
+## missing earned building replaced by a duplicate of another request.
+static func _programme_failures(expected: Array[BuildingRequest], plan: VillagePlan) -> Array[String]:
+	var out: Array[String] = []
+	var wanted := {}
+	var actual := {}
+	for request in expected:
+		var key := request.to_json()
+		wanted[key] = int(wanted.get(key, 0)) + 1
+	for building in plan.buildings:
+		var key: String = building["request"].to_json()
+		actual[key] = int(actual.get(key, 0)) + 1
+	if plan.buildings.size() != expected.size():
+		out.append("programme placed %d buildings, expected %d" % [plan.buildings.size(), expected.size()])
+	for key in wanted:
+		if int(actual.get(key, 0)) != int(wanted[key]):
+			var request := BuildingRequest.from_json(key)
+			out.append("programme %s/%s seed=%d: placed %d, expected %d" % [request.kind,
+				request.purpose, request.seed, int(actual.get(key, 0)), int(wanted[key])])
+	return out
+
+
+static func _check_programme_contracts(res: SuiteResult) -> void:
+	var expected: Array[BuildingRequest] = [BuildingRequest.house(47), BuildingRequest.house(48)]
+	var plan := VillagePlan.new(VillageSpec.new(47))
+	plan.buildings.assign([{"request": expected[1]}, {"request": expected[0]}])
+	res.checked += 1
+	if not _programme_failures(expected, plan).is_empty():
+		res.fail("exact native programme was rejected after placement reordered it")
+	plan.buildings.pop_back()
+	res.checked += 1
+	if _programme_failures(expected, plan).is_empty(): res.fail("missing native request escaped programme QA")
+	plan.buildings.append({"request": expected[1]})
+	res.checked += 1
+	if _programme_failures(expected, plan).is_empty(): res.fail("duplicate replacement escaped programme multiset QA")
+
+
+static func _check_cap_contracts(res: SuiteResult) -> void:
+	var spec := VillageSpec.new(45)
+	spec.population = VillageSpec.POP_MAX
+	res.checked += 1
+	if not spec.valid(): res.fail("population 500 was rejected at the cap boundary")
+	for people in [VillageSpec.POP_MAX + 1, 700]:
+		spec.population = people
+		res.checked += 1
+		for failure in _cap_refusal_failures(spec): res.fail("cap contract: " + failure)
+
+
+static func _check_strand_contracts(res: SuiteResult) -> void:
+	var plan := VillagePlan.new(VillageSpec.new(46))
+	plan.roads.assign([
+		{"class": &"lane", "points": PackedVector2Array([Vector2(-20, 0), Vector2(-20, -20)])},
+		{"class": &"through", "points": PackedVector2Array([Vector2(-40, 0), Vector2(40, 0)])}])
+	plan.water.append({"kind": &"coast", "poly": Poly.from_rect(Rect2(-50, 30, 100, 20))})
+	for road in [0, 1, 1]: plan.lots.append({"road": road})
+	plan.buildings.assign([
+		{"request": BuildingRequest.church(46), "lot": 0},
+		{"request": BuildingRequest.house(47), "lot": 1},
+		{"request": BuildingRequest.house(48), "lot": 2}])
+	res.checked += 1
+	if not _strand_row(plan): res.fail("landmark road masked the houses' strand row")
+	plan.lots[2]["road"] = 0
+	res.checked += 1
+	if _strand_row(plan): res.fail("houses on different roads passed as one strand row")
+	plan.lots[2]["road"] = 1
+	plan.buildings[2]["request"] = BuildingRequest.church(48)
+	res.checked += 1
+	if _strand_row(plan): res.fail("landmark counted as a second strand house")
+	plan.buildings[2]["request"] = BuildingRequest.house(48)
+	plan.lots[2]["road"] = plan.roads.size()
+	res.checked += 1
+	if _strand_row(plan): res.fail("invalid house road index passed strand row QA")
 
 
 static func _requested_row() -> StringName:
@@ -333,16 +474,17 @@ static func _strand_row(plan: VillagePlan) -> bool:
 	var road_index := -1
 	var row_count := 0
 	for building in plan.buildings:
+		if (building["request"] as BuildingRequest).kind != &"house": continue
 		var lot_index: int = int(building["lot"])
 		if lot_index < 0 or lot_index >= plan.lots.size():
-			continue
+			return false
 		var lot_road: int = int(plan.lots[lot_index].get("road", -1))
-		if lot_road < 0:
-			continue
+		if lot_road < 0 or lot_road >= plan.roads.size():
+			return false
 		if road_index < 0:
 			road_index = lot_road
-		if lot_road == road_index:
-			row_count += 1
+		if lot_road != road_index: return false
+		row_count += 1
 	if row_count < 2:
 		return false
 	# A strand row must have coast on the far side of its frontage road, not

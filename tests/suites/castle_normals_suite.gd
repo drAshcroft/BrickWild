@@ -11,6 +11,7 @@ extends RefCounted
 
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("castle normals")
+	NormalsSuite.check_skin_probes(res)
 	for style in CastleSweep.styles():
 		for tier in CastleSweep.tiers():
 			for i in range(CastleSweep.COUNT):

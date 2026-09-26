@@ -11,12 +11,14 @@ const SEEDS := 50
 
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("vforms")
+	_check_manor_site(res)
 	_check_planted_regressions(res)
 	_check_courtyard_approach(res)
 	_check_round_fan(res)
 	_check_lane_reach(res)
 	_check_street_common(res)
 	_check_well_plants(res)
+	_check_strand_working_bank(res)
 	for c in _cases():
 		_check_site_sweep(res, c)
 		_check_full_sample(res, c)
@@ -27,15 +29,183 @@ static func run() -> SuiteResult:
 ## running. It exercises the same rules; it is not the full VIL-017 gate.
 static func run_layout() -> SuiteResult:
 	var res := SuiteResult.new("vforms layout")
+	_check_manor_site(res)
 	_check_planted_regressions(res)
 	_check_courtyard_approach(res)
 	_check_round_fan(res)
 	_check_lane_reach(res)
 	_check_street_common(res)
 	_check_well_plants(res)
+	_check_strand_working_bank(res)
 	for c in _cases():
 		_check_site_sweep(res, c)
 	return res
+
+
+static func _check_manor_site(res: SuiteResult) -> void:
+	var manor: SuiteResult = preload("res://tests/suites/village_manor_site_suite.gd").run()
+	res.checked += manor.checked
+	res.failures.append_array(manor.failures)
+	res.warnings.append_array(manor.warnings)
+
+
+static func _check_strand_working_bank(res: SuiteResult) -> void:
+	var spec := VillageSpec.new(3)
+	spec.population = 70
+	spec.purpose = &"fishing"
+	spec.enclosure = &"none"
+	spec.water = &"coast"
+	spec.generate(3)
+	var plan := VillagePlan.new(spec)
+	plan.site = Rect2(-32, -20, 64, 50)
+	plan.roads.append(VillageSitePlanner._road(PackedVector2Array([
+		Vector2(-32, 0), Vector2(32, 0)]), &"through", 0.4))
+	plan.lots.append({"poly": Poly.from_rect(Rect2(-12, 4.5, 24, 10))})
+	plan.water.append({"kind": &"coast", "poly": Poly.from_rect(Rect2(-28, 16, 56, 10))})
+	var ctx := VillageDresser._context(plan)
+	ctx["strand_walk"] = VillageNavCheck.reached_grid(plan)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	res.checked += 1
+	if VillageDresser._place(plan, ctx, {"built": true}, "boat", Vector2(27, 14.5), rng, -1):
+		res.fail("boat accepted on an isolated shore beyond every working yard")
+	VillageDresser._dress_place(plan, ctx, &"strand")
+	var boats := 0
+	var racks := 0
+	for prop in plan.props:
+		boats += 1 if prop["key"] == "boat" else 0
+		racks += 1 if prop["key"] == "drying_rack" else 0
+	res.checked += 1
+	if boats == 0 or racks == 0:
+		res.fail("reachable shoreline interior needs both a boat and a drying rack")
+	var builder := VillageBuilder.new()
+	builder.build(plan)
+	for i in range(plan.props.size()):
+		var prop: Dictionary = plan.props[i]
+		if prop["key"] not in ["boat", "drying_rack"]:
+			continue
+		var mass_name := "%s%d" % [prop["key"], i]
+		var emitted := false
+		for mass in builder.mass_log:
+			if mass["name"] != mass_name:
+				continue
+			emitted = true
+			var actual: AABB = mass["aabb"]
+			var footprint := Rect2(Vector2(actual.position.x, actual.position.z),
+				Vector2(actual.size.x, actual.size.z))
+			res.checked += 1
+			if not (prop["rect"] as Rect2).grow(0.01).encloses(footprint):
+				res.fail("shore clearance understates the emitted rotated " + String(prop["key"]))
+		res.checked += 1
+		if not emitted:
+			res.fail("shore prop is planned but absent from emitted masses: " + mass_name)
+	var nav := VillageNavCheck.new().check(plan)
+	res.checked += 1
+	for failure in nav["failures"]:
+		if String(failure).begins_with("use:"):
+			res.fail("shore working space: " + String(failure))
+	_check_strand_apron(res, spec)
+	_check_strand_edge(res)
+	_check_strand_route_obstruction(res, spec)
+
+
+static func _check_strand_route_obstruction(res: SuiteResult, spec: VillageSpec) -> void:
+	var plan := VillagePlan.new(spec)
+	plan.site = Rect2(-32, -20, 64, 60)
+	plan.roads.append(VillageSitePlanner._road(PackedVector2Array([
+		Vector2(-32, 0), Vector2(32, 0)]), &"through", 0.4))
+	# A narrow reached neck opens onto a broad working yard. Its route is
+	# separate from the boat's own apron and cannot be protected by that
+	# apron polygon alone.
+	plan.lots.append({"poly": Poly.from_rect(Rect2(-0.75, 4.5, 1.5, 8.0))})
+	plan.lots.append({"poly": Poly.from_rect(Rect2(-12, 10, 24, 10))})
+	plan.water.append({"kind": &"coast", "poly": Poly.from_rect(Rect2(-28, 26, 56, 10))})
+	var ctx := VillageDresser._context(plan)
+	ctx["strand_walk"] = VillageNavCheck.reached_grid(plan)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	res.checked += 1
+	if not VillageDresser._place(plan, ctx, {"built": true}, "boat", Vector2(0, 23), rng, -1):
+		res.fail("reached narrow-neck shore yard could not serve its boat")
+		return
+	res.checked += 1
+	if VillageDresser._place(plan, ctx, {}, "Crate_Metal", Vector2(0, 7), rng, -1):
+		res.fail("later shore crate cut the boat's only yard route")
+	res.checked += 1
+	if not VillageNavCheck.reached_grid(plan).reached(plan.props[0]["rect"], VillageNavCheck.PERSON_RADIUS + 0.4):
+		res.fail("rejected shore obstruction damaged prior boat access")
+
+
+static func _check_strand_edge(res: SuiteResult) -> void:
+	var spec := _spec(8, _cases()[2])
+	var plan := VillagePlan.new(spec)
+	# Four consecutive jittered stations used to leave this long northern
+	# edge outside the site, despite the entire band being clear and dry.
+	plan.site = Rect2(-178.5729, -69.02083, 357.1458, 120.0417)
+	VillageDresser._dress_place(plan, VillageDresser._context(plan), &"edge")
+	var edge := VillageDressCheck.new()
+	edge._check_edge(plan)
+	res.checked += 1
+	if not edge.failures.is_empty():
+		res.fail("clear strand edge: " + "; ".join(edge.failures))
+	plan.plants.clear()
+	var y := plan.site.position.y + 2.5
+	var road := VillageSitePlanner._road(PackedVector2Array([
+		Vector2(plan.site.position.x, y), Vector2(plan.site.end.x, y)]), &"through", spec.wealth)
+	plan.roads.append(road)
+	VillageDresser._dress_place(plan, VillageDresser._context(plan), &"edge")
+	var ribbon := VillageSitePlanner.road_ribbon(road, true)
+	res.checked += 1
+	for plant in plan.plants:
+		if Poly.contains_point(ribbon, plant["pos"]):
+			res.fail("projected strand edge tree bypassed an actual road obstruction")
+			break
+
+
+static func _check_strand_apron(res: SuiteResult, spec: VillageSpec) -> void:
+	var plan := VillagePlan.new(spec)
+	plan.site = Rect2(-32, -20, 64, 60)
+	plan.roads.append(VillageSitePlanner._road(PackedVector2Array([
+		Vector2(-32, 0), Vector2(32, 0)]), &"through", 0.4))
+	plan.lots.append({"poly": Poly.from_rect(Rect2(-12, 4.5, 24, 10))})
+	plan.water.append({"kind": &"coast", "poly": Poly.from_rect(Rect2(-28, 24, 56, 12))})
+	var ctx := VillageDresser._context(plan)
+	ctx["strand_walk"] = VillageNavCheck.reached_grid(plan)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	res.checked += 1
+	if not VillageDresser._place(plan, ctx, {"built": true}, "boat", Vector2(0, 20.5), rng, -1):
+		res.fail("clear shore working apron could not connect to a reached yard")
+		return
+	var prop: Dictionary = plan.props.back()
+	res.checked += 1
+	if not prop.has("approach"):
+		res.fail("shore boat across a real floor gap received no working apron")
+		return
+	var apron: PackedVector2Array = prop["approach"]
+	var builder := VillageBuilder.new()
+	var mesh := builder.build(plan)
+	for point in apron:
+		var found := false
+		for surface in mesh.get_surface_count():
+			var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+			for vertex in vertices:
+				found = found or vertex.distance_to(Vector3(point.x, 0.035, point.y)) < 0.001
+		res.checked += 1
+		if not found:
+			res.fail("shore apron floor is recorded but absent from emitted mesh")
+	res.checked += 1
+	if VillageDresser._plant_is_clear(plan, ctx, Poly.bounding_rect(apron).get_center(), 0.2, 0.2):
+		res.fail("later planting can obstruct the shore working apron")
+	var obstruction := Rect2(Poly.bounding_rect(apron).get_center() - Vector2(0.25, 0.25), Vector2(0.5, 0.5))
+	res.checked += 1
+	if VillageDresser._prop_is_clear(plan, ctx, obstruction, obstruction):
+		res.fail("later props can obstruct the shore working apron")
+	prop.erase("approach")
+	var broken := VillageNavCheck.reached_grid(plan)
+	res.checked += 1
+	if broken.reached(prop["rect"], VillageNavCheck.PERSON_RADIUS + 0.4):
+		res.fail("boat remained reachable after its only apron was removed")
 
 
 static func _check_well_plants(res: SuiteResult) -> void:
@@ -112,6 +282,14 @@ static func _check_lane_reach(res: SuiteResult) -> void:
 		res.checked += 1
 		if not VillageLotPlanner._lot_is_legal(plan, ctx, reached, job, gap):
 			res.fail("isolated lane rejects a reached stable entrance")
+		job["siting"] = {"road": &"through", "insists": true}
+		res.checked += 1
+		if VillageLotPlanner._place_on_road(plan, ctx, job, [1]) >= 0.0:
+			res.fail("required through-road trade silently fell back to an ordinary lane")
+		job["siting"] = {"road": &"lane", "insists": true}
+		res.checked += 1
+		if VillageLotPlanner._place_on_road(plan, ctx, job, [1]) < 0.0:
+			res.fail("explicit companion-lane address rejected a reachable stable")
 		return
 	res.fail("lane reach fixture has no candidate edge")
 
@@ -120,12 +298,19 @@ static func _check_lane_reach(res: SuiteResult) -> void:
 ## Keep it explicit: the quick site sweep and one sample do not stand in for
 ## this expensive measured-building run. Optional form selection allows the
 ## same strict matrix to be split across background runs.
-static func run_full(selected: StringName = &"") -> SuiteResult:
+static func run_full(selected: StringName = &"", first_seed := 0, seed_count := SEEDS) -> SuiteResult:
 	var res := SuiteResult.new("vforms full")
+	if first_seed < 0 or seed_count < 1 or first_seed + seed_count > SEEDS:
+		res.fail("seed range must be nonempty and contained within 0..%d" % (SEEDS - 1))
+		return res
+	var matched := false
 	for c in _cases():
 		if selected != &"" and c["name"] != selected:
 			continue
-		for seed in range(SEEDS):
+		matched = true
+		print("VFORMS RANGE ", c["name"], " seeds=", first_seed, "..", first_seed + seed_count - 1,
+			" of 0..", SEEDS - 1)
+		for seed in range(first_seed, first_seed + seed_count):
 			print("VFORMS FULL START ", c["name"], " seed=", seed)
 			var before := res.failures.size()
 			_check_full_sample(res, c, seed, true)
@@ -135,10 +320,13 @@ static func run_full(selected: StringName = &"") -> SuiteResult:
 					print("VFORMS FULL FAIL ", res.failures[i])
 				res.note("stopped after first failing measured seed; the fifty-seed gate is incomplete")
 				return res
+	if not matched:
+		res.fail("unknown village form %s" % selected)
 	return res
 
 
 static func _check_round_fan(res: SuiteResult) -> void:
+	_check_blight_common(res)
 	var plan := VillageSitePlanner.plan(_spec(0, _cases()[1]))
 	var centre := VillageMeasure.common_centre(plan)
 	var edge: Dictionary = {}
@@ -171,7 +359,33 @@ static func _is_fan(poly: PackedVector2Array, centre: Vector2) -> bool:
 		and absf((poly[1] - centre).normalized().cross((poly[2] - centre).normalized())) < 0.001
 
 
+static func _check_blight_common(res: SuiteResult) -> void:
+	for seed in range(SEEDS):
+		var plan := VillagePlan.new(_spec(seed, _cases()[1]))
+		plan.site = Rect2(-45, -45, 90, 90)
+		var common := Poly.from_rect(Rect2(-15, -15, 30, 30))
+		plan.commons.append({"poly": common})
+		VillageDresser._blight_remnants(plan, VillageDresser._context(plan))
+		var clear := not plan.props.is_empty()
+		for prop in plan.props:
+			clear = clear and VillageLotPlanner.overlap_area(Poly.from_rect(prop["rect"]), common) <= VillageLotPlanner.AREA_EPS
+		res.checked += 1
+		if not clear:
+			res.fail("blight seed %d must retain a ruin cluster wholly outside the common" % seed)
+	var blocked := VillagePlan.new(_spec(41, _cases()[1]))
+	blocked.site = Rect2(-45, -45, 90, 90)
+	blocked.commons.append({"poly": Poly.from_rect(blocked.site)})
+	VillageDresser._blight_remnants(blocked, VillageDresser._context(blocked))
+	res.checked += 1
+	if not blocked.props.is_empty():
+		res.fail("blight ruin bypassed a common covering every candidate site")
+
+
 static func _check_courtyard_approach(res: SuiteResult) -> void:
+	var approach: SuiteResult = preload("res://tests/suites/village_approach_nav_suite.gd").run()
+	res.checked += approach.checked
+	res.failures.append_array(approach.failures)
+	res.warnings.append_array(approach.warnings)
 	var spec := _spec(17217, _cases()[4])
 	var job: Dictionary = {}
 	for request in VillageProgrammer.programme(spec):
@@ -309,6 +523,11 @@ static func _site_problems(plan: VillagePlan, spec: VillageSpec,
 			out.append("strand has no coast water")
 		elif plan.roads_of_class(&"through").is_empty():
 			out.append("strand has no road behind shore")
+		var lane := VillageLotPlanner._add_landmark_lane(plan)
+		if lane >= 0:
+			if Poly.polyline_length(plan.roads[lane]["points"]) > 40.0 + 0.001:
+				out.append("strand landmark lane exceeds its forty-metre dead-end limit")
+			plan.roads.remove_at(lane)
 	if form == &"planted":
 		if plan.commons[0]["kind"] != &"square" or Poly.area(plan.commons[0]["poly"]) < 400.0:
 			out.append("planted square is below 400m2")
@@ -385,9 +604,47 @@ static func _check_planted_regressions(res: SuiteResult) -> void:
 
 
 static func _check_full_sample(res: SuiteResult, c: Dictionary, seed := -1, pure := false) -> void:
+	var failures_before := res.failures.size()
 	var actual_seed: int = 17017 + int(c["population"]) if seed < 0 else seed
 	var spec := _spec(actual_seed, c)
-	var plan := VillageLotPlanner.plan(spec)
+	var requests := VillageProgrammer.programme(spec)
+	var jobs: Array[Dictionary] = preload("res://tests/fixtures/native_measurement_cache.gd").measure(requests)
+	var plan := VillageLotPlanner.plan_measured(spec, jobs)
+	res.checked += 2
+	if jobs.size() != requests.size():
+		res.fail("%s seed %d lost native programme measurements" % [spec.form, actual_seed])
+	var expected := {}
+	var actual := {}
+	for request in requests:
+		var key := request.to_json()
+		expected[key] = int(expected.get(key, 0)) + 1
+	for building in plan.buildings:
+		var key: String = building["request"].to_json()
+		actual[key] = int(actual.get(key, 0)) + 1
+	if expected != actual:
+		res.fail("%s seed %d omitted or duplicated an exact programme request" % [spec.form, actual_seed])
+	if spec.form == &"gate":
+		res.checked += 1
+		if not VillageArchetypeSuite._manor_at_lane_head(plan):
+			res.fail("gate seed %d manor is not reached at the head of its own lane" % actual_seed)
+	if spec.form == &"strand":
+		res.checked += 1
+		var coast := Poly.bounding_rect(plan.water[0]["poly"]).get_center()
+		for building in plan.buildings:
+			if building["class"] in [&"church", &"manor"]:
+				continue
+			var lot: Dictionary = plan.lots[int(building["lot"])]
+			var front: PackedVector2Array = lot["front"]
+			if plan.roads[int(lot["road"])]["class"] != &"through" \
+					or (coast - (front[0] + front[1]) * 0.5).dot(lot["normal"]) <= 0.0:
+				res.fail("strand seed %d ordinary building is outside its one shore-facing row" % actual_seed)
+		var boats := 0
+		var racks := 0
+		for prop in plan.props:
+			boats += 1 if prop["key"] == "boat" else 0
+			racks += 1 if prop["key"] == "drying_rack" else 0
+		if boats == 0 or racks == 0:
+			res.fail("strand seed %d needs both a boat and a drying rack" % actual_seed)
 	if spec.form == &"crossroads":
 		for building in plan.buildings:
 			var request: BuildingRequest = building["request"]
@@ -397,6 +654,17 @@ static func _check_full_sample(res: SuiteResult, c: Dictionary, seed := -1, pure
 				if VillageMeasure.point_to_poly(VillageLotPlanner._through_crossing(plan), lot["poly"]) > 10.0:
 					res.fail("crossroads seed %d inn does not occupy a corner of the crossing" % actual_seed)
 	if spec.form == &"round":
+		res.checked += 2
+		if plan.roads_of_class(&"lane").size() != 1:
+			res.fail("round seed %d must retain exactly one entrance lane after placement" % actual_seed)
+		var common: PackedVector2Array = plan.commons[0]["poly"]
+		var common_centre := Poly.bounding_rect(common).get_center()
+		var radius := common[0].distance_to(common_centre)
+		var circular := common.size() >= 12
+		for point in common:
+			circular = circular and absf(point.distance_to(common_centre) - radius) < 0.01
+		if not circular:
+			res.fail("round seed %d lost its circular polygonal common" % actual_seed)
 		var fans := 0
 		var centre := VillageMeasure.common_centre(plan)
 		for lot in plan.lots:
@@ -411,6 +679,22 @@ static func _check_full_sample(res: SuiteResult, c: Dictionary, seed := -1, pure
 		res.checked += 1
 		if fans == 0:
 			res.fail("round seed %d has no fan of lots around the common" % actual_seed)
+	if spec.form == &"planted":
+		res.checked += 2
+		if plan.commons[0]["kind"] != &"square" or Poly.area(plan.commons[0]["poly"]) < 400.0:
+			res.fail("planted seed %d lost its market square of at least 400m2" % actual_seed)
+		var streets: Array[int] = plan.roads_of_class(&"street")
+		var parallel := false
+		for i in streets.size():
+			var a: PackedVector2Array = plan.roads[streets[i]]["points"]
+			var direction := (a[a.size() - 1] - a[0]).normalized()
+			for j in range(i + 1, streets.size()):
+				var b: PackedVector2Array = plan.roads[streets[j]]["points"]
+				var other := (b[b.size() - 1] - b[0]).normalized()
+				parallel = parallel or (absf(direction.cross(other)) < 0.001 \
+					and absf(direction.cross(b[0] - a[0])) > 1.0)
+		if not parallel:
+			res.fail("planted seed %d needs two distinct parallel streets" % actual_seed)
 	var no_pure := func(_plan: VillagePlan) -> Array: return []
 	var replacements: Dictionary = {} if pure else {&"pure": no_pure}
 	var reports := [
@@ -425,3 +709,20 @@ static func _check_full_sample(res: SuiteResult, c: Dictionary, seed := -1, pure
 		res.checked += 1
 		if not row[1]["ok"]:
 			res.fail("%s seed %d %s: %s" % [c["name"], actual_seed, row[0], "; ".join(row[1]["failures"])])
+	if res.failures.size() > failures_before:
+		_save_failure_plan(plan)
+
+
+## Keep the actual failing output; reproducing native lots can take minutes.
+## The codec restores typed plan data without constructing arbitrary objects.
+static func _save_failure_plan(plan: VillagePlan) -> void:
+	var folder := "res://artifacts/village_forms_failures"
+	DirAccess.make_dir_recursive_absolute(folder)
+	var path := "%s/%s_seed%d_%d.bin" % [folder, String(plan.spec.form),
+		plan.spec.seed, int(Time.get_unix_time_from_system() * 1000.0)]
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		printerr("VFORMS could not preserve failure plan: ", path, " error=", FileAccess.get_open_error())
+		return
+	file.store_var(BuildingCodec.encode(plan))
+	print("VFORMS FAILURE PLAN ", path)
