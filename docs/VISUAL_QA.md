@@ -1,0 +1,310 @@
+# Visual QA
+
+Written against `32c27b7` (2026-09-26). Every claim below names the image it was
+read from, so it can be checked rather than believed. No generator code was
+changed; this is a look at what the system puts on screen, and at what would
+move that.
+
+51 images were examined:
+
+- 41 from `tools/render_shots.gd` — 8 landmark churches, 6 feature close-ups,
+  8 castles, 6 furnished houses, 7 temples, 4 blueprint sheets, 2 cutaway
+  extras
+- 10 village form renders from `tools/render_village_forms.gd` (5 forms × 2
+  views)
+- 2 from a throwaway light probe (below)
+
+**The short version.** The harness is extraordinary and the output is
+*legible*: every building is the right plan, on the right axis, at the right
+scale, and the settlement logic is the best thing here. What is missing is
+everything one layer above correctness — depth at the openings, material on
+the surfaces, a light that belongs to the shot, and a ground the building
+stands on. The house family already has all four. The church and castle
+families have none of them, which is why they score lowest despite passing
+every structural suite.
+
+---
+
+## 1. The rubric
+
+Nine axes, 0–5, 45 maximum. Chosen because each one is answerable from a single
+render by someone who is not a generator author, and each one names a specific
+piece of the system rather than a feeling.
+
+| # | Axis | The question it asks | 0 | 3 | 5 |
+|---|---|---|---|---|---|
+| A | **Silhouette** | does the outline read in one glance, in profile? | shapeless | readable massing | a skyline you could identify |
+| B | **Structure** | can you see what holds it up? | nothing carries | piers and walls read | the load path is legible |
+| C | **Surface** | is there a material story? | one flat colour | two tones | course, texture, weathering |
+| D | **Openings** | do windows have depth? | black decals | recessed | splay, sill, hood, surround |
+| E | **Rhythm** | does the elevation have a beat? | one flat field | even spacing | hierarchy between bays |
+| F | **Setting** | is it in a place? | floating | grounded | sited, shadowed, weathered in |
+| G | **Hierarchy** | is there a focal point, scaled to the shot? | none | one accent | a graded hierarchy |
+| H | **Programme** | can you tell what it is for? | no | roughly | at a glance, and named |
+| I | **Palette** | colour relationships and tonal range | monochrome | two hues | a full range with a focal accent |
+
+Axis H scores highest across the board and axis C lowest. That is the shape of
+this project: it knows *what* to build and has not started on *how it looks*.
+
+---
+
+## 2. Scores
+
+| | A | B | C | D | E | F | G | H | I | **/45** |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **House** | 4.0 | 3.5 | 3.5 | 3.0 | 3.5 | 1.5 | 3.5 | 4.0 | 3.5 | **30.0** |
+| **Village** | 3.5 | 3.0 | 3.0 | 3.0 | 3.5 | 3.0 | 2.0 | 4.0 | 2.5 | **27.5** |
+| **Temple** | 3.0 | 2.5 | 1.5 | 2.0 | 3.5 | 2.0 | 3.0 | 4.5 | 3.5 | **25.5** |
+| **Church** | 3.5 | 1.5 | 1.0 | 1.0 | 1.5 | 1.0 | 2.0 | 3.5 | 1.5 | **16.5** |
+| **Castle** | 3.0 | 2.5 | 1.0 | 1.0 | 2.0 | 1.0 | 1.5 | 3.0 | 1.5 | **16.5** |
+
+The spread is the finding. House and castle are the same codebase, the same
+`MeshKit`, the same `mass_builder`. One is the best thing the system draws and
+the other is the worst. The difference is `ShellAssembler.house_materials` and
+a timber frame with structure in it.
+
+### House — 30.0
+
+`house_exterior.jpg` is a real building. Half-timbered upper storey on a stone
+plinth, jettied, with studs, rails and braces doing visible work; a slate roof
+with a ridge, verge and bargeboards; a porch; mullioned windows with sills; a
+chimney with pots; a bench against the wall. This is the only image in the set
+where every surface has a material.
+
+Deductions:
+
+- **F 1.5** — the cutaways float on a plane. No garden, no yard, no fence, no
+  clutter outside. `house_room.jpg` shows the interior and `house_exterior.jpg`
+  the shell, and nothing in between.
+- **The chimney stands in the middle of the room.** `house_inn.jpg`,
+  `house_smithy.jpg`, `house_farmhouse.jpg` and `house_family_cottage.jpg` all
+  show the stack as a free-standing rectangular column bisecting a room, with
+  the hearth nowhere near it. See S8.
+- **Rooms are large and half empty.** Every cutaway shows the same pattern:
+  furniture against the walls, a bare middle, and floors at the same value as
+  the sky behind them.
+- The gable end of the inn carries two black braces that read as loose sticks.
+  A king-post truss and a gable window would cost one emitter.
+
+### Village — 27.5
+
+`gate_common.jpg` and `crossroads_common.jpg` are the best pictures the system
+makes. A roofscape with spires, chimneys and jetties; a church with an apse and
+a spire; a green with a well; a road network with a crossroads; an orchard
+around the edge. `strand_actual.jpg` gets the linear form on a river exactly
+right.
+
+This is also the proof that **the church generator is good at the wrong scale.**
+The same `ChurchGeometry` that produces the 127 m Notre-Dame produces a
+perfectly convincing 40 m parish church here, seen at the right distance with
+the right neighbours.
+
+Deductions:
+
+- **G 2.0** — the green's stalls are breadcrumbs at this scale, and the orchard
+  is a dotted line of identical lollipops around three sides of the site.
+- **I 2.5** — the ground is one green with no variation, and the autumn trees
+  are a coral that fights everything around it.
+- **F 3.0** — the site is a perfect rectangle with a printed tree border, and
+  the grey void beyond the ground plane is visible in all five aerials.
+
+### Temple — 25.5
+
+`temple_bloodpit_basilica.jpg` and `temple_ossuary_basilica.jpg` are
+atmospheric: raking red and green light down a colonnade, braziers down both
+aisles, the idol glowing at the end. The brazier is the best single prop in the
+system.
+
+- **H 4.5** — the highest single score anywhere. The gate-to-idol axis is
+  unmistakable, which is exactly what `TempleRiteCheck` was written to enforce.
+  The pictures and the harness agree.
+- **C 1.5 / D 2.0** — the flat wall behind the altar is the largest surface in
+  the best temple shot and it is a dead grey field. The altar in
+  `temple_coiled_rotunda.jpg` floats in mid-air over the pit.
+- **The serpent idol is a stack of green cubes.** Unrecognisable as a cult image.
+- **F 2.0** — `_dim()` works for two temples and fails one. See S10.
+
+### Church — 16.5
+
+`detail_crossing.jpg` is the most damning image in the set and it is the one
+most like a real photograph. Durham's lantern tower is a squat box with a plain
+pyramid and four 2-pixel pinnacles. The buttresses are vertical strips of the
+same colour as the wall, glued flat, casting no shadow — painted stripes, not
+structure. Below them is one row of twelve identical black rectangles at
+exactly one height. The transept gable is a red triangle floating on a white
+wall. Roughly 70% of the visible surface is undifferentiated plane.
+
+- **B 1.5** — `detail_flyers.jpg`: the flyer is a thin curved blade with a
+  shallow 16%-of-span bow (`bow = |px - wall_x| * 0.16`,
+  `church_builder.gd:322`) over a 6-step `arc_ribbon`, with no spandrel, no
+  coping and no channel. `detail_dome.jpg`: the pendentives are two flat white
+  triangular blades poking *horizontally* out of the drum.
+- **C 1.0** — every stone surface is one flat albedo. See S3.
+- **D 1.0** — windows are black quads flush with the wall. The rose window has
+  tracery; nothing else does.
+- **A 3.5** — the long ridge and the crossing spire genuinely compose. The
+  north-west elevation of `notre_dame.jpg` is a good building. `hagia_sophia.jpg`
+  and `florence_duomo.jpg` are sheds with a hat: a 12–16-sided dome on a 100 m
+  plain box, and a 153 m box with two horizontal bands of black dashes.
+- `detail_chapels.jpg` is aimed at the roof, not the chevet, and shows no
+  chapels. The shot, not the geometry, is the problem — but a shot that cannot
+  find its own subject is a finding.
+
+### Castle — 16.5
+
+`castle_stokesay.jpg` is the good one: hipped roofs with real eaves and shadow,
+a crenellated gatehouse, four chimneys, a courtyard, a sun angle that lands.
+
+- **A 3.0** — Bodiam, Krak, Chambord, Stokesay and Caernarfon all read as
+  plans. `castle_himeji.jpg` has no tenshu and no *kiso-zukuri* stone base; the
+  walls run straight to the ground. `castle_neuschwanstein.jpg` is a 5 × 8
+  spreadsheet of black dashes on a white box beside a featureless tube.
+- **B 2.5** — batter, merlons and drums read. But every tower is the same size
+  and shape. `CastleGenerator` produces `great_tower` and `great_tower_scale`
+  (`castle_generator.gd:88`) and the silhouette never uses them. See S5.
+- **G 1.5** — the bailey is empty. `castle_krak.jpg` is 300 m of curtain around
+  a flat tan field. See S9.
+- **E 2.0** — Chambord and Neuschwanstein run rows of identical windows with no
+  hierarchy, and a concierge's desk of horizontal string courses that reads as
+  a car park.
+- `castle_caernarfon.jpg`: the corner towers are a mid blue-grey and the curtain
+  is near-white, so the towers read as separate objects laid against the wall.
+
+---
+
+## 3. What the light probe showed
+
+Two hypotheses were tested and **both were wrong**, which is worth recording.
+
+**Hypothesis 1: the renderer is the problem.** `project.godot:12` sets
+`rendering_method="mobile"`, so `env.ssao_enabled = true` at
+`render_shots.gd:511` is a no-op and logs a warning on every single run. The
+whole set was re-rendered with `--rendering-method forward_plus`, which brings
+SSAO up for real (the warning disappears from the log). **The images are
+near-identical.** SSAO on a building whose walls are a handful of large quads,
+seen from 200 m, contributes almost nothing. The flatness is not the renderer.
+
+**Hypothesis 2: the key light is fine.** It is not. `_build_stage()` fixes the
+sun at `Vector3(-42°, -131°, 0)` while every subject gets its own camera yaw,
+so the lighting relationship between light and camera is a lottery. Bodiam,
+Hagia Sophia, Chambord, Neuschwanstein, Caernarfon and three of the churches
+come out with **no cast shadow at all and no lit/shadowed face split** — flat,
+ambient-only, and grey.
+
+The probe (`artifacts/renders/visualqa/sun_probe/`) renders the same Bodiam
+spec twice, changing nothing but the light: a warm key at 28° elevation, energy
+2.6, and the azimuth swung to 118° off the camera. The planes read, the merlons
+cast onto the wall walk, the stone goes cream in light and slate in shade, and
+a cast shadow rakes out of frame toward the viewer. Same geometry, same
+materials, same camera. See S1.
+
+The probe also exposed a defect that only raking light shows: a black vertical
+gash down the left face of Bodiam's square gatehouse — two coplanar faces
+z-fighting. See S11.
+
+---
+
+## 4. Suggestions, ranked by impact per unit of work
+
+### S1. Swing the key light with the camera. *~4 lines.*
+
+`_build_stage()` hard-codes one sun; the camera yaw is per subject. Set the key
+azimuth from the shot's yaw — 110–125° off camera, 26–32° elevation, warm
+(`fff2df`), energy ~2.6, with a cool sky fill opposite at ~0.45. This is the
+single highest-impact change in the list and it touches no geometry. The probe
+images are the before and after.
+
+### S2. Give openings depth. *One emitter.*
+
+Every church and castle window is a black quad flush with the surface. A
+0.12–0.20 m splay plus a projecting sill or hood, in the existing `window()`
+path, changes the read of every elevation in both families. The house family
+already does exactly this and is visibly a class above.
+
+### S3. Extend the house material shader to the other four families. *One new function beside an existing one.*
+
+`ShellAssembler.house_materials` already ships slate courses, thatch reed,
+floorboards and rugs. `render_shots.gd:_shoot_mesh` hands churches, castles and
+temples a bare `StandardMaterial3D` with a flat albedo. A `stone_materials`
+(coursed ashlar, per-course value jitter, a little dirt at the base) and a
+`lead_materials` (sheet lines) beside it would lift 24 of the 41 portraits and
+would cost less than the shader that is already there.
+
+### S4. Set the buttresses off the wall. *Two or three stages.*
+
+`detail_crossing.jpg` is the evidence. Coplanar strips in the wall's own colour
+cannot read as structure at any light. Two or three stages of decreasing
+projection plus a weathering cap is the difference between Durham reading as
+Durham and reading as a barn.
+
+### S5. Vary the towers. *The data is already there.*
+
+`great_tower` and `great_tower_scale` are generated and never reach the
+silhouette. One corner drum at 1.5–2× the rest is the cheapest silhouette
+improvement in the castle family, and it is the single most repeated note about
+castle silhouettes in every critique of this project to date.
+
+### S6. Round the hero solids. *Two defaults.*
+
+`MeshKit.revolve` defaults to `segments := 16` and `cone` to 12. The facets are
+the loudest "cheap" tell in Hagia Sophia, Florence, St Basil and the rotunda.
+32 and 24 on the hero objects only — these are a handful of triangles each.
+
+### S7. Fix the sheet. *Three separate things.*
+
+- `BlueprintView._draw_elevation` draws nave, tower, apse, crossing tower and
+  dome, and **omits aisles, aisle roofs, buttresses, flyers, clerestory,
+  transept and chapels**. The result is a drawing of a different building from
+  the mesh. `sheet_notre_dame.jpg` shows a plain gable where the model has five
+  flyers and two aisle rings. Draw them, or caption the elevation "principal
+  elements only" and stop implying it is the south elevation.
+- `church_generator.gd:143` builds `"%s %s%s"`, so a suffix that does not begin
+  with a hyphen jams onto the name. Two of the four rendered sheets are titled
+  `Black DenysMinster` and `Abbey AldhelmMinster`. One space.
+- Roughly half of each sheet is blank paper, and the plan for a 127 m × 12 m
+  building is a 10:1 sliver with the dimension text sitting inside the nave.
+  A landscape sheet, or a plan at a larger scale beside a smaller elevation,
+  would use the page.
+
+### S8. Put the chimney on the hearth's wall. *One record, two readers.*
+
+The chimney is on the exterior wall; the hearth is placed by
+`_place_against_wall` with no term for which wall. The stack then punches
+through the middle of a room in every cutaway. Recording
+`plan.hearth = {"room": i, "wall": wi}` in the planner and reading it from both
+the builder and the furnisher fixes the plan and the picture at once.
+
+### S9. Populate the bailey. *A function that already exists.*
+
+`CastleFurnisher` deals a working yard; the render path does not call it. Krak's
+300 m curtain encloses a flat tan field.
+
+### S10. Lift the temple floor. *Three constants.*
+
+`_dim()` drops the sun to 0.35 and ambient to 0.3. `temple_starless_pylon.jpg`
+is 90% black and the obelisks, court and idol are invisible. Raise the floor
+and put a rim on the idol so the axis the rite check tests is always legible.
+
+### S11. Kill the z-fight on the gatehouse. *One coplanar pair.*
+
+Bodiam's square gate tower shows a black vertical gash under raking light.
+
+### S12. Give the ground plane a world. *Low priority; S1 does most of it.*
+
+900 m, hard edge, grey void beyond, in 30 of the 41 portraits.
+
+### S13. Break the orchard line. *Three lines of variation.*
+
+Height, lean and canopy radius. The lollipop row is the first thing the eye
+finds in a village aerial.
+
+---
+
+## 5. What not to chase
+
+The churches and castles pass every structural suite in `run_all.gd`. Nothing
+in this document is a correctness problem. Every item above is the layer above
+correctness, which is why none of it is currently measured by anything — and
+why the cheapest useful next step is not a new check but a **render
+acceptance sheet**: the same nine axes, scored by eye, on a fixed set of
+subjects, committed beside `manifest.json`.

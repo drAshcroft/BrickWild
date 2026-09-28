@@ -45,13 +45,16 @@ extends SceneTree
 ##  28 vcheck     - the village checks: scale, roads, lots, places (VIL-006..009)
 ##  29 world      - the buildings of the wider world (WORLD_BUILDINGS), as
 ##                  archetype rows; `warchetype` is the same suite
+##  30 tree      - the generated tree family: four styles, 24 species, ten rules
+##  31 bridge    - the bridge family: four kinds, four mechanisms, ten rules
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
-	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001"]
+	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001",
+	"tree", "bridge"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
@@ -86,6 +89,8 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 ##   lane:church  ~6m    church geometry and surfaces
 ##   lane:temple  ~3m    temple geometry and the rite rules
 ##   lane:sweep   ~40m   everything above; background it, do not wait on it
+##   lane:tree    ~1m    anything in src/tree/, qa/tree_check.gd, tree_shapes
+##   lane:bridge  ~1m    anything in src/bridge/, qa/bridge_check.gd
 ##
 ## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 ## Lanes and bare suite names can be mixed; duplicates run once.
@@ -98,6 +103,8 @@ const LANES: Dictionary = {
 	"lane:church": ["church", "normals", "massing"],
 	"lane:temple": ["temple", "rite"],
 	"lane:world": ["wld001"],
+	"lane:tree": ["tree"],
+	"lane:bridge": ["bridge"],
 	"lane:sweep": ORDER,
 }
 
@@ -303,6 +310,10 @@ static func _run_one(key: String) -> SuiteResult:
 			var kind := StringName(pieces[1])
 			var scale := float(pieces[2].left(1) + "." + pieces[2].right(1))
 			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind_scale(kind, scale)
+		"tree":
+			return preload("res://tests/suites/tree_suite.gd").run()
+		"bridge":
+			return preload("res://tests/suites/bridge_suite.gd").run()
 	return null
 
 
