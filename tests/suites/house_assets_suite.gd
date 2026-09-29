@@ -71,14 +71,14 @@ static func run() -> SuiteResult:
 	_check_lights(res)
 
 	# and every category a recipe asks for must have something in it
-	for kind in HouseFurnisher.RECIPES:
-		for step in HouseFurnisher.RECIPES[kind]:
+	for kind in HouseFurnishingRecipes.RECIPES:
+		for step in HouseFurnishingRecipes.RECIPES[kind]:
 			res.checked += 1
 			if PropCatalog.of_category(String(step["cat"])).is_empty():
 				res.fail("the %s recipe asks for a '%s' and the catalogue has none"
 					% [String(kind), String(step["cat"])])
-	for trade in HouseFurnisher.TRADE_FITTINGS:
-		for step2 in HouseFurnisher.TRADE_FITTINGS[trade]:
+	for trade in HouseFurnishingRecipes.TRADE_FITTINGS:
+		for step2 in HouseFurnishingRecipes.TRADE_FITTINGS[trade]:
 			res.checked += 1
 			if PropCatalog.of_category(String(step2["cat"])).is_empty():
 				res.fail("the %s fittings ask for a '%s' and the catalogue has none"

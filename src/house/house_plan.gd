@@ -206,7 +206,7 @@ func focus_pos() -> Vector2:
 		else Vector2(INF, INF)
 
 
-## The yaw it looks along; HouseFurnisher._facing_of() turns it into a vector.
+## The yaw it looks along; HouseFurnishScore._facing_of() turns it into a vector.
 func focus_facing() -> float:
 	return float(focus.get("facing", 0.0)) if not focus.is_empty() else 0.0
 

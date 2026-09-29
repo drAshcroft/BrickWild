@@ -26,7 +26,7 @@ static func run() -> SuiteResult:
 	_check_range(res, compact, false, "compact three-bay hall")
 	for tier in [&"house", &"manor"]:
 		var free := CastleSweep.spec_at(&"norman", tier, 0)
-		var plan := CastleGenerator.hall_plan(free)
+		var plan := CastleInteriorPlans.hall_plan(free)
 		_expect(res, plan.spec != null, "%s hall fixture has no plan" % tier)
 		if plan.spec == null:
 			continue
@@ -52,7 +52,7 @@ static func _spec(width: float, length: float, height: float, seed_value: int) -
 
 
 static func _check_range(res: SuiteResult, spec: CastleSpec, chapel: bool, label: String) -> void:
-	var plan := CastleGenerator.chapel_plan(spec) if chapel else CastleGenerator.hall_plan(spec)
+	var plan := CastleInteriorPlans.chapel_plan(spec) if chapel else CastleInteriorPlans.hall_plan(spec)
 	_expect(res, plan.spec != null, label + ": expected a valid interior plan")
 	if plan.spec == null:
 		return

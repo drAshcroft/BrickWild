@@ -156,7 +156,7 @@ static func _great_hall(res: SuiteResult) -> void:
 	var ranges: Array[Dictionary] = CastleSweep.each()
 	for e in ranges:
 		var spec: CastleSpec = CastleSweep.spec_at(e["style"], e["tier"], e["index"])
-		var plan: HousePlan = CastleGenerator.hall_plan(spec)
+		var plan: HousePlan = CastleInteriorPlans.hall_plan(spec)
 		var who := "great hall: %s %s %d" % [String(e["style"]), String(e["tier"]),
 			int(e["index"])]
 		res.checked += 1
@@ -309,7 +309,7 @@ static func _keep(res: SuiteResult) -> void:
 	var ranges: Array[Dictionary] = CastleSweep.each()
 	for e in ranges:
 		var spec: CastleSpec = CastleSweep.spec_at(e["style"], e["tier"], e["index"])
-		var plan: HousePlan = CastleGenerator.keep_plan(spec)
+		var plan: HousePlan = CastleKeepPlan.generate(spec)
 		var who := "keep: %s %s %d" % [String(e["style"]), String(e["tier"]),
 			int(e["index"])]
 		res.checked += 1
@@ -411,7 +411,7 @@ static func _chapel(res: SuiteResult) -> void:
 	var ranges: Array[Dictionary] = CastleSweep.each()
 	for e in ranges:
 		var spec: CastleSpec = CastleSweep.spec_at(e["style"], e["tier"], e["index"])
-		var plan: HousePlan = CastleGenerator.chapel_plan(spec)
+		var plan: HousePlan = CastleInteriorPlans.chapel_plan(spec)
 		var who := "chapel: %s %s %d" % [String(e["style"]), String(e["tier"]),
 			int(e["index"])]
 		res.checked += 1

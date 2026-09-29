@@ -11,7 +11,7 @@ static func run() -> SuiteResult:
 			[&"crusader", &"fortress", 0]]:
 		var spec := CastleSweep.spec_at(row[0], row[1], int(row[2]))
 		var label := "%s %s %d" % [row[0], row[1], row[2]]
-		var plan := CastleGenerator.keep_plan(spec)
+		var plan := CastleKeepPlan.generate(spec)
 		_expect(res, plan.spec != null, label + ": keep has no plan")
 		if plan.spec == null:
 			continue
@@ -41,7 +41,7 @@ static func _bounds(res: SuiteResult) -> void:
 	var key := "Bed_Twin1"
 	var raw := PropCatalog.footprint(key)
 	var angle := PI / 4.0
-	var turned := HouseFurnisher._candidate(key, Vector2.ZERO, angle)
+	var turned := HouseFurnishPlacement._candidate(key, Vector2.ZERO, angle)
 	var diagonal := (raw.x + raw.y) / sqrt(2.0)
 	_expect(res, Vector2(turned.rect.size).is_equal_approx(Vector2.ONE * diagonal),
 		"45-degree bed did not include both measured width and depth")
@@ -49,7 +49,7 @@ static func _bounds(res: SuiteResult) -> void:
 	_expect(res, Vector2(turned.zone.size).is_equal_approx(Vector2.ONE * zone_side),
 		"45-degree bed access strip collapsed or used its AABB as the model")
 	for yaw in [0.0, PI / 2.0, PI, -PI / 2.0]:
-		var candidate := HouseFurnisher._candidate(key, Vector2.ZERO, float(yaw))
+		var candidate := HouseFurnishPlacement._candidate(key, Vector2.ZERO, float(yaw))
 		_expect(res, Vector2(candidate.rect.size).is_equal_approx(PropCatalog.footprint_yawed(key, float(yaw))),
 			"cardinal bed footprint changed")
 		var expected_zone := Vector2(PropCatalog.zone_depth(key), raw.y) \
@@ -78,7 +78,7 @@ static func _bounds(res: SuiteResult) -> void:
 	var false_size := HouseFurnishCheck.new()
 	false_size._check_placed(plan)
 	_expect(res, not false_size.failures.is_empty(), "QA accepted an unturned footprint for a rotated model")
-	var overhang := HouseFurnisher._candidate(key, Vector2(2.6,2.6), angle)
+	var overhang := HouseFurnishPlacement._candidate(key, Vector2(2.6,2.6), angle)
 	overhang.room = 0
 	overhang.storey = 0
 	plan.furniture = [overhang]

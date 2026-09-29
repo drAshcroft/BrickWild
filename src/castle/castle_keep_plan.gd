@@ -1,3 +1,4 @@
+class_name CastleKeepPlan
 extends RefCounted
 ## The occupied keep and its outer silhouette share these polygons. Rooms,
 ## openings, stairs and furniture are all planned on the clear inner faces.
@@ -31,17 +32,17 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 	var box := CastleGeometry.keep_aabb(spec)
 	if minf(box.size.x, box.size.z) <= 0.0:
 		return plan
-	var levels := clampi(int(box.size.y / CastleGenerator.KEEP_STOREY_H), 3,
+	var levels := clampi(int(box.size.y / CastleInteriorPlans.KEEP_STOREY_H), 3,
 		HouseGeometry.MAX_STOREYS)
-	var hs := CastleGenerator._keep_spec(spec, box, levels)
+	var hs := CastleInteriorPlans._keep_spec(spec, box, levels)
 	var shaped := spec.keep_shape in [&"round", &"shell", &"tiered"]
 	hs.porch = false
 	hs.chimney = false # The castle owns flues and roof joins.
 	hs.exterior_props = false
 	var floor_rect := HouseGeometry.interior_rect(hs)
-	if minf(floor_rect.size.x, floor_rect.size.y) < CastleGenerator.MIN_KEEP_SIDE \
-			or floor_rect.get_area() < CastleGenerator.MIN_KEEP_AREA \
-			or maxf(floor_rect.size.x, floor_rect.size.y) > CastleGenerator.MAX_KEEP_SIDE:
+	if minf(floor_rect.size.x, floor_rect.size.y) < CastleInteriorPlans.MIN_KEEP_SIDE \
+			or floor_rect.get_area() < CastleInteriorPlans.MIN_KEEP_AREA \
+			or maxf(floor_rect.size.x, floor_rect.size.y) > CastleInteriorPlans.MAX_KEEP_SIDE:
 		return plan
 	plan.spec = hs
 	for level in range(levels):
@@ -81,7 +82,7 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 		if shaped:
 			_windows(plan, level)
 		else:
-			CastleGenerator._keep_windows(plan, floor_rect, level, hs,
+			CastleInteriorPlans._keep_windows(plan, floor_rect, level, hs,
 				3 if hs.kind_on(level) == &"lords_chamber" else -1)
 	# The raised entrance owns its opening interval on this wall. Other
 	# facets retain daylight, including on receding and circular keeps.
@@ -118,23 +119,23 @@ static func _windows(plan: HousePlan, level: int) -> void:
 	# Keep its front horizontal facet solid for the bed and its side access;
 	# the far side is already reserved for the stair landing.
 	var blind := _facing_wall(walls, Vector2(0, 1) if walls.size() > 4 else Vector2(-1, 0))
-	var head := minf(CastleGenerator.WINDOW_SILL + CastleGenerator.WINDOW_H,
+	var head := minf(CastleInteriorPlans.WINDOW_SILL + CastleInteriorPlans.WINDOW_H,
 		plan.spec.height - 0.2)
 	for wi in range(walls.size()):
 		if plan.kind_of(level) == &"lords_chamber" and wi == blind:
 			continue
 		var wall: Dictionary = walls[wi]
 		var length := Vector2(wall.from).distance_to(wall.to)
-		var width := minf(CastleGenerator.WINDOW_W,
+		var width := minf(CastleInteriorPlans.WINDOW_W,
 			length - 2.0 * HouseGeometry.WINDOW_CORNER_MARGIN)
 		if width < 0.45:
 			continue
-		var count := maxi(1, int(length / CastleGenerator.KEEP_WINDOW_PITCH))
+		var count := maxi(1, int(length / CastleInteriorPlans.KEEP_WINDOW_PITCH))
 		for i in range(count):
 			plan.windows.append({"room": level,
 				"pos": Vector2(wall.from).lerp(wall.to, (float(i) + 0.5) / float(count)),
 				"normal": -Vector2(wall.normal), "width": width,
-				"sill": CastleGenerator.WINDOW_SILL, "head": head, "storey": level})
+				"sill": CastleInteriorPlans.WINDOW_SILL, "head": head, "storey": level})
 
 
 ## A common footprint touches a real wall on either landing and fits BOTH

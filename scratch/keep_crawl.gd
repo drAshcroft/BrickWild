@@ -14,7 +14,7 @@ func _init() -> void:
 		f.store_line("start " + who)
 		f.flush()
 		var spec: CastleSpec = CastleSweep.spec_at(e["style"], e["tier"], int(e["index"]))
-		var plan: HousePlan = CastleGenerator.keep_plan(spec)
+		var plan: HousePlan = CastleKeepPlan.generate(spec)
 		var note := "  no keep"
 		if plan.spec != null:
 			var box: AABB = CastleGeometry.keep_aabb(spec)

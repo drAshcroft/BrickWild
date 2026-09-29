@@ -12,11 +12,11 @@ func _init() -> void:
 	f.flush()
 
 	# rebuild what keep_plan does, stage by stage, without furnishing
-	var levels: int = clampi(int(box.size.y / CastleGenerator.KEEP_STOREY_H), 3,
+	var levels: int = clampi(int(box.size.y / CastleInteriorPlans.KEEP_STOREY_H), 3,
 		HouseGeometry.MAX_STOREYS)
 	f.store_line("levels %d" % levels)
 	f.flush()
-	var plan: HousePlan = CastleGenerator.keep_plan(spec)
+	var plan: HousePlan = CastleKeepPlan.generate(spec)
 	if plan.spec == null:
 		f.store_line("no plan (bounded out)")
 		f.close()

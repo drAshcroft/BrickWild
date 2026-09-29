@@ -25,13 +25,13 @@ static func primary(spec: CastleSpec) -> Dictionary:
 		var bounds: AABB
 		match kind:
 			"hall":
-				plan = CastleGenerator.hall_plan(spec)
+				plan = CastleInteriorPlans.hall_plan(spec)
 				bounds = CastleGeometry.hall_aabb(spec)
 			"keep":
-				plan = CastleGenerator.keep_plan(spec)
+				plan = CastleKeepPlan.generate(spec)
 				bounds = CastleGeometry.keep_aabb(spec)
 			"chapel":
-				plan = CastleGenerator.chapel_plan(spec)
+				plan = CastleInteriorPlans.chapel_plan(spec)
 				bounds = CastleGeometry.chapel_aabb(spec)
 		if plan.spec != null:
 			out[kind] = record(kind, plan, bounds)
@@ -54,7 +54,7 @@ static func ridge(spec: CastleSpec) -> Dictionary:
 			links.append(-1)
 		if i < segs.size() - 1:
 			links.append(1)
-		var plan: HousePlan = CastleGenerator.ridge_range_plan(spec, seg, links)
+		var plan: HousePlan = CastleInteriorPlans.ridge_range_plan(spec, seg, links)
 		if plan.spec == null:
 			continue
 		out[String(seg["name"])] = record(String(seg["name"]), plan,
@@ -95,29 +95,17 @@ static func emit(owner: CastleBuilder, row: Dictionary) -> void:
 	var plan: HousePlan = row.plan
 	var builder := HouseBuilder.new()
 	builder.build(plan, false)
-	var occupied_top := plan.spec.height * plan.spec.storeys
 	var bounds: AABB = row.bounds
-	# Existing plans cap ceiling height in very tall ranges. The remaining
-	# volume is an empty roof void with continuous perimeter masonry.
-	if bounds.size.y > occupied_top + 0.001:
-		for run in HouseGeometry.shell_runs(plan, plan.spec.storeys - 1):
-			var thick := float(run.get("thickness", HouseGeometry.wall_thickness(plan.spec)))
-			builder._wall_run(run.from, run.to, thick,
-				bounds.size.y - occupied_top, [], 0, occupied_top, false)
+	# Tall ranges retain continuous perimeter masonry above occupied rooms.
+	builder.extend_upper_walls(bounds.size.y)
 	var mesh := builder.commit()
 	# With the house roof disabled, its roof-colour slot contains glazing.
 	# Castle openings have their own material and are excluded from masonry
 	# voxels. SurfaceTool omits empty slots on commit, so a windowless plan's
 	# floor cannot be identified by its committed numeric index alone.
-	var mapping := [CastleBuilder.SURF_STONE, CastleBuilder.SURF_TRIM,
+	var mapping: Array[int] = [CastleBuilder.SURF_STONE, CastleBuilder.SURF_TRIM,
 		CastleBuilder.SURF_OPEN, CastleBuilder.SURF_STONE]
-	var committed_surface := 0
-	for source in mapping.size():
-		var arrays := builder._kit.surface(source).commit_to_arrays()
-		if arrays.is_empty() or arrays[Mesh.ARRAY_VERTEX] == null or arrays[Mesh.ARRAY_VERTEX].is_empty():
-			continue
-		owner._kit.surface(mapping[source]).append_from(mesh, committed_surface, row.transform)
-		committed_surface += 1
+	owner.append_mapped_mesh(builder, mesh, mapping, row.transform)
 	# Forward openings the child actually emitted, rather than recreating
 	# nominal windows from the spec. Castle QA can then check their actual
 	# position and facade direction alongside the legacy castle openings.

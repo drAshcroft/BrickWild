@@ -17,7 +17,7 @@ func _init() -> void:
 			var bed := PropCatalog.of_category("bed")[0]
 			var good := _piece(plan, bed, blind)
 			var bad := _piece(plan, bed, lit)
-			_expect(HouseFurnisher._affinity(plan, 0, good) > HouseFurnisher._affinity(plan, 0, bad), "blind bed wall loses affinity")
+			_expect(HouseFurnishScore._affinity(plan, 0, good) > HouseFurnishScore._affinity(plan, 0, bad), "blind bed wall loses affinity")
 			plan.furniture = [good]
 			var checker := HouseFurnishCheck.new()
 			checker._check_bed_window(plan)
@@ -37,9 +37,9 @@ func _init() -> void:
 			checker = HouseFurnishCheck.new()
 			checker._check_shelf_over(plan)
 			_expect(checker.failures.is_empty() and checker.warnings.is_empty(), "shelf above oblique bench rejected: " + str(checker.failures))
-			var over := HouseFurnisher._over_bonus(plan, 0, shelf, ["workbench"])
+			var over := HouseFurnishScore._over_bonus(plan, 0, shelf, ["workbench"])
 			plan.furniture[1] = _piece(plan, shelf.key, lit, true)
-			_expect(over > HouseFurnisher._over_bonus(plan, 0, plan.furniture[1], ["workbench"]), "shelf misplaced affinity unchanged")
+			_expect(over > HouseFurnishScore._over_bonus(plan, 0, plan.furniture[1], ["workbench"]), "shelf misplaced affinity unchanged")
 			checker = HouseFurnishCheck.new()
 			checker._check_shelf_over(plan)
 			_expect(not checker.failures.is_empty(), "shelf moved off host accepted")
@@ -94,7 +94,7 @@ func _square_invariance() -> void:
 	rectangle.windows = [{"room": 0, "pos": Vector2(0, floor_rect.position.y), "normal": Vector2(0, -1), "width": 1.0, "sill": 0.95, "head": 2.0}]
 	var key := PropCatalog.of_category("workbench")[0]
 	var piece := _piece(rectangle, key, 0)
-	var baseline := HouseFurnisher._affinity(rectangle, 0, piece)
+	var baseline := HouseFurnishScore._affinity(rectangle, 0, piece)
 	var points := PackedVector2Array([floor_rect.position, Vector2(floor_rect.end.x, floor_rect.position.y), floor_rect.end, Vector2(floor_rect.position.x, floor_rect.end.y)])
 	for reverse in [false, true]:
 		for start in range(4):
@@ -104,7 +104,7 @@ func _square_invariance() -> void:
 			if reverse:
 				outline.reverse()
 			rectangle.rooms[0].outline = outline
-			_expect(is_equal_approx(HouseFurnisher._affinity(rectangle, 0, piece), baseline), "square affinity changed with vertex order")
+			_expect(is_equal_approx(HouseFurnishScore._affinity(rectangle, 0, piece), baseline), "square affinity changed with vertex order")
 			rectangle.furniture = [piece]
 			var checker := HouseFurnishCheck.new()
 			checker._check_workbench_daylight(rectangle)

@@ -27,7 +27,7 @@ func _init() -> void:
 
 
 func _dump(who: String, spec: CastleSpec) -> void:
-	var plan: HousePlan = CastleGenerator.hall_plan(spec)
+	var plan: HousePlan = CastleInteriorPlans.hall_plan(spec)
 	print("=== ", who)
 	if plan.spec == null:
 		print("  no hall plan")

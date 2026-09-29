@@ -128,7 +128,7 @@ func _hall_shots() -> void:
 	spec.length = 90.0
 	spec.height = 18.0
 	CastleGenerator.generate(spec, 9001)
-	var plan: HousePlan = CastleGenerator.hall_plan(spec)
+	var plan: HousePlan = CastleInteriorPlans.hall_plan(spec)
 	if plan.spec == null:
 		print("  (no hall plan for this castle)")
 		return

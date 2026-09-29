@@ -68,6 +68,19 @@ func commit() -> ArrayMesh:
 	return _kit.commit()
 
 
+## Import only populated source surfaces. Empty SurfaceTool slots are omitted
+## from the committed ArrayMesh, so their source indices cannot be used there.
+func append_mapped_mesh(source: MassBuilder, mesh: ArrayMesh,
+		mapping: Array[int], transform: Transform3D) -> void:
+	var committed_surface := 0
+	for source_surface in mapping.size():
+		var arrays: Array = source._kit.surface(source_surface).commit_to_arrays()
+		if arrays.is_empty() or arrays[Mesh.ARRAY_VERTEX] == null or arrays[Mesh.ARRAY_VERTEX].is_empty():
+			continue
+		_kit.surface(mapping[source_surface]).append_from(mesh, committed_surface, transform)
+		committed_surface += 1
+
+
 ## Tag subsequent parts (e.g. "keep", "curtain", "nave") for diagnostics.
 func tag(t: String) -> void:
 	_tag = t

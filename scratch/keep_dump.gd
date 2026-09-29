@@ -7,7 +7,7 @@ func _init() -> void:
 		if String(e["tier"]) != "castle" or int(e["index"]) != 1:
 			continue
 		var spec: CastleSpec = CastleSweep.spec_at(e["style"], e["tier"], int(e["index"]))
-		var plan: HousePlan = CastleGenerator.keep_plan(spec)
+		var plan: HousePlan = CastleKeepPlan.generate(spec)
 		print("=== %s keep %s" % [String(e["style"]),
 			str(CastleGeometry.keep_aabb(spec).size.snappedf(0.01))])
 		if plan.spec == null:

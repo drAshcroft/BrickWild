@@ -62,6 +62,17 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	return commit()
 
 
+## Continue the top room's perimeter into a castle range's unoccupied roof void.
+func extend_upper_walls(height: float) -> void:
+	var occupied_top := spec.height * spec.storeys
+	if height <= occupied_top + 0.001:
+		return
+	for run in HouseGeometry.shell_runs(plan, spec.storeys - 1):
+		var thick := float(run.get("thickness", HouseGeometry.wall_thickness(spec)))
+		_wall_run(run.from, run.to, thick, height - occupied_top,
+			[], 0, occupied_top, false)
+
+
 func _build_hearth_breast() -> void:
 	var breast := HouseGeometry.hearth_breast(plan)
 	if breast.is_empty():

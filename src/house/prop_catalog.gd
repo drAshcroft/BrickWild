@@ -515,7 +515,7 @@ static func zone_depth(key: String) -> float:
 
 ## What a piece WANTS, over and above fitting: the wall with the daylight on
 ## it, the corner nobody walks through, the space above the bench it serves.
-## Optional, and read only by HouseFurnisher._affinity(), which turns it into
+## Optional, and read only by HouseFurnishScore._affinity(), which turns it into
 ## one number per candidate position. Keys, all optional:
 ##   near/far            [category] -- be close to / away from these pieces
 ##   daylight            +1 wants a window wall, -1 wants a dark one

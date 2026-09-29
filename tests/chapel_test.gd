@@ -12,7 +12,7 @@ func _init() -> void:
 		spec.height = 18
 		CastleGenerator.generate(spec, 1)
 		spec.chapel = true
-		var plan := CastleGenerator.chapel_plan(spec)
+		var plan := CastleInteriorPlans.chapel_plan(spec)
 		if plan.spec == null:
 			failures.append("no chapel at %s" % shape)
 			continue

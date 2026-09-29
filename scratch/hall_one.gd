@@ -9,7 +9,7 @@ func _init() -> void:
 	spec.length = 90.0
 	spec.height = 18.0
 	CastleGenerator.generate(spec, 9001)
-	var plan: HousePlan = CastleGenerator.hall_plan(spec)
+	var plan: HousePlan = CastleInteriorPlans.hall_plan(spec)
 	var f: Rect2 = HouseGeometry.room_floor_rect(plan, 0)
 	print("room  ", f, "   dais ", plan.dais_rect(), " rise ", plan.dais_rise())
 	print("door  ", plan.doors[0]["pos"], "  zones ", plan.zones)

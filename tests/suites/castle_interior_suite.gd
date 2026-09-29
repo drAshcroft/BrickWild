@@ -45,7 +45,7 @@ static func run() -> SuiteResult:
 		spec.height = r.randf_range(5.0, 20.0)
 		var sd: int = 31000 + i
 		CastleGenerator.generate(spec, sd)
-		var plan: HousePlan = CastleGenerator.hall_plan(spec)
+		var plan: HousePlan = CastleInteriorPlans.hall_plan(spec)
 		res.checked += 1
 		if plan.spec == null:
 			skipped += 1
@@ -129,7 +129,7 @@ static func _keeps(res: SuiteResult) -> void:
 		spec.height = r.randf_range(6.0, 24.0)
 		var sd: int = 41000 + i
 		CastleGenerator.generate(spec, sd)
-		var plan: HousePlan = CastleGenerator.keep_plan(spec)
+		var plan: HousePlan = CastleKeepPlan.generate(spec)
 		res.checked += 1
 		if plan.spec == null:
 			continue

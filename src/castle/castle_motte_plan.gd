@@ -21,7 +21,7 @@ static func origin(spec: CastleSpec) -> Vector3:
 
 
 static func levels(spec: CastleSpec) -> int:
-	return clampi(int(floor(spec.keep_height / CastleGenerator.KEEP_STOREY_H)), 3, 8)
+	return clampi(int(floor(spec.keep_height / CastleInteriorPlans.KEEP_STOREY_H)), 3, 8)
 
 
 static func inner_radii(spec: CastleSpec) -> Vector2:
@@ -48,7 +48,7 @@ static func generate(spec: CastleSpec, with_furniture := false) -> HousePlan:
 	if keep.size.x <= 0.0 or keep.size.z <= 0.0 or keep.size.y <= 0.0:
 		return plan
 	var n := levels(spec)
-	var hs := CastleGenerator._keep_spec(spec, keep, n)
+	var hs := CastleInteriorPlans._keep_spec(spec, keep, n)
 	hs.wall_thickness_override = spec.shell_thickness
 	hs.porch = false
 	hs.chimney = false

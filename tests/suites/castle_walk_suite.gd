@@ -243,7 +243,7 @@ static func _apse_entry(res: SuiteResult) -> void:
 	s.hall_w = 6
 	s.hall_l = 18
 	s.hall_height = 6
-	var p := CastleGenerator.chapel_plan(s)
+	var p := CastleInteriorPlans.chapel_plan(s)
 	_want(res, p.spec != null, "apse fixture has a chapel HousePlan")
 	if p.spec == null:
 		return

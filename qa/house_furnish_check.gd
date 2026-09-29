@@ -329,7 +329,7 @@ static func _purpose(spec: HouseSpec) -> String:
 ## use zone together? A 3 x 3 m hall genuinely cannot hold a 2.8 m table, and
 ## reporting that as a defect would be reporting the size of the house.
 static func _could_hold(plan: HousePlan, room: int, cat: String) -> bool:
-	return HouseFurnisher.could_place(plan, room, cat)
+	return HouseFurnishPlacement.could_place(plan, room, cat)
 
 
 static func _room_has(plan: HousePlan, room: int, cat: String) -> bool:
@@ -592,7 +592,7 @@ static func _wall_of(plan: HousePlan, p: Dictionary) -> int:
 
 
 ## A row is straight, evenly pitched, all facing the same way, and every
-## copy's use zone is the same shared aisle strip. `HouseFurnisher._place_row`
+## copy's use zone is the same shared aisle strip. `HouseFurnishPlacement._place_row`
 ## builds a row that way by construction; this measures the result the way
 ## every other rule here is measured -- from the placements alone, trusting
 ## nothing about how they got there.
@@ -1202,7 +1202,7 @@ static func _fs_could_hang_over(plan: HousePlan, room: int, piece: Dictionary,
 	return false
 
 
-## The two clearances `HouseFurnisher._place_mounted` keeps, measured the same
+## The two clearances `HouseFurnishPlacement._place_mounted` keeps, measured the same
 ## way: nothing may hang across an opening, and nothing may hang into what is
 ## already on the wall.
 static func _fs_on_opening(plan: HousePlan, room: int, pos: Vector2,
@@ -1370,7 +1370,7 @@ func _check_focus(plan: HousePlan) -> void:
 		failures.append(said)
 	if not plan.focus_faces_door():
 		return
-	var door: int = HouseFurnisher.focus_door(plan, room)
+	var door: int = HouseFurnishScore.focus_door(plan, room)
 	if door < 0:
 		return
 	var c: Vector2 = Rect2(plan.furniture[best]["rect"]).get_center()

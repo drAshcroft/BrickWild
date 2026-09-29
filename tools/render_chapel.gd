@@ -28,7 +28,7 @@ func _init() -> void:
 	spec.height = 18
 	CastleGenerator.generate(spec, 1)
 	spec.chapel = true
-	var plan := CastleGenerator.chapel_plan(spec)
+	var plan := CastleInteriorPlans.chapel_plan(spec)
 	var chapel := HouseAssembler.build(plan, true)
 	viewport.add_child(chapel)
 	var camera := Camera3D.new()

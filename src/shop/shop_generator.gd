@@ -41,7 +41,7 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 
 	var plan := ShopPlanner.plan(spec)
 	if with_furniture:
-		ShopFurnisher.furnish(plan, spec)
+		HouseFurnisher.furnish(plan, spec)
 	for placement in plan.furniture:
 		var room: int = int(placement.get("room", -1))
 		placement["storey"] = plan.storey_of_room(room) if room >= 0 \

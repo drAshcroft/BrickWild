@@ -1058,13 +1058,54 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 			if dry.size() != 1:
 				return false
 			poly = dry[0]
-		lot["poly"] = poly
+	var candidate_lot: Dictionary = lot.duplicate()
+	candidate_lot["poly"] = poly
+	if not _site_clear(plan, ctx, candidate_lot, poly):
+		return false
+	# the fire gap is between BUILDINGS, not lots: measure the bounds rects.
+	var xf: Transform3D = _transform_for(candidate_lot, job)
+	if not _lane_reaches_entrance(plan, candidate_lot, job, xf):
+		return false
+	var mine: PackedVector2Array = Placement.world_rect(job["placement"], xf, false)
+	if not plan.commons.is_empty() and _point_to_poly(VillageMeasure.common_centre(plan), mine) < WELL_CLEAR:
+		return false
+	# A townhouse's setback band tops out at 1 m, so its eaves genuinely do
+	# reach out past its own front edge and over the verge -- that is what a
+	# jettied street front is. What is never allowed is architecture over the
+	# CARRIAGEWAY, so the walls are held inside the lot and the eaves are
+	# held out of the road itself.
+	if not _poly_contains(poly, Placement.world_rect(job["placement"], xf, true)):
+		return false
+	for way in ctx["carriageways"]:
+		if _overlaps(mine, way):
+			return false
+	if not _purpose_clear(plan, candidate_lot, job, poly, mine, xf):
+		return false
+	var req: BuildingRequest = job["request"]
+	if not _neighbours_clear(plan, job, mine, xf, gap):
+		return false
+	var mill_race: Dictionary = {}
+	if req.kind == &"shop" and req.purpose == &"bakery" and not plan.water.is_empty():
+		if not _poly_contains(poly, VillageWaterPlan.mill_walls(job["placement"], xf)):
+			return false
+		if not _poly_contains(Poly.offset(poly, gap + 0.05), mine):
+			return false
+		mill_race = VillageWaterPlan.mill_race(plan, job["placement"], xf)
+		if mill_race.is_empty():
+			return false
+	lot["poly"] = poly
+	if not mill_race.is_empty():
+		lot["mill_race"] = mill_race
+	return true
+
+
+## Site reservations are independent of the building's purpose and footprint.
+static func _site_clear(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
+		poly: PackedVector2Array) -> bool:
 	if not _inside_site(plan.site, poly):
 		return false
 	if plan.spec.purpose == &"mining":
-		# The mine is the settlement's reason for being. Reserve its terminal
-		# workyard before houses fill the last frontage; enclosure offset then
-		# ends before the mouth instead of cutting through it afterwards.
+		# Leave the terminal workyard beyond the last through-road gateway.
 		for road in plan.roads:
 			if road["class"] != &"through": continue
 			var points: PackedVector2Array = road["points"]
@@ -1089,44 +1130,34 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 	for other in plan.lots:
 		if _overlaps(poly, other["poly"]):
 			return false
-	if _corner_blocked(plan, ctx, lot):
-		return false
-	# the fire gap is between BUILDINGS, not lots: measure the bounds rects.
-	var xf: Transform3D = _transform_for(lot, job)
+	return not _corner_blocked(plan, ctx, lot)
+
+
+## A dead-end service lane must physically reach its building's entrance.
+static func _lane_reaches_entrance(plan: VillagePlan, lot: Dictionary,
+		job: Dictionary, xf: Transform3D) -> bool:
 	var assigned: Dictionary = plan.roads[int(lot["road"])]
-	if assigned["class"] == &"lane":
-		var points: PackedVector2Array = assigned["points"]
-		var end: Vector2 = points[points.size() - 1]
-		var joined := VillageMeasure.on_boundary(plan.site, end)
-		for other in plan.roads:
-			if other != assigned and VillageSitePlanner._on_polyline(end, other["points"]):
-				joined = true
-		if not joined and points.size() == 2:
-			# An isolated lane must reach the actual entrance with standing
-			# room past it. A wide manor frontage may overhang the lane's end,
-			# but its door or arrival-court axis must still meet walking floor.
-			var along: Vector2 = (end - points[0]).normalized()
-			var entrance: Vector3 = xf * Vector3(job["placement"]["door"])
-			if (Vector2(entrance.x, entrance.z) - points[0]).dot(along) > points[0].distance_to(end) - 1.0:
-				return false
-	var mine: PackedVector2Array = Placement.world_rect(job["placement"], xf, false)
-	if not plan.commons.is_empty() and _point_to_poly(VillageMeasure.common_centre(plan), mine) < WELL_CLEAR:
-		return false
-	# A townhouse's setback band tops out at 1 m, so its eaves genuinely do
-	# reach out past its own front edge and over the verge -- that is what a
-	# jettied street front is. What is never allowed is architecture over the
-	# CARRIAGEWAY, so the walls are held inside the lot and the eaves are
-	# held out of the road itself.
-	if not _poly_contains(lot["poly"], Placement.world_rect(job["placement"], xf, true)):
-		return false
-	for way in ctx["carriageways"]:
-		if _overlaps(mine, way):
-			return false
+	if assigned["class"] != &"lane":
+		return true
+	var points: PackedVector2Array = assigned["points"]
+	var end: Vector2 = points[points.size() - 1]
+	var joined := VillageMeasure.on_boundary(plan.site, end)
+	for other in plan.roads:
+		if other != assigned and VillageSitePlanner._on_polyline(end, other["points"]):
+			joined = true
+	if joined or points.size() != 2:
+		return true
+	var along: Vector2 = (end - points[0]).normalized()
+	var entrance: Vector3 = xf * Vector3(job["placement"]["door"])
+	return (Vector2(entrance.x, entrance.z) - points[0]).dot(along) <= points[0].distance_to(end) - 1.0
+
+
+## Rules whose meaning depends on the occupant rather than the lot geometry.
+static func _purpose_clear(plan: VillagePlan, lot: Dictionary, job: Dictionary,
+		poly: PackedVector2Array, mine: PackedVector2Array, xf: Transform3D) -> bool:
 	var req: BuildingRequest = job["request"]
 	if req.kind == &"house" and req.purpose == &"farmer":
-		# Sorting a frontage by its distance to the edge is insufficient: on
-		# the inward side of a track, the whole farmhouse moves back toward
-		# the centre. Judge the actual transformed wall centre before accepting.
+		# Measure the transformed walls, not the road frontage.
 		var farm_centre := Poly.bounding_rect(Placement.world_rect(job["placement"], xf, true)).get_center()
 		var reach: float = maxf(FARM_TO_EDGE, minf(plan.site.size.x, plan.site.size.y) * 0.4)
 		if _to_edge(plan.site, farm_centre) > reach:
@@ -1148,6 +1179,13 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 		var civic_front: Vector2 = VillageMeasure.front_mid({"placement": job["placement"], "transform": xf})
 		if VillageMeasure.point_to_poly(civic_front, VillageMeasure.common_poly(plan)) > 14.0:
 			return false
+	return true
+
+
+## Keep fire, noise, and opposing entrances clear of placed buildings.
+static func _neighbours_clear(plan: VillagePlan, job: Dictionary,
+		mine: PackedVector2Array, xf: Transform3D, gap: float) -> bool:
+	var req: BuildingRequest = job["request"]
 	var loud: bool = req.kind == &"shop" and req.purpose == &"blacksmith"
 	var quiet: bool = req.kind in [&"church", &"temple"] or (req.kind == &"shop" and req.purpose == &"tavern")
 	var candidate: Dictionary = {"placement": job["placement"], "transform": xf}
@@ -1158,8 +1196,6 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 		var theirs: PackedVector2Array = Placement.world_rect(
 			b["placement"], b["transform"], false)
 		var want: float = maxf(gap, fire_gap(b["class"], plan.spec, b["placement"]))
-		# fire, noise and the smell: the smithy stands SMITHY_CLEAR from the
-		# church and the tavern, whichever of them came first (VILLAGES 6)
 		var other: BuildingRequest = b["request"]
 		var other_loud: bool = other.kind == &"shop" and other.purpose == &"blacksmith"
 		var other_quiet: bool = other.kind in [&"church", &"temple"] \
@@ -1179,15 +1215,6 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 			if to_me.length_squared() > 0.0001 and other_direction.dot(to_me.normalized()) > 0.7 \
 					and my_direction.dot(to_me.normalized()) > 0.7:
 				return false
-	if req.kind == &"shop" and req.purpose == &"bakery" and not plan.water.is_empty():
-		if not _poly_contains(poly, VillageWaterPlan.mill_walls(job["placement"], xf)):
-			return false
-		if not _poly_contains(Poly.offset(poly, gap + 0.05), mine):
-			return false
-		var race := VillageWaterPlan.mill_race(plan, job["placement"], xf)
-		if race.is_empty():
-			return false
-		lot["mill_race"] = race
 	return true
 
 

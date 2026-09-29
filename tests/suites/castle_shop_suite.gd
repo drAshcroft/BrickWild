@@ -33,7 +33,7 @@ static func _stall(res: SuiteResult, plan: HousePlan) -> void:
 	if index < 0:
 		return
 	var piece: Dictionary = plan.furniture[index]
-	var door: Dictionary = plan.doors[HouseFurnisher.focus_door(plan, room)]
+	var door: Dictionary = plan.doors[HouseFurnishScore.focus_door(plan, room)]
 	var inward_clear := HouseGeometry.door_clear_rect(door, -1.0)
 	_want(res, not Rect2(piece.rect).intersects(inward_clear), "stall body blocks entrance")
 	_want(res, Rect2(piece.zone).intersects(inward_clear), "fixture no longer shares its clear entrance approach")

@@ -31,7 +31,7 @@ func _init() -> void:
 		spec.length = spec.width * r.randf_range(1.0, 2.2)
 		spec.height = r.randf_range(5.0, 26.0)
 		CastleGenerator.generate(spec, 7000 + i)
-		var plan: HousePlan = CastleGenerator.hall_plan(spec)
+		var plan: HousePlan = CastleInteriorPlans.hall_plan(spec)
 		if plan.spec == null:
 			skipped += 1
 			continue

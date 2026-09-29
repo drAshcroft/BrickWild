@@ -25,7 +25,7 @@ static func _floor_prop(res: SuiteResult, yaw: float) -> void:
 	var raw_bounds := SceneBounds.of_node(raw)
 	_expect(res, Vector2(raw_bounds.get_center().x, raw_bounds.get_center().z).length() > 0.1,
 		"stall fixture no longer has an offset model pivot")
-	var p := HouseFurnisher._candidate(key, Vector2(2.3,-1.7), yaw, 1.0, 0.76)
+	var p := HouseFurnishPlacement._candidate(key, Vector2(2.3,-1.7), yaw, 1.0, 0.76)
 	p.pos.y = 6.4
 	p.room = 0
 	p.storey = 2
@@ -99,7 +99,7 @@ static func _light(res: SuiteResult, key: String, yaw: float, mounted: bool) -> 
 
 
 static func _bed(res: SuiteResult, key: String, yaw: float) -> void:
-	var p := HouseFurnisher._candidate(key, Vector2(1.1,2.2), yaw)
+	var p := HouseFurnishPlacement._candidate(key, Vector2(1.1,2.2), yaw)
 	p.pos.y = 6.4
 	var placed := HouseAssembler._instance(p)
 	_expect(res, placed != null, key + ": missing bed model")

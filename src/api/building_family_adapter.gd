@@ -41,6 +41,22 @@ func build_mesh(_building) -> ArrayMesh:
 	return null
 
 
+## The family's existing quality checks, before public diagnostic formatting.
+func quality_report(_building) -> Dictionary:
+	return {"failures": ["unsupported_family: No QA adapter exists for this family."], "warnings": []}
+
+
+static func plan_quality_report(plan: HousePlan) -> Dictionary:
+	var builder := HouseBuilder.new()
+	builder.build(plan)
+	var report: Dictionary = HouseQA.new().check(plan, builder)
+	if not plan.courts.is_empty():
+		var court: Dictionary = CourtCheck.new().check(plan)
+		report["failures"].append_array(court["failures"])
+		report["warnings"].append_array(court["warnings"])
+	return report
+
+
 ## A fresh scene, with the family's own props in it. Null falls back to the
 ## facade's plain mesh instance, which is what an adapter that has no
 ## assembler of its own wants.
@@ -119,6 +135,9 @@ static func of(kind: StringName) -> BuildingFamilyAdapter:
 ## answer the same way about their footprint and their door, and only the
 ## generator and the assembler differ.
 class PlanFamily extends BuildingFamilyAdapter:
+	func quality_report(building) -> Dictionary:
+		return plan_quality_report(building.plan)
+
 	func footprint(building) -> Rect2:
 		return HouseGeometry.storey_rect(building.plan,
 			maxi(building.plan.spec.storeys - 1, 0)).grow(-HouseGeometry.wall_thickness(building.plan.spec))
@@ -212,6 +231,11 @@ class ShopFamily extends PlanFamily:
 
 
 class HotelFamily extends PlanFamily:
+	func quality_report(building) -> Dictionary:
+		var builder := HotelBuilder.new()
+		builder.build(building.plan)
+		return HotelQA.new().check(building.plan, builder)
+
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := HotelSpec.new()
 		_copy_size_and_style(request, spec)
@@ -229,6 +253,11 @@ class HotelFamily extends PlanFamily:
 # ------------------------------------------------------------ the churches
 
 class ChurchFamily extends BuildingFamilyAdapter:
+	func quality_report(building) -> Dictionary:
+		var builder := ChurchBuilder.new()
+		var mesh: ArrayMesh = builder.build(building.spec)
+		return BlueprintQA.new().check(building.spec, mesh, builder)
+
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := ChurchSpec.new()
 		_copy_size_and_style(request, spec)
@@ -270,6 +299,11 @@ class ChurchFamily extends BuildingFamilyAdapter:
 # ------------------------------------------------------------- the castles
 
 class CastleFamily extends BuildingFamilyAdapter:
+	func quality_report(building) -> Dictionary:
+		var builder := CastleBuilder.new()
+		var mesh: ArrayMesh = builder.build(building.spec)
+		return CastleQA.new().check(building.spec, mesh, builder)
+
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := CastleSpec.new()
 		_copy_size_and_style(request, spec)
@@ -316,6 +350,11 @@ class CastleFamily extends BuildingFamilyAdapter:
 # -------------------------------------------------------------- the temples
 
 class TempleFamily extends BuildingFamilyAdapter:
+	func quality_report(building) -> Dictionary:
+		var builder := TempleBuilder.new()
+		builder.build(building.spec)
+		return TempleQA.new().check(building.spec, builder)
+
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := TempleSpec.new()
 		spec.form = request.style
@@ -366,6 +405,15 @@ class TempleFamily extends BuildingFamilyAdapter:
 ## The `world` kind is itself a registry (WLD-000), so its adapter is a
 ## forwarder: `WorldFamilies` decides which of its own families answers.
 class WorldFamily extends BuildingFamilyAdapter:
+	func quality_report(building) -> Dictionary:
+		if building.plan != null:
+			return plan_quality_report(building.plan)
+		if building.spec is TimberHallSpec:
+			var builder := TimberHallBuilder.new()
+			builder.build(building.spec)
+			return HallCheck.check(building.spec, builder)
+		return super.quality_report(building)
+
 	func generate(request: BuildingRequest, out) -> bool:
 		return WorldFamilies.generate(request, out)
 
@@ -405,6 +453,9 @@ class WorldFamily extends BuildingFamilyAdapter:
 ## `style` is the culture and `purpose` is the purpose, exactly as they are
 ## for every other family.
 class VillageFamily extends BuildingFamilyAdapter:
+	func quality_report(building) -> Dictionary:
+		return VillageQA.new().check(building.village)
+
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := VillageSpec.new(request.seed)
 		spec.population = int(round(request.width))

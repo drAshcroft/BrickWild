@@ -1,7 +1,7 @@
 extends SceneTree
 func _init() -> void:
 	var spec: CastleSpec = CastleSweep.spec_at(&"edwardian", &"castle", 1)
-	var plan: HousePlan = CastleGenerator.chapel_plan(spec)
+	var plan: HousePlan = CastleInteriorPlans.chapel_plan(spec)
 	print("axis: ", TempleRiteCheck.plan_axis_faults(plan, 0, plan.entrance()))
 	var b := HouseBuilder.new()
 	b.build(plan)

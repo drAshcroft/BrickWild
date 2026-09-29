@@ -209,7 +209,7 @@ static func _choose_focus(out: HousePlan, spec: ShopSpec, front: int) -> void:
 	var door_pos := Vector2(INF, INF)
 	# Some small shops enter through a service room. The business focus must
 	# face the doorway into its own room, rather than an imagined street door.
-	var entrance := HouseFurnisher.focus_door(out, front)
+	var entrance := HouseFurnishScore.focus_door(out, front)
 	if entrance >= 0:
 		door_pos = out.doors[entrance]["pos"]
 		var nearest := INF
@@ -233,7 +233,7 @@ static func _choose_focus(out: HousePlan, spec: ShopSpec, front: int) -> void:
 				if n.dot(door_n) < 0.9:
 					continue
 			else:
-				if HouseFurnisher._wall_has_window(out, front, wi):
+				if HouseFurnishScore._wall_has_window(out, front, wi):
 					run += 100.0
 			if run > best_run:
 				best_run = run

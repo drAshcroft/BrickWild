@@ -6,7 +6,7 @@ static func run() -> SuiteResult:
 	_synthetic(result)
 	for index in [1, 2]:
 		var spec := CastleSweep.spec_at(&"crusader", &"castle", index)
-		var plan := CastleGenerator.keep_plan(spec)
+		var plan := CastleKeepPlan.generate(spec)
 		var qa := HouseFurnishCheck.new()
 		qa._check_sconce_pair(plan)
 		_expect(result, qa.failures.is_empty(), "crusader castle%d: %s" % [index, str(qa.failures)])
@@ -57,6 +57,14 @@ static func _synthetic(result: SuiteResult) -> void:
 		outline.append(Vector2(cos(angle), sin(angle)) * 10.0)
 	plan.rooms.append({"kind": &"lords_chamber", "rect": Poly.bounding_rect(outline),
 		"outline": outline, "storey": 0})
+	var corner := Rect2(Vector2(8.5, 8.5), Vector2.ONE)
+	_expect(result, not HouseFurnishPlacement._inside_outline(plan, 0, corner),
+		"polygon room accepted a box beyond its masonry")
+	var rectangular := HousePlan.new()
+	rectangular.spec = plan.spec
+	rectangular.rooms.append({"kind": &"bedroom", "rect": Rect2(Vector2(-10, -10), Vector2(20, 20))})
+	_expect(result, HouseFurnishPlacement._inside_outline(rectangular, 0, corner),
+		"a prior polygon room changed a rectangular room's boundary")
 	var walls := HouseGeometry.room_walls(plan, 0)
 	var edge: Dictionary = walls[2]
 	var midpoint := (Vector2(edge.from) + Vector2(edge.to)) * 0.5
@@ -76,13 +84,13 @@ static func _synthetic(result: SuiteResult) -> void:
 	var anchor := {"pos": midpoint, "normal": edge.normal, "dist": 1.1}
 	var candidate: Dictionary = plan.furniture[1].duplicate(true)
 	candidate.flank_anchor = anchor
-	_expect(result, HouseFurnisher._flank_bonus(plan, 0, candidate) > 0,
+	_expect(result, HouseFurnishScore._flank_bonus(plan, 0, candidate) > 0,
 		"placer gives no pairing score to a real oblique-wall pair")
 	var adjacent: Dictionary = walls[3]
 	var adjacent_point := (Vector2(adjacent.from) + Vector2(adjacent.to)) * 0.5
 	var adjacent_candidate: Dictionary = candidate.duplicate(true)
 	adjacent_candidate.rect = Rect2(adjacent_point - Vector2.ONE * 0.05, Vector2.ONE * 0.1)
-	_expect(result, HouseFurnisher._flank_bonus(plan, 0, adjacent_candidate) < 0,
+	_expect(result, HouseFurnishScore._flank_bonus(plan, 0, adjacent_candidate) < 0,
 		"14-gon adjacent facet was mistaken for the anchor's own wall")
 	var other: Dictionary = walls[6]
 	var moved := (Vector2(other.from) + Vector2(other.to)) * 0.5
@@ -93,14 +101,14 @@ static func _synthetic(result: SuiteResult) -> void:
 	_expect(result, not broken.failures.is_empty(), "sconce rule accepted lamps moved onto different physical walls")
 	var narrow_anchor := {"pos": Vector2(edge.from).lerp(edge.to, 0.02),
 		"normal": edge.normal, "reach": 0.0}
-	_expect(result, HouseFurnisher._flank_station(plan, 0, narrow_anchor, 0.4, "sconce") == 0.0,
+	_expect(result, HouseFurnishScore._flank_station(plan, 0, narrow_anchor, 0.4, "sconce") == 0.0,
 		"pair station extended beyond its host facet into the polygon AABB")
 	# Exercise the real placer, independently of the recipe's one-or-two roll.
 	plan.furniture.clear()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7407
-	HouseFurnisher._place_mounted(plan, 0, key, rng)
-	HouseFurnisher._place_mounted(plan, 0, key, rng)
+	HouseFurnishPlacement._place_mounted(plan, 0, key, rng)
+	HouseFurnishPlacement._place_mounted(plan, 0, key, rng)
 	_expect(result, plan.furniture.size() == 2, "polygon placer failed to hang two lamps on clear masonry")
 	if plan.furniture.size() == 2:
 		var first := _physical_wall(plan, 0, plan.furniture[0].rect.get_center())

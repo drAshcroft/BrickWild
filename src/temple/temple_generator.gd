@@ -38,7 +38,7 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	spec.dais_height = float(spec.dais_steps) * TempleGeometry.DAIS_RISE
 
 	# ---- the god ----
-	spec.idol_kind = _pick(r, c["idol"])
+	spec.idol_kind = GeneratorRandom.pick(r, c["idol"])
 	spec.idol_width = clampf(hall.size.x * r.randf_range(0.16, 0.26), 1.4, 6.0)
 	# tall enough to loom: over the altar, and a real share of the room
 	spec.idol_height = maxf(spec.height * r.randf_range(0.45, 0.72),
@@ -63,7 +63,7 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	# ---- the hole ----
 	spec.bridge_width = clampf(TempleGeometry.PROCESSION_MIN + 0.6,
 		TempleGeometry.BRIDGE_MIN, 4.0)
-	spec.pit = _chance(r, f["pit"])
+	spec.pit = GeneratorRandom.chance(r, f["pit"])
 	spec.pit_radius = 0.0
 	if spec.pit:
 		_fit_pit(spec, r)
@@ -74,7 +74,7 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 		spec.pit_radius = minf(spec.pit_radius, lit)
 
 	# ---- columns ----
-	spec.column_rows = _pick(r, f["rows"])
+	spec.column_rows = GeneratorRandom.pick(r, f["rows"])
 	spec.column_bays = 0 if int(f["bays"][1]) == 0 \
 		else r.randi_range(int(f["bays"][0]), int(f["bays"][1]))
 	spec.column_r = clampf(spec.height * 0.055, 0.3, 1.1)
@@ -82,7 +82,7 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	_fit_columns(spec)
 
 	# ---- what the cult adds ----
-	spec.cells = _pick(r, f["cells"]) if _chance(r, c["cells"]) else 0
+	spec.cells = GeneratorRandom.pick(r, f["cells"]) if GeneratorRandom.chance(r, c["cells"]) else 0
 	spec.brazier_bays = r.randi_range(int(c["brazier"][0]), int(c["brazier"][1]))
 	# and never fewer than it takes to light the walk: a processional way with
 	# a dark stretch in the middle of it is a corridor, not a rite
@@ -93,10 +93,10 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	spec.stain = r.randf_range(float(c["stain"][0]), float(c["stain"][1]))
 
 	# ---- what it shows the world ----
-	spec.spire = _chance(r, f["spire"])
+	spec.spire = GeneratorRandom.chance(r, f["spire"])
 	spec.spire_height = spec.height * r.randf_range(0.5, 1.1) if spec.spire else 0.0
-	spec.terraces = _pick(r, f.get("terraces", [3])) if spec.form == &"ziggurat" else 0
-	spec.obelisks = _chance(r, f.get("obelisks", 0.0))
+	spec.terraces = GeneratorRandom.pick(r, f.get("terraces", [3])) if spec.form == &"ziggurat" else 0
+	spec.obelisks = GeneratorRandom.chance(r, f.get("obelisks", 0.0))
 	if spec.form == &"ziggurat":
 		var summit := TempleGeometry.terrace_rect(spec, spec.terraces - 1)
 		spec.idol_width = minf(spec.idol_width, (minf(summit.size.x, summit.size.y) - 1.0) / 1.4)
@@ -115,8 +115,8 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	spec.roof_color = Color(c["roof"][0]).lerp(Color(c["roof"][1]), r.randf())
 	spec.glow_color = Color(c["glow"])
 
-	spec.variant_name = "The %s%s %s" % [_pick(r, FIRST), _pick(r, SECOND),
-		_pick(r, OF)]
+	spec.variant_name = "The %s%s %s" % [GeneratorRandom.pick(r, FIRST), GeneratorRandom.pick(r, SECOND),
+		GeneratorRandom.pick(r, OF)]
 	spec.variant_name = spec.variant_name.strip_edges()
 	# Materialize the final, fully filtered column arrangement once.  Consumers
 	# must read this authored plan list rather than independently re-deriving it.
@@ -189,11 +189,3 @@ static func _fit_columns(spec: TempleSpec) -> void:
 			spec.column_rows = 0
 			spec.column_bays = 0
 			return
-
-
-static func _chance(r: RandomNumberGenerator, p) -> bool:
-	return r.randf() < float(p)
-
-
-static func _pick(r: RandomNumberGenerator, arr: Array):
-	return arr[r.randi_range(0, arr.size() - 1)]

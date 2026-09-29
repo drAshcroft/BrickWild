@@ -1,0 +1,216 @@
+class_name HouseFurnishRepair
+extends RefCounted
+
+const MAX_REPAIRS := 8
+const MAX_TRIALS := 8
+
+## Furnish, then walk the house, then take something out and walk it again.
+##
+## Rules that place one piece at a time cannot see what the room will look like
+## when the last of them has been placed: three sound decisions in a row still
+## add up to a barrel in the only gap between the table and the wall. So the
+## furnisher finishes by asking HouseNavCheck whether a person can actually get
+## about, and while the answer is no it takes something out.
+##
+## WHICH something is measured, not guessed. An earlier version removed the
+## biggest thing in the room that had been reported, which is usually the wrong
+## room -- what blocks a bedroom is in the parlour you would cross to reach it.
+## This version tries removing each candidate in turn and keeps whichever
+## actually opens up the most floor, which needs no theory about where the
+## blockage is.
+##
+## Pieces the room cannot do without are only removed when nothing else helps,
+## and when one goes the plan records it, so the furnishing check can report a
+## missing bed as the compromise it was rather than as a defect.
+static func relax(plan: HousePlan) -> int:
+	var removed := 0
+	for attempt in range(MAX_REPAIRS):
+		var before: Dictionary = HouseNavCheck.new().check(plan)
+		if before["ok"]:
+			break
+		var base: int = int(before["stats"].get("reached_cells", 0))
+		var best := -1
+		var best_gain := 0
+		var best_must := true
+		for f in _candidates(plan):
+			var p: Dictionary = plan.furniture[f]
+			var must: bool = p.get("must", false)
+			var trial: HousePlan = _without(plan, f)
+			var after: Dictionary = HouseNavCheck.new().check(trial)
+			var gain: int = int(after["stats"].get("reached_cells", 0)) - base
+			if bool(after["ok"]):
+				gain += 10000        # the whole point: it fixes the house
+			if gain <= 0:
+				continue
+			# an optional piece is always preferred to a necessary one, however
+			# much floor the necessary one would free
+			if best < 0 or (best_must and not must) \
+					or (best_must == must and gain > best_gain):
+				best = f
+				best_gain = gain
+				best_must = must
+		if best < 0:
+			# A plateau: no single removal opens anything up, because two
+			# pieces are blocking the same route between them. Take out the
+			# biggest optional thing near the trouble anyway and look again --
+			# without this the search stops one move short of the answer.
+			best = _biggest_near(plan, before)
+			if best < 0:
+				break
+		if plan.furniture[best].get("must", false):
+			plan.note_compromise(int(plan.furniture[best]["room"]),
+				String(plan.furniture[best]["cat"]))
+		plan.furniture.remove_at(best)
+		reindex_hosts(plan, best)
+		removed += 1
+	_plan_rugs(plan)
+	return removed
+
+
+static func _plan_rugs(plan: HousePlan) -> void:
+	plan.rugs.clear()
+	for index in plan.furniture.size():
+		var item: Dictionary = plan.furniture[index]
+		var room := int(item["room"])
+		if PropCatalog.category(String(item["key"])) != "table" or plan.kind_of(room) not in HouseFurnishingRecipes.RUG_ROOM_KINDS:
+			continue
+		var floor := HouseGeometry.room_floor_rect(plan, room)
+		var rug := Rect2(item["rect"])
+		for margin in [0.55, 0.35, 0.15, 0.0]:
+			var candidate := Rect2(item["rect"]).grow(margin).intersection(floor)
+			var fits := true
+			if plan.is_polygonal(room):
+				for point in Poly.from_rect(candidate):
+					fits = fits and Poly.contains_point(plan.outline_of(room), point, 0.01)
+			for other in plan.furniture:
+				if other == item or int(other["room"]) != room or PropCatalog.category(other["key"]) != "table":
+					continue
+				if candidate.intersects(Rect2(other["rect"]).grow(margin)):
+					fits = false
+			if not fits:
+				continue
+			rug = candidate
+			break
+		plan.rugs.append({"id": "rug_table_%d" % index, "table": index, "room": room,
+			"storey": plan.storey_of_room(room), "rect": rug})
+
+
+## The biggest optional piece standing in a room that failed, or in one of its
+## neighbours -- what blocks a room is usually in the room you would cross to
+## reach it. Used only to break a plateau, where no single removal helps.
+static func _biggest_near(plan: HousePlan, rep: Dictionary) -> int:
+	var rooms := {}
+	var graph: Dictionary = plan.door_graph()
+	var stranded := {}
+	for i in rep["unreached_rooms"]:
+		stranded[int(i)] = true
+	for i2 in rep["unreached_rooms"]:
+		for nb in graph[int(i2)]:
+			rooms[int(nb)] = true
+	for f in rep["unreachable_items"]:
+		rooms[int(plan.furniture[int(f)]["room"])] = true
+	# Only rooms you can actually get to are worth clearing. Whatever is in the
+	# way stands between the door you are at and the room you cannot reach, so
+	# it is never in the stranded room itself -- and an earlier version spent
+	# every one of its attempts moving barrels around inside one.
+	for s2 in stranded:
+		rooms.erase(s2)
+	# optional pieces first; a necessary one only if there is nothing else in
+	# the way, and then the caller records it as a compromise
+	for allow_must in [false, true]:
+		var found: int = _biggest_in(plan, rooms, allow_must)
+		if found >= 0:
+			return found
+	return -1
+
+
+static func _biggest_in(plan: HousePlan, rooms: Dictionary, allow_must: bool) -> int:
+	var best := -1
+	var best_area := 0.0
+	for f2 in _candidates(plan):
+		var p: Dictionary = plan.furniture[f2]
+		if not rooms.has(int(p["room"])):
+			continue
+		if p.get("must", false) and not allow_must:
+			continue
+		var rect: Rect2 = p["rect"]
+		var area: float = rect.size.x * rect.size.y
+		if area > best_area:
+			best_area = area
+			best = f2
+	return best
+
+
+## The pieces worth trying to remove: the ones standing on the floor, biggest
+## first, capped so the search stays cheap on a large house.
+static func _candidates(plan: HousePlan) -> Array[int]:
+	var out: Array[int] = []
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		if p.get("mounted", false) or p["host"] >= 0:
+			continue
+		if not PropCatalog.blocks_floor(p["key"]):
+			continue
+		out.append(f)
+	out.sort_custom(func(a: int, b: int) -> bool:
+		var ra: Rect2 = plan.furniture[a]["rect"]
+		var rb: Rect2 = plan.furniture[b]["rect"]
+		return ra.size.x * ra.size.y > rb.size.x * rb.size.y)
+	return out.slice(0, MAX_TRIALS)
+
+
+## A copy of the plan with one piece taken out, for asking what would happen.
+## Only the furniture differs, and the nav check reads nothing else that could
+## be mutated, so the rooms and doors are shared rather than copied.
+static func _without(plan: HousePlan, f: int) -> HousePlan:
+	var trial := HousePlan.new()
+	trial.spec = plan.spec
+	trial.rooms = plan.rooms
+	trial.doors = plan.doors
+	trial.windows = plan.windows
+	trial.stairs = plan.stairs
+	trial.hearth = plan.hearth
+	trial.furniture = plan.furniture.duplicate()
+	# Whatever stands ON the piece goes with it, the way reindex_hosts() takes
+	# it when the removal is real. Asking "would taking the table out help?"
+	# with the bench still drawn up to it answers no every time, which is how a
+	# parlour cut in half by a table and its bench survived every repair pass.
+	var doomed: Array[int] = _hosted_by(plan, f)
+	doomed.append(f)
+	doomed.sort()
+	for k in range(doomed.size() - 1, -1, -1):
+		trial.furniture.remove_at(doomed[k])
+	return trial
+
+
+## Everything set on a piece, and everything set on those, by index.
+static func _hosted_by(plan: HousePlan, f: int) -> Array[int]:
+	var out: Array[int] = []
+	var front: Array[int] = [f]
+	while not front.is_empty():
+		var cur: int = front.pop_back()
+		for i in range(plan.furniture.size()):
+			if int(plan.furniture[i]["host"]) != cur or i in out:
+				continue
+			out.append(i)
+			front.append(i)
+	return out
+
+
+## Removing a placement shifts every index after it, and things set ON that
+## placement point back at it by index. Anything that stood on the piece that
+## just left goes with it.
+static func reindex_hosts(plan: HousePlan, removed: int) -> void:
+	var doomed: Array[int] = []
+	for f in range(plan.furniture.size()):
+		var host: int = plan.furniture[f]["host"]
+		if host == removed:
+			doomed.append(f)
+		elif host > removed:
+			plan.furniture[f]["host"] = host - 1
+	for k in range(doomed.size() - 1, -1, -1):
+		var idx: int = doomed[k]
+		plan.furniture.remove_at(idx)
+		reindex_hosts(plan, idx)
+
+
