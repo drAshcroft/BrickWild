@@ -11,9 +11,13 @@ extends RefCounted
 ## how many SurfaceTools exist.
 
 var _sts: Array[SurfaceTool] = []
+## Metric texture coordinates are opt-in. Church and castle stone uses physical
+## metres; houses retain their established UV regions and roof materials.
+var metric_coordinates := false
 
 
-func _init(surface_count: int) -> void:
+func _init(surface_count: int, p_metric_coordinates := false) -> void:
+	metric_coordinates = p_metric_coordinates
 	for i in range(surface_count):
 		var s := SurfaceTool.new()
 		s.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -94,17 +98,38 @@ func _emit_box(pts: Array, surf: int) -> void:
 		[1, 4, 7, 2], [5, 0, 3, 6],      # +x, -x
 		[3, 2, 7, 6], [0, 5, 4, 1],      # top, bottom
 	]
-	var uvs := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]
 	var st: SurfaceTool = _sts[surf]
 	for q in quads:
 		# Every vertex must carry a normal: SurfaceTool locks its attribute set
 		# on the first vertex, and callers mix their own set_normal() calls in.
 		for tri in [[q[0], q[1], q[2]], [q[0], q[2], q[3]]]:
 			var n: Vector3 = _face_normal(pts[tri[0]], pts[tri[1]], pts[tri[2]])
+			var axes: Array = []
+			if metric_coordinates:
+				axes = _surface_uv_axes(n)
 			for vi in range(3):
 				st.set_normal(n)
-				st.set_uv(uvs[vi])
+				if metric_coordinates:
+					st.set_uv(_project_uv(pts[tri[vi]], axes))
+				else:
+					st.set_uv(Vector2(0.0 if vi == 0 else 1.0,
+						0.0 if vi < 2 else 1.0))
 				st.add_vertex(pts[tri[vi]])
+
+
+## A deterministic basis for a face. U follows its horizontal/eave direction;
+## V climbs the face. Absolute dot products make coplanar triangles continuous.
+static func _surface_uv_axes(normal: Vector3) -> Array:
+	var n := normal.normalized()
+	var u := Vector3.UP.cross(n).normalized()
+	if u.length_squared() < 0.001:
+		u = Vector3.RIGHT
+	var v := n.cross(u).normalized()
+	return [u, v]
+
+
+static func _project_uv(point: Vector3, axes: Array) -> Vector2:
+	return Vector2(point.dot(axes[0]), point.dot(axes[1]))
 
 
 ## Outward normal for a triangle wound (a, b, c).
@@ -232,9 +257,10 @@ func gable_end_at(xf: Transform3D, half_span: float, rise: float,
 
 func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
 	var n: Vector3 = _face_normal(a, b, c)
+	var axes: Array = _surface_uv_axes(n) if metric_coordinates else []
 	for p in [a, b, c]:
 		st.set_normal(n)
-		st.set_uv(Vector2(0.5, 0.5))
+		st.set_uv(_project_uv(p, axes) if metric_coordinates else Vector2(0.5, 0.5))
 		st.add_vertex(p)
 
 
@@ -389,6 +415,12 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 		return
 	var st: SurfaceTool = _sts[surf]
 	var rings: int = profile.size() - 1
+	var profile_v := PackedFloat32Array()
+	if metric_coordinates:
+		profile_v.append(0.0)
+		for profile_index in range(1, profile.size()):
+			profile_v.append(profile_v[profile_index - 1]
+				+ profile[profile_index - 1].distance_to(profile[profile_index]))
 	for i in range(rings):
 		var p0: Vector2 = profile[i]
 		var p1: Vector2 = profile[i + 1]
@@ -410,7 +442,13 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 				var n: Vector3 = _face_normal(v[tri[0]], v[tri[1]], v[tri[2]])
 				for vi in tri:
 					st.set_normal(n)
-					st.set_uv(Vector2(float(s) / segments, float(i) / rings))
+					if metric_coordinates:
+						var angle := a0 if vi == 0 or vi == 3 else a1
+						var radius := p0.x if vi == 0 or vi == 1 else p1.x
+						var height := profile_v[i] if vi == 0 or vi == 1 else profile_v[i + 1]
+						st.set_uv(Vector2((angle - start) * radius, height))
+					else:
+						st.set_uv(Vector2(float(s) / segments, float(i) / rings))
 					st.add_vertex(v[vi])
 	# close a partial sweep, so a half-dome is not hollow along its cut
 	if arc < TAU - 0.001:
@@ -430,9 +468,11 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 					if a == start + arc:
 						tri = [tri[0], tri[2], tri[1]]
 					var cn: Vector3 = _face_normal(q[tri[0]], q[tri[1]], q[tri[2]])
+					var cap_axes: Array = _surface_uv_axes(cn) if metric_coordinates else []
 					for vi in tri:
 						st.set_normal(cn)
-						st.set_uv(Vector2(0, 0))
+						st.set_uv(_project_uv(q[vi], cap_axes)
+							if metric_coordinates else Vector2.ZERO)
 						st.add_vertex(q[vi])
 
 
@@ -543,16 +583,19 @@ func half_cylinder(radius: float, height: float, center: Vector2, surf: int,
 	revolve(PackedVector2Array([Vector2(radius, 0.0), Vector2(radius, height)]),
 		origin, surf, segments, PI, 0.0)
 	var st: SurfaceTool = _sts[surf]
+	var top_axes: Array = _surface_uv_axes(Vector3.UP) if metric_coordinates else []
 	for s in range(segments):
 		var a0: float = PI * float(s) / segments
 		var a1: float = PI * float(s + 1) / segments
 		var c: Vector3 = origin + Vector3(0, height, 0)
 		st.set_normal(Vector3.UP)
-		st.set_uv(Vector2(0, 0)); st.add_vertex(c + Vector3(cos(a0) * radius, 0, sin(a0) * radius))
+		var p0 := c + Vector3(cos(a0) * radius, 0, sin(a0) * radius)
+		st.set_uv(_project_uv(p0, top_axes) if metric_coordinates else Vector2.ZERO); st.add_vertex(p0)
 		st.set_normal(Vector3.UP)
-		st.set_uv(Vector2(1, 0)); st.add_vertex(c + Vector3(cos(a1) * radius, 0, sin(a1) * radius))
+		var p1 := c + Vector3(cos(a1) * radius, 0, sin(a1) * radius)
+		st.set_uv(_project_uv(p1, top_axes) if metric_coordinates else Vector2(1, 0)); st.add_vertex(p1)
 		st.set_normal(Vector3.UP)
-		st.set_uv(Vector2(1, 1)); st.add_vertex(c)
+		st.set_uv(_project_uv(c, top_axes) if metric_coordinates else Vector2(1, 1)); st.add_vertex(c)
 
 
 ## A hollow ring in plan, elliptical: the wall of a shell keep. `rx`/`rz` are

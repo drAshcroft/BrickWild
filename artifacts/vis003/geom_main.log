@@ -1,0 +1,63 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running hroof...
+--- house roofs ---
+    farmhouse seed=4413 roof=hipped fitted_dormers=2
+    townhouse seed=4411 roof=half_hipped fitted_dormers=2
+    cottage seed=4412 roof=gable fitted_dormers=0
+    longhall seed=4414 roof=gable fitted_dormers=0
+    elapsed 1.67s
+
+Running hcomponent...
+--- house components ---
+    elapsed 3.09s
+
+Running hopening...
+--- house roof openings ---
+    elapsed 3.64s
+
+Running hsky...
+--- hsky ---
+    elapsed 1.09s
+
+Running hdoor...
+--- house raised doors ---
+    elapsed 0.02s
+
+Running hbounds...
+--- house bounds ---
+    elapsed 6.53s
+
+Running hjetty...
+--- house jetty ---
+    elapsed 2.40s
+
+Running hmaterials...
+--- house materials ---
+    elapsed 0.24s
+
+Running roofquick...
+--- roof quick ---
+    house roofs: farmhouse seed=4413 roof=hipped fitted_dormers=2
+    house roofs: townhouse seed=4411 roof=half_hipped fitted_dormers=2
+    house roofs: cottage seed=4412 roof=gable fitted_dormers=0
+    house roofs: longhall seed=4414 roof=gable fitted_dormers=0
+    elapsed 8.33s
+
+Running metriccoords...
+--- metric coordinates ---
+    elapsed 2.59s
+
+============================================================
+  house roofs        PASS  (452 checked, 0 failures, 0 warnings)
+  house components   PASS  (1526 checked, 0 failures, 0 warnings)
+  house roof openings PASS  (306 checked, 0 failures, 0 warnings)
+  hsky               PASS  (18 checked, 0 failures, 0 warnings)
+  house raised doors PASS  (8 checked, 0 failures, 0 warnings)
+  house bounds       PASS  (1517 checked, 0 failures, 0 warnings)
+  house jetty        PASS  (202 checked, 0 failures, 0 warnings)
+  house materials    PASS  (470 checked, 0 failures, 0 warnings)
+  roof quick         PASS  (2462 checked, 0 failures, 0 warnings)
+  metric coordinates PASS  (14 checked, 0 failures, 0 warnings)
+============================================================
+ALL PASS -- 10 suites, 6975 checks, 0 failures, 0 warnings

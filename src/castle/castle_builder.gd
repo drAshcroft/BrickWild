@@ -38,7 +38,7 @@ const KeepPlan = preload("castle_keep_plan.gd")
 
 func build(p_spec: CastleSpec) -> ArrayMesh:
 	spec = p_spec
-	begin(4)
+	begin_metric(4)
 	_roof_faces.clear()
 	_roof_covers.clear()
 	interiors.clear()

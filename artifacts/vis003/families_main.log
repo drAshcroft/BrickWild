@@ -1,0 +1,113 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running church...
+--- church ---
+    elapsed 64.05s
+
+Running normals...
+--- normals ---
+    openings facing outward: worst run 100% ()
+    elapsed 75.13s
+  WARN [door] opening at (0.000000, 1.800000, -11.020000) is walled in from outside (style=russian seed=5002)
+  WARN surface 2 has 2 degenerate triangles, style=russian seed=5007
+  WARN [door] opening at (0.000000, 1.800000, -18.020000) is walled in from outside (style=russian seed=5009)
+
+Running massing...
+--- massing ---
+    romanesque      0/15 variants with defects
+    gothic          0/15 variants with defects
+    byzantine       0/15 variants with defects
+    nordic_stave    0/15 variants with defects
+    renaissance     0/15 variants with defects
+    russian         0/15 variants with defects
+    elapsed 71.21s
+
+Running ctowerplan...
+--- castle tower plan ---
+    elapsed 9.18s
+
+Running cmotteplan...
+--- castle motte plan ---
+    elapsed 32.00s
+
+Running cforms...
+--- castle forms ---
+    elapsed 74.02s
+
+Running caccess...
+ACCESS norman/castle/0 failures=0
+ACCESS norman/castle/1 failures=0
+ACCESS norman/castle/2 failures=0
+ACCESS norman/fortress/0 failures=0
+ACCESS norman/fortress/1 failures=0
+ACCESS norman/fortress/2 failures=0
+ACCESS edwardian/castle/0 failures=0
+ACCESS edwardian/castle/1 failures=0
+ACCESS edwardian/castle/2 failures=0
+ACCESS edwardian/fortress/0 failures=0
+ACCESS edwardian/fortress/1 failures=0
+ACCESS edwardian/fortress/2 failures=0
+ACCESS crusader/castle/0 failures=0
+ACCESS crusader/castle/1 failures=0
+ACCESS crusader/castle/2 failures=0
+ACCESS crusader/fortress/0 failures=0
+ACCESS crusader/fortress/1 failures=0
+ACCESS crusader/fortress/2 failures=0
+ACCESS french_chateau/castle/0 failures=0
+ACCESS french_chateau/castle/1 failures=0
+ACCESS french_chateau/castle/2 failures=0
+ACCESS french_chateau/fortress/0 failures=0
+ACCESS french_chateau/fortress/1 failures=0
+ACCESS french_chateau/fortress/2 failures=0
+ACCESS bavarian/castle/0 failures=0
+ACCESS bavarian/castle/1 failures=0
+ACCESS bavarian/castle/2 failures=0
+ACCESS bavarian/fortress/1 failures=0
+ACCESS japanese/castle/0 failures=0
+ACCESS japanese/castle/1 failures=0
+ACCESS japanese/castle/2 failures=0
+ACCESS japanese/fortress/0 failures=0
+ACCESS japanese/fortress/1 failures=0
+ACCESS japanese/fortress/2 failures=0
+ACCESS moorish/castle/0 failures=0
+ACCESS moorish/castle/1 failures=0
+ACCESS moorish/castle/2 failures=0
+ACCESS moorish/fortress/0 failures=0
+ACCESS moorish/fortress/1 failures=0
+ACCESS moorish/fortress/2 failures=0
+ACCESS wizard/castle/0 failures=0
+ACCESS wizard/castle/1 failures=0
+ACCESS wizard/castle/2 failures=0
+ACCESS wizard/fortress/0 failures=0
+ACCESS wizard/fortress/1 failures=0
+ACCESS wizard/fortress/2 failures=0
+--- castle physical access ---
+    elapsed 231.82s
+
+Running cforebuilding...
+FOREBUILDING norman/castle failures=0
+FOREBUILDING edwardian/castle failures=0
+FOREBUILDING edwardian/fortress failures=0
+FOREBUILDING crusader/castle failures=0
+FOREBUILDING crusader/fortress failures=0
+FOREBUILDING french_chateau/castle failures=0
+FOREBUILDING french_chateau/fortress failures=0
+FOREBUILDING bavarian/castle failures=0
+FOREBUILDING japanese/castle failures=0
+FOREBUILDING japanese/fortress failures=0
+FOREBUILDING moorish/castle failures=0
+FOREBUILDING moorish/fortress failures=0
+FOREBUILDING wizard/castle failures=0
+FOREBUILDING wizard/fortress failures=0
+--- castle forebuilding ---
+    elapsed 25.51s
+
+Running cgateaccess...
+GATE_ACCESS norman failures=0
+GATE_ACCESS crusader failures=0
+GATE_ACCESS moorish failures=0
+GATE_ACCESS japanese failures=0
+--- castle gate access ---
+    elapsed 1.52s
+
+Running castle...

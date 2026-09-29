@@ -59,7 +59,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"roofquick", "houseqacore", "houseqaplan",
+	"roofquick", "houseqacore", "houseqaplan", "metriccoords",
 	"houseqafurnish", "houseqafull", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -95,7 +95,7 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 ## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 ## Lanes and bare suite names can be mixed; duplicates run once.
 const LANES: Dictionary = {
-	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials"],
+	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "metriccoords"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
@@ -121,6 +121,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return VillageWaterPlanSuite.run()
 		"hjetty":
 			return preload("res://tests/suites/house_jetty_suite.gd").run()
+		"metriccoords":
+			return preload("res://tests/suites/metric_coords_suite.gd").run()
 		"hmaterials":
 			return preload("res://tests/suites/house_material_suite.gd").run()
 		"henvelope":

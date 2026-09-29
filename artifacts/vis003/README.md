@@ -1,0 +1,7 @@
+# Metric coordinate acceptance
+
+`tools/render_metric_coords.gd` renders the [swatch](metric_coordinates.png) without `--headless`. Its single stone-course shader uses 1.35 m blocks and 0.58 m courses across a 2 m box, 20 m wall, sloped roof, half-cylinder, and 12- and 16-sided drums. The sampled pattern stays at a comparable physical scale instead of stretching to each triangle or whole wall. This is a coordinate test material; the runtime church and castle palette remains unchanged until VIS-004.
+
+`metriccoords` asserts physical edge scale on boxes and sloped surfaces, stable circumferential/profile coordinates on drums, planar end caps on partial sweeps, seeded regeneration, unchanged four-surface slots, and legacy UV behavior for default MeshKit/house callers. The main-worktree `lane:geom` run passed 10 suites and 6,975 checks with no failures or warnings; see `geom_main.log`. The broader church/castle run is recorded in `families_main.log`: church, normals, massing, castle tower/motte plans, castle forms, access, forebuilding and gate access completed. It was stopped during the long castle contract sweep. A subsequent standalone castle normals sweep was also stopped before producing a result.
+
+The church normals suite has three warnings about Russian-style openings and triangles. An isolated checkout of pre-change commit `c43fb4b` produced the same three warnings, in the same seeds and positions; see `baseline_normals.log`.

@@ -22,7 +22,7 @@ var _roof_volumes: Array[PackedVector3Array] = []
 
 func build(p_spec: ChurchSpec) -> ArrayMesh:
 	spec = p_spec
-	begin(4)
+	begin_metric(4)
 	_roof_volumes.clear()
 
 	var w: float = spec.width
@@ -581,4 +581,3 @@ func rose(pos: Vector3, face := 0.0) -> void:
 		var bx: Transform3D = t * Transform3D(Basis(Vector3(0, 0, 1), a),
 			Vector3(cos(a) * rr * 0.5, sin(a) * rr * 0.5, -0.03))
 		_kit.oriented_box(Vector3(rr * 0.55, 0.09, 0.08), bx, SURF_TRIM)
-

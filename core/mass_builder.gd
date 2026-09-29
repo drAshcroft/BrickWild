@@ -64,6 +64,13 @@ func begin(surface_count: int) -> void:
 	_kit = MeshKit.new(surface_count)
 
 
+## Start a church/castle shell whose shader coordinates are measured in metres.
+## Kept separate so HouseBuilder's begin(int) override and UV contract remain.
+func begin_metric(surface_count: int) -> void:
+	begin(surface_count)
+	_kit.metric_coordinates = true
+
+
 func commit() -> ArrayMesh:
 	return _kit.commit()
 
