@@ -94,7 +94,7 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 		if shaped:
 			_add_stair(plan, level, level + 1)
 		else:
-			HousePlanner._add_stair(plan, level, level + 1, level, level + 1)
+			HousePlanLevels.add_stair(plan, level, level + 1, level, level + 1)
 	var top_walls := HouseGeometry.room_walls(plan, levels - 1)
 	plan.hearth = {"room": levels - 1, "wall": _facing_wall(top_walls, Vector2(1, 0))}
 	if with_furniture:
@@ -166,7 +166,7 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 				var score := centre.distance_to(front)
 				if avoid.size.x > 0.0:
 					score += centre.distance_to(avoid.get_center())
-				if lower == 0 and _overlap(rect, HousePlanner.door_line(plan, lower, plan.doors[plan.entrance()])):
+				if lower == 0 and _overlap(rect, HousePlanLevels.door_line(plan, lower, plan.doors[plan.entrance()])):
 					score -= 1000.0
 				for door in plan.doors:
 					if HousePlan.record_storey(door) == lower:

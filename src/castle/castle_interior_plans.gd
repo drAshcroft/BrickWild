@@ -273,7 +273,7 @@ static func _chapel_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 ##
 ## A keep is the one castle building the house harness already knew how to
 ## describe: stacked storeys of one room each with a stair against the wall,
-## which is `HouseSpec.storeys` and `HousePlanner._add_stair` and nothing new.
+## which is `HouseSpec.storeys` and `HousePlanLevels.add_stair` and nothing new.
 ## What it needed was a programme of its own -- see KeepSpec -- because a keep
 ## puts its hall UP a stair over a blind store, which is the one thing the
 ## house rules forbid.

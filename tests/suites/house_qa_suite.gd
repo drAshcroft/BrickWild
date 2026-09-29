@@ -322,7 +322,7 @@ static func _stair_fixture(res: SuiteResult) -> void:
 	var size: Vector2 = Rect2(stair["rect"]).size
 	var centred := Rect2(f.get_center() - size / 2.0, size)
 	if in_hall:
-		var line: Rect2 = HousePlanner.door_line(plan, room, plan.doors[front])
+		var line: Rect2 = HousePlanLevels.door_line(plan, room, plan.doors[front])
 		centred.position.x = clampf(line.get_center().x - size.x / 2.0,
 			f.position.x, f.end.x - size.x)
 	for key in ["rect", "lower_rect", "upper_rect"]:

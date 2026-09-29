@@ -641,7 +641,7 @@ static func chimney_center(plan: HousePlan) -> Vector2:
 	if host < 0:
 		return c
 	var wall := plan.hearth_wall()
-	var run := HousePlanner.clear_wall_span(plan, host, wall)
+	var run := HousePlanFeatures.clear_wall_span(plan, host, wall)
 	var along := (run.x + run.y) * 0.5
 	if plan.focus_room() == host and plan.focus_cat() == "hearth" and plan.focus_pos().is_finite():
 		along = plan.focus_pos().x if wall <= 1 else plan.focus_pos().y

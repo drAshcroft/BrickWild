@@ -849,7 +849,7 @@ func _check_bed_window(plan: HousePlan) -> void:
 ## axis-coordinate span is intentionally retained for rectangular rooms.
 static func _fs_clear_wall_run(plan: HousePlan, room: int, wi: int) -> float:
 	if not plan.is_polygonal(room):
-		var span := HousePlanner.clear_wall_span(plan, room, wi)
+		var span := HousePlanFeatures.clear_wall_span(plan, room, wi)
 		return span.y - span.x
 	var wall: Dictionary = HouseGeometry.room_walls(plan, room)[wi]
 	var a: Vector2 = wall.from

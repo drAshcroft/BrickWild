@@ -69,7 +69,7 @@ static func _check_lodging(res: SuiteResult) -> void:
 		res.checked += 1
 		# The invariant the landing pass owns, and only that. Renaming two
 		# ordinary rooms to guest rooms can leave a THIRD room behind one of
-		# them, which is `HousePlanner._open_up_privacy`'s job and not this
+		# them, which is `HousePlanOpenings.open_up_privacy`'s job and not this
 		# pass's; holding the pass to the whole privacy rule would be holding
 		# it to somebody else's work.
 		for i in range(chained.room_count()):
@@ -127,7 +127,7 @@ static func _chained_inn(res: SuiteResult) -> HousePlan:
 		for j in range(i + 1, plan.room_count()):
 			if j == entrance or not HouseGeometry.room_suits(plan, j, &"guest_room"):
 				continue
-			if not HousePlanner._shared_edge(plan, i, j).is_empty():
+			if not HousePlanOpenings.shared_edge(plan, i, j).is_empty():
 				pair = [i, j]
 				break
 		if not pair.is_empty():

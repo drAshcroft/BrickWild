@@ -29,7 +29,7 @@ static func run() -> SuiteResult:
 				for f in HouseNavCheck.new().check(p)["failures"]:
 					res.fail(who + ": " + str(f))
 				for w in p.windows:
-					_expect(res, not HousePlanner._flue_blocks(p, w["pos"], w["normal"], HousePlan.record_storey(w), w["width"]), who + " flue crosses glazing")
+					_expect(res, not HousePlanner.flue_blocks(p, w["pos"], w["normal"], HousePlan.record_storey(w), w["width"]), who + " flue crosses glazing")
 				var ground := HouseGeometry.site_rect(s)
 				for level in range(-1, levels):
 					var site := HouseGeometry.site_rect(s, level)

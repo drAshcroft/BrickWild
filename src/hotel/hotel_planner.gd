@@ -274,7 +274,7 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, storey: int) -> 
 			continue
 		for side in [-1.0, 1.0]:
 			swings.append(HouseGeometry.door_clear_rect(door, side))
-		lines.append(HousePlanner.door_line(plan, lower, door))
+		lines.append(HousePlanLevels.door_line(plan, lower, door))
 	var glass: Array[Rect2] = []
 	for wi in plan.windows_of(lower):
 		glass.append(HouseGeometry.window_clear_rect(plan.windows[wi]))
@@ -286,11 +286,11 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, storey: int) -> 
 		for s in range(steps + 1):
 			var x: float = floor.position.x + travel * float(s) / float(steps)
 			var rect := Rect2(Vector2(x, floor.end.y - size.y), size)
-			if strict < 2 and HousePlanner._hits_any(rect, swings):
+			if strict < 2 and HousePlanLevels.hits_any(rect, swings):
 				continue
-			if strict < 1 and HousePlanner._hits_any(rect, lines):
+			if strict < 1 and HousePlanLevels.hits_any(rect, lines):
 				continue
-			if HousePlanner._hits_any(rect, glass):
+			if HousePlanLevels.hits_any(rect, glass):
 				continue
 			var d: float = absf(rect.get_center().x)
 			if d < best_d:

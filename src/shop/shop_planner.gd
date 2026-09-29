@@ -64,7 +64,7 @@ static func _light_workshops(out: HousePlan, spec: ShopSpec) -> void:
 			var side := {"normal": normal, "line": line,
 				"t0": rect.position.x if horizontal else rect.position.y,
 				"t1": rect.end.x if horizontal else rect.end.y}
-			HousePlanner._windows_along(out, spec, room, side, INF, windows.size() + 1)
+			HousePlanOpenings.windows_along(out, spec, room, side, INF, windows.size() + 1)
 			if out.windows_of(room).size() > windows.size():
 				break
 
@@ -83,7 +83,7 @@ static func _light_workshops(out: HousePlan, spec: ShopSpec) -> void:
 ##
 ## Two remedies, in the order a builder would reach for them. Cut a second
 ## door from a room you may walk through -- cheap, and what
-## `HousePlanner._open_up_privacy` does for a house. Failing that, the room
+## `HousePlanOpenings.open_up_privacy` does for a house. Failing that, the room
 ## the others hang off stops pretending to be a guest room and becomes the
 ## landing it has been acting as, which is the same demotion
 ## `_demote_through_bedrooms` makes for a house's own bedroom.
@@ -125,7 +125,7 @@ static func _cut_public_door(plan: HousePlan, room: int) -> bool:
 	for j in range(plan.room_count()):
 		if j == room or plan.kind_of(j) in HouseGeometry.SLEEPING:
 			continue
-		var edge: Array = HousePlanner._shared_edge(plan, room, j)
+		var edge: Array = HousePlanOpenings.shared_edge(plan, room, j)
 		if edge.is_empty():
 			continue
 		var run: float = edge[3] - edge[2]
@@ -137,7 +137,7 @@ static func _cut_public_door(plan: HousePlan, room: int) -> bool:
 			best_j = j
 	if best_j < 0:
 		return false
-	HousePlanner._add_inner_door(plan, best_j, room, best)
+	HousePlanOpenings.add_inner_door(plan, best_j, room, best)
 	return true
 
 
@@ -225,7 +225,7 @@ static func _choose_focus(out: HousePlan, spec: ShopSpec, front: int) -> void:
 		var best_run := -INF
 		for wi in range(walls.size()):
 			var n: Vector2 = walls[wi]["normal"]
-			var span: Vector2 = HousePlanner.clear_wall_span(out, front, wi)
+			var span: Vector2 = HousePlanFeatures.clear_wall_span(out, front, wi)
 			var run: float = span.y - span.x
 			if faces_door:
 				# the wall whose inward normal points the way the door's
@@ -243,14 +243,14 @@ static func _choose_focus(out: HousePlan, spec: ShopSpec, front: int) -> void:
 		var prefer := INF
 		if faces_door and door_pos.is_finite():
 			prefer = door_pos.x if absf(door_n.y) > 0.5 else door_pos.y
-		out.focus = HousePlanner.focus_on_wall(out, front, best, cat, faces_door, prefer)
+		out.focus = HousePlanFeatures.focus_on_wall(out, front, best, cat, faces_door, prefer)
 		return
 	var f: Rect2 = HouseGeometry.room_floor_rect(out, front)
 	var facing: Vector2 = -door_n
 	if faces_door and door_pos.is_finite():
 		# square in front of the door, looking straight back at it
 		facing = door_n
-		out.focus = HousePlanner.focus_in_room(out, front, cat, facing, faces_door)
+		out.focus = HousePlanFeatures.focus_in_room(out, front, cat, facing, faces_door)
 		var depth: float = f.size.y if absf(door_n.y) > 0.5 else f.size.x
 		var pos: Vector2 = door_pos - door_n * (depth / 2.0)
 		out.focus["pos"] = Vector2(clampf(pos.x, f.position.x + 1.0, f.end.x - 1.0),
@@ -258,4 +258,4 @@ static func _choose_focus(out: HousePlan, spec: ShopSpec, front: int) -> void:
 		return
 	elif out.hearth_room() == front and out.hearth_wall() >= 0:
 		facing = HouseGeometry.room_walls(out, front)[out.hearth_wall()]["normal"]
-	out.focus = HousePlanner.focus_in_room(out, front, cat, facing, faces_door)
+	out.focus = HousePlanFeatures.focus_in_room(out, front, cat, facing, faces_door)

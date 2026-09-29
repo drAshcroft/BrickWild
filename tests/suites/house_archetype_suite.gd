@@ -228,7 +228,7 @@ static func _tower_plan(across: float, storeys: int, sd: int) -> HousePlan:
 				"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H,
 				"storey": level2})
 	for level3 in range(storeys - 1):
-		HousePlanner._add_stair(plan, level3, level3 + 1, level3, level3 + 1)
+		HousePlanLevels.add_stair(plan, level3, level3 + 1, level3, level3 + 1)
 	HouseFurnisher.furnish(plan, spec)
 	return plan
 

@@ -374,7 +374,7 @@ func _build_partitions() -> void:
 			for j in range(i + 1, plan.room_count()):
 				if _room_storey(plan.rooms[j]) != level and _has_storey_metadata(plan.rooms[j]):
 					continue
-				var edge: Array = HousePlanner._shared_edge(plan, i, j)
+				var edge: Array = HousePlanOpenings.shared_edge(plan, i, j)
 				if edge.is_empty():
 					continue
 				var normal: Vector2 = edge[0]

@@ -578,7 +578,7 @@ static func _wall_run_for(plan: HousePlan, d: Dictionary) -> Array:
 	var a: int = d["a"]
 	var b: int = d["b"]
 	if b >= 0:
-		var edge: Array = HousePlanner._shared_edge(plan, a, b)
+		var edge: Array = HousePlanOpenings.shared_edge(plan, a, b)
 		if edge.is_empty():
 			return []
 		var t0: float = edge[2]
@@ -642,7 +642,7 @@ func _check_stair_line(plan: HousePlan) -> void:
 				% [si, gap, room, String(plan.kind_of(room))])
 		if front < 0 or int(plan.doors[front]["a"]) != room:
 			continue
-		var line: Rect2 = HousePlanner.door_line(plan, room, plan.doors[front])
+		var line: Rect2 = HousePlanLevels.door_line(plan, room, plan.doors[front])
 		var over: Rect2 = line.intersection(rect)
 		if over.size.x > TOL and over.size.y > TOL:
 			var msg := "stair_line: the foot of stair %d lies in the line of the front door" % si
