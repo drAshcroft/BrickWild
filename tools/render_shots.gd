@@ -38,6 +38,10 @@ func _init() -> void:
 		await _shoot_scene_acceptance()
 		quit()
 		return
+	if args.has("vis004"):
+		await _shoot_vis004_acceptance()
+		quit()
+		return
 	if args.has("visual-qa"):
 		var selection: String = args[1] if args.size() > 1 else ""
 		await _shoot_visual_acceptance(selection)
@@ -217,6 +221,51 @@ func _shoot_visual_acceptance(selection := "") -> void:
 	var image_count: int = rows.size() * 2 + int(not rows.is_empty()) + int(include_chevet)
 	print("wrote %d acceptance images and manifest to %s/%s" %
 		[image_count, OUT_DIR, out])
+
+
+## VIS-004 material comparison. Seed, camera and lighting stay fixed in each pair.
+func _shoot_vis004_acceptance() -> void:
+	var out := "visualqa/vis004"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + out))
+	var rows: Array[Dictionary] = []
+	for key in ["durham", "notre_dame", "bodiam", "himeji"]:
+		var entry: Dictionary = {}
+		var church := false
+		for candidate in _landmarks():
+			if candidate["key"] == key:
+				entry = candidate
+				church = true
+				break
+		if entry.is_empty():
+			for candidate in _castles():
+				if candidate["key"] == key:
+					entry = candidate
+					break
+		var yaw: float = 0.72 if church else float(entry.get("yaw", 0.72))
+		var pitch: float = -0.28 if church else float(entry.get("pitch", -0.30))
+		var zoom: float = 1.0 if church else float(entry.get("zoom", 1.0))
+		var mesh: ArrayMesh
+		var colors: Array
+		if church:
+			var spec: ChurchSpec = _landmark_spec(entry)
+			mesh = ChurchBuilder.new().build(spec)
+			colors = [spec.stone_color, spec.trim_color, spec.roof_color, Color("15171b")]
+		else:
+			var spec: CastleSpec = _castle_spec(entry)
+			mesh = CastleBuilder.new().build(spec)
+			colors = [spec.stone_color, spec.trim_color, spec.roof_color, Color("15171b")]
+		var before := "%s/%s_before.jpg" % [out, key]
+		var after := "%s/%s_after.jpg" % [out, key]
+		await _shoot_mesh(mesh, colors, before, yaw, pitch, zoom)
+		await _shoot_mesh(mesh, colors, after, yaw, pitch, zoom, Vector3.INF, 0.0, true)
+		rows.append({"key": key, "seed": entry["seed"], "before": before,
+			"after": after, "camera": _camera_metadata(yaw, pitch, zoom)})
+	_save_acceptance_sheet(rows, out + "/contact_sheet.jpg")
+	var f := FileAccess.open(OUT_DIR + "/" + out + "/manifest.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify({"subjects": rows,
+		"columns": ["flat materials", "VIS-004 runtime finish"]}, "\t"))
+	f.close()
+	print("wrote %d VIS-004 pairs and contact sheet to %s" % [rows.size(), out])
 
 
 ## Diagnose the render path with one church and one castle. Both views in each
@@ -904,13 +953,15 @@ func _dim(dark: bool) -> void:
 ## four surfaces, so the stage does not need to know which it is looking at.
 func _shoot_mesh(mesh: ArrayMesh, cols: Array, file: String, yaw: float,
 		pitch: float, zoom := 1.0, focus := Vector3.INF,
-		frame_radius := 0.0) -> void:
+		frame_radius := 0.0, architectural_finish := false) -> void:
 	_mesh_inst.mesh = mesh
 	for i in range(mesh.get_surface_count()):
 		var m := StandardMaterial3D.new()
 		m.albedo_color = cols[i]
 		m.roughness = 0.92
 		_mesh_inst.set_surface_override_material(i, m)
+	if architectural_finish:
+		ShellAssembler.architectural_materials(_mesh_inst, cols)
 
 	var aabb: AABB = mesh.get_aabb()
 	var centre: Vector3 = aabb.get_center()

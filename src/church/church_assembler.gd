@@ -12,4 +12,4 @@ static func build(spec: ChurchSpec, cutaway := false) -> Node3D:
 	var mesh: ArrayMesh = builder.build(spec)
 	return ShellAssembler.build("Church", mesh, [spec.stone_color, spec.trim_color,
 		spec.roof_color, Color("1a1c20")], builder.prop_log,
-		ChurchBuilder.SURF_ROOF, cutaway)
+		ChurchBuilder.SURF_ROOF, cutaway, LightKit.FLAME, true)

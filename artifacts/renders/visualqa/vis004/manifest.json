@@ -1,0 +1,56 @@
+{
+	"columns": [
+		"flat materials",
+		"VIS-004 runtime finish"
+	],
+	"subjects": [
+		{
+			"after": "visualqa/vis004/durham_after.jpg",
+			"before": "visualqa/vis004/durham_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -16.0428182636631,
+				"yaw_degrees": 41.2529612494193,
+				"zoom": 1.0
+			},
+			"key": "durham",
+			"seed": 5005
+		},
+		{
+			"after": "visualqa/vis004/notre_dame_after.jpg",
+			"before": "visualqa/vis004/notre_dame_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -16.0428182636631,
+				"yaw_degrees": 41.2529612494193,
+				"zoom": 1.0
+			},
+			"key": "notre_dame",
+			"seed": 5001
+		},
+		{
+			"after": "visualqa/vis004/bodiam_after.jpg",
+			"before": "visualqa/vis004/bodiam_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -14.8969026734014,
+				"yaw_degrees": 140.374659807052,
+				"zoom": 1.0
+			},
+			"key": "bodiam",
+			"seed": 6001
+		},
+		{
+			"after": "visualqa/vis004/himeji_after.jpg",
+			"before": "visualqa/vis004/himeji_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -13.7509870831398,
+				"yaw_degrees": 143.239448782706,
+				"zoom": 1.0
+			},
+			"key": "himeji",
+			"seed": 6005
+		}
+	]
+}

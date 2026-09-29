@@ -50,6 +50,66 @@ static func surface_materials(node: MeshInstance3D, colors: Array,
 		node.set_surface_override_material(i, m)
 
 
+## Finish the two architectural surfaces from their metre-scale UVs. Stone,
+## trim, roof and opening remain the original four slots; only stone and roof
+## receive procedural variation. The renderer uses this same method for live
+## scenes and reference portraits.
+static func architectural_materials(node: MeshInstance3D, colors: Array,
+		stone_slot := 0, roof_slot := 2) -> void:
+	if DisplayServer.get_name() == "headless" or node.mesh == null:
+		return
+	var stone := Shader.new()
+	stone.code = """shader_type spatial;
+render_mode cull_disabled;
+uniform vec4 stone_colour : source_color;
+uniform float block_width = 2.2;
+uniform float course_height = 0.92;
+void fragment() {
+	vec2 p = UV / vec2(block_width, course_height);
+	float row = floor(p.y);
+	p.x += mod(row, 2.0) * 0.5;
+	vec2 edge = fract(p);
+	float joint = smoothstep(0.025, 0.075, edge.y) * smoothstep(0.025, 0.075, edge.x);
+	vec2 cell = floor(p);
+	float variation = fract(sin(dot(cell, vec2(12.9898,78.233))) * 43758.5453);
+	vec3 block = stone_colour.rgb * mix(0.975, 1.025, variation);
+	ALBEDO = mix(stone_colour.rgb * 0.88, block, joint);
+	ROUGHNESS = 0.94;
+}
+"""
+	var stone_material := ShaderMaterial.new()
+	stone_material.shader = stone
+	var stone_colour: Color = colors[stone_slot] if stone_slot < colors.size() else NO_COLOUR
+	stone_material.set_shader_parameter("stone_colour", stone_colour)
+	node.set_surface_override_material(stone_slot, stone_material)
+
+	var roof := Shader.new()
+	roof.code = """shader_type spatial;
+render_mode cull_disabled;
+uniform vec4 roof_colour : source_color;
+uniform float tile_width = 1.45;
+uniform float course_height = 0.76;
+void fragment() {
+	vec2 p = UV / vec2(tile_width, course_height);
+	float row = floor(p.y);
+	p.x += mod(row, 2.0) * 0.5;
+	vec2 edge = fract(p);
+	float tile = smoothstep(0.025, 0.08, edge.y) * smoothstep(0.025, 0.08, edge.x);
+	vec2 cell = floor(p);
+	float variation = fract(sin(dot(cell, vec2(39.346,11.135))) * 24634.6345);
+	vec3 surface = roof_colour.rgb * mix(0.95, 1.025, variation);
+	ALBEDO = mix(roof_colour.rgb * 0.84, surface, tile);
+	ROUGHNESS = 0.88;
+	METALLIC = 0.06;
+}
+"""
+	var roof_material := ShaderMaterial.new()
+	roof_material.shader = roof
+	var roof_colour: Color = colors[roof_slot] if roof_slot < colors.size() else NO_COLOUR
+	roof_material.set_shader_parameter("roof_colour", roof_colour)
+	node.set_surface_override_material(roof_slot, roof_material)
+
+
 ## Restrained, metre-scale roof courses. Kept opt-in to ordinary houses;
 ## four-surface castle/church/hotel shells retain their material contract.
 static func house_materials(node: MeshInstance3D, spec: HouseSpec) -> void:
@@ -124,7 +184,7 @@ void fragment() {
 ## only way to photograph an interior lit by things that are on fire.
 static func build(node_name: String, mesh: ArrayMesh, colors: Array,
 		props: Array, roof_surface: int, cutaway: bool,
-		glow: Color = LightKit.FLAME) -> Node3D:
+		glow: Color = LightKit.FLAME, architectural_finish := false) -> Node3D:
 	var root := Node3D.new()
 	root.name = node_name
 	if mesh == null:
@@ -134,7 +194,11 @@ static func build(node_name: String, mesh: ArrayMesh, colors: Array,
 	shell.name = "Shell"
 	shell.mesh = mesh
 	surface_materials(shell, colors, DEFAULT_ROUGHNESS,
-		roof_surface if cutaway else -1)
+		-1)
+	if architectural_finish:
+		architectural_materials(shell, colors)
+	if cutaway:
+		shell.set_surface_override_material(roof_surface, invisible())
 	root.add_child(shell)
 
 	if props.is_empty():
