@@ -1,9 +1,9 @@
 # Permissive open source implementations for procedural architecture
 
-This is a study and reuse list for a project that may publish its own code
-under MIT. The list includes **MIT, BSD-3-Clause, ISC, and BSL-1.0** code,
-with a direct repository or license link for each. It does not propose copying
-copyleft code. Licenses can change by version or file, so record the exact
+This is a study and reuse list for BigGlade, whose original code is licensed
+under Apache License 2.0. The list includes **MIT, BSD-3-Clause, ISC, and
+BSL-1.0** code, with a direct repository or license link for each. It does not
+propose copying copyleft code. Licenses can change by version or file, so record the exact
 commit and inspect the files actually imported before adopting a dependency.
 Code licenses do not automatically cover sample models, textures, fonts,
 maps, screenshots, or downloaded datasets.
@@ -81,7 +81,7 @@ portal transitions around the current [Viewport API](https://docs.godotengine.or
 and BigGlade's semantic door graph; a copied old scene is unlikely to satisfy
 current rendering or navigation behavior.
 
-## Reuse protocol for an MIT-target project
+## Reuse protocol for an Apache-2.0 project
 
 1. Pin a repository URL, commit hash, exact paths, and the license file that
    applies to those paths. Do this separately for code and media.
@@ -96,7 +96,7 @@ current rendering or navigation behavior.
    failure boundary: a polygon with a hole, two crossing roads, a portal with
    a held object, or a multi-seed graph.
 6. Keep BigGlade's own code and asset licenses explicit when publishing. An
-   MIT code license does not relicense someone else's models or textures.
+   Apache-2.0 code license does not relicense someone else's models or textures.
 
 The [Godot license guidance](https://docs.godotengine.org/en/stable/about/complying_with_licenses.html)
 also distinguishes the engine license from third-party notices and assets.

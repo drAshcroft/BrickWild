@@ -6,6 +6,12 @@ A seed plus a handful of user-locked dimensions produce a spec; the spec
 produces an `ArrayMesh`; a 2D blueprint sheet is drawn alongside it from the
 same geometry. Six styles, from a Romanesque parish church to Hagia Sophia.
 
+## License
+
+BigGlade's original code is licensed under the [Apache License 2.0](LICENSE).
+Bundled third-party models and other assets retain their own licenses; see
+the license files and READMEs alongside each asset pack.
+
 ## Library API
 
 Godot tools can generate the family-specific representation first, then choose
