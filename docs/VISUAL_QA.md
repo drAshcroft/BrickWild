@@ -5,7 +5,7 @@ read from, so it can be checked rather than believed. No generator code was
 changed; this is a look at what the system puts on screen, and at what would
 move that.
 
-51 images were examined:
+53 images were examined:
 
 - 41 from `tools/render_shots.gd` — 8 landmark churches, 6 feature close-ups,
   8 castles, 6 furnished houses, 7 temples, 4 blueprint sheets, 2 cutaway
@@ -308,3 +308,34 @@ correctness, which is why none of it is currently measured by anything — and
 why the cheapest useful next step is not a new check but a **render
 acceptance sheet**: the same nine axes, scored by eye, on a fixed set of
 subjects, committed beside `manifest.json`.
+
+---
+
+## 6. Current audit (2026-09-29)
+
+This section checks the historical suggestions against code at the start of the
+visual work. The scores above remain a visual opinion about the original images,
+not automated QA results. Recent church and castle commits reorganised planning
+and interior code; the mesh and material paths relevant to these suggestions
+were largely unchanged. The reference portraits still showed the church and
+castle gap. No generator edit was made for this audit.
+
+| Claim | Current finding | Work |
+|---|---|---|
+| S1, lighting | The original `render_shots.gd` fixed the sun while camera yaw varied. SSAO on the mobile renderer was not the missing geometry. | `VIS-001` now records camera-relative lighting and [paired acceptance renders](../artifacts/renders/visualqa/acceptance/README.md); the remaining flatness is in the building. |
+| S2, openings | Church and castle window routines place shallow dark boxes against intact masonry. Some castle planned interiors and the gate tunnel already have real openings. | `VIS-005` and `VIS-006` cut representative host walls and measure apertures. |
+| S3, surfaces | Church and castle portraits use flat `StandardMaterial3D` overrides. Box UVs restart on each triangle; revolved triangles have constant UVs. A shader alone cannot give them consistent courses. | `VIS-003` establishes metre-scale coordinates; `VIS-004` applies the material through the runtime assemblers. |
+| S4, buttresses | They already project from the nave and have caps. Their thin, same-colour shape reads poorly at portrait scale. | `VIS-007` addresses stepped projection and flyer load paths. |
+| S5, great tower | The generated great-tower index and scale already reach `CastleBuilder._tower` through `CastleGeometry`. `CAS-002` completed this work. | No duplicate tower-wiring task. |
+| S6, hero curvature | Hero dome call sites choose explicit segment counts. Changing `MeshKit` defaults would miss them; Florence's eight-sided form is intentional. | `VIS-008` targets hero supports and explicit tessellation. |
+| S7, blueprint | Elevations still omit major visible church parts; the variant-name format still joins some suffixes. | `VIS-010`, after the higher-impact building portraits. |
+| S8, hearth | `HousePlan.hearth` already records the room and wall, and builder/furnisher read it. The proposed missing-record cause is obsolete. | No duplicate house task; inspect any remaining bad cutaway by seed and camera. |
+| S9, bailey | `CastleBuilder` already dresses via `CastleFurnisher`, and `INT-006` added bailey ranges and a well. `render_shots.gd` photographs only the mesh, hiding props and interiors. | `VIS-002` photographs the assembled scene and then judges any remaining yard gap. |
+| S10, temples | `_dim()` controls the dark stage. The coiled idol silhouette needs separate art work; the rotunda altar is built on a dais, so a floating altar is unproved. | Outside the church/castle priority. |
+| S11, Bodiam seam | A black image mark does not identify the alleged coplanar triangle pair. | Gather triangle/raking-light evidence before a geometry fix. |
+| S12, ground | The reference stage still uses a finite plain ground plane. | Lower priority than structure, openings and material. |
+| S13, orchard | Tree position and yaw already vary; size/model repetition remains. Size changes must update measured canopy and trunk bounds. | Outside the church/castle priority. |
+
+Himeji's keep is emitted, yet its silhouette remains weak in the current portrait.
+`CAS-010` is already executing the terraced ground and raised tenshu work. The
+Neuschwanstein/Chambord facade hierarchy is separate work in `VIS-009`.

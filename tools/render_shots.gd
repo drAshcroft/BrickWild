@@ -14,12 +14,29 @@ var _vp: SubViewport
 var _cam: Camera3D
 var _root3d: Node3D
 var _mesh_inst: MeshInstance3D
+var _key_light: DirectionalLight3D
+var _fill_light: DirectionalLight3D
+var _stage_environment: Environment
+var _legacy_light := false
+
+const KEY_ELEVATION := -30.0
+const KEY_CAMERA_OFFSET := -62.0
+const KEY_ENERGY := 1.8
+const FILL_ELEVATION := -18.0
+const FILL_CAMERA_OFFSET := 120.0
+const FILL_ENERGY := 0.45
 
 
 func _init() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	_build_stage()
 	await process_frame
+	var args := OS.get_cmdline_user_args()
+	if args.has("visual-qa"):
+		var selection: String = args[1] if args.size() > 1 else ""
+		await _shoot_visual_acceptance(selection)
+		quit()
+		return
 
 	var manifest: Array[Dictionary] = []
 
@@ -28,7 +45,9 @@ func _init() -> void:
 		var spec: ChurchSpec = _landmark_spec(entry)
 		var file: String = "%s.jpg" % entry["key"]
 		await _shoot_church(spec, file, 0.72, -0.28, 1.0)
-		manifest.append(_describe(entry, spec, file))
+		var row: Dictionary = _describe(entry, spec, file)
+		row.merge(_portrait_metadata(entry["seed"], 0.72, -0.28, 1.0))
+		manifest.append(row)
 
 	# ---- feature close-ups ----
 	for shot in _detail_shots():
@@ -36,8 +55,11 @@ func _init() -> void:
 		var f: Array = _focus_of(spec, shot["focus"])
 		await _shoot_church(spec, shot["file"], shot["yaw"], shot["pitch"], 1.0,
 			f[0], f[1])
-		manifest.append({"key": shot["file"].get_basename(), "title": shot["title"],
-			"caption": shot["caption"], "file": shot["file"], "kind": "detail"})
+		var row: Dictionary = {"key": shot["file"].get_basename(), "title": shot["title"],
+			"caption": shot["caption"], "file": shot["file"], "kind": "detail"}
+		row.merge(_portrait_metadata(shot["entry"]["seed"], shot["yaw"],
+			shot["pitch"], 1.0))
+		manifest.append(row)
 
 	# ---- the landmark castles, three-quarter view from the GATE side ----
 	# Every one of these puts its entrance at -Z, so the yaws below sit the
@@ -47,7 +69,10 @@ func _init() -> void:
 		var cfile: String = "castle_%s.jpg" % entry["key"]
 		await _shoot_castle(cspec, cfile, entry.get("yaw", 0.72),
 			entry.get("pitch", -0.30), entry.get("zoom", 1.0))
-		manifest.append(_describe_castle(entry, cspec, cfile))
+		var row: Dictionary = _describe_castle(entry, cspec, cfile)
+		row.merge(_portrait_metadata(entry["seed"], entry.get("yaw", 0.72),
+			entry.get("pitch", -0.30), entry.get("zoom", 1.0)))
+		manifest.append(row)
 
 	# ---- furnished cutaways, plus one roof-on multistory exterior ----
 	for entry in _houses():
@@ -105,6 +130,90 @@ func _init() -> void:
 	quit()
 
 
+## A fixed camera/seed pair for each visual acceptance subject. The first image
+## uses the historical stage; the second changes only the lighting. The sheet
+## is ordered exactly like the manifest, two columns per subject.
+func _shoot_visual_acceptance(selection := "") -> void:
+	var out := "visualqa/acceptance"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + out))
+	var keys := ["notre_dame", "durham", "hagia_sophia", "bodiam", "krak",
+		"himeji", "neuschwanstein"]
+	var rows: Array[Dictionary] = []
+	for key in keys:
+		if not selection.is_empty() and key != selection:
+			continue
+		var entry: Dictionary = {}
+		var church := false
+		for candidate in _landmarks():
+			if candidate["key"] == key:
+				entry = candidate
+				church = true
+				break
+		if entry.is_empty():
+			for candidate in _castles():
+				if candidate["key"] == key:
+					entry = candidate
+					break
+		var yaw: float = 0.72 if church else float(entry.get("yaw", 0.72))
+		var pitch: float = -0.28 if church else float(entry.get("pitch", -0.30))
+		var zoom: float = 1.0 if church else float(entry.get("zoom", 1.0))
+		var before := "%s/%s_before.jpg" % [out, key]
+		var after := "%s/%s_after.jpg" % [out, key]
+		var mesh: ArrayMesh
+		var colors: Array
+		if church:
+			var spec: ChurchSpec = _landmark_spec(entry)
+			mesh = ChurchBuilder.new().build(spec)
+			colors = [spec.stone_color, spec.trim_color, spec.roof_color,
+				Color("15171b")]
+		else:
+			var spec: CastleSpec = _castle_spec(entry)
+			mesh = CastleBuilder.new().build(spec)
+			colors = [spec.stone_color, spec.trim_color, spec.roof_color,
+				Color("15171b")]
+		_legacy_light = true
+		await _shoot_mesh(mesh, colors, before, yaw, pitch, zoom)
+		_legacy_light = false
+		await _shoot_mesh(mesh, colors, after, yaw, pitch, zoom)
+		rows.append({"key": key, "seed": entry["seed"], "before": before,
+			"after": after, "camera": _camera_metadata(yaw, pitch, zoom),
+			"before_light": _light_metadata(yaw, true),
+			"after_light": _light_metadata(yaw, false)})
+	var include_chevet: bool = selection.is_empty() or selection == "chartres_chevet"
+	if include_chevet:
+		var chapels: Dictionary = _detail_shots()[2]
+		var chartres: ChurchSpec = _landmark_spec(chapels["entry"])
+		var focus: Array = _focus_of(chartres, "chevet")
+		await _shoot_church(chartres, out + "/chartres_chevet.jpg",
+			chapels["yaw"], chapels["pitch"], 1.0, focus[0], focus[1])
+	if not rows.is_empty():
+		_save_acceptance_sheet(rows, out + "/contact_sheet.jpg")
+	var data := {"subjects": rows, "columns": ["historical light", "camera-relative light"]}
+	if include_chevet:
+		data["chevet"] = out + "/chartres_chevet.jpg"
+	var f := FileAccess.open(OUT_DIR + "/" + out + "/manifest.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify(data, "\t"))
+	f.close()
+	var image_count: int = rows.size() * 2 + int(not rows.is_empty()) + int(include_chevet)
+	print("wrote %d acceptance images and manifest to %s/%s" %
+		[image_count, OUT_DIR, out])
+
+
+func _save_acceptance_sheet(rows: Array[Dictionary], file: String) -> void:
+	var tile := Vector2i(550, 380)
+	var sheet := Image.create(tile.x * 2, tile.y * rows.size(), false, Image.FORMAT_RGB8)
+	sheet.fill(Color("22252a"))
+	for i in range(rows.size()):
+		for col in range(2):
+			var path: String = rows[i]["before" if col == 0 else "after"]
+			var img := Image.load_from_file(OUT_DIR + "/" + path)
+			img.resize(tile.x, tile.y, Image.INTERPOLATE_LANCZOS)
+			sheet.blit_rect(img, Rect2i(Vector2i.ZERO, tile),
+				Vector2i(col * tile.x, i * tile.y))
+	sheet.save_jpg(OUT_DIR + "/" + file, 0.9)
+	print("  ", file)
+
+
 # ------------------------------------------------------------------ subjects
 
 func _landmarks() -> Array[Dictionary]:
@@ -146,7 +255,7 @@ func _detail_shots() -> Array[Dictionary]:
 			"yaw": 0.85, "pitch": -0.20, "title": "Dome on pendentives",
 			"caption": "Pendentive course, the window corona round the drum, and the buttressing half-domes."},
 		{"entry": lm[2], "file": "detail_chapels.jpg", "focus": "chevet",
-			"yaw": 2.55, "pitch": -0.36, "title": "Radiating chapels",
+			"yaw": 0.45, "pitch": -0.22, "title": "Radiating chapels",
 			"caption": "Alcoves fanned off the ambulatory. The fan angle is solved from the geometry, not fixed."},
 		{"entry": lm[7], "file": "detail_onion.jpg", "focus": "dome",
 			"yaw": 0.70, "pitch": -0.14, "title": "Onion dome",
@@ -173,9 +282,10 @@ func _focus_of(spec: ChurchSpec, kind: String) -> Array:
 				ChurchGeometry.crossing_center_z(spec)),
 				ChurchGeometry.dome_plan_radius(spec) * 1.9]
 		"chevet":
-			return [Vector3(0.0, spec.height * 0.28,
-				ChurchGeometry.apse_springing_z(spec) + spec.apse_radius * 0.6),
-				ChurchGeometry.ambulatory_radius(spec) * 2.1]
+			return [Vector3(0.0, spec.height * 0.22,
+				ChurchGeometry.apse_springing_z(spec)
+				+ ChurchGeometry.ambulatory_radius(spec) * 0.45),
+				ChurchGeometry.ambulatory_radius(spec) * 2.8]
 		"crossing":
 			return [Vector3(0.0, spec.crossing_tower_height * 0.62,
 				ChurchGeometry.crossing_center_z(spec)), spec.crossing_tower_height * 0.72]
@@ -496,6 +606,7 @@ func _build_stage() -> void:
 	_vp.add_child(_root3d)
 
 	var env := Environment.new()
+	_stage_environment = env
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sky_mat := ProceduralSkyMaterial.new()
@@ -508,21 +619,21 @@ func _build_stage() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 1.0
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.ssao_enabled = true
+	# The project's mobile renderer does not use SSAO. Keep the stage honest.
 	var we := WorldEnvironment.new()
 	we.environment = env
 	_root3d.add_child(we)
 
-	var sun := DirectionalLight3D.new()
-	sun.rotation = Vector3(deg_to_rad(-42.0), deg_to_rad(-131.0), 0.0)
-	sun.light_energy = 1.5
-	sun.shadow_enabled = true
-	_root3d.add_child(sun)
+	_key_light = DirectionalLight3D.new()
+	_key_light.rotation = Vector3(deg_to_rad(-42.0), deg_to_rad(-131.0), 0.0)
+	_key_light.light_energy = 1.5
+	_key_light.shadow_enabled = true
+	_root3d.add_child(_key_light)
 
-	var fill := DirectionalLight3D.new()
-	fill.rotation = Vector3(deg_to_rad(-16.0), deg_to_rad(58.0), 0.0)
-	fill.light_energy = 0.35
-	_root3d.add_child(fill)
+	_fill_light = DirectionalLight3D.new()
+	_fill_light.rotation = Vector3(deg_to_rad(-16.0), deg_to_rad(58.0), 0.0)
+	_fill_light.light_energy = 0.35
+	_root3d.add_child(_fill_light)
 
 	var ground := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
@@ -672,7 +783,59 @@ func _shoot_mesh(mesh: ArrayMesh, cols: Array, file: String, yaw: float,
 	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
 	_cam.position = centre + dir * dist
 	_cam.look_at(centre, Vector3.UP)
+	_set_shot_lighting(yaw)
 	await _capture(file)
+	_set_legacy_lighting()
+
+
+func _set_shot_lighting(yaw: float) -> void:
+	if _legacy_light:
+		_set_legacy_lighting()
+		return
+	_key_light.rotation = Vector3(deg_to_rad(KEY_ELEVATION),
+		yaw + deg_to_rad(KEY_CAMERA_OFFSET), 0.0)
+	_key_light.light_color = Color("fff2df")
+	_key_light.light_energy = KEY_ENERGY
+	_stage_environment.ambient_light_energy = 0.8
+	_fill_light.rotation = Vector3(deg_to_rad(FILL_ELEVATION),
+		yaw + deg_to_rad(FILL_CAMERA_OFFSET), 0.0)
+	_fill_light.light_color = Color("d9e5ff")
+	_fill_light.light_energy = FILL_ENERGY
+
+
+func _set_legacy_lighting() -> void:
+	_key_light.rotation = Vector3(deg_to_rad(-42.0), deg_to_rad(-131.0), 0.0)
+	_key_light.light_color = Color.WHITE
+	_key_light.light_energy = 1.5
+	_stage_environment.ambient_light_energy = 1.0
+	_fill_light.rotation = Vector3(deg_to_rad(-16.0), deg_to_rad(58.0), 0.0)
+	_fill_light.light_color = Color.WHITE
+	_fill_light.light_energy = 0.35
+
+
+static func _camera_metadata(yaw: float, pitch: float, zoom: float) -> Dictionary:
+	return {"yaw_degrees": rad_to_deg(yaw), "pitch_degrees": rad_to_deg(pitch),
+		"zoom": zoom, "fov_degrees": 48.0}
+
+
+static func _light_metadata(yaw: float, historical := false) -> Dictionary:
+	if historical:
+		return {"key_azimuth_degrees": -131.0, "key_elevation_degrees": -42.0,
+			"key_energy": 1.5, "key_color": "ffffff", "fill_azimuth_degrees": 58.0,
+			"fill_elevation_degrees": -16.0, "fill_energy": 0.35,
+			"fill_color": "ffffff", "ambient_energy": 1.0}
+	return {"key_azimuth_degrees": rad_to_deg(yaw) + KEY_CAMERA_OFFSET,
+		"key_elevation_degrees": KEY_ELEVATION, "key_energy": KEY_ENERGY,
+		"key_color": "fff2df", "fill_azimuth_degrees": rad_to_deg(yaw)
+			+ FILL_CAMERA_OFFSET, "fill_elevation_degrees": FILL_ELEVATION,
+		"fill_energy": FILL_ENERGY, "fill_color": "d9e5ff",
+		"ambient_energy": 0.8}
+
+
+static func _portrait_metadata(seed: int, yaw: float, pitch: float,
+		zoom: float) -> Dictionary:
+	return {"seed": seed, "camera": _camera_metadata(yaw, pitch, zoom),
+		"light": _light_metadata(yaw)}
 
 
 func _shoot_sheet(spec: ChurchSpec, file: String) -> void:

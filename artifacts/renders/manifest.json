@@ -1,0 +1,801 @@
+[
+	{
+		"built": "twin west towers, 5 flying buttresses/side, 2 aisle rings, transept, crossing tower, ambulatory, 5 chapels (chevet)",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -16.0428182636631,
+			"yaw_degrees": 41.2529612494193,
+			"zoom": 1.0
+		},
+		"dims": "12.0 x 127 x 33.0 m",
+		"famous_for": "flying buttresses, twin west towers, double aisles",
+		"file": "notre_dame.jpg",
+		"height": "77.9 m to the top",
+		"key": "notre_dame",
+		"kind": "landmark",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 161.252961249419,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -20.7470387505807,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5001,
+		"title": "Notre-Dame de Paris",
+		"variant": "Black DenysMinster"
+	},
+	{
+		"built": "twin west towers, 6 flying buttresses/side, 2 tiers, 2 aisle rings, ambulatory, 5 chapels (chevet)",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -16.0428182636631,
+			"yaw_degrees": 41.2529612494193,
+			"zoom": 1.0
+		},
+		"dims": "14.0 x 144 x 43.0 m",
+		"famous_for": "five-aisled, twin spires, flying buttresses",
+		"file": "cologne.jpg",
+		"height": "107.7 m to the top",
+		"key": "cologne",
+		"kind": "landmark",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 161.252961249419,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -20.7470387505807,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5002,
+		"title": "Cologne Cathedral",
+		"variant": "Abbey AldhelmMinster"
+	},
+	{
+		"built": "west tower, 5 flying buttresses/side, 2 aisle rings, transept, crossing tower, ambulatory, 7 chapels (chevet)",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -16.0428182636631,
+			"yaw_degrees": 41.2529612494193,
+			"zoom": 1.0
+		},
+		"dims": "16.4 x 130 x 37.5 m",
+		"famous_for": "double ambulatory, seven radiating chapels",
+		"file": "chartres.jpg",
+		"height": "75.7 m to the top",
+		"key": "chartres",
+		"kind": "landmark",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 161.252961249419,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -20.7470387505807,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5003,
+		"title": "Chartres Cathedral",
+		"variant": "Saint Aldhelm-by-the-Ford"
+	},
+	{
+		"built": "twin west towers, 5 flying buttresses/side, 2 tiers, 2 aisle rings, transept, crossing tower, 5 chapels (chevet)",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -16.0428182636631,
+			"yaw_degrees": 41.2529612494193,
+			"zoom": 1.0
+		},
+		"dims": "12.0 x 135 x 26.0 m",
+		"famous_for": "single dominant crossing spire",
+		"file": "salisbury.jpg",
+		"height": "67.9 m to the top",
+		"key": "salisbury",
+		"kind": "landmark",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 161.252961249419,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -20.7470387505807,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5004,
+		"title": "Salisbury Cathedral",
+		"variant": "Holy Hilda-in-the-Wold"
+	},
+	{
+		"built": "twin west towers, transept, crossing tower, 3 chapels (chevet)",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -16.0428182636631,
+			"yaw_degrees": 41.2529612494193,
+			"zoom": 1.0
+		},
+		"dims": "11.9 x 61 x 22.2 m",
+		"famous_for": "central lantern tower plus twin west towers",
+		"file": "durham.jpg",
+		"height": "42.7 m to the top",
+		"key": "durham",
+		"kind": "landmark",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 161.252961249419,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -20.7470387505807,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5005,
+		"title": "Durham Cathedral",
+		"variant": "Grey Aldhelm"
+	},
+	{
+		"built": "1 aisle ring, transept, hemisphere dome, half-domes, ambulatory, narthex",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -16.0428182636631,
+			"yaw_degrees": 41.2529612494193,
+			"zoom": 1.0
+		},
+		"dims": "31.0 x 76 x 40.0 m",
+		"famous_for": "great dome on pendentives, braced by half-domes",
+		"file": "hagia_sophia.jpg",
+		"height": "58.1 m to the top",
+		"key": "hagia_sophia",
+		"kind": "landmark",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 161.252961249419,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -20.7470387505807,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5006,
+		"title": "Hagia Sophia",
+		"variant": "Abbey Hilda"
+	},
+	{
+		"built": "2 aisle rings, transept, octagonal dome + lantern, ambulatory, 5 chapels (chevet)",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -16.0428182636631,
+			"yaw_degrees": 41.2529612494193,
+			"zoom": 1.0
+		},
+		"dims": "17.0 x 153 x 45.0 m",
+		"famous_for": "octagonal drum, double-shell dome, lantern",
+		"file": "florence_duomo.jpg",
+		"height": "59.2 m to the top",
+		"key": "florence_duomo",
+		"kind": "landmark",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 161.252961249419,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -20.7470387505807,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5007,
+		"title": "Florence Duomo",
+		"variant": "Holy Wulfran-on-the-Hill"
+	},
+	{
+		"built": "west tower, onion dome, 8 chapels (cluster), narthex",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -16.0428182636631,
+			"yaw_degrees": 41.2529612494193,
+			"zoom": 1.0
+		},
+		"dims": "12.0 x 46 x 30.0 m",
+		"famous_for": "onion domes over a cluster of chapels",
+		"file": "st_basil.jpg",
+		"height": "59.3 m to the top",
+		"key": "st_basil",
+		"kind": "landmark",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 161.252961249419,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -20.7470387505807,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5008,
+		"title": "St Basil's Cathedral",
+		"variant": "Grey Editha-in-the-Wold"
+	},
+	{
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -9.16732472209317,
+			"yaw_degrees": 71.6197243913529,
+			"zoom": 1.0
+		},
+		"caption": "Pier, parabolic flyer arch and pinnacle, sized to the wall they brace.",
+		"file": "detail_flyers.jpg",
+		"key": "detail_flyers",
+		"kind": "detail",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 191.619724391353,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": 9.6197243913529,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5001,
+		"title": "Flying buttresses"
+	},
+	{
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -11.4591559026165,
+			"yaw_degrees": 48.70141258612,
+			"zoom": 1.0
+		},
+		"caption": "Pendentive course, the window corona round the drum, and the buttressing half-domes.",
+		"file": "detail_dome.jpg",
+		"key": "detail_dome",
+		"kind": "detail",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 168.70141258612,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -13.29858741388,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5006,
+		"title": "Dome on pendentives"
+	},
+	{
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -12.6050714928781,
+			"yaw_degrees": 25.783100780887,
+			"zoom": 1.0
+		},
+		"caption": "Alcoves fanned off the ambulatory. The fan angle is solved from the geometry, not fixed.",
+		"file": "detail_chapels.jpg",
+		"key": "detail_chapels",
+		"kind": "detail",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 145.783100780887,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -36.216899219113,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5003,
+		"title": "Radiating chapels"
+	},
+	{
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -8.02140913183153,
+			"yaw_degrees": 40.1070456591576,
+			"zoom": 1.0
+		},
+		"caption": "An ogee profile that bulges past its springing radius, then draws in to a point.",
+		"file": "detail_onion.jpg",
+		"key": "detail_onion",
+		"kind": "detail",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 160.107045659158,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -21.8929543408424,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5008,
+		"title": "Onion dome"
+	},
+	{
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -10.3132403123548,
+			"yaw_degrees": 60.1605684887364,
+			"zoom": 1.0
+		},
+		"caption": "Eight-sided drum carrying the shell, capped by a lantern.",
+		"file": "detail_lantern.jpg",
+		"key": "detail_lantern",
+		"kind": "detail",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 180.160568488736,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -1.83943151126356,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5007,
+		"title": "Octagonal drum and lantern"
+	},
+	{
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -13.7509870831398,
+			"yaw_degrees": 54.4309905374282,
+			"zoom": 1.0
+		},
+		"caption": "A lantern tower on the crossing bay, hipped to the rectangle it stands on.",
+		"file": "detail_crossing.jpg",
+		"key": "detail_crossing",
+		"kind": "detail",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 174.430990537428,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -7.5690094625718,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 5005,
+		"title": "Crossing tower"
+	},
+	{
+		"built": "corner towers, 1 mural towers/side, twin-towered gatehouse, shell keep, great hall",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -14.8969026734014,
+			"yaw_degrees": 140.374659807052,
+			"zoom": 1.0
+		},
+		"dims": "55 x 50 x 18 m site",
+		"famous_for": "quadrangular plan, four drum towers, twin-towered gatehouse",
+		"file": "castle_bodiam.jpg",
+		"height": "53.0 m to the top",
+		"key": "castle_bodiam",
+		"kind": "castle",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 260.374659807052,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": 78.3746598070517,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 6001,
+		"tier": "castle",
+		"title": "Bodiam Castle",
+		"variant": "Blackcliffe Castle"
+	},
+	{
+		"built": "corner towers, 3 mural towers/side, twin-towered gatehouse, inner ward + causeway, shell keep, great hall, chapel",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -9.740282517224,
+			"yaw_degrees": 131.780292880089,
+			"zoom": 0.86
+		},
+		"dims": "300 x 140 x 20 m site",
+		"famous_for": "concentric: two enceintes and a battered talus",
+		"file": "castle_krak.jpg",
+		"height": "47.9 m to the top",
+		"key": "castle_krak",
+		"kind": "castle",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 251.780292880089,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": 69.7802928800893,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 6002,
+		"tier": "fortress",
+		"title": "Krak des Chevaliers",
+		"variant": "Wolfreach Citadel"
+	},
+	{
+		"built": "corner towers, twin-towered gatehouse, inner ward + causeway, square keep, great hall, chapel",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -13.7509870831398,
+			"yaw_degrees": 146.10423775836,
+			"zoom": 1.0
+		},
+		"dims": "156 x 117 x 32 m site",
+		"famous_for": "corner drums under conical roofs, dormered ranges",
+		"file": "castle_chambord.jpg",
+		"height": "78.9 m to the top",
+		"key": "castle_chambord",
+		"kind": "castle",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 266.10423775836,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": 84.1042377583599,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 6003,
+		"tier": "fortress",
+		"title": "Chateau de Chambord",
+		"variant": "Blackcliffe Bastion"
+	},
+	{
+		"built": "corner towers, 2 mural towers/side, twin-towered gatehouse, round keep, great hall, chapel",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -9.16732472209317,
+			"yaw_degrees": 117.456348001819,
+			"zoom": 0.88
+		},
+		"dims": "170 x 60 x 12 m site",
+		"famous_for": "polygonal mural towers along a long curtain",
+		"file": "castle_caernarfon.jpg",
+		"height": "28.4 m to the top",
+		"key": "castle_caernarfon",
+		"kind": "castle",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 237.456348001819,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": 55.4563480018188,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 6004,
+		"tier": "castle",
+		"title": "Caernarfon Castle",
+		"variant": "Oldfell Keep"
+	},
+	{
+		"built": "corner towers, 1 mural towers/side, twin-towered gatehouse, tiered keep, great hall",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -13.7509870831398,
+			"yaw_degrees": 143.239448782706,
+			"zoom": 1.0
+		},
+		"dims": "60 x 50 x 15 m site",
+		"famous_for": "tiered tenshu on a battered stone base",
+		"file": "castle_himeji.jpg",
+		"height": "30.7 m to the top",
+		"key": "castle_himeji",
+		"kind": "castle",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 263.239448782706,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": 81.2394487827058,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 6005,
+		"tier": "castle",
+		"title": "Himeji Castle",
+		"variant": "Ravenmere Keep"
+	},
+	{
+		"built": "corner towers, great hall",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -11.4591559026165,
+			"yaw_degrees": 120.321136977473,
+			"zoom": 1.0
+		},
+		"dims": "150 x 40 x 25 m site",
+		"famous_for": "a ridge of ranges under tall conical spires",
+		"file": "castle_neuschwanstein.jpg",
+		"height": "98.3 m to the top",
+		"key": "castle_neuschwanstein",
+		"kind": "castle",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 240.321136977473,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": 58.3211369774729,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 6006,
+		"tier": "castle",
+		"title": "Neuschwanstein",
+		"variant": "Aberstead Keep"
+	},
+	{
+		"built": "corner towers, great hall, 2 cross wings, 2 chimney stacks",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -14.8969026734014,
+			"yaw_degrees": 148.969026734014,
+			"zoom": 1.0
+		},
+		"dims": "30 x 24 x 10 m site",
+		"famous_for": "fortified manor: a hall between two towers",
+		"file": "castle_stokesay.jpg",
+		"height": "13.8 m to the top",
+		"key": "castle_stokesay",
+		"kind": "castle",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 268.969026734014,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": 86.9690267340141,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 6007,
+		"tier": "manor",
+		"title": "Stokesay Castle",
+		"variant": "Thornreach Grange"
+	},
+	{
+		"built": "great hall, 1 chimney stacks",
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -12.6050714928781,
+			"yaw_degrees": 134.645081855743,
+			"zoom": 1.0
+		},
+		"dims": "7 x 18 x 5 m site",
+		"famous_for": "one range, one ridge, one chimney stack",
+		"file": "castle_longhouse.jpg",
+		"height": "8.1 m to the top",
+		"key": "castle_longhouse",
+		"kind": "castle",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 254.645081855743,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": 72.6450818557435,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"seed": 6008,
+		"tier": "house",
+		"title": "Medieval longhouse",
+		"variant": "Redwatch Croft"
+	},
+	{
+		"built": "hall, kitchen; 2 doors, 2 windows, 22 pieces of furniture",
+		"dims": "5.5 x 7.0 m",
+		"famous_for": "one room: the bed in the corner, the table by the door",
+		"file": "house_one_room_cottage.jpg",
+		"key": "house_one_room_cottage",
+		"kind": "house",
+		"title": "One-room cottage",
+		"trade": "none",
+		"variant": "Nettlerow Steading"
+	},
+	{
+		"built": "parlour, hall, kitchen, bedroom; 4 doors, 6 windows, 25 pieces of furniture",
+		"dims": "8.0 x 10.5 m",
+		"famous_for": "hall, kitchen and a bedroom off the back",
+		"file": "house_family_cottage.jpg",
+		"key": "house_family_cottage",
+		"kind": "house",
+		"title": "Family cottage",
+		"trade": "none",
+		"variant": "Millstonegate Cottage"
+	},
+	{
+		"built": "parlour, hall, workshop, store, kitchen, bedroom; 6 doors, 10 windows, 39 pieces of furniture",
+		"dims": "11.0 x 13.0 m",
+		"famous_for": "a forge in the workshop: anvil, bench, weapon stand",
+		"file": "house_smithy.jpg",
+		"key": "house_smithy",
+		"kind": "house",
+		"title": "Smith's house",
+		"trade": "smith",
+		"variant": "Nettlerow"
+	},
+	{
+		"built": "workshop, hall, parlour, store, bedroom, kitchen; 7 doors, 7 windows, 49 pieces of furniture",
+		"dims": "9.5 x 12.0 m",
+		"famous_for": "bookcase, cauldron and a bench of bottles",
+		"file": "house_alchemist.jpg",
+		"key": "house_alchemist",
+		"kind": "house",
+		"title": "Alchemist's house",
+		"trade": "alchemist",
+		"variant": "Alderbrook Lodge"
+	},
+	{
+		"built": "parlour, hall, store, store, bedroom, kitchen, parlour, parlour, parlour, bedroom, bedroom, parlour; 12 doors, 24 windows, 97 pieces of furniture",
+		"dims": "13.0 x 16.0 m",
+		"famous_for": "common room, parlour, guest rooms and a cellar",
+		"file": "house_inn.jpg",
+		"key": "house_inn",
+		"kind": "house",
+		"title": "Village inn",
+		"trade": "innkeeper",
+		"variant": "Embermill Cottage"
+	},
+	{
+		"built": "parlour, hall, store, store, bedroom, kitchen; 7 doors, 8 windows, 49 pieces of furniture",
+		"dims": "10.0 x 13.0 m",
+		"famous_for": "stores of barrels and crates off the kitchen",
+		"file": "house_farmhouse.jpg",
+		"key": "house_farmhouse",
+		"kind": "house",
+		"title": "Farmhouse",
+		"trade": "farmer",
+		"variant": "Millstonehollow"
+	},
+	{
+		"caption": "Table, benches drawn up to it, tableware set on it, sconces on the wall -- each placed by a rule and then checked.",
+		"file": "house_room.jpg",
+		"key": "house_room",
+		"kind": "house",
+		"title": "The common room"
+	},
+	{
+		"caption": "The same generator with the roof left on: thatch, chimney, porch and shuttered windows.",
+		"file": "house_exterior.jpg",
+		"key": "house_exterior",
+		"kind": "house",
+		"title": "A two-storey inn from the lane"
+	},
+	{
+		"built": "Basilica of The Crimson Choir; a figure idol, 18 columns, a bridged pit, 2 cells",
+		"dims": "26 x 46 x 13 m",
+		"famous_for": "a nave of columns, a hole in the floor, cages down the aisles",
+		"file": "temple_bloodpit_basilica.jpg",
+		"height": "5.0 m to the crown of the god",
+		"key": "temple_bloodpit_basilica",
+		"kind": "temple",
+		"title": "Bloodpit Basilica",
+		"variant": "The Ironcrypt"
+	},
+	{
+		"built": "Pylon of The Starless Deep; a monolith idol, 30 columns",
+		"dims": "34 x 58 x 15 m",
+		"famous_for": "obelisks, a court, a forest of columns, a small dark room",
+		"file": "temple_starless_pylon.jpg",
+		"height": "4.9 m to the crown of the god",
+		"key": "temple_starless_pylon",
+		"kind": "temple",
+		"title": "Temple of the Starless Deep",
+		"variant": "The Weepingbarrow"
+	},
+	{
+		"built": "Ziggurat of The Ashen Crown; a pyre idol, 8 columns, a bridged pit, 4 cells",
+		"dims": "40 x 46 x 16 m",
+		"famous_for": "a stepped mountain with the fire on top of it",
+		"file": "temple_ashen_ziggurat.jpg",
+		"height": "17.5 m to the crown of the god",
+		"key": "temple_ashen_ziggurat",
+		"kind": "temple",
+		"title": "Ziggurat of the Ashen Crown",
+		"variant": "The Thornshrine of the Turning Wheel"
+	},
+	{
+		"built": "Rotunda of The Coiled Fang; a coil idol, 12 columns, a bridged pit",
+		"dims": "32 x 34 x 12 m",
+		"famous_for": "a ring of columns round a hole, the altar bridged over it",
+		"file": "temple_coiled_rotunda.jpg",
+		"height": "5.4 m to the crown of the god",
+		"key": "temple_coiled_rotunda",
+		"kind": "temple",
+		"title": "Rotunda of the Coiled Fang",
+		"variant": "The Hollowfont"
+	},
+	{
+		"built": "Basilica of The Ossuary; a cairn idol, 20 columns, 2 cells",
+		"dims": "24 x 42 x 12 m",
+		"famous_for": "a cairn of skulls where the reredos should be",
+		"file": "temple_ossuary_basilica.jpg",
+		"height": "5.8 m to the crown of the god",
+		"key": "temple_ossuary_basilica",
+		"kind": "temple",
+		"title": "The Ossuary",
+		"variant": "The Weepingsanctum"
+	},
+	{
+		"caption": "Roof off: the axis from gate to altar to idol, columns flanking it, the pit bridged on the line, cells down the aisles.",
+		"file": "temple_plan.jpg",
+		"key": "temple_plan",
+		"kind": "temple",
+		"title": "The plan from above"
+	},
+	{
+		"caption": "The same generator with its roof on.",
+		"file": "temple_exterior.jpg",
+		"key": "temple_exterior",
+		"kind": "temple",
+		"title": "From the road"
+	},
+	{
+		"caption": "Plan and south elevation, drawn from the same ChurchGeometry the mesh uses.",
+		"file": "sheet_notre_dame.jpg",
+		"key": "sheet_notre_dame",
+		"kind": "sheet",
+		"title": "Notre-Dame de Paris — blueprint sheet"
+	},
+	{
+		"caption": "Plan and south elevation, drawn from the same ChurchGeometry the mesh uses.",
+		"file": "sheet_chartres.jpg",
+		"key": "sheet_chartres",
+		"kind": "sheet",
+		"title": "Chartres Cathedral — blueprint sheet"
+	},
+	{
+		"caption": "Plan and south elevation, drawn from the same ChurchGeometry the mesh uses.",
+		"file": "sheet_hagia_sophia.jpg",
+		"key": "sheet_hagia_sophia",
+		"kind": "sheet",
+		"title": "Hagia Sophia — blueprint sheet"
+	},
+	{
+		"caption": "Plan and south elevation, drawn from the same ChurchGeometry the mesh uses.",
+		"file": "sheet_st_basil.jpg",
+		"key": "sheet_st_basil",
+		"kind": "sheet",
+		"title": "St Basil's Cathedral — blueprint sheet"
+	}
+]
