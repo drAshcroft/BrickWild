@@ -27,31 +27,47 @@ classes.
    functions. Commit a trimmed lot polygon and mill race only after the whole
    candidate passes.
 
-## Next passes
+## Completed follow-up splits
 
-These remain substantial and deserve behavior-focused changes of their own:
+1. `HouseFurnishPlacement` now delegates surface placement and geometry to
+   separate collaborators. Candidate validity remains shared, and public
+   cross-class entry points replace calls to underscore-prefixed methods.
+2. `HousePlanner` is now a 92-line coordinator over room, opening, level, and
+   feature stages. A deterministic vertex fingerprint was unchanged by the
+   split.
+3. `VillageDresser` is now a 55-line coordinator over catalogue, context,
+   host, rule, spot, and placement classes. The seeded call order is unchanged.
+4. `HouseFurnishCheck` now dispatches physical, programme, arrangement,
+   spatial, and affinity rules through callables into a shared report. The
+   coordinator is 161 lines. No two-line forwarding methods were added.
 
-1. Split `HouseFurnishPlacement` by placement strategy only where the wall,
-   floor, and surface searches can have narrow interfaces. It is still over
-   1,000 lines. Keep candidate validity shared; do not duplicate clearance
-   rules to make the file smaller. Name the resulting cross-class entry points
-   as public methods instead of relying on underscore-prefixed helpers.
-2. Separate room naming, openings, and upper storey circulation in
-   `HousePlanner`; they already form named stages. In `HouseBuilder`, roof
-   emission is a large, coherent tail and is the first extraction candidate.
-   Give a roof collaborator a narrow emission interface so it does not reach
-   into `_kit` or builder logs. `CastleBuilder` has distinct tower house,
-   enclosure, and keep emitters, but they share mass logging: extract one
-   variant at a time behind `MassBuilder` methods.
-3. Separate `VillageDresser` recipe data, placement spot searches, and
-   clearance checks. Keep its seeded RNG order stable. `LotPlanner` still
-   mixes frontage search with legality checks; the named predicates added in
-   this pass make a later frontage extraction easier to test.
-4. Split `HouseFurnishCheck` by independent rules once the warning contract is
-   documented. The current warning behavior is intentional; moving a rule
-   must not quietly change its severity.
-5. Reduce test suite files by moving reusable fixtures and generators out of
-   test cases. A long test file is lower priority than production coupling.
+## Remaining architectural work
+
+The remaining large files need API work before extraction. A mechanical split
+would create collaborators that reach into another object's mesh kit and logs,
+which is smaller files with stronger coupling.
+
+1. `HouseBuilder` has a coherent roof section of roughly 550 lines. Extract it
+   after defining an emission context for component geometry, opening evidence,
+   and mass logs. The roof emitter should depend on that context rather than on
+   the builder's private fields.
+2. `CastleBuilder` contains distinct sky, motte, ridge, tower-house, manor,
+   enclosure, and keep emitters. Move one variant at a time behind the same
+   `MassBuilder` emission boundary, with geometry and voxel fingerprints for
+   each move.
+3. `VillageLotPlanner` still combines retry policy, frontage search, candidate
+   legality, and special landmark lanes. Its legality predicates are named;
+   the next useful seam is a candidate object that can be tested before commit.
+4. `VillageSitePlanner` can dispatch settlement forms to form-specific
+   planners once road and landmark construction are represented by a small
+   shared context.
+5. Reusable fixture builders can leave the longest test suites. This remains
+   below production coupling in priority.
+
+`CastleGeometry`, `HouseGeometry`, and the other family geometry modules remain
+large by design. They are the documented source of truth for their family and
+contain geometry calculations rather than orchestration state. Line count
+alone is not sufficient reason to distribute those formulas across classes.
 
 ## Verification for a split
 
@@ -79,6 +95,16 @@ running the full sweep after every edit.
 - Temple and rite lane: two suites, 2,247 checks, no failures.
 - Focused public quality dispatch probes returned well-formed reports for
   church, castle, house, shop, hotel, temple, world, and village.
+- House planning split: `lane:plan shop` completed 406 checks with no failures;
+  the before/after house vertex dumps were identical.
+- Furnishing placement split: focused polygon/assembly checks completed 72
+  checks, and `lane:dress` completed 1,170 checks, with no failures.
+- Furnishing QA split: castle plan shell and polygon sconce fixtures completed
+  916 checks with no failures. `ckfurnish` reproduced its clean baseline
+  exactly: 55 checks, five `stair_line` failures, and eight warnings.
+- Village dressing split: the complete `vcheck` 24-village sweep ran for 430
+  seconds. It reached the existing planner/dressing follow-ups recorded by the
+  suite; no parse or dispatch failure occurred.
 
 The full castle sweep and the 200 case interior sweep were stopped after they
 ran far beyond the documented lane estimates without a final summary. Their
