@@ -86,7 +86,7 @@ func _check(plan: HousePlan, builder: HouseBuilder, mesh: ArrayMesh) -> void:
 		var width := PropCatalog.footprint(item["key"]).x * float(item.get("scale", 1.0))
 		_expect(float(breast["width"]) >= width + 0.399, "breast too narrow for actual measured hearth")
 		_expect(float(breast["depth"]) >= 0.4 and float(breast["depth"]) <= 0.6, "breast depth outside 0.4–0.6m")
-		_expect(HouseFurnishCheck._back_gap(plan, item) < 0.02, "hearth back does not touch breast")
+		_expect(HouseFurnishArrangementCheck.back_gap(plan, item) < 0.02, "hearth back does not touch breast")
 	if not breast.is_empty():
 		var found := false
 		for mass in builder.mass_log:

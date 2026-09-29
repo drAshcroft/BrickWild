@@ -29,15 +29,15 @@ static func _polygon_hearth(res: SuiteResult) -> void:
 	plan.hearth = {"room": 0, "wall": 3}
 	var key: String = PropCatalog.of_category("hearth")[0]
 	plan.furniture.append({"room": 0, "key": key, "yaw": -PI / 2.0})
-	_expect(res, HouseFurnishCheck._wall_of(plan, plan.furniture[0]) == 3,
+	_expect(res, HouseFurnishSpatialCheck.wall_of(plan, plan.furniture[0]) == 3,
 		"polygon left-wall hearth was mapped to rectangular wall index")
-	var check := HouseFurnishCheck.new()
-	check._check_hearth(plan)
+	var check := HouseFurnishSpatialCheck.new()
+	check.check_hearth(plan)
 	_expect(res, check.failures.is_empty(), "polygon hearth does not agree with its planned flue")
 	plan.furniture[0].yaw = 0.0
-	_expect(res, HouseFurnishCheck._wall_of(plan, plan.furniture[0]) == 2,
+	_expect(res, HouseFurnishSpatialCheck.wall_of(plan, plan.furniture[0]) == 2,
 		"polygon back-wall control was mapped to rectangular wall index")
-	check._check_hearth(plan)
+	check.check_hearth(plan)
 	_expect(res, not check.failures.is_empty(), "hearth rule accepted a fire rotated away from its planned chimney")
 
 

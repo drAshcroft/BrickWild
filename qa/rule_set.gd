@@ -18,8 +18,9 @@ extends RefCounted
 ## "call": Callable} so the report can name it.
 
 
-## Run every rule of `check`. `methods` maps a rule name to the method on
-## `check` that measures it (missing entries fall back to "_check_" + rule);
+## Run every rule of `check`. `methods` maps a rule name to either a Callable
+## or the method on `check` that measures it (missing entries fall back to
+## "_check_" + rule);
 ## `method_args` are handed to those methods and `override_args` to a
 ## replacement. Returns {rule: replacement_name} for the rules replaced.
 static func run(check: Object, rules: Array, methods: Dictionary, overrides: Dictionary,
@@ -57,8 +58,11 @@ static func run(check: Object, rules: Array, methods: Dictionary, overrides: Dic
 				for f2 in result:
 					failures.append(prefix + _strip(str(f2), name))
 			continue
-		var method: String = String(methods.get(StringName(key), "_check_" + key))
-		check.callv(method, method_args)
+		var handler = methods.get(StringName(key), "_check_" + key)
+		if handler is Callable:
+			handler.callv(method_args)
+		else:
+			check.callv(String(handler), method_args)
 	return replaced
 
 

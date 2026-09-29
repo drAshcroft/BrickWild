@@ -22,7 +22,7 @@ static func run() -> SuiteResult:
 			if PropCatalog.category(placed.key) != "bed":
 				continue
 			beds += 1
-			_expect(res, HouseFurnishCheck._back_gap(plan, placed) \
+			_expect(res, HouseFurnishArrangementCheck.back_gap(plan, placed) \
 				<= HouseGeometry.WALL_GAP + HouseGeometry.BED_HEAD_TOL + 0.001,
 				label + ": bed floats away from its headboard wall")
 			for corner in Poly.from_rect(placed.zone):
@@ -71,20 +71,20 @@ static func _bounds(res: SuiteResult) -> void:
 	turned.room = 0
 	turned.storey = 0
 	plan.furniture = [turned]
-	var good := HouseFurnishCheck.new()
-	good._check_placed(plan)
+	var good := HouseFurnishPhysicalCheck.new()
+	good.check_placed(plan)
 	_expect(res, good.failures.is_empty(), "correct rotated footprint was rejected: " + str(good.failures))
 	plan.furniture[0].rect = Rect2(-raw * 0.5, raw)
-	var false_size := HouseFurnishCheck.new()
-	false_size._check_placed(plan)
+	var false_size := HouseFurnishPhysicalCheck.new()
+	false_size.check_placed(plan)
 	_expect(res, not false_size.failures.is_empty(), "QA accepted an unturned footprint for a rotated model")
 	var overhang := HouseFurnishGeometry.candidate(key, Vector2(2.6,2.6), angle)
 	overhang.room = 0
 	overhang.storey = 0
 	plan.furniture = [overhang]
 	_expect(res, Rect2(plan.rooms[0].rect).encloses(overhang.rect), "overhang fixture does not fit the room AABB")
-	var cut_corner := HouseFurnishCheck.new()
-	cut_corner._check_placed(plan)
+	var cut_corner := HouseFurnishPhysicalCheck.new()
+	cut_corner.check_placed(plan)
 	_expect(res, not cut_corner.failures.is_empty(), "QA accepted furniture through a polygon chamfer")
 
 

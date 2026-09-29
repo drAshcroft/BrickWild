@@ -102,7 +102,7 @@ static func check_interior_details(plan: HousePlan, builder: HouseBuilder) -> Ar
 				errors.append("hearth_breast: furniture intersects masonry: " + String(item["key"]))
 			if PropCatalog.category(item["key"]) == "hearth":
 				var width := PropCatalog.footprint(item["key"]).x * float(item.get("scale", 1.0))
-				if float(breast["width"]) < width + 0.399 or HouseFurnishCheck._back_gap(plan, item) > 0.02:
+				if float(breast["width"]) < width + 0.399 or HouseFurnishArrangementCheck.back_gap(plan, item) > 0.02:
 					errors.append("hearth_breast: measured hearth does not fit or touch its surround")
 	if not plan.rugs.is_empty():
 		if builder.emitted_mesh.get_surface_count() <= HouseBuilder.SURF_FLOOR:

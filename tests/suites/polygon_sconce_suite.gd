@@ -7,13 +7,13 @@ static func run() -> SuiteResult:
 	for index in [1, 2]:
 		var spec := CastleSweep.spec_at(&"crusader", &"castle", index)
 		var plan := CastleKeepPlan.generate(spec)
-		var qa := HouseFurnishCheck.new()
-		qa._check_sconce_pair(plan)
+		var qa := HouseFurnishAffinityCheck.new()
+		qa.check_sconce_pair(plan)
 		_expect(result, qa.failures.is_empty(), "crusader castle%d: %s" % [index, str(qa.failures)])
 		var room := plan.rooms_of(&"lords_chamber")[0]
 		var lamps := _lamps(plan, room)
 		result.note("crusader castle%d: %d lamps from the 1–2 lamp recipe" % [index, lamps.size()])
-		if lamps.size() == 2 and HouseFurnishCheck._fs_pair_fits(plan, room):
+		if lamps.size() == 2 and HouseFurnishAffinityCheck.pair_fits(plan, room):
 			var first := _physical_wall(plan, room, plan.furniture[lamps[0]].rect.get_center())
 			var second := _physical_wall(plan, room, plan.furniture[lamps[1]].rect.get_center())
 			_expect(result, first >= 0 and first == second,
@@ -77,8 +77,8 @@ static func _synthetic(result: SuiteResult) -> void:
 			"pos": Vector3(point.x, 1.8, point.y), "host": -1, "yaw": 0.0})
 	_expect(result, _physical_wall(plan, 0, plan.furniture[0].rect.get_center()) == 2,
 		"oblique fixture is not mounted on intended physical wall")
-	var valid := HouseFurnishCheck.new()
-	valid._check_sconce_pair(plan)
+	var valid := HouseFurnishAffinityCheck.new()
+	valid.check_sconce_pair(plan)
 	_expect(result, valid.failures.is_empty() and valid.warnings.is_empty(),
 		"symmetrical lamps on an oblique edge were rejected")
 	var anchor := {"pos": midpoint, "normal": edge.normal, "dist": 1.1}
@@ -96,8 +96,8 @@ static func _synthetic(result: SuiteResult) -> void:
 	var moved := (Vector2(other.from) + Vector2(other.to)) * 0.5
 	plan.furniture[1].rect = Rect2(moved - Vector2.ONE * 0.05, Vector2.ONE * 0.1)
 	plan.furniture[1].pos = Vector3(moved.x, 1.8, moved.y)
-	var broken := HouseFurnishCheck.new()
-	broken._check_sconce_pair(plan)
+	var broken := HouseFurnishAffinityCheck.new()
+	broken.check_sconce_pair(plan)
 	_expect(result, not broken.failures.is_empty(), "sconce rule accepted lamps moved onto different physical walls")
 	var narrow_anchor := {"pos": Vector2(edge.from).lerp(edge.to, 0.02),
 		"normal": edge.normal, "reach": 0.0}
@@ -114,6 +114,6 @@ static func _synthetic(result: SuiteResult) -> void:
 		var first := _physical_wall(plan, 0, plan.furniture[0].rect.get_center())
 		var second := _physical_wall(plan, 0, plan.furniture[1].rect.get_center())
 		_expect(result, first >= 0 and first == second, "polygon placer selected different physical walls")
-		var placed := HouseFurnishCheck.new()
-		placed._check_sconce_pair(plan)
+		var placed := HouseFurnishAffinityCheck.new()
+		placed.check_sconce_pair(plan)
 		_expect(result, placed.failures.is_empty() and placed.warnings.is_empty(), "polygon placer did not mirror its two lamps")

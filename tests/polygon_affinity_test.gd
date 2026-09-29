@@ -121,11 +121,11 @@ func _backing_precision() -> void:
 	piece.rect.position += inset
 	piece.pos += Vector3(inset.x, 0.0, inset.y)
 	plan.furniture = [piece]
-	var checker := HouseFurnishCheck.new()
-	checker._check_against_wall(plan)
+	var checker := HouseFurnishArrangementCheck.new()
+	checker.check_against_wall(plan)
 	_expect(checker.failures.is_empty(), "exact backing limit rejected by float32 roundoff")
 	piece.rect.position += normal * 0.002
 	piece.pos += Vector3(normal.x, 0.0, normal.y) * 0.002
-	checker = HouseFurnishCheck.new()
-	checker._check_against_wall(plan)
+	checker = HouseFurnishArrangementCheck.new()
+	checker.check_against_wall(plan)
 	_expect(not checker.failures.is_empty(), "bed two millimetres beyond backing limit accepted")
