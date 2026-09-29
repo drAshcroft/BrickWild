@@ -592,7 +592,7 @@ static func _wall_of(plan: HousePlan, p: Dictionary) -> int:
 
 
 ## A row is straight, evenly pitched, all facing the same way, and every
-## copy's use zone is the same shared aisle strip. `HouseFurnishPlacement._place_row`
+## copy's use zone is the same shared aisle strip. `HouseFurnishPlacement.place_row`
 ## builds a row that way by construction; this measures the result the way
 ## every other rule here is measured -- from the placements alone, trusting
 ## nothing about how they got there.
@@ -1202,7 +1202,7 @@ static func _fs_could_hang_over(plan: HousePlan, room: int, piece: Dictionary,
 	return false
 
 
-## The two clearances `HouseFurnishPlacement._place_mounted` keeps, measured the same
+## The two clearances `HouseFurnishSurface.place_mounted` keeps, measured the same
 ## way: nothing may hang across an opening, and nothing may hang into what is
 ## already on the wall.
 static func _fs_on_opening(plan: HousePlan, room: int, pos: Vector2,

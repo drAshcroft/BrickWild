@@ -58,12 +58,12 @@ static func _synthetic(result: SuiteResult) -> void:
 	plan.rooms.append({"kind": &"lords_chamber", "rect": Poly.bounding_rect(outline),
 		"outline": outline, "storey": 0})
 	var corner := Rect2(Vector2(8.5, 8.5), Vector2.ONE)
-	_expect(result, not HouseFurnishPlacement._inside_outline(plan, 0, corner),
+	_expect(result, not HouseFurnishGeometry.inside_outline(plan, 0, corner),
 		"polygon room accepted a box beyond its masonry")
 	var rectangular := HousePlan.new()
 	rectangular.spec = plan.spec
 	rectangular.rooms.append({"kind": &"bedroom", "rect": Rect2(Vector2(-10, -10), Vector2(20, 20))})
-	_expect(result, HouseFurnishPlacement._inside_outline(rectangular, 0, corner),
+	_expect(result, HouseFurnishGeometry.inside_outline(rectangular, 0, corner),
 		"a prior polygon room changed a rectangular room's boundary")
 	var walls := HouseGeometry.room_walls(plan, 0)
 	var edge: Dictionary = walls[2]
@@ -107,8 +107,8 @@ static func _synthetic(result: SuiteResult) -> void:
 	plan.furniture.clear()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7407
-	HouseFurnishPlacement._place_mounted(plan, 0, key, rng)
-	HouseFurnishPlacement._place_mounted(plan, 0, key, rng)
+	HouseFurnishSurface.place_mounted(plan, 0, key, rng)
+	HouseFurnishSurface.place_mounted(plan, 0, key, rng)
 	_expect(result, plan.furniture.size() == 2, "polygon placer failed to hang two lamps on clear masonry")
 	if plan.furniture.size() == 2:
 		var first := _physical_wall(plan, 0, plan.furniture[0].rect.get_center())

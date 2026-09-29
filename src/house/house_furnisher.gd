@@ -136,7 +136,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 			return float(a["opt"]) > float(b["opt"])
 		return int(a["order"]) < int(b["order"]))
 
-	var blocked: Array[Rect2] = HouseFurnishPlacement._initial_blocked(plan, room)
+	var blocked: Array[Rect2] = HouseFurnishPlacement.initial_blocked(plan, room)
 	# Use zones are tracked apart from footprints. Two people may share a
 	# gangway, so zones may overlap each other -- but nothing solid may stand
 	# in one, or the piece it belongs to becomes unusable. Leaving zones out of
@@ -165,7 +165,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 			continue
 		var placed_from := plan.furniture.size()
 		if step["rule"] == &"row":
-			HouseFurnishPlacement._place_row(plan, room, step, blocked, zones, r)
+			HouseFurnishPlacement.place_row(plan, room, step, blocked, zones, r)
 			for placed in range(placed_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = must
 			continue
@@ -175,7 +175,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		var seats_before: int = _count_cat(plan, room, ["seat", "bench"])
 		for k in range(want):
 			var piece_from := plan.furniture.size()
-			HouseFurnishPlacement._place_one(plan, spec, room, String(step["cat"]), step["rule"],
+			HouseFurnishPlacement.place_one(plan, spec, room, String(step["cat"]), step["rule"],
 				blocked, zones, r, step)
 			for placed in range(piece_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = must
@@ -263,7 +263,7 @@ static func _ensure_seating(plan: HousePlan, room: int, blocked: Array[Rect2],
 		return
 	for cat in ["seat", "bench"]:
 		for key in PropCatalog.of_category(cat):
-			HouseFurnishPlacement._place_around(plan, room, key, blocked, zones, r)
+			HouseFurnishPlacement.place_around(plan, room, key, blocked, zones, r)
 			if _count_cat(plan, room, ["seat", "bench"]) > 0:
 				return
 	_drop_the_table(plan, room, blocked, zones)
@@ -289,7 +289,7 @@ static func _recover_dining_pair(plan: HousePlan, room: int, blocked: Array[Rect
 	local_rng.seed = hash("dining|%d|%d" % [plan.spec.seed, room])
 	for key in PropCatalog.of_category("table"):
 		var placed_from := plan.furniture.size()
-		HouseFurnishPlacement._place_free(plan, room, key, blocked, zones, local_rng, true)
+		HouseFurnishPlacement.place_free(plan, room, key, blocked, zones, local_rng, true)
 		if _count_cat(plan, room, ["table"]) > 0:
 			for placed in range(placed_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = true
@@ -361,8 +361,8 @@ static func _ensure_light(plan: HousePlan, room: int, r: RandomNumberGenerator) 
 			continue
 		var key: String = choices[r.randi_range(0, choices.size() - 1)]
 		if rule == &"on":
-			HouseFurnishPlacement._place_on_surface(plan, room, key, r)
+			HouseFurnishSurface.place_on_surface(plan, room, key, r)
 		else:
-			HouseFurnishPlacement._place_mounted(plan, room, key, r)
+			HouseFurnishSurface.place_mounted(plan, room, key, r)
 		if plan.furniture.size() > before:
 			return
