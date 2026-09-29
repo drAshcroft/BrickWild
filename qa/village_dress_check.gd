@@ -500,9 +500,9 @@ func _check_wood(plan: VillagePlan) -> void:
 func _check_culture(plan: VillagePlan) -> void:
 	var allowed := {}
 	for slot in ["edge", "green", "hedge", "ground"]:
-		for key in VillageDresser._palette_keys(
-				{"palette": VillageDresser.PALETTES.get(plan.spec.culture,
-					VillageDresser.PALETTES[&"english"])}, slot):
+		for key in VillageDressRules.palette_keys(
+				{"palette": VillageDressCatalog.PALETTES.get(plan.spec.culture,
+					VillageDressCatalog.PALETTES[&"english"])}, slot):
 			allowed[key] = true
 	if allowed.is_empty():
 		return

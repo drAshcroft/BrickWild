@@ -14,7 +14,7 @@ static func run() -> SuiteResult:
 		spec.generate(seed)
 		var plan := VillageSitePlanner.plan(spec)
 		VillageEnclosurePlan.author(plan)
-		VillageDresser._mine_adit(plan, VillageDresser._context(plan))
+		VillageDressContext.mine_adit(plan, VillageDressContext.make_context(plan))
 		_expect(res, plan.props.size() == 1, "seed%d: no mine mouth" % seed)
 		if plan.props.is_empty(): continue
 		_expect(res, VillageArchetypeSuite._adit_at_through_end(plan), "seed%d: inaccessible or misplaced adit" % seed)

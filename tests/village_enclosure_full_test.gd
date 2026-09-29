@@ -308,12 +308,12 @@ func _edge_controls() -> void:
 	check._check_fields(plan)
 	_expect(check.failures.is_empty(), "pasture outside enclosure rejected")
 	# A far-side wood must stand on land, not merely outside the lot hull.
-	var context := VillageDresser._context(plan)
+	var context := VillageDressContext.make_context(plan)
 	for kind in [&"pond", &"stream", &"river", &"coast", &"race"]:
 		plan.water.assign([{"kind": kind, "poly": Poly.from_rect(Rect2(-8,-8,16,16))}])
-		_expect(not VillageDresser._plant_is_clear(plan, context, Vector2.ZERO, 0.4, 2.0),
+		_expect(not VillageDressPlacement.plant_is_clear(plan, context, Vector2.ZERO, 0.4, 2.0),
 			"tree rooted in " + String(kind) + " accepted")
-		_expect(VillageDresser._plant_is_clear(plan, context, Vector2(10,0), 0.4, 2.0),
+		_expect(VillageDressPlacement.plant_is_clear(plan, context, Vector2(10,0), 0.4, 2.0),
 			"tree on dry " + String(kind) + " bank rejected")
 	plan.lots.assign([{"poly": Poly.from_rect(Rect2(-15,-15,30,30))}])
 	var derived := VillageEnclosurePlan.build(plan)

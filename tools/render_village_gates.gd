@@ -34,7 +34,7 @@ func _init() -> void:
 		plan.roads.append({"points": PackedVector2Array([Vector2(-45, -3), Vector2(45, 3)]),
 			"class": &"through", "width": 6.0, "verge": 1.0})
 		VillageEnclosurePlan.author(plan)
-		VillageDresser._enclosure_hedge(plan, VillageDresser._context(plan))
+		VillageDressContext.enclosure_hedge(plan, VillageDressContext.make_context(plan))
 		var node := VillageAssembler.build(plan)
 		viewport.add_child(node)
 		await process_frame

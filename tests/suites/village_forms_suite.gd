@@ -62,14 +62,14 @@ static func _check_strand_working_bank(res: SuiteResult) -> void:
 		Vector2(-32, 0), Vector2(32, 0)]), &"through", 0.4))
 	plan.lots.append({"poly": Poly.from_rect(Rect2(-12, 4.5, 24, 10))})
 	plan.water.append({"kind": &"coast", "poly": Poly.from_rect(Rect2(-28, 16, 56, 10))})
-	var ctx := VillageDresser._context(plan)
+	var ctx := VillageDressContext.make_context(plan)
 	ctx["strand_walk"] = VillageNavCheck.reached_grid(plan)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 3
 	res.checked += 1
-	if VillageDresser._place(plan, ctx, {"built": true}, "boat", Vector2(27, 14.5), rng, -1):
+	if VillageDressPlacement.place(plan, ctx, {"built": true}, "boat", Vector2(27, 14.5), rng, -1):
 		res.fail("boat accepted on an isolated shore beyond every working yard")
-	VillageDresser._dress_place(plan, ctx, &"strand")
+	VillageDressHosts.dress_place(plan, ctx, &"strand")
 	var boats := 0
 	var racks := 0
 	for prop in plan.props:
@@ -120,16 +120,16 @@ static func _check_strand_route_obstruction(res: SuiteResult, spec: VillageSpec)
 	plan.lots.append({"poly": Poly.from_rect(Rect2(-0.75, 4.5, 1.5, 8.0))})
 	plan.lots.append({"poly": Poly.from_rect(Rect2(-12, 10, 24, 10))})
 	plan.water.append({"kind": &"coast", "poly": Poly.from_rect(Rect2(-28, 26, 56, 10))})
-	var ctx := VillageDresser._context(plan)
+	var ctx := VillageDressContext.make_context(plan)
 	ctx["strand_walk"] = VillageNavCheck.reached_grid(plan)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 3
 	res.checked += 1
-	if not VillageDresser._place(plan, ctx, {"built": true}, "boat", Vector2(0, 23), rng, -1):
+	if not VillageDressPlacement.place(plan, ctx, {"built": true}, "boat", Vector2(0, 23), rng, -1):
 		res.fail("reached narrow-neck shore yard could not serve its boat")
 		return
 	res.checked += 1
-	if VillageDresser._place(plan, ctx, {}, "Crate_Metal", Vector2(0, 7), rng, -1):
+	if VillageDressPlacement.place(plan, ctx, {}, "Crate_Metal", Vector2(0, 7), rng, -1):
 		res.fail("later shore crate cut the boat's only yard route")
 	res.checked += 1
 	if not VillageNavCheck.reached_grid(plan).reached(plan.props[0]["rect"], VillageNavCheck.PERSON_RADIUS + 0.4):
@@ -142,7 +142,7 @@ static func _check_strand_edge(res: SuiteResult) -> void:
 	# Four consecutive jittered stations used to leave this long northern
 	# edge outside the site, despite the entire band being clear and dry.
 	plan.site = Rect2(-178.5729, -69.02083, 357.1458, 120.0417)
-	VillageDresser._dress_place(plan, VillageDresser._context(plan), &"edge")
+	VillageDressHosts.dress_place(plan, VillageDressContext.make_context(plan), &"edge")
 	var edge := VillageDressCheck.new()
 	edge._check_edge(plan)
 	res.checked += 1
@@ -153,7 +153,7 @@ static func _check_strand_edge(res: SuiteResult) -> void:
 	var road := VillageSitePlanner._road(PackedVector2Array([
 		Vector2(plan.site.position.x, y), Vector2(plan.site.end.x, y)]), &"through", spec.wealth)
 	plan.roads.append(road)
-	VillageDresser._dress_place(plan, VillageDresser._context(plan), &"edge")
+	VillageDressHosts.dress_place(plan, VillageDressContext.make_context(plan), &"edge")
 	var ribbon := VillageSitePlanner.road_ribbon(road, true)
 	res.checked += 1
 	for plant in plan.plants:
@@ -169,12 +169,12 @@ static func _check_strand_apron(res: SuiteResult, spec: VillageSpec) -> void:
 		Vector2(-32, 0), Vector2(32, 0)]), &"through", 0.4))
 	plan.lots.append({"poly": Poly.from_rect(Rect2(-12, 4.5, 24, 10))})
 	plan.water.append({"kind": &"coast", "poly": Poly.from_rect(Rect2(-28, 24, 56, 12))})
-	var ctx := VillageDresser._context(plan)
+	var ctx := VillageDressContext.make_context(plan)
 	ctx["strand_walk"] = VillageNavCheck.reached_grid(plan)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 3
 	res.checked += 1
-	if not VillageDresser._place(plan, ctx, {"built": true}, "boat", Vector2(0, 20.5), rng, -1):
+	if not VillageDressPlacement.place(plan, ctx, {"built": true}, "boat", Vector2(0, 20.5), rng, -1):
 		res.fail("clear shore working apron could not connect to a reached yard")
 		return
 	var prop: Dictionary = plan.props.back()
@@ -195,11 +195,11 @@ static func _check_strand_apron(res: SuiteResult, spec: VillageSpec) -> void:
 		if not found:
 			res.fail("shore apron floor is recorded but absent from emitted mesh")
 	res.checked += 1
-	if VillageDresser._plant_is_clear(plan, ctx, Poly.bounding_rect(apron).get_center(), 0.2, 0.2):
+	if VillageDressPlacement.plant_is_clear(plan, ctx, Poly.bounding_rect(apron).get_center(), 0.2, 0.2):
 		res.fail("later planting can obstruct the shore working apron")
 	var obstruction := Rect2(Poly.bounding_rect(apron).get_center() - Vector2(0.25, 0.25), Vector2(0.5, 0.5))
 	res.checked += 1
-	if VillageDresser._prop_is_clear(plan, ctx, obstruction, obstruction):
+	if VillageDressPlacement.prop_is_clear(plan, ctx, obstruction, obstruction):
 		res.fail("later props can obstruct the shore working apron")
 	prop.erase("approach")
 	var broken := VillageNavCheck.reached_grid(plan)
@@ -217,14 +217,14 @@ static func _check_well_plants(res: SuiteResult) -> void:
 		plan.site = Rect2(-20,-20,40,40)
 		plan.commons.append({"poly": Poly.from_rect(Rect2(-10,-10,20,20))})
 		plan.props.append({"key":"well","pos":Vector2(1,1),"rect":Rect2(0,0,2,2),"built":true})
-		var ctx := VillageDresser._context(plan)
+		var ctx := VillageDressContext.make_context(plan)
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 17
 		res.checked += 1
-		if VillageDresser._place(plan,ctx,{"plant":true},key,Vector2(4.9,1),rng,-1):
+		if VillageDressPlacement.place(plan,ctx,{"plant":true},key,Vector2(4.9,1),rng,-1):
 			res.fail("%s placed inside actual well's four-metre working area" % key)
 		res.checked += 1
-		if not VillageDresser._place(plan,ctx,{"plant":true},key,Vector2(5.1,1),rng,-1):
+		if not VillageDressPlacement.place(plan,ctx,{"plant":true},key,Vector2(5.1,1),rng,-1):
 			res.fail("%s rejected outside actual well's clear working area" % key)
 		var check := VillageDressCheck.new()
 		check._check_green(plan)
@@ -242,7 +242,7 @@ static func _check_street_common(res: SuiteResult) -> void:
 			spec.wealth = 0.6
 			spec.generate(spec.seed)
 			var plan := VillageSitePlanner.plan(spec)
-			VillageDresser._dress_place(plan, VillageDresser._context(plan), &"common")
+			VillageDressHosts.dress_place(plan, VillageDressContext.make_context(plan), &"common")
 			var nav := VillageNavCheck.new().check(plan)
 			res.checked += 1
 			for failure in nav["failures"]:
@@ -365,7 +365,7 @@ static func _check_blight_common(res: SuiteResult) -> void:
 		plan.site = Rect2(-45, -45, 90, 90)
 		var common := Poly.from_rect(Rect2(-15, -15, 30, 30))
 		plan.commons.append({"poly": common})
-		VillageDresser._blight_remnants(plan, VillageDresser._context(plan))
+		VillageDressContext.blight_remnants(plan, VillageDressContext.make_context(plan))
 		var clear := not plan.props.is_empty()
 		for prop in plan.props:
 			clear = clear and VillageLotPlanner.overlap_area(Poly.from_rect(prop["rect"]), common) <= VillageLotPlanner.AREA_EPS
@@ -375,7 +375,7 @@ static func _check_blight_common(res: SuiteResult) -> void:
 	var blocked := VillagePlan.new(_spec(41, _cases()[1]))
 	blocked.site = Rect2(-45, -45, 90, 90)
 	blocked.commons.append({"poly": Poly.from_rect(blocked.site)})
-	VillageDresser._blight_remnants(blocked, VillageDresser._context(blocked))
+	VillageDressContext.blight_remnants(blocked, VillageDressContext.make_context(blocked))
 	res.checked += 1
 	if not blocked.props.is_empty():
 		res.fail("blight ruin bypassed a common covering every candidate site")
@@ -544,11 +544,11 @@ static func _site_problems(plan: VillagePlan, spec: VillageSpec,
 static func _check_planted_regressions(res: SuiteResult) -> void:
 	var spec := _spec(17167, _cases()[3])
 	var plan := VillageSitePlanner.plan(spec)
-	var context := VillageDresser._context(plan)
+	var context := VillageDressContext.make_context(plan)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 22
-	VillageDresser._apply(plan, context, VillageDresser.RECIPES[&"common"][0], rng, -1, &"common")
-	VillageDresser._apply(plan, context, VillageDresser.RECIPES[&"market"][0], rng, -1, &"market")
+	VillageDressRules.apply(plan, context, VillageDressCatalog.RECIPES[&"common"][0], rng, -1, &"common")
+	VillageDressRules.apply(plan, context, VillageDressCatalog.RECIPES[&"market"][0], rng, -1, &"market")
 	var stalls := 0
 	for prop in plan.props:
 		if String(prop["key"]).begins_with("Stall"):
