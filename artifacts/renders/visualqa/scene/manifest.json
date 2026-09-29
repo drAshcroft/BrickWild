@@ -1,0 +1,35 @@
+[
+	{
+		"assembled": "visualqa/scene/notre_dame_assembled.jpg",
+		"assembled_dressing_count": 150,
+		"available_prop_models": 150,
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -16.0428182636631,
+			"yaw_degrees": 41.2529612494193,
+			"zoom": 1.0
+		},
+		"key": "notre_dame",
+		"mesh": "visualqa/scene/notre_dame_mesh.jpg",
+		"prop_log_count": 150,
+		"seed": 5001
+	},
+	{
+		"assembled": "visualqa/scene/krak_assembled.jpg",
+		"assembled_dressing_count": 129,
+		"available_prop_models": 129,
+		"bailey_ranges": 4,
+		"camera": {
+			"fov_degrees": 48.0,
+			"pitch_degrees": -9.740282517224,
+			"yaw_degrees": 131.780292880089,
+			"zoom": 0.86
+		},
+		"courtyard": "visualqa/scene/krak_courtyard.jpg",
+		"key": "krak",
+		"mesh": "visualqa/scene/krak_mesh.jpg",
+		"prop_log_count": 129,
+		"seed": 6002,
+		"well_planned": true
+	}
+]

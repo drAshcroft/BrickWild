@@ -24,6 +24,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5001,
 		"title": "Notre-Dame de Paris",
 		"variant": "Black DenysMinster"
@@ -53,6 +54,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5002,
 		"title": "Cologne Cathedral",
 		"variant": "Abbey AldhelmMinster"
@@ -82,6 +84,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5003,
 		"title": "Chartres Cathedral",
 		"variant": "Saint Aldhelm-by-the-Ford"
@@ -111,6 +114,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5004,
 		"title": "Salisbury Cathedral",
 		"variant": "Holy Hilda-in-the-Wold"
@@ -140,6 +144,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5005,
 		"title": "Durham Cathedral",
 		"variant": "Grey Aldhelm"
@@ -169,6 +174,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5006,
 		"title": "Hagia Sophia",
 		"variant": "Abbey Hilda"
@@ -198,6 +204,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5007,
 		"title": "Florence Duomo",
 		"variant": "Holy Wulfran-on-the-Hill"
@@ -227,6 +234,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5008,
 		"title": "St Basil's Cathedral",
 		"variant": "Grey Editha-in-the-Wold"
@@ -253,6 +261,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5001,
 		"title": "Flying buttresses"
 	},
@@ -278,6 +287,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5006,
 		"title": "Dome on pendentives"
 	},
@@ -303,6 +313,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5003,
 		"title": "Radiating chapels"
 	},
@@ -328,6 +339,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5008,
 		"title": "Onion dome"
 	},
@@ -353,6 +365,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5007,
 		"title": "Octagonal drum and lantern"
 	},
@@ -378,6 +391,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 5005,
 		"title": "Crossing tower"
 	},
@@ -406,6 +420,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 6001,
 		"tier": "castle",
 		"title": "Bodiam Castle",
@@ -436,10 +451,36 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 6002,
 		"tier": "fortress",
 		"title": "Krak des Chevaliers",
 		"variant": "Wolfreach Citadel"
+	},
+	{
+		"bailey_ranges": 4,
+		"camera": {
+			"fov_degrees": 48.0,
+			"view": "bailey-facing aerial"
+		},
+		"file": "castle_krak_courtyard.jpg",
+		"key": "castle_krak_courtyard",
+		"kind": "castle",
+		"light": {
+			"ambient_energy": 0.8,
+			"fill_azimuth_degrees": 120.0,
+			"fill_color": "d9e5ff",
+			"fill_elevation_degrees": -18.0,
+			"fill_energy": 0.45,
+			"key_azimuth_degrees": -62.0,
+			"key_color": "fff2df",
+			"key_elevation_degrees": -30.0,
+			"key_energy": 1.8
+		},
+		"render_path": "assembled",
+		"seed": 6002,
+		"title": "Krak des Chevaliers courtyard",
+		"well_planned": true
 	},
 	{
 		"built": "corner towers, twin-towered gatehouse, inner ward + causeway, square keep, great hall, chapel",
@@ -466,6 +507,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 6003,
 		"tier": "fortress",
 		"title": "Chateau de Chambord",
@@ -496,6 +538,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 6004,
 		"tier": "castle",
 		"title": "Caernarfon Castle",
@@ -526,6 +569,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 6005,
 		"tier": "castle",
 		"title": "Himeji Castle",
@@ -556,6 +600,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 6006,
 		"tier": "castle",
 		"title": "Neuschwanstein",
@@ -586,6 +631,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 6007,
 		"tier": "manor",
 		"title": "Stokesay Castle",
@@ -616,6 +662,7 @@
 			"key_elevation_degrees": -30.0,
 			"key_energy": 1.8
 		},
+		"render_path": "assembled",
 		"seed": 6008,
 		"tier": "house",
 		"title": "Medieval longhouse",

@@ -1,0 +1,9 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+Vulkan 1.4.325 - Forward Mobile - Using Device #0: NVIDIA - NVIDIA GeForce RTX 3060
+
+  visualqa/scene/notre_dame_mesh.jpg
+  visualqa/scene/notre_dame_assembled.jpg
+  visualqa/scene/krak_mesh.jpg
+  visualqa/scene/krak_assembled.jpg
+  visualqa/scene/krak_courtyard.jpg
+wrote 5 scene acceptance images and manifest

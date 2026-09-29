@@ -18,6 +18,7 @@ var _key_light: DirectionalLight3D
 var _fill_light: DirectionalLight3D
 var _stage_environment: Environment
 var _legacy_light := false
+var _mesh_only := false
 
 const KEY_ELEVATION := -30.0
 const KEY_CAMERA_OFFSET := -62.0
@@ -32,6 +33,11 @@ func _init() -> void:
 	_build_stage()
 	await process_frame
 	var args := OS.get_cmdline_user_args()
+	_mesh_only = args.has("mesh-only")
+	if args.has("scene-qa"):
+		await _shoot_scene_acceptance()
+		quit()
+		return
 	if args.has("visual-qa"):
 		var selection: String = args[1] if args.size() > 1 else ""
 		await _shoot_visual_acceptance(selection)
@@ -47,6 +53,7 @@ func _init() -> void:
 		await _shoot_church(spec, file, 0.72, -0.28, 1.0)
 		var row: Dictionary = _describe(entry, spec, file)
 		row.merge(_portrait_metadata(entry["seed"], 0.72, -0.28, 1.0))
+		row["render_path"] = "mesh_only" if args.has("mesh-only") else "assembled"
 		manifest.append(row)
 
 	# ---- feature close-ups ----
@@ -59,6 +66,7 @@ func _init() -> void:
 			"caption": shot["caption"], "file": shot["file"], "kind": "detail"}
 		row.merge(_portrait_metadata(shot["entry"]["seed"], shot["yaw"],
 			shot["pitch"], 1.0))
+		row["render_path"] = "mesh_only" if args.has("mesh-only") else "assembled"
 		manifest.append(row)
 
 	# ---- the landmark castles, three-quarter view from the GATE side ----
@@ -68,11 +76,23 @@ func _init() -> void:
 		var cspec: CastleSpec = _castle_spec(entry)
 		var cfile: String = "castle_%s.jpg" % entry["key"]
 		await _shoot_castle(cspec, cfile, entry.get("yaw", 0.72),
-			entry.get("pitch", -0.30), entry.get("zoom", 1.0))
+			entry.get("pitch", -0.30), entry.get("zoom", 1.0),
+			"castle_krak_courtyard.jpg" if entry["key"] == "krak" else "")
 		var row: Dictionary = _describe_castle(entry, cspec, cfile)
 		row.merge(_portrait_metadata(entry["seed"], entry.get("yaw", 0.72),
 			entry.get("pitch", -0.30), entry.get("zoom", 1.0)))
+		row["render_path"] = "mesh_only" if args.has("mesh-only") else "assembled"
 		manifest.append(row)
+		if entry["key"] == "krak" and not args.has("mesh-only"):
+			manifest.append({"key": "castle_krak_courtyard",
+				"title": "Krak des Chevaliers courtyard", "kind": "castle",
+				"file": "castle_krak_courtyard.jpg", "seed": entry["seed"],
+				"render_path": "assembled",
+				"camera": {"view": "bailey-facing aerial",
+					"fov_degrees": _cam.fov},
+				"bailey_ranges": CastleGenerator.bailey_buildings(cspec).size(),
+				"well_planned": not CastleGenerator.bailey_well(cspec).is_empty(),
+				"light": _light_metadata(0.0)})
 
 	# ---- furnished cutaways, plus one roof-on multistory exterior ----
 	for entry in _houses():
@@ -197,6 +217,81 @@ func _shoot_visual_acceptance(selection := "") -> void:
 	var image_count: int = rows.size() * 2 + int(not rows.is_empty()) + int(include_chevet)
 	print("wrote %d acceptance images and manifest to %s/%s" %
 		[image_count, OUT_DIR, out])
+
+
+## Diagnose the render path with one church and one castle. Both views in each
+## pair use the mesh bounds for the camera, so the only change is assembly.
+func _shoot_scene_acceptance() -> void:
+	var out := "visualqa/scene"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + out))
+	var rows: Array[Dictionary] = []
+	for key in ["notre_dame", "krak"]:
+		var church: bool = key == "notre_dame"
+		var entry: Dictionary = {}
+		for candidate in (_landmarks() if church else _castles()):
+			if candidate["key"] == key:
+				entry = candidate
+				break
+		var yaw: float = 0.72 if church else float(entry["yaw"])
+		var pitch: float = -0.28 if church else float(entry["pitch"])
+		var zoom: float = 1.0 if church else float(entry["zoom"])
+		var builder: MassBuilder
+		var scene: Node3D
+		var mesh: ArrayMesh
+		var castle_spec: CastleSpec
+		var cols: Array
+		if church:
+			var spec: ChurchSpec = _landmark_spec(entry)
+			builder = ChurchBuilder.new()
+			cols = [spec.stone_color, spec.trim_color, spec.roof_color,
+				Color("15171b")]
+			mesh = builder.build(spec)
+			scene = ChurchAssembler.build(spec, false)
+		else:
+			var spec: CastleSpec = _castle_spec(entry)
+			castle_spec = spec
+			builder = CastleBuilder.new()
+			cols = [spec.stone_color, spec.trim_color, spec.roof_color,
+				Color("15171b")]
+			mesh = builder.build(spec)
+			scene = CastleAssembler.build(spec, false)
+		var expected := 0
+		for prop in builder.prop_log:
+			if ResourceLoader.exists(PropCatalog.scene_path(prop["key"])):
+				expected += 1
+		var dressing := scene.get_node_or_null("Dressing")
+		var actual: int = dressing.get_child_count() if dressing != null else 0
+		if actual != expected:
+			push_error("%s dressing count %d != %d" % [key, actual, expected])
+		await _shoot_scene_pair(mesh, scene, cols, out, key, yaw, pitch, zoom,
+			castle_spec)
+		rows.append({"key": key, "seed": entry["seed"],
+			"mesh": "%s/%s_mesh.jpg" % [out, key],
+			"assembled": "%s/%s_assembled.jpg" % [out, key],
+			"prop_log_count": builder.prop_log.size(),
+			"available_prop_models": expected, "assembled_dressing_count": actual,
+			"camera": _camera_metadata(yaw, pitch, zoom)})
+		if key == "krak":
+			rows.back()["bailey_ranges"] = CastleGenerator.bailey_buildings(castle_spec).size()
+			rows.back()["well_planned"] = not CastleGenerator.bailey_well(castle_spec).is_empty()
+			rows.back()["courtyard"] = out + "/krak_courtyard.jpg"
+	var f := FileAccess.open(OUT_DIR + "/" + out + "/manifest.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify(rows, "\t"))
+	f.close()
+	print("wrote %d scene acceptance images and manifest" % 5)
+
+
+func _shoot_scene_pair(mesh: ArrayMesh, scene: Node3D, cols: Array,
+		out: String, key: String, yaw: float, pitch: float, zoom: float,
+		castle_spec: CastleSpec = null) -> void:
+	var aabb: AABB = mesh.get_aabb()
+	var centre: Vector3 = aabb.get_center()
+	var radius: float = maxf(aabb.size.length() / 2.0, 1.0)
+	await _shoot_mesh(mesh, cols, "%s/%s_mesh.jpg" % [out, key],
+		yaw, pitch, zoom, centre, radius)
+	await _shoot_scene(scene, "%s/%s_assembled.jpg" % [out, key],
+		yaw, pitch, zoom, centre, radius, castle_spec,
+		"%s/krak_courtyard.jpg" % out if castle_spec != null else "")
 
 
 func _save_acceptance_sheet(rows: Array[Dictionary], file: String) -> void:
@@ -658,16 +753,60 @@ func _build_stage() -> void:
 
 func _shoot_church(spec: ChurchSpec, file: String, yaw: float, pitch: float,
 		zoom := 1.0, focus := Vector3.INF, frame_radius := 0.0) -> void:
-	await _shoot_mesh(ChurchBuilder.new().build(spec),
-		[spec.stone_color, spec.trim_color, spec.roof_color, Color("15171b")],
-		file, yaw, pitch, zoom, focus, frame_radius)
+	if _mesh_only:
+		await _shoot_mesh(ChurchBuilder.new().build(spec),
+			[spec.stone_color, spec.trim_color, spec.roof_color, Color("15171b")],
+			file, yaw, pitch, zoom, focus, frame_radius)
+	else:
+		await _shoot_scene(ChurchAssembler.build(spec, false), file, yaw, pitch,
+			zoom, focus, frame_radius)
 
 
 func _shoot_castle(spec: CastleSpec, file: String, yaw: float, pitch: float,
-		zoom := 1.0) -> void:
-	await _shoot_mesh(CastleBuilder.new().build(spec),
-		[spec.stone_color, spec.trim_color, spec.roof_color, Color("15171b")],
-		file, yaw, pitch, zoom)
+		zoom := 1.0, courtyard_file := "") -> void:
+	if _mesh_only:
+		await _shoot_mesh(CastleBuilder.new().build(spec),
+			[spec.stone_color, spec.trim_color, spec.roof_color, Color("15171b")],
+			file, yaw, pitch, zoom)
+	else:
+		await _shoot_scene(CastleAssembler.build(spec, false), file, yaw, pitch,
+			zoom, Vector3.INF, 0.0, spec if not courtyard_file.is_empty() else null,
+			courtyard_file)
+
+
+func _shoot_scene(node: Node3D, file: String, yaw: float, pitch: float,
+		zoom := 1.0, focus := Vector3.INF, frame_radius := 0.0,
+		courtyard_spec: CastleSpec = null, courtyard_file := "") -> void:
+	_mesh_inst.mesh = null
+	_root3d.add_child(node)
+	await process_frame
+	var aabb: AABB = SceneBounds.of_node(node)
+	var centre: Vector3 = aabb.get_center()
+	var radius: float = maxf(aabb.size.length() / 2.0, 1.0)
+	if focus.x != INF:
+		centre = focus
+		radius = maxf(frame_radius, 1.0)
+	var dist: float = radius / tan(deg_to_rad(_cam.fov) / 2.0) * 1.12 * zoom
+	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
+	_cam.position = centre + dir * dist
+	_cam.look_at(centre, Vector3.UP)
+	_set_shot_lighting(yaw)
+	await _capture(file)
+	if courtyard_spec != null:
+		await _capture_krak_courtyard(courtyard_spec, courtyard_file)
+	_root3d.remove_child(node)
+	node.free()
+	_set_legacy_lighting()
+
+
+func _capture_krak_courtyard(spec: CastleSpec, file: String) -> void:
+	var yard: Rect2 = CastleGeometry.bailey_rect(spec)
+	var centre := Vector3(yard.get_center().x, 2.0, yard.get_center().y)
+	var span: float = maxf(yard.size.x, yard.size.y)
+	_cam.position = centre + Vector3(0.0, span * 0.62, -span * 0.48)
+	_cam.look_at(centre, Vector3.UP)
+	_set_shot_lighting(0.0)
+	await _capture(file)
 
 
 ## A furnished house: the shell plus every prop in it, framed from above so the
