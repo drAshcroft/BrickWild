@@ -719,9 +719,14 @@ func _build_dome() -> void:
 	var drum_h: float = spec.dome_drum_height
 	var octagonal: bool = spec.dome_shape == &"octagonal"
 
-	# pendentives: the square-to-round transition the drum sits on
-	box(Vector3(r * 2.0 + 0.6, ChurchGeometry.PENDENTIVE_H, r * 2.0 + 0.6),
-		Vector3(0, base + ChurchGeometry.PENDENTIVE_H / 2.0, cz), SURF_TRIM)
+	# pendentives: a closed, sloped square-to-drum transition. The upper ring
+	# uses the same sides and phase as the drum, so the latter rests on it.
+	var drum_radius: float = r * (ChurchGeometry.OCTAGONAL_RADIUS_FACTOR if octagonal else 1.0)
+	var rounded_hero: bool = spec.style == &"byzantine" and spec.dome_shape == &"hemisphere"
+	var shell_segments: int = 8 if octagonal else (32 if rounded_hero else 16)
+	var shell_start: float = PI / 8.0 if octagonal else 0.0
+	_pendentive_support(Vector3(0.0, base, cz), r + 0.3, drum_radius,
+		ChurchGeometry.PENDENTIVE_H, shell_segments, shell_start)
 	_log_mass("pendentive", ChurchGeometry.pendentive_aabb(spec))
 	# the corona of windows that lights every one of these domes
 	var lights: int = 8 if octagonal else 12
@@ -729,20 +734,21 @@ func _build_dome() -> void:
 	for i in range(lights):
 		angles.append(TAU / lights * i)
 	_arc_window_shell(Vector3(0, base + ChurchGeometry.PENDENTIVE_H, cz),
-		r * (ChurchGeometry.OCTAGONAL_RADIUS_FACTOR if octagonal else 1.0),
-		drum_h, 8 if octagonal else 16, TAU,
-		PI / 8.0 if octagonal else 0.0, angles,
+		drum_radius, drum_h, shell_segments, TAU,
+		shell_start, angles,
 		r * 0.16, drum_h * 0.45, drum_h * 0.70, &"round")
 	_log_mass("dome_drum", ChurchGeometry.dome_drum_aabb(spec))
 
 	var top: float = base + ChurchGeometry.PENDENTIVE_H + drum_h
 	var rise: float = ChurchGeometry.dome_shell_rise(spec)
-	var segs: int = 8 if octagonal else 16
+	# Round hero shells use explicit fine tessellation. Florence stays an
+	# eight-sided shell; its vertical profile is refined without changing that
+	# deliberate plan.
+	var segs: int = shell_segments
 	# The octagonal drum uses a circumradius of 1.06r. Its shell must spring
 	# from that same ring; using r left an open slot around all eight sides.
 	preload("church_roofs.gd").dome(_kit, _dome_profile(
-		r * (ChurchGeometry.OCTAGONAL_RADIUS_FACTOR if octagonal else 1.0), rise),
-		Vector3(0, top, cz), segs, _roof_volumes, TAU, PI / 8.0 if octagonal else 0.0)
+		drum_radius, rise), Vector3(0, top, cz), segs, _roof_volumes, TAU, shell_start)
 	total_height = maxf(total_height, top + rise)
 
 	if spec.dome_lantern:
@@ -771,6 +777,28 @@ func _build_dome() -> void:
 						ec + Vector3(0, base * 0.3, 0), SURF_ROOF, 8, PI, start)
 
 
+## A closed loft from the square crossing to the drum's exact lower ring. The
+## inclined facets are the support, not four detached triangular blades.
+func _pendentive_support(center: Vector3, lower_half: float, upper_radius: float,
+		height: float, segments: int, start: float) -> void:
+	var lower := PackedVector3Array()
+	var upper := PackedVector3Array()
+	for i in range(segments):
+		var angle := start + TAU * float(i) / float(segments)
+		var direction := Vector2(cos(angle), sin(angle))
+		var square_scale: float = lower_half / maxf(absf(direction.x), absf(direction.y))
+		lower.append(center + Vector3(direction.x * square_scale, 0.0,
+			direction.y * square_scale))
+		upper.append(center + Vector3(direction.x * upper_radius, height,
+			direction.y * upper_radius))
+	var st: SurfaceTool = _kit.surface(SURF_STONE)
+	for i in range(segments):
+		var next := (i + 1) % segments
+		_kit._quad(st, lower[i], lower[next], upper[next], upper[i])
+		_kit._tri(st, center, lower[next], lower[i])
+		_kit._tri(st, center + Vector3.UP * height, upper[i], upper[next])
+
+
 ## Profile of a dome shell, bottom to top: hemispherical, or the ogee curve
 ## that gives an onion dome its shoulder and point.
 func _dome_profile(radius: float, rise: float) -> PackedVector2Array:
@@ -782,7 +810,9 @@ func _dome_profile(radius: float, rise: float) -> PackedVector2Array:
 		for v in ogee:
 			pts.append(Vector2(radius * v.x, rise * v.y))
 		return pts
-	var steps: int = 6
+	var hero_shell: bool = (spec.style == &"byzantine" and spec.dome_shape == &"hemisphere") \
+		or (spec.style == &"renaissance" and spec.dome_shape == &"octagonal")
+	var steps: int = 12 if hero_shell else 6
 	for i in range(steps + 1):
 		var t: float = float(i) / steps
 		pts.append(Vector2(radius * cos(t * PI / 2.0), rise * sin(t * PI / 2.0)))

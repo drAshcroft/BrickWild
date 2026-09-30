@@ -79,6 +79,8 @@ static func run() -> SuiteResult:
 		var p := Vector2(cos(angle), sin(angle)) * s.apse_radius * 0.98
 		_expect(res, not _heights(cap, p.x, base.z + p.y, base.y - 0.2, base.y + 5).is_empty(), "apse shoulder uncovered at angle %.3f" % angle)
 	_tower_and_domes(res)
+	_hero_dome_segments(res)
+	_pendentive_transition(res)
 	return res
 
 static func _triangles(mesh: ArrayMesh, surface: int) -> Array:
@@ -170,3 +172,125 @@ static func _tower_and_domes(res: SuiteResult) -> void:
 					var hits := _heights(roofs, x, z, y - 0.3, y + 0.3)
 					_expect(res, hits.is_empty() if inside else hits.size() == 2,
 						"%s pitch=%.2f roof %s at %s (hits=%s)" % [kind, pitch, "inside volume" if inside else "gap beside volume", Vector3(x,y,z), hits])
+
+
+## Hero dome tessellation is explicit: Hagia gains radial sides, while Florence
+## keeps eight plan facets and both hero shells get a finer vertical profile.
+static func _hero_dome_segments(res: SuiteResult) -> void:
+	for kind in [&"hemisphere", &"octagonal"]:
+		var s := ChurchSpec.new()
+		s.style = &"byzantine" if kind == &"hemisphere" else &"renaissance"
+		s.width = 10.0
+		s.length = 26.0
+		s.height = 12.0
+		s.transept = true
+		s.transept_len = 24.0
+		s.dome = true
+		s.dome_shape = kind
+		s.dome_radius = 4.5
+		s.dome_drum_height = 2.0
+		var builder := ChurchBuilder.new()
+		builder.spec = s
+		builder.begin_metric(4)
+		for surface in range(4):
+			builder._kit.box(Vector3.ONE, Vector3(-100, -100, -100), surface)
+		var before := builder.commit()
+		var roof_before: PackedVector3Array = before.surface_get_arrays(2)[Mesh.ARRAY_VERTEX]
+		builder._build_dome()
+		var mesh := builder.commit()
+		var arrays := mesh.surface_get_arrays(2)
+		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+		var octagonal: bool = kind == &"octagonal"
+		var segments: int = 8 if octagonal else 32
+		var radius := s.dome_radius * (ChurchGeometry.OCTAGONAL_RADIUS_FACTOR if octagonal else 1.0)
+		var profile := builder._dome_profile(radius, ChurchGeometry.dome_shell_rise(s))
+		# Each final apex ring degenerates one of the two triangles per facet.
+		var expected_vertices := segments * ((profile.size() - 1) * 6 - 3)
+		var emitted_vertices := points.size() - roof_before.size()
+		var who := String(kind)
+		_expect(res, emitted_vertices == expected_vertices,
+			"%s dome shell emitted %d vertices; %d explicit segments/profile predict %d" % [
+				who, emitted_vertices, segments, expected_vertices])
+		var ring_angles: Dictionary = {}
+		var spring_y := ChurchGeometry.dome_base_height(s) + ChurchGeometry.PENDENTIVE_H + s.dome_drum_height
+		var cz := ChurchGeometry.crossing_center_z(s)
+		for point in points:
+			if absf(point.y - spring_y) < 0.0001 \
+					and absf(Vector2(point.x, point.z - cz).length() - radius) < 0.0001:
+				var angle := fposmod(atan2(point.z - cz, point.x), TAU)
+				ring_angles[roundi(angle * 100000.0)] = true
+		_expect(res, ring_angles.size() == segments,
+			"%s shell spring has %d ring facets, expected %d" % [who, ring_angles.size(), segments])
+		_expect(res, normals.size() == points.size() and uvs.size() == points.size(),
+			"%s shell lost per-vertex normals or metric UVs" % who)
+		var finite_uvs := true
+		for uv in uvs:
+			if not is_finite(uv.x) or not is_finite(uv.y):
+				finite_uvs = false
+				break
+		_expect(res, finite_uvs, "%s shell emitted non-finite metric UVs" % who)
+
+
+## The support is a closed loft. Its square base meets the crossing, and its
+## upper ring matches the round/octagonal drum at the same height and phase.
+static func _pendentive_transition(res: SuiteResult) -> void:
+	for kind in [&"hemisphere", &"octagonal"]:
+		var octagonal: bool = kind == &"octagonal"
+		var segments: int = 8 if octagonal else 32
+		var start := PI / 8.0 if octagonal else 0.0
+		var lower_half := 4.8
+		var upper_radius := 4.5 * (ChurchGeometry.OCTAGONAL_RADIUS_FACTOR if octagonal else 1.0)
+		var center := Vector3(0.0, 12.0, 3.0)
+		var height := ChurchGeometry.PENDENTIVE_H
+		var builder := ChurchBuilder.new()
+		builder.begin_metric(4)
+		builder.spec = ChurchSpec.new()
+		builder._pendentive_support(center, lower_half, upper_radius, height, segments, start)
+		var mesh := builder.commit()
+		var arrays := mesh.surface_get_arrays(0)
+		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+		var who := String(kind)
+		_expect(res, points.size() == segments * 12,
+			"%s pendentive should emit a closed loft with %d facets" % [who, segments])
+		var x_extent := 0.0
+		var z_extent := 0.0
+		var top_angles: Dictionary = {}
+		for point in points:
+			x_extent = maxf(x_extent, absf(point.x - center.x))
+			z_extent = maxf(z_extent, absf(point.z - center.z))
+			if absf(point.y - center.y - height) < 0.0001 \
+					and absf(Vector2(point.x - center.x, point.z - center.z).length() - upper_radius) < 0.0001:
+				var angle := fposmod(atan2(point.z - center.z, point.x - center.x), TAU)
+				top_angles[roundi(angle * 100000.0)] = true
+		_expect(res, is_equal_approx(x_extent, lower_half) and is_equal_approx(z_extent, lower_half),
+			"%s pendentive lost its square crossing footprint" % who)
+		_expect(res, top_angles.size() == segments,
+			"%s pendentive top ring does not match the %d-sided drum" % [who, segments])
+		var good_normals := normals.size() == points.size()
+		if good_normals:
+			for i in range(0, points.size(), 3):
+				var a := points[i]
+				var b := points[i + 1]
+				var c := points[i + 2]
+				var n := normals[i]
+				if absf(a.y - b.y) < 0.0001 and absf(b.y - c.y) < 0.0001:
+					var upward: bool = absf(a.y - center.y - height) < 0.0001
+					if n.y * (1.0 if upward else -1.0) < 0.99:
+						good_normals = false
+				else:
+					var radial := Vector3((a.x + b.x + c.x) / 3.0 - center.x, 0.0,
+						(a.z + b.z + c.z) / 3.0 - center.z)
+					if n.dot(radial) <= 0.0:
+						good_normals = false
+		_expect(res, good_normals, "%s pendentive shell or cap faces inward or lacks normals" % who)
+		_expect(res, uvs.size() == points.size(), "%s pendentive lacks metric UVs" % who)
+		var finite_uvs := true
+		for uv in uvs:
+			if not is_finite(uv.x) or not is_finite(uv.y):
+				finite_uvs = false
+				break
+		_expect(res, finite_uvs, "%s pendentive emitted non-finite UVs" % who)

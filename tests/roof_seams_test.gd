@@ -26,6 +26,11 @@ func _init() -> void:
 		var arrays := mesh.surface_get_arrays(2)
 		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+		result.checked += 1
+		if normals.size() != points.size() or uvs.size() != points.size():
+			result.fail("partial dome cap lost per-vertex normals or UVs")
+			continue
 		var outward := Vector3(-sin(arc), 0, cos(arc))
 		var end_direction := Vector3(cos(arc), 0, sin(arc))
 		var caps := 0
@@ -34,9 +39,12 @@ func _init() -> void:
 			if absf(center.dot(outward)) < 0.0001 and center.dot(end_direction) > 0.1 \
 					and absf(normals[index].y) < 0.001:
 				caps += 1
-				result.checked += 1
-				if normals[index].dot(outward) < 0.99:
-					result.fail("partial dome end cap faces inside the swept solid")
+				for vertex_index in range(index, index + 3):
+					result.checked += 1
+					if normals[vertex_index].dot(outward) < 0.99:
+						result.fail("partial dome end cap faces inside the swept solid")
+					if not is_finite(uvs[vertex_index].x) or not is_finite(uvs[vertex_index].y):
+						result.fail("partial dome end cap has non-finite UV coordinates")
 		result.checked += 1
 		if caps == 0:
 			result.fail("partial dome end cap vanished")
