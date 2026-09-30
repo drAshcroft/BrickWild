@@ -1,0 +1,16 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running massing...
+--- massing ---
+    romanesque      0/15 variants with defects
+    gothic          0/15 variants with defects
+    byzantine       0/15 variants with defects
+    nordic_stave    0/15 variants with defects
+    renaissance     0/15 variants with defects
+    russian         0/15 variants with defects
+    elapsed 172.74s
+
+============================================================
+  massing            PASS  (90 checked, 0 failures, 0 warnings)
+============================================================
+ALL PASS -- 1 suites, 90 checks, 0 failures, 0 warnings

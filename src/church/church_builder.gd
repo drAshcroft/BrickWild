@@ -33,7 +33,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 
 	# ---------- nave ----------
 	tag("nave")
-	box(Vector3(w, h, l), Vector3(0, h / 2.0, 0), SURF_STONE)
+	_nave_shell()
 	_log_mass("nave", AABB(Vector3(-w / 2.0, 0.0, -l / 2.0), Vector3(w, h, l)))
 	total_height = maxf(total_height, h + w * spec.roof_pitch)
 
@@ -125,7 +125,10 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		var mass_name: String = "tower"
 		if spec.west_towers >= 2:
 			mass_name = "tower_%s" % ("left" if side < 0.0 else "right")
-		box(Vector3(tw, th, tw), Vector3(lx, th / 2.0, lz), SURF_STONE)
+		if spec.west_towers >= 2 and _cuts_west_portal():
+			_west_tower_portal_shell(lx, lz, tw, th)
+		else:
+			box(Vector3(tw, th, tw), Vector3(lx, th / 2.0, lz), SURF_STONE)
 		_log_mass(mass_name, ChurchGeometry.tower_aabb(spec, side))
 		total_height = maxf(total_height, th)
 		for side_i in range(4):
@@ -196,18 +199,11 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	# Only a SINGLE axial tower carries the door out to its own west face. Twin
 	# towers flank the axis, so that same offset left the door hanging in the
 	# gap between them with no wall behind it at all.
-	var door_z: float = -l / 2.0 - 0.02
-	if spec.tower and spec.west_towers == 1:
-		door_z = -l / 2.0 + TOWER_EMBED - spec.tower_width - 0.02
 	var door_h: float = minf(h * 0.32, 3.4)
-	match spec.door_style:
-		&"twin":
-			window(Vector3(-0.8, door_h / 2.0 + 0.1, door_z), PI, 0.85, door_h, &"round", true)
-			window(Vector3(0.8, door_h / 2.0 + 0.1, door_z), PI, 0.85, door_h, &"round", true)
-		&"portal":
-			window(Vector3(0, door_h / 2.0 + 0.05, door_z), PI, w * 0.34, door_h, &"pointed", true)
-		_:
-			window(Vector3(0, door_h / 2.0 + 0.1, door_z), PI, 1.4, door_h, &"round", true)
+	var door_z: float = _west_door_z()
+	for opening in _west_door_openings():
+		window(opening.pos, PI, opening.width, opening.height,
+			opening.style, true, _cuts_west_portal())
 	box(Vector3((w * 0.34 if spec.door_style == &"portal" else 2.4) + 0.7, 0.22, 0.14),
 		Vector3(0, door_h + 0.35, door_z - 0.02), SURF_TRIM)
 
@@ -241,6 +237,210 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	prop_log = ChurchFurnisher.dress(spec)
 
 	return commit()
+
+
+## The nave shell is split at its wall faces. Each masonry panel has measured
+## thickness; its exposed ends become the jambs, head and sill of a real hole.
+const NAVE_WALL_T := 0.36
+
+
+func _cuts_clerestory() -> bool:
+	return spec.style == &"gothic" and ChurchGeometry.has_clerestory(spec)
+
+
+func _cuts_west_portal() -> bool:
+	# A single axial tower or narthex owns a different exterior host wall.
+	return spec.west_towers != 1 and not spec.narthex
+
+
+func _west_door_z() -> float:
+	if spec.tower and spec.west_towers == 1:
+		return -spec.length / 2.0 + TOWER_EMBED - spec.tower_width - ChurchGeometry.OPENING_EPS
+	return -spec.length / 2.0 - ChurchGeometry.OPENING_EPS
+
+
+func _west_door_openings() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var door_h: float = minf(spec.height * 0.32, 3.4)
+	var z: float = _west_door_z()
+	match spec.door_style:
+		&"twin":
+			for x in [-0.8, 0.8]:
+				out.append({"pos": Vector3(x, door_h / 2.0 + 0.1, z),
+					"width": 0.85, "height": door_h, "style": &"round"})
+		&"portal":
+			out.append({"pos": Vector3(0, door_h / 2.0 + 0.05, z),
+				"width": spec.width * 0.34, "height": door_h, "style": &"pointed"})
+		_:
+			out.append({"pos": Vector3(0, door_h / 2.0 + 0.1, z),
+				"width": 1.4, "height": door_h, "style": &"round"})
+	return out
+
+
+func _nave_shell() -> void:
+	var w: float = spec.width
+	var h: float = spec.height
+	var l: float = spec.length
+	if not _cuts_clerestory() and not _cuts_west_portal():
+		box(Vector3(w, h, l), Vector3(0, h / 2.0, 0), SURF_STONE)
+		return
+	var clerestory: Array[Dictionary] = []
+	if _cuts_clerestory():
+		clerestory = ChurchGeometry.clerestory_windows(spec)
+	for side in [-1.0, 1.0]:
+		var holes: Array[Dictionary] = []
+		for opening in clerestory:
+			if signf(opening.pos.x) != side:
+				continue
+			holes.append({"u": opening.pos.z, "width": opening.width,
+				"bottom": opening.pos.y - opening.height / 2.0,
+				"top": opening.pos.y + opening.height / 2.0})
+		_nave_wall_run(-l / 2.0, l / 2.0, h, holes, side, false)
+	var doors: Array[Dictionary] = []
+	if _cuts_west_portal():
+		for opening in _west_door_openings():
+			doors.append({"u": opening.pos.x, "width": opening.width,
+				"bottom": opening.pos.y - opening.height / 2.0,
+				"top": opening.pos.y + opening.height / 2.0})
+	_nave_wall_run(-w / 2.0, w / 2.0, h, doors, 0.0, true)
+	box(Vector3(w, h, NAVE_WALL_T),
+		Vector3(0, h / 2.0, l / 2.0 - NAVE_WALL_T / 2.0), SURF_STONE)
+	var st: SurfaceTool = _kit.surface(SURF_STONE)
+	_nave_plane(st, Vector3(-w / 2.0, 0, -l / 2.0),
+		Vector3(w / 2.0, 0, -l / 2.0), Vector3(w / 2.0, 0, l / 2.0),
+		Vector3(-w / 2.0, 0, l / 2.0), Vector3.DOWN)
+	_nave_plane(st, Vector3(-w / 2.0, h, -l / 2.0),
+		Vector3(w / 2.0, h, -l / 2.0), Vector3(w / 2.0, h, l / 2.0),
+		Vector3(-w / 2.0, h, l / 2.0), Vector3.UP)
+
+
+func _nave_wall_run(u_min: float, u_max: float, wall_h: float,
+		holes: Array[Dictionary], side: float, west: bool) -> void:
+	holes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["u"]) < float(b["u"]))
+	var cursor: float = u_min
+	for opening in holes:
+		var lo: float = maxf(u_min, float(opening["u"]) - float(opening["width"]) / 2.0)
+		var hi: float = minf(u_max, float(opening["u"]) + float(opening["width"]) / 2.0)
+		if hi <= lo or lo < cursor - 0.001:
+			continue
+		_nave_wall_piece(cursor, lo, 0.0, wall_h, side, west)
+		var bottom: float = clampf(float(opening["bottom"]), 0.0, wall_h)
+		var top: float = clampf(float(opening["top"]), 0.0, wall_h)
+		_nave_wall_piece(lo, hi, 0.0, bottom, side, west)
+		_nave_wall_piece(lo, hi, top, wall_h, side, west)
+		cursor = hi
+	_nave_wall_piece(cursor, u_max, 0.0, wall_h, side, west)
+
+
+func _nave_wall_piece(u0: float, u1: float, y0: float, y1: float,
+		side: float, west: bool) -> void:
+	if u1 - u0 <= 0.001 or y1 - y0 <= 0.001:
+		return
+	var middle: float = (u0 + u1) / 2.0
+	var y: float = (y0 + y1) / 2.0
+	if west:
+		box(Vector3(u1 - u0, y1 - y0, NAVE_WALL_T),
+			Vector3(middle, y, -spec.length / 2.0 + NAVE_WALL_T / 2.0), SURF_STONE)
+	else:
+		box(Vector3(NAVE_WALL_T, y1 - y0, u1 - u0),
+			Vector3(side * (spec.width / 2.0 - NAVE_WALL_T / 2.0),
+				y, middle), SURF_STONE)
+
+
+func _nave_plane(st: SurfaceTool, a: Vector3, b: Vector3,
+		c: Vector3, d: Vector3, normal: Vector3) -> void:
+	if (c - a).cross(b - a).dot(normal) < 0.0:
+		_kit._tri(st, a, d, c)
+		_kit._tri(st, a, c, b)
+	else:
+		_kit._tri(st, a, b, c)
+		_kit._tri(st, a, c, d)
+
+
+## Twin towers straddle the west entrance. Their front and rear faces both
+## cross the doorway route; cutting only the nave leaves a walled-in portal.
+func _west_tower_portal_shell(cx: float, cz: float, width: float, height: float) -> void:
+	var x0: float = cx - width / 2.0
+	var x1: float = cx + width / 2.0
+	var z0: float = cz - width / 2.0
+	var z1: float = cz + width / 2.0
+	var holes: Array[Dictionary] = []
+	for opening in _west_door_openings():
+		var lo: float = maxf(x0, opening.pos.x - opening.width / 2.0)
+		var hi: float = minf(x1, opening.pos.x + opening.width / 2.0)
+		if hi <= lo:
+			continue
+		holes.append({"u": (lo + hi) / 2.0, "width": hi - lo,
+			"bottom": opening.pos.y - opening.height / 2.0,
+			"top": opening.pos.y + opening.height / 2.0})
+	_tower_portal_wall(x0, x1, height, holes.duplicate(true), z0, true)
+	_tower_portal_wall(x0, x1, height, holes, z1, false)
+	_tower_portal_side(x0, x0 + NAVE_WALL_T, cz, width, height, holes)
+	_tower_portal_side(x1 - NAVE_WALL_T, x1, cz, width, height, holes)
+	var st: SurfaceTool = _kit.surface(SURF_STONE)
+	_nave_plane(st, Vector3(x0, 0, z0), Vector3(x1, 0, z0),
+		Vector3(x1, 0, z1), Vector3(x0, 0, z1), Vector3.DOWN)
+	_nave_plane(st, Vector3(x0, height, z0), Vector3(x1, height, z0),
+		Vector3(x1, height, z1), Vector3(x0, height, z1), Vector3.UP)
+
+
+func _tower_portal_side(x0: float, x1: float, cz: float, width: float,
+		height: float, holes: Array[Dictionary]) -> void:
+	holes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["u"]) < float(b["u"]))
+	var cursor: float = x0
+	for opening in holes:
+		var lo: float = maxf(x0,
+			float(opening["u"]) - float(opening["width"]) / 2.0)
+		var hi: float = minf(x1,
+			float(opening["u"]) + float(opening["width"]) / 2.0)
+		if hi <= lo or lo < cursor - 0.001:
+			continue
+		_tower_portal_side_piece(cursor, lo, 0.0, height, cz, width)
+		var bottom: float = clampf(float(opening["bottom"]), 0.0, height)
+		var top: float = clampf(float(opening["top"]), 0.0, height)
+		_tower_portal_side_piece(lo, hi, 0.0, bottom, cz, width)
+		_tower_portal_side_piece(lo, hi, top, height, cz, width)
+		cursor = hi
+	_tower_portal_side_piece(cursor, x1, 0.0, height, cz, width)
+
+
+func _tower_portal_side_piece(x0: float, x1: float, y0: float, y1: float,
+		cz: float, width: float) -> void:
+	if x1 - x0 <= 0.001 or y1 - y0 <= 0.001:
+		return
+	box(Vector3(x1 - x0, y1 - y0, width),
+		Vector3((x0 + x1) / 2.0, (y0 + y1) / 2.0, cz), SURF_STONE)
+
+
+func _tower_portal_wall(x0: float, x1: float, height: float,
+		holes: Array[Dictionary], z_face: float, front: bool) -> void:
+	holes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["u"]) < float(b["u"]))
+	var cursor: float = x0
+	for opening in holes:
+		var lo: float = float(opening["u"]) - float(opening["width"]) / 2.0
+		var hi: float = float(opening["u"]) + float(opening["width"]) / 2.0
+		if hi <= lo or lo < cursor - 0.001:
+			continue
+		_tower_portal_piece(cursor, lo, 0.0, height, z_face, front)
+		var bottom: float = clampf(float(opening["bottom"]), 0.0, height)
+		var top: float = clampf(float(opening["top"]), 0.0, height)
+		_tower_portal_piece(lo, hi, 0.0, bottom, z_face, front)
+		_tower_portal_piece(lo, hi, top, height, z_face, front)
+		cursor = hi
+	_tower_portal_piece(cursor, x1, 0.0, height, z_face, front)
+
+
+func _tower_portal_piece(x0: float, x1: float, y0: float, y1: float,
+		z_face: float, front: bool) -> void:
+	if x1 - x0 <= 0.001 or y1 - y0 <= 0.001:
+		return
+	box(Vector3(x1 - x0, y1 - y0, NAVE_WALL_T),
+		Vector3((x0 + x1) / 2.0, (y0 + y1) / 2.0,
+			z_face + (NAVE_WALL_T / 2.0 if front else -NAVE_WALL_T / 2.0)),
+		SURF_STONE)
 
 
 ## Entrance vestibule across the west front.
@@ -493,12 +693,19 @@ func _build_clerestory() -> void:
 		var pos: Vector3 = opening.pos
 		var width: float = opening.width
 		var height: float = opening.height
-		window(pos, opening.face, width, height, spec.window_style)
+		window(pos, opening.face, width, height, spec.window_style, false,
+			_cuts_clerestory())
 		# A slender mullion and pale sill make the tall glazing read as a
 		# deliberate course, while leaving the main silhouette quiet.
 		var xf := Transform3D(Basis(Vector3.UP, opening.face), pos)
 		var mullion: float = clampf(width * 0.06, 0.055, 0.16)
 		host("clerestory_%d" % part_log.size())
+		if _cuts_clerestory():
+			# Set the dark pane at the inner lip. The ray fixture probes stone,
+			# so glazing cannot disguise an uncut masonry host.
+			component_box("clerestory_pane",
+				Vector3(width - 0.08, height - 0.08, 0.025),
+				xf.translated_local(Vector3(0, 0, -NAVE_WALL_T + 0.035)), SURF_OPEN)
 		component_box("clerestory_mullion", Vector3(mullion, height, 0.09),
 			xf.translated_local(Vector3(0, 0, 0.03)), SURF_TRIM)
 		component_box("clerestory_sill", Vector3(width + mullion * 3, mullion, 0.18),
@@ -506,12 +713,16 @@ func _build_clerestory() -> void:
 		host_end()
 
 ## Dark recessed opening facing local +Z, rotated by `face` around Y.
-func window(pos: Vector3, face: float, w: float, h: float, style: StringName, door := false) -> void:
+func window(pos: Vector3, face: float, w: float, h: float, style: StringName,
+		door := false, through := false) -> void:
 	# Facing is logged so the normals suite can prove the opening looks OUT of
 	# the wall. Windows on the +/-X walls were once all given face = 0, which
 	# stood them edge-on to the wall like panels bolted across it.
 	_log_part("window", pos, Vector3(w, h, 0.0), face,
 		Basis(Vector3.UP, face) * Vector3(0, 0, 1))
+	if through:
+		part_log.back()["aperture"] = "through"
+		return # the host wall owns the open throat and its stone returns
 	var depth: float = 0.16 if door else 0.1
 	# `pos` is the wall face. The recess box is centred, so it has to be pushed
 	# half its depth INTO the wall -- left on `pos` it read as a panel glued to

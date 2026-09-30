@@ -1,0 +1,23 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running blueprint...
+--- blueprint ---
+    elapsed 151.63s
+
+Running landmark...
+--- landmark ---
+      notre_dame     4 scales, 0 defects
+      cologne        4 scales, 0 defects
+      chartres       4 scales, 0 defects
+      salisbury      4 scales, 0 defects
+      durham         4 scales, 0 defects
+      hagia_sophia   4 scales, 0 defects
+      florence_duomo 4 scales, 0 defects
+      st_basil       4 scales, 0 defects
+    elapsed 37.96s
+
+============================================================
+  blueprint          PASS  (90 checked, 0 failures, 0 warnings)
+  landmark           PASS  (32 checked, 0 failures, 0 warnings)
+============================================================
+ALL PASS -- 2 suites, 122 checks, 0 failures, 0 warnings

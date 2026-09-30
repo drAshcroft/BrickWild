@@ -1,0 +1,94 @@
+{
+	"shots": [
+		{
+			"after": "visualqa/vis005/notre_dame_west_portal_front_after.jpg",
+			"before": "visualqa/vis005/notre_dame_west_portal_front_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -6.87549354156988,
+				"yaw_degrees": 180.0,
+				"zoom": 1.0
+			},
+			"key": "notre_dame",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5001,
+			"subject": "west_portal"
+		},
+		{
+			"after": "visualqa/vis005/notre_dame_west_portal_raking_after.jpg",
+			"before": "visualqa/vis005/notre_dame_west_portal_raking_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -6.87549354156988,
+				"yaw_degrees": 180.0,
+				"zoom": 1.0
+			},
+			"key": "notre_dame",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5001,
+			"subject": "west_portal"
+		},
+		{
+			"after": "visualqa/vis005/notre_dame_clerestory_front_after.jpg",
+			"before": "visualqa/vis005/notre_dame_clerestory_front_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -4.58366236104659,
+				"yaw_degrees": 90.0,
+				"zoom": 1.0
+			},
+			"key": "notre_dame",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5001,
+			"subject": "clerestory"
+		},
+		{
+			"after": "visualqa/vis005/notre_dame_clerestory_raking_after.jpg",
+			"before": "visualqa/vis005/notre_dame_clerestory_raking_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -4.58366236104659,
+				"yaw_degrees": 90.0,
+				"zoom": 1.0
+			},
+			"key": "notre_dame",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5001,
+			"subject": "clerestory"
+		},
+		{
+			"after": "visualqa/vis005/durham_west_portal_front_after.jpg",
+			"before": "visualqa/vis005/durham_west_portal_front_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -6.87549354156988,
+				"yaw_degrees": 180.0,
+				"zoom": 1.0
+			},
+			"key": "durham",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5005,
+			"subject": "west_portal"
+		},
+		{
+			"after": "visualqa/vis005/durham_west_portal_raking_after.jpg",
+			"before": "visualqa/vis005/durham_west_portal_raking_before.jpg",
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -6.87549354156988,
+				"yaw_degrees": 180.0,
+				"zoom": 1.0
+			},
+			"key": "durham",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5005,
+			"subject": "west_portal"
+		}
+	]
+}

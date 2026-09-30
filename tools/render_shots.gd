@@ -42,6 +42,10 @@ func _init() -> void:
 		await _shoot_vis004_acceptance()
 		quit()
 		return
+	if args.has("vis005"):
+		await _shoot_vis005_acceptance()
+		quit()
+		return
 	if args.has("visual-qa"):
 		var selection: String = args[1] if args.size() > 1 else ""
 		await _shoot_visual_acceptance(selection)
@@ -266,6 +270,65 @@ func _shoot_vis004_acceptance() -> void:
 		"columns": ["flat materials", "VIS-004 runtime finish"]}, "\t"))
 	f.close()
 	print("wrote %d VIS-004 pairs and contact sheet to %s" % [rows.size(), out])
+
+
+## Opening detail comparison. Run at the preceding commit as well as the
+## candidate commit; the two runs use identical seeds, cameras and lights.
+func _shoot_vis005_acceptance() -> void:
+	var out := "visualqa/vis005"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + out))
+	var rows: Array[Dictionary] = []
+	for entry in _landmarks():
+		if entry["key"] not in ["notre_dame", "durham"]:
+			continue
+		var spec: ChurchSpec = _landmark_spec(entry)
+		await _shoot_church(spec, "%s/%s_portrait.jpg" % [out, entry["key"]],
+			0.72, -0.28)
+		var subjects: Array[Dictionary] = [{"name": "west_portal",
+			"focus": Vector3(0.0, 2.0, -spec.length / 2.0),
+			"radius": 7.5, "yaw": PI, "pitch": -0.12}]
+		if entry["key"] == "notre_dame":
+			for opening in ChurchGeometry.clerestory_windows(spec):
+				if opening.pos.x > 0.0 and absf(opening.pos.z) < spec.length * 0.25:
+					subjects.append({"name": "clerestory", "focus": opening.pos,
+						"radius": 5.0, "yaw": PI / 2.0, "pitch": -0.08})
+					break
+		for subject in subjects:
+			for light in ["front", "raking"]:
+				var file: String = "%s/%s_%s_%s_after.jpg" % [out, entry["key"],
+					subject["name"], light]
+				var before: String = "%s/%s_%s_%s_before.jpg" % [out,
+					entry["key"], subject["name"], light]
+				await _shoot_vis005_frame(spec, file, subject["yaw"],
+					subject["pitch"], subject["focus"], subject["radius"],
+					light == "raking")
+				rows.append({"key": entry["key"], "seed": entry["seed"],
+					"subject": subject["name"], "light": light,
+					"before": before, "after": file,
+					"camera": _camera_metadata(subject["yaw"], subject["pitch"], 1.0),
+					"key_offset_degrees": -75.0 if light == "raking" else 0.0})
+	var f := FileAccess.open(OUT_DIR + "/" + out + "/manifest.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify({"shots": rows}, "\t"))
+	f.close()
+	print("wrote %d VIS-005 opening details to %s" % [rows.size(), out])
+
+
+func _shoot_vis005_frame(spec: ChurchSpec, file: String, yaw: float,
+		pitch: float, focus: Vector3, radius: float, raking: bool) -> void:
+	_mesh_inst.mesh = null
+	var node: Node3D = ChurchAssembler.build(spec, false)
+	_root3d.add_child(node)
+	await process_frame
+	var dist: float = radius / tan(deg_to_rad(_cam.fov) / 2.0) * 1.12
+	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
+	_cam.position = focus + dir * dist
+	_cam.look_at(focus, Vector3.UP)
+	_set_shot_lighting(yaw)
+	_key_light.rotation.y = yaw + deg_to_rad(-75.0 if raking else 0.0)
+	await _capture(file)
+	_root3d.remove_child(node)
+	node.free()
+	_set_legacy_lighting()
 
 
 ## Diagnose the render path with one church and one castle. Both views in each
