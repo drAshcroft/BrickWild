@@ -206,9 +206,13 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	# gap between them with no wall behind it at all.
 	var door_h: float = minf(h * 0.32, 3.4)
 	var door_z: float = _west_door_z()
-	for opening in _west_door_openings():
+	var west_doors := _west_door_openings()
+	for opening_index in range(west_doors.size()):
+		var opening: Dictionary = west_doors[opening_index]
 		window(opening.pos, PI, opening.width, opening.height,
 			opening.style, true, _cuts_west_portal())
+		if _cuts_west_portal():
+			_portal_moulding(opening, opening_index)
 	box(Vector3((w * 0.34 if spec.door_style == &"portal" else 2.4) + 0.7, 0.22, 0.14),
 		Vector3(0, door_h + 0.35, door_z - 0.02), SURF_TRIM)
 
@@ -756,16 +760,70 @@ func _build_clerestory() -> void:
 		var mullion: float = clampf(width * 0.06, 0.055, 0.16)
 		host("clerestory_%d" % part_log.size())
 		if _cuts_clerestory():
-			# Set the dark pane at the inner lip. The ray fixture probes stone,
+			# Seat the glazed pane at the inner lip. The ray fixture probes stone,
 			# so glazing cannot disguise an uncut masonry host.
+			_kit.surface(SURF_OPEN).set_color(Color.BLACK)
 			component_box("clerestory_pane",
 				Vector3(width - 0.08, height - 0.08, 0.025),
 				xf.translated_local(Vector3(0, 0, -NAVE_WALL_T + 0.035)), SURF_OPEN)
+			_kit.surface(SURF_OPEN).set_color(Color.WHITE)
+			# Two stone spandrels fill the rectangular cut above its pointed
+			# crown. The pane remains at the far reveal, behind real wall depth.
+			var crown_y: float = height * 0.18
+			var wall_mid: float = -NAVE_WALL_T * 0.5 + ChurchGeometry.OPENING_EPS
+			for side in [-1.0, 1.0]:
+				var points := PackedVector3Array([
+					xf * Vector3(side * width * 0.5, crown_y, wall_mid),
+					xf * Vector3(side * width * 0.5, height * 0.5, wall_mid),
+					xf * Vector3(0, height * 0.5, wall_mid),
+				])
+				component_slab("clerestory_spandrel", points, NAVE_WALL_T,
+					SURF_STONE, false)
 		component_box("clerestory_mullion", Vector3(mullion, height, 0.09),
 			xf.translated_local(Vector3(0, 0, 0.03)), SURF_TRIM)
+		if _cuts_clerestory():
+			component_box("clerestory_transom",
+				Vector3(width - 0.06, mullion * 0.75, 0.09),
+				xf.translated_local(Vector3(0, height * 0.07, 0.03)), SURF_TRIM)
 		component_box("clerestory_sill", Vector3(width + mullion * 3, mullion, 0.18),
 			xf.translated_local(Vector3(0, -height / 2.0, 0.02)), SURF_TRIM)
 		host_end()
+
+
+## A dressed but deliberately open entrance. Its jambs and hood sit outside
+## the throat, so they do not seal the approach tested by the aperture suite.
+func _portal_moulding(opening: Dictionary, index: int) -> void:
+	var width: float = opening.width
+	var height: float = opening.height
+	var face_pos: Vector3 = opening.pos
+	if spec.west_towers >= 2:
+		face_pos.z = ChurchGeometry.tower_center_z(spec) - spec.tower_width * 0.5 \
+			- ChurchGeometry.OPENING_EPS
+	var xf := Transform3D(Basis(Vector3.UP, PI), face_pos)
+	host("west_portal_%d" % index)
+	var jamb := 0.18
+	for side in [-1.0, 1.0]:
+		component_box("portal_jamb", Vector3(jamb, height, 0.24),
+			xf.translated_local(Vector3(side * (width * 0.5 + jamb * 0.5),
+				0, 0.08)), SURF_TRIM)
+	component_box("portal_lintel", Vector3(width + jamb * 2.0, jamb, 0.28),
+		xf.translated_local(Vector3(0, height * 0.5 + jamb * 0.5, 0.08)), SURF_TRIM)
+	if opening.style == &"pointed":
+		var spring := height * 0.5 + jamb * 0.5
+		var crown := spring + minf(width * 0.23, 0.85)
+		for side in [-1.0, 1.0]:
+			_portal_hood_segment(xf, Vector2(side * width * 0.5, spring),
+				Vector2(0, crown))
+	host_end()
+
+
+func _portal_hood_segment(xf: Transform3D, start: Vector2, finish: Vector2) -> void:
+	var edge := (finish - start).normalized()
+	var cross := Vector2(-edge.y, edge.x) * 0.075
+	var points := PackedVector3Array()
+	for p in [start + cross, finish + cross, finish - cross, start - cross]:
+		points.append(xf * Vector3(p.x, p.y, 0.08))
+	component_slab("portal_hood", points, 0.24, SURF_TRIM, false)
 
 ## Dark recessed opening facing local +Z, rotated by `face` around Y.
 func window(pos: Vector3, face: float, w: float, h: float, style: StringName,

@@ -14,7 +14,23 @@ static func run() -> SuiteResult:
 		LandmarkSuite._force_features(row[0], spec)
 		var builder := ChurchBuilder.new()
 		var mesh: ArrayMesh = builder.build(spec)
+		_expect(res, mesh.get_surface_count() == 4,
+			"%s finish changed the four church surface slots" % row[0])
+		var roles := PackedStringArray()
+		for component in builder.component_log:
+			roles.append(component["role"])
 		if row[0] == "notre_dame":
+			_expect(res, roles.has("clerestory_pane")
+				and roles.has("clerestory_spandrel")
+				and roles.has("clerestory_transom"),
+				"Notre-Dame finish components are missing")
+			var pane_colors: PackedColorArray = mesh.surface_get_arrays(
+				ChurchBuilder.SURF_OPEN)[Mesh.ARRAY_COLOR]
+			var marked := 0
+			for color in pane_colors:
+				if color.r < 0.5:
+					marked += 1
+			_expect(res, marked > 0, "clerestory panes lack glazing markers")
 			var windows: Array[Dictionary] = ChurchGeometry.clerestory_windows(spec)
 			_expect(res, windows.size() > 0, "Notre-Dame has no clerestory fixture")
 			for opening in windows:
@@ -25,6 +41,8 @@ static func run() -> SuiteResult:
 				opening.width, opening.height,
 				"%s west portal x=%.2f" % [row[0], opening.pos.x],
 				spec.tower_width + 2.0 if spec.west_towers >= 2 else 0.45)
+		_expect(res, roles.has("portal_jamb") and roles.has("portal_lintel"),
+			"%s cut portal has no named moulding" % row[0])
 	# These wider portals are empty at their logged centres. The coarse voxel
 	# sweep used to call that a floating recess; direct rays verify the cut and
 	# adjacent masonry at the five fixed seeds which exposed the mismatch.

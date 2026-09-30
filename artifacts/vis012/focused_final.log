@@ -1,0 +1,15 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running churchaperture...
+--- church apertures ---
+    elapsed 1.99s
+
+Running churchload...
+--- church load paths ---
+    elapsed 0.65s
+
+============================================================
+  church apertures   PASS  (80 checked, 0 failures, 0 warnings)
+  church load paths  PASS  (572 checked, 0 failures, 0 warnings)
+============================================================
+ALL PASS -- 2 suites, 652 checks, 0 failures, 0 warnings

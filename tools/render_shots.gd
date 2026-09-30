@@ -46,6 +46,10 @@ func _init() -> void:
 		await _shoot_vis005_acceptance()
 		quit()
 		return
+	if args.has("vis012"):
+		await _shoot_vis012_acceptance()
+		quit()
+		return
 	if args.has("vis007") or args.has("vis007-before"):
 		await _shoot_vis007_acceptance("before" if args.has("vis007-before") else "after")
 		quit()
@@ -333,6 +337,45 @@ func _shoot_vis005_frame(spec: ChurchSpec, file: String, yaw: float,
 	_root3d.remove_child(node)
 	node.free()
 	_set_legacy_lighting()
+
+
+## The VIS-005 views again, with the finished opening in the same frame.
+func _shoot_vis012_acceptance() -> void:
+	var out := "visualqa/vis012"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + out))
+	var rows: Array[Dictionary] = []
+	for entry in _landmarks():
+		if entry["key"] not in ["notre_dame", "durham"]:
+			continue
+		var spec: ChurchSpec = _landmark_spec(entry)
+		await _shoot_church(spec, "%s/%s_portrait_after.jpg" % [out, entry["key"]],
+			0.72, -0.28)
+		var subjects: Array[Dictionary] = [{"name": "west_portal",
+			"focus": Vector3(0.0, 2.0, -spec.length / 2.0),
+			"radius": 7.5, "yaw": PI, "pitch": -0.12}]
+		if entry["key"] == "notre_dame":
+			for opening in ChurchGeometry.clerestory_windows(spec):
+				if opening.pos.x > 0.0 and absf(opening.pos.z) < spec.length * 0.25:
+					subjects.append({"name": "clerestory", "focus": opening.pos,
+						"radius": 5.0, "yaw": PI / 2.0, "pitch": -0.08})
+					break
+		for subject in subjects:
+			for light in ["front", "raking"]:
+				var file := "%s/%s_%s_%s_after.jpg" % [out, entry["key"],
+					subject["name"], light]
+				await _shoot_vis005_frame(spec, file, subject["yaw"],
+					subject["pitch"], subject["focus"], subject["radius"],
+					light == "raking")
+				rows.append({"key": entry["key"], "seed": entry["seed"],
+					"subject": subject["name"], "light": light,
+					"before": file.replace("_after.jpg", "_before.jpg"),
+					"after": file,
+					"camera": _camera_metadata(subject["yaw"], subject["pitch"], 1.0),
+					"key_offset_degrees": -75.0 if light == "raking" else 0.0})
+	var f := FileAccess.open(OUT_DIR + "/" + out + "/manifest.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify({"shots": rows}, "\t"))
+	f.close()
+	print("wrote %d VIS-012 opening details to %s" % [rows.size(), out])
 
 
 ## Durham's pier and Notre-Dame's flyer at locked scale, view and light.
