@@ -1,403 +1,53 @@
 extends SceneTree
-## Runs every suite in a fixed order, cheapest and most fundamental first, so a
-## broken contract is reported before a slow voxel sweep has a chance to bury it.
-##
-##   Run everything:  godot --headless --script res://tests/run_all.gd
-##   Run one suite:   godot --headless --script res://tests/run_all.gd -- massing
-##   Run several:     godot --headless --script res://tests/run_all.gd -- castle cmassing
-##
-## Exits nonzero if any suite fails.
+## Stable entry point for the test suites. Install the script-error logger
+## before loading the implementation and its many suite dependencies.
 
-## Order is deliberate: each suite assumes the ones above it hold.
-##   1 library    - the public request/generate/build contract
-##   1a placement - placement()'s door contract and Placement.world_rect
-##   1b poly      - polygon geometry helpers and WalkGrid rasterisation
-##   1c props     - the small props no art pack ships (well, palisade, ...)
-##   2 church     - the spec/build contract itself
-##   3 normals    - the surfaces face the way they are meant to
-##   4 massing    - structural correctness of what that contract produced
-##   5 blueprint  - the drawing agrees with the model
-##   6 landmark   - the famous churches this generator must be able to build
-##   7 castle     - the castle spec/build contract, tier by tier
-##   8 cnormals   - the castle's surfaces and openings
-##   9 cmassing   - structural correctness of what the castle contract produced
-##  10 clandmark  - the famous fortifications this generator must be able to build
-##  11 voxelqa    - exhaustive rasterized checks of the churches (slow)
-##  12 cvoxelqa   - the same, for the castles (slow)
-## 12a dressing   - what is in the churches and castles, and can you walk past it
-## 12b interior   - the castle interiors, hall and keep, over two hundred castles
-##  13 house      - the house spec/plan/build contract
-##  14 assets     - the prop catalogue still describes the props
-##  15 houseqa    - quick deterministic house QA; use houseqafull explicitly
-##  16 hmultistory- explicit levels, stairs, elevations and top roof
-##  17 harchetype - the dwellings this generator must be able to furnish
-## 17a court      - buildings round a yard: the court rules and a hundred houses
-##  18 shop       - the commercial/civic plan/build contract
-##  19 sarchetype - defining rooms, fittings, and walkability for village trades
-##  20 hotel      - the palatial hotel plan/build contract
-##  21 hlandmark  - symmetry, facade landmarks, hotel programme and circulation
-##  22 temple     - the temple spec/build contract and its surfaces
-##  23 rite       - would a rite work in it: axis, sightline, procession, fire
-##  24 tarchetype - the temples a fantasy author would ask for
-##  25 village    - VillageSpec's derived fields and VillagePlan's helpers/purity
-##  26 vsite      - the site planner: through road, common, landmark slot, streets
-##  27 vlot       - the lot planner: frontages, setbacks, fire gaps, corner lots
-##  28 vcheck     - the village checks: scale, roads, lots, places (VIL-006..009)
-##  29 world      - the buildings of the wider world (WORLD_BUILDINGS), as
-##                  archetype rows; `warchetype` is the same suite
-##  30 tree      - the generated tree family: four styles, 24 species, ten rules
-##  31 bridge    - the bridge family: four kinds, four mechanisms, ten rules
-const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
-	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
-	"shop", "sarchetype",
-	"hotel", "hotelroof", "hlandmark",
-	"temple", "rite", "tarchetype",
-	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001",
-	"tree", "bridge"]
+class ScriptErrorCapture extends Logger:
+	var _mutex := Mutex.new()
+	var _errors: Array[String] = []
 
-## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
-	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange",
-	"houseqafurnish", "houseqafull", "castlechange", "ckeepstair", "wld001_domus", "wld001_riad",
-	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
-	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
-	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
-	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
-	"varchetype_thorpe", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
-	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest",
-	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap"]
+	func _log_message(_message: String, _error: bool) -> void:
+		pass
 
-## LANES -- the suites worth running for a given KIND OF EDIT.
-##
-## The slow house suites are slow because they run the FURNISHER SEARCH, not
-## because they cover more geometry: `house` spends six minutes to make 123
-## checks while `roofquick` makes 2452 in eleven seconds. Running them after an
-## emitter or logging change buys most of half an hour and almost no coverage.
-## So pick the lane that matches what you touched, and leave the rest to a
-## batched sweep.
-##
-## Measured on this machine, September 2026. Times drift; the ORDER of
-## magnitude is the point.
-##
-##   lane:geom    ~30s   mesh kit, emitters, roof maths, the component log
-##   lane:plan    ~4m    the planner, room programme, doors, circulation
-##   lane:dress   ~10m   the furnisher, prop recipes, assembly, exteriors
-##   lane:assets  ~6m    anything under assets/props/ or catalog.json
-##   lane:castle-change  ~81s body / 91s host: fixed castle geometry and QA
-##   lane:castle         exhaustive castle sweeps; schedule separately
-##   lane:church-change  ~10s body  bounded roofs, domed styles, openings, massing
-##   lane:church         exhaustive church sweeps; schedule separately
-##   lane:temple  ~3m    temple geometry and the rite rules
-##   lane:sweep   ~40m   everything above; background it, do not wait on it
-##   lane:tree    ~1m    anything in src/tree/, qa/tree_check.gd, tree_shapes
-##   lane:bridge  ~1m    anything in src/bridge/, qa/bridge_check.gd
-##
-## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
-## Lanes and bare suite names can be mixed; duplicates run once.
-const LANES: Dictionary = {
-	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "metriccoords"],
-	"lane:plan": ["house", "houseqaplan", "hmultistory"],
-	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
-	"lane:assets": ["assets", "props", "hassembly"],
-	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange"],
-	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs"],
-	"lane:church-change": ["churchroof", "churchchange"],
-	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
-	"lane:temple": ["temple", "rite"],
-	"lane:world": ["wld001"],
-	"lane:tree": ["tree"],
-	"lane:bridge": ["bridge"],
-	"lane:sweep": ORDER,
-}
+	func _log_error(_function: String, file: String, line: int, code: String,
+			rationale: String, _editor_notify: bool, error_type: int,
+			_script_backtraces: Array[ScriptBacktrace]) -> void:
+		if error_type != Logger.ERROR_TYPE_SCRIPT:
+			return
+		_mutex.lock()
+		_errors.append("%s:%d %s %s" % [file, line, code, rationale])
+		_mutex.unlock()
+
+	func script_errors() -> Array[String]:
+		_mutex.lock()
+		var copy := _errors.duplicate()
+		_mutex.unlock()
+		return copy
 
 
-static func _run_one(key: String) -> SuiteResult:
-	match key:
-		"vmine":
-			return preload("res://tests/suites/village_adit_suite.gd").run()
-		"varchetypecontracts":
-			return VillageArchetypeSuite.run_contracts()
-		"vnativeqa":
-			return preload("res://tests/suites/village_native_qa_suite.gd").run()
-		"vwater":
-			return VillageWaterPlanSuite.run()
-		"hjetty":
-			return preload("res://tests/suites/house_jetty_suite.gd").run()
-		"metriccoords":
-			return preload("res://tests/suites/metric_coords_suite.gd").run()
-		"churchaperture":
-			return preload("res://tests/suites/church_aperture_suite.gd").run()
-		"churchload":
-			return preload("res://tests/suites/church_load_suite.gd").run()
-		"churchchange":
-			return preload("res://tests/suites/church_change_suite.gd").run()
-		"hmaterials":
-			return preload("res://tests/suites/house_material_suite.gd").run()
-		"henvelope":
-			return preload("res://tests/suites/house_envelope_suite.gd").run()
-		"library":
-			return LibrarySuite.run()
-		"placement":
-			return PlacementSuite.run()
-		"poly":
-			return PolySuite.run()
-		"props":
-			return PropKitSuite.run()
-		"church":
-			return ChurchSuite.run()
-		"churchroof":
-			return preload("res://tests/suites/church_roof_suite.gd").run()
-		"ctroof":
-			return preload("res://tests/suites/castle_temple_roof_suite.gd").run()
-		"normals":
-			return NormalsSuite.run()
-		"massing":
-			return MassingSuite.run()
-		"blueprint":
-			return BlueprintMatchSuite.run()
-		"landmark":
-			return LandmarkSuite.run()
-		"castle":
-			return CastleSuite.run()
-		"stoneshell":
-			return preload("res://tests/suites/stone_shell_suite.gd").run()
-		"cwalk":
-			return preload("res://tests/suites/castle_walk_suite.gd").run()
-		"cplanshell":
-			return load("res://tests/suites/castle_plan_shell_suite.gd").run()
-		"ctowerplan":
-			return load("res://tests/suites/castle_tower_plan_suite.gd").run()
-		"ctowerhouse":
-			return load("res://tests/suites/castle_tower_house_suite.gd").run()
-		"cmotteplan":
-			return load("res://tests/suites/castle_motte_plan_suite.gd").run()
-		"cforms":
-			return load("res://tests/suites/castle_forms_suite.gd").run()
-		"crangeplan":
-			return load("res://tests/suites/castle_range_plan_suite.gd").run()
-		"caperture":
-			return load("res://tests/suites/castle_aperture_suite.gd").run()
-		"cshop":
-			return load("res://tests/suites/castle_shop_suite.gd").run()
-		"psconce":
-			return load("res://tests/suites/polygon_sconce_suite.gd").run()
-		"ckfurnish":
-			return load("res://tests/suites/castle_keep_furnishing_suite.gd").run()
-		"caccess":
-			return preload("res://tests/suites/castle_access_suite.gd").run()
-		"cforebuilding":
-			return preload("res://tests/suites/castle_forebuilding_suite.gd").run()
-		"cgateaccess":
-			return preload("res://tests/suites/castle_gate_access_suite.gd").run()
-		"cgatestairs":
-			return preload("res://tests/suites/castle_gate_stair_suite.gd").run()
-		"castlechange":
-			return preload("res://tests/suites/castle_change_suite.gd").run()
-		"ckeepstair":
-			return preload("res://tests/suites/castle_keep_stair_suite.gd").run()
-		"cnormals":
-			return CastleNormalsSuite.run()
-		"cmassing":
-			return CastleMassingSuite.run()
-		"clandmark":
-			return CastleLandmarkSuite.run()
-		"voxelqa":
-			return BlueprintQASuite.run()
-		"cvoxelqa":
-			return CastleQASuite.run()
-		"dressing":
-			return DressingSuite.run()
-		"interior":
-			return CastleInteriorSuite.run()
-		"house":
-			return HouseSuite.run()
-		"hroof":
-			return preload("res://tests/suites/house_roof_suite.gd").run()
-		"roofprobe":
-			return preload("res://tests/roof_probe.gd").self_test()
-		"hexterior":
-			return preload("res://tests/suites/house_exterior_suite.gd").run()
-		"hcomponent":
-			return preload("res://tests/suites/house_component_suite.gd").run()
-		"hopening":
-			return preload("res://tests/suites/house_roof_opening_suite.gd").run()
-		"hsky":
-			return preload("res://tests/suites/house_sky_opening_suite.gd").run()
-		"hdoor":
-			return preload("res://tests/suites/house_raised_door_suite.gd").run()
-		"hbounds":
-			return preload("res://tests/suites/house_bounds_suite.gd").run()
-		"assets":
-			return HouseAssetsSuite.run()
-		"hassembly":
-			return load("res://tests/suites/house_assembly_suite.gd").run()
-		"houseqa":
-			return HouseQASuite.run()
-		"houseqacore":
-			return HouseQASuite.run(false, &"core")
-		"houseqaplan":
-			return HouseQASuite.run(false, &"planning")
-		"houseqafurnish":
-			return HouseQASuite.run(false, &"furnishing")
-		"houseqafull":
-			return HouseQASuite.run(true)
-		"roofquick":
-			return preload("res://tests/suites/roof_quick_suite.gd").run()
-		"hmultistory":
-			return HouseMultistorySuite.run()
-		"harchetype":
-			return HouseArchetypeSuite.run()
-		"court":
-			return CourtSuite.run()
-		"shop":
-			return ShopSuite.run()
-		"sarchetype":
-			return ShopArchetypeSuite.run()
-		"hotel":
-			return HotelSuite.run()
-		"hotelroof":
-			return preload("res://tests/suites/hotel_roof_smoke_suite.gd").run()
-		"hlandmark":
-			return HotelLandmarkSuite.run()
-		"temple":
-			return TempleSuite.run()
-		"rite":
-			return TempleQASuite.run()
-		"tarchetype":
-			return TempleArchetypeSuite.run()
-		"village":
-			return VillageSuite.run()
-		"vsite":
-			return VillageSiteSuite.run()
-		"vlot":
-			return VillageLotSuite.run()
-		"vcheck":
-			return VillageCheckSuite.run()
-		"vforms":
-			return VillageFormsSuite.run()
-		"vformslayout":
-			return VillageFormsSuite.run_layout()
-		"vformsfull":
-			return VillageFormsSuite.run_full()
-		"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate":
-			return VillageFormsSuite.run_full(StringName(key.trim_prefix("vformsfull_")))
-		"venclosure":
-			return preload("res://tests/suites/village_enclosure_suite.gd").run()
-		"vmill":
-			return preload("res://tests/suites/village_mill_suite.gd").run()
-		"vmillfull":
-			return preload("res://tests/suites/village_mill_suite.gd").run(true)
-		"varchetype":
-			return VillageArchetypeSuite.run()
-		"varchetype_thorpe":
-			return VillageArchetypeSuite.run_row(&"thorpe")
-		"varchetype_green_village":
-			return VillageArchetypeSuite.run_row(&"green_village")
-		"varchetype_ford":
-			return VillageArchetypeSuite.run_row(&"ford")
-		"varchetype_mill_village":
-			return VillageArchetypeSuite.run_row(&"mill_village")
-		"varchetype_strand":
-			return VillageArchetypeSuite.run_row(&"strand")
-		"varchetype_pine_hold":
-			return VillageArchetypeSuite.run_row(&"pine_hold")
-		"varchetype_mine_camp":
-			return VillageArchetypeSuite.run_row(&"mine_camp")
-		"varchetype_pilgrims_rest":
-			return VillageArchetypeSuite.run_row(&"pilgrims_rest")
-		"varchetype_lords_village":
-			return VillageArchetypeSuite.run_row(&"lords_village")
-		"varchetype_market_town":
-			return VillageArchetypeSuite.run_row(&"market_town")
-		"varchetype_blight":
-			return VillageArchetypeSuite.run_row(&"blight")
-		"varchetype_cap":
-			return VillageArchetypeSuite.run_row(&"cap")
-		"world", "warchetype":
-			return WorldArchetypeSuite.run()
-		"wld001":
-			return preload("res://tests/suites/world_courtyard_suite.gd").run()
-		"wld001_domus":
-			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"domus")
-		"wld001_riad":
-			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"riad")
-		"wld001_palazzo":
-			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"palazzo")
-		"wld001_domus_07", "wld001_domus_10", "wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10", "wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07", "wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19":
-			var pieces := key.split("_")
-			var kind := StringName(pieces[1])
-			var scale := float(pieces[2].left(1) + "." + pieces[2].right(1))
-			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind_scale(kind, scale)
-		"tree":
-			return preload("res://tests/suites/tree_suite.gd").run()
-		"bridge":
-			return preload("res://tests/suites/bridge_suite.gd").run()
-	return null
-
-
-## Where a suite sits in the canonical order. EXTRA lanes have no ORDER slot,
-## so they sort after the suite they are a subset of -- close enough, and it
-## keeps "cheapest and most fundamental first" true for mixed selections.
-static func _suite_rank(key: String) -> int:
-	var i := ORDER.find(key)
-	if i >= 0:
-		return i
-	return ORDER.size() + EXTRA.find(key)
+var _script_errors := ScriptErrorCapture.new()
 
 
 func _init() -> void:
-	var args := OS.get_cmdline_user_args()
-	var wanted: Array[String] = ORDER.duplicate()
-	if args.size() > 0:
-		wanted = []
-		for a in args:
-			var expanded: Array = LANES.get(a, [a])
-			for key in expanded:
-				if not (key in ORDER or key in EXTRA):
-					printerr("unknown suite '%s'; known suites: %s; known lanes: %s"
-						% [key, ", ".join(ORDER + EXTRA), ", ".join(LANES.keys())])
-					quit(2)
-					return
-				# A lane and a bare name can ask for the same suite. Run it once,
-				# in the ORDER the runner is built around rather than in the
-				# order they happened to be typed.
-				if not wanted.has(key):
-					wanted.append(key)
-		wanted.sort_custom(func(a2: String, b2: String) -> bool:
-			return _suite_rank(a2) < _suite_rank(b2))
+	OS.add_logger(_script_errors)
+	var script := load("res://tests/run_all_impl.gd") as GDScript
+	if script == null or not script.can_instantiate() \
+			or not _script_errors.script_errors().is_empty():
+		_report_bootstrap_failure("suite runner could not compile")
+		quit(1)
+		return
+	var result: Variant = script.new().execute(_script_errors)
+	if result is int and (result != 0 or _script_errors.script_errors().is_empty()):
+		quit(result)
+		return
+	_report_bootstrap_failure("suite runner stopped before a complete verdict")
+	quit(1)
 
-	var results: Array[SuiteResult] = []
-	var failed_suites := 0
-	for key in wanted:
-		print("Running %s..." % key)
-		var started := Time.get_ticks_msec()
-		var res: SuiteResult = _run_one(key)
-		res.note("elapsed %.2fs" % ((Time.get_ticks_msec() - started) / 1000.0))
-		results.append(res)
-		if not res.ok():
-			failed_suites += 1
-		print("--- %s ---" % res.suite_name)
-		for n in res.notes:
-			print("    " + n)
-		for w in res.warnings:
-			print("  WARN " + w)
-		for f in res.failures:
-			print("  FAIL " + f)
-		print("")
 
-	print("=".repeat(60))
-	var total_checked := 0
-	var total_fail := 0
-	var total_warn := 0
-	for res in results:
-		print("  " + res.summary())
-		total_checked += res.checked
-		total_fail += res.failures.size()
-		total_warn += res.warnings.size()
-	print("=".repeat(60))
-	print("%s -- %d suites, %d checks, %d failures, %d warnings" % [
-		"ALL PASS" if failed_suites == 0 else "%d SUITE(S) FAILED" % failed_suites,
-		results.size(), total_checked, total_fail, total_warn])
-	quit(1 if failed_suites > 0 else 0)
+func _report_bootstrap_failure(reason: String) -> void:
+	printerr("RUNNER FAILED: " + reason)
+	var errors := _script_errors.script_errors()
+	for message in errors.slice(0, 5):
+		printerr("  SCRIPT " + message)
+	if errors.size() > 5:
+		printerr("  ... %d more script errors" % (errors.size() - 5))
