@@ -9,7 +9,7 @@ const CASES := [
 	{"name": "round", "style": &"edwardian", "tier": &"manor", "index": 1,
 		"voxel": true},
 	{"name": "battered", "style": &"crusader", "tier": &"castle", "index": 1,
-		"components": true},
+		"components": true, "voxel": true},
 	{"name": "ridge", "style": &"bavarian", "w": 120.0, "l": 40.0,
 		"h": 20.0, "seed": 8805, "plan": &"ridge", "voxel": true},
 	{"name": "tower house", "style": &"norman", "w": 14.0, "l": 12.0,
@@ -44,8 +44,29 @@ static func run() -> SuiteResult:
 			var qa := CastleQA.new().check(spec, mesh, builder)
 			_expect(res, qa.ok, "%s voxel QA: %s" % [who, qa.failures])
 		res.note("%s %.2fs" % [who, (Time.get_ticks_msec() - started) / 1000.0])
+	_keep_entrance_contract(res)
 	_negative_controls(res)
 	return res
+
+
+## The two real Crusader keeps enter above a storage floor. A cheap plan check
+## catches a stair returned to the raised door line on every routine lane run;
+## ckeepstair also runs full CastleQA on both finished production meshes.
+static func _keep_entrance_contract(res: SuiteResult) -> void:
+	var castle := CastleSweep.spec_at(&"crusader", &"castle", 1)
+	var fortress := CastleSpec.new()
+	fortress.style = &"crusader"
+	fortress.width = 90.0
+	fortress.length = 140.0
+	fortress.height = 20.0
+	CastleGenerator.generate(fortress, 9118)
+	for spec in [castle, fortress]:
+		var who := "raised keep seed=%d" % spec.seed
+		var plan := CastleKeepPlan.generate(spec, false)
+		var report := HousePlanCheck.new().check(plan)
+		_expect(res, report.ok, "%s plan: %s" % [who, report.failures])
+		var entry := int(plan.doors[plan.entrance()].a)
+		_expect(res, entry == 1, "%s lost its protected entrance storey" % who)
 
 
 ## The local house plans and the rotated range shells must describe the same

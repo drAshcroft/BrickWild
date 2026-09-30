@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1550" height="905" viewBox="0 0 1550 905">
+<style>text{font-family:Arial,sans-serif;fill:#20252a}.title{font-size:23px;font-weight:700}.panel{font-size:19px;font-weight:700}.note{font-size:16px}</style>
+<rect width="1550" height="905" fill="#eeeae1"/>
+<text x="25" y="36" class="title">Crusader keep entrance route: fixed plan comparison</text>
+<text x="25" y="60" class="note">Blue: front-door line. Red/green: stair from entrance storey. Dashed: room floor bounds. Dot: raised door.</text>
+<g><rect x="25" y="76" width="730" height="390" rx="12" fill="#fcfbf6" stroke="#c6c2b5"/>
+<text x="49" y="111" class="panel">Seed 9250 before</text>
+<rect x="270.5" y="154.5" width="239.1" height="233.1" fill="none" fill-opacity="1" stroke="#555b66" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="382.8" y="154.5" width="14.5" height="233.1" fill="#5598cf" fill-opacity="0.24" stroke="#3a73a6" stroke-width="2" />
+<rect x="397.5" y="162.9" width="36.6" height="15.2" fill="#b9b5a9" fill-opacity="0.38" stroke="#797568" stroke-width="2" />
+<rect x="379.5" y="154.5" width="36.6" height="15.2" fill="#b9b5a9" fill-opacity="0.38" stroke="#797568" stroke-width="2" />
+<rect x="379.5" y="154.5" width="36.6" height="15.2" fill="#cc6d5a" fill-opacity="0.85" stroke="#a34230" stroke-width="2" />
+<circle cx="390.0" cy="387.5" r="6" fill="#1a2631"/>
+<text x="49" y="443" class="note">Front-door line / stair overlap: 0.950 × 1.000 m</text>
+</g>
+<g><rect x="795" y="76" width="730" height="390" rx="12" fill="#fcfbf6" stroke="#c6c2b5"/>
+<text x="819" y="111" class="panel">Seed 9250 after</text>
+<rect x="1040.5" y="154.5" width="239.1" height="233.1" fill="none" fill-opacity="1" stroke="#555b66" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1152.8" y="154.5" width="14.5" height="233.1" fill="#5598cf" fill-opacity="0.24" stroke="#3a73a6" stroke-width="2" />
+<rect x="1149.5" y="154.5" width="36.6" height="15.2" fill="#b9b5a9" fill-opacity="0.38" stroke="#797568" stroke-width="2" />
+<rect x="1149.5" y="154.5" width="36.6" height="15.2" fill="#b9b5a9" fill-opacity="0.38" stroke="#797568" stroke-width="2" />
+<rect x="1167.5" y="162.9" width="36.6" height="15.2" fill="#63a86b" fill-opacity="0.85" stroke="#316e3a" stroke-width="2" />
+<circle cx="1160.0" cy="387.5" r="6" fill="#1a2631"/>
+<text x="819" y="443" class="note">Front-door line / stair overlap: 0.000 × 1.000 m</text>
+</g>
+<g><rect x="25" y="486" width="730" height="390" rx="12" fill="#fcfbf6" stroke="#c6c2b5"/>
+<text x="49" y="521" class="panel">Seed 9118 before</text>
+<rect x="273.8" y="567.7" width="232.5" height="226.7" fill="none" fill-opacity="1" stroke="#555b66" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="382.0" y="567.7" width="16.0" height="226.7" fill="#5598cf" fill-opacity="0.24" stroke="#3a73a6" stroke-width="2" />
+<rect x="397.8" y="578.5" width="40.5" height="16.9" fill="#b9b5a9" fill-opacity="0.38" stroke="#797568" stroke-width="2" />
+<rect x="374.9" y="567.7" width="40.5" height="16.9" fill="#b9b5a9" fill-opacity="0.38" stroke="#797568" stroke-width="2" />
+<rect x="374.9" y="567.7" width="40.5" height="16.9" fill="#cc6d5a" fill-opacity="0.85" stroke="#a34230" stroke-width="2" />
+<circle cx="390.0" cy="794.3" r="6" fill="#1a2631"/>
+<text x="49" y="853" class="note">Front-door line / stair overlap: 0.950 × 1.000 m</text>
+</g>
+<g><rect x="795" y="486" width="730" height="390" rx="12" fill="#fcfbf6" stroke="#c6c2b5"/>
+<text x="819" y="521" class="panel">Seed 9118 after</text>
+<rect x="1043.8" y="567.7" width="232.5" height="226.7" fill="none" fill-opacity="1" stroke="#555b66" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1152.0" y="567.7" width="16.0" height="226.7" fill="#5598cf" fill-opacity="0.24" stroke="#3a73a6" stroke-width="2" />
+<rect x="1144.9" y="567.7" width="40.5" height="16.9" fill="#b9b5a9" fill-opacity="0.38" stroke="#797568" stroke-width="2" />
+<rect x="1144.9" y="567.7" width="40.5" height="16.9" fill="#b9b5a9" fill-opacity="0.38" stroke="#797568" stroke-width="2" />
+<rect x="1167.8" y="578.5" width="40.5" height="16.9" fill="#63a86b" fill-opacity="0.85" stroke="#316e3a" stroke-width="2" />
+<circle cx="1160.0" cy="794.3" r="6" fill="#1a2631"/>
+<text x="819" y="853" class="note">Front-door line / stair overlap: 0.011 × 1.000 m</text>
+</g>
+</svg>

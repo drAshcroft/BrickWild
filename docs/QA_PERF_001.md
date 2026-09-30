@@ -40,9 +40,10 @@ full-sweep time from these six cases, nor claimed that sweep passed.
    access rays, and a deliberate gate-tower/stair overlap.
 4. `castlechange`: fixed Norman, Edwardian, Crusader, Bavarian ridge and Scottish
    tower-house builds. It checks normals, opening directions, massing, component
-   triangle parity, and real `CastleQA` on the two smaller whole buildings. Its
-   own controls invert normals, erase the mass log and block a window ray with
-   solid masonry.
+   triangle parity, and real `CastleQA` on the Norman, Edwardian, Crusader and
+   Bavarian whole buildings. It checks both fixed Crusader entrance plans
+   without rebuilding the two-ring fortress. Its own controls invert normals,
+   erase the mass log and block a window ray with solid masonry.
 
 The scheduled `lane:castle`, `castle`, `cnormals`, `cmassing` and `cvoxelqa`
 remain available. This lane does not imply that every seed passes voxel QA.
@@ -78,3 +79,15 @@ are in `profile_detail_2.log`, `profile_detail_3.log` and
 regressions from the lane. Several manor hall and Crusader keep
 opening-direction warnings also appeared in the bounded lane. They need a
 separate rendered and triangle check before declaring them blocked apertures.
+
+## Current gate after the interior repairs
+
+`CAS-REG-004` repaired the ridge range doors, window ownership and room
+programme; `CAS-REG-005` repaired the raised keep entrance route. The updated
+lane now passes **195 checks, 0 failures and the same 5 outside-probe
+warnings**. It runs full `CastleQA` on fixed Bavarian 8805 and Crusader 9250,
+plus both raised keep plans. The dedicated `ckeepstair` suite also passes
+full `CastleQA` on Crusader 9250 and 9118. See
+`artifacts/cas_reg_005/lane_castle_change.log` and
+`artifacts/cas_reg_005/ckeepstair.log`. These fixed cases make the everyday
+gate useful; the exhaustive sweep remains separate.

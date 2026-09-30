@@ -166,7 +166,8 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 				var score := centre.distance_to(front)
 				if avoid.size.x > 0.0:
 					score += centre.distance_to(avoid.get_center())
-				if lower == 0 and _overlap(rect, HousePlanLevels.door_line(plan, lower, plan.doors[plan.entrance()])):
+				if lower == int(plan.doors[plan.entrance()].a) \
+						and _overlap(rect, HousePlanLevels.door_line(plan, lower, plan.doors[plan.entrance()])):
 					score -= 1000.0
 				for door in plan.doors:
 					if HousePlan.record_storey(door) == lower:

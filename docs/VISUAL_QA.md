@@ -325,13 +325,14 @@ Castle geometry now has a [bounded change lane](QA_PERF_001.md) covering fixed
 square, round-style, battered, ridge and tower-house builds, aperture rays,
 component parity and the nested Crusader gate/stair route. Its 90-second
 baseline correctly exposed the tower-house windows missing before `CAS-REG-003`.
-After that repair it passes 127 checks in about 91 seconds of host time, with
-five previously known outside-probe warnings under `CASTLE-NORMALS-WARNINGS`.
-Full CastleQA also found two separate existing interior defects: ridge range
-doors/windows off their host rooms (`CAS-REG-004`, Bavarian 8805), and a keep
-stair in the entrance line (`CAS-REG-005`, Crusader 9250 and 9118). Those are
-tracked separately from facade polish and the exhaustive castle sweep is still
-unrun after these changes.
+Full CastleQA then found two existing interior defects. `CAS-REG-004`
+[repaired](CAS_REG_004.md) ridge range doors/windows off their host rooms in
+Bavarian 8805. `CAS-REG-005` [repaired](CAS_REG_005.md) a keep stair in the
+protected entrance line in Crusader 9250 and 9118. The expanded bounded lane
+now passes 195 checks, including full QA on Bavarian 8805 and Crusader 9250,
+with five previously known outside-probe warnings under
+`CASTLE-NORMALS-WARNINGS`. The exhaustive castle sweep is still unrun after
+these changes.
 
 ---
 
