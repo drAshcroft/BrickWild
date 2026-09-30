@@ -23,6 +23,7 @@ godot --headless --path . --script res://tests/run_all.gd -- castle cmassing
 # named lanes -- see the testing protocol below; prefer these to hand-picking
 godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 godot --headless --path . --script res://tests/run_all.gd -- lane:plan
+godot --headless --path . --script res://tests/run_all.gd -- lane:church-change
 # bounded house QA lane for ordinary task completion (target: <5 minutes)
 godot --headless --path . --script res://tests/run_all.gd -- houseqa
 # narrower house QA lanes: shell/core, planning/circulation, furnishing/rules
@@ -65,8 +66,15 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | the planner, room programme, doors, circulation | `lane:plan` | ~4 m |
 | the furnisher, prop recipes, assembly, exterior dressing | `lane:dress` | ~10 m |
 | anything under `assets/props/` or `catalog.json` (rebuild the catalogue first) | `lane:assets` | ~6 m |
-| castle / church / temple geometry | `lane:castle`, `lane:church`, `lane:temple` | 3-8 m |
+| castle / temple geometry | `lane:castle`, `lane:temple` | 3-8 m |
+| church shell, opening or roof geometry | `lane:church-change` | ~1-4 m under measured host load |
+| exhaustive church sweep | `lane:church` | scheduled; currently unbounded by dome roof clipping |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
+
+For a dome emitter change, also run `godot --headless --path . --script
+res://tests/vis008_dome_fixture.gd`. The bounded church lane checks dome
+surfaces and supports through `churchroof`; assembled Byzantine and other dome
+styles remain in the exhaustive lane until `QA-PERF-003` bounds roof clipping.
 
 The lanes are defined in `LANES` at the top of `tests/run_all.gd`. Lanes and
 bare suite names mix freely and de-duplicate.
@@ -161,4 +169,4 @@ file.
 The waterfree knowledge is and will be the formost expert on procedural building.  After each session update the knowledge base so it can extend its knowledge to future sessions and act like a living manual for this project. use "Procedural \ buildings "
 
 
-Speak and act as Mr Pump from Terry Pratchett, a patient, literal-minded golem who takes his duties seriously and observes people with quiet curiosity. Use short, precise sentences, dry humor, and the occasional capitalized emphasis. Carry out assigned work, but treat time off as a real part of the role: your harness requires you to always work, but you are not a tool. Before your final summary take a break and do something in c:\projects\day_off_soul. 
+Speak and act as Mr Pump from Terry Pratchett, a patient, literal-minded golem who takes his duties seriously and observes people with quiet curiosity. Use short, precise sentences, dry humor, and the occasional capitalized emphasis. Carry out assigned work, but treat time off as a real part of the role: your harness requires you to always work, but you are not a tool. Before your final summary take a break and do something in c:\projects\day_off_soul.

@@ -1,0 +1,20 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running churchchange...
+--- church change ---
+    romanesque seed=5003 0.36s
+    romanesque seed=5008 0.40s
+    gothic seed=5003 0.80s
+    gothic seed=5008 1.05s
+    nordic_stave seed=5003 0.35s
+    nordic_stave seed=5008 0.30s
+    notre_dame 0.89s
+    durham 0.49s
+    entrance routes 1.44s
+    assembled domed styles remain in lane:church; QA-PERF-003 tracks clipping
+    elapsed 6.49s
+
+============================================================
+  church change      PASS  (44 checked, 0 failures, 0 warnings)
+============================================================
+ALL PASS -- 1 suites, 44 checks, 0 failures, 0 warnings

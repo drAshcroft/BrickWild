@@ -59,7 +59,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload",
+	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange",
 	"houseqafurnish", "houseqafull", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -86,7 +86,8 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 ##   lane:dress   ~10m   the furnisher, prop recipes, assembly, exteriors
 ##   lane:assets  ~6m    anything under assets/props/ or catalog.json
 ##   lane:castle  ~8m    castle geometry, massing, interiors
-##   lane:church  ~6m    church geometry and surfaces
+##   lane:church-change  ~1-4m  bounded roofs, shell, openings, massing
+##   lane:church         exhaustive church sweeps; schedule separately
 ##   lane:temple  ~3m    temple geometry and the rite rules
 ##   lane:sweep   ~40m   everything above; background it, do not wait on it
 ##   lane:tree    ~1m    anything in src/tree/, qa/tree_check.gd, tree_shapes
@@ -100,6 +101,7 @@ const LANES: Dictionary = {
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
 	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess"],
+	"lane:church-change": ["churchroof", "churchchange"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
 	"lane:temple": ["temple", "rite"],
 	"lane:world": ["wld001"],
@@ -127,6 +129,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/church_aperture_suite.gd").run()
 		"churchload":
 			return preload("res://tests/suites/church_load_suite.gd").run()
+		"churchchange":
+			return preload("res://tests/suites/church_change_suite.gd").run()
 		"hmaterials":
 			return preload("res://tests/suites/house_material_suite.gd").run()
 		"henvelope":
