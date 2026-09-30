@@ -17,8 +17,8 @@ static func build(spec: ChurchSpec, cutaway := false) -> Node3D:
 	return root
 
 
-## The black vertex marker belongs only to panes seated in cut clerestory
-## throats. Shallow windows keep the original dark recess in the same slot.
+## The black vertex marker belongs to panes seated in cut masonry throats.
+## A recessed window keeps the original dark material in the same slot.
 static func _finish_glazing(root: Node3D) -> void:
 	if DisplayServer.get_name() == "headless":
 		return

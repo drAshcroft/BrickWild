@@ -41,8 +41,67 @@ static func run() -> SuiteResult:
 				opening.width, opening.height,
 				"%s west portal x=%.2f" % [row[0], opening.pos.x],
 				spec.tower_width + 2.0 if spec.west_towers >= 2 else 0.45)
+		for host in ["aisle", "transept", "tower", "crossing_tower", "narthex", "apse"]:
+			_check_host_sample(res, mesh, builder, host, row[0])
 		_expect(res, roles.has("portal_jamb") and roles.has("portal_lintel"),
 			"%s cut portal has no named moulding" % row[0])
+	var chapel_spec := ChurchSpec.new()
+	chapel_spec.style = &"gothic"
+	chapel_spec.width = 16.4
+	chapel_spec.length = 130.0
+	chapel_spec.height = 37.5
+	ChurchGenerator.generate(chapel_spec, 5003)
+	LandmarkSuite._force_features("chartres", chapel_spec)
+	var chapel_builder := ChurchBuilder.new()
+	var chapel_mesh: ArrayMesh = chapel_builder.build(chapel_spec)
+	_expect(res, _check_host_sample(res, chapel_mesh, chapel_builder,
+		"chapel", "chartres"), "Chartres has no through chapel window")
+	for dome_case in [["hagia_sophia", &"byzantine", 31.0, 76.0, 40.0, 5006],
+			["florence_duomo", &"renaissance", 17.0, 153.0, 45.0, 5007]]:
+		var dome_spec := ChurchSpec.new()
+		dome_spec.style = dome_case[1]
+		dome_spec.width = dome_case[2]
+		dome_spec.length = dome_case[3]
+		dome_spec.height = dome_case[4]
+		ChurchGenerator.generate(dome_spec, dome_case[5])
+		LandmarkSuite._force_features(dome_case[0], dome_spec)
+		var dome_builder := ChurchBuilder.new()
+		var dome_mesh: ArrayMesh = dome_builder.build(dome_spec)
+		_expect(res, _check_host_sample(res, dome_mesh, dome_builder,
+			"dome", dome_case[0]), "%s has no through drum window" % dome_case[0])
+	for towers in [0, 1]:
+		var rose_spec := ChurchSpec.new()
+		rose_spec.style = &"romanesque"
+		rose_spec.width = 12.0
+		rose_spec.length = 62.0
+		rose_spec.height = 22.0
+		ChurchGenerator.generate(rose_spec, 8110 + towers)
+		rose_spec.rose_window = true
+		rose_spec.aisles = 0
+		rose_spec.tower = towers == 1
+		rose_spec.west_towers = towers
+		rose_spec.narthex = false
+		if towers == 1:
+			rose_spec.tower_width = 10.0
+			rose_spec.tower_height = 32.0
+		var rose_builder := ChurchBuilder.new()
+		var rose_mesh: ArrayMesh = rose_builder.build(rose_spec)
+		_check_rose(res, rose_mesh, rose_builder, "single tower" if towers == 1 else "nave")
+		_expect(res, _check_host_sample(res, rose_mesh, rose_builder,
+			"window", "aisle-free nave"), "aisle-free nave has no cut side window")
+	var vestibule := ChurchSpec.new()
+	vestibule.style = &"romanesque"
+	vestibule.width = 12.0
+	vestibule.length = 62.0
+	vestibule.height = 22.0
+	ChurchGenerator.generate(vestibule, 8120)
+	vestibule.narthex = true
+	vestibule.tower = false
+	vestibule.west_towers = 0
+	var vestibule_builder := ChurchBuilder.new()
+	var vestibule_mesh: ArrayMesh = vestibule_builder.build(vestibule)
+	_expect(res, _check_host_sample(res, vestibule_mesh, vestibule_builder,
+		"narthex", "narthex"), "narthex has no cut exterior door")
 	# These wider portals are empty at their logged centres. The coarse voxel
 	# sweep used to call that a floating recess; direct rays verify the cut and
 	# adjacent masonry at the five fixed seeds which exposed the mismatch.
@@ -101,15 +160,59 @@ static func _check_opening(res: SuiteResult, mesh: ArrayMesh,
 		sill + Vector3.UP * 0.015), "%s has no stone sill/threshold" % label)
 
 
+static func _check_host_sample(res: SuiteResult, mesh: ArrayMesh,
+		builder: ChurchBuilder, host: String, label: String) -> bool:
+	for part in builder.part_log:
+		if part.get("kind") != "window" or part.get("tag", "") != host \
+				or part.get("aperture", "") != "through":
+			continue
+		_check_opening(res, mesh, builder, part.pos, part.rot_y,
+			part.size.x, part.size.y, "%s %s" % [label, host])
+		return true
+	return false
+
+
+static func _check_rose(res: SuiteResult, mesh: ArrayMesh,
+		builder: ChurchBuilder, label: String) -> void:
+	var ring_count := 0
+	for component in builder.component_log:
+		if component.get("host", "") == "west_rose" \
+				and component.get("role", "") == "rose_ring":
+			ring_count += 1
+	_expect(res, ring_count == 12,
+		"%s rose lacks its emitted stone surround" % label)
+	for part in builder.part_log:
+		if part.get("kind") != "window" or part.get("tag", "") != "facade":
+			continue
+		var pos: Vector3 = part.pos
+		var outward: Vector3 = part.facing.normalized()
+		var along := Vector3(outward.z, 0, -outward.x)
+		var radius: float = part.size.x * 0.5
+		var clear: Vector3 = pos + along * radius * 0.18 + Vector3.UP * radius * 0.10
+		_expect(res, part.get("aperture", "") == "through",
+			"%s rose is not logged as through" % label)
+		_expect(res, _first_hit(mesh, clear + outward * 0.5,
+			clear - outward * 0.8, true).is_empty(),
+			"%s rose still has masonry behind the tracery" % label)
+		var pier: Vector3 = pos + along * radius * 1.18
+		_expect(res, not _first_hit(mesh, pier + outward * 0.5,
+			pier - outward * 0.8, true).is_empty(),
+			"%s rose lost adjacent masonry" % label)
+		return
+	_expect(res, false, "%s rose has no facade log" % label)
+
+
 static func _blocked(mesh: ArrayMesh, a: Vector3, b: Vector3) -> bool:
 	return not _first_hit(mesh, a, b).is_empty()
 
 
-static func _first_hit(mesh: ArrayMesh, a: Vector3, b: Vector3) -> Dictionary:
+static func _first_hit(mesh: ArrayMesh, a: Vector3, b: Vector3,
+		stone_only := false) -> Dictionary:
 	for surface in range(mesh.get_surface_count()):
 		# A seated glass pane may cross the ray. Only masonry proves whether
 		# the host was actually cut; a dark panel over solid stone still fails.
-		if surface == ChurchBuilder.SURF_OPEN:
+		if surface == ChurchBuilder.SURF_OPEN \
+				or (stone_only and surface != ChurchBuilder.SURF_STONE):
 			continue
 		var arrays: Array = mesh.surface_get_arrays(surface)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]

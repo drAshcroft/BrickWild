@@ -50,6 +50,10 @@ func _init() -> void:
 		await _shoot_vis012_acceptance()
 		quit()
 		return
+	if args.has("vis011"):
+		await _shoot_vis011_acceptance()
+		quit()
+		return
 	if args.has("vis007") or args.has("vis007-before"):
 		await _shoot_vis007_acceptance("before" if args.has("vis007-before") else "after")
 		quit()
@@ -376,6 +380,77 @@ func _shoot_vis012_acceptance() -> void:
 	f.store_string(JSON.stringify({"shots": rows}, "\t"))
 	f.close()
 	print("wrote %d VIS-012 opening details to %s" % [rows.size(), out])
+
+
+## Representative exterior hosts after the remaining masonry cuts. The face
+## logged by the builder also fixes the camera direction for each detail.
+func _shoot_vis011_acceptance() -> void:
+	var out := "visualqa/vis011"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + out))
+	var chosen := {"notre_dame": ["aisle", "tower"],
+		"chartres": ["apse", "chapel"],
+		"durham": ["crossing_tower"],
+		"hagia_sophia": ["dome"],
+		"florence_duomo": ["dome"]}
+	var rows: Array[Dictionary] = []
+	for entry in _landmarks():
+		var key: String = entry["key"]
+		if not chosen.has(key):
+			continue
+		var spec: ChurchSpec = _landmark_spec(entry)
+		if key in ["notre_dame", "chartres", "florence_duomo"]:
+			await _shoot_church(spec, "%s/%s_portrait_after.jpg" % [out, key],
+				0.72, -0.28)
+		var builder := ChurchBuilder.new()
+		builder.build(spec)
+		for host_name in chosen[key]:
+			var selected: Dictionary = {}
+			for part in builder.part_log:
+				if part.get("kind", "") == "window" \
+						and part.get("tag", "") == host_name \
+						and part.get("aperture", "") == "through":
+					selected = part
+					break
+			if selected.is_empty():
+				push_error("VIS-011 has no %s window on %s" % [host_name, key])
+				continue
+			for light in ["front", "raking"]:
+				var file := "%s/%s_%s_%s_after.jpg" % [out, key, host_name, light]
+				await _shoot_vis005_frame(spec, file, selected.rot_y, -0.08,
+					selected.pos, 5.0 if host_name != "dome" else 7.0,
+					light == "raking")
+				rows.append({"key": key, "seed": entry["seed"],
+					"host": host_name, "light": light, "file": file,
+					"focus": selected.pos, "face": selected.rot_y,
+					"key_offset_degrees": -75.0 if light == "raking" else 0.0})
+	var rose_spec := ChurchSpec.new()
+	rose_spec.style = &"romanesque"
+	rose_spec.width = 12.0
+	rose_spec.length = 62.0
+	rose_spec.height = 22.0
+	ChurchGenerator.generate(rose_spec, 8110)
+	rose_spec.rose_window = true
+	rose_spec.aisles = 0
+	rose_spec.tower = false
+	rose_spec.west_towers = 0
+	rose_spec.narthex = false
+	var rose_builder := ChurchBuilder.new()
+	rose_builder.build(rose_spec)
+	for part in rose_builder.part_log:
+		if part.get("kind", "") != "window" or part.get("tag", "") != "facade":
+			continue
+		for light in ["front", "raking"]:
+			var file := "%s/rose_fixture_%s_after.jpg" % [out, light]
+			await _shoot_vis005_frame(rose_spec, file, part.rot_y, -0.08,
+				part.pos, 5.0, light == "raking")
+			rows.append({"key": "rose_fixture", "seed": 8110,
+				"host": "facade", "light": light, "file": file,
+				"focus": part.pos, "face": part.rot_y})
+		break
+	var f := FileAccess.open(OUT_DIR + "/" + out + "/manifest.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify({"shots": rows}, "\t"))
+	f.close()
+	print("wrote %d VIS-011 host details to %s" % [rows.size(), out])
 
 
 ## Durham's pier and Notre-Dame's flyer at locked scale, view and light.

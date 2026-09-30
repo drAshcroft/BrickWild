@@ -1,0 +1,162 @@
+{
+	"shots": [
+		{
+			"face": 4.71238898038469,
+			"file": "visualqa/vis011/notre_dame_aisle_front_after.jpg",
+			"focus": "(-12.13272, 7.4415, -54.20527)",
+			"host": "aisle",
+			"key": "notre_dame",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5001
+		},
+		{
+			"face": 4.71238898038469,
+			"file": "visualqa/vis011/notre_dame_aisle_raking_after.jpg",
+			"focus": "(-12.13272, 7.4415, -54.20527)",
+			"host": "aisle",
+			"key": "notre_dame",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5001
+		},
+		{
+			"face": 0.0,
+			"file": "visualqa/vis011/notre_dame_tower_front_after.jpg",
+			"focus": "(-3.15, 61.04295, -62.88)",
+			"host": "tower",
+			"key": "notre_dame",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5001
+		},
+		{
+			"face": 0.0,
+			"file": "visualqa/vis011/notre_dame_tower_raking_after.jpg",
+			"focus": "(-3.15, 61.04295, -62.88)",
+			"host": "tower",
+			"key": "notre_dame",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5001
+		},
+		{
+			"face": 0.571198683124211,
+			"file": "visualqa/vis011/chartres_apse_front_after.jpg",
+			"focus": "(3.51895, 28.125, 70.17559)",
+			"host": "apse",
+			"key": "chartres",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5003
+		},
+		{
+			"face": 0.571198683124211,
+			"file": "visualqa/vis011/chartres_apse_raking_after.jpg",
+			"focus": "(3.51895, 28.125, 70.17559)",
+			"host": "apse",
+			"key": "chartres",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5003
+		},
+		{
+			"face": -1.22000000034795,
+			"file": "visualqa/vis011/chartres_chapel_front_after.jpg",
+			"focus": "(-11.02264, 7.0875, 68.73353)",
+			"host": "chapel",
+			"key": "chartres",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5003
+		},
+		{
+			"face": -1.22000000034795,
+			"file": "visualqa/vis011/chartres_chapel_raking_after.jpg",
+			"focus": "(-11.02264, 7.0875, 68.73353)",
+			"host": "chapel",
+			"key": "chartres",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5003
+		},
+		{
+			"face": 0.0,
+			"file": "visualqa/vis011/durham_crossing_tower_front_after.jpg",
+			"focus": "(0.0, 35.122, 30.22)",
+			"host": "crossing_tower",
+			"key": "durham",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5005
+		},
+		{
+			"face": 0.0,
+			"file": "visualqa/vis011/durham_crossing_tower_raking_after.jpg",
+			"focus": "(0.0, 35.122, 30.22)",
+			"host": "crossing_tower",
+			"key": "durham",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5005
+		},
+		{
+			"face": 1.37444677850528,
+			"file": "visualqa/vis011/hagia_sophia_dome_front_after.jpg",
+			"focus": "(12.11612, 44.01941, 31.58505)",
+			"host": "dome",
+			"key": "hagia_sophia",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5006
+		},
+		{
+			"face": 1.37444677850528,
+			"file": "visualqa/vis011/hagia_sophia_dome_raking_after.jpg",
+			"focus": "(12.11612, 44.01941, 31.58505)",
+			"host": "dome",
+			"key": "hagia_sophia",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5006
+		},
+		{
+			"face": 0.785398163397448,
+			"file": "visualqa/vis011/florence_duomo_dome_front_after.jpg",
+			"focus": "(4.727151, 47.71414, 76.25215)",
+			"host": "dome",
+			"key": "florence_duomo",
+			"key_offset_degrees": 0.0,
+			"light": "front",
+			"seed": 5007
+		},
+		{
+			"face": 0.785398163397448,
+			"file": "visualqa/vis011/florence_duomo_dome_raking_after.jpg",
+			"focus": "(4.727151, 47.71414, 76.25215)",
+			"host": "dome",
+			"key": "florence_duomo",
+			"key_offset_degrees": -75.0,
+			"light": "raking",
+			"seed": 5007
+		},
+		{
+			"face": 3.14159265358979,
+			"file": "visualqa/vis011/rose_fixture_front_after.jpg",
+			"focus": "(0.0, 15.59, -31.02)",
+			"host": "facade",
+			"key": "rose_fixture",
+			"light": "front",
+			"seed": 8110
+		},
+		{
+			"face": 3.14159265358979,
+			"file": "visualqa/vis011/rose_fixture_raking_after.jpg",
+			"focus": "(0.0, 15.59, -31.02)",
+			"host": "facade",
+			"key": "rose_fixture",
+			"light": "raking",
+			"seed": 8110
+		}
+	]
+}
