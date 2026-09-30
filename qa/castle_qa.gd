@@ -51,7 +51,7 @@ func check(p_spec: CastleSpec, p_mesh: ArrayMesh, p_builder: CastleBuilder,
 	buildings.clear()
 
 	_grid = VoxelGrid.new()
-	_grid.rasterize(mesh, CastleBuilder.SURF_OPEN, _voxel_size())
+	_grid.rasterize(mesh, [CastleBuilder.SURF_OPEN, CastleBuilder.SURF_WATER], _voxel_size())
 	replaced = RuleSet.run(self, RULES, METHODS, overrides, [],
 		[spec, mesh, builder], failures, warnings)
 
@@ -94,7 +94,7 @@ static func gate_access_report(s: CastleSpec, b: CastleBuilder, actual: ArrayMes
 		return out
 	var triangles: Array = []
 	for surface in actual.get_surface_count():
-		if surface != CastleBuilder.SURF_OPEN:
+		if surface != CastleBuilder.SURF_OPEN and surface != CastleBuilder.SURF_WATER:
 			triangles.append_array(HouseQA._mesh_triangles(actual, surface))
 	for ring in CastleGeometry.rings(s):
 		var gate := CastleGeometry.gatehouse_aabb(s, ring)
@@ -127,6 +127,20 @@ static func gate_access_report(s: CastleSpec, b: CastleBuilder, actual: ArrayMes
 		var to := Vector3(0, 1.0, bridge.end.z + 0.1)
 		if _access_ray_hits(triangles, from, to):
 			out.failures.append("gate_access: lowered drawbridge route is obstructed")
+	if s.plan_kind == &"water":
+		var road: AABB = CastleGeometry.causeway_aabb(s)
+		var road_mass := b.mass_log.any(func(m): return m.name == "causeway")
+		if road.size.z <= 0.0 or not road_mass:
+			out.failures.append("gate_access: water plan has no logged causeway")
+		else:
+			var samples := maxi(2, int(ceil(road.size.z / 1.0)))
+			for step in range(1, samples):
+				var z: float = road.position.z + road.size.z * float(step) / float(samples)
+				var above := Vector3(0, 0.45, z)
+				var deck := Vector3(0, 0.20, z)
+				if not _access_ray_hits(triangles, above, deck):
+					out.failures.append("gate_access: causeway has a missing emitted tread at z=%.2f" % z)
+					break
 	return out
 
 
@@ -601,7 +615,7 @@ static func _walk_trial(bounds: Rect2, outer: PackedVector2Array, approach: Rect
 static func _walk_obstacles(grid: WalkGrid, actual: ArrayMesh) -> int:
 	var count := 0
 	for surface in actual.get_surface_count():
-		if surface == CastleBuilder.SURF_OPEN:
+		if surface in [CastleBuilder.SURF_OPEN, CastleBuilder.SURF_WATER]:
 			continue
 		var arrays := actual.surface_get_arrays(surface)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]

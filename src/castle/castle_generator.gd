@@ -66,6 +66,8 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 
 	# ---- walls ----
 	spec.curtain = enclosed
+	if spec.plan_kind == &"water" and enclosed:
+		spec.ditch_width = clampf(spec.width * 0.16, 8.0, 25.0)
 	spec.batter = float(s["batter"])
 	spec.wall_thickness = clampf(spec.height * 0.22, 0.8, minf(5.0, short_side * 0.1))
 	spec.battlements = GeneratorRandom.chance(r, s["battlements"])
@@ -158,6 +160,7 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 		}[String(spec.window_style)]
 	spec.window_h = {"slit": 1.5, "square": 1.1, "mullioned": 1.9, "arched": 1.7
 		}[String(spec.window_style)]
+	_fit_inner_gate_forebuilding(spec)
 
 	# ---- palette ----
 	spec.stone_color = Color(s["stone"][0]).lerp(Color(s["stone"][1]), r.randf())
@@ -228,6 +231,48 @@ static func refit(spec: CastleSpec) -> void:
 	spec.hall = spec.hall_l >= 4.0 and spec.hall_w >= 3.5
 	spec.chapel = spec.chapel and spec.hall 			and b.size.x > spec.hall_w * 2.0 + CastleGeometry.BAILEY_CLEAR * 2.0
 	spec.gate_width = minf(spec.gate_width, CastleGeometry.max_gate_width(spec, 0))
+	_fit_inner_gate_forebuilding(spec)
+
+
+## A raised keep stair must not occupy the inner gate passage. Slide the keep
+## within its existing bailey/hall clearances by the smallest measured amount
+## that leaves the complete forebuilding footprint clear of gate 1.
+static func _fit_inner_gate_forebuilding(spec: CastleSpec) -> void:
+	if not spec.inner_ward or not spec.keep or CastleGeometry.is_motte(spec):
+		return
+	var gate: AABB = CastleGeometry.gatehouse_aabb(spec, 1)
+	if gate.size.x <= 0.0:
+		return
+	var plan: HousePlan = preload("castle_keep_plan.gd").generate(spec, false)
+	var fore: Dictionary = preload("castle_access_geometry.gd").forebuilding_for_plan(spec, plan)
+	if fore.is_empty():
+		return
+	var gate_rect := Rect2(gate.position.x, gate.position.z, gate.size.x, gate.size.z)
+	var current: Rect2 = fore.footprint
+	if not current.grow(0.22).intersects(gate_rect):
+		return
+	var original_offset: float = spec.keep_offset
+	var original_x: float = CastleGeometry.keep_offset_x(spec)
+	var yard: Rect2 = CastleGeometry.bailey_rect(spec)
+	var room: float = yard.size.x * 0.5 - spec.keep_w * 0.5 - CastleGeometry.BAILEY_CLEAR
+	# Estimate both side clearances independent of the current sign; an offset
+	# away from a side range is often the only legal direction.
+	var positive_room: float = room - (spec.hall_w if spec.chapel else 0.0)
+	var negative_room: float = room - (spec.hall_w if spec.hall else 0.0)
+	for index in range(1, int(ceil((maxf(positive_room, negative_room) \
+			+ absf(original_offset)) / 0.25)) + 1):
+		var distance := float(index) * 0.25
+		for candidate in [original_offset + distance, original_offset - distance]:
+			if candidate > positive_room + 0.001 or candidate < -negative_room - 0.001:
+				continue
+			spec.keep_offset = candidate
+			var shifted := current
+			shifted.position.x += CastleGeometry.keep_offset_x(spec) - original_x
+			# The emitted forebuilding roof and slab are about 0.20m wider
+			# than the planner footprint. Reserve that measured envelope here.
+			if not shifted.grow(0.22).intersects(gate_rect):
+				return
+	spec.keep_offset = original_offset
 
 
 ## Shrink the towers until a pair of them fits on the same wall with a run of

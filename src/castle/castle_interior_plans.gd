@@ -335,12 +335,20 @@ static func _keep_windows(plan: HousePlan, floor_rect: Rect2, level: int,
 	# in -- but a ribbon of them along every wall is worse: it still does not
 	# glaze the floor, and it leaves nowhere to put a bed that is not under a
 	# window. Castle windows, five metres apart, do both jobs at once.
-	var margin: float = HouseGeometry.DOOR_CORNER_MARGIN + WINDOW_W
+	var default_margin: float = HouseGeometry.DOOR_CORNER_MARGIN + WINDOW_W
 	for axis in [0, 1]:
+		var margin: float = default_margin
 		var run: float = floor_rect.size.x if axis == 0 else floor_rect.size.y
 		var usable: float = run - margin * 2.0
+		var window_width: float = WINDOW_W
 		if usable <= WINDOW_W:
-			continue
+			# A compact fighting tower cannot take a full hall window. Centre a
+			# narrow light on the wall while keeping real corner clearance.
+			window_width = minf(0.9, run - 2.0 * HouseGeometry.WINDOW_CORNER_MARGIN)
+			if window_width < 0.5:
+				continue
+			margin = (run - window_width) * 0.5
+			usable = window_width
 		var count: int = maxi(int(usable / KEEP_WINDOW_PITCH), 1)
 		for k in range(count):
 			var t: float = (float(k) + 0.5) / float(count)
@@ -364,7 +372,7 @@ static func _keep_windows(plan: HousePlan, floor_rect: Rect2, level: int,
 							floor_rect.end.y - margin, t))
 					n = Vector2(side, 0.0)
 				plan.windows.append({"room": level, "pos": pos, "normal": n,
-					"width": WINDOW_W, "sill": WINDOW_SILL, "head": head,
+					"width": window_width, "sill": WINDOW_SILL, "head": head,
 					"storey": level})
 
 
@@ -479,7 +487,10 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	# its neighbours. `up` is across the range, so the door faces out of it.
 	_hall_door(plan, plan.rooms[0]["rect"], Vector2(0, 1))
 	for i in range(bays):
-		_hall_windows(plan, plan.rooms[i]["rect"], Vector2(1, 0), hs, i)
+		var band_height: float = float(seg["height"]) \
+			/ float(CastleGeometry.ridge_storeys(spec))
+		_hall_windows(plan, plan.rooms[i]["rect"], Vector2(1, 0), hs, i,
+			band_height - 0.2)
 
 	# And the doors that make the chain a building rather than a row of sheds:
 	# one in each end the segment shares with another range.
@@ -594,16 +605,22 @@ static func _hall_door(plan: HousePlan, floor_rect: Rect2, up: Vector2) -> void:
 ## Windows down both long walls, evenly spaced and clear of the corners: a
 ## hall is lit from the sides, because its ends are the dais and the screens.
 static func _hall_windows(plan: HousePlan, floor_rect: Rect2, up: Vector2,
-		hs: HouseSpec, room := 0) -> void:
+		hs: HouseSpec, room := 0, max_head: float = INF) -> void:
 	var lengthwise: bool = up.y > 0.5
 	var run: float = floor_rect.size.y if lengthwise else floor_rect.size.x
-	var margin: float = HouseGeometry.DOOR_CORNER_MARGIN + WINDOW_W
-	var usable: float = run - margin * 2.0
-	if usable <= WINDOW_W:
+	# A reduced range may have a valid room but no full-sized window bay
+	# between its corners. Fit one narrower opening to the available wall.
+	var width: float = minf(WINDOW_W,
+		maxf(run - 2.0 * HouseGeometry.DOOR_CORNER_MARGIN, 0.0))
+	if width < 0.45:
 		return
+	var margin: float = minf(HouseGeometry.DOOR_CORNER_MARGIN + width,
+		maxf((run - width) * 0.5, 0.0))
+	var usable: float = run - margin * 2.0
 	var count: int = maxi(int(usable / WINDOW_PITCH), 1)
-	var head: float = minf(WINDOW_SILL + WINDOW_H, hs.height - 0.2)
-	if head - WINDOW_SILL < 0.4:
+	var head: float = minf(minf(WINDOW_SILL + WINDOW_H, hs.height - 0.2), max_head)
+	var sill: float = minf(WINDOW_SILL, head - 0.4)
+	if head - sill < 0.4:
 		return
 	for k in range(count):
 		var t: float = (float(k) + 0.5) / float(count)
@@ -622,7 +639,7 @@ static func _hall_windows(plan: HousePlan, floor_rect: Rect2, up: Vector2,
 					floor_rect.position.y if side < 0.0 else floor_rect.end.y)
 				n = Vector2(0.0, side)
 			plan.windows.append({"room": room, "pos": pos, "normal": n,
-				"width": WINDOW_W, "sill": WINDOW_SILL, "head": head,
+				"width": width, "sill": sill, "head": head,
 				"storey": 0})
 
 
@@ -656,12 +673,16 @@ static func _courtyard_windows(plan: HousePlan, floor_rect: Rect2, normal: Vecto
 	var wall_x := floor_rect.end.x if normal.x > 0.0 else floor_rect.position.x
 	for span in spans:
 		var run := span.y - span.x
-		var capacity := maxi(int((run + gap) / (WINDOW_W + gap)), 0)
-		if capacity == 0:
+		# Keep a masonry jamb at both ends of each span. A window that exactly
+		# fills the remnant beside a door would erase the stone pier that carries
+		# its lintel.
+		var width: float = minf(WINDOW_W, run - 2.0 * gap)
+		if width < 0.45:
 			continue
+		var capacity := maxi(int((run + gap) / (width + gap)), 1)
 		var count := mini(maxi(int(run / WINDOW_PITCH), minimum), capacity)
 		for k in count:
 			var along := lerpf(span.x, span.y, (float(k) + 0.5) / float(count))
 			plan.windows.append({"room": 0, "pos": Vector2(wall_x, along),
-				"normal": normal, "width": WINDOW_W, "sill": WINDOW_SILL,
+				"normal": normal, "width": width, "sill": WINDOW_SILL,
 				"head": head, "storey": 0})

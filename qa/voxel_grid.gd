@@ -28,7 +28,8 @@ var _solid: Array[PackedByteArray] = []
 ## structure). Surfaces are hollow shells, so the result is dilated by one
 ## voxel: that gives every wall real thickness in the grid and merges touching
 ## geometry into one mass.
-func rasterize(mesh: ArrayMesh, skip_surface := -1, vox_size := 0.0) -> void:
+func rasterize(mesh: ArrayMesh, skip_surface: Variant = -1, vox_size := 0.0,
+		extra_bounds: Array[AABB] = []) -> void:
 	vox = vox_size if vox_size > 0.0 else VOX
 	var mn := Vector3(INF, INF, INF)
 	var mx := -Vector3(INF, INF, INF)
@@ -37,6 +38,9 @@ func rasterize(mesh: ArrayMesh, skip_surface := -1, vox_size := 0.0) -> void:
 		for v in verts:
 			mn = mn.min(v)
 			mx = mx.max(v)
+	for bounds in extra_bounds:
+		mn = mn.min(bounds.position)
+		mx = mx.max(bounds.end)
 	# expand by one voxel so boundary geometry rasterizes fully
 	origin = Vector3(floorf(mn.x / vox) * vox - vox, floorf(mn.y / vox) * vox - vox,
 		floorf(mn.z / vox) * vox - vox)
@@ -50,7 +54,8 @@ func rasterize(mesh: ArrayMesh, skip_surface := -1, vox_size := 0.0) -> void:
 		_solid.append(row)
 
 	for s2 in range(mesh.get_surface_count()):
-		if s2 == skip_surface:
+		if (skip_surface is int and s2 == int(skip_surface)) \
+				or (skip_surface is Array and s2 in skip_surface):
 			continue
 		var arrays: Array = mesh.surface_get_arrays(s2)
 		var verts2: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]

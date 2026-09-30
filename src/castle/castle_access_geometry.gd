@@ -13,9 +13,19 @@ static func forebuilding(spec: CastleSpec) -> Dictionary:
 	if not CastleGeometry.is_enclosed(spec) or not spec.keep or CastleGeometry.is_motte(spec):
 		return {}
 	var plan := preload("castle_keep_plan.gd").generate(spec, false)
+	return forebuilding_for_plan(spec, plan)
+
+
+## Build the stair envelope from the keep plan already in hand. CastleKeepPlan
+## uses this to reject a raised doorway whose real approach would strike gate 1.
+static func forebuilding_for_plan(spec: CastleSpec, plan: HousePlan) -> Dictionary:
+	if not CastleGeometry.is_enclosed(spec) or not spec.keep or CastleGeometry.is_motte(spec):
+		return {}
 	if plan.spec == null or plan.entrance() < 0:
 		return {}
 	var door: Dictionary = plan.doors[plan.entrance()]
+	if HousePlan.record_storey(door) <= 0:
+		return {}
 	var keep := CastleGeometry.keep_aabb(spec)
 	var centre := Vector2(keep.get_center().x, keep.get_center().z)
 	var at: Vector2 = centre + Vector2(door.pos)
@@ -39,7 +49,9 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if not CastleGeometry.is_enclosed(spec):
 		return out
+	var fore: Dictionary = forebuilding(spec)
 	for ring in CastleGeometry.rings(spec):
+		var ring_start: int = out.size()
 		var height := CastleGeometry.wall_height(spec, ring) + CastleGeometry.PARAPET_RISE
 		var flights := maxi(1, int(ceil(height / 2.5)))
 		if height / flights < 2.15:
@@ -59,6 +71,12 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 			CastleGeometry.chapel_aabb(spec), CastleGeometry.apse_aabb(spec), gate]:
 			if box.size.x > 0.0:
 				blocked.append(Rect2(box.position.x, box.position.z, box.size.x, box.size.z).grow(0.15))
+		# The raised keep entrance has its own roofed stair on the ground. Its
+		# planner footprint does not include the emitted slab and roof overhang;
+		# reserve the measured 0.22m envelope so wall stairs cannot cross it.
+		if not fore.is_empty():
+			var fore_footprint: Rect2 = fore["footprint"]
+			blocked.append(fore_footprint.grow(0.22))
 		# An inner gate's projecting towers can occupy the outer ward. Reserve
 		# every ring's masonry, not only the curtain this stair climbs.
 		for other_ring in CastleGeometry.rings(spec):
@@ -82,51 +100,76 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 				var box := CastleGeometry.gatehouse_aabb(spec, other_ring)
 				blocked.append(Rect2(box.position.x, box.position.z, box.size.x, box.size.z))
 		for side in [-1.0, 1.0]:
-			var best := {}
-			var score := INF
-			for e in edge.size():
-				var a := edge[e]
-				var b := edge[(e + 1) % edge.size()]
-				var length := a.distance_to(b)
-				if length < span + 0.4:
-					continue
-				var along := (b - a) / length
-				var inside := -CastleGeometry.edge_outward(a, b)
-				var samples := maxi(1, int(ceil((length - span) / 0.2)))
-				for sample in range(samples + 1):
-					var boundary := a.lerp(b, (span * 0.5 + 0.2 + (length - span - 0.4) * float(sample) / samples) / length)
-					boundary += inside * CastleGeometry.wall_thickness(spec, ring)
-					if boundary.x * float(side) <= 0.0:
-						continue
-					# A narrow gate bay may take a stair end-on. Its final landing
-					# then meets the curtain, leaving the passage between towers free.
-					for transverse in [false, true]:
-						var axis := inside if transverse else along
-						var across := -along if transverse else inside
-						var at := boundary + inside * span * 0.5 + along * width * 0.5 if transverse else boundary
-						var poly := PackedVector2Array([at - axis * span * 0.5,
-							at + axis * span * 0.5, at + axis * span * 0.5 + across * width,
-							at - axis * span * 0.5 + across * width])
-						if not Array(poly).all(func(p): return Poly.contains_point(clear_ward, p, 0.01)):
-							continue
-						var footprint := Poly.bounding_rect(poly)
-						if blocked.any(func(rect): return rect.grow(-0.001).intersects(footprint)):
-							continue
-						if tower_polygons.any(func(tower): return not Geometry2D.intersect_polygons(tower, poly).is_empty()):
-							continue
-						var distance := boundary.distance_squared_to(gate_at) + (1.0 if transverse else 0.0)
-						if distance >= score:
-							continue
-						score = distance
-						best = {"ring": ring, "edge": e, "at": at, "along": axis,
-							"inside": across, "flights": flights, "steps": steps, "rise": rise,
-							"run": run, "span": span, "width": width, "height": height,
-							"start_forward": -1.0 if transverse and flights % 2 == 1 else 1.0,
-							"poly": poly, "footprint": footprint}
+			var best := _best_wall_stair(spec, ring, edge, clear_ward, blocked,
+				tower_polygons, gate_at, width, span, flights, steps, rise, run,
+				height, side)
 			if not best.is_empty():
 				out.append(best)
 				blocked.append(best.footprint.grow(0.2))
+		# On a small polygon, occupied buildings may leave only one x-half-plane
+		# clear. A second independent stair may fit on another face of that side.
+		# Keep every physical clearance check and reserve the first stair before
+		# looking for this fallback.
+		if out.size() - ring_start < 2:
+			var fallback := _best_wall_stair(spec, ring, edge, clear_ward,
+				blocked, tower_polygons, gate_at, width, span, flights, steps,
+				rise, run, height, 0.0)
+			if not fallback.is_empty():
+				out.append(fallback)
+				blocked.append(fallback.footprint.grow(0.2))
 	return out
+
+
+static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Array,
+		clear_ward: PackedVector2Array, blocked: Array[Rect2],
+		tower_polygons: Array[PackedVector2Array], gate_at: Vector2,
+		width: float, span: float, flights: int, steps: int, rise: float,
+		run: float, height: float, side: float) -> Dictionary:
+	var best := {}
+	var score := INF
+	for e in edge.size():
+		var a := edge[e]
+		var b := edge[(e + 1) % edge.size()]
+		var length := a.distance_to(b)
+		var along := (b - a) / length
+		var inside := -CastleGeometry.edge_outward(a, b)
+		# A transverse stair uses only its width along the curtain. Sampling by
+		# the full flight span rejects short octagon facets before it is considered.
+		for transverse in [false, true]:
+			var edge_span := width if transverse else span
+			if length < edge_span + 0.4:
+				continue
+			var edge_offset := edge_span * 0.5 + 0.2
+			var samples := maxi(1, int(ceil((length - edge_span) / 0.2)))
+			for sample in range(samples + 1):
+				var boundary := a.lerp(b, (edge_offset + (length - edge_span - 0.4) \
+					* float(sample) / samples) / length)
+				boundary += inside * CastleGeometry.wall_thickness(spec, ring)
+				if absf(side) > 0.1 and boundary.x * side <= 0.0:
+					continue
+				var axis := inside if transverse else along
+				var across := -along if transverse else inside
+				var at := boundary + inside * span * 0.5 + along * width * 0.5 if transverse else boundary
+				var poly := PackedVector2Array([at - axis * span * 0.5,
+					at + axis * span * 0.5, at + axis * span * 0.5 + across * width,
+					at - axis * span * 0.5 + across * width])
+				if not Array(poly).all(func(p): return Poly.contains_point(clear_ward, p, 0.01)):
+					continue
+				var footprint := Poly.bounding_rect(poly)
+				if blocked.any(func(rect): return rect.grow(-0.001).intersects(footprint)):
+					continue
+				if tower_polygons.any(func(tower): return not Geometry2D.intersect_polygons(tower, poly).is_empty()):
+					continue
+				var distance := boundary.distance_squared_to(gate_at) + (1.0 if transverse else 0.0)
+				if distance >= score:
+					continue
+				score = distance
+				best = {"ring": ring, "edge": e, "at": at, "along": axis,
+					"inside": across, "flights": flights, "steps": steps, "rise": rise,
+					"run": run, "span": span, "width": width, "height": height,
+					"start_forward": -1.0 if transverse and flights % 2 == 1 else 1.0,
+					"poly": poly, "footprint": footprint}
+	return best
 
 
 static func _tower_outline(spec: CastleSpec, ring: int, at: Vector3, vertex := -1) -> PackedVector2Array:

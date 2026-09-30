@@ -10,7 +10,7 @@ static func build(spec: CastleSpec, cutaway := false) -> Node3D:
 	var builder := CastleBuilder.new()
 	var mesh: ArrayMesh = builder.build(spec)
 	var root := ShellAssembler.build("Castle", mesh, [spec.stone_color, spec.trim_color,
-		spec.roof_color, Color("1a1c20")], builder.prop_log,
+		spec.roof_color, Color("1a1c20"), Color("315d70")], builder.prop_log,
 		CastleBuilder.SURF_ROOF, cutaway, LightKit.FLAME, true)
 	for row in builder.interiors:
 		var rooms := Node3D.new()

@@ -74,8 +74,6 @@ const EXPECTED_FAIL := {
 	"conwy": "two wards side by side (no backlog task yet)",
 	"malbork": "three wards in a line, brick (no backlog task yet)",
 	"edinburgh": "terraced baileys (INT-016)",
-	"eilean_donan": "island and causeway: a water plan kind (no backlog task yet)",
-	"caerphilly": "two moats: a water plan kind (no backlog task yet)",
 	"mont_saint_michel": "a church on a terraced ring (INT-016, WLD church composition)",
 }
 
@@ -212,12 +210,17 @@ static func _force_features(key: String, spec: CastleSpec) -> void:
 			spec.courtyard = true
 			spec.chimneys = maxi(spec.chimneys, 3)
 		"bodiam":
-			# a quadrangular castle: four drum towers, a twin-towered gatehouse.
-			# Bodiam is the rectangle -- that is the whole point of it.
-			_force_plan(spec, &"rect", 4)
+			# Four drum towers and a twin-towered gatehouse on a rectangular
+			# island enclosed by water.
+			_force_plan(spec, &"water", 4)
+			spec.ditch_width = clampf(spec.width * 0.16, 8.0, 25.0)
+			spec.moat_count = 1
 			spec.corner_towers = true
 			spec.gate_towers = true
 			spec.side_towers = maxi(spec.side_towers, 1)
+			# Bodiam's defining fabric has no freestanding keep. Its hall range
+			# remains in the courtyard; small scales cannot support a keep stair.
+			spec.keep = false
 		"caernarfon":
 			# the polygonal enceinte itself: a walled circuit that turns at every
 			# tower rather than at four corners -- and the Eagle Tower at the
@@ -321,10 +324,14 @@ static func _force_features(key: String, spec: CastleSpec) -> void:
 			_force_plan(spec, &"ridge", 0)
 			spec.corner_towers = true
 		"eilean_donan":
-			_force_plan(spec, &"rect", 4)
+			_force_plan(spec, &"water", 4)
+			spec.ditch_width = clampf(spec.width * 0.16, 8.0, 25.0)
+			spec.moat_count = 1
 			spec.keep_shape = &"square"
 		"caerphilly":
-			_force_plan(spec, &"rect", 4)
+			_force_plan(spec, &"water", 4)
+			spec.ditch_width = clampf(spec.width * 0.16, 8.0, 25.0)
+			spec.moat_count = 2
 			_force_concentric(spec)
 		"dover":
 			# concentric, with a great square keep on the axis
@@ -385,10 +392,11 @@ static func _check_required_masses(key: String, spec: CastleSpec,
 			_require(builder, who, res, "range_front", "range closing the courtyard")
 			_require(builder, who, res, "chimney_0", "chimney stack")
 		"bodiam":
+			_assert_water_plan(spec, builder, who, res, 1)
 			_require(builder, who, res, "wall_0_back", "curtain wall")
 			_require(builder, who, res, "tower_0_corner_3", "four corner drum towers")
 			_require(builder, who, res, "tower_0_gate_0", "twin-towered gatehouse")
-			_require(builder, who, res, "keep", "residential range in the courtyard")
+			_require(builder, who, res, "hall", "residential hall in the courtyard")
 		"caernarfon":
 			_require(builder, who, res, "tower_0_corner_6", "a tower at every angle of the circuit")
 			var eagle: AABB = builder.mass_aabb("tower_0_corner_1")
@@ -480,9 +488,9 @@ static func _check_required_masses(key: String, spec: CastleSpec,
 				res.fail("%s: not a ridge" % who)
 			res.fail("%s: terraced baileys are not built yet (INT-016)" % who)
 		"eilean_donan":
-			res.fail("%s: water on all sides and a causeway are not a plan kind yet" % who)
+			_assert_water_plan(spec, builder, who, res, 1)
 		"caerphilly":
-			res.fail("%s: two moats are not a plan kind yet" % who)
+			_assert_water_plan(spec, builder, who, res, 2)
 		"dover":
 			_require(builder, who, res, "wall_1_back", "the inner curtain")
 			_require(builder, who, res, "keep", "the great keep")
@@ -499,7 +507,17 @@ static func _check_required_masses(key: String, spec: CastleSpec,
 			_require(builder, who, res, "wing_jog_0", "the L jog")
 			var doors := 0
 			for p in builder.part_log:
-				if p["kind"] == "window" and p["tag"] == "door":
+				var opening_kind := String(p.get("opening_kind", ""))
+				if opening_kind.is_empty():
+					opening_kind = String(p.get("kind", ""))
+				if opening_kind != "door" or String(p.get("tag", "")) != "tower_house":
+					continue
+				var pos: Vector3 = p.get("pos", Vector3.ZERO)
+				var size: Vector3 = p.get("size", Vector3.ZERO)
+				var sill := pos.y - size.y * 0.5
+				if sill < TowerCheck.LIFT_MIN - 0.01:
+					res.fail("%s: tower-house door sill %.2fm is below the raised threshold" % [who, sill])
+				else:
 					doors += 1
 			if doors != 1:
 				res.fail("%s: %d raised doors, wants one" % [who, doors])
@@ -516,3 +534,111 @@ static func _require(builder: CastleBuilder, who: String, res: SuiteResult,
 		prefix: String, feature: String) -> void:
 	if not builder.has_mass(prefix):
 		res.fail("%s: %s did not produce a mass starting with '%s'" % [who, feature, prefix])
+
+
+static func _assert_water_plan(spec: CastleSpec, builder: CastleBuilder,
+		who: String, res: SuiteResult, wanted_rings: int) -> void:
+	if spec.plan_kind != &"water":
+		res.fail("%s: plan kind is %s, wants water" % [who, String(spec.plan_kind)])
+	var rings := {}
+	var segments_by_ring := {}
+	for mass in builder.mass_log:
+		var name: String = mass.name
+		if not name.begins_with("moat_"):
+			continue
+		if not MassRules.is_negative(mass) or mass.get("kind", &"") != &"water":
+			res.fail("%s: %s is not a negative water mass" % [who, name])
+		if float(mass.get("depth", 0.0)) < 2.0 or float(mass.get("depth", 0.0)) > 4.0:
+			res.fail("%s: %s depth %.2fm is outside 2-4m" % [who, name, float(mass.get("depth", 0.0))])
+		if float(mass.get("width", 0.0)) < 8.0 or float(mass.get("width", 0.0)) > 25.0:
+			res.fail("%s: %s width %.2fm is outside 8-25m" % [who, name, float(mass.get("width", 0.0))])
+		rings[int(mass.get("ring", -1))] = true
+		var ring: int = int(mass.get("ring", -1))
+		if not segments_by_ring.has(ring):
+			segments_by_ring[ring] = []
+		segments_by_ring[ring].append(mass)
+		var a2: AABB = mass.aabb
+		var trench_plan := Rect2(a2.position.x, a2.position.z, a2.size.x, a2.size.z)
+		if trench_plan.intersects(CastleGeometry.enceinte_rect(spec, 0)):
+			res.fail("%s: %s trench overlaps the curtain island" % [who, name])
+		if name == ("moat_%d_front_axis" % ring):
+			var road: AABB = CastleGeometry.causeway_aabb(spec)
+			var road_plan := Rect2(road.position.x, road.position.z, road.size.x, road.size.z)
+			var bridge: AABB = CastleGeometry.drawbridge_aabb(spec)
+			var bridge_plan := Rect2(bridge.position.x, bridge.position.z,
+				bridge.size.x, bridge.size.z)
+			if absf(a2.end.y) > 0.01 or (not trench_plan.intersects(road_plan)
+					and not trench_plan.intersects(bridge_plan)):
+				res.fail("%s: front trench does not continue beneath the gate crossing at ground level" % who)
+	if rings.size() != wanted_rings:
+		res.fail("%s: %d moat rings, wants %d" % [who, rings.size(), wanted_rings])
+	for ring_index in range(wanted_rings):
+		if not _water_ring_valid(spec, segments_by_ring.get(ring_index, []), ring_index):
+			res.fail("%s: moat ring %d does not cover all four sides outside the island, with a gate-axis opening" % [who, ring_index])
+	if not builder.has_mass("causeway"):
+		res.fail("%s: water plan has no emitted causeway mass" % who)
+	if not builder.has_mass("drawbridge"):
+		res.fail("%s: water plan has no emitted drawbridge" % who)
+
+
+static func _water_ring_valid(spec: CastleSpec, masses: Array, ring: int) -> bool:
+	var found := {}
+	var site: Rect2 = CastleGeometry.enceinte_rect(spec, 0)
+	var gate_lane: float = CastleGeometry.gate_width(spec, 0) * 0.5 + 1.0
+	var trench_width: float = clampf(spec.ditch_width, 8.0, 25.0)
+	var expected_front := site.position.y - (CastleGeometry.tower_base_half(spec, 0) + 1.5) \
+		- float(ring) * (trench_width + 2.0) - trench_width
+	var expected_front_end := expected_front + trench_width
+	var road: AABB = CastleGeometry.causeway_aabb(spec)
+	var road_plan := Rect2(road.position.x, road.position.z, road.size.x, road.size.z)
+	var bridge: AABB = CastleGeometry.drawbridge_aabb(spec)
+	var bridge_plan := Rect2(bridge.position.x, bridge.position.z,
+		bridge.size.x, bridge.size.z)
+	for mass in masses:
+		var name: String = String(mass.name)
+		if int(mass.get("ring", -1)) != ring:
+			continue
+		var prefix := "moat_%d_" % ring
+		if not name.begins_with(prefix):
+			return false
+		var side := name.trim_prefix(prefix)
+		var a: AABB = mass.aabb
+		var plan := Rect2(a.position.x, a.position.z, a.size.x, a.size.z)
+		if plan.intersects(site):
+			return false
+		if side not in ["back", "left", "right", "front_left", "front_right", "front_axis"] \
+				or found.has(side):
+			return false
+		found[side] = true
+		match side:
+			"back":
+				if a.position.z < site.end.y or a.position.x > site.position.x \
+						or a.end.x < site.end.x:
+					return false
+			"left":
+				if a.end.x > site.position.x or a.position.z > site.position.y \
+						or a.end.z < site.end.y:
+					return false
+			"right":
+				if a.position.x < site.end.x or a.position.z > site.position.y \
+						or a.end.z < site.end.y:
+					return false
+			"front_left":
+				if a.end.z > site.position.y or a.end.x > -gate_lane + 0.05 \
+						or absf(a.position.z - expected_front) > 0.05 \
+						or absf(a.end.z - expected_front_end) > 0.05:
+					return false
+			"front_right":
+				if a.end.z > site.position.y or a.position.x < gate_lane - 0.05 \
+						or absf(a.position.z - expected_front) > 0.05 \
+						or absf(a.end.z - expected_front_end) > 0.05:
+					return false
+			"front_axis":
+				if a.end.z > site.position.y \
+						or absf(a.position.x + gate_lane) > 0.05 \
+						or absf(a.end.x - gate_lane) > 0.05 \
+						or absf(a.position.z - expected_front) > 0.05 \
+						or absf(a.end.z - expected_front_end) > 0.05 \
+						or (not plan.intersects(road_plan) and not plan.intersects(bridge_plan)):
+					return false
+	return found.size() == 6

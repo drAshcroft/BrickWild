@@ -6,6 +6,8 @@ extends RefCounted
 const SIDES := 14
 const TOP_SCALE := 0.62
 const MIN_TOP_SIDE := 6.4
+const COMPACT_FACET_JAMB := 0.25
+const COMPACT_FACET_WINDOW_MIN := 0.3
 
 
 static func outer_outline(spec: CastleSpec, level: int, levels: int) -> PackedVector2Array:
@@ -167,8 +169,14 @@ static func _windows(plan: HousePlan, level: int) -> void:
 		var length := Vector2(wall.from).distance_to(wall.to)
 		var width := minf(CastleInteriorPlans.WINDOW_W,
 			length - 2.0 * HouseGeometry.WINDOW_CORNER_MARGIN)
-		if width < 0.45:
-			continue
+		if width < COMPACT_FACET_WINDOW_MIN:
+			# Small round keeps have real, short masonry facets. Keep the normal
+			# jamb when it leaves a usable aperture; compact facets use a narrower
+			# light while preserving a quarter-metre stone return at each corner.
+			width = minf(CastleInteriorPlans.WINDOW_W,
+				length - 2.0 * COMPACT_FACET_JAMB)
+			if width < COMPACT_FACET_WINDOW_MIN:
+				continue
 		var count := maxi(1, int(length / CastleInteriorPlans.KEEP_WINDOW_PITCH))
 		for i in range(count):
 			plan.windows.append({"room": level,

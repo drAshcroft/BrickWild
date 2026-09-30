@@ -13,12 +13,13 @@ extends MassBuilder
 ## own -- when the church builder and its blueprint each derived their own, the
 ## drawing quietly stopped being a drawing of the model.
 ##
-## Surfaces: 0 = stone, 1 = trim (parapets, copings), 2 = roof, 3 = openings.
+## Surfaces: 0 = stone, 1 = trim, 2 = roof, 3 = openings, 4 = water.
 
 const SURF_STONE := 0
 const SURF_TRIM := 1
 const SURF_ROOF := 2
 const SURF_OPEN := 3
+const SURF_WATER := 4
 
 ## Steps a battered wall or tower is emitted in. More steps is a smoother
 ## talus; four reads as masonry courses rather than as a ramp.
@@ -38,7 +39,7 @@ const KeepPlan = preload("castle_keep_plan.gd")
 
 func build(p_spec: CastleSpec) -> ArrayMesh:
 	spec = p_spec
-	begin_metric(4)
+	begin_metric(5)
 	_roof_faces.clear()
 	_roof_covers.clear()
 	interiors.clear()
@@ -292,7 +293,6 @@ func _motte_flue(row: Dictionary) -> void:
 ## every vertex. No curtain, no gate, no bailey: the ranges are the walls.
 func _build_ridge() -> void:
 	var storeys: int = CastleGeometry.ridge_storeys(spec)
-	var sh: float = spec.height / float(storeys)
 	for seg in CastleGeometry.ridge_ranges(spec):
 		var name: String = seg["name"]
 		tag("hall" if name == "hall" else "range")
@@ -303,6 +303,10 @@ func _build_ridge() -> void:
 		var length: float = seg["length"]
 		var width: float = seg["width"]
 		var height: float = seg["height"]
+		# Ranges can have their own storey count within the silhouette. The
+		# facade contract measures these rows against the range, not the castle's
+		# tallest segment.
+		var sh: float = height / float(storeys)
 		var planned: bool = _planned_interiors.has(name)
 		if planned:
 			Interiors.emit(self, _planned_interiors[name])
@@ -342,7 +346,11 @@ func _build_ridge() -> void:
 		var occupied_top := 0.0
 		if planned:
 			var ps: HouseSpec = (_planned_interiors[name].plan as HousePlan).spec
-			occupied_top = ps.height * float(maxi(ps.storeys, 1))
+			# A ridge range has one occupied plan at its foot. `ps.height` is
+			# clamped for room construction and can be taller than one facade
+			# band at small scales. Only suppress the band the plan actually
+			# occupies; otherwise its ceiling height hides the next castle row.
+			occupied_top = minf(ps.height * float(maxi(ps.storeys, 1)), sh)
 		var n: Vector2 = seg["normal"]
 		var count: int = clampi(int(length / 3.5), 1, 24)
 		for s in range(storeys):
@@ -720,7 +728,9 @@ func _build_enclosure() -> void:
 		_passage(bar, minf(bar.size.x * 0.45, 2.4), minf(bar.size.y * 0.55, 5.0))
 		_log_mass("barbican", bar)
 		_crenellate_rect(bar, bar.size.y, SURF_TRIM)
+	_build_water_moats()
 	_build_drawbridge()
+	_build_causeway()
 
 	tag("link")
 	for side in [-1.0, 1.0]:
@@ -751,6 +761,30 @@ func _build_enclosure() -> void:
 		_range(chapel, "chapel", SURF_STONE, true, [Vector3(-1, 0, 0)], RANGE_BAY)
 		_build_apse()
 	_build_yard()
+
+
+func _build_water_moats() -> void:
+	for trench in CastleGeometry.moat_aabbs(spec):
+		_log_mass(String(trench.name), trench.aabb)
+		mass_log.back()["kind"] = trench.kind
+		mass_log.back()["depth"] = trench.depth
+		mass_log.back()["width"] = trench.width
+		mass_log.back()["ring"] = trench.ring
+		# Keep visible water off the masonry voxel surface. The negative trench
+		# remains the measured mass and must stay clear of positive structure.
+		var a: AABB = trench.aabb
+		tag("water")
+		box(Vector3(a.size.x, 0.02, a.size.z),
+			Vector3(a.get_center().x, 0.01, a.get_center().z), SURF_WATER)
+
+
+func _build_causeway() -> void:
+	var road := CastleGeometry.causeway_aabb(spec)
+	if road.size.x <= 0.0 or road.size.z <= 0.0:
+		return
+	tag("causeway")
+	_box_aabb(road, SURF_STONE)
+	_log_mass("causeway", road)
 
 
 func _build_drawbridge() -> void:

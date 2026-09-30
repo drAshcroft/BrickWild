@@ -116,6 +116,8 @@ static func _allowance(a: String, b: String, polygonal := false, tower_lap := -1
 			return INF                        # the outwork ties into the gate
 		"gate|link", "link|tower", "link|wall":
 			return INF                        # the causeway lands on both gates
+		"causeway|drawbridge":
+			return INF                        # the stone approach meets its timber span
 
 		# --- ranges built against a curtain lap it, and its towers with it ---
 		"keep|wall", "hall|wall", "chapel|wall":
@@ -227,6 +229,10 @@ static func _facade_window(part: Dictionary) -> bool:
 func _check_forebuilding(spec: CastleSpec, builder: CastleBuilder) -> void:
 	if not CastleGeometry.is_enclosed(spec) or not spec.keep or CastleGeometry.is_motte(spec):
 		return
+	# The stair protects a raised, occupied keep entrance. A tiny keep with no
+	# emitted first-floor door has no stair to require or measure.
+	if not _has_emitted_raised_keep_door(builder):
+		return
 	var keep := CastleGeometry.keep_aabb(spec)
 	var found := false
 	for mass in builder.mass_log:
@@ -244,15 +250,37 @@ func _check_forebuilding(spec: CastleSpec, builder: CastleBuilder) -> void:
 				top = maxf(top, MassBuilder.component_aabb(row).end.y)
 		if tread_count < 2 or absf(top - float(mass.get("entry_height", -1.0))) > 0.01:
 			failures.append("forebuilding: treads do not reach the protected first-floor entrance")
-		var raised := false
-		for interior in builder.interiors:
-			if interior.id == "keep":
-				var plan: HousePlan = interior.plan
-				raised = plan.entrance() >= 0 and HousePlan.record_storey(plan.doors[plan.entrance()]) == 1
-		if not raised:
-			failures.append("forebuilding: keep has no first-floor exterior entrance")
 	if not found:
 		failures.append("forebuilding: enclosed keep is missing its protected entrance stair")
+
+
+func _has_emitted_raised_keep_door(builder: CastleBuilder) -> bool:
+	for interior in builder.interiors:
+		if String(interior.get("id", "")) != "keep":
+			continue
+		var plan: HousePlan = interior.get("plan") as HousePlan
+		if plan == null or plan.spec == null or plan.room_count() == 0:
+			continue
+		var entrance := plan.entrance()
+		if entrance < 0:
+			continue
+		var planned_door: Dictionary = plan.doors[entrance]
+		if not bool(planned_door.get("exterior", false)) \
+				or HousePlan.record_storey(planned_door) != 1:
+			continue
+		for part in builder.part_log:
+			if String(part.get("tag", "")) != "keep":
+				continue
+			var opening_kind := String(part.get("opening_kind", ""))
+			if opening_kind.is_empty():
+				opening_kind = String(part.get("kind", ""))
+			if opening_kind != "door":
+				continue
+			var pos: Vector3 = part.get("pos", Vector3.ZERO)
+			var size: Vector3 = part.get("size", Vector3.ZERO)
+			if pos.y - size.y * 0.5 > 0.05:
+				return true
+	return false
 
 
 func _check_wall_stairs(spec: CastleSpec, builder: CastleBuilder) -> void:

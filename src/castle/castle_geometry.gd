@@ -1262,6 +1262,70 @@ static func drawbridge_aabb(spec: CastleSpec) -> AABB:
 	return AABB(Vector3(-width * 0.5, 0, front - length), Vector3(width, 0.22, length))
 
 
+## Negative trench segments around each enclosure. The gate-axis trench
+## continues beneath the raised causeway, which touches its ground-level top;
+## a second trench is nested outside the first.
+static func moat_aabbs(spec: CastleSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if spec.plan_kind != &"water" or not is_enclosed(spec):
+		return out
+	var site: Rect2 = enceinte_rect(spec, 0)
+	var width: float = clampf(spec.ditch_width, 8.0, 25.0)
+	var count: int = clampi(spec.moat_count, 1, 2)
+	var setback: float = tower_base_half(spec, 0) + 1.5
+	var lane_half: float = maxf(gate_width(spec, 0) * 0.5 + 1.0, 2.0)
+	var depth: float = clampf(spec.height * 0.18, 2.0, 4.0)
+	for ring in range(count):
+		var inner: float = setback + float(ring) * (width + 2.0)
+		var x0: float = site.position.x - inner - width
+		var x1: float = site.end.x + inner + width
+		var z0: float = site.position.y - inner - width
+		var z1: float = site.end.y + inner + width
+		var front := z0
+		var back := z1 - width
+		var side_z := z0
+		var side_l := z1 - z0
+		var front_left_w: float = maxf(-lane_half - x0, 0.0)
+		var front_right_x: float = lane_half
+		var front_right_w: float = maxf(x1 - front_right_x, 0.0)
+		var rows := [
+			["back", Vector3(x0, -depth, back), Vector3(x1 - x0, depth, width)],
+			["left", Vector3(x0, -depth, side_z), Vector3(width, depth, side_l)],
+			["right", Vector3(x1 - width, -depth, side_z), Vector3(width, depth, side_l)],
+		]
+		if front_left_w > 0.1:
+			rows.append(["front_left", Vector3(x0, -depth, front), Vector3(front_left_w, depth, width)])
+		if front_right_w > 0.1:
+			rows.append(["front_right", Vector3(front_right_x, -depth, front), Vector3(front_right_w, depth, width)])
+		# The trench remains continuous beneath the raised gate-axis causeway.
+		# Its top is at ground level, so the positive road only touches it.
+		rows.append(["front_axis", Vector3(-lane_half, -depth, front),
+			Vector3(lane_half * 2.0, depth, width)])
+		for row in rows:
+			out.append({"name": "moat_%d_%s" % [ring, row[0]],
+				"aabb": AABB(row[1], row[2]), "depth": depth, "width": width,
+				"ring": ring, "kind": &"water"})
+	return out
+
+
+## Solid road through the gate-axis opening. Its outer end meets the outside
+## bank; its inner end meets the lowered drawbridge.
+static func causeway_aabb(spec: CastleSpec) -> AABB:
+	if spec.plan_kind != &"water" or not is_enclosed(spec):
+		return AABB()
+	var bridge: AABB = drawbridge_aabb(spec)
+	var gate: AABB = gatehouse_aabb(spec, 0)
+	var site: Rect2 = enceinte_rect(spec, 0)
+	var setback: float = tower_base_half(spec, 0) + 1.5
+	var rings_count: int = clampi(spec.moat_count, 1, 2)
+	var width: float = clampf(spec.ditch_width, 8.0, 25.0)
+	var outer_front: float = site.position.y - setback - float(rings_count - 1) * (width + 2.0) - width
+	var z0: float = minf(outer_front, bridge.position.z)
+	var z1: float = maxf(outer_front, bridge.position.z)
+	var lane: float = maxf(gate_width(spec, 0) + 2.0, 3.0)
+	return AABB(Vector3(-lane * 0.5, 0.0, z0), Vector3(lane, 0.25, maxf(z1 - z0, 0.25)))
+
+
 # -------------------------------------------------------------------- keep
 
 ## The keep stands against the back wall of the bailey, lapping it.
@@ -1563,6 +1627,14 @@ static func total_height(spec: CastleSpec) -> float:
 ## Everything the design covers in plan, batter and towers included.
 static func plan_extent(spec: CastleSpec) -> Rect2:
 	var e: Rect2 = enceinte_rect(spec, 0)
+	for trench in moat_aabbs(spec):
+		var a: AABB = trench.aabb
+		e = e.expand(Vector2(a.position.x, a.position.z))
+		e = e.expand(Vector2(a.end.x, a.end.z))
+	var causeway: AABB = causeway_aabb(spec)
+	if causeway.size.x > 0.0:
+		e = e.expand(Vector2(causeway.position.x, causeway.position.z))
+		e = e.expand(Vector2(causeway.end.x, causeway.end.z))
 	if is_sky(spec):
 		var rr: float = sky_rock_radius(spec)
 		e = e.merge(Rect2(Vector2(-rr, -rr), Vector2(rr * 2.0, rr * 2.0)))

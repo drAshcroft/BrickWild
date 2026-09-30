@@ -91,6 +91,8 @@ var barbican: bool               # outwork in front of the gate (fortress)
 ## Clear ditch span at the entrance. Water castles supply their moat/causeway
 ## separately; zero means that an ordinary dry gate needs no drawbridge.
 var ditch_width: float = 0.0
+## Number of nested water cuts around the outer enceinte (1..2).
+var moat_count: int = 1
 
 # inner ward (fortress only): the second, higher enceinte
 var inner_ward: bool
