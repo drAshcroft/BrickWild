@@ -67,14 +67,14 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | the furnisher, prop recipes, assembly, exterior dressing | `lane:dress` | ~10 m |
 | anything under `assets/props/` or `catalog.json` (rebuild the catalogue first) | `lane:assets` | ~6 m |
 | castle / temple geometry | `lane:castle`, `lane:temple` | 3-8 m |
-| church shell, opening or roof geometry | `lane:church-change` | ~1-4 m under measured host load |
-| exhaustive church sweep | `lane:church` | scheduled; currently unbounded by dome roof clipping |
+| church shell, opening or roof geometry | `lane:church-change` | ~10 s suite body; startup varies |
+| exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
 
 For a dome emitter change, also run `godot --headless --path . --script
 res://tests/vis008_dome_fixture.gd`. The bounded church lane checks dome
-surfaces and supports through `churchroof`; assembled Byzantine and other dome
-styles remain in the exhaustive lane until `QA-PERF-003` bounds roof clipping.
+surfaces and supports through `churchroof`, and assembles Byzantine,
+Renaissance and Russian fixtures plus Hagia Sophia, Florence and St Basil.
 
 The lanes are defined in `LANES` at the top of `tests/run_all.gd`. Lanes and
 bare suite names mix freely and de-duplicate.

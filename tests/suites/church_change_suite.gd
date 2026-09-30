@@ -3,14 +3,16 @@ extends RefCounted
 ## sweeps remain in the named church suites and lane:church.
 
 const Apertures = preload("res://tests/suites/church_aperture_suite.gd")
+const Roofs = preload("res://src/church/church_roofs.gd")
+const RoofSuite = preload("res://tests/suites/church_roof_suite.gd")
 
 
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("church change")
-	# Assembled domed styles enter the scheduled sweep. QA-PERF-003 tracks
-	# their currently unbounded roof clipping. churchroof below still checks
-	# dome surfaces and support geometry in this change lane.
-	for style in [&"romanesque", &"gothic", &"nordic_stave"]:
+	# The roof clipper is bounded for assembled domes, so the change lane
+	# checks them alongside the simpler roof and tower forms.
+	for style in [&"romanesque", &"gothic", &"nordic_stave",
+			&"byzantine", &"renaissance", &"russian"]:
 		for index in [3, 8]:
 			var started := Time.get_ticks_msec()
 			var spec: ChurchSpec = TestSweep.spec_at(style, index)
@@ -23,10 +25,15 @@ static func run() -> SuiteResult:
 				NormalsSuite.check_mesh(res, mesh, who)
 				NormalsSuite.check_openings(res, builder, who)
 			_check_massing(res, spec, builder, who)
+			if style == &"byzantine" and index == 3:
+				_expect(res, (mesh.surface_get_arrays(ChurchBuilder.SURF_ROOF)[Mesh.ARRAY_VERTEX]
+					as PackedVector3Array).size() < 12000,
+					"Byzantine roof clipping fragment count regressed")
+				_dome_cut_control(res, spec, builder)
 			var elapsed := (Time.get_ticks_msec() - started) / 1000.0
 			res.note("%s %.2fs" % [who, elapsed])
 
-	for key in ["notre_dame", "durham"]:
+	for key in ["notre_dame", "durham", "hagia_sophia", "florence_duomo", "st_basil"]:
 		var started := Time.get_ticks_msec()
 		var row := _landmark_row(key)
 		var spec := ChurchSpec.new()
@@ -41,6 +48,10 @@ static func run() -> SuiteResult:
 		LandmarkSuite._check_required_masses(key, builder, key, res)
 		LandmarkSuite._check_clerestory(spec, builder, key, res)
 		_check_massing(res, spec, builder, key)
+		if key == "hagia_sophia":
+			_expect(res, (mesh.surface_get_arrays(ChurchBuilder.SURF_ROOF)[Mesh.ARRAY_VERTEX]
+				as PackedVector3Array).size() < 12000,
+				"Hagia Sophia roof clipping fragment count regressed")
 		if key == "notre_dame":
 			var clerestory := ChurchGeometry.clerestory_windows(spec)
 			_expect(res, not clerestory.is_empty(), "Notre-Dame lacks clerestory fixture")
@@ -56,8 +67,29 @@ static func run() -> SuiteResult:
 	var route_elapsed := (Time.get_ticks_msec() - route_start) / 1000.0
 	res.note("entrance routes %.2fs" % route_elapsed)
 	_negative_controls(res)
-	res.note("assembled domed styles remain in lane:church; QA-PERF-003 tracks clipping")
 	return res
+
+
+static func _dome_cut_control(res: SuiteResult, spec: ChurchSpec,
+		builder: ChurchBuilder) -> void:
+	var cut := MeshKit.new(4)
+	var uncut := MeshKit.new(4)
+	for surface in range(4):
+		# SurfaceTool omits empty surfaces; place these fixtures far from the
+		# sample to retain the church surface indexes.
+		cut.box(Vector3.ONE, Vector3(-100, -100, -100), surface)
+		uncut.box(Vector3.ONE, Vector3(-100, -100, -100), surface)
+	Roofs.emit(spec, cut, builder.mass_log, builder._roof_volumes)
+	Roofs.emit(spec, uncut, builder.mass_log, [])
+	var x := -0.625 * spec.dome_radius * 1.5
+	var z := ChurchGeometry.crossing_center_z(spec)
+	var cut_roof := RoofSuite._triangles(cut.commit(), ChurchBuilder.SURF_ROOF)
+	var uncut_roof := RoofSuite._triangles(uncut.commit(), ChurchBuilder.SURF_ROOF)
+	var cut_hits := RoofSuite._heights(cut_roof, x, z, 0, 100)
+	var uncut_hits := RoofSuite._heights(uncut_roof, x, z, 0, 100)
+	_expect(res, cut_hits.is_empty(), "Byzantine half-dome has roof inside shell")
+	_expect(res, uncut_hits.size() == 2,
+		"missing-volume negative control did not expose the roof inside half-dome")
 
 
 static func _landmark_row(key: String) -> Dictionary:

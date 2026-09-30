@@ -86,7 +86,7 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 ##   lane:dress   ~10m   the furnisher, prop recipes, assembly, exteriors
 ##   lane:assets  ~6m    anything under assets/props/ or catalog.json
 ##   lane:castle  ~8m    castle geometry, massing, interiors
-##   lane:church-change  ~1-4m  bounded roofs, shell, openings, massing
+##   lane:church-change  ~10s body  bounded roofs, domed styles, openings, massing
 ##   lane:church         exhaustive church sweeps; schedule separately
 ##   lane:temple  ~3m    temple geometry and the rite rules
 ##   lane:sweep   ~40m   everything above; background it, do not wait on it

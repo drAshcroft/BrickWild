@@ -38,6 +38,9 @@ static func emit(spec: ChurchSpec, kit: MeshKit, masses: Array[Dictionary],
 	var bounds: Array[Rect2] = []
 	for cover in covers:
 		bounds.append(_bounds(cover))
+	var volume_bounds: Array[Rect2] = []
+	for volume in volumes:
+		volume_bounds.append(_bounds(volume))
 	for fi in range(faces.size()):
 		var face := faces[fi]
 		var pieces: Array[PackedVector2Array] = [RoofShape.footprint(face)]
@@ -56,15 +59,24 @@ static func emit(spec: ChurchSpec, kit: MeshKit, masses: Array[Dictionary],
 			pieces = remaining
 			if pieces.is_empty():
 				break
-		for volume in volumes:
-			if not bounds[fi].intersects(_bounds(volume)):
+		for vi in range(volumes.size()):
+			if pieces.is_empty():
+				break
+			if not bounds[fi].intersects(volume_bounds[vi]):
 				continue
-			var hole := _section(volume, face)
+			var hole := _section(volumes[vi], face)
 			if Poly.area(hole) < 0.000001:
 				continue
+			var hole_bounds := _bounds2(hole)
 			var remaining: Array[PackedVector2Array] = []
 			for piece in pieces:
-				remaining.append_array(RoofShape.subtract(piece, hole))
+				# A tetrahedron only cuts roof pieces whose projected footprints
+				# overlap its section. This avoids repeated convex clipping of the
+				# pieces left behind by earlier dome segments.
+				if _bounds2(piece).intersects(hole_bounds):
+					remaining.append_array(RoofShape.subtract(piece, hole))
+				else:
+					remaining.append(piece)
 			pieces = remaining
 		for piece in pieces:
 			piece = _clean_precision_edges(piece)
@@ -141,6 +153,13 @@ static func _bounds(face: PackedVector3Array) -> Rect2:
 	var bounds := Rect2(Vector2(face[0].x, face[0].z), Vector2.ZERO)
 	for p in face:
 		bounds = bounds.expand(Vector2(p.x, p.z))
+	return bounds
+
+
+static func _bounds2(poly: PackedVector2Array) -> Rect2:
+	var bounds := Rect2(poly[0], Vector2.ZERO)
+	for p in poly:
+		bounds = bounds.expand(p)
 	return bounds
 
 

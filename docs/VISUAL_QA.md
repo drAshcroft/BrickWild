@@ -313,8 +313,9 @@ Visual acceptance still needs fixed-camera renders beside the geometry
 checks: a log entry or a dark patch cannot prove that masonry was cut.
 Routine church geometry edits now have a [bounded change lane](../artifacts/qa_perf_002/README.md)
 covering roofs, selected shells, apertures, normals, massing and landmarks.
-Assembled domed churches remain in the scheduled broad lane until
-`QA-PERF-003` bounds their roof clipping cost.
+`QA-PERF-003` [bounded dome clipping](QA_PERF_003.md) and added assembled
+Byzantine, Renaissance and Russian fixtures plus three domed landmarks to that
+lane. The exhaustive church sweep remains scheduled separately.
 
 ---
 

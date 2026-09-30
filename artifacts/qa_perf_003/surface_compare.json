@@ -1,0 +1,43 @@
+{
+  "samples": 289,
+  "exact_samples": 286,
+  "max_height_delta_mm": 1,
+  "different_samples": [
+    {
+      "ix": 1,
+      "iz": 10,
+      "baseline_mm": [
+        16123,
+        16364
+      ],
+      "after_mm": [
+        16124,
+        16364
+      ]
+    },
+    {
+      "ix": 2,
+      "iz": 4,
+      "baseline_mm": [
+        14930,
+        15170
+      ],
+      "after_mm": [
+        14930,
+        15169
+      ]
+    },
+    {
+      "ix": 16,
+      "iz": 10,
+      "baseline_mm": [
+        16123,
+        16364
+      ],
+      "after_mm": [
+        16124,
+        16364
+      ]
+    }
+  ]
+}
