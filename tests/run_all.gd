@@ -48,7 +48,7 @@ extends SceneTree
 ##  30 tree      - the generated tree family: four styles, 24 species, ten rules
 ##  31 bridge    - the bridge family: four kinds, four mechanisms, ten rules
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
-	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
+	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
@@ -167,6 +167,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return load("res://tests/suites/castle_plan_shell_suite.gd").run()
 		"ctowerplan":
 			return load("res://tests/suites/castle_tower_plan_suite.gd").run()
+		"ctowerhouse":
+			return load("res://tests/suites/castle_tower_house_suite.gd").run()
 		"cmotteplan":
 			return load("res://tests/suites/castle_motte_plan_suite.gd").run()
 		"cforms":

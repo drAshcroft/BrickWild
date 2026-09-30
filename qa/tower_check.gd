@@ -69,10 +69,13 @@ func _check_lift(_spec: CastleSpec, builder: CastleBuilder) -> void:
 	var doors := 0
 	var lowest := INF
 	for p in builder.part_log:
-		if p["kind"] != "window":
+		var opening_kind := StringName(p.get("opening_kind", ""))
+		if opening_kind.is_empty():
+			opening_kind = &"door" if p.get("tag", "") == "door" else StringName(p.get("kind", ""))
+		if opening_kind not in [&"window", &"door"]:
 			continue
 		var sill: float = float((p["pos"] as Vector3).y) - float((p["size"] as Vector3).y) / 2.0
-		if p["tag"] == "door":
+		if opening_kind == &"door":
 			doors += 1
 			if sill < LIFT_MIN - TOL:
 				failures.append("lift: the door sill is %.2fm up; a tower house is entered at %.0fm or more"

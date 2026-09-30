@@ -10,6 +10,7 @@ extends RefCounted
 
 const OVAL_SIDES := 24
 const MIN_WINDOW_EDGE := 0.9
+const MIN_WINDOW_WIDTH := 0.3
 const STAIR_RUN := 1.8
 const STAIR_WIDTH := 0.9
 
@@ -183,7 +184,7 @@ static func _add_windows(plan: HousePlan, source: CastleSpec, storey_h: float,
 				continue
 			var pos := (from + to) * 0.5
 			var width := minf(source.window_w, length * 0.45)
-			if width < 0.35:
+			if width < MIN_WINDOW_WIDTH:
 				continue
 			plan.windows.append({"room": level, "pos": pos, "normal": outward,
 				"width": width, "sill": sill, "head": sill + height,
