@@ -773,9 +773,9 @@ func _seed_inside(box: AABB) -> Vector3i:
 	return Vector3i(-1, -1, -1)
 
 
-## Legacy slits are recesses over solid masonry. HousePlan windows are real
-## apertures: measure their surrounding masonry instead of demanding stone
-## through the glass. The fine shell tests separately measure aperture clearance.
+## Legacy slits are recesses over solid masonry. Through slits and HousePlan
+## windows are apertures: measure their masonry returns instead of demanding
+## stone through the opening. The fine shell tests separately measure clearance.
 func _check_openings() -> void:
 	var checked := 0
 	for p in builder.part_log:
@@ -784,7 +784,7 @@ func _check_openings() -> void:
 		checked += 1
 		var pos: Vector3 = p["pos"]
 		var tag: String = p["tag"]
-		if bool(p.get("planned_opening", false)):
+		if bool(p.get("planned_opening", false)) or bool(p.get("through_opening", false)):
 			_check_aperture_surround(p)
 			continue
 		var cell := (pos - _grid.origin) / _grid.vox

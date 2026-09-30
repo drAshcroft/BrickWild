@@ -1,0 +1,14 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+BASELINE norman fortress seed=9119
+  FAIL forebuilding: enclosed keep is missing its protected entrance stair
+BASELINE crusader fortress seed=9118
+  FAIL no_overlap: tower_1_gate_0 and wall_stair_0 interpenetrate 1.40m; they must not touch
+  FAIL no_overlap: tower_1_gate_1 and wall_stair_1 interpenetrate 1.40m; they must not touch
+BASELINE tower house seed=8803
+  FAIL lift: 0 doors; a tower house has one raised door
+  FAIL facade: tower_house occupied storey 1 has no emitted window in height band 7.50..15.00
+  FAIL facade: tower_house occupied storey 2 has no emitted window in height band 15.00..22.50
+  FAIL facade: tower_house occupied storey 3 has no emitted window in height band 22.50..30.00
+  FAIL facade: tower_house occupied storey 4 has no emitted window in height band 30.00..37.50
+  FAIL facade: tower_house occupied storey 5 has no emitted window in height band 37.50..45.00

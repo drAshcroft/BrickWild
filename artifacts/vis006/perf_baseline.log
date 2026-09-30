@@ -1,0 +1,7 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+PERF run=0 build_ms=11611.379 stone_vertices=34962 total_surfaces=4
+PERF run=1 build_ms=13014.935 stone_vertices=34962 total_surfaces=4
+PERF run=2 build_ms=11095.533 stone_vertices=34962 total_surfaces=4
+PERF run=3 build_ms=10091.293 stone_vertices=34962 total_surfaces=4
+PERF tower_full_castle_first_stone_hit_m=2.951

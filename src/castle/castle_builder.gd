@@ -970,10 +970,12 @@ func _build_ring_walls_rect(r: int) -> void:
 		if a.size.x < CastleGeometry.MIN_WALL_RUN and a.size.z < CastleGeometry.MIN_WALL_RUN:
 			continue
 		var outward: Vector3 = _wall_outward(which)
-		_battered_wall(a, t, outward)
+		var slit_points := _wall_slit_positions(a, outward, t)
+		_battered_wall(a, t, outward, slit_points)
 		_log_mass("wall_%d_%s" % [r, String(which)], a)
 		_wall_top(a, outward, t)
-		_wall_slits(a, outward, t, r)
+		_emit_wall_slits(slit_points, outward, true,
+			lerpf(a.size.x if absf(outward.x) > 0.5 else a.size.z, t, 0.62))
 		total_height = maxf(total_height, a.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
 
 
@@ -998,13 +1000,49 @@ func _wall_run(seg: Dictionary, r: int) -> void:
 	# the inner face, which is vertical at every course
 	var mid: Vector2 = ((seg["a"] as Vector2) + (seg["b"] as Vector2)) / 2.0
 	var inner := Vector3(mid.x - outward.x * t, 0.0, mid.y - outward.z * t)
-	for i in range(BATTER_STEPS):
-		var y0: float = h * float(i) / BATTER_STEPS
-		var y1: float = h * float(i + 1) / BATTER_STEPS
-		var th: float = lerpf(tb, t, (y0 + y1) / 2.0 / h)
-		box(Vector3(run, y1 - y0, th),
-			inner + outward * (th / 2.0) + Vector3(0.0, (y0 + y1) / 2.0, 0.0),
-			SURF_STONE, yaw)
+	var slit_y: float = h * 0.62
+	var slit_offsets: Array[float] = []
+	var slit_count: int = clampi(int(run / SLIT_BAY), 1, 24)
+	for i in range(slit_count):
+		slit_offsets.append(((float(i) + 1.0) / (float(slit_count) + 1.0) - 0.5) * run)
+	var levels: Array[float] = [0.0, h]
+	for i in range(1, BATTER_STEPS):
+		levels.append(h * float(i) / BATTER_STEPS)
+	for _offset in slit_offsets:
+		levels.append(clampf(slit_y - 0.75, 0.0, h))
+		levels.append(clampf(slit_y + 0.75, 0.0, h))
+	levels.sort()
+	var run_axis := Vector3(cos(yaw), 0.0, -sin(yaw))
+	for i in range(levels.size() - 1):
+		var y0: float = levels[i]
+		var y1: float = levels[i + 1]
+		if y1 <= y0 + 0.001:
+			continue
+		var ymid := (y0 + y1) * 0.5
+		var th: float = lerpf(tb, t, ymid / h)
+		var exclusions: Array[Vector2] = []
+		if absf(ymid - slit_y) < 0.75:
+			for offset in slit_offsets:
+				exclusions.append(Vector2(offset - 0.16, offset + 0.16))
+		if exclusions.is_empty():
+			box(Vector3(run, y1 - y0, th),
+				inner + outward * (th / 2.0) + Vector3(0.0, ymid, 0.0),
+				SURF_STONE, yaw)
+			continue
+		exclusions.sort_custom(func(l: Vector2, r: Vector2) -> bool: return l.x < r.x)
+		var cursor := -run * 0.5
+		for hole in exclusions:
+			var start: float = clampf(hole.x, -run * 0.5, run * 0.5)
+			if start > cursor + 0.01:
+				var width := start - cursor
+				box(Vector3(width, y1 - y0, th),
+					inner + outward * (th / 2.0) + run_axis * ((cursor + start) * 0.5)
+					+ Vector3(0.0, ymid, 0.0), SURF_STONE, yaw)
+			cursor = maxf(cursor, clampf(hole.y, -run * 0.5, run * 0.5))
+		if run * 0.5 > cursor + 0.01:
+			box(Vector3(run * 0.5 - cursor, y1 - y0, th),
+				inner + outward * (th / 2.0) + run_axis * ((cursor + run * 0.5) * 0.5)
+				+ Vector3(0.0, ymid, 0.0), SURF_STONE, yaw)
 	_log_mass("wall_%d_%s" % [r, String(seg["name"])],
 		CastleGeometry.segment_aabb(spec, r, seg))
 
@@ -1032,12 +1070,13 @@ func _run_slits(seg: Dictionary, r: int) -> void:
 	var y: float = h * 0.62
 	var th: float = lerpf(tb, t, y / h)
 	var face: Vector3 = inner + outward * (th + CastleGeometry.OPENING_EPS)
-	var along := Vector3(cos(seg["yaw"]), 0.0, -sin(seg["yaw"])) * run
+	var along := Vector3(cos(seg["yaw"]), 0.0, -sin(seg["yaw"]))
+	var points: Array[Vector3] = []
 	var n: int = clampi(int(run / SLIT_BAY), 1, 24)
 	for i in range(n):
 		var f: float = (float(i) + 1.0) / (float(n) + 1.0) - 0.5
-		_opening(face + along * f + Vector3(0.0, y, 0.0), seg["yaw"], 0.32, 1.5,
-			&"slit")
+		points.append(face + along * (f * run) + Vector3(0.0, y, 0.0))
+	_emit_wall_slits(points, outward, true, th)
 
 
 ## The keep: a great square tower, a drum, a shell keep on its own plinth, or
@@ -1078,12 +1117,12 @@ func _build_keep() -> void:
 			_shell_openings(c, corner * 0.91, plinth * 0.5, 4, PI / 4.0)
 		_:
 			if not planned:
-				_box_aabb(k, SURF_STONE)
+				_cut_keep_shell(k, opening_y)
 			_crenellate_rect(k, k.size.y, SURF_TRIM)
 			_kit.hip_roof_at(Transform3D(Basis(), c + Vector3(0, k.size.y, 0)),
 				k.size.x * 0.8, k.size.z * 0.8, CastleGeometry.roof_rise(spec, k), SURF_ROOF)
 			if not planned:
-				_face_openings(k, opening_y, spec.window_style)
+				_keep_windows(k, opening_y, spec.window_style)
 	total_height = maxf(total_height, k.size.y + CastleGeometry.roof_rise(spec, k))
 
 
@@ -1178,6 +1217,130 @@ func _build_planned_keep_crown(k: AABB) -> void:
 
 
 # --------------------------------------------------------------- primitives
+
+## Emit a battered tower skin as facet panels, omitting a rectangular aperture
+## from the facet that faces the curtain. CastleGeometry's circumradii are used
+## at both ends, so the opening follows the real polygon face as it tapers.
+func _battered_tower_skin(c: Vector3, base_r: float, top_r: float, h: float,
+		sides: int, rot: float, outward: Vector3) -> Dictionary:
+	var picked := -1
+	var best := -INF
+	for side in range(sides):
+		var mid := rot + TAU * (float(side) + 0.5) / sides
+		var n := Vector3(cos(mid), 0, sin(mid))
+		var score := n.dot(outward.normalized())
+		if score > best:
+			best = score
+			picked = side
+	var slit_y := h * 0.6
+	var slit_h := minf(1.4, h * 0.3)
+	var slit_w := 0.32
+	var bottom := slit_y - slit_h * 0.5
+	var top := slit_y + slit_h * 0.5
+	var picked_mid := rot + TAU * (float(picked) + 0.5) / sides
+	var mid_radius := lerpf(base_r, top_r, slit_y / h)
+	var half_span := maxf(mid_radius * sin(PI / float(sides)), 0.1)
+	var s0 := clampf(0.5 - slit_w / (4.0 * half_span), 0.08, 0.42)
+	var s1 := 1.0 - s0
+	var st := _kit.surface(SURF_STONE)
+	for side in range(sides):
+		var a0 := rot + TAU * float(side) / sides
+		var a1 := rot + TAU * float(side + 1) / sides
+		var is_cut := side == picked
+		var left_end := s0 if is_cut else 1.0
+		var ranges: Array[Vector4] = []
+		if is_cut:
+			ranges.append(Vector4(0.0, left_end, 0.0, h))
+			ranges.append(Vector4(s1, 1.0, 0.0, h))
+			ranges.append(Vector4(s0, s1, 0.0, bottom))
+			ranges.append(Vector4(s0, s1, top, h))
+		else:
+			ranges.append(Vector4(0.0, 1.0, 0.0, h))
+		for rrange in ranges:
+			if rrange.x >= rrange.y or rrange.z >= rrange.w:
+				continue
+			var p0 := _drum_point(c, base_r, top_r, h, a0, a1, rrange.x, rrange.z)
+			var p1 := _drum_point(c, base_r, top_r, h, a0, a1, rrange.y, rrange.z)
+			var p2 := _drum_point(c, base_r, top_r, h, a0, a1, rrange.y, rrange.w)
+			var p3 := _drum_point(c, base_r, top_r, h, a0, a1, rrange.x, rrange.w)
+			_kit._quad(st, p0, p1, p2, p3)
+	var cap := c + Vector3.UP * h
+	for side in range(sides):
+		var a0 := rot + TAU * float(side) / sides
+		var a1 := rot + TAU * float(side + 1) / sides
+		var p0 := cap + Vector3(cos(a0) * top_r, 0, sin(a0) * top_r)
+		var p1 := cap + Vector3(cos(a1) * top_r, 0, sin(a1) * top_r)
+		_kit._tri(st, p0, p1, cap)
+	var normal := Vector3(cos(picked_mid), 0, sin(picked_mid))
+	var angle := atan2(normal.x, normal.z)
+	var face_r := mid_radius * cos(PI / float(sides)) + CastleGeometry.OPENING_EPS
+	return {"pos": c + normal * face_r + Vector3.UP * slit_y,
+		"angle": angle, "width": slit_w, "height": slit_h,
+		"depth": maxf(spec.wall_thickness, 0.35)}
+
+
+func _drum_point(c: Vector3, base_r: float, top_r: float, h: float,
+		a0: float, a1: float, along: float, y: float) -> Vector3:
+	var f := y / h
+	var radius := lerpf(base_r, top_r, f)
+	var p0 := c + Vector3(cos(a0) * radius, y, sin(a0) * radius)
+	var p1 := c + Vector3(cos(a1) * radius, y, sin(a1) * radius)
+	return p0.lerp(p1, along)
+
+## A square keep is a masonry shell around a narrow through-window band. The
+## four inner returns are real reveals: the stone wall is absent through its
+## thickness, rather than hidden behind the dark opening material.
+func _cut_keep_shell(a: AABB, window_y: float) -> void:
+	var w: float = minf(spec.window_w, minf(a.size.x, a.size.z) * 0.28)
+	var h: float = minf(spec.window_h, a.size.y * 0.22)
+	var y0: float = clampf(window_y - h * 0.5, 0.4, a.size.y - h - 0.4)
+	var y1: float = y0 + h
+	var cx: float = a.position.x + a.size.x * 0.5
+	var cz: float = a.position.z + a.size.z * 0.5
+	var x0: float = a.position.x
+	var x1: float = a.position.x + a.size.x
+	if y0 > 0.01:
+		box(Vector3(a.size.x, y0, a.size.z), Vector3(cx, y0 * 0.5, cz), SURF_STONE)
+	if y1 < a.size.y - 0.01:
+		box(Vector3(a.size.x, a.size.y - y1, a.size.z),
+			Vector3(cx, (y1 + a.size.y) * 0.5, cz), SURF_STONE)
+	var half_w := w * 0.5
+	var left := cx - half_w - x0
+	var right := x1 - (cx + half_w)
+	var depth := minf(spec.wall_thickness, minf(a.size.x, a.size.z) * 0.22)
+	var front_z := a.position.z + depth * 0.5
+	var back_z := a.position.z + a.size.z - depth * 0.5
+	var band_y := (y0 + y1) * 0.5
+	for face_z in [front_z, back_z]:
+		if left > 0.01:
+			box(Vector3(left, h, depth), Vector3((x0 + cx - half_w) * 0.5, band_y, face_z), SURF_STONE)
+		if right > 0.01:
+			box(Vector3(right, h, depth), Vector3((cx + half_w + x1) * 0.5, band_y, face_z), SURF_STONE)
+	var cut_z0 := cz - half_w
+	var cut_z1 := cz + half_w
+	var back_len := maxf(0.0, a.position.z + a.size.z - depth - cut_z1)
+	var front_len := maxf(0.0, cut_z0 - (a.position.z + depth))
+	for face_x in [a.position.x + depth * 0.5, a.position.x + a.size.x - depth * 0.5]:
+		if front_len > 0.01:
+			box(Vector3(depth, h, front_len), Vector3(face_x, band_y, a.position.z + depth + front_len * 0.5), SURF_STONE)
+		if back_len > 0.01:
+			box(Vector3(depth, h, back_len), Vector3(face_x, band_y, cut_z1 + back_len * 0.5), SURF_STONE)
+
+
+func _keep_windows(a: AABB, y: float, style: StringName) -> void:
+	var w: float = minf(spec.window_w, minf(a.size.x, a.size.z) * 0.28)
+	var h: float = minf(spec.window_h, a.size.y * 0.22)
+	var cx := a.position.x + a.size.x * 0.5
+	var cz := a.position.z + a.size.z * 0.5
+	var zfront := a.position.z - CastleGeometry.OPENING_EPS
+	var zback := a.position.z + a.size.z + CastleGeometry.OPENING_EPS
+	var xleft := a.position.x - CastleGeometry.OPENING_EPS
+	var xright := a.position.x + a.size.x + CastleGeometry.OPENING_EPS
+	var reveal_depth := minf(spec.wall_thickness, minf(a.size.x, a.size.z) * 0.22)
+	_opening(Vector3(cx, y, zfront), PI, w, h, style, false, true, reveal_depth)
+	_opening(Vector3(cx, y, zback), 0.0, w, h, style, false, true, reveal_depth)
+	_opening(Vector3(xleft, y, cz), -PI * 0.5, w, h, style, false, true, reveal_depth)
+	_opening(Vector3(xright, y, cz), PI * 0.5, w, h, style, false, true, reveal_depth)
 
 ## Metres of bailey-facing wall per window on a hall or chapel: a row of
 ## windows, not one every five metres.
@@ -1320,21 +1483,68 @@ func _dormers(a: AABB, along_x: bool, rise: float) -> void:
 ## A wall run emitted as a battered stack: the inner face is vertical at every
 ## course, the outer face spreads as it descends. Pinning the inner face is what
 ## lets everything inside the bailey ignore the talus completely.
-func _battered_wall(a: AABB, top_thick: float, outward: Vector3) -> void:
+func _battered_wall(a: AABB, top_thick: float, outward: Vector3,
+		cutouts: Array[Vector3] = []) -> void:
 	var axis: int = 0 if absf(outward.x) > 0.5 else 2
 	var base_thick: float = a.size.x if axis == 0 else a.size.z
 	var inner: float = a.position[axis] if outward[axis] > 0.0 \
 		else a.position[axis] + base_thick
-	for i in range(BATTER_STEPS):
-		var y0: float = a.size.y * float(i) / BATTER_STEPS
-		var y1: float = a.size.y * float(i + 1) / BATTER_STEPS
+	var levels: Array[float] = [0.0, a.size.y]
+	for i in range(1, BATTER_STEPS):
+		levels.append(a.size.y * float(i) / BATTER_STEPS)
+	for cut in cutouts:
+		levels.append(clampf(cut.y - 0.75, 0.0, a.size.y))
+		levels.append(clampf(cut.y + 0.75, 0.0, a.size.y))
+	levels.sort()
+	for i in range(levels.size() - 1):
+		var y0: float = levels[i]
+		var y1: float = levels[i + 1]
+		if y1 <= y0 + 0.001:
+			continue
 		var th: float = lerpf(base_thick, top_thick, (y0 + y1) / 2.0 / a.size.y)
 		var c: float = inner + outward[axis] * th / 2.0
 		var size := Vector3(th if axis == 0 else a.size.x, y1 - y0,
 			a.size.z if axis == 0 else th)
 		var pos := Vector3(c if axis == 0 else a.position.x + a.size.x / 2.0,
 			(y0 + y1) / 2.0, a.position.z + a.size.z / 2.0 if axis == 0 else c)
-		box(size, pos, SURF_STONE)
+		var exclusions: Array[Vector2] = []
+		for cut in cutouts:
+			if cut.y - 0.75 <= (y0 + y1) * 0.5 and cut.y + 0.75 >= (y0 + y1) * 0.5:
+				var q: float = cut.z if axis == 0 else cut.x
+				exclusions.append(Vector2(q - 0.16, q + 0.16))
+		if exclusions.is_empty():
+			box(size, pos, SURF_STONE)
+			continue
+		exclusions.sort_custom(func(l: Vector2, r: Vector2) -> bool: return l.x < r.x)
+		var run_min: float = a.position.z if axis == 0 else a.position.x
+		var run_max: float = run_min + (a.size.z if axis == 0 else a.size.x)
+		var cursor := run_min
+		var base_pos := pos
+		for hole in exclusions:
+			var left_end: float = clampf(hole.x, run_min, run_max)
+			if left_end > cursor + 0.01:
+				var piece := size
+				if axis == 0:
+					piece.z = left_end - cursor
+					pos = base_pos
+					pos.z = (cursor + left_end) * 0.5
+				else:
+					piece.x = left_end - cursor
+					pos = base_pos
+					pos.x = (cursor + left_end) * 0.5
+				box(piece, pos, SURF_STONE)
+			cursor = maxf(cursor, clampf(hole.y, run_min, run_max))
+		if run_max > cursor + 0.01:
+			var piece := size
+			if axis == 0:
+				piece.z = run_max - cursor
+				pos = base_pos
+				pos.z = (cursor + run_max) * 0.5
+			else:
+				piece.x = run_max - cursor
+				pos = base_pos
+				pos.x = (cursor + run_max) * 0.5
+			box(piece, pos, SURF_STONE)
 
 
 ## The wall walk and its merlons, following the wall's own top face.
@@ -1368,7 +1578,7 @@ func _wall_top(a: AABB, outward: Vector3, top_thick: float) -> void:
 ## Arrow slits down the outer face of a wall run. The face is battered, so the
 ## slit has to follow it: placed on the base plane instead, every one of them
 ## would hang in the air a metre outside a wall that had already stepped in.
-func _wall_slits(a: AABB, outward: Vector3, top_thick: float, r: int) -> void:
+func _wall_slit_positions(a: AABB, outward: Vector3, top_thick: float) -> Array[Vector3]:
 	var axis: int = 0 if absf(outward.x) > 0.5 else 2
 	var base_thick: float = a.size.x if axis == 0 else a.size.z
 	var inner: float = a.position[axis] if outward[axis] > 0.0 \
@@ -1378,7 +1588,7 @@ func _wall_slits(a: AABB, outward: Vector3, top_thick: float, r: int) -> void:
 	var face: float = inner + outward[axis] * (th + CastleGeometry.OPENING_EPS)
 	var run: float = a.size.z if axis == 0 else a.size.x
 	var n: int = clampi(int(run / SLIT_BAY), 1, 24)
-	var ang: float = atan2(outward.x, outward.z)
+	var points: Array[Vector3] = []
 	for i in range(n):
 		var f: float = (float(i) + 1.0) / (float(n) + 1.0)
 		var p: Vector3
@@ -1386,7 +1596,15 @@ func _wall_slits(a: AABB, outward: Vector3, top_thick: float, r: int) -> void:
 			p = Vector3(face, y, lerpf(a.position.z, a.position.z + a.size.z, f))
 		else:
 			p = Vector3(lerpf(a.position.x, a.position.x + a.size.x, f), y, face)
-		_opening(p, ang, 0.32, 1.5, &"slit")
+		points.append(p)
+	return points
+
+
+func _emit_wall_slits(points: Array[Vector3], outward: Vector3,
+		through := false, reveal_depth := 0.14) -> void:
+	var ang: float = atan2(outward.x, outward.z)
+	for p in points:
+		_opening(p, ang, 0.32, 1.5, &"slit", false, through, reveal_depth)
 
 
 ## One castle tower: a battered shaft, its cap, its parapet and its slits. The
@@ -1402,7 +1620,7 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 		CastleGeometry.tower_half_at(spec, r, vertex))
 	var base_r: float = CastleGeometry.tower_radius_for(spec,
 		CastleGeometry.tower_base_half_at(spec, r, vertex))
-	_kit.drum(c, base_r, top_r, h, SURF_STONE, sides, rot)
+	var slit: Dictionary = _battered_tower_skin(c, base_r, top_r, h, sides, rot, outward)
 	# A flat-topped tower needs a real deck under its crenellations.  The old
 	# ring emitted only the merlon blocks, leaving the roof envelope visible
 	# through the open top and making those blocks read as floating.  The deck
@@ -1437,16 +1655,8 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 				_crenellate_ring(c, parapet_r, h + deck_h, sides, SURF_TRIM)
 	total_height = maxf(total_height, h + rise)
 
-	# Slits on the faces that look OUT of the castle, and on the shell rather
-	# than on the bounding box: a tower's other faces are buried in the curtain
-	# it studs, so a slit there is a window into three metres of masonry.
-	var y: float = h * 0.6
-	var face_r: float = lerpf(base_r, top_r, y / h) * cos(PI / float(sides))
-	var out_ang: float = atan2(outward.x, outward.z)
-	for k in range(3):
-		var ang: float = out_ang + (float(k) - 1.0) * 0.6
-		_opening(c + Vector3(sin(ang) * (face_r + CastleGeometry.OPENING_EPS), y,
-			cos(ang) * (face_r + CastleGeometry.OPENING_EPS)), ang, 0.32, 1.4, &"slit")
+	# Cut one slit into the actual outward facet; the tower's buried faces stay shut.
+	_opening(slit.pos, slit.angle, slit.width, slit.height, &"slit", false, true, slit.depth)
 
 
 ## Merlons along a run, at `y`, each `thick` deep across the parapet.
@@ -1538,17 +1748,19 @@ func _box_aabb(a: AABB, surf: int) -> void:
 ## cannot tell a window from a window turned sideways -- the normals suite
 ## proves each one looks out of its wall.
 func _opening(pos: Vector3, face: float, w: float, h: float, style: StringName,
-		door := false) -> void:
+		door := false, through := false, reveal_depth := 0.14) -> void:
 	_log_part("window", pos, Vector3(w, h, 0.0), face,
 		Basis(Vector3.UP, face) * Vector3(0, 0, 1))
 	part_log.back()["door"] = door
+	part_log.back()["through_opening"] = through
 	var depth: float = 0.24 if door else 0.14
 	var t := Transform3D(Basis(Vector3.UP, face), pos)
 	var t_in: Transform3D = t.translated_local(Vector3(0, 0, -depth / 2.0))
-	_kit.oriented_box(Vector3(w, h, depth), t_in, SURF_OPEN)
+	if not through:
+		_kit.oriented_box(Vector3(w, h, depth), t_in, SURF_OPEN)
 	var st: SurfaceTool = _kit.surface(SURF_OPEN)
 	var face_n: Vector3 = t.basis * Vector3(0, 0, 1)
-	if style == &"arched":
+	if style == &"arched" and not through:
 		var seg: int = 5
 		var rr: float = w * 0.5
 		for i in range(seg):
@@ -1561,7 +1773,7 @@ func _opening(pos: Vector3, face: float, w: float, h: float, style: StringName,
 				st.set_normal(face_n)
 				st.set_uv(Vector2(0.5, 0.5))
 				st.add_vertex(t * p)
-	if style == &"mullioned":
+	if style == &"mullioned" and not through:
 		# the stone bar that divides a manor window into lights
 		_kit.oriented_box(Vector3(0.12, h, depth + 0.04), t_in, SURF_TRIM)
 	if door:
@@ -1573,6 +1785,17 @@ func _opening(pos: Vector3, face: float, w: float, h: float, style: StringName,
 		t_in.translated_local(Vector3(-w / 2.0 - ft / 2.0, 0, 0)), SURF_TRIM)
 	_kit.oriented_box(Vector3(ft, h, depth + 0.04),
 		t_in.translated_local(Vector3(w / 2.0 + ft / 2.0, 0, 0)), SURF_TRIM)
+	if through:
+		_kit.oriented_box(Vector3(w + ft * 2.0, ft, depth + 0.04),
+			t_in.translated_local(Vector3(0, -h / 2.0 - ft / 2.0, 0)), SURF_TRIM)
+		var rt := minf(0.10, w * 0.15)
+		var reveal := maxf(reveal_depth, 0.2)
+		for side in [-1.0, 1.0]:
+			_kit.oriented_box(Vector3(rt, h, reveal),
+				t.translated_local(Vector3(side * w * 0.5, 0, -reveal * 0.5)), SURF_TRIM)
+		for side in [-1.0, 1.0]:
+			_kit.oriented_box(Vector3(w, rt, reveal),
+				t.translated_local(Vector3(0, side * h * 0.5, -reveal * 0.5)), SURF_TRIM)
 
 
 ## Which way a named wall run faces.

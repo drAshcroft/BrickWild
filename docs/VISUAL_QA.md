@@ -300,14 +300,14 @@ finds in a village aerial.
 
 ---
 
-## 5. What not to chase
+## 5. Limits of the original review
 
-The churches and castles pass every structural suite in `run_all.gd`. Nothing
-in this document is a correctness problem. Every item above is the layer above
-correctness, which is why none of it is currently measured by anything — and
-why the cheapest useful next step is not a new check but a **render
-acceptance sheet**: the same nine axes, scored by eye, on a fixed set of
-subjects, committed beside `manifest.json`.
+The original review was visual, but its claim that every structural suite
+passed is no longer supported. The castle massing sweep on 2026-09-29 found
+pre-existing forebuilding, gate-stair overlap, and tower-house failures, each
+reproduced on the pre-aperture build. `CAS-REG-001` through `CAS-REG-003` track
+them. Visual acceptance still needs fixed-camera renders beside the geometry
+checks: a log entry or a dark patch cannot prove that masonry was cut.
 
 ---
 
@@ -318,12 +318,13 @@ visual work. The scores above remain a visual opinion about the original images,
 not automated QA results. Recent church and castle commits reorganised planning
 and interior code; the mesh and material paths relevant to these suggestions
 were largely unchanged. The reference portraits still showed the church and
-castle gap. No generator edit was made for this audit.
+castle gap. The initial audit was read-only; this table now records subsequent
+generator and render changes as their todos land.
 
 | Claim | Current finding | Work |
 |---|---|---|
 | S1, lighting | The original `render_shots.gd` fixed the sun while camera yaw varied. SSAO on the mobile renderer was not the missing geometry. | `VIS-001` now records camera-relative lighting and [paired acceptance renders](../artifacts/renders/visualqa/acceptance/README.md); the remaining flatness is in the building. |
-| S2, openings | Church and castle window routines placed shallow dark boxes against intact masonry. Some castle planned interiors and the gate tunnel already have real openings. | `VIS-005` cuts Gothic nave clerestory openings and west portals through their nave and twin-tower host walls. [Fixed-camera detail pairs](../artifacts/renders/visualqa/vis005/README.md) and ray checks show the depth. `VIS-012` gives those cut windows a pointed stone head and leaded glazing, and leaves the moulded west entrances deliberately open; [paired detail views](../artifacts/renders/visualqa/vis012/README.md) show the finish. `VIS-011` covers other church hosts. `VIS-006` addresses representative castle hosts. |
+| S2, openings | Church and castle window routines placed shallow dark boxes against intact masonry. Some castle planned interiors and the gate tunnel already have real openings. | `VIS-005` cuts Gothic nave clerestory openings and west portals through their nave and twin-tower host walls. [Fixed-camera detail pairs](../artifacts/renders/visualqa/vis005/README.md) and ray checks show the depth. `VIS-012` gives those cut windows a pointed stone head and leaded glazing, and leaves the moulded west entrances deliberately open; [paired detail views](../artifacts/renders/visualqa/vis012/README.md) show the finish. `VIS-011` cuts representative aisle, transept, apse, chapel, tower, narthex, drum and rose hosts; [front and raking evidence](../artifacts/vis011/README.md) includes rays through the stone and blocked adjacent piers. `VIS-014` tracks complete narthex and single-tower entrance routes. `VIS-006` cuts a straight and polygonal curtain slit, a battered tower facet, and a square keep window; [fixture and castle views](../artifacts/vis006/README.md) plus all-surface rays distinguish the aperture from a dark insert. `VIS-013` tracks round and shell keeps. |
 | S3, surfaces | Church and castle portraits used flat `StandardMaterial3D` overrides. The former box UVs restarted on each triangle and revolved faces had constant UVs. | `VIS-003` gives boxes, sloped faces, drums and partial sweeps metre-scale coordinates, confirmed by a [swatch](../artifacts/vis003/metric_coordinates.png) and mesh assertions. `VIS-004` applies restrained stone courses and roof tiles in both runtime assemblers. [Fixed-camera comparisons](../artifacts/renders/visualqa/vis004/README.md) show clearer scale without distant pattern noise. Temples and hotels still use flat materials. |
 | S4, buttresses | They already projected from the nave and had caps. Their thin, same-colour shape read poorly at portrait scale. | `VIS-007` adds three stepped shaft stages and shoulders, corrects twin-tower corner placement, and gives Gothic flyers a heavier arch and coping. [Fixed-camera Durham and Notre-Dame pairs](../artifacts/renders/visualqa/vis007/README.md) show a clearer bearing rhythm; the change remains subtle at whole-building scale. |
 | S5, great tower | The generated great-tower index and scale already reach `CastleBuilder._tower` through `CastleGeometry`. `CAS-002` completed this work. | No duplicate tower-wiring task. |

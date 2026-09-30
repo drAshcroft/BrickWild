@@ -1,0 +1,27 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running cmassing...
+--- castle massing ---
+    house       0/30 variants with defects
+    manor       0/30 variants with defects
+    castle      0/30 variants with defects
+    fortress    8/30 variants with defects
+    elapsed 1837.95s
+  FAIL norman fortress seed=9119: forebuilding: enclosed keep is missing its protected entrance stair
+  FAIL crusader fortress seed=9118: no_overlap: tower_1_gate_0 and wall_stair_0 interpenetrate 1.40m; they must not touch
+  FAIL crusader fortress seed=9118: no_overlap: tower_1_gate_1 and wall_stair_1 interpenetrate 1.40m; they must not touch
+  FAIL crusader fortress seed=9119: forebuilding: enclosed keep is missing its protected entrance stair
+  FAIL french_chateau fortress seed=9119: forebuilding: enclosed keep is missing its protected entrance stair
+  FAIL japanese fortress seed=9118: forebuilding: enclosed keep is missing its protected entrance stair
+  FAIL japanese fortress seed=9119: forebuilding: enclosed keep is missing its protected entrance stair
+  FAIL moorish fortress seed=9119: forebuilding: enclosed keep is missing its protected entrance stair
+  FAIL wizard fortress seed=9119: forebuilding: enclosed keep is missing its protected entrance stair
+  FAIL tower house fixture (should pass): lift: 0 doors; a tower house has one raised door
+  FAIL tower house fixture (massing, should pass): facade: tower_house occupied storey 1 has no emitted window in height band 7.50..15.00
+  FAIL tower house fixture (massing, should pass): facade: tower_house occupied storey 2 has no emitted window in height band 15.00..22.50
+  FAIL tower house fixture (massing, should pass): facade: tower_house occupied storey 3 has no emitted window in height band 22.50..30.00
+  FAIL tower house fixture (massing, should pass): facade: tower_house occupied storey 4 has no emitted window in height band 30.00..37.50
+  FAIL tower house fixture (massing, should pass): facade: tower_house occupied storey 5 has no emitted window in height band 37.50..45.00
+  FAIL tower house fixture (scottish, should pass): lift: 0 doors; a tower house has one raised door
+
+Running cvoxelqa...

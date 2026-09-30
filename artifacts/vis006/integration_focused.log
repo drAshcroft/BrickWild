@@ -1,0 +1,19 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running caperture...
+--- castle apertures ---
+    elapsed 1.65s
+
+Running cgateaccess...
+GATE_ACCESS norman failures=0
+GATE_ACCESS crusader failures=0
+GATE_ACCESS moorish failures=0
+GATE_ACCESS japanese failures=0
+--- castle gate access ---
+    elapsed 3.46s
+
+============================================================
+  castle apertures   PASS  (33 checked, 0 failures, 0 warnings)
+  castle gate access PASS  (16 checked, 0 failures, 0 warnings)
+============================================================
+ALL PASS -- 2 suites, 49 checks, 0 failures, 0 warnings

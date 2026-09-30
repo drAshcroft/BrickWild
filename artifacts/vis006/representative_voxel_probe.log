@@ -1,0 +1,13 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+bodiam seed=6001: PASS, 0 failures, 0 warnings
+bodiam seed=6001 normals: 0 failures, 1 warnings
+  WARN [keep] opening at (0.000000, 11.980516, 21.140003) is walled in from outside (bodiam)
+krak seed=6002: PASS, 0 failures, 0 warnings
+krak seed=6002 normals: 0 failures, 6 warnings
+  WARN [keep] opening at (-5.191888, 13.828838, 47.159996) is walled in from outside (krak)
+  WARN [keep] opening at (0.000000, 13.828838, 47.159996) is walled in from outside (krak)
+  WARN [keep] opening at (5.191888, 13.828838, 47.159996) is walled in from outside (krak)
+  WARN [keep] opening at (-5.191888, 24.857676, 47.159996) is walled in from outside (krak)
+  WARN [keep] opening at (0.000000, 24.857676, 47.159996) is walled in from outside (krak)
+  WARN [keep] opening at (5.191888, 24.857676, 47.159996) is walled in from outside (krak)
