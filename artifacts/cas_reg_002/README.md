@@ -17,6 +17,7 @@ Before, both outer wall stairs overlapped the corresponding inner gate-tower mas
 - `cgatestairs`: 7 checks, 0 failures. Checks the focused stair massing rule, emitted component parity, gate tower/stair AABB separation and counts, gate passage access, mesh normals and opening direction, and clear tread headroom.
 - `cgateaccess`: 16 checks, 0 failures, 0 warnings across Norman, Crusader, Moorish and Japanese gate cases.
 - `caccess`: 199 checks, 0 failures, 0 warnings across the enclosed castle/fortress style-size sweep. Suite body took 707.87 s; this broad physical-access suite is slow and its measured cost is recorded for `QA-PERF-001`.
+- After cherry-picking with QA-PERF-003, [the combined main-branch check](main_integration.log) passed `lane:church-change cgatestairs`: 5,395 checks, 0 failures or warnings.
 - Fixed-camera appearance renders for the same Crusader 9118 production emitters. Cameras: `clearance_overhead` and `clearance_raking`. These render ring walls, gatehouses, towers and stairs from `CastleBuilder`; interiors and yard dressing are omitted to keep the run bounded. The placement change is small in these full geometry views, so use the diagnostic below for direct clearance comparison.
 
 Images:
