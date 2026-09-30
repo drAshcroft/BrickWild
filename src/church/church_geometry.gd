@@ -544,7 +544,7 @@ static func flyer_pier_width(spec: ChurchSpec) -> float:
 
 
 static func flyer_arch_thickness(spec: ChurchSpec) -> float:
-	return clampf(spec.height * 0.05, 0.35, 2.2)
+	return clampf(spec.height * 0.065, 0.45, 2.6)
 
 
 ## Pinnacles, finials and the like scale off the wall height for the same reason.

@@ -46,6 +46,10 @@ func _init() -> void:
 		await _shoot_vis005_acceptance()
 		quit()
 		return
+	if args.has("vis007") or args.has("vis007-before"):
+		await _shoot_vis007_acceptance("before" if args.has("vis007-before") else "after")
+		quit()
+		return
 	if args.has("visual-qa"):
 		var selection: String = args[1] if args.size() > 1 else ""
 		await _shoot_visual_acceptance(selection)
@@ -329,6 +333,50 @@ func _shoot_vis005_frame(spec: ChurchSpec, file: String, yaw: float,
 	_root3d.remove_child(node)
 	node.free()
 	_set_legacy_lighting()
+
+
+## Durham's pier and Notre-Dame's flyer at locked scale, view and light.
+func _shoot_vis007_acceptance(label: String) -> void:
+	var out := "visualqa/vis007"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + out))
+	var rows: Array[Dictionary] = []
+	for entry in _landmarks():
+		if entry["key"] not in ["notre_dame", "durham"]:
+			continue
+		var spec: ChurchSpec = _landmark_spec(entry)
+		await _shoot_church(spec, "%s/%s_portrait_%s.jpg" % [out, entry["key"],
+			label], 0.72, -0.28)
+		var yaw := 1.25
+		var pitch := -0.16
+		var focus: Vector3
+		var radius: float
+		if entry["key"] == "notre_dame":
+			var pair: Array = _focus_of(spec, "flyers")
+			focus = pair[0]
+			radius = pair[1]
+		else:
+			var bz0: float = -spec.length / 2.0 + 0.8
+			if spec.tower:
+				bz0 = -spec.length / 2.0 + ChurchGeometry.TOWER_EMBED \
+					+ spec.tower_width + 0.4
+			var bz1: float = ChurchGeometry.transept_front_z(spec) - 0.6 \
+				if spec.transept else spec.length / 2.0 - 0.8
+			var count: int = maxi(spec.buttress_count_per_side - 1, 1)
+			var bz: float = bz0 + maxf(bz1 - bz0, 2.0) * float(count / 2) / count
+			focus = Vector3(spec.width / 2.0 + spec.buttress_depth * 0.4,
+				spec.height * 0.42, bz)
+			radius = spec.height * 0.58
+		var file: String = "%s/%s_%s.jpg" % [out, entry["key"], label]
+		await _shoot_church(spec, file, yaw, pitch, 1.0, focus, radius)
+		rows.append({"key": entry["key"], "seed": entry["seed"],
+			"file": file, "focus": focus, "radius": radius,
+			"camera": _camera_metadata(yaw, pitch, 1.0),
+			"light": _light_metadata(yaw)})
+	var f := FileAccess.open(OUT_DIR + "/" + out + "/manifest_" + label + ".json",
+		FileAccess.WRITE)
+	f.store_string(JSON.stringify({"shots": rows}, "\t"))
+	f.close()
+	print("wrote %d VIS-007 %s views" % [rows.size(), label])
 
 
 ## Diagnose the render path with one church and one castle. Both views in each

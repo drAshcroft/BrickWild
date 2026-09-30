@@ -171,19 +171,24 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		for side_v in [-1.0, 1.0]:
 			for i in range(n):
 				var bz: float = bz0 + span_bz / float(maxi(n - 1, 1)) * i
-				box(Vector3(bd, h * 0.72, 0.5),
-					Vector3(side_v * (w / 2.0 + bd / 2.0 - 0.05), h * 0.36, bz), SURF_STONE)
-				box(Vector3(bd * 0.6, 0.3, 0.42),
-					Vector3(side_v * (w / 2.0 + bd * 0.3 - 0.05), h * 0.72 + 0.15, bz), SURF_STONE)
+				_stepped_buttress("nave_%s_%d" % ["left" if side_v < 0.0 else "right", i],
+					Vector3(side_v * w / 2.0, 0.0, bz), Vector3(side_v, 0.0, 0.0),
+					h * 0.72, bd, 0.5, false)
 		if spec.tower:
 			var tw2: float = spec.tower_width
 			var th2: float = spec.tower_height
-			var lz2: float = -l / 2.0 + TOWER_EMBED - tw2 / 2.0
-			for cx_v in [-1.0, 1.0]:
-				for cz_v in [-1.0, 1.0]:
-					box(Vector3(bd, th2 * 0.8, bd),
-						Vector3(cx_v * (tw2 / 2.0 + bd / 2.0 - 0.05), th2 * 0.4,
-							lz2 + cz_v * (tw2 / 2.0 + bd / 2.0 - 0.05)), SURF_STONE)
+			for tower_side in ChurchGeometry.west_tower_sides(spec):
+				var tx: float = ChurchGeometry.tower_center_x(spec, tower_side)
+				var tz: float = ChurchGeometry.tower_center_z(spec)
+				for cx_v in [-1.0, 1.0]:
+					for cz_v in [-1.0, 1.0]:
+						_stepped_buttress("tower_%s_%s_%s" % [
+							"left" if tower_side < 0.0 else "right",
+							"left" if cx_v < 0.0 else "right",
+							"front" if cz_v < 0.0 else "rear"],
+							Vector3(tx + cx_v * tw2 / 2.0, 0.0,
+								tz + cz_v * tw2 / 2.0), Vector3(cx_v, 0.0, cz_v),
+							th2 * 0.8, bd, bd, true)
 
 	# ---------- string course ----------
 	tag("trim")
@@ -490,6 +495,38 @@ func _build_ambulatory_and_chapels() -> void:
 			0.6, chh * 0.4, spec.window_style)
 
 
+## A base, two set-backs and stone shoulders make the bearing legible. Every
+## box remains in part_log and has a stable named component for exterior QA.
+func _stepped_buttress(name: String, anchor: Vector3, outward: Vector3,
+		height: float, depth: float, face_width: float, corner: bool) -> void:
+	host(name)
+	var levels := [0.0, 0.38, 0.70, 1.0]
+	var widths := [1.0, 0.72, 0.44]
+	for i in range(3):
+		var d: float = depth * widths[i]
+		var y0: float = height * levels[i]
+		var y1: float = height * levels[i + 1]
+		var z_width: float = d if corner else face_width * (1.0 - i * 0.12)
+		_buttress_piece("shaft_%d" % i,
+			Vector3(d, y1 - y0, z_width),
+			anchor + outward * (d / 2.0 - ChurchGeometry.BUTTRESS_INSET)
+				+ Vector3.UP * ((y0 + y1) / 2.0), SURF_STONE)
+	for i in range(3):
+		var d: float = depth * widths[i]
+		var y: float = height * levels[i + 1]
+		var z_width: float = d if corner else face_width * (1.1 - i * 0.12)
+		_buttress_piece("shoulder_%d" % i,
+			Vector3(d, clampf(height * 0.012, 0.12, 0.28), z_width),
+			anchor + outward * (d / 2.0 - ChurchGeometry.BUTTRESS_INSET)
+				+ Vector3.UP * y, SURF_TRIM)
+	host_end()
+
+
+func _buttress_piece(role: String, size: Vector3, pos: Vector3, surf: int) -> void:
+	_log_part("box", pos, size)
+	component_box(role, size, Transform3D(Basis.IDENTITY, pos), surf)
+
+
 ## Flying buttress: an outer pier, an arch springing from it to the clerestory
 ## wall, and a pinnacle weighting the pier. The Gothic signature.
 func _build_flying_buttresses() -> void:
@@ -520,18 +557,36 @@ func _build_flying_buttresses() -> void:
 				var from_y: float = ph - drop
 				var to_y: float = spring - drop
 				var bow: float = absf(px - wall_x) * 0.16
-				_kit.arc_ribbon(Vector3(px, from_y, pz), Vector3(wall_x, to_y, pz),
-					bow, arch_t, pw * 0.72, SURF_STONE)
+				var from_p := Vector3(px, from_y, pz)
+				var to_p := Vector3(wall_x, to_y, pz)
+				var side_name: String = "left" if side < 0.0 else "right"
+				host("flyer_%s_%d_tier_%d" % [side_name, i, tier])
+				_kit.arc_ribbon(from_p, to_p, bow, arch_t, pw * 0.88, SURF_STONE, 8)
+				var coping_lift: float = arch_t * 0.58
+				_kit.arc_ribbon(from_p + Vector3.UP * coping_lift,
+					to_p + Vector3.UP * coping_lift, bow, arch_t * 0.24,
+					pw * 0.96, SURF_TRIM, 8)
 				# The arch is what ties an otherwise free-standing pier to the
 				# nave, so it counts as a mass: without it the pier reads as
 				# floating, which is exactly what a flyer is meant to avoid.
 				var x0: float = minf(px, wall_x)
 				var y0: float = minf(from_y, to_y) - arch_t
-				var y1: float = maxf(from_y, to_y) + bow + arch_t
+				var y1: float = maxf(from_y, to_y) + bow + arch_t * 1.2
+				var arch_aabb := AABB(Vector3(x0, y0, pz - pw * 0.48),
+					Vector3(absf(px - wall_x), y1 - y0, pw * 0.96))
+				component_note("arch_web", "arc_ribbon", SURF_STONE,
+					{"from_p": from_p, "to_p": to_p, "rise": bow,
+						"thickness": arch_t, "depth": pw * 0.88,
+						"steps": 8, "aabb": arch_aabb})
+				component_note("arch_coping", "arc_ribbon", SURF_TRIM,
+					{"from_p": from_p + Vector3.UP * coping_lift,
+						"to_p": to_p + Vector3.UP * coping_lift, "rise": bow,
+						"thickness": arch_t * 0.24, "depth": pw * 0.96,
+						"steps": 8, "aabb": arch_aabb})
 				_log_mass("flyer_arch_%s_%d_%d"
 					% ["left" if side < 0.0 else "right", i, tier],
-					AABB(Vector3(x0, y0, pz - pw * 0.36),
-						Vector3(absf(px - wall_x), y1 - y0, pw * 0.72)))
+					arch_aabb)
+				host_end()
 
 
 ## A lantern tower over the crossing: the silhouette of Durham and Salisbury.

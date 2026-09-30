@@ -1,0 +1,52 @@
+{
+	"shots": [
+		{
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -9.16732472209317,
+				"yaw_degrees": 71.6197243913529,
+				"zoom": 1.0
+			},
+			"file": "visualqa/vis007/notre_dame_after.jpg",
+			"focus": "(14.03272, 16.5, -0.300001)",
+			"key": "notre_dame",
+			"light": {
+				"ambient_energy": 0.8,
+				"fill_azimuth_degrees": 191.619724391353,
+				"fill_color": "d9e5ff",
+				"fill_elevation_degrees": -18.0,
+				"fill_energy": 0.45,
+				"key_azimuth_degrees": 9.6197243913529,
+				"key_color": "fff2df",
+				"key_elevation_degrees": -30.0,
+				"key_energy": 1.8
+			},
+			"radius": 20.46,
+			"seed": 5001
+		},
+		{
+			"camera": {
+				"fov_degrees": 48.0,
+				"pitch_degrees": -9.16732472209317,
+				"yaw_degrees": 71.6197243913529,
+				"zoom": 1.0
+			},
+			"file": "visualqa/vis007/durham_after.jpg",
+			"focus": "(6.245647, 9.324, -5.088)",
+			"key": "durham",
+			"light": {
+				"ambient_energy": 0.8,
+				"fill_azimuth_degrees": 191.619724391353,
+				"fill_color": "d9e5ff",
+				"fill_elevation_degrees": -18.0,
+				"fill_energy": 0.45,
+				"key_azimuth_degrees": 9.6197243913529,
+				"key_color": "fff2df",
+				"key_elevation_degrees": -30.0,
+				"key_energy": 1.8
+			},
+			"radius": 12.876,
+			"seed": 5005
+		}
+	]
+}

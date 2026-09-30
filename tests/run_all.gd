@@ -59,7 +59,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture",
+	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload",
 	"houseqafurnish", "houseqafull", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -100,7 +100,7 @@ const LANES: Dictionary = {
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
 	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess"],
-	"lane:church": ["church", "normals", "massing", "churchaperture"],
+	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
 	"lane:temple": ["temple", "rite"],
 	"lane:world": ["wld001"],
 	"lane:tree": ["tree"],
@@ -125,6 +125,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/metric_coords_suite.gd").run()
 		"churchaperture":
 			return preload("res://tests/suites/church_aperture_suite.gd").run()
+		"churchload":
+			return preload("res://tests/suites/church_load_suite.gd").run()
 		"hmaterials":
 			return preload("res://tests/suites/house_material_suite.gd").run()
 		"henvelope":
