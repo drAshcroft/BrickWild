@@ -143,6 +143,10 @@ file.
   `ChurchGeometry`, is the single source of truth. `CastleGenerator` clamps
   every size against it so `CastleBuilder.build()` stays a pure function of
   its spec.
+* A wall stair can be beside a tower on ANOTHER enceinte ring. The stair
+  planner reserves that tower's logged mass envelope as well as its exact
+  outline; otherwise a stair can cross the gate tower in the next ward.
+  `cgatestairs` keeps the Crusader fortress seed 9118 case fixed.
 * **A house is a plan, not a mesh.** `HousePlan` holds the rooms, doors,
   windows and furniture; the builder makes a shell from it and
   `HouseAssembler` is the ONLY place that loads a model. Keep it that way:

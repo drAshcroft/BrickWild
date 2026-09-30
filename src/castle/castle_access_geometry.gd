@@ -64,12 +64,20 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 		for other_ring in CastleGeometry.rings(spec):
 			var vertices := CastleGeometry.vertex_tower_centers(spec, other_ring)
 			for index in vertices.size():
-				tower_polygons.append(_tower_outline(spec, other_ring, vertices[index], index))
+				var outline := _tower_outline(spec, other_ring, vertices[index], index)
+				tower_polygons.append(outline)
+				# Massing QA compares logged bounds. Keep stairs outside those
+				# envelopes as well as outside the exact battered tower footprint.
+				if other_ring != ring:
+					blocked.append(Poly.bounding_rect(outline))
 			var towers := CastleGeometry.gate_tower_centers(spec, other_ring)
 			for slot in CastleGeometry.side_tower_slots(spec, other_ring):
 				towers.append(slot.pos)
 			for tower in towers:
-				tower_polygons.append(_tower_outline(spec, other_ring, tower))
+				var outline := _tower_outline(spec, other_ring, tower)
+				tower_polygons.append(outline)
+				if other_ring != ring:
+					blocked.append(Poly.bounding_rect(outline))
 			if other_ring != ring:
 				var box := CastleGeometry.gatehouse_aabb(spec, other_ring)
 				blocked.append(Rect2(box.position.x, box.position.z, box.size.x, box.size.z))

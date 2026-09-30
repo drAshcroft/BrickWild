@@ -48,7 +48,7 @@ extends SceneTree
 ##  30 tree      - the generated tree family: four styles, 24 species, ten rules
 ##  31 bridge    - the bridge family: four kinds, four mechanisms, ten rules
 const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
-	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
+	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
@@ -100,7 +100,7 @@ const LANES: Dictionary = {
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
-	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess"],
+	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs"],
 	"lane:church-change": ["churchroof", "churchchange"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
 	"lane:temple": ["temple", "rite"],
@@ -187,6 +187,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/castle_forebuilding_suite.gd").run()
 		"cgateaccess":
 			return preload("res://tests/suites/castle_gate_access_suite.gd").run()
+		"cgatestairs":
+			return preload("res://tests/suites/castle_gate_stair_suite.gd").run()
 		"cnormals":
 			return CastleNormalsSuite.run()
 		"cmassing":
