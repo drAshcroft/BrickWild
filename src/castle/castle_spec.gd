@@ -201,7 +201,7 @@ static func tower_house_for(style: StringName, tier: StringName, p_seed: int,
 ## Caernarfon and Conwy are polygonal, Castel del Monte is a regular octagon;
 ## a Norman motte castle and a Japanese hirajiro are rectangular, and stay so.
 const PLANS := {
-	&"norman": {"polygon": 0.0, "sides": [6], "motte": 0.45},
+	&"norman": {"polygon": 0.0, "sides": [6], "motte": 0.45, "bergfried": 0.3},
 	&"edwardian": {"polygon": 0.5, "sides": [6, 8]},
 	&"crusader": {"polygon": 0.35, "sides": [5, 6]},
 	&"french_chateau": {"polygon": 0.25, "sides": [6, 8]},
@@ -242,6 +242,12 @@ static func plan_for(style: StringName, tier: StringName, p_seed: int) -> Dictio
 	var motte: float = float(row.get("motte", 0.0))
 	if motte > 0.0 and r.randf() < motte:
 		return {"kind": &"motte_bailey", "sides": 4}
+	# The Rhine bergfried plan is a compact polygonal ward with a slender
+	# donjon beside its larger Palas. It is a Norman castle plan, not a new
+	# random draw for the other styles.
+	var bergfried: float = float(row.get("bergfried", 0.0))
+	if tier == &"castle" and bergfried > 0.0 and r.randf() < bergfried:
+		return {"kind": &"bergfried", "sides": r.randi_range(4, 6)}
 	if r.randf() >= float(row["polygon"]):
 		return rect
 	var opts: Array = row["sides"]

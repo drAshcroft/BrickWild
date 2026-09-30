@@ -45,11 +45,21 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	if spec.plan_override == &"" and CastleSpec.tower_house_for(spec.style, spec.tier,
 			p_seed, spec.width, spec.length, spec.height):
 		spec.plan_kind = &"tower_house"
+	# Keep this plan confined to compact Norman castle sites. The canonical
+	# castle sweep uses 40m and 60m widths, so those established fixtures retain
+	# their current plans while Marksburg-scale sites can select it naturally.
+	if spec.plan_kind == &"bergfried" and (spec.tier != &"castle" \
+			or spec.style != &"norman" or spec.width < 42.0 or spec.width > 55.0 \
+			or spec.length < 42.0 or spec.length > 60.0):
+		spec.plan_kind = &"rect"
 	spec.sides = 4
 	if spec.plan_kind == &"polygon":
 		spec.sides = clampi(spec.sides_override if spec.sides_override > 0 \
 			else int(plan["sides"]), CastleGeometry.POLY_MIN_SIDES,
 			CastleGeometry.POLY_MAX_SIDES)
+	elif spec.plan_kind == &"bergfried":
+		spec.sides = clampi(spec.sides_override if spec.sides_override > 0 \
+			else int(plan["sides"]), 4, 6)
 	# a tower house is a proportion before it is a plan: a site not twice as
 	# tall as it is wide is a house, whatever was asked for
 	if spec.plan_kind == &"tower_house" and (enclosed
@@ -152,6 +162,8 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 			spec.great_tower_scale = float(great_r["scale"])
 	if CastleGeometry.is_sky(spec):
 		_fit_sky(spec)
+	if spec.plan_kind == &"bergfried":
+		_fit_bergfried(spec)
 
 	# ---- openings ----
 	spec.window_style = s["windows"]
@@ -182,6 +194,9 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 ## fitted, and it is deliberately NOT called from generate(): the fitting there
 ## runs in its own order and this must not perturb it.
 static func refit(spec: CastleSpec) -> void:
+	if spec.plan_kind == &"bergfried":
+		_fit_bergfried(spec)
+		return
 	if spec.plan_kind == &"tower_house" and not CastleGeometry.is_enclosed(spec):
 		var r := RandomNumberGenerator.new()
 		r.seed = spec.seed
@@ -403,6 +418,64 @@ static func _fit_bailey_buildings(spec: CastleSpec, r: RandomNumberGenerator) ->
 	spec.chapel = spec.hall and GeneratorRandom.chance(r, 0.6) \
 		and b.size.x > spec.hall_w * 2.0 + CastleGeometry.BAILEY_CLEAR * 2.0
 	spec.chimneys = 0
+
+
+## A Bergfried is deliberately slender; the adjacent Palas carries the greater
+## occupied volume. Keep the pair inside the ward with a reserved access gap.
+static func _fit_bergfried(spec: CastleSpec) -> void:
+	if not CastleGeometry.is_enclosed(spec):
+		return
+	spec.sides = clampi(spec.sides, 4, 6)
+	# The keep is the singular fighting tower in this composition; an additional
+	# great corner tower would consume the Palas' roof height and volume budget.
+	spec.great_tower = -1
+	spec.great_tower_scale = 1.0
+	_fit_towers(spec)
+	spec.inner_ward = false
+	spec.ward_gap = 0.0
+	spec.keep = true
+	spec.hall = true
+	spec.chapel = false
+	spec.keep_shape = &"square"
+	var ward: Rect2 = CastleGeometry.bailey_rect(spec)
+	var max_side: float = minf(10.0, ward.size.x * 0.20)
+	var side: float = clampf(minf(max_side, ward.size.y * 0.20), 5.0, 10.0)
+	spec.keep_w = side
+	spec.keep_l = side
+	spec.keep_height = maxf(spec.height * 1.5, side * 3.2)
+	# The Palas is broad and low, beside the tower. Leave the access stair's
+	# full outward run between the tower door and the hall facade.
+	var access_gap: float = CastleGeometry.bergfried_access_gap(spec)
+	var available: float = ward.size.x - side - access_gap
+	var palas_span: float = minf(20.0, maxf(8.0, available))
+	spec.hall_w = minf(palas_span, available)
+	spec.hall_l = minf(20.0, ward.size.y * 0.72)
+	# On a polygon the ward narrows toward both ends. Search the real inner
+	# polygon, shrinking the Palas gradually only when its base corners cannot
+	# be placed alongside the keep inside those sloping walls.
+	for _attempt in range(28):
+		if CastleGeometry.bergfried_pair_fits(spec):
+			break
+		spec.hall_l = maxf(8.0, spec.hall_l - 0.5)
+		spec.hall_w = maxf(8.0, spec.hall_w - 0.5)
+	if not CastleGeometry.bergfried_pair_fits(spec):
+		# Smallest credible side-by-side composition for a tight polygonal ward.
+		spec.keep_w = 5.0
+		spec.keep_l = 5.0
+		spec.keep_height = maxf(spec.height * 1.5, 16.0)
+		spec.hall_w = 8.0
+		spec.hall_l = 8.0
+	var keep_volume: float = spec.keep_w * spec.keep_l * spec.keep_height
+	var roof_clear_height: float = spec.keep_height \
+		- minf(spec.hall_w, spec.hall_l) * spec.roof_pitch * 0.5 - 1.0
+	spec.hall_height = minf(maxf(4.0, roof_clear_height), maxf(4.0,
+		2.8 * keep_volume / maxf(spec.hall_w * spec.hall_l, 1.0)))
+	spec.keep = spec.keep_w <= 10.0 and spec.keep_l <= 10.0
+	spec.curtain = true
+	spec.corner_towers = true
+	spec.gatehouse = true
+	spec.gate_towers = true
+	spec.side_towers = 0
 
 
 ## The motte and bailey (CAS-005): the mound's height by tier and its slope

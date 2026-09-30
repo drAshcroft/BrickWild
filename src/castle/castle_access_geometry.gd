@@ -36,10 +36,18 @@ static func forebuilding_for_plan(spec: CastleSpec, plan: HousePlan) -> Dictiona
 	var clear := maxf(2.0, float(door.width) + 0.8)
 	var wall := 0.3
 	var width := clear + wall * 2.0
-	var landing := maxf(1.0, at.y - keep.position.z + 0.3)
+	# A side-facing Bergfried door meets a straight stair. Its landing length
+	# is measured along the door normal, not from the tower's north edge.
+	var landing := 1.0 if spec.plan_kind == &"bergfried" else maxf(1.0, at.y - keep.position.z + 0.3)
 	var length := run + landing
 	var front := at + normal * length
-	var foot := Rect2(front.x - width * 0.5, front.y, width, length)
+	var side := Vector2(-normal.y, normal.x)
+	var corners := PackedVector2Array([
+		front - side * width * 0.5, front + side * width * 0.5,
+		at + normal * (HouseGeometry.wall_thickness(plan.spec) + 0.2) - side * width * 0.5,
+		at + normal * (HouseGeometry.wall_thickness(plan.spec) + 0.2) + side * width * 0.5])
+	var foot: Rect2 = Poly.bounding_rect(corners) if spec.plan_kind == &"bergfried" \
+		else Rect2(front.x - width * 0.5, front.y, width, length)
 	return {"at": at, "normal": normal, "front": front, "height": height,
 		"steps": steps, "run": run, "landing": landing, "width": width,
 		"clear": clear, "wall": wall, "length": length, "footprint": foot,

@@ -75,7 +75,8 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 	var entry_level := 1 if CastleGeometry.is_enclosed(spec) else 0
 	hs.entry_storey = entry_level
 	var walls := HouseGeometry.room_walls(plan, entry_level)
-	var front := _facing_wall(walls, Vector2(0, 1))
+	var entry_inward := Vector2(-1, 0) if spec.plan_kind == &"bergfried" else Vector2(0, 1)
+	var front := _facing_wall(walls, entry_inward)
 	var front_wall: Dictionary = walls[front]
 	plan.doors.append({"a": entry_level, "b": -1,
 		"pos": (Vector2(front_wall.from) + Vector2(front_wall.to)) * 0.5,

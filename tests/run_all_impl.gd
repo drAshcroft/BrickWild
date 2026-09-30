@@ -60,7 +60,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange",
-	"houseqafurnish", "houseqafull", "castlechange", "ckeepstair", "wld001_domus", "wld001_riad",
+	"houseqafurnish", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
@@ -102,8 +102,8 @@ const LANES: Dictionary = {
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
-	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange"],
-	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs"],
+	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried"],
+	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried"],
 	"lane:church-change": ["churchroof", "churchchange"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
 	"lane:temple": ["temple", "rite"],
@@ -204,6 +204,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/castle_access_suite.gd").run()
 		"cforebuilding":
 			return preload("res://tests/suites/castle_forebuilding_suite.gd").run()
+		"cbergfried":
+			return preload("res://tests/suites/castle_bergfried_suite.gd").run()
 		"cgateaccess":
 			return preload("res://tests/suites/castle_gate_access_suite.gd").run()
 		"cgatestairs":

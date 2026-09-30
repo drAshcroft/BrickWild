@@ -173,7 +173,7 @@ static func rings(spec: CastleSpec) -> Array[int]:
 ## Sides of the enceinte. A rectangle IS the four-sided case, so everything
 ## below can be written once and asked for `n` rather than for "is it a rect".
 static func plan_sides(spec: CastleSpec) -> int:
-	if spec.plan_kind == &"polygon":
+	if spec.plan_kind in [&"polygon", &"bergfried"]:
 		return clampi(spec.sides, POLY_MIN_SIDES, POLY_MAX_SIDES)
 	return 4
 
@@ -1332,6 +1332,13 @@ static func causeway_aabb(spec: CastleSpec) -> AABB:
 static func keep_aabb(spec: CastleSpec) -> AABB:
 	if not spec.keep:
 		return AABB()
+	if spec.plan_kind == &"bergfried":
+		var ward: Rect2 = bailey_rect(spec)
+		var pair_w: float = spec.keep_w + spec.hall_w + bergfried_access_gap(spec)
+		var x0: float = ward.position.x + (ward.size.x - pair_w) * 0.5
+		var z1: float = bergfried_pair_back_z(spec)
+		return AABB(Vector3(x0, 0.0, z1 - spec.keep_l),
+			Vector3(spec.keep_w, spec.keep_height, spec.keep_l))
 	var z1: float = ward_back_z(spec, spec.keep_w / 2.0) + RANGE_LAP
 	var x: float = keep_offset_x(spec)
 	return AABB(Vector3(x - spec.keep_w / 2.0, 0.0, z1 - spec.keep_l),
@@ -1366,6 +1373,11 @@ static func hall_aabb(spec: CastleSpec) -> AABB:
 		return AABB()
 	if not is_enclosed(spec):
 		return house_range_aabb(spec)
+	if spec.plan_kind == &"bergfried":
+		var keep: AABB = keep_aabb(spec)
+		var z1: float = bergfried_pair_back_z(spec)
+		return AABB(Vector3(keep.end.x + bergfried_access_gap(spec), 0.0, z1 - spec.hall_l),
+			Vector3(spec.hall_w, spec.hall_height, spec.hall_l))
 	var z1: float = interior_back_z(spec)
 	var x0: float = ward_edge_x(spec, -1.0, z1 - spec.hall_l, z1) - RANGE_LAP
 	return AABB(Vector3(x0, 0.0, z1 - spec.hall_l),
@@ -1381,6 +1393,55 @@ static func chapel_aabb(spec: CastleSpec) -> AABB:
 	var x1: float = ward_edge_x(spec, 1.0, z1 - l, z1) + RANGE_LAP
 	return AABB(Vector3(x1 - spec.hall_w, 0.0, z1 - l),
 		Vector3(spec.hall_w, spec.hall_height * 0.85, l))
+
+
+## Space the Palas beyond the Bergfried's side stair toe and landing.
+static func bergfried_access_gap(spec: CastleSpec) -> float:
+	var levels := clampi(int(spec.keep_height / 3.6), 3, HouseGeometry.MAX_STOREYS)
+	var rise: float = spec.keep_height / float(levels) + HouseGeometry.FLOOR_T
+	var tread: float = preload("castle_access_geometry.gd").TREAD
+	return ceilf(rise / 0.2) * tread + 1.4
+
+
+## Place the keep and Palas on a rearward Z band where all base corners fit
+## inside the real inner enceinte polygon. A bounding rectangle alone admits
+## placements through the sloping sides of a polygonal ward.
+static func bergfried_pair_back_z(spec: CastleSpec) -> float:
+	var ward: Rect2 = bailey_rect(spec)
+	var pair_w: float = spec.keep_w + spec.hall_w + bergfried_access_gap(spec)
+	var x0: float = ward.position.x + (ward.size.x - pair_w) * 0.5
+	var keep_x: float = x0
+	var hall_x: float = keep_x + spec.keep_w + bergfried_access_gap(spec)
+	var poly: PackedVector2Array = inner_polygon(spec, inner_ring(spec))
+	var bounds: Rect2 = polygon_bbox(poly)
+	var lower: float = bounds.position.y + maxf(spec.keep_l, spec.hall_l) - 0.05
+	for z1 in range(int(floor(bounds.end.y * 10.0)), int(ceil(lower * 10.0)), -1):
+		var back := float(z1) / 10.0
+		var keep_rect := Rect2(Vector2(keep_x, back - spec.keep_l), Vector2(spec.keep_w, spec.keep_l))
+		var hall_rect := Rect2(Vector2(hall_x, back - spec.hall_l), Vector2(spec.hall_w, spec.hall_l))
+		if _rect_corners_inside(poly, keep_rect) and _rect_corners_inside(poly, hall_rect):
+			return back
+	# Keep downstream AABBs finite even for an impossible fit. The caller's
+	# bounded fitter retries smaller dimensions, and massing QA reports failure.
+	return ward.get_center().y
+
+
+static func bergfried_pair_fits(spec: CastleSpec) -> bool:
+	var ward: Rect2 = bailey_rect(spec)
+	var pair_w: float = spec.keep_w + spec.hall_w + bergfried_access_gap(spec)
+	var x0: float = ward.position.x + (ward.size.x - pair_w) * 0.5
+	var back: float = bergfried_pair_back_z(spec)
+	var poly: PackedVector2Array = inner_polygon(spec, inner_ring(spec))
+	return _rect_corners_inside(poly,
+		Rect2(Vector2(x0, back - spec.keep_l), Vector2(spec.keep_w, spec.keep_l))) \
+		and _rect_corners_inside(poly, Rect2(Vector2(x0 + spec.keep_w + bergfried_access_gap(spec),
+		back - spec.hall_l), Vector2(spec.hall_w, spec.hall_l)))
+
+
+static func _rect_corners_inside(poly: PackedVector2Array, rect: Rect2) -> bool:
+	return [rect.position, Vector2(rect.end.x, rect.position.y), rect.end,
+		Vector2(rect.position.x, rect.end.y)].all(
+		func(point: Vector2) -> bool: return Poly.contains_point(poly, point, 0.01))
 
 
 ## The apse on the chapel (CAS-003): a half-drum on the chapel's free short

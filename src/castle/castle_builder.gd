@@ -1165,6 +1165,9 @@ func _build_forebuilding() -> void:
 	var fore := CastleGeometry.forebuilding(spec)
 	if fore.is_empty():
 		return
+	if spec.plan_kind == &"bergfried":
+		_build_bergfried_forebuilding(fore)
+		return
 	tag("forebuilding")
 	host("forebuilding")
 	var front: Vector2 = fore.front
@@ -1211,6 +1214,71 @@ func _build_forebuilding() -> void:
 	_log_mass("forebuilding", bounds)
 	mass_log[-1].entry_height = height
 	mass_log[-1].footprint = fore.footprint
+	host_end()
+	tag("keep")
+
+
+## A side-facing Bergfried door gets a matching stair axis. The hall stands
+## beyond its toe, leaving the protected ascent clear.
+func _build_bergfried_forebuilding(fore: Dictionary) -> void:
+	tag("forebuilding")
+	host("forebuilding")
+	var front: Vector2 = fore.front
+	var normal: Vector2 = fore.normal
+	var direction := -normal
+	var side := Vector2(direction.y, -direction.x)
+	var basis := Basis(Vector3(side.x, 0, side.y), Vector3.UP,
+		Vector3(direction.x, 0, direction.y))
+	var height: float = fore.height
+	var run: float = fore.run
+	var steps: int = int(fore.steps)
+	var clear: float = fore.clear
+	var wall: float = fore.wall
+	var bounds := AABB()
+	var first := true
+	for step in steps:
+		var top := height * float(step + 1) / float(steps)
+		var at := front + direction * ((float(step) + 0.5) * preload("castle_access_geometry.gd").TREAD)
+		var centre := Vector3(at.x, top * 0.5, at.y)
+		var row := component_box("forebuilding_tread",
+			Vector3(clear, top, preload("castle_access_geometry.gd").TREAD),
+			Transform3D(basis, centre), SURF_STONE)
+		_log_part("forebuilding_step", centre, Vector3(clear, top,
+			preload("castle_access_geometry.gd").TREAD))
+		var box := component_aabb(row)
+		bounds = box if first else bounds.merge(box)
+		first = false
+	var landing_start := front + direction * run
+	var door_at: Vector2 = fore.at
+	var landing_len: float = maxf(float(fore.landing), 0.8)
+	var landing_centre := landing_start + direction * landing_len * 0.5
+	var landing := component_box("forebuilding_landing", Vector3(clear, 0.2, landing_len),
+		Transform3D(basis, Vector3(landing_centre.x, height - 0.1, landing_centre.y)), SURF_STONE)
+	bounds = bounds.merge(component_aabb(landing))
+	for sign in [-1.0, 1.0]:
+		var offset: Vector2 = side * float(sign) * (clear + wall) * 0.5
+		var toe: Vector2 = front + offset
+		var landing_toe: Vector2 = landing_start + offset
+		var door_toe: Vector2 = door_at + offset
+		var cheek := component_slab("forebuilding_wall", PackedVector3Array([
+			Vector3(toe.x, 0.0, toe.y),
+			Vector3(landing_toe.x, 0.0, landing_toe.y),
+			Vector3(door_toe.x, height + 2.75, door_toe.y),
+			Vector3(toe.x, 2.75, toe.y)]), wall, SURF_STONE, false)
+		bounds = bounds.merge(component_aabb(cheek))
+	# A single pitched roof plane follows the stair from its toe to the raised
+	# landing. It remains above the headroom line at every logged tread.
+	var roof_half: float = float(fore.width) * 0.5 + 0.12
+	var roof_vertices := PackedVector3Array([
+		Vector3(front.x + side.x * roof_half, 2.8, front.y + side.y * roof_half),
+		Vector3(front.x - side.x * roof_half, 2.8, front.y - side.y * roof_half),
+		Vector3(door_at.x - side.x * roof_half, height + 2.8, door_at.y - side.y * roof_half),
+		Vector3(door_at.x + side.x * roof_half, height + 2.8, door_at.y + side.y * roof_half)])
+	var roof := component_slab("forebuilding_roof", roof_vertices, 0.15, SURF_ROOF)
+	bounds = bounds.merge(component_aabb(roof))
+	_log_mass("forebuilding", bounds)
+	mass_log.back().entry_height = height
+	mass_log.back().footprint = fore.footprint
 	host_end()
 	tag("keep")
 

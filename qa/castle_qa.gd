@@ -195,7 +195,11 @@ static func lords_walk(s: CastleSpec, b: CastleBuilder, emitted: ArrayMesh = nul
 	if not fore.is_empty():
 		# The ground grid reaches the toe. The emitted tread chain and raised
 		# threshold are verified separately at their actual elevations.
-		goal = Vector2(fore.front) + Vector2(fore.normal) * 0.8
+		# The compact Palas leaves a one-metre clear strip beyond the Bergfried
+		# stair toe. Probe that strip at the toe, before the Palas wall's body
+		# clearance claims the far edge of the same gap.
+		var toe_offset := 0.25 if s.plan_kind == &"bergfried" else 0.8
+		goal = Vector2(fore.front) + Vector2(fore.normal) * toe_offset
 		inside_point = goal
 	out["start"] = start
 	out["keep_approach"] = goal
@@ -263,7 +267,10 @@ static func forebuilding_report(s: CastleSpec, b: CastleBuilder, actual: ArrayMe
 	var last_box := AABB()
 	var landed := false
 	var fore := CastleGeometry.forebuilding(s)
-	var previous_point := Vector3(float(fore.front.x), 0.0, float(fore.front.y) - 0.4)
+	var normal: Vector2 = fore.normal
+	var lateral := Vector3(-normal.y, 0.0, normal.x)
+	var previous_point := Vector3(float(fore.front.x), 0.0, float(fore.front.y)) \
+		+ Vector3(normal.x, 0.0, normal.y) * 0.4
 	for row in b.component_log:
 		if row.host != "forebuilding" or row.role not in ["forebuilding_tread", "forebuilding_landing"]:
 			continue
@@ -281,8 +288,9 @@ static func forebuilding_report(s: CastleSpec, b: CastleBuilder, actual: ArrayMe
 			out.failures.append("forebuilding: disconnected tread or landing")
 		last_box = box
 		for offset in [-0.4, 0.0, 0.4]:
-			var point := centre + Vector3.RIGHT * float(offset)
-			var from := Vector3(previous_point.x + float(offset), point.y + 0.9, previous_point.z)
+			var point := centre + lateral * float(offset)
+			var from := Vector3(previous_point.x, point.y + 0.9, previous_point.z) \
+				+ lateral * float(offset)
 			if _access_ray_hits(triangles, from, point + Vector3.UP * 0.9):
 				out.failures.append("forebuilding: approach blocked between treads at %s" % point)
 			if not _access_ray_hits(triangles, point + Vector3.UP * 0.04, point - Vector3.UP * 0.04):

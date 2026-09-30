@@ -26,9 +26,9 @@ const FAMILIES := ["wall_stair", "wall", "tower", "portcullis", "forebuilding", 
 ## `check(spec, builder, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"no_gaps", &"no_overlap", &"grounded",
 	&"size_match", &"enclosed", &"great_tower", &"ranges", &"motte", &"sky",
-	&"bailey_clear", &"facade", &"wall_stairs", &"forebuilding"]
+	&"bailey_clear", &"facade", &"wall_stairs", &"forebuilding", &"bergfried"]
 const METHODS := {&"no_gaps": "_check_gaps", &"no_overlap": "_check_overlaps",
-	&"enclosed": "_check_enclosure"}
+	&"enclosed": "_check_enclosure", &"bergfried": "_check_bergfried"}
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -281,6 +281,74 @@ func _has_emitted_raised_keep_door(builder: CastleBuilder) -> bool:
 			if pos.y - size.y * 0.5 > 0.05:
 				return true
 	return false
+## CAS-009: the Bergfried is the tallest, the Palas owns the greater volume,
+## and the only keep door is raised and faces the Palas roof.
+func _check_bergfried(spec: CastleSpec, builder: CastleBuilder) -> void:
+	if spec.plan_kind != &"bergfried":
+		return
+	var keep := builder.mass_aabb("keep")
+	var hall := builder.mass_aabb("hall")
+	if not _aabb_finite(keep) or not _aabb_finite(hall):
+		failures.append("bergfried: keep or Palas bounds contain nonfinite coordinates")
+		return
+	if keep.size.x <= 0.0 or hall.size.x <= 0.0:
+		failures.append("bergfried: keep or Palas mass is missing")
+		return
+	var ward: PackedVector2Array = CastleGeometry.inner_polygon(spec, CastleGeometry.inner_ring(spec))
+	if not _footprint_inside(ward, keep) or not _footprint_inside(ward, hall):
+		failures.append("bergfried: keep or Palas base corners lie outside the inner ward")
+	if keep.size.x > 10.0 + TOL or keep.size.z > 10.0 + TOL:
+		failures.append("bergfried: keep footprint %.1fx%.1fm exceeds 10x10m" % [keep.size.x, keep.size.z])
+	if keep.size.y < 3.0 * maxf(keep.size.x, keep.size.z) - TOL:
+		failures.append("bergfried: keep height %.1fm is under three times its %.1fm width" % [keep.size.y, maxf(keep.size.x, keep.size.z)])
+	var keep_volume: float = keep.size.x * keep.size.y * keep.size.z
+	var hall_volume: float = hall.size.x * hall.size.y * hall.size.z
+	if hall_volume < 2.0 * keep_volume - TOL:
+		failures.append("bergfried: Palas volume %.0fm3 (%.1fx%.1fx%.1fm) is under twice the keep's %.0fm3 (%.1fx%.1fx%.1fm)" % [hall_volume, hall.size.x, hall.size.y, hall.size.z, keep_volume, keep.size.x, keep.size.y, keep.size.z])
+	var tallest_other := 0.0
+	var largest_other := 0.0
+	for mass in builder.mass_log:
+		var bounds: AABB = mass.aabb
+		if mass.name != "keep":
+			tallest_other = maxf(tallest_other, bounds.end.y)
+		if mass.name != "hall":
+			largest_other = maxf(largest_other, bounds.size.x * bounds.size.y * bounds.size.z)
+	tallest_other = maxf(tallest_other, hall.end.y + CastleGeometry.roof_rise(spec, hall))
+	if keep.end.y <= tallest_other + TOL:
+		failures.append("bergfried: keep does not top every other mass")
+	if hall_volume <= largest_other + TOL:
+		failures.append("bergfried: Palas is not the largest mass by volume")
+	var doors: Array[Dictionary] = []
+	for part in builder.part_log:
+		if part.get("tag", "") == "keep" and (part.get("kind", "") == "door" or bool(part.get("door", false))):
+			doors.append(part)
+	if doors.size() != 1:
+		failures.append("bergfried: keep has %d exterior door records, wants one" % doors.size())
+		return
+	var door: Dictionary = doors[0]
+	var sill: float = Vector3(door.pos).y - Vector3(door.size).y * 0.5
+	var to_hall := Vector3(hall.get_center().x - keep.get_center().x, 0.0,
+		hall.get_center().z - keep.get_center().z).normalized()
+	var facing: Vector3 = Vector3(door.get("facing", Vector3.ZERO)).normalized()
+	if sill < 4.0 - TOL:
+		failures.append("bergfried: sole keep door sill %.2fm is below 4m" % sill)
+	if facing.dot(to_hall) < 0.8:
+		failures.append("bergfried: raised keep door does not face the Palas roof")
+	if hall.end.y + CastleGeometry.roof_rise(spec, hall) < sill - TOL:
+		failures.append("bergfried: Palas roof is below the raised keep door")
+
+
+static func _footprint_inside(poly: PackedVector2Array, bounds: AABB) -> bool:
+	var corners := [Vector2(bounds.position.x, bounds.position.z),
+		Vector2(bounds.end.x, bounds.position.z), Vector2(bounds.end.x, bounds.end.z),
+		Vector2(bounds.position.x, bounds.end.z)]
+	return corners.all(func(point: Vector2) -> bool: return Poly.contains_point(poly, point, 0.01))
+
+
+static func _aabb_finite(bounds: AABB) -> bool:
+	return [bounds.position.x, bounds.position.y, bounds.position.z,
+		bounds.size.x, bounds.size.y, bounds.size.z].all(
+		func(value: float) -> bool: return is_finite(value))
 
 
 func _check_wall_stairs(spec: CastleSpec, builder: CastleBuilder) -> void:
