@@ -11,7 +11,7 @@ const CASES := [
 	{"name": "battered", "style": &"crusader", "tier": &"castle", "index": 1,
 		"components": true},
 	{"name": "ridge", "style": &"bavarian", "w": 120.0, "l": 40.0,
-		"h": 20.0, "seed": 8805, "plan": &"ridge"},
+		"h": 20.0, "seed": 8805, "plan": &"ridge", "voxel": true},
 	{"name": "tower house", "style": &"norman", "w": 14.0, "l": 12.0,
 		"h": 34.0, "seed": 8804, "plan": &"tower_house"},
 ]
@@ -35,6 +35,8 @@ static func run() -> SuiteResult:
 		_expect(res, massing.ok, "%s massing: %s" % [who, massing.failures])
 		var components := ComponentCheck.check(builder, mesh)
 		_expect(res, components.ok, "%s component triangles: %s" % [who, components.failures])
+		if row.name == "ridge":
+			_ridge_interior_contract(res, builder, who)
 		if row.get("components", false):
 			_expect(res, components.checked > 100,
 				"%s did not exercise measurable exterior components" % who)
@@ -44,6 +46,49 @@ static func run() -> SuiteResult:
 		res.note("%s %.2fs" % [who, (Time.get_ticks_msec() - started) / 1000.0])
 	_negative_controls(res)
 	return res
+
+
+## The local house plans and the rotated range shells must describe the same
+## openings. Check the fixed Bavarian ridge itself, then move a real window
+## off its wall and prove HousePlanCheck rejects the defect.
+static func _ridge_interior_contract(res: SuiteResult, builder: CastleBuilder,
+		who: String) -> void:
+	var found_window := false
+	var checked_openings := 0
+	for row in builder.interiors:
+		var plan: HousePlan = row.plan
+		var report := HouseQA.new().check(plan, null)
+		_expect(res, report.ok, "%s %s interior plan: %s" % [who, row.id, report.failures])
+		var child: HouseBuilder = row.builder
+		for part in child.part_log:
+			var opening_kind := String(part.get("opening_kind", ""))
+			if opening_kind not in ["door", "window"]:
+				continue
+			checked_openings += 1
+			var expected_pos: Vector3 = row.transform * Vector3(part.pos)
+			var expected_facing: Vector3 = (row.transform.basis * Vector3(part.facing)).normalized()
+			var matched := false
+			for emitted in builder.part_log:
+				if not emitted.get("planned_opening", false) \
+						or String(emitted.get("opening_kind", "")) != opening_kind:
+					continue
+				if (Vector3(emitted.pos) - expected_pos).length() <= 0.01 \
+						and Vector3(emitted.facing).dot(expected_facing) >= 0.999:
+					matched = true
+					break
+			_expect(res, matched, "%s %s %s was not forwarded through its range transform"
+				% [who, row.id, opening_kind])
+		if not found_window and not plan.windows.is_empty():
+			found_window = true
+			var window: Dictionary = plan.windows[0]
+			var original: Vector2 = window.pos
+			window.pos = original + Vector2(window.normal) * 0.25
+			var moved := HousePlanCheck.new().check(plan)
+			_expect(res, not moved.ok,
+				"%s moved-off-wall window negative control was accepted" % who)
+			window.pos = original
+	_expect(res, found_window, "%s ridge ranges emitted no plan windows" % who)
+	_expect(res, checked_openings > 0, "%s ridge ranges forwarded no openings" % who)
 
 
 static func _spec(row: Dictionary) -> CastleSpec:

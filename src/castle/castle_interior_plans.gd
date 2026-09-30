@@ -418,11 +418,6 @@ static func _hall_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 ## A range narrower or shorter than this is masonry, not a room.
 const MIN_RANGE_SIDE := 3.0
 const MIN_RANGE_RUN := 5.0
-## How far a connecting door sits in from the end a range shares with its
-## neighbour, so the opening is in wall rather than on the corner.
-const RANGE_LINK_INSET := 1.2
-
-
 ## One rotated range of a ridge castle, in its own frame. `neighbours` is the
 ## count of ranges this one touches (its segment's two ends), used to place the
 ## doors that connect the chain.
@@ -460,8 +455,9 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	plan.spec = hs
 	plan.rooms = []
 	for i in range(bays):
-		# The hall is the bay with the fire in it; the rest are chambers.
-		var bay_kind: StringName = kind if (i == 0 or bays == 1) else &"lords_chamber"
+		# One lord's chamber owns the range's fire. Other bays are guest rooms;
+		# HousePlan has one named hearth/flue per range, not one per bay.
+		var bay_kind: StringName = kind if (i == 0 or bays == 1) else &"guest_room"
 		if bay_run * floor_rect.size.y < float(HouseGeometry.MIN_AREA[bay_kind]) \
 				or minf(bay_run, floor_rect.size.y) < float(HouseGeometry.MIN_SIDE[bay_kind]):
 			bay_kind = kind
@@ -479,13 +475,14 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	# its neighbours. `up` is across the range, so the door faces out of it.
 	_hall_door(plan, plan.rooms[0]["rect"], Vector2(0, 1))
 	for i in range(bays):
-		_hall_windows(plan, plan.rooms[i]["rect"], Vector2(1, 0), hs)
+		_hall_windows(plan, plan.rooms[i]["rect"], Vector2(1, 0), hs, i)
 
 	# And the doors that make the chain a building rather than a row of sheds:
 	# one in each end the segment shares with another range.
 	for end_v in links:
-		var x: float = floor_rect.position.x + RANGE_LINK_INSET if end_v < 0 \
-			else floor_rect.end.x - RANGE_LINK_INSET
+		# This is an aperture in the end wall. Keep it on the local room edge;
+		# the castle transform then carries that wall plane onto the shared tower.
+		var x: float = floor_rect.position.x if end_v < 0 else floor_rect.end.x
 		plan.doors.append({"a": 0 if end_v < 0 else plan.rooms.size() - 1, "b": -1,
 			"pos": Vector2(x, floor_rect.get_center().y),
 			"normal": Vector2(float(end_v), 0.0),
@@ -533,8 +530,10 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 				keep_doors.append(d)
 		plan.doors = keep_doors
 
-	if is_hall:
-		plan.hearth = {"room": 0, "wall": 2}
+	# The selected first room always owns the range hearth and its flue. Later
+	# bays are guest rooms and do not claim a second chimney the range cannot
+	# describe.
+	plan.hearth = {"room": 0, "wall": 2}
 	hs.room_count = plan.rooms.size()
 	HouseFurnisher.furnish(plan, hs)
 	return plan
@@ -556,7 +555,7 @@ static func _hall_door(plan: HousePlan, floor_rect: Rect2, up: Vector2) -> void:
 ## Windows down both long walls, evenly spaced and clear of the corners: a
 ## hall is lit from the sides, because its ends are the dais and the screens.
 static func _hall_windows(plan: HousePlan, floor_rect: Rect2, up: Vector2,
-		hs: HouseSpec) -> void:
+		hs: HouseSpec, room := 0) -> void:
 	var lengthwise: bool = up.y > 0.5
 	var run: float = floor_rect.size.y if lengthwise else floor_rect.size.x
 	var margin: float = HouseGeometry.DOOR_CORNER_MARGIN + WINDOW_W
@@ -583,7 +582,7 @@ static func _hall_windows(plan: HousePlan, floor_rect: Rect2, up: Vector2,
 				pos = Vector2(along,
 					floor_rect.position.y if side < 0.0 else floor_rect.end.y)
 				n = Vector2(0.0, side)
-			plan.windows.append({"room": 0, "pos": pos, "normal": n,
+			plan.windows.append({"room": room, "pos": pos, "normal": n,
 				"width": WINDOW_W, "sill": WINDOW_SILL, "head": head,
 				"storey": 0})
 
