@@ -137,7 +137,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 				"u": lz if face % 2 == 1 else lx,
 				"y": th - tw * 0.28, "width": tw * 0.32,
 				"height": tw * 0.26, "style": &"square"})
-		if spec.west_towers >= 2 and _cuts_west_portal():
+		if spec.west_towers > 0:
 			var x0: float = lx - tw * 0.5
 			var x1: float = lx + tw * 0.5
 			for portal in _west_door_openings():
@@ -228,18 +228,16 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 
 	# ---------- main door ----------
 	tag("door")
-	# Only a SINGLE axial tower carries the door out to its own west face. Twin
-	# towers flank the axis, so that same offset left the door hanging in the
-	# gap between them with no wall behind it at all.
+	# A single axial tower carries the door out to its own west face. The
+	# tower, narthex and nave hosts each cut the same route below.
 	var door_h: float = minf(h * 0.32, 3.4)
 	var door_z: float = _west_door_z()
 	var west_doors := _west_door_openings()
 	for opening_index in range(west_doors.size()):
 		var opening: Dictionary = west_doors[opening_index]
 		window(opening.pos, PI, opening.width, opening.height,
-			opening.style, true, _cuts_west_portal())
-		if _cuts_west_portal():
-			_portal_moulding(opening, opening_index)
+			opening.style, true, true)
+		_portal_moulding(opening, opening_index)
 	box(Vector3((w * 0.34 if spec.door_style == &"portal" else 2.4) + 0.7, 0.22, 0.14),
 		Vector3(0, door_h + 0.35, door_z - 0.02), SURF_TRIM)
 
@@ -471,11 +469,6 @@ func _cuts_clerestory() -> bool:
 	return spec.style == &"gothic" and ChurchGeometry.has_clerestory(spec)
 
 
-func _cuts_west_portal() -> bool:
-	# A single axial tower or narthex owns a different exterior host wall.
-	return spec.west_towers != 1 and not spec.narthex
-
-
 func _west_door_z() -> float:
 	if spec.tower and spec.west_towers == 1:
 		return -spec.length / 2.0 + TOWER_EMBED - spec.tower_width - ChurchGeometry.OPENING_EPS
@@ -519,12 +512,11 @@ func _nave_shell() -> void:
 				holes.append({"face": face, "u": z, "y": h * 0.58,
 					"width": spec.window_w, "height": spec.window_h,
 					"style": spec.window_style, "log": false})
-	if _cuts_west_portal():
-		for opening in _west_door_openings():
-			holes.append({"face": 2, "u": opening.pos.x,
-				"y": opening.pos.y, "width": opening.width,
-				"height": opening.height, "style": opening.style,
-				"log": false})
+	for opening in _west_door_openings():
+		holes.append({"face": 2, "u": opening.pos.x,
+			"y": opening.pos.y, "width": opening.width,
+			"height": opening.height, "style": opening.style,
+			"log": false})
 	if spec.rose_window and spec.west_towers != 1:
 		holes.append_array(_rose_holes(2, 0.0, _rose_y(), _rose_radius()))
 	_windowed_box_shell(AABB(Vector3(-w * 0.5, 0, -l * 0.5),
@@ -547,10 +539,14 @@ func _build_narthex() -> void:
 		return
 	tag("narthex")
 	var a: AABB = ChurchGeometry.narthex_aabb(spec)
-	_windowed_box_shell(a, [{"face": 2, "u": 0.0,
-		"y": a.size.y * 0.42, "width": 1.6,
-		"height": a.size.y * 0.5, "style": spec.window_style,
-		"door": true}])
+	var holes: Array[Dictionary] = []
+	for opening in _west_door_openings():
+		for face in [2, 0]:
+			holes.append({"face": face, "u": opening.pos.x,
+				"y": opening.pos.y, "width": opening.width,
+				"height": opening.height, "style": opening.style,
+				"door": true, "log": face == 2})
+	_windowed_box_shell(a, holes)
 	_log_mass("narthex", a)
 
 

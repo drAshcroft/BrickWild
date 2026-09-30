@@ -119,7 +119,63 @@ static func run() -> SuiteResult:
 	solid.box(Vector3(12.0, 20.0, 30.0), Vector3(0, 10.0, 0), 0)
 	_expect(res, _blocked(solid.commit(), Vector3(6.5, 10, 0),
 		Vector3(5.5, 10, 0)), "control solid wall did not block the probe")
+	_entrance_routes(res)
 	return res
+
+
+## A cut on the outer door is not an entrance if a tower, narthex back wall or
+## nave front still spans the same passage. Trace the entire route.
+static func _entrance_routes(res: SuiteResult) -> void:
+	for mode in ["narthex", "tower", "both"]:
+		var spec := ChurchSpec.new()
+		spec.style = &"romanesque"
+		spec.width = 12.0
+		spec.length = 62.0
+		spec.height = 22.0
+		ChurchGenerator.generate(spec, 8120 if mode == "narthex" else 8111)
+		spec.narthex = mode != "tower"
+		spec.tower = mode != "narthex"
+		spec.west_towers = 0 if mode == "narthex" else 1
+		if spec.tower:
+			spec.tower_width = 10.0
+			spec.tower_height = 32.0
+		var builder := ChurchBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		var front: float = ChurchGeometry.narthex_aabb(spec).position.z \
+			if mode == "narthex" else ChurchGeometry.tower_aabb(spec).position.z
+		var end_z := -spec.length * 0.5 + 2.0
+		var pier_x := 0.0
+		var outer_logs := 0
+		for opening in builder._west_door_openings():
+			var x: float = opening.pos.x
+			var y: float = opening.pos.y - opening.height * 0.10
+			var start := Vector3(x, y, front - 1.0)
+			var end := Vector3(x, y, end_z)
+			_expect(res, _first_hit(mesh, start, end, true).is_empty(),
+				"%s entrance route still hits stone at x=%.2f" % [mode, x])
+			_expect(res, _first_hit(mesh, start, end).is_empty(),
+				"%s entrance route is blocked by trim or another surface" % mode)
+			var logged := false
+			for part in builder.part_log:
+				if part.get("kind") == "window" and part.get("tag") == "door" \
+						and Vector3(part.pos).distance_to(opening.pos) < 0.001 \
+						and part.get("aperture", "") == "through":
+					logged = true
+			_expect(res, logged, "%s inner/axial entrance has a false recess log" % mode)
+			pier_x = maxf(pier_x, absf(x) + opening.width * 0.5 + 0.6)
+		var pier_start := Vector3(pier_x, 1.4, front - 1.0)
+		_expect(res, _blocked(mesh, pier_start,
+			Vector3(pier_x, 1.4, end_z)),
+			"%s entrance route removed its neighbouring pier" % mode)
+		if spec.narthex:
+			for part in builder.part_log:
+				if part.get("kind") == "window" and part.get("tag") == "narthex":
+					outer_logs += 1
+					_expect(res, part.get("aperture", "") == "through" \
+						and part.pos.y - part.size.y * 0.5 < 0.2,
+						"%s narthex front door is raised or logged as a recess" % mode)
+			_expect(res, outer_logs == builder._west_door_openings().size(),
+				"%s narthex exterior and inner doors do not correspond" % mode)
 
 
 static func _check_opening(res: SuiteResult, mesh: ArrayMesh,
