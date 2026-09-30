@@ -26,15 +26,17 @@ static func run() -> SuiteResult:
 		"Crusader 9118 stair component log differs from emitted triangles")
 	var gates: Array = builder.mass_log.filter(func(row): return String(row.name).begins_with("tower_") and "_gate_" in String(row.name))
 	var stairs: Array = builder.mass_log.filter(func(row): return String(row.name).begins_with("wall_stair_"))
-	var overlaps: Array[String] = []
-	for gate in gates:
-		for stair in stairs:
-			var hit: AABB = gate.aabb.intersection(stair.aabb)
-			if hit.size.x > 0.001 and hit.size.z > 0.001:
-				overlaps.append("%s / %s (%0.2f x %0.2f m)" % [gate.name, stair.name, hit.size.x, hit.size.z])
+	var overlaps := _gate_stair_overlaps(gates, stairs)
 	_expect(result, gates.size() == 4, "expected all four gate-tower mass records; got %d" % gates.size())
 	_expect(result, stairs.size() == 4, "expected both stair routes on both rings; got %d" % stairs.size())
 	_expect(result, overlaps.is_empty(), "gate tower and wall stair bounds overlap: " + str(overlaps))
+	# A deliberate overlap proves the clearance probe would reject the original
+	# seed 9118 defect. The production rows above remain untouched.
+	if not gates.is_empty() and not stairs.is_empty():
+		var intruding_gate: Dictionary = gates[0].duplicate()
+		intruding_gate["aabb"] = stairs[0].aabb
+		_expect(result, not _gate_stair_overlaps([intruding_gate], [stairs[0]]).is_empty(),
+			"gate/stair overlap negative control was not detected")
 	var gate_report := CastleQA.gate_access_report(spec, builder, mesh)
 	_expect(result, gate_report.failures.is_empty(), "gate passage access: " + str(gate_report.failures))
 	var triangles: Array = []
@@ -58,6 +60,16 @@ static func _hit(triangles: Array, from: Vector3, to: Vector3) -> bool:
 		if Geometry3D.segment_intersects_triangle(from, to, tri[0], tri[1], tri[2]) != null:
 			return true
 	return false
+
+
+static func _gate_stair_overlaps(gates: Array, stairs: Array) -> Array[String]:
+	var overlaps: Array[String] = []
+	for gate in gates:
+		for stair in stairs:
+			var hit: AABB = gate.aabb.intersection(stair.aabb)
+			if hit.size.x > 0.001 and hit.size.z > 0.001:
+				overlaps.append("%s / %s (%0.2f x %0.2f m)" % [gate.name, stair.name, hit.size.x, hit.size.z])
+	return overlaps
 
 
 static func _expect(result: SuiteResult, ok: bool, message: String) -> void:

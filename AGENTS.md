@@ -22,6 +22,9 @@ godot --headless --path . --script res://tests/run_all.gd -- normals
 godot --headless --path . --script res://tests/run_all.gd -- castle cmassing
 # named lanes -- see the testing protocol below; prefer these to hand-picking
 godot --headless --path . --script res://tests/run_all.gd -- lane:geom
+# bounded castle change gate: apertures, nested-ring stair clearance,
+# fixed structural cases and selected real voxel QA
+godot --headless --path . --script res://tests/run_all.gd -- lane:castle-change
 godot --headless --path . --script res://tests/run_all.gd -- lane:plan
 godot --headless --path . --script res://tests/run_all.gd -- lane:church-change
 # bounded house QA lane for ordinary task completion (target: <5 minutes)
@@ -66,7 +69,9 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | the planner, room programme, doors, circulation | `lane:plan` | ~4 m |
 | the furnisher, prop recipes, assembly, exterior dressing | `lane:dress` | ~10 m |
 | anything under `assets/props/` or `catalog.json` (rebuild the catalogue first) | `lane:assets` | ~6 m |
-| castle / temple geometry | `lane:castle`, `lane:temple` | 3-8 m |
+| castle geometry and openings | `lane:castle-change` | 81 s suite body; 91 s host wall |
+| temple geometry | `lane:temple` | ~3 m |
+| exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | church shell, opening or roof geometry | `lane:church-change` | ~10 s suite body; startup varies |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
@@ -78,6 +83,15 @@ Renaissance and Russian fixtures plus Hagia Sophia, Florence and St Basil.
 
 The lanes are defined in `LANES` at the top of `tests/run_all.gd`. Lanes and
 bare suite names mix freely and de-duplicate.
+
+The bounded castle lane samples square and manor shells with real voxel QA,
+a battered Crusader enclosure, a Bavarian ridge, and a Scottish tower house.
+It also checks true aperture rays and the two-ring Crusader seed 9118 gate/stair
+route. The exhaustive castle, normals, massing, and voxel sweeps remain named
+for scheduled regression. Fixed-case stage and host timings are recorded in
+`docs/QA_PERF_001.md`; the final bounded lane passed 127 checks with five
+classified-as-pending opening-probe warnings. Do not infer that a full sweep
+passed from this lane.
 
 **Why not just run everything.** The slow house suites are slow because they
 run the FURNISHER SEARCH, not because they check more. Measured:
@@ -122,6 +136,10 @@ file.
 * `MeshKit.commit()` deliberately does **not** call `generate_normals()`. Every
   emitter sets its own per-face normal, and generate_normals() smooths across a
   whole surface -- one smooth group spans the entire building.
+* `MeshKit.commit()` omits an empty trailing surface. A tower house with real
+  cut windows may have three mesh surfaces because it has no dark opening
+  insert. Check the required emitted geometry and logs; do not require four
+  surfaces merely because the builder allocated four slots.
 * Both generators share `core/mass_builder.gd`: the mesh kit plus `part_log`
   and `mass_log`, which every QA check measures. A builder that logs a mass it
   never emitted is caught by the voxel suites, not the massing ones.

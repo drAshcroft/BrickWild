@@ -310,8 +310,10 @@ keep and protected entrance in the affected fortress seeds; [focused production
 and small-fixture evidence](CAS_REG_001.md) passes. `CAS-REG-002` separates the
 nested gate towers and wall stairs in the Crusader fortress; its [production
 footprint comparison and 199-check access sweep](CAS_REG_002.md) pass.
-`CAS-REG-003` tracks the tower-house openings. The broad castle massing sweep
-remains incomplete.
+`CAS-REG-003` restores the planned 0.32 m tower-house slit rows and updates the
+raised-door check to read the existing emitted door record; [fixed-camera
+front/raking pairs](CAS_REG_003.md) show the change. The broad castle massing
+sweep remains incomplete.
 Visual acceptance still needs fixed-camera renders beside the geometry
 checks: a log entry or a dark patch cannot prove that masonry was cut.
 Routine church geometry edits now have a [bounded change lane](../artifacts/qa_perf_002/README.md)
@@ -319,6 +321,17 @@ covering roofs, selected shells, apertures, normals, massing and landmarks.
 `QA-PERF-003` [bounded dome clipping](QA_PERF_003.md) and added assembled
 Byzantine, Renaissance and Russian fixtures plus three domed landmarks to that
 lane. The exhaustive church sweep remains scheduled separately.
+Castle geometry now has a [bounded change lane](QA_PERF_001.md) covering fixed
+square, round-style, battered, ridge and tower-house builds, aperture rays,
+component parity and the nested Crusader gate/stair route. Its 90-second
+baseline correctly exposed the tower-house windows missing before `CAS-REG-003`.
+After that repair it passes 127 checks in about 91 seconds of host time, with
+five previously known outside-probe warnings under `CASTLE-NORMALS-WARNINGS`.
+Full CastleQA also found two separate existing interior defects: ridge range
+doors/windows off their host rooms (`CAS-REG-004`, Bavarian 8805), and a keep
+stair in the entrance line (`CAS-REG-005`, Crusader 9250 and 9118). Those are
+tracked separately from facade polish and the exhaustive castle sweep is still
+unrun after these changes.
 
 ---
 

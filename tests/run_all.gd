@@ -60,7 +60,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange",
-	"houseqafurnish", "houseqafull", "wld001_domus", "wld001_riad",
+	"houseqafurnish", "houseqafull", "castlechange", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
@@ -85,7 +85,8 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 ##   lane:plan    ~4m    the planner, room programme, doors, circulation
 ##   lane:dress   ~10m   the furnisher, prop recipes, assembly, exteriors
 ##   lane:assets  ~6m    anything under assets/props/ or catalog.json
-##   lane:castle  ~8m    castle geometry, massing, interiors
+##   lane:castle-change  ~81s body / 91s host: fixed castle geometry and QA
+##   lane:castle         exhaustive castle sweeps; schedule separately
 ##   lane:church-change  ~10s body  bounded roofs, domed styles, openings, massing
 ##   lane:church         exhaustive church sweeps; schedule separately
 ##   lane:temple  ~3m    temple geometry and the rite rules
@@ -100,6 +101,7 @@ const LANES: Dictionary = {
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
+	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange"],
 	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs"],
 	"lane:church-change": ["churchroof", "churchchange"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
@@ -191,6 +193,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/castle_gate_access_suite.gd").run()
 		"cgatestairs":
 			return preload("res://tests/suites/castle_gate_stair_suite.gd").run()
+		"castlechange":
+			return preload("res://tests/suites/castle_change_suite.gd").run()
 		"cnormals":
 			return CastleNormalsSuite.run()
 		"cmassing":
