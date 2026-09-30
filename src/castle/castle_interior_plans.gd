@@ -289,12 +289,12 @@ static func _chapel_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 const KEEP_STOREY_H := 3.6
 const MIN_KEEP_SIDE := 3.2
 const MIN_KEEP_AREA := 12.0
-## And the most. The biggest keep ever built is the White Tower at
-## 36 x 32 m; a fortress in this generator throws up a "keep" mass sixty
-## metres across with four thousand square metres to a floor, which is a
-## block the massing happens to draw as one volume rather than a tower
-## anybody lives up. It keeps its mass; what it does not get is an inside.
-const MAX_KEEP_SIDE := 36.0
+## The planner also provides the door and stair for oversized fortress keeps.
+## This upper bound covers the largest fixed fortress sweep keep (64.3 m).
+const MAX_KEEP_SIDE := 66.0
+## Furniture search scales poorly in a room this large. Large keeps retain a
+## full access plan and shell, but do not run the house furnishing search.
+const MAX_FURNISHED_KEEP_SIDE := 36.0
 ## How far apart a keep sets its windows along a wall. Wider than the hall
 ## pitch on purpose: the gap between two of them is where the bed goes.
 const KEEP_WINDOW_PITCH := 5.0

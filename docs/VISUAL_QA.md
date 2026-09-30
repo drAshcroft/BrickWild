@@ -305,8 +305,11 @@ finds in a village aerial.
 The original review was visual, but its claim that every structural suite
 passed is no longer supported. The castle massing sweep on 2026-09-29 found
 pre-existing forebuilding, gate-stair overlap, and tower-house failures, each
-reproduced on the pre-aperture build. `CAS-REG-001` through `CAS-REG-003` track
-them. Visual acceptance still needs fixed-camera renders beside the geometry
+reproduced on the pre-aperture build. `CAS-REG-001` restores the planned large
+keep and protected entrance in the affected fortress seeds; [focused production
+and small-fixture evidence](CAS_REG_001.md) passes, while the broad castle sweep
+remains incomplete. `CAS-REG-002` and `CAS-REG-003` track the other failures.
+Visual acceptance still needs fixed-camera renders beside the geometry
 checks: a log entry or a dark patch cannot prove that masonry was cut.
 
 ---

@@ -28,8 +28,10 @@ static func primary(spec: CastleSpec) -> Dictionary:
 				plan = CastleInteriorPlans.hall_plan(spec)
 				bounds = CastleGeometry.hall_aabb(spec)
 			"keep":
-				plan = CastleKeepPlan.generate(spec)
 				bounds = CastleGeometry.keep_aabb(spec)
+				var furnish := maxf(bounds.size.x, bounds.size.z) \
+					<= CastleInteriorPlans.MAX_FURNISHED_KEEP_SIDE
+				plan = CastleKeepPlan.generate(spec, furnish)
 			"chapel":
 				plan = CastleInteriorPlans.chapel_plan(spec)
 				bounds = CastleGeometry.chapel_aabb(spec)
