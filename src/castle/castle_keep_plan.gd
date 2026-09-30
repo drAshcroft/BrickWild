@@ -25,6 +25,10 @@ static func outer_outline(spec: CastleSpec, level: int, levels: int) -> PackedVe
 		Vector2(box.size.x, box.size.z)))
 
 
+## Access geometry asks for a structural plan only. Furnishing the same large
+## keep for every forebuilding query repeats measured placement to learn one
+## doorway. CastleInteriors.primary adds the minimum programme to the one
+## occupied plan that is actually emitted.
 static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 	var plan := HousePlan.new()
 	if not spec.keep or CastleGeometry.is_motte(spec):
@@ -100,6 +104,41 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 	if with_furniture:
 		HouseFurnisher.furnish(plan, hs)
 	return plan
+
+
+## Fortress rooms are deliberately kept out of the full decorative search.
+## They still receive the small set of props that makes their room names true.
+## HouseFurnishPlacement applies the same measured footprints, access zones,
+## wall rules and collision checks as the ordinary furnisher, with a fixed seed
+## and at most one placement attempt per required category.
+static func furnish_minimum_programme(plan: HousePlan, spec: HouseSpec) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.seed) ^ 0x4B_45_45_50
+	for room in range(plan.room_count()):
+		var kind: StringName = plan.kind_of(room)
+		var required: Array = HouseFurnishCheck.REQUIRED.get(kind, [])
+		if kind == &"hall" and not HouseFurnishProgrammeCheck._anybody_sleeps(plan):
+			required = required + ["bed"]
+		var blocked: Array[Rect2] = HouseFurnishPlacement.initial_blocked(plan, room)
+		var zones: Array[Rect2] = []
+		for cat_value in required:
+			var cat := String(cat_value)
+			var rule: StringName = &"wall" if cat in HouseFurnishPlacement.WALL_ESSENTIAL else &"free"
+			HouseFurnishPlacement.place_one(plan, spec, room, cat, rule,
+				blocked, zones, rng, {"opt": 1.0})
+		# The shared programme check requires somewhere to sit when a hall has a
+		# table. This deterministic single seat fulfils that contract.
+		if kind == &"hall" or kind == &"parlour":
+			var has_table := false
+			var has_seat := false
+			for index in plan.furniture_of(room):
+				var placed: Dictionary = plan.furniture[index]
+				var category := PropCatalog.category(String(placed["key"]))
+				has_table = has_table or category == "table"
+				has_seat = has_seat or category in ["seat", "bench"]
+			if has_table and not has_seat:
+				HouseFurnishPlacement.place_one(plan, spec, room, "seat", &"around",
+					blocked, zones, rng, {"opt": 1.0})
 
 
 static func _facing_wall(walls: Array[Dictionary], inward: Vector2) -> int:

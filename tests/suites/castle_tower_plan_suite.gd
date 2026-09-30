@@ -39,7 +39,50 @@ static func run() -> SuiteResult:
 		_negative_opening(res, who, plan)
 		_negative_landing(res, who, plan)
 		_check_emitted_door(res, who, spec)
+	_narrow_wizard_fixture(res)
 	return res
+
+
+## The exhaustive voxel fixture is a 9 x 9 x 42 wizard with no forced plan
+## override. Keep its narrow-shaft door contract explicit in this fast suite.
+static func _narrow_wizard_fixture(res: SuiteResult) -> void:
+	var spec := CastleSpec.new()
+	spec.style = &"wizard"
+	spec.width = 9.0
+	spec.length = 9.0
+	spec.height = 42.0
+	spec.tier_override = &"house"
+	CastleGenerator.generate(spec, 12012)
+	var plan: HousePlan = TowerPlan.generate(spec, true)
+	var who := "wizard 9x9x42 seed=12012"
+	_expect(res, plan.spec != null, who + ": no narrow tower plan")
+	if plan.spec == null:
+		return
+	_expect(res, TowerPlan.oval_sides(spec) == 12,
+		who + ": narrow shaft did not select its wider entrance facet")
+	_expect(res, plan.outline_of(0).size() == 12,
+		who + ": plan outline disagrees with narrow emitted drum")
+	_expect(res, not plan.doors.is_empty() \
+		and float(plan.doors[0].get("width", 0.0)) >= HouseGeometry.DOOR_W,
+		who + ": raised entrance is below the standard door width")
+	_expect(res, plan.stairs.size() == plan.room_count() - 1,
+		who + ": stair chain does not reach every upper level")
+	_check_stairs(res, who, plan)
+	var has_hearth := false
+	for prop in plan.furniture:
+		has_hearth = has_hearth or PropCatalog.category(String(prop["key"])) == "hearth"
+	_expect(res, not has_hearth, who + ": unvented castle shaft received a house hearth prop")
+	var qa := HouseQA.new().check(plan, null)
+	_expect(res, qa.failures.is_empty(), who + ": house QA: " + str(qa.failures))
+	var builder := CastleBuilder.new()
+	builder.build(spec)
+	var emitted := builder.part_log.filter(func(part: Dictionary) -> bool:
+		return String(part.get("tag", "")) == "tower_house" \
+			and String(part.get("opening_kind", "")) == "door")
+	_expect(res, emitted.size() == 1, who + ": planned door did not emit one aperture")
+	if emitted.size() == 1:
+		_expect(res, float(emitted[0].get("size", Vector3.ZERO).x) >= HouseGeometry.DOOR_W,
+			who + ": emitted door fell below the standard width")
 
 
 static func _spec(row: Dictionary) -> CastleSpec:
@@ -67,7 +110,7 @@ static func _check_storeys(res: SuiteResult, who: String, spec: CastleSpec,
 		_expect(res, is_equal_approx(float(room.get("wall_thickness", -1.0)), thickness),
 			who + ": storey %d lost tapered wall thickness" % level)
 		var outline: PackedVector2Array = room["outline"]
-		_expect(res, outline.size() == (24 if spec.style == &"wizard" else 4),
+		_expect(res, outline.size() == (TowerPlan.oval_sides(spec) if spec.style == &"wizard" else 4),
 			who + ": storey %d outline has %d facets" % [level, outline.size()])
 		for point in outline:
 			_expect(res, absf(point.x) <= actual.size.x * 0.5 + 0.01
@@ -101,6 +144,9 @@ static func _check_door(res: SuiteResult, who: String, spec: CastleSpec,
 	_expect(res, facet, who + ": raised door normal is not its exact wall facet")
 	_expect(res, float(door["sill"]) >= 2.0 - 0.001,
 		who + ": door is not raised")
+	if spec.style == &"wizard" and maxf(spec.width, spec.length) <= 10.0:
+		_expect(res, float(door["width"]) >= HouseGeometry.DOOR_W - 0.001,
+			who + ": narrow wizard entrance is below the human-width door standard")
 
 
 static func _check_emitted_door(res: SuiteResult, who: String, spec: CastleSpec) -> void:
@@ -113,6 +159,9 @@ static func _check_emitted_door(res: SuiteResult, who: String, spec: CastleSpec)
 			and String(part.get("opening_kind", "")) == "door")
 	_expect(res, doors.size() == 1,
 		who + ": wizard planned door did not emit exactly one actual aperture")
+	if TowerPlan.oval_sides(spec) == TowerPlan.NARROW_OVAL_SIDES and doors.size() == 1:
+		_expect(res, float(doors[0].get("size", Vector3.ZERO).x) >= HouseGeometry.DOOR_W,
+			who + ": emitted narrow-shaft door is below the human-width standard")
 
 
 static func _check_windows(res: SuiteResult, who: String, spec: CastleSpec,

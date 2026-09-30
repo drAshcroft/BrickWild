@@ -125,12 +125,20 @@ static func _tower_house_fixtures(res: SuiteResult) -> void:
 	# lift: a window dropped to the ground storey
 	var low := CastleBuilder.new()
 	low.build(spec)
+	var moved_window := false
 	for p in low.part_log:
-		if p["kind"] == "window" and p["tag"] == "window":
+		# Planned tower-house openings retain their host tag rather than the
+		# legacy "window" tag. TowerCheck reads both from this same part log.
+		if p["kind"] == "window":
 			var pos: Vector3 = p["pos"]
 			p["pos"] = Vector3(pos.x, 1.0, pos.z)
+			moved_window = true
 			break
-	_expect_rule(res, "lift", TowerCheck.new().check(spec, low))
+	res.checked += 1
+	if not moved_window:
+		res.fail("tower house fixture: no emitted window was available to lower")
+	else:
+		_expect_rule(res, "lift", TowerCheck.new().check(spec, low))
 	# foot: the ground storey no wider than the top
 	var thin := CastleBuilder.new()
 	thin.build(spec)

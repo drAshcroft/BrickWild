@@ -38,7 +38,37 @@ static func run() -> SuiteResult:
 					opposite = true
 		_expect(res, opposite, "%s hall lost its two free window walls" % tier)
 		_check_qa(res, plan, "%s hall" % tier)
+	_check_ridge_access(res, CastleSweep.spec_at(&"bavarian", &"fortress", 2),
+		"Bavarian fortress")
+	_check_ridge_access(res, CastleSweep.spec_at(&"dark", &"castle", 0),
+		"dark castle 9249")
+	_check_ridge_access(res, CastleSweep.spec_at(&"dark", &"castle", 1),
+		"dark castle 9250")
+	_check_ridge_access(res, CastleSweep.spec_at(&"dark", &"castle", 2),
+		"dark castle 9251")
+	_check_ridge_access(res, CastleSweep.spec_at(&"dark", &"fortress", 1),
+		"dark fortress 9118")
+	_check_ridge_access(res, CastleSweep.spec_at(&"dark", &"fortress", 2),
+		"dark fortress 9119")
 	return res
+
+
+## The range chain must keep public access out of guest rooms, and its two
+## tower links must not make a straight-through house. These cases used to
+## trigger privacy and doors_in_line in the full voxel sweep.
+static func _check_ridge_access(res: SuiteResult, spec: CastleSpec,
+		label: String) -> void:
+	var builder := CastleBuilder.new()
+	builder.build(spec)
+	var found := false
+	for row in builder.interiors:
+		if not String(row.id).begins_with("range_"):
+			continue
+		found = true
+		var report := HouseQA.new().check(row.plan, null)
+		_expect(res, report.failures.is_empty(),
+			"%s %s emitted access/privacy: %s" % [label, row.id, str(report.failures)])
+	_expect(res, found, "%s emitted no range interior records" % label)
 
 
 static func _spec(width: float, length: float, height: float, seed_value: int) -> CastleSpec:

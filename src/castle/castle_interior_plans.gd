@@ -455,9 +455,13 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	plan.spec = hs
 	plan.rooms = []
 	for i in range(bays):
-		# One lord's chamber owns the range's fire. Other bays are guest rooms;
-		# HousePlan has one named hearth/flue per range, not one per bay.
-		var bay_kind: StringName = kind if (i == 0 or bays == 1) else &"guest_room"
+		# One lord's chamber owns the range's fire. A chain of guest rooms would
+		# make the later rooms accessible only through somebody else's bedroom.
+		# Keep the intermediate bays public parlours and reserve the last bay for
+		# guests; HousePlan has one named hearth/flue per range, not per bay.
+		var bay_kind: StringName = kind
+		if i > 0:
+			bay_kind = &"guest_room" if i == bays - 1 else &"parlour"
 		if bay_run * floor_rect.size.y < float(HouseGeometry.MIN_AREA[bay_kind]) \
 				or minf(bay_run, floor_rect.size.y) < float(HouseGeometry.MIN_SIDE[bay_kind]):
 			bay_kind = kind
@@ -483,11 +487,25 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 		# This is an aperture in the end wall. Keep it on the local room edge;
 		# the castle transform then carries that wall plane onto the shared tower.
 		var x: float = floor_rect.position.x if end_v < 0 else floor_rect.end.x
+		# When both ends connect, offset the openings to opposite sides of the
+		# range. The passage then turns inside the range instead of reading as a
+		# straight corridor through the whole building.
+		var side_offset: float = minf(floor_rect.size.y * 0.25,
+			HouseGeometry.INNER_DOOR_W * 1.25)
+		var door_y: float = floor_rect.get_center().y + float(end_v) * side_offset
 		plan.doors.append({"a": 0 if end_v < 0 else plan.rooms.size() - 1, "b": -1,
-			"pos": Vector2(x, floor_rect.get_center().y),
+			"pos": Vector2(x, door_y),
 			"normal": Vector2(float(end_v), 0.0),
 			"width": HouseGeometry.INNER_DOOR_W, "exterior": true,
 			"front": false, "storey": 0})
+	# The front door belongs on the exposed part of its bay's long facade. A
+	# short first bay can put its midpoint inside the solid tower dive, where the
+	# buried-opening pass below correctly removes it. Slide along the SAME wall
+	# to the nearest point clear of both the room corners and that dive.
+	var buried: float = floor_rect.size.x * 0.5 \
+		- (float(seg["roof_length"]) * 0.5 - CastleGeometry.tower_half(spec, 0))
+	if buried > 0.0:
+		_relocate_range_front_door(plan, floor_rect, buried)
 	# A range's door is on a LONG wall, and so are its windows: unlike a hall,
 	# whose door is on an end wall and can never meet one. Drop any window that
 	# lands on top of a door. Two openings in one piece of wall leave the
@@ -513,8 +531,6 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	# itself in the vertex towers, and a tower is solid: an opening placed out
 	# there is a window with a tower behind it. Drop the ones that land in the
 	# dive rather than pretend the wall is free.
-	var buried: float = floor_rect.size.x * 0.5 \
-		- (float(seg["roof_length"]) * 0.5 - CastleGeometry.tower_half(spec, 0))
 	if buried > 0.0:
 		var keep_windows: Array[Dictionary] = []
 		for wdw in plan.windows:
@@ -537,6 +553,29 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	hs.room_count = plan.rooms.size()
 	HouseFurnisher.furnish(plan, hs)
 	return plan
+
+
+static func _relocate_range_front_door(plan: HousePlan, floor_rect: Rect2,
+		buried: float) -> void:
+	var half_run: float = floor_rect.size.x * 0.5
+	var exposed_lo: float = -half_run + buried
+	var exposed_hi: float = half_run - buried
+	for door in plan.doors:
+		if not bool(door.get("front", false)):
+			continue
+		var room: int = int(door.get("a", -1))
+		if room < 0 or room >= plan.rooms.size():
+			return
+		var rect: Rect2 = plan.rooms[room]["rect"]
+		var margin: float = HouseGeometry.DOOR_CORNER_MARGIN \
+			+ float(door["width"]) * 0.5
+		var lo: float = maxf(rect.position.x + margin, exposed_lo + margin)
+		var hi: float = minf(rect.end.x - margin, exposed_hi - margin)
+		if lo <= hi:
+			var pos: Vector2 = door["pos"]
+			pos.x = clampf(pos.x, lo, hi)
+			door["pos"] = pos
+		return
 
 
 ## The way in, at the lower end, in the middle of the end wall.

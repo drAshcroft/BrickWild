@@ -84,6 +84,10 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		steps.append({"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0})
 		steps.append({"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9})
 	for s in HouseFurnishingRecipes.RECIPES.get(kind, []):
+		# A family without a supported flue omits the hearth prop, while its
+		# table/bed programme remains the same.
+		if String(s["cat"]) == "hearth" and not spec.allows_hearth_furniture():
+			continue
 		# With a bed in it the hall has no middle left to stand a table in, so
 		# the table goes against a wall -- which is what a one-room cottage
 		# does anyway.

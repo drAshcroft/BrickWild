@@ -32,6 +32,8 @@ static func primary(spec: CastleSpec) -> Dictionary:
 				var furnish := maxf(bounds.size.x, bounds.size.z) \
 					<= CastleInteriorPlans.MAX_FURNISHED_KEEP_SIDE
 				plan = CastleKeepPlan.generate(spec, furnish)
+				if not furnish and plan.spec != null:
+					CastleKeepPlan.furnish_minimum_programme(plan, plan.spec)
 			"chapel":
 				plan = CastleInteriorPlans.chapel_plan(spec)
 				bounds = CastleGeometry.chapel_aabb(spec)

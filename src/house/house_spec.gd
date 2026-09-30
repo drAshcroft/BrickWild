@@ -165,6 +165,12 @@ func max_storeys() -> int:
 	return HouseGeometry.MAX_STOREYS
 
 
+## Families without a supported flue may suppress the ordinary hearth prop.
+## Ordinary families retain their hearth recipes.
+func allows_hearth_furniture() -> bool:
+	return true
+
+
 ## Every storey index, lowest first.
 func storey_indices() -> Array[int]:
 	var out: Array[int] = []
