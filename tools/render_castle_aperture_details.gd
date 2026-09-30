@@ -29,6 +29,11 @@ func _init() -> void:
 		print("Square keep shell fixture renders complete: ", _out)
 		quit()
 		return
+	if user_args.has("--round-keep-fixture"):
+		await _render_round_keep_fixture()
+		print("Round keep shell fixture renders complete: ", _out)
+		quit()
+		return
 	for entry in _entries():
 		if not only.is_empty() and entry.name != only:
 			continue
@@ -175,6 +180,60 @@ func _render_square_keep_fixture() -> void:
 		await _save("square_keep_%s_raking.png" % state)
 		keep.queue_free()
 		await process_frame
+
+
+## Same four face positions and camera for the old recessed drum and the cut
+## drum. This isolates the opening change from foreground castle masses.
+func _render_round_keep_fixture() -> void:
+	var spec := CastleSpec.new()
+	spec.stone_color = Color("b6ac9c")
+	spec.trim_color = Color("d0c2a7")
+	spec.roof_color = Color("566271")
+	spec.window_w = 1.5
+	spec.window_h = 2.0
+	spec.wall_thickness = 1.0
+	spec.window_style = &"slit"
+	var base_r := 8.0
+	var top_r := 7.5
+	var h := 12.0
+	var window_y := 6.6
+	var sides := 14
+	var target := Vector3(0, window_y, 0)
+	var normal := Vector3(0, 0, -1)
+	var tangent := Vector3(1, 0, 0)
+	var work_light := OmniLight3D.new()
+	work_light.position = Vector3(0, 9.0, -13.0)
+	work_light.light_energy = 4.0
+	work_light.omni_range = 35.0
+	_stage.add_child(work_light)
+	for state in ["before", "after"]:
+		var builder := CastleBuilder.new()
+		builder.begin_metric(4)
+		builder.spec = spec
+		builder.tag("keep")
+		if state == "before":
+			builder._kit.drum(Vector3.ZERO, base_r, top_r, h,
+				CastleBuilder.SURF_STONE, sides)
+			builder._shell_openings(Vector3.ZERO,
+				lerpf(base_r, top_r, window_y / h), window_y, sides)
+		else:
+			builder._cut_keep_drum(Vector3.ZERO, base_r, top_r, h, window_y, sides)
+		var mesh: ArrayMesh = builder.commit()
+		var keep := ShellAssembler.build("RoundKeepFixture", mesh,
+			[spec.stone_color, spec.trim_color, spec.roof_color, Color("1a1c20")],
+			builder.prop_log, CastleBuilder.SURF_ROOF, false, LightKit.FLAME, false)
+		_stage.add_child(keep)
+		_vp.size = SIZE
+		_cam.fov = 38.0
+		_cam.position = target + normal * 20.0 + Vector3.UP * 0.25 + tangent * 1.2
+		_cam.look_at(target + Vector3.UP * 0.05)
+		await _save("round_keep_%s_front.png" % state)
+		_cam.position = target + normal * 20.0 + Vector3.UP * 0.3 + tangent * 10.0
+		_cam.look_at(target + Vector3.UP * 0.05)
+		await _save("round_keep_%s_raking.png" % state)
+		keep.queue_free()
+		await process_frame
+	work_light.queue_free()
 
 
 func _build_stage() -> void:

@@ -39,6 +39,8 @@ static func run() -> SuiteResult:
 	legacy._check_openings()
 	_want(res, not legacy.failures.is_empty(), "floating legacy slit accepted")
 	_keep_triangle_rays(res)
+	_round_keep_triangle_rays(res)
+	_unplanned_keep_routes(res)
 	_curtain_triangle_rays(res)
 	_polygon_curtain_triangle_rays(res)
 	_tower_triangle_rays(res)
@@ -68,6 +70,62 @@ static func _keep_triangle_rays(res: SuiteResult) -> void:
 		"keep window route is blocked before reaching the opposite exterior")
 	_want(res, blocked, "adjacent keep masonry was lost with the window aperture")
 	_check_logged_returns(res, builder, mesh, "keep")
+
+
+static func _round_keep_triangle_rays(res: SuiteResult) -> void:
+	for rot in [0.0, 0.23]:
+		var builder := CastleBuilder.new()
+		builder.begin_metric(4)
+		builder.spec = CastleSpec.new()
+		builder.spec.window_w = 1.5
+		builder.spec.window_h = 2.0
+		builder.spec.wall_thickness = 1.0
+		builder.tag("keep")
+		builder._cut_keep_drum(Vector3.ZERO, 8.0, 7.5, 12.0, 6.6, 14, rot)
+		var mesh := builder.commit()
+		var windows: Array[Dictionary] = []
+		for row in builder.part_log:
+			if row.get("kind") == "window" and row.get("tag") == "keep":
+				windows.append(row)
+		_want(res, windows.size() == 4, "round keep must log four face-local windows")
+		for row in windows:
+			var normal: Vector3 = row.facing.normalized()
+			var tangent := Vector3(normal.z, 0.0, -normal.x)
+			var origin: Vector3 = row.pos + normal * 2.0
+			_want(res, row.get("through_opening", false),
+				"round keep window was logged as a painted recess")
+			_want(res, not _any_surface_ray_hits(mesh, origin, -normal, 3.0),
+				"round keep facet still blocks its window at rotation %.2f" % rot)
+			_want(res, _stone_ray_hits(mesh, 0, origin + tangent * 1.0,
+				-normal, 3.0), "round keep window removed adjacent masonry")
+			var hit := _stone_first_hit(mesh, 0, origin, -normal, 25.0)
+			_want(res, hit > 12.0,
+				"round keep ray hit stone before reaching opposite shell (%.2f)" % hit)
+		_check_logged_returns(res, builder, mesh, "round keep")
+
+
+static func _unplanned_keep_routes(res: SuiteResult) -> void:
+	for shape in [&"round", &"shell"]:
+		var spec := CastleSpec.new()
+		spec.style = &"edwardian"
+		spec.tier_override = &"castle"
+		spec.width = 55.0
+		spec.length = 50.0
+		spec.height = 18.0
+		CastleGenerator.generate(spec, 6001)
+		spec.keep_shape = shape
+		var builder := CastleBuilder.new()
+		builder.begin_metric(4)
+		builder.spec = spec
+		builder.tag("keep")
+		builder._build_keep()
+		var windows := 0
+		for row in builder.part_log:
+			if row.get("kind") == "window" and row.get("tag") == "keep" \
+					and row.get("through_opening", false):
+				windows += 1
+		_want(res, windows == 4,
+			"unplanned %s keep did not use four real host cuts" % shape)
 
 
 static func _tower_triangle_rays(res: SuiteResult) -> void:

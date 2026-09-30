@@ -1097,9 +1097,8 @@ func _build_keep() -> void:
 		&"round", &"shell":
 			var base_r: float = minf(k.size.x, k.size.z) / 2.0
 			var top_r: float = base_r * 0.94
-			_kit.drum(c, base_r, top_r, k.size.y, SURF_STONE, 14)
+			_cut_keep_drum(c, base_r, top_r, k.size.y, opening_y, 14)
 			_crenellate_ring(c, top_r, k.size.y, 14, SURF_TRIM)
-			_shell_openings(c, lerpf(base_r, top_r, opening_y / k.size.y), opening_y, 14)
 		&"tiered":
 			# A battered stone base carrying diminishing timber storeys. drum()
 			# takes a CIRCUMradius: handing it the half-side made the plinth a
@@ -1217,6 +1216,69 @@ func _build_planned_keep_crown(k: AABB) -> void:
 
 
 # --------------------------------------------------------------- primitives
+
+## Cut the four keep lights from their emitted polygon facets. A 14-sided
+## drum has no exact east/west facet, so choose the nearest face and put the
+## log, trim, and stone partition on that same chord.
+func _cut_keep_drum(c: Vector3, base_r: float, top_r: float, h: float,
+		window_y: float, sides: int, rot := 0.0) -> void:
+	var cut_facets: Dictionary = {}
+	for cardinal in range(4):
+		var wanted := Vector3(sin(float(cardinal) * PI * 0.5), 0.0,
+			cos(float(cardinal) * PI * 0.5))
+		var picked := 0
+		var best := -INF
+		for side in range(sides):
+			var mid := rot + TAU * (float(side) + 0.5) / float(sides)
+			var score := Vector3(cos(mid), 0.0, sin(mid)).dot(wanted)
+			if score > best:
+				best = score
+				picked = side
+		cut_facets[picked] = true
+	var window_h: float = minf(spec.window_h, h * 0.28)
+	var bottom: float = clampf(window_y - window_h * 0.5, 0.3, h - window_h - 0.3)
+	var top: float = bottom + window_h
+	var center_y: float = (bottom + top) * 0.5
+	var mid_r: float = lerpf(base_r, top_r, center_y / h)
+	var half_span: float = mid_r * sin(PI / float(sides))
+	var window_w: float = minf(spec.window_w, half_span * 1.3)
+	var lo: float = clampf(0.5 - window_w / (4.0 * half_span), 0.08, 0.42)
+	var hi: float = 1.0 - lo
+	var st := _kit.surface(SURF_STONE)
+	for side in range(sides):
+		var a0: float = rot + TAU * float(side) / float(sides)
+		var a1: float = rot + TAU * float(side + 1) / float(sides)
+		if cut_facets.has(side):
+			for panel in [Vector4(0.0, lo, 0.0, h), Vector4(hi, 1.0, 0.0, h),
+					Vector4(lo, hi, 0.0, bottom), Vector4(lo, hi, top, h)]:
+				_keep_drum_panel(st, c, base_r, top_r, h, a0, a1, panel)
+		else:
+			_keep_drum_panel(st, c, base_r, top_r, h, a0, a1,
+				Vector4(0.0, 1.0, 0.0, h))
+		var cap := c + Vector3.UP * h
+		var p0 := cap + Vector3(cos(a0) * top_r, 0.0, sin(a0) * top_r)
+		var p1 := cap + Vector3(cos(a1) * top_r, 0.0, sin(a1) * top_r)
+		_kit._tri(st, p0, p1, cap)
+	for side in cut_facets:
+		var mid: float = rot + TAU * (float(side) + 0.5) / float(sides)
+		var normal := Vector3(cos(mid), 0.0, sin(mid))
+		var angle := atan2(normal.x, normal.z)
+		var face_r: float = mid_r * cos(PI / float(sides)) + CastleGeometry.OPENING_EPS
+		var pos := c + normal * face_r + Vector3.UP * center_y
+		_opening(pos, angle, window_w, window_h, spec.window_style, false, true,
+			minf(spec.wall_thickness, top_r * 0.5))
+
+
+func _keep_drum_panel(st: SurfaceTool, c: Vector3, base_r: float,
+		top_r: float, h: float, a0: float, a1: float, panel: Vector4) -> void:
+	if panel.y - panel.x <= 0.001 or panel.w - panel.z <= 0.001:
+		return
+	var p0 := _drum_point(c, base_r, top_r, h, a0, a1, panel.x, panel.z)
+	var p1 := _drum_point(c, base_r, top_r, h, a0, a1, panel.y, panel.z)
+	var p2 := _drum_point(c, base_r, top_r, h, a0, a1, panel.y, panel.w)
+	var p3 := _drum_point(c, base_r, top_r, h, a0, a1, panel.x, panel.w)
+	_kit._quad(st, p0, p1, p2, p3)
+
 
 ## Emit a battered tower skin as facet panels, omitting a rectangular aperture
 ## from the facet that faces the curtain. CastleGeometry's circumradii are used
