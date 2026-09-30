@@ -25,6 +25,19 @@ static func run() -> SuiteResult:
 				opening.width, opening.height,
 				"%s west portal x=%.2f" % [row[0], opening.pos.x],
 				spec.tower_width + 2.0 if spec.west_towers >= 2 else 0.45)
+	# These wider portals are empty at their logged centres. The coarse voxel
+	# sweep used to call that a floating recess; direct rays verify the cut and
+	# adjacent masonry at the five fixed seeds which exposed the mismatch.
+	for case in [[&"gothic", 11], [&"renaissance", 1],
+			[&"renaissance", 6], [&"renaissance", 8], [&"renaissance", 9]]:
+		var spec: ChurchSpec = TestSweep.spec_at(case[0], case[1])
+		var builder := ChurchBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		for opening in builder._west_door_openings():
+			_check_opening(res, mesh, builder, opening.pos, PI,
+				opening.width, opening.height,
+				"%s seed=%d west portal" % [String(case[0]), spec.seed],
+				spec.tower_width + 2.0 if spec.west_towers >= 2 else 0.45)
 	var solid := MeshKit.new(1, true)
 	solid.box(Vector3(12.0, 20.0, 30.0), Vector3(0, 10.0, 0), 0)
 	_expect(res, _blocked(solid.commit(), Vector3(6.5, 10, 0),

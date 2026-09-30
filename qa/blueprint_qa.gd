@@ -149,12 +149,18 @@ func _check_connected_mass() -> void:
 			% [total - visited.size(), total, str(_grid.world_of(example.x, example.y, example.z))])
 
 func _check_openings() -> void:
-	# Every opening must sit embedded in masonry AND not cut all the way through.
+	# Recessed opening overlays must sit in masonry. True cuts are checked by
+	# churchaperture against the emitted stone triangles.
 	var checked := 0
 	for p in builder.part_log:
 		if p["kind"] != "window":
 			continue
 		checked += 1
+		# A cut aperture has an intentionally empty centre. The voxel grid's
+		# one-cell dilation cannot distinguish its stone jamb from a wide void.
+		# The churchaperture fixture checks those openings against mesh triangles.
+		if p.get("aperture", "") == "through":
+			continue
 		var pos: Vector3 = p["pos"]
 		var tag: String = p["tag"]
 		var gi := Vector3i(_grid.vx(pos.x), _grid.vy(pos.y), _grid.vz(pos.z))

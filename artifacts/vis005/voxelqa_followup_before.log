@@ -1,0 +1,15 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running voxelqa...
+--- voxel QA ---
+    elapsed 512.34s
+  FAIL gothic Chapel Wulfran seed=5011: openings_embedded: door opening at (0.0,1.8,-20.0) floats outside masonry
+  FAIL renaissance Abbey MungoPriory seed=5001: openings_embedded: door opening at (0.0,1.8,-10.0) floats outside masonry
+  FAIL renaissance Grey Guthlac-in-the-Wold seed=5006: openings_embedded: door opening at (0.0,1.8,-15.0) floats outside masonry
+  FAIL renaissance Black Mungo-in-the-Wold seed=5008: openings_embedded: door opening at (0.0,1.8,-17.0) floats outside masonry
+  FAIL renaissance Holy Wulfran seed=5009: openings_embedded: door opening at (0.0,1.8,-18.0) floats outside masonry
+
+============================================================
+  voxel QA           FAIL  (90 checked, 5 failures, 0 warnings)
+============================================================
+1 SUITE(S) FAILED -- 1 suites, 90 checks, 5 failures, 0 warnings

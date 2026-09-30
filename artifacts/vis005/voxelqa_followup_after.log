@@ -1,0 +1,15 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running voxelqa...
+--- voxel QA ---
+    elapsed 438.23s
+
+Running churchaperture...
+--- church apertures ---
+    elapsed 0.54s
+
+============================================================
+  voxel QA           PASS  (90 checked, 0 failures, 0 warnings)
+  church apertures   PASS  (44 checked, 0 failures, 0 warnings)
+============================================================
+ALL PASS -- 2 suites, 134 checks, 0 failures, 0 warnings
