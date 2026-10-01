@@ -101,12 +101,18 @@ func _check_stair(plan: HousePlan, failures: Array[String]) -> void:
 		joins[lo] = true
 	if joins.size() != maxi(0, int(plan.spec.storeys) - 1):
 		failures.append("stair: stair does not join every adjacent floor")
-	# Every flat's threshold is a direct, exclusive edge from the stair landing.
+	# Every flat's threshold is reached directly from the stair, sometimes by way
+	# of its private landing so circulation does not pass through a bedroom.
 	for door in plan.doors:
 		if String(door.get("role", "")) != "flat_entry":
 			continue
 		var level := int(door.get("storey", -1))
-		if not stair_rooms.has(level) or int(door.get("a", -1)) != int(stair_rooms[level]):
+		var stair_room := int(stair_rooms.get(level, -1))
+		var landing_room := int(door.get("b", -1))
+		if int(door.get("a", -1)) != stair_room or stair_room < 0 \
+				or landing_room < 0 or landing_room >= plan.room_count() \
+				or String(plan.rooms[landing_room].get("role", "")) != "flat_landing" \
+				or plan.storey_of_room(landing_room) != level:
 			failures.append("stair: a flat entry is not served by that floor's stair")
 	for door2 in plan.doors:
 		if bool(door2.get("exterior", false)) and String(door2.get("role", "")) != "stair_entry" \
@@ -159,7 +165,7 @@ func _check_flats(plan: HousePlan, failures: Array[String], stats: Dictionary) -
 				failures.append("flat: %s has an exterior room door" % String(unit_id))
 				continue
 			if String(door0.get("role", "")) == "flat_entry" \
-					and String(plan.rooms[other].get("role", "")) == "stair":
+					and StringName(plan.rooms[other].get("role", &"")) in [&"stair", &"flat_landing"]:
 				entry_count += 1
 			else:
 				failures.append("flat: %s has a route outside its stair entry" % String(unit_id))

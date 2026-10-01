@@ -81,12 +81,12 @@ static func generate(seed: int, width: float, length: float, _height: float) -> 
 			flat_count += 1
 			var right_unit := "flat_%d" % (flat_count + 1)
 			flat_count += 1
-			var lf := _add_room(plan, &"bedroom", "cubiculum_side", side_front_a, level, left_unit)
+			var lf := _add_room(plan, &"bedroom", "cubiculum_front", side_front_a, level, left_unit)
 			var lm := _add_room(plan, &"parlour", "medianum", side_middle, level, left_unit)
-			var lf2 := _add_room(plan, &"bedroom", "cubiculum_front", side_front_b, level, left_unit)
-			var rf := _add_room(plan, &"bedroom", "cubiculum_front", right_front_a, level, right_unit)
+			var lf2 := _add_room(plan, &"store", "flat_landing", side_front_b, level, left_unit)
+			var rf := _add_room(plan, &"store", "flat_landing", right_front_a, level, right_unit)
 			var rm := _add_room(plan, &"parlour", "medianum", right_middle, level, right_unit)
-			var rf2 := _add_room(plan, &"bedroom", "cubiculum_side", right_front_b, level, right_unit)
+			var rf2 := _add_room(plan, &"bedroom", "cubiculum_front", right_front_b, level, right_unit)
 			_add_door(plan, lf, lm, Vector2(side_front_a.get_center().x, front_end), Vector2(0, 1), level, "flat_room")
 			_add_door(plan, lf2, lm, Vector2(side_front_b.get_center().x, front_end), Vector2(0, 1), level, "flat_room")
 			_add_door(plan, rf, rm, Vector2(right_front_a.get_center().x, front_end), Vector2(0, 1), level, "flat_room")
@@ -94,8 +94,6 @@ static func generate(seed: int, width: float, length: float, _height: float) -> 
 			_add_medianum_windows(plan, lm, side_middle, true, level, spec)
 			_add_medianum_windows(plan, rm, right_middle, false, level, spec)
 			_add_exterior_window(plan, lf, side_front_a, Vector2(0, -1), level, spec)
-			_add_exterior_window(plan, lf2, side_front_b, Vector2(0, -1), level, spec)
-			_add_exterior_window(plan, rf, right_front_a, Vector2(0, -1), level, spec)
 			_add_exterior_window(plan, rf2, right_front_b, Vector2(0, -1), level, spec)
 		else:
 			var service_left_front := Rect2(left.position, Vector2(left.size.x, front_depth))
@@ -111,6 +109,7 @@ static func generate(seed: int, width: float, length: float, _height: float) -> 
 			_add_medianum_windows(plan, service_lm, side_middle, true, level, spec)
 			_add_medianum_windows(plan, service_rm, right_middle, false, level, spec)
 			_add_exterior_window(plan, service_lf, service_left_front, Vector2(0, -1), level, spec)
+			_add_exterior_window(plan, service_rf, service_right_front, Vector2(0, -1), level, spec)
 
 	# Ground-floor tabernae have their own street thresholds. The sole residential
 	# entrance belongs to the continuous stair; shop customers do not use it.
@@ -130,9 +129,9 @@ static func generate(seed: int, width: float, length: float, _height: float) -> 
 		"width": HouseGeometry.DOOR_W, "exterior": true, "front": true,
 		"storey": 0, "role": "stair_entry"})
 	for level in range(STOREYS - 1):
-		var sr: Rect2 = plan.rooms[stair_rooms[level]]["rect"]
+		var sr := HouseGeometry.room_floor_rect(plan, stair_rooms[level])
 		var run := minf(3.0, sr.size.y * 0.32)
-		var rise_rect := Rect2(Vector2(sr.get_center().x - 1.05, sr.position.y + 1.6), Vector2(1.3, run))
+		var rise_rect := Rect2(Vector2(sr.position.x, sr.end.y - run), Vector2(1.3, run))
 		plan.stairs.append({"a": stair_rooms[level], "b": stair_rooms[level + 1],
 			"storey": level, "to_storey": level + 1, "pos": rise_rect.get_center(),
 			"lower_pos": rise_rect.get_center(), "upper_pos": rise_rect.get_center(),
@@ -144,7 +143,7 @@ static func generate(seed: int, width: float, length: float, _height: float) -> 
 		for i in range(plan.rooms.size()):
 			if int(plan.rooms[i].get("storey", 0)) != level:
 				continue
-			if String(plan.rooms[i].get("role", "")) == "cubiculum_front":
+			if String(plan.rooms[i].get("role", "")) == "flat_landing":
 				front_ids.append(i)
 		for room in front_ids:
 			var rr: Rect2 = plan.rooms[room]["rect"]
