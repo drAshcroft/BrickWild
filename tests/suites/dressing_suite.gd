@@ -18,7 +18,7 @@ const CASTLE_WANTS := ["table", "light"]
 ## The bounded selector (`dressingquick`): every church style at three sizes,
 ## and twelve castles -- three styles across all four tiers.
 const QUICK_CHURCH_INDICES := [0, 7, 14]
-const QUICK_CASTLE_STYLES := [&"norman", &"edwardian", &"bavarian"]
+const QUICK_CASTLE_STYLES := [&"norman", &"edwardian", &"bavarian", &"sky"]
 
 
 static func run() -> SuiteResult:
@@ -80,9 +80,17 @@ static func _castles(res: SuiteResult, quick: bool) -> void:
 				# either is a table or a light in the castle; a castle with
 				# neither anywhere, shell or interior, still fails.
 				var inside := _interior_props(builder)
+				# Sky castles are open turret-islands: CastleFurnisher and
+				# CastleInteriors both return nothing for them on purpose (no
+				# ground-floor rooms). That exemption holds only while the
+				# builder really logs no dressing at all; the day a sky castle
+				# gains one prop, it owes a table and a light like the rest.
+				var bare_sky := CastleGeometry.is_sky(spec) and props.is_empty() \
+					and inside.is_empty()
 				check.check(props, CastleGeometry.plan_extent(spec),
-					builder.total_height, label, inside)
-				_want(check, props + inside, CASTLE_WANTS, label)
+					builder.total_height, label, inside, bare_sky)
+				if not bare_sky:
+					_want(check, props + inside, CASTLE_WANTS, label)
 				if CastleGeometry.is_enclosed(spec):
 					_walk_the_yard(check, spec, props, label)
 				_report(res, check)

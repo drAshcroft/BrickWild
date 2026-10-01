@@ -46,11 +46,12 @@ func ok() -> bool:
 ## interiors (`builder.interiors`), which is judged by the house checks rather
 ## than here, but which still counts when asking whether anything burns.
 func check(props: Array, bounds: Rect2, height: float, label: String,
-		lit_extra: Array = []) -> void:
+		lit_extra: Array = [], dark_by_design := false) -> void:
 	_known(props, label)
 	_inside(props, bounds, height, label)
 	_clear(props, label)
-	_lit(props + lit_extra, label)
+	if not dark_by_design:
+		_lit(props + lit_extra, label)
 
 
 ## Every key is a prop the catalogue describes AND measured.
