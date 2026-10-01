@@ -8,18 +8,40 @@ static func plan(spec: ShopSpec) -> HousePlan:
 	# HousePlanner needs a hall while it establishes the entrance and stair
 	# spine. Once that topology is fixed, the public room takes its real role.
 	var front := -1
-	for i in range(out.room_count()):
-		if out.kind_of(i) == &"hall":
-			out.rooms[i]["kind"] = spec.front_room()
-			if front < 0:
-				front = i
+	if spec.business == &"prison":
+		# The domestic name pass intentionally de-duplicates repeated programme
+		# kinds. A prison has many identical cells and corridors, so restore its
+		# authored room roles from the stable custom-rectangle order.
+		var rects := spec.prison_room_rects(HouseGeometry.interior_rect(spec))
+		if rects.size() != out.rooms_on_storey(0).size():
+			push_error("ShopPlanner: prison custom room count does not match its authored layout")
+		else:
+			for i in rects.size():
+				if i == 0:
+					out.rooms[i]["kind"] = &"guardroom"
+				elif is_equal_approx(rects[i].size.x, 1.55):
+					out.rooms[i]["kind"] = &"corridor"
+				else:
+					out.rooms[i]["kind"] = &"cell"
+			for i in rects.size():
+				if i > 0 and is_equal_approx(rects[i].size.x, 1.55):
+					for lower in out.rooms_on_storey(-1):
+						if Rect2(out.rooms[lower]["rect"]).is_equal_approx(rects[i]):
+							out.rooms[lower]["kind"] = &"corridor"
+		front = 0
+	else:
+		for i in range(out.room_count()):
+			if out.kind_of(i) == &"hall":
+				out.rooms[i]["kind"] = spec.front_room()
+				if front < 0:
+					front = i
 	# The public room is the one the street door opens into. When the house
 	# planner had to put the door somewhere other than its hall, the room it
 	# chose becomes the front room and the hall takes that room's kind -- a
 	# stable whose stall room is not on the street is not a stable (LAY-009).
 	var entrance: int = out.entrance_room()
 	var street_front: bool = spec.door_w() >= 1.2 or not spec.front_open().is_empty()
-	if street_front and front >= 0 and entrance >= 0 and entrance != front \
+	if spec.business != &"prison" and street_front and front >= 0 and entrance >= 0 and entrance != front \
 			and out.storey_of_room(entrance) == 0 \
 			and HouseGeometry.room_suits(out, entrance, spec.front_room()):
 		var was: StringName = out.kind_of(entrance)
@@ -32,8 +54,125 @@ static func plan(spec: ShopSpec) -> HousePlan:
 		_choose_focus(out, spec, front)
 		if spec.business == &"library":
 			_pin_library_focus_to_daylight(out, front)
+	if spec.business == &"prison":
+		_plan_prison_access(out)
 	_open_up_lodging(out)
 	return out
+
+
+## Replace the generic spanning tree with parallel guard passages. Every
+## corridor reaches the guardroom without a key; each cell is a locked leaf.
+## The cellar clone below one cell is the sealed oubliette, entered only by its
+## recorded trapdoor and omitted from ordinary door reachability.
+static func _plan_prison_access(plan: HousePlan) -> void:
+	var guardroom := -1
+	var corridors: Array[int] = []
+	var cells: Array[int] = []
+	for i in range(plan.room_count()):
+		if plan.storey_of_room(i) != 0:
+			continue
+		match plan.kind_of(i):
+			&"guardroom": guardroom = i
+			&"corridor": corridors.append(i)
+			&"cell": cells.append(i)
+	if guardroom < 0 or corridors.is_empty() or cells.size() < 3:
+		push_error("ShopPlanner: prison layout is missing its guardroom, corridors, or cells")
+		return
+	# HousePlanner supplied a valid provisional tree. Replace only its ground
+	# floor interior edges; cellar copies keep their independent service route.
+	for d in range(plan.doors.size() - 1, -1, -1):
+		var door: Dictionary = plan.doors[d]
+		if not bool(door.get("exterior", false)) and plan.storey_of_room(int(door["a"])) == 0:
+			plan.doors.remove_at(d)
+	for corridor in corridors:
+		var entry: Array = HousePlanOpenings.shared_edge(plan, guardroom, corridor)
+		if entry.is_empty():
+			push_error("ShopPlanner: prison corridor does not meet the guardroom")
+			continue
+		HousePlanOpenings.add_inner_door(plan, guardroom, corridor, entry)
+	for cell in cells:
+		var best_corridor := -1
+		var best_edge: Array = []
+		var best_run := 0.0
+		for corridor in corridors:
+			var edge: Array = HousePlanOpenings.shared_edge(plan, cell, corridor)
+			if edge.is_empty():
+				continue
+			var run := float(edge[3]) - float(edge[2])
+			if run > best_run:
+				best_run = run
+				best_corridor = corridor
+				best_edge = edge
+		if best_corridor < 0:
+			push_error("ShopPlanner: prison cell has no corridor wall")
+			continue
+		HousePlanOpenings.add_inner_door(plan, best_corridor, cell, best_edge)
+		if not plan.doors.is_empty():
+			plan.doors.back()["locked"] = true
+	# Cellars are cloned before the prison's ground-floor door plan is built.
+	# Rebuild their service graph from the same measured rectangles; the generic
+	# tree cannot reliably place doors on every narrow aisle partition.
+	var lower_by_rect := {}
+	for lower in plan.rooms_on_storey(-1):
+		lower_by_rect[Rect2(plan.rooms[lower]["rect"])] = lower
+	var lower_guard := int(lower_by_rect.get(Rect2(plan.rooms[guardroom]["rect"]), -1))
+	var lower_corridors: Array[int] = []
+	var lower_stores: Array[int] = []
+	for corridor in corridors:
+		var lower_corridor := int(lower_by_rect.get(Rect2(plan.rooms[corridor]["rect"]), -1))
+		if lower_corridor >= 0:
+			plan.rooms[lower_corridor]["kind"] = &"corridor"
+			lower_corridors.append(lower_corridor)
+	for lower in plan.rooms_on_storey(-1):
+		if lower != lower_guard and not lower_corridors.has(lower):
+			lower_stores.append(lower)
+	for d in range(plan.doors.size() - 1, -1, -1):
+		var lower_door: Dictionary = plan.doors[d]
+		if not bool(lower_door.get("exterior", false)) \
+				and plan.storey_of_room(int(lower_door["a"])) == -1:
+			plan.doors.remove_at(d)
+	for corridor in lower_corridors:
+		var edge: Array = HousePlanOpenings.shared_edge(plan, lower_guard, corridor)
+		if not edge.is_empty():
+			HousePlanOpenings.add_inner_door(plan, lower_guard, corridor, edge)
+	for lower in lower_stores:
+		var closest_corridor := -1
+		var closest_edge: Array = []
+		var longest_run := 0.0
+		for corridor in lower_corridors:
+			var edge: Array = HousePlanOpenings.shared_edge(plan, lower, corridor)
+			if edge.is_empty():
+				continue
+			var run := float(edge[3]) - float(edge[2])
+			if run > longest_run:
+				longest_run = run
+				closest_corridor = corridor
+				closest_edge = edge
+		if closest_corridor >= 0:
+			HousePlanOpenings.add_inner_door(plan, closest_corridor, lower, closest_edge)
+	# The lower storey is a clone, so it still tiles the cellar. Seal one cloned
+	# cell behind a floor hatch, removing its ordinary door from the graph.
+	var upper_cell := cells[0]
+	var target_rect: Rect2 = plan.rooms[upper_cell]["rect"]
+	var oubliette := -1
+	for i in range(plan.room_count()):
+		if plan.storey_of_room(i) == -1 and Rect2(plan.rooms[i]["rect"]).is_equal_approx(target_rect):
+			oubliette = i
+			break
+	if oubliette < 0:
+		push_error("ShopPlanner: prison has no cellar cell under its trapdoor")
+		return
+	plan.rooms[oubliette]["kind"] = &"oubliette"
+	plan.rooms[oubliette]["sealed"] = true
+	for d in range(plan.doors.size() - 1, -1, -1):
+		var door2: Dictionary = plan.doors[d]
+		if int(door2["a"]) == oubliette or int(door2["b"]) == oubliette:
+			plan.doors.remove_at(d)
+	var hatch_size := Vector2(0.70, 0.70)
+	var upper_floor := HouseGeometry.room_floor_rect(plan, upper_cell)
+	var hatch_rect := Rect2(upper_floor.end - hatch_size - Vector2(0.16, 0.16), hatch_size)
+	plan.trapdoors.append({"upper_room": upper_cell, "lower_room": oubliette,
+		"upper_storey": 0, "lower_storey": -1, "rect": hatch_rect, "sealed": true})
 
 
 ## A workshop needs useful light across its work area. A small domestic plan
@@ -71,9 +210,9 @@ static func _light_workshops(out: HousePlan, spec: ShopSpec) -> void:
 				break
 
 
-## Readers start beside a window. Pin the principal lectern to a window-side
-## patch of clear floor; the second still follows the measured daylight
-## affinity while the ordinary placer preserves collision and navigation.
+## A reader starts with the book by the light. Pin the first lectern to a
+## window-side patch of floor; the second still follows the same daylight
+## affinity while the ordinary placer keeps its clearance and navigation rules.
 static func _pin_library_focus_to_daylight(out: HousePlan, room: int) -> void:
 	var windows := out.windows_of(room)
 	if windows.is_empty() or out.focus_room() != room or out.focus_cat() != "lectern":

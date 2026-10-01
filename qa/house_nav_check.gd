@@ -244,6 +244,10 @@ func _check_rooms() -> void:
 	for i in range(_plan.room_count()):
 		if _world_shop_has_street_opening(i):
 			continue
+		if _plan.kind_of(i) == &"oubliette" and bool(_plan.rooms[i].get("sealed", false)):
+			# A sealed cellar is intentionally outside the ordinary walking graph.
+			# HousePlanCheck verifies its trapdoor record and keyed graph exception.
+			continue
 		var f: Rect2 = _room_body(i)
 		if _grid_for(_plan.rooms[i]).reached(f):
 			reached += 1

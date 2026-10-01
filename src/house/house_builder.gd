@@ -45,6 +45,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	total_height = spec.height
 
 	_build_floor()
+	_build_trapdoor_panels()
 	_build_plinth()
 	_build_exterior_walls()
 	_build_partitions()
@@ -151,9 +152,11 @@ func _build_floor() -> void:
 			var poly: PackedVector2Array = Poly.offset(plan.outline_of(shaped),
 				room_thick / 2.0)
 			var pieces: Array[PackedVector2Array] = [poly]
-			var stair_hole := _stair_opening(level)
-			if stair_hole.has_area():
-				pieces = RoofShape.subtract(poly, Poly.from_rect(stair_hole))
+			for opening in _floor_openings(level):
+				var remaining: Array[PackedVector2Array] = []
+				for piece in pieces:
+					remaining.append_array(RoofShape.subtract(piece, Poly.from_rect(opening)))
+				pieces = remaining
 			for pi in pieces.size():
 				_kit.slab_poly(_lift(pieces[pi], y0 + t / 2.0), t, SURF_FLOOR)
 				var bounds := Poly.bounding_rect(pieces[pi])
@@ -163,14 +166,41 @@ func _build_floor() -> void:
 				_log_mass(floor_name, AABB(Vector3(bounds.position.x, y0, bounds.position.y),
 					Vector3(bounds.size.x, t, bounds.size.y)), y0)
 			continue
-		var opening := _stair_opening(level)
-		if opening.size.x > 0.01 and opening.size.y > 0.01:
-			_emit_floor_around(r, opening, y0, t, level)
+		var openings := _floor_openings(level)
+		if not openings.is_empty():
+			_emit_floor_around_many(r, openings, y0, t, level)
 		else:
 			box(a.size, a.position + a.size / 2.0, SURF_FLOOR)
 			_log_mass("floor" if _levels().size() == 1 else "floor_%d" % level, a, y0)
 	_build_pits()
 	_emit_stairs()
+
+
+func _floor_openings(level: int) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var stair := _stair_opening(level)
+	if stair.has_area():
+		out.append(stair)
+	for hatch in plan.trapdoors:
+		if int(hatch.get("upper_storey", 0)) == level and hatch.get("rect") is Rect2:
+			out.append(hatch["rect"])
+	return out
+
+
+## The sealed cellar hatch is a closed visible panel laid over the hole. It is
+## an emitted named component; the plan record controls access semantics.
+func _build_trapdoor_panels() -> void:
+	for hatch in plan.trapdoors:
+		var level := int(hatch.get("upper_storey", 0))
+		var rect: Rect2 = hatch.get("rect", Rect2())
+		if not rect.has_area():
+			continue
+		tag("trapdoor")
+		host("cellar_hatch", level)
+		var thickness := 0.045
+		var y := float(level) * spec.height + HouseGeometry.FLOOR_T + thickness / 2.0 + 0.006
+		var xform := Transform3D(Basis.IDENTITY, Vector3(rect.get_center().x, y, rect.get_center().y))
+		component_box("trapdoor_panel", Vector3(rect.size.x, thickness, rect.size.y), xform, SURF_TRIM)
 
 
 ## A storey below the ground is dug, not raised (INT-016): the pit is logged
@@ -188,22 +218,35 @@ func _build_pits() -> void:
 		mass_log.append({"name": "pit_%d" % level, "aabb": pit, "ground": y0, "kind": "dug"})
 
 
-func _emit_floor_around(r: Rect2, hole: Rect2, y0: float, t: float,
+func _emit_floor_around_many(r: Rect2, holes: Array[Rect2], y0: float, t: float,
 		level: int) -> void:
-	var pieces := [
-		Rect2(r.position, Vector2(r.size.x, maxf(hole.position.y - r.position.y, 0.0))),
-		Rect2(Vector2(r.position.x, hole.end.y), Vector2(r.size.x,
-			maxf(r.end.y - hole.end.y, 0.0))),
-		Rect2(Vector2(r.position.x, hole.position.y), Vector2(
-			maxf(hole.position.x - r.position.x, 0.0), hole.size.y)),
-		Rect2(Vector2(hole.end.x, hole.position.y), Vector2(
-			maxf(r.end.x - hole.end.x, 0.0), hole.size.y)),
-	]
+	var xs: Array[float] = [r.position.x, r.end.x]
+	var ys: Array[float] = [r.position.y, r.end.y]
+	for hole in holes:
+		var clipped := r.intersection(hole)
+		if clipped.has_area():
+			xs.append(clipped.position.x)
+			xs.append(clipped.end.x)
+			ys.append(clipped.position.y)
+			ys.append(clipped.end.y)
+	xs.sort()
+	ys.sort()
 	var emitted := 0
-	for p in pieces:
-		if p.size.x > 0.01 and p.size.y > 0.01:
+	for xi in range(xs.size() - 1):
+		for yi in range(ys.size() - 1):
+			var p := Rect2(Vector2(xs[xi], ys[yi]), Vector2(xs[xi + 1] - xs[xi], ys[yi + 1] - ys[yi]))
+			if p.size.x <= 0.01 or p.size.y <= 0.01:
+				continue
+			var centre2 := p.get_center()
+			var in_hole := false
+			for hole in holes:
+				if hole.has_point(centre2):
+					in_hole = true
+					break
+			if in_hole:
+				continue
 			var size := Vector3(p.size.x, t, p.size.y)
-			var centre := Vector3(p.get_center().x, y0 + t / 2.0, p.get_center().y)
+			var centre := Vector3(centre2.x, y0 + t / 2.0, centre2.y)
 			box(size, centre, SURF_FLOOR)
 			_log_mass("floor_%d_%d" % [level, emitted], AABB(centre - size / 2.0, size), y0)
 			emitted += 1

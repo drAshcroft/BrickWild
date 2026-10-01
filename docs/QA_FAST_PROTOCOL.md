@@ -35,6 +35,7 @@ times rather than an idle-machine promise.
 | house exterior and assembly | `lane:house-exterior-fast` | 112 s | 1,024 checks, pass |
 | props and assembly contracts | `lane:assets-fast` | 40 s | 119 checks, pass |
 | library business and row repair | `lane:library-change` | 54 s | 31 checks, pass; 32 warnings |
+| prison programme and keyed routes | `prison` | 225 s | 7 checks, pass; 13 warnings |
 | temple geometry and rite | `lane:temple` | 52 s | 2,247 checks, pass; 7 warnings |
 | village site, lots, plan rules | `lane:village-fast` | 113 s | 8 checks, 17 existing VIL-017 failures |
 

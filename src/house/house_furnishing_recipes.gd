@@ -186,6 +186,13 @@ const RECIPES := {
 		{"cat": "lectern", "rule": &"free", "n": [0, 1], "opt": 0.7},
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
 	],
+	&"guardroom": [
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "seat", "rule": &"around", "n": [2, 4], "opt": 1.0},
+	],
+	&"cell": [
+		{"cat": "cage", "key": "Cage_Small", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+	],
 	&"reading_room": [
 		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "lectern", "rule": &"free", "n": [2, 2], "opt": 1.0},
@@ -269,6 +276,9 @@ const RECIPES := {
 const SHOP_FITTINGS := {
 	&"barracks": [
 		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+	],
+	&"prison": [
+		{"cat": "stand", "key": "WeaponStand", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 	],
 	# the forge first, on the chimney wall the planner chose, and the anvil
 	# beside it (its affinity says so) facing the door (the plan's focus)

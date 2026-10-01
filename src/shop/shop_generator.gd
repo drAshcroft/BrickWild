@@ -25,18 +25,27 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	# planned in any of them. A chimney without a hearth is an unsupported stack.
 	if spec.business == &"barracks":
 		spec.chimney = false
+	if spec.business == &"prison":
+		spec.chimney = false
+		spec.storeys = 1
+		spec.cellars = 1
 	spec.window_shutters = r.randf() < float(style["shutters"])
 	spec.timber_frame = r.randf() < float(style["timber"])
 	spec.stud_pitch = r.randf_range(float(style["studs"][0]), float(style["studs"][1]))
 	spec.frame_braces = spec.timber_frame and r.randf() < float(style["braces"])
 	spec.frame_rail = spec.timber_frame and r.randf() < float(style["rail"])
 	spec.clutter = r.randf_range(float(style["clutter"][0]), float(style["clutter"][1]))
+	if spec.business == &"prison":
+		spec.clutter = 0.0
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
-	spec.room_count = HouseSpec.rooms_for(inner.size.x * inner.size.y)
+	if spec.business == &"prison":
+		spec.room_count = spec.prison_room_rects(inner).size()
+	else:
+		spec.room_count = HouseSpec.rooms_for(inner.size.x * inner.size.y)
 	spec.room_count = mini(spec.room_count, int(ShopSpec.BUSINESSES[spec.business].get("max_rooms", 6)))
 	spec.program = spec.room_program(spec.room_count)
-	spec.back_door = spec.room_count >= 3 and r.randf() < 0.7
+	spec.back_door = spec.business != &"prison" and spec.room_count >= 3 and r.randf() < 0.7
 	spec.wall_color = Color(style["wall"][0]).lerp(Color(style["wall"][1]), r.randf())
 	spec.trim_color = Color(style["trim"][0]).lerp(Color(style["trim"][1]), r.randf())
 	spec.roof_color = Color(style["roof"][0]).lerp(Color(style["roof"][1]), r.randf())

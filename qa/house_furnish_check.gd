@@ -65,6 +65,8 @@ const REQUIRED := {
 	&"great_hall": ["table"],
 	&"lords_chamber": ["bed"],
 	&"nave": ["table"],
+	&"guardroom": ["table"],
+	&"cell": ["cage"],
 }
 
 ## And what a trade must have in the room it works in.
@@ -77,6 +79,7 @@ const TRADE_REQUIRED := {
 const BUSINESS_REQUIRED := {
 	&"blacksmith": {&"workshop": ["anvil"]},
 	&"bakery": {&"kitchen": ["hearth"]},
+	&"prison": {&"guardroom": ["stand"]},
 }
 
 ## Which rule each message prefix belongs to, so a report can group a house's

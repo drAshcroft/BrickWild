@@ -92,7 +92,7 @@ const ROOM_ASPECT_MAX := 3.4
 ## Westminster is 20.7 x 73 m, three and a half to one -- and a castle range is
 ## narrower than that again, so measuring one against a parlour reports every
 ## hall ever built as a corridor.
-const ASPECT_MAX := {&"great_hall": 6.0, &"nave": 6.0}
+const ASPECT_MAX := {&"great_hall": 6.0, &"nave": 6.0, &"corridor": 20.0}
 
 
 ## The longest a room of `kind` may be for its width before it stops being a
@@ -111,6 +111,7 @@ const MIN_AREA := {
 	&"gallery": 8.0, &"laundry": 7.0, &"great_hall": 16.0,
 	&"lords_chamber": 10.0, &"nave": 12.0,
 	&"reading_room": 14.0, &"stacks": 20.0, &"scriptorium": 8.0,
+	&"guardroom": 8.0, &"corridor": 2.4, &"cell": 4.0, &"oubliette": 4.0,
 }
 
 ## And the narrowest it may be. Area alone is not enough: a bed is 1.9 x 2.4 m
@@ -128,12 +129,19 @@ const MIN_SIDE := {
 	&"gallery": 2.4, &"laundry": 2.4, &"great_hall": 3.0,
 	&"lords_chamber": 2.8, &"nave": 2.8,
 	&"reading_room": 3.0, &"stacks": 3.6, &"scriptorium": 2.6,
+	&"guardroom": 2.4, &"corridor": 1.15, &"cell": 2.0, &"oubliette": 2.0,
 }
 
 
 ## Can room `i` be called `kind` -- big enough, and not a corridor?
 static func room_suits(plan: HousePlan, i: int, kind: StringName) -> bool:
 	var f: Rect2 = room_floor_rect(plan, i)
+	if kind == &"corridor":
+		return minf(f.size.x, f.size.y) >= 1.15 \
+			and maxf(f.size.x, f.size.y) >= 2.0 * minf(f.size.x, f.size.y)
+	if kind == &"cell":
+		return minf(f.size.x, f.size.y) >= 2.0 \
+			and maxf(f.size.x, f.size.y) <= 3.0
 	if f.size.x * f.size.y < float(MIN_AREA.get(kind, 4.0)):
 		return false
 	return minf(f.size.x, f.size.y) >= float(MIN_SIDE.get(kind, 1.6))
@@ -143,7 +151,8 @@ const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour",
 	&"sales_floor", &"stable", &"tack_room", &"dining_room", &"guest_room",
 	&"office", &"records", &"council_chamber", &"meeting_hall", &"lobby",
 	&"lounge", &"suite", &"gallery", &"laundry", &"great_hall",
-	&"lords_chamber", &"nave", &"reading_room", &"stacks", &"scriptorium"]
+	&"lords_chamber", &"nave", &"reading_room", &"stacks", &"scriptorium",
+	&"guardroom"]
 
 ## Rooms someone sleeps in. Nobody should have to walk through one of these
 ## to reach anywhere else -- not just the house's own "bedroom".

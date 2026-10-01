@@ -190,7 +190,7 @@ func _check_shapes(plan: HousePlan) -> void:
 			if int(stair.get("a", -1)) == i or int(stair.get("b", -1)) == i:
 				has_vertical_access = true
 				break
-		if plan.doors_of(i).is_empty() and not has_vertical_access:
+		if plan.doors_of(i).is_empty() and not has_vertical_access and not plan.has_trapdoor_access(i):
 			failures.append("shape: %s has no door at all" % who)
 
 
@@ -242,10 +242,58 @@ func _check_connectivity(plan: HousePlan) -> void:
 		return
 	var seen: Dictionary = plan.reachable_rooms(start)
 	stats["rooms_reached"] = seen.size()
+	var prison: bool = plan.spec is ShopSpec and plan.spec.business == &"prison"
+	var without_keys: Dictionary = plan.reachable_rooms(start, &"", false) if prison else seen
+	if prison:
+		stats["rooms_reached_without_keys"] = without_keys.size()
+		var cells := 0
+		var locked_cells := 0
+		var oubliettes := 0
+		for i in range(plan.room_count()):
+			if plan.storey_of_room(i) != 0 and plan.kind_of(i) != &"oubliette":
+				continue
+			match plan.kind_of(i):
+				&"cell":
+					cells += 1
+					var exits := 0
+					for d in plan.doors:
+						if int(d.get("a", -1)) == i or int(d.get("b", -1)) == i:
+							exits += 1
+							if not bool(d.get("locked", false)):
+								failures.append("connected: prison cell %d has an unlocked door" % i)
+					if exits != 1:
+						failures.append("connected: prison cell %d has %d doors, expected one" % [i, exits])
+					if not seen.has(i) or without_keys.has(i):
+						failures.append("connected: prison cell %d must be key-reachable and locked without keys" % i)
+					locked_cells += 1
+				&"oubliette":
+					oubliettes += 1
+					if not bool(plan.rooms[i].get("sealed", false)) or seen.has(i) or not plan.has_trapdoor_access(i):
+						failures.append("connected: prison oubliette %d must be sealed and reachable only by its trapdoor" % i)
+		if cells < 3 or locked_cells != cells:
+			failures.append("connected: prison has %d cells; at least three locked cells are required" % cells)
+		if oubliettes != 1:
+			failures.append("connected: prison has %d oubliettes; exactly one is required" % oubliettes)
+		if plan.trapdoors.size() != 1:
+			failures.append("connected: prison has %d trapdoors; exactly one is required" % plan.trapdoors.size())
+		for hatch in plan.trapdoors:
+			var upper := int(hatch.get("upper_room", -1))
+			var lower := int(hatch.get("lower_room", -1))
+			var hatch_rect: Rect2 = hatch.get("rect", Rect2())
+			if upper < 0 or lower < 0 or upper >= plan.room_count() or lower >= plan.room_count():
+				failures.append("connected: prison trapdoor references a missing room")
+				continue
+			if plan.kind_of(lower) != &"oubliette" or not bool(hatch.get("sealed", false)) \
+					or int(hatch.get("upper_storey", 0)) != plan.storey_of_room(upper) \
+					or int(hatch.get("lower_storey", 0)) != plan.storey_of_room(lower) \
+					or not HouseGeometry.room_floor_rect(plan, upper).encloses(hatch_rect):
+				failures.append("connected: prison trapdoor is not a sealed hatch from its upper room to the oubliette")
+		stats["locked_cells"] = locked_cells
+		stats["sealed_oubliettes"] = oubliettes
 	for i in range(plan.room_count()):
 		if plan.world_family == &"courtyard_house" and _world_shop_has_street_opening(plan, i):
 			continue
-		if not seen.has(i):
+		if not seen.has(i) and not (prison and plan.kind_of(i) == &"oubliette"):
 			failures.append("connected: room %d (%s) cannot be reached from the front door"
 				% [i, String(plan.kind_of(i))])
 
@@ -327,6 +375,9 @@ func _check_privacy(plan: HousePlan) -> void:
 		if plan.kind_of(i) == &"bedroom":
 			continue
 		if plan.world_family == &"courtyard_house" and _world_shop_has_street_opening(plan, i):
+			continue
+		if plan.spec is ShopSpec and plan.spec.business == &"prison" \
+				and plan.kind_of(i) == &"oubliette" and bool(plan.rooms[i].get("sealed", false)):
 			continue
 		if not polite.has(i):
 			failures.append("privacy: the only way into room %d (%s) is through a %s"

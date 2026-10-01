@@ -10,6 +10,8 @@ var business: StringName = &"general_store"
 ## Four measured rectangles keep the barracks office compact while preserving
 ## enough frontage for a table and two benches in the mess.
 func custom_room_rects(inner: Rect2) -> Array[Rect2]:
+	if business == &"prison":
+		return prison_room_rects(inner)
 	if business != &"barracks":
 		return []
 	var office_w := minf(inner.size.x * 0.37, 7.0)
@@ -25,10 +27,54 @@ func custom_room_rects(inner: Rect2) -> Array[Rect2]:
 	return [front, mess, dorm, armoury]
 
 
+## Parallel corridors open directly from the front guardroom. Each cell bay
+## shares one long wall with a corridor and measures two to three metres on
+## both sides.
+func prison_room_rects(inner: Rect2) -> Array[Rect2]:
+	const AISLE := 1.55
+	var columns := 0
+	var cell_w := 0.0
+	for count in range(1, 16):
+		var candidate := (inner.size.x - AISLE * float(count + 1)) / float(count)
+		if candidate >= 2.15 and candidate <= 3.0:
+			columns = count
+			cell_w = candidate
+	if columns == 0:
+		return []
+	var guard_depth := maxf(2.8, inner.size.x / 3.4 + 0.15)
+	var cell_run := inner.size.y - guard_depth
+	if cell_run < 2.0:
+		return []
+	var min_rows := ceili(cell_run / 3.0)
+	var max_rows := floori(cell_run / 2.15)
+	var rows := clampi(roundi(cell_run / 2.55), min_rows, max_rows)
+	var cell_d := cell_run / float(rows)
+	if cell_d < 2.15 or cell_d > 3.0:
+		return []
+	var out: Array[Rect2] = [Rect2(inner.position, Vector2(inner.size.x, guard_depth))]
+	var x := inner.position.x
+	var rear := Rect2(inner.position.x, inner.position.y + guard_depth,
+		inner.size.x, cell_run)
+	var aisles: Array[Rect2] = []
+	var cells: Array[Rect2] = []
+	for col in range(columns + 1):
+		aisles.append(Rect2(Vector2(x, rear.position.y), Vector2(AISLE, cell_run)))
+		x += AISLE
+		if col >= columns:
+			continue
+		for row in range(rows):
+			cells.append(Rect2(Vector2(x, rear.position.y + cell_d * row),
+				Vector2(cell_w, cell_d)))
+		x += cell_w
+	out.append_array(aisles)
+	out.append_array(cells)
+	return out
+
+
 ## The front door must open directly into the compact office, even though the
 ## adjoining mess rectangle is closer to the building centre.
 func preferred_front_room_index() -> int:
-	return 0 if business == &"barracks" else -1
+	return 0 if business in [&"barracks", &"prison"] else -1
 
 ## Rooms are ordered from the public front toward private/service space.
 ## The first room replaces the house planner's temporary hall after doors,
@@ -47,6 +93,9 @@ const BUSINESSES := {
 	&"library": {"label": "Library / Archive",
 		"rooms": [&"reading_room", &"stacks", &"scriptorium", &"office"], "max_rooms": 4,
 		"door_w": 1.2, "focus": {"cat": "lectern", "faces_door": false}},
+	&"prison": {"label": "Prison / Dungeon",
+		"rooms": [&"guardroom", &"corridor", &"cell"], "max_rooms": 64,
+		"door_w": 1.2, "focus": {"cat": "table", "faces_door": false}},
 	&"blacksmith": {"label": "Blacksmith", "rooms": [&"workshop", &"store", &"office"],
 		"door_w": 2.4, "focus": {"cat": "anvil", "faces_door": true}},
 	&"stable": {"label": "Stable", "rooms": [&"stable", &"tack_room", &"store", &"office"],
@@ -110,6 +159,21 @@ func focus() -> Dictionary:
 
 func room_program(count: int) -> Array[StringName]:
 	var row: Dictionary = BUSINESSES[business]
+	if business == &"prison":
+		var rects := prison_room_rects(HouseGeometry.interior_rect(self))
+		var aisle_count := 0
+		var cell_count := 0
+		for rect in rects:
+			if absf(rect.size.x - 1.55) < 0.01:
+				aisle_count += 1
+			elif rect.size.x <= 3.0 and rect.size.y <= 3.0:
+				cell_count += 1
+		var program: Array[StringName] = [&"hall"]
+		for _aisle in range(aisle_count):
+			program.append(&"corridor")
+		for _cell in range(cell_count):
+			program.append(&"cell")
+		return program.slice(0, count)
 	var source: Array = row["rooms"]
 	# a corridor is only worth a room when the trade has rooms to spare for
 	# it; below that it would displace the very room it exists to serve

@@ -6,6 +6,7 @@ extends RefCounted
 const REQUIRED := {
 	&"barracks": ["office", "bed", "stand", "table", "bench"],
 	&"library": ["reading_room", "bookcase", "lectern", "hearth"],
+	&"prison": ["guardroom", "table", "stand"],
 	&"blacksmith": ["workshop", "anvil", "workbench"],
 	&"stable": ["stable", "stall"],
 	&"restaurant": ["dining_room", "table", "seat"],
@@ -28,7 +29,7 @@ static func run() -> SuiteResult:
 	for business in REQUIRED:
 		var spec := ShopSpec.new()
 		spec.business = business
-		spec.style = &"longhall" if business in [&"blacksmith", &"stable", &"carpenter", &"library"] else &"townhouse"
+		spec.style = &"longhall" if business in [&"blacksmith", &"stable", &"carpenter", &"library", &"prison"] else &"townhouse"
 		spec.width = 14.0
 		spec.length = 18.0
 		if business == &"barracks":
@@ -37,6 +38,9 @@ static func run() -> SuiteResult:
 		if business == &"library":
 			spec.width = 18.0
 			spec.length = 28.0
+		if business == &"prison":
+			spec.width = 15.8
+			spec.length = 22.0
 		spec.height = 2.9
 		var plan := ShopGenerator.generate(spec, 33000 + absi(String(business).hash()) % 900)
 		var builder := HouseBuilder.new()
@@ -45,6 +49,16 @@ static func run() -> SuiteResult:
 		var wants: Array = REQUIRED[business]
 		if not plan.has_kind(StringName(wants[0])):
 			res.fail("%s has no defining %s room" % [String(business), wants[0]])
+		if business == &"prison":
+			var cells := 0
+			var oubliettes := 0
+			for room in range(plan.room_count()):
+				if plan.storey_of_room(room) == 0 and plan.kind_of(room) == &"cell": cells += 1
+				if plan.kind_of(room) == &"oubliette": oubliettes += 1
+			if cells < 3 or oubliettes != 1:
+				res.fail("prison archetype lacks at least three cells and one oubliette")
+			if not _has_key(plan, "WeaponStand"):
+				res.fail("prison archetype lacks a WeaponStand")
 		for cat in wants.slice(1):
 			if not _has_category(plan, String(cat)):
 				res.fail("%s has no defining %s fitting" % [String(business), cat])
@@ -491,5 +505,12 @@ static func shopfront_rules(spec: ShopSpec, plan: HousePlan, builder: HouseBuild
 static func _has_category(plan: HousePlan, category: String) -> bool:
 	for placement in plan.furniture:
 		if PropCatalog.category(placement["key"]) == category:
+			return true
+	return false
+
+
+static func _has_key(plan: HousePlan, key: String) -> bool:
+	for placement in plan.furniture:
+		if String(placement["key"]) == key:
 			return true
 	return false

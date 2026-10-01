@@ -75,6 +75,10 @@ var courts: Array[Dictionary] = []
 ##  "rect": Rect2, "lower_rect": Rect2, "upper_rect": Rect2,
 ##  "width": float, "run": float}
 var stairs: Array[Dictionary] = []
+## Cellar hatches. A sealed trapdoor is a physical opening and a recorded
+## special access, but it is not an ordinary keyed door-graph edge.
+## {upper_room, lower_room, upper_storey, lower_storey, rect, sealed}
+var trapdoors: Array[Dictionary] = []
 ## Things a room should have had and does not, because keeping them would have
 ## blocked the way through the house: {room: [category, ...]}.
 ##
@@ -370,11 +374,13 @@ func entrance_room() -> int:
 
 ## Room-to-room graph as {room: [rooms]}, following doors only. This is what
 ## "can you get from the front door to the back bedroom" is answered with.
-func door_graph() -> Dictionary:
+func door_graph(has_keys := true) -> Dictionary:
 	var g := {}
 	for i in range(rooms.size()):
 		g[i] = []
 	for d in doors:
+		if bool(d.get("locked", false)) and not has_keys:
+			continue
 		var a: int = d["a"]
 		var b: int = d["b"]
 		if b < 0 or a < 0:
@@ -407,11 +413,12 @@ func door_graph() -> Dictionary:
 ## THROUGH rooms of one kind (a single StringName) or several (an Array of
 ## StringNames). The refused kinds can still be the destination, just not a
 ## room walked through to get somewhere else.
-func reachable_rooms(start: int, no_pass_kind: Variant = &"") -> Dictionary:
+func reachable_rooms(start: int, no_pass_kind: Variant = &"",
+		has_keys := true) -> Dictionary:
 	var no_pass: Array = no_pass_kind if no_pass_kind is Array else [no_pass_kind]
 	var seen := {start: true}
 	var stack: Array[int] = [start]
-	var g: Dictionary = door_graph()
+	var g: Dictionary = door_graph(has_keys)
 	while not stack.is_empty():
 		var cur: int = stack.pop_back()
 		if cur != start and kind_of(cur) in no_pass:
@@ -421,6 +428,13 @@ func reachable_rooms(start: int, no_pass_kind: Variant = &"") -> Dictionary:
 				seen[nb] = true
 				stack.append(nb)
 	return seen
+
+
+func has_trapdoor_access(room: int) -> bool:
+	for trapdoor in trapdoors:
+		if int(trapdoor.get("lower_room", -1)) == room:
+			return true
+	return false
 
 
 func total_floor_area() -> float:
