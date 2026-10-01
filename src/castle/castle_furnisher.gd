@@ -23,8 +23,10 @@ const INSET := 0.4          # off the inside face of a range wall
 const TABLE_PITCH := 2.8    # one row of trestles to the next
 const BENCH_OFF := 1.0      # bench centre from the table it serves
 const GATE_CLEAR := 3.5     # width of the way in that stays empty
-const YARD_STEP := 2.6      # spacing of the courtyard standing places
 const YARD_MARGIN := 0.35   # air between two pieces of yard clutter
+const YARD_FIXTURES_PER_CLEAR_M2 := 0.012 # measured placements per clear ward m²
+const YARD_MAX_FIXTURES := 140
+const YARD_MIN_FIXTURES := 12
 
 # ---- fire ----
 const SCONCE_H := 2.4
@@ -90,7 +92,7 @@ const YARD_PROGRAMME := [
 
 
 ## Everything the castle is furnished with.
-static func dress(spec: CastleSpec) -> Array[Dictionary]:
+static func dress(spec: CastleSpec, yard_data: Dictionary = {}) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var rng := RandomNumberGenerator.new()
 	# Its own stream, for the same reason ChurchFurnisher has one: build() must
@@ -127,7 +129,7 @@ static func dress(spec: CastleSpec) -> Array[Dictionary]:
 	_dress_hall(_room_of(CastleGeometry.hall_aabb(spec)), out, rng)
 	_dress_chapel(spec, out)
 	_dress_chamber(_room_of(CastleGeometry.keep_aabb(spec)), out, rng)
-	_dress_yard(spec, out)
+	_dress_yard(spec, out, yard_data)
 	_dress_defences(spec, out)
 	_dress_forebuilding(spec, out)
 	return out
@@ -334,55 +336,53 @@ static func _dress_chapel(spec: CastleSpec, out: Array[Dictionary]) -> void:
 
 ## The working yard.
 ##
-## Standing places are dealt round the inside of the curtain and the programme
-## is dealt into them in order: whatever will not fit in the next place is
-## tried in the one after. Everything the castle is already built of -- keep,
-## hall, chapel, mound, gatehouse, towers -- is reserved before a single barrel
-## is set down, and so is the way in from the gate, because a courtyard nobody
-## can cross is not a courtyard.
-static func _dress_yard(spec: CastleSpec, out: Array[Dictionary]) -> void:
+## Seeded candidates are dealt across the clear ward, in use cycles. Everything
+## the castle is already built of -- keep, hall, chapel, mound, gatehouse,
+## towers, ranges and well -- is reserved before a single fixture is set down,
+## as is the way in from the gate, because an uncrossable yard is not a yard.
+static func _dress_yard(spec: CastleSpec, out: Array[Dictionary],
+		yard_data: Dictionary = {}) -> void:
 	var bailey: Rect2 = CastleGeometry.bailey_rect(spec)
 	if bailey.size.x < 6.0 or bailey.size.y < 6.0:
 		return
-	var taken: Array[Rect2] = _reserved(spec)
-	var next := 0
-	for spot in _yard_spots(bailey):
-		if next >= YARD_PROGRAMME.size():
-			break
-		var row: Dictionary = YARD_PROGRAMME[next]
+	var ranges: Array = yard_data["ranges"] if yard_data.has("ranges") \
+		else CastleGenerator.bailey_buildings(spec)
+	var well: Dictionary = yard_data["well"] if yard_data.has("well") \
+		else CastleGenerator.bailey_well(spec)
+	var taken: Array[Rect2] = _reserved(spec, ranges, well)
+	var clear_area: float = _clear_area_before(spec, ranges, well)
+	if clear_area < 60.0:
+		return
+	var wanted: int = clampi(int(ceil(clear_area * YARD_FIXTURES_PER_CLEAR_M2)),
+		YARD_MIN_FIXTURES, YARD_MAX_FIXTURES)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = spec.seed ^ 0x59415244
+	var placed := 0
+	var attempts := 0
+	# Seeded dart throws fill the usable court irregularly instead of leaving
+	# the first side of a perimeter ring dressed and the rest bare. A station
+	# cycle retains distinct logistics, smithing, training and storage uses.
+	while placed < wanted and attempts < wanted * 90:
+		attempts += 1
+		var spot := Vector2(rng.randf_range(bailey.position.x + 1.0, bailey.end.x - 1.0),
+			rng.randf_range(bailey.position.y + 1.0, bailey.end.y - 1.0))
+		var row: Dictionary = YARD_PROGRAMME[placed % YARD_PROGRAMME.size()]
 		var key: String = String(row["key"])
-		# everything in a yard is turned toward the middle of it: the cart to
-		# be unloaded, the anvil to be worked at, the dummy to be hit
-		var yaw: float = _yaw_facing(bailey.get_center() - spot)
+		var yaw: float = _yaw_facing(bailey.get_center() - spot) + rng.randf_range(-0.28, 0.28)
 		var rect: Rect2 = _foot(key, spot, yaw, 1.0)
 		if not bailey.grow(-0.2).encloses(rect) or _clashes(rect, taken):
 			continue
 		taken.append(rect)
-		_put(out, key, _v3(spot), yaw, 1.0, StringName(row["kind"]))
-		next += 1
-
-
-## Every standing place in the yard, in a ring inside the curtain: a castle
-## keeps the middle of its own courtyard clear and stacks what it owns against
-## the walls.
-static func _yard_spots(bailey: Rect2) -> Array[Vector2]:
-	var out: Array[Vector2] = []
-	var ring: Rect2 = bailey.grow(-(CastleGeometry.BAILEY_CLEAR + 0.6))
-	if ring.size.x <= 0.0 or ring.size.y <= 0.0:
-		return out
-	var corners: Array[Vector2] = [ring.position, Vector2(ring.end.x, ring.position.y),
-		ring.end, Vector2(ring.position.x, ring.end.y)]
-	for i in range(4):
-		var a: Vector2 = corners[i]
-		var b: Vector2 = corners[(i + 1) % 4]
-		var steps: int = maxi(int(a.distance_to(b) / YARD_STEP), 1)
-		for k in range(steps):
-			out.append(a.lerp(b, float(k) / float(steps)))
-	return out
+		var placement := PropCatalog.placement(key, _v3(spot), yaw, 1.0,
+			StringName(row["kind"]))
+		placement["yard_zone"] = &"bailey_exterior"
+		placement["yard_use"] = _yard_use(StringName(row["kind"]))
+		out.append(placement)
+		placed += 1
 
 
 ## The floor that is spoken for before the dressing starts.
-static func _reserved(spec: CastleSpec) -> Array[Rect2]:
+static func _reserved(spec: CastleSpec, ranges: Array = [], well: Dictionary = {}) -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	for a in [CastleGeometry.keep_aabb(spec), CastleGeometry.hall_aabb(spec),
 			CastleGeometry.chapel_aabb(spec), CastleGeometry.gatehouse_aabb(spec, 0),
@@ -407,7 +407,162 @@ static func _reserved(spec: CastleSpec) -> Array[Rect2]:
 			var s: float = CastleGeometry.tower_base_half_at(spec, r, i)
 			out.append(Rect2(Vector2(t.x - s, t.z - s), Vector2(s * 2.0, s * 2.0)))
 			i += 1
+	# The independently planned ranges and well are not scenery. Keep both their
+	# walls and door approaches out of the exterior fixture sampler.
+	if ranges.is_empty() and not CastleGeometry.is_enclosed(spec):
+		ranges = []
+	elif ranges.is_empty():
+		ranges = CastleGenerator.bailey_buildings(spec)
+	if well.is_empty() and CastleGeometry.is_enclosed(spec):
+		well = CastleGenerator.bailey_well(spec)
+	for b in ranges:
+		out.append(Rect2(b["rect"]).grow(CastleGeometry.BAILEY_CLEAR))
+	if not well.is_empty():
+		var at: Vector2 = well["pos"]
+		out.append(Rect2(at - Vector2.ONE * 1.0, Vector2.ONE * 2.0).grow(1.2))
 	return out
+
+
+## The share of the bailey that remains open before the outdoor dressing goes
+## down. Geometry is measured as a rectangle union, so overlapping keep/stair
+## envelopes are not subtracted twice.
+static func _clear_area_before(spec: CastleSpec, ranges: Array = [], well: Dictionary = {}) -> float:
+	var bailey: Rect2 = CastleGeometry.bailey_rect(spec)
+	var occupied: Array[Rect2] = CastleGeometry.bailey_obstacles(spec)
+	for a in [CastleGeometry.gatehouse_aabb(spec, 0), CastleGeometry.barbican_aabb(spec)]:
+		if a.size.x > 0.0:
+			occupied.append(Rect2(a.position.x, a.position.z, a.size.x, a.size.z))
+	for r in CastleGeometry.rings(spec):
+		var i := 0
+		for tower in CastleGeometry.vertex_tower_centers(spec, r):
+			var half: float = CastleGeometry.tower_base_half_at(spec, r, i)
+			occupied.append(Rect2(tower.x - half, tower.z - half, half * 2.0, half * 2.0))
+			i += 1
+	if CastleGeometry.is_motte(spec):
+		var motte: AABB = CastleGeometry.motte_aabb(spec)
+		occupied.append(Rect2(motte.position.x, motte.position.z, motte.size.x, motte.size.z))
+	if ranges.is_empty() and CastleGeometry.is_enclosed(spec):
+		ranges = CastleGenerator.bailey_buildings(spec)
+	if well.is_empty() and CastleGeometry.is_enclosed(spec):
+		well = CastleGenerator.bailey_well(spec)
+	for b in ranges:
+		occupied.append(Rect2(b["rect"]))
+	if not well.is_empty():
+		var at: Vector2 = well["pos"]
+		var radius: float = float(well.get("radius", 0.9))
+		occupied.append(Rect2(at - Vector2.ONE * radius, Vector2.ONE * radius * 2.0))
+	return maxf(0.0, bailey.get_area() - _rect_union_area(bailey, occupied))
+
+
+## Exact axis-aligned rectangle union clipped to the bailey.
+static func _rect_union_area(bounds: Rect2, rects: Array[Rect2]) -> float:
+	var clipped: Array[Rect2] = []
+	var xs: Array[float] = []
+	for rect in rects:
+		var overlap: Rect2 = rect.intersection(bounds)
+		if overlap.has_area():
+			clipped.append(overlap)
+			xs.append(overlap.position.x)
+			xs.append(overlap.end.x)
+	if clipped.is_empty():
+		return 0.0
+	xs.sort()
+	var area := 0.0
+	for i in range(xs.size() - 1):
+		var x0: float = xs[i]
+		var x1: float = xs[i + 1]
+		if x1 - x0 <= 0.0001:
+			continue
+		var spans: Array[Vector2] = []
+		for rect in clipped:
+			if rect.position.x < x1 and rect.end.x > x0:
+				spans.append(Vector2(rect.position.y, rect.end.y))
+		spans.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+		var covered := 0.0
+		var low := INF
+		var high := -INF
+		for span in spans:
+			if span.x > high:
+				covered += maxf(0.0, high - low)
+				low = span.x
+				high = span.y
+			else:
+				high = maxf(high, span.y)
+		covered += maxf(0.0, high - low)
+		area += (x1 - x0) * covered
+	return area
+
+
+static func yard_report(spec: CastleSpec, props: Array, interiors: Array = [],
+		yard_data: Dictionary = {}) -> Dictionary:
+	var bailey: Rect2 = CastleGeometry.bailey_rect(spec)
+	var fixtures: Array[Dictionary] = []
+	var footprints: Array[Rect2] = []
+	var all_structures: Array[Rect2] = CastleGeometry.bailey_obstacles(spec)
+	for a in [CastleGeometry.gatehouse_aabb(spec, 0), CastleGeometry.barbican_aabb(spec)]:
+		if a.size.x > 0.0:
+			all_structures.append(Rect2(a.position.x, a.position.z, a.size.x, a.size.z))
+	for r in CastleGeometry.rings(spec):
+		var tower_index := 0
+		for tower in CastleGeometry.vertex_tower_centers(spec, r):
+			var half: float = CastleGeometry.tower_base_half_at(spec, r, tower_index)
+			all_structures.append(Rect2(tower.x - half, tower.z - half,
+				half * 2.0, half * 2.0))
+			tower_index += 1
+	if CastleGeometry.is_motte(spec):
+		var motte: AABB = CastleGeometry.motte_aabb(spec)
+		all_structures.append(Rect2(motte.position.x, motte.position.z,
+			motte.size.x, motte.size.z))
+	var ranges: Array = yard_data["ranges"] if yard_data.has("ranges") \
+		else CastleGenerator.bailey_buildings(spec)
+	var well: Dictionary = yard_data["well"] if yard_data.has("well") \
+		else CastleGenerator.bailey_well(spec)
+	for b in ranges:
+		all_structures.append(Rect2(b["rect"]))
+	if not well.is_empty():
+		var at: Vector2 = well["pos"]
+		var radius: float = float(well.get("radius", 0.9))
+		all_structures.append(Rect2(at - Vector2.ONE * radius, Vector2.ONE * radius * 2.0))
+	for p in props:
+		if StringName(p.get("yard_zone", &"")) != &"bailey_exterior":
+			continue
+		var footprint: Rect2 = p["rect"]
+		footprints.append(footprint)
+		fixtures.append({"key": p["key"], "use": p["yard_use"], "kind": p["kind"],
+			"pos": p["pos"], "rect": footprint, "occupied_m2": footprint.get_area()})
+	var preexisting_area: float = _rect_union_area(bailey, all_structures)
+	var fixture_area: float = _rect_union_area(bailey, footprints)
+	var after_structures: Array[Rect2] = all_structures.duplicate()
+	after_structures.append_array(footprints)
+	return {"ward_area_m2": bailey.get_area(),
+		"clear_before_m2": maxf(0.0, bailey.get_area() - preexisting_area),
+		"fixture_occupied_m2": fixture_area,
+		"clear_after_m2": maxf(0.0, bailey.get_area()
+			- _rect_union_area(bailey, after_structures)),
+		"exterior_fixture_count": fixtures.size(), "fixtures": fixtures,
+		"range_count": ranges.size(),
+		"well_present": not well.is_empty(),
+		"interior_prop_count": _range_prop_count(interiors)}
+
+
+static func _range_prop_count(interiors: Array) -> int:
+	var count := 0
+	for row in interiors:
+		if not String(row.get("id", "")).begins_with("yard_"):
+			continue
+		var plan: HousePlan = row["plan"]
+		count += plan.furniture.size()
+	return count
+
+
+static func _yard_use(kind: StringName) -> StringName:
+	if kind in [&"cart"]:
+		return &"transport"
+	if kind in [&"forge", &"light"]:
+		return &"smithing"
+	if kind in [&"arms", &"yard"]:
+		return &"training"
+	return &"stores"
 
 
 # ------------------------------------------------------------------ defences

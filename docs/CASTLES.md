@@ -221,6 +221,38 @@ treats a keep's ceiling as `ROOM_CEILING` (5.5 m) rather than the twenty metres
 of the mass. It furnishes the ground floor; a banner hung at three quarters of
 a keep would fly four storeys above the only floor there is.
 
+## Yard occupancy evidence
+
+### VIS-015: large-ward exterior occupancy
+
+`CastleBuilder.yard_report` records the bailey's measured rectangle area,
+clear area after the keep/ranges/well but before outdoor dressing, fixture
+footprints and occupied area, and the clear area left after those fixtures.
+Every outdoor placement carries `yard_zone = bailey_exterior` and a use
+(`transport`, `smithing`, `training`, or `stores`); furniture inside the shop
+`HousePlan`s stays untagged and is counted separately. The fixture budget is
+proportional to measured clear ward area, with a bounded cap, and a seeded
+irregular sampler leaves the full gate-to-keep axis, range approaches, well,
+and wall-stair footprints reserved.
+
+Run the bounded fixed-seed control with:
+
+```powershell
+godot --headless --path . --script res://tests/run_all.gd -- vis015
+```
+
+It records and checks Krak seed 6002 and a second large fortress. The
+deliberately blocked-route control uses a full-width yard barrier; the ordinary
+`dressing` selector remains the scheduled broad sweep. Same-camera before and
+after assembled portraits are captured by:
+
+```powershell
+godot --path . --script res://tools/render_shots.gd -- vis015
+```
+
+This writes `artifacts/renders/visualqa/vis015/` and keeps the existing
+`castle_krak.jpg` and `visualqa/scene/krak_courtyard.jpg` as the before views.
+
 ## What the suites check
 
 The chapel is a one-room `HousePlan` with an altar on a raised sanctuary,

@@ -33,6 +33,11 @@ var _roof_covers: Array[PackedVector3Array] = []
 var _roof_openings: Array[Dictionary] = []
 var interiors: Array[Dictionary] = []
 var interior_errors: Array[String] = []
+## Measured bailey-only yard occupancy. Interior shop furniture is counted
+## separately and never inflates the exterior fixture total.
+var yard_report: Dictionary = {}
+var _yard_ranges: Array[Dictionary] = []
+var _yard_well: Dictionary = {}
 var _planned_interiors := {}
 const Interiors = preload("castle_interiors.gd")
 const KeepPlan = preload("castle_keep_plan.gd")
@@ -46,6 +51,9 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 	_roof_openings.clear()
 	interiors.clear()
 	interior_errors.clear()
+	yard_report.clear()
+	_yard_ranges.clear()
+	_yard_well.clear()
 	_planned_interiors = Interiors.primary(spec)
 	total_height = spec.height
 
@@ -75,7 +83,7 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 ## shell and then quietly forgotten.
 func _dressed() -> ArrayMesh:
 	_join_roofs()
-	prop_log = CastleFurnisher.dress(spec)
+	prop_log = CastleFurnisher.dress(spec, {"ranges": _yard_ranges, "well": _yard_well})
 	# Old decorative furniture must not overlap the actual plan's furniture.
 	prop_log = prop_log.filter(func(p: Dictionary) -> bool:
 		for row in interiors:
@@ -84,6 +92,9 @@ func _dressed() -> ArrayMesh:
 			if bounds.grow(0.2).has_point(at):
 				return false
 		return true)
+	if CastleGeometry.is_enclosed(spec):
+		yard_report = CastleFurnisher.yard_report(spec, prop_log, interiors,
+			{"ranges": _yard_ranges, "well": _yard_well})
 	var mesh: ArrayMesh = commit()
 	return _elevate_sky(mesh) if CastleGeometry.is_sky(spec) else mesh
 
@@ -1844,7 +1855,9 @@ const RANGE_BAY := 3.0
 ## somewhere to set the real shop down.
 func _build_yard() -> void:
 	tag("yard")
-	for b in CastleGenerator.bailey_buildings(spec):
+	_yard_ranges = CastleGenerator.bailey_buildings(spec)
+	_yard_well = CastleGenerator.bailey_well(spec)
+	for b in _yard_ranges:
 		var rect: Rect2 = b["rect"]
 		var h: float = YARD_WALL_H
 		var a := AABB(Vector3(rect.position.x,
@@ -1858,7 +1871,7 @@ func _build_yard() -> void:
 		else:
 			_planned_interiors[id] = row
 		_range(a, id, SURF_STONE, true, [], RANGE_BAY)
-	var well: Dictionary = CastleGenerator.bailey_well(spec)
+	var well: Dictionary = _yard_well
 	if well.is_empty():
 		return
 	var at: Vector2 = well["pos"]

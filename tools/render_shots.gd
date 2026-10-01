@@ -50,6 +50,10 @@ func _init() -> void:
 		await _shoot_vis012_acceptance()
 		quit()
 		return
+	if args.has("vis015"):
+		await _shoot_vis015_acceptance()
+		quit()
+		return
 	if args.has("vis011"):
 		await _shoot_vis011_acceptance()
 		quit()
@@ -1133,6 +1137,38 @@ func _capture_krak_courtyard(spec: CastleSpec, file: String) -> void:
 	_cam.look_at(centre, Vector3.UP)
 	_set_shot_lighting(0.0)
 	await _capture(file)
+
+
+## Same cameras as the archived Krak portrait and courtyard comparison. The
+## existing files are the before views; this command writes only after views
+## plus a manifest which binds both pairs and the measured yard report.
+func _shoot_vis015_acceptance() -> void:
+	var entry: Dictionary = {}
+	for row in _castles():
+		if row["key"] == "krak":
+			entry = row
+			break
+	var spec: CastleSpec = _castle_spec(entry)
+	var out := "visualqa/vis015"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + out))
+	var builder := CastleBuilder.new()
+	builder.build(spec)
+	var scene := CastleAssembler.build(spec, false)
+	await _shoot_scene(scene, out + "/krak_assembled_after.jpg",
+		float(entry["yaw"]), float(entry["pitch"]), float(entry["zoom"]),
+		Vector3.INF, 0.0, spec, out + "/krak_courtyard_after.jpg")
+	var manifest := {"task": "VIS-015", "seed": entry["seed"],
+		"before": {"assembled": "../../castle_krak.jpg",
+			"courtyard": "../scene/krak_courtyard.jpg"},
+		"after": {"assembled": out + "/krak_assembled_after.jpg",
+			"courtyard": out + "/krak_courtyard_after.jpg"},
+		"yard_report": builder.yard_report,
+		"camera": {"yaw": entry["yaw"], "pitch": entry["pitch"],
+			"zoom": entry["zoom"], "courtyard": "bailey-facing aerial"},
+		"notes": "Exterior yard fixtures are measured separately from range-interior props."}
+	var file := FileAccess.open(OUT_DIR + "/" + out + "/manifest.json", FileAccess.WRITE)
+	file.store_string(JSON.stringify(manifest, "\t"))
+	file.close()
 
 
 ## A furnished house: the shell plus every prop in it, framed from above so the
