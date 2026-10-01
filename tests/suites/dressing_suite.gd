@@ -15,16 +15,33 @@ const CHURCH_WANTS := ["altar", "pew", "light"]
 const CASTLE_WANTS := ["table", "light"]
 
 
+## The bounded selector (`dressingquick`): every church style at three sizes,
+## and twelve castles -- three styles across all four tiers.
+const QUICK_CHURCH_INDICES := [0, 7, 14]
+const QUICK_CASTLE_STYLES := [&"norman", &"edwardian", &"bavarian"]
+
+
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("dressing")
-	_churches(res)
-	_castles(res)
+	_churches(res, false)
+	_castles(res, false)
+	_negative_control(res)
 	return res
 
 
-static func _churches(res: SuiteResult) -> void:
+static func run_quick() -> SuiteResult:
+	var res := SuiteResult.new("dressing (quick)")
+	_churches(res, true)
+	_castles(res, true)
+	_negative_control(res)
+	return res
+
+
+static func _churches(res: SuiteResult, quick: bool) -> void:
 	for style in TestSweep.styles():
 		for i in range(TestSweep.COUNT):
+			if quick and not i in QUICK_CHURCH_INDICES:
+				continue
 			var spec: ChurchSpec = TestSweep.spec_at(style, i)
 			var label := "church %s/%d" % [String(style), TestSweep.seed_at(i)]
 			var builder := ChurchBuilder.new()
@@ -43,10 +60,14 @@ static func _churches(res: SuiteResult) -> void:
 			_report(res, check)
 
 
-static func _castles(res: SuiteResult) -> void:
+static func _castles(res: SuiteResult, quick: bool) -> void:
 	for style in CastleSweep.styles():
+		if quick and not style in QUICK_CASTLE_STYLES:
+			continue
 		for tier in CastleSweep.tiers():
 			for i in range(CastleSweep.COUNT):
+				if quick and i != 0:
+					continue
 				var spec: CastleSpec = CastleSweep.spec_at(style, tier, i)
 				var label := "castle %s/%s/%d" % [String(style), String(tier),
 					CastleSweep.seed_at(tier, i)]
@@ -54,9 +75,14 @@ static func _castles(res: SuiteResult) -> void:
 				builder.build(spec)
 				var props: Array = builder.prop_log
 				var check := DressingCheck.new()
+				# Since INT-007 the great hall and keep are furnished by planned
+				# interiors, not by the shell furnisher. A table or a light in
+				# either is a table or a light in the castle; a castle with
+				# neither anywhere, shell or interior, still fails.
+				var inside := _interior_props(builder)
 				check.check(props, CastleGeometry.plan_extent(spec),
-					builder.total_height, label)
-				_want(check, props, CASTLE_WANTS, label)
+					builder.total_height, label, inside)
+				_want(check, props + inside, CASTLE_WANTS, label)
 				if CastleGeometry.is_enclosed(spec):
 					_walk_the_yard(check, spec, props, label)
 				_report(res, check)
@@ -111,6 +137,44 @@ static func _church_bounds(spec: ChurchSpec) -> Rect2:
 		var n: AABB = ChurchGeometry.narthex_aabb(spec)
 		out = out.merge(Rect2(Vector2(n.position.x, n.position.z),
 			Vector2(n.size.x, n.size.z)))
+	return out
+
+
+## Counting the planned interiors must not make the wants unfailable: a castle
+## with no table and no fire anywhere, shell or interior, still fails all
+## three, and one whose only light is a planned interior's sconce does not.
+static func _negative_control(res: SuiteResult) -> void:
+	var bare := DressingCheck.new()
+	_want(bare, [], CASTLE_WANTS, "control: bare castle")
+	bare.check([], Rect2(Vector2(-10, -10), Vector2(20, 20)), 10.0, "control: bare castle", [])
+	res.checked += 1
+	if bare.failures.size() != 2 or bare.warnings.size() != 1:
+		res.fail("control: a castle with no table and no fire must fail 'table' and 'light' and warn 'lit' (got %d failures, %d warnings)"
+			% [bare.failures.size(), bare.warnings.size()])
+	var lit := DressingCheck.new()
+	lit.check([], Rect2(Vector2(-10, -10), Vector2(20, 20)), 10.0, "control: sconce",
+		[{"key": "Torch_Metal", "kind": "light"}])
+	res.checked += 1
+	if not lit.warnings.is_empty():
+		res.fail("control: an interior sconce should count as light")
+	res.checked += lit.checked + bare.checked
+
+
+## The furniture of the castle's planned interiors, as placements the wants
+## can read: `kind` is the catalogue category, or "light" for anything the
+## catalogue tags as a light. Positions are in each plan's own frame, so these
+## feed only the wants and the lit rule, never the placement rules.
+static func _interior_props(builder: CastleBuilder) -> Array:
+	var out: Array = []
+	for row in builder.interiors:
+		var plan: HousePlan = row.get("plan")
+		if plan == null:
+			continue
+		for f in plan.furniture:
+			var key: String = f.key
+			var kind := "light" if PropCatalog.has_tag(key, PropCatalog.LIGHT) \
+				else PropCatalog.category(key)
+			out.append({"key": key, "kind": kind})
 	return out
 
 
