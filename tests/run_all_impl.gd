@@ -60,7 +60,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange",
-	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "cterrace", "chimeji", "wld001_domus", "wld001_riad",
+	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
@@ -290,6 +290,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return ShopSuite.run()
 		"sarchetype":
 			return ShopArchetypeSuite.run()
+		"barracks100":
+			return ShopArchetypeSuite.run_barracks_seeds(100)
+		"barracksquick":
+			return ShopArchetypeSuite.run_barracks_quick()
 		"hotel":
 			return HotelSuite.run()
 		"hotelroof":

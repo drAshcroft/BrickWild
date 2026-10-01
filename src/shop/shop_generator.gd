@@ -21,6 +21,10 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	# a smithy or a bakehouse is its fire: the flue is not a dice roll
 	if spec.business in [&"blacksmith", &"bakery"]:
 		spec.chimney = true
+	# Guardrooms have an office, dormitory, armoury and mess, with no fire
+	# planned in any of them. A chimney without a hearth is an unsupported stack.
+	if spec.business == &"barracks":
+		spec.chimney = false
 	spec.window_shutters = r.randf() < float(style["shutters"])
 	spec.timber_frame = r.randf() < float(style["timber"])
 	spec.stud_pitch = r.randf_range(float(style["studs"][0]), float(style["studs"][1]))
@@ -30,6 +34,7 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	spec.room_count = HouseSpec.rooms_for(inner.size.x * inner.size.y)
+	spec.room_count = mini(spec.room_count, int(ShopSpec.BUSINESSES[spec.business].get("max_rooms", 6)))
 	spec.program = spec.room_program(spec.room_count)
 	spec.back_door = spec.room_count >= 3 and r.randf() < 0.7
 	spec.wall_color = Color(style["wall"][0]).lerp(Color(style["wall"][1]), r.randf())

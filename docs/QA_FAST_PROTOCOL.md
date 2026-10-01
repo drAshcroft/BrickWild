@@ -48,7 +48,7 @@ reject a mutated plan. Its current red result is a village defect, not a
 runner error. See the logs under `artifacts/qa_fast/`.
 
 Run the focused feature fixture in the same invocation whenever one exists:
-for example `cbergfried`, `cterrace`, `chimeji`, `librarybiz`, or `prison`. If the
+for example `cbergfried`, `cterrace`, `chimeji`, `barracksquick`, `librarybiz`, or `prison`. If the
 combined wall time exceeds 300 seconds, make a smaller fixed fixture; keep
 the wider sample as scheduled regression. The 100-seed barracks and library
 matrices are scheduled breadth checks. A quick lane never proves that every
@@ -58,6 +58,11 @@ For CAS-010, the full `clandmark` suite hit the five-minute cap. The
 `chimeji` selector runs the same landmark assertions at all four Himeji
 scales in 41 seconds; use it with the terrace fixture for castle terrace
 edits. Keep full `clandmark` in the scheduled batch.
+
+For INT-008, `shop,barracksquick` passed in 38 seconds. The combined
+`shop,sarchetype` sweep hit the cap while running other shop families.
+`barracksquick` checks the requested three sizes, HouseQA and negative
+controls; the prepared clone's 100-seed matrix remains breadth evidence.
 
 ## Scheduled regression and asset exception
 

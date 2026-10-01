@@ -97,6 +97,21 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 			steps.append(wall_table)
 			continue
 		steps.append(s)
+	if spec is ShopSpec and (spec as ShopSpec).business == &"barracks":
+		var room_area := HouseGeometry.room_area(plan, room)
+		if kind == &"dormitory" and room_area >= 150.0:
+			steps.append({"cat": "bed", "rule": &"row", "n": [4, 6], "min_n": 4,
+				"pitch": 0.0, "aisle": 1.0, "along": "wall",
+				"avoid_window_walls": true, "avoid_door_lines": true, "opt": 1.0})
+		if kind == &"armoury" and room_area >= 150.0:
+			steps.append({"cat": "stand", "key": "WeaponStand", "rule": &"row",
+				"n": [2, 4], "min_n": 2, "pitch": 0.0, "aisle": 0.9,
+				"along": "wall", "opt": 1.0})
+		if kind == &"mess":
+			var extra_tables := 1 if room_area >= 50.0 else 0
+			for _table in range(extra_tables):
+				steps.append({"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0})
+				steps.append({"cat": "bench", "rule": &"around", "n": [2, 2], "opt": 1.0})
 
 	# the trade fits out whichever room it works in, after that room's own
 	# recipe has had its say

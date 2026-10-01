@@ -157,6 +157,24 @@ const RECIPES := {
 		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.8},
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.8},
 	],
+	&"dormitory": [
+		{"cat": "bed", "rule": &"row", "n": [4, 6], "min_n": 4, "pitch": 0.0,
+			"aisle": 1.0, "along": "wall", "avoid_window_walls": true,
+			"avoid_door_lines": true, "opt": 1.0},
+		{"cat": "chest", "rule": &"wall", "n": [0, 2], "opt": 0.55},
+		{"cat": "sconce", "rule": &"mounted", "n": [2, 3], "opt": 0.9},
+	],
+	&"armoury": [
+		{"cat": "stand", "key": "WeaponStand", "rule": &"row", "n": [2, 4], "min_n": 2,
+			"pitch": 0.0, "aisle": 0.9, "along": "wall", "opt": 1.0},
+		{"cat": "trophy", "key": "Shield_Wooden", "rule": &"mounted", "n": [2, 4], "opt": 1.0},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.8},
+	],
+	&"mess": [
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "bench", "rule": &"around", "n": [2, 2], "opt": 1.0},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.8},
+	],
 	&"office": [
 		{"cat": "workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "seat", "rule": &"around", "n": [1, 1], "opt": 0.8},
@@ -220,6 +238,9 @@ const RECIPES := {
 }
 
 const SHOP_FITTINGS := {
+	&"barracks": [
+		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+	],
 	# the forge first, on the chimney wall the planner chose, and the anvil
 	# beside it (its affinity says so) facing the door (the plan's focus)
 	&"blacksmith": [
@@ -275,4 +296,3 @@ const TRADE_FITTINGS := {
 		{"cat": "books", "rule": &"on", "n": [1, 3], "opt": 0.95},
 	],
 }
-

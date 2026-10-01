@@ -6,6 +6,30 @@ extends HouseSpec
 
 var business: StringName = &"general_store"
 
+
+## Four measured rectangles keep the barracks office compact while preserving
+## enough frontage for a table and two benches in the mess.
+func custom_room_rects(inner: Rect2) -> Array[Rect2]:
+	if business != &"barracks":
+		return []
+	var office_w := minf(inner.size.x * 0.37, 7.0)
+	var front_d := inner.size.y * 0.19
+	var front := Rect2(inner.position, Vector2(office_w, front_d))
+	var mess := Rect2(Vector2(inner.position.x + office_w, inner.position.y),
+		Vector2(inner.size.x - office_w, front_d))
+	var rear_d := (inner.size.y - front_d) * 0.5
+	var rear_start := inner.position.y + front_d
+	var dorm := Rect2(Vector2(inner.position.x, rear_start), Vector2(inner.size.x, rear_d))
+	var armoury := Rect2(Vector2(inner.position.x, rear_start + rear_d),
+		Vector2(inner.size.x, inner.end.y - (rear_start + rear_d)))
+	return [front, mess, dorm, armoury]
+
+
+## The front door must open directly into the compact office, even though the
+## adjoining mess rectangle is closer to the building centre.
+func preferred_front_room_index() -> int:
+	return 0 if business == &"barracks" else -1
+
 ## Rooms are ordered from the public front toward private/service space.
 ## The first room replaces the house planner's temporary hall after doors,
 ## windows, and (when needed) stairs have been laid out.
@@ -17,6 +41,9 @@ var business: StringName = &"general_store"
 ## it into `HousePlan.focus`; HouseFurnishCheck's `focus` rule proves it is
 ## there and facing the right way. (INT-002)
 const BUSINESSES := {
+	&"barracks": {"label": "Barracks / Guardhouse",
+		"rooms": [&"office", &"dormitory", &"armoury", &"mess"], "max_rooms": 4,
+		"door_w": 1.2, "focus": {"cat": "workbench", "faces_door": false}},
 	&"blacksmith": {"label": "Blacksmith", "rooms": [&"workshop", &"store", &"office"],
 		"door_w": 2.4, "focus": {"cat": "anvil", "faces_door": true}},
 	&"stable": {"label": "Stable", "rooms": [&"stable", &"tack_room", &"store", &"office"],

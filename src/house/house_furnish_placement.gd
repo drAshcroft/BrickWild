@@ -131,6 +131,11 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		rule: StringName, blocked: Array[Rect2], zones: Array[Rect2],
 		r: RandomNumberGenerator, step: Dictionary = {}) -> void:
 	var choices: Array[String] = PropCatalog.of_category(cat)
+	if step.has("key"):
+		var exact_key := String(step["key"])
+		if not choices.has(exact_key):
+			return
+		choices = [exact_key]
 	if choices.is_empty():
 		return
 	var key: String = choices[r.randi_range(0, choices.size() - 1)]
@@ -295,13 +300,31 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 ##
 ## If fewer than `min_n` fit, nothing is placed and the room records the
 ## compromise, the same as any other step that could not be met.
+static func _in_door_line(plan: HousePlan, room: int, item: Dictionary) -> bool:
+	var rect := Rect2(item["rect"])
+	var centre := rect.get_center()
+	for door_index in plan.doors_of(room):
+		var door: Dictionary = plan.doors[door_index]
+		var normal := Vector2(door["normal"])
+		var relative := centre - Vector2(door["pos"])
+		var across := absf(relative.dot(Vector2(normal.y, -normal.x)))
+		var half := (absf(normal.y) * rect.size.x + absf(normal.x) * rect.size.y) / 2.0
+		if across < (float(door["width"]) / 2.0 + half) * 0.5:
+			return true
+	return false
+
+
 static func place_row(plan: HousePlan, room: int, step: Dictionary,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
 	var cat: String = String(step["cat"])
 	var choices: Array[String] = PropCatalog.of_category(cat)
 	if choices.is_empty():
 		return
-	var key: String = choices[r.randi_range(0, choices.size() - 1)]
+	var key: String = String(step.get("key", ""))
+	if key.is_empty():
+		key = choices[r.randi_range(0, choices.size() - 1)]
+	elif not choices.has(key):
+		return
 	var n_max: int = int(step["n"][1])
 	var n_want: int = n_max if n_max > 0 else 999
 	var min_n: int = int(step.get("min_n", step["n"][0]))
@@ -339,6 +362,9 @@ static func place_row(plan: HousePlan, room: int, step: Dictionary,
 	# at all.
 	for sc in HouseFurnishGeometry.scales(key):
 		for wi in range(lines.size()):
+			if bool(step.get("avoid_window_walls", false)) \
+					and HouseFurnishSpatialCheck.fs_wall_lit(plan, room, wi):
+				continue
 			var wall: Dictionary = lines[wi]
 			var n: Vector2 = wall["normal"]
 			var yaw: float = HouseFurnishGeometry.yaw_facing(n)
@@ -375,6 +401,8 @@ static func place_row(plan: HousePlan, room: int, step: Dictionary,
 						var t: float = start_t + float(i) * use_pitch
 						var centre: Vector2 = a2 + along * t + n * out
 						var cand: Dictionary = HouseFurnishGeometry.candidate(key, centre, yaw, 1.0, sc)
+						if bool(step.get("avoid_door_lines", false)) and _in_door_line(plan, room, cand):
+							break
 						# A ROW SHARES ONE AISLE, and that aisle is its use
 						# zone -- it is assigned below, once the row is known.
 						# The per-piece zone must not be tested here: a seat

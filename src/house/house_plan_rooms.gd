@@ -10,6 +10,12 @@ const MAX_SPLIT := 0.64
 ## Split the interior until there are `spec.room_count` rooms or nothing can be
 ## split any further without making a cupboard.
 static func subdivide(p: HousePlan, spec: HouseSpec) -> void:
+	if spec.has_method("custom_room_rects"):
+		var custom: Array[Rect2] = spec.custom_room_rects(HouseGeometry.interior_rect(spec))
+		if custom.size() == maxi(spec.room_count, 1):
+			for rect in custom:
+				p.rooms.append({"kind": &"hall", "rect": rect, "storey": 0})
+			return
 	var rects: Array[Rect2] = [HouseGeometry.interior_rect(spec)]
 	var r := spec.rng
 	var want: int = maxi(spec.room_count, 1)
@@ -107,6 +113,9 @@ const KIND_POLES := {
 	&"bedroom": {"front": -1.0, "service": -0.3},
 	&"guest_room": {"front": -1.0, "service": -0.3},
 	&"suite": {"front": -1.0, "service": -0.3},
+	&"dormitory": {"front": -1.0, "service": 1.0},
+	&"armoury": {"front": -0.3, "service": 0.3},
+	&"mess": {"front": 0.8, "service": 0.0},
 }
 
 
@@ -149,7 +158,15 @@ static func name_rooms(p: HousePlan, spec: HouseSpec) -> void:
 	if spec.has_method("front_room"):
 		hall_kind = spec.front_room()
 	var hall := -1
+	if spec.has_method("preferred_front_room_index"):
+		var preferred: int = spec.preferred_front_room_index()
+		if preferred >= 0 and preferred < n \
+				and HouseGeometry.room_suits(p, preferred, hall_kind) \
+				and HouseGeometry.room_suits(p, preferred, &"hall"):
+			hall = preferred
 	for i in order:
+		if hall >= 0:
+			break
 		if HouseGeometry.room_suits(p, i, hall_kind) and HouseGeometry.room_suits(p, i, &"hall"):
 			hall = i
 			break
@@ -286,4 +303,3 @@ static func _largest(p: HousePlan) -> int:
 			area = a
 			best = i
 	return best
-

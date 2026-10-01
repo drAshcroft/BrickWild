@@ -77,8 +77,8 @@ static func _internal_room_focus(res: SuiteResult) -> void:
 		res.fail("internal stable focus: the stall was removed instead of facing its door")
 		return
 	plan.furniture[stall].yaw += PI
-	var check := HouseFurnishCheck.new()
-	check._check_focus(plan)
+	var check := HouseFurnishAffinityCheck.new()
+	check.check_focus(plan)
 	res.checked += 1
 	if check.failures.is_empty():
 		res.fail("internal stable focus: turning the stall away from its door was not detected")
