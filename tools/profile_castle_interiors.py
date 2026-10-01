@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -21,8 +22,11 @@ PHASES = {
     "src/castle/castle_interiors.gd": ["primary", "yard", "emit"],
     "src/castle/castle_builder.gd": ["build"],
     "src/house/house_builder.gd": ["build"],
-    "src/house/house_furnisher.gd": ["furnish", "relax", "_furnish_room",
-        "_place_free", "_place_mounted", "_keep_the_room_passable", "could_place"],
+    "src/house/house_furnisher.gd": ["furnish", "_furnish_room",
+        "_keep_the_room_passable"],
+    "src/house/house_furnish_repair.gd": ["relax"],
+    "src/house/house_furnish_placement.gd": ["could_place", "place_one",
+        "place_free", "place_around"],
     "qa/house_qa.gd": ["check"],
     "qa/castle_qa.gd": ["check", "_check_interiors", "lords_walk"],
     "qa/voxel_grid.gd": ["rasterize"],
@@ -110,7 +114,8 @@ def prepare(args: argparse.Namespace) -> None:
     (target / "tools/castle_phase_clock.gd").write_text(CLOCK, encoding="utf-8")
     methods = {} if args.plain else {key: value[:] for key, value in PHASES.items()}
     if args.detail:
-        methods["src/house/house_furnisher.gd"] += ["_fits", "_inside_outline", "_affinity", "_candidate"]
+        methods["src/house/house_furnish_geometry.gd"] = ["fits", "inside_outline", "candidate"]
+        methods["src/house/house_furnish_score.gd"] = ["_affinity"]
     for relative, names in methods.items():
         path = target / relative
         path.write_text(instrument(path.read_text(encoding="utf-8"), relative, names), encoding="utf-8")
@@ -131,6 +136,17 @@ def run(args: argparse.Namespace) -> None:
             godot = candidate
     log_dir = target / "results"
     log_dir.mkdir(exist_ok=True)
+    # Isolated snapshots must not depend on, or attempt to update, the host
+    # editor settings. Managed runners commonly expose the real AppData as
+    # read-only, which makes Godot's editor import crash before profiling.
+    user_root = target / ".profile_user"
+    roaming = user_root / "AppData" / "Roaming"
+    local = user_root / "AppData" / "Local"
+    roaming.mkdir(parents=True, exist_ok=True)
+    local.mkdir(parents=True, exist_ok=True)
+    profile_env = os.environ.copy()
+    profile_env["APPDATA"] = str(roaming)
+    profile_env["LOCALAPPDATA"] = str(local)
     commands = [([str(godot), "--headless", "--path", str(target), "--editor", "--quit"], "import")]
     run_args = [str(godot), "--headless", "--path", str(target), "--script", "res://tools/profile_castle_interiors.gd", "--", "--repeat", str(args.repeat)]
     for case in args.case or []:
@@ -145,7 +161,7 @@ def run(args: argparse.Namespace) -> None:
         with (log_dir / f"{name}.log").open("w", encoding="utf-8") as log:
             try:
                 result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT,
-                    timeout=args.timeout, check=False)
+                    timeout=args.timeout, check=False, env=profile_env)
             except subprocess.TimeoutExpired:
                 print(json.dumps({"phase": name, "ok": False, "reason": "timeout", "log": str(log.name)}))
                 raise SystemExit(1)

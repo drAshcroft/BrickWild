@@ -94,3 +94,35 @@ The comparison and source manifests are saved beside those snapshots; the
 compact table data is `artifacts/p1p2_api/perf_fitorder_summary.json`. The task's
 quiet repeated medians and final five-suite castle acceptance remain separate
 gates, after the concurrent geometry and furnishing changes settle.
+
+## Current-main focused audit (2026-10-01)
+
+The profiler was brought forward after the furnisher was split into geometry,
+placement, repair and scoring modules. Its subprocesses now use snapshot-local
+`APPDATA` and `LOCALAPPDATA`; otherwise a managed Windows runner can crash in
+the editor import while trying to save the host's editor settings.
+
+Two quiet, QA-enabled checks were used instead of reopening the exhaustive
+castle sweep:
+
+| Fixture | Repeats | Generation | Furnisher | Free placement | Navigation repair | Castle QA | Result |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Norman manor 0 | 3 | 0.712s median | 0.676s | 0.401s | 0.057s | 0.666s | identical fingerprints; pass |
+| Norman fortress 0 | 1 | 85.225s | 83.589s | 51.708s | 27.231s | 9.252s | complete fingerprint; pass |
+
+The reports are
+`artifacts/castle_perf/current_20261001d/results/profile.json` and
+`artifacts/castle_perf/current_20261001c/results/profile.json`. The large case
+confirms that exact furnishing search remains the cost centre: mesh emission was
+0.213s, while free placement and passability accounted for most generation.
+It also confirms the corrected eight-storey keep now passes full per-fixture QA;
+only eight daylight warnings remain.
+
+The previously integrated `_fits` rejection reordering remains the production
+optimization. Its six-case before/after snapshots prove exact plan, placement,
+RNG, mesh and log parity and record improvements in five of six fixtures. The
+current audit establishes that the optimized code still runs and passes after
+the later module split. A broad `cforebuilding` attempt was stopped at the
+five-minute focused-gate ceiling after 20 fixtures with zero failures printed;
+it is not reported as a pass. Exhaustive five-suite coverage belongs to the
+scheduled castle sweep, not to an ordinary performance-task completion gate.
