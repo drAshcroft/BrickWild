@@ -121,12 +121,13 @@ static func place_on_surface(plan: HousePlan, room: int, key: String,
 		for index in hosts:
 			if String(plan.furniture[index].get("row", "")) != "":
 				row_hosts.append(index)
-		if row_hosts.is_empty():
-			return
-		# Distribute small tools over the benches in a lab rather than piling
-		# every bottle on the first work surface. The stable index tie-break keeps
-		# the result deterministic for a seeded recipe.
-		row_hosts.sort_custom(func(a: int, b: int) -> bool:
+		if not row_hosts.is_empty():
+			hosts = row_hosts
+		# Distribute small tools over the eligible benches rather than piling
+		# every bottle on the first work surface. A row-only recipe narrows the
+		# hosts above; a distributed recipe can use separately placed benches.
+		# The stable index tie-break keeps a seeded recipe deterministic.
+		hosts.sort_custom(func(a: int, b: int) -> bool:
 			var count_a := 0
 			var count_b := 0
 			for f in plan.furniture_of(room):
@@ -135,7 +136,6 @@ static func place_on_surface(plan: HousePlan, room: int, key: String,
 			if count_a != count_b:
 				return count_a < count_b
 			return a < b)
-		hosts = row_hosts
 	var host: int = hosts[0] if prefer_row_hosts else hosts[r.randi_range(0, hosts.size() - 1)]
 	var host_rect: Rect2 = plan.furniture[host]["rect"]
 	var top: float = float(plan.furniture[host]["pos"].y) \

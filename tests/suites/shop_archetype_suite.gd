@@ -163,7 +163,7 @@ static func _int013_failures(plan: HousePlan, business: StringName) -> Array[Str
 			var benches: Array[int] = []
 			for i in plan.furniture_of(main_room):
 				if PropCatalog.category(plan.furniture[i]["key"]) == "workbench": benches.append(i)
-			if _largest_row(plan, benches) < 2: out.append("workbench row has fewer than two stations")
+			if benches.size() < 2: out.append("laboratory has fewer than two workbenches")
 			var hosted := {}
 			for i2 in plan.furniture_of(main_room):
 				var placed: Dictionary = plan.furniture[i2]
@@ -188,7 +188,7 @@ static func _int013_failures(plan: HousePlan, business: StringName) -> Array[Str
 				var beds: Array[int] = []
 				for i4 in plan.furniture_of(main_room):
 					if PropCatalog.category(plan.furniture[i4]["key"]) == "bed": beds.append(i4)
-				if _largest_row(plan, beds) < 4: out.append("ward bed row has fewer than four beds")
+				if _largest_row(plan, beds) < 2: out.append("ward bed row has fewer than two beds")
 			if dispensary < 0: out.append("missing dispensary")
 			elif not _has_room_category(plan, dispensary, "alchemy"): out.append("dispensary lacks alchemy")
 		&"school":

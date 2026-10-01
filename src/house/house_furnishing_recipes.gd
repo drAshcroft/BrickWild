@@ -289,8 +289,7 @@ const RECIPES := {
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
 	],
 	&"laboratory": [
-		{"cat": "workbench", "rule": &"row", "n": [2, 2], "min_n": 2,
-			"pitch": 0.0, "aisle": 0.9, "along": "wall", "opt": 1.0},
+		{"cat": "workbench", "rule": &"wall", "n": [2, 2], "opt": 1.0},
 		{"cat": "cage", "key": "Cage_Small", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 	],
@@ -303,7 +302,7 @@ const RECIPES := {
 		{"cat": "rack", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
 	],
 	&"ward": [
-		{"cat": "bed", "rule": &"row", "n": [4, 6], "min_n": 4,
+		{"cat": "bed", "rule": &"row", "n": [2, 6], "min_n": 2,
 			"pitch": 0.0, "aisle": 1.0, "along": "wall", "avoid_window_walls": true,
 			"avoid_door_lines": true, "opt": 1.0},
 		{"cat": "nightstand", "rule": &"wall", "n": [0, 2], "opt": 0.6},
@@ -343,7 +342,7 @@ const SHOP_FITTINGS := {
 	&"butcher": [{"cat": "blade", "rule": &"on", "n": [1, 2], "opt": 1.0}],
 	&"apothecary": [{"cat": "alchemy", "rule": &"on", "n": [2, 4], "opt": 1.0}],
 	&"alchemist_laboratory": [
-		{"cat": "alchemy", "rule": &"on", "n": [2, 4], "host": "row", "opt": 1.0},
+		{"cat": "alchemy", "rule": &"on", "n": [2, 4], "host": "distributed", "opt": 1.0},
 	],
 	&"bathhouse": [
 		{"cat": "barrel", "rule": &"row", "n": [2, 4], "min_n": 2,
