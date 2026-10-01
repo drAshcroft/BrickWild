@@ -204,9 +204,9 @@ func _build_han_features() -> void:
 
 func _dome_point(centre: Vector2, radius: float, base_y: float, rise: float,
 		theta: float, phi: float) -> Vector3:
-	var ring := cosf(theta) * radius
-	return Vector3(centre.x + ring * cosf(phi), base_y + rise * sinf(theta),
-		centre.y + ring * sinf(phi))
+	var ring: float = cos(theta) * radius
+	return Vector3(centre.x + ring * cos(phi), base_y + rise * sin(theta),
+		centre.y + ring * sin(phi))
 
 
 # ------------------------------------------------------------------ floor
