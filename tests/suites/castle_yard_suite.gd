@@ -129,18 +129,28 @@ static func _route_checks(res: SuiteResult, spec: CastleSpec,
 	# One flood proves that the well, shops and wall-stair landings all remain
 	# reachable; individual placement checks above prove their approaches are
 	# outside the fixture collision envelopes.
-	var targets: Array[Rect2] = []
+	var targets: Array[Dictionary] = []
 	if not well.is_empty():
 		var at: Vector2 = well["pos"]
-		targets.append(Rect2(at - Vector2.ONE * 1.0, Vector2.ONE * 2.0))
+		var radius: float = float(well.get("radius", 0.9))
+		var body := Rect2(at - Vector2.ONE * radius, Vector2.ONE * radius * 2.0)
+		targets.append({"label": "well", "rect": _approach_target(body, bailey.get_center())})
 	for entry in CastleGenerator.bailey_buildings(spec):
 		var r: Rect2 = entry["rect"]
-		var x: float = r.position.x - 1.2 if r.get_center().x > 0.0 else r.end.x + 1.2
-		targets.append(Rect2(Vector2(x - 0.4, r.get_center().y - 0.4), Vector2(0.8, 0.8)))
+		targets.append({"label": String(entry.get("kind", "range")),
+			"rect": _approach_target(r, bailey.get_center())})
+	var stair_index := 0
 	for stair in CastleGeometry.wall_stairs(spec):
-		targets.append(stair.footprint)
+		var approach: Rect2 = stair.footprint.grow(0.3)
+		for prop in builder.prop_log:
+			if StringName(prop.get("yard_zone", &"")) != &"bailey_exterior":
+				continue
+			_want(res, not approach.intersects(prop["rect"]),
+				label + ": wall stair %d approach is occupied" % stair_index)
+		stair_index += 1
 	for target in targets:
-		_want(res, grid.reached(target, 0.4), label + ": a range, well or wall stair is unreachable")
+		_want(res, grid.reached(target.rect, 0.4),
+			label + ": %s approach is unreachable" % target.label)
 	# A full-width cross-yard barrier is a deliberate negative control. The
 	# source-side walk remains possible, but the keep-side target must be cut off.
 	var sealed := _yard_grid(bailey, blocks)
@@ -160,6 +170,19 @@ static func _yard_grid(bailey: Rect2, blocks: Array[Rect2]) -> WalkGrid:
 		grid.add_obstacle(block)
 	grid.build(HouseGeometry.PERSON_RADIUS)
 	return grid
+
+
+## A use is reached at the clear ground beside its footprint, not in the solid
+## well/range body itself. Pick the point on the yard-facing edge and step one
+## person radius into the court.
+static func _approach_target(body: Rect2, toward: Vector2) -> Rect2:
+	var edge := Vector2(clampf(toward.x, body.position.x, body.end.x),
+		clampf(toward.y, body.position.y, body.end.y))
+	var direction := (toward - edge).normalized()
+	if direction.length_squared() < 0.0001:
+		direction = Vector2.RIGHT
+	var centre := edge + direction * (HouseGeometry.PERSON_RADIUS + 0.3)
+	return Rect2(centre - Vector2.ONE * 0.4, Vector2.ONE * 0.8)
 
 
 static func _want(res: SuiteResult, passed: bool, message: String) -> void:

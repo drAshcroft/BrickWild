@@ -360,14 +360,20 @@ static func _dress_yard(spec: CastleSpec, out: Array[Dictionary],
 	var placed := 0
 	var attempts := 0
 	# Seeded dart throws fill the usable court irregularly instead of leaving
-	# the first side of a perimeter ring dressed and the rest bare. A station
-	# cycle retains distinct logistics, smithing, training and storage uses.
+	# the first side of a perimeter ring dressed and the rest bare. Each use has
+	# a broad ward zone, so a normal-scale portrait reads working areas instead
+	# of evenly scattered confetti; triangular jitter keeps every zone irregular.
 	while placed < wanted and attempts < wanted * 90:
 		attempts += 1
-		var spot := Vector2(rng.randf_range(bailey.position.x + 1.0, bailey.end.x - 1.0),
-			rng.randf_range(bailey.position.y + 1.0, bailey.end.y - 1.0))
 		var row: Dictionary = YARD_PROGRAMME[placed % YARD_PROGRAMME.size()]
 		var key: String = String(row["key"])
+		var use := _yard_use(StringName(row["kind"]))
+		var anchor := _yard_use_anchor(bailey, use)
+		var spread := Vector2(bailey.size.x * 0.13, bailey.size.y * 0.13)
+		var jitter := Vector2(
+			(rng.randf() + rng.randf() - 1.0) * spread.x,
+			(rng.randf() + rng.randf() - 1.0) * spread.y)
+		var spot := anchor + jitter
 		var yaw: float = _yaw_facing(bailey.get_center() - spot) + rng.randf_range(-0.28, 0.28)
 		var rect: Rect2 = _foot(key, spot, yaw, 1.0)
 		if not bailey.grow(-0.2).encloses(rect) or _clashes(rect, taken):
@@ -376,7 +382,7 @@ static func _dress_yard(spec: CastleSpec, out: Array[Dictionary],
 		var placement := PropCatalog.placement(key, _v3(spot), yaw, 1.0,
 			StringName(row["kind"]))
 		placement["yard_zone"] = &"bailey_exterior"
-		placement["yard_use"] = _yard_use(StringName(row["kind"]))
+		placement["yard_use"] = use
 		out.append(placement)
 		placed += 1
 
@@ -385,7 +391,8 @@ static func _dress_yard(spec: CastleSpec, out: Array[Dictionary],
 static func _reserved(spec: CastleSpec, ranges: Array = [], well: Dictionary = {}) -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	for a in [CastleGeometry.keep_aabb(spec), CastleGeometry.hall_aabb(spec),
-			CastleGeometry.chapel_aabb(spec), CastleGeometry.gatehouse_aabb(spec, 0),
+			CastleGeometry.chapel_aabb(spec), CastleGeometry.apse_aabb(spec),
+			CastleGeometry.gatehouse_aabb(spec, 0),
 			CastleGeometry.barbican_aabb(spec)]:
 		if a.size.x > 0.0:
 			out.append(_plan(a).grow(CastleGeometry.BAILEY_CLEAR * 0.5))
@@ -565,6 +572,21 @@ static func _yard_use(kind: StringName) -> StringName:
 	return &"stores"
 
 
+static func _yard_use_anchor(bailey: Rect2, use: StringName) -> Vector2:
+	var offset := Vector2.ZERO
+	match use:
+		&"transport":
+			offset = Vector2(-0.24, -0.25)
+		&"smithing":
+			offset = Vector2(-0.27, 0.20)
+		&"training":
+			offset = Vector2(0.27, 0.22)
+		_:
+			offset = Vector2(0.28, -0.16)
+	return bailey.get_center() + Vector2(bailey.size.x * offset.x,
+		bailey.size.y * offset.y)
+
+
 # ------------------------------------------------------------------ defences
 
 ## Fire where the watch is: along the wall walk, on the tower tops, and either
@@ -701,8 +723,9 @@ static func _v3(p: Vector2) -> Vector3:
 
 
 static func _foot(key: String, at: Vector2, yaw: float, scale: float) -> Rect2:
-	var f: Vector2 = PropCatalog.footprint_yawed(key, yaw) * scale
-	return Rect2(at - f / 2.0, f)
+	var f: Vector2 = PropCatalog.footprint_rotated(key, yaw) * scale
+	var centre := PropCatalog.plan_centre(key, Vector3(at.x, 0.0, at.y), yaw, scale)
+	return Rect2(centre - f / 2.0, f)
 
 
 static func _clashes(rect: Rect2, taken: Array[Rect2]) -> bool:
