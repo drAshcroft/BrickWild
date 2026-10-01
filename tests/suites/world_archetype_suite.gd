@@ -64,6 +64,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 60.0, "length": 60.0, "height": 15.0,
 		"must": ["ancestral_hall", "gallery", "clan_room", "stair", "roof_ring"],
 		"check": &"tulou_check", "about": "Hakka clan fortress with inward galleries"},
+	{"key": "nagara_hundred_spires", "family": &"nagara", "kind": &"hundred_spires",
+		"width": 31.0, "length": 20.0, "height": 31.0,
+		"must": ["ardhamandapa", "mandapa", "mahamandapa", "garbhagriha", "plinth", "shikhara", "urushringa"],
+		"check": &"shikhara_check", "about": "Spire of a Hundred Spires"},
 ]
 
 
@@ -109,6 +113,44 @@ static func run() -> SuiteResult:
 		res.note("  0 archetypes")
 	_negative_hall_fixtures(res)
 	_negative_tower_fixtures(res)
+	return res
+
+
+static func run_nagara() -> SuiteResult:
+	var res := SuiteResult.new("world Nagara archetype")
+	var row: Dictionary = {}
+	for candidate in ARCHETYPES:
+		if candidate.get("key") == "nagara_hundred_spires":
+			row = candidate
+			break
+	if row.is_empty():
+		res.fail("Nagara archetype row is missing")
+		return res
+	for scale in SCALES:
+		var request := BuildingRequest.new()
+		request.kind = &"world"
+		request.seed = _seed_for("nagara_hundred_spires", scale)
+		request.style = row["family"]
+		request.purpose = row["kind"]
+		request.width = snappedf(float(row["width"]) * scale, 0.01)
+		request.length = snappedf(float(row["length"]) * scale, 0.01)
+		request.height = float(row["height"])
+		var building: GeneratedBuilding = BigGlade.generate(request)
+		res.checked += 1
+		var who := "nagara_hundred_spires scale=%.2f" % scale
+		if building == null or not building.is_ok():
+			res.fail("%s: did not generate: %s" % [who,
+				str(building.errors) if building != null else "null"])
+			continue
+		for failure in assert_contains(building, row["must"]):
+			res.fail("%s: %s" % [who, failure])
+		var mesh: ArrayMesh = BigGlade.build_mesh(building)
+		if mesh == null:
+			res.fail("%s: no Nagara family mesh" % who)
+		else:
+			NormalsSuite.check_mesh(res, mesh, who)
+		for failure in _family_check(building, row["check"]):
+			res.fail("%s: %s" % [who, failure])
 	return res
 
 
@@ -419,13 +461,18 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		cruciform_builder.build(building.plan)
 		out.append_array(CruciformCheck.check(building.plan, cruciform_builder).get("failures", []))
 		return out
+	if check == &"shikhara_check" and building.plan != null:
+		var nagara_builder := NagaraBuilder.new()
+		nagara_builder.build(building.plan)
+		out.append_array(ShikharaCheck.check(building.plan, nagara_builder).get("failures", []))
+		return out
 	var script = load("res://qa/%s.gd" % String(check).to_snake_case())
 	if script == null:
 		out.append("check: no qa/%s.gd" % String(check).to_snake_case())
 		return out
 	var checker = script.new()
 	var rep: Dictionary
-	if building.plan != null and check in [&"hammam_check", &"pagoda_check"]:
+	if building.plan != null and check in [&"hammam_check", &"pagoda_check", &"shikhara_check"]:
 		rep = checker.check(building.plan, mesh_builder)
 	elif building.plan != null and check == &"tulou_check":
 		rep = checker.check(building.plan, mesh_builder)
@@ -461,6 +508,10 @@ static func _builder_for(building: GeneratedBuilding):
 			var tulou_builder := TulouBuilder.new()
 			tulou_builder.build(building.plan)
 			return tulou_builder
+		if building.plan.world_family == &"nagara":
+			var nb := NagaraBuilder.new()
+			nb.build(building.plan)
+			return nb
 		var hb := HouseBuilder.new()
 		hb.build(building.plan)
 		return hb

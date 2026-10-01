@@ -96,6 +96,13 @@ const FAMILIES := {
 		"width": {"min": 40.0, "max": 120.0},
 		"length": {"min": 40.0, "max": 120.0},
 		"height": {"min": 9.0, "max": 25.0},
+	},
+	&"nagara": {
+		"label": "Nagara temple",
+		"kinds": [&"hundred_spires"],
+		"width": {"min": 18.0, "max": 52.0},
+		"length": {"min": 20.0, "max": 64.0},
+		"height": {"min": 24.0, "max": 60.0},
 	}
 }
 
@@ -198,6 +205,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = tulou_made["spec"]
 		out.plan = tulou_made["plan"]
 		return true
+	if request.style == &"nagara" and request.purpose in kinds_of(&"nagara"):
+		var nagara_made := NagaraGenerator.generate(request.purpose, request.seed,
+			request.width, request.length, request.height)
+		out.spec = nagara_made["spec"]
+		out.plan = nagara_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -230,6 +243,9 @@ static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"tulou":
 		return TulouBuilder.new().build(building.plan)
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"nagara":
+		return NagaraBuilder.new().build(building.plan)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null
 	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)

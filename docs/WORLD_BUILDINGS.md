@@ -405,6 +405,17 @@ hundred spires.
 | **pradakshina** (sandhara type) | you can walk round the sanctum inside | a passage ring round the garbhagriha; the walk flood circles it |
 | **sightline** | the image is seen from the mandapa | as the rite check, from the mandapa door |
 
+**Implemented family (WLD-013).** Request `kind=world`, `style=nagara`,
+`purpose=hundred_spires`; the public envelope is 18–52 m wide, 20–64 m long,
+and 24–60 m tall. `NagaraGenerator` stores four named halls, the one-door
+garbhagriha, the plinth, and the pradakshina ring in a `HousePlan`.
+`NagaraBuilder` emits the walls, stairs, ring floor and curved radial-profile
+spire, and logs the emitted masses. `ShikharaCheck` shares the axis and ray
+helpers in `TempleRiteCheck`; each of its seven rules has a negative fixture in
+`tests/suites/nagara_suite.gd`. Run the focused gate with `-- wld013`; the
+Nagara row in `WorldArchetypeSuite` also checks all four standard scales and
+`MassRules`.
+
 ### 3.2 The Dravida compound: Thanjavur and after
 
 The southern temple is a walled town: a rectangular enclosure with a
