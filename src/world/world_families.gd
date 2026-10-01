@@ -20,6 +20,13 @@ const FAMILIES := {
 		"length": {"min": 15.0, "max": 50.0},
 		"height": {"min": 2.6, "max": 24.0},
 	},
+	&"mosque": {
+		"label": "Hypostyle mosque",
+		"kinds": [&"hypostyle"],
+		"width": {"min": 60.0, "max": 180.0},
+		"length": {"min": 40.0, "max": 130.0},
+		"height": {"min": 8.0, "max": 30.0},
+	},
 	&"timber_hall": {
 		"label": "Timber hall",
 		"kinds": [&"great_hall", &"phoenix_pavilion"],
@@ -95,6 +102,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = insula_made["spec"]
 		out.plan = insula_made["plan"]
 		return true
+	if request.style == &"mosque" and request.purpose in kinds_of(&"mosque"):
+		var mosque_made := MosqueGenerator.generate(request.purpose, request.seed,
+			request.width, request.length, request.height)
+		out.spec = mosque_made["spec"]
+		out.plan = mosque_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -110,6 +123,9 @@ static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family in [&"courtyard_house", &"insula"]:
 		return HouseBuilder.new().build(building.plan)
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"mosque":
+		return MosqueBuilder.new().build(building.plan)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null
 	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)

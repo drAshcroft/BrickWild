@@ -77,6 +77,9 @@ var courts: Array[Dictionary] = []
 ##  "rect": Rect2, "lower_rect": Rect2, "upper_rect": Rect2,
 ##  "width": float, "run": float}
 var stairs: Array[Dictionary] = []
+## World-family structural columns, authored once for both emitter and QA.
+## Rows use {pos: Vector3, radius: float, height: float, role: StringName}.
+var columns: Array[Dictionary] = []
 ## Cellar hatches. A sealed trapdoor is a physical opening and a recorded
 ## special access, but it is not an ordinary keyed door-graph edge.
 ## {upper_room, lower_room, upper_storey, lower_storey, rect, sealed}

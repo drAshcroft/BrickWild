@@ -93,7 +93,7 @@ static var _registry: Dictionary = {}
 ## hotel is a house.
 static func for_building(building) -> BuildingFamilyAdapter:
 	var spec: RefCounted = building.spec
-	if building.plan != null and building.plan.world_family == &"courtyard_house":
+	if building.plan != null and building.plan.world_family in [&"courtyard_house", &"mosque"]:
 		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
@@ -406,6 +406,8 @@ class TempleFamily extends BuildingFamilyAdapter:
 ## forwarder: `WorldFamilies` decides which of its own families answers.
 class WorldFamily extends BuildingFamilyAdapter:
 	func quality_report(building) -> Dictionary:
+		if building.plan != null and building.plan.world_family == &"mosque":
+			return QiblaCheck.new().check(building.plan)
 		if building.plan != null:
 			return plan_quality_report(building.plan)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
@@ -425,23 +427,25 @@ class WorldFamily extends BuildingFamilyAdapter:
 		return WorldFamilies.build_mesh(building)
 
 	func instantiate(building, cutaway: bool) -> Node3D:
-		if building.plan != null and building.plan.world_family == &"courtyard_house":
+		if building.plan != null and building.plan.world_family in [&"courtyard_house", &"insula"]:
 			return HouseAssembler.build(building.plan, cutaway)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			return CastleAssembler.build(building.spec, cutaway)
 		return null
 
 	func footprint(building) -> Rect2:
-		if building.plan != null and building.plan.world_family == &"courtyard_house":
+		if building.plan != null and building.plan.world_family in [&"courtyard_house", &"insula"]:
 			return HouseGeometry.site_rect(building.plan.spec)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			var bounds := CastleGeometry.tower_house_aabb(building.spec)
 			return Rect2(Vector2(bounds.position.x, bounds.position.z),
 				Vector2(bounds.size.x, bounds.size.z))
+		if building.plan != null and building.plan.world_family == &"mosque":
+			return building.plan.world_meta.get("hall_rect", Rect2())
 		return Rect2()
 
 	func door(building) -> Vector3:
-		if building.plan != null and building.plan.world_family == &"courtyard_house":
+		if building.plan != null and building.plan.world_family in [&"courtyard_house", &"insula"]:
 			var d: int = building.plan.entrance()
 			if d >= 0:
 				var p: Vector2 = building.plan.doors[d]["pos"]
@@ -453,6 +457,9 @@ class WorldFamily extends BuildingFamilyAdapter:
 			var height := minf(CastleGeometry.tower_storey_height(spec) * 0.7, 2.6)
 			return Vector3(bounds.get_center().x, sill + height * 0.5,
 				bounds.position.z - CastleGeometry.OPENING_EPS)
+		if building.plan != null and building.plan.world_family == &"mosque":
+			var p: Vector2 = building.plan.world_meta.get("sahn_door", Vector2.ZERO)
+			return Vector3(p.x, 1.0, p.y)
 		return Vector3.ZERO
 
 

@@ -167,7 +167,8 @@ static func from_dict(data: Dictionary) -> BuildingDocument:
 	if out.spec is VillageSpec and out.village == null:
 		return _refused("invalid_document", "village", "Village documents require their generated VillagePlan.")
 	if out.request.kind == &"world" and not (out.spec is TimberHallSpec or
-			(out.spec is HouseSpec and out.plan != null and out.plan.world_family == &"courtyard_house") or
+			(out.spec is HouseSpec and out.plan != null
+				and out.plan.world_family in [&"courtyard_house", &"insula", &"mosque"]) or
 			(out.spec is CastleSpec and out.request.style == &"tower_house"
 				and CastleGeometry.is_tower_house(out.spec))):
 		return _refused("invalid_document", "spec", "Unknown world-family state.")

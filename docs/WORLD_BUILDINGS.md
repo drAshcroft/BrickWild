@@ -138,6 +138,13 @@ library of the caliph.
 | **minaret** | the tallest mass is the minaret, and it stands outside the hall | the tallest AABB is tagged `minaret`; it does not intersect the hall's AABB |
 | **rows** | the hall is standing room | standable floor ≥ 0.6 × hall area; no column in the central aisle |
 
+WLD-004 implements this as the `mosque/hypostyle` world family. `HousePlan.columns`
+is the shared column-grid record; `MosqueBuilder` emits that exact list and
+`QiblaCheck` reads its rows, qibla wall, sahn and emitted structural masses.
+The `wld004` selector includes one failing control for each named rule, while
+`warchetype` exercises the Hall of a Thousand Pillars at all four canonical
+scales.
+
 ### 1.5 The hammam
 
 Rome's baths shrunk to a neighbourhood: a sequence of ever-hotter rooms,

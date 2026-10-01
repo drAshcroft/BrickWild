@@ -14,6 +14,10 @@ const SCALES: Array[float] = [0.7, 1.0, 1.4, 1.9]
 const TowerGenerator = preload("res://src/world/world_tower_house_generator.gd")
 
 const ARCHETYPES: Array[Dictionary] = [
+	{"key": "hall_thousand_pillars", "family": &"mosque", "kind": &"hypostyle",
+		"width": 90.0, "length": 60.0, "height": 12.0,
+		"must": ["qibla_wall", "mihrab", "column", "sahn_floor", "minaret"],
+		"check": &"qibla_check", "about": "Hall of a Thousand Pillars"},
 	{"key": "great_hall_east", "family": &"timber_hall", "kind": &"great_hall",
 		"width": 34.0, "length": 18.0, "height": 20.0,
 		"must": ["platform", "column", "dais", "image", "roof"],
@@ -356,7 +360,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 	var mesh_builder = _builder_for(building)
 	if mesh_builder != null and not mesh_builder.mass_log.is_empty():
 		var anchor: String = mesh_builder.mass_log[0]["name"]
-		for f in MassRules.gaps(mesh_builder.mass_log, anchor)["failures"]:
+		var free_prefixes: Array = ["sahn_floor", "fountain", "minaret"] if building.plan != null and building.plan.world_family == &"mosque" else []
+		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_prefixes)["failures"]:
 			out.append(str(f))
 	if check == &"":
 		return out
@@ -375,6 +380,10 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 ## A builder that has been through the building, so its mass log is filled.
 static func _builder_for(building: GeneratedBuilding):
 	if building.plan != null:
+		if building.plan.world_family == &"mosque":
+			var mb := MosqueBuilder.new()
+			mb.build(building.plan)
+			return mb
 		var hb := HouseBuilder.new()
 		hb.build(building.plan)
 		return hb
