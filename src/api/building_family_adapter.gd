@@ -93,7 +93,8 @@ static var _registry: Dictionary = {}
 ## hotel is a house.
 static func for_building(building) -> BuildingFamilyAdapter:
 	var spec: RefCounted = building.spec
-	if building.plan != null and building.plan.world_family in [&"courtyard_house", &"mosque"]:
+	if building.plan != null and building.plan.world_family in \
+			[&"courtyard_house", &"insula", &"mosque", &"caravanserai"]:
 		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
@@ -409,6 +410,8 @@ class WorldFamily extends BuildingFamilyAdapter:
 		if building.plan != null and building.plan.world_family == &"mosque":
 			return QiblaCheck.new().check(building.plan)
 		if building.plan != null:
+			if building.plan.world_subkind == &"sultan_han":
+				return HanCheck.new().check(building.plan)
 			return plan_quality_report(building.plan)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			var builder := CastleBuilder.new()
@@ -427,14 +430,16 @@ class WorldFamily extends BuildingFamilyAdapter:
 		return WorldFamilies.build_mesh(building)
 
 	func instantiate(building, cutaway: bool) -> Node3D:
-		if building.plan != null and building.plan.world_family in [&"courtyard_house", &"insula"]:
+		if building.plan != null and building.plan.world_family in \
+				[&"courtyard_house", &"insula", &"caravanserai"]:
 			return HouseAssembler.build(building.plan, cutaway)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			return CastleAssembler.build(building.spec, cutaway)
 		return null
 
 	func footprint(building) -> Rect2:
-		if building.plan != null and building.plan.world_family in [&"courtyard_house", &"insula"]:
+		if building.plan != null and building.plan.world_family in \
+				[&"courtyard_house", &"insula", &"caravanserai"]:
 			return HouseGeometry.site_rect(building.plan.spec)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			var bounds := CastleGeometry.tower_house_aabb(building.spec)
@@ -445,7 +450,8 @@ class WorldFamily extends BuildingFamilyAdapter:
 		return Rect2()
 
 	func door(building) -> Vector3:
-		if building.plan != null and building.plan.world_family in [&"courtyard_house", &"insula"]:
+		if building.plan != null and building.plan.world_family in \
+				[&"courtyard_house", &"insula", &"caravanserai"]:
 			var d: int = building.plan.entrance()
 			if d >= 0:
 				var p: Vector2 = building.plan.doors[d]["pos"]

@@ -47,6 +47,13 @@ const FAMILIES := {
 		"width": {"min": 5.6, "max": 15.2},
 		"length": {"min": 5.6, "max": 15.2},
 		"height": {"min": 31.5, "max": 85.5},
+	},
+	&"caravanserai": {
+		"label": "Caravanserai",
+		"kinds": [&"sultan_han"],
+		"width": {"min": 49.0, "max": 133.0},
+		"length": {"min": 38.5, "max": 105.0},
+		"height": {"min": 12.0, "max": 12.0},
 	}
 }
 
@@ -108,6 +115,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = mosque_made["spec"]
 		out.plan = mosque_made["plan"]
 		return true
+	if request.style == &"caravanserai" and request.purpose in kinds_of(&"caravanserai"):
+		var han_made := WorldHanGenerator.generate(request.seed, request.width,
+			request.length, request.height)
+		out.spec = han_made["spec"]
+		out.plan = han_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -121,7 +134,7 @@ static func build_mesh(building) -> ArrayMesh:
 			and CastleGeometry.is_tower_house(building.spec):
 		return CastleBuilder.new().build(building.spec)
 	if building != null and building.plan != null \
-			and building.plan.world_family in [&"courtyard_house", &"insula"]:
+			and building.plan.world_family in [&"courtyard_house", &"insula", &"caravanserai"]:
 		return HouseBuilder.new().build(building.plan)
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"mosque":

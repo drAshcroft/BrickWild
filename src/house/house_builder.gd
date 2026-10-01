@@ -17,6 +17,8 @@ const SURF_WALL := 0
 const SURF_TRIM := 1
 const SURF_ROOF := 2
 const SURF_FLOOR := 3
+const HAN_DOME_SEGMENTS := 16
+const HAN_DOME_BANDS := 5
 
 var plan: HousePlan
 var spec: HouseSpec
@@ -60,6 +62,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_chimney()
 	_build_hearth_breast()
 	_build_rugs()
+	_build_han_features()
 	return commit()
 
 
@@ -106,6 +109,104 @@ func _build_rugs() -> void:
 			st.add_vertex(Vector3(points[index].x, y, points[index].y))
 		st.set_color(Color.WHITE)
 		_log_part("rug", Vector3(rect.get_center().x, y, rect.get_center().y), Vector3(rect.size.x, 0, rect.size.y))
+
+
+## The han's open-air kiosk and winter-hall dome are structural, named masses.
+## They are emitted here so CourtCheck, mass rules and renderers all see the
+## same geometry rather than plan-only symbols.
+func _build_han_features() -> void:
+	if plan.world_subkind != &"sultan_han":
+		return
+	var kiosk: Rect2 = plan.world_meta["kiosk_rect"]
+	var flood: Rect2 = plan.world_meta["flood_rect"]
+	var centre := kiosk.get_center()
+	var half := kiosk.size * 0.5
+	var water_gap := kiosk.grow(0.16)
+	var water_bands: Array[Rect2] = [
+		Rect2(flood.position, Vector2(flood.size.x, water_gap.position.y - flood.position.y)),
+		Rect2(Vector2(flood.position.x, water_gap.end.y),
+			Vector2(flood.size.x, flood.end.y - water_gap.end.y)),
+		Rect2(Vector2(flood.position.x, water_gap.position.y),
+			Vector2(water_gap.position.x - flood.position.x, water_gap.size.y)),
+		Rect2(Vector2(water_gap.end.x, water_gap.position.y),
+			Vector2(flood.end.x - water_gap.end.x, water_gap.size.y))]
+	tag("han_court_water")
+	host("court_water", 0)
+	for band in water_bands:
+		if not band.has_area():
+			continue
+		var points := PackedVector3Array()
+		for p in Poly.from_rect(band):
+			points.append(Vector3(p.x, plan.water_plane, p.y))
+		component_slab("han_court_flood", points, 0.015, SURF_FLOOR, false)
+	host_end()
+
+	var post_offset := Vector2(half.x - 0.42, half.y - 0.42)
+	tag("han_kiosk")
+	host("kiosk", 0)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var pos := Vector3(centre.x + post_offset.x * sx, 1.81,
+				centre.y + post_offset.y * sz)
+			var size := Vector3(0.34, 3.62, 0.34)
+			component_box("han_kiosk_pier", size,
+				Transform3D(Basis.IDENTITY, pos), SURF_WALL)
+	var deck_size := Vector3(kiosk.size.x, 0.36, kiosk.size.y)
+	var deck_pos := Vector3(centre.x, 2.72, centre.y)
+	component_box("han_kiosk_deck", deck_size,
+		Transform3D(Basis.IDENTITY, deck_pos), SURF_TRIM)
+	var canopy_side := maxf(2.8, kiosk.size.x - 0.42)
+	var canopy_size := Vector3(canopy_side, 0.22, canopy_side)
+	var canopy_pos := Vector3(centre.x, 3.72, centre.y)
+	component_box("han_kiosk_canopy", canopy_size,
+		Transform3D(Basis.IDENTITY, canopy_pos), SURF_ROOF)
+	var kiosk_bounds := AABB(Vector3(kiosk.position.x, 0.0, kiosk.position.y),
+		Vector3(kiosk.size.x, canopy_pos.y + canopy_size.y * 0.5,
+			kiosk.size.y))
+	_log_mass("han_kiosk", kiosk_bounds)
+	total_height = maxf(total_height, kiosk_bounds.end.y)
+	host_end()
+
+	var hall: Rect2 = plan.world_meta["winter_hall_rect"]
+	var radius := float(plan.world_meta["dome_radius"])
+	var base_y := float(plan.world_meta["dome_base_y"])
+	var rise := float(plan.world_meta["dome_rise"])
+	var dome_centre := hall.get_center()
+	tag("han_winter_hall")
+	host("winter_hall", 0)
+	var top_angle := PI * 0.5 - 0.035
+	for band in range(HAN_DOME_BANDS):
+		var theta0 := top_angle * float(band) / float(HAN_DOME_BANDS)
+		var theta1 := top_angle * float(band + 1) / float(HAN_DOME_BANDS)
+		for segment in range(HAN_DOME_SEGMENTS):
+			var phi0 := TAU * float(segment) / float(HAN_DOME_SEGMENTS)
+			var phi1 := TAU * float(segment + 1) / float(HAN_DOME_SEGMENTS)
+			var points := PackedVector3Array([
+				_dome_point(dome_centre, radius, base_y, rise, theta0, phi0),
+				_dome_point(dome_centre, radius, base_y, rise, theta0, phi1),
+				_dome_point(dome_centre, radius, base_y, rise, theta1, phi1),
+				_dome_point(dome_centre, radius, base_y, rise, theta1, phi0)])
+			component_slab("han_dome_segment", points, 0.14, SURF_ROOF, false)
+	var apex := Vector3(dome_centre.x, base_y + rise, dome_centre.y)
+	for segment in range(HAN_DOME_SEGMENTS):
+		var phi0 := TAU * float(segment) / float(HAN_DOME_SEGMENTS)
+		var phi1 := TAU * float(segment + 1) / float(HAN_DOME_SEGMENTS)
+		var cap := PackedVector3Array([apex,
+			_dome_point(dome_centre, radius, base_y, rise, top_angle, phi0),
+			_dome_point(dome_centre, radius, base_y, rise, top_angle, phi1)])
+		component_slab("han_dome_cap", cap, 0.14, SURF_ROOF, false)
+	var dome_size := Vector3(radius * 2.0, rise + 0.16, radius * 2.0)
+	_log_mass("han_winter_dome", AABB(
+		Vector3(dome_centre.x - radius, base_y - 0.08, dome_centre.y - radius), dome_size))
+	total_height = maxf(total_height, base_y + rise)
+	host_end()
+
+
+func _dome_point(centre: Vector2, radius: float, base_y: float, rise: float,
+		theta: float, phi: float) -> Vector3:
+	var ring := cosf(theta) * radius
+	return Vector3(centre.x + ring * cosf(phi), base_y + rise * sinf(theta),
+		centre.y + ring * sinf(phi))
 
 
 # ------------------------------------------------------------------ floor

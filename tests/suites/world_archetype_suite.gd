@@ -34,6 +34,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 8.0, "length": 8.0, "height": 45.0,
 		"must": ["hall", "platform", "storey_0"],
 		"check": &"tower_check", "about": "Bologna tower house with a walkable roof deck"},
+	{"key": "sultan_han", "family": &"caravanserai", "kind": &"sultan_han",
+		"width": 70.0, "length": 55.0, "height": 12.0,
+		"must": ["guest_room", "stable", "han_kiosk", "han_winter_dome"],
+		"check": &"han_check", "about": "Sultan's Han with a flooded court and domed winter hall"},
 ]
 
 
@@ -360,8 +364,12 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 	var mesh_builder = _builder_for(building)
 	if mesh_builder != null and not mesh_builder.mass_log.is_empty():
 		var anchor: String = mesh_builder.mass_log[0]["name"]
-		var free_prefixes: Array = ["sahn_floor", "fountain", "minaret"] if building.plan != null and building.plan.world_family == &"mosque" else []
-		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_prefixes)["failures"]:
+		var free_masses: Array[String] = []
+		if building.plan != null and building.plan.world_family == &"mosque":
+			free_masses.assign(["sahn_floor", "fountain", "minaret"])
+		elif building.plan != null and building.plan.world_subkind == &"sultan_han":
+			free_masses.append("han_kiosk")
+		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_masses)["failures"]:
 			out.append(str(f))
 	if check == &"":
 		return out
