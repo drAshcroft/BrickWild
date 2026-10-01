@@ -103,6 +103,13 @@ const FAMILIES := {
 		"width": {"min": 18.0, "max": 52.0},
 		"length": {"min": 20.0, "max": 64.0},
 		"height": {"min": 24.0, "max": 60.0},
+	},
+	&"temple_mountain": {
+		"label": "Temple mountain",
+		"kinds": [&"angkor_mountain"],
+		"width": {"min": 120.0, "max": 380.0},
+		"length": {"min": 120.0, "max": 380.0},
+		"height": {"min": 30.0, "max": 90.0},
 	}
 }
 
@@ -211,6 +218,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = nagara_made["spec"]
 		out.plan = nagara_made["plan"]
 		return true
+	if request.style == &"temple_mountain" and request.purpose in kinds_of(&"temple_mountain"):
+		var mountain_made := MountainGenerator.generate(request.purpose, request.seed,
+			request.width, request.length, request.height)
+		out.spec = mountain_made["spec"]
+		out.plan = mountain_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -246,6 +259,9 @@ static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"nagara":
 		return NagaraBuilder.new().build(building.plan)
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"temple_mountain":
+		return MountainBuilder.new().build(building.plan)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null
 	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)

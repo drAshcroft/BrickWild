@@ -354,11 +354,20 @@ serpent-god, the level-with-a-boss-at-the-top.
 |---|---|---|
 | **nest** | rings inside rings, each higher | every enclosure rect strictly contains the next; floor level rises with each (≥ 1.5 m per step); `MassRules.overlaps` allows only the stair joints |
 | **quincunx** | five towers on top, the middle one tallest | five `tower` masses on the top terrace: one at the centre, four at the ordinal corners equidistant from it within 0.05; the centre one taller than the others by ≥ 1.2× |
-| **axis** | the causeway leads straight to the top | the causeway rect is centred on the axis; every gopura (gate) on the axis; `_segment_hits` from the causeway start to the central tower's upper half is clear |
-| **moat** | water all the way round, one crossing | a `water` rect surrounds the outer wall on all sides ≥ 20 m wide; exactly one causeway crosses it |
+| **axis** | the causeway leads straight to the top | the causeway rect is centred on the axis; every emitted gopura (gate) is on the axis; `Sightline.clear` from the causeway start to the central tower's upper half |
+| **moat** | water all the way round, one crossing | measured water masses surround the outer wall on all sides ≥ 20 m wide; exactly one causeway mass crosses it |
 | **climb** | the pilgrim can walk from the gate to the summit | the walk grid, one level per terrace with the stairs as links, reaches the top platform; never narrower than 1.2 m |
 | **pradakshina** | each gallery is a loop you can walk round | on every terrace the gallery flood returns to its start |
 | **symmetry**, **dominance** | as the rite check | `_check_symmetry`, `_check_dominance` applied to the whole mountain |
+
+**Implementation.** `WorldFamilies` registers `temple_mountain / angkor_mountain`;
+`MountainGenerator` authors three raised gallery rings, the emitted moat and
+single causeway, the inter-ring stair treads, axial gopuras, and the summit
+quincunx in `HousePlan.world_meta`. `MountainBuilder` emits and logs that same
+plan. `MountainCheck` extends `TempleRiteCheck`, reuses its symmetry and
+dominance rules, and measures each gallery loop and the gate-to-summit route
+with `WalkGrid`. Run the focused gate with `-- wld011`; `world` also includes
+the 200 × 200 × 60 archetype at the shared 70/100/140/190 percent scales.
 
 ### 2.6 The cruciform temple: Bagan
 

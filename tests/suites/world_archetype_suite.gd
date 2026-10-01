@@ -68,6 +68,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 31.0, "length": 20.0, "height": 31.0,
 		"must": ["ardhamandapa", "mandapa", "mahamandapa", "garbhagriha", "plinth", "shikhara", "urushringa"],
 		"check": &"shikhara_check", "about": "Spire of a Hundred Spires"},
+	{"key": "temple_mountain", "family": &"temple_mountain", "kind": &"angkor_mountain",
+		"width": 200.0, "length": 200.0, "height": 60.0,
+		"must": ["water", "causeway", "enclosure", "gopura", "tower_center"],
+		"check": &"mountain_check", "about": "three raised rings, moat crossing and quincunx"},
 ]
 
 
@@ -437,7 +441,8 @@ static func assert_contains(building: GeneratedBuilding, must: Array) -> Array[S
 static func _family_check(building: GeneratedBuilding, check: StringName) -> Array[String]:
 	var out: Array[String] = []
 	var mesh_builder = _builder_for(building)
-	if mesh_builder != null and not mesh_builder.mass_log.is_empty():
+	if mesh_builder != null and not mesh_builder.mass_log.is_empty() \
+			and (building.plan == null or building.plan.world_family != &"temple_mountain"):
 		var anchor: String = mesh_builder.mass_log[0]["name"]
 		var free_masses: Array[String] = []
 		if building.plan != null and building.plan.world_family == &"mosque":
@@ -466,6 +471,13 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		nagara_builder.build(building.plan)
 		out.append_array(ShikharaCheck.check(building.plan, nagara_builder).get("failures", []))
 		return out
+	if check == &"mountain_check" and building.plan != null:
+		var mountain_builder := MountainBuilder.new()
+		var mesh := mountain_builder.build(building.plan)
+		if mesh == null or mesh.get_surface_count() == 0:
+			out.append("mountain: no emitted mesh")
+		out.append_array(MountainCheck.new().check_mountain(building.plan, mountain_builder).get("failures", []))
+		return out
 	var script = load("res://qa/%s.gd" % String(check).to_snake_case())
 	if script == null:
 		out.append("check: no qa/%s.gd" % String(check).to_snake_case())
@@ -488,6 +500,10 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 ## A builder that has been through the building, so its mass log is filled.
 static func _builder_for(building: GeneratedBuilding):
 	if building.plan != null:
+		if building.plan.world_family == &"temple_mountain":
+			var mountain := MountainBuilder.new()
+			mountain.build(building.plan)
+			return mountain
 		if building.plan.world_family == &"cruciform_temple":
 			var cruciform := CruciformBuilder.new()
 			cruciform.build(building.plan)

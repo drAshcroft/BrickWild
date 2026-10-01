@@ -95,7 +95,7 @@ static func for_building(building) -> BuildingFamilyAdapter:
 	var spec: RefCounted = building.spec
 	if building.plan != null and building.plan.world_family in \
 			[&"courtyard_house", &"insula", &"mosque", &"caravanserai", &"hammam",
-			&"cruciform_temple", &"nagara", &"pagoda", &"tulou", &"vihara"]:
+			&"cruciform_temple", &"nagara", &"pagoda", &"temple_mountain", &"tulou", &"vihara"]:
 		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
@@ -408,6 +408,10 @@ class TempleFamily extends BuildingFamilyAdapter:
 ## forwarder: `WorldFamilies` decides which of its own families answers.
 class WorldFamily extends BuildingFamilyAdapter:
 	func quality_report(building) -> Dictionary:
+		if building.plan != null and building.plan.world_family == &"temple_mountain":
+			var mountain_builder := MountainBuilder.new()
+			mountain_builder.build(building.plan)
+			return MountainCheck.new().check_mountain(building.plan, mountain_builder)
 		if building.plan != null and building.plan.world_family == &"cruciform_temple":
 			var builder := CruciformBuilder.new()
 			builder.build(building.plan)
@@ -481,6 +485,8 @@ class WorldFamily extends BuildingFamilyAdapter:
 		if building.plan != null and building.plan.world_family == &"nagara":
 			var r: Rect2 = building.plan.world_meta.get("plinth_rect", Rect2())
 			return r
+		if building.plan != null and building.plan.world_family == &"temple_mountain":
+			return building.plan.world_meta.get("moat", Rect2())
 		if building.spec is StupaSpec:
 			return Rect2(Vector2(-building.spec.width * 0.5, -building.spec.length * 0.5),
 				Vector2(building.spec.width, building.spec.length))
@@ -512,6 +518,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 		if building.plan != null and building.plan.world_family == &"nagara":
 			var p: Vector2 = building.plan.world_meta.get("entry", Vector2.ZERO)
 			return Vector3(p.x, float(building.plan.world_meta.get("plinth_height", 0.0)) + 1.0, p.y)
+		if building.plan != null and building.plan.world_family == &"temple_mountain":
+			var gates: Array = building.plan.world_meta.get("gopuras", [])
+			var p: Vector2 = gates[0].get("center", Vector2.ZERO) if not gates.is_empty() else Vector2.ZERO
+			return Vector3(p.x, 1.0, p.y)
 		if building.spec is StupaSpec:
 			return Vector3(0, 0, -building.spec.torana_radius)
 		return Vector3.ZERO
