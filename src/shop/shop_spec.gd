@@ -153,8 +153,8 @@ const BUSINESSES := {
 		"door_w": 1.2, "focus": {"cat": "table", "faces_door": false}},
 	&"guildhall": {"label": "Guildhall", "rooms": [&"meeting_hall", &"office", &"records", &"store"],
 		"door_w": 1.2, "focus": {"cat": "table", "faces_door": false}},
-	&"market_hall": {"label": "Market Hall", "rooms": [&"market_hall", &"store", &"office"],
-		"max_rooms": 3, "door_w": 2.0, "focus": {"cat": "counter", "faces_door": true}},
+	&"market_hall": {"label": "Market Hall", "rooms": [&"market_hall"],
+		"max_rooms": 1, "door_w": 2.0, "focus": {"cat": "counter", "faces_door": true}},
 }
 
 

@@ -337,12 +337,18 @@ static func _check_shell(plan: HousePlan, builder: HouseBuilder) -> Array[String
 		out.append(str(g))
 	# and the rooms the mesh was built from must be the rooms the plan claims
 	var wall_masses := 0
+	var colonnade_walls := {}
 	for m in masses:
-		if (m["name"] as String).begins_with("wall_") \
-				or (m["name"] as String).begins_with("partition_"):
+		var mass_name := String(m["name"])
+		if mass_name.begins_with("wall_") or mass_name.begins_with("partition_"):
 			wall_masses += 1
-	if wall_masses < 4:
-		out.append("shell: only %d wall masses -- a house has four sides" % wall_masses)
+		elif mass_name.begins_with("colonnade_lintel_"):
+			var pieces := mass_name.split("_")
+			if pieces.size() >= 5:
+				colonnade_walls["%s|%s" % [pieces[2], pieces[3]]] = true
+	var wall_sides := wall_masses + colonnade_walls.size()
+	if wall_sides < 4:
+		out.append("shell: only %d wall masses or structural colonnade sides -- a house has four sides" % wall_sides)
 	return out
 
 

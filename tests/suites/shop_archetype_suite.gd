@@ -162,8 +162,11 @@ static func _negative_market_hall_controls(res: SuiteResult, plan: HousePlan) ->
 		res.fail("market hall negative control: removing all posts escaped plan validation")
 	plan.columns = original_columns.duplicate(true)
 	if not plan.columns.is_empty():
+		var column_room := int(plan.columns[0]["room"])
+		var column_wall := int(plan.columns[0]["wall"])
+		var wall: Dictionary = HouseGeometry.room_walls(plan, column_room)[column_wall]
 		var original_pos: Vector2 = plan.columns[0]["pos"]
-		plan.columns[0]["pos"] = original_pos + Vector2(1.0, 0.0)
+		plan.columns[0]["pos"] = original_pos - Vector2(wall["normal"]) * 1.0
 		var drifted: Array = check.check(plan)["failures"]
 		if not drifted.any(func(row: String) -> bool: return row.contains("off wall")):
 			res.fail("market hall negative control: moving a post off the wall escaped plan validation")

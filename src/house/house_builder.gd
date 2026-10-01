@@ -455,8 +455,9 @@ func _build_colonnade_run(run: Dictionary, level: int, y0: float,
 			Vector3(centre2.x, lintel_y, centre2.y))
 		host("colonnade_%d_%d" % [selected_room, selected_wall], level)
 		component_box("colonnade_lintel", lintel_size, lintel_xf, SURF_TRIM)
+		var lintel_mass := _oriented_box_aabb(centre2, lintel_y, length, lintel_h, thick, yaw)
 		_log_mass("colonnade_lintel_%d_%d_%d" % [selected_room, selected_wall, pi],
-			_oriented_box_aabb(centre2, lintel_y, length, lintel_h, thick, yaw), y0)
+			lintel_mass, lintel_mass.position.y)
 	host_end()
 	if not portal.is_empty():
 		var p0: Vector2 = from + dir * portal_interval.x

@@ -206,8 +206,16 @@ func _check_colonnade(plan: HousePlan) -> void:
 				failures.append("colonnade: room %d wall %d has fewer than two planned posts" % [room, wi])
 			var portal: Dictionary = wall.get("portal", {})
 			if portal.is_empty():
+				var is_entrance_wall := false
+				var entrance := plan.entrance()
 				if plan.spec is ShopSpec and (plan.spec as ShopSpec).business == &"market_hall" \
-						and int(plan.entrance_room()) == room:
+						and entrance >= 0 and int(plan.doors[entrance].get("a", -1)) == room:
+					var door_pos: Vector2 = plan.doors[entrance]["pos"]
+					var nearest_to_door := Geometry2D.get_closest_point_to_segment(door_pos,
+						wall["from"], wall["to"])
+					is_entrance_wall = nearest_to_door.distance_to(door_pos) \
+						<= HouseGeometry.wall_thickness(plan.spec) * 0.6
+				if is_entrance_wall:
 					failures.append("colonnade: market hall entrance wall has no solid portal")
 				continue
 			var start := float(portal.get("start", -1.0))

@@ -199,7 +199,15 @@ static func _plan_market_colonnade(plan: HousePlan, room: int) -> void:
 		push_error("ShopPlanner: market hall entrance portal does not fit its front wall")
 		return
 	plan.rooms[room]["wall_kinds"] = kinds
-	plan.rooms[room]["wall_portals"] = {portal_wall: portal}
+	var wall_portals: Dictionary = {}
+	wall_portals[portal_wall] = portal
+	plan.rooms[room]["wall_portals"] = wall_portals
+	# The arcade walls are open air, not window hosts. Remove openings that the
+	# ordinary room planner laid on those spans so neither the mesh nor QA
+	# expects glazing trim in a colonnade.
+	for wi in range(plan.windows.size() - 1, -1, -1):
+		if int(plan.windows[wi].get("room", -1)) == room:
+			plan.windows.remove_at(wi)
 	plan.columns.clear()
 	const POST := 0.30
 	const PITCH := 2.6
