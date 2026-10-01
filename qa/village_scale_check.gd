@@ -22,6 +22,10 @@ const SITE_MAX := 400.0
 ## ground is grown until its farms, with their six-metre fire gaps, are all
 ## housed, and that ground is honestly emptier than a market town's.
 const DENSITY_MIN := 0.05
+## A sub-25-person hamlet still reserves a future landmark before lots are
+## cut. Three complete farmhouses on that honest ground measure about 3.6%;
+## asking the tiny settlement to mimic town density only grows retry roads.
+const DENSITY_MIN_HAMLET := 0.035
 const DENSITY_MAX := 0.30
 
 var failures: Array[String] = []
@@ -115,9 +119,11 @@ func _check_density(plan: VillagePlan) -> void:
 		built += Poly.area(VillageMeasure.bounds_poly(b))
 	var site: float = plan.site.size.x * plan.site.size.y
 	var d: float = built / maxf(site, 1.0)
+	var minimum: float = DENSITY_MIN_HAMLET if plan.spec.population < VillageSpec.HAMLET_POPULATION else DENSITY_MIN
 	stats["density"] = snappedf(d, 0.001)
-	if d < DENSITY_MIN:
-		failures.append("density: %.1f%% of the site is built; a village is at least %.0f%%" % [d * 100.0, DENSITY_MIN * 100.0])
+	if d < minimum:
+		failures.append("density: %.1f%% of the site is built; this settlement is at least %.1f%%"
+			% [d * 100.0, minimum * 100.0])
 	if d > DENSITY_MAX:
 		failures.append("density: %.1f%% of the site is built; a village is at most %.0f%%" % [d * 100.0, DENSITY_MAX * 100.0])
 

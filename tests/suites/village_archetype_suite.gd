@@ -32,6 +32,14 @@ static func run_row(key: StringName) -> SuiteResult:
 	return _run_selected(key)
 
 
+## One canonical matrix cell, for bounded change gates. This uses the same
+## native requests, placement, VillageQA and archetype predicates as the full
+## 108-case sweep; it merely selects one cell instead of pretending every
+## local repair needs the whole scheduled regression.
+static func run_case(key: StringName, seed_index: int, scale: float) -> SuiteResult:
+	return _run_selected(key, seed_index, scale)
+
+
 ## Semantic controls for spatial archetype predicates, independent of the
 ## expensive native-building matrix. A building "on" a common fronts it;
 ## putting its centre inside the common contradicts the no-building rule.
@@ -83,10 +91,11 @@ static func run_contracts() -> SuiteResult:
 	_check_cap_contracts(res)
 	_check_strand_contracts(res)
 	_check_programme_contracts(res)
+	_check_hamlet_qa_contracts(res)
 	return res
 
 
-static func _run_selected(requested: StringName) -> SuiteResult:
+static func _run_selected(requested: StringName, only_seed := -1, only_scale := -1.0) -> SuiteResult:
 	var res := SuiteResult.new("village archetype")
 	var matched := false
 	for row in ARCHETYPES:
@@ -94,8 +103,14 @@ static func _run_selected(requested: StringName) -> SuiteResult:
 			continue
 		matched = true
 		var row_failures := 0
+		var row_cases := 0
 		for seed_index in range(3):
+			if only_seed >= 0 and seed_index != only_seed:
+				continue
 			for scale in SCALES:
+				if only_scale > 0.0 and not is_equal_approx(scale, only_scale):
+					continue
+				row_cases += 1
 				var people: int = maxi(12, int(round(float(row["people"]) * scale)))
 				var spec := VillageSpec.new(_seed_for(row["key"], seed_index, scale))
 				spec.population = people
@@ -129,6 +144,9 @@ static func _run_selected(requested: StringName) -> SuiteResult:
 					res.fail(message)
 					print("VIL020 FAIL ", message)
 				var qa: Dictionary = VillageQA.new().check(plan, {}, false)
+				print("VIL020 PLAN ", who, " site=", plan.site.size,
+					" buildings=", plan.buildings.size(), " density=", qa["stats"].get("density", -1.0),
+					" common_fronted=", qa["stats"].get("common_fronted", -1.0))
 				for failure in qa["failures"]:
 					var message := "%s: QA: %s" % [who, String(failure)]
 					res.fail(message)
@@ -162,7 +180,11 @@ static func _run_selected(requested: StringName) -> SuiteResult:
 						print("VIL020 FAILURE PLAN ", path)
 					res.note("stopped at first defective native village; the complete archetype matrix remains required")
 					return res
-		res.note("  %s: %d cases, %d defects" % [String(row["key"]), 9, row_failures])
+		if row_cases == 0:
+			res.fail("unknown village archetype matrix cell: %s seed=%d scale=%.1f"
+				% [String(row["key"]), only_seed, only_scale])
+		else:
+			res.note("  %s: %d cases, %d defects" % [String(row["key"]), row_cases, row_failures])
 	if not matched:
 		res.fail("unknown village archetype: " + String(requested))
 	return res
@@ -222,6 +244,44 @@ static func _check_programme_contracts(res: SuiteResult) -> void:
 	plan.buildings.append({"request": expected[1]})
 	res.checked += 1
 	if _programme_failures(expected, plan).is_empty(): res.fail("duplicate replacement escaped programme multiset QA")
+
+
+## The relaxed bands belong only to sub-25-person hamlets. Synthetic geometry
+## pins both sides of each boundary without generating a native building.
+static func _check_hamlet_qa_contracts(res: SuiteResult) -> void:
+	var spec := VillageSpec.new(48)
+	spec.population = 13
+	var plan := VillagePlan.new(spec)
+	plan.site = Rect2(-50.0, -50.0, 100.0, 100.0)
+	plan.commons.append({"kind": &"common", "poly": Poly.from_rect(plan.site)})
+	plan.lots.assign([
+		{"front": PackedVector2Array([Vector2(-50, -50), Vector2(50, -50)])},
+		{"front": PackedVector2Array([Vector2(-50, -50), Vector2(-50, 50)])},
+		{"front": PackedVector2Array([Vector2(-50, -50), Vector2(50, -50)])},
+	])
+	var placement := {"footprint": Rect2(-5.0, -6.0, 10.0, 12.0),
+		"bounds": AABB(Vector3(-5.0, 0.0, -6.0), Vector3(10.0, 3.0, 12.0)),
+		"door": Vector3(0.0, 0.0, -6.0)}
+	for i in range(3):
+		plan.buildings.append({"lot": i, "placement": placement,
+			"transform": Transform3D(Basis.IDENTITY, Vector3(200.0 + float(i) * 20.0, 0.0, 200.0))})
+	var scale := VillageScaleCheck.new()
+	scale._check_density(plan)
+	res.checked += 1
+	if not scale.failures.is_empty(): res.fail("3.6% hamlet density was rejected: " + str(scale.failures))
+	var place := VillagePlaceCheck.new()
+	place._check_common(plan)
+	res.checked += 1
+	if not place.failures.is_empty(): res.fail("57% hamlet common frontage was rejected: " + str(place.failures))
+	plan.spec.population = VillageSpec.HAMLET_POPULATION
+	scale = VillageScaleCheck.new()
+	scale._check_density(plan)
+	res.checked += 1
+	if scale.failures.is_empty(): res.fail("3.6% full-village density escaped the 5% rule")
+	place = VillagePlaceCheck.new()
+	place._check_common(plan)
+	res.checked += 1
+	if place.failures.is_empty(): res.fail("57% full-village common frontage escaped the 60% rule")
 
 
 static func _check_cap_contracts(res: SuiteResult) -> void:

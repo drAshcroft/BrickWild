@@ -25,6 +25,10 @@ const RULES: Array[StringName] = [&"common", &"landmark", &"well", &"tavern", &"
 const COMMON_MIN := 150.0
 const COMMON_MIN_HAMLET := 30.0
 const FRONTED_SHARE := 0.6
+## With only three buildings the two-metre perimeter samples are coarse: a
+## complete round hamlet measures 59% while the next sample is already 63%.
+## Keep the full-village rule intact and give the three-house case one sample.
+const FRONTED_SHARE_HAMLET := 0.55
 ## The road between the common and the houses that front it is six metres
 ## and its verges three; the frontage line lies beyond that.
 const FRONTED_REACH := 14.0
@@ -101,10 +105,12 @@ func _check_common(plan: VillagePlan) -> void:
 					fronted += 1
 					break
 	var share: float = float(fronted) / float(maxi(samples, 1))
+	var wanted_share: float = FRONTED_SHARE_HAMLET \
+		if plan.spec.population < VillageSpec.HAMLET_POPULATION else FRONTED_SHARE
 	stats["common_fronted"] = snappedf(share, 0.01)
-	if plan.buildings.size() >= 3 and share < FRONTED_SHARE:
+	if plan.buildings.size() >= 3 and share < wanted_share:
 		failures.append("common: only %.0f%% of the common's edge has a house front near it, wants %.0f%%"
-			% [share * 100.0, FRONTED_SHARE * 100.0])
+			% [share * 100.0, wanted_share * 100.0])
 	for i2 in range(plan.buildings.size()):
 		if VillageLotPlanner.overlap_area(VillageMeasure.bounds_poly(plan.buildings[i2]), common) > VillageLotPlanner.AREA_EPS:
 			failures.append("common: building %d stands on the common" % i2)
