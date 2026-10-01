@@ -42,6 +42,28 @@ func commit() -> ArrayMesh:
 	return mesh
 
 
+## `commit()`, plus the logical slot of each surface when an EMPTY surface was
+## skipped ahead of a populated one. A committed mesh omits an empty surface,
+## so everything after it moves down a position and an assembler that reads
+## surface N as slot N dresses it in the wrong material. Naming the survivors
+## `material_slot:N` is the convention the shell and tree assemblers already
+## honour. A trailing empty surface moves nothing and leaves the names alone.
+func commit_named() -> ArrayMesh:
+	var mesh := commit()
+	var populated: Array[int] = []
+	for slot in range(_sts.size()):
+		var arrays: Array = _sts[slot].commit_to_arrays()
+		var vertices = arrays[Mesh.ARRAY_VERTEX]
+		if vertices != null and not vertices.is_empty():
+			populated.append(slot)
+	for k in range(populated.size()):
+		if populated[k] != k:
+			for j in range(populated.size()):
+				mesh.surface_set_name(j, "material_slot:%d" % populated[j])
+			break
+	return mesh
+
+
 ## Copy an emitted mesh with every vertex moved by `offset`. Normals are
 ## directions and remain unchanged. Used when a whole procedural building has
 ## a local ground plane above world zero, as the sky citadel does.

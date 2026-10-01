@@ -59,7 +59,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
+	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -158,6 +158,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/house_jetty_suite.gd").run()
 		"metriccoords":
 			return preload("res://tests/suites/metric_coords_suite.gd").run()
+		"matkit":
+			return preload("res://tests/suites/material_kit_suite.gd").run()
 		"churchaperture":
 			return preload("res://tests/suites/church_aperture_suite.gd").run()
 		"churchload":
