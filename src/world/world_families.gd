@@ -26,6 +26,13 @@ const FAMILIES := {
 		"width": {"min": 18.0, "max": 120.0},
 		"length": {"min": 8.0, "max": 42.0},
 		"height": {"min": 10.0, "max": 24.0},
+	},
+	&"insula": {
+		"label": "Insula",
+		"kinds": [&"port_tenement"],
+		"width": {"min": 20.0, "max": 45.0},
+		"length": {"min": 18.0, "max": 38.0},
+		"height": {"min": 12.0, "max": 20.7},
 	}
 }
 
@@ -69,6 +76,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = made["spec"]
 		out.plan = made["plan"]
 		return true
+	if request.style == &"insula" and request.purpose in kinds_of(&"insula"):
+		var insula_made := InsulaGenerator.generate(request.seed, request.width,
+			request.length, request.height)
+		out.spec = insula_made["spec"]
+		out.plan = insula_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -79,7 +92,7 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 ## Build the mesh for a world building's spec, or null when there is none.
 static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
-			and building.plan.world_family == &"courtyard_house":
+			and building.plan.world_family in [&"courtyard_house", &"insula"]:
 		return HouseBuilder.new().build(building.plan)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null

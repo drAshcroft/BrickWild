@@ -315,7 +315,7 @@ func _check_use_zones() -> void:
 
 
 func _world_shop_door(door: Dictionary) -> bool:
-	if _plan.world_family != &"courtyard_house" or not bool(door.get("exterior", false)):
+	if _plan.world_family not in [&"courtyard_house", &"insula"] or not bool(door.get("exterior", false)):
 		return false
 	if bool(door.get("front", false)):
 		return false
@@ -325,7 +325,7 @@ func _world_shop_door(door: Dictionary) -> bool:
 
 
 func _world_shop_has_street_opening(room: int) -> bool:
-	if _plan.world_family != &"courtyard_house" or room < 0 or room >= _plan.rooms.size():
+	if _plan.world_family not in [&"courtyard_house", &"insula"] or room < 0 or room >= _plan.rooms.size():
 		return false
 	if not String(_plan.rooms[room].get("role", "")).begins_with("taberna"):
 		return false

@@ -21,6 +21,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 60.0, "length": 12.0, "height": 14.0,
 		"must": ["platform", "column", "dais", "image", "roof", "water", "wing"],
 		"check": &"hall_check", "about": "Phoenix Hall with mirrored wings"},
+	{"key": "port_tenement", "family": &"insula", "kind": &"port_tenement",
+		"width": 30.0, "length": 20.0, "height": 18.0,
+		"must": ["shop", "stair", "bedroom", "parlour"],
+		"check": &"insula_check", "about": "five-storey port tenement with six flats"},
 ]
 
 
@@ -50,10 +54,11 @@ static func run() -> SuiteResult:
 				res.fail("%s: %s" % [who, f])
 			var mesh: ArrayMesh = BigGlade.build_mesh(building)
 			if mesh == null:
-				res.fail("%s: no timber hall mesh" % who)
+				res.fail("%s: no family mesh" % who)
 			else:
 				NormalsSuite.check_mesh(res, mesh, who)
-				_opening_rays(res, building.spec as TimberHallSpec, mesh, who)
+				if building.spec is TimberHallSpec:
+					_opening_rays(res, building.spec as TimberHallSpec, mesh, who)
 			for f2 in _family_check(building, row.get("check", &"")):
 				res.fail("%s: %s" % [who, f2])
 			if res.failures.size() > before:

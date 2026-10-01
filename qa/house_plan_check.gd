@@ -364,7 +364,7 @@ func _check_connectivity(plan: HousePlan) -> void:
 		stats["locked_cells"] = locked_cells
 		stats["sealed_oubliettes"] = oubliettes
 	for i in range(plan.room_count()):
-		if plan.world_family == &"courtyard_house" and _world_shop_has_street_opening(plan, i):
+		if plan.world_family in [&"courtyard_house", &"insula"] and _world_shop_has_street_opening(plan, i):
 			continue
 		if not seen.has(i) and not (prison and plan.kind_of(i) == &"oubliette"):
 			failures.append("connected: room %d (%s) cannot be reached from the front door"
@@ -447,7 +447,7 @@ func _check_privacy(plan: HousePlan) -> void:
 		# problem this check exists to catch.
 		if plan.kind_of(i) == &"bedroom":
 			continue
-		if plan.world_family == &"courtyard_house" and _world_shop_has_street_opening(plan, i):
+		if plan.world_family in [&"courtyard_house", &"insula"] and _world_shop_has_street_opening(plan, i):
 			continue
 		if plan.spec is ShopSpec and plan.spec.business == &"prison" \
 				and plan.kind_of(i) == &"oubliette" and bool(plan.rooms[i].get("sealed", false)):
