@@ -20,12 +20,84 @@ var _stage_environment: Environment
 var _legacy_light := false
 var _mesh_only := false
 
-const KEY_ELEVATION := -30.0
-const KEY_CAMERA_OFFSET := -62.0
-const KEY_ENERGY := 1.8
-const FILL_ELEVATION := -18.0
-const FILL_CAMERA_OFFSET := 120.0
-const FILL_ENERGY := 0.45
+var _ground_mat: ShaderMaterial
+var _atmo: Dictionary = {}
+var _family: StringName = &"church"
+
+# EVAL-B01. The key is a warm sun swung 112 degrees round from the camera, so
+# the camera sees the shaded faces with the lit edges raking past them and the
+# cast shadows fall toward the lens. Every subject has its own camera yaw, so
+# the light is placed from the yaw, never fixed in the world. The fill is the
+# cool sky on the other side, a quarter of the key. Each family has a time of
+# day (ATMOSPHERES); the values the shot used are copied into the manifest.
+const KEY_ELEVATION := -29.0
+const KEY_CAMERA_OFFSET := -112.0
+const KEY_ENERGY := 2.4
+const FILL_ELEVATION := -15.0
+const FILL_CAMERA_OFFSET := 65.0
+const FILL_ENERGY := 0.6
+
+## Time of day and weather per family. `key_elevation` is degrees above the
+## horizon. `earth_a`/`earth_b` are the two tones the ground mottles between.
+## The haze colour is both the fog and the sky's horizon, so the far ground
+## melts into the sky instead of ending on a hard edge.
+const ATMOSPHERES := {
+	&"church": {"label": "clear late morning, dry meadow",
+		"sky_top": "4a74b0", "sky_horizon": "d6dcdc", "haze": "d6dcdc",
+		"below": "b9bfba", "earth_a": "6c6d58", "earth_b": "787a60",
+		"key_color": "fff0d8", "key_energy": 2.1, "key_elevation": 29.0,
+		"fill_color": "cfdcff", "fill_energy": 0.6, "ambient": 0.45},
+	&"castle": {"label": "high thin overcast, rough dun field",
+		"sky_top": "5f7ea6", "sky_horizon": "cdd0cc", "haze": "cdd0cc",
+		"below": "aaa9a0", "earth_a": "5f5d4d", "earth_b": "6a6753",
+		"key_color": "ffe9cc", "key_energy": 1.7, "key_elevation": 28.0,
+		"fill_color": "c8d4f0", "fill_energy": 0.55, "ambient": 0.4},
+	&"house": {"label": "warm afternoon, kept grass",
+		"sky_top": "4d7bb8", "sky_horizon": "dcdcd0", "haze": "dcdcd0",
+		"below": "bcc0b2", "earth_a": "66714f", "earth_b": "737c59",
+		"key_color": "ffe8c8", "key_energy": 2.2, "key_elevation": 31.0,
+		"fill_color": "d0dfff", "fill_energy": 0.62, "ambient": 0.45},
+	&"temple_dusk": {"label": "dusk, ash-red western sky, cold earth",
+		"sky_top": "2e4a82", "sky_horizon": "c9966f", "haze": "c9966f",
+		"below": "8a6a58", "earth_a": "58534b", "earth_b": "655c4f",
+		"key_color": "ffcc99", "key_energy": 1.6, "key_elevation": 17.0,
+		"fill_color": "8ea4d8", "fill_energy": 0.45, "ambient": 0.5},
+	&"temple_dark": {"label": "night within, braziers the only warm light",
+		"sky_top": "12161f", "sky_horizon": "2a2733", "haze": "22202a",
+		"below": "1a191f", "earth_a": "2c2a2a", "earth_b": "353029",
+		"key_color": "ffffff", "key_energy": 0.35, "key_elevation": 42.0,
+		"fill_color": "ffffff", "fill_energy": 0.12, "ambient": 0.3,
+		# inside the hall the sun comes down the axis, as it always did: the
+		# shafts between the columns are the picture
+		"key_offset": 49.0, "no_fog": true},
+	&"legacy": {"label": "historical VIS-001 stage",
+		"sky_top": "6b8cb5", "sky_horizon": "cfd8e0", "haze": "9aa0a0",
+		"below": "9aa0a0", "earth_a": "6f7360", "earth_b": "6f7360",
+		"key_color": "ffffff", "key_energy": 1.5, "key_elevation": 42.0,
+		"fill_color": "ffffff", "fill_energy": 0.35, "ambient": 1.0},
+}
+
+const GROUND_SHADER := """
+shader_type spatial;
+uniform vec3 earth_a : source_color = vec3(0.45, 0.45, 0.30);
+uniform vec3 earth_b : source_color = vec3(0.52, 0.50, 0.34);
+varying vec3 wp;
+float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) {
+	vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x),
+		mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	float n = vn(wp.xz / 70.0) * 0.5 + vn(wp.xz / 17.0) * 0.3 + vn(wp.xz / 3.2) * 0.2;
+	vec3 c = mix(earth_a, earth_b, smoothstep(0.25, 0.75, n));
+	c *= 0.93 + 0.14 * vn(wp.xz * 2.7);
+	ALBEDO = c;
+	ROUGHNESS = 1.0;
+	SPECULAR = 0.0;
+}
+"""
 
 
 func _init() -> void:
@@ -387,7 +459,7 @@ func _shoot_vis005_frame(spec: ChurchSpec, file: String, yaw: float,
 	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
 	_cam.position = focus + dir * dist
 	_cam.look_at(focus, Vector3.UP)
-	_set_shot_lighting(yaw)
+	_set_shot_lighting(yaw, dist + radius)
 	_key_light.rotation.y = yaw + deg_to_rad(-75.0 if raking else 0.0)
 	await _capture(file)
 	_root3d.remove_child(node)
@@ -718,6 +790,7 @@ func _focus_of(spec: ChurchSpec, kind: String) -> Array:
 
 
 func _landmark_spec(entry: Dictionary) -> ChurchSpec:
+	_family = &"church"
 	var spec := ChurchSpec.new()
 	spec.style = entry["style"]
 	spec.width = entry["w"]
@@ -839,6 +912,7 @@ func _castles() -> Array[Dictionary]:
 
 
 func _castle_spec(entry: Dictionary) -> CastleSpec:
+	_family = &"castle"
 	var spec := CastleSpec.new()
 	spec.style = entry["style"]
 	spec.tier_override = entry["tier"]
@@ -1035,24 +1109,35 @@ func _build_stage() -> void:
 	env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color("6b8cb5")
-	sky_mat.sky_horizon_color = Color("cfd8e0")
-	sky_mat.ground_bottom_color = Color("5b5b55")
-	sky_mat.ground_horizon_color = Color("9aa0a0")
+	# a long, soft haze band at the horizon and a deeper blue overhead
+	sky_mat.sky_curve = 0.32
+	sky_mat.ground_curve = 0.08
+	sky_mat.sun_angle_max = 0.0
 	sky.sky_material = sky_mat
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 1.0
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.fog_enabled = false
+	env.fog_mode = Environment.FOG_MODE_DEPTH
+	env.fog_sky_affect = 0.0
+	env.fog_depth_curve = 1.6
 	# The project's mobile renderer does not use SSAO. Keep the stage honest.
 	var we := WorldEnvironment.new()
 	we.environment = env
 	_root3d.add_child(we)
+	# Directional shadows default to a 100 m reach, which is why a 300 m
+	# fortress seen from 450 m cast nothing. The reach is set per shot below;
+	# the atlas is the largest the renderer allows.
+	RenderingServer.directional_shadow_atlas_set_size(8192, true)
 
 	_key_light = DirectionalLight3D.new()
 	_key_light.rotation = Vector3(deg_to_rad(-42.0), deg_to_rad(-131.0), 0.0)
 	_key_light.light_energy = 1.5
 	_key_light.shadow_enabled = true
+	_key_light.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	_key_light.directional_shadow_blend_splits = true
+	_key_light.directional_shadow_max_distance = 600.0
 	_root3d.add_child(_key_light)
 
 	_fill_light = DirectionalLight3D.new()
@@ -1060,15 +1145,19 @@ func _build_stage() -> void:
 	_fill_light.light_energy = 0.35
 	_root3d.add_child(_fill_light)
 
+	# A plane far wider than the camera can see, with the fog doing the work of
+	# an edge: by the time the eye reaches the border the earth is haze.
 	var ground := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(900, 900)
+	pm.size = Vector2(9000, 9000)
 	ground.mesh = pm
-	var gm := StandardMaterial3D.new()
-	gm.albedo_color = Color("6f7360")
-	gm.roughness = 1.0
-	ground.material_override = gm
+	var gsh := Shader.new()
+	gsh.code = GROUND_SHADER
+	_ground_mat = ShaderMaterial.new()
+	_ground_mat.shader = gsh
+	ground.material_override = _ground_mat
 	_root3d.add_child(ground)
+	_set_atmosphere(&"church")
 
 	_mesh_inst = MeshInstance3D.new()
 	_root3d.add_child(_mesh_inst)
@@ -1120,7 +1209,7 @@ func _shoot_scene(node: Node3D, file: String, yaw: float, pitch: float,
 	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
 	_cam.position = centre + dir * dist
 	_cam.look_at(centre, Vector3.UP)
-	_set_shot_lighting(yaw)
+	_set_shot_lighting(yaw, dist + radius)
 	await _capture(file)
 	if courtyard_spec != null:
 		await _capture_krak_courtyard(courtyard_spec, courtyard_file)
@@ -1135,7 +1224,7 @@ func _capture_krak_courtyard(spec: CastleSpec, file: String) -> void:
 	var span: float = maxf(yard.size.x, yard.size.y)
 	_cam.position = centre + Vector3(0.0, span * 0.62, -span * 0.48)
 	_cam.look_at(centre, Vector3.UP)
-	_set_shot_lighting(0.0)
+	_set_shot_lighting(PI, _cam.position.distance_to(centre) + span * 0.6)
 	await _capture(file)
 
 
@@ -1187,6 +1276,8 @@ func _shoot_house(plan: HousePlan, file: String, yaw: float, pitch: float,
 	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
 	_cam.position = centre + dir * dist
 	_cam.look_at(centre, Vector3.UP)
+	_family = &"house"
+	_set_shot_lighting(yaw, dist + radius)
 	await _capture(file)
 	node.queue_free()
 
@@ -1207,7 +1298,6 @@ func _shoot_temple(spec: TempleSpec, file: String, mode: StringName) -> void:
 	var mountain: bool = spec.form == &"ziggurat"
 	var node: Node3D = TempleAssembler.build(spec, mode != &"exterior" and not mountain)
 	_root3d.add_child(node)
-	_dim(mode != &"exterior")
 	await process_frame
 	var idol: Vector3 = TempleGeometry.idol_center(spec)
 	match mode:
@@ -1236,30 +1326,31 @@ func _shoot_temple(spec: TempleSpec, file: String, mode: StringName) -> void:
 			var dir := Vector3(sin(2.5) * cos(-0.22), 0.22, cos(2.5) * cos(-0.22))
 			_cam.position = aabb.get_center() + dir * dist
 			_cam.look_at(aabb.get_center(), Vector3.UP)
+	var fwd: Vector3 = -_cam.global_transform.basis.z
+	_family = &"temple_dusk" if mode == &"exterior" else &"temple_dark"
+	var reach: float = _cam.position.distance_to(idol) + 40.0
+	if mode == &"aerial":
+		reach = _cam.position.length() * 1.3
+	elif mode == &"exterior":
+		reach = _cam.position.distance_to(SceneBounds.of_node(node).get_center()) 			+ SceneBounds.of_node(node).size.length() / 2.0
+	_set_shot_lighting(atan2(-fwd.x, -fwd.z), reach)
 	await _capture(file)
 	node.queue_free()
-	_dim(false)
 
 
-## Turn the daylight down. A temple lit like a meadow is not a temple, and the
-## braziers the rite check insists on are the point of the picture.
-func _dim(dark: bool) -> void:
-	var sun := true
-	for child in _root3d.get_children():
-		if child is DirectionalLight3D:
-			var lamp := child as DirectionalLight3D
-			if sun:
-				lamp.light_energy = 0.35 if dark else 1.5
-				sun = false
-			else:
-				lamp.light_energy = 0.12 if dark else 0.35
-		elif child is WorldEnvironment:
-			var env: Environment = (child as WorldEnvironment).environment
-			env.ambient_light_energy = 0.3 if dark else 1.0
-			var sky_mat: ProceduralSkyMaterial = env.sky.sky_material
-			sky_mat.sky_top_color = Color("161a24") if dark else Color("6b8cb5")
-			sky_mat.sky_horizon_color = Color("2a2733") if dark else Color("cfd8e0")
-			sky_mat.ground_horizon_color = Color("1d1c22") if dark else Color("9aa0a0")
+## Choose the time of day. Colours only; the key and fill are placed per shot
+## by `_set_shot_lighting`, which knows the camera.
+func _set_atmosphere(name: StringName) -> void:
+	_atmo = ATMOSPHERES[name].duplicate()
+	_atmo["name"] = String(name)
+	var sky_mat: ProceduralSkyMaterial = _stage_environment.sky.sky_material
+	sky_mat.sky_top_color = Color(_atmo["sky_top"])
+	sky_mat.sky_horizon_color = Color(_atmo["sky_horizon"])
+	sky_mat.ground_horizon_color = Color(_atmo["haze"])
+	sky_mat.ground_bottom_color = Color(_atmo["below"])
+	_stage_environment.fog_light_color = Color(_atmo["haze"])
+	_ground_mat.set_shader_parameter("earth_a", Color(_atmo["earth_a"]))
+	_ground_mat.set_shader_parameter("earth_b", Color(_atmo["earth_b"]))
 
 
 ## Frame a built mesh and save one image. Both generators hand this the same
@@ -1270,7 +1361,8 @@ func _shoot_mesh(mesh: ArrayMesh, cols: Array, file: String, yaw: float,
 	_mesh_inst.mesh = mesh
 	for i in range(mesh.get_surface_count()):
 		var m := StandardMaterial3D.new()
-		m.albedo_color = cols[i]
+		# a fifth surface (the moat water) has no colour in the four-entry palettes
+		m.albedo_color = cols[i] if i < cols.size() else Color("4b7a99")
 		m.roughness = 0.92
 		_mesh_inst.set_surface_override_material(i, m)
 	if architectural_finish:
@@ -1286,27 +1378,68 @@ func _shoot_mesh(mesh: ArrayMesh, cols: Array, file: String, yaw: float,
 	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
 	_cam.position = centre + dir * dist
 	_cam.look_at(centre, Vector3.UP)
-	_set_shot_lighting(yaw)
+	_set_shot_lighting(yaw, dist + radius)
 	await _capture(file)
 	_set_legacy_lighting()
 
 
-func _set_shot_lighting(yaw: float) -> void:
+## Place the key and fill for one camera. `reach` is the distance from the
+## camera to the far side of the subject; it sets how far shadows are drawn
+## and where the ground starts to fade into haze.
+func _set_shot_lighting(yaw: float, reach := 0.0) -> void:
 	if _legacy_light:
 		_set_legacy_lighting()
 		return
-	_key_light.rotation = Vector3(deg_to_rad(KEY_ELEVATION),
-		yaw + deg_to_rad(KEY_CAMERA_OFFSET), 0.0)
-	_key_light.light_color = Color("fff2df")
-	_key_light.light_energy = KEY_ENERGY
-	_stage_environment.ambient_light_energy = 0.8
+	if reach <= 0.0:
+		reach = 120.0
+	_set_atmosphere(_atmosphere_name())
+	_key_light.rotation = Vector3(deg_to_rad(-float(_atmo["key_elevation"])),
+		yaw + deg_to_rad(_key_offset()), 0.0)
+	_key_light.light_color = Color(_atmo["key_color"])
+	_key_light.light_energy = _atmo["key_energy"]
+	_stage_environment.ambient_light_energy = _atmo["ambient"]
 	_fill_light.rotation = Vector3(deg_to_rad(FILL_ELEVATION),
 		yaw + deg_to_rad(FILL_CAMERA_OFFSET), 0.0)
-	_fill_light.light_color = Color("d9e5ff")
-	_fill_light.light_energy = FILL_ENERGY
+	_fill_light.light_color = Color(_atmo["fill_color"])
+	_fill_light.light_energy = _atmo["fill_energy"]
+	# shadows: one orthogonal box (8192 px atlas) reaching just past the far
+	# wall, so a 300 m fortress gets texels of about 6 cm; bias a little
+	# harder as the texels get bigger.
+	_key_light.directional_shadow_max_distance = reach * 1.25
+	_key_light.directional_shadow_fade_start = 1.0
+	_key_light.shadow_normal_bias = clampf(reach / 120.0, 1.0, 4.0)
+	_key_light.shadow_bias = 0.05
+	_key_light.shadow_blur = 1.8
+	# a low sun throws shadows from casters well outside the receiving box, so
+	# the pancake (default 20 m) must reach as far as the subject is deep
+	_key_light.directional_shadow_pancake_size = reach
+	# fog: the subject stays clear, the ground beyond it goes to haze
+	var begin: float = reach * 1.25
+	_stage_environment.fog_enabled = not _atmo.get("no_fog", false)
+	_stage_environment.fog_depth_begin = begin
+	_stage_environment.fog_depth_end = minf(begin + maxf(reach * 5.0, 500.0), 3600.0)
+
+
+func _key_offset() -> float:
+	return float(ATMOSPHERES[_atmosphere_name()].get("key_offset", KEY_CAMERA_OFFSET))
+
+
+## Which time of day this family is shot in. Houses and temples set `_family`
+## themselves; `_castle_spec` and `_landmark_spec` set it for the rest.
+func _atmosphere_name() -> StringName:
+	match _family:
+		&"castle":
+			return &"castle"
+		&"house":
+			return &"house"
+		&"temple_dusk", &"temple_dark":
+			return _family
+	return &"church"
 
 
 func _set_legacy_lighting() -> void:
+	_set_atmosphere(&"legacy")
+	_stage_environment.fog_enabled = false
 	_key_light.rotation = Vector3(deg_to_rad(-42.0), deg_to_rad(-131.0), 0.0)
 	_key_light.light_color = Color.WHITE
 	_key_light.light_energy = 1.5
@@ -1314,6 +1447,7 @@ func _set_legacy_lighting() -> void:
 	_fill_light.rotation = Vector3(deg_to_rad(-16.0), deg_to_rad(58.0), 0.0)
 	_fill_light.light_color = Color.WHITE
 	_fill_light.light_energy = 0.35
+	_key_light.directional_shadow_max_distance = 100.0
 
 
 static func _camera_metadata(yaw: float, pitch: float, zoom: float) -> Dictionary:
@@ -1321,21 +1455,31 @@ static func _camera_metadata(yaw: float, pitch: float, zoom: float) -> Dictionar
 		"zoom": zoom, "fov_degrees": 48.0}
 
 
-static func _light_metadata(yaw: float, historical := false) -> Dictionary:
+func _light_metadata(yaw: float, historical := false) -> Dictionary:
 	if historical:
 		return {"key_azimuth_degrees": -131.0, "key_elevation_degrees": -42.0,
 			"key_energy": 1.5, "key_color": "ffffff", "fill_azimuth_degrees": 58.0,
 			"fill_elevation_degrees": -16.0, "fill_energy": 0.35,
-			"fill_color": "ffffff", "ambient_energy": 1.0}
-	return {"key_azimuth_degrees": rad_to_deg(yaw) + KEY_CAMERA_OFFSET,
-		"key_elevation_degrees": KEY_ELEVATION, "key_energy": KEY_ENERGY,
-		"key_color": "fff2df", "fill_azimuth_degrees": rad_to_deg(yaw)
-			+ FILL_CAMERA_OFFSET, "fill_elevation_degrees": FILL_ELEVATION,
-		"fill_energy": FILL_ENERGY, "fill_color": "d9e5ff",
-		"ambient_energy": 0.8}
+			"fill_color": "ffffff", "ambient_energy": 1.0,
+			"atmosphere": "legacy", "shadow_max_distance_m": 100.0,
+			"ground": "6f7360 plane, 900 m, no fog"}
+	var a: Dictionary = ATMOSPHERES[_atmosphere_name()]
+	return {"key_azimuth_degrees": rad_to_deg(yaw) + _key_offset(),
+		"key_elevation_degrees": -float(a["key_elevation"]),
+		"key_energy": a["key_energy"], "key_color": a["key_color"],
+		"fill_azimuth_degrees": rad_to_deg(yaw) + FILL_CAMERA_OFFSET,
+		"fill_elevation_degrees": FILL_ELEVATION,
+		"fill_energy": a["fill_energy"], "fill_color": a["fill_color"],
+		"ambient_energy": a["ambient"],
+		"atmosphere": String(_atmosphere_name()), "time_of_day": a["label"],
+		"shadow_max_distance_m": _key_light.directional_shadow_max_distance,
+		"ground": "mottled %s/%s earth, 9 km plane, depth haze %s from %.0f m"
+			% [a["earth_a"], a["earth_b"], a["haze"],
+				_stage_environment.fog_depth_begin],
+		"sky": "%s overhead to %s at the horizon" % [a["sky_top"], a["sky_horizon"]]}
 
 
-static func _portrait_metadata(seed: int, yaw: float, pitch: float,
+func _portrait_metadata(seed: int, yaw: float, pitch: float,
 		zoom: float) -> Dictionary:
 	return {"seed": seed, "camera": _camera_metadata(yaw, pitch, zoom),
 		"light": _light_metadata(yaw)}
