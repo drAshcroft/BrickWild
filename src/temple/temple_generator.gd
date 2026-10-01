@@ -59,6 +59,11 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	var altar_top: float = TempleGeometry.dais_top(spec) + spec.altar_h
 	spec.idol_height = maxf(spec.idol_height,
 		altar_top * 2.15 - TempleGeometry.dais_top(spec))
+	# ... and never so small that the room swallows it: the god fills at least
+	# the share of the room the rite check wants, whatever the sanctum cost it
+	if spec.form != &"ziggurat":
+		spec.idol_height = maxf(spec.idol_height,
+			spec.height * 0.46 - TempleGeometry.dais_top(spec))
 
 	# ---- the hole ----
 	spec.bridge_width = clampf(TempleGeometry.PROCESSION_MIN + 0.6,
