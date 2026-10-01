@@ -473,6 +473,8 @@ static func place_row(plan: HousePlan, room: int, step: Dictionary,
 	for cand in best_row:
 		cand["zone"] = best_zone
 		cand["row"] = row_group
+		if bool(step.get("free_standing", false)):
+			cand["free_standing"] = true
 		HouseFurnishGeometry.commit(plan, room, cand, blocked, zones)
 
 

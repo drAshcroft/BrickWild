@@ -34,6 +34,7 @@ times rather than an idle-machine promise.
 | furnishing and assembly | `lane:house-furnish-fast` | 194 s | 127 checks, pass; 2 warnings |
 | house exterior and assembly | `lane:house-exterior-fast` | 112 s | 1,024 checks, pass |
 | props and assembly contracts | `lane:assets-fast` | 40 s | 119 checks, pass |
+| library business and row repair | `lane:library-change` | 54 s | 31 checks, pass; 32 warnings |
 | temple geometry and rite | `lane:temple` | 52 s | 2,247 checks, pass; 7 warnings |
 | village site, lots, plan rules | `lane:village-fast` | 113 s | 8 checks, 17 existing VIL-017 failures |
 
@@ -63,6 +64,9 @@ For INT-008, `shop,barracksquick` passed in 38 seconds. The combined
 `shop,sarchetype` sweep hit the cap while running other shop families.
 `barracksquick` checks the requested three sizes, HouseQA and negative
 controls; the prepared clone's 100-seed matrix remains breadth evidence.
+For INT-009, `lane:library-change` checks shop contracts, three library sizes
+and two repair regressions in 54 seconds. The 100-seed library matrix stays
+in scheduled regression.
 
 ## Scheduled regression and asset exception
 

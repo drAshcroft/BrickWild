@@ -110,6 +110,7 @@ const MIN_AREA := {
 	&"lobby": 16.0, &"lounge": 10.0, &"suite": 14.0,
 	&"gallery": 8.0, &"laundry": 7.0, &"great_hall": 16.0,
 	&"lords_chamber": 10.0, &"nave": 12.0,
+	&"reading_room": 14.0, &"stacks": 20.0, &"scriptorium": 8.0,
 }
 
 ## And the narrowest it may be. Area alone is not enough: a bed is 1.9 x 2.4 m
@@ -126,6 +127,7 @@ const MIN_SIDE := {
 	&"lobby": 3.2, &"lounge": 2.8, &"suite": 3.4,
 	&"gallery": 2.4, &"laundry": 2.4, &"great_hall": 3.0,
 	&"lords_chamber": 2.8, &"nave": 2.8,
+	&"reading_room": 3.0, &"stacks": 3.6, &"scriptorium": 2.6,
 }
 
 
@@ -141,7 +143,7 @@ const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour",
 	&"sales_floor", &"stable", &"tack_room", &"dining_room", &"guest_room",
 	&"office", &"records", &"council_chamber", &"meeting_hall", &"lobby",
 	&"lounge", &"suite", &"gallery", &"laundry", &"great_hall",
-	&"lords_chamber", &"nave"]
+	&"lords_chamber", &"nave", &"reading_room", &"stacks", &"scriptorium"]
 
 ## Rooms someone sleeps in. Nobody should have to walk through one of these
 ## to reach anywhere else -- not just the house's own "bedroom".

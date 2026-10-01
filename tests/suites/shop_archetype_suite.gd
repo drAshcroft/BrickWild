@@ -5,6 +5,7 @@ extends RefCounted
 
 const REQUIRED := {
 	&"barracks": ["office", "bed", "stand", "table", "bench"],
+	&"library": ["reading_room", "bookcase", "lectern", "hearth"],
 	&"blacksmith": ["workshop", "anvil", "workbench"],
 	&"stable": ["stable", "stall"],
 	&"restaurant": ["dining_room", "table", "seat"],
@@ -27,10 +28,13 @@ static func run() -> SuiteResult:
 	for business in REQUIRED:
 		var spec := ShopSpec.new()
 		spec.business = business
-		spec.style = &"longhall" if business in [&"blacksmith", &"stable", &"carpenter"] else &"townhouse"
+		spec.style = &"longhall" if business in [&"blacksmith", &"stable", &"carpenter", &"library"] else &"townhouse"
 		spec.width = 14.0
 		spec.length = 18.0
 		if business == &"barracks":
+			spec.width = 18.0
+			spec.length = 28.0
+		if business == &"library":
 			spec.width = 18.0
 			spec.length = 28.0
 		spec.height = 2.9

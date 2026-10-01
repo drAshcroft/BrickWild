@@ -179,8 +179,10 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		# dressing roll, nudged by how cluttered the household is. Rolling for
 		# the mandatory pieces too is how a bedroom came out with no bed in it
 		# five per cent of the time.
-		var must: bool = float(step["opt"]) >= 1.0
-		if not must and r.randf() > float(step["opt"]) * lerpf(0.75, 1.15, spec.clutter):
+		var must: bool = float(step["opt"]) >= 1.0 \
+			and not bool(step.get("repair_optional", false))
+		if not must and not bool(step.get("always_attempt", false)) \
+				and r.randf() > float(step["opt"]) * lerpf(0.75, 1.15, spec.clutter):
 			continue
 		var placed_from := plan.furniture.size()
 		if step["rule"] == &"row":
@@ -260,10 +262,15 @@ static func _keep_the_room_passable(plan: HousePlan, room: int,
 				victim = f
 		if victim < 0:
 			return
-		blocked.erase(plan.furniture[victim]["rect"])
-		zones.erase(plan.furniture[victim]["zone"])
-		plan.furniture.remove_at(victim)
-		HouseFurnishRepair.reindex_hosts(plan, victim)
+		var repair_indices := HouseFurnishRepair._repair_target_indices(plan, victim)
+		for ri in range(repair_indices.size() - 1, -1, -1):
+			var index: int = repair_indices[ri]
+			if index >= plan.furniture.size():
+				continue
+			blocked.erase(plan.furniture[index]["rect"])
+			zones.erase(plan.furniture[index]["zone"])
+			plan.furniture.remove_at(index)
+			HouseFurnishRepair.reindex_hosts(plan, index)
 
 
 ## A table with nothing to sit at it is a table nobody uses.

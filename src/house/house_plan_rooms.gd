@@ -116,6 +116,9 @@ const KIND_POLES := {
 	&"dormitory": {"front": -1.0, "service": 1.0},
 	&"armoury": {"front": -0.3, "service": 0.3},
 	&"mess": {"front": 0.8, "service": 0.0},
+	&"reading_room": {"front": 0.9, "service": 0.0},
+	&"stacks": {"front": -0.1, "service": 0.9},
+	&"scriptorium": {"front": 0.1, "service": 0.5},
 }
 
 

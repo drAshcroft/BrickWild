@@ -19,7 +19,7 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	spec.porch = r.randf() < float(style["porch"])
 	spec.chimney = r.randf() < float(style["chimney"])
 	# a smithy or a bakehouse is its fire: the flue is not a dice roll
-	if spec.business in [&"blacksmith", &"bakery"]:
+	if spec.business in [&"blacksmith", &"bakery", &"library"]:
 		spec.chimney = true
 	# Guardrooms have an office, dormitory, armoury and mess, with no fire
 	# planned in any of them. A chimney without a hearth is an unsupported stack.

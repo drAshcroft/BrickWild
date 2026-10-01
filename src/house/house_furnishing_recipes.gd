@@ -186,6 +186,35 @@ const RECIPES := {
 		{"cat": "lectern", "rule": &"free", "n": [0, 1], "opt": 0.7},
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
 	],
+	&"reading_room": [
+		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "lectern", "rule": &"free", "n": [2, 2], "opt": 1.0},
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "seat", "rule": &"around", "n": [2, 4], "opt": 1.0},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+	],
+	# Two wall-backed runs leave a measured one-metre aisle. A center bank fills
+	# the large room when its space is available, but is treated as one optional
+	# furnishing so navigation repair cannot tear a hole in its shelf pitch.
+	&"stacks": [
+		{"cat": "bookcase", "rule": &"row", "n": [3, 5], "min_n": 3,
+			"pitch": 0.0, "aisle": 1.0, "along": "wall",
+			"avoid_door_lines": true, "opt": 1.0},
+		{"cat": "bookcase", "rule": &"row", "n": [3, 5], "min_n": 3,
+			"pitch": 0.0, "aisle": 1.0, "along": "wall",
+			"avoid_door_lines": true, "opt": 1.0},
+		{"cat": "bookcase", "rule": &"row", "n": [3, 8], "min_n": 3,
+			"pitch": 0.0, "aisle": 1.0, "along": "axis",
+			"avoid_door_lines": true, "free_standing": true,
+			"repair_optional": true, "always_attempt": true, "opt": 1.0},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.8},
+	],
+	&"scriptorium": [
+		{"cat": "workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "seat", "rule": &"around", "n": [1, 1], "opt": 0.8},
+		{"cat": "books", "rule": &"on", "n": [1, 2], "opt": 0.9},
+		{"cat": "shelf", "rule": &"mounted", "n": [1, 2], "opt": 0.8},
+	],
 	&"council_chamber": [
 		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
 		{"cat": "seat", "rule": &"around", "n": [3, 5], "opt": 1.0},

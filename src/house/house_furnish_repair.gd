@@ -60,9 +60,14 @@ static func relax(plan: HousePlan) -> int:
 		if plan.furniture[best].get("must", false):
 			plan.note_compromise(int(plan.furniture[best]["room"]),
 				String(plan.furniture[best]["cat"]))
-		plan.furniture.remove_at(best)
-		reindex_hosts(plan, best)
-		removed += 1
+		var repair_indices := _repair_target_indices(plan, best)
+		for ri in range(repair_indices.size() - 1, -1, -1):
+			var index: int = repair_indices[ri]
+			if index >= plan.furniture.size():
+				continue
+			plan.furniture.remove_at(index)
+			reindex_hosts(plan, index)
+		removed += repair_indices.size()
 	_plan_rugs(plan)
 	return removed
 
@@ -145,12 +150,20 @@ static func _biggest_in(plan: HousePlan, rooms: Dictionary, allow_must: bool) ->
 ## first, capped so the search stays cheap on a large house.
 static func _candidates(plan: HousePlan) -> Array[int]:
 	var out: Array[int] = []
+	var seen_island_rows := {}
 	for f in range(plan.furniture.size()):
 		var p: Dictionary = plan.furniture[f]
 		if p.get("mounted", false) or p["host"] >= 0:
 			continue
 		if not PropCatalog.blocks_floor(p["key"]):
 			continue
+		var row: String = String(p.get("row", ""))
+		if bool(p.get("free_standing", false)) and not row.is_empty():
+			# All cases in an island row trial the same whole-row removal. Keep one
+			# representative so duplicate trials cannot crowd required pieces out.
+			if seen_island_rows.has(row):
+				continue
+			seen_island_rows[row] = true
 		out.append(f)
 	out.sort_custom(func(a: int, b: int) -> bool:
 		var ra: Rect2 = plan.furniture[a]["rect"]
@@ -175,12 +188,34 @@ static func _without(plan: HousePlan, f: int) -> HousePlan:
 	# it when the removal is real. Asking "would taking the table out help?"
 	# with the bench still drawn up to it answers no every time, which is how a
 	# parlour cut in half by a table and its bench survived every repair pass.
-	var doomed: Array[int] = _hosted_by(plan, f)
-	doomed.append(f)
+	var doomed := _repair_target_indices(plan, f)
+	for target in doomed.duplicate():
+		doomed.append_array(_hosted_by(plan, target))
+	var unique_doomed: Array[int] = []
+	for idx in doomed:
+		if not idx in unique_doomed:
+			unique_doomed.append(idx)
+	doomed = unique_doomed
 	doomed.sort()
 	for k in range(doomed.size() - 1, -1, -1):
 		trial.furniture.remove_at(doomed[k])
 	return trial
+
+
+## Navigation repair removes the intentional center bookcase row as one unit.
+## Removing one case would leave a pitch gap and fail the strict row contract.
+## Wall-backed runs keep their ordinary per-piece repair behavior.
+static func _repair_target_indices(plan: HousePlan, f: int) -> Array[int]:
+	var piece: Dictionary = plan.furniture[f]
+	var row: String = String(piece.get("row", ""))
+	if not bool(piece.get("free_standing", false)) or row.is_empty():
+		return [f]
+	var members: Array[int] = []
+	for i in range(plan.furniture.size()):
+		if int(plan.furniture[i]["room"]) == int(piece["room"]) \
+				and String(plan.furniture[i].get("row", "")) == row:
+			members.append(i)
+	return members if not members.is_empty() else [f]
 
 
 ## Everything set on a piece, and everything set on those, by index.

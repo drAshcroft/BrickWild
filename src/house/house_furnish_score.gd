@@ -91,6 +91,11 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 	# daylight: a workbench wants the window wall, a bookcase wants any other
 	if aff.has("daylight"):
 		var want: float = float(aff["daylight"])
+		# A library lectern belongs beside its window; strengthen this measured
+		# preference only for the reading room so centring cannot pull it away.
+		if plan.spec is ShopSpec and (plan.spec as ShopSpec).business == &"library" \
+				and PropCatalog.category(key) == "lectern":
+			want *= 5.0
 		if wall >= 0:
 			if _wall_has_window(plan, room, wall):
 				score += want * DAYLIGHT_W

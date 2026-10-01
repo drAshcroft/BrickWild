@@ -30,6 +30,8 @@ static func plan(spec: ShopSpec) -> HousePlan:
 		_cut_shopfront(out, spec, front)
 		_light_workshops(out, spec)
 		_choose_focus(out, spec, front)
+		if spec.business == &"library":
+			_pin_library_focus_to_daylight(out, front)
 	_open_up_lodging(out)
 	return out
 
@@ -67,6 +69,29 @@ static func _light_workshops(out: HousePlan, spec: ShopSpec) -> void:
 			HousePlanOpenings.windows_along(out, spec, room, side, INF, windows.size() + 1)
 			if out.windows_of(room).size() > windows.size():
 				break
+
+
+## Readers start beside a window. Pin the principal lectern to a window-side
+## patch of clear floor; the second still follows the measured daylight
+## affinity while the ordinary placer preserves collision and navigation.
+static func _pin_library_focus_to_daylight(out: HousePlan, room: int) -> void:
+	var windows := out.windows_of(room)
+	if windows.is_empty() or out.focus_room() != room or out.focus_cat() != "lectern":
+		return
+	var floor := HouseGeometry.room_floor_rect(out, room)
+	var hearth := HouseFurnishScore._hearth_point(out, room)
+	var chosen := windows[0]
+	var best := -INF
+	for wi in windows:
+		var point := Vector2(out.windows[wi]["pos"])
+		var score := point.distance_to(hearth) if hearth.is_finite() else point.distance_to(floor.get_center())
+		if score > best:
+			best = score
+			chosen = wi
+	var window_point := Vector2(out.windows[chosen]["pos"])
+	var inward := (floor.get_center() - window_point).normalized()
+	out.focus["pos"] = window_point + inward * 0.8
+	out.focus["placed"] = false
 
 
 ## A trade that lets rooms gives every one of them its own way out (LAY-012).
