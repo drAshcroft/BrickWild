@@ -81,7 +81,10 @@ const PROPS := {
 	# ---- tables and seats ----
 	"Table_Large": {"cat": "table", "tags": [SURFACE], "zone": 0.0, "affinity": {"focus": "hearth", "face": "focus"}},
 	"Workbench": {"cat": "workbench", "tags": [WALL, SURFACE], "zone": 0.9, "affinity": {"daylight": 1.0}},
-	"Workbench_Drawers": {"cat": "workbench", "tags": [WALL, SURFACE], "zone": 0.9, "affinity": {"daylight": 1.0}},
+	# This pack file is only the small drawer insert, authored in the coordinate
+	# frame of the full Workbench. It is measured correctly, but is not a
+	# standalone work surface and must never satisfy a workbench recipe.
+	"Workbench_Drawers": {"cat": "workbench_insert", "tags": [], "zone": 0.0},
 	"Chair_1": {"cat": "seat", "tags": [], "zone": 0.55},
 	"Stool": {"cat": "seat", "tags": [], "zone": 0.5},
 	"Bench": {"cat": "bench", "tags": [], "zone": 0.55},

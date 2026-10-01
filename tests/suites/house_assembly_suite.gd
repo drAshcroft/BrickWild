@@ -15,8 +15,21 @@ static func run() -> SuiteResult:
 	for key in ["Bed_Twin1", "Bed_Twin2"]:
 		for yaw in [0.0, PI / 2.0]:
 			_bed(res, key, float(yaw))
+	_workbench_semantics(res)
 	_legacy_exterior(res)
 	return res
+
+
+static func _workbench_semantics(res: SuiteResult) -> void:
+	var benches := PropCatalog.of_category("workbench")
+	_expect(res, "Workbench" in benches,
+		"the full-size Workbench no longer satisfies workbench recipes")
+	_expect(res, not "Workbench_Drawers" in benches \
+			and PropCatalog.category("Workbench_Drawers") == "workbench_insert",
+		"the drawer insert is still offered as a standalone workbench")
+	for key in ["Potion_2", "SmallBottle"]:
+		_expect(res, PropCatalog.has_tag(key, PropCatalog.ON_SURFACE),
+			"%s lost its supported-surface placement rule" % key)
 
 
 static func _floor_prop(res: SuiteResult, yaw: float) -> void:
