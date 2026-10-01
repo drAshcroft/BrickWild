@@ -38,6 +38,8 @@ static func run() -> SuiteResult:
 	var res := SuiteResult.new("material kit")
 	_chart_is_meshkits(res)
 	_kit_hands_back_materials(res)
+	_world_palettes(res)
+	_hall_walls_are_plaster(res)
 	return res
 
 
@@ -99,3 +101,91 @@ static func _kit_hands_back_materials(res: SuiteResult) -> void:
 	if DisplayServer.get_name() == "headless" \
 			and not (tree_bark as StandardMaterial3D).vertex_color_use_as_albedo:
 		res.fail("bark must keep the tree's vertex-colour grain")
+
+
+static func _request(style: StringName, purpose: StringName) -> BuildingRequest:
+	var request := BuildingRequest.new()
+	request.kind = &"world"
+	request.style = style
+	request.purpose = purpose
+	request.seed = 4101
+	var envelope: Dictionary = WorldFamilies.envelope(style)
+	request.width = float(envelope["width"]["min"])
+	request.length = float(envelope["length"]["min"])
+	request.height = float(envelope["height"]["min"])
+	return request
+
+
+static func _world_palettes(res: SuiteResult) -> void:
+	for row in FAMILIES:
+		var building := BigGlade.generate(_request(row[0], row[1]))
+		res.checked += 1
+		if building == null or not building.is_ok():
+			res.fail("%s/%s did not generate at its smallest size" % [row[0], row[1]])
+			continue
+		var mesh: ArrayMesh = WorldFamilies.build_mesh(building)
+		var palette: Array = WorldAssembler.palette(building)
+		res.checked += 1
+		if mesh == null:
+			res.fail("%s/%s has no mesh" % [row[0], row[1]])
+			continue
+		if palette.is_empty():
+			res.fail("%s/%s has no palette: it would render as flat colour" % [row[0], row[1]])
+			continue
+		var node := MeshInstance3D.new()
+		node.mesh = mesh
+		MaterialKit.apply(node, palette)
+		for i in range(mesh.get_surface_count()):
+			res.checked += 1
+			if node.get_surface_override_material(i) == null:
+				res.fail("%s/%s surface %d has no kit material" % [row[0], row[1], i])
+		node.free()
+		res.checked += 1
+		if not _normals_unit(mesh):
+			res.fail("%s/%s has a non-unit or non-finite normal; the metre chart is built from it" % [row[0], row[1]])
+
+
+## Every vertex normal is finite and unit length.
+static func _normals_unit(mesh: ArrayMesh) -> bool:
+	for surface in range(mesh.get_surface_count()):
+		var normals: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_NORMAL]
+		if normals.is_empty():
+			return false
+		for n in normals:
+			if not n.is_finite() or absf(n.length() - 1.0) > 0.01:
+				return false
+	return true
+
+
+static func _hall_walls_are_plaster(res: SuiteResult) -> void:
+	for kind in [&"great_hall", &"phoenix_pavilion"]:
+		var spec := TimberHallGenerator.generate(kind, 4101, 34.0, 18.0, 20.0)
+		var mesh := TimberHallBuilder.new().build(spec)
+		var surface := _surface_of_slot(mesh, TimberHallBuilder.SURF_PLASTER)
+		res.checked += 1
+		if surface < 0:
+			res.fail("%s emits no plaster surface for the walls between its posts" % kind)
+			continue
+		var plaster: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		var height := 0.0
+		for p in plaster:
+			height = maxf(height, p.y)
+		res.checked += 1
+		if height < spec.platform_h + spec.height * 0.99:
+			res.fail("%s: the plaster walls do not reach the eaves" % kind)
+		# the great hall has no dark surface (no pond), so its plaster is the
+		# fourth surface in the mesh and must say which slot it is
+		res.checked += 1
+		if mesh.get_surface_count() < 5 and not mesh.surface_get_name(surface).begins_with("material_slot:"):
+			res.fail("%s: a skipped surface shifted plaster's index and the mesh does not name the slot" % kind)
+
+
+static func _surface_of_slot(mesh: ArrayMesh, slot: int) -> int:
+	for i in range(mesh.get_surface_count()):
+		var named := mesh.surface_get_name(i)
+		if named.begins_with("material_slot:"):
+			if int(named.trim_prefix("material_slot:")) == slot:
+				return i
+		elif i == slot:
+			return i
+	return -1

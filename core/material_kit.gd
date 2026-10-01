@@ -87,6 +87,48 @@ float joint(vec2 e, vec2 fw, float w) {
 	float fade = clamp((max(fw.x, fw.y) - 0.35) * 2.0, 0.0, 1.0);
 	return mix(a, 1.0 - w * 1.6, fade);
 }
+
+// A wall that is also a floor. HouseBuilder puts a stone ground storey in the
+// FLOOR surface, so one slot holds both a wall and the paving beside it; where
+// `floor_colour` has alpha, a face that looks up is paved (flags, or a glazed
+// two-colour tile with `floor_checker`) and the red-marked vertices are rugs.
+uniform vec4 floor_colour : source_color = vec4(0.0, 0.0, 0.0, 0.0);
+uniform vec4 floor_alt : source_color = vec4(0.85, 0.8, 0.7, 1.0);
+uniform vec4 rug_colour : source_color = vec4(0.44, 0.24, 0.22, 1.0);
+uniform float floor_tile = 0.45;
+uniform float floor_checker = 0.0;
+// a rectangle of the paving (x0, z0, x1, z1) laid as small glazed tile instead
+uniform vec4 court_rect = vec4(0.0);
+uniform vec4 court_a : source_color = vec4(0.18, 0.5, 0.52, 1.0);
+uniform vec4 court_b : source_color = vec4(0.9, 0.87, 0.78, 1.0);
+
+bool paved(vec3 n) {
+	return floor_colour.a > 0.5 && n.y > 0.85;
+}
+
+vec3 paving_albedo(vec2 q, vec2 uv, vec3 vcol) {
+	if (court_rect.z > court_rect.x && vcol.r > 0.5 && mpos.x > court_rect.x && mpos.x < court_rect.z
+			&& mpos.z > court_rect.y && mpos.z < court_rect.w) {
+		vec2 t = mpos.xz / 0.3;
+		float cchk = mod(floor(t.x) + floor(t.y), 2.0);
+		float cg = joint(fract(t), fwidth(t), 0.05);
+		vec3 cc = mix(court_a.rgb, court_b.rgb, cchk) * (0.93 + 0.12 * hash21(floor(t)));
+		return mix(court_a.rgb * 0.5, cc, cg);
+	}
+	vec2 p = q / floor_tile;
+	vec2 id = floor(p);
+	float chk = mod(id.x + id.y, 2.0);
+	float g = joint(fract(p), fwidth(p), 0.045);
+	vec3 c = mix(floor_colour.rgb, floor_alt.rgb, chk * floor_checker) * (0.92 + 0.14 * hash21(id));
+	c = mix(floor_colour.rgb * 0.62, c, g);
+	if (vcol.r < 0.5) {
+		vec2 edge = min(uv, vec2(1.0) - uv);
+		float border = step(0.055, min(edge.x, edge.y)) * (1.0 - step(0.09, min(edge.x, edge.y)));
+		float weave = 0.96 + 0.04 * sin(uv.x * 540.0) * sin(uv.y * 540.0);
+		c = mix(rug_colour.rgb, vec3(0.72, 0.56, 0.30), border * 0.85) * weave;
+	}
+	return c;
+}
 """
 
 
@@ -128,6 +170,9 @@ void fragment() {
 	}
 	ALBEDO = col;
 	ROUGHNESS = 0.94;
+	if (paved(n)) {
+		ALBEDO = paving_albedo(q, UV, COLOR.rgb);
+	}
 	if (vertex_tint) {
 		ALBEDO *= COLOR.rgb;
 	}
@@ -206,6 +251,9 @@ void fragment() {
 	}
 	ALBEDO = c;
 	ROUGHNESS = 0.96;
+	if (paved(n)) {
+		ALBEDO = paving_albedo(q, UV, COLOR.rgb);
+	}
 	if (vertex_tint) {
 		ALBEDO *= COLOR.rgb;
 	}
@@ -218,6 +266,7 @@ uniform vec4 quoin_colour : source_color = vec4(0.8, 0.77, 0.7, 1.0);
 uniform vec4 court_colour : source_color = vec4(0.0, 0.0, 0.0, 0.0);
 uniform float quoin_w = 0.8;
 uniform vec2 brick = vec2(0.34, 0.15);
+uniform vec4 mortar : source_color = vec4(0.70, 0.66, 0.58, 1.0);
 void fragment() {
 	vec3 n = normalize(mnrm);
 	vec2 q = metric(UV);
@@ -228,7 +277,7 @@ void fragment() {
 	float j = joint(fract(p), fwidth(p), 0.07);
 	float v = hash21(id + vec2(2.1, 8.3));
 	vec3 b = base_colour.rgb * (0.82 + 0.34 * v) * (0.94 + 0.1 * vnoise(q * 3.0));
-	vec3 col = mix(vec3(0.70, 0.66, 0.58), b, j);
+	vec3 col = mix(mortar.rgb, b, j);
 	if (quoin_rect.z > quoin_rect.x && abs(n.y) < 0.5) {
 		bool xface = abs(n.x) > abs(n.z);
 		float along = xface ? mpos.z : mpos.x;
@@ -256,6 +305,9 @@ void fragment() {
 	}
 	ALBEDO = col;
 	ROUGHNESS = 0.95;
+	if (paved(n)) {
+		ALBEDO = paving_albedo(q, UV, COLOR.rgb);
+	}
 	if (vertex_tint) {
 		ALBEDO *= COLOR.rgb;
 	}
@@ -278,9 +330,11 @@ void fragment() {
 	vec2 id = floor(p);
 	vec2 e = fract(p);
 	float v = hash21(id + vec2(5.3, 1.1));
-	float ribs = mix(1.0, 0.8 + 0.2 * cos(6.2831853 * e.x), rib);
-	float lapv = mix(1.0 - lap, 1.0, smoothstep(0.0, 0.85, e.y));
-	float j = joint(e, fwidth(p), joint_w);
+	vec2 fw = fwidth(p);
+	float far = clamp((max(fw.x, fw.y) - 0.22) * 3.0, 0.0, 1.0);
+	float ribs = mix(mix(1.0, 0.8 + 0.2 * cos(6.2831853 * e.x), rib), mix(1.0, 0.9, rib), far);
+	float lapv = mix(mix(1.0 - lap, 1.0, smoothstep(0.0, 0.85, e.y)), 1.0 - lap * 0.45, far);
+	float j = joint(e, fw, joint_w);
 	vec3 c = base_colour.rgb * (1.0 + (v - 0.5) * 2.0 * jitter) * ribs * lapv;
 	ALBEDO = mix(base_colour.rgb * 0.5, c, j);
 	ROUGHNESS = mix(0.9, 0.5, sheen);
@@ -345,6 +399,9 @@ void fragment() {
 	float butt = smoothstep(0.0, 0.012, abs(fract(q.y / 2.4 + tone) - 0.5));
 	ALBEDO = c * mix(0.5, 1.0, gap) * mix(0.82, 1.0, butt);
 	ROUGHNESS = mix(0.84, 0.95, weather);
+	if (paved(n)) {
+		ALBEDO = paving_albedo(q, UV, COLOR.rgb);
+	}
 	if (vertex_tint) {
 		ALBEDO *= COLOR.rgb;
 	}
@@ -361,8 +418,8 @@ void fragment() {
 	vec3 c = mix(base_colour.rgb * 0.88, base_colour.rgb * 1.08, patina);
 	c = mix(c, vec3(0.42, 0.52, 0.48), 0.18 * patina);
 	ALBEDO = c * mix(1.0, 0.72, seam * 0.8);
-	ROUGHNESS = 0.42;
-	METALLIC = 0.4;
+	ROUGHNESS = 0.55;
+	METALLIC = 0.14;
 }
 """
 
@@ -411,27 +468,10 @@ void fragment() {
 """
 
 const PAVING := """
-uniform vec4 alt_colour : source_color = vec4(0.85, 0.8, 0.7, 1.0);
-uniform vec4 grout_colour : source_color = vec4(0.5, 0.47, 0.42, 1.0);
-uniform vec4 rug_colour : source_color = vec4(0.44, 0.24, 0.22, 1.0);
-uniform float tile = 0.4;
-uniform float checker = 0.0;
 void fragment() {
 	vec2 q = metric(UV);
-	vec2 p = q / tile;
-	vec2 id = floor(p);
-	float chk = mod(id.x + id.y, 2.0);
-	float g = joint(fract(p), fwidth(p), 0.045);
-	vec3 c = mix(base_colour.rgb, alt_colour.rgb, chk * checker) * (0.92 + 0.14 * hash21(id));
-	ALBEDO = mix(grout_colour.rgb, c, g);
-	ROUGHNESS = mix(0.9, 0.55, checker);
-	if (COLOR.r < 0.5) {
-		vec2 edge = min(UV, vec2(1.0) - UV);
-		float border = step(0.055, min(edge.x, edge.y)) * (1.0 - step(0.09, min(edge.x, edge.y)));
-		float weave = 0.96 + 0.04 * sin(UV.x * 540.0) * sin(UV.y * 540.0);
-		ALBEDO = mix(rug_colour.rgb, vec3(0.72, 0.56, 0.30), border * 0.85) * weave;
-		ROUGHNESS = 0.94;
-	}
+	ALBEDO = paving_albedo(q, UV, COLOR.rgb);
+	ROUGHNESS = COLOR.r < 0.5 ? 0.94 : mix(0.9, 0.55, floor_checker);
 }
 """
 
@@ -644,14 +684,16 @@ static func thatch(colour: Color, metric_uv := false) -> Material:
 ## turns the boards to run along the face's U instead of up it (a deck); a
 ## `roof` colour with alpha makes the pitched faces shingles (a covered bridge).
 static func timber(colour: Color, weathered := false, metric_uv := false,
-		along := false, tint := false, roof := Color(0.0, 0.0, 0.0, 0.0)) -> Material:
-	return _make("timber", TIMBER, colour, {"weather": 0.55 if weathered else 0.0,
-		"along": along, "roof_colour": roof}, metric_uv, tint)
+		along := false, tint := false, roof := Color(0.0, 0.0, 0.0, 0.0),
+		extra := {}) -> Material:
+	var p := {"weather": 0.55 if weathered else 0.0, "along": along, "roof_colour": roof}
+	p.merge(extra, true)
+	return _make("timber", TIMBER, colour, p, metric_uv, tint)
 
 
 ## Sheet lead over a dome or flat: standing seams every 0.62 m, a faint patina.
-static func lead(colour: Color = Color("737b7c"), metric_uv := false) -> Material:
-	return _make("lead", LEAD, colour, {}, metric_uv, false, 0.42, 0.4)
+static func lead(colour: Color = Color("68706f"), metric_uv := false) -> Material:
+	return _make("lead", LEAD, colour, {}, metric_uv, false, 0.55, 0.14)
 
 
 ## Still water: deep, glossy, a slow ripple. Never a flat blue plate.
@@ -679,9 +721,26 @@ static func whitewash(colour: Color = Color("e9e4d6"), metric_uv := false) -> Ma
 ## Keeps the house floor's rug marker (vertex colour red below 0.5).
 static func paving(colour: Color, alt := Color("d9d0b8"), tile := 0.45,
 		checker := 0.0, rug := Color("703c38")) -> Material:
-	return _make("floor", PAVING, colour, {"alt_colour": alt, "tile": tile,
-		"checker": checker, "rug_colour": rug,
-		"grout_colour": colour.darkened(0.35)}, false)
+	var p := floored(colour, alt, tile, checker)
+	p["rug_colour"] = rug
+	return _make("floor", PAVING, colour, p, false)
+
+
+## The `extra` that lays a rectangle of the paving (x0, z0, x1, z1 in model
+## space) as small two-colour glazed tile: a riad's court inside plain flags.
+static func tiled_court(rect: Rect2, a: Color, b: Color) -> Dictionary:
+	return {"court_rect": Vector4(rect.position.x, rect.position.y, rect.end.x, rect.end.y),
+		"court_a": a, "court_b": b}
+
+
+## The `extra` that turns a wall material into wall-and-floor: every face that
+## looks up is paved in `colour` (flags) or `colour`/`alt` (glazed tile,
+## `checker` 1). HouseBuilder emits a stone ground storey in the FLOOR slot, so
+## that slot has to be both.
+static func floored(colour: Color, alt := Color("d9d0b8"), tile := 0.45,
+		checker := 0.0) -> Dictionary:
+	return {"floor_colour": Color(colour.r, colour.g, colour.b, 1.0),
+		"floor_alt": alt, "floor_tile": tile, "floor_checker": checker}
 
 
 ## Bark: vertical fissures. Reads the mesh's vertex colour, because the tree's

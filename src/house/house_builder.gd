@@ -304,7 +304,11 @@ func begin(surface_count: int) -> void:
 
 
 func commit() -> ArrayMesh:
-	emitted_mesh = super.commit()
+	# A world plan is dressed slot by slot, and a roof-off cutaway omits the
+	# roof surface ahead of the floor; name the survivors. Ordinary houses
+	# are left exactly as they were.
+	emitted_mesh = commit_named() if plan != null and plan.world_family != &"" \
+		else super.commit()
 	return emitted_mesh
 
 

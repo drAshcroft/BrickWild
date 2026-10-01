@@ -492,7 +492,8 @@ class WorldFamily extends BuildingFamilyAdapter:
 			return HouseAssembler.build(building.plan, cutaway)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			return CastleAssembler.build(building.spec, cutaway)
-		return null
+		# every other world family: its mesh, in what it is built of
+		return WorldAssembler.instance(building)
 
 	func footprint(building) -> Rect2:
 		if building.plan != null and building.plan.world_family in \

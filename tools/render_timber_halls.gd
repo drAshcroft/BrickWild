@@ -23,14 +23,9 @@ func _init() -> void:
 func _hall_shot(spec: TimberHallSpec, roof: bool, file: String, yaw: float, pitch: float, witness: bool = false) -> void:
 	var builder := TimberHallBuilder.new()
 	var mesh := builder.build(spec, roof)
-	var cols := [Color("6f4936"), Color("aaa49a"), Color("384d6d"), Color("2f78a8")]
 	_mesh_inst.mesh = mesh
-	for i in range(mesh.get_surface_count()):
-		var material := StandardMaterial3D.new()
-		material.albedo_color = cols[i]
-		material.roughness = 0.9
-		material.cull_mode = BaseMaterial3D.CULL_BACK
-		_mesh_inst.set_surface_override_material(i, material)
+	# the hall in what it is built of: timber, plaster, stone, grey tile (EVAL-B04)
+	MaterialKit.apply(_mesh_inst, WorldAssembler.hall_palette(spec))
 	var witness_node: MeshInstance3D = null
 	if witness:
 		var h := TimberHallGeometry.hall_rect(spec)
