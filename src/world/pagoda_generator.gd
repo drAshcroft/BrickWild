@@ -52,7 +52,7 @@ static func generate(kind: StringName, seed: int, width: float, length: float,
 			"storey": level, "wall_thickness": HouseGeometry.wall_thickness(spec)})
 		floor_radii.append(floor_radius)
 		tiers.append({"storey": level, "width": tier_width,
-			"height": tier_height, "y": tier_y, "room": room_index})
+			"height": tier_height, "y": tier_y, "room": level})
 
 	# A single front entrance on the lowest edge, with its opening cut by the
 	# ordinary polygon shell emitter.
