@@ -54,6 +54,10 @@ func _init() -> void:
 		await _shoot_vis011_acceptance()
 		quit()
 		return
+	if args.has("vis010"):
+		await _shoot_vis010_acceptance()
+		quit()
+		return
 	if args.has("vis007") or args.has("vis007-before"):
 		await _shoot_vis007_acceptance("before" if args.has("vis007-before") else "after")
 		quit()
@@ -168,6 +172,23 @@ func _init() -> void:
 	f.close()
 	print("wrote %d images to %s" % [manifest.size(), OUT_DIR])
 	quit()
+
+
+## The four blueprint references used by VIS-010, without rendering the full
+## church/castle/house/temple portrait catalogue.
+func _shoot_vis010_acceptance() -> void:
+	var out := "vis010"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(
+		OUT_DIR + "/" + out))
+	var keys := ["notre_dame", "chartres", "hagia_sophia", "st_basil"]
+	var rendered := 0
+	for entry in _landmarks():
+		if entry["key"] not in keys:
+			continue
+		var spec: ChurchSpec = _landmark_spec(entry)
+		await _shoot_sheet(spec, "%s/sheet_%s.jpg" % [out, entry["key"]])
+		rendered += 1
+	print("VIS-010 rendered %d blueprint sheets to %s/%s" % [rendered, OUT_DIR, out])
 
 
 ## A fixed camera/seed pair for each visual acceptance subject. The first image
