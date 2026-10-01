@@ -198,6 +198,8 @@ static func _hero_dome_segments(res: SuiteResult) -> void:
 		var roof_before: PackedVector3Array = before.surface_get_arrays(2)[Mesh.ARRAY_VERTEX]
 		builder._build_dome()
 		var mesh := builder.commit()
+		_expect(res, builder.has_mass("pendentive"),
+			"%s dome lost its pendentive mass log" % String(kind))
 		var arrays := mesh.surface_get_arrays(2)
 		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
@@ -254,8 +256,8 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 		var who := String(kind)
-		_expect(res, points.size() == segments * 12,
-			"%s pendentive should emit a closed loft with %d facets" % [who, segments])
+		_expect(res, points.size() == segments * (ChurchBuilder.PENDENTIVE_PROFILE_STEPS + 1) * 6,
+			"%s pendentive should emit a closed curved loft with %d facets" % [who, segments])
 		var x_extent := 0.0
 		var z_extent := 0.0
 		var top_angles: Dictionary = {}
@@ -270,6 +272,40 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 			"%s pendentive lost its square crossing footprint" % who)
 		_expect(res, top_angles.size() == segments,
 			"%s pendentive top ring does not match the %d-sided drum" % [who, segments])
+		var top_phase_ok := true
+		for i in range(segments):
+			var expected_angle := roundi(fposmod(start + TAU * float(i) / float(segments), TAU) * 100000.0)
+			if not top_angles.has(expected_angle):
+				top_phase_ok = false
+		_expect(res, top_phase_ok, "%s pendentive top ring phase does not match the drum" % who)
+		var square_ring_ok := true
+		var drum_ring_ok := true
+		for point in points:
+			if absf(point.y - center.y) < 0.0001 \
+					and Vector2(point.x - center.x, point.z - center.z).length() > 0.1:
+				var square_edge := maxf(absf(point.x - center.x), absf(point.z - center.z))
+				if absf(square_edge - lower_half) > 0.01:
+					square_ring_ok = false
+			if absf(point.y - center.y - height) < 0.0001 \
+					and Vector2(point.x - center.x, point.z - center.z).length() > 0.1:
+				if absf(Vector2(point.x - center.x, point.z - center.z).length() - upper_radius) > 0.01:
+					drum_ring_ok = false
+		_expect(res, square_ring_ok, "%s lower ring does not meet square crossing within 1 cm" % who)
+		_expect(res, drum_ring_ok, "%s upper ring does not meet drum within 1 cm" % who)
+		_expect(res, _closed_triangle_shell(points), "%s pendentive shell has an open edge" % who)
+		if not octagonal:
+			var curved_ring := false
+			for point in points:
+				if absf(point.y - center.y - height / 3.0) < 0.0001 \
+						and absf(atan2(point.z - center.z, point.x - center.x) - PI / 4.0) < 0.0001:
+					var linear_radius := lerpf(lower_half / cos(PI / 4.0), upper_radius, 1.0 / 3.0)
+					curved_ring = absf(Vector2(point.x - center.x, point.z - center.z).length()
+						- linear_radius) > 0.05
+		_expect(res, octagonal or curved_ring,
+			"hemisphere support profile is still a straight-sided square-to-drum funnel")
+		_expect(res, builder.part_log.size() == 1 and builder.component_log.size() == 1
+			and builder.component_log[0]["role"] == "pendentive_support",
+			"pendentive support lost its part/component logging")
 		var good_normals := normals.size() == points.size()
 		if good_normals:
 			for i in range(0, points.size(), 3):
@@ -294,3 +330,37 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 				finite_uvs = false
 				break
 		_expect(res, finite_uvs, "%s pendentive emitted non-finite UVs" % who)
+		var metric_uvs := true
+		for i in range(0, points.size(), 3):
+			for edge in [[0, 1], [1, 2], [2, 0]]:
+				var a_index: int = i + int(edge[0])
+				var b_index: int = i + int(edge[1])
+				var world_length := points[a_index].distance_to(points[b_index])
+				var uv_length := uvs[a_index].distance_to(uvs[b_index])
+				if absf(world_length - uv_length) > 0.001:
+					metric_uvs = false
+					break
+		_expect(res, metric_uvs, "%s pendentive UVs no longer use metre-scale face projection" % who)
+		var broken := points.duplicate()
+		broken[0] += Vector3(0.02, 0.0, 0.0)
+		_expect(res, not _closed_triangle_shell(broken),
+			"disconnected-ring negative control was not detected")
+
+
+static func _closed_triangle_shell(points: PackedVector3Array) -> bool:
+	if points.is_empty() or points.size() % 3 != 0:
+		return false
+	var edges := {}
+	for i in range(0, points.size(), 3):
+		var triangle := [points[i], points[i + 1], points[i + 2]]
+		for edge_index in range(3):
+			var a: Vector3 = triangle[edge_index]
+			var b: Vector3 = triangle[(edge_index + 1) % 3]
+			var a_key := "%d,%d,%d" % [roundi(a.x * 100000.0), roundi(a.y * 100000.0), roundi(a.z * 100000.0)]
+			var b_key := "%d,%d,%d" % [roundi(b.x * 100000.0), roundi(b.y * 100000.0), roundi(b.z * 100000.0)]
+			var key := "%s|%s" % [a_key, b_key] if a_key < b_key else "%s|%s" % [b_key, a_key]
+			edges[key] = int(edges.get(key, 0)) + 1
+	for count in edges.values():
+		if int(count) != 2:
+			return false
+	return true

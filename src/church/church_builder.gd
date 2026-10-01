@@ -16,6 +16,7 @@ const SURF_OPEN := 3
 ## Joint depths live in ChurchGeometry so the blueprint reads the same values.
 const TOWER_EMBED := ChurchGeometry.TOWER_EMBED
 const APSE_EMBED := ChurchGeometry.APSE_EMBED
+const PENDENTIVE_PROFILE_STEPS := 6
 
 var spec: ChurchSpec
 var _roof_volumes: Array[PackedVector3Array] = []
@@ -777,22 +778,50 @@ func _build_dome() -> void:
 ## inclined facets are the support, not four detached triangular blades.
 func _pendentive_support(center: Vector3, lower_half: float, upper_radius: float,
 		height: float, segments: int, start: float) -> void:
-	var lower := PackedVector3Array()
-	var upper := PackedVector3Array()
-	for i in range(segments):
-		var angle := start + TAU * float(i) / float(segments)
-		var direction := Vector2(cos(angle), sin(angle))
-		var square_scale: float = lower_half / maxf(absf(direction.x), absf(direction.y))
-		lower.append(center + Vector3(direction.x * square_scale, 0.0,
-			direction.y * square_scale))
-		upper.append(center + Vector3(direction.x * upper_radius, height,
-			direction.y * upper_radius))
+	# Several metric stone courses turn the old straight-sided funnel into a
+	# curved bearing. The lower ring is exactly the square crossing; the final
+	# ring uses the drum's exact radius, phase and vertex count.
+	var rings: Array[PackedVector3Array] = []
+	for row in range(PENDENTIVE_PROFILE_STEPS + 1):
+		var t := float(row) / float(PENDENTIVE_PROFILE_STEPS)
+		var eased := t * t * (3.0 - 2.0 * t)
+		var curve := pow(eased, 1.35)
+		var ring := PackedVector3Array()
+		for i in range(segments):
+			var angle := start + TAU * float(i) / float(segments)
+			var direction := Vector2(cos(angle), sin(angle))
+			var square_radius: float = lower_half / maxf(absf(direction.x), absf(direction.y))
+			var radius: float = lerpf(square_radius, upper_radius, curve)
+			ring.append(center + Vector3(direction.x * radius, height * t,
+				direction.y * radius))
+		rings.append(ring)
+	var all_points := PackedVector3Array()
+	for ring in rings:
+		all_points.append_array(ring)
 	var st: SurfaceTool = _kit.surface(SURF_STONE)
+	for row in range(rings.size() - 1):
+		var lower := rings[row]
+		var upper := rings[row + 1]
+		for i in range(segments):
+			var next := (i + 1) % segments
+			_kit._quad(st, lower[i], lower[next], upper[next], upper[i])
+	var bottom := rings[0]
+	var top := rings.back()
 	for i in range(segments):
 		var next := (i + 1) % segments
-		_kit._quad(st, lower[i], lower[next], upper[next], upper[i])
-		_kit._tri(st, center, lower[next], lower[i])
-		_kit._tri(st, center + Vector3.UP * height, upper[i], upper[next])
+		_kit._tri(st, center, bottom[next], bottom[i])
+		_kit._tri(st, center + Vector3.UP * height, top[i], top[next])
+	var envelope := AABB(center + Vector3(-lower_half, 0.0, -lower_half),
+		Vector3(lower_half * 2.0, height, lower_half * 2.0))
+	_log_part("pendentive", center + Vector3.UP * (height * 0.5),
+		Vector3(lower_half * 2.0, height, lower_half * 2.0))
+	host("dome")
+	component_note("pendentive_support", "curved_loft", SURF_STONE, {
+		"center": center, "lower_half": lower_half, "upper_radius": upper_radius,
+		"height": height, "segments": segments, "start": start,
+		"profile_steps": PENDENTIVE_PROFILE_STEPS, "vertices": all_points,
+		"aabb": envelope})
+	host_end()
 
 
 ## Profile of a dome shell, bottom to top: hemispherical, or the ogee curve
