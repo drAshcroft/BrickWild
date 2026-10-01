@@ -69,7 +69,7 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest", "cas013",
 	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015",
-	"runnererror", "runnerfail", "int012", "int013", "thievesden100", "cnormaldiag"]
+	"runnererror", "runnerfail", "int012", "int013", "thievesden100", "cnormaldiag", "libraryquick", "placementquick"]
 
 ## LANES -- the suites worth running for a given KIND OF EDIT.
 ##
