@@ -65,6 +65,33 @@ but skips CastleQA's voxel raster and geometry checks. It supplies evidence
 for triage; it does not decide whether an AABB warning represents an opaque
 obstruction or whether a layout alternative is feasible.
 
+### Current focused dispositions (2026-10-01)
+
+Two native-exit-zero diagnostic runs sampled five committed production
+fixtures without the voxel sweep. Their complete JSON records, including the
+storey-zero walk maps, are in
+`artifacts/castle_interior_diag/focus_keep_godot.log` and
+`artifacts/castle_interior_diag/nav_shelf_shape_godot.log`. The first sampled
+`norman/castle/0` and `edwardian/castle/0`; the second sampled
+`norman/castle/1`, `norman/fortress/0`, and `edwardian/castle/2`. These are
+current fixture-level dispositions, not new counts for the historical 84-case
+inventory.
+
+| Category | Current focused disposition |
+| --- | --- |
+| `seating` | Reproduced. The Norman chapel has four and the Edwardian chapel has six measured `Bench` placements in explicit row groups around a clear central aisle, while the focus table is at the sanctuary. The generic rule asks every bench for a nearby table, so these warnings describe pew semantics rather than a demonstrated access or orientation defect. Chapel-specific follow-up remains with `INT-005`; dining-seat checks stay strict. |
+| `focus` | Did not reproduce in either sampled chapel. Both retain a measured `CandleStick` beside a placed focus table, and HouseQA reports no focus warning or failure. This closes no unsampled historical fixture and does not justify weakening opaque-blocker detection. |
+| `nav` | Did not reproduce in `norman/castle/1` `yard_stable`. The current 5.8 by 3.69 m stable contains the measured 3.021 by 1.06 m stall, all nav checks pass, and the archived map records no stranded-area warning. No threshold or footprint changed in this triage. |
+| `shelf_over` | Did not reproduce in `norman/fortress/0` `yard_blacksmith`. The current workshop has a 1.534 by 0.778 m workbench on the south wall and a measured wall shelf centred over its span; HouseQA reports neither warning nor failure. The distinct seed-60068 alchemist failure and polygon-affinity helper task remain separate. |
+| `against` | Reproduced in `edwardian/castle/0` keep rooms 1 and 3. Both `Cabinet` rows carry `free_standing=true`, exactly the furnisher's recorded fallback after wall placement fails. This is an honest compromise, not an unreported hard defect; the flag and warning remain. |
+| `shape` | Reproduced in `edwardian/castle/2`: the emitted great-hall plan is 6.334 by 44.272 m (aspect 6.99). Minimum size, furnishing, and navigation still pass. This is a genuine programme/proportion warning requiring a future architectural decision, not a roof or route failure. |
+| `sconce_pair` | Reproduced in `edwardian/castle/0` room 3. The two measured wall lamps are on the same south facet at x=0.775 and x=-0.245 and are not mirrored about the room or a checked anchor. The existing actual-facet warning is therefore accurate and remains enabled. |
+
+No production placement, measured body, warning threshold, or QA severity was
+changed for this classification. Categories that no longer reproduce are
+recorded as such rather than silently removed; remaining preferences and
+compromises stay visible.
+
 **Recorded furnishing compromise: `against` (8)**
 
 Representative fixture: `edwardian/castle/0`, seed 9249, `keep`:
