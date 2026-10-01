@@ -293,18 +293,27 @@ static func dome_base_height(spec: ChurchSpec) -> float:
 	return spec.height
 
 
+## A hero Byzantine dome needs enough vertical bearing depth for the
+## square-to-round curve to read at building scale. Other dome families keep
+## the compact course, including Florence's deliberate octagonal support.
+static func pendentive_height(spec: ChurchSpec) -> float:
+	if spec.style == &"byzantine" and spec.dome_shape == &"hemisphere":
+		return maxf(PENDENTIVE_H, spec.dome_radius * 0.18)
+	return PENDENTIVE_H
+
+
 ## The pendentive course: the square-to-round transition that carries the drum
 ## on the walls below. It is a real structural member, so it is a mass of its
 ## own -- without it the drum reads as hovering half a metre above the nave.
 static func pendentive_aabb(spec: ChurchSpec) -> AABB:
 	var r: float = spec.dome_radius + 0.3
 	return AABB(Vector3(-r, dome_base_height(spec), crossing_center_z(spec) - r),
-		Vector3(r * 2.0, PENDENTIVE_H, r * 2.0))
+		Vector3(r * 2.0, pendentive_height(spec), r * 2.0))
 
 
 static func dome_drum_aabb(spec: ChurchSpec) -> AABB:
 	var r: float = spec.dome_radius
-	return AABB(Vector3(-r, dome_base_height(spec) + PENDENTIVE_H,
+	return AABB(Vector3(-r, dome_base_height(spec) + pendentive_height(spec),
 		crossing_center_z(spec) - r), Vector3(r * 2.0, spec.dome_drum_height, r * 2.0))
 
 
@@ -333,7 +342,7 @@ static func min_drum_height(spec: ChurchSpec) -> float:
 	if not spec.dome:
 		return 0.0
 	var clearance: float = nave_ridge_height(spec) + spec.height * 0.12
-	var without_drum: float = dome_base_height(spec) + PENDENTIVE_H + dome_shell_rise(spec)
+	var without_drum: float = dome_base_height(spec) + pendentive_height(spec) + dome_shell_rise(spec)
 	return maxf(clearance - without_drum, spec.dome_radius * 0.25)
 
 
@@ -348,7 +357,7 @@ static func dome_shell_rise(spec: ChurchSpec) -> float:
 
 
 static func dome_apex_height(spec: ChurchSpec) -> float:
-	var top: float = dome_base_height(spec) + PENDENTIVE_H + spec.dome_drum_height \
+	var top: float = dome_base_height(spec) + pendentive_height(spec) + spec.dome_drum_height \
 		+ dome_shell_rise(spec)
 	if spec.dome_lantern:
 		top += spec.dome_radius * (LANTERN_RATIO + LANTERN_CAP_RATIO)

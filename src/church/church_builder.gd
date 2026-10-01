@@ -19,7 +19,7 @@ const APSE_EMBED := ChurchGeometry.APSE_EMBED
 const PENDENTIVE_PROFILE_STEPS := 6
 const PENDENTIVE_LEDGE_ROWS := [2, 4, 5]
 const PENDENTIVE_LEDGE_WIDTH := 0.22
-const PENDENTIVE_LEDGE_RISE := 0.12
+const PENDENTIVE_LEDGE_RISE := 0.06
 
 var spec: ChurchSpec
 var _roof_volumes: Array[PackedVector3Array] = []
@@ -725,21 +725,22 @@ func _build_dome() -> void:
 	var rounded_hero: bool = spec.style == &"byzantine" and spec.dome_shape == &"hemisphere"
 	var shell_segments: int = 8 if octagonal else (32 if rounded_hero else 16)
 	var shell_start: float = PI / 8.0 if octagonal else 0.0
+	var pendentive_h: float = ChurchGeometry.pendentive_height(spec)
 	_pendentive_support(Vector3(0.0, base, cz), r + 0.3, drum_radius,
-		ChurchGeometry.PENDENTIVE_H, shell_segments, shell_start, rounded_hero)
+		pendentive_h, shell_segments, shell_start, rounded_hero)
 	_log_mass("pendentive", ChurchGeometry.pendentive_aabb(spec))
 	# the corona of windows that lights every one of these domes
 	var lights: int = 8 if octagonal else 12
 	var angles: Array = []
 	for i in range(lights):
 		angles.append(TAU / lights * i)
-	_arc_window_shell(Vector3(0, base + ChurchGeometry.PENDENTIVE_H, cz),
+	_arc_window_shell(Vector3(0, base + pendentive_h, cz),
 		drum_radius, drum_h, shell_segments, TAU,
 		shell_start, angles,
 		r * 0.16, drum_h * 0.45, drum_h * 0.70, &"round")
 	_log_mass("dome_drum", ChurchGeometry.dome_drum_aabb(spec))
 
-	var top: float = base + ChurchGeometry.PENDENTIVE_H + drum_h
+	var top: float = base + pendentive_h + drum_h
 	var rise: float = ChurchGeometry.dome_shell_rise(spec)
 	# Round hero shells use explicit fine tessellation. Florence stays an
 	# eight-sided shell; its vertical profile is refined without changing that
@@ -795,7 +796,7 @@ func _pendentive_support(center: Vector3, lower_half: float, upper_radius: float
 			# square envelope, so the roof-cut boundary does not grow.
 			rings.append(_pendentive_ring(center, lower_half, upper_radius, height,
 				segments, start, t, true))
-			var ledge_top := t + PENDENTIVE_LEDGE_RISE
+			var ledge_top := t + PENDENTIVE_LEDGE_RISE / height
 			rings.append(_pendentive_ring(center, lower_half, upper_radius, height,
 				segments, start, ledge_top, true))
 			rings.append(_pendentive_ring(center, lower_half, upper_radius, height,

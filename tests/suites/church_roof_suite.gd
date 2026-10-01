@@ -216,7 +216,8 @@ static func _hero_dome_segments(res: SuiteResult) -> void:
 			"%s dome shell emitted %d vertices; %d explicit segments/profile predict %d" % [
 				who, emitted_vertices, segments, expected_vertices])
 		var ring_angles: Dictionary = {}
-		var spring_y := ChurchGeometry.dome_base_height(s) + ChurchGeometry.PENDENTIVE_H + s.dome_drum_height
+		var spring_y := ChurchGeometry.dome_base_height(s) \
+			+ ChurchGeometry.pendentive_height(s) + s.dome_drum_height
 		var cz := ChurchGeometry.crossing_center_z(s)
 		for point in points:
 			if absf(point.y - spring_y) < 0.0001 \
@@ -238,6 +239,19 @@ static func _hero_dome_segments(res: SuiteResult) -> void:
 ## The support is a closed loft. Its square base meets the crossing, and its
 ## upper ring matches the round/octagonal drum at the same height and phase.
 static func _pendentive_transition(res: SuiteResult) -> void:
+	var hagia := ChurchSpec.new()
+	hagia.style = &"byzantine"
+	hagia.dome_shape = &"hemisphere"
+	hagia.dome_radius = 10.0
+	var florence := ChurchSpec.new()
+	florence.style = &"renaissance"
+	florence.dome_shape = &"octagonal"
+	florence.dome_radius = 10.0
+	_expect(res, is_equal_approx(ChurchGeometry.pendentive_height(hagia), 1.8),
+		"hero Byzantine pendentive did not scale to a readable bearing height")
+	_expect(res, is_equal_approx(ChurchGeometry.pendentive_height(florence),
+		ChurchGeometry.PENDENTIVE_H),
+		"Florence lost its compact intentional octagonal bearing")
 	for kind in [&"hemisphere", &"octagonal"]:
 		var octagonal: bool = kind == &"octagonal"
 		var segments: int = 8 if octagonal else 32
