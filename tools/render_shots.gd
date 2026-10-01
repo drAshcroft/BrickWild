@@ -204,11 +204,16 @@ func _shoot_vis009_acceptance() -> void:
 		if String(entry.key) not in ["neuschwanstein", "chambord"]:
 			continue
 		var spec := _castle_spec(entry)
+		# Chambord's dormered ranges sit inside a very large enceinte. The
+		# catalogue-wide framing makes their hierarchy illegible, so this focused
+		# acceptance portrait deliberately crops the outermost towers.
+		var shot_zoom: float = float(entry.get("zoom", 1.0)) \
+			* (0.68 if String(entry.key) == "chambord" else 0.90)
 		await _shoot_castle(spec, "%s/%s_front.jpg" % [out, entry.key],
-			float(entry.yaw), float(entry.pitch), float(entry.get("zoom", 1.0)))
+			float(entry.yaw), float(entry.pitch), shot_zoom)
 		await _shoot_castle(spec, "%s/%s_raking.jpg" % [out, entry.key],
 			float(entry.yaw) - 0.35, float(entry.pitch) - 0.08,
-			float(entry.get("zoom", 1.0)))
+			shot_zoom)
 		rendered += 2
 	print("VIS-009 rendered %d focused castle views to %s/%s" % [rendered, OUT_DIR, out])
 

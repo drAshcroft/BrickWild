@@ -222,7 +222,8 @@ func _exposed_roof_pieces(face: PackedVector3Array, face_index: int,
 	var out: Array[PackedVector3Array] = []
 	for piece in pieces:
 		var cut_face := RoofShape.lift(piece, face)
-		out.append_array(RoofShape.exposed(cut_face, covers, own_index))
+		for exposed_piece in RoofShape.exposed(cut_face, covers, own_index):
+			out.append(RoofShape.lift(exposed_piece, cut_face))
 	return out
 
 
@@ -521,7 +522,7 @@ func _emit_seated_roof_dormer(xf: Transform3D, seat: Dictionary, z: float,
 			xf * Vector3(float(seat["cheek_x"]), side_top, z + side * hw)])
 		component_slab("dormer_cheek", cheek, 0.08, SURF_STONE, false)
 	var gable := PackedVector3Array([
-		xf * Vector3(front, head, z - hw), xf * Vector3(front, head, z + hw),
+		xf * Vector3(front, base, z - hw), xf * Vector3(front, base, z + hw),
 		xf * Vector3(front, side_top, z + hw),
 		xf * Vector3(front, peak - RoofShape.DEPTH * 0.5, z),
 		xf * Vector3(front, side_top, z - hw)])
