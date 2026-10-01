@@ -197,6 +197,8 @@ func _rows(plan: HousePlan, builder: MosqueBuilder, failures: Array[String], sta
 		failures.append("rows: standable floor is below 0.6 of hall area")
 	var central := float(plan.world_meta.get("central_aisle", 0.0))
 	for column in plan.columns:
-		if absf(Vector3(column.get("pos", Vector3.ZERO)).x) < central * 0.5:
+		# Match the grid check's millimetre tolerance at the authored aisle edge;
+		# symmetric floating-point multiplication can land a boundary just below it.
+		if absf(Vector3(column.get("pos", Vector3.ZERO)).x) < central * 0.5 - 0.001:
 			failures.append("rows: column blocks the central prayer aisle")
 			break
