@@ -47,7 +47,7 @@ static func generate(kind: StringName, seed: int, width: float, length: float,
 		var z := hall.position.y + hall_depth * 0.11 + float(row) * row_pitch
 		for file in range((aisle_count - 1) / 2):
 			for side in [-1.0, 1.0]:
-				var x := side * (centre_gap * 0.5 + float(file) * side_pitch)
+				var x: float = float(side) * (centre_gap * 0.5 + float(file) * side_pitch)
 				plan.columns.append({"pos": Vector3(x, 0.0, z), "radius": 0.32,
 					"height": spec.height * 0.72, "role": &"hypostyle"})
 	# The two points either side of the centre aisle are symmetric; the missing

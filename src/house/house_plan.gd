@@ -77,17 +77,15 @@ var courts: Array[Dictionary] = []
 ##  "rect": Rect2, "lower_rect": Rect2, "upper_rect": Rect2,
 ##  "width": float, "run": float}
 var stairs: Array[Dictionary] = []
-## World-family structural columns, authored once for both emitter and QA.
-## Rows use {pos: Vector3, radius: float, height: float, role: StringName}.
-var columns: Array[Dictionary] = []
 ## Cellar hatches. A sealed trapdoor is a physical opening and a recorded
 ## special access, but it is not an ordinary keyed door-graph edge.
 ## {upper_room, lower_room, upper_storey, lower_storey, rect, sealed}
 var trapdoors: Array[Dictionary] = []
-## Structural posts authored by wall plans: {room, wall, storey, pos: Vector2,
-## size: Vector2 (x/z), height, kind}. Columns are part of both the built
-## shell and the walk/sightline model, rather than decoration inferred by the
-## emitter.
+## Structural columns authored once for both emitter and QA. Wall-plan rows
+## use {room, wall, storey, pos: Vector2, size: Vector2 (x/z), height, kind};
+## world-family rows use {pos: Vector3, radius, height, role}. Columns are part
+## of both the built shell and the walk/sightline model, rather than decoration
+## inferred by the emitter.
 var columns: Array[Dictionary] = []
 ## Things a room should have had and does not, because keeping them would have
 ## blocked the way through the house: {room: [category, ...]}.

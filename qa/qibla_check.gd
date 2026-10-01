@@ -14,7 +14,7 @@ func check(plan: HousePlan, builder: MosqueBuilder = null) -> Dictionary:
 	_qibla(plan, builder, failures)
 	_grid(plan, builder, failures)
 	_sightline(plan, builder, failures)
-	_sahn(plan, failures)
+	_sahn(plan, builder, failures)
 	_minaret(plan, builder, failures)
 	_rows(plan, builder, failures, stats)
 	return {"ok": failures.is_empty(), "failures": failures,
