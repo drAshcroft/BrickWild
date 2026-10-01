@@ -41,6 +41,9 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 		ShellAssembler.house_materials(shell, plan.spec)
 	else:
 		ShellAssembler.house_floor_material(shell, plan.spec)
+	if plan.world_family != &"":
+		# a family of the wider world is built of its own things (EVAL-B04)
+		WorldAssembler.dress_house(shell, plan)
 	root.add_child(shell)
 	furnish(root, plan)
 	dress_exterior(root, plan)

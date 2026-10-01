@@ -566,9 +566,41 @@ static func fit_envelope(mesh: ArrayMesh, spec: TreeSpec) -> ArrayMesh:
 	var lim: float = spec.canopy_radius * (1.0 + TreeGeometry.DRAW_ALLOWANCE)
 	if reach > lim * (1.0 + FIT_EPSILON) and reach > 1e-3:
 		kx = lim / reach
+	# The waist is corrected LOCALLY, after the uniform fit. Scaling the whole
+	# mesh to bring a low branch inside the head-height promise shrank a
+	# twenty-two metre oak to a third of its crown to answer for a toe, so the
+	# tighter the promise was written the smaller the tree came out. Only what
+	# is at or below the band is drawn in, and it eases back out above it.
 	var waist_lim: float = spec.trunk_clear * (1.0 + TreeGeometry.DRAW_ALLOWANCE)
-	if at_waist > waist_lim * (1.0 + FIT_EPSILON) and at_waist > 1e-3:
-		kx = minf(kx, waist_lim / at_waist)
-	if absf(kx - 1.0) < 1e-5 and absf(ky - 1.0) < 1e-5 and absf(lift) < 1e-4:
+	var kw: float = 1.0
+	if at_waist * kx > waist_lim * (1.0 + FIT_EPSILON) and at_waist > 1e-3:
+		kw = waist_lim / (at_waist * kx)
+	if absf(kx - 1.0) < 1e-5 and absf(ky - 1.0) < 1e-5 and absf(lift) < 1e-4 			and kw == 1.0:
 		return mesh
-	return scaled(mesh, Vector3(kx, ky, kx))
+	var fitted: ArrayMesh = scaled(mesh, Vector3(kx, ky, kx))
+	if kw < 1.0:
+		fitted = _draw_in_waist(fitted, kw, TreeGeometry.TRUNK_HEIGHT)
+	return fitted
+
+
+## Pull everything at or below `band` toward the trunk axis by `kw`, easing
+## back to no change by twice the band, so the trunk and the low branches thin
+## together without a step in the mesh.
+static func _draw_in_waist(mesh: ArrayMesh, kw: float, band: float) -> ArrayMesh:
+	var out := ArrayMesh.new()
+	for surface in range(mesh.get_surface_count()):
+		var arrays: Array = mesh.surface_get_arrays(surface).duplicate(true)
+		var vs: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		for i in range(vs.size()):
+			var y: float = vs[i].y
+			if y >= band * 2.0:
+				continue
+			var k: float = kw
+			if y > band:
+				k = lerpf(kw, 1.0, smoothstep(0.0, 1.0, (y - band) / band))
+			vs[i] = Vector3(vs[i].x * k, y, vs[i].z * k)
+		arrays[Mesh.ARRAY_VERTEX] = vs
+		out.add_surface_from_arrays(mesh.surface_get_primitive_type(surface), arrays)
+		out.surface_set_material(surface, mesh.surface_get_material(surface))
+		out.surface_set_name(surface, mesh.surface_get_name(surface))
+	return out

@@ -59,7 +59,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
+	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -69,7 +69,7 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest", "cas013",
 	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015",
-	"runnererror", "runnerfail", "int012", "int013", "thievesden100", "cnormaldiag"]
+	"runnererror", "runnerfail", "int012", "int013", "thievesden100", "cnormaldiag", "dressingquick"]
 
 ## LANES -- the suites worth running for a given KIND OF EDIT.
 ##
@@ -121,7 +121,7 @@ const LANES: Dictionary = {
 	"lane:church-change": ["churchroof", "churchchange"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
 	"lane:temple": ["temple", "rite"],
-	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018"],
+	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "matkit"],
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
 	"lane:sweep": ORDER,
@@ -158,6 +158,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/house_jetty_suite.gd").run()
 		"metriccoords":
 			return preload("res://tests/suites/metric_coords_suite.gd").run()
+		"matkit":
+			return preload("res://tests/suites/material_kit_suite.gd").run()
 		"churchaperture":
 			return preload("res://tests/suites/church_aperture_suite.gd").run()
 		"churchload":
@@ -167,6 +169,7 @@ static func _run_one(key: String) -> SuiteResult:
 		"vis016":
 			var result := SuiteResult.new("VIS-016 curved pendentive controls")
 			preload("res://tests/suites/church_roof_suite.gd")._pendentive_transition(result)
+			preload("res://tests/suites/church_roof_suite.gd")._hero_bearing(result)
 			return result
 		"vis009":
 			return preload("res://tests/suites/vis009_suite.gd").run()
@@ -264,6 +267,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return CastleQASuite.run()
 		"dressing":
 			return DressingSuite.run()
+		"dressingquick":
+			return DressingSuite.run_quick()
 		"interior":
 			return CastleInteriorSuite.run()
 		"house":

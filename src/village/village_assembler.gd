@@ -33,6 +33,7 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 	ground.mesh = ground_mesh(plan)
 	ShellAssembler.surface_materials(ground,
 		BuildingFamilyAdapter.colours(plan.spec))
+	_ground_finish(ground)
 	root.add_child(ground)
 	var houses := Node3D.new()
 	houses.name = "Buildings"
@@ -50,6 +51,27 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 		houses.add_child(node)
 	_dressing(root, plan)
 	return root
+
+
+## The surfaces that carry their own vertex colour (a lot's tint, a bank's
+## wet-to-dry gradient) multiply it into the slot colour.
+static func _ground_finish(ground: MeshInstance3D) -> void:
+	var mesh := ground.mesh as ArrayMesh
+	if mesh == null:
+		return
+	for i in mesh.get_surface_count():
+		var slot := int(mesh.surface_get_name(i).trim_prefix("material_slot:"))
+		var m := ground.get_surface_override_material(i) as StandardMaterial3D
+		if m == null:
+			continue
+		if slot in [VillageBuilder.SURF_YARD, VillageBuilder.SURF_BANK]:
+			m.vertex_color_use_as_albedo = true
+		elif slot == VillageBuilder.SURF_WATER:
+			# clear at the margin, dark where it is deep: the bank and the bed
+			# show through, so the colour of the water is the depth of it
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.albedo_color.a = 0.74
+			m.roughness = 0.45
 
 
 ## The dressing: every catalogue prop and plant the dresser placed, and a
@@ -71,6 +93,7 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 		var key: String = String(p["key"])
 		var at := Vector3(float(p["pos"].x), 0.0, float(p["pos"].y))
 		var yaw: float = float(p.get("yaw", 0.0))
+		at.y = VillageBuilder.ground_height(plan, p["pos"])
 		if not bool(p.get("built", false)):
 			var node: Node3D = _model(key, at, yaw)
 			if node != null:
@@ -84,8 +107,10 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 		var t: Dictionary = plan.plants[j]
 		var key2: String = String(t["key"])
 		var node2: Node3D = _model(key2,
-			Vector3(float(t["pos"].x), -PLANT_SINK, float(t["pos"].y)),
-			float(t.get("yaw", 0.0)))
+			Vector3(float(t["pos"].x), VillageBuilder.ground_height(plan, t["pos"]) - PLANT_SINK,
+				float(t["pos"].y)),
+			float(t.get("yaw", 0.0)), float(t.get("scale", 1.0)),
+			float(t.get("lean", 0.0)), float(t.get("lean_yaw", 0.0)))
 		if node2 != null:
 			node2.name = "%s_%d" % [key2, j]
 			plants.add_child(node2)
@@ -94,7 +119,8 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 ## One catalogue model, set down on the ground and turned. Null when the
 ## catalogue does not know the key or the pack is not installed -- a village
 ## missing an art pack should be a village missing its barrels, not a crash.
-static func _model(key: String, at: Vector3, yaw: float) -> Node3D:
+static func _model(key: String, at: Vector3, yaw: float, scale := 1.0,
+		lean := 0.0, lean_yaw := 0.0) -> Node3D:
 	if not PropCatalog.known(key):
 		return null
 	var path: String = PropCatalog.scene_path(key)
@@ -106,8 +132,14 @@ static func _model(key: String, at: Vector3, yaw: float) -> Node3D:
 	var node := packed.instantiate() as Node3D
 	if node == null:
 		return null
-	node.position = at - Vector3(0.0, PropCatalog.floor_offset(key), 0.0)
+	node.position = at - Vector3(0.0, PropCatalog.floor_offset(key) * scale, 0.0)
 	node.rotation.y = yaw + PropCatalog.face_offset(key)
+	if lean != 0.0:
+		# tilted about the foot, in the direction `lean_yaw`
+		var axis := Vector3(cos(lean_yaw), 0.0, -sin(lean_yaw))
+		node.basis = Basis(axis, lean) * node.basis
+	if scale != 1.0:
+		node.scale = Vector3.ONE * scale
 	return node
 
 

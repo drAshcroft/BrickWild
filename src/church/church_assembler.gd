@@ -11,10 +11,25 @@ static func build(spec: ChurchSpec, cutaway := false) -> Node3D:
 	var builder := ChurchBuilder.new()
 	var mesh: ArrayMesh = builder.build(spec)
 	var root := ShellAssembler.build("Church", mesh, [spec.stone_color, spec.trim_color,
-		spec.roof_color, Color("1a1c20")], builder.prop_log,
+		spec.roof_color, Color("1a1c20"), Color.WHITE], builder.prop_log,
 		ChurchBuilder.SURF_ROOF, cutaway, LightKit.FLAME, true)
 	_finish_glazing(root)
+	_finish_painted_domes(root)
 	return root
+
+
+## The onions of a hero St Basil's carry their own colours in the mesh's
+## vertex colours, so their surface takes them as albedo.
+static func _finish_painted_domes(root: Node3D) -> void:
+	var shell := root.get_node_or_null("Shell") as MeshInstance3D
+	if shell == null or shell.mesh == null 			or shell.mesh.get_surface_count() <= ChurchBuilder.SURF_ACCENT:
+		return
+	var paint := StandardMaterial3D.new()
+	paint.vertex_color_use_as_albedo = true
+	paint.roughness = 0.42
+	paint.metallic = 0.18
+	paint.cull_mode = BaseMaterial3D.CULL_DISABLED
+	shell.set_surface_override_material(ChurchBuilder.SURF_ACCENT, paint)
 
 
 ## The black vertex marker belongs to panes seated in cut masonry throats.

@@ -17,17 +17,37 @@ extends RefCounted
 ## furnisher is forced onto it actually fits.
 static func choose_hearth(p: HousePlan, spec: HouseSpec) -> void:
 	p.hearth = {}
+	# A room is only a hearth room if the fire will actually fit on one of its
+	# outside walls. The planner used to take the first room of the right kind
+	# and its best wall however short that wall's clear run was, so a kitchen
+	# whose one outside wall was taken up by the back door and a window was
+	# given a chimney with nowhere to light a fire under it, and the furnisher
+	# had to give the kitchen's hearth up. The next room of a hearth-bearing
+	# kind (the hall, then the workshop) takes the chimney instead; the kitchen
+	# keeps its cooking fire but not the flue. Only when NO room can hold a
+	# hearth does the longest short run win, as before.
+	var need: float = hearth_run_needed()
 	var room := -1
+	var fallback := -1
 	for kind in [&"kitchen", &"hall", &"workshop"]:
 		for i in p.rooms_of(kind):
 			if p.storey_of_room(i) != 0:
 				continue
-			if _hearth_walls(p, spec, i).is_empty():
+			var candidates: Array[int] = _hearth_walls(p, spec, i)
+			if candidates.is_empty():
 				continue
-			room = i
-			break
+			if fallback < 0:
+				fallback = i
+			var longest := 0.0
+			for wi in candidates:
+				longest = maxf(longest, _clear_wall_run(p, i, wi))
+			if longest >= need:
+				room = i
+				break
 		if room >= 0:
 			break
+	if room < 0:
+		room = fallback
 	if room < 0:
 		return
 	var walls: Array[int] = _hearth_walls(p, spec, room)
@@ -39,6 +59,16 @@ static func choose_hearth(p: HousePlan, spec: HouseSpec) -> void:
 			best_run = run
 			best = wi
 	p.hearth = {"room": room, "wall": best}
+
+
+## The clear stretch of outside wall a hearth needs: the widest hearth in the
+## catalogue and the chimney breast built round it (HouseGeometry.breast_for_hearth
+## adds 0.4 m to the piece's width). Measured from the catalogue, not authored.
+static func hearth_run_needed() -> float:
+	var widest := 0.0
+	for key in PropCatalog.of_category("hearth"):
+		widest = maxf(widest, PropCatalog.footprint(key).x)
+	return widest + 0.4
 
 
 ## Which of a room's four walls are on the outside of the house. A chimney

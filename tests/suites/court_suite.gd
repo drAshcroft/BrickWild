@@ -13,6 +13,13 @@ extends RefCounted
 const SEEDS := 100
 ## The court is this share of the shorter side, so a big house gets a big yard.
 const COURT_SHARE := 0.28
+## A range longer than this many times its own depth is not one room, it is a
+## corridor with a roof: it is cut into three along its length.
+const RANGE_ASPECT := 2.4
+## No piece of a cut range may be narrower than this: a parlour wants 2.6 m.
+const PIECE_MIN := 3.0
+## What a window onto the yard may be, so that the big rooms are still lit.
+const YARD_WINDOW_MAX := 1.9
 
 
 static func run() -> SuiteResult:
@@ -128,53 +135,201 @@ static func courtyard(w: float, l: float, sd: int, with_furniture := true) -> Ho
 	var court := Rect2(inner.position + Vector2(depth, depth),
 		inner.size - Vector2(depth, depth) * 2.0)
 	plan.courts = [{"rect": court, "storey": 0}]
-	plan.rooms = [
-		{"kind": &"hall", "storey": 0,
-			"rect": Rect2(inner.position, Vector2(inner.size.x, depth))},
-		# the back range sleeps: a four-range house with nowhere to sleep puts
-		# the bed in its hall, and the hall here is a narrow range with windows
-		# on both of its long walls -- street on one side, yard on the other --
-		# so the bed ends up under one whichever wall it takes
-		{"kind": &"bedroom", "storey": 0,
-			"rect": Rect2(Vector2(inner.position.x, court.end.y),
-				Vector2(inner.size.x, inner.end.y - court.end.y))},
-		{"kind": &"kitchen", "storey": 0,
-			"rect": Rect2(Vector2(inner.position.x, court.position.y),
-				Vector2(depth, court.size.y))},
-		{"kind": &"store", "storey": 0,
-			"rect": Rect2(Vector2(court.end.x, court.position.y),
-				Vector2(inner.end.x - court.end.x, court.size.y))},
-	]
-	plan.doors = [{"a": 0, "b": -1,
-		"pos": Vector2(inner.get_center().x, inner.position.y),
-		"normal": Vector2(0, -1), "width": HouseGeometry.DOOR_W,
-		"exterior": true, "front": true, "storey": 0}]
-	var onto := [
-		[0, Vector2(court.get_center().x, court.position.y), Vector2(0, 1)],
-		[1, Vector2(court.get_center().x, court.end.y), Vector2(0, -1)],
-		[2, Vector2(court.position.x, court.get_center().y), Vector2(1, 0)],
-		[3, Vector2(court.end.x, court.get_center().y), Vector2(-1, 0)],
-	]
-	for row in onto:
-		plan.doors.append({"a": int(row[0]), "b": -1, "pos": row[1],
-			"normal": Vector2(row[2]), "width": HouseGeometry.DOOR_W,
-			"exterior": true, "front": false, "storey": 0})
-		var n: Vector2 = row[2]
-		var along := Vector2(n.y, -n.x)
-		var reach: float = (court.size.x if absf(n.y) > 0.5 else court.size.y) * 0.3
-		for t in [-1.0, 1.0]:
-			plan.windows.append({"room": int(row[0]),
-				"pos": Vector2(row[1]) + along * t * reach, "normal": n,
-				"width": HouseGeometry.WINDOW_W,
-				"sill": HouseGeometry.WINDOW_SILL,
-				"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H,
-				"storey": 0})
-	plan.windows.append({"room": 0,
-		"pos": Vector2(inner.get_center().x - inner.size.x * 0.25, inner.position.y),
-		"normal": Vector2(0, -1), "width": HouseGeometry.WINDOW_W,
-		"sill": HouseGeometry.WINDOW_SILL,
-		"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H, "storey": 0})
+	_ring_of_rooms(plan, inner, court, depth)
 	plan.hearth = {"room": 2, "wall": 2}
 	if with_furniture:
 		HouseFurnisher.furnish(plan, spec)
 	return plan
+
+
+## The cuts that divide the span lo..hi of a range of depth `depth` into rooms.
+## One room when it is already room-shaped; three when it is a long gallery.
+## ODD, never two, so a door in the middle of the range is never on a wall
+## between rooms. Returned as the n + 1 boundaries, lo first, hi last.
+static func _cuts(lo: float, hi: float, depth: float) -> Array[float]:
+	var span := hi - lo
+	var n := 1
+	if span > RANGE_ASPECT * depth and span / 3.0 >= PIECE_MIN:
+		n = 3
+	var out: Array[float] = []
+	for k in range(n + 1):
+		out.append(lo + span * float(k) / float(n))
+	return out
+
+
+## A window wide enough that `panes` of them give `area` of floor its share of
+## glass with a margin, and no wider than a wall of a yard house would carry.
+static func _glass_width(area: float, panes: int) -> float:
+	var need: float = area * HouseGeometry.GLAZING_MIN * 1.25
+	return clampf(need / (float(panes) * HouseGeometry.WINDOW_H),
+		HouseGeometry.WINDOW_W, YARD_WINDOW_MAX)
+
+
+static func _window(room: int, pos: Vector2, n: Vector2, width: float) -> Dictionary:
+	return {"room": room, "pos": pos, "normal": n, "width": width,
+		"sill": HouseGeometry.WINDOW_SILL,
+		"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H, "storey": 0}
+
+
+static func _internal_door(a: int, b: int, pos: Vector2, n: Vector2) -> Dictionary:
+	return {"a": a, "b": b, "pos": pos, "normal": n,
+		"width": HouseGeometry.INNER_DOOR_W, "exterior": false, "front": false,
+		"storey": 0}
+
+
+## The four ranges, each divided into rooms along its length, and the doors
+## and windows that make them rooms.
+##
+## Front and back span the whole width, so they have a room at each corner and
+## one or three on the yard between; the side ranges have only the yard run.
+## Every room that stands on the yard has a door onto it and a pair of windows
+## looking in. The corner rooms are not on the yard, so they open into their
+## neighbour and look at the street. Rooms 0 to 3 stay the hall, the back
+## bedroom, the kitchen and the store, as other fixtures index them.
+static func _ring_of_rooms(plan: HousePlan, inner: Rect2, court: Rect2,
+		depth: float) -> void:
+	var fx: Array[float] = _cuts(court.position.x, court.end.x, depth)
+	var fy: Array[float] = _cuts(court.position.y, court.end.y, depth)
+	var split_x := fx.size() > 2
+	var split_y := fy.size() > 2
+	var front_kinds: Array[StringName] = [&"dining_room", &"hall", &"parlour"]
+	var west_kinds: Array[StringName] = [&"parlour", &"kitchen", &"parlour"]
+	var east_kinds: Array[StringName] = [&"parlour", &"store", &"parlour"]
+	var keys: Array[StringName] = [&"front", &"back", &"west", &"east"]
+	var rects: Dictionary = {&"front": [], &"back": [], &"west": [], &"east": []}
+	var kinds: Dictionary = {&"front": [], &"back": [], &"west": [], &"east": []}
+	for k in range(fx.size() - 1):
+		rects[&"front"].append(Rect2(Vector2(fx[k], inner.position.y),
+			Vector2(fx[k + 1] - fx[k], court.position.y - inner.position.y)))
+		kinds[&"front"].append(front_kinds[k] if split_x else &"hall")
+		rects[&"back"].append(Rect2(Vector2(fx[k], court.end.y),
+			Vector2(fx[k + 1] - fx[k], inner.end.y - court.end.y)))
+		kinds[&"back"].append(&"bedroom")
+	for k in range(fy.size() - 1):
+		rects[&"west"].append(Rect2(Vector2(inner.position.x, fy[k]),
+			Vector2(court.position.x - inner.position.x, fy[k + 1] - fy[k])))
+		kinds[&"west"].append(west_kinds[k] if split_y else &"kitchen")
+		rects[&"east"].append(Rect2(Vector2(court.end.x, fy[k]),
+			Vector2(inner.end.x - court.end.x, fy[k + 1] - fy[k])))
+		kinds[&"east"].append(east_kinds[k] if split_y else &"store")
+	# the corner rooms close the front and back ranges
+	var corner_keys: Array[StringName] = [&"front_w", &"front_e", &"back_w", &"back_e"]
+	var corner_kind := {&"front_w": &"parlour", &"front_e": &"parlour",
+		&"back_w": &"parlour", &"back_e": &"store"}
+	var corner_rect := {
+		&"front_w": Rect2(inner.position,
+			Vector2(court.position.x - inner.position.x, court.position.y - inner.position.y)),
+		&"front_e": Rect2(Vector2(court.end.x, inner.position.y),
+			Vector2(inner.end.x - court.end.x, court.position.y - inner.position.y)),
+		&"back_w": Rect2(Vector2(inner.position.x, court.end.y),
+			Vector2(court.position.x - inner.position.x, inner.end.y - court.end.y)),
+		&"back_e": Rect2(court.end,
+			Vector2(inner.end.x - court.end.x, inner.end.y - court.end.y))}
+	# the principal room of a range is the middle piece; those are rooms 0..3
+	var ids: Dictionary = {&"front": [], &"back": [], &"west": [], &"east": []}
+	var principal: Dictionary = {}
+	for key in keys:
+		principal[key] = int(rects[key].size() / 2)
+		ids[key].resize(rects[key].size())
+		ids[key][principal[key]] = plan.rooms.size()
+		plan.rooms.append({"kind": kinds[key][principal[key]], "storey": 0,
+			"rect": rects[key][principal[key]]})
+	for key in keys:
+		for k in range(rects[key].size()):
+			if k == principal[key]:
+				continue
+			ids[key][k] = plan.rooms.size()
+			plan.rooms.append({"kind": kinds[key][k], "storey": 0, "rect": rects[key][k]})
+	var corner_id: Dictionary = {}
+	for key in corner_keys:
+		corner_id[key] = plan.rooms.size()
+		plan.rooms.append({"kind": corner_kind[key], "storey": 0, "rect": corner_rect[key]})
+
+	# the street door, into the hall
+	plan.doors.append({"a": ids[&"front"][principal[&"front"]], "b": -1,
+		"pos": Vector2(inner.get_center().x, inner.position.y),
+		"normal": Vector2(0, -1), "width": HouseGeometry.DOOR_W,
+		"exterior": true, "front": true, "storey": 0})
+	var normals := {&"front": Vector2(0, 1), &"back": Vector2(0, -1),
+		&"west": Vector2(1, 0), &"east": Vector2(-1, 0)}
+	for key in keys:
+		var n: Vector2 = normals[key]
+		var along := Vector2(n.y, -n.x)
+		for k in range(rects[key].size()):
+			var r: Rect2 = rects[key][k]
+			var room: int = ids[key][k]
+			# the yard face of this room, and the middle of it
+			var at: Vector2
+			var span: float
+			if absf(n.y) > 0.5:
+				at = Vector2(r.get_center().x, court.position.y if n.y > 0.0 else court.end.y)
+				span = r.size.x
+			else:
+				at = Vector2(court.position.x if n.x > 0.0 else court.end.x, r.get_center().y)
+				span = r.size.y
+			var width := _glass_width(r.size.x * r.size.y, 2)
+			var reach := maxf(span * 0.28, (width + HouseGeometry.DOOR_W) * 0.5 + 0.1)
+			if key == &"back":
+				# A bedroom's door is hung toward one end of its yard wall, not
+				# in the middle: a bed never has to lie in the line of it, and
+				# the two windows sit together on the long stretch beside it.
+				var off := minf(span * 0.3, span * 0.5 - HouseGeometry.DOOR_W * 0.5 - 0.4)
+				var door_at := at + along * off
+				plan.doors.append({"a": room, "b": -1, "pos": door_at, "normal": n,
+					"width": HouseGeometry.DOOR_W, "exterior": true, "front": false,
+					"storey": 0})
+				var stretch_lo := -span * 0.5
+				var stretch_hi := off - (HouseGeometry.DOOR_W + width) * 0.5 - 0.1
+				var stretch := stretch_hi - stretch_lo
+				if stretch >= 2.0 * width + 0.3:
+					for q in [0.25, 0.75]:
+						plan.windows.append(_window(room,
+							at + along * (stretch_lo + stretch * q), n, width))
+				else:
+					var one := minf(_glass_width(r.size.x * r.size.y, 1), stretch - 0.2)
+					plan.windows.append(_window(room,
+						at + along * (stretch_lo + stretch * 0.5), n, one))
+			else:
+				plan.doors.append({"a": room, "b": -1, "pos": at, "normal": n,
+					"width": HouseGeometry.DOOR_W, "exterior": true, "front": false,
+					"storey": 0})
+				for t in [-1.0, 1.0]:
+					plan.windows.append(_window(room, at + along * t * reach, n, width))
+			# a room of a cut range opens into the next one along it -- except
+			# the sleeping range, whose bedrooms each open on the yard alone
+			if k + 1 < rects[key].size() and key != &"back":
+				var edge: Vector2
+				var dn: Vector2
+				if absf(n.y) > 0.5:
+					edge = Vector2(r.end.x, r.get_center().y)
+					dn = Vector2(1, 0)
+				else:
+					edge = Vector2(r.get_center().x, r.end.y)
+					dn = Vector2(0, 1)
+				plan.doors.append(_internal_door(room, ids[key][k + 1], edge, dn))
+	# each corner room opens into the room beside it and looks at the street
+	# The back corners do NOT open into the back range, which sleeps: a room you
+	# reach through a bedroom is a privacy failure. They open into the end of the
+	# side range beside them (the kitchen side feeds the dining room).
+	var beside := {&"front_w": [&"front", true, Vector2(1, 0), Vector2(0, -1)],
+		&"front_e": [&"front", false, Vector2(-1, 0), Vector2(0, -1)],
+		&"back_w": [&"west", false, Vector2(0, -1), Vector2(0, 1)],
+		&"back_e": [&"east", false, Vector2(0, -1), Vector2(0, 1)]}
+	for key in corner_keys:
+		var row: Array = beside[key]
+		var cr: Rect2 = corner_rect[key]
+		var list: Array = ids[row[0]]
+		var nid: int = int(list[0]) if bool(row[1]) else int(list[list.size() - 1])
+		var dn2: Vector2 = row[2]
+		var edge2 := Vector2(cr.end.x if dn2.x > 0.0 else cr.position.x, cr.get_center().y)
+		if absf(dn2.y) > 0.5:
+			edge2 = Vector2(cr.get_center().x, cr.position.y)
+		plan.doors.append(_internal_door(corner_id[key], nid, edge2, dn2))
+		var out_n: Vector2 = row[3]
+		var wall_y: float = inner.position.y if out_n.y < 0.0 else inner.end.y
+		plan.windows.append(_window(corner_id[key], Vector2(cr.get_center().x, wall_y),
+			out_n, _glass_width(cr.size.x * cr.size.y, 1)))
+	var hall_r: Rect2 = rects[&"front"][principal[&"front"]]
+	plan.windows.append(_window(ids[&"front"][principal[&"front"]],
+		Vector2(hall_r.get_center().x - hall_r.size.x * 0.3, inner.position.y),
+		Vector2(0, -1), HouseGeometry.WINDOW_W))

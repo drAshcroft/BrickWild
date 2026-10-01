@@ -221,18 +221,29 @@ func _build_idol() -> void:
 			_kit.stepped_taper(Vector3(c.x, c.y + leg + h * 0.42 + h * 0.18, c.z),
 				w * 0.34, h * 0.14, SURF_TRIM, 3, 0.1)
 		&"coil":
-			# a serpent, wound round its own plinth, head at the top
+			# a serpent wound up a tapering core, three turns, rising from a
+			# broad coil at the foot to a raised, hooded head at the top
 			var turns: float = 3.0
-			var rings: int = 22
+			var rings: int = 30
+			var body_h: float = h * 0.78
+			_kit.drum(Vector3(c.x, c.y, c.z), w * 0.5, w * 0.34, h * 0.06, SURF_STONE, 10)
+			_kit.drum(Vector3(c.x, c.y + h * 0.06, c.z), w * 0.26, w * 0.08,
+				body_h - h * 0.06, SURF_STONE, 8)
 			for i in range(rings):
 				var t: float = float(i) / float(rings - 1)
 				var a: float = t * TAU * turns
-				var rr: float = lerpf(w * 0.5, w * 0.12, t)
-				var y: float = c.y + t * h * 0.9
-				box(Vector3(w * 0.24, h / float(rings) * 1.6, w * 0.24),
-					Vector3(c.x + sin(a) * rr, y, c.z + cos(a) * rr), SURF_STONE, a)
-			box(Vector3(w * 0.3, h * 0.12, w * 0.42),
-				Vector3(c.x, c.y + h * 0.95, c.z - w * 0.1), SURF_TRIM)
+				var rr: float = lerpf(w * 0.34, w * 0.1, t)
+				var th: float = lerpf(w * 0.26, w * 0.12, t)
+				var y: float = c.y + h * 0.06 + t * (body_h - h * 0.06)
+				box(Vector3(th, body_h / float(rings) * 2.4, th),
+					Vector3(c.x + sin(a) * rr, y, c.z + cos(a) * rr), SURF_TRIM, a)
+			# the neck lifts out of the last turn and the head leans toward the altar
+			box(Vector3(w * 0.11, h * 0.14, w * 0.11),
+				Vector3(c.x, c.y + body_h + h * 0.05, c.z - w * 0.03), SURF_TRIM)
+			box(Vector3(w * 0.32, h * 0.07, w * 0.42),
+				Vector3(c.x, c.y + h * 0.935, c.z - w * 0.1), SURF_TRIM)
+			box(Vector3(w * 0.5, h * 0.03, w * 0.3),
+				Vector3(c.x, c.y + h * 0.985, c.z - w * 0.06), SURF_STONE)
 		&"cairn":
 			# a heap of skulls, stacked into a spire because somebody had time
 			_kit.stepped_taper(Vector3(c.x, c.y, c.z), w, h, SURF_TRIM, 7, w * 0.12, false, 0.0, 1.15)

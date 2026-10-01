@@ -41,3 +41,18 @@ func _init(p_seed := 0) -> void:
 	width = 48.0
 	length = 24.0
 	height = 3.6
+
+
+## The footprint of the facade dressing, which stands out in front of the wall:
+## the end cornices, the balconies and the entrance canopy. HouseGeometry
+## merges it into exterior_bounds so the planned exterior includes it.
+func landmark_footprint() -> Rect2:
+	var front := HotelGeometry.front_z(self) - HotelGeometry.FACADE_REACH
+	var half := width * 0.5 + 0.55
+	return Rect2(Vector2(-half, front), Vector2(half * 2.0, length * 0.5 + 0.5 - front))
+
+
+## Highest point of the silhouette: the dormer and cupola finials, which rise
+## above the ridge.
+func landmark_height() -> float:
+	return HotelGeometry.wall_top(self) + maxf(roof_rise, HotelGeometry.FINIAL_RISE)

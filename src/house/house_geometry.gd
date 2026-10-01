@@ -870,6 +870,12 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		for piece in plan.yard_pieces:
 			r = r.merge(piece["rect"])
 	var top: float = total_height(spec)
+	# A landmark declares the storybook elevation it stands in front of its
+	# walls (balconies, entrance canopy, cornices, cupolas), so those parts
+	# are planned exterior rather than leakage.
+	if spec.has_method("landmark_footprint"):
+		r = r.merge(spec.landmark_footprint())
+		top = maxf(top, spec.landmark_height())
 	return AABB(Vector3(r.position.x, 0.0, r.position.y),
 		Vector3(r.size.x, top, r.size.y))
 

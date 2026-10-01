@@ -52,4 +52,5 @@ static func dress(plan: VillagePlan) -> VillagePlan:
 	# Shore yards must be reached through the final garden and hedge layout.
 	# An unobstructed apron cannot help when later planting cuts its yard off.
 	VillageDressHosts.dress_place(plan, ctx, &"strand")
+	VillageDressHosts.dress_place(plan, ctx, &"reeds")
 	return plan

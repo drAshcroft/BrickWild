@@ -238,6 +238,58 @@ static func _hero_dome_segments(res: SuiteResult) -> void:
 
 ## The support is a closed loft. Its square base meets the crossing, and its
 ## upper ring matches the round/octagonal drum at the same height and phase.
+## VIS-016, hero Hagia Sophia: the bearing under the drum must be masonry. A
+## square block with vertical faces (not a flared skirt), a solid wall where
+## there is no window and an open throat where there is one, four great arches
+## and four corner piers.
+static func _hero_bearing(res: SuiteResult) -> void:
+	for scale in [1.0, 0.5]:
+		var spec := ChurchSpec.new()
+		spec.style = &"byzantine"
+		spec.width = 31.0 * scale
+		spec.length = 76.0 * scale
+		spec.height = 40.0 * scale
+		ChurchGenerator.generate(spec, 5006)
+		ChurchGenerator.apply_landmark(spec, "hagia_sophia")
+		var builder := ChurchBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		var who := "hero Hagia x%.1f" % scale
+		var base: float = ChurchGeometry.dome_base_height(spec)
+		var rise: float = ChurchGeometry.pendentive_height(spec)
+		var half: float = ChurchGeometry.hagia_bearing_half(spec)
+		var cz: float = ChurchGeometry.crossing_center_z(spec)
+		var bearing := builder.mass_aabb("pendentive")
+		_expect(res, absf(bearing.size.x - half * 2.0) < 0.01 and absf(bearing.size.z - half * 2.0) < 0.01
+			and absf(bearing.size.y - rise) < 0.01,
+			"%s bearing is not the square block the dome circle is inscribed in" % who)
+		_expect(res, rise > spec.dome_radius * 0.6,
+			"%s bearing is too shallow to read as masonry" % who)
+		var stone := _triangles(mesh, ChurchBuilder.SURF_STONE)
+		var flare := 0
+		for t in stone:
+			for v in t:
+				if v.y > base + 0.6 * scale and v.y < base + rise - 0.05 						and absf(v.z - cz) <= half + 0.05 and absf(v.x) > half + 0.05:
+					flare += 1
+		_expect(res, flare == 0, "%s bearing flares past its square (%d vertices)" % [who, flare])
+		var hr: float = ChurchGeometry.half_dome_radius(spec)
+		var y: float = base + rise * 0.5
+		var wall_z: float = cz + hr * 0.17
+		_expect(res, _intersects(stone, Vector3(half + 5.0, y, wall_z), Vector3(half - 1.0, y, wall_z)),
+			"%s bearing wall is not solid between its windows" % who)
+		_expect(res, not _intersects(stone, Vector3(half + 5.0, y, cz),
+			Vector3(-half - 5.0, y, cz)),
+			"%s bearing has no open throat at its centre window" % who)
+		for i in range(4):
+			_expect(res, not builder.components_of("great_arch_%d" % i).is_empty(),
+				"%s great arch %d is missing" % [who, i])
+		var pier_top: float = ChurchGeometry.hagia_pier_top(spec)
+		var piers := 0
+		for part in builder.part_log:
+			if part.kind == "box" and part.tag == "bearing" 					and absf(part.size.x - ChurchGeometry.hagia_pier_size(spec)) < 0.001 					and absf(part.pos.y + part.size.y / 2.0 - pier_top) < 0.001:
+				piers += 1
+		_expect(res, piers == 4, "%s has %d corner piers, expected 4" % [who, piers])
+
+
 static func _pendentive_transition(res: SuiteResult) -> void:
 	var hagia := ChurchSpec.new()
 	hagia.style = &"byzantine"
