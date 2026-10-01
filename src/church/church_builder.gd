@@ -191,17 +191,9 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	if spec.buttresses:
 		var n: int = spec.buttress_count_per_side
 		var bd: float = spec.buttress_depth
-		# keep buttresses clear of the tower (west) and transept crossing (east)
-		var bz0: float = -l / 2.0 + 0.8
-		if spec.tower:
-			bz0 = -l / 2.0 + TOWER_EMBED + spec.tower_width + 0.4
-		var bz1: float = l / 2.0 - 0.8
-		if spec.transept:
-			bz1 = ChurchGeometry.transept_front_z(spec) - 0.6
-		var span_bz: float = maxf(bz1 - bz0, 2.0)
 		for side_v in [-1.0, 1.0]:
 			for i in range(n):
-				var bz: float = bz0 + span_bz / float(maxi(n - 1, 1)) * i
+				var bz: float = ChurchGeometry.nave_buttress_z(spec, i, n)
 				_stepped_buttress("nave_%s_%d" % ["left" if side_v < 0.0 else "right", i],
 					Vector3(side_v * w / 2.0, 0.0, bz), Vector3(side_v, 0.0, 0.0),
 					h * 0.72, bd, 0.5, false)

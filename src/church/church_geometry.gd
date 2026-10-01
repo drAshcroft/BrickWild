@@ -622,6 +622,20 @@ static func flyer_z(spec: ChurchSpec, i: int) -> float:
 	return lerpf(zr.x, zr.y, float(i) / float(n - 1))
 
 
+## Z centre of a nave buttress. Shared by the shell and blueprint so the
+## elevation marks the same bays that carry the emitted supports.
+static func nave_buttress_z(spec: ChurchSpec, i: int, count := -1) -> float:
+	var n: int = count if count > 0 else spec.buttress_count_per_side
+	var z0: float = -spec.length / 2.0 + 0.8
+	if spec.tower:
+		z0 = -spec.length / 2.0 + TOWER_EMBED + spec.tower_width + 0.4
+	var z1: float = spec.length / 2.0 - 0.8
+	if spec.transept:
+		z1 = transept_front_z(spec) - 0.6
+	var span: float = maxf(z1 - z0, 2.0)
+	return z0 + span / float(maxi(n - 1, 1)) * i
+
+
 # ------------------------------------------------------------- envelope
 
 ## Ridge height of the nave roof, which caps the nave walls.

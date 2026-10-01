@@ -252,6 +252,15 @@ the loudest "cheap" tell in Hagia Sophia, Florence, St Basil and the rotunda.
 
 ### S7. Fix the sheet. *Three separate things.*
 
+VIS-010 implementation: geometry-backed +X elevations now include aisle tiers,
+clerestory openings, transept, nave supports, chapels and Byzantine dome
+composition. `vis010` is the bounded structural selector. The four sheets
+still require non-headless visual confirmation via
+`godot --path . --script res://tools/render_shots.gd`.
+
+The following notes describe the pre-VIS-010 state and remain as the visual
+acceptance checklist until the rendered sheets are reviewed.
+
 - `BlueprintView._draw_elevation` draws nave, tower, apse, crossing tower and
   dome, and **omits aisles, aisle roofs, buttresses, flyers, clerestory,
   transept and chapels**. The result is a drawing of a different building from

@@ -29,6 +29,138 @@ static func run() -> SuiteResult:
 	return res
 
 
+## Bounded VIS-010 fixture. It inspects the same geometry inventory consumed by
+## the south elevation and uses one deliberate omission per structural rule.
+static func run_vis010() -> SuiteResult:
+	var res := SuiteResult.new("vis010")
+	var cases: Array[Dictionary] = [
+		{"key": "notre_dame", "style": &"gothic", "width": 12.0, "length": 127.0, "height": 33.0, "seed": 5001},
+		{"key": "chartres", "style": &"gothic", "width": 16.4, "length": 130.0, "height": 37.5, "seed": 5003},
+		{"key": "hagia_sophia", "style": &"byzantine", "width": 31.0, "length": 76.0, "height": 40.0, "seed": 5006},
+		{"key": "st_basil", "style": &"russian", "width": 12.0, "length": 46.0, "height": 30.0, "seed": 5008},
+	]
+	for row in cases:
+		var spec: ChurchSpec = _vis010_spec(row)
+		var inventory: Dictionary = BlueprintView.south_elevation_inventory(spec)
+		var key: String = row["key"]
+		res.checked += 1
+		match key:
+			"notre_dame":
+				_expect(inventory["aisles"].size() >= 2, key, "two aisle/roof tiers", res)
+				_expect(not inventory["clerestory"].is_empty(), key, "clerestory windows", res)
+				_expect(not inventory["buttresses"].is_empty(), key, "nave buttress bays", res)
+				_expect(not inventory["flyers"].is_empty(), key, "flying buttress bays", res)
+			"chartres":
+				_expect(not inventory["aisles"].is_empty(), key, "aisle roof tier", res)
+				_expect(not inventory["clerestory"].is_empty(), key, "clerestory windows", res)
+				_expect(not inventory["flyers"].is_empty(), key, "flying buttress bays", res)
+				_expect(inventory["chapels"].size() >= 5, key, "radiating chapel projections", res)
+				if spec.transept:
+					_expect(inventory["transept"] != AABB(), key, "transept bay", res)
+			"hagia_sophia":
+				_expect(inventory["dome"] and inventory["dome_shape"] == &"hemisphere", key, "main hemispherical dome", res)
+				_expect(inventory["half_domes"], key, "buttressing half-domes", res)
+			"st_basil":
+				_expect(inventory["dome"] and inventory["dome_shape"] == &"onion", key, "onion dome", res)
+				_expect(inventory["chapels"].size() >= 4, key, "cluster chapel projections", res)
+		if spec.variant_name.ends_with("Minster") or spec.variant_name.ends_with("Priory"):
+			_expect(spec.variant_name.contains(" Minster") or spec.variant_name.contains(" Priory"),
+				key, "spaced generated suffix", res)
+
+	# One counterexample per optional row proves its geometry inventory is not a
+	# permanent decoration list. These checks are intentionally very small.
+	var no_aisles: ChurchSpec = _vis010_spec(cases[0])
+	no_aisles.aisles = 0
+	_expect(BlueprintView.south_elevation_inventory(no_aisles)["aisles"].is_empty(),
+		"control", "aisle omission", res)
+	var no_flyers: ChurchSpec = _vis010_spec(cases[0])
+	no_flyers.flying_buttresses = false
+	_expect(BlueprintView.south_elevation_inventory(no_flyers)["flyers"].is_empty(),
+		"control", "flyer omission", res)
+	var no_buttresses: ChurchSpec = _vis010_spec(cases[0])
+	no_buttresses.buttresses = false
+	_expect(BlueprintView.south_elevation_inventory(no_buttresses)["buttresses"].is_empty(),
+		"control", "buttress omission", res)
+	var no_clerestory: ChurchSpec = _vis010_spec(cases[0])
+	no_clerestory.clerestory = false
+	no_clerestory.flying_buttresses = false
+	_expect(BlueprintView.south_elevation_inventory(no_clerestory)["clerestory"].is_empty(),
+		"control", "clerestory omission", res)
+	var no_transept: ChurchSpec = _copy_vis010_spec(cases[0])
+	no_transept.transept = true
+	no_transept.transept_len = maxf(no_transept.transept_len, no_transept.width * 2.2)
+	_expect(BlueprintView.south_elevation_inventory(no_transept)["transept"] != AABB(),
+		"control", "transept presence", res)
+	no_transept.transept = false
+	_expect(BlueprintView.south_elevation_inventory(no_transept)["transept"] == AABB(),
+		"control", "transept omission", res)
+	var no_chapels: ChurchSpec = _vis010_spec(cases[1])
+	no_chapels.radiating_chapels = 0
+	_expect(BlueprintView.south_elevation_inventory(no_chapels)["chapels"].is_empty(),
+		"control", "chapel omission", res)
+	var no_half_domes: ChurchSpec = _vis010_spec(cases[2])
+	no_half_domes.half_domes = false
+	_expect(not BlueprintView.south_elevation_inventory(no_half_domes)["half_domes"],
+		"control", "half-dome omission", res)
+	return res
+
+
+static func _vis010_spec(row: Dictionary) -> ChurchSpec:
+	var spec: ChurchSpec = _copy_vis010_spec(row)
+	match row["key"]:
+		"notre_dame":
+			spec.aisles = maxi(spec.aisles, 2)
+			spec.apse = true
+			_force_vis_flyers(spec)
+		"chartres":
+			spec.apse = true
+			spec.ambulatory = true
+			spec.radiating_chapels = maxi(spec.radiating_chapels, 7)
+			if spec.chapel_radius == 0.0:
+				spec.chapel_radius = spec.apse_radius * 0.38
+			_force_vis_flyers(spec)
+		"hagia_sophia":
+			spec.dome = true
+			spec.dome_shape = &"hemisphere"
+			spec.dome_radius = maxf(spec.dome_radius, spec.width * 0.45)
+			spec.dome_drum_height = maxf(spec.dome_drum_height, spec.dome_radius * ChurchGeometry.DOME_DRUM_RATIO)
+			spec.half_domes = true
+		"st_basil":
+			spec.dome = true
+			spec.dome_shape = &"onion"
+			spec.dome_radius = maxf(spec.dome_radius, spec.width * 0.45)
+			spec.dome_drum_height = maxf(spec.dome_drum_height, spec.dome_radius * ChurchGeometry.DOME_DRUM_RATIO)
+			spec.radiating_chapels = maxi(spec.radiating_chapels, 4)
+			spec.chapel_arrangement = &"cluster"
+			if spec.chapel_radius == 0.0:
+				spec.chapel_radius = spec.width * 0.38
+	return spec
+
+
+static func _copy_vis010_spec(row: Dictionary) -> ChurchSpec:
+	var spec := ChurchSpec.new()
+	spec.style = row["style"]
+	spec.width = row["width"]
+	spec.length = row["length"]
+	spec.height = row["height"]
+	ChurchGenerator.generate(spec, row["seed"])
+	return spec
+
+
+static func _force_vis_flyers(spec: ChurchSpec) -> void:
+	spec.flying_buttresses = true
+	spec.buttresses = true
+	spec.buttress_count_per_side = maxi(spec.buttress_count_per_side, 4)
+	if spec.buttress_depth == 0.0:
+		spec.buttress_depth = 0.6
+
+
+static func _expect(condition: bool, who: String, expected: String, res: SuiteResult) -> void:
+	res.checked += 1
+	if not condition:
+		res.fail("%s: missing %s from south elevation inventory" % [who, expected])
+
+
 ## Every mass the builder emitted must sit exactly where ChurchGeometry says.
 static func _check_masses_match_geometry(spec: ChurchSpec, builder: ChurchBuilder,
 		who: String, res: SuiteResult) -> void:

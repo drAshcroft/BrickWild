@@ -12,6 +12,39 @@ var village: VillagePlan
 ## Shown instead of a sheet when there is nothing to draw -- a castle, for now.
 var note: String = ""
 
+
+## Geometry inventory for the +X elevation. This is also consumed by the
+## focused structural fixture, so a claimed feature cannot vanish from both
+## drawing and test expectations unnoticed.
+static func south_elevation_inventory(p_spec: ChurchSpec) -> Dictionary:
+	var aisles: Array[Dictionary] = []
+	for ring in range(p_spec.aisles):
+		aisles.append({"bounds": ChurchGeometry.aisle_aabb(p_spec, 1.0, ring),
+			"roof_high": ChurchGeometry.aisle_roof_high(p_spec, ring)})
+	var buttresses: Array[float] = []
+	if p_spec.buttresses:
+		for i in range(p_spec.buttress_count_per_side):
+			buttresses.append(ChurchGeometry.nave_buttress_z(p_spec, i))
+	var flyers: Array[Dictionary] = []
+	if p_spec.flying_buttresses:
+		for i in range(ChurchGeometry.flyer_count(p_spec)):
+			flyers.append({"z": ChurchGeometry.flyer_z(p_spec, i), "tiers": p_spec.flyer_tiers})
+	var chapels: Array[AABB] = []
+	for i in range(p_spec.radiating_chapels):
+		chapels.append(ChurchGeometry.chapel_aabb(p_spec, i))
+	return {
+		"aisles": aisles,
+		"clerestory": ChurchGeometry.clerestory_windows(p_spec),
+		"transept": ChurchGeometry.transept_aabb(p_spec) if p_spec.transept else AABB(),
+		"buttresses": buttresses,
+		"flyers": flyers,
+		"chapels": chapels,
+		"dome": p_spec.dome,
+		"dome_shape": p_spec.dome_shape,
+		"half_domes": p_spec.dome and p_spec.half_domes,
+		"exedrae": p_spec.dome and p_spec.half_domes and p_spec.exedrae,
+	}
+
 func setup(p_spec: ChurchSpec) -> void:
 	spec = p_spec
 	village = null
@@ -250,12 +283,19 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 	var total_h: float = ChurchGeometry.total_height(spec)
 	var zext: Vector2 = ChurchGeometry.length_extent(spec)
 	var ground_span: float = zext.y - zext.x
-	var scale: float = minf((r.size.x - 50) / ground_span, (r.size.y - 40) / total_h)
+	# Reserve margin for the right-hand dimension and its text. Long churches
+	# used to consume the whole width and clip that label at the page edge.
+	var scale: float = minf((r.size.x - 116) / ground_span, (r.size.y - 68) / total_h)
 	if scale <= 0:
 		return
 	var zmid: float = (zext.x + zext.y) / 2.0
-	var gy: float = r.position.y + r.size.y - 18     # ground line
-	var cx: float = r.position.x + r.size.x / 2.0
+	var gy: float = r.position.y + r.size.y - 24     # ground line
+	var cx: float = r.position.x + (r.size.x - 58) / 2.0
+	draw_string(ThemeDB.fallback_font, Vector2(r.position.x + 16, r.position.y + 17),
+		"SOUTH ELEVATION  /  +X SIDE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ink)
+	draw_string(ThemeDB.fallback_font, Vector2(r.position.x + 16, r.position.y + 32),
+		"Depth is projected; chapel masses share their true Z positions.",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, light)
 
 	draw_line(Vector2(cx - ground_span / 2.0 * scale - 10, gy),
 		Vector2(cx + ground_span / 2.0 * scale + 10, gy), ink, 2.0)
@@ -308,6 +348,49 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 		Vector2((z_left + z_right) / 2.0, up.call(h + roof_rise)),
 		Vector2(z_right, up.call(h))]), ink, 1.4)
 
+	# Lower aisle walls and their shed-roof profiles. The south ring is visible
+	# in this projection; nested rings retain the builder's exact tier heights.
+	var elevation: Dictionary = south_elevation_inventory(spec)
+	var aisle_parts: Array[Dictionary] = elevation["aisles"]
+	for ring in range(aisle_parts.size()):
+		var aisle: AABB = aisle_parts[ring]["bounds"]
+		var a0: float = zx.call(aisle.position.z)
+		var a1: float = zx.call(aisle.position.z + aisle.size.z)
+		var wall_top: float = aisle.size.y
+		draw_rect(Rect2(Vector2(a0, up.call(wall_top)), Vector2(a1 - a0, wall_top * scale)),
+			Color(0.15, 0.28, 0.43, 0.08), true)
+		draw_rect(Rect2(Vector2(a0, up.call(wall_top)), Vector2(a1 - a0, wall_top * scale)),
+			light, false, 0.9)
+		var roof_high: float = aisle_parts[ring]["roof_high"]
+		draw_polyline(PackedVector2Array([
+			Vector2(a0, up.call(roof_high)), Vector2(a1, up.call(roof_high)),
+			Vector2(a1, up.call(wall_top)), Vector2(a0, up.call(wall_top)),
+			Vector2(a0, up.call(roof_high))]), ink, 1.3)
+
+	# Buttress positions are shared with ChurchBuilder. From the south they read
+	# as piers; flyer glyphs below mark the number and tier of the cross-braces.
+	if spec.buttresses:
+		var buttress_z: Array[float] = elevation["buttresses"]
+		for bz in buttress_z:
+			var bw: float = maxf(0.32, spec.buttress_depth * 0.55) * scale
+			var top: float = h * 0.72
+			draw_rect(Rect2(Vector2(zx.call(bz) - bw / 2.0, up.call(top)),
+				Vector2(bw, top * scale)), ink, false, 1.0)
+
+	# The transept ridge runs across X and appears end-on in a south elevation.
+	# Keep its true Z bay, and distinguish its roof from the nave gable.
+	var transept_bounds: AABB = elevation["transept"]
+	if transept_bounds != AABB():
+		var ta: AABB = transept_bounds
+		var tz0: float = zx.call(ta.position.z)
+		var tz1: float = zx.call(ta.position.z + ta.size.z)
+		var tc: float = zx.call(ChurchGeometry.transept_center_z(spec))
+		var trise: float = spec.width * spec.roof_pitch * 0.9
+		draw_rect(Rect2(Vector2(tz0, up.call(h)), Vector2(tz1 - tz0, h * scale)), light, false, 1.0)
+		draw_polyline(PackedVector2Array([
+			Vector2(tz0, up.call(h)), Vector2(tc, up.call(h + trise)),
+			Vector2(tz1, up.call(h))]), ink, 1.4)
+
 	# apse: springs from the east wall, projecting one radius east
 	if spec.apse:
 		var aa: AABB = ChurchGeometry.apse_aabb(spec)
@@ -317,6 +400,24 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 		draw_line(Vector2(a_z0, a_top), Vector2(a_z1, a_top), ink, 1.2)
 		draw_arc(Vector2(a_z0, a_top), a_z1 - a_z0, -PI / 2.0, 0.0, 12, ink, 1.6)
 		draw_line(Vector2(a_z1, a_top), Vector2(a_z1, gy), ink, 1.2)
+	if spec.ambulatory:
+		var am: AABB = ChurchGeometry.ambulatory_aabb(spec)
+		var am0: float = zx.call(am.position.z)
+		var am1: float = zx.call(am.position.z + am.size.z)
+		draw_rect(Rect2(Vector2(am0, up.call(am.size.y)),
+			Vector2(am1 - am0, am.size.y * scale)), light, false, 0.9)
+	# The south projection folds the chapel fan in depth. Their actual Z bounds
+	# remain distinct, which is why Chartres reads as a row rather than a blob.
+	var chapel_parts: Array[AABB] = elevation["chapels"]
+	for chapel in chapel_parts:
+		var ch0: float = zx.call(chapel.position.z)
+		var ch1: float = zx.call(chapel.position.z + chapel.size.z)
+		var ch_top: float = chapel.size.y
+		if ch1 - ch0 > 0.03:
+			draw_rect(Rect2(Vector2(ch0, up.call(ch_top)),
+				Vector2(ch1 - ch0, ch_top * scale)), Color(0.15, 0.28, 0.43, 0.06), true)
+			draw_rect(Rect2(Vector2(ch0, up.call(ch_top)),
+				Vector2(ch1 - ch0, ch_top * scale)), ink, false, 0.9)
 
 	# crossing tower: the horizontal axis here is Z, so its width is the
 	# crossing bay's depth, not the nave width.
@@ -329,7 +430,7 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 			Vector2(c_r - c_l, spec.crossing_tower_height * scale)), ink, false, 1.6)
 
 	# dome: drum + shell, with a lantern box if the style carries one
-	if spec.dome:
+	if elevation["dome"]:
 		var dcz: float = zx.call(ChurchGeometry.crossing_center_z(spec))
 		var dr: float = spec.dome_radius * scale
 		var drum_base: float = ChurchGeometry.dome_base_height(spec)
@@ -355,6 +456,17 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 			var lw: float = dr * 0.35
 			draw_rect(Rect2(Vector2(dcz - lw / 2.0, up.call(shell_top) - lh),
 				Vector2(lw, lh)), ink, false, 1.4)
+	if elevation["half_domes"]:
+		var hr: float = ChurchGeometry.half_dome_radius(spec)
+		var base: float = ChurchGeometry.dome_base_height(spec)
+		for direction in [-1.0, 1.0]:
+			_draw_projected_half_dome(ChurchGeometry.crossing_center_z(spec), base,
+				hr, hr * 0.85, direction, scale, zx, up, ink)
+			if elevation["exedrae"]:
+				var er: float = hr * 0.4
+				var ez: float = ChurchGeometry.crossing_center_z(spec) + direction * hr * 0.62
+				_draw_projected_half_dome(ez, base * 0.55 + base * 0.3,
+					er, base * 0.24, direction, scale, zx, up, light)
 
 	# nave side windows -- drawn only when there is no aisle in front of them,
 	# matching ChurchBuilder, which skips them when aisles are present.
@@ -367,10 +479,48 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 			var wh: float = spec.window_h * scale
 			var wy: float = up.call(h * 0.58) - wh / 2.0
 			_draw_window(Vector2(wx, wy), ww, wh, ink)
+	var clerestory_parts: Array[Dictionary] = elevation["clerestory"]
+	if not clerestory_parts.is_empty():
+		for opening in clerestory_parts:
+			var pos: Vector3 = opening["pos"]
+			var ww: float = float(opening["width"]) * scale
+			var wh: float = float(opening["height"]) * scale
+			_draw_window(Vector2(zx.call(pos.z), up.call(pos.y + float(opening["height"]) / 2.0)),
+				ww, wh, ink)
+	# The braces run across X and project to each bay from this viewpoint. These
+	# small arch glyphs preserve the real tier/rhythm without suggesting they
+	# occupy additional nave length.
+	var flyer_parts: Array[Dictionary] = elevation["flyers"]
+	if not flyer_parts.is_empty():
+		for flyer in flyer_parts:
+			var fz: float = zx.call(flyer["z"])
+			for tier in range(flyer["tiers"]):
+				var drop: float = float(tier) * ChurchGeometry.flyer_tier_drop(spec)
+				var low: float = ChurchGeometry.flyer_pier_height(spec) - drop
+				var high: float = ChurchGeometry.flyer_spring_height(spec) - drop
+				var glyph: float = maxf(1.1, ChurchGeometry.flyer_pier_width(spec) * 0.38) * scale
+				draw_polyline(PackedVector2Array([
+					Vector2(fz - glyph, up.call(low)), Vector2(fz - glyph * 0.45, up.call((low + high) * 0.5)),
+					Vector2(fz, up.call(maxf(low, high) + glyph * 0.2)),
+					Vector2(fz + glyph * 0.45, up.call((low + high) * 0.5)),
+					Vector2(fz + glyph, up.call(low))]), ink, 1.2)
 
-	_dim_line_v(Vector2(cx + ground_span / 2.0 * scale + 20, up.call(total_h)),
-		Vector2(cx + ground_span / 2.0 * scale + 20, gy),
+	_dim_line_v(Vector2(cx + ground_span / 2.0 * scale + 24, up.call(total_h)),
+		Vector2(cx + ground_span / 2.0 * scale + 24, gy),
 		"%.1f m" % total_h, ink, light)
+
+
+func _draw_projected_half_dome(center_z: float, base_y: float, radius: float,
+		rise: float, direction: float, scale: float, zx: Callable,
+		up: Callable, color: Color) -> void:
+	var points := PackedVector2Array()
+	for i in range(9):
+		var t: float = float(i) / 8.0
+		var z: float = center_z + direction * radius * (1.0 - t)
+		var y: float = base_y + rise * sin(t * PI * 0.5)
+		points.append(Vector2(zx.call(z), up.call(y)))
+	points.append(Vector2(zx.call(center_z), up.call(base_y)))
+	draw_polyline(points, color, maxf(0.8, scale * 0.16))
 
 
 func _draw_window(tl: Vector2, ww: float, wh: float, ink: Color) -> void:

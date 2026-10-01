@@ -139,8 +139,11 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 	spec.corner_turrets = spec.style == &"gothic" and GeneratorRandom.chance(r, 0.5)
 	spec.string_course = GeneratorRandom.chance(r, 0.7)
 
-	spec.variant_name = "%s %s%s" % [
-		GeneratorRandom.pick(r, FIRST_WORDS).trim_suffix("."), GeneratorRandom.pick(r, SECOND_WORDS), GeneratorRandom.pick(r, SUFFIXES)]
+	var first: String = GeneratorRandom.pick(r, FIRST_WORDS).trim_suffix(".")
+	var second: String = GeneratorRandom.pick(r, SECOND_WORDS)
+	var suffix: String = GeneratorRandom.pick(r, SUFFIXES)
+	var separator: String = "" if suffix.begins_with("-") or suffix.is_empty() else " "
+	spec.variant_name = "%s %s%s%s" % [first, second, separator, suffix]
 
 ## Settle chapel size and count so the alcoves fit their hemicycle and leave
 ## each other clear.
