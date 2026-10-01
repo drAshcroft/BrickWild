@@ -61,6 +61,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 		_build_roof()
 	_build_porch()
 	_build_chimney()
+	_build_yard()
 	_build_hearth_breast()
 	_build_rugs()
 	_build_han_features()
@@ -1948,6 +1949,23 @@ func _build_porch() -> void:
 		"aabb": xf * AABB(Vector3(-w * 0.5, 0.0, -porch_along * 0.5),
 			Vector3(w, 0.42, porch_along))})
 	_kit.ridge_roof(xf, w, porch_along, 0.42, SURF_ROOF)
+	host_end()
+
+
+## The yard's BUILT pieces (HouseYard): rails, posts, logs, a trough, a lean-to.
+## The plan owns every box; this only emits them, each as a named component on
+## host "yard" carrying its piece id, so exterior QA can say which fence moved.
+## Nothing here when `exterior_props` is off, so the bare shell is bit-identical.
+func _build_yard() -> void:
+	if not spec.exterior_props or plan.yard_pieces.is_empty():
+		return
+	tag("yard")
+	host("yard", 0)
+	for piece in plan.yard_pieces:
+		for part in piece["parts"]:
+			var surf := SURF_WALL if str(part["surf"]) == "wall" else SURF_TRIM
+			var row := component_box(str(part["role"]), part["size"], HouseYard.part_xform(part), surf)
+			row["piece"] = piece["id"]
 	host_end()
 
 

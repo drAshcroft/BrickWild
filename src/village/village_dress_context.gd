@@ -238,6 +238,10 @@ static func make_context(plan: VillagePlan) -> Dictionary:
 		var poly: PackedVector2Array = VillageMeasure.bounds_poly(b)
 		bounds.append(poly)
 		boxes.append(Poly.bounding_rect(poly))
+		# the house's own yard is the house's: nothing of the village's stands in it
+		for yard_poly in VillageMeasure.yard_polys(b):
+			bounds.append(yard_poly)
+			boxes.append(Poly.bounding_rect(yard_poly))
 		var d: Vector2 = VillageMeasure.door(b)
 		doors.append(Rect2(d - Vector2(VillageDressCatalog.DOOR_CLEAR, VillageDressCatalog.DOOR_CLEAR),
 			Vector2(VillageDressCatalog.DOOR_CLEAR, VillageDressCatalog.DOOR_CLEAR) * 2.0))

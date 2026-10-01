@@ -11,7 +11,14 @@ static func dress_building(plan: VillagePlan, ctx: Dictionary, i: int) -> void:
 	if not VillageDressCatalog.RECIPES.has(host):
 		return
 	var rng := VillageDressPlacement.rng(plan, "host|%d" % i)
+	# A house dresses its own yard (HouseYard, EVAL-B06): its measured
+	# placement says which categories it already put outside. The village hands
+	# those to the house instead of adding a second barrel, bench or cart, and
+	# keeps what only a village plants -- trees, hedges, ground cover.
+	var given: Array = (plan.buildings[i].get("placement", {}) as Dictionary).get("yard_categories", [])
 	for step in VillageDressCatalog.RECIPES[host]:
+		if not bool(step.get("plant", false)) and String(step["cat"]) in given:
+			continue
 		VillageDressRules.apply(plan, ctx, step, rng, i, host)
 
 

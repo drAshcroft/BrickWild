@@ -63,6 +63,16 @@ static func dress_exterior(root: Node3D, plan: HousePlan) -> void:
 		if PropCatalog.has_tag(p["key"], PropCatalog.LIGHT):
 			exterior.add_child(LightKit.for_prop(p["key"], node.position,
 				node.rotation.y, float(p["scale"])))
+	# The yard's catalogue props, instantiated the same way as the facade
+	# pieces: this is the only place a model loads. Its built pieces are in the
+	# shell mesh (HouseBuilder._build_yard), not here.
+	for p in plan.yard:
+		var node := _instance(p, false)
+		if node == null:
+			push_error("Missing yard prop model: %s" % p["key"])
+			continue
+		node.name = p["id"]
+		exterior.add_child(node)
 
 
 ## The furniture, and the light every lamp among it gives off (LAY-011).
@@ -117,7 +127,7 @@ static func viewing_distance(plan: HousePlan) -> float:
 	var r := Rect2(Vector2(shell.position.x, shell.position.z),
 		Vector2(shell.size.x, shell.size.z))
 	if plan.spec.exterior_props:
-		for p in plan.exterior:
+		for p in plan.exterior + plan.yard:
 			var b := HouseExterior.bounds_of(p)
 			r = r.merge(Rect2(Vector2(b.position.x, b.position.z), Vector2(b.size.x, b.size.z)))
 	return maxf(r.size.x, r.size.y) * 1.25 + 6.0

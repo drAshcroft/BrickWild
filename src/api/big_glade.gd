@@ -127,7 +127,18 @@ static func check(building) -> Dictionary:
 ## merely copied from the requested envelope: both are read from the plan/spec
 ## that produced the mesh.
 static func placement(building) -> Dictionary:
+	# `bounds` is the ARCHITECTURE (and the facade pieces on its walls), never the
+	# yard: the yard's built pieces are put aside while this mesh is measured and
+	# restored after. The yard is reported beside it (`yard`, `yard_extent`,
+	# `yard_blocks`), so a lot can size itself on the house as it always did and
+	# still keep the ground the yard needs; the village walks round `yard_blocks`.
+	var held: Array[Dictionary] = []
+	if building != null and building.plan is HousePlan:
+		held = building.plan.yard_pieces.duplicate()
+		building.plan.yard_pieces.clear()
 	var mesh: ArrayMesh = build_mesh(building)
+	if building != null and building.plan is HousePlan:
+		building.plan.yard_pieces.assign(held)
 	if mesh == null:
 		return {}
 	var bounds := mesh.get_aabb()
@@ -147,6 +158,18 @@ static func placement(building) -> Dictionary:
 		"north": Basis(Vector3.UP, building.request.orientation).inverse() * Vector3.BACK,
 		"door": _door(building),
 	}
+	# The yard: `bounds` above already holds what is really there (built pieces in
+	# the mesh, props merged in). `yard` is the ENVELOPE the house may dress, the
+	# footprint with its porch and chimney grown by the apron (2 to 3 m): the
+	# permission, not an extent. A lot that keeps `yard` clear keeps every yard
+	# prop and the walkway to the door; the lot owns everything beyond it.
+	# `yard_categories` is what the house already supplies (a cart, a barrel, a
+	# bench), so a village that dresses the same ground can leave those out.
+	if building.plan is HousePlan and HouseYard.applies(building.plan):
+		out["yard"] = HouseGeometry.yard_rect(building.plan)
+		out["yard_categories"] = HouseYard.categories(building.plan)
+		out["yard_extent"] = HouseYard.extent(building.plan)
+		out["yard_blocks"] = HouseYard.obstacles(building.plan)
 	var family := BuildingFamilyAdapter.for_building(building)
 	if family != null:
 		out.merge(family.placement_metadata(building, bounds))
