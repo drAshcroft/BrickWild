@@ -25,22 +25,61 @@ const SURF_STONE := 4
 const SURF_WOOD := 5
 const SURF_ROOF := 6
 const SURF_DARK := 7
-const SURFACES := 8
+## The ground is more than one ground (EVAL-B05). Slots 0-7 keep their
+## numbers because the crossing checks name slots 4 and 5.
+const SURF_YARD := 8   # lots and yards: worked earth and grass, tinted per lot
+const SURF_VERGE := 9  # the grass shoulder along a road
+const SURF_WEAR := 10  # the darker line down a road where the carts run
+const SURF_TREAD := 11 # bare trodden earth round the well and at each door
+const SURF_FIELD := 12 # ploughland outside the edge
+const SURF_BANK := 13  # the shelving bank, coloured per vertex from dry to wet
+const SURF_BED := 14   # the river bed, seen through shallow water
+const SURFACES := 15
 
 ## What each surface is, for the assembler's materials.
 const COLOURS := {
-	SURF_GROUND: "6f7a4a", SURF_ROAD: "8a7b62", SURF_COMMON: "5f8a3f",
-	SURF_WATER: "3e6a8a", SURF_STONE: "8f8b82", SURF_WOOD: "6b5238",
+	SURF_GROUND: "6a7447", SURF_ROAD: "a08d6b", SURF_COMMON: "7aa34a",
+	SURF_WATER: "36607e", SURF_STONE: "8f8b82", SURF_WOOD: "6b5238",
 	SURF_ROOF: "7a6340", SURF_DARK: "2a2622",
+	SURF_YARD: "857649", SURF_VERGE: "6f8b45", SURF_WEAR: "8b7959",
+	SURF_TREAD: "a38c64", SURF_FIELD: "86724a",
+	SURF_BANK: "7a6a48", SURF_BED: "2f332f",
 }
+
+## A river with a bank (EVAL-B05). Natural water (everything but a mill race)
+## lies below the land: its surface at WATER_LEVEL, a bank that shelves from
+## BANK_CREST at BANK_WIDTH metres out down to the water's edge and on to the
+## bed, which the water, a little clear at the margin, lets show through.
+## The ground is cut away where the bank is, so the pit is real geometry.
+const WATER_LEVEL := -0.14
+const BANK_WIDTH := 2.6
+const BANK_CREST := 0.004
+const BED_LEVEL := -0.55
+## How far under the water the bank keeps shelving before it is bed.
+const BANK_SHELF := 2.4
+const BANK_CELL := 0.6
+## What the ground is cut back to: a little inside the bank's crest, so the
+## bank sheet overlaps the land and never leaves a hairline.
+const BANK_CUT := 2.3
+const SKIRT := 0.08
 
 ## How the ground is layered, so a road reads over the field and the common
 ## over both. Millimetres apart: enough to beat z-fighting, far too little to
 ## trip over.
 const Y_GROUND := 0.005
+const Y_FIELD := 0.006
+const Y_YARD := 0.008
+const Y_VERGE := 0.012
 const Y_ROAD := 0.02
+const Y_WEAR := 0.025
 const Y_COMMON := 0.03
+const Y_TREAD := 0.034
 const Y_WATER := 0.01
+## How wide the worn centre line is, as a share of the road, and the bare
+## patches: round the well, and at each door.
+const WEAR_SHARE := 0.38
+const WELL_TREAD := 2.4
+const DOOR_TREAD := 1.2
 
 ## §5's edge, by enclosure kind. A hedge is planted, not built, so it is the
 ## dresser's business and not this file's.
@@ -92,26 +131,93 @@ func commit() -> ArrayMesh:
 ## frames rather than a plane of zero height.
 func _ground(plan: VillagePlan) -> void:
 	var site: Rect2 = plan.site
-	box(Vector3(site.size.x, 0.2, site.size.y),
-		Vector3(site.get_center().x, -0.1, site.get_center().y), SURF_GROUND)
-	_log_mass("ground", AABB(Vector3(site.position.x, -0.2, site.position.y),
-		Vector3(site.size.x, 0.2, site.size.y)))
-	for lot in plan.lots:
-		_flat(lot["poly"], Y_GROUND, SURF_GROUND)
+	var waters := natural_water(plan)
+	if waters.is_empty():
+		box(Vector3(site.size.x, 0.2, site.size.y),
+			Vector3(site.get_center().x, -0.1, site.get_center().y), SURF_GROUND)
+		_log_mass("ground", AABB(Vector3(site.position.x, -0.2, site.position.y),
+			Vector3(site.size.x, 0.2, site.size.y)))
+	else:
+		# The slab is sunk to the river bed, walled round at the site's edge,
+		# and the land is a sheet laid over it with the water and its bank cut out.
+		box(Vector3(site.size.x, 0.2, site.size.y),
+			Vector3(site.get_center().x, BED_LEVEL - 0.1, site.get_center().y), SURF_BED)
+		var skirt_height := -BED_LEVEL - 0.003
+		for side in [Rect2(site.position, Vector2(site.size.x, SKIRT)),
+				Rect2(Vector2(site.position.x, site.end.y - SKIRT), Vector2(site.size.x, SKIRT)),
+				Rect2(site.position, Vector2(SKIRT, site.size.y)),
+				Rect2(Vector2(site.end.x - SKIRT, site.position.y), Vector2(SKIRT, site.size.y))]:
+			box(Vector3(side.size.x, skirt_height, side.size.y),
+				Vector3(side.get_center().x, -skirt_height * 0.5 - 0.003, side.get_center().y), SURF_GROUND)
+		_log_mass("ground", AABB(Vector3(site.position.x, BED_LEVEL - 0.2, site.position.y),
+			Vector3(site.size.x, 0.2 - BED_LEVEL, site.size.y)))
+		for piece in _land_pieces(Poly.from_rect(site), _holes(waters, BANK_CUT)):
+			_flat(piece, 0.0, SURF_GROUND)
+	var dry := _holes(waters, BANK_WIDTH)
+	for field in plan.fields:
+		_field(plan, field)
+	for i in plan.lots.size():
+		_flat_clipped(plan.lots[i]["poly"], Y_YARD, SURF_YARD, dry, _lot_tint(plan, i))
 	for road in plan.roads:
-		_flat(VillageSitePlanner.road_ribbon(road, true), Y_GROUND, SURF_GROUND)
+		_flat_clipped(VillageSitePlanner.road_ribbon(road, true), Y_VERGE, SURF_VERGE, dry)
 		_flat(VillageSitePlanner.road_ribbon(road, false), Y_ROAD, SURF_ROAD)
+		_flat(Poly.ribbon(road["points"], float(road["width"]) * 0.5 * WEAR_SHARE),
+			Y_WEAR, SURF_WEAR)
 	for c in plan.commons:
-		_flat(c["poly"], Y_COMMON, SURF_COMMON)
+		_flat_clipped(c["poly"], Y_COMMON, SURF_COMMON, dry)
+	_trodden(plan)
+
+
+## Each lot is its own bit of worked ground: a small, deterministic shift in
+## lightness and warmth, so a row of yards is not one stamped colour.
+func _lot_tint(plan: VillagePlan, index: int) -> Color:
+	var h := fposmod(sin(float(index) * 12.9898 + float(plan.spec.seed) * 0.0137) * 43758.5453, 1.0)
+	var k := fposmod(sin(float(index) * 78.233 + float(plan.spec.seed) * 0.0291) * 24634.6345, 1.0)
+	var light := 0.90 + h * 0.18
+	return Color(light * (1.0 + (k - 0.5) * 0.10), light, light * (1.0 - (k - 0.5) * 0.10))
+
+
+## Ploughland and pasture, which the plan holds and the ground never drew. A
+## field that touches water is left as the plain ground: the bank is the
+## water's business.
+func _field(plan: VillagePlan, field: Dictionary) -> void:
+	var poly: PackedVector2Array = field["poly"]
+	for w in plan.water:
+		if not Geometry2D.intersect_polygons(poly, w["poly"]).is_empty():
+			return
+	var surf := SURF_FIELD if field.get("kind", &"field") == &"field" else SURF_VERGE
+	_flat(poly, Y_FIELD, surf)
+
+
+## The well and each door wear the grass through to earth.
+func _trodden(plan: VillagePlan) -> void:
+	for p in plan.props:
+		if String(p["key"]) == "well":
+			_flat(_disc(p["pos"], WELL_TREAD), Y_TREAD, SURF_TREAD)
+	for b in plan.buildings:
+		var door: Vector3 = b.get("door", Vector3.INF)
+		if door.is_finite():
+			_flat(_disc(Vector2(door.x, door.z), DOOR_TREAD), Y_TREAD, SURF_TREAD)
+
+
+static func _disc(centre: Vector2, radius: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in 14:
+		var a := TAU * float(i) / 14.0
+		out.append(centre + Vector2(cos(a), sin(a)) * radius * (1.0 + 0.12 * sin(float(i) * 2.3)))
+	return out
 
 
 ## Emit the final, serialized crossing routes. Each bend shares its mitered
 ## edge with the next deck panel, so neither holes nor shortcut chords appear.
 func _water(plan: VillagePlan) -> void:
 	for w in plan.water:
-		_flat(w["poly"], Y_WATER, SURF_WATER)
 		if w["kind"] == &"race":
+			_flat(w["poly"], Y_WATER, SURF_WATER)
 			_race_banks(plan, w)
+		else:
+			_flat(w["poly"], WATER_LEVEL, SURF_WATER)
+			_bank(w["poly"])
 	for index in plan.water_crossings.size():
 		_crossing(plan.water_crossings[index], index)
 
@@ -433,7 +539,7 @@ func _built_props(plan: VillagePlan) -> void:
 		if not bool(p.get("built", false)):
 			continue
 		var at := Vector3(float(p["pos"].x), 0.0, float(p["pos"].y))
-		at.y = float(p.get("elevation", 0.0))
+		at.y = float(p["elevation"]) if p.has("elevation") else ground_height(plan, p["pos"])
 		var yaw: float = float(p.get("yaw", 0.0))
 		var box_of := AABB()
 		if p.has("approach"):
@@ -463,12 +569,175 @@ func _built_props(plan: VillagePlan) -> void:
 		total_height = maxf(total_height, box_of.position.y + box_of.size.y)
 
 
+# ------------------------------------------------------------------ banks
+
+## The polygons of natural water: a river, a stream, a pond or the coast.
+static func natural_water(plan: VillagePlan) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	if plan == null:
+		return out
+	for w in plan.water:
+		if w["kind"] != &"race":
+			out.append(w["poly"])
+	return out
+
+
+## Signed distance to a polygon: positive outside, negative within.
+static func signed_distance(poly: PackedVector2Array, p: Vector2) -> float:
+	var best := INF
+	for i in poly.size():
+		best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(
+			p, poly[i], poly[(i + 1) % poly.size()])))
+	return -best if Poly.contains_point(poly, p) else best
+
+
+## The height of the land at signed distance `d` from natural water's edge:
+## the crest at BANK_WIDTH, the water level at the edge, the bed BANK_SHELF
+## metres under the water. Smoothly shelving, so it shades as a slope.
+static func bank_height(d: float) -> float:
+	if d >= BANK_WIDTH:
+		return BANK_CREST
+	if d >= 0.0:
+		return lerpf(WATER_LEVEL, BANK_CREST, smoothstep(0.0, 1.0, d / BANK_WIDTH))
+	return lerpf(WATER_LEVEL, BED_LEVEL, smoothstep(0.0, 1.0, minf(-d / BANK_SHELF, 1.0)))
+
+
+## Where the ground really is at a point, for whatever stands on it: the bank
+## where there is water, level land everywhere else.
+static func ground_height(plan: VillagePlan, p: Vector2) -> float:
+	var h := 0.0
+	var found := false
+	for poly in natural_water(plan):
+		if not Poly.bounding_rect(poly).grow(BANK_WIDTH).has_point(p):
+			continue
+		var d := signed_distance(poly, p)
+		if d < BANK_WIDTH:
+			h = minf(h, bank_height(d)) if found else bank_height(d)
+			found = true
+	return h
+
+
+## The colour of the bank at signed distance `d`: ground at the crest, the
+## earth of the slope, wet and dark at the water line, then pale shallows
+## going to the dark of the bed.
+static func bank_colour(d: float) -> Color:
+	var ground := Color(String(COLOURS[SURF_GROUND]))
+	var slope := Color("86775a")
+	var wet := Color("4c4130")
+	var sand := Color("a69d7c")
+	var bed := Color("2b2f2c")
+	if d >= BANK_WIDTH:
+		return ground
+	if d >= BANK_WIDTH * 0.45:
+		return slope.lerp(ground, smoothstep(BANK_WIDTH * 0.45, BANK_WIDTH, d))
+	if d >= 0.0:
+		return wet.lerp(slope, smoothstep(0.0, BANK_WIDTH * 0.45, d))
+	if d >= -0.5:
+		return wet.lerp(sand, smoothstep(0.0, 1.0, -d / 0.5))
+	return sand.lerp(bed, smoothstep(0.0, 1.0, (-d - 0.5) / (BANK_SHELF - 0.5)))
+
+
+## Grow each water polygon by `by`, as the polygons of the pit.
+static func _holes(waters: Array[PackedVector2Array], by: float) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	for poly in waters:
+		for grown in Geometry2D.offset_polygon(poly, by, Geometry2D.JOIN_ROUND):
+			out.append(grown)
+	return out
+
+
+## `poly` with the holes cut from it, as polygons without holes: where a
+## hole is wholly inside (a pond) the polygon is split down a vertical line
+## through it first, so each half has a notch and no island.
+static func _land_pieces(poly: PackedVector2Array, holes: Array[PackedVector2Array]) -> Array[PackedVector2Array]:
+	var pieces: Array[PackedVector2Array] = [poly]
+	for hole in holes:
+		var next: Array[PackedVector2Array] = []
+		for piece in pieces:
+			var cut := Geometry2D.clip_polygons(piece, hole)
+			var islands := false
+			for c in cut:
+				islands = islands or Geometry2D.is_polygon_clockwise(c)
+			if not islands:
+				for c in cut:
+					next.append(c)
+				continue
+			var box_of := Poly.bounding_rect(piece)
+			var x_mid := Poly.bounding_rect(hole).get_center().x
+			for half in [Rect2(box_of.position, Vector2(x_mid - box_of.position.x, box_of.size.y)),
+					Rect2(Vector2(x_mid, box_of.position.y), Vector2(box_of.end.x - x_mid, box_of.size.y))]:
+				for part in Geometry2D.intersect_polygons(piece, Poly.from_rect(half)):
+					for c in Geometry2D.clip_polygons(part, hole):
+						if not Geometry2D.is_polygon_clockwise(c):
+							next.append(c)
+		pieces = next
+	return pieces
+
+
+## A flat layer with the pit cut out of it.
+func _flat_clipped(poly: PackedVector2Array, y: float, surf: int,
+		holes: Array[PackedVector2Array], tint := Color(0, 0, 0, 0)) -> void:
+	var pieces: Array = _land_pieces(poly, holes) if not holes.is_empty() else [poly]
+	for piece in pieces:
+		_flat(piece, y, surf, tint)
+
+
+## The bank: a grid of the ground heights over the pit, coloured per vertex
+## from `bank_colour`, with normals from the slope. Cells wholly deep under
+## the water or wholly beyond the crest are left to the bed and the land.
+func _bank(poly: PackedVector2Array) -> void:
+	var area := Poly.bounding_rect(poly).grow(BANK_WIDTH + BANK_CELL)
+	var nx := maxi(1, int(ceil(area.size.x / BANK_CELL)))
+	var ny := maxi(1, int(ceil(area.size.y / BANK_CELL)))
+	var sx := area.size.x / float(nx)
+	var sy := area.size.y / float(ny)
+	var dist := PackedFloat32Array()
+	dist.resize((nx + 1) * (ny + 1))
+	for j in ny + 1:
+		for i in nx + 1:
+			dist[j * (nx + 1) + i] = signed_distance(poly, area.position + Vector2(i * sx, j * sy))
+	var st: SurfaceTool = _kit.surface(SURF_BANK)
+	for j in ny:
+		for i in nx:
+			var ds := [dist[j * (nx + 1) + i], dist[j * (nx + 1) + i + 1],
+				dist[(j + 1) * (nx + 1) + i + 1], dist[(j + 1) * (nx + 1) + i]]
+			var lo := minf(minf(ds[0], ds[1]), minf(ds[2], ds[3]))
+			var hi := maxf(maxf(ds[0], ds[1]), maxf(ds[2], ds[3]))
+			if lo > BANK_WIDTH or hi < -BANK_SHELF:
+				continue
+			var corners := [Vector2i(i, j), Vector2i(i + 1, j), Vector2i(i + 1, j + 1), Vector2i(i, j + 1)]
+			var verts: Array[Vector3] = []
+			var normals: Array[Vector3] = []
+			var colours: Array[Color] = []
+			for k in 4:
+				var c: Vector2i = corners[k]
+				var d: float = ds[k]
+				verts.append(Vector3(area.position.x + c.x * sx, bank_height(d), area.position.y + c.y * sy))
+				colours.append(bank_colour(d))
+				# slope: finite difference of the height field across the cell
+				var dx := bank_height(dist[c.y * (nx + 1) + mini(c.x + 1, nx)]) \
+					- bank_height(dist[c.y * (nx + 1) + maxi(c.x - 1, 0)])
+				var dz := bank_height(dist[mini(c.y + 1, ny) * (nx + 1) + c.x]) \
+					- bank_height(dist[maxi(c.y - 1, 0) * (nx + 1) + c.x])
+				normals.append(Vector3(-dx / (2.0 * sx), 1.0, -dz / (2.0 * sy)).normalized())
+			for tri in [[0, 1, 2], [0, 2, 3]]:
+				var a: Vector3 = verts[tri[0]]
+				var b: Vector3 = verts[tri[1]]
+				var c3: Vector3 = verts[tri[2]]
+				var order: Array = tri if (c3 - a).cross(b - a).y > 0.0 else [tri[0], tri[2], tri[1]]
+				for k in order:
+					st.set_normal(normals[k])
+					st.set_color(colours[k])
+					st.set_uv(Vector2.ZERO)
+					st.add_vertex(verts[k])
+
+
 # -------------------------------------------------------------- internals
 
 ## A polygon as a flat double-sided sheet at height `y`. Double-sided because
 ## a village is looked at from above and from the road, and a one-sided
 ## ground plane disappears from underneath.
-func _flat(poly: PackedVector2Array, y: float, surf: int) -> void:
+func _flat(poly: PackedVector2Array, y: float, surf: int, tint := Color(0, 0, 0, 0)) -> void:
 	if poly.size() < 3:
 		return
 	var tris: PackedInt32Array = Geometry2D.triangulate_polygon(poly)
@@ -481,5 +750,7 @@ func _flat(poly: PackedVector2Array, y: float, surf: int) -> void:
 			var n: Vector3 = (tri[2] - tri[0]).cross(tri[1] - tri[0]).normalized()
 			for v in tri:
 				st.set_normal(n)
+				if tint.a > 0.0:
+					st.set_color(tint)
 				st.set_uv(Vector2.ZERO)
 				st.add_vertex(v)

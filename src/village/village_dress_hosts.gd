@@ -51,7 +51,7 @@ static func dress_place(plan: VillagePlan, ctx: Dictionary, place: StringName) -
 				return
 		&"church":
 			return          # the churchyard is dressed with its building
-		&"water", &"strand":
+		&"water", &"strand", &"reeds":
 			if plan.water.is_empty():
 				return
 			if place == &"strand" and plan.spec.purpose != &"fishing":

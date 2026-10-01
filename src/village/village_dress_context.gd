@@ -19,7 +19,8 @@ static func enclosure_hedge(plan: VillagePlan, ctx: Dictionary) -> void:
 			for i in steps:
 				var at := a.lerp(b, (float(i) + 0.5) / float(steps))
 				var key := keys[rng.randi() % keys.size()]
-				var radius := maxf(PropCatalog.trunk(key), PropCatalog.canopy(key))
+				var look: Dictionary = VillageDressPlacement.plant_looks(plan, {"palette": "hedge"}, key, a.lerp(b, (float(i) + 0.5) / float(steps)))[0]
+				var radius := maxf(float(look["trunk"]), float(look["canopy"]))
 				var clear := true
 				for water in plan.water:
 					if Poly.contains_point(water["poly"], at) or VillageMeasure.point_to_poly(at, water["poly"]) < radius + 0.3:
@@ -32,9 +33,36 @@ static func enclosure_hedge(plan: VillagePlan, ctx: Dictionary) -> void:
 						clear = false
 				if not clear:
 					continue
-				plan.plants.append({"key": key, "pos": at, "canopy": PropCatalog.canopy(key),
-					"trunk": PropCatalog.trunk(key), "yaw": rng.randf_range(0, TAU), "zone": &"enclosure"})
+				var row := VillageDressPlacement.plant_row(key, at, look, rng.randf_range(0, TAU))
+				row["zone"] = &"enclosure"
+				plan.plants.append(row)
 				VillageDressPlacement.remember(ctx, at, Rect2(at - Vector2.ONE * radius, Vector2.ONE * radius * 2.0), radius)
+				_hedgerow_tree(plan, ctx, at, e, i)
+
+
+## Here and there a hedge keeps a tree: a hedgerow oak left to grow when the
+## rest was laid. Rare, outside the line, and held to every clearance the
+## row itself keeps.
+static func _hedgerow_tree(plan: VillagePlan, ctx: Dictionary, at: Vector2,
+		edge_index: int, piece: int) -> void:
+	var roll := fposmod(sin(float(edge_index) * 91.7 + float(piece) * 12.9898
+		+ float(plan.spec.seed) * 0.31) * 43758.5453, 1.0)
+	if roll > 0.045:
+		return
+	var keys: Array[String] = VillageDressRules.palette_keys(ctx, "edge")
+	if keys.is_empty():
+		return
+	var key := keys[int(roll * 1000.0) % keys.size()]
+	var outward: Vector2 = (at - plan.site.get_center()).normalized()
+	var spot: Vector2 = at + outward * 2.2
+	for look in VillageDressPlacement.plant_looks(plan, {"palette": "edge"}, key, spot):
+		if VillageDressPlacement.plant_is_clear(plan, ctx, spot, look["trunk"], look["canopy"]):
+			var row := VillageDressPlacement.plant_row(key, spot, look, roll * TAU)
+			row["zone"] = &"enclosure"
+			plan.plants.append(row)
+			VillageDressPlacement.remember(ctx, spot, Rect2(spot - Vector2(look["trunk"], look["trunk"]),
+				Vector2(look["trunk"], look["trunk"]) * 2.0), look["trunk"])
+			return
 
 
 ## The mine mouth sits beside the final through-road segment, inside the
