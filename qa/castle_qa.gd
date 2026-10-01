@@ -106,13 +106,15 @@ static func gate_access_report(s: CastleSpec, b: CastleBuilder, actual: ArrayMes
 				count += 1
 		if count != 2:
 			out.failures.append("gate_access: ring %d needs a logged portcullis guide pair" % ring)
+		var ground: float = CastleGeometry.ring_ground_y(s, ring)
 		for side in [-1.0, 1.0]:
-			var start := Vector3(float(side) * (half - 0.15), 1.0, slot_z)
-			var slot := Vector3(float(side) * (half + 0.1), 1.0, slot_z)
-			var back := Vector3(float(side) * (half + 0.22), 1.0, slot_z)
+			var start := Vector3(float(side) * (half - 0.15), ground + 1.0, slot_z)
+			var slot := Vector3(float(side) * (half + 0.1), ground + 1.0, slot_z)
+			var back := Vector3(float(side) * (half + 0.22), ground + 1.0, slot_z)
 			if _access_ray_hits(triangles, start, slot) or not _access_ray_hits(triangles, start, back):
 				out.failures.append("gate_access: ring %d has no open recessed groove with a solid guide" % ring)
-			if not _access_ray_hits(triangles, start + Vector3.FORWARD * 0.3, slot + Vector3.FORWARD * 0.3):
+			if not _access_ray_hits(triangles, start + Vector3.FORWARD * 0.3,
+					slot + Vector3.FORWARD * 0.3):
 				out.failures.append("gate_access: ring %d groove has no adjacent passage masonry" % ring)
 	var bridge := CastleGeometry.drawbridge_aabb(s)
 	if bridge.size.z > 0.0:
@@ -144,6 +146,74 @@ static func gate_access_report(s: CastleSpec, b: CastleBuilder, actual: ArrayMes
 	return out
 
 
+## Probe each emitted terrace tread vertically and keep a standing body clear
+## from the outer gate approach to the raised inner gate. Also checks the
+## terrace cap under the actual inner curtain footing, using emitted triangles.
+static func terrace_route_report(s: CastleSpec, b: CastleBuilder,
+		actual: ArrayMesh) -> Dictionary:
+	var out := {"failures": [], "floor_samples": 0, "support_samples": 0}
+	if s.plan_kind != &"terraced":
+		return out
+	var triangles: Array = []
+	for surface in actual.get_surface_count():
+		if surface != CastleBuilder.SURF_OPEN:
+			triangles.append_array(HouseQA._mesh_triangles(actual, surface))
+	var stair := b.mass_aabb("terrace_stair_1")
+	var rise: float = CastleGeometry.ring_ground_y(s, 1)
+	if stair.size.z <= 0.0:
+		out.failures.append("terrace access: connecting stair mass is missing")
+		return out
+	var count := maxi(int(ceil(stair.size.z / 0.25)), 2)
+	var previous_floor := -INF
+	for i in range(count):
+		var f: float = (float(i) + 0.5) / float(count)
+		var z: float = stair.position.z + stair.size.z * f
+		var expected: float = rise * f
+		var floor_y: float = _walk_floor_y(triangles, Vector2(0.0, z),
+			expected + 0.3, expected - 0.35)
+		if floor_y == -INF:
+			out.failures.append("terrace access: emitted stair floor is missing at z=%.2f" % z)
+			continue
+		out.floor_samples += 1
+		if (i == 0 and floor_y > WalkGrid.MAX_STEP + 0.03) \
+				or (i > 0 and (floor_y - previous_floor > WalkGrid.MAX_STEP + 0.03 \
+					or floor_y < previous_floor - 0.03)):
+			out.failures.append("terrace access: stair has a discontinuity at z=%.2f (floor %.2f after %.2f)" \
+				% [z, floor_y, previous_floor])
+		previous_floor = floor_y
+		if i == count - 1 and rise - floor_y > WalkGrid.MAX_STEP + 0.03:
+			out.failures.append("terrace access: last emitted tread misses raised landing")
+		if _access_ray_hits(triangles, Vector3(0.0, floor_y + 0.08, z),
+				Vector3(0.0, floor_y + 1.8, z)):
+			out.failures.append("terrace access: emitted treads block body clearance at z=%.2f" % z)
+	for seg in CastleGeometry.wall_segments(s, 1):
+		var a: Vector2 = seg["a"]
+		var c: Vector2 = seg["b"]
+		var outward: Vector3 = seg["outward"]
+		var midpoint: Vector2 = (a + c) * 0.5
+		var inner_foot := Vector2(midpoint.x - outward.x
+			* (CastleGeometry.wall_thickness(s, 1) + 0.1),
+			midpoint.y - outward.z * (CastleGeometry.wall_thickness(s, 1) + 0.1))
+		if _walk_floor_y(triangles, inner_foot, rise + 0.25, rise - 0.25) < rise - 0.02:
+			out.failures.append("terrace support: cap misses inner curtain base at %s" % inner_foot)
+		else:
+			out.support_samples += 1
+	return out
+
+
+static func _walk_floor_y(triangles: Array, point: Vector2, top: float,
+		bottom: float) -> float:
+	var a := Vector3(point.x, top, point.y)
+	var c := Vector3(point.x, bottom, point.y)
+	var highest := -INF
+	for tri in triangles:
+		var hit: Variant = Geometry3D.segment_intersects_triangle(a, c,
+			tri[0], tri[1], tri[2])
+		if hit is Vector3:
+			highest = maxf(highest, hit.y)
+	return highest
+
+
 ## Start outside the outer gate (and barbican), traverse every ring and its
 ## causeway, then chain the keep's storeys through HouseNavCheck. Structural
 ## triangles at body height block the exterior grid: a painted doorway on a
@@ -166,8 +236,10 @@ static func lords_walk(s: CastleSpec, b: CastleBuilder, emitted: ArrayMesh = nul
 		out.failures.append("keep has no entrance")
 		return out
 	var d: Dictionary = p.doors[entrance]
-	if not bool(d.get("exterior", false)) or HousePlan.record_storey(d) != 1:
-		out.failures.append("keep entrance is not a protected first-floor exterior door")
+	var expected_storey := 0 if s.terraced_fallback else 1
+	if not bool(d.get("exterior", false)) \
+			or HousePlan.record_storey(d) != expected_storey:
+		out.failures.append("keep entrance is not at its protected expected storey")
 		return out
 	var xf: Transform3D = keep.transform
 	# HousePlan records exterior doors on the inner wall face.
@@ -183,7 +255,8 @@ static func lords_walk(s: CastleSpec, b: CastleBuilder, emitted: ArrayMesh = nul
 	var approach := Rect2(-gate.size.x * 0.5, front - 2.0, gate.size.x, gate.position.z - front + 2.5)
 	var bounds := CastleGeometry.polygon_bbox(outer).merge(approach).grow(1.0)
 	var actual := emitted if emitted != null else b.commit()
-	var access := forebuilding_report(s, b, actual, keep)
+	var access := {"failures": []} if s.terraced_fallback \
+		else forebuilding_report(s, b, actual, keep)
 	out["forebuilding"] = access
 	out.failures.append_array(access.failures)
 	var start := Vector2(0, front - 1.0)
@@ -192,12 +265,11 @@ static func lords_walk(s: CastleSpec, b: CastleBuilder, emitted: ArrayMesh = nul
 	var inside_world := xf * Vector3(inside_local.x, 0, inside_local.y)
 	var inside_point := Vector2(inside_world.x, inside_world.z)
 	var fore := CastleGeometry.forebuilding(s)
-	if not fore.is_empty():
+	if not fore.is_empty() and not s.terraced_fallback:
 		# The ground grid reaches the toe. The emitted tread chain and raised
 		# threshold are verified separately at their actual elevations.
-		# The compact Palas leaves a one-metre clear strip beyond the Bergfried
-		# stair toe. Probe that strip at the toe, before the Palas wall's body
-		# clearance claims the far edge of the same gap.
+		# Probe the compact Bergfried's open toe strip before the Palas wall
+		# claims body clearance at the far edge of the same gap.
 		var toe_offset := 0.25 if s.plan_kind == &"bergfried" else 0.8
 		goal = Vector2(fore.front) + Vector2(fore.normal) * toe_offset
 		inside_point = goal

@@ -28,10 +28,9 @@ var tier: StringName             # &"house", &"manor", &"castle", &"fortress"
 var variant_name: String
 
 # ---- the plan ----
-## Shape of the enceinte: &"rect" (an axis-aligned rectangle, the plan every
-## castle used to have) or &"polygon" (a regular N-gon with a flat edge facing
-## the gate). A rectangle IS the N = 4 polygon; `plan_kind` only says whether
-## the builder may take the axis-aligned shortcut.
+## Shape of the enceinte: &"rect" (axis-aligned), &"polygon" (a regular N-gon),
+## or &"terraced" (two nested polygonal wards with raised inner ground).
+## The builder may take the axis-aligned shortcut only for &"rect".
 var plan_kind: StringName = &"rect"
 ## Sides of the enceinte: 4 for &"rect", POLY_MIN_SIDES..POLY_MAX_SIDES for
 ## &"polygon".
@@ -97,6 +96,11 @@ var moat_count: int = 1
 # inner ward (fortress only): the second, higher enceinte
 var inner_ward: bool
 var ward_gap: float              # clear ground between the two curtains
+## Rise between the two ground planes of a terraced plan.
+var terrace_rise: float = 3.0
+## True only when a requested terrace could not fit a second ward at the
+## retained site dimensions; the single-ring fallback keeps its entry at grade.
+var terraced_fallback: bool = false
 
 # buildings inside, or the whole building at house/manor tier
 var keep: bool

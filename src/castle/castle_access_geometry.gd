@@ -24,6 +24,8 @@ static func forebuilding_for_plan(spec: CastleSpec, plan: HousePlan) -> Dictiona
 	if plan.spec == null or plan.entrance() < 0:
 		return {}
 	var door: Dictionary = plan.doors[plan.entrance()]
+	# A forebuilding is for a raised keep entrance. Grade-level fallback and
+	# terraced doors have no stair to reserve or emit.
 	if HousePlan.record_storey(door) <= 0:
 		return {}
 	var keep := CastleGeometry.keep_aabb(spec)
@@ -38,7 +40,8 @@ static func forebuilding_for_plan(spec: CastleSpec, plan: HousePlan) -> Dictiona
 	var width := clear + wall * 2.0
 	# A side-facing Bergfried door meets a straight stair. Its landing length
 	# is measured along the door normal, not from the tower's north edge.
-	var landing := 1.0 if spec.plan_kind == &"bergfried" else maxf(1.0, at.y - keep.position.z + 0.3)
+	var landing := 1.0 if spec.plan_kind in [&"bergfried", &"terraced"] \
+		else maxf(1.0, at.y - keep.position.z + 0.3)
 	var length := run + landing
 	var front := at + normal * length
 	var side := Vector2(-normal.y, normal.x)

@@ -70,6 +70,12 @@ static func is_motte(spec: CastleSpec) -> bool:
 	return spec.plan_kind == &"motte_bailey" and is_enclosed(spec)
 
 
+## Ground plane of each ward. The outer bailey remains at world ground; the
+## inner polygon stands on its logged retaining terrace.
+static func ring_ground_y(spec: CastleSpec, ring: int) -> float:
+	return spec.terrace_rise if spec.plan_kind == &"terraced" and ring > 0 else 0.0
+
+
 static func is_sky(spec: CastleSpec) -> bool:
 	return spec.style == &"sky" \
 		and (spec.tier == &"castle" or spec.tier == &"fortress")
@@ -173,7 +179,7 @@ static func rings(spec: CastleSpec) -> Array[int]:
 ## Sides of the enceinte. A rectangle IS the four-sided case, so everything
 ## below can be written once and asked for `n` rather than for "is it a rect".
 static func plan_sides(spec: CastleSpec) -> int:
-	if spec.plan_kind in [&"polygon", &"bergfried"]:
+	if spec.plan_kind in [&"polygon", &"bergfried", &"terraced"]:
 		return clampi(spec.sides, POLY_MIN_SIDES, POLY_MAX_SIDES)
 	return 4
 
@@ -1337,11 +1343,12 @@ static func keep_aabb(spec: CastleSpec) -> AABB:
 		var pair_w: float = spec.keep_w + spec.hall_w + bergfried_access_gap(spec)
 		var x0: float = ward.position.x + (ward.size.x - pair_w) * 0.5
 		var z1: float = bergfried_pair_back_z(spec)
-		return AABB(Vector3(x0, 0.0, z1 - spec.keep_l),
+		return AABB(Vector3(x0, ring_ground_y(spec, inner_ring(spec)), z1 - spec.keep_l),
 			Vector3(spec.keep_w, spec.keep_height, spec.keep_l))
 	var z1: float = ward_back_z(spec, spec.keep_w / 2.0) + RANGE_LAP
 	var x: float = keep_offset_x(spec)
-	return AABB(Vector3(x - spec.keep_w / 2.0, 0.0, z1 - spec.keep_l),
+	return AABB(Vector3(x - spec.keep_w / 2.0,
+		ring_ground_y(spec, inner_ring(spec)), z1 - spec.keep_l),
 		Vector3(spec.keep_w, spec.keep_height, spec.keep_l))
 
 
@@ -1380,7 +1387,7 @@ static func hall_aabb(spec: CastleSpec) -> AABB:
 			Vector3(spec.hall_w, spec.hall_height, spec.hall_l))
 	var z1: float = interior_back_z(spec)
 	var x0: float = ward_edge_x(spec, -1.0, z1 - spec.hall_l, z1) - RANGE_LAP
-	return AABB(Vector3(x0, 0.0, z1 - spec.hall_l),
+	return AABB(Vector3(x0, ring_ground_y(spec, inner_ring(spec)), z1 - spec.hall_l),
 		Vector3(spec.hall_w, spec.hall_height, spec.hall_l))
 
 
@@ -1391,7 +1398,8 @@ static func chapel_aabb(spec: CastleSpec) -> AABB:
 	var l: float = maxf(spec.hall_l * 0.55, 3.0)
 	var z1: float = interior_back_z(spec)
 	var x1: float = ward_edge_x(spec, 1.0, z1 - l, z1) + RANGE_LAP
-	return AABB(Vector3(x1 - spec.hall_w, 0.0, z1 - l),
+	return AABB(Vector3(x1 - spec.hall_w, ring_ground_y(spec, inner_ring(spec)),
+		z1 - l),
 		Vector3(spec.hall_w, spec.hall_height * 0.85, l))
 
 
@@ -1485,7 +1493,7 @@ static func apse_aabb(spec: CastleSpec) -> AABB:
 		return AABB()
 	var cx: float = chapel.position.x + chapel.size.x / 2.0
 	var z_face: float = chapel.position.z + APSE_EMBED
-	return AABB(Vector3(cx - r, 0.0, z_face - r),
+	return AABB(Vector3(cx - r, ring_ground_y(spec, inner_ring(spec)), z_face - r),
 		Vector3(2.0 * r, chapel.size.y * APSE_HEIGHT_RATIO, r + APSE_EMBED))
 
 

@@ -26,9 +26,11 @@ const FAMILIES := ["wall_stair", "wall", "tower", "portcullis", "forebuilding", 
 ## `check(spec, builder, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"no_gaps", &"no_overlap", &"grounded",
 	&"size_match", &"enclosed", &"great_tower", &"ranges", &"motte", &"sky",
-	&"bailey_clear", &"facade", &"wall_stairs", &"forebuilding", &"bergfried"]
+	&"bailey_clear", &"facade", &"wall_stairs", &"forebuilding", &"bergfried",
+	&"terraced"]
 const METHODS := {&"no_gaps": "_check_gaps", &"no_overlap": "_check_overlaps",
-	&"enclosed": "_check_enclosure", &"bergfried": "_check_bergfried"}
+	&"enclosed": "_check_enclosure", &"bergfried": "_check_bergfried",
+	&"terraced": "_check_terraced"}
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -40,8 +42,18 @@ var replaced: Dictionary = {}
 ## absent from this table is expected NOT to overlap at all; INF marks a
 ## crossing meant to pass fully through.
 static func _allowance(a: String, b: String, polygonal := false, tower_lap := -1.0,
-		ridge := false) -> float:
+		ridge := false, terraced := false) -> float:
 	var key: String = "|".join(PackedStringArray([a, b]) if a < b else PackedStringArray([b, a]))
+	if terraced:
+		if a == "terrace" or b == "terrace":
+			# The polygon fill is an earthwork envelope, not a solid box. Its AABB
+			# intentionally contains the nested rings and structures on the terrace.
+			return INF
+		if key in ["gate|terrace_stair_1", "link|terrace_stair_1"]:
+			# The single flight crosses only the logged gate passage and its link.
+			# cterrace checks emitted passage rays and stair body clearance before
+			# accepting this AABB-only joint. Other stair intersections stay strict.
+			return INF
 	# On a receding keep, the forebuilding landing rests on the exposed
 	# ground-storey shoulder. Physical access QA checks the hollow stair route.
 	if key == "forebuilding|keep":
@@ -167,6 +179,57 @@ func check(spec: CastleSpec, builder: CastleBuilder, overrides: Dictionary = {})
 	return _report()
 
 
+## A raised ward is sound only when its mass, ground metadata, connecting
+## stair and Himeji height relationship agree with the built geometry.
+func _check_terraced(spec: CastleSpec, builder: CastleBuilder) -> void:
+	if spec.plan_kind != &"terraced":
+		return
+	if not spec.inner_ward:
+		failures.append("terrace: inner polygon ring is missing")
+		return
+	var rise: float = CastleGeometry.ring_ground_y(spec, 1)
+	var terrace := builder.mass_aabb("terrace")
+	if terrace.size.y < 3.0 - TOL or absf(terrace.position.y) > TOL \
+			or absf(terrace.end.y - rise) > TOL:
+		failures.append("terrace: logged fill does not span ground to raised floor")
+	var inner_count := 0
+	for mass in builder.mass_log:
+		var nm: String = mass["name"]
+		if nm.begins_with("wall_1_") or nm.begins_with("gate_1") \
+				or nm.begins_with("tower_1_"):
+			inner_count += 1
+			if absf(float(mass.get("ground", -INF)) - rise) > TOL \
+					or absf((mass["aabb"] as AABB).position.y - rise) > TOL:
+				failures.append("terrace: %s is not grounded on the raised floor" % nm)
+	if inner_count == 0:
+		failures.append("terrace: no elevated curtain mass was logged")
+	var stair := builder.mass_aabb("terrace_stair_1")
+	var outer_gate: AABB = CastleGeometry.gatehouse_aabb(spec, 0)
+	var inner_gate: AABB = CastleGeometry.gatehouse_aabb(spec, 1)
+	if stair.size.z <= 0.0 or stair.position.z < outer_gate.position.z - 0.15 \
+			or stair.position.z > outer_gate.end.z + 0.15 \
+			or absf(stair.end.z - inner_gate.position.z) > 0.15 \
+			or absf(stair.end.y - rise) > TOL:
+		failures.append("terrace: connecting stair does not continuously join the two gate approaches")
+	if spec.keep:
+		var keep: AABB = builder.mass_aabb("keep")
+		var curtain_top := 0.0
+		for mass in builder.mass_log:
+			var nm2: String = mass["name"]
+			if nm2.begins_with("wall_") or nm2.begins_with("gate_"):
+				curtain_top = maxf(curtain_top, (mass["aabb"] as AABB).end.y)
+		var keep_top: float = keep.end.y + CastleGeometry.roof_rise(spec, keep)
+		if absf(keep.position.y - rise) > TOL or keep_top < curtain_top + 10.0 - TOL:
+			failures.append("terrace: keep is not on top and 10 m clear of every curtain")
+	for mass in builder.mass_log:
+		var yard_name: String = mass["name"]
+		if yard_name.begins_with("yard_"):
+			var yard_box: AABB = mass["aabb"]
+			if absf(float(mass.get("ground", -INF)) - rise) > TOL \
+					or absf(yard_box.position.y - rise) > TOL:
+				failures.append("terrace: %s is not grounded on the raised floor" % yard_name)
+
+
 ## Count occupied HEIGHT BANDS, not windows: a hundred ground-floor slits
 ## cannot stand in for the missing upper rows of a three-storey range.
 ## Planned openings here are the child builder's forwarded emission records.
@@ -227,7 +290,22 @@ static func _facade_window(part: Dictionary) -> bool:
 
 
 func _check_forebuilding(spec: CastleSpec, builder: CastleBuilder) -> void:
-	if not CastleGeometry.is_enclosed(spec) or not spec.keep or CastleGeometry.is_motte(spec):
+	if not CastleGeometry.is_enclosed(spec) or not spec.keep or CastleGeometry.is_motte(spec) \
+			or spec.plan_kind == &"terraced" or spec.terraced_fallback:
+		return
+	# Only a first-floor exterior keep entrance needs this stair. Some small
+	# occupied shells cannot fit a keep plan at all; an unplanned solid keep has
+	# no doorway to protect, so a missing forebuilding is not an access defect.
+	var raised_entry := false
+	for interior in builder.interiors:
+		if interior.id != "keep":
+			continue
+		var plan: HousePlan = interior.plan
+		var entrance := plan.entrance()
+		if entrance >= 0 and HousePlan.record_storey(plan.doors[entrance]) == 1:
+			raised_entry = true
+			break
+	if not raised_entry:
 		return
 	# The stair protects a raised, occupied keep entrance. A tiny keep with no
 	# emitted first-floor door has no stair to require or measure.
@@ -423,6 +501,11 @@ func _check_bailey_clear(spec: CastleSpec, builder: CastleBuilder) -> void:
 		for other in builder.mass_log:
 			if other["name"] == name:
 				continue
+			# The terraced mass is earthwork supporting the inner ward. Yard
+			# buildings stand on its top surface by design; its logged AABB spans
+			# the entire fill and is not a clearance obstacle.
+			if spec.plan_kind == &"terraced" and other["name"] == "terrace":
+				continue
 			var ob: AABB = other["aabb"]
 			var orect := Rect2(ob.position.x, ob.position.z, ob.size.x, ob.size.z)
 			if not orect.intersects(rect.grow(clear)):
@@ -479,8 +562,10 @@ func _check_overlaps(spec: CastleSpec, builder: CastleBuilder) -> void:
 		tower_lap = CastleGeometry.WING_LAP \
 			+ spec.wall_thickness * (CastleGeometry.TOWER_FOOT_RATIO - 1.0)
 	var ridge: bool = CastleGeometry.is_ridge(spec)
+	var terraced: bool = spec.plan_kind == &"terraced"
 	var o: Dictionary = MassRules.overlaps(builder.mass_log,
-		func(a: String, b: String) -> float: return _allowance(a, b, polygonal, tower_lap, ridge),
+		func(a: String, b: String) -> float:
+			return _allowance(a, b, polygonal, tower_lap, ridge, terraced),
 		FAMILIES)
 	_add(o["failures"])
 	stats["worst_penetration"] = o["worst"]

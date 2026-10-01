@@ -14,6 +14,10 @@ var _sts: Array[SurfaceTool] = []
 ## Metric texture coordinates are opt-in. Church and castle stone uses physical
 ## metres; houses retain their established UV regions and roof materials.
 var metric_coordinates := false
+## Temporary world-space offset applied at the final vertex write. Ring builders
+## use this while emitting an elevated enceinte, then reset it before the next
+## mass. Geometry arguments and normals remain in their local frame.
+var emission_offset := Vector3.ZERO
 
 
 func _init(surface_count: int, p_metric_coordinates := false) -> void:
@@ -114,7 +118,7 @@ func _emit_box(pts: Array, surf: int) -> void:
 				else:
 					st.set_uv(Vector2(0.0 if vi == 0 else 1.0,
 						0.0 if vi < 2 else 1.0))
-				st.add_vertex(pts[tri[vi]])
+				_add_vertex(st, pts[tri[vi]])
 
 
 ## A deterministic basis for a face. U follows its horizontal/eave direction;
@@ -261,12 +265,16 @@ func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
 	for p in [a, b, c]:
 		st.set_normal(n)
 		st.set_uv(_project_uv(p, axes) if metric_coordinates else Vector2(0.5, 0.5))
-		st.add_vertex(p)
+		_add_vertex(st, p)
 
 
 func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
 	_tri(st, a, b, c)
 	_tri(st, a, c, d)
+
+
+func _add_vertex(st: SurfaceTool, point: Vector3) -> void:
+	st.add_vertex(point + emission_offset)
 
 
 ## A flat slab of `thickness` through any planar polygon, given its corners in
@@ -335,7 +343,7 @@ func _tri_metric(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3,
 	for p in [a, b, c]:
 		st.set_normal(normal)
 		st.set_uv(Vector2(p.dot(u), p.dot(v)))
-		st.add_vertex(p)
+		_add_vertex(st, p)
 
 
 ## Hipped roof: side slabs plus sloped ends, so all four sides fall away.
@@ -449,7 +457,7 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 						st.set_uv(Vector2((angle - start) * radius, height))
 					else:
 						st.set_uv(Vector2(float(s) / segments, float(i) / rings))
-					st.add_vertex(v[vi])
+					_add_vertex(st, v[vi])
 	# close a partial sweep, so a half-dome is not hollow along its cut
 	if arc < TAU - 0.001:
 		for a in [start, start + arc]:
@@ -473,7 +481,7 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 						st.set_normal(cn)
 						st.set_uv(_project_uv(q[vi], cap_axes)
 							if metric_coordinates else Vector2.ZERO)
-						st.add_vertex(q[vi])
+						_add_vertex(st, q[vi])
 
 
 ## Battered drum with a capped top: the shaft of every castle tower.
@@ -590,12 +598,12 @@ func half_cylinder(radius: float, height: float, center: Vector2, surf: int,
 		var c: Vector3 = origin + Vector3(0, height, 0)
 		st.set_normal(Vector3.UP)
 		var p0 := c + Vector3(cos(a0) * radius, 0, sin(a0) * radius)
-		st.set_uv(_project_uv(p0, top_axes) if metric_coordinates else Vector2.ZERO); st.add_vertex(p0)
+		st.set_uv(_project_uv(p0, top_axes) if metric_coordinates else Vector2.ZERO); _add_vertex(st, p0)
 		st.set_normal(Vector3.UP)
 		var p1 := c + Vector3(cos(a1) * radius, 0, sin(a1) * radius)
-		st.set_uv(_project_uv(p1, top_axes) if metric_coordinates else Vector2(1, 0)); st.add_vertex(p1)
+		st.set_uv(_project_uv(p1, top_axes) if metric_coordinates else Vector2(1, 0)); _add_vertex(st, p1)
 		st.set_normal(Vector3.UP)
-		st.set_uv(_project_uv(c, top_axes) if metric_coordinates else Vector2(1, 1)); st.add_vertex(c)
+		st.set_uv(_project_uv(c, top_axes) if metric_coordinates else Vector2(1, 1)); _add_vertex(st, c)
 
 
 ## A hollow ring in plan, elliptical: the wall of a shell keep. `rx`/`rz` are

@@ -72,10 +72,12 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 	for room_index in range(plan.room_count()):
 		if not HouseGeometry.room_suits(plan, room_index, plan.kind_of(room_index)):
 			return HousePlan.new()
-	var entry_level := 1 if CastleGeometry.is_enclosed(spec) else 0
+	var entry_level := 1 if CastleGeometry.is_enclosed(spec) \
+		and spec.plan_kind != &"terraced" and not spec.terraced_fallback else 0
 	hs.entry_storey = entry_level
 	var walls := HouseGeometry.room_walls(plan, entry_level)
-	var entry_inward := Vector2(-1, 0) if spec.plan_kind == &"bergfried" else Vector2(0, 1)
+	var entry_inward := Vector2(-1, 0) if spec.plan_kind == &"bergfried" \
+		else (Vector2(1, 0) if spec.plan_kind == &"terraced" else Vector2(0, 1))
 	var front := _facing_wall(walls, entry_inward)
 	var front_wall: Dictionary = walls[front]
 	plan.doors.append({"a": entry_level, "b": -1,
@@ -174,6 +176,8 @@ static func _windows(plan: HousePlan, level: int) -> void:
 			# Small round keeps have real, short masonry facets. Keep the normal
 			# jamb when it leaves a usable aperture; compact facets use a narrower
 			# light while preserving a quarter-metre stone return at each corner.
+			# 45 cm jamb when it leaves a usable aperture; only compact facets
+			# fall back to a 25 cm stone jamb and a narrow 30 cm light.
 			width = minf(CastleInteriorPlans.WINDOW_W,
 				length - 2.0 * COMPACT_FACET_JAMB)
 			if width < COMPACT_FACET_WINDOW_MIN:

@@ -26,6 +26,9 @@ const TIER_SUFFIXES := {
 
 
 static func generate(spec: CastleSpec, p_seed: int) -> void:
+	# A spec may be regenerated after a caller changes style or plan override.
+	# The fallback belongs to one failed terraced fit only.
+	spec.terraced_fallback = false
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
 	var s: Dictionary = CastleSpec.STYLES[spec.style]
@@ -53,7 +56,7 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 			or spec.length < 42.0 or spec.length > 60.0):
 		spec.plan_kind = &"rect"
 	spec.sides = 4
-	if spec.plan_kind == &"polygon":
+	if spec.plan_kind in [&"polygon", &"terraced"]:
 		spec.sides = clampi(spec.sides_override if spec.sides_override > 0 \
 			else int(plan["sides"]), CastleGeometry.POLY_MIN_SIDES,
 			CastleGeometry.POLY_MAX_SIDES)
@@ -114,6 +117,12 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	spec.ward_gap = 0.0
 	if spec.tier == &"fortress" and spec.plan_kind != &"motte_bailey":
 		_fit_inner_ward(spec, r)
+	if spec.plan_kind == &"terraced" and enclosed:
+		spec.terrace_rise = maxf(spec.terrace_rise, 3.0)
+		force_inner_ward(spec, minf(spec.width, spec.length) * 0.16)
+		if not spec.inner_ward:
+			spec.terraced_fallback = true
+			spec.plan_kind = &"polygon"
 	var motte_size := Vector2.ZERO
 	if spec.plan_kind == &"motte_bailey" and enclosed:
 		_fit_motte(spec, r)
@@ -162,6 +171,9 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 			spec.great_tower_scale = float(great_r["scale"])
 	if CastleGeometry.is_sky(spec):
 		_fit_sky(spec)
+	if spec.plan_kind == &"terraced" and spec.keep:
+		spec.keep_height = maxf(spec.keep_height,
+			CastleGeometry.gate_height(spec, 1) + 10.0)
 	if spec.plan_kind == &"bergfried":
 		_fit_bergfried(spec)
 
@@ -194,9 +206,27 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 ## fitted, and it is deliberately NOT called from generate(): the fitting there
 ## runs in its own order and this must not perturb it.
 static func refit(spec: CastleSpec) -> void:
+	# Calling refit on a polygon explicitly treats it as an ordinary polygon.
+	# The terraced branch below can set the marker again if this fit fails.
+	if spec.plan_kind != &"terraced":
+		spec.terraced_fallback = false
 	if spec.plan_kind == &"bergfried":
 		_fit_bergfried(spec)
 		return
+	if spec.plan_kind == &"terraced" and CastleGeometry.is_enclosed(spec):
+		spec.terrace_rise = maxf(spec.terrace_rise, 3.0)
+		spec.terraced_fallback = false
+		force_inner_ward(spec, maxf(spec.ward_gap,
+			minf(spec.width, spec.length) * 0.16))
+		if not spec.inner_ward:
+			# Keep the requested footprint. A terraced plan whose second ring
+			# cannot leave room for a walkable ward is an ordinary polygonal ward,
+			# never a terraced plan with a missing ring.
+			spec.terraced_fallback = true
+			spec.plan_kind = &"polygon"
+		if spec.keep:
+			spec.keep_height = maxf(spec.keep_height,
+				CastleGeometry.gate_height(spec, 1) + 10.0)
 	if spec.plan_kind == &"tower_house" and not CastleGeometry.is_enclosed(spec):
 		var r := RandomNumberGenerator.new()
 		r.seed = spec.seed

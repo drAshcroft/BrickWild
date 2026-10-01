@@ -720,6 +720,8 @@ func _build_chimneys() -> void:
 func _build_enclosure() -> void:
 	for r in CastleGeometry.rings(spec):
 		_build_ring(r)
+	if spec.plan_kind == &"terraced":
+		_build_terrace_stair()
 	_build_wall_stairs()
 
 	tag("barbican")
@@ -746,6 +748,8 @@ func _build_enclosure() -> void:
 		_build_keep()
 	if CastleGeometry.is_motte(spec):
 		_build_motte()
+	if spec.plan_kind == &"terraced":
+		_build_terrace()
 
 	# The hall and the chapel look into the bailey (CAS-003): windows on the
 	# courtyard face and the free short end, none through the curtain they
@@ -761,6 +765,15 @@ func _build_enclosure() -> void:
 		_range(chapel, "chapel", SURF_STONE, true, [Vector3(-1, 0, 0)], RANGE_BAY)
 		_build_apse()
 	_build_yard()
+	if spec.plan_kind == &"terraced":
+		var inner_ground := CastleGeometry.ring_ground_y(spec,
+			CastleGeometry.inner_ring(spec))
+		for mass in mass_log:
+			var nm: String = mass["name"]
+			if nm in ["keep", "hall", "chapel", "apse", "well"] \
+					or nm.begins_with("yard_") or nm.begins_with("forebuilding"):
+				if (mass["aabb"] as AABB).position.y >= inner_ground - 0.01:
+					mass["ground"] = inner_ground
 
 
 func _build_water_moats() -> void:
@@ -848,7 +861,8 @@ func _build_apse() -> void:
 	tag("apse")
 	var r: float = CastleGeometry.apse_radius(spec)
 	var h: float = a.size.y
-	var origin := Vector3(a.position.x + a.size.x / 2.0, 0.0, a.position.z + a.size.z)
+	var origin := Vector3(a.position.x + a.size.x / 2.0, a.position.y,
+		a.position.z + a.size.z)
 	var aperture := PackedVector2Array()
 	var planned := _planned_interiors.has("chapel")
 	if planned:
@@ -915,6 +929,11 @@ func _build_apse() -> void:
 
 
 func _build_ring(r: int) -> void:
+	var lift: float = CastleGeometry.ring_ground_y(spec, r)
+	var part_start := part_log.size()
+	var mass_start := mass_log.size()
+	var component_start := component_log.size()
+	_kit.emission_offset.y = lift
 	if CastleGeometry.is_polygonal(spec):
 		_build_ring_walls_poly(r)
 	else:
@@ -939,7 +958,6 @@ func _build_ring(r: int) -> void:
 	for c2 in CastleGeometry.gate_tower_centers(spec, r):
 		_tower(c2, r, "tower_%d_gate_%d" % [r, i], Vector3(0, 0, -1))
 		i += 1
-
 	tag("gate")
 	var g: AABB = CastleGeometry.gatehouse_aabb(spec, r)
 	if g.size.x > 0.0:
@@ -952,7 +970,109 @@ func _build_ring(r: int) -> void:
 			var x: float = lerpf(-g.size.x * 0.3, g.size.x * 0.3, float(k) / 2.0)
 			_opening(Vector3(x, g.size.y * 0.72, g.position.z - CastleGeometry.OPENING_EPS),
 				PI, 0.4, 0.6, &"square")
-		total_height = maxf(total_height, g.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+			total_height = maxf(total_height, g.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+	_kit.emission_offset = Vector3.ZERO
+	_translate_ring_records(part_start, mass_start, component_start, lift)
+	if lift > 0.0:
+		total_height = maxf(total_height, lift + CastleGeometry.wall_height(spec, r)
+			+ CastleGeometry.PARAPET_RISE + spec.merlon_h)
+
+
+## MeshKit lifts only the vertices emitted for a ring. Keep all three QA logs
+## in that same world frame, including component transforms and slabs.
+func _translate_ring_records(part_start: int, mass_start: int, component_start: int,
+		lift: float) -> void:
+	if absf(lift) < 0.001:
+		return
+	var offset := Vector3.UP * lift
+	for i in range(part_start, part_log.size()):
+		part_log[i]["pos"] = (part_log[i]["pos"] as Vector3) + offset
+	for i in range(mass_start, mass_log.size()):
+		var a: AABB = mass_log[i]["aabb"]
+		mass_log[i]["aabb"] = AABB(a.position + offset, a.size)
+		mass_log[i]["ground"] = lift
+	for i in range(component_start, component_log.size()):
+		var row: Dictionary = component_log[i]
+		if row.has("xf"):
+			var xf: Transform3D = row["xf"]
+			xf.origin += offset
+			row["xf"] = xf
+		if row.has("points"):
+			var points: PackedVector3Array = row["points"]
+			for p in range(points.size()):
+				points[p] += offset
+			row["points"] = points
+		if row.has("aabb"):
+			var a: AABB = row["aabb"]
+			row["aabb"] = AABB(a.position + offset, a.size)
+
+
+## Solid shrinking stone courses. The widest course is at world ground; each
+## course steps inward as it rises, giving the retaining side its batter.
+func _build_terrace() -> void:
+	var rise: float = spec.terrace_rise
+	if rise < 3.0 or not spec.inner_ward:
+		return
+	var poly: PackedVector2Array = CastleGeometry.enceinte_polygon(spec, 1)
+	var centre: Vector2 = CastleGeometry.polygon_bbox(poly).get_center()
+	var t: float = CastleGeometry.wall_thickness(spec, 1)
+	var half: Vector2 = CastleGeometry.polygon_bbox(poly).size * 0.5
+	var base_inset := Vector2(t * 0.35, t * 0.35)
+	# The cap laps the inner curtain footing by 0.2 wall-thickness. The stair
+	# surface and curtain therefore meet at the same terrace elevation.
+	var top_inset := Vector2(t * 0.8, t * 0.8)
+	var overall := AABB(Vector3(centre.x - half.x + base_inset.x, 0.0,
+		centre.y - half.y + base_inset.y),
+		Vector3(maxf(half.x * 2.0 - 2.0 * base_inset.x, 1.0), rise,
+			maxf(half.y * 2.0 - 2.0 * base_inset.y, 1.0)))
+	tag("terrace")
+	var levels := 4
+	for level in range(levels):
+		var f: float = float(level + 1) / float(levels)
+		var inset: Vector2 = base_inset.lerp(top_inset, f)
+		var points := PackedVector3Array()
+		for p in poly:
+			var q := centre + Vector2((p.x - centre.x) * maxf(0.1, (half.x - inset.x) / half.x),
+				(p.y - centre.y) * maxf(0.1, (half.y - inset.y) / half.y))
+			points.append(Vector3(q.x,
+				rise * (float(level) + 0.5) / float(levels), q.y))
+		_kit.slab_poly(points, rise / float(levels), SURF_STONE, true)
+		_log_part("terrace_course", overall.get_center(),
+			Vector3(overall.size.x, rise / float(levels), overall.size.z))
+	_log_mass("terrace", overall, 0.0)
+	total_height = maxf(total_height, rise)
+
+
+## One narrow stone flight climbs from the outer gate approach to the raised
+## inner gate. Treads remain separate so the voxel walker can pass above them.
+func _build_terrace_stair() -> void:
+	if not spec.inner_ward:
+		return
+	var rise: float = spec.terrace_rise
+	var outer: AABB = CastleGeometry.gatehouse_aabb(spec, 0)
+	var inner: AABB = CastleGeometry.gatehouse_aabb(spec, 1)
+	var front: float = outer.position.z + outer.size.z
+	var back: float = inner.position.z
+	var run: float = back - front
+	if run < rise * 1.2:
+		front = outer.position.z + outer.size.z * 0.45
+		run = back - front
+	if run <= 0.5:
+		return
+	var width := minf(3.0, maxf(1.8, spec.gate_width * 0.3))
+	var steps := maxi(int(ceil(rise / 0.2)), 8)
+	var tread := run / float(steps)
+	tag("terrace_stair")
+	var low_z := front
+	var bounds := AABB(Vector3(-width * 0.5, 0.0, low_z),
+		Vector3(width, rise, run))
+	for i in range(steps):
+		var y: float = rise * float(i + 1) / float(steps)
+		var z: float = low_z + tread * (float(i) + 0.5)
+		box(Vector3(width, y, tread * 1.02), Vector3(0.0, y * 0.5, z), SURF_STONE)
+	_log_mass("terrace_stair_1", bounds, 0.0)
+	mass_log.back()["walk_height"] = rise
+	mass_log.back()["ring"] = 1
 
 
 ## A real tunnel through the gate mass, with no dark collision box sealing it.
@@ -1117,13 +1237,15 @@ func _run_slits(seg: Dictionary, r: int) -> void:
 ## the tiered tenshu of a Japanese castle.
 func _build_keep() -> void:
 	var k: AABB = CastleGeometry.keep_aabb(spec)
-	var c := Vector3(k.position.x + k.size.x / 2.0, 0.0, k.position.z + k.size.z / 2.0)
+	var c := Vector3(k.position.x + k.size.x / 2.0, k.position.y,
+		k.position.z + k.size.z / 2.0)
 	_log_mass("keep", k)
 	var planned := _planned_interiors.has("keep")
 	if planned:
 		Interiors.emit(self, _planned_interiors["keep"])
 		_build_planned_keep_crown(k)
-		_build_forebuilding()
+		if spec.plan_kind != &"terraced" and not spec.terraced_fallback:
+			_build_forebuilding()
 		total_height = maxf(total_height, k.end.y + CastleGeometry.roof_rise(spec, k))
 		return
 	var opening_y: float = k.size.y * 0.55
@@ -1525,7 +1647,9 @@ func _build_yard() -> void:
 	for b in CastleGenerator.bailey_buildings(spec):
 		var rect: Rect2 = b["rect"]
 		var h: float = YARD_WALL_H
-		var a := AABB(Vector3(rect.position.x, 0.0, rect.position.y),
+		var a := AABB(Vector3(rect.position.x,
+			CastleGeometry.ring_ground_y(spec, CastleGeometry.inner_ring(spec)),
+			rect.position.y),
 			Vector3(rect.size.x, h, rect.size.y))
 		var row := Interiors.yard(spec, b)
 		var id := "yard_%s" % String(b["business"])
@@ -1539,7 +1663,8 @@ func _build_yard() -> void:
 		return
 	var at: Vector2 = well["pos"]
 	var kit := PropKit.new(_kit, SURF_STONE, SURF_TRIM, SURF_ROOF, SURF_OPEN)
-	var box: AABB = kit.well(Vector3(at.x, 0.0, at.y), 0.0, float(well["radius"]))
+	var ground: float = CastleGeometry.ring_ground_y(spec, CastleGeometry.inner_ring(spec))
+	var box: AABB = kit.well(Vector3(at.x, ground, at.y), 0.0, float(well["radius"]))
 	if box.size.x > 0.01:
 		_log_mass("well", box)
 		total_height = maxf(total_height, box.position.y + box.size.y)

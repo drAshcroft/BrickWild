@@ -73,15 +73,18 @@ const LANDMARKS: Array[Dictionary] = [
 const EXPECTED_FAIL := {
 	"conwy": "two wards side by side (no backlog task yet)",
 	"malbork": "three wards in a line, brick (no backlog task yet)",
-	"edinburgh": "terraced baileys (INT-016)",
+	"eilean_donan": "island and causeway: a water plan kind (no backlog task yet)",
+	"caerphilly": "two moats: a water plan kind (no backlog task yet)",
 	"mont_saint_michel": "a church on a terraced ring (INT-016, WLD church composition)",
 }
 
 
-static func run() -> SuiteResult:
+static func run(focus_key: String = "") -> SuiteResult:
 	var res := SuiteResult.new("castle landmark")
 	for landmark in LANDMARKS:
 		var key: String = landmark["key"]
+		if not focus_key.is_empty() and key != focus_key:
+			continue
 		var defects := 0
 		for scale in SCALES:
 			if OS.get_environment("BIG_GLADE_TEST_TRACE") == "1":
@@ -96,7 +99,7 @@ static func run() -> SuiteResult:
 			_force_features(key, spec)
 
 			var builder := CastleBuilder.new()
-			builder.build(spec)
+			var emitted: ArrayMesh = builder.build(spec)
 			res.checked += 1
 			var who := "%s scale=%.2f" % [key, scale]
 			var before_fail: int = res.failures.size()
@@ -106,14 +109,14 @@ static func run() -> SuiteResult:
 			if EXPECTED_FAIL.has(key):
 				# the massing still has to be sound; only the feature is excused
 				var probe := SuiteResult.new("probe")
-				_check_required_masses(key, spec, builder, who, probe, scale)
+				_check_required_masses(key, spec, builder, who, probe, scale, emitted)
 				if probe.failures.is_empty():
 					res.note("  %s: expected to fail (%s) and passed -- take it off EXPECTED_FAIL"
 						% [who, String(EXPECTED_FAIL[key])])
 				elif is_equal_approx(scale, 1.0):
 					res.note("  %s: expected-fail, blocked by %s" % [key, String(EXPECTED_FAIL[key])])
 			else:
-				_check_required_masses(key, spec, builder, who, res, scale)
+				_check_required_masses(key, spec, builder, who, res, scale, emitted)
 			var rep: Dictionary = CastleMassingCheck.new().check(spec, builder)
 			for f in rep["failures"]:
 				res.fail("%s: %s" % [who, str(f)])
@@ -123,7 +126,8 @@ static func run() -> SuiteResult:
 			if res.failures.size() > before_fail:
 				defects += 1
 		res.note("  %-15s %d scales, %d defects" % [key, SCALES.size(), defects])
-	_check_castel_del_monte(res)
+	if focus_key.is_empty() or focus_key == "castel_del_monte":
+		_check_castel_del_monte(res)
 	return res
 
 
@@ -246,6 +250,7 @@ static func _force_features(key: String, spec: CastleSpec) -> void:
 			spec.tower_height = 65.0 * (spec.height / 25.0) \
 				/ CastleGeometry.great_tower_height_factor(spec.great_tower_scale)
 		"himeji":
+			_force_plan(spec, &"terraced", 5)
 			spec.keep_shape = &"tiered"
 			spec.tower_roof = &"tiered"
 			spec.corner_towers = true
@@ -321,7 +326,7 @@ static func _force_features(key: String, spec: CastleSpec) -> void:
 			spec.tower_shape = &"polygonal"
 			_force_plan(spec, &"polygon", 8)
 		"edinburgh":
-			_force_plan(spec, &"ridge", 0)
+			_force_plan(spec, &"terraced", 6)
 			spec.corner_towers = true
 		"eilean_donan":
 			_force_plan(spec, &"water", 4)
@@ -379,7 +384,8 @@ static func _force_concentric(spec: CastleSpec) -> void:
 ## For each landmark, confirm the forced feature actually produced structural
 ## geometry -- not just a flag flipped on a spec nobody read.
 static func _check_required_masses(key: String, spec: CastleSpec,
-		builder: CastleBuilder, who: String, res: SuiteResult, scale: float) -> void:
+		builder: CastleBuilder, who: String, res: SuiteResult, scale: float,
+		emitted: ArrayMesh = null) -> void:
 	match key:
 		"longhouse":
 			_require(builder, who, res, "hall", "hall block")
@@ -422,6 +428,52 @@ static func _check_required_masses(key: String, spec: CastleSpec,
 					res.fail("%s: a ridge castle has a %s mass" % [who, banned])
 		"himeji":
 			_require(builder, who, res, "keep", "tiered tenshu")
+			if scale < 1.0:
+				# At these footprints the second polygon cannot leave a walkable
+				# ward. The generator must report the single-ring fallback plainly.
+				if spec.plan_kind != &"polygon" or spec.inner_ward \
+						or not spec.terraced_fallback:
+					res.fail("%s: infeasible small terrace did not become an explicit polygon fallback" % who)
+				if builder.has_mass("terrace") or builder.has_mass("wall_1") \
+						or builder.has_mass("forebuilding"):
+					res.fail("%s: single-ring fallback emitted a phantom terrace or inner wall" % who)
+				_require(builder, who, res, "wall_0", "the retained outer polygon")
+				var fallback_plan := CastleKeepPlan.generate(spec, false)
+				if fallback_plan.doors.is_empty() \
+						or HousePlan.record_storey(fallback_plan.doors[0]) != 0:
+					res.fail("%s: single-ring fallback keep entrance is not at grade" % who)
+				var walk := CastleQA.lords_walk(spec, builder, emitted)
+				for failure in walk.failures:
+					res.fail("%s: fallback gate-to-keep route: %s" % [who, str(failure)])
+				# A reused spec must not carry this one-fit decision into a new
+				# generation or an explicitly ordinary polygon refit.
+				var reused := CastleSpec.new()
+				reused.style = &"norman"
+				reused.tier_override = spec.tier
+				reused.width = spec.width
+				reused.length = spec.length
+				reused.height = spec.height
+				reused.terraced_fallback = true
+				reused.plan_override = &"polygon"
+				CastleGenerator.generate(reused, spec.seed + 1)
+				if reused.terraced_fallback:
+					res.fail("%s: fallback marker leaked across regeneration" % who)
+				reused.terraced_fallback = true
+				CastleGenerator.refit(reused)
+				if reused.terraced_fallback:
+					res.fail("%s: fallback marker leaked into ordinary polygon refit" % who)
+				return
+			_require(builder, who, res, "terrace", "the raised top ward")
+			if not builder.has_mass("terrace_stair_"):
+				res.fail("%s: the inner ward has no joining stair" % who)
+			var keep_top: float = builder.mass_aabb("keep").end.y \
+				+ CastleGeometry.roof_rise(spec, builder.mass_aabb("keep"))
+			var curtain_top := 0.0
+			for mass in builder.mass_log:
+				if String(mass["name"]).begins_with("wall_") or String(mass["name"]).begins_with("gate_"):
+					curtain_top = maxf(curtain_top, (mass["aabb"] as AABB).end.y)
+			if keep_top - curtain_top < 10.0:
+				res.fail("%s: tenshu top is only %.1fm above the highest curtain" % [who, keep_top - curtain_top])
 		"chambord":
 			_require(builder, who, res, "tower_0_corner_0", "corner drum towers")
 			_require(builder, who, res, "keep", "central keep")
@@ -484,9 +536,7 @@ static func _check_required_masses(key: String, spec: CastleSpec,
 			if CastleGeometry.plan_sides(spec) != 8:
 				res.fail("%s: not an octagon" % who)
 		"edinburgh":
-			if spec.plan_kind != &"ridge":
-				res.fail("%s: not a ridge" % who)
-			res.fail("%s: terraced baileys are not built yet (INT-016)" % who)
+			_require(builder, who, res, "terrace", "the raised inner ward")
 		"eilean_donan":
 			_assert_water_plan(spec, builder, who, res, 1)
 		"caerphilly":
