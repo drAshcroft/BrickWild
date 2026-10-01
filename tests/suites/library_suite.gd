@@ -93,7 +93,8 @@ static func run() -> SuiteResult:
 
 static func _check_world_generic_envelope(res: SuiteResult) -> void:
 	var descriptor: Dictionary = BigGlade.describe_kind(&"world")
-	var tower_max := float(WorldFamilies.envelope(&"tower_house")["height"]["max"])
+	var tower_envelope: Dictionary = WorldFamilies.envelope(&"tower_house")
+	var tower_max := float(tower_envelope["height"]["max"])
 	res.checked += 1
 	if float(descriptor["height"]["max"]) < tower_max:
 		res.fail("world generic height envelope does not include registered tower families")
@@ -101,19 +102,35 @@ static func _check_world_generic_envelope(res: SuiteResult) -> void:
 	request.kind = &"world"
 	request.style = &"tower_house"
 	request.purpose = &"merchant_tower"
-	request.width = 8.0
-	request.length = 8.0
+	var width_max := float(tower_envelope["width"]["max"])
+	var length_max := float(tower_envelope["length"]["max"])
+	request.width = width_max + 0.000001
+	request.length = length_max + 0.000001
 	request.height = tower_max
 	res.checked += 1
 	if not BuildingLibrary.validate(request).is_empty():
-		res.fail("tower at its published family maximum was refused by the public API")
+		res.fail("tower dimensions with float-scale endpoint drift were refused")
 	request.height = tower_max + 0.01
 	var failures := BuildingLibrary.validate(request)
 	res.checked += 1
-	if not failures.any(func(failure: Dictionary) -> bool:
-		return failure.get("code", &"") == &"dimension_out_of_range" \
-			and failure.get("field", &"") == &"height"):
+	if not _has_dimension_failure(failures, &"height"):
 		res.fail("tower family height above its envelope was not rejected")
+	request.height = tower_max
+	request.width = width_max + 0.01
+	res.checked += 1
+	if not _has_dimension_failure(BuildingLibrary.validate(request), &"width"):
+		res.fail("tower family width 0.01 m above its envelope was not rejected")
+	request.width = width_max
+	request.length = length_max + 0.01
+	res.checked += 1
+	if not _has_dimension_failure(BuildingLibrary.validate(request), &"length"):
+		res.fail("tower family length 0.01 m above its envelope was not rejected")
+
+
+static func _has_dimension_failure(failures: Array[Dictionary], field: StringName) -> bool:
+	return failures.any(func(failure: Dictionary) -> bool:
+		return failure.get("code", &"") == &"dimension_out_of_range" \
+			and failure.get("field", &"") == field)
 
 
 ## VIL-019: a village asked for like any other building.

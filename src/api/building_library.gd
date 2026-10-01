@@ -288,7 +288,7 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 		elif known:
 			var limits: Dictionary = KIND_ROWS[request.kind][field]
 			var maximum := _dimension_max(request.kind, field, float(limits["max"]))
-			if value < float(limits["min"]) or value > maximum:
+			if _outside_envelope(value, float(limits["min"]), maximum):
 				out.append(_error(&"dimension_out_of_range", field,
 					"%s must be between %s and %s for a %s." % [
 						_field_word(request.kind, field), limits["min"], maximum,
@@ -419,11 +419,21 @@ static func validate_world_envelope(request: BuildingRequest) -> Array[Dictionar
 	for field in DIMENSIONS:
 		var value: float = request.get(field)
 		var lim: Dictionary = env[field]
-		if value < float(lim["min"]) or value > float(lim["max"]):
+		if _outside_envelope(value, float(lim["min"]), float(lim["max"])):
 			out.append(_error(&"dimension_out_of_range", field,
 				"%s must be between %s and %s metres for a %s." % [
 					String(field), lim["min"], lim["max"], String(request.style)]))
 	return out
+
+
+## Treat representational drift at a published endpoint as that endpoint.
+## `is_equal_approx` is tight enough to absorb binary float noise while still
+## rejecting meaningful increments such as a centimetre past the limit.
+static func _outside_envelope(value: float, minimum: float, maximum: float) -> bool:
+	if not is_finite(value):
+		return true
+	return (value < minimum and not is_equal_approx(value, minimum)) \
+		or (value > maximum and not is_equal_approx(value, maximum))
 
 
 ## The generic world envelope must include every registered family. The
