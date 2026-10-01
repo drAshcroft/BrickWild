@@ -27,8 +27,9 @@ static func run() -> SuiteResult:
 	var report := BigGlade.check(building)
 	if not bool(report.get("ok", false)):
 		res.fail("Queen's Well public API check reports a failure")
-	for failure in report.get("failures", []):
-		res.fail("Queen's Well: %s" % String(failure))
+	for diagnostic in report.get("diagnostics", []):
+		if String(diagnostic.get("severity", "")) == "error":
+			res.fail("Queen's Well: %s" % String(diagnostic.get("message", diagnostic)))
 	if not WorldFamilies.has_family(&"stepwell") \
 			or WorldFamilies.kinds_of(&"stepwell") != [&"queens_well"]:
 		res.fail("world family registry does not publish stepwell / queens_well")

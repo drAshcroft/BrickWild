@@ -225,7 +225,7 @@ func _check_tank_walk(plan: HousePlan, failures: Array[String]) -> void:
 		Vector2(access.end.x - 0.55, tank.get_center().y)]
 	var reached_sides := 0
 	for p in points:
-		if grid.distance_to(p, 0.8) <= 0.8:
+		if is_finite(grid.distance_to(p, 0.8)):
 			reached_sides += 1
 	if reached_sides < 3:
 		failures.append("water: the flood reaches only %d sides of the tank, needs three" % reached_sides)

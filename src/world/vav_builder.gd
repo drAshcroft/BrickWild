@@ -33,7 +33,7 @@ func build(plan: HousePlan) -> ArrayMesh:
 	var tank: Rect2 = meta["tank"]
 	var channel_center := float(meta.get("channel_center_z", 0.0))
 	for side in [-1.0, 1.0]:
-		var z := channel_center + side * (channel_width * 0.5 + wall_t * 0.5)
+		var z: float = channel_center + float(side) * (channel_width * 0.5 + wall_t * 0.5)
 		var wall_x := site.position.x
 		var wall_width := site.size.x
 		if side > 0.0:
@@ -113,9 +113,9 @@ func _emit_tank(meta: Dictionary) -> void:
 	var floor_y := float(meta["tank_floor_y"])
 	var t := 0.55
 	var slab := Vector3(rect.size.x, t, rect.size.y)
-	var slab_pos := Vector3(rect.get_center().x, floor_y - t * 0.5, rect.get_center().y)
+	var slab_pos := Vector3(rect.get_center().x, floor_y + t * 0.5, rect.get_center().y)
 	box(slab, slab_pos, STONE)
-	_log_mass("tank_floor", AABB(slab_pos - slab * 0.5, slab), floor_y - t)
+	_log_mass("tank_floor", AABB(slab_pos - slab * 0.5, slab), floor_y)
 	for side in [-1.0, 1.0]:
 		if side < 0.0:
 			continue # the north edge opens directly onto the last stair landing
