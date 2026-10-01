@@ -58,7 +58,7 @@ static func generate(seed: int, width: float, length: float, _height: float) -> 
 		if level == 0:
 			_add_room(plan, &"shop", "taberna_left", left, level)
 			_add_room(plan, &"shop", "taberna_right", right, level)
-			var ground_store := _add_room(plan, &"store", "ground_store", Rect2(Vector2(stair.x, stair_room_rect.end.y),
+			var ground_store := _add_room(plan, &"store", "ground_store", Rect2(Vector2(stair.position.x, stair_room_rect.end.y),
 				Vector2(stair.size.x, inner.end.y - stair_room_rect.end.y)), level)
 			_add_door(plan, stair_room, ground_store,
 				Vector2(stair.get_center().x, stair_room_rect.end.y), Vector2(0, 1), level, "service")
