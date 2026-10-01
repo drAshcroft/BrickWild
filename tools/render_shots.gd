@@ -58,6 +58,10 @@ func _init() -> void:
 		await _shoot_vis010_acceptance()
 		quit()
 		return
+	if args.has("vis009"):
+		await _shoot_vis009_acceptance()
+		quit()
+		return
 	if args.has("vis007") or args.has("vis007-before"):
 		await _shoot_vis007_acceptance("before" if args.has("vis007-before") else "after")
 		quit()
@@ -189,6 +193,24 @@ func _shoot_vis010_acceptance() -> void:
 		await _shoot_sheet(spec, "%s/sheet_%s.jpg" % [out, entry["key"]])
 		rendered += 1
 	print("VIS-010 rendered %d blueprint sheets to %s/%s" % [rendered, OUT_DIR, out])
+
+
+## Fixed-camera portraits of the two VIS-009 roofline subjects.
+func _shoot_vis009_acceptance() -> void:
+	var out := "visualqa/vis009"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + out))
+	var rendered := 0
+	for entry in _castles():
+		if String(entry.key) not in ["neuschwanstein", "chambord"]:
+			continue
+		var spec := _castle_spec(entry)
+		await _shoot_castle(spec, "%s/%s_front.jpg" % [out, entry.key],
+			float(entry.yaw), float(entry.pitch), float(entry.get("zoom", 1.0)))
+		await _shoot_castle(spec, "%s/%s_raking.jpg" % [out, entry.key],
+			float(entry.yaw) - 0.35, float(entry.pitch) - 0.08,
+			float(entry.get("zoom", 1.0)))
+		rendered += 2
+	print("VIS-009 rendered %d focused castle views to %s/%s" % [rendered, OUT_DIR, out])
 
 
 ## A fixed camera/seed pair for each visual acceptance subject. The first image

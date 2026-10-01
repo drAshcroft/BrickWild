@@ -30,6 +30,7 @@ const SLIT_BAY := 4.5          # metres of wall per arrow slit
 var spec: CastleSpec
 var _roof_faces: Array[PackedVector3Array] = []
 var _roof_covers: Array[PackedVector3Array] = []
+var _roof_openings: Array[Dictionary] = []
 var interiors: Array[Dictionary] = []
 var interior_errors: Array[String] = []
 var _planned_interiors := {}
@@ -42,6 +43,7 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 	begin_metric(5)
 	_roof_faces.clear()
 	_roof_covers.clear()
+	_roof_openings.clear()
 	interiors.clear()
 	interior_errors.clear()
 	_planned_interiors = Interiors.primary(spec)
@@ -182,9 +184,10 @@ func _join_roofs() -> void:
 		# boundary, so clip each slope only by the actual tower top footprints;
 		# the two range skins then meet under masonry instead of crossing in the
 		# visible envelope.
-		for face in _roof_faces:
-			for piece in RoofShape.exposed(face, _roof_covers, -1):
-				_kit.slab_poly(RoofShape.lift(piece, face), RoofShape.DEPTH, SURF_ROOF, true)
+		for i in range(_roof_faces.size()):
+			var face := _roof_faces[i]
+			for piece in _exposed_roof_pieces(face, i, _roof_covers, -1):
+				_kit.slab_poly(piece, RoofShape.DEPTH, SURF_ROOF, true)
 		return
 	for mass in mass_log:
 		var name: String = mass["name"]
@@ -200,8 +203,27 @@ func _join_roofs() -> void:
 			Vector3(a.end.x, a.end.y, a.position.z), a.end, Vector3(a.position.x, a.end.y, a.end.z)]))
 	for i in range(_roof_faces.size()):
 		var face := _roof_faces[i]
-		for piece in RoofShape.exposed(face, covers, i):
-			_kit.slab_poly(RoofShape.lift(piece, face), RoofShape.DEPTH, SURF_ROOF, true)
+		for piece in _exposed_roof_pieces(face, i, covers, i):
+			_kit.slab_poly(piece, RoofShape.DEPTH, SURF_ROOF, true)
+
+
+## Dormer footprints are removed before cover clipping, so the roof which owns
+## a dormer has a real hole rather than a plane behind its glazing.
+func _exposed_roof_pieces(face: PackedVector3Array, face_index: int,
+		covers: Array[PackedVector3Array], own_index: int) -> Array[PackedVector3Array]:
+	var pieces: Array[PackedVector2Array] = [RoofShape.footprint(face)]
+	for opening in _roof_openings:
+		if int(opening["face_index"]) != face_index:
+			continue
+		var next: Array[PackedVector2Array] = []
+		for piece in pieces:
+			next.append_array(RoofShape.subtract(piece, opening["polygon"]))
+		pieces = next
+	var out: Array[PackedVector3Array] = []
+	for piece in pieces:
+		var cut_face := RoofShape.lift(piece, face)
+		out.append_array(RoofShape.exposed(cut_face, covers, own_index))
+	return out
 
 
 # -------------------------------------------------------- motte and bailey
@@ -330,11 +352,14 @@ func _build_ridge() -> void:
 		# the tower footprint at every bend; those exposed vertical wedges were
 		# the dark "holes" in the joined envelope.  Keep the hip faces deferred
 		# so the deck below can occlude their buried ends.
-		for face in RoofShape.faces(width + EAVE, roof_length, rise, &"half_hipped"):
+		var roof_start := _roof_faces.size()
+		var local_roof := RoofShape.faces(width + EAVE, roof_length, rise, &"half_hipped")
+		for face in local_roof:
 			_roof_faces.append(xf * face)
 		_ridge_end_fascia(xf, width + EAVE, roof_length, rise)
 		if spec.dormers:
-			_ridge_dormers(mid, dir, length, width, height, rise)
+			_roof_dormers(xf, local_roof, roof_start, length, name,
+				(width + EAVE) * 0.5, rise, true)
 		total_height = maxf(total_height, roof_base + rise)
 		# windows: a row a storey on both long faces, on the rotated face.
 		#
@@ -352,7 +377,9 @@ func _build_ridge() -> void:
 			# occupies; otherwise its ceiling height hides the next castle row.
 			occupied_top = minf(ps.height * float(maxi(ps.storeys, 1)), sh)
 		var n: Vector2 = seg["normal"]
-		var count: int = clampi(int(length / 3.5), 1, 24)
+		# The hall is the principal range. Give it a calmer, wider bay rhythm;
+		# the shorter connecting ranges carry the denser secondary cadence.
+		var count: int = clampi(int(length / (5.0 if name == "hall" else 3.5)), 1, 24)
 		for s in range(storeys):
 			var y: float = (float(s) + 0.55) * sh
 			if planned and y - spec.window_h * 0.5 < occupied_top:
@@ -363,7 +390,10 @@ func _build_ridge() -> void:
 				for i in range(count):
 					var t: float = (float(i) + 1.0) / (float(count) + 1.0) - 0.5
 					var p: Vector2 = mid + dir * (length * t) + face_n * (width / 2.0 + CastleGeometry.OPENING_EPS)
-					_opening(Vector3(p.x, y, p.y), ang, spec.window_w, spec.window_h, spec.window_style)
+					var principal_bay := name == "hall" and i == int(count / 2)
+					_opening(Vector3(p.x, y, p.y), ang,
+						spec.window_w * (1.18 if principal_bay else 1.0),
+						spec.window_h * (1.08 if principal_bay else 1.0), spec.window_style)
 	tag("tower")
 	var i2 := 0
 	var spire_vertex: int = CastleGeometry.spine(spec).size() / 2
@@ -409,19 +439,100 @@ func _build_dark_spire() -> void:
 	total_height = maxf(total_height, spec.keep_height)
 
 
-## Dormers along a rotated range, either side of its ridge.
-func _ridge_dormers(mid: Vector2, dir: Vector2, length: float, width: float,
-		height: float, rise: float) -> void:
-	var n := Vector2(-dir.y, dir.x)
-	var count: int = clampi(int(length / 6.0), 1, 8)
-	var dw: float = minf(1.4, width * 0.2)
-	var yaw: float = atan2(-dir.y, dir.x)
-	for side in [-1.0, 1.0]:
+## Dormers sit on the measured roof plane and cut their footprint out of it.
+## The local roof frame is X across the pitch and Z along the ridge.
+func _roof_dormers(xf: Transform3D, roof: Array[PackedVector3Array],
+		roof_start: int, run: float, range_name: String, half: float,
+		rise: float, ridge_style: bool) -> void:
+	if roof.size() < 2 or half <= 0.0 or rise <= 0.0:
+		return
+	var count: int = clampi(int(run / (8.0 if range_name == "hall" else 6.0)), 1, 8) if ridge_style \
+		else clampi(int(run / (7.0 if range_name == "hall" else 9.0)), 1, 6)
+	var dormer_width: float = minf(1.8 if range_name == "hall" else 1.25,
+		(half * 2.0) * (0.2 if ridge_style else (0.28 if range_name == "hall" else 0.18)))
+	for face_side in [-1.0, 1.0]:
+		var face_index := 0 if face_side < 0.0 else 1
+		var seat := RoofShape.dormer_seat(half, rise, face_side * half * 0.62, dormer_width)
+		if not bool(seat.get("fits", false)):
+			continue
+		var rh: float = seat["roof_half"]
+		var out_dir: float = signf(float(seat["front"]))
+		var host: PackedVector2Array = RoofShape.footprint(roof[face_index])
 		for i in range(count):
-			var t: float = (float(i) + 1.0) / (float(count) + 1.0) - 0.5
-			var p: Vector2 = mid + dir * (length * t) + n * (side * width * 0.26)
-			box(Vector3(dw, dw * 1.5, dw), Vector3(p.x, height + rise * 0.45 + dw * 0.75, p.y),
-				SURF_ROOF, yaw)
+			var z := -run * 0.38 + run * 0.76 * (float(i) + 0.5) / float(count)
+			var cover := PackedVector2Array([
+				Vector2(float(seat["front"]) + out_dir * 0.12, z - rh),
+				Vector2(float(seat["side_x"]), z - rh),
+				Vector2(float(seat["peak_x"]), z),
+				Vector2(float(seat["side_x"]), z + rh),
+				Vector2(float(seat["front"]) + out_dir * 0.12, z + rh)])
+			if not _roof_polygon_fits(host, cover):
+				continue
+			var opening := PackedVector2Array([
+				Vector2(float(seat["front"]), z - dormer_width * 0.5),
+				Vector2(float(seat["cheek_x"]), z - dormer_width * 0.5),
+				Vector2(float(seat["peak_x"]), z),
+				Vector2(float(seat["cheek_x"]), z + dormer_width * 0.5),
+				Vector2(float(seat["front"]), z + dormer_width * 0.5)])
+			var world_opening := PackedVector2Array()
+			for p in opening:
+				var wp := xf * Vector3(p.x, 0.0, p.y)
+				world_opening.append(Vector2(wp.x, wp.z))
+			var owner := "dormer:%s:%d:%d" % [range_name, int(face_side), i]
+			_roof_openings.append({"face_index": roof_start + face_index,
+				"polygon": world_opening, "owner": owner})
+			_emit_seated_roof_dormer(xf, seat, z, dormer_width, owner)
+
+
+static func _roof_polygon_fits(host: PackedVector2Array, candidate: PackedVector2Array) -> bool:
+	for p in candidate:
+		if not Poly.contains_point(host, p):
+			return false
+		for i in range(host.size()):
+			var edge: Vector2 = host[(i + 1) % host.size()] - host[i]
+			if edge.length() > 0.0 and absf(edge.cross(p - host[i])) / edge.length() < 0.12:
+				return false
+	return true
+
+
+func _emit_seated_roof_dormer(xf: Transform3D, seat: Dictionary, z: float,
+		dormer_width: float, owner: String) -> void:
+	var front: float = seat["front"]
+	var out_dir: float = signf(front)
+	var base: float = seat["base"]
+	var eave: float = seat["eave"]
+	var peak: float = seat["peak"]
+	var rh: float = seat["roof_half"]
+	var hw: float = dormer_width * 0.5
+	var lift: float = peak - eave
+	var side_top: float = eave + lift * (1.0 - hw / rh) - RoofShape.DEPTH * 0.5
+	var head: float = eave - RoofShape.DEPTH * 0.5
+	host(owner)
+	for side in [-1.0, 1.0]:
+		var rooflet := PackedVector3Array([
+			xf * Vector3(front + out_dir * 0.12, eave, z + side * rh),
+			xf * Vector3(float(seat["side_x"]), eave, z + side * rh),
+			xf * Vector3(float(seat["peak_x"]), peak, z),
+			xf * Vector3(front + out_dir * 0.12, peak, z)])
+		component_slab("dormer_roof", rooflet, RoofShape.DEPTH, SURF_ROOF, true)
+		var cheek := PackedVector3Array([
+			xf * Vector3(front, base, z + side * hw),
+			xf * Vector3(front, side_top, z + side * hw),
+			xf * Vector3(float(seat["cheek_x"]), side_top, z + side * hw)])
+		component_slab("dormer_cheek", cheek, 0.08, SURF_STONE, false)
+	var gable := PackedVector3Array([
+		xf * Vector3(front, head, z - hw), xf * Vector3(front, head, z + hw),
+		xf * Vector3(front, side_top, z + hw),
+		xf * Vector3(front, peak - RoofShape.DEPTH * 0.5, z),
+		xf * Vector3(front, side_top, z - hw)])
+	component_slab("dormer_gable", gable, 0.10, SURF_STONE, false)
+	var normal := xf.basis.x * out_dir
+	var face_angle := atan2(normal.x, normal.z)
+	var window_pos := xf * Vector3(front + out_dir * 0.06, (base + head) * 0.5, z)
+	_opening(window_pos, face_angle, dormer_width * 0.48,
+		maxf((head - base) * 0.64, 0.35), &"arched")
+	part_log.back()["component_host"] = owner
+	host_end()
 
 
 # ------------------------------------------------------------- tower house
@@ -1779,11 +1890,14 @@ func _range(a: AABB, mass_name: String, surf: int, roofed: bool,
 		var span: float = a.size.z if along_x else a.size.x
 		var along: float = a.size.x if along_x else a.size.z
 		var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(cx, a.size.y, cz))
+		var roof_start := _roof_faces.size()
+		var local_roof := RoofShape.faces(span + EAVE, along + EAVE * 0.8, rise)
 		_kit.ridge_roof(xf, span + EAVE, along + EAVE * 0.8, rise, SURF_ROOF,
 			SURF_STONE, span, along, 0.3, 0.0, _roof_faces)
 		total_height = maxf(total_height, a.size.y + rise)
 		if spec.dormers:
-			_dormers(a, along_x, rise)
+			_roof_dormers(xf, local_roof, roof_start, along, mass_name,
+				(span + EAVE) * 0.5, rise, false)
 	if not _planned_interiors.has(mass_name):
 		_face_openings(a, a.size.y * 0.5, spec.window_style, faces, bay)
 
@@ -1836,25 +1950,6 @@ func _shell_openings(c: Vector3, radius: float, y: float, sides: int,
 		var ang: float = rot + PI / 2.0 * k
 		_opening(c + Vector3(sin(ang) * face_r, y, cos(ang) * face_r),
 			ang, spec.window_w, spec.window_h, spec.window_style)
-
-
-## Roof dormers: the tall gabled windows of a chateau roofline.
-func _dormers(a: AABB, along_x: bool, rise: float) -> void:
-	var n: int = clampi(int((a.size.x if along_x else a.size.z) / 6.0), 1, 6)
-	var run: float = a.size.x if along_x else a.size.z
-	var span: float = a.size.z if along_x else a.size.x
-	var dw: float = minf(1.4, span * 0.2)
-	for side in [-1.0, 1.0]:
-		for i in range(n):
-			var t: float = (float(i) + 1.0) / (float(n) + 1.0) - 0.5
-			var out: float = span * 0.26
-			var pos: Vector3 = Vector3(a.position.x + a.size.x / 2.0,
-				a.size.y + rise * 0.45, a.position.z + a.size.z / 2.0)
-			if along_x:
-				pos += Vector3(run * t, 0.0, side * out)
-			else:
-				pos += Vector3(side * out, 0.0, run * t)
-			box(Vector3(dw, dw * 1.5, dw), pos + Vector3(0, dw * 0.75, 0), SURF_ROOF)
 
 
 ## A wall run emitted as a battered stack: the inner face is vertical at every
