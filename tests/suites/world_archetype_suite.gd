@@ -180,7 +180,13 @@ static func run_nagara() -> SuiteResult:
 
 static func run_tower_house() -> SuiteResult:
 	var res := SuiteResult.new("world tower house")
-	var row: Dictionary = ARCHETYPES.back()
+	var row: Dictionary = {}
+	for candidate in ARCHETYPES:
+		if candidate["key"] == "merchant_tower":
+			row = candidate
+	if row.is_empty():
+		res.fail("merchant_tower row missing from ARCHETYPES")
+		return res
 	for scale in SCALES:
 		var request := BuildingRequest.new()
 		request.kind = &"world"
