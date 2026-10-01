@@ -10,7 +10,10 @@ const CASES: Array[Dictionary] = [
 	{"style": &"japanese", "tier": &"castle", "index": 0},
 ]
 const RAY_LENGTH := 1.0
-const RAY_START := 0.02
+# The dark opening insert is recessed by OPENING_EPS. Start beyond it and
+# inspect only opaque building surfaces; the insert depicts the aperture and
+# is not evidence that masonry blocks it.
+const RAY_START := 0.05
 const TRI_EPS := 1e-7
 
 
@@ -121,6 +124,8 @@ static func _report_ray_hits(res: SuiteResult, mesh: ArrayMesh, start: Vector3,
 	var nearest := 2.0
 	var hit_detail := "none"
 	for surface in range(mesh.get_surface_count()):
+		if surface == CastleBuilder.SURF_OPEN or surface == CastleBuilder.SURF_WATER:
+			continue
 		var arrays: Array = mesh.surface_get_arrays(surface)
 		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var raw_indices: Variant = arrays[Mesh.ARRAY_INDEX]
@@ -137,11 +142,29 @@ static func _report_ray_hits(res: SuiteResult, mesh: ArrayMesh, start: Vector3,
 			if hit_t < 0.0 or hit_t >= nearest:
 				continue
 			nearest = hit_t
-			hit_detail = "surface=%d triangle=%d t=%.6f point=%s indices=[%d,%d,%d] vertices=[%s,%s,%s]"
-				% [surface, t / 3, hit_t, str(start + direction * hit_t),
+			hit_detail = (
+				"surface=%d(%s) triangle=%d t=%.6f point=%s indices=[%d,%d,%d] vertices=[%s,%s,%s]"
+				% [surface, _surface_name(surface), t / 3, hit_t,
+					str(start + direction * hit_t),
 					ia, ib, ic, str(verts[ia]), str(verts[ib]), str(verts[ic])]
+			)
 	res.note("TRIANGLE_RAY %s tag=%s from=%s to=%s hit=%s" % [
 		where, tag, str(start), str(finish), hit_detail])
+
+
+static func _surface_name(surface: int) -> String:
+	match surface:
+		CastleBuilder.SURF_STONE:
+			return "stone"
+		CastleBuilder.SURF_TRIM:
+			return "trim"
+		CastleBuilder.SURF_ROOF:
+			return "roof"
+		CastleBuilder.SURF_OPEN:
+			return "opening"
+		CastleBuilder.SURF_WATER:
+			return "water"
+	return "unknown"
 
 
 ## Returns segment fraction in [0,1], or -1 when the segment misses the triangle.

@@ -189,7 +189,26 @@ Run only this focused evidence pass with:
 & 'C:\Projects\godot\Godot_v4.5.2-stable_mono_win64\Godot_v4.5.2-stable_mono_win64.exe' --headless --path . --script res://tests/run_all.gd -- cnormaldiag
 ```
 
-The segment ray is a geometric discriminator for the logged outward probe, not a complete visibility or solid-occupancy oracle. A miss means only that this finite segment did not cross an emitted triangle. Inspect the affected opening with a raking render before changing a producer or checker. Keep the original direction, support and mesh-normal failures active. No producer fix is justified by a mass-box warning alone.
+The segment starts beyond the recessed dark opening insert and excludes the
+opening and water surfaces. It is a geometric discriminator for the logged
+outward probe, not a complete visibility or solid-occupancy oracle. A miss means
+only that this finite segment did not cross emitted stone, trim or roof geometry.
+Inspect the affected opening with a raking render before changing a producer or
+checker. Keep the original direction, support and mesh-normal failures active.
+No producer fix is justified by a mass-box warning alone.
+
+The 2026-10-01 current-main focused run is archived at
+`artifacts/qa_fast/cnormaldiag/20261001_002639/stdout.log`. It passed in 45.19s
+with five legacy AABB warnings and no roof degenerates in any of the four
+starting fixtures. Both Norman manor warnings were chimney-envelope false
+positives with no emitted-triangle hit. The Norman castle warning was a curtain
+wall envelope false positive with no hit. The two remaining Edwardian keep rays
+hit narrow trim geometry, not stone, after the insert was excluded; their broad
+wall/keep AABBs therefore do not establish a walled-in opening. The four prior
+Edwardian tower warnings and both previously reported Norman/Japanese roof
+degenerate groups did not reproduce. These are dispositions for the fixed
+starting fixtures, not a claim that the historical 54-fixture inventory was
+rerun. Its current exact count belongs to the scheduled castle sweep.
 
 **Exact reproduction**
 
