@@ -72,6 +72,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 31.0, "length": 20.0, "height": 31.0,
 		"must": ["ardhamandapa", "mandapa", "mahamandapa", "garbhagriha", "plinth", "shikhara", "urushringa"],
 		"check": &"shikhara_check", "about": "Spire of a Hundred Spires"},
+	{"key": "quarried_temple", "family": &"rock_cut_temple", "kind": &"quarried_temple",
+		"width": 82.0, "length": 46.0, "height": 30.0,
+		"must": ["pit_wall", "gateway", "gallery_floor", "bridge", "nandi", "hall", "sanctum", "shikhara"],
+		"check": &"cut_check", "about": "Quarried Temple below a pit-wall gallery"},
 	{"key": "temple_mountain", "family": &"temple_mountain", "kind": &"angkor_mountain",
 		"width": 200.0, "length": 200.0, "height": 60.0,
 		"must": ["water", "causeway", "enclosure", "gopura", "tower_center"],
@@ -469,6 +473,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 			free_masses.assign(["vastu_well", "jharokha"])
 		elif building.plan != null and building.plan.world_family == &"stepwell":
 			free_masses.assign(["pavilion", "tank", "shaft", "water"])
+		elif building.plan != null and building.plan.world_family == &"rock_cut_temple":
+			free_masses.assign(["gateway", "gallery", "bridge"])
 		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_masses)["failures"]:
 			out.append(str(f))
 	if check == &"":
@@ -496,7 +502,7 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		return out
 	var checker = script.new()
 	var rep: Dictionary
-	if building.plan != null and check in [&"hammam_check", &"pagoda_check", &"shikhara_check", &"vav_check", &"vastu_check"]:
+	if building.plan != null and check in [&"cut_check", &"hammam_check", &"pagoda_check", &"shikhara_check", &"vav_check", &"vastu_check"]:
 		rep = checker.check(building.plan, mesh_builder)
 	elif building.plan != null and check == &"tulou_check":
 		rep = checker.check(building.plan, mesh_builder)
@@ -540,6 +546,10 @@ static func _builder_for(building: GeneratedBuilding):
 			var nb := NagaraBuilder.new()
 			nb.build(building.plan)
 			return nb
+		if building.plan.world_family == &"rock_cut_temple":
+			var cut_builder := CutTempleBuilder.new()
+			cut_builder.build(building.plan)
+			return cut_builder
 		if building.plan.world_family == &"stepwell":
 			var vb := VavBuilder.new()
 			vb.build(building.plan)

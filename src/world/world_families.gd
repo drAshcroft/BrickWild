@@ -111,6 +111,13 @@ const FAMILIES := {
 		"length": {"min": 20.0, "max": 64.0},
 		"height": {"min": 24.0, "max": 60.0},
 	},
+	&"rock_cut_temple": {
+		"label": "Rock-cut temple",
+		"kinds": [&"quarried_temple"],
+		"width": {"min": 57.4, "max": 155.8},
+		"length": {"min": 32.2, "max": 87.4},
+		"height": {"min": 21.0, "max": 38.0},
+	},
 	&"temple_mountain": {
 		"label": "Temple mountain",
 		"kinds": [&"angkor_mountain"],
@@ -238,6 +245,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = nagara_made["spec"]
 		out.plan = nagara_made["plan"]
 		return true
+	if request.style == &"rock_cut_temple" and request.purpose in kinds_of(&"rock_cut_temple"):
+		var cut_made := CutTempleGenerator.generate(request.seed, request.width,
+			request.length, request.height)
+		out.spec = cut_made["spec"]
+		out.plan = cut_made["plan"]
+		return true
 	if request.style == &"temple_mountain" and request.purpose in kinds_of(&"temple_mountain"):
 		var mountain_made := MountainGenerator.generate(request.purpose, request.seed,
 			request.width, request.length, request.height)
@@ -285,6 +298,9 @@ static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"nagara":
 		return NagaraBuilder.new().build(building.plan)
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"rock_cut_temple":
+		return CutTempleBuilder.new().build(building.plan)
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"temple_mountain":
 		return MountainBuilder.new().build(building.plan)

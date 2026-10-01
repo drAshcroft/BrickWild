@@ -476,6 +476,13 @@ the interesting part.
 | **sky** | the court is open above | `CourtCheck.sky` over the pit floor between the temple and the walls |
 | **gallery** | the pit walls hold a colonnade you can walk | a floor strip along the pit's walls, reached by the flood |
 
+**Implemented family (WLD-015).** Request `kind=world`,
+`style=rock_cut_temple`, `purpose=quarried_temple`. `CutTempleGenerator`
+retains the 82 x 46 m pit, its per-building ground datum, negative occupied
+storeys, four gallery strips, bridge and five axial stations. `CutTempleBuilder`
+emits the cut faces and every named mass from those records; `CutCheck` measures
+the emitted top elevations, pit-wall clearance, flood route, open sky and axis.
+
 ### 3.4 The stepwell
 
 A building that goes down instead of up: a corridor of stairs descending

@@ -95,7 +95,7 @@ static func for_building(building) -> BuildingFamilyAdapter:
 	var spec: RefCounted = building.spec
 	if building.plan != null and building.plan.world_family in \
 			[&"courtyard_house", &"insula", &"mosque", &"caravanserai", &"hammam",
-			&"cruciform_temple", &"nagara", &"pagoda", &"stepwell", &"temple_mountain", &"tulou", &"vastu", &"vihara"]:
+			&"cruciform_temple", &"nagara", &"pagoda", &"rock_cut_temple", &"stepwell", &"temple_mountain", &"tulou", &"vastu", &"vihara"]:
 		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
@@ -435,6 +435,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 			var nagara_builder := NagaraBuilder.new()
 			nagara_builder.build(building.plan)
 			return ShikharaCheck.check(building.plan, nagara_builder)
+		if building.plan != null and building.plan.world_family == &"rock_cut_temple":
+			var cut_builder := CutTempleBuilder.new()
+			cut_builder.build(building.plan)
+			return CutCheck.new().check(building.plan, cut_builder)
 		if building.plan != null and building.plan.world_family == &"stepwell":
 			var vav_builder := VavBuilder.new()
 			vav_builder.build(building.plan)
@@ -497,6 +501,8 @@ class WorldFamily extends BuildingFamilyAdapter:
 		if building.plan != null and building.plan.world_family == &"nagara":
 			var r: Rect2 = building.plan.world_meta.get("plinth_rect", Rect2())
 			return r
+		if building.plan != null and building.plan.world_family == &"rock_cut_temple":
+			return building.plan.world_meta.get("pit", Rect2())
 		if building.plan != null and building.plan.world_family == &"temple_mountain":
 			return building.plan.world_meta.get("moat", Rect2())
 		if building.spec is StupaSpec:
@@ -532,6 +538,9 @@ class WorldFamily extends BuildingFamilyAdapter:
 		if building.plan != null and building.plan.world_family == &"nagara":
 			var p: Vector2 = building.plan.world_meta.get("entry", Vector2.ZERO)
 			return Vector3(p.x, float(building.plan.world_meta.get("plinth_height", 0.0)) + 1.0, p.y)
+		if building.plan != null and building.plan.world_family == &"rock_cut_temple":
+			var pit: Rect2 = building.plan.world_meta.get("pit", Rect2())
+			return Vector3(0.0, 1.0, pit.position.y)
 		if building.plan != null and building.plan.world_family == &"temple_mountain":
 			var gates: Array = building.plan.world_meta.get("gopuras", [])
 			var p: Vector2 = gates[0].get("center", Vector2.ZERO) if not gates.is_empty() else Vector2.ZERO
