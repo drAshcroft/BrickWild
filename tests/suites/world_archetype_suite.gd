@@ -56,6 +56,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"must": ["stupa_dome", "ground_circumambulatory_ring", "drum_circumambulatory_ring",
 			"stupa_harmika", "stupa_chatra_shaft", "stupa_torana_0"],
 		"check": &"stupa_check", "about": "Sanchi-derived Saint's Mound"},
+	{"key": "monks_cloister", "family": &"vihara", "kind": &"monks_cloister",
+		"width": 50.0, "length": 40.0, "height": 5.0,
+		"must": ["cell", "vihara_shrine", "verandah", "vihara_well"],
+		"check": &"vihara_check", "about": "Vihara cells around the cloister court"},
 ]
 
 
@@ -396,6 +400,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 			free_masses.append("eave_tier")
 		elif building.spec is StupaSpec:
 			free_masses.append("stupa_")
+		elif building.plan != null and building.plan.world_subkind == &"monks_cloister":
+			free_masses.append("vihara_well")
 		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_masses)["failures"]:
 			out.append(str(f))
 	if check == &"":

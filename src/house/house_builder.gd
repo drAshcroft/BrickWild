@@ -63,6 +63,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_hearth_breast()
 	_build_rugs()
 	_build_han_features()
+	_build_vihara_features()
 	return commit()
 
 
@@ -199,6 +200,38 @@ func _build_han_features() -> void:
 	_log_mass("han_winter_dome", AABB(
 		Vector3(dome_centre.x - radius, base_y - 0.08, dome_centre.y - radius), dome_size))
 	total_height = maxf(total_height, base_y + rise)
+	host_end()
+
+
+## The open court's low stone well is a real, separately measured feature.
+func _build_vihara_features() -> void:
+	if plan.world_subkind != &"monks_cloister":
+		return
+	var basin: Rect2 = plan.world_meta.get("well_rect", Rect2())
+	if not basin.has_area():
+		return
+	var thickness := 0.18
+	var wall_height := 0.78
+	var wall_center_y := wall_height * 0.5
+	var center := basin.get_center()
+	tag("vihara_well")
+	host("court_well", 0)
+	var x_side := Vector3(thickness, wall_height, basin.size.y)
+	var z_side := Vector3(basin.size.x - thickness * 2.0, wall_height, thickness)
+	for x in [basin.position.x + thickness * 0.5, basin.end.x - thickness * 0.5]:
+		component_box("vihara_well_rim", x_side,
+			Transform3D(Basis.IDENTITY, Vector3(x, wall_center_y, center.y)), SURF_TRIM)
+	for z in [basin.position.y + thickness * 0.5, basin.end.y - thickness * 0.5]:
+		component_box("vihara_well_rim", z_side,
+			Transform3D(Basis.IDENTITY, Vector3(center.x, wall_center_y, z)), SURF_TRIM)
+	var water := basin.grow(-thickness)
+	var points := PackedVector3Array()
+	for p in Poly.from_rect(water):
+		points.append(Vector3(p.x, plan.water_plane, p.y))
+	component_slab("vihara_well_water", points, 0.025, SURF_FLOOR, false)
+	_log_mass("vihara_well", AABB(Vector3(basin.position.x, 0.0, basin.position.y),
+		Vector3(basin.size.x, wall_height, basin.size.y)))
+	total_height = maxf(total_height, wall_height)
 	host_end()
 
 

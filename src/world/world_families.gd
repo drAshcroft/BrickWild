@@ -82,6 +82,13 @@ const FAMILIES := {
 		"width": {"min": 32.0, "max": 48.0},
 		"length": {"min": 32.0, "max": 48.0},
 		"height": {"min": 14.0, "max": 20.0},
+	},
+	&"vihara": {
+		"label": "Vihara",
+		"kinds": [&"monks_cloister"],
+		"width": {"min": 35.0, "max": 95.0},
+		"length": {"min": 28.0, "max": 76.0},
+		"height": {"min": 5.0, "max": 5.0},
 	}
 }
 
@@ -172,6 +179,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = StupaGenerator.generate(request.purpose, request.seed,
 			request.width, request.length, request.height)
 		return true
+	if request.style == &"vihara" and request.purpose in kinds_of(&"vihara"):
+		var vihara_made := ViharaGenerator.generate(request.seed, request.width,
+			request.length, request.height)
+		out.spec = vihara_made["spec"]
+		out.plan = vihara_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -185,7 +198,7 @@ static func build_mesh(building) -> ArrayMesh:
 			and CastleGeometry.is_tower_house(building.spec):
 		return CastleBuilder.new().build(building.spec)
 	if building != null and building.plan != null \
-			and building.plan.world_family in [&"courtyard_house", &"insula", &"caravanserai"]:
+			and building.plan.world_family in [&"courtyard_house", &"insula", &"caravanserai", &"vihara"]:
 		return HouseBuilder.new().build(building.plan)
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"mosque":
