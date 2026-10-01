@@ -249,14 +249,17 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 		var builder := ChurchBuilder.new()
 		builder.begin_metric(4)
 		builder.spec = ChurchSpec.new()
-		builder._pendentive_support(center, lower_half, upper_radius, height, segments, start)
+		builder._pendentive_support(center, lower_half, upper_radius, height, segments, start,
+			not octagonal)
 		var mesh := builder.commit()
 		var arrays := mesh.surface_get_arrays(0)
 		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 		var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 		var who := String(kind)
-		_expect(res, points.size() == segments * (ChurchBuilder.PENDENTIVE_PROFILE_STEPS + 1) * 6,
+		var expected_rings := ChurchBuilder.PENDENTIVE_PROFILE_STEPS + 1 \
+			+ (0 if octagonal else ChurchBuilder.PENDENTIVE_LEDGE_ROWS.size() * 3)
+		_expect(res, points.size() == segments * expected_rings * 6,
 			"%s pendentive should emit a closed curved loft with %d facets" % [who, segments])
 		var x_extent := 0.0
 		var z_extent := 0.0
@@ -270,6 +273,14 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 				top_angles[roundi(angle * 100000.0)] = true
 		_expect(res, is_equal_approx(x_extent, lower_half) and is_equal_approx(z_extent, lower_half),
 			"%s pendentive lost its square crossing footprint" % who)
+		var envelope_ok := true
+		for point in points:
+			if absf(point.x - center.x) > lower_half + 0.01 \
+					or absf(point.z - center.z) > lower_half + 0.01 \
+					or point.y < center.y - 0.01 \
+					or point.y > center.y + height + 0.01:
+				envelope_ok = false
+		_expect(res, envelope_ok, "%s pendentive course escaped its roof-cut/mass envelope" % who)
 		_expect(res, top_angles.size() == segments,
 			"%s pendentive top ring does not match the %d-sided drum" % [who, segments])
 		var top_phase_ok := true
@@ -303,6 +314,20 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 						- linear_radius) > 0.05
 		_expect(res, octagonal or curved_ring,
 			"hemisphere support profile is still a straight-sided square-to-drum funnel")
+		if not octagonal:
+			var ledge_radius := 0.0
+			var ledge_y := center.y + height * (5.0 / ChurchBuilder.PENDENTIVE_PROFILE_STEPS)
+			var ledge_t := 5.0 / ChurchBuilder.PENDENTIVE_PROFILE_STEPS
+			var eased := ledge_t * ledge_t * (3.0 - 2.0 * ledge_t)
+			var base_radius := lerpf(lower_half, upper_radius, pow(eased, 1.35))
+			for point in points:
+				if absf(point.y - ledge_y) < 0.0001 \
+						and absf(point.z - center.z) < 0.0001 \
+						and point.x > center.x + 0.1:
+					ledge_radius = maxf(ledge_radius,
+						Vector2(point.x - center.x, point.z - center.z).length())
+			_expect(res, ledge_radius - base_radius >= ChurchBuilder.PENDENTIVE_LEDGE_WIDTH - 0.01,
+				"hemisphere bearing lacks the specified visible corbel course")
 		_expect(res, builder.part_log.size() == 1 and builder.component_log.size() == 1
 			and builder.component_log[0]["role"] == "pendentive_support",
 			"pendentive support lost its part/component logging")
@@ -314,8 +339,13 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 				var c := points[i + 2]
 				var n := normals[i]
 				if absf(a.y - b.y) < 0.0001 and absf(b.y - c.y) < 0.0001:
-					var upward: bool = absf(a.y - center.y - height) < 0.0001
-					if n.y * (1.0 if upward else -1.0) < 0.99:
+					if absf(a.y - center.y - height) < 0.0001:
+						if n.y < 0.99:
+							good_normals = false
+					elif absf(a.y - center.y) < 0.0001:
+						if n.y > -0.99:
+							good_normals = false
+					elif absf(n.y) < 0.99:
 						good_normals = false
 				else:
 					var radial := Vector3((a.x + b.x + c.x) / 3.0 - center.x, 0.0,

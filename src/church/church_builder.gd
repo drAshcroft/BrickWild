@@ -17,6 +17,9 @@ const SURF_OPEN := 3
 const TOWER_EMBED := ChurchGeometry.TOWER_EMBED
 const APSE_EMBED := ChurchGeometry.APSE_EMBED
 const PENDENTIVE_PROFILE_STEPS := 6
+const PENDENTIVE_LEDGE_ROWS := [2, 4, 5]
+const PENDENTIVE_LEDGE_WIDTH := 0.22
+const PENDENTIVE_LEDGE_RISE := 0.12
 
 var spec: ChurchSpec
 var _roof_volumes: Array[PackedVector3Array] = []
@@ -723,7 +726,7 @@ func _build_dome() -> void:
 	var shell_segments: int = 8 if octagonal else (32 if rounded_hero else 16)
 	var shell_start: float = PI / 8.0 if octagonal else 0.0
 	_pendentive_support(Vector3(0.0, base, cz), r + 0.3, drum_radius,
-		ChurchGeometry.PENDENTIVE_H, shell_segments, shell_start)
+		ChurchGeometry.PENDENTIVE_H, shell_segments, shell_start, rounded_hero)
 	_log_mass("pendentive", ChurchGeometry.pendentive_aabb(spec))
 	# the corona of windows that lights every one of these domes
 	var lights: int = 8 if octagonal else 12
@@ -777,24 +780,26 @@ func _build_dome() -> void:
 ## A closed loft from the square crossing to the drum's exact lower ring. The
 ## inclined facets are the support, not four detached triangular blades.
 func _pendentive_support(center: Vector3, lower_half: float, upper_radius: float,
-		height: float, segments: int, start: float) -> void:
+		height: float, segments: int, start: float, articulated: bool = false) -> void:
 	# Several metric stone courses turn the old straight-sided funnel into a
 	# curved bearing. The lower ring is exactly the square crossing; the final
 	# ring uses the drum's exact radius, phase and vertex count.
 	var rings: Array[PackedVector3Array] = []
 	for row in range(PENDENTIVE_PROFILE_STEPS + 1):
 		var t := float(row) / float(PENDENTIVE_PROFILE_STEPS)
-		var eased := t * t * (3.0 - 2.0 * t)
-		var curve := pow(eased, 1.35)
-		var ring := PackedVector3Array()
-		for i in range(segments):
-			var angle := start + TAU * float(i) / float(segments)
-			var direction := Vector2(cos(angle), sin(angle))
-			var square_radius: float = lower_half / maxf(absf(direction.x), absf(direction.y))
-			var radius: float = lerpf(square_radius, upper_radius, curve)
-			ring.append(center + Vector3(direction.x * radius, height * t,
-				direction.y * radius))
-		rings.append(ring)
+		rings.append(_pendentive_ring(center, lower_half, upper_radius, height,
+			segments, start, t, false))
+		if articulated and PENDENTIVE_LEDGE_ROWS.has(row):
+			# Each corbel course steps out, rises as a short fascia, then returns
+			# to the curved bearing. The overhang is clamped to the crossing's
+			# square envelope, so the roof-cut boundary does not grow.
+			rings.append(_pendentive_ring(center, lower_half, upper_radius, height,
+				segments, start, t, true))
+			var ledge_top := t + PENDENTIVE_LEDGE_RISE
+			rings.append(_pendentive_ring(center, lower_half, upper_radius, height,
+				segments, start, ledge_top, true))
+			rings.append(_pendentive_ring(center, lower_half, upper_radius, height,
+				segments, start, ledge_top, false))
 	var all_points := PackedVector3Array()
 	for ring in rings:
 		all_points.append_array(ring)
@@ -819,9 +824,28 @@ func _pendentive_support(center: Vector3, lower_half: float, upper_radius: float
 	component_note("pendentive_support", "curved_loft", SURF_STONE, {
 		"center": center, "lower_half": lower_half, "upper_radius": upper_radius,
 		"height": height, "segments": segments, "start": start,
-		"profile_steps": PENDENTIVE_PROFILE_STEPS, "vertices": all_points,
+		"profile_steps": PENDENTIVE_PROFILE_STEPS, "articulated": articulated,
+		"vertices": all_points,
 		"aabb": envelope})
 	host_end()
+
+
+func _pendentive_ring(center: Vector3, lower_half: float, upper_radius: float,
+		height: float, segments: int, start: float, t: float,
+		ledge: bool) -> PackedVector3Array:
+	var eased := t * t * (3.0 - 2.0 * t)
+	var curve := pow(eased, 1.35)
+	var ring := PackedVector3Array()
+	for i in range(segments):
+		var angle := start + TAU * float(i) / float(segments)
+		var direction := Vector2(cos(angle), sin(angle))
+		var square_radius: float = lower_half / maxf(absf(direction.x), absf(direction.y))
+		var radius: float = lerpf(square_radius, upper_radius, curve)
+		if ledge:
+			radius += minf(PENDENTIVE_LEDGE_WIDTH, maxf(0.0, square_radius - radius))
+		ring.append(center + Vector3(direction.x * radius, height * t,
+			direction.y * radius))
+	return ring
 
 
 ## Profile of a dome shell, bottom to top: hemispherical, or the ogee curve
