@@ -67,7 +67,7 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest",
-	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld016",
+	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld016", "int021",
 	"runnererror", "runnerfail"]
 
 ## LANES -- the suites worth running for a given KIND OF EDIT.
@@ -168,6 +168,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return LibrarySuite.run()
 		"placement":
 			return PlacementSuite.run()
+		"int021":
+			return PlacementSuite.run_orientation()
 		"poly":
 			return PolySuite.run()
 		"props":

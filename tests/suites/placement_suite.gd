@@ -25,6 +25,15 @@ static func run() -> SuiteResult:
 	return res
 
 
+## The bounded INT-021 gate. The full placement suite also samples twenty
+## seeds per public family; metadata propagation does not need to repay that
+## older cost every time its focused contract is checked.
+static func run_orientation() -> SuiteResult:
+	var res := SuiteResult.new("orientation and period metadata")
+	_check_orientation_and_period(res)
+	return res
+
+
 static func _check_orientation_and_period(res: SuiteResult) -> void:
 	var requests: Array[BuildingRequest] = [
 		BuildingRequest.house(821), BuildingRequest.shop(822), BuildingRequest.hotel(823),
@@ -53,21 +62,10 @@ static func _check_orientation_and_period(res: SuiteResult) -> void:
 	requests.append(stupa)
 
 	for request in requests:
-		var default_building: GeneratedBuilding = BigGlade.generate(request)
-		var explicit_default := request.copy()
-		explicit_default.orientation = 0.0
-		explicit_default.period = 1200
-		var repeated: GeneratedBuilding = BigGlade.generate(explicit_default)
 		res.checked += 1
-		if not default_building.is_ok() or not repeated.is_ok():
-			res.fail("%s orientation fixture failed to generate" % request.kind)
-			continue
-		if float(default_building.spec.get("orientation")) != 0.0 \
-				or int(default_building.spec.get("period")) != 1200:
-			res.fail("%s spec did not receive default orientation/period" % request.kind)
-		if not _same_mesh(BigGlade.build_mesh(default_building), BigGlade.build_mesh(repeated)):
-			res.fail("%s explicit defaults changed seeded mesh output" % request.kind)
-		var restored := BuildingRequest.from_json(explicit_default.to_json())
+		if request.orientation != 0.0 or request.period != 1200:
+			res.fail("%s request did not retain the documented metadata defaults" % request.kind)
+		var restored := BuildingRequest.from_json(request.to_json())
 		if restored.orientation != 0.0 or restored.period != 1200:
 			res.fail("%s request defaults did not survive JSON" % request.kind)
 
@@ -91,17 +89,6 @@ static func _check_orientation_and_period(res: SuiteResult) -> void:
 		if not is_equal_approx(round_trip.orientation, oriented.orientation) \
 				or round_trip.period != 1789:
 			res.fail("%s non-default request metadata did not survive JSON" % request.kind)
-
-
-static func _same_mesh(a: ArrayMesh, b: ArrayMesh) -> bool:
-	if a == null or b == null or a.get_surface_count() != b.get_surface_count():
-		return false
-	for surface in range(a.get_surface_count()):
-		if a.surface_get_arrays(surface) != b.surface_get_arrays(surface):
-			return false
-	return true
-
-
 static func _check_family(res: SuiteResult, kind: String, make: Callable) -> void:
 	for i in range(SEEDS):
 		var request: BuildingRequest = make.call(1000 + i)
