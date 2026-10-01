@@ -678,7 +678,7 @@ func curved_wall(points: PackedVector3Array, height: float, base_thickness: floa
 	var distances := PackedFloat32Array([0.0])
 	for i in range(1, count):
 		distances.append(distances[i - 1] + points[i - 1].distance_to(points[i]))
-	var run := distances.back()
+	var run: float = distances[distances.size() - 1]
 	if run <= 0.001:
 		return AABB()
 	var levels: Array[float] = [0.0, height]
