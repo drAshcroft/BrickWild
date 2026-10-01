@@ -70,17 +70,22 @@ static func plan(spec: ShopSpec) -> HousePlan:
 ## Keep the street-facing shop ordinary. The only route from it into the
 ## marked private rooms crosses one explicitly secret interior door.
 static func _plan_thieves_den(plan: HousePlan) -> void:
-	var sales := -1
-	var store := -1
-	var dormitory := -1
-	for i in range(plan.room_count()):
-		match plan.kind_of(i):
-			&"sales_floor": sales = i
-			&"store": store = i
-			&"dormitory": dormitory = i
-	if sales < 0 or store < 0 or dormitory < 0:
-		push_error("ShopPlanner: thieves' den needs sales floor, store, and dormitory")
+	var bays: Array[int] = plan.rooms_on_storey(0)
+	bays.sort_custom(func(a: int, b: int) -> bool:
+		return Rect2(plan.rooms[a]["rect"]).get_center().x \
+			< Rect2(plan.rooms[b]["rect"]).get_center().x)
+	if bays.size() != 3:
+		push_error("ShopPlanner: thieves' den needs three adjoining bays")
 		return
+	# HousePlanRooms assigns a service-hungry dormitory before the store. In
+	# this authored left-to-right topology the roles themselves are spatial:
+	# street sales -> concealed store -> private dormitory.
+	var sales: int = bays[0]
+	var store: int = bays[1]
+	var dormitory: int = bays[2]
+	plan.rooms[sales]["kind"] = &"sales_floor"
+	plan.rooms[store]["kind"] = &"store"
+	plan.rooms[dormitory]["kind"] = &"dormitory"
 	for i in range(plan.doors.size() - 1, -1, -1):
 		if not bool(plan.doors[i].get("exterior", false)):
 			plan.doors.remove_at(i)

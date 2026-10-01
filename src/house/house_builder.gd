@@ -768,12 +768,13 @@ func _build_secret_door_panels() -> void:
 		# Two face rails and upright stiles make the fitted slab read as joinery,
 		# not as a missing piece of wall. All are emitted and logged components.
 		for rail_y in [0.28, height - 0.25]:
-			var rail_pos := position - n * 0.06
+			var rail_pos: Vector2 = position - n * 0.06
 			var rail_xf := Transform3D(Basis(Vector3.UP, yaw),
 				Vector3(rail_pos.x, y0 + rail_y, rail_pos.y))
 			component_box("secret_bookcase_rail", Vector3(width - 0.12, 0.07, 0.035), rail_xf, SURF_TRIM)
 		for side in [-1.0, 1.0]:
-			var stile_pos := position - n * 0.06 + tangent * side * (width * 0.38)
+			var stile_pos: Vector2 = position - n * 0.06 \
+				+ tangent * float(side) * (width * 0.38)
 			var stile_xf := Transform3D(Basis(Vector3.UP, yaw),
 				Vector3(stile_pos.x, y0 + height * 0.5, stile_pos.y))
 			component_box("secret_bookcase_stile", Vector3(0.07, height - 0.12, 0.035), stile_xf, SURF_TRIM)
