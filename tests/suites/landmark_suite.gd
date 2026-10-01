@@ -23,7 +23,7 @@ const LANDMARKS: Array[Dictionary] = [
 	{"key": "durham", "style": &"romanesque", "width": 11.9, "length": 61.0, "height": 22.2},
 	{"key": "hagia_sophia", "style": &"byzantine", "width": 31.0, "length": 76.0, "height": 40.0},
 	{"key": "florence_duomo", "style": &"renaissance", "width": 17.0, "length": 153.0, "height": 45.0},
-	{"key": "st_basil", "style": &"russian", "width": 12.0, "length": 46.0, "height": 30.0},
+	{"key": "st_basil", "style": &"russian", "width": 24.0, "length": 30.0, "height": 26.0},
 ]
 
 
@@ -123,18 +123,9 @@ static func _force_features(key: String, spec: ChurchSpec) -> void:
 		"durham":
 			_force_crossing_tower(spec)
 			_force_west_towers(spec, 2)
-		"hagia_sophia":
-			_force_dome(spec, &"hemisphere")
-			spec.half_domes = true
-		"florence_duomo":
-			_force_dome(spec, &"octagonal")
-			spec.dome_lantern = true
-		"st_basil":
-			_force_dome(spec, &"onion")
-			if spec.radiating_chapels < 4:
-				spec.radiating_chapels = 4
-			if spec.chapel_radius == 0.0:
-				spec.chapel_radius = spec.apse_radius * 0.38
+		"hagia_sophia", "florence_duomo", "st_basil":
+			# composed, not rolled: the hero geometry lives behind spec.hero
+			ChurchGenerator.apply_landmark(spec, key)
 
 
 ## Twin (or single) west towers, with a physically sensible width/height when
@@ -171,19 +162,6 @@ static func _force_crossing_tower(spec: ChurchSpec) -> void:
 		spec.crossing_tower_height = spec.height * 1.6
 
 
-## A dome over the crossing replaces a crossing tower there, same as the
-## generator enforces when it picks a dome for itself.
-static func _force_dome(spec: ChurchSpec, shape: StringName) -> void:
-	spec.dome = true
-	spec.dome_shape = shape
-	if spec.dome_radius == 0.0:
-		spec.dome_radius = spec.width * 0.45
-	if spec.dome_drum_height == 0.0:
-		spec.dome_drum_height = spec.dome_radius * ChurchGeometry.DOME_DRUM_RATIO
-	spec.crossing_tower = false
-	spec.crossing_tower_height = 0.0
-
-
 # --------------------------------------------------------- geometry assertions
 
 ## For each landmark, confirm the forced feature actually produced a
@@ -216,12 +194,47 @@ static func _check_required_masses(key: String, builder: ChurchBuilder, who: Str
 			# half-domes are not yet their own logged mass; they read off the
 			# same drum until the builder gives them a distinct name.
 			_require(builder, who, res, "dome_drum", "dome (with buttressing half-domes)")
+			# the bearing is masonry the dome stands on, with the four great arches
+			# drawn on its faces, not a flared collar
+			_require(builder, who, res, "pendentive", "square masonry bearing")
+			for i in range(4):
+				if builder.components_of("great_arch_%d" % i).is_empty():
+					res.fail("%s: great arch %d was not emitted" % [who, i])
 		"florence_duomo":
 			# shape and lantern are attributes of the drum mass, not separate ones.
 			_require(builder, who, res, "dome_drum", "octagonal drum + lantern-topped dome")
+			_require(builder, who, res, "crossing_octagon", "octagonal crossing")
+			for i in range(3):
+				_require(builder, who, res, "tribune_%d" % i, "tribune %d round the crossing" % i)
+			_check_florence_proportions(builder, who, res)
 		"st_basil":
 			_require(builder, who, res, "dome_drum", "onion dome")
 			_require(builder, who, res, "chapel_3", "4th radiating chapel")
+			_require(builder, who, res, "chapel_7", "8th radiating chapel")
+			_require(builder, who, res, "podium", "podium")
+			var heights := {}
+			for i in range(8):
+				heights[snappedf(builder.mass_aabb("chapel_%d" % i).size.y, 0.1)] = true
+			if heights.size() < 5:
+				res.fail("%s: chapels stand at only %d different heights" % [who, heights.size()])
+
+
+## The Duomo is read by its dome: the crossing is the widest thing in the plan
+## and the dome the tallest in the elevation, each by a margin, and the nave is
+## laid out in a few huge bays rather than a picket line.
+static func _check_florence_proportions(builder: ChurchBuilder, who: String,
+		res: SuiteResult) -> void:
+	var spec: ChurchSpec = builder.spec
+	var octagon: AABB = builder.mass_aabb("crossing_octagon")
+	var nave: AABB = builder.mass_aabb("nave")
+	if octagon.size.x < ChurchGeometry.aisle_outer_x(spec) * 2.0 * 1.4:
+		res.fail("%s: crossing (%.1fm) is not clearly wider than nave and aisles (%.1fm)"
+			% [who, octagon.size.x, ChurchGeometry.aisle_outer_x(spec) * 2.0])
+	if ChurchGeometry.total_height(spec) < nave.size.y * 1.8:
+		res.fail("%s: dome (%.1fm) is not clearly taller than the nave (%.1fm)"
+			% [who, ChurchGeometry.total_height(spec), nave.size.y])
+	if ChurchGeometry.hero_bay_count(spec) > 6:
+		res.fail("%s: %d bays is a picket line" % [who, ChurchGeometry.hero_bay_count(spec)])
 
 
 static func _require(builder: ChurchBuilder, who: String, res: SuiteResult, prefix: String,

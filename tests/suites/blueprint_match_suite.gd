@@ -37,7 +37,8 @@ static func run_vis010() -> SuiteResult:
 		{"key": "notre_dame", "style": &"gothic", "width": 12.0, "length": 127.0, "height": 33.0, "seed": 5001},
 		{"key": "chartres", "style": &"gothic", "width": 16.4, "length": 130.0, "height": 37.5, "seed": 5003},
 		{"key": "hagia_sophia", "style": &"byzantine", "width": 31.0, "length": 76.0, "height": 40.0, "seed": 5006},
-		{"key": "st_basil", "style": &"russian", "width": 12.0, "length": 46.0, "height": 30.0, "seed": 5008},
+		{"key": "florence_duomo", "style": &"renaissance", "width": 17.0, "length": 153.0, "height": 45.0, "seed": 5007},
+		{"key": "st_basil", "style": &"russian", "width": 24.0, "length": 30.0, "height": 26.0, "seed": 5008},
 	]
 	for row in cases:
 		var spec: ChurchSpec = _vis010_spec(row)
@@ -60,9 +61,27 @@ static func run_vis010() -> SuiteResult:
 			"hagia_sophia":
 				_expect(inventory["dome"] and inventory["dome_shape"] == &"hemisphere", key, "main hemispherical dome", res)
 				_expect(inventory["half_domes"], key, "buttressing half-domes", res)
+				_expect(inventory["bearing"] != AABB(), key, "square masonry bearing", res)
+				_expect(inventory["piers"].size() == 4, key, "four corner piers", res)
+				_expect(not inventory["clerestory"].is_empty(), key, "clerestory arches", res)
+			"florence_duomo":
+				_expect(inventory["dome"] and inventory["dome_shape"] == &"octagonal", key, "octagonal dome", res)
+				_expect(inventory["crossing_octagon"] != AABB(), key, "octagonal crossing", res)
+				_expect(inventory["tribunes"].size() == 3, key, "three tribunes", res)
+				# bays, not a picket line: two lights a side per bay
+				_expect(inventory["clerestory"].size() == 4 * ChurchGeometry.hero_bay_count(spec),
+					key, "clerestory lights in bays", res)
+				_expect(ChurchGeometry.hero_bay_count(spec) <= 6, key, "a few huge bays", res)
+				# the crossing is the widest and tallest thing, by a margin
+				_expect(spec.dome_radius * 2.0 > spec.width * 2.0 and
+					ChurchGeometry.total_height(spec) > spec.height * 1.8,
+					key, "dome dominant over the nave", res)
 			"st_basil":
 				_expect(inventory["dome"] and inventory["dome_shape"] == &"onion", key, "onion dome", res)
 				_expect(inventory["chapels"].size() >= 4, key, "cluster chapel projections", res)
+				_expect(inventory["chapels"].size() == 8, key, "eight chapels", res)
+				_expect(inventory["podium"] != AABB(), key, "podium", res)
+				_expect(inventory["tent"], key, "tented core", res)
 		if spec.variant_name.ends_with("Minster") or spec.variant_name.ends_with("Priory"):
 			_expect(spec.variant_name.contains(" Minster") or spec.variant_name.contains(" Priory"),
 				key, "spaced generated suffix", res)
@@ -102,6 +121,22 @@ static func run_vis010() -> SuiteResult:
 	no_half_domes.half_domes = false
 	_expect(not BlueprintView.south_elevation_inventory(no_half_domes)["half_domes"],
 		"control", "half-dome omission", res)
+	# the hero rows are keyed off spec.hero, so a church without it draws none
+	var no_bearing: ChurchSpec = _vis010_spec(cases[2])
+	no_bearing.hero = &""
+	var plain: Dictionary = BlueprintView.south_elevation_inventory(no_bearing)
+	_expect(plain["bearing"] == AABB() and plain["piers"].is_empty(),
+		"control", "bearing and pier omission", res)
+	var no_octagon: ChurchSpec = _vis010_spec(cases[3])
+	no_octagon.hero = &""
+	plain = BlueprintView.south_elevation_inventory(no_octagon)
+	_expect(plain["crossing_octagon"] == AABB() and plain["tribunes"].is_empty(),
+		"control", "octagon and tribune omission", res)
+	var no_podium: ChurchSpec = _vis010_spec(cases[4])
+	no_podium.hero = &""
+	plain = BlueprintView.south_elevation_inventory(no_podium)
+	_expect(plain["podium"] == AABB() and not plain["tent"],
+		"control", "podium and tent omission", res)
 	return res
 
 
@@ -119,21 +154,8 @@ static func _vis010_spec(row: Dictionary) -> ChurchSpec:
 			if spec.chapel_radius == 0.0:
 				spec.chapel_radius = spec.apse_radius * 0.38
 			_force_vis_flyers(spec)
-		"hagia_sophia":
-			spec.dome = true
-			spec.dome_shape = &"hemisphere"
-			spec.dome_radius = maxf(spec.dome_radius, spec.width * 0.45)
-			spec.dome_drum_height = maxf(spec.dome_drum_height, spec.dome_radius * ChurchGeometry.DOME_DRUM_RATIO)
-			spec.half_domes = true
-		"st_basil":
-			spec.dome = true
-			spec.dome_shape = &"onion"
-			spec.dome_radius = maxf(spec.dome_radius, spec.width * 0.45)
-			spec.dome_drum_height = maxf(spec.dome_drum_height, spec.dome_radius * ChurchGeometry.DOME_DRUM_RATIO)
-			spec.radiating_chapels = maxi(spec.radiating_chapels, 4)
-			spec.chapel_arrangement = &"cluster"
-			if spec.chapel_radius == 0.0:
-				spec.chapel_radius = spec.width * 0.38
+		"hagia_sophia", "florence_duomo", "st_basil":
+			ChurchGenerator.apply_landmark(spec, row["key"])
 	return spec
 
 
@@ -196,6 +218,12 @@ static func _check_masses_match_geometry(spec: ChurchSpec, builder: ChurchBuilde
 				want = ChurchGeometry.dome_drum_aabb(spec)
 			"narthex":
 				want = ChurchGeometry.narthex_aabb(spec)
+			"crossing_octagon":
+				want = ChurchGeometry.octagon_aabb(spec)
+			"podium":
+				want = ChurchGeometry.podium_aabb(spec)
+			var n when n.begins_with("tribune_"):
+				want = ChurchGeometry.tribune_aabb(spec, n.get_slice("_", 1).to_int())
 			var n when n.begins_with("aisle_left_"):
 				want = ChurchGeometry.aisle_aabb(spec, -1.0, n.get_slice("_", 2).to_int())
 			var n when n.begins_with("aisle_right_"):

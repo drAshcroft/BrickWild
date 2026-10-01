@@ -137,6 +137,10 @@ func _init() -> void:
 		await _shoot_vis010_acceptance()
 		quit()
 		return
+	if args.has("hero-domes"):
+		await _shoot_hero_domes()
+		quit()
+		return
 	if args.has("vis009"):
 		await _shoot_vis009_acceptance()
 		quit()
@@ -263,7 +267,7 @@ func _shoot_vis010_acceptance() -> void:
 	var out := "vis010"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(
 		OUT_DIR + "/" + out))
-	var keys := ["notre_dame", "chartres", "hagia_sophia", "st_basil"]
+	var keys := ["notre_dame", "chartres", "hagia_sophia", "florence_duomo", "st_basil"]
 	var rendered := 0
 	for entry in _landmarks():
 		if entry["key"] not in keys:
@@ -740,9 +744,41 @@ func _landmarks() -> Array[Dictionary]:
 			"w": 17.0, "l": 153.0, "h": 45.0, "seed": 5007,
 			"feat": "octagonal drum, double-shell dome, lantern"},
 		{"key": "st_basil", "style": &"russian", "title": "St Basil's Cathedral",
-			"w": 12.0, "l": 46.0, "h": 30.0, "seed": 5008, "sheet": true,
+			"w": 24.0, "l": 30.0, "h": 26.0, "seed": 5008, "sheet": true,
 			"feat": "onion domes over a cluster of chapels"},
 	]
+
+
+## Florence, St Basil and Hagia Sophia only: their portraits and close-ups
+## under the standard names, plus a second and third camera on each so the
+## composition (crossing and tribunes, cluster and podium, bearing and arches)
+## can be judged from more than the one three-quarter view.
+func _shoot_hero_domes() -> void:
+	var keys := ["florence_duomo", "st_basil", "hagia_sophia"]
+	var by_key := {}
+	for entry in _landmarks():
+		by_key[entry["key"]] = entry
+	for key in keys:
+		var entry: Dictionary = by_key[key]
+		var spec: ChurchSpec = _landmark_spec(entry)
+		await _shoot_church(spec, "%s.jpg" % key, 0.72, -0.28, 1.0)
+	for shot in _detail_shots():
+		if not (shot["entry"]["key"] in keys):
+			continue
+		var spec: ChurchSpec = _landmark_spec(shot["entry"])
+		var f: Array = _focus_of(spec, shot["focus"])
+		await _shoot_church(spec, shot["file"], shot["yaw"], shot["pitch"], 1.0, f[0], f[1])
+	var extra := [
+		{"key": "florence_duomo", "file": "hero_florence_east.jpg", "yaw": 2.45, "pitch": -0.30},
+		{"key": "florence_duomo", "file": "hero_florence_south.jpg", "yaw": 1.45, "pitch": -0.22},
+		{"key": "st_basil", "file": "hero_basil_west.jpg", "yaw": -0.55, "pitch": -0.24},
+		{"key": "st_basil", "file": "hero_basil_east.jpg", "yaw": 2.5, "pitch": -0.20},
+		{"key": "hagia_sophia", "file": "hero_hagia_south.jpg", "yaw": 1.45, "pitch": -0.18},
+		{"key": "hagia_sophia", "file": "hero_hagia_east.jpg", "yaw": 2.6, "pitch": -0.30},
+	]
+	for row in extra:
+		var spec: ChurchSpec = _landmark_spec(by_key[row["key"]])
+		await _shoot_church(spec, row["file"], row["yaw"], row["pitch"], 1.0)
 
 
 func _detail_shots() -> Array[Dictionary]:
@@ -757,9 +793,9 @@ func _detail_shots() -> Array[Dictionary]:
 		{"entry": lm[2], "file": "detail_chapels.jpg", "focus": "chevet",
 			"yaw": 0.45, "pitch": -0.22, "title": "Radiating chapels",
 			"caption": "Alcoves fanned off the ambulatory. The fan angle is solved from the geometry, not fixed."},
-		{"entry": lm[7], "file": "detail_onion.jpg", "focus": "dome",
+		{"entry": lm[7], "file": "detail_onion.jpg", "focus": "chapel_onion",
 			"yaw": 0.70, "pitch": -0.14, "title": "Onion dome",
-			"caption": "An ogee profile that bulges past its springing radius, then draws in to a point."},
+			"caption": "A chapel tower: windowed drum, then an ogee dome that bulges past its springing radius and draws in to a cross. Each chapel has its own height and colour."},
 		{"entry": lm[6], "file": "detail_lantern.jpg", "focus": "dome",
 			"yaw": 1.05, "pitch": -0.18, "title": "Octagonal drum and lantern",
 			"caption": "Eight-sided drum carrying the shell, capped by a lantern."},
@@ -781,6 +817,13 @@ func _focus_of(spec: ChurchSpec, kind: String) -> Array:
 				+ spec.dome_drum_height * 0.5 + ChurchGeometry.dome_shell_rise(spec) * 0.45,
 				ChurchGeometry.crossing_center_z(spec)),
 				ChurchGeometry.dome_plan_radius(spec) * 1.9]
+		"chapel_onion":
+			var tower: int = mini(3, spec.radiating_chapels - 1)
+			var dc: Vector3 = ChurchGeometry.chapel_drum_center(spec, tower)
+			var body: float = ChurchGeometry.chapel_body_height(spec, tower)
+			return [Vector3(dc.x, body + ChurchGeometry.chapel_drum_height(spec, tower) * 0.8
+				+ ChurchGeometry.chapel_onion_rise(spec) * 0.35, dc.z),
+				ChurchGeometry.chapel_drum_radius(spec) * 5.0]
 		"chevet":
 			return [Vector3(0.0, spec.height * 0.22,
 				ChurchGeometry.apse_springing_z(spec)
@@ -831,21 +874,9 @@ func _force_features(spec: ChurchSpec, key: String) -> void:
 			spec.west_towers = 2
 			spec.transept = true
 			spec.crossing_tower = true
-		"hagia_sophia":
-			spec.dome = true
-			spec.dome_shape = &"hemisphere"
-			spec.half_domes = true
-			spec.exedrae = true
-		"florence_duomo":
-			spec.dome = true
-			spec.dome_shape = &"octagonal"
-			spec.dome_lantern = true
-			spec.transept = true
-		"st_basil":
-			spec.dome = true
-			spec.dome_shape = &"onion"
-			spec.radiating_chapels = 8
-			spec.chapel_arrangement = &"cluster"
+		"hagia_sophia", "florence_duomo", "st_basil":
+			# composed, not rolled: ChurchGenerator.apply_landmark
+			ChurchGenerator.apply_landmark(spec, key)
 	# backfill any size the generator left at zero, then re-settle the ring
 	if spec.tower and spec.tower_width <= 0.0:
 		spec.tower_width = spec.width * 0.55
