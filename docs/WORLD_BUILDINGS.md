@@ -585,7 +585,7 @@ plus two.
 |---|---|---|
 | **Courtyards** | every family in sections 1, 2.1, 2.4, 3.2, 3.6, 3.7 | a `HousePlan` whose rooms tile the interior minus one or more `court` rects; the court is floor to the walk grid, sky to the roof, and exterior to the daylight rule |
 | **Polygon rooms** | tulou, pagoda, stupa, octagonal landings | room outlines as polygons with `rect` as bounding box; `WalkGrid` rasterises polygons |
-| **Negative storeys** | stepwell, rock-cut, crypts | `storey` may be < 0; the builder digs a pit mass instead of raising walls; `MassRules.grounded` takes a ground level per building |
+| **Negative storeys** | rock-cut, crypts | `storey` may be < 0; the builder digs a pit mass instead of raising walls; `MassRules.grounded` takes a ground level per building. The stepwell implementation is WLD-016. |
 | **Roof openings** | domus (compluvium), hammam (oculus), tulou and every court | an opening kind on the roof, with a rect; `CourtCheck.sky` and `HammamCheck.oculi` read it |
 | **Column grids as plan data** | halls, mosques, prakaras, viharas | `TempleGeometry` computes columns; they should be on the plan so the walk grid, the sightline and the symmetry rule all read one list |
 | **A period / orientation flag** | Dravida (who is tallest), siheyuan (south), vastu (east) | the spec carries `period` and a compass so orientation rules mean something |
@@ -605,6 +605,16 @@ one row to the registry and its archetype rows here. WLD-010 exposes the
 `tulou/clan_ring` family with polygon wedge rooms, a measured ground-to-crown
 wall taper, continuous gallery floors, a central court and four radial stairs;
 `wld010` carries one failing control for each `TulouCheck` rule.
+
+WLD-016 adds `stepwell / queens_well`. The HousePlan uses storeys 0 through -7
+and seven authored descending flights. `VavBuilder` emits the retaining banks,
+eight pavilion roofs and supports, a tank rim and water surface, and a round
+draw shaft whose bottom extends below the tank. `VavCheck` measures the
+negative-storey chain, ≤40° stair pitch, narrowing terraces, open sky, pavilion
+supports, and a `WalkGrid` route to three sides of the tank. The focused
+`wld016` selector includes negative fixtures for broken flights, widening
+tiers, missing pavilions, inaccessible or dry tanks, a missing shaft, and a
+roof over the stair corridor.
 
 In the manner of `house_archetype_suite.gd`: what each must CONTAIN, never
 where. Built at 70 %, 100 %, 140 % and 190 % and put through its own check

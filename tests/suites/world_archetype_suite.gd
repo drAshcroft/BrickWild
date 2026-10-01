@@ -72,6 +72,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 200.0, "length": 200.0, "height": 60.0,
 		"must": ["water", "causeway", "enclosure", "gopura", "tower_center"],
 		"check": &"mountain_check", "about": "three raised rings, moat crossing and quincunx"},
+	{"key": "queens_well", "family": &"stepwell", "kind": &"queens_well",
+		"width": 65.0, "length": 20.0, "height": 28.0,
+		"must": ["landing", "stair", "retaining_wall", "pavilion", "tank", "shaft", "water"],
+		"check": &"vav_check", "about": "The Queen's Well descending through seven levels"},
 ]
 
 
@@ -457,6 +461,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 			free_masses.append("stupa_")
 		elif building.plan != null and building.plan.world_subkind == &"monks_cloister":
 			free_masses.append("vihara_well")
+		elif building.plan != null and building.plan.world_family == &"stepwell":
+			free_masses.assign(["pavilion", "tank", "shaft", "water"])
 		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_masses)["failures"]:
 			out.append(str(f))
 	if check == &"":
@@ -484,7 +490,7 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		return out
 	var checker = script.new()
 	var rep: Dictionary
-	if building.plan != null and check in [&"hammam_check", &"pagoda_check", &"shikhara_check"]:
+	if building.plan != null and check in [&"hammam_check", &"pagoda_check", &"shikhara_check", &"vav_check"]:
 		rep = checker.check(building.plan, mesh_builder)
 	elif building.plan != null and check == &"tulou_check":
 		rep = checker.check(building.plan, mesh_builder)
@@ -528,6 +534,10 @@ static func _builder_for(building: GeneratedBuilding):
 			var nb := NagaraBuilder.new()
 			nb.build(building.plan)
 			return nb
+		if building.plan.world_family == &"stepwell":
+			var vb := VavBuilder.new()
+			vb.build(building.plan)
+			return vb
 		var hb := HouseBuilder.new()
 		hb.build(building.plan)
 		return hb
