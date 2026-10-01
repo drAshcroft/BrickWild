@@ -107,7 +107,7 @@ static func place_ceiling(plan: HousePlan, room: int, key: String) -> void:
 
 ## A mug, a candle, a stack of books -- set ON something, never on the floor.
 static func place_on_surface(plan: HousePlan, room: int, key: String,
-		r: RandomNumberGenerator) -> void:
+		r: RandomNumberGenerator, prefer_row_hosts := false) -> void:
 	var hosts: Array[int] = []
 	for f in plan.furniture_of(room):
 		var host_key: String = plan.furniture[f]["key"]
@@ -116,7 +116,27 @@ static func place_on_surface(plan: HousePlan, room: int, key: String,
 			hosts.append(f)
 	if hosts.is_empty():
 		return
-	var host: int = hosts[r.randi_range(0, hosts.size() - 1)]
+	if prefer_row_hosts:
+		var row_hosts: Array[int] = []
+		for index in hosts:
+			if String(plan.furniture[index].get("row", "")) != "":
+				row_hosts.append(index)
+		if row_hosts.is_empty():
+			return
+		# Distribute small tools over the benches in a lab rather than piling
+		# every bottle on the first work surface. The stable index tie-break keeps
+		# the result deterministic for a seeded recipe.
+		row_hosts.sort_custom(func(a: int, b: int) -> bool:
+			var count_a := 0
+			var count_b := 0
+			for f in plan.furniture_of(room):
+				if int(plan.furniture[f].get("host", -1)) == a: count_a += 1
+				if int(plan.furniture[f].get("host", -1)) == b: count_b += 1
+			if count_a != count_b:
+				return count_a < count_b
+			return a < b)
+		hosts = row_hosts
+	var host: int = hosts[0] if prefer_row_hosts else hosts[r.randi_range(0, hosts.size() - 1)]
 	var host_rect: Rect2 = plan.furniture[host]["rect"]
 	var top: float = float(plan.furniture[host]["pos"].y) \
 		+ PropCatalog.surface_height(plan.furniture[host]["key"]) \
@@ -148,4 +168,3 @@ static func place_on_surface(plan: HousePlan, room: int, key: String,
 			"cat": PropCatalog.category(key), "mounted": false, "scale": 1.0,
 		})
 		return
-

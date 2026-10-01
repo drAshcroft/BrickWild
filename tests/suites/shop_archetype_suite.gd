@@ -22,6 +22,10 @@ const REQUIRED := {
 	&"guildhall": ["meeting_hall", "table", "bench"],
 	&"palace": ["antechamber", "seat", "banner", "bed", "chest"],
 	&"market_hall": ["market_hall", "counter"],
+	&"alchemist_laboratory": ["laboratory", "workbench", "alchemy", "cage", "hearth"],
+	&"bathhouse": ["changing_room", "bench", "bath_hall", "barrel"],
+	&"hospice": ["ward", "bed", "dispensary", "alchemy"],
+	&"school": ["schoolroom", "bench", "lectern", "masters_office"],
 }
 const BENCH_SEAT_PITCH := 0.65 # metres per usable place along the measured bench
 
@@ -34,6 +38,9 @@ static func run() -> SuiteResult:
 		spec.style = &"longhall" if business in [&"blacksmith", &"stable", &"carpenter", &"library", &"prison"] else &"townhouse"
 		spec.width = 14.0
 		spec.length = 18.0
+		if business in [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]:
+			spec.width = 20.0
+			spec.length = 26.0
 		if business == &"barracks":
 			spec.width = 18.0
 			spec.length = 28.0
@@ -64,6 +71,9 @@ static func run() -> SuiteResult:
 		for cat in wants.slice(1):
 			if not _has_category(plan, String(cat)):
 				res.fail("%s has no defining %s fitting" % [String(business), cat])
+		if business in [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]:
+			for contract_failure in _int013_failures(plan, business):
+				res.fail("%s: %s" % [String(business), contract_failure])
 		var report: Dictionary = HouseQA.new().check(plan, builder)
 		for failure in report["failures"]:
 			res.fail("%s: %s" % [String(business), failure])
@@ -77,6 +87,148 @@ static func run() -> SuiteResult:
 		_check_barracks(res)
 	_check_lodging(res)
 	return res
+
+
+## INT-013's focused contract. Three measured footprints check the room
+## programme and the defining fixtures; one standard plan per family is then
+## deliberately stripped to prove its defining rule can fail.
+static func run_int013() -> SuiteResult:
+	var res := SuiteResult.new("INT-013 shop archetypes")
+	var businesses: Array[StringName] = [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]
+	for business in businesses:
+		for scale in [0.7, 1.0, 1.4]:
+			var spec := _int013_spec(business, scale)
+			var plan := ShopGenerator.generate(spec, 71300 + businesses.find(business) * 10 + int(scale * 100))
+			var builder := HouseBuilder.new()
+			builder.build(plan)
+			res.checked += 1
+			for failure in _int013_failures(plan, business):
+				res.fail("%s scale=%.1f: %s" % [String(business), scale, failure])
+			for failure2 in HouseQA.new().check(plan, builder)["failures"]:
+				res.fail("%s scale=%.1f QA: %s" % [String(business), scale, failure2])
+		var control_spec := _int013_spec(business, 1.0)
+		var control := ShopGenerator.generate(control_spec, 71399 + businesses.find(business))
+		if not _int013_failures(control, business).is_empty():
+			res.fail("%s negative control starts from a plan that is already invalid" % String(business))
+			continue
+		var room := _int013_contract_room(control, business)
+		var category := "alchemy"
+		var expected := "alchemy"
+		match business:
+			&"bathhouse":
+				category = "barrel"
+				expected = "tubs"
+			&"hospice":
+				category = "bed"
+				expected = "bed row"
+			&"school":
+				category = "bench"
+				expected = "bench rows"
+		for i in range(control.furniture.size() - 1, -1, -1):
+			if int(control.furniture[i]["room"]) == room \
+					and PropCatalog.category(control.furniture[i]["key"]) == category:
+				control.furniture.remove_at(i)
+		var negative := _int013_failures(control, business)
+		res.checked += 1
+		if not negative.any(func(row: String) -> bool: return row.contains(expected)):
+			res.fail("%s negative control: removing %s escaped the defining check" % [String(business), expected])
+	return res
+
+
+static func _int013_spec(business: StringName, scale: float) -> ShopSpec:
+	var spec := ShopSpec.new()
+	spec.business = business
+	spec.style = &"longhall" if business in [&"alchemist_laboratory", &"school"] else &"townhouse"
+	spec.width = 20.0 * scale
+	spec.length = 26.0 * scale
+	spec.height = 3.0
+	return spec
+
+
+static func _int013_contract_room(plan: HousePlan, business: StringName) -> int:
+	var kind: StringName = &"laboratory" if business == &"alchemist_laboratory" else \
+		&"bath_hall" if business == &"bathhouse" else \
+		&"ward" if business == &"hospice" else &"schoolroom"
+	return _room_of_kind(plan, kind)
+
+
+static func _int013_failures(plan: HousePlan, business: StringName) -> Array[String]:
+	var out: Array[String] = []
+	var main_room := _int013_contract_room(plan, business)
+	match business:
+		&"alchemist_laboratory":
+			if main_room < 0:
+				out.append("missing laboratory")
+				return out
+			var benches: Array[int] = []
+			for i in plan.furniture_of(main_room):
+				if PropCatalog.category(plan.furniture[i]["key"]) == "workbench": benches.append(i)
+			if _largest_row(plan, benches) < 2: out.append("workbench row has fewer than two stations")
+			var hosted := {}
+			for i2 in plan.furniture_of(main_room):
+				var placed: Dictionary = plan.furniture[i2]
+				if PropCatalog.category(placed["key"]) == "alchemy" and benches.has(int(placed.get("host", -1))):
+					hosted[int(placed["host"])] = true
+			if hosted.size() < 2: out.append("alchemy is not carried across both benches")
+			if not _has_room_category(plan, main_room, "cage"): out.append("missing cage")
+			if not _has_room_category(plan, main_room, "hearth"): out.append("missing hearth")
+		&"bathhouse":
+			var changing := _room_of_kind(plan, &"changing_room")
+			if changing < 0: out.append("missing changing_room")
+			elif not _has_room_category(plan, changing, "bench"): out.append("changing room lacks bench")
+			var tubs: Array[int] = []
+			if main_room >= 0:
+				for i3 in plan.furniture_of(main_room):
+					if PropCatalog.category(plan.furniture[i3]["key"]) == "barrel": tubs.append(i3)
+			if _largest_row(plan, tubs) < 2: out.append("tubs do not form a row of two or more")
+		&"hospice":
+			var dispensary := _room_of_kind(plan, &"dispensary")
+			if main_room < 0: out.append("missing ward")
+			else:
+				var beds: Array[int] = []
+				for i4 in plan.furniture_of(main_room):
+					if PropCatalog.category(plan.furniture[i4]["key"]) == "bed": beds.append(i4)
+				if _largest_row(plan, beds) < 4: out.append("ward bed row has fewer than four beds")
+			if dispensary < 0: out.append("missing dispensary")
+			elif not _has_room_category(plan, dispensary, "alchemy"): out.append("dispensary lacks alchemy")
+		&"school":
+			var office := _room_of_kind(plan, &"masters_office")
+			if main_room < 0: out.append("missing schoolroom")
+			else:
+				var benches2: Array[int] = []
+				for i5 in plan.furniture_of(main_room):
+					if PropCatalog.category(plan.furniture[i5]["key"]) == "bench": benches2.append(i5)
+				if _row_group_count(plan, benches2) < 2: out.append("schoolroom lacks two bench rows")
+				if not _has_room_category(plan, main_room, "lectern"): out.append("schoolroom lacks lectern")
+			if office < 0: out.append("missing master's office")
+	return out
+
+
+static func _has_room_category(plan: HousePlan, room: int, category: String) -> bool:
+	for i in plan.furniture_of(room):
+		if PropCatalog.category(plan.furniture[i]["key"]) == category: return true
+	return false
+
+
+static func _largest_row(plan: HousePlan, members: Array[int]) -> int:
+	var groups := {}
+	for i in members:
+		var row := String(plan.furniture[i].get("row", ""))
+		if row != "": groups[row] = int(groups.get(row, 0)) + 1
+	var largest := 0
+	for count in groups.values(): largest = maxi(largest, int(count))
+	return largest
+
+
+static func _row_group_count(plan: HousePlan, members: Array[int]) -> int:
+	var groups := {}
+	for i in members:
+		var row := String(plan.furniture[i].get("row", ""))
+		if row != "": groups[row] = int(groups.get(row, 0)) + 1
+	var count := 0
+	for size in groups.values():
+		if int(size) >= 2: count += 1
+	return count
 
 
 ## INT-017's bounded selector. It checks one real generated hall, its shell and

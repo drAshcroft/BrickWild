@@ -20,6 +20,18 @@ carpenters, town halls, and guildhalls. Each declares public rooms first and
 service rooms behind them; the generator chooses their exact subdivision and
 connections.
 
+INT-013 adds four recipe-only occupational families to that same plan and
+furnishing pipeline. An alchemist laboratory has two rowed workbenches, with
+alchemy props distributed across both, a cage, and a hearth. A bathhouse has
+a changing room and a bath hall; the current owned prop catalogue has no
+dedicated tub, so the measured upright barrel model stands in as each wooden
+tub and the bath check requires at least two in one row. A hospice has a ward
+with a row of beds and an alchemy-equipped dispensary. A school has two
+separate bench rows and a lectern in its schoolroom, plus a master's office.
+These are room recipes and `SHOP_FITTINGS`, not new mesh or room-planner
+families. Fittings can name their target `room` when they belong behind the
+public room.
+
 The defining fixtures are semantic rather than coordinate-based: a blacksmith
 must contain an anvil and workbench, a stable a stall and feed storage, a shop
 a counter, a dining room a table and seats, a tailor a cutting table under a
@@ -53,11 +65,15 @@ Two shop suites extend that coverage:
 - `shop` checks every business, deterministic plans, furnishings, and shells.
 - `sarchetype` checks the defining room and fixtures of every business, then
   runs the full shared QA harness.
+- `int013` checks only the four new families at 70%, 100%, and 140% footprints,
+  runs shared house QA, and removes one defining fixture per family to prove
+  its semantic contract fails. It is the routine focused gate; broad seed
+  sweeps remain scheduled work.
 
 Run them with:
 
 ```
-godot --headless --path . --script res://tests/run_all.gd -- shop sarchetype
+godot --headless --path . --script res://tests/run_all.gd -- int013
 ```
 
 ## Assets

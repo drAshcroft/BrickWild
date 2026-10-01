@@ -176,7 +176,8 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		&"ceiling":
 			HouseFurnishSurface.place_ceiling(plan, room, key)
 		&"on":
-			HouseFurnishSurface.place_on_surface(plan, room, key, r)
+			HouseFurnishSurface.place_on_surface(plan, room, key, r,
+				String(step.get("host", "")) == "row")
 	# The first focus piece placed writes back where it actually stood, so the
 	# check compares the plan with the furniture rather than with itself.
 	if plan.furniture.size() > before_place and plan.focus_room() == room \

@@ -288,6 +288,42 @@ const RECIPES := {
 		{"cat": "bucket", "rule": &"corner", "n": [1, 2], "opt": 0.8},
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
 	],
+	&"laboratory": [
+		{"cat": "workbench", "rule": &"row", "n": [2, 2], "min_n": 2,
+			"pitch": 0.0, "aisle": 0.9, "along": "wall", "opt": 1.0},
+		{"cat": "cage", "key": "Cage_Small", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+	],
+	&"bath_hall": [
+		{"cat": "bucket", "rule": &"corner", "n": [1, 2], "opt": 0.8},
+	],
+	&"changing_room": [
+		{"cat": "bench", "rule": &"row", "n": [1, 2], "min_n": 1,
+			"pitch": 0.0, "aisle": 0.9, "along": "wall", "opt": 1.0},
+		{"cat": "rack", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+	],
+	&"ward": [
+		{"cat": "bed", "rule": &"row", "n": [4, 6], "min_n": 4,
+			"pitch": 0.0, "aisle": 1.0, "along": "wall", "avoid_window_walls": true,
+			"avoid_door_lines": true, "opt": 1.0},
+		{"cat": "nightstand", "rule": &"wall", "n": [0, 2], "opt": 0.6},
+	],
+	&"dispensary": [
+		{"cat": "bookcase", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "alchemy", "rule": &"on", "n": [1, 2], "opt": 1.0},
+	],
+	&"schoolroom": [
+		{"cat": "bench", "rule": &"row", "n": [2, 4], "min_n": 2,
+			"pitch": 0.0, "aisle": 1.1, "along": "wall", "opt": 1.0},
+		{"cat": "bench", "rule": &"row", "n": [2, 4], "min_n": 2,
+			"pitch": 0.0, "aisle": 1.1, "along": "wall", "opt": 1.0},
+	],
+	&"masters_office": [
+		{"cat": "workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "seat", "rule": &"around", "n": [1, 1], "opt": 1.0},
+		{"cat": "bookcase", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+	],
 }
 
 const SHOP_FITTINGS := {
@@ -306,6 +342,19 @@ const SHOP_FITTINGS := {
 	&"bakery": [{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0}],
 	&"butcher": [{"cat": "blade", "rule": &"on", "n": [1, 2], "opt": 1.0}],
 	&"apothecary": [{"cat": "alchemy", "rule": &"on", "n": [2, 4], "opt": 1.0}],
+	&"alchemist_laboratory": [
+		{"cat": "alchemy", "rule": &"on", "n": [2, 4], "host": "row", "opt": 1.0},
+	],
+	&"bathhouse": [
+		{"cat": "barrel", "rule": &"row", "n": [2, 4], "min_n": 2,
+			"pitch": 0.0, "aisle": 0.9, "along": "wall", "room": "bath_hall", "opt": 1.0},
+	],
+	&"hospice": [
+		{"cat": "alchemy", "rule": &"on", "n": [2, 3], "room": "dispensary", "opt": 1.0},
+	],
+	&"school": [
+		{"cat": "lectern", "rule": &"free", "n": [1, 1], "room": "schoolroom", "opt": 1.0},
+	],
 	# 1.0 like every other trade's own fitting: the shop archetype asks for a
 	# tailor's sacks by name, and a defining fitting placed on a dice roll is a
 	# tailor with nothing in it one time in five.

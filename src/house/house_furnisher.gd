@@ -121,7 +121,15 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		else HouseFurnishingRecipes.SHOP_FITTINGS.get((spec as ShopSpec).business, [])
 	if trade_room == kind:
 		for s2 in fittings:
-			steps.append(s2)
+			if StringName(s2.get("room", trade_room)) == kind:
+				if plan.focus_room() == room and String(s2["cat"]) == plan.focus_cat():
+					steps.insert(0, s2)
+				else:
+					steps.append(s2)
+	else:
+		for s3 in fittings:
+			if s3.has("room") and StringName(s3["room"]) == kind:
+				steps.append(s3)
 
 	# The focus is the one piece the room is arranged around, so it goes in
 	# whether or not the recipe happened to list it: a tavern's bar is not in
