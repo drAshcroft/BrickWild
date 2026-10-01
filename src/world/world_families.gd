@@ -89,6 +89,13 @@ const FAMILIES := {
 		"width": {"min": 35.0, "max": 95.0},
 		"length": {"min": 28.0, "max": 76.0},
 		"height": {"min": 5.0, "max": 5.0},
+	},
+	&"tulou": {
+		"label": "Tulou",
+		"kinds": [&"clan_ring"],
+		"width": {"min": 40.0, "max": 120.0},
+		"length": {"min": 40.0, "max": 120.0},
+		"height": {"min": 9.0, "max": 25.0},
 	}
 }
 
@@ -185,6 +192,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = vihara_made["spec"]
 		out.plan = vihara_made["plan"]
 		return true
+	if request.style == &"tulou" and request.purpose in kinds_of(&"tulou"):
+		var tulou_made := TulouGenerator.generate(request.seed, request.width,
+			request.length, request.height, request.storeys)
+		out.spec = tulou_made["spec"]
+		out.plan = tulou_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -214,6 +227,9 @@ static func build_mesh(building) -> ArrayMesh:
 		return PagodaBuilder.new().build(building.plan)
 	if building != null and building.spec is StupaSpec:
 		return StupaBuilder.new().build(building.spec)
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"tulou":
+		return TulouBuilder.new().build(building.plan)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null
 	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)

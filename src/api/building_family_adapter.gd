@@ -95,7 +95,7 @@ static func for_building(building) -> BuildingFamilyAdapter:
 	var spec: RefCounted = building.spec
 	if building.plan != null and building.plan.world_family in \
 			[&"courtyard_house", &"insula", &"mosque", &"caravanserai", &"hammam",
-			&"cruciform_temple", &"pagoda", &"vihara"]:
+			&"cruciform_temple", &"pagoda", &"tulou", &"vihara"]:
 		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
@@ -414,6 +414,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 			return CruciformCheck.check(building.plan, builder)
 		if building.plan != null and building.plan.world_family == &"mosque":
 			return QiblaCheck.new().check(building.plan)
+		if building.plan != null and building.plan.world_family == &"tulou":
+			var tulou_builder := TulouBuilder.new()
+			tulou_builder.build(building.plan)
+			return TulouCheck.new().check(building.plan, tulou_builder)
 		if building.plan != null and building.plan.world_family == &"hammam":
 			var builder := HammamBuilder.new()
 			builder.build(building.plan)
@@ -458,7 +462,7 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func footprint(building) -> Rect2:
 		if building.plan != null and building.plan.world_family in \
-				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"vihara"]:
+				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"tulou", &"vihara"]:
 			return HouseGeometry.site_rect(building.plan.spec)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			var bounds := CastleGeometry.tower_house_aabb(building.spec)
@@ -477,7 +481,7 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func door(building) -> Vector3:
 		if building.plan != null and building.plan.world_family in \
-				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"vihara"]:
+				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"tulou", &"vihara"]:
 			var d: int = building.plan.entrance()
 			if d >= 0:
 				var p: Vector2 = building.plan.doors[d]["pos"]

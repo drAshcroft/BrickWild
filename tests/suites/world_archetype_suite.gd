@@ -60,6 +60,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 50.0, "length": 40.0, "height": 5.0,
 		"must": ["cell", "vihara_shrine", "verandah", "vihara_well"],
 		"check": &"vihara_check", "about": "Vihara cells around the cloister court"},
+	{"key": "clan_ring", "family": &"tulou", "kind": &"clan_ring",
+		"width": 60.0, "length": 60.0, "height": 15.0,
+		"must": ["ancestral_hall", "gallery", "clan_room", "stair", "roof_ring"],
+		"check": &"tulou_check", "about": "Hakka clan fortress with inward galleries"},
 ]
 
 
@@ -77,6 +81,8 @@ static func run() -> SuiteResult:
 			request.width = snappedf(float(row["width"]) * scale, 0.01)
 			request.length = snappedf(float(row["length"]) * scale, 0.01)
 			request.height = float(row["height"]) * scale if row["family"] == &"pagoda" else float(row["height"])
+			if row["family"] == &"tulou":
+				request.storeys = 4
 			var building: GeneratedBuilding = BigGlade.generate(request)
 			res.checked += 1
 			var who := "%s scale=%.2f" % [key, scale]
@@ -394,6 +400,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		var free_masses: Array[String] = []
 		if building.plan != null and building.plan.world_family == &"mosque":
 			free_masses.assign(["sahn_floor", "fountain", "minaret"])
+		elif building.plan != null and building.plan.world_family == &"tulou":
+			free_masses.assign(["stair", "ancestral_hall"])
 		elif building.plan != null and building.plan.world_subkind == &"sultan_han":
 			free_masses.append("han_kiosk")
 		elif building.plan != null and building.plan.world_family == &"pagoda":
@@ -418,6 +426,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 	var checker = script.new()
 	var rep: Dictionary
 	if building.plan != null and check in [&"hammam_check", &"pagoda_check"]:
+		rep = checker.check(building.plan, mesh_builder)
+	elif building.plan != null and check == &"tulou_check":
 		rep = checker.check(building.plan, mesh_builder)
 	elif building.plan != null:
 		rep = checker.check(building.plan)
@@ -447,6 +457,10 @@ static func _builder_for(building: GeneratedBuilding):
 			var pb := PagodaBuilder.new()
 			pb.build(building.plan)
 			return pb
+		if building.plan.world_family == &"tulou":
+			var tulou_builder := TulouBuilder.new()
+			tulou_builder.build(building.plan)
+			return tulou_builder
 		var hb := HouseBuilder.new()
 		hb.build(building.plan)
 		return hb
