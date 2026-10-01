@@ -30,7 +30,7 @@ const NO_COLOUR := Color("1a1c20")
 ## Materials and not meshes: nothing here loads an asset, so a headless build
 ## is unaffected by any of it.
 static func surface_materials(node: MeshInstance3D, colors: Array,
-		roughness := DEFAULT_ROUGHNESS, hide := -1) -> void:
+		roughness := DEFAULT_ROUGHNESS, hide := -1, vertex_colour_slots: Array = []) -> void:
 	if node.mesh == null:
 		return
 	for i in range(node.mesh.get_surface_count()):
@@ -47,6 +47,11 @@ static func surface_materials(node: MeshInstance3D, colors: Array,
 		m.albedo_color = c if c is Color else NO_COLOUR
 		m.roughness = roughness
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		if slot in vertex_colour_slots:
+			# the surface carries its own colours (a castle's ground skin and
+			# yard dressing); the slot's colour tints them and white leaves them
+			m.vertex_color_use_as_albedo = true
+			m.vertex_color_is_srgb = true
 		node.set_surface_override_material(i, m)
 
 
@@ -184,7 +189,8 @@ void fragment() {
 ## only way to photograph an interior lit by things that are on fire.
 static func build(node_name: String, mesh: ArrayMesh, colors: Array,
 		props: Array, roof_surface: int, cutaway: bool,
-		glow: Color = LightKit.FLAME, architectural_finish := false) -> Node3D:
+		glow: Color = LightKit.FLAME, architectural_finish := false,
+		vertex_colour_slots: Array = []) -> Node3D:
 	var root := Node3D.new()
 	root.name = node_name
 	if mesh == null:
@@ -194,7 +200,7 @@ static func build(node_name: String, mesh: ArrayMesh, colors: Array,
 	shell.name = "Shell"
 	shell.mesh = mesh
 	surface_materials(shell, colors, DEFAULT_ROUGHNESS,
-		-1)
+		-1, vertex_colour_slots)
 	if architectural_finish:
 		architectural_materials(shell, colors)
 	if cutaway:

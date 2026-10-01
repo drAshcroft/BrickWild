@@ -27,6 +27,7 @@ const YARD_MARGIN := 0.35   # air between two pieces of yard clutter
 const YARD_FIXTURES_PER_CLEAR_M2 := 0.012 # measured placements per clear ward m²
 const YARD_MAX_FIXTURES := 140
 const YARD_MIN_FIXTURES := 12
+const LOOSE_SHARE := 0.4   # share of the area-scaled count left loose once the yards are laid
 
 # ---- fire ----
 const SCONCE_H := 2.4
@@ -355,6 +356,20 @@ static func _dress_yard(spec: CastleSpec, out: Array[Dictionary],
 		return
 	var wanted: int = clampi(int(ceil(clear_area * YARD_FIXTURES_PER_CLEAR_M2)),
 		YARD_MIN_FIXTURES, YARD_MAX_FIXTURES)
+	# The working yards go down first (EVAL-B02). Their props are catalogue
+	# pieces at measured footprints, already placed inside each yard's earth;
+	# the loose clutter below keeps out of every yard and takes the remainder.
+	var yards: Array = yard_data["yards"] if yard_data.has("yards") 		else CastleYards.plan(spec, ranges, well)
+	var yard_props := 0
+	for yard in yards:
+		taken.append((yard["rect"] as Rect2).grow(0.2))
+		for prop in yard["props"]:
+			out.append(prop)
+			yard_props += 1
+	# What the yards do not hold is the loose clutter of the open ward. Four
+	# tenths of the old area-scaled count: the yards carry the rest, and a ward
+	# of scattered barrels is the confetti they replace.
+	wanted = maxi(int(round(float(wanted) * LOOSE_SHARE)), YARD_MIN_FIXTURES)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = spec.seed ^ 0x59415244
 	var placed := 0
@@ -541,7 +556,16 @@ static func yard_report(spec: CastleSpec, props: Array, interiors: Array = [],
 	var fixture_area: float = _rect_union_area(bailey, footprints)
 	var after_structures: Array[Rect2] = all_structures.duplicate()
 	after_structures.append_array(footprints)
-	return {"ward_area_m2": bailey.get_area(),
+	var yard_rows: Array[Dictionary] = []
+	for yard in yard_data.get("yards", []):
+		var yard_props := 0
+		for p in props:
+			if StringName(p.get("yard_name", &"")) == StringName(yard["name"]):
+				yard_props += 1
+		yard_rows.append({"name": yard["name"], "rect": yard["rect"],
+			"area_m2": (yard["rect"] as Rect2).get_area(), "prop_count": yard_props,
+			"piece_count": (yard["pieces"] as Array).size()})
+	return {"yards": yard_rows, "ward_area_m2": bailey.get_area(),
 		"clear_before_m2": maxf(0.0, bailey.get_area() - preexisting_area),
 		"fixture_occupied_m2": fixture_area,
 		"clear_after_m2": maxf(0.0, bailey.get_area()

@@ -830,7 +830,7 @@ func _check_connected_mass() -> void:
 		independent[row.id] = true
 	for m in builder.mass_log:
 		var nm: String = m["name"]
-		if not (nm.begins_with("yard_") or nm == "well" or independent.has(nm)):
+		if not (nm.begins_with("yard_") or nm.begins_with("yardwork_") or nm == "well" or independent.has(nm)):
 			continue
 		var box: AABB = m["aabb"]
 		# An independently seeded house must have real masonry at its foot.
