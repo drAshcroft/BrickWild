@@ -159,8 +159,23 @@ static func surface_materials(node: MeshInstance3D, spec: TreeSpec) -> void:
 		if slot < 0 or slot >= colours.size():
 			continue
 		var c: Color = colours[slot]
-		node.set_surface_override_material(i,
-			glow_material(c) if slot == SURF_GLOW else tree_material(c))
+		node.set_surface_override_material(i, _slot_material(slot, c))
+
+
+## One surface's material (EVAL-B04): bark with its fissures, leaf with a little
+## value variation per lobe, the accent and the glow as they were. Bark and leaf
+## read the mesh's vertex colour, because the voxel grain is vertex colour --
+## the same requirement `tree_material` states. A headless build gets the
+## plain `tree_material`, which is what `MaterialKit` hands back there too.
+static func _slot_material(slot: int, c: Color) -> Material:
+	if slot == SURF_GLOW:
+		return glow_material(c)
+	if MaterialKit.live():
+		if slot == SURF_BARK:
+			return MaterialKit.bark(c)
+		if slot == SURF_LEAF:
+			return MaterialKit.leaf(c)
+	return tree_material(c)
 
 
 ## A wood: one regenerated tree per position, under a single `forest` root.

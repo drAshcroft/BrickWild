@@ -182,6 +182,8 @@ func _vote_materials(node: Node) -> void:
 ## Does this surface already show the mesh's vertex colour, or is it a light
 ## source? Either way it is not the plastic blob, and it is left as it is.
 static func _reads_vertex_colour(m: Material) -> bool:
+	if m is ShaderMaterial:
+		return bool((m as ShaderMaterial).get_shader_parameter("vertex_tint"))
 	if m == null or not (m is StandardMaterial3D):
 		return false
 	var sm := m as StandardMaterial3D

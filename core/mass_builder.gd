@@ -75,6 +75,12 @@ func commit() -> ArrayMesh:
 	return _kit.commit()
 
 
+## `commit()` with each surface's logical slot named when an empty surface was
+## skipped ahead of it; see `MeshKit.commit_named`.
+func commit_named() -> ArrayMesh:
+	return _kit.commit_named()
+
+
 ## Import only populated source surfaces. Empty SurfaceTool slots are omitted
 ## from the committed ArrayMesh, so their source indices cannot be used there.
 func append_mapped_mesh(source: MassBuilder, mesh: ArrayMesh,
