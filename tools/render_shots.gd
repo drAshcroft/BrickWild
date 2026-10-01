@@ -718,9 +718,9 @@ func _detail_shots() -> Array[Dictionary]:
 		{"entry": lm[2], "file": "detail_chapels.jpg", "focus": "chevet",
 			"yaw": 0.45, "pitch": -0.22, "title": "Radiating chapels",
 			"caption": "Alcoves fanned off the ambulatory. The fan angle is solved from the geometry, not fixed."},
-		{"entry": lm[7], "file": "detail_onion.jpg", "focus": "dome",
+		{"entry": lm[7], "file": "detail_onion.jpg", "focus": "chapel_onion",
 			"yaw": 0.70, "pitch": -0.14, "title": "Onion dome",
-			"caption": "An ogee profile that bulges past its springing radius, then draws in to a point."},
+			"caption": "A chapel tower: windowed drum, then an ogee dome that bulges past its springing radius and draws in to a cross. Each chapel has its own height and colour."},
 		{"entry": lm[6], "file": "detail_lantern.jpg", "focus": "dome",
 			"yaw": 1.05, "pitch": -0.18, "title": "Octagonal drum and lantern",
 			"caption": "Eight-sided drum carrying the shell, capped by a lantern."},
@@ -742,6 +742,13 @@ func _focus_of(spec: ChurchSpec, kind: String) -> Array:
 				+ spec.dome_drum_height * 0.5 + ChurchGeometry.dome_shell_rise(spec) * 0.45,
 				ChurchGeometry.crossing_center_z(spec)),
 				ChurchGeometry.dome_plan_radius(spec) * 1.9]
+		"chapel_onion":
+			var tower: int = mini(3, spec.radiating_chapels - 1)
+			var dc: Vector3 = ChurchGeometry.chapel_drum_center(spec, tower)
+			var body: float = ChurchGeometry.chapel_body_height(spec, tower)
+			return [Vector3(dc.x, body + ChurchGeometry.chapel_drum_height(spec, tower) * 0.8
+				+ ChurchGeometry.chapel_onion_rise(spec) * 0.35, dc.z),
+				ChurchGeometry.chapel_drum_radius(spec) * 5.0]
 		"chevet":
 			return [Vector3(0.0, spec.height * 0.22,
 				ChurchGeometry.apse_springing_z(spec)
