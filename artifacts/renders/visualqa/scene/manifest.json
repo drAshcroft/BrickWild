@@ -16,8 +16,8 @@
 	},
 	{
 		"assembled": "visualqa/scene/krak_assembled.jpg",
-		"assembled_dressing_count": 129,
-		"available_prop_models": 129,
+		"assembled_dressing_count": 260,
+		"available_prop_models": 260,
 		"bailey_ranges": 4,
 		"camera": {
 			"fov_degrees": 48.0,
@@ -28,7 +28,7 @@
 		"courtyard": "visualqa/scene/krak_courtyard.jpg",
 		"key": "krak",
 		"mesh": "visualqa/scene/krak_mesh.jpg",
-		"prop_log_count": 129,
+		"prop_log_count": 260,
 		"seed": 6002,
 		"well_planned": true
 	}
