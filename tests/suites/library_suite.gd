@@ -47,6 +47,7 @@ static func run() -> SuiteResult:
 	_check_contract(res, requests)
 	_check_documents(res, requests)
 	_check_village_kind(res)
+	_check_world_generic_envelope(res)
 
 	var descriptor: Dictionary = BigGlade.describe_kind(&"house")
 	res.checked += 1
@@ -88,6 +89,31 @@ static func run() -> SuiteResult:
 				or plan.reachable_rooms(plan.entrance_room()).size() != plan.room_count():
 			res.fail("two-storey plan lacks complete upper-floor circulation")
 	return res
+
+
+static func _check_world_generic_envelope(res: SuiteResult) -> void:
+	var descriptor: Dictionary = BigGlade.describe_kind(&"world")
+	var tower_max := float(WorldFamilies.envelope(&"tower_house")["height"]["max"])
+	res.checked += 1
+	if float(descriptor["height"]["max"]) < tower_max:
+		res.fail("world generic height envelope does not include registered tower families")
+	var request := BuildingRequest.new()
+	request.kind = &"world"
+	request.style = &"tower_house"
+	request.purpose = &"merchant_tower"
+	request.width = 8.0
+	request.length = 8.0
+	request.height = tower_max
+	res.checked += 1
+	if not BuildingLibrary.validate(request).is_empty():
+		res.fail("tower at its published family maximum was refused by the public API")
+	request.height = tower_max + 0.01
+	var failures := BuildingLibrary.validate(request)
+	res.checked += 1
+	if not failures.any(func(failure: Dictionary) -> bool:
+		return failure.get("code", &"") == &"dimension_out_of_range" \
+			and failure.get("field", &"") == &"height"):
+		res.fail("tower family height above its envelope was not rejected")
 
 
 ## VIL-019: a village asked for like any other building.

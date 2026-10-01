@@ -35,7 +35,9 @@ const KINDS: Array[StringName] = [&"church", &"castle", &"house", &"shop",
 ##   height_label what its height means, in its own words
 ##   width/length/height/storeys   {min, max, step, value} -- the envelope AND
 ##                the default, so `defaults()` and the range check cannot
-##                disagree
+##                disagree. The generic world maximum also expands to cover
+##                every family's registered maximum; family validation then
+##                applies the narrower limit for the selected family.
 ##   style_label / purpose_label   what the two option lists are CALLED in
 ##                this family: a temple has a form and a cult, a shop has a
 ##                shell style and a business. An empty purpose_label means
@@ -243,6 +245,10 @@ static func describe(kind: StringName) -> Dictionary:
 	if not KIND_ROWS.has(kind):
 		return {}
 	var out: Dictionary = KIND_ROWS[kind].duplicate(true)
+	if kind == &"world":
+		for field in DIMENSIONS:
+			out[field]["max"] = _dimension_max(kind, field,
+				float(out[field]["max"]))
 	out["kind"] = kind
 	out["api_version"] = API_VERSION
 	out["styles"] = options(kind, &"style")
@@ -281,10 +287,11 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 				"%s must be a positive finite number." % String(field)))
 		elif known:
 			var limits: Dictionary = KIND_ROWS[request.kind][field]
-			if value < float(limits["min"]) or value > float(limits["max"]):
+			var maximum := _dimension_max(request.kind, field, float(limits["max"]))
+			if value < float(limits["min"]) or value > maximum:
 				out.append(_error(&"dimension_out_of_range", field,
 					"%s must be between %s and %s for a %s." % [
-						_field_word(request.kind, field), limits["min"], limits["max"],
+						_field_word(request.kind, field), limits["min"], maximum,
 						String(request.kind)]))
 	if not known:
 		return out
@@ -417,6 +424,20 @@ static func validate_world_envelope(request: BuildingRequest) -> Array[Dictionar
 				"%s must be between %s and %s metres for a %s." % [
 					String(field), lim["min"], lim["max"], String(request.style)]))
 	return out
+
+
+## The generic world envelope must include every registered family. The
+## selected family's envelope remains the stricter request-level check.
+static func _dimension_max(kind: StringName, field: StringName,
+		base_max: float) -> float:
+	if kind != &"world":
+		return base_max
+	var maximum := base_max
+	for family in WorldFamilies.families():
+		var env: Dictionary = WorldFamilies.envelope(family)
+		if env.has(field):
+			maximum = maxf(maximum, float(env[field]["max"]))
+	return maximum
 
 
 static func _error(code: StringName, field: StringName, message: String) -> Dictionary:

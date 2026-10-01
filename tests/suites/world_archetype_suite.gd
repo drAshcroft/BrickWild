@@ -48,8 +48,8 @@ static func run() -> SuiteResult:
 			request.seed = _seed_for(key, scale)
 			request.style = row["family"]
 			request.purpose = row["kind"]
-			request.width = float(row["width"]) * scale
-			request.length = float(row["length"]) * scale
+			request.width = snappedf(float(row["width"]) * scale, 0.01)
+			request.length = snappedf(float(row["length"]) * scale, 0.01)
 			request.height = float(row["height"])
 			var building: GeneratedBuilding = BigGlade.generate(request)
 			res.checked += 1
@@ -89,9 +89,9 @@ static func run_tower_house() -> SuiteResult:
 		request.seed = _seed_for("merchant_tower", scale)
 		request.style = &"tower_house"
 		request.purpose = &"merchant_tower"
-		request.width = float(row["width"]) * scale
-		request.length = float(row["length"]) * scale
-		request.height = float(row["height"]) * scale
+		request.width = snappedf(float(row["width"]) * scale, 0.01)
+		request.length = snappedf(float(row["length"]) * scale, 0.01)
+		request.height = snappedf(float(row["height"]) * scale, 0.01)
 		var building: GeneratedBuilding = BigGlade.generate(request)
 		res.checked += 1
 		var who := "merchant_tower scale=%.2f" % scale
