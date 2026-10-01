@@ -1387,6 +1387,9 @@ func _build_court_roofs() -> void:
 		_log_mass("court_roof_fascia_%d" % fi,
 			AABB(fp - fs * 0.5, fs), wall_top)
 	for ci in range(plan.courts.size()):
+		if plan.courts.size() > 1:
+			_build_multi_court_roofs(site, wall_top, rise)
+			break
 		# A multi-storey courtyard repeats its plan court at each level, but the
 		# building has one roof ring. Emitting every record stacked identical
 		# plates at the top and made the roof look like floating bands.
@@ -1450,7 +1453,87 @@ func _build_court_roofs() -> void:
 					Vector3(band.size.x, rise + 0.24, band.size.y)))
 			total_height = maxf(total_height, wall_top + rise)
 	_record_court_roof_openings(wall_top)
+	# The main hall is the ceremonial and visual apex of a Siheyuan. This
+	# courtyard roof path returns before the ordinary roof emitter, so author
+	# its ridge here as emitted geometry and a named mass, not QA metadata.
+	if plan.world_family == &"siheyuan":
+		var hall: Rect2 = plan.world_meta.get("main_hall_rect", Rect2())
+		var ridge_top := float(plan.world_meta.get("hall_ridge_height", wall_top + rise + 0.25))
+		var support_size := Vector3(0.24, ridge_top, 0.24)
+		for side in [-1.0, 1.0]:
+			var support_center := Vector3(hall.get_center().x + side * 1.5,
+				ridge_top * 0.5, hall.get_center().y)
+			box(support_size, support_center, SURF_TRIM)
+			_log_mass("siheyuan_ridge_support",
+				AABB(support_center - support_size * 0.5, support_size))
+		var ridge_size := Vector3(hall.size.x + 0.4, 0.3, 0.28)
+		var ridge_center := Vector3(hall.get_center().x, ridge_top - ridge_size.y * 0.5,
+			hall.get_center().y)
+		tag("roof")
+		host("main_hall_ridge")
+		box(ridge_size, ridge_center, SURF_ROOF)
+		_log_mass("siheyuan_main_hall_ridge",
+			AABB(ridge_center - ridge_size * 0.5, ridge_size), ridge_center.y - ridge_size.y * 0.5)
+		total_height = maxf(total_height, ridge_top)
+		host_end()
 	host_end()
+
+
+## A multi-court compound has open court rectangles, not one giant lightwell.
+## Keep the side ranges outside the outer court edges and roof only the axial
+## halls between them; the span polygons leave every court open to the sky.
+func _build_multi_court_roofs(site: Rect2, wall_top: float, rise: float) -> void:
+	var ordered: Array[Rect2] = []
+	for court_row in plan.courts:
+		ordered.append(Rect2(court_row["rect"]))
+	ordered.sort_custom(func(a: Rect2, b: Rect2) -> bool: return a.position.y < b.position.y)
+	var first: Rect2 = ordered[0]
+	var last: Rect2 = ordered[ordered.size() - 1]
+	var depth := 0.24
+	var front_quad := PackedVector3Array([
+		Vector3(site.position.x, wall_top + rise, site.position.y),
+		Vector3(site.end.x, wall_top + rise, site.position.y),
+		Vector3(first.end.x, wall_top, first.position.y),
+		Vector3(first.position.x, wall_top, first.position.y)])
+	component_slab("roof_court_multi_front", front_quad, depth, SURF_ROOF)
+	_log_mass("roof_court_multi_front", AABB(Vector3(site.position.x, wall_top - depth * 0.5, site.position.y),
+		Vector3(site.size.x, rise + depth, first.position.y - site.position.y)))
+	var rear_quad := PackedVector3Array([
+		Vector3(site.end.x, wall_top + rise, site.end.y),
+		Vector3(site.position.x, wall_top + rise, site.end.y),
+		Vector3(last.position.x, wall_top, last.end.y),
+		Vector3(last.end.x, wall_top, last.end.y)])
+	component_slab("roof_court_multi_rear", rear_quad, depth, SURF_ROOF)
+	_log_mass("roof_court_multi_rear", AABB(Vector3(site.position.x, wall_top - depth * 0.5, last.end.y),
+		Vector3(site.size.x, rise + depth, site.end.y - last.end.y)))
+	var left_quad := PackedVector3Array([
+		Vector3(site.position.x, wall_top + rise, first.position.y),
+		Vector3(site.position.x, wall_top + rise, last.end.y),
+		Vector3(first.position.x, wall_top, last.end.y),
+		Vector3(first.position.x, wall_top, first.position.y)])
+	component_slab("roof_court_multi_west", left_quad, depth, SURF_ROOF)
+	_log_mass("roof_court_multi_west", AABB(Vector3(site.position.x, wall_top - depth * 0.5, first.position.y),
+		Vector3(first.position.x - site.position.x, rise + depth, last.end.y - first.position.y)))
+	var right_quad := PackedVector3Array([
+		Vector3(site.end.x, wall_top + rise, last.end.y),
+		Vector3(site.end.x, wall_top + rise, first.position.y),
+		Vector3(last.end.x, wall_top, first.position.y),
+		Vector3(last.end.x, wall_top, last.end.y)])
+	component_slab("roof_court_multi_east", right_quad, depth, SURF_ROOF)
+	_log_mass("roof_court_multi_east", AABB(Vector3(last.end.x, wall_top - depth * 0.5, first.position.y),
+		Vector3(site.end.x - last.end.x, rise + depth, last.end.y - first.position.y)))
+	for ci in range(ordered.size() - 1):
+		var gap := Rect2(Vector2(site.position.x, ordered[ci].end.y),
+			Vector2(site.size.x, ordered[ci + 1].position.y - ordered[ci].end.y))
+		if gap.size.y <= 0.0:
+			continue
+		var size := Vector3(gap.size.x, depth, gap.size.y)
+		var center := Vector3(gap.get_center().x, wall_top + rise * 0.55, gap.get_center().y)
+		component_box("roof_court_multi_hall_%d" % ci, size,
+			Transform3D(Basis(), center), SURF_ROOF)
+		_log_mass("roof_court_multi_hall_%d" % ci,
+			AABB(center - size * 0.5, size))
+	total_height = maxf(total_height, wall_top + rise)
 
 
 func _build_roof() -> void:

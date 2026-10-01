@@ -96,7 +96,7 @@ static func for_building(building) -> BuildingFamilyAdapter:
 	if building.plan != null and building.plan.world_family in \
 			[&"courtyard_house", &"insula", &"mosque", &"caravanserai", &"hammam",
 			&"cruciform_temple", &"dravida", &"nagara", &"pagoda", &"rock_cut_temple",
-			&"stepwell", &"temple_mountain", &"tulou", &"vastu", &"vihara"]:
+			&"siheyuan", &"stepwell", &"temple_mountain", &"tulou", &"vastu", &"vihara"]:
 		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
@@ -424,6 +424,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 			var tulou_builder := TulouBuilder.new()
 			tulou_builder.build(building.plan)
 			return TulouCheck.new().check(building.plan, tulou_builder)
+		if building.plan != null and building.plan.world_family == &"siheyuan":
+			var siheyuan_builder := HouseBuilder.new()
+			siheyuan_builder.build(building.plan)
+			return SiheyuanCheck.new().check(building.plan, siheyuan_builder)
 		if building.plan != null and building.plan.world_family == &"hammam":
 			var builder := HammamBuilder.new()
 			builder.build(building.plan)
@@ -475,7 +479,8 @@ class WorldFamily extends BuildingFamilyAdapter:
 	func generate(request: BuildingRequest, out) -> bool:
 		if not WorldFamilies.generate(request, out):
 			return false
-		_copy_orientation_and_period(request, out.spec)
+		if out.spec != null:
+			_copy_orientation_and_period(request, out.spec)
 		return true
 
 	func build_mesh(building) -> ArrayMesh:
@@ -483,7 +488,7 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func instantiate(building, cutaway: bool) -> Node3D:
 		if building.plan != null and building.plan.world_family in \
-				[&"courtyard_house", &"insula", &"caravanserai", &"vastu", &"vihara"]:
+				[&"courtyard_house", &"insula", &"caravanserai", &"siheyuan", &"vastu", &"vihara"]:
 			return HouseAssembler.build(building.plan, cutaway)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			return CastleAssembler.build(building.spec, cutaway)
@@ -491,7 +496,7 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func footprint(building) -> Rect2:
 		if building.plan != null and building.plan.world_family in \
-				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"tulou", &"vastu", &"vihara"]:
+				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"siheyuan", &"tulou", &"vastu", &"vihara"]:
 			return HouseGeometry.site_rect(building.plan.spec)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			var bounds := CastleGeometry.tower_house_aabb(building.spec)
@@ -521,7 +526,7 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func door(building) -> Vector3:
 		if building.plan != null and building.plan.world_family in \
-				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"tulou", &"vastu", &"vihara"]:
+				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"siheyuan", &"tulou", &"vastu", &"vihara"]:
 			var d: int = building.plan.entrance()
 			if d >= 0:
 				var p: Vector2 = building.plan.doors[d]["pos"]

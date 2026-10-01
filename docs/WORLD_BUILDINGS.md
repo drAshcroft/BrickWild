@@ -231,6 +231,12 @@ yamen, the walled compound of a great family.
 | **walk** | the covered way joins the three halls | a `verandah` floor strip runs continuously from the main hall's door to both wings' doors; the court flood reaches all three without leaving it |
 | **courts in line** | a bigger house is more courts, not a bigger court | every court's centre lies on the axis; courts are ordered front to back with a hall between each pair |
 
+The public world registry exposes `scholars_compound` for the one-court
+22 x 32 x 5 m archetype and `two_court_compound` for an axial two-court
+variant. The latter refuses an envelope too short to contain both courts and
+their intervening hall. Orientation is stored in the local-frame convention:
+at zero yaw, local -Z is the south-facing entrance side.
+
 ### 2.2 The timber hall on a platform
 
 The building the whole of East Asia is made of: a stone platform, a grid of

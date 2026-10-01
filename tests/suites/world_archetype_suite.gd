@@ -64,6 +64,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 15.0, "length": 28.0, "height": 10.0,
 		"must": ["kitchen", "vastu_main_hall", "vastu_well", "jharokha"],
 		"check": &"vastu_check", "about": "Merchant's Haveli around a vastu light well"},
+	{"key": "scholars_compound", "family": &"siheyuan", "kind": &"scholars_compound",
+		"width": 22.0, "length": 32.0, "height": 5.0, "scales": [1.0],
+		"must": ["fauces", "blind_screen", "main_hall", "wing", "verandah", "siheyuan_main_hall_ridge"],
+		"check": &"siheyuan_check", "about": "south-facing Scholar's Compound with paired wings"},
 	{"key": "clan_ring", "family": &"tulou", "kind": &"clan_ring",
 		"width": 60.0, "length": 60.0, "height": 15.0,
 		"must": ["ancestral_hall", "gallery", "clan_room", "stair", "roof_ring"],
@@ -513,6 +517,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		rep = checker.check(building.plan, mesh_builder)
 	elif building.plan != null and check == &"tulou_check":
 		rep = checker.check(building.plan, mesh_builder)
+	elif building.plan != null and check == &"siheyuan_check":
+		rep = checker.check(building.plan, mesh_builder)
 	elif building.plan != null:
 		rep = checker.check(building.plan)
 	else:
@@ -549,6 +555,10 @@ static func _builder_for(building: GeneratedBuilding):
 			var tulou_builder := TulouBuilder.new()
 			tulou_builder.build(building.plan)
 			return tulou_builder
+		if building.plan.world_family == &"siheyuan":
+			var siheyuan_builder := HouseBuilder.new()
+			siheyuan_builder.build(building.plan)
+			return siheyuan_builder
 		if building.plan.world_family == &"nagara":
 			var nb := NagaraBuilder.new()
 			nb.build(building.plan)
