@@ -13,7 +13,7 @@ const MEASURE_INPUTS: Array[String] = [
 
 static func pack_fingerprint(pack_name: String, pack: Dictionary) -> String:
 	var pack_dir := "res://assets/props/%s" % String(pack.get("dir", ""))
-	var files := _tree_hashes(pack_dir)
+	var files: Variant = _tree_hashes(pack_dir)
 	if files == null:
 		if DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(pack_dir)):
 			return ""
@@ -76,7 +76,7 @@ static func store_cache(path: String, cache: Dictionary) -> bool:
 
 
 static func fingerprint_tree_for_test(root: String) -> String:
-	var files := _tree_hashes(root)
+	var files: Variant = _tree_hashes(root)
 	if files == null:
 		return ""
 	return JSON.stringify(files, "", true).sha256_text()

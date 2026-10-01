@@ -11,7 +11,10 @@ extends SceneTree
 ## Fast repeat: godot --headless --path . --script res://tools/build_prop_catalog.gd -- --incremental
 
 const OUT := "res://assets/props/catalog.json"
-const CACHE_PATH := "user://prop_catalog_cache.json"
+# Keep the cache beside Godot's other project-local generated state. This is
+# ignored by git and remains writable in managed workspaces where user:// may
+# be intentionally read-only.
+const CACHE_PATH := "res://.godot/prop_catalog_cache.json"
 const CatalogCache := preload("res://tools/prop_catalog_cache.gd")
 
 
@@ -77,6 +80,7 @@ func _init() -> void:
 			return
 		print("byte parity: full measurement equals cache-backed incremental output")
 		result["reused"] = parity["reused"]
+		result["reused_packs"] = parity["reused_packs"]
 		result["measured"] += parity["measured"]
 
 	var output := FileAccess.open(OUT, FileAccess.WRITE)
@@ -91,7 +95,7 @@ func _init() -> void:
 		quit(1)
 		return
 	print("catalogue has %d props; measured %d, reused %d packs (%d props) -> %s"
-		% [rows.size(), result["measured"], result["reused"], result["reused_packs"], OUT])
+		% [rows.size(), result["measured"], result["reused_packs"], result["reused"], OUT])
 	quit(0)
 
 

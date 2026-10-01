@@ -91,7 +91,8 @@ The cache hashes every file in each pack tree (models, buffers, textures and
 `.import` settings), plus the measurement code, catalogue pack rules, project
 settings and engine version. Any changed or added/removed file invalidates
 that pack; a missing or malformed cache forces measurement. The cache is in
-`user://`, not source control. `--verify-parity` is the expensive oracle
+the project-local ignored `.godot/` directory, not source control.
+`--verify-parity` is the expensive oracle
 command: it runs a full measurement, reads the just-written cache back, and
 requires cache-backed JSON to match the full output byte-for-byte. `lane:assets`
 still checks every catalogue entry against its imported model; `lane:assets-fast`
