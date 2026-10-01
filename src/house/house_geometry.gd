@@ -867,6 +867,18 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		Vector3(r.size.x, top, r.size.y))
 
 
+## The YARD ENVELOPE: the shell footprint with its porch and chimney stack,
+## grown by the apron (2 to 3 m, by style). Everything the house plans outside
+## its walls stays inside this; the lot owns the rest. A declared permission, not
+## a measured extent -- so it is not part of exterior_bounds().
+static func yard_rect(plan: HousePlan) -> Rect2:
+	var r := site_rect(plan.spec)
+	for extra in [chimney_rect(plan), porch_rect(plan)]:
+		if extra.size.x > 0.0:
+			r = r.merge(extra)
+	return r.grow(HouseYard.apron(plan.spec))
+
+
 ## CONSERVATIVE spec-only bounds, for callers with no plan. The hearth and the
 ## entrance may be on any wall, so every wall is grown by what either could
 ## add. A superset of exterior_bounds(), never a subset -- and never presented

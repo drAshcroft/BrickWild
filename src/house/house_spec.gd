@@ -55,7 +55,11 @@ var window_mullions: bool = true  # vertical timber bars dividing windows
 var window_hoods: bool = false    # dripstone hood mouldings over window heads
 var chimney_style: StringName = &"stepped" # &"stepped", &"straight", &"louver"
 var chimney_pots: int = 1         # terracotta flue pots at the crown
-var exterior_props: bool = true   # rain barrels, firewood, trade signs
+var exterior_props: bool = true   # facade pieces, the yard and its built pieces: the one switch
+## Metres of yard round the shell (porch and chimney stack included) that this
+## house may dress; the lot owns the rest. Negative means the style's own, 2 to
+## 3 m (HouseYard.APRON). Never drawn from `rng`, so it cannot move a plan.
+var yard_apron: float = -1.0
 ## Chosen before planning, so clear floor, openings and emitted masonry agree.
 var material: StringName = &"timber" # timber | stone
 ## Site frame metadata. These do not participate in seeded plan generation.
