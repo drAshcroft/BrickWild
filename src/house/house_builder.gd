@@ -304,7 +304,11 @@ func begin(surface_count: int) -> void:
 
 
 func commit() -> ArrayMesh:
-	emitted_mesh = super.commit()
+	# A world plan is dressed slot by slot, and a roof-off cutaway omits the
+	# roof surface ahead of the floor; name the survivors. Ordinary houses
+	# are left exactly as they were.
+	emitted_mesh = commit_named() if plan != null and plan.world_family != &"" \
+		else super.commit()
 	return emitted_mesh
 
 
@@ -1386,8 +1390,21 @@ func _build_court_roofs() -> void:
 			Transform3D(Basis(), fp), SURF_WALL)
 		_log_mass("court_roof_fascia_%d" % fi,
 			AABB(fp - fs * 0.5, fs), wall_top)
+	# A one-court house of several storeys carries one court record per storey,
+	# all the same rectangle. That is still one court and one four-range ring,
+	# not a multi-court compound: only DISTINCT rectangles take the multi path.
+	var distinct_courts: Array[Rect2] = []
+	for court_row in plan.courts:
+		var cr := Rect2(court_row["rect"])
+		var known := false
+		for seen in distinct_courts:
+			if seen.position.distance_to(cr.position) < 0.01 and seen.size.distance_to(cr.size) < 0.01:
+				known = true
+				break
+		if not known:
+			distinct_courts.append(cr)
 	for ci in range(plan.courts.size()):
-		if plan.courts.size() > 1:
+		if distinct_courts.size() > 1:
 			_build_multi_court_roofs(site, wall_top, rise)
 			break
 		# A multi-storey courtyard repeats its plan court at each level, but the

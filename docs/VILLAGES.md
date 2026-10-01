@@ -191,7 +191,7 @@ A road is a polyline with a class. Class sets width, verge and surface.
 | `through` | 6 m | 1.5 m | dirt → gravel → cobble | enters and leaves the site; the only class that crosses the enclosure |
 | `street` | 4 m | 1 m | dirt → cobble | joins the through road to the common and the lots on it |
 | `lane` | 2.5 m | 0.5 m | dirt | serves a handful of lots or one farm; may dead-end at a lot |
-| `path` | 1.2 m | 0 | trodden; `RockPath_*` stepping stones at wealth ≥ 0.5 | door to road, across the green, round the church |
+| `path` | 1.2 m | 0.7 m | trodden; `RockPath_*` stepping stones at wealth ≥ 0.5 | door to road, across the green, round the church |
 | `track` | 3 m | 0 | dirt | out to the fields; outside the enclosure only |
 
 The site planner lays the through road first (a gentle curve or two, never a

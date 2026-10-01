@@ -27,3 +27,6 @@ assets/props/wild/*
 scratch/logs/
 scratch/*.json
 /docs/screenshots
+
+# Agent worktrees
+.claude/

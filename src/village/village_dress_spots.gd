@@ -39,6 +39,8 @@ static func spots_for(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 			return _along_water(plan, rng, count)
 		&"band":
 			return _edge_band(plan, rng, count)
+		&"reeds":
+			return _reed_beds(plan)
 	return []
 
 
@@ -264,6 +266,43 @@ static func _along_water(plan: VillagePlan, rng: RandomNumberGenerator,
 	return out
 
 
+## Reed beds along natural water: stations at a pitch round the shore, kept
+## where a slow noise says a bed has taken, so the rushes grow in stands with
+## open bank between them rather than in a fence. Never a mill race, which is
+## timber-edged. Deterministic from the seed, and capped so a long river
+## does not bury the village in grass.
+static func _reed_beds(plan: VillagePlan) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var phase := float(plan.spec.seed % 719) * 0.173
+	for w in plan.water:
+		if w["kind"] == &"race":
+			continue
+		var poly: PackedVector2Array = w["poly"]
+		var along := 0.0
+		for e in poly.size():
+			var a: Vector2 = poly[e]
+			var b: Vector2 = poly[(e + 1) % poly.size()]
+			var length: float = a.distance_to(b)
+			if length < 0.01:
+				continue
+			var dir: Vector2 = (b - a) / length
+			var normal := Vector2(-dir.y, dir.x)
+			var t := 0.0
+			while t < length:
+				var bed: float = 0.5 + 0.3 * sin(along * 0.11 + phase) + 0.2 * sin(along * 0.37 + phase * 1.7)
+				var jitter: float = fposmod(sin((along + float(e) * 7.0) * 12.9898 + phase) * 43758.5453, 1.0)
+				if bed > 0.45 and out.size() < 150:
+					var at: Vector2 = a + dir * t
+					var out_pt: Vector2 = at + normal * (0.4 + jitter * 0.8)
+					if Poly.contains_point(poly, out_pt):
+						out_pt = at - normal * (0.4 + jitter * 0.8)
+					out.append(out_pt)
+				var step_m: float = 1.5 + jitter * 1.0
+				t += step_m
+				along += step_m
+	return out
+
+
 ## Boats belong beside reachable shore yards. Polygon corners alone put
 ## them beyond the last lot, with no ground a person could stand on.
 static func _strand_bank(plan: VillagePlan, ctx: Dictionary) -> Array[Vector2]:
@@ -356,6 +395,15 @@ static func _edge_band(plan: VillagePlan, rng: RandomNumberGenerator,
 		pitch *= 0.5
 	var steps: int = maxi(int(perimeter / pitch), want)
 	var n: int = ring.size()
+	# An edge that was planted by people over a long time is not a fence of
+	# equal trees (EVAL-B05): it has gaps, it wanders in and out, and it
+	# thickens into a copse at a corner. The shape is a slow noise along the
+	# walk, drawn from the seed and NOT from `rng`, so the stream the rest of
+	# the dressing draws from is the one it always was.
+	var p1 := float(plan.spec.seed % 977) * 0.113
+	var p2 := float(plan.spec.seed % 613) * 0.271
+	var p3 := float(plan.spec.seed % 389) * 0.419
+	var skipped := 0
 	for k in range(steps):
 		var t: float = float(k) / float(steps) * float(n)
 		var seg: int = int(t) % n
@@ -367,6 +415,8 @@ static func _edge_band(plan: VillagePlan, rng: RandomNumberGenerator,
 		var inward: Vector2 = (site.get_center() - along).normalized()
 		var depth: float = rng.randf_range(0.5, maxf(band, 1.5))
 		var jitter := Vector2(rng.randf_range(-1.5, 1.5), rng.randf_range(-1.5, 1.5))
+		var wobble: float = 0.5 + 0.5 * sin(float(k) * 0.23 + p3)
+		depth = lerpf(depth, 0.5 + wobble * maxf(band - 0.5, 1.0), 0.6)
 		var p: Vector2 = along + inward * depth + jitter
 		if plan.spec.form == &"strand" and not site.has_point(p):
 			# A long shore site gives the inward vector little depth near its
@@ -376,6 +426,29 @@ static func _edge_band(plan: VillagePlan, rng: RandomNumberGenerator,
 			p = VillageDressRules.inside_edge(site, p, 1.5)
 		if inner.has_point(p) or not site.has_point(p):
 			continue          # inside the village, not at its edge
+		var slow: float = 0.5 + 0.25 * sin(float(k) * 0.37 + p1) + 0.25 * sin(float(k) * 0.91 + p2)
+		# A gap, never more than two stations running: 12 m at the pitch,
+		# and the edge rule allows 25 m of nothing within 6 m of anything.
+		if slow < 0.2 and skipped < 2:
+			skipped += 1
+			continue
+		skipped = 0
 		out.append(p)
+		# A copse: the odd station thickens into two or three trees
+		if slow > 0.9:
+			out.append(p + Vector2(2.4, 0.8).rotated(float(k)))
+			out.append(p + Vector2(-1.2, 2.2).rotated(float(k)))
+	# and a clump at each real corner of the ring
+	for c in range(n):
+		var prev: Vector2 = ring[(c + n - 1) % n]
+		var next: Vector2 = ring[(c + 1) % n]
+		var corner: Vector2 = ring[c]
+		if absf((corner - prev).normalized().angle_to((next - corner).normalized())) < 0.5:
+			continue
+		var in_dir: Vector2 = (site.get_center() - corner).normalized()
+		for q in [Vector2(3.0, 2.0), Vector2(-2.0, 4.2), Vector2(4.6, -1.5)]:
+			var cp: Vector2 = corner + in_dir * 2.0 + q.rotated(in_dir.angle() - PI * 0.5)
+			if not inner.has_point(cp) and site.has_point(cp):
+				out.append(cp)
 	return out
 

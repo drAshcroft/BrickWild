@@ -66,7 +66,7 @@ func _generate(kind: StringName, seed: int, width: float, length: float,
 func _street(building: GeneratedBuilding, filename: String) -> void:
 	var builder := HouseBuilder.new()
 	var mesh := builder.build(building.plan, true)
-	_set_mesh(mesh)
+	_set_mesh(mesh, building.plan)
 	_clear_witness()
 	var site := HouseGeometry.site_rect(building.plan.spec)
 	_cam.fov = 58.0 if int(building.plan.spec.storeys) >= 3 else 46.0
@@ -90,7 +90,7 @@ func _street(building: GeneratedBuilding, filename: String) -> void:
 func _court(building: GeneratedBuilding, filename: String, gate := false) -> void:
 	var builder := HouseBuilder.new()
 	var mesh := builder.build(building.plan, false)
-	_set_mesh(mesh)
+	_set_mesh(mesh, building.plan)
 	_clear_witness()
 	var court := Rect2(building.plan.world_meta["court_rect"])
 	var centre := Vector3(court.get_center().x, 0.0, court.get_center().y)
@@ -110,7 +110,7 @@ func _court(building: GeneratedBuilding, filename: String, gate := false) -> voi
 		await _look(eye, centre + Vector3.UP * court_target_y, filename)
 
 
-func _set_mesh(mesh: ArrayMesh) -> void:
+func _set_mesh(mesh: ArrayMesh, plan: HousePlan = null) -> void:
 	_mesh_inst.mesh = mesh
 	for i in range(mesh.get_surface_count()):
 		var mat := StandardMaterial3D.new()
@@ -118,6 +118,9 @@ func _set_mesh(mesh: ArrayMesh) -> void:
 		mat.roughness = 0.86
 		mat.cull_mode = BaseMaterial3D.CULL_BACK
 		_mesh_inst.set_surface_override_material(i, mat)
+	if plan != null:
+		# the real thing: what the family is built of (EVAL-B04)
+		WorldAssembler.dress_house(_mesh_inst, plan)
 
 
 func _add_water_witness(at: Vector3) -> void:

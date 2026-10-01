@@ -22,7 +22,7 @@ const ROAD_CLASSES := {
 	&"through": {"width": 6.0, "verge": 1.5, "surface": ["dirt", "gravel", "cobble"]},
 	&"street": {"width": 4.0, "verge": 1.0, "surface": ["dirt", "dirt", "cobble"]},
 	&"lane": {"width": 2.5, "verge": 0.5, "surface": ["dirt", "dirt", "dirt"]},
-	&"path": {"width": 1.2, "verge": 0.0, "surface": ["trodden", "trodden", "stones"]},
+	&"path": {"width": 1.2, "verge": 0.7, "surface": ["trodden", "trodden", "stones"]},
 	&"track": {"width": 3.0, "verge": 0.0, "surface": ["dirt", "dirt", "dirt"]},
 }
 
@@ -48,6 +48,11 @@ const THROUGH_MIN_SAMPLES := 9
 const BEND_A1 := Vector2(0.035, 0.050)
 const BEND_A2 := Vector2(0.005, 0.015)
 const MIN_BOW_M := 2.0          ## a road at least this far off its own chord is not "straight across"
+
+## Two junctions closer than this are one junction with a kink (§5, and the
+## road check's JUNCTION_APART). A ring of chords round a common is only
+## drawn when its chords are longer.
+const JUNCTION_MIN_SPACING_M := 8.0
 
 const COMMON_MIN_AREA := 150.0
 const HAMLET_COMMON_AREA := 30.0
@@ -335,13 +340,19 @@ static func _plan_street(out: VillagePlan, spec: VillageSpec, through: PackedVec
 	var height: float = WELL_PLOT_SIDE if hamlet else maxf(target / width, 9.0)
 
 	var mid: float = 0.0   # the common sits mid-village
+	# A hamlet's well plot is 5.6 m across. Its approach path leaves the through
+	# road at a real vertex, and a path that slants in from a vertex five metres
+	# off the plot's axis puts its ribbon corner in the well's own floor, so the
+	# well is pushed off the centre and out of the path's reach. Put the plot on
+	# the vertex: the path runs straight in and the well stands at its end.
+	if hamlet:
+		mid = through[_vertex_near_x(through, 0.0)].x
 	var rect: Rect2 = _rect_north_of(through, out.roads[0], mid, width, height, COMMON_ROAD_GAP)
 	out.commons.append({"poly": Poly.from_rect(rect), "kind": &"common"})
 	# A bowed road may touch the common only at one corner. That contact has
 	# no pedestrian width after erosion, so give the well a real civic path.
 	var approach := _road(PackedVector2Array([through[_vertex_near_x(through, mid)],
 		rect.get_center() - Vector2(0.0, 1.9)]), &"path", spec.wealth)
-	approach["verge"] = 0.7
 	out.roads.append(approach)
 
 	# The common's other three sides (VIL-012). Without them the common has
@@ -457,7 +468,6 @@ static func _plan_strand(out: VillagePlan, spec: VillageSpec,
 	out.commons.append({"poly": Poly.from_rect(common), "kind": &"common"})
 	var approach := _road(PackedVector2Array([Vector2(0.0, anchor_y),
 		common.get_center() - Vector2(0.0, 1.9)]), &"path", spec.wealth)
-	approach["verge"] = 0.7
 	out.roads.append(approach)
 	# The landmark can occupy the inland civic plot without creating a
 	# second residential row. Its own service lane keeps its native door.
@@ -517,9 +527,6 @@ static func _plan_planted(out: VillagePlan, spec: VillageSpec,
 	# beautiful but inaccessible island containing the well and market.
 	var approach := _road(PackedVector2Array([Vector2(left_x, centre.y),
 		centre - Vector2(2.0, 0.0)]), &"path", spec.wealth)
-	# Walkable grass shoulders keep the nominal 1.2m path clear after the
-	# pedestrian-radius erosion used by the shared navigation grid.
-	approach["verge"] = 0.7
 	out.roads.append(approach)
 	_reserve_landmark(out, spec, square, site, top + _ring_half() + LANDMARK_GAP)
 
@@ -723,6 +730,13 @@ static func _ring_street(out: VillagePlan, spec: VillageSpec, through: PackedVec
 	var clear: float = _ring_half() + COMMON_ROAD_GAP
 	var centre := common.get_center()
 	var radius := maxf(common.size.x, common.size.y) * 0.5
+	# A rectangular common reaches past the circle its longer side implies, to
+	# its corners; a ring tangent to that circle cut across them (the street
+	# form's two end chords overlapped the common by 3.5 m^2 on 17 of 50 seeds).
+	# The gate form shares this ring but has no room to spare: its manor lane
+	# needs the old ring, so it keeps it (a known gap, see the task report).
+	if spec.form == &"street":
+		radius = common.size.length() * 0.5
 	# Chords cut inside their circumradius.  Offset the centreline by the
 	# reciprocal of cos(22.5 degrees), so the inward road edge remains at the
 	# common's radius even at the midpoint of each 45-degree chord.  Each chord
@@ -732,6 +746,11 @@ static func _ring_street(out: VillagePlan, spec: VillageSpec, through: PackedVec
 	if spec.form == &"round":
 		arc_radius = _round_ring_radius(radius)
 	var far_y: float = centre.y + arc_radius
+	# A ring round a well plot is chords of four metres: junctions on top of
+	# each other, and a street laid across the plot's own corners. A hamlet's
+	# common is fronted on the through road alone; that is what a hamlet is.
+	if spec.form != &"round" and 2.0 * arc_radius * sin(PI / 8.0) < JUNCTION_MIN_SPACING_M:
+		return -INF
 	# Room for the street, the landmark behind it AND a band of lots beyond
 	# that -- not merely for the street itself.
 	#
@@ -851,6 +870,10 @@ static func _rect_north_of(points: PackedVector2Array, road: Dictionary, at_x: f
 	for p in points:
 		if p.x >= left - 6.0 and p.x <= right + 6.0:
 			road_top = maxf(road_top, p.y)
+	# The road between two samples is higher than the lower of them: take the
+	# road where the rectangle's own edges stand, not only the samples near it.
+	for edge_x in [left, right]:
+		road_top = maxf(road_top, VillageLotPlanner._polyline_y_at_x(points, edge_x))
 	if road_top == -INF:
 		road_top = 0.0
 	var bottom: float = road_top + float(road["width"]) * 0.5 + float(road["verge"]) + gap

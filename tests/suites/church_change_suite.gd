@@ -47,6 +47,11 @@ static func run() -> SuiteResult:
 		var mesh: ArrayMesh = builder.build(spec)
 		LandmarkSuite._check_required_masses(key, builder, key, res)
 		LandmarkSuite._check_clerestory(spec, builder, key, res)
+		if spec.hero != &"":
+			# the hero emitters (octagon, tribunes, bearing, arches, tent, onions)
+			# face outward and their openings look out of their walls
+			NormalsSuite.check_mesh(res, mesh, "%s hero" % key)
+			NormalsSuite.check_openings(res, builder, "%s hero" % key)
 		_check_massing(res, spec, builder, key)
 		if key == "hagia_sophia":
 			_expect(res, (mesh.surface_get_arrays(ChurchBuilder.SURF_ROOF)[Mesh.ARRAY_VERTEX]

@@ -38,8 +38,8 @@ static func _stall(res: SuiteResult, plan: HousePlan) -> void:
 	_want(res, not Rect2(piece.rect).intersects(inward_clear), "stall body blocks entrance")
 	_want(res, Rect2(piece.zone).intersects(inward_clear), "fixture no longer shares its clear entrance approach")
 	piece.yaw += PI
-	var check := HouseFurnishCheck.new()
-	check._check_focus(plan)
+	var check := HouseFurnishAffinityCheck.new()
+	check.check_focus(plan)
 	_want(res, not check.failures.is_empty(), "reversed stall facing escaped QA")
 
 
@@ -66,8 +66,8 @@ static func _workbench(res: SuiteResult, plan: HousePlan) -> void:
 	plan.windows = keep
 	plan.furniture[bench].rect = Rect2(-1.612338, -1.432662, 1.53444, 0.77824)
 	plan.furniture[bench].free_standing = false
-	var check := HouseFurnishCheck.new()
-	check._check_workbench_daylight(plan)
+	var check := HouseFurnishAffinityCheck.new()
+	check.check_workbench_daylight(plan)
 	_want(res, not check.failures.is_empty(), "dark bench pose escaped daylight QA")
 
 

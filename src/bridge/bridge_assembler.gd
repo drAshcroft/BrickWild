@@ -60,6 +60,36 @@ static func materials(spec: BridgeSpec) -> Array[StandardMaterial3D]:
 	return out
 
 
+## What each kind of bridge is built of (EVAL-B04), by surface: stone, timber,
+## deck, metal. The stone bridge is ashlar with a lighter worn coping on every
+## upward face of the parapet and a setted deck; the covered bridge stands on
+## rubble abutments, in weathered boards under a shingled roof; the rope
+## bridge is plank and hemp; the mobile span is timber on ashlar with iron.
+static func kit_materials(spec: BridgeSpec) -> Array:
+	var iron: Material = materials(spec)[3]
+	var shingle := Color(spec.roof_color.r, spec.roof_color.g, spec.roof_color.b, 1.0)
+	match spec.kind:
+		&"stone":
+			return [MaterialKit.ashlar(spec.stone_color, false, Vector2(0.9, 0.42), {"coping": 1.0}),
+				MaterialKit.timber(spec.timber_color, true),
+				MaterialKit.paving(spec.deck_color, spec.deck_color, 0.5),
+				iron]
+		&"covered":
+			return [MaterialKit.rubble(spec.stone_color),
+				MaterialKit.timber(spec.timber_color, true, false, false, false, shingle),
+				MaterialKit.timber(spec.deck_color, true, false, true),
+				iron]
+		&"rope":
+			return [MaterialKit.rubble(spec.stone_color),
+				MaterialKit.timber(spec.timber_color, true),
+				MaterialKit.timber(spec.deck_color, true, false, true),
+				MaterialKit.rope(Color("8a7550"))]
+	return [MaterialKit.ashlar(spec.stone_color, false, Vector2(0.9, 0.42)),
+		MaterialKit.timber(spec.timber_color, true),
+		MaterialKit.timber(spec.deck_color, true, false, true),
+		iron]
+
+
 ## A whole bridge: a `MeshInstance3D`, a site, and a lamp per `spec.glow` entry.
 static func build(spec: BridgeSpec, builder: BridgeBuilder = null) -> Node3D:
 	var root := Node3D.new()
@@ -73,6 +103,8 @@ static func build(spec: BridgeSpec, builder: BridgeBuilder = null) -> Node3D:
 	for i in range(mesh.get_surface_count()):
 		if i < cols.size():
 			span.set_surface_override_material(i, cols[i])
+	if MaterialKit.live():
+		MaterialKit.apply(span, kit_materials(spec))
 	root.add_child(span)
 	root.add_child(site(spec))
 	for i in range(spec.glow.size()):
@@ -137,7 +169,8 @@ static func site(spec: BridgeSpec) -> Node3D:
 	var gm := StandardMaterial3D.new()
 	gm.roughness = 1.0
 	ground.set_surface_override_material(0, _mat(BED))
-	ground.set_surface_override_material(1, _mat(ROCK))
+	ground.set_surface_override_material(1,
+		MaterialKit.rock(ROCK) if MaterialKit.live() else _mat(ROCK))
 	ground.set_surface_override_material(2, _mat(GROUND))
 	root.add_child(ground)
 
@@ -151,7 +184,7 @@ static func site(spec: BridgeSpec) -> Node3D:
 	wm.albedo_color = WATER
 	wm.roughness = 0.1
 	wm.metallic = 0.15
-	water.set_surface_override_material(0, wm)
+	water.set_surface_override_material(0, MaterialKit.water(WATER) if MaterialKit.live() else wm)
 	root.add_child(water)
 	return root
 

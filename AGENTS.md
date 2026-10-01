@@ -80,7 +80,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | anything under `assets/props/` or `catalog.json` | rebuild catalogue, then `lane:assets` | required exception: over 5 m |
 | castle geometry and openings | `lane:castle-change` | 209 s host |
 | temple geometry | `lane:temple` | 52 s host |
-| village site, lots, plan rules | `lane:village-fast` | 113 s host; current VIL-017 failures |
+| village site, lots, plan rules | `lane:village-fast` | 113 s host |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | church shell, opening or roof geometry | `lane:church-change` | 20 s host |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |

@@ -17,12 +17,15 @@ inputs and both light rigs. These are visual judgments, not automated scores.
 | Himeji | Repeated tiered roofs still obscure the tenshu. | Tower faces separate, while the base lacks a terrace. | White wall highlights remain strong. | Small slits remain visible. | Main keep still loses to similar surrounding towers; CAS-010 owns the raised terrace. |
 | Neuschwanstein | Ridge ranges and spires remain readable. | Light gives the tall tower more volume. | Long walls stay flat. | Window rows remain uniform dashes. | Entrance and roof hierarchy still need VIS-009. |
 
-The key is 62 degrees to one side of the camera at 30 degrees elevation, with
-warm energy 1.8, cool fill 0.45 and ambient 0.8. The historical key was fixed
-at -131 degrees azimuth, -42 degrees elevation, energy 1.5, with white fill
-0.35 and ambient 1.0. The new setup improves face separation on Bodiam,
-Durham and Notre-Dame without hiding their openings. It gives Hagia Sophia and
-Himeji bright white walls, so material and form work remain necessary.
+EVAL-B01 re-rendered the right column. The key is now a warm sun 112 degrees
+round from the camera at 28 to 29 degrees elevation (energy 1.7 to 2.1 by
+family), the cool fill sits at +65 degrees at about a quarter of the key, and
+ambient is 0.4 to 0.45. The old column keeps the historical fixed light. Cause
+of the earlier flatness: the directional shadow reach was Godot's default
+100 m from the camera, so any portrait taken from further out (every castle,
+most churches) drew no shadow at all. The reach is now set per shot to just
+past the far wall, in one orthogonal box on an 8192 atlas. The ground is a
+mottled earth plane fading into horizon haze by depth fog.
 
 The [Chartres chevet shot](chartres_chevet.jpg) now contains the chapel ring,
 ambulatory and apse. The earlier `detail_chapels.jpg` frame was aimed into an

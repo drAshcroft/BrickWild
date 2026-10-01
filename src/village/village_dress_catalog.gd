@@ -84,6 +84,12 @@ const RECIPES := {
 		{"cat": "rock", "rule": &"bank", "n": [2, 5], "opt": 0.8, "plant": true},
 		{"cat": "plant", "rule": &"bank", "n": [2, 4], "opt": 0.7, "plant": true},
 	],
+	# rushes along the bank, planted LAST so they take only what nothing else
+	# wanted: never the strand's aprons, never a road or a door
+	&"reeds": [
+		{"cat": "reed", "rule": &"reeds", "n": [1, 1], "opt": 1.0, "plant": true,
+			"palette": "reed", "fill": true},
+	],
 	&"strand": [
 		{"cat": "boat", "rule": &"bank", "n": [1, 2], "opt": 1.0, "built": true},
 		{"cat": "drying_rack", "rule": &"bank", "n": [1, 2], "opt": 1.0, "built": true},
@@ -107,7 +113,8 @@ const RECIPES := {
 ## Â§8's palette, by culture. Four slots, and a village plants from one row and
 ## no other: `edge` at the boundary and behind the farms, `green` the one tree
 ## on the common, `hedge` along a lot's side boundaries and the verges,
-## `ground` the cover on the verges and the common.
+## `ground` the cover on the verges and the common, `wild` the dead and
+## storm-broken trees an old edge always has one or two of.
 ##
 ## The keys are catalogue keys, not categories, because a palette is exactly
 ## the business of naming WHICH birch. A `*` suffix takes every catalogue key
@@ -116,27 +123,37 @@ const RECIPES := {
 const PALETTES := {
 	&"english": {"edge": ["Wild_CommonTree_*", "Nature_MapleTree_*"],
 		"green": ["Wild_CommonTree_*"], "hedge": ["Wild_Bush_Common*"],
-		"ground": ["Wild_Grass_Common_*", "Wild_Clover_*", "Nature_Flower_*_Clump"]},
+		"ground": ["Wild_Grass_Common_*", "Wild_Clover_*", "Nature_Flower_*_Clump"],
+		"wild": ["Nature_DeadTree_1", "Nature_DeadTree_2"]},
 	&"frankish": {"edge": ["Wild_CommonTree_*", "Nature_MapleTree_*"],
 		"green": ["Wild_CommonTree_*"], "hedge": ["Wild_Bush_Common*"],
-		"ground": ["Wild_Grass_Common_*", "Wild_Clover_*", "Nature_Flower_*_Clump"]},
+		"ground": ["Wild_Grass_Common_*", "Wild_Clover_*", "Nature_Flower_*_Clump"],
+		"wild": ["Nature_DeadTree_1", "Nature_DeadTree_2"]},
 	&"norse": {"edge": ["Wild_Pine_*", "Nature_BirchTree_*"],
 		"green": ["Nature_BirchTree_*"], "hedge": ["Nature_Bush_Small*"],
-		"ground": ["Wild_Grass_Wispy_*", "Wild_Rock_Medium_*"]},
+		"ground": ["Wild_Grass_Wispy_*", "Wild_Rock_Medium_*"],
+		"wild": ["Nature_DeadTree_1", "Nature_DeadTree_2"]},
 	&"alpine": {"edge": ["Wild_Pine_*", "Nature_BirchTree_*"],
 		"green": ["Nature_BirchTree_*"], "hedge": ["Nature_Bush_Small*"],
-		"ground": ["Wild_Grass_Wispy_*", "Wild_Rock_Medium_*"]},
+		"ground": ["Wild_Grass_Wispy_*", "Wild_Rock_Medium_*"],
+		"wild": ["Nature_DeadTree_1", "Nature_DeadTree_2"]},
 	&"moorish": {"edge": ["Wild_TwistedTree_*", "Wild_CommonTree_*"],
 		"green": ["Wild_TwistedTree_*"], "hedge": ["Wild_Plant_1*", "Wild_Plant_7*"],
-		"ground": ["Wild_Pebble_*", "Wild_Grass_Common_Short"]},
+		"ground": ["Wild_Pebble_*", "Wild_Grass_Common_Short"],
+		"wild": ["Nature_DeadTree_1"]},
 	&"eastern": {"edge": ["Wild_TwistedTree_*", "Wild_CommonTree_*"],
 		"green": ["Wild_TwistedTree_*"], "hedge": ["Wild_Plant_1*", "Wild_Plant_7*"],
-		"ground": ["Wild_Pebble_*", "Wild_Grass_Common_Short"]},
+		"ground": ["Wild_Pebble_*", "Wild_Grass_Common_Short"],
+		"wild": ["Nature_DeadTree_1"]},
 	# no green tree at all: nothing grows on a blighted common
 	&"blighted": {"edge": ["Nature_DeadTree_*", "Wild_DeadTree_*"],
 		"green": [], "hedge": ["Wild_Mushroom_*"],
 		"ground": ["Wild_Mushroom_*", "Wild_Pebble_Square_*"]},
 }
+
+## Rushes and sedge for a bank. Every culture's water has them, so they are
+## not a row of PALETTES: `palette_keys` falls back to this for the `reed` slot.
+const REEDS: Array = ["Wild_Grass_Wispy_Tall", "Wild_Grass_Common_Tall", "Nature_Grass_Large"]
 
 ## The props that are BUILT rather than loaded (VIL-010). A recipe step marked
 ## `built` names one of these instead of a catalogue category; the assembler

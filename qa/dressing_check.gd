@@ -41,11 +41,17 @@ func ok() -> bool:
 ## The rules that hold for any dressed shell. `bounds` is the ground the
 ## building stands on in plan and `height` its tallest point; `label` names the
 ## building in every complaint, since a sweep reports on hundreds of them.
-func check(props: Array, bounds: Rect2, height: float, label: String) -> void:
+##
+## `lit_extra` is light the shell did not place: the furniture of the planned
+## interiors (`builder.interiors`), which is judged by the house checks rather
+## than here, but which still counts when asking whether anything burns.
+func check(props: Array, bounds: Rect2, height: float, label: String,
+		lit_extra: Array = [], dark_by_design := false) -> void:
 	_known(props, label)
 	_inside(props, bounds, height, label)
 	_clear(props, label)
-	_lit(props, label)
+	if not dark_by_design:
+		_lit(props + lit_extra, label)
 
 
 ## Every key is a prop the catalogue describes AND measured.

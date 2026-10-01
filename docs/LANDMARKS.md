@@ -14,6 +14,7 @@ expected to be able to build. Sources listed at the bottom.
 | Florence Duomo | Renaissance | 153 long, 90 at transept | **Octagonal drum + double-shell dome** (45.5 m inner diameter, 90 m to lantern base); three radial tribunes of five chapels each |
 | St Basil's | Russian | central chapel 46 m internal | **Nine chapels around a central tent**, total 65 m; **onion domes**, eight arranged in a star |
 
+
 ## Feature checklist this drives
 
 - flying buttresses (pier + flyer arch + pinnacle)
@@ -21,6 +22,28 @@ expected to be able to build. Sources listed at the bottom.
 - alcoves: radiating chapels, ambulatory, apsidal chapels, exedrae
 - twin west towers, and a crossing tower/lantern
 - multiple aisle pairs (single, double, and the five-aisled section)
+
+## Hero composition (EVAL-B03)
+
+Three of these buildings are read by one feature, so they are composed rather
+than rolled. `ChurchGenerator.apply_landmark(spec, key)` runs after
+`generate()`, sets `spec.hero` and sizes the parts from the figures above; every
+hero rule in `ChurchGeometry` and `ChurchBuilder` is gated on `spec.hero`, so a
+randomly generated church is byte-for-byte unchanged (90 sweep churches
+fingerprinted before and after). The landmark suite, `render_shots.gd` and the
+`vis010` fixture all call it, so they cannot disagree.
+
+| Hero | Landmark rows used | What the mesh builds |
+|---|---|---|
+| `florence` | length is the OVERALL 153 m; the nave is shortened so nave, crossing and east tribune add up to it. Dome 45 m of 153 (`FLORENCE_DOME_RATIO` 0.14) | an octagonal crossing block as wide as the dome (the drum stands back from it on a chamfered ledge), three tribunes (east, south, north) round it, four nave bays with a pilaster on every bay edge, one tall aisle light and two modest round-headed clerestory lights per bay, the eight-sided shell and a lantern sized for its dome |
+| `basil` | core 24 x 30 x 26 m (the earlier 12 x 46 row made a long box that no ring of chapels could surround); the real 65 m total comes from the tent | a podium (two stone courses, the door lifted onto it), a porch on the west where the ring opens, a tented core (eight-gored tent, stone bands, small gilded onion), eight chapels at staggered heights each with a windowed drum and its own painted onion (own vertex-coloured surface, `SURF_ACCENT`) |
+| `hagia` | 31 x 76 x 40 m, dome 0.45 of the width | a shallow-roofed nave in bays (one tall arched clerestory light per bay, aisle arcade, pilasters), the drum on a square masonry bearing (vertical faces, windows under the north and south arches, a pier at each corner) with the four great arches drawn on its faces, half-domes springing from the bearing's east and west faces and crowning at its top, then the apse |
+
+Checks: `landmark` (required masses, bay rhythm, Florence proportions, eight
+distinct chapel heights), `vis010` (the blueprint inventory draws the same
+rows), `vis016` (the Hagia bearing is a masonry block with a solid wall and an
+open throat, not a flared skirt) and `lane:church-change` (normals and openings
+of all three hero meshes).
 
 ## Sources
 
