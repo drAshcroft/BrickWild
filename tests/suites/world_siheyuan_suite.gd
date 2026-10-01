@@ -135,6 +135,6 @@ static func _negative_fixtures(res: SuiteResult) -> void:
 	_expect(res, "disconnected verandah", "walk", broken_walk)
 
 	var off_axis_court := _fixture_plan(22014)
-	var second := Rect2(Vector2(-4.0, 18.0), Vector2(8.0, 8.0))
+	var second := Rect2(Vector2(-2.0, 18.0), Vector2(8.0, 8.0))
 	off_axis_court.courts.append({"rect": second, "storey": 0, "id": "outer_court"})
 	_expect(res, "off-axis second court", "courts_in_line", off_axis_court)

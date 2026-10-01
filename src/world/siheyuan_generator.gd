@@ -63,7 +63,9 @@ static func generate(seed: int, width: float, length: float, height: float,
 	var passage_w := minf(4.0, (inner.size.x - court_w) * 0.5)
 	var wing_w := (inner.size.x - court_w - 4.0 - passage_w * 0.5) * 0.5
 	var wing_depth := minf(12.0, court_d + 2.0)
-	var hall_w := minf(inner.size.x * 0.82, wing_w * 2.0 + 0.5)
+	# The long two-court entry passage grows with the site. Keep the principal
+	# hall broad enough to remain the compound's largest room at that scale.
+	var hall_w := inner.size.x * 0.74
 	var hall_depth := minf(7.0, inner.size.y * 0.22)
 	if wing_w < 3.2 or wing_depth < 8.0 or hall_w < 7.0 or hall_depth < 5.0:
 		return {"error": "siheyuan: terrain envelope cannot fit the required compound clearances"}

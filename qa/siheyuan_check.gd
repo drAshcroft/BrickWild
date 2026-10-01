@@ -168,8 +168,8 @@ func _check_verandah(plan: HousePlan, failures: Array[String], stats: Dictionary
 	for door in plan.doors:
 		if String(door.get("role", "")).begins_with("verandah_") \
 				or String(door.get("role", "")) in ["hall_verandah", "west_verandah_door", "east_verandah_door", "gate_verandah"]:
-		var pos: Vector2 = door.get("pos", Vector2.ZERO)
-		grid.add_floor(Rect2(pos - Vector2(0.5, 0.5), Vector2.ONE))
+			var pos: Vector2 = door.get("pos", Vector2.ZERO)
+			grid.add_floor(Rect2(pos - Vector2(0.5, 0.5), Vector2.ONE))
 	grid.build(HouseGeometry.PERSON_RADIUS)
 	var rear_index := _role_room(plan, "verandah_rear")
 	if rear_index >= 0 and grid.flood_from(HouseGeometry.room_floor_rect(plan, rear_index).get_center()):
