@@ -10,6 +10,8 @@ static func run() -> SuiteResult:
 		{"name": "hamlet", "seed": 0, "population": 18, "purpose": &"mining", "wealth": 0.4},
 	]
 	var mutation_plan: VillagePlan
+	var street_site: VillagePlan
+	var street_spec: VillageSpec
 	for row in fixtures:
 		var spec := _spec(int(row.seed), int(row.population), row.purpose, float(row.wealth))
 		var site_plan: VillagePlan = VillageSitePlanner.plan(spec)
@@ -22,6 +24,9 @@ static func run() -> SuiteResult:
 			if common_area > 60.0:
 				res.fail("hamlet site baseline: common area %.2fm² exceeds the well-sized limit" % common_area)
 
+		if row.name == "street":
+			street_site = site_plan
+			street_spec = spec
 		var plan: VillagePlan = VillageLotPlanner.plan(spec)
 		res.checked += 1
 		if plan.lots.is_empty():
@@ -39,6 +44,7 @@ static func run() -> SuiteResult:
 		res.fail("width mutation control had no street plan")
 	else:
 		_check_width_mutation(res, mutation_plan)
+	_check_site_controls(res, street_site, street_spec)
 	return res
 
 
@@ -90,3 +96,33 @@ static func _copy_plan(plan: VillagePlan) -> VillagePlan:
 	out.props = plan.props.duplicate(true)
 	out.plants = plan.plants.duplicate(true)
 	return out
+
+
+## Negative controls for the site baseline: the two rules that were once
+## silenced by being wrong must still catch a real fault. A street laid across
+## the common is a road on the green; a path with no shoulder is a path whose
+## verge is not the class's.
+static func _check_site_controls(res: SuiteResult, plan: VillagePlan, spec: VillageSpec) -> void:
+	res.checked += 1
+	if plan == null or plan.commons.is_empty():
+		res.fail("site controls had no street site plan with a common")
+		return
+	var common: PackedVector2Array = plan.commons[0]["poly"]
+	var rect := Poly.bounding_rect(common)
+	var crossed := _copy_plan(plan)
+	var mid := rect.get_center()
+	crossed.roads.append(VillageSitePlanner._road(PackedVector2Array([
+		mid - Vector2(rect.size.x, 0.0), mid + Vector2(rect.size.x, 0.0)]), &"street", spec.wealth))
+	if not "common overlaps a street" in VillageSiteSuite._judge(crossed, spec):
+		res.fail("a street laid across the common escaped the common check")
+	res.checked += 1
+	var bare := _copy_plan(plan)
+	var found_path := false
+	for road in bare.roads:
+		if road["class"] == &"path":
+			road["verge"] = 0.0
+			found_path = true
+	if not found_path:
+		res.fail("site controls: the street plan has no path to strip of its verge")
+	elif not "path verge 0.00 != 0.70" in VillageSiteSuite._judge(bare, spec):
+		res.fail("a path with no verge escaped the verge check")
