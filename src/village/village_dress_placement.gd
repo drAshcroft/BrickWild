@@ -17,8 +17,9 @@ static func place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		if bool(step.get("orchard", false)) and (host < 0 or not Poly.contains_point(plan.lots[plan.lot_of_building(host)]["poly"], at)):
 			return false
 		var looks: Array = plant_looks(plan, step, key, at)
+		var marginal: bool = String(step.get("palette", "")) == "reed"
 		for look in looks:
-			if not plant_is_clear(plan, ctx, at, look["trunk"], look["canopy"]):
+			if not plant_is_clear(plan, ctx, at, look["trunk"], look["canopy"], marginal):
 				continue
 			plan.plants.append(plant_row(key, at, look, snappedf(rng.randf_range(0.0, TAU), 0.001)))
 			remember(ctx, at, Rect2(at - Vector2(look["trunk"], look["trunk"]),
@@ -119,11 +120,13 @@ static func plant_looks(plan: VillagePlan, step: Dictionary, key: String,
 	var trunk0: float = maxf(PropCatalog.trunk(key), 0.1)
 	var kind := plant_kind(key)
 	var out: Array = []
-	if kind == &"cover":
-		out.append(_look(key, 1.0, 0.0, 0.0, canopy0, trunk0))
-		return out
 	var r := RandomNumberGenerator.new()
 	r.seed = hash("look|%d|%s|%.1f|%.1f" % [plan.spec.seed, key, at.x, at.y])
+	if kind == &"cover":
+		# rushes stand taller than the grass they were measured as
+		var tall: float = r.randf_range(1.3, 1.9) if String(step.get("palette", "")) == "reed" else 1.0
+		out.append(_look(key, tall, 0.0, 0.0, canopy0, trunk0))
+		return out
 	var s := 1.0
 	var lean_max := 0.0
 	var lean_chance := 0.0
@@ -267,7 +270,7 @@ static func prop_is_clear(plan: VillagePlan, ctx: Dictionary, rect: Rect2,
 ## Same functions as the checks -- `overlap_area` over `Geometry2D`, not the
 ## convex clipper, because a road ribbon bends.
 static func plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
-		trunk: float, canopy: float) -> bool:
+		trunk: float, canopy: float, marginal := false) -> bool:
 	if not plan.site.has_point(at):
 		return false
 	# The green's working space belongs to the well. Large boulders from a
@@ -277,7 +280,10 @@ static func plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
 			if prop["key"] == "well" and at.distance_to(prop["pos"]) < VillageDressCatalog.GREEN_TREE_CLEAR:
 				return false
 	for w in plan.water:
-		if Poly.contains_point(w["poly"], at) or VillageMeasure.point_to_poly(at, w["poly"]) < trunk + 0.2:
+		# A marginal plant (a reed) stands in the shallows' edge by nature: only
+		# the water itself, and a hand's breadth of it, is refused.
+		var margin: float = 0.25 if marginal and w["kind"] != &"race" else trunk + 0.2
+		if Poly.contains_point(w["poly"], at) or VillageMeasure.point_to_poly(at, w["poly"]) < margin:
 			return false
 	var stem_rect: Rect2 = Rect2(at - Vector2(trunk, trunk),
 		Vector2(trunk, trunk) * 2.0).grow(VillageDressCatalog.TRUNK_CLEAR)

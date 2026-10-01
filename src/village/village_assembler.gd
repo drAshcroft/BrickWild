@@ -61,10 +61,17 @@ static func _ground_finish(ground: MeshInstance3D) -> void:
 		return
 	for i in mesh.get_surface_count():
 		var slot := int(mesh.surface_get_name(i).trim_prefix("material_slot:"))
-		if slot in [VillageBuilder.SURF_YARD]:
-			var m := ground.get_surface_override_material(i) as StandardMaterial3D
-			if m != null:
-				m.vertex_color_use_as_albedo = true
+		var m := ground.get_surface_override_material(i) as StandardMaterial3D
+		if m == null:
+			continue
+		if slot in [VillageBuilder.SURF_YARD, VillageBuilder.SURF_BANK]:
+			m.vertex_color_use_as_albedo = true
+		elif slot == VillageBuilder.SURF_WATER:
+			# clear at the margin, dark where it is deep: the bank and the bed
+			# show through, so the colour of the water is the depth of it
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.albedo_color.a = 0.74
+			m.roughness = 0.45
 
 
 ## The dressing: every catalogue prop and plant the dresser placed, and a
@@ -86,6 +93,7 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 		var key: String = String(p["key"])
 		var at := Vector3(float(p["pos"].x), 0.0, float(p["pos"].y))
 		var yaw: float = float(p.get("yaw", 0.0))
+		at.y = VillageBuilder.ground_height(plan, p["pos"])
 		if not bool(p.get("built", false)):
 			var node: Node3D = _model(key, at, yaw)
 			if node != null:
@@ -99,7 +107,8 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 		var t: Dictionary = plan.plants[j]
 		var key2: String = String(t["key"])
 		var node2: Node3D = _model(key2,
-			Vector3(float(t["pos"].x), -PLANT_SINK, float(t["pos"].y)),
+			Vector3(float(t["pos"].x), VillageBuilder.ground_height(plan, t["pos"]) - PLANT_SINK,
+				float(t["pos"].y)),
 			float(t.get("yaw", 0.0)), float(t.get("scale", 1.0)),
 			float(t.get("lean", 0.0)), float(t.get("lean_yaw", 0.0)))
 		if node2 != null:

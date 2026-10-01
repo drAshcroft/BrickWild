@@ -499,7 +499,7 @@ func _check_wood(plan: VillagePlan) -> void:
 ## palettes reads as two villages, and this is the rule that says so.
 func _check_culture(plan: VillagePlan) -> void:
 	var allowed := {}
-	for slot in ["edge", "green", "hedge", "ground", "wild"]:
+	for slot in ["edge", "green", "hedge", "ground", "wild", "reed"]:
 		for key in VillageDressRules.palette_keys(
 				{"palette": VillageDressCatalog.PALETTES.get(plan.spec.culture,
 					VillageDressCatalog.PALETTES[&"english"])}, slot):

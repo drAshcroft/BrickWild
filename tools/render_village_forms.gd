@@ -7,6 +7,10 @@ const OUT := "res://artifacts/p1p2_village/form_renders"
 func _init() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT))
 	_build_stage()
+	# the stage floor sits at y = 0; a village with a river has land below it
+	for child in _root3d.get_children():
+		if child is MeshInstance3D and (child as MeshInstance3D).mesh is PlaneMesh:
+			(child as Node3D).position.y = -1.2
 	await process_frame
 	var args := OS.get_cmdline_user_args()
 	var selected: String = args[0] if not args.is_empty() else ""

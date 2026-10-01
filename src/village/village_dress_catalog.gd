@@ -84,6 +84,12 @@ const RECIPES := {
 		{"cat": "rock", "rule": &"bank", "n": [2, 5], "opt": 0.8, "plant": true},
 		{"cat": "plant", "rule": &"bank", "n": [2, 4], "opt": 0.7, "plant": true},
 	],
+	# rushes along the bank, planted LAST so they take only what nothing else
+	# wanted: never the strand's aprons, never a road or a door
+	&"reeds": [
+		{"cat": "reed", "rule": &"reeds", "n": [1, 1], "opt": 1.0, "plant": true,
+			"palette": "reed", "fill": true},
+	],
 	&"strand": [
 		{"cat": "boat", "rule": &"bank", "n": [1, 2], "opt": 1.0, "built": true},
 		{"cat": "drying_rack", "rule": &"bank", "n": [1, 2], "opt": 1.0, "built": true},
@@ -144,6 +150,10 @@ const PALETTES := {
 		"green": [], "hedge": ["Wild_Mushroom_*"],
 		"ground": ["Wild_Mushroom_*", "Wild_Pebble_Square_*"]},
 }
+
+## Rushes and sedge for a bank. Every culture's water has them, so they are
+## not a row of PALETTES: `palette_keys` falls back to this for the `reed` slot.
+const REEDS: Array = ["Wild_Grass_Wispy_Tall", "Wild_Grass_Common_Tall", "Nature_Grass_Large"]
 
 ## The props that are BUILT rather than loaded (VIL-010). A recipe step marked
 ## `built` names one of these instead of a catalogue category; the assembler

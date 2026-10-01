@@ -39,6 +39,8 @@ static func spots_for(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 			return _along_water(plan, rng, count)
 		&"band":
 			return _edge_band(plan, rng, count)
+		&"reeds":
+			return _reed_beds(plan)
 	return []
 
 
@@ -261,6 +263,43 @@ static func _along_water(plan: VillagePlan, rng: RandomNumberGenerator,
 			if out.size() >= count * 2:
 				break
 			out.append(p)
+	return out
+
+
+## Reed beds along natural water: stations at a pitch round the shore, kept
+## where a slow noise says a bed has taken, so the rushes grow in stands with
+## open bank between them rather than in a fence. Never a mill race, which is
+## timber-edged. Deterministic from the seed, and capped so a long river
+## does not bury the village in grass.
+static func _reed_beds(plan: VillagePlan) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var phase := float(plan.spec.seed % 719) * 0.173
+	for w in plan.water:
+		if w["kind"] == &"race":
+			continue
+		var poly: PackedVector2Array = w["poly"]
+		var along := 0.0
+		for e in poly.size():
+			var a: Vector2 = poly[e]
+			var b: Vector2 = poly[(e + 1) % poly.size()]
+			var length: float = a.distance_to(b)
+			if length < 0.01:
+				continue
+			var dir: Vector2 = (b - a) / length
+			var normal := Vector2(-dir.y, dir.x)
+			var t := 0.0
+			while t < length:
+				var bed: float = 0.5 + 0.3 * sin(along * 0.11 + phase) + 0.2 * sin(along * 0.37 + phase * 1.7)
+				var jitter: float = fposmod(sin((along + float(e) * 7.0) * 12.9898 + phase) * 43758.5453, 1.0)
+				if bed > 0.45 and out.size() < 150:
+					var at: Vector2 = a + dir * t
+					var out_pt: Vector2 = at + normal * (0.4 + jitter * 0.8)
+					if Poly.contains_point(poly, out_pt):
+						out_pt = at - normal * (0.4 + jitter * 0.8)
+					out.append(out_pt)
+				var step_m: float = 1.5 + jitter * 1.0
+				t += step_m
+				along += step_m
 	return out
 
 
