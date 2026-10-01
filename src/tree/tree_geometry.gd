@@ -77,14 +77,20 @@ const TRUNK_CLAIM := {
 	&"crystal": 0.70,     # the rune circle
 	&"inverted": 0.95,    # the dome, which hangs below the ground
 	&"weeping": 0.85,     # the curtain, which reaches it
-	&"floating": 0.48,    # the vines hanging under the island
+	&"floating": 0.0,     # nothing: island and vines hang above head height
 }
 
 ## What the spec PROMISES the mesh will measure, in the two radii
 ## SceneBounds uses. Computed from the spec, never from the builder, so a
 ## builder that grew a wider crown than it was told to is caught.
 static func expected_radii(spec: TreeSpec) -> Vector2:
-	return Vector2(spec.canopy_radius, spec.trunk_clear) + draw_allowance(spec)
+	var out: Vector2 = Vector2(spec.canopy_radius, spec.trunk_clear) + draw_allowance(spec)
+	# A drawing may stray past an envelope, but there is no envelope where a
+	# tree claims nothing: a hanging island is wholly above head height and its
+	# trunk promise is nothing, not an allowance on nothing.
+	if spec.trunk_clear <= 0.0:
+		out.y = 0.0
+	return out
 
 
 ## How far a DRAWING may legitimately reach outside the analytic envelope the
