@@ -408,6 +408,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 	func quality_report(building) -> Dictionary:
 		if building.plan != null:
 			return plan_quality_report(building.plan)
+		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
+			var builder := CastleBuilder.new()
+			builder.build(building.spec)
+			return TowerCheck.new().check(building.spec, builder)
 		if building.spec is TimberHallSpec:
 			var builder := TimberHallBuilder.new()
 			builder.build(building.spec)
@@ -423,11 +427,17 @@ class WorldFamily extends BuildingFamilyAdapter:
 	func instantiate(building, cutaway: bool) -> Node3D:
 		if building.plan != null and building.plan.world_family == &"courtyard_house":
 			return HouseAssembler.build(building.plan, cutaway)
+		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
+			return CastleAssembler.build(building.spec, cutaway)
 		return null
 
 	func footprint(building) -> Rect2:
 		if building.plan != null and building.plan.world_family == &"courtyard_house":
 			return HouseGeometry.site_rect(building.plan.spec)
+		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
+			var bounds := CastleGeometry.tower_house_aabb(building.spec)
+			return Rect2(Vector2(bounds.position.x, bounds.position.z),
+				Vector2(bounds.size.x, bounds.size.z))
 		return Rect2()
 
 	func door(building) -> Vector3:
@@ -436,6 +446,13 @@ class WorldFamily extends BuildingFamilyAdapter:
 			if d >= 0:
 				var p: Vector2 = building.plan.doors[d]["pos"]
 				return Vector3(p.x, 1.0, p.y)
+		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
+			var spec: CastleSpec = building.spec
+			var bounds := CastleGeometry.tower_house_aabb(spec)
+			var sill := CastleGeometry.tower_door_sill(spec)
+			var height := minf(CastleGeometry.tower_storey_height(spec) * 0.7, 2.6)
+			return Vector3(bounds.get_center().x, sill + height * 0.5,
+				bounds.position.z - CastleGeometry.OPENING_EPS)
 		return Vector3.ZERO
 
 

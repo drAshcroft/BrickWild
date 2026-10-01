@@ -22,7 +22,7 @@ const STAIR_WIDTH := 0.9
 ## shared house checker.
 class TowerSpec extends HouseSpec:
 	func max_storeys() -> int:
-		return 6
+		return 7
 
 	func allows_hearth_furniture() -> bool:
 		return false
@@ -34,8 +34,10 @@ class TowerSpec extends HouseSpec:
 				out.append(&"store")
 			elif level == 1:
 				out.append(&"hall")
-			elif level == count - 1:
+			elif level == count - 2:
 				out.append(&"lords_chamber")
+			elif level == count - 1:
+				out.append(&"roof_platform")
 			else:
 				out.append(&"parlour")
 		return out
@@ -59,9 +61,9 @@ static func generate(source: CastleSpec, with_furniture := true) -> HousePlan:
 	hs.width = top.size.x
 	hs.length = top.size.z
 	hs.height = storey_h
-	hs.storeys = levels
-	hs.room_count = levels
-	hs.program = hs.room_program(levels)
+	hs.storeys = levels + 1
+	hs.room_count = levels + 1
+	hs.program = hs.room_program(levels + 1)
 	hs.variant_name = "%s: tower-house shaft" % source.variant_name
 	hs.wall_color = source.stone_color
 	hs.trim_color = source.trim_color
@@ -87,6 +89,17 @@ static func generate(source: CastleSpec, with_furniture := true) -> HousePlan:
 			"outer_outline": _outer_outline(source, outer),
 			"wall_thickness": thickness,
 		})
+	# The roof fighting deck is a real final level. INT-004 stair landings and
+	# nav grids can therefore prove the top is reachable instead of stopping at
+	# the last enclosed chamber.
+	var platform := CastleGeometry.tower_platform_aabb(source)
+	var deck := Vector2(maxf(platform.size.x - 0.6, 0.5),
+		maxf(platform.size.z - 0.6, 0.5))
+	var deck_outline := Poly.from_rect(Rect2(-deck * 0.5, deck))
+	plan.rooms.append({"kind": &"roof_platform", "storey": levels,
+		"rect": Poly.bounding_rect(deck_outline), "outline": deck_outline,
+		"outer_aabb": platform, "outer_outline": _outer_outline(source, platform),
+		"wall_thickness": 0.3})
 
 	# The tower is entered at the real sill, not at a fictitious ground door.
 	var sill := CastleGeometry.tower_door_sill(source)
@@ -115,8 +128,8 @@ static func generate(source: CastleSpec, with_furniture := true) -> HousePlan:
 		"elevated": true,
 	})
 
-	_add_windows(plan, source, storey_h, door_level, door_width)
-	_add_stairs(plan, levels)
+	_add_windows(plan, source, storey_h, door_level, door_width, levels)
+	_add_stairs(plan, levels + 1)
 
 	# Jog blocks are real exterior masses with partial height.  They are not
 	# silently reported as rooms until a later emitter has a matching L-shaped
@@ -181,10 +194,10 @@ static func _front_wall(plan: HousePlan, level: int) -> Dictionary:
 
 
 static func _add_windows(plan: HousePlan, source: CastleSpec, storey_h: float,
-		door_level: int, door_width: float) -> void:
+		door_level: int, door_width: float, levels: int) -> void:
 	# The foot is blind, and every higher storey receives openings on its actual
 	# polygon edges.  The door edge is left clear on the entry storey.
-	for level in range(plan.room_count()):
+	for level in range(levels):
 		if level == 0:
 			continue
 		var height := minf(source.window_h, storey_h * 0.42)

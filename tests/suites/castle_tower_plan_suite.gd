@@ -25,11 +25,11 @@ static func run() -> SuiteResult:
 		_expect(res, plan.spec != null, who + ": no tower plan")
 		if plan.spec == null:
 			continue
-		_expect(res, plan.rooms.size() == spec.tower_storeys,
-			who + ": %d rooms for %d storeys" % [plan.rooms.size(), spec.tower_storeys])
+		_expect(res, plan.rooms.size() == spec.tower_storeys + 1,
+			who + ": enclosed floors and the roof deck need %d rooms" % (spec.tower_storeys + 1))
 		_expect(res, plan.doors.size() == 1, who + ": expected one exterior door")
-		_expect(res, plan.stairs.size() == maxi(spec.tower_storeys - 1, 0),
-			who + ": stair chain does not span every storey")
+		_expect(res, plan.stairs.size() == spec.tower_storeys,
+			who + ": stair chain does not reach the roof platform")
 		_check_storeys(res, who, spec, plan)
 		_check_door(res, who, spec, plan)
 		_check_windows(res, who, spec, plan)
@@ -103,8 +103,10 @@ static func _check_storeys(res: SuiteResult, who: String, spec: CastleSpec,
 		plan: HousePlan) -> void:
 	for level in range(plan.rooms.size()):
 		var room: Dictionary = plan.rooms[level]
-		var actual: AABB = CastleGeometry.tower_storey_aabb(spec, level)
-		var thickness := CastleGeometry.tower_wall_thickness(spec, level)
+		var deck := level == spec.tower_storeys
+		var actual: AABB = CastleGeometry.tower_platform_aabb(spec) if deck \
+			else CastleGeometry.tower_storey_aabb(spec, level)
+		var thickness := 0.3 if deck else CastleGeometry.tower_wall_thickness(spec, level)
 		_expect(res, room.get("outer_aabb", AABB()) == actual,
 			who + ": storey %d did not retain tower_storey_aabb" % level)
 		_expect(res, is_equal_approx(float(room.get("wall_thickness", -1.0)), thickness),
@@ -227,7 +229,7 @@ static func _negative_aabb(res: SuiteResult, who: String, spec: CastleSpec,
 	if spec.style != &"wizard":
 		return
 	var bad := plan.rooms[0]["outline"] as PackedVector2Array
-	var top := plan.rooms[plan.rooms.size() - 1]["outline"] as PackedVector2Array
+	var top := plan.rooms[spec.tower_storeys - 1]["outline"] as PackedVector2Array
 	var differs := _bounds(bad) != _bounds(top)
 	# The oval negative is the AABB's corner, which lies outside the shell.
 	var box := _bounds(top)

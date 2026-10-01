@@ -11,6 +11,7 @@ extends RefCounted
 ## Every WLD family task adds its rows here and is green here.
 
 const SCALES: Array[float] = [0.7, 1.0, 1.4, 1.9]
+const TowerGenerator = preload("res://src/world/world_tower_house_generator.gd")
 
 const ARCHETYPES: Array[Dictionary] = [
 	{"key": "great_hall_east", "family": &"timber_hall", "kind": &"great_hall",
@@ -25,6 +26,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 30.0, "length": 20.0, "height": 18.0,
 		"must": ["shop", "stair", "bedroom", "parlour"],
 		"check": &"insula_check", "about": "five-storey port tenement with six flats"},
+	{"key": "merchant_tower", "family": &"tower_house", "kind": &"merchant_tower",
+		"width": 8.0, "length": 8.0, "height": 45.0,
+		"must": ["hall", "platform", "storey_0"],
+		"check": &"tower_check", "about": "Bologna tower house with a walkable roof deck"},
 ]
 
 
@@ -67,6 +72,47 @@ static func run() -> SuiteResult:
 	if ARCHETYPES.is_empty():
 		res.note("  0 archetypes")
 	_negative_hall_fixtures(res)
+	_negative_tower_fixtures(res)
+	return res
+
+
+static func run_tower_house() -> SuiteResult:
+	var res := SuiteResult.new("world tower house")
+	var row: Dictionary = ARCHETYPES.back()
+	for scale in SCALES:
+		var request := BuildingRequest.new()
+		request.kind = &"world"
+		request.seed = _seed_for("merchant_tower", scale)
+		request.style = &"tower_house"
+		request.purpose = &"merchant_tower"
+		request.width = float(row["width"]) * scale
+		request.length = float(row["length"]) * scale
+		request.height = float(row["height"]) * scale
+		var building: GeneratedBuilding = BigGlade.generate(request)
+		res.checked += 1
+		var who := "merchant_tower scale=%.2f" % scale
+		if building == null or not building.is_ok():
+			res.fail("%s: did not generate: %s" % [who,
+				str(building.errors) if building != null else "null"])
+			continue
+		var builder := CastleBuilder.new()
+		var mesh := builder.build(building.spec as CastleSpec)
+		if mesh == null:
+			res.fail("%s: no castle tower mesh" % who)
+		else:
+			NormalsSuite.check_mesh(res, mesh, who)
+		for f in TowerCheck.new().check(building.spec, builder)["failures"]:
+			res.fail("%s: %s" % [who, str(f)])
+		var doors: Array = builder.part_log.filter(func(part: Dictionary) -> bool:
+			return part.get("opening_kind", "") == "door")
+		if doors.size() != 1:
+			res.fail("%s: expected one raised entrance" % who)
+		elif float((doors[0]["pos"] as Vector3).y) - float((doors[0]["size"] as Vector3).y) * 0.5 < TowerCheck.LIFT_MIN:
+			res.fail("%s: door sill is below the ladder reach" % who)
+	res.checked += 1
+	if WorldFamilies.kinds_of(&"tower_house") != [&"merchant_tower"]:
+		res.fail("tower_house family does not publish merchant_tower")
+	_negative_tower_fixtures(res)
 	return res
 
 
@@ -120,6 +166,82 @@ static func _negative_hall_fixtures(res: SuiteResult) -> void:
 	res.checked += 1
 	if not _has_failure(bracket_report, "brackets:"):
 		res.fail("negative hall fixture: missing bracket sets were accepted")
+
+
+static func _negative_tower_fixtures(res: SuiteResult) -> void:
+	var spec := TowerGenerator.generate(&"merchant_tower", 701,
+		8.0, 8.0, 45.0)
+	var squat := CastleBuilder.new()
+	squat.build(spec)
+	for mass in squat.mass_log:
+		if mass["name"] == "hall":
+			var a: AABB = mass["aabb"]
+			mass["aabb"] = AABB(a.position, Vector3(a.size.x, a.size.x * 2.0, a.size.z))
+	_expect_tower_rule(res, "slender", TowerCheck.new().check(spec, squat))
+
+	var low_door := CastleBuilder.new()
+	low_door.build(spec)
+	for part in low_door.part_log:
+		if String(part.get("opening_kind", "")) == "door":
+			var p: Vector3 = part["pos"]
+			var size: Vector3 = part["size"]
+			part["pos"] = Vector3(p.x, size.y * 0.5 + 0.5, p.z)
+			break
+	_expect_tower_rule(res, "lift", TowerCheck.new().check(spec, low_door))
+
+	var missing_room := CastleBuilder.new()
+	missing_room.build(spec)
+	var room_plan: HousePlan = missing_room.interiors[0]["plan"]
+	room_plan.rooms.pop_back()
+	_expect_tower_rule(res, "stack", TowerCheck.new().check(spec, missing_room))
+	var extra_room := CastleBuilder.new()
+	extra_room.build(spec)
+	var extra_plan: HousePlan = extra_room.interiors[0]["plan"]
+	var duplicate := extra_plan.rooms[1].duplicate(true)
+	extra_plan.rooms.append(duplicate)
+	_expect_tower_rule(res, "stack", TowerCheck.new().check(spec, extra_room))
+
+	var missing_stair := CastleBuilder.new()
+	missing_stair.build(spec)
+	var stair_plan: HousePlan = missing_stair.interiors[0]["plan"]
+	for stair_i in range(stair_plan.stairs.size()):
+		if int(stair_plan.stairs[stair_i].get("to_storey", -1)) == spec.tower_storeys:
+			stair_plan.stairs.remove_at(stair_i)
+			break
+	_expect_tower_rule(res, "stack", TowerCheck.new().check(spec, missing_stair))
+
+	var thin_foot := CastleBuilder.new()
+	thin_foot.build(spec)
+	var top_width := 0.0
+	for top_mass in thin_foot.mass_log:
+		if String(top_mass["name"]).begins_with("storey_"):
+			top_width = (top_mass["aabb"] as AABB).size.x
+	for foot_mass in thin_foot.mass_log:
+		if foot_mass["name"] == "storey_0":
+			var a2: AABB = foot_mass["aabb"]
+			foot_mass["aabb"] = AABB(Vector3(a2.position.x + (a2.size.x - top_width) * 0.5,
+				a2.position.y, a2.position.z + (a2.size.z - top_width) * 0.5),
+				Vector3(top_width, a2.size.y, top_width))
+			break
+	_expect_tower_rule(res, "foot", TowerCheck.new().check(spec, thin_foot))
+
+	var gap := CastleBuilder.new()
+	gap.build(spec)
+	gap.mass_log.append({"name": "detached_fixture", "aabb": AABB(Vector3(100, 100, 100), Vector3.ONE)})
+	_expect_tower_rule(res, "no_gaps", TowerCheck.new().check(spec, gap))
+
+	var ungrounded := CastleBuilder.new()
+	ungrounded.build(spec)
+	ungrounded.mass_log.append({"name": "floating_fixture", "aabb": AABB(Vector3(0, 1, 0), Vector3.ONE)})
+	_expect_tower_rule(res, "size_match", TowerCheck.new().check(spec, ungrounded))
+
+
+static func _expect_tower_rule(res: SuiteResult, rule: String, report: Dictionary) -> void:
+	res.checked += 1
+	for failure in report.get("failures", []):
+		if String(failure).begins_with(rule + ":"):
+			return
+	res.fail("negative tower fixture %s was accepted" % rule)
 
 
 static func _has_failure(report: Dictionary, prefix: String) -> bool:

@@ -67,7 +67,7 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
 	"varchetype_thorpe", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest",
-	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap",
+	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003",
 	"runnererror", "runnerfail"]
 
 ## LANES -- the suites worth running for a given KIND OF EDIT.
@@ -119,7 +119,7 @@ const LANES: Dictionary = {
 	"lane:church-change": ["churchroof", "churchchange"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
 	"lane:temple": ["temple", "rite"],
-	"lane:world": ["wld001", "wld002"],
+	"lane:world": ["wld001", "wld002", "wld003"],
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
 	"lane:sweep": ORDER,
@@ -387,6 +387,8 @@ static func _run_one(key: String) -> SuiteResult:
 			var kind := StringName(pieces[1])
 			var scale := float(pieces[2].left(1) + "." + pieces[2].right(1))
 			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind_scale(kind, scale)
+		"wld003":
+			return WorldArchetypeSuite.run_tower_house()
 		"tree":
 			return preload("res://tests/suites/tree_suite.gd").run()
 		"bridge":

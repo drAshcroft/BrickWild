@@ -571,7 +571,10 @@ the registry (`FAMILIES`, `generate()`, `build_mesh()`), and
 `tests/suites/world_archetype_suite.gd` (`world` / `warchetype` in run_all)
 builds every row at 70/100/140/190 %, runs its family check and MassRules,
 and `assert_contains()` asks for masses, room kinds and furniture by name.
-Each family task adds one row to the registry and its archetype rows here.
+WLD-003 exposes `merchant_tower` through the `tower_house` family and adds the
+focused `wld003` selector. It uses the CAS-006 shaft with an INT-004 room and
+stair plan, including the reachable roof-platform level. Each family task adds
+one row to the registry and its archetype rows here.
 
 In the manner of `house_archetype_suite.gd`: what each must CONTAIN, never
 where. Built at 70 %, 100 %, 140 % and 190 % and put through its own check

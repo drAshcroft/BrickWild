@@ -33,8 +33,17 @@ const FAMILIES := {
 		"width": {"min": 20.0, "max": 45.0},
 		"length": {"min": 18.0, "max": 38.0},
 		"height": {"min": 12.0, "max": 20.7},
+	},
+	&"tower_house": {
+		"label": "Tower house",
+		"kinds": [&"merchant_tower"],
+		"width": {"min": 5.6, "max": 15.2},
+		"length": {"min": 5.6, "max": 15.2},
+		"height": {"min": 31.5, "max": 85.5},
 	}
 }
+
+const TowerGenerator = preload("res://src/world/world_tower_house_generator.gd")
 
 
 static func families() -> Array[StringName]:
@@ -70,6 +79,10 @@ static func envelope(family: StringName) -> Dictionary:
 ## plan-based families). Returns false when the family has no generator
 ## yet, which the facade reports as an error rather than a building.
 static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
+	if request.style == &"tower_house" and request.purpose in kinds_of(&"tower_house"):
+		out.spec = TowerGenerator.generate(request.purpose, request.seed,
+			request.width, request.length, request.height)
+		return true
 	if request.style == &"courtyard_house" and request.purpose in kinds_of(&"courtyard_house"):
 		var made := WorldCourtyardGenerator.generate(request.purpose, request.seed,
 			request.width, request.length, request.height, true)
@@ -91,6 +104,9 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 
 ## Build the mesh for a world building's spec, or null when there is none.
 static func build_mesh(building) -> ArrayMesh:
+	if building != null and building.spec is CastleSpec \
+			and CastleGeometry.is_tower_house(building.spec):
+		return CastleBuilder.new().build(building.spec)
 	if building != null and building.plan != null \
 			and building.plan.world_family in [&"courtyard_house", &"insula"]:
 		return HouseBuilder.new().build(building.plan)

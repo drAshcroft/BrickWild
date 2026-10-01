@@ -51,15 +51,21 @@ func check(plan: HousePlan) -> Dictionary:
 		failures.append("nav: no front door to start from")
 		return _report()
 	# a step inside the front door: where somebody stands having just come in
+	var entry_level := HousePlan.record_storey(_plan.doors[door])
+	if not _grids.has(entry_level):
+		failures.append("nav: front door is on missing storey %d" % entry_level)
+		return _report()
 	var inside: Vector2 = Vector2(_plan.doors[door]["pos"]) \
 		- Vector2(_plan.doors[door]["normal"]) * (HouseGeometry.wall_thickness(_plan.spec) * 0.5 + 0.2)
+	_grid = _grids[entry_level]
 	if not _grid.flood_from(inside):
 		failures.append("nav: there is nowhere to stand inside the front door")
 		return _report()
 	# Propagate walkability through stair landings. Each level keeps its own
 	# WalkGrid (the distance transform remains shared and 2D); a stair is the
 	# explicit edge between those grids.
-	_flood_storeys(inside)
+	_flood_storeys(inside, entry_level)
+	_grid = _grids[0]
 	stats["walkable_area"] = snappedf(_grid.walkable_area(), 0.1)
 	stats["reached_cells"] = _grid.reached_cells()
 
@@ -145,10 +151,10 @@ func _rasterize() -> void:
 		_grids[level].build(HouseGeometry.PERSON_RADIUS)
 
 
-func _flood_storeys(inside: Vector2) -> void:
+func _flood_storeys(inside: Vector2, start_level := 0) -> void:
 	var reachable_levels := {}
-	var seeds := {0: inside}
-	var pending: Array[int] = [0]
+	var seeds := {start_level: inside}
+	var pending: Array[int] = [start_level]
 	while not pending.is_empty():
 		var level: int = pending.pop_front()
 		var grid: WalkGrid = _grids[level]
@@ -180,7 +186,7 @@ func _flood_storeys(inside: Vector2) -> void:
 			if not seeds.has(other):
 				seeds[other] = there.get_center()
 				pending.append(other)
-		if level == 0:
+		if level == start_level:
 			_grid = grid
 	for level in _levels():
 		if not reachable_levels.has(level):
