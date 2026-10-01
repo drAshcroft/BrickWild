@@ -91,13 +91,13 @@ func _emit_halls(meta: Dictionary) -> void:
 	var door_w := minf(4.0, sanctum.size.x * 0.5)
 	var side_w := (sanctum.size.x - door_w) * 0.5
 	for side in [-1.0, 1.0]:
-		var p_x := sanctum.get_center().x + side * (door_w * 0.5 + side_w * 0.5)
+		var p_x: float = sanctum.get_center().x + float(side) * (door_w * 0.5 + side_w * 0.5)
 		_box_mass("sanctum_door_jamb_%s" % ("left" if side < 0 else "right"),
 			Vector3(side_w, s_h, wall_t), Vector3(p_x, s_h * 0.5, front_z + wall_t * 0.5), STONE)
 	_box_mass("sanctum_door_lintel", Vector3(door_w, s_h - 4.0, wall_t),
 		Vector3(0.0, 4.0 + (s_h - 4.0) * 0.5, front_z + wall_t * 0.5), STONE)
 	for side in [-1.0, 1.0]:
-		var p_x := sanctum.get_center().x + side * (sanctum.size.x * 0.5 - wall_t * 0.5)
+		var p_x: float = sanctum.get_center().x + float(side) * (sanctum.size.x * 0.5 - wall_t * 0.5)
 		_box_mass("sanctum_side_%s" % ("left" if side < 0 else "right"),
 			Vector3(wall_t, s_h, sanctum.size.y),
 			Vector3(p_x, s_h * 0.5, sanctum.get_center().y), STONE)
