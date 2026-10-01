@@ -42,6 +42,10 @@ godot --headless --path . --script res://tests/temple_test.gd
 
 # after changing anything in assets/props/, re-measure the catalogue
 godot --headless --path . --script res://tools/build_prop_catalog.gd
+# repeat exactly from the source-fingerprinted pack cache after the first full pass
+godot --headless --path . --script res://tools/build_prop_catalog.gd -- --incremental
+# expensive oracle check: full measurement, then cache-backed byte-for-byte parity
+godot --headless --path . --script res://tools/build_prop_catalog.gd -- --verify-parity
 
 # reference renders -- must NOT be headless, the dummy renderer makes no image
 godot --path . --script res://tools/render_shots.gd     # -> artifacts/renders/

@@ -77,9 +77,22 @@ and `lane:sweep` as batch or pre-merge runs. Record their native exit and
 summary separately. `cvoxelqa` now prints completed/total fixtures and
 elapsed time every ten cases, before each fantasy fixture, and on completion.
 
-Changes under `assets/props/` still require `tools/build_prop_catalog.gd`
-and the full catalogue check. That rebuild is currently above five minutes;
-`lane:assets-fast` gives prompt contract feedback but does not replace it.
-An incremental exact rebuild or faster full measurement is a separate
-optimization task, `QA-ASSET-CATALOG-001`. Do not mark a changed model
-accepted from the fast lane alone.
+Changes under `assets/props/` still require a catalogue rebuild and the full
+catalogue check. The default `tools/build_prop_catalog.gd` is the full
+measurement oracle. After that seeds the local cache, use its exact
+pack-incremental mode for routine rebuilds:
+
+```powershell
+godot --headless --path . --script res://tools/build_prop_catalog.gd -- --incremental
+godot --headless --path . --script res://tests/run_all.gd -- catalogcache
+```
+
+The cache hashes every file in each pack tree (models, buffers, textures and
+`.import` settings), plus the measurement code, catalogue pack rules, project
+settings and engine version. Any changed or added/removed file invalidates
+that pack; a missing or malformed cache forces measurement. The cache is in
+`user://`, not source control. `--verify-parity` is the expensive oracle
+command: it runs a full measurement, reads the just-written cache back, and
+requires cache-backed JSON to match the full output byte-for-byte. `lane:assets`
+still checks every catalogue entry against its imported model; `lane:assets-fast`
+does not replace it.
