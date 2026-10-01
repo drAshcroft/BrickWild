@@ -293,8 +293,8 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 		_expect(res, square_ring_ok, "%s lower ring does not meet square crossing within 1 cm" % who)
 		_expect(res, drum_ring_ok, "%s upper ring does not meet drum within 1 cm" % who)
 		_expect(res, _closed_triangle_shell(points), "%s pendentive shell has an open edge" % who)
+		var curved_ring := false
 		if not octagonal:
-			var curved_ring := false
 			for point in points:
 				if absf(point.y - center.y - height / 3.0) < 0.0001 \
 						and absf(atan2(point.z - center.z, point.x - center.x) - PI / 4.0) < 0.0001:

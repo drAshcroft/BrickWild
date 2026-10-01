@@ -806,7 +806,7 @@ func _pendentive_support(center: Vector3, lower_half: float, upper_radius: float
 			var next := (i + 1) % segments
 			_kit._quad(st, lower[i], lower[next], upper[next], upper[i])
 	var bottom := rings[0]
-	var top := rings.back()
+	var top: PackedVector3Array = rings[rings.size() - 1]
 	for i in range(segments):
 		var next := (i + 1) % segments
 		_kit._tri(st, center, bottom[next], bottom[i])
