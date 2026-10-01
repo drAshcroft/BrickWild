@@ -114,8 +114,10 @@ static func _check_kept_fractions(result: SuiteResult) -> void:
 	large_request["buildings"] = {"granary": 0.9, "palisade": 0.9}
 	var small: VillageSpec = _spec(small_request)
 	var large: VillageSpec = _spec(large_request)
-	var small_shop := _shop_width(VillageProgrammer.programme(small), &"general_store")
-	var large_shop := _shop_width(VillageProgrammer.programme(large), &"general_store")
+	var small_shop := _request_width(VillageProgrammer.programme(small), &"shop",
+		&"general_store", VillageProgrammer._seed_for(small, "brief|granary"))
+	var large_shop := _request_width(VillageProgrammer.programme(large), &"shop",
+		&"general_store", VillageProgrammer._seed_for(large, "brief|granary"))
 	result.checked += 1
 	if small.enclosure != &"palisade" or not is_equal_approx(small.enclosure_kept_fraction, 0.2):
 		result.fail("palisade fraction was not retained by the authored edge")
@@ -126,8 +128,12 @@ static func _check_kept_fractions(result: SuiteResult) -> void:
 	palace_request["buildings"] = {"palace": 0.2}
 	var palace_large: Dictionary = _base()
 	palace_large["buildings"] = {"palace": 0.9}
-	var small_castle: float = _castle_width(VillageProgrammer.programme(_spec(palace_request)))
-	var large_castle: float = _castle_width(VillageProgrammer.programme(_spec(palace_large)))
+	var small_palace: VillageSpec = _spec(palace_request)
+	var large_palace: VillageSpec = _spec(palace_large)
+	var small_castle: float = _request_width(VillageProgrammer.programme(small_palace),
+		&"castle", &"", VillageProgrammer._seed_for(small_palace, "brief|seat|royal"))
+	var large_castle: float = _request_width(VillageProgrammer.programme(large_palace),
+		&"castle", &"", VillageProgrammer._seed_for(large_palace, "brief|seat|royal"))
 	result.checked += 1
 	if large_castle <= small_castle:
 		result.fail("palace kept fraction did not change the authored seat footprint")
@@ -140,16 +146,11 @@ static func _check_kept_fractions(result: SuiteResult) -> void:
 		result.fail("40% enclosure fraction did not leave physical gaps")
 
 
-static func _shop_width(requests: Array[BuildingRequest], purpose: StringName) -> float:
+static func _request_width(requests: Array[BuildingRequest], kind: StringName,
+		purpose: StringName, seed: int) -> float:
 	for request in requests:
-		if request.kind == &"shop" and request.purpose == purpose:
-			return request.width
-	return 0.0
-
-
-static func _castle_width(requests: Array[BuildingRequest]) -> float:
-	for request in requests:
-		if request.kind == &"castle":
+		if request.kind == kind and request.seed == seed \
+				and (purpose == &"" or request.purpose == purpose):
 			return request.width
 	return 0.0
 
