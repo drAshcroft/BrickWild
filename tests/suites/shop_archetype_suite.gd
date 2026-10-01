@@ -23,9 +23,9 @@ const REQUIRED := {
 	&"palace": ["antechamber", "seat", "banner", "bed", "chest"],
 	&"market_hall": ["market_hall", "counter"],
 	&"alchemist_laboratory": ["laboratory", "workbench", "alchemy", "cage", "hearth"],
-	&"bathhouse": ["changing_room", "bench", "bath_hall", "barrel"],
-	&"hospice": ["ward", "bed", "dispensary", "alchemy"],
-	&"school": ["schoolroom", "bench", "lectern", "masters_office"],
+	&"bathhouse": {"rooms": ["changing_room", "bath_hall"], "cats": ["bench", "barrel"]},
+	&"hospice": {"rooms": ["ward", "dispensary"], "cats": ["bed", "alchemy"]},
+	&"school": {"rooms": ["schoolroom", "masters_office"], "cats": ["bench", "lectern"]},
 	&"thieves_den": ["sales_floor", "counter", "bookcase"],
 }
 const BENCH_SEAT_PITCH := 0.65 # metres per usable place along the measured bench
@@ -59,9 +59,18 @@ static func run() -> SuiteResult:
 		var builder := HouseBuilder.new()
 		builder.build(plan)
 		res.checked += 1
-		var wants: Array = REQUIRED[business]
-		if not plan.has_kind(StringName(wants[0])):
-			res.fail("%s has no defining %s room" % [String(business), wants[0]])
+		var wants_rooms: Array = []
+		var wants_cats: Array = []
+		var wants = REQUIRED[business]
+		if wants is Dictionary:
+			wants_rooms = wants["rooms"]
+			wants_cats = wants["cats"]
+		else:
+			wants_rooms = [wants[0]]
+			wants_cats = wants.slice(1)
+		for kind in wants_rooms:
+			if not plan.has_kind(StringName(kind)):
+				res.fail("%s has no defining %s room" % [String(business), kind])
 		if business == &"prison":
 			var cells := 0
 			var oubliettes := 0
@@ -72,7 +81,7 @@ static func run() -> SuiteResult:
 				res.fail("prison archetype lacks at least three cells and one oubliette")
 			if not _has_key(plan, "WeaponStand"):
 				res.fail("prison archetype lacks a WeaponStand")
-		for cat in wants.slice(1):
+		for cat in wants_cats:
 			if not _has_category(plan, String(cat)):
 				res.fail("%s has no defining %s fitting" % [String(business), cat])
 		if business in [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]:
