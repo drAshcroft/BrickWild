@@ -40,6 +40,7 @@ static func run() -> SuiteResult:
 	_kit_hands_back_materials(res)
 	_world_palettes(res)
 	_hall_walls_are_plaster(res)
+	_bridges_and_trees(res)
 	return res
 
 
@@ -189,3 +190,50 @@ static func _surface_of_slot(mesh: ArrayMesh, slot: int) -> int:
 		elif i == slot:
 			return i
 	return -1
+
+
+## Bridges name their slots when a middle surface is empty (a stone bridge with
+## no timber would otherwise hand its deck the timber material), every kind has
+## a four-surface kit palette, and a tree's bark and leaf read vertex colour.
+static func _bridges_and_trees(res: SuiteResult) -> void:
+	for kind in [&"stone", &"covered", &"rope", &"mobile"]:
+		var spec := BridgeAssembler.showcase(kind, 5100)
+		BridgeGenerator.generate(spec, 5100)
+		var mesh: ArrayMesh = BridgeBuilder.new().build(spec)
+		res.checked += 1
+		var last := -1
+		var ordered := true
+		for i in range(mesh.get_surface_count()):
+			var slot := i
+			var named := mesh.surface_get_name(i)
+			if named.begins_with("material_slot:"):
+				slot = int(named.trim_prefix("material_slot:"))
+			ordered = ordered and slot > last and slot < BridgeSpec.SURFACE_COUNT
+			last = slot
+		if not ordered:
+			res.fail("%s bridge surfaces do not resolve to ascending slots" % kind)
+		res.checked += 1
+		if BridgeAssembler.kit_materials(spec).size() != BridgeSpec.SURFACE_COUNT:
+			res.fail("%s bridge palette does not cover the four surfaces" % kind)
+		var node: Node3D = BridgeAssembler.build(spec)
+		var span: MeshInstance3D = node.get_node("Mesh")
+		for i in range(span.mesh.get_surface_count()):
+			res.checked += 1
+			if span.get_surface_override_material(i) == null:
+				res.fail("%s bridge surface %d has no material" % [kind, i])
+		node.free()
+	var tree := TreeSpec.new()
+	TreeGenerator.generate(tree, 4101)
+	var tree_node: Node3D = TreeAssembler.build(tree)
+	var tree_mesh: MeshInstance3D = tree_node.get_node("Mesh")
+	for i in range(tree_mesh.mesh.get_surface_count()):
+		var material: Material = tree_mesh.get_surface_override_material(i)
+		res.checked += 1
+		var reads := false
+		if material is StandardMaterial3D:
+			reads = (material as StandardMaterial3D).vertex_color_use_as_albedo
+		elif material is ShaderMaterial:
+			reads = bool((material as ShaderMaterial).get_shader_parameter("vertex_tint"))
+		if not reads:
+			res.fail("tree surface %d does not read the voxel grain in vertex colour" % i)
+	tree_node.free()

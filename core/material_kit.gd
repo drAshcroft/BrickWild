@@ -495,10 +495,13 @@ uniform float lobe = 1.8;
 void fragment() {
 	vec3 lc = floor(mpos / lobe);
 	float lv = hash21(lc.xy + vec2(lc.z * 17.1, lc.z * 5.3));
+	float lw = hash21(lc.yz + vec2(lc.x * 3.7, 11.0));
 	float dapple = vnoise(mpos.xz * 1.9 + vec2(mpos.y * 1.3, 0.0));
-	vec3 c = base_colour.rgb * (0.86 + 0.26 * lv) * (0.9 + 0.2 * dapple);
+	vec3 c = base_colour.rgb * (0.80 + 0.34 * lv) * (0.9 + 0.2 * dapple);
+	// a warmer, yellower lobe now and then, as a real crown has
+	c = mix(c, c * vec3(1.14, 1.06, 0.78), lw * 0.7);
 	ALBEDO = c;
-	ROUGHNESS = 0.82;
+	ROUGHNESS = 0.9;
 	if (vertex_tint) {
 		ALBEDO *= COLOR.rgb;
 	}

@@ -48,7 +48,9 @@ func build(spec: BridgeSpec) -> ArrayMesh:
 	_deck(spec)
 	for m in spec.members:
 		_member(spec, m)
-	return BridgeGeometry.fit_mesh(kit.commit(), spec)
+	# commit_named: a bridge with no timber would otherwise hand its deck the
+	# timber material, one surface along
+	return BridgeGeometry.fit_mesh(kit.commit_named(), spec)
 
 
 # ------------------------------------------------------------------ members
