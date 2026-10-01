@@ -80,6 +80,8 @@ const BUSINESS_REQUIRED := {
 	&"blacksmith": {&"workshop": ["anvil"]},
 	&"bakery": {&"kitchen": ["hearth"]},
 	&"prison": {&"guardroom": ["stand"]},
+	&"palace": {&"throne_room": ["seat"], &"treasury": ["chest"],
+		&"royal_chamber": ["bed"]},
 }
 
 ## Which rule each message prefix belongs to, so a report can group a house's

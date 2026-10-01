@@ -5,6 +5,9 @@ extends RefCounted
 
 static func plan(spec: ShopSpec) -> HousePlan:
 	var out: HousePlan = HousePlanner.plan(spec)
+	if spec.business == &"palace":
+		_plan_palace(out)
+		return out
 	# HousePlanner needs a hall while it establishes the entrance and stair
 	# spine. Once that topology is fixed, the public room takes its real role.
 	var front := -1
@@ -58,6 +61,103 @@ static func plan(spec: ShopSpec) -> HousePlan:
 		_plan_prison_access(out)
 	_open_up_lodging(out)
 	return out
+
+
+## Give the throne hall its declared chain and rear branch doors. The generic
+## house planner supplies shell openings; the palace owns this interior graph.
+static func _plan_palace(plan: HousePlan) -> void:
+	if plan.room_count() != 4:
+		push_error("ShopPlanner: palace needs exactly four authored rooms")
+		return
+	var kinds: Array[StringName] = [&"antechamber", &"throne_room", &"treasury", &"royal_chamber"]
+	for i in kinds.size():
+		plan.rooms[i]["kind"] = kinds[i]
+	# The throne axis stays centred on the actual entrance, including the case
+	# where rounding in the exterior wall left it a few centimetres off-centre.
+	var entrance := plan.entrance()
+	if entrance < 0:
+		push_error("ShopPlanner: palace has no entrance")
+		return
+	var entrance_x: float = plan.doors[entrance]["pos"].x
+	for d in range(plan.doors.size() - 1, -1, -1):
+		if not bool(plan.doors[d].get("exterior", false)):
+			plan.doors.remove_at(d)
+	for branch in [2, 3]:
+		var edge: Array = HousePlanOpenings.shared_edge(plan, 1, branch)
+		if edge.is_empty():
+			push_error("ShopPlanner: palace rear branch does not meet its throne room")
+			continue
+		HousePlanOpenings.add_inner_door(plan, 1, branch, edge)
+	var entry_edge: Array = HousePlanOpenings.shared_edge(plan, 0, 1)
+	if entry_edge.is_empty():
+		push_error("ShopPlanner: palace antechamber does not meet its throne room")
+	else:
+		HousePlanOpenings.add_inner_door(plan, 0, 1, entry_edge)
+	# Treasury is secure and deliberately unglazed. The royal chamber retains
+	# its outside windows and is a leaf in the room graph.
+	plan.windows = plan.windows.filter(func(w: Dictionary) -> bool:
+		return int(w["room"]) != 2)
+	plan.hearth = {}
+	var throne_room := HouseGeometry.room_floor_rect(plan, 1)
+	var dais_width := minf(4.2, throne_room.size.x - 1.0)
+	var dais_depth := minf(3.0, throne_room.size.y * 0.48)
+	var dais := Rect2(Vector2(entrance_x - dais_width * 0.5,
+		throne_room.end.y - dais_depth - 0.75), Vector2(dais_width, dais_depth))
+	plan.dais = {"room": 1, "rect": dais, "rise": 0.25}
+	plan.focus = {"room": 1, "cat": "seat",
+		"pos": Vector2(entrance_x, dais.get_center().y),
+		"facing": 0.0, "faces_door": false}
+
+
+## Place a measured banner on either side wall at the throne's depth. These
+## wall records carry no floor rectangle, so the axis and walking checks read
+## them without treating them as obstacles.
+static func place_palace_banners(plan: HousePlan) -> void:
+	var room := plan.focus_room()
+	if room < 0 or plan.kind_of(room) != &"throne_room":
+		return
+	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
+	var base: float = HouseFurnishGeometry.storey_base(plan, room)
+	var key := "Banner_2"
+	var height := PropCatalog.height(key)
+	var centre_y := minf(plan.spec.height - height * 0.5, 1.85)
+	# Both banners hang on the rear wall, with the throne between them. Their
+	# measured width is the span along this wall; test both stations together so
+	# a rear-branch door cannot steal one half of the pair.
+	var wall: Dictionary = walls[1]
+	var normal := Vector2(wall["normal"])
+	var lower_x: float = float(wall["from"].x) + PropCatalog.size(key).x * 0.5 + 0.2
+	var upper_x: float = float(wall["to"].x) - PropCatalog.size(key).x * 0.5 - 0.2
+	var banner_distance := 0.0
+	var found := false
+	for step in range(24):
+		var distance := 2.4 + float(step) * 0.15
+		var left := Vector2(plan.focus_pos().x - distance, float(wall["from"].y))
+		var right := Vector2(plan.focus_pos().x + distance, float(wall["from"].y))
+		if left.x < lower_x or right.x > upper_x:
+			continue
+		var clear_pair := true
+		for point in [left, right]:
+			if HouseFurnishScore._on_opening(plan, room, point, normal, PropCatalog.size(key).x) \
+					or HouseFurnishScore._crowds_mounted(plan, room, point, PropCatalog.size(key).x):
+				clear_pair = false
+		if clear_pair:
+			banner_distance = distance
+			found = true
+			break
+	if not found:
+		push_error("ShopPlanner: palace cannot find a mirrored banner station")
+		return
+	for side in [-1.0, 1.0]:
+		var point := Vector2(plan.focus_pos().x + banner_distance * side,
+			float(wall["from"].y)) + normal * 0.02
+		var yaw := HouseFurnishGeometry.yaw_facing(normal)
+		plan.furniture.append({"key": key, "room": room,
+			"storey": HousePlan.record_storey(plan.rooms[room]),
+			"pos": Vector3(point.x, base + centre_y, point.y), "yaw": yaw,
+			"rect": Rect2(point - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
+			"zone": Rect2(), "host": -1, "cat": "banner",
+			"mounted": true, "scale": 1.0})
 
 
 ## Replace the generic spanning tree with parallel guard passages. Every

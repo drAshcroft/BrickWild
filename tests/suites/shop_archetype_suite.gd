@@ -20,6 +20,7 @@ const REQUIRED := {
 	&"carpenter": ["workshop", "workbench", "rack", "bench"],
 	&"town_hall": ["council_chamber", "table", "seat"],
 	&"guildhall": ["meeting_hall", "table", "bench"],
+	&"palace": ["antechamber", "seat", "banner", "bed", "chest"],
 }
 const BENCH_SEAT_PITCH := 0.65 # metres per usable place along the measured bench
 

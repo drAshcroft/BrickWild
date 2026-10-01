@@ -111,6 +111,8 @@ const MIN_AREA := {
 	&"gallery": 8.0, &"laundry": 7.0, &"great_hall": 16.0,
 	&"lords_chamber": 10.0, &"nave": 12.0,
 	&"reading_room": 14.0, &"stacks": 20.0, &"scriptorium": 8.0,
+	&"antechamber": 10.0, &"throne_room": 18.0, &"treasury": 6.0,
+	&"royal_chamber": 11.0,
 	&"guardroom": 8.0, &"corridor": 2.4, &"cell": 4.0, &"oubliette": 4.0,
 }
 
@@ -129,6 +131,8 @@ const MIN_SIDE := {
 	&"gallery": 2.4, &"laundry": 2.4, &"great_hall": 3.0,
 	&"lords_chamber": 2.8, &"nave": 2.8,
 	&"reading_room": 3.0, &"stacks": 3.6, &"scriptorium": 2.6,
+	&"antechamber": 2.6, &"throne_room": 3.0, &"treasury": 2.0,
+	&"royal_chamber": 3.3,
 	&"guardroom": 2.4, &"corridor": 1.15, &"cell": 2.0, &"oubliette": 2.0,
 }
 
@@ -152,11 +156,12 @@ const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour",
 	&"office", &"records", &"council_chamber", &"meeting_hall", &"lobby",
 	&"lounge", &"suite", &"gallery", &"laundry", &"great_hall",
 	&"lords_chamber", &"nave", &"reading_room", &"stacks", &"scriptorium",
+	&"antechamber", &"throne_room", &"royal_chamber",
 	&"guardroom"]
 
 ## Rooms someone sleeps in. Nobody should have to walk through one of these
 ## to reach anywhere else -- not just the house's own "bedroom".
-const SLEEPING := [&"bedroom", &"guest_room", &"suite", &"lords_chamber"]
+const SLEEPING := [&"bedroom", &"guest_room", &"suite", &"lords_chamber", &"royal_chamber"]
 
 
 

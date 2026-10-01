@@ -152,6 +152,23 @@ const RECIPES := {
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
 		{"cat": "candle", "rule": &"on", "n": [1, 1], "opt": 0.9},
 	],
+	&"antechamber": [
+		{"cat": "seat", "rule": &"around", "n": [1, 2], "opt": 0.7},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+	],
+	&"throne_room": [
+		{"cat": "seat", "key": "Chair_1", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+	],
+	&"treasury": [
+		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "storage", "rule": &"wall", "n": [0, 1], "opt": 0.7},
+	],
+	&"royal_chamber": [
+		{"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+	],
 	&"guest_room": [
 		{"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.8},

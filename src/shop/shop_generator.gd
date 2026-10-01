@@ -25,8 +25,13 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	# planned in any of them. A chimney without a hearth is an unsupported stack.
 	if spec.business == &"barracks":
 		spec.chimney = false
-	if spec.business == &"prison":
+	if spec.business in [&"prison", &"palace"]:
 		spec.chimney = false
+	if spec.business == &"palace":
+		spec.back_door = false
+		spec.storeys = 1
+		spec.cellars = 0
+	if spec.business == &"prison":
 		spec.storeys = 1
 		spec.cellars = 1
 	spec.window_shutters = r.randf() < float(style["shutters"])
@@ -41,11 +46,14 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	if spec.business == &"prison":
 		spec.room_count = spec.prison_room_rects(inner).size()
+	elif spec.business == &"palace":
+		spec.room_count = 4
 	else:
 		spec.room_count = HouseSpec.rooms_for(inner.size.x * inner.size.y)
 	spec.room_count = mini(spec.room_count, int(ShopSpec.BUSINESSES[spec.business].get("max_rooms", 6)))
 	spec.program = spec.room_program(spec.room_count)
-	spec.back_door = spec.business != &"prison" and spec.room_count >= 3 and r.randf() < 0.7
+	spec.back_door = spec.business not in [&"prison", &"palace"] \
+		and spec.room_count >= 3 and r.randf() < 0.7
 	spec.wall_color = Color(style["wall"][0]).lerp(Color(style["wall"][1]), r.randf())
 	spec.trim_color = Color(style["trim"][0]).lerp(Color(style["trim"][1]), r.randf())
 	spec.roof_color = Color(style["roof"][0]).lerp(Color(style["roof"][1]), r.randf())
@@ -56,6 +64,8 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	var plan := ShopPlanner.plan(spec)
 	if with_furniture:
 		HouseFurnisher.furnish(plan, spec)
+		if spec.business == &"palace":
+			ShopPlanner.place_palace_banners(plan)
 	for placement in plan.furniture:
 		var room: int = int(placement.get("room", -1))
 		placement["storey"] = plan.storey_of_room(room) if room >= 0 \

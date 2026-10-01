@@ -60,7 +60,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange",
-	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "wld001_domus", "wld001_riad",
+	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
@@ -112,6 +112,7 @@ const LANES: Dictionary = {
 	"lane:house-exterior-fast": ["hexterior", "hassembly"],
 	"lane:assets-fast": ["props", "hassembly"],
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
+	"lane:palace-change": ["palace"],
 	"lane:village-fast": ["vquick"],
 	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried"],
 	"lane:castle": ["castle", "cnormals", "cmassing", "clandmark", "cvoxelqa", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried", "cterrace"],
@@ -303,6 +304,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/library_business_suite.gd").run_seeds(100)
 		"prison":
 			return preload("res://tests/suites/prison_suite.gd").run()
+		"palace":
+			return preload("res://tests/suites/palace_suite.gd").run()
 		"hotel":
 			return HotelSuite.run()
 		"hotelroof":

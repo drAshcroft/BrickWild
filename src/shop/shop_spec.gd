@@ -10,6 +10,24 @@ var business: StringName = &"general_store"
 ## Four measured rectangles keep the barracks office compact while preserving
 ## enough frontage for a table and two benches in the mess.
 func custom_room_rects(inner: Rect2) -> Array[Rect2]:
+	if business == &"palace":
+		# The entry room, throne axis, and two private rear branches are one
+		# authored topology. Keeping these rectangles stable lets the planner
+		# wire the treasury and royal chamber directly to the throne room.
+		var entry_depth := inner.size.y * 0.24
+		var throne_depth := inner.size.y * 0.48
+		var rear_depth := inner.size.y - entry_depth - throne_depth
+		var half_width := inner.size.x * 0.5
+		return [
+			Rect2(inner.position, Vector2(inner.size.x, entry_depth)),
+			Rect2(Vector2(inner.position.x, inner.position.y + entry_depth),
+				Vector2(inner.size.x, throne_depth)),
+			Rect2(Vector2(inner.position.x, inner.position.y + entry_depth + throne_depth),
+				Vector2(half_width, rear_depth)),
+			Rect2(Vector2(inner.position.x + half_width,
+				inner.position.y + entry_depth + throne_depth),
+				Vector2(inner.size.x - half_width, rear_depth)),
+		]
 	if business == &"prison":
 		return prison_room_rects(inner)
 	if business != &"barracks":
@@ -74,7 +92,7 @@ func prison_room_rects(inner: Rect2) -> Array[Rect2]:
 ## The front door must open directly into the compact office, even though the
 ## adjoining mess rectangle is closer to the building centre.
 func preferred_front_room_index() -> int:
-	return 0 if business in [&"barracks", &"prison"] else -1
+	return 0 if business in [&"barracks", &"prison", &"palace"] else -1
 
 ## Rooms are ordered from the public front toward private/service space.
 ## The first room replaces the house planner's temporary hall after doors,
@@ -96,6 +114,10 @@ const BUSINESSES := {
 	&"prison": {"label": "Prison / Dungeon",
 		"rooms": [&"guardroom", &"corridor", &"cell"], "max_rooms": 64,
 		"door_w": 1.2, "focus": {"cat": "table", "faces_door": false}},
+	&"palace": {"label": "Throne Hall / Palace",
+		"rooms": [&"antechamber", &"throne_room", &"treasury", &"royal_chamber"],
+		"max_rooms": 4, "door_w": 1.2,
+		"focus": {"cat": "seat", "faces_door": false}},
 	&"blacksmith": {"label": "Blacksmith", "rooms": [&"workshop", &"store", &"office"],
 		"door_w": 2.4, "focus": {"cat": "anvil", "faces_door": true}},
 	&"stable": {"label": "Stable", "rooms": [&"stable", &"tack_room", &"store", &"office"],
@@ -159,6 +181,9 @@ func focus() -> Dictionary:
 
 func room_program(count: int) -> Array[StringName]:
 	var row: Dictionary = BUSINESSES[business]
+	if business == &"palace":
+		var palace: Array[StringName] = [&"antechamber", &"throne_room", &"treasury", &"royal_chamber"]
+		return palace.slice(0, count)
 	if business == &"prison":
 		var rects := prison_room_rects(HouseGeometry.interior_rect(self))
 		var aisle_count := 0
