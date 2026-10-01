@@ -25,22 +25,41 @@ const SURF_STONE := 4
 const SURF_WOOD := 5
 const SURF_ROOF := 6
 const SURF_DARK := 7
-const SURFACES := 8
+## The ground is more than one ground (EVAL-B05). Slots 0-7 keep their
+## numbers because the crossing checks name slots 4 and 5.
+const SURF_YARD := 8   # lots and yards: worked earth and grass, tinted per lot
+const SURF_VERGE := 9  # the grass shoulder along a road
+const SURF_WEAR := 10  # the darker line down a road where the carts run
+const SURF_TREAD := 11 # bare trodden earth round the well and at each door
+const SURF_FIELD := 12 # ploughland outside the edge
+const SURFACES := 13
 
 ## What each surface is, for the assembler's materials.
 const COLOURS := {
-	SURF_GROUND: "6f7a4a", SURF_ROAD: "8a7b62", SURF_COMMON: "5f8a3f",
+	SURF_GROUND: "6a7447", SURF_ROAD: "a08d6b", SURF_COMMON: "7aa34a",
 	SURF_WATER: "3e6a8a", SURF_STONE: "8f8b82", SURF_WOOD: "6b5238",
 	SURF_ROOF: "7a6340", SURF_DARK: "2a2622",
+	SURF_YARD: "857649", SURF_VERGE: "6f8b45", SURF_WEAR: "8b7959",
+	SURF_TREAD: "a38c64", SURF_FIELD: "86724a",
 }
 
 ## How the ground is layered, so a road reads over the field and the common
 ## over both. Millimetres apart: enough to beat z-fighting, far too little to
 ## trip over.
 const Y_GROUND := 0.005
+const Y_FIELD := 0.006
+const Y_YARD := 0.008
+const Y_VERGE := 0.012
 const Y_ROAD := 0.02
+const Y_WEAR := 0.025
 const Y_COMMON := 0.03
+const Y_TREAD := 0.034
 const Y_WATER := 0.01
+## How wide the worn centre line is, as a share of the road, and the bare
+## patches: round the well, and at each door.
+const WEAR_SHARE := 0.38
+const WELL_TREAD := 2.4
+const DOOR_TREAD := 1.2
 
 ## §5's edge, by enclosure kind. A hedge is planted, not built, so it is the
 ## dresser's business and not this file's.
@@ -96,13 +115,58 @@ func _ground(plan: VillagePlan) -> void:
 		Vector3(site.get_center().x, -0.1, site.get_center().y), SURF_GROUND)
 	_log_mass("ground", AABB(Vector3(site.position.x, -0.2, site.position.y),
 		Vector3(site.size.x, 0.2, site.size.y)))
-	for lot in plan.lots:
-		_flat(lot["poly"], Y_GROUND, SURF_GROUND)
+	for field in plan.fields:
+		_field(plan, field)
+	for i in plan.lots.size():
+		_flat(plan.lots[i]["poly"], Y_YARD, SURF_YARD, _lot_tint(plan, i))
 	for road in plan.roads:
-		_flat(VillageSitePlanner.road_ribbon(road, true), Y_GROUND, SURF_GROUND)
+		_flat(VillageSitePlanner.road_ribbon(road, true), Y_VERGE, SURF_VERGE)
 		_flat(VillageSitePlanner.road_ribbon(road, false), Y_ROAD, SURF_ROAD)
+		_flat(Poly.ribbon(road["points"], float(road["width"]) * 0.5 * WEAR_SHARE),
+			Y_WEAR, SURF_WEAR)
 	for c in plan.commons:
 		_flat(c["poly"], Y_COMMON, SURF_COMMON)
+	_trodden(plan)
+
+
+## Each lot is its own bit of worked ground: a small, deterministic shift in
+## lightness and warmth, so a row of yards is not one stamped colour.
+func _lot_tint(plan: VillagePlan, index: int) -> Color:
+	var h := fposmod(sin(float(index) * 12.9898 + float(plan.spec.seed) * 0.0137) * 43758.5453, 1.0)
+	var k := fposmod(sin(float(index) * 78.233 + float(plan.spec.seed) * 0.0291) * 24634.6345, 1.0)
+	var light := 0.90 + h * 0.18
+	return Color(light * (1.0 + (k - 0.5) * 0.10), light, light * (1.0 - (k - 0.5) * 0.10))
+
+
+## Ploughland and pasture, which the plan holds and the ground never drew. A
+## field that touches water is left as the plain ground: the bank is the
+## water's business.
+func _field(plan: VillagePlan, field: Dictionary) -> void:
+	var poly: PackedVector2Array = field["poly"]
+	for w in plan.water:
+		if not Geometry2D.intersect_polygons(poly, w["poly"]).is_empty():
+			return
+	var surf := SURF_FIELD if field.get("kind", &"field") == &"field" else SURF_VERGE
+	_flat(poly, Y_FIELD, surf)
+
+
+## The well and each door wear the grass through to earth.
+func _trodden(plan: VillagePlan) -> void:
+	for p in plan.props:
+		if String(p["key"]) == "well":
+			_flat(_disc(p["pos"], WELL_TREAD), Y_TREAD, SURF_TREAD)
+	for b in plan.buildings:
+		var door: Vector3 = b.get("door", Vector3.INF)
+		if door.is_finite():
+			_flat(_disc(Vector2(door.x, door.z), DOOR_TREAD), Y_TREAD, SURF_TREAD)
+
+
+static func _disc(centre: Vector2, radius: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in 14:
+		var a := TAU * float(i) / 14.0
+		out.append(centre + Vector2(cos(a), sin(a)) * radius * (1.0 + 0.12 * sin(float(i) * 2.3)))
+	return out
 
 
 ## Emit the final, serialized crossing routes. Each bend shares its mitered
@@ -468,7 +532,7 @@ func _built_props(plan: VillagePlan) -> void:
 ## A polygon as a flat double-sided sheet at height `y`. Double-sided because
 ## a village is looked at from above and from the road, and a one-sided
 ## ground plane disappears from underneath.
-func _flat(poly: PackedVector2Array, y: float, surf: int) -> void:
+func _flat(poly: PackedVector2Array, y: float, surf: int, tint := Color(0, 0, 0, 0)) -> void:
 	if poly.size() < 3:
 		return
 	var tris: PackedInt32Array = Geometry2D.triangulate_polygon(poly)
@@ -481,5 +545,7 @@ func _flat(poly: PackedVector2Array, y: float, surf: int) -> void:
 			var n: Vector3 = (tri[2] - tri[0]).cross(tri[1] - tri[0]).normalized()
 			for v in tri:
 				st.set_normal(n)
+				if tint.a > 0.0:
+					st.set_color(tint)
 				st.set_uv(Vector2.ZERO)
 				st.add_vertex(v)

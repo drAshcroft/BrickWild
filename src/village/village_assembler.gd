@@ -33,6 +33,7 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 	ground.mesh = ground_mesh(plan)
 	ShellAssembler.surface_materials(ground,
 		BuildingFamilyAdapter.colours(plan.spec))
+	_ground_finish(ground)
 	root.add_child(ground)
 	var houses := Node3D.new()
 	houses.name = "Buildings"
@@ -50,6 +51,20 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 		houses.add_child(node)
 	_dressing(root, plan)
 	return root
+
+
+## The surfaces that carry their own vertex colour (a lot's tint, a bank's
+## wet-to-dry gradient) multiply it into the slot colour.
+static func _ground_finish(ground: MeshInstance3D) -> void:
+	var mesh := ground.mesh as ArrayMesh
+	if mesh == null:
+		return
+	for i in mesh.get_surface_count():
+		var slot := int(mesh.surface_get_name(i).trim_prefix("material_slot:"))
+		if slot in [VillageBuilder.SURF_YARD]:
+			var m := ground.get_surface_override_material(i) as StandardMaterial3D
+			if m != null:
+				m.vertex_color_use_as_albedo = true
 
 
 ## The dressing: every catalogue prop and plant the dresser placed, and a
