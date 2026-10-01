@@ -28,7 +28,6 @@ const SURF_WATER := 4
 const SURF_GROUND := 4
 const SURF_DRESS := 5
 const SURFACES := 6
-const WATER_COLOUR := Color("315d70")
 
 ## Steps a battered wall or tower is emitted in. More steps is a smoother
 ## talus; four reads as masonry courses rather than as a ramp.
@@ -951,24 +950,13 @@ func _build_water_moats() -> void:
 		mass_log.back()["depth"] = trench.depth
 		mass_log.back()["width"] = trench.width
 		mass_log.back()["ring"] = trench.ring
-		# Keep visible water off the masonry voxel surface. The negative trench
-		# remains the measured mass and must stay clear of positive structure.
-		var a: AABB = trench.aabb
-		tag("water")
-		mark_ground_skin()
-		_kit.surface(SURF_GROUND).set_color(WATER_COLOUR)
-		box(Vector3(a.size.x, 0.02, a.size.z),
-			Vector3(a.get_center().x, 0.01, a.get_center().z), SURF_WATER)
-		_kit.surface(SURF_GROUND).set_color(Color.WHITE)
+	# The trench stays the measured negative mass. What shows is the water that
+	# stands in it, the banks that hold it and the revetment along the curtain.
+	CastleMoatBuilder.emit(self)
 
 
 func _build_causeway() -> void:
-	var road := CastleGeometry.causeway_aabb(spec)
-	if road.size.x <= 0.0 or road.size.z <= 0.0:
-		return
-	tag("causeway")
-	_box_aabb(road, SURF_STONE)
-	_log_mass("causeway", road)
+	CastleMoatBuilder.causeway(self)
 
 
 func _build_drawbridge() -> void:
