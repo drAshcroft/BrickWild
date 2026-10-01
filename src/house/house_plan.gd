@@ -61,6 +61,15 @@ var rugs: Array[Dictionary] = []
 ## These never participate in room furnishing or room compromise removal.
 var exterior: Array[Dictionary] = []
 var exterior_omissions: Array[String] = []
+## The yard beyond the facade (HouseYard, EVAL-B06). `yard` is measured catalogue
+## props on the ground, each {id, key, pos, yaw, scale, role, host, group,
+## bounds, rect, storey, mounted} with host "front" | "side" | "rear" | "porch"
+## | "chimney" | "path" -- the shape of `exterior`, so HouseExterior.bounds_of()
+## and the assembler read both. `yard_pieces` is what the catalogue has no model
+## for and the builder emits as component_box rows on host "yard":
+## {id, kind, role, host, group, rect, parts: [{role, surf, size, centre, basis}]}.
+var yard: Array[Dictionary] = []
+var yard_pieces: Array[Dictionary] = []
 ## The holes in the plan: {"rect": Rect2, "storey": int,
 ##  "outline": PackedVector2Array (optional)}.
 ##

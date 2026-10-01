@@ -12,6 +12,19 @@ static func bounds_poly(b: Dictionary) -> PackedVector2Array:
 	return Placement.world_rect(b["placement"], b["transform"], false)
 
 
+## What a house's yard puts on the ground a person must walk round (fences,
+## woodpiles, carts, beds), as world XZ polygons. Not part of `bounds_poly`: the
+## lot is sized on the architecture, and the yard is the house's own ground.
+static func yard_polys(b: Dictionary) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	var blocks: Array = b["placement"].get("yard_blocks", [])
+	for r in blocks:
+		var rect: Rect2 = r
+		var local := {"footprint": rect}
+		out.append(Placement.world_rect(local, b["transform"], true))
+	return out
+
+
 ## The walls' outline in world XZ.
 static func footprint_poly(b: Dictionary) -> PackedVector2Array:
 	return Placement.world_rect(b["placement"], b["transform"], true)

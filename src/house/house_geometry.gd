@@ -893,6 +893,13 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 	for extra in [chimney_rect(plan), porch_rect(plan)]:
 		if extra.size.x > 0.0:
 			r = r.merge(extra)
+	# The yard's BUILT pieces are emitted in the shell mesh, so the bound that
+	# promises to contain every emitted vertex contains them. The yard's props
+	# are separate models (BigGlade.placement merges them), and the APRON itself
+	# is permission, not content: it is exposed as `yard_rect`, never added here.
+	if spec.exterior_props:
+		for piece in plan.yard_pieces:
+			r = r.merge(piece["rect"])
 	var top: float = total_height(spec)
 	# A landmark declares the storybook elevation it stands in front of its
 	# walls (balconies, entrance canopy, cornices, cupolas), so those parts
@@ -902,6 +909,18 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		top = maxf(top, spec.landmark_height())
 	return AABB(Vector3(r.position.x, 0.0, r.position.y),
 		Vector3(r.size.x, top, r.size.y))
+
+
+## The YARD ENVELOPE: the shell footprint with its porch and chimney stack,
+## grown by the apron (2 to 3 m, by style). Everything the house plans outside
+## its walls stays inside this; the lot owns the rest. A declared permission, not
+## a measured extent -- so it is not part of exterior_bounds().
+static func yard_rect(plan: HousePlan) -> Rect2:
+	var r := site_rect(plan.spec)
+	for extra in [chimney_rect(plan), porch_rect(plan)]:
+		if extra.size.x > 0.0:
+			r = r.merge(extra)
+	return r.grow(HouseYard.apron(plan.spec))
 
 
 ## CONSERVATIVE spec-only bounds, for callers with no plan. The hearth and the
@@ -921,6 +940,10 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 		pad = maxf(pad, chimney_size(spec) + maxf(CHIMNEY_BASE_EXTRA, 0.22))
 	if spec.porch:
 		pad = maxf(pad, porch_depth(spec) + 0.2 + wall_thickness(spec))
+	# The yard's built pieces are in the mesh and lie inside the envelope: the
+	# apron beyond the shell, its porch and chimney stack.
+	if spec.exterior_props and not spec.has_method("room_program"):
+		pad += HouseYard.apron(spec)
 	r = r.grow(pad)
 	var top: float = total_height(spec)
 	return AABB(Vector3(r.position.x, 0.0, r.position.y),

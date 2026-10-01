@@ -129,6 +129,8 @@ static func _grid_for_bounds(plan: VillagePlan, bounds: Rect2, cell_size: float)
 	# obstruction: what is actually there
 	for b in plan.buildings:
 		grid.add_obstacle_poly(VillageMeasure.bounds_poly(b))
+		for poly in VillageMeasure.yard_polys(b):
+			grid.add_obstacle_poly(poly)
 	# Restore only explicit native arrival courts; the rest of each building's
 	# full measured envelope remains an obstruction. Later props and water can
 	# still block this route and are tested normally.
