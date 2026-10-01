@@ -82,3 +82,12 @@ static func _light_the_fires(root: Node3D, builder: TempleBuilder,
 			yaw, s, spec.glow_color, reach)
 		lamp.light_energy = 2.4
 		root.add_child(lamp)
+	# and the god himself: a low flame in the cult's colour before the idol, so
+	# the end of the axis is never a silhouette against nothing
+	var idol: Vector3 = TempleGeometry.idol_center(spec)
+	var rim: OmniLight3D = LightKit.make(
+		Vector3(idol.x, idol.y + spec.idol_height * 0.55,
+			idol.z - spec.idol_width * 0.75),
+		spec.glow_color, 1.8, maxf(spec.idol_height * 2.6, 6.0))
+	rim.name = "IdolLight"
+	root.add_child(rim)

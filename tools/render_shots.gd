@@ -1249,17 +1249,17 @@ func _dim(dark: bool) -> void:
 		if child is DirectionalLight3D:
 			var lamp := child as DirectionalLight3D
 			if sun:
-				lamp.light_energy = 0.35 if dark else 1.5
+				lamp.light_energy = 0.8 if dark else 1.5
 				sun = false
 			else:
-				lamp.light_energy = 0.12 if dark else 0.35
+				lamp.light_energy = 0.3 if dark else 0.35
 		elif child is WorldEnvironment:
 			var env: Environment = (child as WorldEnvironment).environment
-			env.ambient_light_energy = 0.3 if dark else 1.0
+			env.ambient_light_energy = 0.7 if dark else 1.0
 			var sky_mat: ProceduralSkyMaterial = env.sky.sky_material
-			sky_mat.sky_top_color = Color("161a24") if dark else Color("6b8cb5")
-			sky_mat.sky_horizon_color = Color("2a2733") if dark else Color("cfd8e0")
-			sky_mat.ground_horizon_color = Color("1d1c22") if dark else Color("9aa0a0")
+			sky_mat.sky_top_color = Color("2b3550") if dark else Color("6b8cb5")
+			sky_mat.sky_horizon_color = Color("4a4a66") if dark else Color("cfd8e0")
+			sky_mat.ground_horizon_color = Color("2d2d3a") if dark else Color("9aa0a0")
 
 
 ## Frame a built mesh and save one image. Both generators hand this the same

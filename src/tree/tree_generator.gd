@@ -31,25 +31,25 @@ const STYLES := {
 	&"voxel": {
 		&"oak": {"trunk_h": 0.34, "trunk_r": 0.020, "canopy_r": 0.30, "lobe_h": 0.80,
 			"branches": 4, "conifer": false, "phyl": 0.62, "leaf": "4f7038", "bark": "6b5138"},
-		&"birch": {"trunk_h": 0.46, "trunk_r": 0.012, "canopy_r": 0.20, "lobe_h": 0.95,
+		&"birch": {"trunk_h": 0.46, "trunk_r": 0.012, "canopy_r": 0.28, "lobe_h": 0.95,
 			"branches": 5, "conifer": false, "phyl": 0.78, "leaf": "86a84c", "bark": "cfc7b4"},
 		&"spruce": {"trunk_h": 0.16, "trunk_r": 0.016, "canopy_r": 0.24, "lobe_h": 1.95,
 			"branches": 6, "conifer": true, "phyl": 0.34, "leaf": "2f5730", "bark": "5a4630"},
 		&"acacia": {"trunk_h": 0.44, "trunk_r": 0.015, "canopy_r": 0.36, "lobe_h": 0.42,
 			"branches": 4, "conifer": false, "phyl": 0.52, "leaf": "6f8442", "bark": "7d6a4c"},
-		&"willow": {"trunk_h": 0.30, "trunk_r": 0.022, "canopy_r": 0.28, "lobe_h": 0.72,
+		&"willow": {"trunk_h": 0.30, "trunk_r": 0.022, "canopy_r": 0.33, "lobe_h": 0.72,
 			"branches": 5, "conifer": false, "phyl": 0.85, "leaf": "7d9a4a", "bark": "6a5740"},
-		&"palm": {"trunk_h": 0.72, "trunk_r": 0.013, "canopy_r": 0.24, "lobe_h": 0.30,
+		&"palm": {"trunk_h": 0.72, "trunk_r": 0.013, "canopy_r": 0.28, "lobe_h": 0.30,
 			"branches": 6, "conifer": false, "phyl": 1.05, "leaf": "5f8a3c", "bark": "8a7550"},
 	},
 	&"indie": {
 		&"oak": {"trunk_h": 0.36, "trunk_r": 0.026, "canopy_r": 0.30, "lobe_h": 0.82,
 			"branches": 4, "conifer": false, "phyl": 0.60, "leaf": "527f3a", "bark": "6d5339"},
-		&"birch": {"trunk_h": 0.50, "trunk_r": 0.015, "canopy_r": 0.20, "lobe_h": 0.95,
+		&"birch": {"trunk_h": 0.50, "trunk_r": 0.015, "canopy_r": 0.31, "lobe_h": 0.95,
 			"branches": 5, "conifer": false, "phyl": 0.76, "leaf": "8fb04f", "bark": "d6cfbc"},
 		&"poplar": {"trunk_h": 0.24, "trunk_r": 0.018, "canopy_r": 0.15, "lobe_h": 1.85,
 			"branches": 5, "conifer": false, "phyl": 0.66, "leaf": "6b9247", "bark": "7d6a52"},
-		&"willow": {"trunk_h": 0.28, "trunk_r": 0.024, "canopy_r": 0.30, "lobe_h": 0.70,
+		&"willow": {"trunk_h": 0.28, "trunk_r": 0.024, "canopy_r": 0.33, "lobe_h": 0.70,
 			"branches": 5, "conifer": false, "phyl": 0.88, "leaf": "84a24c", "bark": "6d5942"},
 		&"pine": {"trunk_h": 0.14, "trunk_r": 0.018, "canopy_r": 0.22, "lobe_h": 2.10,
 			"branches": 7, "conifer": true, "phyl": 0.32, "leaf": "35603a", "bark": "5f4a33"},
@@ -59,15 +59,15 @@ const STYLES := {
 	&"natural": {
 		&"oak": {"trunk_h": 0.38, "trunk_r": 0.028, "canopy_r": 0.30, "lobe_h": 0.85,
 			"branches": 4, "conifer": false, "phyl": 0.58, "leaf": "4e7536", "bark": "6a5138"},
-		&"ash": {"trunk_h": 0.44, "trunk_r": 0.023, "canopy_r": 0.26, "lobe_h": 0.92,
+		&"ash": {"trunk_h": 0.44, "trunk_r": 0.023, "canopy_r": 0.30, "lobe_h": 0.92,
 			"branches": 4, "conifer": false, "phyl": 0.64, "leaf": "5c8442", "bark": "7b7566"},
-		&"beech": {"trunk_h": 0.42, "trunk_r": 0.025, "canopy_r": 0.24, "lobe_h": 0.88,
+		&"beech": {"trunk_h": 0.42, "trunk_r": 0.025, "canopy_r": 0.30, "lobe_h": 0.88,
 			"branches": 4, "conifer": false, "phyl": 0.60, "leaf": "5f8a41", "bark": "9aa0a2"},
-		&"hawthorn": {"trunk_h": 0.28, "trunk_r": 0.032, "canopy_r": 0.26, "lobe_h": 0.66,
+		&"hawthorn": {"trunk_h": 0.28, "trunk_r": 0.032, "canopy_r": 0.32, "lobe_h": 0.66,
 			"branches": 5, "conifer": false, "phyl": 0.94, "leaf": "4a6f3c", "bark": "5f4c3a"},
 		&"pine": {"trunk_h": 0.12, "trunk_r": 0.019, "canopy_r": 0.23, "lobe_h": 2.20,
 			"branches": 7, "conifer": true, "phyl": 0.30, "leaf": "2f5c35", "bark": "5c4830"},
-		&"willow": {"trunk_h": 0.30, "trunk_r": 0.025, "canopy_r": 0.29, "lobe_h": 0.74,
+		&"willow": {"trunk_h": 0.30, "trunk_r": 0.025, "canopy_r": 0.33, "lobe_h": 0.74,
 			"branches": 5, "conifer": false, "phyl": 0.86, "leaf": "7f9c48", "bark": "685540"},
 	},
 	&"magic": {
@@ -115,6 +115,10 @@ static func generate(spec: TreeSpec, p_seed: int) -> void:
 	spec.canopy_base = spec.trunk_height
 	spec.canopy_top = spec.height
 	spec.leafless = spec.species in LEAFLESS
+	# a spindle (poplar, pine, crystal, a conifer) carries its tall crown ratio; the
+	# round kinds keep the default ball, which the village canopy figures were fitted to
+	if float(s["lobe_h"]) >= 1.2:
+		spec.leaf_density = float(s["lobe_h"])
 	spec.root_flare = r.randf_range(0.35, 0.85)
 	spec.trunk_radius = maxf(spec.height * float(s["trunk_r"]), TreeGeometry.TRUNK_R_MIN)
 	spec.canopy_radius = maxf(spec.height * float(s["canopy_r"]),
@@ -144,6 +148,9 @@ static func generate(spec: TreeSpec, p_seed: int) -> void:
 	TreeGeometry.root_spread(spec))
 	spec.trunk_clear = maxf(spec.trunk_clear,
 		spec.canopy_radius * float(TreeGeometry.TRUNK_CLAIM.get(spec.species, 0.0)))
+	# a hanging tree is lifted clear of the band, and has no trunk to promise in it
+	if not TreeGeometry.is_rooted(spec):
+		spec.trunk_clear = spec.canopy_radius * float(TreeGeometry.TRUNK_CLAIM.get(spec.species, 0.0))
 	spec.block = _block_for(spec, r)
 
 	# --- the skeleton and the crown, as data ---
@@ -205,6 +212,18 @@ static func _grow_skeleton(spec: TreeSpec, s: Dictionary, r: RandomNumberGenerat
 			var reach: float = spec.canopy_radius * lerpf(0.30, 0.86, top_bias) \
 				* r.randf_range(0.8, 1.2)
 			_add_branch(spec, base, dir, reach, stem_r * 0.42, 0, r)
+	# A bare tree has no crown to carry it to the height it promised, so the
+	# stem itself goes on up: a snag, thinning to a point, leaning with the
+	# tree. Without it a dead tree stood at half the height it was asked for.
+	if spec.leafless and not conifer:
+		var top: Vector3 = stem[stem.size() - 1]["pos"]
+		var lean_dir := Vector3(sin(spec.lean_dir), 0.0, cos(spec.lean_dir))
+		var lean_to: Vector3 = lean_dir * spec.lean * spec.height * 0.35
+		var tip := Vector3(top.x + lean_to.x, spec.height * 0.985, top.z + lean_to.z)
+		var r0: float = spec.trunk_radius * 0.72
+		spec.branches.append({
+			"from": top, "to": tip, "r0": r0, "r1": r0 * 0.25, "level": 0,
+			"phyl": TreeGeometry.phyllotaxis(spec.branches.size())})
 
 
 static func _add_branch(spec: TreeSpec, from: Vector3, dir: Vector3, reach: float,
@@ -405,29 +424,41 @@ static func _refit_crown(spec: TreeSpec) -> void:
 ## the promise has to say so or every short or coniferous tree fails its own
 ## clearance rule for having a low crown, which is what those trees are.
 static func _claim_head_room(spec: TreeSpec) -> void:
+	var band: float = TreeGeometry.TRUNK_HEIGHT
+	# a hanging tree is lifted off the ground, and the head-height band with it
+	if not TreeGeometry.is_rooted(spec):
+		band -= TreeGeometry.ground_clearance(spec)
 	var deepest: float = 0.0
+	# The promise is what the mesh reaches AT OR BELOW the band, so each part is
+	# clipped to it: a lobe's cross-section at the band, and the stretch of a
+	# branch that lies under it. Counting a whole lobe or a whole branch for
+	# dipping a toe in the band promised twice what the tree had.
 	for lobe in spec.lobes:
 		var c: Vector3 = lobe["pos"]
-		var half: float = float(lobe["radius"]) * maxf(float(lobe["squash"]), 0.05)
-		if c.y - half < TreeGeometry.TRUNK_HEIGHT:
-			deepest = maxf(deepest, Vector2(c.x, c.z).length() + float(lobe["radius"]))
+		var rad: float = float(lobe["radius"])
+		var half: float = rad * maxf(float(lobe["squash"]), 0.05)
+		if c.y - half < band:
+			var within: float = 1.0
+			if c.y > band:
+				within = sqrt(maxf(0.0, 1.0 - pow((c.y - band) / half, 2.0)))
+			deepest = maxf(deepest, Vector2(c.x, c.z).length() + rad * within)
 	# The BRANCHES, which is where most of the surprise was. A nine-metre oak
 	# with a clear trunk of three and a half metres has a whorl of branches at
 	# sixty centimetres: you cannot walk under it, and `trunk_clear` said half a
-	# metre. Every clearance failure that was left after the crown was folded in
-	# was a branch, and a branch is exactly as much of an obstacle as a root.
+	# metre. A branch is exactly as much of an obstacle as a root -- but only the
+	# part of it that is under the band.
 	for branch in spec.branches:
 		var a: Vector3 = branch["from"]
 		var b: Vector3 = branch["to"]
-		# `minf`, not `maxf`. A branch from 1.5 m to 2.0 m has BOTH endpoints
-		# near or above the band and the middle of it in the band, and a test
-		# on the endpoints waved that one through -- which is how two seeds of
-		# one species ended up promising 0.72 m and 0.25 m while measuring the
-		# same metre.
-		if minf(a.y, b.y) >= TreeGeometry.TRUNK_HEIGHT:
+		if minf(a.y, b.y) >= band:
 			continue
-		deepest = maxf(deepest, maxf(Vector2(a.x, a.z).length(),
-			Vector2(b.x, b.z).length()) + float(branch["r0"]))
+		var lo: Vector3 = a if a.y <= b.y else b
+		var hi: Vector3 = b if a.y <= b.y else a
+		var tip: Vector3 = hi
+		if hi.y > band:
+			tip = lo.lerp(hi, (band - lo.y) / (hi.y - lo.y))
+		deepest = maxf(deepest, maxf(Vector2(lo.x, lo.z).length(),
+			Vector2(tip.x, tip.z).length()) + float(branch["r0"]))
 	# A voxel tree is quantised: a cell's face sits half a block outside the
 	# lobe that filled it, and the band measures FACES.
 	deepest += spec.block * 0.5 if spec.style == &"voxel" else 0.0
