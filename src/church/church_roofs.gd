@@ -23,7 +23,10 @@ static func emit(spec: ChurchSpec, kit: MeshKit, masses: Array[Dictionary],
 		var octagonal := spec.dome_shape == &"octagonal"
 		var count := 8 if octagonal else 16
 		var radius := spec.dome_radius * (ChurchGeometry.OCTAGONAL_RADIUS_FACTOR if octagonal else 1.0)
-		var top := spec.height + ChurchGeometry.PENDENTIVE_H + spec.dome_drum_height
+		# Randomly generated churches keep the nominal course here, so their roofs
+		# are untouched; a hero landmark cuts to the real height of its bearing.
+		var course: float = ChurchGeometry.PENDENTIVE_H if spec.hero == &"" 			else ChurchGeometry.pendentive_height(spec)
+		var top := spec.height + course + spec.dome_drum_height
 		for i in range(count):
 			var a := TAU * float(i) / count + (PI / 8.0 if octagonal else 0.0)
 			drum.append(Vector3(cos(a) * radius, top, ChurchGeometry.crossing_center_z(spec) + sin(a) * radius))

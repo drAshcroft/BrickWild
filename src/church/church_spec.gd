@@ -64,6 +64,13 @@ var chapel_arrangement: StringName  # &"chevet" (fanned off the apse) or
 var chapel_radius: float
 var narthex: bool                # entrance vestibule across the west front
 
+# ---- hero landmark composition (ChurchGenerator.apply_landmark) ----
+# Left empty by the generator, so every random church is built as before. The
+# three famous domed churches set it, and ChurchGeometry/ChurchBuilder then
+# add what makes each of them read:
+#   &"florence" -- an octagonal crossing the width of the dome, three tribunes
+var hero: StringName = &""
+
 const STYLES := {
 	&"romanesque": {
 		"label": "Romanesque",

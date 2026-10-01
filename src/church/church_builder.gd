@@ -61,7 +61,13 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 				var ax: float = ChurchGeometry.aisle_center_x(spec, side, ring)
 				var aisle: AABB = ChurchGeometry.aisle_aabb(spec, side, ring)
 				var aisle_windows: Array[Dictionary] = []
-				if ring == spec.aisles - 1:
+				if ring == spec.aisles - 1 and ChurchGeometry.hero_bays(spec):
+					for bay_window in ChurchGeometry.hero_aisle_windows(spec):
+						aisle_windows.append({"face": 1 if side > 0.0 else 3,
+							"u": bay_window.z, "y": bay_window.y,
+							"width": bay_window.width, "height": bay_window.height,
+							"style": spec.window_style})
+				elif ring == spec.aisles - 1:
 					var nwin: int = int(al / 3.0)
 					for i in range(nwin):
 						var wz: float = az0 + al / float(nwin + 1) * (i + 1)
@@ -258,6 +264,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 
 	_build_narthex()
 	_build_ambulatory_and_chapels()
+	_build_tribunes()
 	_build_flying_buttresses()
 	_build_crossing_tower()
 	_build_dome()
@@ -711,21 +718,27 @@ func _build_dome() -> void:
 	var drum_h: float = spec.dome_drum_height
 	var octagonal: bool = spec.dome_shape == &"octagonal"
 
-	# pendentives: a closed, sloped square-to-drum transition. The upper ring
-	# uses the same sides and phase as the drum, so the latter rests on it.
+	# What carries the drum. Randomly generated churches get a closed,
+	# sloped square-to-drum loft whose upper ring shares the drum's sides and
+	# phase. The hero landmarks get masonry that reads as masonry: Florence a
+	# crossing octagon as wide as its dome.
 	var drum_radius: float = r * (ChurchGeometry.OCTAGONAL_RADIUS_FACTOR if octagonal else 1.0)
 	var rounded_hero: bool = spec.style == &"byzantine" and spec.dome_shape == &"hemisphere"
 	var shell_segments: int = 8 if octagonal else (32 if rounded_hero else 16)
 	var shell_start: float = PI / 8.0 if octagonal else 0.0
 	var pendentive_h: float = ChurchGeometry.pendentive_height(spec)
-	_pendentive_support(Vector3(0.0, base, cz), r + 0.3, drum_radius,
-		pendentive_h, shell_segments, shell_start, rounded_hero)
+	if ChurchGeometry.octagon_crossing(spec):
+		_octagon_crossing(cz, base, drum_radius, pendentive_h)
+	else:
+		_pendentive_support(Vector3(0.0, base, cz), r + 0.3, drum_radius,
+			pendentive_h, shell_segments, shell_start, rounded_hero)
 	_log_mass("pendentive", ChurchGeometry.pendentive_aabb(spec))
 	# the corona of windows that lights every one of these domes
 	var lights: int = 8 if octagonal else 12
 	var angles: Array = []
 	for i in range(lights):
 		angles.append(TAU / lights * i)
+	tag("dome")
 	_arc_window_shell(Vector3(0, base + pendentive_h, cz),
 		drum_radius, drum_h, shell_segments, TAU,
 		shell_start, angles,
@@ -745,10 +758,11 @@ func _build_dome() -> void:
 	total_height = maxf(total_height, top + rise)
 
 	if spec.dome_lantern:
-		var lh: float = r * ChurchGeometry.LANTERN_RATIO
-		_kit.prism(r * 0.16, lh, 8, Vector3(0, top + rise, cz), SURF_STONE)
-		_kit.stepped_taper(Vector3(0, top + rise + lh, cz), r * 0.34,
-			r * ChurchGeometry.LANTERN_CAP_RATIO, SURF_ROOF, 3, 0.1)
+		var lh: float = ChurchGeometry.lantern_height(spec)
+		var lr: float = ChurchGeometry.lantern_radius(spec)
+		_kit.prism(lr, lh, 8, Vector3(0, top + rise, cz), SURF_STONE)
+		_kit.stepped_taper(Vector3(0, top + rise + lh, cz), ChurchGeometry.lantern_cap_width(spec),
+			ChurchGeometry.lantern_cap_height(spec), SURF_ROOF, 3, 0.1)
 		total_height = maxf(total_height, top + rise + lh)
 
 	# Hagia Sophia braces its dome with half-domes east and west, themselves
@@ -768,6 +782,66 @@ func _build_dome() -> void:
 						Vector2(er, base * 0.3)]), ec, SURF_STONE, 8, PI, start)
 					_kit.revolve(_dome_profile(er, er * 0.8),
 						ec + Vector3(0, base * 0.3, 0), SURF_ROOF, 8, PI, start)
+
+
+# ------------------------------------------------------------ Florence
+
+## The octagonal crossing: eight masonry faces as wide as the dome, with a
+## window in each face the nave does not enter, and a cornice that carries the
+## drum. The nave runs into the west face; three tribunes ring the rest.
+func _octagon_crossing(cz: float, base: float, drum_radius: float,
+		pendentive_h: float) -> void:
+	tag("crossing")
+	var lights: Array = []
+	for k in range(8):
+		var bearing: float = wrapf(float(k) * PI / 4.0, -PI + 0.001, PI + 0.001)
+		if absf(absf(bearing) - PI) < 0.01:
+			continue          # the west face opens onto the nave
+		lights.append(bearing)
+	var block_radius: float = ChurchGeometry.octagon_circumradius(spec)
+	_arc_window_shell(Vector3(0, 0, cz), block_radius, base, 8, TAU, PI / 8.0,
+		lights, block_radius * 0.13, base * 0.17, base * 0.82, &"round")
+	_log_mass("crossing_octagon", ChurchGeometry.octagon_aabb(spec))
+	# two string courses divide the tall block, and the drum stands back from
+	# it on a chamfered stone ledge
+	for course in [0.40, 0.66]:
+		_kit.drum(Vector3(0, base * course, cz), block_radius * 1.012,
+			block_radius * 1.012, maxf(base * 0.008, 0.15), SURF_TRIM, 8, PI / 8.0)
+	_kit.drum(Vector3(0, base, cz), block_radius * 1.01, drum_radius,
+		pendentive_h, SURF_TRIM, 8, PI / 8.0)
+
+
+## Three tribunes -- east, south and north -- as half-drums as wide as an
+## octagon face, each lit by three windows and roofed by a half cone.
+func _build_tribunes() -> void:
+	var count: int = ChurchGeometry.tribune_count(spec)
+	if count <= 0:
+		return
+	tag("tribune")
+	var rt: float = ChurchGeometry.tribune_radius(spec)
+	var ht: float = ChurchGeometry.tribune_height(spec)
+	for i in range(count):
+		var c: Vector3 = ChurchGeometry.tribune_center(spec, i)
+		var phi: float = ChurchGeometry.tribune_angle(spec, i)
+		var start: float = ChurchGeometry.tribune_arc_start(spec, i)
+		_arc_window_shell(Vector3(c.x, 0.0, c.z), rt, ht, 7, PI, start,
+			[phi - PI / 7.0, phi, phi + PI / 7.0], rt * 0.2, ht * 0.42, ht * 0.5,
+			spec.window_style, true)
+		_log_mass("tribune_%d" % i, ChurchGeometry.tribune_aabb(spec, i))
+		_oriented_half_cone(Vector3(c.x, ht, c.z), rt + ChurchGeometry.APSE_EAVE,
+			rt * 0.9, start, SURF_ROOF)
+
+
+## A half cone over a half-drum whose arc starts at `start` (revolve angle
+## space). The apse's own cap is the start = 0 case.
+func _oriented_half_cone(pos: Vector3, radius: float, height: float, start: float,
+		s: int) -> void:
+	for i in range(10):
+		var a: float = start + PI * float(i) / 10.0
+		var b: float = start + PI * float(i + 1) / 10.0
+		_kit.slab_poly(PackedVector3Array([pos + Vector3(cos(a) * radius, 0, sin(a) * radius),
+			pos + Vector3(cos(b) * radius, 0, sin(b) * radius), pos + Vector3(0, height, 0)]),
+			RoofShape.DEPTH, s, true)
 
 
 ## A closed loft from the square crossing to the drum's exact lower ring. The

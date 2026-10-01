@@ -127,8 +127,8 @@ static func _force_features(key: String, spec: ChurchSpec) -> void:
 			_force_dome(spec, &"hemisphere")
 			spec.half_domes = true
 		"florence_duomo":
-			_force_dome(spec, &"octagonal")
-			spec.dome_lantern = true
+			# composed, not rolled: the hero geometry lives behind spec.hero
+			ChurchGenerator.apply_landmark(spec, key)
 		"st_basil":
 			_force_dome(spec, &"onion")
 			if spec.radiating_chapels < 4:
@@ -219,9 +219,31 @@ static func _check_required_masses(key: String, builder: ChurchBuilder, who: Str
 		"florence_duomo":
 			# shape and lantern are attributes of the drum mass, not separate ones.
 			_require(builder, who, res, "dome_drum", "octagonal drum + lantern-topped dome")
+			_require(builder, who, res, "crossing_octagon", "octagonal crossing")
+			for i in range(3):
+				_require(builder, who, res, "tribune_%d" % i, "tribune %d round the crossing" % i)
+			_check_florence_proportions(builder, who, res)
 		"st_basil":
 			_require(builder, who, res, "dome_drum", "onion dome")
 			_require(builder, who, res, "chapel_3", "4th radiating chapel")
+
+
+## The Duomo is read by its dome: the crossing is the widest thing in the plan
+## and the dome the tallest in the elevation, each by a margin, and the nave is
+## laid out in a few huge bays rather than a picket line.
+static func _check_florence_proportions(builder: ChurchBuilder, who: String,
+		res: SuiteResult) -> void:
+	var spec: ChurchSpec = builder.spec
+	var octagon: AABB = builder.mass_aabb("crossing_octagon")
+	var nave: AABB = builder.mass_aabb("nave")
+	if octagon.size.x < ChurchGeometry.aisle_outer_x(spec) * 2.0 * 1.4:
+		res.fail("%s: crossing (%.1fm) is not clearly wider than nave and aisles (%.1fm)"
+			% [who, octagon.size.x, ChurchGeometry.aisle_outer_x(spec) * 2.0])
+	if ChurchGeometry.total_height(spec) < nave.size.y * 1.8:
+		res.fail("%s: dome (%.1fm) is not clearly taller than the nave (%.1fm)"
+			% [who, ChurchGeometry.total_height(spec), nave.size.y])
+	if ChurchGeometry.hero_bay_count(spec) > 6:
+		res.fail("%s: %d bays is a picket line" % [who, ChurchGeometry.hero_bay_count(spec)])
 
 
 static func _require(builder: ChurchBuilder, who: String, res: SuiteResult, prefix: String,

@@ -62,6 +62,10 @@ func _init() -> void:
 		await _shoot_vis010_acceptance()
 		quit()
 		return
+	if args.has("hero-domes"):
+		await _shoot_hero_domes()
+		quit()
+		return
 	if args.has("vis009"):
 		await _shoot_vis009_acceptance()
 		quit()
@@ -670,6 +674,38 @@ func _landmarks() -> Array[Dictionary]:
 	]
 
 
+## Florence, St Basil and Hagia Sophia only: their portraits and close-ups
+## under the standard names, plus a second and third camera on each so the
+## composition (crossing and tribunes, cluster and podium, bearing and arches)
+## can be judged from more than the one three-quarter view.
+func _shoot_hero_domes() -> void:
+	var keys := ["florence_duomo", "st_basil", "hagia_sophia"]
+	var by_key := {}
+	for entry in _landmarks():
+		by_key[entry["key"]] = entry
+	for key in keys:
+		var entry: Dictionary = by_key[key]
+		var spec: ChurchSpec = _landmark_spec(entry)
+		await _shoot_church(spec, "%s.jpg" % key, 0.72, -0.28, 1.0)
+	for shot in _detail_shots():
+		if not (shot["entry"]["key"] in keys):
+			continue
+		var spec: ChurchSpec = _landmark_spec(shot["entry"])
+		var f: Array = _focus_of(spec, shot["focus"])
+		await _shoot_church(spec, shot["file"], shot["yaw"], shot["pitch"], 1.0, f[0], f[1])
+	var extra := [
+		{"key": "florence_duomo", "file": "hero_florence_east.jpg", "yaw": 2.45, "pitch": -0.30},
+		{"key": "florence_duomo", "file": "hero_florence_south.jpg", "yaw": 1.45, "pitch": -0.22},
+		{"key": "st_basil", "file": "hero_basil_west.jpg", "yaw": -0.55, "pitch": -0.24},
+		{"key": "st_basil", "file": "hero_basil_east.jpg", "yaw": 2.5, "pitch": -0.20},
+		{"key": "hagia_sophia", "file": "hero_hagia_south.jpg", "yaw": 1.45, "pitch": -0.18},
+		{"key": "hagia_sophia", "file": "hero_hagia_east.jpg", "yaw": 2.6, "pitch": -0.30},
+	]
+	for row in extra:
+		var spec: ChurchSpec = _landmark_spec(by_key[row["key"]])
+		await _shoot_church(spec, row["file"], row["yaw"], row["pitch"], 1.0)
+
+
 func _detail_shots() -> Array[Dictionary]:
 	var lm: Array[Dictionary] = _landmarks()
 	return [
@@ -761,10 +797,8 @@ func _force_features(spec: ChurchSpec, key: String) -> void:
 			spec.half_domes = true
 			spec.exedrae = true
 		"florence_duomo":
-			spec.dome = true
-			spec.dome_shape = &"octagonal"
-			spec.dome_lantern = true
-			spec.transept = true
+			# composed, not rolled: ChurchGenerator.apply_landmark
+			ChurchGenerator.apply_landmark(spec, key)
 		"st_basil":
 			spec.dome = true
 			spec.dome_shape = &"onion"

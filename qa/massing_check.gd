@@ -14,7 +14,7 @@ extends RefCounted
 
 const TOL := MassRules.TOL
 ## Mass name prefixes that fold to a family for the joint table.
-const FAMILIES := ["aisle", "chapel", "flyer_pier", "flyer_arch", "tower"]
+const FAMILIES := ["aisle", "chapel", "flyer_pier", "flyer_arch", "tower", "tribune"]
 ## Masses carried on the walls below them rather than standing on the ground.
 const CARRIED := ["dome_drum", "pendentive", "flyer_arch"]
 
@@ -44,6 +44,16 @@ static func _allowance(spec: ChurchSpec, a: String, b: String) -> float:
 			return INF                        # the dome oversails them
 		"crossing_tower|dome_drum":
 			return INF                        # generator never emits both
+
+		# --- hero landmarks (spec.hero) ---
+		"crossing_octagon|nave", "aisle|crossing_octagon":
+			return INF                        # the nave and aisles run into the octagon
+		"crossing_octagon|dome_drum", "crossing_octagon|pendentive":
+			return INF                        # the drum stands on it
+		"crossing_octagon|tribune":
+			return INF                        # a tribune is buried in the face it opens off
+		"dome_drum|tribune", "pendentive|tribune", "nave|tribune", "aisle|tribune":
+			return 0.0                        # tribunes stand clear of everything else
 		"flyer_arch|flyer_pier", "flyer_arch|nave", "aisle|flyer_arch":
 			return INF                        # the flyer lands on the wall it braces
 		"flyer_arch|transept", "flyer_pier|transept":
