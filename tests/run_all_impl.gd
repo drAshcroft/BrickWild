@@ -53,7 +53,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
-	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001", "wld002", "wld004", "wld006",
+	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001", "wld002", "wld004", "wld005", "wld006",
 	"tree", "bridge"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
@@ -119,7 +119,7 @@ const LANES: Dictionary = {
 	"lane:church-change": ["churchroof", "churchchange"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
 	"lane:temple": ["temple", "rite"],
-	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld006"],
+	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006"],
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
 	"lane:sweep": ORDER,
@@ -378,6 +378,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/insula_suite.gd").run()
 		"wld004":
 			return preload("res://tests/suites/qibla_suite.gd").run()
+		"wld005":
+			return preload("res://tests/suites/hammam_suite.gd").run()
 		"wld006":
 			return preload("res://tests/suites/world_han_suite.gd").run()
 		"wld001_domus":

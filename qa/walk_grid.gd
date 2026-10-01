@@ -21,6 +21,7 @@ var cell := 0.12
 var _free: PackedByteArray = PackedByteArray()   # floor, before the body
 var _walk: PackedByteArray = PackedByteArray()   # floor a person fits on
 var _seen: PackedByteArray = PackedByteArray()   # reached from the start
+var _walk_steps: PackedInt32Array = PackedInt32Array() # shortest cardinal steps from the start; -1 when unreached
 ## How high the floor of each cell stands, in metres above the storey. Zero
 ## almost everywhere; a dais, a step or a terrace edge raises its own cells.
 var _level: PackedFloat32Array = PackedFloat32Array()
@@ -40,11 +41,13 @@ func setup(bounds: Rect2, cell_size := 0.12) -> void:
 	_free.resize(nx * nz)
 	_walk.resize(nx * nz)
 	_seen.resize(nx * nz)
+	_walk_steps.resize(nx * nz)
 	_level.resize(nx * nz)
 	for i in range(_free.size()):
 		_free[i] = 0
 		_walk[i] = 0
 		_seen[i] = 0
+		_walk_steps[i] = -1
 		_level[i] = 0.0
 
 
@@ -153,10 +156,15 @@ func flood_from(from: Vector2, search := 0.6) -> bool:
 		return false
 	for i in range(_seen.size()):
 		_seen[i] = 0
-	var stack: Array[Vector2i] = [start]
-	_seen[start.x * nz + start.y] = 1
-	while not stack.is_empty():
-		var cur: Vector2i = stack.pop_back()
+		_walk_steps[i] = -1
+	var queue: Array[Vector2i] = [start]
+	var start_index := start.x * nz + start.y
+	_seen[start_index] = 1
+	_walk_steps[start_index] = 0
+	var head := 0
+	while head < queue.size():
+		var cur: Vector2i = queue[head]
+		head += 1
 		var here: float = _level[cur.x * nz + cur.y]
 		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			var nb: Vector2i = cur + d
@@ -170,8 +178,31 @@ func flood_from(from: Vector2, search := 0.6) -> bool:
 			if absf(_level[idx] - here) > MAX_STEP:
 				continue
 			_seen[idx] = 1
-			stack.append(nb)
+			_walk_steps[idx] = _walk_steps[cur.x * nz + cur.y] + 1
+			queue.append(nb)
 	return true
+
+
+## Shortest measured walking distance from the most recent flood start to the
+## nearest standable cell within `search` of `point`. Returns INF when the
+## point has no reached floor nearby. This uses the same body-eroded grid and
+## step rules as `flood_from`, so route checks do not invent a second grid.
+func distance_to(point: Vector2, search := 0.6) -> float:
+	if _walk_steps.is_empty():
+		return INF
+	var base: Vector2i = cell_of(point)
+	var cells := maxi(int(ceil(search / cell)), 0)
+	var best := 1 << 30
+	for dx in range(-cells, cells + 1):
+		for dz in range(-cells, cells + 1):
+			var x := base.x + dx
+			var z := base.y + dz
+			if at(_walk, x, z) == 0:
+				continue
+			var steps: int = _walk_steps[x * nz + z]
+			if steps >= 0:
+				best = mini(best, steps)
+	return INF if best == (1 << 30) else float(best) * cell
 
 
 ## Was any cell inside `rect` (grown by `grow`, since a person stands NEXT to a

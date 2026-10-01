@@ -54,6 +54,13 @@ const FAMILIES := {
 		"width": {"min": 49.0, "max": 133.0},
 		"length": {"min": 38.5, "max": 105.0},
 		"height": {"min": 12.0, "max": 12.0},
+	},
+	&"hammam": {
+		"label": "Hammam",
+		"kinds": [&"steam_baths"],
+		"width": {"min": 14.0, "max": 48.0},
+		"length": {"min": 10.0, "max": 32.0},
+		"height": {"min": 6.0, "max": 12.0},
 	}
 }
 
@@ -121,6 +128,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = han_made["spec"]
 		out.plan = han_made["plan"]
 		return true
+	if request.style == &"hammam" and request.purpose in kinds_of(&"hammam"):
+		var hammam_made := HammamGenerator.generate(request.seed, request.width,
+			request.length, request.height)
+		out.spec = hammam_made["spec"]
+		out.plan = hammam_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -139,6 +152,9 @@ static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"mosque":
 		return MosqueBuilder.new().build(building.plan)
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"hammam":
+		return HammamBuilder.new().build(building.plan)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null
 	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)

@@ -416,9 +416,11 @@ func tiered_taper(base_center: Vector3, base_w: float, height: float, surf: int,
 
 ## Surface of revolution from a profile of (radius, height) points, bottom to
 ## top. arc < TAU sweeps only part of the circle, which is how half-domes and
-## exedrae are made. This is the workhorse behind every dome shape.
+## exedrae are made. `ellipse_scale` applies a plan-space X/Z scale after the
+## sweep for oval domes; its default preserves a true circular revolution.
 func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
-		segments := 16, arc := TAU, start := 0.0) -> void:
+		segments := 16, arc := TAU, start := 0.0,
+		ellipse_scale := Vector2.ONE) -> void:
 	if profile.size() < 2:
 		return
 	var st: SurfaceTool = _sts[surf]
@@ -436,10 +438,10 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 			var a0: float = start + arc * float(s) / segments
 			var a1: float = start + arc * float(s + 1) / segments
 			var v := [
-				center + Vector3(cos(a0) * p0.x, p0.y, sin(a0) * p0.x),
-				center + Vector3(cos(a1) * p0.x, p0.y, sin(a1) * p0.x),
-				center + Vector3(cos(a1) * p1.x, p1.y, sin(a1) * p1.x),
-				center + Vector3(cos(a0) * p1.x, p1.y, sin(a0) * p1.x),
+				center + Vector3(cos(a0) * p0.x * ellipse_scale.x, p0.y, sin(a0) * p0.x * ellipse_scale.y),
+				center + Vector3(cos(a1) * p0.x * ellipse_scale.x, p0.y, sin(a1) * p0.x * ellipse_scale.y),
+				center + Vector3(cos(a1) * p1.x * ellipse_scale.x, p1.y, sin(a1) * p1.x * ellipse_scale.y),
+				center + Vector3(cos(a0) * p1.x * ellipse_scale.x, p1.y, sin(a0) * p1.x * ellipse_scale.y),
 			]
 			# Per TRIANGLE, not per quad: four points on a dome are not coplanar,
 			# and sharing the first triangle's normal with the second left a
@@ -461,7 +463,8 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 	# close a partial sweep, so a half-dome is not hollow along its cut
 	if arc < TAU - 0.001:
 		for a in [start, start + arc]:
-			var dir := Vector3(cos(a), 0, sin(a))
+			var dir := Vector3(cos(a) * ellipse_scale.x, 0,
+				sin(a) * ellipse_scale.y)
 			for i in range(rings):
 				var q := [
 					center + dir * profile[i].x + Vector3(0, profile[i].y, 0),

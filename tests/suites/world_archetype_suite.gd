@@ -38,6 +38,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 70.0, "length": 55.0, "height": 12.0,
 		"must": ["guest_room", "stable", "han_kiosk", "han_winter_dome"],
 		"check": &"han_check", "about": "Sultan's Han with a flooded court and domed winter hall"},
+	{"key": "steam_baths", "family": &"hammam", "kind": &"steam_baths",
+		"width": 24.0, "length": 16.0, "height": 8.0,
+		"must": ["changing", "cold", "warm", "hot", "dome", "oculus", "furnace"],
+		"check": &"hammam_check", "about": "four-stage hammam with domed bathing rooms"},
 ]
 
 
@@ -343,6 +347,11 @@ static func assert_contains(building: GeneratedBuilding, must: Array) -> Array[S
 	if building.plan != null:
 		for i in range(building.plan.room_count()):
 			names[String(building.plan.kind_of(i))] = true
+			var role := String(building.plan.rooms[i].get("role", ""))
+			if not role.is_empty():
+				names[role] = true
+		for opening in building.plan.roof_openings:
+			names[String(opening.get("kind", ""))] = true
 		for p in building.plan.furniture:
 			names[PropCatalog.category(p["key"])] = true
 	for want in must:
@@ -378,8 +387,13 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		out.append("check: no qa/%s.gd" % String(check).to_snake_case())
 		return out
 	var checker = script.new()
-	var rep: Dictionary = checker.check(building.plan) if building.plan != null \
-		else checker.check(building.spec, mesh_builder)
+	var rep: Dictionary
+	if building.plan != null and check == &"hammam_check":
+		rep = checker.check(building.plan, mesh_builder)
+	elif building.plan != null:
+		rep = checker.check(building.plan)
+	else:
+		rep = checker.check(building.spec, mesh_builder)
 	for f2 in rep.get("failures", []):
 		out.append(str(f2))
 	return out
@@ -392,6 +406,10 @@ static func _builder_for(building: GeneratedBuilding):
 			var mb := MosqueBuilder.new()
 			mb.build(building.plan)
 			return mb
+		if building.plan.world_family == &"hammam":
+			var hammam_builder := HammamBuilder.new()
+			hammam_builder.build(building.plan)
+			return hammam_builder
 		var hb := HouseBuilder.new()
 		hb.build(building.plan)
 		return hb

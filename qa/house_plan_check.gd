@@ -27,11 +27,11 @@ const TOL := 0.02
 ## Every rule, in the order it runs, by the name its messages carry. A family
 ## may replace one through `check(plan, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"tiling", &"storeys", &"shape", &"way_in",
-	&"connected", &"privacy", &"opening", &"window", &"stairs", &"stair_line",
+	&"connected", &"privacy", &"opening", &"window", &"daylight", &"stairs", &"stair_line",
 	&"doors_in_line", &"upstairs_programme", &"colonnade"]
 const METHODS := {&"shape": "_check_shapes", &"way_in": "_check_entrance",
 	&"connected": "_check_connectivity", &"opening": "_check_door_openings",
-	&"window": "_check_windows"}
+	&"window": "_check_windows", &"daylight": "_check_daylight"}
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -511,7 +511,7 @@ func _check_door_openings(plan: HousePlan) -> void:
 
 
 ## Windows: outside walls only, clear of the corners, clear of each other and
-## of the doors, and enough of them to light the room.
+## of the doors.
 func _check_windows(plan: HousePlan) -> void:
 	for wi in range(plan.windows.size()):
 		var w: Dictionary = plan.windows[wi]
@@ -571,6 +571,9 @@ func _check_windows(plan: HousePlan) -> void:
 					and float(w["sill"]) < float(d.get("head", HouseGeometry.DOOR_H)) - 0.02:
 				failures.append("window %d is cut through a doorway" % wi)
 
+## Daylight is its own replaceable rule. A blind family can replace daylight
+## while retaining the ordinary checks that any windows it does have fit.
+func _check_daylight(plan: HousePlan) -> void:
 	for i in range(plan.room_count()):
 		var kind: StringName = plan.kind_of(i)
 		if not HouseGeometry.is_habitable(kind):
