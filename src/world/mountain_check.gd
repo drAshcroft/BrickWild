@@ -9,7 +9,7 @@ const TOWER_RATIO := 1.2
 
 var _plan: HousePlan
 var _mountain_builder: MountainBuilder
-var _walk: WalkGrid
+var _climb_grid: WalkGrid
 
 
 func check_mountain(plan: HousePlan, builder: MountainBuilder) -> Dictionary:
@@ -195,12 +195,12 @@ func _check_moat() -> void:
 func _check_climb() -> void:
 	var meta: Dictionary = _plan.world_meta
 	var bounds: Rect2 = meta["moat"].grow(1.0)
-	_walk = WalkGrid.new()
-	_walk.setup(bounds, float(meta.get("walk_cell", 0.25)))
-	_walk.add_floor(meta["causeway"], 0.0)
+	_climb_grid = WalkGrid.new()
+	_climb_grid.setup(bounds, float(meta.get("walk_cell", 0.25)))
+	_climb_grid.add_floor(meta["causeway"], 0.0)
 	for ring in meta.get("rings", []):
 		for segment in MountainGenerator.gallery_segments(ring):
-			_walk.add_floor(segment, float(ring["level"]))
+			_climb_grid.add_floor(segment, float(ring["level"]))
 	for stair in meta.get("stairs", []):
 		var rect: Rect2 = stair["rect"]
 		if rect.size.x < WALK_WIDTH_MIN:
@@ -208,15 +208,15 @@ func _check_climb() -> void:
 		var rise: float = stair.get("rise", 0.0)
 		if rise <= 0.0 or rise > WalkGrid.MAX_STEP + 0.001:
 			failures.append("climb: %s has an unwalkable %.2fm riser" % [String(stair["id"]), rise])
-		_walk.add_floor(rect, float(stair["level"]))
-	_walk.add_floor(meta["summit"], float(meta["summit_level"]))
-	_walk.build(0.35)
+		_climb_grid.add_floor(rect, float(stair["level"]))
+	_climb_grid.add_floor(meta["summit"], float(meta["summit_level"]))
+	_climb_grid.build(0.35)
 	var start: Vector2 = meta["causeway_start"]
-	if not _walk.flood_from(start, 0.75):
+	if not _climb_grid.flood_from(start, 0.75):
 		failures.append("climb: no standable start on the causeway")
-	elif not _walk.reached(meta["summit"]):
+	elif not _climb_grid.reached(meta["summit"]):
 		failures.append("climb: linked walks and stairs do not reach the summit")
-	stats["climb_walkable_area"] = snappedf(_walk.walkable_area(), 0.1)
+	stats["climb_walkable_area"] = snappedf(_climb_grid.walkable_area(), 0.1)
 
 
 func _check_pradakshina() -> void:
