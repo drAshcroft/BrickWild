@@ -267,11 +267,14 @@ static func negative_controls() -> Array[String]:
 			&"blind":
 				test_plan.windows.append({"room": 0, "storey": 0, "outer_wall": true})
 			&"inward":
-				test_plan.doors.erase(0)
+				for door in test_plan.doors:
+					if String(door.get("role", "")) == "inward_clan_door":
+						door["normal"] = -Vector2(door.get("normal", Vector2.ZERO))
+						break
 			&"equal":
 				test_plan.rooms[1]["width"] = float(test_plan.rooms[1]["width"]) * 1.2
 			&"centre":
-				test_plan.rooms.erase(int(test_plan.world_meta["hall_room"]))
+				test_plan.rooms.remove_at(int(test_plan.world_meta["hall_room"]))
 			&"stairs":
 				test_plan.world_meta["stair_count"] = 1
 			&"storeys":
