@@ -14,6 +14,8 @@ const FACADE_D := 0.12
 const DORMER_SET_DOWN := 0.62
 ## The dormer opening, and the body that stands in it.
 const DORMER_W := 1.15
+## The arched ceremonial entrance opening.
+const ENTRANCE_W := 3.8
 
 
 func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
@@ -27,6 +29,10 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_facade()
 	if with_roof:
 		_build_palace_roof()
+	# The planner lays rugs and hearth breasts for a hotel exactly as for a
+	# house (LAY-010), so the builder must emit the same structure.
+	_build_hearth_breast()
+	_build_rugs()
 	return commit()
 
 
@@ -41,7 +47,17 @@ func _build_facade() -> void:
 	for level in range(hs.storeys + 1):
 		var y := 0.25 if level == 0 else float(level) * hs.height - 0.12
 		tag("cornice")
-		box(Vector3(hs.width + 0.8, 0.22, 0.34), Vector3(0, y, z), SURF_TRIM)
+		if level == 0:
+			# The base course is a plinth moulding at ankle height: it must not
+			# run across the ceremonial doorway and trip the approach, so it
+			# stops either side of the entrance void.
+			var gap := _entrance_half_width()
+			var side_w := (hs.width + 0.8) * 0.5 - gap
+			for side in [-1.0, 1.0]:
+				box(Vector3(side_w, 0.22, 0.34),
+					Vector3(side * (gap + side_w * 0.5), y, z), SURF_TRIM)
+		else:
+			box(Vector3(hs.width + 0.8, 0.22, 0.34), Vector3(0, y, z), SURF_TRIM)
 	# Quoins and central pilasters carry the strict symmetry of the reference.
 	for x in [-hs.width * 0.5, -centre_w * 0.5, centre_w * 0.5, hs.width * 0.5]:
 		tag("pilaster")
@@ -60,6 +76,12 @@ func _build_facade() -> void:
 	_build_entrance(z, centre_w)
 	_build_balconies(z, centre_w)
 	_build_centre_crown(z, top, centre_w)
+
+
+## Half the width of the ceremonial entrance void, which the planned front
+## door (1.8 m) sits in the middle of.
+func _entrance_half_width() -> float:
+	return ENTRANCE_W * 0.5
 
 
 func _window(pos: Vector3, ground := false) -> void:
@@ -82,7 +104,7 @@ func _window(pos: Vector3, ground := false) -> void:
 
 func _build_entrance(z: float, centre_w: float) -> void:
 	tag("ceremonial_entrance")
-	var door_w := 3.8
+	var door_w := ENTRANCE_W
 	var door_h := 3.15
 	for side in [-1.0, 1.0]:
 		box(Vector3(0.52, door_h + 1.35, 0.52),
