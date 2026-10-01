@@ -75,10 +75,18 @@ const FAMILIES := {
 		"width": {"min": 20.0, "max": 57.0},
 		"length": {"min": 20.0, "max": 57.0},
 		"height": {"min": 40.0, "max": 144.0},
+	},
+	&"stupa": {
+		"label": "Stupa",
+		"kinds": [&"saints_mound"],
+		"width": {"min": 32.0, "max": 48.0},
+		"length": {"min": 32.0, "max": 48.0},
+		"height": {"min": 14.0, "max": 20.0},
 	}
 }
 
 const TowerGenerator = preload("res://src/world/world_tower_house_generator.gd")
+const StupaGenerator = preload("res://src/world/stupa_generator.gd")
 
 
 static func families() -> Array[StringName]:
@@ -160,6 +168,10 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = pagoda_made["spec"]
 		out.plan = pagoda_made["plan"]
 		return true
+	if request.style == &"stupa" and request.purpose in kinds_of(&"stupa"):
+		out.spec = StupaGenerator.generate(request.purpose, request.seed,
+			request.width, request.length, request.height)
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -187,6 +199,8 @@ static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"pagoda":
 		return PagodaBuilder.new().build(building.plan)
+	if building != null and building.spec is StupaSpec:
+		return StupaBuilder.new().build(building.spec)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null
 	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)

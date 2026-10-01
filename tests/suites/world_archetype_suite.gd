@@ -51,6 +51,11 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 30.0, "length": 30.0, "height": 65.0,
 		"must": ["floor_0", "eave_tier", "mast", "finial"],
 		"check": &"pagoda_check", "about": "Nine-Storey Pagoda"},
+	{"key": "saints_mound", "family": &"stupa", "kind": &"saints_mound",
+		"width": 40.0, "length": 40.0, "height": 17.0, "scales": [1.0],
+		"must": ["stupa_dome", "ground_circumambulatory_ring", "drum_circumambulatory_ring",
+			"stupa_harmika", "stupa_chatra_shaft", "stupa_torana_0"],
+		"check": &"stupa_check", "about": "Sanchi-derived Saint's Mound"},
 ]
 
 
@@ -59,7 +64,7 @@ static func run() -> SuiteResult:
 	for row in ARCHETYPES:
 		var key: String = row["key"]
 		var defects := 0
-		for scale in SCALES:
+		for scale in row.get("scales", SCALES):
 			var request := BuildingRequest.new()
 			request.kind = &"world"
 			request.seed = _seed_for(key, scale)
@@ -389,6 +394,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 			free_masses.append("han_kiosk")
 		elif building.plan != null and building.plan.world_family == &"pagoda":
 			free_masses.append("eave_tier")
+		elif building.spec is StupaSpec:
+			free_masses.append("stupa_")
 		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_masses)["failures"]:
 			out.append(str(f))
 	if check == &"":
@@ -453,4 +460,8 @@ static func _builder_for(building: GeneratedBuilding):
 		var thb := TimberHallBuilder.new()
 		thb.build(building.spec)
 		return thb
+	if building.spec is StupaSpec:
+		var sb := StupaBuilder.new()
+		sb.build(building.spec)
+		return sb
 	return null

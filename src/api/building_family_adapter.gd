@@ -434,6 +434,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 			var builder := TimberHallBuilder.new()
 			builder.build(building.spec)
 			return HallCheck.check(building.spec, builder)
+		if building.spec is StupaSpec:
+			var builder := StupaBuilder.new()
+			builder.build(building.spec)
+			return StupaCheck.new().check(building.spec, builder)
 		return super.quality_report(building)
 
 	func generate(request: BuildingRequest, out) -> bool:
@@ -464,6 +468,9 @@ class WorldFamily extends BuildingFamilyAdapter:
 			return building.plan.world_meta.get("hall_rect", Rect2())
 		if building.plan != null and building.plan.world_family == &"pagoda":
 			return building.plan.world_meta.get("footprint", Rect2())
+		if building.spec is StupaSpec:
+			return Rect2(Vector2(-building.spec.width * 0.5, -building.spec.length * 0.5),
+				Vector2(building.spec.width, building.spec.length))
 		return Rect2()
 
 	func door(building) -> Vector3:
@@ -489,6 +496,8 @@ class WorldFamily extends BuildingFamilyAdapter:
 		if building.plan != null and building.plan.world_family == &"pagoda":
 			var p: Vector2 = building.plan.world_meta.get("entry", Vector2.ZERO)
 			return Vector3(p.x, 1.0, p.y)
+		if building.spec is StupaSpec:
+			return Vector3(0, 0, -building.spec.torana_radius)
 		return Vector3.ZERO
 
 
