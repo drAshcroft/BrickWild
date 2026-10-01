@@ -192,7 +192,7 @@ func _shoot_vis010_acceptance() -> void:
 	var out := "vis010"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(
 		OUT_DIR + "/" + out))
-	var keys := ["notre_dame", "chartres", "hagia_sophia", "st_basil"]
+	var keys := ["notre_dame", "chartres", "hagia_sophia", "florence_duomo", "st_basil"]
 	var rendered := 0
 	for entry in _landmarks():
 		if entry["key"] not in keys:
