@@ -18,6 +18,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 90.0, "length": 60.0, "height": 12.0,
 		"must": ["qibla_wall", "mihrab", "column", "sahn_floor", "minaret"],
 		"check": &"qibla_check", "about": "Hall of a Thousand Pillars"},
+	{"key": "temple_four_winds", "family": &"cruciform_temple", "kind": &"temple_of_four_winds",
+		"width": 90.0, "length": 90.0, "height": 50.0,
+		"must": ["hall_floor", "outer_ring", "inner_ring", "image", "sikhara"],
+		"check": &"cruciform_check", "about": "four cardinal Buddhas and linked rings"},
 	{"key": "great_hall_east", "family": &"timber_hall", "kind": &"great_hall",
 		"width": 34.0, "length": 18.0, "height": 20.0,
 		"must": ["platform", "column", "dais", "image", "roof"],
@@ -382,6 +386,11 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 			out.append(str(f))
 	if check == &"":
 		return out
+	if check == &"cruciform_check" and building.plan != null:
+		var cruciform_builder := CruciformBuilder.new()
+		cruciform_builder.build(building.plan)
+		out.append_array(CruciformCheck.check(building.plan, cruciform_builder).get("failures", []))
+		return out
 	var script = load("res://qa/%s.gd" % String(check).to_snake_case())
 	if script == null:
 		out.append("check: no qa/%s.gd" % String(check).to_snake_case())
@@ -402,6 +411,10 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 ## A builder that has been through the building, so its mass log is filled.
 static func _builder_for(building: GeneratedBuilding):
 	if building.plan != null:
+		if building.plan.world_family == &"cruciform_temple":
+			var cruciform := CruciformBuilder.new()
+			cruciform.build(building.plan)
+			return cruciform
 		if building.plan.world_family == &"mosque":
 			var mb := MosqueBuilder.new()
 			mb.build(building.plan)

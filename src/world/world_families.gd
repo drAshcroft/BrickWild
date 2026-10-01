@@ -27,6 +27,13 @@ const FAMILIES := {
 		"length": {"min": 40.0, "max": 130.0},
 		"height": {"min": 8.0, "max": 30.0},
 	},
+	&"cruciform_temple": {
+		"label": "Cruciform temple",
+		"kinds": [&"temple_of_four_winds"],
+		"width": {"min": 60.0, "max": 180.0},
+		"length": {"min": 60.0, "max": 180.0},
+		"height": {"min": 32.0, "max": 50.0},
+	},
 	&"timber_hall": {
 		"label": "Timber hall",
 		"kinds": [&"great_hall", &"phoenix_pavilion"],
@@ -134,6 +141,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = hammam_made["spec"]
 		out.plan = hammam_made["plan"]
 		return true
+	if request.style == &"cruciform_temple" and request.purpose in kinds_of(&"cruciform_temple"):
+		var shrine := CruciformGenerator.generate(request.purpose, request.seed,
+			request.width, request.length, request.height)
+		out.spec = shrine["spec"]
+		out.plan = shrine["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -155,6 +168,9 @@ static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"hammam":
 		return HammamBuilder.new().build(building.plan)
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"cruciform_temple":
+		return CruciformBuilder.new().build(building.plan)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null
 	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)
