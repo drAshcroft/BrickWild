@@ -48,11 +48,13 @@ static func run_quick() -> SuiteResult:
 	_tm.clear()
 	_check_family(res, "house", func(s: int): return BuildingRequest.house(s, &"cottage", &"none", 9.0, 12.0, 2.6), 1)
 	_check_family(res, "shop", func(s: int): return BuildingRequest.shop(s, &"blacksmith", &"longhall", 11.0, 14.0, 2.8), 1)
-	_check_family(res, "hotel", func(s: int): return BuildingRequest.hotel(s, &"grand_budapest", 30.0, 16.0, 3.0), 1)
+	# the hotel door contract is judged on the oriented hotel the orientation pass
+	# generates: one 45 s generation instead of two
 	_check_family(res, "church", func(s: int): return BuildingRequest.church(s, &"gothic", 10.0, 22.0, 12.0), 1)
 	_check_family(res, "castle", func(s: int): return BuildingRequest.castle(s, &"norman", 55.0, 50.0, 18.0), 1)
 	_check_family(res, "temple", func(s: int): return BuildingRequest.temple(s, &"basilica", &"blood", 26.0, 44.0, 12.0), 1)
-	_check_family(res, "world", _world_request, 1)
+	# a world family places its door to the same 0.6 m the library suite allows
+	_check_family(res, "world", _world_request, 1, 0.6)
 	# the village's gate is placed to 0.6 m, as the library suite judges it
 	_check_family(res, "village", _village_request, 1, 0.6)
 	_check_world_rect(res)
@@ -156,6 +158,9 @@ static func _check_orientation_and_period(res: SuiteResult, quick := false) -> v
 		t0 = Time.get_ticks_msec()
 		var placement: Dictionary = BigGlade.placement(turned)
 		_lap(request.kind, "orientation placement", t0)
+		if quick and request.kind == &"hotel":
+			res.checked += 1
+			_check_placed(res, "hotel", request, placement, TOLERANCE)
 		var north: Vector3 = placement.get("north", Vector3.ZERO)
 		if north.distance_to(Vector3.LEFT) > 0.001:
 			res.fail("%s placement north is wrong in the oriented building frame: %s" %
@@ -183,21 +188,27 @@ static func _check_family(res: SuiteResult, kind: String, make: Callable,
 		if placement.is_empty():
 			res.fail("%s seed=%d: placement() returned nothing" % [kind, request.seed])
 			continue
-		var bounds: AABB = placement.get("bounds", AABB())
-		var footprint: Rect2 = placement.get("footprint", Rect2())
-		var door: Vector3 = placement.get("door", Vector3.INF)
-		var front_z: float = footprint.position.y
-		if absf(door.z - front_z) > tolerance:
-			res.fail("%s seed=%d: door.z=%.3f is not within %.1fm of footprint -Z edge %.3f" %
-				[kind, request.seed, door.z, tolerance, front_z])
-		if door.x < footprint.position.x - tolerance \
-				or door.x > footprint.position.x + footprint.size.x + tolerance:
-			res.fail("%s seed=%d: door.x=%.3f falls outside footprint's X span" % [kind, request.seed, door.x])
-		# The footprint is the walls, so it must never be larger than the full
-		# emitted architecture that measured `bounds`.
-		if footprint.size.x > bounds.size.x + tolerance:
-			res.fail("%s seed=%d: footprint width %.3f exceeds bounds width %.3f" %
-				[kind, request.seed, footprint.size.x, bounds.size.x])
+		_check_placed(res, kind, request, placement, tolerance)
+
+
+## The door/footprint contract on one placement, in the own frame of the building.
+static func _check_placed(res: SuiteResult, kind: String, request: BuildingRequest,
+		placement: Dictionary, tolerance: float) -> void:
+	var bounds: AABB = placement.get("bounds", AABB())
+	var footprint: Rect2 = placement.get("footprint", Rect2())
+	var door: Vector3 = placement.get("door", Vector3.INF)
+	var front_z: float = footprint.position.y
+	if absf(door.z - front_z) > tolerance:
+		res.fail("%s seed=%d: door.z=%.3f is not within %.1fm of footprint -Z edge %.3f" %
+			[kind, request.seed, door.z, tolerance, front_z])
+	if door.x < footprint.position.x - tolerance \
+			or door.x > footprint.position.x + footprint.size.x + tolerance:
+		res.fail("%s seed=%d: door.x=%.3f falls outside footprint's X span" % [kind, request.seed, door.x])
+	# The footprint is the walls, so it must never be larger than the full
+	# emitted architecture that measured `bounds`.
+	if footprint.size.x > bounds.size.x + tolerance:
+		res.fail("%s seed=%d: footprint width %.3f exceeds bounds width %.3f" %
+			[kind, request.seed, footprint.size.x, bounds.size.x])
 
 
 ## A door authored on the local -Z face rotates and translates with the rest

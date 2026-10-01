@@ -27,17 +27,21 @@ times rather than an idle-machine promise.
 
 | Edit | Routine selector | Wall time | Result |
 |---|---|---:|---|
-| mesh emitters, roofs, house components | `lane:geom` | 116 s | 6,975 checks, pass |
-| castle shells, openings, access | `lane:castle-change` | 209 s | 214 checks, pass; 5 classified warnings |
+| mesh emitters, roofs, house components | `lane:geom` | 129 s (1 Oct; 116 s on 30 Sep) | 6,975 checks, pass |
+| castle shells, openings, access | `lane:castle-change` | 310 s (1 Oct, loaded host; 209 s on 30 Sep) | 214 checks, pass; 5 classified warnings |
 | church shells, openings, roofs | `lane:church-change` | 20 s | pass |
 | house planning and circulation | `lane:house-plan-fast` | 206 s | 263 checks, pass; 1 warning |
-| furnishing and assembly | `lane:house-furnish-fast` | 194 s | 127 checks, pass; 2 warnings |
+| furnishing and assembly | `lane:house-furnish-fast` | 4 m (1 Oct; 194 s on 30 Sep) | 127 checks, pass; 2 warnings |
 | house exterior and assembly | `lane:house-exterior-fast` | 112 s | 1,024 checks, pass |
 | props and assembly contracts | `lane:assets-fast` | 40 s | 119 checks, pass |
 | library business and row repair | `lane:library-change` | 54 s | 31 checks, pass; 32 warnings |
 | prison programme and keyed routes | `prison` | 225 s | 7 checks, pass; 13 warnings |
 | temple geometry and rite | `lane:temple` | 52 s | 2,247 checks, pass; 7 warnings |
-| village site, lots, plan rules | `lane:village-fast` | 113 s | 10 checks, 0 failures (the VIL-017 baselines were fixed) |
+| village site, lots, plan rules | `lane:village-fast` | 2.5 m (1 Oct) | 10 checks, 0 failures (the VIL-017 baselines were fixed) |
+| church roofs + temple + tree + bridge together | `lane:church-change lane:temple lane:tree lane:bridge` | 230 s (1 Oct) | pass |
+| the dwellings the generator must furnish | `harchetype` | 2.5 m (1 Oct) | pass |
+| church and castle dressing, bounded | `dressingquick` | under 5 m | pass |
+| the public API, every kind once | `lane:api` | 283 s (1 Oct, loaded host) | 141 checks, pass; `libraryquick` 82 checks about 3.5 m, `placementquick` 31 checks about 1.2 m, `poly` 28 checks |
 
 The first furnishing candidate used the existing 24-house statistical sweep.
 It passed its assertions but took 343 seconds, so it is **not** the routine
@@ -80,6 +84,32 @@ and two repair regressions in 54 seconds. The 100-seed library matrix stays
 in scheduled regression.
 
 ## Scheduled regression and asset exception
+
+`lane:scheduled` names the gates that must run before a merge but not per
+task. They were red for three weeks because they were in no lane at all.
+Measured 1 Oct on the loaded host:
+
+| Gate | Time |
+|---|---|
+| `dressing` (exhaustive; `dressingquick` is the bounded form) | 37 m |
+| `hlandmark` | 13 m |
+| `hotel` | 23 m |
+| `court` | 8 m |
+| `wld001` | 20 m |
+| `lane:world` (with `court`) | 32 m |
+| `vlot`, `vcheck`, `vformslayout`, `interior`, `cvoxelqa` | minutes each; `cvoxelqa` the longest |
+| `library` | 10 m (601 s; 2077 s before the suite stopped regenerating each building per rule) |
+| `placement` | an hour or more; never finished in 35 m |
+
+`lane:world` is scheduled, not routine. The `library` and `placement` API
+sweeps are the first two entries a full sweep used to pay for; the full
+sweep (`lane:sweep` and the no-argument run) now starts with the bounded
+pair `libraryquick placementquick` and `poly`, and the full pair lives in
+`lane:scheduled`. Their cost is hotel generation: a hotel is ~45 s of
+furnisher search at any size, and `library` made seven of them (now four), `placement`
+twenty-one. `libraryquick` and `placementquick` cover every kind
+`BigGlade.describe_kind` publishes (church, castle, house, shop, hotel,
+temple, world, village) once at one size and seed.
 
 Keep `lane:castle`, `castle cmassing clandmark cvoxelqa`, `house`, `court`,
 `houseqa`, `houseqafull`, `lane:dress`, full village form/enclosure matrices,

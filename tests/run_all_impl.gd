@@ -12,7 +12,7 @@ extends RefCounted
 ##   1 libraryquick   - the public request/generate/build contract, every kind once
 ##   1a placementquick- placement()'s door contract and Placement.world_rect, every kind once
 ##                      (the full `library` and `placement` sweeps are in EXTRA and
-##                      lane:scheduled: ~35 min and an hour, mostly hotel generation)
+##                      lane:scheduled: ~10 min and an hour or more, mostly hotel generation)
 ##   1b poly      - polygon geometry helpers and WalkGrid rasterisation
 ##   1c props     - the small props no art pack ships (well, palisade, ...)
 ##   2 church     - the spec/build contract itself

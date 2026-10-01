@@ -71,15 +71,10 @@ static func _run(quick: bool) -> SuiteResult:
 	]
 	if quick:
 		# the smallest hotel the library accepts: still the whole programme
-		requests[1] = BuildingRequest.castle(202, &"norman", 30.0, 28.0, 12.0)
+		# the smallest castle that is still an enclosed castle: below ~46 m the
+		# generator makes an open manor whose door is recessed (see placement)
+		requests[1] = BuildingRequest.castle(202, &"norman", 48.0, 42.0, 18.0)
 		requests[4] = BuildingRequest.hotel(373, &"grand_budapest", 30.0, 16.0, 3.0)
-		var insula := BigGlade.default_request(&"world", 828)
-		insula.style = &"insula"
-		insula.purpose = &"port_tenement"
-		insula.width = 30.0
-		insula.length = 24.0
-		insula.height = 15.0
-		requests.append(insula)
 	_tm.clear()
 	for request in requests:
 		_check_family(res, request)
@@ -113,6 +108,8 @@ static func _run(quick: bool) -> SuiteResult:
 	_check_contract(res, requests)
 	_check_documents(res, requests)
 	_check_village_kind(res)
+	_check_world_kind(res)
+	_check_every_kind_covered(res, requests)
 	_check_world_generic_envelope(res)
 
 	var descriptor: Dictionary = BigGlade.describe_kind(&"house")
@@ -156,6 +153,67 @@ static func _run(quick: bool) -> SuiteResult:
 			res.fail("two-storey plan lacks complete upper-floor circulation")
 	_notes(res)
 	return res
+
+
+## The world families share one kind with no pre-facade pipeline and no house
+## plan. The quick selector gives it the facade rules that apply: it
+## generates, builds four surfaces, places its door on the -Z edge, round-trips
+## a document and assembles. The envelope rules follow in
+## _check_world_generic_envelope; the full suite leaves the families to `world`.
+## The quick selector's promise is "every kind once". Keep it true: a kind
+## added to BuildingLibrary.KINDS that this suite does not touch fails here.
+static func _check_every_kind_covered(res: SuiteResult, requests: Array[BuildingRequest]) -> void:
+	if not _quick:
+		return
+	var covered := {&"village": true, &"world": true}  # _check_village_kind, _check_world_kind
+	for request in requests:
+		covered[request.kind] = true
+	for kind in BigGlade.kinds():
+		res.checked += 1
+		if not covered.has(kind):
+			res.fail("libraryquick does not exercise the published kind '%s'" % String(kind))
+
+
+static func _check_world_kind(res: SuiteResult) -> void:
+	if not _quick:
+		return
+	var request := BigGlade.default_request(&"world", 828)
+	request.style = &"insula"
+	request.purpose = &"port_tenement"
+	request.width = 30.0
+	request.length = 24.0
+	request.height = 15.0
+	var t0 := Time.get_ticks_msec()
+	var made: GeneratedBuilding = BigGlade.generate(request)
+	_lap("world", "generate", t0)
+	res.checked += 1
+	if not made.is_ok():
+		res.fail("world: insula did not generate: %s" % made.errors)
+		return
+	t0 = Time.get_ticks_msec()
+	var mesh: ArrayMesh = BigGlade.build_mesh(made)
+	_lap("world", "build", t0)
+	res.checked += 1
+	if mesh == null or mesh.get_surface_count() != 4:
+		res.fail("world: the mesh does not have four surfaces")
+	var placement: Dictionary = BigGlade.placement(made)
+	var fp: Rect2 = placement.get("footprint", Rect2())
+	var door: Vector3 = placement.get("door", Vector3.ZERO)
+	res.checked += 1
+	if placement.get("kind") != &"world" or placement.get("front") != Vector3(0.0, 0.0, -1.0) 			or absf(door.z - fp.position.y) > 0.6:
+		res.fail("world: placement identity, front or door is wrong: %s" % placement)
+	var doc: BuildingDocument = BigGlade.generate_document(request)
+	res.checked += 1
+	if doc == null or not doc.is_ok() or doc.placement != placement 			or not (JSON.parse_string(JSON.stringify(doc.to_dict())) is Dictionary):
+		res.fail("world: the document differs from the generation or is not plain data")
+	t0 = Time.get_ticks_msec()
+	var scene: Node3D = BigGlade.instantiate(made, true)
+	_lap("world", "instantiate", t0)
+	res.checked += 1
+	if scene == null:
+		res.fail("world: the family assembled to nothing")
+	else:
+		scene.free()
 
 
 static func _check_world_generic_envelope(res: SuiteResult) -> void:
