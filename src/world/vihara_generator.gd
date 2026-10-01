@@ -161,9 +161,9 @@ static func _add_row_cells(plan: HousePlan, court: Rect2, veranda: int,
 			_add_cell(plan, veranda, Rect2(Vector2(right_x, court.end.y + VERANDAH),
 				Vector2.ONE * CELL_SIDE), Vector2(0, -1), "cell_rear")
 		else:
-			front_y := court.position.y - VERANDAH - CELL_SIDE
-			left_end := center_x - PASSAGE_WIDTH * 0.5
-			right_start := center_x + PASSAGE_WIDTH * 0.5
+			var front_y: float = court.position.y - VERANDAH - CELL_SIDE
+			var left_end: float = center_x - PASSAGE_WIDTH * 0.5
+			var right_start: float = center_x + PASSAGE_WIDTH * 0.5
 			if left_x + CELL_SIDE <= left_end + 0.001:
 				_add_cell(plan, veranda, Rect2(Vector2(left_x, front_y),
 					Vector2.ONE * CELL_SIDE), Vector2(0, 1), "cell_front")

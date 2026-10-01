@@ -139,7 +139,7 @@ func _verandah_connected(plan: HousePlan, rooms: Dictionary) -> bool:
 	var visited := {start: true}
 	var graph := plan.door_graph()
 	while not queue.is_empty():
-		var current := queue.pop_front()
+		var current: int = queue.pop_front()
 		for raw_next in graph.get(current, []):
 			var next := int(raw_next)
 			if not rooms.values().has(next) or visited.has(next):
