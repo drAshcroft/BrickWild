@@ -27,7 +27,7 @@
 		"render_path": "assembled",
 		"seed": 5001,
 		"title": "Notre-Dame de Paris",
-		"variant": "Black DenysMinster"
+		"variant": "Black Denys Minster"
 	},
 	{
 		"built": "twin west towers, 6 flying buttresses/side, 2 tiers, 2 aisle rings, ambulatory, 5 chapels (chevet)",
@@ -57,7 +57,7 @@
 		"render_path": "assembled",
 		"seed": 5002,
 		"title": "Cologne Cathedral",
-		"variant": "Abbey AldhelmMinster"
+		"variant": "Abbey Aldhelm Minster"
 	},
 	{
 		"built": "west tower, 5 flying buttresses/side, 2 aisle rings, transept, crossing tower, ambulatory, 7 chapels (chevet)",
@@ -160,7 +160,7 @@
 		"dims": "31.0 x 76 x 40.0 m",
 		"famous_for": "great dome on pendentives, braced by half-domes",
 		"file": "hagia_sophia.jpg",
-		"height": "58.1 m to the top",
+		"height": "59.9 m to the top",
 		"key": "hagia_sophia",
 		"kind": "landmark",
 		"light": {
@@ -396,7 +396,7 @@
 		"title": "Crossing tower"
 	},
 	{
-		"built": "corner towers, 1 mural towers/side, twin-towered gatehouse, shell keep, great hall",
+		"built": "corner towers, 1 mural towers/side, twin-towered gatehouse, great hall",
 		"camera": {
 			"fov_degrees": 48.0,
 			"pitch_degrees": -14.8969026734014,
@@ -545,7 +545,7 @@
 		"variant": "Oldfell Keep"
 	},
 	{
-		"built": "corner towers, 1 mural towers/side, twin-towered gatehouse, tiered keep, great hall",
+		"built": "corner towers, 1 mural towers/side, twin-towered gatehouse, inner ward + causeway, tiered keep, great hall",
 		"camera": {
 			"fov_degrees": 48.0,
 			"pitch_degrees": -13.7509870831398,
@@ -555,7 +555,7 @@
 		"dims": "60 x 50 x 15 m site",
 		"famous_for": "tiered tenshu on a battered stone base",
 		"file": "castle_himeji.jpg",
-		"height": "30.7 m to the top",
+		"height": "37.7 m to the top",
 		"key": "castle_himeji",
 		"kind": "castle",
 		"light": {
@@ -691,7 +691,7 @@
 		"variant": "Millstonegate Cottage"
 	},
 	{
-		"built": "parlour, hall, workshop, store, kitchen, bedroom; 6 doors, 10 windows, 39 pieces of furniture",
+		"built": "parlour, hall, workshop, store, kitchen, bedroom; 6 doors, 10 windows, 47 pieces of furniture",
 		"dims": "11.0 x 13.0 m",
 		"famous_for": "a forge in the workshop: anvil, bench, weapon stand",
 		"file": "house_smithy.jpg",
@@ -702,7 +702,7 @@
 		"variant": "Nettlerow"
 	},
 	{
-		"built": "workshop, hall, parlour, store, bedroom, kitchen; 7 doors, 7 windows, 49 pieces of furniture",
+		"built": "workshop, hall, parlour, store, bedroom, kitchen; 7 doors, 7 windows, 50 pieces of furniture",
 		"dims": "9.5 x 12.0 m",
 		"famous_for": "bookcase, cauldron and a bench of bottles",
 		"file": "house_alchemist.jpg",
