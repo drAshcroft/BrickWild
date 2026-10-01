@@ -27,6 +27,10 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 godot --headless --path . --script res://tests/run_all.gd -- lane:castle-change
 godot --headless --path . --script res://tests/run_all.gd -- lane:plan
 godot --headless --path . --script res://tests/run_all.gd -- lane:church-change
+# the public API, every kind once (libraryquick placementquick poly)
+godot --headless --path . --script res://tests/run_all.gd -- lane:api
+# the slow gates that must pass before a merge, not per task (hours; background it)
+godot --headless --path . --script res://tests/run_all.gd -- lane:scheduled
 # bounded house QA lane for ordinary task completion (target: <5 minutes)
 godot --headless --path . --script res://tests/run_all.gd -- houseqa
 # narrower house QA lanes: shell/core, planning/circulation, furnishing/rules
@@ -74,19 +78,40 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 
 | You touched | Lane | Time |
 |---|---|---|
-| `core/mesh_kit.gd`, `core/mass_builder.gd`, any `*_builder.gd` emitter, roof maths | `lane:geom` | 116 s host |
+| `core/mesh_kit.gd`, `core/mass_builder.gd`, any `*_builder.gd` emitter, roof maths | `lane:geom` | 129 s host (1 Oct) |
 | the planner, room programme, doors, circulation | `lane:house-plan-fast` | 206 s host |
-| the furnisher, prop recipes, assembly | `lane:house-furnish-fast` | 194 s host |
+| the furnisher, prop recipes, assembly | `lane:house-furnish-fast` | 4 m host |
 | house exterior dressing | `lane:house-exterior-fast` | 112 s host |
 | prop code or assembly | `lane:assets-fast` | 40 s host |
 | anything under `assets/props/` or `catalog.json` | rebuild catalogue, then `lane:assets` | required exception: over 5 m |
-| castle geometry and openings | `lane:castle-change` | 209 s host |
-| temple geometry | `lane:temple` | 52 s host |
-| village site, lots, plan rules | `lane:village-fast` | 113 s host |
+| castle geometry and openings | `lane:castle-change` | 310 s host (1 Oct; over the 5 m gate under load) |
+| temple geometry | `lane:temple` | 52 s host; with `lane:church-change`, tree and bridge, 230 s together |
+| village site, lots, plan rules | `lane:village-fast` | 2.5 m host, green, 10 checks |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | church shell, opening or roof geometry | `lane:church-change` | 20 s host |
+| the public API: `BigGlade.generate/build_mesh/placement/instantiate`, `BuildingLibrary`, `Placement`, `BuildingRequest` | `lane:api` | ~4.7 m host (`libraryquick` ~3.5 m, `placementquick` ~1.2 m, `poly`); every published kind once |
+| church or castle dressing, props placed in them | `dressingquick` | under 5 m host |
+| the dwellings the generator must furnish | `harchetype` | 2.5 m host |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
+
+Scheduled, not per task. These are the gates that were red for three weeks
+because no lane ran them. Run them before a merge, in the background, one
+Godot at a time, with the log redirected to a file:
+
+| Gate | Lane or suite | Time |
+|---|---|---|
+| everything below in one command | `lane:scheduled` | well over an hour |
+| church and castle dressing, exhaustive | `dressing` | 37 m |
+| hotel facade, programme and circulation | `hlandmark` | 13 m |
+| the palatial hotel contract | `hotel` | 23 m |
+| buildings round a yard | `court` | 8 m |
+| the wider world, courtyard houses | `wld001` | 20 m |
+| the whole world family | `lane:world` | 32 m with `court` |
+| village lot planner and checks | `vlot`, `vcheck`, `vformslayout` | minutes each |
+| castle interiors | `interior` | minutes |
+| exhaustive castle voxel QA | `cvoxelqa` | scheduled; long |
+| the full public API sweeps | `library`, `placement` | `library` ~10 m (was 35 m), `placement` an hour or more: the cost is hotel generation (~45 s each at any size; `library` now makes 4, `placement` 21); `libraryquick` and `placementquick` keep one of each kind |
 
 For a dome emitter change, also run `godot --headless --path . --script
 res://tests/vis008_dome_fixture.gd`. The bounded church lane checks dome

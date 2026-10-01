@@ -1,12 +1,66 @@
 class_name LibrarySuite
 extends RefCounted
+
+## Wall time per "family step", in ms. Always summarised in the suite notes
+## (one line per family); the raw per-step lines are printed when the
+## BIG_GLADE_TEST_TRACE environment variable is set.
+static var _tm: Dictionary = {}
+
+## The bounded selector (`libraryquick`) runs every rule once on the smallest
+## sensible size of every family. The full suite keeps the production sizes
+## and the extra independent generation for the determinism rules.
+static var _quick := false
+
+## What the first pass learned about each request, keyed "kind:seed", so the
+## contract and document passes judge the SAME generation instead of paying
+## for a fresh one per rule. A hotel generation is ~45 s of furnisher search;
+## the suite used to make seven of them. Keys: made, mesh, pa (placement),
+## again, again_mesh, pb (the second independent generation, full run only).
+static var _cache: Dictionary = {}
+
+
+static func _lap(family: Variant, step: String, started: int) -> void:
+	var key := "%s %s" % [String(family), step]
+	_tm[key] = int(_tm.get(key, 0)) + Time.get_ticks_msec() - started
+	if OS.get_environment("BIG_GLADE_TEST_TRACE") != "":
+		print("[library] %s +%d ms" % [key, Time.get_ticks_msec() - started])
+
+
+static func _notes(res: SuiteResult) -> void:
+	var by_family := {}
+	for key in _tm:
+		var parts: PackedStringArray = String(key).split(" ", true, 1)
+		var row: Array = by_family.get(parts[0], [])
+		row.append("%s %.1fs" % [parts[1], float(_tm[key]) / 1000.0])
+		by_family[parts[0]] = row
+	for family in by_family:
+		var total := 0
+		for key in _tm:
+			if String(key).begins_with(String(family) + " "):
+				total += int(_tm[key])
+		res.note("time %s %.1fs: %s" % [family, total / 1000.0, ", ".join(by_family[family])])
 ## Public API contract: the facade preserves every existing family pipeline,
 ## rejects invalid requests cleanly, and keeps generation separate from mesh
 ## emission.
 
 
 static func run() -> SuiteResult:
-	var res := SuiteResult.new("library")
+	return _run(false)
+
+
+## `libraryquick`: every kind the library publishes, every contract rule, once.
+static func run_quick() -> SuiteResult:
+	return _run(true)
+
+
+static func _key(request: BuildingRequest) -> String:
+	return "%s:%d" % [String(request.kind), request.seed]
+
+
+static func _run(quick: bool) -> SuiteResult:
+	var res := SuiteResult.new("libraryquick" if quick else "library")
+	_quick = quick
+	_cache.clear()
 	var requests: Array[BuildingRequest] = [
 		BuildingRequest.church(101, &"gothic", 10.0, 22.0, 12.0),
 		BuildingRequest.castle(202, &"norman", 55.0, 50.0, 18.0),
@@ -15,6 +69,13 @@ static func run() -> SuiteResult:
 		BuildingRequest.hotel(373, &"grand_budapest", 48.0, 24.0, 3.6),
 		BuildingRequest.temple(404, &"basilica", &"blood", 26.0, 44.0, 12.0),
 	]
+	if quick:
+		# the smallest hotel the library accepts: still the whole programme
+		# the smallest castle that is still an enclosed castle: below ~46 m the
+		# generator makes an open manor whose door is recessed (see placement)
+		requests[1] = BuildingRequest.castle(202, &"norman", 48.0, 42.0, 18.0)
+		requests[4] = BuildingRequest.hotel(373, &"grand_budapest", 30.0, 16.0, 3.0)
+	_tm.clear()
 	for request in requests:
 		_check_family(res, request)
 
@@ -47,6 +108,8 @@ static func run() -> SuiteResult:
 	_check_contract(res, requests)
 	_check_documents(res, requests)
 	_check_village_kind(res)
+	_check_world_kind(res)
+	_check_every_kind_covered(res, requests)
 	_check_world_generic_envelope(res)
 
 	var descriptor: Dictionary = BigGlade.describe_kind(&"house")
@@ -88,7 +151,69 @@ static func run() -> SuiteResult:
 		if floors.size() != 2 or plan.stairs.size() != 1 or exterior_upper \
 				or plan.reachable_rooms(plan.entrance_room()).size() != plan.room_count():
 			res.fail("two-storey plan lacks complete upper-floor circulation")
+	_notes(res)
 	return res
+
+
+## The world families share one kind with no pre-facade pipeline and no house
+## plan. The quick selector gives it the facade rules that apply: it
+## generates, builds four surfaces, places its door on the -Z edge, round-trips
+## a document and assembles. The envelope rules follow in
+## _check_world_generic_envelope; the full suite leaves the families to `world`.
+## The quick selector's promise is "every kind once". Keep it true: a kind
+## added to BuildingLibrary.KINDS that this suite does not touch fails here.
+static func _check_every_kind_covered(res: SuiteResult, requests: Array[BuildingRequest]) -> void:
+	if not _quick:
+		return
+	var covered := {&"village": true, &"world": true}  # _check_village_kind, _check_world_kind
+	for request in requests:
+		covered[request.kind] = true
+	for kind in BigGlade.kinds():
+		res.checked += 1
+		if not covered.has(kind):
+			res.fail("libraryquick does not exercise the published kind '%s'" % String(kind))
+
+
+static func _check_world_kind(res: SuiteResult) -> void:
+	if not _quick:
+		return
+	var request := BigGlade.default_request(&"world", 828)
+	request.style = &"insula"
+	request.purpose = &"port_tenement"
+	request.width = 30.0
+	request.length = 24.0
+	request.height = 15.0
+	var t0 := Time.get_ticks_msec()
+	var made: GeneratedBuilding = BigGlade.generate(request)
+	_lap("world", "generate", t0)
+	res.checked += 1
+	if not made.is_ok():
+		res.fail("world: insula did not generate: %s" % made.errors)
+		return
+	t0 = Time.get_ticks_msec()
+	var mesh: ArrayMesh = BigGlade.build_mesh(made)
+	_lap("world", "build", t0)
+	res.checked += 1
+	if mesh == null or mesh.get_surface_count() != 4:
+		res.fail("world: the mesh does not have four surfaces")
+	var placement: Dictionary = BigGlade.placement(made)
+	var fp: Rect2 = placement.get("footprint", Rect2())
+	var door: Vector3 = placement.get("door", Vector3.ZERO)
+	res.checked += 1
+	if placement.get("kind") != &"world" or placement.get("front") != Vector3(0.0, 0.0, -1.0) 			or absf(door.z - fp.position.y) > 0.6:
+		res.fail("world: placement identity, front or door is wrong: %s" % placement)
+	var doc: BuildingDocument = BigGlade.generate_document(request)
+	res.checked += 1
+	if doc == null or not doc.is_ok() or doc.placement != placement 			or not (JSON.parse_string(JSON.stringify(doc.to_dict())) is Dictionary):
+		res.fail("world: the document differs from the generation or is not plain data")
+	t0 = Time.get_ticks_msec()
+	var scene: Node3D = BigGlade.instantiate(made, true)
+	_lap("world", "instantiate", t0)
+	res.checked += 1
+	if scene == null:
+		res.fail("world: the family assembled to nothing")
+	else:
+		scene.free()
 
 
 static func _check_world_generic_envelope(res: SuiteResult) -> void:
@@ -161,8 +286,10 @@ static func _check_village_kind(res: SuiteResult) -> void:
 	var request: BuildingRequest = BigGlade.default_request(&"village", 9101)
 	request.style = &"english"
 	request.purpose = &"farming"
-	request.width = 40.0
+	request.width = 12.0 if _quick else 40.0
+	var t0 := Time.get_ticks_msec()
 	var made: GeneratedBuilding = BigGlade.generate(request)
+	_lap("village", "generate", t0)
 	res.checked += 1
 	if not made.is_ok() or made.village == null or made.village.buildings.is_empty():
 		res.fail("village: the kind did not generate a village: %s" % made.errors)
@@ -170,7 +297,9 @@ static func _check_village_kind(res: SuiteResult) -> void:
 	res.checked += 1
 	if made.representation() != made.village:
 		res.fail("village: the generated representation is not its plan")
+	t0 = Time.get_ticks_msec()
 	var mesh: ArrayMesh = BigGlade.build_mesh(made)
+	_lap("village", "build", t0)
 	res.checked += 1
 	if mesh == null or mesh.get_surface_count() == 0:
 		res.fail("village: the kind emitted no mesh")
@@ -184,7 +313,9 @@ static func _check_village_kind(res: SuiteResult) -> void:
 	if absf(door.z - fp.position.y) > 0.6:
 		res.fail("village: its gate is %.2fm off the -Z edge of its own site"
 			% (door.z - fp.position.y))
+	t0 = Time.get_ticks_msec()
 	var scene: Node3D = BigGlade.instantiate(made)
+	_lap("village", "instantiate", t0)
 	res.checked += 1
 	if scene == null or scene.get_node_or_null("Buildings") == null:
 		res.fail("village: the kind assembled to nothing")
@@ -199,8 +330,14 @@ static func _check_village_kind(res: SuiteResult) -> void:
 static func _check_documents(res: SuiteResult, requests: Array[BuildingRequest]) -> void:
 	for request in requests:
 		var where := "kind=%s seed=%d" % [String(request.kind), request.seed]
+		var t0 := Time.get_ticks_msec()
 		var doc: BuildingDocument = BigGlade.generate_document(request)
-		var made: GeneratedBuilding = BigGlade.generate(request)
+		_lap(request.kind, "documents", t0)
+		# the first pass's generation, judged again here rather than rebuilt
+		var entry: Dictionary = _cache.get(_key(request), {})
+		var made: GeneratedBuilding = entry.get("made")
+		if made == null:
+			made = BigGlade.generate(request)
 		res.checked += 1
 		if doc == null or not doc.is_ok():
 			res.fail("document: %s did not generate: %s" % [where, doc.errors if doc else "null"])
@@ -221,11 +358,22 @@ static func _check_documents(res: SuiteResult, requests: Array[BuildingRequest])
 				% [String(request.kind), where])
 
 		res.checked += 1
-		if not _same_mesh(BigGlade.build_mesh(doc), BigGlade.build_mesh(made)):
+		var made_mesh: ArrayMesh = entry.get("mesh")
+		if made_mesh == null:
+			made_mesh = BigGlade.build_mesh(made)
+		var made_placement: Dictionary = entry.get("pa", {})
+		if made_placement.is_empty():
+			made_placement = BigGlade.placement(made)
+		if not _same_mesh(BigGlade.build_mesh(doc), made_mesh):
 			res.fail("document: builds a different mesh from its own generation, " + where)
 		res.checked += 1
-		if doc.placement != BigGlade.placement(made):
+		if doc.placement != made_placement:
 			res.fail("document: placement differs from the generation's, " + where)
+		# two independent generations of one request furnish identically
+		if want_plan and doc.plan != null and made.plan != null:
+			res.checked += 1
+			if doc.plan.furniture != made.plan.furniture:
+				res.fail("document: furnishing differs from the generation's, " + where)
 
 		# plain enough to leave the process: JSON must take it whole, and what
 		# comes back must still name the same building
@@ -261,7 +409,9 @@ static func _check_documents(res: SuiteResult, requests: Array[BuildingRequest])
 
 static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	var before := _request_fingerprint(request)
+	var t0 := Time.get_ticks_msec()
 	var made: GeneratedBuilding = BigGlade.generate(request)
+	_lap(request.kind, "generate", t0)
 	res.checked += 1
 	var where := "kind=%s seed=%d" % [String(request.kind), request.seed]
 	if not made.is_ok():
@@ -282,10 +432,16 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	elif made.plan != null:
 		res.fail("non-house result unexpectedly has a house plan, " + where)
 
+	t0 = Time.get_ticks_msec()
 	var mesh: ArrayMesh = BigGlade.build_mesh(made)
+	_lap(request.kind, "build", t0)
+	t0 = Time.get_ticks_msec()
 	var legacy: Array = _legacy(request)
+	_lap(request.kind, "legacy", t0)
 	if mesh == null or mesh.get_surface_count() != 4:
 		res.fail("facade emitted a bad mesh, " + where)
+	elif legacy.is_empty():
+		pass  # the world families have no pre-facade pipeline to compare with
 	elif not _same_mesh(mesh, legacy[2]):
 		res.fail("facade mesh differs from legacy pipeline, " + where)
 	if request.kind in [&"house", &"shop", &"hotel"]:
@@ -296,12 +452,23 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 				or made.plan.compromises != old_plan.compromises:
 			res.fail("facade house plan differs from legacy pipeline, " + where)
 
-	var again: GeneratedBuilding = BigGlade.generate(request)
-	var again_mesh: ArrayMesh = BigGlade.build_mesh(again)
-	if made.name() != again.name() or not _same_mesh(mesh, again_mesh):
-		res.fail("facade is not deterministic, " + where)
-	if request.kind in [&"house", &"shop", &"hotel"] and made.plan.furniture != again.plan.furniture:
-		res.fail("facade furnishing is not deterministic, " + where)
+	# A second independent generation of the same request. The full suite makes
+	# it here; the quick selector leaves the determinism rules to the document
+	# pass, whose generate_document() is a second independent generation.
+	var entry := {"made": made, "mesh": mesh}
+	if not _quick:
+		t0 = Time.get_ticks_msec()
+		var again: GeneratedBuilding = BigGlade.generate(request)
+		_lap(request.kind, "generate", t0)
+		t0 = Time.get_ticks_msec()
+		var again_mesh: ArrayMesh = BigGlade.build_mesh(again)
+		_lap(request.kind, "build", t0)
+		if made.name() != again.name() or not _same_mesh(mesh, again_mesh):
+			res.fail("facade is not deterministic, " + where)
+		if request.kind in [&"house", &"shop", &"hotel"] and made.plan.furniture != again.plan.furniture:
+			res.fail("facade furnishing is not deterministic, " + where)
+		entry["again"] = again
+		entry["again_mesh"] = again_mesh
 
 	# Dispatch follows the retained representation, not the mutable request
 	# snapshot a caller receives for diagnostics.
@@ -311,6 +478,8 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 		res.fail("mutating the request snapshot broke mesh dispatch, " + where)
 	made.request.kind = generated_kind
 	var placement: Dictionary = BigGlade.placement(made)
+	entry["pa"] = placement
+	_cache[_key(request)] = entry
 	var bounds: AABB = placement.get("bounds", AABB())
 	if placement.get("kind") != request.kind or placement.get("seed") != request.seed \
 			or placement.get("front") != Vector3(0.0, 0.0, -1.0):
@@ -318,8 +487,10 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	if bounds.size.x <= 0.0 or bounds.size.y <= 0.0 or bounds.size.z <= 0.0:
 		res.fail("placement bounds are empty, " + where)
 
+	t0 = Time.get_ticks_msec()
 	var scene_a: Node3D = BigGlade.instantiate(made, true, true)
 	var scene_b: Node3D = BigGlade.instantiate(made, true)
+	_lap(request.kind, "instantiate", t0)
 	if scene_a == null or scene_b == null or scene_a == scene_b:
 		res.fail("facade did not create fresh scene instances, " + where)
 	elif request.kind in [&"house", &"shop", &"hotel"] and scene_a.get_node_or_null("Furniture") == null:
@@ -443,14 +614,25 @@ static func _check_contract(res: SuiteResult, requests: Array[BuildingRequest]) 
 	no_family.height = 5.0
 	_check_invalid(res, no_family, &"unknown_family")
 	for request in requests:
-		var a: GeneratedBuilding = BigGlade.generate(request)
-		var b: GeneratedBuilding = BigGlade.generate(request)
+		# The first pass's two independent generations; the quick selector has
+		# one, and the document pass proves the second (same mesh, same placement).
+		var t0 := Time.get_ticks_msec()
+		var entry: Dictionary = _cache.get(_key(request), {})
+		var a: GeneratedBuilding = entry.get("made")
+		var b: GeneratedBuilding = entry.get("again")
+		if a == null:
+			a = BigGlade.generate(request)
+		if b == null and not _quick:
+			b = BigGlade.generate(request)
+		_lap(request.kind, "contract", t0)
 		res.checked += 1
-		if a == null or b == null or not a.is_ok() or not b.is_ok():
+		if a == null or (b == null and not _quick) or not a.is_ok() or (b != null and not b.is_ok()):
 			res.fail("contract: %s did not generate" % String(request.kind))
 			continue
-		var pa: Dictionary = BigGlade.placement(a)
-		var pb: Dictionary = BigGlade.placement(b)
+		var pa: Dictionary = entry.get("pa", {})
+		if pa.is_empty():
+			pa = BigGlade.placement(a)
+		var pb: Dictionary = BigGlade.placement(b) if b != null else pa
 		for key in ["api_version", "kind", "seed", "name", "bounds", "footprint", "front", "door"]:
 			if not pa.has(key):
 				res.fail("contract: placement(%s) has no %s" % [String(request.kind), key])
@@ -462,8 +644,13 @@ static func _check_contract(res: SuiteResult, requests: Array[BuildingRequest]) 
 		var door: Vector3 = pa.get("door", Vector3.ZERO)
 		if absf(door.z - fp.position.y) > 0.6:
 			res.fail("contract: %s's door is %.2fm off the footprint's -Z edge" % [String(request.kind), door.z - fp.position.y])
-		var mesh: ArrayMesh = BigGlade.build_mesh(a)
+		var mesh: ArrayMesh = entry.get("mesh")
+		if mesh == null:
+			mesh = BigGlade.build_mesh(a)
+		var mesh_b: ArrayMesh = entry.get("again_mesh")
+		if mesh_b == null and b != null:
+			mesh_b = BigGlade.build_mesh(b)
 		if mesh == null or mesh.get_surface_count() != 4:
 			res.fail("contract: %s's mesh does not have four surfaces" % String(request.kind))
-		elif not _same_mesh(mesh, BigGlade.build_mesh(b)):
+		elif mesh_b != null and not _same_mesh(mesh, mesh_b):
 			res.fail("contract: %s seed %d built two different meshes" % [String(request.kind), request.seed])

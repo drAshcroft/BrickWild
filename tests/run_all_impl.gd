@@ -9,8 +9,10 @@ extends RefCounted
 ## Exits nonzero if any suite fails.
 
 ## Order is deliberate: each suite assumes the ones above it hold.
-##   1 library    - the public request/generate/build contract
-##   1a placement - placement()'s door contract and Placement.world_rect
+##   1 libraryquick   - the public request/generate/build contract, every kind once
+##   1a placementquick- placement()'s door contract and Placement.world_rect, every kind once
+##                      (the full `library` and `placement` sweeps are in EXTRA and
+##                      lane:scheduled: ~10 min and an hour or more, mostly hotel generation)
 ##   1b poly      - polygon geometry helpers and WalkGrid rasterisation
 ##   1c props     - the small props no art pack ships (well, palisade, ...)
 ##   2 church     - the spec/build contract itself
@@ -47,7 +49,7 @@ extends RefCounted
 ##                  archetype rows; `warchetype` is the same suite
 ##  30 tree      - the generated tree family: four styles, 24 species, ten rules
 ##  31 bridge    - the bridge family: four kinds, four mechanisms, ten rules
-const ORDER: Array[String] = ["library", "placement", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
+const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "cwater", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
@@ -57,7 +59,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 	"tree", "bridge"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
+const EXTRA: Array[String] = ["library", "placement", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
@@ -97,6 +99,11 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 ##   lane:church-change  ~10s body  bounded roofs, domed styles, openings, massing
 ##   lane:church         exhaustive church sweeps; schedule separately
 ##   lane:temple  ~3m    temple geometry and the rite rules
+##   lane:api     ~4m    BigGlade facade, library, placement(): quick pair + poly
+##   lane:scheduled      the slow gates that must pass before a merge, not per
+##                       task: dressing, hlandmark, hotel, court, wld001, vlot,
+##                       vcheck, vformslayout, interior, cvoxelqa, library,
+##                       placement. Hours; background it, one suite at a time
 ##   lane:sweep   ~40m   everything above; background it, do not wait on it
 ##   lane:tree    ~1m    anything in src/tree/, qa/tree_check.gd, tree_shapes
 ##   lane:bridge  ~1m    anything in src/bridge/, qa/bridge_check.gd
@@ -124,6 +131,8 @@ const LANES: Dictionary = {
 	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "matkit"],
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
+	"lane:api": ["libraryquick", "placementquick", "poly"],
+	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "interior", "cvoxelqa", "library", "placement"],
 	"lane:sweep": ORDER,
 }
 
@@ -183,6 +192,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return LibrarySuite.run()
 		"placement":
 			return PlacementSuite.run()
+		"libraryquick":
+			return LibrarySuite.run_quick()
+		"placementquick":
+			return PlacementSuite.run_quick()
 		"int021":
 			return PlacementSuite.run_orientation()
 		"poly":
