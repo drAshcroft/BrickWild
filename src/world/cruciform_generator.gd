@@ -60,9 +60,12 @@ static func generate(_kind: StringName, seed: int, width: float, length: float,
 	for dir2 in directions:
 		var center := Vector2(dir2.x * (outer_ring_half + inner_ring_half) * 0.5,
 			dir2.y * (outer_ring_half + inner_ring_half) * 0.5)
-		var size := Vector2(ring_width, outer_ring_half - inner_ring_half)
+		# Overlap each corridor strip by half its width at both ends. A link that
+		# merely meets the rings on a floating-point boundary is not walkable area.
+		var link_length := outer_ring_half - inner_ring_half + ring_width
+		var size := Vector2(ring_width, link_length)
 		if absf(dir2.x) > 0.5:
-			size = Vector2(outer_ring_half - inner_ring_half, ring_width)
+			size = Vector2(link_length, ring_width)
 		links.append(Rect2(center - size * 0.5, size))
 	plan.world_meta = {"outer_ring": outer, "inner_ring": inner,
 		"ring_links": links, "entrances": entrances, "images": images,
