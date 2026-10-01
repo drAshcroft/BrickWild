@@ -15,19 +15,21 @@ static func plan(spec: ShopSpec) -> HousePlan:
 		# The domestic name pass intentionally de-duplicates repeated programme
 		# kinds. A prison has many identical cells and corridors, so restore its
 		# authored room roles from the stable custom-rectangle order.
+		var layout := spec.prison_layout(HouseGeometry.interior_rect(spec))
 		var rects := spec.prison_room_rects(HouseGeometry.interior_rect(spec))
+		var aisle_n: int = (layout["aisles"] as Array).size() if not layout.is_empty() else 0
 		if rects.size() != out.rooms_on_storey(0).size():
 			push_error("ShopPlanner: prison custom room count does not match its authored layout")
 		else:
 			for i in rects.size():
 				if i == 0:
 					out.rooms[i]["kind"] = &"guardroom"
-				elif is_equal_approx(rects[i].size.x, 1.55):
+				elif i <= aisle_n:
 					out.rooms[i]["kind"] = &"corridor"
 				else:
 					out.rooms[i]["kind"] = &"cell"
 			for i in rects.size():
-				if i > 0 and is_equal_approx(rects[i].size.x, 1.55):
+				if i > 0 and i <= aisle_n:
 					for lower in out.rooms_on_storey(-1):
 						if Rect2(out.rooms[lower]["rect"]).is_equal_approx(rects[i]):
 							out.rooms[lower]["kind"] = &"corridor"

@@ -56,47 +56,114 @@ func custom_room_rects(inner: Rect2) -> Array[Rect2]:
 	return [front, mess, dorm, armoury]
 
 
-## Parallel corridors open directly from the front guardroom. Each cell bay
-## shares one long wall with a corridor and measures two to three metres on
-## both sides.
-func prison_room_rects(inner: Rect2) -> Array[Rect2]:
+## Column widths for the prison cell block: the cell count and the width of
+## each of the `count + 1` aisles. An empty Dictionary means the width cannot
+## hold a cell block at all.
+##
+## 1. A standard 1.55 m aisle with 2.25-3.0 m cells, exactly (the original
+##    rule, so every width that already had a layout keeps its seed output).
+## 2. Otherwise the aisle flexes between 1.4 and 1.8 m, as a warder would
+##    widen a passage by a hand to make the bays come out.
+## 3. Otherwise (the dead bands near 8, 11.5, 16 and 20 m, where the bays will
+##    not tile) the most cells that fit are laid at the width that keeps the
+##    aisles nearest 1.55 m, and any remainder is given to the two OUTER
+##    aisles, which run along the walls and can be as wide as the building
+##    needs without making a cell too large.
+static func prison_columns(width: float) -> Dictionary:
 	const AISLE := 1.55
-	var columns := 0
-	var cell_w := 0.0
+	const CELL_MIN := 2.25  # the floor loses 0.2 m to the walls; cells must keep 2.0 m clear
+	const CELL_MAX := 3.0
+	var best := 0
 	for count in range(1, 16):
-		var candidate := (inner.size.x - AISLE * float(count + 1)) / float(count)
-		if candidate >= 2.15 and candidate <= 3.0:
-			columns = count
-			cell_w = candidate
-	if columns == 0:
-		return []
+		var candidate := (width - AISLE * float(count + 1)) / float(count)
+		if candidate >= CELL_MIN and candidate <= CELL_MAX:
+			best = count
+	if best > 0:
+		return _prison_columns_uniform(best, (width - AISLE * float(best + 1)) / float(best), AISLE)
+	var flex_best := 0
+	var flex_aisle := AISLE
+	for count in range(1, 16):
+		var lo := maxf(1.4, (width - CELL_MAX * float(count)) / float(count + 1))
+		var hi := minf(1.8, (width - CELL_MIN * float(count)) / float(count + 1))
+		if lo <= hi:
+			flex_best = count
+			flex_aisle = clampf(AISLE, lo, hi)
+	if flex_best > 0:
+		return _prison_columns_uniform(flex_best,
+			(width - flex_aisle * float(flex_best + 1)) / float(flex_best), flex_aisle)
+	var most := 0
+	for count in range(1, 16):
+		if CELL_MIN * float(count) + 1.4 * float(count + 1) <= width + 0.0001:
+			most = count
+	if most == 0:
+		return {}
+	var cell_w := clampf((width - AISLE * float(most + 1)) / float(most), CELL_MIN, CELL_MAX)
+	var spare := width - cell_w * float(most) - AISLE * float(most + 1)
+	if spare < 0.0:
+		return _prison_columns_uniform(most, cell_w,
+			(width - cell_w * float(most)) / float(most + 1))
+	var aisles: Array[float] = []
+	for i in range(most + 1):
+		aisles.append(AISLE + (spare * 0.5 if i == 0 or i == most else 0.0))
+	return {"cells": most, "cell_w": cell_w, "aisles": aisles}
+
+
+static func _prison_columns_uniform(count: int, cell_w: float, aisle: float) -> Dictionary:
+	var aisles: Array[float] = []
+	for i in range(count + 1):
+		aisles.append(aisle)
+	return {"cells": count, "cell_w": cell_w, "aisles": aisles}
+
+
+## The prison split into its three kinds: {"guard": Rect2, "aisles": Array[Rect2],
+## "cells": Array[Rect2]}. Empty when the footprint cannot hold a guardroom, a
+## corridor and at least three cells.
+func prison_layout(inner: Rect2) -> Dictionary:
+	var cols := prison_columns(inner.size.x)
+	if cols.is_empty():
+		return {}
+	var columns: int = cols["cells"]
+	var cell_w: float = cols["cell_w"]
+	var aisle_w: Array = cols["aisles"]
 	var guard_depth := maxf(2.8, inner.size.x / 3.4 + 0.15)
 	var cell_run := inner.size.y - guard_depth
 	if cell_run < 2.0:
-		return []
+		return {}
 	var min_rows := ceili(cell_run / 3.0)
-	var max_rows := floori(cell_run / 2.15)
+	var max_rows := floori(cell_run / 2.25)
+	if max_rows < 1:
+		return {}
 	var rows := clampi(roundi(cell_run / 2.55), min_rows, max_rows)
 	var cell_d := cell_run / float(rows)
-	if cell_d < 2.15 or cell_d > 3.0:
-		return []
-	var out: Array[Rect2] = [Rect2(inner.position, Vector2(inner.size.x, guard_depth))]
+	if cell_d < 2.25 or cell_d > 3.0 or columns * rows < 3:
+		return {}
+	var top := inner.position.y + guard_depth
 	var x := inner.position.x
-	var rear := Rect2(inner.position.x, inner.position.y + guard_depth,
-		inner.size.x, cell_run)
 	var aisles: Array[Rect2] = []
 	var cells: Array[Rect2] = []
 	for col in range(columns + 1):
-		aisles.append(Rect2(Vector2(x, rear.position.y), Vector2(AISLE, cell_run)))
-		x += AISLE
+		aisles.append(Rect2(Vector2(x, top), Vector2(float(aisle_w[col]), cell_run)))
+		x += float(aisle_w[col])
 		if col >= columns:
 			continue
 		for row in range(rows):
-			cells.append(Rect2(Vector2(x, rear.position.y + cell_d * row),
-				Vector2(cell_w, cell_d)))
+			cells.append(Rect2(Vector2(x, top + cell_d * row), Vector2(cell_w, cell_d)))
 		x += cell_w
-	out.append_array(aisles)
-	out.append_array(cells)
+	return {"guard": Rect2(inner.position, Vector2(inner.size.x, guard_depth)),
+		"aisles": aisles, "cells": cells}
+
+
+## Parallel corridors open directly from the front guardroom. Each cell bay
+## shares one long wall with a corridor and measures two to three metres on
+## both sides. Order: guardroom, every aisle, every cell.
+func prison_room_rects(inner: Rect2) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var layout := prison_layout(inner)
+	if layout.is_empty():
+		return out
+	out.append(layout["guard"])
+	out.append_array(layout["aisles"])
+	out.append_array(layout["cells"])
 	return out
 
 
@@ -214,14 +281,9 @@ func room_program(count: int) -> Array[StringName]:
 		var palace: Array[StringName] = [&"antechamber", &"throne_room", &"treasury", &"royal_chamber"]
 		return palace.slice(0, count)
 	if business == &"prison":
-		var rects := prison_room_rects(HouseGeometry.interior_rect(self))
-		var aisle_count := 0
-		var cell_count := 0
-		for rect in rects:
-			if absf(rect.size.x - 1.55) < 0.01:
-				aisle_count += 1
-			elif rect.size.x <= 3.0 and rect.size.y <= 3.0:
-				cell_count += 1
+		var layout := prison_layout(HouseGeometry.interior_rect(self))
+		var aisle_count := (layout["aisles"] as Array).size() if not layout.is_empty() else 0
+		var cell_count := (layout["cells"] as Array).size() if not layout.is_empty() else 0
 		var program: Array[StringName] = [&"hall"]
 		for _aisle in range(aisle_count):
 			program.append(&"corridor")
