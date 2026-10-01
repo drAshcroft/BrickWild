@@ -136,7 +136,8 @@ static func _check_pradakshina(plan: HousePlan, failures: Array[String]) -> void
 		failures.append("pradakshina: walk flood cannot enter the passage")
 		return
 	for i in range(1, ring.size()):
-		if not grid.reached((ring[i] as Rect2).get_center(), 0.0):
+		var centre := (ring[i] as Rect2).get_center()
+		if not grid.reached(Rect2(centre - Vector2.ONE * 0.1, Vector2.ONE * 0.2), 0.0):
 			failures.append("pradakshina: walk flood does not circle segment %d" % i)
 			return
 

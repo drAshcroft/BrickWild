@@ -6,6 +6,7 @@ const STONE := 0
 const TRIM := 1
 const ROOF := 2
 const DARK := 3
+const WALL_T := NagaraGenerator.WALL_T
 
 func build(plan: HousePlan) -> ArrayMesh:
 	begin_metric(4)
@@ -56,9 +57,9 @@ func _emit_end_walls(plan: HousePlan, halls: Array, heights: Array,
 		var wall_h := plinth_h + minf(float(heights[i]), float(heights[i + 1]))
 		_wall_with_door(rect, rect.end.y - WALL_T, plinth_h, wall_h, door, "partition_%d" % i)
 	var last: Rect2 = halls[-1]
-	_box_mass("rear_wall", Vector3(last.size.x, float(heights[-1]), WALL_T),
-		Vector3(last.get_center().x, plinth_h + float(heights[-1]) * 0.5,
-			last.end.y - WALL_T * 0.5), STONE)
+	var sanctum_door: Dictionary = plan.doors[-1]
+	_wall_with_door(last, last.end.y - WALL_T, plinth_h,
+		plinth_h + float(heights[-1]), sanctum_door, "rear_wall")
 
 
 func _wall_with_door(rect: Rect2, z: float, base: float, top: float, door: Dictionary,
@@ -82,7 +83,6 @@ func _wall_with_door(rect: Rect2, z: float, base: float, top: float, door: Dicti
 func _emit_sanctum(plan: HousePlan, plinth_h: float, hall_height: float) -> void:
 	var sanctum: Rect2 = plan.world_meta["sanctum_rect"]
 	var top := plinth_h + hall_height * 0.82
-	var door: Dictionary = plan.doors[-1]
 	# The sanctum is a small, enclosed, windowless square, with exactly one axial door.
 	var wall_h := top - plinth_h
 	_box_mass("sanctum_left", Vector3(WALL_T, wall_h, sanctum.size.y),
@@ -91,7 +91,6 @@ func _emit_sanctum(plan: HousePlan, plinth_h: float, hall_height: float) -> void
 		Vector3(sanctum.end.x - WALL_T * 0.5, plinth_h + wall_h * 0.5, sanctum.get_center().y), STONE)
 	_box_mass("sanctum_rear", Vector3(sanctum.size.x, wall_h, WALL_T),
 		Vector3(sanctum.get_center().x, plinth_h + wall_h * 0.5, sanctum.end.y - WALL_T * 0.5), STONE)
-	_wall_with_door(sanctum, sanctum.position.y - WALL_T, plinth_h, top, door, "sanctum_front")
 	_box_mass("sanctum_roof", Vector3(sanctum.size.x, 0.28, sanctum.size.y),
 		Vector3(sanctum.get_center().x, top, sanctum.get_center().y), DARK)
 	_log_mass("garbhagriha", AABB(Vector3(sanctum.position.x, plinth_h, sanctum.position.y),
