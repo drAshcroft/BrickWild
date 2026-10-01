@@ -102,7 +102,9 @@ static func _fixtures(res: SuiteResult) -> void:
 	var off_axis_hall := _fixture_plan(9617)
 	for room in off_axis_hall.rooms:
 		if String(room.get("role", "")) == "winter_hall":
-			room["rect"] = Rect2(room["rect"]).translated(Vector2(1.0, 0.0))
+			var shifted: Rect2 = room["rect"]
+			shifted.position += Vector2(1.0, 0.0)
+			room["rect"] = shifted
 			break
 	_expect(res, "off-axis winter hall", "winter_hall", off_axis_hall)
 
