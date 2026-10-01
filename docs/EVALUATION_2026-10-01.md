@@ -321,3 +321,41 @@ Observations:
    constants.
 7. Swing the key light in the portrait stage. It was S1 in September; it is
    still the cheapest change that touches no geometry.
+
+## 7. What was done the same day
+
+Nineteen tasks were filed in the todo store (EVAL-C01 to C13, B01 to B07,
+U01 to U03) and worked by one agent each in isolated worktrees, correctness
+first, then beauty, then usefulness. Fourteen were merged into `main` on
+2026-10-01; the merged tree was confirmed after each builder-touching merge.
+
+| Task | What landed | Verified on the merged tree |
+|---|---|---|
+| C01 | sarchetype rooms/fittings table, wld003 row lookup, cshop controls call the affinity check | sarchetype 69/0, wld003 13/0, cshop 21/0 |
+| C02 | dressing sweep pools shell props with planned interiors; `dressingquick` | dressingquick 50158/0, dressing 567149/0 |
+| C03 | prison tiles every library width; dead-band fixtures | prison 175/0, shop 30/0 |
+| C04 | hotel rugs, hearth breast, entrance trim, declared facade reach | hlandmark 3/0, hotel 6/0 |
+| C05 | one court record per storey is one court; single roof ring | wld001 riad/palazzo/domus 16/0 each |
+| C06 | court ranges divided into rooms with yard doors and glass | court 105/0, warnings 454 to 4 |
+| C07 | street and hamlet site baselines, two negative controls | vquick 10/0, vsite 161/0 |
+| C08 | chimney room chosen by whether the hearth fits its wall | hearth warnings 6 to 0 |
+| C09 | idol fills the room, serpent silhouette, readable dark stage | rite 60/0, dominance warnings gone |
+| C10 | crowns fill their promise; head-height promise matches the mesh | tree 835/0, warnings 142 to 13 |
+| B01 | per-shot shadow reach, camera-relative key by family, hazed ground | catalogue, scene-qa, vis004 regenerated |
+| B03 | Florence crossing and tribunes, St Basil cluster, Hagia bearing | lane:church-change 5411/0, 90 sweep churches unchanged |
+| B04 | `core/material_kit.gd`; 21 world families, bridges and trees dressed | matkit 204/0, every wld suite unchanged |
+| B05 | village ground surfaces, orchard variation, river bank and reeds | vquick, vsite, vwater, vmill, venclosure 0 failures |
+| B06 | house yard: planned placements, built pieces, `HouseYardCheck` | hexterior 2045/0, lane:geom 7080/0 |
+| U02 | the house blueprint sheet in the Studio | hblueprint 189/0, church sheet byte-identical |
+| U03 | libraryquick, placementquick, lane:api, lane:scheduled, true lane tables | lane:api 149/0, library 77/0 in 601 s |
+
+Confirmations of the merged tree: 42 suites / 66,960 checks / 0 failures
+after the correctness merges; 22 / 13,929 / 0 after the material kit;
+14 / 7,266 / 0 after the hotel roof and blueprint changes. The final run on
+`1204daf` is recorded in `artifacts/eval_20261001/final_confirm_main_1204daf.log`.
+
+Still open: B02 castle yards and moat (step 1 verified, step 2 unverified,
+on branch `wip/castle-yards-moat`), B07 sky castle dressing, C11 and C13
+village scheduled suites, C12 the farmhouse chimney in the back door, U01
+the rest of the document refresh. The September rubric was not re-scored;
+the pictures to score are in `artifacts/renders/` at `main`.

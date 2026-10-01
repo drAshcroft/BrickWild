@@ -80,32 +80,32 @@ mesh. A castle still gets a note, and a temple a text list. The house sheet draw
 no dormers (they are never on the -Z face), no colonnade runs, and a courtyard
 house gets no roof in elevation because its ranges are roofed one by one.
 
-### 0b. Houses are one storey
-No stairs, no loft, no cellar below ground. The room programme, the nav check
-and the archetypes all assume a single floor; a second storey would need a
-stair as a room kind and a nav check that knows how to climb it.
+### 0b. Houses are one to three storeys, with a cellar (resolved)
+`HouseSpec.storeys` is 1..3 and `cellars` 0..1 (INT-016); stairs are a room
+kind, the nav check climbs them, and `hmultistory` sweeps 200 two-storey
+houses. What remains is the temple (0aa below).
 
 ### 0aa. A temple is one storey and has no crypt
 The rite runs at ground level. A stair down to an undercroft, or up to a
 gallery over the nave, would need the walking check to understand levels --
 which is the same thing the houses want for a second storey.
 
-### 0c. The full suite takes about nine minutes
-The house suites generate every house three times over -- once per suite -- and
-generating a house now includes walking it. Caching the sweep between suites
-would cut it to a third.
+### 0c. The full suite takes well over an hour
+Measured 2026-10-01: `hotel` alone 23 min (a hotel generation costs 45 s or
+more in the furnisher search), `court` 8 min, `dressing` 37 min, `library`
+10 min after its regeneration waste was removed, `placement` over an hour.
+`lane:api` and `lane:scheduled` in `tests/run_all_impl.gd` split the fast
+contract checks from the pre-merge gates; see `docs/QA_FAST_PROTOCOL.md`.
+A faster hotel generator is the real fix.
 
-### 1. `src/building/` is a superseded draft awaiting a decision
-`building_spec.gd`, `spec_generator.gd`, `building_builder.gd`, `main.gd`,
-`scenes/main.tscn` and the legacy suite are an earlier house generator. It
-compiles, it is deterministic, and its suite passes — but nothing in the
-shipping path reaches it: `scenes/main.tscn` is referenced by nothing and is
-not the main scene. Its colour pipeline is also unfinished (`wall_color`,
-`timber_color`, `roof_color`, `wall_material`, `plaster_worn` are written by
-the generator and read by nothing, so houses render untextured).
+### 0d. Scheduled village suites are red
+`vlot` 71/1 (the manor found no frontage), `vcheck` 79/13 (pop 26 well-path,
+pop 40 fronting/arrive/earned, dress fields integration) and
+`varchetype_thorpe` (three) fail on `main` as of 2026-10-01 and sit in no
+routine lane. Tracked as EVAL-C11 and EVAL-C13 in the todo store.
 
-**This is a product decision, not a bug: finish it or delete it.** It is kept
-building so the choice stays deliberate.
+### 1. `src/building/` has been deleted (resolved)
+The superseded draft generator is gone from the tree.
 
 ### 2. Remaining duplication inside the builders
 The box emitter is written three times (`building_builder.gd:104`,

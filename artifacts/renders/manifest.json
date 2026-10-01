@@ -175,7 +175,7 @@
 		"variant": "Grey Aldhelm"
 	},
 	{
-		"built": "1 aisle ring, transept, hemisphere dome, half-domes, ambulatory, narthex",
+		"built": "1 aisle ring, hemisphere dome, half-domes, narthex",
 		"camera": {
 			"fov_degrees": 48.0,
 			"pitch_degrees": -16.0428182636631,
@@ -185,7 +185,7 @@
 		"dims": "31.0 x 76 x 40.0 m",
 		"famous_for": "great dome on pendentives, braced by half-domes",
 		"file": "hagia_sophia.jpg",
-		"height": "59.9 m to the top",
+		"height": "71.2 m to the top",
 		"key": "hagia_sophia",
 		"kind": "landmark",
 		"light": {
@@ -195,7 +195,7 @@
 			"fill_color": "cfdcff",
 			"fill_elevation_degrees": -15.0,
 			"fill_energy": 0.6,
-			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 338 m",
+			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 286 m",
 			"key_azimuth_degrees": -70.7470387505807,
 			"key_color": "fff0d8",
 			"key_elevation_degrees": -29.0,
@@ -210,17 +210,17 @@
 		"variant": "Abbey Hilda"
 	},
 	{
-		"built": "2 aisle rings, transept, octagonal dome + lantern, ambulatory, 5 chapels (chevet)",
+		"built": "1 aisle ring, octagonal dome + lantern",
 		"camera": {
 			"fov_degrees": 48.0,
 			"pitch_degrees": -16.0428182636631,
 			"yaw_degrees": 41.2529612494193,
 			"zoom": 1.0
 		},
-		"dims": "17.0 x 153 x 45.0 m",
+		"dims": "17.0 x 101 x 45.0 m",
 		"famous_for": "octagonal drum, double-shell dome, lantern",
 		"file": "florence_duomo.jpg",
-		"height": "59.2 m to the top",
+		"height": "99.8 m to the top",
 		"key": "florence_duomo",
 		"kind": "landmark",
 		"light": {
@@ -230,7 +230,7 @@
 			"fill_color": "cfdcff",
 			"fill_elevation_degrees": -15.0,
 			"fill_energy": 0.6,
-			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 406 m",
+			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 425 m",
 			"key_azimuth_degrees": -70.7470387505807,
 			"key_color": "fff0d8",
 			"key_elevation_degrees": -29.0,
@@ -245,17 +245,17 @@
 		"variant": "Holy Wulfran-on-the-Hill"
 	},
 	{
-		"built": "west tower, onion dome, 8 chapels (cluster), narthex",
+		"built": "onion dome, 8 chapels (cluster), narthex",
 		"camera": {
 			"fov_degrees": 48.0,
 			"pitch_degrees": -16.0428182636631,
 			"yaw_degrees": 41.2529612494193,
 			"zoom": 1.0
 		},
-		"dims": "12.0 x 46 x 30.0 m",
+		"dims": "24.0 x 30 x 26.0 m",
 		"famous_for": "onion domes over a cluster of chapels",
 		"file": "st_basil.jpg",
-		"height": "59.3 m to the top",
+		"height": "65.0 m to the top",
 		"key": "st_basil",
 		"kind": "landmark",
 		"light": {
@@ -265,7 +265,7 @@
 			"fill_color": "cfdcff",
 			"fill_elevation_degrees": -15.0,
 			"fill_energy": 0.6,
-			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 189 m",
+			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 192 m",
 			"key_azimuth_degrees": -70.7470387505807,
 			"key_color": "fff0d8",
 			"key_elevation_degrees": -29.0,
@@ -328,7 +328,7 @@
 			"fill_color": "cfdcff",
 			"fill_elevation_degrees": -15.0,
 			"fill_energy": 0.6,
-			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 108 m",
+			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 119 m",
 			"key_azimuth_degrees": -63.29858741388,
 			"key_color": "fff0d8",
 			"key_elevation_degrees": -29.0,
@@ -379,7 +379,7 @@
 			"yaw_degrees": 40.1070456591576,
 			"zoom": 1.0
 		},
-		"caption": "An ogee profile that bulges past its springing radius, then draws in to a point.",
+		"caption": "A chapel tower: windowed drum, then an ogee dome that bulges past its springing radius and draws in to a cross. Each chapel has its own height and colour.",
 		"file": "detail_onion.jpg",
 		"key": "detail_onion",
 		"kind": "detail",
@@ -390,7 +390,7 @@
 			"fill_color": "cfdcff",
 			"fill_elevation_degrees": -15.0,
 			"fill_energy": 0.6,
-			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 52 m",
+			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 63 m",
 			"key_azimuth_degrees": -71.8929543408424,
 			"key_color": "fff0d8",
 			"key_elevation_degrees": -29.0,
@@ -421,7 +421,7 @@
 			"fill_color": "cfdcff",
 			"fill_elevation_degrees": -15.0,
 			"fill_energy": 0.6,
-			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 59 m",
+			"ground": "mottled 6c6d58/787a60 earth, 9 km plane, depth haze d6dcdc from 181 m",
 			"key_azimuth_degrees": -51.8394315112636,
 			"key_color": "fff0d8",
 			"key_elevation_degrees": -29.0,

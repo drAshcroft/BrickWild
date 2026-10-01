@@ -54,3 +54,12 @@ godot --headless --path . --script res://tests/run_all.gd -- hotel hlandmark
 The landmark suite builds the reference at 78%, 100%, and 130% scale. It says
 what the building must contain, never where the generator must place every
 piece beyond the defining axial and symmetry constraints.
+
+`hlandmark` failed from 2026-09-23 to 2026-10-01, when the shared house rules
+for rugs, hearth breasts, door-trim clearance and declared exterior bounds
+landed without the hotel being taught them. The hotel builder now calls the
+house rug and hearth-breast passes, stops its base cornice either side of the
+ceremonial entrance, and declares its cornices, balconies, canopy and finials
+through `HotelSpec.landmark_footprint()` and `landmark_height()`. A new rule
+in `HouseQA` means running `hlandmark` (13 min) and `hotel` (23 min) in the
+same change; they are in `lane:scheduled`.
