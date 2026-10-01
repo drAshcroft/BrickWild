@@ -12,8 +12,11 @@ extends Control
 ## castle meant describing it, not duplicating the studio.
 
 const VARIANTS := 6
+const SHEET_HEIGHT := 300.0
+const HOUSE_SHEET_HEIGHT := 470.0
 
 @onready var viewport: SubViewport = $HSplit/CenterCol/ViewportPanel/SubViewport
+@onready var bp_panel: PanelContainer = $HSplit/CenterCol/BPPanel
 @onready var bp_view: BlueprintView = $HSplit/CenterCol/BPPanel/BlueprintView
 @onready var width_slider: HSlider = $HSplit/LeftPanel/Margin/Grid/WidthSlider
 @onready var length_slider: HSlider = $HSplit/LeftPanel/Margin/Grid/LengthSlider
@@ -348,6 +351,9 @@ func _show(idx: int) -> void:
 	viewport.get_node("ModelRoot").add_child(_mesh_instance)
 	(viewport.get_node("ModelRoot") as Node3D).rotation.y = buildings[idx].request.orientation
 	variant_list.select(idx)
+	# A house sheet is a plan per storey, an elevation and a schedule: it gets
+	# the room a drawing needs. The church sheet and the notes keep their strip.
+	bp_panel.custom_minimum_size.y = HOUSE_SHEET_HEIGHT if s is HouseSpec else SHEET_HEIGHT
 	info_label.text = _describe(s)
 	_frame(mesh)
 	if s is VillageSpec:
@@ -355,7 +361,7 @@ func _show(idx: int) -> void:
 	elif s is ChurchSpec:
 		bp_view.setup(s)
 	elif s is HouseSpec:
-		bp_view.show_note(_house_sheet(plans[idx]))
+		bp_view.setup_house(plans[idx])
 	elif s is TempleSpec:
 		bp_view.show_note(_temple_sheet(s))
 	else:
@@ -363,31 +369,6 @@ func _show(idx: int) -> void:
 		# yet; say so rather than leaving the last church's plan on screen.
 		bp_view.show_note("%s — %s.\nNo blueprint sheet for castles yet: the sheet is drawn from ChurchGeometry."
 			% [s.variant_name, String(s.tier).capitalize()])
-
-
-## The room list, in place of a blueprint sheet: which rooms the plan came out
-## with, how big they are, and what is in them.
-func _house_sheet(plan: HousePlan) -> String:
-	var purpose: String
-	if plan.spec is HotelSpec:
-		purpose = BigGlade.option_label(&"hotel", &"style", (plan.spec as HotelSpec).style)
-	elif plan.spec is ShopSpec:
-		purpose = BigGlade.option_label(&"shop", &"purpose", (plan.spec as ShopSpec).business)
-	else:
-		purpose = BigGlade.option_label(&"house", &"purpose", plan.spec.trade)
-	var lines: Array[String] = ["%s -- %s, %d rooms on %d storey%s"
-		% [plan.spec.variant_name, purpose,
-			plan.room_count(), plan.spec.storeys, "" if plan.spec.storeys == 1 else "s"]]
-	for i in range(plan.room_count()):
-		var f: Rect2 = HouseGeometry.room_floor_rect(plan, i)
-		var items: Array[String] = []
-		for fi in plan.furniture_of(i):
-			items.append(String(plan.furniture[fi]["key"]).replace("_", " "))
-		lines.append("L%d %-9s %.1f x %.1f m  %d doors, %d windows\n    %s"
-			% [plan.storey_of_room(i) + 1, String(plan.kind_of(i)), f.size.x, f.size.y,
-				plan.doors_of(i).size(), plan.windows_of(i).size(),
-				", ".join(items) if not items.is_empty() else "-"])
-	return "\n".join(lines)
 
 
 ## What the temple is and what is in it. The rite is the interesting part, so

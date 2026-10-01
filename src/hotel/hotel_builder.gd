@@ -167,8 +167,9 @@ func _build_palace_roof() -> void:
 	# turn to get there, so the roof local X runs across the hotel LENGTH and
 	# its local Z along the hotel WIDTH. Every dormer number below is in that
 	# frame, not in the hotel one.
-	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(0, top, 0))
-	var roof := RoofShape.faces(hs.length + 1.0, hs.width + 1.0, hs.roof_rise)
+	var layout := HotelGeometry.roof_layout(hs)
+	var xf: Transform3D = layout["transform"]
+	var roof: Array[PackedVector3Array] = layout["faces"]
 	var dormers := _hotel_dormer_seats(hs, roof)
 	# ridge_roof still closes the four wall heads against the actual roof
 	# underside; that part has no dormers in it. Its slopes are deferred so the

@@ -9,6 +9,8 @@ extends Control
 
 var spec: ChurchSpec
 var village: VillagePlan
+## The house sheet, when the Studio is showing a house, a shop or a hotel.
+var house: HouseSheet
 ## Shown instead of a sheet when there is nothing to draw -- a castle, for now.
 var note: String = ""
 
@@ -70,6 +72,17 @@ static func south_elevation_inventory(p_spec: ChurchSpec) -> Dictionary:
 func setup(p_spec: ChurchSpec) -> void:
 	spec = p_spec
 	village = null
+	house = null
+	note = ""
+	queue_redraw()
+
+
+## Draw a house, shop or hotel: a plan per storey, the front elevation and the
+## room schedule, all from the HousePlan (see HouseSheet).
+func setup_house(plan: HousePlan) -> void:
+	spec = null
+	village = null
+	house = HouseSheet.new(plan)
 	note = ""
 	queue_redraw()
 
@@ -78,10 +91,14 @@ func setup(p_spec: ChurchSpec) -> void:
 func show_note(text: String) -> void:
 	spec = null
 	village = null
+	house = null
 	note = text
 	queue_redraw()
 
 func _draw() -> void:
+	if house != null:
+		house.draw(self)
+		return
 	if village != null:
 		_draw_village()
 		return
@@ -112,6 +129,7 @@ func _draw() -> void:
 func setup_village(plan: VillagePlan) -> void:
 	spec = null
 	village = plan
+	house = null
 	note = ""
 	queue_redraw()
 

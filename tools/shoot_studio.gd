@@ -43,10 +43,23 @@ func _init() -> void:
 		for i in range(30):
 			await process_frame
 		var name: String = ui.kind_opt.get_item_text(k).to_lower()
+		if not name.is_valid_identifier():
+			name = String(kind)         # "shop / civic building" is not a file name
 		var img: Image = root.get_texture().get_image()
 		img.save_png("res://artifacts/renders/studio_%s.png" % name)
 		if kind == &"village":
 			DirAccess.make_dir_recursive_absolute("res://docs/screenshots")
 			img.save_png("res://docs/screenshots/studio_village.png")
 		print("wrote studio_%s.png" % name)
+		if kind == &"house":
+			# the plan per storey is the point of the house sheet: a second shot
+			# with two storeys shows the plans side by side and a stair
+			ui.storeys_slider.value = 2
+			ui.auto_generate = true
+			ui.regenerate()
+			ui.auto_generate = false
+			for i in range(30):
+				await process_frame
+			root.get_texture().get_image().save_png("res://artifacts/renders/studio_house_2storey.png")
+			print("wrote studio_house_2storey.png")
 	quit(0)
