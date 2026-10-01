@@ -61,6 +61,16 @@ For CAS-010, the full `clandmark` suite hit the five-minute cap. The
 scales in 41 seconds; use it with the terrace fixture for castle terrace
 edits. Keep full `clandmark` in the scheduled batch.
 
+For the scheduled castle contract/massing/landmark/voxel batch, use
+`lane:castle-spot` for routine spot coverage. It composes the existing
+`castlechange` fixed production cases, which check the build contract, massing,
+and full `CastleQA`, with Himeji's four fixed landmark scales from `chimeji`.
+Expected host time is about 100 seconds: the measured bodies were 51 seconds
+for `castlechange` and 41 seconds for `chimeji`, plus one runner startup. This
+deterministic spot lane does not prove that the full style × tier × seed sweep
+passed; keep `lane:castle` and `castle cmassing clandmark cvoxelqa` as scheduled
+runs.
+
 For INT-008, `shop,barracksquick` passed in 38 seconds. The combined
 `shop,sarchetype` sweep hit the cap while running other shop families.
 `barracksquick` checks the requested three sizes, HouseQA and negative
