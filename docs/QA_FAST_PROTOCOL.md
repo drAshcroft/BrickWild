@@ -37,7 +37,7 @@ times rather than an idle-machine promise.
 | library business and row repair | `lane:library-change` | 54 s | 31 checks, pass; 32 warnings |
 | prison programme and keyed routes | `prison` | 225 s | 7 checks, pass; 13 warnings |
 | temple geometry and rite | `lane:temple` | 52 s | 2,247 checks, pass; 7 warnings |
-| village site, lots, plan rules | `lane:village-fast` | 113 s | 8 checks, 17 existing VIL-017 failures |
+| village site, lots, plan rules | `lane:village-fast` | 113 s | 10 checks, 0 failures (the VIL-017 baselines were fixed) |
 
 The first furnishing candidate used the existing 24-house statistical sweep.
 It passed its assertions but took 343 seconds, so it is **not** the routine

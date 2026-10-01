@@ -169,7 +169,11 @@ static func _judge(plan: VillagePlan, spec: VillageSpec) -> Array[String]:
 		# within 15 m of the through road, and clear of every carriageway
 		if _poly_to_polyline(common, pts) > COMMON_TO_ROAD_MAX:
 			out.append("common %.1f m from the through road" % _poly_to_polyline(common, pts))
+		# A path crosses the green to the well (§5: "door to road, across the
+		# green"); every wheeled class keeps clear of it.
 		for r in plan.roads:
+			if r["class"] == &"path":
+				continue
 			var ribbon: PackedVector2Array = VillageSitePlanner.road_ribbon(r, true)
 			if Poly.intersection_area(common, ribbon) > 0.01:
 				out.append("common overlaps a %s" % r["class"])
