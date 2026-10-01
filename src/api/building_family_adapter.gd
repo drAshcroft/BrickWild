@@ -95,7 +95,7 @@ static func for_building(building) -> BuildingFamilyAdapter:
 	var spec: RefCounted = building.spec
 	if building.plan != null and building.plan.world_family in \
 			[&"courtyard_house", &"insula", &"mosque", &"caravanserai", &"hammam",
-			&"cruciform_temple"]:
+			&"cruciform_temple", &"pagoda"]:
 		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
@@ -418,6 +418,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 			var builder := HammamBuilder.new()
 			builder.build(building.plan)
 			return HammamCheck.new().check(building.plan, builder)
+		if building.plan != null and building.plan.world_family == &"pagoda":
+			var pagoda_builder := PagodaBuilder.new()
+			pagoda_builder.build(building.plan)
+			return PagodaCheck.new().check(building.plan, pagoda_builder)
 		if building.plan != null:
 			if building.plan.world_subkind == &"sultan_han":
 				return HanCheck.new().check(building.plan)
@@ -458,6 +462,8 @@ class WorldFamily extends BuildingFamilyAdapter:
 			return building.plan.world_meta.get("hall_rect", Rect2())
 		if building.plan != null and building.plan.world_family == &"cruciform_temple":
 			return building.plan.world_meta.get("hall_rect", Rect2())
+		if building.plan != null and building.plan.world_family == &"pagoda":
+			return building.plan.world_meta.get("footprint", Rect2())
 		return Rect2()
 
 	func door(building) -> Vector3:
@@ -479,6 +485,9 @@ class WorldFamily extends BuildingFamilyAdapter:
 			return Vector3(p.x, 1.0, p.y)
 		if building.plan != null and building.plan.world_family == &"cruciform_temple":
 			var p: Vector2 = building.plan.world_meta["entrances"][0]["pos"]
+			return Vector3(p.x, 1.0, p.y)
+		if building.plan != null and building.plan.world_family == &"pagoda":
+			var p: Vector2 = building.plan.world_meta.get("entry", Vector2.ZERO)
 			return Vector3(p.x, 1.0, p.y)
 		return Vector3.ZERO
 

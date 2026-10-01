@@ -68,6 +68,13 @@ const FAMILIES := {
 		"width": {"min": 14.0, "max": 48.0},
 		"length": {"min": 10.0, "max": 32.0},
 		"height": {"min": 6.0, "max": 12.0},
+	},
+	&"pagoda": {
+		"label": "Pagoda",
+		"kinds": [&"square_pagoda", &"octagonal_pagoda", &"dodecagonal_pagoda"],
+		"width": {"min": 20.0, "max": 57.0},
+		"length": {"min": 20.0, "max": 57.0},
+		"height": {"min": 40.0, "max": 144.0},
 	}
 }
 
@@ -147,6 +154,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = shrine["spec"]
 		out.plan = shrine["plan"]
 		return true
+	if request.style == &"pagoda" and request.purpose in kinds_of(&"pagoda"):
+		var pagoda_made := PagodaGenerator.generate(request.purpose, request.seed,
+			request.width, request.length, request.height)
+		out.spec = pagoda_made["spec"]
+		out.plan = pagoda_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -171,6 +184,9 @@ static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"cruciform_temple":
 		return CruciformBuilder.new().build(building.plan)
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"pagoda":
+		return PagodaBuilder.new().build(building.plan)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null
 	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)

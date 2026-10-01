@@ -12,6 +12,7 @@ extends RefCounted
 
 const SCALES: Array[float] = [0.7, 1.0, 1.4, 1.9]
 const TowerGenerator = preload("res://src/world/world_tower_house_generator.gd")
+const PagodaGenerator = preload("res://src/world/pagoda_generator.gd")
 
 const ARCHETYPES: Array[Dictionary] = [
 	{"key": "hall_thousand_pillars", "family": &"mosque", "kind": &"hypostyle",
@@ -46,6 +47,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 24.0, "length": 16.0, "height": 8.0,
 		"must": ["changing", "cold", "warm", "hot", "dome", "oculus", "furnace"],
 		"check": &"hammam_check", "about": "four-stage hammam with domed bathing rooms"},
+	{"key": "nine_storey_pagoda", "family": &"pagoda", "kind": &"square_pagoda",
+		"width": 30.0, "length": 30.0, "height": 65.0,
+		"must": ["floor_0", "eave_tier", "mast", "finial"],
+		"check": &"pagoda_check", "about": "Nine-Storey Pagoda"},
 ]
 
 
@@ -62,7 +67,7 @@ static func run() -> SuiteResult:
 			request.purpose = row["kind"]
 			request.width = snappedf(float(row["width"]) * scale, 0.01)
 			request.length = snappedf(float(row["length"]) * scale, 0.01)
-			request.height = float(row["height"])
+			request.height = float(row["height"]) * scale if row["family"] == &"pagoda" else float(row["height"])
 			var building: GeneratedBuilding = BigGlade.generate(request)
 			res.checked += 1
 			var who := "%s scale=%.2f" % [key, scale]
@@ -382,6 +387,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 			free_masses.assign(["sahn_floor", "fountain", "minaret"])
 		elif building.plan != null and building.plan.world_subkind == &"sultan_han":
 			free_masses.append("han_kiosk")
+		elif building.plan != null and building.plan.world_family == &"pagoda":
+			free_masses.append("eave_tier")
 		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_masses)["failures"]:
 			out.append(str(f))
 	if check == &"":
@@ -397,7 +404,7 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		return out
 	var checker = script.new()
 	var rep: Dictionary
-	if building.plan != null and check == &"hammam_check":
+	if building.plan != null and check in [&"hammam_check", &"pagoda_check"]:
 		rep = checker.check(building.plan, mesh_builder)
 	elif building.plan != null:
 		rep = checker.check(building.plan)
@@ -423,6 +430,10 @@ static func _builder_for(building: GeneratedBuilding):
 			var hammam_builder := HammamBuilder.new()
 			hammam_builder.build(building.plan)
 			return hammam_builder
+		if building.plan.world_family == &"pagoda":
+			var pb := PagodaBuilder.new()
+			pb.build(building.plan)
+			return pb
 		var hb := HouseBuilder.new()
 		hb.build(building.plan)
 		return hb
