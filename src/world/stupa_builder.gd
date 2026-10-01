@@ -66,22 +66,22 @@ func _build_paths(spec: StupaSpec) -> void:
 	# Stairs rise one flight from ground path to the terrace. The diametric
 	# opposite flight makes the ring connection usable from either approach.
 	for side in [-1.0, 1.0]:
-		var inner_x := side * (spec.drum_radius - 0.25)
-	var span := 2.2
-		var stair_aabb := AABB(Vector3(minf(inner_x, inner_x + side * span), 0.0, -2.0),
+		var inner_x: float = float(side) * (spec.drum_radius - 0.25)
+		var span: float = 2.2
+		var stair_aabb: AABB = AABB(Vector3(minf(inner_x, inner_x + float(side) * span), 0.0, -2.0),
 			Vector3(span, spec.drum_y, 4.0))
-		var steps := maxi(int(ceil(spec.drum_y / 0.25)), 1)
+		var steps: int = maxi(int(ceil(spec.drum_y / 0.25)), 1)
 		host("double_stair", 0)
 		for i in range(steps):
-			var dx := span / steps
+			var dx: float = span / steps
 			var step_x: float
 			if side > 0:
 				step_x = inner_x + dx * (float(i) + 0.5)
 			else:
 				step_x = inner_x - dx * (float(i) + 0.5)
-			var top := spec.drum_y * (1.0 - float(i + 1) / steps)
-			var step_size := Vector3(dx + 0.01, maxf(top, 0.05), 4.0)
-			var step_center := Vector3(step_x, step_size.y * 0.5, 0)
+			var top: float = spec.drum_y * (1.0 - float(i + 1) / steps)
+			var step_size: Vector3 = Vector3(dx + 0.01, maxf(top, 0.05), 4.0)
+			var step_center: Vector3 = Vector3(step_x, step_size.y * 0.5, 0)
 			component_box("stupa_stair_tread", step_size,
 				Transform3D(Basis.IDENTITY, step_center), SURF_TRIM)
 		component_note("stupa_double_stair", "stair_group", SURF_TRIM,
@@ -107,40 +107,40 @@ func _build_harmika_and_chatra(spec: StupaSpec) -> void:
 		Transform3D(Basis.IDENTITY, shaft_center), SURF_TRIM)
 	_log_mass("stupa_chatra_shaft", AABB(shaft_center - shaft_size * 0.5, shaft_size))
 	for i in range(3):
-		var radius := 1.7 - 0.38 * i
-		var y := shaft_center.y + shaft_height * 0.5 + 0.16 + 0.22 * i
+		var radius: float = 1.7 - 0.38 * i
+		var y: float = shaft_center.y + shaft_height * 0.5 + 0.16 + 0.22 * i
 		var profile := PackedVector2Array([Vector2(0.0, 0.0), Vector2(radius, 0.0),
 			Vector2(radius, 0.16), Vector2(0.0, 0.16)])
 		_kit.revolve(profile, Vector3(0, y, 0), SURF_TRIM, 32)
-		var cap_box := AABB(Vector3(-radius, y, -radius), Vector3(radius * 2.0, 0.16, radius * 2.0))
+		var cap_box: AABB = AABB(Vector3(-radius, y, -radius), Vector3(radius * 2.0, 0.16, radius * 2.0))
 		component_note("stupa_chatra_disc", "annular_revolve", SURF_TRIM,
 			{"aabb": cap_box, "radius": radius, "axis_y": y})
 		_log_mass("stupa_chatra_disc_%d" % i, cap_box, y)
-	var top := shaft_center.y + shaft_height * 0.5 + 0.16 + 0.44 + 0.16
+	var top: float = shaft_center.y + shaft_height * 0.5 + 0.16 + 0.44 + 0.16
 	total_height = top
 	host_end()
 
 
 func _build_toranas(spec: StupaSpec) -> void:
 	for i in range(4):
-		var angle := i * PI * 0.5
-		var radial := Vector3(cos(angle), 0, sin(angle))
-		var center := radial * spec.torana_radius + Vector3(0, 3.4, 0)
-		var width := 3.0
-		var post_size := Vector3(0.38, 6.8, 0.42)
-		var tangent := Vector3(-radial.z, 0, radial.x)
-		var yaw := angle + PI * 0.5
+		var angle: float = i * PI * 0.5
+		var radial: Vector3 = Vector3(cos(angle), 0, sin(angle))
+		var center: Vector3 = radial * spec.torana_radius + Vector3(0, 3.4, 0)
+		var width: float = 3.0
+		var post_size: Vector3 = Vector3(0.38, 6.8, 0.42)
+		var tangent: Vector3 = Vector3(-radial.z, 0, radial.x)
+		var yaw: float = angle + PI * 0.5
 		host("torana_%d" % i, 0)
 		for side in [-1.0, 1.0]:
-			var post_center := center + tangent * width * 0.5 * side
+			var post_center: Vector3 = center + tangent * width * 0.5 * float(side)
 			component_box("torana_post", post_size,
 				Transform3D(Basis(Vector3.UP, yaw), post_center), SURF_TRIM)
-		var beam_size := Vector3(width + 0.5, 0.38, 0.5)
+		var beam_size: Vector3 = Vector3(width + 0.5, 0.38, 0.5)
 		for level in [5.4, 6.2, 7.0]:
-			var beam_center := Vector3(center.x, level, center.z)
+			var beam_center: Vector3 = Vector3(center.x, float(level), center.z)
 			component_box("torana_lintel", beam_size,
 				Transform3D(Basis(Vector3.UP, yaw), beam_center), SURF_TRIM)
-		var mass := AABB(Vector3(center.x - 2.0, 0.0, center.z - 2.0), Vector3(4.0, 7.3, 4.0))
+		var mass: AABB = AABB(Vector3(center.x - 2.0, 0.0, center.z - 2.0), Vector3(4.0, 7.3, 4.0))
 		component_note("torana_cardinal_mass", "aabb", SURF_TRIM,
 			{"aabb": mass, "angle": angle, "radius": Vector2(center.x, center.z).length()})
 		_log_mass("stupa_torana_%d" % i, mass)
@@ -150,12 +150,12 @@ func _build_toranas(spec: StupaSpec) -> void:
 static func _dome_volume(spec: StupaSpec) -> float:
 	# Revolved measured profile integral. Simpson/trapezoid sampling is exact
 	# enough for the broad, piecewise-linear architectural profile.
-	var heights := [0.0, 0.14, 0.42, 0.70, 0.91, 1.0]
-	var radii := [1.0, 0.98, 0.90, 0.70, 0.40, 0.0]
-	var volume := 0.0
+	var heights: Array[float] = [0.0, 0.14, 0.42, 0.70, 0.91, 1.0]
+	var radii: Array[float] = [1.0, 0.98, 0.90, 0.70, 0.40, 0.0]
+	var volume: float = 0.0
 	for i in range(heights.size() - 1):
-		var dy := (heights[i + 1] - heights[i]) * spec.dome_rise
-		var r0 := radii[i] * spec.dome_radius
-		var r1 := radii[i + 1] * spec.dome_radius
+		var dy: float = (heights[i + 1] - heights[i]) * spec.dome_rise
+		var r0: float = radii[i] * spec.dome_radius
+		var r1: float = radii[i + 1] * spec.dome_radius
 		volume += PI * dy * (r0 * r0 + r0 * r1 + r1 * r1) / 3.0
 	return volume

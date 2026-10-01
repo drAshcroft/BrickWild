@@ -144,7 +144,7 @@ func _check_cardinal(builder: StupaBuilder, failures: Array[String], stats: Dict
 		radii.append(centre.length())
 		angles.append(fposmod(atan2(centre.y, centre.x) + TAU, TAU))
 	angles.sort()
-	var spread := radii.max() - radii.min()
+	var spread: float = radii.max() - radii.min()
 	stats["torana_radius_spread"] = spread
 	if spread > 0.05:
 		failures.append("cardinal: torana masses do not share one radius within 0.05m")
@@ -241,7 +241,7 @@ func _interior_air_count(profile: PackedVector2Array, radius: float, rise: float
 		head += 1
 		for d in [Vector3i(1, 0, 0), Vector3i(-1, 0, 0), Vector3i(0, 1, 0),
 				Vector3i(0, -1, 0), Vector3i(0, 0, 1), Vector3i(0, 0, -1)]:
-			var next := cell + d
+			var next: Vector3i = cell + Vector3i(d)
 			if next.x < 0 or next.x >= nx or next.y < 0 or next.y >= ny \
 					or next.z < 0 or next.z >= nz:
 				continue
