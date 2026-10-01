@@ -6,6 +6,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$Selectors = @(
+    foreach ($entry in $Selectors) {
+        foreach ($selector in $entry.Split(',')) {
+            $selector = $selector.Trim()
+            if ($selector.Length -eq 0) { throw 'Empty QA selector' }
+            $selector
+        }
+    }
+)
 $workspace = Split-Path -Parent $PSScriptRoot
 $godot = 'C:\Projects\godot\Godot_v4.5.2-stable_mono_win64\Godot_v4.5.2-stable_mono_win64.exe'
 $selection = $Selectors -join '__'
