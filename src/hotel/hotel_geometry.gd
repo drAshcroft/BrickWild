@@ -11,6 +11,10 @@ const MAX_FLOOR_H := 4.5
 const TOWER_INSET_FRACTION := 0.075
 const CUPOLA_R_FRACTION := 0.042
 const FACADE_PROJECTION := 0.28
+## How far the balconies and entrance canopy stand out beyond the facade plane.
+const FACADE_REACH := 1.3
+## Cupola finial height above the wall head.
+const FINIAL_RISE := 6.1
 
 
 static func wall_top(spec: HotelSpec) -> float:
