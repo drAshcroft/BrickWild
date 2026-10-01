@@ -57,10 +57,10 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 	"tree", "bridge"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull",
+const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange",
-	"houseqafurnish", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "wld001_domus", "wld001_riad",
+	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
@@ -86,6 +86,11 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 ##   lane:plan    ~4m    the planner, room programme, doors, circulation
 ##   lane:dress   ~10m   the furnisher, prop recipes, assembly, exteriors
 ##   lane:assets  ~6m    anything under assets/props/ or catalog.json
+##   lane:house-plan-fast     bounded plan and multi-storey checks
+##   lane:house-furnish-fast  bounded furnishing and assembly checks
+##   lane:house-exterior-fast bounded exterior and assembly checks
+##   lane:assets-fast        props and assembly contract (catalogue rebuild separate)
+##   lane:village-fast       site, lot and village contract checks
 ##   lane:castle-change  ~81s body / 91s host: fixed castle geometry and QA
 ##   lane:castle         exhaustive castle sweeps; schedule separately
 ##   lane:church-change  ~10s body  bounded roofs, domed styles, openings, massing
@@ -102,6 +107,11 @@ const LANES: Dictionary = {
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
+	"lane:house-plan-fast": ["houseqaplan", "hmultistory"],
+	"lane:house-furnish-fast": ["houseqafurnishfast", "hassembly"],
+	"lane:house-exterior-fast": ["hexterior", "hassembly"],
+	"lane:assets-fast": ["props", "hassembly"],
+	"lane:village-fast": ["vquick"],
 	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried"],
 	"lane:castle": ["castle", "cnormals", "cmassing", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried"],
 	"lane:church-change": ["churchroof", "churchchange"],
@@ -260,6 +270,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return HouseQASuite.run(false, &"planning")
 		"houseqafurnish":
 			return HouseQASuite.run(false, &"furnishing")
+		"houseqafurnishfast":
+			return HouseQASuite.run(false, &"furnishing", 12, 8)
 		"houseqafull":
 			return HouseQASuite.run(true)
 		"roofquick":
@@ -288,6 +300,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return TempleArchetypeSuite.run()
 		"village":
 			return VillageSuite.run()
+		"vquick":
+			return preload("res://tests/suites/village_quick_suite.gd").run()
 		"vsite":
 			return VillageSiteSuite.run()
 		"vlot":

@@ -16,13 +16,18 @@ const QUICK_VARIETY_COUNT := 16
 const FULL_VARIETY_COUNT := 40
 
 
-static func run(full: bool = false, group: StringName = &"all") -> SuiteResult:
+static func run(full: bool = false, group: StringName = &"all",
+		sweep_limit: int = -1, variety_limit: int = -1) -> SuiteResult:
 	var res := SuiteResult.new("house QA (%s)" % String(group))
 	if not [&"all", &"core", &"planning", &"furnishing"].has(group):
 		res.fail("house QA: unknown group %s" % String(group))
 		return res
 	var sweep_count: int = FULL_SWEEP_COUNT if full else QUICK_SWEEP_COUNT
 	var variety_count: int = FULL_VARIETY_COUNT if full else QUICK_VARIETY_COUNT
+	if sweep_limit > 0:
+		sweep_count = sweep_limit
+	if variety_limit > 0:
+		variety_count = variety_limit
 	var mode := "full" if full else "quick"
 	print("house QA: START (%s; %d-house statistical sweeps)" % [mode, sweep_count])
 	var total_start := Time.get_ticks_msec()

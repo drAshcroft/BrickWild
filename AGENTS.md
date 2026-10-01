@@ -58,6 +58,9 @@ godot --headless --path . --editor --quit
 ## Testing protocol
 
 **Pick the lane that matches the edit. Do not run the full sweep per task.**
+Use the measured routine gate in `docs/QA_FAST_PROTOCOL.md`: the selector and
+its focused fixture must finish in under five minutes of host wall time.
+`tools/run_qa_lane.ps1` records stdout, stderr, native exit, and wall time.
 
 ```
 godot --headless --path . --script res://tests/run_all.gd -- lane:geom
@@ -65,14 +68,17 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 
 | You touched | Lane | Time |
 |---|---|---|
-| `core/mesh_kit.gd`, `core/mass_builder.gd`, any `*_builder.gd` emitter, roof maths | `lane:geom` | ~30 s |
-| the planner, room programme, doors, circulation | `lane:plan` | ~4 m |
-| the furnisher, prop recipes, assembly, exterior dressing | `lane:dress` | ~10 m |
-| anything under `assets/props/` or `catalog.json` (rebuild the catalogue first) | `lane:assets` | ~6 m |
-| castle geometry and openings | `lane:castle-change` | 81 s suite body; 91 s host wall |
-| temple geometry | `lane:temple` | ~3 m |
+| `core/mesh_kit.gd`, `core/mass_builder.gd`, any `*_builder.gd` emitter, roof maths | `lane:geom` | 116 s host |
+| the planner, room programme, doors, circulation | `lane:house-plan-fast` | 206 s host |
+| the furnisher, prop recipes, assembly | `lane:house-furnish-fast` | 194 s host |
+| house exterior dressing | `lane:house-exterior-fast` | 112 s host |
+| prop code or assembly | `lane:assets-fast` | 40 s host |
+| anything under `assets/props/` or `catalog.json` | rebuild catalogue, then `lane:assets` | required exception: over 5 m |
+| castle geometry and openings | `lane:castle-change` | 209 s host |
+| temple geometry | `lane:temple` | 52 s host |
+| village site, lots, plan rules | `lane:village-fast` | 113 s host; current VIL-017 failures |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
-| church shell, opening or roof geometry | `lane:church-change` | ~10 s suite body; startup varies |
+| church shell, opening or roof geometry | `lane:church-change` | 20 s host |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
 
