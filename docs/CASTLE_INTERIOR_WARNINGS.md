@@ -172,6 +172,25 @@ Representative starting fixtures are `norman/manor/0` seed 9074 (two hall warnin
 
 All 28 warnings name surface 2, which [CastleBuilder](../src/castle/castle_builder.gd:16) defines as roof. Every one reports exactly two triangles. This proves tiny/zero-area emitted roof triangles, but does not by itself prove an exposed roof hole, reversed winding or a coincident seam. Start with `norman/castle/0`, seed 9249; dump the two offending triangle indices and all vertices from surface 2, respecting `Mesh.ARRAY_INDEX` when present. Trace those vertices through `CastleBuilder._join_roofs`, its roof emitters and `MeshKit.slab_poly` before deciding which producer to change. Those are investigation entry points, not a confirmed offending emitter.
 
+### Focused emitted-triangle diagnostic
+
+`tests/suites/castle_normals_diagnostic_suite.gd` adds the opt-in `cnormaldiag` selector. It builds the four representative fixtures below, then invokes the unchanged `NormalsSuite.check_mesh` and `NormalsSuite.check_openings` checks. For each warning-branch opening it prints the full matching part record (including any `planned_opening` metadata), shrunken mass names and boxes containing the inward/outward probes, and the nearest intersection along the outward emitted-triangle segment. For roof degenerates it prints surface, triangle ordinal, actual array indices, cross-product magnitude and vertex positions. The ray helper has a synthetic hit and miss control.
+
+| Fixture | Prior warning inventory | What the diagnostic must resolve |
+| --- | --- | --- |
+| `norman/manor/0`, seed 9074 | 2 hall outside-probe warnings | Whether either outward ray crosses an emitted opaque triangle; list both probe-containing mass boxes. |
+| `norman/castle/0`, seed 9249 | 1 keep outside-probe warning; 2 roof degenerate triangles | Classify the keep ray; record both indexed roof triangles and their exact vertices. |
+| `edwardian/fortress/0`, seed 9117 | 4 tower and 2 keep outside-probe warnings | Classify each of the six outward rays independently, with its part tag and containing masses. |
+| `japanese/castle/0`, seed 9249 | 2 roof degenerate triangles; no outside-probe warning | Record the two indexed roof triangles as the category-separation control. |
+
+Run only this focused evidence pass with:
+
+```powershell
+& 'C:\Projects\godot\Godot_v4.5.2-stable_mono_win64\Godot_v4.5.2-stable_mono_win64.exe' --headless --path . --script res://tests/run_all.gd -- cnormaldiag
+```
+
+The segment ray is a geometric discriminator for the logged outward probe, not a complete visibility or solid-occupancy oracle. A miss means only that this finite segment did not cross an emitted triangle. Inspect the affected opening with a raking render before changing a producer or checker. Keep the original direction, support and mesh-normal failures active. No producer fix is justified by a mass-box warning alone.
+
 **Exact reproduction**
 
 The key in the table below is accepted directly by `CastleSweep.spec_at(style, tier, index)`; its authoritative dimensions and seed mapping are in [CastleSweep.SIZES](../tests/suites/castle_sweep.gd:14). In addition to the castle/fortress rows listed earlier, the warning inventory includes `house/2` = 12 x 24 x 6.5 m, seed 9331; `manor/0` = 14 x 24 x 8 m, seed 9074; `manor/1` = 26 x 40 x 10 m, seed 9075; `manor/2` = 32 x 60 x 12 m, seed 9076; and `fortress/2` = 200 x 300 x 28 m, seed 9119.
