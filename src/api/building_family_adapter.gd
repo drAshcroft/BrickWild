@@ -364,6 +364,7 @@ class TempleFamily extends BuildingFamilyAdapter:
 		spec.width = request.width
 		spec.length = request.length
 		spec.height = request.height
+		_copy_orientation_and_period(request, spec)
 		TempleGenerator.generate(spec, request.seed)
 		out.spec = spec
 		return true
@@ -459,7 +460,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 		return super.quality_report(building)
 
 	func generate(request: BuildingRequest, out) -> bool:
-		return WorldFamilies.generate(request, out)
+		if not WorldFamilies.generate(request, out):
+			return false
+		_copy_orientation_and_period(request, out.spec)
+		return true
 
 	func build_mesh(building) -> ArrayMesh:
 		return WorldFamilies.build_mesh(building)
@@ -561,6 +565,7 @@ class VillageFamily extends BuildingFamilyAdapter:
 		spec.purpose = request.purpose
 		spec.water = request.water
 		spec.enclosure = request.enclosure
+		_copy_orientation_and_period(request, spec)
 		if not spec.valid():
 			return false
 		spec.generate(request.seed)
@@ -639,3 +644,9 @@ static func _copy_size_and_style(request: BuildingRequest, spec: RefCounted) -> 
 	spec.set("width", request.width)
 	spec.set("length", request.length)
 	spec.set("height", request.height)
+	_copy_orientation_and_period(request, spec)
+
+
+static func _copy_orientation_and_period(request: BuildingRequest, spec: RefCounted) -> void:
+	spec.set("orientation", request.orientation)
+	spec.set("period", request.period)

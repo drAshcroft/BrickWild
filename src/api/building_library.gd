@@ -293,6 +293,9 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 					"%s must be between %s and %s for a %s." % [
 						_field_word(request.kind, field), limits["min"], maximum,
 						String(request.kind)]))
+	if not is_finite(request.orientation):
+		out.append(_error(&"invalid_orientation", &"orientation",
+			"orientation must be a finite yaw in radians."))
 	if not known:
 		return out
 	var row: Dictionary = KIND_ROWS[request.kind]

@@ -18,6 +18,10 @@ var purpose: StringName = &""
 ## than inferred from height, so callers can change levels without ceiling scale.
 var storeys: int = 1
 var material: StringName = &"timber"
+## Yaw in radians describing local -Z relative to world north. Zero faces south.
+var orientation: float = 0.0
+## Period metadata carried to family specs for downstream consumers.
+var period: int = 1200
 ## Village-only landscape controls; vocabulary comes from describe_kind().
 var water: StringName = &"none"
 var enclosure: StringName = &"none"
@@ -32,7 +36,8 @@ func to_dict() -> Dictionary:
 		"kind": String(kind), "seed": str(seed), "style": String(style),
 		"purpose": String(purpose), "width": width, "length": length,
 		"height": height, "storeys": storeys, "material": String(material),
-		"water": String(water), "enclosure": String(enclosure)}
+		"water": String(water), "enclosure": String(enclosure),
+		"orientation": orientation, "period": period}
 
 
 func to_json() -> String:
@@ -64,16 +69,16 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 			out._decode_errors.append(_field_error(field, "must be text"))
 		else:
 			out.set(field, StringName(data[field]))
-	for field in ["width", "length", "height", "storeys"]:
+	for field in ["width", "length", "height", "storeys", "orientation", "period"]:
 		if not data.has(field):
 			continue
 		var v: Variant = data[field]
 		if not (v is int or v is float) or not is_finite(float(v)):
 			out._decode_errors.append(_field_error(field, "must be a finite number"))
-		elif field == "storeys" and float(v) != floorf(float(v)):
+		elif field in ["storeys", "period"] and float(v) != floorf(float(v)):
 			out._decode_errors.append(_field_error(field, "must be an integer"))
 		else:
-			out.set(field, int(v) if field == "storeys" else float(v))
+			out.set(field, int(v) if field in ["storeys", "period"] else float(v))
 	var seed_value: Variant = data.get("seed", "0")
 	if seed_value is String and seed_value.is_valid_int() and str(int(seed_value)) == seed_value:
 		out.seed = int(seed_value)
@@ -132,6 +137,8 @@ func copy() -> BuildingRequest:
 	out.material = material
 	out.water = water
 	out.enclosure = enclosure
+	out.orientation = orientation
+	out.period = period
 	out._decode_errors = _decode_errors.duplicate(true)
 	return out
 

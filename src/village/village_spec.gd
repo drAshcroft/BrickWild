@@ -21,6 +21,8 @@ var purpose: StringName = &"farming"
 var wealth: float = 0.4
 var enclosure: StringName = &"none"
 var water: StringName = &"none"
+var orientation: float = 0.0
+var period: int = 1200
 
 # ---- derived from seed + the six above ----
 var households: int = 0

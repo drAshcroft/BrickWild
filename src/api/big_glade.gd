@@ -144,6 +144,7 @@ static func placement(building) -> Dictionary:
 		"bounds": bounds,
 		"footprint": _footprint(building),
 		"front": Vector3(0.0, 0.0, -1.0),
+		"north": Basis(Vector3.UP, building.request.orientation).inverse() * Vector3.BACK,
 		"door": _door(building),
 	}
 	var family := BuildingFamilyAdapter.for_building(building)

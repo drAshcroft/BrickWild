@@ -58,6 +58,9 @@ var chimney_pots: int = 1         # terracotta flue pots at the crown
 var exterior_props: bool = true   # rain barrels, firewood, trade signs
 ## Chosen before planning, so clear floor, openings and emitted masonry agree.
 var material: StringName = &"timber" # timber | stone
+## Site frame metadata. These do not participate in seeded plan generation.
+var orientation: float = 0.0
+var period: int = 1200
 ## Optional explicit masonry thickness for non-house shells.  Castle plans
 ## carry their measured shell thickness here; the negative value preserves the
 ## historical material-derived default for ordinary houses.

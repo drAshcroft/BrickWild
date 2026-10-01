@@ -21,7 +21,85 @@ static func run() -> SuiteResult:
 	_check_family(res, "castle", func(s: int): return BuildingRequest.castle(s, &"norman", 55.0, 50.0, 18.0))
 	_check_family(res, "temple", func(s: int): return BuildingRequest.temple(s, &"basilica", &"blood", 26.0, 44.0, 12.0))
 	_check_world_rect(res)
+	_check_orientation_and_period(res)
 	return res
+
+
+static func _check_orientation_and_period(res: SuiteResult) -> void:
+	var requests: Array[BuildingRequest] = [
+		BuildingRequest.house(821), BuildingRequest.shop(822), BuildingRequest.hotel(823),
+		BuildingRequest.church(824), BuildingRequest.castle(825), BuildingRequest.temple(826),
+		BigGlade.default_request(&"village", 827)]
+	var insula := BigGlade.default_request(&"world", 828)
+	insula.style = &"insula"
+	insula.purpose = &"port_tenement"
+	insula.width = 30.0
+	insula.length = 24.0
+	insula.height = 15.0
+	requests.append(insula)
+	var hall := BigGlade.default_request(&"world", 829)
+	hall.style = &"timber_hall"
+	hall.purpose = &"great_hall"
+	hall.width = 34.0
+	hall.length = 18.0
+	hall.height = 20.0
+	requests.append(hall)
+	var stupa := BigGlade.default_request(&"world", 830)
+	stupa.style = &"stupa"
+	stupa.purpose = &"saints_mound"
+	stupa.width = 40.0
+	stupa.length = 40.0
+	stupa.height = 17.0
+	requests.append(stupa)
+
+	for request in requests:
+		var default_building: GeneratedBuilding = BigGlade.generate(request)
+		var explicit_default := request.copy()
+		explicit_default.orientation = 0.0
+		explicit_default.period = 1200
+		var repeated: GeneratedBuilding = BigGlade.generate(explicit_default)
+		res.checked += 1
+		if not default_building.is_ok() or not repeated.is_ok():
+			res.fail("%s orientation fixture failed to generate" % request.kind)
+			continue
+		if float(default_building.spec.get("orientation")) != 0.0 \
+				or int(default_building.spec.get("period")) != 1200:
+			res.fail("%s spec did not receive default orientation/period" % request.kind)
+		if not _same_mesh(BigGlade.build_mesh(default_building), BigGlade.build_mesh(repeated)):
+			res.fail("%s explicit defaults changed seeded mesh output" % request.kind)
+		var restored := BuildingRequest.from_json(explicit_default.to_json())
+		if restored.orientation != 0.0 or restored.period != 1200:
+			res.fail("%s request defaults did not survive JSON" % request.kind)
+
+		var oriented := request.copy()
+		oriented.orientation = PI / 2.0
+		oriented.period = 1789
+		var turned: GeneratedBuilding = BigGlade.generate(oriented)
+		res.checked += 1
+		if not turned.is_ok():
+			res.fail("%s non-default orientation fixture failed to generate" % request.kind)
+			continue
+		if not is_equal_approx(float(turned.spec.get("orientation")), PI / 2.0) \
+				or int(turned.spec.get("period")) != 1789:
+			res.fail("%s spec did not receive non-default orientation/period" % request.kind)
+		var placement: Dictionary = BigGlade.placement(turned)
+		var north: Vector3 = placement.get("north", Vector3.ZERO)
+		if north.distance_to(Vector3.LEFT) > 0.001:
+			res.fail("%s placement north is wrong in the oriented building frame: %s" %
+				[request.kind, north])
+		var round_trip := BuildingRequest.from_json(oriented.to_json())
+		if not is_equal_approx(round_trip.orientation, oriented.orientation) \
+				or round_trip.period != 1789:
+			res.fail("%s non-default request metadata did not survive JSON" % request.kind)
+
+
+static func _same_mesh(a: ArrayMesh, b: ArrayMesh) -> bool:
+	if a == null or b == null or a.get_surface_count() != b.get_surface_count():
+		return false
+	for surface in range(a.get_surface_count()):
+		if a.surface_get_arrays(surface) != b.surface_get_arrays(surface):
+			return false
+	return true
 
 
 static func _check_family(res: SuiteResult, kind: String, make: Callable) -> void:

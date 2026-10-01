@@ -62,6 +62,8 @@ var edge_opt: OptionButton
 var water_label: Label
 var edge_label: Label
 var generate_button: Button
+var orientation_spin: SpinBox
+var period_spin: SpinBox
 
 
 func _ready() -> void:
@@ -98,13 +100,33 @@ func _add_landscape_controls() -> void:
 	seed_input.tooltip_text = "Keep the seed to return to the same place."
 	var shuffle := Button.new()
 	shuffle.text = "New seed"
+	var orientation_label := Label.new()
+	orientation_label.text = "Orientation (°)"
+	orientation_spin = SpinBox.new()
+	orientation_spin.min_value = -360.0
+	orientation_spin.max_value = 360.0
+	orientation_spin.step = 1.0
+	orientation_spin.value = 0.0
+	orientation_spin.suffix = "°"
+	orientation_spin.tooltip_text = "Yaw of local -Z relative to north. Zero faces south."
+	var period_label := Label.new()
+	period_label.text = "Period"
+	period_spin = SpinBox.new()
+	period_spin.min_value = -10000.0
+	period_spin.max_value = 10000.0
+	period_spin.step = 1.0
+	period_spin.value = 1200.0
 	generate_button = Button.new()
 	generate_button.text = "Generate"
-	for control in [water_label, water_opt, edge_label, edge_opt, seed_label, seed_input, shuffle, generate_button]:
+	for control in [water_label, water_opt, edge_label, edge_opt,
+			orientation_label, orientation_spin, period_label, period_spin,
+			seed_label, seed_input, shuffle, generate_button]:
 		grid.add_child(control)
 		grid.move_child(control, grid.get_node("Hint").get_index())
 	water_opt.item_selected.connect(func(_i): _controls_changed())
 	edge_opt.item_selected.connect(func(_i): _controls_changed())
+	orientation_spin.value_changed.connect(func(_v): _controls_changed())
+	period_spin.value_changed.connect(func(_v): _controls_changed())
 	seed_input.text_submitted.connect(func(_text): regenerate())
 	generate_button.pressed.connect(regenerate)
 	shuffle.pressed.connect(func():
@@ -300,6 +322,8 @@ func _build(seed_value: int) -> GeneratedBuilding:
 	request.width = width_slider.value
 	request.length = length_slider.value
 	request.height = height_slider.value
+	request.orientation = deg_to_rad(orientation_spin.value)
+	request.period = int(period_spin.value)
 	if BigGlade.describe_kind(_kind()).has("storeys"):
 		request.storeys = int(storeys_slider.value)
 	if _kind() == VILLAGE:
@@ -322,6 +346,7 @@ func _show(idx: int) -> void:
 	else:
 		_mesh_instance = BigGlade.instantiate(buildings[idx], cutaway)
 	viewport.get_node("ModelRoot").add_child(_mesh_instance)
+	(viewport.get_node("ModelRoot") as Node3D).rotation.y = buildings[idx].request.orientation
 	variant_list.select(idx)
 	info_label.text = _describe(s)
 	_frame(mesh)

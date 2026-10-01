@@ -20,6 +20,8 @@ var cult: StringName = &"blood"
 var width: float = 26.0     # X, metres, outside face to outside face
 var length: float = 44.0    # Z; the way in is at -Z, the god is at +Z
 var height: float = 12.0    # floor to the ceiling of the great hall
+var orientation: float = 0.0
+var period: int = 1200
 
 # ---- derived from seed + form + cult ----
 var variant_name: String

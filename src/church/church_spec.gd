@@ -11,6 +11,8 @@ var style: StringName = &"romanesque"
 var width: float = 10.0     # nave width, meters  (X)
 var length: float = 20.0    # nave length (Z), before tower/apse additions
 var height: float = 12.0    # wall height to eaves, meters
+var orientation: float = 0.0
+var period: int = 1200
 
 # ---- derived from seed + style ----
 var variant_name: String
@@ -139,4 +141,3 @@ func _init(p_seed := 0) -> void:
 	seed = p_seed
 	rng = RandomNumberGenerator.new()
 	rng.seed = seed
-

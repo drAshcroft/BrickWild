@@ -16,6 +16,8 @@ var style: StringName = &"norman"
 var width: float = 40.0     # site width, metres  (X)
 var length: float = 50.0    # site length, metres (Z); the gate is at -Z
 var height: float = 10.0    # main wall / eaves height, metres
+var orientation: float = 0.0
+var period: int = 1200
 ## Force a tier instead of deriving it from the footprint. &"" means derive.
 var tier_override: StringName = &""
 ## Force a plan kind instead of deriving it from style and tier. &"" derives.

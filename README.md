@@ -30,8 +30,12 @@ if building.is_ok():
 Use `BuildingRequest.church()`, `.castle()`, `.house()`, `.shop()`, `.hotel()` or `.temple()` so each
 call site keeps the vocabulary of that building family. Generation is seeded,
 does not mutate the request, and does not emit geometry until `build_mesh()`.
-`placement()` reports measured bounds, footprint, identity and the local -Z
-front. The third `instantiate()` argument opts into shell-only collision.
+`placement()` reports measured bounds, footprint, identity, the local -Z
+front, and `north` as a vector in the building's local frame. Requests carry
+`orientation` in radians (yaw of local -Z relative to north; zero faces south)
+and an integer `period` (default 1200); both values are retained on every
+family spec. Studio displays orientation in degrees and exposes the period.
+The third `instantiate()` argument opts into shell-only collision.
 
 ### Discovering what to ask for
 
@@ -122,7 +126,8 @@ What a caller of the library may rely on, and what it may not.
   descriptor field, a new placement key) keep the number; a change that
   removes or renames a field, or alters what an existing field means, raises
   it. `BuildingRequest`'s public fields (`kind`, `seed`, `style`, `purpose`,
-  `width`, `length`, `height`, `storeys`, `material`, `water`, `enclosure`) are
+  `width`, `length`, `height`, `storeys`, `material`, `water`, `enclosure`,
+  `orientation`, `period`) are
   the request contract.
 - **Coordinates.** Metres. `+X` right, `+Y` up, `+Z` back; every family's
   public front faces local `-Z`. The door is the actual entrance, which may
@@ -146,8 +151,8 @@ What a caller of the library may rely on, and what it may not.
   See [the transport contract](docs/PUBLIC_API_TRANSPORT.md) for headless
   generation, structured QA, lossless state and DM_View interior export.
 - **Seeds.** Within one generator release, the same request (kind, seed, style,
-  purpose, sizes, storeys) produces the same representation, the same
-  `placement()` and the same mesh, on the same Godot version. Seeded output
+  purpose, sizes, storeys, orientation, period) produces the same
+  representation, `placement()` and mesh, on the same Godot version. Seeded output
   is **not** guaranteed stable across releases: a generator change that
   re-arranges a house is a change to every seed, and it is made
   deliberately. A caller that needs a building to stay put should keep the
