@@ -34,6 +34,9 @@ var variant_name: String
 ## or &"terraced" (two nested polygonal wards with raised inner ground).
 ## The builder may take the axis-aligned shortcut only for &"rect".
 var plan_kind: StringName = &"rect"
+## Bulge polygon curtain runs outward between their vertex towers. Elven
+## masonry uses this by default; other styles stay faceted unless requested.
+var curved_edges := false
 ## Sides of the enceinte: 4 for &"rect", POLY_MIN_SIDES..POLY_MAX_SIDES for
 ## &"polygon".
 var sides: int = 4
@@ -220,6 +223,7 @@ const PLANS := {
 	&"wizard": {"polygon": 0.0, "sides": [6]},
 	&"dark": {"polygon": 0.0, "sides": [4], "forced": &"ridge"},
 	&"sky": {"polygon": 1.0, "sides": [7, 8], "forced": &"polygon"},
+	&"elven": {"polygon": 1.0, "sides": [6, 7, 8], "forced": &"polygon"},
 }
 
 
@@ -365,6 +369,16 @@ const STYLES := {
 		"roof_pitch": [0.7, 1.0], "windows": &"arched", "dormers": 0.2,
 		"stone": ["d6d8e8", "929ac1"], "roof": ["697caf", "34446e"],
 		"chimneys": [0, 1], "wings": [1], "merlon_profile": &"block",
+	},
+	&"elven": {
+		"label": "Elven Hall",
+		"plan_kind": &"polygon", "curved_edges": true,
+		"tower_shape": &"round", "tower_roof": [&"cone", &"flat"],
+		"keep_shape": [&"round", &"shell"], "battlements": 0.0, "batter": 0.01,
+		"side_towers": [0, 1], "gate_towers": 0.2, "barbican": 0.0,
+		"roof_pitch": [0.35, 0.65], "windows": &"arched", "dormers": 0.0,
+		"stone": ["c7d1c2", "9eae98"], "roof": ["51695d", "354a42"],
+		"chimneys": [0], "wings": [1], "merlon_profile": &"block",
 	},
 }
 

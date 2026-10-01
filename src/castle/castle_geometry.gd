@@ -626,8 +626,11 @@ static func wall_segments(spec: CastleSpec, r: int) -> Array[Dictionary]:
 			var run_len: float = ra.distance_to(rb)
 			if run_len < MIN_WALL_RUN:
 				continue
-			var steps: int = 1 if flat else clampi(int(run_len / WALL_STEP) + 1,
-				1, WALL_STEPS_MAX)
+			# A curved curtain is a single arc from vertex to vertex. Splitting it
+			# into the old straight-wall staircase would reset the sagitta at each
+			# join and turn one sweep into a row of scallops.
+			var steps: int = 1 if flat or spec.curved_edges else clampi(
+				int(run_len / WALL_STEP) + 1, 1, WALL_STEPS_MAX)
 			for k in range(steps):
 				var sa: Vector2 = ra.lerp(rb, float(k) / float(steps))
 				var sb: Vector2 = ra.lerp(rb, float(k + 1) / float(steps))

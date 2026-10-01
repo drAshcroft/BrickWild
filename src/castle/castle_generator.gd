@@ -33,6 +33,7 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	spec.rng.seed = p_seed
 	var s: Dictionary = CastleSpec.STYLES[spec.style]
 	var r := spec.rng
+	spec.curved_edges = bool(s.get("curved_edges", false))
 
 	spec.tier = spec.tier_override if spec.tier_override != &"" \
 		else CastleSpec.tier_for(spec.width, spec.length)

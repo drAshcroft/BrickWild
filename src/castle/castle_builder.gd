@@ -1145,6 +1145,9 @@ func _build_ring_walls_poly(r: int) -> void:
 
 
 func _wall_run(seg: Dictionary, r: int) -> void:
+	if spec.curved_edges:
+		_curved_wall_run(seg, r)
+		return
 	var t: float = CastleGeometry.wall_thickness(spec, r)
 	var tb: float = CastleGeometry.wall_base_thickness(spec, r)
 	var h: float = CastleGeometry.wall_height(spec, r)
@@ -1209,6 +1212,91 @@ func _wall_run(seg: Dictionary, r: int) -> void:
 		_crenellate_run(edge - along, edge + along, h + CastleGeometry.PARAPET_RISE,
 			spec.merlon_h * 0.7, yaw, SURF_TRIM)
 	_run_slits(seg, r)
+	total_height = maxf(total_height, h + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+
+
+## Elven curtains bow between the original polygon vertices. Sampling includes
+## both sides of every slit, so the mesh cut and its logged opening share the
+## same curved surface coordinates. Corner towers still use CastleGeometry's
+## unshifted polygon vertices.
+func _curved_wall_run(seg: Dictionary, r: int) -> void:
+	var t: float = CastleGeometry.wall_thickness(spec, r)
+	var tb: float = CastleGeometry.wall_base_thickness(spec, r)
+	var h: float = CastleGeometry.wall_height(spec, r)
+	var run: float = float(seg["length"])
+	var a: Vector2 = seg["a"]
+	var b: Vector2 = seg["b"]
+	var outward: Vector2 = Vector2(float(seg["outward"].x), float(seg["outward"].z))
+	var sagitta: float = run * 0.16
+	var slit_y: float = h * 0.62
+	var slit_h := minf(1.5, h * 0.24)
+	var slit_w := 0.32
+	var slit_count: int = clampi(int(run / SLIT_BAY), 1, 24)
+	var slit_t: Array[float] = []
+	var ts: Array[float] = [0.0, 1.0]
+	var baseline_steps: int = clampi(int(ceil(run / 1.5)), 12, 64)
+	for i in range(1, baseline_steps):
+		ts.append(float(i) / float(baseline_steps))
+	for i in range(slit_count):
+		var center_t: float = (float(i) + 1.0) / float(slit_count + 1)
+		slit_t.append(center_t)
+		ts.append(center_t)
+		var half_t: float = (slit_w * 0.5 + 0.03) / run
+		ts.append(clampf(center_t - half_t, 0.0, 1.0))
+		ts.append(clampf(center_t + half_t, 0.0, 1.0))
+	ts.sort()
+	var unique_ts: Array[float] = []
+	for value in ts:
+		if unique_ts.is_empty() or value > unique_ts.back() + 0.00001:
+			unique_ts.append(value)
+	var pts := PackedVector3Array()
+	var distances := PackedFloat32Array([0.0])
+	for i in range(unique_ts.size()):
+		var f: float = unique_ts[i]
+		var p: Vector2 = a.lerp(b, f) + outward * (4.0 * sagitta * f * (1.0 - f))
+		pts.append(Vector3(p.x, 0.0, p.y))
+		if i > 0:
+			distances.append(distances[i - 1] + pts[i - 1].distance_to(pts[i]))
+	var openings: Array[Rect2] = []
+	var wall_band := Vector2(clampf(slit_y - slit_h * 0.5, 0.25, h - slit_h - 0.25), slit_h)
+	for center_t in slit_t:
+		var index := 0
+		for i in range(unique_ts.size()):
+			if unique_ts[i] >= center_t:
+				index = i
+				break
+		var distance: float = distances[index]
+		openings.append(Rect2(distance - slit_w * 0.5, wall_band.x, slit_w, wall_band.y))
+	var wall_bounds := _kit.curved_wall(pts, h, tb, t, SURF_STONE, openings)
+	_log_mass("wall_%d_%s" % [r, String(seg["name"])], wall_bounds)
+
+	# A bowed wall walk is a second shallow curved shell, not a box on the chord.
+	var walk_h: float = CastleGeometry.PARAPET_RISE
+	_kit.curved_wall(pts, walk_h, t + 0.3, t + 0.3, SURF_TRIM, [], h)
+	if spec.battlements:
+		var mw: float = CastleGeometry.merlon_width(spec)
+		var pitch: float = mw + CastleGeometry.MERLON_GAP
+		var count: int = int(run / pitch)
+		for i in range(count):
+			var f: float = (float(i) + 0.5) / float(count)
+			var p: Vector2 = a.lerp(b, f) + outward * (4.0 * sagitta * f * (1.0 - f))
+			var derivative: Vector2 = (b - a) + outward * (4.0 * sagitta * (1.0 - 2.0 * f))
+			var tangent := derivative.normalized()
+			var face_yaw := atan2(tangent.y, tangent.x) + PI * 0.5
+			_emit_merlon(Vector3(mw, spec.merlon_h, t + 0.3),
+				Vector3(p.x, h + walk_h + spec.merlon_h * 0.5, p.y), SURF_TRIM, face_yaw)
+
+	for center_t in slit_t:
+		var f: float = center_t
+		var p: Vector2 = a.lerp(b, f) + outward * (4.0 * sagitta * f * (1.0 - f))
+		var derivative: Vector2 = (b - a) + outward * (4.0 * sagitta * (1.0 - 2.0 * f))
+		var tangent := derivative.normalized()
+		var normal := Vector2(tangent.y, -tangent.x)
+		var thick: float = lerpf(tb, t, slit_y / h)
+		var surface_point: Vector2 = p + normal * (thick * 0.5 + CastleGeometry.OPENING_EPS)
+		var angle: float = atan2(normal.x, normal.y)
+		_opening(Vector3(surface_point.x, slit_y, surface_point.y), angle,
+			slit_w, slit_h, &"slit", false, true, thick)
 	total_height = maxf(total_height, h + CastleGeometry.PARAPET_RISE + spec.merlon_h)
 
 

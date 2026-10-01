@@ -661,3 +661,114 @@ func arc_ribbon(from_p: Vector3, to_p: Vector3, rise: float, thickness: float,
 			(prev + p) / 2.0)
 		oriented_box(Vector3(depth, thickness, seg_len * 1.08), xf, surf)
 		prev = p
+
+
+## A closed masonry strip following a sampled plan curve. `points` are the
+## centreline in plan, in order round the wall; `openings` are Rect2s whose X
+## values are distances along that line and whose Y values are the vertical
+## opening bands. Callers include opening edges in `points`, so an omitted
+## panel ends exactly at the aperture rather than rounding it to a tessellation
+## step. The returned bounds include the widest, battered course.
+func curved_wall(points: PackedVector3Array, height: float, base_thickness: float,
+		top_thickness: float, surf: int, openings: Array[Rect2] = [],
+		base_y := 0.0) -> AABB:
+	if points.size() < 2 or height <= 0.0:
+		return AABB()
+	var count := points.size()
+	var distances := PackedFloat32Array([0.0])
+	for i in range(1, count):
+		distances.append(distances[i - 1] + points[i - 1].distance_to(points[i]))
+	var run := distances.back()
+	if run <= 0.001:
+		return AABB()
+	var levels: Array[float] = [0.0, height]
+	for opening in openings:
+		levels.append(clampf(opening.position.y, 0.0, height))
+		levels.append(clampf(opening.end.y, 0.0, height))
+	levels.sort()
+	var clean_levels: Array[float] = []
+	for level in levels:
+		if clean_levels.is_empty() or level > clean_levels.back() + 0.001:
+			clean_levels.append(level)
+	var bounds := AABB()
+	var first := true
+	var st: SurfaceTool = _sts[surf]
+	for i in range(count - 1):
+		var delta := points[i + 1] - points[i]
+		var tangent := Vector2(delta.x, delta.z).normalized()
+		if tangent.length_squared() < 0.99:
+			continue
+		# Polygon edges are wound counter-clockwise in X/Z. This is their
+		# outward normal; the curved path keeps that winding as it bends.
+		var outward := Vector2(tangent.y, -tangent.x)
+		var seg_lo: float = distances[i]
+		var seg_hi: float = distances[i + 1]
+		for band in range(clean_levels.size() - 1):
+			var y0: float = clean_levels[band]
+			var y1: float = clean_levels[band + 1]
+			if y1 <= y0 + 0.001:
+				continue
+			var ym := (y0 + y1) * 0.5
+			var thick := lerpf(base_thickness, top_thickness, ym / height)
+			var blocked := false
+			for opening in openings:
+				if ym > opening.position.y and ym < opening.end.y \
+						and (seg_lo + seg_hi) * 0.5 > opening.position.x \
+						and (seg_lo + seg_hi) * 0.5 < opening.end.x:
+					blocked = true
+					break
+			if blocked:
+				continue
+			var p0 := Vector2(points[i].x, points[i].z)
+			var p1 := Vector2(points[i + 1].x, points[i + 1].z)
+			var half := thick * 0.5
+			var outside0 := p0 + outward * half
+			var outside1 := p1 + outward * half
+			var inside0 := p0 - outward * half
+			var inside1 := p1 - outward * half
+			var lo := y0 + base_y
+			var hi := y1 + base_y
+			var outer_a := Vector3(outside0.x, lo, outside0.y)
+			var outer_b := Vector3(outside1.x, lo, outside1.y)
+			var outer_c := Vector3(outside1.x, hi, outside1.y)
+			var outer_d := Vector3(outside0.x, hi, outside0.y)
+			var inner_a := Vector3(inside0.x, lo, inside0.y)
+			var inner_b := Vector3(inside1.x, lo, inside1.y)
+			var inner_c := Vector3(inside1.x, hi, inside1.y)
+			var inner_d := Vector3(inside0.x, hi, inside0.y)
+			_quad(st, outer_a, outer_b, outer_c, outer_d)
+			_quad(st, inner_b, inner_a, inner_d, inner_c)
+			# Top and bottom returns close each course. The reveals at openings
+			# are supplied by the castle's normal through-opening emitter.
+			_quad(st, outer_d, outer_c, inner_c, inner_d)
+			_quad(st, inner_a, inner_b, outer_b, outer_a)
+			for point in [outer_a, outer_b, outer_c, outer_d,
+					inner_a, inner_b, inner_c, inner_d]:
+				if first:
+					bounds = AABB(point, Vector3.ZERO)
+					first = false
+				else:
+					bounds = bounds.expand(point)
+	# End faces are the only non-course faces which were not closed above.
+	for idx in [0, count - 1]:
+		var p := Vector2(points[idx].x, points[idx].z)
+		var prev_i := 1 if idx == 0 else count - 2
+		var tangent := Vector2(points[idx].x - points[prev_i].x,
+			points[idx].z - points[prev_i].z).normalized()
+		if idx == 0:
+			tangent = -tangent
+		var outward := Vector2(tangent.y, -tangent.x)
+		var base_half := base_thickness * 0.5
+		var top_half := top_thickness * 0.5
+		var a := Vector3(p.x + outward.x * base_half, base_y,
+			p.y + outward.y * base_half)
+		var b := Vector3(p.x - outward.x * base_half, base_y,
+			p.y - outward.y * base_half)
+		var c := Vector3(p.x - outward.x * top_half, base_y + height,
+			p.y - outward.y * top_half)
+		var d := Vector3(p.x + outward.x * top_half, base_y + height,
+			p.y + outward.y * top_half)
+		_quad(st, a, b, c, d)
+		for point in [a, b, c, d]:
+			bounds = bounds.expand(point)
+	return bounds
