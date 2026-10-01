@@ -760,6 +760,37 @@ static func roof_top_above_walls(spec: HouseSpec) -> float:
 	return top
 
 
+## Height of the roof's ridge line above the ground: the top storey's wall head
+## plus the rise. The roof faces in roof_layout() are built from these two
+## numbers, so the blueprint's elevation can be compared with them.
+static func ridge_height(spec: HouseSpec) -> float:
+	return spec.height * float(maxi(spec.storeys, 1)) + roof_rise(spec)
+
+
+## The roof the builder lays on this plan, from the family that owns it: the
+## faces in the roof's own frame, the transform to world, and the rise. A
+## house, a shop and a long hall share roof_layout(); a hotel has its mansard.
+static func roof_of(plan: HousePlan) -> Dictionary:
+	if plan.spec is HotelSpec:
+		return HotelGeometry.roof_layout(plan.spec as HotelSpec)
+	return roof_layout(plan)
+
+
+## The ridge line's height above ground for any house-family spec.
+static func ridge_of(spec: HouseSpec) -> float:
+	if spec is HotelSpec:
+		return HotelGeometry.wall_top(spec as HotelSpec) + (spec as HotelSpec).roof_rise
+	return ridge_height(spec)
+
+
+## The top of the finished shell, from the family that owns it: a hotel's
+## cupolas stand above its roof.
+static func shell_top(spec: HouseSpec) -> float:
+	if spec is HotelSpec:
+		return HotelGeometry.total_height(spec as HotelSpec)
+	return total_height(spec)
+
+
 ## Exact top of the emitted shell, in world space.
 static func total_height(spec: HouseSpec) -> float:
 	var raw_storeys = spec.get("storeys")
