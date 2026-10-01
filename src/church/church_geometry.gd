@@ -60,6 +60,12 @@ const OCT_BLOCK_FACTOR := 1.12   # Florence: block circumradius, x dome radius; 
 const FLORENCE_DOME_RATIO := 0.14   # dome radius, x overall length (45 m of 153)
 const FLORENCE_BAY := 1.45       # bay pitch, x nave width: four huge bays
 const TRIBUNE_HEIGHT_RATIO := 0.5
+const TENT_RISE_RATIO := 2.3     # St Basil: tent rise, x core radius
+const TENT_CAP_RATIO := 0.95     # the little drum and onion on the tent's tip
+const PODIUM_RATIO := 0.045      # St Basil: podium height, x core height
+const PODIUM_MARGIN := 2.4       # podium reach beyond the outermost chapel
+const BASIL_PATTERN := [0.34, 0.46, 0.38, 0.52, 0.42, 0.48, 0.36, 0.54]
+const BASIL_DRUM_PATTERN := [0.9, 1.25, 1.0, 1.35, 1.1, 0.85, 1.3, 1.05]
 
 
 # ------------------------------------------------------------------ nave
@@ -367,6 +373,8 @@ static func min_drum_height(spec: ChurchSpec) -> float:
 
 ## Rise of the dome shell above the top of its drum.
 static func dome_shell_rise(spec: ChurchSpec) -> float:
+	if basil_core(spec):
+		return tent_rise(spec)
 	match spec.dome_shape:
 		&"onion":
 			return spec.dome_radius * 1.55
@@ -380,6 +388,8 @@ static func dome_apex_height(spec: ChurchSpec) -> float:
 		+ dome_shell_rise(spec)
 	if spec.dome_lantern:
 		top += lantern_height(spec) + lantern_cap_height(spec)
+	if basil_core(spec):
+		top += tent_cap_height(spec)
 	return top
 
 
@@ -567,7 +577,7 @@ static func chapel_aabb(spec: ChurchSpec, i: int) -> AABB:
 		lo.x = minf(lo.x, px); lo.y = minf(lo.y, pz)
 		hi.x = maxf(hi.x, px); hi.y = maxf(hi.y, pz)
 	return AABB(Vector3(lo.x, 0.0, lo.y),
-		Vector3(hi.x - lo.x, spec.height * 0.42, hi.y - lo.y))
+		Vector3(hi.x - lo.x, chapel_tower_height(spec, i), hi.y - lo.y))
 
 
 static func narthex_depth(spec: ChurchSpec) -> float:
@@ -834,6 +844,78 @@ static func _hero_clerestory(spec: ChurchSpec) -> Array[Dictionary]:
 	return out
 
 
+## St Basil: a tented core ringed by onion-domed chapels on a podium.
+static func basil_core(spec: ChurchSpec) -> bool:
+	return spec.hero == &"basil" and spec.dome
+
+
+static func tent_rise(spec: ChurchSpec) -> float:
+	return spec.dome_radius * TENT_RISE_RATIO
+
+
+static func tent_cap_height(spec: ChurchSpec) -> float:
+	return spec.dome_radius * TENT_CAP_RATIO
+
+
+static func podium_height(spec: ChurchSpec) -> float:
+	return maxf(spec.height * PODIUM_RATIO, 0.6) if basil_core(spec) else 0.0
+
+
+## The podium reaches PODIUM_MARGIN beyond everything that stands on it.
+static func podium_aabb(spec: ChurchSpec) -> AABB:
+	var lo := Vector2(-spec.width / 2.0, -spec.length / 2.0)
+	var hi := Vector2(spec.width / 2.0, spec.length / 2.0)
+	if spec.narthex:
+		var n: AABB = narthex_aabb(spec)
+		lo.y = minf(lo.y, n.position.z)
+	for i in range(spec.radiating_chapels):
+		var c: AABB = chapel_aabb(spec, i)
+		lo = lo.min(Vector2(c.position.x, c.position.z))
+		hi = hi.max(Vector2(c.end.x, c.end.z))
+	var m: float = PODIUM_MARGIN
+	return AABB(Vector3(lo.x - m, 0.0, lo.y - m),
+		Vector3(hi.x - lo.x + m * 2.0, podium_height(spec), hi.y - lo.y + m * 2.0))
+
+
+## Body of chapel `i` below its drum. Heights are staggered so no two
+## neighbours read as a pair.
+static func chapel_body_height(spec: ChurchSpec, i: int) -> float:
+	if spec.hero == &"basil":
+		return spec.height * float(BASIL_PATTERN[i % BASIL_PATTERN.size()])
+	return spec.height * 0.42
+
+
+static func chapel_drum_radius(spec: ChurchSpec) -> float:
+	return spec.chapel_radius * 0.78
+
+
+static func chapel_drum_height(spec: ChurchSpec, i: int) -> float:
+	return spec.chapel_radius * 0.9 * float(BASIL_DRUM_PATTERN[(i * 3) % BASIL_DRUM_PATTERN.size()])
+
+
+static func chapel_onion_rise(spec: ChurchSpec) -> float:
+	return chapel_drum_radius(spec) * 1.7
+
+
+static func chapel_spike_height(spec: ChurchSpec) -> float:
+	return spec.chapel_radius * 0.45
+
+
+## The drum stands a little out from the chapel's flat face, so it sits wholly
+## over the half-drum below it.
+static func chapel_drum_center(spec: ChurchSpec, i: int) -> Vector3:
+	var a: float = chapel_angle(spec, i)
+	return chapel_center(spec, i) + Vector3(sin(a), 0.0, cos(a)) * (spec.chapel_radius * 0.10)
+
+
+## Ground to the tip of the cross: what the elevation draws.
+static func chapel_tower_height(spec: ChurchSpec, i: int) -> float:
+	if spec.hero != &"basil":
+		return spec.height * 0.42
+	return chapel_body_height(spec, i) + chapel_drum_height(spec, i) \
+		+ chapel_onion_rise(spec) + chapel_spike_height(spec)
+
+
 # ------------------------------------------------------------- envelope
 
 ## Ridge height of the nave roof, which caps the nave walls.
@@ -909,6 +991,10 @@ static func mass_length_extent(spec: ChurchSpec) -> Vector2:
 		var oct: AABB = octagon_aabb(spec)
 		z1 = maxf(z1, oct.end.z)
 		z0 = minf(z0, oct.position.z)
+	if podium_height(spec) > 0.0:
+		var pod: AABB = podium_aabb(spec)
+		z1 = maxf(z1, pod.end.z)
+		z0 = minf(z0, pod.position.z)
 	return Vector2(z0, z1)
 
 
@@ -953,4 +1039,6 @@ static func width_extent(spec: ChurchSpec) -> float:
 		var tb: AABB = tribune_aabb(spec, i)
 		w = maxf(w, absf(tb.position.x) * 2.0)
 		w = maxf(w, absf(tb.end.x) * 2.0)
+	if podium_height(spec) > 0.0:
+		w = maxf(w, podium_aabb(spec).size.x)
 	return w

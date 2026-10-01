@@ -4,12 +4,15 @@ extends MassBuilder
 ## apse (half-cylinder), west tower + roof, then window/door/trim detailing.
 ##
 ## Surfaces: 0 = stone walls, 1 = trim/string courses, 2 = roof, 3 = openings
-##           (dark recesses for windows/doors).
+##           (dark recesses for windows/doors),
+##           4 = painted domes (vertex-coloured; only the hero St Basil's
+##           emits it, and an empty trailing surface is not committed).
 
 const SURF_STONE := 0
 const SURF_TRIM := 1
 const SURF_ROOF := 2
 const SURF_OPEN := 3
+const SURF_ACCENT := 4
 
 ## How far attached masses penetrate the host wall, so they read as joined
 ## rather than floating beside it or swallowing the nave.
@@ -20,13 +23,19 @@ const PENDENTIVE_PROFILE_STEPS := 6
 const PENDENTIVE_LEDGE_ROWS := [2, 4, 5]
 const PENDENTIVE_LEDGE_WIDTH := 0.22
 const PENDENTIVE_LEDGE_RISE := 0.06
+const PODIUM_STEP_INSET := 1.0
+## The painted onions of St Basil's: gold, green, blue, red, cream, orange,
+## teal and violet, in the order the chapels take them.
+const BASIL_COLOURS: Array[Color] = [Color("c9a227"), Color("2f7d57"),
+	Color("2d5fa8"), Color("b7352b"), Color("e8e0c8"), Color("d98a2b"),
+	Color("3f8f8a"), Color("8e3d8f")]
 
 var spec: ChurchSpec
 var _roof_volumes: Array[PackedVector3Array] = []
 
 func build(p_spec: ChurchSpec) -> ArrayMesh:
 	spec = p_spec
-	begin_metric(4)
+	begin_metric(5)
 	_roof_volumes.clear()
 
 	var w: float = spec.width
@@ -241,11 +250,11 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 			opening.style, true, true)
 		_portal_moulding(opening, opening_index)
 	box(Vector3((w * 0.34 if spec.door_style == &"portal" else 2.4) + 0.7, 0.22, 0.14),
-		Vector3(0, door_h + 0.35, door_z - 0.02), SURF_TRIM)
+		Vector3(0, door_h + 0.35 + ChurchGeometry.podium_height(spec), door_z - 0.02), SURF_TRIM)
 
 	# ---------- nave windows when there are no aisles ----------
 	tag("window")
-	if spec.aisles == 0:
+	if spec.aisles == 0 and spec.hero != &"basil":
 		var nw2: int = int(l / 3.2)
 		for i in range(nw2):
 			var wz2: float = -l / 2.0 + l / float(nw2 + 1) * (i + 1)
@@ -262,6 +271,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		rose(Vector3(0, _rose_y(), _west_door_z() if spec.west_towers == 1
 			else -l / 2.0 - ChurchGeometry.OPENING_EPS), PI)
 
+	_build_podium()
 	_build_narthex()
 	_build_ambulatory_and_chapels()
 	_build_tribunes()
@@ -482,16 +492,17 @@ func _west_door_openings() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var door_h: float = minf(spec.height * 0.32, 3.4)
 	var z: float = _west_door_z()
+	var lift: float = ChurchGeometry.podium_height(spec)
 	match spec.door_style:
 		&"twin":
 			for x in [-0.8, 0.8]:
-				out.append({"pos": Vector3(x, door_h / 2.0 + 0.1, z),
+				out.append({"pos": Vector3(x, door_h / 2.0 + 0.1 + lift, z),
 					"width": 0.85, "height": door_h, "style": &"round"})
 		&"portal":
-			out.append({"pos": Vector3(0, door_h / 2.0 + 0.05, z),
+			out.append({"pos": Vector3(0, door_h / 2.0 + 0.05 + lift, z),
 				"width": spec.width * 0.34, "height": door_h, "style": &"pointed"})
 		_:
-			out.append({"pos": Vector3(0, door_h / 2.0 + 0.1, z),
+			out.append({"pos": Vector3(0, door_h / 2.0 + 0.1 + lift, z),
 				"width": 1.4, "height": door_h, "style": &"round"})
 	return out
 
@@ -507,7 +518,7 @@ func _nave_shell() -> void:
 				"u": opening.pos.z, "y": opening.pos.y,
 				"width": opening.width, "height": opening.height,
 				"style": spec.window_style, "log": false})
-	if spec.aisles == 0:
+	if spec.aisles == 0 and spec.hero != &"basil":
 		var count: int = int(l / 3.2)
 		for i in range(count):
 			var z: float = -l * 0.5 + l / float(count + 1) * (i + 1)
@@ -571,17 +582,21 @@ func _build_ambulatory_and_chapels() -> void:
 		return
 	tag("chapel")
 	var chr_r: float = spec.chapel_radius
-	var chh: float = spec.height * 0.42
 	for i in range(spec.radiating_chapels):
 		var c: Vector3 = ChurchGeometry.chapel_center(spec, i)
 		var a: float = ChurchGeometry.chapel_angle(spec, i)
+		var chh: float = ChurchGeometry.chapel_body_height(spec, i)
+		var domed: bool = spec.hero == &"basil"
 		# each alcove is a little apse in its own right, facing outward
 		_arc_window_shell(Vector3(c.x, 0.0, c.z), chr_r, chh, 7, PI,
 			ChurchGeometry.chapel_arc_start(spec, i), [a], 0.6,
-			chh * 0.4, chh * 0.45, spec.window_style)
+			chh * 0.4, chh * 0.45, spec.window_style, domed)
 		_log_mass("chapel_%d" % i, ChurchGeometry.chapel_aabb(spec, i))
-		_kit.stepped_taper(Vector3(c.x, chh, c.z), chr_r * 2.0 + 0.2, chr_r * 0.6,
-			SURF_ROOF, 3, 0.15, true, 0.0, 0.8)
+		if domed:
+			_basil_chapel_tower(i)
+		else:
+			_kit.stepped_taper(Vector3(c.x, chh, c.z), chr_r * 2.0 + 0.2, chr_r * 0.6,
+				SURF_ROOF, 3, 0.15, true, 0.0, 0.8)
 
 
 ## A base, two set-backs and stone shoulders make the bearing legible. Every
@@ -735,6 +750,8 @@ func _build_dome() -> void:
 	_log_mass("pendentive", ChurchGeometry.pendentive_aabb(spec))
 	# the corona of windows that lights every one of these domes
 	var lights: int = 8 if octagonal else 12
+	if ChurchGeometry.basil_core(spec):
+		lights = 8
 	var angles: Array = []
 	for i in range(lights):
 		angles.append(TAU / lights * i)
@@ -747,6 +764,10 @@ func _build_dome() -> void:
 
 	var top: float = base + pendentive_h + drum_h
 	var rise: float = ChurchGeometry.dome_shell_rise(spec)
+	if ChurchGeometry.basil_core(spec):
+		_tent_core(Vector3(0, top, cz), drum_radius, rise, shell_segments)
+		total_height = maxf(total_height, top + rise + ChurchGeometry.tent_cap_height(spec))
+		return
 	# Round hero shells use explicit fine tessellation. Florence stays an
 	# eight-sided shell; its vertical profile is refined without changing that
 	# deliberate plan.
@@ -844,6 +865,84 @@ func _oriented_half_cone(pos: Vector3, radius: float, height: float, start: floa
 			RoofShape.DEPTH, s, true)
 
 
+# ------------------------------------------------------------ St Basil's
+
+## Podium: two stone courses reaching past the outermost chapel, so the whole
+## cluster stands on one raised platform. The door is lifted onto it.
+func _build_podium() -> void:
+	var ph: float = ChurchGeometry.podium_height(spec)
+	if ph <= 0.0:
+		return
+	tag("podium")
+	var a: AABB = ChurchGeometry.podium_aabb(spec)
+	var c: Vector3 = a.get_center()
+	var inset: float = minf(1.0, PODIUM_STEP_INSET)
+	box(Vector3(a.size.x, ph * 0.5, a.size.z), Vector3(c.x, ph * 0.25, c.z), SURF_STONE)
+	box(Vector3(a.size.x - inset * 2.0, ph, a.size.z - inset * 2.0),
+		Vector3(c.x, ph * 0.5, c.z), SURF_STONE)
+	box(Vector3(a.size.x - inset * 2.0 + 0.3, 0.18, a.size.z - inset * 2.0 + 0.3),
+		Vector3(c.x, ph + 0.09, c.z), SURF_TRIM)
+	_log_mass("podium", a)
+
+
+## The core is tented. An eight-gored tent, banded in stone, narrows to a small
+## drum and a gilded onion with its cross.
+func _tent_core(pos: Vector3, radius: float, rise: float, segments: int) -> void:
+	var tent := PackedVector2Array()
+	for row in [Vector2(1.0, 0.0), Vector2(0.96, 0.10), Vector2(0.80, 0.30),
+			Vector2(0.58, 0.55), Vector2(0.36, 0.78), Vector2(0.18, 0.93),
+			Vector2(0.14, 1.0)]:
+		tent.append(Vector2(radius * row.x, rise * row.y))
+	_kit.revolve(tent, pos, SURF_ROOF, segments)
+	for band in [Vector2(0.80, 0.30), Vector2(0.58, 0.55), Vector2(0.36, 0.78)]:
+		_kit.prism(radius * band.x + 0.12, maxf(rise * 0.025, 0.18), segments,
+			pos + Vector3(0, rise * band.y, 0), SURF_TRIM)
+	var cap: float = ChurchGeometry.tent_cap_height(spec)
+	var tip: Vector3 = pos + Vector3(0, rise, 0)
+	var neck: float = cap * 0.26
+	_kit.prism(radius * 0.17, neck, 8, tip, SURF_STONE)
+	_onion(tip + Vector3(0, neck, 0), radius * 0.26, cap * 0.5, Color("c9a227"), 12)
+	_kit.spike(Vector2(radius * 0.05, radius * 0.05), cap * 0.24,
+		tip + Vector3(0, neck + cap * 0.5, 0), SURF_TRIM)
+
+
+## One chapel's tower: cornice, eight-sided windowed drum, painted onion and
+## cross. Colour and heights come from the chapel's index, so neighbours differ.
+func _basil_chapel_tower(i: int) -> void:
+	var body_h: float = ChurchGeometry.chapel_body_height(spec, i)
+	var dc: Vector3 = ChurchGeometry.chapel_drum_center(spec, i)
+	var rd: float = ChurchGeometry.chapel_drum_radius(spec)
+	var hd: float = ChurchGeometry.chapel_drum_height(spec, i)
+	_arc_window_shell(Vector3(dc.x, body_h, dc.z), rd, hd, 8, TAU, PI / 8.0,
+		[0.0, PI / 2.0, PI, -PI / 2.0], rd * 0.36, hd * 0.5, hd * 0.5, &"round", true)
+	var top_y: float = body_h + hd
+	_kit.prism(rd * 1.1, 0.25, 8, Vector3(dc.x, top_y - 0.25, dc.z), SURF_TRIM, PI / 8.0)
+	var colour: Color = BASIL_COLOURS[(i * 3 + 1) % BASIL_COLOURS.size()]
+	_onion(Vector3(dc.x, top_y, dc.z), rd, ChurchGeometry.chapel_onion_rise(spec),
+		colour, 12)
+	var spike: float = ChurchGeometry.chapel_spike_height(spec)
+	_kit.spike(Vector2(rd * 0.12, rd * 0.12), spike,
+		Vector3(dc.x, top_y + ChurchGeometry.chapel_onion_rise(spec), dc.z), SURF_TRIM)
+
+
+## A painted onion: its own vertex-coloured surface.
+func _onion(center: Vector3, radius: float, rise: float, colour: Color,
+		segments: int) -> void:
+	var st: SurfaceTool = _kit.surface(SURF_ACCENT)
+	st.set_color(colour)
+	_kit.revolve(_onion_profile(radius, rise), center, SURF_ACCENT, segments)
+	st.set_color(Color.WHITE)
+
+
+static func _onion_profile(radius: float, rise: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	# bulges past the springing radius, then draws in to a point
+	for v in [Vector2(1.0, 0.0), Vector2(1.14, 0.24), Vector2(1.05, 0.46),
+			Vector2(0.78, 0.68), Vector2(0.42, 0.86), Vector2(0.0, 1.0)]:
+		pts.append(Vector2(radius * v.x, rise * v.y))
+	return pts
+
+
 ## A closed loft from the square crossing to the drum's exact lower ring. The
 ## inclined facets are the support, not four detached triangular blades.
 func _pendentive_support(center: Vector3, lower_half: float, upper_radius: float,
@@ -920,12 +1019,7 @@ func _pendentive_ring(center: Vector3, lower_half: float, upper_radius: float,
 func _dome_profile(radius: float, rise: float) -> PackedVector2Array:
 	var pts := PackedVector2Array()
 	if spec.dome_shape == &"onion":
-		# bulges past the springing radius, then draws in to a point
-		var ogee := [Vector2(1.0, 0.0), Vector2(1.14, 0.24), Vector2(1.05, 0.46),
-			Vector2(0.78, 0.68), Vector2(0.42, 0.86), Vector2(0.0, 1.0)]
-		for v in ogee:
-			pts.append(Vector2(radius * v.x, rise * v.y))
-		return pts
+		return _onion_profile(radius, rise)
 	var hero_shell: bool = (spec.style == &"byzantine" and spec.dome_shape == &"hemisphere") \
 		or (spec.style == &"renaissance" and spec.dome_shape == &"octagonal")
 	var steps: int = 12 if hero_shell else 6

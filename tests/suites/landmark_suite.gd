@@ -23,7 +23,7 @@ const LANDMARKS: Array[Dictionary] = [
 	{"key": "durham", "style": &"romanesque", "width": 11.9, "length": 61.0, "height": 22.2},
 	{"key": "hagia_sophia", "style": &"byzantine", "width": 31.0, "length": 76.0, "height": 40.0},
 	{"key": "florence_duomo", "style": &"renaissance", "width": 17.0, "length": 153.0, "height": 45.0},
-	{"key": "st_basil", "style": &"russian", "width": 12.0, "length": 46.0, "height": 30.0},
+	{"key": "st_basil", "style": &"russian", "width": 24.0, "length": 30.0, "height": 26.0},
 ]
 
 
@@ -126,15 +126,9 @@ static func _force_features(key: String, spec: ChurchSpec) -> void:
 		"hagia_sophia":
 			_force_dome(spec, &"hemisphere")
 			spec.half_domes = true
-		"florence_duomo":
+		"florence_duomo", "st_basil":
 			# composed, not rolled: the hero geometry lives behind spec.hero
 			ChurchGenerator.apply_landmark(spec, key)
-		"st_basil":
-			_force_dome(spec, &"onion")
-			if spec.radiating_chapels < 4:
-				spec.radiating_chapels = 4
-			if spec.chapel_radius == 0.0:
-				spec.chapel_radius = spec.apse_radius * 0.38
 
 
 ## Twin (or single) west towers, with a physically sensible width/height when
@@ -226,6 +220,13 @@ static func _check_required_masses(key: String, builder: ChurchBuilder, who: Str
 		"st_basil":
 			_require(builder, who, res, "dome_drum", "onion dome")
 			_require(builder, who, res, "chapel_3", "4th radiating chapel")
+			_require(builder, who, res, "chapel_7", "8th radiating chapel")
+			_require(builder, who, res, "podium", "podium")
+			var heights := {}
+			for i in range(8):
+				heights[snappedf(builder.mass_aabb("chapel_%d" % i).size.y, 0.1)] = true
+			if heights.size() < 5:
+				res.fail("%s: chapels stand at only %d different heights" % [who, heights.size()])
 
 
 ## The Duomo is read by its dome: the crossing is the widest thing in the plan

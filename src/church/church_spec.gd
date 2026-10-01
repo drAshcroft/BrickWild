@@ -69,6 +69,7 @@ var narthex: bool                # entrance vestibule across the west front
 # three famous domed churches set it, and ChurchGeometry/ChurchBuilder then
 # add what makes each of them read:
 #   &"florence" -- an octagonal crossing the width of the dome, three tribunes
+#   &"basil"    -- a podium, a tented core and eight onion-domed chapels
 var hero: StringName = &""
 
 const STYLES := {

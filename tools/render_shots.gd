@@ -669,7 +669,7 @@ func _landmarks() -> Array[Dictionary]:
 			"w": 17.0, "l": 153.0, "h": 45.0, "seed": 5007,
 			"feat": "octagonal drum, double-shell dome, lantern"},
 		{"key": "st_basil", "style": &"russian", "title": "St Basil's Cathedral",
-			"w": 12.0, "l": 46.0, "h": 30.0, "seed": 5008, "sheet": true,
+			"w": 24.0, "l": 30.0, "h": 26.0, "seed": 5008, "sheet": true,
 			"feat": "onion domes over a cluster of chapels"},
 	]
 
@@ -796,14 +796,9 @@ func _force_features(spec: ChurchSpec, key: String) -> void:
 			spec.dome_shape = &"hemisphere"
 			spec.half_domes = true
 			spec.exedrae = true
-		"florence_duomo":
+		"florence_duomo", "st_basil":
 			# composed, not rolled: ChurchGenerator.apply_landmark
 			ChurchGenerator.apply_landmark(spec, key)
-		"st_basil":
-			spec.dome = true
-			spec.dome_shape = &"onion"
-			spec.radiating_chapels = 8
-			spec.chapel_arrangement = &"cluster"
 	# backfill any size the generator left at zero, then re-settle the ring
 	if spec.tower and spec.tower_width <= 0.0:
 		spec.tower_width = spec.width * 0.55

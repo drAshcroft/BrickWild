@@ -54,6 +54,8 @@ static func _allowance(spec: ChurchSpec, a: String, b: String) -> float:
 			return INF                        # a tribune is buried in the face it opens off
 		"dome_drum|tribune", "pendentive|tribune", "nave|tribune", "aisle|tribune":
 			return 0.0                        # tribunes stand clear of everything else
+		"nave|podium", "narthex|podium", "chapel|podium", "pendentive|podium", "dome_drum|podium":
+			return INF                        # St Basil's podium is under the whole cluster
 		"flyer_arch|flyer_pier", "flyer_arch|nave", "aisle|flyer_arch":
 			return INF                        # the flyer lands on the wall it braces
 		"flyer_arch|transept", "flyer_pier|transept":
@@ -96,6 +98,9 @@ static func _allowance(spec: ChurchSpec, a: String, b: String) -> float:
 			return 0.0                        # opposite ends of the church
 		"chapel|chapel":
 			return 0.0                        # alcoves must not collide
+		"chapel|narthex":
+			# a clustered ring is fanned round the porch's flank and may graze it
+			return INF if spec.chapel_arrangement == &"cluster" else 0.0
 		"chapel|nave", "chapel|transept", "aisle|chapel":
 			# A clustered ring is set INTO the central mass, so its boxes
 			# overlap by design. A chevet chapel stands off in the apse and

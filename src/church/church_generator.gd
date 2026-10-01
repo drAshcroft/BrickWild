@@ -149,11 +149,13 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 ## after generate(): it overrides whatever the dice chose, sets `spec.hero`
 ## (which switches on the landmark geometry in ChurchGeometry/ChurchBuilder),
 ## and sizes the parts from the dimensions docs/LANDMARKS.md gives. `key` is
-## the landmark key: "florence_duomo".
+## the landmark key: "florence_duomo" or "st_basil".
 static func apply_landmark(spec: ChurchSpec, key: String) -> void:
 	match key:
 		"florence_duomo":
 			_landmark_florence(spec)
+		"st_basil":
+			_landmark_basil(spec)
 
 
 ## Florence: spec.length arrives as the OVERALL length (153 m) and is turned
@@ -192,6 +194,39 @@ static func _landmark_florence(spec: ChurchSpec) -> void:
 	spec.buttress_count_per_side = ChurchGeometry.hero_bay_count(spec) + 1
 	spec.dome_drum_height = maxf(spec.dome_radius * 0.75,
 		ChurchGeometry.min_drum_height(spec))
+
+
+## St Basil: a compact core (the suite gives its footprint) crowned by a tent,
+## eight chapels ringed round it on a podium, entered through a porch on the
+## west where the ring opens.
+static func _landmark_basil(spec: ChurchSpec) -> void:
+	spec.hero = &"basil"
+	_clear_towers(spec)
+	spec.transept = false
+	spec.transept_len = 0.0
+	spec.apse = false
+	spec.ambulatory = false
+	spec.aisles = 0
+	spec.clerestory = false
+	spec.buttresses = false
+	spec.flying_buttresses = false
+	spec.rose_window = false
+	spec.crossing_tower = false
+	spec.crossing_tower_height = 0.0
+	spec.narthex = true
+	spec.dome = true
+	spec.dome_shape = &"onion"
+	spec.dome_lantern = false
+	spec.half_domes = false
+	spec.exedrae = false
+	spec.roof_pitch = 0.12
+	spec.dome_radius = spec.width * 0.30
+	spec.dome_drum_height = maxf(spec.dome_radius * 2.1,
+		ChurchGeometry.min_drum_height(spec))
+	spec.chapel_arrangement = &"cluster"
+	spec.radiating_chapels = 8
+	spec.chapel_radius = spec.width * 0.2
+	_fit_chapels(spec)
 
 
 static func _clear_towers(spec: ChurchSpec) -> void:

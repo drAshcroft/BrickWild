@@ -50,6 +50,9 @@ static func south_elevation_inventory(p_spec: ChurchSpec) -> Dictionary:
 		"crossing_octagon": ChurchGeometry.octagon_aabb(p_spec) \
 			if ChurchGeometry.octagon_crossing(p_spec) else AABB(),
 		"tribunes": tribunes,
+		"podium": ChurchGeometry.podium_aabb(p_spec) \
+			if ChurchGeometry.podium_height(p_spec) > 0.0 else AABB(),
+		"tent": ChurchGeometry.basil_core(p_spec),
 	}
 
 func setup(p_spec: ChurchSpec) -> void:
@@ -184,6 +187,10 @@ func _draw_plan(r: Rect2, ink: Color, light: Color) -> void:
 		var br: Vector2 = to_paper.call(Vector2(a.position.x + a.size.x,
 			a.position.z + a.size.z))
 		return Rect2(tl, br - tl)
+
+	# podium: the raised platform under St Basil's whole cluster
+	if ChurchGeometry.podium_height(spec) > 0.0:
+		draw_rect(plan_rect.call(ChurchGeometry.podium_aabb(spec)), light, false, 1.0)
 
 	# aisles: one ring per spec.aisles, each lapping the one inside it
 	if spec.aisles > 0:
@@ -448,7 +455,11 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 			draw_rect(Rect2(Vector2(ch0, up.call(ch_top)),
 				Vector2(ch1 - ch0, ch_top * scale)), ink, false, 0.9)
 
-	# the octagonal crossing and its tribunes
+	# podium, octagonal crossing and tribunes
+	var podium: AABB = elevation["podium"]
+	if podium != AABB():
+		draw_rect(Rect2(Vector2(zx.call(podium.position.z), up.call(podium.size.y)),
+			Vector2(podium.size.z * scale, podium.size.y * scale)), ink, false, 1.2)
 	var octagon: AABB = elevation["crossing_octagon"]
 	if octagon != AABB():
 		draw_rect(Rect2(Vector2(zx.call(octagon.position.z), up.call(octagon.size.y)),
@@ -479,7 +490,21 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 			Vector2(dr * 2.0, spec.dome_drum_height * scale)), ink, false, 1.6)
 		var shell_rise: float = ChurchGeometry.dome_shell_rise(spec)
 		var shell_top: float = drum_top + shell_rise
-		if spec.dome_shape == &"onion":
+		if elevation["tent"]:
+			# the tent narrows to a little drum and onion at its tip
+			draw_polyline(PackedVector2Array([
+				Vector2(dcz - dr, up.call(drum_top)),
+				Vector2(dcz - dr * 0.8, up.call(drum_top + shell_rise * 0.30)),
+				Vector2(dcz - dr * 0.36, up.call(drum_top + shell_rise * 0.78)),
+				Vector2(dcz - dr * 0.14, up.call(shell_top)),
+				Vector2(dcz + dr * 0.14, up.call(shell_top)),
+				Vector2(dcz + dr * 0.36, up.call(drum_top + shell_rise * 0.78)),
+				Vector2(dcz + dr * 0.8, up.call(drum_top + shell_rise * 0.30)),
+				Vector2(dcz + dr, up.call(drum_top))]), ink, 1.6)
+			var cap: float = ChurchGeometry.tent_cap_height(spec)
+			draw_rect(Rect2(Vector2(dcz - dr * 0.26, up.call(shell_top + cap * 0.76)),
+				Vector2(dr * 0.52, cap * 0.76 * scale)), ink, false, 1.4)
+		elif spec.dome_shape == &"onion":
 			# bulged ogee: swells past the drum width before pinching to the apex
 			draw_polyline(PackedVector2Array([
 				Vector2(dcz - dr, up.call(drum_top)),
