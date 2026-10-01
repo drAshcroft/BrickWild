@@ -37,6 +37,8 @@ godot --headless --path . --script res://tests/run_all.gd -- houseqafurnish
 godot --headless --path . --script res://tests/house_test.gd
 # exhaustive statistical house QA is for nightly/pre-merge use
 godot --headless --path . --script res://tests/run_all.gd -- houseqafull
+# the house/shop/hotel blueprint sheet against the plan and the mesh
+godot --headless --path . --script res://tests/run_all.gd -- hblueprint
 # the temple suites alone
 godot --headless --path . --script res://tests/temple_test.gd
 

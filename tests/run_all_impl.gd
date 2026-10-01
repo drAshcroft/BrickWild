@@ -59,7 +59,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"roofquick", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
+	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "metriccoords", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -284,6 +284,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/house_raised_door_suite.gd").run()
 		"hbounds":
 			return preload("res://tests/suites/house_bounds_suite.gd").run()
+		"hblueprint":
+			return preload("res://tests/suites/house_blueprint_suite.gd").run()
 		"assets":
 			return HouseAssetsSuite.run()
 		"catalogcache":

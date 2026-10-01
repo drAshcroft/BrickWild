@@ -846,7 +846,7 @@ func _draw_elevation(view: BlueprintView, area: Rect2) -> void:
 	var rx2: float = rx + 36.0
 	if roof["drawn"]:
 		view.draw_line(Vector2(fx.call(float(e["x0"])) + 4, fy.call(ridge)), Vector2(rx2 - 4, fy.call(ridge)), LIGHT, 0.8)
-		view.draw_string(font, Vector2(rx2 - 2, fy.call(ridge) + 3), "ridge %.1f" % ridge, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, INK)
+		view.draw_string(font, Vector2(rx - 64, fy.call(ridge) - 3), "ridge %.1f m" % ridge, HORIZONTAL_ALIGNMENT_RIGHT, 60, 8, INK)
 	var foot: float = gy + 14.0 + cellar_depth * sc
 	view._dim_line(Vector2(fx.call(float(e["wall_x1"])), foot), Vector2(fx.call(float(e["wall_x0"])), foot),
 		"%.1f m" % (float(e["wall_x1"]) - float(e["wall_x0"])), INK, LIGHT)

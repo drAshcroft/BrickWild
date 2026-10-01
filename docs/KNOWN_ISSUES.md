@@ -69,11 +69,16 @@ them could be reached.
 
 ## Open
 
-### 0. The blueprint sheet only draws churches
-The Studio shows a room-by-room contents list for a house and a note for a
-castle, but `BlueprintView` still only draws a plan and elevation for a
-`ChurchSpec`. A house plan is the obvious next sheet to draw -- the rooms,
-doors and windows are all in `HousePlan` already.
+### 0. The blueprint sheet draws churches, villages and houses, not castles or temples
+`BlueprintView` draws a plan and elevation for a `ChurchSpec`, the site for a
+village, and (EVAL-U02) `HouseSheet` draws a house, a shop or a hotel: a plan
+per storey from `HouseGeometry` (shell runs, partitions, doors as swing arcs,
+windows as triple lines, stairs, hearth, courts, furniture at its measured
+footprint), the front elevation (-Z) from the builder's own roof faces, and a
+room schedule. The `hblueprint` suite holds the drawing against the plan and the
+mesh. A castle still gets a note, and a temple a text list. The house sheet draws
+no dormers (they are never on the -Z face), no colonnade runs, and a courtyard
+house gets no roof in elevation because its ranges are roofed one by one.
 
 ### 0b. Houses are one storey
 No stairs, no loft, no cellar below ground. The room programme, the nav check
