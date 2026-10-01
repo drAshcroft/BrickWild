@@ -16,15 +16,15 @@ static func place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 	if is_plant:
 		if bool(step.get("orchard", false)) and (host < 0 or not Poly.contains_point(plan.lots[plan.lot_of_building(host)]["poly"], at)):
 			return false
-		var trunk: float = maxf(PropCatalog.trunk(key), 0.1)
-		if not plant_is_clear(plan, ctx, at, trunk, PropCatalog.canopy(key)):
-			return false
-		plan.plants.append({"key": key, "pos": at,
-			"canopy": PropCatalog.canopy(key), "trunk": trunk,
-			"yaw": snappedf(rng.randf_range(0.0, TAU), 0.001)})
-		remember(ctx, at, Rect2(at - Vector2(trunk, trunk),
-			Vector2(trunk, trunk) * 2.0), trunk)
-		return true
+		var looks: Array = plant_looks(plan, step, key, at)
+		for look in looks:
+			if not plant_is_clear(plan, ctx, at, look["trunk"], look["canopy"]):
+				continue
+			plan.plants.append(plant_row(key, at, look, snappedf(rng.randf_range(0.0, TAU), 0.001)))
+			remember(ctx, at, Rect2(at - Vector2(look["trunk"], look["trunk"]),
+				Vector2(look["trunk"], look["trunk"]) * 2.0), look["trunk"])
+			return true
+		return false
 	var built: bool = bool(step.get("built", false))
 	var size: Vector2 = Vector2(VillageDressCatalog.BUILT[key]["size"]) if built \
 		else PropCatalog.footprint(key)
@@ -74,6 +74,94 @@ static func place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		ctx["strand_walk"] = occupied_walk
 	remember(ctx, at, rect, maxf(size.x, size.y) * 0.5)
 	return true
+
+
+# --------------------------------------------------- how a plant is grown
+
+## A plant row. `canopy` and `trunk` are what THIS tree promises, after its
+## scale and lean: the checks read these and never the catalogue's, and the
+## assembler draws the model at exactly this scale and tilt.
+static func plant_row(key: String, at: Vector2, look: Dictionary, yaw: float) -> Dictionary:
+	var row := {"key": key, "pos": at, "canopy": look["canopy"], "trunk": look["trunk"],
+		"yaw": yaw}
+	if look["scale"] != 1.0 or look["lean"] != 0.0:
+		row["scale"] = look["scale"]
+		row["lean"] = look["lean"]
+		row["lean_yaw"] = look["lean_yaw"]
+	return row
+
+
+## What kind of growing thing a key is, for how much it may vary.
+static func plant_kind(key: String) -> StringName:
+	match PropCatalog.category(key):
+		"tree":
+			return &"tree"
+		"dead_tree":
+			return &"dead"
+		"bush":
+			return &"bush"
+	return &"cover"
+
+
+## One plant as grown (EVAL-B05): a scale, and for some a lean, drawn from
+## the position so the same village always grows the same trees and no other
+## random stream moves. The measured promise is carried through exactly:
+##   canopy = measured * scale + the reach of the lean at the crown
+##   trunk  = measured * scale where it grew, the measured trunk where it
+##            shrank (a smaller model's head-height band reaches higher into
+##            the crown, so it cannot promise less), plus the lean at 1.8 m.
+## The clearance contract is a bound, so a promise a little generous is safe.
+## A `green` tree, the one on the common, is a veteran: it tries the largest
+## of 1.6x down to 1.15x that the ground allows, and is first in the list.
+static func plant_looks(plan: VillagePlan, step: Dictionary, key: String,
+		at: Vector2) -> Array:
+	var canopy0: float = PropCatalog.canopy(key)
+	var trunk0: float = maxf(PropCatalog.trunk(key), 0.1)
+	var kind := plant_kind(key)
+	var out: Array = []
+	if kind == &"cover":
+		out.append(_look(key, 1.0, 0.0, 0.0, canopy0, trunk0))
+		return out
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("look|%d|%s|%.1f|%.1f" % [plan.spec.seed, key, at.x, at.y])
+	var s := 1.0
+	var lean_max := 0.0
+	var lean_chance := 0.0
+	match kind:
+		&"tree":
+			s = r.randf_range(0.8, 1.28)
+			lean_max = deg_to_rad(7.0)
+			lean_chance = 0.3
+		&"dead":
+			s = r.randf_range(0.85, 1.2)
+			lean_max = deg_to_rad(13.0)
+			lean_chance = 0.65
+		&"bush":
+			s = r.randf_range(0.8, 1.3)
+	if bool(step.get("orchard", false)):
+		s = r.randf_range(0.92, 1.08)   # planted in a row, so nearly alike
+		lean_max = deg_to_rad(3.0)
+	var lean := 0.0
+	var lean_yaw := r.randf_range(0.0, TAU)
+	if lean_max > 0.0 and r.randf() < lean_chance:
+		lean = r.randf_range(0.35, 1.0) * lean_max
+	if String(step.get("palette", "")) == "green" and kind == &"tree":
+		for veteran in [1.6, 1.45, 1.3, 1.15]:
+			out.append(_look(key, veteran, 0.0, 0.0, canopy0, trunk0))
+	out.append(_look(key, s, lean, lean_yaw, canopy0, trunk0))
+	if s > 0.8 or lean > 0.0:
+		# the smallest, upright version of the same tree is always on offer
+		out.append(_look(key, 0.8, 0.0, 0.0, canopy0, trunk0))
+	return out
+
+
+static func _look(key: String, s: float, lean: float, lean_yaw: float,
+		canopy0: float, trunk0: float) -> Dictionary:
+	var height: float = PropCatalog.size(key).y * s
+	return {"scale": snappedf(s, 0.001), "lean": snappedf(lean, 0.001),
+		"lean_yaw": snappedf(lean_yaw, 0.001),
+		"canopy": canopy0 * s + height * sin(lean),
+		"trunk": trunk0 * maxf(s, 1.0) + 1.8 * s * sin(lean)}
 
 
 static func _is_light(key: String, built: bool) -> bool:

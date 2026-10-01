@@ -34,6 +34,8 @@ static func apply(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		if placed >= count:
 			break
 		var key: String = keys[rng.randi() % keys.size()]
+		if role == &"edge" and bool(step.get("fill", false)) and bool(step.get("plant", false)):
+			key = _edge_kind(plan, ctx, key, spot)
 		var placement_step: Dictionary = step
 		if role == &"market" and step["rule"] == &"row":
 			placement_step = step.duplicate()
@@ -71,6 +73,27 @@ static func apply(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 				plan.plants[-1]["row"] = "orchard:%d" % host
 				plan.plants[-1]["host"] = host
 			placed += 1
+
+
+## A planted edge is mostly the culture's own tree, with the odd bush where
+## a hedge grew up between two, and the odd dead or broken tree an old edge
+## always has. Drawn from the spot, not from `rng`; a blighted village is
+## already all dead wood and keeps its row as it is.
+static func _edge_kind(plan: VillagePlan, ctx: Dictionary, key: String, spot: Vector2) -> String:
+	if plan.spec.culture == &"blighted":
+		return key
+	var roll := fposmod(sin(spot.x * 12.9898 + spot.y * 78.233 + float(plan.spec.seed) * 0.173) * 43758.5453, 1.0)
+	var slot := ""
+	if roll < 0.14:
+		slot = "hedge"
+	elif roll < 0.21:
+		slot = "wild"
+	if slot.is_empty():
+		return key
+	var options := palette_keys(ctx, slot)
+	if options.is_empty():
+		return key
+	return options[int(roll * 10000.0) % options.size()]
 
 
 static func inside_edge(site: Rect2, spot: Vector2, depth: float) -> Vector2:

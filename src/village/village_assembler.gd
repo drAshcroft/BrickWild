@@ -100,7 +100,8 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 		var key2: String = String(t["key"])
 		var node2: Node3D = _model(key2,
 			Vector3(float(t["pos"].x), -PLANT_SINK, float(t["pos"].y)),
-			float(t.get("yaw", 0.0)))
+			float(t.get("yaw", 0.0)), float(t.get("scale", 1.0)),
+			float(t.get("lean", 0.0)), float(t.get("lean_yaw", 0.0)))
 		if node2 != null:
 			node2.name = "%s_%d" % [key2, j]
 			plants.add_child(node2)
@@ -109,7 +110,8 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 ## One catalogue model, set down on the ground and turned. Null when the
 ## catalogue does not know the key or the pack is not installed -- a village
 ## missing an art pack should be a village missing its barrels, not a crash.
-static func _model(key: String, at: Vector3, yaw: float) -> Node3D:
+static func _model(key: String, at: Vector3, yaw: float, scale := 1.0,
+		lean := 0.0, lean_yaw := 0.0) -> Node3D:
 	if not PropCatalog.known(key):
 		return null
 	var path: String = PropCatalog.scene_path(key)
@@ -121,8 +123,14 @@ static func _model(key: String, at: Vector3, yaw: float) -> Node3D:
 	var node := packed.instantiate() as Node3D
 	if node == null:
 		return null
-	node.position = at - Vector3(0.0, PropCatalog.floor_offset(key), 0.0)
+	node.position = at - Vector3(0.0, PropCatalog.floor_offset(key) * scale, 0.0)
 	node.rotation.y = yaw + PropCatalog.face_offset(key)
+	if lean != 0.0:
+		# tilted about the foot, in the direction `lean_yaw`
+		var axis := Vector3(cos(lean_yaw), 0.0, -sin(lean_yaw))
+		node.basis = Basis(axis, lean) * node.basis
+	if scale != 1.0:
+		node.scale = Vector3.ONE * scale
 	return node
 
 
