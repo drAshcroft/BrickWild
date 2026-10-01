@@ -706,6 +706,15 @@ func check_focus(plan: HousePlan) -> void:
 		boxes.append(AABB(Vector3(qr.position.x, base, qr.position.y),
 			Vector3(qr.size.x, qh, qr.size.y)))
 		names.append(String(q["key"]))
+	for ci in plan.columns.size():
+		var column: Dictionary = plan.columns[ci]
+		if int(column.get("room", -1)) != room or int(column.get("storey", 0)) != plan.storey_of_room(room):
+			continue
+		var pos: Vector2 = column["pos"]
+		var size: Vector2 = column["size"]
+		boxes.append(AABB(Vector3(pos.x - size.x * 0.5, base, pos.y - size.y * 0.5),
+			Vector3(size.x, float(column["height"]), size.y)))
+		names.append("column_%d" % ci)
 	var hit: Array[int] = Sightline.blockers(eye, aim, boxes)
 	if not hit.is_empty():
 		warnings.append("focus: the %s in room %d cannot be seen from the door past the %s"

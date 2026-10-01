@@ -130,6 +130,14 @@ func _rasterize() -> void:
 		var level := HousePlan.record_storey(p)
 		if _grids.has(level):
 			_grids[level].add_obstacle(p["rect"])
+	for column in _plan.columns:
+		var level := int(column.get("storey", 0))
+		if not _grids.has(level):
+			continue
+		var pos: Vector2 = column.get("pos", Vector2.ZERO)
+		var size: Vector2 = column.get("size", Vector2.ZERO)
+		if size.x > 0.0 and size.y > 0.0:
+			_grids[level].add_obstacle(Rect2(pos - size * 0.5, size))
 	var breast := HouseGeometry.hearth_breast(_plan)
 	if not breast.is_empty() and _grids.has(int(breast["storey"])):
 		_grids[int(breast["storey"])].add_obstacle_poly(breast["outline"])

@@ -359,12 +359,121 @@ func _build_exterior_walls() -> void:
 			var to: Vector2 = run["to"]
 			var normal: Vector2 = run["normal"]
 			var thick: float = float(run.get("thickness", HouseGeometry.wall_thickness(spec)))
+			if _build_colonnade_run(run, level, y0, h, thick):
+				continue
 			var openings: Array[Dictionary] = _openings_on(from, to, normal, level, thick)
 			_wall_run(from, to, thick, h, openings, surf, y0)
 			var a: AABB = _run_aabb(from, to, thick, h, y0)
 			var suffix := "" if _levels().size() == 1 else "_%d" % level
 			_log_mass("wall_%s%s" % [String(run["side"]), suffix], a, y0)
 	total_height = maxf(total_height, h * _storeys())
+
+
+## Replace a planned arcade wall with authored posts and lintels. A portal is
+## the one solid interval on the market hall's front: its real door is still
+## cut by the ordinary opening path.
+func _build_colonnade_run(run: Dictionary, level: int, y0: float,
+		height: float, thick: float) -> bool:
+	var from: Vector2 = run["from"]
+	var to: Vector2 = run["to"]
+	var dir := (to - from).normalized()
+	var outward: Vector2 = run["normal"]
+	var selected_room := -1
+	var selected_wall := -1
+	var selected_record: Dictionary = {}
+	for room in range(plan.room_count()):
+		if _room_storey(plan.rooms[room]) != level:
+			continue
+		var walls := HouseGeometry.room_walls(plan, room)
+		for wi in walls.size():
+			var wall: Dictionary = walls[wi]
+			if wall.get("kind", &"solid") != &"colonnade":
+				continue
+			var wall_dir := (Vector2(wall["to"]) - Vector2(wall["from"])).normalized()
+			if absf(wall_dir.dot(dir)) < 0.98 or Vector2(wall["normal"]).dot(outward) > -0.95:
+				continue
+			var midpoint: Vector2 = (Vector2(wall["from"]) + Vector2(wall["to"])) * 0.5
+			if absf((midpoint - from).dot(outward)) > thick + 0.35:
+				continue
+			selected_room = room
+			selected_wall = wi
+			selected_record = wall
+			break
+		if selected_room >= 0:
+			break
+	if selected_room < 0:
+		return false
+	var posts: Array[Dictionary] = []
+	for column in plan.columns:
+		if int(column.get("room", -1)) == selected_room \
+				and int(column.get("wall", -1)) == selected_wall \
+				and int(column.get("storey", level)) == level:
+			posts.append(column)
+	if posts.is_empty():
+		return false
+	tag("colonnade")
+	var portal: Dictionary = selected_record.get("portal", {})
+	var portal_interval := Vector2(-INF, -INF)
+	if not portal.is_empty():
+		var wf: Vector2 = selected_record["from"]
+		var wt: Vector2 = selected_record["to"]
+		var wlen := wf.distance_to(wt)
+		var world_a := wf.lerp(wt, float(portal["start"]) / wlen)
+		var world_b := wf.lerp(wt, float(portal["end"]) / wlen)
+		portal_interval = Vector2((world_a - from).dot(dir), (world_b - from).dot(dir))
+	for column in posts:
+		var pos: Vector2 = column["pos"]
+		var size: Vector2 = column["size"]
+		var post_height := float(column["height"])
+		var centre := Vector3(pos.x, y0 + post_height * 0.5, pos.y)
+		var post_size := Vector3(size.x, post_height, size.y)
+		var xform := Transform3D(Basis.IDENTITY, centre)
+		host("colonnade_%d_%d" % [selected_room, selected_wall], level)
+		component_box("colonnade_column", post_size, xform, SURF_TRIM)
+		_log_mass("colonnade_column_%d_%d_%d" % [selected_room, selected_wall, posts.find(column)],
+			AABB(centre - post_size * 0.5, post_size), y0)
+	host_end()
+	var sorted_posts := posts.duplicate()
+	sorted_posts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return (Vector2(a["pos"]) - from).dot(dir) < (Vector2(b["pos"]) - from).dot(dir))
+	var lintel_h := minf(0.26, height * 0.12)
+	var lintel_y := y0 + height - lintel_h * 0.5
+	var yaw := atan2(-dir.y, dir.x)
+	for pi in range(sorted_posts.size() - 1):
+		var a: Dictionary = sorted_posts[pi]
+		var b: Dictionary = sorted_posts[pi + 1]
+		var pa: Vector2 = a["pos"]
+		var pb: Vector2 = b["pos"]
+		var ta := (pa - from).dot(dir)
+		var tb := (pb - from).dot(dir)
+		if portal_interval.x >= -1.0 and ta < portal_interval.y and tb > portal_interval.x:
+			continue
+		var length := pa.distance_to(pb) + minf(float(a["size"].x), float(b["size"].x))
+		var centre2 := (pa + pb) * 0.5
+		var lintel_size := Vector3(length, lintel_h, thick)
+		var lintel_xf := Transform3D(Basis(Vector3.UP, yaw),
+			Vector3(centre2.x, lintel_y, centre2.y))
+		host("colonnade_%d_%d" % [selected_room, selected_wall], level)
+		component_box("colonnade_lintel", lintel_size, lintel_xf, SURF_TRIM)
+		_log_mass("colonnade_lintel_%d_%d_%d" % [selected_room, selected_wall, pi],
+			_oriented_box_aabb(centre2, lintel_y, length, lintel_h, thick, yaw), y0)
+	host_end()
+	if not portal.is_empty():
+		var p0: Vector2 = from + dir * portal_interval.x
+		var p1: Vector2 = from + dir * portal_interval.y
+		var openings := _openings_on(p0, p1, outward, level, thick)
+		_wall_run(p0, p1, thick, height, openings, SURF_WALL, y0)
+		_log_mass("wall_%s_portal" % String(run["side"]),
+			_run_aabb(p0, p1, thick, height, y0), y0)
+	return true
+
+
+func _oriented_box_aabb(centre: Vector2, y: float, along: float,
+		height: float, across: float, yaw: float) -> AABB:
+	var sx := absf(cos(yaw)) * along + absf(sin(yaw)) * across
+	var sz := absf(sin(yaw)) * along + absf(cos(yaw)) * across
+	return AABB(Vector3(centre.x - sx * 0.5, y - height * 0.5,
+		centre.y - sz * 0.5), Vector3(sx, height, sz))
 
 
 # ------------------------------------------------------------------ jetty

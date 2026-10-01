@@ -59,6 +59,8 @@ static func plan(spec: ShopSpec) -> HousePlan:
 			_pin_library_focus_to_daylight(out, front)
 	if spec.business == &"prison":
 		_plan_prison_access(out)
+	if spec.business == &"market_hall" and front >= 0:
+		_plan_market_colonnade(out, front)
 	_open_up_lodging(out)
 	return out
 
@@ -158,6 +160,79 @@ static func place_palace_banners(plan: HousePlan) -> void:
 			"rect": Rect2(point - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 			"zone": Rect2(), "host": -1, "cat": "banner",
 			"mounted": true, "scale": 1.0})
+
+
+## The market hall's open arcade is plan data. Its front doorway remains a
+## masonry portal, leaving two visible colonnade spans on that elevation.
+static func _plan_market_colonnade(plan: HousePlan, room: int) -> void:
+	var walls := HouseGeometry.room_walls(plan, room)
+	var kinds: Array[StringName] = []
+	for _wall in walls:
+		kinds.append(&"colonnade")
+	var entrance := plan.entrance()
+	if entrance < 0:
+		return
+	var door: Dictionary = plan.doors[entrance]
+	var door_pos: Vector2 = door["pos"]
+	var portal_wall := -1
+	var portal_at := 0.0
+	var portal_distance := INF
+	for wi in walls.size():
+		var wall: Dictionary = walls[wi]
+		var nearest := Geometry2D.get_closest_point_to_segment(door_pos,
+			wall["from"], wall["to"])
+		var distance := nearest.distance_to(door_pos)
+		if distance < portal_distance:
+			portal_distance = distance
+			portal_wall = wi
+			portal_at = (nearest - Vector2(wall["from"])).dot(
+				(Vector2(wall["to"]) - Vector2(wall["from"])).normalized())
+	if portal_wall < 0 or portal_distance > HouseGeometry.wall_thickness(plan.spec) * 0.6:
+		push_error("ShopPlanner: market hall entrance is not on a room wall")
+		return
+	var portal_width := maxf(float(door["width"]) + 0.9, 2.8)
+	var portal := {"centre": portal_at, "width": portal_width,
+		"start": maxf(0.35, portal_at - portal_width * 0.5),
+		"end": minf(walls[portal_wall]["from"].distance_to(walls[portal_wall]["to"]) - 0.35,
+			portal_at + portal_width * 0.5)}
+	if float(portal["end"]) <= float(portal["start"]):
+		push_error("ShopPlanner: market hall entrance portal does not fit its front wall")
+		return
+	plan.rooms[room]["wall_kinds"] = kinds
+	plan.rooms[room]["wall_portals"] = {portal_wall: portal}
+	plan.columns.clear()
+	const POST := 0.30
+	const PITCH := 2.6
+	for wi in walls.size():
+		var wall: Dictionary = walls[wi]
+		var from: Vector2 = wall["from"]
+		var to: Vector2 = wall["to"]
+		var length := from.distance_to(to)
+		var spans: Array[Vector2] = []
+		if wi == portal_wall:
+			spans = [Vector2(0.0, float(portal["start"])),
+				Vector2(float(portal["end"]), length)]
+		else:
+			spans = [Vector2(0.0, length)]
+		for span in spans:
+			var span_length := span.y - span.x
+			if span_length < POST:
+				continue
+			var bays := maxi(1, ceili(span_length / PITCH))
+			for post_index in range(bays + 1):
+				var t := lerpf(span.x, span.y, float(post_index) / float(bays))
+				var pos := from.lerp(to, t / length) \
+					- Vector2(wall["normal"]) * HouseGeometry.wall_thickness(plan.spec) * 0.5
+				var duplicate := false
+				for existing in plan.columns:
+					if Vector2(existing["pos"]).distance_to(pos) < POST * 0.8:
+						duplicate = true
+						break
+				if duplicate:
+					continue
+				plan.columns.append({"kind": &"colonnade", "room": room, "wall": wi,
+					"storey": plan.storey_of_room(room), "pos": pos,
+					"size": Vector2(POST, POST), "height": plan.spec.height - 0.26})
 
 
 ## Replace the generic spanning tree with parallel guard passages. Every

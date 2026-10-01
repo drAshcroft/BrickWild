@@ -27,7 +27,9 @@ var water_plane: float = 0.0
 var world_meta: Dictionary = {}
 
 ## {"kind": StringName, "rect": Rect2, "storey": int,
-##  "outline": PackedVector2Array (optional)}
+##  "outline": PackedVector2Array (optional),
+##  "wall_kinds": [StringName] (optional),
+##  "wall_portals": {wall index: {start, end}} (optional)}
 ##
 ## `outline` is the TRUTH about a room's shape when it is there, and `rect`
 ## stays as its bounding box so every rectangle-shaped rule still has something
@@ -79,6 +81,11 @@ var stairs: Array[Dictionary] = []
 ## special access, but it is not an ordinary keyed door-graph edge.
 ## {upper_room, lower_room, upper_storey, lower_storey, rect, sealed}
 var trapdoors: Array[Dictionary] = []
+## Structural posts authored by wall plans: {room, wall, storey, pos: Vector2,
+## size: Vector2 (x/z), height, kind}. Columns are part of both the built
+## shell and the walk/sightline model, rather than decoration inferred by the
+## emitter.
+var columns: Array[Dictionary] = []
 ## Things a room should have had and does not, because keeping them would have
 ## blocked the way through the house: {room: [category, ...]}.
 ##

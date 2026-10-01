@@ -21,6 +21,7 @@ const REQUIRED := {
 	&"town_hall": ["council_chamber", "table", "seat"],
 	&"guildhall": ["meeting_hall", "table", "bench"],
 	&"palace": ["antechamber", "seat", "banner", "bed", "chest"],
+	&"market_hall": ["market_hall", "counter"],
 }
 const BENCH_SEAT_PITCH := 0.65 # metres per usable place along the measured bench
 
@@ -70,10 +71,111 @@ static func run() -> SuiteResult:
 			res.warn("%s: %s" % [String(business), warning])
 		for failure2 in shopfront_rules(spec, plan, builder):
 			res.fail("%s: %s" % [String(business), failure2])
+		if business == &"market_hall":
+			_market_hall_contract(res, plan, builder)
 	if REQUIRED.has(&"barracks"):
 		_check_barracks(res)
 	_check_lodging(res)
 	return res
+
+
+## INT-017's bounded selector. It checks one real generated hall, its shell and
+## walk plan, then mutates the authoring records to prove the new rule detects
+## missing posts, drifted posts, and a lost entrance portal.
+static func run_market_hall() -> SuiteResult:
+	var res := SuiteResult.new("market hall colonnade")
+	var spec := ShopSpec.new()
+	spec.business = &"market_hall"
+	spec.style = &"longhall"
+	spec.width = 18.0
+	spec.length = 28.0
+	spec.height = 3.2
+	var plan := ShopGenerator.generate(spec, 41717)
+	var builder := HouseBuilder.new()
+	builder.build(plan)
+	res.checked += 1
+	if not plan.has_kind(&"market_hall"):
+		res.fail("market hall has no market_hall room")
+	for fault in HouseQA.new().check(plan, builder)["failures"]:
+		res.fail("market hall: %s" % String(fault))
+	for component_fault in ComponentCheck.check(builder, builder.emitted_mesh)["failures"]:
+		res.fail("market hall components: %s" % String(component_fault))
+	for fault2 in shopfront_rules(spec, plan, builder):
+		res.fail("market hall: %s" % fault2)
+	_market_hall_contract(res, plan, builder)
+	return res
+
+
+static func _market_hall_contract(res: SuiteResult, plan: HousePlan,
+		builder: HouseBuilder) -> void:
+	var room := plan.entrance_room()
+	if room < 0 or plan.kind_of(room) != &"market_hall":
+		res.fail("market hall: street door does not enter its market hall")
+		return
+	var walls := HouseGeometry.room_walls(plan, room)
+	var arcade_walls := 0
+	var portal_walls := 0
+	for wall in walls:
+		if wall.get("kind", &"solid") == &"colonnade":
+			arcade_walls += 1
+			if not wall.get("portal", {}).is_empty():
+				portal_walls += 1
+	if arcade_walls < 4 or portal_walls != 1:
+		res.fail("market hall: colonnade walls=%d entrance portals=%d, wants four arcade spans and one solid portal"
+			% [arcade_walls, portal_walls])
+	if plan.columns.size() < 8:
+		res.fail("market hall: only %d columns are authored around the hall" % plan.columns.size())
+	var post_masses := 0
+	var lintel_masses := 0
+	for mass in builder.mass_log:
+		var mass_name := String(mass["name"])
+		if mass_name.begins_with("colonnade_column_"):
+			post_masses += 1
+		elif mass_name.begins_with("colonnade_lintel_"):
+			lintel_masses += 1
+	if post_masses < plan.columns.size() or lintel_masses < 4:
+		res.fail("market hall: structural log has %d posts and %d lintels for %d planned columns"
+			% [post_masses, lintel_masses, plan.columns.size()])
+	var emitted_posts := 0
+	var emitted_lintels := 0
+	for component in builder.component_log:
+		var role := String(component.get("role", component.get("name", component.get("id", ""))))
+		if role.contains("colonnade_column"):
+			emitted_posts += 1
+		elif role.contains("colonnade_lintel"):
+			emitted_lintels += 1
+	if emitted_posts < plan.columns.size() or emitted_lintels < 4:
+		res.fail("market hall: mesh has %d posts and %d lintels for %d planned columns"
+			% [emitted_posts, emitted_lintels, plan.columns.size()])
+	_negative_market_hall_controls(res, plan)
+
+
+static func _negative_market_hall_controls(res: SuiteResult, plan: HousePlan) -> void:
+	var check := HousePlanCheck.new()
+	if not check.check(plan)["failures"].is_empty():
+		res.fail("market hall negative controls: valid source plan is already rejected")
+		return
+	var original_columns: Array[Dictionary] = plan.columns.duplicate(true)
+	plan.columns.clear()
+	var missing := check.check(plan)["failures"]
+	if not missing.any(func(row: String) -> bool: return row.begins_with("colonnade:")):
+		res.fail("market hall negative control: removing all posts escaped plan validation")
+	plan.columns = original_columns.duplicate(true)
+	if not plan.columns.is_empty():
+		var original_pos: Vector2 = plan.columns[0]["pos"]
+		plan.columns[0]["pos"] = original_pos + Vector2(1.0, 0.0)
+		var drifted := check.check(plan)["failures"]
+		if not drifted.any(func(row: String) -> bool: return row.contains("off wall")):
+			res.fail("market hall negative control: moving a post off the wall escaped plan validation")
+		plan.columns[0]["pos"] = original_pos
+	var room := plan.entrance_room()
+	if room >= 0:
+		var old_portals: Dictionary = plan.rooms[room].get("wall_portals", {}).duplicate(true)
+		plan.rooms[room]["wall_portals"] = {}
+		var missing_portal := check.check(plan)["failures"]
+		if not missing_portal.any(func(row: String) -> bool: return row.contains("no solid portal")):
+			res.fail("market hall negative control: removing the entrance portal escaped plan validation")
+		plan.rooms[room]["wall_portals"] = old_portals
 
 
 static func run_barracks_quick() -> SuiteResult:

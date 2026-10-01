@@ -28,7 +28,7 @@ const TOL := 0.02
 ## may replace one through `check(plan, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"tiling", &"storeys", &"shape", &"way_in",
 	&"connected", &"privacy", &"opening", &"window", &"stairs", &"stair_line",
-	&"doors_in_line", &"upstairs_programme"]
+	&"doors_in_line", &"upstairs_programme", &"colonnade"]
 const METHODS := {&"shape": "_check_shapes", &"way_in": "_check_entrance",
 	&"connected": "_check_connectivity", &"opening": "_check_door_openings",
 	&"window": "_check_windows"}
@@ -164,6 +164,71 @@ func _check_storeys(plan: HousePlan) -> void:
 			failures.append("storeys: storey %d has no rooms" % level)
 	stats["storeys"] = wanted
 	stats["cellars"] = -lowest
+
+
+## A wall kind that opens the arcade must have its actual posts in the plan.
+## This validates the authored structure before either the mesh or the walk
+## check consumes it.
+func _check_colonnade(plan: HousePlan) -> void:
+	var used := {}
+	for ci in plan.columns.size():
+		var column: Dictionary = plan.columns[ci]
+		var room := int(column.get("room", -1))
+		var wall_index := int(column.get("wall", -1))
+		if room < 0 or room >= plan.room_count():
+			failures.append("colonnade: column %d names missing room %d" % [ci, room])
+			continue
+		var walls := HouseGeometry.room_walls(plan, room)
+		if wall_index < 0 or wall_index >= walls.size() \
+				or walls[wall_index].get("kind", &"solid") != &"colonnade":
+			failures.append("colonnade: column %d is not on an authored colonnade wall" % ci)
+			continue
+		if int(column.get("storey", plan.storey_of_room(room))) != plan.storey_of_room(room):
+			failures.append("colonnade: column %d has the wrong storey" % ci)
+		var pos: Vector2 = column.get("pos", Vector2(INF, INF))
+		var size: Vector2 = column.get("size", Vector2.ZERO)
+		var height := float(column.get("height", 0.0))
+		var wall: Dictionary = walls[wall_index]
+		var nearest := Geometry2D.get_closest_point_to_segment(pos, wall["from"], wall["to"])
+		if pos.distance_to(nearest) > HouseGeometry.wall_thickness(plan.spec) * 0.5 + 0.1:
+			failures.append("colonnade: column %d is off wall %d" % [ci, wall_index])
+		if size.x <= 0.05 or size.y <= 0.05 or height <= 0.5 or height > plan.spec.height + TOL:
+			failures.append("colonnade: column %d has invalid dimensions" % ci)
+		var key := "%d|%d" % [room, wall_index]
+		used[key] = int(used.get(key, 0)) + 1
+	for room in range(plan.room_count()):
+		for wi in HouseGeometry.room_walls(plan, room).size():
+			var wall: Dictionary = HouseGeometry.room_walls(plan, room)[wi]
+			if wall.get("kind", &"solid") != &"colonnade":
+				continue
+			var key := "%d|%d" % [room, wi]
+			if int(used.get(key, 0)) < 2:
+				failures.append("colonnade: room %d wall %d has fewer than two planned posts" % [room, wi])
+			var portal: Dictionary = wall.get("portal", {})
+			if portal.is_empty():
+				if plan.spec is ShopSpec and (plan.spec as ShopSpec).business == &"market_hall" \
+						and int(plan.entrance_room()) == room:
+					failures.append("colonnade: market hall entrance wall has no solid portal")
+				continue
+			var start := float(portal.get("start", -1.0))
+			var end := float(portal.get("end", -1.0))
+			var length: float = Vector2(wall["from"]).distance_to(wall["to"])
+			if start < 0.0 or end <= start or end > length:
+				failures.append("colonnade: room %d wall %d has an invalid entrance portal" % [room, wi])
+				continue
+			var has_door := false
+			for door in plan.doors:
+				if int(door.get("a", -1)) != room or not bool(door.get("exterior", false)):
+					continue
+				var nearest := Geometry2D.get_closest_point_to_segment(Vector2(door["pos"]),
+					wall["from"], wall["to"])
+				var along := nearest.distance_to(Vector2(wall["from"]))
+				if nearest.distance_to(Vector2(door["pos"])) <= HouseGeometry.wall_thickness(plan.spec) * 0.6 \
+						and along - float(door["width"]) * 0.5 >= start - TOL \
+						and along + float(door["width"]) * 0.5 <= end + TOL:
+					has_door = true
+			if not has_door:
+				failures.append("colonnade: room %d wall %d portal does not contain its entrance" % [room, wi])
 
 
 ## The lowest storey a plan may have: 0, or -cellars for a spec that digs

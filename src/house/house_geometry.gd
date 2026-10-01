@@ -376,15 +376,26 @@ static func is_habitable(kind: StringName) -> bool:
 ## not a traversal, which is why the two paths are written out separately: a
 ## hearth on "wall 2" means the left wall, and it has to keep meaning that.
 static func room_walls(plan: HousePlan, i: int) -> Array[Dictionary]:
+	var out: Array[Dictionary]
 	if plan.is_polygonal(i):
-		return polygon_walls(plan.outline_of(i))
-	var f: Rect2 = room_floor_rect(plan, i)
-	return [
+		out = polygon_walls(plan.outline_of(i))
+	else:
+		var f: Rect2 = room_floor_rect(plan, i)
+		out = [
 		{"from": f.position, "to": Vector2(f.end.x, f.position.y), "normal": Vector2(0, 1)},
 		{"from": Vector2(f.position.x, f.end.y), "to": f.end, "normal": Vector2(0, -1)},
 		{"from": f.position, "to": Vector2(f.position.x, f.end.y), "normal": Vector2(1, 0)},
 		{"from": Vector2(f.end.x, f.position.y), "to": f.end, "normal": Vector2(-1, 0)},
-	]
+		]
+	var room: Dictionary = plan.rooms[i]
+	var kinds: Array = room.get("wall_kinds", [])
+	var portals: Dictionary = room.get("wall_portals", {})
+	for wi in out.size():
+		out[wi]["index"] = wi
+		out[wi]["kind"] = StringName(kinds[wi]) if wi < kinds.size() else &"solid"
+		if portals.has(wi):
+			out[wi]["portal"] = portals[wi]
+	return out
 
 
 # ------------------------------------------------------------------ doors

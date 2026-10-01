@@ -23,7 +23,7 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 		spec.chimney = true
 	# Guardrooms have an office, dormitory, armoury and mess, with no fire
 	# planned in any of them. A chimney without a hearth is an unsupported stack.
-	if spec.business == &"barracks":
+	if spec.business in [&"barracks", &"market_hall"]:
 		spec.chimney = false
 	if spec.business in [&"prison", &"palace"]:
 		spec.chimney = false
