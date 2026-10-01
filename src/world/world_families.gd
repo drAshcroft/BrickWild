@@ -131,6 +131,13 @@ const FAMILIES := {
 		"width": {"min": 45.5, "max": 123.5},
 		"length": {"min": 14.0, "max": 38.0},
 		"height": {"min": 16.8, "max": 28.0},
+	},
+	&"dravida": {
+		"label": "Dravida compound",
+		"kinds": [&"god_kings_precinct"],
+		"width": {"min": 100.0, "max": 380.0},
+		"length": {"min": 70.0, "max": 240.0},
+		"height": {"min": 45.0, "max": 120.0},
 	}
 }
 
@@ -263,6 +270,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = vav_made["spec"]
 		out.plan = vav_made["plan"]
 		return true
+	if request.style == &"dravida" and request.purpose in kinds_of(&"dravida"):
+		var dravida_made := DravidaGenerator.generate(request.purpose, request.seed,
+			request.width, request.length, request.height, request.period)
+		out.spec = dravida_made["spec"]
+		out.plan = dravida_made["plan"]
+		return true
 	if request.style != &"timber_hall" or not request.purpose in kinds_of(&"timber_hall"):
 		return false
 	out.spec = TimberHallGenerator.generate(request.purpose, request.seed,
@@ -307,6 +320,9 @@ static func build_mesh(building) -> ArrayMesh:
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"stepwell":
 		return VavBuilder.new().build(building.plan)
+	if building != null and building.plan != null \
+			and building.plan.world_family == &"dravida":
+		return DravidaBuilder.new().build(building.plan)
 	if building == null or not (building.spec is TimberHallSpec):
 		return null
 	return TimberHallBuilder.new().build(building.spec as TimberHallSpec)

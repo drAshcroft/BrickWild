@@ -84,6 +84,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 65.0, "length": 20.0, "height": 28.0,
 		"must": ["landing", "stair", "retaining_wall", "pavilion", "tank", "shaft", "water"],
 		"check": &"vav_check", "about": "The Queen's Well descending through seven levels"},
+	{"key": "god_kings_precinct", "family": &"dravida", "kind": &"god_kings_precinct",
+		"width": 240.0, "length": 120.0, "height": 63.0, "scales": [0.7, 1.0, 1.4],
+		"must": ["prakara", "colonnade_floor", "gopuram", "nandi", "dhvaja", "vimana_tier"],
+		"check": &"prakara_check", "about": "God-King's Precinct with period-sensitive axial gates"},
 ]
 
 
@@ -475,6 +479,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 			free_masses.assign(["pavilion", "tank", "shaft", "water"])
 		elif building.plan != null and building.plan.world_family == &"rock_cut_temple":
 			free_masses.assign(["gateway", "gallery", "bridge"])
+		elif building.plan != null and building.plan.world_family == &"dravida":
+			free_masses.assign(["colonnade", "mandapa", "sanctum", "vimana", "gopuram", "nandi", "dhvaja"])
 		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_masses)["failures"]:
 			out.append(str(f))
 	if check == &"":
@@ -502,7 +508,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		return out
 	var checker = script.new()
 	var rep: Dictionary
-	if building.plan != null and check in [&"cut_check", &"hammam_check", &"pagoda_check", &"shikhara_check", &"vav_check", &"vastu_check"]:
+	if building.plan != null and check in [&"cut_check", &"hammam_check", &"pagoda_check",
+			&"prakara_check", &"shikhara_check", &"vav_check", &"vastu_check"]:
 		rep = checker.check(building.plan, mesh_builder)
 	elif building.plan != null and check == &"tulou_check":
 		rep = checker.check(building.plan, mesh_builder)
@@ -554,6 +561,10 @@ static func _builder_for(building: GeneratedBuilding):
 			var vb := VavBuilder.new()
 			vb.build(building.plan)
 			return vb
+		if building.plan.world_family == &"dravida":
+			var db := DravidaBuilder.new()
+			db.build(building.plan)
+			return db
 		var hb := HouseBuilder.new()
 		hb.build(building.plan)
 		return hb

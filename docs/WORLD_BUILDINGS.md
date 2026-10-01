@@ -444,12 +444,24 @@ sanctum tower is the tallest thing; after it the gateways overtake it.
 
 | Rule | The sentence | The measurement |
 |---|---|---|
-| **enclosure** | a walled rectangle with a colonnade inside it you can walk fully round | `CourtCheck.ring` on the prakara; the colonnade floor strip is continuous |
-| **gates** | the gopurams stand on the axis, in the walls | every `gopuram` mass is centred on the axis and intersects an enclosure wall |
-| **who is tallest** | before 1200 the vimana; after, the gate | a `period` flag on the spec; the tallest AABB is `vimana` or `gopuram` accordingly |
+| **enclosure** | a walled rectangle with a colonnade inside it you can walk fully round | the emitted prakara walls surround a four-sided floor loop; `WalkGrid` floods around it with emitted columns as obstructions |
+| **gates** | the gopurams stand on the axis, in the walls | front and rear `gopuram` tower AABBs are centred on x=0 and cross their corresponding enclosure wall planes |
+| **who is tallest** | before 1200 the vimana; after, the gate | the request `period` is retained on the spec and plan; the tallest emitted AABB is a vimana tier before 1200 and a gopuram from 1200 onward |
 | **nandi** | the bull faces the god from the court | a `nandi` mass on the axis between gate and hall, facing +axis, with a clear sightline to the sanctum door |
 | **tiers** | the vimana steps | the stepped-taper tiers over the sanctum decrease monotonically; tier count ≥ 5 |
-| **flagstaff** | on the axis, before the hall | a `dhvaja` mass between the inner gate and the first mandapa, on the axis |
+| **flagstaff** | on the axis, before the hall | a `dhvaja` mass between the inner face of the front gate and the first mandapa, on x=0 |
+
+**Implemented family (WLD-014).** Request `kind=world`, `style=dravida`,
+`purpose=god_kings_precinct`; the public envelope is 100–380 m wide,
+70–240 m long, and 45–120 m high. `DravidaGenerator` retains the enclosure,
+gallery loop, mandapa, sanctum, period-selected tower heights, six decreasing
+vimana tiers, Nandi, and dhvaja in a `HousePlan`. `DravidaBuilder` emits and
+logs the prakara, gate towers, halls, bull and tier masses. `PrakaraCheck`
+checks the emitted walk loop and sightline as well as every plan rule. The
+focused `-- wld014` suite has a negative fixture for each rule and tests both
+period regimes through the public API and serialized document path. The
+God-King's Precinct archetype is also checked at 70%, 100% and 140% size by
+`WorldArchetypeSuite`.
 
 ### 3.3 The rock-cut temple
 

@@ -53,7 +53,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
-	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001", "wld002", "wld004", "wld005", "wld006", "wld009", "wld010", "wld011", "wld012", "wld013", "wld015", "wld016", "wld017", "wld018", "wld019",
+	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001", "wld002", "wld004", "wld005", "wld006", "wld009", "wld010", "wld011", "wld012", "wld013", "wld014", "wld015", "wld016", "wld017", "wld018", "wld019",
 	"tree", "bridge"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
@@ -68,7 +68,7 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 	"dmvbrief",
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest",
-	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld015", "wld016", "int021",
+	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021",
 	"runnererror", "runnerfail", "int013"]
 
 ## LANES -- the suites worth running for a given KIND OF EDIT.
@@ -405,6 +405,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/tulou_suite.gd").run()
 		"wld013":
 			return preload("res://tests/suites/nagara_suite.gd").run()
+		"wld014":
+			return preload("res://tests/suites/dravida_suite.gd").run()
 		"wld015":
 			return preload("res://tests/suites/cut_temple_suite.gd").run()
 		"wld016":

@@ -95,7 +95,8 @@ static func for_building(building) -> BuildingFamilyAdapter:
 	var spec: RefCounted = building.spec
 	if building.plan != null and building.plan.world_family in \
 			[&"courtyard_house", &"insula", &"mosque", &"caravanserai", &"hammam",
-			&"cruciform_temple", &"nagara", &"pagoda", &"rock_cut_temple", &"stepwell", &"temple_mountain", &"tulou", &"vastu", &"vihara"]:
+			&"cruciform_temple", &"dravida", &"nagara", &"pagoda", &"rock_cut_temple",
+			&"stepwell", &"temple_mountain", &"tulou", &"vastu", &"vihara"]:
 		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
@@ -447,6 +448,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 			var vastu_builder := HouseBuilder.new()
 			vastu_builder.build(building.plan)
 			return VastuCheck.new().check(building.plan, vastu_builder)
+		if building.plan != null and building.plan.world_family == &"dravida":
+			var dravida_builder := DravidaBuilder.new()
+			dravida_builder.build(building.plan)
+			return PrakaraCheck.new().check(building.plan, dravida_builder)
 		if building.plan != null:
 			if building.plan.world_subkind == &"sultan_han":
 				return HanCheck.new().check(building.plan)
@@ -510,6 +515,8 @@ class WorldFamily extends BuildingFamilyAdapter:
 				Vector2(building.spec.width, building.spec.length))
 		if building.plan != null and building.plan.world_family == &"stepwell":
 			return building.plan.world_meta.get("site", Rect2())
+		if building.plan != null and building.plan.world_family == &"dravida":
+			return building.plan.world_meta.get("enclosure", Rect2())
 		return Rect2()
 
 	func door(building) -> Vector3:
@@ -550,6 +557,9 @@ class WorldFamily extends BuildingFamilyAdapter:
 		if building.plan != null and building.plan.world_family == &"stepwell":
 			var p: Vector2 = building.plan.world_meta.get("entry", Vector2.ZERO)
 			return Vector3(p.x, 0.8, p.y)
+		if building.plan != null and building.plan.world_family == &"dravida":
+			var p: Vector2 = building.plan.world_meta.get("entry", Vector2.ZERO)
+			return Vector3(p.x, 1.0, p.y)
 		return Vector3.ZERO
 
 
