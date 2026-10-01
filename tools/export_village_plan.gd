@@ -37,6 +37,7 @@ const PLACES := 0.001
 
 ## The site is capped at BigGlade's own maximum however big a cell is.
 const SITE_MAX_M := 400.0
+const BUILDING_MAX := 140
 
 
 func _init() -> void:
@@ -59,15 +60,35 @@ func _init() -> void:
 	var request: Dictionary = parsed
 	var notes: Array[String] = []
 	var spec: VillageSpec = spec_from_request(request, text, notes)
+	var brief_errors: Array[String] = request_errors(request)
+	if not brief_errors.is_empty():
+		printerr("SiteRequest refused: %s" % "; ".join(brief_errors))
+		quit(3)
+		return
 	if not spec.valid():
 		printerr("SiteRequest does not map to a village: %s" % ", ".join(spec.errors()))
 		quit(3)
 		return
 	spec.generate(spec.seed)
-	_settle_form(spec, notes, _wants_temple(request.get("buildings", {})))
 	var plan: VillagePlan = VillageLotPlanner.plan(spec)
 	if plan.roads.is_empty():
-		printerr("no plan: form '%s' is not one BigGlade lays yet" % String(spec.form))
+		printerr("SiteRequest refused: no roads could be planned for form '%s'" % String(spec.form))
+		quit(3)
+		return
+	if plan.site.size.x > spec.requested_site_m + 0.01 or plan.site.size.y > spec.requested_site_m + 0.01:
+		printerr("SiteRequest refused: population %d needs %.1f x %.1f m, beyond %.1f m terrain envelope" % [
+			spec.population, plan.site.size.x, plan.site.size.y, spec.requested_site_m])
+		quit(3)
+		return
+	var requested_buildings: int = VillageProgrammer.programme(spec).size()
+	if requested_buildings > BUILDING_MAX:
+		printerr("SiteRequest refused: %d buildings exceeds site capacity %d" % [
+			requested_buildings, BUILDING_MAX])
+		quit(3)
+		return
+	if plan.buildings.size() < requested_buildings:
+		printerr("SiteRequest refused: only %d of %d requested buildings fit in %.1f m" % [
+			plan.buildings.size(), requested_buildings, spec.requested_site_m])
 		quit(3)
 		return
 	var out: Dictionary = site_plan(plan, request)
@@ -114,7 +135,7 @@ const CULTURE_MAP := {
 ## fishing village.
 const PURPOSE_RULES := [
 	{"purpose": &"garrison", "built": ["marble-wall", "stone-wall"], "at": 0.5},
-	{"purpose": &"pilgrim", "built": ["ziggurat", "temple", "great-tomb"], "at": 0.6},
+	{"purpose": &"pilgrim", "built": ["temple"], "at": 0.000001},
 	{"purpose": &"mining", "built": ["forge-hall"], "at": 0.6},
 	{"purpose": &"fishing", "water": true},
 	{"purpose": &"forest", "forest": 0.5},
@@ -122,19 +143,11 @@ const PURPOSE_RULES := [
 	{"purpose": &"farming"},
 ]
 
-## Did the city build something a temple would stand for? The `pilgrim`
-## purpose is the only one that puts a temple in the programme, so this is
-## what decides whether it may be substituted in.
-static func _wants_temple(built: Dictionary) -> bool:
-	for word in ["ziggurat", "temple", "great-tomb", "shrine"]:
-		if float(built.get(word, 0.0)) >= 0.3:
-			return true
-	return false
-
-
 ## Wealth in mythsim is unbounded; BigGlade's is 0..1. A thousand is a rich
 ## city, and everything past it is simply rich.
 const WEALTH_FULL := 1000.0
+const PALETTE_ORDER: Array[StringName] = [&"english", &"frankish", &"norse",
+	&"alpine", &"moorish", &"eastern", &"blighted"]
 
 
 ## The `VillageSpec` a SiteRequest asks for. `raw` is the request's own text,
@@ -144,36 +157,120 @@ const WEALTH_FULL := 1000.0
 static func spec_from_request(request: Dictionary, raw: String = "",
 		notes: Array[String] = []) -> VillageSpec:
 	var out := VillageSpec.new()
+	var errors: Array[String] = request_errors(request)
+	if not errors.is_empty():
+		return out
 	out.seed = _seed_of(request, raw)
-	# mythsim counts a city in thousands; a BigGlade site is at most 500
-	# people, and the contract's "building count rises with population and
-	# never exceeds 140" is what the cap is for.
-	var asked: int = int(request.get("population", 40))
-	out.population = clampi(asked, VillageSpec.POP_MIN, VillageSpec.POP_MAX)
-	if out.population != asked:
-		notes.append("population %d is outside a BigGlade site's range; planned at %d"
-			% [asked, out.population])
-	out.culture = _culture_of(String(request.get("culture", "")))
+	out.site_brief = true
+	out.population = int(request.get("population", 40))
+	out.source_culture = StringName(String(request.get("culture", "english")).to_lower())
+	out.tongue = StringName(String(request.get("tongue", "")).to_lower())
+	out.culture = _culture_of(String(out.source_culture))
+	out.regime = StringName(String(request.get("regime", "")).to_lower())
 	out.wealth = clampf(float(request.get("wealth", 0.0)) / WEALTH_FULL, 0.0, 1.0)
 	var terrain: Dictionary = request.get("terrain", {})
-	var built: Dictionary = request.get("buildings", {})
+	out.terrain_envelope = terrain.duplicate(true)
+	out.requested_site_m = float(request.get("site_m", SITE_MAX_M))
+	var built: Dictionary = request.get("buildings", {}).duplicate(true)
+	for word in BUILT_WORDS:
+		built[word] = float(built.get(word, 0.0))
+	out.kept_buildings = built
+	out.plant_palette = _plant_palette(String(out.source_culture), String(out.tongue))
 	out.water = _water_of(terrain)
-	out.purpose = _purpose_of(built, terrain, out.population)
+	out.purpose = _purpose_for_brief(built, terrain, out.population, out.regime)
 	out.enclosure = _enclosure_of(built, out.population, out.purpose)
+	out.enclosure_kept_fraction = _enclosure_fraction(built)
 	return out
 
 
-## Two of VILLAGES §3's seven forms have planners (VIL-003): `street` and
-## `green`. Everything else -- `gate`, `strand`, `planted`, `crossroads`,
-## `round` -- is still to come, and a spec that derives one of them plans
-## nothing at all.
-##
-## Rather than write an empty SitePlan, this steps the spec toward a form
-## BigGlade can lay and SAYS SO in the plan's `notes`. Both concessions are
-## the form table's own thresholds read backwards:
-##   * two hundred people or more is a gate village whatever else it is
-##   * only farming, pilgrim, forest and mining reach `street` or `green`;
-##     garrison, market, crossroads, fishing and mill do not
+## Reject a request when the bounded village planner cannot honor its stated
+## population or terrain. Clamping makes a different city and hides failure.
+static func request_errors(request: Dictionary) -> Array[String]:
+	var errors: Array[String] = []
+	if request.has("buildings") and not request["buildings"] is Dictionary:
+		errors.append("buildings must be an object of kept fractions")
+	if request.has("terrain") and not request["terrain"] is Dictionary:
+		errors.append("terrain must be an envelope object")
+	if not errors.is_empty():
+		return errors
+	var population_value: Variant = request.get("population", 40)
+	if not _is_number(population_value):
+		errors.append("population must be numeric")
+		return errors
+	var raw_population: float = float(population_value)
+	var population: int = int(raw_population)
+	if not is_equal_approx(raw_population, float(population)):
+		errors.append("population must be a whole number")
+	if population < VillageSpec.POP_MIN or population > VillageSpec.POP_MAX:
+		errors.append("population %d exceeds local capacity [%d, %d]" % [population,
+			VillageSpec.POP_MIN, VillageSpec.POP_MAX])
+	var site_value: Variant = request.get("site_m", SITE_MAX_M)
+	if not _is_number(site_value):
+		errors.append("site_m must be numeric")
+		return errors
+	var site_m: float = float(site_value)
+	if site_m < VillageSitePlanner.SITE_MIN_SIDE or site_m > SITE_MAX_M:
+		errors.append("site_m %.1f is outside the buildable envelope [%.0f, %.0f] m" % [
+			site_m, VillageSitePlanner.SITE_MIN_SIDE, SITE_MAX_M])
+	var terrain: Dictionary = request.get("terrain", {})
+	for field in ["elevation", "forest", "fertility"]:
+		if terrain.has(field):
+			if not _is_number(terrain[field]):
+				errors.append("terrain %s must be numeric" % field)
+				continue
+			var reading: float = float(terrain[field])
+			if reading < 0.0 or reading > 1.0:
+				errors.append("terrain %s %.3f is outside [0, 1]" % [field, reading])
+	var slope_value: Variant = terrain.get("slope", 0.0)
+	if not _is_number(slope_value):
+		errors.append("terrain slope must be numeric")
+		return errors
+	var slope: float = float(slope_value)
+	if slope < 0.0 or slope >= MAX_BUILDABLE_SLOPE:
+		errors.append("terrain slope %.3f has no buildable village ground (maximum %.2f)" % [
+			slope, MAX_BUILDABLE_SLOPE])
+	var edges: Variant = terrain.get("water_edges", [])
+	if not edges is Array:
+		errors.append("terrain water_edges must be an array")
+	else:
+		var edge_list: Array = edges
+		for edge in edge_list:
+			if String(edge) not in ["north", "south", "east", "west"]:
+				errors.append("unknown terrain water edge '%s'" % String(edge))
+	var regime: String = String(request.get("regime", "" )).to_lower()
+	if not regime.is_empty() and regime not in ["royal", "council", "theocracy", "military"]:
+		errors.append("unknown regime '%s'" % regime)
+	var built: Dictionary = request.get("buildings", {})
+	for key in built:
+		if String(key) not in BUILT_WORDS:
+			errors.append("unknown authored building '%s'" % String(key))
+			continue
+		if not _is_number(built[key]):
+			errors.append("building '%s' kept fraction must be numeric" % String(key))
+			continue
+		var kept: float = float(built[key])
+		if kept < 0.0 or kept > 1.0:
+			errors.append("building '%s' kept fraction %.3f is outside [0, 1]" % [String(key), kept])
+	if errors.any(func(message: String) -> bool: return message.contains("kept fraction must be numeric")):
+		return errors
+	var wall_fraction: float = maxf(float(built.get("stone-wall", 0.0)),
+		float(built.get("marble-wall", 0.0)))
+	if wall_fraction > 0.0 and population < VillageSpec.WALL_MIN_POPULATION \
+			and regime != "military":
+		errors.append("a kept wall needs at least %d people or a military regime" % VillageSpec.WALL_MIN_POPULATION)
+	return errors
+
+
+static func _is_number(value: Variant) -> bool:
+	return typeof(value) in [TYPE_INT, TYPE_FLOAT]
+
+
+const MAX_BUILDABLE_SLOPE := 0.35
+
+
+## Retained for callers that intentionally adapt a legacy spec into the
+## historical street/green planner limits. C1 no longer calls this fallback:
+## the brief keeps its population and regime or is explicitly refused.
 static func _settle_form(spec: VillageSpec, notes: Array[String],
 		wants_temple: bool) -> void:
 	if spec.form in VillageSitePlanner.FORMS_SUPPORTED:
@@ -291,6 +388,18 @@ static func _water_of(terrain: Dictionary) -> StringName:
 
 
 static func _purpose_of(built: Dictionary, terrain: Dictionary, population: int) -> StringName:
+	# Native callers have no government regime to apply.
+	return _purpose_for_brief(built, terrain, population, &"")
+
+
+static func _purpose_for_brief(built: Dictionary, terrain: Dictionary, population: int,
+		regime: StringName) -> StringName:
+	if regime == &"military":
+		return &"garrison"
+	if regime == &"council":
+		return &"market"
+	if regime == &"theocracy" and float(built.get("temple", 0.0)) > 0.0:
+		return &"pilgrim"
 	for rule in PURPOSE_RULES:
 		if rule.has("built"):
 			var got := false
@@ -309,6 +418,14 @@ static func _purpose_of(built: Dictionary, terrain: Dictionary, population: int)
 	return &"farming"
 
 
+static func _plant_palette(culture: String, tongue: String) -> StringName:
+	var cultural: StringName = _culture_of(culture)
+	var linguistic: StringName = cultural if tongue.is_empty() else _culture_of(tongue)
+	var a: int = PALETTE_ORDER.find(cultural)
+	var b: int = PALETTE_ORDER.find(linguistic)
+	return PALETTE_ORDER[posmod(a * 2 + b, PALETTE_ORDER.size())]
+
+
 ## What is round the edge, from what the city has built. A wall needs the
 ## people to build and man it (`VillageSpec.WALL_MIN_POPULATION`) or a
 ## garrison to supply them, so a city that has one but is now too small for
@@ -316,13 +433,19 @@ static func _purpose_of(built: Dictionary, terrain: Dictionary, population: int)
 static func _enclosure_of(built: Dictionary, population: int, purpose: StringName) -> StringName:
 	var walled: float = maxf(float(built.get("marble-wall", 0.0)),
 		float(built.get("stone-wall", 0.0)))
-	if walled >= 0.3:
+	var palisade: float = float(built.get("palisade", 0.0))
+	if walled > palisade:
 		if population >= VillageSpec.WALL_MIN_POPULATION or purpose == &"garrison":
 			return &"wall"
 		return &"palisade"
-	if float(built.get("palisade", 0.0)) >= 0.3:
+	if palisade > 0.0:
 		return &"palisade"
 	return &"none"
+
+
+static func _enclosure_fraction(built: Dictionary) -> float:
+	return maxf(float(built.get("palisade", 0.0)), maxf(float(built.get("stone-wall", 0.0)),
+		float(built.get("marble-wall", 0.0))))
 
 
 # ---------------------------------------------------------- plan -> JSON
@@ -336,6 +459,17 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		"city_id": city_id,
 		"seed": str(request.get("seed", 0)),
 		"generator": GENERATOR,
+		"name": String(request.get("name", plan.spec.variant_name)),
+		"local_name": plan.spec.variant_name,
+		"culture_source": String(plan.spec.source_culture),
+		"tongue": String(plan.spec.tongue),
+		"regime": String(plan.spec.regime),
+		"plant_palette": String(plan.spec.plant_palette),
+		"enclosure": {"kind": String(plan.spec.enclosure),
+			"kept_fraction": _n(plan.spec.enclosure_kept_fraction)},
+		"authored_buildings": plan.spec.kept_buildings.duplicate(true),
+		"terrain": plan.spec.terrain_envelope.duplicate(true),
+		"site_m_requested": _n(plan.spec.requested_site_m),
 		# what was asked for, alongside what was planned, so a consumer can
 		# see the difference without re-reading its own request
 		"population_asked": int(request.get("population", 0)),

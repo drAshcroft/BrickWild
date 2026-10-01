@@ -23,6 +23,17 @@ var enclosure: StringName = &"none"
 var water: StringName = &"none"
 var orientation: float = 0.0
 var period: int = 1200
+## Optional external C1 brief. Empty strings and the default palette preserve
+## the native seven-input village path exactly.
+var site_brief := false
+var regime: StringName = &""
+var tongue: StringName = &""
+var source_culture: StringName = &""
+var plant_palette: StringName = &"english"
+var kept_buildings: Dictionary = {}
+var enclosure_kept_fraction: float = 1.0
+var terrain_envelope: Dictionary = {}
+var requested_site_m: float = 400.0
 
 # ---- derived from seed + the six above ----
 var households: int = 0
@@ -180,6 +191,8 @@ func generate(p_seed: int) -> void:
 			"request": "ziggurat of the void", "where": "landmark beside the common"})
 	site = _derive_site(programme, enclosure)
 	variant_name = _derive_variant_name(seed)
+	if site_brief:
+		variant_name = _brief_variant_name(seed, source_culture, tongue)
 
 
 ## `round(population / 4.5)`, then nudged +-10% by a value drawn from the
@@ -271,3 +284,20 @@ static func _derive_variant_name(p_seed: int) -> String:
 	var second: String = CastleGenerator.SECOND_WORDS[nr.randi_range(0, CastleGenerator.SECOND_WORDS.size() - 1)]
 	var suffix: String = VILLAGE_SUFFIXES[nr.randi_range(0, VILLAGE_SUFFIXES.size() - 1)]
 	return "%s%s%s" % [first, second, suffix]
+
+
+## C1 names use both external culture and tongue, while remaining a pure
+## function of the brief and its seed. Native villages retain the name above.
+static func _brief_variant_name(p_seed: int, p_culture: StringName,
+		p_tongue: StringName) -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("site_brief_name|%d|%s|%s" % [p_seed, p_culture, p_tongue])
+	var roots := ["Alder", "Brook", "Cairn", "Dale", "Elder", "Fen", "Glen", "Hearth"]
+	var endings := ["ford", "stead", "mere", "wick", "combe", "holt", "bridge", "field"]
+	var tongue_roots := {
+		&"orc": ["Grak", "Urz", "Morg", "Drok"], &"elf": ["Leth", "Ael", "Ith", "Sila"],
+		&"dwarf": ["Dun", "Kaz", "Brom", "Thrain"], &"human": ["Alder", "Brook", "Cairn", "Dale"]}
+	var words: Array = tongue_roots.get(p_tongue, roots)
+	var root: String = words[rng.randi_range(0, words.size() - 1)]
+	var end: String = endings[rng.randi_range(0, endings.size() - 1)]
+	return "%s%s of %s" % [root, end, String(p_culture).capitalize()]

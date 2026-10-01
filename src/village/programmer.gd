@@ -82,12 +82,82 @@ static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 
 	_append_landmark(out, spec, styles)
 	_append_shops(out, spec, styles)
+	if spec.site_brief:
+		_append_site_brief(out, spec, styles)
 
 	if spec.population >= MANOR_MIN_POP or spec.purpose == &"garrison":
 		out.append(BuildingRequest.castle(
 			_seed_for(spec, "manor"), styles["castle"], 40.0, 50.0, 10.0))
 
 	return out
+
+
+## Translate mythsim's kept words into real, placeable architecture. A kept
+## fraction changes the requested footprint; it is not opaque metadata. The
+## temple word alone creates a temple, so the C1 presence rule stays exact.
+static func _append_site_brief(out: Array[BuildingRequest], spec: VillageSpec,
+		styles: Dictionary) -> void:
+	var built: Dictionary = spec.kept_buildings
+	if float(built.get("granary", 0.0)) > 0.0:
+		_append_shop(out, spec, "granary", &"general_store", styles["house"], float(built["granary"]))
+	if float(built.get("forge-hall", 0.0)) > 0.0:
+		_append_shop(out, spec, "forge-hall", &"blacksmith", styles["house"], float(built["forge-hall"]))
+	if float(built.get("shrine", 0.0)) > 0.0:
+		var fraction: float = float(built["shrine"])
+		out.append(BuildingRequest.church(_seed_for(spec, "brief|shrine"), styles["church"],
+			lerpf(6.0, 10.0, fraction), lerpf(10.0, 16.0, fraction), lerpf(6.0, 9.0, fraction)))
+	if float(built.get("palace", 0.0)) > 0.0:
+		_append_seat(out, spec, styles, &"royal", float(built["palace"]))
+	if float(built.get("great-tomb", 0.0)) > 0.0:
+		_append_castle(out, spec, styles, "great-tomb", float(built["great-tomb"]))
+	if float(built.get("ziggurat", 0.0)) > 0.0:
+		# Ziggurat is a stepped civic monument in this renderer. It uses a
+		# castle mass; only the explicit `temple` key earns TempleSpec geometry.
+		_append_castle(out, spec, styles, "ziggurat", float(built["ziggurat"]))
+	_append_seat(out, spec, styles, spec.regime, 1.0)
+
+
+static func _append_seat(out: Array[BuildingRequest], spec: VillageSpec,
+		styles: Dictionary, requested_regime: StringName, fraction: float) -> void:
+	match requested_regime:
+		&"royal":
+			if not _has_kind(out, &"castle"):
+				_append_castle(out, spec, styles, "seat|royal", fraction)
+		&"council":
+			if not _has_shop_purpose(out, &"town_hall"):
+				_append_shop(out, spec, "seat|council", &"town_hall", styles["house"], fraction)
+		&"theocracy":
+			if not _has_kind(out, &"temple") and not _has_kind(out, &"church"):
+				# Theocracy gets a religious seat, but a temple is emitted only
+				# when the request's `temple` kept fraction is positive.
+				out.append(BuildingRequest.church(_seed_for(spec, "seat|theocracy"),
+					styles["church"], 10.0, 20.0, 12.0))
+		&"military":
+			if not _has_kind(out, &"castle"):
+				_append_castle(out, spec, styles, "seat|military", fraction)
+
+
+static func _append_shop(out: Array[BuildingRequest], spec: VillageSpec, key: String,
+	business: StringName, style: StringName, fraction: float) -> void:
+	var size: float = lerpf(0.72, 1.0, clampf(fraction, 0.0, 1.0))
+	out.append(BuildingRequest.shop(_seed_for(spec, "brief|" + key), business, style,
+		11.0 * size, 14.0 * size, 2.8, 1))
+
+
+static func _append_castle(out: Array[BuildingRequest], spec: VillageSpec,
+	styles: Dictionary, key: String, fraction: float) -> void:
+	var size: float = lerpf(0.65, 1.0, clampf(fraction, 0.0, 1.0))
+	out.append(BuildingRequest.castle(_seed_for(spec, "brief|" + key), styles["castle"],
+		40.0 * size, 50.0 * size, 10.0))
+
+
+static func _has_kind(requests: Array[BuildingRequest], kind: StringName) -> bool:
+	return requests.any(func(request: BuildingRequest) -> bool: return request.kind == kind)
+
+
+static func _has_shop_purpose(requests: Array[BuildingRequest], purpose: StringName) -> bool:
+	return requests.any(func(request: BuildingRequest) -> bool:
+		return request.kind == &"shop" and request.purpose == purpose)
 
 
 ## `population -> households` earned kinds, independent of `programme()`'s
@@ -125,7 +195,19 @@ static func earned_kinds(population: int, purpose: StringName, water: StringName
 
 
 static func _append_landmark(out: Array[BuildingRequest], spec: VillageSpec, styles: Dictionary) -> void:
-	if spec.culture == &"blighted":
+	if spec.site_brief:
+		var temple_fraction: float = float(spec.kept_buildings.get("temple", 0.0))
+		if temple_fraction > 0.0:
+			out.append(BuildingRequest.temple(_seed_for(spec, "brief|temple"),
+				styles["temple_form"], styles["temple_cult"], lerpf(14.0, 26.0, temple_fraction),
+				lerpf(24.0, 44.0, temple_fraction), lerpf(10.0, 16.0, temple_fraction)))
+			return
+		if spec.population >= CHURCH_MIN_POP:
+			out.append(BuildingRequest.church(_seed_for(spec, "church"), styles["church"], 10.0, 20.0, 12.0))
+		elif spec.population >= SHRINE_MIN_POP:
+			out.append(BuildingRequest.church(_seed_for(spec, "shrine"), styles["church"], 6.0, 10.0, 6.0))
+		return
+	elif spec.culture == &"blighted":
 		# The stepped shrine is this settlement's landmark. Its summit rises
 		# above the witch cottages, while the ritual chamber remains usable.
 		out.append(BuildingRequest.temple(

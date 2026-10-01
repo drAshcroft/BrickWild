@@ -230,7 +230,7 @@ func _enclosure(plan: VillagePlan) -> void:
 	for i in range(n):
 		var a: Vector2 = edge[i]
 		var b: Vector2 = edge[(i + 1) % n]
-		for run in _minus_gates(a, b, gates):
+		for run in _keep_fraction(_minus_gates(a, b, gates), plan.enclosure_kept_fraction):
 			for part in _water_edge_runs(plan, run[0], run[1]):
 				if part["natural"]:
 					continue # The water itself is the boundary; never dam a river or coast.
@@ -252,6 +252,22 @@ func _enclosure(plan: VillagePlan) -> void:
 	# across this gap would visually and physically undo the road opening.
 	for g in gates.size():
 		_gate(gates[g], g, kind)
+
+
+## Retain a centered share of each side after real gate openings have been
+## cut. This gives fractional walls actual gaps and keeps the fraction stable
+## if a road adds or removes a gate.
+static func _keep_fraction(runs: Array, fraction: float) -> Array:
+	var out: Array = []
+	var keep: float = clampf(fraction, 0.0, 1.0)
+	if keep <= 0.0:
+		return out
+	for run in runs:
+		var a: Vector2 = run[0]
+		var b: Vector2 = run[1]
+		var margin: float = (1.0 - keep) * 0.5
+		out.append([a.lerp(b, margin), a.lerp(b, 1.0 - margin)])
+	return out
 
 
 func _gate(gate: Dictionary, index: int, kind: StringName) -> void:

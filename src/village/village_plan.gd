@@ -55,6 +55,9 @@ var commons: Array[Dictionary] = []
 
 ## The edge of the settlement. Empty polygon when `enclosure == none`.
 var enclosure: PackedVector2Array = PackedVector2Array()
+## Fraction of authored enclosure retained by an external site brief. Native
+## villages keep the historical complete edge.
+var enclosure_kept_fraction: float = 1.0
 
 ## Where a road crosses the enclosure. {"pos": Vector2, "road": int}.
 ## Named `gate_crossings` (not `gates`) because `gates()` below is the typed
@@ -159,6 +162,7 @@ func equals(other: VillagePlan) -> bool:
 		and _array_of_dict_equal(buildings, other.buildings)
 		and _array_of_dict_equal(commons, other.commons)
 		and _poly_equal(enclosure, other.enclosure)
+		and is_equal_approx(enclosure_kept_fraction, other.enclosure_kept_fraction)
 		and _array_of_dict_equal(gate_crossings, other.gate_crossings)
 		and _array_of_dict_equal(water, other.water)
 		and _array_of_dict_equal(water_crossings, other.water_crossings)
@@ -178,6 +182,13 @@ static func _spec_equal(a: VillageSpec, b: VillageSpec) -> bool:
 		and a.households == b.households and a.form == b.form
 		and a.variant_name == b.variant_name and a.site == b.site
 		and _array_of_dict_equal(a.programme, b.programme)
+		and a.site_brief == b.site_brief and a.regime == b.regime
+		and a.tongue == b.tongue and a.source_culture == b.source_culture
+		and a.plant_palette == b.plant_palette
+		and _value_equal(a.kept_buildings, b.kept_buildings)
+		and is_equal_approx(a.enclosure_kept_fraction, b.enclosure_kept_fraction)
+		and _value_equal(a.terrain_envelope, b.terrain_envelope)
+		and is_equal_approx(a.requested_site_m, b.requested_site_m)
 	)
 
 

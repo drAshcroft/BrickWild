@@ -91,6 +91,7 @@ static func author(plan: VillagePlan) -> void:
 		return
 	var derived := build(plan)
 	plan.enclosure = derived["edge"]
+	plan.enclosure_kept_fraction = clampf(plan.spec.enclosure_kept_fraction, 0.0, 1.0)
 	plan.gate_crossings.assign(derived["gates"])
 
 static func _nearest_boundary(p: Vector2, poly: PackedVector2Array) -> Vector2:

@@ -248,6 +248,7 @@ static func make_context(plan: VillagePlan) -> Dictionary:
 	var road_boxes: Array[Rect2] = []
 	for ribbon in roads:
 		road_boxes.append(Poly.bounding_rect(ribbon))
+	var palette_id: StringName = plan.spec.plant_palette if plan.spec.site_brief else plan.spec.culture
 	return {
 		"roads": roads, "road_boxes": road_boxes,
 		"bounds": bounds, "boxes": boxes, "doors": doors,
@@ -257,5 +258,6 @@ static func make_context(plan: VillagePlan) -> Dictionary:
 		# slower than planning it.
 		"grid": {},
 		"common": VillageMeasure.common_poly(plan),
-		"palette": VillageDressCatalog.PALETTES.get(plan.spec.culture, VillageDressCatalog.PALETTES[&"english"]),
+		"palette": VillageDressCatalog.PALETTES.get(palette_id,
+			VillageDressCatalog.PALETTES.get(plan.spec.culture, VillageDressCatalog.PALETTES[&"english"])),
 	}
