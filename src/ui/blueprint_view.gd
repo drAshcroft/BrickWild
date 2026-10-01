@@ -36,6 +36,15 @@ static func south_elevation_inventory(p_spec: ChurchSpec) -> Dictionary:
 	var tribunes: Array[AABB] = []
 	for i in range(ChurchGeometry.tribune_count(p_spec)):
 		tribunes.append(ChurchGeometry.tribune_aabb(p_spec, i))
+	var piers: Array[AABB] = []
+	if ChurchGeometry.hagia_bearing(p_spec):
+		var psize: float = ChurchGeometry.hagia_pier_size(p_spec)
+		var base: float = ChurchGeometry.dome_base_height(p_spec)
+		for sx in [-1.0, 1.0]:
+			for sz in [-1.0, 1.0]:
+				var pc: Vector3 = ChurchGeometry.hagia_pier_center(p_spec, sx, sz)
+				piers.append(AABB(Vector3(pc.x - psize / 2.0, base, pc.z - psize / 2.0),
+					Vector3(psize, ChurchGeometry.hagia_pier_top(p_spec) - base, psize)))
 	return {
 		"aisles": aisles,
 		"clerestory": ChurchGeometry.clerestory_windows(p_spec),
@@ -52,6 +61,9 @@ static func south_elevation_inventory(p_spec: ChurchSpec) -> Dictionary:
 		"tribunes": tribunes,
 		"podium": ChurchGeometry.podium_aabb(p_spec) \
 			if ChurchGeometry.podium_height(p_spec) > 0.0 else AABB(),
+		"bearing": ChurchGeometry.pendentive_aabb(p_spec) \
+			if ChurchGeometry.hagia_bearing(p_spec) else AABB(),
+		"piers": piers,
 		"tent": ChurchGeometry.basil_core(p_spec),
 	}
 
@@ -266,6 +278,12 @@ func _draw_plan(r: Rect2, ink: Color, light: Color) -> void:
 			tpts.append(tc + Vector2(sin(tth), cos(tth)) * ChurchGeometry.tribune_radius(spec) * scale)
 		draw_polyline(tpts, ink, 1.8)
 
+	# Hagia Sophia's square bearing, with a pier at each corner
+	if ChurchGeometry.hagia_bearing(spec):
+		draw_rect(plan_rect.call(ChurchGeometry.pendentive_aabb(spec)), ink, false, 1.4)
+		for pier in south_elevation_inventory(spec)["piers"]:
+			draw_rect(plan_rect.call(pier), ink, false, 1.6)
+
 	# dome: circle over the crossing, or an octagon for an octagonal drum
 	if spec.dome:
 		var dc: Vector2 = to_paper.call(Vector2(0, ChurchGeometry.crossing_center_z(spec)))
@@ -455,7 +473,7 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 			draw_rect(Rect2(Vector2(ch0, up.call(ch_top)),
 				Vector2(ch1 - ch0, ch_top * scale)), ink, false, 0.9)
 
-	# podium, octagonal crossing and tribunes
+	# podium, octagonal crossing, tribunes, bearing and piers
 	var podium: AABB = elevation["podium"]
 	if podium != AABB():
 		draw_rect(Rect2(Vector2(zx.call(podium.position.z), up.call(podium.size.y)),
@@ -468,6 +486,14 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 		var tb: AABB = tribune
 		draw_rect(Rect2(Vector2(zx.call(tb.position.z), up.call(tb.size.y)),
 			Vector2(tb.size.z * scale, tb.size.y * scale)), ink, false, 1.2)
+	var bearing: AABB = elevation["bearing"]
+	if bearing != AABB():
+		draw_rect(Rect2(Vector2(zx.call(bearing.position.z), up.call(bearing.end.y)),
+			Vector2(bearing.size.z * scale, bearing.size.y * scale)), ink, false, 1.8)
+		for pier in elevation["piers"]:
+			var pb: AABB = pier
+			draw_rect(Rect2(Vector2(zx.call(pb.position.z), up.call(pb.end.y)),
+				Vector2(pb.size.z * scale, pb.size.y * scale)), light, false, 1.2)
 
 	# crossing tower: the horizontal axis here is Z, so its width is the
 	# crossing bay's depth, not the nave width.
@@ -525,8 +551,8 @@ func _draw_elevation(r: Rect2, ink: Color, light: Color) -> void:
 		var hr: float = ChurchGeometry.half_dome_radius(spec)
 		var base: float = ChurchGeometry.dome_base_height(spec)
 		for direction in [-1.0, 1.0]:
-			_draw_projected_half_dome(ChurchGeometry.crossing_center_z(spec), base,
-				hr, hr * 0.85, direction, scale, zx, up, ink)
+			_draw_projected_half_dome(ChurchGeometry.half_dome_face_z(spec, direction), base,
+				hr, ChurchGeometry.half_dome_rise(spec), direction, scale, zx, up, ink)
 			if elevation["exedrae"]:
 				var er: float = hr * 0.4
 				var ez: float = ChurchGeometry.crossing_center_z(spec) + direction * hr * 0.62

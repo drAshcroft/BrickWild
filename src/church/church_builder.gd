@@ -735,8 +735,9 @@ func _build_dome() -> void:
 
 	# What carries the drum. Randomly generated churches get a closed,
 	# sloped square-to-drum loft whose upper ring shares the drum's sides and
-	# phase. The hero landmarks get masonry that reads as masonry: Florence a
-	# crossing octagon as wide as its dome.
+	# phase. The three hero landmarks get masonry that reads as masonry: a
+	# crossing octagon (Florence), a square bearing with piers and great arches
+	# (Hagia Sophia).
 	var drum_radius: float = r * (ChurchGeometry.OCTAGONAL_RADIUS_FACTOR if octagonal else 1.0)
 	var rounded_hero: bool = spec.style == &"byzantine" and spec.dome_shape == &"hemisphere"
 	var shell_segments: int = 8 if octagonal else (32 if rounded_hero else 16)
@@ -744,13 +745,17 @@ func _build_dome() -> void:
 	var pendentive_h: float = ChurchGeometry.pendentive_height(spec)
 	if ChurchGeometry.octagon_crossing(spec):
 		_octagon_crossing(cz, base, drum_radius, pendentive_h)
+	elif ChurchGeometry.hagia_bearing(spec):
+		_hagia_bearing(cz, base, pendentive_h)
 	else:
 		_pendentive_support(Vector3(0.0, base, cz), r + 0.3, drum_radius,
 			pendentive_h, shell_segments, shell_start, rounded_hero)
 	_log_mass("pendentive", ChurchGeometry.pendentive_aabb(spec))
 	# the corona of windows that lights every one of these domes
 	var lights: int = 8 if octagonal else 12
-	if ChurchGeometry.basil_core(spec):
+	if ChurchGeometry.hagia_bearing(spec):
+		lights = 16
+	elif ChurchGeometry.basil_core(spec):
 		lights = 8
 	var angles: Array = []
 	for i in range(lights):
@@ -790,11 +795,15 @@ func _build_dome() -> void:
 	# carried on smaller semi-domed exedrae.
 	if spec.half_domes:
 		var hr: float = ChurchGeometry.half_dome_radius(spec)
+		var half_rise: float = ChurchGeometry.half_dome_rise(spec)
+		var half_segs: int = 12 if ChurchGeometry.hagia_bearing(spec) else 10
 		for dir_v in [-1.0, 1.0]:
 			var d: float = dir_v
 			var start: float = 0.0 if d > 0.0 else PI
-			preload("church_roofs.gd").dome(_kit, _dome_profile(hr, hr * 0.85),
-				Vector3(0, base, cz), 10, _roof_volumes, PI, start)
+			var face_z: float = ChurchGeometry.half_dome_face_z(spec, d)
+			preload("church_roofs.gd").dome(_kit, _dome_profile(hr, half_rise,
+				8 if ChurchGeometry.hagia_bearing(spec) else 0),
+				Vector3(0, base, face_z), half_segs, _roof_volumes, PI, start)
 			if spec.exedrae:
 				for ex_v in [-1.0, 1.0]:
 					var er: float = hr * 0.4
@@ -863,6 +872,71 @@ func _oriented_half_cone(pos: Vector3, radius: float, height: float, start: floa
 		_kit.slab_poly(PackedVector3Array([pos + Vector3(cos(a) * radius, 0, sin(a) * radius),
 			pos + Vector3(cos(b) * radius, 0, sin(b) * radius), pos + Vector3(0, height, 0)]),
 			RoofShape.DEPTH, s, true)
+
+
+# ------------------------------------------------------------ Hagia Sophia
+
+## A square masonry bearing under the drum: the crossing square the dome circle
+## is inscribed in, closed top and bottom, with the four great arches drawn on
+## its faces, windows under the north and south arches, and a pier at each
+## corner that climbs past it. Half-domes spring from the east and west faces.
+func _hagia_bearing(cz: float, base: float, pendentive_h: float) -> void:
+	tag("bearing")
+	var half: float = ChurchGeometry.hagia_bearing_half(spec)
+	var hr: float = ChurchGeometry.half_dome_radius(spec)
+	var bearing := AABB(Vector3(-half, base, cz - half),
+		Vector3(half * 2.0, pendentive_h, half * 2.0))
+	var holes: Array[Dictionary] = []
+	for face in [1, 3]:
+		for k in range(5):
+			holes.append({"face": face, "u": cz + float(k - 2) * hr * 0.34,
+				"y": base + pendentive_h * 0.42, "width": hr * 0.12,
+				"height": pendentive_h * 0.40, "style": &"round"})
+	_windowed_box_shell(bearing, holes)
+	var top: float = ChurchGeometry.hagia_pier_top(spec)
+	var size: float = ChurchGeometry.hagia_pier_size(spec)
+	for sx_v in [-1.0, 1.0]:
+		for sz_v in [-1.0, 1.0]:
+			var pc: Vector3 = ChurchGeometry.hagia_pier_center(spec, sx_v, sz_v)
+			box(Vector3(size, top - base, size),
+				Vector3(pc.x, (base + top) * 0.5, pc.z), SURF_STONE)
+			box(Vector3(size * 1.14, 0.3, size * 1.14),
+				Vector3(pc.x, top + 0.15, pc.z), SURF_TRIM)
+			_kit.spike(Vector2(size * 1.0, size * 1.0), size * 0.7,
+				Vector3(pc.x, top + 0.3, pc.z), SURF_STONE)
+	var arch_rise: float = pendentive_h * 0.97
+	var thick: float = clampf(spec.dome_radius * 0.05, 0.25, 1.0)
+	var index := 0
+	for dir_v in [-1.0, 1.0]:
+		host("great_arch_%d" % index)
+		_great_arch(Vector3(0, base, cz + dir_v * (half + thick * 0.3)),
+			Vector3.RIGHT, hr, arch_rise, thick)
+		host_end()
+		index += 1
+		host("great_arch_%d" % index)
+		_great_arch(Vector3(dir_v * (half + thick * 0.3), base, cz),
+			Vector3.BACK, hr, arch_rise, thick)
+		host_end()
+		index += 1
+
+
+## A semi-elliptical ring of dressed stones standing proud of the wall plane.
+## `along` is the horizontal direction in that plane.
+func _great_arch(center: Vector3, along: Vector3, rx: float, ry: float,
+		thick: float) -> void:
+	var steps := 16
+	var prev: Vector3 = center + along * rx
+	for k in range(1, steps + 1):
+		var phi: float = PI * float(k) / float(steps)
+		var p: Vector3 = center + along * (rx * cos(phi)) + Vector3.UP * (ry * sin(phi))
+		var seg: Vector3 = p - prev
+		var seg_len: float = seg.length()
+		if seg_len > 0.001:
+			var xf := Transform3D(Basis().looking_at(seg / seg_len, Vector3.UP),
+				(prev + p) * 0.5)
+			component_box("great_arch", Vector3(thick * 1.1, thick, seg_len * 1.08),
+				xf, SURF_TRIM)
+		prev = p
 
 
 # ------------------------------------------------------------ St Basil's
@@ -1016,13 +1090,15 @@ func _pendentive_ring(center: Vector3, lower_half: float, upper_radius: float,
 
 ## Profile of a dome shell, bottom to top: hemispherical, or the ogee curve
 ## that gives an onion dome its shoulder and point.
-func _dome_profile(radius: float, rise: float) -> PackedVector2Array:
+func _dome_profile(radius: float, rise: float, steps_override := 0) -> PackedVector2Array:
 	var pts := PackedVector2Array()
 	if spec.dome_shape == &"onion":
 		return _onion_profile(radius, rise)
 	var hero_shell: bool = (spec.style == &"byzantine" and spec.dome_shape == &"hemisphere") \
 		or (spec.style == &"renaissance" and spec.dome_shape == &"octagonal")
 	var steps: int = 12 if hero_shell else 6
+	if steps_override > 0:
+		steps = steps_override
 	for i in range(steps + 1):
 		var t: float = float(i) / steps
 		pts.append(Vector2(radius * cos(t * PI / 2.0), rise * sin(t * PI / 2.0)))

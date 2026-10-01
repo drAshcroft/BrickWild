@@ -791,12 +791,7 @@ func _force_features(spec: ChurchSpec, key: String) -> void:
 			spec.west_towers = 2
 			spec.transept = true
 			spec.crossing_tower = true
-		"hagia_sophia":
-			spec.dome = true
-			spec.dome_shape = &"hemisphere"
-			spec.half_domes = true
-			spec.exedrae = true
-		"florence_duomo", "st_basil":
+		"hagia_sophia", "florence_duomo", "st_basil":
 			# composed, not rolled: ChurchGenerator.apply_landmark
 			ChurchGenerator.apply_landmark(spec, key)
 	# backfill any size the generator left at zero, then re-settle the ring

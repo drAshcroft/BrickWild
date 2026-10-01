@@ -145,17 +145,19 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 	var separator: String = "" if suffix.begins_with("-") or suffix.is_empty() else " "
 	spec.variant_name = "%s %s%s%s" % [first, second, separator, suffix]
 
-## The famous domed churches, composed rather than rolled. Call this
+## The three famous domed churches, composed rather than rolled. Call this
 ## after generate(): it overrides whatever the dice chose, sets `spec.hero`
 ## (which switches on the landmark geometry in ChurchGeometry/ChurchBuilder),
 ## and sizes the parts from the dimensions docs/LANDMARKS.md gives. `key` is
-## the landmark key: "florence_duomo" or "st_basil".
+## the landmark key: "florence_duomo", "st_basil" or "hagia_sophia".
 static func apply_landmark(spec: ChurchSpec, key: String) -> void:
 	match key:
 		"florence_duomo":
 			_landmark_florence(spec)
 		"st_basil":
 			_landmark_basil(spec)
+		"hagia_sophia":
+			_landmark_hagia(spec)
 
 
 ## Florence: spec.length arrives as the OVERALL length (153 m) and is turned
@@ -227,6 +229,40 @@ static func _landmark_basil(spec: ChurchSpec) -> void:
 	spec.radiating_chapels = 8
 	spec.chapel_radius = spec.width * 0.2
 	_fit_chapels(spec)
+
+
+## Hagia Sophia: a shallow-roofed nave, the dome on a square bearing, the
+## half-domes east and west, a stepped apse and buttressed walls.
+static func _landmark_hagia(spec: ChurchSpec) -> void:
+	spec.hero = &"hagia"
+	_clear_towers(spec)
+	spec.ambulatory = false
+	spec.radiating_chapels = 0
+	spec.chapel_radius = 0.0
+	spec.narthex = true
+	spec.rose_window = false
+	spec.flying_buttresses = false
+	spec.window_style = &"round"
+	spec.aisles = 1
+	spec.aisle_width = clampf(spec.width * 0.2, 1.5, 6.0)
+	spec.clerestory = true
+	spec.transept = false
+	spec.transept_len = 0.0
+	spec.crossing_tower = false
+	spec.crossing_tower_height = 0.0
+	spec.apse = true
+	spec.dome = true
+	spec.dome_shape = &"hemisphere"
+	spec.dome_lantern = false
+	spec.half_domes = true
+	spec.exedrae = false
+	spec.roof_pitch = 0.12
+	spec.dome_radius = spec.width * 0.45
+	spec.buttresses = true
+	spec.buttress_count_per_side = ChurchGeometry.hero_bay_count(spec) + 1
+	spec.buttress_depth = clampf(spec.width * 0.04, 0.5, 1.4)
+	spec.dome_drum_height = maxf(spec.dome_radius * 0.5,
+		ChurchGeometry.min_drum_height(spec))
 
 
 static func _clear_towers(spec: ChurchSpec) -> void:

@@ -167,6 +167,7 @@ static func _run_one(key: String) -> SuiteResult:
 		"vis016":
 			var result := SuiteResult.new("VIS-016 curved pendentive controls")
 			preload("res://tests/suites/church_roof_suite.gd")._pendentive_transition(result)
+			preload("res://tests/suites/church_roof_suite.gd")._hero_bearing(result)
 			return result
 		"vis009":
 			return preload("res://tests/suites/vis009_suite.gd").run()

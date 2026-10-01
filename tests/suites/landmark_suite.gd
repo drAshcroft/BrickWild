@@ -123,10 +123,7 @@ static func _force_features(key: String, spec: ChurchSpec) -> void:
 		"durham":
 			_force_crossing_tower(spec)
 			_force_west_towers(spec, 2)
-		"hagia_sophia":
-			_force_dome(spec, &"hemisphere")
-			spec.half_domes = true
-		"florence_duomo", "st_basil":
+		"hagia_sophia", "florence_duomo", "st_basil":
 			# composed, not rolled: the hero geometry lives behind spec.hero
 			ChurchGenerator.apply_landmark(spec, key)
 
@@ -165,19 +162,6 @@ static func _force_crossing_tower(spec: ChurchSpec) -> void:
 		spec.crossing_tower_height = spec.height * 1.6
 
 
-## A dome over the crossing replaces a crossing tower there, same as the
-## generator enforces when it picks a dome for itself.
-static func _force_dome(spec: ChurchSpec, shape: StringName) -> void:
-	spec.dome = true
-	spec.dome_shape = shape
-	if spec.dome_radius == 0.0:
-		spec.dome_radius = spec.width * 0.45
-	if spec.dome_drum_height == 0.0:
-		spec.dome_drum_height = spec.dome_radius * ChurchGeometry.DOME_DRUM_RATIO
-	spec.crossing_tower = false
-	spec.crossing_tower_height = 0.0
-
-
 # --------------------------------------------------------- geometry assertions
 
 ## For each landmark, confirm the forced feature actually produced a
@@ -210,6 +194,12 @@ static func _check_required_masses(key: String, builder: ChurchBuilder, who: Str
 			# half-domes are not yet their own logged mass; they read off the
 			# same drum until the builder gives them a distinct name.
 			_require(builder, who, res, "dome_drum", "dome (with buttressing half-domes)")
+			# the bearing is masonry the dome stands on, with the four great arches
+			# drawn on its faces, not a flared collar
+			_require(builder, who, res, "pendentive", "square masonry bearing")
+			for i in range(4):
+				if builder.components_of("great_arch_%d" % i).is_empty():
+					res.fail("%s: great arch %d was not emitted" % [who, i])
 		"florence_duomo":
 			# shape and lantern are attributes of the drum mass, not separate ones.
 			_require(builder, who, res, "dome_drum", "octagonal drum + lantern-topped dome")

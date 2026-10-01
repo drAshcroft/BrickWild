@@ -70,6 +70,7 @@ var narthex: bool                # entrance vestibule across the west front
 # add what makes each of them read:
 #   &"florence" -- an octagonal crossing the width of the dome, three tribunes
 #   &"basil"    -- a podium, a tented core and eight onion-domed chapels
+#   &"hagia"    -- a square masonry bearing with corner piers under the drum
 var hero: StringName = &""
 
 const STYLES := {

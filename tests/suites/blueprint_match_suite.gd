@@ -61,6 +61,9 @@ static func run_vis010() -> SuiteResult:
 			"hagia_sophia":
 				_expect(inventory["dome"] and inventory["dome_shape"] == &"hemisphere", key, "main hemispherical dome", res)
 				_expect(inventory["half_domes"], key, "buttressing half-domes", res)
+				_expect(inventory["bearing"] != AABB(), key, "square masonry bearing", res)
+				_expect(inventory["piers"].size() == 4, key, "four corner piers", res)
+				_expect(not inventory["clerestory"].is_empty(), key, "clerestory arches", res)
 			"florence_duomo":
 				_expect(inventory["dome"] and inventory["dome_shape"] == &"octagonal", key, "octagonal dome", res)
 				_expect(inventory["crossing_octagon"] != AABB(), key, "octagonal crossing", res)
@@ -119,9 +122,14 @@ static func run_vis010() -> SuiteResult:
 	_expect(not BlueprintView.south_elevation_inventory(no_half_domes)["half_domes"],
 		"control", "half-dome omission", res)
 	# the hero rows are keyed off spec.hero, so a church without it draws none
+	var no_bearing: ChurchSpec = _vis010_spec(cases[2])
+	no_bearing.hero = &""
+	var plain: Dictionary = BlueprintView.south_elevation_inventory(no_bearing)
+	_expect(plain["bearing"] == AABB() and plain["piers"].is_empty(),
+		"control", "bearing and pier omission", res)
 	var no_octagon: ChurchSpec = _vis010_spec(cases[3])
 	no_octagon.hero = &""
-	var plain: Dictionary = BlueprintView.south_elevation_inventory(no_octagon)
+	plain = BlueprintView.south_elevation_inventory(no_octagon)
 	_expect(plain["crossing_octagon"] == AABB() and plain["tribunes"].is_empty(),
 		"control", "octagon and tribune omission", res)
 	var no_podium: ChurchSpec = _vis010_spec(cases[4])
@@ -146,13 +154,7 @@ static func _vis010_spec(row: Dictionary) -> ChurchSpec:
 			if spec.chapel_radius == 0.0:
 				spec.chapel_radius = spec.apse_radius * 0.38
 			_force_vis_flyers(spec)
-		"hagia_sophia":
-			spec.dome = true
-			spec.dome_shape = &"hemisphere"
-			spec.dome_radius = maxf(spec.dome_radius, spec.width * 0.45)
-			spec.dome_drum_height = maxf(spec.dome_drum_height, spec.dome_radius * ChurchGeometry.DOME_DRUM_RATIO)
-			spec.half_domes = true
-		"florence_duomo", "st_basil":
+		"hagia_sophia", "florence_duomo", "st_basil":
 			ChurchGenerator.apply_landmark(spec, row["key"])
 	return spec
 

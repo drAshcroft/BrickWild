@@ -66,6 +66,8 @@ const PODIUM_RATIO := 0.045      # St Basil: podium height, x core height
 const PODIUM_MARGIN := 2.4       # podium reach beyond the outermost chapel
 const BASIL_PATTERN := [0.34, 0.46, 0.38, 0.52, 0.42, 0.48, 0.36, 0.54]
 const BASIL_DRUM_PATTERN := [0.9, 1.25, 1.0, 1.35, 1.1, 0.85, 1.3, 1.05]
+const HAGIA_BEARING_RATIO := 0.74   # bearing block height, x dome radius
+const HAGIA_PIER_RATIO := 0.30      # corner pier plan size, x dome radius
 
 
 # ------------------------------------------------------------------ nave
@@ -318,6 +320,8 @@ static func dome_base_height(spec: ChurchSpec) -> float:
 static func pendentive_height(spec: ChurchSpec) -> float:
 	if octagon_crossing(spec):
 		return spec.dome_radius * 0.06      # the chamfered ledge between block and drum
+	if hagia_bearing(spec):
+		return spec.dome_radius * HAGIA_BEARING_RATIO
 	if spec.style == &"byzantine" and spec.dome_shape == &"hemisphere":
 		return maxf(PENDENTIVE_H, spec.dome_radius * 0.18)
 	return PENDENTIVE_H
@@ -783,18 +787,20 @@ static func half_drum_aabb(c: Vector3, r: float, start: float, height: float) ->
 	return AABB(Vector3(lo.x, 0.0, lo.y), Vector3(hi.x - lo.x, height, hi.y - lo.y))
 
 
-## Florence is laid out in bays, not as a picket line: the nave wall is
-## divided at its pilasters, and each bay carries its own aisle window and a
-## pair of modest round-headed clerestory lights.
+## Florence and Hagia Sophia are laid out in bays, not as a picket line: the
+## nave wall is divided at its pilasters, and each bay carries its own aisle
+## window and clerestory light(s).
 static func hero_bays(spec: ChurchSpec) -> bool:
-	return octagon_crossing(spec)
+	return octagon_crossing(spec) or (spec.hero == &"hagia" and spec.dome)
 
 
-## Four huge bays.
+## Four huge bays at Florence; about a third of a nave width each at Hagia.
 static func hero_bay_count(spec: ChurchSpec) -> int:
-	var z0: float = -spec.length / 2.0 + 0.8
-	var z1: float = octagon_west_z(spec) - 0.8
-	return maxi(2, roundi((z1 - z0) / (spec.width * FLORENCE_BAY)))
+	if octagon_crossing(spec):
+		var z0: float = -spec.length / 2.0 + 0.8
+		var z1: float = octagon_west_z(spec) - 0.8
+		return maxi(2, roundi((z1 - z0) / (spec.width * FLORENCE_BAY)))
+	return maxi(3, roundi((spec.length - 1.6) / (spec.width * 0.30)))
 
 
 ## Bay edges along the nave: pilasters stand on them.
@@ -814,28 +820,36 @@ static func hero_aisle_windows(spec: ChurchSpec) -> Array[Dictionary]:
 	var ring: int = spec.aisles - 1
 	var ah: float = aisle_height(spec, ring)
 	var edges: Array[float] = hero_bay_edges(spec)
+	var florence: bool = octagon_crossing(spec)
 	for i in range(edges.size() - 1):
 		var pitch: float = edges[i + 1] - edges[i]
 		out.append({"z": (edges[i] + edges[i + 1]) * 0.5,
-			"width": minf(pitch * 0.11, 2.6), "height": ah * 0.46, "y": ah * 0.5})
+			"width": minf(pitch * (0.11 if florence else 0.26), 2.6 if florence else 3.2),
+			"height": ah * (0.46 if florence else 0.55), "y": ah * 0.5})
 	return out
 
 
+## The clerestory in bays. Florence gets a pair of modest round-headed lights in
+## each; Hagia Sophia one tall arched light.
 static func _hero_clerestory(spec: ChurchSpec) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var sill: float = aisle_roof_high(spec) + RoofShape.DEPTH + 0.18
 	var head: float = spec.height - 0.22
 	var band: float = head - sill
 	var edges: Array[float] = hero_bay_edges(spec)
+	var florence: bool = octagon_crossing(spec)
+	var offsets: Array = [-0.2, 0.2] if florence else [0.0]
 	for i in range(edges.size() - 1):
 		var pitch: float = edges[i + 1] - edges[i]
-		var width: float = minf(pitch * 0.14, band * 0.42)
+		var width: float = minf(pitch * (0.14 if florence else 0.34),
+			band * (0.42 if florence else 0.5))
 		var crown: float = width * 0.25
-		var height: float = minf(width * 1.25, band * 0.62 - crown)
+		var height: float = minf(width * 1.25 if florence else band * 0.7,
+			band * 0.62 - crown if florence else band - crown - 0.4)
 		if width < 0.2 or height < 0.25:
 			return []
 		var mid: float = sill + band * 0.5
-		for dz in [-0.2, 0.2]:
+		for dz in offsets:
 			for side in [-1.0, 1.0]:
 				out.append({"pos": Vector3(side * (spec.width / 2.0 + OPENING_EPS), mid,
 					(edges[i] + edges[i + 1]) * 0.5 + float(dz) * pitch),
@@ -916,6 +930,47 @@ static func chapel_tower_height(spec: ChurchSpec, i: int) -> float:
 		+ chapel_onion_rise(spec) + chapel_spike_height(spec)
 
 
+## Hagia Sophia: the drum stands on a square masonry bearing whose four faces
+## are the great arches. Half-domes spring from its east and west faces.
+static func hagia_bearing(spec: ChurchSpec) -> bool:
+	return spec.hero == &"hagia" and spec.dome and spec.dome_shape == &"hemisphere"
+
+
+## Half the bearing's side: the crossing square the dome circle is inscribed in.
+static func hagia_bearing_half(spec: ChurchSpec) -> float:
+	return spec.dome_radius + 0.3
+
+
+static func hagia_pier_size(spec: ChurchSpec) -> float:
+	return spec.dome_radius * HAGIA_PIER_RATIO
+
+
+## Centre of the corner pier at (sx, sz) in {-1, 1}.
+static func hagia_pier_center(spec: ChurchSpec, sx: float, sz: float) -> Vector3:
+	var off: float = hagia_bearing_half(spec) - hagia_pier_size(spec) * 0.5
+	return Vector3(sx * off, 0.0, crossing_center_z(spec) + sz * off)
+
+
+## Piers climb past the bearing to about half-way up the drum.
+static func hagia_pier_top(spec: ChurchSpec) -> float:
+	return dome_base_height(spec) + pendentive_height(spec) + spec.dome_drum_height * 0.5
+
+
+## Rise of a half-dome. At Hagia the crown meets the top of the bearing, so
+## the great arches and the domes close at one level.
+static func half_dome_rise(spec: ChurchSpec) -> float:
+	if hagia_bearing(spec):
+		return pendentive_height(spec)
+	return half_dome_radius(spec) * 0.85
+
+
+## Z of the plane a half-dome springs from: the bearing's east and west faces.
+static func half_dome_face_z(spec: ChurchSpec, dir: float) -> float:
+	if hagia_bearing(spec):
+		return crossing_center_z(spec) + dir * hagia_bearing_half(spec)
+	return crossing_center_z(spec)
+
+
 # ------------------------------------------------------------- envelope
 
 ## Ridge height of the nave roof, which caps the nave walls.
@@ -981,8 +1036,10 @@ static func mass_length_extent(spec: ChurchSpec) -> Vector2:
 		z1 = maxf(z1, ct.position.z + ct.size.z)
 		z0 = minf(z0, ct.position.z)
 	if spec.dome and spec.half_domes:
-		z1 = maxf(z1, crossing_center_z(spec) + half_dome_radius(spec))
-		z0 = minf(z0, crossing_center_z(spec) - half_dome_radius(spec))
+		var half_reach: float = half_dome_radius(spec) \
+			+ (hagia_bearing_half(spec) if hagia_bearing(spec) else 0.0)
+		z1 = maxf(z1, crossing_center_z(spec) + half_reach)
+		z0 = minf(z0, crossing_center_z(spec) - half_reach)
 	for i in range(tribune_count(spec)):
 		var tb: AABB = tribune_aabb(spec, i)
 		z1 = maxf(z1, tb.end.z)
