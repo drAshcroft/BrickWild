@@ -60,6 +60,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 50.0, "length": 40.0, "height": 5.0,
 		"must": ["cell", "vihara_shrine", "verandah", "vihara_well"],
 		"check": &"vihara_check", "about": "Vihara cells around the cloister court"},
+	{"key": "merchants_haveli", "family": &"vastu", "kind": &"merchants_haveli",
+		"width": 15.0, "length": 28.0, "height": 10.0,
+		"must": ["kitchen", "vastu_main_hall", "vastu_well", "jharokha"],
+		"check": &"vastu_check", "about": "Merchant's Haveli around a vastu light well"},
 	{"key": "clan_ring", "family": &"tulou", "kind": &"clan_ring",
 		"width": 60.0, "length": 60.0, "height": 15.0,
 		"must": ["ancestral_hall", "gallery", "clan_room", "stair", "roof_ring"],
@@ -461,6 +465,8 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 			free_masses.append("stupa_")
 		elif building.plan != null and building.plan.world_subkind == &"monks_cloister":
 			free_masses.append("vihara_well")
+		elif building.plan != null and building.plan.world_family == &"vastu":
+			free_masses.assign(["vastu_well", "jharokha"])
 		elif building.plan != null and building.plan.world_family == &"stepwell":
 			free_masses.assign(["pavilion", "tank", "shaft", "water"])
 		for f in MassRules.gaps(mesh_builder.mass_log, anchor, free_masses)["failures"]:
@@ -490,7 +496,7 @@ static func _family_check(building: GeneratedBuilding, check: StringName) -> Arr
 		return out
 	var checker = script.new()
 	var rep: Dictionary
-	if building.plan != null and check in [&"hammam_check", &"pagoda_check", &"shikhara_check", &"vav_check"]:
+	if building.plan != null and check in [&"hammam_check", &"pagoda_check", &"shikhara_check", &"vav_check", &"vastu_check"]:
 		rep = checker.check(building.plan, mesh_builder)
 	elif building.plan != null and check == &"tulou_check":
 		rep = checker.check(building.plan, mesh_builder)

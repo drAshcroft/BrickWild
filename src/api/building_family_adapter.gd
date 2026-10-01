@@ -95,7 +95,7 @@ static func for_building(building) -> BuildingFamilyAdapter:
 	var spec: RefCounted = building.spec
 	if building.plan != null and building.plan.world_family in \
 			[&"courtyard_house", &"insula", &"mosque", &"caravanserai", &"hammam",
-			&"cruciform_temple", &"nagara", &"pagoda", &"stepwell", &"temple_mountain", &"tulou", &"vihara"]:
+			&"cruciform_temple", &"nagara", &"pagoda", &"stepwell", &"temple_mountain", &"tulou", &"vastu", &"vihara"]:
 		return of(&"world")
 	if spec is HotelSpec:
 		return of(&"hotel")
@@ -439,6 +439,10 @@ class WorldFamily extends BuildingFamilyAdapter:
 			var vav_builder := VavBuilder.new()
 			vav_builder.build(building.plan)
 			return VavCheck.new().check(building.plan, vav_builder)
+		if building.plan != null and building.plan.world_family == &"vastu":
+			var vastu_builder := HouseBuilder.new()
+			vastu_builder.build(building.plan)
+			return VastuCheck.new().check(building.plan, vastu_builder)
 		if building.plan != null:
 			if building.plan.world_subkind == &"sultan_han":
 				return HanCheck.new().check(building.plan)
@@ -470,7 +474,7 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func instantiate(building, cutaway: bool) -> Node3D:
 		if building.plan != null and building.plan.world_family in \
-				[&"courtyard_house", &"insula", &"caravanserai", &"vihara"]:
+				[&"courtyard_house", &"insula", &"caravanserai", &"vastu", &"vihara"]:
 			return HouseAssembler.build(building.plan, cutaway)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			return CastleAssembler.build(building.spec, cutaway)
@@ -478,7 +482,7 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func footprint(building) -> Rect2:
 		if building.plan != null and building.plan.world_family in \
-				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"tulou", &"vihara"]:
+				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"tulou", &"vastu", &"vihara"]:
 			return HouseGeometry.site_rect(building.plan.spec)
 		if building.spec is CastleSpec and CastleGeometry.is_tower_house(building.spec):
 			var bounds := CastleGeometry.tower_house_aabb(building.spec)
@@ -504,7 +508,7 @@ class WorldFamily extends BuildingFamilyAdapter:
 
 	func door(building) -> Vector3:
 		if building.plan != null and building.plan.world_family in \
-				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"tulou", &"vihara"]:
+				[&"courtyard_house", &"insula", &"caravanserai", &"hammam", &"tulou", &"vastu", &"vihara"]:
 			var d: int = building.plan.entrance()
 			if d >= 0:
 				var p: Vector2 = building.plan.doors[d]["pos"]

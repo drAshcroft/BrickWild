@@ -53,7 +53,7 @@ const ORDER: Array[String] = ["library", "placement", "poly", "props", "church",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
-	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001", "wld002", "wld004", "wld005", "wld006", "wld009", "wld010", "wld011", "wld012", "wld013", "wld016", "wld017", "wld018",
+	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001", "wld002", "wld004", "wld005", "wld006", "wld009", "wld010", "wld011", "wld012", "wld013", "wld016", "wld017", "wld018", "wld019",
 	"tree", "bridge"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
@@ -407,6 +407,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/nagara_suite.gd").run()
 		"wld016":
 			return preload("res://tests/suites/vav_suite.gd").run()
+		"wld019":
+			return preload("res://tests/suites/vastu_suite.gd").run()
 		"wld001_domus":
 			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"domus")
 		"wld001_riad":

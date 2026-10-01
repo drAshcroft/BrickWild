@@ -64,6 +64,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_rugs()
 	_build_han_features()
 	_build_vihara_features()
+	_build_vastu_features()
 	return commit()
 
 
@@ -233,6 +234,49 @@ func _build_vihara_features() -> void:
 		Vector3(basin.size.x, wall_height, basin.size.y)))
 	total_height = maxf(total_height, wall_height)
 	host_end()
+
+
+## A haveli's north-east well and upper street projections are structural
+## features. They stay in the house builder so the public world family uses
+## the same shell, mass log and assembler as every other plan-first house.
+func _build_vastu_features() -> void:
+	if plan.world_family != &"vastu":
+		return
+	var well: Rect2 = plan.world_meta.get("well_rect", Rect2())
+	if well.has_area():
+		var rim_t := 0.16
+		var rim_h := 0.72
+		var centre := well.get_center()
+		tag("vastu_well")
+		host("vastu_well", 0)
+		var x_side := Vector3(rim_t, rim_h, well.size.y)
+		var z_side := Vector3(well.size.x - rim_t * 2.0, rim_h, rim_t)
+		for x in [well.position.x + rim_t * 0.5, well.end.x - rim_t * 0.5]:
+			component_box("vastu_well_rim", x_side,
+				Transform3D(Basis.IDENTITY, Vector3(x, rim_h * 0.5, centre.y)), SURF_TRIM)
+		for z in [well.position.y + rim_t * 0.5, well.end.y - rim_t * 0.5]:
+			component_box("vastu_well_rim", z_side,
+				Transform3D(Basis.IDENTITY, Vector3(centre.x, rim_h * 0.5, z)), SURF_TRIM)
+		_log_mass("vastu_well", AABB(Vector3(well.position.x, 0.0, well.position.y),
+			Vector3(well.size.x, rim_h, well.size.y)))
+		total_height = maxf(total_height, rim_h)
+		host_end()
+
+	var site := HouseGeometry.site_rect(spec)
+	var base_y := float(plan.world_meta.get("jharokha_floor", spec.height))
+	var projection := Vector3(minf(2.4, site.size.x * 0.18), 2.2, 0.8)
+	for index in range(2):
+		var side := -1.0 if index == 0 else 1.0
+		var pos := Vector3(side * site.size.x * 0.24,
+			base_y + projection.y * 0.5, site.position.y - projection.z * 0.5)
+		var xf := Transform3D(Basis.IDENTITY, pos)
+		tag("jharokha_%d" % index)
+		host("jharokha_%d" % index, 1)
+		component_box("jharokha_bay", projection, xf, SURF_TRIM)
+		_log_mass("jharokha_%d" % index,
+			AABB(pos - projection * 0.5, projection), base_y)
+		total_height = maxf(total_height, base_y + projection.y)
+		host_end()
 
 
 func _dome_point(centre: Vector2, radius: float, base_y: float, rise: float,

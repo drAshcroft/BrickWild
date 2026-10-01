@@ -90,6 +90,13 @@ const FAMILIES := {
 		"length": {"min": 28.0, "max": 76.0},
 		"height": {"min": 5.0, "max": 5.0},
 	},
+	&"vastu": {
+		"label": "Haveli / vastu house",
+		"kinds": [&"merchants_haveli"],
+		"width": {"min": 12.0, "max": 36.0},
+		"length": {"min": 18.0, "max": 48.0},
+		"height": {"min": 7.0, "max": 16.0},
+	},
 	&"tulou": {
 		"label": "Tulou",
 		"kinds": [&"clan_ring"],
@@ -213,6 +220,12 @@ static func generate(request: BuildingRequest, out: GeneratedBuilding) -> bool:
 		out.spec = vihara_made["spec"]
 		out.plan = vihara_made["plan"]
 		return true
+	if request.style == &"vastu" and request.purpose in kinds_of(&"vastu"):
+		var vastu_made := VastuGenerator.generate(request.seed, request.width,
+			request.length, request.height)
+		out.spec = vastu_made["spec"]
+		out.plan = vastu_made["plan"]
+		return true
 	if request.style == &"tulou" and request.purpose in kinds_of(&"tulou"):
 		var tulou_made := TulouGenerator.generate(request.seed, request.width,
 			request.length, request.height, request.storeys)
@@ -250,7 +263,7 @@ static func build_mesh(building) -> ArrayMesh:
 			and CastleGeometry.is_tower_house(building.spec):
 		return CastleBuilder.new().build(building.spec)
 	if building != null and building.plan != null \
-			and building.plan.world_family in [&"courtyard_house", &"insula", &"caravanserai", &"vihara"]:
+			and building.plan.world_family in [&"courtyard_house", &"insula", &"caravanserai", &"vastu", &"vihara"]:
 		return HouseBuilder.new().build(building.plan)
 	if building != null and building.plan != null \
 			and building.plan.world_family == &"mosque":

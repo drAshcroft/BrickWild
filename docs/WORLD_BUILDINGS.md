@@ -573,6 +573,12 @@ mandala* is a 9 × 9 grid over the plan, and it says where things go:
 | **light well** | the court is deep | court width ≤ 1.0 × the eave height round it (contrast the Mediterranean 0.6–2.5) |
 | **jharokha** | balconies on the street, upstairs | ≥ 1 `jharokha` mass on the street facade with its floor ≥ one storey up and its footprint outside the site rect |
 
+**Implemented family (WLD-019).** Request `kind=world`, `style=vastu`,
+`purpose=merchants_haveli`. `VastuGenerator` authors the two-storey ring and
+its site-frame compass facts, `HouseBuilder` emits the north-east well and
+upper jharokhas, and `VastuCheck` owns the six rules above. Run the bounded
+gate with `-- wld019`; it includes one deliberate failing fixture per rule.
+
 ---
 
 ## 4. What the representation has to learn
