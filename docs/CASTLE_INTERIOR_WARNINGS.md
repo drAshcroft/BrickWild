@@ -53,6 +53,18 @@ $env:BIG_GLADE_TEST_TRACE = '1'
 
 The recorded voxel sweep took 1949.20 seconds while other suites ran concurrently. This is not an isolated performance benchmark; use the existing [performance follow-up](tasks/castle_interior_performance.json).
 
+For a smaller read-only inspection, run `godot --headless --path . --script
+res://tools/diagnose_castle_interior_warnings.gd`. With no selectors it visits
+the nine representative CastleSweep fixtures named below. Pass one or more
+`style/tier/index` keys after `--` to narrow it, for example
+`-- norman/castle/0 edwardian/castle/0`. Each JSON line includes the live
+interior plan's room rectangles and aspects, furniture measurements and
+orientation metadata, compromise records, HouseQA warnings/failures, and the
+storey-zero walk map. This builds each castle and runs plan/furnishing/nav QA,
+but skips CastleQA's voxel raster and geometry checks. It supplies evidence
+for triage; it does not decide whether an AABB warning represents an opaque
+obstruction or whether a layout alternative is feasible.
+
 **Recorded furnishing compromise: `against` (8)**
 
 Representative fixture: `edwardian/castle/0`, seed 9249, `keep`:
