@@ -51,6 +51,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_plinth()
 	_build_exterior_walls()
 	_build_partitions()
+	_build_secret_door_panels()
 	if plan.has_court():
 		_build_court_walls()
 	if spec.material != &"stone":
@@ -734,13 +735,48 @@ func _build_partitions() -> void:
 					if not _on_run(from, to, normal, d["pos"], d["normal"]):
 						continue
 					var interval := _door_interval(d)
+					var is_secret := bool(d.get("secret", false))
 					openings.append({"t": _along(from, to, d["pos"]), "w": float(d["width"]),
-						"bottom": interval[0], "top": interval[1], "kind": "door",
+						"bottom": interval[0], "top": interval[1], "kind": "secret" if is_secret else "door",
 						"normal": normal})
 				_wall_run(from, to, HouseGeometry.INNER_WALL_T, h, openings, SURF_WALL, y0)
 				var suffix := "" if _levels().size() == 1 else "_%d" % level
 				_log_mass("partition_%d_%d%s" % [i, j, suffix],
 					_run_aabb(from, to, HouseGeometry.INNER_WALL_T, h, y0), y0)
+
+
+## The passage remains a real opening to navigation. On its public side, a
+## full-height fitted panel makes it read as an unbroken wall or bookcase.
+func _build_secret_door_panels() -> void:
+	for di in range(plan.doors.size()):
+		var door: Dictionary = plan.doors[di]
+		if not bool(door.get("secret", false)) or bool(door.get("exterior", false)):
+			continue
+		var level := _opening_storey(door)
+		var y0 := float(level) * spec.height
+		var n := Vector2(door.get("normal", Vector2.RIGHT)).normalized()
+		var tangent := Vector2(n.y, -n.x)
+		var yaw := atan2(-tangent.y, tangent.x)
+		var position := Vector2(door["pos"]) - n * (HouseGeometry.INNER_WALL_T * 0.5 + 0.05)
+		var width := float(door["width"]) + 0.10
+		var height := minf(float(door.get("head", HouseGeometry.DOOR_H)), spec.height - 0.05)
+		var xf := Transform3D(Basis(Vector3.UP, yaw),
+			Vector3(position.x, y0 + height * 0.5, position.y))
+		tag("secret_bookcase_panel")
+		host("secret_door_%d" % di, level)
+		component_box("secret_bookcase_panel", Vector3(width, height, 0.10), xf, SURF_TRIM)
+		# Two face rails and upright stiles make the fitted slab read as joinery,
+		# not as a missing piece of wall. All are emitted and logged components.
+		for rail_y in [0.28, height - 0.25]:
+			var rail_pos := position - n * 0.06
+			var rail_xf := Transform3D(Basis(Vector3.UP, yaw),
+				Vector3(rail_pos.x, y0 + rail_y, rail_pos.y))
+			component_box("secret_bookcase_rail", Vector3(width - 0.12, 0.07, 0.035), rail_xf, SURF_TRIM)
+		for side in [-1.0, 1.0]:
+			var stile_pos := position - n * 0.06 + tangent * side * (width * 0.38)
+			var stile_xf := Transform3D(Basis(Vector3.UP, yaw),
+				Vector3(stile_pos.x, y0 + height * 0.5, stile_pos.y))
+			component_box("secret_bookcase_stile", Vector3(0.07, height - 0.12, 0.035), stile_xf, SURF_TRIM)
 
 
 ## A court edge is an outside wall of its range, even though it is not one of
@@ -864,7 +900,7 @@ func _wall_run(from: Vector2, to: Vector2, thick: float, height: float,
 			_wall_piece(from, dir, yaw, lo, hi, 0.0, bottom, thick, surf, y_offset)
 		if top < height - 0.01:
 			_wall_piece(from, dir, yaw, lo, hi, top, height, thick, surf, y_offset)
-		if decorate:
+		if decorate and String(op.get("kind", "")) != "secret":
 			_opening_trim(from, dir, yaw, t, w, bottom, top, thick, op, y_offset)
 		cursor = maxf(cursor, hi)
 	if cursor < run - 0.01:

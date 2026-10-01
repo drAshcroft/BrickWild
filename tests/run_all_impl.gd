@@ -69,7 +69,7 @@ const EXTRA: Array[String] = ["vmine", "varchetypecontracts", "vnativeqa", "vwat
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest",
 	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021",
-	"runnererror", "runnerfail", "int013"]
+	"runnererror", "runnerfail", "int012", "int013", "thievesden100"]
 
 ## LANES -- the suites worth running for a given KIND OF EDIT.
 ##
@@ -299,6 +299,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return ShopArchetypeSuite.run()
 		"int013":
 			return ShopArchetypeSuite.run_int013()
+		"int012":
+			return ShopArchetypeSuite.run_int012()
+		"thievesden100":
+			return ShopArchetypeSuite.run_thieves_den_seeds(100)
 		"markethall":
 			return ShopArchetypeSuite.run_market_hall()
 		"barracks100":

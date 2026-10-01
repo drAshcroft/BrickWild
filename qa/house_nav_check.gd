@@ -29,6 +29,7 @@ var stats: Dictionary = {}
 var _plan: HousePlan
 var _grid: WalkGrid
 var _grids: Dictionary = {}
+var _omit_secret_doors := false
 
 ## Which rooms could not be walked to, and which pieces of furniture could not
 ## be reached. The furnisher reads these to thin a room out until it works, so
@@ -37,13 +38,14 @@ var unreached_rooms: Array[int] = []
 var unreachable_items: Array[int] = []
 
 
-func check(plan: HousePlan) -> Dictionary:
+func check(plan: HousePlan, omit_secret_doors := false) -> Dictionary:
 	failures.clear()
 	warnings.clear()
 	stats.clear()
 	unreached_rooms.clear()
 	unreachable_items.clear()
 	_plan = plan
+	_omit_secret_doors = omit_secret_doors
 
 	_rasterize()
 	var door: int = _plan.entrance()
@@ -74,6 +76,17 @@ func check(plan: HousePlan) -> Dictionary:
 	_check_use_zones()
 	_check_steps()
 	_check_islands()
+	if not _omit_secret_doors and not _plan.secret_room_indices().is_empty():
+		var ordinary := HouseNavCheck.new()
+		ordinary.check(_plan, true)
+		var hidden_reached: Array[int] = []
+		for room in _plan.secret_room_indices():
+			if not ordinary.unreached_rooms.has(room):
+				hidden_reached.append(room)
+		if not hidden_reached.is_empty():
+			failures.append("nav: hidden rooms %s remain reachable without secret doors" % [str(hidden_reached)])
+		stats["secret_doors_omitted"] = true
+		stats["hidden_rooms_unreached_without_secrets"] = _plan.secret_room_indices().size() - hidden_reached.size()
 	return _report()
 
 
@@ -117,6 +130,8 @@ func _rasterize() -> void:
 			else:
 				_grids[level2].add_floor(Rect2(_plan.courts[ci]["rect"]))
 	for d in _plan.doors:
+		if _omit_secret_doors and bool(d.get("secret", false)):
+			continue
 		var level := HousePlan.record_storey(d)
 		if _grids.has(level):
 			_grids[level].add_floor(_door_gap(d))
@@ -280,6 +295,8 @@ func _check_rooms() -> void:
 func _check_doors() -> void:
 	for d in range(_plan.doors.size()):
 		var door: Dictionary = _plan.doors[d]
+		if _omit_secret_doors and bool(door.get("secret", false)):
+			continue
 		if _world_shop_door(door):
 			continue
 		var sides: Array = [-1.0, 1.0] if not door["exterior"] else [-1.0]

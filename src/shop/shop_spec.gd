@@ -30,6 +30,17 @@ func custom_room_rects(inner: Rect2) -> Array[Rect2]:
 		]
 	if business == &"prison":
 		return prison_room_rects(inner)
+	if business == &"thieves_den":
+		# Three adjoining bays make the hidden route unambiguous: street sales
+		# floor -> secret store -> private dormitory. There is no geometric
+		# bypass around the concealed partition.
+		var bay_w := inner.size.x / 3.0
+		return [
+			Rect2(inner.position, Vector2(bay_w, inner.size.y)),
+			Rect2(inner.position + Vector2(bay_w, 0.0), Vector2(bay_w, inner.size.y)),
+			Rect2(inner.position + Vector2(bay_w * 2.0, 0.0),
+				Vector2(inner.size.x - bay_w * 2.0, inner.size.y)),
+		]
 	if business != &"barracks":
 		return []
 	var office_w := minf(inner.size.x * 0.37, 7.0)
@@ -92,7 +103,7 @@ func prison_room_rects(inner: Rect2) -> Array[Rect2]:
 ## The front door must open directly into the compact office, even though the
 ## adjoining mess rectangle is closer to the building centre.
 func preferred_front_room_index() -> int:
-	return 0 if business in [&"barracks", &"prison", &"palace"] else -1
+	return 0 if business in [&"barracks", &"prison", &"palace", &"thieves_den"] else -1
 
 ## Rooms are ordered from the public front toward private/service space.
 ## The first room replaces the house planner's temporary hall after doors,
@@ -167,6 +178,10 @@ const BUSINESSES := {
 	&"school": {"label": "School",
 		"rooms": [&"schoolroom", &"masters_office", &"store"], "max_rooms": 3,
 		"door_w": 1.2, "focus": {"cat": "lectern", "faces_door": false}},
+	&"thieves_den": {"label": "Thieves' Den",
+		"rooms": [&"sales_floor", &"store", &"dormitory"], "max_rooms": 3,
+		"door_w": 1.0, "front_open": {"width": 1.6},
+		"focus": {"cat": "counter", "faces_door": true}},
 }
 
 

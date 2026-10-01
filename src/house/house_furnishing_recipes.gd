@@ -354,6 +354,9 @@ const SHOP_FITTINGS := {
 	&"school": [
 		{"cat": "lectern", "rule": &"free", "n": [1, 1], "room": "schoolroom", "opt": 1.0},
 	],
+	&"thieves_den": [
+		{"cat": "bookcase", "rule": &"wall", "n": [1, 1], "room": "store", "opt": 1.0},
+	],
 	# 1.0 like every other trade's own fitting: the shop archetype asks for a
 	# tailor's sacks by name, and a defining fitting placed on a dice roll is a
 	# tailor with nothing in it one time in five.

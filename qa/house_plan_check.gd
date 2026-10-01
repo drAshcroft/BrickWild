@@ -274,6 +274,10 @@ func _check_entrance(plan: HousePlan) -> void:
 	var exteriors := 0
 	var inner: Rect2 = HouseGeometry.interior_rect(plan.spec)
 	for d in plan.doors:
+		if bool(d.get("secret", false)):
+			if bool(d.get("exterior", false)):
+				failures.append("way in: a secret door cannot be an exterior entrance")
+			continue
 		if not d["exterior"]:
 			continue
 		var entry_level: int = plan.spec.entry_storey if plan.spec is KeepSpec else 0
@@ -437,7 +441,11 @@ func _check_privacy(plan: HousePlan) -> void:
 	var start: int = plan.entrance_room()
 	if start < 0:
 		return
-	var polite: Dictionary = plan.reachable_rooms(start, HouseGeometry.SLEEPING)
+	var private_rooms: Array[int] = plan.secret_room_indices()
+	# Secret doors belong to connectivity, but not to the ordinary circulation
+	# graph used for privacy. A hidden room is private by being absent here.
+	var polite: Dictionary = plan.reachable_rooms(start, HouseGeometry.SLEEPING, true, false)
+	stats["private_rooms"] = private_rooms.size()
 	for i in range(plan.room_count()):
 		# A bedroom is the private endpoint a house's own occupant sleeps in --
 		# its own reachability was never in scope (a house does not put one
@@ -445,7 +453,7 @@ func _check_privacy(plan: HousePlan) -> void:
 		# are not exempt: a guest_room or suite reachable only through a
 		# DIFFERENT sleeping room is exactly the corridor-through-a-bedroom
 		# problem this check exists to catch.
-		if plan.kind_of(i) == &"bedroom":
+		if plan.kind_of(i) == &"bedroom" or plan.is_private_room(i):
 			continue
 		if plan.world_family in [&"courtyard_house", &"insula"] and _world_shop_has_street_opening(plan, i):
 			continue
@@ -475,6 +483,8 @@ func _sleeping_room_on_path(plan: HousePlan, start: int, dest: int) -> String:
 		return "sleeping room"
 	var node: int = parent[dest]
 	while node != -1 and node != start:
+		if plan.is_private_room(node):
+			return "secret room"
 		if plan.kind_of(node) in HouseGeometry.SLEEPING:
 			return String(plan.kind_of(node))
 		node = parent[node]
@@ -487,6 +497,8 @@ func _sleeping_room_on_path(plan: HousePlan, start: int, dest: int) -> String:
 func _check_door_openings(plan: HousePlan) -> void:
 	for di in range(plan.doors.size()):
 		var d: Dictionary = plan.doors[di]
+		if bool(d.get("secret", false)):
+			continue
 		var run: Array = _wall_run_for(plan, d)
 		if run.is_empty():
 			failures.append("opening: door %d is not on any wall the rooms share" % di)
@@ -502,6 +514,8 @@ func _check_door_openings(plan: HousePlan) -> void:
 				% [di, HouseGeometry.DOOR_CORNER_MARGIN])
 		for dj in range(di + 1, plan.doors.size()):
 			var e: Dictionary = plan.doors[dj]
+			if bool(e.get("secret", false)):
+				continue
 			if not _same_wall(d, e):
 				continue
 			var gap: float = (Vector2(d["pos"]) - Vector2(e["pos"])).length()
@@ -564,6 +578,8 @@ func _check_windows(plan: HousePlan) -> void:
 					< (float(w["width"]) + float(o["width"])) / 2.0 + 0.05:
 				failures.append("windows %d and %d overlap on the same wall" % [wi, wj])
 		for d in plan.doors:
+			if bool(d.get("secret", false)):
+				continue
 			if not _same_wall(w, d):
 				continue
 			if (Vector2(w["pos"]) - Vector2(d["pos"])).length() \

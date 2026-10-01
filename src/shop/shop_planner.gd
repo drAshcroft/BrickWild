@@ -61,8 +61,41 @@ static func plan(spec: ShopSpec) -> HousePlan:
 		_plan_prison_access(out)
 	if spec.business == &"market_hall" and front >= 0:
 		_plan_market_colonnade(out, front)
+	if spec.business == &"thieves_den":
+		_plan_thieves_den(out)
 	_open_up_lodging(out)
 	return out
+
+
+## Keep the street-facing shop ordinary. The only route from it into the
+## marked private rooms crosses one explicitly secret interior door.
+static func _plan_thieves_den(plan: HousePlan) -> void:
+	var sales := -1
+	var store := -1
+	var dormitory := -1
+	for i in range(plan.room_count()):
+		match plan.kind_of(i):
+			&"sales_floor": sales = i
+			&"store": store = i
+			&"dormitory": dormitory = i
+	if sales < 0 or store < 0 or dormitory < 0:
+		push_error("ShopPlanner: thieves' den needs sales floor, store, and dormitory")
+		return
+	for i in range(plan.doors.size() - 1, -1, -1):
+		if not bool(plan.doors[i].get("exterior", false)):
+			plan.doors.remove_at(i)
+	plan.rooms[store]["secret"] = true
+	plan.rooms[dormitory]["secret"] = true
+	plan.windows = plan.windows.filter(func(window: Dictionary) -> bool:
+		return int(window.get("room", -1)) != store and int(window.get("room", -1)) != dormitory)
+	var hidden_edge := HousePlanOpenings.shared_edge(plan, sales, store)
+	var rear_edge := HousePlanOpenings.shared_edge(plan, store, dormitory)
+	if hidden_edge.is_empty() or rear_edge.is_empty():
+		push_error("ShopPlanner: thieves' den bays do not form a continuous route")
+		return
+	HousePlanOpenings.add_inner_door(plan, sales, store, hidden_edge)
+	plan.doors.back()["secret"] = true
+	HousePlanOpenings.add_inner_door(plan, store, dormitory, rear_edge)
 
 
 ## Give the throne hall its declared chain and rear branch doors. The generic

@@ -37,13 +37,16 @@ var world_meta: Dictionary = {}
 ## in every house: the outline exists for the shapes a rectangle cannot say --
 ## a round tower, an octagonal chapter house, a pagoda (GEO-002).
 ##
+## A room may carry `secret: true` when ordinary visitors should not enter it;
+## `is_private_room()` is the single query for that designation.
+##
 ## An outline is the CLEAR FLOOR, not a partition centre-line. A rectangular
 ## room is cut out of the interior and shares half of each partition with its
 ## neighbour; a polygonal room is not produced by cutting, so there is no
 ## shared partition to give half of, and what you draw is what you walk on.
 var rooms: Array[Dictionary] = []
 ## {"a": int, "b": int (-1 outdoors), "pos": Vector2, "normal": Vector2,
-##  "width": float, "exterior": bool, "storey": int}
+##  "width": float, "exterior": bool, "storey": int, "secret": bool}
 var doors: Array[Dictionary] = []
 ## {"room": int, "pos": Vector2, "normal": Vector2, "width": float,
 ##  "sill": float, "head": float, "storey": int}
@@ -367,10 +370,12 @@ func furniture_of(i: int) -> Array[int]:
 ## The way in. There is exactly one front door; the checks insist on it.
 func entrance() -> int:
 	for d in range(doors.size()):
+		if bool(doors[d].get("secret", false)):
+			continue
 		if doors[d]["exterior"] and doors[d].get("front", false):
 			return d
 	for d in range(doors.size()):
-		if doors[d]["exterior"]:
+		if doors[d]["exterior"] and not bool(doors[d].get("secret", false)):
 			return d
 	return -1
 
@@ -382,11 +387,13 @@ func entrance_room() -> int:
 
 ## Room-to-room graph as {room: [rooms]}, following doors only. This is what
 ## "can you get from the front door to the back bedroom" is answered with.
-func door_graph(has_keys := true) -> Dictionary:
+func door_graph(has_keys := true, include_secret := true) -> Dictionary:
 	var g := {}
 	for i in range(rooms.size()):
 		g[i] = []
 	for d in doors:
+		if not include_secret and bool(d.get("secret", false)):
+			continue
 		if bool(d.get("locked", false)) and not has_keys:
 			continue
 		var a: int = d["a"]
@@ -422,11 +429,11 @@ func door_graph(has_keys := true) -> Dictionary:
 ## StringNames). The refused kinds can still be the destination, just not a
 ## room walked through to get somewhere else.
 func reachable_rooms(start: int, no_pass_kind: Variant = &"",
-		has_keys := true) -> Dictionary:
+		has_keys := true, include_secret := true) -> Dictionary:
 	var no_pass: Array = no_pass_kind if no_pass_kind is Array else [no_pass_kind]
 	var seen := {start: true}
 	var stack: Array[int] = [start]
-	var g: Dictionary = door_graph(has_keys)
+	var g: Dictionary = door_graph(has_keys, include_secret)
 	while not stack.is_empty():
 		var cur: int = stack.pop_back()
 		if cur != start and kind_of(cur) in no_pass:
@@ -436,6 +443,20 @@ func reachable_rooms(start: int, no_pass_kind: Variant = &"",
 				seen[nb] = true
 				stack.append(nb)
 	return seen
+
+
+func is_private_room(i: int) -> bool:
+	if i < 0 or i >= rooms.size():
+		return false
+	return bool(rooms[i].get("secret", false))
+
+
+func secret_room_indices() -> Array[int]:
+	var out: Array[int] = []
+	for i in range(rooms.size()):
+		if bool(rooms[i].get("secret", false)):
+			out.append(i)
+	return out
 
 
 func has_trapdoor_access(room: int) -> bool:

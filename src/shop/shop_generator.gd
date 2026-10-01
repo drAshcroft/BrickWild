@@ -25,7 +25,7 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	# planned in any of them. A chimney without a hearth is an unsupported stack.
 	if spec.business in [&"barracks", &"market_hall"]:
 		spec.chimney = false
-	if spec.business in [&"prison", &"palace"]:
+	if spec.business in [&"prison", &"palace", &"thieves_den"]:
 		spec.chimney = false
 	if spec.business == &"palace":
 		spec.back_door = false
@@ -52,7 +52,7 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 		spec.room_count = HouseSpec.rooms_for(inner.size.x * inner.size.y)
 	spec.room_count = mini(spec.room_count, int(ShopSpec.BUSINESSES[spec.business].get("max_rooms", 6)))
 	spec.program = spec.room_program(spec.room_count)
-	spec.back_door = spec.business not in [&"prison", &"palace"] \
+	spec.back_door = spec.business not in [&"prison", &"palace", &"thieves_den"] \
 		and spec.room_count >= 3 and r.randf() < 0.7
 	spec.wall_color = Color(style["wall"][0]).lerp(Color(style["wall"][1]), r.randf())
 	spec.trim_color = Color(style["trim"][0]).lerp(Color(style["trim"][1]), r.randf())

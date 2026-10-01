@@ -20,6 +20,16 @@ carpenters, town halls, and guildhalls. Each declares public rooms first and
 service rooms behind them; the generator chooses their exact subdivision and
 connections.
 
+INT-012 adds a recipe-only thieves' den. Its ordinary sales floor leads to a
+hidden store through one secret interior door, then to a private dormitory.
+The two hidden rooms have no outside doors or windows. The builder cuts the
+passage for navigation and covers the public-side aperture with a logged,
+full-height joinery panel that reads as a solid wall or bookcase. Secret doors
+are absent from entrance and visible-opening semantics, but remain in room
+connectivity. Privacy treats rooms marked `secret` as private endpoints.
+`HouseNavCheck` checks the normal route and repeats its flood without secret
+doors; the hidden rooms must then be unreachable.
+
 INT-013 adds four recipe-only occupational families to that same plan and
 furnishing pipeline. An alchemist laboratory has two rowed workbenches, with
 alchemy props distributed across both, a cage, and a hearth. A bathhouse has
@@ -69,10 +79,16 @@ Two shop suites extend that coverage:
   runs shared house QA, and removes one defining fixture per family to prove
   its semantic contract fails. It is the routine focused gate; broad seed
   sweeps remain scheduled work.
+- `int012` checks the thieves' den at 70%, 100%, and 140%, the concealed panel,
+  shared QA, and negative controls for a lost secret marker, missing passage,
+  and an invalid exterior secret door. `thievesden100` is the opt-in scheduled
+  100-seed seed contract; it is deliberately not part of the routine focused
+  lane.
 
 Run them with:
 
 ```
+godot --headless --path . --script res://tests/run_all.gd -- int012
 godot --headless --path . --script res://tests/run_all.gd -- int013
 ```
 

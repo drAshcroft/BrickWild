@@ -26,6 +26,7 @@ const REQUIRED := {
 	&"bathhouse": ["changing_room", "bench", "bath_hall", "barrel"],
 	&"hospice": ["ward", "bed", "dispensary", "alchemy"],
 	&"school": ["schoolroom", "bench", "lectern", "masters_office"],
+	&"thieves_den": ["sales_floor", "counter", "bookcase"],
 }
 const BENCH_SEAT_PITCH := 0.65 # metres per usable place along the measured bench
 
@@ -41,6 +42,9 @@ static func run() -> SuiteResult:
 		if business in [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]:
 			spec.width = 20.0
 			spec.length = 26.0
+		if business == &"thieves_den":
+			spec.width = 30.0
+			spec.length = 24.0
 		if business == &"barracks":
 			spec.width = 18.0
 			spec.length = 28.0
@@ -74,6 +78,9 @@ static func run() -> SuiteResult:
 		if business in [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]:
 			for contract_failure in _int013_failures(plan, business):
 				res.fail("%s: %s" % [String(business), contract_failure])
+		if business == &"thieves_den":
+			for contract_failure in _thieves_den_failures(plan):
+				res.fail("thieves_den: %s" % contract_failure)
 		var report: Dictionary = HouseQA.new().check(plan, builder)
 		for failure in report["failures"]:
 			res.fail("%s: %s" % [String(business), failure])
@@ -133,6 +140,156 @@ static func run_int013() -> SuiteResult:
 		if not negative.any(func(row: String) -> bool: return row.contains(expected)):
 			res.fail("%s negative control: removing %s escaped the defining check" % [String(business), expected])
 	return res
+
+
+## Bounded secret-door contract. Three footprints are checked once each, then
+## deliberately damaged plans prove the secret route and hidden-room rule are
+## measurable. The optional 100-seed lane is kept separate for scheduled QA.
+static func run_int012() -> SuiteResult:
+	var res := SuiteResult.new("INT-012 secret doors")
+	for scale in [0.7, 1.0, 1.4]:
+		var plan := ShopGenerator.generate(_int012_spec(scale), 81200 + int(scale * 100))
+		var builder := HouseBuilder.new()
+		builder.build(plan)
+		res.checked += 1
+		for failure in _thieves_den_failures(plan):
+			res.fail("scale=%.1f: %s" % [scale, failure])
+		var report: Dictionary = HouseQA.new().check(plan, builder)
+		for failure2 in report["failures"]:
+			res.fail("scale=%.1f QA: %s" % [scale, failure2])
+		var nav := HouseNavCheck.new()
+		nav.check(plan)
+		if int(nav.stats.get("hidden_rooms_unreached_without_secrets", 0)) != 2:
+			res.fail("scale=%.1f: second navigation flood did not isolate both hidden rooms" % scale)
+		if not builder.component_log.any(func(part: Dictionary) -> bool:
+			return String(part.get("role", "")) == "secret_bookcase_panel"):
+			res.fail("scale=%.1f: builder emitted no secret bookcase panel" % scale)
+	var control := ShopGenerator.generate(_int012_spec(1.0), 81299)
+	if not _thieves_den_failures(control).is_empty():
+		res.fail("negative controls: standard thieves' den is invalid")
+		return res
+	var secret_door := -1
+	for i in range(control.doors.size()):
+		if bool(control.doors[i].get("secret", false)):
+			secret_door = i
+			break
+	if secret_door < 0:
+		res.fail("negative controls: no secret door to mutate")
+		return res
+	var no_secret := _copy_plan(control)
+	no_secret.doors[secret_door].erase("secret")
+	var nav_without_marker := HouseNavCheck.new()
+	var marker_report: Dictionary = nav_without_marker.check(no_secret)
+	res.checked += 1
+	if marker_report["ok"] or not marker_report["failures"].any(func(message: String) -> bool:
+		return String(message).contains("remain reachable without secret doors")):
+		res.fail("negative control: removing the secret marker did not expose the hidden route")
+	var no_door := _copy_plan(control)
+	no_door.doors.remove_at(secret_door)
+	var plan_report: Dictionary = HousePlanCheck.new().check(no_door)
+	res.checked += 1
+	if not plan_report["failures"].any(func(message: String) -> bool:
+		return String(message).begins_with("connected:") and String(message).contains("cannot be reached")):
+		res.fail("negative control: removing the secret door escaped plan connectivity")
+	var exterior_secret := _copy_plan(control)
+	exterior_secret.doors[secret_door]["exterior"] = true
+	exterior_secret.doors[secret_door]["front"] = true
+	exterior_secret.doors[secret_door]["b"] = -1
+	var exterior_report: Dictionary = HousePlanCheck.new().check(exterior_secret)
+	res.checked += 1
+	if not exterior_report["failures"].any(func(message: String) -> bool:
+		return String(message).contains("secret door cannot be an exterior entrance")):
+		res.fail("negative control: exterior secret door escaped entrance semantics")
+	var no_bookcase := _copy_plan(control)
+	var hidden_store := _room_of_kind(no_bookcase, &"store")
+	for i in range(no_bookcase.furniture.size() - 1, -1, -1):
+		if int(no_bookcase.furniture[i]["room"]) == hidden_store \
+				and PropCatalog.category(no_bookcase.furniture[i]["key"]) == "bookcase":
+			no_bookcase.furniture.remove_at(i)
+	res.checked += 1
+	if not _thieves_den_failures(no_bookcase).any(func(message: String) -> bool:
+		return String(message).contains("hidden store has no bookcase disguise")):
+		res.fail("negative control: removing the hidden-store bookcase escaped the fixture rule")
+	return res
+
+
+static func run_thieves_den_seeds(count := 100) -> SuiteResult:
+	var res := SuiteResult.new("INT-012 thieves den seed sweep")
+	for seed in range(count):
+		var plan := ShopGenerator.generate(_int012_spec(1.0), 81200 + seed)
+		var builder := HouseBuilder.new()
+		builder.build(plan)
+		res.checked += 1
+		for failure in _thieves_den_failures(plan):
+			res.fail("seed=%d: %s" % [seed, failure])
+		for failure2 in HouseQA.new().check(plan, builder)["failures"]:
+			res.fail("seed=%d QA: %s" % [seed, failure2])
+	return res
+
+
+static func _int012_spec(scale: float) -> ShopSpec:
+	var spec := ShopSpec.new()
+	spec.business = &"thieves_den"
+	spec.style = &"townhouse"
+	spec.width = 30.0 * scale
+	spec.length = 24.0 * scale
+	spec.height = 3.0
+	return spec
+
+
+static func _thieves_den_failures(plan: HousePlan) -> Array[String]:
+	var out: Array[String] = []
+	var sales := _room_of_kind(plan, &"sales_floor")
+	var store := _room_of_kind(plan, &"store")
+	var dormitory := _room_of_kind(plan, &"dormitory")
+	if sales < 0 or store < 0 or dormitory < 0:
+		out.append("requires sales floor, hidden store, and hidden dormitory")
+		return out
+	if plan.entrance_room() != sales:
+		out.append("street door does not enter the sales floor")
+	if not bool(plan.rooms[store].get("secret", false)) or not bool(plan.rooms[dormitory].get("secret", false)):
+		out.append("store and dormitory must be marked private")
+	var bookcase := false
+	for item in plan.furniture_of(store):
+		if PropCatalog.category(plan.furniture[item]["key"]) == "bookcase":
+			bookcase = true
+	if not bookcase:
+		out.append("hidden store has no bookcase disguise")
+	var secret_edges := 0
+	var has_store_dorm_door := false
+	for door in plan.doors:
+		var a := int(door.get("a", -1))
+		var b := int(door.get("b", -1))
+		if bool(door.get("secret", false)):
+			secret_edges += 1
+			if bool(door.get("exterior", false)) or not ((a == sales and b == store) or (a == store and b == sales)):
+				out.append("secret door is not the sales-floor to store passage")
+			var edge := HousePlanOpenings.shared_edge(plan, sales, store)
+			if edge.is_empty():
+				out.append("secret passage does not lie on a shared wall")
+			elif absf(Vector2(door["pos"]).dot(Vector2(edge[0])) - float(edge[1])) > 0.05:
+				out.append("secret passage is not centered on its shared wall")
+		elif (a == store and b == dormitory) or (a == dormitory and b == store):
+			has_store_dorm_door = true
+		if bool(door.get("exterior", false)) and (a == store or a == dormitory or b == store or b == dormitory):
+			out.append("hidden room has an exterior door")
+	if secret_edges != 1:
+		out.append("requires exactly one concealed sales-floor to store door")
+	if not has_store_dorm_door:
+		out.append("dormitory lacks its ordinary store-side door")
+	for window in plan.windows:
+		if int(window.get("room", -1)) == store or int(window.get("room", -1)) == dormitory:
+			out.append("hidden room has an exterior window")
+	var start := plan.entrance_room()
+	var all_rooms := plan.reachable_rooms(start)
+	var without_secrets := plan.reachable_rooms(start, &"", true, false)
+	if not all_rooms.has(store) or not all_rooms.has(dormitory):
+		out.append("secret-aware room graph cannot reach hidden rooms")
+	if without_secrets.has(store) or without_secrets.has(dormitory):
+		out.append("ordinary room graph reaches hidden rooms without secret door")
+	if not plan.is_private_room(store) or not plan.is_private_room(dormitory):
+		out.append("privacy model does not identify hidden rooms as private")
+	return out
 
 
 static func _int013_spec(business: StringName, scale: float) -> ShopSpec:
