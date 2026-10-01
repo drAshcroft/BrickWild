@@ -157,14 +157,14 @@ static func _negative_market_hall_controls(res: SuiteResult, plan: HousePlan) ->
 		return
 	var original_columns: Array[Dictionary] = plan.columns.duplicate(true)
 	plan.columns.clear()
-	var missing := check.check(plan)["failures"]
+	var missing: Array = check.check(plan)["failures"]
 	if not missing.any(func(row: String) -> bool: return row.begins_with("colonnade:")):
 		res.fail("market hall negative control: removing all posts escaped plan validation")
 	plan.columns = original_columns.duplicate(true)
 	if not plan.columns.is_empty():
 		var original_pos: Vector2 = plan.columns[0]["pos"]
 		plan.columns[0]["pos"] = original_pos + Vector2(1.0, 0.0)
-		var drifted := check.check(plan)["failures"]
+		var drifted: Array = check.check(plan)["failures"]
 		if not drifted.any(func(row: String) -> bool: return row.contains("off wall")):
 			res.fail("market hall negative control: moving a post off the wall escaped plan validation")
 		plan.columns[0]["pos"] = original_pos
@@ -172,7 +172,7 @@ static func _negative_market_hall_controls(res: SuiteResult, plan: HousePlan) ->
 	if room >= 0:
 		var old_portals: Dictionary = plan.rooms[room].get("wall_portals", {}).duplicate(true)
 		plan.rooms[room]["wall_portals"] = {}
-		var missing_portal := check.check(plan)["failures"]
+		var missing_portal: Array = check.check(plan)["failures"]
 		if not missing_portal.any(func(row: String) -> bool: return row.contains("no solid portal")):
 			res.fail("market hall negative control: removing the entrance portal escaped plan validation")
 		plan.rooms[room]["wall_portals"] = old_portals

@@ -710,9 +710,9 @@ func check_focus(plan: HousePlan) -> void:
 		var column: Dictionary = plan.columns[ci]
 		if int(column.get("room", -1)) != room or int(column.get("storey", 0)) != plan.storey_of_room(room):
 			continue
-		var pos: Vector2 = column["pos"]
+		var column_pos: Vector2 = column["pos"]
 		var size: Vector2 = column["size"]
-		boxes.append(AABB(Vector3(pos.x - size.x * 0.5, base, pos.y - size.y * 0.5),
+		boxes.append(AABB(Vector3(column_pos.x - size.x * 0.5, base, column_pos.y - size.y * 0.5),
 			Vector3(size.x, float(column["height"]), size.y)))
 		names.append("column_%d" % ci)
 	var hit: Array[int] = Sightline.blockers(eye, aim, boxes)
