@@ -136,7 +136,15 @@ static func placement(building) -> Dictionary:
 	if building != null and building.plan is HousePlan:
 		held = building.plan.yard_pieces.duplicate()
 		building.plan.yard_pieces.clear()
+	# A castle's optional ground apron is ground, not architecture: it is put
+	# aside here exactly as the yard pieces are, and reported beside `bounds`.
+	var apron_held := false
+	if building != null and building.spec is CastleSpec:
+		apron_held = (building.spec as CastleSpec).ground_apron
+		(building.spec as CastleSpec).ground_apron = false
 	var mesh: ArrayMesh = build_mesh(building)
+	if apron_held:
+		(building.spec as CastleSpec).ground_apron = true
 	if building != null and building.plan is HousePlan:
 		building.plan.yard_pieces.assign(held)
 	if mesh == null:
@@ -170,6 +178,12 @@ static func placement(building) -> Dictionary:
 		out["yard_categories"] = HouseYard.categories(building.plan)
 		out["yard_extent"] = HouseYard.extent(building.plan)
 		out["yard_blocks"] = HouseYard.obstacles(building.plan)
+	if apron_held:
+		# the ground the castle asks for, beside `bounds` and not in it
+		var ring := Rect2()
+		for r in CastleApron.rects(building.spec).values():
+			ring = r if ring.size == Vector2.ZERO else ring.merge(r)
+		out["ground_apron"] = ring
 	var family := BuildingFamilyAdapter.for_building(building)
 	if family != null:
 		out.merge(family.placement_metadata(building, bounds))

@@ -84,9 +84,75 @@ static func _check_fixture(res: SuiteResult, fixture: Dictionary,
 		label + ": yard uses are not visibly distinct")
 	_want(res, is_equal_approx(union_area, float(report["fixture_occupied_m2"])),
 		label + ": occupied-footprint total disagrees with fixture records")
+	_yard_checks(res, spec, builder, label, run_route)
 	if run_route:
 		_route_checks(res, spec, builder, label)
 	return report
+
+
+## EVAL-B02: the bailey's clutter is grouped into working yards, each on its own
+## patch of beaten earth, so a cluster reads as one thing from the wall walk.
+static func _yard_checks(res: SuiteResult, spec: CastleSpec, builder: CastleBuilder,
+		label: String, strict: bool) -> void:
+	var report: Dictionary = builder.yard_report
+	var yards: Array = report.get("yards", [])
+	var bailey: Rect2 = CastleGeometry.bailey_rect(spec)
+	var axis: Rect2 = CastleGeometry.gate_axis_strip(spec)
+	_want(res, yards.size() >= 2, label + ": fewer than two working yards")
+	var reserved: Array[Rect2] = CastleFurnisher._reserved(spec)
+	var earths := {}
+	for i in range(yards.size()):
+		var row: Dictionary = yards[i]
+		var yard_name := String(row["name"])
+		var rect: Rect2 = row["rect"]
+		var host := "yard_" + yard_name
+		_want(res, bailey.encloses(rect), label + ": %s yard is not inside the ward" % yard_name)
+		_want(res, not rect.intersects(axis), label + ": %s yard is across the way from the gate" % yard_name)
+		for obstacle in reserved:
+			# the market is laid round the well, whose own reserve it contains
+			if rect.encloses(obstacle):
+				continue
+			_want(res, not rect.intersects(obstacle),
+				label + ": %s yard lies over a range, tower, stair or route reserve" % yard_name)
+		for j in range(i + 1, yards.size()):
+			_want(res, not rect.intersects(yards[j]["rect"]),
+				label + ": %s and %s yards overlap" % [yard_name, String(yards[j]["name"])])
+		# the earth is logged, measurable and its own colour
+		var ground: Array[Dictionary] = []
+		for c in builder.components_of(host):
+			if c["role"] == "yard_ground":
+				ground.append(c)
+		_want(res, ground.size() == 1, label + ": %s yard has no logged ground patch" % yard_name)
+		if ground.size() == 1:
+			var a: AABB = CastleBuilder.component_aabb(ground[0])
+			_want(res, rect.grow(0.01).encloses(Rect2(a.position.x, a.position.z, a.size.x, a.size.z)),
+				label + ": %s ground patch lies outside its yard" % yard_name)
+			_want(res, a.size.x * a.size.z > rect.get_area() * 0.5,
+				label + ": %s ground patch covers under half its yard" % yard_name)
+		var earth := int(CastleYards.EARTH[StringName(yard_name)])
+		_want(res, not earths.has(earth), label + ": two yards share one earth colour")
+		earths[earth] = true
+		# what is built on it stands on it, and its props are measured
+		var built := 0
+		for mass in builder.mass_log:
+			if not String(mass["name"]).begins_with("yardwork_%s_" % yard_name):
+				continue
+			built += 1
+			var box: AABB = mass["aabb"]
+			var plan := Rect2(box.position.x, box.position.z, box.size.x, box.size.z)
+			_want(res, rect.grow(0.01).encloses(plan),
+				label + ": %s of the %s yard stands outside it" % [mass["name"], yard_name])
+			_want(res, not plan.intersects(axis),
+				label + ": %s stands across the way from the gate" % mass["name"])
+		_want(res, built >= 2, label + ": %s yard has fewer than two built pieces" % yard_name)
+		_want(res, int(row["prop_count"]) >= 3,
+			label + ": %s yard has fewer than three catalogue props" % yard_name)
+		for p in builder.prop_log:
+			if StringName(p.get("yard_name", &"")) == StringName(yard_name):
+				_want(res, rect.encloses(p["rect"]),
+					label + ": %s prop %s stands off its patch" % [yard_name, p["key"]])
+	res.note("%s: %d working yards (%s)" % [label, yards.size(), ", ".join(
+		yards.map(func(y): return "%s %.0f m2" % [y["name"], y["area_m2"]]))])
 
 
 static func _route_checks(res: SuiteResult, spec: CastleSpec,

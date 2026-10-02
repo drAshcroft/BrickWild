@@ -318,28 +318,32 @@ static func _check_water_is_never_a_lot(res: SuiteResult) -> void:
 ## §6: the manor stands at the head of the village on its OWN lane, >= 20 m
 ## back. Cut on its own rather than by earning it with a 200-person village,
 ## because a manor village is forty more houses of mesh for the same rule.
+##
+## The village is the one that earns a manor: a garrison, which is a gate
+## village (VILLAGES §3). A 150-person farming village is a green and earns
+## none: its ring street and civic ground left a manor no frontage through any
+## of the planner's site retries. It goes through `plan_measured`, the one pipeline, so that the
+## site grows as it does for a real lord's village: a bare form's ground is a
+## metre or two short of a 52 m deep manor lot beside the ring (EVAL-C11).
+## Only the castle is generated here -- the village's own households are
+## never programmed -- so this stays one building's worth of mesh.
 static func _check_manor_gets_its_own_lane(res: SuiteResult) -> void:
-	# A big site, because §5 asks the manor for a >= 20 m setback and §6 for
-	# 15 m clear all round: that does not fit behind a 90 m hamlet's road.
-	# Only the castle is generated here -- the village's own households are
-	# never programmed -- so this stays one building's worth of mesh.
-	var spec: VillageSpec = _spec(21, 150, &"farming")
-	var plan: VillagePlan = VillageSitePlanner.plan(spec)
-	var roads_before: int = plan.roads.size()
+	var spec: VillageSpec = _spec(21, 150, &"garrison")
 	var reqs: Array[BuildingRequest] = [BuildingRequest.castle(5, &"norman", 24.0, 26.0, 9.0)]
-	var missed: int = VillageLotPlanner.cut(plan, reqs)
+	var plan: VillagePlan = VillageLotPlanner.plan_measured(spec, VillageLotPlanner.measure_all(reqs))
 	res.checked += 1
-	if missed != 0 or plan.buildings.size() != 1:
+	if spec.form != &"gate":
+		res.fail("a garrison is not a gate village (form '%s')" % spec.form)
+		return
+	if plan.buildings.size() != 1:
 		res.fail("the manor found no frontage")
 		return
-	if plan.roads.size() <= roads_before:
-		res.fail("the manor was not given a lane of its own")
-	else:
-		var lane: int = int(plan.lots[0]["road"])
-		if lane < roads_before:
-			res.fail("the manor fronts road %d, an existing road, not its own lane" % lane)
-		elif plan.roads[lane]["class"] != &"lane":
-			res.fail("the manor's own road is a '%s'" % plan.roads[lane]["class"])
+	var lane: int = int(plan.lots[0]["road"])
+	if lane != plan.roads.size() - 1:
+		res.fail("the manor fronts road %d, not the lane laid for it (last of %d roads)"
+			% [lane, plan.roads.size()])
+	elif plan.roads[lane]["class"] != &"lane":
+		res.fail("the manor's own road is a '%s'" % plan.roads[lane]["class"])
 	for p in judge(plan):
 		res.fail("manor case: " + p)
 	res.note("manor case: setback band [20, 40] honoured on its own lane")

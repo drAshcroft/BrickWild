@@ -496,8 +496,16 @@ static func _dress_fixtures(res: SuiteResult, base: VillagePlan) -> void:
 		var authored := _copy(enclosed)
 		authored.fields = [{"kind": &"field", "poly": derived_outer["edge"]}]
 		VillageDresser.dress(authored)
-		if not authored.fields.is_empty():
+		# The dresser drops the inside field and, the village being a farming
+		# one, lays its own pasture beyond the edge (the positive case above
+		# requires one), so "retained" means a field left ON the edge's ground,
+		# not any field at all. The control proves the question can say yes.
+		var after: Dictionary = VillageEnclosurePlan.build(authored)
+		if _field_inside(authored, after["edge"]):
 			res.fail("dress fields integration: inside authored field was retained")
+		res.checked += 1
+		if not _field_inside(bad_outer, derived_outer["edge"]):
+			res.fail("dress fields integration: an inside field is not recognised as inside")
 
 		var forest_spec := VillageSpec.new(9218)
 		forest_spec.population = 30
@@ -509,6 +517,14 @@ static func _dress_fixtures(res: SuiteResult, base: VillagePlan) -> void:
 		forest_spec.generate(forest_spec.seed)
 		var forest := VillageLotPlanner.plan(forest_spec)
 		_clean(res, "dress far-side wood", VillageDressCheck.new().check(forest))
+
+
+## True when any of the plan's fields lies on the ground within `edge`.
+static func _field_inside(plan: VillagePlan, edge: PackedVector2Array) -> bool:
+	for field in plan.fields:
+		if VillageLotPlanner.overlap_area(field["poly"], edge) > VillageLotPlanner.AREA_EPS:
+			return true
+	return false
 
 
 ## The most trees DressCheck allows on a common, read from the check so the

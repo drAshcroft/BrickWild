@@ -1317,6 +1317,79 @@ static func moat_aabbs(spec: CastleSpec) -> Array[Dictionary]:
 	return out
 
 
+# ------------------------------------------------------------ moat banks
+#
+# The trench is a NEGATIVE mass and the ground a plane at y = 0, so nothing can
+# be dug: the water stands at WATER_LEVEL and is held by earth built up round
+# it (EVAL-B02). Outside the last ring an earth bank rises from the water's
+# edge to BANK_CREST and falls to the ground over BANK_RUN; between two rings
+# the bank is a dam as wide as the gap. Inside the first ring a stone
+# revetment faces the water along the curtain's side.
+
+const WATER_LEVEL := 0.04
+const BANK_CREST := 0.75
+const BANK_RUN := 3.4
+const DAM_CREST := 0.45
+const REVET_T := 0.45
+const REVET_H := 0.85
+const CAUSEWAY_SHOULDER := 1.2     # deck beyond the drawbridge, each side
+const PIER_SIZE := 0.9
+const PIER_H := 0.95
+
+
+## Plan rectangle of one moat ring's OUTER edge: moat_aabbs and the banks both
+## stand on it.
+static func moat_ring_rect(spec: CastleSpec, ring: int) -> Rect2:
+	var site: Rect2 = enceinte_rect(spec, 0)
+	var width: float = clampf(spec.ditch_width, 8.0, 25.0)
+	var setback: float = tower_base_half(spec, 0) + 1.5
+	var inner: float = setback + float(ring) * (width + 2.0)
+	var x0: float = site.position.x - inner - width
+	var z0: float = site.position.y - inner - width
+	return Rect2(Vector2(x0, z0), Vector2(site.end.x + inner + width - x0,
+		site.end.y + inner + width - z0))
+
+
+## Everything a water plan needs to dress its moat: one row per ring.
+## {ring, outer: Rect2, inner: Rect2, width, last: bool, run, crest}
+static func moat_rings(spec: CastleSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if spec.plan_kind != &"water" or not is_enclosed(spec):
+		return out
+	var width: float = clampf(spec.ditch_width, 8.0, 25.0)
+	var count: int = clampi(spec.moat_count, 1, 2)
+	for ring in range(count):
+		var outer: Rect2 = moat_ring_rect(spec, ring)
+		var last: bool = ring == count - 1
+		out.append({"ring": ring, "outer": outer, "inner": outer.grow(-width),
+			"width": width, "last": last,
+			# between two rings the bank is the 2 m dam; outside the last it is
+			# a full bank
+			"run": BANK_RUN if last else 2.0,
+			"crest": BANK_CREST if last else DAM_CREST})
+	return out
+
+
+## The stone deck of the causeway: the drawbridge's width and a shoulder, not
+## the whole lane the road reserves. The rest of the lane stays water, which is
+## what lets the deck read as carried on piers rather than as a slab on a
+## lawn. `causeway_aabb` is still the reserve the trench is cut round.
+static func causeway_deck_aabb(spec: CastleSpec) -> AABB:
+	var road: AABB = causeway_aabb(spec)
+	if road.size.x <= 0.0 or road.size.z <= 0.0:
+		return AABB()
+	var bridge: AABB = drawbridge_aabb(spec)
+	var w: float = minf(road.size.x, maxf(bridge.size.x + CAUSEWAY_SHOULDER * 2.0, 3.0))
+	return AABB(Vector3(-w * 0.5, road.position.y, road.position.z),
+		Vector3(w, road.size.y, road.size.z))
+
+
+## Half the clear gap the banks and the revetment leave for the road.
+static func causeway_gap_half(spec: CastleSpec) -> float:
+	var deck: AABB = causeway_deck_aabb(spec)
+	return deck.size.x * 0.5 + PIER_SIZE + 0.4 if deck.size.x > 0.0 else 0.0
+
+
 ## Solid road through the gate-axis opening. Its outer end meets the outside
 ## bank; its inner end meets the lowered drawbridge.
 static func causeway_aabb(spec: CastleSpec) -> AABB:
@@ -1707,6 +1780,10 @@ static func plan_extent(spec: CastleSpec) -> Rect2:
 	if causeway.size.x > 0.0:
 		e = e.expand(Vector2(causeway.position.x, causeway.position.z))
 		e = e.expand(Vector2(causeway.end.x, causeway.end.z))
+	for ring_row in moat_rings(spec):
+		# the bank stands on the ring's outer edge and reaches `run` beyond it
+		if ring_row["last"]:
+			e = e.merge((ring_row["outer"] as Rect2).grow(float(ring_row["run"])))
 	if is_sky(spec):
 		var rr: float = sky_rock_radius(spec)
 		e = e.merge(Rect2(Vector2(-rr, -rr), Vector2(rr * 2.0, rr * 2.0)))
