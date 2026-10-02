@@ -351,8 +351,16 @@ first, then beauty, then usefulness. Fourteen were merged into `main` on
 
 Confirmations of the merged tree: 42 suites / 66,960 checks / 0 failures
 after the correctness merges; 22 / 13,929 / 0 after the material kit;
-14 / 7,266 / 0 after the hotel roof and blueprint changes. The final run on
-`1204daf` is recorded in `artifacts/eval_20261001/final_confirm_main_1204daf.log`.
+14 / 7,266 / 0 after the hotel roof and blueprint changes. The final run of
+every fast lane plus `lane:api` on the day's last merge
+(`artifacts/eval_20261001/final_confirm_main_1204daf.log`) gave 48 suites /
+69,652 checks / 16 failures, all one cause the yard agent's own lanes could
+not see: the new `HouseYardCheck` access rule ("a ground-floor exterior door
+cannot be reached from the road edge") fires on house plans that have no
+road edge, namely castle interior plans, the world courtyard houses and the
+guildhall. Filed as EVAL-C14 and assigned the same day; until it lands,
+`lane:castle-change`, the three `wld001` bounded selectors and `sarchetype`
+are red for that reason alone.
 
 Still open: B02 castle yards and moat (step 1 verified, step 2 unverified,
 on branch `wip/castle-yards-moat`), B07 sky castle dressing, C11 and C13
