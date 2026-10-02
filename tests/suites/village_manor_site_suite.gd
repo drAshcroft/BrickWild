@@ -59,7 +59,7 @@ static func run() -> SuiteResult:
 	if manors.size() != 1:
 		return res
 	var building: Dictionary = plan.buildings[manors[0]]
-	var native := BigGlade.generate(building["request"])
+	var native := BrickWild.generate(building["request"])
 	_expect(res, native.is_ok() and native.spec is CastleSpec \
 		and (native.spec as CastleSpec).tier == &"manor",
 		"estate was replaced by a smaller building to fit the site")

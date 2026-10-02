@@ -1,6 +1,6 @@
 extends SceneTree
 ## EVAL-B04 non-headless render gate: every family of the wider world through the
-## public path (BigGlade.generate -> BigGlade.instantiate), so the picture is the
+## public path (BrickWild.generate -> BrickWild.instantiate), so the picture is the
 ## building in what it is made of -- the assembler's own materials, not a staged
 ## palette. One three-quarter portrait per family at its smallest size, to
 ## artifacts/renders/world_materials/.
@@ -68,12 +68,12 @@ func _shoot(row: Array) -> void:
 	request.width = float(envelope["width"]["min"])
 	request.length = float(envelope["length"]["min"])
 	request.height = float(envelope["height"]["min"])
-	var building := BigGlade.generate(request)
+	var building := BrickWild.generate(request)
 	if building == null or not building.is_ok():
 		print("  ", row[0], " did not generate")
 		return
 	_ground.visible = not (row[0] in NO_GROUND)
-	var node: Node3D = BigGlade.instantiate(building)
+	var node: Node3D = BrickWild.instantiate(building)
 	if node == null:
 		print("  ", row[0], " has no scene")
 		return

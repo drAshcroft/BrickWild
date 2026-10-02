@@ -89,7 +89,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | village site, lots, plan rules | `lane:village-fast` | 2.5 m host, green, 10 checks |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | church shell, opening or roof geometry | `lane:church-change` | 20 s host |
-| the public API: `BigGlade.generate/build_mesh/placement/instantiate`, `BuildingLibrary`, `Placement`, `BuildingRequest` | `lane:api` | ~4.7 m host (`libraryquick` ~3.5 m, `placementquick` ~1.2 m, `poly`); every published kind once |
+| the public API: `BrickWild.generate/build_mesh/placement/instantiate`, `BuildingLibrary`, `Placement`, `BuildingRequest` | `lane:api` | ~4.7 m host (`libraryquick` ~3.5 m, `placementquick` ~1.2 m, `poly`); every published kind once |
 | church or castle dressing, props placed in them | `dressingquick` | under 5 m host |
 | the dwellings the generator must furnish | `harchetype` | 2.5 m host |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |

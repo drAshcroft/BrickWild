@@ -10,8 +10,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$sourceManifestPath = Join-Path $PSScriptRoot 'big_glade_addon_manifest.json'
-$installedManifestName = '.big_glade_install_manifest.json'
+$sourceManifestPath = Join-Path $PSScriptRoot 'brick_wild_addon_manifest.json'
+$installedManifestName = '.brick_wild_install_manifest.json'
 $utf8NoBom = New-Object Text.UTF8Encoding($false)
 
 function Assert-RelativePackagePath {
@@ -105,9 +105,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $targetRoot 'project.godot') -PathTy
     throw "TargetProject is not a Godot project (project.godot not found): $targetRoot"
 }
 
-$addonRoot = [IO.Path]::GetFullPath((Join-Path $targetRoot 'addons/big_glade'))
+$addonRoot = [IO.Path]::GetFullPath((Join-Path $targetRoot 'addons/brick_wild'))
 $expectedAddonParent = [IO.Path]::GetFullPath((Join-Path $targetRoot 'addons'))
-$null = Resolve-ContainedPath -Root $expectedAddonParent -RelativePath 'big_glade' `
+$null = Resolve-ContainedPath -Root $expectedAddonParent -RelativePath 'brick_wild' `
     -Description 'Addon destination'
 
 $sourceManifest = [IO.File]::ReadAllText($sourceManifestPath) | ConvertFrom-Json
@@ -115,7 +115,7 @@ if ([int]$sourceManifest.schema_version -ne 1) {
     throw "Unsupported addon source manifest schema: $($sourceManifest.schema_version)"
 }
 
-$versionPath = Join-Path $repositoryRoot 'packaging/big_glade/VERSION'
+$versionPath = Join-Path $repositoryRoot 'packaging/brick_wild/VERSION'
 $version = [IO.File]::ReadAllText($versionPath).Trim()
 if ($version -ne [string]$sourceManifest.package_version) {
     throw "Package version mismatch between VERSION and source manifest"
@@ -185,7 +185,7 @@ if (Test-Path -LiteralPath $installedManifestPath -PathType Leaf) {
         }
     }
     catch {
-        throw "Installed BigGlade manifest is invalid; refusing to remove any files: $installedManifestPath"
+        throw "Installed BrickWild manifest is invalid; refusing to remove any files: $installedManifestPath"
     }
 }
 

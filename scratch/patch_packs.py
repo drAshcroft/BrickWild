@@ -11,11 +11,11 @@ def edit(path, pairs):
 edit("src/house/prop_catalog.gd", [
 # ---- the pack table ----
 ("""const SOURCE_ASSET_ROOT := "res://assets/props/"
-const ADDON_ASSET_ROOT := "res://addons/big_glade/assets/props/"
+const ADDON_ASSET_ROOT := "res://addons/brick_wild/assets/props/"
 const CATALOG_FILE := "catalog.json"
 """,
  """const SOURCE_ASSET_ROOT := "res://assets/props/"
-const ADDON_ASSET_ROOT := "res://addons/big_glade/assets/props/"
+const ADDON_ASSET_ROOT := "res://addons/brick_wild/assets/props/"
 const CATALOG_FILE := "catalog.json"
 
 ## The art packs the props come from: which folder, and what the models are

@@ -88,7 +88,7 @@ The render utility writes roof-on, roof-off, and lord's-chamber PNGs for square,
 round, and tiered keeps to `artifacts/renders/`. Run it with a real renderer;
 headless mode does not produce useful reference images.
 
-Set `BIG_GLADE_TEST_TRACE=1` to log the style, tier, index, and seed before each
+Set `BRICK_WILD_TEST_TRACE=1` to log the style, tier, index, and seed before each
 canonical castle case. The runner also prints suite start and elapsed time,
 which makes a slow or failing headless run easier to locate.
 

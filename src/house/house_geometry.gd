@@ -910,7 +910,7 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 			r = r.merge(extra)
 	# The yard's BUILT pieces are emitted in the shell mesh, so the bound that
 	# promises to contain every emitted vertex contains them. The yard's props
-	# are separate models (BigGlade.placement merges them), and the APRON itself
+	# are separate models (BrickWild.placement merges them), and the APRON itself
 	# is permission, not content: it is exposed as `yard_rect`, never added here.
 	if spec.exterior_props:
 		for piece in plan.yard_pieces:

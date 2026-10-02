@@ -35,7 +35,7 @@ static func _run_kinds_at_scale(kinds: Array[StringName], selected_scale: float)
 				print("wld001 case %s scale=%.2f seed=%d" % [String(kind), scale, seed_offset])
 				var case_started := Time.get_ticks_msec()
 				var case_failures := res.failures.size()
-				var building: GeneratedBuilding = BigGlade.generate(request)
+				var building: GeneratedBuilding = BrickWild.generate(request)
 				res.checked += 1
 				var who := "%s scale=%.2f seed=%d" % [String(kind), scale, seed_offset]
 				if building == null or not building.is_ok():

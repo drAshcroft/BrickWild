@@ -48,7 +48,7 @@ static func run_contracts() -> SuiteResult:
 	var plan := VillagePlan.new(VillageSpec.new(42))
 	plan.commons.append({"kind": &"common", "poly": Poly.from_rect(Rect2(-10.0, -10.0, 20.0, 20.0))})
 	plan.lots.append({"front": PackedVector2Array([Vector2(-6.0, 12.0), Vector2(6.0, 12.0)])})
-	var building := {"request": BigGlade.default_request(&"temple", 42), "lot": 0,
+	var building := {"request": BrickWild.default_request(&"temple", 42), "lot": 0,
 		"transform": Transform3D(Basis.IDENTITY, Vector3(0.0, 0.0, 20.0)),
 		"placement": {"footprint": Rect2(-4.0, -5.0, 8.0, 10.0),
 			"bounds": AABB(Vector3(-4.0, 0.0, -5.0), Vector3(8.0, 8.0, 10.0)),
@@ -194,14 +194,14 @@ static func _cap_refusal_failures(spec: VillageSpec) -> Array[String]:
 	var out: Array[String] = []
 	if spec.population <= VillageSpec.POP_MAX or spec.valid():
 		out.append("above-cap population was not rejected by the spec")
-	var request := BigGlade.default_request(&"village", spec.seed)
+	var request := BrickWild.default_request(&"village", spec.seed)
 	request.width = spec.population
 	request.length = spec.wealth * 100.0
 	request.style = spec.culture
 	request.purpose = spec.purpose
 	request.water = spec.water
 	request.enclosure = spec.enclosure
-	var built := BigGlade.generate(request)
+	var built := BrickWild.generate(request)
 	if built.is_ok() or built.errors.is_empty() or built.spec != null or built.village != null:
 		out.append("public generator built or silently clamped an above-cap village")
 	if built.request == null or built.request.width != float(spec.population):
@@ -715,7 +715,7 @@ static func _manor_at_lane_head(plan: VillagePlan) -> bool:
 	for b in plan.buildings:
 		var request: BuildingRequest = b["request"]
 		if request.kind != &"castle": continue
-		var native := BigGlade.generate(request)
+		var native := BrickWild.generate(request)
 		if not native.is_ok() or not native.spec is CastleSpec or (native.spec as CastleSpec).tier != &"manor":
 			continue
 		var lot_index: int = int(b["lot"])

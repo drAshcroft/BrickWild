@@ -77,7 +77,7 @@ static func yard(spec: CastleSpec, entry: Dictionary) -> Dictionary:
 	var request := BuildingRequest.shop(spec.seed ^ int(String(entry.business).hash()),
 		entry.business, &"longhall", rect.size.y, rect.size.x, CastleBuilder.YARD_WALL_H)
 	request.material = &"stone"
-	var building := BigGlade.generate(request)
+	var building := BrickWild.generate(request)
 	if not building.is_ok():
 		return {"errors": building.errors, "request": request}
 	var hs := building.spec as ShopSpec

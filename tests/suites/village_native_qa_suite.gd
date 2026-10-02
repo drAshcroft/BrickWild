@@ -7,7 +7,7 @@ const NativeQA = preload("res://tests/fixtures/native_family_qa_cache.gd")
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("village native family QA")
 	var church_request := BuildingRequest.church(11, &"romanesque", 8, 12, 8)
-	var church := BigGlade.generate(church_request)
+	var church := BrickWild.generate(church_request)
 	_expect(res, church.is_ok(), "native church fixture did not generate")
 	if church.is_ok():
 		var report := NativeQA.check(church_request)
@@ -24,7 +24,7 @@ static func run() -> SuiteResult:
 			return failure.begins_with("proportions: tower wider than nave")),
 			"church's physically overwide tower escaped native QA dispatch")
 	var castle_request := BuildingRequest.castle(11, &"norman", 50, 50, 10)
-	var castle := BigGlade.generate(castle_request)
+	var castle := BrickWild.generate(castle_request)
 	_expect(res, castle.is_ok(), "native castle fixture did not generate")
 	if castle.is_ok():
 		var report := NativeQA.check(castle_request)

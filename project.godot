@@ -3,7 +3,7 @@ config_version=5
 
 [application]
 
-config/name="BigGlade"
+config/name="BrickWild"
 run/main_scene="res://scenes/studio.tscn"
 config/features=PackedStringArray("4.5")
 

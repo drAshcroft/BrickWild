@@ -12,7 +12,7 @@ static func run() -> SuiteResult:
 	request.width = 90.0
 	request.length = 90.0
 	request.height = 50.0
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if building == null or not building.is_ok():
 		res.fail("Temple of Four Winds did not generate")

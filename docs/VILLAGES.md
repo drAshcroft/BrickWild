@@ -11,7 +11,7 @@ mode. The generator takes a population and stops when that population is
 housed; the harness fails a village that is bigger than its people.
 
 ```
-VillageSpec ─▶ SitePlanner ─▶ LotPlanner ─▶ Programmer ─▶ BigGlade.generate()
+VillageSpec ─▶ SitePlanner ─▶ LotPlanner ─▶ Programmer ─▶ BrickWild.generate()
  population,    roads,          parcels        which lot     per lot, seeded
  style, purpose, common,        along roads,   gets which
  wealth, water  edge, water     front to road  building
@@ -31,7 +31,7 @@ VillageSpec ─▶ SitePlanner ─▶ LotPlanner ─▶ Programmer ─▶ BigGla
 is for a house. The planners write it, the dresser adds to it, the builder
 and the assembler read it, and the checks judge it in metres and polygons
 without loading a model. The buildings inside it are ordinary
-`BuildingRequest`s answered by `BigGlade.generate()`, so a village inherits
+`BuildingRequest`s answered by `BrickWild.generate()`, so a village inherits
 every house, shop, church, castle and temple suite for free — a village
 that passes `VillageQA` has also passed `HouseQA` on every house in it.
 
@@ -214,7 +214,7 @@ the roads themselves are never lots.
 |---|---|
 | **setback** — door to road edge | cottage 1.5 – 6 m; townhouse 0 – 1 m; farm 4 – 12 m; church 6 – 15 m; manor ≥ 20 m on its own lane |
 | **fire gap** — between building bounds | cottage ≥ 1.5 m; farm ≥ 6 m; townhouse may touch its neighbours (a terrace) when `wealth ≥ 0.5` and `form = planted` |
-| **front** — building local −Z toward the front edge | within 15°; every family's front is −Z (`BigGlade.placement()`), so this is one rule for all of them |
+| **front** — building local −Z toward the front edge | within 15°; every family's front is −Z (`BrickWild.placement()`), so this is one rule for all of them |
 | **fit** — `placement().bounds` inside the lot | with the fire gap as margin |
 | **yard** — the rest of the lot | garden, orchard, hedge, props by trade |
 
@@ -264,7 +264,7 @@ silently move to a back lane.
 
 Building sizes come from the family's `describe_kind()` envelope, scaled by
 wealth and the household, and every request is sent through
-`BigGlade.generate()`; the lot is sized from the *measured* `placement()`
+`BrickWild.generate()`; the lot is sized from the *measured* `placement()`
 bounds afterwards, never from the requested envelope, for the same reason
 the massing check reads `mass_log` and not the spec.
 
@@ -542,7 +542,7 @@ that is neither road nor common nor lot is a moat the walk grid cannot cross.
 the family QA on every building in it. Each rule is a sentence and a
 measurement, in the vocabulary the harness already has: `Rect2`/polygon
 geometry, `WalkGrid`, `MassRules`, `_segment_hits` from the rite check, and
-`BigGlade.placement()` for building bounds and fronts. `ascii_map()` prints
+`BrickWild.placement()` for building bounds and fronts. `ascii_map()` prints
 the plan — roads, lots, building fronts, the common, the walk — because a
 village is the building most in need of being *looked at*.
 
@@ -769,7 +769,7 @@ acceptance.
 | **Measured `canopy`** | plants | `build_prop_catalog.gd` records a canopy radius and trunk radius for anything under `nature/` |
 | **A ground and a road mesh** | the builder | done (VIL-018): `src/village/village_builder.gd` raises the site slab, the lots, the road ribbons with their verges, the commons, the water and a bridge wherever a road crosses it, the palisade or wall round the edge with a gate at every crossing, and the ten `PropKit` props the dresser asked for. It extends `MassBuilder`, so every one of those is in `mass_log` and the checks measure what was emitted. `VillageAssembler` then adds what is a MODEL — the buildings, the catalogue props, the plants, and an `OmniLight3D` per light through `LightKit`. A heightmap is *not* v1 — every form here is flat, and the strand and the mine are the first to want a slope |
 | **Village-scale `WalkGrid`** | the nav check | cell 0.25 m; `add_obstacle` for polygons |
-| **A `village` kind on the facade** | every consumer | done (VIL-019): `BuildingRequest(kind = &"village")` goes through `BigGlade.generate()` like any other family and comes back with its `VillagePlan` on `GeneratedBuilding.village`. Its two numbers ride on the request's own number fields — `width` is the population and `length` the wealth as a percentage — and the descriptor's `width_label`/`length_label` say so, so a caller filling a form from `describe_kind()` asks for the right thing. `placement()` gives the site as the footprint and the point on its −Z edge nearest the common as the door |
+| **A `village` kind on the facade** | every consumer | done (VIL-019): `BuildingRequest(kind = &"village")` goes through `BrickWild.generate()` like any other family and comes back with its `VillagePlan` on `GeneratedBuilding.village`. Its two numbers ride on the request's own number fields — `width` is the population and `length` the wealth as a percentage — and the descriptor's `width_label`/`length_label` say so, so a caller filling a form from `describe_kind()` asks for the right thing. `placement()` gives the site as the footprint and the point on its −Z edge nearest the common as the door |
 | **The Studio** | looking at it | a `Village` kind with population, culture, purpose, wealth, water, edge; and `BlueprintView` draws the plan from above — the sheet finally draws something other than a church, and it is the most useful drawing the Studio could make |
 
 ## 12. Order

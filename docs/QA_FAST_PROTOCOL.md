@@ -108,7 +108,7 @@ pair `libraryquick placementquick` and `poly`, and the full pair lives in
 `lane:scheduled`. Their cost is hotel generation: a hotel is ~45 s of
 furnisher search at any size, and `library` made seven of them (now four), `placement`
 twenty-one. `libraryquick` and `placementquick` cover every kind
-`BigGlade.describe_kind` publishes (church, castle, house, shop, hotel,
+`BrickWild.describe_kind` publishes (church, castle, house, shop, hotel,
 temple, world, village) once at one size and seed.
 
 Keep `lane:castle`, `castle cmassing clandmark cvoxelqa`, `house`, `court`,

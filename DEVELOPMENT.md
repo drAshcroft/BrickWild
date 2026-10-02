@@ -4,9 +4,8 @@ This guide is for contributors working on the generator, Studio, QA, or addon
 packaging. If you only want to run or embed BrickWild, use the
 [installation guide](INSTALLATION.md).
 
-BrickWild is the repository and product name. The public GDScript class
-`BigGlade`, the `addons/big_glade` install directory, and related filenames are
-retained for API compatibility.
+BrickWild is the repository, product, GDScript facade, and addon name. The
+public class is `BrickWild`; install the addon at `addons/brick_wild`.
 
 ## Requirements
 
@@ -74,14 +73,14 @@ qa/                    geometry, circulation, furnishing, and semantic checks
 tests/suites/           reusable test suites
 tests/fixtures/         focused failure and integration fixtures
 tools/                  renderers, exporters, catalogue and install tools
-packaging/big_glade/    addon metadata, example, and package version
+packaging/brick_wild/    addon metadata, example, and package version
 docs/                   design contracts, investigations, and QA protocols
 ```
 
 The central runtime flow is:
 
 ```text
-BuildingRequest -> BigGlade -> BuildingFamilyAdapter -> plan/spec
+BuildingRequest -> BrickWild -> BuildingFamilyAdapter -> plan/spec
                                                   -> mesh / scene / placement
 ```
 
@@ -207,9 +206,9 @@ or village-archetype scheduled gates.
 
 ## Addon packaging
 
-`tools/big_glade_addon_manifest.json` defines the relocatable package.
-`tools/install_big_glade_addon.ps1` copies that closure into
-`res://addons/big_glade` and tracks the files it owns. Update the manifest when
+`tools/brick_wild_addon_manifest.json` defines the relocatable package.
+`tools/install_brick_wild_addon.ps1` copies that closure into
+`res://addons/brick_wild` and tracks the files it owns. Update the manifest when
 a runtime script is added, removed, or moved. Every `.gd` with a registered
 class must travel with its `.gd.uid` sidecar.
 
@@ -217,8 +216,8 @@ From a complete local checkout, verify an install with a disposable Godot
 project:
 
 ```powershell
-.\tools\install_big_glade_addon.ps1 -TargetProject C:\path\to\GodotProject -DryRun
-.\tools\install_big_glade_addon.ps1 -TargetProject C:\path\to\GodotProject
+.\tools\install_brick_wild_addon.ps1 -TargetProject C:\path\to\GodotProject -DryRun
+.\tools\install_brick_wild_addon.ps1 -TargetProject C:\path\to\GodotProject
 godot --headless --path C:\path\to\GodotProject --editor --quit
 ```
 
@@ -232,7 +231,7 @@ and Linux has not been verified.
 - Note any required suite that could not run because of the missing public
   asset closure.
 - Include a seed and screenshot for visible changes.
-- Preserve API compatibility or explain the `BigGlade.API_VERSION` impact.
+- Preserve API compatibility or explain the `BrickWild.API_VERSION` impact.
 - Record the origin and license of every new third-party asset.
 
 For deeper project invariants and maintainer commands, see `AGENTS.md`. Design

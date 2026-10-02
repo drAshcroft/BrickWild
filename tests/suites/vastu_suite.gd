@@ -13,20 +13,20 @@ static func run() -> SuiteResult:
 	request.width = 15.0
 	request.length = 28.0
 	request.height = 10.0
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if building == null or not building.is_ok() or building.plan == null:
 		res.fail("Merchant's Haveli did not generate through the public API")
 		return res
-	var mesh := BigGlade.build_mesh(building)
-	var report := BigGlade.check(building)
+	var mesh := BrickWild.build_mesh(building)
+	var report := BrickWild.check(building)
 	if mesh == null or mesh.get_surface_count() < 4 or not bool(report.get("ok", false)):
 		res.fail("Merchant's Haveli public mesh/check contract failed: %s" %
 			str(report.get("diagnostics", [])))
-	var restored := BuildingDocument.from_json(BigGlade.generate_document(request).to_json())
+	var restored := BuildingDocument.from_json(BrickWild.generate_document(request).to_json())
 	res.checked += 1
 	if not restored.is_ok() or restored.plan == null \
-			or restored.plan.world_family != &"vastu" or BigGlade.build_mesh(restored) == null:
+			or restored.plan.world_family != &"vastu" or BrickWild.build_mesh(restored) == null:
 		res.fail("haveli did not survive the public document round trip")
 
 	var broken_centre := _fixture()

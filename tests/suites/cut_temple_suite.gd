@@ -6,7 +6,7 @@ extends RefCounted
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("world rock-cut temple")
 	var request := _request()
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if building == null or not building.is_ok():
 		res.fail("Quarried Temple did not generate: %s" %
@@ -19,13 +19,13 @@ static func run() -> SuiteResult:
 	if pit.size.distance_to(Vector2(82.0, 46.0)) > 0.02 \
 			or absf(float(building.plan.world_meta.get("pit_floor_y", 0.0)) + 30.0) > 0.02:
 		res.fail("Quarried Temple does not retain its 82x46x30m cut")
-	var mesh := BigGlade.build_mesh(building)
+	var mesh := BrickWild.build_mesh(building)
 	if mesh == null or mesh.get_surface_count() < 3:
 		res.fail("Quarried Temple did not emit rock, carving and roof surfaces")
-	var footprint: Rect2 = BigGlade.placement(building).get("footprint", Rect2())
+	var footprint: Rect2 = BrickWild.placement(building).get("footprint", Rect2())
 	if footprint.position.distance_to(pit.position) > 0.02 or footprint.size.distance_to(pit.size) > 0.02:
 		res.fail("rock-cut placement does not publish the pit as its site")
-	var report := BigGlade.check(building)
+	var report := BrickWild.check(building)
 	if not bool(report.get("ok", false)):
 		res.fail("Quarried Temple public API check reports failure")
 	for diagnostic in report.get("diagnostics", []):
@@ -34,17 +34,17 @@ static func run() -> SuiteResult:
 	if not WorldFamilies.has_family(CutTempleGenerator.FAMILY) \
 			or WorldFamilies.kinds_of(CutTempleGenerator.FAMILY) != [CutTempleGenerator.SUBKIND]:
 		res.fail("world family registry does not publish rock_cut_temple / quarried_temple")
-	var document := BigGlade.generate_document(request)
+	var document := BrickWild.generate_document(request)
 	res.checked += 1
 	if not document.is_ok() or document.plan == null \
 			or document.plan.world_family != CutTempleGenerator.FAMILY \
-			or BigGlade.build_mesh(document) == null:
+			or BrickWild.build_mesh(document) == null:
 		res.fail("rock-cut family did not survive the public document path")
 	var restored := BuildingDocument.from_json(document.to_json())
 	res.checked += 1
 	if not restored.is_ok() or restored.plan == null \
 			or restored.plan.world_family != CutTempleGenerator.FAMILY \
-			or BigGlade.build_mesh(restored) == null:
+			or BrickWild.build_mesh(restored) == null:
 		res.fail("negative-storey rock-cut plan did not survive document serialization")
 	_fixtures(res)
 	return res

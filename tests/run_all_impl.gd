@@ -99,7 +99,7 @@ const EXTRA: Array[String] = ["library", "placement", "vmine", "varchetypecontra
 ##   lane:church-change  ~10s body  bounded roofs, domed styles, openings, massing
 ##   lane:church         exhaustive church sweeps; schedule separately
 ##   lane:temple  ~3m    temple geometry and the rite rules
-##   lane:api     ~4m    BigGlade facade, library, placement(): quick pair + poly
+##   lane:api     ~4m    BrickWild facade, library, placement(): quick pair + poly
 ##   lane:scheduled      the slow gates that must pass before a merge, not per
 ##                       task: dressing, hlandmark, hotel, court, wld001, vlot,
 ##                       vcheck, vformslayout, interior, cvoxelqa, library,

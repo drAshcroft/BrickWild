@@ -87,7 +87,7 @@ static func run(focus_key: String = "") -> SuiteResult:
 			continue
 		var defects := 0
 		for scale in SCALES:
-			if OS.get_environment("BIG_GLADE_TEST_TRACE") == "1":
+			if OS.get_environment("BRICK_WILD_TEST_TRACE") == "1":
 				print("castle landmark: %s scale=%.2f seed=%d" % [key, scale, _seed_for(key, scale)])
 			var spec := CastleSpec.new()
 			spec.style = landmark["style"]

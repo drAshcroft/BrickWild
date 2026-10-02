@@ -398,14 +398,14 @@ static func titles(p: HousePlan) -> Array[String]:
 	var style: String
 	var purpose: String
 	if spec is HotelSpec:
-		style = BigGlade.option_label(&"hotel", &"style", (spec as HotelSpec).style)
+		style = BrickWild.option_label(&"hotel", &"style", (spec as HotelSpec).style)
 		purpose = "hotel"
 	elif spec is ShopSpec:
-		style = BigGlade.option_label(&"shop", &"style", spec.style)
-		purpose = BigGlade.option_label(&"shop", &"purpose", (spec as ShopSpec).business)
+		style = BrickWild.option_label(&"shop", &"style", spec.style)
+		purpose = BrickWild.option_label(&"shop", &"purpose", (spec as ShopSpec).business)
 	else:
-		style = BigGlade.option_label(&"house", &"style", spec.style)
-		purpose = BigGlade.option_label(&"house", &"purpose", spec.trade)
+		style = BrickWild.option_label(&"house", &"style", spec.style)
+		purpose = BrickWild.option_label(&"house", &"purpose", spec.trade)
 	var storeys := "%d storey%s" % [spec.storeys, "" if spec.storeys == 1 else "s"]
 	if int(spec.get("cellars")) > 0:
 		storeys += " and a cellar"

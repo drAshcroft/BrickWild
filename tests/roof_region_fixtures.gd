@@ -238,7 +238,7 @@ static func _village(cases: Array[Dictionary]) -> void:
 		return
 	for i in site.buildings.size():
 		var record: Dictionary = site.buildings[i]
-		var building := BigGlade._generate(record["request"], true)
+		var building := BrickWild._generate(record["request"], true)
 		var plan: HousePlan = building.plan
 		var xf: Transform3D = record["transform"]
 		var regions: Array[Dictionary] = []
@@ -250,7 +250,7 @@ static func _village(cases: Array[Dictionary]) -> void:
 		regions.append(_region("open_entrance_approach", _poly_xf(Poly.from_rect(
 			Rect2(door.x - 0.3, door.z - 4.3, 0.6, 0.6)), xf), xf.origin.y + 1.0, true))
 		var row := _case("village", "placed_%s_%d" % [record["kind"], i], plan.spec,
-			_mesh_xf(BigGlade.build_mesh(building), xf), regions, "src/village/lot_planner.gd: cut_measured; native BuildingRequest")
+			_mesh_xf(BrickWild.build_mesh(building), xf), regions, "src/village/lot_planner.gd: cut_measured; native BuildingRequest")
 		row["site_seed"] = spec.seed
 		row["transform"] = [[xf.basis.x.x, xf.basis.x.y, xf.basis.x.z],
 			[xf.basis.y.x, xf.basis.y.y, xf.basis.y.z], [xf.basis.z.x, xf.basis.z.y, xf.basis.z.z],

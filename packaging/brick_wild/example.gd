@@ -4,8 +4,8 @@ extends Node3D
 
 func _ready() -> void:
 	var request := BuildingRequest.house(42, &"cottage", &"smith", 9.0, 12.0, 2.6)
-	var document := BigGlade.generate_document(request)
+	var document := BrickWild.generate_document(request)
 	if document.is_ok():
-		add_child(BigGlade.instantiate(document, false, true))
+		add_child(BrickWild.instantiate(document, false, true))
 	else:
 		push_error(str(document.errors))

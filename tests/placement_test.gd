@@ -1,5 +1,5 @@
 extends SceneTree
-## BigGlade.placement()'s door contract, standalone.
+## BrickWild.placement()'s door contract, standalone.
 ## Run: godot --headless --path . --script res://tests/placement_test.gd
 
 

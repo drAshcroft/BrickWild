@@ -51,25 +51,25 @@ not yet been verified.
 
 ## Use it from GDScript
 
-BrickWild is the project name. The public GDScript facade remains `BigGlade`,
-and the addon remains at `res://addons/big_glade`, so the repository rename
-does not break existing projects.
+The public GDScript facade is `BrickWild`. Install the addon at
+`res://addons/brick_wild`. Projects using the former `BigGlade` class or
+`addons/big_glade` path must update those references.
 
 ```gdscript
 var request := BuildingRequest.house(
 	1234, &"townhouse", &"smith", 9.0, 12.0, 2.6, 2
 )
-var generated: GeneratedBuilding = BigGlade.generate(request)
+var generated: GeneratedBuilding = BrickWild.generate(request)
 
 if generated.is_ok():
-	var placement: Dictionary = BigGlade.placement(generated)
-	var building: Node3D = BigGlade.instantiate(generated, false, true)
+	var placement: Dictionary = BrickWild.placement(generated)
+	var building: Node3D = BrickWild.instantiate(generated, false, true)
 	add_child(building)
 ```
 
-Use `BigGlade.build_mesh(generated)` when you only need an `ArrayMesh`.
-`BigGlade.generate_document(request)` produces a serializable building
-document, and `BigGlade.describe_kind()` exposes the supported sizes, styles,
+Use `BrickWild.build_mesh(generated)` when you only need an `ArrayMesh`.
+`BrickWild.generate_document(request)` produces a serializable building
+document, and `BrickWild.describe_kind()` exposes the supported sizes, styles,
 and purposes for data-driven tools.
 
 The facade currently supports these request kinds:
@@ -114,7 +114,7 @@ alone cannot.
 ## Project status
 
 BrickWild is under active development and has not published a stable release
-yet. `BigGlade.API_VERSION` is currently `1`, but seeded output is only stable
+yet. `BrickWild.API_VERSION` is currently `2`, but seeded output is only stable
 within a generator release: generator improvements may deliberately change the
 building produced by a seed. Save a `BuildingDocument` when an exact generated
 building must remain fixed.

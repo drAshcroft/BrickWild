@@ -1,7 +1,7 @@
 import io, os, shutil
 
 SRC = r"C:/Projects/itch_assets/quaternius/dungeon kit/FBX-20260809T001824Z-1-001/FBX"
-DST = r"C:/Projects/BigGlade/assets/props/dungeon"
+DST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "props", "dungeon"))
 
 # The DRESSING of the Dungeon Kit, not its modular architecture: the builders
 # emit their own walls, floors and arches, so a wall tile is of no use here.

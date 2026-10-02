@@ -8,7 +8,7 @@ static func run() -> SuiteResult:
 	var request := _request(22007)
 	request.orientation = PI / 2.0
 	request.period = 1400
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if building == null or not building.is_ok():
 		res.fail("Scholar's Compound did not generate: %s" % (str(building.errors) if building != null else "null"))
@@ -26,23 +26,23 @@ static func run() -> SuiteResult:
 		res.fail("Scholar's Compound has no emitted shell")
 	for failure in SiheyuanCheck.new().check(building.plan, builder).get("failures", []):
 		res.fail("Scholar's Compound: %s" % str(failure))
-	var public_check := BigGlade.check(building)
+	var public_check := BrickWild.check(building)
 	res.checked += 1
 	if not bool(public_check.get("ok", false)):
 		res.fail("public adapter rejected the Scholar's Compound: %s" % str(public_check.get("diagnostics", [])))
-	var placement := BigGlade.placement(building)
+	var placement := BrickWild.placement(building)
 	var expected_north := Basis(Vector3.UP, request.orientation).inverse() * Vector3.BACK
 	res.checked += 1
 	if Vector3(placement.get("north", Vector3.ZERO)).distance_to(expected_north) > 0.001:
 		res.fail("INT-021 compass orientation did not reach public placement metadata")
-	var document := BigGlade.generate_document(request)
+	var document := BrickWild.generate_document(request)
 	res.checked += 1
 	if document.spec == null or document.plan == null or document.plan.world_family != &"siheyuan":
 		res.fail("public building document rejected the Siheyuan family")
 	var double_request := _request(22015)
 	double_request.purpose = &"two_court_compound"
 	double_request.length = 60.0
-	var double_building: GeneratedBuilding = BigGlade.generate(double_request)
+	var double_building: GeneratedBuilding = BrickWild.generate(double_request)
 	res.checked += 1
 	if not double_building.is_ok() or double_building.plan.courts.size() != 2:
 		res.fail("two-court Siheyuan variant did not produce its ordered court pair")
@@ -54,13 +54,13 @@ static func run() -> SuiteResult:
 	var short_double := _request(22016)
 	short_double.purpose = &"two_court_compound"
 	short_double.length = 40.0
-	var short_refused: GeneratedBuilding = BigGlade.generate(short_double)
+	var short_refused: GeneratedBuilding = BrickWild.generate(short_double)
 	res.checked += 1
 	if short_refused.is_ok() or short_refused.errors.is_empty():
 		res.fail("the two-court variant did not refuse a too-short terrain envelope")
 	var impossible := _request(22008)
 	impossible.height = 2.2
-	var refused: GeneratedBuilding = BigGlade.generate(impossible)
+	var refused: GeneratedBuilding = BrickWild.generate(impossible)
 	res.checked += 1
 	if refused.is_ok() or refused.errors.is_empty():
 		res.fail("an undersized-height site brief was not explicitly refused")

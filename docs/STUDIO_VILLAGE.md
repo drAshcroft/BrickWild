@@ -1,7 +1,7 @@
 # Village Studio
 
 Choose Village in the Studio to grow a seeded settlement. Population, culture,
-purpose, wealth, water and edge controls come from `BigGlade.describe_kind()`;
+purpose, wealth, water and edge controls come from `BrickWild.describe_kind()`;
 the UI has no separate option tables. Set the controls and press **Grow village**.
 **New seed** keeps the controls and grows another settlement.
 

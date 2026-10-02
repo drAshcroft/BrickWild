@@ -13,7 +13,7 @@ static func run() -> SuiteResult:
 	request.length = 60.0
 	request.height = 15.0
 	request.storeys = 4
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if building == null or not building.is_ok():
 		res.fail("Clan Ring did not generate: %s" % (str(building.errors) if building != null else "null"))
@@ -29,7 +29,7 @@ static func run() -> SuiteResult:
 	for failure2 in TulouCheck.negative_controls():
 		res.fail(String(failure2))
 	res.checked += 8
-	var document := BigGlade.generate_document(request)
+	var document := BrickWild.generate_document(request)
 	res.checked += 1
 	if document == null or not document.is_ok() or document.plan.world_family != &"tulou":
 		res.fail("API document lost the tulou family plan")

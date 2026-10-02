@@ -14,7 +14,7 @@ func _init() -> void:
 			found = true
 	if not found: failures.append("Village missing from kind menu")
 	ui._on_kind_changed()
-	var descriptor := BigGlade.describe_kind(&"village")
+	var descriptor := BrickWild.describe_kind(&"village")
 	for pair in [[ui.style_opt, "styles"], [ui.trade_opt, "purposes"], [ui.water_opt, "waters"], [ui.edge_opt, "enclosures"]]:
 		var options: OptionButton = pair[0]
 		var expected: Array = descriptor[pair[1]]
@@ -23,7 +23,7 @@ func _init() -> void:
 			if options.get_item_metadata(i) != expected[i]["id"]: failures.append("Option identity drift")
 	if not ui.water_opt.visible or not ui.edge_opt.visible: failures.append("Landscape controls hidden")
 	if ui.seed_input.text.is_empty(): failures.append("Seed input missing")
-	var request := BigGlade.default_request(&"village", 42)
+	var request := BrickWild.default_request(&"village", 42)
 	request.length = 0
 	request.water = &"pond"
 	request.enclosure = &"hedge"

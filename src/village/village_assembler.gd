@@ -5,7 +5,7 @@ extends RefCounted
 ## `VillageBuilder` raises everything that is mesh -- the ground, the roads,
 ## the water and its bridges, the edge and its gates, and the ten small props
 ## no art pack ships. This file adds everything that is a MODEL: every
-## building generated through BigGlade and set down at the transform the lot
+## building generated through BrickWild and set down at the transform the lot
 ## planner gave it, every catalogue prop the dresser placed, every plant it
 ## planted, and an `OmniLight3D` for each light through `LightKit`, which is
 ## the same lamp the house, shop, hotel and temple assemblers hang.
@@ -40,10 +40,10 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 	root.add_child(houses)
 	for i in range(plan.buildings.size()):
 		var b: Dictionary = plan.buildings[i]
-		var built: GeneratedBuilding = BigGlade.generate(b["request"])
+		var built: GeneratedBuilding = BrickWild.generate(b["request"])
 		if built == null or not built.is_ok():
 			continue
-		var node: Node3D = BigGlade.instantiate(built, cutaway)
+		var node: Node3D = BrickWild.instantiate(built, cutaway)
 		if node == null:
 			continue
 		node.name = "%s_%d" % [String(b["kind"]), i]

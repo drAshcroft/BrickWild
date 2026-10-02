@@ -119,7 +119,7 @@ static func _request(style: StringName, purpose: StringName) -> BuildingRequest:
 
 static func _world_palettes(res: SuiteResult) -> void:
 	for row in FAMILIES:
-		var building := BigGlade.generate(_request(row[0], row[1]))
+		var building := BrickWild.generate(_request(row[0], row[1]))
 		res.checked += 1
 		if building == null or not building.is_ok():
 			res.fail("%s/%s did not generate at its smallest size" % [row[0], row[1]])

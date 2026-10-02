@@ -1,7 +1,7 @@
 class_name Placement
 extends RefCounted
-## Small geometry helper for `BigGlade.placement()` results. Kept separate from
-## BigGlade itself so scene-based consumers (lots, fire gaps, canopies) can
+## Small geometry helper for `BrickWild.placement()` results. Kept separate from
+## BrickWild itself so scene-based consumers (lots, fire gaps, canopies) can
 ## work with the footprint without touching the generation facade.
 
 

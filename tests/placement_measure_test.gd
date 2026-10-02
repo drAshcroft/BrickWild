@@ -24,27 +24,27 @@ func _init() -> void:
 		_check(request)
 	# Other adapters retain full generation and their measured native entrance.
 	var manor := BuildingRequest.castle(4232296064, &"norman", 40, 50, 18.8)
-	var castle := BigGlade.generate(manor)
-	var expected := BigGlade.placement(castle)
-	_expect(BigGlade.measure(manor) == expected, "castle fallback placement")
+	var castle := BrickWild.generate(manor)
+	var expected := BrickWild.placement(castle)
+	_expect(BrickWild.measure(manor) == expected, "castle fallback placement")
 	_expect(expected.has("approach"), "recessed manor retains its certified approach")
 	_expect(not VillageLotPlanner.measure(manor).is_empty(), "village accepts native measured manor")
-	_expect(BigGlade.measure(null).is_empty(), "null request refused")
+	_expect(BrickWild.measure(null).is_empty(), "null request refused")
 	var invalid := BuildingRequest.house(42)
 	invalid.width = -1
-	_expect(BigGlade.measure(invalid).is_empty(), "invalid request refused")
+	_expect(BrickWild.measure(invalid).is_empty(), "invalid request refused")
 	# Measuring uses independent specs/RNGs and must not alter a later interior.
 	var request := BuildingRequest.house(303, &"townhouse", &"smith", 9, 12, 2.7)
 	request.storeys = 2
-	var before := BigGlade.generate(request)
+	var before := BrickWild.generate(request)
 	var expected_state: Variant = BuildingCodec.encode(before.plan)
 	var expected_rng: int = before.spec.rng.state
 	seed(8133)
 	var global_expected := randi()
 	seed(8133)
-	BigGlade.measure(request)
+	BrickWild.measure(request)
 	_expect(randi() == global_expected, "measurement preserves global RNG stream")
-	var after := BigGlade.generate(request)
+	var after := BrickWild.generate(request)
 	_expect(BuildingCodec.encode(after.plan) == expected_state, "measurement preserves subsequent complete interior")
 	_expect(after.spec.rng.state == expected_rng, "full generation retains exact post-furnishing RNG state")
 	_expect(not after.plan.furniture.is_empty(), "public generate still furnishes")
@@ -60,13 +60,13 @@ func _check(request: BuildingRequest) -> void:
 	print("MEASURE ", who)
 	var unchanged := request.to_json()
 	var started := Time.get_ticks_usec()
-	var full := BigGlade.generate(request)
+	var full := BrickWild.generate(request)
 	_expect(full.is_ok(), who + " full generation")
 	if not full.is_ok(): return
-	var placement := BigGlade.placement(full)
+	var placement := BrickWild.placement(full)
 	var full_us := Time.get_ticks_usec() - started
 	started = Time.get_ticks_usec()
-	var measured := BigGlade.measure(request)
+	var measured := BrickWild.measure(request)
 	var measure_us := Time.get_ticks_usec() - started
 	_expect(measured == placement, who + " exact placement (bounds, footprint, door, metadata)")
 	_expect(request.to_json() == unchanged, who + " request remains unchanged")

@@ -2,7 +2,7 @@
 
 Architecture is an arrangement of space, structure, light, thresholds, and
 social meaning. Its art cannot be reduced to a score, but a generator can
-protect the relationships that make a building legible. BigGlade's family
+protect the relationships that make a building legible. BrickWild's family
 documents are a rich source of measurable examples; the rules below are
 **design heuristics**, not universal historical standards or building codes.
 
@@ -86,7 +86,7 @@ cannot decide where a bracket or barrel belongs.
 | Context | Size and style against adjacent buildings and public space | Street rhythm, setback, landmark prominence | Deliberate anomaly or singular landmark |
 
 The numeric bounds belong to an archetype and setting, not this general table.
-For instance, BigGlade's village widths and room clearances are design
+For instance, BrickWild's village widths and room clearances are design
 fixtures. Test them at several scales; do not canonize one screenshot.
 
 ## 5. Typology before ornament

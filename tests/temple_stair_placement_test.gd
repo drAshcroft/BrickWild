@@ -5,9 +5,9 @@ func _init() -> void:
 	var failures: Array[String] = []
 	for seed_value in [0, 19, 731]:
 		var request := BuildingRequest.temple(seed_value, &"ziggurat", &"blood", 24.0, 24.0, 16.0)
-		var made := BigGlade.generate(request)
-		var mesh := BigGlade.build_mesh(made)
-		var placement := BigGlade.placement(made)
+		var made := BrickWild.generate(request)
+		var mesh := BrickWild.build_mesh(made)
+		var placement := BrickWild.placement(made)
 		var spec := made.spec as TempleSpec
 		var footprint: Rect2 = placement.footprint
 		var approach: Rect2 = placement.approach
@@ -19,7 +19,7 @@ func _init() -> void:
 			failures.append("native portal was moved to the stair toe")
 		if not is_equal_approx(approach.end.y, door.z) or approach.position.y >= footprint.position.y:
 			failures.append("native approach does not join the full frontage to its portal")
-		if not placement == BigGlade.measure(request):
+		if not placement == BrickWild.measure(request):
 			failures.append("measurement lost native temple arrival metadata")
 		for stair in TempleGeometry.stair_rects(spec):
 			checks += 1
@@ -32,9 +32,9 @@ func _init() -> void:
 		if not CastleQA._door_ray_clear(mesh, Vector3(0, 1.0, middle), Vector3.BACK,
 			approach.size.y * 0.5):
 			failures.append("emitted ground-level passage is blocked")
-	var plain := BigGlade.generate(BuildingRequest.temple(4, &"basilica", &"blood", 24, 30, 12))
+	var plain := BrickWild.generate(BuildingRequest.temple(4, &"basilica", &"blood", 24, 30, 12))
 	checks += 1
-	if BigGlade.placement(plain).has("approach"):
+	if BrickWild.placement(plain).has("approach"):
 		failures.append("ordinary basilica acquired a fabricated approach")
 	for failure in failures: printerr(failure)
 	print("TEMPLE STAIR PLACEMENT COMPLETE ", checks, " checks, ", failures.size(), " failures")

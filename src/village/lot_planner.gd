@@ -14,9 +14,9 @@ extends RefCounted
 ##    why lots are cut per straight SEGMENT of a road polyline: a segment's
 ##    offset is a straight line, so the front edge is exactly collinear with
 ##    it and the lot is a simple quadrilateral by construction.
-## 2. The lot is sized from the MEASURED `BigGlade.placement()` of the
+## 2. The lot is sized from the MEASURED `BrickWild.placement()` of the
 ##    building assigned to it -- every request is sent through
-##    `BigGlade.generate()` first -- never from the requested envelope, for
+##    `BrickWild.generate()` first -- never from the requested envelope, for
 ##    the same reason the massing check reads `mass_log` and not the spec.
 ##    `footprint` (the walls' outline) sizes the lot and the setback;
 ##    `bounds` (eaves, porches, chimneys) is what the fire gap clears.
@@ -516,7 +516,7 @@ static func _context(plan: VillagePlan) -> Dictionary:
 ## walls' `footprint`, the full `bounds`, and the placement dictionary the
 ## plan carries. Empty when the request does not generate.
 static func measure(request: BuildingRequest) -> Dictionary:
-	var pl: Dictionary = BigGlade.measure(request)
+	var pl: Dictionary = BrickWild.measure(request)
 	if pl.is_empty():
 		return {}
 	var fp: Rect2 = pl["footprint"]

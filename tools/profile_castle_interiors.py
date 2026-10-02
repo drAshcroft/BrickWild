@@ -110,7 +110,7 @@ def prepare(args: argparse.Namespace) -> None:
         out.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, out)
         hashes[relative.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
-    (target / "project.godot").write_text('config_version=5\n[application]\nconfig/name="BigGlade castle profile"\nconfig/features=PackedStringArray("4.5")\n[rendering]\nrenderer/rendering_method="gl_compatibility"\n', encoding="utf-8")
+    (target / "project.godot").write_text('config_version=5\n[application]\nconfig/name="BrickWild castle profile"\nconfig/features=PackedStringArray("4.5")\n[rendering]\nrenderer/rendering_method="gl_compatibility"\n', encoding="utf-8")
     (target / "tools/castle_phase_clock.gd").write_text(CLOCK, encoding="utf-8")
     methods = {} if args.plain else {key: value[:] for key, value in PHASES.items()}
     if args.detail:

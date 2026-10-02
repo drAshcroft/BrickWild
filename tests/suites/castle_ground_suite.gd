@@ -110,13 +110,13 @@ static func _apron(res: SuiteResult) -> void:
 
 	# placement: bounds and footprint are the architecture's, the apron is beside them
 	var request := BuildingRequest.castle(Landmarks._seed_for("bodiam", 1.0), &"edwardian", 55.0, 50.0, 18.0)
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	_want(res, building != null and building.is_ok(), "apron: placement fixture did not generate")
 	if building == null or not building.is_ok():
 		return
-	var without: Dictionary = BigGlade.placement(building)
+	var without: Dictionary = BrickWild.placement(building)
 	(building.spec as CastleSpec).ground_apron = true
-	var with_apron: Dictionary = BigGlade.placement(building)
+	var with_apron: Dictionary = BrickWild.placement(building)
 	_want(res, (with_apron["bounds"] as AABB).is_equal_approx(without["bounds"]),
 		"apron: placement bounds grew with the apron")
 	_want(res, (with_apron["footprint"] as Rect2).is_equal_approx(without["footprint"]),

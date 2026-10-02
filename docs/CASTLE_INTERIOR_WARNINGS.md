@@ -47,7 +47,7 @@ Find the building by its stable `id` in `builder.interiors`; its `plan` is the l
 The full reproduction command from the project root is:
 
 ```powershell
-$env:BIG_GLADE_TEST_TRACE = '1'
+$env:BRICK_WILD_TEST_TRACE = '1'
 & 'C:\Projects\godot\Godot_v4.5.2-stable_mono_win64\Godot_v4.5.2-stable_mono_win64.exe' --headless --path . --script res://tests/run_all.gd -- cvoxelqa
 ```
 
@@ -279,7 +279,7 @@ Save it as `artifacts/repro_castle_normals.gd` and run the executable from AGENT
 Full required reproduction:
 
 ```powershell
-$env:BIG_GLADE_TEST_TRACE = '1'
+$env:BRICK_WILD_TEST_TRACE = '1'
 & 'C:\Projects\godot\Godot_v4.5.2-stable_mono_win64\Godot_v4.5.2-stable_mono_win64.exe' --headless --path . --script res://tests/run_all.gd -- cnormals
 ```
 

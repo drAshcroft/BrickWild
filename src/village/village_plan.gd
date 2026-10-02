@@ -41,7 +41,7 @@ var roads: Array[Dictionary] = []
 var lots: Array[Dictionary] = []
 
 ## A building on a lot. {"lot": int (index into `lots`), "request":
-## BuildingRequest, "placement": Dictionary (BigGlade.placement() result --
+## BuildingRequest, "placement": Dictionary (BrickWild.placement() result --
 ## the MEASURED bounds/footprint/door the lot was sized from), "transform":
 ## Transform3D (the scene root's placement: rotated so the building's local
 ## -Z faces its lot's front edge), "door": Vector3 (the placement door in

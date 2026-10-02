@@ -52,7 +52,7 @@ var _suspend_regen := false
 
 
 ## The village is a registered kind now (VIL-019), so it comes out of
-## `BigGlade.kinds()` with the rest and is not added by hand. It keeps its own
+## `BrickWild.kinds()` with the rest and is not added by hand. It keeps its own
 ## controls (the sliders are a population and a wealth, not metres) and its
 ## own preview path, which shows two villages rather than six buildings
 ## because planning one is a few seconds of work.
@@ -71,10 +71,10 @@ var period_spin: SpinBox
 
 func _ready() -> void:
 	_add_landscape_controls()
-	for kind_key in BigGlade.kinds():
+	for kind_key in BrickWild.kinds():
 		if kind_key == &"world" and WorldFamilies.families().is_empty():
 			continue          # a registry with no families is nothing to show yet
-		var descriptor: Dictionary = BigGlade.describe_kind(kind_key)
+		var descriptor: Dictionary = BrickWild.describe_kind(kind_key)
 		kind_opt.add_item(descriptor["label"])
 		kind_opt.set_item_metadata(kind_opt.item_count - 1, kind_key)
 	kind_opt.item_selected.connect(func(_i): _on_kind_changed())
@@ -141,7 +141,7 @@ func _controls_changed() -> void:
 	if _suspend_regen:
 		return
 	if _kind() == VILLAGE:
-		var descriptor: Dictionary = BigGlade.describe_kind(VILLAGE)
+		var descriptor: Dictionary = BrickWild.describe_kind(VILLAGE)
 		width_label.text = "%s: %d" % [descriptor["width_label"], int(width_slider.value)]
 		length_label.text = "%s: %d" % [descriptor["length_label"], int(length_slider.value)]
 		info_label.text = "Choose Grow village to apply these settings."
@@ -160,7 +160,7 @@ func _kind() -> StringName:
 ## the same public discovery path as every building family.
 func _options(field: StringName) -> Array[Dictionary]:
 	var key: String = {&"style": "styles", &"purpose": "purposes", &"water": "waters", &"enclosure": "enclosures"}.get(field, "")
-	var listed: Array = BigGlade.describe_kind(_kind()).get(key, [])
+	var listed: Array = BrickWild.describe_kind(_kind()).get(key, [])
 	var typed: Array[Dictionary] = []
 	for row in listed:
 		typed.append(row)
@@ -209,7 +209,7 @@ func _trade() -> StringName:
 ## rebuilds once instead of once per slider.
 func _on_kind_changed() -> void:
 	var village: bool = _kind() == VILLAGE
-	var cfg: Dictionary = BigGlade.describe_kind(_kind())
+	var cfg: Dictionary = BrickWild.describe_kind(_kind())
 	_suspend_regen = true
 	for pair in [[width_slider, "width"], [length_slider, "length"],
 			[height_slider, "height"]]:
@@ -283,9 +283,9 @@ func regenerate() -> void:
 	for i in range(VARIANTS):
 		var made: GeneratedBuilding = _build(base_seed + i * 7919)
 		if not made.is_ok():
-			push_error("BigGlade generation failed: %s" % made.errors)
+			push_error("BrickWild generation failed: %s" % made.errors)
 			continue
-		var mesh: ArrayMesh = BigGlade.build_mesh(made)
+		var mesh: ArrayMesh = BrickWild.build_mesh(made)
 		buildings.append(made)
 		specs.append(made.spec)
 		meshes.append(mesh)
@@ -308,7 +308,7 @@ func _regenerate_village(base_seed: int) -> void:
 			return
 		var plan: VillagePlan = made.village
 		specs.append(made.spec)
-		meshes.append(BigGlade.build_mesh(made))
+		meshes.append(BrickWild.build_mesh(made))
 		plans.append(plan)
 		buildings.append(made)
 		variant_list.add_item("%s (%s, %d buildings)" % [made.name(), String(made.spec.form), plan.buildings.size()])
@@ -319,7 +319,7 @@ func _regenerate_village(base_seed: int) -> void:
 ## Generate one variant through the public API. Mesh and scene emission happen
 ## separately so the retained representation is available to other tools.
 func _build(seed_value: int) -> GeneratedBuilding:
-	var request := BigGlade.default_request(_kind(), seed_value)
+	var request := BrickWild.default_request(_kind(), seed_value)
 	request.style = _get_style_key()
 	request.purpose = _second_key() if trade_opt.item_count > 0 else &""
 	request.width = width_slider.value
@@ -327,12 +327,12 @@ func _build(seed_value: int) -> GeneratedBuilding:
 	request.height = height_slider.value
 	request.orientation = deg_to_rad(orientation_spin.value)
 	request.period = int(period_spin.value)
-	if BigGlade.describe_kind(_kind()).has("storeys"):
+	if BrickWild.describe_kind(_kind()).has("storeys"):
 		request.storeys = int(storeys_slider.value)
 	if _kind() == VILLAGE:
 		request.water = water_opt.get_item_metadata(water_opt.selected)
 		request.enclosure = edge_opt.get_item_metadata(edge_opt.selected)
-	return BigGlade.generate(request)
+	return BrickWild.generate(request)
 
 
 func _show(idx: int) -> void:
@@ -347,7 +347,7 @@ func _show(idx: int) -> void:
 	if s is VillageSpec:
 		_mesh_instance = VillageAssembler.build(plans[idx], cutaway_button.button_pressed)
 	else:
-		_mesh_instance = BigGlade.instantiate(buildings[idx], cutaway)
+		_mesh_instance = BrickWild.instantiate(buildings[idx], cutaway)
 	viewport.get_node("ModelRoot").add_child(_mesh_instance)
 	(viewport.get_node("ModelRoot") as Node3D).rotation.y = buildings[idx].request.orientation
 	variant_list.select(idx)
@@ -375,7 +375,7 @@ func _show(idx: int) -> void:
 ## the sheet lists the things the checks care about.
 func _temple_sheet(s: TempleSpec) -> String:
 	var bits: Array[String] = ["%s of %s"
-		% [BigGlade.option_label(&"temple", &"style", s.form), BigGlade.option_label(&"temple", &"purpose", s.cult)]]
+		% [BrickWild.option_label(&"temple", &"style", s.form), BrickWild.option_label(&"temple", &"purpose", s.cult)]]
 	bits.append("hall %.0f x %.0f x %.0f m" % [s.width, s.length, s.height])
 	bits.append("the god: a %s, %.1f m to its crown"
 		% [String(s.idol_kind), TempleGeometry.idol_apex(s)])
@@ -404,12 +404,12 @@ func _describe(s) -> String:
 			String(s.purpose), s.households, plan.buildings.size(), plan.site.size.x, plan.site.size.y]
 	if s is TempleSpec:
 		return "%s -- %s of %s\n%.0f x %.0f m, %.0f m to the ceiling, %.0f m to the crown of the god" % [
-			s.variant_name, BigGlade.option_label(&"temple", &"style", s.form),
-			BigGlade.option_label(&"temple", &"purpose", s.cult), s.width, s.length, s.height,
+			s.variant_name, BrickWild.option_label(&"temple", &"style", s.form),
+			BrickWild.option_label(&"temple", &"purpose", s.cult), s.width, s.length, s.height,
 			TempleGeometry.total_height(s)]
 	if s is HotelSpec:
 		return "%s -- %s\n%.0f x %.0f m, %d guest floors at %.1f m -- %d facade bays, %d dormers, twin cupolas" % [
-			s.variant_name, BigGlade.option_label(&"hotel", &"style", s.style), s.width,
+			s.variant_name, BrickWild.option_label(&"hotel", &"style", s.style), s.width,
 			s.length, s.storeys, s.height, s.facade_bays, s.dormer_count]
 	if s is ShopSpec:
 		var rooms: Array[String] = []
@@ -418,8 +418,8 @@ func _describe(s) -> String:
 			if not label in rooms:
 				rooms.append(label)
 		return "%s -- %s %s\n%.1f x %.1f m, %d storey%s at %.1f m -- %s" % [
-			s.variant_name, BigGlade.option_label(&"shop", &"style", s.style),
-			BigGlade.option_label(&"shop", &"purpose", s.business), s.width, s.length, s.storeys,
+			s.variant_name, BrickWild.option_label(&"shop", &"style", s.style),
+			BrickWild.option_label(&"shop", &"purpose", s.business), s.width, s.length, s.storeys,
 			"" if s.storeys == 1 else "s", s.height, ", ".join(rooms)]
 	if s is HouseSpec:
 		var bits: Array[String] = []
@@ -428,8 +428,8 @@ func _describe(s) -> String:
 			if n > 0:
 				bits.append("%d %s" % [n, String(kind)] if n > 1 else String(kind))
 		return "%s -- %s %s\n%.1f x %.1f m, %d storey%s at %.1f m -- %s" % [
-			s.variant_name, BigGlade.option_label(&"house", &"style", s.style),
-			BigGlade.option_label(&"house", &"purpose", s.trade), s.width, s.length, s.storeys,
+			s.variant_name, BrickWild.option_label(&"house", &"style", s.style),
+			BrickWild.option_label(&"house", &"purpose", s.trade), s.width, s.length, s.storeys,
 			"" if s.storeys == 1 else "s", s.height,
 			", ".join(bits)]
 	if s is CastleSpec:
@@ -453,11 +453,11 @@ func _describe(s) -> String:
 		if s.chimneys > 0:
 			bits.append("%d stacks" % s.chimneys)
 		return "%s — %s %s\nSite %.0f×%.0f m, walls %.0f m, %.0f m to the top — %s" % [
-			s.variant_name, BigGlade.option_label(&"castle", &"style", s.style),
+			s.variant_name, BrickWild.option_label(&"castle", &"style", s.style),
 			String(s.tier).capitalize(), s.width, s.length, s.height,
 			CastleGeometry.total_height(s), ", ".join(bits)]
 	return "%s — %s\nNave %.0f×%.0f m, eaves %.0f m%s%s%s" % [
-		s.variant_name, BigGlade.option_label(&"church", &"style", s.style),
+		s.variant_name, BrickWild.option_label(&"church", &"style", s.style),
 		s.width, s.length, s.height,
 		", tower" if s.tower else "", ", spire" if s.spire else "",
 		", apse" if s.apse else ""]

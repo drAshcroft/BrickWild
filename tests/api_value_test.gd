@@ -20,7 +20,7 @@ func _init() -> void:
 	var village := VillageSpec.new(818)
 	village.generate(818)
 	var doc := BuildingDocument.new()
-	doc.request = BigGlade.default_request(&"village", 818)
+	doc.request = BrickWild.default_request(&"village", 818)
 	doc.spec = village
 	doc.village = VillagePlan.new(village)
 	doc.village.buildings.append({"request": BuildingRequest.house(1), "transform": Transform3D.IDENTITY})

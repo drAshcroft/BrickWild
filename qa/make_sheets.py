@@ -1,4 +1,4 @@
-"""Build labelled contact sheets from BigGlade render output, for visual QA.
+"""Build labelled contact sheets from BrickWild render output, for visual QA.
 
 Each sheet is a fixed grid so several buildings can be judged side by side
 rather than one at a time. Labels are drawn under the tile, so a sheet can be

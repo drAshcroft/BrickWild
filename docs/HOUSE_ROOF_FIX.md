@@ -18,12 +18,12 @@ Reproduction and validation
 
 ```powershell
 $godotExe = 'C:/Projects/godot/Godot_v4.5.2-stable_mono_win64/Godot_v4.5.2-stable_mono_win64.exe'
-& $godotExe --headless --path C:/Projects/BigGlade --editor --quit
-& $godotExe --headless --path C:/Projects/BigGlade --script res://tests/run_all.gd -- hroof hexterior
+& $godotExe --headless --path . --editor --quit
+& $godotExe --headless --path . --script res://tests/run_all.gd -- hroof hexterior
 # Include the real interior furnishing decisions in the four roof fixtures:
-& $godotExe --headless --path C:/Projects/BigGlade --script res://tests/house_roof_test.gd -- --full
+& $godotExe --headless --path . --script res://tests/house_roof_test.gd -- --full
 # Rendering must not be headless:
-& $godotExe --path C:/Projects/BigGlade --script res://tools/render_house_roofs.gd -- --full
+& $godotExe --path . --script res://tools/render_house_roofs.gd -- --full
 ```
 
 The focused runner exits nonzero on a failure. It covers gable/hip/half-hip roofs, both orientations, square/near-square hips, low/high pitches, deterministic rebuilding and cutaways. Negative fixtures recreate the old crossed slabs, lower a gable, block a door/window, overlap props, corrupt bounds and specify an invalid facade host. Prop tests load the real models through the assembler and compare their transformed bounds and lamp positions with the plan. Public placement and JSON serialization are also checked.

@@ -1,6 +1,6 @@
 class_name GeneratedBuilding
 extends RefCounted
-## The engine-native representation produced by BigGlade.generate().
+## The engine-native representation produced by BrickWild.generate().
 ##
 ## `spec` remains family-specific. Houses, shops, and hotels additionally retain
 ## their HousePlan, because the plan -- not the shell mesh -- is their representation.
@@ -9,7 +9,7 @@ var request: BuildingRequest
 var spec: RefCounted
 var plan: HousePlan
 ## The village kind's own representation (VIL-019). A village is a plan of
-## BigGlade buildings on lots, so it needs its own field rather than the
+## BrickWild buildings on lots, so it needs its own field rather than the
 ## house plan's -- and `representation()` hands back whichever a family
 ## actually filled.
 var village: VillagePlan

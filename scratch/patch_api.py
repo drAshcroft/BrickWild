@@ -1,5 +1,5 @@
 import io
-p = "src/api/big_glade.gd"
+p = "src/api/brick_wild.gd"
 s = io.open(p, encoding="utf-8").read()
 
 old = """## Create a fresh scene instance. Houses and temples include their prop models;

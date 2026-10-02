@@ -5,7 +5,7 @@ extends RefCounted
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("world Nagara temple")
 	var request := _request()
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if building == null or not building.is_ok():
 		res.fail("Spire of a Hundred Spires did not generate through the public API")
@@ -19,7 +19,7 @@ static func run() -> SuiteResult:
 		res.fail("public family adapter did not expose the plinth footprint")
 	if family != null and not family.quality_report(building).get("ok", false):
 		res.fail("public family quality report rejected the reference temple")
-	var instance := BigGlade.instantiate(building)
+	var instance := BrickWild.instantiate(building)
 	if instance == null:
 		res.fail("public API did not instantiate the Nagara mesh")
 	var builder := NagaraBuilder.new()

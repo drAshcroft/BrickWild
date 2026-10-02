@@ -1,4 +1,4 @@
-class_name BigGlade
+class_name BrickWild
 extends RefCounted
 ## Public entry point for deterministic building generation.
 ##
@@ -226,10 +226,10 @@ static func instantiate(building, cutaway := false,
 		ShellAssembler.surface_materials(instance,
 			BuildingFamilyAdapter.colours(building.spec))
 		root = instance
-	root.set_meta(&"big_glade", true)
-	root.set_meta(&"big_glade_kind", building.request.kind)
-	root.set_meta(&"big_glade_seed", building.request.seed)
-	root.set_meta(&"big_glade_name", building.name())
+	root.set_meta(&"brick_wild", true)
+	root.set_meta(&"brick_wild_kind", building.request.kind)
+	root.set_meta(&"brick_wild_seed", building.request.seed)
+	root.set_meta(&"brick_wild_name", building.name())
 	if with_collision:
 		_add_architecture_collision(root)
 	return root

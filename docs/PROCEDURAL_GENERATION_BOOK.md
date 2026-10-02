@@ -15,10 +15,10 @@
 This is the reading map for the WaterFree knowledge base. Search or browse the
 `Procedural/buildings`, `Procedural/villages`, `Procedural/meshes`,
 `Procedural/biomes` and `Procedural/forests` branches. Each entry is a reusable
-rule with a reason, a failure mode and a BigGlade example; a minority also carry
+rule with a reason, a failure mode and a BrickWild example; a minority also carry
 a source, in prose or in `source_repo_url`. The branches can become chapters of
 a practical book; the project documents below provide case studies and numeric
-fixtures. Treat the numbers in those documents as BigGlade design choices, not
+fixtures. Treat the numbers in those documents as BrickWild design choices, not
 historical laws.
 
 [KNOWLEDGE_AUDIT_BUILDINGS_BIOMES_FORESTS.md](KNOWLEDGE_AUDIT_BUILDINGS_BIOMES_FORESTS.md)
@@ -27,8 +27,8 @@ orthogonal, the `biomes` and `forests` branches absent until that audit created
 them, and six entries filed outside every branch this page names. Read it before
 adding to any of these branches.
 
-The branches include the original BigGlade lessons that had been scattered
-under `godot/bigglade`, `procedural-generation`, and `world/buildings`, plus
+The branches include the original BrickWild lessons that had been scattered
+under `godot/brickwild`, `procedural-generation`, and `world/buildings`, plus
 transferable building and settlement patterns from other projects. Their
 original entry IDs, content, source repositories, and scopes are preserved;
 only their hierarchy paths changed. The explicit, repeatable mapping lives in
@@ -44,7 +44,7 @@ mass, openings, surfaces, fixtures, and small clutter. Keep a stable identifier
 for every generated part. Each stage consumes the previous stage's measured
 output and records enough information to reproduce or diagnose a failure.
 
-BigGlade's building families follow Spec -> Geometry -> Plan -> Builder ->
+BrickWild's building families follow Spec -> Geometry -> Plan -> Builder ->
 Assembler. `HousePlan` and `VillagePlan` are data contracts. Assemblers load
 models; builders emit geometry. This allows plan and circulation checks without
 loading scenes. See [HOUSES.md](HOUSES.md), [VILLAGES.md](VILLAGES.md), and
@@ -73,7 +73,7 @@ separate parameters. Courtyard buildings organize rooms around open space;
 tower houses stack a small footprint; hypostyle halls require a column field
 with a clear route; pagodas repeat tapering tiers; stepwells organize a
 descending route to water. A single rectangle-and-roof template cannot encode
-these differences. BigGlade's [WORLD_BUILDINGS.md](WORLD_BUILDINGS.md) surveys
+these differences. BrickWild's [WORLD_BUILDINGS.md](WORLD_BUILDINGS.md) surveys
 Mediterranean, East and South-East Asian, and Indian families and identifies
 representation changes each requires. Its examples are design references to
 verify against specialist historical sources before claiming authenticity.
@@ -90,7 +90,7 @@ the underlying rooms, openings, and structural supports.
 
 Represent a solid's surfaces explicitly: vertices, winding, normals, UVs,
 material role, host, and stable component id. Godot uses clockwise front
-faces. BigGlade's `MeshKit._face_normal` is the single winding authority, and
+faces. BrickWild's `MeshKit._face_normal` is the single winding authority, and
 its building emitters assign per-face normals so neighboring architectural
 planes remain crisp. Index vertices only across faces that may share the same
 normal and attributes. Group surfaces by named material role because empty
@@ -112,7 +112,7 @@ about required data and update frequency, not architectural style.
 ## 5. Assets and decoration are placed by function
 
 Maintain a measured catalogue of model extents, pivots, support surfaces,
-collision footprints, and optional canopy/trunk radii. BigGlade regenerates
+collision footprints, and optional canopy/trunk radii. BrickWild regenerates
 `assets/props/catalog.json` from the actual models. A room recipe says what a
 space must contain and which relation each item has to a host: against wall,
 beside table, on shelf, facing focus, near entrance. Reserve circulation and
@@ -139,7 +139,7 @@ buildings, paths, enclosure, and outside land use. A road graph alone cannot
 make a village: doors must face reachable frontage; the common and work sites
 need appropriate neighbors; houses and services must match population.
 
-BigGlade's [VILLAGES.md](VILLAGES.md) defines street, green, crossroads,
+BrickWild's [VILLAGES.md](VILLAGES.md) defines street, green, crossroads,
 round, strand, planted, and gate forms as road/common/lot patterns. Its
 population thresholds and dimensions are game design rules, not universal
 demography. [Procedural Modeling of Cities](https://people.eecs.berkeley.edu/~sequin/CS285/PAPERS/Parish_Muller01.pdf)
@@ -157,7 +157,7 @@ them, repair where possible, and reject irreparable candidates. Keep reason
 codes so failures teach the generator. Preserve deterministic sub-seeds by
 stage or stable identity so adding a prop does not reshuffle the road graph.
 
-BigGlade's checks inspect emitted vertices and geometry logs as well as plan
+BrickWild's checks inspect emitted vertices and geometry logs as well as plan
 data. The logs must describe what the builder actually emitted. Test at
 several seeds and scales, and introduce faulty geometry to prove that each
 check can reject a defect. A rendered view adds visual evidence; headless
@@ -188,7 +188,7 @@ a colour. And the biome must select the building family: a marsh village and a
 limestone village may share a road graph and share almost nothing else.
 
 Terrain is an explicit non-goal in `docs/VILLAGES.md` — "roads, lots, houses,
-then Terrain last, if at all". BigGlade therefore has no consumer for these rules
+then Terrain last, if at all". BrickWild therefore has no consumer for these rules
 yet. The vocabulary exists as unread data in the `SiteRequest` fixtures
 (`terrain.elevation`, `slope`, `water_edges`, `forest`, `fertility`, `rock`), of
 which `tools/export_village_plan.gd` reads only `water_edges` and `forest`. That
@@ -214,7 +214,7 @@ field**. A constant radius gives the same density in a bog and on a hill, and th
 result reads as a plantation. A plant is **two radii, not a box**: canopy is the
 reach that must clear a roof, trunk is the reach at or below a fixed trunk height
 that must stay off a road, because a birch's bounding box is two metres of mostly
-air around a 16 cm stem. BigGlade already does this and tests it — `SceneBounds`
+air around a 16 cm stem. BrickWild already does this and tests it — `SceneBounds`
 measures both, all 104 plant keys in `assets/props/catalog.json` carry them, and
 the assets suite fails on drift.
 
@@ -308,5 +308,5 @@ reusing the same fixture rows the landmark suites build because a render is
 documentation and documenting a house that would fail its own checks is worse than
 not documenting one. What is missing is turning *documented* into *compared*.
 
-Each chapter should pair a general algorithm with one BigGlade case study,
+Each chapter should pair a general algorithm with one BrickWild case study,
 an alternate building tradition, a failure example, and a measurable exercise.

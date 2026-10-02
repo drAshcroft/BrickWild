@@ -1,6 +1,6 @@
 # Permissive open source implementations for procedural architecture
 
-This is a study and reuse list for BigGlade, whose original code is licensed
+This is a study and reuse list for BrickWild, whose original code is licensed
 under Apache License 2.0. The list includes **MIT, BSD-3-Clause, ISC, and
 BSL-1.0** code, with a direct repository or license link for each. It does not
 propose copying copyleft code. Licenses can change by version or file, so record the exact
@@ -8,7 +8,7 @@ commit and inspect the files actually imported before adopting a dependency.
 Code licenses do not automatically cover sample models, textures, fonts,
 maps, screenshots, or downloaded datasets.
 
-| Implementation | Verified repository license | What to study or use | BigGlade fit |
+| Implementation | Verified repository license | What to study or use | BrickWild fit |
 |---|---|---|---|
 | [Godot Engine](https://godotengine.org/license/) | MIT | `ArrayMesh`, `SurfaceTool`, `MeshDataTool`, `SubViewport`, `MultiMesh` and navigation APIs | Runtime and reference API for mesh, instancing and portal chapters |
 | [Godot demo projects](https://github.com/godotengine/godot-demo-projects) | MIT repository | Small runnable examples of viewport, 3D and rendering behavior | Reproduce a narrow engine behavior before changing `MeshKit` or assembly |
@@ -41,7 +41,7 @@ of a door. A polygon library can calculate these regions, but the semantic
 plan must decide *which* subtraction is allowed. [Clipper2](https://github.com/AngusJohnson/Clipper2)
 supports boolean and offset operations. Its current README flags its own
 triangulation code as buggy; use it for clipping/offsetting and validate a
-separate triangulation path. Use BigGlade's `core/poly.gd` where its narrower
+separate triangulation path. Use BrickWild's `core/poly.gd` where its narrower
 operations already suffice.
 
 **Triangulation.** A footprint, floor with courtyard hole, irregular roof
@@ -64,7 +64,7 @@ decoration edge curves; its README says the plugin is not feature complete.
 [Procedural City Truck Sim](https://github.com/stavguo/procedural-city-truck-sim)
 is a compact oriented-box parcel experiment. Its own roadmap still lists
 building collision and other city features as future work. Neither replaces
-BigGlade's semantic village checks for frontage, common, purpose or walking.
+BrickWild's semantic village checks for frontage, common, purpose or walking.
 
 **Noise.** [FastNoise Lite](https://github.com/Auburn/FastNoiseLite) supplies
 multiple coherent noise families. Noise is best used for secondary variation:
@@ -78,7 +78,7 @@ provides a concrete paired-camera and viewport-texture experiment and
 documents its seams, lighting, physics, and performance limits. Use its
 failure list as a checklist. For a production 4.5 implementation, design
 portal transitions around the current [Viewport API](https://docs.godotengine.org/en/4.5/classes/class_viewport.html)
-and BigGlade's semantic door graph; a copied old scene is unlikely to satisfy
+and BrickWild's semantic door graph; a copied old scene is unlikely to satisfy
 current rendering or navigation behavior.
 
 ## Reuse protocol for an Apache-2.0 project
@@ -95,7 +95,7 @@ current rendering or navigation behavior.
 5. Add a tiny fixture that exercises the imported feature and documents its
    failure boundary: a polygon with a hole, two crossing roads, a portal with
    a held object, or a multi-seed graph.
-6. Keep BigGlade's own code and asset licenses explicit when publishing. An
+6. Keep BrickWild's own code and asset licenses explicit when publishing. An
    Apache-2.0 code license does not relicense someone else's models or textures.
 
 The [Godot license guidance](https://docs.godotengine.org/en/stable/about/complying_with_licenses.html)

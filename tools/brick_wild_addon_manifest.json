@@ -3,15 +3,15 @@
   "package_version": "0.1.0",
   "metadata": [
     {
-      "source": "packaging/big_glade/plugin.cfg",
+      "source": "packaging/brick_wild/plugin.cfg",
       "destination": "plugin.cfg"
     },
     {
-      "source": "packaging/big_glade/README.md",
+      "source": "packaging/brick_wild/README.md",
       "destination": "README.md"
     },
     {
-      "source": "packaging/big_glade/VERSION",
+      "source": "packaging/brick_wild/VERSION",
       "destination": "VERSION"
     },
     {
@@ -21,8 +21,8 @@
   ],
   "scripts": [
     {
-      "source": "src/api/big_glade.gd",
-      "destination": "api/big_glade.gd"
+      "source": "src/api/brick_wild.gd",
+      "destination": "api/brick_wild.gd"
     },
     {
       "source": "src/api/building_codec.gd",
@@ -461,11 +461,11 @@
       "destination": "runtime/navigation/walk_grid.gd"
     },
     {
-      "source": "packaging/big_glade/example.gd",
+      "source": "packaging/brick_wild/example.gd",
       "destination": "example.gd"
     },
     {
-      "source": "packaging/big_glade/plugin.gd",
+      "source": "packaging/brick_wild/plugin.gd",
       "destination": "plugin.gd"
     }
   ],

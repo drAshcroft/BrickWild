@@ -1,13 +1,13 @@
 # Public data and headless generation
 
-BigGlade targets Godot 4.5.2. API version 1 and JSON schema version 1 are separate:
+BrickWild targets Godot 4.5.2. API version 2 and JSON schema version 1 are separate:
 additive fields can grow without changing either; incompatible schema changes need
 a new schema version. Readers ignore unknown fields and reject unknown versions.
 Fixed seeds reproduce within the same generator version and Godot precision build;
 future releases may deliberately improve generated buildings.
 
-`BigGlade.measure(request)` returns the same placement data as
-`BigGlade.placement(BigGlade.generate(request))`. House/shop measurement generates
+`BrickWild.measure(request)` returns the same placement data as
+`BrickWild.placement(BrickWild.generate(request))`. House/shop measurement generates
 their real structural plan, shell and exterior props. Rugs and chimney breasts
 depend on final furniture placements, so houses and affected shops replay native
 furnishing and retain those derived shell records before discarding temporary
@@ -24,14 +24,14 @@ chamber. The physical stairs remain in its footprint and the actual door stays
 at the portal; the approach describes only the clear native route between them.
 
 `BuildingRequest.to_dict()/to_json()` and `from_dict()/from_json()` round-trip
-requests. The schema is `bigglade.request`. A minimal request is
+requests. The schema is `brickwild.request`. A minimal request is
 `{"kind":"house","seed":"42"}`; omitted controls use the published family
 defaults. Seeds are signed 64-bit decimal strings so JSON consumers cannot round
 them. Numeric seeds are accepted only within JSON's exact integer range.
 
 `BuildingDocument.to_dict()/to_json()` and `from_dict()/from_json()` preserve the
 generated state, including edited derived values, rather than rerunning generation.
-The `bigglade.building` schema retains readable `spec`, `plan`, and `placement`
+The `brickwild.building` schema retains readable `spec`, `plan`, and `placement`
 projections, plus a lossless `state` used to rebuild. State containers and a fixed
 allowlist of data classes are tagged. Engine value types are base64 Godot Variant
 bytes with object decoding disabled. RNGs, scene nodes, scripts, callables and
@@ -39,13 +39,13 @@ resources are never serialized. This representation requires Godot to rebuild;
 the readable projection and DM_View contracts can be read by any JSON consumer.
 
 ```gdscript
-var document := BigGlade.generate_document(BuildingRequest.house(42))
+var document := BrickWild.generate_document(BuildingRequest.house(42))
 var restored := BuildingDocument.from_json(document.to_json())
-var mesh := BigGlade.build_mesh(restored)
-var diagnostics := BigGlade.check(restored)
+var mesh := BrickWild.build_mesh(restored)
+var diagnostics := BrickWild.check(restored)
 ```
 
-`BigGlade.check()` accepts either a generated building or a document. It invokes
+`BrickWild.check()` accepts either a generated building or a document. It invokes
 the existing family checks and returns `ok`, `diagnostics` (severity, rule code,
 field, message), and plain-data `stats`. It keeps builders and their logs private.
 Warnings report genuine compromises without hiding failures. Church/castle voxel

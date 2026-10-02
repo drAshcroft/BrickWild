@@ -1,5 +1,5 @@
 import io
-p = 'src/api/big_glade.gd'
+p = 'src/api/brick_wild.gd'
 s = io.open(p, encoding='utf-8').read()
 
 head_start = s.index('const API_VERSION := 1')

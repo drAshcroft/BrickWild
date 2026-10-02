@@ -11,7 +11,7 @@ static func check(building) -> Dictionary:
 			var row: Dictionary = error.duplicate(true)
 			row["severity"] = "error"
 			diagnostics.append(row)
-		return {"api_version": BigGlade.API_VERSION, "ok": false,
+		return {"api_version": BrickWild.API_VERSION, "ok": false,
 			"diagnostics": diagnostics, "stats": {}}
 	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.for_building(building)
 	var report: Dictionary = family.quality_report(building) if family != null else {
@@ -22,7 +22,7 @@ static func check(building) -> Dictionary:
 			var rule := text.get_slice(":", 0).strip_edges() if ":" in text else "quality"
 			diagnostics.append({"severity": severity, "code": rule,
 				"field": "building", "message": text})
-	return {"api_version": BigGlade.API_VERSION,
+	return {"api_version": BrickWild.API_VERSION,
 		"ok": report.get("failures", []).is_empty(),
 		"kind": String(building.request.kind), "seed": str(building.request.seed),
 		"diagnostics": diagnostics, "stats": BuildingDocument._plain(report.get("stats", {}))}

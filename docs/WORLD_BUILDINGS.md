@@ -623,7 +623,7 @@ plus two.
 
 ## 5. Archetypes for the suites
 
-*Scaffold (WLD-000):* `BigGlade` has a `world` kind whose `style` is the
+*Scaffold (WLD-000):* `BrickWild` has a `world` kind whose `style` is the
 family and whose `purpose` is the sub-kind; `src/world/world_families.gd` is
 the registry (`FAMILIES`, `generate()`, `build_mesh()`), and
 `tests/suites/world_archetype_suite.gd` (`world` / `warchetype` in run_all)

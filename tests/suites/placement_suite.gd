@@ -1,6 +1,6 @@
 class_name PlacementSuite
 extends RefCounted
-## BigGlade.placement()'s `door` contract: the canonical fixtures' doors lie on the
+## BrickWild.placement()'s `door` contract: the canonical fixtures' doors lie on the
 ## -Z edge of its own measured `footprint` (the walls' outline -- narrower
 ## than `bounds`, which also covers roof eaves, porches, chimney stacks,
 ## battlements and facade towers), and Placement.world_rect rotates either
@@ -12,14 +12,14 @@ const SEEDS := 20
 const TOLERANCE := 0.2
 
 ## Wall time per step in ms, keyed "family step". One summary line per family
-## is always added to the suite notes; BIG_GLADE_TEST_TRACE prints every lap.
+## is always added to the suite notes; BRICK_WILD_TEST_TRACE prints every lap.
 static var _tm: Dictionary = {}
 
 
 static func _lap(family: Variant, step: String, started: int) -> void:
 	var key := "%s %s" % [String(family), step]
 	_tm[key] = int(_tm.get(key, 0)) + Time.get_ticks_msec() - started
-	if OS.get_environment("BIG_GLADE_TEST_TRACE") != "":
+	if OS.get_environment("BRICK_WILD_TEST_TRACE") != "":
 		print("[placement] %s +%d ms" % [key, Time.get_ticks_msec() - started])
 
 
@@ -64,7 +64,7 @@ static func run_quick() -> SuiteResult:
 
 
 static func _world_request(s: int) -> BuildingRequest:
-	var r := BigGlade.default_request(&"world", s)
+	var r := BrickWild.default_request(&"world", s)
 	r.style = &"insula"
 	r.purpose = &"port_tenement"
 	r.width = 30.0
@@ -74,7 +74,7 @@ static func _world_request(s: int) -> BuildingRequest:
 
 
 static func _village_request(s: int) -> BuildingRequest:
-	var r := BigGlade.default_request(&"village", s)
+	var r := BrickWild.default_request(&"village", s)
 	r.width = 12.0
 	return r
 
@@ -111,22 +111,22 @@ static func _check_orientation_and_period(res: SuiteResult, quick := false) -> v
 	var requests: Array[BuildingRequest] = [
 		BuildingRequest.house(821), BuildingRequest.shop(822), hotel,
 		BuildingRequest.church(824), BuildingRequest.castle(825), BuildingRequest.temple(826),
-		BigGlade.default_request(&"village", 827)]
-	var insula := BigGlade.default_request(&"world", 828)
+		BrickWild.default_request(&"village", 827)]
+	var insula := BrickWild.default_request(&"world", 828)
 	insula.style = &"insula"
 	insula.purpose = &"port_tenement"
 	insula.width = 30.0
 	insula.length = 24.0
 	insula.height = 15.0
 	requests.append(insula)
-	var hall := BigGlade.default_request(&"world", 829)
+	var hall := BrickWild.default_request(&"world", 829)
 	hall.style = &"timber_hall"
 	hall.purpose = &"great_hall"
 	hall.width = 34.0
 	hall.length = 18.0
 	hall.height = 20.0
 	requests.append(hall)
-	var stupa := BigGlade.default_request(&"world", 830)
+	var stupa := BrickWild.default_request(&"world", 830)
 	stupa.style = &"stupa"
 	stupa.purpose = &"saints_mound"
 	stupa.width = 40.0
@@ -146,7 +146,7 @@ static func _check_orientation_and_period(res: SuiteResult, quick := false) -> v
 		oriented.orientation = PI / 2.0
 		oriented.period = 1789
 		var t0 := Time.get_ticks_msec()
-		var turned: GeneratedBuilding = BigGlade.generate(oriented)
+		var turned: GeneratedBuilding = BrickWild.generate(oriented)
 		_lap(request.kind, "orientation generate", t0)
 		res.checked += 1
 		if not turned.is_ok():
@@ -156,7 +156,7 @@ static func _check_orientation_and_period(res: SuiteResult, quick := false) -> v
 				or int(turned.spec.get("period")) != 1789:
 			res.fail("%s spec did not receive non-default orientation/period" % request.kind)
 		t0 = Time.get_ticks_msec()
-		var placement: Dictionary = BigGlade.placement(turned)
+		var placement: Dictionary = BrickWild.placement(turned)
 		_lap(request.kind, "orientation placement", t0)
 		if quick and request.kind == &"hotel":
 			res.checked += 1
@@ -176,14 +176,14 @@ static func _check_family(res: SuiteResult, kind: String, make: Callable,
 	for i in range(seeds):
 		var request: BuildingRequest = make.call(1000 + i)
 		var t0 := Time.get_ticks_msec()
-		var made: GeneratedBuilding = BigGlade.generate(request)
+		var made: GeneratedBuilding = BrickWild.generate(request)
 		_lap(kind, "generate", t0)
 		res.checked += 1
 		if not made.is_ok():
 			res.fail("%s seed=%d: generation failed: %s" % [kind, request.seed, made.errors])
 			continue
 		t0 = Time.get_ticks_msec()
-		var placement: Dictionary = BigGlade.placement(made)
+		var placement: Dictionary = BrickWild.placement(made)
 		_lap(kind, "placement", t0)
 		if placement.is_empty():
 			res.fail("%s seed=%d: placement() returned nothing" % [kind, request.seed])
@@ -215,12 +215,12 @@ static func _check_placed(res: SuiteResult, kind: String, request: BuildingReque
 ## of the footprint: world_rect should carry it along with the same transform.
 static func _check_world_rect(res: SuiteResult) -> void:
 	var request := BuildingRequest.house(42, &"cottage", &"none", 9.0, 12.0, 2.6)
-	var made: GeneratedBuilding = BigGlade.generate(request)
+	var made: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if not made.is_ok():
 		res.fail("world_rect fixture: house generation failed: %s" % made.errors)
 		return
-	var placement: Dictionary = BigGlade.placement(made)
+	var placement: Dictionary = BrickWild.placement(made)
 	var bounds: AABB = placement["bounds"]
 	var transform := Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(10.0, 0.0, -5.0))
 	var rect: PackedVector2Array = Placement.world_rect(placement, transform)

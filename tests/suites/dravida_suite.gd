@@ -5,7 +5,7 @@ extends RefCounted
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("world Dravida / Prakara")
 	var request := _request(900)
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if building == null or not building.is_ok():
 		res.fail("God-King's Precinct did not generate through the public API")
@@ -17,7 +17,7 @@ static func run() -> SuiteResult:
 		res.fail("period or orientation metadata was not retained")
 	if not WorldFamilies.kinds_of(&"dravida").has(&"god_kings_precinct"):
 		res.fail("world registry does not publish the God-King's Precinct kind")
-	var descriptor := BigGlade.describe_kind(&"world")
+	var descriptor := BrickWild.describe_kind(&"world")
 	var published := false
 	for row in descriptor.get("families", []):
 		if row.get("id") == &"dravida" and &"god_kings_precinct" in row.get("kinds", []):
@@ -29,16 +29,16 @@ static func run() -> SuiteResult:
 		res.fail("public family adapter did not expose the prakara footprint")
 	if family != null and not family.quality_report(building).get("ok", false):
 		res.fail("public family quality report rejected the reference compound")
-	var api_report := BigGlade.check(building)
+	var api_report := BrickWild.check(building)
 	if not api_report.get("ok", false):
-		res.fail("public BigGlade.check rejected the reference compound")
-	var placement := BigGlade.placement(building)
+		res.fail("public BrickWild.check rejected the reference compound")
+	var placement := BrickWild.placement(building)
 	var north: Vector3 = placement.get("north", Vector3.ZERO)
 	if placement.is_empty() or not placement.has("footprint") \
 			or (north -
 				Basis(Vector3.UP, request.orientation).inverse() * Vector3.BACK).length() > 0.001:
 		res.fail("public placement did not expose the footprint and requested orientation")
-	var mesh: ArrayMesh = BigGlade.build_mesh(building)
+	var mesh: ArrayMesh = BrickWild.build_mesh(building)
 	if mesh == null or mesh.get_surface_count() < 3:
 		res.fail("Dravida builder did not emit stone, trim and roof surfaces")
 	var builder := DravidaBuilder.new()
@@ -50,17 +50,17 @@ static func run() -> SuiteResult:
 			res.fail("reference compound: %s" % failure)
 		for failure in PrakaraCheck.new().check(building.plan, builder).get("failures", []):
 			res.fail("reference compound: %s" % str(failure))
-	var document := BigGlade.generate_document(request)
+	var document := BrickWild.generate_document(request)
 	res.checked += 1
 	if not document.is_ok() or document.plan == null \
-			or document.plan.world_family != &"dravida" or BigGlade.build_mesh(document) == null:
+			or document.plan.world_family != &"dravida" or BrickWild.build_mesh(document) == null:
 		res.fail("Dravida family did not survive the public document path")
 	var restored := BuildingDocument.from_json(document.to_json())
 	res.checked += 1
 	if not restored.is_ok() or restored.plan == null \
-			or restored.plan.world_family != &"dravida" or BigGlade.build_mesh(restored) == null:
+			or restored.plan.world_family != &"dravida" or BrickWild.build_mesh(restored) == null:
 		res.fail("Dravida plan did not survive document serialization")
-	var late := BigGlade.generate(_request(1450))
+	var late := BrickWild.generate(_request(1450))
 	res.checked += 1
 	if late == null or not late.is_ok():
 		res.fail("late-period God-King's Precinct did not generate")

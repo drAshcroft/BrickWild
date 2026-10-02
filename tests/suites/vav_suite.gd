@@ -5,7 +5,7 @@ extends RefCounted
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("world stepwell / Vav")
 	var request := _request()
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if building == null or not building.is_ok():
 		res.fail("Queen's Well did not generate: %s" %
@@ -18,13 +18,13 @@ static func run() -> SuiteResult:
 			or absf(tank.size.x - 9.5) > 0.02 or absf(tank.size.y - 9.4) > 0.02 \
 			or building.plan.stairs.size() != 7 or building.plan.rooms.size() != 8:
 		res.fail("Queen's Well does not retain its seven-flight, 23 m, 9.5 x 9.4 m descent")
-	var mesh: ArrayMesh = BigGlade.build_mesh(building)
+	var mesh: ArrayMesh = BrickWild.build_mesh(building)
 	if mesh == null or mesh.get_surface_count() < 3:
 		res.fail("Queen's Well did not emit stone, trim and water surfaces")
-	var footprint: Rect2 = BigGlade.placement(building).get("footprint", Rect2())
+	var footprint: Rect2 = BrickWild.placement(building).get("footprint", Rect2())
 	if absf(footprint.size.x - 65.0) > 0.02 or absf(footprint.size.y - 20.0) > 0.02:
 		res.fail("stepwell placement does not publish the authored site footprint")
-	var report := BigGlade.check(building)
+	var report := BrickWild.check(building)
 	if not bool(report.get("ok", false)):
 		res.fail("Queen's Well public API check reports a failure")
 	for diagnostic in report.get("diagnostics", []):
@@ -33,15 +33,15 @@ static func run() -> SuiteResult:
 	if not WorldFamilies.has_family(&"stepwell") \
 			or WorldFamilies.kinds_of(&"stepwell") != [&"queens_well"]:
 		res.fail("world family registry does not publish stepwell / queens_well")
-	var document := BigGlade.generate_document(request)
+	var document := BrickWild.generate_document(request)
 	res.checked += 1
 	if not document.is_ok() or document.plan == null \
-			or document.plan.world_family != &"stepwell" or BigGlade.build_mesh(document) == null:
+			or document.plan.world_family != &"stepwell" or BrickWild.build_mesh(document) == null:
 		res.fail("stepwell family did not survive the public building document path")
 	var restored := BuildingDocument.from_json(document.to_json())
 	res.checked += 1
 	if not restored.is_ok() or restored.plan == null \
-			or restored.plan.world_family != &"stepwell" or BigGlade.build_mesh(restored) == null:
+			or restored.plan.world_family != &"stepwell" or BrickWild.build_mesh(restored) == null:
 		res.fail("stepwell negative-storey plan did not survive document serialization")
 	_fixtures(res)
 	return res

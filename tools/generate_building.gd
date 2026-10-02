@@ -19,7 +19,7 @@ func _init() -> void:
 		_fail("read_failed", "request", "Cannot read request file.", 2)
 		return
 	var request := BuildingRequest.from_json(FileAccess.get_file_as_string(opts["request"]))
-	var document := BigGlade.generate_document(request)
+	var document := BrickWild.generate_document(request)
 	if not document.is_ok():
 		var refusal := {"ok": false, "errors": document.errors}
 		_write(opts["out"], JSON.stringify(refusal, "\t", true, true) + "\n")
@@ -29,12 +29,12 @@ func _init() -> void:
 	if not _write(opts["out"], document.to_json()):
 		return
 	if opts.has("mesh"):
-		var error := ResourceSaver.save(BigGlade.build_mesh(document), opts["mesh"])
+		var error := ResourceSaver.save(BrickWild.build_mesh(document), opts["mesh"])
 		if error != OK:
 			_fail("write_failed", "mesh", error_string(error), 2)
 			return
 	if opts.has("qa"):
-		var qa: Dictionary = BigGlade.check(document)
+		var qa: Dictionary = BrickWild.check(document)
 		if not _write(opts["qa"], JSON.stringify(qa, "\t", true, true) + "\n"):
 			return
 		if not qa["ok"]:

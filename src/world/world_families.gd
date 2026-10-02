@@ -3,7 +3,7 @@ extends RefCounted
 ## The `world` kind's registry (WLD-000; WORLD_BUILDINGS 5): the building
 ## families of the wider world -- courtyard houses, timber halls on their
 ## platforms, and the rest of WORLD_BUILDINGS -- each added here as one row
-## with its own generator, check and archetype rows, so `BigGlade.generate()`
+## with its own generator, check and archetype rows, so `BrickWild.generate()`
 ## dispatches by `request.style` (the family) and `request.purpose` (the
 ## sub-kind) without the facade changing for every new family.
 ##

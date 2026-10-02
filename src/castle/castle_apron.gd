@@ -6,7 +6,7 @@ extends RefCounted
 ## away over it.
 ##
 ## OPTIONAL. `CastleSpec.ground_apron` is off by default, so a bare castle is
-## bit-identical. It is never part of `BigGlade.placement()` bounds: that call
+## bit-identical. It is never part of `BrickWild.placement()` bounds: that call
 ## puts the flag aside while it measures, the way a house sets its yard pieces
 ## aside and a hotel keeps its finials in `landmark_footprint`. A village that
 ## lays its own ground round a castle must not be pushed out by ours.

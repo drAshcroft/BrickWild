@@ -2,7 +2,7 @@ class_name BuildingDocument
 extends RefCounted
 ## What a building IS, before anything draws it (API-003).
 ##
-## `BigGlade.generate()` already stops short of a mesh, but what it hands back
+## `BrickWild.generate()` already stops short of a mesh, but what it hands back
 ## is the family's own live object: a `HousePlan` full of `Rect2`s, or a
 ## `CastleSpec` whose fields only mean something to the castle. That is the
 ## right representation to BUILD from and the wrong one to hand across a
@@ -17,7 +17,7 @@ extends RefCounted
 ##     it, vertex for vertex. Nothing is re-derived and nothing is rounded.
 ##   * `to_dict()` -- the same building as plain Dictionaries, Arrays and
 ##     numbers, which is what serialises, diffs, travels between processes
-##     and can be read without loading BigGlade at all.
+##     and can be read without loading BrickWild at all.
 ##
 ## The pipeline is therefore three named stages rather than two:
 ##
@@ -30,7 +30,7 @@ extends RefCounted
 ## one to find out where the door is.
 
 const API_VERSION := BuildingLibrary.API_VERSION
-const SCHEMA := "bigglade.building"
+const SCHEMA := "brickwild.building"
 const SCHEMA_VERSION := 1
 
 ## The request this was generated from -- a detached copy, so a caller that
@@ -42,7 +42,7 @@ var spec: RefCounted
 var plan: HousePlan
 ## The village kind's own plan (VIL-019); null for the rest.
 var village: VillagePlan
-## `BigGlade.placement()` for this building: bounds, footprint, front, door.
+## `BrickWild.placement()` for this building: bounds, footprint, front, door.
 var placement: Dictionary = {}
 ## Why this is not a building, when it is not. Same shape as
 ## `GeneratedBuilding.errors`: {"code", "field", "message"}.
@@ -73,7 +73,7 @@ func payload() -> RefCounted:
 # ------------------------------------------------------------- serialisation
 
 ## The whole document as plain data: no object references, no engine types
-## except the numbers inside them, nothing that needs BigGlade to read.
+## except the numbers inside them, nothing that needs BrickWild to read.
 ##
 ## Vectors and rectangles come out as arrays of floats rather than as
 ## dictionaries with x/y keys, because that is half the bytes and every
@@ -122,7 +122,7 @@ static func from_json(text: String) -> BuildingDocument:
 
 static func from_dict(data: Dictionary) -> BuildingDocument:
 	if data.get("schema", "") != SCHEMA or data.get("schema_version", 0) != SCHEMA_VERSION:
-		return _refused("unsupported_schema", "schema_version", "Only bigglade.building schema 1 is supported.")
+		return _refused("unsupported_schema", "schema_version", "Only brickwild.building schema 1 is supported.")
 	if not data.get("request") is Dictionary:
 		return _refused("invalid_document", "request", "A document must carry its request.")
 	var out := BuildingDocument.new()

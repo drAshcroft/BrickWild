@@ -60,7 +60,7 @@ func _generate(kind: StringName, seed: int, width: float, length: float,
 	request.width = width
 	request.length = length
 	request.height = height
-	return BigGlade.generate(request)
+	return BrickWild.generate(request)
 
 
 func _street(building: GeneratedBuilding, filename: String) -> void:

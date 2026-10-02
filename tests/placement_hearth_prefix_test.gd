@@ -23,7 +23,7 @@ func _check(request: BuildingRequest) -> void:
 	var who := "%s/%s/%d/%d" % [request.style, request.material, request.storeys, request.seed]
 	print("PREFIX ", who)
 	var started := Time.get_ticks_usec()
-	var full := BigGlade.generate(request)
+	var full := BrickWild.generate(request)
 	var full_us := Time.get_ticks_usec() - started
 	if not full.is_ok():
 		failures.append(who + " invalid full request")
@@ -48,7 +48,7 @@ func _check(request: BuildingRequest) -> void:
 	_expect(same, who + " complete mesh parity")
 	_expect(a.part_log == b.part_log and a.mass_log == b.mass_log and a.component_log == b.component_log,
 		who + " complete emitted log parity")
-	_expect(BigGlade.placement(full) == BigGlade.placement(prefix), who + " complete placement parity")
+	_expect(BrickWild.placement(full) == BrickWild.placement(prefix), who + " complete placement parity")
 	_expect(full.plan.exterior == plan.exterior, who + " exterior parity")
 	times.append({"fixture": who, "full_ms": full_us / 1000.0, "prefix_ms": prefix_us / 1000.0})
 

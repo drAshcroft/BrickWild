@@ -52,7 +52,7 @@ static func _house(style: StringName, seed: int, w: float, l: float, h: float,
 
 
 static func _family(kind: StringName, seed: int) -> HousePlan:
-	var made: GeneratedBuilding = BigGlade.generate(BigGlade.default_request(kind, seed))
+	var made: GeneratedBuilding = BrickWild.generate(BrickWild.default_request(kind, seed))
 	return made.plan
 
 

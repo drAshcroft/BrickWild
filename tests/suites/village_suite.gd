@@ -547,7 +547,7 @@ static func _trades_present(reqs: Array[BuildingRequest]) -> Dictionary:
 
 ## Grep guard: the village never draws a house of its own. VILLAGES §2's
 ## opening promise -- "the buildings inside it are ordinary
-## `BuildingRequest`s answered by `BigGlade.generate()`" -- means nothing in
+## `BuildingRequest`s answered by `BrickWild.generate()`" -- means nothing in
 ## src/village/ may import the house family's own planner/builder.
 static func _check_programme_no_house_family_import(res: SuiteResult) -> void:
 	var dir := DirAccess.open("res://src/village")
@@ -577,35 +577,35 @@ static func _check_programme_culture_styles_build(res: SuiteResult) -> void:
 		var styles: Dictionary = VillageProgrammer.CULTURE_STYLES[culture]
 
 		var house_req := BuildingRequest.house(1, styles["house"], &"none")
-		var house_built := BigGlade.generate(house_req)
+		var house_built := BrickWild.generate(house_req)
 		res.checked += 1
 		if not house_built.is_ok():
 			res.fail("%s house style '%s' failed to build: %s" % [
 				culture, styles["house"], house_built.errors])
 
 		var shop_req := BuildingRequest.shop(1, &"general_store", styles["house"])
-		var shop_built := BigGlade.generate(shop_req)
+		var shop_built := BrickWild.generate(shop_req)
 		res.checked += 1
 		if not shop_built.is_ok():
 			res.fail("%s shop style '%s' failed to build: %s" % [
 				culture, styles["house"], shop_built.errors])
 
 		var church_req := BuildingRequest.church(1, styles["church"])
-		var church_built := BigGlade.generate(church_req)
+		var church_built := BrickWild.generate(church_req)
 		res.checked += 1
 		if not church_built.is_ok():
 			res.fail("%s church style '%s' failed to build: %s" % [
 				culture, styles["church"], church_built.errors])
 
 		var castle_req := BuildingRequest.castle(1, styles["castle"])
-		var castle_built := BigGlade.generate(castle_req)
+		var castle_built := BrickWild.generate(castle_req)
 		res.checked += 1
 		if not castle_built.is_ok():
 			res.fail("%s castle style '%s' failed to build: %s" % [
 				culture, styles["castle"], castle_built.errors])
 
 		var temple_req := BuildingRequest.temple(1, styles["temple_form"], styles["temple_cult"])
-		var temple_built := BigGlade.generate(temple_req)
+		var temple_built := BrickWild.generate(temple_req)
 		res.checked += 1
 		if not temple_built.is_ok():
 			res.fail("%s temple form '%s' cult '%s' failed to build: %s" % [

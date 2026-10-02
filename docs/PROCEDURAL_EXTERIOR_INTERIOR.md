@@ -24,7 +24,7 @@ planes, and a silhouette landmark. Use the same polygon/plane descriptor
 for roof skin, wall profiles, dormer seats, and drainage details. A roof may
 be steep for visual character, but its openings and attachments must meet its
 actual planes. [ROOF_AUDIT.md](ROOF_AUDIT.md) and
-[ROOF_REGION_CONTRACTS.md](ROOF_REGION_CONTRACTS.md) give BigGlade examples.
+[ROOF_REGION_CONTRACTS.md](ROOF_REGION_CONTRACTS.md) give BrickWild examples.
 
 ### Facade and openings
 
@@ -63,7 +63,7 @@ Give each room a purpose and required activities. The house entry should
 lead somewhere useful; a shop needs customer and work zones; a castle's hall
 needs a route from the gate; a temple needs a clear processional path. Build
 the adjacency graph, pack rooms, place doors and stairs, then confirm every
-required threshold is reachable. BigGlade's `qa/walk_grid.gd` is the shared
+required threshold is reachable. BrickWild's `qa/walk_grid.gd` is the shared
 floor/obstruction model for house and temple checks.
 
 ### Furniture hierarchy
@@ -83,7 +83,7 @@ and a clear sightline. `beside_table` needs a seat offset plus standing room.
 `on_support` needs a measured support plane and enough footprint. `near_door`
 must still leave the door's swing and approach clear. For angled or polygon
 rooms, evaluate these relations in the host's local frame rather than its
-AABB. BigGlade's polygon furnishing and castle range rules demonstrate why.
+AABB. BrickWild's polygon furnishing and castle range rules demonstrate why.
 
 ### Light and atmosphere
 
@@ -99,7 +99,7 @@ the processional route.
 
 The furnisher can move or remove optional clutter when it blocks navigation.
 It should preserve required activity objects; if none can fit, return a
-diagnostic identifying the room and violated constraint. BigGlade records a
+diagnostic identifying the room and violated constraint. BrickWild records a
 warning when navigation repair forces removal of something a room needs.
 Functional layout research likewise treats arrangement as constraints and
 optimization; see [Make it Home](https://web.cs.ucla.edu/~dt/papers/siggraph11/siggraph11.pdf)

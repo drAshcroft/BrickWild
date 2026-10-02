@@ -9,7 +9,7 @@ static func run() -> SuiteResult:
 	var res := SuiteResult.new("world insula")
 	for scale in SCALES:
 		var request := _request(scale, 9200 + int(scale * 100.0))
-		var building: GeneratedBuilding = BigGlade.generate(request)
+		var building: GeneratedBuilding = BrickWild.generate(request)
 		var who := "port_tenement scale=%.2f" % scale
 		res.checked += 1
 		if building == null or not building.is_ok():

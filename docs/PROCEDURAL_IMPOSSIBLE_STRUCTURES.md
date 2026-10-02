@@ -21,7 +21,7 @@ disagree on purpose.
 | Recursive room | Door appears to lead to a copy of the room | Instanced room with bounded recursion and unique identity | Infinite rendering or unbounded traversal |
 
 These are **design patterns for a game world**, not claims about physical
-architecture. They derive from BigGlade's plan-first and QA approach, and from
+architecture. They derive from BrickWild's plan-first and QA approach, and from
 portal and virtual-environment research. A portal demonstration uses paired
 cameras and a viewport texture, while research on redirected walking and
 change blindness shows that perceived space can differ from the underlying
@@ -62,7 +62,7 @@ perspective hallway can compress or expand objects while its collision path
 remains conventional. A roof may fold into itself above the player's reach.
 This is the cheapest technique and preserves ordinary navigation.
 
-Even here, write the exception into the plan. BigGlade's grounded-mass check
+Even here, write the exception into the plan. BrickWild's grounded-mass check
 should accept a named `levitation_field` or `magic_anchor` relation instead of
 silencing support checks for every building. Ask the generator to provide a
 readable visual cue: runes, chains, a beam, a levitating shadow, or a break in

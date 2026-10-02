@@ -41,13 +41,13 @@ hot paths, so its absolute times are diagnostic rather than release medians.
 
 Never coarsen grids, omit real furnishings or relax QA to improve these timings.
 Acceptance still requires the five castle suites plus affected house/shop suites.
-An exclusive BigGlade test window is not an idle machine if unrelated projects
+An exclusive BrickWild test window is not an idle machine if unrelated projects
 are running CPU-heavy tests; record that limitation explicitly.
 
 The September 2026 exploratory run is in `artifacts/p1p2_api/perf_before/results`.
 All six fixtures repeated with identical complete-state fingerprints. It was
 explicitly concurrent: an unrelated dungeon test process stayed active, and other
-BigGlade lanes resumed during the later cases. These are diagnostic medians, not
+BrickWild lanes resumed during the later cases. These are diagnostic medians, not
 an idle-machine acceptance baseline:
 
 | Fixture | Generate | Furnisher | Free placement | Navigation repair | Castle QA |

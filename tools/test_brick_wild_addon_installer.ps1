@@ -6,16 +6,16 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$installer = Join-Path $PSScriptRoot 'install_big_glade_addon.ps1'
-$sourceManifestPath = Join-Path $PSScriptRoot 'big_glade_addon_manifest.json'
+$installer = Join-Path $PSScriptRoot 'install_brick_wild_addon.ps1'
+$sourceManifestPath = Join-Path $PSScriptRoot 'brick_wild_addon_manifest.json'
 $sourceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $utf8NoBom = New-Object Text.UTF8Encoding($false)
 $tempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd(
     [IO.Path]::DirectorySeparatorChar,
     [IO.Path]::AltDirectorySeparatorChar)
-$fixture = Join-Path $tempBase ('BigGladeAddonInstall_' + [Guid]::NewGuid().ToString('N'))
+$fixture = Join-Path $tempBase ('BrickWildAddonInstall_' + [Guid]::NewGuid().ToString('N'))
 $fixture = [IO.Path]::GetFullPath($fixture)
-$expectedPrefix = $tempBase + [IO.Path]::DirectorySeparatorChar + 'BigGladeAddonInstall_'
+$expectedPrefix = $tempBase + [IO.Path]::DirectorySeparatorChar + 'BrickWildAddonInstall_'
 if (-not $fixture.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing unsafe fixture path: $fixture"
 }
@@ -87,14 +87,14 @@ try {
     [IO.Directory]::CreateDirectory($fixture) | Out-Null
     [IO.File]::WriteAllText(
         (Join-Path $fixture 'project.godot'),
-        "config_version=5`n`n[application]`nconfig/name=`"BigGlade addon fixture`"`n")
+        "config_version=5`n`n[application]`nconfig/name=`"BrickWild addon fixture`"`n")
 
     $dry = & $installer -TargetProject $fixture -DryRun
     Assert-Equal $true $dry.DryRun 'Dry run flag was not reported'
     if ($dry.WouldCopy -le 0) {
         throw 'Dry run did not report the initial addon copies'
     }
-    if (Test-Path -LiteralPath (Join-Path $fixture 'addons/big_glade')) {
+    if (Test-Path -LiteralPath (Join-Path $fixture 'addons/brick_wild')) {
         throw 'Dry run changed the target project'
     }
 
@@ -110,11 +110,11 @@ try {
         }
     }
 
-    $addonRoot = Join-Path $fixture 'addons/big_glade'
-    $installedManifest = Join-Path $addonRoot '.big_glade_install_manifest.json'
+    $addonRoot = Join-Path $fixture 'addons/brick_wild'
+    $installedManifest = Join-Path $addonRoot '.brick_wild_install_manifest.json'
     foreach ($required in @(
-        'api/big_glade.gd',
-        'api/big_glade.gd.uid',
+        'api/brick_wild.gd',
+        'api/brick_wild.gd.uid',
         'runtime/navigation/house_nav_check.gd',
         'assets/props/catalog.json',
         'assets/props/fantasy/Anvil.gltf',
@@ -201,37 +201,37 @@ func _init() -> void:
 		BuildingRequest.shop(105),
 		BuildingRequest.hotel(106),
 		BuildingRequest.temple(104),
-		BigGlade.default_request(&"world", 107),
+		BrickWild.default_request(&"world", 107),
 	]
 	for request in requests:
-		var generated := BigGlade.generate_document(request)
+		var generated := BrickWild.generate_document(request)
 		if not generated.is_ok():
 			printerr("generation failed: %s" % generated.errors)
 			failed = true
 			continue
-		var mesh := BigGlade.build_mesh(generated)
+		var mesh := BrickWild.build_mesh(generated)
 		if mesh == null or mesh.get_surface_count() == 0:
 			printerr("mesh emission failed for %s" % request.kind)
 			failed = true
-		var node := BigGlade.instantiate(generated)
+		var node := BrickWild.instantiate(generated)
 		if node == null:
 			printerr("scene instantiation failed for %s" % request.kind)
 			failed = true
 		else:
 			node.free()
 		var restored := BuildingDocument.from_json(generated.to_json())
-		if not restored.is_ok() or BigGlade.build_mesh(restored) == null:
+		if not restored.is_ok() or BrickWild.build_mesh(restored) == null:
 			printerr("document round trip failed for %s" % request.kind)
 			failed = true
 	for key in PropCatalog.keys():
 		if not ResourceLoader.exists(PropCatalog.scene_path(key)):
 			printerr("prop resource missing: %s" % key)
 			failed = true
-	var repeat := BigGlade.generate(BuildingRequest.church(101))
-	if repeat.name() != BigGlade.generate(BuildingRequest.church(101)).name():
+	var repeat := BrickWild.generate(BuildingRequest.church(101))
+	if repeat.name() != BrickWild.generate(BuildingRequest.church(101)).name():
 		printerr("same-seed generation was not deterministic")
 		failed = true
-	print("BIGGLADE_ADDON_SMOKE_OK")
+	print("BRICKWILD_ADDON_SMOKE_OK")
 	quit(1 if failed else 0)
 '@
         [IO.File]::WriteAllText($smokePath, $smoke, $utf8NoBom)
@@ -239,7 +239,7 @@ func _init() -> void:
             '--editor', '--quit')
         $smokeResult = Invoke-GodotFixture -Arguments @('--headless', '--path', $fixture,
             '--script', 'res://smoke.gd')
-        if (-not $smokeResult.Stdout.Contains('BIGGLADE_ADDON_SMOKE_OK')) {
+        if (-not $smokeResult.Stdout.Contains('BRICKWILD_ADDON_SMOKE_OK')) {
             throw "Godot smoke did not report completion:`n$($smokeResult.Stdout)`n$($smokeResult.Stderr)"
         }
         $godotVerified = $true

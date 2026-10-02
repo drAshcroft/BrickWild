@@ -19,14 +19,14 @@ static func run() -> SuiteResult:
 		request.width = 200.0 * scale
 		request.length = 200.0 * scale
 		request.height = 60.0
-		var building: GeneratedBuilding = BigGlade.generate(request)
+		var building: GeneratedBuilding = BrickWild.generate(request)
 		res.checked += 1
 		var label := "temple_mountain scale=%.2f" % scale
 		if building == null or not building.is_ok():
 			res.fail("%s: failed to generate: %s" % [label,
 				str(building.errors) if building != null else "null"])
 			continue
-		var api_mesh: ArrayMesh = BigGlade.build_mesh(building)
+		var api_mesh: ArrayMesh = BrickWild.build_mesh(building)
 		if api_mesh == null or api_mesh.get_surface_count() == 0:
 			res.fail("%s: world API did not dispatch the mountain mesh" % label)
 		var builder := MountainBuilder.new()

@@ -9,7 +9,7 @@ extends RefCounted
 ## Deliberately independent of `VillageSpec.RECIPES` (which only sizes the
 ## spec's own approximate `site` rect, VILLAGES §1) so this file is the one
 ## place §4's actual building-earning rules live. It never draws a building
-## of its own: every request is answered by `BigGlade.generate()`.
+## of its own: every request is answered by `BrickWild.generate()`.
 
 ## Culture -> the style/form names that exist in each family's spec. VILLAGES
 ## §1's culture row: "which house, shop, church, castle and temple styles the
@@ -119,7 +119,7 @@ static func _raise_landmark(out: Array[BuildingRequest]) -> void:
 	var base_height: float = out[landmark].height
 	for step in range(LANDMARK_LIFT_STEPS + 1):
 		out[landmark].height = base_height + float(step)
-		var placed: Dictionary = BigGlade.measure(out[landmark])
+		var placed: Dictionary = BrickWild.measure(out[landmark])
 		if placed.is_empty():
 			break
 		if (placed["bounds"] as AABB).size.y > tallest + LANDMARK_CLEAR:

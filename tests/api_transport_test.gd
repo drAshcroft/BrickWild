@@ -9,17 +9,17 @@ var checks := 0
 func _init() -> void:
 	var requests := [BuildingRequest.church(101), BuildingRequest.castle(202),
 		BuildingRequest.house(303), BuildingRequest.shop(353), BuildingRequest.hotel(373),
-		BuildingRequest.temple(404), BigGlade.default_request(&"world", 505)]
+		BuildingRequest.temple(404), BrickWild.default_request(&"world", 505)]
 	for req in requests:
 		print("Round trip: %s" % req.kind)
-		var made := BigGlade.generate_document(req)
+		var made := BrickWild.generate_document(req)
 		_expect(made.is_ok(), "generate %s" % req.kind)
 		if not made.is_ok(): continue
 		var restored := BuildingDocument.from_json(made.to_json())
 		_expect(restored.is_ok(), "restore %s: %s" % [req.kind, restored.errors])
 		if not restored.is_ok(): continue
 		_expect(restored.to_json() == made.to_json(), "byte round trip %s" % req.kind)
-		_expect(_same_mesh(BigGlade.build_mesh(made), BigGlade.build_mesh(restored)), "mesh parity %s" % req.kind)
+		_expect(_same_mesh(BrickWild.build_mesh(made), BrickWild.build_mesh(restored)), "mesh parity %s" % req.kind)
 		if made.plan != null:
 			_expect(restored.plan.spec == restored.spec, "spec identity %s" % req.kind)
 			_expect(restored.plan.furniture == made.plan.furniture, "all furniture fields %s" % req.kind)
@@ -40,13 +40,13 @@ func _init() -> void:
 	var huge := BuildingRequest.house(9223372036854775807)
 	_expect(BuildingRequest.from_json(huge.to_json()).seed == huge.seed, "int64 seed survives JSON")
 	for text in ['[]', '{"kind":"house","width":"wide"}', '{"kind":"house","storeys":1.5}', '{"kind":"house","seed":9007199254740994}', '{"kind":"house","schema_version":999}']:
-		_expect(not BigGlade.generate(BuildingRequest.from_json(text)).is_ok(), "invalid request refused: " + text)
+		_expect(not BrickWild.generate(BuildingRequest.from_json(text)).is_ok(), "invalid request refused: " + text)
 	_expect(not BuildingDocument.from_json('{"schema_version":999}').is_ok(), "unknown document schema")
-	var bad := BigGlade.generate(BuildingRequest.from_json('{}'))
-	_expect(not BigGlade.check(bad)["ok"], "invalid building diagnostic")
-	var valid := BigGlade.generate(BuildingRequest.house(77))
+	var bad := BrickWild.generate(BuildingRequest.from_json('{}'))
+	_expect(not BrickWild.check(bad)["ok"], "invalid building diagnostic")
+	var valid := BrickWild.generate(BuildingRequest.house(77))
 	valid.plan.rooms[0]["rect"] = Rect2(999, 999, 2, 2)
-	var report := BigGlade.check(valid)
+	var report := BrickWild.check(valid)
 	_expect(not report["ok"] and not report["diagnostics"].is_empty(), "functional QA catches displaced room")
 	var village := VillageSpec.new(818)
 	village.population = 30

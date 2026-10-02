@@ -11,7 +11,7 @@ extends SceneTree
 ## and the whole of the work here is mapping mythsim's vocabulary onto a
 ## `VillageSpec` and writing the result out in the agreed shape.
 ##
-## Two things the contract asks for that BigGlade did not already have:
+## Two things the contract asks for that BrickWild did not already have:
 ##
 ##   * `building_id`, `"<city_id>/b-<nnn>"`, the join key C2 (the interior
 ##     plan) and C4 (the people who live in it) hang off. It is the
@@ -29,13 +29,13 @@ extends SceneTree
 
 const OUT_SCHEMA := "dmv.site.plan"
 const OUT_SCHEMA_VERSION := 1
-const GENERATOR := "bigglade-0.3"
+const GENERATOR := "brickwild-0.3"
 ## Everything is written to this many decimal places, and nothing is written
 ## at more. A millimetre is far below anything a village plan means, and it
 ## is what makes two runs byte-identical.
 const PLACES := 0.001
 
-## The site is capped at BigGlade's own maximum however big a cell is.
+## The site is capped at BrickWild's own maximum however big a cell is.
 const SITE_MAX_M := 400.0
 const BUILDING_MAX := 140
 
@@ -114,11 +114,11 @@ func _init() -> void:
 ## mythsim's ten authored words for what a city has built. `buildings` in the
 ## request is a kept FRACTION against each of them -- it says what the city
 ## has, never how many or where, and turning that into instances is
-## BigGlade's half of the contract.
+## BrickWild's half of the contract.
 const BUILT_WORDS := ["palisade", "granary", "stone-wall", "shrine", "temple",
 	"palace", "forge-hall", "great-tomb", "marble-wall", "ziggurat"]
 
-## mythsim's cultures are its own; BigGlade's seven are the palettes it can
+## mythsim's cultures are its own; BrickWild's seven are the palettes it can
 ## actually build. Anything not named here is folded onto one of the seven by
 ## the hash of its own name, which is arbitrary but STABLE -- the same tongue
 ## always builds in the same style, which is what a consumer needs.
@@ -143,7 +143,7 @@ const PURPOSE_RULES := [
 	{"purpose": &"farming"},
 ]
 
-## Wealth in mythsim is unbounded; BigGlade's is 0..1. A thousand is a rich
+## Wealth in mythsim is unbounded; BrickWild's is 0..1. A thousand is a rich
 ## city, and everything past it is simply rich.
 const WEALTH_FULL := 1000.0
 const PALETTE_ORDER: Array[StringName] = [&"english", &"frankish", &"norse",
@@ -152,7 +152,7 @@ const PALETTE_ORDER: Array[StringName] = [&"english", &"frankish", &"norse",
 
 ## The `VillageSpec` a SiteRequest asks for. `raw` is the request's own text,
 ## used only for the seed -- see `_seed_of`. Anything the request asks for
-## that BigGlade cannot yet build is written into `notes` and carried out to
+## that BrickWild cannot yet build is written into `notes` and carried out to
 ## the consumer rather than silently swallowed.
 static func spec_from_request(request: Dictionary, raw: String = "",
 		notes: Array[String] = []) -> VillageSpec:
@@ -289,7 +289,7 @@ static func _settle_form(spec: VillageSpec, notes: Array[String],
 			% [was_pop, String(was_form), spec.population])
 		if spec.form in VillageSitePlanner.FORMS_SUPPORTED:
 			return
-	# 2. the purpose, through the ones that DO reach a form BigGlade lays,
+	# 2. the purpose, through the ones that DO reach a form BrickWild lays,
 	# in a fixed order so the same request always lands the same way
 	var was_purpose: StringName = spec.purpose
 	var unplanned: StringName = spec.form
@@ -321,7 +321,7 @@ const GATE_POPULATION := 200
 ## still a bigger village than one of 210.
 const PLANNED_BAND := Vector2(140.0, 199.0)
 ## Purposes to try, in order, when the one asked for has no planner. Between
-## them they cover both forms BigGlade lays: `green` (farming or pilgrim, 40
+## them they cover both forms BrickWild lays: `green` (farming or pilgrim, 40
 ## to 200) and `street` (farming, forest or mining, 12 to 80).
 const PURPOSE_FALLBACKS: Array[StringName] = [&"farming", &"mining", &"forest", &"pilgrim"]
 

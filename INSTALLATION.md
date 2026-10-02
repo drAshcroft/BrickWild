@@ -40,16 +40,16 @@ The installer has been verified on Windows. From the BrickWild repository,
 preview the managed changes and then install:
 
 ```powershell
-.\tools\install_big_glade_addon.ps1 `
+.\tools\install_brick_wild_addon.ps1 `
   -TargetProject C:\path\to\YourGodotProject `
   -DryRun
 
-.\tools\install_big_glade_addon.ps1 `
+.\tools\install_brick_wild_addon.ps1 `
   -TargetProject C:\path\to\YourGodotProject
 ```
 
 The destination must already contain `project.godot`. The installer writes the
-package to exactly `res://addons/big_glade`. It can be run again to update the
+package to exactly `res://addons/brick_wild`. It can be run again to update the
 managed files and leaves unrelated files in that directory untouched.
 
 After the first installation, run the destination project once in the editor
@@ -73,20 +73,21 @@ func _ready() -> void:
 	var request := BuildingRequest.house(
 		42, &"cottage", &"smith", 9.0, 12.0, 2.6
 	)
-	var generated := BigGlade.generate(request)
+	var generated := BrickWild.generate(request)
 	if generated.is_ok():
-		add_child(BigGlade.instantiate(generated, false, true))
+		add_child(BrickWild.instantiate(generated, false, true))
 	else:
 		push_error(str(generated.errors))
 ```
 
-BrickWild is the repository name. `BigGlade` is the current compatibility name
-of the public facade, and `addons/big_glade` is the stable package path.
+The public facade is `BrickWild`, and the addon installs at
+`addons/brick_wild`. Existing projects using the former class or addon path
+must update their references when migrating.
 
-Use `BigGlade.build_mesh(generated)` for an `ArrayMesh`,
-`BigGlade.placement(generated)` for measured bounds and entrance data, or
-`BigGlade.generate_document(request)` when the result must cross a JSON or
-process boundary. See [the package README](packaging/big_glade/README.md) and
+Use `BrickWild.build_mesh(generated)` for an `ArrayMesh`,
+`BrickWild.placement(generated)` for measured bounds and entrance data, or
+`BrickWild.generate_document(request)` when the result must cross a JSON or
+process boundary. See [the package README](packaging/brick_wild/README.md) and
 [public transport contract](docs/PUBLIC_API_TRANSPORT.md) for details.
 
 ## Current public preview limit

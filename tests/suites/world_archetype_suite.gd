@@ -111,7 +111,7 @@ static func run() -> SuiteResult:
 			request.height = float(row["height"]) * scale if row["family"] == &"pagoda" else float(row["height"])
 			if row["family"] == &"tulou":
 				request.storeys = 4
-			var building: GeneratedBuilding = BigGlade.generate(request)
+			var building: GeneratedBuilding = BrickWild.generate(request)
 			res.checked += 1
 			var who := "%s scale=%.2f" % [key, scale]
 			var before: int = res.failures.size()
@@ -121,7 +121,7 @@ static func run() -> SuiteResult:
 				continue
 			for f in assert_contains(building, row.get("must", [])):
 				res.fail("%s: %s" % [who, f])
-			var mesh: ArrayMesh = BigGlade.build_mesh(building)
+			var mesh: ArrayMesh = BrickWild.build_mesh(building)
 			if mesh == null:
 				res.fail("%s: no family mesh" % who)
 			else:
@@ -159,7 +159,7 @@ static func run_nagara() -> SuiteResult:
 		request.width = snappedf(float(row["width"]) * scale, 0.01)
 		request.length = snappedf(float(row["length"]) * scale, 0.01)
 		request.height = float(row["height"])
-		var building: GeneratedBuilding = BigGlade.generate(request)
+		var building: GeneratedBuilding = BrickWild.generate(request)
 		res.checked += 1
 		var who := "nagara_hundred_spires scale=%.2f" % scale
 		if building == null or not building.is_ok():
@@ -168,7 +168,7 @@ static func run_nagara() -> SuiteResult:
 			continue
 		for failure in assert_contains(building, row["must"]):
 			res.fail("%s: %s" % [who, failure])
-		var mesh: ArrayMesh = BigGlade.build_mesh(building)
+		var mesh: ArrayMesh = BrickWild.build_mesh(building)
 		if mesh == null:
 			res.fail("%s: no Nagara family mesh" % who)
 		else:
@@ -196,7 +196,7 @@ static func run_tower_house() -> SuiteResult:
 		request.width = snappedf(float(row["width"]) * scale, 0.01)
 		request.length = snappedf(float(row["length"]) * scale, 0.01)
 		request.height = snappedf(float(row["height"]) * scale, 0.01)
-		var building: GeneratedBuilding = BigGlade.generate(request)
+		var building: GeneratedBuilding = BrickWild.generate(request)
 		res.checked += 1
 		var who := "merchant_tower scale=%.2f" % scale
 		if building == null or not building.is_ok():

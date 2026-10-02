@@ -35,7 +35,7 @@ static func run() -> SuiteResult:
 
 ## Populations and wealths chosen so the sweep is houses, one shop and the
 ## small shrine, one storey each: every request goes through
-## `BigGlade.generate()`, and a village that earns a church, an inn or a
+## `BrickWild.generate()`, and a village that earns a church, an inn or a
 ## manor -- or the second storey a wealth above 0.3 buys -- is several times
 ## the mesh for exactly the same lot rules. The manor and the landmark lane
 ## have their own dedicated checks below.

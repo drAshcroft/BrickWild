@@ -67,7 +67,7 @@ Branch shape, counted by mechanism rather than by title keyword:
 Three form-class entries, verbatim context:
 
 > `[procedural/buildings/families] Compose architecture from archetype, structure, and style`
-> BigGlade survey: docs/WORLD_BUILDINGS.md, plus docs/CASTLES.md, docs/TEMPLES.md,
+> BrickWild survey: docs/WORLD_BUILDINGS.md, plus docs/CASTLES.md, docs/TEMPLES.md,
 > docs/HOTELS.md. The survey is a generator design reference, not a claim of
 > historical universality; verify cultural and period details with specialist
 > sources before publication.
@@ -75,7 +75,7 @@ Three form-class entries, verbatim context:
 > `[procedural/buildings/composition] Compose site, mass, facade, and detail at separate scales`
 > Design chapter: docs/PROCEDURAL_ARCHITECTURE_RULES.md. CGA's mass-to-facade-to-detail
 > hierarchy is a useful research basis: https://doi.org/10.1145/1179352.1141931 .
-> BigGlade examples: docs/CASTLES.md, docs/HOTELS.md and docs/ROOF_AUDIT.md.
+> BrickWild examples: docs/CASTLES.md, docs/HOTELS.md and docs/ROOF_AUDIT.md.
 
 > `[procedural/buildings/exteriors] Exterior weather and material masks follow exposure and use`
 > Design chapter: docs/PROCEDURAL_EXTERIOR_INTERIOR.md. Keep UV scale and hard normals
@@ -244,7 +244,7 @@ From the Steam page for app 2198150 (Pounce Light, released 23 Sep 2024):
 | Mechanism | Nearest entry in the store | Why it is not the same thing |
 |---|---|---|
 | Reactive assembly: a drawn mark becomes structure | `procedural/buildings/authoring` bulk stamps; `procedural/villages/infrastructure` crossings | Both *edit* a fixed grammar. Reactive assembly *infers* a grammar that does not exist yet. |
-| Support inferred bottom-up after a mass moves | `procedural/buildings/exterior-interior` "exterior promises require interior evidence" | That is the **opposite direction**: a door promises a route, checked against the plan. Support inference is geometry proposing and structure catching up. BigGlade's checks are all "does the mesh match the plan", never "is the plan still buildable now the mesh changed". |
+| Support inferred bottom-up after a mass moves | `procedural/buildings/exterior-interior` "exterior promises require interior evidence" | That is the **opposite direction**: a door promises a route, checked against the plan. Support inference is geometry proposing and structure catching up. BrickWild's checks are all "does the mesh match the plan", never "is the plan still buildable now the mesh changed". |
 | Vegetation as an architectural layer | `procedural/buildings/decoration` furnishing; `procedural/villages/landscape` land use | Both place plants. A plant on a wall has a host surface, a normal, a contact point and a support extent, and belongs to the building's dressing stage. |
 | Gridless organic massing | — | Nothing. No entry, no emitter, no primitive (see §3). |
 | A no-failure generator | `Procedural/buildings/validation`: "generate candidates, measure, repair, **reject irreparable candidates**"; `procedural/buildings/plans`: "a budget hit is not a proof... **report exhausted**" | The whole constraint stack assumes rejection is available. A toy that forbids failure needs a third answer to an unsatisfiable constraint: absorb it into the mass. |
@@ -317,7 +317,7 @@ against a climate vector; first match names the biome. Keep it a pure function a
 run it before every stage that consumes it. *Reason:* a label map cannot explain
 itself; a threshold table is testable and a cell's biome is re-derivable from the
 fields. *Failure:* a switch on a biome id is a lookup, so changing a field changes
-nothing downstream; an un-ordered table makes the last rule silently win. *BigGlade:*
+nothing downstream; an un-ordered table makes the last rule silently win. *BrickWild:*
 no biome code exists. The vocabulary is written down and unread —
 `tests/fixtures/site_requests/*.json` carry
 `terrain.{elevation, slope, water_edges, forest, fertility, rock}`, and
@@ -329,7 +329,7 @@ wrong, print per-field quantiles and per-biome/per-species area shares across at
 least three seeds before looking at a picture. *Reason:* a map hides the fact that
 one class owns 90% of the cells; the distribution names the cause. *Failure:* a
 prior diagnosis blamed flora content and missed the climate cause entirely.
-*BigGlade:* the same shape as "a check that selects what it measures can pass by
+*BrickWild:* the same shape as "a check that selects what it measures can pass by
 measuring nothing" — compare counts, not impressions. *Source:* the
 `climate-and-ecology` entry.
 
@@ -345,7 +345,7 @@ world with **no forests at all**. *Source:* the `climate-and-ecology` entry.
 share of land below freezing. *Reason:* the lapse rate decides which bands exist.
 *Failure:* an over-steep rate put **44% of land below freezing**, leaving no room
 for a cold-forest band; the map looked plausible and the biome list was
-unreachable. *BigGlade:* `terrain.elevation` is an unread fixture field here, so
+unreachable. *BrickWild:* `terrain.elevation` is an unread fixture field here, so
 the rule has no consumer yet. *Source:* the `climate-and-ecology` entry.
 
 **BI-05 — Ecology needs succession, or the lowest-stress species wins.**
@@ -358,8 +358,8 @@ regardless of tuning. *Source:* the `climate-and-ecology` entry.
 **BI-06 — Cache the expensive field, re-run only the loop.** *Rule:* habitat
 fields are the expensive half; cache them and re-run only the ecology loop when
 tuning. *Reason:* a harness that recomputes fields per iteration cannot be tuned,
-because each run costs a world. *BigGlade:* the identical split already exists as
-`BigGlade test lanes` — the slow house suites are slow because they run the
+because each run costs a world. *BrickWild:* the identical split already exists as
+`BrickWild test lanes` — the slow house suites are slow because they run the
 furnisher search, not because they check more. *Source:* the `climate-and-ecology`
 entry plus the lane entry.
 
@@ -367,7 +367,7 @@ entry plus the lane entry.
 biomes meet through a transition band whose width is authored, and that band is
 where scatter density and material blending live. *Reason:* a zero-width edge puts
 a tree half in a wood and half in a field. *Failure:* a hard edge reads as a fence
-the world did not build. *BigGlade:* the settlement already has the concept at
+the world did not build. *BrickWild:* the settlement already has the concept at
 village scale — `VillageDresser.EDGE_BAND` is a hand-authored band-width table
 (`none 4`, `hedge 5`, `palisade 8`, `wall 10`) with `EDGE_PITCH 6.0` and
 `EDGE_REACH 6.0`. The same rule about a treeline is not written anywhere.
@@ -377,7 +377,7 @@ village scale — `VillageDresser.EDGE_BAND` is a hand-authored band-width table
 `(surface, material, UV scale, normal strength)` plus the plant catalogue slots it
 may draw from. *Reason:* a colour-only biome collapses the moment the sun moves;
 a material set survives it. *Failure:* uniform random grime loses the
-construction story — the lesson already recorded for buildings. *BigGlade:*
+construction story — the lesson already recorded for buildings. *BrickWild:*
 `HouseSpec.roof_material` is a spec enum plus a shader `uniform bool thatch` in
 `ShellAssembler.house_materials()`; no reed, course or tile geometry is ever
 emitted. Village ground is one flat untextured colour `6f7a4a`. The only doc that
@@ -389,7 +389,7 @@ feedback loop.** *Rule:* when the pipeline reorders, re-reading climate must not
 write back into erosion. *Reason:* a feedback loop makes the output depend on
 iteration count, which is a determinism bug wearing a physics costume.
 *Failure:* an oorographic-contrast fix that fed back would silently re-order its
-own inputs. *BigGlade:* the same shape as "hash the seed WITH the element id" —
+own inputs. *BrickWild:* the same shape as "hash the seed WITH the element id" —
 do not add a second draw to fix a first-draw problem. *Source:*
 `simulation/procedural-generation/climate`.
 
@@ -400,7 +400,7 @@ nothing else: materials, plot size, water strategy, which props exist, whether
 there is a ford or a bridge. *Reason:* without this axis the biome is wallpaper.
 *Failure:* seven culture palettes over one ground colour is a reskin — the same
 defect as "a theme that only changes the tileset is a reskin", one level up.
-*BigGlade:* `VillageDresser.PALETTES` is a per-village **culture** row
+*BrickWild:* `VillageDresser.PALETTES` is a per-village **culture** row
 (english / frankish / norse / alpine / moorish / eastern / blighted) crossed with
 slots (edge / green / hedge / ground). That is a palette, not a place. The missing
 axis is environmental, and `terrain.rock` and `terrain.fertility` in the
@@ -418,7 +418,7 @@ blue-noise sampling with a minimum radius `r(x)` that is a function of the local
 field. *Reason:* uniform-density sampling cannot express thinning, clearing or
 avoidance, so the field never reaches the scatter. *Failure:* a constant radius
 over a moisture field gives the same density in a bog and on a hill, and the
-result reads as a plantation. *BigGlade:* `FOREST_DENSITY 2.0`, `TRUNK_CLEAR 1.0`
+result reads as a plantation. *BrickWild:* `FOREST_DENSITY 2.0`, `TRUNK_CLEAR 1.0`
 and `GREEN_TREE_CLEAR 4.0` are constants; `_scatter()` is the only
 density-driven generator and `_wood()` is a separate authored path. *Source:*
 Bridson 2007 for the sampler; the store has **no** entry on Poisson-disk sampling
@@ -430,7 +430,7 @@ axis and is what must clear a roof; trunk is the same measure at or below a fixe
 trunk height and is what must stay off a road. *Reason:* one AABB is wrong for
 every plant and worst for a birch — two metres of mostly air around a 16 cm stem.
 *Failure:* an AABB-driven placement either clears a 4 m circle for a stem or lets
-a crown through a roof. *BigGlade:* **this is the strongest vegetation fact in the
+a crown through a roof. *BrickWild:* **this is the strongest vegetation fact in the
 project and it is filed under `procedural/buildings/assets`.** `core/scene_bounds.gd`
 `plant_of_node()` / `_gather_radii()` and `SceneBounds.TRUNK_HEIGHT`; `PropCatalog.canopy()`
 and `.trunk()`; `assets/props/catalog.json` carries `canopy` and `trunk` for all
@@ -444,7 +444,7 @@ drift or on `canopy <= 0`. *Action:* promote to this branch and cross-reference 
 with its own species set, radius, count and LOD. *Reason:* a stand built from one
 species at one height is a field of lollipops. *Failure:* the trade is real, not a
 bug: on real airborne-LiDAR data, stratifying the canopy raised understory
-detection from 46% to 68% while raising over-segmentation from 1% to 16%. *BigGlade:*
+detection from 46% to 68% while raising over-segmentation from 1% to 16%. *BrickWild:*
 `qa/village_dress_check.gd` `COVER_CATS` (grass, flower, ground_cover, pebble,
 stepping_stone, mushroom) is a ground layer with no upper layers above it; trees
 come from `_wood()` / `_scatter()` as a single class. *Source:* Hamraz et al.,
@@ -457,7 +457,7 @@ of the trade-off, not as a claim about a game forest.
 still.** *Rule:* if an instancer registers per LOD band, that index is a **spatial
 coverage** band. Test it while the camera moves: the defect appears only at the
 instant the band changes underneath you. *Failure:* a still frame cannot catch it,
-so every screenshot review of a LOD change is a false pass. *BigGlade:* no
+so every screenshot review of a LOD change is a false pass. *BrickWild:* no
 `LODGroup`, no `visibility_range`, no `MultiMesh` anywhere;
 `VillageAssembler._model()` does `load()` plus `instantiate()` per plant. The
 project is therefore currently safe from this bug and has no defence if it ever
@@ -468,7 +468,7 @@ adds one — what keeps it safe is the scale ceiling, `SITE_MAX_SIDE = 400` and
 field that decides *which* blades from the dials that decide *how many*. *Reason:*
 with a near dial and a far dial, the near one dominates what the player actually
 sees, and a screenshot tests only the near dial. *Failure:* the far dial is never
-exercised by any visual review and drifts indefinitely. *BigGlade:* nothing to
+exercised by any visual review and drifts indefinitely. *BrickWild:* nothing to
 apply yet; the deferral is bought by `SITE_MAX_SIDE = 400`. *Source:*
 `godot/voxelgames/rendering/grass-density` and the calico field entry.
 
@@ -476,7 +476,7 @@ apply yet; the deferral is bought by `SITE_MAX_SIDE = 400`. *Source:*
 *Rule:* when a tree is swapped for a card, keep automatic mesh LOD and do not bake
 lighting into the impostor's albedo. *Reason:* lighting baked into albedo
 double-lights at the swap distance and the two bands disagree exactly where the
-player is looking. *BigGlade:* no impostors, and no foliage shader at all —
+player is looking. *BrickWild:* no impostors, and no foliage shader at all —
 `core/shell_assembler.gd` holds two shaders, roof courses and floor textile.
 *Source:* `godot/voxelgames/rendering/asset-lod`, which itself records that atlas
 grid, depth blending and transition pixels were **not** benchmarked on the target
@@ -488,7 +488,7 @@ order the stages architecture → circulation → planting, and clear by the mea
 trunk radius, not a bounding box. *Reason:* a plant placed later on a route cuts
 the route, and the later stage always wins. *Failure:* the shore case, verbatim —
 reserving the apron is insufficient because a later bush can cut its upstream yard
-route. *BigGlade:* this one is already right, and it is the store's best runnable
+route. *BrickWild:* this one is already right, and it is the store's best runnable
 rule. `VillageDresser` runs `_spots_for()` candidates through `_prop_is_clear()` /
 `_plant_is_clear()` with `PROP_CLEAR 0.35`, `DOOR_CLEAR 1.2`, `ROAD_CLEAR 0.4`,
 `TRUNK_CLEAR 1.0`, `CANOPY_SLACK 0.1`, and `qa/village_dress_check.gd`
@@ -501,7 +501,7 @@ surface, a normal, a contact point, a support extent and a growth constraint. It
 then belongs to the building's dressing stage and is measured by the building's
 QA, not the landscape's. *Failure:* a plant's bounding box is not the wall it
 grows on — the general form of the trap already recorded as "a terrain sampler is
-not what a 0.2 m object stands on". *BigGlade:* **no ivy, vine, creeper, climber,
+not what a 0.2 m object stands on". *BrickWild:* **no ivy, vine, creeper, climber,
 foliage or overgrowth anywhere** — 0 hits over `src/`, `core/`, `qa/`, `tools/`,
 `docs/`. Vegetation is instanced art and never grows onto a wall;
 `HouseExterior.dress()` places wall props only. The measurement substrate is
@@ -512,7 +512,7 @@ already there (FO-02); only the attachment is missing. *Source:* the
 outermost band of trees is the silhouette. Give it its own species, height and
 density rather than letting the scatter run out. *Reason:* a forest that thins to
 nothing has no edge, and a settlement with no edge has no shape from a distance.
-*Failure:* grass and pebbles left in the edge band read as litter. *BigGlade:*
+*Failure:* grass and pebbles left in the edge band read as litter. *BrickWild:*
 `VillageDresser._edge_band()` / `_hedges()` and `VillageDressCheck` already do the
 settlement-edge version — `EDGE_PITCH 6.0`, `EDGE_REACH 6.0`, `EDGE_RUN_MAX 25.0`,
 `GREEN_TREES_MAX 3`, and `_visible_edge_plant()` rejects grass and pebbles as edge
@@ -528,7 +528,7 @@ which is expensive, per-tree, and only worth it where one tree is the subject.
 *Reason:* colonization gives a believable branch graph from an attractor set at the
 cost of an iteration loop per tree. *Failure:* a self-organizing model re-run for
 every tree in a stand is the same mistake as re-running the furnisher search per
-prop. *BigGlade:* 104 measured plant models exist and are regression-tested; the
+prop. *BrickWild:* 104 measured plant models exist and are regression-tested; the
 answer here is unambiguously the catalogue, and there is correctly no tree
 generation. *Source:* Runions et al. (SIGGRAPH 2005,
 [doi:10.1145/1186822.1073251](https://doi.org/10.1145/1186822.1073251)),
@@ -554,7 +554,7 @@ Togelius, [arXiv:1906.05094](https://arxiv.org/abs/1906.05094).
 during mesh emission leaves nothing to check the inference against, and makes undo
 impossible. *Failure:* structure that exists only as emitted triangles cannot be
 queried, cannot be validated, and cannot be re-derived. *Tiny Glade:* "Draw a path
-through a building? A door pops up!" *BigGlade:* the reverse direction already
+through a building? A door pops up!" *BrickWild:* the reverse direction already
 exists as a good check — "exterior promises require interior evidence" says a
 front door promises an entry route. Reactive assembly needs the other direction,
 and both are cheap once both exist.
@@ -564,7 +564,7 @@ when a mass is raised, derive the shortest support path to the ground, snap it t
 column grid, add beams where the span is long. Treat a support change as a plan
 change, not a mesh patch. *Failure:* authored columns drift from the mass they hold
 the moment the mass moves, and nothing re-checks. *Tiny Glade:* "Raise the
-building? Columns and beams line up to support it." *BigGlade:* `qa/mass_rules.gd`
+building? Columns and beams line up to support it." *BrickWild:* `qa/mass_rules.gd`
 `grounded()` proves every mass touches its declared ground — a support check with
 exactly one permitted relation. It cannot express "held by these columns", because
 nothing in the codebase models a column as anything but a mass. The primitive
@@ -580,7 +580,7 @@ reusing the stack for a cosy toy produces a generator that sometimes emits
 nothing, which the toy forbids. *Failure:* a rejected candidate is a hole in the
 world where the player drew a wall. *Tiny Glade:* "There are no wrong answers or
 failure states. You can change your mind at any time, and whatever you make will
-look cozy out of the box." *BigGlade:* the store's shape is the opposite —
+look cozy out of the box." *BrickWild:* the store's shape is the opposite —
 "repair where possible, and reject irreparable candidates", and "a budget hit is
 not a proof... return an exhausted flag". The third answer is to absorb the
 violation into the mass.
@@ -590,7 +590,7 @@ violation into the mass.
 with measured support first. *Reason:* it breaks the box read immediately, needs
 no new mass primitive, and reuses the `SceneBounds` measurement this project
 already has. *Failure:* unattached vegetation is a level-dressing pass, which is
-what it is. *Tiny Glade:* "Ivy envelops your buildings." *BigGlade:* substrate
+what it is. *Tiny Glade:* "Ivy envelops your buildings." *BrickWild:* substrate
 measured and tested (FO-02), attachment absent (FO-08). *This is the
 highest value-per-effort move on the list.*
 
@@ -600,7 +600,7 @@ just the geometry. *Reason:* this project's facade grammar assumes one plane per
 face with a crisp normal per architectural surface; a bulged wall has one
 continuous normal, and the crispness that makes stone read correctly is gone.
 *Failure:* a single smooth group spans the whole building and every edge goes soft.
-*BigGlade:* `MeshKit._face_normal` is the single winding authority — Godot's front
+*BrickWild:* `MeshKit._face_normal` is the single winding authority — Godot's front
 faces are clockwise, so a triangle wound (a, b, c) has outward normal
 `(c - a).cross(b - a)` — and `MeshKit.commit()` deliberately does **not** call
 `generate_normals()`. `revolve()` already emits curved surfaces, so the obstacle is
@@ -615,7 +615,7 @@ is neither, and a human staring at a PNG is the current substitute. *Failure:*
 the failure is invisible until someone happens to render that seed — and
 `src/ui/studio.gd::_frame`, the function that decides what a viewer sees, is
 itself untested, so a regression in framing passes every check in the repository.
-*BigGlade:* no test or `qa/` file references a `Camera3D`; there is no image
+*BrickWild:* no test or `qa/` file references a `Camera3D`; there is no image
 comparison anywhere. `tools/render_shots.gd` sets the right principle — a render
 is documentation, so it reuses the same fixture rows the landmark suites build and
 would rather document nothing than document a house that fails its own checks.

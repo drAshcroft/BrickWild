@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Wall time per "family step", in ms. Always summarised in the suite notes
 ## (one line per family); the raw per-step lines are printed when the
-## BIG_GLADE_TEST_TRACE environment variable is set.
+## BRICK_WILD_TEST_TRACE environment variable is set.
 static var _tm: Dictionary = {}
 
 ## The bounded selector (`libraryquick`) runs every rule once on the smallest
@@ -22,7 +22,7 @@ static var _cache: Dictionary = {}
 static func _lap(family: Variant, step: String, started: int) -> void:
 	var key := "%s %s" % [String(family), step]
 	_tm[key] = int(_tm.get(key, 0)) + Time.get_ticks_msec() - started
-	if OS.get_environment("BIG_GLADE_TEST_TRACE") != "":
+	if OS.get_environment("BRICK_WILD_TEST_TRACE") != "":
 		print("[library] %s +%d ms" % [key, Time.get_ticks_msec() - started])
 
 
@@ -112,15 +112,15 @@ static func _run(quick: bool) -> SuiteResult:
 	_check_every_kind_covered(res, requests)
 	_check_world_generic_envelope(res)
 
-	var descriptor: Dictionary = BigGlade.describe_kind(&"house")
+	var descriptor: Dictionary = BrickWild.describe_kind(&"house")
 	res.checked += 1
-	if descriptor.get("api_version") != BigGlade.API_VERSION \
+	if descriptor.get("api_version") != BrickWild.API_VERSION \
 			or (descriptor.get("styles", []) as Array).is_empty() \
 			or (descriptor.get("purposes", []) as Array).is_empty() \
 			or not descriptor.has("storeys"):
 		res.fail("house descriptor is incomplete")
 	descriptor["width"]["min"] = -1.0
-	if BigGlade.describe_kind(&"house")["width"]["min"] < 0.0:
+	if BrickWild.describe_kind(&"house")["width"]["min"] < 0.0:
 		res.fail("describe_kind returned mutable library state")
 
 	# Storeys are an explicit house input and survive both the detached request
@@ -133,7 +133,7 @@ static func _run(quick: bool) -> SuiteResult:
 	res.checked += 1
 	if stacked_request.storeys != 2 or stacked_copy.storeys != 2:
 		res.fail("house storeys did not survive request copy")
-	var stacked: GeneratedBuilding = BigGlade.generate(stacked_request)
+	var stacked: GeneratedBuilding = BrickWild.generate(stacked_request)
 	res.checked += 1
 	var stacked_spec: HouseSpec = stacked.spec as HouseSpec
 	if not stacked.is_ok() or stacked_spec == null or stacked_spec.storeys != 2 \
@@ -168,7 +168,7 @@ static func _check_every_kind_covered(res: SuiteResult, requests: Array[Building
 	var covered := {&"village": true, &"world": true}  # _check_village_kind, _check_world_kind
 	for request in requests:
 		covered[request.kind] = true
-	for kind in BigGlade.kinds():
+	for kind in BrickWild.kinds():
 		res.checked += 1
 		if not covered.has(kind):
 			res.fail("libraryquick does not exercise the published kind '%s'" % String(kind))
@@ -177,37 +177,37 @@ static func _check_every_kind_covered(res: SuiteResult, requests: Array[Building
 static func _check_world_kind(res: SuiteResult) -> void:
 	if not _quick:
 		return
-	var request := BigGlade.default_request(&"world", 828)
+	var request := BrickWild.default_request(&"world", 828)
 	request.style = &"insula"
 	request.purpose = &"port_tenement"
 	request.width = 30.0
 	request.length = 24.0
 	request.height = 15.0
 	var t0 := Time.get_ticks_msec()
-	var made: GeneratedBuilding = BigGlade.generate(request)
+	var made: GeneratedBuilding = BrickWild.generate(request)
 	_lap("world", "generate", t0)
 	res.checked += 1
 	if not made.is_ok():
 		res.fail("world: insula did not generate: %s" % made.errors)
 		return
 	t0 = Time.get_ticks_msec()
-	var mesh: ArrayMesh = BigGlade.build_mesh(made)
+	var mesh: ArrayMesh = BrickWild.build_mesh(made)
 	_lap("world", "build", t0)
 	res.checked += 1
 	if mesh == null or mesh.get_surface_count() != 4:
 		res.fail("world: the mesh does not have four surfaces")
-	var placement: Dictionary = BigGlade.placement(made)
+	var placement: Dictionary = BrickWild.placement(made)
 	var fp: Rect2 = placement.get("footprint", Rect2())
 	var door: Vector3 = placement.get("door", Vector3.ZERO)
 	res.checked += 1
 	if placement.get("kind") != &"world" or placement.get("front") != Vector3(0.0, 0.0, -1.0) 			or absf(door.z - fp.position.y) > 0.6:
 		res.fail("world: placement identity, front or door is wrong: %s" % placement)
-	var doc: BuildingDocument = BigGlade.generate_document(request)
+	var doc: BuildingDocument = BrickWild.generate_document(request)
 	res.checked += 1
 	if doc == null or not doc.is_ok() or doc.placement != placement 			or not (JSON.parse_string(JSON.stringify(doc.to_dict())) is Dictionary):
 		res.fail("world: the document differs from the generation or is not plain data")
 	t0 = Time.get_ticks_msec()
-	var scene: Node3D = BigGlade.instantiate(made, true)
+	var scene: Node3D = BrickWild.instantiate(made, true)
 	_lap("world", "instantiate", t0)
 	res.checked += 1
 	if scene == null:
@@ -217,7 +217,7 @@ static func _check_world_kind(res: SuiteResult) -> void:
 
 
 static func _check_world_generic_envelope(res: SuiteResult) -> void:
-	var descriptor: Dictionary = BigGlade.describe_kind(&"world")
+	var descriptor: Dictionary = BrickWild.describe_kind(&"world")
 	var tower_envelope: Dictionary = WorldFamilies.envelope(&"tower_house")
 	var tower_max := float(tower_envelope["height"]["max"])
 	res.checked += 1
@@ -267,28 +267,28 @@ static func _has_dimension_failure(failures: Array[Dictionary], field: StringNam
 ## its own footprint, and it assembles to a scene.
 static func _check_village_kind(res: SuiteResult) -> void:
 	res.checked += 1
-	if not &"village" in BigGlade.kinds():
+	if not &"village" in BrickWild.kinds():
 		res.fail("village: the kind is not registered")
 		return
-	var d: Dictionary = BigGlade.describe_kind(&"village")
+	var d: Dictionary = BrickWild.describe_kind(&"village")
 	res.checked += 1
 	if d.get("width_label", "") != "Population" or d.get("style_label") != "Culture" 			or (d.get("styles", []) as Array).size() != VillageSpec.CULTURES.size() 			or (d.get("purposes", []) as Array).size() != VillageSpec.PURPOSES.size():
 		res.fail("village: the descriptor does not publish its own controls: %s" % d)
 	# a population out of range is refused in the village's own words
-	var small: BuildingRequest = BigGlade.default_request(&"village", 1)
+	var small: BuildingRequest = BrickWild.default_request(&"village", 1)
 	small.width = 9.0
-	var refused: GeneratedBuilding = BigGlade.generate(small)
+	var refused: GeneratedBuilding = BrickWild.generate(small)
 	res.checked += 1
 	if refused.is_ok() or not str(refused.errors).contains("Population"):
 		res.fail("village: a population of 9 was not refused in its own words: %s"
 			% refused.errors)
 
-	var request: BuildingRequest = BigGlade.default_request(&"village", 9101)
+	var request: BuildingRequest = BrickWild.default_request(&"village", 9101)
 	request.style = &"english"
 	request.purpose = &"farming"
 	request.width = 12.0 if _quick else 40.0
 	var t0 := Time.get_ticks_msec()
-	var made: GeneratedBuilding = BigGlade.generate(request)
+	var made: GeneratedBuilding = BrickWild.generate(request)
 	_lap("village", "generate", t0)
 	res.checked += 1
 	if not made.is_ok() or made.village == null or made.village.buildings.is_empty():
@@ -298,12 +298,12 @@ static func _check_village_kind(res: SuiteResult) -> void:
 	if made.representation() != made.village:
 		res.fail("village: the generated representation is not its plan")
 	t0 = Time.get_ticks_msec()
-	var mesh: ArrayMesh = BigGlade.build_mesh(made)
+	var mesh: ArrayMesh = BrickWild.build_mesh(made)
 	_lap("village", "build", t0)
 	res.checked += 1
 	if mesh == null or mesh.get_surface_count() == 0:
 		res.fail("village: the kind emitted no mesh")
-	var pl: Dictionary = BigGlade.placement(made)
+	var pl: Dictionary = BrickWild.placement(made)
 	res.checked += 1
 	if pl.get("kind") != &"village" or pl.get("front") != Vector3(0.0, 0.0, -1.0):
 		res.fail("village: placement identity or orientation is wrong: %s" % pl)
@@ -314,7 +314,7 @@ static func _check_village_kind(res: SuiteResult) -> void:
 		res.fail("village: its gate is %.2fm off the -Z edge of its own site"
 			% (door.z - fp.position.y))
 	t0 = Time.get_ticks_msec()
-	var scene: Node3D = BigGlade.instantiate(made)
+	var scene: Node3D = BrickWild.instantiate(made)
 	_lap("village", "instantiate", t0)
 	res.checked += 1
 	if scene == null or scene.get_node_or_null("Buildings") == null:
@@ -331,13 +331,13 @@ static func _check_documents(res: SuiteResult, requests: Array[BuildingRequest])
 	for request in requests:
 		var where := "kind=%s seed=%d" % [String(request.kind), request.seed]
 		var t0 := Time.get_ticks_msec()
-		var doc: BuildingDocument = BigGlade.generate_document(request)
+		var doc: BuildingDocument = BrickWild.generate_document(request)
 		_lap(request.kind, "documents", t0)
 		# the first pass's generation, judged again here rather than rebuilt
 		var entry: Dictionary = _cache.get(_key(request), {})
 		var made: GeneratedBuilding = entry.get("made")
 		if made == null:
-			made = BigGlade.generate(request)
+			made = BrickWild.generate(request)
 		res.checked += 1
 		if doc == null or not doc.is_ok():
 			res.fail("document: %s did not generate: %s" % [where, doc.errors if doc else "null"])
@@ -360,11 +360,11 @@ static func _check_documents(res: SuiteResult, requests: Array[BuildingRequest])
 		res.checked += 1
 		var made_mesh: ArrayMesh = entry.get("mesh")
 		if made_mesh == null:
-			made_mesh = BigGlade.build_mesh(made)
+			made_mesh = BrickWild.build_mesh(made)
 		var made_placement: Dictionary = entry.get("pa", {})
 		if made_placement.is_empty():
-			made_placement = BigGlade.placement(made)
-		if not _same_mesh(BigGlade.build_mesh(doc), made_mesh):
+			made_placement = BrickWild.placement(made)
+		if not _same_mesh(BrickWild.build_mesh(doc), made_mesh):
 			res.fail("document: builds a different mesh from its own generation, " + where)
 		res.checked += 1
 		if doc.placement != made_placement:
@@ -399,9 +399,9 @@ static func _check_documents(res: SuiteResult, requests: Array[BuildingRequest])
 	# a refused request is a document that says why and builds nothing
 	var bad := BuildingRequest.house(1)
 	bad.purpose = &"dragon_tamer"
-	var refused: BuildingDocument = BigGlade.generate_document(bad)
+	var refused: BuildingDocument = BrickWild.generate_document(bad)
 	res.checked += 1
-	if refused.is_ok() or refused.errors.is_empty() or BigGlade.build_mesh(refused) != null:
+	if refused.is_ok() or refused.errors.is_empty() or BrickWild.build_mesh(refused) != null:
 		res.fail("document: an invalid request produced a buildable document")
 	elif not refused.placement.is_empty():
 		res.fail("document: a refused document carries a placement")
@@ -410,7 +410,7 @@ static func _check_documents(res: SuiteResult, requests: Array[BuildingRequest])
 static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	var before := _request_fingerprint(request)
 	var t0 := Time.get_ticks_msec()
-	var made: GeneratedBuilding = BigGlade.generate(request)
+	var made: GeneratedBuilding = BrickWild.generate(request)
 	_lap(request.kind, "generate", t0)
 	res.checked += 1
 	var where := "kind=%s seed=%d" % [String(request.kind), request.seed]
@@ -433,7 +433,7 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 		res.fail("non-house result unexpectedly has a house plan, " + where)
 
 	t0 = Time.get_ticks_msec()
-	var mesh: ArrayMesh = BigGlade.build_mesh(made)
+	var mesh: ArrayMesh = BrickWild.build_mesh(made)
 	_lap(request.kind, "build", t0)
 	t0 = Time.get_ticks_msec()
 	var legacy: Array = _legacy(request)
@@ -458,10 +458,10 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	var entry := {"made": made, "mesh": mesh}
 	if not _quick:
 		t0 = Time.get_ticks_msec()
-		var again: GeneratedBuilding = BigGlade.generate(request)
+		var again: GeneratedBuilding = BrickWild.generate(request)
 		_lap(request.kind, "generate", t0)
 		t0 = Time.get_ticks_msec()
-		var again_mesh: ArrayMesh = BigGlade.build_mesh(again)
+		var again_mesh: ArrayMesh = BrickWild.build_mesh(again)
 		_lap(request.kind, "build", t0)
 		if made.name() != again.name() or not _same_mesh(mesh, again_mesh):
 			res.fail("facade is not deterministic, " + where)
@@ -474,10 +474,10 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	# snapshot a caller receives for diagnostics.
 	var generated_kind: StringName = made.request.kind
 	made.request.kind = &"temple" if generated_kind != &"temple" else &"church"
-	if not _same_mesh(mesh, BigGlade.build_mesh(made)):
+	if not _same_mesh(mesh, BrickWild.build_mesh(made)):
 		res.fail("mutating the request snapshot broke mesh dispatch, " + where)
 	made.request.kind = generated_kind
-	var placement: Dictionary = BigGlade.placement(made)
+	var placement: Dictionary = BrickWild.placement(made)
 	entry["pa"] = placement
 	_cache[_key(request)] = entry
 	var bounds: AABB = placement.get("bounds", AABB())
@@ -488,8 +488,8 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 		res.fail("placement bounds are empty, " + where)
 
 	t0 = Time.get_ticks_msec()
-	var scene_a: Node3D = BigGlade.instantiate(made, true, true)
-	var scene_b: Node3D = BigGlade.instantiate(made, true)
+	var scene_a: Node3D = BrickWild.instantiate(made, true, true)
+	var scene_b: Node3D = BrickWild.instantiate(made, true)
 	_lap(request.kind, "instantiate", t0)
 	if scene_a == null or scene_b == null or scene_a == scene_b:
 		res.fail("facade did not create fresh scene instances, " + where)
@@ -498,8 +498,8 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	elif request.kind == &"temple" and scene_a.get_node_or_null("Dressing") == null:
 		res.fail("assembled temple omitted its dressing, " + where)
 	if scene_a != null:
-		if not scene_a.has_meta(&"big_glade") \
-				or scene_a.get_meta(&"big_glade_kind") != request.kind \
+		if not scene_a.has_meta(&"brick_wild") \
+				or scene_a.get_meta(&"brick_wild_kind") != request.kind \
 				or scene_a.find_child("*col", true, false) == null:
 			res.fail("scene identity or collision is incomplete, " + where)
 	if scene_a != null:
@@ -570,14 +570,14 @@ static func _same_mesh(a: ArrayMesh, b: ArrayMesh) -> bool:
 
 static func _check_invalid(res: SuiteResult, request: BuildingRequest,
 		want_code: StringName) -> void:
-	var made: GeneratedBuilding = BigGlade.generate(request)
+	var made: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if made.is_ok() or made.errors.is_empty():
 		res.fail("invalid request succeeded: %s" % String(want_code))
 		return
 	for error in made.errors:
 		if error["code"] == want_code:
-			if BigGlade.build_mesh(made) != null:
+			if BrickWild.build_mesh(made) != null:
 				res.fail("invalid request emitted a mesh: %s" % String(want_code))
 			return
 	res.fail("invalid request did not report %s: %s" % [String(want_code), made.errors])
@@ -594,15 +594,15 @@ static func _request_fingerprint(request: BuildingRequest) -> Array:
 ## giving the same placement, name and mesh.
 static func _check_contract(res: SuiteResult, requests: Array[BuildingRequest]) -> void:
 	res.checked += 1
-	if BigGlade.API_VERSION != 1:
-		res.fail("contract: API_VERSION is %d; README documents 1" % BigGlade.API_VERSION)
-	for kind in BigGlade.kinds():
+	if BrickWild.API_VERSION != 2:
+		res.fail("contract: API_VERSION is %d; README documents 2" % BrickWild.API_VERSION)
+	for kind in BrickWild.kinds():
 		res.checked += 1
-		var d: Dictionary = BigGlade.describe_kind(kind)
-		if d.get("api_version") != BigGlade.API_VERSION or not d.has("styles") \
+		var d: Dictionary = BrickWild.describe_kind(kind)
+		if d.get("api_version") != BrickWild.API_VERSION or not d.has("styles") \
 				or not d.has("width") or not d.has("length") or not d.has("height"):
 			res.fail("contract: describe_kind(%s) lacks the version or an envelope" % String(kind))
-	var world: Dictionary = BigGlade.describe_kind(&"world")
+	var world: Dictionary = BrickWild.describe_kind(&"world")
 	res.checked += 1
 	if not world.has("families"):
 		res.fail("contract: the world descriptor lists no families field")
@@ -621,9 +621,9 @@ static func _check_contract(res: SuiteResult, requests: Array[BuildingRequest]) 
 		var a: GeneratedBuilding = entry.get("made")
 		var b: GeneratedBuilding = entry.get("again")
 		if a == null:
-			a = BigGlade.generate(request)
+			a = BrickWild.generate(request)
 		if b == null and not _quick:
-			b = BigGlade.generate(request)
+			b = BrickWild.generate(request)
 		_lap(request.kind, "contract", t0)
 		res.checked += 1
 		if a == null or (b == null and not _quick) or not a.is_ok() or (b != null and not b.is_ok()):
@@ -631,8 +631,8 @@ static func _check_contract(res: SuiteResult, requests: Array[BuildingRequest]) 
 			continue
 		var pa: Dictionary = entry.get("pa", {})
 		if pa.is_empty():
-			pa = BigGlade.placement(a)
-		var pb: Dictionary = BigGlade.placement(b) if b != null else pa
+			pa = BrickWild.placement(a)
+		var pb: Dictionary = BrickWild.placement(b) if b != null else pa
 		for key in ["api_version", "kind", "seed", "name", "bounds", "footprint", "front", "door"]:
 			if not pa.has(key):
 				res.fail("contract: placement(%s) has no %s" % [String(request.kind), key])
@@ -646,10 +646,10 @@ static func _check_contract(res: SuiteResult, requests: Array[BuildingRequest]) 
 			res.fail("contract: %s's door is %.2fm off the footprint's -Z edge" % [String(request.kind), door.z - fp.position.y])
 		var mesh: ArrayMesh = entry.get("mesh")
 		if mesh == null:
-			mesh = BigGlade.build_mesh(a)
+			mesh = BrickWild.build_mesh(a)
 		var mesh_b: ArrayMesh = entry.get("again_mesh")
 		if mesh_b == null and b != null:
-			mesh_b = BigGlade.build_mesh(b)
+			mesh_b = BrickWild.build_mesh(b)
 		if mesh == null or mesh.get_surface_count() != 4:
 			res.fail("contract: %s's mesh does not have four surfaces" % String(request.kind))
 		elif mesh_b != null and not _same_mesh(mesh, mesh_b):

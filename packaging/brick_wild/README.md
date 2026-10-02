@@ -4,11 +4,11 @@ BrickWild generates deterministic churches, castles, furnished houses, medieval
 shops/civic buildings, grand hotels, and temples from a seed and size request. The
 tested target is Godot 4.5.2; newer versions have not been verified.
 
-Install the addon at exactly `res://addons/big_glade`. From the BrickWild source
+Install the addon at exactly `res://addons/brick_wild`. From the BrickWild source
 repository, the Windows-tested installer is:
 
 ```powershell
-.\tools\install_big_glade_addon.ps1 -TargetProject C:\path\to\GodotProject
+.\tools\install_brick_wild_addon.ps1 -TargetProject C:\path\to\GodotProject
 ```
 
 The source checkout must contain the dungeon, nature, wild, and fantasy prop
@@ -27,10 +27,10 @@ empty, so enabling it is optional.
 
 ```gdscript
 var request := BuildingRequest.house(42, &"cottage", &"smith", 9.0, 12.0, 2.6)
-var generated := BigGlade.generate(request)
+var generated := BrickWild.generate(request)
 if generated.is_ok():
-	var placement: Dictionary = BigGlade.placement(generated)
-	var building: Node3D = BigGlade.instantiate(generated, false, true)
+	var placement: Dictionary = BrickWild.placement(generated)
+	var building: Node3D = BrickWild.instantiate(generated, false, true)
 	add_child(building)
 ```
 
@@ -39,14 +39,14 @@ For a workplace, use for example
 For the palatial landmark hotel, use
 `BuildingRequest.hotel(42, &"grand_budapest", 48.0, 24.0, 3.6)`.
 
-Use `BigGlade.build_mesh(generated)` when only an `ArrayMesh` is needed. Calling
-`BigGlade.generate(request)` produces the family representation without first
+Use `BrickWild.build_mesh(generated)` when only an `ArrayMesh` is needed. Calling
+`BrickWild.generate(request)` produces the family representation without first
 creating scene nodes. `placement()` returns measured bounds, footprint and the
 local -Z front; the third `instantiate()` argument enables shell-only collision.
 
-The installer owns only files listed in `.big_glade_install_manifest.json`.
+The installer owns only files listed in `.brick_wild_install_manifest.json`.
 Updating the addon removes obsolete files from that prior managed set while
-leaving unrelated files under `addons/big_glade` untouched.
+leaving unrelated files under `addons/brick_wild` untouched.
 
 The four local Quaternius packs (Fantasy Props MegaKit, Dungeon Kit, Nature Kit,
 and Stylized Nature MegaKit) identify CC0 terms in their local license texts.

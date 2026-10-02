@@ -3,7 +3,7 @@ House exterior task runbook
 
 These tasks implement the findings in [HOUSE_RULES_EVALUATION.md](HOUSE_RULES_EVALUATION.md). The authoritative live status/dependencies are in the waterfree task store. This file and `docs/tasks/house_exterior_tasks.json` preserve the instructions in the repository, since `.waterfree/` and `artifacts/` are ignored. The initial backlog was diagnostic; implementation and remaining scope are now recorded in [HOUSE_ROOF_FIX.md](HOUSE_ROOF_FIX.md) and task aiNotes. Pending does not mean untouched: read those notes before repeating a geometry repair.
 
-Start with `waterfree todos search HOUSE-EXT- --workspace C:/Projects/BigGlade` or `get-ready`. Claim only a ready task, set it executing, and read its dependencies' completion notes. Do not infer completion from old roof tasks: the earlier overhead-coverage repair is complete but its overlapping-slab approach is explicitly superseded by HOUSE-EXT-003.
+Start with `waterfree todos search HOUSE-EXT- --workspace .` or `get-ready`. Claim only a ready task, set it executing, and read its dependencies' completion notes. Do not infer completion from old roof tasks: the earlier overhead-coverage repair is complete but its overlapping-slab approach is explicitly superseded by HOUSE-EXT-003.
 
 All lengths below are metres. House axes: +X right, +Y up, +Z back; the front is -Z. The builder rotates the roof to follow the longer footprint dimension, so roof-local sides are not always world-space sides. Use symbol searches when line numbers drift.
 
@@ -23,21 +23,21 @@ PowerShell commands (Godot is not on PATH):
 ```powershell
 $godotExe = 'C:/Projects/godot/Godot_v4.5.2-stable_mono_win64/Godot_v4.5.2-stable_mono_win64.exe'
 # Only required after adding a NEW class_name:
-& $godotExe --headless --path C:/Projects/BigGlade --editor --quit
+& $godotExe --headless --path . --editor --quit
 # Choose suites relevant to your task, not every suite on every edit:
-& $godotExe --headless --path C:/Projects/BigGlade --script res://tests/run_all.gd -- house houseqa hmultistory harchetype
+& $godotExe --headless --path . --script res://tests/run_all.gd -- house houseqa hmultistory harchetype
 # Changed prop files require remeasurement, then assets suite:
-& $godotExe --headless --path C:/Projects/BigGlade --script res://tools/build_prop_catalog.gd
-& $godotExe --headless --path C:/Projects/BigGlade --script res://tests/run_all.gd -- assets
+& $godotExe --headless --path . --script res://tools/build_prop_catalog.gd
+& $godotExe --headless --path . --script res://tests/run_all.gd -- assets
 # Existing tracked render starting point; do NOT add --headless:
-& $godotExe --path C:/Projects/BigGlade --script res://tools/render_house_roofs.gd -- --full
+& $godotExe --path . --script res://tools/render_house_roofs.gd -- --full
 ```
 
 HOUSE-EXT-001 now provides `tests/run_all.gd -- hroof hexterior`, `tests/house_roof_test.gd -- --full` and `tools/render_house_roofs.gd -- --full`. Historical `artifacts/eval_house_rules.gd` and `artifacts/probe_house_rules.gd` are useful if present, but not guaranteed in a fresh checkout. Existing images are under `artifacts/house_rules_eval/`. The `roof_farm_*` images are the natural seed; `roof_farm_hip_*` is an explicitly forced-hip control. The basic house suite completed 123 checks without reported failures in the evaluation; houseqa/hmultistory/harchetype did not complete in that run. Do not reuse historical task notes as proof that today's full suite passes.
 
 Read AGENTS.md for the full rules. In particular: a GDScript parse error can hang a headless process; inspect the start of its error log instead of waiting indefinitely. Front faces are clockwise and `MeshKit._face_normal` owns the convention; never call generate_normals to paper over it. HousePlan is the truth, the builder is a pure emitter, and HouseAssembler is the only house model-loading boundary. Measure furniture/prop dimensions; reuse WalkGrid; preserve documented furnishing compromises.
 
-When introducing files/classes/surfaces/serialized fields, inspect `tools/big_glade_addon_manifest.json`, the addon installer tests, BuildingFamilyAdapter and BuildingDocument as applicable. Shared MeshKit changes may affect castle, hotel, temple and PropKit; discover actual callers and run their relevant suites. Do not automatically broaden a house fix into unrelated building-rule changes.
+When introducing files/classes/surfaces/serialized fields, inspect `tools/brick_wild_addon_manifest.json`, the addon installer tests, BuildingFamilyAdapter and BuildingDocument as applicable. Shared MeshKit changes may affect castle, hotel, temple and PropKit; discover actual callers and run their relevant suites. Do not automatically broaden a house fix into unrelated building-rule changes.
 
 Dependency order controls prerequisites, not exclusive file ownership. HOUSE-EXT-003/004/005 may touch the same builder/mesh code: inspect the current diff before editing and coordinate if another agent owns those files. These tasks authorize backlog work, not automatic parallel execution.
 

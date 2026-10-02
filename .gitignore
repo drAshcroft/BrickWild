@@ -12,7 +12,7 @@ artifacts/*
 __pycache__/
 *.pyc
 
-# Art packs: BigGlade is private and props are not published with it
+# Art packs are licensed separately from the source repository.
 assets/props/dungeon/
 
 # The two nature packs, on the same footing as the dungeon kit above: the art

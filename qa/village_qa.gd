@@ -73,14 +73,14 @@ static func dressing_map(plan: VillagePlan, cols := 78) -> String:
 ## The family harness for one building of the plan, regenerated from its
 ## request the way the lot planner measured it.
 static func _building_qa(b: Dictionary) -> Dictionary:
-	return _native_qa(BigGlade.generate(b["request"]))
+	return _native_qa(BrickWild.generate(b["request"]))
 
 
 ## Use the public family dispatch, including church blueprint and castle
 ## voxel/interior QA. Native checks use local architecture; the village's lot
 ## and navigation checks separately judge the placed transform and access.
 static func _native_qa(built: GeneratedBuilding) -> Dictionary:
-	var report := BigGlade.check(built)
+	var report := BrickWild.check(built)
 	var failures: Array[String] = []
 	var warnings: Array[String] = []
 	for diagnostic in report["diagnostics"]:

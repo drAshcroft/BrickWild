@@ -345,13 +345,13 @@ static func _api_bounds(res: SuiteResult) -> void:
 	made.request = BuildingRequest.house(4413)
 	made.spec = s
 	made.plan = plan
-	var bounds: AABB = BigGlade.placement(made)["bounds"]
+	var bounds: AABB = BrickWild.placement(made)["bounds"]
 	_expect(res, plan.yard_pieces.size() > 0, "api fixture lost its yard pieces to placement")
 	for p in plan.exterior:
 		_expect(res, bounds.grow(0.001).encloses(HouseExterior.bounds_of(p)), "public placement crops exterior prop " + p["key"])
 	# The yard is reported BESIDE the architectural bounds, not inside them:
 	# the envelope, the extent of what stands in it, and the ground it blocks.
-	var placed := BigGlade.placement(made)
+	var placed := BrickWild.placement(made)
 	_expect(res, placed["yard"] == HouseGeometry.yard_rect(plan), "placement does not report the yard envelope")
 	_expect(res, not plan.yard.is_empty() and not plan.yard_pieces.is_empty(), "api fixture has no yard")
 	var extent: Rect2 = placed["yard_extent"]
@@ -374,4 +374,4 @@ static func _api_bounds(res: SuiteResult) -> void:
 	_expect(res, roundtrip["exterior"].size() == plan.exterior.size(), "document lost exterior records")
 	_expect(res, roundtrip["exterior"][0]["bounds"].size() == 6, "document bounds are not numeric AABB data")
 	s.exterior_props = false
-	_expect(res, BigGlade.placement(made)["bounds"] == HouseBuilder.new().build(plan).get_aabb(), "disabled props still expand public bounds")
+	_expect(res, BrickWild.placement(made)["bounds"] == HouseBuilder.new().build(plan).get_aabb(), "disabled props still expand public bounds")

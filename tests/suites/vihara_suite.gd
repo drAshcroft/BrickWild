@@ -13,7 +13,7 @@ static func run() -> SuiteResult:
 	request.width = 50.0
 	request.length = 40.0
 	request.height = 5.0
-	var building: GeneratedBuilding = BigGlade.generate(request)
+	var building: GeneratedBuilding = BrickWild.generate(request)
 	res.checked += 1
 	if building == null or not building.is_ok():
 		res.fail("Monks' Cloister 50 x 40 x 5 did not generate: %s" %

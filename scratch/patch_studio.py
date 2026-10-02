@@ -5,25 +5,25 @@ s = io.open(p, encoding='utf-8').read()
 # every family-table label lookup goes through the public option contract
 subs = [
  ('HotelSpec.HOTEL_STYLES[(plan.spec as HotelSpec).style]["label"]',
-  'BigGlade.option_label(&"hotel", &"style", (plan.spec as HotelSpec).style)'),
+  'BrickWild.option_label(&"hotel", &"style", (plan.spec as HotelSpec).style)'),
  ('ShopSpec.BUSINESSES[(plan.spec as ShopSpec).business]["label"]',
-  'BigGlade.option_label(&"shop", &"purpose", (plan.spec as ShopSpec).business)'),
+  'BrickWild.option_label(&"shop", &"purpose", (plan.spec as ShopSpec).business)'),
  ('HouseSpec.TRADES[plan.spec.trade]["label"]',
-  'BigGlade.option_label(&"house", &"purpose", plan.spec.trade)'),
+  'BrickWild.option_label(&"house", &"purpose", plan.spec.trade)'),
  ('TempleSpec.FORMS[s.form]["label"]',
-  'BigGlade.option_label(&"temple", &"style", s.form)'),
+  'BrickWild.option_label(&"temple", &"style", s.form)'),
  ('TempleSpec.CULTS[s.cult]["label"]',
-  'BigGlade.option_label(&"temple", &"purpose", s.cult)'),
+  'BrickWild.option_label(&"temple", &"purpose", s.cult)'),
  ('HotelSpec.HOTEL_STYLES[s.style]["label"]',
-  'BigGlade.option_label(&"hotel", &"style", s.style)'),
+  'BrickWild.option_label(&"hotel", &"style", s.style)'),
  ('ShopSpec.BUSINESSES[s.business]["label"]',
-  'BigGlade.option_label(&"shop", &"purpose", s.business)'),
+  'BrickWild.option_label(&"shop", &"purpose", s.business)'),
  ('HouseSpec.TRADES[s.trade]["label"]',
-  'BigGlade.option_label(&"house", &"purpose", s.trade)'),
+  'BrickWild.option_label(&"house", &"purpose", s.trade)'),
  ('CastleSpec.STYLES[s.style]["label"]',
-  'BigGlade.option_label(&"castle", &"style", s.style)'),
+  'BrickWild.option_label(&"castle", &"style", s.style)'),
  ('ChurchSpec.STYLES[s.style]["label"]',
-  'BigGlade.option_label(&"church", &"style", s.style)'),
+  'BrickWild.option_label(&"church", &"style", s.style)'),
 ]
 for old, new in subs:
     n = s.count(old)
@@ -31,12 +31,12 @@ for old, new in subs:
     s = s.replace(old, new)
 
 # the shop line names the shell style too, and a shop's styles are the house's
-old = 'HouseSpec.STYLES[s.style]["label"],\n\t\t\tBigGlade.option_label(&"shop", &"purpose", s.business)'
-new = 'BigGlade.option_label(&"shop", &"style", s.style),\n\t\t\tBigGlade.option_label(&"shop", &"purpose", s.business)'
+old = 'HouseSpec.STYLES[s.style]["label"],\n\t\t\tBrickWild.option_label(&"shop", &"purpose", s.business)'
+new = 'BrickWild.option_label(&"shop", &"style", s.style),\n\t\t\tBrickWild.option_label(&"shop", &"purpose", s.business)'
 assert s.count(old) == 1
 s = s.replace(old, new)
-old = 'HouseSpec.STYLES[s.style]["label"],\n\t\t\tBigGlade.option_label(&"house", &"purpose", s.trade)'
-new = 'BigGlade.option_label(&"house", &"style", s.style),\n\t\t\tBigGlade.option_label(&"house", &"purpose", s.trade)'
+old = 'HouseSpec.STYLES[s.style]["label"],\n\t\t\tBrickWild.option_label(&"house", &"purpose", s.trade)'
+new = 'BrickWild.option_label(&"house", &"style", s.style),\n\t\t\tBrickWild.option_label(&"house", &"purpose", s.trade)'
 assert s.count(old) == 1
 s = s.replace(old, new)
 io.open(p, 'w', encoding='utf-8', newline='\n').write(s)

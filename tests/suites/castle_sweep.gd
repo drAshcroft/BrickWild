@@ -46,7 +46,7 @@ static func tiers() -> Array:
 
 ## Build spec number `i` for (style, tier), generated and ready to build.
 static func spec_at(style: StringName, tier: StringName, i: int) -> CastleSpec:
-	if OS.get_environment("BIG_GLADE_TEST_TRACE") == "1":
+	if OS.get_environment("BRICK_WILD_TEST_TRACE") == "1":
 		print("castle case: %s %s index=%d seed=%d" % [style, tier, i, seed_at(tier, i)])
 	var row: Dictionary = SIZES[tier][i]
 	var spec := CastleSpec.new()

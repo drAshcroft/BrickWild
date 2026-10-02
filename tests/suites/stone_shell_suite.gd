@@ -259,14 +259,14 @@ static func _public_material(res: SuiteResult) -> void:
 	_expect(res, copy.material == &"stone", "request copy lost or aliased material")
 	_expect(res, BuildingLibrary.validate(copy).is_empty(), "public API rejected stone")
 	copy.material = &"paper"
-	var rejected := BigGlade.generate(copy)
+	var rejected := BrickWild.generate(copy)
 	var precise_error := false
 	for error in rejected.errors:
 		precise_error = precise_error or (error["code"] == &"invalid_material" and error["field"] == &"material")
 	_expect(res, precise_error and rejected.spec == null,
 		"unsupported material did not fail before generation with invalid_material/material")
 	copy.material = &"stone"
-	var doc := BigGlade.generate_document(copy)
+	var doc := BrickWild.generate_document(copy)
 	_expect(res, doc.is_ok(), "stone public document failed: %s" % str(doc.errors))
 	if not doc.is_ok():
 		return

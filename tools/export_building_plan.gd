@@ -45,7 +45,7 @@ static func building_plan(site: Dictionary, building_id: String) -> Dictionary:
 	if not record.get("request") is Dictionary or not record.get("transform") is Dictionary:
 		return _error("missing_generation_data", "Re-export C1 with request and transform fields; exact interiors cannot be recovered from a bounding box.")
 	var request := BuildingRequest.from_dict(record["request"])
-	var made := BigGlade.generate(request)
+	var made := BrickWild.generate(request)
 	if not made.is_ok():
 		return {"ok": false, "errors": made.errors}
 	if made.plan == null:
@@ -110,7 +110,7 @@ static func building_plan(site: Dictionary, building_id: String) -> Dictionary:
 			"key": f["key"], "at_m": [_n(position.x), _n(position.z)],
 			"elevation_m": _n(position.y), "facing": [_n(facing.x), _n(facing.z)]})
 	var out := {"schema": SCHEMA, "schema_version": 1, "building_id": building_id,
-		"kind": record.get("kind", String(request.kind)), "generator": "bigglade-0.3", "seed": str(request.seed),
+		"kind": record.get("kind", String(request.kind)), "generator": "brickwild-0.3", "seed": str(request.seed),
 		"rooms": rooms, "doors": doors, "windows": windows, "stairs": stairs, "furniture": furniture,
 		"compromises": BuildingDocument._plain(plan.compromises),
 		"entrance_door_id": "%s/d-%03d" % [building_id, plan.entrance()]}

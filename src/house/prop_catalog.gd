@@ -21,7 +21,7 @@ extends RefCounted
 ## corrects a model that was authored pointing some other way.
 
 const SOURCE_ASSET_ROOT := "res://assets/props/"
-const ADDON_ASSET_ROOT := "res://addons/big_glade/assets/props/"
+const ADDON_ASSET_ROOT := "res://addons/brick_wild/assets/props/"
 const CATALOG_FILE := "catalog.json"
 
 ## The art packs the props come from: which folder, and what the models are
@@ -367,10 +367,10 @@ const PROPS := {
 static var _sizes: Dictionary = {}
 
 
-## BigGlade can run from this repository or from its conventional Godot addon
+## BrickWild can run from this repository or from its conventional Godot addon
 ## location. Resolve once from the catalogue itself so callers do not need to
 ## configure paths and another project's unrelated res://assets folder cannot
-## be mistaken for BigGlade's art when the addon is installed.
+## be mistaken for BrickWild's art when the addon is installed.
 static func asset_root() -> String:
 	if not _resolved_asset_root.is_empty():
 		return _resolved_asset_root

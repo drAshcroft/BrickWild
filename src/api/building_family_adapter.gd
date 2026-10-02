@@ -8,7 +8,7 @@ extends RefCounted
 ## its own footprint and its own front door. Between them the facade needs to
 ## know neither.
 ##
-## Before this, `BigGlade` had a `match request.kind` for generation, a chain
+## Before this, `BrickWild` had a `match request.kind` for generation, a chain
 ## of `spec is ChurchSpec` for the mesh, another for the scene, another for
 ## the footprint and another for the door -- five places to edit, in five
 ## different orders, to add a family. `WorldFamilies` was already a registry

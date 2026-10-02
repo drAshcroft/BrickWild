@@ -6,7 +6,7 @@ extends RefCounted
 ## purposes it offers and the words for them all live here, and both halves of
 ## the boundary read the SAME rows:
 ##
-##   * `BigGlade.describe_kind()` publishes them, so a caller can discover
+##   * `BrickWild.describe_kind()` publishes them, so a caller can discover
 ##     what to ask for without importing a single family header.
 ##   * `validate()` rejects a request against them BEFORE any family
 ##     generator runs, so an unknown trade is one error dictionary rather than
@@ -23,7 +23,7 @@ extends RefCounted
 ## the house's business -- and this file only names which table is a kind's
 ## styles and which is its purposes.
 
-const API_VERSION := 1
+const API_VERSION := 2
 
 ## Every kind, in the order a menu should show them.
 const KINDS: Array[StringName] = [&"church", &"castle", &"house", &"shop",

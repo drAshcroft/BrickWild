@@ -1,6 +1,6 @@
 class_name BuildingRequest
 extends RefCounted
-## Public inputs for one deterministic BigGlade building.
+## Public inputs for one deterministic BrickWild building.
 ##
 ## Prefer the family-named factories below. They keep `style` and `purpose`
 ## transport-friendly while preserving the vocabulary callers actually use:
@@ -27,7 +27,7 @@ var water: StringName = &"none"
 var enclosure: StringName = &"none"
 var _decode_errors: Array[Dictionary] = []
 
-const SCHEMA := "bigglade.request"
+const SCHEMA := "brickwild.request"
 const SCHEMA_VERSION := 1
 
 
@@ -58,7 +58,7 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 	var out := BuildingRequest.new()
 	if data.get("schema", SCHEMA) != SCHEMA or data.get("schema_version", 1) != SCHEMA_VERSION:
 		out._decode_errors.append({"code": "unsupported_schema", "field": "schema_version",
-			"message": "Only bigglade.request schema 1 is supported."})
+			"message": "Only brickwild.request schema 1 is supported."})
 	var kinds: Variant = data.get("kind", "")
 	if kinds is String and StringName(kinds) in BuildingLibrary.kinds():
 		out = BuildingLibrary.defaults(StringName(kinds), 0) if out._decode_errors.is_empty() else out

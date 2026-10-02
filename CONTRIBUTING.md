@@ -15,7 +15,7 @@ Thank you for helping improve BrickWild. Please read the
 5. Keep a `.gd.uid` sidecar with any moved or added GDScript file that has one.
 
 Changes to an existing public request field or response key need special
-care. `BigGlade.API_VERSION` governs the public API contract;
+care. `BrickWild.API_VERSION` governs the public API contract;
 `docs/PUBLIC_API_TRANSPORT.md` describes serialization. Additive fields can
 retain the API version. Removing, renaming, or changing a field's meaning
 requires a version decision and migration notes.
