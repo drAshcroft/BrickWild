@@ -27,6 +27,7 @@ const YARD_MARGIN := 0.35   # air between two pieces of yard clutter
 const YARD_FIXTURES_PER_CLEAR_M2 := 0.012 # measured placements per clear ward m²
 const YARD_MAX_FIXTURES := 140
 const YARD_MIN_FIXTURES := 12
+const LOOSE_SHARE := 0.4   # share of the area-scaled count left loose once the yards are laid
 
 # ---- fire ----
 const SCONCE_H := 2.4
@@ -111,7 +112,9 @@ static func dress(spec: CastleSpec, yard_data: Dictionary = {}) -> Array[Diction
 				_dress_chamber(room, out, rng)
 		return out
 	if CastleGeometry.is_sky(spec):
-		return out # open turret-islands have no conventional ground-floor rooms
+		# open turret-islands have no ground-floor rooms: they are lived in out of doors
+		_dress_sky(spec, out)
+		return out
 	if not CastleGeometry.is_enclosed(spec):
 		# a house or a manor: the range IS the building
 		_dress_hall(_room_of(CastleGeometry.house_range_aabb(spec)), out, rng)
@@ -133,6 +136,76 @@ static func dress(spec: CastleSpec, yard_data: Dictionary = {}) -> Array[Diction
 	_dress_defences(spec, out)
 	_dress_forebuilding(spec, out)
 	return out
+
+
+## A floating fortress, lived in (EVAL-B07). There are no rooms to furnish: the
+## towers are hollow drums hung in air, the one floor is the rock they hang over,
+## so the garrison lives on the rock and on the drums' faces.
+##
+##   a watch brazier at the foot of every turret island, outside its drum, so a
+##   sentry under each tower has a fire and each tower has a glow at its base
+##   a feast board in the middle of the largest island, the rock: trestles in a
+##   row down the gate axis with benches and a chair at the head, a chalice,
+##   plate and candles on the high board
+##   war banners and sconces on the inward faces of the two tallest turrets,
+##   the faces that look down on the board
+static func _dress_sky(spec: CastleSpec, out: Array[Dictionary]) -> void:
+	var towers: Array[Dictionary] = CastleGeometry.sky_towers(spec)
+	if towers.is_empty():
+		return
+	for tower in towers:
+		var base: Vector3 = tower["pos"]
+		var flat := Vector2(base.x, base.z)
+		var outward: Vector2 = flat.normalized() if flat.length() > 0.01 else Vector2(0.0, 1.0)
+		var reach: float = float(tower["radius"]) * 1.08 + 1.3
+		var at: Vector2 = flat + outward * reach
+		_put(out, BRAZIER, _v3(at), 0.0, 1.0, &"light")
+
+	# the feast board, down the gate axis, at the middle of the rock
+	var rock_r: float = CastleGeometry.sky_rock_radius(spec)
+	var along := Vector2(0.0, 1.0)
+	var rows: int = 3 if rock_r > 24.0 else 1
+	var t_scale: float = _fit_scale(TRESTLE, minf(rock_r * 0.5, 6.0))
+	var b_scale: float = _fit_scale(BENCH, minf(rock_r * 0.5, 6.0))
+	for i in range(rows):
+		var p: Vector2 = along * (float(i) - float(rows - 1) * 0.5) * TABLE_PITCH
+		if t_scale > 0.0:
+			_put(out, TRESTLE, _v3(p), _yaw_facing(-along), t_scale, &"table")
+		if b_scale > 0.0:
+			for side in [-1.0, 1.0]:
+				_put(out, BENCH, _v3(p + along * side * BENCH_OFF),
+					_yaw_facing(-along * side), b_scale, &"bench")
+	var head: Vector2 = along * (float(rows) * 0.5 * TABLE_PITCH + 0.6)
+	if t_scale > 0.0:
+		var top: float = PropCatalog.height(TRESTLE) * t_scale
+		var first: Vector2 = -along * (float(rows - 1) * 0.5) * TABLE_PITCH
+		_on(out, "Chalice", first + Vector2(0.7, 0.0), top, 0.0, &"vessel")
+		_on(out, "Table_Plate", first + Vector2(-0.7, 0.0), top, 0.0, &"vessel")
+		_on(out, "CandleStick_Triple", first, top, 0.0, &"light")
+	_put(out, "Chair_1", _v3(head), _yaw_facing(-along), 1.0, &"seat")
+
+	# heraldry and torches on the two tallest drums, facing the board
+	var order: Array[Dictionary] = towers.duplicate()
+	order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a["height"]) > float(b["height"]))
+	var n_flags := mini(2, order.size())
+	for k in range(n_flags):
+		var tower: Dictionary = order[k]
+		var base: Vector3 = tower["pos"]
+		var flat := Vector2(base.x, base.z)
+		var inward: Vector2 = (-flat).normalized() if flat.length() > 0.01 else Vector2(0.0, -1.0)
+		var h: float = float(tower["height"])
+		var r: float = float(tower["radius"])
+		var key: String = WAR_BANNERS[k % WAR_BANNERS.size()]
+		var face: Vector2 = flat + inward * (r * 1.04 + 0.14)
+		_put(out, key, Vector3(face.x, float(tower["bottom"]) + h * 0.5, face.y),
+			_mount_yaw(key, inward), 1.0, &"banner")
+		var lamp: Vector2 = flat + inward * (r * 1.06 + 0.1)
+		var across := Vector2(-inward.y, inward.x)
+		for side in [-1.0, 1.0]:
+			var sp: Vector2 = lamp + across * side * (r * 0.5)
+			_put(out, SCONCE, Vector3(sp.x, float(tower["bottom"]) + h * 0.34, sp.y),
+				_mount_yaw(SCONCE, inward), 1.0, &"light")
 
 
 static func _dress_forebuilding(spec: CastleSpec, out: Array[Dictionary]) -> void:
@@ -355,6 +428,20 @@ static func _dress_yard(spec: CastleSpec, out: Array[Dictionary],
 		return
 	var wanted: int = clampi(int(ceil(clear_area * YARD_FIXTURES_PER_CLEAR_M2)),
 		YARD_MIN_FIXTURES, YARD_MAX_FIXTURES)
+	# The working yards go down first (EVAL-B02). Their props are catalogue
+	# pieces at measured footprints, already placed inside each yard's earth;
+	# the loose clutter below keeps out of every yard and takes the remainder.
+	var yards: Array = yard_data["yards"] if yard_data.has("yards") 		else CastleYards.plan(spec, ranges, well)
+	var yard_props := 0
+	for yard in yards:
+		taken.append((yard["rect"] as Rect2).grow(0.2))
+		for prop in yard["props"]:
+			out.append(prop)
+			yard_props += 1
+	# What the yards do not hold is the loose clutter of the open ward. Four
+	# tenths of the old area-scaled count: the yards carry the rest, and a ward
+	# of scattered barrels is the confetti they replace.
+	wanted = maxi(int(round(float(wanted) * LOOSE_SHARE)), YARD_MIN_FIXTURES)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = spec.seed ^ 0x59415244
 	var placed := 0
@@ -541,7 +628,16 @@ static func yard_report(spec: CastleSpec, props: Array, interiors: Array = [],
 	var fixture_area: float = _rect_union_area(bailey, footprints)
 	var after_structures: Array[Rect2] = all_structures.duplicate()
 	after_structures.append_array(footprints)
-	return {"ward_area_m2": bailey.get_area(),
+	var yard_rows: Array[Dictionary] = []
+	for yard in yard_data.get("yards", []):
+		var yard_props := 0
+		for p in props:
+			if StringName(p.get("yard_name", &"")) == StringName(yard["name"]):
+				yard_props += 1
+		yard_rows.append({"name": yard["name"], "rect": yard["rect"],
+			"area_m2": (yard["rect"] as Rect2).get_area(), "prop_count": yard_props,
+			"piece_count": (yard["pieces"] as Array).size()})
+	return {"yards": yard_rows, "ward_area_m2": bailey.get_area(),
 		"clear_before_m2": maxf(0.0, bailey.get_area() - preexisting_area),
 		"fixture_occupied_m2": fixture_area,
 		"clear_after_m2": maxf(0.0, bailey.get_area()
