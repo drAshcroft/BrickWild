@@ -26,6 +26,7 @@ static func generate(spec: HotelSpec, p_seed: int, with_furniture := true) -> Ho
 	spec.porch = false
 	spec.chimney = false
 	spec.window_shutters = false
+	spec.roof_material = &"slate"
 	spec.timber_frame = false
 	spec.stud_pitch = 1.0
 	spec.frame_braces = false

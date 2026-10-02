@@ -13,9 +13,9 @@ const SIZE := Vector2i(1100, 760)
 
 ## [file, style, purpose, seed, yaw, pitch, zoom]
 const SHOTS := [
-	["domus", &"courtyard_house", &"domus", 12001, 0.55, -0.42, 1.0],
-	["riad", &"courtyard_house", &"riad", 12002, 0.55, -0.42, 1.0],
-	["palazzo", &"courtyard_house", &"palazzo", 12003, 0.55, -0.32, 1.0],
+	["domus", &"courtyard_house", &"domus", 12001, 2.6, -0.42, 1.0],
+	["riad", &"courtyard_house", &"riad", 12002, 2.6, -0.42, 1.0],
+	["palazzo", &"courtyard_house", &"palazzo", 12003, 2.6, -0.32, 1.0],
 	["insula", &"insula", &"port_tenement", 4101, 0.55, -0.4, 1.0],
 	["han", &"caravanserai", &"sultan_han", 4101, 0.6, -0.5, 1.0],
 	["hammam", &"hammam", &"steam_baths", 4101, 0.6, -0.45, 1.0],
@@ -93,7 +93,19 @@ func _shoot(row: Array) -> void:
 		await RenderingServer.frame_post_draw
 	_vp.get_texture().get_image().save_png("%s/%s.png" % [OUT, row[0]])
 	print("  ", row[0])
-	node.queue_free()
+	node.free()
+	if row[1] == &"courtyard_house" and building.plan != null:
+		# These houses face inward. Keep their private outer walls, and show
+		# the court rather than inventing street windows for a rear portrait.
+		var court := HouseAssembler.build(building.plan, true)
+		_stage.add_child(court)
+		_cam.position = centre + Vector3(0.35, 1.0, -0.35).normalized() * dist
+		_cam.look_at(centre, Vector3.UP)
+		for k in range(3):
+			await process_frame
+			await RenderingServer.frame_post_draw
+		_vp.get_texture().get_image().save_png("%s/%s_court.png" % [OUT, row[0]])
+		court.free()
 	await process_frame
 
 

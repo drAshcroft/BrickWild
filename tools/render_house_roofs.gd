@@ -16,6 +16,9 @@ var _directory := OUT
 
 
 func _init() -> void:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--out="):
+			_directory = arg.trim_prefix("--out=")
 	if OS.get_cmdline_user_args().has("--matrix"):
 		_directory = "res://artifacts/p1p2_house/art_before" if OS.get_cmdline_user_args().has("--before-art") else "res://artifacts/p1p2_house/art_after"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_directory))
@@ -71,6 +74,13 @@ func _roof_shots(row: Dictionary) -> void:
 	ShellAssembler.house_materials(_mesh_inst, spec)
 	var aabb: AABB = mesh.get_aabb()
 	HouseAssembler.dress_exterior(_root3d, plan)
+	var furnished: Node3D = null
+	if OS.get_cmdline_user_args().has("--full"):
+		# Keep furniture present under the exterior roof too, so a protruding
+		# fixture cannot disappear merely because this is the outside view.
+		furnished = Node3D.new()
+		_root3d.add_child(furnished)
+		HouseAssembler.furnish(furnished, plan)
 	for p in plan.exterior:
 		aabb = aabb.merge(HouseExterior.bounds_of(p))
 	print("  props=%d omissions=%s" % [plan.exterior.size(), plan.exterior_omissions])
@@ -91,6 +101,8 @@ func _roof_shots(row: Dictionary) -> void:
 			Vector3(c.x, top * 0.55, c.z), key + ".jpg")
 		_mesh_inst.mesh = null
 		_root3d.get_node("Exterior").free()
+		if furnished != null:
+			furnished.free()
 		return
 
 	# square on the gable, from far enough that the whole end reads
@@ -106,6 +118,16 @@ func _roof_shots(row: Dictionary) -> void:
 	await _look(Vector3(c.x - reach * 1.5, top * 1.45, aabb.end.z + reach * 1.5), Vector3(c.x, top * 0.55, c.z), "roof_%s_back.jpg" % key)
 	_mesh_inst.mesh = null
 	_root3d.get_node("Exterior").free()
+	if furnished != null:
+		furnished.free()
+	if OS.get_cmdline_user_args().has("--full"):
+		# Photograph the same furnished plan through the production assembler.
+		# Roof portraits alone cannot reveal bare rooms or misplaced furniture.
+		var interior := HouseAssembler.build(plan, true)
+		_root3d.add_child(interior)
+		await _look(Vector3(reach * 0.8, reach * 1.5, -reach * 0.95),
+			Vector3(0, spec.height * spec.storeys * 0.35, 0), "roof_%s_interior.jpg" % key)
+		interior.free()
 
 
 # ------------------------------------------------------------------- rigging
@@ -133,9 +155,23 @@ func _look(eye: Vector3, at: Vector3, file: String) -> void:
 
 
 func _write_evidence() -> void:
+	var revision: Array = []
+	OS.execute("git", ["rev-parse", "HEAD"], revision)
+	FileAccess.open(_directory + "/session.json", FileAccess.WRITE).store_string(JSON.stringify({
+		"base_revision": String(revision[0]).strip_edges() if not revision.is_empty() else "unknown",
+		"working_tree": true, "utc": Time.get_datetime_string_from_system(true),
+		"furnished": OS.get_cmdline_user_args().has("--full"),
+		"views": ["gable", "three_quarter", "ridge", "left", "back", "interior"]}, "\t"))
 	var f := FileAccess.open(_directory + "/evidence.json", FileAccess.WRITE)
 	f.store_string(JSON.stringify(_evidence, "\t"))
 	if not OS.get_cmdline_user_args().has("--matrix"):
+		var gallery := "<!doctype html><meta charset='utf-8'><title>BrickWild home review</title><style>body{background:#242723;color:#f2efdc;font:16px sans-serif;margin:2rem}article{margin:2rem 0}section{display:flex;gap:1rem}img{width:48%;object-fit:contain}a{color:#bbd9ce}</style><h1>BrickWild: generated home review</h1><p>Fixed-seed exteriors; with --full, each furnished cutaway uses the same plan. Generation records: <a href='session.json'>session</a>, <a href='evidence.json'>fixtures</a>.</p><p>The 4 x 5 m small cottage is a direct-generator stress case below the public API size envelope.</p>"
+		for row in _evidence:
+			gallery += "<article><h2>%s · seed %d</h2><p>%.1f × %.1f m · %d storeys · %s / %s</p><section><img src='roof_%s_three_quarter.jpg' alt='%s exterior'>" % [row["key"], row["seed"], row["width"], row["length"], row["storeys"], row["roof"], row["material"], row["key"], row["key"]]
+			if OS.get_cmdline_user_args().has("--full"):
+				gallery += "<img src='roof_%s_interior.jpg' alt='%s furnished cutaway'>" % [row["key"], row["key"]]
+			gallery += "</section></article>"
+		FileAccess.open(_directory + "/index.html", FileAccess.WRITE).store_string(gallery)
 		return
 	var html := "<!doctype html><meta charset='utf-8'><title>House art direction</title><style>body{background:#242723;color:#f2efdc;font:16px sans-serif}main{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}img{width:100%}figure{margin:0}figcaption{padding:8px}</style><h1>House silhouette matrix</h1><p>Fixed seeds, camera/light rig and canonical dimensions. Rise ratios are art-direction evidence, not structural limits.</p><main>"
 	for row in _evidence:
@@ -175,6 +211,7 @@ func _stage() -> void:
 	sun.rotation = Vector3(deg_to_rad(-40.0), deg_to_rad(-128.0), 0.0)
 	sun.light_energy = 1.4
 	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 160.0
 	_root3d.add_child(sun)
 
 	var fill := DirectionalLight3D.new()

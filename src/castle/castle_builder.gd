@@ -433,6 +433,14 @@ func _build_ridge() -> void:
 			# occupies; otherwise its ceiling height hides the next castle row.
 			occupied_top = minf(ps.height * float(maxi(ps.storeys, 1)), sh)
 		var n: Vector2 = seg["normal"]
+		if spec.style in [&"bavarian", &"french_chateau"]:
+			host("ridge_%s_courses" % name)
+			for level in range(1, storeys + 1):
+				for side in [-1.0, 1.0]:
+					var p: Vector2 = mid + n * float(side) * (width * 0.5)
+					component_box("range_string_course", Vector3(length, 0.18, 0.18),
+						Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, level * sh - 0.12, p.y)), SURF_TRIM)
+			host_end()
 		# The hall is the principal range. Give it a calmer, wider bay rhythm;
 		# the shorter connecting ranges carry the denser secondary cadence.
 		var count: int = clampi(int(length / (5.0 if name == "hall" else 3.5)), 1, 24)
@@ -2147,7 +2155,12 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 		CastleGeometry.tower_half_at(spec, r, vertex))
 	var base_r: float = CastleGeometry.tower_radius_for(spec,
 		CastleGeometry.tower_base_half_at(spec, r, vertex))
-	var slit: Dictionary = _battered_tower_skin(c, base_r, top_r, h, sides, rot, outward)
+	var palatial := spec.style in [&"bavarian", &"french_chateau"]
+	var slit: Dictionary = {}
+	if palatial:
+		_palatial_tower_skin(c, base_r, top_r, h, sides, rot, outward)
+	else:
+		slit = _battered_tower_skin(c, base_r, top_r, h, sides, rot, outward)
 	# A flat-topped tower needs a real deck under its crenellations.  The old
 	# ring emitted only the merlon blocks, leaving the roof envelope visible
 	# through the open top and making those blocks read as floating.  The deck
@@ -2183,7 +2196,66 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 	total_height = maxf(total_height, h + rise)
 
 	# Cut one slit into the actual outward facet; the tower's buried faces stay shut.
-	_opening(slit.pos, slit.angle, slit.width, slit.height, &"slit", false, true, slit.depth)
+	if not slit.is_empty():
+		_opening(slit.pos, slit.angle, slit.width, slit.height, &"slit", false, true, slit.depth)
+
+
+## Residential towers have occupied-looking window tiers, not one defensive
+## slit in a fifty-metre shaft. Cut the real tapered facets on the outward
+## half only; the buried faces at the range joints remain closed.
+func _palatial_tower_skin(c: Vector3, base_r: float, top_r: float, h: float,
+		sides: int, rot: float, outward: Vector3) -> void:
+	var levels := clampi(int(h / 5.0), 2, 12)
+	var step := h / levels
+	var win_h := minf(maxf(spec.window_h, 1.6), step * 0.48)
+	var win_w := minf(maxf(spec.window_w, 0.85), top_r * sin(PI / sides) * 1.05)
+	var st := _kit.surface(SURF_STONE)
+	for side in range(sides):
+		var a0 := rot + TAU * float(side) / sides
+		var a1 := rot + TAU * float(side + 1) / sides
+		var normal := Vector3(cos((a0 + a1) * 0.5), 0, sin((a0 + a1) * 0.5))
+		var cut := normal.dot(outward.normalized()) > 0.35
+		var ranges: Array[Vector4] = []
+		if cut:
+			var cursor := 0.0
+			for level in range(levels):
+				var y := (level + 0.58) * step
+				var low := y - win_h * 0.5
+				var high := y + win_h * 0.5
+				var radius := lerpf(base_r, top_r, y / h)
+				var s0 := 0.5 - win_w / (4.0 * radius * sin(PI / sides))
+				ranges.append(Vector4(0, 1, cursor, low))
+				ranges.append(Vector4(0, s0, low, high))
+				ranges.append(Vector4(1.0 - s0, 1, low, high))
+				cursor = high
+				var pos := c + normal * (radius * cos(PI / sides) + CastleGeometry.OPENING_EPS) + Vector3.UP * y
+				_opening(pos, atan2(normal.x, normal.z), win_w, win_h,
+					spec.window_style, false, true, maxf(spec.wall_thickness, 0.35))
+			ranges.append(Vector4(0, 1, cursor, h))
+		else:
+			ranges.append(Vector4(0, 1, 0, h))
+		for band in ranges:
+			_kit._quad(st,
+				_drum_point(c, base_r, top_r, h, a0, a1, band.x, band.z),
+				_drum_point(c, base_r, top_r, h, a0, a1, band.y, band.z),
+				_drum_point(c, base_r, top_r, h, a0, a1, band.y, band.w),
+				_drum_point(c, base_r, top_r, h, a0, a1, band.x, band.w))
+		var cap := c + Vector3.UP * h
+		_kit._tri(st, cap + Vector3(cos(a0) * top_r, 0, sin(a0) * top_r),
+			cap + Vector3(cos(a1) * top_r, 0, sin(a1) * top_r), cap)
+	# Facet-following string courses articulate the storeys without moving
+	# the tower envelope or placing bands across a window.
+	host("palatial_tower_%s" % str(c))
+	for level in range(1, levels + 1):
+		var y := level * step - 0.12
+		var radius := lerpf(base_r, top_r, y / h)
+		for side in range(sides):
+			var angle := rot + TAU * (float(side) + 0.5) / sides
+			var normal := Vector3(cos(angle), 0, sin(angle))
+			component_box("tower_string_course", Vector3(2.0 * radius * sin(PI / sides) + 0.08, 0.18, 0.18),
+				Transform3D(Basis(Vector3.UP, atan2(normal.x, normal.z)),
+					c + normal * (radius * cos(PI / sides)) + Vector3.UP * y), SURF_TRIM)
+	host_end()
 
 
 ## Merlons along a run, at `y`, each `thick` deep across the parapet.

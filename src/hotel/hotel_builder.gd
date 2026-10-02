@@ -58,21 +58,29 @@ func _build_facade() -> void:
 					Vector3(side * (gap + side_w * 0.5), y, z), SURF_TRIM)
 		else:
 			box(Vector3(hs.width + 0.8, 0.22, 0.34), Vector3(0, y, z), SURF_TRIM)
-	# Quoins and central pilasters carry the strict symmetry of the reference.
-	for x in [-hs.width * 0.5, -centre_w * 0.5, centre_w * 0.5, hs.width * 0.5]:
+	# Corner quoins are outside every planned opening. Central pilasters on an
+	# unrelated bay grid used to run straight through guest-room windows.
+	for x in [-hs.width * 0.5, hs.width * 0.5]:
 		tag("pilaster")
 		box(Vector3(0.42, top, 0.36), Vector3(x, top * 0.5, z - 0.02), SURF_TRIM)
 		for course in range(int(top / 0.65)):
 			box(Vector3(0.62, 0.12, 0.42),
 				Vector3(x, 0.35 + course * 0.65, z - 0.04), SURF_TRIM)
 
-	var bays := HotelGeometry.facade_bay_positions(hs)
-	for level in range(hs.storeys):
-		var y := float(level) * hs.height + hs.height * 0.58
-		for i in range(bays.size()):
-			if level == 0 and i == bays.size() / 2:
-				continue
-			_window(Vector3(bays[i], y, z - 0.16), level == 0)
+	# The house shell already cuts, glazes and frames plan.windows. Only add
+	# hoods here, using those SAME openings; never paint a second window grid
+	# over them. The front's ground-floor rhythm follows its public rooms.
+	for i in range(plan.windows.size()):
+		var w: Dictionary = plan.windows[i]
+		if Vector2(w["normal"]).y > -0.9:
+			continue
+		var level := HousePlan.record_storey(w)
+		var y := level * hs.height + float(w["head"]) + 0.22
+		tag("facade_hood")
+		host("hotel_window_%d" % i, level)
+		component_box("facade_hood", Vector3(float(w["width"]) + 0.38, 0.12, 0.30),
+			Transform3D(Basis(), Vector3(Vector2(w["pos"]).x, y, z)), SURF_TRIM)
+		host_end()
 	_build_entrance(z, centre_w)
 	_build_balconies(z, centre_w)
 	_build_centre_crown(z, top, centre_w)
@@ -86,8 +94,11 @@ func _entrance_half_width() -> float:
 
 func _window(pos: Vector3, ground := false) -> void:
 	var h := WINDOW_H * (1.12 if ground else 1.0)
-	tag("facade_window")
-	box(Vector3(WINDOW_W, h, FACADE_D), pos, SURF_ROOF)
+	# Blind lights belong only to the unoccupied roof crown and cupolas.
+	# Habitable storeys must use the actual apertures above.
+	tag("crown_window")
+	_glazing_box("crown_glazing", Vector3(WINDOW_W, h, FACADE_D),
+		Transform3D(Basis(), pos))
 	box(Vector3(WINDOW_W + FRAME * 2.0, FRAME, FACADE_D * 1.8),
 		pos + Vector3(0, h * 0.5 + FRAME * 0.5, -0.02), SURF_TRIM)
 	box(Vector3(WINDOW_W + FRAME * 2.0, FRAME, FACADE_D * 1.8),
@@ -104,29 +115,26 @@ func _window(pos: Vector3, ground := false) -> void:
 
 func _build_entrance(z: float, centre_w: float) -> void:
 	tag("ceremonial_entrance")
-	var door_w := ENTRANCE_W
-	var door_h := 3.15
+	var door_w := 1.8
+	var door_h := minf(2.65, spec.height - 0.45)
 	for side in [-1.0, 1.0]:
-		box(Vector3(0.52, door_h + 1.35, 0.52),
-			Vector3(side * (door_w * 0.5 + 0.6), (door_h + 1.35) * 0.5, z - 0.12),
+		box(Vector3(0.32, door_h, 0.42),
+			Vector3(side * (door_w * 0.5 + 0.3), door_h * 0.5, z - 0.12),
 			SURF_TRIM)
-		box(Vector3(0.68, 0.18, 0.64),
-			Vector3(side * (door_w * 0.5 + 0.6), 0.09, z - 0.12), SURF_TRIM)
-		# Dark side leaves make the opening read at landmark scale while the
-		# central 1.8m planned doorway remains physically open.
-		box(Vector3(0.72, 2.45, FACADE_D),
-			Vector3(side * 1.28, 1.23, z - 0.18), SURF_ROOF)
+		box(Vector3(0.42, 0.18, 0.54),
+			Vector3(side * (door_w * 0.5 + 0.3), 0.09, z - 0.12), SURF_TRIM)
 	_kit.arc_ribbon(Vector3(-door_w * 0.5, door_h + 0.05, z - 0.14),
-		Vector3(door_w * 0.5, door_h + 0.05, z - 0.14), 0.75, 0.18, 0.25,
+		Vector3(door_w * 0.5, door_h + 0.05, z - 0.14), 0.25, 0.14, 0.25,
 		SURF_TRIM, 10)
 	box(Vector3(minf(centre_w * 0.78, 11.0), 0.24, 1.35),
-		Vector3(0, door_h + 1.35, z - 0.5), SURF_TRIM)
+		Vector3(0, spec.height - 0.38, z - 0.5), SURF_TRIM)
 	# The sign panel is wall-colored and framed, leaving the real entrance void
 	# below it open for navigation and collision.
-	box(Vector3(minf(centre_w * 0.62, 8.2), 0.88, 0.24),
-		Vector3(0, door_h + 2.05, z - 0.1), SURF_WALL)
+	# The plaque belongs BETWEEN floors, not across the first-floor windows.
+	box(Vector3(minf(centre_w * 0.62, 8.2), 0.48, 0.24),
+		Vector3(0, spec.height + 0.12, z - 0.1), SURF_WALL)
 	box(Vector3(minf(centre_w * 0.68, 8.8), 0.12, 0.34),
-		Vector3(0, door_h + 2.55, z - 0.12), SURF_TRIM)
+		Vector3(0, spec.height + 0.42, z - 0.12), SURF_TRIM)
 
 
 func _build_balconies(z: float, centre_w: float) -> void:

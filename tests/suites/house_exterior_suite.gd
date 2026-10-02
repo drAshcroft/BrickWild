@@ -7,6 +7,7 @@ static func run() -> SuiteResult:
 	for style in [&"cottage", &"farmhouse", &"townhouse", &"longhall", &"witch_hut"]:
 		for trade in [&"none", &"farmer", &"smith", &"alchemist", &"innkeeper"]:
 			for rotated in [false, true]:
+				print("    exterior %s/%s rotated=%s" % [style, trade, rotated])
 				var s := HouseSpec.new()
 				s.style = style
 				s.trade = trade
@@ -81,6 +82,7 @@ static func _yard(res: SuiteResult) -> void:
 	for style in [&"cottage", &"farmhouse", &"townhouse", &"longhall", &"witch_hut"]:
 		for trade in [&"none", &"farmer", &"smith", &"alchemist", &"innkeeper", &"scholar"]:
 			for rotated in [false, true]:
+				print("    yard %s/%s rotated=%s" % [style, trade, rotated])
 				var s := HouseSpec.new()
 				s.style = style
 				s.trade = trade
@@ -89,7 +91,12 @@ static func _yard(res: SuiteResult) -> void:
 				s.storeys = 2 if style == &"townhouse" else 1
 				var plan := HouseGenerator.generate(s, 4413, false)
 				var who := "yard %s/%s rotated=%s" % [style, trade, rotated]
-				_expect(res, plan.yard.size() >= 2, who + " has no path and no porch pail")
+				var path_parts := 0
+				for piece in plan.yard_pieces:
+					if piece["kind"] == "path":
+						path_parts += piece["parts"].size()
+				_expect(res, not plan.yard.is_empty() and path_parts > 0,
+					who + " has no procedural approach or porch pail")
 				var builder := HouseBuilder.new()
 				builder.build(plan, true)
 				for error in HouseYardCheck.check(plan, builder):

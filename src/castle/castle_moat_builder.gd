@@ -18,12 +18,12 @@ extends RefCounted
 ## as built) with `causeway_parapet_*` and `causeway_pier_*`. All stand outside
 ## or on top of the trench, which is below ground, so none interpenetrates it.
 
-const SHALLOW := Color("78aeb5")
-const MID := Color("4a8497")
-const DEEP := Color("2b576b")
+const SHALLOW := Color("6f9694")
+const MID := Color("587d80")
+const DEEP := Color("426167")
 const MUD := Color("5d4c37")
-const GRASS := Color("72894a")
-const GRASS_OUTER := Color("86995a")
+const GRASS := Color("66734f")
+const GRASS_OUTER := Color("74805a")
 
 
 static func emit(b: CastleBuilder) -> void:

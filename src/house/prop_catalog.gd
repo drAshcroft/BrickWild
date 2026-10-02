@@ -653,7 +653,12 @@ static func house_origin(placement: Dictionary) -> Vector3:
 		# Put the measured back against that face and the body into the room.
 		var depth := footprint_rotated(key, face_offset(key)).y * scale
 		origin += Vector3(-sin(yaw), 0, -cos(yaw)) * depth * 0.5
-	elif not has_tag(key, CEILING):
+	elif has_tag(key, CEILING):
+		# A ceiling record is the mount height, not an imported model pivot.
+		# Some chandeliers extend above their origin and used to pierce flat
+		# roofs. Hang the measured TOP at the mount, at every scale/storey.
+		origin.y -= (floor_offset(key) + height(key)) * scale
+	else:
 		origin.y -= floor_offset(key) * scale
 	return origin
 

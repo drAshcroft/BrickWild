@@ -367,3 +367,119 @@ on branch `wip/castle-yards-moat`), B07 sky castle dressing, C11 and C13
 village scheduled suites, C12 the farmhouse chimney in the back door, U01
 the rest of the document refresh. The September rubric was not re-scored;
 the pictures to score are in `artifacts/renders/` at `main`.
+
+## Render-led follow-up: BrickWild
+
+The status paragraph above records the earlier merge, not the current tree.
+`artifacts/eval_20261001/pr_confirm.log` subsequently passed 62,635 checks with
+zero failures. It includes the chimney/door repair and the corrected yard-access
+scope for castle interiors, courtyards and guildhalls. C12 and C14 are reconciled
+as complete; B07 is also confirmed by the fresh 391-check `cground` suite.
+
+The next visual pass uses fresh generated examples, not the earlier screenshots:
+
+- Hotel: remove the independent decorative window grid. Hoods now follow the
+  real planned openings; the entrance plaque sits between floors, and central
+  pilasters no longer cross guest windows. Plaster, slate, glazing and patterned
+  floors use the production assembler. Seven unfurnished size/height fixtures
+  check alignment and rays through actual openings, plus a negative control.
+- Homes: add metre-scale floorboards/paving while preserving rug markers.
+  Ceiling fixtures hang by their measured top. Wall sconces are scaled and
+  positioned between head clearance and the actual ceiling; the previous
+  1.85m mounting height put the top of `Lantern_Wall` at 3.27m in a 2.6m room.
+  The assembly fixture measures imported meshes, not just placement records.
+- Approaches: full-width, flush procedural pavers replace tiny path props.
+  This part of the yard no longer depends on the optional Wild art pack.
+- Residential castle towers: Bavarian/château towers get real outward window
+  tiers and facet-following floor bands. Defensive styles retain their slit
+  windows. Ridge ranges get floor bands; moat colours are less saturated.
+- Timber halls: raised wall posts, tie beams, portal framing and eave brackets
+  replace the painted frame grid. Components are measured against the mesh.
+- Courtyards: preserve inward-facing architecture. References now include the
+  entrance side and an elevated cutaway, rather than presenting only blank
+  rear walls. The fitting-height correction removes the roof intrusions.
+- Temples: stone courses and a more restrained procession-light intensity
+  distinguish the room from the shrine. Shrine close-ups supplement, rather
+  than replace, the original gate-axis reference. Processional braziers also
+  need their measured footprints clear of pylons, column bases, dais and pit
+  rims; placing only their centres beside the axis left bowls inside walls.
+
+No third-party assets were imported. WaterFree Assets found the already-used
+Fantasy Props MegaKit; its shipped standard-pack licence was checked as CC0.
+Optional non-public packs remain outside the repository. A local vision-model
+comparison falsely denied the visible duplicate hotel windows; that result is
+archived in `artifacts/visual_refinement/hotel_vision.json` and recorded in
+`waterfree/issues`. Direct inspection and geometry checks remain the authority.
+
+Reproduction commands are in `DEVELOPMENT.md`. House evidence lives in
+`artifacts/visual_refinement/homes_after/`; world views in
+`artifacts/renders/world_materials/`; selected castles and temples in
+`artifacts/renders/refinement/`. These are ignored working evidence, not shipped
+screenshots. The house and landmark manifests record seeds and the base revision;
+they explicitly identify working-tree renders.
+
+### Completed bounded gates for the refinement
+
+These are separate invocations, with overlapping checks; do not add their
+counts together as unique coverage. Native exit was zero for each row.
+
+| Selector | Checks | Failures | Warnings | Host wall time |
+|---|---:|---:|---:|---:|
+| `hotelroof hassembly` | 1,749 | 0 | 0 | 153 s |
+| `lane:geom` (final) | 8,768 | 0 | 0 | 107 s |
+| `lane:house-exterior-fast` | 1,925 | 0 | 0 | 219 s |
+| `lane:house-furnish-fast` | 155 | 0 | 2 | 122 s |
+| `lane:castle-change` | 282 | 0 | 5 | 186 s |
+| `lane:temple lane:assets-fast matkit` | 4,200 | 0 | 0 | 113 s |
+| `vsite` (expanded retry fixtures) | 311 | 0 | 0 | 74 s |
+| `lane:village-fast` | 10 | 0 | 0 | 157 s |
+| `tests/village_thorpe_fixture.gd` | 9 | 0 | 16 | 38 s |
+| `tests/village_green_fixture.gd` | 4 cases | 0 | 21 | 141 s |
+
+The furnishing warnings say the bounded sample did not exercise `table_focus`
+and `table_face`. The five castle opening-probe warnings match the established
+round-hall/battered-keep baseline. Neither set has been suppressed. A combined
+exterior/geometry attempt hit its 300-second cap; both gates then passed in
+separate bounded runs. Logs are under `artifacts/visual_refinement/` and
+`artifacts/qa_fast/`. The full scheduled sweep was not run for this change.
+
+The initial fresh village audit took 1,621 seconds: `vlot` passed all 71 checks,
+including the manor frontage. `vcheck` reduced to four failures (seed 9203
+missing its earned tavern; seeds 9208, 9210 and 9211 below common-frontage
+coverage). `varchetype_thorpe` stopped at its first defective case, seed-index 0
+at 140% population, with density and common-frontage failures. This is not a
+pass of the remaining archetype matrix. The earlier thirteen-failure report
+therefore overstates the current defect count, but C11/C13 still need work.
+
+The follow-up fixes two geometric causes: green-village retry width was also
+moving the through road sideways, consuming the southern building row; the
+minimum common width could grow through an unchanged snapped ring road.
+Road offset now depends on site depth, and junctions move with the required
+common width. An explicit path bridges the gap between the bowed road and
+the common. Common-facing placement also scores uncovered perimeter in street
+and green forms, as it already did for round settlements. No coverage threshold
+or navigation rule was relaxed.
+
+The final site gate checks 150 retry layouts, with full walking-grid checks on
+six selected layouts. An initial all-layout navigation attempt was cancelled
+at 215 seconds to keep routine verification bounded; it is not a pass.
+
+The four failing green seeds (9203, 9208, 9210, 9211) subsequently passed
+complete focused VillageQA with their full programmes present. Common frontage
+is 91%, 91%, 91% and 94%; the well approach is reachable in each. Fresh assembled
+views of seed 9203 are in `artifacts/p1p2_village/form_renders/green_9203_*.jpg`.
+
+Thorpe had a separate cause: `_landmark_site_depth` reserved a measured northern
+lot for temples but excluded churches. Its church consumed a flank, displacing
+farms and forcing wider retries. Including churches restores all seven buildings
+on a 144 x 104.84m site instead of 225 x 97.5m. The canonical seed-index 0,
+population-scale 1.4 cell now passes nine checks: density 6.7%, frontage 69%.
+The fixture reuses source-fingerprinted native measurements and native QA while
+rerunning the site, lots, dressing, navigation and archetype checks. Its sixteen
+native furnishing warnings were not suppressed. The full nine-cell Thorpe row
+and full `vcheck` rerun remain scheduled acceptance, not claimed passes.
+
+B02 is reconciled against the fresh castle images and bounded aperture/ground
+gates. B07, C12 and C14 were confirmed from their landed repairs. C11/C13 retain
+the remaining full-village acceptance work. No unverified task is silently
+closed by this render review.

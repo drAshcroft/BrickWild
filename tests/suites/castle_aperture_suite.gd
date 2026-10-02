@@ -39,6 +39,7 @@ static func run() -> SuiteResult:
 	legacy._check_openings()
 	_want(res, not legacy.failures.is_empty(), "floating legacy slit accepted")
 	_keep_triangle_rays(res)
+	_palatial_tower_rays(res)
 	_round_keep_triangle_rays(res)
 	_unplanned_keep_routes(res)
 	_curtain_triangle_rays(res)
@@ -126,6 +127,30 @@ static func _unplanned_keep_routes(res: SuiteResult) -> void:
 				windows += 1
 		_want(res, windows == 4,
 			"unplanned %s keep did not use four real host cuts" % shape)
+
+
+static func _palatial_tower_rays(res: SuiteResult) -> void:
+	for style in [&"bavarian", &"french_chateau"]:
+		var b := CastleBuilder.new()
+		b.spec = CastleSpec.new()
+		b.spec.style = style
+		b.spec.window_style = &"arched"
+		b.begin_metric(4)
+		b._palatial_tower_skin(Vector3.ZERO, 4.2, 3.8, 24.0, 12, 0.0, Vector3(0, 0, -1))
+		var mesh := b.commit()
+		var windows := 0
+		for p in b.part_log:
+			if p["kind"] != "window":
+				continue
+			windows += 1
+			var n: Vector3 = p["facing"]
+			_want(res, not _stone_ray_hits(mesh, 0, p["pos"] + n * 0.8, -n, 1.6),
+				"palatial tower has stone behind a residential window")
+			var tangent := Vector3(n.z, 0, -n.x)
+			_want(res, _stone_ray_hits(mesh, 0, p["pos"] + tangent * (p["size"].x * 0.5 + 0.15) + n * 0.8, -n, 1.6),
+				"palatial tower lost masonry beside its window")
+		_want(res, windows >= 12, "palatial tower has too few outward window tiers")
+		_want(res, ComponentCheck.check(b, mesh)["ok"], "tower courses absent from mesh")
 
 
 static func _tower_triangle_rays(res: SuiteResult) -> void:

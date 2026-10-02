@@ -17,7 +17,45 @@ static func run() -> SuiteResult:
 			_bed(res, key, float(yaw))
 	_workbench_semantics(res)
 	_legacy_exterior(res)
+	for scale in [0.65, 1.0]:
+		_ceiling_prop(res, scale)
+	_mounted_ceiling_clearance(res)
 	return res
+
+
+static func _mounted_ceiling_clearance(res: SuiteResult) -> void:
+	for height in [2.2, 2.6, 4.5]:
+		var spec := HouseSpec.new()
+		spec.height = height
+		var plan := HouseGenerator.generate(spec, 4412, false)
+		for key in ["Lantern_Wall", "Torch_Metal"]:
+			plan.furniture.clear()
+			HouseFurnishSurface.place_mounted(plan, 0, key, spec.rng)
+			_expect(res, plan.furniture.size() == 1, "mounted clearance fixture placed no lamp")
+			if plan.furniture.is_empty():
+				continue
+			var placed := HouseAssembler._instance(plan.furniture[0])
+			var bounds := SceneBounds.of_node(placed)
+			_expect(res, bounds.end.y <= spec.height - HouseGeometry.FLOOR_T + TOL,
+				"%s pierces a %.2fm ceiling" % [key, spec.height])
+			_expect(res, bounds.position.y >= 1.7 - TOL,
+				"%s hangs into head clearance" % key)
+			placed.free()
+
+
+static func _ceiling_prop(res: SuiteResult, scale: float) -> void:
+	var p := {"key": "Chandelier", "pos": Vector3(1.2, 7.8, -2.1),
+		"yaw": PI / 5.0, "scale": scale, "mounted": true, "host": -1}
+	var placed := HouseAssembler._instance(p)
+	_expect(res, placed != null, "ceiling model missing")
+	if placed == null:
+		return
+	var bounds := SceneBounds.of_node(placed)
+	_expect(res, absf(bounds.end.y - p.pos.y) < TOL,
+		"chandelier's measured top misses its ceiling mount")
+	_expect(res, bounds.position.y < p.pos.y - 0.1,
+		"chandelier does not hang into the room")
+	placed.free()
 
 
 static func _workbench_semantics(res: SuiteResult) -> void:

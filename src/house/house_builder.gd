@@ -1981,7 +1981,11 @@ func _build_yard() -> void:
 	for piece in plan.yard_pieces:
 		for part in piece["parts"]:
 			var surf := SURF_WALL if str(part["surf"]) == "wall" else SURF_TRIM
+			if str(part["surf"]) == "floor":
+				surf = SURF_FLOOR
+				_kit.surface(surf).set_color(Color(1, 0, 1)) # Exterior paving, not timber or rug.
 			var row := component_box(str(part["role"]), part["size"], HouseYard.part_xform(part), surf)
+			_kit.surface(surf).set_color(Color.WHITE)
 			row["piece"] = piece["id"]
 	host_end()
 

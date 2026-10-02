@@ -109,6 +109,10 @@ func _init() -> void:
 	await process_frame
 	var args := OS.get_cmdline_user_args()
 	_mesh_only = args.has("mesh-only")
+	if args.has("refinement"):
+		await _shoot_refinement(args)
+		quit()
+		return
 	if args.has("scene-qa"):
 		await _shoot_scene_acceptance()
 		quit()
@@ -263,6 +267,38 @@ func _init() -> void:
 
 ## The four blueprint references used by VIS-010, without rendering the full
 ## church/castle/house/temple portrait catalogue.
+## Current assembled buildings, not historical-light comparison meshes.
+## Usage: -- refinement [neuschwanstein bodiam chambord coiled_rotunda ...]
+func _shoot_refinement(args: PackedStringArray) -> void:
+	var selected := Array(args)
+	selected.erase("refinement")
+	var folder := "refinement"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR + "/" + folder))
+	var records: Array[Dictionary] = []
+	for entry in _castles():
+		if not selected.is_empty() and not entry["key"] in selected:
+			continue
+		var cs := _castle_spec(entry)
+		var file := "%s/castle_%s.jpg" % [folder, entry["key"]]
+		await _shoot_castle(cs, file, entry.get("yaw", 2.5), entry.get("pitch", -0.3), 1.0,
+			folder + "/castle_krak_courtyard.jpg" if entry["key"] == "krak" else "")
+		records.append({"key": entry["key"], "seed": entry["seed"], "file": file})
+	for entry in _temples():
+		if not selected.is_empty() and not entry["key"] in selected:
+			continue
+		var ts := _temple_spec(entry)
+		for mode in [&"axis", &"shrine", &"aerial"]:
+			var file := "%s/temple_%s_%s.jpg" % [folder, entry["key"], mode]
+			await _shoot_temple(ts, file, mode)
+			records.append({"key": entry["key"], "seed": entry["seed"], "file": file})
+	var revision: Array = []
+	OS.execute("git", ["rev-parse", "HEAD"], revision)
+	FileAccess.open(OUT_DIR + "/" + folder + "/manifest.json", FileAccess.WRITE).store_string(
+		JSON.stringify({"base_revision": String(revision[0]).strip_edges() if not revision.is_empty() else "unknown",
+			"working_tree": true, "utc": Time.get_datetime_string_from_system(true),
+			"render_path": "assembled", "subjects": records}, "\t"))
+
+
 func _shoot_vis010_acceptance() -> void:
 	var out := "vis010"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(
@@ -1335,6 +1371,15 @@ func _shoot_temple(spec: TempleSpec, file: String, mode: StringName) -> void:
 	await process_frame
 	var idol: Vector3 = TempleGeometry.idol_center(spec)
 	match mode:
+		&"shrine":
+			# A detail accompanies, never replaces, the tested gate sightline.
+			# This reveals the idol without enlarging it to suit a wide camera.
+			var focus := idol + Vector3.UP * spec.idol_height * 0.45
+			# Stay on the ritual axis: a sideways detail camera can hide the
+			# shrine behind a column even when the tested sightline is clear.
+			_cam.position = focus + Vector3(0, spec.idol_height * 0.15,
+				-maxf(6.0, spec.idol_height * 2.4))
+			_cam.look_at(focus, Vector3.UP)
 		&"axis":
 			# where the harness stands to check the sightline: a step inside the
 			# threshold for three of the forms, the foot of the great stair for

@@ -91,9 +91,40 @@ static func house_floor_material(node: MeshInstance3D, spec: HouseSpec) -> void:
 render_mode cull_disabled;
 uniform vec4 floor_colour : source_color;
 uniform vec4 rug_colour : source_color;
+uniform bool stone_floor = false;
+varying vec3 floor_pos;
+varying vec3 floor_normal;
+void vertex() {
+	floor_pos = VERTEX;
+	floor_normal = NORMAL;
+}
 void fragment() {
 	ALBEDO = floor_colour.rgb;
 	ROUGHNESS = 0.94;
+	// Metres, not the per-face 0..1 UV: a large hall must not have one
+	// enormous plank. Vertical faces in this shared slot use masonry courses.
+	if (floor_normal.y > 0.85) {
+		vec2 p = floor_pos.xz / ((stone_floor || COLOR.g < 0.5) ? vec2(0.55) : vec2(0.20, 2.4));
+		p.y += mod(floor(p.x), 2.0) * 0.5;
+		vec2 cell = floor(p);
+		vec2 edge = min(fract(p), vec2(1.0) - fract(p));
+		vec2 aa = fwidth(p);
+		vec2 seam = smoothstep(vec2(0.015), vec2(0.025) + aa, edge);
+		float fade = 1.0 - clamp(max(aa.x, aa.y), 0.0, 1.0);
+		float tone = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+		ALBEDO *= mix(1.0, (0.94 + tone * 0.12) * mix(0.68, 1.0, seam.x * seam.y), fade);
+	} else if (abs(floor_normal.y) < 0.5) {
+		// Chimneys and stone bases share this slot, but are masonry, not
+		// vertical floorboards. Keep their courses at an architectural scale.
+		float along = abs(floor_normal.x) > 0.5 ? floor_pos.z : floor_pos.x;
+		vec2 p = vec2(along / 0.65, floor_pos.y / 0.24);
+		p.x += mod(floor(p.y), 2.0) * 0.5;
+		vec2 edge = min(fract(p), vec2(1.0) - fract(p));
+		vec2 aa = fwidth(p);
+		vec2 seam = smoothstep(vec2(0.025), vec2(0.045) + aa, edge);
+		float fade = 1.0 - clamp(max(aa.x, aa.y), 0.0, 1.0);
+		ALBEDO *= mix(1.0, mix(0.72, 1.0, seam.x * seam.y), fade);
+	}
 	if (COLOR.r < 0.5) {
 		vec2 edge = min(UV, vec2(1.0) - UV);
 		float border = step(0.055, min(edge.x, edge.y)) * (1.0 - step(0.09, min(edge.x, edge.y)));
@@ -105,6 +136,7 @@ void fragment() {
 	var floor_material := ShaderMaterial.new()
 	floor_material.shader = textile
 	floor_material.set_shader_parameter("floor_colour", spec.floor_color)
+	floor_material.set_shader_parameter("stone_floor", spec.material == &"stone" or spec is HotelSpec)
 	var palette := [Color("703c38"), Color("365b60"), Color("806438")]
 	floor_material.set_shader_parameter("rug_colour", palette[absi(spec.seed) % palette.size()])
 	node.set_surface_override_material(HouseBuilder.SURF_FLOOR, floor_material)

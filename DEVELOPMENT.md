@@ -173,6 +173,38 @@ Rendered evidence complements geometry and QA checks. It does not replace
 them. When updating a tracked screenshot, keep its generating script and
 reproduction seed current.
 
+For a focused visual review, use the production assemblers and keep both
+exterior and furnished views. These commands do not require new art packs:
+
+```text
+godot --path . --script res://tools/render_house_roofs.gd -- --full --out=res://artifacts/visual_refinement/homes_after
+godot --path . --script res://tools/render_hotel.gd -- --shell
+godot --path . --script res://tools/render_world_materials.gd -- great_hall phoenix_pavilion riad palazzo
+godot --path . --script res://tools/render_shots.gd -- refinement neuschwanstein chambord bodiam krak coiled_rotunda starless_pylon
+```
+
+The hotel `--shell` option skips furnishing only; omit it to include the full
+plan. House references include cutaways with `--full`, seeds in `evidence.json`,
+and the base revision/time in `session.json`. Open `index.html` in the house
+output directory for the paired exterior/interior gallery. Courtyard references include an
+inward-looking cutaway; temple references retain the tested gate view alongside
+a shrine close-up. Generated images live under ignored `artifacts/` directories.
+Local vision-model commentary is advisory: inspect the images and check actual
+opening rays and imported prop bounds before accepting a result.
+
+For the green-village regressions found in this review, run `vsite` and
+`lane:village-fast`, then the bounded native-building fixture:
+
+```powershell
+godot --headless --path . --script res://tests/village_green_fixture.gd
+godot --headless --path . --script res://tests/village_thorpe_fixture.gd
+```
+
+The green fixture checks seeds 9203, 9208, 9210 and 9211 without suppressing
+village failures. The Thorpe fixture checks seed-index 0 at 140% population,
+including each native building's QA. Neither replaces the complete `vcheck`
+or village-archetype scheduled gates.
+
 ## Addon packaging
 
 `tools/big_glade_addon_manifest.json` defines the relocatable package.

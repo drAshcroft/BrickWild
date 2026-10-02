@@ -21,9 +21,37 @@ static func run() -> SuiteResult:
 	for form_case in _cases():
 		_check_form(res, form_case)
 	_check_hamlet_common_is_the_well(res)
+	_check_green_retry_sites(res)
 	_check_determinism(res)
 	_check_spec_untouched(res)
 	return res
+
+
+## Retry width must buy usable frontage, not push the whole street to the
+## southern boundary or leave the well across an unwalkable strip of grass.
+static func _check_green_retry_sites(res: SuiteResult) -> void:
+	for seed in 50:
+		var spec := _spec(9200 + seed, 40, &"farming")
+		for scale in [1.0, 2.0, 3.5]:
+			var plan := VillageSitePlanner.plan(spec, 0, scale)
+			var common: PackedVector2Array = plan.commons[0]["poly"]
+			res.checked += 1
+			for road in plan.roads:
+				if road["class"] != &"path" and Poly.intersection_area(common,
+						VillageSitePlanner.road_ribbon(road, true)) > 0.01:
+					res.fail("green %d x%s: common crosses %s" % [seed, scale, road["class"]])
+			var points: PackedVector2Array = plan.roads[0]["points"]
+			if absf(points[0].y + plan.site.size.y * 0.12) > 0.01:
+				res.fail("green %d x%s: retry consumed the southern frontage" % [seed, scale])
+			# All 150 layouts get geometry checks; keep the expensive walking
+			# grid to the two fixed seeds that first exposed the missing link.
+			if seed not in [3, 8]:
+				continue
+			VillageDressHosts.dress_place(plan, VillageDressContext.make_context(plan), &"common")
+			var nav := VillageNavCheck.new().check(plan)
+			for failure in nav["failures"]:
+				if String(failure).begins_with("use:") or String(failure).begins_with("paths:"):
+					res.fail("green %d x%s: %s" % [seed, scale, failure])
 
 
 ## The two configurations that derive the two forms this planner owns. Note

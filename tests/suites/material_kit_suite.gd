@@ -161,7 +161,19 @@ static func _normals_unit(mesh: ArrayMesh) -> bool:
 static func _hall_walls_are_plaster(res: SuiteResult) -> void:
 	for kind in [&"great_hall", &"phoenix_pavilion"]:
 		var spec := TimberHallGenerator.generate(kind, 4101, 34.0, 18.0, 20.0)
-		var mesh := TimberHallBuilder.new().build(spec)
+		var builder := TimberHallBuilder.new()
+		var mesh := builder.build(spec)
+		var components := ComponentCheck.check(builder, mesh)
+		res.checked += 1
+		if not components["ok"] or int(components["checked"]) < 10:
+			res.fail("%s: raised hall frame is missing from its mesh" % kind)
+		for c in builder.component_log:
+			var bounds := MassBuilder.component_aabb(c)
+			var door := AABB(Vector3(-1.49, spec.platform_h, -spec.length * 0.5 - 0.5),
+				Vector3(2.98, minf(5.0, spec.height * 0.42) - 0.02, 1.0))
+			res.checked += 1
+			if bounds.intersects(door):
+				res.fail("%s: raised frame obstructs the entrance" % kind)
 		var surface := _surface_of_slot(mesh, TimberHallBuilder.SURF_PLASTER)
 		res.checked += 1
 		if surface < 0:

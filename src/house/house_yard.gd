@@ -66,11 +66,8 @@ const MAX_GROUPS := 3
 
 ## Built-piece kinds, for the check.
 const KINDS := ["fence", "woodpile", "washing_line", "midden", "leanto", "trough",
-	"signpost", "bed"]
+	"signpost", "bed", "path"]
 
-const STONES := ["Wild_RockPath_Round_Small_1", "Wild_RockPath_Round_Small_2",
-	"Wild_RockPath_Round_Small_3", "Wild_RockPath_Square_Small_1",
-	"Wild_RockPath_Square_Small_2", "Wild_RockPath_Square_Small_3"]
 const HERBS := ["Wild_Plant_7", "Wild_Fern_1", "Wild_Plant_1", "Nature_Flower_3_Clump", "Wild_Fern_1", "Wild_Plant_7"]
 
 
@@ -438,24 +435,23 @@ static func _porch_pail(ctx: Dictionary) -> Dictionary:
 ## The stepping-stone path from the road edge to the door. Flush with the
 ## ground, so it is walked over and may cross the door approach.
 static func _path(ctx: Dictionary) -> Dictionary:
-	var rng: RandomNumberGenerator = ctx["rng"]
 	var env: Rect2 = ctx["env"]
 	var cell := _cell(ctx, "front", ctx["door_u"])
-	var props: Array = []
-	var d := 0.35
+	var parts: Array = []
+	var d := 0.28
 	var porch := HouseGeometry.porch_rect(ctx["plan"])
-	while d < float(cell["room"]) - 0.35:
-		var key: String = STONES[rng.randi() % STONES.size()]
-		var scale := 0.58 + rng.randf() * 0.12
-		var jitter := (rng.randf() - 0.5) * 0.18
-		var stone := make_prop(key, _w(cell, jitter, d), rng.randf() * TAU, scale, "path_stone", "path")
-		var b: AABB = stone["bounds"]
+	# Full walking-width pavers read as an approach, not a tiny scattering of
+	# stones. Built geometry also survives a public checkout without Wild art.
+	while d < float(cell["room"]) - 0.24:
+		var part := _part(cell, "path_paver", 0.0, d, 0.86, 0.46, 0.0, 0.045, "floor")
+		var b := part_aabb(part)
 		var r := Rect2(Vector2(b.position.x, b.position.z), Vector2(b.size.x, b.size.z))
-		var on_porch: bool = porch.size.x > 0.0 and porch.grow(0.1).intersects(r)
-		if not on_porch and clear_reason(ctx["plan"], env, b).is_empty() 				and _overlap_reason(ctx["accepted"], b).is_empty():
-			props.append(stone)
-		d += 0.66 + rng.randf() * 0.12
-	return {"props": props} if not props.is_empty() else {}
+		var on_porch: bool = porch.size.x > 0.0 and porch.grow(0.05).intersects(r)
+		if not on_porch and clear_reason(ctx["plan"], env, b).is_empty() \
+				and _overlap_reason(ctx["accepted"], b).is_empty():
+			parts.append(part)
+		d += 0.50
+	return {"pieces": [_piece("path", "approach", parts, "path")]} if not parts.is_empty() else {}
 
 
 static func _flowers(ctx: Dictionary) -> Dictionary:

@@ -33,7 +33,61 @@ static func run() -> SuiteResult:
 	_check_surface(res, mesh, ROOF_SURFACE, "roof")
 	_check_rotated_roof(res, mesh, spec)
 	_check_wall_roof_contact(res, mesh, spec)
+	_check_facade(res, plan, builder, mesh)
+	for width in [30.0, 62.4, 80.0]:
+		for height in [3.0, 4.5]:
+			var fs := HotelSpec.new()
+			fs.width = width
+			fs.height = height
+			var fp := HotelGenerator.generate(fs, 43101, false)
+			var fb := HotelBuilder.new()
+			var fm := fb.build(fp)
+			_check_facade(res, fp, fb, fm)
 	return res
+
+
+static func _check_facade(res: SuiteResult, plan: HousePlan,
+		builder: HotelBuilder, mesh: ArrayMesh) -> void:
+	var front: Array[Dictionary] = []
+	for w in plan.windows:
+		if Vector2(w["normal"]).y < -0.9:
+			front.append(w)
+	var hoods: Array[Dictionary] = []
+	for c in builder.component_log:
+		if c["role"] == "facade_hood":
+			hoods.append(c)
+	_expect(res, not front.is_empty() and hoods.size() == front.size(),
+		"facade must have exactly one hood per planned front window")
+	var opaque := _triangles(mesh, HouseBuilder.SURF_WALL)
+	opaque.append_array(_triangles(mesh, HouseBuilder.SURF_TRIM))
+	for w in front:
+		var p: Vector2 = w["pos"]
+		var y := HousePlan.record_storey(w) * plan.spec.height
+		var expected := Vector3(p.x, y + float(w["head"]) + 0.22,
+			HotelGeometry.front_z(plan.spec as HotelSpec))
+		var matches := 0
+		for c in hoods:
+			var bounds := MassBuilder.component_aabb(c)
+			if bounds.get_center().distance_to(expected) < 0.001 \
+					and absf(bounds.size.x - float(w["width"]) - 0.38) < 0.001:
+				matches += 1
+		_expect(res, matches == 1, "hood is detached from its planned opening")
+		# Off-centre rays avoid intended mullions, but catch opaque ornaments.
+		for side in [-0.25, 0.25]:
+			var eye := Vector3(p.x + side * float(w["width"]),
+				y + (float(w["sill"]) + float(w["head"])) * 0.5, p.y - 1.2)
+			_expect(res, _hits(opaque, eye, eye + Vector3(0, 0, 1.3)).is_empty(),
+				"facade ornament blocks window at %v" % eye)
+	var failures: Array[String] = []
+	HotelQA._check_symmetry(builder, failures)
+	_expect(res, failures.is_empty(), "real guest-floor symmetry: %s" % str(failures))
+	# Negative control: no openings is not a symmetrical elevation.
+	var saved := builder.part_log.duplicate()
+	builder.part_log.clear()
+	failures.clear()
+	HotelQA._check_symmetry(builder, failures)
+	_expect(res, not failures.is_empty(), "symmetry accepted no windows")
+	builder.part_log.assign(saved)
 
 
 static func _expect(res: SuiteResult, condition: bool, message: String) -> void:

@@ -121,12 +121,15 @@ static func _check_landmarks(spec: HotelSpec, builder: HotelBuilder,
 static func _check_symmetry(builder: HotelBuilder, failures: Array[String]) -> void:
 	var windows: Array[Vector3] = []
 	for part in builder.part_log:
-		if part["tag"] != "facade_window":
+		if part["kind"] != "window" or part.get("opening_kind", "") != "window":
 			continue
-		var size: Vector3 = part["size"]
-		if absf(size.x - HotelBuilder.WINDOW_W) < 0.01 \
-				and absf(size.z - HotelBuilder.FACADE_D) < 0.01:
-			windows.append(part["pos"])
+		var pos: Vector3 = part["pos"]
+		# Ground-floor public rooms have their own programme. Guest floors
+		# retain the bilateral rhythm; inspect real openings, not painted panes.
+		if Vector3(part["facing"]).z < -0.9 and pos.y > builder.spec.height:
+			windows.append(pos)
+	if windows.is_empty():
+		failures.append("symmetry: no real guest-floor facade windows")
 	for pos in windows:
 		var paired := false
 		for other in windows:

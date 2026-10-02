@@ -175,7 +175,7 @@ static func _landmark_site_depth(plan: VillagePlan, jobs: Array[Dictionary]) -> 
 	var north_edge := common.get_center().y + radius + road_half
 	var needed := 0.0
 	for job in jobs:
-		if (job["request"] as BuildingRequest).kind != &"temple":
+		if (job["request"] as BuildingRequest).kind not in [&"church", &"temple"]:
 			continue
 		var rule: Dictionary = LOT_RULES[&"church"]
 		var depth := _setback(rule, job) + float(job["back"]) + float(rule["yard"])
@@ -753,7 +753,8 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 				< (b["mid"] as Vector2).distance_to(near_point))
 	else:
 		ordered = _sorted(ordered, site)
-		if plan.spec.form == &"round" and StringName(site.get("toward", &"common")) == &"common":
+		if plan.spec.form in [&"round", &"green", &"street"] \
+				and StringName(site.get("toward", &"common")) == &"common":
 			# Populate the whole green rather than repeatedly choosing the
 			# slightly nearer side of a bowed road. The civic landmark already
 			# occupies one sector; ordinary common-facing buildings fill gaps.

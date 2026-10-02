@@ -13,6 +13,9 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 	shell.name = "Shell"
 	shell.mesh = mesh
 	ShellAssembler.surface_materials(shell, BuildingFamilyAdapter.colours(plan.spec))
+	shell.set_surface_override_material(HouseBuilder.SURF_WALL,
+		MaterialKit.plaster(plan.spec.wall_color))
+	ShellAssembler.house_materials(shell, plan.spec)
 	root.add_child(shell)
 	HouseAssembler.furnish(root, plan)
 	return root

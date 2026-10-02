@@ -19,6 +19,7 @@ const SURF_STONE := 0
 const SURF_TRIM := 1
 const SURF_ROOF := 2
 const SURF_DARK := 3
+const BRAZIER_SCALE := 0.75
 
 var spec: TempleSpec
 
@@ -541,7 +542,7 @@ func _dress_braziers() -> void:
 		return
 	var x: float = TempleGeometry.axis_half_width(spec) + 0.5
 	var pit: Rect2 = TempleGeometry.pit_rect(spec)
-	var reach: float = TempleGeometry.LIGHT_REACH * 0.62
+	var reach: float = TempleGeometry.LIGHT_REACH * 0.45
 	var z: float = z0
 	var placed := 0
 	while z <= z1 + 0.01 and placed < 24:
@@ -551,14 +552,53 @@ func _dress_braziers() -> void:
 			at = pit.end.y + 0.8
 		if at > z1:
 			break
-		for side in [-1.0, 1.0]:
-			_prop("Cauldron", Vector3(side * x, 0.0, at), 0.0, 1.0, &"light")
+		_brazier_pair(x, at)
 		placed += 1
 		z = at + reach
 	# and one pair at the foot of the dais, so the altar is never approached
 	# out of the dark
-	for side2 in [-1.0, 1.0]:
-		_prop("Cauldron", Vector3(side2 * x, 0.0, z1), 0.0, 1.0, &"light")
+	_brazier_pair(x, z1)
+
+
+## A centre beside the axis is not enough: a bowl has width, and the pylon
+## extends further into the court than the front wall. Search a small local
+## neighbourhood, keeping both members of the pair clear and on real floor.
+func _brazier_pair(x: float, z: float) -> void:
+	for dz in [0.0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8, 2.4, -2.4]:
+		for dx in [0.0, 0.6, 1.2]:
+			var left := Vector2(-x - float(dx), z + float(dz))
+			var right := Vector2(x + float(dx), z + float(dz))
+			if _brazier_clear(left) and _brazier_clear(right):
+				_prop("Cauldron", Vector3(left.x, 0.002, left.y), 0.0, BRAZIER_SCALE, &"light")
+				_prop("Cauldron", Vector3(right.x, 0.002, right.y), 0.0, BRAZIER_SCALE, &"light")
+				return
+
+
+func _brazier_clear(pos: Vector2) -> bool:
+	var size := PropCatalog.footprint("Cauldron") * BRAZIER_SCALE + Vector2.ONE * 0.12
+	var rect := Rect2(pos - size * 0.5, size)
+	var supported := false
+	for floor_rect in TempleGeometry.floor_rects(spec):
+		supported = supported or floor_rect.encloses(rect)
+	if not supported:
+		return false
+	var pit := TempleGeometry.pit_rect(spec)
+	if pit.size.x > 0.0 and pit.grow(TempleGeometry.PIT_RIM).intersects(rect):
+		return false
+	for mass in mass_log:
+		var name := String(mass["name"])
+		if not (name.begins_with("wall_") or name.begins_with("pylon_") \
+				or name.begins_with("column_") or name == "dais"):
+			continue
+		var b: AABB = mass["aabb"]
+		if Rect2(Vector2(b.position.x, b.position.z), Vector2(b.size.x, b.size.z)).intersects(rect):
+			return false
+	for p in prop_log:
+		if p["key"] == "Cauldron":
+			var v: Vector3 = p["pos"]
+			if Rect2(Vector2(v.x, v.z) - size * 0.5, size).intersects(rect):
+				return false
+	return true
 
 
 ## Fire along the lip of the pit.
@@ -573,17 +613,18 @@ func _dress_pit() -> void:
 	var pit: Rect2 = TempleGeometry.pit_rect(spec)
 	if pit.size.x <= 0.0:
 		return
-	var out: float = TempleGeometry.PIT_RIM + 0.55
+	var out: float = TempleGeometry.PIT_RIM + PropCatalog.footprint("Cauldron").x * BRAZIER_SCALE * 0.5 + 0.07
 	var x: float = pit.size.x / 2.0 + out
 	var reach: float = TempleGeometry.LIGHT_REACH * 0.62
 	var z0: float = pit.position.y - out
 	var z1: float = pit.end.y + out
 	var n: int = maxi(int(ceil((z1 - z0) / reach)), 1)
+	# Reserve the middle pair first: the centre of a wide bridge is the point
+	# furthest from either lip, and neighbouring bowls must not displace it.
+	_brazier_pair(x, pit.get_center().y)
 	for i in range(n + 1):
 		var z: float = lerpf(z0, z1, float(i) / float(n))
-		for side in [-1.0, 1.0]:
-			_prop("Cauldron", Vector3(pit.get_center().x + side * x, 0.0, z),
-				0.0, 1.0, &"light")
+		_brazier_pair(x, z)
 
 
 ## The altar furniture. A cup, a blade, and candles: the whole apparatus of the

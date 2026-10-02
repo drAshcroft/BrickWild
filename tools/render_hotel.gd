@@ -16,7 +16,7 @@ func _init() -> void:
 	_build_stage()
 	var spec := HotelSpec.new()
 	spec.style = &"grand_budapest"
-	var plan := HotelGenerator.generate(spec, 43101)
+	var plan := HotelGenerator.generate(spec, 43101, not OS.get_cmdline_user_args().has("--shell"))
 	var node := HotelAssembler.build(plan, false)
 	stage.add_child(node)
 	await process_frame
@@ -26,7 +26,7 @@ func _init() -> void:
 	var aspect := float(SHOT.x) / float(SHOT.y)
 	var horizontal_fov := 2.0 * atan(tan(vertical_fov * 0.5) * aspect)
 	var distance := maxf(bounds.size.x * 0.5 / tan(horizontal_fov * 0.5),
-		bounds.size.y * 0.5 / tan(vertical_fov * 0.5)) * 1.24
+		bounds.size.y * 0.5 / tan(vertical_fov * 0.5)) * 1.18 + bounds.size.z * 0.5
 	var direction := Vector3(0.0, 0.10, -1.0).normalized()
 	camera.position = centre + direction * distance
 	camera.look_at(centre + Vector3(0, bounds.size.y * 0.03, 0), Vector3.UP)
@@ -65,6 +65,7 @@ func _build_stage() -> void:
 	sun.light_color = Color("fff0dd")
 	sun.light_energy = 1.05
 	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 200.0
 	stage.add_child(sun)
 	var fill := DirectionalLight3D.new()
 	fill.rotation = Vector3(deg_to_rad(-18.0), deg_to_rad(35.0), 0.0)

@@ -41,6 +41,7 @@ static func run() -> SuiteResult:
 				if builder.prop_log.is_empty():
 					res.fail("the temple was never dressed, " + where)
 				_column_plan(res, spec, builder, where)
+				_brazier_clearance(res, builder, where)
 				NormalsSuite.check_mesh(res, mesh, where)
 
 	# determinism: same seed, same temple
@@ -63,6 +64,34 @@ static func run() -> SuiteResult:
 	_column_grid_helper(res)
 	_compact_columns(res)
 	return res
+
+
+static func _brazier_clearance(res: SuiteResult, builder: TempleBuilder, where: String) -> void:
+	var bowls: Array[AABB] = []
+	for p in builder.prop_log:
+		if p["key"] != "Cauldron":
+			continue
+		var pos: Vector3 = p["pos"]
+		var size := PropCatalog.size("Cauldron") * float(p["scale"])
+		var bounds := AABB(pos + Vector3(-size.x * 0.5, 0, -size.z * 0.5), size)
+		res.checked += 1
+		var footprint := Rect2(Vector2(bounds.position.x, bounds.position.z), Vector2(size.x, size.z))
+		for corner in Poly.from_rect(footprint):
+			var supported := false
+			for floor_rect in TempleGeometry.floor_rects(builder.spec):
+				supported = supported or floor_rect.grow(0.001).has_point(corner)
+			if not supported:
+				res.fail("brazier foot has no floor at %s, %s" % [corner, where])
+		for mass in builder.mass_log:
+			var name := String(mass["name"])
+			if name.begins_with("wall_") or name.begins_with("pylon_") \
+					or name.begins_with("column_") or name == "dais":
+				if bounds.intersects(mass["aabb"]):
+					res.fail("brazier intersects %s at %s, %s" % [name, pos, where])
+		for other in bowls:
+			if bounds.intersects(other):
+				res.fail("braziers overlap at %s, %s" % [pos, where])
+		bowls.append(bounds)
 
 
 static func _compact_columns(res: SuiteResult) -> void:

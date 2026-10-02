@@ -23,6 +23,7 @@ func build(p_spec: TimberHallSpec, p_with_roof := true, p_fill_door := false) ->
 	begin(5)
 	_build_platform()
 	_build_hall()
+	_build_wall_frame()
 	_build_columns()
 	_build_dais_and_image()
 	_build_wings()
@@ -94,6 +95,52 @@ func _build_hall() -> void:
 		if h.end.y > cursor:
 			var seg2 := h.end.y - cursor
 			box(Vector3(spec.wall_t, spec.height, seg2), Vector3(x, floor_y + spec.height / 2.0, cursor + seg2 / 2.0), SURF_PLASTER)
+
+## Raised joinery gives the plaster bays a readable scale and casts shadows;
+## it is attached outside the wall, not another row of interior obstacles.
+func _build_wall_frame() -> void:
+	var h := TimberHallGeometry.hall_rect(spec)
+	var bottom := spec.platform_h
+	var top := bottom + spec.height
+	var door_h := minf(5.0, spec.height * 0.42)
+	for z in [h.position.y - 0.06, h.end.y + 0.06]:
+		host("hall_front" if z < 0.0 else "hall_back")
+		for y in [bottom + door_h + 0.35, top - 0.5]:
+			component_box("hall_tie_beam", Vector3(h.size.x, 0.28, 0.22),
+				Transform3D(Basis(), Vector3(0, y, z)), SURF_TIMBER)
+		var bays := maxi(3, int(h.size.x / 4.0))
+		for i in range(bays + 1):
+			var x := lerpf(h.position.x + 0.18, h.end.x - 0.18, float(i) / bays)
+			# Door stays 3m wide. Its own jambs are below.
+			if z < 0.0 and absf(x) < 1.8:
+				continue
+			component_box("hall_wall_post", Vector3(0.32, spec.height, 0.22),
+				Transform3D(Basis(), Vector3(x, bottom + spec.height * 0.5, z)), SURF_TIMBER)
+			component_box("hall_eave_bracket", Vector3(0.65, 0.32, 0.65),
+				Transform3D(Basis(), Vector3(x, top - 0.2, z)), SURF_TIMBER)
+		host_end()
+	host("hall_portal")
+	for x in [-1.65, 1.65]:
+		component_box("hall_portal_jamb", Vector3(0.28, door_h, 0.38),
+			Transform3D(Basis(), Vector3(x, bottom + door_h * 0.5, h.position.y - 0.1)), SURF_TIMBER)
+	component_box("hall_portal_lintel", Vector3(3.6, 0.28, 0.42),
+		Transform3D(Basis(), Vector3(0, bottom + door_h + 0.14, h.position.y - 0.1)), SURF_TIMBER)
+	host_end()
+	for side in [-1.0, 1.0]:
+		host("hall_side_%s" % str(side))
+		var x: float = side * (h.size.x * 0.5 + 0.06)
+		var window_y := bottom + (9.0 if spec.wings else 5.0)
+		for y in [window_y - 1.25, top - 0.5]:
+			component_box("hall_side_rail", Vector3(0.22, 0.28, h.size.y),
+				Transform3D(Basis(), Vector3(x, y, 0)), SURF_TIMBER)
+		var posts: Array[float] = [h.position.y + 0.18, h.end.y - 0.18]
+		for i in range(3):
+			posts.append(lerpf(h.position.y + 3.0, h.end.y - 3.0, (float(i) + 0.5) / 3.0))
+		for z in posts:
+			component_box("hall_side_post", Vector3(0.22, spec.height, 0.32),
+				Transform3D(Basis(), Vector3(x, bottom + spec.height * 0.5, z)), SURF_TIMBER)
+		host_end()
+
 
 func _build_columns() -> void:
 	for i in range(spec.columns.size()):

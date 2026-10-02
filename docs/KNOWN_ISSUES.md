@@ -1,10 +1,10 @@
 # Known issues
 
-Status after the temple generator landed. All 18 suites pass; the house and
-temple suites between them are more than half the checks. The house warnings that remain are the two the harness is
-designed to report rather than hide: rooms with less glass than the daylight
-rule asks for, and rooms that gave up a piece of furniture so the rooms beyond
-them could be reached.
+This file includes historical findings. For the current render-led review and
+exact QA coverage, see [the evaluation follow-up](EVALUATION_2026-10-01.md#render-led-follow-up-brickwild).
+Passing bounded lanes does not imply that the full scheduled sweep passed.
+House warnings deliberately retain daylight shortfalls and furniture removed
+to preserve circulation.
 
 ## Fixed
 
@@ -98,11 +98,22 @@ more in the furnisher search), `court` 8 min, `dressing` 37 min, `library`
 contract checks from the pre-merge gates; see `docs/QA_FAST_PROTOCOL.md`.
 A faster hotel generator is the real fix.
 
-### 0d. Scheduled village suites are red
-`vlot` 71/1 (the manor found no frontage), `vcheck` 79/13 (pop 26 well-path,
-pop 40 fronting/arrive/earned, dress fields integration) and
-`varchetype_thorpe` (three) fail on `main` as of 2026-10-01 and sit in no
-routine lane. Tracked as EVAL-C11 and EVAL-C13 in the todo store.
+### 0d. Village scheduled acceptance still needs a complete rerun
+The fresh 2026-10-02 audit supersedes the original thirteen-failure report:
+`vlot` passed 71 checks, including manor frontage. Before the current repair,
+`vcheck` had four failures (one missing tavern and three common-frontage cases).
+The Thorpe matrix stopped at seed-index 0, population scale 1.4, with density
+and common-frontage failures; unvisited cells are not passes.
+
+The green-site repair keeps road offset tied to site depth, moves ring
+junctions when the common needs more width, and connects the well by a real
+path. The expanded `vsite` gate passed 311 checks and `lane:village-fast`
+passed 10. All four originally failing green seeds subsequently passed focused
+VillageQA. Thorpe's measured landmark-depth reservation now includes churches
+as well as temples: its failing cell passed nine checks, with density 6.7%
+and common frontage 69%. Sixteen native-building warnings remain visible.
+Complete scheduled acceptance is still tracked as EVAL-C11/C13; these focused
+passes do not establish that every previously unvisited matrix cell is green.
 
 ### 1. `src/building/` has been deleted (resolved)
 The superseded draft generator is gone from the tree.

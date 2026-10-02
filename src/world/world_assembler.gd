@@ -210,14 +210,11 @@ static func _mosque(plan: HousePlan) -> Array:
 static func hall_palette(spec: TimberHallSpec) -> Array:
 	var pavilion := spec.kind == &"phoenix_pavilion"
 	var timber := Color("9a3226") if pavilion else Color("4a3527")
-	var top := spec.platform_h + spec.height
 	return [MaterialKit.timber(timber),
 		MaterialKit.ashlar(Color("b4aea1"), false, Vector2(1.3, 0.5), {"coping": 1.0}),
 		MaterialKit.grey_tile(Color("575b5f")),
 		MaterialKit.water(Color("3f5c63")),
-		MaterialKit.plaster(Color("e4dcc8"), false, {"frame_bay": 4.0,
-			"frame_colour": timber.darkened(0.1), "frame_floor": spec.platform_h,
-			"frame_top": top})]
+		MaterialKit.plaster(Color("e4dcc8"))]
 
 
 static func _joined(a: Dictionary, b: Dictionary) -> Dictionary:

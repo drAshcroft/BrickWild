@@ -9,7 +9,19 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
 	var y: float = HouseGeometry.SCONCE_HEIGHT if PropCatalog.category(key) == "sconce" \
 		else HouseGeometry.SHELF_HEIGHT
-	var width: float = PropCatalog.size(key).x
+	# A mount height is not the top of the mesh. In particular Lantern_Wall
+	# extends 1.419m ABOVE its pivot, and used to project through low roofs.
+	# Fit its measured body above head height and below the ceiling; scoring
+	# and assembly receive that same scale, rather than just clamping light.
+	var ceiling := plan.spec.height - HouseGeometry.FLOOR_T - 0.03
+	var scale := 1.0
+	if PropCatalog.category(key) == "sconce":
+		scale = minf(1.0, maxf(0.1, ceiling - 1.7) / maxf(PropCatalog.height(key), 0.01))
+	var top := (PropCatalog.floor_offset(key) + PropCatalog.height(key)) * scale
+	y = minf(y, ceiling - top)
+	if PropCatalog.category(key) == "sconce":
+		y = maxf(y, 1.7 - PropCatalog.floor_offset(key) * scale)
+	var width: float = PropCatalog.size(key).x * scale
 	# Worked out once, not once per candidate: where a pair of these hangs is
 	# a fact about the room, and HouseFurnishScore._flank_anchor() scans the walls to find it.
 	# Leaving it inside the scoring loop made the house suites four times as
@@ -48,7 +60,7 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 				continue
 			var cand := {
 				"key": key, "pos": Vector3(pos.x, 0.0, pos.y),
-				"yaw": HouseFurnishGeometry.yaw_facing(n), "scale": 1.0,
+				"yaw": HouseFurnishGeometry.yaw_facing(n), "scale": scale,
 				"rect": Rect2(pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 				"host": -1, "mounted": true, "flank_anchor": anchor,
 			}
@@ -65,7 +77,7 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 		"yaw": best_yaw,
 		"rect": Rect2(best_pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
-		"mounted": true, "scale": 1.0,
+		"mounted": true, "scale": scale,
 	})
 
 

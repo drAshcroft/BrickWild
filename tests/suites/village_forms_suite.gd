@@ -538,6 +538,13 @@ static func _site_problems(plan: VillagePlan, spec: VillageSpec,
 			out.append(String(failure))
 	if form == &"gate" and plan.roads_of_class(&"through").size() != 1:
 		out.append("gate needs one through road")
+	if form == &"gate":
+		for common in plan.commons:
+			for road in plan.roads:
+				if road["class"] == &"path":
+					continue
+				if Poly.intersection_area(common["poly"], VillageSitePlanner.road_ribbon(road, true)) > 0.01:
+					out.append("gate common overlaps a %s carriageway/verge" % road["class"])
 	return out
 
 

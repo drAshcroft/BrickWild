@@ -300,7 +300,10 @@ static func _through_road(site: Rect2, spec: VillageSpec, rng: RandomNumberGener
 	var a2: float = rng.randf_range(BEND_A2.x, BEND_A2.y) * length * (1.0 if rng.randf() < 0.5 else -1.0)
 	# the green wants the road down one side of it; the street form runs it
 	# through the middle with houses on both sides.
-	var offset: float = -0.12 * length if spec.form == &"green" else 0.0
+	# Retry sites grow along the road only. Moving the road by that new width
+	# consumed the unchanged southern building row (and eventually left the
+	# site). Its lateral offset belongs to the site's depth, not its length.
+	var offset: float = -0.12 * site.size.y if spec.form == &"green" else 0.0
 	var samples: int = maxi(THROUGH_MIN_SAMPLES, int(ceil(length / THROUGH_SAMPLE_M)))
 	var pts := PackedVector2Array()
 	for i in range(samples + 1):
@@ -308,7 +311,7 @@ static func _through_road(site: Rect2, spec: VillageSpec, rng: RandomNumberGener
 		var x: float = site.position.x + length * t
 		var y: float = offset + a1 * sin(PI * t) + a2 * sin(TAU * t)
 		pts.append(Vector2(x, y))
-	# The bend and the green's offset grow with the road's LENGTH, and a site
+	# The bend grows with the road's LENGTH, and a site
 	# stretched along its road (VIL-012) keeps its depth: a 315 m by 90 m site
 	# carried its through road 54 m off the middle, out of the ground the walk
 	# grid covers, and nobody could arrive (EVAL-C11). Keep the whole road, with
@@ -844,6 +847,16 @@ static func _plan_green(out: VillagePlan, spec: VillageSpec, through: PackedVect
 	var ib: int = _vertex_near_x(through, centre_x + want_w * 0.5 + GREEN_SIDE_CLEAR)
 	if ib - ia < 2:
 		ib = mini(through.size() - 1, ia + 2)
+	# Snapping can leave less than the minimum green width between the two
+	# junctions. Move the junctions too, rather than extending the common
+	# through its eastern ring road while leaving that road where it was.
+	while through[ib].x - through[ia].x < want_w + GREEN_SIDE_CLEAR * 2.0:
+		if ia > 0:
+			ia -= 1
+		elif ib < through.size() - 1:
+			ib += 1
+		else:
+			break
 	var left: float = through[ia].x + GREEN_SIDE_CLEAR
 	var right: float = through[ib].x - GREEN_SIDE_CLEAR
 	var green_w: float = maxf(right - left, GREEN_MIN_W)
@@ -858,6 +871,12 @@ static func _plan_green(out: VillagePlan, spec: VillageSpec, through: PackedVect
 	height = maxf(height, GREEN_MIN_H)
 	var rect := Rect2(Vector2(left, bottom), Vector2(green_w, height))
 	out.commons.append({"poly": Poly.from_rect(rect), "kind": &"common"})
+	# The common clears the highest part of a bowed road, leaving a gap at
+	# its centre. Give the well a real walking approach across that gap.
+	var join: Vector2 = through[_vertex_near_x(through, rect.get_center().x)]
+	var walk := (rect.get_center() - join).normalized()
+	out.roads.append(_road(PackedVector2Array([join, rect.get_center() - walk * 1.9]),
+		&"path", spec.wealth))
 
 	# the ring: west up, north across, east down -- a loop closed by the
 	# through road itself, so the graph is one component with no dead end.

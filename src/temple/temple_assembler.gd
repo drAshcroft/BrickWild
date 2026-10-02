@@ -24,6 +24,8 @@ static func build(spec: TempleSpec, cutaway := false) -> Node3D:
 	ShellAssembler.surface_materials(shell, BuildingFamilyAdapter.colours(spec),
 		ShellAssembler.DEFAULT_ROUGHNESS,
 		TempleBuilder.SURF_ROOF if cutaway else -1)
+	shell.set_surface_override_material(TempleBuilder.SURF_STONE,
+		MaterialKit.ashlar(spec.stone_color, false, Vector2(1.2, 0.5)))
 	root.add_child(shell)
 
 	var props := Node3D.new()
@@ -80,7 +82,7 @@ static func _light_the_fires(root: Node3D, builder: TempleBuilder,
 		var yaw: float = float(p.get("yaw", 0.0)) + PropCatalog.face_offset(key)
 		var lamp: OmniLight3D = LightKit.for_prop(key, Vector3(pos.x, pos.y - drop, pos.z),
 			yaw, s, spec.glow_color, reach)
-		lamp.light_energy = 2.4
+		lamp.light_energy = 1.25
 		root.add_child(lamp)
 	# and the god himself: a low flame in the cult's colour before the idol, so
 	# the end of the axis is never a silhouette against nothing
@@ -88,6 +90,6 @@ static func _light_the_fires(root: Node3D, builder: TempleBuilder,
 	var rim: OmniLight3D = LightKit.make(
 		Vector3(idol.x, idol.y + spec.idol_height * 0.55,
 			idol.z - spec.idol_width * 0.75),
-		spec.glow_color, 1.8, maxf(spec.idol_height * 2.6, 6.0))
+		spec.glow_color.lerp(Color("fff0da"), 0.35), 2.6, maxf(spec.idol_height * 2.6, 6.0))
 	rim.name = "IdolLight"
 	root.add_child(rim)
