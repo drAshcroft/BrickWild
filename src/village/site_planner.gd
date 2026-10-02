@@ -308,6 +308,21 @@ static func _through_road(site: Rect2, spec: VillageSpec, rng: RandomNumberGener
 		var x: float = site.position.x + length * t
 		var y: float = offset + a1 * sin(PI * t) + a2 * sin(TAU * t)
 		pts.append(Vector2(x, y))
+	# The bend and the green's offset grow with the road's LENGTH, and a site
+	# stretched along its road (VIL-012) keeps its depth: a 315 m by 90 m site
+	# carried its through road 54 m off the middle, out of the ground the walk
+	# grid covers, and nobody could arrive (EVAL-C11). Keep the whole road, with
+	# its verges and the site margin, inside the site; a road that already fits
+	# is untouched.
+	var half_road: float = float(ROAD_CLASSES[&"through"]["width"]) * 0.5 		+ float(ROAD_CLASSES[&"through"]["verge"])
+	var room: float = site.size.y * 0.5 - half_road - SITE_MARGIN_M
+	var reach := 0.0
+	for p in pts:
+		reach = maxf(reach, absf(p.y))
+	if reach > room and room > 0.0:
+		var squeeze: float = room / reach
+		for i in range(pts.size()):
+			pts[i].y *= squeeze
 	return pts
 
 
@@ -351,8 +366,14 @@ static func _plan_street(out: VillagePlan, spec: VillageSpec, through: PackedVec
 	out.commons.append({"poly": Poly.from_rect(rect), "kind": &"common"})
 	# A bowed road may touch the common only at one corner. That contact has
 	# no pedestrian width after erosion, so give the well a real civic path.
-	var approach := _road(PackedVector2Array([through[_vertex_near_x(through, mid)],
-		rect.get_center() - Vector2(0.0, 1.9)]), &"path", spec.wealth)
+	# The path stops a stride short of the well, on the line it was walking: from
+	# a vertex off the plot's axis that line is slanted, and ending it straight
+	# above the centre left its ribbon's corner in the well's own floor (the
+	# well was pushed aside and out of the path's reach, EVAL-C11).
+	var join: Vector2 = through[_vertex_near_x(through, mid)]
+	var walk: Vector2 = (rect.get_center() - join).normalized()
+	var approach := _road(PackedVector2Array([join, rect.get_center() - walk * 1.9]),
+		&"path", spec.wealth)
 	out.roads.append(approach)
 
 	# The common's other three sides (VIL-012). Without them the common has
@@ -733,9 +754,10 @@ static func _ring_street(out: VillagePlan, spec: VillageSpec, through: PackedVec
 	# A rectangular common reaches past the circle its longer side implies, to
 	# its corners; a ring tangent to that circle cut across them (the street
 	# form's two end chords overlapped the common by 3.5 m^2 on 17 of 50 seeds).
-	# The gate form shares this ring but has no room to spare: its manor lane
-	# needs the old ring, so it keeps it (a known gap, see the task report).
-	if spec.form == &"street":
+	# The gate form shares it. Its manor lane used to need the old, smaller
+	# ring; the lot planner now grows the lord's site as it does for any manor
+	# (plan_measured), and the manor is placed with the corrected ring (EVAL-C11).
+	if spec.form == &"street" or spec.form == &"gate":
 		radius = common.size.length() * 0.5
 	# Chords cut inside their circumradius.  Offset the centreline by the
 	# reciprocal of cos(22.5 degrees), so the inward road edge remains at the

@@ -305,7 +305,7 @@ static func plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
 	var boxes: Array[Rect2] = ctx["boxes"]
 	var bounds: Array[PackedVector2Array] = ctx["bounds"]
 	for j in range(bounds.size()):
-		if not boxes[j].grow(canopy + VillageDressCatalog.TRUNK_CLEAR).has_point(at):
+		if not boxes[j].grow(maxf(canopy, trunk) + VillageDressCatalog.TRUNK_CLEAR).has_point(at):
 			continue
 		# The CHECK'S measurement, not a rect overlap: `DressCheck.canopies`
 		# asks for the true distance from the trunk to the building, and a
