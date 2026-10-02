@@ -20,6 +20,14 @@ const SURF_TRIM := 1
 const SURF_ROOF := 2
 const SURF_OPEN := 3
 const SURF_WATER := 4
+## Slot 4 is the ground skin of the whole site -- water, beaten earth, bank,
+## grass -- and slot 5 the small timber, hay and cloth of the working yards.
+## Both are vertex-coloured (CastleAssembler turns that on), so a new colour
+## costs no new material. QA treats slot 4 as it always treated water: a thin
+## sheet, not masonry.
+const SURF_GROUND := 4
+const SURF_DRESS := 5
+const SURFACES := 6
 
 ## Steps a battered wall or tower is emitted in. More steps is a smoother
 ## talus; four reads as masonry courses rather than as a ramp.
@@ -38,6 +46,9 @@ var interior_errors: Array[String] = []
 var yard_report: Dictionary = {}
 var _yard_ranges: Array[Dictionary] = []
 var _yard_well: Dictionary = {}
+var _yards: Array[Dictionary] = []
+var _skin_used := false
+var _dress_used := false
 var _planned_interiors := {}
 const Interiors = preload("castle_interiors.gd")
 const KeepPlan = preload("castle_keep_plan.gd")
@@ -45,7 +56,7 @@ const KeepPlan = preload("castle_keep_plan.gd")
 
 func build(p_spec: CastleSpec) -> ArrayMesh:
 	spec = p_spec
-	begin_metric(5)
+	begin_metric(SURFACES)
 	_roof_faces.clear()
 	_roof_covers.clear()
 	_roof_openings.clear()
@@ -54,6 +65,9 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 	yard_report.clear()
 	_yard_ranges.clear()
 	_yard_well.clear()
+	_yards.clear()
+	_skin_used = false
+	_dress_used = false
 	_planned_interiors = Interiors.primary(spec)
 	total_height = spec.height
 
@@ -83,7 +97,8 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 ## shell and then quietly forgotten.
 func _dressed() -> ArrayMesh:
 	_join_roofs()
-	prop_log = CastleFurnisher.dress(spec, {"ranges": _yard_ranges, "well": _yard_well})
+	prop_log = CastleFurnisher.dress(spec, {"ranges": _yard_ranges, "well": _yard_well,
+		"yards": _yards})
 	# Old decorative furniture must not overlap the actual plan's furniture.
 	prop_log = prop_log.filter(func(p: Dictionary) -> bool:
 		for row in interiors:
@@ -94,9 +109,37 @@ func _dressed() -> ArrayMesh:
 		return true)
 	if CastleGeometry.is_enclosed(spec):
 		yard_report = CastleFurnisher.yard_report(spec, prop_log, interiors,
-			{"ranges": _yard_ranges, "well": _yard_well})
+			{"ranges": _yard_ranges, "well": _yard_well, "yards": _yards})
+	_keep_surface_slots()
 	var mesh: ArrayMesh = commit()
 	return _elevate_sky(mesh) if CastleGeometry.is_sky(spec) else mesh
+
+
+## The ground skin is slot 4 and the yard dressing slot 5. A SurfaceTool with
+## nothing in it adds no surface, which would slide slot 5 down into slot 4 and
+## put timber where QA expects water. When only the dressing was used, slot 4
+## gets a one-millimetre speck so that every slot stays where its constant says.
+func _keep_surface_slots() -> void:
+	if _skin_used or not _dress_used:
+		return
+	var st := _kit.surface(SURF_GROUND)
+	var p := Vector3(0.0, 0.0, 0.0)
+	st.set_normal(Vector3.UP)
+	st.add_vertex(p)
+	st.set_normal(Vector3.UP)
+	st.add_vertex(p + Vector3(0.0, 0.0, 0.001))
+	st.set_normal(Vector3.UP)
+	st.add_vertex(p + Vector3(0.001, 0.0, 0.0))
+
+
+## Say that slot 4 carries something, so no speck is needed to hold its place.
+func mark_ground_skin() -> void:
+	_skin_used = true
+
+
+## Say that slot 5 carries something.
+func mark_dress() -> void:
+	_dress_used = true
 
 
 ## Emit in the castle's local frame, where its floor is y=0. `_elevate_sky`
@@ -894,7 +937,8 @@ func _build_enclosure() -> void:
 		for mass in mass_log:
 			var nm: String = mass["name"]
 			if nm in ["keep", "hall", "chapel", "apse", "well"] \
-					or nm.begins_with("yard_") or nm.begins_with("forebuilding"):
+					or nm.begins_with("yard_") or nm.begins_with("yardwork_") \
+					or nm.begins_with("forebuilding"):
 				if (mass["aabb"] as AABB).position.y >= inner_ground - 0.01:
 					mass["ground"] = inner_ground
 
@@ -906,21 +950,13 @@ func _build_water_moats() -> void:
 		mass_log.back()["depth"] = trench.depth
 		mass_log.back()["width"] = trench.width
 		mass_log.back()["ring"] = trench.ring
-		# Keep visible water off the masonry voxel surface. The negative trench
-		# remains the measured mass and must stay clear of positive structure.
-		var a: AABB = trench.aabb
-		tag("water")
-		box(Vector3(a.size.x, 0.02, a.size.z),
-			Vector3(a.get_center().x, 0.01, a.get_center().z), SURF_WATER)
+	# The trench stays the measured negative mass. What shows is the water that
+	# stands in it, the banks that hold it and the revetment along the curtain.
+	CastleMoatBuilder.emit(self)
 
 
 func _build_causeway() -> void:
-	var road := CastleGeometry.causeway_aabb(spec)
-	if road.size.x <= 0.0 or road.size.z <= 0.0:
-		return
-	tag("causeway")
-	_box_aabb(road, SURF_STONE)
-	_log_mass("causeway", road)
+	CastleMoatBuilder.causeway(self)
 
 
 func _build_drawbridge() -> void:
@@ -1872,6 +1908,10 @@ func _build_yard() -> void:
 			_planned_interiors[id] = row
 		_range(a, id, SURF_STONE, true, [], RANGE_BAY)
 	var well: Dictionary = _yard_well
+	_yards = CastleYards.plan(spec, _yard_ranges, well)
+	if not _yards.is_empty():
+		mark_dress()
+		CastleYardBuilder.emit(self, _yards)
 	if well.is_empty():
 		return
 	var at: Vector2 = well["pos"]

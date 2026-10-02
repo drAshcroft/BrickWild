@@ -550,7 +550,7 @@ func _check_gaps(spec: CastleSpec, builder: CastleBuilder) -> void:
 	# A yard building and the well stand on their own in the bailey: they are
 	# buildings in a courtyard, not part of the fortification (CAS-012).
 	var g: Dictionary = MassRules.gaps(builder.mass_log, _anchor(spec),
-		["yard_", "well"])
+		["yard_", "yardwork_", "bank_", "well"])
 	_add(g["failures"])
 	stats["masses_joined"] = g["joined"]
 

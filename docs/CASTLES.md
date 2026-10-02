@@ -253,6 +253,55 @@ godot --path . --script res://tools/render_shots.gd -- vis015
 This writes `artifacts/renders/visualqa/vis015/` and keeps the existing
 `castle_krak.jpg` and `visualqa/scene/krak_courtyard.jpg` as the before views.
 
+### EVAL-B02: the bailey is grouped into working yards
+
+From the wall walk a barrel is a speck: the VIS-015 clutter read as confetti
+on a 300 m ward. What reads at that distance is a *place*, so the bailey now
+holds up to four **working yards** (`src/castle/castle_yards.gd`), each on its
+own quad of beaten earth in its own colour:
+
+| yard | earth | built (no pack ships these) | catalogue props |
+|---|---|---|---|
+| smithy | soot | lean-to roof on posts with a plank back, woodpiles | anvil, forge cauldron, quench barrels, weapon stand, cart |
+| stable | straw | rail fence with a gate gap, two haystacks, a trough | barrels, buckets, feed bags, fodder cart |
+| market and muster | gravel | two cloth-on-posts canopies, beside the well | stalls, tables, apple and carrot crates, dummies, weapon rack |
+| timber store | sawdust | long lean-to shed, woodpiles stacked log by log, a free pile | chopping block, cart, rope, crates |
+
+`CastleYards.plan(spec, ranges, well)` is a pure function of the spec. It
+reserves what the furnisher reserves plus the geometry's `gate_axis_strip`, the
+ranges and the well, and each yard it has already placed; every yard stays in
+the ward and a yard that does not fit is shrunk, then dropped. The smithy and
+the stable lean on their own range when the bailey has one. Sizes scale with
+the ward (a 300 m ward gets 30 m yards and taller roofs, a 40 m ward gets
+7 m yards).
+
+`CastleYardBuilder` raises them through the builder's logs:
+
+- **components** `yard_rim` and `yard_ground` (host `yard_<name>`) -- the earth;
+  `yard_roof` and `yard_cloth` -- the roofs and canopies, which are components
+  and not masses so a prop standing UNDER one is not inside a solid;
+- **masses** `yardwork_<name>_<piece>` for every solid piece (posts, back
+  screens, troughs, woodpiles, fence runs, haystacks), measured from what was
+  emitted. They are named `yardwork_` and not `yard_` because `yard_` is the
+  prefix of a bailey *building* and every building rule reads it. The voxel QA
+  seeds from them as it does from the well; the gap rule treats them as it
+  treats the well and the yard buildings.
+
+The earth, timber, hay and cloth are vertex colours on two new shell surfaces
+(slot 4, the ground skin that used to be water only, and slot 5, yard dressing),
+so a new colour costs no material. `CastleAssembler` turns vertex colour on for
+those two slots; QA treats slot 4 as it always treated water. If only slot 5 is
+used the builder puts a one-millimetre speck in slot 4 so no slot slides down
+into another (a SurfaceTool with nothing in it adds no surface).
+
+The catalogue props of each yard go through the furnisher as ordinary
+`bailey_exterior` fixtures first; the loose clutter of the open ward is now
+`LOOSE_SHARE` (0.4) of the old area-scaled count and keeps out of every yard.
+`vis015` checks each yard: inside the ward, off the gate strip and every
+reserve, not over another yard, one logged ground patch inside its yard, its
+own earth colour, two or more built pieces and three or more catalogue props
+all inside the patch, and every built piece inside the patch and off the way in.
+
 ## What the suites check
 
 The chapel is a one-room `HousePlan` with an altar on a raised sanctuary,
