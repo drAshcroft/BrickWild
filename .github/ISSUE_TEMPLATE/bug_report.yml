@@ -1,0 +1,31 @@
+name: Bug report
+description: Report a reproducible BrickWild problem
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include the expected behavior and actual behavior.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Godot version and operating system
+      placeholder: Godot 4.5.2, Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include building kind, seed, sizes, and steps when applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Remove personal data before posting.

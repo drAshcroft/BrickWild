@@ -26,7 +26,9 @@ assets/props/wild/*
 # Suite logs and one-off exports from a working session
 scratch/logs/
 scratch/*.json
-/docs/screenshots
+# Documentation captures are source material; Godot's generated sidecars are not.
+/docs/screenshots/*
+!/docs/screenshots/*.png
 /.claude/worktrees
 
 # Agent worktrees
