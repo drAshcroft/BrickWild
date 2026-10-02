@@ -97,6 +97,10 @@ var barbican: bool               # outwork in front of the gate (fortress)
 var ditch_width: float = 0.0
 ## Number of nested water cuts around the outer enceinte (1..2).
 var moat_count: int = 1
+## Optional ground round the castle: earth, rough grass and a track from the
+## gate, a few metres beyond the plan extent (CastleApron). Off by default and
+## never part of BigGlade.placement() bounds.
+var ground_apron: bool = false
 
 # inner ward (fortress only): the second, higher enceinte
 var inner_ward: bool

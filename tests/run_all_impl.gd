@@ -70,7 +70,7 @@ const EXTRA: Array[String] = ["library", "placement", "vmine", "varchetypecontra
 	"dmvbrief",
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest", "cas013",
-	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015",
+	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015", "cground",
 	"runnererror", "runnerfail", "int012", "int013", "thievesden100", "cnormaldiag", "dressingquick"]
 
 ## LANES -- the suites worth running for a given KIND OF EDIT.
@@ -184,6 +184,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/vis009_suite.gd").run()
 		"vis015":
 			return preload("res://tests/suites/castle_yard_suite.gd").run()
+		"cground":
+			return preload("res://tests/suites/castle_ground_suite.gd").run()
 		"hmaterials":
 			return preload("res://tests/suites/house_material_suite.gd").run()
 		"henvelope":

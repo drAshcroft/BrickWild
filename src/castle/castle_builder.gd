@@ -97,6 +97,7 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 ## shell and then quietly forgotten.
 func _dressed() -> ArrayMesh:
 	_join_roofs()
+	CastleApron.emit(self)
 	prop_log = CastleFurnisher.dress(spec, {"ranges": _yard_ranges, "well": _yard_well,
 		"yards": _yards})
 	# Old decorative furniture must not overlap the actual plan's furniture.

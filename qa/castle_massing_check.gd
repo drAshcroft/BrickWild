@@ -550,7 +550,7 @@ func _check_gaps(spec: CastleSpec, builder: CastleBuilder) -> void:
 	# A yard building and the well stand on their own in the bailey: they are
 	# buildings in a courtyard, not part of the fortification (CAS-012).
 	var g: Dictionary = MassRules.gaps(builder.mass_log, _anchor(spec),
-		["yard_", "yardwork_", "bank_", "well"])
+		["yard_", "yardwork_", "bank_", "well", "ground_apron"])
 	_add(g["failures"])
 	stats["masses_joined"] = g["joined"]
 
@@ -670,6 +670,9 @@ func _check_size_match(spec: CastleSpec, builder: CastleBuilder) -> void:
 	var span := AABB()
 	var first := true
 	for m3 in masses:
+		# the optional ground apron is ground, not the design's plan
+		if String(m3["name"]).begins_with("ground_apron"):
+			continue
 		var b: AABB = m3["aabb"]
 		span = b if first else span.merge(b)
 		first = false
