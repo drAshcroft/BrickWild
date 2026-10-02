@@ -266,6 +266,7 @@ static func _chapel_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 	out.roof_color = spec.roof_color
 	out.floor_color = spec.stone_color.darkened(0.35)
 	out.clutter = 0.5
+	out.exterior_props = false # inside the castle masonry: no yard, no road edge
 	return out
 
 
@@ -407,6 +408,7 @@ static func _hall_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 	out.roof_color = spec.roof_color
 	out.floor_color = spec.stone_color.darkened(0.35)
 	out.clutter = 0.5
+	out.exterior_props = false # inside the castle masonry: no yard, no road edge
 	return out
 
 

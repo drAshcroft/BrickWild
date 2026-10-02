@@ -28,7 +28,7 @@ const TOL := 0.02
 ## may replace one through `check(plan, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"tiling", &"storeys", &"shape", &"way_in",
 	&"connected", &"privacy", &"opening", &"window", &"daylight", &"stairs", &"stair_line",
-	&"doors_in_line", &"upstairs_programme", &"colonnade"]
+	&"doors_in_line", &"door_chimney", &"upstairs_programme", &"colonnade"]
 const METHODS := {&"shape": "_check_shapes", &"way_in": "_check_entrance",
 	&"connected": "_check_connectivity", &"opening": "_check_door_openings",
 	&"window": "_check_windows", &"daylight": "_check_daylight"}
@@ -646,6 +646,33 @@ static func _on_outline(poly: PackedVector2Array, p: Vector2) -> bool:
 		if (a + d * t).distance_to(p) < 0.05:
 			return true
 	return false
+
+
+## No exterior door opens onto the chimney stack (EVAL-C12). The stack is a
+## solid 1 m column on the outside of the hearth wall; a door whose clear
+## opening, run out through the wall and a pace beyond it, meets that footprint
+## has a chimney standing in it. Measured from the plan's doors and the same
+## footprint the builder emits (HouseGeometry.chimney_rect).
+func _check_door_chimney(plan: HousePlan) -> void:
+	for di in door_chimney_clashes(plan):
+		failures.append("door_chimney: exterior door %d opens onto the chimney stack" % di)
+
+
+## The doors whose opening meets the chimney stack's footprint, by index.
+static func door_chimney_clashes(plan: HousePlan) -> Array[int]:
+	var out: Array[int] = []
+	if not plan.spec.chimney or plan.hearth_room() < 0:
+		return out
+	var stack: Rect2 = HouseGeometry.chimney_rect(plan)
+	if stack.size.x <= 0.0:
+		return out
+	for di in range(plan.doors.size()):
+		var d: Dictionary = plan.doors[di]
+		if not d.get("exterior", false) or bool(d.get("secret", false)):
+			continue
+		if stack.intersection(HouseGeometry.door_opening_rect(plan.spec, d)).get_area() > 0.0001:
+			out.append(di)
+	return out
 
 
 ## What is upstairs is not a copy of what is downstairs.

@@ -94,6 +94,14 @@ static func applies(plan: HousePlan) -> bool:
 	return plan.entrance() >= 0
 
 
+## Does this plan stand on open ground with a road edge to walk from? A house, a
+## shop and a hotel do. A courtyard or shaped plan opens its doors onto its own
+## court and a castle interior stands inside masonry: there is no road edge to
+## reach them from, and the access rule has nothing to say (EVAL-C14).
+static func has_road_edge(plan: HousePlan) -> bool:
+	return plan.spec.exterior_props and not HouseGeometry.is_shaped(plan) 		and not plan.has_court()
+
+
 # --------------------------------------------------------------------- planning
 
 ## Plan the yard into `plan.yard` and `plan.yard_pieces`. Deterministic: the same
@@ -839,7 +847,7 @@ static func obstacles(plan: HousePlan) -> Array[Rect2]:
 ## chimney stands in its back door is the shell's defect, not the yard's; the yard
 ## may only never make a reachable door unreachable.
 static func access_ok(plan: HousePlan) -> bool:
-	if plan.entrance() < 0:
+	if plan.entrance() < 0 or not has_road_edge(plan):
 		return true
 	var with_yard := HouseExterior.reached_doors(plan, true)
 	if plan.entrance() not in with_yard:
