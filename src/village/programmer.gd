@@ -77,8 +77,9 @@ static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("programme|%d" % spec.seed)
 
+	var mix: Array[StringName] = _mixed_styles(spec, styles)
 	for i in range(spec.households):
-		out.append(_make_house(spec, styles, rng, i))
+		out.append(_make_house(spec, styles, rng, i, mix[i] if not mix.is_empty() else &""))
 
 	_append_landmark(out, spec, styles)
 	_append_shops(out, spec, styles)
@@ -89,7 +90,64 @@ static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 		out.append(BuildingRequest.castle(
 			_seed_for(spec, "manor"), styles["castle"], 40.0, 50.0, 10.0))
 
+	_raise_landmark(out)
 	return out
+
+
+## The landmark is the tallest building in the village (VILLAGES §9.4; the
+## place check measures it). A rich village builds two-storey houses 11 to
+## 13 m high and a shrine asked for at 6 m measured 11.8, so it is asked for
+## more height, a metre at a time, until it is measured clear of the highest
+## roof any house or shop could have (EVAL-C11). The request carries the
+## height, so the plan's building is exactly the one the programme named.
+## A keep is its own landmark and is left alone, and a temple whose height
+## does not answer the request is left as it is.
+const LANDMARK_CLEAR := 0.3
+const LANDMARK_LIFT_STEPS := 10
+
+static func _raise_landmark(out: Array[BuildingRequest]) -> void:
+	var landmark := -1
+	var tallest := 0.0
+	for i in range(out.size()):
+		if out[i].kind in [&"church", &"temple"]:
+			if landmark < 0:
+				landmark = i
+		elif out[i].kind in [&"house", &"shop"]:
+			tallest = maxf(tallest, roof_top_bound(out[i]))
+	if landmark < 0 or tallest <= 0.0:
+		return
+	var base_height: float = out[landmark].height
+	for step in range(LANDMARK_LIFT_STEPS + 1):
+		out[landmark].height = base_height + float(step)
+		var placed: Dictionary = BigGlade.measure(out[landmark])
+		if placed.is_empty():
+			break
+		if (placed["bounds"] as AABB).size.y > tallest + LANDMARK_CLEAR:
+			return
+	out[landmark].height = base_height
+
+
+## The highest this house or shop can stand, from its request alone: the
+## steepest pitch its style allows and every attachment that rises over the
+## ridge, through the one function the builder's own bounds use. The
+## generator draws a pitch inside the style's range and the draw is never
+## above it, so this is never below the measured height.
+static func roof_top_bound(request: BuildingRequest) -> float:
+	var spec := HouseSpec.new()
+	spec.style = request.style
+	spec.width = request.width
+	spec.length = request.length
+	spec.height = request.height
+	spec.storeys = clampi(request.storeys, 1, 3)
+	var style: Dictionary = HouseSpec.STYLES.get(request.style, {})
+	if style.is_empty():
+		return 0.0
+	spec.roof_pitch = float(style["roof_pitch"][1])
+	spec.chimney = true
+	spec.porch = true
+	spec.bargeboards = true
+	spec.roof_type = &"gable"
+	return HouseGeometry.total_height(spec)
 
 
 ## Translate mythsim's kept words into real, placeable architecture. A kept
@@ -247,9 +305,14 @@ static func _append_shops(out: Array[BuildingRequest], spec: VillageSpec, styles
 ## the wealth gradient the PlaceCheck measures.
 const HOUSE_SIZE_SPREAD := 0.22
 
-static func _make_house(spec: VillageSpec, styles: Dictionary, rng: RandomNumberGenerator, i: int) -> BuildingRequest:
+static func _make_house(spec: VillageSpec, styles: Dictionary, rng: RandomNumberGenerator, i: int,
+		forced_style: StringName = &"") -> BuildingRequest:
 	var trade := _trade_for(spec, i)
+	# the draw is always taken, so a forced style leaves every later house and
+	# shop exactly where it was
 	var style := _house_style(spec, styles, rng)
+	if forced_style != &"":
+		style = forced_style
 	var storeys := _storeys_for(spec.wealth, rng)
 	var w: float = lerp(7.0, 10.0, clampf(spec.wealth, 0.0, 1.0))
 	var l: float = lerp(9.0, 13.0, clampf(spec.wealth, 0.0, 1.0))
@@ -257,6 +320,47 @@ static func _make_house(spec: VillageSpec, styles: Dictionary, rng: RandomNumber
 	var size: float = 1.0 + HOUSE_SIZE_SPREAD * (2.0 * t - 1.0)
 	return BuildingRequest.house(_seed_for(spec, "house|%d" % i), style, trade,
 		snappedf(w * size, 0.1), snappedf(l * size, 0.1), 2.6, storeys)
+
+
+## VILLAGES §9.3's `variety`: no one style is more than 45 % of the houses.
+## `_house_style` draws each house on its own, which for a rich village gives
+## townhouse and the base style two shares that cannot both be under 45 %, and
+## a thorpe of six came out five townhouses to one (EVAL-C11). A village rich
+## enough to mix (the check's own band, 0.55) and big enough to be judged
+## (five houses) is given three styles, the culture's cottage and farmhouse
+## as well as the townhouse, dealt in quotas: the townhouse the wealth's share
+## of them, up to the cap, the rest shared between the other two, and the
+## order shuffled from the seed so the big houses are not all one style.
+## Empty when the village is not one of those, and the draws stand.
+const MIXING_WEALTH := 0.55
+const MIXING_MIN_HOUSES := 5
+const STYLE_SHARE_CAP := 0.45
+
+static func _mixed_styles(spec: VillageSpec, styles: Dictionary) -> Array[StringName]:
+	var out: Array[StringName] = []
+	var base: StringName = styles["house"]
+	var n: int = spec.households
+	if base not in MIXABLE_HOUSE_STYLES or spec.wealth < MIXING_WEALTH or n < MIXING_MIN_HOUSES:
+		return out
+	var other: StringName = &"farmhouse" if base == &"cottage" else &"cottage"
+	var cap: int = int(floorf(STYLE_SHARE_CAP * float(n) - 0.0001))
+	var townhouses: int = mini(cap, int(roundf(clampf(spec.wealth, 0.0, 1.0) * float(n))))
+	var rest: int = n - townhouses
+	var bases: int = mini(cap, int(ceilf(float(rest) * 0.5)))
+	for k in range(townhouses):
+		out.append(&"townhouse")
+	for k in range(bases):
+		out.append(base)
+	for k in range(rest - bases):
+		out.append(other)
+	var dealer := RandomNumberGenerator.new()
+	dealer.seed = hash("styles|%d" % spec.seed)
+	for k in range(out.size() - 1, 0, -1):
+		var j: int = dealer.randi_range(0, k)
+		var swap: StringName = out[k]
+		out[k] = out[j]
+		out[j] = swap
+	return out
 
 
 ## §4: "wealth sets storeys (1 below 0.3, 2 above 0.6)"; between the two, the
