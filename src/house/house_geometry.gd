@@ -849,6 +849,21 @@ static func chimney_rect(plan: HousePlan) -> Rect2:
 	return Rect2(c - Vector2.ONE * s * 0.5, Vector2.ONE * s)
 
 
+## An exterior door's clear opening in plan: its leaf width, out through the
+## wall and half a metre past it. The chimney stack must stay out of it
+## (EVAL-C12).
+static func door_opening_rect(spec: HouseSpec, d: Dictionary) -> Rect2:
+	var n: Vector2 = d["normal"]
+	var pos: Vector2 = d["pos"]
+	var half: float = float(d["width"]) * 0.5
+	var reach: float = wall_thickness(spec) + 0.5
+	if absf(n.y) > 0.5:
+		var z1: float = pos.y + n.y * reach
+		return Rect2(Vector2(pos.x - half, minf(pos.y, z1)), Vector2(half * 2.0, absf(z1 - pos.y)))
+	var x1: float = pos.x + n.x * reach
+	return Rect2(Vector2(minf(pos.x, x1), pos.y - half), Vector2(absf(x1 - pos.x), half * 2.0))
+
+
 ## The porch's own footprint, on the wall the entrance is actually on.
 static func porch_rect(plan: HousePlan) -> Rect2:
 	var spec := plan.spec

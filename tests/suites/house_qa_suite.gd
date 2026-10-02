@@ -101,6 +101,9 @@ static func run(full: bool = false, group: StringName = &"all",
 		phase_start = _phase_start("doors-in-line fixture")
 		_doors_in_line_fixture(res)
 		_phase_end("doors-in-line fixture", phase_start)
+		phase_start = _phase_start("door-chimney fixture")
+		_door_chimney_fixture(res)
+		_phase_end("door-chimney fixture", phase_start)
 		phase_start = _phase_start("poles sweep")
 		_poles_sweep(res, sweep_count)
 		_phase_end("poles sweep", phase_start)
@@ -240,6 +243,40 @@ static func _doors_in_line_fixture(res: SuiteResult) -> void:
 	var want := "doors_in_line: doors 0 and 1 face each other across the house, 0.60m of them in line"
 	if not want in rep["failures"]:
 		res.fail("doors in line fixture: wanted\n    %s\n  got: %s" % [want, str(rep["failures"])])
+
+
+## The door_chimney rule, shown to fire (EVAL-C12): a one-room house whose fire
+## is on the back wall and whose back door is cut where the stack stands. The
+## plan before the door is clean; with it the rule names the door; and the
+## planner, given that door, moves the fire to a wall it does not block.
+static func _door_chimney_fixture(res: SuiteResult) -> void:
+	var plan := _fs_plan(&"hall", 73002)
+	plan.spec.chimney = true
+	plan.hearth = {"room": 0, "wall": 1}
+	var inner: Rect2 = HouseGeometry.interior_rect(plan.spec)
+	var at: float = HouseGeometry.chimney_center(plan).x
+	var before: int = plan.doors.size()
+	res.checked += 1
+	if not HousePlanCheck.door_chimney_clashes(plan).is_empty():
+		res.fail("door chimney fixture: the bare plan already has a stack in a door")
+	plan.doors.append({"a": 0, "b": -1, "pos": Vector2(at, inner.end.y),
+		"normal": Vector2(0, 1), "width": 0.95, "exterior": true, "front": false,
+		"storey": 0})
+	# the furnisher pins the stack to where the fire stood: put that on the door
+	plan.focus = {"room": 0, "cat": "hearth", "pos": Vector2(at, inner.end.y),
+		"facing": 0.0, "faces_door": false}
+	res.checked += 1
+	var rep: Dictionary = HousePlanCheck.new().check(plan)
+	var want := "door_chimney: exterior door %d opens onto the chimney stack" % before
+	if not want in rep["failures"]:
+		res.fail("door chimney fixture: wanted
+    %s
+  got: %s" % [want, str(rep["failures"])])
+	res.checked += 1
+	HousePlanFeatures.choose_hearth(plan, plan.spec)
+	plan.focus = {}
+	if not HousePlanCheck.door_chimney_clashes(plan).is_empty():
+		res.fail("door chimney fixture: choose_hearth left the stack in the door (wall %d)" % plan.hearth_wall())
 
 
 ## The exhaustive lane checks two hundred one-storey houses with a back door,

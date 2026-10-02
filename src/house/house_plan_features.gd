@@ -55,10 +55,40 @@ static func choose_hearth(p: HousePlan, spec: HouseSpec) -> void:
 	var best_run := -INF
 	for wi in walls:
 		var run: float = _clear_wall_run(p, room, wi)
+		# a stack standing in an exterior door is worse than a short run
+		# (EVAL-C12): a wall whose stack would meet a door only wins when
+		# every wall's would
+		if _stack_meets_door(p, spec, room, wi):
+			run -= 1000.0
 		if run > best_run:
 			best_run = run
 			best = wi
 	p.hearth = {"room": room, "wall": best}
+
+
+## Would the chimney stack, centred on the middle of this wall's clear run (where
+## HouseGeometry.chimney_center puts it), stand in an exterior door's opening?
+static func _stack_meets_door(p: HousePlan, spec: HouseSpec, room: int, wi: int) -> bool:
+	var span: Vector2 = clear_wall_span(p, room, wi)
+	var along: float = (span.x + span.y) * 0.5
+	var r: Rect2 = HouseGeometry.site_rect(spec)
+	var s: float = HouseGeometry.chimney_size(spec)
+	var c: Vector2
+	match wi:
+		0: c = Vector2(along, r.position.y - s / 2.0 + 0.15)
+		1: c = Vector2(along, r.end.y + s / 2.0 - 0.15)
+		2: c = Vector2(r.position.x - s / 2.0 + 0.15, along)
+		_: c = Vector2(r.end.x + s / 2.0 - 0.15, along)
+	var w: float = s + 0.22
+	if spec.chimney_style == &"stepped":
+		w = maxf(w, s + HouseGeometry.CHIMNEY_BASE_EXTRA)
+	var stack := Rect2(c - Vector2.ONE * w * 0.5, Vector2.ONE * w)
+	for d in p.doors:
+		if not d.get("exterior", false) or bool(d.get("secret", false)):
+			continue
+		if stack.intersection(HouseGeometry.door_opening_rect(spec, d)).get_area() > 0.0001:
+			return true
+	return false
 
 
 ## The clear stretch of outside wall a hearth needs: the widest hearth in the
