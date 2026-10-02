@@ -251,6 +251,7 @@ const CHANCEL_RISE := 0.15
 ## it the way it measures a room.
 static func _chapel_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 	var out := HouseSpec.new(spec.seed ^ 0x43_48_50_4C)
+	out.exterior_props = false   # the ward is the castle yard; no house yard here
 	out.material = &"stone"
 	out.plinth_height = 0.0
 	out.style = &"longhall"
@@ -392,6 +393,7 @@ static func _longest_table() -> float:
 ## rather than as a cottage.
 static func _hall_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 	var out := HouseSpec.new(spec.seed)
+	out.exterior_props = false   # the ward is the castle yard; no house yard here
 	out.material = &"stone"
 	out.plinth_height = 0.0
 	out.style = &"longhall"
