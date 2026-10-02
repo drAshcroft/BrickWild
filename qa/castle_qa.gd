@@ -20,11 +20,12 @@ extends RefCounted
 const EPS := 0.05
 ## How far off the wall centre-line a perimeter sample may find its masonry.
 const WALL_PROBE := 1
+const Occupancy = preload("res://qa/castle_occupancy_check.gd")
 
 ## The rules, in order; a family may replace one through
 ## `check(spec, mesh, builder, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"no_nan", &"grounded", &"connected_mass",
-	&"openings_embedded", &"enceinte_closed", &"interiors", &"lords_walk", &"gate_access"]
+	&"openings_embedded", &"enceinte_closed", &"interiors", &"occupied_shells", &"access_routes", &"lords_walk", &"gate_access"]
 const METHODS := {&"no_nan": "_check_vertices", &"grounded": "_check_ground",
 	&"openings_embedded": "_check_openings", &"enceinte_closed": "_check_enceinte"}
 
@@ -83,8 +84,20 @@ func _check_lords_walk() -> void:
 		failures.append("lords_walk: " + failure)
 
 
+func _check_occupied_shells() -> void:
+	var report := Occupancy.check(spec, builder, mesh)
+	stats["occupied_shells"] = report.stats
+	failures.append_array(report.failures)
+
+
 func _check_gate_access() -> void:
 	var report := gate_access_report(spec, builder, mesh)
+	failures.append_array(report.failures)
+
+
+func _check_access_routes() -> void:
+	var report := preload("castle_route_check.gd").check(builder, mesh)
+	stats["access_routes"] = {"routes": report.routes, "ok": report.ok}
 	failures.append_array(report.failures)
 
 
@@ -420,7 +433,7 @@ static func _lords_walk_special(s: CastleSpec, b: CastleBuilder,
 	for failure in door_report.failures:
 		out.failures.append(failure)
 	out["door"] = door_report
-	var route := _special_approach_report(building_id, b, row, door)
+	var route := _special_approach_report(building_id, b, row, door, actual)
 	for failure in route.failures:
 		out.failures.append(failure)
 	out["approach"] = route
@@ -527,7 +540,7 @@ static func _door_ray_clear(actual: ArrayMesh, point: Vector3, facing: Vector3,
 
 
 static func _special_approach_report(building_id: String, b: CastleBuilder,
-		row: Dictionary, door: Dictionary) -> Dictionary:
+		row: Dictionary, door: Dictionary, actual: ArrayMesh = null) -> Dictionary:
 	var out := {"failures": [], "steps": 0, "contiguous": false, "monotonic": false}
 	var kind := "tower_approach_step" if building_id == "tower_house" else "motte_approach_step"
 	var steps: Array[Dictionary] = []
@@ -549,7 +562,8 @@ static func _special_approach_report(building_id: String, b: CastleBuilder,
 		var centre: Vector3 = steps[i].get("pos", Vector3.ZERO)
 		var size: Vector3 = steps[i].get("size", Vector3.ZERO)
 		var top := centre.y + size.y * 0.5
-		if size.y <= 0.0 or top <= previous_top + 0.001 or top - previous_top > 0.30 + 0.001:
+		# A landing can be level; steps must not descend or exceed a usable rise.
+		if size.y <= 0.0 or top < previous_top - 0.001 or top - previous_top > 0.30 + 0.001:
 			walkable_risers = false
 		previous_top = top
 		var distance := Vector2(centre.x, centre.z).distance_to(Vector2(door_world.x, door_world.z))
@@ -578,6 +592,64 @@ static func _special_approach_report(building_id: String, b: CastleBuilder,
 		out.failures.append("%s: %s chain is not monotonic toward the door" % [building_id, kind])
 	if not walkable_risers:
 		out.failures.append("%s: %s chain has a missing or non-walkable riser" % [building_id, kind])
+	var physical := _approach_mesh_report(steps, actual if actual != null else b.commit(),
+		minf(float(door.width) - 0.12, HouseGeometry.PATH_MIN))
+	out["mesh"] = physical
+	for failure in physical.failures:
+		out.failures.append("%s: %s" % [building_id, failure])
+	return out
+
+
+## Step records locate the probes; only the final mesh can prove that the
+## treads exist and the body corridor is free of other castle masonry.
+static func _approach_mesh_report(steps: Array[Dictionary], actual: ArrayMesh,
+		clear_width: float) -> Dictionary:
+	var out := {"failures": [], "treads_checked": 0}
+	var triangles: Array = []
+	for surface in actual.get_surface_count():
+		if surface not in [CastleBuilder.SURF_OPEN, CastleBuilder.SURF_WATER]:
+			triangles.append_array(HouseQA._mesh_triangles(actual, surface))
+	var previous := Vector3.ZERO
+	for i in steps.size():
+		var step: Dictionary = steps[i]
+		var size: Vector3 = step.size
+		var top: Vector3 = step.pos + Vector3.UP * size.y * 0.5
+		var yaw := float(step.get("rot_y", 0.0))
+		var lateral := Vector3(cos(yaw), 0.0, -sin(yaw))
+		var direction := Vector3(sin(yaw), 0.0, cos(yaw))
+		if i == 0:
+			previous = top - direction * (size.z * 0.5 + 0.12)
+			previous.y = 0.0
+		var radius := minf(clear_width, size.x - 0.12) * 0.5
+		var region := AABB(top, Vector3.ZERO).expand(previous).grow(2.1)
+		var nearby: Array = []
+		for tri in triangles:
+			var bounds := AABB(tri[0], Vector3.ZERO).expand(tri[1]).expand(tri[2])
+			if region.intersects(bounds.grow(0.001)):
+				nearby.append(tri)
+		var floor_missing := false
+		var obstructed := false
+		for offset in [-radius, 0.0, radius]:
+			var point := top + lateral * float(offset)
+			# A broad downward ray can mistake the mound beneath an omitted
+			# tread for the tread itself. Measure the named top to 4 mm.
+			if not _access_ray_hits(nearby, point + Vector3.UP * 0.004,
+					point - Vector3.UP * 0.004):
+				floor_missing = true
+			if _access_ray_hits(nearby, point + Vector3.UP * 0.05,
+					point + Vector3.UP * 1.95):
+				obstructed = true
+			for height in [0.12, 0.9, 1.9]:
+				var end := point + Vector3.UP * float(height)
+				var start := Vector3(previous.x, end.y, previous.z) + lateral * float(offset)
+				if _access_ray_hits(nearby, start, end):
+					obstructed = true
+		if floor_missing:
+			out.failures.append("approach mesh: tread %d has no emitted walking surface" % i)
+		if obstructed:
+			out.failures.append("approach mesh: tread %d has blocked body clearance or headroom" % i)
+		out.treads_checked += 1
+		previous = top
 	return out
 
 

@@ -17,7 +17,13 @@ static func primary(spec: CastleSpec) -> Dictionary:
 		if shell_plan.spec != null:
 			out["keep_shell"] = record("keep_shell", shell_plan,
 				CastleGeometry.shell_keep_aabb(spec))
-		return out
+		# A motte replaces the keep, not the occupied bailey ranges. Returning
+		# here left the hall and chapel as windowed blocks without any way in.
+		out.merge(preload("castle_mural_plan.gd").records(spec))
+		out.merge(preload("castle_gate_plan.gd").records(spec))
+		var apse := preload("castle_apse_plan.gd").record(spec)
+		if not apse.is_empty():
+			out["apse"] = apse
 	if CastleGeometry.is_sky(spec):
 		return out # Sky castles retain their separate multi-storey contract.
 	for kind in ["hall", "keep", "chapel"]:

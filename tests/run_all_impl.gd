@@ -50,7 +50,7 @@ extends RefCounted
 ##  30 tree      - the generated tree family: four styles, 24 species, ten rules
 ##  31 bridge    - the bridge family: four kinds, four mechanisms, ten rules
 const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
-	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "cwater", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
+	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cmotteaccess", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "cwater", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
@@ -62,7 +62,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 const EXTRA: Array[String] = ["library", "placement", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
-	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
+	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "coccupancy", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
@@ -122,9 +122,10 @@ const LANES: Dictionary = {
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
 	"lane:palace-change": ["palace"],
 	"lane:village-fast": ["vquick"],
-	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried"],
+	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cmotteaccess"],
+	"lane:motte-change": ["cmotteplan", "cmotteaccess", "coccupancy"],
 	"lane:castle-spot": ["castlechange", "chimeji"],
-	"lane:castle": ["castle", "cnormals", "cmassing", "clandmark", "cvoxelqa", "ctowerplan", "cmotteplan", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried", "cterrace"],
+	"lane:castle": ["castle", "cnormals", "cmassing", "clandmark", "cvoxelqa", "ctowerplan", "cmotteplan", "cmotteaccess", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried", "cterrace"],
 	"lane:church-change": ["churchroof", "churchchange"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
 	"lane:temple": ["temple", "rite"],
@@ -234,6 +235,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return load("res://tests/suites/castle_tower_house_suite.gd").run()
 		"cmotteplan":
 			return load("res://tests/suites/castle_motte_plan_suite.gd").run()
+		"cmotteaccess":
+			return load("res://tests/suites/castle_motte_access_suite.gd").run()
+		"coccupancy":
+			return load("res://tests/suites/castle_occupancy_suite.gd").run()
 		"cforms":
 			return load("res://tests/suites/castle_forms_suite.gd").run()
 		"crangeplan":

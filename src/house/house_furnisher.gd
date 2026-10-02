@@ -289,6 +289,8 @@ static func _keep_the_room_passable(plan: HousePlan, room: int,
 ## will not go in, the table comes out and the plan says so.
 static func _ensure_seating(plan: HousePlan, room: int, blocked: Array[Rect2],
 		zones: Array[Rect2], r: RandomNumberGenerator) -> void:
+	if plan.kind_of(room) == &"sanctuary":
+		return # An altar is approached standing; its nave owns the seats.
 	if _count_cat(plan, room, ["table"]) == 0:
 		if plan.was_dropped(room, "table"):
 			_recover_dining_pair(plan, room, blocked, zones)

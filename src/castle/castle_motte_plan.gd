@@ -81,6 +81,7 @@ static func generate(spec: CastleSpec, with_furniture := false) -> HousePlan:
 	var door_normal := -Vector2(front["normal"])
 	plan.doors.append({"a": 0, "b": -1, "pos": door_pos,
 		"normal": door_normal, "width": door_width,
+		"head": 2.3,
 		"exterior": true, "front": true, "storey": 0, "host": "keep_shell",
 		"surface_point": door_pos, "surface_normal": door_normal,
 		"route": "motte_climb"})

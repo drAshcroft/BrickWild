@@ -25,7 +25,9 @@ func _init() -> void:
 	await process_frame
 	var options := OS.get_cmdline_args() + OS.get_cmdline_user_args()
 	if "--motte-revision" in options:
-		await _motte_revision_shots()
+		if not await _motte_revision_shots():
+			quit(1)
+			return
 	elif "--motte-only" in options:
 		await _motte_shots()
 	else:
@@ -58,7 +60,7 @@ func _motte_spec() -> CastleSpec:
 
 
 ## One assembled small fixture exposes the revised doorway and wall flue.
-func _motte_revision_shots() -> void:
+func _motte_revision_shots() -> bool:
 	var spec := CastleSpec.new()
 	spec.style = &"norman"
 	spec.width = 45.0
@@ -66,6 +68,19 @@ func _motte_revision_shots() -> void:
 	spec.height = 6.0
 	spec.plan_override = &"motte_bailey"
 	CastleGenerator.generate(spec, 8856)
+	# A README capture must pass the same physical contract as its fixture.
+	# Refuse to replace the evidence image with a castle the rig rejects.
+	var checked_builder := CastleBuilder.new()
+	var checked_mesh := checked_builder.build(spec)
+	var report := CastleQA.new().check(spec, checked_mesh, checked_builder)
+	var report_path := OUT + "/motte_revision_qa.json"
+	FileAccess.open(report_path, FileAccess.WRITE).store_string(JSON.stringify({
+		"seed": 8856, "width": 45, "length": 55, "height": 6,
+		"ok": report.ok, "failures": report.failures,
+		"warnings": report.warnings, "stats": report.stats}, "  "))
+	if not report.ok:
+		push_error("README castle failed physical QA: " + str(report.failures))
+		return false
 	var castle := CastleAssembler.build(spec)
 	_stage.add_child(castle)
 	var keep := CastleGeometry.shell_keep_aabb(spec)
@@ -83,7 +98,11 @@ func _motte_revision_shots() -> void:
 	_cam.position = at + Vector3(-10.0, 6.0, -10.0)
 	_cam.look_at(at)
 	await _save("motte_revision_flue.png")
+	_cam.position = Vector3(65.0, 65.0, -82.0)
+	_cam.look_at(Vector3(0.0, 5.0, -6.0))
+	await _save("motte_revision_ward.png")
 	castle.free()
+	return true
 
 
 func _tower_house_shots() -> void:

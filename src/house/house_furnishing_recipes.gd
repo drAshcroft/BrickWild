@@ -139,6 +139,13 @@ const RECIPES := {
 		{"cat": "tableware", "rule": &"on", "n": [1, 2], "opt": 0.9},
 		{"cat": "candle", "rule": &"on", "n": [1, 1], "opt": 0.9},
 	],
+	&"sanctuary": [
+		# The altar bay serves standing worship. Congregation seating belongs
+		# in the adjoining nave, whose existing pew rows remain unchanged.
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		{"cat": "candelabrum", "rule": &"free", "n": [0, 1], "opt": 0.7},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 1.0},
+	],
 	&"lords_chamber": [
 		# The room at the top of a keep: a bed, a fire of its own, and enough
 		# to sit at. The hearth goes in before the bed because the flue is on a

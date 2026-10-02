@@ -7,6 +7,114 @@ const SPINE := 0.2
 const LANDING := 0.9
 const TREAD := 0.28
 
+
+## The emitted motte treads are also the passage reservation at the bailey's
+## rear curtain. Extending a stair to the mound toe must cut every wall it
+## crosses; a clear line beside the climbing curtain alone is insufficient.
+static func motte_approach(spec: CastleSpec, door_xz := Vector2(INF, INF)) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not CastleGeometry.is_motte(spec):
+		return out
+	var wall := CastleGeometry.climb_wall(spec)
+	var keep := CastleGeometry.shell_keep_aabb(spec)
+	var centre := CastleGeometry.motte_center(spec)
+	var to := Vector3(centre.x, spec.motte_height + HouseGeometry.FLOOR_T,
+		keep.position.z + spec.shell_thickness)
+	var width := clampf(maxf(float(wall.thickness) * 3.0, 2.0), 2.0, 3.6)
+	var outward := Vector2(0.0, -1.0)
+	var door_clear := width
+	var doorway_depth := 0.0
+	if is_finite(door_xz.x) and is_finite(door_xz.y):
+		to.x = door_xz.x
+		to.z = door_xz.y
+		var plan := CastleMottePlan.generate(spec, false)
+		if plan.spec != null and plan.entrance() >= 0:
+			outward = Vector2(plan.doors[plan.entrance()].normal).normalized()
+			door_clear = minf(width, float(plan.doors[plan.entrance()].width) - 0.12)
+			doorway_depth = HouseGeometry.wall_thickness(plan.spec)
+	else:
+		to.x += float(wall.thickness) * 0.5 + width * 0.5 + 0.25
+	var radius := CastleGeometry.motte_base_radius(spec)
+	# Reach the drum toe along the doorway's true normal. A Z-aligned flight
+	# can strike an oblique doorway's jamb even with its centre on the door.
+	var offset := Vector2(to.x, to.z) - centre
+	var along := offset.dot(outward)
+	var length := -along + sqrt(maxf(along * along + radius * radius - offset.length_squared(), 0.0)) + 0.8
+	if length <= 0.1:
+		return out
+	var direction := Vector3(-outward.x, 0.0, -outward.y)
+	var lateral := Vector3(direction.z, 0.0, -direction.x)
+	var from := Vector3(to.x, 0.0, to.z) - direction * length
+	var yaw := atan2(direction.x, direction.z)
+	var batter := tan(deg_to_rad(clampf(spec.motte_batter, 20.0, 60.0)))
+	var count := maxi(5, maxi(int(ceil(to.y / 0.28)), int(ceil(length * batter / 0.20))))
+	var depth := length / float(count)
+	var previous_top := 0.0
+	for i in range(count):
+		var at := from + direction * (depth * (float(i) + 0.5))
+		# The broad exterior flight narrows before entering the doorway. The
+		# tread itself, as well as its walking corridor, must clear both jambs.
+		var remaining := length - depth * (float(i) + 0.5)
+		var tread_width := clampf(door_clear + (remaining - doorway_depth - depth) * 2.0,
+			door_clear, width)
+		var surface_y := 0.0
+		for sx in [-tread_width * 0.5, tread_width * 0.5]:
+			for sz in [-depth * 0.5, depth * 0.5]:
+				var corner := at + lateral * float(sx) + direction * float(sz)
+				surface_y = maxf(surface_y, motte_surface_y(spec, corner.x, corner.z))
+		# A radial mound can peak between the uphill corners. The closest
+		# footprint point to its centre bounds the entire visible tread top.
+		var toward_centre := Vector3(centre.x - at.x, 0.0, centre.y - at.z)
+		var nearest := at + lateral * clampf(toward_centre.dot(lateral),
+			-tread_width * 0.5, tread_width * 0.5) + direction * clampf(
+			toward_centre.dot(direction), -depth * 0.5, depth * 0.5)
+		surface_y = maxf(surface_y, motte_surface_y(spec, nearest.x, nearest.z))
+		# The occupied floor is above the mound by FLOOR_T. A stair following
+		# bare terrain alone is buried by that floor at the keep threshold.
+		var top := maxf(to.y * float(i + 1) / float(count),
+			surface_y + HouseGeometry.FLOOR_T + 0.015)
+		# The mound top is a level landing. Artificial micro-risers here used
+		# to climb above the occupied floor and obstruct the doorway threshold.
+		top = maxf(top, previous_top)
+		var base := surface_y + 0.005
+		var h := maxf(top - base, 0.01)
+		at.y = base + h * 0.5
+		out.append({"pos": at, "size": Vector3(tread_width, h, depth), "rot_y": yaw})
+		previous_top = at.y + h * 0.5
+	return out
+
+
+static func motte_surface_y(spec: CastleSpec, x: float, z: float) -> float:
+	var centre := CastleGeometry.motte_center(spec)
+	var radius := CastleGeometry.motte_base_radius(spec)
+	var top_radius := CastleGeometry.motte_top_radius(spec)
+	var radial := Vector2(x - centre.x, z - centre.y).length()
+	if radial >= radius:
+		return 0.0
+	if radial <= top_radius:
+		return spec.motte_height
+	return spec.motte_height * (radius - radial) / maxf(radius - top_radius, 0.001)
+
+
+## X/Y opening through an axis-aligned rear curtain, including the battered
+## toe. Its head follows the highest tread actually crossing that masonry.
+static func motte_passage(spec: CastleSpec, wall: AABB,
+		door_xz := Vector2(INF, INF)) -> Rect2:
+	var opening := Rect2()
+	for step in motte_approach(spec, door_xz):
+		var at: Vector3 = step.pos
+		var size: Vector3 = step.size
+		var yaw := float(step.rot_y)
+		var half := Vector2(absf(cos(yaw)) * size.x + absf(sin(yaw)) * size.z,
+			absf(sin(yaw)) * size.x + absf(cos(yaw)) * size.z) * 0.5
+		if at.z + half.y < wall.position.z - 0.12 \
+				or at.z - half.y > wall.end.z + 0.12:
+			continue
+		var gap := Rect2(at.x - half.x - 0.12, 0.0,
+			half.x * 2.0 + 0.24, at.y + size.y * 0.5 + 2.2)
+		opening = gap if not opening.has_area() else opening.merge(gap)
+	return opening
+
 ## A roofed straight stair meets the actual first-floor face. Receding keeps
 ## get a longer top landing across the lower storey's shoulder.
 static func forebuilding(spec: CastleSpec) -> Dictionary:

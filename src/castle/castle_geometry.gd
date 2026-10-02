@@ -1120,6 +1120,10 @@ static func gatehouse_aabb(spec: CastleSpec, r: int) -> AABB:
 
 
 static func gate_height(spec: CastleSpec, r: int) -> float:
+	if is_motte(spec):
+		# The guard chamber opens onto the curtain walk; leave a full room
+		# above that floor instead of placing decorative lights in its header.
+		return maxf(wall_height(spec, r) * 1.25, wall_height(spec, r) + PARAPET_RISE + 2.6)
 	return wall_height(spec, r) * 1.25
 
 

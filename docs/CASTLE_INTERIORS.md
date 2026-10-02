@@ -36,6 +36,21 @@ The [motte overview](screenshots/motte_revision_hero.png),
 [furnished entrance](screenshots/motte_revision_entrance.png), and
 [wall flue](screenshots/motte_revision_flue.png) are actual renderer captures.
 Reproduce them with `tools/render_castle_specials.gd -- --motte-revision`.
+The overview fixture is Norman, 45 by 55 metres, height 6, seed 8856.
+Its earlier passing QA result was incomplete: motte dispatch omitted hall and
+chapel plans, the small towers had no occupied plans, and the approach check
+accepted step records without measuring the curtain crossing in the mesh.
+`cmotteaccess` now checks the finished approach and the fixture's occupied
+buildings. Its negative controls preserve the step logs while restoring the
+blocking curtain or removing emitted tread geometry. `coccupancy` exercises
+missing building records, blocked entrances, and windows without rooms.
+The motte's mural towers enter from the curtain walk and contain real floors
+and connecting stairs. The gate chamber sits above the gate passage, with a
+gallery to the wall walk. The curved chapel sanctuary has its own floor,
+windows and a shared doorway into the nave. Its altar programme does not
+require pews in this smaller space.
+The render utility runs `CastleQA` first and saves `motte_revision_qa.json`
+beside the captures; a failed report prevents replacement images.
 `tests/castle_motte_envelope_test.gd` checks 48 seeded fits;
 `tests/castle_motte_native_test.gd -- small compact fortress` checks the furnished
 3-, 7-, and 8-storey fixtures against emitted geometry and navigation.
@@ -73,6 +88,9 @@ gate passages, then uses the keep plan's navigation and stair chain to reach the
 lord's chamber. It uses the existing `WalkGrid` and measured prop footprints.
 Painting a door on a solid wall cannot satisfy it. This rule applies when the
 builder has emitted a keep plan.
+Special motte and tower-house approaches also require emitted tread surfaces,
+a clear body-width corridor between treads, and 1.95 metres of headroom.
+An orderly list of step positions cannot establish those facts.
 
 ## Verification
 
@@ -101,11 +119,13 @@ an offset-pivot stall fixture and reversed-bed negative controls.
 ## Eligibility and remaining work
 
 The existing hall, chapel, and keep planners have room-size eligibility limits.
-This bridge emits their valid plans; it does not invent a plan for a range that
-those planners reject. Ridge castles, tower houses, and motte shell keeps need
-dedicated plans matching their rotated ranges, raised entrances, and mound
-geometry. They remain separate follow-up work. Ordinary castle wings and
-annexes without an authored HousePlan also retain their existing geometry.
+Ridge castles, tower houses, and motte shell keeps have dedicated plans, but
+some forms still emit additional occupied-looking geometry outside those plans.
+The inventory check derives required buildings from the site specification for
+each family; omitting an entire plan is a failure. Ordinary castle wings,
+annexes, defensive towers and upper ridge storeys without complete plans are
+reported as missing coverage. Passing the pictured motte does not establish
+complete coverage of the castle family.
 Tall hall and chapel ranges can contain an unoccupied void between the plan's
 ceiling height and the castle-owned roof.
 
@@ -118,7 +138,13 @@ profiles on an otherwise idle machine before further optimization.
 
 The hotel dormer roof defect is tracked separately as `ROOF-AUDIT-001`.
 
-The canonical voxel QA sweep passes all 84 fixtures with 204 nonfatal warnings.
+The historical canonical voxel QA sweep passed 84 fixtures with 204 nonfatal
+warnings before the occupied-shell checks were added. That result did not prove
+that every visible building had an interior or that its windows opened into one.
+On 2026-10-02 the stronger bounded `castlechange` check rejected blocked hall
+windows in seed 9075, blocked keep windows in seed 9250, and roomless upper
+ridge windows in seed 8805. Those are failures, not accepted warning categories.
+The castle family must not be described as complete while these remain.
 [The warning handoff](CASTLE_INTERIOR_WARNINGS.md) records category counts,
 exact fixtures, rule locations and the related pending triage task. Warnings
 include explicit furnishing compromises, generic seating rules applied to

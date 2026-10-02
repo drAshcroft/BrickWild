@@ -65,6 +65,7 @@ const REQUIRED := {
 	&"great_hall": ["table"],
 	&"lords_chamber": ["bed"],
 	&"nave": ["table"],
+	&"sanctuary": ["table"],
 	&"guardroom": ["table"],
 	&"cell": ["cage"],
 }

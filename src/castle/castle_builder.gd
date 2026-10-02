@@ -734,87 +734,22 @@ func _tower_approach_steps(t: AABB, sill: float, door_xz: Vector2) -> void:
 ## Physical steps follow the existing climb from bailey ground to the shell
 ## threshold.  They terminate at the plan's inner shell face, in the same
 ## local frame as the `keep_shell` interior record.
-func _motte_approach_steps(wall: Dictionary, door_xz := Vector2(INF, INF)) -> void:
-	var from := Vector3(wall["from"])
-	var keep := CastleGeometry.shell_keep_aabb(spec)
-	var centre := CastleGeometry.motte_center(spec)
-	var to := Vector3(centre.x, spec.motte_height,
-		keep.position.z + spec.shell_thickness)
-	if is_finite(door_xz.x) and is_finite(door_xz.y):
-		to.x = door_xz.x
-		to.z = door_xz.y
-	var horizontal := Vector3(to.x - from.x, 0.0, to.z - from.z)
-	var length := horizontal.length()
-	if length <= 0.1:
-		return
-	var direction := horizontal / length
-	var count := maxi(5, int(ceil(to.y / 0.28)))
-	var depth := length / float(count)
-	var width := clampf(maxf(float(wall["thickness"]) * 3.0, 2.0), 2.0, 3.6)
-	# The climb is a solid curtain, not a walkable ramp.  Put the stair flight
-	# in a parallel lane beside it, with its inner edge clear of the curtain;
-	# the last landing remains within route-QA threshold of the shell door.
-	var lane_offset := float(wall["thickness"]) * 0.5 + width * 0.5 + 0.25
-	var has_plan_target := is_finite(door_xz.x) and is_finite(door_xz.y)
-	if not has_plan_target:
-		to.x += lane_offset
-	from.x = to.x
-	# The curtain starts on the front half of the mound, where a y=0 box is
-	# completely buried by the drum.  Extend the same side lane to the drum toe
-	# so the first tread really starts at bailey ground.
-	var mound_centre := CastleGeometry.motte_center(spec)
-	var mound_radius := CastleGeometry.motte_base_radius(spec)
-	var dx := to.x - mound_centre.x
-	var toe_span := sqrt(maxf(mound_radius * mound_radius - dx * dx, 0.0))
-	var toe_z := mound_centre.y - toe_span - 0.8
-	from.z = minf(from.z, toe_z)
-	horizontal = Vector3(to.x - from.x, 0.0, to.z - from.z)
-	length = horizontal.length()
-	direction = horizontal / maxf(length, 0.001)
-	# Match the drum batter as well as the total rise: otherwise the slope can
-	# overtake a nominal 0.28 m riser even when the total-height count is high.
-	var batter := tan(deg_to_rad(clampf(spec.motte_batter, 20.0, 60.0)))
-	count = maxi(count, int(ceil(length * batter / 0.20)))
-	depth = length / float(count)
-	var yaw := atan2(direction.x, direction.z)
-	var previous_top := 0.0
-	for i in range(count):
-		var centre_step := from + direction * (depth * (float(i) + 0.5))
-		# The uphill edge of a wide tread is closer to the drum centre than its
-		# centre sample.  Lift to the highest of all four footprint corners so no
-		# part of the visible top is swallowed by the mound.
-		var half_depth := depth * 0.5
-		var half_width := width * 0.5
-		var surface_y := 0.0
-		for sx in [-half_width, half_width]:
-			for sz in [-half_depth, half_depth]:
-				surface_y = maxf(surface_y,
-					_motte_surface_y(centre_step.x + sx, centre_step.z + sz))
-		var target_top := to.y * float(i + 1) / float(count)
-		var top := maxf(target_top, surface_y + 0.015)
-		# Preserve a strictly rising, walkable chain when a floating-point sample
-		# lands exactly on the batter seam.
-		top = maxf(top, previous_top + 0.002)
-		var base := surface_y + 0.005
-		var h := maxf(top - base, 0.01)
-		centre_step.y = base + h * 0.5
-		var size := Vector3(width, h, depth)
-		_log_part("motte_approach_step", centre_step, size, yaw,
-			Vector3(0.0, 1.0, 0.0))
-		_kit.box(size, centre_step, SURF_STONE, yaw)
-		previous_top = centre_step.y + h * 0.5
+func _motte_approach_steps(_wall: Dictionary, door_xz := Vector2(INF, INF)) -> void:
+	for step in preload("castle_access_geometry.gd").motte_approach(spec, door_xz):
+		_log_part("motte_approach_step", step.pos, step.size, step.rot_y, Vector3.UP)
+		_kit.box(step.size, step.pos, SURF_STONE, step.rot_y)
 
 
-func _motte_surface_y(x: float, z: float) -> float:
-	var c := CastleGeometry.motte_center(spec)
-	var r := CastleGeometry.motte_base_radius(spec)
-	var top_r := CastleGeometry.motte_top_radius(spec)
-	var radial := Vector2(x - c.x, z - c.y).length()
-	if radial >= r:
-		return 0.0
-	if radial <= top_r:
-		return spec.motte_height
-	return spec.motte_height * (r - radial) / maxf(r - top_r, 0.001)
+func _motte_door_target() -> Vector2:
+	if not _planned_interiors.has("keep_shell"):
+		return Vector2(INF, INF)
+	var row: Dictionary = _planned_interiors["keep_shell"]
+	var plan: HousePlan = row.plan
+	if plan.entrance() < 0:
+		return Vector2(INF, INF)
+	var door: Dictionary = plan.doors[plan.entrance()]
+	var at: Vector3 = row.transform * Vector3(door.pos.x, 0.0, door.pos.y)
+	return Vector2(at.x, at.z)
 
 
 # ------------------------------------------------------------------- house
@@ -1031,6 +966,14 @@ func _build_apse() -> void:
 	var h: float = a.size.y
 	var origin := Vector3(a.position.x + a.size.x / 2.0, a.position.y,
 		a.position.z + a.size.z)
+	if _planned_interiors.has("apse"):
+		Interiors.emit(self, _planned_interiors["apse"])
+		_kit.revolve(PackedVector2Array([Vector2(r * 1.08, h), Vector2(0.0, h + r * 0.9)]),
+			origin, SURF_ROOF, 10, PI, PI)
+		_log_mass("apse", a)
+		_log_part("apse", a.get_center(), a.size)
+		total_height = maxf(total_height, h + r * 0.9)
+		return
 	var aperture := PackedVector2Array()
 	var planned := _planned_interiors.has("chapel")
 	if planned:
@@ -1130,20 +1073,48 @@ func _build_ring(r: int) -> void:
 	var g: AABB = CastleGeometry.gatehouse_aabb(spec, r)
 	if g.size.x > 0.0:
 		var door_h: float = minf(g.size.y * 0.4, 5.0)
-		_passage(g, minf(g.size.x * 0.4, 4.0), door_h, r)
+		var gate_id := "gate_%d" % r
+		if _planned_interiors.has(gate_id):
+			_build_gate_chamber(g, r, door_h, _planned_interiors[gate_id])
+		else:
+			_passage(g, minf(g.size.x * 0.4, 4.0), door_h, r)
 		_log_mass("gate_%d" % r, g)
 		_crenellate_rect(g, g.size.y, SURF_TRIM)
-		# murder holes read as a band of small openings over the passage
-		for k in range(3):
-			var x: float = lerpf(-g.size.x * 0.3, g.size.x * 0.3, float(k) / 2.0)
-			_opening(Vector3(x, g.size.y * 0.72, g.position.z - CastleGeometry.OPENING_EPS),
-				PI, 0.4, 0.6, &"square")
-			total_height = maxf(total_height, g.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+		if not _planned_interiors.has(gate_id):
+			for k in range(3):
+				var x: float = lerpf(-g.size.x * 0.3, g.size.x * 0.3, float(k) / 2.0)
+				_opening(Vector3(x, g.size.y * 0.72, g.position.z - CastleGeometry.OPENING_EPS),
+					PI, 0.4, 0.6, &"square")
+		total_height = maxf(total_height, g.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
 	_kit.emission_offset = Vector3.ZERO
 	_translate_ring_records(part_start, mass_start, component_start, lift)
 	if lift > 0.0:
 		total_height = maxf(total_height, lift + CastleGeometry.wall_height(spec, r)
 			+ CastleGeometry.PARAPET_RISE + spec.merlon_h)
+
+
+func _build_gate_chamber(gate: AABB, ring: int, passage_h: float, row: Dictionary) -> void:
+	var room: AABB = row.bounds
+	# Only the masonry below the chamber remains a passage mass. Emitting
+	# the original full-height header would fill every new room and window.
+	var base := AABB(gate.position, Vector3(gate.size.x,
+		room.position.y - gate.position.y, gate.size.z))
+	_passage(base, minf(gate.size.x * 0.4, 4.0), passage_h, ring)
+	Interiors.emit(self, row)
+	host(row.id)
+	component_box("gate_chamber_ceiling", Vector3(gate.size.x, 0.18, gate.size.z),
+		Transform3D(Basis.IDENTITY, Vector3(gate.get_center().x, gate.end.y - 0.09,
+			gate.get_center().z)), SURF_STONE)
+	for rect in row.gallery:
+		var area: Rect2 = rect
+		component_box("gate_access_gallery", Vector3(area.size.x, 0.22, area.size.y),
+			Transform3D(Basis.IDENTITY, Vector3(area.get_center().x,
+				float(row.walk_y) - 0.11, area.get_center().y)), SURF_TRIM)
+	var support: Vector2 = row.support
+	var support_h := float(row.walk_y) - 0.22
+	component_box("gate_gallery_pier", Vector3(0.8, support_h, 0.8),
+		Transform3D(Basis.IDENTITY, Vector3(support.x, support_h * 0.5, support.y)), SURF_STONE)
+	host_end()
 
 
 ## MeshKit lifts only the vertices emitted for a ring. Keep all three QA logs
@@ -1293,9 +1264,23 @@ func _build_ring_walls_rect(r: int) -> void:
 			continue
 		var outward: Vector3 = _wall_outward(which)
 		var slit_points := _wall_slit_positions(a, outward, t)
-		_battered_wall(a, t, outward, slit_points)
+		var passage := Rect2()
+		if CastleGeometry.is_motte(spec) and r == 0 and which == &"back":
+			passage = preload("castle_access_geometry.gd").motte_passage(spec, a, _motte_door_target())
+			# An arrow slit cannot occupy the same masonry as the postern.
+			slit_points = slit_points.filter(func(p: Vector3) -> bool:
+				return not passage.intersects(Rect2(p.x - 0.16, p.y - 0.75, 0.32, 1.5)))
+		_battered_wall(a, t, outward, slit_points, passage)
 		_log_mass("wall_%d_%s" % [r, String(which)], a)
-		_wall_top(a, outward, t)
+		if passage.has_area() and passage.end.y >= a.size.y - 0.01:
+			# A low curtain may have no room for a lintel. Keep its coping out of
+			# the route too, rather than sealing the opening with the wall walk.
+			for interval in [Vector2(a.position.x, passage.position.x), Vector2(passage.end.x, a.end.x)]:
+				if interval.y > interval.x + 0.01:
+					_wall_top(AABB(Vector3(interval.x, a.position.y, a.position.z),
+						Vector3(interval.y - interval.x, a.size.y, a.size.z)), outward, t)
+		else:
+			_wall_top(a, outward, t)
 		_emit_wall_slits(slit_points, outward, true,
 			lerpf(a.size.x if absf(outward.x) > 0.5 else a.size.z, t, 0.62))
 		total_height = maxf(total_height, a.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
@@ -2019,7 +2004,7 @@ func _shell_openings(c: Vector3, radius: float, y: float, sides: int,
 ## course, the outer face spreads as it descends. Pinning the inner face is what
 ## lets everything inside the bailey ignore the talus completely.
 func _battered_wall(a: AABB, top_thick: float, outward: Vector3,
-		cutouts: Array[Vector3] = []) -> void:
+		cutouts: Array[Vector3] = [], passage := Rect2()) -> void:
 	var axis: int = 0 if absf(outward.x) > 0.5 else 2
 	var base_thick: float = a.size.x if axis == 0 else a.size.z
 	var inner: float = a.position[axis] if outward[axis] > 0.0 \
@@ -2030,6 +2015,9 @@ func _battered_wall(a: AABB, top_thick: float, outward: Vector3,
 	for cut in cutouts:
 		levels.append(clampf(cut.y - 0.75, 0.0, a.size.y))
 		levels.append(clampf(cut.y + 0.75, 0.0, a.size.y))
+	if passage.has_area():
+		levels.append(clampf(passage.position.y, 0.0, a.size.y))
+		levels.append(clampf(passage.end.y, 0.0, a.size.y))
 	levels.sort()
 	for i in range(levels.size() - 1):
 		var y0: float = levels[i]
@@ -2043,6 +2031,9 @@ func _battered_wall(a: AABB, top_thick: float, outward: Vector3,
 		var pos := Vector3(c if axis == 0 else a.position.x + a.size.x / 2.0,
 			(y0 + y1) / 2.0, a.position.z + a.size.z / 2.0 if axis == 0 else c)
 		var exclusions: Array[Vector2] = []
+		if passage.has_area() and (y0 + y1) * 0.5 >= passage.position.y \
+				and (y0 + y1) * 0.5 <= passage.end.y:
+			exclusions.append(Vector2(passage.position.x, passage.end.x))
 		for cut in cutouts:
 			if cut.y - 0.75 <= (y0 + y1) * 0.5 and cut.y + 0.75 >= (y0 + y1) * 0.5:
 				var q: float = cut.z if axis == 0 else cut.x
@@ -2157,7 +2148,11 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 		CastleGeometry.tower_base_half_at(spec, r, vertex))
 	var palatial := spec.style in [&"bavarian", &"french_chateau"]
 	var slit: Dictionary = {}
-	if palatial:
+	if _planned_interiors.has(mass_name):
+		var row: Dictionary = _planned_interiors[mass_name]
+		Interiors.emit(self, row)
+		_mural_landing(row)
+	elif palatial:
 		_palatial_tower_skin(c, base_r, top_r, h, sides, rot, outward)
 	else:
 		slit = _battered_tower_skin(c, base_r, top_r, h, sides, rot, outward)
@@ -2198,6 +2193,24 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 	# Cut one slit into the actual outward facet; the tower's buried faces stay shut.
 	if not slit.is_empty():
 		_opening(slit.pos, slit.angle, slit.width, slit.height, &"slit", false, true, slit.depth)
+
+
+## A small landing joins the tower doorway to the continuous curtain coping.
+## It follows the actual floor elevation; a short rise to the coping stays
+## within the same single-step contract as the castle's other stone landings.
+func _mural_landing(row: Dictionary) -> void:
+	var rect: Rect2 = row.walk_landing
+	var plan: HousePlan = row.plan
+	var door: Dictionary = plan.doors[plan.entrance()]
+	var floor_y := HousePlan.record_storey(door) * plan.spec.height + HouseGeometry.FLOOR_T
+	var y := minf(floor_y, float(row.walk_y))
+	var size := Vector3(rect.size.x, 0.22, rect.size.y)
+	var point := Vector3(rect.get_center().x, y - size.y * 0.5, rect.get_center().y)
+	host(row.id)
+	component_box("tower_access_landing", size, Transform3D(Basis.IDENTITY, point), SURF_TRIM)
+	host_end()
+	_log_part("tower_access_landing", point, size)
+	part_log.back()["host"] = row.id
 
 
 ## Residential towers have occupied-looking window tiers, not one defensive
@@ -2335,6 +2348,51 @@ func _emit_merlon(size: Vector3, pos: Vector3, surf: int, yaw := 0.0) -> void:
 ## An AABB emitted as a box, which is how nearly every castle mass is drawn.
 func _box_aabb(a: AABB, surf: int) -> void:
 	box(a.size, a.position + a.size / 2.0, surf)
+
+
+## Curtains terminate at occupied tower rooms. The old complete wall boxes
+## continued through their floors; logging rooms alone must not hide that.
+func box(size: Vector3, pos: Vector3, surf: int, rot_y := 0.0, shear := 0.0) -> void:
+	if _tag != "curtain" or not CastleGeometry.is_motte(spec):
+		super.box(size, pos, surf, rot_y, shear)
+		return
+	var footprint := PackedVector2Array()
+	var xf := Transform3D(Basis(Vector3.UP, rot_y), pos)
+	for corner in Poly.from_rect(Rect2(-Vector2(size.x, size.z) * 0.5, Vector2(size.x, size.z))):
+		var point := xf * Vector3(corner.x, 0.0, corner.y)
+		footprint.append(Vector2(point.x, point.z))
+	var pieces: Array[PackedVector2Array] = [footprint]
+	var changed := false
+	for row in _planned_interiors.values():
+		if not bool(row.get("mural_tower", false)):
+			continue
+		var plan: HousePlan = row.plan
+		var origin: Vector3 = row.transform.origin
+		var hole := PackedVector2Array()
+		for point in plan.outline_of(0):
+			hole.append(point + Vector2(origin.x, origin.z))
+		var cuts: Array[PackedVector2Array] = [hole]
+		# The walkway's merlons may stand across a perfectly cut tower door.
+		# Reserve the full authored arrival landing above its walking surface.
+		if pos.y + size.y * 0.5 > float(row.walk_y) + 0.05:
+			cuts.append(Poly.from_rect(row.walk_landing))
+		for cut in cuts:
+			var remaining: Array[PackedVector2Array] = []
+			for piece in pieces:
+				if Poly.intersection_area(piece, cut) > 0.000001:
+					changed = true
+					remaining.append_array(RoofShape.subtract(piece, cut))
+				else:
+					remaining.append(piece)
+			pieces = remaining
+	if not changed:
+		super.box(size, pos, surf, rot_y, shear)
+		return
+	for piece in pieces:
+		var points := PackedVector3Array()
+		for point in piece:
+			points.append(Vector3(point.x, pos.y, point.y))
+		component_slab("curtain_room_return", points, size.y, surf, true)
 
 
 # ---------------------------------------------------------------- openings

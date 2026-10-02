@@ -20,8 +20,9 @@ the public API keeps planning separate from mesh and scene creation.
   grand hotels, temples, and regional world-building families.
 - **Settlements, not scatter:** villages have roads, lots, a common, water,
   boundaries, vegetation, and buildings that face and fit their sites.
-- **Usable interiors:** rooms, doors, stairs, furniture, ritual routes, and
-  castle access are planned and checked before a scene is assembled.
+- **Planned interiors:** rooms, doors, stairs, furniture, and ritual routes.
+  Castle checks measure occupied rooms and access against the emitted mesh;
+  [interior coverage gaps remain](docs/CASTLE_INTERIORS.md#eligibility-and-remaining-work).
 - **One source of truth:** plans and geometry drive meshes, blueprints,
   placement bounds, and serialized building documents.
 - **A testable generator:** bounded QA lanes check structure, openings,
@@ -31,7 +32,9 @@ the public API keeps planning separate from mesh and scene creation.
 
 The castle above is generated geometry, not a hand-authored level. Its walls,
 stairs, entrances, rooms, furniture, and access routes are all part of the
-same seeded result.
+same seeded result. It is the Norman motte regression fixture, seed 8856.
+The render tool requires it to pass physical QA before writing these images.
+Other castle forms still have failing interior and opening checks.
 
 ## Try it
 

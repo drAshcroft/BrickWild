@@ -230,6 +230,7 @@ static func chapel_plan(spec: CastleSpec) -> HousePlan:
 		aisle.size.y = 1.2
 		aisle.size.x = sanctuary.position.x - aisle.position.x
 	plan.zones.append({"room": 0, "rect": aisle, "why": "chapel centre aisle"})
+	preload("castle_apse_plan.gd").connect_chapel(plan, spec)
 	HouseFurnisher.furnish(plan, hs)
 	return plan
 
