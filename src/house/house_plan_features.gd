@@ -29,11 +29,14 @@ static func choose_hearth(p: HousePlan, spec: HouseSpec) -> void:
 	var need: float = hearth_run_needed()
 	var room := -1
 	var fallback := -1
+	var door_blocked := false
 	for kind in [&"kitchen", &"hall", &"workshop"]:
 		for i in p.rooms_of(kind):
 			if p.storey_of_room(i) != 0:
 				continue
-			var candidates: Array[int] = _hearth_walls(p, spec, i)
+			var all_walls: Array[int] = _hearth_walls(p, spec, i)
+			var candidates: Array[int] = _walls_clear_of_doors(p, spec, i, all_walls)
+			door_blocked = door_blocked or candidates.size() < all_walls.size()
 			if candidates.is_empty():
 				continue
 			if fallback < 0:
@@ -49,21 +52,31 @@ static func choose_hearth(p: HousePlan, spec: HouseSpec) -> void:
 	if room < 0:
 		room = fallback
 	if room < 0:
+		# a flue whose only possible wall has an exterior door under the stack
+		# is not built at all (EVAL-C12): no chimney beats a chimney in a door
+		if door_blocked:
+			spec.chimney = false
 		return
-	var walls: Array[int] = _hearth_walls(p, spec, room)
+	var walls: Array[int] = _walls_clear_of_doors(p, spec, room, _hearth_walls(p, spec, room))
 	var best: int = walls[0]
 	var best_run := -INF
 	for wi in walls:
 		var run: float = _clear_wall_run(p, room, wi)
-		# a stack standing in an exterior door is worse than a short run
-		# (EVAL-C12): a wall whose stack would meet a door only wins when
-		# every wall's would
-		if _stack_meets_door(p, spec, room, wi):
-			run -= 1000.0
 		if run > best_run:
 			best_run = run
 			best = wi
 	p.hearth = {"room": room, "wall": best}
+
+
+## The walls whose stack, centred on the middle of the wall's clear run, would
+## not stand in an exterior door's opening (EVAL-C12).
+static func _walls_clear_of_doors(p: HousePlan, spec: HouseSpec, room: int,
+		walls: Array[int]) -> Array[int]:
+	var out: Array[int] = []
+	for wi in walls:
+		if not _stack_meets_door(p, spec, room, wi):
+			out.append(wi)
+	return out
 
 
 ## Would the chimney stack, centred on the middle of this wall's clear run (where
