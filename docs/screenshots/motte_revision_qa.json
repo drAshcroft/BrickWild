@@ -1,0 +1,210 @@
+{
+  "camera_views": [
+    {
+      "file": "motte_revision_hero.png",
+      "name": "hero",
+      "position": [
+        64.8275146484375,
+        40.4889602661133,
+        -67.0963668823242
+      ],
+      "target": [
+        1.5010986328125,
+        10.0922803878784,
+        -3.76995086669922
+      ]
+    },
+    {
+      "file": "motte_revision_entrance.png",
+      "name": "entrance",
+      "position": [
+        15.4986944198608,
+        15.4405317306519,
+        -10.1015043258667
+      ],
+      "target": [
+        2.36199998855591,
+        9.84053134918213,
+        6.12893867492676
+      ]
+    },
+    {
+      "file": "motte_revision_flue.png",
+      "name": "flue",
+      "position": [
+        -20.1650333404541,
+        21.5555553436279,
+        12.2104959487915
+      ],
+      "target": [
+        -5.8657693862915,
+        17.5555553436279,
+        11.4817657470703
+      ]
+    },
+    {
+      "file": "motte_revision_ward.png",
+      "name": "ward",
+      "position": [
+        51.3991394042969,
+        94.5351181030273,
+        -65.1829223632813
+      ],
+      "target": [
+        1.5010986328125,
+        10.0922803878784,
+        -3.76995086669922
+      ]
+    }
+  ],
+  "captured_at_utc": "2026-10-03T07:51:33",
+  "engine": {
+    "build": "official",
+    "hash": "6ce3de25aa58466e14ef354703ba8d9791a417da",
+    "hex": 263426,
+    "major": 4,
+    "minor": 5,
+    "patch": 2,
+    "status": "stable",
+    "string": "4.5.2-stable (official)",
+    "timestamp": 0
+  },
+  "failures": [],
+  "fixture": {
+    "family": "motte_bailey",
+    "height": 6,
+    "keep_height": 11.7240285873413,
+    "keep_length": 11.6121416091919,
+    "keep_width": 13.2742910385132,
+    "length": 55,
+    "motte_height": 7.29053163528442,
+    "plan_override": "motte_bailey",
+    "seed": 8856,
+    "style": "norman",
+    "width": 45
+  },
+  "ok": true,
+  "schema": "brickwild.castle_visual_preflight",
+  "schema_version": 1,
+  "source_sha256": {
+    "qa/castle_occupancy_check.gd": "55885a9312ba5a3766bad80eafa7b720f86da768032967bff69d401e60bd017e",
+    "qa/castle_qa.gd": "3c31e0ea56474873e1e9f6e67f54c4ce9f69f903b61f3cd4035e9fc1dde54e88",
+    "qa/castle_route_check.gd": "c2a46e0b154c981bf0b64b9c6a6a8abab3362e1ede3c3bcb7c10d22e05b342da",
+    "src/castle/castle_access_geometry.gd": "75c638b64b78008724d5a1e911e5c03878d9e3289912216d5b86d7287c3cc6a1",
+    "src/castle/castle_builder.gd": "a98c9b567e81aa0099c4d77a08159faabdcdda5d70644208dbae53ea5bd11523",
+    "src/castle/castle_gate_plan.gd": "4cf7790e17bc250a54e2280f0c23f3882a0f4fcd1c79420cbda8ea9a37c6f4b0",
+    "src/castle/castle_geometry.gd": "3ecb74764f3723ef2f0d2c6ab19a564c2c54c961f8b6c14dd777d0e83cf14d00",
+    "src/castle/castle_interiors.gd": "1f69f1ae5e699efd24eef16dbbf5beee0eac6c44d707d49e319ac4cabd8f2090",
+    "src/castle/castle_mural_plan.gd": "17737d2ca6f1b370b26ac4a2cadfb7677f321bfcad9e0a663920cc72c0f0723e"
+  },
+  "stats": {
+    "access_routes": {
+      "courtyard_routes": 7,
+      "ok": true,
+      "routes": 7,
+      "wall_stairs": 2
+    },
+    "interior_buildings": 11,
+    "lords_walk": {
+      "applicable": true,
+      "approach": {
+        "contiguous": true,
+        "failures": [],
+        "mesh": {
+          "failures": [],
+          "treads_checked": 54
+        },
+        "monotonic": true,
+        "steps": 54,
+        "walkable_risers": true
+      },
+      "building_id": "keep_shell",
+      "door": {
+        "clear": true,
+        "failures": [],
+        "matched": true
+      },
+      "failures": [],
+      "house_nav": {
+        "failures": [],
+        "ok": true,
+        "stats": {
+          "reached_cells": 4670,
+          "rooms_walkable": 3,
+          "stranded_area": 0.0,
+          "use_zones": 4,
+          "use_zones_reached": 4,
+          "walkable_area": 67.2
+        },
+        "unreachable_items": [],
+        "unreached_rooms": [],
+        "warnings": []
+      },
+      "stairs": {
+        "actual": 2,
+        "expected": 2,
+        "failures": []
+      }
+    },
+    "occupied_shells": {
+      "door_rays": 108,
+      "exterior_doors": 12,
+      "family": "motte_bailey",
+      "inventory_scope": "spec_and_geometry",
+      "recorded_buildings": 11,
+      "required_buildings": 11,
+      "required_ids": [
+        "keep_shell",
+        "hall",
+        "chapel",
+        "apse",
+        "gate_0",
+        "tower_0_corner_0",
+        "tower_0_corner_1",
+        "tower_0_corner_2",
+        "tower_0_corner_3",
+        "tower_0_gate_0",
+        "tower_0_gate_1"
+      ],
+      "room_floor_samples": 39,
+      "rooms": 26,
+      "unplanned_window_hosts": [
+        "curtain"
+      ],
+      "windows": 69
+    },
+    "openings_checked": 92,
+    "parts": 363,
+    "reachable_fraction": 1.0,
+    "ring_0_samples": 202,
+    "voxels_solid": 64385
+  },
+  "warnings": [
+    "interiors[tower_0_corner_0]: light: room 0 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_0]: light: room 1 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_0]: light: room 2 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_1]: light: room 0 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_1]: light: room 1 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_1]: light: room 2 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_2]: light: room 0 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_2]: light: room 1 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_2]: light: room 2 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_2]: light: room 3 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_3]: light: room 0 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_3]: light: room 1 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_corner_3]: light: room 2 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_gate_0]: light: room 0 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_gate_0]: light: room 1 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_gate_0]: light: room 2 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_gate_1]: light: room 0 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_gate_1]: light: room 1 (guardroom) has no lamp, sconce or candle",
+    "interiors[tower_0_gate_1]: light: room 2 (guardroom) has no lamp, sconce or candle",
+    "interiors[gate_0]: daylight: room 0 (guardroom) has 1.20 m2 of glass for 32.0 m2 of floor",
+    "interiors[gate_0]: light: room 0 (guardroom) has no lamp, sconce or candle",
+    "interiors[keep_shell]: sconce_pair: the two lamps in room 1 (hall) are on walls 10 and 12",
+    "interiors[keep_shell]: sconce_pair: the two lamps in room 2 (lords_chamber) are on walls 5 and 11",
+    "interiors[chapel]: seating: Bench in room 0 (nave) is not at any table",
+    "interiors[chapel]: seating: Bench in room 0 (nave) is not at any table",
+    "interiors[apse]: nav: 0.6 m2 of floor is walkable but cut off from the rest of the house"
+  ]
+}

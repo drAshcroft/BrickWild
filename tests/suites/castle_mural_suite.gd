@@ -26,6 +26,8 @@ static func check_fixture(result: SuiteResult, _spec: CastleSpec,
 		var origin: Vector3 = row.transform.origin
 		var inside := Vector2(door.pos) - Vector2(door.normal) * 0.35 + Vector2(origin.x, origin.z)
 		var route: Array[Vector2] = [inside, row.walk_outer, row.walk_target]
+		if row.has("walk_route"):
+			route.assign(row.walk_route)
 		var nearby := _near_route(triangles, route, minf(y, row.walk_y))
 		var failure := _route_failure(nearby, route, minf(y, row.walk_y))
 		_expect(result, failure.is_empty(), "mural %s: %s" % [row.id, failure])

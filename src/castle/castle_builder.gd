@@ -2208,6 +2208,48 @@ func _mural_landing(row: Dictionary) -> void:
 	var point := Vector3(rect.get_center().x, y - size.y * 0.5, rect.get_center().y)
 	host(row.id)
 	component_box("tower_access_landing", size, Transform3D(Basis.IDENTITY, point), SURF_TRIM)
+	for span in row.get("walk_gallery", []):
+		var a: Vector2 = span.a
+		var b: Vector2 = span.b
+		var delta := b - a
+		if delta.length() < 0.03:
+			continue
+		var deck_width := float(span.width)
+		var deck_size := Vector3(delta.length(), 0.22, deck_width)
+		var mid := (a + b) * 0.5
+		var walk_y := float(row.walk_y)
+		var deck_point := Vector3(mid.x, walk_y - 0.11,
+			(a.y + b.y) * 0.5)
+		var yaw := atan2(-delta.y, delta.x)
+		component_box("tower_access_gallery", deck_size,
+			Transform3D(Basis(Vector3.UP, yaw), deck_point), SURF_TRIM)
+		if bool(span.get("guarded", false)):
+			var bounds: AABB = row.bounds
+			var tower_center := Vector2(bounds.get_center().x, bounds.get_center().z)
+			var support_h := walk_y - 0.22
+			if support_h > 0.6 and not Rect2(bounds.position.x, bounds.position.z,
+					bounds.size.x, bounds.size.z).grow(0.2).has_point(mid):
+				var pier_size := Vector3(0.65, support_h, 0.65)
+				component_box("tower_gallery_pier", pier_size,
+					Transform3D(Basis.IDENTITY, Vector3(mid.x, support_h * 0.5, mid.y)),
+					SURF_STONE)
+			var side := Vector2(-delta.y, delta.x).normalized()
+			if (mid + side - tower_center).length_squared() < \
+					(mid - side - tower_center).length_squared():
+				side = -side
+			var rail_width := 0.16
+			var rail_height := 0.62
+			var rail_start := a + delta.normalized() * (0.8 if bool(span.get("open_start", false)) else 0.0)
+			var rail_end := b - delta.normalized() * (0.8 if bool(span.get("open_end", false)) else 0.0)
+			var rail_mid := (rail_start + rail_end) * 0.5
+			var rail_length := rail_start.distance_to(rail_end)
+			if rail_length < 0.1:
+				continue
+			var rail_xz := rail_mid + side * (deck_width * 0.5 - rail_width * 0.5)
+			var rail_size := Vector3(rail_length, rail_height, rail_width)
+			var rail_point := Vector3(rail_xz.x, walk_y + rail_height * 0.5, rail_xz.y)
+			component_box("tower_gallery_parapet", rail_size,
+				Transform3D(Basis(Vector3.UP, yaw), rail_point), SURF_STONE)
 	host_end()
 	_log_part("tower_access_landing", point, size)
 	part_log.back()["host"] = row.id
@@ -2376,6 +2418,13 @@ func box(size: Vector3, pos: Vector3, surf: int, rot_y := 0.0, shear := 0.0) -> 
 		# Reserve the full authored arrival landing above its walking surface.
 		if pos.y + size.y * 0.5 > float(row.walk_y) + 0.05:
 			cuts.append(Poly.from_rect(row.walk_landing))
+			for span in row.get("walk_gallery", []):
+				var a: Vector2 = span.a
+				var b: Vector2 = span.b
+				var tangent := (b - a).normalized()
+				var side := Vector2(-tangent.y, tangent.x) * float(span.width) * 0.5
+				var gallery_cut := PackedVector2Array([a + side, b + side, b - side, a - side])
+				cuts.append(gallery_cut)
 		for cut in cuts:
 			var remaining: Array[PackedVector2Array] = []
 			for piece in pieces:

@@ -6,7 +6,7 @@ const THICKNESS := 0.45
 const GALLERY_WIDTH := 1.5
 
 
-static func records(spec: CastleSpec) -> Dictionary:
+static func records(spec: CastleSpec, geometry_only := false) -> Dictionary:
 	var out := {}
 	if not CastleGeometry.is_motte(spec):
 		return out
@@ -48,7 +48,8 @@ static func records(spec: CastleSpec) -> Dictionary:
 			plan.windows.append({"room": 0, "storey": 0,
 				"pos": Vector2(x, room.position.y), "normal": Vector2.UP,
 				"width": 0.5, "sill": 1.05, "head": 1.85})
-		CastleKeepPlan.furnish_minimum_programme(plan, hs)
+		if not geometry_only:
+			CastleKeepPlan.furnish_minimum_programme(plan, hs)
 		var bounds := AABB(Vector3(gate.position.x, floor_base, gate.position.z),
 			Vector3(gate.size.x, hs.height, gate.size.z))
 		var row := {"id": "gate_%d" % ring, "plan": plan, "bounds": bounds,

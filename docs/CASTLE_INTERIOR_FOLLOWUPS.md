@@ -1,27 +1,28 @@
 # Remaining castle interior work
 
-These findings were confirmed while completing INT-007 on 2026-09-13. The new
-bridge emits the existing valid hall, keep, chapel and bailey-shop HousePlans.
-The forms below need new plan geometry before they can use that bridge.
+The original findings date from INT-007 on 2026-09-13. Plans now exist for
+ridge ranges, tower houses and motte keeps. Their existence did not establish
+complete castle occupancy: the independent inventory added on 2 October found
+whole missing interiors and windows above the rooms actually represented.
+The broad CASTLE-INTERIOR-FORMS task remains open.
 
 ## Plans for ridge castles, tower houses and motte shell keeps
 
 Current entry points:
 
-- `src/castle/castle_interiors.gd::primary` deliberately excludes ridge and
-  tower-house forms. Do not remove this guard until their plans match the mesh.
-- `CastleBuilder._build_ridge` emits rotated ranges from
-  `CastleGeometry.ridge_ranges`. `CastleGenerator.hall_plan` instead reads
-  `CastleGeometry.hall_aabb`, an axis-aligned range unrelated to the actual ridge
-  segment. Reusing that plan places floors, doors and props outside their host.
-- `CastleBuilder._build_tower_house` emits each `tower_storey_aabb`, the platform
-  and `tower_jog_aabbs`. Its entrance is elevated to `tower_door_sill`, and the
-  floors can exceed the keep programme's three or four levels. The ordinary hall
-  and keep plans do not describe this geometry or its entrance route.
-- `CastleBuilder._build_motte` emits an oval ring at `shell_keep_aabb` on the
-  mound. The ordinary `keep_aabb` describes a different location in the bailey.
-  `castle_keep_plan.gd::generate` therefore returns no plan for motte castles.
-  The historic painted doorway in the oval ring is not an enterable opening.
+- `src/castle/castle_interiors.gd::primary` dispatches ridge ranges and tower
+  houses to their local plans. Inventory coverage still needs to include ridge
+  defensive towers, tower-house jogs, manor annexes/wings and sky towers.
+- Ridge ranges use `CastleInteriorPlans.ridge_range_plan` in each segment's
+  rotated frame. Seed 8805 exposed upper facade windows without upper rooms;
+  the multistorey repair and its emitted-floor evidence are still in progress.
+- Tower-house plans represent the main tapered storeys and raised entrance.
+  `tower_jog_aabbs` still require independent occupied plans and real access.
+- Motte plans use the mound-fitted oval at `shell_keep_aabb`. The seed 8856
+  furnished fixture now passes full CastleQA: its keep, hall, chapel, sanctuary,
+  gate chamber and six mural towers have room-backed openings. Seven defensive
+  entrances reach courtyard ground through two real wall stairs. Fresh renders
+  are being inspected separately; this fixture does not close the broad task.
 
 Implementation requirements:
 

@@ -168,6 +168,21 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if not CastleGeometry.is_enclosed(spec):
 		return out
+	var galleries: Array[Rect2] = []
+	if CastleGeometry.is_motte(spec):
+		# A wall stair must not climb under a gallery with less than standing
+		# headroom. Ask the same pure access layout that emits those decks.
+		var mural := preload("castle_mural_plan.gd").records(spec, true)
+		for row in mural.values():
+			galleries.append(Rect2(row.walk_landing))
+			for span in row.get("walk_gallery", []):
+				var a: Vector2 = span.a
+				var b: Vector2 = span.b
+				var side := Vector2(-(b - a).y, (b - a).x).normalized() * float(span.width) * 0.5
+				galleries.append(Poly.bounding_rect(PackedVector2Array([a + side, b + side, b - side, a - side])))
+		for row in preload("castle_gate_plan.gd").records(spec, true).values():
+			for gallery in row.gallery:
+				galleries.append(Rect2(gallery))
 	var fore: Dictionary = forebuilding(spec)
 	for ring in CastleGeometry.rings(spec):
 		var ring_start: int = out.size()
@@ -185,6 +200,8 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 		var gate := CastleGeometry.gatehouse_aabb(spec, ring)
 		var gate_at := Vector2(gate.get_center().x, gate.get_center().z)
 		var blocked: Array[Rect2] = []
+		for gallery in galleries:
+			blocked.append(gallery.grow(0.15))
 		var tower_polygons: Array[PackedVector2Array] = []
 		for box in [CastleGeometry.keep_aabb(spec), CastleGeometry.hall_aabb(spec),
 			CastleGeometry.chapel_aabb(spec), CastleGeometry.apse_aabb(spec), gate]:
@@ -279,6 +296,22 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 					continue
 				if tower_polygons.any(func(tower): return not Geometry2D.intersect_polygons(tower, poly).is_empty()):
 					continue
+				# The flight can be clear while its final step onto the curtain
+				# crosses a projecting tower. Reserve that body corridor as well.
+				var start_forward := -1.0 if transverse and flights % 2 == 1 else 1.0
+				var finish_forward := start_forward * (1.0 if flights % 2 == 1 else -1.0)
+				var arrival := at + axis * finish_forward * (run + LANDING) * 0.5 + across * LANE * 0.5
+				var coping := Geometry2D.get_closest_point_to_segment(arrival,
+					a + inside * CastleGeometry.wall_thickness(spec, ring) * 0.5,
+					b + inside * CastleGeometry.wall_thickness(spec, ring) * 0.5)
+				var arrival_side := Vector2(-(coping - arrival).y, (coping - arrival).x).normalized() * 0.3
+				var arrival_poly := PackedVector2Array([arrival + arrival_side, coping + arrival_side,
+					coping - arrival_side, arrival - arrival_side])
+				var arrival_bounds := Poly.bounding_rect(arrival_poly).grow(0.01)
+				if blocked.any(func(rect): return rect.grow(-0.001).intersects(arrival_bounds)):
+					continue
+				if tower_polygons.any(func(tower): return not Geometry2D.intersect_polygons(tower, arrival_poly).is_empty()):
+					continue
 				var distance := boundary.distance_squared_to(gate_at) + (1.0 if transverse else 0.0)
 				if distance >= score:
 					continue
@@ -286,7 +319,7 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 				best = {"ring": ring, "edge": e, "at": at, "along": axis,
 					"inside": across, "flights": flights, "steps": steps, "rise": rise,
 					"run": run, "span": span, "width": width, "height": height,
-					"start_forward": -1.0 if transverse and flights % 2 == 1 else 1.0,
+					"start_forward": start_forward,
 					"poly": poly, "footprint": footprint}
 	return best
 

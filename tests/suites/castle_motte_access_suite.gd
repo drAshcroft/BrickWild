@@ -15,6 +15,10 @@ static func run() -> SuiteResult:
 	_want(res, qa.ok, "README hero complete CastleQA: " + str(qa.failures))
 	_want(res, int(qa.stats.get("access_routes", {}).get("routes", 0)) == 7,
 		"production CastleQA did not inspect all six tower routes and gate gallery")
+	var routes := preload("res://qa/castle_route_check.gd").check(builder, mesh)
+	_want(res, routes.ok and routes.courtyard_routes == 7 and routes.wall_stairs >= 1,
+		"occupied tower/gate routes do not reach an emitted stair down to courtyard: " + str(routes.failures))
+	_route_mutations(res, builder, mesh)
 	var massing := CastleMassingCheck.new().check(spec, builder)
 	_want(res, massing.ok, "README hero massing: " + str(massing.failures))
 	var components := ComponentCheck.check(builder, mesh)
@@ -40,6 +44,84 @@ static func run() -> SuiteResult:
 	var clean := _report(structural, structural.commit())
 	_want(res, clean.failures.is_empty(), "seed 8806 approach: " + str(clean.failures))
 	return res
+
+
+static func _route_mutations(res: SuiteResult, builder: CastleBuilder, mesh: ArrayMesh) -> void:
+	var routes = preload("res://qa/castle_route_check.gd")
+	var omitted := _without_wall_stairs(builder, mesh)
+	_want(res, omitted.removed > 0, "missing-stair negative control removed no triangles")
+	var missing := routes.check(builder, omitted.mesh)
+	_want(res, not missing.ok and missing.wall_stairs == 0 and missing.courtyard_routes == 0,
+		"all wall stair triangles removed with intact records still permit courtyard access")
+	for row in builder.interiors:
+		if not bool(row.get("gate_chamber", false)):
+			continue
+		var at := Vector2(row.walk_route[1])
+		var kit := MeshKit.new(1)
+		kit.box(Vector3(1.5, 0.12, 1.5), Vector3(at.x, float(row.walk_y) + 1.5, at.y), 0)
+		var blocked := _with_surface(mesh, kit.commit(), CastleBuilder.SURF_ROOF)
+		var roof := routes.check(builder, blocked)
+		_want(res, not roof.ok and Array(roof.failures).any(func(failure):
+			return String(failure).begins_with("access_routes[gate_0]") and "blocks" in String(failure)),
+			"physical roof slab across gate route escaped production headroom check")
+		break
+
+
+## Re-emit just the named stair components to identify the exact triangles
+## being removed. Builder records stay unchanged throughout the mutation.
+static func _without_wall_stairs(builder: CastleBuilder, mesh: ArrayMesh) -> Dictionary:
+	var isolated := {}
+	for row in builder.component_log:
+		if not String(row.host).begins_with("wall_stair_"):
+			continue
+		var surface := int(row.surface)
+		if not isolated.has(surface):
+			isolated[surface] = MeshKit.new(1)
+		var kit: MeshKit = isolated[surface]
+		if row.form == "box":
+			kit.oriented_box(row.size, row.xf, 0)
+		elif row.form == "slab":
+			kit.slab_poly(row.points, float(row.depth), 0, bool(row.vertical))
+	var counts := {}
+	for surface in isolated:
+		var vertices: PackedVector3Array = (isolated[surface] as MeshKit).commit().surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		counts[surface] = ComponentCheck.triangle_counts(vertices)
+	var out := ArrayMesh.new()
+	var removed := 0
+	for surface in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var count := indices.size() if not indices.is_empty() else vertices.size()
+		var kept := PackedInt32Array()
+		var targets: Dictionary = counts.get(surface, {})
+		for i in range(0, count - 2, 3):
+			var a := indices[i] if not indices.is_empty() else i
+			var b := indices[i + 1] if not indices.is_empty() else i + 1
+			var c := indices[i + 2] if not indices.is_empty() else i + 2
+			var key := ComponentCheck.triangle_key(vertices[a], vertices[b], vertices[c])
+			if int(targets.get(key, 0)) > 0:
+				targets[key] -= 1
+				removed += 1
+				continue
+			kept.append_array(PackedInt32Array([a, b, c]))
+		arrays[Mesh.ARRAY_INDEX] = kept
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return {"mesh": out, "removed": removed}
+
+
+static func _with_surface(mesh: ArrayMesh, addition: ArrayMesh, target: int) -> ArrayMesh:
+	var out := ArrayMesh.new()
+	for surface in mesh.get_surface_count():
+		if surface != target:
+			out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, mesh.surface_get_arrays(surface))
+			continue
+		var merged := SurfaceTool.new()
+		merged.begin(Mesh.PRIMITIVE_TRIANGLES)
+		merged.append_from(mesh, surface, Transform3D.IDENTITY)
+		merged.append_from(addition, 0, Transform3D.IDENTITY)
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, merged.commit_to_arrays())
+	return out
 
 
 static func hero_spec() -> CastleSpec:

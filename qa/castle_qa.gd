@@ -97,7 +97,8 @@ func _check_gate_access() -> void:
 
 func _check_access_routes() -> void:
 	var report := preload("castle_route_check.gd").check(builder, mesh)
-	stats["access_routes"] = {"routes": report.routes, "ok": report.ok}
+	stats["access_routes"] = {"routes": report.routes, "ok": report.ok,
+		"wall_stairs": report.wall_stairs, "courtyard_routes": report.courtyard_routes}
 	failures.append_array(report.failures)
 
 

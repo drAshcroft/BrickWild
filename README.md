@@ -35,6 +35,8 @@ The castle above is generated geometry, not a hand-authored level. Its walls,
 stairs, entrances, rooms, furniture, and access routes are all part of the
 same seeded result. It is the Norman motte regression fixture, seed 8856.
 The render tool requires it to pass physical QA before writing these images.
+The 3 October capture checks eleven occupied structures and seven defensive
+entrances connected to courtyard ground. See the [repair and test evidence](docs/MOTTE_ROUTE_REPAIR.md).
 Other castle forms still have failing interior and opening checks.
 
 ## Try it

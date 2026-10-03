@@ -13,6 +13,17 @@ const SIZE := Vector2i(1400, 1000)
 const Interiors = preload("res://src/castle/castle_interiors.gd")
 const TowerPlan = preload("res://src/castle/castle_tower_plan.gd")
 const MottePlan = preload("res://src/castle/castle_motte_plan.gd")
+const MOTTE_REVISION_SOURCES: Array[String] = [
+	"res://src/castle/castle_builder.gd",
+	"res://src/castle/castle_geometry.gd",
+	"res://src/castle/castle_access_geometry.gd",
+	"res://src/castle/castle_mural_plan.gd",
+	"res://src/castle/castle_gate_plan.gd",
+	"res://src/castle/castle_interiors.gd",
+	"res://qa/castle_occupancy_check.gd",
+	"res://qa/castle_route_check.gd",
+	"res://qa/castle_qa.gd",
+]
 
 var _vp: SubViewport
 var _cam: Camera3D
@@ -74,35 +85,125 @@ func _motte_revision_shots() -> bool:
 	var checked_mesh := checked_builder.build(spec)
 	var report := CastleQA.new().check(spec, checked_mesh, checked_builder)
 	var report_path := OUT + "/motte_revision_qa.json"
-	FileAccess.open(report_path, FileAccess.WRITE).store_string(JSON.stringify({
-		"seed": 8856, "width": 45, "length": 55, "height": 6,
+	# The actual emitted mesh bounds include the curtain, towers, caps, keep,
+	# galleries and mound, but no ground plane or render-stage backdrop.
+	var whole_bounds: AABB = checked_mesh.get_aabb()
+	var whole_centre := whole_bounds.get_center()
+	var hero_position := _fit_camera_position(whole_bounds, whole_centre, Vector3(1.0, 0.48, -1.0))
+	var pose := _door_pose(spec, "keep_shell")
+	var door_world: Vector3 = pose.world
+	var door_normal: Vector3 = pose.normal
+	var door_tangent := Vector3(-door_normal.z, 0.0, door_normal.x).normalized()
+	var entrance_position := door_world + door_normal * 20.0 + Vector3.UP * 7.0 + door_tangent * 6.0
+	var plan := MottePlan.generate(spec, false)
+	var flue := MottePlan.flue(plan, spec.merlon_h + 0.45)
+	var flue_transform: Transform3D = flue.transform
+	var at := MottePlan.origin(spec) + flue_transform.origin
+	var flue_normal: Vector3 = flue_transform.basis * Vector3.BACK
+	flue_normal.y = 0.0
+	flue_normal = flue_normal.normalized()
+	var flue_tangent := Vector3(-flue_normal.z, 0.0, flue_normal.x)
+	var flue_position := at + flue_normal * 14.0 + Vector3.UP * 4.0 + flue_tangent * 3.0
+	var ward_position := _fit_camera_position(whole_bounds, whole_centre, Vector3(0.65, 1.1, -0.8))
+	var views: Array[Dictionary] = [
+		_camera_view("hero", "motte_revision_hero.png", hero_position, whole_centre),
+		_camera_view("entrance", "motte_revision_entrance.png", entrance_position,
+			door_world + Vector3.UP * 1.4),
+		_camera_view("flue", "motte_revision_flue.png", flue_position, at),
+		_camera_view("ward", "motte_revision_ward.png", ward_position, whole_centre),
+	]
+	var preflight := {"schema": "brickwild.castle_visual_preflight", "schema_version": 1,
+		"captured_at_utc": Time.get_datetime_string_from_system(true),
+		"engine": Engine.get_version_info(),
+		"fixture": {"family": "motte_bailey", "style": "norman",
+			"plan_override": "motte_bailey", "seed": 8856,
+			"width": 45, "length": 55, "height": 6,
+			"keep_width": spec.keep_w, "keep_length": spec.keep_l,
+			"keep_height": spec.keep_height, "motte_height": spec.motte_height},
+		"source_sha256": _motte_revision_source_hashes(),
+		"camera_views": _plain_camera_views(views),
 		"ok": report.ok, "failures": report.failures,
-		"warnings": report.warnings, "stats": report.stats}, "  "))
+		"warnings": report.warnings, "stats": report.stats}
+	if not _write_json_via_temp(report_path, preflight):
+		push_error("Could not write motte preflight report")
+		return false
 	if not report.ok:
 		push_error("README castle failed physical QA: " + str(report.failures))
 		return false
 	var castle := CastleAssembler.build(spec)
 	_stage.add_child(castle)
-	var keep := CastleGeometry.shell_keep_aabb(spec)
-	var centre := keep.get_center()
-	_cam.position = centre + Vector3(-30.0, 20.0, -34.0)
-	_cam.look_at(centre + Vector3.DOWN * 3.0)
-	await _save("motte_revision_hero.png")
-	var pose := _door_pose(spec, "keep_shell")
-	_cam.position = Vector3(pose.world) + Vector3(pose.normal) * 14.0 + Vector3(5.0, 4.0, 0.0)
-	_cam.look_at(Vector3(pose.world) + Vector3.DOWN * 1.0)
-	await _save("motte_revision_entrance.png")
-	var plan := MottePlan.generate(spec, false)
-	var flue := MottePlan.flue(plan, spec.merlon_h + 0.45)
-	var at := MottePlan.origin(spec) + Transform3D(flue.transform).origin
-	_cam.position = at + Vector3(-10.0, 6.0, -10.0)
-	_cam.look_at(at)
-	await _save("motte_revision_flue.png")
-	_cam.position = Vector3(65.0, 65.0, -82.0)
-	_cam.look_at(Vector3(0.0, 5.0, -6.0))
-	await _save("motte_revision_ward.png")
+	for view in views:
+		_cam.position = view.position
+		_cam.look_at(view.target)
+		await _save(String(view.file))
 	castle.free()
 	return true
+
+
+func _camera_view(name: String, file: String, position: Vector3, target: Vector3) -> Dictionary:
+	return {"name": name, "file": file, "position": position, "target": target}
+
+
+func _fit_camera_position(bounds: AABB, target: Vector3, direction: Vector3,
+		margin := 0.10) -> Vector3:
+	var toward_camera := direction.normalized()
+	var forward := -toward_camera
+	var right := forward.cross(Vector3.UP).normalized()
+	var camera_up := right.cross(forward).normalized()
+	var vertical_tan := tan(deg_to_rad(_cam.fov) * 0.5)
+	var horizontal_tan := vertical_tan * float(SIZE.x) / float(SIZE.y)
+	var safe_fraction := 1.0 - margin
+	var distance := 1.0
+	for mask in range(8):
+		var corner := Vector3(
+			bounds.position.x + (bounds.size.x if (mask & 1) != 0 else 0.0),
+			bounds.position.y + (bounds.size.y if (mask & 2) != 0 else 0.0),
+			bounds.position.z + (bounds.size.z if (mask & 4) != 0 else 0.0))
+		var delta := corner - target
+		var offset_toward_camera := delta.dot(toward_camera)
+		var required_horizontal := offset_toward_camera \
+			+ absf(delta.dot(right)) / (horizontal_tan * safe_fraction)
+		var required_vertical := offset_toward_camera \
+			+ absf(delta.dot(camera_up)) / (vertical_tan * safe_fraction)
+		distance = maxf(distance, maxf(required_horizontal, required_vertical))
+	return target + toward_camera * distance
+
+
+func _plain_camera_views(views: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for view in views:
+		out.append({"name": view.name, "file": view.file,
+			"position": _vector_array(view.position), "target": _vector_array(view.target)})
+	return out
+
+
+func _vector_array(value: Vector3) -> Array[float]:
+	return [value.x, value.y, value.z]
+
+
+func _motte_revision_source_hashes() -> Dictionary:
+	var hashes := {}
+	for path in MOTTE_REVISION_SOURCES:
+		var absolute := ProjectSettings.globalize_path(path)
+		hashes[path.trim_prefix("res://")] = FileAccess.get_sha256(absolute) \
+			if FileAccess.file_exists(absolute) else "missing"
+	return hashes
+
+
+func _write_json_via_temp(path: String, value: Dictionary) -> bool:
+	var absolute := ProjectSettings.globalize_path(path)
+	var temporary := absolute + ".tmp"
+	var file := FileAccess.open(temporary, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(value, "  ") + "\n")
+	var write_error := file.get_error()
+	file.close()
+	if write_error != OK:
+		return false
+	if FileAccess.file_exists(absolute) and DirAccess.remove_absolute(absolute) != OK:
+		return false
+	return DirAccess.rename_absolute(temporary, absolute) == OK
 
 
 func _tower_house_shots() -> void:

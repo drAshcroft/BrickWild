@@ -318,7 +318,9 @@ static func _pose(plan: HousePlan, transform: Transform3D, opening: Dictionary,
 	var y := float(level) * plan.spec.height + (bottom + top) * 0.5
 	return {"pos": transform * Vector3(point.x, y, point.y),
 		"facing": (transform.basis * Vector3(normal.x, 0, normal.y)).normalized(),
-		"width": float(opening.width), "height": top - bottom, "thickness": thickness}
+		"width": float(opening.width), "height": top - bottom, "thickness": thickness,
+		"floor_y": (transform * Vector3(point.x,
+			float(level) * plan.spec.height + HouseGeometry.FLOOR_T, point.y)).y}
 
 
 static func _matches(opening: Dictionary, part: Dictionary) -> bool:
@@ -344,16 +346,47 @@ static func _check_door_mesh(out: Dictionary, id: String, opening: Dictionary,
 	var centre: Vector3 = opening.pos
 	var reach := float(opening.thickness) + 0.20
 	var half_width := maxf(0.0, float(opening.width) * 0.5 - 0.12)
-	var half_height := maxf(0.0, float(opening.height) * 0.5 - 0.15)
+	var aperture_bottom := centre.y - float(opening.height) * 0.5
+	var aperture_top := centre.y + float(opening.height) * 0.5
+	var nominal_floor := float(opening.floor_y)
+	var support_bounds := AABB(centre - Vector3.ONE * (reach + half_width),
+		Vector3.ONE * (reach + half_width) * 2.0)
+	support_bounds.position.y = nominal_floor - 0.31
+	support_bounds.size.y = 0.62
+	var support := _nearby(geometry, support_bounds)
+	var floor_y := nominal_floor
+	# The aperture may start below the occupied floor, and an exterior gallery
+	# may meet it with an ordinary step. Measure that real threshold; rays below
+	# its top are testing the floor's side, not a standing person's clearance.
+	for across in [-half_width, 0.0, half_width]:
+		for depth in [-reach, 0.0, reach]:
+			var foot: Vector3 = centre + tangent * float(across) + normal * float(depth)
+			for triangle in support:
+				var upward: Vector3 = (triangle.c - triangle.a).cross(triangle.b - triangle.a).normalized()
+				if upward.y < 0.9:
+					continue
+				var hit: Variant = Geometry3D.segment_intersects_triangle(
+					Vector3(foot.x, nominal_floor + 0.3, foot.z),
+					Vector3(foot.x, nominal_floor - 0.3, foot.z), triangle.a, triangle.b, triangle.c)
+				if hit != null:
+					floor_y = maxf(floor_y, Vector3(hit).y)
+	if aperture_top - maxf(aperture_bottom, floor_y) < 1.85:
+		_fail(out, id, "exterior entrance has insufficient standing height above its emitted threshold")
+		return
+	var low := maxf(aperture_bottom, floor_y) + 0.15
+	var high := aperture_top - 0.15
 	var bounds := AABB(centre, Vector3.ZERO)
 	for across in [-half_width, half_width]:
-		for height in [-half_height, half_height]:
+		for height in [low, high]:
 			for depth in [-reach, reach]:
-				bounds = bounds.expand(centre + tangent * across + Vector3.UP * height + normal * depth)
+				var point: Vector3 = centre + tangent * across + normal * depth
+				point.y = height
+				bounds = bounds.expand(point)
 	var nearby := _nearby(geometry, bounds.grow(0.001))
 	for across in [-half_width, 0.0, half_width]:
-		for height in [-half_height, 0.0, half_height]:
-			var point: Vector3 = centre + tangent * float(across) + Vector3.UP * float(height)
+		for height in [low, (low + high) * 0.5, high]:
+			var point: Vector3 = centre + tangent * float(across)
+			point.y = height
 			out.stats.door_rays += 1
 			for triangle in nearby:
 				if Geometry3D.segment_intersects_triangle(point - normal * reach, point + normal * reach,
