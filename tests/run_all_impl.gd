@@ -49,9 +49,11 @@ extends RefCounted
 ##                  archetype rows; `warchetype` is the same suite
 ##  30 tree      - the generated tree family: four styles, 24 species, ten rules
 ##  31 bridge    - the bridge family: four kinds, four mechanisms, ten rules
+##  32 rich      - the rich house: the ornament vocabulary, and the rules that
+##                  say a tall cottage is not one of them (HOUSE-RICH)
 const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cmotteaccess", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "cwater", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "harchetype", "court",
+	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "hrich", "harchetype", "court",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
@@ -112,6 +114,7 @@ const EXTRA: Array[String] = ["library", "placement", "vmine", "varchetypecontra
 ## Lanes and bare suite names can be mixed; duplicates run once.
 const LANES: Dictionary = {
 	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "metriccoords"],
+	"lane:rich": ["hrich", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
@@ -309,6 +312,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/house_raised_door_suite.gd").run()
 		"hbounds":
 			return preload("res://tests/suites/house_bounds_suite.gd").run()
+		"hrich":
+			return HouseRichSuite.run()
 		"hblueprint":
 			return preload("res://tests/suites/house_blueprint_suite.gd").run()
 		"assets":

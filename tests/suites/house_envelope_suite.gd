@@ -43,7 +43,10 @@ static func run() -> SuiteResult:
 	var res := SuiteResult.new("house envelope")
 	for i in 18:
 		var s := HouseSpec.new()
-		s.style = HouseSweep.styles()[i % 5]
+		# `% 5` was the style count when this suite was written, so adding a
+		# sixth style would have left it covering five and said nothing. Ask the
+		# table how many there are instead of counting them here.
+		s.style = HouseSweep.styles()[i % HouseSweep.styles().size()]
 		var size_id := (i + i / 3) % 3
 		s.width = [5.5, 8.0, 14.0][size_id]
 		s.length = [12.0, 8.1, 7.0][size_id]

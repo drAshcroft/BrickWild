@@ -37,6 +37,10 @@ godot --headless --path . --script res://tests/run_all.gd -- houseqa
 godot --headless --path . --script res://tests/run_all.gd -- houseqacore
 godot --headless --path . --script res://tests/run_all.gd -- houseqaplan
 godot --headless --path . --script res://tests/run_all.gd -- houseqafurnish
+# the rich house: ornament vocabulary, and the rules that keep a tall cottage
+# out of it (HOUSE-RICH; see docs/RICH_HOUSES.md)
+godot --headless --path . --script res://tests/run_all.gd -- hrich
+godot --headless --path . --script res://tests/run_all.gd -- lane:rich
 # broader bounded house-family regression
 godot --headless --path . --script res://tests/house_test.gd
 # exhaustive statistical house QA is for nightly/pre-merge use
@@ -52,6 +56,15 @@ godot --headless --path . --script res://tools/build_prop_catalog.gd
 godot --headless --path . --script res://tools/build_prop_catalog.gd -- --incremental
 # expensive oracle check: full measurement, then cache-backed byte-for-byte parity
 godot --headless --path . --script res://tools/build_prop_catalog.gd -- --verify-parity
+
+# fingerprint the houses: plan text AND shell vertices for the five long-standing
+# styles, so a "this changes nothing" claim is a diff rather than an assertion
+git worktree add C:/projects/bg_base HEAD
+godot --headless --path C:/projects/bg_base --editor --quit
+cp tools/fingerprint_houses.gd C:/projects/bg_base/tools/
+godot --headless --path C:/projects/bg_base --script res://tools/fingerprint_houses.gd > base.txt
+godot --headless --path . --script res://tools/fingerprint_houses.gd > new.txt
+diff base.txt new.txt                          # identical => not one vertex moved
 
 # reference renders -- must NOT be headless, the dummy renderer makes no image
 godot --path . --script res://tools/render_shots.gd     # -> artifacts/renders/
@@ -82,6 +95,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | the planner, room programme, doors, circulation | `lane:house-plan-fast` | 206 s host |
 | the furnisher, prop recipes, assembly | `lane:house-furnish-fast` | 4 m host |
 | house exterior dressing | `lane:house-exterior-fast` | 112 s host |
+| rich-house trim, its bound, its rules | `lane:rich` | see docs/RICH_HOUSES.md |
 | prop code or assembly | `lane:assets-fast` | 40 s host |
 | anything under `assets/props/` or `catalog.json` | rebuild catalogue, then `lane:assets` | required exception: over 5 m |
 | castle geometry and openings | `lane:castle-change` | 310 s host (1 Oct; over the 5 m gate under load) |
@@ -156,6 +170,20 @@ godot --headless --path /tmp/bg_base --script res://tools/dump_house_vertices.gd
 godot --headless --path .           --script res://tools/dump_house_vertices.gd > /tmp/new.txt
 diff /tmp/base.txt /tmp/new.txt      # identical => not one vertex moved
 ```
+
+That tool hashes MESH VERTICES ONLY, and it only covers four fixed fixtures.
+Two things it cannot see: a plan that changed under an unchanged shell, and a
+style added to the sweep. `tools/fingerprint_houses.gd` covers both — every
+long-standing style across the whole canonical sweep, hashing the plan's own
+fields beside the vertex hash. Use that one when a generator, spec or plan
+changed; use `dump_house_vertices.gd` when only an emitter did.
+
+Do not hash a plan with `var_to_str(plan)`. An Object member prints as its
+**instance id**, so the hash measures a pointer: two identical plans in two
+processes differ, and you will spend an afternoon chasing a change that is not
+there. Enumerate `get_property_list()` and take each field, leaving out the
+object-valued ones. `fingerprint_houses.gd` does exactly that, in
+`_plan_text`.
 
 **Always redirect a long run to a file.** An agent harness capturing a
 multi-minute headless run into its own buffer loses the summary and reports

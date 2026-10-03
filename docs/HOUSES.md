@@ -20,6 +20,13 @@ read it and judge it; `HouseAssembler` is the only place that ever loads a
 model. That split is why the whole harness runs headless in milliseconds per
 house — the checks work in metres and rectangles and never touch the art.
 
+## Styles
+
+Six of them: cottage, farmhouse, townhouse, long hall, witch's hut, and
+**rich** — the same house with its storeys *articulated* rather than merely
+taller. `docs/RICH_HOUSES.md` has the ornament vocabulary, the exterior bound it
+has to earn, and the rules that keep a stretched cottage out of the class.
+
 ## Storeys and roofs
 
 A house asks for one, two or three levels through `HouseSpec.storeys`; the
@@ -309,6 +316,12 @@ make it that kind of house, and each put through the whole harness.
 | Alchemist | Witch's Hut | 9.5 × 12 | hall, workshop, bookcase, workbench |
 | Inn | Townhouse | 13 × 16 | hall, parlour, bedroom, table, seating |
 | Scholar's house | Townhouse | 10 × 12 | hall, parlour, bookcase |
+| Rich merchant's house | Rich | 12 × 15, three storeys | hall, parlour, table, seating, **and the ornament** |
+
+That last row is the only one whose "must contain" includes anything that is
+not furniture. A rich archetype additionally owes its crown, its belt courses
+and its pediments, because "tall" and "rich" are not the same claim and the
+suite is the place that says so.
 
 An archetype declares what a house must CONTAIN, never where anything goes.
 The layout is the generator's business, and the moment a test says where the

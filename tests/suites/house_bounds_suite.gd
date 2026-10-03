@@ -18,6 +18,7 @@ static func run() -> SuiteResult:
 	_features(res)
 	_chimney_walls(res)
 	_conservative(res)
+	_rich(res)
 	_injected(res)
 	return res
 
@@ -111,6 +112,45 @@ static func _features(res: SuiteResult) -> void:
 								"%s %s bb=%s ch=%s pots=%d dor=%s"
 									% [kind, size, bargeboards, chimney, pots, dormers])
 
+
+
+## A rich house is the case the bound has to earn twice over (HOUSE-RICH): the
+## crown at the wall head reaches past the face of the wall it stands on, and
+## the crown on the ridge stands above the height the roof alone would promise.
+##
+## What is crossed here is the ENVELOPE -- orientation, roof type, storey count,
+## and the two switches that move the bound at all. The bands and the pediments
+## hang inside the crown's reach by construction (BAND_OUT and PEDIMENT_OUT are
+## both smaller than CORNICE_OUT), and their containment is already measured for
+## every house in the `houseqa` sweep, which now includes rich. Crossing all
+## four switches instead of two would have cost 96 extra builds to prove the
+## same two numbers.
+static func _rich(res: SuiteResult) -> void:
+	for size in [Vector2(8, 12), Vector2(12, 8)]:
+		for kind in [&"gable", &"half_hipped"]:
+			for storeys in [2, 3]:
+				for cornice in [false, true]:
+					for crown in [false, true]:
+						var s := HouseSpec.new()
+						s.style = &"rich"
+						s.width = size.x
+						s.length = size.y
+						s.height = 2.9
+						s.storeys = storeys
+						s.exterior_props = false
+						var plan := HouseGenerator.generate(s, 5500, false)
+						s.roof_type = kind
+						# the richest configuration available at that setting
+						s.cornice = cornice
+						s.string_courses = 2 if cornice else 0
+						s.pediments = cornice
+						s.ridge_finial = crown
+						s.rng.seed = s.seed
+						plan = HousePlanner.plan(s)
+						var mesh := HouseBuilder.new().build(plan)
+						_assert_bounds(res, plan, mesh,
+							"%s %s %d storeys cornice=%s crown=%s"
+								% [String(kind), size, storeys, cornice, crown])
 
 ## The chimney can land on any of the four walls. The old spec-only extent
 ## always grew +X, which was right one time in four.

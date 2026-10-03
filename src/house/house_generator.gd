@@ -24,6 +24,11 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	spec.cellars = clampi(spec.cellars, 0, 1)
 	var s: Dictionary = HouseSpec.STYLES[spec.style]
 	var r := spec.rng
+	# A style row may ask for a storey floor (HOUSE-RICH). A rich house is read
+	# as banded storeys, and a single storey has no band to read. It comes from
+	# the style table rather than from the stream, so it is deterministic and no
+	# other style carries one.
+	spec.storeys = maxi(spec.storeys, int(s.get("min_storeys", 1)))
 
 	spec.roof_pitch = r.randf_range(float(s["roof_pitch"][0]), float(s["roof_pitch"][1]))
 	spec.roof_pitch *= HouseGeometry.art_pitch_scale(spec)
@@ -65,6 +70,16 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	spec.chimney_style = s.get("chimney_style", &"stepped")
 	var pots_range: Array = s.get("pots", [1, 2])
 	spec.chimney_pots = r.randi_range(int(pots_range[0]), int(pots_range[1]))
+
+	# HOUSE-RICH ornament. A style row with no "cornice" key is an ordinary house
+	# and takes NO draw here: four rolls behind one `if` is what keeps adding
+	# rich from moving a single existing seed's plan, roof or furniture.
+	if s.has("cornice"):
+		spec.cornice = GeneratorRandom.chance(r, float(s["cornice"]))
+		var bands: Array = s.get("string_courses", [0, 0])
+		spec.string_courses = r.randi_range(int(bands[0]), int(bands[1]))
+		spec.pediments = GeneratorRandom.chance(r, float(s.get("pediments", 0.0)))
+		spec.ridge_finial = GeneratorRandom.chance(r, float(s.get("ridge_finial", 0.0)))
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y

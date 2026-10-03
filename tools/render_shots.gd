@@ -230,6 +230,16 @@ func _init() -> void:
 		"caption": "The same generator with the roof left on: thatch, chimney, porch and shuttered windows.",
 		"file": "house_exterior.jpg", "kind": "house"})
 
+	# and the rich house from the street, roof on: the ornament is exterior, so
+	# a cutaway would photograph none of the thing this style is for
+	var rich_ext: Array = _house_plan(_houses()[5])
+	await _shoot_house(rich_ext[1], "house_rich_exterior.jpg", 1.15, -0.28, 1.15, false)
+	manifest.append({"key": "house_rich_exterior",
+		"title": "A rich merchant's house from the street",
+		"caption": "Three banded storeys: a crown at the wall head, a belt course at "
+			+ "each storey line, pedimented upper windows and an obelisk on the ridge.",
+		"file": "house_rich_exterior.jpg", "kind": "house"})
+
 	# ---- the temples, from the door and from above ----
 	for entry in _temples():
 		var tspec: TempleSpec = _temple_spec(entry)
@@ -1059,6 +1069,12 @@ func _houses() -> Array[Dictionary]:
 			"title": "Farmhouse", "w": 10.0, "l": 13.0, "h": 2.7, "seed": 8106,
 			"feat": "stores of barrels and crates off the kitchen",
 			"yaw": 0.85, "pitch": -0.82},
+		{"key": "rich_merchant", "style": &"rich", "trade": &"innkeeper",
+			"title": "Rich merchant's house", "w": 12.0, "l": 15.0, "h": 3.0,
+			"storeys": 3, "seed": 8107, "ornament": true,
+			"feat": "three banded storeys: a crown at the wall head, belt courses at "
+				+ "each storey line, pedimented upper windows and an obelisk on the ridge",
+			"yaw": 1.0, "pitch": -0.55},
 	]
 
 
@@ -1081,6 +1097,12 @@ func _house_plan(entry: Dictionary) -> Array:
 		printerr("  %s FAILS its own checks:" % entry["key"])
 		for f in rep["failures"]:
 			printerr("     " + str(f))
+	if bool(entry.get("ornament", false)):
+		var rich: Dictionary = RichHouseCheck.new().check(plan, builder)
+		if not rich["ok"]:
+			printerr("  %s FAILS the rich check:" % entry["key"])
+			for f2 in rich["failures"]:
+				printerr("     " + str(f2))
 	var rooms: Array[String] = []
 	for i in range(plan.room_count()):
 		rooms.append("%s(%d)" % [String(plan.kind_of(i)), plan.furniture_of(i).size()])

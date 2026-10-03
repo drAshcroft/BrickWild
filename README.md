@@ -1,5 +1,6 @@
 # BrickWild
 
+
 **Deterministic procedural buildings and settlements for Godot 4.5.2.**
 
 BrickWild turns a seed and a compact request into architecture with a plan:

@@ -57,6 +57,10 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	if spec.material != &"stone":
 		_build_jetty()
 		_build_timber_frame()
+	# HOUSE-RICH: the crown, the belt bands and the pediments. Every one of
+	# them is behind its own spec field, so an ordinary house returns from this
+	# having emitted nothing and its mesh is unchanged vertex for vertex.
+	_build_rich_trim()
 	if with_roof:
 		_build_roof()
 	_build_porch()
@@ -1346,6 +1350,178 @@ func _proud(depth: float) -> float:
 	return HouseGeometry.wall_thickness(spec) / 2.0 + depth / 2.0 - 0.015
 
 
+# --------------------------------------------------------------- rich trim
+
+## The ornament that separates a rich dwelling from a tall ordinary one
+## (HOUSE-RICH): the crown at the wall head, a belt band at each storey line,
+## a pediment over every upper window, and an obelisk on the ridge.
+##
+## Every piece is driven by its own `HouseSpec` field rather than by a test for
+## the style's name, so a style row without the four keys reaches all of this
+## and emits nothing at all. That is what keeps the five existing house styles
+## byte-identical, and it means the vocabulary is reachable from a chance
+## table rather than hard-wired to one word.
+func _build_rich_trim() -> void:
+	if spec.cornice:
+		_build_rich_cornice()
+	if spec.string_courses > 0:
+		_build_rich_bands()
+	if spec.pediments:
+		_build_rich_pediments()
+
+
+## The crown at the wall head, in three steps, on every elevation of the top
+## storey. The corona is the step that oversails: CORNICE_OUT is how far past
+## the wall face it reaches, and HouseGeometry.exterior_bounds grows the bound
+## by that same number, so a bound cannot be looser than the thing it bounds.
+func _build_rich_cornice() -> void:
+	tag("cornice")
+	var level := _storeys() - 1
+	host("cornice", level)
+	var head: float = spec.height * float(level)
+	var step: float = HouseGeometry.CORNICE_H / 3.0
+	var steps := [["cornice_bed", HouseGeometry.CORNICE_BED_OUT],
+		["cornice_corona", HouseGeometry.CORNICE_OUT],
+		["cornice_crown", HouseGeometry.CORNICE_CROWN_OUT]]
+	for i in steps.size():
+		var y0: float = head - HouseGeometry.CORNICE_H + step * float(i)
+		for run in HouseGeometry.shell_runs(plan, level):
+			_moulding(run, y0, step, float(steps[i][1]), String(steps[i][0]))
+	host_end()
+
+
+## A belt band at each storey line, counted down from the top.
+##
+## A string course marks a storey line by capping the storey BELOW it, so it
+## is emitted on that storey's own wall run at the head of that wall -- which
+## also keeps it a clear storey-height from the crown, rather than fighting it
+## for the same 360 mm of wall.
+##
+## `y0` is storey-relative, because that is what `_openings_on` reports: the
+## wall builder hands the same records to `_wall_run` and adds the storey
+## offset at the last moment, and a band that compared a world height against a
+## storey-relative one would never see a doorway to break at.
+func _build_rich_bands() -> void:
+	tag("string_course")
+	var wanted: int = mini(spec.string_courses, maxi(_storeys() - 1, 0))
+	for i in wanted:
+		var level := _storeys() - 2 - i
+		host("band_%d" % level, level)
+		var offset: float = spec.height * float(level)
+		var y0: float = spec.height - HouseGeometry.BAND_H
+		for run in HouseGeometry.shell_runs(plan, level):
+			var openings := _openings_on(run["from"], run["to"], run["normal"], level,
+				float(run.get("thickness", HouseGeometry.wall_thickness(spec))))
+			_moulding(run, y0, HouseGeometry.BAND_H, HouseGeometry.BAND_OUT,
+				"string_course", openings, offset)
+	host_end()
+
+
+## A pediment over every window above the ground floor, sized to whatever the
+## storey has under its own head. A window whose head is close enough to the
+## wall head that even PEDIMENT_MIN_RISE would not fit is left plain rather
+## than pushed through the roof above it.
+func _build_rich_pediments() -> void:
+	for wi in plan.windows.size():
+		var win: Dictionary = plan.windows[wi]
+		var level := HousePlan.record_storey(win)
+		if level < 1:
+			continue
+		var base: float = float(level) * spec.height + float(win["head"])
+		var rise: float = minf(HouseGeometry.PEDIMENT_RISE,
+			spec.height * float(level + 1) - base - 0.12)
+		if rise < HouseGeometry.PEDIMENT_MIN_RISE:
+			continue
+		host("pediment_%d" % wi, level)
+		_pediment(win, base, rise)
+	host_end()
+
+
+## One pediment: a horizontal cornice across the head, a raking cornice up each
+## slope, and the tympanum between them. The window record sits on the
+## interior wall face, so every piece is set out from the wall CENTRE-line.
+func _pediment(win: Dictionary, base: float, rise: float) -> void:
+	var normal: Vector2 = win["normal"]
+	var along := Vector2(-normal.y, normal.x)
+	var yaw := atan2(-along.y, along.x)
+	var half: float = float(win["width"]) * 0.5 + HouseGeometry.PEDIMENT_MARGIN
+	var wall: float = HouseGeometry.wall_thickness(spec)
+	var centre: Vector2 = Vector2(win["pos"]) + normal * (wall * 0.5)
+	var foot: float = base + 0.10
+	# The tympanum and its raking cornices sit a PEDIMENT_OUT clear of the wall
+	# face; the horizontal cornice below spans the whole wall thickness.
+	var proud: Vector2 = normal * (wall * 0.5 + HouseGeometry.PEDIMENT_OUT * 0.5)
+	var face: Vector2 = centre + proud
+	component_box("pediment_cornice", Vector3(half * 2.0, 0.10,
+		wall + HouseGeometry.PEDIMENT_OUT * 2.0),
+		Transform3D(Basis(Vector3.UP, yaw),
+			Vector3(centre.x, base + 0.05, centre.y)), SURF_TRIM)
+	var apex := Vector3(face.x, foot + rise, face.y)
+	component_slab("pediment_face", PackedVector3Array([
+		Vector3(face.x - along.x * half, foot, face.y - along.y * half),
+		Vector3(face.x + along.x * half, foot, face.y + along.y * half),
+		apex]), HouseGeometry.PEDIMENT_OUT, SURF_TRIM, false)
+	var span: float = sqrt(half * half + rise * rise)
+	# The corner end of each rake is DOWN and the apex end is UP, so the tilt
+	# is negated for the corner that lies along +X of the run's own frame.
+	var tilt := -atan2(rise, half)
+	for side in [-1.0, 1.0]:
+		var corner: Vector2 = centre + along * (half * side) + proud
+		var mid := Vector3((corner.x + face.x) * 0.5, foot + rise * 0.5,
+			(corner.y + face.y) * 0.5)
+		var xf := Transform3D(Basis(Vector3.UP, yaw), mid)
+		xf = xf * Transform3D(Basis(Vector3(0, 0, 1), tilt * side), Vector3.ZERO)
+		component_box("pediment_rake", Vector3(span, 0.08, HouseGeometry.PEDIMENT_OUT),
+			xf, SURF_TRIM)
+
+
+## One continuous moulding along a wall run: a step of the crown, or a belt
+## band. `openings` breaks it wherever an opening comes through, so a band
+## never runs across a doorway -- the same rule the timber mid rail follows.
+## `y0` and `y_offset` are the storey's own vertical frame, as above.
+func _moulding(run: Dictionary, y0: float, height: float, out: float, role: String,
+		openings: Array = [], y_offset := 0.0) -> void:
+	var from: Vector2 = run["from"]
+	var to: Vector2 = run["to"]
+	var seg: Vector2 = to - from
+	var length: float = seg.length()
+	if length <= 0.02 or height <= 0.01:
+		return
+	var dir: Vector2 = seg / length
+	var yaw := atan2(-dir.y, dir.x)
+	var thick: float = float(run.get("thickness", HouseGeometry.wall_thickness(spec))) \
+		+ out * 2.0
+	var cuts: Array = []
+	for op in openings:
+		if float(op["bottom"]) > y0 + height or float(op["top"]) < y0:
+			continue          # the band passes clear above or below it
+		cuts.append([float(op["t"]) - float(op["w"]) * 0.5,
+			float(op["t"]) + float(op["w"]) * 0.5])
+	cuts.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	var cursor := 0.0
+	for cut in cuts:
+		var lo: float = float(cut[0])
+		if lo > cursor + 0.02:
+			_moulding_piece(from, dir, yaw, cursor, lo, y0, height, thick, role, y_offset)
+		cursor = maxf(cursor, float(cut[1]))
+	if cursor < length - 0.02:
+		_moulding_piece(from, dir, yaw, cursor, length, y0, height, thick, role, y_offset)
+
+
+## The box one unbroken stretch of moulding emits, centred on the wall it is
+## fixed to and standing `out` proud of that wall's face.
+func _moulding_piece(from: Vector2, dir: Vector2, yaw: float, t0: float, t1: float,
+		y0: float, height: float, thick: float, role: String,
+		y_offset := 0.0) -> void:
+	var length: float = t1 - t0
+	if length <= 0.02:
+		return
+	var mid: Vector2 = from + dir * ((t0 + t1) * 0.5)
+	component_box(role, Vector3(length, height, thick),
+		Transform3D(Basis(Vector3.UP, yaw),
+			Vector3(mid.x, y_offset + y0 + height * 0.5, mid.y)), SURF_TRIM)
+
+
 # ------------------------------------------------------------------- roof
 
 ## How far the roof runs past the end wall at the gable: the verge.
@@ -1604,12 +1780,11 @@ func _build_roof() -> void:
 		var shift := Transform3D(Basis(), Vector3(inward.x, 0, inward.y))
 		_roof_face(xf * shift, profile, SURF_WALL, "roof_wall", false, HouseGeometry.wall_thickness(spec))
 
-	var ridge_half := along * 0.5 + 0.25
-	if spec.roof_type != &"gable":
-		var cut := RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else 0.0
-		ridge_half = maxf(ridge_half - (span * 0.5 + 0.35) * (1.0 - cut), 0.0)
-	if ridge_half > 0.05:
-		_emit_ridge_cap_segments(xf, rise, ridge_half, authored)
+	# One ridge length for the cap and the crown that may stand on it, so the
+	# two can never disagree about whether there IS a ridge.
+	var ridge: float = HouseGeometry.ridge_half_for(spec, span, along)
+	if ridge > 0.05:
+		_emit_ridge_cap_segments(xf, rise, ridge, authored)
 	var roof_bounds: AABB = xf * AABB(Vector3(-h - 0.35, -RoofShape.DEPTH * 0.5, -f - 0.25),
 		Vector3(span + 0.7, rise + RoofShape.DEPTH * 0.5 + 0.22, along + 0.5))
 	_log_mass("roof" if _storeys() == 1 else "roof_%d" % (_storeys() - 1), roof_bounds)
@@ -1620,6 +1795,7 @@ func _build_roof() -> void:
 			_gable_frame(xf, span, along, rise, wall_peak)
 		var verge_top := rise * RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else rise
 		_build_bargeboards(xf, span, along, rise, verge_top)
+	_build_ridge_crown(xf, rise, ridge)
 	_build_eaves_tails(xf, span, along, rise)
 	_build_dormers(xf, layout["dormers"])
 	host_end()
@@ -1773,6 +1949,32 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 				0.24, HouseGeometry.VERGE_PENDANT_D),
 				xf * Transform3D(Basis(), Vector3(float(side2) * half, -0.05, z)),
 				SURF_TRIM)
+
+
+## The obelisk that crowns a rich ridge (HOUSE-RICH), standing on the ridge
+## cap beside the verge boards rather than as part of them.
+##
+## It is emitted in the roof's own frame at exactly the height
+## HouseGeometry.roof_top_above_walls adds to the rise, so the silhouette the
+## exterior bound promises and the mesh that bound must contain agree to the
+## millimetre rather than to a tolerance. A roof with no ridge to stand on
+## gets no crown, and the bound knows it too.
+func _build_ridge_crown(xf: Transform3D, rise: float, ridge: float) -> void:
+	if not spec.ridge_finial or ridge <= 0.05:
+		return
+	tag("ridge_crown")
+	host("ridge_crown", _storeys() - 1)
+	var seat: float = rise + HouseGeometry.RIDGE_CAP_TOP
+	component_box("ridge_crown_plinth",
+		Vector3(HouseGeometry.CROWN_BASE_W, HouseGeometry.CROWN_BASE_H,
+			HouseGeometry.CROWN_BASE_W),
+		xf * Transform3D(Basis(), Vector3(0.0,
+			seat + HouseGeometry.CROWN_BASE_H * 0.5, 0.0)), SURF_TRIM)
+	component_box("ridge_crown",
+		Vector3(HouseGeometry.CROWN_W, HouseGeometry.CROWN_H, HouseGeometry.CROWN_W),
+		xf * Transform3D(Basis(), Vector3(0.0, seat + HouseGeometry.CROWN_BASE_H
+			+ HouseGeometry.CROWN_H * 0.5, 0.0)), SURF_TRIM)
+	host_end()
 
 
 func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float) -> void:

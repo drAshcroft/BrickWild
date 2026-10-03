@@ -51,6 +51,14 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 9.0, "length": 11.0, "height": 2.7, "cellars": 1,
 		"rooms": [&"hall"], "cats": ["barrel|crate"],
 		"about": "a house over a cellar: barrels below, a stair down from the hall"},
+	# HOUSE-RICH: the same dwelling, banded. "ornament" is what makes this one
+	# a rich house rather than a tall cottage, so it is declared the way the
+	# rooms and the fittings are -- as the thing this archetype must contain.
+	{"key": "rich_merchant", "style": &"rich", "trade": &"innkeeper",
+		"width": 12.0, "length": 15.0, "height": 3.0, "storeys": 3, "ornament": true,
+		"rooms": [&"hall", &"parlour"], "cats": ["table", "bench|seat"],
+		"about": "a banded three-storey merchant's house: crown, belt courses, "
+			+ "pediments and an obelisk on the ridge"},
 ]
 
 
@@ -67,6 +75,7 @@ static func run() -> SuiteResult:
 			spec.length = float(row["length"]) * scale
 			spec.height = float(row["height"])
 			spec.cellars = int(row.get("cellars", 0))
+			spec.storeys = int(row.get("storeys", 1))
 			var plan: HousePlan = HouseGenerator.generate(spec, _seed_for(key, scale))
 			var builder := HouseBuilder.new()
 			builder.build(plan)
@@ -96,6 +105,12 @@ static func run() -> SuiteResult:
 				res.fail("%s: %s" % [who, str(f)])
 			for w in rep["warnings"]:
 				res.warn("%s: %s" % [who, str(w)])
+			# a rich archetype additionally owes the ornament, or it is a tall
+			# cottage with a nice name
+			if bool(row.get("ornament", false)):
+				var rich: Dictionary = RichHouseCheck.new().check(plan, builder)
+				for f2 in rich["failures"]:
+					res.fail("%s: %s" % [who, str(f2)])
 			# a cellar is a storey: rooms on it, a pit dug for it, a stair
 			# down to it, and the walk reaching it (INT-016)
 			if spec.cellars > 0:

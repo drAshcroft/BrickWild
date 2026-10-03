@@ -55,6 +55,16 @@ var window_mullions: bool = true  # vertical timber bars dividing windows
 var window_hoods: bool = false    # dripstone hood mouldings over window heads
 var chimney_style: StringName = &"stepped" # &"stepped", &"straight", &"louver"
 var chimney_pots: int = 1         # terracotta flue pots at the crown
+## ---- rich-house ornament (HOUSE-RICH) ----
+## A rich dwelling is the same plan with its storeys ARTICULATED: the bands,
+## the crown and the roof are separate pieces you can count, rather than a
+## cottage with the height turned up. All four are read from the style row, so
+## `rich` is a chance table like every other style and a rich house is still
+## reproducible from (style, trade, size, storeys, seed).
+var cornice: bool = false        # a projecting crown at the wall head
+var string_courses: int = 0      # belt bands at each storey line, 0..2
+var pediments: bool = false      # pedimented heads over the upper windows
+var ridge_finial: bool = false   # an obelisk crowning the ridge cap
 var exterior_props: bool = true   # facade pieces, the yard and its built pieces: the one switch
 ## Metres of yard round the shell (porch and chimney stack included) that this
 ## house may dress; the lot owns the rest. Negative means the style's own, 2 to
@@ -147,6 +157,24 @@ const STYLES := {
 		"framing": [&"arch_brace", &"square_panel"], "truss": [&"king_post"],
 		"jetty": 0.2, "dormers": 0.2, "bargeboards": 0.6, "stone_ground": 0.05,
 		"chimney_style": &"stepped", "pots": [1, 1],
+	},
+	&"rich": {
+		"label": "Rich House",
+		# The tightest studs in the table and a mid rail at every band: the
+		# elevation is read as horizontal stripes, not as a plastered box.
+		"timber": 1.0, "studs": [0.32, 0.5], "braces": 0.25, "rail": 1.0,
+		"roof_pitch": [1.25, 1.7], "porch": 0.85, "chimney": 1.0, "shutters": 0.8,
+		"wall": ["e6dcc4", "cdbda2"], "trim": ["7d5f38", "543f22"],
+		"roof": ["5c4230", "3d2b1e"], "floor": ["84745a", "695c46"],
+		"clutter": [0.55, 0.9],
+		"plinth": [0.5, 0.75], "roof_types": [&"gable", &"half_hipped"],
+		"framing": [&"close_studding", &"saltire"], "truss": [&"queen_post", &"king_post"],
+		"jetty": 0.95, "dormers": 0.9, "bargeboards": 1.0, "stone_ground": 0.6,
+		"chimney_style": &"stepped", "pots": [1, 2],
+		# HOUSE-RICH: the four ornament switches. A style row that carries none
+		# of these is an ordinary house, whatever its name.
+		"cornice": 1.0, "string_courses": [1, 2], "pediments": 0.85,
+		"ridge_finial": 1.0, "min_storeys": 2,
 	},
 }
 

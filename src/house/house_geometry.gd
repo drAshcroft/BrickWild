@@ -717,6 +717,62 @@ const ROOF_ALONG_OUT := 0.25
 ## Stone quoins are 0.56 m deep at their widest course, centred on the corner,
 ## so they reach this far past the wall line on BOTH axes.
 const QUOIN_OUT := 0.28
+
+# ---- rich-house ornament (HOUSE-RICH) ----
+## The crown at the wall head, in three steps: the corona is the one that
+## oversails, and CORNICE_OUT is how far past the wall face it reaches.
+## HouseBuilder._build_rich_cornice emits with these numbers and the bound
+## below grows by the same one, so a bound cannot disagree with the thing it
+## bounds -- the failure house_bounds_suite exists to catch.
+const CORNICE_H := 0.36
+const CORNICE_BED_OUT := 0.12
+const CORNICE_OUT := 0.30
+const CORNICE_CROWN_OUT := 0.20
+## The band at a storey line. Shallower than the crown, which is why a bound
+## grown by CORNICE_OUT already contains every band on every storey below it.
+const BAND_H := 0.18
+const BAND_OUT := 0.13
+## A pediment over an upper window: its base runs PEDIMENT_MARGIN either side
+## of the opening, its apex stands PEDIMENT_RISE above that. Both are CAPS --
+## the emitter shrinks the rise to whatever the storey has under its own head.
+const PEDIMENT_MARGIN := 0.34
+const PEDIMENT_RISE := 0.42
+const PEDIMENT_OUT := 0.22
+const PEDIMENT_MIN_RISE := 0.18
+## The ridge crown: a plinth and an obelisk standing on the ridge cap, which is
+## 0.22 m wide (HouseBuilder._emit_ridge_cap_segments). The plinth overhangs it
+## by 40 mm and the obelisk is narrower than the plinth, so nothing is left
+## hanging over the slope with air under it.
+## roof_top_above_walls() adds CROWN_BASE_H + CROWN_H to the rise, and
+## HouseBuilder._build_ridge_crown emits from the same pair: the silhouette the
+## bound promises and the mesh it must contain agree by construction.
+const CROWN_BASE_W := 0.30
+const CROWN_BASE_H := 0.14
+const CROWN_W := 0.18
+const CROWN_H := 1.15
+
+## Half the length of the ridge cap this roof carries, or zero when it has no
+## ridge to cap. HouseBuilder._build_roof emits the cap and the ridge crown
+## from this one number, so the two can never disagree about whether there is
+## a ridge for a crown to stand on.
+##
+## `ridge_half_for` takes the span and along the roof was actually built from,
+## so a plan whose top storey is shaped or opens onto a court is measured on
+## the geometry that exists rather than on the rectangle its spec would give.
+static func ridge_half_for(spec: HouseSpec, span: float, along: float) -> float:
+	var half: float = along * 0.5 + 0.25
+	if spec.roof_type != &"gable":
+		var cut := RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else 0.0
+		half = maxf(half - (span * 0.5 + 0.35) * (1.0 - cut), 0.0)
+	return half
+
+
+## The same ridge for a spec alone, which is all the exterior bound knows.
+static func ridge_half(spec: HouseSpec) -> float:
+	var top := site_rect(spec, maxi(spec.storeys - 1, 0))
+	return ridge_half_for(spec, minf(top.size.x, top.size.y), maxf(top.size.x, top.size.y))
+
+
 ## Bounds are promised to CONTAIN every shell vertex exactly, and to be no
 ## looser than this. Tested both ways.
 const BOUNDS_TOL := 0.16
@@ -757,6 +813,8 @@ static func roof_top_above_walls(spec: HouseSpec) -> float:
 		top = maxf(top, rise + FINIAL_TOP)
 	if spec.chimney:
 		top = maxf(top, rise + CHIMNEY_TOP)
+	if spec.ridge_finial and ridge_half(spec) > 0.05:
+		top = maxf(top, rise + RIDGE_CAP_TOP + CROWN_BASE_H + CROWN_H)
 	return top
 
 
@@ -903,6 +961,11 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 	if has_quoins(spec):
 		neg = neg.max(Vector2.ONE * QUOIN_OUT)
 		pos = pos.max(Vector2.ONE * QUOIN_OUT)
+	if spec.cornice:
+		# The crown at the wall head reaches past the face of the wall it
+		# stands on, so it is planned exterior and not leakage.
+		neg = neg.max(Vector2.ONE * CORNICE_OUT)
+		pos = pos.max(Vector2.ONE * CORNICE_OUT)
 	var r: Rect2 = site_rect(spec, maxi(spec.storeys - 1, 0)).grow_individual(neg.x, neg.y, pos.x, pos.y)
 	r = r.merge(site_rect(spec).grow_individual(0, jetty_front_reach(spec), 0, 0))
 	for extra in [chimney_rect(plan), porch_rect(plan)]:
@@ -946,6 +1009,8 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 	var over := roof_overhang(spec)
 	if has_quoins(spec):
 		over = over.max(Vector2.ONE * QUOIN_OUT)
+	if spec.cornice:
+		over = over.max(Vector2.ONE * CORNICE_OUT)
 	# The front is known, but a spec alone cannot say which wall is the front
 	# once the entrance moves, so the jetty reach is applied all round.
 	var all_round: float = maxf(maxf(over.x, over.y), jetty_front_reach(spec))
