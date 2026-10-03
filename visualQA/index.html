@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Human visual QA — BigGlade</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#f3f1eb;color:#252820;font:16px system-ui,sans-serif}
+  header,footer{padding:16px 24px;background:#fff;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  header{border-bottom:1px solid #ddd}h1{margin:0;font-size:22px}select,button,textarea{font:inherit}
+  select{padding:7px}main{padding:18px 24px 110px}#hint{margin:0 0 16px;color:#58604f}
+  #cards{display:grid;grid-template-columns:1fr 1fr;gap:20px}article{background:white;border:1px solid #dadcd3;border-radius:8px;overflow:hidden}
+  .image{display:block;background:#dce0dc}.image img{display:block;width:100%;height:48vh;object-fit:contain}
+  .details{padding:16px}h2{margin:0 0 6px;font-size:18px}.date{font-size:12px;color:#646b61;margin:0 0 14px}
+  .checks{display:flex;gap:10px 16px;flex-wrap:wrap;margin-bottom:14px}.checks label{cursor:pointer;white-space:nowrap}
+  input[type=checkbox]{width:19px;height:19px;vertical-align:middle;accent-color:#386b4b;margin-right:5px}
+  textarea{display:block;width:100%;margin-top:5px;padding:8px;border:1px solid #bdc5b9;border-radius:4px;resize:vertical}
+  footer{position:fixed;bottom:0;left:0;right:0;border-top:1px solid #ddd}button{padding:11px 24px;border:0;border-radius:5px;background:#326044;color:white;cursor:pointer}
+  button:disabled{opacity:.5;cursor:wait}#status{flex:1}#error{color:#a22121}#done{padding:50px 0;font-size:22px}
+  @media(max-width:850px){#cards{grid-template-columns:1fr}.image img{height:50vh}main{padding:16px 12px 140px}header,footer{padding:12px}}
+</style>
+<header><h1>Human visual QA</h1><select id="classSelect" aria-label="Building class"></select><span id="progress"></span></header>
+<main><p id="hint">Tick Pretty if you like it. Tick a problem if you see one. Click an image to inspect it full size.</p><div id="cards"></div><div id="done" hidden></div><p id="error" role="alert"></p></main>
+<footer><span id="status" role="status">Next saves both ratings to visualQA/HumanRate.md.</span><button id="next" disabled>Save &amp; Next →</button></footer>
+<script>
+const fields=['pretty','collisions','window problems','door problems','roof problems'];
+const labels=['Pretty','Collisions','Window problems','Door problems','Roof problems'];
+const $=id=>document.getElementById(id);
+let classes=[],reviewed=new Set(),index=0,reviewId='',busy=false;
+function show(){
+  $('error').textContent='';$('cards').replaceChildren();$('done').hidden=true;
+  $('classSelect').value=String(index);$('progress').textContent=`${index+1} / ${classes.length} classes · ${reviewed.size} saved`;
+  reviewId=crypto.randomUUID();$('next').disabled=false;
+  classes[index].renders.forEach(render=>{
+    const card=document.createElement('article');
+    card.innerHTML='<a class="image" target="_blank" rel="noopener"><img></a><div class="details"><h2></h2><p class="date"></p><div class="checks"></div><label>Notes (optional)<textarea rows="2" maxlength="2000"></textarea></label></div>';
+    card.querySelector('a').href=render.url;const img=card.querySelector('img');img.src=render.url;img.alt=render.label;
+    img.onerror=()=>{$('error').textContent='A render could not load. Reload before rating.';$('next').disabled=true};
+    card.querySelector('h2').textContent=render.label;
+    card.querySelector('.date').textContent=`Captured ${new Date(render.captured).toLocaleString()} · ${render.path}`;
+    fields.forEach((field,i)=>{const label=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.name=field;label.append(input,document.createTextNode(labels[i]));card.querySelector('.checks').append(label)});
+    $('cards').append(card);
+  });
+}
+$('classSelect').onchange=()=>{if(!busy){index=Number($('classSelect').value);show();$('status').textContent='Next saves both ratings. Revisiting a class appends a new review.'}};
+$('next').onclick=async()=>{
+  if(busy)return;busy=true;$('next').disabled=true;$('classSelect').disabled=true;$('error').textContent='';$('status').textContent='Saving…';
+  const ratings=Array.from($('cards').children).map((card,i)=>({id:classes[index].renders[i].id,flags:Object.fromEntries(Array.from(card.querySelectorAll('input')).map(input=>[input.name,input.checked])),note:card.querySelector('textarea').value}));
+  try{
+    const response=await fetch('/api/rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({review_id:reviewId,class:classes[index].id,ratings})});
+    const result=await response.json();if(!response.ok||!result.saved)throw new Error(result.error||'Save failed');
+    reviewed.add(classes[index].id);$('status').textContent='Saved to visualQA/HumanRate.md.';
+    const next=classes.findIndex((row,i)=>i>index&&!reviewed.has(row.id));
+    const remaining=next>=0?next:classes.findIndex(row=>!reviewed.has(row.id));
+    if(remaining>=0){index=remaining;show();window.scrollTo(0,0)}else{
+      $('cards').replaceChildren();$('done').hidden=false;$('done').textContent=`All ${classes.length} classes saved. Thank you. The buildings have been observed.`;
+      $('progress').textContent=`${classes.length} / ${classes.length} saved`;
+    }
+  }catch(error){$('error').textContent=`Not saved: ${error.message}. Your choices are still here; retry Next.`;$('status').textContent='Save failed.';$('next').disabled=false}
+  finally{busy=false;$('classSelect').disabled=false}
+};
+fetch('/api/classes').then(async response=>{if(!response.ok)throw new Error('Could not load render list');return response.json()}).then(data=>{
+  classes=data.classes;reviewed=new Set(data.reviewed);
+  classes.forEach((row,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=row.label;$('classSelect').append(option)});
+  index=Math.max(0,classes.findIndex(row=>!reviewed.has(row.id)));show();
+}).catch(error=>{$('error').textContent=error.message});
+</script>
+</html>

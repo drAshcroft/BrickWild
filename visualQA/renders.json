@@ -1,0 +1,26 @@
+[
+  {"id":"castle","label":"Castle","renders":[
+    {"label":"Motte — whole castle","path":"docs/screenshots/motte_revision_hero.png"},
+    {"label":"Motte — entrance and stairs","path":"docs/screenshots/motte_revision_entrance.png"}]},
+  {"id":"church","label":"Church","renders":[
+    {"label":"Chartres","path":"artifacts/renders/chartres.jpg"},
+    {"label":"Durham","path":"artifacts/renders/durham.jpg"}]},
+  {"id":"house","label":"House","renders":[
+    {"label":"Family cottage — exterior","path":"artifacts/renders/building_audit/house/family_cottage_exterior_3q.jpg"},
+    {"label":"Rich merchant — cutaway","path":"artifacts/renders/building_audit/house/rich_merchant_elevated_cutaway.jpg"}]},
+  {"id":"shop","label":"Shop / civic building","renders":[
+    {"label":"Blacksmith — exterior","path":"artifacts/renders/building_audit/shop/blacksmith_longhall_exterior_3q.jpg"},
+    {"label":"Blacksmith — cutaway","path":"artifacts/renders/building_audit/shop/blacksmith_longhall_elevated_cutaway.jpg"}]},
+  {"id":"hotel","label":"Hotel","renders":[
+    {"label":"Grand Budapest — exterior","path":"artifacts/renders/hotel_grand_budapest.jpg"},
+    {"label":"Grand Budapest — dormer row detail","path":"artifacts/renders/hotel_dormers/hotel_grand_budapest_row_after.jpg"}]},
+  {"id":"temple","label":"Temple","renders":[
+    {"label":"Starless pylon — aerial","path":"artifacts/renders/refinement/temple_starless_pylon_aerial.jpg"},
+    {"label":"Starless pylon — axis","path":"artifacts/renders/refinement/temple_starless_pylon_axis.jpg"}]},
+  {"id":"world","label":"World building","renders":[
+    {"label":"Palazzo — exterior","path":"artifacts/renders/world_courtyards/palazzo_roof_on.png"},
+    {"label":"Palazzo — courtyard cutaway","path":"artifacts/renders/world_courtyards/palazzo_court_roof_off.png"}]},
+  {"id":"village","label":"Village","renders":[
+    {"label":"Thorpe — roofs on","path":"artifacts/p1_acceptance/village_archetypes/thorpe_roof.jpg"},
+    {"label":"Thorpe — cutaway","path":"artifacts/p1_acceptance/village_archetypes/thorpe_cutaway.jpg"}]}
+]
