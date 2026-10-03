@@ -14,6 +14,7 @@ extends RefCounted
 ## structural rules that can still fail -- nothing floating, nothing hovering.
 # A pitched roof is carried by the wall plates even in a one-storey house.
 const SHELL_CARRIED: Array = ["roof"]
+const MeshIntegrityCheck = preload("res://qa/mesh_integrity_check.gd")
 
 
 ## `overrides` lets a family replace a rule of the plan or furnishing check
@@ -50,6 +51,8 @@ func check(plan: HousePlan, builder: HouseBuilder, overrides: Dictionary = {}) -
 	if builder != null:
 		failures.append_array(check_interior_details(plan, builder))
 		failures.append_array(check_exterior_geometry(plan, builder))
+		if builder.emitted_mesh != null:
+			failures.append_array(MeshIntegrityCheck.check(builder.emitted_mesh, "HouseBuilder"))
 		for f2 in _check_shell(plan, builder):
 			failures.append(f2)
 		for f3 in _check_vertical_shell(plan, builder):
