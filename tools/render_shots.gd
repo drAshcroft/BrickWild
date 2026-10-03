@@ -104,6 +104,11 @@ void fragment() {
 
 
 func _init() -> void:
+	# Derived render scripts reuse this stage and its camera helpers. GDScript
+	# runs this initializer for them too, so only the directly selected script
+	# may launch the reference batch.
+	if not _is_direct_render_shots_invocation():
+		return
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	_build_stage()
 	await process_frame
@@ -273,6 +278,19 @@ func _init() -> void:
 	f.close()
 	print("wrote %d images to %s" % [manifest.size(), OUT_DIR])
 	quit()
+
+
+func _is_direct_render_shots_invocation() -> bool:
+	var args := OS.get_cmdline_args()
+	for i in range(args.size() - 1):
+		if args[i] not in ["--script", "-s"]:
+			continue
+		var selected_script := String(args[i + 1]).replace("\\", "/")
+		while selected_script.begins_with("./"):
+			selected_script = selected_script.substr(2)
+		return selected_script in ["res://tools/render_shots.gd", "tools/render_shots.gd"] \
+			or selected_script.ends_with("/tools/render_shots.gd")
+	return false
 
 
 ## The four blueprint references used by VIS-010, without rendering the full
