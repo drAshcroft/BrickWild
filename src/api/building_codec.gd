@@ -45,8 +45,8 @@ static func encode(value: Variant) -> Variant:
 
 
 const CLASSES := ["BuildingRequest", "HouseSpec", "ShopSpec", "HotelSpec",
-	"ChurchSpec", "CastleSpec", "TempleSpec", "TimberHallSpec", "VillageSpec",
-	"InsulaSpec", "HousePlan", "VillagePlan"]
+	"ChurchSpec", "CastleSpec", "TempleSpec", "WindmillSpec", "TimberHallSpec",
+	"VillageSpec", "InsulaSpec", "HousePlan", "VillagePlan"]
 
 
 func decode(value: Variant, depth := 0) -> Variant:
@@ -88,6 +88,7 @@ func decode(value: Variant, depth := 0) -> Variant:
 		"ChurchSpec": object = ChurchSpec.new(0)
 		"CastleSpec": object = CastleSpec.new(0)
 		"TempleSpec": object = TempleSpec.new(0)
+		"WindmillSpec": object = WindmillSpec.new(0)
 		"TimberHallSpec": object = TimberHallSpec.new()
 		"InsulaSpec": object = InsulaSpec.new(0)
 		"VillageSpec": object = VillageSpec.new(0)

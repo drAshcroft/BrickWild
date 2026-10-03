@@ -51,6 +51,8 @@ extends RefCounted
 ##  31 bridge    - the bridge family: four kinds, four mechanisms, ten rules
 ##  32 rich      - the rich house: the ornament vocabulary, and the rules that
 ##                  say a tall cottage is not one of them (HOUSE-RICH)
+##  33 windmill - the five mills, every one of them, against twelve rules
+##                  (post, tower, smock, farm windpump, Dutch polder mill)
 const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cmotteaccess", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "cwater", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "hrich", "harchetype", "court",
@@ -58,12 +60,12 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
 	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001", "wld002", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld014", "wld015", "wld016", "wld017", "wld018", "wld019",
-	"tree", "bridge"]
+	"tree", "bridge", "windmill"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["library", "placement", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
+	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -135,7 +137,8 @@ const LANES: Dictionary = {
 	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "matkit"],
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
-	"lane:api": ["libraryquick", "placementquick", "poly"],
+	"lane:windmill": ["windmill"],
+	"lane:api": ["libraryquick", "placementquick", "poly", "windmill"],
 	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "interior", "cvoxelqa", "library", "placement"],
 	"lane:sweep": ORDER,
 }
@@ -242,6 +245,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return load("res://tests/suites/castle_motte_access_suite.gd").run()
 		"cmotteroute":
 			return load("res://tests/suites/castle_motte_route_suite.gd").run()
+		"cridgeoccupancy":
+			return load("res://tests/suites/castle_ridge_occupancy_suite.gd").run()
 		"coccupancy":
 			return load("res://tests/suites/castle_occupancy_suite.gd").run()
 		"cforms":
@@ -493,6 +498,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/tree_suite.gd").run()
 		"bridge":
 			return preload("res://tests/suites/bridge_suite.gd").run()
+		"windmill":
+			return preload("res://tests/suites/windmill_suite.gd").run()
 	return null
 
 

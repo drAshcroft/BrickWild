@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BrickWild — The October Commission</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --ink: #e9e3d4; --dim: #a59c88; --bg: #0d0b10; --panel: #17141c;
+    --edge: #2c2633; --pump: #e8892b; --moss: #6f8a4a; --blood: #b3322d;
+    --ghost: #9fd3c7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: radial-gradient(ellipse at 50% -10%, #2a2140 0%, var(--bg) 60%);
+    color: var(--ink); font: 16px/1.55 Georgia, "Times New Roman", serif;
+  }
+  main { max-width: 1060px; margin: 0 auto; padding: 0 22px 80px; }
+  header { text-align: center; padding: 64px 0 24px; }
+  header h1 {
+    font-size: 54px; margin: 0; letter-spacing: 2px; font-variant: small-caps;
+    color: var(--pump); text-shadow: 0 0 18px rgba(232,137,43,.35);
+  }
+  header p { color: var(--dim); font-style: italic; margin: 8px 0 0; }
+  h2 {
+    font-variant: small-caps; letter-spacing: 1px; color: var(--pump);
+    border-bottom: 1px solid var(--edge); padding-bottom: 6px; margin-top: 56px;
+  }
+  h3 { margin: 0 0 6px; color: var(--ghost); font-variant: small-caps; }
+  code { font: 13px Consolas, monospace; background: #221d28; padding: 1px 5px; border-radius: 3px; color: #f0c98f; }
+  .lede { font-size: 19px; }
+  .panel { background: var(--panel); border: 1px solid var(--edge); border-radius: 8px; padding: 18px 20px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (max-width: 860px) { .grid3, .grid2 { grid-template-columns: 1fr; } }
+  .card ul { padding-left: 18px; margin: 8px 0 0; }
+  .card li { margin: 3px 0; }
+  .tag { display: inline-block; font: 12px Consolas, monospace; padding: 1px 7px; border-radius: 10px;
+    border: 1px solid var(--edge); color: var(--dim); margin-right: 4px; }
+  .tag.new { color: var(--pump); border-color: #6b4318; }
+  .tag.have { color: var(--moss); border-color: #3b4a26; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--edge); vertical-align: top; }
+  th { color: var(--dim); font-weight: normal; font-variant: small-caps; }
+  .keep { color: var(--ghost); } .relax { color: var(--pump); } .newc { color: #d6a8ff; }
+  /* the decay demo */
+  #stage { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--edge); }
+  .controls { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .controls label { color: var(--dim); }
+  input[type=range] { width: 320px; accent-color: var(--pump); }
+  button { background: #221d28; color: var(--ink); border: 1px solid var(--edge); border-radius: 6px;
+    padding: 6px 12px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--pump); }
+  #stageName { font-size: 22px; color: var(--pump); font-variant: small-caps; min-width: 140px; }
+  #stageNote { color: var(--dim); font-style: italic; }
+  .ladder { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 14px; font-size: 13px; }
+  .ladder div { background: #120f16; border: 1px solid var(--edge); border-radius: 6px; padding: 8px; }
+  .ladder b { color: var(--ghost); display: block; font-variant: small-caps; }
+  .lord svg { width: 100%; height: 150px; display: block; background: linear-gradient(#1b0f14, #2a1418); border-radius: 6px; }
+  .phase { border-left: 3px solid var(--pump); padding: 4px 0 4px 16px; margin: 18px 0; }
+  .phase h3 { color: var(--ink); }
+  .task { display: grid; grid-template-columns: 92px 1fr 150px; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--edge); }
+  .task .id { font: 13px Consolas, monospace; color: var(--pump); }
+  .task .lane { font: 12px Consolas, monospace; color: var(--dim); text-align: right; }
+  .pump { margin-top: 60px; text-align: center; color: var(--dim); font-style: italic; }
+  .q li { margin: 10px 0; }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>The October Commission</h1>
+  <p>Decaying buildings, haunted mansions and the castles of dark lords — a proposal for BrickWild</p>
+</header>
+
+<p class="lede">
+  The proposal, in one sentence: <b>decay is a pass, not a style.</b> We do not write a
+  "ruined church" generator, a "ruined cottage" generator and a "ruined windmill" generator.
+  We write one seeded, logged decay pass that every family can run on its own plan.
+  Then we add the two showpieces that decay alone cannot make: the <b>Hollow Manor</b>
+  (a Second Empire haunted mansion) and the <b>Dark Lord</b> castles.
+</p>
+<p>
+  You asked whether the mesh rules can be loosened. Yes, but carefully. A ruin may have
+  holes in it. A ruin may not have stones floating in the air. The rule is:
+  <b>every defect must be deliberate and must be written down.</b> The QA checks accept
+  a defect that is recorded in the decay log and fail one that is not. The details are
+  in <a href="#rules" style="color:var(--ghost)">the rules of a good ruin</a>.
+</p>
+
+<!-- ============================================================ DEMO -->
+<h2>The decay dial</h2>
+<p>
+  A toy version of the pass. Move the slider and the house goes through the six stages
+  real buildings go through, in the order they go through them. Damage starts where
+  water gets in, at the roof and the openings, and the walls go last. The seed fixes
+  <i>which</i> slates fall. The dial only sets <i>how many</i>.
+</p>
+<div class="panel">
+  <svg id="stage" viewBox="0 0 900 460" aria-label="Decay demonstration"></svg>
+  <div class="controls">
+    <label for="decay">decay</label>
+    <input id="decay" type="range" min="0" max="100" value="38">
+    <span id="stageName">Derelict</span>
+    <button id="reseed">new seed</button>
+    <span id="seedLbl" style="font:13px Consolas,monospace;color:var(--dim)"></span>
+  </div>
+  <div class="controls">
+    <label for="jank">jank</label>
+    <input id="jank" type="range" min="0" max="100" value="0">
+    <span id="jankName" style="font-size:22px;color:var(--ghost);font-variant:small-caps;min-width:140px">plumb</span>
+    <span style="color:var(--dim);font-style:italic">The fourth family. It is independent of decay: a crooked house can be brand new.</span>
+  </div>
+  <p id="stageNote"></p>
+  <div class="ladder">
+    <div><b>0 · Sound</b>Byte-identical to today's house. Fingerprint proves it.</div>
+    <div><b>.2 · Neglected</b>Grime, cracked panes, a shutter hanging off one hinge.</div>
+    <div><b>.4 · Derelict</b>Boarded windows, missing slates, a sagging ridge, ivy.</div>
+    <div><b>.6 · Ruinous</b>Roof bays open to the sky, chimney leaning, porch fallen.</div>
+    <div><b>.8 · Shell</b>Roofless. Gables standing. Wall tops broken. Rubble.</div>
+    <div><b>1 · Stump</b>Walls to waist height, all that is left.</div>
+  </div>
+</div>
+
+<!-- ============================================================ FAMILIES -->
+<h2>Three families of dread</h2>
+<div class="grid3">
+  <div class="panel card">
+    <h3>I. The Decrepit</h3>
+    <span class="tag new">decay pass</span><span class="tag have">every kind</span>
+    <p>Any existing building, aged. The cheapest of the three, and it gives us the most buildings.</p>
+    <ul>
+      <li><b>Abandoned cottage</b>: boarded up, the roof caved in, the chimney still standing.</li>
+      <li><b>Ruined abbey</b>: a roofless nave with the gable walls standing and empty tracery, like Tintern.</li>
+      <li><b>Dead windmill</b>: the new windmill family with two sails snapped off.</li>
+      <li><b>Broken bridge</b>: the middle span collapsed into the river.</li>
+      <li><b>Slighted castle</b>: breached curtain walls, roofless towers, crenellations with gaps.</li>
+    </ul>
+  </div>
+  <div class="panel card">
+    <h3>II. The Hollow Manor</h3>
+    <span class="tag new">mansard</span><span class="tag new">turret</span><span class="tag have">rich house</span>
+    <p>The Psycho house and the Addams house: a new house <i>style</i> built on the rich-house ornament, plus two new roof pieces.</p>
+    <ul>
+      <li>A <b>mansard roof</b> with iron cresting and a widow's walk.</li>
+      <li>A <b>corner turret</b> with a candle-snuffer roof.</li>
+      <li>A wraparound porch that sags, a bay window, and tall narrow sashes.</li>
+      <li>Exactly <b>one lit window</b>, in the attic. Never more than one.</li>
+      <li>Inside: a portrait gallery, a library, a ballroom with a chandelier, furniture under dust sheets, cobwebs in the ceiling corners.</li>
+    </ul>
+  </div>
+  <div class="panel card">
+    <h3>III. The Dark Lords</h3>
+    <span class="tag have">style: dark</span><span class="tag new">4 variants</span>
+    <p>The <code>dark</code> castle already exists: a ridge plan with one spire keep. It needs a palette, some lights and three companions.</p>
+    <ul>
+      <li>Black basalt with red-lit arrow slits that glow against the walls.</li>
+      <li>A lava moat: the moat skin, coloured orange and emissive.</li>
+      <li><code>spike</code> merlons (they already exist), braziers, a skull keystone, tattered banners.</li>
+      <li>A portcullis with teeth. A road lined with pikes.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="panel card" style="margin-top:16px">
+  <h3>IV. The Crooked</h3>
+  <span class="tag new">slice warp</span><span class="tag have">every kind</span><span class="tag new">jank</span>
+  <p>Deliberately janky buildings, with walls that are angled on purpose: Burton, Seuss, <i>Caligari</i>, the Crooked House at Sopot.
+    It is the second dial on the drawing above, and it does not depend on decay. A crooked house can be brand new.</p>
+  <div class="grid2">
+    <ul>
+      <li><b>One affine per floor line.</b> Each storey has a 2D shear, twist and flare. It is linear between floor lines,
+        so the walls kink at every floor. That gives the angular look rather than a melted one.</li>
+      <li><b>Floors stay level.</b> The warp only moves things sideways at a given height. The planner, furnisher and walker
+        all work on a level floor, so they run unmodified, and props keep standing upright.</li>
+      <li><b>It cannot tear.</b> A continuous map keeps a closed shell closed and every part attached. That is why the mesh rules
+        hardly need relaxing here.</li>
+    </ul>
+    <ul>
+      <li><b>Per-mass warps</b> come later. Every tower in a castle bends its own way, chimneys corkscrew,
+        and the tips of witch-hat roofs curl.</li>
+      <li><b>Presets:</b> the Seuss stack (each storey smaller and turned), the Burton tower (thin, tall, kinked twice),
+        and the sinking cottage (it leans one way only, as if the ground had given).</li>
+      <li>It works with decay. A crooked house that is falling down is the best kind.</li>
+    </ul>
+  </div>
+</div>
+
+<h3 style="margin-top:28px">The four dark lords</h3>
+<div class="grid2 lord" id="lords"></div>
+
+<!-- ============================================================ RULES -->
+<h2 id="rules">The rules of a good ruin</h2>
+<p>
+  We are loosening the mesh requirements. We are not removing them. A defect that was
+  chosen looks decrepit. A defect that was not chosen looks like a bug, and in October
+  players will notice the difference. Every decay operation writes one row to a new
+  <code>decay_log</code> (the cause, the part, the triangles removed or moved). Each check
+  then reads that log in the same way the furnishing check already treats a recorded
+  removal: as a warning, not a failure.
+</p>
+<table>
+  <tr><th>Rule</th><th>Status</th><th>Why</th></tr>
+  <tr><td>Watertight shell / closed roof coverage</td><td class="relax">relaxed: if logged</td><td>Holes in the roof are what we are making.</td></tr>
+  <tr><td>Exact <code>component_log</code> triangle match</td><td class="relax">relaxed: after applying the log</td><td>A moved slate is logged as moved, not as vanished. <code>component_check</code> replays the decay log before it compares.</td></tr>
+  <tr><td>Plumb walls, straight ridges</td><td class="relax">relaxed: lean ≤ 6°, sag ≤ span/40</td><td>A crooked chimney looks old. A wall leaning at 30° looks broken.</td></tr>
+  <tr><td>Window inserts, glazing, facade bands</td><td class="relax">relaxed</td><td>Broken and boarded windows are part of the look.</td></tr>
+  <tr><td>Furnishing programme complete</td><td class="relax">relaxed</td><td>An abandoned house may have lost its bed. It must not have a bed in a wall.</td></tr>
+  <tr><td>Crooked warp never inverts a face</td><td class="keep">kept</td><td>The determinant of each storey's affine must stay positive, normals are recomputed per face after the warp, and the lean is capped at 12°.</td></tr>
+  <tr><td>Furniture against a leaning wall</td><td class="newc">new</td><td>Clearance is measured against the warped wall, not the plumb plan. A wardrobe must not push its top through a wall that leans in.</td></tr>
+  <tr><td>Face winding / outward normals</td><td class="keep">kept</td><td>An inside-out face does not look rotten. It looks like a rendering bug.</td></tr>
+  <tr><td>No floating parts</td><td class="keep">kept</td><td>A broken thing falls down. A shutter hangs from its hinge. Rubble lies on the ground.</td></tr>
+  <tr><td>Door-to-every-room walkability</td><td class="keep">kept</td><td>A haunted house is somewhere players go. The rubble must leave a route through.</td></tr>
+  <tr><td>Decay 0 is byte-identical</td><td class="keep">kept</td><td><code>fingerprint_houses.gd</code> diff. The pass draws from its own seeded stream, so the building underneath does not change.</td></tr>
+  <tr><td>Rubble conservation</td><td class="newc">new</td><td>Stone removed from a breach has to go somewhere. There is rubble at the foot of the wall, roughly 30–100% of the removed volume.</td></tr>
+  <tr><td>Decay order</td><td class="newc">new</td><td>The roof fails before the walls, and wall tops before wall bases. A roofless house with intact window glass is wrong.</td></tr>
+  <tr><td>Silhouette reads at distance</td><td class="newc">new: human QA</td><td>A <code>spooky</code> column on the walk-QA rating page. You decide, not a threshold.</td></tr>
+</table>
+
+<!-- ============================================================ ARCH -->
+<h2>How it is built</h2>
+<div class="grid2">
+  <div class="panel">
+    <h3>Decay on the plan, then on the mesh</h3>
+    <p>There are two layers, and most of the work belongs to the first:</p>
+    <ol>
+      <li><b>Plan-level</b> (before the build): which roof bays exist, which floors have fallen,
+        which windows are boarded, which merlons are gone, where breaches cut. The builders then
+        emit coherent geometry for a ruined plan. This keeps every log true without exceptions.</li>
+      <li><b>Mesh-level</b> (after the build): vertex-colour grime, moss on surfaces that face up or north,
+        soot above openings, ridge sag, ivy sheets, cobwebs, rubble cones. Each of these
+        is logged.</li>
+    </ol>
+    <p>The entry point is <code>core/decay/</code>: a <code>DecaySpec</code> (amount, age profile,
+      climate) and a <code>DecayPass</code> with one adapter per family. The pass seeds
+      from <code>hash("decay|kind|seed")</code>, so it never disturbs the parent stream.</p>
+  </div>
+  <div class="panel">
+    <h3>API shape</h3>
+    <p>Recommended: decay becomes a <b>request field</b> that every kind accepts, so it is not one more style to sweep.</p>
+    <p><code>BuildingRequest.decay = 0.6</code><br>
+       <code>BrickWild.generate(&amp;"church", seed, {decay = 0.8})</code></p>
+    <p>The Hollow Manor is a house <b>style</b>, the same way <code>rich</code> is, so the planner,
+      furnisher and walker are used unmodified. One warning, from the rich-house notes:
+      a new entry in <code>HouseSpec.STYLES</code> is added to every house sweep automatically.
+      That is free coverage, but it adds to sweep time.</p>
+    <p>The dark-lord variants are <code>dark</code> sub-plans chosen by seed: <code>needle</code> (today's),
+      <code>crag</code>, <code>sunken</code>, <code>floating</code> (the existing sky plan, chained to the ground).</p>
+  </div>
+</div>
+
+<!-- ============================================================ ASSETS -->
+<h2>What we already own</h2>
+<table>
+  <tr><th>Pack</th><th>Useful for</th><th>Licence / state</th></tr>
+  <tr><td><b>Mansion Pack</b> (Greenworks, 1.1 GB)</td><td>Balconies, chimneys, iron fence and gate, ivy, lamp posts, doors and knobs, marble, coffee tables, ceilings</td>
+      <td>Unity Asset Store EULA. <b>Building guide only.</b> Extracted outside the repo, to <code>C:\Projectsuilding_guides\</code>, to study proportions and details. Not one file enters BrickWild.</td></tr>
+  <tr><td><b>Mysterious Mansion – Level</b> (Seta, 545 MB)</td><td>A whole spooky mansion level: lamps, interior set dressing. Useful as a reference for mood and as a prop source.</td>
+      <td>Unity Asset Store EULA. Building guide only, like the Mansion Pack.</td></tr>
+  <tr><td><b>Quaternius Dungeon Kit</b> (in repo)</td><td><code>Wall_Broken</code>, <code>Pot*_Broken</code>, <code>Skull</code>, <code>Candles</code>, <code>Flag_GothicArch</code>, <code>BearTrap</code>, <code>Trapdoor</code>, <code>Torch</code></td><td>CC0. Already imported and catalogued.</td></tr>
+  <tr><td><b>Fantasy Props MegaKit</b> (in repo)</td><td><code>Chandelier</code>, <code>Cauldron</code>, <code>Cage_Small</code>, <code>CandleStick_Triple</code>, <code>Chain_Coil</code>, <code>Vase_Rubble</code>, banners</td><td>CC0. Already imported.</td></tr>
+  <tr><td>Modular Medieval Lanterns</td><td>Gate lanterns, hanging lamps for the manor drive</td><td>Unity EULA. Cached.</td></tr>
+  <tr><td>Sonniss GDC audio</td><td>Creaks and wind for the walk-QA rig (optional)</td><td>Royalty-free. No AI training.</td></tr>
+</table>
+<p style="color:var(--dim)">Decided: the two mansion packs are <b>references</b>. We measure them (eave heights, turret
+  proportions, cresting, porch spans) and write those down as numbers in the generator. Their meshes and textures are not
+  part of this project, not even gitignored. Every prop the haunted buildings place comes from the CC0 kits already here.</p>
+
+<!-- ============================================================ PLAN -->
+<h2>The work, in order</h2>
+
+<div class="phase">
+  <h3>Phase 0 — See it at night first</h3>
+  <div class="task"><span class="id">HNT-000</span><span>Night render preset: moonlight, volumetric fog, emissive windows. Baseline shots of the current <code>dark</code> castle, <code>witch_hut</code> and <code>rich</code> house, so we know where we are starting from.</span><span class="lane">render_shots</span></div>
+</div>
+
+<div class="phase">
+  <h3>Phase 1 — The decay pass</h3>
+  <div class="task"><span class="id">HNT-001</span><span><code>DecaySpec</code>, <code>decay_log</code>, own RNG stream, request field. Proof: decay 0 gives a fingerprint diff of zero.</span><span class="lane">fingerprint, lane:api</span></div>
+  <div class="task"><span class="id">HNT-002</span><span>House shell decay: roof bays opened with the rafters showing, ridge sag, broken and boarded windows, shutters askew, leaning chimney, collapsed porch.</span><span class="lane">lane:geom, hcomponent</span></div>
+  <div class="task"><span class="id">HNT-003</span><span>Masonry decay: jagged wall tops, missing merlons, breaches with rubble cones, roofless towers, the ruined-abbey nave.</span><span class="lane">castle-change, church-change</span></div>
+  <div class="task"><span class="id">HNT-004</span><span>Surface age: grime, moss, soot, ivy sheets, cobwebs in interior corners, dust sheets over furniture.</span><span class="lane">lane:geom</span></div>
+  <div class="task"><span class="id">HNT-005</span><span>Ruin QA: checks read the log, plus the new rules (no floaters, rubble conservation, decay order, still walkable). Proof that it is not a tautology: a faulty fixture that leaves a slate floating must fail.</span><span class="lane">new lane:haunt</span></div>
+</div>
+
+<div class="phase">
+  <h3>Phase 1½ — The Crooked <span class="tag have">040–041 built, branch haunt/core</span></h3>
+  <p style="color:var(--dim);margin:4px 0 8px">Built first after all, because it is the smaller job and decay will use the same post-build slot.
+    <code>lane:haunt</code>: 2085 checks in 92 s. Plumb on the left, crooked on the right, same seed, same camera:
+    <a href="crooked_sheet.jpg" style="color:var(--ghost)">contact sheet</a>.</p>
+  <div class="task"><span class="id">HNT-040 ✓</span><span><code>SliceWarp</code>: affine keys per floor line, applied to the emitted mesh and to every prop transform. Normals are recomputed per face. Request field <code>jank</code>. Proof: jank 0 gives a fingerprint diff of zero.</span><span class="lane">fingerprint, lane:geom</span></div>
+  <div class="task"><span class="id">HNT-041 ✓</span><span>Crooked QA: positive determinant, lean cap, furniture clearance measured against the warped wall, doors still open. A faulty fixture with a 40° lean must fail.</span><span class="lane">lane:haunt</span></div>
+  <div class="task"><span class="id">HNT-042</span><span>Per-mass warps: each tower bends its own way, chimneys corkscrew, witch-hat tips curl.</span><span class="lane">castle-change, church-change</span></div>
+  <div class="task"><span class="id">HNT-043</span><span>Presets: the Seuss stack, the Burton tower, the sinking cottage.</span><span class="lane">lane:haunt</span></div>
+</div>
+
+<div class="phase">
+  <h3>Phase 2 — The Hollow Manor</h3>
+  <div class="task"><span class="id">HNT-010</span><span>Mansard roof (steep lower slope, shallow upper), iron cresting, widow's walk.</span><span class="lane">roofquick, lane:geom</span></div>
+  <div class="task"><span class="id">HNT-011</span><span>Corner turret: round or octagonal, candle-snuffer cone, joined to the roof planes.</span><span class="lane">lane:geom, hcomponent</span></div>
+  <div class="task"><span class="id">HNT-012</span><span><code>gothic</code> house style: proportions, palette, wraparound porch, one lit attic window; haunted room programme (gallery, library, ballroom).</span><span class="lane">lane:house-plan-fast</span></div>
+  <div class="task"><span class="id">HNT-013</span><span>Mansion guide sheet: the two packs extracted outside the repo, measured, and the proportions written into the <code>gothic</code> style row with their sources noted.</span><span class="lane">none (reference)</span></div>
+</div>
+
+<div class="phase">
+  <h3>Phase 3 — The Dark Lords</h3>
+  <div class="task"><span class="id">HNT-020</span><span>Dread palette: basalt, red emissive slits, lava moat skin.</span><span class="lane">castle-change</span></div>
+  <div class="task"><span class="id">HNT-021</span><span>Three new sub-plans: <code>crag</code> (Dracula on a pinnacle), <code>sunken</code> (necromancer, flooded ward), <code>floating</code> (lich: the sky plan with anchor chains).</span><span class="lane">castle-change</span></div>
+  <div class="task"><span class="id">HNT-022</span><span>Dressing: braziers, skull keystone, tattered banners, portcullis teeth, a road of pikes.</span><span class="lane">dressingquick</span></div>
+</div>
+
+<div class="phase">
+  <h3>Phase 4 — The October set</h3>
+  <div class="task"><span class="id">HNT-030</span><span>Graveyard kit: headstones, mausoleums (a tiny temple), iron fence, lychgate.</span><span class="lane">lane:temple</span></div>
+  <div class="task"><span class="id">HNT-031</span><span>Village form <code>hollow</code>: the manor on the hill, a ruined church with its graveyard, derelict cottages, one dead mill.</span><span class="lane">lane:village-fast</span></div>
+  <div class="task"><span class="id">HNT-032</span><span>Walk-QA night mode: a lantern for the player, creaks on the soundtrack, and a <code>spooky</code> column on the rating sheet.</span><span class="lane">human QA</span></div>
+  <div class="task"><span class="id">HNT-033</span><span>Calendar gallery: 31 seeds, one building for each night of October.</span><span class="lane">render_shots</span></div>
+</div>
+
+<!-- ============================================================ QUESTIONS -->
+<h2>Decided, 3 October</h2>
+<div class="panel">
+<ol class="q" style="margin:0">
+  <li><b>Decay and jank are request fields on every kind.</b> They are not styles, so they never multiply the sweeps.</li>
+  <li><b>PG-13.</b> Skulls, chains and empty pikes, and nothing on the pikes.</li>
+  <li><b>Order:</b> the Crooked (done), then the decay pass, then the Hollow Manor, then the Dark Lords as the finale.</li>
+  <li><b>Mansion packs are guides, not assets.</b> We extract them outside the repo, study them and take numbers from them. We take no files.</li>
+  <li><b>Deliberate jank is in:</b> walls angled on purpose, kinked at the floor lines.</li>
+</ol>
+</div>
+
+<p class="pump">
+  Drafted by Mr Pump. Golems do not haunt things. We are, however, very good at standing
+  in dark corridors without moving, and we offer this experience in a consulting capacity.
+</p>
+</main>
+
+<script>
+// ---------------------------------------------------------------- seeded rng
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+let SEED = 8102;
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("stage");
+let TARGET = svg;   // where el() puts things: the sky, or the house that gets warped
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  (parent || TARGET).appendChild(e); return e;
+}
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+// how far through a band of the dial: 0 before lo, 1 after hi
+const band = (d, lo, hi) => clamp((d - lo) / (hi - lo), 0, 1);
+
+const STAGES = [
+  [0.00, "Sound", "As built. The same vertices as today's generator."],
+  [0.12, "Neglected", "Grime from the ground up. The first panes crack, and one shutter hangs off a hinge."],
+  [0.32, "Derelict", "The ground floor is boarded up, slates are missing, the ridge sags and the ivy is climbing."],
+  [0.52, "Ruinous", "Roof bays are open to the sky and the rafters show. The chimney leans and the porch has fallen."],
+  [0.72, "Shell", "The roof is gone. The gables are still standing, the wall tops are broken and the rubble is at their feet."],
+  [0.92, "Stump", "Walls at waist height. All that is left is the plan."],
+];
+
+const JANK = [
+  [0.00, "plumb"], [0.15, "askew"], [0.45, "crooked"], [0.75, "Caligari"],
+];
+
+// The crooked warp: every storey is sheared on its own, and the shear is
+// continuous at the floor lines, so the house leans one way, then the other,
+// with a kink at each floor. Floors stay level. Nothing tears. It has its own
+// seed stream, so the decay above is the same house whatever the jank.
+function crooked(house, defs, ground, knots) {
+  const j = document.getElementById("jank").value / 100;
+  document.getElementById("jankName").textContent = JANK.filter(k => j >= k[0]).pop()[1];
+  const JR = rng(SEED ^ 0x5eed);
+  let lean = JR() < 0.5 ? 1 : -1, ybot = ground, off = 0;
+  for (let i = 0; i < knots.length; i++) {
+    const ytop = knots[i];
+    // the roof band leans hardest; the ground floor least
+    const s = j * lean * (0.06 + 0.16 * JR() + 0.08 * i);
+    const clip = el("clipPath", {id: "band" + i}, defs);
+    el("rect", {x: -300, y: ytop - 0.6, width: 1500, height: ybot - ytop + 1.2}, clip);
+    el("use", {href: "#house", "clip-path": `url(#band${i})`,
+      transform: `translate(${off + s * ybot} 0) matrix(1 0 ${-s} 1 0 0)`});
+    off += s * (ybot - ytop);
+    ybot = ytop;
+    if (JR() < 0.75) lean = -lean;
+  }
+}
+
+function draw() {
+  const d = document.getElementById("decay").value / 100;
+  const st = STAGES.filter(s => d >= s[0]).pop();
+  document.getElementById("stageName").textContent = st[1];
+  document.getElementById("stageNote").textContent = st[2];
+  document.getElementById("seedLbl").textContent = "seed " + SEED;
+  svg.innerHTML = "";
+  const R = rng(SEED);
+
+  // sky, moon, distant hills
+  const defs = el("defs", {});
+  const sky = el("linearGradient", {id: "sky", x1: 0, y1: 0, x2: 0, y2: 1}, defs);
+  el("stop", {offset: "0", "stop-color": "#151227"}, sky);
+  el("stop", {offset: "1", "stop-color": "#3a2b3f"}, sky);
+  const grime = el("linearGradient", {id: "grime", x1: 0, y1: 1, x2: 0, y2: 0}, defs);
+  el("stop", {offset: "0", "stop-color": "#1b1a10", "stop-opacity": 0.85}, grime);
+  el("stop", {offset: "1", "stop-color": "#1b1a10", "stop-opacity": 0}, grime);
+  const glow = el("radialGradient", {id: "glow"}, defs);
+  el("stop", {offset: "0", "stop-color": "#ffd27a", "stop-opacity": 0.9}, glow);
+  el("stop", {offset: "1", "stop-color": "#ffd27a", "stop-opacity": 0}, glow);
+  el("rect", {x: 0, y: 0, width: 900, height: 460, fill: "url(#sky)"});
+  el("circle", {cx: 760, cy: 80, r: 44, fill: "#efe6c8", opacity: 0.92});
+  el("circle", {cx: 742, cy: 70, r: 44, fill: "#1d172d", opacity: 0.25});
+  for (let i = 0; i < 40; i++) el("circle", {cx: R() * 900, cy: R() * 180, r: R() * 1.2 + 0.3, fill: "#fff", opacity: 0.5});
+  el("path", {d: "M0 380 Q150 330 300 360 T620 350 T900 340 V460 H0Z", fill: "#1a1520"});
+
+  // geometry of the house
+  const X0 = 250, X1 = 610, GROUND = 400, EAVE = 220, MANS_TOP = 150;
+  const wallTop = lerp(EAVE, GROUND - 60, band(d, 0.9, 1.0));   // stump stage lowers walls
+  const C_WALL = "#5d5566", C_TRIM = "#2b2530", C_ROOF = "#2f3340";
+
+  // the house is drawn once into a group, then shown through warped bands
+  const house = el("g", {id: "house"}, defs);
+  TARGET = house;
+
+  // tower (left), behind the main block
+  const TX0 = 200, TX1 = 270, TTOP = lerp(130, wallTop + 20, band(d, 0.75, 1.0));
+  el("rect", {x: TX0, y: TTOP, width: TX1 - TX0, height: GROUND - TTOP, fill: C_WALL, stroke: C_TRIM});
+  if (d < 0.7) {
+    // candle-snuffer roof, losing slates then its point
+    const apex = lerp(40, 100, band(d, 0.45, 0.7));
+    el("path", {d: `M${TX0 - 8} ${TTOP} L${(TX0 + TX1) / 2} ${apex} L${TX1 + 8} ${TTOP}Z`, fill: C_ROOF, stroke: C_TRIM});
+    if (d > 0.45) el("path", {d: `M${(TX0 + TX1) / 2 - 6} ${apex + 6} l12 18 l-9 6 Z`, fill: "#151227"});
+  } else {
+    // jagged top
+    let p = `M${TX0} ${TTOP}`;
+    for (let x = TX0; x <= TX1; x += 10) p += ` L${x} ${TTOP - R() * 14}`;
+    el("path", {d: p + ` L${TX1} ${TTOP + 2}Z`, fill: C_WALL, stroke: C_TRIM});
+  }
+
+  // main block
+  el("rect", {x: X0, y: wallTop, width: X1 - X0, height: GROUND - wallTop, fill: C_WALL, stroke: C_TRIM, "stroke-width": 2});
+
+  // mansard roof: tiles drop out, then bays open, then it goes
+  const roofGone = band(d, 0.6, 0.78);
+  if (d < 0.78) {
+    const rows = 6, cols = 18;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const y0 = lerp(EAVE, MANS_TOP, r / rows), y1 = lerp(EAVE, MANS_TOP, (r + 1) / rows);
+      const inset0 = lerp(0, 22, r / rows), inset1 = lerp(0, 22, (r + 1) / rows);
+      const w0 = (X1 - X0 + 20 - 2 * inset0) / cols, w1 = (X1 - X0 + 20 - 2 * inset1) / cols;
+      const ax = X0 - 10 + inset0 + c * w0, bx = X0 - 10 + inset1 + c * w1;
+      const sag = Math.sin(Math.PI * (c + 0.5) / cols) * 10 * band(d, 0.25, 0.6);
+      const roll = R();
+      // missing slate: higher rows and the middle go first (water pools in the sag)
+      const weak = 0.55 * (r / rows) + 0.45 * Math.sin(Math.PI * (c + 0.5) / cols);
+      const gone = roll < band(d, 0.22, 0.75) * (0.4 + weak) || roofGone * 1.2 > roll + 0.1;
+      if (gone) {
+        // rafters stay a little longer than the slates
+        if (roll > roofGone) el("line", {x1: ax + w0 / 2, y1: y0 + sag, x2: bx + w1 / 2, y2: y1 + sag, stroke: "#3b2d22", "stroke-width": 2});
+        continue;
+      }
+      el("path", {d: `M${ax} ${y0 + sag} L${ax + w0} ${y0 + sag} L${bx + w1} ${y1 + sag} L${bx} ${y1 + sag}Z`,
+        fill: C_ROOF, stroke: "#20232c", "stroke-width": 0.7});
+    }
+    // iron cresting on the flat
+    if (d < 0.5) for (let x = X0 + 14; x < X1 - 10; x += 9)
+      el("path", {d: `M${x} ${MANS_TOP} v-10 m-3 3 l3 -5 l3 5`, stroke: "#111", fill: "none", "stroke-width": 1.2});
+  }
+
+  // chimney: leans, then falls
+  if (d < 0.72) {   // it stands on the roof, so it goes when the roof goes
+    const lean = band(d, 0.3, 0.7) * 7, cx = 540;
+    const g = el("g", {transform: `rotate(${lean} ${cx} ${MANS_TOP + 8})`});
+    el("rect", {x: cx - 12, y: MANS_TOP - 62, width: 24, height: 70, fill: "#4a3e3c", stroke: C_TRIM}, g);
+    el("rect", {x: cx - 16, y: MANS_TOP - 66, width: 32, height: 7, fill: "#3a302f"}, g);
+  }
+
+  // gable shells after the roof goes
+  if (d >= 0.72 && d < 0.92) {
+    let p = `M${X0} ${wallTop}`;
+    for (let x = X0; x <= X1; x += 12) p += ` L${x} ${wallTop - 6 - R() * 20 * band(d, 0.72, 0.9)}`;
+    el("path", {d: p + ` L${X1} ${wallTop}Z`, fill: C_WALL});
+    el("path", {d: `M${X0} ${wallTop} L${X0 + 30} ${wallTop - 70} L${X0 + 60} ${wallTop}Z`, fill: C_WALL, stroke: C_TRIM});
+  }
+
+  // windows: 2 floors x 5 bays, tall and narrow
+  const floors = wallTop < 300 ? [[240, 300], [320, 375]] : [[Math.max(wallTop + 8, 320), 375]];
+  let lit = false;
+  floors.forEach(([wy0, wy1], fi) => {
+    for (let b = 0; b < 5; b++) {
+      const wx = X0 + 30 + b * 66, ww = 26;
+      if (fi === floors.length - 1 && b === 2) {          // the front door
+        el("rect", {x: wx - 4, y: 318, width: 34, height: GROUND - 318, fill: "#1a1310", stroke: C_TRIM});
+        if (d > 0.35) el("path", {d: `M${wx - 4} 318 l34 ${GROUND - 318}`, stroke: "#5a4632", "stroke-width": 5});
+        continue;
+      }
+      if (wy1 - wy0 < 10) continue;
+      const roll = R();
+      const broken = roll < band(d, 0.1, 0.55);
+      el("rect", {x: wx, y: wy0, width: ww, height: wy1 - wy0, fill: broken ? "#0b0a0e" : "#34405a", stroke: C_TRIM, "stroke-width": 2});
+      if (!broken) { el("line", {x1: wx + ww / 2, y1: wy0, x2: wx + ww / 2, y2: wy1, stroke: C_TRIM}); continue; }
+      // jagged glass remains in the frame
+      el("path", {d: `M${wx} ${wy0} l${ww * 0.4} 0 l-${ww * 0.25} ${12 + R() * 14} Z`, fill: "#34405a", opacity: 0.8});
+      // boarded on the ground floor once derelict
+      if (fi === floors.length - 1 && d > 0.3 && d < 0.85)
+        for (let k = 0; k < 3; k++) el("rect", {x: wx - 4, y: wy0 + 8 + k * 16, width: ww + 8, height: 6, fill: "#6a5338",
+          transform: `rotate(${(R() - 0.5) * 18} ${wx + ww / 2} ${wy0 + 10 + k * 16})`});
+      // one shutter hangs by a hinge
+      if (b === 4 && fi === 0 && d > 0.1 && d < 0.8)
+        el("rect", {x: wx + ww, y: wy0, width: 12, height: wy1 - wy0, fill: "#3d3242",
+          transform: `rotate(${18 + 20 * band(d, 0.1, 0.5)} ${wx + ww} ${wy0})`});
+    }
+  });
+  // exactly one lit window, in the tower: never more than one
+  if (d < 0.75) {
+    el("circle", {cx: 235, cy: 205, r: 40, fill: "url(#glow)", opacity: 0.7});
+    el("rect", {x: 226, y: 190, width: 18, height: 30, fill: "#ffcf6a", stroke: C_TRIM});
+    lit = true;
+  }
+
+  // porch: posts lean, roof slips, then it is on the ground
+  const porchFall = band(d, 0.45, 0.65);
+  if (porchFall < 1) {
+    const g = el("g", {transform: `rotate(${porchFall * 9} ${X1 - 10} ${GROUND})`});
+    el("rect", {x: X0 - 10, y: 305, width: X1 - X0 + 20, height: 9, fill: "#3a3036"}, g);
+    for (let x = X0 - 5; x <= X1 + 5; x += 60) el("rect", {x: x, y: 314, width: 6, height: GROUND - 314, fill: "#4a3f45"}, g);
+  } else {
+    el("path", {d: `M${X0 - 20} ${GROUND} L${X0 + 120} ${GROUND - 14} L${X1 - 40} ${GROUND - 6} L${X1 + 20} ${GROUND}Z`, fill: "#3a3036"});
+  }
+
+  // grime rising from the ground
+  el("rect", {x: X0, y: wallTop, width: X1 - X0, height: GROUND - wallTop, fill: "url(#grime)", opacity: band(d, 0.05, 0.6)});
+
+  // ivy climbs the tower and the left wall
+  const ivyH = band(d, 0.2, 0.8) * 230;
+  for (let i = 0; i < ivyH / 2.2; i++) {
+    const y = GROUND - R() * ivyH, x = TX0 + R() * 95;
+    el("circle", {cx: x, cy: y, r: 3 + R() * 4, fill: R() < 0.5 ? "#3f5a2c" : "#55703a", opacity: 0.9});
+  }
+
+  // rubble at the foot: only after something has come down
+  const rub = band(d, 0.55, 1.0);
+  for (let i = 0; i < rub * 70; i++) {
+    const x = X0 - 40 + R() * (X1 - X0 + 80), s = 3 + R() * 8;
+    el("rect", {x: x, y: GROUND - s * 0.6 - R() * 6 * rub, width: s, height: s * 0.6, fill: R() < 0.5 ? "#4c4552" : "#5b5161",
+      transform: `rotate(${R() * 40 - 20} ${x} ${GROUND})`});
+  }
+
+  TARGET = svg;
+  crooked(house, defs, GROUND, [310, EAVE, MANS_TOP, 0]);
+
+  // fog and a dead tree
+  el("path", {d: "M700 400 l6 -120 l-30 -40 m30 40 l26 -50 m-20 82 l40 -24", stroke: "#0f0c12", "stroke-width": 7, fill: "none", "stroke-linecap": "round"});
+  el("rect", {x: 0, y: GROUND, width: 900, height: 60, fill: "#0d0b10"});
+  for (let i = 0; i < 6; i++) el("ellipse", {cx: R() * 900, cy: 395 + R() * 20, rx: 120 + R() * 80, ry: 10, fill: "#cfc7e0", opacity: 0.06});
+}
+
+// ---------------------------------------------------------------- the lords
+const LORDS = [
+  ["needle", "Today's dark ridge with a spire keep. It needs basalt, red slits and a beacon on the needle.",
+   "M20 150 L20 110 L60 110 L60 95 L90 95 L90 110 L130 110 L130 60 L140 60 L150 8 L160 60 L170 60 L170 110 L210 110 L210 90 L240 90 L240 110 L300 110 L300 150Z", [[150, 18]]],
+  ["crag", "Dracula on a pinnacle: tall thin towers, conical roofs, one bridge across the gorge.",
+   "M0 150 L40 150 L70 100 L90 100 L90 60 L84 60 L95 30 L106 60 L100 60 L100 100 L120 100 L120 70 L114 70 L125 45 L136 70 L130 70 L130 100 L160 100 L160 52 L152 52 L166 20 L180 52 L172 52 L172 100 L190 100 L215 150 L300 150 L300 128 L215 128 L215 150 Z", [[166, 70], [125, 85]]],
+  ["sunken", "The necromancer's ward, half under black water. Drowned arcades and leaning towers.",
+   "M0 150 L0 120 L40 120 L40 80 L60 80 L60 118 L120 118 L118 50 L140 46 L142 118 L200 118 L200 95 L225 92 L228 118 L300 118 L300 150Z", [[130, 70]]],
+  ["floating", "The lich's sky castle (the existing sky plan), held to the earth by chains.",
+   "M90 80 L90 50 L110 50 L110 30 L120 14 L130 30 L130 50 L170 50 L170 36 L185 36 L185 50 L210 50 L210 80 L180 104 L150 116 L120 104Z", [[120, 40], [178, 60]]],
+];
+function drawLords() {
+  const host = document.getElementById("lords");
+  for (const [name, note, path, lights] of LORDS) {
+    const card = document.createElement("div"); card.className = "panel card";
+    const s = document.createElementNS(NS, "svg"); s.setAttribute("viewBox", "0 0 300 150");
+    const add = (t, a) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); s.appendChild(e); return e; };
+    add("circle", {cx: 255, cy: 30, r: 16, fill: "#c0392b", opacity: 0.55});
+    if (name === "sunken") add("rect", {x: 0, y: 118, width: 300, height: 32, fill: "#0e1a1c"});
+    if (name === "floating") {
+      add("path", {d: "M0 150 Q80 128 160 140 T300 136 V150 H0Z", fill: "#120b0e"});
+      for (const [x0, x1] of [[100, 60], [200, 245]]) add("path", {d: `M${x0} 90 Q${(x0 + x1) / 2} 130 ${x1} 140`, stroke: "#555", "stroke-dasharray": "3 2", fill: "none"});
+    }
+    if (name === "needle") add("rect", {x: 0, y: 140, width: 300, height: 10, fill: "#ff6a1a", opacity: 0.8});
+    add("path", {d: path, fill: "#08060a"});
+    for (const [x, y] of lights) add("rect", {x: x - 2, y: y, width: 4, height: 8, fill: "#ff3b2a"});
+    card.appendChild(s);
+    const h = document.createElement("h3"); h.textContent = name; h.style.marginTop = "10px"; card.appendChild(h);
+    const p = document.createElement("p"); p.textContent = note; p.style.margin = "0"; card.appendChild(p);
+    host.appendChild(card);
+  }
+}
+
+document.getElementById("decay").addEventListener("input", draw);
+document.getElementById("jank").addEventListener("input", draw);
+document.getElementById("reseed").addEventListener("click", () => { SEED = Math.floor(Math.random() * 99999); draw(); });
+const q = new URLSearchParams(location.search).get("d");
+if (q !== null) document.getElementById("decay").value = q;
+const qj = new URLSearchParams(location.search).get("j");
+if (qj !== null) document.getElementById("jank").value = qj;
+draw(); drawLords();
+</script>
+</body>
+</html>

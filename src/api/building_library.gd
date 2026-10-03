@@ -27,7 +27,7 @@ const API_VERSION := 2
 
 ## Every kind, in the order a menu should show them.
 const KINDS: Array[StringName] = [&"church", &"castle", &"house", &"shop",
-	&"hotel", &"temple", &"world", &"village"]
+	&"hotel", &"temple", &"windmill", &"world", &"village"]
 
 ## One row per kind:
 ##   label        what the kind is called
@@ -90,6 +90,25 @@ const KIND_ROWS := {
 		"height": {"min": 3.0, "max": 4.5, "step": 0.1, "value": 3.6},
 		"storeys": {"min": 3, "max": 3, "step": 1, "value": 3},
 	},
+	# A windmill is not sized by its walls. Its three numbers are the ROTOR's
+	# span, the BODY's own width, and how TALL it stands -- which is what a
+	# caller actually wants to move when they are placing one on a skyline.
+	&"windmill": {
+		"label": "Windmill", "size_label": "Mill",
+		"height_label": "Tower height (m)",
+		"style_label": "Type", "purpose_label": "",
+		"width": {"min": 2.5, "max": 20.0, "step": 0.5, "value": 12.0},
+		"length": {"min": 2.0, "max": 10.0, "step": 0.5, "value": 6.0},
+		"height": {"min": 3.0, "max": 24.0, "step": 0.5, "value": 12.0},
+		"width_label": "Sail span (m)", "length_label": "Body (m)",
+		# A windmill calls the same three numbers by different names, and its
+		# generator CLAMPS them to what its own type can be built as: a windpump
+		# asked for a twenty-metre sail span is answered with a fan it can
+		# really turn. Both facts belong in the row, because both are what a
+		# caller is entitled to be told by `describe_kind()`.
+		"fields": ["sail_span", "body", "height"], "clamps": true,
+		"surfaces": 5,
+	},
 	# the buildings of the wider world (WLD-000): `style` is the family and
 	# `purpose` its sub-kind; WorldFamilies is the registry and every family
 	# narrows this envelope with its own
@@ -118,6 +137,34 @@ const KIND_ROWS := {
 ## The dimensions every kind has. `storeys` is separate: it is an integer, and
 ## only the plan-based families carry one.
 const DIMENSIONS: Array[StringName] = [&"width", &"length", &"height"]
+
+
+## The spec fields a kind's three numbers live in, in request order. A family
+## whose spec calls them something else -- a windmill's sail span and its body --
+## says so in its own row, and everything that compares a spec against the
+## request it came from asks here instead of assuming the house's names.
+static func dimension_fields(kind: StringName) -> Array[StringName]:
+	var named: Array = KIND_ROWS.get(kind, {}).get("fields", [])
+	if named.size() != DIMENSIONS.size():
+		return [&"width", &"length", &"height"]
+	var out: Array[StringName] = []
+	for name in named:
+		out.append(StringName(name))
+	return out
+
+
+## Whether this kind's generator may CLAMP its three numbers. One that does
+## must still answer inside the envelope `describe_kind()` published; one that
+## does not must answer with exactly what it was given.
+static func clamps(kind: StringName) -> bool:
+	return bool(KIND_ROWS.get(kind, {}).get("clamps", false))
+
+
+## How many surfaces a kind's mesh may carry. Four is the contract nearly every
+## family keeps; a windmill has five, because its ironwork is not the colour of
+## its thatch and folding the two together dressed the whole gearing as straw.
+static func surface_count(kind: StringName) -> int:
+	return int(KIND_ROWS.get(kind, {}).get("surfaces", 4))
 
 
 ## What a kind calls one of its dimension fields, for an error a person will
@@ -153,6 +200,8 @@ static func styles(kind: StringName) -> Dictionary:
 			return HotelSpec.HOTEL_STYLES
 		&"temple":
 			return TempleSpec.FORMS
+		&"windmill":
+			return WindmillSpec.TYPES
 		&"village":
 			return _named(VillageSpec.CULTURES)
 	return {}

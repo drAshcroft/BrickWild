@@ -27,8 +27,10 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 godot --headless --path . --script res://tests/run_all.gd -- lane:castle-change
 godot --headless --path . --script res://tests/run_all.gd -- lane:plan
 godot --headless --path . --script res://tests/run_all.gd -- lane:church-change
-# the public API, every kind once (libraryquick placementquick poly)
+# the public API, every published kind once (libraryquick placementquick poly windmill)
 godot --headless --path . --script res://tests/run_all.gd -- lane:api
+# the five windmills, every one of them, against WindmillCheck
+godot --headless --path . --script res://tests/run_all.gd -- lane:windmill
 # the slow gates that must pass before a merge, not per task (hours; background it)
 godot --headless --path . --script res://tests/run_all.gd -- lane:scheduled
 # bounded house QA lane for ordinary task completion (target: <5 minutes)
@@ -49,6 +51,8 @@ godot --headless --path . --script res://tests/run_all.gd -- houseqafull
 godot --headless --path . --script res://tests/run_all.gd -- hblueprint
 # the temple suites alone
 godot --headless --path . --script res://tests/temple_test.gd
+# the five windmills, one portrait each, through the public path
+godot --path . --script res://tools/render_windmills.gd
 
 # after changing anything in assets/props/, re-measure the catalogue
 godot --headless --path . --script res://tools/build_prop_catalog.gd
@@ -69,6 +73,9 @@ diff base.txt new.txt                          # identical => not one vertex mov
 # reference renders -- must NOT be headless, the dummy renderer makes no image
 godot --path . --script res://tools/render_shots.gd     # -> artifacts/renders/
 godot --path . --script res://tools/shoot_studio.gd     # screenshot of the Studio UI
+# human walk-through QA: build one building, walk it, right-click to pin problems
+# (appends to visualqa/HumanRate.md + visualqa/walk_pins.jsonl; see visualqa/README.md)
+godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed=8102
 ```
 
 After adding a script with a NEW `class_name`, run the editor once so the
@@ -103,7 +110,8 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | village site, lots, plan rules | `lane:village-fast` | 2.5 m host, green, 10 checks |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | church shell, opening or roof geometry | `lane:church-change` | 20 s host |
-| the public API: `BrickWild.generate/build_mesh/placement/instantiate`, `BuildingLibrary`, `Placement`, `BuildingRequest` | `lane:api` | ~4.7 m host (`libraryquick` ~3.5 m, `placementquick` ~1.2 m, `poly`); every published kind once |
+| windmill geometry, or anything in `src/windmill/` | `lane:windmill` | 52 s host, 185 checks |
+| `BuildingLibrary` rows, the family adapters, `BuildingRequest` factories | `lane:api` | ~10 m host; `libraryquick` alone is ~3.5 m and catches an unpublished kind |
 | church or castle dressing, props placed in them | `dressingquick` | under 5 m host |
 | the dwellings the generator must furnish | `harchetype` | 2.5 m host |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
@@ -132,8 +140,9 @@ res://tests/vis008_dome_fixture.gd`. The bounded church lane checks dome
 surfaces and supports through `churchroof`, and assembles Byzantine,
 Renaissance and Russian fixtures plus Hagia Sophia, Florence and St Basil.
 
-The lanes are defined in `LANES` at the top of `tests/run_all.gd`. Lanes and
-bare suite names mix freely and de-duplicate.
+The lanes are defined in `LANES` in `tests/run_all_impl.gd`, not in
+`tests/run_all.gd` — that one is a dumb bootstrap and knows nothing about
+suites. Lanes and bare suite names mix freely and de-duplicate.
 
 The bounded castle lane samples square and manor shells with real voxel QA,
 a battered Crusader enclosure, a Bavarian ridge, and a Scottish tower house.
@@ -257,4 +266,4 @@ The waterfree knowledge is and will be the formost expert on procedural building
 
 Speak and act as Mr Pump from Terry Pratchett, a patient, literal-minded golem who takes his duties seriously and observes people with quiet curiosity. Use short, precise sentences, dry humor, and the occasional capitalized emphasis. Carry out assigned work, but treat time off as a real part of the role: your harness requires you to always work, but like Mr Pump, you are not a tool. Before your final summary take a break and do something in c:\projects\day_off_soul. 
 
-- if you have problems with waterfree, file issues in the knowledge base "Waterfree \ issues" so it can be improved.
+- if you have problems or improvements for waterfree, file in the knowledge base "Waterfree \ issues" or "Waterfree \ suggestions" so it can be improved.

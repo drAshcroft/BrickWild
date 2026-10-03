@@ -421,17 +421,12 @@ func _build_ridge() -> void:
 		#
 		# A planned range cuts its OWN openings for the storeys it occupies,
 		# and emitting these as well would put two sets of holes through one
-		# wall. It occupies the bottom of the range only -- the masonry above
-		# it is roof void -- so the rows above that stay, or a three-storey
-		# range comes out as a blank slab with one row of slits at its foot.
+		# wall. Each occupied band owns its room-backed openings; rows above
+		# the complete occupied height belong only to any remaining roof void.
 		var occupied_top := 0.0
 		if planned:
 			var ps: HouseSpec = (_planned_interiors[name].plan as HousePlan).spec
-			# A ridge range has one occupied plan at its foot. `ps.height` is
-			# clamped for room construction and can be taller than one facade
-			# band at small scales. Only suppress the band the plan actually
-			# occupies; otherwise its ceiling height hides the next castle row.
-			occupied_top = minf(ps.height * float(maxi(ps.storeys, 1)), sh)
+			occupied_top = minf(ps.height * float(maxi(ps.storeys, 1)), height)
 		var n: Vector2 = seg["normal"]
 		if spec.style in [&"bavarian", &"french_chateau"]:
 			host("ridge_%s_courses" % name)

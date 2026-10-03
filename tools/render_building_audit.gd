@@ -34,7 +34,7 @@ func _init() -> void:
 		"hotel":
 			await _run_request(BuildingRequest.hotel(373, &"grand_budapest", 30.0, 16.0, 3.0), "grand_budapest_compact")
 		"church":
-			await _run_request(BuildingRequest.church(5005, &"romanesque", 11.9, 60.0, 22.2), "durham_romanesque")
+			await _run_church()
 		"temple":
 			await _run_temple()
 		"world":
@@ -78,6 +78,25 @@ func _run_house() -> void:
 		await _run_request(fixture["request"], fixture["key"], fixture["request"].style == &"rich")
 
 
+func _run_church() -> void:
+	var seed_value := LandmarkSuite._seed_for("durham", 1.0)
+	var request := BuildingRequest.church(seed_value, &"romanesque", 11.9, 61.0, 22.2)
+	var building := BrickWild.generate(request)
+	if not building.is_ok():
+		_audit_rows.append(_failed_fixture("durham_romanesque", request, building.errors))
+		return
+	var spec: ChurchSpec = building.spec
+	LandmarkSuite._force_features("durham", spec)
+	var report := BrickWild.check(building)
+	var row := _fixture_row("durham_romanesque", request, building, report)
+	row["canonical_forced_features"] = ["transept", "crossing_tower", "two_west_towers"]
+	row["captures"].append(await _capture_fixture(building, false,
+		"exterior_3q", "durham_romanesque_exterior_3q.jpg"))
+	row["captures"].append(await _capture_fixture(building, true,
+		"axis_cutaway", "durham_romanesque_axis_cutaway.jpg", true))
+	_audit_rows.append(row)
+
+
 func _run_temple() -> void:
 	var request := BuildingRequest.temple(7302, &"pylon", &"void", 34.0, 58.0, 15.0)
 	var building := BrickWild.generate(request)
@@ -85,7 +104,7 @@ func _run_temple() -> void:
 		_audit_rows.append(_failed_fixture("starless_pylon", request, building.errors))
 		return
 	var spec: TempleSpec = building.spec
-	var needs: Array[String] = ["obelisks"]
+	var needs: Array[String] = ["obelisks", "columns"]
 	TempleArchetypeSuite._force(spec, needs)
 	# Force the same documented feature as the canonical temple fixture before
 	# checking and assembling, so the picture and its QA describe one spec.

@@ -112,6 +112,8 @@ static func for_building(building) -> BuildingFamilyAdapter:
 		return of(&"temple")
 	if spec is VillageSpec:
 		return of(&"village")
+	if spec is WindmillSpec:
+		return of(&"windmill")
 	# a family whose spec is its own: the world kind, and whatever comes next
 	return of(building.request.kind) if building.request != null else null
 
@@ -127,6 +129,7 @@ static func of(kind: StringName) -> BuildingFamilyAdapter:
 			&"temple": TempleFamily.new(),
 			&"world": WorldFamily.new(),
 			&"village": VillageFamily.new(),
+			&"windmill": WindmillFamily.new(),
 		}
 	return _registry.get(kind, null)
 
@@ -404,6 +407,58 @@ class TempleFamily extends BuildingFamilyAdapter:
 			Vector2(width, door(building).z - front))}
 
 
+
+# ------------------------------------------------------------- the windmills
+
+## Five buildings in one adapter, because which one you want is a `style` and
+## not a kind: a post mill, a tower mill, a smock mill, a farm windpump and a
+## Dutch polder mill all answer to the same three numbers and the same front.
+class WindmillFamily extends BuildingFamilyAdapter:
+	func quality_report(building) -> Dictionary:
+		var builder := WindmillBuilder.new()
+		var mesh: ArrayMesh = builder.build(building.spec)
+		return WindmillCheck.new().check(building.spec, mesh, builder)
+
+	func generate(request: BuildingRequest, out) -> bool:
+		var spec := WindmillSpec.new(request.seed)
+		spec.mill_type = request.style
+		spec.material = request.material
+		# The request's three numbers are the mill's own, in the mill's own
+		# words: a rotor span, a body, and a height. Nothing is renamed and
+		# nothing is guessed -- `WindmillGeometry.legal()` clamps them to what
+		# the type can actually be built as.
+		spec.sail_span = request.width
+		spec.body = request.length
+		spec.height = request.height
+		_copy_orientation_and_period(request, spec)
+		WindmillGenerator.generate(spec, request.seed)
+		out.spec = spec
+		return true
+
+	func build_mesh(building) -> ArrayMesh:
+		return WindmillBuilder.new().build(building.spec as WindmillSpec)
+
+	func instantiate(building, _cutaway: bool) -> Node3D:
+		return WindmillAssembler.build(building.spec as WindmillSpec)
+
+	## The mill's own body. A post mill's burr is square and stands at its own
+	## yaw, so its plan is the four turned corners rather than the box around
+	## them.
+	func footprint(building) -> Rect2:
+		return WindmillGeometry.site_rect(building.spec as WindmillSpec)
+
+	func door(building) -> Vector3:
+		return WindmillGeometry.door_point(building.spec as WindmillSpec)
+
+	## A polder mill needs a race in front of its door, and the footprint cannot
+	## be the one to say so: the race is a channel cut into the ground, and
+	## folding it in would drag the footprint's front edge away from the door it
+	## is supposed to be the front of. Published here instead, which is where a
+	## lot already looks for ground a building needs.
+	func placement_metadata(building, _bounds: AABB) -> Dictionary:
+		var race: Rect2 = WindmillGeometry.race_site(building.spec as WindmillSpec)
+		return {"race": race} if race.size != Vector2.ZERO else {}
+
 # ------------------------------------------------ the buildings of the world
 
 ## The `world` kind is itself a registry (WLD-000), so its adapter is a
@@ -651,6 +706,14 @@ static func colours(spec: RefCounted) -> Array:
 		# a temple's fourth surface is its own darkness, not a floor colour
 		return [spec.get("stone_color"), spec.get("trim_color"),
 			spec.get("roof_color"), TEMPLE_DARK]
+	if spec is WindmillSpec:
+		# A windmill has five surfaces and its own reasons for each: iron,
+		# cloth or thatch, race water, and the dark of its own doorways. The
+		# iron in particular is not the colour of anything else on the mill,
+		# and folding it into "trim" dressed the whole gearing as thatch.
+		var mill: WindmillSpec = spec
+		return [mill.wall_color, mill.trim_color, mill.sail_color,
+			mill.dark_color, mill.water_color]
 	# house, shop and hotel name their masonry `wall_color`; church, castle
 	# and the world families call the same surface `stone_color`
 	var wall = spec.get("wall_color")

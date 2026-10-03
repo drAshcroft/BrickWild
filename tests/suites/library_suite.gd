@@ -68,6 +68,8 @@ static func _run(quick: bool) -> SuiteResult:
 		BuildingRequest.shop(353, &"blacksmith", &"longhall", 11.0, 14.0, 2.8),
 		BuildingRequest.hotel(373, &"grand_budapest", 48.0, 24.0, 3.6),
 		BuildingRequest.temple(404, &"basilica", &"blood", 26.0, 44.0, 12.0),
+		BuildingRequest.windmill(505, &"tower", 13.0, 6.5, 14.0),
+		BuildingRequest.windmill(515, &"paddle", 10.0, 6.5, 12.0),
 	]
 	if quick:
 		# the smallest hotel the library accepts: still the whole programme
@@ -423,9 +425,27 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 		res.fail("facade retained caller-owned request, " + where)
 	if made.spec.get("seed") != request.seed or made.name().is_empty():
 		res.fail("generated identity is incomplete, " + where)
-	if made.spec.get("width") != request.width or made.spec.get("length") != request.length \
-			or made.spec.get("height") != request.height:
-		res.fail("generated dimensions differ from request, " + where)
+	# A family's spec names its three numbers in its own words -- a windmill's
+	# are a sail span and a body -- and a generator may CLAMP them to what its
+	# own type can be built as. One that clamps must still answer inside the
+	# envelope the library published; one that does not must answer with exactly
+	# what it was given.
+	var fields: Array[StringName] = BuildingLibrary.dimension_fields(request.kind)
+	var limits_row: Dictionary = BuildingLibrary.KIND_ROWS[request.kind]
+	var clamps: bool = BuildingLibrary.clamps(request.kind)
+	for i in range(BuildingLibrary.DIMENSIONS.size()):
+		var field: StringName = fields[i]
+		var got = made.spec.get(field)
+		if got == null:
+			res.fail("generated %s is missing, %s" % [String(field), where])
+			continue
+		if clamps:
+			var band: Dictionary = limits_row[BuildingLibrary.DIMENSIONS[i]]
+			if float(got) < float(band["min"]) - 0.001 or float(got) > float(band["max"]) + 0.001:
+				res.fail("generated %s is %.2f, outside the published envelope, %s"
+					% [String(field), float(got), where])
+		elif float(got) != float(request.get(BuildingLibrary.DIMENSIONS[i])):
+			res.fail("generated %s differs from request, %s" % [String(field), where])
 	if request.kind in [&"house", &"shop", &"hotel"]:
 		if made.plan == null or made.plan.spec != made.spec:
 			res.fail("house result did not retain its plan, " + where)
@@ -438,8 +458,15 @@ static func _check_family(res: SuiteResult, request: BuildingRequest) -> void:
 	t0 = Time.get_ticks_msec()
 	var legacy: Array = _legacy(request)
 	_lap(request.kind, "legacy", t0)
-	if mesh == null or mesh.get_surface_count() != 4:
-		res.fail("facade emitted a bad mesh, " + where)
+	# A family declares how many surfaces its mesh carries; four is nearly
+	# everyone's, and a mill has a fifth because its iron is not its thatch.
+	# A mill with no race draws no water, and an empty TRAILING surface moves
+	# nothing, so the count may be lower than declared but never higher.
+	var surfaces: int = mesh.get_surface_count() if mesh != null else 0
+	var declared: int = BuildingLibrary.surface_count(request.kind)
+	if surfaces < 1 or surfaces > declared:
+		res.fail("facade emitted a bad mesh (%d surfaces, the family declares %d), %s"
+			% [surfaces, declared, where])
 	elif legacy.is_empty():
 		pass  # the world families have no pre-facade pipeline to compare with
 	elif not _same_mesh(mesh, legacy[2]):
@@ -650,7 +677,14 @@ static func _check_contract(res: SuiteResult, requests: Array[BuildingRequest]) 
 		var mesh_b: ArrayMesh = entry.get("again_mesh")
 		if mesh_b == null and b != null:
 			mesh_b = BrickWild.build_mesh(b)
-		if mesh == null or mesh.get_surface_count() != 4:
-			res.fail("contract: %s's mesh does not have four surfaces" % String(request.kind))
+		# A family declares how many surfaces its mesh carries; four is nearly
+		# everyone's, and a mill has a fifth because its iron is not its thatch.
+		# A mill with no race draws no water, and an empty TRAILING surface moves
+		# nothing, so the count may be lower than declared but never higher.
+		var surfaces: int = mesh.get_surface_count() if mesh != null else 0
+		var declared: int = BuildingLibrary.surface_count(request.kind)
+		if surfaces < 1 or surfaces > declared:
+			res.fail("contract: %s's mesh has %d surfaces; its row declares %d"
+				% [String(request.kind), surfaces, declared])
 		elif mesh_b != null and not _same_mesh(mesh, mesh_b):
 			res.fail("contract: %s seed %d built two different meshes" % [String(request.kind), request.seed])

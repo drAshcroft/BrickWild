@@ -130,6 +130,14 @@ static func temple(p_seed: int, p_form: StringName = &"basilica",
 	return _make(&"temple", p_seed, p_form, p_cult, p_width, p_length, p_height)
 
 
+## A windmill. `p_sail_span` is the rotor's diameter, `p_body` the width of
+## the mill's own body, and `p_height` how tall it stands -- for a post mill
+## that is its burr, for a tower mill its tower, for a windpump its lattice.
+static func windmill(p_seed: int, p_type: StringName = &"tower",
+		p_sail_span := 12.0, p_body := 6.0, p_height := 12.0) -> BuildingRequest:
+	return _make(&"windmill", p_seed, p_type, &"", p_sail_span, p_body, p_height)
+
+
 ## A detached copy lets the library retain the request without retaining
 ## mutable caller-owned state.
 func copy() -> BuildingRequest:

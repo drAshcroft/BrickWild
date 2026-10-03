@@ -33,3 +33,4 @@ scratch/*.json
 
 # Agent worktrees
 .claude/
+/visualqa/walk_shots

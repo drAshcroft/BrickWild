@@ -424,9 +424,9 @@ static func _hall_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 ##
 ## Each range is planned in ITS OWN FRAME: local X runs along the segment,
 ## local Z across it, and CastleInteriors.record carries the segment's yaw so
-## the same numbers land on the emitted masonry. The range occupies its ground
-## storey; the masonry above is a roof void, which CastleInteriors.emit already
-## closes with continuous perimeter walling.
+## the same numbers land on the emitted masonry. Occupied floors follow the
+## emitted range storey bands; CastleInteriors.emit closes the remaining wall
+## height with continuous perimeter masonry.
 
 ## A range narrower or shorter than this is masonry, not a room.
 const MIN_RANGE_SIDE := 3.0
@@ -444,6 +444,10 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	var box := AABB(Vector3(-run * 0.5, 0.0, -across * 0.5),
 		Vector3(run, float(seg["height"]), across))
 	var hs: HouseSpec = _hall_spec(spec, box)
+	var levels: int = CastleGeometry.ridge_storeys(spec)
+	var band_height: float = float(seg["height"]) / float(levels)
+	hs.height = band_height
+	hs.storeys = levels
 	var is_hall: bool = String(seg["name"]) == "hall"
 	hs.variant_name = "%s: %s" % [spec.variant_name,
 		"the great hall" if is_hall else "a range"]
@@ -467,35 +471,48 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 		return plan
 	plan.spec = hs
 	plan.rooms = []
-	for i in range(bays):
-		# One lord's chamber owns the range's fire. A chain of guest rooms would
-		# make the later rooms accessible only through somebody else's bedroom.
-		# Keep the intermediate bays public parlours and reserve the last bay for
-		# guests; HousePlan has one named hearth/flue per range, not per bay.
-		var bay_kind: StringName = kind
-		if i > 0:
-			bay_kind = &"guest_room" if i == bays - 1 else &"parlour"
-		if bay_run * floor_rect.size.y < float(HouseGeometry.MIN_AREA[bay_kind]) \
-				or minf(bay_run, floor_rect.size.y) < float(HouseGeometry.MIN_SIDE[bay_kind]):
-			bay_kind = kind
-		plan.rooms.append({"kind": bay_kind, "storey": 0,
-			"rect": Rect2(Vector2(floor_rect.position.x + bay_run * float(i),
-				floor_rect.position.y), Vector2(bay_run, floor_rect.size.y))})
-	for i in range(1, bays):
-		plan.doors.append({"a": i - 1, "b": i,
-			"pos": Vector2(floor_rect.position.x + bay_run * float(i),
-				floor_rect.get_center().y),
-			"normal": Vector2(1, 0), "width": HouseGeometry.INNER_DOOR_W,
-			"exterior": false, "front": false, "storey": 0})
+	plan.doors = []
+	plan.windows = []
+	hs.program = []
+	for level in range(levels):
+		for i in range(bays):
+			# The entrance-level principal bay remains the great hall. Above it,
+			# private rooms must sit at the end of a route, never between a stair
+			# and another occupied floor or bay.
+			var bay_kind: StringName = kind
+			if is_hall and level == 0 and i == 0:
+				bay_kind = &"great_hall"
+			elif i == 0 and not (bays == 1 and level == levels - 1):
+				# This room leads to a later bay, or the stair above it. It is a
+				# public circulation room. Only a one-bay top floor is terminal.
+				bay_kind = &"parlour"
+			elif i > 0:
+				bay_kind = &"guest_room" if i == bays - 1 else &"parlour"
+			if bay_run * floor_rect.size.y < float(HouseGeometry.MIN_AREA[bay_kind]) \
+					or minf(bay_run, floor_rect.size.y) < float(HouseGeometry.MIN_SIDE[bay_kind]):
+				bay_kind = kind
+			var room_index := level * bays + i
+			var room_rect := Rect2(Vector2(floor_rect.position.x + bay_run * float(i),
+				floor_rect.position.y), Vector2(bay_run, floor_rect.size.y))
+			plan.rooms.append({"kind": bay_kind, "storey": level, "rect": room_rect})
+			hs.program.append(bay_kind)
+			var window_start := plan.windows.size()
+			_hall_windows(plan, room_rect, Vector2(1, 0), hs, room_index,
+				band_height - 0.2)
+			for wi in range(window_start, plan.windows.size()):
+				plan.windows[wi]["storey"] = level
+		for i in range(1, bays):
+			var left_room := level * bays + i - 1
+			var right_room := level * bays + i
+			plan.doors.append({"a": left_room, "b": right_room,
+				"pos": Vector2(floor_rect.position.x + bay_run * float(i),
+					floor_rect.get_center().y),
+				"normal": Vector2(1, 0), "width": HouseGeometry.INNER_DOOR_W,
+				"exterior": false, "front": false, "storey": level})
 
 	# The way in is on a LONG face, because a range's ends are where it meets
 	# its neighbours. `up` is across the range, so the door faces out of it.
 	_hall_door(plan, plan.rooms[0]["rect"], Vector2(0, 1))
-	for i in range(bays):
-		var band_height: float = float(seg["height"]) \
-			/ float(CastleGeometry.ridge_storeys(spec))
-		_hall_windows(plan, plan.rooms[i]["rect"], Vector2(1, 0), hs, i,
-			band_height - 0.2)
 
 	# And the doors that make the chain a building rather than a row of sheds:
 	# one in each end the segment shares with another range.
@@ -509,11 +526,22 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 		var side_offset: float = minf(floor_rect.size.y * 0.25,
 			HouseGeometry.INNER_DOOR_W * 1.25)
 		var door_y: float = floor_rect.get_center().y + float(end_v) * side_offset
-		plan.doors.append({"a": 0 if end_v < 0 else plan.rooms.size() - 1, "b": -1,
+		plan.doors.append({"a": 0 if end_v < 0 else bays - 1, "b": -1,
 			"pos": Vector2(x, door_y),
 			"normal": Vector2(float(end_v), 0.0),
 			"width": HouseGeometry.INNER_DOOR_W, "exterior": true,
 			"front": false, "storey": 0})
+	# A real stair connects each occupied range floor. Room indices differ from
+	# storey indices when the range has more than one bay.
+	var previous_stair := Rect2()
+	for level in range(levels - 1):
+		var lower_room := level * bays
+		var upper_room := (level + 1) * bays
+		var stair := _ridge_add_stair(plan, level, level + 1,
+			lower_room, upper_room, previous_stair)
+		if not stair.is_empty():
+			plan.stairs.append(stair)
+			previous_stair = stair.rect
 	# The front door belongs on the exposed part of its bay's long facade. A
 	# short first bay can put its midpoint inside the solid tower dive, where the
 	# buried-opening pass below correctly removes it. Slide along the SAME wall
@@ -532,6 +560,8 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 		var wp: Vector2 = wdw["pos"]
 		var clash := false
 		for d in plan.doors:
+			if HousePlan.record_storey(d) != HousePlan.record_storey(wdw):
+				continue
 			var dp: Vector2 = d["pos"]
 			if (wdw["normal"] as Vector2).dot(d["normal"]) < 0.5:
 				continue          # different wall
@@ -569,6 +599,77 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	hs.room_count = plan.rooms.size()
 	HouseFurnisher.furnish(plan, hs)
 	return plan
+
+
+static func _ridge_add_stair(plan: HousePlan, lower_storey: int,
+		upper_storey: int, lower_room: int, upper_room: int,
+		avoid: Rect2) -> Dictionary:
+	var floor_rect := HouseGeometry.room_floor_rect(plan, upper_room)
+	var run := minf(2.4, maxf(HouseGeometry.PATH_MIN,
+		maxf(floor_rect.size.x, floor_rect.size.y) - 0.3))
+	var width := minf(1.0, maxf(HouseGeometry.PATH_MIN,
+		minf(floor_rect.size.x, floor_rect.size.y) - 0.3))
+	var entrance := plan.entrance()
+	if entrance < 0:
+		return {}
+	var front := Vector2(plan.doors[entrance]["pos"])
+	var walls := HouseGeometry.room_walls(plan, upper_room)
+	walls.append_array(HouseGeometry.room_walls(plan, lower_room))
+	var best := Rect2()
+	var best_score := -INF
+	for size in [Vector2(run, width), Vector2(width, run)]:
+		for wall in walls:
+			var normal: Vector2 = wall.normal
+			var support: float = (absf(normal.x) * size.x + absf(normal.y) * size.y) * 0.5
+			var length: float = Vector2(wall.from).distance_to(wall.to)
+			var samples := maxi(int(length / 0.2), 1)
+			for sample in range(samples + 1):
+				var centre: Vector2 = Vector2(wall.from).lerp(wall.to,
+					float(sample) / float(samples)) + normal * support
+				var rect := Rect2(centre - size * 0.5, size)
+				if not _ridge_stair_fits(plan, lower_room, rect) \
+						or not _ridge_stair_fits(plan, upper_room, rect):
+					continue
+				if avoid.has_area() and rect.intersects(avoid, true):
+					continue
+				var blocked := false
+				for door in plan.doors:
+					if HousePlan.record_storey(door) != lower_storey:
+						continue
+					if int(door.get("a", -1)) != lower_room \
+							and int(door.get("b", -1)) != lower_room:
+						continue
+					if _ridge_rects_overlap(rect, HouseGeometry.door_clear_rect(door, -1.0)):
+						blocked = true
+						break
+				if blocked:
+					continue
+				var score := centre.distance_to(front)
+				if avoid.has_area():
+					score += centre.distance_to(avoid.get_center())
+				if score > best_score:
+					best = rect
+					best_score = score
+	if not best.has_area():
+		return {}
+	var centre := best.get_center()
+	return {"a": lower_room, "b": upper_room,
+		"storey": lower_storey, "to_storey": upper_storey,
+		"pos": centre, "lower_pos": centre, "upper_pos": centre,
+		"rect": best, "lower_rect": best, "upper_rect": best,
+		"width": width, "run": run}
+
+
+static func _ridge_stair_fits(plan: HousePlan, room: int, rect: Rect2) -> bool:
+	for point in Poly.from_rect(rect):
+		if not Poly.contains_point(HouseGeometry.room_floor_poly(plan, room), point, 0.001):
+			return false
+	return true
+
+
+static func _ridge_rects_overlap(a: Rect2, b: Rect2) -> bool:
+	var overlap := a.intersection(b)
+	return overlap.size.x > 0.02 and overlap.size.y > 0.02
 
 
 static func _relocate_range_front_door(plan: HousePlan, floor_rect: Rect2,
