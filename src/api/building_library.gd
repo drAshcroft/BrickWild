@@ -253,6 +253,9 @@ static func describe(kind: StringName) -> Dictionary:
 	out["api_version"] = API_VERSION
 	out["styles"] = options(kind, &"style")
 	out["purposes"] = options(kind, &"purpose")
+	if CrookedWarp.supports(kind):
+		out["jank"] = {"min": 0.0, "max": 1.0, "value": 0.0}
+		out["jank_label"] = "Crookedness"
 	if kind == &"village":
 		out["waters"] = options(kind, &"water")
 		out["enclosures"] = options(kind, &"enclosure")
@@ -296,6 +299,12 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 	if not is_finite(request.orientation):
 		out.append(_error(&"invalid_orientation", &"orientation",
 			"orientation must be a finite yaw in radians."))
+	if not is_finite(request.jank) or request.jank < 0.0 or request.jank > 1.0:
+		out.append(_error(&"invalid_jank", &"jank",
+			"jank must be a number from 0 (plumb) to 1 (as crooked as it goes)."))
+	elif request.jank > 0.0 and not CrookedWarp.supports(request.kind):
+		out.append(_error(&"jank_unsupported", &"jank",
+			"A %s cannot be crooked as one piece; leave jank at 0." % String(request.kind)))
 	if not known:
 		return out
 	var row: Dictionary = KIND_ROWS[request.kind]

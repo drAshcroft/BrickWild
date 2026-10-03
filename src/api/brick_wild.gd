@@ -109,7 +109,10 @@ static func build_mesh(building) -> ArrayMesh:
 	if building == null or not building.is_ok():
 		return null
 	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.for_building(building)
-	return family.build_mesh(building) if family != null else null
+	var mesh: ArrayMesh = family.build_mesh(building) if family != null else null
+	# a crooked building leans after it is built (HNT-040): the family never knows
+	var warp := CrookedWarp.for_building(building)
+	return warp.warp_mesh(mesh) if warp != null and mesh != null else mesh
 
 
 ## Run the existing family's geometry and functionality checks. This may be
@@ -215,7 +218,14 @@ static func instantiate(building, cutaway := false,
 		return null
 	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.for_building(building)
 	var root: Node3D = family.instantiate(building, cutaway) if family != null else null
+	if root != null:
+		# the scene leans exactly as build_mesh() does, props and lights with it,
+		# and before collision is made so that leans too
+		var warp := CrookedWarp.for_building(building)
+		if warp != null:
+			warp.warp_scene(root)
 	if root == null:
+		# (build_mesh() below is already crooked)
 		# a family with no assembler of its own: its mesh, in its own colours
 		var mesh: ArrayMesh = build_mesh(building)
 		if mesh == null:
