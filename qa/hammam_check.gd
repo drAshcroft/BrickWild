@@ -3,12 +3,13 @@ extends RefCounted
 ## Plan, walking, roof, and service rules for WLD-005 steam baths.
 
 const RULES: Array[StringName] = [&"identity", &"path", &"walk_distance",
-	&"hot_leaf", &"oculi", &"domes", &"furnace"]
+	&"hot_leaf", &"oculi", &"domes", &"dome_mesh_support", &"furnace"]
 const STATIONS: Array[StringName] = HammamGenerator.STATIONS
 const METHODS := {
 	&"identity": "_check_identity", &"path": "_check_path",
 	&"walk_distance": "_check_walk_distance", &"hot_leaf": "_check_hot_leaf",
 	&"oculi": "_check_oculi", &"domes": "_check_domes",
+	&"dome_mesh_support": "_check_dome_mesh_support",
 	&"furnace": "_check_furnace",
 }
 
@@ -201,6 +202,80 @@ func _check_domes(plan: HousePlan, builder: HammamBuilder,
 			if rows < 1 or int(row.get("triangles", 0)) < expected:
 				failures.append("domes: %s revolved shell emitted too few profile triangles" % String(role))
 			stats["dome_%s_coverage" % String(role)] = snappedf(ratio, 0.001)
+
+
+## Verify the dome shell itself. Its mass AABB and component row can both stay
+## intact when triangles are lost, so sample elevated points on the actual
+## roof surface above the flat panel plane. The sample ring avoids the small
+## crown oculi by staying well outside their radii.
+func _check_dome_mesh_support(plan: HousePlan, builder: HammamBuilder,
+		_nav_report: Dictionary) -> void:
+	# This rule extends the emitted-geometry contract only when a builder was
+	# supplied. Plan-only callers retain their existing behavior.
+	if builder == null:
+		return
+	if builder.emitted_mesh == null:
+		failures.append("dome_mesh_support: no emitted mesh is available")
+		return
+	var mesh: ArrayMesh = builder.emitted_mesh
+	if HouseBuilder.SURF_ROOF >= mesh.get_surface_count():
+		failures.append("dome_mesh_support: roof surface is missing")
+		return
+	var triangles := _surface_triangles(mesh, HouseBuilder.SURF_ROOF)
+	if triangles.is_empty():
+		failures.append("dome_mesh_support: roof surface has no triangles")
+		return
+	var rise := minf(plan.spec.height * 0.30, 2.4)
+	var base_y := plan.spec.height
+	var roles: Array[StringName] = [&"cold", &"warm", &"hot"]
+	var samples := 8
+	var ring_radius := 0.72
+	for role in roles:
+		if not _station_ids.has(role) or int(_station_ids[role]) < 0:
+			continue
+		var room := HouseGeometry.room_floor_rect(plan, int(_station_ids[role]))
+		var rx := room.size.x * 0.51
+		var rz := room.size.y * 0.51
+		var centre := room.get_center()
+		var supported := 0
+		for sample in range(samples):
+			var angle := TAU * float(sample) / float(samples)
+			var point := centre + Vector2(cos(angle) * rx * ring_radius,
+				sin(angle) * rz * ring_radius)
+			var start := Vector3(point.x, base_y + rise + 0.3, point.y)
+			var end := Vector3(point.x, base_y + rise * 0.2, point.y)
+			if _ray_hits_roof(triangles, start, end):
+				supported += 1
+		stats["dome_%s_mesh_support" % String(role)] = "%d/%d" % [supported, samples]
+		if supported != samples:
+			failures.append("dome_mesh_support: %s dome supports %d/%d elevated roof probes" %
+				[String(role), supported, samples])
+
+
+static func _surface_triangles(mesh: ArrayMesh, surface: int) -> Array:
+	var out: Array = []
+	var arrays: Array = mesh.surface_get_arrays(surface)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var index_value: Variant = arrays[Mesh.ARRAY_INDEX]
+	var indices: PackedInt32Array = index_value if index_value != null else PackedInt32Array()
+	if indices.is_empty():
+		for i in range(0, vertices.size() - 2, 3):
+			out.append([vertices[i], vertices[i + 1], vertices[i + 2]])
+	else:
+		for i in range(0, indices.size() - 2, 3):
+			if indices[i] < vertices.size() and indices[i + 1] < vertices.size() \
+					and indices[i + 2] < vertices.size():
+				out.append([vertices[indices[i]], vertices[indices[i + 1]],
+					vertices[indices[i + 2]]])
+	return out
+
+
+static func _ray_hits_roof(triangles: Array, start: Vector3, end: Vector3) -> bool:
+	for triangle in triangles:
+		if Geometry3D.segment_intersects_triangle(start, end,
+				triangle[0], triangle[1], triangle[2]) != null:
+			return true
+	return false
 
 
 func _check_furnace(plan: HousePlan, builder: HammamBuilder,
