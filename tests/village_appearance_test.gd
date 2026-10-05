@@ -77,12 +77,39 @@ static func run() -> SuiteResult:
 	work.name = "yard_work"
 	yard.add_child(work)
 	var yard_plan := HousePlan.new()
-	yard_plan.yard = [{"id": "yard_flowers", "group": &"flowers"},
-		{"id": "yard_work", "group": &"woodpile"}]
+	yard_plan.yard = [{"id": "yard_flowers", "group": "flowers#0"},
+		{"id": "yard_work", "group": "woodpile#0"}]
 	VillageAssembler._suppress_yard_ornament(root, yard_plan)
 	_expect(res, yard.get_node_or_null("yard_flowers") == null \
 		and yard.get_node_or_null("yard_work") == work,
 		"bare yard retained invisible ornamental collision or removed work equipment")
+	var thin_a := Node3D.new()
+	var thin_b := Node3D.new()
+	var paired_plan := HousePlan.new()
+	for scene in [thin_a, thin_b]:
+		var exterior := Node3D.new()
+		exterior.name = "Exterior"
+		scene.add_child(exterior)
+		for i in 20:
+			for side in ["a", "b"]:
+				var plant := Node3D.new()
+				plant.name = "bed_%d_%s" % [i, side]
+				exterior.add_child(plant)
+	for i in 20:
+		for side in ["a", "b"]:
+			paired_plan.yard.append({"id": "bed_%d_%s" % [i, side], "group": "flowers#%d" % i})
+	VillageAssembler._suppress_yard_ornament(thin_a, paired_plan, 0.25)
+	VillageAssembler._suppress_yard_ornament(thin_b, paired_plan, 0.25)
+	var kept := thin_a.get_node("Exterior").get_child_count()
+	_expect(res, kept > 0 and kept < 40, "intermediate decoration did not thin household planting")
+	var consistent := true
+	for i in 20:
+		var a_exists := thin_a.has_node("Exterior/bed_%d_a" % i)
+		consistent = consistent and a_exists == thin_a.has_node("Exterior/bed_%d_b" % i) \
+			and a_exists == thin_b.has_node("Exterior/bed_%d_a" % i)
+	_expect(res, consistent, "household planting thinned nondeterministically or split paired beds")
+	thin_a.free()
+	thin_b.free()
 	root.free()
 	colorful.free()
 	clean.free()

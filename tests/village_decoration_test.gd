@@ -42,7 +42,8 @@ static func run() -> SuiteResult:
 	if plain.equals(base) or lush.equals(base):
 		res.fail("VillagePlan equality ignored decoration controls")
 	for variant in [plain, lush]:
-		var report: Dictionary = VillageDressCheck.new().check(variant)
+		res.checked += 1
+		var report: Dictionary = VillageQA.new().check(variant, {}, false)
 		for failure in report["failures"]:
 			res.fail("decoration %.1f QA: %s" % [variant.spec.decoration_level, failure])
 		if int(report["stats"].get("green_trees", 0)) > VillageDressCheck.GREEN_TREES_MAX:
@@ -97,7 +98,8 @@ static func run() -> SuiteResult:
 	if not _same_layout(compact_base, compact_zero) or not _same_layout(compact_base, compact_lush):
 		res.fail("decoration changed compact roads, lots or building requests")
 	for variant in [compact_zero, compact_lush]:
-		var report: Dictionary = VillageDressCheck.new().check(variant)
+		res.checked += 1
+		var report: Dictionary = VillageQA.new().check(variant, {}, false)
 		for failure in report["failures"]:
 			res.fail("compact decoration QA: %s" % failure)
 

@@ -133,7 +133,8 @@ func _check_density(plan: VillagePlan) -> void:
 func _check_pure(plan: VillagePlan) -> void:
 	var spec: VillageSpec = plan.spec
 	var before := [spec.seed, spec.population, spec.culture, spec.purpose, spec.wealth,
-		spec.enclosure, spec.water, spec.compact_display, spec.households, spec.form, spec.site, spec.variant_name]
+		spec.enclosure, spec.water, spec.compact_display, spec.decoration_level, spec.upkeep,
+		spec.households, spec.form, spec.site, spec.variant_name]
 	var twin := VillageSpec.new(spec.seed)
 	twin.population = spec.population
 	twin.culture = spec.culture
@@ -142,11 +143,14 @@ func _check_pure(plan: VillagePlan) -> void:
 	twin.enclosure = spec.enclosure
 	twin.water = spec.water
 	twin.compact_display = spec.compact_display
+	twin.decoration_level = spec.decoration_level
+	twin.upkeep = spec.upkeep
 	twin.generate(spec.seed)
 	var again: VillagePlan = VillageLotPlanner.plan(twin)
 	if not plan.equals(again):
 		failures.append("pure: the same spec planned twice gave two different villages")
 	var after := [spec.seed, spec.population, spec.culture, spec.purpose, spec.wealth,
-		spec.enclosure, spec.water, spec.compact_display, spec.households, spec.form, spec.site, spec.variant_name]
+		spec.enclosure, spec.water, spec.compact_display, spec.decoration_level, spec.upkeep,
+		spec.households, spec.form, spec.site, spec.variant_name]
 	if before != after:
 		failures.append("pure: planning wrote to the spec")

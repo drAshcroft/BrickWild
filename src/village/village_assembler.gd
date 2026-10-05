@@ -66,10 +66,10 @@ static func _apply_building_appearance(node: Node3D, built: GeneratedBuilding,
 		return
 	var palette_seed := built.request.seed if built.request != null else 0
 	_paint_architecture(node, decoration, upkeep, palette_seed)
-	# House and shop yards have an independent planner. At the bare setting,
-	# suppress only ornamental planting; keep paths, tools, washing and trade work.
-	if decoration <= 0.0 and built.plan is HousePlan:
-		_suppress_yard_ornament(node, built.plan as HousePlan)
+	# House and shop yards have an independent planner. Thin ornamental groups
+	# below the legacy setting; keep paths, tools, washing and trade work.
+	if decoration < 0.5 and built.plan is HousePlan:
+		_suppress_yard_ornament(node, built.plan as HousePlan, decoration)
 
 
 static func _paint_architecture(root: Node, decoration: float, upkeep: float,
@@ -155,13 +155,22 @@ static func _appearance_color(base: Color, slot: int, decoration: float,
 	return result.lerp(weathered, (1.0 - upkeep) * 0.38)
 
 
-static func _suppress_yard_ornament(root: Node, plan: HousePlan) -> void:
+static func _suppress_yard_ornament(root: Node, plan: HousePlan, decoration := 0.0) -> void:
 	const ORNAMENTAL_GROUPS := [&"garden", &"flowers", &"herb_bed", &"mushrooms"]
 	var exterior := root.get_node_or_null("Exterior")
 	if exterior == null:
 		return
 	for row in plan.yard:
-		if StringName(row.get("group", &"")) in ORNAMENTAL_GROUPS:
+		var tag := String(row.get("group", ""))
+		var group := tag.get_slice("#", 0)
+		if StringName(group) in ORNAMENTAL_GROUPS:
+			# One deterministic decision per authored group, so paired beds stay
+			# paired and thinning never consumes the house planner's random stream.
+			var rng := RandomNumberGenerator.new()
+			var seed_value := plan.spec.seed if plan.spec != null else 0
+			rng.seed = hash("village-yard|%d|%s" % [seed_value, tag])
+			if decoration > 0.0 and rng.randf() < decoration * 2.0:
+				continue
 			var ornament := exterior.get_node_or_null(String(row.get("id", "")))
 			if ornament != null:
 				# Remove the model as well as any imported collision children.
