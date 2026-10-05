@@ -67,6 +67,10 @@ var edge_label: Label
 var generate_button: Button
 var orientation_spin: SpinBox
 var period_spin: SpinBox
+var decoration_slider: HSlider
+var upkeep_slider: HSlider
+var decoration_label: Label
+var upkeep_label: Label
 
 
 func _ready() -> void:
@@ -95,6 +99,18 @@ func _add_landscape_controls() -> void:
 	water_opt = OptionButton.new()
 	edge_label = Label.new()
 	edge_opt = OptionButton.new()
+	decoration_label = Label.new()
+	upkeep_label = Label.new()
+	decoration_slider = HSlider.new()
+	upkeep_slider = HSlider.new()
+	for slider in [decoration_slider, upkeep_slider]:
+		slider.custom_minimum_size = Vector2(120, 20)
+		slider.min_value = 0.0
+		slider.max_value = 1.0
+		slider.step = 0.05
+		slider.value_changed.connect(func(_v): _controls_changed())
+	decoration_slider.tooltip_text = "Bare / functional (0) through lush / storybook (1). Independent of wealth."
+	upkeep_slider.tooltip_text = "Weathered / neglected (0) through cared-for (1). Independent of wealth."
 	var seed_label := Label.new()
 	seed_label.text = "Seed"
 	seed_input = LineEdit.new()
@@ -122,6 +138,7 @@ func _add_landscape_controls() -> void:
 	generate_button = Button.new()
 	generate_button.text = "Generate"
 	for control in [water_label, water_opt, edge_label, edge_opt,
+			decoration_label, decoration_slider, upkeep_label, upkeep_slider,
 			orientation_label, orientation_spin, period_label, period_spin,
 			seed_label, seed_input, shuffle, generate_button]:
 		grid.add_child(control)
@@ -144,6 +161,8 @@ func _controls_changed() -> void:
 		var descriptor: Dictionary = BrickWild.describe_kind(VILLAGE)
 		width_label.text = "%s: %d" % [descriptor["width_label"], int(width_slider.value)]
 		length_label.text = "%s: %d" % [descriptor["length_label"], int(length_slider.value)]
+		decoration_label.text = "Decoration: %.2f" % decoration_slider.value
+		upkeep_label.text = "Upkeep: %.2f" % upkeep_slider.value
 		info_label.text = "Choose Grow village to apply these settings."
 	else:
 		regenerate()
@@ -252,7 +271,16 @@ func _on_kind_changed() -> void:
 	water_opt.visible = village
 	edge_label.visible = village
 	edge_opt.visible = village
+	for control in [decoration_label, decoration_slider, upkeep_label, upkeep_slider]:
+		control.visible = village
 	if village:
+		for pair in [[decoration_slider, "decoration_level"], [upkeep_slider, "upkeep"]]:
+			var slider: HSlider = pair[0]
+			var row: Dictionary = cfg[pair[1]]
+			slider.min_value = row["min"]
+			slider.max_value = row["max"]
+			slider.step = row["step"]
+			slider.value = row["value"]
 		water_label.text = cfg["water_label"]
 		edge_label.text = cfg["enclosure_label"]
 		_fill(water_opt, _options(&"water"))
@@ -319,6 +347,10 @@ func _regenerate_village(base_seed: int) -> void:
 ## Generate one variant through the public API. Mesh and scene emission happen
 ## separately so the retained representation is available to other tools.
 func _build(seed_value: int) -> GeneratedBuilding:
+	return BrickWild.generate(_request(seed_value))
+
+
+func _request(seed_value: int) -> BuildingRequest:
 	var request := BrickWild.default_request(_kind(), seed_value)
 	request.style = _get_style_key()
 	request.purpose = _second_key() if trade_opt.item_count > 0 else &""
@@ -332,7 +364,9 @@ func _build(seed_value: int) -> GeneratedBuilding:
 	if _kind() == VILLAGE:
 		request.water = water_opt.get_item_metadata(water_opt.selected)
 		request.enclosure = edge_opt.get_item_metadata(edge_opt.selected)
-	return BrickWild.generate(request)
+		request.decoration_level = decoration_slider.value
+		request.upkeep = upkeep_slider.value
+	return request
 
 
 func _show(idx: int) -> void:

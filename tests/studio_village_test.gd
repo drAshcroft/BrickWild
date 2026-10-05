@@ -22,6 +22,13 @@ func _init() -> void:
 		for i in range(expected.size()):
 			if options.get_item_metadata(i) != expected[i]["id"]: failures.append("Option identity drift")
 	if not ui.water_opt.visible or not ui.edge_opt.visible: failures.append("Landscape controls hidden")
+	if not ui.decoration_slider.visible or not ui.upkeep_slider.visible: failures.append("Appearance controls hidden")
+	if ui.decoration_slider.value != 0.5 or ui.upkeep_slider.value != 1.0: failures.append("Appearance defaults drift")
+	ui.decoration_slider.value = 0.9
+	ui.upkeep_slider.value = 0.2
+	var selected: BuildingRequest = ui._request(42)
+	if selected.decoration_level != 0.9 or selected.upkeep != 0.2: failures.append("Appearance controls lost in request")
+	if not ui.info_label.text.contains("Grow village"): failures.append("Slider does not defer generation")
 	if ui.seed_input.text.is_empty(): failures.append("Seed input missing")
 	var request := BrickWild.default_request(&"village", 42)
 	request.length = 0
