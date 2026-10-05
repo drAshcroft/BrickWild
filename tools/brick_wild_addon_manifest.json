@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "package_version": "0.1.0",
   "metadata": [
     {
@@ -19,536 +19,86 @@
       "destination": "PUBLIC_API_TRANSPORT.md"
     }
   ],
+  "_script_trees_note": "Every .gd under a script tree ships with its .uid; new files need no manifest edit. A new src/ directory must be added here or the installer test fails. 'scripts' holds only the files that do not follow their directory's rule.",
+  "script_trees": [
+    {
+      "source": "src/api",
+      "destination": "api"
+    },
+    {
+      "source": "src/bridge",
+      "destination": "families/bridge"
+    },
+    {
+      "source": "src/castle",
+      "destination": "families/castle"
+    },
+    {
+      "source": "src/church",
+      "destination": "families/church"
+    },
+    {
+      "source": "src/hotel",
+      "destination": "families/hotel"
+    },
+    {
+      "source": "src/house",
+      "destination": "families/house"
+    },
+    {
+      "source": "src/shop",
+      "destination": "families/shop"
+    },
+    {
+      "source": "src/temple",
+      "destination": "families/temple"
+    },
+    {
+      "source": "src/tree",
+      "destination": "families/tree"
+    },
+    {
+      "source": "src/village",
+      "destination": "families/village"
+    },
+    {
+      "source": "src/windmill",
+      "destination": "families/windmill"
+    },
+    {
+      "source": "src/world",
+      "destination": "families/world"
+    },
+    {
+      "source": "core",
+      "destination": "core"
+    },
+    {
+      "source": "qa",
+      "destination": "runtime/qa",
+      "exclude": [
+        "house_nav_check.gd",
+        "walk_grid.gd"
+      ]
+    }
+  ],
   "scripts": [
-    {
-      "source": "src/api/brick_wild.gd",
-      "destination": "api/brick_wild.gd"
-    },
-    {
-      "source": "src/api/building_codec.gd",
-      "destination": "api/building_codec.gd"
-    },
-    {
-      "source": "src/api/building_document.gd",
-      "destination": "api/building_document.gd"
-    },
-    {
-      "source": "src/api/building_family_adapter.gd",
-      "destination": "api/building_family_adapter.gd"
-    },
-    {
-      "source": "src/api/building_library.gd",
-      "destination": "api/building_library.gd"
-    },
-    {
-      "source": "src/api/building_request.gd",
-      "destination": "api/building_request.gd"
-    },
-    {
-      "source": "src/api/building_result.gd",
-      "destination": "api/building_result.gd"
-    },
-    {
-      "source": "src/api/generated_building.gd",
-      "destination": "api/generated_building.gd"
-    },
-    {
-      "source": "src/api/placement.gd",
-      "destination": "api/placement.gd"
-    },
-    {
-      "source": "src/castle/castle_assembler.gd",
-      "destination": "families/castle/castle_assembler.gd"
-    },
-    {
-      "source": "src/castle/castle_builder.gd",
-      "destination": "families/castle/castle_builder.gd"
-    },
-    {
-      "source": "src/castle/castle_furnisher.gd",
-      "destination": "families/castle/castle_furnisher.gd"
-    },
-    {
-      "source": "src/castle/castle_generator.gd",
-      "destination": "families/castle/castle_generator.gd"
-    },
-    {
-      "source": "src/castle/castle_access_geometry.gd",
-      "destination": "families/castle/castle_access_geometry.gd"
-    },
-    {
-      "source": "src/castle/castle_geometry.gd",
-      "destination": "families/castle/castle_geometry.gd"
-    },
-    {
-      "source": "src/castle/castle_interiors.gd",
-      "destination": "families/castle/castle_interiors.gd"
-    },
-    {
-      "source": "src/castle/castle_keep_plan.gd",
-      "destination": "families/castle/castle_keep_plan.gd"
-    },
-    {
-      "source": "src/castle/castle_motte_plan.gd",
-      "destination": "families/castle/castle_motte_plan.gd"
-    },
-    {
-      "source": "src/castle/castle_spec.gd",
-      "destination": "families/castle/castle_spec.gd"
-    },
-    {
-      "source": "src/castle/castle_tower_plan.gd",
-      "destination": "families/castle/castle_tower_plan.gd"
-    },
-    {
-      "source": "src/castle/keep_spec.gd",
-      "destination": "families/castle/keep_spec.gd"
-    },
-    {
-      "source": "src/church/church_assembler.gd",
-      "destination": "families/church/church_assembler.gd"
-    },
-    {
-      "source": "src/church/church_builder.gd",
-      "destination": "families/church/church_builder.gd"
-    },
-    {
-      "source": "src/church/church_furnisher.gd",
-      "destination": "families/church/church_furnisher.gd"
-    },
-    {
-      "source": "src/church/church_generator.gd",
-      "destination": "families/church/church_generator.gd"
-    },
-    {
-      "source": "src/church/church_geometry.gd",
-      "destination": "families/church/church_geometry.gd"
-    },
-    {
-      "source": "src/church/church_roofs.gd",
-      "destination": "families/church/church_roofs.gd"
-    },
-    {
-      "source": "src/church/church_spec.gd",
-      "destination": "families/church/church_spec.gd"
-    },
-    {
-      "source": "src/hotel/hotel_assembler.gd",
-      "destination": "families/hotel/hotel_assembler.gd"
-    },
-    {
-      "source": "src/hotel/hotel_builder.gd",
-      "destination": "families/hotel/hotel_builder.gd"
-    },
-    {
-      "source": "src/hotel/hotel_generator.gd",
-      "destination": "families/hotel/hotel_generator.gd"
-    },
-    {
-      "source": "src/hotel/hotel_geometry.gd",
-      "destination": "families/hotel/hotel_geometry.gd"
-    },
-    {
-      "source": "src/hotel/hotel_planner.gd",
-      "destination": "families/hotel/hotel_planner.gd"
-    },
-    {
-      "source": "src/hotel/hotel_spec.gd",
-      "destination": "families/hotel/hotel_spec.gd"
-    },
-    {
-      "source": "src/house/house_assembler.gd",
-      "destination": "families/house/house_assembler.gd"
-    },
-    {
-      "source": "src/house/house_builder.gd",
-      "destination": "families/house/house_builder.gd"
-    },
-    {
-      "source": "src/house/house_exterior.gd",
-      "destination": "families/house/house_exterior.gd"
-    },
-    {
-      "source": "src/house/house_furnisher.gd",
-      "destination": "families/house/house_furnisher.gd"
-    },
-    {
-      "source": "src/house/house_generator.gd",
-      "destination": "families/house/house_generator.gd"
-    },
-    {
-      "source": "src/house/house_geometry.gd",
-      "destination": "families/house/house_geometry.gd"
-    },
-    {
-      "source": "src/house/house_plan.gd",
-      "destination": "families/house/house_plan.gd"
-    },
-    {
-      "source": "src/house/house_planner.gd",
-      "destination": "families/house/house_planner.gd"
-    },
-    {
-      "source": "src/house/house_spec.gd",
-      "destination": "families/house/house_spec.gd"
-    },
-    {
-      "source": "src/house/prop_catalog.gd",
-      "destination": "families/house/prop_catalog.gd"
-    },
-    {
-      "source": "src/shop/shop_assembler.gd",
-      "destination": "families/shop/shop_assembler.gd"
-    },
-    {
-      "source": "src/shop/shop_generator.gd",
-      "destination": "families/shop/shop_generator.gd"
-    },
-    {
-      "source": "src/shop/shop_planner.gd",
-      "destination": "families/shop/shop_planner.gd"
-    },
-    {
-      "source": "src/shop/shop_spec.gd",
-      "destination": "families/shop/shop_spec.gd"
-    },
-    {
-      "source": "src/temple/column_grid.gd",
-      "destination": "families/temple/column_grid.gd"
-    },
-    {
-      "source": "src/temple/temple_assembler.gd",
-      "destination": "families/temple/temple_assembler.gd"
-    },
-    {
-      "source": "src/temple/temple_builder.gd",
-      "destination": "families/temple/temple_builder.gd"
-    },
-    {
-      "source": "src/temple/temple_generator.gd",
-      "destination": "families/temple/temple_generator.gd"
-    },
-    {
-      "source": "src/temple/temple_geometry.gd",
-      "destination": "families/temple/temple_geometry.gd"
-    },
-    {
-      "source": "src/temple/temple_spec.gd",
-      "destination": "families/temple/temple_spec.gd"
-    },
-    {
-      "source": "src/village/lot_planner.gd",
-      "destination": "families/village/lot_planner.gd"
-    },
-    {
-      "source": "src/village/programmer.gd",
-      "destination": "families/village/programmer.gd"
-    },
-    {
-      "source": "src/village/site_planner.gd",
-      "destination": "families/village/site_planner.gd"
-    },
-    {
-      "source": "src/village/village_assembler.gd",
-      "destination": "families/village/village_assembler.gd"
-    },
-    {
-      "source": "src/village/village_builder.gd",
-      "destination": "families/village/village_builder.gd"
-    },
-    {
-      "source": "src/village/village_dresser.gd",
-      "destination": "families/village/village_dresser.gd"
-    },
-    {
-      "source": "src/village/village_enclosure_plan.gd",
-      "destination": "families/village/village_enclosure_plan.gd"
-    },
-    {
-      "source": "src/village/village_plan.gd",
-      "destination": "families/village/village_plan.gd"
-    },
-    {
-      "source": "src/village/village_spec.gd",
-      "destination": "families/village/village_spec.gd"
-    },
-    {
-      "source": "src/village/village_water_plan.gd",
-      "destination": "families/village/village_water_plan.gd"
-    },
-    {
-      "source": "src/world/timber_hall_builder.gd",
-      "destination": "families/world/timber_hall_builder.gd"
-    },
-    {
-      "source": "src/world/timber_hall_generator.gd",
-      "destination": "families/world/timber_hall_generator.gd"
-    },
-    {
-      "source": "src/world/timber_hall_geometry.gd",
-      "destination": "families/world/timber_hall_geometry.gd"
-    },
-    {
-      "source": "src/world/timber_hall_spec.gd",
-      "destination": "families/world/timber_hall_spec.gd"
-    },
-    {
-      "source": "src/world/world_courtyard_generator.gd",
-      "destination": "families/world/world_courtyard_generator.gd"
-    },
-    {
-      "source": "src/world/world_families.gd",
-      "destination": "families/world/world_families.gd"
-    },
-    {
-      "source": "core/light_kit.gd",
-      "destination": "core/light_kit.gd"
-    },
-    {
-      "source": "core/mass_builder.gd",
-      "destination": "core/mass_builder.gd"
-    },
-    {
-      "source": "core/mesh_kit.gd",
-      "destination": "core/mesh_kit.gd"
-    },
-    {
-      "source": "core/poly.gd",
-      "destination": "core/poly.gd"
-    },
-    {
-      "source": "core/prop_kit.gd",
-      "destination": "core/prop_kit.gd"
-    },
-    {
-      "source": "core/roof_shape.gd",
-      "destination": "core/roof_shape.gd"
-    },
-    {
-      "source": "core/scene_bounds.gd",
-      "destination": "core/scene_bounds.gd"
-    },
-    {
-      "source": "core/shell_assembler.gd",
-      "destination": "core/shell_assembler.gd"
-    },
-    {
-      "source": "qa/blueprint_qa.gd",
-      "destination": "runtime/qa/blueprint_qa.gd"
-    },
-    {
-      "source": "qa/castle_massing_check.gd",
-      "destination": "runtime/qa/castle_massing_check.gd"
-    },
-    {"source": "qa/castle_qa.gd", "destination": "runtime/qa/castle_qa.gd"},
-    {"source": "qa/castle_occupancy_check.gd", "destination": "runtime/qa/castle_occupancy_check.gd"},
-    {"source": "src/castle/castle_route_check.gd", "destination": "families/castle/castle_route_check.gd"},
-    {"source": "qa/house_qa.gd", "destination": "runtime/qa/house_qa.gd"},
-    {"source": "qa/mesh_integrity_check.gd", "destination": "runtime/qa/mesh_integrity_check.gd"},
-    {
-      "source": "qa/component_check.gd",
-      "destination": "runtime/qa/component_check.gd"
-    },
-    {
-      "source": "qa/court_check.gd",
-      "destination": "runtime/qa/court_check.gd"
-    },
-    {
-      "source": "qa/dressing_check.gd",
-      "destination": "runtime/qa/dressing_check.gd"
-    },
-    {
-      "source": "qa/hall_check.gd",
-      "destination": "runtime/qa/hall_check.gd"
-    },
-    {
-      "source": "qa/hotel_qa.gd",
-      "destination": "runtime/qa/hotel_qa.gd"
-    },
-    {
-      "source": "qa/house_furnish_check.gd",
-      "destination": "runtime/qa/house_furnish_check.gd"
-    },
     {
       "source": "qa/house_nav_check.gd",
       "destination": "runtime/navigation/house_nav_check.gd"
-    },
-    {
-      "source": "qa/house_plan_check.gd",
-      "destination": "runtime/qa/house_plan_check.gd"
-    },
-    {
-      "source": "qa/mass_rules.gd",
-      "destination": "runtime/qa/mass_rules.gd"
-    },
-    {
-      "source": "qa/massing_check.gd",
-      "destination": "runtime/qa/massing_check.gd"
-    },
-    {
-      "source": "qa/roof_opening_check.gd",
-      "destination": "runtime/qa/roof_opening_check.gd"
-    },
-    {
-      "source": "qa/rule_set.gd",
-      "destination": "runtime/qa/rule_set.gd"
-    },
-    {
-      "source": "qa/sightline.gd",
-      "destination": "runtime/qa/sightline.gd"
-    },
-    {
-      "source": "qa/temple_qa.gd",
-      "destination": "runtime/qa/temple_qa.gd"
-    },
-    {
-      "source": "qa/temple_rite_check.gd",
-      "destination": "runtime/qa/temple_rite_check.gd"
-    },
-    {
-      "source": "qa/tower_check.gd",
-      "destination": "runtime/qa/tower_check.gd"
-    },
-    {
-      "source": "qa/village_dress_check.gd",
-      "destination": "runtime/qa/village_dress_check.gd"
-    },
-    {
-      "source": "qa/village_enclosure_check.gd",
-      "destination": "runtime/qa/village_enclosure_check.gd"
-    },
-    {
-      "source": "qa/village_lot_check.gd",
-      "destination": "runtime/qa/village_lot_check.gd"
-    },
-    {
-      "source": "qa/village_measure.gd",
-      "destination": "runtime/qa/village_measure.gd"
-    },
-    {
-      "source": "qa/village_nav_check.gd",
-      "destination": "runtime/qa/village_nav_check.gd"
-    },
-    {
-      "source": "qa/village_place_check.gd",
-      "destination": "runtime/qa/village_place_check.gd"
-    },
-    {
-      "source": "qa/village_qa.gd",
-      "destination": "runtime/qa/village_qa.gd"
-    },
-    {
-      "source": "qa/village_road_check.gd",
-      "destination": "runtime/qa/village_road_check.gd"
-    },
-    {
-      "source": "qa/village_scale_check.gd",
-      "destination": "runtime/qa/village_scale_check.gd"
-    },
-    {
-      "source": "qa/voxel_grid.gd",
-      "destination": "runtime/qa/voxel_grid.gd"
     },
     {
       "source": "qa/walk_grid.gd",
       "destination": "runtime/navigation/walk_grid.gd"
     },
     {
-      "source": "packaging/brick_wild/example.gd",
-      "destination": "example.gd"
+      "source": "src/ui/blueprint_view.gd",
+      "destination": "families/ui/blueprint_view.gd"
     },
     {
-      "source": "packaging/brick_wild/plugin.gd",
-      "destination": "plugin.gd"
-    },
-    {"source": "core/generator_random.gd", "destination": "core/generator_random.gd"},
-    {"source": "core/material_kit.gd", "destination": "core/material_kit.gd"},
-    {"source": "qa/cut_check.gd", "destination": "runtime/qa/cut_check.gd"},
-    {"source": "qa/hammam_check.gd", "destination": "runtime/qa/hammam_check.gd"},
-    {"source": "qa/han_check.gd", "destination": "runtime/qa/han_check.gd"},
-    {"source": "qa/house_furnish_affinity_check.gd", "destination": "runtime/qa/house_furnish_affinity_check.gd"},
-    {"source": "qa/house_furnish_arrangement_check.gd", "destination": "runtime/qa/house_furnish_arrangement_check.gd"},
-    {"source": "qa/house_furnish_physical_check.gd", "destination": "runtime/qa/house_furnish_physical_check.gd"},
-    {"source": "qa/house_furnish_programme_check.gd", "destination": "runtime/qa/house_furnish_programme_check.gd"},
-    {"source": "qa/house_furnish_spatial_check.gd", "destination": "runtime/qa/house_furnish_spatial_check.gd"},
-    {"source": "qa/house_yard_check.gd", "destination": "runtime/qa/house_yard_check.gd"},
-    {"source": "qa/pagoda_check.gd", "destination": "runtime/qa/pagoda_check.gd"},
-    {"source": "qa/prakara_check.gd", "destination": "runtime/qa/prakara_check.gd"},
-    {"source": "qa/qibla_check.gd", "destination": "runtime/qa/qibla_check.gd"},
-    {"source": "qa/shikhara_check.gd", "destination": "runtime/qa/shikhara_check.gd"},
-    {"source": "qa/siheyuan_check.gd", "destination": "runtime/qa/siheyuan_check.gd"},
-    {"source": "qa/stupa_check.gd", "destination": "runtime/qa/stupa_check.gd"},
-    {"source": "qa/tulou_check.gd", "destination": "runtime/qa/tulou_check.gd"},
-    {"source": "qa/vastu_check.gd", "destination": "runtime/qa/vastu_check.gd"},
-    {"source": "qa/vav_check.gd", "destination": "runtime/qa/vav_check.gd"},
-    {"source": "qa/vihara_check.gd", "destination": "runtime/qa/vihara_check.gd"},
-    {"source": "qa/windmill_check.gd", "destination": "runtime/qa/windmill_check.gd"},
-    {"source": "src/world/world_tower_house_generator.gd", "destination": "families/world/world_tower_house_generator.gd"},
-    {"source": "src/castle/castle_apron.gd", "destination": "families/castle/castle_apron.gd"},
-    {"source": "src/castle/castle_apse_plan.gd", "destination": "families/castle/castle_apse_plan.gd"},
-    {"source": "src/castle/castle_gate_plan.gd", "destination": "families/castle/castle_gate_plan.gd"},
-    {"source": "src/castle/castle_mural_plan.gd", "destination": "families/castle/castle_mural_plan.gd"},
-    {"source": "src/castle/castle_interior_plans.gd", "destination": "families/castle/castle_interior_plans.gd"},
-    {"source": "src/castle/castle_moat_builder.gd", "destination": "families/castle/castle_moat_builder.gd"},
-    {"source": "src/castle/castle_skin.gd", "destination": "families/castle/castle_skin.gd"},
-    {"source": "src/castle/castle_yard_builder.gd", "destination": "families/castle/castle_yard_builder.gd"},
-    {"source": "src/castle/castle_yards.gd", "destination": "families/castle/castle_yards.gd"},
-    {"source": "src/house/house_furnish_geometry.gd", "destination": "families/house/house_furnish_geometry.gd"},
-    {"source": "src/house/house_furnish_placement.gd", "destination": "families/house/house_furnish_placement.gd"},
-    {"source": "src/house/house_furnish_repair.gd", "destination": "families/house/house_furnish_repair.gd"},
-    {"source": "src/house/house_furnish_score.gd", "destination": "families/house/house_furnish_score.gd"},
-    {"source": "src/house/house_furnish_surface.gd", "destination": "families/house/house_furnish_surface.gd"},
-    {"source": "src/house/house_furnishing_recipes.gd", "destination": "families/house/house_furnishing_recipes.gd"},
-    {"source": "src/house/house_plan_features.gd", "destination": "families/house/house_plan_features.gd"},
-    {"source": "src/house/house_plan_levels.gd", "destination": "families/house/house_plan_levels.gd"},
-    {"source": "src/house/house_plan_openings.gd", "destination": "families/house/house_plan_openings.gd"},
-    {"source": "src/house/house_plan_rooms.gd", "destination": "families/house/house_plan_rooms.gd"},
-    {"source": "src/house/house_yard.gd", "destination": "families/house/house_yard.gd"},
-    {"source": "src/ui/blueprint_view.gd", "destination": "families/ui/blueprint_view.gd"},
-    {"source": "src/ui/house_sheet.gd", "destination": "families/ui/house_sheet.gd"},
-    {"source": "src/village/village_dress_catalog.gd", "destination": "families/village/village_dress_catalog.gd"},
-    {"source": "src/village/village_dress_context.gd", "destination": "families/village/village_dress_context.gd"},
-    {"source": "src/village/village_dress_hosts.gd", "destination": "families/village/village_dress_hosts.gd"},
-    {"source": "src/village/village_dress_placement.gd", "destination": "families/village/village_dress_placement.gd"},
-    {"source": "src/village/village_dress_rules.gd", "destination": "families/village/village_dress_rules.gd"},
-    {"source": "src/village/village_dress_spots.gd", "destination": "families/village/village_dress_spots.gd"},
-    {"source": "src/windmill/windmill_assembler.gd", "destination": "families/windmill/windmill_assembler.gd"},
-    {"source": "src/windmill/windmill_builder.gd", "destination": "families/windmill/windmill_builder.gd"},
-    {"source": "src/windmill/windmill_generator.gd", "destination": "families/windmill/windmill_generator.gd"},
-    {"source": "src/windmill/windmill_geometry.gd", "destination": "families/windmill/windmill_geometry.gd"},
-    {"source": "src/windmill/windmill_spec.gd", "destination": "families/windmill/windmill_spec.gd"},
-    {"source": "src/world/cruciform_builder.gd", "destination": "families/world/cruciform_builder.gd"},
-    {"source": "src/world/cruciform_check.gd", "destination": "families/world/cruciform_check.gd"},
-    {"source": "src/world/cruciform_generator.gd", "destination": "families/world/cruciform_generator.gd"},
-    {"source": "src/world/cut_temple_builder.gd", "destination": "families/world/cut_temple_builder.gd"},
-    {"source": "src/world/cut_temple_generator.gd", "destination": "families/world/cut_temple_generator.gd"},
-    {"source": "src/world/dravida_builder.gd", "destination": "families/world/dravida_builder.gd"},
-    {"source": "src/world/dravida_generator.gd", "destination": "families/world/dravida_generator.gd"},
-    {"source": "src/world/hammam_builder.gd", "destination": "families/world/hammam_builder.gd"},
-    {"source": "src/world/hammam_generator.gd", "destination": "families/world/hammam_generator.gd"},
-    {"source": "src/world/insula_generator.gd", "destination": "families/world/insula_generator.gd"},
-    {"source": "src/world/insula_spec.gd", "destination": "families/world/insula_spec.gd"},
-    {"source": "src/world/mosque_builder.gd", "destination": "families/world/mosque_builder.gd"},
-    {"source": "src/world/mosque_generator.gd", "destination": "families/world/mosque_generator.gd"},
-    {"source": "src/world/mountain_builder.gd", "destination": "families/world/mountain_builder.gd"},
-    {"source": "src/world/mountain_check.gd", "destination": "families/world/mountain_check.gd"},
-    {"source": "src/world/mountain_generator.gd", "destination": "families/world/mountain_generator.gd"},
-    {"source": "src/world/nagara_builder.gd", "destination": "families/world/nagara_builder.gd"},
-    {"source": "src/world/nagara_generator.gd", "destination": "families/world/nagara_generator.gd"},
-    {"source": "src/world/pagoda_builder.gd", "destination": "families/world/pagoda_builder.gd"},
-    {"source": "src/world/pagoda_generator.gd", "destination": "families/world/pagoda_generator.gd"},
-    {"source": "src/world/siheyuan_generator.gd", "destination": "families/world/siheyuan_generator.gd"},
-    {"source": "src/world/stupa_builder.gd", "destination": "families/world/stupa_builder.gd"},
-    {"source": "src/world/stupa_generator.gd", "destination": "families/world/stupa_generator.gd"},
-    {"source": "src/world/stupa_spec.gd", "destination": "families/world/stupa_spec.gd"},
-    {"source": "src/world/tulou_builder.gd", "destination": "families/world/tulou_builder.gd"},
-    {"source": "src/world/tulou_generator.gd", "destination": "families/world/tulou_generator.gd"},
-    {"source": "src/world/vastu_generator.gd", "destination": "families/world/vastu_generator.gd"},
-    {"source": "src/world/vav_builder.gd", "destination": "families/world/vav_builder.gd"},
-    {"source": "src/world/vav_generator.gd", "destination": "families/world/vav_generator.gd"},
-    {"source": "src/world/vihara_generator.gd", "destination": "families/world/vihara_generator.gd"},
-    {"source": "src/world/world_assembler.gd", "destination": "families/world/world_assembler.gd"},
-    {"source": "src/world/world_han_generator.gd", "destination": "families/world/world_han_generator.gd"}
+      "source": "src/ui/house_sheet.gd",
+      "destination": "families/ui/house_sheet.gd"
+    }
   ],
   "files": [
     {
@@ -560,17 +110,23 @@
     {
       "source": "assets/props/dungeon",
       "destination": "assets/props/dungeon",
-      "exclude_suffixes": [".import"]
+      "exclude_suffixes": [
+        ".import"
+      ]
     },
     {
       "source": "assets/props/nature",
       "destination": "assets/props/nature",
-      "exclude_suffixes": [".import"]
+      "exclude_suffixes": [
+        ".import"
+      ]
     },
     {
       "source": "assets/props/wild",
       "destination": "assets/props/wild",
-      "exclude_suffixes": [".import"]
+      "exclude_suffixes": [
+        ".import"
+      ]
     },
     {
       "source": "assets/props/fantasy",

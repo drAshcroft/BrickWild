@@ -50,7 +50,8 @@ const PEOPLE_PER_HOUSEHOLD := 4.5
 const HOUSEHOLD_JITTER := 0.10   # +-10% from the seed
 
 const CULTURES: Array[StringName] = [
-	&"english", &"frankish", &"norse", &"alpine", &"moorish", &"eastern", &"blighted"]
+	&"english", &"frankish", &"norse", &"alpine", &"moorish", &"eastern", &"blighted",
+	&"mediterranean", &"east_asian", &"saharan"]
 const PURPOSES: Array[StringName] = [
 	&"farming", &"crossroads", &"market", &"mill", &"fishing", &"mining",
 	&"garrison", &"pilgrim", &"forest"]

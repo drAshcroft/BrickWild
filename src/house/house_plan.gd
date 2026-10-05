@@ -304,7 +304,7 @@ func rooms_onto_court(ci: int) -> Array[int]:
 		var n: Vector2 = d["normal"]
 		for side in [1.0, -1.0]:
 			if Poly.contains_point(poly,
-					pos + n * side * (HouseGeometry.WALL_T + 0.05), 0.01):
+					pos + n * side * (HouseGeometry.wall_thickness(spec) + 0.05), 0.01):
 				out.append(room)
 				break
 	return out

@@ -71,6 +71,26 @@ var exterior_props: bool = true   # facade pieces, the yard and its built pieces
 ## 3 m (HouseYard.APRON). Never drawn from `rng`, so it cannot move a plan.
 var yard_apron: float = -1.0
 ## Chosen before planning, so clear floor, openings and emitted masonry agree.
+## ---- vernacular exterior culture (HOUSE-CULTURE) ----
+## Five dwellings that are not a timber cottage: a whitewashed tile house, a
+## stilted timber house under a sweeping roof, a thatched compound house, a
+## thatched cottage, a mud hut. None of them is a European house with the
+## colours changed, so each names a PIECE of architecture the six European
+## styles never had -- and every switch below is read from the style row
+## behind one guard, so the six European rows take no draw and not one
+## seeded plan, roof or piece of furniture moves.
+var parapet: bool = false          # a wall standing on the roof eave
+var veranda: bool = false          # a roofed open platform on the entrance wall
+var veranda_depth: float = 1.5     # how far the platform reaches out
+var eave_sweep: bool = false       # the eave flicks up at its four corners
+var thatch_roll: bool = false      # a combed ridge roll and a thick eave roll
+var corner_piers: bool = false     # rounded mud-brick corners
+## How far the roof oversails its walls. Negative means HouseGeometry's
+## ordinary 0.35 m / 0.25 m, and the bound reads the resolved value from
+## there, so a deep-eaved house cannot be looser than the eave it built.
+var roof_span_out: float = -1.0
+var roof_along_out: float = -1.0
+## Chosen before planning, so clear floor, openings and emitted masonry agree.
 var material: StringName = &"timber" # timber | stone
 ## Site frame metadata. These do not participate in seeded plan generation.
 var orientation: float = 0.0
@@ -102,6 +122,7 @@ const STYLES := {
 		"label": "Cottage",
 		"timber": 0.95, "studs": [0.95, 1.5], "braces": 0.8, "rail": 0.5,
 		"roof_pitch": [0.85, 1.2], "porch": 0.5, "chimney": 0.9, "shutters": 0.7,
+		"roof_material": &"shingle", "pitch_reference": 7.0,
 		"wall": ["e6ddc8", "cfc3a8"], "trim": ["6b5236", "4a3826"],
 		"roof": ["6a4a34", "4e3626"], "floor": ["8a7a5e", "6f6148"],
 		"clutter": [0.5, 0.8],
@@ -114,6 +135,7 @@ const STYLES := {
 		"label": "Farmhouse",
 		"timber": 0.9, "studs": [1.1, 1.7], "braces": 0.85, "rail": 0.4,
 		"roof_pitch": [0.7, 1.0], "porch": 0.7, "chimney": 0.95, "shutters": 0.5,
+		"roof_material": &"thatch", "pitch_reference": 9.0,
 		"wall": ["d9d2bd", "bcb49c"], "trim": ["7a6242", "56452e"],
 		"roof": ["7b6a4a", "5c4e35"], "floor": ["7d6f56", "615641"],
 		"clutter": [0.6, 0.95],
@@ -126,6 +148,7 @@ const STYLES := {
 		"label": "Townhouse",
 		"timber": 1.0, "studs": [0.45, 0.7], "braces": 0.3, "rail": 0.9,
 		"roof_pitch": [1.0, 1.4], "porch": 0.2, "chimney": 1.0, "shutters": 0.35,
+		"roof_material": &"slate", "pitch_reference": 8.0,
 		"wall": ["cfc9bd", "b3ac9e"], "trim": ["4b4238", "342e28"],
 		"roof": ["4a4f57", "353a41"], "floor": ["8e7f63", "6b5f49"],
 		"clutter": [0.35, 0.6],
@@ -138,6 +161,7 @@ const STYLES := {
 		"label": "Long Hall",
 		"timber": 0.85, "studs": [1.0, 1.6], "braces": 0.9, "rail": 0.35,
 		"roof_pitch": [0.9, 1.25], "porch": 0.35, "chimney": 0.8, "shutters": 0.3,
+		"roof_material": &"thatch", "pitch_reference": 8.0,
 		"wall": ["c9b899", "ab9877"], "trim": ["5a4429", "3e2f1d"],
 		"roof": ["50412c", "39301f"], "floor": ["7a6a4f", "5b4f3a"],
 		"clutter": [0.5, 0.85],
@@ -150,6 +174,7 @@ const STYLES := {
 		"label": "Witch's Hut",
 		"timber": 0.8, "studs": [0.8, 1.4], "braces": 0.6, "rail": 0.5,
 		"roof_pitch": [1.2, 1.7], "porch": 0.25, "chimney": 1.0, "shutters": 0.6,
+		"roof_material": &"shingle", "pitch_reference": 8.0, "pitch_exponent": 0.2,
 		"wall": ["b6b2a0", "938f7e"], "trim": ["46402f", "2e2a1e"],
 		"roof": ["3f4a3a", "2c352a"], "floor": ["6c6250", "51493c"],
 		"clutter": [0.75, 1.0],
@@ -164,6 +189,7 @@ const STYLES := {
 		# elevation is read as horizontal stripes, not as a plastered box.
 		"timber": 1.0, "studs": [0.32, 0.5], "braces": 0.25, "rail": 1.0,
 		"roof_pitch": [1.25, 1.7], "porch": 0.85, "chimney": 1.0, "shutters": 0.8,
+		"roof_material": &"shingle", "pitch_reference": 8.0,
 		"wall": ["e6dcc4", "cdbda2"], "trim": ["7d5f38", "543f22"],
 		"roof": ["5c4230", "3d2b1e"], "floor": ["84745a", "695c46"],
 		"clutter": [0.55, 0.9],
@@ -175,6 +201,105 @@ const STYLES := {
 		# of these is an ordinary house, whatever its name.
 		"cornice": 1.0, "string_courses": [1, 2], "pediments": 0.85,
 		"ridge_finial": 1.0, "min_storeys": 2,
+	},
+	&"mediterranean": {
+		"label": "Mediterranean House",
+		# Limewashed rendered masonry under pantiles. There is no frame to
+		# expose, so `timber` is zero and the wall is a plastered solid: the
+		# elevation is read from its shutters, its deep eave and its terrace
+		# wall, not from studs.
+		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
+		"roof_pitch": [0.5, 0.75], "porch": 0.35, "chimney": 0.45, "shutters": 0.9,
+		"wall": ["f2e8d4", "e0cfae"], "trim": ["2f6b63", "1d4a43"],
+		"roof": ["b4622f", "8d4722"], "floor": ["bcab89", "9c8a6b"],
+		"clutter": [0.35, 0.7],
+		"plinth": [0.5, 0.85], "roof_types": [&"hipped", &"gable"],
+		"framing": [&"square_panel"], "truss": [&"king_post"],
+		"jetty": 0.0, "dormers": 0.25, "bargeboards": 0.0, "stone_ground": 0.0,
+		"chimney_style": &"straight", "pots": [1, 2],
+		"roof_material": &"tile", "pitch_reference": 9.0,
+		"wall_t": 0.45, "culture": 1.0,
+		"parapet": 0.7, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"corner_piers": 0.0, "span_out": 0.55, "along_out": 0.45,
+	},
+	&"asian": {
+		"label": "Asian Timber House",
+		# A boarded shell standing clear of the wet ground, under one very
+		# deep roof whose corners flick up. The veranda and the eave sweep are
+		# not decoration on this style; they are the house, and a plan without
+		# them is a shed with a hat on.
+		"timber": 0.85, "studs": [0.9, 1.3], "braces": 0.7, "rail": 0.8,
+		"roof_pitch": [0.95, 1.3], "porch": 0.0, "chimney": 0.15, "shutters": 0.0,
+		"wall": ["dccfab", "c2b189"], "trim": ["6b4a2f", "47301c"],
+		"roof": ["3f4a44", "2b3430"], "floor": ["a08a63", "857050"],
+		"clutter": [0.3, 0.65],
+		"plinth": [0.6, 0.95], "roof_types": [&"hipped"],
+		"framing": [&"square_panel", &"arch_brace"], "truss": [&"king_post", &"queen_post"],
+		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
+		"chimney_style": &"straight", "pots": [1, 1],
+		"roof_material": &"tile", "pitch_reference": 8.0,
+		"wall_t": 0.3, "culture": 1.0,
+		"parapet": 0.0, "veranda": 1.0, "eave_sweep": 1.0, "thatch_roll": 0.0,
+		"corner_piers": 0.0, "span_out": 0.95, "along_out": 0.85,
+	},
+	&"african": {
+		"label": "African Compound House",
+		# Thick ochre daub over a rubble core, combed reed over it, and a
+		# shaded veranda to sit out the heat under. No chimney: the smoke
+		# leaves by the roof, which is why the hearth is in the middle of the
+		# floor and not against a wall.
+		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
+		"roof_pitch": [1.0, 1.35], "porch": 0.0, "chimney": 0.0, "shutters": 0.15,
+		"wall": ["c08a55", "9b6b3e"], "trim": ["5a3a22", "3b2514"],
+		"roof": ["ac8a44", "806229"], "floor": ["9c7a52", "7a5f3e"],
+		"clutter": [0.5, 0.9],
+		"plinth": [0.3, 0.6], "roof_types": [&"hipped", &"conical"],
+		"framing": [&"square_panel"], "truss": [&"king_post"],
+		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
+		"chimney_style": &"straight", "pots": [1, 1],
+		"roof_material": &"thatch", "pitch_reference": 8.0,
+		"wall_t": 0.5, "culture": 1.0,
+		"parapet": 0.6, "veranda": 0.75, "eave_sweep": 0.0, "thatch_roll": 1.0,
+		"corner_piers": 1.0, "span_out": 0.7, "along_out": 0.6,
+	},
+	&"thatch_cottage": {
+		"label": "Thatched Cottage",
+		# A cob cottage under a very steep combed roof. Thatch is why this
+		# style has no bargeboards at all: a verge board is a thing that holds
+	# ON slates or tiles, and a thatcher finishes a gable by turning the reeds
+		# down and wiring them, not by nailing a board to the end of them.
+		"timber": 0.55, "studs": [1.0, 1.5], "braces": 0.5, "rail": 0.4,
+		"roof_pitch": [1.15, 1.5], "porch": 0.6, "chimney": 0.85, "shutters": 0.4,
+		"wall": ["efe7d3", "dbcfb4"], "trim": ["4a3826", "322518"],
+		"roof": ["bda25f", "8d7640"], "floor": ["8a7a5e", "6f6148"],
+		"clutter": [0.45, 0.8],
+		"plinth": [0.3, 0.55], "roof_types": [&"gable"],
+		"framing": [&"arch_brace", &"square_panel"], "truss": [&"king_post", &"collar_strut"],
+		"jetty": 0.25, "dormers": 0.2, "bargeboards": 0.0, "stone_ground": 0.1,
+		"chimney_style": &"stepped", "pots": [1, 2],
+		"roof_material": &"thatch", "pitch_reference": 7.0,
+		"wall_t": 0.5, "culture": 1.0,
+		"parapet": 0.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 1.0,
+		"corner_piers": 0.0, "span_out": 0.5, "along_out": 0.35,
+	},
+	&"mud_hut": {
+		"label": "Mud Hut",
+		# One room, very thick walls, one cone. There is nothing to put a
+		# window in that is not a hole through half a metre of mud, so the
+		# openings are small and high and the plan is nearly a square.
+		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
+		"roof_pitch": [1.05, 1.4], "porch": 0.0, "chimney": 0.0, "shutters": 0.0,
+		"wall": ["b98a5e", "94663d"], "trim": ["6b4527", "472c16"],
+		"roof": ["ab8e4c", "82692e"], "floor": ["8a6a45", "6a5033"],
+		"clutter": [0.4, 0.75],
+		"plinth": [0.25, 0.45], "roof_types": [&"conical"],
+		"framing": [&"square_panel"], "truss": [&"king_post"],
+		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
+		"chimney_style": &"straight", "pots": [1, 1],
+		"roof_material": &"thatch", "pitch_reference": 7.0,
+		"wall_t": 0.62, "culture": 1.0,
+		"parapet": 0.0, "veranda": 0.45, "eave_sweep": 0.0, "thatch_roll": 1.0,
+		"corner_piers": 1.0, "span_out": 0.8, "along_out": 0.7,
 	},
 }
 

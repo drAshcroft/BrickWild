@@ -61,6 +61,10 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	# them is behind its own spec field, so an ordinary house returns from this
 	# having emitted nothing and its mesh is unchanged vertex for vertex.
 	_build_rich_trim()
+	# HOUSE-CULTURE: the two pieces that stand at or below the wall head. The
+	# three that belong to the roof are emitted from _build_roof, because they
+	# are placed against the roof that was actually built.
+	_build_culture()
 	if with_roof:
 		_build_roof()
 	_build_porch()
@@ -1521,6 +1525,214 @@ func _moulding_piece(from: Vector2, dir: Vector2, yaw: float, t0: float, t1: flo
 		Transform3D(Basis(Vector3.UP, yaw),
 			Vector3(mid.x, y_offset + y0 + height * 0.5, mid.y)), SURF_TRIM)
 
+## ----------------------------------------------------------------- culture
+##
+## Five dwellings that are not a timber cottage. Each piece below is a NAMED
+## component with its own host, emitted through component_box/component_slab
+## so `qa/component_check.gd` re-emits it against real triangles and
+## `qa/vernacular_house_check.gd` can ask what a parapet is made of rather than
+## whether a count fell. Every number comes from HouseGeometry, which is also
+## where the exterior bound reads them from.
+
+func _build_culture() -> void:
+	_build_corner_piers()
+	_build_veranda()
+
+
+## Rounded mud corners: a regular octagon standing on each corner of each
+## storey. A daub wall is built up in lifts and washed by the first rain, and
+## the corners go first, so they are the first thing rebuilt -- and what they
+## are rebuilt as is a round pier, not a square one. It reaches PIER_R past
+## the wall line, which every roof that carries one already oversails.
+func _build_corner_piers() -> void:
+	if not spec.corner_piers:
+		return
+	tag("corner_pier")
+	for level in range(_storeys()):
+		host("corner_piers", level)
+		var y0: float = spec.height * float(level)
+		for sx in [-1.0, 1.0]:
+			for sz in [-1.0, 1.0]:
+				var centre := Vector2(float(sx) * spec.width * 0.5,
+					float(sz) * spec.length * 0.5)
+				# A vertical slab is centred on the plane it is handed, so the
+				# pier's plane is its own mid-height. Centred on the floor
+				# instead, half of every pier stands in the ground.
+				component_slab("corner_pier", _pier_ring(centre, HouseGeometry.PIER_R,
+					y0 + spec.height * 0.5), spec.height, SURF_WALL, true)
+	host_end()
+
+
+func _pier_ring(centre: Vector2, radius: float, y: float) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	var n: int = HouseGeometry.PIER_SIDES
+	for i in range(n):
+		var a := TAU * float(i) / float(n)
+		out.append(Vector3(centre.x + cos(a) * radius, y, centre.y + sin(a) * radius))
+	return out
+
+
+## A veranda: a platform on the ground, posts, a head beam and a shed rooflet
+## over all three, on the wall the entrance is actually on -- so it is a
+## veranda and not a porch bolted to the wrong elevation. The rooflet falls
+## outward and oversails the posts, which is what shades them.
+func _build_veranda() -> void:
+	if not spec.veranda:
+		return
+	var d: int = plan.entrance()
+	if d < 0:
+		return
+	tag("veranda")
+	host("veranda", 0)
+	var door: Dictionary = plan.doors[d]
+	var n: Vector2 = door["normal"]
+	# Local +Z points OUT of the door, +X runs along the wall, and the origin is
+	# the door's own place in the plan. A veranda built at the world origin is
+	# a veranda in the middle of the house, and its bound is still correct.
+	var xf := Transform3D(Basis(Vector3.UP, atan2(n.x, n.y)),
+		Vector3(door["pos"].x, 0.0, door["pos"].y))
+	var face: float = HouseGeometry.wall_thickness(spec) * 0.5
+	var depth: float = spec.veranda_depth
+	var head: float = HouseGeometry.veranda_head(spec)
+	var pw: float = HouseGeometry.VERANDA_POST_W
+	var w: float = float(door["width"]) * 2.0 + pw * float(HouseGeometry.VERANDA_POSTS)
+	var front: float = face + depth
+	component_box("veranda_deck", Vector3(w, HouseGeometry.VERANDA_DECK_T, depth),
+		xf * Transform3D(Basis(), Vector3(0.0, HouseGeometry.VERANDA_DECK_T * 0.5,
+			face + depth * 0.5)), SURF_FLOOR)
+	var run: float = w - pw
+	for i in range(HouseGeometry.VERANDA_POSTS):
+		var px: float = -run * 0.5 + run * float(i) / float(HouseGeometry.VERANDA_POSTS - 1)
+		component_box("veranda_post", Vector3(pw, head, pw),
+			xf * Transform3D(Basis(), Vector3(px, head * 0.5, front - pw * 0.5)), SURF_TRIM)
+	component_box("veranda_beam", Vector3(run + pw * 2.0, HouseGeometry.VERANDA_BEAM_H,
+		HouseGeometry.VERANDA_BEAM_W),
+		xf * Transform3D(Basis(), Vector3(0.0, head + HouseGeometry.VERANDA_BEAM_H * 0.5,
+			front - pw * 0.5)), SURF_TRIM)
+	# The rooflet, in segments: a shed roof over a veranda is a slab that
+	# falls, and the kit extrudes a slab along one axis, so the veranda's width
+	# is the axis it cannot be extruded along.
+	var edge: float = front + HouseGeometry.VERANDA_EAVE_OUT
+	var rt: float = HouseGeometry.VERANDA_ROOF_T
+	var fall: float = HouseGeometry.VERANDA_ROOF_FALL
+	var segs: int = 4
+	for i in range(segs):
+		var x0: float = -w * 0.5 + w * (float(i) + 0.5) / float(segs)
+		var seg: float = w / float(segs)
+		_roof_face(xf, PackedVector3Array([
+			Vector3(x0, head, face), Vector3(x0, head - fall, edge),
+			Vector3(x0, head - fall - rt, edge), Vector3(x0, head - rt, face)]),
+			SURF_ROOF, "veranda_roof_%d" % i, false, seg)
+	host_end()
+
+
+## The roof's plan half-extents, span first, in the 64-bit floats the emitter
+## lays in. Read from the layout the builder laid out rather than recomputed
+## from the spec, so a piece that stands ON the eave cannot be placed against a
+## different roof than the one above it. `HouseGeometry.roof_oversail` would do
+## this in one line and in 32 bits; see HouseGeometry.roof_span_out for why that
+## is not a cosmetic difference.
+func _eave_half_x(layout: Dictionary) -> float:
+	return float(layout["span"]) * 0.5 + HouseGeometry.roof_span_out(spec)
+
+
+func _eave_half_y(layout: Dictionary) -> float:
+	return float(layout["along"]) * 0.5 + HouseGeometry.roof_along_out(spec)
+
+
+## A parapet on the roof edge, with its outer face ON the eave rather than
+## past it -- so it costs the plan bound nothing and the roof behind it is the
+## roof that contains it. It only reads against a shallow pitch, which is
+## exactly the roof the styles that ask for it are given.
+func _build_parapet(layout: Dictionary) -> void:
+	if not spec.parapet:
+		return
+	tag("parapet")
+	host("parapet", _storeys() - 1)
+	var hx: float = _eave_half_x(layout)
+	var hy: float = _eave_half_y(layout)
+	var t: float = HouseGeometry.PARAPET_T
+	var y0: float = HouseGeometry.PARAPET_BASE
+	for side in [-1.0, 1.0]:
+		var s := float(side)
+		component_box("parapet", Vector3(t, HouseGeometry.PARAPET_H, hy * 2.0),
+			layout["transform"] * Transform3D(Basis(),
+				Vector3(s * (hx - t * 0.5), y0 + HouseGeometry.PARAPET_H * 0.5, 0.0)), SURF_WALL)
+		component_box("parapet", Vector3(hx * 2.0, HouseGeometry.PARAPET_H, t),
+			layout["transform"] * Transform3D(Basis(),
+				Vector3(0.0, y0 + HouseGeometry.PARAPET_H * 0.5, s * (hy - t * 0.5))), SURF_WALL)
+	host_end()
+
+
+## The eave sweep: a fin at each of the four roof corners, standing SWEEP_UP
+## above the eave and reaching SWEEP_RUN back along it. Set inboard of the
+## eave and stopped there, so it is the roof's own oversail that bounds it and
+## a house that did not widen its roof got no sweep.
+func _build_eave_sweep(layout: Dictionary) -> void:
+	if not spec.eave_sweep:
+		return
+	tag("eave_sweep")
+	host("eave_sweep", _storeys() - 1)
+	var hx: float = _eave_half_x(layout)
+	var hy: float = _eave_half_y(layout)
+	var t: float = HouseGeometry.SWEEP_T
+	for side in [-1.0, 1.0]:
+		for end in [-1.0, 1.0]:
+			var sx := float(side)
+			var ez := float(end)
+			# The fin is a vertical triangle extruded ACROSS its own plane, so
+			# the slab straddles the plane rather than starting at it. Setting
+			# the plane half a fin inboard lands the fin's outer face exactly
+			# on the eave, whichever corner of the roof this is.
+			var plane: float = sx * (hx - t * 0.5)
+			_roof_face(layout["transform"], PackedVector3Array([
+				Vector3(plane, 0.0, ez * hy),
+				Vector3(plane, 0.0, ez * (hy - HouseGeometry.SWEEP_RUN)),
+				Vector3(plane, HouseGeometry.SWEEP_UP, ez * hy)]),
+				SURF_ROOF, "eave_sweep_%d_%d" % [int(sx), int(ez)], false, t)
+	host_end()
+
+
+## The thatch roll. Reeds are combed and BUNDLED at the ridge at intervals
+## rather than run as one continuous capping, so the roll is a short fin every
+## ROLL_PITCH along it; the eave is one thick bundle capping both eaves. Only
+## the roll stands above the slab, so only the roll moves the height bound.
+func _build_thatch_roll(layout: Dictionary) -> void:
+	if not spec.thatch_roll:
+		return
+	tag("thatch_roll")
+	host("thatch_roll", _storeys() - 1)
+	var xf: Transform3D = layout["transform"]
+	var hx: float = _eave_half_x(layout)
+	var hy: float = _eave_half_y(layout)
+	var rise: float = layout["rise"]
+	var ew: float = HouseGeometry.THATCH_EAVE_W
+	for side in [-1.0, 1.0]:
+		component_box("thatch_eave", Vector3(ew, HouseGeometry.THATCH_EAVE_H, hy * 2.0),
+			xf * Transform3D(Basis(), Vector3(float(side) * (hx - ew * 0.5),
+		RoofShape.DEPTH * 0.5 - HouseGeometry.THATCH_EAVE_H * 0.5, 0.0)), SURF_ROOF)
+	var ridge: float = HouseGeometry.ridge_half_for(spec, float(layout["span"]),
+		float(layout["along"]))
+	if ridge <= 0.05:
+		host_end()
+		return
+	# A roll is a bundle ROLL_T deep, and `slab_poly` straddles the plane it is
+	# handed, so the first one starts a half-bundle in from the ridge end and the
+	# last one stops a half-bundle short of the other. Spacing the centres off
+	# the ends rather than off -ridge is what keeps a 14 m cottage's roll from
+	# hanging half a metre over the gable.
+	var first: float = -ridge + HouseGeometry.ROLL_T * 0.5
+	var last: float = ridge - HouseGeometry.ROLL_T * 0.5
+	var count: int = maxi(int((last - first) / HouseGeometry.ROLL_PITCH) + 1, 1)
+	var rw: float = HouseGeometry.ROLL_W
+	for i in range(count):
+		var z: float = first if count == 1 else lerpf(first, last, float(i) / float(count - 1))
+		_roof_face(xf, PackedVector3Array([
+			Vector3(-rw * 0.5, rise, z), Vector3(rw * 0.5, rise, z),
+			Vector3(0.0, rise + HouseGeometry.ROLL_H, z)]),
+			SURF_ROOF, "thatch_roll_%d" % i, false, HouseGeometry.ROLL_T)
+	host_end()
+
 
 # ------------------------------------------------------------------- roof
 
@@ -1785,11 +1997,14 @@ func _build_roof() -> void:
 	var ridge: float = HouseGeometry.ridge_half_for(spec, span, along)
 	if ridge > 0.05:
 		_emit_ridge_cap_segments(xf, rise, ridge, authored)
-	var roof_bounds: AABB = xf * AABB(Vector3(-h - 0.35, -RoofShape.DEPTH * 0.5, -f - 0.25),
-		Vector3(span + 0.7, rise + RoofShape.DEPTH * 0.5 + 0.22, along + 0.5))
+	var over_x := HouseGeometry.roof_span_out(spec)
+	var over_y := HouseGeometry.roof_along_out(spec)
+	var roof_bounds: AABB = xf * AABB(Vector3(-h - over_x, -RoofShape.DEPTH * 0.5, -f - over_y),
+		Vector3(span + over_x * 2.0, rise + RoofShape.DEPTH * 0.5 + HouseGeometry.roof_slab_top(spec),
+			along + over_y * 2.0))
 	_log_mass("roof" if _storeys() == 1 else "roof_%d" % (_storeys() - 1), roof_bounds)
-	total_height = maxf(total_height, xf.origin.y + rise + 0.22)
-	if spec.roof_type != &"hipped":
+	total_height = maxf(total_height, xf.origin.y + rise + HouseGeometry.roof_slab_top(spec))
+	if spec.roof_type in [&"gable", &"half_hipped"]:
 		var wall_peak := RoofShape.height_at(faces, Vector2(0, f))
 		if spec.timber_frame:
 			_gable_frame(xf, span, along, rise, wall_peak)
@@ -1798,6 +2013,9 @@ func _build_roof() -> void:
 	_build_ridge_crown(xf, rise, ridge)
 	_build_eaves_tails(xf, span, along, rise)
 	_build_dormers(xf, layout["dormers"])
+	_build_parapet(layout)
+	_build_eave_sweep(layout)
+	_build_thatch_roll(layout)
 	host_end()
 
 
@@ -1919,7 +2137,10 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 	if not spec.bargeboards:
 		return
 	tag("bargeboards")
-	var half := (span + 0.7) / 2.0
+	# The eave the board is nailed to is the roof this house actually built,
+	# not a hard-coded 0.35 m: a house with a deeper eave gets its verge board
+	# at that eave, and `verge_overhang` reads the same number.
+	var half: float = (span + HouseGeometry.roof_span_out(spec) * 2.0) * 0.5
 	var ang := atan2(rise, half)
 	var bb_w: float = HouseGeometry.BARGEBOARD_W
 	var bb_thick := 0.05
@@ -1979,11 +2200,15 @@ func _build_ridge_crown(xf: Transform3D, rise: float, ridge: float) -> void:
 
 func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float) -> void:
 	tag("eaves")
-	var half := span / 2.0
+	# Half a wall's span, plus the 0.15 m the tails always stood out, plus
+	# whatever EXTRA eave this house has. Adding the extra rather than reading
+	# a resolved number is what keeps an ordinary eave bit-for-bit what it was.
+	var extra: float = maxf(0.0, HouseGeometry.roof_span_out(spec) - HouseGeometry.ROOF_SPAN_OUT)
+	var half: float = span / 2.0
 	var tail_spacing := 0.75
 	var count := maxi(int(along / tail_spacing), 3)
 	for side in [-1.0, 1.0]:
-		var ex: float = float(side) * (half + 0.15)
+		var ex: float = float(side) * (half + HouseGeometry.EAVE_TAIL_OUT + extra)
 		for i in range(count + 1):
 			var ez: float = -along / 2.0 + float(i) * (along / float(count))
 			component_box("eave_tail", Vector3(0.12, 0.09, 0.22),

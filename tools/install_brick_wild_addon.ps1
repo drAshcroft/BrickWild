@@ -111,7 +111,7 @@ $null = Resolve-ContainedPath -Root $expectedAddonParent -RelativePath 'brick_wi
     -Description 'Addon destination'
 
 $sourceManifest = [IO.File]::ReadAllText($sourceManifestPath) | ConvertFrom-Json
-if ([int]$sourceManifest.schema_version -ne 1) {
+if ([int]$sourceManifest.schema_version -ne 2) {
     throw "Unsupported addon source manifest schema: $($sourceManifest.schema_version)"
 }
 
@@ -129,7 +129,37 @@ foreach ($item in @($sourceManifest.metadata) + @($sourceManifest.files)) {
         -SourceRelative ([string]$item.source) -DestinationRelative ([string]$item.destination)
 }
 
+# A script tree ships every .gd directly inside its source directory. Files
+# are discovered, not listed, so a new script cannot be left out of the addon
+# by forgetting a manifest edit -- that is how the hand-written list rotted.
+$scripts = New-Object 'Collections.Generic.List[object]'
+foreach ($tree in @($sourceManifest.script_trees)) {
+    $treeSourceRelative = ([string]$tree.source).TrimEnd('/', '\')
+    $treeSource = Resolve-ContainedPath -Root $repositoryRoot -RelativePath $treeSourceRelative `
+        -Description 'Script tree source'
+    if (-not (Test-Path -LiteralPath $treeSource -PathType Container)) {
+        throw "Required script tree is missing: $treeSourceRelative"
+    }
+    $excluded = @()
+    if ($tree.PSObject.Properties.Name -contains 'exclude') {
+        $excluded = @($tree.exclude | ForEach-Object { [string]$_ })
+    }
+    foreach ($file in Get-ChildItem -LiteralPath $treeSource -File -Filter '*.gd' |
+            Sort-Object Name) {
+        if ($file.Name -in $excluded) {
+            continue
+        }
+        $scripts.Add([pscustomobject]@{
+            source = "$treeSourceRelative/$($file.Name)"
+            destination = ([string]$tree.destination).TrimEnd('/', '\') + "/$($file.Name)"
+        }) | Out-Null
+    }
+}
 foreach ($script in @($sourceManifest.scripts)) {
+    $scripts.Add($script) | Out-Null
+}
+
+foreach ($script in $scripts) {
     $sourceRelative = [string]$script.source
     $destinationRelative = [string]$script.destination
     Add-PackageFile -Entries $entries -Destinations $destinations `

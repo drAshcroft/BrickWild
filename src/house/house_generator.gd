@@ -12,7 +12,13 @@ const FIRST_WORDS := ["Alder", "Bramble", "Copper", "Ember", "Fern", "Hollow",
 	"Larkspur", "Millstone", "Nettle", "Rook", "Thistle", "Willow"]
 const SECOND_WORDS := ["barrow", "brook", "coombe", "croft", "gate", "hearth",
 	"hollow", "mill", "row", "stile", "thatch", "well"]
+
 const SUFFIXES := ["", "", " Cottage", " House", " Lodge", " Steading"]
+
+## How deep a veranda reaches out from the wall it stands on, in metres. Wide
+## enough to sit and work in, shallow enough that a five-metre house still has
+## a yard behind the posts.
+const VERANDA_DEPTH_RANGE := [1.35, 1.85]
 
 
 ## Generate the spec's derived fields, then plan and furnish. Returns the plan,
@@ -47,8 +53,14 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	spec.stone_ground_floor = spec.storeys > 1 and GeneratorRandom.chance(r, float(s.get("stone_ground", 0.15)))
 	spec.jetty = spec.storeys > 1 and GeneratorRandom.chance(r, float(s.get("jetty", 0.5)))
 	spec.jetty_depth = r.randf_range(0.24, 0.32)
-	spec.roof_material = &"slate" if spec.style == &"townhouse" else (
-		&"thatch" if spec.style in [&"farmhouse", &"longhall"] else &"shingle")
+	spec.roof_material = StringName(s.get("roof_material", &"shingle"))
+	# A style row may ask for a thicker wall than a timber frame needs. It is
+	# set BEFORE planning so the interior, the openings and the emitted
+	# masonry are all measured against the same wall.
+	var wall_t := float(s.get("wall_t", 0.0))
+	spec.wall_thickness_override = wall_t if wall_t > 0.0 else -1.0
+	spec.roof_span_out = float(s.get("span_out", -1.0))
+	spec.roof_along_out = float(s.get("along_out", -1.0))
 	var roof_types: Array = s.get("roof_types", [&"gable", &"half_hipped"])
 	spec.roof_type = GeneratorRandom.pick(r, roof_types)
 	# Read the same roll for a rotated footprint without shifting the historic
@@ -80,6 +92,22 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 		spec.string_courses = r.randi_range(int(bands[0]), int(bands[1]))
 		spec.pediments = GeneratorRandom.chance(r, float(s.get("pediments", 0.0)))
 		spec.ridge_finial = GeneratorRandom.chance(r, float(s.get("ridge_finial", 0.0)))
+
+	# HOUSE-CULTURE: the vernacular switchboard. Same guard, same reason as the
+	# four rolls above -- a row with no "culture" key is a European house and
+	# takes no draw here at all, so adding five styles moved nothing.
+	if s.has("culture"):
+		spec.parapet = GeneratorRandom.chance(r, float(s.get("parapet", 0.0)))
+		spec.veranda = GeneratorRandom.chance(r, float(s.get("veranda", 0.0)))
+		spec.eave_sweep = GeneratorRandom.chance(r, float(s.get("eave_sweep", 0.0)))
+		spec.thatch_roll = GeneratorRandom.chance(r, float(s.get("thatch_roll", 0.0)))
+		spec.corner_piers = GeneratorRandom.chance(r, float(s.get("corner_piers", 0.0)))
+		spec.veranda_depth = r.randf_range(VERANDA_DEPTH_RANGE[0], VERANDA_DEPTH_RANGE[1])
+		# A cone has no eave to stand a wall on: its skirt runs out to the plan
+		# rectangle, so a parapet round it would wall off the hut's own base.
+		# Said here, where the roof type has already been drawn, rather than
+		# leaving an emitter to work out why it should refuse.
+		spec.parapet = spec.parapet and spec.roof_type != &"conical"
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y

@@ -56,6 +56,7 @@ extends RefCounted
 const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cmotteaccess", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "cwater", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "hrich", "harchetype", "court",
+	"hvernacular",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
@@ -117,6 +118,7 @@ const EXTRA: Array[String] = ["library", "placement", "vmine", "varchetypecontra
 const LANES: Dictionary = {
 	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "hmesh", "metriccoords"],
 	"lane:rich": ["hrich", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty"],
+	"lane:culture": ["hvernacular", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty", "hmaterials"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
@@ -323,6 +325,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/house_bounds_suite.gd").run()
 		"hrich":
 			return HouseRichSuite.run()
+		"hvernacular":
+			return HouseVernacularSuite.run()
 		"hblueprint":
 			return preload("res://tests/suites/house_blueprint_suite.gd").run()
 		"assets":

@@ -41,7 +41,7 @@ class BlockedDoor extends HouseBuilder:
 
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("house envelope")
-	for i in 18:
+	for i in 22:
 		var s := HouseSpec.new()
 		# `% 5` was the style count when this suite was written, so adding a
 		# sixth style would have left it covering five and said nothing. Ask the
@@ -57,7 +57,7 @@ static func run() -> SuiteResult:
 		s.storeys = 1 + (i / 3) % 3
 		s.exterior_props = false
 		var p := HouseGenerator.generate(s, 4400 + i, false)
-		s.roof_type = [&"gable", &"half_hipped", &"hipped"][i % 3]
+		s.roof_type = [&"gable", &"half_hipped", &"hipped", &"conical"][i % 4]
 		s.roof_pitch = [0.7, 1.1, 1.6][(i / 3 + i) % 3]
 		s.dormers = i % 2 == 0
 		s.dormer_count = 2 if s.dormers else 0

@@ -2,7 +2,7 @@ extends RefCounted
 
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("house materials")
-	for kind in [&"gable", &"half_hipped", &"hipped"]:
+	for kind in [&"gable", &"half_hipped", &"hipped", &"conical"]:
 		for rotated in [false, true]:
 			var s := HouseSpec.new()
 			s.width = 13.0 if rotated else 9.0

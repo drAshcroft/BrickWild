@@ -30,6 +30,17 @@ const CULTURE_STYLES := {
 		"temple_form": &"pylon", "temple_cult": &"serpent"},
 	&"blighted": {"house": &"witch_hut", "castle": &"crusader", "church": &"byzantine",
 		"temple_form": &"ziggurat", "temple_cult": &"void"},
+	# HOUSE-CULTURE. These three carry a house style the other seven do not
+	# have. Their castle, church and temple rows are BORROWED from the nearest
+	# culture that has one, because those families have no Mediterranean, East
+	# Asian or Saharan entry yet: a shared castle is a smaller lie than a
+	# castle style that does not exist, and the house is the part that matters.
+	&"mediterranean": {"house": &"mediterranean", "castle": &"moorish",
+		"church": &"romanesque", "temple_form": &"basilica", "temple_cult": &"blood"},
+	&"east_asian": {"house": &"asian", "castle": &"japanese",
+		"church": &"byzantine", "temple_form": &"pylon", "temple_cult": &"serpent"},
+	&"saharan": {"house": &"african", "castle": &"moorish",
+		"church": &"byzantine", "temple_form": &"pylon", "temple_cult": &"serpent"},
 }
 
 ## House base styles that keep the cottage/farmhouse silhouette long enough

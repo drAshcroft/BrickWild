@@ -76,7 +76,18 @@ godot --path . --script res://tools/shoot_studio.gd     # screenshot of the Stud
 # human walk-through QA: build one building, walk it, right-click to pin problems
 # (appends to visualqa/HumanRate.md + visualqa/walk_pins.jsonl; see visualqa/README.md)
 godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed=8102
+
+# freeze a release for OTHER projects (from a commit, never the working tree;
+# background it). Bump VERSION, plugin.cfg and the manifest version first.
+.\tools\release_brick_wild.ps1 > artifacts\release.log 2>&1
 ```
+
+**Other projects use `releases/`, not this tree.** VoxelGames embeds
+`releases/<id>/addons/brick_wild` through that release's `install.ps1`;
+Dm_View and PaperFjord run `godot --path releases/<id>/project`. Do not tell a
+consumer to point at `C:\Projects\BigGlade` itself. See `docs/RELEASES.md`.
+The addon manifest lists directories; a new `src/` family needs one line in
+its `script_trees` or the installer test fails.
 
 After adding a script with a NEW `class_name`, run the editor once so the
 class is registered, or every suite fails with "Identifier not declared":

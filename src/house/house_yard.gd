@@ -31,7 +31,13 @@ extends RefCounted
 
 ## Style apron, metres. A townhouse is tight to its street; a farm sprawls.
 const APRON := {&"cottage": 2.6, &"farmhouse": 3.0, &"townhouse": 2.0,
-	&"longhall": 2.8, &"witch_hut": 2.6}
+	&"longhall": 2.8, &"witch_hut": 2.6,
+	# A Mediterranean house stands in a paved square, a compound in a wide one,
+	# and an Asian house gives a slice of its own to the veranda. All three stay
+	# inside the 2 to 3 m the apron contract promises: a compound wants more
+	# ground, and a compound is what a walled village around it provides.
+	&"mediterranean": 2.4, &"asian": 2.9, &"african": 3.0,
+	&"thatch_cottage": 2.6, &"mud_hut": 3.0}
 const DEFAULT_APRON := 2.5
 
 ## A thing this low is a path, not an obstacle: it is walked over, and it may
@@ -52,6 +58,14 @@ const STYLE_GROUPS := {
 	&"townhouse": [&"crates", &"rain_barrel"],
 	&"longhall": [&"woodpile", &"training"],
 	&"witch_hut": [&"herb_bed", &"drying_line", &"mushrooms", &"midden"],
+	# HOUSE-CULTURE. A yard says who lives here, and a household with no trade
+	# is judged on its kind of house instead -- water jars and a drying line in
+	# the sun, a dung midden and a cart in a compound, pots under the shade.
+	&"mediterranean": [&"garden", &"flowers", &"crates"],
+	&"asian": [&"garden", &"crates", &"rain_barrel"],
+	&"african": [&"midden", &"crates", &"cart"],
+	&"thatch_cottage": [&"garden", &"washing_line", &"woodpile"],
+	&"mud_hut": [&"midden", &"herb_bed", &"mushrooms"],
 }
 const TRADE_GROUPS := {
 	&"none": [],

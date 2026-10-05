@@ -91,7 +91,7 @@ static func _spec(w: float, l: float) -> HouseSpec:
 ## so the roof's own rotation is exercised.
 static func _features(res: SuiteResult) -> void:
 	for size in [Vector2(8, 12), Vector2(12, 8)]:
-		for kind in [&"gable", &"half_hipped", &"hipped"]:
+		for kind in [&"gable", &"half_hipped", &"hipped", &"conical"]:
 			for bargeboards in [false, true]:
 				for chimney in [false, true]:
 					for pots in [1, 2]:

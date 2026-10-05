@@ -64,7 +64,25 @@ function Invoke-GodotFixture {
 
 try {
     $sourceManifest = [IO.File]::ReadAllText($sourceManifestPath) | ConvertFrom-Json
-    $manifestSources = @($sourceManifest.scripts | ForEach-Object { [string]$_.source })
+    # The effective script list: every .gd in a script tree, plus the named
+    # exceptions. Mirrors the installer, which discovers rather than lists.
+    $manifestScripts = New-Object 'Collections.Generic.List[object]'
+    foreach ($tree in @($sourceManifest.script_trees)) {
+        $treeSource = ([string]$tree.source).TrimEnd('/')
+        $excluded = @()
+        if ($tree.PSObject.Properties.Name -contains 'exclude') {
+            $excluded = @($tree.exclude | ForEach-Object { [string]$_ })
+        }
+        foreach ($file in Get-ChildItem -LiteralPath (Join-Path $sourceRoot $treeSource) -File -Filter '*.gd') {
+            if ($file.Name -in $excluded) { continue }
+            $manifestScripts.Add([pscustomobject]@{
+                source = "$treeSource/$($file.Name)"
+                destination = ([string]$tree.destination).TrimEnd('/') + "/$($file.Name)"
+            }) | Out-Null
+        }
+    }
+    foreach ($script in @($sourceManifest.scripts)) { $manifestScripts.Add($script) | Out-Null }
+    $manifestSources = @($manifestScripts | ForEach-Object { [string]$_.source })
     foreach ($runtimeRoot in @('src', 'core', 'qa')) {
         foreach ($runtime in Get-ChildItem -LiteralPath (Join-Path $sourceRoot $runtimeRoot) -Recurse -Filter '*.gd') {
             $relative = $runtime.FullName.Substring($sourceRoot.Length + 1).Replace('\', '/')
@@ -74,7 +92,7 @@ try {
             }
         }
     }
-    foreach ($script in @($sourceManifest.scripts)) {
+    foreach ($script in $manifestScripts) {
         $scriptSource = Join-Path $sourceRoot ([string]$script.source)
         if (-not (Test-Path -LiteralPath $scriptSource -PathType Leaf)) {
             throw "Manifest runtime script is missing: $($script.source)"
@@ -156,7 +174,7 @@ try {
 
     $installedManifestData = [IO.File]::ReadAllText($installedManifest) | ConvertFrom-Json
     $managedPaths = @($installedManifestData.files | ForEach-Object { [string]$_.path })
-    foreach ($script in @($sourceManifest.scripts)) {
+    foreach ($script in $manifestScripts) {
         $destination = ([string]$script.destination).Replace('\', '/')
         if ($destination -notin $managedPaths -or ($destination + '.uid') -notin $managedPaths) {
             throw "Installed manifest omitted runtime script closure: $destination"
@@ -189,52 +207,7 @@ try {
             throw "GodotPath does not exist: $GodotPath"
         }
         $smokePath = Join-Path $fixture 'smoke.gd'
-        $smoke = @'
-extends SceneTree
-
-func _init() -> void:
-	var failed := false
-	var requests := [
-		BuildingRequest.church(101),
-		BuildingRequest.castle(102),
-		BuildingRequest.house(103),
-		BuildingRequest.shop(105),
-		BuildingRequest.hotel(106),
-		BuildingRequest.temple(104),
-		BrickWild.default_request(&"world", 107),
-	]
-	for request in requests:
-		var generated := BrickWild.generate_document(request)
-		if not generated.is_ok():
-			printerr("generation failed: %s" % generated.errors)
-			failed = true
-			continue
-		var mesh := BrickWild.build_mesh(generated)
-		if mesh == null or mesh.get_surface_count() == 0:
-			printerr("mesh emission failed for %s" % request.kind)
-			failed = true
-		var node := BrickWild.instantiate(generated)
-		if node == null:
-			printerr("scene instantiation failed for %s" % request.kind)
-			failed = true
-		else:
-			node.free()
-		var restored := BuildingDocument.from_json(generated.to_json())
-		if not restored.is_ok() or BrickWild.build_mesh(restored) == null:
-			printerr("document round trip failed for %s" % request.kind)
-			failed = true
-	for key in PropCatalog.keys():
-		if not ResourceLoader.exists(PropCatalog.scene_path(key)):
-			printerr("prop resource missing: %s" % key)
-			failed = true
-	var repeat := BrickWild.generate(BuildingRequest.church(101))
-	if repeat.name() != BrickWild.generate(BuildingRequest.church(101)).name():
-		printerr("same-seed generation was not deterministic")
-		failed = true
-	print("BRICKWILD_ADDON_SMOKE_OK")
-	quit(1 if failed else 0)
-'@
-        [IO.File]::WriteAllText($smokePath, $smoke, $utf8NoBom)
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'brick_wild_addon_smoke.gd') -Destination $smokePath
         $null = Invoke-GodotFixture -Arguments @('--headless', '--path', $fixture,
             '--editor', '--quit')
         $smokeResult = Invoke-GodotFixture -Arguments @('--headless', '--path', $fixture,

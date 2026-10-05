@@ -459,12 +459,12 @@ static func roof_rise(spec: HouseSpec) -> float:
 ## slowly than width; witch huts deliberately keep their extravagant pitch.
 ## Applied only to generated pitch, never to an explicit emitter fixture.
 static func art_pitch_scale(spec: HouseSpec) -> float:
-	var reference := float({&"cottage": 7.0, &"farmhouse": 9.0,
-		&"townhouse": 8.0, &"longhall": 8.0, &"witch_hut": 8.0}.get(spec.style, 8.0))
+	var row: Dictionary = HouseSpec.STYLES.get(spec.style, {})
+	var reference := float(row.get("pitch_reference", 8.0))
 	var span := minf(spec.width, spec.length)
 	if span <= reference:
 		return 1.0
-	return pow(reference / span, 0.2 if spec.style == &"witch_hut" else 0.5)
+	return pow(reference / span, float(row.get("pitch_exponent", 0.5)))
 
 
 ## Pure plan-space roof layout. Attachments and the emitter read the same
@@ -478,7 +478,9 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 	var rise := roof_rise(s)
 	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if top.size.x > top.size.y else 0.0),
 		Vector3(top.get_center().x, s.height * maxi(s.storeys, 1), top.get_center().y))
-	var roof := RoofShape.faces(span + 0.7, along + 0.5, rise, s.roof_type)
+	var span_out := roof_span_out(s)
+	var roof := RoofShape.faces(span + span_out * 2.0,
+		along + roof_along_out(s) * 2.0, rise, s.roof_type)
 	var layout := {"transform": xf, "span": span, "along": along, "rise": rise,
 		"faces": roof, "dormers": [], "rejections": [], "requested": 0}
 	# A candidate that is turned away says WHY. A fitter that silently drops
@@ -495,7 +497,7 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 	if not s.dormers or s.dormer_count <= 0:
 		return layout
 	layout["requested"] = mini(s.dormer_count, 3)
-	var half := (span + 0.7) * 0.5
+	var half := span * 0.5 + span_out
 	var dw := 0.95
 	# Where a dormer can sit on a slope is RoofShape's question, not this
 	# file's: the hotel asks it too, and asking it twice is how one of them
@@ -751,6 +753,153 @@ const CROWN_BASE_H := 0.14
 const CROWN_W := 0.18
 const CROWN_H := 1.15
 
+# ---- vernacular exterior culture (HOUSE-CULTURE) ----
+## The roof's two oversails, in metres, resolved from the spec. A negative
+## `roof_span_out` is the ordinary 0.35 m eave; a style row may ask instead for
+## the deep eave of a stilted house or the wide skirt of a thatched cone. The
+## emitter and the bound BOTH read this, so a deep-eaved house can never be
+## looser than the eave it actually built.
+##
+## TWO functions, not one returning a Vector2, and that is not tidiness. A
+## `Vector2`'s components are 32-bit, so returning `Vector2(ROOF_SPAN_OUT, ...)`
+## and reading `.x` back gave 0.34999999403953552 instead of 0.35 -- six
+## nanometres of error in every roof the builder laid, which is invisible in a
+## picture and moves a vertex hash. GDScript's `float` is 64-bit; the emitter's
+## arithmetic has to stay in it.
+static func roof_span_out(spec: HouseSpec) -> float:
+	return ROOF_SPAN_OUT if spec.roof_span_out < 0.0 else spec.roof_span_out
+
+
+static func roof_along_out(spec: HouseSpec) -> float:
+	return ROOF_ALONG_OUT if spec.roof_along_out < 0.0 else spec.roof_along_out
+
+
+## The same two numbers as a Vector2, for the BOUND only. Every consumer of
+## this one compares an AABB, and `verge_overhang` has always returned 32-bit
+## components; see roof_span_out for why the emitters do not use it.
+static func roof_oversail(spec: HouseSpec) -> Vector2:
+	return Vector2(roof_span_out(spec), roof_along_out(spec))
+
+
+## How far the rafter tails stand out from the wall face on an ordinary eave.
+## `HouseBuilder._build_eaves_tails` adds this to half the wall's span, and adds
+## the eave's own EXTRA oversail on top of it -- so a house with the ordinary
+## 0.35 m eave gets exactly the number it always got, and a deep-eaved one gets
+## its tails at the eave it actually built.
+const EAVE_TAIL_OUT := 0.15
+
+
+## An eaves parapet: a rendered wall standing on the roof's own edge, with its
+## outer face ON the eave rather than past it, so it costs the plan bound
+## nothing. It is the cheapest honest way to say "this is not a house with a
+## roof on it, it is a house with a terrace", and it only reads because the
+## roof behind it is shallow.
+const PARAPET_T := 0.30
+const PARAPET_H := 0.62
+## The slab's own top face at the eave, which is where the parapet starts.
+const PARAPET_BASE := RoofShape.DEPTH * 0.5
+
+
+## A veranda: a platform on the ground, posts, a head beam and a shed rooflet
+## over all three. HouseBuilder._build_veranda emits every piece from these
+## numbers, and veranda_rect() is the footprint the bound merges.
+const VERANDA_DECK_T := 0.16
+const VERANDA_POST_W := 0.16
+const VERANDA_POSTS := 4
+const VERANDA_BEAM_W := 0.18
+const VERANDA_BEAM_H := 0.22
+const VERANDA_ROOF_T := 0.16
+const VERANDA_ROOF_FALL := 0.55   # the rooflet drops this much to its outer edge
+const VERANDA_EAVE_OUT := 0.30     # and oversails the posts by this much
+## Head height of the veranda roof against the wall. Capped below the storey it
+## serves, because a veranda taller than its own floor is a canopy.
+const VERANDA_HEAD_MAX := 2.35
+const VERANDA_HEAD_CLEAR := 0.4
+
+
+## The eave sweep: a fin at each of the four roof corners standing SWEEP_UP
+## above the eave and reaching SWEEP_RUN back along it. It is set INBOARD of
+## the eave and stops there, so like the parapet it costs the plan bound
+## nothing -- it is the roof's own oversail that reaches past it.
+const SWEEP_UP := 0.55
+const SWEEP_RUN := 0.95
+const SWEEP_T := 0.14
+
+
+## The thatch roll. Reeds are combed and bundled at the ridge at intervals, not
+## run as one continuous capping, so the roll is a short fin every ROLL_PITCH
+## along the ridge; the eave is one thick rolled bundle capping both eaves.
+## Only the ridge roll adds height, because only it stands above the slab.
+const ROLL_PITCH := 0.55
+const ROLL_W := 0.44
+const ROLL_H := 0.3
+const ROLL_T := 0.5
+const THATCH_EAVE_W := 0.45
+const THATCH_EAVE_H := 0.34
+## What a thatch roll puts above the slab's own top face, which is the number
+## roof_top_above_walls() has to promise once a house carries one.
+const THATCH_ROLL_TOP := ROLL_H
+
+
+## How far above the slab's own mid-plane the tallest thing the ROOF puts up
+## stands. The ridge cap and a thatch roll compete for this one number, and
+## both the emitter that measures the shell's height and the bound that
+## promises it read it here, so the two cannot disagree about a thatched roof.
+static func roof_slab_top(spec: HouseSpec) -> float:
+	# A cone has no ridge, so there is nothing to cap and no reeds to bundle
+	# along one. Promising a cap's height here anyway would leave the bound
+	# reaching for a piece that was never emitted, and a bound loose by more
+	# than BOUNDS_TOL is as much a failure as one that is too tight.
+	if ridge_half(spec) <= 0.05:
+		return RIDGE_SLAB_TOP
+	return maxf(RIDGE_CAP_TOP, THATCH_ROLL_TOP if spec.thatch_roll else 0.0)
+
+
+## Rounded mud corners: a regular octagon standing on each corner of each
+## storey, PIER_R in radius, so it reaches that far past the wall line. Every
+## style that carries one also carries a roof oversail wider than PIER_R, so
+## the eave already reaches past the piers and the plan bound is unchanged.
+const PIER_R := 0.3
+const PIER_SIDES := 8
+
+
+## Head height of a veranda's roof where it meets the wall.
+static func veranda_head(spec: HouseSpec) -> float:
+	return minf(VERANDA_HEAD_MAX, maxf(2.0, spec.height - VERANDA_HEAD_CLEAR))
+
+
+## The veranda's own footprint: the platform, its posts, and the rooflet that
+## oversails them, on the wall the entrance is actually on. Merged into
+## exterior_bounds() for the same reason the porch is -- it is emitted in the
+## shell mesh, and a bound that promises to contain every emitted vertex has
+## to contain this one too.
+static func veranda_rect(plan: HousePlan) -> Rect2:
+	var spec := plan.spec
+	var d: int = plan.entrance()
+	if not spec.veranda or d < 0:
+		return Rect2()
+	var door: Dictionary = plan.doors[d]
+	var normal: Vector2 = door["normal"]
+	var face: float = wall_thickness(spec) * 0.5
+	var reach: float = face + spec.veranda_depth + VERANDA_EAVE_OUT
+	var w: float = float(door["width"]) * 2.0 + VERANDA_POST_W * float(VERANDA_POSTS)
+	var out_p: Vector2 = door["pos"] + normal * reach
+	var in_p: Vector2 = door["pos"] - normal * (face + 0.05)
+	var across: Vector2 = Vector2(normal.y, -normal.x) * (w * 0.5)
+	var r := Rect2(out_p + across, Vector2.ZERO)
+	for p in [out_p - across, in_p + across, in_p - across]:
+		r = r.expand(p)
+	return r
+
+
+## How far the furthest piece a style row can add stands above the wall head.
+## The bound reads this, and so does nothing else, so a house whose parapet or
+## thatch roll grew past its own roof would be caught rather than tolerated.
+static func parapet_top(spec: HouseSpec) -> float:
+	return PARAPET_BASE + PARAPET_H if spec.parapet else 0.0
+
+
+
 ## Half the length of the ridge cap this roof carries, or zero when it has no
 ## ridge to cap. HouseBuilder._build_roof emits the cap and the ridge crown
 ## from this one number, so the two can never disagree about whether there is
@@ -760,10 +909,15 @@ const CROWN_H := 1.15
 ## so a plan whose top storey is shaped or opens onto a court is measured on
 ## the geometry that exists rather than on the rectangle its spec would give.
 static func ridge_half_for(spec: HouseSpec, span: float, along: float) -> float:
-	var half: float = along * 0.5 + 0.25
+	# A cone has an apex and no ridge, so there is nothing to cap and nothing
+	# for a finial to stand on. Returning zero is what makes the emitter skip
+	# both, from one number, rather than from a second opinion about the kind.
+	if spec.roof_type == &"conical":
+		return 0.0
+	var half: float = along * 0.5 + roof_along_out(spec)
 	if spec.roof_type != &"gable":
 		var cut := RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else 0.0
-		half = maxf(half - (span * 0.5 + 0.35) * (1.0 - cut), 0.0)
+		half = maxf(half - (span * 0.5 + roof_span_out(spec)) * (1.0 - cut), 0.0)
 	return half
 
 
@@ -808,13 +962,17 @@ static func jetty_front_reach(spec: HouseSpec) -> float:
 ## of which wall anything stands on, so it is exact from the spec alone.
 static func roof_top_above_walls(spec: HouseSpec) -> float:
 	var rise: float = roof_rise(spec)
-	var top: float = rise + maxf(RIDGE_SLAB_TOP, RIDGE_CAP_TOP)
+	var top: float = rise + roof_slab_top(spec)
 	if spec.bargeboards and spec.roof_type == &"gable":
 		top = maxf(top, rise + FINIAL_TOP)
 	if spec.chimney:
 		top = maxf(top, rise + CHIMNEY_TOP)
 	if spec.ridge_finial and ridge_half(spec) > 0.05:
 		top = maxf(top, rise + RIDGE_CAP_TOP + CROWN_BASE_H + CROWN_H)
+	if spec.parapet:
+		top = maxf(top, parapet_top(spec))
+	if spec.eave_sweep:
+		top = maxf(top, SWEEP_UP)
 	return top
 
 
@@ -871,11 +1029,13 @@ static func total_height(spec: HouseSpec) -> float:
 ## reaches depends on the pitch -- which is why a constant was 0.128 m short on
 ## every bargeboarded house.
 static func verge_overhang(spec: HouseSpec) -> Vector2:
-	if not spec.bargeboards or spec.roof_type == &"hipped":
-		return Vector2(ROOF_SPAN_OUT, ROOF_ALONG_OUT)
+	var span_out := roof_span_out(spec)
+	var along_out := roof_along_out(spec)
+	if not spec.bargeboards or spec.roof_type in [&"hipped", &"conical"]:
+		return Vector2(span_out, along_out)
 	var top := site_rect(spec, maxi(spec.storeys - 1, 0))
 	var span: float = minf(top.size.x, top.size.y)
-	var half: float = (span + 0.7) * 0.5
+	var half: float = (span + span_out * 2.0) * 0.5
 	var ang: float = atan2(roof_rise(spec), half)
 	# The board's foot, plus half its width swung out by the tilt. The drop
 	# pendant hangs at the eave itself and is shallower than that.
@@ -883,7 +1043,7 @@ static func verge_overhang(spec: HouseSpec) -> Vector2:
 		VERGE_PENDANT_D * 0.5)
 	var along: float = VERGE_END_OUT + (FINIAL_D * 0.5 if spec.roof_type == &"gable"
 		else VERGE_PENDANT_D * 0.5)
-	return Vector2(ROOF_SPAN_OUT + across, along)
+	return Vector2(span_out + across, along)
 
 
 ## verge_overhang mapped onto the WORLD axes. The roof turns to follow the
@@ -968,7 +1128,7 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		pos = pos.max(Vector2.ONE * CORNICE_OUT)
 	var r: Rect2 = site_rect(spec, maxi(spec.storeys - 1, 0)).grow_individual(neg.x, neg.y, pos.x, pos.y)
 	r = r.merge(site_rect(spec).grow_individual(0, jetty_front_reach(spec), 0, 0))
-	for extra in [chimney_rect(plan), porch_rect(plan)]:
+	for extra in [chimney_rect(plan), porch_rect(plan), veranda_rect(plan)]:
 		if extra.size.x > 0.0:
 			r = r.merge(extra)
 	# The yard's BUILT pieces are emitted in the shell mesh, so the bound that
@@ -995,7 +1155,10 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 ## a measured extent -- so it is not part of exterior_bounds().
 static func yard_rect(plan: HousePlan) -> Rect2:
 	var r := site_rect(plan.spec)
-	for extra in [chimney_rect(plan), porch_rect(plan)]:
+	# The veranda is shell, not yard, but it stands on the same ground and the
+	# yard's walk and its props both have to know where it is -- exactly as they
+	# do for the porch.
+	for extra in [chimney_rect(plan), porch_rect(plan), veranda_rect(plan)]:
 		if extra.size.x > 0.0:
 			r = r.merge(extra)
 	return r.grow(HouseYard.apron(plan.spec))
@@ -1020,6 +1183,9 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 		pad = maxf(pad, chimney_size(spec) + maxf(CHIMNEY_BASE_EXTRA, 0.22))
 	if spec.porch:
 		pad = maxf(pad, porch_depth(spec) + 0.2 + wall_thickness(spec))
+	if spec.veranda:
+		pad = maxf(pad, wall_thickness(spec) * 0.5
+			+ HouseGenerator.VERANDA_DEPTH_RANGE[1] + VERANDA_EAVE_OUT)
 	# The yard's built pieces are in the mesh and lie inside the envelope: the
 	# apron beyond the shell, its porch and chimney stack.
 	if spec.exterior_props and not spec.has_method("room_program"):

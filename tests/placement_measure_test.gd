@@ -10,7 +10,10 @@ func _init() -> void:
 	for i in styles.size():
 		for material in [&"timber", &"stone"]:
 			var request := BuildingRequest.house(4411 + i, styles[i],
-				HouseSpec.TRADES.keys()[i], 9, 12, 2.7)
+			# TRADES is a different table from STYLES and the two have never
+			# had the same number of rows; indexing one with the other's index
+			# worked only while they happened to agree.
+			HouseSpec.TRADES.keys()[i % HouseSpec.TRADES.size()], 9, 12, 2.7)
 			request.material = material
 			request.storeys = 2 if i % 2 == 0 or styles[i] == &"townhouse" else 1
 			fixtures.append(request)

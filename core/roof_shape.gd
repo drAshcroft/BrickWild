@@ -7,12 +7,20 @@ extends RefCounted
 const DEPTH := 0.24
 const HALF_HIP := 0.62
 
+## A cone is not a pyramid: it has no ridge to cap and no two planes meeting
+## at an apex ridge, only a ring of facets running to a single point. Mud-brick
+## and reed huts are roofed with it, and a square hip cannot stand in for one
+## because its ridge is the very thing a cone has not got.
+const CONE_SIDES := 8
+
 
 static func faces(span: float, along: float, rise: float,
 		kind: StringName = &"gable") -> Array[PackedVector3Array]:
 	var out: Array[PackedVector3Array] = []
 	if minf(span, along) <= 0.0 or rise <= 0.0:
 		return out
+	if kind == &"conical":
+		return _cone(span, along, rise)
 	var h := span * 0.5
 	var f := along * 0.5
 	var cut := rise if kind == &"gable" else (rise * HALF_HIP if kind == &"half_hipped" else 0.0)
@@ -33,6 +41,33 @@ static func faces(span: float, along: float, rise: float,
 		for end_v in [-1.0, 1.0]:
 			out.append(PackedVector3Array([Vector3(-w, cut, end_v * f),
 				Vector3(w, cut, end_v * f), Vector3(0, rise, end_v * ridge)]))
+	return out
+
+
+## A ring of facets from the plan rectangle's own perimeter up to one apex.
+##
+## The base samples the RECTANGLE perimeter, not a circle inscribed in it, and
+## that is deliberate on two counts. A circle would leave the four corners of
+## the plan uncovered, and `wall_profile` asks "how high is the roof at this
+## point?" for every crossing along a wall -- a NAN where a corner should be
+## puts a hole in the wall head. And a rectangular base with a kink down the
+## middle of each side is what a combed reed cone over a rectangular hut
+## actually looks like, because the thatcher lays it facet by facet.
+static func _cone(span: float, along: float, rise: float) -> Array[PackedVector3Array]:
+	var out: Array[PackedVector3Array] = []
+	var h := span * 0.5
+	var f := along * 0.5
+	var ring := PackedVector3Array()
+	var corners := [Vector2(h, -f), Vector2(h, f), Vector2(-h, f), Vector2(-h, -f)]
+	for i in range(corners.size()):
+		var a: Vector2 = corners[i]
+		var b: Vector2 = corners[(i + 1) % corners.size()]
+		for k in range(CONE_SIDES / 4):
+			var p := a.lerp(b, float(k) / float(CONE_SIDES / 4))
+			ring.append(Vector3(p.x, 0.0, p.y))
+	for i in range(ring.size()):
+		out.append(PackedVector3Array([ring[i], ring[(i + 1) % ring.size()],
+			Vector3(0.0, rise, 0.0)]))
 	return out
 
 

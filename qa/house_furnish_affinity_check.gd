@@ -27,9 +27,19 @@ func _fs_report(plan: HousePlan, p: Dictionary, cat: String, msg: String) -> voi
 ## A bench is worked at, and a person works in the light. A workbench in a room
 ## with a window backs onto the wall that window is in, or at the very least
 ## stands within reach of it.
-## Generated houses satisfy the strict form (the window wall itself) in 100% of
-## cases, so this fails outright.
+##
+## The strict form -- the window wall itself -- is only possible if the room
+## can give it. "Beside the window, not across it" means the run has to clear
+## the window's own keep-clear as well as be long enough for the piece, and a
+## workshop three metres deep with its window in the middle of a wall cannot
+## do that however the bench is turned. Demanding it anyway is a failure the
+## planner could not have avoided, and reporting it as a failure teaches
+## nothing; this is the same shape the `shelf_over` rule already uses, where a
+## station found but unused is a failure and no station at all is a warning.
 const FS_WINDOW_REACH := 2.5
+## Slack on the run test, so a bench that IS on the window wall is never
+## reported as one that could not have been.
+const FS_LIT_RUN_TOL := 0.12
 
 func check_workbench_daylight(plan: HousePlan) -> void:
 	for f in range(plan.furniture.size()):
@@ -50,9 +60,75 @@ func check_workbench_daylight(plan: HousePlan) -> void:
 			near = minf(near, c.distance_to(Vector2(plan.windows[w]["pos"])))
 		if near <= FS_WINDOW_REACH:
 			continue
-		_fs_report(plan, p, "workbench",
-			"workbench_daylight: %s works %.2fm from the nearest window, with its back to a blind wall"
-			% [HouseFurnishCheck.who(plan, f), near])
+		if _lit_run_takes_bench(plan, room, p):
+			_fs_report(plan, p, "workbench",
+				"workbench_daylight: %s works %.2fm from the nearest window, with its back to a blind wall"
+				% [HouseFurnishCheck.who(plan, f), near])
+		else:
+			warnings.append("workbench_daylight: %s works %.2fm from the nearest window, and this room "
+				% [HouseFurnishCheck.who(plan, f), near]
+				+ "has no clear stretch of its window wall long enough for the bench")
+
+
+## Could this room have put the bench on a wall that has a window?
+##
+## The run a piece is offered on is the wall LESS whatever the window in it
+## keeps clear, because a bench stood in front of a window is the one
+## arrangement this whole rule exists to prevent. Both pieces are measured, so
+## a room that could have done it and did not still fails.
+static func _lit_run_takes_bench(plan: HousePlan, room: int, p: Dictionary) -> bool:
+	var rect: Rect2 = p["rect"]
+	var span: float = maxf(rect.size.x, rect.size.y) + FS_LIT_RUN_TOL
+	for wi in plan.windows_of(room):
+		if not _lit_wall_of_window(plan, room, wi):
+			continue
+		if _clear_run(plan, room, wi) >= span:
+			return true
+	return false
+
+
+## Which of this room's walls, if any, carries the window `wi`.
+static func _lit_wall_of_window(plan: HousePlan, room: int, wi: int) -> int:
+	var walls := HouseGeometry.room_walls(plan, room)
+	var w: Dictionary = plan.windows[wi]
+	var pos: Vector2 = w["pos"]
+	var n: Vector2 = w["normal"]
+	for i in walls.size():
+		if absf((walls[i]["normal"] as Vector2).dot(n)) < 0.9:
+			continue
+		var seg: Vector2 = (walls[i]["to"] as Vector2) - (walls[i]["from"] as Vector2)
+		if seg.length_squared() <= 0.0:
+			continue
+		var t: float = (pos - (walls[i]["from"] as Vector2)).dot(seg) / seg.length_squared()
+		if t >= 0.0 and t <= 1.0:
+			return i
+	return -1
+
+
+## The longest unbroken stretch of window wall `wi`, measured along the wall and
+## with the window's own clear area taken out of it.
+static func _clear_run(plan: HousePlan, room: int, wi: int) -> float:
+	var walls := HouseGeometry.room_walls(plan, room)
+	var lit := _lit_wall_of_window(plan, room, wi)
+	if lit < 0 or lit >= walls.size():
+		return 0.0
+	var a: Vector2 = walls[lit]["from"]
+	var b: Vector2 = walls[lit]["to"]
+	var run: float = (b - a).length()
+	if run <= 0.0:
+		return 0.0
+	var along: Vector2 = (b - a) / run
+	var clear := HouseGeometry.window_clear_rect(plan.windows[wi])
+	var lo := INF
+	var hi := -INF
+	for corner in [clear.position, Vector2(clear.end.x, clear.position.y),
+			Vector2(clear.position.x, clear.end.y), clear.end]:
+		var s: float = (corner - a).dot(along)
+		lo = minf(lo, s)
+		hi = maxf(hi, s)
+	lo = maxf(lo, 0.0)
+	hi = minf(hi, run)
+	return maxf(0.0, lo + (run - hi))
 
 
 ## Heat and parchment do not mix: a bookcase keeps off the wall the chimney is

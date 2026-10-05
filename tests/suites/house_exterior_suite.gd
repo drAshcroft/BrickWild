@@ -4,7 +4,10 @@ extends RefCounted
 
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("house exterior")
-	for style in [&"cottage", &"farmhouse", &"townhouse", &"longhall", &"witch_hut"]:
+	# Every style the table publishes, not the five that existed when this suite
+	# was written: a style that is absent from this list is a style whose
+	# dressing and yard are never measured, and it passes by saying nothing.
+	for style in HouseSweep.styles():
 		for trade in [&"none", &"farmer", &"smith", &"alchemist", &"innkeeper"]:
 			for rotated in [false, true]:
 				print("    exterior %s/%s rotated=%s" % [style, trade, rotated])
@@ -79,7 +82,7 @@ static func _check_assembly(res: SuiteResult, plan: HousePlan, who: String) -> v
 ## leaves the bare shell, byte for byte.
 static func _yard(res: SuiteResult) -> void:
 	var with_pieces := 0
-	for style in [&"cottage", &"farmhouse", &"townhouse", &"longhall", &"witch_hut"]:
+	for style in HouseSweep.styles():
 		for trade in [&"none", &"farmer", &"smith", &"alchemist", &"innkeeper", &"scholar"]:
 			for rotated in [false, true]:
 				print("    yard %s/%s rotated=%s" % [style, trade, rotated])

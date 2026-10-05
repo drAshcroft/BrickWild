@@ -16,6 +16,7 @@ static func dress(plan: HousePlan) -> void:
 		return
 	var s := plan.spec
 	var service := 3 if posmod(s.seed, 2) == 0 else 2
+	var trade_recipe := false
 	var recipe: Array = [["Lantern_Wall", 0.45, 0, "entrance_light"],
 		["Bench", 0.8, 0, "entrance_seat"],
 		["Barrel", 1.0, service, "storage"], ["Bucket_Wooden_1", 1.0, service, "storage"]]
@@ -23,14 +24,26 @@ static func dress(plan: HousePlan) -> void:
 		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"], ["Bench", 0.8, 0, "entrance_seat"],
 			["Barrel_Apples", 1.0, service, "produce"], ["FarmCrate_Carrot", 1.0, service, "produce"],
 			["Bag", 0.9, service, "produce"]]
+		trade_recipe = true
 	if s.trade == &"smith":
 		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"], ["Bench", 0.7, 0, "entrance_seat"],
 			["Anvil_Log", 1.0, service, "smith_work"], ["Crate_Wooden", 0.8, service, "smith_work"]]
+		trade_recipe = true
 	elif s.trade == &"alchemist" or s.style == &"witch_hut":
 		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"], ["Cauldron", 0.7, service, "herb_work"],
 			["Pot_1", 1.4, service, "herb_work"], ["Bucket_Wooden_1", 1.0, service, "herb_work"]]
+		trade_recipe = true
 	elif s.trade == &"innkeeper":
 		recipe.append(["Barrel_Holder", 0.85, service, "inn_storage"])
+		trade_recipe = true
+	if HouseSpec.STYLES.get(s.style, {}).has("culture") and not trade_recipe:
+		# HOUSE-CULTURE. A trade still wins -- a smith's mud hut is a smith's --
+		# but a household with none keeps what its kind of house keeps: a lamp
+		# by the door, a bench in the shade, and the water and the storage.
+		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"],
+			["Bench", 0.8, 0, "entrance_seat"],
+			["Pot_1", 1.2, service, "storage"], ["Barrel", 1.0, service, "storage"],
+			["Bucket_Wooden_1", 1.0, service, "water"]]
 	for item in recipe:
 		var key: String = item[0]
 		var scale: float = item[1]
@@ -77,7 +90,9 @@ static func _candidate(plan: HousePlan, key: String, scale: float, wall: int,
 	var foot := PropCatalog.footprint_rotated(key, yaw + PropCatalog.face_offset(key)) * scale
 	var mounted := PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED)
 	var deep := foot.dot(normal.abs())
-	var outward := HouseGeometry.WALL_T * 0.5 + deep * 0.5 + (-0.005 if mounted else 0.16)
+	# Out from the wall FACE, and the face is half of this house's own wall --
+	# 0.35 m for a timber frame and rather more for a mud-brick one.
+	var outward := HouseGeometry.wall_thickness(plan.spec) * 0.5 + deep * 0.5 + (-0.005 if mounted else 0.16)
 	var center := a.lerp(b, fraction) + normal * outward
 	var center_y := minf(1.85, plan.spec.height - raw.y * 0.5 - 0.12) if mounted else raw.y * 0.5
 	var off: Vector3 = rotation * (PropCatalog.centre_offset(key) * scale)
@@ -104,10 +119,10 @@ static func bounds_of(p: Dictionary) -> AABB:
 
 
 static func _opening_box(pos: Vector2, normal: Vector2, width: float,
-		bottom: float, top: float, depth: float) -> AABB:
+		bottom: float, top: float, depth: float, thick: float) -> AABB:
 	var along := Vector2(normal.y, -normal.x).abs() * width
 	var size := along + normal.abs() * depth
-	var center := pos + normal * (HouseGeometry.WALL_T + depth * 0.5)
+	var center := pos + normal * (thick + depth * 0.5)
 	return AABB(Vector3(center.x - size.x * 0.5, bottom, center.y - size.y * 0.5),
 		Vector3(size.x, top - bottom, size.y))
 
@@ -122,14 +137,15 @@ static func facade_clear(plan: HousePlan, bounds: AABB) -> String:
 		if not door["exterior"] or HousePlan.record_storey(door) != 0:
 			continue
 		var reserved := _opening_box(door["pos"], door["normal"], float(door["width"]) + 1.1,
-			-0.1, HouseGeometry.DOOR_H + 0.25, 3.2)
+			-0.1, HouseGeometry.DOOR_H + 0.25, 3.2, HouseGeometry.wall_thickness(plan.spec))
 		if bounds.intersects(reserved):
 			return "blocks a door approach or porch"
 	for win in plan.windows:
 		var level := HousePlan.record_storey(win) * plan.spec.height
 		var width: float = win["width"] * (2.0 if plan.spec.window_shutters else 1.0) + 0.22
 		if bounds.intersects(_opening_box(win["pos"], win["normal"], width,
-			level + float(win["sill"]) - 0.1, level + float(win["head"]) + 0.25, 0.8)):
+			level + float(win["sill"]) - 0.1, level + float(win["head"]) + 0.25, 0.8,
+			HouseGeometry.wall_thickness(plan.spec))):
 			return "obstructs glazing, shutters or a window hood"
 	if plan.spec.chimney:
 		var c := HouseGeometry.chimney_center(plan)
@@ -226,7 +242,9 @@ static func reached_doors(plan: HousePlan, with_yard: bool) -> Array[int]:
 	for d in plan.doors.size():
 		var door: Dictionary = plan.doors[d]
 		if door["exterior"] and HousePlan.record_storey(door) == 0:
-			var at: Vector2 = door["pos"] + door["normal"] * (HouseGeometry.WALL_T + 0.4)
+			# Out past THIS house's wall face. The old constant put the probe
+			# point inside a mud-brick wall, which is a door no walk can reach.
+			var at: Vector2 = door["pos"] + door["normal"] * (HouseGeometry.wall_thickness(plan.spec) + 0.4)
 			if grid.reached(Rect2(at - Vector2.ONE * 0.1, Vector2.ONE * 0.2)):
 				out.append(d)
 	return out

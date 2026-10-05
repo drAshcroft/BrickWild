@@ -289,7 +289,7 @@ static func _layout(res: SuiteResult, who: String, drawn: Dictionary) -> void:
 static func _roof_kinds(res: SuiteResult) -> void:
 	for size in [Vector2(8, 12), Vector2(12, 8)]:
 		var plan: HousePlan = _house(&"cottage", 4412, size.x, size.y, 2.6, 2)
-		for kind in [&"gable", &"half_hipped", &"hipped"]:
+		for kind in [&"gable", &"half_hipped", &"hipped", &"conical"]:
 			plan.spec.roof_type = kind
 			var builder := HouseBuilder.new()
 			builder.build(plan)
@@ -298,7 +298,8 @@ static func _roof_kinds(res: SuiteResult) -> void:
 			res.checked += 1
 			for line in bad:
 				res.fail("%s %s: %s" % [kind, size, line])
-			# a hipped roof has no gable wall to show: its hull is not a triangle
+			# a hipped or conical roof has no gable wall to show: its hull is not
+			# a triangle
 			var hull: PackedVector2Array = drawn["elevation"]["roof"]["hull"]
 			res.checked += 1
 			if hull.size() < 3:

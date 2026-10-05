@@ -74,10 +74,15 @@ static func architectural_materials(node: MeshInstance3D, colors: Array,
 static func house_materials(node: MeshInstance3D, spec: HouseSpec) -> void:
 	if DisplayServer.get_name() == "headless":
 		return # Dummy renderer has no shader instances; retain base material.
-	var slate: bool = spec.roof_material == &"slate"
+	# Course and tile width are the roof's own two numbers: slate is small and
+	# square, a pantile is long and narrow, a shingle or a thatch is neither.
+	# `thatch` is the shader's own flag and is the only one of the three that
+	# changes anything but the tiling.
+	var kind := spec.roof_material
+	var course: float = 0.22 if kind == &"slate" else (0.38 if kind == &"tile" else 0.30)
+	var tile_w: float = 0.30 if kind == &"slate" else (0.26 if kind == &"tile" else 0.42)
 	node.set_surface_override_material(HouseBuilder.SURF_ROOF, MaterialKit.house_roof(
-		spec.roof_color, 0.22 if slate else 0.30, 0.30 if slate else 0.42,
-		spec.roof_material == &"thatch"))
+		spec.roof_color, course, tile_w, kind == &"thatch"))
 	house_floor_material(node, spec)
 
 

@@ -59,6 +59,30 @@ const ARCHETYPES: Array[Dictionary] = [
 		"rooms": [&"hall", &"parlour"], "cats": ["table", "bench|seat"],
 		"about": "a banded three-storey merchant's house: crown, belt courses, "
 			+ "pediments and an obelisk on the ridge"},
+	# HOUSE-CULTURE. "culture" is what makes these rows vernacular rather than
+	# European with a new name, and it is declared the way "ornament" is: as
+	# the thing this archetype must BE, not the piece a given seed happens to
+	# roll. VernacularHouseCheck holds each rolled piece to its architecture.
+	{"key": "mediterranean_house", "style": &"mediterranean", "trade": &"none",
+		"width": 9.0, "length": 11.0, "height": 2.8, "culture": true,
+		"rooms": [&"hall"], "cats": ["table|seat"],
+		"about": "a limewashed house under a shallow tiled roof, shutters and all"},
+	{"key": "asian_house", "style": &"asian", "trade": &"none",
+		"width": 9.0, "length": 11.0, "height": 2.7, "culture": true,
+		"rooms": [&"hall"], "cats": ["table|seat"],
+		"about": "a boarded house under one very deep roof, on a veranda"},
+	{"key": "african_compound", "style": &"african", "trade": &"none",
+		"width": 10.0, "length": 12.0, "height": 2.8, "culture": true,
+		"rooms": [&"hall"], "cats": ["table|seat"],
+		"about": "a thick-walled compound house under combed thatch"},
+	{"key": "thatched_cottage", "style": &"thatch_cottage", "trade": &"none",
+		"width": 8.0, "length": 10.0, "height": 2.5, "culture": true,
+		"rooms": [], "cats": ["bed"],
+		"about": "a cob cottage under a very steep combed roof and no verge board"},
+	{"key": "mud_hut", "style": &"mud_hut", "trade": &"none",
+		"width": 6.5, "length": 7.5, "height": 2.4, "culture": true,
+		"rooms": [], "cats": ["bed"],
+		"about": "one room, half a metre of wall, and a cone over it"},
 ]
 
 
@@ -80,7 +104,9 @@ static func run() -> SuiteResult:
 			var builder := HouseBuilder.new()
 			builder.build(plan)
 			res.checked += 1
-			var who := "%s scale=%.2f" % [key, scale]
+			# The seed in every message: a failure you cannot rebuild from the
+			# report is a failure you have to guess at.
+			var who := "%s seed=%d scale=%.2f" % [key, spec.seed, scale]
 			var before: int = res.failures.size()
 
 			# the rooms this kind of house is defined by. A small one may not
@@ -111,6 +137,15 @@ static func run() -> SuiteResult:
 				var rich: Dictionary = RichHouseCheck.new().check(plan, builder)
 				for f2 in rich["failures"]:
 					res.fail("%s: %s" % [who, str(f2)])
+			# a vernacular archetype owes its vocabulary, or it is a European
+			# house with a foreign name. The check runs on the plan as
+			# generated: which pieces a seed carries is the dice's business, and
+			# the check holds each of them to being the right piece in the right
+			# place.
+			if bool(row.get("culture", false)):
+				var culture: Dictionary = VernacularHouseCheck.new().check(plan, builder)
+				for f3 in culture["failures"]:
+					res.fail("%s: %s" % [who, str(f3)])
 			# a cellar is a storey: rooms on it, a pit dug for it, a stair
 			# down to it, and the walk reaching it (INT-016)
 			if spec.cellars > 0:

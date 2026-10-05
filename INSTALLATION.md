@@ -36,8 +36,18 @@ within one BrickWild release.
 > [Current public preview limit](#current-public-preview-limit) before using
 > these steps.
 
-The installer has been verified on Windows. From the BrickWild repository,
-preview the managed changes and then install:
+If a maintainer has frozen a release (see [Releases](docs/RELEASES.md)),
+install from it instead; it is one verified commit and does not change while
+the repository is being edited:
+
+```powershell
+C:\Projects\BigGlade\releases\brick_wild-0.1.0\install.ps1 `
+  -TargetProject C:\path\to\YourGodotProject
+```
+
+To install straight from a checkout, which takes whatever the working tree
+holds at that moment, the installer has been verified on Windows. Preview the
+managed changes and then install:
 
 ```powershell
 .\tools\install_brick_wild_addon.ps1 `

@@ -34,3 +34,7 @@ scratch/*.json
 # Agent worktrees
 .claude/
 /visualqa/walk_shots
+
+# Frozen addon releases (tools/release_brick_wild.ps1). They hold the licensed
+# prop packs, so they are never committed; consumers install from this folder.
+/releases/
