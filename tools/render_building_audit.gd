@@ -16,8 +16,8 @@ func _init() -> void:
 	for arg in args:
 		if arg.begins_with("--family:"):
 			_audit_family = arg.trim_prefix("--family:").strip_edges().to_lower()
-	if _audit_family not in ["house", "culture", "shop", "hotel", "church", "temple", "world", "village"]:
-		printerr("Usage: godot --path . --script res://tools/render_building_audit.gd -- --family:house|culture|shop|hotel|church|temple|world|village")
+	if _audit_family not in ["house", "culture", "shop", "hotel", "church", "temple", "world", "village", "village-appearance"]:
+		printerr("Usage: godot --path . --script res://tools/render_building_audit.gd -- --family:house|culture|shop|hotel|church|temple|world|village|village-appearance")
 		quit(2)
 		return
 	var out_dir := AUDIT_ROOT + "/" + _audit_family
@@ -56,6 +56,8 @@ func _init() -> void:
 			request.water = &"none"
 			request.enclosure = &"hedge"
 			await _run_request(request, "thorpe_english_farming")
+		"village-appearance":
+			await _run_village_appearance()
 	var failures := _audit_failure_reasons()
 	var exit_code := 1 if not failures.is_empty() else 0
 	var image_count := _captured_image_count()
@@ -87,6 +89,32 @@ func _run_culture() -> void:
 	for i in styles.size():
 		var request := BuildingRequest.house(62001 + i, styles[i], &"none", 9.0, 11.0, 2.8, 1)
 		await _run_request(request, String(styles[i]))
+
+
+## Re-dress one retained settlement: identical architecture, lots and cameras.
+func _run_village_appearance() -> void:
+	var request := BuildingRequest.compact_village(741, 40, &"mediterranean")
+	var building := BrickWild.generate(request)
+	if not building.is_ok():
+		_audit_rows.append(_failed_fixture("village_appearance", request, building.errors))
+		return
+	for profile in [{"key": "basics", "level": 0.0, "upkeep": 1.0},
+			{"key": "neglected", "level": 0.15, "upkeep": 0.0},
+			{"key": "legacy", "level": 0.5, "upkeep": 1.0},
+			{"key": "storybook", "level": 1.0, "upkeep": 1.0}]:
+		request.decoration_level = profile["level"]
+		request.upkeep = profile["upkeep"]
+		building.request = request.copy()
+		building.village.spec.decoration_level = request.decoration_level
+		building.village.spec.upkeep = request.upkeep
+		VillageDresser.dress(building.village)
+		var key: String = profile["key"]
+		var report := VillageQA.new().check(building.village, {}, false)
+		var row := _fixture_row(key, building.request, building, report)
+		row["dressing"] = {"plants": building.village.plants.size(), "props": building.village.props.size()}
+		for view in ["exterior_3q", "street"]:
+			row["captures"].append(await _capture_fixture(building, false, view, key + "_" + view + ".jpg"))
+		_audit_rows.append(row)
 
 
 func _run_church() -> void:
@@ -175,6 +203,15 @@ func _capture_fixture(building: GeneratedBuilding, cutaway: bool, view: String,
 	_root3d.add_child(node)
 	await process_frame
 	var bounds: AABB = SceneBounds.of_node(node)
+	if _audit_family == "village-appearance" and building.village != null:
+		# Frame the fixed site and architecture, rather than changing the camera
+		# when a new tree makes the scene bounds taller.
+		var site: Rect2 = building.village.site
+		var top := 16.0
+		for placed in building.village.buildings:
+			var measured: AABB = placed["placement"].get("bounds", AABB())
+			top = maxf(top, measured.end.y)
+		bounds = AABB(Vector3(site.position.x, 0.0, site.position.y), Vector3(site.size.x, top, site.size.y))
 	if bounds.size.length() <= 0.01:
 		node.queue_free()
 		row["status"] = "empty_bounds"
@@ -201,6 +238,18 @@ func _capture_fixture(building: GeneratedBuilding, cutaway: bool, view: String,
 			_set_atmosphere(&"church")
 			_cam.position = Vector3(door.x, maxf(1.7, door.y), door.z + 0.35)
 			focus = Vector3(0.0, centre.y * 0.35, bounds.position.z + bounds.size.z * 0.78)
+	elif view == "street" and building.village != null:
+		_set_atmosphere(&"house")
+		var points: PackedVector2Array = building.village.roads[0]["points"]
+		var segment := maxi(0, (points.size() - 1) / 3)
+		segment = mini(segment, points.size() - 2)
+		var at := points[segment].lerp(points[segment + 1], 0.35)
+		var ahead := (points[segment + 1] - points[segment]).normalized()
+		_cam.position = Vector3(at.x, 1.65, at.y)
+		focus = _cam.position + Vector3(ahead.x, 0.0, ahead.y) * 15.0
+		yaw = atan2(-ahead.x, -ahead.y)
+		pitch = 0.0
+		_cam.look_at(focus, Vector3.UP)
 	elif entry:
 		_set_atmosphere(&"house")
 		var approach := clampf(bounds.size.z * 0.22, 4.0, 7.5)
