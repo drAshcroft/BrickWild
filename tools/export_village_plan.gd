@@ -168,6 +168,8 @@ static func spec_from_request(request: Dictionary, raw: String = "",
 	out.culture = _culture_of(String(out.source_culture))
 	out.regime = StringName(String(request.get("regime", "")).to_lower())
 	out.wealth = clampf(float(request.get("wealth", 0.0)) / WEALTH_FULL, 0.0, 1.0)
+	out.decoration_level = float(request.get("decoration_level", 0.5))
+	out.upkeep = float(request.get("upkeep", 1.0))
 	var terrain: Dictionary = request.get("terrain", {})
 	out.terrain_envelope = terrain.duplicate(true)
 	out.requested_site_m = float(request.get("site_m", SITE_MAX_M))
@@ -204,6 +206,14 @@ static func request_errors(request: Dictionary) -> Array[String]:
 	if population < VillageSpec.POP_MIN or population > VillageSpec.POP_MAX:
 		errors.append("population %d exceeds local capacity [%d, %d]" % [population,
 			VillageSpec.POP_MIN, VillageSpec.POP_MAX])
+	for field in ["decoration_level", "upkeep"]:
+		if not request.has(field):
+			continue
+		var value: Variant = request[field]
+		if not _is_number(value) or not is_finite(float(value)):
+			errors.append("%s must be a finite number" % field)
+		elif float(value) < 0.0 or float(value) > 1.0:
+			errors.append("%s %.3f is outside [0, 1]" % [field, float(value)])
 	var site_value: Variant = request.get("site_m", SITE_MAX_M)
 	if not _is_number(site_value):
 		errors.append("site_m must be numeric")
@@ -477,6 +487,8 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		"purpose": String(plan.spec.purpose),
 		"form": String(plan.spec.form),
 		"enclosure": String(plan.spec.enclosure),
+		"decoration_level": _n(plan.spec.decoration_level),
+		"upkeep": _n(plan.spec.upkeep),
 		"site": {
 			"width_m": _n(minf(plan.site.size.x, SITE_MAX_M)),
 			"depth_m": _n(minf(plan.site.size.y, SITE_MAX_M)),

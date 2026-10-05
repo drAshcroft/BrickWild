@@ -48,9 +48,125 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 			continue
 		node.name = "%s_%d" % [String(b["kind"]), i]
 		node.transform = b["transform"]
+		_apply_building_appearance(node, built, plan.spec)
 		houses.add_child(node)
 	_dressing(root, plan)
 	return root
+
+
+## Paint only the architectural shell of each generated building. Surface 0 is
+## the wall and surface 1 is trim in all current building families. Catalogue
+## models, furniture, roofs, floors, and geometry retain their own materials.
+static func _apply_building_appearance(node: Node3D, built: GeneratedBuilding,
+		spec: VillageSpec) -> void:
+	var decoration := clampf(spec.decoration_level, 0.0, 1.0)
+	var upkeep := clampf(spec.upkeep, 0.0, 1.0)
+	# This fast path preserves the legacy material objects and rendered output.
+	if is_equal_approx(decoration, 0.5) and is_equal_approx(upkeep, 1.0):
+		return
+	var palette_seed := built.request.seed if built.request != null else 0
+	_paint_architecture(node, decoration, upkeep, palette_seed)
+	# House and shop yards have an independent planner. At the bare setting,
+	# suppress only ornamental planting; keep paths, tools, washing and trade work.
+	if decoration <= 0.0 and built.plan is HousePlan:
+		_suppress_yard_ornament(node, built.plan as HousePlan)
+
+
+static func _paint_architecture(root: Node, decoration: float, upkeep: float,
+		palette_seed: int) -> void:
+	for child in root.get_children():
+		if child is MeshInstance3D and (child.name == "Shell" or child.name == "Stone"):
+			_paint_shell_seeded(child as MeshInstance3D, decoration, upkeep, palette_seed)
+		_paint_architecture(child, decoration, upkeep, palette_seed)
+
+
+static func _paint_shell(shell: MeshInstance3D, decoration: float, upkeep: float) -> void:
+	_paint_shell_seeded(shell, decoration, upkeep, 0)
+
+
+static func _paint_shell_seeded(shell: MeshInstance3D, decoration: float,
+		upkeep: float, palette_seed: int) -> void:
+	if shell.mesh == null:
+		return
+	for surface in range(shell.mesh.get_surface_count()):
+		var slot := surface
+		if shell.mesh is ArrayMesh:
+			var surface_name := (shell.mesh as ArrayMesh).surface_get_name(surface)
+			if surface_name.begins_with("material_slot:"):
+				slot = int(surface_name.trim_prefix("material_slot:"))
+		if slot > 1:
+			continue
+		var original := shell.get_active_material(surface)
+		if original == null:
+			continue
+		var material := original.duplicate() as Material
+		if material is StandardMaterial3D:
+			var standard := material as StandardMaterial3D
+			standard.albedo_color = _appearance_color(standard.albedo_color, slot,
+				decoration, upkeep, palette_seed)
+		elif material is ShaderMaterial:
+			var shader_material := material as ShaderMaterial
+			var base = shader_material.get_shader_parameter("base_colour")
+			if base is Color:
+				shader_material.set_shader_parameter("base_colour",
+					_appearance_color(base, slot, decoration, upkeep, palette_seed))
+			elif slot == 0:
+				# The carved masonry finish uses its own historical uniform name.
+				var stone = shader_material.get_shader_parameter("stone_colour")
+				if stone is Color:
+					shader_material.set_shader_parameter("stone_colour",
+						_appearance_color(stone, slot, decoration, upkeep, palette_seed))
+				else:
+					continue
+			else:
+				continue
+		else:
+			continue
+		shell.set_surface_override_material(surface, material)
+
+
+static func _appearance_color(base: Color, slot: int, decoration: float,
+		upkeep: float, palette_seed := 0) -> Color:
+	var result := base
+	if decoration < 0.5:
+		var bare := Color("b4aea0") if slot == 0 else Color("888176")
+		result = result.lerp(bare, (0.5 - decoration) * 2.0)
+	elif decoration > 0.5:
+		var hue := base.h
+		var saturation := base.s
+		var value := base.v
+		if saturation < 0.18:
+			# Neutral source colours get a deterministic warm pastel; already
+			# cultural colours keep their hue and become brighter and richer.
+			var warm_hues := [0.075, 0.11, 0.035, 0.15, 0.96]
+			hue = float(warm_hues[absi(palette_seed) % warm_hues.size()])
+			if slot == 1:
+				hue = fposmod(hue + 0.86, 1.0)
+			saturation = 0.42 if slot == 0 else 0.48
+			value = 0.88 if slot == 0 else 0.53
+		else:
+			hue = fposmod(hue + (0.035 if slot == 1 else 0.0), 1.0)
+			saturation = minf(1.0, saturation + (0.20 if slot == 0 else 0.24))
+			value = maxf(value, 0.84 if slot == 0 else 0.66)
+		var fantasy := Color.from_hsv(hue, saturation, value, base.a)
+		result = result.lerp(fantasy, (decoration - 0.5) * 2.0)
+	# Upkeep changes wear independently of decoration and never reads wealth.
+	var weathered := Color("817d73") if slot == 0 else Color("77716a")
+	return result.lerp(weathered, (1.0 - upkeep) * 0.38)
+
+
+static func _suppress_yard_ornament(root: Node, plan: HousePlan) -> void:
+	const ORNAMENTAL_GROUPS := [&"garden", &"flowers", &"herb_bed", &"mushrooms"]
+	var exterior := root.get_node_or_null("Exterior")
+	if exterior == null:
+		return
+	for row in plan.yard:
+		if StringName(row.get("group", &"")) in ORNAMENTAL_GROUPS:
+			var ornament := exterior.get_node_or_null(String(row.get("id", "")))
+			if ornament != null:
+				# Remove the model as well as any imported collision children.
+				# An invisible garden must not become an invisible obstacle.
+				ornament.free()
 
 
 ## The surfaces that carry their own vertex colour (a lot's tint, a bank's

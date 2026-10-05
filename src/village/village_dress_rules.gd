@@ -10,7 +10,14 @@ extends RefCounted
 ## a failure for having one bench instead of two.
 static func apply(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		rng: RandomNumberGenerator, host: int, role: StringName) -> void:
+	# The historic level .5 takes this same path, and therefore makes exactly
+	# the same draws in exactly the same order. At zero, explicitly optional
+	# pieces disappear while functional recipes remain untouched.
+	if bool(step.get("optional", false)) and plan.spec.decoration_level <= 0.0:
+		return
 	var opt: float = float(step.get("opt", 1.0))
+	if bool(step.get("optional", false)) and plan.spec.decoration_level < 0.5:
+		opt *= plan.spec.decoration_level * 2.0
 	if opt < 1.0 and rng.randf() > opt:
 		return
 	var span: Array = step["n"]
@@ -84,10 +91,17 @@ static func _edge_kind(plan: VillagePlan, ctx: Dictionary, key: String, spot: Ve
 		return key
 	var roll := fposmod(sin(spot.x * 12.9898 + spot.y * 78.233 + float(plan.spec.seed) * 0.173) * 43758.5453, 1.0)
 	var slot := ""
-	if roll < 0.14:
-		slot = "hedge"
-	elif roll < 0.21:
-		slot = "wild"
+	if plan.spec.upkeep >= 1.0:
+		if roll < 0.14:
+			slot = "hedge"
+		elif roll < 0.21:
+			slot = "wild"
+	else:
+		var wild_chance := lerpf(0.07, 0.24, 1.0 - plan.spec.upkeep)
+		if roll < 0.14:
+			slot = "hedge"
+		elif roll < 0.14 + wild_chance:
+			slot = "wild"
 	if slot.is_empty():
 		return key
 	var options := palette_keys(ctx, slot)
@@ -161,4 +175,3 @@ static func palette_keys(ctx: Dictionary, slot: String) -> Array[String]:
 
 
 ## Where a step's pieces go, by its rule. Every rule returns candidate points
-

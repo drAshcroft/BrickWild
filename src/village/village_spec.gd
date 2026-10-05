@@ -17,6 +17,11 @@ var rng: RandomNumberGenerator
 # ---- user-specified (never randomized, never clamped) ----
 ## Opt-in close urban display. Buildings remain measured in real metres.
 var compact_display: bool = false
+## Optional exterior planting and ornament. 0 is plain; 0.5 preserves the
+## historic recipe; values above it add separately seeded planting.
+var decoration_level: float = 0.5
+## Care of optional outdoor dressing, independent of household wealth.
+var upkeep: float = 1.0
 var population: int = 40
 var culture: StringName = &"english"
 var purpose: StringName = &"farming"
@@ -171,6 +176,10 @@ func errors() -> Array[String]:
 		out.append("unknown purpose '%s'" % purpose)
 	if wealth < 0.0 or wealth > 1.0:
 		out.append("wealth %f out of range [0, 1]" % wealth)
+	if not is_finite(decoration_level) or decoration_level < 0.0 or decoration_level > 1.0:
+		out.append("decoration_level %f out of range [0, 1]" % decoration_level)
+	if not is_finite(upkeep) or upkeep < 0.0 or upkeep > 1.0:
+		out.append("upkeep %f out of range [0, 1]" % upkeep)
 	if not (enclosure in ENCLOSURES):
 		out.append("unknown enclosure '%s'" % enclosure)
 	if not (water in WATERS):

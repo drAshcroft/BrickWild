@@ -28,6 +28,10 @@ var enclosure: StringName = &"none"
 ## Opt-in compact presentation for villages. It preserves metre-scale
 ## buildings and is valid only with no water or enclosure.
 var compact_display: bool = false
+## Village-only exterior ornament intensity, from bare/basic to lush/storybook.
+var decoration_level: float = 0.5
+## Village-only condition of buildings, from worn/slum to clean.
+var upkeep: float = 1.0
 var _decode_errors: Array[Dictionary] = []
 
 const SCHEMA := "brickwild.request"
@@ -45,6 +49,10 @@ func to_dict() -> Dictionary:
 	# from_dict treats a missing field as the false default.
 	if compact_display:
 		out["compact_display"] = true
+	if decoration_level != 0.5:
+		out["decoration_level"] = decoration_level
+	if upkeep != 1.0:
+		out["upkeep"] = upkeep
 	return out
 
 
@@ -92,6 +100,14 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 			out.compact_display = data["compact_display"]
 		else:
 			out._decode_errors.append(_field_error("compact_display", "must be a boolean"))
+	for field in ["decoration_level", "upkeep"]:
+		if not data.has(field):
+			continue
+		var value: Variant = data[field]
+		if typeof(value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value)):
+			out._decode_errors.append(_field_error(field, "must be a finite number"))
+		else:
+			out.set(field, float(value))
 	var seed_value: Variant = data.get("seed", "0")
 	if seed_value is String and seed_value.is_valid_int() and str(int(seed_value)) == seed_value:
 		out.seed = int(seed_value)
@@ -156,18 +172,23 @@ static func windmill(p_seed: int, p_type: StringName = &"tower",
 ## enclosure; they remain ordinary metre-scale village plans.
 static func village(p_seed: int, p_population: int = 40,
 		p_culture: StringName = &"english", p_purpose: StringName = &"farming",
-		p_wealth: float = 0.4, p_compact_display: bool = false) -> BuildingRequest:
+		p_wealth: float = 0.4, p_compact_display: bool = false,
+		p_decoration_level: float = 0.5, p_upkeep: float = 1.0) -> BuildingRequest:
 	var out := _make(&"village", p_seed, p_culture, p_purpose,
 		float(p_population), p_wealth * 100.0, 1.0)
 	out.compact_display = p_compact_display
+	out.decoration_level = p_decoration_level
+	out.upkeep = p_upkeep
 	return out
 
 
 ## The common presentation request for close rows in an external display.
 static func compact_village(p_seed: int, p_population: int = 40,
 		p_culture: StringName = &"english", p_purpose: StringName = &"market",
-		p_wealth: float = 0.4) -> BuildingRequest:
-	return village(p_seed, p_population, p_culture, p_purpose, p_wealth, true)
+		p_wealth: float = 0.4, p_decoration_level: float = 0.5,
+		p_upkeep: float = 1.0) -> BuildingRequest:
+	return village(p_seed, p_population, p_culture, p_purpose, p_wealth, true,
+		p_decoration_level, p_upkeep)
 
 
 ## A detached copy lets the library retain the request without retaining
@@ -178,6 +199,8 @@ func copy() -> BuildingRequest:
 	out.water = water
 	out.enclosure = enclosure
 	out.compact_display = compact_display
+	out.decoration_level = decoration_level
+	out.upkeep = upkeep
 	out.orientation = orientation
 	out.period = period
 	out._decode_errors = _decode_errors.duplicate(true)

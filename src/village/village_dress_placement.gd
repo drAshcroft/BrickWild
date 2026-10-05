@@ -334,11 +334,15 @@ static func plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
 ## door crosses it. Culture's `hedge` slot, at a pitch, and only where the
 ## village is rich enough to keep one (Â§7: `row`, wealth x 0.8).
 static func hedges(plan: VillagePlan, ctx: Dictionary) -> void:
+	if plan.spec.decoration_level <= 0.0:
+		return
 	var keys: Array[String] = VillageDressRules.palette_keys(ctx, "hedge")
 	if keys.is_empty():
 		return
 	var rng := rng(plan, "hedge")
 	var chance: float = plan.spec.wealth * 0.8
+	if plan.spec.decoration_level < 0.5:
+		chance *= plan.spec.decoration_level * 2.0
 	for i in range(plan.buildings.size()):
 		if rng.randf() > chance:
 			continue
@@ -405,4 +409,3 @@ static func rng(plan: VillagePlan, key: String) -> RandomNumberGenerator:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("dress|%d|%s" % [plan.spec.seed, key])
 	return rng
-

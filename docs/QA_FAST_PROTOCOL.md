@@ -38,6 +38,7 @@ times rather than an idle-machine promise.
 | prison programme and keyed routes | `prison` | 225 s | 7 checks, pass; 13 warnings |
 | temple geometry and rite | `lane:temple` | 52 s | 2,247 checks, pass; 7 warnings |
 | village site, lots, plan rules | `lane:village-fast` | 2.5 m (1 Oct) | 10 checks, 0 failures (the VIL-017 baselines were fixed) |
+| village decoration, upkeep, materials and transport, with village regression | `lane:village-fast lane:village-appearance-fast` | 169 s (5 Oct) | 91 checks, 0 failures, 0 warnings |
 | church roofs + temple + tree + bridge together | `lane:church-change lane:temple lane:tree lane:bridge` | 230 s (1 Oct) | pass |
 | the dwellings the generator must furnish | `harchetype` | 2.5 m (1 Oct) | pass |
 | church and castle dressing, bounded | `dressingquick` | under 5 m | pass |

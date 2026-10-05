@@ -32,57 +32,57 @@ const EDGE_PITCH := 6.0
 const RECIPES := {
 	# any house: what a household leaves outside its own front door
 	&"house": [
-		{"cat": "barrel", "rule": &"wall", "n": [1, 1], "opt": 0.7},
-		{"cat": "bench", "rule": &"wall", "n": [0, 1], "opt": 0.4},
-		{"cat": "bush", "rule": &"verge", "n": [2, 2], "opt": 0.6, "plant": true},
+		{"cat": "barrel", "rule": &"wall", "n": [1, 1], "opt": 0.7, "optional": true},
+		{"cat": "bench", "rule": &"wall", "n": [0, 1], "opt": 0.4, "optional": true},
+		{"cat": "bush", "rule": &"verge", "n": [2, 2], "opt": 0.6, "plant": true, "optional": true},
 	],
 	&"farm": [
-		{"cat": "crate", "rule": &"yard", "n": [1, 3], "opt": 0.9},
-		{"cat": "sack", "rule": &"yard", "n": [1, 2], "opt": 0.9},
-		{"cat": "wagon", "rule": &"yard", "n": [0, 1], "opt": 0.6},
-		{"cat": "haystack", "rule": &"yard", "n": [1, 1], "opt": 0.8, "built": true},
+		{"cat": "crate", "rule": &"yard", "n": [1, 3], "opt": 0.9, "optional": true},
+		{"cat": "sack", "rule": &"yard", "n": [1, 2], "opt": 0.9, "optional": true},
+		{"cat": "wagon", "rule": &"yard", "n": [0, 1], "opt": 0.6, "optional": true},
+		{"cat": "haystack", "rule": &"yard", "n": [1, 1], "opt": 0.8, "built": true, "optional": true},
 		{"cat": "tree", "rule": &"row", "n": [3, 3], "pitch": 5.0, "opt": 1.0, "plant": true, "orchard": true},
 	],
 	&"smithy": [
 		{"cat": "anvil", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "barrel", "rule": &"wall", "n": [1, 1], "opt": 1.0},
-		{"cat": "cookware", "rule": &"wall", "n": [0, 1], "opt": 0.8},
+		{"cat": "cookware", "rule": &"wall", "n": [0, 1], "opt": 0.8, "optional": true},
 		{"cat": "sconce", "rule": &"light", "n": [1, 1], "opt": 1.0},
 	],
 	&"tavern": [
 		{"cat": "bench", "rule": &"verge", "n": [2, 2], "opt": 1.0},
 		{"cat": "barrel", "rule": &"verge", "n": [1, 2], "opt": 1.0},
 		{"cat": "sconce", "rule": &"light", "n": [1, 1], "opt": 1.0},
-		{"cat": "banner", "rule": &"wall", "n": [1, 1], "opt": 0.6},
+		{"cat": "banner", "rule": &"wall", "n": [1, 1], "opt": 0.6, "optional": true},
 	],
 	&"stable": [
-		{"cat": "wagon", "rule": &"yard", "n": [1, 1], "opt": 0.8},
-		{"cat": "sack", "rule": &"wall", "n": [1, 2], "opt": 0.8},
+		{"cat": "wagon", "rule": &"yard", "n": [1, 1], "opt": 0.8, "optional": true},
+		{"cat": "sack", "rule": &"wall", "n": [1, 2], "opt": 0.8, "optional": true},
 	],
 	&"market": [
 		{"cat": "stall", "rule": &"row", "n": [3, 6], "pitch": 4.0, "opt": 1.0},
-		{"cat": "crate", "rule": &"on", "n": [1, 2], "opt": 0.9},
+		{"cat": "crate", "rule": &"on", "n": [1, 2], "opt": 0.9, "optional": true},
 		{"cat": "wall_torch", "rule": &"light", "n": [2, 2], "opt": 1.0},
 	],
 	# the common: the well first, and it is the reason a common is a common
 	&"common": [
 		{"cat": "well", "rule": &"centre", "n": [1, 1], "opt": 1.0, "built": true},
-		{"cat": "bench", "rule": &"scatter", "n": [2, 2], "opt": 0.7},
+		{"cat": "bench", "rule": &"scatter", "n": [2, 2], "opt": 0.7, "optional": true},
 		{"cat": "tree", "rule": &"centre", "n": [1, 1], "opt": 0.5, "plant": true,
-			"palette": "green"},
-		{"cat": "flower", "rule": &"scatter", "n": [2, 4], "opt": 0.6, "plant": true},
+			"palette": "green", "optional": true},
+		{"cat": "flower", "rule": &"scatter", "n": [2, 4], "opt": 0.6, "plant": true, "optional": true},
 	],
 	&"church": [
 		{"cat": "tree", "rule": &"ring", "n": [4, 6], "opt": 0.8, "plant": true,
-			"palette": "edge"},
+			"palette": "edge", "optional": true},
 	],
 	&"gate": [
 		{"cat": "signpost", "rule": &"beside", "n": [1, 1], "opt": 1.0, "built": true},
 		{"cat": "lamp_post", "rule": &"beside", "n": [2, 2], "opt": 1.0, "built": true},
 	],
 	&"water": [
-		{"cat": "rock", "rule": &"bank", "n": [2, 5], "opt": 0.8, "plant": true},
-		{"cat": "plant", "rule": &"bank", "n": [2, 4], "opt": 0.7, "plant": true},
+		{"cat": "rock", "rule": &"bank", "n": [2, 5], "opt": 0.8, "plant": true, "optional": true},
+		{"cat": "plant", "rule": &"bank", "n": [2, 4], "opt": 0.7, "plant": true, "optional": true},
 	],
 	# rushes along the bank, planted LAST so they take only what nothing else
 	# wanted: never the strand's aprons, never a road or a door
@@ -106,7 +106,7 @@ const RECIPES := {
 		{"cat": "tree", "rule": &"band", "n": [6, 14], "opt": 1.0, "plant": true,
 			"palette": "edge", "fill": true},
 		{"cat": "ground", "rule": &"band", "n": [4, 10], "opt": 0.6, "plant": true,
-			"palette": "ground"},
+			"palette": "ground", "optional": true},
 	],
 }
 
@@ -182,4 +182,3 @@ const GREEN_TREE_CLEAR := 4.0
 ## Dress a planned village: fills `plan.props` and `plan.plants` and nothing
 ## else. Mutates the plan it is given, like the furnisher does; returns it for
 ## convenience.
-

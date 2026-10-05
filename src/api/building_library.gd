@@ -309,6 +309,12 @@ static func describe(kind: StringName) -> Dictionary:
 		out["enclosure_label"] = "Edge"
 		out["compact_display"] = {"available": true, "default": false,
 			"requires": {"water": &"none", "enclosure": &"none"}}
+		out["decoration_level"] = {"min": 0.0, "max": 1.0, "step": 0.05,
+			"value": 0.5, "label": "Decoration",
+			"min_label": "Bare / basic", "max_label": "Lush / storybook"}
+		out["upkeep"] = {"min": 0.0, "max": 1.0, "step": 0.05,
+			"value": 1.0, "label": "Upkeep",
+			"min_label": "Worn / slum", "max_label": "Clean"}
 	if kind == &"world":
 		# a world family narrows the kind's envelope with its own, so the
 		# families are published with theirs attached
@@ -370,9 +376,21 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 		if request.compact_display and (request.water != &"none" or request.enclosure != &"none"):
 			out.append(_error(&"invalid_compact_display", &"compact_display",
 				"Compact display requires water=none and enclosure=none."))
+		for field in [&"decoration_level", &"upkeep"]:
+			var value := float(request.get(field))
+			if not is_finite(value) or value < 0.0 or value > 1.0:
+				out.append(_error(&"invalid_village_control", field,
+					"%s must be a finite number from 0 to 1." % String(field)))
 	elif request.compact_display:
 		out.append(_error(&"unsupported_option", &"compact_display",
 			"compact_display is only available for villages."))
+	if request.kind != &"village":
+		if request.decoration_level != 0.5:
+			out.append(_error(&"unsupported_option", &"decoration_level",
+				"decoration_level is only available for villages."))
+		if request.upkeep != 1.0:
+			out.append(_error(&"unsupported_option", &"upkeep",
+				"upkeep is only available for villages."))
 	if request.kind == &"world" and out.is_empty():
 		# a world family narrows the kind's envelope with its own, and owns
 		# which sub-kinds it comes in

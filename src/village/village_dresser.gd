@@ -49,15 +49,42 @@ static func dress(plan: VillagePlan) -> VillagePlan:
 		VillageDressHosts.dress_building(plan, ctx, i)
 	VillageDressContext.blight_remnants(plan, ctx)
 	VillageDressPlacement.hedges(plan, ctx)
-	if plan.spec.compact_display:
+	if plan.spec.compact_display and plan.spec.decoration_level > 0.0:
 		_compact_plants(plan, ctx)
 	else:
-		VillageDressHosts.dress_place(plan, ctx, &"edge")
+		if not plan.spec.compact_display:
+			VillageDressHosts.dress_place(plan, ctx, &"edge")
 	# Shore yards must be reached through the final garden and hedge layout.
 	# An unobstructed apron cannot help when later planting cuts its yard off.
 	VillageDressHosts.dress_place(plan, ctx, &"strand")
 	VillageDressHosts.dress_place(plan, ctx, &"reeds")
+	_lush_pass(plan, ctx)
 	return plan
+
+
+## Extra flowers are a new, isolated stream. The default .5 path never calls
+## this pass, so historic recipe RNG and every default placement stay intact.
+static func _lush_pass(plan: VillagePlan, ctx: Dictionary) -> void:
+	if plan.spec.decoration_level <= 0.5:
+		return
+	var count := int(round(6.0 * (plan.spec.decoration_level - 0.5) * 2.0))
+	if count <= 0:
+		return
+	var rng := VillageDressPlacement.rng(plan, "lush|common")
+	var step := {"cat": "flower", "rule": &"scatter", "n": [count, count],
+		"opt": 1.0, "plant": true, "palette": "ground"}
+	VillageDressRules.apply(plan, ctx, step, rng, -1, &"common")
+	# Kept on its own stream per host: extra beds beside houses cannot perturb
+	# the historical barrels, work props, stalls, or any later host's rolls.
+	for i in range(plan.buildings.size()):
+		var host := VillageDressHosts.host_of(plan, i)
+		if host not in [&"house", &"farm", &"tavern", &"stable"]:
+			continue
+		var yard_rng := VillageDressPlacement.rng(plan, "lush|host|%d" % i)
+		var yard_count := maxi(1, int(round(3.0 * (plan.spec.decoration_level - 0.5) * 2.0)))
+		var yard_step := {"cat": "flower", "rule": &"verge", "n": [yard_count, yard_count],
+			"opt": 1.0, "plant": true, "palette": "ground"}
+		VillageDressRules.apply(plan, ctx, yard_step, yard_rng, i, host)
 
 
 ## A few trees in genuine free gaps of the occupied display, never a distant
@@ -73,10 +100,12 @@ static func _compact_plants(plan: VillagePlan, ctx: Dictionary) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("compact-trees|%d" % plan.spec.seed)
 	var trees := 0
+	var target := int(round(12.0 * plan.spec.decoration_level / 0.5)) \
+		if plan.spec.decoration_level <= 0.5 else int(round(12.0 + 12.0 * (plan.spec.decoration_level - 0.5)))
 	for plant in plan.plants:
 		if VillageDressPlacement.plant_kind(plant["key"]) == &"tree": trees += 1
 	for attempt in range(500):
-		if trees >= 12: break
+		if trees >= target: break
 		var at := Vector2(rng.randf_range(occupied.position.x, occupied.end.x),
 			rng.randf_range(occupied.position.y, occupied.end.y))
 		var key: String = keys[attempt % keys.size()]

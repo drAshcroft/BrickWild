@@ -28,7 +28,7 @@ extends RefCounted
 
 const RULES: Array[StringName] = [&"host", &"doorways", &"road", &"stalls",
 	&"fences", &"canopies", &"edge", &"green", &"cover", &"lights",
-	&"fields", &"wood", &"culture"]
+	&"fields", &"wood", &"culture", &"controls"]
 
 ## A prop may sit this far outside its host's lot before it is somebody
 ## else's problem: half a metre of slack for a barrel against a wall on the
@@ -74,6 +74,17 @@ func check(plan: VillagePlan, overrides: Dictionary = {}) -> Dictionary:
 	replaced = RuleSet.run(self, RULES, {}, overrides, [plan], [plan], failures, warnings)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
 		"stats": stats, "replaced": replaced}
+
+
+## Presentation controls are bounded independent inputs, not wealth aliases.
+func _check_controls(plan: VillagePlan) -> void:
+	for field in ["decoration_level", "upkeep"]:
+		var value: float = float(plan.spec.get(field))
+		if not is_finite(value) or value < 0.0 or value > 1.0:
+			failures.append("controls: %s %.3f is outside [0, 1]" % [field, value])
+			return
+	stats["decoration_level"] = plan.spec.decoration_level
+	stats["upkeep"] = plan.spec.upkeep
 
 
 # ------------------------------------------------------------------- host
