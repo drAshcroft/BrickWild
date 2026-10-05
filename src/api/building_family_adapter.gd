@@ -649,6 +649,7 @@ class VillageFamily extends BuildingFamilyAdapter:
 		spec.purpose = request.purpose
 		spec.water = request.water
 		spec.enclosure = request.enclosure
+		spec.compact_display = request.compact_display
 		_copy_orientation_and_period(request, spec)
 		if not spec.valid():
 			return false

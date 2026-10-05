@@ -307,6 +307,8 @@ static func describe(kind: StringName) -> Dictionary:
 		out["enclosures"] = options(kind, &"enclosure")
 		out["water_label"] = "Water"
 		out["enclosure_label"] = "Edge"
+		out["compact_display"] = {"available": true, "default": false,
+			"requires": {"water": &"none", "enclosure": &"none"}}
 	if kind == &"world":
 		# a world family narrows the kind's envelope with its own, so the
 		# families are published with theirs attached
@@ -365,6 +367,12 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 			out.append(_error(&"invalid_population", &"width", "Population must be a whole number."))
 		if request.enclosure == &"wall" and request.width < VillageSpec.WALL_MIN_POPULATION and request.purpose != &"garrison":
 			out.append(_error(&"invalid_enclosure", &"enclosure", "A wall needs at least %d people or a garrison purpose." % VillageSpec.WALL_MIN_POPULATION))
+		if request.compact_display and (request.water != &"none" or request.enclosure != &"none"):
+			out.append(_error(&"invalid_compact_display", &"compact_display",
+				"Compact display requires water=none and enclosure=none."))
+	elif request.compact_display:
+		out.append(_error(&"unsupported_option", &"compact_display",
+			"compact_display is only available for villages."))
 	if request.kind == &"world" and out.is_empty():
 		# a world family narrows the kind's envelope with its own, and owns
 		# which sub-kinds it comes in

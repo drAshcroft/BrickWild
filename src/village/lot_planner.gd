@@ -382,7 +382,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	var gradient_floor := 0.0
 	for job in jobs:
 		var cls: StringName = job["class"]
-		if cls == &"church" and plan.landmark_reserved() and not plan.spec.compact_display:
+		if cls == &"church" and plan.landmark_reserved():
 			if landmark_lane < 0:
 				landmark_lane = _add_landmark_lane(plan)
 				ctx = _context(plan)
@@ -582,7 +582,11 @@ static func lot_rule(cls: StringName, spec: VillageSpec) -> Dictionary:
 		return rule
 	rule = rule.duplicate()
 	if cls in [&"townhouse", &"shop", &"cottage"]:
-		rule.merge({"set_min": 0.2, "set_max": 1.5, "use": 0.4, "fire": 0.35, "yard": 0.6}, true)
+		# Keep the shell and eaves full size. East Asian roofs can project just
+		# over two metres in front of the measured wall; this cap gives the
+		# ordinary 0.2 m road clearance its room while staying well inside the
+		# native cottage's six-metre maximum.
+		rule.merge({"set_min": 0.2, "set_max": 2.5, "use": 0.4, "fire": 0.35, "yard": 0.6}, true)
 	elif cls == &"church":
 		rule.merge({"set_min": 0.4, "set_max": 2.5, "use": 1.0, "fire": 0.5, "yard": 0.8}, true)
 	return rule
@@ -677,7 +681,11 @@ static func _open_roads(plan: VillagePlan, reserved: Array) -> Array:
 	for r in range(plan.roads.size()):
 		if r in reserved:
 			continue
-		if plan.spec.compact_display and r >= 2:
+		# Compact plans reserve roads 2 and 3 for the two side streets. They
+		# are ordinary frontage; only the short path through the common is not
+		# a building road. An index cutoff silently left the compact blocks
+		# without their intended frontage.
+		if plan.spec.compact_display and plan.roads[r]["class"] == &"path":
 			continue
 		out.append(r)
 	out.sort_custom(func(a, b) -> bool:
@@ -1327,15 +1335,27 @@ static func _commit(plan: VillagePlan, lot: Dictionary, job: Dictionary, _rule: 
 static func _add_landmark_lane(plan: VillagePlan) -> int:
 	var rect: Rect2 = Poly.bounding_rect(plan.landmark_site["poly"])
 	var setback: float = float(lot_rule(&"church", plan.spec)["use"])
-	var lane_x: float = rect.position.x - setback - LANE_HALF
-	if lane_x - LANE_HALF < plan.site.position.x + SITE_MARGIN:
+	var lane_half: float = LANE_HALF
+	if plan.spec.compact_display:
+		var rule: Dictionary = VillageSitePlanner.road_rule(&"lane", plan.spec)
+		lane_half = float(rule["width"]) * 0.5 + float(rule["verge"])
+	var lane_x: float = rect.position.x - setback - lane_half
+	if lane_x - lane_half < plan.site.position.x + SITE_MARGIN:
 		return -1
-	var through: PackedVector2Array = plan.roads[0]["points"]
-	var start_y: float = _polyline_y_at_x(through, lane_x)
+	var approach: PackedVector2Array = plan.roads[0]["points"]
+	if plan.spec.compact_display and plan.roads.size() > 1:
+		# The compact civic plot sits north of its back street. Connect its
+		# short service lane there instead of running a 50 m lane from the
+		# southern through road across the whole settlement.
+		approach = plan.roads[1]["points"]
+	var start_y: float = _polyline_y_at_x(approach, lane_x)
 	# Most forms put the landmark beyond (positive-y) the common.  A strand
 	# puts water there, so its inland slot is above the common and this service
 	# lane runs in the opposite direction.
 	var end_y: float = rect.end.y + 2.0 if rect.position.y > start_y else rect.position.y - 2.0
+	if plan.spec.compact_display and rect.position.y > start_y:
+		# Keep the service lane's verge inside the compact site's civic end.
+		end_y = minf(end_y, plan.site.end.y - lane_half)
 	if plan.spec.form == &"strand" and rect.position.y < start_y:
 		# The church's measured frontage is wider than the reserved slot.
 		# Give it the full legal dead-end length, measured from its junction;
@@ -1345,6 +1365,10 @@ static func _add_landmark_lane(plan: VillagePlan) -> int:
 		return -1
 	var pts := PackedVector2Array([Vector2(lane_x, start_y), Vector2(lane_x, end_y)])
 	var lane: Dictionary = _lane(pts, plan.spec.wealth)
+	if plan.spec.compact_display:
+		var rule: Dictionary = VillageSitePlanner.road_rule(&"lane", plan.spec)
+		lane["width"] = rule["width"]
+		lane["verge"] = rule["verge"]
 	# the lane itself must not be laid across the common, the water or the
 	# slot it serves.
 	var ribbon: PackedVector2Array = VillageSitePlanner.road_ribbon(lane, true)

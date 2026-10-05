@@ -67,6 +67,35 @@ programme and a fortified market town at the cap comes out near 140
 buildings. That is the top of the envelope, and the harness's first rule
 holds it there.
 
+### Compact display villages
+
+Projects that show many settlements in a small scene can use the compact
+factory. It creates the same seeded programme and culturally styled
+buildings, while tightening the road, yard and clearance layout around them.
+Building geometry remains at its measured real-world size. The current
+compact layout is an open, dry planted grid, so water and enclosure are not
+available on this preset. Lots can use up to a 2.5 m door setback when a
+full-size roof projection needs room to clear the carriageway. Churchyard
+ground is reserved only after the population earns a shrine or church, leaving
+that space for houses in a hamlet. A house-only display occupies 66×64 m; an
+earned landmark expands its north-south site depth to 80 m to keep its full
+churchyard inside the site.
+
+```gdscript
+var spec := VillageSpec.compact(8102, 24, &"mediterranean", &"market", 0.4)
+if not spec.valid():
+	push_error("Village request: %s" % "; ".join(spec.errors()))
+	return
+var plan: VillagePlan = VillageLotPlanner.plan(spec)
+```
+
+The defaults are 40 people, English culture, market purpose and `0.4` wealth.
+Pass the same seed and inputs to reproduce the plan. The compact flag
+is also available on manually built `VillageSpec`s; those requests must keep
+`water` and `enclosure` at `none`. `vcompact` checks the factory, the
+Mediterranean and East Asian house styles, lot fit, compact clearances and
+determinism.
+
 ---
 
 ## 2. What a village IS: the six clauses

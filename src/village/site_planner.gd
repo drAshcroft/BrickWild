@@ -259,7 +259,8 @@ static func _extra_lanes(out: VillagePlan, spec: VillageSpec, through: PackedVec
 ## and independent of the road -- the road is laid inside it.
 static func site_rect(spec: VillageSpec) -> Rect2:
 	if spec.compact_display:
-		return Rect2(Vector2(-33.0, -32.0), Vector2(66.0, 64.0))
+		var depth: float = 80.0 if _compact_has_landmark(spec) else 64.0
+		return Rect2(Vector2(-33.0, -depth * 0.5), Vector2(66.0, depth))
 	var built: float = float(spec.households) * HOUSE_FOOTPRINT
 	for row in spec.programme:
 		if row["kind"] == &"house":
@@ -583,12 +584,21 @@ static func _plan_compact(out: VillagePlan, spec: VillageSpec) -> void:
 	var common := Rect2(Vector2(-4.0, -3.0), Vector2(8.0, 6.0))
 	out.commons.append({"poly": Poly.from_rect(common), "kind": &"square"})
 	out.roads.append(_compact_road(PackedVector2Array([front[2], Vector2(0.0, -1.5)]), &"path", spec))
-	# Reserve a modest civic address before the lot cutter measures its fit.
-	# The cutter may use another existing street frontage for a larger church,
-	# exactly as it does when an ordinary landmark does not fit its first slot.
-	var civic := Rect2(Vector2(-5.0, 16.0), Vector2(10.0, 13.0))
-	out.landmark_site = {"poly": Poly.from_rect(civic), "kind": &"church",
-		"front": PackedVector2Array([civic.position, civic.position + Vector2(civic.size.x, 0.0)])}
+# Reserve church ground only when the programme earns a shrine or church.
+	# Hamlets below that threshold need their frontage for households. The
+	# full-size compact shrine also needs a real six-metre churchyard around
+	# its measured walls, so leave enough width for both side clearances.
+	if _compact_has_landmark(spec):
+		var civic := Rect2(Vector2(-11.0, 16.0), Vector2(22.0, 22.0))
+		out.landmark_site = {"poly": Poly.from_rect(civic), "kind": &"church",
+			"front": PackedVector2Array([civic.position, civic.position + Vector2(civic.size.x, 0.0)])}
+
+
+static func _compact_has_landmark(spec: VillageSpec) -> bool:
+	for row in spec.programme:
+		if row["kind"] in [&"shrine", &"church", &"temple"]:
+			return true
+	return false
 
 
 static func _compact_road(points: PackedVector2Array, cls: StringName, spec: VillageSpec) -> Dictionary:

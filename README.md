@@ -78,6 +78,21 @@ Use `BrickWild.build_mesh(generated)` when you only need an `ArrayMesh`.
 document, and `BrickWild.describe_kind()` exposes the supported sizes, styles,
 and purposes for data-driven tools.
 
+House and shop styles share the house style catalogue. A caller can use the
+published option ids directly; it does not need to import `HouseSpec`:
+
+```gdscript
+var styles: Array = BrickWild.describe_kind(&"house")["styles"]
+var request := BuildingRequest.house(1234, &"pueblo", &"none")
+```
+
+Current vernacular options include `mediterranean`, `asian`, `thatch_cottage`,
+and `pueblo`.
+
+For close settlement displays, request a compact village through the same
+public request boundary:
+see [Compact Villages](docs/COMPACT_VILLAGES.md).
+
 The facade currently supports these request kinds:
 
 | Kind | Examples |

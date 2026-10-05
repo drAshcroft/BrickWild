@@ -141,6 +141,22 @@ func _init(p_seed := 0) -> void:
 	rng.seed = seed
 
 
+## Ready-to-plan close urban display for projects that render many settlements
+## inside a small scene. The buildings retain their measured real-world size;
+## only streets, yards and clearances use the compact layout rules.
+static func compact(p_seed: int, p_population: int = 40,
+		p_culture: StringName = &"english", p_purpose: StringName = &"market",
+		p_wealth: float = 0.4) -> VillageSpec:
+	var spec := VillageSpec.new(p_seed)
+	spec.compact_display = true
+	spec.population = p_population
+	spec.culture = p_culture
+	spec.purpose = p_purpose
+	spec.wealth = p_wealth
+	spec.generate(p_seed)
+	return spec
+
+
 ## Everything wrong with the CURRENT inputs, independent of whether
 ## `generate()` has been called. Empty means the spec is safe to derive from.
 func errors() -> Array[String]:

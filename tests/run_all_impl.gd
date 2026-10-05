@@ -64,7 +64,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"tree", "bridge", "windmill"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["library", "placement", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick",
+const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
@@ -118,7 +118,7 @@ const EXTRA: Array[String] = ["library", "placement", "vmine", "varchetypecontra
 const LANES: Dictionary = {
 	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "hmesh", "metriccoords"],
 	"lane:rich": ["hrich", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty"],
-	"lane:culture": ["hvernacular", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty", "hmaterials"],
+	"lane:culture": ["hvernacular", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty", "hmaterials", "cultureapi"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
@@ -128,7 +128,7 @@ const LANES: Dictionary = {
 	"lane:assets-fast": ["props", "hassembly"],
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
 	"lane:palace-change": ["palace"],
-	"lane:village-fast": ["vquick"],
+	"lane:village-fast": ["vquick", "vcompact", "compactapi"],
 	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cmotteaccess"],
 	"lane:motte-change": ["cmotteplan", "cmotteaccess", "coccupancy"],
 	"lane:castle-spot": ["castlechange", "chimeji"],
@@ -140,7 +140,7 @@ const LANES: Dictionary = {
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
 	"lane:windmill": ["windmill"],
-	"lane:api": ["libraryquick", "placementquick", "poly", "windmill"],
+	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi"],
 	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "interior", "cvoxelqa", "library", "placement"],
 	"lane:sweep": ORDER,
 }
@@ -397,6 +397,12 @@ static func _run_one(key: String) -> SuiteResult:
 			return VillageSuite.run()
 		"vquick":
 			return preload("res://tests/suites/village_quick_suite.gd").run()
+		"vcompact":
+			return preload("res://tests/suites/village_compact_suite.gd").run()
+		"cultureapi":
+			return preload("res://tests/suites/cultural_style_api_suite.gd").run()
+		"compactapi":
+			return preload("res://tests/suites/compact_village_api_suite.gd").run()
 		"vsite":
 			return VillageSiteSuite.run()
 		"vlot":

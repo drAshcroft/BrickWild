@@ -112,7 +112,7 @@ static func judge(plan: VillagePlan) -> Array[String]:
 		var lot: Dictionary = plan.lots[int(b["lot"])]
 		var poly: PackedVector2Array = lot["poly"]
 		var cls: StringName = b["class"]
-		var rule: Dictionary = VillageLotPlanner.LOT_RULES[cls]
+		var rule: Dictionary = VillageLotPlanner.lot_rule(cls, plan.spec)
 		var front: PackedVector2Array = lot["front"]
 		var xf: Transform3D = b["transform"]
 		var pl: Dictionary = b["placement"]
@@ -135,9 +135,10 @@ static func judge(plan: VillagePlan) -> Array[String]:
 		var bounds: AABB = pl["bounds"]
 		var measured_w: float = maxf(fp.size.x, bounds.size.x)
 		var front_len: float = front[0].distance_to(front[1])
-		if front_len < measured_w + FRONT_SLACK - 1e-3:
-			out.append("lot %d frontage %.2f < measured width %.2f + 1" % [
-				int(b["lot"]), front_len, measured_w])
+		var frontage_slack: float = VillageLotPlanner.frontage_slack(plan.spec)
+		if front_len < measured_w + frontage_slack - 1e-3:
+			out.append("lot %d frontage %.2f < measured width %.2f + %.2f" % [
+				int(b["lot"]), front_len, measured_w, frontage_slack])
 
 		# --- §5 fit, measured: the WALLS stand inside the lot, and the eaves
 		# -- which a townhouse's 0-1 m setback band lets reach out over the
@@ -176,7 +177,7 @@ static func judge(plan: VillagePlan) -> Array[String]:
 		# --- §5 corner: a corner lot fronts the more important road
 		var mine: int = int(VillageLotPlanner.ROAD_RANK.get(plan.roads[int(lot["road"])]["class"], 9))
 		for j in VillageSitePlanner.junctions(plan):
-			if _point_to_poly(j["pos"], poly) > VillageLotPlanner.CORNER_RADIUS:
+			if _point_to_poly(j["pos"], poly) > VillageLotPlanner.corner_radius(plan.spec):
 				continue
 			for r in j["roads"]:
 				var theirs: int = int(VillageLotPlanner.ROAD_RANK.get(plan.roads[int(r)]["class"], 9))

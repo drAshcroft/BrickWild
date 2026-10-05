@@ -25,6 +25,9 @@ var period: int = 1200
 ## Village-only landscape controls; vocabulary comes from describe_kind().
 var water: StringName = &"none"
 var enclosure: StringName = &"none"
+## Opt-in compact presentation for villages. It preserves metre-scale
+## buildings and is valid only with no water or enclosure.
+var compact_display: bool = false
 var _decode_errors: Array[Dictionary] = []
 
 const SCHEMA := "brickwild.request"
@@ -32,12 +35,17 @@ const SCHEMA_VERSION := 1
 
 
 func to_dict() -> Dictionary:
-	return {"schema": SCHEMA, "schema_version": SCHEMA_VERSION,
+	var out := {"schema": SCHEMA, "schema_version": SCHEMA_VERSION,
 		"kind": String(kind), "seed": str(seed), "style": String(style),
 		"purpose": String(purpose), "width": width, "length": length,
 		"height": height, "storeys": storeys, "material": String(material),
 		"water": String(water), "enclosure": String(enclosure),
 		"orientation": orientation, "period": period}
+	# Omit the opt-in when false so old requests keep their original JSON shape.
+	# from_dict treats a missing field as the false default.
+	if compact_display:
+		out["compact_display"] = true
+	return out
 
 
 func to_json() -> String:
@@ -79,6 +87,11 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 			out._decode_errors.append(_field_error(field, "must be an integer"))
 		else:
 			out.set(field, int(v) if field in ["storeys", "period"] else float(v))
+	if data.has("compact_display"):
+		if data["compact_display"] is bool:
+			out.compact_display = data["compact_display"]
+		else:
+			out._decode_errors.append(_field_error("compact_display", "must be a boolean"))
 	var seed_value: Variant = data.get("seed", "0")
 	if seed_value is String and seed_value.is_valid_int() and str(int(seed_value)) == seed_value:
 		out.seed = int(seed_value)
@@ -138,6 +151,25 @@ static func windmill(p_seed: int, p_type: StringName = &"tower",
 	return _make(&"windmill", p_seed, p_type, &"", p_sail_span, p_body, p_height)
 
 
+## A village uses width for population and length for wealth percent, as
+## published by `describe_kind(&"village")`. Compact villages have no water or
+## enclosure; they remain ordinary metre-scale village plans.
+static func village(p_seed: int, p_population: int = 40,
+		p_culture: StringName = &"english", p_purpose: StringName = &"farming",
+		p_wealth: float = 0.4, p_compact_display: bool = false) -> BuildingRequest:
+	var out := _make(&"village", p_seed, p_culture, p_purpose,
+		float(p_population), p_wealth * 100.0, 1.0)
+	out.compact_display = p_compact_display
+	return out
+
+
+## The common presentation request for close rows in an external display.
+static func compact_village(p_seed: int, p_population: int = 40,
+		p_culture: StringName = &"english", p_purpose: StringName = &"market",
+		p_wealth: float = 0.4) -> BuildingRequest:
+	return village(p_seed, p_population, p_culture, p_purpose, p_wealth, true)
+
+
 ## A detached copy lets the library retain the request without retaining
 ## mutable caller-owned state.
 func copy() -> BuildingRequest:
@@ -145,6 +177,7 @@ func copy() -> BuildingRequest:
 	out.material = material
 	out.water = water
 	out.enclosure = enclosure
+	out.compact_display = compact_display
 	out.orientation = orientation
 	out.period = period
 	out._decode_errors = _decode_errors.duplicate(true)
