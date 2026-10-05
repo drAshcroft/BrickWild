@@ -23,3 +23,14 @@ Run the focused regression with:
 ```powershell
 & 'C:\Projects\godot\Godot_v4.5.2-stable_mono_win64\Godot_v4.5.2-stable_mono_win64.exe' --headless --path . --script res://tests/run_all.gd -- hvernacular
 ```
+
+Capture Mediterranean, Asian, thatched and Pueblo houses through the public
+API with the reference renderer (run without `--headless`):
+
+```powershell
+& 'C:\Projects\godot\Godot_v4.5.2-stable_mono_win64\Godot_v4.5.2-stable_mono_win64.exe' --path . --script res://tools/render_building_audit.gd -- --family:culture
+```
+
+The exterior, entrance and cutaway images are written under
+`artifacts/renders/building_audit/culture/`. The accompanying `audit.json`
+records the requests, cameras, public API QA and vernacular geometry checks.

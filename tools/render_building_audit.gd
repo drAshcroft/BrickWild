@@ -16,8 +16,8 @@ func _init() -> void:
 	for arg in args:
 		if arg.begins_with("--family:"):
 			_audit_family = arg.trim_prefix("--family:").strip_edges().to_lower()
-	if _audit_family not in ["house", "shop", "hotel", "church", "temple", "world", "village"]:
-		printerr("Usage: godot --path . --script res://tools/render_building_audit.gd -- --family:house|shop|hotel|church|temple|world|village")
+	if _audit_family not in ["house", "culture", "shop", "hotel", "church", "temple", "world", "village"]:
+		printerr("Usage: godot --path . --script res://tools/render_building_audit.gd -- --family:house|culture|shop|hotel|church|temple|world|village")
 		quit(2)
 		return
 	var out_dir := AUDIT_ROOT + "/" + _audit_family
@@ -29,6 +29,8 @@ func _init() -> void:
 	match _audit_family:
 		"house":
 			await _run_house()
+		"culture":
+			await _run_culture()
 		"shop":
 			await _run_request(BuildingRequest.shop(353, &"blacksmith", &"longhall", 11.0, 14.0, 2.8, 1), "blacksmith_longhall")
 		"hotel":
@@ -76,6 +78,15 @@ func _run_house() -> void:
 	]
 	for fixture in fixtures:
 		await _run_request(fixture["request"], fixture["key"], fixture["request"].style == &"rich")
+
+
+## Capture the consumer-facing cultural styles with roofs on and off. Keep
+## requests beside the images so a silhouette can be reproduced from its seed.
+func _run_culture() -> void:
+	var styles: Array[StringName] = [&"mediterranean", &"asian", &"thatch_cottage", &"pueblo"]
+	for i in styles.size():
+		var request := BuildingRequest.house(62001 + i, styles[i], &"none", 9.0, 11.0, 2.8, 1)
+		await _run_request(request, String(styles[i]))
 
 
 func _run_church() -> void:
@@ -145,6 +156,11 @@ func _run_request(request: BuildingRequest, key: String, rich := false) -> void:
 		var builder := HouseBuilder.new()
 		builder.build(building.plan)
 		row["qa"]["rich_house"] = _qa_status(RichHouseCheck.new().check(building.plan, builder))
+	if request.kind in [&"house", &"shop"] and building.plan != null \
+			and HouseSpec.STYLES.get(request.style, {}).has("culture"):
+		var builder := HouseBuilder.new()
+		builder.build(building.plan)
+		row["qa"]["vernacular"] = _qa_status(VernacularHouseCheck.new().check(building.plan, builder))
 	_audit_rows.append(row)
 
 
