@@ -1,6 +1,6 @@
 class_name HouseVernacularSuite
 extends RefCounted
-## HOUSE-CULTURE: five houses that are not a timber cottage, and the pieces of
+## HOUSE-CULTURE: six houses that are not a timber cottage, and the pieces of
 ## architecture that make them so.
 ##
 ## The positive half builds every vernacular style across the canonical sizes
@@ -28,11 +28,11 @@ const WANTED_ROLES := [&"parapet", &"veranda_deck", &"veranda_post", &"veranda_b
 	&"veranda_roof_0", &"eave_sweep_-1_-1", &"eave_sweep_1_1", &"thatch_eave",
 	&"thatch_roll_0", &"corner_pier"]
 
-## The five styles, spelled out rather than read from the table: this suite
+## The six styles, spelled out rather than read from the table: this suite
 ## exists to hold THEM to their architecture, so it must not quietly grow a
 ## sixth row and then pass it by having no expectations for it.
 const CULTURE_STYLES: Array[StringName] = [&"mediterranean", &"asian", &"african",
-	&"thatch_cottage", &"mud_hut"]
+	&"thatch_cottage", &"mud_hut", &"pueblo"]
 
 ## The styles that must keep emitting nothing from this vocabulary.
 const ORDINARY_STYLES: Array[StringName] = [&"cottage", &"farmhouse", &"townhouse",
@@ -54,6 +54,9 @@ const FORCED := [
 	{"style": &"mud_hut", "w": 7.0, "l": 8.0, "h": 2.4, "seed": 62005,
 		"on": ["corner_piers", "thatch_roll"], "roof": &"conical",
 		"about": "a cone, rounded corners and an eave roll with no ridge to roll"},
+	{"style": &"pueblo", "w": 10.0, "l": 12.0, "h": 2.8, "seed": 62006,
+		"on": ["parapet"], "roof": &"flat",
+		"about": "a level adobe roof behind a terrace parapet"},
 ]
 
 
@@ -105,6 +108,17 @@ class HipUnderAConicalSpec extends HouseBuilder:
 	func _build_roof() -> void:
 		var saved: StringName = spec.roof_type
 		spec.roof_type = &"hipped"
+		super._build_roof()
+		spec.roof_type = saved
+
+
+## The spec remains flat while the emitter lays a hip. This isolates the new
+## Pueblo rule's evidence in the actual roof vertices.
+class HipUnderPuebloSpec extends HouseBuilder:
+	func _build_roof() -> void:
+		var saved: StringName = spec.roof_type
+		spec.roof_type = &"hipped"
+		spec.roof_pitch = 0.65
 		super._build_roof()
 		spec.roof_type = saved
 
@@ -215,8 +229,8 @@ static func _spec(style: StringName, row: Dictionary) -> HouseSpec:
 ##
 ## Every piece of this vocabulary is a geometry question. The full house
 ## harness -- the plan rules, the furnisher, the walker -- already runs all
-## eleven styles, because `HouseSweep.styles()` reads the table and the table
-## now includes these five. Paying for the furnisher search again here would
+## twelve styles, because `HouseSweep.styles()` reads the table and the table
+## now includes these six. Paying for the furnisher search again here would
 ## cost minutes to re-prove what `houseqa` has already measured.
 static func _plan(style: StringName, row: Dictionary) -> HousePlan:
 	return HouseGenerator.generate(_spec(style, row), int(row["seed"]), false)
@@ -268,6 +282,13 @@ static func _positive(res: SuiteResult) -> void:
 				var report: Dictionary = VernacularHouseCheck.new().check(plan, builder)
 				for f2 in report["failures"]:
 					res.fail("%s: %s" % [who, str(f2)])
+				if style == &"pueblo":
+					_expect(res, spec.roof_type == &"flat" and spec.parapet,
+						"%s: Pueblo lost its flat roof or enclosing parapet" % who)
+					_expect(res, HouseGeometry.wall_thickness(spec) >= 0.65,
+						"%s: Pueblo lost its thick masonry walls" % who)
+					_expect(res, spec.roof_material == &"earth",
+						"%s: Pueblo's flat roof is not plain earth" % who)
 	for style in CULTURE_STYLES:
 		res.checked += 1
 		if not kinds.has(&"conical") and style == &"mud_hut":
@@ -343,6 +364,8 @@ static func _controls(res: SuiteResult) -> void:
 	_expect_rule(res, "veranda", FORCED[1], VerandaAtOrigin.new(), "veranda")
 	_expect_rule(res, "piers", FORCED[3], SquarePiers.new(), "piers")
 	_expect_rule(res, "cone", FORCED[4], HipUnderAConicalSpec.new(), "cone")
+	_expect_rule(res, "pueblo", FORCED[5], NoParapet.new(), "parapet")
+	_expect_rule(res, "pueblo flat roof", FORCED[5], HipUnderPuebloSpec.new(), "pueblo")
 
 	# A gable that grew a cone. The spec still says gable and still says its
 	# ridge length, so only the GEOMETRY can catch it -- which is the point of

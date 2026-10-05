@@ -4,9 +4,10 @@ extends RefCounted
 ## actually emitted (HOUSE-CULTURE).
 ##
 ## Six of the styles in `HouseSpec.STYLES` are a timber cottage with the
-## colours changed. The other five are not: a limewashed tile house, a stilted
+## colours changed. The other six are not: a limewashed tile house, a stilted
 ## timber house under one very deep roof, a thatched compound house, a thatched
-## cottage, a mud hut. Each of those five owes at least one PIECE of
+## cottage, a mud hut, and a thick-walled Pueblo adobe house under a flat roof.
+## Each of those six owes at least one PIECE of
 ## architecture the European six have no name for -- an eaves parapet, a
 ## veranda, an upturned eave, a combed thatch roll, a rounded mud corner, and a
 ## cone over the plan rather than a ridge along it.
@@ -28,7 +29,7 @@ extends RefCounted
 ## and breaks one replaces it through `overrides` rather than switching it off
 ## (RuleSet, INT-020), exactly as `RichHouseCheck` does.
 const RULES: Array[StringName] = [&"european", &"declared", &"parapet", &"veranda",
-	&"sweep", &"thatch", &"cone", &"piers"]
+	&"sweep", &"thatch", &"cone", &"piers", &"pueblo"]
 
 ## The five style-row switches that make a house vernacular, and the component
 ## role each one owes. Kept here so the check names the whole vocabulary in one
@@ -374,6 +375,41 @@ func _check_piers(plan: HousePlan, builder: HouseBuilder) -> void:
 				% [HouseGeometry.PIER_SIDES, pts.size()])
 			break
 	stats["piers"] = piers.size()
+
+
+## Pueblo is carried by its flat roof and thick adobe shell, not by its name or
+## palette. Check the emitted roof face as well as the source spec so a shallow
+## hip cannot masquerade as a terrace.
+func _check_pueblo(plan: HousePlan, builder: HouseBuilder) -> void:
+	if plan.spec.style != &"pueblo":
+		return
+	var spec := plan.spec
+	if HouseGeometry.wall_thickness(spec) < 0.65:
+		failures.append("pueblo: the shell is not thick earthen masonry")
+	if spec.timber_frame:
+		failures.append("pueblo: the shell acquired an exposed timber frame")
+	if spec.roof_type != &"flat" or HouseGeometry.roof_rise(spec) > 0.001:
+		failures.append("pueblo: the roof is not level")
+	if spec.roof_material != &"earth":
+		failures.append("pueblo: the roof is not finished in plain earth")
+	if not spec.parapet:
+		failures.append("pueblo: the roof has no enclosing parapet")
+	var face_count := 0
+	for row in builder.roof_components:
+		if not String(row.get("role", "")).begins_with("roof_face_"):
+			continue
+		face_count += 1
+		var pts: PackedVector3Array = row.get("points", PackedVector3Array())
+		if pts.is_empty():
+			failures.append("pueblo: the roof has no emitted face vertices")
+			continue
+		var y0 := pts[0].y
+		for p in pts:
+			if absf(p.y - y0) > PLACE_TOL:
+				failures.append("pueblo: an emitted roof face is pitched")
+	if face_count == 0:
+		failures.append("pueblo: the roof slab was not emitted")
+	stats["pueblo_roof_faces"] = face_count
 
 
 # ------------------------------------------------------------------ helpers

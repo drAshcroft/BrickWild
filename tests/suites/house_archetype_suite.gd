@@ -83,6 +83,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 6.5, "length": 7.5, "height": 2.4, "culture": true,
 		"rooms": [], "cats": ["bed"],
 		"about": "one room, half a metre of wall, and a cone over it"},
+	{"key": "pueblo_home", "style": &"pueblo", "trade": &"none",
+		"width": 10.0, "length": 12.0, "height": 2.8, "culture": true,
+		"rooms": [&"hall"], "cats": ["table|seat"],
+		"about": "a thick adobe home beneath a flat earth roof and parapet"},
 ]
 
 
@@ -199,6 +203,10 @@ static func _round_tower(res: SuiteResult) -> void:
 	for across in [8.0, 11.0]:
 		var plan: HousePlan = _tower_plan(across, TOWER_STOREYS,
 			int(4400 + across * 10.0))
+		var roof: Dictionary = HouseGeometry.roof_layout(plan)
+		var roof_faces: Array = roof["faces"]
+		if roof_faces.is_empty():
+			res.fail("round_tower %.0fm: authored tower has no roof faces" % across)
 		var builder := HouseBuilder.new()
 		builder.build(plan)
 		var who := "round_tower %.0fm" % across
@@ -244,6 +252,11 @@ static func _tower_plan(across: float, storeys: int, sd: int) -> HousePlan:
 	spec.length = across
 	spec.height = 2.8
 	spec.storeys = storeys
+	# This hand-authored plan bypasses HouseGenerator, so give its roof an
+	# explicit valid descriptor. A zero default pitch yields no faces and makes
+	# wall_profile evaluate an empty roof as NAN.
+	spec.roof_type = &"hipped"
+	spec.roof_pitch = 0.9
 	spec.room_count = storeys
 	spec.variant_name = "Round Tower"
 	spec.clutter = 0.5

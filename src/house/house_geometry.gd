@@ -909,10 +909,9 @@ static func parapet_top(spec: HouseSpec) -> float:
 ## so a plan whose top storey is shaped or opens onto a court is measured on
 ## the geometry that exists rather than on the rectangle its spec would give.
 static func ridge_half_for(spec: HouseSpec, span: float, along: float) -> float:
-	# A cone has an apex and no ridge, so there is nothing to cap and nothing
-	# for a finial to stand on. Returning zero is what makes the emitter skip
-	# both, from one number, rather than from a second opinion about the kind.
-	if spec.roof_type == &"conical":
+	# A cone has an apex, and a flat roof has no ridge, so neither can carry a
+	# cap or a finial. One return keeps all ridge consumers in agreement.
+	if spec.roof_type in [&"conical", &"flat"]:
 		return 0.0
 	var half: float = along * 0.5 + roof_along_out(spec)
 	if spec.roof_type != &"gable":

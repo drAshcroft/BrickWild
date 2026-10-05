@@ -17,7 +17,17 @@ const CONE_SIDES := 8
 static func faces(span: float, along: float, rise: float,
 		kind: StringName = &"gable") -> Array[PackedVector3Array]:
 	var out: Array[PackedVector3Array] = []
-	if minf(span, along) <= 0.0 or rise <= 0.0:
+	if minf(span, along) <= 0.0:
+		return out
+	# A flat roof is a real horizontal slab, not a near-zero hip. Keep this
+	# branch ahead of the rise guard so its upper face exists at rise == 0.
+	if kind == &"flat":
+		var h := span * 0.5
+		var f := along * 0.5
+		out.append(PackedVector3Array([Vector3(-h, rise, -f), Vector3(h, rise, -f),
+			Vector3(h, rise, f), Vector3(-h, rise, f)]))
+		return out
+	if rise <= 0.0:
 		return out
 	if kind == &"conical":
 		return _cone(span, along, rise)

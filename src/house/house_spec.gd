@@ -45,7 +45,7 @@ var stone_ground_floor: bool = false # entire ground level is stone masonry
 var jetty: bool = false           # whether upper storeys overhang the lower storey
 var jetty_depth: float = 0.28     # cantilever overhang depth in metres
 var roof_type: StringName = &"gable" # &"gable", &"half_hipped", &"hipped"
-var roof_material: StringName = &"shingle" # shingle | slate | thatch, derived without extra RNG draws
+var roof_material: StringName = &"shingle" # shingle | slate | thatch | earth, derived without extra RNG draws
 var dormers: bool = false         # dormer windows on roof slope
 var dormer_count: int = 0         # number of dormers
 var framing_pattern: StringName = &"close_studding" # &"close_studding", &"square_panel", &"saltire", &"arch_brace"
@@ -72,10 +72,11 @@ var exterior_props: bool = true   # facade pieces, the yard and its built pieces
 var yard_apron: float = -1.0
 ## Chosen before planning, so clear floor, openings and emitted masonry agree.
 ## ---- vernacular exterior culture (HOUSE-CULTURE) ----
-## Five dwellings that are not a timber cottage: a whitewashed tile house, a
+## Six dwellings that are not a timber cottage: a whitewashed tile house, a
 ## stilted timber house under a sweeping roof, a thatched compound house, a
-## thatched cottage, a mud hut. None of them is a European house with the
-## colours changed, so each names a PIECE of architecture the six European
+## thatched cottage, a mud hut, and a thick-walled Pueblo adobe house under a
+## flat terrace roof. None of them is a European house with the colours changed,
+## so each names a PIECE of architecture the six European
 ## styles never had -- and every switch below is read from the style row
 ## behind one guard, so the six European rows take no draw and not one
 ## seeded plan, roof or piece of furniture moves.
@@ -300,6 +301,24 @@ const STYLES := {
 		"wall_t": 0.62, "culture": 1.0,
 		"parapet": 0.0, "veranda": 0.45, "eave_sweep": 0.0, "thatch_roll": 1.0,
 		"corner_piers": 1.0, "span_out": 0.8, "along_out": 0.7,
+	},
+	&"pueblo": {
+		"label": "Pueblo Adobe House",
+		# A broad earthen dwelling with thick, sun-dried walls and a level roof
+		# behind a high parapet. Its silhouette is a terrace, not a hidden hip.
+		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
+		"roof_pitch": [0.0, 0.0], "porch": 0.0, "chimney": 0.0, "shutters": 0.15,
+		"wall": ["c98b58", "a66d40"], "trim": ["755036", "563a27"],
+		"roof": ["b58a58", "92704a"], "floor": ["a58b66", "80684d"],
+		"clutter": [0.3, 0.6],
+		"plinth": [0.25, 0.4], "roof_types": [&"flat"],
+		"framing": [&"square_panel"], "truss": [&"king_post"],
+		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
+		"chimney_style": &"straight", "pots": [1, 1],
+		"roof_material": &"earth", "pitch_reference": 8.0,
+		"wall_t": 0.72, "culture": 1.0,
+		"parapet": 1.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"corner_piers": 0.0, "span_out": 0.25, "along_out": 0.25,
 	},
 }
 

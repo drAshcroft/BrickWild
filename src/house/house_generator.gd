@@ -95,7 +95,7 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 
 	# HOUSE-CULTURE: the vernacular switchboard. Same guard, same reason as the
 	# four rolls above -- a row with no "culture" key is a European house and
-	# takes no draw here at all, so adding five styles moved nothing.
+	# takes no draw here at all, so adding these styles moved nothing.
 	if s.has("culture"):
 		spec.parapet = GeneratorRandom.chance(r, float(s.get("parapet", 0.0)))
 		spec.veranda = GeneratorRandom.chance(r, float(s.get("veranda", 0.0)))
@@ -108,6 +108,10 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 		# Said here, where the roof type has already been drawn, rather than
 		# leaving an emitter to work out why it should refuse.
 		spec.parapet = spec.parapet and spec.roof_type != &"conical"
+		# A Pueblo roof is level and depends on its parapet for the readable
+		# skyline. The style table sets both as invariants rather than chances.
+		if spec.style == &"pueblo":
+			spec.parapet = true
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y

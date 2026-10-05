@@ -1527,7 +1527,7 @@ func _moulding_piece(from: Vector2, dir: Vector2, yaw: float, t0: float, t1: flo
 
 ## ----------------------------------------------------------------- culture
 ##
-## Five dwellings that are not a timber cottage. Each piece below is a NAMED
+## Six dwellings that are not a timber cottage. Each piece below is a NAMED
 ## component with its own host, emitted through component_box/component_slab
 ## so `qa/component_check.gd` re-emits it against real triangles and
 ## `qa/vernacular_house_check.gd` can ask what a parapet is made of rather than
@@ -2199,6 +2199,8 @@ func _build_ridge_crown(xf: Transform3D, rise: float, ridge: float) -> void:
 
 
 func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float) -> void:
+	if spec.roof_type == &"flat":
+		return
 	tag("eaves")
 	# Half a wall's span, plus the 0.15 m the tails always stood out, plus
 	# whatever EXTRA eave this house has. Adding the extra rather than reading

@@ -74,6 +74,13 @@ static func architectural_materials(node: MeshInstance3D, colors: Array,
 static func house_materials(node: MeshInstance3D, spec: HouseSpec) -> void:
 	if DisplayServer.get_name() == "headless":
 		return # Dummy renderer has no shader instances; retain base material.
+	if spec.roof_material == &"earth":
+		var roof := StandardMaterial3D.new()
+		roof.albedo_color = spec.roof_color
+		roof.roughness = 1.0
+		node.set_surface_override_material(HouseBuilder.SURF_ROOF, roof)
+		house_floor_material(node, spec)
+		return
 	# Course and tile width are the roof's own two numbers: slate is small and
 	# square, a pantile is long and narrow, a shingle or a thatch is neither.
 	# `thatch` is the shader's own flag and is the only one of the three that
