@@ -148,8 +148,8 @@ const FAMILIES := {
 	}
 }
 
-const TowerGenerator = preload("res://src/world/world_tower_house_generator.gd")
-const StupaGenerator = preload("res://src/world/stupa_generator.gd")
+const TowerGenerator = preload("world_tower_house_generator.gd")
+const StupaGenerator = preload("stupa_generator.gd")
 
 
 static func families() -> Array[StringName]:

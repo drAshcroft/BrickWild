@@ -1,3 +1,4 @@
+class_name MeshIntegrityCheck
 extends RefCounted
 ## Structural integrity rules for an emitted triangle mesh.
 ## This deliberately checks each face against its own winding. It does not

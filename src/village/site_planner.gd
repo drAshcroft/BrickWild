@@ -140,6 +140,9 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
 		var w: float = minf(out.site.size.x * site_scale, SITE_MAX_SIDE)
 		var h: float = out.site.size.y
 		out.site = Rect2(Vector2(-w * 0.5, -h * 0.5), Vector2(w, h))
+	if spec.compact_display:
+		_plan_compact(out, spec)
+		return out
 	if not (spec.form in FORMS_SUPPORTED):
 		return out
 
@@ -255,6 +258,8 @@ static func _extra_lanes(out: VillagePlan, spec: VillageSpec, through: PackedVec
 ## the built area lands in the middle of §9.1's density band. Deterministic,
 ## and independent of the road -- the road is laid inside it.
 static func site_rect(spec: VillageSpec) -> Rect2:
+	if spec.compact_display:
+		return Rect2(Vector2(-33.0, -32.0), Vector2(66.0, 64.0))
 	var built: float = float(spec.households) * HOUSE_FOOTPRINT
 	for row in spec.programme:
 		if row["kind"] == &"house":
@@ -553,6 +558,65 @@ static func _plan_planted(out: VillagePlan, spec: VillageSpec,
 		centre - Vector2(2.0, 0.0)]), &"path", spec.wealth)
 	out.roads.append(approach)
 	_reserve_landmark(out, spec, square, site, top + _ring_half() + LANDMARK_GAP)
+
+
+## A pedestrian planted settlement. The native site planner owns this graph:
+## two mildly bowed parallel streets provide four rows of measured lots.
+## Width retries enlarge the street runs without enlarging the buildings.
+static func _plan_compact(out: VillagePlan, spec: VillageSpec) -> void:
+	var left := out.site.position.x
+	var right := out.site.end.x
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("compact-site|%d" % spec.seed)
+	var bend := rng.randf_range(0.65, 1.15)
+	var left_front := Vector2(left + 2.0, -13.0 + bend * 2.0 / absf(left))
+	var right_front := Vector2(right - 2.0, left_front.y)
+	var left_back := Vector2(left + 2.0, 13.0 - bend * 0.7 * 2.0 / absf(left))
+	var right_back := Vector2(right - 2.0, left_back.y)
+	var front := PackedVector2Array([Vector2(left, -13.0), left_front,
+		Vector2(0.0, -13.0 + bend), right_front, Vector2(right, -13.0)])
+	var back := PackedVector2Array([left_back, Vector2(0.0, 13.0 - bend * 0.7), right_back])
+	out.roads.append(_compact_road(front, &"through", spec))
+	out.roads.append(_compact_road(back, &"street", spec))
+	out.roads.append(_compact_road(PackedVector2Array([left_front, left_back]), &"street", spec))
+	out.roads.append(_compact_road(PackedVector2Array([right_front, right_back]), &"street", spec))
+	var common := Rect2(Vector2(-4.0, -3.0), Vector2(8.0, 6.0))
+	out.commons.append({"poly": Poly.from_rect(common), "kind": &"square"})
+	out.roads.append(_compact_road(PackedVector2Array([front[2], Vector2(0.0, -1.5)]), &"path", spec))
+	# Reserve a modest civic address before the lot cutter measures its fit.
+	# The cutter may use another existing street frontage for a larger church,
+	# exactly as it does when an ordinary landmark does not fit its first slot.
+	var civic := Rect2(Vector2(-5.0, 16.0), Vector2(10.0, 13.0))
+	out.landmark_site = {"poly": Poly.from_rect(civic), "kind": &"church",
+		"front": PackedVector2Array([civic.position, civic.position + Vector2(civic.size.x, 0.0)])}
+
+
+static func _compact_road(points: PackedVector2Array, cls: StringName, spec: VillageSpec) -> Dictionary:
+	var road := _road(points, cls, spec.wealth)
+	var rule := road_rule(cls, spec)
+	road["width"] = rule["width"]
+	road["verge"] = rule["verge"]
+	return road
+
+
+## Effective geometry policy shared with native QA.
+static func road_rule(cls: StringName, spec: VillageSpec) -> Dictionary:
+	var rule: Dictionary = ROAD_CLASSES[cls]
+	if not spec.compact_display:
+		return rule
+	rule = rule.duplicate()
+	rule["width"] = 1.2 if cls == &"path" else 2.2
+	rule["verge"] = 0.25
+	return rule
+
+
+static func density_max(spec: VillageSpec) -> float:
+	return 0.55 if spec.compact_display else 0.30
+
+
+static func common_min_area(spec: VillageSpec) -> float:
+	if spec.compact_display: return 40.0
+	return HAMLET_COMMON_AREA if spec.population < HAMLET_POPULATION else COMMON_MIN_AREA
 
 
 ## Gate villages keep the ordinary common and through road, but the manor's

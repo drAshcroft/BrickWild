@@ -22,8 +22,6 @@ extends RefCounted
 
 const RULES: Array[StringName] = [&"common", &"landmark", &"well", &"tavern", &"stable",
 	&"smithy", &"mill", &"market", &"civic", &"manor", &"churchyard", &"gradient", &"farms"]
-const COMMON_MIN := 150.0
-const COMMON_MIN_HAMLET := 30.0
 const FRONTED_SHARE := 0.6
 ## With only three buildings the two-metre perimeter samples are coarse: a
 ## complete round hamlet measures 59% while the next sample is already 63%.
@@ -32,10 +30,8 @@ const FRONTED_SHARE_HAMLET := 0.55
 ## The road between the common and the houses that front it is six metres
 ## and its verges three; the frontage line lies beyond that.
 const FRONTED_REACH := 14.0
-const WELL_CLEAR := 6.0
 const TAVERN_TO_GATE := 60.0
 const STABLE_TO_INN := 20.0
-const SMITHY_CLEAR := 12.0
 const STALL_ROW_GAP := 4.0
 const MANOR_CLEAR := 15.0
 const MANOR_FACE_DEG := 30.0
@@ -73,7 +69,7 @@ func _check_common(plan: VillagePlan) -> void:
 		failures.append("common: the village has no common")
 		return
 	var area: float = Poly.area(common)
-	var want: float = COMMON_MIN_HAMLET if plan.spec.population < VillageSpec.HAMLET_POPULATION else COMMON_MIN
+	var want: float = VillageSitePlanner.common_min_area(plan.spec)
 	stats["common_area"] = snappedf(area, 0.1)
 	if area < want - 0.1:
 		failures.append("common: the common is %.0f m2, wants %.0f" % [area, want])
@@ -216,8 +212,8 @@ func _check_well(plan: VillagePlan) -> void:
 			failures.append("well: the well at %v is off the common" % pos)
 		for i in range(plan.buildings.size()):
 			var d: float = VillageMeasure.point_to_poly(pos, VillageMeasure.bounds_poly(plan.buildings[i]))
-			if d < WELL_CLEAR:
-				failures.append("well: building %d stands %.1fm from the well, wants %.0f" % [i, d, WELL_CLEAR])
+			if d < VillageLotPlanner.well_clearance(plan.spec):
+				failures.append("well: building %d stands %.1fm from the well, wants %.0f" % [i, d, VillageLotPlanner.well_clearance(plan.spec)])
 				break
 		var pathed := false
 		for r in plan.roads_of_class(&"path"):
@@ -280,9 +276,9 @@ func _check_smithy(plan: VillagePlan) -> void:
 			if not quiet:
 				continue
 			var d: float = VillageMeasure.poly_distance(mine, VillageMeasure.bounds_poly(other))
-			if d < SMITHY_CLEAR:
+			if d < VillageLotPlanner.smithy_clearance(plan.spec):
 				failures.append("smithy: building %d stands %.0fm from building %d (%s), wants %.0f"
-					% [i, d, j, String(other["kind"]), SMITHY_CLEAR])
+					% [i, d, j, String(other["kind"]), VillageLotPlanner.smithy_clearance(plan.spec)])
 		if VillageMeasure.centre(mine).x < cx - 0.01:
 			failures.append("smithy: building %d is upwind (west) of the common" % i)
 

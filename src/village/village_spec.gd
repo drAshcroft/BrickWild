@@ -15,6 +15,8 @@ var seed: int
 var rng: RandomNumberGenerator
 
 # ---- user-specified (never randomized, never clamped) ----
+## Opt-in close urban display. Buildings remain measured in real metres.
+var compact_display: bool = false
 var population: int = 40
 var culture: StringName = &"english"
 var purpose: StringName = &"farming"
@@ -142,6 +144,8 @@ func _init(p_seed := 0) -> void:
 ## `generate()` has been called. Empty means the spec is safe to derive from.
 func errors() -> Array[String]:
 	var out: Array[String] = []
+	if compact_display and (water != &"none" or enclosure != &"none"):
+		out.append("compact_display currently requires water=none and enclosure=none")
 	if population < POP_MIN or population > POP_MAX:
 		out.append("population %d out of range [%d, %d]" % [population, POP_MIN, POP_MAX])
 	if not (culture in CULTURES):
@@ -183,7 +187,7 @@ func generate(p_seed: int) -> void:
 		return   # nothing sane to derive without a population in range
 
 	households = _derive_households(population, seed)
-	form = _derive_form(population, purpose, culture)
+	form = &"planted" if compact_display else _derive_form(population, purpose, culture)
 	programme = _derive_programme(population, purpose, water)
 	if culture == &"blighted":
 		programme = programme.filter(func(row): return row["kind"] not in [&"shrine", &"church", &"temple"])

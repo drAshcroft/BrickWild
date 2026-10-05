@@ -1,3 +1,4 @@
+class_name CastleAccessGeometry
 extends RefCounted
 ## Access structures are measured before yard dressing. All coordinates are
 ## in the castle frame; emitters and planning reservations read these records.

@@ -178,6 +178,7 @@ static func _spec_equal(a: VillageSpec, b: VillageSpec) -> bool:
 	return (
 		a.seed == b.seed and a.population == b.population and a.culture == b.culture
 		and a.purpose == b.purpose and is_equal_approx(a.wealth, b.wealth)
+		and a.compact_display == b.compact_display
 		and a.enclosure == b.enclosure and a.water == b.water
 		and a.households == b.households and a.form == b.form
 		and a.variant_name == b.variant_name and a.site == b.site

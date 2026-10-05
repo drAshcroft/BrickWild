@@ -1,3 +1,4 @@
+class_name CastleOccupancyCheck
 extends RefCounted
 ## Occupied structures must exist independently of the records they supply.
 ## The occupied inventory comes from the site specification, never interiors.

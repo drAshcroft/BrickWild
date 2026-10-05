@@ -100,7 +100,10 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	var unplaced: int = cut_measured(out, jobs)
 	var common_state := _round_common_state(out)
 	var previous_scale := 1.0
-	for attempt in RETRIES:
+	var attempts: Array = RETRIES
+	if spec.compact_display:
+		attempts = [[0, 1.05], [0, 1.1], [0, 1.15], [0, 1.2], [0, 1.25]] + RETRIES
+	for attempt in attempts:
 		if unplaced <= 0 and bool(common_state["ready"]):
 			break
 		# These authored forms deliberately ignore generic extra lanes. Do
@@ -177,7 +180,7 @@ static func _landmark_site_depth(plan: VillagePlan, jobs: Array[Dictionary]) -> 
 	for job in jobs:
 		if (job["request"] as BuildingRequest).kind not in [&"church", &"temple"]:
 			continue
-		var rule: Dictionary = LOT_RULES[&"church"]
+		var rule: Dictionary = lot_rule(&"church", plan.spec)
 		var depth := _setback(rule, job) + float(job["back"]) + float(rule["yard"])
 		# Keep a small construction margin: Rect2 excludes its upper edge,
 		# and an exactly touching back fence must not lose the whole frontage.
@@ -379,7 +382,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	var gradient_floor := 0.0
 	for job in jobs:
 		var cls: StringName = job["class"]
-		if cls == &"church" and plan.landmark_reserved():
+		if cls == &"church" and plan.landmark_reserved() and not plan.spec.compact_display:
 			if landmark_lane < 0:
 				landmark_lane = _add_landmark_lane(plan)
 				ctx = _context(plan)
@@ -395,7 +398,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 			# A manor requires its own approach. Falling through to an ordinary
 			# road counts an invalid placement as success and prevents retries.
 			continue
-		elif req_kind(job) == &"stable":
+		elif req_kind(job) == &"stable" and not plan.spec.compact_display:
 			if stable_lane < 0:
 				stable_lane = _add_stable_lane(plan)
 				if stable_lane >= 0:
@@ -571,9 +574,43 @@ static func terraces_allowed(spec: VillageSpec) -> bool:
 	return spec != null and spec.wealth >= TERRACE_MIN_WEALTH and spec.form == TERRACE_FORM
 
 
+## Effective public lot rules for a native compact display. Architecture is
+## still measured at full size; only unbuilt yards and clearances differ.
+static func lot_rule(cls: StringName, spec: VillageSpec) -> Dictionary:
+	var rule: Dictionary = LOT_RULES.get(cls, LOT_RULES[&"cottage"])
+	if spec == null or not spec.compact_display:
+		return rule
+	rule = rule.duplicate()
+	if cls in [&"townhouse", &"shop", &"cottage"]:
+		rule.merge({"set_min": 0.2, "set_max": 1.5, "use": 0.4, "fire": 0.35, "yard": 0.6}, true)
+	elif cls == &"church":
+		rule.merge({"set_min": 0.4, "set_max": 2.5, "use": 1.0, "fire": 0.5, "yard": 0.8}, true)
+	return rule
+
+
+static func corner_radius(spec: VillageSpec) -> float:
+	return 2.5 if spec.compact_display else CORNER_RADIUS
+
+
+static func back_clearance(spec: VillageSpec) -> float:
+	return 2.0 if spec.compact_display else BACK_TO_FRONT_CLEAR
+
+
+static func well_clearance(spec: VillageSpec) -> float:
+	return 2.0 if spec.compact_display else WELL_CLEAR
+
+
+static func smithy_clearance(spec: VillageSpec) -> float:
+	return 3.0 if spec.compact_display else SMITHY_CLEAR
+
+
+static func frontage_slack(spec: VillageSpec) -> float:
+	return 0.35 if spec.compact_display else 1.0
+
+
 static func fire_gap(cls: StringName, spec: VillageSpec, placement: Dictionary = {}) -> float:
-	var gap: float = float(LOT_RULES.get(cls, LOT_RULES[&"cottage"])["fire"])
-	if cls in [&"townhouse", &"shop"] and terraces_allowed(spec):
+	var gap: float = float(lot_rule(cls, spec)["fire"])
+	if cls in [&"townhouse", &"shop"] and terraces_allowed(spec) and not spec.compact_display:
 		gap = 0.0
 	# Touching terraces are an option for shells that fit their narrow front
 	# setback. A projecting porch or jetty needs its measured clearance even
@@ -583,7 +620,7 @@ static func fire_gap(cls: StringName, spec: VillageSpec, placement: Dictionary =
 		var bounds: AABB = placement["bounds"]
 		var front_projection: float = maxf(0.0, footprint.position.y - bounds.position.z)
 		var recess: float = 0.0 if placement.has("approach") else float(placement["door"].z) - footprint.position.y
-		var rule: Dictionary = LOT_RULES.get(cls, LOT_RULES[&"cottage"])
+		var rule: Dictionary = lot_rule(cls, spec)
 		gap = maxf(gap, front_projection + recess - float(rule["set_max"]))
 	return gap
 
@@ -639,6 +676,8 @@ static func _open_roads(plan: VillagePlan, reserved: Array) -> Array:
 	var out: Array = []
 	for r in range(plan.roads.size()):
 		if r in reserved:
+			continue
+		if plan.spec.compact_display and r >= 2:
 			continue
 		out.append(r)
 	out.sort_custom(func(a, b) -> bool:
@@ -705,9 +744,9 @@ static func siting_of(request: BuildingRequest, cls: StringName) -> Dictionary:
 static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 		roads: Array, floor_d := 0.0) -> float:
 	var cls: StringName = job["class"]
-	var rule: Dictionary = LOT_RULES.get(cls, LOT_RULES[&"cottage"])
+	var rule: Dictionary = lot_rule(cls, plan.spec)
 	var gap: float = fire_gap(cls, plan.spec, job["placement"])
-	var frontage: float = 2.0 * float(job["half_w"]) + maxf(gap, 1.0)
+	var frontage: float = 2.0 * float(job["half_w"]) + maxf(gap, frontage_slack(plan.spec))
 	var setback: float = _setback(rule, job)
 	var depth: float = setback + float(job["back"]) + float(rule["yard"])
 	var site: Dictionary = job.get("siting", SITING_DEFAULT)
@@ -826,9 +865,9 @@ static func _place_pond_mill(plan: VillagePlan, ctx: Dictionary, job: Dictionary
 	var size := Poly.bounding_rect(original).size
 	var original_centre := Poly.bounding_rect(original).get_center()
 	var common := VillageMeasure.common_centre(plan)
-	var rule: Dictionary = LOT_RULES[job["class"]]
+	var rule: Dictionary = lot_rule(job["class"], plan.spec)
 	var gap := fire_gap(job["class"], plan.spec, job["placement"])
-	var frontage := 2.0 * float(job["half_w"]) + maxf(gap, 1.0)
+	var frontage := 2.0 * float(job["half_w"]) + maxf(gap, frontage_slack(plan.spec))
 	var setback := _setback(rule, job)
 	var depth := setback + float(job["back"]) + float(rule["yard"])
 	var spots: Array = []
@@ -1068,7 +1107,7 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 	if not _lane_reaches_entrance(plan, candidate_lot, job, xf):
 		return false
 	var mine: PackedVector2Array = Placement.world_rect(job["placement"], xf, false)
-	if not plan.commons.is_empty() and _point_to_poly(VillageMeasure.common_centre(plan), mine) < WELL_CLEAR:
+	if not plan.commons.is_empty() and _point_to_poly(VillageMeasure.common_centre(plan), mine) < well_clearance(plan.spec):
 		return false
 	# A townhouse's setback band tops out at 1 m, so its eaves genuinely do
 	# reach out past its own front edge and over the verge -- that is what a
@@ -1202,11 +1241,11 @@ static func _neighbours_clear(plan: VillagePlan, job: Dictionary,
 		var other_quiet: bool = other.kind in [&"church", &"temple"] \
 			or (other.kind == &"shop" and other.purpose == &"tavern")
 		if (loud and other_quiet) or (quiet and other_loud):
-			want = maxf(want, SMITHY_CLEAR)
+			want = maxf(want, smithy_clearance(plan.spec))
 		if _poly_distance(mine, theirs) < want - 1e-3:
 			return false
 		var other_foot := VillageMeasure.footprint_poly(b)
-		if _poly_distance(my_foot, other_foot) < BACK_TO_FRONT_CLEAR:
+		if _poly_distance(my_foot, other_foot) < back_clearance(plan.spec):
 			var other_direction := VillageMeasure.front_dir(b)
 			var to_other := VillageMeasure.centre(other_foot) - my_front
 			if to_other.length_squared() > 0.0001 and my_direction.dot(to_other.normalized()) > 0.7 \
@@ -1227,7 +1266,7 @@ static func _corner_blocked(plan: VillagePlan, ctx: Dictionary, lot: Dictionary)
 	var mine: int = int(ROAD_RANK.get(plan.roads[int(lot["road"])]["class"], 9))
 	for j in ctx["junctions"]:
 		var pos: Vector2 = j["pos"]
-		if _point_to_poly(pos, lot["poly"]) > CORNER_RADIUS:
+		if _point_to_poly(pos, lot["poly"]) > corner_radius(plan.spec):
 			continue
 		for r in j["roads"]:
 			if int(ROAD_RANK.get(plan.roads[int(r)]["class"], 9)) < mine:
@@ -1287,7 +1326,7 @@ static func _commit(plan: VillagePlan, lot: Dictionary, job: Dictionary, _rule: 
 ## west side of the slot for exactly that. Returns the road index, or -1.
 static func _add_landmark_lane(plan: VillagePlan) -> int:
 	var rect: Rect2 = Poly.bounding_rect(plan.landmark_site["poly"])
-	var setback: float = float(LOT_RULES[&"church"]["use"])
+	var setback: float = float(lot_rule(&"church", plan.spec)["use"])
 	var lane_x: float = rect.position.x - setback - LANE_HALF
 	if lane_x - LANE_HALF < plan.site.position.x + SITE_MARGIN:
 		return -1
@@ -1324,9 +1363,9 @@ static func _add_landmark_lane(plan: VillagePlan) -> int:
 static func _place_landmark(plan: VillagePlan, ctx: Dictionary, job: Dictionary, road: int) -> bool:
 	var rect: Rect2 = Poly.bounding_rect(plan.landmark_site["poly"])
 	var gap: float = fire_gap(&"church", plan.spec, job["placement"])
-	var rule: Dictionary = LOT_RULES[&"church"]
+	var rule: Dictionary = lot_rule(&"church", plan.spec)
 	var setback: float = _setback(rule, job)
-	var frontage: float = maxf(rect.size.y, 2.0 * float(job["half_w"]) + maxf(gap, 1.0))
+	var frontage: float = maxf(rect.size.y, 2.0 * float(job["half_w"]) + maxf(gap, frontage_slack(plan.spec)))
 	var depth: float = setback + maxf(float(job["back"]), rect.size.x) + float(rule["yard"])
 	for e in ctx["edges"]:
 		if int(e["road"]) != road:

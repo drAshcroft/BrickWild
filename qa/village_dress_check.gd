@@ -284,6 +284,9 @@ func _check_canopies(plan: VillagePlan) -> void:
 ## not -- no run longer than EDGE_RUN_MAX without a building back, a hedge, a
 ## wall or a tree within reach, except where a road or the water crosses it.
 func _check_edge(plan: VillagePlan) -> void:
+	# Compact displays dress the occupied streets, without a perimeter ring.
+	if not VillageDresser.edge_band_required(plan.spec):
+		return
 	var edge: PackedVector2Array = plan.enclosure
 	if edge.size() < 3 and plan.spec.enclosure != &"none":
 		var derived: Dictionary = VillageEnclosurePlan.build(plan)

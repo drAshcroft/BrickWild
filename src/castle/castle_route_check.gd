@@ -1,9 +1,14 @@
+class_name CastleRouteCheck
 extends RefCounted
 ## Production mesh proof for occupied towers and gatehouse galleries. Route
 ## records locate probes; emitted masonry proves support and body clearance.
+##
+## Moved out of qa/ because it reads castle access geometry. Both the source tree
+## and the packaged addon must resolve that link, and only a file that sits beside
+## its dependency can do so with a relative path. The occupancy helper is reached
+## by its global class_name, which is layout-independent.
 
-const Access = preload("res://src/castle/castle_access_geometry.gd")
-const Occupancy = preload("res://qa/castle_occupancy_check.gd")
+const Access = preload("castle_access_geometry.gd")
 
 
 static func check(builder: CastleBuilder, mesh: ArrayMesh) -> Dictionary:
@@ -15,7 +20,7 @@ static func check(builder: CastleBuilder, mesh: ArrayMesh) -> Dictionary:
 	# Missing records cannot make the route check pass by reducing its work.
 	# The inventory comes from the site, independently of the planner.
 	if CastleGeometry.is_motte(builder.spec):
-		for required in Occupancy.expected_ids(builder.spec):
+		for required in CastleOccupancyCheck.expected_ids(builder.spec):
 			if not required.begins_with("tower_") and not required.begins_with("gate_"):
 				continue
 			var present := false

@@ -20,7 +20,6 @@ extends RefCounted
 const EPS := 0.05
 ## How far off the wall centre-line a perimeter sample may find its masonry.
 const WALL_PROBE := 1
-const Occupancy = preload("res://qa/castle_occupancy_check.gd")
 
 ## The rules, in order; a family may replace one through
 ## `check(spec, mesh, builder, overrides)` (RuleSet, INT-020).
@@ -85,7 +84,7 @@ func _check_lords_walk() -> void:
 
 
 func _check_occupied_shells() -> void:
-	var report := Occupancy.check(spec, builder, mesh)
+	var report := CastleOccupancyCheck.check(spec, builder, mesh)
 	stats["occupied_shells"] = report.stats
 	failures.append_array(report.failures)
 
@@ -96,7 +95,7 @@ func _check_gate_access() -> void:
 
 
 func _check_access_routes() -> void:
-	var report := preload("castle_route_check.gd").check(builder, mesh)
+	var report := CastleRouteCheck.check(builder, mesh)
 	stats["access_routes"] = {"routes": report.routes, "ok": report.ok,
 		"wall_stairs": report.wall_stairs, "courtyard_routes": report.courtyard_routes}
 	failures.append_array(report.failures)

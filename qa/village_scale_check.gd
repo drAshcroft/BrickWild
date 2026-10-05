@@ -26,7 +26,6 @@ const DENSITY_MIN := 0.05
 ## cut. Three complete farmhouses on that honest ground measure about 3.6%;
 ## asking the tiny settlement to mimic town density only grows retry roads.
 const DENSITY_MIN_HAMLET := 0.035
-const DENSITY_MAX := 0.30
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -120,12 +119,13 @@ func _check_density(plan: VillagePlan) -> void:
 	var site: float = plan.site.size.x * plan.site.size.y
 	var d: float = built / maxf(site, 1.0)
 	var minimum: float = DENSITY_MIN_HAMLET if plan.spec.population < VillageSpec.HAMLET_POPULATION else DENSITY_MIN
+	var maximum: float = VillageSitePlanner.density_max(plan.spec)
 	stats["density"] = snappedf(d, 0.001)
 	if d < minimum:
 		failures.append("density: %.1f%% of the site is built; this settlement is at least %.1f%%"
 			% [d * 100.0, minimum * 100.0])
-	if d > DENSITY_MAX:
-		failures.append("density: %.1f%% of the site is built; a village is at most %.0f%%" % [d * 100.0, DENSITY_MAX * 100.0])
+	if d > maximum:
+		failures.append("density: %.1f%% of the site is built; a village is at most %.0f%%" % [d * 100.0, maximum * 100.0])
 
 
 ## Plan the same inputs again and compare, and make sure planning left the
@@ -133,7 +133,7 @@ func _check_density(plan: VillagePlan) -> void:
 func _check_pure(plan: VillagePlan) -> void:
 	var spec: VillageSpec = plan.spec
 	var before := [spec.seed, spec.population, spec.culture, spec.purpose, spec.wealth,
-		spec.enclosure, spec.water, spec.households, spec.form, spec.site, spec.variant_name]
+		spec.enclosure, spec.water, spec.compact_display, spec.households, spec.form, spec.site, spec.variant_name]
 	var twin := VillageSpec.new(spec.seed)
 	twin.population = spec.population
 	twin.culture = spec.culture
@@ -141,11 +141,12 @@ func _check_pure(plan: VillagePlan) -> void:
 	twin.wealth = spec.wealth
 	twin.enclosure = spec.enclosure
 	twin.water = spec.water
+	twin.compact_display = spec.compact_display
 	twin.generate(spec.seed)
 	var again: VillagePlan = VillageLotPlanner.plan(twin)
 	if not plan.equals(again):
 		failures.append("pure: the same spec planned twice gave two different villages")
 	var after := [spec.seed, spec.population, spec.culture, spec.purpose, spec.wealth,
-		spec.enclosure, spec.water, spec.households, spec.form, spec.site, spec.variant_name]
+		spec.enclosure, spec.water, spec.compact_display, spec.households, spec.form, spec.site, spec.variant_name]
 	if before != after:
 		failures.append("pure: planning wrote to the spec")

@@ -161,10 +161,14 @@ func _check_dead_ends(plan: VillagePlan) -> void:
 func _check_width(plan: VillagePlan) -> void:
 	for r in range(plan.roads.size()):
 		var road: Dictionary = plan.roads[r]
-		var want: float = float(VillageSitePlanner.ROAD_CLASSES[road["class"]]["width"])
+		var rule: Dictionary = VillageSitePlanner.road_rule(road["class"], plan.spec)
+		var want: float = float(rule["width"])
 		var got: float = float(road["width"])
 		if absf(got - want) > want * WIDTH_TOL:
 			failures.append("width: %s %d is %.2fm wide, its class is %.2f" % [String(road["class"]), r, got, want])
+		var verge: float = float(rule["verge"])
+		if not is_equal_approx(float(road["verge"]), verge):
+			failures.append("width: %s %d has %.2fm verge, its class is %.2f" % [String(road["class"]), r, float(road["verge"]), verge])
 		# and the ribbon really is that wide: the offset of each edge from
 		# the centreline
 		var ribbon: PackedVector2Array = VillageSitePlanner.road_ribbon(road, false)

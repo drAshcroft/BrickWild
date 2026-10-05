@@ -20,10 +20,8 @@ extends RefCounted
 const RULES: Array[StringName] = [&"tiling", &"frontage", &"faces_road", &"setback",
 	&"fit", &"fire_gap", &"back_to_front", &"variety"]
 const COLLINEAR_EPS := 0.1
-const FRONT_SLACK := 1.0
 const FACE_DEG := 15.0
 const BAND_SLACK := 0.05
-const BACK_TO_FRONT_M := 8.0
 const STYLE_SHARE_MAX := 0.45
 const NEIGHBOUR_M := 12.0
 const MIXING_WEALTH := 0.55
@@ -89,7 +87,7 @@ func _check_frontage(plan: VillagePlan) -> void:
 		if b >= 0:
 			var fp: Rect2 = plan.buildings[b]["placement"]["footprint"]
 			var have: float = front[0].distance_to(front[1])
-			if have < fp.size.x + FRONT_SLACK - 0.01:
+			if have < fp.size.x + VillageLotPlanner.frontage_slack(plan.spec) - 0.01:
 				failures.append("frontage: lot %d's front is %.1fm for a %.1fm building" % [i, have, fp.size.x])
 
 
@@ -127,7 +125,7 @@ func _check_setback(plan: VillagePlan) -> void:
 		var b: Dictionary = plan.buildings[i]
 		var lot: Dictionary = plan.lots[int(b["lot"])]
 		var front: PackedVector2Array = lot["front"]
-		var rule: Dictionary = VillageLotPlanner.LOT_RULES.get(b["class"], VillageLotPlanner.LOT_RULES[&"cottage"])
+		var rule: Dictionary = VillageLotPlanner.lot_rule(b["class"], plan.spec)
 		var door: Vector2 = VillageMeasure.door(b)
 		# A certified open-court approach connects the facing footprint to a
 		# recessed native entrance. Keep the strict front setback and judge
@@ -176,7 +174,7 @@ func _check_back_to_front(plan: VillagePlan) -> void:
 			var bc: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(b))
 			var to: Vector2 = bc - ac
 			var d: float = VillageMeasure.poly_distance(VillageMeasure.footprint_poly(a), VillageMeasure.footprint_poly(b))
-			if d >= BACK_TO_FRONT_M or to.length() < 0.01:
+			if d >= VillageLotPlanner.back_clearance(plan.spec) or to.length() < 0.01:
 				continue
 			if af.dot(to.normalized()) < 0.7:
 				continue      # B is not in front of A

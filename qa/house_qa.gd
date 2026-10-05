@@ -14,7 +14,6 @@ extends RefCounted
 ## structural rules that can still fail -- nothing floating, nothing hovering.
 # A pitched roof is carried by the wall plates even in a one-storey house.
 const SHELL_CARRIED: Array = ["roof"]
-const MeshIntegrityCheck = preload("res://qa/mesh_integrity_check.gd")
 
 
 ## `overrides` lets a family replace a rule of the plan or furnishing check
