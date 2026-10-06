@@ -4,6 +4,7 @@ extends RefCounted
 
 const THICKNESS := 0.45
 const GALLERY_WIDTH := 1.5
+const NARROW_THICKNESS := 0.3
 
 
 static func records(spec: CastleSpec, geometry_only := false) -> Dictionary:
@@ -33,21 +34,34 @@ static func records(spec: CastleSpec, geometry_only := false) -> Dictionary:
 		hs.trim_color = spec.trim_color
 		hs.roof_color = spec.roof_color
 		hs.floor_color = spec.stone_color.darkened(0.35)
-		hs.program.append(&"guardroom")
 		var plan := HousePlan.new()
 		plan.spec = hs
 		var room := HouseGeometry.interior_rect(hs)
-		plan.rooms.append({"kind": &"guardroom", "rect": room, "storey": 0})
+		# A narrow gatehouse (a polygon castle's gate is two metres across) has
+		# no guardroom over it; the chamber is a passage, on thinner walls if
+		# that is what it takes to hold one, or there is no chamber at all.
+		var kind: StringName = &"guardroom"
+		var fits := minf(room.size.x, room.size.y) >= float(HouseGeometry.MIN_SIDE[kind]) \
+			and room.get_area() >= float(HouseGeometry.MIN_AREA[kind])
+		if not fits:
+			kind = &"corridor"
+			hs.wall_thickness_override = NARROW_THICKNESS
+			room = HouseGeometry.interior_rect(hs)
+			if minf(room.size.x, room.size.y) < float(HouseGeometry.MIN_SIDE[kind]):
+				continue
+		hs.program.append(kind)
+		plan.rooms.append({"kind": kind, "rect": room, "storey": 0})
 		var door_pos := Vector2(room.end.x, room.end.y - 0.95)
 		plan.doors.append({"a": 0, "b": -1, "pos": door_pos,
 			"normal": Vector2.RIGHT, "width": 1.2, "exterior": true,
 			"front": true, "storey": 0, "sill": HouseGeometry.FLOOR_T,
 			"head": 2.35, "route": "curtain_gallery"})
-		for column in 3:
-			var x := lerpf(room.position.x + 0.7, room.end.x - 0.7, float(column) * 0.5)
-			plan.windows.append({"room": 0, "storey": 0,
-				"pos": Vector2(x, room.position.y), "normal": Vector2.UP,
-				"width": 0.5, "sill": 1.05, "head": 1.85})
+		if kind == &"guardroom":
+			for column in 3:
+				var x := lerpf(room.position.x + 0.7, room.end.x - 0.7, float(column) * 0.5)
+				plan.windows.append({"room": 0, "storey": 0,
+					"pos": Vector2(x, room.position.y), "normal": Vector2.UP,
+					"width": 0.5, "sill": 1.05, "head": 1.85})
 		if not geometry_only:
 			CastleKeepPlan.furnish_minimum_programme(plan, hs)
 		var bounds := AABB(Vector3(gate.position.x, floor_base, gate.position.z),

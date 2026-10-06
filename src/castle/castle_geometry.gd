@@ -1580,6 +1580,9 @@ const APSE_HEIGHT_RATIO := 0.85
 ## The apse radius: APSE_RATIO of the chapel's width, reduced until the apse
 ## stands inside the ward on a plan whose walls close in toward the gate, and
 ## 0 when even a small one would not.
+const APSE_MIN_RADIUS := 2.4
+
+
 static func apse_radius(spec: CastleSpec) -> float:
 	var chapel: AABB = chapel_aabb(spec)
 	if chapel.size.x <= 0.0:
@@ -1596,7 +1599,10 @@ static func apse_radius(spec: CastleSpec) -> float:
 			var hw: float = poly_half_width(poly, front)
 			fits = hw > 0.0 and absf(cx) + r <= hw - 0.05
 		if fits:
-			return r
+			# Narrower than this the half-drum cannot hold even a vestry store
+			# (CastleApsePlan), so it is not built at all rather than left a
+			# blind drum with a window painted on it.
+			return r if r >= APSE_MIN_RADIUS else 0.0
 		r *= 0.85
 		if r < chapel.size.x * 0.2:
 			return 0.0

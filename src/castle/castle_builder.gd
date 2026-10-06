@@ -138,18 +138,27 @@ func _keep_surface_slots() -> void:
 			highest = slot
 	for slot in range(highest):
 		if not populated[slot]:
-			_speck(slot)
+			_speck(slot, true)
 
 
-func _speck(slot: int) -> void:
+func _speck(slot: int, upward := false) -> void:
 	var st := _kit.surface(slot)
 	var p := Vector3(0.0, 0.0, 0.0)
+	var a := p + Vector3(0.0, 0.0, 0.001)
+	var b := p + Vector3(0.001, 0.0, 0.0)
+	# Front faces are clockwise: (b - p) x (a - p) is the outward normal, so a
+	# triangle that really faces up is wound p, b, a. (The ground speck has
+	# always been wound the other way and is left exactly as it was.)
+	if upward:
+		var swap := a
+		a = b
+		b = swap
 	st.set_normal(Vector3.UP)
 	st.add_vertex(p)
 	st.set_normal(Vector3.UP)
-	st.add_vertex(p + Vector3(0.0, 0.0, 0.001))
+	st.add_vertex(a)
 	st.set_normal(Vector3.UP)
-	st.add_vertex(p + Vector3(0.001, 0.0, 0.0))
+	st.add_vertex(b)
 
 
 ## Say that slot 4 carries something, so no speck is needed to hold its place.

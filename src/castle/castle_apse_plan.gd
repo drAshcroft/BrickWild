@@ -42,7 +42,18 @@ static func record(spec: CastleSpec) -> Dictionary:
 		return {}
 	var plan := HousePlan.new()
 	plan.spec = hs
-	plan.rooms.append({"kind": &"sanctuary", "rect": Poly.bounding_rect(outline),
+	# A small chapel's apse is a niche, not a sanctuary: a vestry store if it
+	# holds that, and no occupied room at all when it holds neither.
+	var kind: StringName = &"sanctuary"
+	var probe := Poly.bounding_rect(outline)
+	if Poly.area(outline) < float(HouseGeometry.MIN_AREA[kind]) \
+		or minf(probe.size.x, probe.size.y) < float(HouseGeometry.MIN_SIDE[kind]):
+		kind = &"store"
+		hs.program = [&"store"] as Array[StringName]
+		if Poly.area(outline) < float(HouseGeometry.MIN_AREA[kind]) \
+			or minf(probe.size.x, probe.size.y) < float(HouseGeometry.MIN_SIDE[kind]):
+			return {}
+	plan.rooms.append({"kind": kind, "rect": Poly.bounding_rect(outline),
 		"outline": outline, "storey": 0, "host": "apse"})
 	var walls := HouseGeometry.room_walls(plan, 0)
 	for wall in walls:
@@ -63,11 +74,12 @@ static func record(spec: CastleSpec) -> Dictionary:
 	# The sanctuary has its altar and standing place; pews belong to the nave.
 	# The approach from the nave stays clear before any furniture is selected.
 	var floor_rect := Poly.bounding_rect(outline)
-	plan.focus = {"room": 0, "cat": "table", "pos": Vector2(0.0,
-		floor_rect.position.y + floor_rect.size.y * 0.4), "facing": 0.0, "faces_door": false}
-	plan.zones.append({"room": 0, "rect": Rect2(-0.6,
-		floor_rect.end.y - HouseGeometry.DOOR_CLEAR, 1.2, HouseGeometry.DOOR_CLEAR),
-		"why": "sanctuary standing approach"})
+	if kind == &"sanctuary":
+		plan.focus = {"room": 0, "cat": "table", "pos": Vector2(0.0,
+			floor_rect.position.y + floor_rect.size.y * 0.4), "facing": 0.0, "faces_door": false}
+		plan.zones.append({"room": 0, "rect": Rect2(-0.6,
+			floor_rect.end.y - HouseGeometry.DOOR_CLEAR, 1.2, HouseGeometry.DOOR_CLEAR),
+			"why": "sanctuary standing approach"})
 	HouseFurnisher.furnish(plan, hs)
 	return {"id": "apse", "plan": plan, "bounds": bounds,
 		"transform": Transform3D(Basis.IDENTITY, centre)}

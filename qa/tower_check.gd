@@ -71,6 +71,10 @@ func _check_lift(_spec: CastleSpec, builder: CastleBuilder) -> void:
 	var doors := 0
 	var lowest := INF
 	for p in builder.part_log:
+		# The jogs are blocks of their own, entered from the ground; the lift
+		# rule is about the shaft.
+		if String(p.get("tag", "")).begins_with("wing_jog_"):
+			continue
 		var opening_kind := StringName(p.get("opening_kind", ""))
 		if opening_kind.is_empty():
 			opening_kind = &"door" if p.get("tag", "") == "door" else StringName(p.get("kind", ""))

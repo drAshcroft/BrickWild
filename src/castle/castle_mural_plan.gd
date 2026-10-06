@@ -72,7 +72,9 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 	# (battered Crusader towers: 0.61 m). Then fit the storey height to the
 	# walk instead, and let the walls rise unbroken over any short last void.
 	var storey_override := 0.0
-	if score > 0.4:
+	# (The motte's routes were proven on uniform storeys; other castles always
+	# align the door floor with the coping, which stands 0.25 m proud of the wall.)
+	if score > 0.4 or not CastleGeometry.is_motte(spec):
 		var gap := INF
 		for fit_entry in range(1, 8):
 			var fit_h := (walk_y - HouseGeometry.FLOOR_T) / float(fit_entry)
@@ -89,6 +91,14 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 				levels = fit_levels
 				entry = fit_entry
 				storey_override = fit_h
+	# A tower lower than the coping, or whose storeys cannot be fitted to it,
+	# has no raised door that meets the walk. It is entered from the ward.
+	var raised := absf(float(entry) * (storey_override if storey_override > 0.0
+		else height / float(levels)) + HouseGeometry.FLOOR_T - walk_y) <= WalkGrid.MAX_STEP
+	if not raised:
+		entry = 0
+		storey_override = 0.0
+		levels = clampi(roundi(height / 3.4), 2, MAX_TOWER_STOREYS)
 	var hs := KeepSpec.new(spec.seed ^ int(id.hash()))
 	hs.material = &"stone"
 	hs.style = &"townhouse"
@@ -116,12 +126,21 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 	for side in range(sides):
 		var angle := rotation + TAU * float(side) / float(sides)
 		outline.append(Vector2(cos(angle), sin(angle)) * radius)
+	# A coarse outline (a hexagon has a vertex on its Y axis) can reach past the
+	# tower's own square; the interior the tiling check measures must hold it.
+	var probe := Poly.bounding_rect(outline)
+	var reach := maxf(maxf(absf(probe.position.x), probe.end.x),
+		maxf(absf(probe.position.y), probe.end.y))
+	hs.width = maxf(hs.width, 2.0 * (reach + THICKNESS))
+	hs.length = maxf(hs.length, 2.0 * (reach + THICKNESS))
 	for level in range(levels):
 		plan.rooms.append({"kind": &"guardroom", "rect": Poly.bounding_rect(outline),
 			"outline": outline.duplicate(), "storey": level, "host": id})
 		hs.program.append(&"guardroom")
-	var access := _door(plan, spec, ring, centre, entry, vertex, id.contains("_gate_"))
-	if access.is_empty() and CastleGeometry.tower_sides(spec) > 4:
+	var access := {}
+	if raised:
+		access = _door(plan, spec, ring, centre, entry, vertex, id.contains("_gate_"))
+	if raised and access.is_empty() and CastleGeometry.tower_sides(spec) > 4:
 		_exact_towers = true
 		access = _door(plan, spec, ring, centre, entry, vertex, id.contains("_gate_"))
 		_exact_towers = false
