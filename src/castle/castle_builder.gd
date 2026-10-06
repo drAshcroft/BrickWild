@@ -2537,6 +2537,22 @@ func _mural_landing(row: Dictionary) -> void:
 			var rail_point := Vector3(rail_xz.x, walk_y + rail_height * 0.5, rail_xz.y)
 			component_box("tower_gallery_parapet", rail_size,
 				Transform3D(Basis(Vector3.UP, yaw), rail_point), SURF_STONE)
+	# Two straight decks meeting at an angle leave a wedge open on the outside
+	# of the turn: a square pad at each joint closes it (the route check samples
+	# the corner itself).
+	var spans: Array = row.get("walk_gallery", [])
+	for index in range(1, spans.size()):
+		var previous: Vector2 = Vector2(spans[index - 1].b) - Vector2(spans[index - 1].a)
+		var following: Vector2 = Vector2(spans[index].b) - Vector2(spans[index].a)
+		if previous.length() < 0.03 or following.length() < 0.03:
+			continue
+		if absf(previous.normalized().cross(following.normalized())) < 0.05:
+			continue
+		var joint: Vector2 = spans[index].a
+		var pad := maxf(float(spans[index].width), float(spans[index - 1].width))
+		component_box("tower_access_gallery", Vector3(pad, 0.22, pad),
+			Transform3D(Basis.IDENTITY, Vector3(joint.x, float(row.walk_y) - 0.11, joint.y)),
+			SURF_TRIM)
 	host_end()
 	_log_part("tower_access_landing", point, size)
 	part_log.back()["host"] = row.id
