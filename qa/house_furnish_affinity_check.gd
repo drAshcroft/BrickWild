@@ -80,7 +80,7 @@ static func _lit_run_takes_bench(plan: HousePlan, room: int, p: Dictionary) -> b
 	var rect: Rect2 = p["rect"]
 	var span: float = maxf(rect.size.x, rect.size.y) + FS_LIT_RUN_TOL
 	for wi in plan.windows_of(room):
-		if not _lit_wall_of_window(plan, room, wi):
+		if _lit_wall_of_window(plan, room, wi) < 0:
 			continue
 		if _clear_run(plan, room, wi) >= span:
 			return true
