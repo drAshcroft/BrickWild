@@ -40,8 +40,11 @@ static func primary(spec: CastleSpec) -> Dictionary:
 			var against: Array[AABB] = []
 			if climb.size.x > 0.0:
 				against.append(climb)
+			drop_stair_windows(out["keep_shell"], 1.2, false)
 			drop_buried_windows(spec, out["keep_shell"], against)
-			drop_stair_windows(out["keep_shell"])
+			var shell_walls := curtain_boxes(spec)
+			shell_walls.append_array(against)
+			restore_daylight(out["keep_shell"], shell_walls)
 		# A motte replaces the keep, not the occupied bailey ranges. Returning
 		# here left the hall and chapel as windowed blocks without any way in.
 	if CastleGeometry.is_enclosed(spec):
@@ -54,6 +57,7 @@ static func primary(spec: CastleSpec) -> Dictionary:
 			out["apse"] = apse
 	if CastleGeometry.is_sky(spec):
 		return preload("castle_manor_plan.gd").sky_records(spec)
+	var furnish_keep := false
 	for kind in ["hall", "keep", "chapel"]:
 		var plan: HousePlan
 		var bounds: AABB
@@ -63,17 +67,33 @@ static func primary(spec: CastleSpec) -> Dictionary:
 				bounds = CastleGeometry.hall_aabb(spec)
 			"keep":
 				bounds = CastleGeometry.keep_aabb(spec)
-				var furnish := maxf(bounds.size.x, bounds.size.z) \
+				furnish_keep = maxf(bounds.size.x, bounds.size.z) \
 					<= CastleInteriorPlans.MAX_FURNISHED_KEEP_SIDE
-				plan = CastleKeepPlan.generate(spec, furnish)
-				if not furnish and plan.spec != null:
-					CastleKeepPlan.furnish_minimum_programme(plan, plan.spec)
+				# Furnished after its windows are settled: a storey whose every
+				# wall is stair, door or curtain masonry becomes a store.
+				plan = CastleKeepPlan.generate(spec, false)
 			"chapel":
 				plan = CastleInteriorPlans.chapel_plan(spec)
 				bounds = CastleGeometry.chapel_aabb(spec)
+		var yaw := 0.0
+		if plan.spec == null and kind != "keep" and bounds.size.x > 0.0 				and CastleGeometry.is_enclosed(spec):
+			# A hall too long or too small for one great-hall room is still a
+			# building: plan it as a range of bays (or a store) turned to the ward.
+			plan = preload("castle_manor_plan.gd").annexe_plan(spec, bounds)
+			if bounds.size.z >= bounds.size.x:
+				yaw = -PI * 0.5 if kind == "hall" else PI * 0.5
 		if plan.spec != null:
-			out[kind] = record(kind, plan, bounds)
+			out[kind] = record(kind, plan, bounds, yaw)
 			if kind == "keep":
+				drop_stair_windows(out[kind], 1.2, false)
+				drop_buried_windows(spec, out[kind])
+				restore_daylight(out[kind], curtain_boxes(spec))
+				blind_rooms_to_stores(plan)
+				if furnish_keep:
+					HouseFurnisher.furnish(plan, plan.spec)
+				else:
+					CastleKeepPlan.furnish_minimum_programme(plan, plan.spec)
+			elif yaw != 0.0:
 				drop_buried_windows(spec, out[kind])
 	if not CastleGeometry.is_enclosed(spec):
 		out.merge(preload("castle_manor_plan.gd").records(spec))
@@ -104,12 +124,9 @@ static func primary(spec: CastleSpec) -> Dictionary:
 ## A keep may stand with its back built into the curtain. A planned window on
 ## that face opens onto masonry, not air: drop every window whose outward reveal
 ## (and the daylight beyond it) would pass through a curtain wall or its coping.
-static func drop_buried_windows(spec: CastleSpec, row: Dictionary,
-		obstructions: Array[AABB] = []) -> int:
-	var plan: HousePlan = row.plan
-	var xf: Transform3D = row.transform
+## The curtain walls with their coping and merlons, as boxes.
+static func curtain_boxes(spec: CastleSpec) -> Array[AABB]:
 	var walls: Array[AABB] = []
-	walls.append_array(obstructions)
 	if CastleGeometry.is_enclosed(spec):
 		for ring in CastleGeometry.rings(spec):
 			var cap := CastleGeometry.PARAPET_RISE + spec.merlon_h + 0.1
@@ -117,6 +134,16 @@ static func drop_buried_windows(spec: CastleSpec, row: Dictionary,
 				var box := CastleGeometry.segment_aabb(spec, ring, segment)
 				box.size.y += cap
 				walls.append(box.grow(0.05))
+	return walls
+
+
+static func drop_buried_windows(spec: CastleSpec, row: Dictionary,
+		obstructions: Array[AABB] = []) -> int:
+	var plan: HousePlan = row.plan
+	var xf: Transform3D = row.transform
+	var walls: Array[AABB] = []
+	walls.append_array(obstructions)
+	walls.append_array(curtain_boxes(spec))
 	if walls.is_empty():
 		return 0
 	var kept: Array[Dictionary] = []
@@ -130,34 +157,40 @@ static func drop_buried_windows(spec: CastleSpec, row: Dictionary,
 
 
 ## A window that opens onto a stair (or the well above one) has no floor to
-## stand at: drop it. `reach` is how far into the room the stair may stand.
-static func drop_stair_windows(row: Dictionary, reach := 1.2) -> int:
+## stand at: drop it, then give any room that lost its last light a clear one.
+## `reach` is how far into the room the stair may stand.
+static func drop_stair_windows(row: Dictionary, reach := 1.2, restore := true) -> int:
 	var plan: HousePlan = row.plan
 	var kept: Array[Dictionary] = []
 	for window in plan.windows:
-		var storey := HousePlan.record_storey(window)
-		var normal := Vector2(window.normal).normalized()
-		var tangent := Vector2(-normal.y, normal.x)
-		var half := float(window.width) * 0.5 + 0.3
-		var pos := Vector2(window.pos)
-		var area := PackedVector2Array([pos + tangent * half, pos - tangent * half,
-			pos - tangent * half - normal * reach, pos + tangent * half - normal * reach])
-		var blocked := false
-		for stair in plan.stairs:
-			var rects: Array[Rect2] = []
-			if int(stair.get("storey", -1)) == storey:
-				rects.append(Rect2(stair.get("lower_rect", stair.get("rect", Rect2()))))
-			if int(stair.get("to_storey", -1)) == storey:
-				rects.append(Rect2(stair.get("upper_rect", stair.get("rect", Rect2()))))
-			for rect in rects:
-				if Poly.intersection_area(area, Poly.from_rect(rect)) > 0.01:
-					blocked = true
-		if not blocked:
+		if not _window_on_stair(plan, window, reach):
 			kept.append(window)
 	var dropped := plan.windows.size() - kept.size()
 	if dropped > 0:
 		plan.windows = kept
+		if restore:
+			restore_daylight(row, [] as Array[AABB])
 	return dropped
+
+
+static func _window_on_stair(plan: HousePlan, window: Dictionary, reach := 1.2) -> bool:
+	var storey := HousePlan.record_storey(window)
+	var normal := Vector2(window.normal).normalized()
+	var tangent := Vector2(-normal.y, normal.x)
+	var half := float(window.width) * 0.5 + 0.3
+	var pos := Vector2(window.pos)
+	var area := PackedVector2Array([pos + tangent * half, pos - tangent * half,
+		pos - tangent * half - normal * reach, pos + tangent * half - normal * reach])
+	for stair in plan.stairs:
+		var rects: Array[Rect2] = []
+		if int(stair.get("storey", -1)) == storey:
+			rects.append(Rect2(stair.get("lower_rect", stair.get("rect", Rect2()))))
+		if int(stair.get("to_storey", -1)) == storey:
+			rects.append(Rect2(stair.get("upper_rect", stair.get("rect", Rect2()))))
+		for rect in rects:
+			if Poly.intersection_area(area, Poly.from_rect(rect)) > 0.01:
+				return true
+	return false
 
 
 ## Whether a window's outward reveal (0.7 m of it) meets any of `walls`.
@@ -183,6 +216,23 @@ static func _window_buried(row: Dictionary, window: Dictionary, walls: Array[AAB
 		if wall.intersects(reveal):
 			return true
 	return false
+
+
+## A habitable room no window can serve (every wall is stair, door or curtain
+## masonry) is a store, not a living room; the facade rule is about living rooms.
+static func blind_rooms_to_stores(plan: HousePlan) -> void:
+	for index in range(plan.rooms.size()):
+		if plan.rooms[index].kind not in HouseGeometry.HABITABLE:
+			continue
+		var lit := false
+		for window in plan.windows:
+			if int(window.get("room", -1)) == index:
+				lit = true
+				break
+		if not lit:
+			plan.rooms[index]["kind"] = &"store"
+			if index < plan.spec.program.size():
+				plan.spec.program[index] = &"store"
 
 
 ## A habitable room that lost every window to a neighbour gets one on its
@@ -214,6 +264,8 @@ static func restore_daylight(row: Dictionary, obstructions: Array[AABB]) -> int:
 				"head": minf(2.9, plan.spec.height - 0.2)}
 			var clear := true
 			var tangent := Vector2(-normal.y, normal.x)
+			if _window_on_stair(plan, window):
+				clear = false
 			for door in plan.doors:
 				if HousePlan.record_storey(door) != storey or Vector2(door.normal).dot(normal) < 0.99:
 					continue

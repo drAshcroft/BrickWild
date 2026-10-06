@@ -190,6 +190,16 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 					"sill": 0.95, "head": minf(hs.height - 0.3, 2.15), "host": id})
 			if plan.windows.size() > before:
 				break
+	# A storey no window can reach (curtain masonry on every facet) is a store,
+	# not a guardroom: nobody is posted where they cannot see out.
+	for level in range(levels):
+		var lit := false
+		for window in plan.windows:
+			if int(window.get("room", -1)) == level:
+				lit = true
+		if not lit:
+			plan.rooms[level]["kind"] = &"store"
+			hs.program[level] = &"store"
 	CastleKeepPlan.furnish_minimum_programme(plan, hs)
 	var row := {"id": id, "plan": plan, "bounds": bounds,
 		"transform": Transform3D(Basis.IDENTITY, centre), "mural_tower": true,

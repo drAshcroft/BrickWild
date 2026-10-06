@@ -204,10 +204,10 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 			gate_decks.append(Rect2(gallery))
 	var strict: Array[Rect2] = tower_decks.duplicate()
 	strict.append_array(gate_decks)
-	out = _plan_wall_stairs(spec, strict)
+	out = _plan_wall_stairs(spec, strict, true)
 	if CastleGeometry.is_motte(spec) or gate_decks.is_empty() or _stairs_near_gates(spec, out):
 		return out
-	return _plan_wall_stairs(spec, tower_decks)
+	return _plan_wall_stairs(spec, tower_decks, false)
 
 
 ## Is there a stair within 15 m of the gate of every ring?
@@ -229,7 +229,10 @@ static func _stairs_near_gates(spec: CastleSpec, stairs: Array[Dictionary]) -> b
 	return true
 
 
-static func _plan_wall_stairs(spec: CastleSpec, galleries: Array[Rect2]) -> Array[Dictionary]:
+## `envelopes`: also keep clear of each tower's own logged box on its own ring
+## (massing QA compares those boxes), not only of the exact footprint.
+static func _plan_wall_stairs(spec: CastleSpec, galleries: Array[Rect2],
+		envelopes: bool) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var fore: Dictionary = forebuilding(spec)
 	for ring in CastleGeometry.rings(spec):
@@ -269,8 +272,11 @@ static func _plan_wall_stairs(spec: CastleSpec, galleries: Array[Rect2]) -> Arra
 				var outline := _tower_outline(spec, other_ring, vertices[index], index)
 				tower_polygons.append(outline)
 				# Massing QA compares logged bounds. Keep stairs outside those
-				# envelopes as well as outside the exact battered tower footprint.
-				if other_ring != ring:
+				# envelopes (the tower's own logged box, not just the polygon's
+				# bounding rectangle) as well as outside the exact footprint.
+				if envelopes:
+					blocked.append(_mass_rect(spec, other_ring, vertices[index], index))
+				elif other_ring != ring:
 					blocked.append(Poly.bounding_rect(outline))
 			var towers := CastleGeometry.gate_tower_centers(spec, other_ring)
 			for slot in CastleGeometry.side_tower_slots(spec, other_ring):
@@ -278,7 +284,9 @@ static func _plan_wall_stairs(spec: CastleSpec, galleries: Array[Rect2]) -> Arra
 			for tower in towers:
 				var outline := _tower_outline(spec, other_ring, tower)
 				tower_polygons.append(outline)
-				if other_ring != ring:
+				if envelopes:
+					blocked.append(_mass_rect(spec, other_ring, tower))
+				elif other_ring != ring:
 					blocked.append(Poly.bounding_rect(outline))
 			if other_ring != ring:
 				var box := CastleGeometry.gatehouse_aabb(spec, other_ring)
@@ -302,6 +310,11 @@ static func _plan_wall_stairs(spec: CastleSpec, galleries: Array[Rect2]) -> Arra
 				out.append(fallback)
 				blocked.append(fallback.footprint.grow(0.2))
 	return out
+
+
+static func _mass_rect(spec: CastleSpec, ring: int, centre: Vector3, vertex := -1) -> Rect2:
+	var box := CastleGeometry.tower_aabb(spec, ring, centre, vertex)
+	return Rect2(box.position.x, box.position.z, box.size.x, box.size.z).grow(0.05)
 
 
 static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Array,
