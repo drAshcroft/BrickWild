@@ -63,44 +63,7 @@ static func _fresh() -> Dictionary:
 
 static func _without_top(source: ArrayMesh, surface: int, footprint: Rect2,
 		height: float) -> Dictionary:
-	if source == null or surface >= source.get_surface_count():
-		return {"mesh": null, "removed_triangles": 0}
-	var result := ArrayMesh.new()
-	var removed := 0
-	for surface_index in range(source.get_surface_count()):
-		var arrays: Array = source.surface_get_arrays(surface_index).duplicate(true)
-		var index_value: Variant = arrays[Mesh.ARRAY_INDEX]
-		var indices: PackedInt32Array = index_value if index_value != null else PackedInt32Array()
-		if indices.is_empty():
-			arrays[Mesh.ARRAY_INDEX] = null
-		if surface_index == surface:
-			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			var order := indices.duplicate()
-			if order.is_empty():
-				for i in range(vertices.size()):
-					order.append(i)
-			var kept := PackedInt32Array()
-			for i in range(0, order.size() - 2, 3):
-				var a: Vector3 = vertices[order[i]]
-				var b: Vector3 = vertices[order[i + 1]]
-				var c: Vector3 = vertices[order[i + 2]]
-				var face := (c - a).cross(b - a)
-				var centre := (a + b + c) / 3.0
-				var inside := footprint.has_point(Vector2(centre.x, centre.z))
-				if face.length_squared() > 1e-12 and face.normalized().dot(Vector3.UP) > 0.95 \
-						and absf(centre.y - height) <= 0.01 and inside:
-					removed += 1
-				else:
-					kept.append(order[i])
-					kept.append(order[i + 1])
-					kept.append(order[i + 2])
-			arrays[Mesh.ARRAY_INDEX] = kept
-		result.add_surface_from_arrays(source.surface_get_primitive_type(surface_index), arrays)
-		result.surface_set_material(surface_index, source.surface_get_material(surface_index))
-		result.surface_set_name(surface_index, source.surface_get_name(surface_index))
-	if result.get_surface_count() != source.get_surface_count():
-		return {"mesh": null, "removed_triangles": removed}
-	return {"mesh": result, "removed_triangles": removed}
+	return MeshProbe.remove_triangles(source, surface, MeshProbe.top_face_in(footprint, height))
 
 
 static func _has_failure(report: Dictionary, needle: String) -> bool:

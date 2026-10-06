@@ -2,7 +2,7 @@ class_name VavCheck
 extends RefCounted
 ## WLD-016 plan and emitted-geometry rules for descending stepwells.
 
-func check(plan: HousePlan, builder: VavBuilder) -> Dictionary:
+func check(plan: HousePlan, builder: VavBuilder, emitted_mesh: ArrayMesh = null) -> Dictionary:
 	var failures: Array[String] = []
 	var meta: Dictionary = plan.world_meta
 	_check_identity(plan, failures)
@@ -15,6 +15,7 @@ func check(plan: HousePlan, builder: VavBuilder) -> Dictionary:
 	_check_walk(plan, failures)
 	_check_sky(plan, builder, failures)
 	_check_grounding(builder, failures)
+	_check_mesh(plan, builder, emitted_mesh, failures)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": [],
 		"stats": {"negative_storeys": plan.rooms.size() - 1,
 			"flights": plan.stairs.size(), "pavilions": meta.get("pavilions", []).size(),
@@ -251,3 +252,135 @@ func _check_grounding(builder: VavBuilder, failures: Array[String]) -> void:
 		return
 	for issue in MassRules.grounded(builder.mass_log, []):
 		failures.append("grounded: %s" % String(issue))
+
+
+## WORLD-MESH-VERIFY. The rules above read the mass log; these read the emitted
+## triangles, so a log row whose geometry was lost cannot pass. `emitted_mesh`
+## is optional: without it the builder's own surfaces are read.
+func _check_mesh(plan: HousePlan, builder: VavBuilder, emitted_mesh: ArrayMesh,
+		failures: Array[String]) -> void:
+	var stone := MeshProbe.surface_triangles(builder, emitted_mesh, VavBuilder.STONE)
+	var trim := MeshProbe.surface_triangles(builder, emitted_mesh, VavBuilder.TRIM)
+	var water := MeshProbe.surface_triangles(builder, emitted_mesh, VavBuilder.WATER)
+	if stone.is_empty() or trim.is_empty() or water.is_empty():
+		failures.append("mesh_support: an emitted stone, trim or water surface has no triangles")
+		return
+	var all := stone + trim + water
+	var meta: Dictionary = plan.world_meta
+	# Floors a body stands on: every landing, the grade apron, the tank edge.
+	for i in range(plan.rooms.size()):
+		var rect: Rect2 = plan.rooms[i].get("rect", Rect2())
+		var y := float(plan.rooms[i].get("elevation", 0.0))
+		var samples := MeshProbe.rect_samples(rect, [0.2, 0.5, 0.8], [0.25, 0.75])
+		var hits := MeshProbe.supported_count(stone, samples, y)
+		if hits != samples.size():
+			failures.append("mesh_support: landing %d has floor triangles at %d/%d probes" %
+				[i, hits, samples.size()])
+	var apron: Rect2 = meta.get("entry_apron", Rect2())
+	var apron_samples := MeshProbe.rect_samples(apron, [0.25, 0.75], [0.5])
+	var apron_hits := MeshProbe.supported_count(stone, apron_samples, 0.0)
+	if apron_hits != apron_samples.size():
+		failures.append("mesh_support: entry apron has floor triangles at %d/%d probes" %
+			[apron_hits, apron_samples.size()])
+	var floor_y := float(meta.get("tank_floor_y", 0.0))
+	var strips: Array = meta.get("tank_walk", [])
+	for i in range(strips.size()):
+		var strip: Rect2 = strips[i]
+		if strip.size.x <= 0.1 or strip.size.y <= 0.1:
+			continue
+		var strip_samples := MeshProbe.rect_samples(strip, [0.25, 0.75], [0.5])
+		var strip_hits := MeshProbe.supported_count(stone, strip_samples, floor_y)
+		if strip_hits != strip_samples.size():
+			failures.append("mesh_support: tank walk %d has floor triangles at %d/%d probes" %
+				[i, strip_hits, strip_samples.size()])
+	# Every tread of every flight: the top face at its stepped height.
+	for i in range(plan.stairs.size()):
+		var flight: Dictionary = plan.stairs[i]
+		var rect: Rect2 = flight.get("rect", Rect2())
+		var steps := int(flight.get("steps", 0))
+		if steps < 1 or rect.size.x <= 0.0:
+			continue
+		var depth := rect.size.x / float(steps)
+		var step_height := (float(flight["lower_y"]) - float(flight["upper_y"])) / float(steps)
+		var missing := 0
+		for step in range(steps):
+			var top_y := float(flight["lower_y"]) - float(step + 1) * step_height
+			var x := rect.end.x - (float(step) + 0.5) * depth
+			var ok := true
+			for fraction in [0.25, 0.75]:
+				var z := lerpf(rect.position.y, rect.end.y, fraction)
+				ok = ok and MeshProbe.has_upward_support(trim, Vector2(x, z), top_y)
+			if not ok:
+				missing += 1
+		if missing > 0:
+			failures.append("mesh_support: flight %d has %d of %d treads without top triangles" %
+				[i, missing, steps])
+	# Apertures: the stair corridor is open to the sky above every flight and
+	# the draw shaft is open from grade to its bottom.
+	var covered := 0
+	for i in range(plan.stairs.size()):
+		var flight: Dictionary = plan.stairs[i]
+		var rect: Rect2 = flight.get("rect", Rect2())
+		var centre := rect.get_center()
+		var mid_y := (float(flight["lower_y"]) + float(flight["upper_y"])) * 0.5
+		if MeshProbe.ray_blocked(all, Vector3(centre.x, 40.0, centre.y),
+				Vector3(centre.x, mid_y + 0.1, centre.y)):
+			covered += 1
+	if covered > 0:
+		failures.append("mesh_aperture: %d of %d flights are covered from the sky" %
+			[covered, plan.stairs.size()])
+	var shaft: Rect2 = meta.get("shaft", Rect2())
+	var shaft_bottom := float(meta.get("shaft_bottom_y", 0.0))
+	var shaft_radius := minf(shaft.size.x, shaft.size.y) * 0.5
+	var core: Array[Vector2] = [Vector2.ZERO, Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]
+	var shaft_blocked := 0
+	for dir in core:
+		var p := shaft.get_center() + dir * shaft_radius * 0.5
+		if MeshProbe.ray_blocked(all, Vector3(p.x, 40.0, p.y),
+				Vector3(p.x, shaft_bottom + 0.4, p.y)):
+			shaft_blocked += 1
+	if shaft_blocked > 0:
+		failures.append("mesh_aperture: draw shaft core is blocked at %d/%d vertical rays" %
+			[shaft_blocked, core.size()])
+	# Occupied volumes: each pavilion is roofed over four real columns.
+	for pavilion in meta.get("pavilions", []):
+		var id := String(pavilion.get("id", ""))
+		var centre: Vector2 = pavilion["center"]
+		var size: Vector2 = pavilion["size"]
+		var y := float(pavilion["y"])
+		var roof_y := y + 2.8 + 0.38
+		var roof_samples := MeshProbe.rect_samples(Rect2(centre - size * 0.5, size),
+			[0.25, 0.75], [0.25, 0.75])
+		var roof_hits := MeshProbe.supported_count(trim, roof_samples, roof_y)
+		if roof_hits != roof_samples.size():
+			failures.append("mesh_support: %s roof has top triangles at %d/%d probes" %
+				[id, roof_hits, roof_samples.size()])
+		var columns_missing := 0
+		for sx in [-1.0, 1.0]:
+			for sz in [-1.0, 1.0]:
+				var p := Vector3(centre.x + sx * (size.x * 0.5 - 0.35), y + 1.4,
+					centre.y + sz * (size.y * 0.5 - 0.35))
+				if not MeshProbe.ray_blocked(stone,
+						p - Vector3(1.0, 0.0, 0.0), p + Vector3(1.0, 0.0, 0.0)):
+					columns_missing += 1
+		if columns_missing > 0:
+			failures.append("mesh_support: %s lost %d of 4 column shafts" % [id, columns_missing])
+	# The basin holds water: three walls and a water surface at the right height.
+	var tank: Rect2 = meta.get("tank", Rect2())
+	var wall_y := floor_y + 0.9
+	var tank_centre := tank.get_center()
+	var walls_open := 0
+	var wall_dirs: Array[Vector2] = [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1)]
+	for dir in wall_dirs:
+		var far := tank_centre + dir * (maxf(tank.size.x, tank.size.y) * 0.5 + 1.0)
+		if not MeshProbe.ray_blocked(stone, Vector3(tank_centre.x, wall_y, tank_centre.y),
+				Vector3(far.x, wall_y, far.y)):
+			walls_open += 1
+	if walls_open > 0:
+		failures.append("mesh_enclosure: tank leaks through %d of its 3 walls" % walls_open)
+	var water_samples := MeshProbe.rect_samples(tank.grow(-1.5), [0.25, 0.75], [0.25, 0.75])
+	var water_y := float(meta.get("water_y", 0.0)) + 0.08
+	var water_hits := MeshProbe.supported_count(water, water_samples, water_y)
+	if water_hits != water_samples.size():
+		failures.append("mesh_support: tank water surface has triangles at %d/%d probes" %
+			[water_hits, water_samples.size()])

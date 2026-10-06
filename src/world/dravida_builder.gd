@@ -60,6 +60,10 @@ func _emit_colonnade(meta: Dictionary) -> void:
 		supports.append(Vector2(outer.position.x + 1.0, z))
 		supports.append(Vector2(outer.end.x - 1.0, z))
 	for i in range(1, 4):
+		# The middle bay is the processional axis through the gopuram; a column
+		# there blocked the entrance walk (found by the emitted-triangle aperture rays).
+		if i == 2:
+			continue
 		var x := lerpf(inner.position.x + 2.0, inner.end.x - 2.0, float(i) / 4.0)
 		supports.append(Vector2(x, outer.position.y + 1.0))
 		supports.append(Vector2(x, outer.end.y - 1.0))

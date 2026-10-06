@@ -220,51 +220,11 @@ static func _strip_samples(rect: Rect2) -> Array[Vector2]:
 
 static func _surface_triangles(builder: NagaraBuilder, mesh: ArrayMesh,
 		surface: int) -> Array:
-	var arrays: Array
-	if mesh != null:
-		if surface >= mesh.get_surface_count():
-			return []
-		arrays = mesh.surface_get_arrays(surface)
-	else:
-		if builder._kit == null or surface >= builder._kit._sts.size():
-			return []
-		arrays = builder._kit.surface(surface).commit_to_arrays()
-	if arrays.size() <= Mesh.ARRAY_INDEX:
-		return []
-	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	if vertices.is_empty():
-		return []
-	var index_value: Variant = arrays[Mesh.ARRAY_INDEX]
-	var order: PackedInt32Array = index_value if index_value != null else PackedInt32Array()
-	if order.is_empty():
-		order = PackedInt32Array()
-		for i in range(vertices.size()):
-			order.append(i)
-	var triangles: Array = []
-	for i in range(0, order.size() - 2, 3):
-		var ia := order[i]
-		var ib := order[i + 1]
-		var ic := order[i + 2]
-		if ia >= 0 and ib >= 0 and ic >= 0 and ia < vertices.size() \
-				and ib < vertices.size() and ic < vertices.size():
-			triangles.append([vertices[ia], vertices[ib], vertices[ic]])
-	return triangles
+	return MeshProbe.surface_triangles(builder, mesh, surface)
 
 
 static func _has_upward_support(triangles: Array, point: Vector2, y: float) -> bool:
-	var from := Vector3(point.x, y + 0.025, point.y)
-	var to := Vector3(point.x, y - 0.025, point.y)
-	for triangle in triangles:
-		var a: Vector3 = triangle[0]
-		var b: Vector3 = triangle[1]
-		var c: Vector3 = triangle[2]
-		var face := (c - a).cross(b - a)
-		if face.length_squared() < 1e-12 or face.normalized().dot(Vector3.UP) < 0.95:
-			continue
-		var hit: Variant = Geometry3D.segment_intersects_triangle(from, to, a, b, c)
-		if hit != null and absf((hit as Vector3).y - y) <= 0.02:
-			return true
-	return false
+	return MeshProbe.has_upward_support(triangles, point, y)
 
 
 static func _check_sightline(plan: HousePlan, builder: NagaraBuilder,

@@ -2,7 +2,8 @@ class_name PrakaraCheck
 extends RefCounted
 ## WLD-014 plan and emitted-geometry checks for a Dravida prakara compound.
 
-func check(plan: HousePlan, builder: DravidaBuilder) -> Dictionary:
+func check(plan: HousePlan, builder: DravidaBuilder,
+		emitted_mesh: ArrayMesh = null) -> Dictionary:
 	var failures: Array[String] = []
 	_check_identity(plan, failures)
 	_check_enclosure(plan, builder, failures)
@@ -13,6 +14,7 @@ func check(plan: HousePlan, builder: DravidaBuilder) -> Dictionary:
 	_check_vimana(plan, builder, failures)
 	_check_dhvaja(plan, builder, failures)
 	_check_sightline(plan, builder, failures)
+	_check_mesh(plan, builder, emitted_mesh, failures)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": [],
 		"stats": {"colonnade_sides": plan.world_meta.get("colonnade", []).size(),
 			"gopurams": plan.world_meta.get("gates", []).size(),
@@ -207,3 +209,84 @@ func _check_sightline(plan: HousePlan, builder: DravidaBuilder,
 		blockers.append(mass["aabb"])
 	if not Sightline.clear(from, to, blockers):
 		failures.append("sightline: emitted masses block Nandi's view to the sanctum door")
+
+
+## WORLD-MESH-VERIFY. The checks above read the mass log. These read the
+## emitted triangles: the floors are there, the gates and the sanctum door are
+## open at body height, the walls really stop a walk, and the roofs exist.
+## `emitted_mesh` is optional: without it the builder's own surfaces are read.
+func _check_mesh(plan: HousePlan, builder: DravidaBuilder, emitted_mesh: ArrayMesh,
+		failures: Array[String]) -> void:
+	var stone := MeshProbe.surface_triangles(builder, emitted_mesh, DravidaBuilder.STONE)
+	var trim := MeshProbe.surface_triangles(builder, emitted_mesh, DravidaBuilder.TRIM)
+	var roof := MeshProbe.surface_triangles(builder, emitted_mesh, DravidaBuilder.ROOF)
+	if stone.is_empty() or trim.is_empty() or roof.is_empty():
+		failures.append("mesh_support: an emitted stone, trim or roof surface has no triangles")
+		return
+	var all := stone + trim + roof
+	var meta: Dictionary = plan.world_meta
+	var ring: Array = meta.get("colonnade", [])
+	for i in range(ring.size()):
+		_require_top(trim, "colonnade side %d" % i, ring[i], 0.28, [0.2, 0.5, 0.8], [0.5], failures)
+	var hall: Rect2 = meta["hall"]
+	_require_top(stone, "mandapa floor", hall, 0.3, [0.2, 0.5, 0.8], [0.2, 0.5, 0.8], failures)
+	_require_top(roof, "mandapa roof", hall, 11.25, [0.2, 0.5, 0.8], [0.2, 0.5, 0.8], failures)
+	var sanctum: Rect2 = meta["sanctum"]
+	_require_top(trim, "sanctum roof", sanctum, 8.5 + 0.19, [0.2, 0.8], [0.2, 0.8], failures)
+	var tiers: Array = meta.get("vimana_tiers", [])
+	var centre: Vector3 = meta["vimana_center"]
+	if not tiers.is_empty():
+		var top: Dictionary = tiers.back()
+		var top_y := float(top["base_y"]) + float(top["height"]) + 0.175
+		var width := float(top["width"])
+		var crown := Rect2(Vector2(centre.x, centre.z) - Vector2(width, width) * 0.5,
+			Vector2(width, width))
+		_require_top(trim, "vimana crown", crown, top_y, [0.3, 0.7], [0.3, 0.7], failures)
+	for gate in meta.get("gates", []):
+		var id := String(gate["id"])
+		var gc: Vector3 = gate["center"]
+		var tower_top := float(meta["gopuram_height"])
+		var tower := Rect2(Vector2(-6.0, gc.z - 4.0), Vector2(12.0, 8.0))
+		_require_top(roof, id + " tower roof", tower, tower_top, [0.3, 0.7], [0.3, 0.7], failures)
+		var closed := 0
+		for x in [-3.0, 0.0, 3.0]:
+			for y in [1.0, 3.5]:
+				if MeshProbe.ray_blocked(all, Vector3(x, y, gc.z - 7.0), Vector3(x, y, gc.z + 7.0)):
+					closed += 1
+		if closed > 0:
+			failures.append("mesh_aperture: %s passage is closed at %d/6 body-height rays" % [id, closed])
+	var door_z := sanctum.position.y
+	var door_closed := 0
+	for x in [-1.2, 0.0, 1.2]:
+		for y in [1.0, 3.0]:
+			if MeshProbe.ray_blocked(all, Vector3(x, y, door_z - 1.0), Vector3(x, y, door_z + 1.5)):
+				door_closed += 1
+	if door_closed > 0:
+		failures.append("mesh_aperture: sanctum door is closed at %d/6 body-height rays" % door_closed)
+	var walls: Array = []
+	var enclosure: Rect2 = meta["enclosure"]
+	var t := DravidaGenerator.WALL_T
+	walls.append(["prakara east", Vector3(enclosure.end.x - t - 0.3, 3.5, 0.0), Vector3(enclosure.end.x + 0.3, 3.5, 0.0)])
+	walls.append(["prakara west", Vector3(enclosure.position.x + t + 0.3, 3.5, 0.0), Vector3(enclosure.position.x - 0.3, 3.5, 0.0)])
+	for x in [-14.0, 14.0]:
+		walls.append(["prakara front %d" % int(x), Vector3(x, 3.5, enclosure.position.y + t + 0.3), Vector3(x, 3.5, enclosure.position.y - 0.3)])
+		walls.append(["prakara rear %d" % int(x), Vector3(x, 3.5, enclosure.end.y - t - 0.3), Vector3(x, 3.5, enclosure.end.y + 0.3)])
+	var sc := sanctum.get_center()
+	walls.append(["sanctum east", Vector3(sc.x, 2.0, sc.y), Vector3(sanctum.end.x + 0.3, 2.0, sc.y)])
+	walls.append(["sanctum west", Vector3(sc.x, 2.0, sc.y), Vector3(sanctum.position.x - 0.3, 2.0, sc.y)])
+	walls.append(["sanctum rear", Vector3(sc.x, 2.0, sc.y), Vector3(sc.x, 2.0, sanctum.end.y + 0.3)])
+	var hc := hall.get_center()
+	walls.append(["mandapa east", Vector3(hc.x, 2.0, hc.y), Vector3(hall.end.x + 0.3, 2.0, hc.y)])
+	walls.append(["mandapa west", Vector3(hc.x, 2.0, hc.y), Vector3(hall.position.x - 0.3, 2.0, hc.y)])
+	for row in walls:
+		if not MeshProbe.ray_blocked(all, row[1], row[2]):
+			failures.append("mesh_enclosure: %s wall does not stop the walk out" % row[0])
+
+
+func _require_top(triangles: Array, label: String, rect: Rect2, y: float,
+		along: Array, across: Array, failures: Array[String]) -> void:
+	var samples := MeshProbe.rect_samples(rect, along, across)
+	var hits := MeshProbe.supported_count(triangles, samples, y)
+	if hits != samples.size():
+		failures.append("mesh_support: %s has top triangles at %d/%d probes" %
+			[label, hits, samples.size()])

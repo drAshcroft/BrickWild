@@ -12,7 +12,8 @@ var _mountain_builder: MountainBuilder
 var _climb_grid: WalkGrid
 
 
-func check_mountain(plan: HousePlan, builder: MountainBuilder) -> Dictionary:
+func check_mountain(plan: HousePlan, builder: MountainBuilder,
+		emitted_mesh: ArrayMesh = null) -> Dictionary:
 	failures.clear()
 	warnings.clear()
 	stats.clear()
@@ -25,6 +26,7 @@ func check_mountain(plan: HousePlan, builder: MountainBuilder) -> Dictionary:
 	_check_climb()
 	_check_pradakshina()
 	_check_rite_rules()
+	_check_mesh(emitted_mesh)
 	return {"ok": failures.is_empty(), "failures": failures,
 		"warnings": warnings, "stats": stats}
 
@@ -285,6 +287,102 @@ func _check_rite_rules() -> void:
 		if other.end.y > center_box.end.y + 0.05:
 			failures.append("dominance: %s reaches above the central tower" % name)
 			break
+
+
+## WORLD-MESH-VERIFY. The walks, gates and walls above are judged on the mass
+## log; here the emitted triangles must really carry them. `emitted_mesh` is
+## optional: without it the builder's own surfaces are read.
+func _check_mesh(emitted_mesh: ArrayMesh) -> void:
+	var stone := MeshProbe.surface_triangles(_mountain_builder, emitted_mesh, MountainBuilder.STONE)
+	var roof := MeshProbe.surface_triangles(_mountain_builder, emitted_mesh, MountainBuilder.ROOF)
+	var water := MeshProbe.surface_triangles(_mountain_builder, emitted_mesh, MountainBuilder.WATER)
+	if stone.is_empty() or roof.is_empty() or water.is_empty():
+		failures.append("mesh_support: an emitted stone, roof or water surface has no triangles")
+		return
+	var meta: Dictionary = _plan.world_meta
+	var all := stone + roof + water
+	# Floors: causeway, every gallery side, every stair step, the summit.
+	_require_floor(stone, "causeway", meta["causeway"], 0.08, [0.15, 0.5, 0.85], [0.5])
+	var rings: Array = meta["rings"]
+	for i in range(rings.size()):
+		var segments := MountainGenerator.gallery_segments(rings[i])
+		for j in range(segments.size()):
+			_require_floor(stone, "gallery %d side %d" % [i, j], segments[j],
+				float(rings[i]["level"]), [0.2, 0.5, 0.8], [0.5])
+	for stair in meta["stairs"]:
+		var stair_rect: Rect2 = stair["rect"]
+		_require_floor(stone, String(stair["id"]), stair_rect,
+			float(stair["level"]) + float(stair["rise"]), [0.5], [0.25, 0.75])
+	var summit: Rect2 = meta["summit"]
+	_require_floor(stone, "summit", summit, float(meta["summit_level"]),
+		[0.1, 0.5, 0.9], [0.1, 0.5, 0.9])
+	for mass in _mountain_builder.mass_log:
+		var name := String(mass.get("name", ""))
+		if name.begins_with("water_"):
+			var box: AABB = mass["aabb"]
+			var water_rect := Rect2(Vector2(box.position.x, box.position.z),
+				Vector2(box.size.x, box.size.z))
+			_require_floor(water, name, water_rect, box.end.y, [0.25, 0.75], [0.5])
+	# Occupied volume: wall tops and tower roofs exist, and each wall really
+	# stops a body walking out of its ring (the gate gap is tested separately).
+	for i in range(rings.size()):
+		var ring: Dictionary = rings[i]
+		var r: Rect2 = ring["rect"]
+		var level := float(ring["level"])
+		var t := float(ring["wall_thickness"])
+		var h := float(ring["wall_height"])
+		var mid := level + h * 0.5
+		var half_gate := float(ring["gate_width"]) * 0.5
+		var cz := r.get_center().y
+		var rays: Array = [
+			["east", Vector3(r.end.x - t - 0.3, mid, cz), Vector3(r.end.x + 0.3, mid, cz)],
+			["west", Vector3(r.position.x + t + 0.3, mid, cz), Vector3(r.position.x - 0.3, mid, cz)],
+			["south", Vector3(0.0, mid, r.end.y - t - 0.3), Vector3(0.0, mid, r.end.y + 0.3)],
+			["north_left", Vector3(-half_gate - 2.0, mid, r.position.y + t + 0.3),
+				Vector3(-half_gate - 2.0, mid, r.position.y - 0.3)],
+			["north_right", Vector3(half_gate + 2.0, mid, r.position.y + t + 0.3),
+				Vector3(half_gate + 2.0, mid, r.position.y - 0.3)],
+		]
+		for ray in rays:
+			if not MeshProbe.ray_blocked(all, ray[1], ray[2]):
+				failures.append("mesh_enclosure: ring %d %s wall does not stop the walk out" %
+					[i, ray[0]])
+		var wall_rect := Rect2(Vector2(r.position.x, r.end.y - t), Vector2(r.size.x, t))
+		_require_floor(stone, "ring %d south wall top" % i, wall_rect, level + h,
+			[0.2, 0.5, 0.8], [0.5])
+		# Aperture: the axial gate is open at body height through the wall.
+		var gate: Dictionary = meta["gopuras"][i]
+		var gate_h := float(gate["height"])
+		var clear_x := (float(gate["width"]) - 2.0) * 0.3
+		var z := r.position.y + t * 0.5
+		var closed := 0
+		for x in [-clear_x, 0.0, clear_x]:
+			for y in [level + 0.9, level + gate_h - 1.2]:
+				if MeshProbe.ray_blocked(all, Vector3(x, y, z - 2.5), Vector3(x, y, z + 2.5)):
+					closed += 1
+		if closed > 0:
+			failures.append("mesh_aperture: gopura %d is closed at %d/6 body-height rays" % [i, closed])
+	for mass in _mountain_builder.mass_log:
+		var name := String(mass.get("name", ""))
+		if name.begins_with("tower_"):
+			var box: AABB = mass["aabb"]
+			var tower_rect := Rect2(Vector2(box.position.x, box.position.z),
+				Vector2(box.size.x, box.size.z))
+			_require_floor(roof, name + " roof", tower_rect, box.end.y, [0.25, 0.75], [0.25, 0.75])
+			var mid_y := box.get_center().y
+			var c := box.get_center()
+			if not MeshProbe.ray_blocked(roof, Vector3(box.position.x - 0.5, mid_y, c.z),
+					Vector3(box.end.x + 0.5, mid_y, c.z)):
+				failures.append("mesh_enclosure: %s is not a solid emitted volume" % name)
+
+
+func _require_floor(triangles: Array, label: String, rect: Rect2, y: float,
+		along: Array, across: Array) -> void:
+	var samples := MeshProbe.rect_samples(rect, along, across)
+	var hits := MeshProbe.supported_count(triangles, samples, y)
+	if hits != samples.size():
+		failures.append("mesh_support: %s has top triangles at %d/%d probes" %
+			[label, hits, samples.size()])
 
 
 func _mass(name: String) -> Dictionary:

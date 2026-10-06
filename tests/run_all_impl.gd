@@ -66,7 +66,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi", "vground", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
+	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -475,6 +475,12 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/hammam_mesh_support_suite.gd").run()
 		"nagaramesh":
 			return load("res://tests/suites/nagara_mesh_support_suite.gd").run()
+		"stepwellmesh":
+			return load("res://tests/suites/vav_mesh_support_suite.gd").run()
+		"mountainmesh":
+			return load("res://tests/suites/mountain_mesh_support_suite.gd").run()
+		"dravidamesh":
+			return load("res://tests/suites/dravida_mesh_support_suite.gd").run()
 		"wld006":
 			return preload("res://tests/suites/world_han_suite.gd").run()
 		"wld007":
