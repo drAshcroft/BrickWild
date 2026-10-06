@@ -51,6 +51,28 @@ static func primary(spec: CastleSpec) -> Dictionary:
 		# Every walled castle's towers, gatehouses and apse are rooms, not solid
 		# masses with windows painted on them.
 		out.merge(preload("castle_mural_plan.gd").records(spec))
+		# A tower's window must not open onto a curtain or a neighbouring mass
+		# (inner-ward towers face the outer ring's masonry).
+		# The gallery decks of every tower stand on piers; no window may look at
+		# one, whichever tower's gallery it is.
+		var spans: Array = []
+		for id in out:
+			spans.append_array(out[id].get("walk_gallery", []))
+		for id in out:
+			if bool(out[id].get("mural_tower", false)):
+				drop_buried_windows(spec, out[id])
+				var gate_plan: HousePlan = out[id].plan
+				var origin: Vector3 = out[id].transform.origin
+				var lit: Array[Dictionary] = []
+				for window in gate_plan.windows:
+					var opening := {"pos": Vector2(window.pos), "width": window.width}
+					if not preload("castle_mural_plan.gd")._window_hits_gallery(origin, opening,
+							Vector2(window.normal),
+							spans, float(HousePlan.record_storey(window)) * gate_plan.spec.height
+							+ float(window.sill), INF):
+						lit.append(window)
+				gate_plan.windows = lit
+				blind_rooms_to_stores(gate_plan)
 		out.merge(preload("castle_gate_plan.gd").records(spec))
 		var apse := preload("castle_apse_plan.gd").record(spec)
 		if not apse.is_empty():

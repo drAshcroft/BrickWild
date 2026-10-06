@@ -184,6 +184,9 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 				var opening := _window_on_wall(plan, level, wall, spec, ring, centre)
 				if opening.is_empty():
 					continue
+				if _window_hits_gallery(centre, opening, normal, access.gallery,
+						float(level) * hs.height + 0.95, walk_y):
+					continue
 				plan.windows.append({"room": level, "storey": level,
 					"pos": opening.pos,
 					"normal": normal, "width": opening.width,
@@ -527,6 +530,31 @@ static func _window_on_wall(plan: HousePlan, level: int, wall: Dictionary,
 						level * plan.spec.height + 0.95):
 				return {"pos": pos, "width": width}
 	return {}
+
+
+## The gallery decks round a tower are carried on piers that stand as high as
+## the walk; a window below the walk must not look at one.
+static func _window_hits_gallery(centre: Vector3, opening: Dictionary, normal: Vector2,
+		gallery: Array, window_bottom: float, walk_y: float) -> bool:
+	if window_bottom > walk_y:
+		return false
+	var tangent := Vector2(-normal.y, normal.x)
+	var half := float(opening.width) * 0.5 + 0.2
+	var at := Vector2(centre.x, centre.z) + Vector2(opening.pos)
+	var area := PackedVector2Array([at + tangent * half - normal * 0.8,
+		at - tangent * half - normal * 0.8,
+		at - tangent * half + normal * 1.1, at + tangent * half + normal * 1.1])
+	for span in gallery:
+		var a: Vector2 = span.a
+		var b: Vector2 = span.b
+		if a.distance_to(b) < 0.03:
+			continue
+		var along := (b - a).normalized()
+		var side := Vector2(-along.y, along.x) * (float(span.width) * 0.5 + 0.35)
+		var deck := PackedVector2Array([a + side, b + side, b - side, a - side])
+		if Poly.intersection_area(area, deck) > 0.01:
+			return true
+	return false
 
 
 static func _window_curtain_clear(spec: CastleSpec, ring: int, centre: Vector3,

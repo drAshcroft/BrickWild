@@ -313,7 +313,9 @@ static func ridge_tower_centers(spec: CastleSpec) -> Array[Dictionary]:
 
 
 static func ridge_storeys(spec: CastleSpec) -> int:
-	return clampi(int(spec.height / RIDGE_STOREY_H), 3, 5)
+	# A range's plan is a HouseSpec, which supports four storeys: a 28 m fortress
+	# ridge has four tall ones rather than five that no plan can declare.
+	return clampi(int(spec.height / RIDGE_STOREY_H), 3, HouseGeometry.MAX_STOREYS)
 
 
 ## The dark fortress' one spire keep stands at the midpoint of its ridge.
