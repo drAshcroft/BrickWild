@@ -60,6 +60,21 @@ static func hall_plan(spec: CastleSpec) -> HousePlan:
 			mini(3, int(box.size.z / CastleBuilder.RANGE_BAY)))
 	else:
 		_hall_windows(plan, floor_rect, up, hs)
+		# A short, broad hall has one bay on the door's own wall: a window in the
+		# doorway is two openings in one piece of masonry.
+		var clear: Array[Dictionary] = []
+		for window in plan.windows:
+			var clash := false
+			for door in plan.doors:
+				if Vector2(door["normal"]).dot(window["normal"]) < 0.99:
+					continue
+				var tangent := Vector2(-Vector2(window["normal"]).y, Vector2(window["normal"]).x)
+				var gap := absf((Vector2(window["pos"]) - Vector2(door["pos"])).dot(tangent))
+				if gap < (float(window["width"]) + float(door["width"])) * 0.5 + 0.3:
+					clash = true
+			if not clash:
+				clear.append(window)
+		plan.windows = clear
 
 	# The dais at the upper end: deep enough to stand the high table and the
 	# bench behind it on, and never less than the fifth of the hall that makes

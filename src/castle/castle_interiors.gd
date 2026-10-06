@@ -274,6 +274,11 @@ static func restore_daylight(row: Dictionary, obstructions: Array[AABB]) -> int:
 			continue
 		var storey := plan.storey_of_room(index)
 		var walls := HouseGeometry.room_walls(plan, index)
+		# The wall the hearth stands on carries its chimney breast, not a window.
+		if int(plan.hearth.get("room", -1)) == index:
+			var hearth_wall := int(plan.hearth.get("wall", -1))
+			if hearth_wall >= 0 and hearth_wall < walls.size() and walls.size() > 1:
+				walls.remove_at(hearth_wall)
 		walls.sort_custom(func(a, b): return Vector2(a.from).distance_to(a.to) > Vector2(b.from).distance_to(b.to))
 		for wall in walls:
 			var length := Vector2(wall.from).distance_to(wall.to)
