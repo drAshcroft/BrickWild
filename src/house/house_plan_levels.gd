@@ -488,8 +488,9 @@ static func _stair_spot(p: HousePlan, room: int, f: Rect2, size: Vector2,
 	var bound: Rect2 = HouseGeometry.interior_rect(p.spec)
 	if upper_room >= 0:
 		bound = bound.intersection(HouseGeometry.room_floor_rect(p, upper_room))
-	if bound.has_area() and bound.intersection(f).size.x >= size.x 			and bound.intersection(f).size.y >= size.y:
-		f = bound.intersection(f)
+	var fit: Rect2 = bound.intersection(f)
+	if bound.has_area() and fit.size.x >= size.x and fit.size.y >= size.y:
+		f = fit
 	else:
 		bound = Rect2()
 	var along_x: bool = size.x >= size.y
