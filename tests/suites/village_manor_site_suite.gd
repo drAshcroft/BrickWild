@@ -45,7 +45,10 @@ static func run() -> SuiteResult:
 		"unreserved fixture no longer reproduces the missing dedicated manor lane")
 	# This intermediate retry has room on an ordinary road but no lawful
 	# dedicated estate lane. It used to report success and stop retries here.
-	var fallback := VillageSitePlanner.plan(spec, 12, 2.5, 170.0)
+	# The depth is the knife edge: 170 m was once short of a lawful estate lane
+	# and now admits one (the lane leans toward the common and fits a 225 m
+	# wide site), so the case that still lacks it is 140 m (6 Oct audit).
+	var fallback := VillageSitePlanner.plan(spec, 12, 2.5, 140.0)
 	var missing := VillageLotPlanner.cut_measured(fallback, jobs)
 	_expect(res, missing == 1 and fallback.buildings_of_kind(&"castle").is_empty(),
 		"failed dedicated manor lane fell back to an ordinary road and ended retries")
