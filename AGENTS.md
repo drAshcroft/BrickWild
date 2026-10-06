@@ -27,6 +27,9 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 godot --headless --path . --script res://tests/run_all.gd -- lane:castle-change
 godot --headless --path . --script res://tests/run_all.gd -- lane:plan
 godot --headless --path . --script res://tests/run_all.gd -- lane:church-change
+# which form of which castle is still solid or unreachable (build + occupancy + routes
+# per plan, minutes per case; see docs/CASTLE_INTERIOR_FOLLOWUPS.md)
+godot --headless --path . --script res://tools/castle_occupancy_sweep.gd -- fortress norman 1
 # the public API, every published kind once (libraryquick placementquick poly windmill)
 godot --headless --path . --script res://tests/run_all.gd -- lane:api
 # the five windmills, every one of them, against WindmillCheck

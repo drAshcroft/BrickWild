@@ -43,27 +43,36 @@ Found and fixed on the way (each one made a whole family read red):
 - `tower_door_sill`: a 5.7 m storey could not hold a 2.6 m door above a 4 m
   sill; the head went through the ceiling.
 
-Still open (this is why the task stays pending):
+Still open (this is why the task stays pending). `tools/castle_occupancy_sweep.gd`
+reproduces every line below; the counts are from the canonical grid at the
+pass's last full sweep:
 
-- Tight ridge zigzags (every `dark` castle, 40 to 55 m): the ranges are as wide
-  as the pitch between vertices, so the mitre-safe cut leaves no room; the
-  ranges and towers stay solid blocks and their required records are missing.
-  A real answer clips the end bays to mitred polygons (convex room outlines).
+- Tight ridge zigzags (`dark castle` seed 9249, 40 m): the ranges are as wide as
+  the pitch between vertices, so the mitre-safe cut leaves no room and the
+  ranges, towers and spire stay solid with their required records missing. A real
+  answer clips the end bays to mitred convex outlines. (The other dark and
+  bavarian ridges plan and pass.)
 - Tower-house shaft (not the jogs): the roof-platform room is emitted as a full
   storey of walls above the deck and fills the stair opening; the platform room
   sticks out of its interior and is reached only through a lord's chamber; the
-  approach steps block `lords_walk`; jog windows can face the approach steps.
-  `ctowerplan` (wizard oval) and `cforms` were red before this pass.
-- Castles whose towers are shorter than the curtain walk (the smallest tier of
-  every walled style): ground doors meet the 0.65 m wall footing; stairs do not
-  reach the upper storeys of the small rooms (nav).
-- Polygon and rect keeps: planned windows are filled by sliver wall pieces
-  (tiered or polygonal keep outlines against `extend_upper_walls`); the motte
-  shell keep's windows on seeds other than 8856.
-- Gate chamber routes in some rect and fortress cases are crossed by masonry
-  (`access_routes[gate_N]`), and some side-tower walk routes have no floor.
-- `hall` has no plan in a few fortress/crusader cases (too large or too small a
-  range), so its required record is missing.
+  approach steps block `lords_walk`; jog windows can face the approach steps and
+  the Z jog's second block still has a window against masonry. `ctowerplan`
+  (wizard oval) and `cforms` were red before this pass.
+- The smallest tier of every walled style (40 x 55 m): the corner towers are
+  embedded in a 5 m footing, no clear gallery reaches the coping, and the ground
+  door a fallback gives them meets the 0.65 m wall footing (door clearance fails);
+  `crusader`, `french_chateau`, `bavarian`, `japanese`, `moorish`, `wizard`
+  castle 0.
+- Elven (bowed) curtains: `_curved_wall_run` bypasses `CastleBuilder.box`, so the
+  towers are never cut out of the wall, the tower rooms have no floor where the
+  curtain crosses them and the routes fail.
+- Gate chamber routes in a few rect and fortress cases are crossed by masonry
+  (`access_routes[gate_N]`); inner-ward gate towers' windows in some polygon
+  fortresses face the other ring.
+- Not this task's forms, but red in the same sweeps: `yard_general_store`
+  planned window has no matching emitted aperture (every fortress), a keep
+  programme with a second dining table (fortress keeps), `hall`/`chapel`/`apse`
+  records in a few fortress shapes (the fallback plans cover most).
 
 ## Plans for ridge castles, tower houses and motte shell keeps
 
