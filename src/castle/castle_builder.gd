@@ -121,9 +121,28 @@ func _dressed() -> ArrayMesh:
 ## put timber where QA expects water. When only the dressing was used, slot 4
 ## gets a one-millimetre speck so that every slot stays where its constant says.
 func _keep_surface_slots() -> void:
-	if _skin_used or not _dress_used:
-		return
-	var st := _kit.surface(SURF_GROUND)
+	if not _skin_used and _dress_used:
+		_speck(SURF_GROUND)
+	# The same goes for any slot left empty beneath a populated one: a tower
+	# house with a flat top has no roof, so its glazing slid from slot 3 down to
+	# slot 2 and every opening check read it as masonry.
+	var populated: Array[bool] = []
+	var highest := -1
+	for slot in range(SURF_DRESS + 1):
+		var arrays: Array = _kit.surface(slot).commit_to_arrays()
+		var has := not arrays.is_empty() and arrays[Mesh.ARRAY_VERTEX] != null
+		if has:
+			has = not (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty()
+		populated.append(has)
+		if has:
+			highest = slot
+	for slot in range(highest):
+		if not populated[slot]:
+			_speck(slot)
+
+
+func _speck(slot: int) -> void:
+	var st := _kit.surface(slot)
 	var p := Vector3(0.0, 0.0, 0.0)
 	st.set_normal(Vector3.UP)
 	st.add_vertex(p)
@@ -691,7 +710,7 @@ func _build_tower_house() -> void:
 	# The plan owns the raised doorway and its sill interval.  Keep the old
 	# opening only for an unplanned tower caller.
 	var sill: float = CastleGeometry.tower_door_sill(spec)
-	var door_h: float = minf(CastleGeometry.tower_storey_height(spec) * 0.7, 2.6)
+	var door_h: float = CastleGeometry.tower_door_height(spec)
 	var door_storey: int = clampi(int(sill / CastleGeometry.tower_storey_height(spec)), 0, n - 1)
 	if not planned_tower:
 		tag("door")

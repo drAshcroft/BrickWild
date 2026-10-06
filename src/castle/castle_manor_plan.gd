@@ -393,6 +393,20 @@ static func jog_records(spec: CastleSpec) -> Dictionary:
 	return out
 
 
+## The solid approach steps the builder raises to a tower house's door
+## (CastleBuilder._tower_approach_steps), as one box, so a neighbour's window
+## is not planned onto them.
+static func tower_approach_box(spec: CastleSpec, door_xz: Vector2) -> AABB:
+	var t := CastleGeometry.tower_house_aabb(spec)
+	var sill := CastleGeometry.tower_door_sill(spec)
+	var count := maxi(4, int(ceil(sill / 0.28)))
+	var depth := clampf(maxf(t.size.z * 0.08, 0.8), 0.8, 1.5)
+	var width := clampf(maxf(t.size.x * 0.28, 2.0), 2.0, 3.6)
+	var total := float(count) * depth
+	return AABB(Vector3(door_xz.x - width * 0.5 - 0.3, 0.0, door_xz.y - total - 0.3),
+		Vector3(width + 0.6, sill + 3.5, total + 0.3))
+
+
 static func jog_plan(spec: CastleSpec, box: AABB) -> HousePlan:
 	return annexe_plan(spec, box)
 

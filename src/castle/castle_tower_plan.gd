@@ -103,7 +103,7 @@ static func generate(source: CastleSpec, with_furniture := true) -> HousePlan:
 
 	# The tower is entered at the real sill, not at a fictitious ground door.
 	var sill := CastleGeometry.tower_door_sill(source)
-	var door_h := minf(storey_h * 0.7, 2.6)
+	var door_h := CastleGeometry.tower_door_height(source)
 	var door_level := clampi(int(floor(sill / maxf(storey_h, 0.01))), 0, levels - 1)
 	var front := _front_wall(plan, door_level)
 	# Use the actual faceted wall chord. A small wizard shaft has a short

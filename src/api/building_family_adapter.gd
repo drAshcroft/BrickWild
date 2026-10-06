@@ -591,7 +591,7 @@ class WorldFamily extends BuildingFamilyAdapter:
 			var spec: CastleSpec = building.spec
 			var bounds := CastleGeometry.tower_house_aabb(spec)
 			var sill := CastleGeometry.tower_door_sill(spec)
-			var height := minf(CastleGeometry.tower_storey_height(spec) * 0.7, 2.6)
+			var height := CastleGeometry.tower_door_height(spec)
 			return Vector3(bounds.get_center().x, sill + height * 0.5,
 				bounds.position.z - CastleGeometry.OPENING_EPS)
 		if building.plan != null and building.plan.world_family == &"mosque":

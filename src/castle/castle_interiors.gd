@@ -15,12 +15,17 @@ static func primary(spec: CastleSpec) -> Dictionary:
 			# open from one into the other's masonry.
 			out.merge(preload("castle_manor_plan.gd").jog_records(spec))
 			var shaft: AABB = out["tower_house"].bounds
+			var door: Dictionary = tower_plan.doors[tower_plan.entrance()]
+			var door_world: Vector3 = out["tower_house"].transform * Vector3(door.pos.x, 0.0, door.pos.y)
+			var steps := preload("castle_manor_plan.gd").tower_approach_box(spec,
+				Vector2(door_world.x, door_world.z))
 			var jog_boxes: Array[AABB] = []
 			for id in out:
 				if String(id).begins_with("wing_jog_"):
 					jog_boxes.append(out[id].bounds)
-					var against: Array[AABB] = [shaft]
+					var against: Array[AABB] = [shaft, steps]
 					drop_buried_windows(spec, out[id], against)
+					restore_daylight(out[id], against)
 			if not jog_boxes.is_empty():
 				drop_buried_windows(spec, out["tower_house"], jog_boxes)
 		return out

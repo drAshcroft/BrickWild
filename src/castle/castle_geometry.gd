@@ -412,8 +412,21 @@ static func wizard_balconies(spec: CastleSpec) -> Array[Dictionary]:
 
 
 ## The sill of the one raised door: a storey up, and never below the lift.
+## Height of the raised doorway's opening: a standing person, in any storey.
+static func tower_door_height(spec: CastleSpec) -> float:
+	return minf(tower_storey_height(spec) * 0.7, 2.6)
+
+
+## World height of the doorway's sill. A storey 5.7 m high cannot hold a door
+## 2.6 m tall above a 4 m sill (head at 6.6 m, through the ceiling); the sill
+## comes down until the head clears the floor above, never below the lift. A
+## storey too short for that carries the door on the next floor instead.
 static func tower_door_sill(spec: CastleSpec) -> float:
-	return clampf(tower_storey_height(spec), TOWER_LIFT_MIN, 4.0)
+	var storey := tower_storey_height(spec)
+	var fit := storey - tower_door_height(spec) - 0.2
+	if fit < TOWER_LIFT_MIN:
+		return storey
+	return clampf(minf(storey, 4.0), TOWER_LIFT_MIN, fit)
 
 
 ## The jog: an L plan has one block off the front-right corner, projecting
