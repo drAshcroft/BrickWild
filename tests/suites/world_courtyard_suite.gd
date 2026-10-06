@@ -81,7 +81,8 @@ static func _walk_pin_domus(res: SuiteResult) -> void:
 		var room := int(f.get("room", -1))
 		var key := String(f.get("key", ""))
 		var p: Vector3 = f.get("pos", Vector3.ZERO)
-		if not bool(f.get("mounted", false)) and p.y < 0.05:
+		# standing pieces stand on the floor's TOP (FLOOR_T above the datum)
+		if not bool(f.get("mounted", false)) and p.y < HouseGeometry.FLOOR_T + 0.05:
 			standing[room] = int(standing.get(room, 0)) + 1
 		var host := int(f.get("host", -1))
 		if host >= 0:

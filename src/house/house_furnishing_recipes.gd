@@ -55,6 +55,15 @@ const AMPLE := {
 		# never hung as a pair (sconce_pair)
 		{"cat": "shelf", "rule": &"mounted", "n": [1, 2], "opt": 0.8},
 	]},
+	# A 60 m2 range of a peristyle house is a bed in an acre of floor when the
+	# dressing rolls for its nightstand and chest both come up empty (WLD001
+	# domus, seed 1: nothing was refused, both were rolled out). A bedroom this
+	# big always gets its bedside table and a chest; the attempt is
+	# not rolled, and if no wall takes one the placement says so as usual.
+	&"bedroom": {"area": 30.0, "steps": [
+		{"cat": "nightstand", "rule": &"wall", "n": [1, 1], "opt": 0.9, "always_attempt": true},
+		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.8, "always_attempt": true},
+	]},
 }
 
 
