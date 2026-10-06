@@ -355,8 +355,8 @@ static func add_stair(p: HousePlan, lower_room: int, upper_room: int,
 	var run2: float = minf(2.4, maxf(HouseGeometry.PATH_MIN, short_side - 0.3))
 	var width2: float = minf(1.0, maxf(HouseGeometry.PATH_MIN, long_side - 0.3))
 	var size2 := Vector2(width2, run2) if along_x else Vector2(run2, width2)
-	var found: Dictionary = _stair_spot(p, lower_room, floor_rect, size)
-	var other: Dictionary = _stair_spot(p, lower_room, floor_rect, size2)
+	var found: Dictionary = _stair_spot(p, lower_room, floor_rect, size, upper_room)
+	var other: Dictionary = _stair_spot(p, lower_room, floor_rect, size2, upper_room)
 	if int(other["strict"]) < int(found["strict"]):
 		found = other
 		run = run2
@@ -364,8 +364,8 @@ static func add_stair(p: HousePlan, lower_room: int, upper_room: int,
 	# a hall too narrow for the stair to keep out of the door's line either
 	# way moves the DOOR instead: to the end of its wall away from the stair
 	if int(found["strict"]) >= 2 and _slide_front_door(p, lower_room, found["rect"]):
-		var again: Dictionary = _stair_spot(p, lower_room, floor_rect, size)
-		var again2: Dictionary = _stair_spot(p, lower_room, floor_rect, size2)
+		var again: Dictionary = _stair_spot(p, lower_room, floor_rect, size, upper_room)
+		var again2: Dictionary = _stair_spot(p, lower_room, floor_rect, size2, upper_room)
 		if int(again2["strict"]) < int(again["strict"]):
 			again = again2
 			run = run2
@@ -478,7 +478,20 @@ static func door_line(p: HousePlan, room: int, door: Dictionary) -> Rect2:
 ## last resort is the wall with the fewest openings, at the end furthest from
 ## the door. Returns {"rect": Rect2, "strict": int}, the strictness level the
 ## spot was found at (0 = every rule held).
-static func _stair_spot(p: HousePlan, room: int, f: Rect2, size: Vector2) -> Dictionary:
+static func _stair_spot(p: HousePlan, room: int, f: Rect2, size: Vector2,
+		upper_room := -1) -> Dictionary:
+	# The flight has a landing on BOTH storeys and a stair's rectangle serves
+	# both, so it must stand on the floor of each and inside the interior the
+	# plan checks it against. An upper storey's room can be wider than the
+	# interior (a jetty, a banded storey): a well set against its back wall
+	# is then outside it, however well it fits the room below.
+	var bound: Rect2 = HouseGeometry.interior_rect(p.spec)
+	if upper_room >= 0:
+		bound = bound.intersection(HouseGeometry.room_floor_rect(p, upper_room))
+	if bound.has_area() and bound.intersection(f).size.x >= size.x 			and bound.intersection(f).size.y >= size.y:
+		f = bound.intersection(f)
+	else:
+		bound = Rect2()
 	var along_x: bool = size.x >= size.y
 	var swings: Array[Rect2] = []
 	var lines: Array[Rect2] = []
@@ -531,6 +544,8 @@ static func _stair_spot(p: HousePlan, room: int, f: Rect2, size: Vector2) -> Dic
 				# corners of the bounding box are masonry, and a well set down
 				# in one is a landing nobody can walk to (GEO-002).
 				if not _inside_room(p, room, rect):
+					continue
+				if bound.has_area() and not bound.grow(0.01).encloses(rect):
 					continue
 				var score: float = rect.get_center().distance_to(front)
 				# a well must leave the way past it: the short way across the
