@@ -340,8 +340,21 @@ static func _add_stairs(plan: HousePlan, ids: Array[Dictionary], inner: Rect2,
 		var room: Rect2 = plan.rooms[lower]["rect"]
 		var w := minf(1.4, room.size.x * 0.35)
 		var d := minf(3.0, room.size.y * 0.45)
-		var r := Rect2(Vector2(room.end.x - w - 0.03, room.position.y + 0.3),
-			Vector2(w, d))
+		# the floor both landings share, so every corner is on real floor
+		var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, lower).intersection(
+			HouseGeometry.room_floor_rect(plan, upper)).grow(-0.03)
+		# The flight arriving on this storey comes up in the same room; stand
+		# clear of its well (HousePlanLevels.arriving_wells), first at the east
+		# wall, then the other corners.
+		var wells: Array[Rect2] = HousePlanLevels.arriving_wells(plan, level)
+		var r := Rect2()
+		for corner in [Vector2(1, 0), Vector2(1, 1), Vector2(0, 0), Vector2(0, 1)]:
+			r = Rect2(Vector2(
+				floor_rect.end.x - w if corner.x > 0.5 else floor_rect.position.x,
+				floor_rect.end.y - d - 0.27 if corner.y > 0.5 else floor_rect.position.y + 0.27),
+				Vector2(w, d))
+			if not HousePlanLevels.hits_any(r, wells):
+				break
 		plan.stairs.append({"a": lower, "b": upper, "storey": level,
 			"to_storey": level + 1, "pos": r.get_center(),
 			"lower_pos": r.get_center(), "upper_pos": r.get_center(),

@@ -137,7 +137,16 @@ static func generate(seed: int, width: float, length: float, _height: float) -> 
 	for level in range(STOREYS - 1):
 		var sr := HouseGeometry.room_floor_rect(plan, stair_rooms[level])
 		var run := minf(3.0, sr.size.y * 0.32)
-		var rise_rect := Rect2(Vector2(sr.position.x, sr.end.y - run), Vector2(1.3, run))
+		# keep the lower landing out of the well of the flight arriving here
+		# (HousePlanLevels.arriving_wells): west then east wall, back then front
+		var wells: Array[Rect2] = HousePlanLevels.arriving_wells(plan, level)
+		var rise_rect := Rect2()
+		for corner in [Vector2(0, 1), Vector2(1, 1), Vector2(0, 0), Vector2(1, 0)]:
+			rise_rect = Rect2(Vector2(
+				sr.end.x - 1.3 if corner.x > 0.5 else sr.position.x,
+				sr.position.y if corner.y < 0.5 else sr.end.y - run), Vector2(1.3, run))
+			if not HousePlanLevels.hits_any(rise_rect, wells):
+				break
 		plan.stairs.append({"a": stair_rooms[level], "b": stair_rooms[level + 1],
 			"storey": level, "to_storey": level + 1, "pos": rise_rect.get_center(),
 			"lower_pos": rise_rect.get_center(), "upper_pos": rise_rect.get_center(),
