@@ -19,6 +19,8 @@ const MIN_ROOM_RUN := 6.0
 const SEARCH_STEP := 0.5
 const SEARCH_LIMIT := 40.0
 const CLEARANCE := 0.5
+## Share of the dark spire's height that is rooms; the needle above is stone.
+const SPIRE_ROOMS := 0.72
 
 static var _cache := {}
 
@@ -40,14 +42,26 @@ static func _layout(spec: CastleSpec) -> Dictionary:
 	for index in range(centres.size()):
 		var centre: Vector3 = centres[index].pos
 		var away := Vector2(centres[index].away.x, centres[index].away.z)
-		var has_tower: bool = spec.style != &"dark" or index != spire
+		# The dark fortress puts a spire, not a tower, on its middle vertex: a
+		# cylinder of rooms under a stone needle. It is the castle's "keep".
+		var is_spire: bool = spec.style == &"dark" and index == spire and spec.keep
+		var has_tower: bool = spec.style != &"dark" or index != spire or is_spire
 		var half := CastleGeometry.tower_half_at(spec, 0, index)
+		var height := CastleGeometry.tower_height_at(spec, 0, index)
+		var id := "tower_0_corner_%d" % index
+		var bounds := CastleGeometry.tower_aabb(spec, 0, centre, index)
 		var sides: int = preload("castle_mural_plan.gd").coarse_sides(
 			CastleGeometry.tower_sides(spec), half - preload("castle_manor_plan.gd").TOWER_THICKNESS)
+		if is_spire:
+			var spire_r := CastleGeometry.dark_spire_aabb(spec).size.x * 0.5
+			half = spire_r * cos(PI / 12.0)
+			height = spec.height * SPIRE_ROOMS
+			id = "keep"
+			sides = 12
+			bounds = AABB(Vector3(centre.x - spire_r, 0.0, centre.z - spire_r),
+				Vector3(spire_r * 2.0, height, spire_r * 2.0))
 		var radius := half / cos(PI / float(sides))
-		var reach := radius
-		if not has_tower:
-			reach = CastleGeometry.dark_spire_aabb(spec).size.x * 0.5 / cos(PI / 12.0)
+		var reach := radius if has_tower else 1.0
 		var outline := PackedVector2Array()
 		var start := atan2(away.y, away.x) - PI / float(sides)
 		for side in range(sides):
@@ -57,10 +71,10 @@ static func _layout(spec: CastleSpec) -> Dictionary:
 		# outside it so the door has somewhere to open onto.
 		var door_at := Vector2(centre.x, centre.z) + away * (half - 0.2)
 		var apron := _rect(door_at, door_at + away * 2.2, 2.0)
-		towers.append({"index": index, "id": "tower_0_corner_%d" % index, "centre": centre,
+		towers.append({"index": index, "id": id, "centre": centre,
 			"away": away, "half": half, "sides": sides, "outer": outline, "apron": apron,
-			"has_tower": has_tower, "reach": reach,
-			"height": CastleGeometry.tower_height_at(spec, 0, index)})
+			"has_tower": has_tower, "reach": reach, "spire": is_spire, "start": start,
+			"height": height, "bounds": bounds})
 	var dive := CastleGeometry.tower_half(spec, 0) * CastleGeometry.RIDGE_DIVE
 	# Trim each range at both vertices.
 	var cuts_at: Array[float] = []

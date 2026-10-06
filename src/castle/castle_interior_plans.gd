@@ -453,9 +453,10 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	var is_hall: bool = String(seg["name"]) == "hall"
 	hs.variant_name = "%s: %s" % [spec.variant_name,
 		"the great hall" if is_hall else "a range"]
-	hs.program = [&"great_hall" if is_hall else &"lords_chamber"]
+	hs.program = [&"great_hall" if is_hall else StringName(opts.get("kind", &"lords_chamber"))]
 	var floor_rect: Rect2 = HouseGeometry.interior_rect(hs)
-	if floor_rect.size.x < MIN_RANGE_RUN or floor_rect.size.y < MIN_RANGE_SIDE:
+	var min_side: float = float(opts.get("min_side", MIN_RANGE_SIDE)) - 0.001
+	if floor_rect.size.x < MIN_RANGE_RUN or floor_rect.size.y < min_side:
 		return plan
 	var kind: StringName = hs.program[0]
 	if floor_rect.size.x * floor_rect.size.y < float(HouseGeometry.MIN_AREA[kind]):
@@ -600,6 +601,18 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 				keep_doors.append(d)
 		plan.doors = keep_doors
 
+	# A block that leans on another building has no light on that wall (local
+	# +Z), and a short one has no room beside its door: say where the light
+	# comes from now, before the furnisher has stood a bed under it.
+	if bool(opts.get("lean", false)):
+		var exposed: Array[Dictionary] = []
+		for window in plan.windows:
+			if Vector2(window["normal"]).y <= 0.0:
+				exposed.append(window)
+		plan.windows = exposed
+	if bool(opts.get("end_windows", false)):
+		_ridge_end_windows(plan)
+
 	# The selected first room always owns the range hearth and its flue. Later
 	# bays are guest rooms and do not claim a second chimney the range cannot
 	# describe.
@@ -607,6 +620,28 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	hs.room_count = plan.rooms.size()
 	HouseFurnisher.furnish(plan, hs)
 	return plan
+
+
+## A habitable room without a window gets a light in each end wall.
+static func _ridge_end_windows(plan: HousePlan) -> void:
+	for index in range(plan.rooms.size()):
+		var kind: StringName = plan.rooms[index].kind
+		if kind not in HouseGeometry.HABITABLE:
+			continue
+		var has_light := false
+		for window in plan.windows:
+			if int(window.get("room", -1)) == index:
+				has_light = true
+		if has_light:
+			continue
+		var rect: Rect2 = HouseGeometry.room_floor_rect(plan, index)
+		var storey := plan.storey_of_room(index)
+		var head := minf(2.3, plan.spec.height - 0.2)
+		for end in [-1.0, 1.0]:
+			var x := rect.position.x if end < 0.0 else rect.end.x
+			plan.windows.append({"room": index, "storey": storey,
+				"pos": Vector2(x, rect.get_center().y), "normal": Vector2(end, 0.0),
+				"width": 1.0, "sill": 1.1, "head": head})
 
 
 static func _ridge_add_stair(plan: HousePlan, lower_storey: int,
@@ -655,6 +690,12 @@ static func _ridge_add_stair(plan: HousePlan, lower_storey: int,
 				var score := centre.distance_to(front)
 				if avoid.has_area():
 					score += centre.distance_to(avoid.get_center())
+				# The foot of a stair must not look straight back at the front
+				# door: a penalty, so a cramped room can still place one.
+				var entry: Dictionary = plan.doors[entrance]
+				if int(entry["a"]) == lower_room and _ridge_rects_overlap(rect,
+						HousePlanLevels.door_line(plan, lower_room, entry)):
+					score -= 1000.0
 				if score > best_score:
 					best = rect
 					best_score = score

@@ -136,7 +136,8 @@ static func furnish_minimum_programme(plan: HousePlan, spec: HouseSpec) -> void:
 			# The free-floor hunt probes the room on a grid and costs seconds in
 			# a wide tower room. A guardroom's table against a wall is as true to
 			# the room, and the wall search is linear in its perimeter.
-			if kind == &"guardroom" and cat == "table" 					and HouseGeometry.room_floor_rect(plan, room).get_area() > WIDE_ROOM_AREA:
+			var wide := HouseGeometry.room_floor_rect(plan, room).get_area() > WIDE_ROOM_AREA
+			if kind == &"guardroom" and cat == "table" and wide:
 				rule = &"wall"
 			HouseFurnishPlacement.place_one(plan, spec, room, cat, rule,
 				blocked, zones, rng, {"opt": 1.0})

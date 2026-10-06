@@ -11,6 +11,18 @@ static func primary(spec: CastleSpec) -> Dictionary:
 		if tower_plan.spec != null:
 			out["tower_house"] = record("tower_house", tower_plan,
 				CastleGeometry.tower_house_aabb(spec))
+			# The jogs of an L or Z plan are rooms of their own; a window cannot
+			# open from one into the other's masonry.
+			out.merge(preload("castle_manor_plan.gd").jog_records(spec))
+			var shaft: AABB = out["tower_house"].bounds
+			var jog_boxes: Array[AABB] = []
+			for id in out:
+				if String(id).begins_with("wing_jog_"):
+					jog_boxes.append(out[id].bounds)
+					var against: Array[AABB] = [shaft]
+					drop_buried_windows(spec, out[id], against)
+			if not jog_boxes.is_empty():
+				drop_buried_windows(spec, out["tower_house"], jog_boxes)
 		return out
 	if CastleGeometry.is_motte(spec):
 		var shell_plan: HousePlan = CastleMottePlan.generate(spec, true)
@@ -28,7 +40,7 @@ static func primary(spec: CastleSpec) -> Dictionary:
 		if not apse.is_empty():
 			out["apse"] = apse
 	if CastleGeometry.is_sky(spec):
-		return out # Sky castles retain their separate multi-storey contract.
+		return preload("castle_manor_plan.gd").sky_records(spec)
 	for kind in ["hall", "keep", "chapel"]:
 		var plan: HousePlan
 		var bounds: AABB
@@ -57,7 +69,12 @@ static func primary(spec: CastleSpec) -> Dictionary:
 		for id in out:
 			masses.append({"id": id, "box": (out[id].bounds as AABB)})
 		var porch := CastleGeometry.porch_aabb(spec)
+		if porch.size.x > 0.0 and spec.courtyard and out.has("range_front"):
+			# The planned front range carries its own passage; see _build_porch.
+			porch.size.z = CastleGeometry.PORCH_DEPTH + 0.3
 		var cheeks := preload("castle_manor_plan.gd").infill_boxes(spec)
+		for stack in range(spec.chimneys if spec.chimneys > 0 else 0):
+			cheeks.append(CastleGeometry.chimney_aabb(spec, stack))
 		for id in out:
 			var others: Array[AABB] = []
 			for mass in masses:
@@ -67,6 +84,7 @@ static func primary(spec: CastleSpec) -> Dictionary:
 				others.append(porch)
 			others.append_array(cheeks)
 			drop_buried_windows(spec, out[id], others)
+			restore_daylight(out[id], others)
 	return out
 
 
@@ -90,29 +108,78 @@ static func drop_buried_windows(spec: CastleSpec, row: Dictionary,
 		return 0
 	var kept: Array[Dictionary] = []
 	for window in plan.windows:
-		var normal := Vector2(window.normal).normalized()
-		var tangent := Vector2(-normal.y, normal.x)
-		var storey := HousePlan.record_storey(window)
-		var y := float(storey) * plan.spec.height + (float(window.sill) + float(window.head)) * 0.5
-		var centre := xf * Vector3(Vector2(window.pos).x, y, Vector2(window.pos).y)
-		var out_w := xf.basis * Vector3(normal.x, 0.0, normal.y)
-		var side_w := xf.basis * Vector3(tangent.x, 0.0, tangent.y)
-		centre += out_w * 0.7
-		var half := Vector3(absf(side_w.x) * float(window.width) * 0.5 + absf(out_w.x) * 0.7,
-			(float(window.head) - float(window.sill)) * 0.5,
-			absf(side_w.z) * float(window.width) * 0.5 + absf(out_w.z) * 0.7)
-		var reveal := AABB(centre - half, half * 2.0)
-		var buried := false
-		for wall in walls:
-			if wall.intersects(reveal):
-				buried = true
-				break
-		if not buried:
+		if not _window_buried(row, window, walls):
 			kept.append(window)
 	var dropped := plan.windows.size() - kept.size()
 	if dropped > 0:
 		plan.windows = kept
 	return dropped
+
+
+## Whether a window's outward reveal (0.7 m of it) meets any of `walls`.
+static func _window_buried(row: Dictionary, window: Dictionary, walls: Array[AABB]) -> bool:
+	var plan: HousePlan = row.plan
+	var xf: Transform3D = row.transform
+	var normal := Vector2(window.normal).normalized()
+	var tangent := Vector2(-normal.y, normal.x)
+	var storey := HousePlan.record_storey(window)
+	var y := float(storey) * plan.spec.height + (float(window.sill) + float(window.head)) * 0.5
+	var centre := xf * Vector3(Vector2(window.pos).x, y, Vector2(window.pos).y)
+	var out_w := xf.basis * Vector3(normal.x, 0.0, normal.y)
+	var side_w := xf.basis * Vector3(tangent.x, 0.0, tangent.y)
+	centre += out_w * 0.7
+	var half := Vector3(absf(side_w.x) * float(window.width) * 0.5 + absf(out_w.x) * 0.7,
+		(float(window.head) - float(window.sill)) * 0.5,
+		absf(side_w.z) * float(window.width) * 0.5 + absf(out_w.z) * 0.7)
+	var reveal := AABB(centre - half, half * 2.0)
+	for wall in walls:
+		if wall.intersects(reveal):
+			return true
+	return false
+
+
+## A habitable room that lost every window to a neighbour gets one on its
+## longest clear wall: daylight is part of what makes it a room.
+static func restore_daylight(row: Dictionary, obstructions: Array[AABB]) -> int:
+	var plan: HousePlan = row.plan
+	var added := 0
+	for index in range(plan.rooms.size()):
+		if plan.rooms[index].kind not in HouseGeometry.HABITABLE:
+			continue
+		var lit := false
+		for window in plan.windows:
+			if int(window.get("room", -1)) == index:
+				lit = true
+				break
+		if lit:
+			continue
+		var storey := plan.storey_of_room(index)
+		var walls := HouseGeometry.room_walls(plan, index)
+		walls.sort_custom(func(a, b): return Vector2(a.from).distance_to(a.to) > Vector2(b.from).distance_to(b.to))
+		for wall in walls:
+			var length := Vector2(wall.from).distance_to(wall.to)
+			if length < 1.8:
+				continue
+			var normal := -Vector2(wall.normal)
+			var window := {"room": index, "storey": storey,
+				"pos": (Vector2(wall.from) + Vector2(wall.to)) * 0.5, "normal": normal,
+				"width": minf(1.4, length - 1.0), "sill": 1.1,
+				"head": minf(2.9, plan.spec.height - 0.2)}
+			var clear := true
+			var tangent := Vector2(-normal.y, normal.x)
+			for door in plan.doors:
+				if HousePlan.record_storey(door) != storey or Vector2(door.normal).dot(normal) < 0.99:
+					continue
+				var along := absf((Vector2(window.pos) - Vector2(door.pos)).dot(tangent))
+				var depth := absf((Vector2(window.pos) - Vector2(door.pos)).dot(normal))
+				if along < (float(window.width) + float(door.width)) * 0.5 + 0.4 and depth < 0.3:
+					clear = false
+			if clear and not _window_buried(row, window, obstructions):
+				plan.windows.append(window)
+				added += 1
+				break
+	return added
+
 
 ## Every range and tower of a ridge castle, keyed by the mass name the builder
 ## logs.
@@ -151,8 +218,7 @@ static func ridge(spec: CastleSpec) -> Dictionary:
 			"window_dot": 0.77, "facet_facing": true})
 		if plan.spec == null:
 			continue
-		out[String(tower.id)] = record(String(tower.id), plan,
-			CastleGeometry.tower_aabb(spec, 0, centre, index))
+		out[String(tower.id)] = record(String(tower.id), plan, tower.bounds)
 	return out
 
 

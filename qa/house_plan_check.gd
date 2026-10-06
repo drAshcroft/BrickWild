@@ -890,6 +890,10 @@ func _check_doors_in_line(plan: HousePlan) -> void:
 			var en: Vector2 = e["normal"]
 			if dn.dot(en) > -0.9:
 				continue
+			# A gate passage is a corridor whose two ends are both doorways; the
+			# plan says so (`passage`), and only then is seeing through it right.
+			if bool(d.get("passage", false)) and bool(e.get("passage", false)):
+				continue
 			var along := Vector2(absf(dn.y), absf(dn.x))
 			var a: float = Vector2(d["pos"]).dot(along)
 			var b: float = Vector2(e["pos"]).dot(along)

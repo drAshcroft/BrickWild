@@ -193,15 +193,20 @@ func _build_sky_citadel() -> void:
 		var tail: float = tower["tail"]
 		_kit.inverted_batter(radius * 1.08, tail, base, SURF_STONE, 12,
 			PI / 12.0 + float(i) * 0.11)
-		_kit.drum(base, radius * 1.08, radius, height, SURF_STONE, 12,
-			PI / 12.0 + float(i) * 0.11)
+		var sky_id := "sky_tower_%d" % i
+		var sky_planned := _planned_interiors.has(sky_id)
+		if sky_planned:
+			Interiors.emit(self, _planned_interiors[sky_id])
+		else:
+			_kit.drum(base, radius * 1.08, radius, height, SURF_STONE, 12,
+				PI / 12.0 + float(i) * 0.11)
 		var roof_h: float = radius * (2.0 + float(i % 3) * 0.55)
 		_kit.cone(radius * 1.12, roof_h, base + Vector3.UP * height,
 			SURF_ROOF, 12, PI / 12.0)
 		var outward := Vector3(base.x, 0.0, base.z).normalized()
 		var face: float = atan2(outward.x, outward.z)
 		var face_r: float = radius * cos(PI / 12.0) + CastleGeometry.OPENING_EPS
-		for level in [0.34, 0.68]:
+		for level in ([] if sky_planned else [0.34, 0.68]):
 			_opening(base + outward * face_r + Vector3.UP * (height * level),
 				face, minf(radius * 0.42, 1.5), minf(height * 0.12, 2.8), &"arched")
 		_log_part("sky_tower", (tower["aabb"] as AABB).get_center(),
@@ -497,11 +502,25 @@ func _build_dark_spire() -> void:
 	var c: Vector3 = CastleGeometry.dark_spire_center(spec)
 	var r: float = a.size.x * 0.5
 	tag("keep")
-	_kit.revolve(PackedVector2Array([
-		Vector2(r, 0.0), Vector2(r, spec.height * 0.72),
-		Vector2(r * 0.68, spec.height), Vector2(r * 0.42, spec.keep_height * 0.62),
-		Vector2(0.0, spec.keep_height),
-	]), c, SURF_STONE, 12, TAU, PI / 12.0)
+	if _planned_interiors.has("keep"):
+		# The cylinder is rooms now; only the needle above them is solid, turned
+		# to the plan's own facets so the two meet edge to edge.
+		Interiors.emit(self, _planned_interiors["keep"])
+		var turn := PI / 12.0
+		for tower in preload("castle_ridge_plan.gd").layout(spec).towers:
+			if tower.id == "keep":
+				turn = float(tower.start)
+		_kit.revolve(PackedVector2Array([
+			Vector2(r, spec.height * 0.72),
+			Vector2(r * 0.68, spec.height), Vector2(r * 0.42, spec.keep_height * 0.62),
+			Vector2(0.0, spec.keep_height),
+		]), c, SURF_STONE, 12, TAU, turn)
+	else:
+		_kit.revolve(PackedVector2Array([
+			Vector2(r, 0.0), Vector2(r, spec.height * 0.72),
+			Vector2(r * 0.68, spec.height), Vector2(r * 0.42, spec.keep_height * 0.62),
+			Vector2(0.0, spec.keep_height),
+		]), c, SURF_STONE, 12, TAU, PI / 12.0)
 	_log_part("spire", c + Vector3.UP * (spec.keep_height * 0.5), a.size)
 	_log_mass("keep", a)
 	total_height = maxf(total_height, spec.keep_height)
@@ -711,13 +730,20 @@ func _build_tower_house() -> void:
 		for f in [Vector3(0, 0, -1), Vector3(0, 0, 1), Vector3(-1, 0, 0), Vector3(1, 0, 0)]:
 			if (f as Vector3).dot(buried) < 0.9:
 				faces.append(f)
-		_box_aabb(jog, SURF_STONE)
-		_log_mass("wing_jog_%d" % j, jog)
+		var jog_id := "wing_jog_%d" % j
+		var jog_planned := _planned_interiors.has(jog_id)
+		if jog_planned:
+			Interiors.emit(self, _planned_interiors[jog_id])
+		else:
+			_box_aabb(jog, SURF_STONE)
+		_log_mass(jog_id, jog)
 		var jp := AABB(Vector3(jog.position.x - 0.2, jog.position.y + jog.size.y, jog.position.z - 0.2),
 			Vector3(jog.size.x + 0.4, 0.4, jog.size.z + 0.4))
 		_box_aabb(jp, SURF_STONE)
 		_crenellate_rect(jp, jp.position.y + jp.size.y, SURF_TRIM)
 		var rows: int = maxi(int(jog.size.y / CastleGeometry.tower_storey_height(spec)), 1)
+		if jog_planned:
+			rows = 0
 		for row in range(rows):
 			var jy: float = (float(row) + 0.55) * CastleGeometry.tower_storey_height(spec)
 			if jy - spec.window_h / 2.0 < CastleGeometry.TOWER_LIFT_MIN or jy > jog.size.y - 0.5:
@@ -790,7 +816,11 @@ func _build_manor() -> void:
 	tag("wing")
 	for side in CastleGeometry.wing_sides(spec):
 		var w: AABB = CastleGeometry.manor_wing_aabb(spec, side)
-		_range(w, "wing_%s" % ("left" if side < 0.0 else "right"), SURF_STONE, true)
+		var wing_id := "wing_%s" % ("left" if side < 0.0 else "right")
+		var roof_over := AABB()
+		if _planned_interiors.has(wing_id):
+			roof_over = preload("castle_manor_plan.gd").wing_nose(spec, side).plan_box
+		_range(w, wing_id, SURF_STONE, true, [], 5.0, roof_over)
 	# Planned wings start at their front tower's rear face; solid cheeks close
 	# the strip the tower leaves beside it.
 	if _planned_interiors.has("wing_left") or _planned_interiors.has("wing_right"):
@@ -2153,20 +2183,22 @@ const YARD_WALL_H := 3.2
 
 
 func _range(a: AABB, mass_name: String, surf: int, roofed: bool,
-		faces: Array = [], bay := 5.0) -> void:
+		faces: Array = [], bay := 5.0, roof_box := AABB()) -> void:
 	if _planned_interiors.has(mass_name):
 		Interiors.emit(self, _planned_interiors[mass_name])
 	else:
 		_box_aabb(a, surf)
 	_log_mass(mass_name, a)
-	var cx: float = a.position.x + a.size.x / 2.0
-	var cz: float = a.position.z + a.size.z / 2.0
+	# A wing whose rooms start behind its front tower is roofed only over them.
+	var r: AABB = roof_box if roof_box.has_surface() else a
+	var cx: float = r.position.x + r.size.x / 2.0
+	var cz: float = r.position.z + r.size.z / 2.0
 	if roofed:
-		var rise: float = CastleGeometry.roof_rise(spec, a)
-		var along_x: bool = CastleGeometry.ridge_along_x(a)
+		var rise: float = CastleGeometry.roof_rise(spec, r)
+		var along_x: bool = CastleGeometry.ridge_along_x(r)
 		var yaw: float = PI / 2.0 if along_x else 0.0
-		var span: float = a.size.z if along_x else a.size.x
-		var along: float = a.size.x if along_x else a.size.z
+		var span: float = r.size.z if along_x else r.size.x
+		var along: float = r.size.x if along_x else r.size.z
 		var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(cx, a.size.y, cz))
 		var roof_start := _roof_faces.size()
 		var local_roof := RoofShape.faces(span + EAVE, along + EAVE * 0.8, rise)

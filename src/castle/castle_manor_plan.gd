@@ -11,6 +11,8 @@ const MIN_STOREY_H := 2.7
 const STOREY_H := 3.4
 const TOWER_THICKNESS := 0.6
 const CLOSET_DOOR := 0.8
+## A stone wing four metres across has a 2.8 m room: a lord's chamber's minimum.
+const NARROW_WING := 2.8
 ## Shortest facet that takes a door leaf and its two corner margins.
 const DOOR_FACET := 1.65
 
@@ -36,11 +38,17 @@ static func records(spec: CastleSpec) -> Dictionary:
 	if front.size.x > 0.0:
 		_add(out, "range_front", front_range_plan(spec, front), front, 0.0)
 	var index := 0
+	var sides := CastleGeometry.wing_sides(spec)
 	for centre in CastleGeometry.manor_tower_centers(spec):
 		var id := "tower_manor_%d" % index
+		var wing_id := "wing_%s" % ("left" if sides[index] < 0.0 else "right")
+		index += 1
+		# A tower stands inside its wing's end: without the wing's own plan the
+		# wing is still a solid block running through the tower's rooms.
+		if not out.has(wing_id):
+			continue
 		var tower_box := CastleGeometry.tower_aabb(spec, 0, centre)
 		_add(out, id, tower_plan(spec, id, centre), tower_box, 0.0)
-		index += 1
 	return out
 
 
@@ -74,8 +82,14 @@ static func _levels(height: float, cap := 4) -> int:
 static func wing_plan(spec: CastleSpec, box: AABB, id: String) -> HousePlan:
 	var seg := {"name": id, "length": box.size.z, "width": box.size.x,
 		"height": box.size.y}
-	return CastleInteriorPlans.ridge_range_plan(spec, seg, [], {
-		"levels": _levels(box.size.y), "buried_lo": 0.0, "buried_hi": 0.0})
+	var options := {"levels": _levels(box.size.y), "buried_lo": 0.0, "buried_hi": 0.0,
+		"min_side": NARROW_WING}
+	# Too narrow for a lord's chamber (3.0 m): the rooms are parlours.
+	var inner := box.size.x - 2.0 * HouseGeometry.wall_thickness(
+		CastleInteriorPlans._hall_spec(spec, box))
+	if inner < 3.0:
+		options["kind"] = &"parlour"
+	return CastleInteriorPlans.ridge_range_plan(spec, seg, [], options)
 
 
 ## A wing with a front tower: the tower stands inside the wing's end, so the
@@ -124,8 +138,10 @@ static func infill_boxes(spec: CastleSpec) -> Array[AABB]:
 static func annexe_plan(spec: CastleSpec, box: AABB) -> HousePlan:
 	var seg := {"name": "annexe", "length": maxf(box.size.x, box.size.z),
 		"width": minf(box.size.x, box.size.z), "height": box.size.y}
+	# The local +Z wall is the one against the building this leans on.
 	var plan := CastleInteriorPlans.ridge_range_plan(spec, seg, [], {
-		"levels": _levels(box.size.y, 2), "buried_lo": 0.0, "buried_hi": 0.0})
+		"levels": _levels(box.size.y, 2), "buried_lo": 0.0, "buried_hi": 0.0,
+		"lean": true, "end_windows": true})
 	if plan.spec != null:
 		return plan
 	return _closet_plan(spec, box)
@@ -144,9 +160,10 @@ static func _closet_plan(spec: CastleSpec, box: AABB) -> HousePlan:
 		return plan
 	plan.spec = hs
 	plan.rooms.append({"kind": &"store", "rect": room, "storey": 0})
-	# Face east, away from the hall the annexe leans on.
-	plan.doors.append({"a": 0, "b": -1, "pos": Vector2(room.position.x, room.get_center().y),
-		"normal": Vector2(-1.0, 0.0), "width": CLOSET_DOOR, "exterior": true,
+	# On the local -Z wall, like every range's door; the record's yaw turns it
+	# away from the building the block leans on.
+	plan.doors.append({"a": 0, "b": -1, "pos": Vector2(room.get_center().x, room.position.y),
+		"normal": Vector2(0.0, -1.0), "width": CLOSET_DOOR, "exterior": true,
 		"front": true, "storey": 0})
 	HouseFurnisher.furnish(plan, hs)
 	return plan
@@ -185,18 +202,17 @@ static func front_range_plan(spec: CastleSpec, box: AABB) -> HousePlan:
 	plan.rooms.append({"kind": bay_kind, "rect": right, "storey": 0})
 	hs.program.append_array([bay_kind, &"corridor", bay_kind])
 	for level in range(1, levels):
-		var kind: StringName = &"lords_chamber" if level == levels - 1 else &"parlour"
-		if not _suits(floor_rect, kind):
-			kind = &"parlour"
+		var kind: StringName = &"parlour"
 		plan.rooms.append({"kind": kind, "rect": floor_rect, "storey": level})
 		hs.program.append(kind)
 	var mid_y := y0 + depth * 0.5
 	# Both ends of the passage are doorways, one to the road and one to the court.
 	plan.doors.append({"a": 1, "b": -1, "pos": Vector2(cx, y0), "normal": Vector2(0, -1),
-		"width": minf(passage - 0.3, 1.6), "exterior": true, "front": true, "storey": 0})
+		"width": minf(passage - 0.3, 1.6), "exterior": true, "front": true, "storey": 0,
+		"passage": true})
 	plan.doors.append({"a": 1, "b": -1, "pos": Vector2(cx, floor_rect.end.y),
 		"normal": Vector2(0, 1), "width": minf(passage - 0.3, 1.6), "exterior": true,
-		"front": false, "storey": 0})
+		"front": false, "storey": 0, "passage": true})
 	plan.doors.append({"a": 0, "b": 1, "pos": Vector2(x1, mid_y), "normal": Vector2(1, 0),
 		"width": HouseGeometry.INNER_DOOR_W, "exterior": false, "front": false, "storey": 0})
 	plan.doors.append({"a": 1, "b": 2, "pos": Vector2(x2, mid_y), "normal": Vector2(1, 0),
@@ -238,6 +254,10 @@ static func tower_plan(spec: CastleSpec, id: String, centre: Vector3, opts := {}
 	var desired: Vector2 = opts.get("desired", Vector2(0.0, -1.0))
 	var window_dot: float = float(opts.get("window_dot", -0.3))
 	var levels := _levels(height, 6)
+	# A floating tower is entered a storey up, from its bridge: "door_y" is the
+	# height above the tower's foot at which the door's floor should be.
+	var door_level := clampi(roundi(float(opts.get("door_y", 0.0)) / (height / float(levels))),
+		0, levels - 1)
 	var hs := KeepSpec.new(spec.seed ^ int(id.hash()))
 	hs.material = &"stone"
 	hs.style = &"townhouse"
@@ -245,7 +265,7 @@ static func tower_plan(spec: CastleSpec, id: String, centre: Vector3, opts := {}
 	hs.length = half * 2.0
 	hs.height = height / float(levels)
 	hs.storeys = levels
-	hs.entry_storey = 0
+	hs.entry_storey = door_level
 	hs.room_count = levels
 	hs.wall_thickness_override = TOWER_THICKNESS
 	hs.plinth_height = 0.0
@@ -295,7 +315,7 @@ static func tower_plan(spec: CastleSpec, id: String, centre: Vector3, opts := {}
 	# The way in: the facet facing the road, else the one most clear of the wing.
 	var best := {}
 	var score := -INF
-	for wall in HouseGeometry.room_walls(plan, 0):
+	for wall in HouseGeometry.room_walls(plan, door_level):
 		var normal := -Vector2(wall.normal)
 		var length := Vector2(wall.from).distance_to(wall.to)
 		if length < 1.8:
@@ -308,9 +328,11 @@ static func tower_plan(spec: CastleSpec, id: String, centre: Vector3, opts := {}
 		return HousePlan.new()
 	var a: Vector2 = best.from
 	var b: Vector2 = best.to
-	plan.doors.append({"a": 0, "b": -1, "pos": (a + b) * 0.5, "normal": -Vector2(best.normal),
-		"width": minf(1.2, maxf(HouseGeometry.PATH_MIN, a.distance_to(b) - 2.0 * HouseGeometry.DOOR_CORNER_MARGIN)),
-		"exterior": true, "front": true, "storey": 0, "sill": 0.0,
+	var door_width := minf(float(opts.get("door_width", 1.2)), maxf(HouseGeometry.PATH_MIN,
+		a.distance_to(b) - 2.0 * HouseGeometry.DOOR_CORNER_MARGIN))
+	plan.doors.append({"a": door_level, "b": -1, "pos": (a + b) * 0.5,
+		"normal": -Vector2(best.normal), "width": door_width,
+		"exterior": true, "front": true, "storey": door_level, "sill": 0.0,
 		"head": minf(hs.height - 0.2, 2.35)})
 	var previous := Rect2()
 	for level in range(levels - 1):
@@ -352,3 +374,59 @@ static func _suits_outline(outline: PackedVector2Array, probe: Rect2,
 	var enough_area := Poly.area(outline) >= float(HouseGeometry.MIN_AREA[kind])
 	return enough_area and minf(probe.size.x, probe.size.y) \
 		>= float(HouseGeometry.MIN_SIDE[kind])
+
+
+## The jogs of an L or Z tower house. Each is a small block against the shaft;
+## its door looks out of the side the shaft does not cover.
+static func jog_records(spec: CastleSpec) -> Dictionary:
+	var out := {}
+	var jogs := CastleGeometry.tower_jog_aabbs(spec)
+	for index in range(jogs.size()):
+		var box: AABB = jogs[index]
+		var long_x := box.size.x >= box.size.z
+		var yaw := 0.0
+		if long_x:
+			yaw = 0.0 if index == 0 else PI
+		else:
+			yaw = -PI * 0.5 if index == 0 else PI * 0.5
+		_add(out, "wing_jog_%d" % index, jog_plan(spec, box), box, yaw)
+	return out
+
+
+static func jog_plan(spec: CastleSpec, box: AABB) -> HousePlan:
+	return annexe_plan(spec, box)
+
+
+## The turret-islands of a sky castle: stacks of rooms entered from the bridge
+## that leaves each one, a storey up, with windows all round.
+static func sky_records(spec: CastleSpec) -> Dictionary:
+	var out := {}
+	var bridges := CastleGeometry.sky_bridges(spec)
+	var index := 0
+	for tower in CastleGeometry.sky_towers(spec):
+		var pos: Vector3 = tower.pos
+		var radius: float = tower.radius
+		var centre_xz := Vector2(pos.x, pos.z)
+		var desired := centre_xz.normalized() if centre_xz.length() > 0.1 else Vector2(0.0, -1.0)
+		var attach := pos.y + float(tower.height) * 0.58
+		for bridge in bridges:
+			var from_p: Vector3 = bridge.from
+			var to_p: Vector3 = bridge.to
+			var heading := Vector2(to_p.x - from_p.x, to_p.z - from_p.z).normalized()
+			if Vector2(from_p.x, from_p.z).distance_to(centre_xz) < radius + 0.8:
+				desired = heading
+				attach = from_p.y
+				break
+			if Vector2(to_p.x, to_p.z).distance_to(centre_xz) < radius + 0.8:
+				desired = -heading
+				attach = to_p.y
+				break
+		var id := "sky_tower_%d" % index
+		var opts := {"height": float(tower.height), "half": radius * cos(PI / 12.0),
+			"desired": desired, "window_dot": -1.0, "facet_facing": true,
+			"door_y": attach - pos.y - 1.1, "door_width": 1.0}
+		var box := AABB(Vector3(pos.x - radius, pos.y, pos.z - radius),
+			Vector3(radius * 2.0, float(tower.height), radius * 2.0))
+		_add(out, id, tower_plan(spec, id, pos, opts), box, 0.0)
+		index += 1
+	return out

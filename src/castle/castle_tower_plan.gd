@@ -131,11 +131,8 @@ static func generate(source: CastleSpec, with_furniture := true) -> HousePlan:
 	_add_windows(plan, source, storey_h, door_level, door_width, levels)
 	_add_stairs(plan, levels + 1)
 
-	# Jog blocks are real exterior masses with partial height.  They are not
-	# silently reported as rooms until a later emitter has a matching L-shaped
-	# shell path; retain an explicit omission for every one.
-	for index in range(CastleGeometry.tower_jog_aabbs(source).size()):
-		plan.exterior_omissions.append("tower_jog_%d: exterior solid retained; no occupied room" % index)
+	# The jogs of an L or Z plan are separate occupied blocks against the shaft
+	# (CastleManorPlan.jog_records), not part of this plan.
 
 	if with_furniture:
 		HouseFurnisher.furnish(plan, hs)

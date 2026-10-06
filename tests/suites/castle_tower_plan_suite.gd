@@ -203,18 +203,24 @@ static func _check_stairs(res: SuiteResult, who: String, plan: HousePlan) -> voi
 
 static func _check_jogs(res: SuiteResult, who: String, spec: CastleSpec,
 		plan: HousePlan) -> void:
+	# The shaft's own plan no longer carries jog omissions: each jog is a
+	# separate occupied block (CastleManorPlan.jog_records), checked here to
+	# exist with the floors, door and windows a block of its size can hold.
 	var count := CastleGeometry.tower_jog_aabbs(spec).size()
-	_expect(res, plan.exterior_omissions.size() == count,
-		who + ": explicit jog omissions %d, expected %d" % [plan.exterior_omissions.size(), count])
+	_expect(res, plan.exterior_omissions.is_empty(),
+		who + ": the shaft plan still lists jog omissions %s" % [plan.exterior_omissions])
+	var rows: Dictionary = preload("res://src/castle/castle_manor_plan.gd").jog_records(spec)
+	_expect(res, rows.size() == count,
+		who + ": %d of %d jogs have an occupied plan" % [rows.size(), count])
 	for index in range(count):
-		var prefix := "tower_jog_%d:" % index
-		var found := false
-		for omission in plan.exterior_omissions:
-			if omission.begins_with(prefix):
-				found = true
-				break
-		_expect(res, found,
-			who + ": missing explicit omission for jog %d" % index)
+		var id := "wing_jog_%d" % index
+		_expect(res, rows.has(id), who + ": no occupied plan for jog %d" % index)
+		if not rows.has(id):
+			continue
+		var jog: HousePlan = rows[id].plan
+		_expect(res, jog.entrance() >= 0, who + ": jog %d has no way in" % index)
+		var report := HouseQA.new().check(jog, null)
+		_expect(res, report.ok, who + ": jog %d plan: %s" % [index, report.failures])
 
 
 ## A rectangular/AABB substitution is not an acceptable tower floor.  The

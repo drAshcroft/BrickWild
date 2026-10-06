@@ -3,6 +3,8 @@ extends RefCounted
 ## Their shared HousePlans own every floor, stair, doorway and window.
 
 const THICKNESS := 0.6
+## KeepSpec's storey limit; a tower plan may not declare more.
+const MAX_TOWER_STOREYS := 8
 ## Shortest facet that takes a 1.2 m door and its jambs.
 const DOOR_FACET := 1.56
 ## Curtain points beyond this from a tower door are searched only as a fallback.
@@ -77,7 +79,7 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 			if fit_h < 2.4 or fit_h > 7.0:
 				continue
 			var fit_levels := int(floor(height / fit_h + 0.001))
-			if fit_levels <= fit_entry:
+			if fit_levels <= fit_entry or fit_levels > MAX_TOWER_STOREYS:
 				continue
 			# A short void under the cap is harmless; thirty-centimetre storeys
 			# or a dozen furnished rooms are not. Favour ordinary storey heights.
@@ -333,7 +335,10 @@ static func _best_route(spec: CastleSpec, ring: int, centre: Vector3,
 			var ward := (CastleGeometry.enceinte_rect(spec, ring).get_center()
 				- Vector2(centre.x, centre.z)).normalized()
 			var bend := outside + ward * 2.5
-			if _line_hits_tower(outside, bend, tower_bounds, 0.8) 					or _line_hits_tower(bend, target, tower_bounds, 0.8):
+			var blocked := _line_hits_tower(outside, bend, tower_bounds, 0.8)
+			if not blocked:
+				blocked = _line_hits_tower(bend, target, tower_bounds, 0.8)
+			if blocked:
 				continue
 			waypoints = [outside, bend, target]
 		var route: Array[Vector2] = [inside]
