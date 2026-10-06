@@ -249,9 +249,9 @@ func _on_kind_changed() -> void:
 	var has_storeys: bool = cfg.has("storeys")
 	storeys_label.visible = has_storeys
 	storeys_slider.visible = has_storeys
-	cutaway_label.visible = has_storeys or village
-	cutaway_button.visible = has_storeys or village
-	cutaway_label.text = "Village view" if village else "House view"
+	# Every kind has a roof to lift. Churches, castles and temples used to be
+	# forced into cutaway with no way back, which read as a missing roof.
+	cutaway_label.text = "Village view" if village else ("House view" if has_storeys else "Roof")
 	if has_storeys:
 		var storey_cfg: Dictionary = cfg["storeys"]
 		storeys_slider.min_value = storey_cfg["min"]
@@ -377,7 +377,7 @@ func _show(idx: int) -> void:
 		_mesh_instance.queue_free()
 	var mesh: ArrayMesh = meshes[idx]
 	var s = specs[idx]
-	var cutaway: bool = cutaway_button.button_pressed if s is HouseSpec else true
+	var cutaway: bool = cutaway_button.button_pressed
 	if s is VillageSpec:
 		_mesh_instance = VillageAssembler.build(plans[idx], cutaway_button.button_pressed)
 	else:
