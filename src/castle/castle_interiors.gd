@@ -19,6 +19,9 @@ static func primary(spec: CastleSpec) -> Dictionary:
 				CastleGeometry.shell_keep_aabb(spec))
 		# A motte replaces the keep, not the occupied bailey ranges. Returning
 		# here left the hall and chapel as windowed blocks without any way in.
+	if CastleGeometry.is_enclosed(spec):
+		# Every walled castle's towers, gatehouses and apse are rooms, not solid
+		# masses with windows painted on them.
 		out.merge(preload("castle_mural_plan.gd").records(spec))
 		out.merge(preload("castle_gate_plan.gd").records(spec))
 		var apse := preload("castle_apse_plan.gd").record(spec)
@@ -45,30 +48,111 @@ static func primary(spec: CastleSpec) -> Dictionary:
 				bounds = CastleGeometry.chapel_aabb(spec)
 		if plan.spec != null:
 			out[kind] = record(kind, plan, bounds)
+			if kind == "keep":
+				drop_buried_windows(spec, out[kind])
+	if not CastleGeometry.is_enclosed(spec):
+		out.merge(preload("castle_manor_plan.gd").records(spec))
+		# A window cannot open into a neighbouring wing, tower or porch.
+		var masses: Array[Dictionary] = []
+		for id in out:
+			masses.append({"id": id, "box": (out[id].bounds as AABB)})
+		var porch := CastleGeometry.porch_aabb(spec)
+		var cheeks := preload("castle_manor_plan.gd").infill_boxes(spec)
+		for id in out:
+			var others: Array[AABB] = []
+			for mass in masses:
+				if mass.id != id:
+					others.append(mass.box)
+			if porch.size.x > 0.0:
+				others.append(porch)
+			others.append_array(cheeks)
+			drop_buried_windows(spec, out[id], others)
 	return out
 
-## Every range of a ridge castle, keyed by the mass name the builder logs.
+
+## A keep may stand with its back built into the curtain. A planned window on
+## that face opens onto masonry, not air: drop every window whose outward reveal
+## (and the daylight beyond it) would pass through a curtain wall or its coping.
+static func drop_buried_windows(spec: CastleSpec, row: Dictionary,
+		obstructions: Array[AABB] = []) -> int:
+	var plan: HousePlan = row.plan
+	var xf: Transform3D = row.transform
+	var walls: Array[AABB] = []
+	walls.append_array(obstructions)
+	if CastleGeometry.is_enclosed(spec):
+		for ring in CastleGeometry.rings(spec):
+			var cap := CastleGeometry.PARAPET_RISE + spec.merlon_h + 0.1
+			for segment in CastleGeometry.wall_segments(spec, ring):
+				var box := CastleGeometry.segment_aabb(spec, ring, segment)
+				box.size.y += cap
+				walls.append(box.grow(0.05))
+	if walls.is_empty():
+		return 0
+	var kept: Array[Dictionary] = []
+	for window in plan.windows:
+		var normal := Vector2(window.normal).normalized()
+		var tangent := Vector2(-normal.y, normal.x)
+		var storey := HousePlan.record_storey(window)
+		var y := float(storey) * plan.spec.height + (float(window.sill) + float(window.head)) * 0.5
+		var centre := xf * Vector3(Vector2(window.pos).x, y, Vector2(window.pos).y)
+		var out_w := xf.basis * Vector3(normal.x, 0.0, normal.y)
+		var side_w := xf.basis * Vector3(tangent.x, 0.0, tangent.y)
+		centre += out_w * 0.7
+		var half := Vector3(absf(side_w.x) * float(window.width) * 0.5 + absf(out_w.x) * 0.7,
+			(float(window.head) - float(window.sill)) * 0.5,
+			absf(side_w.z) * float(window.width) * 0.5 + absf(out_w.z) * 0.7)
+		var reveal := AABB(centre - half, half * 2.0)
+		var buried := false
+		for wall in walls:
+			if wall.intersects(reveal):
+				buried = true
+				break
+		if not buried:
+			kept.append(window)
+	var dropped := plan.windows.size() - kept.size()
+	if dropped > 0:
+		plan.windows = kept
+	return dropped
+
+## Every range and tower of a ridge castle, keyed by the mass name the builder
+## logs.
 ##
-## The record carries the SEGMENT\'S yaw, so the plan built in the range\'s own
-## frame lands on the masonry the builder emits for it. ridge_range_aabb is
-## centred on the segment midpoint, which is where record() puts the transform.
+## The record carries the SEGMENT'S yaw, so the plan built in the range's own
+## frame lands on the masonry the builder emits for it. Each range is planned
+## between its two tower junctions (see CastleRidgePlan): the rooms stop where
+## the towers' rooms begin and masonry cheeks fill the old overlap.
 static func ridge(spec: CastleSpec) -> Dictionary:
 	var out := {}
-	var segs: Array[Dictionary] = CastleGeometry.ridge_ranges(spec)
+	var layout: Dictionary = preload("castle_ridge_plan.gd").layout(spec)
+	var segs: Array = layout.ranges
+	var planned: Array[bool] = []
 	for i in range(segs.size()):
 		var seg: Dictionary = segs[i]
-		# A segment touches its predecessor at its start and its successor at
-		# its end; the chain\'s two outermost ends open on nothing.
-		var links: Array[int] = []
-		if i > 0:
-			links.append(-1)
-		if i < segs.size() - 1:
-			links.append(1)
-		var plan: HousePlan = CastleInteriorPlans.ridge_range_plan(spec, seg, links)
+		var plan: HousePlan = HousePlan.new()
+		if bool(seg.usable):
+			plan = CastleInteriorPlans.ridge_range_plan(spec, seg, [], {
+				"buried_lo": 0.0, "buried_hi": 0.0})
+		planned.append(plan.spec != null)
 		if plan.spec == null:
 			continue
 		out[String(seg["name"])] = record(String(seg["name"]), plan,
 			CastleGeometry.ridge_range_aabb(seg), float(seg["yaw"]))
+	# A tower is only carved out once both ranges that meet it are planned;
+	# otherwise the range is still a solid block running through its rooms.
+	for tower in layout.towers:
+		if not bool(tower.has_tower):
+			continue
+		var index: int = tower.index
+		if (index > 0 and not planned[index - 1]) or (index < segs.size() and not planned[index]):
+			continue
+		var centre: Vector3 = tower.centre
+		var plan: HousePlan = preload("castle_manor_plan.gd").tower_plan(spec, String(tower.id),
+			centre, {"height": tower.height, "half": tower.half, "desired": tower.away,
+			"window_dot": 0.77, "facet_facing": true})
+		if plan.spec == null:
+			continue
+		out[String(tower.id)] = record(String(tower.id), plan,
+			CastleGeometry.tower_aabb(spec, 0, centre, index))
 	return out
 
 

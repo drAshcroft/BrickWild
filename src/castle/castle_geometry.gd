@@ -1258,7 +1258,30 @@ static func bailey_obstacles(spec: CastleSpec) -> Array[Rect2]:
 
 
 static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
-	return preload("castle_access_geometry.gd").wall_stairs(spec)
+	# Planning the stairs also plans every tower access gallery they must clear,
+	# which costs seconds on a fortress and is asked for by the builder, the
+	# furnisher and the checks alike. A spec's signature fixes the answer.
+	var key := spec_signature(spec)
+	if not _stair_cache.has(key):
+		if _stair_cache.size() >= 6:
+			_stair_cache.clear()
+		_stair_cache[key] = preload("castle_access_geometry.gd").wall_stairs(spec)
+	var cached: Array[Dictionary] = []
+	cached.assign((_stair_cache[key] as Array).duplicate(true))
+	return cached
+
+
+static var _stair_cache := {}
+
+
+## Hash of every script variable of a spec, so a derived plan can be cached
+## without trusting that nobody changed a field since it was computed.
+static func spec_signature(spec: CastleSpec) -> int:
+	var parts: PackedStringArray = []
+	for property in spec.get_property_list():
+		if int(property.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE:
+			parts.append("%s=%s" % [property.name, str(spec.get(property.name))])
+	return "|".join(parts).hash()
 
 
 static func forebuilding(spec: CastleSpec) -> Dictionary:

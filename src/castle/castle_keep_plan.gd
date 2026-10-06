@@ -116,6 +116,10 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 ## HouseFurnishPlacement applies the same measured footprints, access zones,
 ## wall rules and collision checks as the ordinary furnisher, with a fixed seed
 ## and at most one placement attempt per required category.
+## Rooms wider than this furnish their guardroom table against a wall.
+const WIDE_ROOM_AREA := 24.0
+
+
 static func furnish_minimum_programme(plan: HousePlan, spec: HouseSpec) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(spec.seed) ^ 0x4B_45_45_50
@@ -129,6 +133,11 @@ static func furnish_minimum_programme(plan: HousePlan, spec: HouseSpec) -> void:
 		for cat_value in required:
 			var cat := String(cat_value)
 			var rule: StringName = &"wall" if cat in HouseFurnishPlacement.WALL_ESSENTIAL else &"free"
+			# The free-floor hunt probes the room on a grid and costs seconds in
+			# a wide tower room. A guardroom's table against a wall is as true to
+			# the room, and the wall search is linear in its perimeter.
+			if kind == &"guardroom" and cat == "table" 					and HouseGeometry.room_floor_rect(plan, room).get_area() > WIDE_ROOM_AREA:
+				rule = &"wall"
 			HouseFurnishPlacement.place_one(plan, spec, room, cat, rule,
 				blocked, zones, rng, {"opt": 1.0})
 		# The shared programme check requires somewhere to sit when a hall has a

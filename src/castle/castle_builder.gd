@@ -415,7 +415,7 @@ func _build_ridge() -> void:
 		_ridge_end_fascia(xf, width + EAVE, roof_length, rise)
 		if spec.dormers:
 			_roof_dormers(xf, local_roof, roof_start, length, name,
-				(width + EAVE) * 0.5, rise, true)
+				(width + EAVE) * 0.5, rise, true, planned)
 		total_height = maxf(total_height, roof_base + rise)
 		# windows: a row a storey on both long faces, on the rotated face.
 		#
@@ -453,6 +453,15 @@ func _build_ridge() -> void:
 					_opening(Vector3(p.x, y, p.y), ang,
 						spec.window_w * (1.18 if principal_bay else 1.0),
 						spec.window_h * (1.08 if principal_bay else 1.0), spec.window_style)
+	# Solid cheeks of the old range-into-tower junction, around the planned
+	# tower rooms and between the ranges' trimmed ends.
+	if not _planned_interiors.is_empty():
+		for cheek in preload("castle_ridge_plan.gd").layout(spec).cheeks:
+			var height: float = cheek.height
+			var face := PackedVector3Array()
+			for point in cheek.polygon:
+				face.append(Vector3(point.x, height * 0.5, point.y))
+			_kit.slab_poly(face, height, SURF_STONE, true)
 	tag("tower")
 	var i2 := 0
 	var spire_vertex: int = CastleGeometry.spine(spec).size() / 2
@@ -500,9 +509,12 @@ func _build_dark_spire() -> void:
 
 ## Dormers sit on the measured roof plane and cut their footprint out of it.
 ## The local roof frame is X across the pitch and Z along the ridge.
+## A dormer only glazes a room that exists. Planned masses have floors up to
+## their wall head and nothing in the roof, so their dormers are shuttered
+## blind gablets (`blind`): the roof keeps its rhythm, no window opens on air.
 func _roof_dormers(xf: Transform3D, roof: Array[PackedVector3Array],
 		roof_start: int, run: float, range_name: String, half: float,
-		rise: float, ridge_style: bool) -> void:
+		rise: float, ridge_style: bool, blind := false) -> void:
 	if roof.size() < 2 or half <= 0.0 or rise <= 0.0:
 		return
 	var count: int = clampi(int(run / (8.0 if range_name == "hall" else 6.0)), 1, 8) if ridge_style \
@@ -540,7 +552,7 @@ func _roof_dormers(xf: Transform3D, roof: Array[PackedVector3Array],
 			var owner := "dormer:%s:%d:%d" % [range_name, int(face_side), i]
 			_roof_openings.append({"face_index": roof_start + face_index,
 				"polygon": world_opening, "owner": owner})
-			_emit_seated_roof_dormer(xf, seat, z, dormer_width, owner)
+			_emit_seated_roof_dormer(xf, seat, z, dormer_width, owner, blind)
 
 
 static func _roof_polygon_fits(host: PackedVector2Array, candidate: PackedVector2Array) -> bool:
@@ -555,7 +567,7 @@ static func _roof_polygon_fits(host: PackedVector2Array, candidate: PackedVector
 
 
 func _emit_seated_roof_dormer(xf: Transform3D, seat: Dictionary, z: float,
-		dormer_width: float, owner: String) -> void:
+		dormer_width: float, owner: String, blind := false) -> void:
 	var front: float = seat["front"]
 	var out_dir: float = signf(front)
 	var base: float = seat["base"]
@@ -588,6 +600,12 @@ func _emit_seated_roof_dormer(xf: Transform3D, seat: Dictionary, z: float,
 	var normal := xf.basis.x * out_dir
 	var face_angle := atan2(normal.x, normal.z)
 	var window_pos := xf * Vector3(front + out_dir * 0.06, (base + head) * 0.5, z)
+	if blind:
+		var shutter := Vector3(dormer_width * 0.48, maxf((head - base) * 0.64, 0.35), 0.05)
+		component_box("dormer_shutter", shutter,
+			Transform3D(Basis(Vector3.UP, face_angle), window_pos), SURF_TRIM)
+		host_end()
+		return
 	_opening(window_pos, face_angle, dormer_width * 0.48,
 		maxf((head - base) * 0.64, 0.35), &"arched")
 	part_log.back()["component_host"] = owner
@@ -773,6 +791,11 @@ func _build_manor() -> void:
 	for side in CastleGeometry.wing_sides(spec):
 		var w: AABB = CastleGeometry.manor_wing_aabb(spec, side)
 		_range(w, "wing_%s" % ("left" if side < 0.0 else "right"), SURF_STONE, true)
+	# Planned wings start at their front tower's rear face; solid cheeks close
+	# the strip the tower leaves beside it.
+	if _planned_interiors.has("wing_left") or _planned_interiors.has("wing_right"):
+		for cheek in preload("castle_manor_plan.gd").infill_boxes(spec):
+			_box_aabb(cheek, SURF_STONE)
 
 	tag("range")
 	var fr: AABB = CastleGeometry.manor_front_range_aabb(spec)
@@ -797,6 +820,10 @@ func _build_porch() -> void:
 	if p.size.x <= 0.0:
 		return
 	tag("porch")
+	# A planned front range carries its own gate passage as a room; the porch
+	# is then only the projecting vestibule, not a tunnel through its masonry.
+	if spec.courtyard and _planned_interiors.has("range_front"):
+		p.size.z = CastleGeometry.PORCH_DEPTH + 0.3
 	_passage(p, minf(p.size.x * 0.5, 2.0), minf(p.size.y - 0.2, HouseGeometry.DOOR_H))
 	_log_mass("porch", p)
 	var xf := Transform3D(Basis(), Vector3(0.0, p.size.y, p.position.z + p.size.z / 2.0))
@@ -2148,7 +2175,7 @@ func _range(a: AABB, mass_name: String, surf: int, roofed: bool,
 		total_height = maxf(total_height, a.size.y + rise)
 		if spec.dormers:
 			_roof_dormers(xf, local_roof, roof_start, along, mass_name,
-				(span + EAVE) * 0.5, rise, false)
+				(span + EAVE) * 0.5, rise, false, _planned_interiors.has(mass_name))
 	if not _planned_interiors.has(mass_name):
 		_face_openings(a, a.size.y * 0.5, spec.window_style, faces, bay)
 
@@ -2350,7 +2377,8 @@ func _tower(c: Vector3, r: int, mass_name: String, outward: Vector3,
 	if _planned_interiors.has(mass_name):
 		var row: Dictionary = _planned_interiors[mass_name]
 		Interiors.emit(self, row)
-		_mural_landing(row)
+		if row.has("walk_landing") and not bool(row.get("ground_entry", false)):
+			_mural_landing(row)
 	elif palatial:
 		_palatial_tower_skin(c, base_r, top_r, h, sides, rot, outward)
 	else:
@@ -2594,7 +2622,7 @@ func _box_aabb(a: AABB, surf: int) -> void:
 ## Curtains terminate at occupied tower rooms. The old complete wall boxes
 ## continued through their floors; logging rooms alone must not hide that.
 func box(size: Vector3, pos: Vector3, surf: int, rot_y := 0.0, shear := 0.0) -> void:
-	if _tag != "curtain" or not CastleGeometry.is_motte(spec):
+	if _tag != "curtain" or not CastleGeometry.is_enclosed(spec):
 		super.box(size, pos, surf, rot_y, shear)
 		return
 	var footprint := PackedVector2Array()
@@ -2615,7 +2643,7 @@ func box(size: Vector3, pos: Vector3, surf: int, rot_y := 0.0, shear := 0.0) -> 
 		var cuts: Array[PackedVector2Array] = [hole]
 		# The walkway's merlons may stand across a perfectly cut tower door.
 		# Reserve the full authored arrival landing above its walking surface.
-		if pos.y + size.y * 0.5 > float(row.walk_y) + 0.05:
+		if pos.y + size.y * 0.5 > float(row.walk_y) + 0.05 and row.walk_landing.has_area():
 			cuts.append(Poly.from_rect(row.walk_landing))
 			for span in row.get("walk_gallery", []):
 				var a: Vector2 = span.a

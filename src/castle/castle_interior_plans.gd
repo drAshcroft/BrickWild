@@ -435,7 +435,7 @@ const MIN_RANGE_RUN := 5.0
 ## count of ranges this one touches (its segment's two ends), used to place the
 ## doors that connect the chain.
 static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
-		links: Array[int]) -> HousePlan:
+		links: Array[int], opts := {}) -> HousePlan:
 	var plan := HousePlan.new()
 	var run: float = float(seg["length"])
 	var across: float = float(seg["width"])
@@ -444,7 +444,9 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	var box := AABB(Vector3(-run * 0.5, 0.0, -across * 0.5),
 		Vector3(run, float(seg["height"]), across))
 	var hs: HouseSpec = _hall_spec(spec, box)
-	var levels: int = CastleGeometry.ridge_storeys(spec)
+	# `opts` lets a manor wing reuse this planner: `levels`, and how much of each
+	# end ("buried_lo"/"buried_hi", local x) is masonry shared with a neighbour.
+	var levels: int = int(opts.get("levels", CastleGeometry.ridge_storeys(spec)))
 	var band_height: float = float(seg["height"]) / float(levels)
 	hs.height = band_height
 	hs.storeys = levels
@@ -547,9 +549,12 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	# buried-opening pass below correctly removes it. Slide along the SAME wall
 	# to the nearest point clear of both the room corners and that dive.
 	var buried: float = floor_rect.size.x * 0.5 \
-		- (float(seg["roof_length"]) * 0.5 - CastleGeometry.tower_half(spec, 0))
-	if buried > 0.0:
-		_relocate_range_front_door(plan, floor_rect, buried)
+		- (float(seg.get("roof_length", run)) * 0.5 - CastleGeometry.tower_half(spec, 0))
+	var buried_lo: float = float(opts.get("buried_lo", buried))
+	var buried_hi: float = float(opts.get("buried_hi", buried))
+	var any_buried: bool = buried_lo > 0.0 or buried_hi > 0.0
+	if any_buried:
+		_relocate_range_front_door(plan, floor_rect, maxf(buried_lo, 0.0), maxf(buried_hi, 0.0))
 	# A range's door is on a LONG wall, and so are its windows: unlike a hall,
 	# whose door is on an end wall and can never meet one. Drop any window that
 	# lands on top of a door. Two openings in one piece of wall leave the
@@ -577,18 +582,21 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	# itself in the vertex towers, and a tower is solid: an opening placed out
 	# there is a window with a tower behind it. Drop the ones that land in the
 	# dive rather than pretend the wall is free.
-	if buried > 0.0:
+	if any_buried:
+		var exposed_lo: float = -floor_rect.size.x * 0.5 + maxf(buried_lo, 0.0)
+		var exposed_hi: float = floor_rect.size.x * 0.5 - maxf(buried_hi, 0.0)
 		var keep_windows: Array[Dictionary] = []
 		for wdw in plan.windows:
-			if absf(float((wdw["pos"] as Vector2).x)) <= floor_rect.size.x * 0.5 - buried:
+			var wx: float = float((wdw["pos"] as Vector2).x)
+			if wx >= exposed_lo and wx <= exposed_hi:
 				keep_windows.append(wdw)
 		plan.windows = keep_windows
 		var keep_doors: Array[Dictionary] = []
 		for d in plan.doors:
 			# A link door belongs in the dive on purpose: it is how one range
 			# reaches the next THROUGH the tower they share.
-			if absf(float(d["normal"].x)) > 0.5 \
-					or absf(float((d["pos"] as Vector2).x)) <= floor_rect.size.x * 0.5 - buried:
+			var dx: float = float((d["pos"] as Vector2).x)
+			if absf(float(d["normal"].x)) > 0.5 or (dx >= exposed_lo and dx <= exposed_hi):
 				keep_doors.append(d)
 		plan.doors = keep_doors
 
@@ -673,10 +681,10 @@ static func _ridge_rects_overlap(a: Rect2, b: Rect2) -> bool:
 
 
 static func _relocate_range_front_door(plan: HousePlan, floor_rect: Rect2,
-		buried: float) -> void:
+		buried_lo: float, buried_hi: float) -> void:
 	var half_run: float = floor_rect.size.x * 0.5
-	var exposed_lo: float = -half_run + buried
-	var exposed_hi: float = half_run - buried
+	var exposed_lo: float = -half_run + buried_lo
+	var exposed_hi: float = half_run - buried_hi
 	for door in plan.doors:
 		if not bool(door.get("front", false)):
 			continue

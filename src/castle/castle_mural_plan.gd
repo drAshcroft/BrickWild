@@ -3,11 +3,30 @@ extends RefCounted
 ## Their shared HousePlans own every floor, stair, doorway and window.
 
 const THICKNESS := 0.6
+## Shortest facet that takes a 1.2 m door and its jambs.
+const DOOR_FACET := 1.56
+## Curtain points beyond this from a tower door are searched only as a fallback.
+const NEAR_REACH := 14.0
+
+
+static var _geometry_cache := {}
 
 
 static func records(spec: CastleSpec, geometry_only := false) -> Dictionary:
+	if geometry_only:
+		# Pure in the spec, asked for repeatedly by the stair planner.
+		var key := CastleGeometry.spec_signature(spec)
+		if not _geometry_cache.has(key):
+			if _geometry_cache.size() >= 6:
+				_geometry_cache.clear()
+			_geometry_cache[key] = _records(spec, true)
+		return _geometry_cache[key]
+	return _records(spec, false)
+
+
+static func _records(spec: CastleSpec, geometry_only: bool) -> Dictionary:
 	var out := {}
-	if not CastleGeometry.is_motte(spec):
+	if not CastleGeometry.is_enclosed(spec):
 		return out
 	for ring in CastleGeometry.rings(spec):
 		var corners := CastleGeometry.vertex_tower_centers(spec, ring)
@@ -47,12 +66,33 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 			score = cost
 			levels = count
 			entry = candidate
+	# Uniform storeys may land the raised door more than a step off the coping
+	# (battered Crusader towers: 0.61 m). Then fit the storey height to the
+	# walk instead, and let the walls rise unbroken over any short last void.
+	var storey_override := 0.0
+	if score > 0.4:
+		var gap := INF
+		for fit_entry in range(1, 8):
+			var fit_h := (walk_y - HouseGeometry.FLOOR_T) / float(fit_entry)
+			if fit_h < 2.4 or fit_h > 7.0:
+				continue
+			var fit_levels := int(floor(height / fit_h + 0.001))
+			if fit_levels <= fit_entry:
+				continue
+			# A short void under the cap is harmless; thirty-centimetre storeys
+			# or a dozen furnished rooms are not. Favour ordinary storey heights.
+			var fit_gap := height - float(fit_levels) * fit_h + absf(fit_h - 3.5)
+			if fit_gap < gap:
+				gap = fit_gap
+				levels = fit_levels
+				entry = fit_entry
+				storey_override = fit_h
 	var hs := KeepSpec.new(spec.seed ^ int(id.hash()))
 	hs.material = &"stone"
 	hs.style = &"townhouse"
 	hs.width = half * 2.0
 	hs.length = half * 2.0
-	hs.height = height / float(levels)
+	hs.height = storey_override if storey_override > 0.0 else height / float(levels)
 	hs.storeys = levels
 	hs.entry_storey = entry
 	hs.room_count = levels
@@ -68,8 +108,8 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 	var plan := HousePlan.new()
 	plan.spec = hs
 	var outline := PackedVector2Array()
-	var sides := CastleGeometry.tower_sides(spec)
-	var rotation := CastleGeometry.tower_rotation(spec)
+	var sides := coarse_sides(CastleGeometry.tower_sides(spec), half - THICKNESS)
+	var rotation := PI / float(sides)
 	var radius := (half - THICKNESS) / cos(PI / float(sides))
 	for side in range(sides):
 		var angle := rotation + TAU * float(side) / float(sides)
@@ -79,12 +119,24 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 			"outline": outline.duplicate(), "storey": level, "host": id})
 		hs.program.append(&"guardroom")
 	var access := _door(plan, spec, ring, centre, entry, vertex, id.contains("_gate_"))
+	if access.is_empty() and CastleGeometry.tower_sides(spec) > 4:
+		_exact_towers = true
+		access = _door(plan, spec, ring, centre, entry, vertex, id.contains("_gate_"))
+		_exact_towers = false
+	var ground := false
 	if access.is_empty():
-		return
+		# No clear gallery from the coping reaches this tower (a hexagon's
+		# side vertex, say). Enter it at courtyard level instead, from the ward.
+		access = _ground_door(plan, spec, ring, centre)
+		ground = true
+		hs.entry_storey = 0
+		if access.is_empty():
+			return
 	plan.doors.append(access.door)
 	if geometry_only:
 		var access_row := {"id": id, "plan": plan, "bounds": bounds,
 			"transform": Transform3D(Basis.IDENTITY, centre), "mural_tower": true,
+			"ground_entry": ground,
 			"walk_landing": access.landing, "walk_y": walk_y,
 			"walk_target": access.target, "walk_outer": access.outer,
 			"walk_inside": access.inside, "walk_route": access.route,
@@ -98,25 +150,73 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 			previous = plan.stairs[-1].upper_rect
 	var toward := Vector2(centre.x, centre.z - CastleGeometry.enceinte_rect(spec, ring).get_center().y).normalized()
 	for level in range(levels):
-		for wall in HouseGeometry.room_walls(plan, level):
-			var normal := -Vector2(wall.normal)
-			if normal.dot(toward) < 0.4:
-				continue
-			var opening := _window_on_wall(plan, level, wall, spec, ring, centre)
-			if opening.is_empty():
-				continue
-			plan.windows.append({"room": level, "storey": level,
-				"pos": opening.pos,
-				"normal": normal, "width": opening.width,
-				"sill": 0.95, "head": minf(hs.height - 0.3, 2.15), "host": id})
+		# Facets that look away from the curtain first; a tower at a polygon's
+		# side vertex may have none that are clear, so widen the net rather than
+		# leave an occupied storey without daylight.
+		for facing in [0.4, 0.0, -0.4]:
+			var before := plan.windows.size()
+			for wall in HouseGeometry.room_walls(plan, level):
+				var normal := -Vector2(wall.normal)
+				if normal.dot(toward) < facing:
+					continue
+				var opening := _window_on_wall(plan, level, wall, spec, ring, centre)
+				if opening.is_empty():
+					continue
+				plan.windows.append({"room": level, "storey": level,
+					"pos": opening.pos,
+					"normal": normal, "width": opening.width,
+					"sill": 0.95, "head": minf(hs.height - 0.3, 2.15), "host": id})
+			if plan.windows.size() > before:
+				break
 	CastleKeepPlan.furnish_minimum_programme(plan, hs)
 	var row := {"id": id, "plan": plan, "bounds": bounds,
 		"transform": Transform3D(Basis.IDENTITY, centre), "mural_tower": true,
+		"ground_entry": ground,
 		"walk_landing": access.landing, "walk_y": walk_y,
 		"walk_target": access.target, "walk_outer": access.outer,
 		"walk_inside": access.inside, "walk_route": access.route,
 		"walk_gallery": access.gallery}
 	out[id] = row
+
+
+## A slender tower has facets too short for a doorway and its margins. Coarsen
+## the plan (12, 8, 6, 4 sides) until a facet takes one; the shell is raised
+## from this plan, so a six-sided turret really is six-sided.
+static func coarse_sides(sides: int, clear: float) -> int:
+	for candidate in [12, 8, 6, 4]:
+		if candidate > sides:
+			continue
+		if 2.0 * clear * tan(PI / float(candidate)) >= DOOR_FACET:
+			return candidate
+	return 4
+
+
+## A doorway at courtyard level on the facet that most nearly faces the ward.
+static func _ground_door(plan: HousePlan, spec: CastleSpec, ring: int,
+		centre: Vector3) -> Dictionary:
+	var ward := CastleGeometry.enceinte_rect(spec, ring).get_center()
+	var inward := (ward - Vector2(centre.x, centre.z)).normalized()
+	var best := {}
+	var score := -INF
+	for wall in HouseGeometry.room_walls(plan, 0):
+		var normal := -Vector2(wall.normal)
+		var length := Vector2(wall.from).distance_to(wall.to)
+		if length < DOOR_FACET:
+			continue
+		var candidate := normal.dot(inward)
+		if candidate > score:
+			score = candidate
+			best = wall
+	if best.is_empty() or score < 0.2:
+		return {}
+	var pos := (Vector2(best.from) + Vector2(best.to)) * 0.5
+	var normal := -Vector2(best.normal)
+	var width := minf(1.2, Vector2(best.from).distance_to(best.to) - 2.0 * 0.32)
+	return {"door": {"a": 0, "b": -1, "pos": pos, "normal": normal, "width": width,
+		"exterior": true, "front": true, "storey": 0, "sill": 0.0,
+		"head": minf(plan.spec.height - 0.2, 2.35), "route": "courtyard"},
+		"landing": Rect2(), "target": Vector2.ZERO, "outer": pos, "inside": pos,
+		"route": [], "gallery": []}
 
 
 static func _door(plan: HousePlan, spec: CastleSpec, ring: int, centre: Vector3,
@@ -183,10 +283,9 @@ static func _door(plan: HousePlan, spec: CastleSpec, ring: int, centre: Vector3,
 ## room outline; a fixed shell-thickness offset can still leave a walker inside
 ## the broad, battered corner mass.
 static func _beyond_tower(door: Vector2, normal: Vector2, bounds: AABB) -> Vector2:
-	var rect := Rect2(bounds.position.x, bounds.position.z, bounds.size.x, bounds.size.z).grow(0.9)
 	var point := door
 	for _step in range(120):
-		if not rect.has_point(point):
+		if not _tower_bounds_has(bounds, point, 0.9):
 			return point
 		point += normal * 0.1
 	return point
@@ -194,22 +293,38 @@ static func _beyond_tower(door: Vector2, normal: Vector2, bounds: AABB) -> Vecto
 
 static func _access_route(spec: CastleSpec, ring: int, centre: Vector3,
 		tower_bounds: AABB, vertex: int, outside: Vector2, inside: Vector2) -> Array[Vector2]:
-	var candidates: Array[Vector2] = []
-	if vertex >= 0:
-		for link in _corner_targets(spec, ring, centre, vertex):
-			candidates.append(link.target)
-	else:
-		for segment in CastleGeometry.wall_segments(spec, ring):
-			var wall_out := Vector2(segment.outward.x, segment.outward.z)
-			var offset := wall_out * CastleGeometry.wall_thickness(spec, ring) * 0.5
-			var a: Vector2 = Vector2(segment.a) - offset
-			var b: Vector2 = Vector2(segment.b) - offset
-			var delta := b - a
-			var steps := maxi(1, ceili(delta.length() / 0.2))
-			for i in range(steps + 1):
-				var point := a.lerp(b, float(i) / steps)
-				if not _tower_bounds_has(tower_bounds, point, 0.8):
-					candidates.append(point)
+	# The shortest route is the one we keep, so look near the doorway first:
+	# testing every 20 cm of a hundred-metre curtain made each side tower cost
+	# seconds. Only if nothing near works is the whole curtain searched.
+	var best_route: Array[Vector2] = []
+	for reach in [NEAR_REACH, INF]:
+		var candidates: Array[Vector2] = []
+		if vertex >= 0:
+			for link in _corner_targets(spec, ring, centre, vertex):
+				candidates.append(link.target)
+		else:
+			for segment in CastleGeometry.wall_segments(spec, ring):
+				var wall_out := Vector2(segment.outward.x, segment.outward.z)
+				var offset := wall_out * CastleGeometry.wall_thickness(spec, ring) * 0.5
+				var a: Vector2 = Vector2(segment.a) - offset
+				var b: Vector2 = Vector2(segment.b) - offset
+				var delta := b - a
+				var steps := maxi(1, ceili(delta.length() / 0.2))
+				for i in range(steps + 1):
+					var point := a.lerp(b, float(i) / steps)
+					if point.distance_to(outside) > reach:
+						continue
+					if not _tower_bounds_has(tower_bounds, point, 0.8):
+						candidates.append(point)
+		best_route = _best_route(spec, ring, centre, tower_bounds, outside, inside, candidates)
+		if not best_route.is_empty() or vertex >= 0:
+			break
+	return best_route
+
+
+static func _best_route(spec: CastleSpec, ring: int, centre: Vector3,
+		tower_bounds: AABB, outside: Vector2, inside: Vector2,
+		candidates: Array[Vector2]) -> Array[Vector2]:
 	var best_route: Array[Vector2] = []
 	var best_length := INF
 	for target in candidates:
@@ -218,8 +333,7 @@ static func _access_route(spec: CastleSpec, ring: int, centre: Vector3,
 			var ward := (CastleGeometry.enceinte_rect(spec, ring).get_center()
 				- Vector2(centre.x, centre.z)).normalized()
 			var bend := outside + ward * 2.5
-			if _line_hits_tower(outside, bend, tower_bounds, 0.8) \
-					or _line_hits_tower(bend, target, tower_bounds, 0.8):
+			if _line_hits_tower(outside, bend, tower_bounds, 0.8) 					or _line_hits_tower(bend, target, tower_bounds, 0.8):
 				continue
 			waypoints = [outside, bend, target]
 		var route: Array[Vector2] = [inside]
@@ -259,8 +373,6 @@ static func _corner_targets(spec: CastleSpec, ring: int, centre: Vector3,
 		if not edge_best.has(edge) or d < float(edge_best[edge].distance):
 			edge_best[edge] = {"segment": segment, "endpoint": endpoint, "distance": d}
 	var candidates: Array[Dictionary] = []
-	var envelope := Rect2(tower_bounds.position.x, tower_bounds.position.z,
-		tower_bounds.size.x, tower_bounds.size.z).grow(1.0)
 	for row in edge_best.values():
 		var segment: Dictionary = row.segment
 		var endpoint: Vector2 = row.endpoint
@@ -274,7 +386,7 @@ static func _corner_targets(spec: CastleSpec, ring: int, centre: Vector3,
 			var along := endpoint.distance_to(other) * float(i) / float(steps)
 			var sample := endpoint + tangent * along \
 				- wall_out * CastleGeometry.wall_thickness(spec, ring) * 0.5
-			if not envelope.has_point(sample):
+			if not _tower_bounds_has(tower_bounds, sample, 1.0):
 				target = sample
 				found = true
 				break
@@ -336,7 +448,17 @@ static func _route_length(route: Array[Vector2]) -> float:
 	return length
 
 
+## Whether `point` is within `grow` of the tower. The measured envelope is the
+## base square; a faceted tower occupies a circle inside it, and at a polygon's
+## side vertex the square's empty corners hide every route. `_exact_towers`
+## (second pass only, so existing routes never move) uses the circle.
+static var _exact_towers := false
+
+
 static func _tower_bounds_has(bounds: AABB, point: Vector2, grow: float) -> bool:
+	if _exact_towers:
+		var centre := Vector2(bounds.get_center().x, bounds.get_center().z)
+		return centre.distance_to(point) <= bounds.size.x * 0.5 * 1.04 + grow
 	return Rect2(bounds.position.x, bounds.position.z, bounds.size.x,
 		bounds.size.z).grow(grow).has_point(point)
 

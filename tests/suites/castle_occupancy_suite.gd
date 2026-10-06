@@ -237,9 +237,19 @@ static func _without_floor(mesh: ArrayMesh, row: Dictionary, room: int) -> Dicti
 			for offset in 3:
 				var index: int = indices[start + offset] if not indices.is_empty() else start + offset
 				var point: Vector3 = inverse * source_vertices[index]
-				if point.y < floor_y - 0.001 or point.y > floor_y + HouseGeometry.FLOOR_T + 0.001 \
-						or not rect.has_point(Vector2(point.x, point.z)):
+				if point.y < floor_y - 0.02 or point.y > floor_y + HouseGeometry.FLOOR_T + 0.001:
 					erase = false
+			# A slab can span several rooms of a storey. Take every floor
+			# triangle that reaches into this room, so the room really loses it.
+			if erase:
+				var lo := Vector2(INF, INF)
+				var hi := Vector2(-INF, -INF)
+				for offset in 3:
+					var index: int = indices[start + offset] if not indices.is_empty() else start + offset
+					var local: Vector3 = inverse * source_vertices[index]
+					lo = lo.min(Vector2(local.x, local.z))
+					hi = hi.max(Vector2(local.x, local.z))
+				erase = rect.intersects(Rect2(lo, hi - lo))
 			if erase:
 				removed += 1
 				continue

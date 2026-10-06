@@ -4,7 +4,7 @@ extends RefCounted
 
 static func record(spec: CastleSpec) -> Dictionary:
 	var bounds := CastleGeometry.apse_aabb(spec)
-	if not CastleGeometry.is_motte(spec) or bounds.size.x <= 0.0:
+	if not CastleGeometry.is_enclosed(spec) or bounds.size.x <= 0.0:
 		return {}
 	var hs := HouseSpec.new(spec.seed ^ 0x41505345)
 	hs.material = &"stone"
@@ -74,12 +74,17 @@ static func record(spec: CastleSpec) -> Dictionary:
 
 
 static func connect_chapel(plan: HousePlan, spec: CastleSpec) -> void:
-	if not CastleGeometry.is_motte(spec) or CastleGeometry.apse_aabb(spec).size.x <= 0.0:
+	if not CastleGeometry.is_enclosed(spec) or CastleGeometry.apse_aabb(spec).size.x <= 0.0:
 		return
 	var rect := HouseGeometry.room_floor_rect(plan, 0)
 	var point := Vector2(rect.get_center().x, rect.position.y)
 	for door in plan.doors:
 		if Vector2(door.pos).distance_to(point) < 0.01:
+			# The chapel's own entrance already stands on this wall. It is also
+			# the way through to the apse, whose doorway is 2.3 m: a standard
+			# 2.02 m leaf left masonry across the upper part of the passage.
+			door["head"] = maxf(float(door.get("head", HouseGeometry.DOOR_H)), 2.3)
+			door["sill"] = minf(float(door.get("sill", 0.0)), 0.0)
 			return
 	plan.doors.append({"a": 0, "b": -1, "pos": point, "normal": Vector2(0, -1),
 		"width": HouseGeometry.DOOR_W, "exterior": true, "front": false,

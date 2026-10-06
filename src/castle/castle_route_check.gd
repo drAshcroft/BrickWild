@@ -19,7 +19,7 @@ static func check(builder: CastleBuilder, mesh: ArrayMesh) -> Dictionary:
 	out.wall_stairs = network.stairs.size()
 	# Missing records cannot make the route check pass by reducing its work.
 	# The inventory comes from the site, independently of the planner.
-	if CastleGeometry.is_motte(builder.spec):
+	if CastleGeometry.is_enclosed(builder.spec):
 		for required in CastleOccupancyCheck.expected_ids(builder.spec):
 			if not required.begins_with("tower_") and not required.begins_with("gate_"):
 				continue
@@ -35,6 +35,8 @@ static func check(builder: CastleBuilder, mesh: ArrayMesh) -> Dictionary:
 		var gate := bool(row.get("gate_chamber", false))
 		if not mural and not gate:
 			continue
+		if bool(row.get("ground_entry", false)):
+			continue # entered from the ward; there is no curtain route to prove
 		out.routes += 1
 		var id := String(row.id)
 		var plan: HousePlan = row.plan

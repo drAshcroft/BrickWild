@@ -183,9 +183,12 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 	if CastleGeometry.is_motte(spec):
 		# A wall stair must not climb under a gallery with less than standing
 		# headroom. Ask the same pure access layout that emits those decks.
+		# (Other walled castles keep the stair layout their routes were proven
+		# on; CastleRouteCheck still rejects a stair whose headroom is blocked.)
 		var mural := preload("castle_mural_plan.gd").records(spec, true)
 		for row in mural.values():
-			galleries.append(Rect2(row.walk_landing))
+			if Rect2(row.walk_landing).has_area():
+				galleries.append(Rect2(row.walk_landing))
 			for span in row.get("walk_gallery", []):
 				var a: Vector2 = span.a
 				var b: Vector2 = span.b

@@ -173,16 +173,36 @@ static func _check_room_floor(out: Dictionary, id: String, row: Dictionary,
 	var plan: HousePlan = row.plan
 	var polygon := HouseGeometry.room_floor_poly(plan, room)
 	var rect := Poly.bounding_rect(polygon)
-	var floor_y := float(plan.storey_of_room(room)) * plan.spec.height
+	var storey := plan.storey_of_room(room)
+	var floor_y := float(storey) * plan.spec.height
 	var xf: Transform3D = row.transform
+	# Stair wells are real holes in a floor, and a dais is a real step up. A
+	# sample inside either is judged against what the plan says is there: the
+	# well is not floor to be missed, the dais is floor a step higher.
+	var wells: Array[Rect2] = []
+	for stair in plan.stairs:
+		if int(stair.get("storey", -1)) == storey:
+			wells.append(Rect2(stair.get("lower_rect", stair.get("rect", Rect2()))).grow(0.1))
+		if int(stair.get("to_storey", -1)) == storey:
+			wells.append(Rect2(stair.get("upper_rect", stair.get("rect", Rect2()))).grow(0.1))
 	var samples: Array[Vector3] = []
 	var bounds := AABB(xf * Vector3(rect.position.x, floor_y, rect.position.y), Vector3.ZERO)
+	var in_wells := 0
 	for u in range(1, 6):
 		for v in range(1, 6):
 			var point := rect.position + rect.size * Vector2(float(u) / 6.0, float(v) / 6.0)
 			if not Poly.contains_point(polygon, point, 0.01):
 				continue
-			var world := xf * Vector3(point.x, floor_y, point.y)
+			var within_well := false
+			for well in wells:
+				if well.has_point(point):
+					within_well = true
+					break
+			if within_well:
+				in_wells += 1
+				continue
+			var level := floor_y + (plan.dais_rise() if plan.on_dais(room, point) else 0.0)
+			var world := xf * Vector3(point.x, level, point.y)
 			samples.append(world)
 			bounds = bounds.expand(world - Vector3.UP * 0.3).expand(world + Vector3.UP * 1.9)
 	var nearby: Array = []
@@ -192,15 +212,19 @@ static func _check_room_floor(out: Dictionary, id: String, row: Dictionary,
 	var supported := 0
 	for point in samples:
 		out.stats.room_floor_samples += 1
-		if _hits(nearby, point + Vector3.UP * 0.10, point - Vector3.UP * 0.30) 				and not _hits(nearby, point + Vector3.UP * 0.15, point + Vector3.UP * 1.85):
+		var floored := _hits(nearby, point + Vector3.UP * 0.10, point - Vector3.UP * 0.30)
+		if floored and not _hits(nearby, point + Vector3.UP * 0.15, point + Vector3.UP * 1.85):
 			supported += 1
 	var fraction := float(supported) / float(maxi(1, samples.size()))
 	out.stats.min_room_floor_fraction = minf(float(out.stats.get("min_room_floor_fraction", 1.0)), fraction)
-	# One surviving stair landing must not stand in for a floor. Stair wells,
-	# dais steps and furniture-free voids take a share, never the majority.
+	# One surviving stair landing must not stand in for a floor: outside the
+	# wells and the dais, at least half the room has to be somewhere to stand.
 	if samples.is_empty() or fraction < ROOM_FLOOR_MIN_FRACTION:
-		_fail(out, id, "room %d has no emitted floor with standing clearance (%d of %d samples)"
-			% [room, supported, samples.size()])
+		_fail(out, id, "room %d has no emitted floor with standing clearance" % room)
+		# The counts stay out of the message: callers match it exactly.
+		out.stats["floor_shortfalls"] = out.stats.get("floor_shortfalls", []) + [
+			"%s room %d: %d of %d samples supported, %d in stair wells"
+			% [id, room, supported, samples.size(), in_wells]]
 
 
 ## Windows are matched in both directions: a valid plan cannot excuse an

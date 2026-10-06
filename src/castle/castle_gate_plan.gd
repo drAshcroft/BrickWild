@@ -8,7 +8,7 @@ const GALLERY_WIDTH := 1.5
 
 static func records(spec: CastleSpec, geometry_only := false) -> Dictionary:
 	var out := {}
-	if not CastleGeometry.is_motte(spec):
+	if not CastleGeometry.is_enclosed(spec):
 		return out
 	for ring in CastleGeometry.rings(spec):
 		var gate := CastleGeometry.gatehouse_aabb(spec, ring)
