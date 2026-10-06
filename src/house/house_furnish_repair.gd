@@ -32,7 +32,7 @@ static func relax(plan: HousePlan) -> int:
 		var best := -1
 		var best_gain := 0
 		var best_must := true
-		for f in _candidates(plan):
+		for f in _candidates(plan, before):
 			var p: Dictionary = plan.furniture[f]
 			var must: bool = p.get("must", false)
 			var trial: HousePlan = _without(plan, f)
@@ -167,7 +167,7 @@ static func _biggest_in(plan: HousePlan, rooms: Dictionary, allow_must: bool) ->
 
 ## The pieces worth trying to remove: the ones standing on the floor, biggest
 ## first, capped so the search stays cheap on a large house.
-static func _candidates(plan: HousePlan) -> Array[int]:
+static func _candidates(plan: HousePlan, rep: Dictionary = {}) -> Array[int]:
 	var out: Array[int] = []
 	var seen_island_rows := {}
 	for f in range(plan.furniture.size()):
@@ -188,7 +188,38 @@ static func _candidates(plan: HousePlan) -> Array[int]:
 		var ra: Rect2 = plan.furniture[a]["rect"]
 		var rb: Rect2 = plan.furniture[b]["rect"]
 		return ra.size.x * ra.size.y > rb.size.x * rb.size.y)
-	return out.slice(0, MAX_TRIALS)
+	var picked: Array[int] = out.slice(0, MAX_TRIALS)
+	if rep.is_empty():
+		return picked
+	# The cap keeps the search cheap, but "biggest first" can fill all eight
+	# slots with furniture from rooms nowhere near the trouble, leaving the
+	# crate that stands in the only gap to a stranded room untried (thorpe
+	# seed 1, 0.7: two crates in a pass-through store cut the kitchen off).
+	# Pieces in rooms beside a stranded room, or holding an unreachable item,
+	# always get their trial, after the ordinary candidates so ties break as
+	# they always did.
+	var near := _rooms_near_trouble(plan, rep)
+	var extra := 0
+	for f2 in out:
+		if extra >= MAX_TRIALS or f2 in picked:
+			continue
+		if near.has(int(plan.furniture[f2]["room"])):
+			picked.append(f2)
+			extra += 1
+	return picked
+
+
+## Rooms that could be hiding what blocks the route: the neighbours of every
+## stranded room, and the rooms of items nobody can reach.
+static func _rooms_near_trouble(plan: HousePlan, rep: Dictionary) -> Dictionary:
+	var rooms := {}
+	var graph: Dictionary = plan.door_graph()
+	for i in rep.get("unreached_rooms", []):
+		for nb in graph.get(int(i), []):
+			rooms[int(nb)] = true
+	for f in rep.get("unreachable_items", []):
+		rooms[int(plan.furniture[int(f)]["room"])] = true
+	return rooms
 
 
 ## A copy of the plan with one piece taken out, for asking what would happen.
