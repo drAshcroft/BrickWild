@@ -98,22 +98,24 @@ more in the furnisher search), `court` 8 min, `dressing` 37 min, `library`
 contract checks from the pre-merge gates; see `docs/QA_FAST_PROTOCOL.md`.
 A faster hotel generator is the real fix.
 
-### 0d. Village scheduled acceptance still needs a complete rerun
-The fresh 2026-10-02 audit supersedes the original thirteen-failure report:
-`vlot` passed 71 checks, including manor frontage. Before the current repair,
-`vcheck` had four failures (one missing tavern and three common-frontage cases).
-The Thorpe matrix stopped at seed-index 0, population scale 1.4, with density
-and common-frontage failures; unvisited cells are not passes.
+### 0d. Village scheduled acceptance (verified 2026-10-06)
+The 2026-10-06 rerun on current main is green: `vlot` 71 checks, 0 failures;
+`vcheck` 81 checks, 0 failures (24 villages); `varchetype_thorpe` 59 checks,
+0 failures; `varchetype_thorpe_0_07` 5 checks, 0 failures;
+`tests/village_thorpe_fixture.gd` 9 checks, 0 failures; `vformslayout` 438
+checks, 0 failures; `lane:village-fast` 47 and `lane:village-appearance-fast`
+64, all passing. Warnings from native buildings remain visible by design.
 
-The green-site repair keeps road offset tied to site depth, moves ring
-junctions when the common needs more width, and connects the well by a real
-path. The expanded `vsite` gate passed 311 checks and `lane:village-fast`
-passed 10. All four originally failing green seeds subsequently passed focused
-VillageQA. Thorpe's measured landmark-depth reservation now includes churches
-as well as temples: its failing cell passed nine checks, with density 6.7%
-and common frontage 69%. Sixteen native-building warnings remain visible.
-Complete scheduled acceptance is still tracked as EVAL-C11/C13; these focused
-passes do not establish that every previously unvisited matrix cell is green.
+Three defects were found and fixed on the way (commits d8256b1, fcb5f0e,
+516835c): a nav-repair candidate cap that left two crates in a pass-through
+store untried (thorpe seed 1, 0.7); a coarse 1.3 width retry that took a round
+hamlet below the 3.5 percent density floor (thorpe seed 2, 0.7), now narrowed
+through finer steps; and the manor-lane fallback fixture, whose 170 m cell had
+become lawful (it already failed at 63c0003), now pinned at 140 m.
+
+Still red and not village code: `lane:house-furnish-fast` fails one check, the
+hand-built feng shui fixture in `tests/suites/house_qa_suite.gd:1256`, because
+62b60eb (5 Oct) turned its expected workbench_daylight failure into a warning.
 
 ### 1. `src/building/` has been deleted (resolved)
 The superseded draft generator is gone from the tree.
