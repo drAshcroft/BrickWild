@@ -6,6 +6,65 @@ complete castle occupancy: the independent inventory added on 2 October found
 whole missing interiors and windows above the rooms actually represented.
 The broad CASTLE-INTERIOR-FORMS task remains open.
 
+## Status after the 6 October 2026 pass (CASTLE-INTERIOR-FORMS)
+
+Every form named in the inventory (`CastleOccupancyCheck.expected_ids`) now has
+a planner. What changed, and what is still red, measured with
+`artifacts/castle_todo/sweep_occ.gd`-style sweeps (build, occupancy, route and
+per-plan HouseQA over the canonical style x tier x size grid):
+
+Done and green on the bounded lane (`lane:castle-change`, `cridgeoccupancy`,
+`coccupancy`, `cmotteaccess`, `cmotteroute`, `cgatestairs`, `ctowerhouse`):
+
+- Walled castles: mural towers, gatehouse chamber and apse are planned for every
+  enclosed plan, not only the motte (`castle_mural_plan.gd`, `castle_gate_plan.gd`,
+  `castle_apse_plan.gd`). A slender tower coarsens its facets (12, 8, 6, 4) until
+  a facet takes a door; the door floor is fitted to the coping; a tower lower
+  than the coping, or one no gallery reaches, is entered from the ward.
+- Manors and houses: `castle_manor_plan.gd` plans wings (a ridge range turned to
+  the court), the courtyard front range (guard bay, passage, guard bay, one room
+  above), the annexe, the front towers and the tower-house jogs. A wing starts
+  at its tower's rear face and masonry cheeks fill the strip beside the tower.
+- Ridge castles: `castle_ridge_plan.gd` trims each range at its vertex towers
+  (mitre-safe cut), fills the old overlap with solid cheeks, and plans the vertex
+  towers and the dark spire (the castle's `keep`). Dormers over a planned mass
+  are shuttered blind gablets: a window must open into a room.
+- Sky castles: each turret-island is a stack of rooms entered a storey up from
+  the bridge that leaves it.
+- QA: `_check_room_floor` counts samples outside stair wells (dais measured at
+  its rise) and wants half of them supported; the mutation harness removes every
+  floor triangle that reaches the room.
+
+Found and fixed on the way (each one made a whole family read red):
+
+- A flat-topped tower house has no roof slot, so `commit()` slid its glazing
+  from surface 3 to surface 2 and every opening check read it as masonry.
+  `_keep_surface_slots` now holds every empty slot below a populated one.
+- `tower_door_sill`: a 5.7 m storey could not hold a 2.6 m door above a 4 m
+  sill; the head went through the ceiling.
+
+Still open (this is why the task stays pending):
+
+- Tight ridge zigzags (every `dark` castle, 40 to 55 m): the ranges are as wide
+  as the pitch between vertices, so the mitre-safe cut leaves no room; the
+  ranges and towers stay solid blocks and their required records are missing.
+  A real answer clips the end bays to mitred polygons (convex room outlines).
+- Tower-house shaft (not the jogs): the roof-platform room is emitted as a full
+  storey of walls above the deck and fills the stair opening; the platform room
+  sticks out of its interior and is reached only through a lord's chamber; the
+  approach steps block `lords_walk`; jog windows can face the approach steps.
+  `ctowerplan` (wizard oval) and `cforms` were red before this pass.
+- Castles whose towers are shorter than the curtain walk (the smallest tier of
+  every walled style): ground doors meet the 0.65 m wall footing; stairs do not
+  reach the upper storeys of the small rooms (nav).
+- Polygon and rect keeps: planned windows are filled by sliver wall pieces
+  (tiered or polygonal keep outlines against `extend_upper_walls`); the motte
+  shell keep's windows on seeds other than 8856.
+- Gate chamber routes in some rect and fortress cases are crossed by masonry
+  (`access_routes[gate_N]`), and some side-tower walk routes have no floor.
+- `hall` has no plan in a few fortress/crusader cases (too large or too small a
+  range), so its required record is missing.
+
 ## Plans for ridge castles, tower houses and motte shell keeps
 
 Current entry points:

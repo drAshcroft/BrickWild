@@ -72,9 +72,10 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 	# (battered Crusader towers: 0.61 m). Then fit the storey height to the
 	# walk instead, and let the walls rise unbroken over any short last void.
 	var storey_override := 0.0
-	# (The motte's routes were proven on uniform storeys; other castles always
-	# align the door floor with the coping, which stands 0.25 m proud of the wall.)
-	if score > 0.4 or not CastleGeometry.is_motte(spec):
+	# Always align the door floor with the coping, which stands 0.25 m proud of
+	# the wall: a sill a third of a metre below it leaves the walk slab across
+	# the doorway (the door-clearance rays caught it on every polygon castle).
+	if true:
 		var gap := INF
 		for fit_entry in range(1, 8):
 			var fit_h := (walk_y - HouseGeometry.FLOOR_T) / float(fit_entry)

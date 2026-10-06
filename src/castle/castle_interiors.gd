@@ -34,6 +34,14 @@ static func primary(spec: CastleSpec) -> Dictionary:
 		if shell_plan.spec != null:
 			out["keep_shell"] = record("keep_shell", shell_plan,
 				CastleGeometry.shell_keep_aabb(spec))
+			# The climbing curtain runs up to the shell: a window on that side
+			# looks at masonry, as a keep built into the wall does.
+			var climb := CastleGeometry.climb_aabb(spec)
+			var against: Array[AABB] = []
+			if climb.size.x > 0.0:
+				against.append(climb)
+			drop_buried_windows(spec, out["keep_shell"], against)
+			drop_stair_windows(out["keep_shell"])
 		# A motte replaces the keep, not the occupied bailey ranges. Returning
 		# here left the hall and chapel as windowed blocks without any way in.
 	if CastleGeometry.is_enclosed(spec):
@@ -121,6 +129,37 @@ static func drop_buried_windows(spec: CastleSpec, row: Dictionary,
 	return dropped
 
 
+## A window that opens onto a stair (or the well above one) has no floor to
+## stand at: drop it. `reach` is how far into the room the stair may stand.
+static func drop_stair_windows(row: Dictionary, reach := 1.2) -> int:
+	var plan: HousePlan = row.plan
+	var kept: Array[Dictionary] = []
+	for window in plan.windows:
+		var storey := HousePlan.record_storey(window)
+		var normal := Vector2(window.normal).normalized()
+		var tangent := Vector2(-normal.y, normal.x)
+		var half := float(window.width) * 0.5 + 0.3
+		var pos := Vector2(window.pos)
+		var area := PackedVector2Array([pos + tangent * half, pos - tangent * half,
+			pos - tangent * half - normal * reach, pos + tangent * half - normal * reach])
+		var blocked := false
+		for stair in plan.stairs:
+			var rects: Array[Rect2] = []
+			if int(stair.get("storey", -1)) == storey:
+				rects.append(Rect2(stair.get("lower_rect", stair.get("rect", Rect2()))))
+			if int(stair.get("to_storey", -1)) == storey:
+				rects.append(Rect2(stair.get("upper_rect", stair.get("rect", Rect2()))))
+			for rect in rects:
+				if Poly.intersection_area(area, Poly.from_rect(rect)) > 0.01:
+					blocked = true
+		if not blocked:
+			kept.append(window)
+	var dropped := plan.windows.size() - kept.size()
+	if dropped > 0:
+		plan.windows = kept
+	return dropped
+
+
 ## Whether a window's outward reveal (0.7 m of it) meets any of `walls`.
 static func _window_buried(row: Dictionary, window: Dictionary, walls: Array[AABB]) -> bool:
 	var plan: HousePlan = row.plan
@@ -132,10 +171,13 @@ static func _window_buried(row: Dictionary, window: Dictionary, walls: Array[AAB
 	var centre := xf * Vector3(Vector2(window.pos).x, y, Vector2(window.pos).y)
 	var out_w := xf.basis * Vector3(normal.x, 0.0, normal.y)
 	var side_w := xf.basis * Vector3(tangent.x, 0.0, tangent.y)
-	centre += out_w * 0.7
-	var half := Vector3(absf(side_w.x) * float(window.width) * 0.5 + absf(out_w.x) * 0.7,
+	# The opening runs through the whole wall (3 m of a motte's shell) and a
+	# little beyond it.
+	var depth := maxf(0.7, HouseGeometry.wall_thickness(plan.spec) + 0.2)
+	centre += out_w * depth
+	var half := Vector3(absf(side_w.x) * float(window.width) * 0.5 + absf(out_w.x) * depth,
 		(float(window.head) - float(window.sill)) * 0.5,
-		absf(side_w.z) * float(window.width) * 0.5 + absf(out_w.z) * 0.7)
+		absf(side_w.z) * float(window.width) * 0.5 + absf(out_w.z) * depth)
 	var reveal := AABB(centre - half, half * 2.0)
 	for wall in walls:
 		if wall.intersects(reveal):

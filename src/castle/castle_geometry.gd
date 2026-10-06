@@ -1580,7 +1580,7 @@ const APSE_HEIGHT_RATIO := 0.85
 ## The apse radius: APSE_RATIO of the chapel's width, reduced until the apse
 ## stands inside the ward on a plan whose walls close in toward the gate, and
 ## 0 when even a small one would not.
-const APSE_MIN_RADIUS := 2.4
+const APSE_MIN_RADIUS := 2.8
 
 
 static func apse_radius(spec: CastleSpec) -> float:

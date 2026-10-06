@@ -179,24 +179,58 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if not CastleGeometry.is_enclosed(spec):
 		return out
-	var galleries: Array[Rect2] = []
+	# A wall stair must not climb under a gallery with less than standing
+	# headroom. Ask the same pure access layout that emits those decks. The
+	# motte reserves every tower's and the gate chamber's. Other walled castles
+	# keep the stair layout their routes were proven on and reserve the gate
+	# chamber's gallery only as far as that leaves a stair within 15 m of every
+	# gate (Crusader 9118 has none once the gallery counts); then they fall back
+	# to the layout without it. CastleRouteCheck still rejects a stair whose
+	# headroom is blocked.
+	var tower_decks: Array[Rect2] = []
 	if CastleGeometry.is_motte(spec):
-		# A wall stair must not climb under a gallery with less than standing
-		# headroom. Ask the same pure access layout that emits those decks.
-		# (Other walled castles keep the stair layout their routes were proven
-		# on; CastleRouteCheck still rejects a stair whose headroom is blocked.)
 		var mural := preload("castle_mural_plan.gd").records(spec, true)
 		for row in mural.values():
 			if Rect2(row.walk_landing).has_area():
-				galleries.append(Rect2(row.walk_landing))
+				tower_decks.append(Rect2(row.walk_landing))
 			for span in row.get("walk_gallery", []):
 				var a: Vector2 = span.a
 				var b: Vector2 = span.b
 				var side := Vector2(-(b - a).y, (b - a).x).normalized() * float(span.width) * 0.5
-				galleries.append(Poly.bounding_rect(PackedVector2Array([a + side, b + side, b - side, a - side])))
-		for row in preload("castle_gate_plan.gd").records(spec, true).values():
-			for gallery in row.gallery:
-				galleries.append(Rect2(gallery))
+				tower_decks.append(Poly.bounding_rect(PackedVector2Array([a + side, b + side, b - side, a - side])))
+	var gate_decks: Array[Rect2] = []
+	for row in preload("castle_gate_plan.gd").records(spec, true).values():
+		for gallery in row.gallery:
+			gate_decks.append(Rect2(gallery))
+	var strict: Array[Rect2] = tower_decks.duplicate()
+	strict.append_array(gate_decks)
+	out = _plan_wall_stairs(spec, strict)
+	if CastleGeometry.is_motte(spec) or gate_decks.is_empty() or _stairs_near_gates(spec, out):
+		return out
+	return _plan_wall_stairs(spec, tower_decks)
+
+
+## Is there a stair within 15 m of the gate of every ring?
+static func _stairs_near_gates(spec: CastleSpec, stairs: Array[Dictionary]) -> bool:
+	for ring in CastleGeometry.rings(spec):
+		var gate := CastleGeometry.gatehouse_aabb(spec, ring)
+		var gate_rect := Rect2(gate.position.x, gate.position.z, gate.size.x, gate.size.z)
+		var near := false
+		for stair in stairs:
+			if int(stair.ring) != ring:
+				continue
+			var rect: Rect2 = stair.footprint
+			var dx := maxf(0.0, maxf(rect.position.x - gate_rect.end.x, gate_rect.position.x - rect.end.x))
+			var dy := maxf(0.0, maxf(rect.position.y - gate_rect.end.y, gate_rect.position.y - rect.end.y))
+			if Vector2(dx, dy).length() <= 15.0:
+				near = true
+		if not near:
+			return false
+	return true
+
+
+static func _plan_wall_stairs(spec: CastleSpec, galleries: Array[Rect2]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
 	var fore: Dictionary = forebuilding(spec)
 	for ring in CastleGeometry.rings(spec):
 		var ring_start: int = out.size()
