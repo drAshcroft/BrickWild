@@ -100,6 +100,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	var unplaced: int = cut_measured(out, jobs)
 	var common_state := _round_common_state(out)
 	var previous_scale := 1.0
+	var accepted: Array = [0, 1.0]
 	var attempts: Array = RETRIES
 	if spec.compact_display:
 		attempts = [[0, 1.05], [0, 1.1], [0, 1.15], [0, 1.2], [0, 1.25]] + RETRIES
@@ -111,13 +112,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 		if spec.form in [&"strand", &"planted"] and is_equal_approx(float(attempt[1]), previous_scale):
 			continue
 		previous_scale = float(attempt[1])
-		var again: VillagePlan = VillageSitePlanner.plan(spec, int(attempt[0]), float(attempt[1]), minimum_depth, shore_depth)
-		# Through-road bends grow with retry width. Reserve against the road
-		# actually offered on this attempt, rather than the original narrow site.
-		var retry_depth := _manor_site_depth(again, jobs)
-		if retry_depth > again.site.size.y + 0.001:
-			again = VillageSitePlanner.plan(spec, int(attempt[0]), float(attempt[1]),
-				maxf(minimum_depth, retry_depth), shore_depth)
+		var again: VillagePlan = _replan(spec, jobs, int(attempt[0]), float(attempt[1]), minimum_depth, shore_depth)
 		var left: int = cut_measured(again, jobs)
 		var next_common := _round_common_state(again)
 		var better_common: bool = (bool(next_common["ready"]) and not bool(common_state["ready"])) \
@@ -127,6 +122,24 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			out = again
 			unplaced = left
 			common_state = next_common
+			accepted = attempt
+	# A coarse width step can buy the common its frontage with ground the
+	# village does not need: a round hamlet that is ready at 1.1 was taken at
+	# 1.3 and then failed the density floor at 3.47 %. Take the narrowest
+	# finer step that houses everyone and keeps the common as good as it is.
+	if float(accepted[1]) > 1.0 and _density(out) < _density_floor(spec):
+		for scale in FINE_WIDTH_STEPS:
+			if scale >= float(accepted[1]):
+				break
+			var finer: VillagePlan = _replan(spec, jobs, int(accepted[0]), scale, minimum_depth, shore_depth)
+			var finer_left: int = cut_measured(finer, jobs)
+			var finer_common := _round_common_state(finer)
+			if finer_left > unplaced or bool(finer_common["ready"]) != bool(common_state["ready"]) 					or float(finer_common["coverage"]) < float(common_state["coverage"]):
+				continue
+			out = finer
+			unplaced = finer_left
+			common_state = finer_common
+			break
 	_trim_lanes(out)
 	# Lot cutting can add service lanes, drop roads and add a mill race.
 	# Store crossings only against these final road/water indices.
@@ -236,6 +249,31 @@ const RETRIES := [[2, 1.0], [4, 1.0], [6, 1.0], [8, 1.0], [10, 1.0], [12, 1.0],
 
 
 const MAX_EXTRA_LANES := 12
+const FINE_WIDTH_STEPS: Array[float] = [1.05, 1.1, 1.15, 1.2, 1.25]
+
+
+## One site attempt: the form's roads plus `lanes` extra ones, `scale` wider
+## along the road. Through-road bends grow with width, so the manor's depth is
+## reserved against the road actually offered, not the first narrow site.
+static func _replan(spec: VillageSpec, jobs: Array[Dictionary], lanes: int, scale: float,
+		minimum_depth: float, shore_depth: float) -> VillagePlan:
+	var again: VillagePlan = VillageSitePlanner.plan(spec, lanes, scale, minimum_depth, shore_depth)
+	var retry_depth := _manor_site_depth(again, jobs)
+	if retry_depth > again.site.size.y + 0.001:
+		again = VillageSitePlanner.plan(spec, lanes, scale, maxf(minimum_depth, retry_depth), shore_depth)
+	return again
+
+
+## Built area over site area, measured as VillageScaleCheck measures it.
+static func _density(plan: VillagePlan) -> float:
+	var built := 0.0
+	for b in plan.buildings:
+		built += Poly.area(VillageMeasure.bounds_poly(b))
+	return built / maxf(plan.site.size.x * plan.site.size.y, 1.0)
+
+
+static func _density_floor(spec: VillageSpec) -> float:
+	return VillageScaleCheck.DENSITY_MIN_HAMLET if spec.population < VillageSpec.HAMLET_POPULATION 		else VillageScaleCheck.DENSITY_MIN
 
 
 ## A lane goes somewhere (VILLAGES 9.2): after the lots are cut, every lane
