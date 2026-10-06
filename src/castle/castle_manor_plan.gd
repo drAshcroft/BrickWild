@@ -351,6 +351,16 @@ static func tower_plan(spec: CastleSpec, id: String, centre: Vector3, opts := {}
 			plan.windows.append({"room": level, "storey": level, "pos": opening.pos,
 				"normal": normal, "width": opening.width, "sill": 0.95,
 				"head": minf(hs.height - 0.3, 2.15), "host": id})
+	# A storey no window can reach (the ground floor, or the facets beside the
+	# range joins) is a store, not a guardroom.
+	for level in range(levels):
+		var lit := false
+		for window in plan.windows:
+			if int(window.get("room", -1)) == level:
+				lit = true
+		if not lit:
+			plan.rooms[level]["kind"] = &"store"
+			hs.program[level] = &"store"
 	CastleKeepPlan.furnish_minimum_programme(plan, hs)
 	return plan
 
