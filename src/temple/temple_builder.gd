@@ -38,6 +38,8 @@ func build(p_spec: TempleSpec) -> ArrayMesh:
 	_build_pit()
 	_build_cells()
 	_build_roof()
+	if spec.form == &"basilica":
+		_build_order()
 	_build_outworks()
 	_dress()
 	return commit()
@@ -325,7 +327,8 @@ func _build_roof() -> void:
 			var span: float = r.size.y if along_x else r.size.x
 			var along: float = r.size.x if along_x else r.size.y
 			_kit.ridge_roof(Transform3D(Basis(Vector3.UP, yaw), Vector3(0.0, h, 0.0)),
-				span + 1.2, along + 0.8, span * 0.32, SURF_ROOF, SURF_STONE, span, along)
+				span + 1.2, along + 0.8, span * TempleGeometry.RIDGE_PITCH, SURF_ROOF,
+				SURF_STONE, span, along)
 			total_height = maxf(total_height, TempleGeometry.roof_height(spec))
 		&"flat":
 			box(Vector3(r.size.x + 0.8, 0.5, r.size.y + 0.8),
@@ -348,6 +351,179 @@ func _build_roof() -> void:
 			base, spec.spire_height, SURF_ROOF, 5, 0.2)
 		total_height = maxf(total_height,
 			TempleGeometry.roof_height(spec) + spec.spire_height)
+
+
+# ------------------------------------------------------------------ the order
+
+## A basilica's classical dress. Without it the form was four plain walls and a
+## steep ridge, and the walker's verdict was "looks like a barn". What makes a
+## hall read as a TEMPLE from outside is a short list, and this is it:
+##
+##   a stepped podium      the building stands on a stylobate, not on the grass
+##   pilasters             the bay rhythm of the colonnade inside, shown outside
+##   clerestory lights     one per bay, high in each eave wall
+##   an entablature        architrave and cornice round all four walls
+##   raking cornices       which turn each gable into a pediment
+##   an aedicule           pilasters, lintel and a little pediment round the gate
+##
+## All of it is outside the walls and none of it is logged as a mass: the rite
+## rules are about the inside of the building and must not see it. Nothing
+## stands further out than `TempleGeometry.ORDER_REACH`, inside the roof's
+## overhang, and the gate opening is left exactly as wide and as high as it was.
+func _build_order() -> void:
+	tag("order")
+	var r: Rect2 = TempleGeometry.site_rect(spec)
+	var h: float = spec.height
+	var reach: float = TempleGeometry.ORDER_REACH
+	var gate_half: float = TempleGeometry.GATE_W / 2.0 + spec.wall_t * 0.35
+	var gh: float = minf(TempleGeometry.GATE_H, h - 0.6)
+	var steps: int = TempleGeometry.PODIUM_STEPS
+	var rise: float = TempleGeometry.PODIUM_RISE
+	var podium: float = rise * float(steps)
+	var ent_h: float = clampf(h * 0.11, 0.8, 1.6)
+	var ent_y: float = h - ent_h
+	var front: float = r.position.y
+	var back: float = r.end.y
+	var hw: float = r.size.x / 2.0
+
+	# the podium: courses stepping in as they rise, cut down to the ground at
+	# the gate so the way in stays level with the floor inside
+	for k in range(steps):
+		var out: float = reach * float(steps - k) / float(steps)
+		var y0: float = rise * float(k)
+		var cy: float = y0 + rise / 2.0
+		for side in [-1.0, 1.0]:
+			box(Vector3(out, rise, r.size.y + out * 2.0),
+				Vector3(side * (hw + out / 2.0), cy, r.get_center().y), SURF_STONE)
+			var w: float = hw - gate_half
+			box(Vector3(w, rise, out), Vector3(side * (gate_half + w / 2.0), cy,
+				front - out / 2.0), SURF_STONE)
+		box(Vector3(r.size.x, rise, out), Vector3(0.0, cy, back + out / 2.0), SURF_STONE)
+
+	# the entablature round all four walls: a frieze course, and the cornice
+	# over it reaching out under the eaves
+	var frieze_out: float = 0.24
+	var cornice_y0: float = h - 0.42
+	var cornice_y1: float = h - 0.13
+	for band in [[ent_y, cornice_y0, frieze_out, SURF_STONE],
+			[cornice_y0, cornice_y1, reach - 0.05, SURF_TRIM]]:
+		var y0: float = band[0]
+		var y1: float = band[1]
+		var out2: float = band[2]
+		var surf: int = band[3]
+		var cy2: float = (y0 + y1) / 2.0
+		for side in [-1.0, 1.0]:
+			box(Vector3(out2, y1 - y0, r.size.y + out2 * 2.0),
+				Vector3(side * (hw + out2 / 2.0), cy2, r.get_center().y), surf)
+		for z in [front - out2 / 2.0, back + out2 / 2.0]:
+			box(Vector3(r.size.x, y1 - y0, out2), Vector3(0.0, cy2, z), surf)
+
+	# pilasters on every wall, on the bay rhythm, and a clerestory light in
+	# each bay of the eave walls -- the walls the ridge runs along
+	var along_x: bool = r.size.x > r.size.y
+	var pw: float = clampf(h * 0.055, 0.5, 0.9)
+	var p_out: float = 0.28
+	var p_h: float = ent_y - podium
+	var aedicule_half: float = gate_half + 0.45 + 0.7
+	for wall in range(4):
+		# 0 left, 1 right (along Z); 2 front, 3 back (along X)
+		var runs_z: bool = wall < 2
+		var length: float = r.size.y if runs_z else r.size.x
+		var sgn: float = -1.0 if wall % 2 == 0 else 1.0
+		var normal := Vector3(sgn, 0.0, 0.0) if runs_z else Vector3(0.0, 0.0, sgn)
+		var face: float = hw if runs_z else (back if wall == 3 else -front)
+		var n_bays: int = maxi(int(round(length / TempleGeometry.ORDER_BAY)), 2)
+		var eave_wall: bool = runs_z != along_x
+		var stations: Array[float] = []
+		for i in range(n_bays + 1):
+			stations.append(lerpf(-length / 2.0 + pw / 2.0, length / 2.0 - pw / 2.0,
+				float(i) / float(n_bays)))
+		for i in range(stations.size()):
+			var s: float = stations[i]
+			var at_gate: bool = wall == 2 and absf(s) < aedicule_half + pw
+			if not at_gate:
+				_pilaster(normal, face, s, runs_z, r, pw, p_out, podium, p_h)
+			if not eave_wall or i == stations.size() - 1:
+				continue
+			var mid: float = (s + stations[i + 1]) / 2.0
+			var bay: float = stations[i + 1] - s
+			if wall == 2 and absf(mid) < aedicule_half + bay * 0.5:
+				continue
+			_clerestory(normal, face, mid, runs_z, r, minf(bay * 0.3, 1.4),
+				clampf(h * 0.2, 1.0, 3.2), h * 0.66)
+
+	# raking cornices: each gable end becomes a pediment framed top and bottom
+	var span: float = r.size.y if along_x else r.size.x
+	var along: float = r.size.x if along_x else r.size.y
+	var roof_rise: float = span * TempleGeometry.RIDGE_PITCH
+	var hs: float = (span + 1.2) / 2.0
+	var roof_xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if along_x else 0.0),
+		Vector3(0.0, h, 0.0))
+	var rake_h: float = 0.32
+	var rake_d: float = 0.5
+	for end in [-1.0, 1.0]:
+		for side in [-1.0, 1.0]:
+			var x0: float = side * (span / 2.0 + 0.45)
+			var under0: float = roof_rise * (1.0 - absf(x0) / hs) - RoofShape.DEPTH * 0.5 - rake_h / 2.0
+			var under1: float = roof_rise - RoofShape.DEPTH * 0.5 - rake_h / 2.0
+			var a := Vector3(x0, under0, 0.0)
+			var b := Vector3(0.0, under1, 0.0)
+			var d: Vector3 = (b - a).normalized()
+			var basis := Basis(d, Vector3(-d.y, d.x, 0.0), Vector3(0.0, 0.0, 1.0))
+			var mid3: Vector3 = (a + b) / 2.0 + Vector3(0.0, 0.0, end * (along / 2.0 + rake_d / 2.0))
+			_kit.oriented_box(Vector3(a.distance_to(b), rake_h, rake_d),
+				roof_xf * Transform3D(basis, mid3), SURF_TRIM)
+
+	# the aedicule round the gate: two pilasters, a lintel, a little pediment
+	var ped_y: float = gh + 0.8
+	for side in [-1.0, 1.0]:
+		box(Vector3(0.7, ped_y - podium, 0.4),
+			Vector3(side * (gate_half + 0.45 + 0.35), podium + (ped_y - podium) / 2.0,
+				front - 0.2), SURF_TRIM)
+	box(Vector3((gate_half + 1.15) * 2.0, ped_y - gh, 0.46),
+		Vector3(0.0, gh + (ped_y - gh) / 2.0, front - 0.23), SURF_STONE)
+	var ped_half: float = gate_half + 1.2
+	var ped_rise: float = ped_half * 0.32
+	if ped_y + ped_rise < ent_y - 0.2:
+		_kit.gable_end_at(Transform3D(Basis(), Vector3(0.0, ped_y, front)),
+			ped_half, ped_rise, -0.5, 0.0, SURF_TRIM)
+
+
+## One pilaster on an outer wall: a shaft standing a little proud, on a base,
+## under a capital. `s` is its station along the wall.
+func _pilaster(normal: Vector3, face: float, s: float, runs_z: bool, r: Rect2,
+		pw: float, out: float, y0: float, height: float) -> void:
+	var c: Vector3 = _on_wall(normal, face, s, runs_z, r)
+	var sz := func(w: float, hh: float, d: float) -> Vector3:
+		return Vector3(d, hh, w) if runs_z else Vector3(w, hh, d)
+	box(sz.call(pw, height, out), c + normal * (out / 2.0)
+		+ Vector3(0.0, y0 + height / 2.0, 0.0), SURF_STONE)
+	box(sz.call(pw + 0.16, 0.3, out + 0.08), c + normal * ((out + 0.08) / 2.0)
+		+ Vector3(0.0, y0 + 0.15, 0.0), SURF_STONE)
+	box(sz.call(pw + 0.22, 0.34, out + 0.14), c + normal * ((out + 0.14) / 2.0)
+		+ Vector3(0.0, y0 + height - 0.17, 0.0), SURF_TRIM)
+
+
+## A clerestory light: a dark opening on the outer face with a stone sill and
+## a trim head, high in the wall between two pilasters.
+func _clerestory(normal: Vector3, face: float, s: float, runs_z: bool, r: Rect2,
+		w: float, hh: float, cy: float) -> void:
+	var c: Vector3 = _on_wall(normal, face, s, runs_z, r)
+	var sz := func(ww: float, yy: float, d: float) -> Vector3:
+		return Vector3(d, yy, ww) if runs_z else Vector3(ww, yy, d)
+	box(sz.call(w, hh, 0.04), c + normal * 0.03 + Vector3(0.0, cy, 0.0), SURF_DARK)
+	box(sz.call(w + 0.3, 0.18, 0.2), c + normal * 0.1
+		+ Vector3(0.0, cy - hh / 2.0 - 0.09, 0.0), SURF_STONE)
+	box(sz.call(w + 0.3, 0.22, 0.16), c + normal * 0.08
+		+ Vector3(0.0, cy + hh / 2.0 + 0.11, 0.0), SURF_TRIM)
+
+
+## The point on an outer wall face at station `s` along it, at ground level.
+static func _on_wall(normal: Vector3, face: float, s: float, runs_z: bool,
+		r: Rect2) -> Vector3:
+	if runs_z:
+		return Vector3(normal.x * face, 0.0, r.get_center().y + s)
+	return Vector3(s, 0.0, normal.z * face)
 
 
 func _build_dome_roof(rect: Rect2) -> void:

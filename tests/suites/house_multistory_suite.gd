@@ -36,6 +36,9 @@ static func run() -> SuiteResult:
 			res.warn("%s: %s" % [who, str(w)])
 		_check_elevations(res, plan, who)
 		_check_stairs(res, plan, who)
+		if int(row["storeys"]) >= 3:
+			_check_stacked_flight_control(res, plan, who)
+		_check_stair_foot_control(res, plan, who)
 		_check_roof(res, builder, spec, who)
 		_check_chimney(res, plan, builder, who)
 		_check_upstairs_programme(res, plan, who)
@@ -231,6 +234,65 @@ static func _check_stairs(res: SuiteResult, plan: HousePlan, who: String) -> voi
 	for level in range(int(plan.spec.storeys) - 1):
 		if not pairs.has(level):
 			res.fail("%s: no stair transition from storey %d" % [who, level])
+
+
+## The negative control for HousePlanCheck's stacked-flight rule: move the
+## upper flight into the lower one's well, as every planner used to, and the
+## check must say so. The real plan must not.
+static func _check_stacked_flight_control(res: SuiteResult, plan: HousePlan, who: String) -> void:
+	res.checked += 1
+	var says := func(p: HousePlan) -> bool:
+		for f in HousePlanCheck.new().check(p)["failures"]:
+			if "stands in the well" in str(f):
+				return true
+		return false
+	if says.call(plan):
+		res.fail("%s: a flight stands in the well of the flight below it" % who)
+	var lower := -1
+	var upper := -1
+	for i in range(plan.stairs.size()):
+		if int(plan.stairs[i]["storey"]) == 0:
+			lower = i
+		elif int(plan.stairs[i]["storey"]) == 1:
+			upper = i
+	if lower < 0 or upper < 0:
+		res.fail("%s: stacked-flight control needs two flights" % who)
+		return
+	var saved: Dictionary = plan.stairs[upper].duplicate(true)
+	var well: Rect2 = plan.stairs[lower]["upper_rect"]
+	for key in ["rect", "lower_rect", "upper_rect"]:
+		plan.stairs[upper][key] = well
+	var caught: bool = says.call(plan)
+	plan.stairs[upper] = saved
+	if not caught:
+		res.fail("%s: HousePlanCheck missed a flight stacked in the well below it" % who)
+
+
+## The negative control for the stair-foot rule: stretch the first flight from
+## wall to wall of its room, so neither end has floor to step from, and
+## HousePlanCheck must say it starts in a wall. The real plan must not.
+static func _check_stair_foot_control(res: SuiteResult, plan: HousePlan, who: String) -> void:
+	if plan.stairs.is_empty():
+		return
+	res.checked += 1
+	var says := func(p: HousePlan) -> bool:
+		for f in HousePlanCheck.new().check(p)["failures"]:
+			if "starts in a wall" in str(f):
+				return true
+		return false
+	if says.call(plan):
+		res.fail("%s: a flight starts in a wall" % who)
+	var saved: Dictionary = plan.stairs[0].duplicate(true)
+	var r: Rect2 = saved["lower_rect"]
+	var floor := HouseGeometry.room_floor_rect(plan, int(saved["a"]))
+	var wall_to_wall := Rect2(Vector2(floor.position.x, r.position.y), Vector2(floor.size.x, r.size.y)) \
+		if r.size.x > r.size.y else Rect2(Vector2(r.position.x, floor.position.y), Vector2(r.size.x, floor.size.y))
+	for key in ["rect", "lower_rect", "upper_rect"]:
+		plan.stairs[0][key] = wall_to_wall
+	var caught: bool = says.call(plan)
+	plan.stairs[0] = saved
+	if not caught:
+		res.fail("%s: HousePlanCheck missed a flight with no floor at its foot" % who)
 
 
 static func _check_roof(res: SuiteResult, builder: HouseBuilder, spec: HouseSpec, who: String) -> void:

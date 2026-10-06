@@ -140,7 +140,11 @@ void fragment() {
 	if (COLOR.r < 0.5) {
 		vec2 edge = min(UV, vec2(1.0) - UV);
 		float border = step(0.055, min(edge.x, edge.y)) * (1.0 - step(0.09, min(edge.x, edge.y)));
-		float weave = 0.96 + 0.04 * sin(UV.x * 540.0) * sin(UV.y * 540.0);
+		// The nap is in metres: on the rug's own 0..1 UV a 10 m runner had
+		// 540 threads end to end, too fine to see, and read as a flat sheet.
+		vec2 thread = floor_pos.xz * 38.0;
+		float nap = 1.0 - clamp(max(fwidth(thread).x, fwidth(thread).y) * 0.5, 0.0, 1.0);
+		float weave = 1.0 - nap * 0.07 * (0.5 + 0.5 * sin(thread.x) * sin(thread.y));
 		ALBEDO = mix(rug_colour.rgb, vec3(0.72, 0.56, 0.30), border * 0.85) * weave;
 	}
 }
@@ -149,7 +153,9 @@ void fragment() {
 	floor_material.shader = textile
 	floor_material.set_shader_parameter("floor_colour", spec.floor_color)
 	floor_material.set_shader_parameter("stone_floor", spec.material == &"stone" or spec is HotelSpec)
-	var palette := [Color("703c38"), Color("365b60"), Color("806438")]
+	# Madder, rust, ochre: warm dyes. A teal third read, with its pale border,
+	# as a sheet of glass laid on the floor (WALK-QA, 6 Oct, hotel pin 11).
+	var palette := [Color("703c38"), Color("7a4528"), Color("806438")]
 	floor_material.set_shader_parameter("rug_colour", palette[absi(spec.seed) % palette.size()])
 	node.set_surface_override_material(HouseBuilder.SURF_FLOOR, floor_material)
 

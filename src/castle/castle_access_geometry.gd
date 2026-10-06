@@ -5,8 +5,18 @@ extends RefCounted
 
 const LANE := 1.25
 const SPINE := 0.2
-const LANDING := 0.9
+## A landing turns the walker through a half circle onto the other lane. It
+## is at least a lane deep, as a building code asks; at 0.9 m a person met the
+## guard rail before they had finished turning (walk-QA, Thorncliffe pin 2).
+const LANDING := 1.3
 const TREAD := 0.28
+## Every rail on a wall stair: posts, flight rail, landing and end guards.
+const RAIL_T := 0.12
+const RAIL_H := 0.75
+const PIER_INSET := 0.02
+## A flight's rise. Below this the solid treads of the flight two above leave
+## less than a body and a step of headroom over the top of this one.
+const MIN_FLIGHT_RISE := 2.15
 
 
 ## The emitted motte treads are also the passage reservation at the bailey's
@@ -273,7 +283,26 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 		# A transverse stair uses only its width along the curtain. Sampling by
 		# the full flight span rejects short octagon facets before it is considered.
 		for transverse in [false, true]:
-			var edge_span := width if transverse else span
+			# A transverse stair climbs away from the curtain and must arrive
+			# back at it. With an even number of flights it therefore starts
+			# at the curtain too, its foot boxed into a landing-deep slot
+			# against the wall (walk-QA, Thorncliffe pin 1). An odd count
+			# puts the foot at the open end, facing the ward.
+			var f_count := flights
+			var f_steps := steps
+			var f_rise := rise
+			var f_run := run
+			var f_span := span
+			if transverse and flights % 2 == 0:
+				var more := height / float(flights + 1) >= MIN_FLIGHT_RISE
+				f_count = flights + 1 if more else flights - 1
+				if f_count < 1:
+					continue
+				f_rise = height / float(f_count)
+				f_steps = maxi(1, int(ceil(f_rise / 0.2)))
+				f_run = f_steps * TREAD
+				f_span = f_run + LANDING * 2.0
+			var edge_span := width if transverse else f_span
 			if length < edge_span + 0.4:
 				continue
 			var edge_offset := edge_span * 0.5 + 0.2
@@ -281,15 +310,18 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 			for sample in range(samples + 1):
 				var boundary := a.lerp(b, (edge_offset + (length - edge_span - 0.4) \
 					* float(sample) / samples) / length)
-				boundary += inside * CastleGeometry.wall_thickness(spec, ring)
+				# Stand clear of the coping's lip. Flush with the inner face,
+				# the top landing and the lip shared one plane at walk height
+				# and z-fought (walk-QA, Thorncliffe pin 6).
+				boundary += inside * (CastleGeometry.wall_thickness(spec, ring) + CastleGeometry.WALK_LIP)
 				if absf(side) > 0.1 and boundary.x * side <= 0.0:
 					continue
 				var axis := inside if transverse else along
 				var across := -along if transverse else inside
-				var at := boundary + inside * span * 0.5 + along * width * 0.5 if transverse else boundary
-				var poly := PackedVector2Array([at - axis * span * 0.5,
-					at + axis * span * 0.5, at + axis * span * 0.5 + across * width,
-					at - axis * span * 0.5 + across * width])
+				var at := boundary + inside * f_span * 0.5 + along * width * 0.5 if transverse else boundary
+				var poly := PackedVector2Array([at - axis * f_span * 0.5,
+					at + axis * f_span * 0.5, at + axis * f_span * 0.5 + across * width,
+					at - axis * f_span * 0.5 + across * width])
 				if not Array(poly).all(func(p): return Poly.contains_point(clear_ward, p, 0.01)):
 					continue
 				var footprint := Poly.bounding_rect(poly)
@@ -299,9 +331,24 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 					continue
 				# The flight can be clear while its final step onto the curtain
 				# crosses a projecting tower. Reserve that body corridor as well.
-				var start_forward := -1.0 if transverse and flights % 2 == 1 else 1.0
-				var finish_forward := start_forward * (1.0 if flights % 2 == 1 else -1.0)
-				var arrival := at + axis * finish_forward * (run + LANDING) * 0.5 + across * LANE * 0.5
+				var start_forward := -1.0 if transverse and f_count % 2 == 1 else 1.0
+				# The foot must be walked up to from open ward. A stair along a
+				# curtain may climb either way; on a polygon its foot can run
+				# into the corner where the next curtain turns in. Take the
+				# direction whose foot is clear, or skip the place.
+				var lane0 := (f_count - 1) % 2
+				var foot_across := across * (LANE * 0.5 + lane0 * (LANE + SPINE))
+				var foot_ok := func(sf: float) -> bool:
+					var foot: Vector2 = at + axis * (sf * (-f_span * 0.5 - 0.6)) + foot_across
+					return Poly.contains_point(clear_ward, foot, 0.01) \
+						and _edge_distance(clear_ward, foot) >= 0.5 \
+						and not blocked.any(func(rect): return rect.has_point(foot))
+				if not foot_ok.call(start_forward):
+					if transverse or not foot_ok.call(-start_forward):
+						continue
+					start_forward = -start_forward
+				var finish_forward := start_forward * (1.0 if f_count % 2 == 1 else -1.0)
+				var arrival := at + axis * finish_forward * (f_run + LANDING) * 0.5 + across * LANE * 0.5
 				var coping := Geometry2D.get_closest_point_to_segment(arrival,
 					a + inside * CastleGeometry.wall_thickness(spec, ring) * 0.5,
 					b + inside * CastleGeometry.wall_thickness(spec, ring) * 0.5)
@@ -318,10 +365,17 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 					continue
 				score = distance
 				best = {"ring": ring, "edge": e, "at": at, "along": axis,
-					"inside": across, "flights": flights, "steps": steps, "rise": rise,
-					"run": run, "span": span, "width": width, "height": height,
-					"start_forward": start_forward,
-					"poly": poly, "footprint": footprint}
+					"inside": across, "flights": f_count, "steps": f_steps, "rise": f_rise,
+					"run": f_run, "span": f_span, "width": width, "height": height,
+					"start_forward": start_forward, "transverse": transverse,
+					"landing": LANDING, "poly": poly, "footprint": footprint}
+	return best
+
+
+static func _edge_distance(poly: PackedVector2Array, p: Vector2) -> float:
+	var best := INF
+	for i in poly.size():
+		best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(p, poly[i], poly[(i + 1) % poly.size()])))
 	return best
 
 
@@ -343,10 +397,21 @@ static func pieces(stair: Dictionary) -> Array[Dictionary]:
 	var width: float = stair.width
 	# The grounded central spine carries every flight. Landings turn round
 	# its ends, so a support is never also a wall across the route.
+	var landing := float(stair.get("landing", LANDING))
+	var transverse := bool(stair.get("transverse", false))
+	var pier := 0.22
 	_piece(out, "wall_stair_spine", Vector3(run, height, SPINE), Vector3(0, height * 0.5, LANE + SPINE * 0.5), stair)
+	# Which long sides fall away to the ward. The far side (lane 1) always
+	# does. Lane 0 stands against the curtain on a stair along it, but on a
+	# transverse stair it is the other open side, and it had no guard for its
+	# whole height (walk-QA, Thorncliffe pin 3).
+	var guarded: Array[int] = [1]
+	if transverse:
+		guarded.append(0)
 	for flight in int(stair.flights):
 		var lane := (int(stair.flights) - 1 - flight) % 2
 		var lane_at := LANE * 0.5 + lane * (LANE + SPINE)
+		var guard_v := width - 0.06 if lane == 1 else 0.06
 		var forward := (1.0 if flight % 2 == 0 else -1.0) * float(stair.get("start_forward", 1.0))
 		var floor_y := flight * float(stair.rise)
 		for step in int(stair.steps):
@@ -354,25 +419,52 @@ static func pieces(stair: Dictionary) -> Array[Dictionary]:
 			var u := forward * (-run * 0.5 + (step + 0.5) * TREAD)
 			_piece(out, "wall_stair_tread", Vector3(TREAD, rise, LANE),
 				Vector3(u, floor_y + rise * 0.5, lane_at), stair)
-			if lane == 1 and step % 3 == 0:
+			if lane in guarded and step % 3 == 0:
 				_piece(out, "wall_stair_guard_post", Vector3(0.08, 0.9, 0.08),
-					Vector3(u, floor_y + rise + 0.45, width - 0.06), stair)
-		if lane == 1:
+					Vector3(u, floor_y + rise + 0.45, guard_v), stair)
+		if lane in guarded:
 			var slope := atan2(float(stair.rise), forward * run)
 			_piece(out, "wall_stair_flight_rail", Vector3(Vector2(run, float(stair.rise)).length(), 0.09, 0.09),
-				Vector3(0, floor_y + float(stair.rise) * 0.5 + 0.9, width - 0.06), stair,
+				Vector3(0, floor_y + float(stair.rise) * 0.5 + 0.9, guard_v), stair,
 				Basis(Vector3.BACK, slope))
 		var level := floor_y + float(stair.rise)
-		var end := forward * (run + LANDING) * 0.5
-		_piece(out, "wall_stair_landing", Vector3(LANDING, 0.2, width),
+		var end := forward * (run + landing) * 0.5
+		var out_sign := signf(end)
+		_piece(out, "wall_stair_landing", Vector3(landing, 0.2, width),
 			Vector3(end, level - 0.1, width * 0.5), stair)
-		# Rails stay on the outside of the two-lane stair. The inside edge
-		# opens directly onto the curtain's coping at the top landing.
-		_piece(out, "wall_stair_landing_rail", Vector3(LANDING, 0.75, 0.12),
-			Vector3(end, level + 0.375, width - 0.06), stair)
+		# Side guards stop at the corner pier rather than sharing its outer
+		# faces, which z-fought where they overlapped.
+		for v_side in guarded:
+			var v := width - RAIL_T * 0.5 if v_side == 1 else RAIL_T * 0.5
+			var length := landing - (pier if v_side == 1 else 0.0)
+			_piece(out, "wall_stair_landing_rail", Vector3(length, RAIL_H, RAIL_T),
+				Vector3(end - out_sign * (landing - length) * 0.5, level + RAIL_H * 0.5, v), stair)
+		# The landing's outer end is a drop too, except where it meets the
+		# curtain: a transverse stair's curtain end (u < 0), where the walk is.
+		# The inside edge of a stair along the curtain opens onto the coping at
+		# the top landing, so no guard runs there.
+		if not (transverse and out_sign < 0.0):
+			var v0 := RAIL_T if transverse else 0.0
+			var v1 := width - pier
+			_piece(out, "wall_stair_end_rail", Vector3(RAIL_T, RAIL_H, v1 - v0),
+				Vector3(out_sign * (span * 0.5 - RAIL_T * 0.5), level + RAIL_H * 0.5, (v0 + v1) * 0.5), stair)
+	# The stair stands WALK_LIP clear of the curtain so its top landing does not
+	# share the coping lip's plane. The gap is built up solid to the coping's
+	# underside, so the stair bears on the wall and leaves no slot beside it.
+	var lip: float = CastleGeometry.WALK_LIP
+	var bear_h: float = height - CastleGeometry.PARAPET_RISE
+	if transverse:
+		_piece(out, "wall_stair_bearing", Vector3(lip, bear_h, width),
+			Vector3(-span * 0.5 - lip * 0.5, bear_h * 0.5, width * 0.5), stair)
+	else:
+		_piece(out, "wall_stair_bearing", Vector3(span, bear_h, lip),
+			Vector3(0.0, bear_h * 0.5, -lip * 0.5), stair)
+	# The corner piers stand 2 cm inside the landings' edges and rise to rail
+	# height as newels: flush, their faces and tops lay in the landings' planes.
 	for side in [-1.0, 1.0]:
-		_piece(out, "wall_stair_pier", Vector3(0.22, height, 0.22),
-			Vector3(float(side) * (span * 0.5 - 0.11), height * 0.5, width - 0.11), stair)
+		_piece(out, "wall_stair_pier", Vector3(pier, height + RAIL_H, pier),
+			Vector3(float(side) * (span * 0.5 - pier * 0.5 - PIER_INSET), (height + RAIL_H) * 0.5,
+				width - pier * 0.5 - PIER_INSET), stair)
 	return out
 
 

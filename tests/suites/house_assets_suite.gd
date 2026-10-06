@@ -45,6 +45,12 @@ static func run() -> SuiteResult:
 						PropCatalog.canopy(key), PropCatalog.trunk(key)])
 			elif PropCatalog.canopy(key) <= 0.0:
 				res.fail("%s is a plant with no measured canopy" % key)
+			# The ground line the assembler sits a plant on (walk QA pin:
+			# a bush sat on its buried stem stub floated 0.23 m).
+			res.checked += 1
+			if absf(float(plant["seat"]) - PropCatalog.seat_offset(key)) > TOL:
+				res.fail("%s has its ground line %.3fm off its origin; the catalogue says %.3f"
+					% [key, plant["seat"], PropCatalog.seat_offset(key)])
 		var want: Vector3 = PropCatalog.size(key)
 		if (measured.size - want).length() > TOL:
 			res.fail("%s measures %.3f x %.3f x %.3f, the catalogue says %.3f x %.3f x %.3f"

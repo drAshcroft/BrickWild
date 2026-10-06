@@ -127,6 +127,12 @@ static func commit(plan: HousePlan, room: int, cand: Dictionary,
 	# is part of that elevation: the high table stands ON the step, and
 	# everything in plan still measures as though the step were flat floor.
 	pos.y += storey_base(plan, room)
+	# A piece stands on the floor's TOP, not on the storey datum: the builder
+	# lays each floor slab from the datum up by FLOOR_T. Standing furniture on
+	# the datum sank every leg twelve centimetres into the boards, cut the
+	# bottom off a crate of carrots, and put the base of an upper-storey
+	# bookcase exactly on the ceiling below it, where it flickered through.
+	pos.y += HouseGeometry.FLOOR_T
 	if plan.on_dais(room, Vector2(pos.x, pos.z)):
 		pos.y += plan.dais_rise()
 	cand["pos"] = pos

@@ -20,7 +20,61 @@ static func run() -> SuiteResult:
 	_variety(res)
 	_purity(res)
 	_public_api(res)
+	_negative_controls(res)
+	_walk_pin_rook_mill(res)
 	return res
+
+
+## The two rules the Rook Mill walk pins asked for, each made to fail on
+## purpose so neither can be a tautology: a window placed on the bounding
+## circle rather than the battered polygon, and toy sails on a tall tower.
+static func _negative_controls(res: SuiteResult) -> void:
+	for mill_type in [&"tower", &"smock", &"paddle"]:
+		var spec := _spec(mill_type, 12.0, 6.0, 12.0, 1)
+		spec.windows = maxi(spec.windows, 2)
+		var faulty: WindmillBuilder = preload("res://tests/fixtures/faulty_windmill_builder.gd").new()
+		var mesh: ArrayMesh = faulty.build(spec)
+		var rep: Dictionary = WindmillCheck.new().check(spec, mesh, faulty)
+		_expect(res, _has_rule(rep, "openings"),
+			"%s: openings placed on the bounding circle passed the openings rule (%s)."
+				% [mill_type, rep["failures"]])
+	for mill_type in [&"tower", &"smock"]:
+		var spec := _spec(mill_type, 12.0, 6.0, 12.0, 1)
+		spec.sail_r = spec.curb_y * 0.3          # vanes of 0.6 x the height
+		var builder := WindmillBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		var rep: Dictionary = WindmillCheck.new().check(spec, mesh, builder)
+		_expect(res, _has_rule(rep, "proportion"),
+			"%s: sails spanning 0.6 of the tower's height passed the proportion rule."
+				% mill_type)
+
+
+## The pinned mill itself, through the public path: the request the walker
+## built, every rule green, sails in proportion and the door on the wall.
+static func _walk_pin_rook_mill(res: SuiteResult) -> void:
+	var request := BuildingRequest.from_dict({"kind": "windmill", "style": "tower",
+		"seed": "1", "width": 12.0, "length": 6.0, "height": 12.0,
+		"material": "timber"})
+	var building := BrickWild.generate(request)
+	_expect(res, building.is_ok(), "Rook Mill: the walk-pin request was refused.")
+	if not building.is_ok():
+		return
+	var spec: WindmillSpec = building.spec
+	var builder := WindmillBuilder.new()
+	var mesh: ArrayMesh = builder.build(spec)
+	var rep: Dictionary = WindmillCheck.new().check(spec, mesh, builder)
+	_expect(res, rep["ok"], "Rook Mill: %s" % [rep["failures"]])
+	_expect(res, spec.sail_span >= spec.curb_y * WindmillGeometry.SPAN_PER_HEIGHT - 0.01,
+		"Rook Mill: a %.1f m span on a %.1f m tower." % [spec.sail_span, spec.curb_y])
+	_expect(res, not builder.components("door_hinge").is_empty(),
+		"Rook Mill: the door has no leaf furniture, so it does not read as a door.")
+
+
+static func _has_rule(rep: Dictionary, rule: String) -> bool:
+	for f in rep["failures"]:
+		if String(f).begins_with(rule + ":"):
+			return true
+	return false
 
 
 ## Every mill, at every corner of its own envelope, from several seeds.

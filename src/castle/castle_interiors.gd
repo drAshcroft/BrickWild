@@ -101,6 +101,27 @@ static func yard(spec: CastleSpec, entry: Dictionary) -> Dictionary:
 
 ## The castle's old mass is replaced, not overlaid. Its roof remains owned by
 ## CastleBuilder so touching ranges still share the joined roof envelope.
+## The same mesh with every vertex's UV projected from its castle-frame
+## position on its face's own basis, exactly as MeshKit does for metric kits.
+static func _metric_uvs(mesh: ArrayMesh, xf: Transform3D) -> ArrayMesh:
+	var out := ArrayMesh.new()
+	for s in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(s)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL] \
+			if arrays[Mesh.ARRAY_NORMAL] != null else PackedVector3Array()
+		if normals.size() == verts.size():
+			var uv := PackedVector2Array()
+			uv.resize(verts.size())
+			for i in verts.size():
+				var axes: Array = MeshKit._surface_uv_axes((xf.basis * normals[i]).normalized())
+				uv[i] = MeshKit._project_uv(xf * verts[i], axes)
+			arrays[Mesh.ARRAY_TEX_UV] = uv
+		out.add_surface_from_arrays(mesh.surface_get_primitive_type(s), arrays)
+		out.surface_set_material(s, mesh.surface_get_material(s))
+	return out
+
+
 static func emit(owner: CastleBuilder, row: Dictionary) -> void:
 	var plan: HousePlan = row.plan
 	var builder := HouseBuilder.new()
@@ -109,6 +130,12 @@ static func emit(owner: CastleBuilder, row: Dictionary) -> void:
 	# Tall ranges retain continuous perimeter masonry above occupied rooms.
 	builder.extend_upper_walls(bounds.size.y)
 	var mesh := builder.commit()
+	# The castle's masonry is textured in metre coordinates; a house shell is
+	# not, and its unit-square box UVs stretched one tile of coursing across a
+	# whole gable, sheared on the second triangle of every face (walk-QA,
+	# Thorncliffe pin 11, "weird lines"). Re-project in the castle frame.
+	if owner._kit.metric_coordinates:
+		mesh = _metric_uvs(mesh, row.transform)
 	# With the house roof disabled, its roof-colour slot contains glazing.
 	# Castle openings have their own material and are excluded from masonry
 	# voxels. SurfaceTool omits empty slots on commit, so a windowless plan's

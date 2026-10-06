@@ -53,10 +53,17 @@ func _expect(ok: bool, message: String) -> void:
 
 func _check(plan: HousePlan, builder: HouseBuilder, mesh: ArrayMesh) -> void:
 	_expect(mesh.get_surface_count() == 4, "interior details changed four-surface contract")
+	# one rug per free-standing table, one runner per row of tables
 	var wanted := 0
+	var rows := {}
 	for item in plan.furniture:
 		if PropCatalog.category(item["key"]) == "table" and plan.kind_of(int(item["room"])) in [&"hall", &"parlour", &"dining", &"dining_room"]:
-			wanted += 1
+			var row := String(item.get("row", ""))
+			if row == "":
+				wanted += 1
+			elif not rows.has(row):
+				rows[row] = true
+				wanted += 1
 	_expect(plan.rugs.size() == wanted, "missing or orphan table rug")
 	var arrays := mesh.surface_get_arrays(HouseBuilder.SURF_FLOOR)
 	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]

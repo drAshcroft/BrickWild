@@ -26,6 +26,8 @@ static func _run_kinds(kinds: Array[StringName]) -> SuiteResult:
 static func _run_kinds_at_scale(kinds: Array[StringName], selected_scale: float) -> SuiteResult:
 	var res := SuiteResult.new("world courtyard")
 	_fixtures(res)
+	if &"domus" in kinds:
+		_walk_pin_domus(res)
 	for kind in kinds:
 		for scale in SCALES:
 			if selected_scale >= 0.0 and absf(scale - selected_scale) > 0.001:
@@ -57,6 +59,74 @@ static func _run_kinds_at_scale(kinds: Array[StringName], selected_scale: float)
 					"PASS" if res.failures.size() == case_failures else "FAIL",
 					who, (Time.get_ticks_msec() - case_started) / 1000.0])
 	return res
+
+
+## The Merchant's Domus the walker pinned (review 1a10f8e7682668f8189), built
+## through the public path: its ranges are furnished rooms, nothing hangs
+## through the floor, the street door is a door a person walks through, the
+## flanks are not blank, the shop fronts are cut, and the glazing the shell
+## draws in the roof slot renders as glass rather than as roof tile.
+static func _walk_pin_domus(res: SuiteResult) -> void:
+	var request := BuildingRequest.from_dict({"kind": "world", "style": "courtyard_house",
+		"purpose": "domus", "seed": "1", "width": 20.0, "length": 30.0,
+		"height": 6.0, "storeys": 1, "material": "timber"})
+	var building: GeneratedBuilding = BrickWild.generate(request)
+	res.checked += 1
+	if building == null or not building.is_ok():
+		res.fail("walk-pin domus: generation failed")
+		return
+	var plan: HousePlan = building.plan
+	var standing := {}
+	for f in plan.furniture:
+		var room := int(f.get("room", -1))
+		var key := String(f.get("key", ""))
+		var p: Vector3 = f.get("pos", Vector3.ZERO)
+		if not bool(f.get("mounted", false)) and p.y < 0.05:
+			standing[room] = int(standing.get(room, 0)) + 1
+		var host := int(f.get("host", -1))
+		if host >= 0:
+			res.checked += 1
+			if host >= plan.furniture.size() \
+					or int(plan.furniture[host].get("room", -2)) != room:
+				res.fail("walk-pin domus: %s stands on a host that is not there" % key)
+		var bottom: float = p.y + PropCatalog.floor_offset(key) * float(f.get("scale", 1.0))
+		res.checked += 1
+		if bottom < -0.03:
+			res.fail("walk-pin domus: %s hangs %.2f m through the floor" % [key, -bottom])
+	for i in range(plan.rooms.size()):
+		var kind := plan.kind_of(i)
+		if kind == &"gallery":
+			continue
+		res.checked += 1
+		if int(standing.get(i, 0)) < 2:
+			res.fail("walk-pin domus: room %d (%s) holds %d standing pieces"
+				% [i, String(kind), int(standing.get(i, 0))])
+	var programme := 0
+	for i in range(plan.rooms.size()):
+		if plan.kind_of(i) in [&"dining_room", &"parlour", &"bedroom"]:
+			programme += 1
+	res.checked += 1
+	if programme < 3:
+		res.fail("walk-pin domus: only %d ranges have a domestic programme" % programme)
+	var street_w := 0.0
+	var flank := 0
+	for door in plan.doors:
+		if bool(door.get("front", false)):
+			street_w = float(door.get("width", 0.0))
+	for win in plan.windows:
+		if String(win.get("role", "")) == "high_side_window":
+			flank += 1
+	res.checked += 2
+	if street_w < 1.4:
+		res.fail("walk-pin domus: the street door is %.2f m wide" % street_w)
+	if flank < 6:
+		res.fail("walk-pin domus: %d high windows relieve the flanks" % flank)
+	for f2 in CourtCheck.new().check(plan)["failures"]:
+		res.fail("walk-pin domus: %s" % f2)
+	var palette: Array = WorldAssembler.house_palette(plan)
+	res.checked += 1
+	if palette.size() < 3 or palette[2] == null or (palette[2] as Material).next_pass == null:
+		res.fail("walk-pin domus: the roof slot has no glazing pass, so windows render as tile")
 
 
 static func _request(kind: StringName, scale: float, seed: int) -> BuildingRequest:
@@ -194,6 +264,20 @@ static func _fixtures(res: SuiteResult) -> void:
 		"normal": Vector2(1, 0), "width": 0.8, "exterior": false,
 		"front": false, "role": "shop_back_door"})
 	_expect(res, "shops", CourtCheck.new().check(shop_door))
+	# the walk-pin shop front: the display window stacked on the door's span
+	var stacked := _fixture_plan(&"domus", 9114)
+	for door in stacked.doors:
+		if String(door.get("role", "")) != "taberna":
+			continue
+		for win in stacked.windows:
+			if int(win.get("room", -1)) == int(door.get("a", -2)) \
+					and String(win.get("role", "")) == "taberna_display":
+				win["pos"] = door["pos"]
+		break
+	res.checked += 1
+	var stacked_failures: Array = CourtCheck.new().check(stacked)["failures"]
+	if not str(stacked_failures).contains("stacked"):
+		res.fail("negative fixture shops/stacked did not fail: %s" % [stacked_failures])
 
 	var gate := _fixture_plan(&"palazzo", 9109)
 	for door in gate.doors:

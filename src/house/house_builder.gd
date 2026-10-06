@@ -19,7 +19,6 @@ const SURF_ROOF := 2
 const SURF_FLOOR := 3
 const HAN_DOME_SEGMENTS := 16
 const HAN_DOME_BANDS := 5
-
 var plan: HousePlan
 var spec: HouseSpec
 var emitted_mesh: ArrayMesh
@@ -67,6 +66,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_culture()
 	if with_roof:
 		_build_roof()
+		_build_ceiling()
 	_build_porch()
 	_build_chimney()
 	_build_yard()
@@ -321,6 +321,59 @@ func commit() -> ArrayMesh:
 	return emitted_mesh
 
 
+## How far a slab is tucked out of the faces it would otherwise share (WALK-QA,
+## 6 Oct). A floor laid exactly to the outside of the walls puts its edge in
+## the wall's own plane, and its underside in the plane of every upper
+## partition's foot: the renderer cannot order either pair and the walk-through
+## saw a flickering stripe along each floor line and a sawtooth across a
+## ceiling. The slab now stops this far inside the outer faces and hangs this
+## far below its storey line, where both seams are buried in masonry. The
+## walking surface, `y0 + FLOOR_T`, is unchanged, and so is the logged mass.
+const SLAB_TUCK := 0.006
+## The same idea for an opening's frame: the jambs, head and sill were laid
+## exactly against the wall's cut, so the jamb's inner face and the reveal were
+## one plane and flickered (WALK-QA, 6 Oct, hotel pin 1). The frame now stands
+## this far into the opening and hides the cut. The clear opening loses twice
+## this, 12 mm, nowhere near anything a body or the nav grid can notice.
+const TRIM_TUCK := 0.006
+
+
+## The top storey's ceiling: a plaster slab across the wall heads, so that
+## looking up indoors meets a ceiling and not the underside of the roof boards
+## (WALK-QA, 6 Oct, shop pin 7: "no ceiling"). The plan already assumes one --
+## `spec.height` is floor to ceiling, chandeliers hang from it, and a dormer
+## lights an attic, not a room -- and every lower storey has one in the floor
+## above. It lies ON the wall heads, out to the walls' centre lines, so its
+## underside meets the tops of the walls back to back and shares no plane with
+## them.
+##
+## Not for a cutaway (the roof is off to show the rooms), a yard plan, a
+## shaped storey, a flat or conical roof (the roof IS the ceiling there), a
+## plan with authored roof openings (an oculus or a compluvium must stay open
+## to the sky), or a family of the wider world (it owns its interiors).
+const CEILING_T := 0.06
+
+
+func _build_ceiling(any_roof := false, roofed := false) -> void:
+	if not (roof_enabled or roofed) or plan.has_court() or plan.world_family != &"" \
+			or not plan.roof_openings.is_empty():
+		return
+	if not any_roof and spec.roof_type not in [&"gable", &"half_hipped", &"hipped"]:
+		return
+	var levels := _levels()
+	var level: int = levels.max()
+	if _shaped_room(level) >= 0:
+		return
+	var r: Rect2 = HouseGeometry.storey_rect(plan, level).grow(-HouseGeometry.wall_thickness(spec) * 0.5)
+	var y := float(level + 1) * spec.height
+	tag("ceiling")
+	host("ceiling", level)
+	component_box("ceiling", Vector3(r.size.x, CEILING_T, r.size.y),
+		Transform3D(Basis(), Vector3(r.get_center().x, y + CEILING_T * 0.5, r.get_center().y)),
+		SURF_WALL)
+	host_end()
+
+
 func _build_floor() -> void:
 	tag("floor")
 	var t: float = HouseGeometry.FLOOR_T
@@ -329,6 +382,12 @@ func _build_floor() -> void:
 		var y0 := float(level) * spec.height
 		var a := AABB(Vector3(r.position.x, y0, r.position.y),
 			Vector3(r.size.x, t, r.size.y))
+		# the emitted slab: inside the outer faces, and down past the storey
+		# line -- except the lowest, whose underside is on the ground and seen
+		# by nobody, and which must not reach below the planned shell
+		var drop := 0.0 if level == _lowest() else SLAB_TUCK
+		var slab := AABB(Vector3(r.position.x + SLAB_TUCK, y0 - drop, r.position.y + SLAB_TUCK),
+			Vector3(r.size.x - SLAB_TUCK * 2.0, t + drop, r.size.y - SLAB_TUCK * 2.0))
 		var holes: Array[int] = plan.courts_on(level)
 		if not holes.is_empty():
 			# The floor is laid round the yard, band by band, so the court is
@@ -350,7 +409,7 @@ func _build_floor() -> void:
 					remaining.append_array(RoofShape.subtract(piece, Poly.from_rect(opening)))
 				pieces = remaining
 			for pi in pieces.size():
-				_kit.slab_poly(_lift(pieces[pi], y0 + t / 2.0), t, SURF_FLOOR)
+				_kit.slab_poly(_lift(pieces[pi], y0 + (t - drop) / 2.0), t + drop, SURF_FLOOR)
 				var bounds := Poly.bounding_rect(pieces[pi])
 				var floor_name := "floor" if _levels().size() == 1 else "floor_%d" % level
 				if pieces.size() > 1:
@@ -360,9 +419,9 @@ func _build_floor() -> void:
 			continue
 		var openings := _floor_openings(level)
 		if not openings.is_empty():
-			_emit_floor_around_many(r, openings, y0, t, level)
+			_emit_floor_around_many(r, openings, y0, t, level, drop)
 		else:
-			box(a.size, a.position + a.size / 2.0, SURF_FLOOR)
+			box(slab.size, slab.position + slab.size / 2.0, SURF_FLOOR)
 			_log_mass("floor" if _levels().size() == 1 else "floor_%d" % level, a, y0)
 	_build_pits()
 	_emit_stairs()
@@ -411,7 +470,7 @@ func _build_pits() -> void:
 
 
 func _emit_floor_around_many(r: Rect2, holes: Array[Rect2], y0: float, t: float,
-		level: int) -> void:
+		level: int, drop := SLAB_TUCK) -> void:
 	var xs: Array[float] = [r.position.x, r.end.x]
 	var ys: Array[float] = [r.position.y, r.end.y]
 	for hole in holes:
@@ -439,7 +498,11 @@ func _emit_floor_around_many(r: Rect2, holes: Array[Rect2], y0: float, t: float,
 				continue
 			var size := Vector3(p.size.x, t, p.size.y)
 			var centre := Vector3(centre2.x, y0 + t / 2.0, centre2.y)
-			box(size, centre, SURF_FLOOR)
+			# emitted tucked like the whole slab; logged as planned
+			var tucked := p.intersection(r.grow(-SLAB_TUCK))
+			box(Vector3(tucked.size.x, t + drop, tucked.size.y),
+				Vector3(tucked.get_center().x, y0 + (t - drop) / 2.0, tucked.get_center().y),
+				SURF_FLOOR)
 			_log_mass("floor_%d_%d" % [level, emitted], AABB(centre - size / 2.0, size), y0)
 			emitted += 1
 
@@ -484,8 +547,12 @@ func _emit_stairs() -> void:
 		# the planner laid the well on (it runs the room's long way, LAY-005)
 		var along_x: bool = footprint.size.x > footprint.size.y
 		var run: float = footprint.size.x if along_x else footprint.size.y
+		# from whichever end has floor in front of it (HouseGeometry.stair_climb)
+		var climb: float = HouseGeometry.stair_climb(plan, stair)
 		for s in range(steps):
 			var t: float = run * (float(s) + 0.5) / steps
+			if climb < 0.0:
+				t = run - t
 			var h := step_h * float(s + 1)
 			var step_size := Vector3(run / steps, h, footprint.size.y) if along_x \
 				else Vector3(footprint.size.x, h, run / steps)
@@ -529,13 +596,14 @@ func _build_plinth() -> void:
 				"kind": "door", "normal": normal})
 		# These are clearances, not additional framed doors. Framing the short
 		# plinth opening used to put a second lintel across the real doorway.
-		_wall_run(from, to, thick, plinth_h, openings, SURF_FLOOR, 0.0, false)
+		_wall_run(from, to, thick, plinth_h, openings, SURF_FLOOR, 0.0, false,
+			_corner_ext(run, thick))
 		# Chamfered stone water-table moulding at the top of the plinth
 		var seg: Vector2 = to - from
 		var run_len: float = seg.length()
 		if run_len > 0.1:
 			_wall_run(from, to, thick + 0.04, 0.06, openings, SURF_FLOOR,
-				plinth_h - 0.03, false)
+				plinth_h - 0.03, false, _corner_ext(run, thick + 0.04))
 
 
 # ------------------------------------------------------------------ walls
@@ -554,7 +622,7 @@ func _build_exterior_walls() -> void:
 			if _build_colonnade_run(run, level, y0, h, thick):
 				continue
 			var openings: Array[Dictionary] = _openings_on(from, to, normal, level, thick)
-			_wall_run(from, to, thick, h, openings, surf, y0)
+			_wall_run(from, to, thick, h, openings, surf, y0, true, _corner_ext(run, thick))
 			var a: AABB = _run_aabb(from, to, thick, h, y0)
 			var suffix := "" if _levels().size() == 1 else "_%d" % level
 			_log_mass("wall_%s%s" % [String(run["side"]), suffix], a, y0)
@@ -890,7 +958,8 @@ func _door_interval(door: Dictionary) -> Array:
 ## place a door on a wall that might run along either axis without writing the
 ## whole thing twice.
 func _wall_run(from: Vector2, to: Vector2, thick: float, height: float,
-		openings: Array[Dictionary], surf: int, y_offset := 0.0, decorate := true) -> void:
+		openings: Array[Dictionary], surf: int, y_offset := 0.0, decorate := true,
+		corner_ext := 0.0) -> void:
 	var seg: Vector2 = to - from
 	var run: float = seg.length()
 	if run < 0.01:
@@ -900,7 +969,9 @@ func _wall_run(from: Vector2, to: Vector2, thick: float, height: float,
 	openings.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return float(a["t"]) < float(b["t"]))
 
-	var cursor := 0.0
+	# `corner_ext` lengthens (or, negative, shortens) both ends: see _corner_ext.
+	# The openings are still measured from `from`.
+	var cursor := -corner_ext
 	for op in openings:
 		var t: float = float(op["t"])
 		var w: float = float(op["w"])
@@ -917,8 +988,27 @@ func _wall_run(from: Vector2, to: Vector2, thick: float, height: float,
 		if decorate and String(op.get("kind", "")) != "secret":
 			_opening_trim(from, dir, yaw, t, w, bottom, top, thick, op, y_offset)
 		cursor = maxf(cursor, hi)
-	if cursor < run - 0.01:
-		_wall_piece(from, dir, yaw, cursor, run, 0.0, height, thick, surf, y_offset)
+	if cursor < run + corner_ext - 0.01:
+		_wall_piece(from, dir, yaw, cursor, run + corner_ext, 0.0, height, thick, surf, y_offset)
+
+
+## How far a rectangular shell's run is carried past its centre-line ends.
+##
+## The four runs go corner to corner along the wall CENTRE lines, so a box laid
+## on each stops half a wall short of the outside corner and every corner was
+## missing a square column of masonry: a notch the walk-through saw as a pale
+## stripe down the corner, with the plinth's end face fighting the wall's
+## inside it (WALK-QA, 6 Oct, shop pin 2; hotel pin 4). Front and back now run
+## through the corner, and the two sides stop at their inner faces, so the
+## corner is solid and no two outside faces share a plane. A shaped shell's
+## runs meet at their own angles and are left alone.
+static func _corner_ext(run: Dictionary, thick: float) -> float:
+	match StringName(run.get("side", &"")):
+		&"front", &"back":
+			return thick / 2.0
+		&"left", &"right":
+			return -thick / 2.0
+	return 0.0
 
 
 func _wall_piece(from: Vector2, dir: Vector2, yaw: float, t0: float, t1: float,
@@ -955,17 +1045,20 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 	host("%s_%d" % [String(op["kind"]), _opening_seq], int(y_offset / maxf(spec.height, 0.01) + 0.5))
 	_opening_seq += 1
 	var jamb := 0.09
+	# The frame stands TRIM_TUCK proud into the opening, so its inner faces
+	# cover the wall's reveal and soffit instead of lying in their planes.
+	var tuck := TRIM_TUCK
 	for side in [-1.0, 1.0]:
-		var p: Vector2 = from + dir * (t + side * (w / 2.0 + jamb / 2.0))
+		var p: Vector2 = from + dir * (t + side * (w / 2.0 + jamb / 2.0 - tuck))
 		var xf := Transform3D(Basis(Vector3.UP, yaw),
 			Vector3(p.x, y_offset + (bottom + top) / 2.0, p.y))
 		component_box("opening_jamb", Vector3(jamb, top - bottom, thick + 0.04), xf, SURF_TRIM)
 	var head_xf := Transform3D(Basis(Vector3.UP, yaw),
-		Vector3(mid.x, y_offset + top + jamb / 2.0, mid.y))
+		Vector3(mid.x, y_offset + top + jamb / 2.0 - tuck, mid.y))
 	component_box("opening_head", Vector3(w + jamb * 2.0, jamb, thick + 0.04), head_xf, SURF_TRIM)
 	if bottom > 0.01:
 		var sill_xf := Transform3D(Basis(Vector3.UP, yaw),
-			Vector3(mid.x, y_offset + bottom - jamb / 2.0, mid.y))
+			Vector3(mid.x, y_offset + bottom - jamb / 2.0 + tuck, mid.y))
 		component_box("opening_sill", Vector3(w + jamb * 2.0, jamb, thick + 0.12), sill_xf, SURF_TRIM)
 		if op["kind"] == "window":
 			# Inset dark lattice glazing panel
@@ -995,16 +1088,26 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 
 			# Board-and-batten shutters with strap hinges
 			if spec.window_shutters:
+				# On a framed wall the shutters hang on the timbers, so they
+				# stand in front of the studs. At 3 cm off the plaster they
+				# sat inside the frame's own depth and the studs ran through
+				# them (WALK-QA, 6 Oct, Wolfmarch Green house_9 pin 4).
+				var off: float = thick / 2.0 + 0.03
+				var framed_level := int(y_offset / maxf(spec.height, 0.01) + 0.5)
+				if spec.timber_frame and spec.material != &"stone" \
+						and not (spec.stone_ground_floor and framed_level == 0):
+					off = _proud(HouseGeometry.BEAM_D) + HouseGeometry.BEAM_D / 2.0 + 0.03
 				for side2 in [-1.0, 1.0]:
-					var sp: Vector2 = from + dir * (t + side2 * (w * 0.75)) \
-						+ normal * (thick / 2.0 + 0.03)
+					var sp: Vector2 = from + dir * (t + side2 * (w * 0.75)) + normal * off
 					var sxf := Transform3D(Basis(Vector3.UP, yaw),
 						Vector3(sp.x, y_offset + (bottom + top) / 2.0, sp.y))
 					component_box("opening_shutter", Vector3(w * 0.45, top - bottom, 0.05), sxf, SURF_TRIM)
-					# Horizontal strap hinges
+					# Horizontal strap hinges, a hair proud of the leaf on
+					# whichever axis the wall faces
+					var hp: Vector2 = sp + normal * 0.01
 					for hy in [0.25, 0.75]:
 						var hxf := Transform3D(Basis(Vector3.UP, yaw),
-							Vector3(sp.x, y_offset + bottom + (top - bottom) * hy, sp.y + normal.y * 0.01))
+							Vector3(hp.x, y_offset + bottom + (top - bottom) * hy, hp.y))
 						component_box("opening_hinge", Vector3(w * 0.40, 0.04, 0.07), hxf, SURF_TRIM)
 	host(outer_host, outer_storey)
 
@@ -1259,14 +1362,13 @@ func _saltire_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
 
 func _arch_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
 		length: float, h: float, openings: Array[Dictionary], y_offset: float, y_sill: float) -> void:
-	var run: float = minf(HouseGeometry.BRACE_RUN * 1.1, length * 0.28)
+	var run: float = _paired_brace_run(minf(HouseGeometry.BRACE_RUN * 1.1, length * 0.28),
+		length, openings)
 	var rise: float = run * 1.2
-	if rise > h - HouseGeometry.PLATE_H - y_sill:
+	if run <= 0.0 or rise > h - HouseGeometry.PLATE_H - y_sill:
 		return
 	for side in [1.0, -1.0]:
 		var foot: float = HouseGeometry.POST_W + run if side > 0.0 else length - HouseGeometry.POST_W - run
-		if _blocked_by_opening(openings, foot, run):
-			continue
 		var mid_t: float = foot - side * run / 2.0
 		var mid_y: float = h - HouseGeometry.PLATE_H - rise / 2.0
 		var span: float = sqrt(run * run + rise * rise)
@@ -1306,15 +1408,14 @@ func _rail_between(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
 ## the wall. Emitted as a tilted beam, which is what they are.
 func _corner_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
 		length: float, h: float, openings: Array[Dictionary], y_offset := 0.0) -> void:
-	var run: float = minf(HouseGeometry.BRACE_RUN, length * 0.3)
+	var run: float = _paired_brace_run(minf(HouseGeometry.BRACE_RUN, length * 0.3),
+		length, openings)
 	var rise: float = run * 1.15
-	if rise > h - HouseGeometry.PLATE_H - HouseGeometry.SILL_BEAM_H:
+	if run <= 0.0 or rise > h - HouseGeometry.PLATE_H - HouseGeometry.SILL_BEAM_H:
 		return
 	for side in [1.0, -1.0]:
 		var foot: float = HouseGeometry.POST_W + run if side > 0.0 \
 			else length - HouseGeometry.POST_W - run
-		if _blocked_by_opening(openings, foot, run):
-			continue
 		var mid_t: float = foot - side * run / 2.0
 		var mid_y: float = h - HouseGeometry.PLATE_H - rise / 2.0
 		var span: float = sqrt(run * run + rise * rise)
@@ -1324,6 +1425,27 @@ func _corner_braces(from: Vector2, dir: Vector2, yaw: float, normal: Vector2,
 		xf = xf * Transform3D(Basis(Vector3(0, 0, 1), tilt), Vector3.ZERO)
 		component_box("timber_brace", Vector3(span, HouseGeometry.BEAM_W * 0.9,
 			HouseGeometry.BEAM_D), xf, SURF_TRIM)
+
+
+## The run both corner braces of a wall can share: the longest, from `run`
+## down to MIN_BRACE_RUN, at which NEITHER foot lands on an opening; 0.0 when
+## there is none. The braces are a pair. Testing each corner alone dropped the
+## one beside a window and kept the other, and a lone diagonal reads as a
+## mistake (WALK-QA, 6 Oct, shop pin 1).
+const MIN_BRACE_RUN := 0.45
+
+
+static func _paired_brace_run(run: float, length: float,
+		openings: Array[Dictionary]) -> float:
+	var r := run
+	while r >= MIN_BRACE_RUN - 0.001:
+		var near_foot: float = HouseGeometry.POST_W + r
+		var far_foot: float = length - HouseGeometry.POST_W - r
+		if not _blocked_by_opening(openings, near_foot, r) \
+				and not _blocked_by_opening(openings, far_foot, r):
+			return r
+		r -= 0.05
+	return 0.0
 
 
 ## Is a beam of this width going to land on a door or a window?

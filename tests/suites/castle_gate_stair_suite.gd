@@ -52,7 +52,58 @@ static func run() -> SuiteResult:
 	_expect(result, blocked_routes.is_empty(), "stair headroom obstructed: " + str(blocked_routes))
 	print("GATE_STAIR crusader seed=9118 gates=", gates.size(), " stairs=", stairs.size(),
 		" failures=", result.failures.size())
+	_walkable_stairs(result)
 	return result
+
+
+## Walk-QA, Thorncliffe Tower (norman seed 1): a transverse stair whose foot
+## was boxed against the curtain, 0.9 m landings, open ends over an 18 m drop
+## and a top landing in the coping lip's plane. The real stairs must pass
+## CastleMassingCheck.stair_walk_failures; each old fault, put back, must not.
+static func _walkable_stairs(result: SuiteResult) -> void:
+	var Access = preload("res://src/castle/castle_access_geometry.gd")
+	var spec := CastleSpec.new()
+	spec.style = &"norman"
+	spec.width = 55.0
+	spec.length = 50.0
+	spec.height = 18.0
+	CastleGenerator.generate(spec, 1)
+	var stairs: Array[Dictionary] = CastleGeometry.wall_stairs(spec)
+	_expect(result, stairs.size() >= 2, "Thorncliffe has %d wall stairs" % stairs.size())
+	var transverse: Dictionary = {}
+	for stair in stairs:
+		var why := CastleMassingCheck.stair_walk_failures(spec, stair, Access.pieces(stair))
+		_expect(result, why.is_empty(), "Thorncliffe stair: %s" % str(why))
+		if bool(stair.get("transverse", false)):
+			transverse = stair
+	_expect(result, not transverse.is_empty(), "Thorncliffe fixture lost its transverse stair")
+	if transverse.is_empty():
+		return
+	# the old foot: an even flight count starting at the curtain
+	var old := transverse.duplicate()
+	old.flights = int(transverse.flights) + 1
+	old.start_forward = 1.0
+	_want_fault(result, spec, old, Access.pieces(old), "foot", "a foot boxed against the curtain")
+	# a 0.9 m landing
+	var shallow: Array = Access.pieces(transverse).map(func(p): return p.duplicate())
+	for p in shallow:
+		if p.role == "wall_stair_landing":
+			p.size = Vector3(0.9, p.size.y, p.size.z)
+	_want_fault(result, spec, transverse, shallow, "shallower", "a 0.9m landing")
+	# no end rails
+	var open: Array = Access.pieces(transverse).filter(func(p): return p.role != "wall_stair_end_rail")
+	_want_fault(result, spec, transverse, open, "rail", "unrailed landing ends")
+	# flush with the inner face, under the lip
+	var flush := transverse.duplicate()
+	flush.at = Vector2(transverse.at) - Vector2(transverse.along) * CastleGeometry.WALK_LIP
+	_want_fault(result, spec, flush, Access.pieces(flush), "lip", "a top landing under the lip")
+
+
+static func _want_fault(result: SuiteResult, spec: CastleSpec, stair: Dictionary, pieces: Array,
+		word: String, label: String) -> void:
+	var why := CastleMassingCheck.stair_walk_failures(spec, stair, pieces)
+	_expect(result, why.any(func(w: String) -> bool: return word in w),
+		"control: %s was not caught (%s)" % [label, str(why)])
 
 
 static func _hit(triangles: Array, from: Vector3, to: Vector3) -> bool:

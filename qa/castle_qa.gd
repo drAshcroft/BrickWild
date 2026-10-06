@@ -14,6 +14,8 @@ extends RefCounted
 ##                         window apertures have jambs, a head and a sill
 ##   5. enceinte_closed    the wall line is continuous the whole way round,
 ##                         except where the gate is meant to be
+##   loops_reachable       every through-cut curtain loop has a floor and a
+##                         clear body's height behind its skin (CastleLoopCheck)
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {...}}
 
@@ -24,7 +26,8 @@ const WALL_PROBE := 1
 ## The rules, in order; a family may replace one through
 ## `check(spec, mesh, builder, overrides)` (RuleSet, INT-020).
 const RULES: Array[StringName] = [&"no_nan", &"grounded", &"connected_mass",
-	&"openings_embedded", &"enceinte_closed", &"interiors", &"occupied_shells", &"access_routes", &"lords_walk", &"gate_access"]
+	&"openings_embedded", &"enceinte_closed", &"interiors", &"occupied_shells", &"access_routes", &"lords_walk", &"gate_access",
+	&"loops_reachable"]
 const METHODS := {&"no_nan": "_check_vertices", &"grounded": "_check_ground",
 	&"openings_embedded": "_check_openings", &"enceinte_closed": "_check_enceinte"}
 
@@ -87,6 +90,11 @@ func _check_occupied_shells() -> void:
 	var report := CastleOccupancyCheck.check(spec, builder, mesh)
 	stats["occupied_shells"] = report.stats
 	failures.append_array(report.failures)
+
+
+## Every through-cut curtain loop has somewhere for its archer to stand.
+func _check_loops_reachable() -> void:
+	failures.append_array(CastleLoopCheck.check(spec, builder, mesh))
 
 
 func _check_gate_access() -> void:

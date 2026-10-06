@@ -15,7 +15,7 @@ static func run() -> SuiteResult:
 	_want(res, qa.ok, "README hero complete CastleQA: " + str(qa.failures))
 	_want(res, int(qa.stats.get("access_routes", {}).get("routes", 0)) == 7,
 		"production CastleQA did not inspect all six tower routes and gate gallery")
-	var routes := preload("res://qa/castle_route_check.gd").check(builder, mesh)
+	var routes := preload("res://src/castle/castle_route_check.gd").check(builder, mesh)
 	_want(res, routes.ok and routes.courtyard_routes == 7 and routes.wall_stairs >= 1,
 		"occupied tower/gate routes do not reach an emitted stair down to courtyard: " + str(routes.failures))
 	_route_mutations(res, builder, mesh)
@@ -47,7 +47,7 @@ static func run() -> SuiteResult:
 
 
 static func _route_mutations(res: SuiteResult, builder: CastleBuilder, mesh: ArrayMesh) -> void:
-	var routes = preload("res://qa/castle_route_check.gd")
+	var routes = preload("res://src/castle/castle_route_check.gd")
 	var omitted := _without_wall_stairs(builder, mesh)
 	_want(res, omitted.removed > 0, "missing-stair negative control removed no triangles")
 	var missing := routes.check(builder, omitted.mesh)

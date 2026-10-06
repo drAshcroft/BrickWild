@@ -5,10 +5,12 @@ extends RefCounted
 const TOL := 0.03
 
 var failures: Array = []
+var warnings: Array = []
 
 
 func _init(report: Dictionary = {}) -> void:
 	failures = report.get("failures", [])
+	warnings = report.get("warnings", [])
 
 
 ## Inside its room, and clear of everything else standing on the floor.
@@ -125,6 +127,32 @@ func check_doorways(plan: HousePlan) -> void:
 				if over.size.x > TOL and over.size.y > TOL:
 					failures.append("doorway: %s stands in the swing of door %d"
 						% [HouseFurnishCheck.who(plan, f), d])
+			# The swing is not the whole of a way in. A free-standing table a
+			# hand's breadth past the swing is the first thing you walk into:
+			# the swing rule let two of those through (walk QA, 6 Oct). A row
+			# is placed and judged as a row, and the piece the plan is arranged
+			# around may face the door on purpose; a table the furnisher had to
+			# set there for want of anywhere else says so and is a warning.
+			if not _approach_applies(plan, p) or not int(p["room"]) in [int(door.get("a", -1)), int(door.get("b", -1))]:
+				continue
+			for a in HouseFurnishPlacement.door_approach_rects(door):
+				var over2: Rect2 = a.intersection(rect)
+				if over2.size.x > TOL and over2.size.y > TOL:
+					var msg := "doorway: %s stands in the approach to door %d" \
+						% [HouseFurnishCheck.who(plan, f), d]
+					if bool(p.get("door_approach", false)):
+						warnings.append(msg + " -- the room had nowhere else for it")
+					else:
+						failures.append(msg)
+					break
+
+
+static func _approach_applies(plan: HousePlan, p: Dictionary) -> bool:
+	if PropCatalog.category(String(p["key"])) != "table":
+		return false
+	if String(p.get("row", "")) != "":
+		return false
+	return not (plan.focus_room() == int(p["room"]) and plan.focus_cat() == "table")
 
 
 ## And nothing tall may stand across a window.

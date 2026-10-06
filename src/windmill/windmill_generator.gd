@@ -36,7 +36,9 @@ static func generate(spec: WindmillSpec, p_seed: int) -> void:
 
 	# 2. The rotor, which every type shares and every type means differently.
 	spec.sail_r = spec.sail_span * 0.5
-	spec.sail_width = clampf(spec.sail_r * 0.16, 0.45, 1.6)
+	# a sail's breadth is about a fifth of its length -- leading and trailing
+	# boards together -- or it reads as a slat rather than a sail
+	spec.sail_width = clampf(spec.sail_r * 0.2, 0.45, 2.0)
 	spec.whorl_r = clampf(spec.sail_r * 0.085, 0.28, 0.72)
 	spec.sail_angle = rng.randf_range(0.42, 1.15)
 	spec.sails = _blade_count(rng, row["sails"])
@@ -139,7 +141,8 @@ static func _post(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictionar
 
 ## A weatherboarded frame on a low brick stump, turning an ogee cap.
 static func _smock(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictionary) -> void:
-	spec.stump_h = rng.randf_range(1.4, 3.2)
+	spec.stump_h = rng.randf_range(float(WindmillGeometry.STUMP_H[0]),
+		float(WindmillGeometry.STUMP_H[1]))
 	spec.burr_y = spec.stump_h
 	spec.curb_r = spec.base_r * rng.randf_range(float(row["batter"][0]), float(row["batter"][1]))
 	spec.cap = GeneratorRandom.pick(rng, row["cap"])

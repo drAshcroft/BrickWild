@@ -2,7 +2,7 @@ extends RefCounted
 ## Structural diagnostic companion to the furnished README fixture. Reuses
 ## production plans and emitters, without running the large keep furnisher.
 
-const Routes = preload("res://qa/castle_route_check.gd")
+const Routes = preload("res://src/castle/castle_route_check.gd")
 const AccessSuite = preload("res://tests/suites/castle_motte_access_suite.gd")
 const Mural = preload("res://src/castle/castle_mural_plan.gd")
 const Gate = preload("res://src/castle/castle_gate_plan.gd")

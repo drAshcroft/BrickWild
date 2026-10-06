@@ -45,7 +45,64 @@ static func run() -> SuiteResult:
 	_curtain_triangle_rays(res)
 	_polygon_curtain_triangle_rays(res)
 	_tower_triangle_rays(res)
+	_loop_reachability(res)
 	return res
+
+
+## Walk-QA, Thorncliffe pin 14: loops through the curtain with nowhere to
+## stand behind them. Real curtain loops must give their archer a floor and a
+## body's height a metre in from the face; the old kind -- a slit tunnelled
+## through solid wall halfway up -- must be refused.
+static func _loop_reachability(res: SuiteResult) -> void:
+	# The straight and polygonal emitters, as the rays above build them.
+	var straight := CastleBuilder.new()
+	straight.begin_metric(4)
+	straight.spec = CastleSpec.new()
+	var bounds := AABB(Vector3(-8, 0, -8), Vector3(16, 8, 1.5))
+	var outward := Vector3(0, 0, -1)
+	var points := straight._wall_slit_positions(bounds, outward, 1.5)
+	straight.tag("curtain")
+	straight._battered_wall(bounds, 1.5, outward, points)
+	straight._emit_wall_slits(points, outward, true, CastleBuilder._loop_reveal(1.5, 1.5, 8.0))
+	_want_loops(res, straight, straight.commit(), true, "straight curtain")
+	var poly := CastleBuilder.new()
+	poly.begin_metric(5)
+	poly.spec = CastleSpec.new()
+	CastleGenerator.generate(poly.spec, 6003)
+	poly.tag("curtain")
+	poly._wall_run({"a": Vector2(-8.0, 0.0), "b": Vector2(8.0, 0.0), "length": 16.0,
+		"yaw": 0.0, "outward": Vector3(0, 0, 1), "name": "loop_fixture"}, 0)
+	_want_loops(res, poly, poly.commit(), true, "polygon curtain")
+	# Negative control: 3 m of wall with a slit tunnelled through at 5-6.5 m.
+	var old := CastleBuilder.new()
+	old.begin_metric(4)
+	old.spec = CastleSpec.new()
+	old.tag("curtain")
+	old.box(Vector3(3.84, 8, 3), Vector3(-2.08, 4, 0), CastleBuilder.SURF_STONE)
+	old.box(Vector3(3.84, 8, 3), Vector3(2.08, 4, 0), CastleBuilder.SURF_STONE)
+	old.box(Vector3(0.32, 5, 3), Vector3(0, 2.5, 0), CastleBuilder.SURF_STONE)
+	old.box(Vector3(0.32, 1.5, 3), Vector3(0, 7.25, 0), CastleBuilder.SURF_STONE)
+	old.part_log.append({"kind": "window", "tag": "curtain", "pos": Vector3(0, 5.75, -1.52),
+		"size": Vector3(0.32, 1.5, 0), "facing": Vector3(0, 0, -1), "through_opening": true})
+	_want_loops(res, old, old.commit(), false, "control: mid-height tunnel slit")
+
+
+static func _want_loops(res: SuiteResult, builder: CastleBuilder, mesh: ArrayMesh,
+		reachable: bool, label: String) -> void:
+	var triangles: Array = []
+	for surface in [CastleBuilder.SURF_STONE, CastleBuilder.SURF_TRIM]:
+		if surface < mesh.get_surface_count():
+			triangles.append_array(HouseQA._mesh_triangles(mesh, surface))
+	var grounds: Array[float] = [0.0]
+	var loops := 0
+	for part in builder.part_log:
+		if part.get("kind") != "window" or String(part.get("tag", "")) != "curtain":
+			continue
+		loops += 1
+		var why := CastleLoopCheck.unreachable(part, triangles, grounds)
+		_want(res, why.is_empty() == reachable, "%s: loop at %s %s" % [label, part.pos,
+			why if not why.is_empty() else "was accepted"])
+	_want(res, loops > 0, "%s: no curtain loop was logged" % label)
 
 
 ## A dark opening box still intersects its own ray. Restricting this probe to

@@ -60,6 +60,8 @@ const CEILING := "ceiling"        # hangs from the ceiling
 const LIGHT := "light"            # counts toward a room being lit
 const PLANT := "plant"            # grows: measured as a canopy and a trunk
 const GROUND := "ground"          # lies on the ground and is walked over
+const OUTDOOR := "outdoor"        # built for weather and stone: a porch, a gate, a hall
+                                  # of a castle -- never a cottage's parlour
 
 ## key -> {cat, tags, zone, face, affinity}
 ##   cat   what the piece is, which is what a room's recipe asks for
@@ -118,7 +120,11 @@ const PROPS := {
 	"WeaponStand": {"cat": "stand", "tags": [WALL], "zone": 0.6},
 	"Dummy": {"cat": "stand", "tags": [], "zone": 0.7},
 	"BookStand": {"cat": "lectern", "tags": [SURFACE], "zone": 0.7, "affinity": {"daylight": 1.0}},
-	"Stall_Empty": {"cat": "counter", "tags": [WALL, SURFACE], "zone": 0.9},
+	# A market stall is a counter under a canopy. Its box is 2.63 m tall, and
+	# taking that for the counter set a tavern's mugs and a lobby's keys on the
+	# canopy (walk QA, 6 Oct). `top` is the counter board, measured from the
+	# model's up-facing faces (0.83-0.87 m), not the height of the box.
+	"Stall_Empty": {"cat": "counter", "tags": [WALL, SURFACE], "zone": 0.9, "top": 0.86},
 	"Stall_Cart_Empty": {"cat": "stall", "tags": [], "zone": 0.9},
 	"Bag": {"cat": "sack", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 
@@ -132,7 +138,11 @@ const PROPS := {
 	"Banner_2": {"cat": "banner", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
 	"Banner_1_Cloth": {"cat": "banner", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
 	"Banner_2_Cloth": {"cat": "banner", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
-	"Lantern_Wall": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI, "affinity": {"flank": "door"}},
+	# A caged iron lantern on a metre of bracket: the light over a front door
+	# or in a castle hall. Hung in a cottage or a barracks mess it reads as a
+	# dungeon fitting brought indoors (walk QA, 6 Oct), so it is OUTDOOR and
+	# the furnisher hangs it only in the rooms ROUGH_ROOMS names.
+	"Lantern_Wall": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT, OUTDOOR], "zone": 0.0, "face": PI, "affinity": {"flank": "door"}},
 	"Torch_Metal": {"cat": "sconce", "tags": [WALL_MOUNTED, LIGHT], "zone": 0.0, "face": PI, "affinity": {"flank": "door"}},
 	"Chandelier": {"cat": "chandelier", "tags": [CEILING, LIGHT], "zone": 0.0, "affinity": {"over": ["table"]}},
 	# Its own category: a candelabrum is a metre and a third of standing iron, so
@@ -416,6 +426,29 @@ static func keys() -> Array[String]:
 	return out
 
 
+## Rooms built rough enough for an OUTDOOR fitting: stone halls, guard and
+## arms rooms, cells, stables. Everything else is a domestic interior.
+const ROUGH_ROOMS: Array[StringName] = [&"great_hall", &"guardroom", &"armoury",
+	&"cell", &"stable", &"tack_room"]
+
+
+## Is this prop at home in a room of this kind?
+static func suits_room(key: String, room_kind: StringName) -> bool:
+	return not has_tag(key, OUTDOOR) or room_kind in ROUGH_ROOMS
+
+
+## The props of a category a room of this kind may be furnished with: the
+## whole category, less the outdoor pieces when the room is domestic. Falls
+## back to the whole category rather than leave a room with nothing at all.
+static func of_category_for_room(cat: String, room_kind: StringName) -> Array[String]:
+	var all := of_category(cat)
+	var out: Array[String] = []
+	for k in all:
+		if suits_room(k, room_kind):
+			out.append(k)
+	return out if not out.is_empty() else all
+
+
 ## Every prop of a category, in a stable order.
 static func of_category(cat: String) -> Array[String]:
 	var out: Array[String] = []
@@ -475,8 +508,12 @@ static func height(key: String) -> float:
 
 
 ## Height of the top a prop offers to things set on it, or 0 if it offers none.
+## The top of the box unless the piece names its working surface (`top`): a
+## stall's counter is under its canopy, not on it.
 static func surface_height(key: String) -> float:
-	return height(key) if has_tag(key, SURFACE) else 0.0
+	if not has_tag(key, SURFACE):
+		return 0.0
+	return minf(float(PROPS[key].get("top", height(key))), height(key))
 
 
 ## Where the model's feet are relative to its own origin. A wall shelf is
@@ -487,6 +524,17 @@ static func floor_offset(key: String) -> float:
 	if not _sizes.has(key):
 		return 0.0
 	return float(_sizes[key]["floor"])
+
+
+## The height, relative to the model's own origin, that is set on the ground.
+## For a plant this is its measured ground line (SceneBounds.plant_seat): the
+## nature packs bury a stub of stem under the origin, and sitting the lowest
+## vertex on the ground floats the bush. For everything else it is the floor.
+static func seat_offset(key: String) -> float:
+	_load()
+	if not _sizes.has(key):
+		return 0.0
+	return float(_sizes[key].get("seat", _sizes[key]["floor"]))
 
 
 ## Where the flame is, relative to the model's own origin: the measured top

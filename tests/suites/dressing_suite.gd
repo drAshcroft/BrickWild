@@ -45,10 +45,11 @@ static func _churches(res: SuiteResult, quick: bool) -> void:
 			var spec: ChurchSpec = TestSweep.spec_at(style, i)
 			var label := "church %s/%d" % [String(style), TestSweep.seed_at(i)]
 			var builder := ChurchBuilder.new()
-			builder.build(spec)
+			var mesh := builder.build(spec)
 			var props: Array = builder.prop_log
 			var check := DressingCheck.new()
 			check.check(props, _church_bounds(spec), builder.total_height, label)
+			check.embedded(props, _solid_triangles(mesh), label)
 			_want(check, props, CHURCH_WANTS, label)
 			# the one piece of floor a church exists to be walked down
 			var nave := Rect2(Vector2(-spec.width / 2.0 + 0.15, -spec.length / 2.0 + 0.15),
@@ -72,7 +73,7 @@ static func _castles(res: SuiteResult, quick: bool) -> void:
 				var label := "castle %s/%s/%d" % [String(style), String(tier),
 					CastleSweep.seed_at(tier, i)]
 				var builder := CastleBuilder.new()
-				builder.build(spec)
+				var mesh := builder.build(spec)
 				var props: Array = builder.prop_log
 				var check := DressingCheck.new()
 				# Since INT-007 the great hall and keep are furnished by planned
@@ -87,6 +88,7 @@ static func _castles(res: SuiteResult, quick: bool) -> void:
 				check.check(props, CastleGeometry.plan_extent(spec),
 					builder.total_height, label, inside)
 				_want(check, props + inside, CASTLE_WANTS, label)
+				check.embedded(props, _solid_triangles(mesh), label)
 				if CastleGeometry.is_enclosed(spec):
 					_walk_the_yard(check, spec, props, label)
 				_report(res, check)
@@ -162,6 +164,30 @@ static func _negative_control(res: SuiteResult) -> void:
 	if not lit.warnings.is_empty():
 		res.fail("control: an interior sconce should count as light")
 	res.checked += lit.checked + bare.checked
+	# A standing piece inside a block of masonry is buried; the same piece set
+	# beside it, or on top of it, is not.
+	var block := MassBuilder.new()
+	block.begin(1)
+	block.box(Vector3(2, 3, 2), Vector3(0, 1.5, 0), 0)
+	var solid := _solid_triangles(block.commit())
+	var cases := {"inside": [Vector3(0.3, 0.0, 0.2), true], "beside": [Vector3(2.5, 0.0, 0.0), false],
+		"on top": [Vector3(0.0, 3.0, 0.0), false], "sunk": [Vector3(0.0, 2.7, 0.0), true]}
+	for name in cases:
+		var probe := DressingCheck.new()
+		probe.embedded([PropCatalog.placement("Cauldron", cases[name][0], 0.0, 1.0, &"light")], solid, "control")
+		res.checked += 1
+		if probe.failures.is_empty() == bool(cases[name][1]):
+			res.fail("control: a cauldron %s a block %s" % [name,
+				"was not called buried" if cases[name][1] else "was called buried"])
+
+
+## The solid faces of a shell: stone, trim and roof, never openings or glass.
+static func _solid_triangles(mesh: ArrayMesh) -> Array:
+	var out: Array = []
+	for surface in [0, 1, 2]:
+		if surface < mesh.get_surface_count():
+			out.append_array(HouseQA._mesh_triangles(mesh, surface))
+	return out
 
 
 ## The furniture of the castle's planned interiors, as placements the wants

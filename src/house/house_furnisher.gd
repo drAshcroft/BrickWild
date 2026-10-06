@@ -83,7 +83,14 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	if sleeps_here:
 		steps.append({"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0})
 		steps.append({"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9})
-	for s in HouseFurnishingRecipes.RECIPES.get(kind, []):
+	var recipe: Array = HouseFurnishingRecipes.RECIPES.get(kind, [])
+	if HouseFurnishingRecipes.dines_elsewhere(plan, room) \
+			and not _dining_table_lost(plan, room):
+		recipe = HouseFurnishingRecipes.SITTING_PARLOUR
+	var ample: Dictionary = HouseFurnishingRecipes.AMPLE.get(kind, {})
+	if not ample.is_empty() and HouseGeometry.room_area(plan, room) >= float(ample["area"]):
+		recipe = recipe + ample["steps"]
+	for s in recipe:
 		# A family without a supported flue omits the hearth prop, while its
 		# table/bed programme remains the same.
 		if String(s["cat"]) == "hearth" and not spec.allows_hearth_furniture():
@@ -158,6 +165,19 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	for i in range(steps.size()):
 		steps[i] = steps[i].duplicate()
 		steps[i]["order"] = i
+	# A free table that the recipe goes on to seat knows what it will be
+	# seated with, so it can be stood where that seat fits.
+	for i2 in range(steps.size()):
+		if String(steps[i2]["cat"]) != "table" or steps[i2]["rule"] != &"free":
+			continue
+		if plan.focus_room() == room and plan.focus_cat() == "table":
+			continue # a high table or an altar has its own seating contract
+		for j2 in range(i2 + 1, steps.size()):
+			if steps[j2]["rule"] == &"around" and String(steps[j2].get("host", "")) != "row":
+				steps[i2]["seat_cat"] = String(steps[j2]["cat"])
+				# room for the least the step asks, up to a pair facing
+				steps[i2]["seat_n"] = clampi(int(steps[j2]["n"][0]), 1, 2)
+				break
 	steps.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if not is_equal_approx(float(a["opt"]), float(b["opt"])):
 			return float(a["opt"]) > float(b["opt"])
@@ -201,6 +221,12 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		var lo: int = int(step["n"][0])
 		var hi: int = int(step["n"][1])
 		var want: int = lo if hi <= lo else r.randi_range(lo, hi)
+		if step["rule"] == &"around" and String(step.get("host", "")) == "row":
+			# Seats for a row are seats for every table in it. Two benches
+			# for a hall of eight trestles is six tables nobody sits at
+			# (walk QA, 6 Oct); each bench goes to the emptiest trestle, so
+			# one per table is the least a full row is owed.
+			want = maxi(want, _count_row_tables(plan, room))
 		var seats_before: int = _count_cat(plan, room, ["seat", "bench"])
 		for k in range(want):
 			var piece_from := plan.furniture.size()
@@ -208,6 +234,17 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 				blocked, zones, r, step)
 			for placed in range(piece_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = must
+				if bool(step.get("settle", false)):
+					# a settle is a seat against a wall, sat on for itself; it
+					# is not drawn up to anything and nothing is missing
+					plan.furniture[placed]["settle"] = true
+			if bool(step.get("settle", false)) and plan.furniture.size() > piece_from \
+					and bool(plan.furniture[-1].get("free_standing", false)):
+				# no wall would take it, and a settle out in the middle of the
+				# floor is the bench-without-a-table this programme replaces
+				var stray: Dictionary = plan.furniture.pop_back()
+				blocked.erase(stray["rect"])
+				zones.erase(stray["zone"])
 		# A table nobody can sit at is worse than no table: it takes the middle
 		# of the room and gives nothing back. If not one seat would go round it,
 		# the table goes instead, and the plan records why.
@@ -344,6 +381,24 @@ static func _count_cat(plan: HousePlan, room: int, cats: Array) -> int:
 	return n
 
 
+## Was the household's dining room already furnished, and did it end up with
+## no table? Then this parlour is where they eat after all: one table, not none.
+static func _dining_table_lost(plan: HousePlan, room: int) -> bool:
+	var dining := HouseFurnishingRecipes.dining_room_of(plan)
+	if dining < 0 or dining > room:
+		return false
+	return _count_cat(plan, dining, ["table"]) == 0
+
+
+static func _count_row_tables(plan: HousePlan, room: int) -> int:
+	var n := 0
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(p["key"]) == "table" and String(p.get("row", "")) != "":
+			n += 1
+	return n
+
+
 ## Tables that stand on their own, as opposed to ones placed as part of a row.
 static func _count_freestanding_tables(plan: HousePlan, room: int) -> int:
 	var n := 0
@@ -373,6 +428,16 @@ static func _drop_the_table(plan: HousePlan, room: int, blocked: Array[Rect2],
 				and Rect2(p["rect"]).get_center().distance_to(plan.focus_pos()) \
 				< HouseFurnishScore.FOCUS_TOL:
 			continue
+		# and never a table somebody is already sitting at: a step that found
+		# no room for ONE more chair is not a table nobody can use
+		var seated := false
+		for g in plan.furniture_of(room):
+			if int(plan.furniture[g]["host"]) == f \
+					and PropCatalog.category(plan.furniture[g]["key"]) in ["seat", "bench"]:
+				seated = true
+				break
+		if seated:
+			continue
 		blocked.erase(p["rect"])
 		plan.note_compromise(room, "table")
 		plan.furniture.remove_at(f)
@@ -392,7 +457,7 @@ static func _ensure_light(plan: HousePlan, room: int, r: RandomNumberGenerator) 
 	for cat in ["candle", "sconce"]:
 		var before: int = plan.furniture.size()
 		var rule: StringName = &"on" if cat == "candle" else &"mounted"
-		var choices: Array[String] = PropCatalog.of_category(cat)
+		var choices: Array[String] = PropCatalog.of_category_for_room(cat, plan.kind_of(room))
 		if choices.is_empty():
 			continue
 		var key: String = choices[r.randi_range(0, choices.size() - 1)]

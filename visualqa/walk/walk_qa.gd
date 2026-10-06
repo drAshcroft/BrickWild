@@ -576,25 +576,42 @@ func _physics_process(delta: float) -> void:
 
 ## Climb a stair tread: if the way ahead is blocked at the feet but clear one
 ## step higher, lift, move, and settle back onto the tread.
+##
+## The lowest lift that works, not always the full STEP. A 1.75 m body lifted
+## 0.4 m needs 2.15 m of headroom, and a doorway is 2.02 m: every door with a
+## 0.12 m floor sill was refused from outside, however wide it was (WALK-QA,
+## 6 Oct, hotel pins 7 and 14 -- reproduced and cleared by
+## tools/walk_doors.gd).
 func _step_up(motion: Vector3) -> bool:
 	var xf := _player.global_transform
 	if not _player.test_move(xf, motion):
 		return false
-	var lift := Vector3(0, STEP, 0)
-	if _player.test_move(xf, lift):
-		return false
-	var raised := xf.translated(lift)
-	if _player.test_move(raised, motion):
-		return false
-	var ahead := raised.translated(motion)
-	var col := KinematicCollision3D.new()
-	if not _player.test_move(ahead, -lift, col):
-		return false
-	if col.get_normal().y < cos(_player.floor_max_angle):
-		return false
-	_player.global_transform = ahead.translated(col.get_travel())
-	_player.velocity.y = 0.0
-	return true
+	for h in [STEP * 0.25, STEP * 0.5, STEP * 0.75, STEP]:
+		var lift := Vector3(0, h, 0)
+		if _player.test_move(xf, lift):
+			continue
+		var raised := xf.translated(lift)
+		if _player.test_move(raised, motion):
+			continue
+		var ahead := raised.translated(motion)
+		var col := KinematicCollision3D.new()
+		if not _player.test_move(ahead, -lift, col):
+			continue
+		# One frame's motion lands the capsule on the tread's front EDGE, whose
+		# contact normal sits right at the slope limit, so every stair stalled
+		# from flat ground (castle walk pin 5). Judge the tread a body radius
+		# ahead instead; still move only this frame's distance.
+		var probe := raised.translated(motion.normalized() * maxf(motion.length(), RADIUS))
+		var tread := KinematicCollision3D.new()
+		if _player.test_move(raised, probe.origin - raised.origin):
+			probe = ahead
+		if not _player.test_move(probe, -lift, tread) \
+				or tread.get_normal().y < cos(_player.floor_max_angle):
+			continue
+		_player.global_transform = ahead.translated(col.get_travel())
+		_player.velocity.y = 0.0
+		return true
+	return false
 
 
 func _input(event: InputEvent) -> void:

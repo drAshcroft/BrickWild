@@ -72,23 +72,41 @@ static func relax(plan: HousePlan) -> int:
 	return removed
 
 
+## One rug under each table -- and ONE under each row of tables. A row of
+## trestles with a separate scrap of carpet under every one, each clipped to a
+## sliver by its neighbours, read as a stack of unexplained floor patches
+## (walk QA, 6 Oct): a row is one arrangement and lies on one runner.
 static func _plan_rugs(plan: HousePlan) -> void:
 	plan.rugs.clear()
+	var rows_done := {}
 	for index in plan.furniture.size():
 		var item: Dictionary = plan.furniture[index]
 		var room := int(item["room"])
 		if PropCatalog.category(String(item["key"])) != "table" or plan.kind_of(room) not in HouseFurnishingRecipes.RUG_ROOM_KINDS:
 			continue
+		var row := String(item.get("row", ""))
+		var under := Rect2(item["rect"])
+		var members: Array[int] = [index]
+		if row != "":
+			if rows_done.has(row):
+				continue
+			rows_done[row] = true
+			for j in plan.furniture.size():
+				if j != index and String(plan.furniture[j].get("row", "")) == row \
+						and int(plan.furniture[j]["room"]) == room:
+					members.append(j)
+					under = under.merge(Rect2(plan.furniture[j]["rect"]))
 		var floor := HouseGeometry.room_floor_rect(plan, room)
-		var rug := Rect2(item["rect"])
+		var rug := under
 		for margin in [0.55, 0.35, 0.15, 0.0]:
-			var candidate := Rect2(item["rect"]).grow(margin).intersection(floor)
+			var candidate := under.grow(margin).intersection(floor)
 			var fits := true
 			if plan.is_polygonal(room):
 				for point in Poly.from_rect(candidate):
 					fits = fits and Poly.contains_point(plan.outline_of(room), point, 0.01)
-			for other in plan.furniture:
-				if other == item or int(other["room"]) != room or PropCatalog.category(other["key"]) != "table":
+			for oi in plan.furniture.size():
+				var other: Dictionary = plan.furniture[oi]
+				if oi in members or int(other["room"]) != room or PropCatalog.category(other["key"]) != "table":
 					continue
 				if candidate.intersects(Rect2(other["rect"]).grow(margin)):
 					fits = false
@@ -96,7 +114,8 @@ static func _plan_rugs(plan: HousePlan) -> void:
 				continue
 			rug = candidate
 			break
-		plan.rugs.append({"id": "rug_table_%d" % index, "table": index, "room": room,
+		plan.rugs.append({"id": ("rug_row_%d" if row != "" else "rug_table_%d") % index,
+			"table": index, "tables": members, "room": room,
 			"storey": plan.storey_of_room(room), "rect": rug})
 
 

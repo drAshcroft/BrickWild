@@ -7,9 +7,46 @@ extends RefCounted
 const WALL_ESSENTIAL := ["bed", "hearth", "bookcase", "nightstand", "chest"]
 const PROBE_STEP := 0.12
 const MAX_PROBES := 128
+## How far a seat may run past the side of the table it is drawn up to before
+## it is not "at" that side any more. A chair at the end of a table fits; a
+## 2.8 m bench across the end of a 1.1 m table does not.
+const LONG_SEAT_OVERHANG := 0.3
+## How deep into a room the approach to a door is kept clear of tables and
+## other free-standing pieces, beyond the swing itself, and how far either
+## side of the leaf. A table a hand's breadth past the swing still meets you
+## as you come in (walk QA, 6 Oct).
+const DOOR_APPROACH := 1.6
+const DOOR_APPROACH_SIDE := 0.3
+## Clear floor kept round a table before another table may stand there: a
+## seat's depth and its pull-back space.
+const TABLE_GAP := 1.1
 
 static func _seating_probe(plan: HousePlan, room: int, table: Dictionary,
-		blocked: Array[Rect2], zones: Array[Rect2]) -> Dictionary:
+		blocked: Array[Rect2], zones: Array[Rect2], seat_cat := "seat",
+		seat_n := 1) -> Dictionary:
+	if seat_n > 1:
+		# The table must take that many seats before the first one is kept:
+		# a trestle with room for one bench of the two it was given is a
+		# trestle jammed against its neighbour.
+		var trial := _seating_probe(plan, room, table, blocked, zones, seat_cat, 1)
+		if trial.is_empty():
+			return {}
+		var occupied2 := blocked.duplicate()
+		var used2 := zones.duplicate()
+		var probe2 := HousePlan.new()
+		probe2.spec = plan.spec
+		probe2.rooms = plan.rooms
+		probe2.doors = plan.doors
+		probe2.windows = plan.windows
+		HouseFurnishGeometry.commit(probe2, room, table.duplicate(), occupied2, used2)
+		var rng2 := RandomNumberGenerator.new()
+		rng2.seed = 0
+		var key2: String = String(trial["key"])
+		for _k in range(seat_n):
+			place_around(probe2, room, key2, occupied2, used2, rng2)
+		if probe2.furniture.size() < 1 + seat_n:
+			return {}
+		return trial
 	var probe := HousePlan.new()
 	probe.spec = plan.spec
 	probe.rooms = plan.rooms
@@ -23,7 +60,7 @@ static func _seating_probe(plan: HousePlan, room: int, table: Dictionary,
 	var count := probe.furniture.size()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 0
-	for key in PropCatalog.of_category("seat"):
+	for key in PropCatalog.of_category(seat_cat):
 		place_around(probe, room, key, occupied, used, rng)
 		if probe.furniture.size() > count:
 			var seat: Dictionary = probe.furniture[-1].duplicate()
@@ -136,6 +173,8 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		if not choices.has(exact_key):
 			return
 		choices = [exact_key]
+	else:
+		choices = PropCatalog.of_category_for_room(cat, plan.kind_of(room))
 	if choices.is_empty():
 		return
 	var key: String = choices[r.randi_range(0, choices.size() - 1)]
@@ -143,7 +182,8 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 	match rule:
 		&"wall":
 			var had: int = plan.furniture.size()
-			_place_against_wall(plan, room, key, blocked, zones, r)
+			_wall_clear_of_doors(plan, room, key, blocked, zones, r)
+			_flag_door_approach(plan, room, had)
 			if plan.furniture.size() == had and not cat in WALL_ESSENTIAL:
 				# no wall will take it. A workbench can stand out in the room --
 				# a bed cannot, which is what WALL_ESSENTIAL is for -- and the
@@ -159,11 +199,23 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 				plan.note_compromise(room, cat)
 		&"free":
 			var before: int = plan.furniture.size()
-			place_free(plan, room, key, blocked, zones, r)
+			var seat_cat := String(step.get("seat_cat", ""))
+			if seat_cat != "":
+				# a table the recipe means to seat is stood where its seats
+				# will go, the first of them drawn up with it; a table stood
+				# on the best open floor and THEN found to have no room for a
+				# bench was a barracks mess's second table, dropped again
+				var seat_n := int(step.get("seat_n", 1))
+				place_free(plan, room, key, blocked, zones, r, true, seat_cat, seat_n)
+				if plan.furniture.size() == before and seat_n > 1:
+					place_free(plan, room, key, blocked, zones, r, true, seat_cat, 1)
+			if plan.furniture.size() == before:
+				place_free(plan, room, key, blocked, zones, r)
 			if plan.furniture.size() == before:
 				# no room to stand it clear of the walls; against one is better
 				# than not at all, and is what a small cottage does
-				_place_against_wall(plan, room, key, blocked, zones, r)
+				_wall_clear_of_doors(plan, room, key, blocked, zones, r)
+				_flag_door_approach(plan, room, before)
 		&"corner":
 			_place_corner(plan, room, key, blocked, zones, r)
 		&"around":
@@ -247,6 +299,14 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 					+ n * (depth * float(sc) / 2.0 + (HouseGeometry.BREAST_DEPTH if hearth_only >= 0 else HouseGeometry.WALL_GAP))
 				for zs in [1.0, -1.0]:
 					var try_cand: Dictionary = HouseFurnishGeometry.candidate(key, scaled_centre, yaw, zs, sc)
+					if try_cand["cat"] in ["seat", "bench"]:
+						# A seat backed to a wall is sat on facing the room: the
+						# floor it needs is in FRONT of it, for the legs, not the
+						# pull-back space behind a chair at a table, which here
+						# would be inside the masonry.
+						var z0: Rect2 = try_cand["zone"]
+						var c0: Vector2 = Rect2(try_cand["rect"]).get_center()
+						try_cand["zone"] = Rect2(c0 * 2.0 - z0.get_center() - z0.size / 2.0, z0.size)
 					if hearth_only >= 0:
 						var breast := HouseGeometry.breast_for_hearth(plan, room, try_cand, wi)
 						if not _breast_fits(plan, room, breast, floor_rect, blocked, zones):
@@ -494,10 +554,10 @@ static func _forced_wall(plan: HousePlan, room: int, key: String) -> int:
 ## Room in the middle of the floor, for a table or an anvil.
 static func place_free(plan: HousePlan, room: int, key: String,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator,
-		require_seat := false) -> void:
+		require_seat := false, seat_cat := "seat", seat_n := 1) -> void:
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var extra: Array[Rect2] = _window_blocks(plan, room, key)
-	var result := {"best": {}, "score": -INF, "require_seat": require_seat}
+	var result := {"best": {}, "score": -INF, "require_seat": require_seat, "seat_cat": seat_cat, "seat_n": seat_n}
 	# Where the fire is does not change while the table hunts for a spot, and
 	# the hunt looks at thousands of spots. Found once here and carried on the
 	# candidate; leaving it inside the grid made every table in the sweep walk
@@ -515,17 +575,105 @@ static func place_free(plan: HousePlan, room: int, key: String,
 	# to the pin anyway. Searching a 12 x 30 m great hall at 12 cm for a table
 	# the plan had already placed cost ten seconds a hall.
 	var pin: Rect2 = _pin_box(plan, room, key)
-	for yaw in yaws:
-		for sc in HouseFurnishGeometry.scales(key):
-			_free_at_scale(plan, room, key, yaw, sc, floor_rect, blocked, zones,
-				extra, r, result, focus, pin)
+	# Keep the way in clear first: a free-standing piece is tried out of the
+	# approach to every door, and only if the room has nowhere else for it is
+	# it allowed back in -- and then it says so, so the check can tell a
+	# cramped room's compromise from a careless placement. The focus piece is
+	# the exception: a counter that faces the shop door is MEANT to meet you.
+	var approach: Array[Rect2] = []
+	if not _is_focus_piece(plan, room, key):
+		approach = door_approaches(plan, room)
+	var with_approach: Array[Rect2] = extra.duplicate()
+	with_approach.append_array(approach)
+	if PropCatalog.category(key) == "table":
+		# and a table keeps a chair and a passage from the tables already in
+		# the room: two trestles ten centimetres apart are one table with a
+		# crack in it (walk QA, 6 Oct)
+		for f in plan.furniture_of(room):
+			if PropCatalog.category(plan.furniture[f]["key"]) == "table":
+				with_approach.append(Rect2(plan.furniture[f]["rect"]).grow(TABLE_GAP))
+	var passes: Array = [with_approach, extra] if with_approach.size() > extra.size() else [extra]
+	var in_approach := false
+	for pass_any in passes:
+		var pass_extra: Array[Rect2] = pass_any
+		for yaw in yaws:
+			for sc in HouseFurnishGeometry.scales(key):
+				_free_at_scale(plan, room, key, yaw, sc, floor_rect, blocked, zones,
+					pass_extra, r, result, focus, pin)
+		if not Dictionary(result["best"]).is_empty():
+			break
+		in_approach = true
 	var best: Dictionary = result["best"]
+	if in_approach and not best.is_empty():
+		for a in approach:
+			if a.intersects(Rect2(best["rect"])):
+				best["door_approach"] = true
+				break
 	var seat: Dictionary = best.get("paired_seat", {})
 	best.erase("paired_seat")
 	HouseFurnishGeometry.commit(plan, room, best, blocked, zones)
 	if not seat.is_empty():
 		seat["host"] = plan.furniture.size() - 1
 		HouseFurnishGeometry.commit(plan, room, seat, blocked, zones)
+
+
+## The approach to every door of a room: the strip a person walks through
+## after the swing, a little wider than the leaf. Both sides of each door are
+## returned; the one that lies outside this room never meets a candidate.
+static func door_approaches(plan: HousePlan, room: int) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for d in plan.doors_of(room):
+		out.append_array(door_approach_rects(plan.doors[d]))
+	return out
+
+
+static func door_approach_rects(door: Dictionary) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var c: Vector2 = door["pos"]
+	var w: float = float(door["width"]) + DOOR_APPROACH_SIDE * 2.0
+	for side in [-1.0, 1.0]:
+		var n: Vector2 = Vector2(door["normal"]) * side
+		var along := Vector2(n.y, -n.x).abs()
+		var a: Vector2 = c - along * (w / 2.0)
+		var b: Vector2 = c + along * (w / 2.0) + n * DOOR_APPROACH
+		out.append(Rect2(a.min(b), (b - a).abs()))
+	return out
+
+
+## Against a wall, out of the approach to the doors if the piece is a table
+## and the room has anywhere else for it; otherwise against a wall as before.
+static func _wall_clear_of_doors(plan: HousePlan, room: int, key: String,
+		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
+	var before := plan.furniture.size()
+	if PropCatalog.category(key) == "table":
+		var approach := door_approaches(plan, room)
+		var held: Array[Rect2] = blocked.duplicate()
+		blocked.append_array(approach)
+		_place_against_wall(plan, room, key, blocked, zones, r)
+		# put the borrowed rectangles back out, keeping what was committed
+		var committed: Array[Rect2] = blocked.slice(held.size() + approach.size())
+		blocked.assign(held + committed)
+		if plan.furniture.size() > before:
+			return
+	_place_against_wall(plan, room, key, blocked, zones, r)
+
+
+## A table set against a wall had no door approach to avoid -- the wall rule
+## slides along the wall it was given -- so when it lands in one, it says so.
+static func _flag_door_approach(plan: HousePlan, room: int, placed_from: int) -> void:
+	if plan.furniture.size() <= placed_from:
+		return
+	var p: Dictionary = plan.furniture[placed_from]
+	if PropCatalog.category(String(p["key"])) != "table":
+		return
+	for a in door_approaches(plan, room):
+		if a.intersects(Rect2(p["rect"])):
+			p["door_approach"] = true
+			return
+
+
+static func _is_focus_piece(plan: HousePlan, room: int, key: String) -> bool:
+	return plan.focus_room() == room and PropCatalog.category(key) == plan.focus_cat()
 
 
 static func _breast_fits(plan: HousePlan, room: int, breast: Dictionary, floor_rect: Rect2,
@@ -609,7 +757,7 @@ static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 				+ HouseFurnishScore._affinity(plan, room, cand)
 			if score > float(result["score"]):
 				if bool(result.get("require_seat", false)):
-					var seat := _seating_probe(plan, room, cand, blocked, zones)
+					var seat := _seating_probe(plan, room, cand, blocked, zones, String(result["seat_cat"]), int(result["seat_n"]))
 					if seat.is_empty():
 						continue
 					cand["paired_seat"] = seat
@@ -697,6 +845,11 @@ static func place_around(plan: HousePlan, room: int, key: String,
 			var seat_span: float = absf(along.x) * foot.x + absf(along.y) * foot.y
 			var run: float = absf(along.x) * host_rect.size.x \
 				+ absf(along.y) * host_rect.size.y
+			if seat_span > run + LONG_SEAT_OVERHANG:
+				# A bench drawn up to the END of a trestle sticks out a metre
+				# either side of it, faces the wrong way along the room and
+				# blocks the floor beyond: a long seat belongs on a long side.
+				continue
 			var steps: int = maxi(int(run / 0.45), 1)
 			for s in range(steps + 1):
 				var t: float = lerpf(-run / 2.0 + seat_span / 2.0, run / 2.0 - seat_span / 2.0,
@@ -722,15 +875,36 @@ static func place_around(plan: HousePlan, room: int, key: String,
 ## seats whichever has the fewest people at it already, so a second bench goes
 ## to the next table rather than crowding the first.
 static func _find_host(plan: HousePlan, room: int, cats: Array,
-		want_row := false) -> int:
+		want_row := false, first_only := false) -> int:
 	var pool: Array[int] = []
 	for f in plan.furniture_of(room):
 		if PropCatalog.category(plan.furniture[f]["key"]) in cats:
 			pool.append(f)
 	if pool.is_empty():
 		return -1
-	if not want_row:
+	if first_only:
 		return pool[0]
+	if not want_row:
+		# A chair goes to a TABLE before it goes to a counter or a bench, and
+		# to the table with the fewest people at it already. Taking simply the
+		# first host in the room put a lobby's chairs round its reception desk,
+		# seated a tavern at its bar while the dining table went without, and
+		# drew a barracks' second bench up to the end of the FIRST table while
+		# the second stood bare (walk QA, 6 Oct).
+		var best_free: int = pool[0]
+		var best_key := Vector2i(1 << 20, 1 << 20)
+		for f4 in pool:
+			var rank: int = cats.find(PropCatalog.category(plan.furniture[f4]["key"]))
+			var seated := 0
+			for g2 in plan.furniture_of(room):
+				if int(plan.furniture[g2]["host"]) == f4 \
+						and not PropCatalog.has_tag(plan.furniture[g2]["key"], PropCatalog.ON_SURFACE):
+					seated += 1
+			var key := Vector2i(rank, seated)
+			if key.x < best_key.x or (key.x == best_key.x and key.y < best_key.y):
+				best_key = key
+				best_free = f4
+		return best_free
 	var rows: Array[int] = []
 	for f2 in pool:
 		if String(plan.furniture[f2].get("row", "")) != "":
@@ -767,7 +941,7 @@ static func _find_host(plan: HousePlan, room: int, cats: Array,
 ## has to reach it, and a body crossing the dais has to go round it.
 static func _place_behind(plan: HousePlan, room: int, key: String,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
-	var host: int = _find_host(plan, room, ["table", "workbench", "counter"])
+	var host: int = _find_host(plan, room, ["table", "workbench", "counter"], false, true)
 	if host < 0:
 		return
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)

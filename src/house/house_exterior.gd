@@ -111,7 +111,8 @@ static func bounds_of(p: Dictionary) -> AABB:
 	var yaw: float = p["yaw"] + PropCatalog.face_offset(key)
 	var pos: Vector3 = p["pos"]
 	if not PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED):
-		pos.y -= PropCatalog.floor_offset(key) * scale
+		# the same ground line HouseAssembler sits the model on (a plant's seat)
+		pos.y -= PropCatalog.seat_offset(key) * scale
 	var center: Vector3 = pos + Basis(Vector3.UP, yaw) * (PropCatalog.centre_offset(key) * scale)
 	var foot := PropCatalog.footprint_rotated(key, yaw) * scale
 	var size := Vector3(foot.x, PropCatalog.height(key) * scale, foot.y)

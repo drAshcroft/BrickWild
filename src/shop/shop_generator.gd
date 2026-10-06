@@ -16,6 +16,9 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	var r := spec.rng
 
 	spec.roof_pitch = r.randf_range(float(style["roof_pitch"][0]), float(style["roof_pitch"][1]))
+	# the style's roofing, as a house of the same style has it: no draw, and
+	# only the roof material reads it
+	spec.roof_material = StringName(style.get("roof_material", &"shingle"))
 	spec.porch = r.randf() < float(style["porch"])
 	spec.chimney = r.randf() < float(style["chimney"])
 	# a smithy or a bakehouse is its fire: the flue is not a dice roll

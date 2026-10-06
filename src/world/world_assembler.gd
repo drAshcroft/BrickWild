@@ -56,9 +56,60 @@ static func instance(building) -> MeshInstance3D:
 ## The shell of a plan-based house family, dressed. Called by HouseAssembler
 ## after its own materials so a world plan overrides them.
 static func dress_house(shell: MeshInstance3D, plan: HousePlan) -> void:
-	var materials: Array = plan_palette(plan)
+	var materials: Array = house_palette(plan)
 	if not materials.is_empty():
 		MaterialKit.apply(shell, materials)
+
+
+## A family's palette for a `HouseBuilder` shell: `plan_palette`, with the
+## glazing pass on the roof slot the shell draws its windows into.
+static func house_palette(plan: HousePlan) -> Array:
+	return _with_glazing(plan_palette(plan))
+
+
+## `HouseBuilder` draws window glazing INTO the roof slot, marked by a black
+## vertex colour (`_glazing_box`), and the house's own roof shader turns those
+## fragments to glass. A world palette puts its own roof material in that slot
+## -- a terracotta or a grey tile that knows nothing of the marker -- so every
+## window of every plan-based world family rendered as a panel of roof tile:
+## the domus walker's "what are these". This second pass draws the marked
+## glazing as glass over whatever roof material the family chose, and only
+## the marked fragments.
+const GLAZING_PASS := """shader_type spatial;
+render_mode cull_disabled;
+void vertex() {
+	VERTEX += NORMAL * 0.003;
+}
+void fragment() {
+	if (COLOR.r >= 0.5) {
+		discard;
+	}
+	ALBEDO = vec3(0.1529, 0.3372, 0.3763);
+	ROUGHNESS = 0.22;
+	METALLIC = 0.25;
+}
+"""
+static var _glazing_pass: ShaderMaterial
+
+
+static func glazing_pass() -> ShaderMaterial:
+	if _glazing_pass == null:
+		var shader := Shader.new()
+		shader.code = GLAZING_PASS
+		_glazing_pass = ShaderMaterial.new()
+		_glazing_pass.shader = shader
+	return _glazing_pass
+
+
+## The roof slot of a plan palette, given the glazing pass. Duplicated rather
+## than modified, so a cached or shared material is never changed for its
+## other users.
+static func _with_glazing(materials: Array) -> Array:
+	if materials.size() > HouseBuilder.SURF_ROOF and materials[HouseBuilder.SURF_ROOF] is Material:
+		var roof: Material = (materials[HouseBuilder.SURF_ROOF] as Material).duplicate()
+		roof.next_pass = glazing_pass()
+		materials[HouseBuilder.SURF_ROOF] = roof
+	return materials
 
 
 ## Materials for a generated world building, by surface.

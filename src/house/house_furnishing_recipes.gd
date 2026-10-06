@@ -4,6 +4,97 @@ extends RefCounted
 
 const RUG_ROOM_KINDS := [&"hall", &"parlour", &"dining", &"dining_room"]
 
+## Where a household eats, best first. A dwelling has ONE dining table: in the
+## dining room if it has one, else in the hall. A parlour in a house that eats
+## elsewhere is the room you sit in, not a second place to dine -- the village
+## walk found houses with three tables and no way past them (walk QA, 6 Oct).
+const DINING_KINDS: Array[StringName] = [&"dining_room", &"dining", &"hall"]
+
+## What a parlour holds when the house dines elsewhere: a settle against the
+## wall, the books and the chest, the lamps -- and the floor in the middle.
+const SITTING_PARLOUR := [
+	{"cat": "bench", "rule": &"wall", "n": [1, 1], "opt": 0.9, "settle": true},
+	{"cat": "bookcase", "rule": &"wall", "n": [0, 1], "opt": 0.7},
+	{"cat": "chest", "rule": &"wall", "n": [0, 1], "opt": 0.6},
+	{"cat": "storage", "rule": &"wall", "n": [0, 1], "opt": 0.6},
+	{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+	{"cat": "candle", "rule": &"on", "n": [1, 1], "opt": 0.8},
+]
+
+
+## What a room adds when it is far bigger than its recipe was written for.
+## A recipe is a cottage-sized list; a hotel lobby of two hundred square metres
+## furnished from it is a counter, a chandelier and an echo, and a 65 m2 office
+## is one desk in a corner (walk QA, 6 Oct). Above `area` m2 these steps are
+## added, after the room's own, so the room still has its defining pieces first.
+const AMPLE := {
+	&"lobby": {"area": 60.0, "steps": [
+		{"cat": "table", "rule": &"free", "n": [1, 2], "opt": 0.9},
+		{"cat": "seat", "rule": &"around", "n": [3, 6], "opt": 0.9},
+		{"cat": "bench", "rule": &"wall", "n": [1, 2], "opt": 0.8, "settle": true},
+		{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 0.7},
+		{"cat": "candelabrum", "rule": &"free", "n": [1, 2], "opt": 0.7},
+		{"cat": "sconce", "rule": &"mounted", "n": [2, 3], "opt": 0.9},
+	]},
+	&"office": {"area": 30.0, "steps": [
+		{"cat": "bookcase", "rule": &"wall", "n": [1, 2], "opt": 0.9},
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 0.8},
+		{"cat": "seat", "rule": &"around", "n": [2, 3], "opt": 0.8},
+		{"cat": "chest", "rule": &"wall", "n": [0, 1], "opt": 0.6},
+		{"cat": "storage", "rule": &"wall", "n": [0, 1], "opt": 0.6},
+		{"cat": "candle", "rule": &"on", "n": [1, 1], "opt": 0.8},
+	]},
+	&"kitchen": {"area": 40.0, "steps": [
+		# the work table in the middle of a big kitchen, a stool at it
+		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 0.9},
+		{"cat": "seat", "rule": &"around", "n": [1, 2], "opt": 0.8},
+		{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 0.8},
+		{"cat": "barrel", "rule": &"corner", "n": [1, 2], "opt": 0.7},
+		{"cat": "cookware", "rule": &"corner", "n": [1, 2], "opt": 0.7},
+		# no extra lamp: a second one drawn on its own is a pair that was
+		# never hung as a pair (sconce_pair)
+		{"cat": "shelf", "rule": &"mounted", "n": [1, 2], "opt": 0.8},
+	]},
+}
+
+
+## Is this a single household's home, as opposed to a shop, an inn, a hotel or
+## a block of flats, any of which may lay a table in every room it likes?
+static func is_dwelling(plan: HousePlan) -> bool:
+	var spec: HouseSpec = plan.spec
+	# an innkeeper's house is a public house: its parlour is a second taproom
+	return spec != null and not spec is ShopSpec and not spec is HotelSpec \
+		and not spec is InsulaSpec and plan.world_family == &"" \
+		and spec.trade != &"innkeeper"
+
+
+## The room this dwelling eats in, or -1. Rooms of the first DINING_KINDS kind
+## present; the lowest-numbered of them.
+static func dining_room_of(plan: HousePlan) -> int:
+	for kind in DINING_KINDS:
+		# A hall that is also the bedroom -- nobody sleeps anywhere else --
+		# has a bed in it and its table against a wall if at all; a parlour
+		# beside it is where the household eats.
+		if kind == &"hall" and plan.has_kind(&"parlour") and not HouseFurnisher._anybody_sleeps(plan):
+			continue
+		var rooms: Array[int] = plan.rooms_of(kind)
+		if not rooms.is_empty():
+			return rooms[0]
+	return -1
+
+
+## Does this parlour's household eat in some other room? Then it gets the
+## sitting programme instead of a table.
+static func dines_elsewhere(plan: HousePlan, room: int) -> bool:
+	if plan.kind_of(room) != &"parlour" or not is_dwelling(plan):
+		return false
+	var dining := dining_room_of(plan)
+	if dining >= 0:
+		return dining != room
+	# no hall and no dining room: the first parlour is where they eat
+	var parlours: Array[int] = plan.rooms_of(&"parlour")
+	return not parlours.is_empty() and parlours[0] != room
+
 ## Recipes per room kind: a list of steps, each
 ##   {"cat": String, "rule": StringName, "n": [min, max], "opt": float}
 ##

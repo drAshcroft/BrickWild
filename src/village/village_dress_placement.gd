@@ -63,6 +63,12 @@ static func place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 		"built": built, "light": _is_light(key, built)})
 	if not shore_apron.is_empty():
 		plan.props.back()["approach"] = shore_apron
+	# A `light` step hangs its torch ON the wall. Stood on the ground it read as
+	# a "ground light" in the walk QA (shop_2, 6 Oct): hang it at a house
+	# sconce's height, its lowest point recorded as the elevation it stands at.
+	if StringName(step.get("rule", &"")) == &"light" and not built:
+		plan.props.back()["elevation"] = VillageBuilder.ground_height(plan, at) \
+			+ HouseGeometry.SCONCE_HEIGHT - PropCatalog.size(key).y * 0.5
 	if shore_obstacle:
 		var occupied_walk := VillageNavCheck.reached_grid(plan)
 		var all_reached := true

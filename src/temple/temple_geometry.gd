@@ -41,6 +41,20 @@ const LIGHT_REACH := 7.0      # how far one brazier lights the way
 const OBELISK_H := 0.55       # x temple height
 const SPIRE_BASE := 0.28      # x hall width
 const COLUMN_CAP := 0.45      # the capital, x column radius
+## A basilica's ridge rise, x its span. It was 0.32 -- a barn's pitch, and the
+## first thing a walker said of the building was "looks like a barn". A
+## temple front is a low pediment; Roman basilicas ran near 20 degrees.
+const RIDGE_PITCH := 0.18
+## The classical order a basilica dresses its walls in (`TempleBuilder.
+## _build_order`): a stepped podium, pilasters on the bay rhythm, clerestory
+## lights between them, an entablature at the eaves, raking cornices that make
+## each gable a pediment, and an aedicule round the gate. Nothing in it stands
+## further out from a wall than ORDER_REACH -- inside the roof's own overhang
+## -- so a lot planned to the footprint still holds the building.
+const ORDER_REACH := 0.6
+const PODIUM_STEPS := 3
+const PODIUM_RISE := 0.22
+const ORDER_BAY := 4.6        # target pilaster spacing, metres
 
 ## Person radius for the walking checks: a robed celebrant, not a burglar.
 const PERSON_RADIUS := 0.28
@@ -595,7 +609,7 @@ static func roof_height(spec: TempleSpec) -> float:
 			return spec.height + dome_radius(spec) * 0.55 + RoofShape.DEPTH * 0.5
 		&"pylon":
 			return spec.height + 0.5
-	return spec.height + minf(spec.width, spec.length) * 0.32 + RoofShape.DEPTH * 0.5
+	return spec.height + minf(spec.width, spec.length) * RIDGE_PITCH + RoofShape.DEPTH * 0.5
 
 
 static func total_height(spec: TempleSpec) -> float:

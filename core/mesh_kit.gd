@@ -125,10 +125,15 @@ func _emit_box(pts: Array, surf: int) -> void:
 		[3, 2, 7, 6], [0, 5, 4, 1],      # top, bottom
 	]
 	var st: SurfaceTool = _sts[surf]
+	# The face's own corners, in quad order. Both triangles read them by corner,
+	# so the second no longer repeats the first's (0,0)(1,0)(1,1) and shears the
+	# texture along the diagonal (castle walk pin 11, "weird lines").
+	var corner_uv := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]
 	for q in quads:
 		# Every vertex must carry a normal: SurfaceTool locks its attribute set
 		# on the first vertex, and callers mix their own set_normal() calls in.
-		for tri in [[q[0], q[1], q[2]], [q[0], q[2], q[3]]]:
+		for corners in [[0, 1, 2], [0, 2, 3]]:
+			var tri := [q[corners[0]], q[corners[1]], q[corners[2]]]
 			var n: Vector3 = _face_normal(pts[tri[0]], pts[tri[1]], pts[tri[2]])
 			var axes: Array = []
 			if metric_coordinates:
@@ -138,8 +143,7 @@ func _emit_box(pts: Array, surf: int) -> void:
 				if metric_coordinates:
 					st.set_uv(_project_uv(pts[tri[vi]], axes))
 				else:
-					st.set_uv(Vector2(0.0 if vi == 0 else 1.0,
-						0.0 if vi < 2 else 1.0))
+					st.set_uv(corner_uv[corners[vi]])
 				_add_vertex(st, pts[tri[vi]])
 
 

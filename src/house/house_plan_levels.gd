@@ -497,6 +497,7 @@ static func _stair_spot(p: HousePlan, room: int, f: Rect2, size: Vector2) -> Dic
 			front = door["pos"]
 	for w in p.windows_of(room):
 		glass.append(HouseGeometry.window_clear_rect(p.windows[w]))
+	var wells: Array[Rect2] = arriving_wells(p, storey)
 	# the two walls the run lies along; the stair's long edge is on one of them
 	var walls: Array[Rect2] = []
 	if along_x:
@@ -517,6 +518,9 @@ static func _stair_spot(p: HousePlan, room: int, f: Rect2, size: Vector2) -> Dic
 				var t: float = travel * float(s) / float(steps)
 				var rect := Rect2(base.position + (Vector2(t, 0.0) if along_x
 					else Vector2(0.0, t)), size)
+				# never at any strictness: see arriving_wells
+				if hits_any(rect, wells):
+					continue
 				if strict < 3 and hits_any(rect, swings):
 					continue
 				if strict < 2 and hits_any(rect, lines):
@@ -553,6 +557,38 @@ static func _inside_room(p: HousePlan, room: int, rect: Rect2) -> bool:
 		if not Poly.contains_point(poly, c, 0.01):
 			return false
 	return true
+
+
+## How far a new flight keeps from the well of the flight arriving beside it.
+const WELL_CLEAR := 0.3
+
+
+## The wells that open in `storey`'s floor: where the flight from the storey
+## below comes up, grown by WELL_CLEAR.
+##
+## A flight may not stand in one. Every planner used to choose the next storey's
+## stair by the same rules from the same doors, so it chose the same rectangle:
+## the upper flight sat on top of the lower one, the lower flight climbed
+## straight into the solid foot of the upper, and nothing arrived anywhere
+## (WALK-QA, 6 Oct, hotel pin 9 "stairway to nowhere"; 110 of 120 three-storey
+## house plans did the same). HousePlanCheck's `stairs` rule now refuses it.
+##
+## And the other way round, for a flight planned after the ones above it (a
+## cellar stair is): the flights that LEAVE the storey the new one arrives on
+## stand where it would come up.
+static func arriving_wells(p: HousePlan, storey: int) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for stair in p.stairs:
+		var lo := int(stair.get("storey", 0))
+		var hi := int(stair.get("to_storey", lo + 1))
+		var well := Rect2()
+		if hi == storey:
+			well = Rect2(stair.get("upper_rect", stair.get("rect", Rect2())))
+		elif lo == storey + 1:
+			well = Rect2(stair.get("lower_rect", stair.get("rect", Rect2())))
+		if well.has_area():
+			out.append(well.grow(WELL_CLEAR))
+	return out
 
 
 static func hits_any(rect: Rect2, others: Array[Rect2]) -> bool:

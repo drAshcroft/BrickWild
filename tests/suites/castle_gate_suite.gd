@@ -1,6 +1,6 @@
 extends RefCounted
 ## Gatehouse windows belong to a room reached from the curtain walk.
-const Routes = preload("res://qa/castle_route_check.gd")
+const Routes = preload("res://src/castle/castle_route_check.gd")
 const Probe = preload("res://tests/suites/stone_shell_suite.gd")
 
 

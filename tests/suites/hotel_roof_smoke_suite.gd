@@ -52,19 +52,31 @@ static func _check_facade(res: SuiteResult, plan: HousePlan,
 	for w in plan.windows:
 		if Vector2(w["normal"]).y < -0.9:
 			front.append(w)
+	var wall_z := HotelGeometry.wall_face_z(plan.spec as HotelSpec)
 	var hoods: Array[Dictionary] = []
 	for c in builder.component_log:
-		if c["role"] == "facade_hood":
+		if c["role"] == "facade_hood" and MassBuilder.component_aabb(c).get_center().z < wall_z:
 			hoods.append(c)
 	_expect(res, not front.is_empty() and hoods.size() == front.size(),
 		"facade must have exactly one hood per planned front window")
+	# Dressing is SEATED on the wall: every facade piece's back is in the wall,
+	# none of it hangs in front with daylight behind (WALK-QA, 6 Oct, pin 4).
+	var floating := 0
+	for c in builder.component_log:
+		if c["role"] in ["facade_hood", "string_course", "quoin_pier", "quoin_block", "pilaster"]:
+			var b := MassBuilder.component_aabb(c)
+			var face_hit := b.end.z >= wall_z - 0.001 if b.get_center().z < wall_z - 0.05 \
+				else true
+			if not face_hit:
+				floating += 1
+	_expect(res, floating == 0, "%d facade pieces stand clear of the front wall" % floating)
 	var opaque := _triangles(mesh, HouseBuilder.SURF_WALL)
 	opaque.append_array(_triangles(mesh, HouseBuilder.SURF_TRIM))
 	for w in front:
 		var p: Vector2 = w["pos"]
 		var y := HousePlan.record_storey(w) * plan.spec.height
 		var expected := Vector3(p.x, y + float(w["head"]) + 0.22,
-			HotelGeometry.front_z(plan.spec as HotelSpec))
+			wall_z - HotelBuilder.HOOD_D * 0.5 + HotelBuilder.EMBED)
 		var matches := 0
 		for c in hoods:
 			var bounds := MassBuilder.component_aabb(c)
@@ -88,6 +100,23 @@ static func _check_facade(res: SuiteResult, plan: HousePlan,
 	HotelQA._check_symmetry(builder, failures)
 	_expect(res, not failures.is_empty(), "symmetry accepted no windows")
 	builder.part_log.assign(saved)
+	# Balconies stand before their french windows, and the rule can fail.
+	failures.clear()
+	HotelQA._check_balconies(plan, builder, failures)
+	_expect(res, failures.is_empty(), "balconies: %s" % str(failures))
+	var opened := -1
+	for wi in range(plan.windows.size()):
+		if bool(plan.windows[wi].get("balcony", false)):
+			opened = wi
+			break
+	_expect(res, opened >= 0, "no french window opens onto a balcony")
+	if opened >= 0:
+		var was: Vector2 = plan.windows[opened]["pos"]
+		plan.windows[opened]["pos"] = was + Vector2(0.9, 0.0)
+		failures.clear()
+		HotelQA._check_balconies(plan, builder, failures)
+		_expect(res, not failures.is_empty(), "balconies accepted a balcony off its window")
+		plan.windows[opened]["pos"] = was
 
 
 static func _expect(res: SuiteResult, condition: bool, message: String) -> void:

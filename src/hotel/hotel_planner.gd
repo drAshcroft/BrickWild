@@ -72,10 +72,78 @@ static func plan(spec: HotelSpec) -> HousePlan:
 			if kitchen >= 0:
 				out.hearth = {"room": kitchen, "wall": 1}
 		_add_windows(out, front_rooms, gallery, back_rooms, inner, storey, spec)
+		if storey == 0 and kitchen >= 0:
+			_settle_kitchen_fire(out, kitchen)
 
+	_open_balconies(out, spec)
 	for storey in range(spec.storeys - 1):
 		_add_stair(out, galleries[storey], galleries[storey + 1], storey)
 	return out
+
+
+## The yard wall is the kitchen fire's first choice -- but the tall windows go
+## in after it was chosen, and on a wide hotel they leave 75 cm of wall between
+## them, so the furnisher could hang no fire anywhere on it and the kitchen
+## came out with no hearth at all: a cabinet, a barrel rack and a chalice, which
+## the walk QA took for a bar (6 Oct). A hotel raises no stack over its
+## kitchen (HotelBuilder emits the breast alone), so once the glazing is known
+## the fire may take whichever kitchen wall still has room for it.
+static func _settle_kitchen_fire(out: HousePlan, kitchen: int) -> void:
+	var need: float = HousePlanFeatures.hearth_run_needed()
+	if HousePlanFeatures._clear_wall_run(out, kitchen, 1) >= need:
+		return
+	var best := 1
+	var best_run := HousePlanFeatures._clear_wall_run(out, kitchen, 1)
+	for wi in range(HouseGeometry.room_walls(out, kitchen).size()):
+		var run: float = HousePlanFeatures._clear_wall_run(out, kitchen, wi)
+		if run > best_run:
+			best_run = run
+			best = wi
+	out.hearth = {"room": kitchen, "wall": best}
+
+
+## The storey the balconies serve: the piano nobile above the public floor.
+const BALCONY_STOREY := 1
+
+
+## Three balconies on the piano nobile, each in front of a real window that is
+## let down to the floor as a french window (`"balcony": true`) -- one on the
+## axis and a mirrored pair, at the windows nearest the old stations a third of
+## the pavilion out. The builder seats each balcony on its window, so the
+## balcony and the door behind it cannot drift apart again (WALK-QA, 6 Oct,
+## hotel pins 2 and 3: balconies with no door, off the window grid).
+static func _open_balconies(plan: HousePlan, spec: HotelSpec) -> void:
+	if spec.storeys <= BALCONY_STOREY:
+		return
+	var front: Array[int] = []
+	for i in range(plan.windows.size()):
+		var w: Dictionary = plan.windows[i]
+		if HousePlan.record_storey(w) == BALCONY_STOREY and Vector2(w["normal"]).y < -0.9:
+			front.append(i)
+	for target in [0.0, HotelGeometry.centre_width(spec) * 0.32]:
+		var best := -1
+		var best_d := INF
+		for i in front:
+			var x: float = Vector2(plan.windows[i]["pos"]).x
+			if x < -0.01 or bool(plan.windows[i].get("balcony", false)):
+				continue
+			if absf(x - target) < best_d:
+				best_d = absf(x - target)
+				best = i
+		if best < 0:
+			continue
+		var bx: float = Vector2(plan.windows[best]["pos"]).x
+		for i in front:
+			var x: float = Vector2(plan.windows[i]["pos"]).x
+			if absf(x - bx) < 0.02 or (bx > 0.01 and absf(x + bx) < 0.02):
+				plan.windows[i]["balcony"] = true
+				# Which balcony it opens onto, by its centre. An elevation with
+				# no axial window gets ONE axial balcony across the central
+				# pair rather than two, so there are always three.
+				plan.windows[i]["balcony_x"] = 0.0 if target == 0.0 else signf(x) * bx
+				# a 3 cm upstand over the floor, so the wall under the
+				# opening does not end in the floor's own plane
+				plan.windows[i]["sill"] = HouseGeometry.FLOOR_T + 0.03
 
 
 ## Rooms on each side of the gallery: two facade bays to a room, so a room is
@@ -278,6 +346,10 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, storey: int) -> 
 	var glass: Array[Rect2] = []
 	for wi in plan.windows_of(lower):
 		glass.append(HouseGeometry.window_clear_rect(plan.windows[wi]))
+	# Not in the well the flight below comes up through: the two flights used
+	# to share one rectangle, so the first climbed into the solid foot of the
+	# second and arrived nowhere (WALK-QA, 6 Oct, pin 9).
+	var wells: Array[Rect2] = HousePlanLevels.arriving_wells(plan, storey)
 	var best := Rect2()
 	var best_d := INF
 	var travel: float = floor.size.x - size.x
@@ -286,6 +358,8 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, storey: int) -> 
 		for s in range(steps + 1):
 			var x: float = floor.position.x + travel * float(s) / float(steps)
 			var rect := Rect2(Vector2(x, floor.end.y - size.y), size)
+			if HousePlanLevels.hits_any(rect, wells):
+				continue
 			if strict < 2 and HousePlanLevels.hits_any(rect, swings):
 				continue
 			if strict < 1 and HousePlanLevels.hits_any(rect, lines):

@@ -18,6 +18,7 @@ func check(plan: HousePlan, builder: HotelBuilder) -> Dictionary:
 	_check_program(plan, failures)
 	_check_gallery(plan, spec, failures)
 	_check_landmarks(spec, builder, failures)
+	_check_balconies(plan, builder, failures)
 	_check_symmetry(builder, failures)
 	var stats: Dictionary = shared["stats"].duplicate()
 	stats["facade_bays"] = spec.facade_bays
@@ -116,6 +117,55 @@ static func _check_landmarks(spec: HotelSpec, builder: HotelBuilder,
 		failures.append("landmark: mansard roof has too few dormers")
 	if builder.total_height < HotelGeometry.wall_top(spec) + spec.roof_rise:
 		failures.append("landmark: roofline does not reach its planned crown")
+
+
+## A balcony is a door's: each balcony slab stands at its storey's floor in
+## front of a french window, and each french window has its balcony. The
+## walk-through found three balconies at sill height with no door behind them
+## and off the window grid (WALK-QA, 6 Oct, hotel pins 2 and 3).
+static func _check_balconies(plan: HousePlan, builder: HotelBuilder,
+		failures: Array[String]) -> void:
+	var slabs: Array[Vector3] = []   # x, top, front-wall contact
+	for part in builder.part_log:
+		var size: Vector3 = part.get("size", Vector3.ZERO)
+		if part["tag"] == "balcony" and size.x > 1.0 and size.z > 0.5:
+			var p: Vector3 = part["pos"]
+			slabs.append(Vector3(p.x, p.y + size.y * 0.5, p.z + size.z * 0.5))
+	var wall_z := HotelGeometry.wall_face_z(plan.spec as HotelSpec)
+	var balconies := {}
+	for wi in range(plan.windows.size()):
+		var w: Dictionary = plan.windows[wi]
+		if not bool(w.get("balcony", false)):
+			continue
+		var x: float = Vector2(w["pos"]).x
+		var centre: float = float(w.get("balcony_x", x))
+		balconies[snappedf(centre, 0.01)] = true
+		var floor_top := HousePlan.record_storey(w) * plan.spec.height + HouseGeometry.FLOOR_T
+		var found := false
+		for s in slabs:
+			# the slab is centred on its balcony and wide enough for this window
+			var part_w := 0.0
+			for part in builder.part_log:
+				if part["tag"] == "balcony" and absf(Vector3(part["pos"]).x - s.x) < 0.001 \
+						and Vector3(part["size"]).x > 1.0:
+					part_w = Vector3(part["size"]).x
+			if absf(s.x - centre) < 0.05 and absf(s.y - floor_top) < 0.03 \
+					and s.z >= wall_z - 0.001 and absf(x - s.x) + 0.5 < part_w * 0.5:
+				found = true
+		if not found:
+			failures.append("balcony: french window %d has no balcony at its floor in front of it" % wi)
+		if float(w["sill"]) > HouseGeometry.FLOOR_T + 0.05:
+			failures.append("balcony: window %d opens onto a balcony but is not let down to the floor" % wi)
+	for s in slabs:
+		var found := false
+		for w in plan.windows:
+			if bool(w.get("balcony", false)) \
+					and absf(s.x - float(w.get("balcony_x", Vector2(w["pos"]).x))) < 0.05:
+				found = true
+		if not found:
+			failures.append("balcony: the balcony at x=%.2f has no french window behind it" % s.x)
+	if balconies.size() != 3:
+		failures.append("balcony: %d balconies with french windows, wants 3" % balconies.size())
 
 
 static func _check_symmetry(builder: HotelBuilder, failures: Array[String]) -> void:

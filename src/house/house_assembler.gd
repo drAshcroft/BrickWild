@@ -37,7 +37,12 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 	# (API-005). The house's roof is not hidden for a cutaway -- the builder
 	# is asked not to emit it at all, which is why `not cutaway` goes in above.
 	ShellAssembler.surface_materials(shell, BuildingFamilyAdapter.colours(plan.spec))
-	if plan.spec.material != &"stone" and not plan.spec.has_method("room_program"):
+	# A shop's shell IS a house's shell, roof and all, so it gets the coursed
+	# roof too: the `room_program` test was meant for the castle families that
+	# borrow this assembler, and a flat brown shop roof was the price of it
+	# (WALK-QA, 6 Oct, shop pin 3).
+	if plan.spec.material != &"stone" and (plan.spec is ShopSpec
+			or not plan.spec.has_method("room_program")):
 		ShellAssembler.house_materials(shell, plan.spec)
 	else:
 		ShellAssembler.house_floor_material(shell, plan.spec)
@@ -112,7 +117,7 @@ static func _instance(p: Dictionary, centred := true) -> Node3D:
 		return node
 	var pos: Vector3 = p["pos"]
 	# sit it on whatever it stands on: the floor, a table top, or its bracket
-	var drop: float = PropCatalog.floor_offset(key) * scale_factor
+	var drop: float = PropCatalog.seat_offset(key) * scale_factor
 	if PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED) \
 			or PropCatalog.has_tag(key, PropCatalog.CEILING):
 		drop = 0.0

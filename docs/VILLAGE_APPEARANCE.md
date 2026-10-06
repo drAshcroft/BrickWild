@@ -46,6 +46,27 @@ Below `0.5`, household planting groups thin deterministically along with
 village dressing. Paired beds remain paired. At zero their models and any
 collision children are removed.
 
+## Open ground
+
+A native (non-compact) village's site is sized for its roads, so there can be
+tens of metres of land between the last lot and the edge band that is not a
+lot, a road, the common or a field. `VillageDresser.open_ground` finds that
+land by measurement -- grid points with nothing planned within 7 m -- and
+dresses the most open of them, 15 m apart: a copse from the culture's edge,
+hedge and ground palettes, or in a farming or forest village every other patch
+a hay meadow (a built haystack with cover round it). Only plants and built
+pieces go there, because open land is not walk-grid floor. The pass runs last
+on its own named streams, so every earlier placement is unchanged. Decoration
+`0.0` places none; `0.5` dresses every patch found; above it the patches are
+fuller. Low upkeep turns some copse trees to dead wood. Compact displays keep
+their own gap planting and skip this pass. Open-ground plants carry
+`zone = &"open"`.
+
+Every assembled model is checked against the ground by `VillageGroundCheck`
+(`-- vground`, in `lane:village-fast`): props by their lowest vertex, plants by
+their ground line, and each house's yard and facade models against the height
+their own plan row gives. See the walk-QA note in `SceneBounds.plant_seat`.
+
 ## Asset ideas
 
 The first implementation uses the project's existing measured catalogue.

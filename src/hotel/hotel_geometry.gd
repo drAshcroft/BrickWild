@@ -33,8 +33,19 @@ static func cupola_radius(spec: HotelSpec) -> float:
 	return clampf(spec.width * CUPOLA_R_FRACTION, 1.35, 2.5)
 
 
+## The plane the roof crown and cupolas are measured from, standing
+## FACADE_PROJECTION proud of the front wall. NOT the wall: dressing laid on
+## it hangs in the air (see wall_face_z).
 static func front_z(spec: HotelSpec) -> float:
 	return -spec.length * 0.5 - FACADE_PROJECTION
+
+
+## The front wall's outside face, which is where facade dressing is seated.
+## Cornices, quoins, hoods, balconies and the entrance used to be centred on
+## front_z and so stood 0.11 to 0.23 m clear of the wall they decorate, with
+## daylight behind them (WALK-QA, 6 Oct, hotel pin 4).
+static func wall_face_z(spec: HotelSpec) -> float:
+	return -spec.length * 0.5
 
 
 static func total_height(spec: HotelSpec) -> float:

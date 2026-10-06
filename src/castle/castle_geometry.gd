@@ -30,6 +30,7 @@ const TENSHU_TIERS := 5           # storeys the timber tower steps down through
 const MERLON_W := 0.65            # merlon width along the parapet
 const MERLON_GAP := 0.55          # crenel (the gap) width
 const PARAPET_RISE := 0.25        # wall-walk coping under the merlons
+const WALK_LIP := 0.15            # the coping's overhang past each face of the curtain
 const GATE_DEPTH_MIN := 3.0
 const MIN_WALL_RUN := 1.5         # shorter than this and a wall run is dropped
 const BAILEY_CLEAR := 1.5         # air kept between interior ranges

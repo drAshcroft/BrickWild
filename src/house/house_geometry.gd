@@ -278,6 +278,47 @@ static func is_exterior_edge(spec: HouseSpec, axis: int, value: float) -> bool:
 ## partition on every edge it shares with another room. Furniture is placed in
 ## this rectangle, never in the raw partition rect, or every wall-hugging piece
 ## would be buried half a partition deep in the wall beside it.
+## The floor a body needs in front of a stair's first step: its radius.
+const STAIR_APPROACH := 0.3
+
+
+## Which way a straight flight climbs along its long axis: +1.0 from its low
+## coordinate end, -1.0 from its high end. The FOOT is the end with floor in
+## front of it. The builder used to climb toward +x/+z whatever stood at the
+## other end, and a flight laid against the hall's end wall began in the wall
+## itself, with nowhere to stand to get on it (WALK-QA, 6 Oct, Wolfmarch Green
+## house_9 pin 5). A record may say so itself with "climb".
+static func stair_climb(plan: HousePlan, stair: Dictionary) -> float:
+	if stair.has("climb"):
+		return signf(float(stair["climb"])) if float(stair["climb"]) != 0.0 else 1.0
+	var r := Rect2(stair.get("lower_rect", stair.get("rect", Rect2())))
+	var room := int(stair.get("a", -1))
+	if room < 0 or room >= plan.room_count() or not is_straight_flight(r):
+		return 1.0
+	var floor := room_floor_rect(plan, room).grow(0.01)
+	if floor.encloses(stair_approach(r, 1.0)):
+		return 1.0
+	if floor.encloses(stair_approach(r, -1.0)):
+		return -1.0
+	return 1.0
+
+
+## A well at least half again as long as it is wide holds a straight flight;
+## a squarer one is a newel or a spiral, which has no single foot end.
+static func is_straight_flight(r: Rect2) -> bool:
+	return r.has_area() and maxf(r.size.x, r.size.y) >= minf(r.size.x, r.size.y) * 1.5
+
+
+## The strip of floor in front of the foot of a flight laid on `r` and
+## climbing `climb` (see stair_climb).
+static func stair_approach(r: Rect2, climb: float, depth := STAIR_APPROACH) -> Rect2:
+	if r.size.x > r.size.y:
+		var x := r.position.x - depth if climb > 0.0 else r.end.x
+		return Rect2(Vector2(x, r.position.y), Vector2(depth, r.size.y))
+	var z := r.position.y - depth if climb > 0.0 else r.end.y
+	return Rect2(Vector2(r.position.x, z), Vector2(r.size.x, depth))
+
+
 static func room_floor_rect(plan: HousePlan, i: int) -> Rect2:
 	# An outline is the clear floor already: there is no partition to give half
 	# of, so the floor rectangle is simply what the outline spans.

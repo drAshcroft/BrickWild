@@ -490,6 +490,22 @@ func _check_shops(plan: HousePlan) -> void:
 			if attached == door:
 				continue
 			failures.append("shops: taberna has an additional door into the house")
+		# A shop front is a door AND a window, but not on one span: the wall
+		# builder cuts one opening per span of a run, so a window over the door
+		# refills the doorway and the door refills the window -- a frame round
+		# plain plaster, which is what the walker found on the street front.
+		var dp := Vector2(door.get("pos", Vector2.ZERO))
+		var dn := Vector2(door.get("normal", Vector2.ZERO))
+		var dw := float(door.get("width", 0.0))
+		for win in plan.windows:
+			var wn := Vector2(win.get("normal", Vector2.ZERO))
+			var wp := Vector2(win.get("pos", Vector2.ZERO))
+			if wn.dot(dn) < 0.99:
+				continue
+			var across := absf((wp - dp).dot(dn))
+			var along := absf((wp - dp).dot(Vector2(-dn.y, dn.x)))
+			if across < 0.05 and along < (dw + float(win.get("width", 0.0))) / 2.0:
+				failures.append("shops: a window is stacked on the taberna door's span, so neither is cut")
 	if shops != 2:
 		failures.append("shops: expected two tabernae, found %d" % shops)
 

@@ -175,11 +175,14 @@ static func _check_default_uvs(res: SuiteResult) -> void:
 	var arrays: Array = legacy.commit().surface_get_arrays(0)
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 	res.checked += 1
+	# Each face is one 0..1 square, both triangles reading its corners. The
+	# second triangle used to repeat the first's UVs, which sheared every
+	# per-face texture along the diagonal (castle walk pin 11, 6 Oct).
 	var expected := [Vector2.ZERO, Vector2(1, 0), Vector2.ONE,
-		Vector2.ZERO, Vector2(1, 0), Vector2.ONE]
+		Vector2.ZERO, Vector2.ONE, Vector2(0, 1)]
 	for i in range(expected.size()):
 		if uvs[i] != expected[i]:
-			res.fail("default MeshKit UVs changed; house UV compatibility was lost")
+			res.fail("default MeshKit UVs are not one 0..1 square per face")
 			return
 
 

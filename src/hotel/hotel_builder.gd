@@ -29,6 +29,10 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_facade()
 	if with_roof:
 		_build_palace_roof()
+		# the guest floor under the mansard has a ceiling, like a house's top
+		# storey (WALK-QA, 6 Oct). `roof_enabled` stays false: HouseQA reads
+		# it as "this is a house roof" and the mansard is not one.
+		_build_ceiling(true, true)
 	# The planner lays rugs and hearth breasts for a hotel exactly as for a
 	# house (LAY-010), so the builder must emit the same structure.
 	_build_hearth_breast()
@@ -41,49 +45,243 @@ func _build_facade() -> void:
 	var z := HotelGeometry.front_z(hs)
 	var top := HotelGeometry.wall_top(hs)
 	var centre_w := HotelGeometry.centre_width(hs)
-
-	# Horizontal cornices make the elevation read as stacked public, piano
-	# nobile, and guest-room zones rather than one tall pink slab.
-	for level in range(hs.storeys + 1):
-		var y := 0.25 if level == 0 else float(level) * hs.height - 0.12
-		tag("cornice")
-		if level == 0:
-			# The base course is a plinth moulding at ankle height: it must not
-			# run across the ceremonial doorway and trip the approach, so it
-			# stops either side of the entrance void.
-			var gap := _entrance_half_width()
-			var side_w := (hs.width + 0.8) * 0.5 - gap
-			for side in [-1.0, 1.0]:
-				box(Vector3(side_w, 0.22, 0.34),
-					Vector3(side * (gap + side_w * 0.5), y, z), SURF_TRIM)
-		else:
-			box(Vector3(hs.width + 0.8, 0.22, 0.34), Vector3(0, y, z), SURF_TRIM)
-	# Corner quoins are outside every planned opening. Central pilasters on an
-	# unrelated bay grid used to run straight through guest-room windows.
-	for x in [-hs.width * 0.5, hs.width * 0.5]:
-		tag("pilaster")
-		box(Vector3(0.42, top, 0.36), Vector3(x, top * 0.5, z - 0.02), SURF_TRIM)
-		for course in range(int(top / 0.65)):
-			box(Vector3(0.62, 0.12, 0.42),
-				Vector3(x, 0.35 + course * 0.65, z - 0.04), SURF_TRIM)
-
-	# The house shell already cuts, glazes and frames plan.windows. Only add
-	# hoods here, using those SAME openings; never paint a second window grid
-	# over them. The front's ground-floor rhythm follows its public rooms.
-	for i in range(plan.windows.size()):
-		var w: Dictionary = plan.windows[i]
-		if Vector2(w["normal"]).y > -0.9:
-			continue
-		var level := HousePlan.record_storey(w)
-		var y := level * hs.height + float(w["head"]) + 0.22
-		tag("facade_hood")
-		host("hotel_window_%d" % i, level)
-		component_box("facade_hood", Vector3(float(w["width"]) + 0.38, 0.12, 0.30),
-			Transform3D(Basis(), Vector3(Vector2(w["pos"]).x, y, z)), SURF_TRIM)
-		host_end()
-	_build_entrance(z, centre_w)
-	_build_balconies(z, centre_w)
+	# Everything below is SEATED on the wall it dresses (_face_box), on all
+	# four walls. It used to be centred on front_z, 0.28 m proud of the wall,
+	# and only on the front: the dressing floated with daylight behind it and
+	# the long side and back walls were bare pink slabs (WALK-QA, 6 Oct,
+	# hotel pins 4, 5 and 6).
+	_build_courses(hs)
+	_build_quoins(hs)
+	_build_hoods(hs)
+	_build_pilasters(hs)
+	_build_entrance(HotelGeometry.wall_face_z(hs), centre_w)
+	_build_balconies(hs)
 	_build_centre_crown(z, top, centre_w)
+
+
+## How far facade dressing is sunk into its wall, so that its back face is
+## buried in the masonry instead of lying in the wall's own plane.
+const EMBED := 0.03
+## String courses: height and projection.
+const COURSE_H := 0.22
+const COURSE_D := 0.34
+## Corner rustication: the pier, and the blocks laid over it.
+const QUOIN_PIER := 0.30
+const QUOIN_PROUD := 0.10
+const QUOIN_BLOCK_PROUD := 0.16
+const QUOIN_PITCH := 0.6
+const QUOIN_BLOCK_H := 0.46
+## Pilaster strips on the cell divisions.
+const PILASTER_W := 0.36
+const PILASTER_D := 0.10
+## Window hoods: how far past the opening each end runs, and their projection.
+const HOOD_OVER := 0.19
+const HOOD_D := 0.30
+
+
+## The four outside faces of the shell: the left end of the face, the
+## direction along it, the outward normal and its length. The shell's outer
+## faces are the site rectangle's edges.
+func _faces(hs: HotelSpec) -> Array[Dictionary]:
+	var hw := hs.width * 0.5
+	var hl := hs.length * 0.5
+	return [
+		{"side": &"front", "o": Vector2(-hw, -hl), "dir": Vector2(1, 0), "n": Vector2(0, -1), "len": hs.width},
+		{"side": &"back", "o": Vector2(-hw, hl), "dir": Vector2(1, 0), "n": Vector2(0, 1), "len": hs.width},
+		{"side": &"left", "o": Vector2(-hw, -hl), "dir": Vector2(0, 1), "n": Vector2(-1, 0), "len": hs.length},
+		{"side": &"right", "o": Vector2(hw, -hl), "dir": Vector2(0, 1), "n": Vector2(1, 0), "len": hs.length},
+	]
+
+
+## A box laid against a face: `t` along it, `along` long, `y` its centre
+## height, standing `depth` out of the wall with EMBED of that buried. Logged
+## as a named component AND as a part, so exterior QA sees it and the landmark
+## counts (which read part tags) still do.
+func _face_box(face: Dictionary, role: String, t: float, along: float, y: float,
+		h: float, depth: float) -> void:
+	var dir: Vector2 = face["dir"]
+	var n: Vector2 = face["n"]
+	var c: Vector2 = Vector2(face["o"]) + dir * t + n * (depth * 0.5 - EMBED)
+	var yaw := atan2(-dir.y, dir.x)
+	var size := Vector3(along, h, depth)
+	component_box(role, size, Transform3D(Basis(Vector3.UP, yaw), Vector3(c.x, y, c.y)), SURF_TRIM)
+	_log_part("box", Vector3(c.x, y, c.y), size, yaw)
+
+
+## Every opening cut in one face, as {t, w, y0, y1} in world heights, with the
+## width its dressing takes (frame and hood) folded in.
+func _face_openings(face: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var n: Vector2 = face["n"]
+	var dir: Vector2 = face["dir"]
+	var records: Array = []
+	for w in plan.windows:
+		records.append([w, float(w["width"]) + HOOD_OVER * 2.0, float(w["sill"]),
+			float(w["head"]) + 0.3])
+	for d in plan.doors:
+		if not d["exterior"]:
+			continue
+		var dw: float = ENTRANCE_W if bool(d.get("front", false)) else float(d["width"]) + 0.2
+		records.append([d, dw, float(d.get("sill", 0.0)),
+			float(d.get("head", HouseGeometry.DOOR_H)) + 0.1])
+	for r in records:
+		var rec: Dictionary = r[0]
+		if Vector2(rec["normal"]).dot(n) < 0.9:
+			continue
+		var level := HousePlan.record_storey(rec)
+		var pos: Vector2 = rec["pos"]
+		out.append({"t": (pos - Vector2(face["o"])).dot(dir), "w": float(r[1]),
+			"y0": level * spec.height + float(r[2]), "y1": level * spec.height + float(r[3])})
+	return out
+
+
+## The heights of the string courses: an ankle-height base course, one at
+## every floor line and one at the wall head.
+func _course_heights(hs: HotelSpec) -> Array[float]:
+	var out: Array[float] = []
+	for level in range(hs.storeys + 1):
+		out.append(0.25 if level == 0 else float(level) * hs.height - 0.12)
+	return out
+
+
+## Horizontal string courses round all four walls, stopping either side of any
+## opening they would cross (the base course must not trip a doorway). Front
+## and back run through the corners; the sides stop against them, so no two
+## course faces share a plane.
+func _build_courses(hs: HotelSpec) -> void:
+	tag("cornice")
+	for face in _faces(hs):
+		var through: bool = face["side"] in [&"front", &"back"]
+		var t0: float = -(COURSE_D - EMBED) if through else EMBED
+		var t1: float = float(face["len"]) - t0
+		var openings := _face_openings(face)
+		host("course_%s" % String(face["side"]))
+		for y in _course_heights(hs):
+			var gaps: Array = []
+			for op in openings:
+				if float(op["y1"]) > y - COURSE_H * 0.5 and float(op["y0"]) < y + COURSE_H * 0.5:
+					gaps.append([float(op["t"]) - float(op["w"]) * 0.5,
+						float(op["t"]) + float(op["w"]) * 0.5])
+			gaps.sort_custom(func(a, b): return a[0] < b[0])
+			gaps.append([t1, t1])
+			var cursor := t0
+			for g in gaps:
+				var lo: float = minf(g[0], t1)
+				if lo - cursor > 0.05:
+					_face_box(face, "string_course", (cursor + lo) * 0.5, lo - cursor,
+						y, COURSE_H, COURSE_D)
+				cursor = maxf(cursor, g[1])
+		host_end()
+
+
+## Rusticated quoins at all four corners: a pier wrapping the corner and
+## alternating long and short blocks over it, kept clear of the openings and
+## of the string courses.
+func _build_quoins(hs: HotelSpec) -> void:
+	tag("pilaster")
+	var top := HotelGeometry.wall_top(hs)
+	var courses := _course_heights(hs)
+	for face in _faces(hs):
+		var through: bool = face["side"] in [&"front", &"back"]
+		var openings := _face_openings(face)
+		var length: float = face["len"]
+		host("quoin_%s" % String(face["side"]))
+		for end in [0, 1]:
+			# the clear run from this corner to the first opening
+			var clear := 1.2
+			for op in openings:
+				var edge: float = float(op["t"]) - float(op["w"]) * 0.5
+				if end == 1:
+					edge = length - float(op["t"]) - float(op["w"]) * 0.5
+				clear = minf(clear, edge - 0.08)
+			if clear < QUOIN_PIER:
+				continue
+			# Front and back own the corner itself; the side pieces start
+			# behind them so the two never share a face.
+			var start: float = -QUOIN_PROUD if through else EMBED
+			var pier_len: float = QUOIN_PIER - start
+			var pier_t: float = start + pier_len * 0.5
+			# stops short of the wall head, so its top is not the wall's plane
+			_face_box(face, "quoin_pier", pier_t if end == 0 else length - pier_t, pier_len,
+				(top - 0.05) * 0.5, top - 0.05, QUOIN_PROUD + EMBED)
+			var k := 0
+			var y0 := 0.40
+			while y0 + QUOIN_BLOCK_H < top - 0.3:
+				var y1 := y0 + QUOIN_BLOCK_H
+				var crossing := false
+				for cy in courses:
+					if y1 > cy - COURSE_H * 0.5 - 0.02 and y0 < cy + COURSE_H * 0.5 + 0.02:
+						crossing = true
+				if not crossing:
+					var long: bool = (k % 2 == 0) == through
+					var reach: float = minf(clear, 0.72 if long else 0.42)
+					var bstart: float = -QUOIN_BLOCK_PROUD if through else EMBED
+					var blen: float = reach - bstart
+					var bt: float = bstart + blen * 0.5
+					_face_box(face, "quoin_block", bt if end == 0 else length - bt, blen,
+						(y0 + y1) * 0.5, QUOIN_BLOCK_H, QUOIN_BLOCK_PROUD + EMBED)
+				k += 1
+				y0 += QUOIN_PITCH
+		host_end()
+
+
+## A hood over every window on every wall, from the SAME plan.windows the shell
+## cut -- never a second painted grid.
+func _build_hoods(hs: HotelSpec) -> void:
+	tag("facade_hood")
+	for face in _faces(hs):
+		var n: Vector2 = face["n"]
+		for i in range(plan.windows.size()):
+			var w: Dictionary = plan.windows[i]
+			if Vector2(w["normal"]).dot(n) < 0.9:
+				continue
+			var level := HousePlan.record_storey(w)
+			var t: float = (Vector2(w["pos"]) - Vector2(face["o"])).dot(face["dir"])
+			host("hotel_window_%d" % i, level)
+			_face_box(face, "facade_hood", t, float(w["width"]) + HOOD_OVER * 2.0,
+				level * hs.height + float(w["head"]) + 0.22, 0.12, HOOD_D)
+			host_end()
+
+
+## Pilaster strips on the cell divisions -- where the partitions meet the
+## outside wall -- wherever one stands clear of every opening and hood on its
+## wall, so the long elevations read in bays rather than as one slab. A strip
+## that would cross a window is not laid at all (the old bay grid did cross
+## them).
+func _build_pilasters(hs: HotelSpec) -> void:
+	tag("pilaster")
+	var top := HotelGeometry.wall_top(hs)
+	var inner := HouseGeometry.interior_rect(hs)
+	for face in _faces(hs):
+		var along_x: bool = absf(Vector2(face["dir"]).x) > 0.5
+		var lo: float = inner.position.x if along_x else inner.position.y
+		var hi: float = inner.end.x if along_x else inner.end.y
+		var lines := {}
+		for room in plan.rooms:
+			var r: Rect2 = room["rect"]
+			for v in ([r.position.x, r.end.x] if along_x else [r.position.y, r.end.y]):
+				if v > lo + 0.5 and v < hi - 0.5:
+					lines[snappedf(v, 0.001)] = true
+		var openings := _face_openings(face)
+		var origin: float = Vector2(face["o"]).x if along_x else Vector2(face["o"]).y
+		host("pilasters_%s" % String(face["side"]))
+		for v in lines.keys():
+			var t: float = float(v) - origin
+			var clear := true
+			for op in openings:
+				if absf(t - float(op["t"])) < float(op["w"]) * 0.5 + PILASTER_W * 0.5 + 0.05:
+					clear = false
+			if face["side"] == &"front":
+				for b in _balconies():
+					if absf(float(v) - b.x) < b.y * 0.5 + PILASTER_W:
+						clear = false
+				if absf(float(v)) < ENTRANCE_W:
+					clear = false
+			if not clear:
+				continue
+			_face_box(face, "pilaster", t, PILASTER_W, (0.30 + top - 0.12) * 0.5,
+				top - 0.42, PILASTER_D + EMBED)
+		host_end()
 
 
 ## Half the width of the ceremonial entrance void, which the planned front
@@ -113,41 +311,94 @@ func _window(pos: Vector3, ground := false) -> void:
 		pos + Vector3(0, h * 0.5 + 0.22, 0), SURF_TRIM)
 
 
+## `z` is the front wall's face: every piece is seated on it.
 func _build_entrance(z: float, centre_w: float) -> void:
 	tag("ceremonial_entrance")
 	var door_w := 1.8
 	var door_h := minf(2.65, spec.height - 0.45)
 	for side in [-1.0, 1.0]:
 		box(Vector3(0.32, door_h, 0.42),
-			Vector3(side * (door_w * 0.5 + 0.3), door_h * 0.5, z - 0.12),
+			Vector3(side * (door_w * 0.5 + 0.3), door_h * 0.5, z - 0.21 + EMBED),
 			SURF_TRIM)
-		box(Vector3(0.42, 0.18, 0.54),
-			Vector3(side * (door_w * 0.5 + 0.3), 0.09, z - 0.12), SURF_TRIM)
-	_kit.arc_ribbon(Vector3(-door_w * 0.5, door_h + 0.05, z - 0.14),
-		Vector3(door_w * 0.5, door_h + 0.05, z - 0.14), 0.25, 0.14, 0.25,
+		# The plinth steps out on the street and outer sides only. Its door
+		# side stops 1 cm inside the pier's (one plane would fight): stepped
+		# 5 cm towards the opening, it showed past the end of the reveal as a
+		# stub in the doorway (WALK-QA, 6 Oct, hotel pin 7).
+		box(Vector3(0.36, 0.18, 0.54),
+			Vector3(side * (door_w * 0.5 + 0.33), 0.09, z - 0.27 + EMBED), SURF_TRIM)
+	_kit.arc_ribbon(Vector3(-door_w * 0.5, door_h + 0.05, z - 0.125 + EMBED),
+		Vector3(door_w * 0.5, door_h + 0.05, z - 0.125 + EMBED), 0.25, 0.14, 0.25,
 		SURF_TRIM, 10)
-	box(Vector3(minf(centre_w * 0.78, 11.0), 0.24, 1.35),
-		Vector3(0, spec.height - 0.38, z - 0.5), SURF_TRIM)
-	# The sign panel is wall-colored and framed, leaving the real entrance void
-	# below it open for navigation and collision.
-	# The plaque belongs BETWEEN floors, not across the first-floor windows.
-	box(Vector3(minf(centre_w * 0.62, 8.2), 0.48, 0.24),
-		Vector3(0, spec.height + 0.12, z - 0.1), SURF_WALL)
-	box(Vector3(minf(centre_w * 0.68, 8.8), 0.12, 0.34),
-		Vector3(0, spec.height + 0.42, z - 0.12), SURF_TRIM)
+	var canopy_w := minf(centre_w * 0.78, 11.0)
+	var canopy_y := spec.height - 0.38
+	box(Vector3(canopy_w, 0.24, 1.35), Vector3(0, canopy_y, z - 0.675 + EMBED), SURF_TRIM)
+	# The hotel's name board is the canopy's fascia. It used to be a plaque on
+	# the wall between the floors, which is where the balcony doors now are.
+	box(Vector3(canopy_w * 0.7, 0.34, 0.08),
+		Vector3(0, canopy_y, z - 1.35 + EMBED - 0.03), SURF_WALL)
 
 
-func _build_balconies(z: float, centre_w: float) -> void:
-	var xs := [-centre_w * 0.32, 0.0, centre_w * 0.32]
-	for x in xs:
+## A balcony is BALCONY_W wide, centred on its french window.
+const BALCONY_W := 2.3
+const BALCONY_D := 1.05
+
+
+## Every balcony, as (centre x, width, storey): one per `balcony_x` the
+## planner gave its french windows, wide enough to stand before all of them.
+func _balconies() -> Array[Vector3]:
+	var spans := {}
+	for w in plan.windows:
+		if not bool(w.get("balcony", false)):
+			continue
+		var key: float = snappedf(float(w.get("balcony_x", Vector2(w["pos"]).x)), 0.001)
+		var reach: float = absf(Vector2(w["pos"]).x - key)
+		var was: Vector2 = spans.get(key, Vector2(0.0, HousePlan.record_storey(w)))
+		spans[key] = Vector2(maxf(was.x, reach), was.y)
+	var out: Array[Vector3] = []
+	for key in spans:
+		out.append(Vector3(key, spans[key].x * 2.0 + BALCONY_W, spans[key].y))
+	return out
+
+
+## The balconies stand at the floor of the storey they serve, in front of the
+## french window the planner opened for each (HotelPlanner._open_balconies):
+## a balcony with no door behind it, at sill height and off the window grid,
+## is what the walk-through found (WALK-QA, 6 Oct, hotel pins 2 and 3).
+func _build_balconies(hs: HotelSpec) -> void:
+	var z := HotelGeometry.wall_face_z(hs)
+	for b in _balconies():
 		tag("balcony")
-		var y := spec.height * 1.22
-		box(Vector3(3.8, 0.18, 1.05), Vector3(x, y, z - 0.48), SURF_TRIM)
-		for post in range(7):
-			var px: float = x - 1.6 + post * (3.2 / 6.0)
-			box(Vector3(0.08, 0.72, 0.08),
-				Vector3(px, y + 0.42, z - 0.92), SURF_TRIM)
-		box(Vector3(3.45, 0.09, 0.1), Vector3(x, y + 0.8, z - 0.92), SURF_TRIM)
+		var x: float = b.x
+		var width: float = b.y
+		var top := b.z * hs.height + HouseGeometry.FLOOR_T
+		var slab_t := 0.18
+		var front := z - BALCONY_D + EMBED
+		box(Vector3(width, slab_t, BALCONY_D),
+			Vector3(x, top - slab_t * 0.5, z - BALCONY_D * 0.5 + EMBED), SURF_TRIM)
+		var half := width * 0.5 - 0.08
+		var posts := maxi(7, int(half * 2.0 / 0.33) + 1)
+		for post in range(posts):
+			var px: float = x - half + post * (half * 2.0 / float(posts - 1))
+			# up into the rail, so the balusters carry it
+			box(Vector3(0.08, 0.75, 0.08), Vector3(px, top + 0.375, front + 0.08), SURF_TRIM)
+		box(Vector3(width - 0.1, 0.09, 0.1), Vector3(x, top + 0.78, front + 0.08), SURF_TRIM)
+		# The two ends, from the front rail back into the wall, so the balcony
+		# is closed on three sides. They abut the front rail rather than overlap
+		# it: the two tops are one plane.
+		var end_from := front + 0.13
+		var end_to := z + EMBED
+		# Each end carries balusters at the front's pitch. A bare rail running
+		# back to the wall, with nothing under it, read from the street as a
+		# diagonal stub poking past the balcony (WALK-QA, 6 Oct, hotel pin 2).
+		var pitch: float = half * 2.0 / float(posts - 1)
+		var end_posts := maxi(1, int((end_to - 0.06 - (front + 0.08)) / pitch))
+		for side in [-1.0, 1.0]:
+			box(Vector3(0.08, 0.09, end_to - end_from),
+				Vector3(x + side * half, top + 0.78, (end_from + end_to) * 0.5), SURF_TRIM)
+			for k in range(1, end_posts + 1):
+				# 7 cm, not the rail's 8: their sides would share its planes
+				box(Vector3(0.07, 0.75, 0.08),
+					Vector3(x + side * half, top + 0.375, front + 0.08 + k * pitch), SURF_TRIM)
 
 
 func _build_centre_crown(z: float, top: float, centre_w: float) -> void:

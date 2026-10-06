@@ -64,7 +64,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"tree", "bridge", "windmill"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
+const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi", "vground", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
@@ -98,7 +98,8 @@ const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi"
 ##   lane:house-furnish-fast  bounded furnishing and assembly checks
 ##   lane:house-exterior-fast bounded exterior and assembly checks
 ##   lane:assets-fast        props and assembly contract (catalogue rebuild separate)
-##   lane:village-fast       site, lot and village contract checks
+##   lane:village-fast       site, lot and village contract checks, and every
+##                           assembled model of the pinned village on its ground
 ##   lane:castle-change  ~81s body / 91s host: fixed castle geometry and QA
 ##   lane:castle         exhaustive castle sweeps; schedule separately
 ##   lane:church-change  ~10s body  bounded roofs, domed styles, openings, massing
@@ -128,7 +129,7 @@ const LANES: Dictionary = {
 	"lane:assets-fast": ["props", "hassembly"],
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
 	"lane:palace-change": ["palace"],
-	"lane:village-fast": ["vquick", "vcompact", "compactapi"],
+	"lane:village-fast": ["vquick", "vcompact", "compactapi", "vground"],
 	"lane:village-appearance-fast": ["vdecoration", "vdecorationapi", "vappearance"],
 	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cmotteaccess"],
 	"lane:motte-change": ["cmotteplan", "cmotteaccess", "coccupancy"],
@@ -400,6 +401,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_quick_suite.gd").run()
 		"vcompact":
 			return preload("res://tests/suites/village_compact_suite.gd").run()
+		"vground":
+			return preload("res://tests/village_ground_test.gd").run()
 		"vdecoration":
 			return preload("res://tests/village_decoration_test.gd").run()
 		"vdecorationapi":

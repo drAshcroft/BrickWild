@@ -19,8 +19,8 @@ const SURF_ROAD := VillageBuilder.SURF_ROAD
 const SURF_COMMON := VillageBuilder.SURF_COMMON
 const SURF_WATER := VillageBuilder.SURF_WATER
 ## A plant is turned by its own yaw and left at the size it was modelled;
-## this is how far into the ground it is pushed so it does not float on a
-## catalogue floor offset.
+## this is how far below its measured seat it is pushed, so the rim of its
+## base never shows a hairline of daylight on level ground.
 const PLANT_SINK := 0.02
 
 
@@ -48,10 +48,25 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 			continue
 		node.name = "%s_%d" % [String(b["kind"]), i]
 		node.transform = b["transform"]
+		_record_stands(node, built)
 		_apply_building_appearance(node, built, plan.spec)
 		houses.add_child(node)
 	_dressing(root, plan)
 	return root
+
+
+## Where each of a house's yard and facade models stands, in the building's
+## own frame, as plain data on its node: `VillageGroundCheck` judges the loaded
+## models against it (walk QA: a yard cart in the air). Plain rows rather than
+## the plan, so the scene stays packable.
+static func _record_stands(node: Node3D, built: GeneratedBuilding) -> void:
+	if not built.plan is HousePlan:
+		return
+	var rows: Array = []
+	for row in built.plan.exterior + built.plan.yard:
+		rows.append({"id": String(row.get("id", "")), "key": String(row.get("key", "")),
+			"y": float((row["pos"] as Vector3).y), "mounted": bool(row.get("mounted", false))})
+	node.set_meta(&"stands", rows)
 
 
 ## Paint only the architectural shell of each generated building. Surface 0 is
@@ -199,6 +214,23 @@ static func _ground_finish(ground: MeshInstance3D) -> void:
 			m.roughness = 0.45
 
 
+## How far below its seat a plant is set. A leaning plant is tilted about its
+## foot, which lifts the uphill rim of its trunk base by the base radius times
+## the sine of the lean -- a 7 degree tree showed 6 cm of daylight on one side.
+## The base radius is the measured trunk at the plant's scale, held to
+## LEAN_BASE_MAX because the trunk band also takes in low branches.
+const LEAN_BASE_MAX := 0.5
+
+
+static func plant_sink(t: Dictionary) -> float:
+	var lean: float = absf(float(t.get("lean", 0.0)))
+	if lean <= 0.0:
+		return PLANT_SINK
+	var base: float = minf(PropCatalog.trunk(String(t["key"])) * float(t.get("scale", 1.0)),
+		LEAN_BASE_MAX)
+	return PLANT_SINK + base * sin(lean)
+
+
 ## The dressing: every catalogue prop and plant the dresser placed, and a
 ## light for each one the catalogue tags LIGHT. The props the dresser marked
 ## `built` are already in the ground mesh -- `VillageBuilder` raised them --
@@ -218,7 +250,9 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 		var key: String = String(p["key"])
 		var at := Vector3(float(p["pos"].x), 0.0, float(p["pos"].y))
 		var yaw: float = float(p.get("yaw", 0.0))
-		at.y = VillageBuilder.ground_height(plan, p["pos"])
+		# a wall torch hangs at its recorded elevation; the rest stand on the ground
+		at.y = float(p["elevation"]) if p.has("elevation") \
+			else VillageBuilder.ground_height(plan, p["pos"])
 		if not bool(p.get("built", false)):
 			var node: Node3D = _model(key, at, yaw)
 			if node != null:
@@ -232,7 +266,7 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 		var t: Dictionary = plan.plants[j]
 		var key2: String = String(t["key"])
 		var node2: Node3D = _model(key2,
-			Vector3(float(t["pos"].x), VillageBuilder.ground_height(plan, t["pos"]) - PLANT_SINK,
+			Vector3(float(t["pos"].x), VillageBuilder.ground_height(plan, t["pos"]) - plant_sink(t),
 				float(t["pos"].y)),
 			float(t.get("yaw", 0.0)), float(t.get("scale", 1.0)),
 			float(t.get("lean", 0.0)), float(t.get("lean_yaw", 0.0)))
@@ -257,7 +291,9 @@ static func _model(key: String, at: Vector3, yaw: float, scale := 1.0,
 	var node := packed.instantiate() as Node3D
 	if node == null:
 		return null
-	node.position = at - Vector3(0.0, PropCatalog.floor_offset(key) * scale, 0.0)
+	# The measured ground line, not an authored offset: a plant's seat (its
+	# own ground line), anything else its lowest point.
+	node.position = at - Vector3(0.0, PropCatalog.seat_offset(key) * scale, 0.0)
 	node.rotation.y = yaw + PropCatalog.face_offset(key)
 	if lean != 0.0:
 		# tilted about the foot, in the direction `lean_yaw`

@@ -211,22 +211,53 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 				var bz: float = ChurchGeometry.nave_buttress_z(spec, i, n)
 				_stepped_buttress("nave_%s_%d" % ["left" if side_v < 0.0 else "right", i],
 					Vector3(side_v * w / 2.0, 0.0, bz), Vector3(side_v, 0.0, 0.0),
-					h * 0.72, bd, 0.5, false)
+					h * 0.72, bd, ChurchGeometry.BUTTRESS_FACE, false)
 		if spec.tower:
 			var tw2: float = spec.tower_width
 			var th2: float = spec.tower_height
+			# A corner buttress may not stand in the way in, inside the nave
+			# the tower is embedded in, or on its twin's buttress. Twin towers
+			# 0.6 m apart put two of them, overlapping, on the axis in front of
+			# the portal (walk-QA, Wolfmarch Green pin 14) and two more inside
+			# the nave behind it.
+			var keep_out: Array[Rect2] = []
+			for door in ChurchGeometry.west_door_layout(spec):
+				var half_w: float = float(door.width) * 0.5 + 0.3
+				keep_out.append(Rect2(float(door.x) - half_w, -l * 2.0, half_w * 2.0, l * 4.0))
+			keep_out.append(Rect2(-w / 2.0 + NAVE_WALL_T, -l / 2.0 + NAVE_WALL_T,
+				w - NAVE_WALL_T * 2.0, l - NAVE_WALL_T))
+			var feet: Array[Rect2] = []
+			var names: Array[String] = []
+			var rows: Array = []
 			for tower_side in ChurchGeometry.west_tower_sides(spec):
 				var tx: float = ChurchGeometry.tower_center_x(spec, tower_side)
 				var tz: float = ChurchGeometry.tower_center_z(spec)
 				for cx_v in [-1.0, 1.0]:
 					for cz_v in [-1.0, 1.0]:
-						_stepped_buttress("tower_%s_%s_%s" % [
-							"left" if tower_side < 0.0 else "right",
-							"left" if cx_v < 0.0 else "right",
-							"front" if cz_v < 0.0 else "rear"],
-							Vector3(tx + cx_v * tw2 / 2.0, 0.0,
-								tz + cz_v * tw2 / 2.0), Vector3(cx_v, 0.0, cz_v),
-							th2 * 0.8, bd, bd, true)
+						var corner := Vector2(tx + cx_v * tw2 / 2.0, tz + cz_v * tw2 / 2.0)
+						var foot := Rect2(corner + Vector2(cx_v, cz_v) * bd * 0.5 - Vector2(bd, bd) * 0.5,
+							Vector2(bd, bd))
+						feet.append(foot)
+						rows.append([tower_side, cx_v, cz_v])
+			for k in feet.size():
+				var clear := not keep_out.any(func(r: Rect2) -> bool: return r.intersects(feet[k].grow(-0.02)))
+				for j in feet.size():
+					if j != k and feet[j].grow(-0.02).intersects(feet[k]):
+						clear = false
+				if not clear:
+					continue
+				var tower_side: float = rows[k][0]
+				var cx_v: float = rows[k][1]
+				var cz_v: float = rows[k][2]
+				var tx: float = ChurchGeometry.tower_center_x(spec, tower_side)
+				var tz: float = ChurchGeometry.tower_center_z(spec)
+				_stepped_buttress("tower_%s_%s_%s" % [
+					"left" if tower_side < 0.0 else "right",
+					"left" if cx_v < 0.0 else "right",
+					"front" if cz_v < 0.0 else "rear"],
+					Vector3(tx + cx_v * tw2 / 2.0, 0.0,
+						tz + cz_v * tw2 / 2.0), Vector3(cx_v, 0.0, cz_v),
+					th2 * 0.8, bd, bd, true)
 
 	# ---------- string course ----------
 	tag("trim")
@@ -255,9 +286,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	# ---------- nave windows when there are no aisles ----------
 	tag("window")
 	if spec.aisles == 0 and spec.hero != &"basil":
-		var nw2: int = int(l / 3.2)
-		for i in range(nw2):
-			var wz2: float = -l / 2.0 + l / float(nw2 + 1) * (i + 1)
+		for wz2 in ChurchGeometry.nave_window_zs(spec):
 			for sx_v in [-1.0, 1.0]:
 				window(Vector3(sx_v * (w / 2.0 + 0.02), h * 0.58, wz2),
 					sx_v * PI / 2.0, spec.window_w, spec.window_h,
@@ -272,6 +301,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 			else -l / 2.0 - ChurchGeometry.OPENING_EPS), PI)
 
 	_build_podium()
+	_build_floor()
 	_build_narthex()
 	_build_ambulatory_and_chapels()
 	_build_tribunes()
@@ -493,17 +523,13 @@ func _west_door_openings() -> Array[Dictionary]:
 	var door_h: float = minf(spec.height * 0.32, 3.4)
 	var z: float = _west_door_z()
 	var lift: float = ChurchGeometry.podium_height(spec)
-	match spec.door_style:
-		&"twin":
-			for x in [-0.8, 0.8]:
-				out.append({"pos": Vector3(x, door_h / 2.0 + 0.1 + lift, z),
-					"width": 0.85, "height": door_h, "style": &"round"})
-		&"portal":
-			out.append({"pos": Vector3(0, door_h / 2.0 + 0.05 + lift, z),
-				"width": spec.width * 0.34, "height": door_h, "style": &"pointed"})
-		_:
-			out.append({"pos": Vector3(0, door_h / 2.0 + 0.1 + lift, z),
-				"width": 1.4, "height": door_h, "style": &"round"})
+	# A doorway is cut to the floor it serves. Started 5-10 cm up, each wall
+	# it passed through kept a strip of stone across the way in, proud of the
+	# bare ground on both sides -- two trip steps between the west front and
+	# the nave (walk-QA, Abbey Ivo pin 2, "stuck in door").
+	for door in ChurchGeometry.west_door_layout(spec):
+		out.append({"pos": Vector3(float(door.x), door_h / 2.0 + lift, z),
+			"width": door.width, "height": door_h, "style": door.style})
 	return out
 
 
@@ -519,9 +545,7 @@ func _nave_shell() -> void:
 				"width": opening.width, "height": opening.height,
 				"style": spec.window_style, "log": false})
 	if spec.aisles == 0 and spec.hero != &"basil":
-		var count: int = int(l / 3.2)
-		for i in range(count):
-			var z: float = -l * 0.5 + l / float(count + 1) * (i + 1)
+		for z in ChurchGeometry.nave_window_zs(spec):
 			for face in [1, 3]:
 				holes.append({"face": face, "u": z, "y": h * 0.58,
 					"width": spec.window_w, "height": spec.window_h,
@@ -937,6 +961,21 @@ func _great_arch(center: Vector3, along: Vector3, rx: float, ry: float,
 			component_box("great_arch", Vector3(thick * 1.1, thick, seg_len * 1.08),
 				xf, SURF_TRIM)
 		prev = p
+
+
+# ------------------------------------------------------------ floor
+
+## The paving under nave, aisles, transept, tower bases and narthex
+## (ChurchGeometry.floor_rects). Without it the closed shells' downward
+## bottoms were the only faces at floor level: no floor to see from inside,
+## and none for a walker to stand on.
+func _build_floor() -> void:
+	tag("floor")
+	var t: float = ChurchGeometry.FLOOR_T
+	for r in ChurchGeometry.floor_rects(spec):
+		box(Vector3(r.size.x, t, r.size.y),
+			Vector3(r.get_center().x, ChurchGeometry.FLOOR_LIFT - t / 2.0, r.get_center().y),
+			SURF_STONE)
 
 
 # ------------------------------------------------------------ St Basil's

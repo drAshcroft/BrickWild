@@ -823,6 +823,7 @@ func _build_chimneys() -> void:
 # --------------------------------------------------------------- enclosure
 
 func _build_enclosure() -> void:
+	_collect_loop_blockers()
 	for r in CastleGeometry.rings(spec):
 		_build_ring(r)
 	if spec.plan_kind == &"terraced":
@@ -869,6 +870,7 @@ func _build_enclosure() -> void:
 	if chapel.size.x > 0.0:
 		_range(chapel, "chapel", SURF_STONE, true, [Vector3(-1, 0, 0)], RANGE_BAY)
 		_build_apse()
+	_close_curtain_slivers()
 	_build_yard()
 	if spec.plan_kind == &"terraced":
 		var inner_ground := CastleGeometry.ring_ground_y(spec,
@@ -948,6 +950,71 @@ func _build_wall_stairs() -> void:
 		mass_log.back()["footprint"] = stair.poly
 		host_end()
 		index += 1
+
+
+## No slot narrower than a passage between a ward building and the curtain.
+##
+## A Bergfried and its Palas are fitted back from the curtain until their base
+## corners clear a polygon's sloping sides, which can leave them half a metre
+## short of the back wall: a slot open from the wall-walk to the ground that
+## nobody can use and a walker steps into (walk-QA, Thorncliffe pin 10). The
+## slot is built up solid to the wall head and capped flush with the walk.
+const SLIVER_MAX := 1.2
+
+
+func _close_curtain_slivers() -> void:
+	if not CastleGeometry.is_enclosed(spec) or CastleGeometry.is_motte(spec):
+		return
+	var ring := CastleGeometry.inner_ring(spec)
+	var ward := CastleGeometry.inner_polygon(spec, ring)
+	if ward.size() < 3:
+		return
+	var lip := Geometry2D.offset_polygon(ward, -CastleGeometry.WALK_LIP)
+	var h := CastleGeometry.wall_height(spec, ring)
+	var ground := CastleGeometry.ring_ground_y(spec, ring)
+	for name in ["keep", "hall", "chapel"]:
+		var b := mass_aabb(name)
+		if b.size.x <= 0.0 or b.end.y < ground + h * 0.5:
+			continue
+		var plan := Rect2(b.position.x, b.position.z, b.size.x, b.size.z)
+		for dir in [Vector2(0, 1), Vector2(0, -1), Vector2(1, 0), Vector2(-1, 0)]:
+			var half := plan.size * 0.5
+			var face := plan.get_center() + Vector2(dir.x * half.x, dir.y * half.y)
+			var reach := _ward_reach(ward, face, dir)
+			if reach <= 0.02 or reach >= SLIVER_MAX:
+				continue
+			# The slot: the building's face, swept out to the curtain.
+			var slot := Rect2(face, Vector2.ZERO).expand(face + dir * reach)
+			if dir.x == 0.0:
+				slot = Rect2(plan.position.x, slot.position.y, plan.size.x, slot.size.y)
+			else:
+				slot = Rect2(slot.position.x, plan.position.y, slot.size.x, plan.size.y)
+			var fill := AABB(Vector3(slot.position.x, ground, slot.position.y),
+				Vector3(slot.size.x, h, slot.size.y))
+			tag("curtain")
+			box(fill.size, fill.get_center(), SURF_STONE)
+			if not lip.is_empty():
+				var rect := PackedVector2Array([slot.position, Vector2(slot.end.x, slot.position.y),
+					slot.end, Vector2(slot.position.x, slot.end.y)])
+				for piece in Geometry2D.intersect_polygons(rect, lip[0]):
+					var pts := PackedVector3Array()
+					for p in piece:
+						pts.append(Vector3(p.x, ground + h + CastleGeometry.PARAPET_RISE * 0.5, p.y))
+					component_slab("curtain_fill_coping", pts, CastleGeometry.PARAPET_RISE, SURF_TRIM)
+			var side := "back" if dir.y > 0.0 else ("front" if dir.y < 0.0 else ("east" if dir.x > 0.0 else "west"))
+			_log_mass("wall_%d_fill_%s_%s" % [ring, name, side], AABB(fill.position,
+				fill.size + Vector3(0.0, CastleGeometry.PARAPET_RISE, 0.0)))
+
+
+## How far from `from`, along `dir`, the ward polygon's boundary lies.
+static func _ward_reach(ward: PackedVector2Array, from: Vector2, dir: Vector2) -> float:
+	var best := INF
+	for i in ward.size():
+		var hit: Variant = Geometry2D.segment_intersects_segment(from, from + dir * 1000.0,
+			ward[i], ward[(i + 1) % ward.size()])
+		if hit != null:
+			best = minf(best, from.distance_to(hit))
+	return best
 
 
 ## The chapel's apse: a half-drum on the end toward the gate, under a half
@@ -1264,7 +1331,7 @@ func _build_ring_walls_rect(r: int) -> void:
 			passage = preload("castle_access_geometry.gd").motte_passage(spec, a, _motte_door_target())
 			# An arrow slit cannot occupy the same masonry as the postern.
 			slit_points = slit_points.filter(func(p: Vector3) -> bool:
-				return not passage.intersects(Rect2(p.x - 0.16, p.y - 0.75, 0.32, 1.5)))
+				return not passage.intersects(Rect2(p.x - EMBRASURE_W * 0.5 - 0.2, 0.0, EMBRASURE_W + 0.4, EMBRASURE_H)))
 		_battered_wall(a, t, outward, slit_points, passage)
 		_log_mass("wall_%d_%s" % [r, String(which)], a)
 		if passage.has_area() and passage.end.y >= a.size.y - 0.01:
@@ -1277,7 +1344,7 @@ func _build_ring_walls_rect(r: int) -> void:
 		else:
 			_wall_top(a, outward, t)
 		_emit_wall_slits(slit_points, outward, true,
-			lerpf(a.size.x if absf(outward.x) > 0.5 else a.size.z, t, 0.62))
+			_loop_reveal(a.size.x if absf(outward.x) > 0.5 else a.size.z, t, a.size.y))
 		total_height = maxf(total_height, a.size.y + CastleGeometry.PARAPET_RISE + spec.merlon_h)
 
 
@@ -1290,6 +1357,143 @@ func _build_ring_walls_poly(r: int) -> void:
 	tag("curtain")
 	for seg in CastleGeometry.wall_segments(spec, r):
 		_wall_run(seg, r)
+
+
+# ------------------------------------------------------------ arrow loops
+## A loop is only worth cutting where an archer can stand behind it. Through
+## slits at 62% of the curtain's height opened into four metres of solid wall
+## with no floor behind them (walk-QA, Thorncliffe pin 14). A curtain's loops
+## are now the embrasured kind: the slit pierces only the outer skin, at an
+## archer's eye on the ward's ground, and behind it a recess a person can walk
+## into opens off the ward.
+const LOOP_Y := 1.4               # slit centre above the ward's ground
+const LOOP_H := 1.5
+const LOOP_W := 0.32
+const EMBRASURE_W := 1.0
+const EMBRASURE_H := 2.2
+const LOOP_SKIN := 0.6            # the outer masonry the slit alone pierces
+## In front of an embrasure's mouth: room to stand in the ward.
+const LOOP_APPROACH := 0.9
+## The deepest skin an archer can shoot through (CastleLoopCheck.STAND).
+const LOOP_STAND := 1.0
+
+## Where loops may not open, filled by _build_enclosure: plan rectangles of the
+## buildings and stairs against the curtain, and the outlines of the towers
+## and gatehouses whose masonry would swallow a loop.
+var _loop_rects: Array[Rect2] = []
+var _loop_polys: Array[PackedVector2Array] = []
+
+
+func _collect_loop_blockers() -> void:
+	_loop_rects = CastleGeometry.bailey_obstacles(spec)
+	if CastleGeometry.is_motte(spec):
+		var m: AABB = CastleGeometry.motte_aabb(spec)
+		_loop_rects.append(Rect2(m.position.x, m.position.z, m.size.x, m.size.z))
+	_loop_polys.clear()
+	var access := preload("castle_access_geometry.gd")
+	for r in CastleGeometry.rings(spec):
+		var vertices := CastleGeometry.vertex_tower_centers(spec, r)
+		for index in vertices.size():
+			_loop_polys.append(access._tower_outline(spec, r, vertices[index], index))
+		var towers := CastleGeometry.gate_tower_centers(spec, r)
+		for slot in CastleGeometry.side_tower_slots(spec, r):
+			towers.append(slot.pos)
+		for tower in towers:
+			_loop_polys.append(access._tower_outline(spec, r, tower))
+		var g: AABB = CastleGeometry.gatehouse_aabb(spec, r)
+		if g.size.x > 0.0:
+			_loop_polys.append(Poly.from_rect(Rect2(g.position.x, g.position.z, g.size.x, g.size.z)))
+
+
+## May a loop open at inner-face point `mouth` (plan) whose slit is at `slit`?
+func _loop_clear(mouth: Vector2, slit: Vector2, inward: Vector2, along: Vector2) -> bool:
+	var half := along * (EMBRASURE_W * 0.5 + 0.2)
+	var front := mouth + inward * LOOP_APPROACH
+	var approach := Poly.bounding_rect(PackedVector2Array([mouth - half, mouth + half,
+		front + half, front - half]))
+	for rect in _loop_rects:
+		if rect.grow(0.1).intersects(approach):
+			return false
+	for poly in _loop_polys:
+		for p in [mouth, slit, mouth - half, mouth + half, slit - half, slit + half]:
+			if Geometry2D.is_point_in_polygon(p, poly):
+				return false
+	return true
+
+
+## How deep the embrasure goes in from the inner face, for a course `th`
+## thick at the loop on a curtain `h` tall; 0 for a wall thin enough to shoot
+## straight through. Castle QA walks the curtain's centre line at half its
+## height, so on a low curtain the recess stops short of the middle.
+static func _embrasure_depth(th: float, h: float) -> float:
+	var depth := th - LOOP_SKIN
+	if h * 0.5 - EMBRASURE_H < 0.5:
+		depth = minf(depth, th * 0.5 - 0.3)
+	return depth if depth >= 0.4 else 0.0
+
+
+## A wall can carry loops only if the slit and a course above it fit, and an
+## archer can stand within a metre of the outer face: straight through a thin
+## wall, or at the back of the embrasure in a thick one.
+static func _loops_fit(h: float, base := 0.0, top := 0.0) -> bool:
+	if h < LOOP_Y + LOOP_H * 0.5 + 1.0:
+		return false
+	if top <= 0.0:
+		return true
+	var th := _batter_thickness(base, top, LOOP_Y, h)
+	var emb := _embrasure_depth(_batter_thickness(base, top, minf(EMBRASURE_H, h) - 0.01, h), h)
+	return th - emb <= LOOP_STAND
+
+
+## A course's thickness: its batter step's, not its own sub-band's, so the
+## extra levels a loop adds put no micro-steps in the outer face.
+static func _batter_thickness(base: float, top: float, y: float, h: float) -> float:
+	var step := h / float(BATTER_STEPS)
+	var band := clampf(floorf(y / step), 0.0, float(BATTER_STEPS - 1))
+	return lerpf(base, top, (band + 0.5) * step / h)
+
+
+## The levels a course stack must break at for its loops.
+static func _loop_levels(levels: Array[float], h: float, emb: bool) -> void:
+	for y in [LOOP_Y - LOOP_H * 0.5, LOOP_Y + LOOP_H * 0.5]:
+		levels.append(clampf(y, 0.0, h))
+	if emb:
+		levels.append(clampf(EMBRASURE_H, 0.0, h))
+
+
+## One course between y0 and y1, `th` thick, along u in [u_lo, u_hi], as
+## pieces Vector4(u0, u1, d0, d1) with d measured in from the inner face:
+## whole where nothing is cut; round each loop, the inner masonry cut by the
+## embrasure and the outer skin by the slit.
+static func _course_cuts(u_lo: float, u_hi: float, y0: float, y1: float, th: float,
+		loops: Array[float], emb_depth: float) -> Array[Vector4]:
+	var out: Array[Vector4] = []
+	var ymid := (y0 + y1) * 0.5
+	var in_slit := not loops.is_empty() and absf(ymid - LOOP_Y) < LOOP_H * 0.5
+	var in_emb := not loops.is_empty() and emb_depth > 0.0 and ymid < EMBRASURE_H
+	var none: Array[float] = []
+	if not in_slit and not in_emb:
+		out.append(Vector4(u_lo, u_hi, 0.0, th))
+	elif emb_depth <= 0.0:
+		_cut_span(out, u_lo, u_hi, 0.0, th, loops, LOOP_W)
+	else:
+		_cut_span(out, u_lo, u_hi, 0.0, emb_depth, loops if in_emb else none, EMBRASURE_W)
+		_cut_span(out, u_lo, u_hi, emb_depth, th, loops if in_slit else none, LOOP_W)
+	return out
+
+
+static func _cut_span(out: Array[Vector4], u_lo: float, u_hi: float, d0: float, d1: float,
+		loops: Array[float], width: float) -> void:
+	var sorted := loops.duplicate()
+	sorted.sort()
+	var cursor := u_lo
+	for u in sorted:
+		var start := clampf(float(u) - width * 0.5, u_lo, u_hi)
+		if start > cursor + 0.01:
+			out.append(Vector4(cursor, start, d0, d1))
+		cursor = maxf(cursor, clampf(float(u) + width * 0.5, u_lo, u_hi))
+	if u_hi > cursor + 0.01:
+		out.append(Vector4(cursor, u_hi, d0, d1))
 
 
 func _wall_run(seg: Dictionary, r: int) -> void:
@@ -1305,61 +1509,41 @@ func _wall_run(seg: Dictionary, r: int) -> void:
 	# the inner face, which is vertical at every course
 	var mid: Vector2 = ((seg["a"] as Vector2) + (seg["b"] as Vector2)) / 2.0
 	var inner := Vector3(mid.x - outward.x * t, 0.0, mid.y - outward.z * t)
-	var slit_y: float = h * 0.62
-	var slit_offsets: Array[float] = []
-	var slit_count: int = clampi(int(run / SLIT_BAY), 1, 24)
-	for i in range(slit_count):
-		slit_offsets.append(((float(i) + 1.0) / (float(slit_count) + 1.0) - 0.5) * run)
+	var run_axis := Vector3(cos(yaw), 0.0, -sin(yaw))
+	var loops := _run_loops(seg, r)
+	# The recess is as deep as the thinnest course it passes through allows.
+	var emb := 0.0
+	if not loops.is_empty():
+		emb = _embrasure_depth(_batter_thickness(tb, t, minf(EMBRASURE_H, h) - 0.01, h), h)
 	var levels: Array[float] = [0.0, h]
 	for i in range(1, BATTER_STEPS):
 		levels.append(h * float(i) / BATTER_STEPS)
-	for _offset in slit_offsets:
-		levels.append(clampf(slit_y - 0.75, 0.0, h))
-		levels.append(clampf(slit_y + 0.75, 0.0, h))
+	if not loops.is_empty():
+		_loop_levels(levels, h, emb > 0.0)
 	levels.sort()
-	var run_axis := Vector3(cos(yaw), 0.0, -sin(yaw))
 	for i in range(levels.size() - 1):
 		var y0: float = levels[i]
 		var y1: float = levels[i + 1]
 		if y1 <= y0 + 0.001:
 			continue
 		var ymid := (y0 + y1) * 0.5
-		var th: float = lerpf(tb, t, ymid / h)
-		var exclusions: Array[Vector2] = []
-		if absf(ymid - slit_y) < 0.75:
-			for offset in slit_offsets:
-				exclusions.append(Vector2(offset - 0.16, offset + 0.16))
-		if exclusions.is_empty():
-			box(Vector3(run, y1 - y0, th),
-				inner + outward * (th / 2.0) + Vector3(0.0, ymid, 0.0),
-				SURF_STONE, yaw)
-			continue
-		exclusions.sort_custom(func(l: Vector2, r: Vector2) -> bool: return l.x < r.x)
-		var cursor := -run * 0.5
-		for hole in exclusions:
-			var start: float = clampf(hole.x, -run * 0.5, run * 0.5)
-			if start > cursor + 0.01:
-				var width := start - cursor
-				box(Vector3(width, y1 - y0, th),
-					inner + outward * (th / 2.0) + run_axis * ((cursor + start) * 0.5)
-					+ Vector3(0.0, ymid, 0.0), SURF_STONE, yaw)
-			cursor = maxf(cursor, clampf(hole.y, -run * 0.5, run * 0.5))
-		if run * 0.5 > cursor + 0.01:
-			box(Vector3(run * 0.5 - cursor, y1 - y0, th),
-				inner + outward * (th / 2.0) + run_axis * ((cursor + run * 0.5) * 0.5)
+		var th: float = _batter_thickness(tb, t, ymid, h)
+		for piece in _course_cuts(-run * 0.5, run * 0.5, y0, y1, th, loops, emb):
+			box(Vector3(piece.y - piece.x, y1 - y0, piece.w - piece.z),
+				inner + outward * ((piece.z + piece.w) * 0.5) + run_axis * ((piece.x + piece.y) * 0.5)
 				+ Vector3(0.0, ymid, 0.0), SURF_STONE, yaw)
 	_log_mass("wall_%d_%s" % [r, String(seg["name"])],
 		CastleGeometry.segment_aabb(spec, r, seg))
 
 	# wall walk and merlons, following the run's own top face
 	var walk: Vector3 = inner + outward * (t / 2.0) + Vector3(0.0, h + CastleGeometry.PARAPET_RISE / 2.0, 0.0)
-	box(Vector3(run, CastleGeometry.PARAPET_RISE, t + 0.3), walk, SURF_TRIM, yaw)
+	box(Vector3(run, CastleGeometry.PARAPET_RISE, t + 2.0 * CastleGeometry.WALK_LIP), walk, SURF_TRIM, yaw)
 	if spec.battlements:
 		var edge: Vector3 = inner + outward * (t - spec.merlon_h * 0.35)
 		var along := Vector3(cos(yaw), 0.0, -sin(yaw)) * (run / 2.0)
 		_crenellate_run(edge - along, edge + along, h + CastleGeometry.PARAPET_RISE,
 			spec.merlon_h * 0.7, yaw, SURF_TRIM)
-	_run_slits(seg, r)
+	_run_slits(seg, r, loops, emb)
 	total_height = maxf(total_height, h + CastleGeometry.PARAPET_RISE + spec.merlon_h)
 
 
@@ -1420,7 +1604,7 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 
 	# A bowed wall walk is a second shallow curved shell, not a box on the chord.
 	var walk_h: float = CastleGeometry.PARAPET_RISE
-	_kit.curved_wall(pts, walk_h, t + 0.3, t + 0.3, SURF_TRIM, [], h)
+	_kit.curved_wall(pts, walk_h, t + 2.0 * CastleGeometry.WALK_LIP, t + 2.0 * CastleGeometry.WALK_LIP, SURF_TRIM, [], h)
 	if spec.battlements:
 		var mw: float = CastleGeometry.merlon_width(spec)
 		var pitch: float = mw + CastleGeometry.MERLON_GAP
@@ -1449,24 +1633,48 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 
 
 ## Arrow slits down a slanted run, on the battered face itself.
-func _run_slits(seg: Dictionary, r: int) -> void:
+func _run_slits(seg: Dictionary, r: int, loops: Array[float], emb: float) -> void:
+	if loops.is_empty():
+		return
 	var t: float = CastleGeometry.wall_thickness(spec, r)
 	var tb: float = CastleGeometry.wall_base_thickness(spec, r)
 	var h: float = CastleGeometry.wall_height(spec, r)
-	var run: float = seg["length"]
 	var outward: Vector3 = seg["outward"]
 	var mid: Vector2 = ((seg["a"] as Vector2) + (seg["b"] as Vector2)) / 2.0
 	var inner := Vector3(mid.x - outward.x * t, 0.0, mid.y - outward.z * t)
-	var y: float = h * 0.62
-	var th: float = lerpf(tb, t, y / h)
+	var th: float = _batter_thickness(tb, t, LOOP_Y, h)
 	var face: Vector3 = inner + outward * (th + CastleGeometry.OPENING_EPS)
 	var along := Vector3(cos(seg["yaw"]), 0.0, -sin(seg["yaw"]))
 	var points: Array[Vector3] = []
+	for u in loops:
+		points.append(face + along * u + Vector3(0.0, LOOP_Y, 0.0))
+	# The slit's reveals line the skin it pierces, not the recess behind it.
+	_emit_wall_slits(points, outward, true, th - emb)
+
+
+## Where along a straight run its loops go: evenly spaced, less any that would
+## open behind a building or stair or inside a tower.
+func _run_loops(seg: Dictionary, r: int) -> Array[float]:
+	var out: Array[float] = []
+	var h: float = CastleGeometry.wall_height(spec, r)
+	if not _loops_fit(h, CastleGeometry.wall_base_thickness(spec, r), CastleGeometry.wall_thickness(spec, r)):
+		return out
+	var t: float = CastleGeometry.wall_thickness(spec, r)
+	var tb: float = CastleGeometry.wall_base_thickness(spec, r)
+	var run: float = seg["length"]
+	var outward: Vector3 = seg["outward"]
+	var mid: Vector2 = ((seg["a"] as Vector2) + (seg["b"] as Vector2)) / 2.0
+	var out2 := Vector2(outward.x, outward.z)
+	var inner := mid - out2 * t
+	var along := Vector2(cos(seg["yaw"]), -sin(seg["yaw"]))
+	var th: float = _batter_thickness(tb, t, LOOP_Y, h)
 	var n: int = clampi(int(run / SLIT_BAY), 1, 24)
 	for i in range(n):
-		var f: float = (float(i) + 1.0) / (float(n) + 1.0) - 0.5
-		points.append(face + along * (f * run) + Vector3(0.0, y, 0.0))
-	_emit_wall_slits(points, outward, true, th)
+		var u: float = ((float(i) + 1.0) / (float(n) + 1.0) - 0.5) * run
+		var mouth := inner + along * u
+		if _loop_clear(mouth, mouth + out2 * th, -out2, along):
+			out.append(u)
+	return out
 
 
 ## The keep: a great square tower, a drum, a shell keep on its own plinth, or
@@ -2004,68 +2212,49 @@ func _battered_wall(a: AABB, top_thick: float, outward: Vector3,
 	var base_thick: float = a.size.x if axis == 0 else a.size.z
 	var inner: float = a.position[axis] if outward[axis] > 0.0 \
 		else a.position[axis] + base_thick
-	var levels: Array[float] = [0.0, a.size.y]
-	for i in range(1, BATTER_STEPS):
-		levels.append(a.size.y * float(i) / BATTER_STEPS)
+	var h: float = a.size.y
+	var run_min: float = a.position.z if axis == 0 else a.position.x
+	var run_max: float = run_min + (a.size.z if axis == 0 else a.size.x)
+	# The loops (see LOOP_Y): positions along the run; each is embrasured.
+	var loops: Array[float] = []
 	for cut in cutouts:
-		levels.append(clampf(cut.y - 0.75, 0.0, a.size.y))
-		levels.append(clampf(cut.y + 0.75, 0.0, a.size.y))
+		loops.append(cut.z if axis == 0 else cut.x)
+	var emb := 0.0
+	if not loops.is_empty():
+		emb = _embrasure_depth(_batter_thickness(base_thick, top_thick,
+			minf(EMBRASURE_H, h) - 0.01, h), h)
+	var levels: Array[float] = [0.0, h]
+	for i in range(1, BATTER_STEPS):
+		levels.append(h * float(i) / BATTER_STEPS)
+	if not loops.is_empty():
+		_loop_levels(levels, h, emb > 0.0)
 	if passage.has_area():
-		levels.append(clampf(passage.position.y, 0.0, a.size.y))
-		levels.append(clampf(passage.end.y, 0.0, a.size.y))
+		levels.append(clampf(passage.position.y, 0.0, h))
+		levels.append(clampf(passage.end.y, 0.0, h))
 	levels.sort()
 	for i in range(levels.size() - 1):
 		var y0: float = levels[i]
 		var y1: float = levels[i + 1]
 		if y1 <= y0 + 0.001:
 			continue
-		var th: float = lerpf(base_thick, top_thick, (y0 + y1) / 2.0 / a.size.y)
-		var c: float = inner + outward[axis] * th / 2.0
-		var size := Vector3(th if axis == 0 else a.size.x, y1 - y0,
-			a.size.z if axis == 0 else th)
-		var pos := Vector3(c if axis == 0 else a.position.x + a.size.x / 2.0,
-			(y0 + y1) / 2.0, a.position.z + a.size.z / 2.0 if axis == 0 else c)
-		var exclusions: Array[Vector2] = []
-		if passage.has_area() and (y0 + y1) * 0.5 >= passage.position.y \
-				and (y0 + y1) * 0.5 <= passage.end.y:
-			exclusions.append(Vector2(passage.position.x, passage.end.x))
-		for cut in cutouts:
-			if cut.y - 0.75 <= (y0 + y1) * 0.5 and cut.y + 0.75 >= (y0 + y1) * 0.5:
-				var q: float = cut.z if axis == 0 else cut.x
-				exclusions.append(Vector2(q - 0.16, q + 0.16))
-		if exclusions.is_empty():
+		var ymid := (y0 + y1) * 0.5
+		var th: float = _batter_thickness(base_thick, top_thick, ymid, h)
+		var pieces := _course_cuts(run_min, run_max, y0, y1, th, loops, emb)
+		if passage.has_area() and ymid >= passage.position.y and ymid <= passage.end.y:
+			var cut: Array[Vector4] = []
+			for piece in pieces:
+				for keep in [Vector2(piece.x, minf(piece.y, passage.position.x)),
+						Vector2(maxf(piece.x, passage.end.x), piece.y)]:
+					if keep.y > keep.x + 0.01:
+						cut.append(Vector4(keep.x, keep.y, piece.z, piece.w))
+			pieces = cut
+		for piece in pieces:
+			var c: float = inner + outward[axis] * (piece.z + piece.w) * 0.5
+			var u: float = (piece.x + piece.y) * 0.5
+			var size := Vector3(piece.w - piece.z if axis == 0 else piece.y - piece.x, y1 - y0,
+				piece.y - piece.x if axis == 0 else piece.w - piece.z)
+			var pos := Vector3(c if axis == 0 else u, ymid, u if axis == 0 else c)
 			box(size, pos, SURF_STONE)
-			continue
-		exclusions.sort_custom(func(l: Vector2, r: Vector2) -> bool: return l.x < r.x)
-		var run_min: float = a.position.z if axis == 0 else a.position.x
-		var run_max: float = run_min + (a.size.z if axis == 0 else a.size.x)
-		var cursor := run_min
-		var base_pos := pos
-		for hole in exclusions:
-			var left_end: float = clampf(hole.x, run_min, run_max)
-			if left_end > cursor + 0.01:
-				var piece := size
-				if axis == 0:
-					piece.z = left_end - cursor
-					pos = base_pos
-					pos.z = (cursor + left_end) * 0.5
-				else:
-					piece.x = left_end - cursor
-					pos = base_pos
-					pos.x = (cursor + left_end) * 0.5
-				box(piece, pos, SURF_STONE)
-			cursor = maxf(cursor, clampf(hole.y, run_min, run_max))
-		if run_max > cursor + 0.01:
-			var piece := size
-			if axis == 0:
-				piece.z = run_max - cursor
-				pos = base_pos
-				pos.z = (cursor + run_max) * 0.5
-			else:
-				piece.x = run_max - cursor
-				pos = base_pos
-				pos.x = (cursor + run_max) * 0.5
-			box(piece, pos, SURF_STONE)
 
 
 ## The wall walk and its merlons, following the wall's own top face.
@@ -2078,8 +2267,9 @@ func _wall_top(a: AABB, outward: Vector3, top_thick: float) -> void:
 	var run: float = a.size.z if axis == 0 else a.size.x
 	var cx: float = walk if axis == 0 else a.position.x + a.size.x / 2.0
 	var cz: float = a.position.z + a.size.z / 2.0 if axis == 0 else walk
-	box(Vector3(top_thick + 0.3 if axis == 0 else run, CastleGeometry.PARAPET_RISE,
-			run if axis == 0 else top_thick + 0.3),
+	var coping: float = top_thick + 2.0 * CastleGeometry.WALK_LIP
+	box(Vector3(coping if axis == 0 else run, CastleGeometry.PARAPET_RISE,
+			run if axis == 0 else coping),
 		Vector3(cx, a.size.y + CastleGeometry.PARAPET_RISE / 2.0, cz), SURF_TRIM)
 	if not spec.battlements:
 		return
@@ -2104,12 +2294,16 @@ func _wall_slit_positions(a: AABB, outward: Vector3, top_thick: float) -> Array[
 	var base_thick: float = a.size.x if axis == 0 else a.size.z
 	var inner: float = a.position[axis] if outward[axis] > 0.0 \
 		else a.position[axis] + base_thick
-	var y: float = a.size.y * 0.62
-	var th: float = lerpf(base_thick, top_thick, y / a.size.y)
+	var points: Array[Vector3] = []
+	if not _loops_fit(a.size.y, base_thick, top_thick):
+		return points
+	var y: float = LOOP_Y
+	var th: float = _batter_thickness(base_thick, top_thick, y, a.size.y)
 	var face: float = inner + outward[axis] * (th + CastleGeometry.OPENING_EPS)
 	var run: float = a.size.z if axis == 0 else a.size.x
 	var n: int = clampi(int(run / SLIT_BAY), 1, 24)
-	var points: Array[Vector3] = []
+	var out2 := Vector2(outward.x, outward.z)
+	var along := Vector2(0.0, 1.0) if axis == 0 else Vector2(1.0, 0.0)
 	for i in range(n):
 		var f: float = (float(i) + 1.0) / (float(n) + 1.0)
 		var p: Vector3
@@ -2117,8 +2311,18 @@ func _wall_slit_positions(a: AABB, outward: Vector3, top_thick: float) -> Array[
 			p = Vector3(face, y, lerpf(a.position.z, a.position.z + a.size.z, f))
 		else:
 			p = Vector3(lerpf(a.position.x, a.position.x + a.size.x, f), y, face)
-		points.append(p)
+		var slit := Vector2(p.x, p.z)
+		var mouth := slit - out2 * (th + CastleGeometry.OPENING_EPS)
+		if _loop_clear(mouth, slit, -out2, along):
+			points.append(p)
 	return points
+
+
+## How deep a straight wall's slit reveals go: the skin, not the recess.
+static func _loop_reveal(base_thick: float, top_thick: float, h: float) -> float:
+	var th := _batter_thickness(base_thick, top_thick, LOOP_Y, h)
+	return th - _embrasure_depth(_batter_thickness(base_thick, top_thick,
+		minf(EMBRASURE_H, h) - 0.01, h), h)
 
 
 func _emit_wall_slits(points: Array[Vector3], outward: Vector3,

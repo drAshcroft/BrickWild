@@ -117,13 +117,19 @@ static func generate(seed: int, width: float, length: float, _height: float) -> 
 	for i in range(2):
 		var shop_room := i + 1
 		var shop_rect: Rect2 = plan.rooms[shop_room]["rect"]
-		var p := Vector2(shop_rect.get_center().x, inner.position.y)
-		plan.doors.append({"a": shop_room, "b": -1, "pos": p, "normal": Vector2(0, -1),
-			"width": maxf(2.0, shop_opening_w), "exterior": true, "front": false,
+		# door and display window side by side: stacked on one centre, the
+		# wall builder refilled both (see WorldCourtyardGenerator.taberna_openings)
+		var door_w := maxf(2.0, shop_opening_w)
+		var pair := WorldCourtyardGenerator.taberna_openings(shop_rect, inner.position.y,
+			door_w, shop_opening_w)
+		plan.doors.append({"a": shop_room, "b": -1, "pos": pair["door"], "normal": Vector2(0, -1),
+			"width": door_w, "exterior": true, "front": false,
 			"storey": 0, "role": "taberna"})
-		plan.windows.append({"room": shop_room, "pos": p, "normal": Vector2(0, -1),
-			"width": shop_opening_w, "sill": 2.3, "head": minf(spec.height - 0.25, 3.25),
-			"storey": 0, "role": "taberna_display"})
+		if float(pair["window_w"]) > 0.0:
+			plan.windows.append({"room": shop_room, "pos": pair["window"], "normal": Vector2(0, -1),
+				"width": float(pair["window_w"]), "sill": 2.3,
+				"head": minf(spec.height - 0.25, 3.25),
+				"storey": 0, "role": "taberna_display"})
 	var street := Vector2(stair.get_center().x, inner.position.y)
 	plan.doors.append({"a": stair_rooms[0], "b": -1, "pos": street, "normal": Vector2(0, -1),
 		"width": HouseGeometry.DOOR_W, "exterior": true, "front": true,

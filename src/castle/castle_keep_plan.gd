@@ -202,6 +202,10 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 	var walls := HouseGeometry.room_walls(plan, upper)
 	walls.append_array(HouseGeometry.room_walls(plan, lower))
 	var sizes: Array[Vector2] = [Vector2(run, width), Vector2(width, run)]
+	# The flight arriving on `lower` from below: standing in its well, this one
+	# would climb out of that flight's solid foot -- the hotel's "stairway to
+	# nowhere" (WALK-QA, 6 Oct), which every shaped keep repeated floor on floor.
+	var wells: Array[Rect2] = HousePlanLevels.arriving_wells(plan, lower)
 	for size in sizes:
 		for wall in walls:
 			var normal := Vector2(wall.normal)
@@ -216,6 +220,8 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 				if avoid.size.x > 0.0 and rect.intersects(avoid, true):
 					continue
 				var score := centre.distance_to(front)
+				if HousePlanLevels.hits_any(rect, wells):
+					score -= 2000.0
 				if avoid.size.x > 0.0:
 					score += centre.distance_to(avoid.get_center())
 				if lower == int(plan.doors[plan.entrance()].a) \

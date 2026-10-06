@@ -64,6 +64,8 @@ const TENT_RISE_RATIO := 2.3     # St Basil: tent rise, x core radius
 const TENT_CAP_RATIO := 0.95     # the little drum and onion on the tent's tip
 const PODIUM_RATIO := 0.045      # St Basil: podium height, x core height
 const PODIUM_MARGIN := 2.4       # podium reach beyond the outermost chapel
+const FLOOR_T := 0.05            # paved floor slab, under the rooms a person walks
+const FLOOR_LIFT := 0.001        # its top, just proud of a village's ground at y=0
 const BASIL_PATTERN := [0.34, 0.46, 0.38, 0.52, 0.42, 0.48, 0.36, 0.54]
 const BASIL_DRUM_PATTERN := [0.9, 1.25, 1.0, 1.35, 1.1, 0.85, 1.3, 1.05]
 const HAGIA_BEARING_RATIO := 0.74   # bearing block height, x dome radius
@@ -83,6 +85,22 @@ static func nave_window_count(spec: ChurchSpec) -> int:
 
 static func door_height(spec: ChurchSpec) -> float:
 	return minf(spec.height * DOOR_H_RATIO, DOOR_H_CAP)
+
+
+## The west doorways across the facade: {x, width, style} per leaf. The
+## builder cuts them and the furnisher keeps their way clear; one table so the
+## two cannot disagree.
+static func west_door_layout(spec: ChurchSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	match spec.door_style:
+		&"twin":
+			for x in [-0.8, 0.8]:
+				out.append({"x": x, "width": 0.85, "style": &"round"})
+		&"portal":
+			out.append({"x": 0.0, "width": spec.width * 0.34, "style": &"pointed"})
+		_:
+			out.append({"x": 0.0, "width": 1.4, "style": &"round"})
+	return out
 
 
 # ----------------------------------------------------------------- tower
@@ -676,6 +694,33 @@ static func flyer_z(spec: ChurchSpec, i: int) -> float:
 
 ## Z centre of a nave buttress. Shared by the shell and blueprint so the
 ## elevation marks the same bays that carry the emitted supports.
+## Where the nave's side windows stand along Z, both walls alike. With
+## buttresses each sits in the middle of a bay between two of them, where a
+## mason would put it; spaced on their own rhythm down the whole length, the
+## windows met the buttresses and showed slivers of glass either side of one
+## (walk-QA, Abbey Ivo pin 1). A bay too short for a window keeps none.
+static func nave_window_zs(spec: ChurchSpec) -> Array[float]:
+	var out: Array[float] = []
+	if not spec.buttresses or spec.buttress_count_per_side < 2:
+		var count: int = int(spec.length / NAVE_WINDOW_BAY)
+		for i in range(count):
+			out.append(-spec.length * 0.5 + spec.length / float(count + 1) * (i + 1))
+		return out
+	var n: int = spec.buttress_count_per_side
+	# a buttress is BUTTRESS_FACE wide along the wall; leave a hand either side
+	var need: float = spec.window_w + BUTTRESS_FACE + 0.4
+	for i in range(n - 1):
+		var a: float = nave_buttress_z(spec, i, n)
+		var b: float = nave_buttress_z(spec, i + 1, n)
+		if b - a >= need:
+			out.append((a + b) * 0.5)
+	return out
+
+
+## A nave buttress's width along the wall (ChurchBuilder emits it at this).
+const BUTTRESS_FACE := 0.5
+
+
 static func nave_buttress_z(spec: ChurchSpec, i: int, count := -1) -> float:
 	var n: int = count if count > 0 else spec.buttress_count_per_side
 	var z0: float = -spec.length / 2.0 + 0.8
@@ -873,6 +918,71 @@ static func tent_cap_height(spec: ChurchSpec) -> float:
 
 static func podium_height(spec: ChurchSpec) -> float:
 	return maxf(spec.height * PODIUM_RATIO, 0.6) if basil_core(spec) else 0.0
+
+
+## The paved floor of the rooms a person walks: nave, aisles, transept, the
+## west towers' ground storeys and the narthex, as DISJOINT plates (the rooms
+## overlap where they lap each other; overlapping coplanar tops would fight).
+##
+## Every one of those masses is a closed shell whose bottom faces DOWN at y=0,
+## so from inside there was no floor at all: the eye saw the ground through
+## it, and one-sided trimesh collision let the walker's capsule, standing on
+## the ground 2 cm lower, poke its foot through those undersides and jam on
+## their edge in the doorway (WALK-QA, 6 Oct, Abbey Ivo pin 2 "stuck in
+## door"). A podium church stands on its podium and needs none.
+static func floor_rects(spec: ChurchSpec) -> Array[Rect2]:
+	if podium_height(spec) > 0.0:
+		return []
+	var rooms: Array[Rect2] = [_plan_rect(nave_aabb(spec))]
+	for ring in range(spec.aisles):
+		for side in [-1.0, 1.0]:
+			rooms.append(_plan_rect(aisle_aabb(spec, side, ring)))
+	if spec.transept:
+		rooms.append(_plan_rect(transept_aabb(spec)))
+	for side in west_tower_sides(spec):
+		rooms.append(_plan_rect(tower_aabb(spec, side)))
+	if spec.narthex:
+		rooms.append(_plan_rect(narthex_aabb(spec)))
+	return disjoint_rects(rooms)
+
+
+static func _plan_rect(a: AABB) -> Rect2:
+	return Rect2(a.position.x, a.position.z, a.size.x, a.size.z)
+
+
+## The union of `rects` as non-overlapping rectangles: cut the plane on every
+## rect edge, keep the covered cells, and merge each z strip's runs in x.
+static func disjoint_rects(rects: Array[Rect2]) -> Array[Rect2]:
+	var xs: Array[float] = []
+	var zs: Array[float] = []
+	for r in rects:
+		if r.size.x <= 0.01 or r.size.y <= 0.01:
+			continue
+		for v in [r.position.x, r.end.x]:
+			if not xs.any(func(o: float) -> bool: return absf(o - v) < 0.001):
+				xs.append(v)
+		for v in [r.position.y, r.end.y]:
+			if not zs.any(func(o: float) -> bool: return absf(o - v) < 0.001):
+				zs.append(v)
+	xs.sort()
+	zs.sort()
+	var out: Array[Rect2] = []
+	for j in range(zs.size() - 1):
+		var run_x0 := INF
+		for i in range(xs.size()):
+			var covered := false
+			if i < xs.size() - 1:
+				var c := Vector2((xs[i] + xs[i + 1]) / 2.0, (zs[j] + zs[j + 1]) / 2.0)
+				for r in rects:
+					if r.has_point(c):
+						covered = true
+						break
+			if covered and run_x0 == INF:
+				run_x0 = xs[i]
+			elif not covered and run_x0 != INF:
+				out.append(Rect2(run_x0, zs[j], xs[i] - run_x0, zs[j + 1] - zs[j]))
+				run_x0 = INF
+	return out
 
 
 ## The podium reaches PODIUM_MARGIN beyond everything that stands on it.

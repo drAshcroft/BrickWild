@@ -464,8 +464,100 @@ func _check_wall_stairs(spec: CastleSpec, builder: CastleBuilder) -> void:
 				failures.append("wall_stairs: %s has no grounded tread chain contacting the %.2fm curtain walk" % [mass.name, target])
 		if count < 2:
 			failures.append("wall_stairs: ring %d has %d stairs, needs two" % [ring, count])
+		for stair in CastleGeometry.wall_stairs(spec):
+			if int(stair.ring) == ring:
+				for why in stair_walk_failures(spec, stair,
+						CastleAccessGeometry.pieces(stair)):
+					failures.append("wall_stairs: " + why)
 		if not near_gate:
 			failures.append("wall_stairs: ring %d has no stair within 15m of its gate" % ring)
+
+
+
+
+## A wall stair as a person meets it (walk-QA, Thorncliffe pins 1-3 and 6):
+##   foot     the first tread is approached from open ward, not from a slot
+##            against the curtain
+##   landing  every landing is at least a lane deep, room to turn
+##   guards   every landing end that falls to the ward has an end rail, and a
+##            transverse stair's other long side is railed too
+##   lip      the top landing stands clear of the coping's lip, so the two do
+##            not share a plane at walk height
+## `pieces` are the stair's emitted pieces (CastleAccessGeometry.pieces).
+static func stair_walk_failures(spec: CastleSpec, stair: Dictionary, pieces: Array) -> Array[String]:
+	var out: Array[String] = []
+	var along := Vector2(stair.along)
+	var inside := Vector2(stair.inside)
+	var at := Vector2(stair.at)
+	var ring := int(stair.ring)
+	var transverse := bool(stair.get("transverse", false))
+	var span := float(stair.span)
+	var ward: PackedVector2Array = CastleGeometry.inner_polygon(spec, ring)
+	var label := "stair at %s" % at.snapped(Vector2.ONE * 0.01)
+	var local := func(p: Vector3) -> Vector2:
+		var d := Vector2(p.x, p.z) - at
+		return Vector2(d.dot(along), d.dot(inside))
+	# foot
+	var first_u := INF
+	var first_y := INF
+	for piece in pieces:
+		if piece.role == "wall_stair_tread" and (piece.xf as Transform3D).origin.y < first_y:
+			first_y = (piece.xf as Transform3D).origin.y
+			first_u = local.call((piece.xf as Transform3D).origin).x
+	var sf := float(stair.get("start_forward", 1.0))
+	var foot_u: float = first_u - sf * (CastleAccessGeometry.TREAD * 0.5 + CastleAccessGeometry.LANDING + 0.6)
+	var lane0 := (int(stair.flights) - 1) % 2
+	var foot: Vector2 = at + along * foot_u + inside * (CastleAccessGeometry.LANE * 0.5 + lane0 * (CastleAccessGeometry.LANE + CastleAccessGeometry.SPINE))
+	if not Poly.contains_point(ward, foot, 0.01) or _edge_distance(ward, foot) < 0.5:
+		out.append("%s: its foot is not reached from open ward" % label)
+	# landings and their guards
+	var landings: Array[float] = []
+	var end_rails: Array[float] = []
+	var side0_rails := 0
+	for piece in pieces:
+		var c: Vector2 = local.call((piece.xf as Transform3D).origin)
+		if piece.role == "wall_stair_landing":
+			var depth: float = (piece.size as Vector3).x
+			if depth < CastleAccessGeometry.LANE - 0.01:
+				out.append("%s: a %.2fm landing is shallower than a lane" % [label, depth])
+			landings.append(c.x)
+		elif piece.role == "wall_stair_end_rail":
+			end_rails.append(c.x)
+		elif piece.role == "wall_stair_landing_rail" and c.y < 0.2:
+			side0_rails += 1
+	var top_level := -INF
+	for piece in pieces:
+		if piece.role == "wall_stair_landing":
+			top_level = maxf(top_level, (piece.xf as Transform3D).origin.y)
+	for u in landings:
+		var curtain_end := transverse and u < 0.0
+		if curtain_end:
+			continue
+		var guarded := end_rails.any(func(r: float) -> bool: return signf(r) == signf(u) and absf(absf(r) - span * 0.5) < 0.2)
+		if not guarded:
+			out.append("%s: a landing end over the ward has no rail" % label)
+			break
+	if transverse and side0_rails < landings.size():
+		out.append("%s: a transverse stair's open side is unrailed" % label)
+	# lip: the top landing's plan box against the curtain's inner face
+	for piece in pieces:
+		if piece.role != "wall_stair_landing" or absf((piece.xf as Transform3D).origin.y - top_level) > 0.01:
+			continue
+		var box := MassBuilder.component_aabb({"form": "box", "xf": piece.xf, "size": piece.size})
+		var corners := [Vector2(box.position.x, box.position.z), Vector2(box.end.x, box.position.z),
+			Vector2(box.end.x, box.end.z), Vector2(box.position.x, box.end.z)]
+		for p in corners:
+			if _edge_distance(ward, p) < CastleGeometry.WALK_LIP - 0.02:
+				out.append("%s: its top landing lies under the coping's lip" % label)
+				return out
+	return out
+
+
+static func _edge_distance(poly: PackedVector2Array, p: Vector2) -> float:
+	var best := INF
+	for i in poly.size():
+		best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(p, poly[i], poly[(i + 1) % poly.size()])))
+	return best
 
 
 ## What stands in the bailey keeps its distance (CAS-012).

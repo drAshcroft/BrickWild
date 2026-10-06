@@ -128,6 +128,9 @@ static func run(full: bool = false, group: StringName = &"all",
 		phase_start = _phase_start("feng shui sweep")
 		_feng_shui_sweep(res, sweep_count, full)
 		_phase_end("feng shui sweep", phase_start)
+		phase_start = _phase_start("walk QA fixtures")
+		_walk_qa_fixtures(res)
+		_phase_end("walk QA fixtures", phase_start)
 	print("house QA: DONE (%s; %.2fs)" % [mode,
 		float(Time.get_ticks_msec() - total_start) / 1000.0])
 	return res
@@ -1432,3 +1435,185 @@ static func _feng_shui_sweep(res: SuiteResult, count: int, full: bool) -> void:
 			if not expected_seen.has(seed):
 				res.fail("expected feng shui baseline seed=%d did not reproduce; review and remove/update the baseline" % seed)
 	res.note("feng shui   %d houses, %d failures" % [count, bad])
+
+
+## The furnishing rules the walk-through of 6 Oct added, each with the
+## negative control that proves it is not a tautology: a hand-made room that
+## breaks the rule must fail it, and the same room put right must not.
+static func _walk_qa_fixtures(res: SuiteResult) -> void:
+	_wq_furniture_floor(res)
+	_wq_bench_at_table_end(res)
+	_wq_door_approach(res)
+	_wq_outdoor_lamp(res)
+	_wq_second_dining_table(res)
+	_wq_surface_in_reach(res)
+
+
+static func _wq_has(rep: Dictionary, field: String, prefix: String, needle: String) -> bool:
+	for m in rep[field]:
+		if String(m).begins_with(prefix) and String(m).contains(needle):
+			return true
+	return false
+
+
+## Standing furniture stands on the slab the builder emitted. A real house
+## passes; the same house with one table sunk to the storey datum -- where
+## every piece stood before 6 Oct -- fails.
+static func _wq_furniture_floor(res: SuiteResult) -> void:
+	var spec := HouseSpec.new()
+	spec.style = &"cottage"
+	spec.width = 8.0
+	spec.length = 10.5
+	var plan: HousePlan = HouseGenerator.generate(spec, 8102)
+	var builder := HouseBuilder.new()
+	builder.build(plan)
+	res.checked += 1
+	var clean := HouseQA.check_furniture_floor(plan, builder)
+	if not clean.is_empty():
+		res.fail("walk QA fixture: a generated cottage fails furniture_floor: %s" % [clean])
+	var victim := -1
+	for f in plan.furniture.size():
+		if PropCatalog.category(plan.furniture[f]["key"]) == "table":
+			victim = f
+			break
+	res.checked += 1
+	if victim < 0:
+		res.fail("walk QA fixture: the cottage has no table to sink")
+		return
+	var sunk_pos: Vector3 = plan.furniture[victim]["pos"]
+	sunk_pos.y -= HouseGeometry.FLOOR_T
+	plan.furniture[victim]["pos"] = sunk_pos
+	var sunk := HouseQA.check_furniture_floor(plan, builder)
+	var caught := false
+	for m in sunk:
+		caught = caught or (String(m).begins_with("furniture_floor: Table_Large") and String(m).contains("below"))
+	if not caught:
+		res.fail("walk QA fixture: a table sunk %.2fm into the floor escaped furniture_floor: %s"
+			% [HouseGeometry.FLOOR_T, sunk])
+
+
+## A 2.8 m bench drawn up to the 1.1 m end of a table fails seating; the same
+## bench on the table's long side does not.
+static func _wq_bench_at_table_end(res: SuiteResult) -> void:
+	var plan := _fs_plan(&"hall", 8201)
+	var c: Vector2 = HouseGeometry.room_floor_rect(plan, 0).get_center()
+	var table := _fs_piece("Table_Large", c, 0.0)
+	var t_rect: Rect2 = table["rect"]
+	var bench_end := _fs_piece("Bench", Vector2(t_rect.end.x + 0.3, c.y), PI / 2.0)
+	bench_end["host"] = 0
+	plan.furniture = [table, bench_end]
+	res.checked += 1
+	var rep := HouseFurnishCheck.new().check(plan)
+	if not _wq_has(rep, "failures", "seating:", "side of the table it is drawn up to"):
+		res.fail("walk QA fixture: a bench across the end of a table escaped seating: %s" % [rep["failures"]])
+	var bench_side := _fs_piece("Bench", Vector2(c.x, t_rect.end.y + 0.3), 0.0)
+	bench_side["host"] = 0
+	plan.furniture = [table, bench_side]
+	res.checked += 1
+	rep = HouseFurnishCheck.new().check(plan)
+	if _wq_has(rep, "failures", "seating:", "side of the table it is drawn up to"):
+		res.fail("walk QA fixture: a bench on the long side of a table failed seating: %s" % [rep["failures"]])
+
+
+## A free table just past the swing of the front door fails doorway; the
+## furnisher's own "nowhere else" flag turns it into a warning, and the same
+## table a stride further in passes.
+static func _wq_door_approach(res: SuiteResult) -> void:
+	var plan := _fs_plan(&"hall", 8202)
+	var door: Dictionary = plan.doors[0]
+	var into := -Vector2(door["normal"])
+	var foot: Vector2 = PropCatalog.footprint_yawed("Table_Large", 0.0)
+	var near_c: Vector2 = Vector2(door["pos"]) + into * (HouseGeometry.DOOR_CLEAR + 0.1 + foot.y / 2.0)
+	plan.furniture = [_fs_piece("Table_Large", near_c, 0.0)]
+	res.checked += 1
+	var rep := HouseFurnishCheck.new().check(plan)
+	if not _wq_has(rep, "failures", "doorway:", "approach to door 0"):
+		res.fail("walk QA fixture: a table in the door approach escaped doorway: %s" % [rep["failures"]])
+	plan.furniture[0]["door_approach"] = true
+	res.checked += 1
+	rep = HouseFurnishCheck.new().check(plan)
+	if _wq_has(rep, "failures", "doorway:", "approach to door 0") \
+			or not _wq_has(rep, "warnings", "doorway:", "approach to door 0"):
+		res.fail("walk QA fixture: a flagged table in the door approach is not a warning")
+	var far_c: Vector2 = Vector2(door["pos"]) + into * (HouseFurnishPlacement.DOOR_APPROACH + 0.2 + foot.y / 2.0)
+	plan.furniture = [_fs_piece("Table_Large", far_c, 0.0)]
+	res.checked += 1
+	rep = HouseFurnishCheck.new().check(plan)
+	if _wq_has(rep, "failures", "doorway:", "approach") or _wq_has(rep, "warnings", "doorway:", "approach"):
+		res.fail("walk QA fixture: a table clear of the door approach was reported")
+
+
+## The caged dungeon lantern in a parlour fails light; in a great hall it is
+## at home.
+static func _wq_outdoor_lamp(res: SuiteResult) -> void:
+	for kind in [&"parlour", &"great_hall"]:
+		var plan := _fs_plan(kind, 8203)
+		var at := _fs_against(plan, "Lantern_Wall", 0, 1.0)
+		plan.furniture = [_fs_piece("Lantern_Wall", at, 0.0, 1.8)]
+		res.checked += 1
+		var rep := HouseFurnishCheck.new().check(plan)
+		var caught := _wq_has(rep, "failures", "light:", "outdoor fitting")
+		if caught != (kind == &"parlour"):
+			res.fail("walk QA fixture: Lantern_Wall in a %s: outdoor-light failure %s"
+				% [String(kind), "missing" if not caught else "raised"])
+	# and the furnisher itself never draws it for a domestic room
+	res.checked += 1
+	if "Lantern_Wall" in PropCatalog.of_category_for_room("sconce", &"parlour") \
+			or not "Lantern_Wall" in PropCatalog.of_category_for_room("sconce", &"great_hall"):
+		res.fail("walk QA fixture: of_category_for_room does not keep the lantern out of a parlour")
+
+
+## A cottage that eats in its hall and lays a second table in its parlour fails
+## programme; the parlour with no table at all passes it.
+static func _wq_second_dining_table(res: SuiteResult) -> void:
+	var plan := _fs_plan(&"hall", 8204)
+	plan.spec.trade = &"none"
+	var inner: Rect2 = plan.rooms[0]["rect"]
+	# a hall, a parlour, and a bedroom so the hall is not also where they sleep
+	var third := inner.size.x / 3.0
+	plan.rooms = [{"kind": &"hall", "rect": Rect2(inner.position, Vector2(third, inner.size.y)), "storey": 0},
+		{"kind": &"parlour", "rect": Rect2(inner.position + Vector2(third, 0), Vector2(third, inner.size.y)), "storey": 0},
+		{"kind": &"bedroom", "rect": Rect2(inner.position + Vector2(third * 2.0, 0), Vector2(third, inner.size.y)), "storey": 0}]
+	var table_hall := _fs_piece("Table_Large", Rect2(plan.rooms[0]["rect"]).get_center(), PI / 2.0)
+	var table_parlour := _fs_piece("Table_Large", Rect2(plan.rooms[1]["rect"]).get_center(), PI / 2.0)
+	table_parlour["room"] = 1
+	plan.furniture = [table_hall, table_parlour]
+	res.checked += 1
+	if not HouseFurnishingRecipes.dines_elsewhere(plan, 1) or HouseFurnishingRecipes.dines_elsewhere(plan, 0):
+		res.fail("walk QA fixture: dines_elsewhere does not pick the hall over the parlour")
+	var rep := HouseFurnishCheck.new().check(plan)
+	res.checked += 1
+	if not _wq_has(rep, "failures", "programme:", "second dining table"):
+		res.fail("walk QA fixture: a parlour's second dining table escaped programme: %s" % [rep["failures"]])
+	plan.furniture = [table_hall]
+	rep = HouseFurnishCheck.new().check(plan)
+	res.checked += 1
+	if _wq_has(rep, "failures", "programme:", "room 1 (parlour) has no table"):
+		res.fail("walk QA fixture: a sitting parlour was still required to hold a table")
+	# and where the hall is also the bedroom, the parlour is where they eat
+	plan.rooms[2]["kind"] = &"store"
+	res.checked += 1
+	if HouseFurnishingRecipes.dines_elsewhere(plan, 1):
+		res.fail("walk QA fixture: a sleeping hall took the dining table from the parlour")
+
+
+## Things are set on a working surface a person can reach. The market stall's
+## box is its canopy: measured to the top of the box, its "counter" was out of
+## reach, which is where the tavern's mug and spoon were floating.
+const REACH := 1.3
+
+static func _wq_surface_in_reach(res: SuiteResult) -> void:
+	res.checked += 1
+	if PropCatalog.height("Stall_Empty") <= REACH:
+		res.fail("walk QA fixture: the stall's box is no longer taller than reach; the control is void")
+	# the furniture a meal or a ledger is set out on; a wall shelf is measured
+	# from its bracket and a lectern's desk is a slope, neither a table top
+	for key in PropCatalog.keys():
+		if not PropCatalog.has_tag(key, PropCatalog.SURFACE) \
+				or PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED) \
+				or not PropCatalog.category(key) in ["table", "counter", "workbench", "storage", "nightstand", "crate"]:
+			continue
+		res.checked += 1
+		if PropCatalog.surface_height(key) > REACH:
+			res.fail("walk QA fixture: %s offers a working surface at %.2fm, out of reach"
+				% [key, PropCatalog.surface_height(key)])

@@ -24,6 +24,11 @@ extends RefCounted
 ##   FACING      every triangle winds the way its own normal says, and a
 ##               mill's front is its local -Z
 ##   COMPONENT   every named part in the log is in the mesh, and no others
+##   OPENINGS    every door and window lies ON the wall it is cut in -- the
+##               polygon the drum really is, leaning with its batter -- not on
+##               the circle round it or the box round that
+##   PROPORTION  a tower or smock mill's sails span at least
+##               SPAN_PER_HEIGHT_MIN of its height; less reads as toy vanes
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {..}}
 
@@ -39,9 +44,16 @@ const GROUND_TOL := 0.35
 ## A ladder this close to the sails' own breadth is a ladder the sails hit.
 const LADDER_TOL := 0.06
 
+## How far an opening may stand off the wall it is cut in, and how far it may
+## sink into it. An opening is lifted a centimetre or two off the masonry so
+## the two surfaces cannot fight; one placed on the circle round a polygon
+## drum, or held vertical against a battered one, stands off by ten.
+const OPENING_PROUD_MAX := 0.045
+const OPENING_SUNK_MAX := 0.004
+
 const RULES: Array[StringName] = [&"standing", &"rotor", &"clearance",
 	&"cap_clear", &"winding", &"access", &"gear", &"wheel", &"envelope",
-	&"solid", &"facing", &"component"]
+	&"solid", &"facing", &"component", &"openings", &"proportion"]
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -392,6 +404,56 @@ func _check_component(spec: WindmillSpec, mesh: ArrayMesh, _m: Dictionary,
 	var rep: Dictionary = ComponentCheck.check(builder, mesh)
 	for f in rep["failures"]:
 		_fail(&"component", String(f))
+
+
+## Every door and window lies on the wall it is cut in. Measured on the logged
+## slab's own corners -- which `component` proves are in the mesh -- against
+## `WindmillGeometry.wall_distance`, the polygon the drum is drawn as.
+func _check_openings(spec: WindmillSpec, _mesh: ArrayMesh, _m: Dictionary,
+		builder: WindmillBuilder) -> void:
+	if builder == null or spec.mill_type == &"windpump":
+		return          # a lattice has no wall to cut an opening in
+	var worst_out := 0.0
+	var worst_in := 0.0
+	var worst_role := ""
+	var count := 0
+	for row in builder.component_log:
+		var role := String(row["role"])
+		if role != "door" and role != "window":
+			continue
+		if String(row["form"]) != "slab":
+			continue
+		count += 1
+		var depth: float = float(row.get("depth", 0.0)) * 0.5
+		for p in row["points"]:
+			var d: float = WindmillGeometry.wall_distance(spec, p)
+			if d > worst_out:
+				worst_out = d
+				worst_role = role
+			worst_in = minf(worst_in, d - depth)
+	stats["opening_proud"] = worst_out
+	if count == 0:
+		_fail(&"openings", "the mill drew no door or window at all.")
+		return
+	if worst_out > OPENING_PROUD_MAX:
+		_fail(&"openings", "a %s stands %.3f m off the wall it is cut in (allowed %.3f): it was placed on a bounding circle or box, not on the surface."
+			% [worst_role, worst_out, OPENING_PROUD_MAX])
+	if worst_in < -OPENING_SUNK_MAX:
+		_fail(&"openings", "an opening is sunk %.3f m into the wall, where the masonry hides it."
+			% -worst_in)
+
+
+## A cap mill's sails are in proportion to the tower that carries them.
+func _check_proportion(spec: WindmillSpec, _mesh: ArrayMesh, m: Dictionary,
+		_builder: WindmillBuilder) -> void:
+	if spec.mill_type != &"tower" and spec.mill_type != &"smock":
+		return
+	var tall: float = maxf(spec.curb_y, 0.01)
+	var ratio: float = float(m["rotor_reach"]) * 2.0 / tall
+	stats["span_per_height"] = ratio
+	if ratio < WindmillGeometry.SPAN_PER_HEIGHT_MIN:
+		_fail(&"proportion", "the sails span %.2f m on a %.2f m tower (%.2f of its height; at least %.2f): toy vanes on a tall drum."
+			% [float(m["rotor_reach"]) * 2.0, tall, ratio, WindmillGeometry.SPAN_PER_HEIGHT_MIN])
 
 
 # ------------------------------------------------------------------ lookups

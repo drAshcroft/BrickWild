@@ -61,6 +61,11 @@ const BANNERS := ["Banner_1", "Banner_2", "Banner_1_Cloth", "Banner_2_Cloth"]
 ## The big flags, for the curtain and the gatehouse: outdoor heraldry, where the
 ## MegaKit cloth would be lost against a fifteen metre wall.
 const WAR_BANNERS := ["Dungeon_Flag_Wall", "Dungeon_Flag_Wall2"]
+## The Dungeon Kit wall flags carry their cloth on the side _mount_yaw turns to
+## the wall, and a catalogue `face` cannot fix it here: ShellAssembler adds back
+## what _mount_yaw takes off. Hung without this, only the rod showed, culled
+## cloth behind it (walk-QA, Thorncliffe pin 4; rendered both ways).
+const WAR_BANNER_TURN := PI
 const MONUMENT := ["Dungeon_Statue_Stag", "Dungeon_Statue_Fox"]
 const TREASURE := "Dungeon_Chest_Gold"
 const LIBRARY := "Dungeon_Bookcase_Full"
@@ -127,6 +132,20 @@ static func dress(spec: CastleSpec, yard_data: Dictionary = {}) -> Array[Diction
 			for side in CastleGeometry.wing_sides(spec):
 				_dress_chamber(_room_of(CastleGeometry.manor_wing_aabb(spec, side)),
 					out, rng)
+		# A manor's towers are built into the front ends of its wings, so a
+		# room's corner can be inside a tower's drum. Nothing stands there.
+		var towers := CastleGeometry.manor_tower_centers(spec)
+		if not towers.is_empty():
+			var reach: float = CastleGeometry.tower_radius_for(spec, CastleGeometry.tower_base_half(spec, 0))
+			out.assign(out.filter(func(p: Dictionary) -> bool:
+				var rect: Rect2 = p["rect"]
+				if rect.size.x <= 0.0:
+					return true
+				for t in towers:
+					var q := Vector2(clampf(t.x, rect.position.x, rect.end.x), clampf(t.z, rect.position.y, rect.end.y))
+					if q.distance_to(Vector2(t.x, t.z)) < reach:
+						return false
+				return true))
 		return out
 
 	_dress_hall(_room_of(CastleGeometry.hall_aabb(spec)), out, rng)
@@ -689,46 +708,135 @@ static func _yard_use_anchor(bailey: Rect2, use: StringName) -> Vector2:
 ## side of the gate passage.
 static func _dress_defences(spec: CastleSpec, out: Array[Dictionary]) -> void:
 	var fires := 0
+	var reach: float = PropCatalog.footprint(BRAZIER).length() * 0.5 + 0.15
 	for r in CastleGeometry.rings(spec):
 		var t: float = CastleGeometry.wall_thickness(spec, r)
-		var walk_y: float = CastleGeometry.wall_height(spec, r)
+		# On the coping, not sunk a parapet-rise into it.
+		var walk_y: float = CastleGeometry.ring_ground_y(spec, r) \
+			+ CastleGeometry.wall_height(spec, r) + CastleGeometry.PARAPET_RISE
+		var masonry := _walk_obstacles(spec, r)
 		for seg in CastleGeometry.wall_segments(spec, r):
 			if fires >= MAX_WALL_FIRES:
 				break
 			var a: Vector2 = seg["a"]
 			var b: Vector2 = seg["b"]
 			var o: Vector3 = seg["outward"]
+			# the walk runs along the middle of the wall, not its outer face
+			var inset := Vector2(o.x, o.z) * t / 2.0
 			var n: int = maxi(int(float(seg["length"]) / WALL_FIRE_BAY), 1)
 			for i in range(n):
 				if fires >= MAX_WALL_FIRES:
 					break
-				var m: Vector2 = a.lerp(b, (float(i) + 0.5) / float(n))
-				# the walk runs along the middle of the wall, not its outer face
-				_put(out, BRAZIER, Vector3(m.x - o.x * t / 2.0, walk_y,
-					m.y - o.z * t / 2.0), 0.0, 1.0, &"light")
+				var at := _clear_walk_spot(a - inset, b - inset, (float(i) + 0.5) / float(n),
+					reach, masonry)
+				# A run's midpoint can lie inside the drum of the tower that
+				# ends it; the fire moves along the walk or is left out
+				# (walk-QA, Thorncliffe pins 8 and 9).
+				if not is_finite(at.x):
+					continue
+				_put(out, BRAZIER, Vector3(at.x, walk_y, at.y), 0.0, 1.0, &"light")
 				fires += 1
-		var i2 := 0
-		for tower in CastleGeometry.vertex_tower_centers(spec, r):
-			_put(out, BRAZIER, Vector3(tower.x,
-				CastleGeometry.tower_height_at(spec, r, i2), tower.z), 0.0, 1.0, &"light")
-			i2 += 1
+		# A watch fire on each corner tower's deck: only a flat roof has one
+		# (CastleBuilder._tower lays it a parapet-rise above the shaft). Under
+		# a cone or pyramid the fire stood inside the roof.
+		if spec.tower_roof == &"flat":
+			var i2 := 0
+			for tower in CastleGeometry.vertex_tower_centers(spec, r):
+				_put(out, BRAZIER, Vector3(tower.x, CastleGeometry.ring_ground_y(spec, r)
+					+ CastleGeometry.tower_height_at(spec, r, i2) + CastleGeometry.PARAPET_RISE,
+					tower.z), 0.0, 1.0, &"light")
+				i2 += 1
 
 	# the gate passage, lit from inside
 	var g: AABB = CastleGeometry.gatehouse_aabb(spec, 0)
 	if g.size.x <= 0.0:
 		return
-	var y: float = minf(SCONCE_H, CastleGeometry.gate_height(spec, 0) * 0.5)
+	# The passage is CastleBuilder._passage's: centred, at most 4 m wide, its
+	# vault at most 5 m up. The sconces go on ITS walls. Set against the
+	# gatehouse's outer side faces they were 0.14 m inside solid masonry.
+	var passage_w: float = minf(g.size.x * 0.4, 4.0)
+	var passage_h: float = minf(g.size.y * 0.4, 5.0)
+	var cx: float = g.get_center().x
+	var y: float = minf(SCONCE_H, passage_h - 0.4)
 	for side in [-1.0, 1.0]:
-		var x: float = g.position.x + (g.size.x - 0.14 if side > 0.0 else 0.14)
-		_put(out, SCONCE, Vector3(x, y, g.position.z + g.size.z * 0.6),
+		_put(out, SCONCE, Vector3(cx + side * passage_w * 0.5, y, g.position.z + g.size.z * 0.6),
 			_mount_yaw(SCONCE, Vector2(-side, 0.0)), 1.0, &"light")
-	# heraldry either side of the way in, on the front of the gatehouse
-	var flag_y: float = CastleGeometry.gate_height(spec, 0) * 0.55
+	# Heraldry either side of the way in, on the FRONT of the gatehouse, or of
+	# the barbican where one stands before it. Hung on the side faces at
+	# mid-depth instead, an inward gatehouse put them in the ward 12 m up,
+	# beside the wall stair (walk-QA, Thorncliffe pin 4).
+	var front := g
+	var way_w := passage_w
+	var bar: AABB = CastleGeometry.barbican_aabb(spec)
+	if bar.size.x > 0.0:
+		front = bar
+		way_w = minf(bar.size.x * 0.45, 2.4)
 	for side2 in [-1.0, 1.0]:
 		var key: String = WAR_BANNERS[0 if side2 < 0.0 else 1]
-		var fx: float = g.position.x + (g.size.x + 0.16 if side2 > 0.0 else -0.16)
-		_put(out, key, Vector3(fx, flag_y, g.position.z + g.size.z * 0.5),
-			_mount_yaw(key, Vector2(side2, 0.0)), 1.0, &"banner")
+		var half_w: float = PropCatalog.footprint(key).x * 0.5
+		var fx: float = front.get_center().x + side2 * (way_w * 0.5 + 0.4 + half_w)
+		if absf(fx - front.get_center().x) + half_w > front.size.x * 0.5 - 0.1:
+			continue
+		# Tops level with the head of the way in, by each model's measured
+		# floor: one flag's origin is at its foot, the other's at its rod.
+		var floor_off: float = PropCatalog.floor_offset(key)
+		var flag_y: float = maxf(passage_h - floor_off - PropCatalog.height(key), 1.2 - floor_off)
+		_put(out, key, Vector3(fx, flag_y, front.position.z - 0.16),
+			_mount_yaw(key, Vector2(0.0, -1.0)) + WAR_BANNER_TURN, 1.0, &"banner")
+
+
+## What stands on a ring's wall-walk in plan: every tower drum on any ring (an
+## inner gate's towers can stand over the outer walk) and the gatehouses.
+static func _walk_obstacles(spec: CastleSpec, _ring: int) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	var access := preload("castle_access_geometry.gd")
+	for r in CastleGeometry.rings(spec):
+		var vertices := CastleGeometry.vertex_tower_centers(spec, r)
+		for index in vertices.size():
+			out.append(access._tower_outline(spec, r, vertices[index], index))
+		var towers := CastleGeometry.gate_tower_centers(spec, r)
+		for slot in CastleGeometry.side_tower_slots(spec, r):
+			towers.append(slot.pos)
+		for tower in towers:
+			out.append(access._tower_outline(spec, r, tower))
+		var g: AABB = CastleGeometry.gatehouse_aabb(spec, r)
+		if g.size.x > 0.0:
+			out.append(Poly.from_rect(Rect2(g.position.x, g.position.z, g.size.x, g.size.z)))
+	return out
+
+
+## The point on the walk line a..b nearest to fraction `f` whose `reach` disc
+## is clear of every obstacle outline, or INF if the whole run is taken.
+static func _clear_walk_spot(a: Vector2, b: Vector2, f: float, reach: float,
+		obstacles: Array[PackedVector2Array]) -> Vector2:
+	var length := a.distance_to(b)
+	if length < reach * 2.0:
+		return Vector2(INF, INF)
+	var lo := reach / length
+	var hi := 1.0 - lo
+	var step := 0.25 / length
+	for k in range(int(ceil(1.0 / step)) + 1):
+		for sgn in [1.0, -1.0]:
+			var g: float = f + float(sgn) * k * step
+			if g < lo or g > hi:
+				continue
+			var p := a.lerp(b, g)
+			var clear := true
+			for poly in obstacles:
+				if Geometry2D.is_point_in_polygon(p, poly) or _poly_distance(poly, p) < reach:
+					clear = false
+					break
+			if clear:
+				return p
+	return Vector2(INF, INF)
+
+
+static func _poly_distance(poly: PackedVector2Array, p: Vector2) -> float:
+	var best := INF
+	for i in poly.size():
+		var q := Geometry2D.get_closest_point_to_segment(p, poly[i], poly[(i + 1) % poly.size()])
+		best = minf(best, p.distance_to(q))
+	return best
 
 
 # --------------------------------------------------------------- the room

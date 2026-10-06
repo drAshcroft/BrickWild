@@ -49,6 +49,7 @@ func check(plan: HousePlan, builder: HouseBuilder, overrides: Dictionary = {}) -
 
 	if builder != null:
 		failures.append_array(check_interior_details(plan, builder))
+		failures.append_array(check_furniture_floor(plan, builder))
 		failures.append_array(check_exterior_geometry(plan, builder))
 		if builder.emitted_mesh != null:
 			failures.append_array(MeshIntegrityCheck.check(builder.emitted_mesh, "HouseBuilder"))
@@ -134,6 +135,51 @@ static func check_interior_details(plan: HousePlan, builder: HouseBuilder) -> Ar
 					count += 1
 			if count < 6:
 				errors.append("rug: no actual quad 2 mm above floor for " + String(rug["id"]))
+	return errors
+
+
+## Every piece that stands on the floor stands on the floor the builder
+## EMITTED: its base at the top of the slab under it, not at the storey datum
+## the slab is laid up from. Measured against the mesh, so a plan and a builder
+## that disagree about where the boards are cannot agree with themselves. This
+## is the rule that would have caught twelve centimetres of every table leg
+## sunk into the floor and an upper-storey bookcase standing on the ceiling of
+## the room below (walk QA, 6 Oct).
+const FURNITURE_FLOOR_TOL := 0.02
+
+static func check_furniture_floor(plan: HousePlan, builder: HouseBuilder) -> Array[String]:
+	var errors: Array[String] = []
+	if builder.emitted_mesh == null:
+		return errors
+	var triangles := _mesh_triangles(builder.emitted_mesh, HouseBuilder.SURF_FLOOR)
+	if triangles.is_empty():
+		return errors
+	for item in plan.furniture:
+		var key := String(item.get("key", ""))
+		var room := int(item.get("room", -1))
+		if room < 0 or not PropCatalog.known(key) or bool(item.get("mounted", false)) \
+				or bool(item.get("world_water", false)):
+			continue
+		if PropCatalog.has_tag(key, PropCatalog.ON_SURFACE) \
+				or PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED) \
+				or PropCatalog.has_tag(key, PropCatalog.CEILING):
+			continue
+		var at: Vector2 = Rect2(item["rect"]).get_center()
+		var base: float = float(item["pos"].y)
+		if plan.on_dais(room, at):
+			base -= plan.dais_rise()
+		var top := -INF
+		var from := Vector3(at.x, base + 0.3, at.y)
+		var to := Vector3(at.x, base - 0.6, at.y)
+		for tri in triangles:
+			var hit: Variant = Geometry3D.segment_intersects_triangle(from, to, tri[0], tri[1], tri[2])
+			if hit != null:
+				top = maxf(top, (hit as Vector3).y)
+		if top == -INF:
+			continue # no slab under this point in the floor surface (a court, a shaped edge)
+		if absf(base - top) > FURNITURE_FLOOR_TOL:
+			errors.append("furniture_floor: %s in room %d stands %.2fm %s the floor it is on"
+				% [key, room, absf(base - top), "below" if base < top else "above"])
 	return errors
 
 

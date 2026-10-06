@@ -3,6 +3,9 @@ extends RefCounted
 
 # Mounted, ceiling, and hosted surface placements.
 
+## How far the foot of a hanging piece (a banner) clears the floor.
+const HANG_CLEAR := 0.45
+
 ## A shelf, rack or sconce on a wall, above the furniture already there.
 static func place_mounted(plan: HousePlan, room: int, key: String,
 		r: RandomNumberGenerator) -> void:
@@ -18,6 +21,12 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 	if PropCatalog.category(key) == "sconce":
 		scale = minf(1.0, maxf(0.1, ceiling - 1.7) / maxf(PropCatalog.height(key), 0.01))
 	var top := (PropCatalog.floor_offset(key) + PropCatalog.height(key)) * scale
+	# A banner hangs from its pivot: its measured floor is BELOW the pivot
+	# (Banner_1_Cloth by 2.25 m). Hung at shelf height its cloth ran through
+	# the floor -- a walker's "what is this?" in the domus fauces. Lift it so
+	# its foot clears the floor, then let the ceiling have the last word.
+	if PropCatalog.floor_offset(key) < 0.0:
+		y = maxf(y, HANG_CLEAR - PropCatalog.floor_offset(key) * scale)
 	y = minf(y, ceiling - top)
 	if PropCatalog.category(key) == "sconce":
 		y = maxf(y, 1.7 - PropCatalog.floor_offset(key) * scale)
@@ -32,6 +41,7 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 	var best_pos := Vector2.ZERO
 	var best_yaw := 0.0
 	var best_score := -INF
+	var lamp := PropCatalog.category(key) == "sconce"
 	# Every clear stretch of every wall is scored. A shelf wants the wall
 	# above the bench it serves and a sconce wants to mirror its mate about
 	# the door; neither is findable by trying six positions at random.
@@ -58,6 +68,8 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 				continue
 			if HouseFurnishScore._crowds_mounted(plan, room, pos, width):
 				continue
+			if lamp and _near_lamp(plan, room, pos):
+				continue
 			var cand := {
 				"key": key, "pos": Vector3(pos.x, 0.0, pos.y),
 				"yaw": HouseFurnishGeometry.yaw_facing(n), "scale": scale,
@@ -79,6 +91,20 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
 		"mounted": true, "scale": scale,
 	})
+
+
+## How close two wall lamps may hang. A third torch thirty-six centimetres
+## from the second is not lighting more of the hall, it is a cluster.
+const LAMP_SPACING := 0.85  # under the narrowest pair station (FS_PAIR_MIN 0.9)
+
+static func _near_lamp(plan: HousePlan, room: int, pos: Vector2) -> bool:
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if not bool(p.get("mounted", false)) or PropCatalog.category(String(p["key"])) != "sconce":
+			continue
+		if Vector2(p["pos"].x, p["pos"].z).distance_to(pos) < LAMP_SPACING:
+			return true
+	return false
 
 
 static func place_ceiling(plan: HousePlan, room: int, key: String) -> void:

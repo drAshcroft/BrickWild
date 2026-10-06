@@ -144,6 +144,7 @@ func _build_catalog(paths: Array[String], pack_names: Array[String], paths_by_pa
 				if not plant.is_empty():
 					row["canopy"] = plant["canopy"]
 					row["trunk"] = plant["trunk"]
+					row["seat"] = plant["seat"]
 				measured_rows[prop_name] = row
 				measured += 1
 		cache["packs"][pack_name] = {"fingerprint": fingerprint, "props": measured_rows}

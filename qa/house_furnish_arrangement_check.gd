@@ -78,6 +78,13 @@ func check_seating(plan: HousePlan) -> void:
 		var cat: String = PropCatalog.category(p["key"])
 		if cat != "seat" and cat != "bench":
 			continue
+		if bool(p.get("settle", false)):
+			# a settle against a parlour wall is sat on where it stands -- but it
+			# must stand against that wall, or it is a bench that lost its table
+			if HouseFurnishArrangementCheck.back_gap(plan, p) > HouseGeometry.WALL_GAP + 0.1:
+				failures.append("seating: %s is a settle standing %.2fm off the wall"
+					% [HouseFurnishCheck.who(plan, f), back_gap(plan, p)])
+			continue
 		var host: int = p.get("host", -1)
 		if host < 0:
 			# it may still be at a table it was not explicitly given
@@ -107,6 +114,16 @@ func check_seating(plan: HousePlan) -> void:
 		var across := Vector2(-facing.y, facing.x)
 		var half_w: float = (absf(across.x) * Rect2(p["rect"]).size.x
 			+ absf(across.y) * Rect2(p["rect"]).size.y) / 2.0
+		# ...but a seat the furnisher DREW UP to a table must belong to the
+		# side it faces. A 2.8 m bench across the 1.1 m end of a trestle
+		# sticks out a metre either side, blocks the floor and reads as a
+		# bench that missed its table (walk QA, 6 Oct).
+		if int(p.get("host", -1)) >= 0:
+			var side: float = absf(across.x) * host_rect.size.x + absf(across.y) * host_rect.size.y
+			if half_w * 2.0 > side + HouseFurnishPlacement.LONG_SEAT_OVERHANG + TOL:
+				failures.append("seating: %s is %.2fm long at a %.2fm side of the table it is drawn up to"
+					% [HouseFurnishCheck.who(plan, f), half_w * 2.0, side])
+				continue
 		var sees := false
 		for t in [-0.8, -0.4, 0.0, 0.4, 0.8]:
 			if _ray_hits_rect(seat_c + across * (half_w * t), facing, host_rect.grow(0.05), 1.6):
@@ -136,13 +153,19 @@ static func _nearest_table(plan: HousePlan, p: Dictionary) -> int:
 ## Something to see by, in every room somebody uses after dark.
 func check_light(plan: HousePlan) -> void:
 	for i in range(plan.room_count()):
-		if not HouseGeometry.is_habitable(plan.kind_of(i)):
-			continue
 		var lit := false
 		for f in plan.furniture_of(i):
-			if PropCatalog.has_tag(plan.furniture[f]["key"], PropCatalog.LIGHT):
+			var key: String = plan.furniture[f]["key"]
+			if PropCatalog.has_tag(key, PropCatalog.LIGHT):
 				lit = true
-				break
+			# a caged dungeon lantern is the porch's light, not the parlour's
+			# (nor the store's: this one holds in every room, lived in or not)
+			if PropCatalog.has_tag(key, PropCatalog.LIGHT) \
+					and not PropCatalog.suits_room(key, plan.kind_of(i)):
+				failures.append("light: %s is an outdoor fitting in a domestic room"
+					% HouseFurnishCheck.who(plan, f))
+		if not HouseGeometry.is_habitable(plan.kind_of(i)):
+			continue
 		if not lit:
 			warnings.append("light: room %d (%s) has no lamp, sconce or candle"
 				% [i, String(plan.kind_of(i))])

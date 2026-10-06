@@ -233,16 +233,27 @@ static func _dress_transept(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 	var end_x: float = spec.transept_len / 2.0
 	if end_x <= spec.width / 2.0 + 1.0:
 		return
+	# Each arm's own floor, inside its walls. The pieces were set at fixed
+	# offsets from the arm's end, which on a shallow arm put a statue into its
+	# east wall with only its tips showing (walk-QA, Wolfmarch Green pin 16).
+	var t: AABB = ChurchGeometry.transept_aabb(spec)
+	var inset: float = ChurchBuilder.NAVE_WALL_T + WALL_CLEAR
+	var z0: float = t.position.z + inset
+	var z1: float = t.end.z - inset
 	for side in [-1.0, 1.0]:
-		_put(out, BRAZIER, Vector3(side * (end_x - 1.0), 0.0, tz), 0.0, 1.0, &"light")
-		_put(out, CANDELABRUM, Vector3(side * (end_x - 2.1), 0.0, tz - 1.0), 0.0, 1.0,
+		var near: float = spec.width / 2.0
+		var far: float = end_x - inset
+		var arm := Rect2(minf(side * near, side * far), z0, absf(far - near), z1 - z0)
+		var taken: Array[Rect2] = []
+		_put_fitted(out, taken, arm, BRAZIER, Vector3(side * (end_x - 1.0), 0.0, tz), 0.0, &"light")
+		_put_fitted(out, taken, arm, CANDELABRUM, Vector3(side * (end_x - 2.1), 0.0, tz - 1.0), 0.0,
 			&"light")
 		# a statue at the end of each arm, where a side altar would stand, but
 		# only where there is height to look up at one
 		if spec.height >= STATUE_MIN_H:
 			var statue: String = STATUES[0 if side < 0.0 else 1]
-			_put(out, statue, Vector3(side * (end_x - 3.4), 0.0, tz + 1.2),
-				PropCatalog.yaw_facing(Vector2(-side, 0.0)), 1.0, &"statue")
+			_put_fitted(out, taken, arm, statue, Vector3(side * (end_x - 3.4), 0.0, tz + 1.2),
+				PropCatalog.yaw_facing(Vector2(-side, 0.0)), &"statue")
 		var yaw: float = -PI / 2.0 if side > 0.0 else PI / 2.0
 		_put(out, SCONCE, Vector3(side * (end_x - 0.12), minf(SCONCE_H, spec.height * 0.6),
 			tz), yaw, 1.0, &"light")
@@ -280,13 +291,40 @@ static func _dress_west_end(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 		_put(out, FONT, Vector3(-fx, 0.0, -spec.length / 2.0 + 1.1), 0.0, 1.0, &"font")
 	if not spec.tower:
 		return
-	var tz: float = ChurchGeometry.tower_center_z(spec)
+	# The tower base: stores and the spare bell rope go in its back corner,
+	# against the walls and clear of any way through it. The catalogue says
+	# rope is a corner piece kept from doors; set on the middle of the floor,
+	# where a single west tower is also the way in, it read as litter
+	# (walk-QA, Wolfmarch Green pin 15). The crate was set at a fixed fraction
+	# of the tower's width and turned, which on a narrow tower ran it into the
+	# walls.
+	var inset: float = ChurchBuilder.NAVE_WALL_T + WALL_CLEAR
+	var route := Rect2()
+	if spec.west_towers == 1:
+		# the west door crosses this tower to the nave
+		var reach: float = 0.0
+		for door in ChurchGeometry.west_door_layout(spec):
+			reach = maxf(reach, absf(float(door.x)) + float(door.width) * 0.5)
+		route = Rect2(-reach - 0.4, -spec.length, (reach + 0.4) * 2.0, spec.length * 2.0)
 	for side in ChurchGeometry.west_tower_sides(spec):
-		var cx: float = ChurchGeometry.tower_center_x(spec, side)
-		_put(out, BELL_ROPE, Vector3(cx, 0.0, tz), 0.0, 1.0, &"rope")
+		var tower: AABB = ChurchGeometry.tower_aabb(spec, side)
+		var room := Rect2(tower.position.x + inset, tower.position.z + inset,
+			tower.size.x - inset * 2.0, tower.size.z - inset * 2.0)
+		if room.size.x <= 0.0 or room.size.y <= 0.0:
+			continue
+		# The corner away from the nave axis, at the east (inner) side.
+		var out_x: float = side if absf(side) > 0.0 else 1.0
+		var corner := Vector2(room.end.x if out_x > 0.0 else room.position.x, room.end.y)
+		var taken: Array[Rect2] = []
+		if route.has_area():
+			taken.append(route)
 		if spec.tower_width >= 3.0:
-			_put(out, "Crate_Wooden", Vector3(cx + spec.tower_width * 0.28, 0.0,
-				tz + spec.tower_width * 0.28), 0.6, 1.0, &"store")
+			_put_fitted(out, taken, room, "Crate_Wooden", Vector3(corner.x, 0.0, corner.y), 0.0, &"store")
+		# the coil beside it, toward the west, or in the corner if alone
+		var at := Vector3(corner.x, 0.0, corner.y)
+		if not taken.is_empty() and taken.back() != route:
+			at.z = taken.back().position.y - 0.05 - PropCatalog.footprint(BELL_ROPE).y * 0.5
+		_put_fitted(out, taken, room, BELL_ROPE, at, 0.0, &"rope")
 
 
 # ------------------------------------------------------------------ shared
@@ -316,3 +354,24 @@ static func _altar_scale(spec: ChurchSpec) -> float:
 static func _put(out: Array[Dictionary], key: String, pos: Vector3, yaw: float,
 		scale: float, kind: StringName) -> void:
 	out.append(PropCatalog.placement(key, pos, yaw, scale, kind))
+
+
+## Place a standing piece as near `pos` as `room` allows: moved until its plan
+## rectangle lies inside the room, and left out when it does not fit there or
+## would stand on anything in `taken`. What it occupies is added to `taken`.
+static func _put_fitted(out: Array[Dictionary], taken: Array[Rect2], room: Rect2,
+		key: String, pos: Vector3, yaw: float, kind: StringName) -> bool:
+	var rect: Rect2 = PropCatalog.placement(key, pos, yaw, 1.0, kind).rect
+	if rect.size.x > room.size.x or rect.size.y > room.size.y:
+		return false
+	var shift := Vector3(
+		maxf(room.position.x - rect.position.x, 0.0) - maxf(rect.end.x - room.end.x, 0.0), 0.0,
+		maxf(room.position.y - rect.position.y, 0.0) - maxf(rect.end.y - room.end.y, 0.0))
+	var placed := PropCatalog.placement(key, pos + shift, yaw, 1.0, kind)
+	var at: Rect2 = placed.rect
+	for other in taken:
+		if other.grow(-0.01).intersects(at):
+			return false
+	out.append(placed)
+	taken.append(at)
+	return true

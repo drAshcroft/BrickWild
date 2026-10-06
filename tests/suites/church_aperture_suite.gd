@@ -120,7 +120,58 @@ static func run() -> SuiteResult:
 	_expect(res, _blocked(solid.commit(), Vector3(6.5, 10, 0),
 		Vector3(5.5, 10, 0)), "control solid wall did not block the probe")
 	_entrance_routes(res)
+	_floor_under_entrance(res)
+	_windows_between_buttresses(res)
 	return res
+
+
+## Walk-QA, Abbey Ivo pin 1: a nave buttress standing across a side window,
+## glass showing either side of it. Every style at three sizes, and a control
+## that moves one window onto a buttress.
+static func _windows_between_buttresses(res: SuiteResult) -> void:
+	var swept := 0
+	for style in TestSweep.styles():
+		for i in [0, 7, 14]:
+			var spec: ChurchSpec = TestSweep.spec_at(style, i)
+			var builder := ChurchBuilder.new()
+			builder.build(spec)
+			var clashes := _bay_clashes(builder)
+			_expect(res, clashes.is_empty(), "%s/%d: %s" % [String(style), i, ", ".join(clashes)])
+			if clashes.is_empty() and builder.components("shaft_0").size() > 0:
+				swept += 1
+				if swept == 1:
+					# the control: one window moved onto the first nave buttress
+					var shaft: Dictionary = {}
+					for row in builder.component_log:
+						if String(row.role) == "shaft_0" and String(row.host).begins_with("nave_"):
+							shaft = row
+							break
+					for part in builder.part_log:
+						if part.get("kind") == "window" and part.get("tag") == "window" \
+								and signf(Vector3(part.pos).x) == signf(MassBuilder.component_aabb(shaft).get_center().x):
+							part.pos = Vector3(part.pos.x, part.pos.y, MassBuilder.component_aabb(shaft).get_center().z)
+							break
+					_expect(res, not _bay_clashes(builder).is_empty(),
+						"control: a window moved onto a buttress was not caught")
+	_expect(res, swept > 0, "no buttressed church in the sweep to test")
+
+
+static func _bay_clashes(builder: ChurchBuilder) -> PackedStringArray:
+	var out := PackedStringArray()
+	for row in builder.component_log:
+		if String(row.role) != "shaft_0" or not String(row.host).begins_with("nave_"):
+			continue
+		var b: AABB = MassBuilder.component_aabb(row)
+		for part in builder.part_log:
+			if part.get("kind") != "window" or part.get("tag") != "window":
+				continue
+			var pos: Vector3 = part.pos
+			if signf(pos.x) != signf(b.get_center().x):
+				continue
+			var half: float = Vector3(part.size).x * 0.5
+			if pos.z + half > b.position.z + 0.01 and pos.z - half < b.end.z - 0.01:
+				out.append("%s stands across the window at z=%.2f" % [row.host, pos.z])
+	return out
 
 
 ## A cut on the outer door is not an entrance if a tower, narthex back wall or
@@ -155,6 +206,13 @@ static func _entrance_routes(res: SuiteResult) -> void:
 				"%s entrance route still hits stone at x=%.2f" % [mode, x])
 			_expect(res, _first_hit(mesh, start, end).is_empty(),
 				"%s entrance route is blocked by trim or another surface" % mode)
+			# At the feet, too: a sill left across a doorway is a step up from
+			# bare ground on both sides (walk-QA, Abbey Ivo pin 2).
+			# Measured from the floor the church stands on, not from the hole,
+			# or a hole cut short of the floor would pass its own test.
+			var feet: float = ChurchGeometry.podium_height(spec) + 0.03
+			_expect(res, _first_hit(mesh, Vector3(x, feet, front - 1.0), Vector3(x, feet, end_z)).is_empty(),
+				"%s entrance route has a sill across it at x=%.2f" % [mode, x])
 			var logged := false
 			for part in builder.part_log:
 				if part.get("kind") == "window" and part.get("tag") == "door" \
@@ -176,6 +234,80 @@ static func _entrance_routes(res: SuiteResult) -> void:
 						"%s narthex front door is raised or logged as a recess" % mode)
 			_expect(res, outer_logs == builder._west_door_openings().size(),
 				"%s narthex exterior and inner doors do not correspond" % mode)
+
+
+## Something to STAND on, all the way in. The rays above are horizontal, so a
+## church with no floor at all passed them: every room was a closed shell
+## whose bottom faced DOWN at y=0, the walker stood on the ground 2 cm lower,
+## and its capsule jammed on those undersides' edge in the doorway (WALK-QA,
+## 6 Oct, Abbey Ivo pin 2). Straight down along each west leaf's route, from
+## the west front to the nave, the nearest face must face UP at the floor
+## datum. A floorless builder is the negative control.
+static func _floor_under_entrance(res: SuiteResult) -> void:
+	var floorless: GDScript = load("res://tests/fixtures/floorless_church_builder.gd")
+	for row in [[&"romanesque", 1], [&"gothic", 2], [&"nordic_stave", 3], [&"byzantine", 1],
+			[&"renaissance", 1], [&"russian", 3]]:
+		var spec := ChurchSpec.new()
+		spec.style = row[0]
+		ChurchGenerator.generate(spec, row[1])
+		var label := "%s %d" % [row[0], row[1]]
+		var gaps: PackedStringArray = _floor_gaps(spec, ChurchBuilder.new())
+		_expect(res, gaps.is_empty(), "%s has no floor to stand on under its entrance at %s"
+			% [label, ", ".join(gaps.slice(0, 4))])
+		if row[0] == &"romanesque":
+			_expect(res, not _floor_gaps(spec, floorless.new()).is_empty(),
+				"%s floor probe passed a floorless church: the probe is a tautology" % label)
+
+
+## Route points with no upward face at the floor datum directly below them.
+static func _floor_gaps(spec: ChurchSpec, builder: ChurchBuilder) -> PackedStringArray:
+	var mesh: ArrayMesh = builder.build(spec)
+	var datum: float = ChurchGeometry.podium_height(spec)
+	# from the face the outer door is cut in: the narthex front, a single
+	# tower's west face, or the nave's west wall (twin towers stand either side
+	# of open air, which needs no floor)
+	var west := -spec.length / 2.0
+	if spec.narthex:
+		west = ChurchGeometry.narthex_aabb(spec).position.z
+	elif spec.tower and spec.west_towers == 1:
+		west = ChurchGeometry.tower_aabb(spec).position.z
+	var gaps := PackedStringArray()
+	for leaf in ChurchGeometry.west_door_layout(spec):
+		var x: float = leaf["x"]
+		var z := west + 0.05
+		while z < -spec.length / 2.0 + 2.0:
+			var hit := _nearest_hit(mesh, Vector3(x, datum + 0.5, z), Vector3(x, datum - 0.1, z))
+			if hit.is_empty() or hit["normal"].y < 0.7 or absf(hit["at"].y - datum) > 0.06:
+				gaps.append("(%.2f, %.2f)" % [x, z])
+			z += 0.25
+	return gaps
+
+
+## The hit nearest `a` on segment a-b, with its face's outward normal (Godot
+## winds front faces clockwise: (c - a) x (b - a)).
+static func _nearest_hit(mesh: ArrayMesh, a: Vector3, b: Vector3) -> Dictionary:
+	var best := {}
+	var best_d := INF
+	for surface in range(mesh.get_surface_count()):
+		if surface == ChurchBuilder.SURF_OPEN:
+			continue
+		var arrays: Array = mesh.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] 			if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+		var count: int = indices.size() if not indices.is_empty() else vertices.size()
+		for i in range(0, count, 3):
+			var p0: Vector3 = vertices[indices[i] if not indices.is_empty() else i]
+			var p1: Vector3 = vertices[indices[i + 1] if not indices.is_empty() else i + 1]
+			var p2: Vector3 = vertices[indices[i + 2] if not indices.is_empty() else i + 2]
+			var hit = Geometry3D.segment_intersects_triangle(a, b, p0, p1, p2)
+			if hit == null or a.distance_to(hit) >= best_d:
+				continue
+			var n := (p2 - p0).cross(p1 - p0)
+			if n.length() < 1e-9:
+				continue
+			best_d = a.distance_to(hit)
+			best = {"at": hit, "normal": n.normalized()}
+	return best
 
 
 static func _check_opening(res: SuiteResult, mesh: ArrayMesh,

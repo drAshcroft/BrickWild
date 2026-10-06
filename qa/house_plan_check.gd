@@ -420,6 +420,14 @@ func _check_stairs(plan: HousePlan) -> void:
 						if not Poly.contains_point(HouseGeometry.room_floor_poly(plan, room), point, TOL):
 							failures.append("stairs: stair %d %s lies outside room %d's floor" % [si, key, room])
 							break
+		# There is floor to stand on in front of the first step: a flight that
+		# starts in a wall cannot be got onto (WALK-QA, 6 Oct, house_9 pin 5).
+		# The builder climbs from the end that has it.
+		var foot_rect := Rect2(stair.get("lower_rect", stair.get("rect", Rect2())))
+		if HouseGeometry.is_straight_flight(foot_rect) \
+				and not HouseGeometry.room_floor_rect(plan, a).grow(TOL).encloses(
+				HouseGeometry.stair_approach(foot_rect, HouseGeometry.stair_climb(plan, stair))):
+			failures.append("stairs: stair %d has no floor at its foot -- it starts in a wall" % si)
 		if stair.has("lower_rect") and stair.has("upper_rect"):
 			var lower: Rect2 = stair["lower_rect"]
 			var upper: Rect2 = stair["upper_rect"]
@@ -430,6 +438,27 @@ func _check_stairs(plan: HousePlan) -> void:
 	for lo in range(lowest, wanted - 1):
 		if not pairs.has(lo):
 			failures.append("stairs: no transition from storey %d to %d" % [lo, lo + 1])
+	# A flight standing in the well of the flight below it: the lower flight
+	# climbs into the upper one's solid foot and arrives nowhere (WALK-QA,
+	# 6 Oct, hotel pin 9). Every planner did it; HousePlanLevels.arriving_wells
+	# is how they now keep out.
+	for si in range(plan.stairs.size()):
+		for sj in range(plan.stairs.size()):
+			var below: Dictionary = plan.stairs[si]
+			var above: Dictionary = plan.stairs[sj]
+			if int(above.get("storey", 0)) != int(below.get("to_storey", int(below.get("storey", 0)) + 1)):
+				continue
+			var below_rect := Rect2(below.get("upper_rect", below.get("rect", Rect2())))
+			var above_rect := Rect2(above.get("lower_rect", above.get("rect", Rect2())))
+			# A spiral (a square well, as in a keep's turret) rises floor after
+			# floor through the same well by design; only straight flights can
+			# climb into one another's foot.
+			if not HouseGeometry.is_straight_flight(below_rect) \
+					or not HouseGeometry.is_straight_flight(above_rect):
+				continue
+			var over := below_rect.intersection(above_rect)
+			if over.size.x > TOL and over.size.y > TOL:
+				failures.append("stairs: stair %d stands in the well of stair %d below it" % [sj, si])
 	stats["stairs"] = plan.stairs.size()
 
 
@@ -564,7 +593,9 @@ func _check_windows(plan: HousePlan) -> void:
 		if t - half < lo - TOL or t + half > hi + TOL:
 			failures.append("window %d is cut into room %d's wall but sits outside the room"
 				% [wi, w["room"]])
-		if float(w["sill"]) < 0.5:
+		# A french window onto a planned balcony IS let down to the floor; the
+		# family's own QA proves the balcony is built in front of it.
+		if float(w["sill"]) < 0.5 and not bool(w.get("balcony", false)):
 			failures.append("window %d has a %.2fm sill -- that is a doorway"
 				% [wi, float(w["sill"])])
 		if float(w["head"]) > plan.spec.height - 0.1:

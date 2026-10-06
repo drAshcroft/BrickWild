@@ -1,7 +1,7 @@
 extends RefCounted
 ## Guard towers must have a walkable inside and a real connection to the wall.
 const Probe = preload("res://tests/suites/stone_shell_suite.gd")
-const Routes = preload("res://qa/castle_route_check.gd")
+const Routes = preload("res://src/castle/castle_route_check.gd")
 
 
 static func check_fixture(result: SuiteResult, _spec: CastleSpec,

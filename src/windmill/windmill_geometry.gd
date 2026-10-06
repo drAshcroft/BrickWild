@@ -49,6 +49,17 @@ const CAP_CLEAR := 0.35
 ## outside the sail's own breadth it has to stand.
 const LADDER_CLEAR := 0.3
 
+## A cap mill's sail span against the height of the tower carrying it. The
+## generator holds a tower or smock mill's span to at least SPAN_PER_HEIGHT of
+## its height (and allows up to SPAN_PER_HEIGHT_MAX); `WindmillCheck` fails a
+## drawn rotor under SPAN_PER_HEIGHT_MIN. A real tower mill's sails span about
+## the tower's height or more; a span of half the height reads as toy vanes.
+const SPAN_PER_HEIGHT := 0.9
+const SPAN_PER_HEIGHT_MAX := 1.5
+const SPAN_PER_HEIGHT_MIN := 0.8
+## A smock mill's brick stump, under its timber frame.
+const STUMP_H := [1.4, 3.2]
+
 ## A post mill's post cannot be so short that a miller would not climb it.
 const POST_MIN := 1.9
 const TRESTLE_MIN := 2.4
@@ -159,8 +170,117 @@ static func wall_thickness(spec: WindmillSpec) -> float:
 	return minf(WALL_T, maxf(spec.base_r * 0.22, 0.18))
 
 
+## A round drum's door must fit ONE face of the polygon it is drawn as, or its
+## edges hang in the air where the next face turns away. Measured at the
+## door head, where a battered face is narrowest.
 static func door_w(spec: WindmillSpec) -> float:
-	return minf(spec.door_w, maxf(spec.base_r * 1.15, 0.7))
+	var w: float = minf(spec.door_w, maxf(spec.base_r * 1.15, 0.7))
+	if not is_square(spec) and spec.mill_type != &"windpump":
+		var head: float = floor_y(spec) + minf(spec.door_h, maxf(spec.height * 0.78, 1.4))
+		w = minf(w, face_width(spec, head) * 0.92)
+	return w
+
+
+# ------------------------------------------------------------ the wall surface
+#
+# A drum is drawn as a POLYGON of `sides` faces, battered from its base radius
+# to its curb radius, and an opening put on the circle that polygon is
+# inscribed in -- or on the drum's bounding box -- hangs in the air beside the
+# wall wherever a face turns away from it, and stands vertical where the wall
+# leans. These are the one description of that surface: the builder draws the
+# drum from them and places every opening on them, and `WindmillCheck` measures
+# every opening against them.
+
+## The drum is turned half a segment so a FACE, not a corner, looks down -Z,
+## which is where the door is. With a corner there, the door stood across a
+## ridge and both of its jambs stood off the wall.
+static func drum_start(sides_n: int) -> float:
+	return PI / float(maxi(sides_n, 3))
+
+
+## The battered band of drum at height `y`: its foot and head, the radii there
+## (to the polygon's corners) and its number of faces. A smock mill has two --
+## a round brick stump and an eight-sided frame on it.
+static func drum_band(spec: WindmillSpec, y: float) -> Dictionary:
+	if spec.mill_type == &"smock":
+		if y < spec.stump_h:
+			return {"y0": 0.0, "y1": spec.stump_h, "r0": spec.base_r,
+				"r1": spec.base_r * 0.96, "sides": SIDES_ROUND}
+		return {"y0": spec.stump_h, "y1": spec.curb_y, "r0": spec.base_r * 0.96,
+			"r1": spec.curb_r, "sides": SIDES_SMOCK}
+	return {"y0": floor_y(spec), "y1": spec.curb_y, "r0": spec.base_r,
+		"r1": spec.curb_r, "sides": sides(spec)}
+
+
+## How far a post mill's boarding stands proud of its burr wall. The boards are
+## the face an opening is fixed to.
+static func board_proud(spec: WindmillSpec) -> float:
+	return spec.wall_t * 0.125
+
+
+## One face's width at height `y`.
+static func face_width(spec: WindmillSpec, y: float) -> float:
+	if is_square(spec):
+		return spec.base_r * 2.0
+	var band: Dictionary = drum_band(spec, y)
+	var t: float = clampf((y - float(band["y0"])) / maxf(float(band["y1"]) - float(band["y0"]), 0.001), 0.0, 1.0)
+	var r: float = lerpf(float(band["r0"]), float(band["r1"]), t)
+	return 2.0 * r * sin(PI / float(band["sides"]))
+
+
+## The wall face an opening at plan angle `angle` (atan2(z, x), the angle
+## `MeshKit.revolve` uses) and height `y` belongs on: the centre of the
+## nearest face, ON its plane, with that face's outward normal -- tipped up by
+## the batter -- and the direction up the face. A square burr's faces are flat
+## and vertical, at its own yaw.
+static func wall_face(spec: WindmillSpec, angle: float, y: float) -> Dictionary:
+	if is_square(spec):
+		var yaw := Basis(Vector3.UP, spec.body_yaw)
+		var local: Vector3 = yaw.inverse() * Vector3(cos(angle), 0.0, sin(angle))
+		var axis := Vector3(signf(local.x), 0.0, 0.0) if absf(local.x) > absf(local.z) \
+			else Vector3(0.0, 0.0, signf(local.z) if local.z != 0.0 else -1.0)
+		var n: Vector3 = yaw * axis
+		var out_r: float = spec.base_r + board_proud(spec)
+		return {"angle": atan2(n.z, n.x), "point": n * out_r + Vector3(0.0, y, 0.0),
+			"normal": n, "up": Vector3.UP, "width": spec.base_r * 2.0}
+	var band: Dictionary = drum_band(spec, y)
+	var n_sides: int = int(band["sides"])
+	var step: float = TAU / float(n_sides)
+	var start: float = drum_start(n_sides)
+	var k: float = round((angle - start) / step - 0.5)
+	var a: float = start + step * (k + 0.5)
+	var half: float = PI / float(n_sides)
+	var y0: float = float(band["y0"])
+	var y1: float = float(band["y1"])
+	var t: float = clampf((y - y0) / maxf(y1 - y0, 0.001), 0.0, 1.0)
+	var r: float = lerpf(float(band["r0"]), float(band["r1"]), t)
+	# the apothem's change per metre up the drum: negative on a battered wall
+	var slope: float = (float(band["r1"]) - float(band["r0"])) / maxf(y1 - y0, 0.001) * cos(half)
+	var out := Vector3(cos(a), 0.0, sin(a))
+	return {"angle": a, "point": out * (r * cos(half)) + Vector3(0.0, y, 0.0),
+		"normal": (out - Vector3.UP * slope).normalized(),
+		"up": (out * slope + Vector3.UP).normalized(),
+		"width": 2.0 * r * sin(half)}
+
+
+## How far `p` stands OUTSIDE the drawn wall (negative: inside it). Measured
+## along the plan ray through `p`, against the polygon the drum really is.
+static func wall_distance(spec: WindmillSpec, p: Vector3) -> float:
+	if is_square(spec):
+		var local: Vector3 = Basis(Vector3.UP, spec.body_yaw).inverse() * p
+		return maxf(absf(local.x), absf(local.z)) - (spec.base_r + board_proud(spec))
+	var band: Dictionary = drum_band(spec, p.y)
+	var n_sides: int = int(band["sides"])
+	var step: float = TAU / float(n_sides)
+	var start: float = drum_start(n_sides)
+	var angle: float = atan2(p.z, p.x)
+	var k: float = floor((angle - start) / step)
+	var centre: float = start + step * (k + 0.5)
+	var t: float = clampf((p.y - float(band["y0"])) / maxf(float(band["y1"]) - float(band["y0"]), 0.001), 0.0, 1.0)
+	var r: float = lerpf(float(band["r0"]), float(band["r1"]), t)
+	var half: float = PI / float(n_sides)
+	var radius_here: float = r * cos(half) / maxf(cos(angle - centre), 0.01)
+	return Vector2(p.x, p.z).length() - radius_here
 
 
 static func door_h(spec: WindmillSpec) -> float:
@@ -580,8 +700,17 @@ static func legal(spec: WindmillSpec) -> Dictionary:
 	var body_r: float = clampf(maxf(spec.body, 1.0) * 0.5,
 		float(r["body_r"][0]), float(r["body_r"][1]))
 	var height: float = clampf(spec.height, float(r["height"][0]), float(r["height"][1]))
-	var span: float = clampf(maxf(spec.sail_span, 2.0),
-		body_r * float(band[0]) * 2.0, body_r * float(band[1]) * 2.0)
+	var lo: float = body_r * float(band[0]) * 2.0
+	var hi: float = body_r * float(band[1]) * 2.0
+	if spec.mill_type in [&"tower", &"smock"]:
+		# A cap mill's sails are sized to its TOWER, not to its foot: a real
+		# tower mill's sails span roughly the tower's height or more, and a
+		# rotor held to a multiple of the base radius read as a toy on a tall
+		# drum. The smock's brick stump is under its frame, so it counts.
+		var tall: float = height + (STUMP_H[1] if spec.mill_type == &"smock" else 0.0)
+		lo = maxf(lo, tall * SPAN_PER_HEIGHT)
+		hi = maxf(hi, tall * SPAN_PER_HEIGHT_MAX)
+	var span: float = clampf(maxf(spec.sail_span, 2.0), lo, hi)
 	return {"sail_span": span, "body": body_r * 2.0, "height": height,
 		"base_r": body_r}
 

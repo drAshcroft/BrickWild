@@ -22,6 +22,15 @@ The supplied front elevation was translated into measurable rules:
 - three balustraded balconies;
 - a columned, arched ceremonial entrance on the central axis.
 
+Since the 6 Oct walk-through, every piece of dressing is SEATED on the wall
+it decorates (`HotelBuilder._face_box`, `HotelGeometry.wall_face_z`), never
+centred on `front_z`, which stands 0.28 m proud and left it floating. String
+courses, rusticated quoins, window hoods and pilaster strips on the cell
+divisions run round all four walls. The balconies stand at the first-floor
+floor in front of french windows the planner lets down for them
+(`"balcony": true`, `"balcony_x"`), and `HotelQA._check_balconies` requires
+each balcony to have its door and each door its balcony.
+
 Pink plaster, cream trim, dark blue roofs, and red interior floors are separate
 mesh surfaces so callers can replace the materials without rebuilding geometry.
 

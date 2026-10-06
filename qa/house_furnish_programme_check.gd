@@ -31,6 +31,20 @@ func check_program(plan: HousePlan) -> void:
 		# as well. HouseFurnisher asks the same question the same way.
 		if not spec is ShopSpec and kind == &"hall" and not _anybody_sleeps(plan):
 			cats = cats + ["bed"]
+		# One household, one dining table. A parlour in a house that eats in
+		# its hall or dining room is a sitting room: it needs no table, and a
+		# table in it is the second dining table the walk QA tripped over.
+		# (If the dining room could not take its table, the parlour's is the
+		# household's one table, and is both allowed and still required.)
+		if HouseFurnishingRecipes.dines_elsewhere(plan, i):
+			var dining := HouseFurnishingRecipes.dining_room_of(plan)
+			if dining < 0:
+				dining = plan.rooms_of(&"parlour")[0]
+			if _room_has(plan, dining, "table"):
+				cats = cats.filter(func(c: String) -> bool: return c != "table")
+				if _room_has(plan, i, "table"):
+					failures.append("programme: room %d (parlour) has a second dining table; the household eats in room %d"
+						% [i, dining])
 		for cat in cats:
 			if _room_has(plan, i, cat):
 				continue
