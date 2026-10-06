@@ -99,6 +99,16 @@ static func check_fixture(result: SuiteResult, spec: CastleSpec,
 	_expect(result, _contains(missing_floor.failures, "occupied_shells[hall]: window") \
 			and _contains(missing_floor.failures, "no emitted floor-backed occupied volume"),
 		"missing emitted room floor escaped while plan and window logs stayed intact")
+	# A stair landing is a floor patch, not a room. Keep one under the stripped
+	# hall, logs untouched: the check must still fail the room.
+	var landed := _with_landing(floorless.mesh, hall, 0)
+	var landing_check := Occupancy.check(spec, builder, landed)
+	_expect(result, _contains(landing_check.failures, "occupied_shells[hall]: room 0 has no emitted floor"),
+		"one surviving stair landing passed a room whose floor was removed")
+	_expect(result, float(landing_check.stats.get("min_room_floor_fraction", 1.0)) < 0.5,
+		"landing mutation reports a majority-supported floor")
+	_expect(result, float(clean.stats.get("min_room_floor_fraction", 0.0)) >= Occupancy.ROOM_FLOOR_MIN_FRACTION,
+		"clean README motte reports a room below the floor fraction")
 	_expect(result, Occupancy.check(spec, builder, mesh, geometry).failures == clean.failures,
 		"occupancy controls retained stale failures after restoration")
 	_sanctuary_contract(result, spec, builder, mesh)
@@ -183,6 +193,27 @@ static func _sanctuary_contract(result: SuiteResult, spec: CastleSpec,
 	_expect(result, int(stripped.removed) > 0 \
 			and _contains(floorless.failures, "occupied_shells[apse]: room 0 has no emitted floor"),
 		"sanctuary floor removal escaped the emitted-room check")
+
+
+static func _with_landing(mesh: ArrayMesh, row: Dictionary, room: int) -> ArrayMesh:
+	var plan: HousePlan = row.plan
+	var polygon := HouseGeometry.room_floor_poly(plan, room)
+	var rect := Poly.bounding_rect(polygon)
+	var point := rect.get_center()
+	for step in 5:
+		var probe := rect.position + rect.size * Vector2(0.5, 0.2 + 0.15 * step)
+		if Poly.contains_point(polygon, point, 0.5):
+			break
+		point = probe
+	var floor_y := float(plan.storey_of_room(room)) * plan.spec.height
+	var kit := MeshKit.new(1)
+	var xf: Transform3D = row.transform
+	kit.oriented_box(Vector3(1.2, HouseGeometry.FLOOR_T, 1.2),
+		Transform3D(xf.basis, xf * Vector3(point.x, floor_y + HouseGeometry.FLOOR_T * 0.5, point.y)), 0)
+	var patch := kit.commit()
+	var output := mesh.duplicate() as ArrayMesh
+	output.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, patch.surface_get_arrays(0))
+	return output
 
 
 static func _without_floor(mesh: ArrayMesh, row: Dictionary, room: int) -> Dictionary:

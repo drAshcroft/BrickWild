@@ -5,6 +5,10 @@ extends RefCounted
 ## Every supplied interior is then checked against the final combined mesh.
 
 
+## Share of in-polygon samples that must have emitted floor and headroom.
+const ROOM_FLOOR_MIN_FRACTION := 0.5
+
+
 static func expected_ids(spec: CastleSpec) -> Array[String]:
 	var ids: Array[String] = []
 	if CastleGeometry.is_tower_house(spec):
@@ -185,12 +189,18 @@ static func _check_room_floor(out: Dictionary, id: String, row: Dictionary,
 	for triangle in _nearby(geometry, bounds.grow(0.01)):
 		if int(triangle.surface) not in [CastleBuilder.SURF_OPEN, CastleBuilder.SURF_GROUND]:
 			nearby.append(triangle)
+	var supported := 0
 	for point in samples:
 		out.stats.room_floor_samples += 1
-		if _hits(nearby, point + Vector3.UP * 0.10, point - Vector3.UP * 0.30) \
-				and not _hits(nearby, point + Vector3.UP * 0.15, point + Vector3.UP * 1.85):
-			return
-	_fail(out, id, "room %d has no emitted floor with standing clearance" % room)
+		if _hits(nearby, point + Vector3.UP * 0.10, point - Vector3.UP * 0.30) 				and not _hits(nearby, point + Vector3.UP * 0.15, point + Vector3.UP * 1.85):
+			supported += 1
+	var fraction := float(supported) / float(maxi(1, samples.size()))
+	out.stats.min_room_floor_fraction = minf(float(out.stats.get("min_room_floor_fraction", 1.0)), fraction)
+	# One surviving stair landing must not stand in for a floor. Stair wells,
+	# dais steps and furniture-free voids take a share, never the majority.
+	if samples.is_empty() or fraction < ROOM_FLOOR_MIN_FRACTION:
+		_fail(out, id, "room %d has no emitted floor with standing clearance (%d of %d samples)"
+			% [room, supported, samples.size()])
 
 
 ## Windows are matched in both directions: a valid plan cannot excuse an
