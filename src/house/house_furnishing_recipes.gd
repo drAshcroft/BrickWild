@@ -2,6 +2,10 @@ class_name HouseFurnishingRecipes
 extends RefCounted
 ## Room, shop and trade recipes consumed by HouseFurnisher.
 
+const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+const DOMESTIC_TABLE_MIN_HEIGHT := 0.70
+const DOMESTIC_PREP_MIN_HEIGHT := 0.75
+
 const RUG_ROOM_KINDS := [&"hall", &"parlour", &"dining", &"dining_room"]
 
 ## Where a household eats, best first. A dwelling has ONE dining table: in the
@@ -77,9 +81,25 @@ static func is_dwelling(plan: HousePlan) -> bool:
 		and spec.trade != &"innkeeper"
 
 
+## Activity-group overlays belong only to the ordinary HouseSpec. Keep the
+## broader is_dwelling helper unchanged for existing callers that include
+## keeps and custom house families.
+static func is_ordinary_house(plan: HousePlan) -> bool:
+	var spec: HouseSpec = plan.spec
+	return spec != null and spec.get_script() == BASE_HOUSE_SPEC \
+		and plan.world_family == &"" and spec.trade != &"innkeeper"
+
+
 ## The room this dwelling eats in, or -1. Rooms of the first DINING_KINDS kind
 ## present; the lowest-numbered of them.
 static func dining_room_of(plan: HousePlan) -> int:
+	# Ordinary houses choose one physically verified household dining room before
+	# any furniture is placed. The selected room may be upstairs only when the
+	# planner's bare circulation check passed. A missing room is explicit; do not
+	# silently infer one from a hall that also sleeps or cooks.
+	if is_ordinary_house(plan) and plan.domestic_layout.has("dining_room"):
+		var selected: int = int(plan.domestic_layout.get("dining_room", -1))
+		return selected if selected >= 0 and selected < plan.room_count() else -1
 	for kind in DINING_KINDS:
 		# A hall that is also the bedroom -- nobody sleeps anywhere else --
 		# has a bed in it and its table against a wall if at all; a parlour
@@ -103,6 +123,167 @@ static func dines_elsewhere(plan: HousePlan, room: int) -> bool:
 	# no hall and no dining room: the first parlour is where they eat
 	var parlours: Array[int] = plan.rooms_of(&"parlour")
 	return not parlours.is_empty() and parlours[0] != room
+
+
+## Domestic contracts are overlays, not edits to the shared shop, inn, castle,
+## temple and world recipes. The base recipe remains the authority for every
+## other family. A compact domestic hall may also carry the kitchen when its
+## planner says it has no separate kitchen bay.
+static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := true) -> Array:
+	var kind: StringName = plan.kind_of(room)
+	var recipe: Array = RECIPES.get(kind, [])
+	if not is_ordinary_house(plan):
+		# Keep the old public/private parlour substitution for a keep, custom
+		# house or trade family that the broader dwelling predicate includes.
+		if sitting_if_available and dines_elsewhere(plan, room):
+			return SITTING_PARLOUR
+		return recipe
+	var parlour_is_sitting: bool = sitting_if_available and dines_elsewhere(plan, room)
+	if parlour_is_sitting:
+		recipe = _sitting_parlour_recipe()
+	else:
+		recipe = recipe.duplicate(true)
+	var domestic_functions: Array = plan.rooms[room].get("domestic_functions", [])
+	var shared_cooking: bool = kind == &"hall" and domestic_functions.has(&"cooking")
+	# A no-trade Witch's Hut has a real craft room. This is a style-local
+	# overlay; the alchemist trade and every non-witch workshop keep their own
+	# existing recipes.
+	if kind == &"workshop" and plan.spec.style == &"witch_hut" \
+			and plan.spec.trade == &"none":
+		for step_variant in recipe:
+			var step: Dictionary = step_variant
+			if String(step.get("cat", "")) == "workbench":
+				step["group"] = "witchwork"
+				step["opt"] = 1.0
+			elif String(step.get("cat", "")) == "shelf":
+				step["group"] = "witchwork"
+				step["opt"] = 1.0
+			elif String(step.get("cat", "")) == "sconce":
+				step["group"] = "witchwork"
+				step["opt"] = 1.0
+		recipe.append_array([
+			{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
+			{"cat": "alchemy", "rule": &"on", "host": "distributed", "n": [2, 2], "opt": 1.0, "group": "witchwork"},
+			{"cat": "books", "rule": &"on", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
+		])
+	var tagged: Array = []
+	for original in recipe:
+		var step: Dictionary = original.duplicate(true)
+		var category: String = String(step.get("cat", ""))
+		if not parlour_is_sitting and kind in [&"hall", &"dining_room", &"parlour"] \
+				and category in ["table", "seat", "bench"]:
+			step["group"] = "eating"
+			step["opt"] = 1.0
+		elif parlour_is_sitting and category in ["bench", "sconce"]:
+			step["group"] = "sitting"
+			step["opt"] = 1.0
+		if kind == &"bedroom":
+			if category == "bed":
+				step["group"] = "sleep"
+			elif category == "nightstand":
+				# This pack's only nightstand is a 1.216 m tall wall shelf. A
+				# low wooden chest is honest bedroom storage and a usable bedside
+				# support; place it at the bed end instead of calling that shelf a
+				# bedside table.
+				step["cat"] = "chest"
+				step["key"] = "Chest_Wood"
+				step["rule"] = &"beside"
+				step["near_cat"] = "bed"
+				step["near_anchor"] = "head_end"
+				step["opt"] = 1.0
+				step["group"] = "sleep"
+			elif category == "chest":
+				step["group"] = "sleep"
+				step["opt"] = 1.0
+			elif category == "sconce":
+				step["group"] = "sleep"
+				step["opt"] = 1.0
+		if kind == &"kitchen" and category in ["hearth", "storage", "cookware"]:
+			step["group"] = "cooking"
+			step["opt"] = 1.0
+		tagged.append(step)
+	if kind == &"kitchen":
+		var prep_pair: Array = [
+			{"cat": "workbench", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
+			{"cat": "bucket", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
+		]
+		var storage_index := -1
+		for step_index in range(tagged.size()):
+			if String(tagged[step_index].get("cat", "")) == "storage":
+				storage_index = step_index
+				break
+		if storage_index >= 0:
+			for prep_step in prep_pair:
+				tagged.insert(storage_index + 1, prep_step)
+				storage_index += 1
+		else:
+			tagged.append_array(prep_pair)
+	if shared_cooking:
+		var cooking_core: Array = [
+			{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "cooking"},
+			{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "cooking"},
+			{"cat": "workbench", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
+			{"cat": "bucket", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
+			{"cat": "cookware", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "cooking"},
+		]
+		var without_duplicate_kitchen_storage: Array = []
+		for step in tagged:
+			if String(step.get("cat", "")) == "storage":
+				continue # cooking_core already supplied the household's store
+			without_duplicate_kitchen_storage.append(step)
+		tagged = cooking_core + without_duplicate_kitchen_storage
+	if is_ordinary_house(plan) and plan.domestic_layout.has("dining_room"):
+		var selected_room: int = int(plan.domestic_layout.get("dining_room", -1))
+		var dining_kinds: Array[StringName] = [&"hall", &"dining_room", &"dining", &"parlour"]
+		if kind in dining_kinds and room != selected_room:
+			# A household has one meal table. Other parlours are sitting rooms;
+			# other halls and dining rooms keep their non-meal pieces only.
+			if kind == &"parlour":
+				return _sitting_parlour_recipe()
+			var without_second_meal: Array = []
+			for step in tagged:
+				if String(step.get("cat", "")) in ["table", "seat", "bench"]:
+					continue
+				without_second_meal.append(step)
+			tagged = without_second_meal
+		elif room == selected_room:
+			var preplaced_meal: Array = plan.domestic_layout.get("dining_group", [])
+			var without_meal_bench: Array = []
+			for step in tagged:
+				if String(step.get("cat", "")) == "bench":
+					continue
+				if not preplaced_meal.is_empty() \
+						and String(step.get("cat", "")) in ["table", "seat"]:
+					continue
+				without_meal_bench.append(step)
+			tagged = without_meal_bench
+	return tagged
+
+
+static func _sitting_parlour_recipe() -> Array:
+	var out: Array = SITTING_PARLOUR.duplicate(true)
+	for step in out:
+		var category: String = String(step.get("cat", ""))
+		if category in ["bench", "sconce"]:
+			step["group"] = "sitting"
+			step["opt"] = 1.0
+	return out
+
+
+## Optional large-room additions follow the same family boundary as the core
+## recipe. The general bedroom expansion asks for the tall Nightstand_Shelf;
+## an ordinary house already has a low head-end chest in its required overlay.
+static func ample_steps_for_room(plan: HousePlan, room: int) -> Array:
+	var kind: StringName = plan.kind_of(room)
+	var ample: Dictionary = AMPLE.get(kind, {})
+	var steps: Array = ample.get("steps", []).duplicate(true)
+	if is_ordinary_house(plan) and kind == &"bedroom":
+		var domestic_steps: Array = []
+		for step in steps:
+			if String(step.get("cat", "")) != "nightstand":
+				domestic_steps.append(step)
+		steps = domestic_steps
+	return steps
 
 ## Recipes per room kind: a list of steps, each
 ##   {"cat": String, "rule": StringName, "n": [min, max], "opt": float}

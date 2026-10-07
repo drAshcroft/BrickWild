@@ -101,7 +101,7 @@ func check_supported(plan: HousePlan) -> void:
 			failures.append("supported: %s is hosted by a different storey" % HouseFurnishCheck.who(plan, f))
 		var top: float = float(plan.furniture[host]["pos"].y) \
 			+ PropCatalog.surface_height(host_key) \
-			* float(plan.furniture[host].get("scale", 1.0))
+			* PropCatalog.placement_height_scale(plan.furniture[host])
 		if absf(float(p["pos"].y) - top) > 0.02:
 			failures.append("supported: %s floats %.2fm above the %s it sits on"
 				% [HouseFurnishCheck.who(plan, f), float(p["pos"].y) - top, host_key])

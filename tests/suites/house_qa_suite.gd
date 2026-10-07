@@ -401,17 +401,21 @@ static func _stair_fixture(res: SuiteResult) -> void:
 		res.fail("stair fixture: a stair in the line of the front door was not reported")
 
 
-## The exhaustive lane checks two hundred two-storey houses: the stair touches a wall and keeps out of the
-## front door's line in every one, and the hall still has its table in almost
-## every one -- the stair against the wall is what leaves the middle free.
+## The stair sweep keeps its wall and door-line checks. Dining is measured as
+## one complete, reachable household activity, wherever the plan puts it.
 static func _stair_sweep(res: SuiteResult, count: int) -> void:
 	var styles: Array = HouseSweep.styles()
 	var trades: Array = HouseSweep.trades()
 	var on_wall := 0
 	var off_line := 0
-	var halls := 0
-	var tables := 0
 	var n_stairs := 0
+	var applicable := 0
+	var not_applicable := 0
+	var complete := 0
+	var incomplete := 0
+	var infeasible_seen := false
+	var positive_seen: Dictionary = {}
+	var incomplete_seeds: Array[int] = []
 	for n in range(count):
 		_progress("stair sweep", n, count)
 		var spec := HouseSpec.new()
@@ -438,22 +442,115 @@ static func _stair_sweep(res: SuiteResult, count: int) -> void:
 				on_wall += 1
 			if line_ok:
 				off_line += 1
-		for i in plan.rooms_of(&"hall"):
-			if plan.storey_of_room(i) != 0:
+		if not HouseFurnishingRecipes.is_ordinary_house(plan):
+			not_applicable += 1
+			continue
+		var seed_value: int = spec.seed
+		if seed_value == 72000:
+			infeasible_seen = true
+			var selected_control: int = int(plan.domestic_layout.get("dining_room", -1))
+			if String(plan.domestic_layout.get("dining_selection", "")) != "unsatisfied" \
+					or not bool(plan.domestic_layout.get("stair_unsatisfied", false)):
+				res.fail("stair sweep dining: named seed 72000 no longer records its blocked-stair negative")
+			if selected_control >= 0 and selected_control < plan.room_count() \
+					and plan.storey_of_room(selected_control) > 0:
+				res.fail("stair sweep dining: seed 72000 selected unreachable upper dining")
+			continue
+		applicable += 1
+		var dining_state: String = String(plan.domestic_layout.get("dining_selection", ""))
+		var selected: int = int(plan.domestic_layout.get("dining_room", -999))
+		var meal_tables: Array[int] = []
+		var meal_seats: Array[int] = []
+		for fi in range(plan.furniture.size()):
+			var piece: Dictionary = plan.furniture[fi]
+			if String(piece.get("activity_group", "")) != "eating":
 				continue
-			halls += 1
-			for fi in plan.furniture_of(i):
-				if PropCatalog.category(plan.furniture[fi]["key"]) == "table":
-					tables += 1
-					break
-	res.note("stair       %d/%d against a wall, %d/%d out of the door line, %d/%d halls with a table"
-		% [on_wall, n_stairs, off_line, n_stairs, tables, halls])
+			if String(piece.get("cat", "")) == "table":
+				meal_tables.append(fi)
+			elif String(piece.get("cat", "")) == "seat":
+				meal_seats.append(fi)
+		if dining_state == "complete":
+			complete += 1
+			positive_seen[seed_value] = true
+			_stair_sweep_check_complete_dining(res, plan, seed_value, selected, meal_tables, meal_seats)
+		elif dining_state == "unsatisfied":
+			incomplete += 1
+			incomplete_seeds.append(seed_value)
+			if String(plan.domestic_layout.get("dining_selection_reason", "")).is_empty():
+				res.fail("stair sweep dining seed %d has an unreasoned shortfall" % seed_value)
+			if meal_tables.size() > 1:
+				res.fail("stair sweep dining seed %d retained duplicate meal tables" % seed_value)
+			if selected < -1 or selected >= plan.room_count():
+				res.fail("stair sweep dining seed %d names invalid attempted room %d" % [seed_value, selected])
+			if selected < 0:
+				if not meal_tables.is_empty() or not _stair_sweep_has_no_room_dining_shortfall(plan):
+					res.fail("stair sweep dining seed %d has an unreported no-room result" % seed_value)
+			else:
+				if not plan.was_dropped(selected, "activity:eating"):
+					res.fail("stair sweep dining seed %d lacks an activity:eating shortfall" % seed_value)
+				for table_index in meal_tables:
+					if int(plan.furniture[table_index].get("room", -1)) != selected:
+						res.fail("stair sweep dining seed %d retained a table outside attempted room" % seed_value)
+		else:
+			incomplete += 1
+			incomplete_seeds.append(seed_value)
+			res.fail("stair sweep dining seed %d has no final selection state" % seed_value)
+		if seed_value in [72009, 72015, 72021] and dining_state != "complete":
+			res.fail("stair sweep dining required positive seed %d is %s" % [seed_value, dining_state])
+	# Seed 72000 was checked above and deliberately not added to `applicable`.
+	var required_complete: int = int(ceil(float(applicable) * 0.95))
+	res.note("stair       %d/%d against a wall, %d/%d out of the door line"
+		% [on_wall, n_stairs, off_line, n_stairs])
+	res.note("dining      %d/%d applicable complete (95%% required); %d incomplete; %d not applicable; incomplete seeds=%s"
+		% [complete, applicable, incomplete, not_applicable, str(incomplete_seeds)])
 	if on_wall < n_stairs:
 		res.fail("stair sweep: %d of %d stairs stand off every wall" % [n_stairs - on_wall, n_stairs])
 	if off_line < n_stairs:
 		res.fail("stair sweep: %d of %d stairs stand in the line of the front door" % [n_stairs - off_line, n_stairs])
-	if halls > 0 and float(tables) / float(halls) < 0.95:
-		res.fail("stair sweep: only %d of %d two-storey halls have a table" % [tables, halls])
+	if not infeasible_seen:
+		res.fail("stair sweep dining: the named 72000 blocked-stair control was not tested")
+	if complete < required_complete:
+		res.fail("stair sweep dining: only %d of %d applicable requests completed; need %d"
+			% [complete, applicable, required_complete])
+	for required_seed in [72009, 72015, 72021]:
+		if required_seed < 72000 + count and not bool(positive_seen.get(required_seed, false)):
+			res.fail("stair sweep dining: required positive seed %d did not complete" % required_seed)
+
+
+static func _stair_sweep_check_complete_dining(res: SuiteResult, plan: HousePlan,
+		seed_value: int, selected: int, tables: Array[int], seats: Array[int]) -> void:
+	if selected < 0 or selected >= plan.room_count():
+		res.fail("stair sweep dining seed %d has invalid selected room %d" % [seed_value, selected])
+		return
+	var capacity: int = HouseFurnisher._household_seat_capacity(plan)
+	if tables.size() != 1:
+		res.fail("stair sweep dining seed %d has %d meal tables" % [seed_value, tables.size()])
+	if seats.size() != capacity:
+		res.fail("stair sweep dining seed %d has %d/%d seats" % [seed_value, seats.size(), capacity])
+	for seat_index in seats:
+		var seat: Dictionary = plan.furniture[seat_index]
+		if int(seat.get("room", -1)) != selected:
+			res.fail("stair sweep dining seed %d has a seat outside selected room" % seed_value)
+		if tables.size() == 1 and int(seat.get("host", -1)) != tables[0]:
+			res.fail("stair sweep dining seed %d has a stale meal-seat host" % seed_value)
+	if tables.size() == 1 and int(plan.furniture[tables[0]].get("room", -1)) != selected:
+		res.fail("stair sweep dining seed %d has its meal table outside selected room" % seed_value)
+	var nav: Dictionary = HouseNavCheck.new().check(plan)
+	if nav["unreached_rooms"].has(selected):
+		res.fail("stair sweep dining seed %d selected an unreachable room" % seed_value)
+	var meal_indices: Array[int] = tables.duplicate()
+	meal_indices.append_array(seats)
+	for item_index in nav["unreachable_items"]:
+		if int(plan.furniture[item_index].get("room", -1)) == selected and item_index in meal_indices:
+			res.fail("stair sweep dining seed %d has an unreachable table or seat" % seed_value)
+
+
+static func _stair_sweep_has_no_room_dining_shortfall(plan: HousePlan) -> bool:
+	for shortfall in plan.domestic_layout.get("activity_shortfalls", []):
+		if int(shortfall.get("room", -999)) == -1 \
+				and "activity:eating:no_verified_room" in shortfall.get("issues", []):
+			return true
+	return false
 
 
 static func _hearth_fixture(res: SuiteResult) -> void:
@@ -1178,10 +1275,11 @@ static func _feng_shui_fixtures(res: SuiteResult) -> void:
 	_fs_focus_door(res)
 
 
-## Regression for the narrow shelf station between the two workshop windows.
-## The checker and placer both probe mounted positions in 6cm steps; the
-## placer used to redistribute that step over each wall and miss the 4cm-wide
-## valid interval that the checker correctly reported as available.
+## Keep the generated longhall canary honest when later room and recipe
+## changes move its workbench/windows. A remaining issue is only a failure
+## when the measured shelf has a genuinely clear same-wall station; otherwise
+## the checker must retain the unavailable-geometry warning. A separate
+## controlled clear-wall fixture tests actual feasible shelf placement.
 static func _seed_60068_shelf_over(res: SuiteResult) -> void:
 	var spec := HouseSpec.new()
 	spec.style = &"longhall"
@@ -1192,11 +1290,40 @@ static func _seed_60068_shelf_over(res: SuiteResult) -> void:
 	var plan: HousePlan = HouseGenerator.generate(spec, 60068)
 	res.checked += 1
 	var report: Dictionary = HouseFurnishCheck.new().check(plan)
-	for messages in [report["failures"], report["warnings"]]:
-		for message in messages:
-			if String(message).begins_with("shelf_over:"):
-				res.fail("seed 60068 shelf-over regression: %s" % String(message))
-				return
+	var saw_kitchen := false
+	var unavailable_rooms: Array[int] = []
+	for room in range(plan.room_count()):
+		if plan.kind_of(room) != &"kitchen":
+			continue
+		saw_kitchen = true
+		var widest := 0.05
+		for index in plan.furniture_of(room):
+			var piece: Dictionary = plan.furniture[index]
+			if PropCatalog.category(String(piece["key"])) == "shelf":
+				widest = maxf(widest, PropCatalog.size(String(piece["key"])).x)
+		var available := false
+		for index in plan.furniture_of(room):
+			var piece: Dictionary = plan.furniture[index]
+			if PropCatalog.category(String(piece["key"])) in ["workbench", "counter"] \
+					and HouseFurnishAffinityCheck._fs_could_hang_over(plan, room, piece, widest):
+				available = true
+		if not available:
+			unavailable_rooms.append(room)
+			continue
+		for message in report["failures"] + report["warnings"]:
+			if String(message).begins_with("shelf_over:") \
+					and String(message).contains("room %d " % room):
+				res.fail("seed 60068 feasible shelf-over regression: %s" % String(message))
+	if not saw_kitchen:
+		res.fail("seed 60068 generated no kitchen for shelf-over regression")
+	for room in unavailable_rooms:
+		var warning_found := false
+		for message in report["warnings"]:
+			if String(message).begins_with("shelf_over:") \
+					and String(message).contains("room %d " % room):
+				warning_found = true
+		if not warning_found:
+			res.fail("seed 60068 kitchen %d had no legal shelf station but its warning disappeared" % room)
 
 
 ## One room, one front door in the far wall (wall 1) and one window in the near

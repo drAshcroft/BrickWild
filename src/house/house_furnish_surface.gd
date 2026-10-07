@@ -31,17 +31,35 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 	if PropCatalog.category(key) == "sconce":
 		y = maxf(y, 1.7 - PropCatalog.floor_offset(key) * scale)
 	var width: float = PropCatalog.size(key).x * scale
+	var lamp := PropCatalog.category(key) == "sconce"
+	var shelf := PropCatalog.category(key) == "shelf"
 	# Worked out once, not once per candidate: where a pair of these hangs is
 	# a fact about the room, and HouseFurnishScore._flank_anchor() scans the walls to find it.
 	# Leaving it inside the scoring loop made the house suites four times as
 	# slow for an answer that never changed.
+	var pair_clearance: Callable = func(pos: Vector2, normal: Vector2) -> bool:
+		var target_yaw: float = HouseFurnishGeometry.yaw_facing(normal)
+		return not _blocks_domestic_threshold(plan, room, key, pos, target_yaw, y, scale)
 	var anchor: Dictionary = HouseFurnishScore._flank_anchor(plan, room,
-		HouseFurnishScore._widest_of(PropCatalog.category(key)), PropCatalog.category(key)) \
+		HouseFurnishScore._widest_of(PropCatalog.category(key)), PropCatalog.category(key),
+		pair_clearance) \
 		if PropCatalog.affinity(key).has("flank") else {}
+	# A two-lamp recipe is a preference for a balanced pair, not permission to
+	# put the second lamp on another wall. If this room has no safe mirrored
+	# station, keep its already placed useful lamp and record the optional
+	# second member as unavailable. A first lamp may still be placed below.
+	if lamp and anchor.is_empty() and HouseFurnishingRecipes.is_ordinary_house(plan) \
+			and plan.kind_of(room) == &"hall":
+		for existing_index in plan.furniture_of(room):
+			var existing: Dictionary = plan.furniture[existing_index]
+			if bool(existing.get("mounted", false)) \
+					and PropCatalog.category(String(existing.get("key", ""))) == "sconce":
+				plan.note_compromise(room, "sconce_pair:no_safe_mirrored_station")
+				return
 	var best_pos := Vector2.ZERO
 	var best_yaw := 0.0
 	var best_score := -INF
-	var lamp := PropCatalog.category(key) == "sconce"
+	var best_over_cover := -1.0
 	# Every clear stretch of every wall is scored. A shelf wants the wall
 	# above the bench it serves and a sconce wants to mirror its mate about
 	# the door; neither is findable by trying six positions at random.
@@ -80,8 +98,12 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 				"host": -1, "mounted": true, "flank_anchor": anchor,
 			}
 			var score: float = HouseFurnishScore._affinity(plan, room, cand) + r.randf() * HouseFurnishScore.JITTER
-			if score > best_score:
+			var over_cover := _mounted_over_coverage(plan, room, cand) if shelf else -1.0
+			var better_relation := shelf and over_cover > best_over_cover + 0.0001
+			var tied_relation := not shelf or absf(over_cover - best_over_cover) <= 0.0001
+			if better_relation or (tied_relation and score > best_score):
 				best_score = score
+				best_over_cover = over_cover
 				best_pos = pos
 				best_yaw = HouseFurnishGeometry.yaw_facing(n)
 	if best_score == -INF:
@@ -94,6 +116,37 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
 		"mounted": true, "scale": scale,
 	})
+
+
+## A shelf's primary job is to hang over the work surface it serves. Rank by
+## the mounted model's measured, rotated footprint first; aesthetic affinities
+## and seeded jitter only choose between equally useful stations.
+static func _mounted_over_coverage(plan: HousePlan, room: int,
+		candidate: Dictionary) -> float:
+	var wall := HouseFurnishScore._back_wall_index(plan, room,
+		Rect2(candidate["rect"]), candidate)
+	if wall < 0:
+		return 0.0
+	var normal: Vector2 = HouseGeometry.room_walls(plan, room)[wall]["normal"]
+	var along := Vector2(normal.y, -normal.x)
+	var shelf_span := HouseFurnishSpatialCheck.fs_projection(
+		Rect2(candidate["rect"]), along, candidate)
+	var shelf_width := maxf(shelf_span.y - shelf_span.x, 0.05)
+	var best := 0.0
+	for index in plan.furniture_of(room):
+		var host: Dictionary = plan.furniture[index]
+		if PropCatalog.category(String(host["key"])) not in ["workbench", "counter"] \
+				or bool(host.get("mounted", false)) or int(host.get("host", -1)) >= 0:
+			continue
+		if HouseFurnishSpatialCheck.fs_back_wall(plan, room,
+				Rect2(host["rect"]), host) != wall:
+			continue
+		var host_span := HouseFurnishSpatialCheck.fs_projection(
+			Rect2(host["rect"]), along, host)
+		var host_width := maxf(host_span.y - host_span.x, 0.05)
+		var overlap := minf(shelf_span.y, host_span.y) - maxf(shelf_span.x, host_span.x)
+		best = maxf(best, clampf(overlap / minf(shelf_width, host_width), 0.0, 1.0))
+	return best
 
 
 ## A mount point can miss an opening while the shelf body projects into its
@@ -148,7 +201,7 @@ static func _blocks_domestic_threshold(plan: HousePlan, room: int, key: String,
 
 ## How close two wall lamps may hang. A third torch thirty-six centimetres
 ## from the second is not lighting more of the hall, it is a cluster.
-const LAMP_SPACING := 0.85  # under the narrowest pair station (FS_PAIR_MIN 0.9)
+const LAMP_SPACING := HouseFurnishScore.FLANK_MIN_PAIR_SEPARATION
 
 static func _near_lamp(plan: HousePlan, room: int, pos: Vector2) -> bool:
 	for f in plan.furniture_of(room):
@@ -235,7 +288,7 @@ static func place_on_surface(plan: HousePlan, room: int, key: String,
 	var host_rect: Rect2 = plan.furniture[host]["rect"]
 	var top: float = float(plan.furniture[host]["pos"].y) \
 		+ PropCatalog.surface_height(plan.furniture[host]["key"]) \
-		* float(plan.furniture[host].get("scale", 1.0))
+		* PropCatalog.placement_height_scale(plan.furniture[host])
 	var foot: Vector2 = PropCatalog.footprint(key)
 	var margin := 0.06
 	var lo := Vector2(host_rect.position.x + foot.x / 2.0 + margin,

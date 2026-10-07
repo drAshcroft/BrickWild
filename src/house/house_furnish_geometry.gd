@@ -16,14 +16,17 @@ static func storey_base(plan: HousePlan, room: int) -> float:
 
 ## A placement, before it is known whether it fits.
 static func candidate(key: String, centre: Vector2, yaw: float,
-		zone_side := 1.0, scale := 1.0) -> Dictionary:
+		zone_side := 1.0, scale := 1.0, height_scale := -1.0) -> Dictionary:
 	var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw) * scale
 	var rect := Rect2(centre - foot / 2.0, foot)
-	return {
+	var placement := {
 		"key": key, "pos": Vector3(centre.x, 0.0, centre.y), "yaw": yaw,
 		"rect": rect, "zone": zone_rect(key, rect, yaw, zone_side), "host": -1,
 		"cat": PropCatalog.category(key), "mounted": false, "scale": scale,
 	}
+	if height_scale >= 0.0:
+		placement["height_scale"] = height_scale
+	return placement
 
 
 ## The floor a person needs to USE the piece.
@@ -200,4 +203,3 @@ static func no_slivers(rect: Rect2, floor_rect: Rect2) -> bool:
 ## Yaw that turns a prop's face (local -Z) toward `n`.
 static func yaw_facing(n: Vector2) -> float:
 	return atan2(-n.x, -n.y)
-

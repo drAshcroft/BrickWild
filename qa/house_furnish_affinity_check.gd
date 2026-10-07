@@ -534,6 +534,7 @@ static func _fs_could_hang_over(plan: HousePlan, room: int, piece: Dictionary,
 	if wi < 0:
 		return false
 	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
+	var normal: Vector2 = walls[wi]["normal"]
 	var a: Vector2 = walls[wi]["from"]
 	var b: Vector2 = walls[wi]["to"]
 	var run: float = (b - a).length()
@@ -548,7 +549,8 @@ static func _fs_could_hang_over(plan: HousePlan, room: int, piece: Dictionary,
 	var t: float = lo
 	while t <= hi + 0.001:
 		var pos: Vector2 = a + along * t
-		var clear_here: bool = not _fs_on_opening(plan, room, pos, width)
+		var clear_here: bool = not _fs_on_opening(plan, room, pos, width) \
+			and not _fs_on_hearth_breast(plan, room, pos, normal, width)
 		if clear_here and not _fs_crowded(plan, room, pos, width, "shelf"):
 			var c: float = pos.dot(axis)
 			var hi_edge: float = minf(c + width / 2.0, interval.y)
@@ -558,6 +560,20 @@ static func _fs_could_hang_over(plan: HousePlan, room: int, piece: Dictionary,
 				return true
 		t += 0.06
 	return false
+
+
+## The availability probe must model the solid full-height chimney surround as
+## well as doors and windows. It occupies this wall run; it is not a free
+## mounting surface just because it is not an aperture.
+static func _fs_on_hearth_breast(plan: HousePlan, room: int, pos: Vector2,
+		normal: Vector2, width: float) -> bool:
+	var breast: Dictionary = HouseGeometry.hearth_breast(plan)
+	if breast.is_empty() or int(breast.get("room", -1)) != room \
+			or normal.dot(Vector2(breast["normal"])) <= 0.99:
+		return false
+	var along := Vector2(-normal.y, normal.x)
+	return absf((pos - Vector2(breast["centre"])).dot(along)) \
+		< (width + float(breast["width"])) * 0.5 + 0.05
 
 
 ## The two clearances `HouseFurnishSurface.place_mounted` keeps, measured the same
@@ -766,8 +782,7 @@ func check_focus(plan: HousePlan) -> void:
 	var base: float = float(plan.storey_of_room(room)) * plan.spec.height
 	var inside: Vector2 = Vector2(d["pos"]) - outward * 0.5
 	var eye := Vector3(inside.x, base + 1.6, inside.y)
-	var top: float = base + PropCatalog.height(plan.furniture[best]["key"]) \
-		* float(plan.furniture[best].get("scale", 1.0)) * 0.9
+	var top: float = base + PropCatalog.placement_height(plan.furniture[best]) * 0.9
 	var aim := Vector3(c.x, top, c.y)
 	var boxes: Array = []
 	var names: Array[String] = []
@@ -778,7 +793,7 @@ func check_focus(plan: HousePlan) -> void:
 		if q.get("mounted", false) or int(q["host"]) >= 0:
 			continue
 		var qr: Rect2 = q["rect"]
-		var qh: float = PropCatalog.height(q["key"]) * float(q.get("scale", 1.0))
+		var qh: float = PropCatalog.placement_height(q)
 		boxes.append(AABB(Vector3(qr.position.x, base, qr.position.y),
 			Vector3(qr.size.x, qh, qr.size.y)))
 		names.append(String(q["key"]))

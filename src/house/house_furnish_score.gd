@@ -35,6 +35,8 @@ const OVER_W := 5.0
 ## A pair of sconces, mirrored about the door or the fire.
 const FLANK_W := 6.0
 const FLANK_IDEAL := 0.9
+## Two lamps must be far enough apart for place_mounted's body-clearance test.
+const FLANK_MIN_PAIR_SEPARATION := 0.85
 ## Wall a pair needs either side of what it flanks: the lamp's own half width
 ## and the clearance _on_opening() keeps around a door, with a little over.
 const FLANK_REACH := 1.5
@@ -480,7 +482,7 @@ static func _widest_of(cat: String) -> float:
 ## an arm's length from the door and its mate a metre and a half the other
 ## way, on the far side of a second doorway.
 static func _flank_anchor(plan: HousePlan, room: int, width: float,
-		cat: String) -> Dictionary:
+		cat: String, pair_clearance: Callable = Callable()) -> Dictionary:
 	var candidates: Array[Dictionary] = []
 	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	for i in plan.furniture_of(room):
@@ -515,7 +517,7 @@ static func _flank_anchor(plan: HousePlan, room: int, width: float,
 			"normal": Vector2(walls[wi2]["normal"]), "reach": 0.0,
 		})
 	for cand in candidates:
-		var dist: float = _flank_station(plan, room, cand, width, cat)
+		var dist: float = _flank_station(plan, room, cand, width, cat, pair_clearance)
 		if dist > 0.0:
 			cand["dist"] = dist
 			return cand
@@ -525,7 +527,7 @@ static func _flank_anchor(plan: HousePlan, room: int, width: float,
 ## How far either side of an anchor a pair can actually hang, or 0 when it
 ## cannot. Nearest first: a pair belongs close about what it flanks.
 static func _flank_station(plan: HousePlan, room: int, anchor: Dictionary,
-		width: float, cat: String) -> float:
+		width: float, cat: String, pair_clearance: Callable = Callable()) -> float:
 	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var n: Vector2 = anchor["normal"]
 	var pos: Vector2 = anchor["pos"]
@@ -534,7 +536,9 @@ static func _flank_station(plan: HousePlan, room: int, anchor: Dictionary,
 	var lo: float = f.position.dot(axis) + width / 2.0 + 0.2
 	var hi: float = f.end.dot(axis) - width / 2.0 - 0.2
 	var t: float = pos.dot(axis)
-	var first: float = maxf(float(anchor["reach"]) + width / 2.0 + 0.2, FLANK_IDEAL)
+	var minimum: float = maxf(float(anchor["reach"]) + width / 2.0 + 0.2,
+		FLANK_MIN_PAIR_SEPARATION / 2.0 if cat == "sconce" else 0.0)
+	var first: float = maxf(minimum, FLANK_IDEAL)
 	var d: float = first
 	var host := {}
 	if plan.is_polygonal(room):
@@ -558,9 +562,38 @@ static func _flank_station(plan: HousePlan, room: int, anchor: Dictionary,
 				# the pair's own half already hanging there does not count
 				ok = false
 				break
+			if pair_clearance.is_valid() and not bool(pair_clearance.call(p, n)):
+				ok = false
+				break
 		if ok:
 			return d
 		d += MOUNT_STEP
+	# A short but usable wall may fit a close, symmetrical pair even when the
+	# preferred station is too far from its anchor. Try closer mirrored points
+	# before declaring that no pair wall exists. This never relaxes the wall,
+	# opening, mounted-clearance or door-reach checks above.
+	d = first - MOUNT_STEP
+	while d >= minimum:
+		var close_ok := true
+		for side in [-1.0, 1.0]:
+			var close_pos: Vector2 = pos + along * (d * side)
+			if not host.is_empty():
+				var close_edge := Vector2(host.to) - Vector2(host.from)
+				var close_station := (close_pos - Vector2(host.from)).dot(close_edge.normalized())
+				if close_station < width / 2.0 + 0.2 or close_station > close_edge.length() - width / 2.0 - 0.2:
+					close_ok = false
+					break
+			if (host.is_empty() and (close_pos.dot(axis) < lo or close_pos.dot(axis) > hi)) \
+					or _on_opening(plan, room, close_pos, n, width) \
+					or _crowds_mounted(plan, room, close_pos, width, cat):
+				close_ok = false
+				break
+			if pair_clearance.is_valid() and not bool(pair_clearance.call(close_pos, n)):
+				close_ok = false
+				break
+		if close_ok:
+			return d
+		d -= MOUNT_STEP
 	return 0.0
 
 

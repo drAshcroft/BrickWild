@@ -83,7 +83,7 @@
                       "description":  "Extend existing relation recipes into complete cooking, sleeping, eating, sitting and storage arrangements sized to usable space and household capacity. Do not replace the furnisher wholesale.",
                       "priority":  "P1",
                       "phase":  "inhabited-buildings",
-                      "status":  "pending",
+                      "status":  "executing",
                       "taskType":  "feature",
                       "targetCoord":  {
                                           "file":  "src/house/house_furnishing_recipes.gd"

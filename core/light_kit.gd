@@ -39,12 +39,18 @@ const ATTENUATION := 1.4
 ## a lamp whether or not its mesh could be found, which is what lets the
 ## assets suite count them against the plan.
 static func for_prop(key: String, origin: Vector3, yaw: float, scale: float,
-		color: Color = FLAME, reach_scale: float = 1.0) -> OmniLight3D:
+		color: Color = FLAME, reach_scale: float = 1.0,
+		height_scale: float = -1.0) -> OmniLight3D:
 	var row: Dictionary = TABLE.get(PropCatalog.category(key), DEFAULT)
-	var off: Vector3 = PropCatalog.light_offset(key) * scale
+	var vertical_scale: float = scale if height_scale < 0.0 else height_scale
+	var raw_offset := PropCatalog.light_offset(key)
+	var off := Vector3(raw_offset.x * scale, raw_offset.y * vertical_scale,
+		raw_offset.z * scale)
 	# a lamp hung from the ceiling burns at its middle, not its mount
 	if PropCatalog.has_tag(key, PropCatalog.CEILING):
-		off = PropCatalog.centre_offset(key) * scale
+		raw_offset = PropCatalog.centre_offset(key)
+		off = Vector3(raw_offset.x * scale, raw_offset.y * vertical_scale,
+			raw_offset.z * scale)
 	var turned := Vector3(off.x * cos(yaw) + off.z * sin(yaw), off.y,
 		-off.x * sin(yaw) + off.z * cos(yaw))
 	return make(origin + turned, color, float(row["energy"]),
@@ -74,9 +80,11 @@ static func light_the_plan(plan: HousePlan) -> Node3D:
 		if not PropCatalog.has_tag(key, PropCatalog.LIGHT):
 			continue
 		var s: float = float(p.get("scale", 1.0))
+		var height_scale: float = PropCatalog.placement_height_scale(p)
 		var origin := PropCatalog.house_origin(p)
 		var lamp: OmniLight3D = for_prop(key, origin,
-			float(p["yaw"]) + PropCatalog.face_offset(key), s)
+			float(p["yaw"]) + PropCatalog.face_offset(key), s,
+			FLAME, 1.0, height_scale)
 		# a flame cannot burn above the ceiling of the room it is in, however
 		# tall the model that carries it was authored
 		var storey: int = HousePlan.record_storey(p)

@@ -508,6 +508,18 @@ static func height(key: String) -> float:
 	return size(key).y
 
 
+## Vertical scale for a placement. Most records keep their historical uniform
+## `scale`; selected furniture may keep its measured adult height while its
+## plan footprint is reduced.
+static func placement_height_scale(placement: Dictionary) -> float:
+	return float(placement.get("height_scale", placement.get("scale", 1.0)))
+
+
+## Measured vertical size after placement scaling.
+static func placement_height(placement: Dictionary) -> float:
+	return height(String(placement.get("key", ""))) * placement_height_scale(placement)
+
+
 ## Height of the top a prop offers to things set on it, or 0 if it offers none.
 ## The top of the box unless the piece names its working surface (`top`): a
 ## stall's counter is under its canopy, not on it.
@@ -692,6 +704,7 @@ static func plan_centre(key: String, pos: Vector3, yaw: float, scale: float) -> 
 static func house_origin(placement: Dictionary) -> Vector3:
 	var key := String(placement.key)
 	var scale := float(placement.get("scale", 1.0))
+	var height_scale := placement_height_scale(placement)
 	var yaw := float(placement.yaw)
 	var model_yaw := yaw + face_offset(key)
 	var centre := centre_offset(key) * scale
@@ -706,9 +719,9 @@ static func house_origin(placement: Dictionary) -> Vector3:
 		# A ceiling record is the mount height, not an imported model pivot.
 		# Some chandeliers extend above their origin and used to pierce flat
 		# roofs. Hang the measured TOP at the mount, at every scale/storey.
-		origin.y -= (floor_offset(key) + height(key)) * scale
+		origin.y -= (floor_offset(key) + height(key)) * height_scale
 	else:
-		origin.y -= floor_offset(key) * scale
+		origin.y -= floor_offset(key) * height_scale
 	return origin
 
 

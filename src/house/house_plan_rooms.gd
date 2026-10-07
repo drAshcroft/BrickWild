@@ -4,6 +4,8 @@ extends RefCounted
 
 const MIN_SPLIT := 0.36
 const MAX_SPLIT := 0.64
+const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+const DOMESTIC_KITCHEN_MIN_SIDE := 3.0
 
 # --------------------------------------------------------------- subdivide
 
@@ -85,6 +87,8 @@ static func _domestic_layout(p: HousePlan, spec: HouseSpec) -> Dictionary:
 	var rejected: Array[Dictionary] = []
 	var candidate := kinds.duplicate()
 	var initial_candidate: Array[StringName] = candidate.duplicate()
+	var kitchen_merged := _ordinary_domestic_no_trade(spec) \
+		and _programme_includes_kitchen(spec) and not candidate.has(&"kitchen")
 	var required: Array[StringName] = [&"hall"]
 	if wanted >= 3 and kinds.has(&"kitchen"):
 		required.append(&"kitchen")
@@ -95,20 +99,29 @@ static func _domestic_layout(p: HousePlan, spec: HouseSpec) -> Dictionary:
 		required.append(trade_room)
 
 	while candidate.size() >= required.size():
-		var attempt: Dictionary = _fit_large_domestic_candidate(p, spec, inner, candidate) \
-			if large_grammar else _fit_domestic_candidate(p, spec, inner, candidate)
+		var compact_shared: bool = kitchen_merged and _compact_shared_cooking_square(spec, inner, candidate)
+		var attempt: Dictionary
+		if compact_shared:
+			attempt = _fit_compact_shared_cooking_candidate(p, spec, inner, candidate)
+		else:
+			attempt = _fit_large_domestic_candidate(p, spec, inner, candidate) \
+				if large_grammar else _fit_domestic_candidate(p, spec, inner, candidate)
 		if bool(attempt.get("ok", false)):
 			var rooms: Array[Dictionary] = attempt["rooms"]
 			var has_kitchen := candidate.has(&"kitchen")
+			var shared_cooking := kitchen_merged or not has_kitchen
+			var satisfied_activities: Array[StringName] = candidate.duplicate()
+			if kitchen_merged and not satisfied_activities.has(&"kitchen"):
+				satisfied_activities.append(&"kitchen")
 			for row in rooms:
 				if row["kind"] == &"hall":
 					var functions: Array[StringName] = [&"entry", &"circulation", &"dining", &"common_living"]
-					if not has_kitchen:
+					if shared_cooking:
 						functions.append(&"cooking")
 					row["domestic_role"] = &"communal_hall" if spec.style == &"longhall" else &"living_hall"
 					row["domestic_functions"] = functions
 					row["meal_room"] = true
-					row["shared_cooking"] = not has_kitchen
+					row["shared_cooking"] = shared_cooking
 					row["domestic_layout_storey"] = 0
 				else:
 					row["domestic_role"] = _activity_role(row["kind"])
@@ -118,14 +131,15 @@ static func _domestic_layout(p: HousePlan, spec: HouseSpec) -> Dictionary:
 				"status": &"planned", "style": spec.style,
 				"requested_rooms": requested, "planned_rooms": rooms.size(),
 				"ground_activities": candidate.duplicate(),
+				"merged_activities": [&"kitchen"] if kitchen_merged else [],
 				"capacity_expanded": large_grammar and rooms.size() > requested,
 				"omitted_rooms": maxi(requested - rooms.size(), 0),
-				"omitted_activities": _omitted_activities(initial_candidate, candidate),
+				"omitted_activities": _omitted_activities(initial_candidate, satisfied_activities),
 				"rejected_candidates": rejected,
 				"reason": "",
 				"mirror": bool(attempt["mirror"]),
 				"hall_role": &"communal_hall" if spec.style == &"longhall" else &"living_hall",
-				"shared_cooking": not has_kitchen,
+				"shared_cooking": shared_cooking,
 			}}
 		reason = String(attempt.get("reason", "activity dimensions did not fit"))
 		rejected.append({"activities": candidate.duplicate(), "reason": reason})
@@ -146,6 +160,17 @@ static func _domestic_layout(p: HousePlan, spec: HouseSpec) -> Dictionary:
 					drop = i
 					break
 		if drop < 0:
+			# Keep a dedicated kitchen through all optional/style-priority retries.
+			# Only merge it after the remaining hall, kitchen and bedroom cannot fit.
+			if _ordinary_domestic_no_trade(spec) and not kitchen_merged \
+					and candidate.has(&"kitchen") and candidate.has(&"bedroom"):
+				candidate.erase(&"kitchen")
+				required.erase(&"kitchen")
+				kitchen_merged = true
+				var last_rejected: Dictionary = rejected.back()
+				last_rejected["resolution"] = "merge kitchen activity into the hall; keep a separate bedroom"
+				rejected[rejected.size() - 1] = last_rejected
+				continue
 			break
 		candidate.remove_at(drop)
 
@@ -252,6 +277,72 @@ static func _domestic_kinds(spec: HouseSpec, wanted: int) -> Array[StringName]:
 	return ordered
 
 
+## Ordinary, no-trade domestic plans may merge cooking into the hall when
+## there is not enough clear width for both a usable kitchen and bedroom.
+## Adapter-owned programmes and explicit trades keep their established rules.
+static func _ordinary_domestic_no_trade(spec: HouseSpec) -> bool:
+	return spec != null and spec.get_script() == BASE_HOUSE_SPEC \
+		and spec.trade == &"none" \
+		and HouseSpec.STYLES.get(spec.style, {}).has("domestic_program") \
+		and not spec.has_method("room_program") \
+		and not spec.has_method("custom_room_rects") \
+		and not spec.has_method("landmark_footprint")
+
+
+static func _programme_includes_kitchen(spec: HouseSpec) -> bool:
+	var programme: Array = spec.program if not spec.program.is_empty() \
+		else HouseSpec.STYLES.get(spec.style, {}).get("domestic_program", [])
+	return programme.has(&"kitchen")
+
+
+static func _domestic_min_side(spec: HouseSpec, kind: StringName) -> float:
+	if kind == &"kitchen" and _ordinary_domestic_no_trade(spec):
+		return DOMESTIC_KITCHEN_MIN_SIDE
+	return float(HouseGeometry.MIN_SIDE.get(kind, 1.6))
+
+
+static func _domestic_room_suits(p: HousePlan, room: int, kind: StringName) -> bool:
+	if not HouseGeometry.room_suits(p, room, kind):
+		return false
+	if kind == &"kitchen" and _ordinary_domestic_no_trade(p.spec):
+		var floor: Rect2 = HouseGeometry.room_floor_rect(p, room)
+		return minf(floor.size.x, floor.size.y) >= DOMESTIC_KITCHEN_MIN_SIDE
+	return true
+
+
+static func _compact_shared_cooking_square(spec: HouseSpec, inner: Rect2,
+		kinds: Array[StringName]) -> bool:
+	return _ordinary_domestic_no_trade(spec) and spec.storeys == 1 and spec.cellars == 0 \
+		and kinds.size() == 2 and kinds.has(&"hall") and kinds.has(&"bedroom") \
+		and inner.size.x <= 7.5 and inner.size.y <= 7.5 \
+		and absf(inner.size.x - inner.size.y) <= 0.75
+
+
+## The front-to-back split cannot leave 3.3 m for the bedroom and a useful
+## shared cooking/dining hall inside a compact square. Put the rooms side by
+## side instead: the hall receives the front door on its own short wall, while
+## its long clear run separates meal and cooking work zones.
+static func _fit_compact_shared_cooking_candidate(p: HousePlan, spec: HouseSpec,
+		inner: Rect2, kinds: Array[StringName]) -> Dictionary:
+	var wall_half: float = HouseGeometry.INNER_WALL_T * 0.5
+	var hall_min: float = float(HouseGeometry.MIN_SIDE.get(&"hall", 2.6)) + wall_half
+	var bedroom_min: float = _domestic_min_side(spec, &"bedroom")
+	var hall_width: float = minf(3.1 + wall_half,
+		inner.size.x - bedroom_min - wall_half)
+	if hall_width < hall_min:
+		return {"ok": false, "reason": "compact shared hall cannot retain its minimum width beside the bedroom"}
+	var mirror: bool = posmod(spec.seed, 2) == 1
+	var hall_x: float = inner.end.x - hall_width if mirror else inner.position.x
+	var bedroom_x: float = inner.position.x if mirror else inner.position.x + hall_width
+	var bedroom_width: float = inner.size.x - hall_width
+	var hall := {"kind": &"hall", "rect": Rect2(Vector2(hall_x, inner.position.y),
+		Vector2(hall_width, inner.size.y)), "storey": 0}
+	var bedroom := {"kind": &"bedroom", "rect": Rect2(Vector2(bedroom_x, inner.position.y),
+		Vector2(bedroom_width, inner.size.y)), "storey": 0}
+	var rooms: Array[Dictionary] = [hall, bedroom]
+	return _validate_domestic_rooms(p, inner, rooms, mirror)
+
+
 ## Large houses use a hall that is a room and a circulation spine at once.
 ## Side bays open directly to it; the sleeping rooms therefore remain private
 ## leaf rooms rather than routes to the kitchen.
@@ -288,7 +379,7 @@ static func _fit_large_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: 
 			var kind: StringName = activities[activity_index]
 			var aspect_depth := clear_bay_width / HouseGeometry.aspect_max(kind)
 			var area_depth := float(HouseGeometry.MIN_AREA.get(kind, 4.0)) / maxf(clear_bay_width, 0.1)
-			var raw_min := maxf(float(HouseGeometry.MIN_SIDE.get(kind, 1.6)),
+			var raw_min := maxf(_domestic_min_side(spec, kind),
 				maxf(aspect_depth, area_depth))
 			var depth_allowance: float = HouseGeometry.INNER_WALL_T \
 				if row_index < row_count - 1 else HouseGeometry.INNER_WALL_T * 0.5
@@ -343,7 +434,7 @@ static func _validate_domestic_rooms(p: HousePlan, inner: Rect2,
 	for i in range(rooms.size()):
 		var room_index := p.rooms.size() - rooms.size() + i
 		var kind: StringName = p.kind_of(room_index)
-		if not HouseGeometry.room_suits(p, room_index, kind):
+		if not _domestic_room_suits(p, room_index, kind):
 			valid = false
 			why = "%s room does not fit its minimum floor" % String(kind)
 			break
@@ -368,6 +459,12 @@ static func _fit_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: Rect2,
 	# entrance approach, rather than meeting the hall minimum by area alone.
 	if inner.size.y >= 8.0:
 		hall_min_depth = maxf(hall_min_depth, 3.6)
+	if kinds.size() > 1 and not kinds.has(&"kitchen"):
+		# A shared cooking and eating room needs depth for both work access
+		# and occupied seats. Preserve the bedroom fit check below.
+		var bedroom_depth := float(HouseGeometry.MIN_SIDE.get(&"bedroom", 3.3))
+		var shared_depth := minf(3.1 + wall_half, inner.size.y - bedroom_depth - wall_half)
+		hall_min_depth = maxf(hall_min_depth, shared_depth)
 	if spec.storeys >= 3 and HousePlanLevels._is_plain_house_spec(spec):
 		# The middle hall carries two flights, their protected well edge, a
 		# continuous body-width transfer path, and the rear doorway apron. Keep
@@ -381,6 +478,14 @@ static func _fit_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: Rect2,
 		hall_min_depth = maxf(hall_min_depth, stair_hall_depth)
 	var hall_ratio: float = _hall_ratio(spec.style, inner) + float(posmod(spec.seed, 3)) * 0.01
 	var hall_depth := maxf(hall_min_depth, inner.size.y * hall_ratio)
+	if kinds.size() == 2 and kinds.has(&"bedroom") and not kinds.has(&"kitchen") \
+			and _ordinary_domestic_no_trade(spec) and spec.storeys == 1 and spec.cellars == 0:
+		# This room carries entry, meals, cooking and common life. A single bed
+		# must not receive the larger half while all four activities are squeezed
+		# into a shallow front strip. Keep a usable sleeping bay, then assign the
+		# remaining depth to the shared room; validation still checks both rooms.
+		var sleep_depth := maxf(_domestic_min_side(spec, &"bedroom"), 3.6) + wall_half
+		hall_depth = maxf(hall_depth, inner.size.y - sleep_depth)
 	if kinds.has(&"kitchen") and kinds.size() > 2 \
 			and inner.size.x >= 8.0 and inner.size.y >= 10.0:
 		return _fit_service_wing_candidate(p, spec, inner, kinds, hall_depth)
@@ -416,7 +521,7 @@ static func _fit_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: Rect2,
 		for possible in range(2, mini(2, remaining.size() - cursor) + 1):
 			var required_width := wall_half * float(possible - 1)
 			for k in range(possible):
-				required_width += float(HouseGeometry.MIN_SIDE.get(remaining[cursor + k], 1.6))
+				required_width += _domestic_min_side(spec, remaining[cursor + k])
 			if inner.size.x < required_width:
 				break
 			take = possible
@@ -432,13 +537,13 @@ static func _fit_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: Rect2,
 		for cell in range(group.size()):
 			var kind: StringName = group[cell]
 			var edge_allowance := wall_half if group.size() > 1 else 0.0
-			min_width_sum += float(HouseGeometry.MIN_SIDE.get(kind, 1.6)) + edge_allowance
+			min_width_sum += _domestic_min_side(spec, kind) + edge_allowance
 			width_weight_sum += _width_weight(kind, spec.style)
 		var spare_width := maxf(inner.size.x - min_width_sum, 0.0)
 		for cell in range(group.size()):
 			var kind: StringName = group[cell]
 			var edge_allowance := wall_half if group.size() > 1 else 0.0
-			var width := float(HouseGeometry.MIN_SIDE.get(kind, 1.6)) + edge_allowance \
+			var width := _domestic_min_side(spec, kind) + edge_allowance \
 				+ spare_width * _width_weight(kind, spec.style) / maxf(width_weight_sum, 0.001)
 			widths.append(width)
 		row_widths.append(widths)
@@ -455,7 +560,7 @@ static func _fit_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: Rect2,
 			var aspect_depth := clear_width / HouseGeometry.aspect_max(kind)
 			var area_depth := float(HouseGeometry.MIN_AREA.get(kind, 4.0)) / maxf(clear_width, 0.1)
 			var depth_allowance: float = wall_half * (2.0 if row_index < row_groups.size() - 1 else 1.0)
-			row_min = maxf(row_min, maxf(float(HouseGeometry.MIN_SIDE.get(kind, 1.6)),
+			row_min = maxf(row_min, maxf(_domestic_min_side(spec, kind),
 				maxf(aspect_depth, area_depth)) + depth_allowance)
 		row_min_depths.append(row_min)
 		min_depth_sum += row_min
@@ -504,7 +609,7 @@ static func _fit_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: Rect2,
 	for i in range(rooms.size()):
 		var kind: StringName = p.kind_of(p.rooms.size() - rooms.size() + i)
 		var room_index := p.rooms.size() - rooms.size() + i
-		if not HouseGeometry.room_suits(p, room_index, kind):
+		if not _domestic_room_suits(p, room_index, kind):
 			valid = false
 			why = "%s room does not fit its minimum floor" % String(kind)
 			break
@@ -527,10 +632,10 @@ static func _fit_service_wing_candidate(p: HousePlan, spec: HouseSpec, inner: Re
 		kinds: Array[StringName], hall_depth: float) -> Dictionary:
 	var wall_half := HouseGeometry.INNER_WALL_T * 0.5
 	var rest_depth := inner.size.y - hall_depth
-	var service_width := maxf(float(HouseGeometry.MIN_SIDE.get(&"kitchen", 2.2)) + wall_half,
+	var service_width := maxf(_domestic_min_side(spec, &"kitchen") + wall_half,
 		inner.size.x * 0.38)
 	var wing_width := inner.size.x - service_width
-	if wing_width < float(HouseGeometry.MIN_SIDE.get(&"bedroom", 3.3)):
+	if wing_width < _domestic_min_side(spec, &"bedroom") + wall_half:
 		return {"ok": false, "reason": "back-yard kitchen wing leaves no private room bay"}
 	var activities: Array[StringName] = kinds.slice(1)
 	activities.erase(&"kitchen")
@@ -545,7 +650,7 @@ static func _fit_service_wing_candidate(p: HousePlan, spec: HouseSpec, inner: Re
 	for kind in activities:
 		var aspect_depth := wing_width / HouseGeometry.aspect_max(kind)
 		var area_depth := float(HouseGeometry.MIN_AREA.get(kind, 4.0)) / maxf(wing_width, 0.1)
-		var row_min := maxf(float(HouseGeometry.MIN_SIDE.get(kind, 1.6)),
+		var row_min := maxf(_domestic_min_side(spec, kind),
 			maxf(aspect_depth, area_depth)) + wall_half
 		row_min_depths.append(row_min)
 		min_depth_sum += row_min

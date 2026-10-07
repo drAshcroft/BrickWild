@@ -102,7 +102,7 @@ static func _headroom(plan: HousePlan, si: int, st: Dictionary, out: Array[Strin
 		var tread := h * ceilf(t / going) / _steps(st) + int(st["storey"]) * h
 		if bool(st.get("domestic_profile", false)):
 			tread += HouseGeometry.FLOOR_T
-		var y0: float = origin.y + PropCatalog.floor_offset(key) * scale
+		var y0: float = origin.y + PropCatalog.floor_offset(key) * PropCatalog.placement_height_scale(f)
 		if y0 < tread + HEADROOM:
 			out.append("stair_headroom: %s is %.2fm above the stair %d tread under it"
 				% [HouseFurnishCheck.who(plan, fi), y0 - tread, si])

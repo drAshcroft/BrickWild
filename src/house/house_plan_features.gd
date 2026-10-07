@@ -2,6 +2,8 @@ class_name HousePlanFeatures
 extends RefCounted
 ## Hearth and focus placement selected after circulation and glazing.
 
+const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+
 ## Decide once, here, which wall the fire and the flue share.
 ##
 ## The builder used to pick the chimney's wall and the furnisher used to pick
@@ -142,11 +144,162 @@ static func _hearth_walls(p: HousePlan, spec: HouseSpec, i: int) -> Array[int]:
 ## is comparing the plan with the furniture and not the plan with itself.
 static func choose_focus(p: HousePlan, _spec: HouseSpec) -> void:
 	p.focus = {}
+	var shared_room: int = _shared_cooking_hall(p, _spec)
+	var cooking_region := Rect2()
+	if shared_room >= 0:
+		cooking_region = _assign_shared_activity_regions(p, _spec, shared_room)
 	var room: int = p.hearth_room()
 	var wi: int = p.hearth_wall()
 	if room < 0 or wi < 0:
 		return
+	if room == shared_room and not cooking_region.has_area():
+		# The legacy wall focus is safer than pinning a hearth to an unusable
+		# half-wall when doors or windows consume the cooking band's clear run.
+		p.focus = focus_on_wall(p, room, wi, "hearth", false)
+		return
+	if room == shared_room:
+		var prefer_rear_end: bool = wi >= 2
+		var prefer: float = _focus_coordinate_in_region(p, room, wi, cooking_region,
+			prefer_rear_end)
+		if not is_finite(prefer):
+			# Do not force the hearth onto a wall position outside its cooking
+			# region. Remove the bands so consumers use their established layout.
+			var room_data: Dictionary = p.rooms[shared_room]
+			room_data.erase("activity_regions")
+			room_data["activity_regions_status"] = "unavailable: no hearth-width clear span in cooking band"
+			p.rooms[shared_room] = room_data
+			p.focus = focus_on_wall(p, room, wi, "hearth", false)
+			return
+		var preferred_focus: Dictionary = focus_on_wall(p, room, wi, "hearth", false, prefer)
+		if _focus_inside_region(p, room, wi, preferred_focus, cooking_region):
+			p.focus = preferred_focus
+		else:
+			var room_data: Dictionary = p.rooms[shared_room]
+			room_data.erase("activity_regions")
+			room_data["activity_regions_status"] = "unavailable: preferred hearth wall position escaped cooking band"
+			p.rooms[shared_room] = room_data
+			p.focus = focus_on_wall(p, room, wi, "hearth", false)
+		return
 	p.focus = focus_on_wall(p, room, wi, "hearth", false)
+
+
+## A shared hall gets two actual clear-floor bands only in a plain, one-storey
+## domestic house. Trades, adapters, world plans, cellars and upper floors keep
+## their existing room-wide placement rules.
+static func _shared_cooking_hall(p: HousePlan, spec: HouseSpec) -> int:
+	if spec == null or spec.get_script() != BASE_HOUSE_SPEC or spec.trade != &"none" \
+			or spec.storeys != 1 or spec.cellars != 0 or not p.world_family.is_empty() \
+			or not HouseSpec.STYLES.get(spec.style, {}).has("domestic_program") \
+			or spec.has_method("room_program") or spec.has_method("custom_room_rects") \
+			or spec.has_method("landmark_footprint"):
+		return -1
+	for i in p.rooms_of(&"hall"):
+		if p.storey_of_room(i) == 0 and bool(p.rooms[i].get("shared_cooking", false)):
+			return i
+	return -1
+
+
+## Split along the room's longer clear-floor axis. The rear is positive Z in
+## plan coordinates; when the long axis runs left-to-right, place cooking next
+## to the selected hearth side or the side with a feasible hearth run.
+static func _assign_shared_activity_regions(p: HousePlan, spec: HouseSpec,
+		room: int) -> Rect2:
+	var floor: Rect2 = HouseGeometry.room_floor_rect(p, room)
+	if floor.size.x <= 0.0 or floor.size.y <= 0.0:
+		return Rect2()
+	var cooking := floor
+	var eating := floor
+	if floor.size.y >= floor.size.x:
+		var split_y: float = floor.position.y + floor.size.y * 0.5
+		eating.size.y = split_y - floor.position.y
+		cooking.position.y = split_y
+		cooking.size.y = floor.end.y - split_y
+	else:
+		var wall: int = p.hearth_wall() if p.hearth_room() == room else -1
+		var cooking_left := wall == 2 or (wall < 0 and posmod(spec.seed, 2) == 0)
+		if wall == 0 or wall == 1:
+			cooking_left = _feasible_cooking_half(p, room, floor, wall)
+		var split_x: float = floor.position.x + floor.size.x * 0.5
+		eating.size.x = floor.size.x * 0.5
+		cooking.size.x = floor.size.x * 0.5
+		if cooking_left:
+			cooking.position.x = floor.position.x
+			eating.position.x = split_x
+		else:
+			cooking.position.x = split_x
+			eating.position.x = floor.position.x
+	var room_data: Dictionary = p.rooms[room]
+	room_data["activity_regions"] = {&"cooking": cooking, &"eating": eating}
+	room_data["activity_regions_status"] = "planned"
+	p.rooms[room] = room_data
+	return cooking
+
+
+static func _feasible_cooking_half(p: HousePlan, room: int, floor: Rect2,
+		wall: int) -> bool:
+	var needed: float = hearth_run_needed()
+	var left := Rect2(floor.position, Vector2(floor.size.x * 0.5, floor.size.y))
+	var right := Rect2(Vector2(floor.position.x + floor.size.x * 0.5, floor.position.y),
+		Vector2(floor.size.x * 0.5, floor.size.y))
+	var left_run := _best_region_wall_run(p, room, wall, left)
+	var right_run := _best_region_wall_run(p, room, wall, right)
+	if left_run >= needed and right_run < needed:
+		return true
+	if right_run >= needed and left_run < needed:
+		return false
+	if left_run != right_run:
+		return left_run > right_run
+	return posmod(p.spec.seed, 2) == 0
+
+
+static func _best_region_wall_run(p: HousePlan, room: int, wall: int,
+		region: Rect2) -> float:
+	var horizontal: bool = wall <= 1
+	var region_lo: float = region.position.x if horizontal else region.position.y
+	var region_hi: float = region.end.x if horizontal else region.end.y
+	var best := 0.0
+	for span in clear_wall_spans(p, room, wall):
+		var overlap: float = minf(span.y, region_hi) - maxf(span.x, region_lo)
+		best = maxf(best, overlap)
+	return best
+
+
+## Return a preferred along-wall coordinate only when a whole hearth plus
+## breast fits on a clear stretch inside the cooking band.
+static func _focus_coordinate_in_region(p: HousePlan, room: int, wall: int,
+		region: Rect2, prefer_hi_end: bool = false) -> float:
+	var horizontal: bool = wall <= 1
+	var lo: float = region.position.x if horizontal else region.position.y
+	var hi: float = region.end.x if horizontal else region.end.y
+	var half_needed: float = hearth_run_needed() * 0.5
+	var region_centre: float = (lo + hi) * 0.5
+	# Leave the return wall usable by shallow storage, including its backing
+	# gap, instead of letting the hearth approach clip that wall's fittings.
+	var target: float = hi - half_needed - 0.2 if prefer_hi_end else region_centre
+	var preferred := target
+	var best_distance := INF
+	var found := false
+	for span in clear_wall_spans(p, room, wall):
+		var valid_lo: float = maxf(span.x + half_needed, lo + half_needed)
+		var valid_hi: float = minf(span.y - half_needed, hi - half_needed)
+		if valid_hi < valid_lo:
+			continue
+		var at: float = clampf(target, valid_lo, valid_hi)
+		var distance: float = absf(at - target)
+		if distance < best_distance:
+			best_distance = distance
+			preferred = at
+			found = true
+	return preferred if found else INF
+
+
+static func _focus_inside_region(p: HousePlan, room: int, wall: int,
+		focus: Dictionary, region: Rect2) -> bool:
+	if focus.is_empty() or not region.has_area():
+		return false
+	var normal: Vector2 = HouseGeometry.room_walls(p, room)[wall]["normal"]
+	var inside: Vector2 = Vector2(focus["pos"]) + normal * 0.05
+	return region.has_point(inside)
 
 
 ## A focus record for a piece backed to wall `wi` of `room`: at the middle of
@@ -279,4 +432,3 @@ static func clear_wall_spans(p: HousePlan, room: int, wi: int) -> Array[Vector2]
 	if spans.is_empty():
 		spans.append(Vector2(lo, lo))
 	return spans
-

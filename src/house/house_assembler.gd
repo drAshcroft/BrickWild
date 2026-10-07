@@ -110,14 +110,15 @@ static func _instance(p: Dictionary, centred := true) -> Node3D:
 	var node: Node3D = packed.instantiate()
 	node.name = key
 	var scale_factor: float = float(p.get("scale", 1.0))
-	node.scale = Vector3.ONE * scale_factor
+	var height_scale: float = PropCatalog.placement_height_scale(p)
+	node.scale = Vector3(scale_factor, height_scale, scale_factor)
 	node.rotation.y = float(p["yaw"]) + PropCatalog.face_offset(key)
 	if centred:
 		node.position = PropCatalog.house_origin(p)
 		return node
 	var pos: Vector3 = p["pos"]
 	# sit it on whatever it stands on: the floor, a table top, or its bracket
-	var drop: float = PropCatalog.seat_offset(key) * scale_factor
+	var drop: float = PropCatalog.seat_offset(key) * height_scale
 	if PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED) \
 			or PropCatalog.has_tag(key, PropCatalog.CEILING):
 		drop = 0.0

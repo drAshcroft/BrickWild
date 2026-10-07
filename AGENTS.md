@@ -76,6 +76,8 @@ diff base.txt new.txt                          # identical => not one vertex mov
 # reference renders -- must NOT be headless, the dummy renderer makes no image
 godot --path . --script res://tools/render_shots.gd     # -> artifacts/renders/
 godot --path . --script res://tools/shoot_studio.gd     # screenshot of the Studio UI
+# measure the rig against the human pins: which pin does any rule name?
+godot --headless --path . --script res://tools/replay_walk_pins.gd -- since=2026-10-06T23
 # human walk-through QA: build one building, walk it, right-click to pin problems
 # (appends to visualqa/HumanRate.md + visualqa/walk_pins.jsonl; see visualqa/README.md)
 godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed=8102
@@ -127,7 +129,8 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | windmill geometry, or anything in `src/windmill/` | `lane:windmill` | 52 s host, 185 checks |
 | `BuildingLibrary` rows, the family adapters, `BuildingRequest` factories | `lane:api` | ~10 m host; `libraryquick` alone is ~3.5 m and catches an unpublished kind |
 | church or castle dressing, props placed in them | `dressingquick` | under 5 m host |
-| the dwellings the generator must furnish | `harchetype` | 2.5 m host |
+| the dwellings the generator must furnish | `harchetype` | 2.5 m host (5 m on 7 Oct; red with the walk rules until the furnisher catches up, see docs/WALK_PINS.md) |
+| a walk-QA pin, a walk rule, a stair rule, a z-fight budget | `walkpins` | ~1 m host, 40 checks |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
 

@@ -27,9 +27,445 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 	plan.furniture.clear()
 	plan.rugs.clear()
 	plan.hearth.erase("breast")
+	if HouseFurnishingRecipes.is_ordinary_house(plan):
+		_select_household_dining_room(plan)
 	for i in range(plan.room_count()):
 		_furnish_room(plan, spec, i)
 	HouseFurnishRepair.relax(plan)
+	_audit_activity_groups(plan)
+
+
+## Choose one room for the household's meal before room recipes run. This is a
+## bounded physical trial of the real measured table and complete seat set,
+## using door, window, zone and stair reservations. Upper rooms are considered
+## only when the unfurnished plan already proves a usable stair route.
+static func _select_household_dining_room(plan: HousePlan) -> void:
+	plan.domestic_layout.erase("dining_room")
+	plan.domestic_layout.erase("dining_key")
+	plan.domestic_layout.erase("dining_group")
+	plan.domestic_layout.erase("dining_selection")
+	plan.domestic_layout.erase("dining_selection_reason")
+	plan.domestic_layout["dining_probe_count"] = 0
+	var capacity: int = _household_seat_capacity(plan)
+	var candidates: Array[int] = []
+	# Preserve authored dining rooms. For ordinary rooms, the ground hall gets
+	# first choice when it is not also doing the work of a kitchen or bedroom.
+	_append_dining_candidates(plan, candidates, [&"dining_room", &"dining"], 0)
+	_append_dining_candidates(plan, candidates, [&"hall"], 0, false)
+	_append_dining_candidates(plan, candidates, [&"parlour"], 0)
+	var upper_kinds: Array[StringName] = [&"dining_room", &"dining", &"parlour"]
+	var has_upper_candidate := false
+	for kind in upper_kinds:
+		for room in plan.rooms_of(kind):
+			if plan.storey_of_room(room) > 0:
+				has_upper_candidate = true
+	var route_failure_declared: bool = bool(plan.domestic_layout.get("stair_unsatisfied", false))
+	if has_upper_candidate and not plan.stairs.is_empty() and not route_failure_declared:
+		var nav: Dictionary = HouseNavCheck.new().check(plan)
+		for kind in upper_kinds:
+			for room in plan.rooms_of(kind):
+				if plan.storey_of_room(room) <= 0 or candidates.has(room) \
+						or _meal_room_competes_with_sleep_or_cooking(plan, room):
+					continue
+				if not nav["unreached_rooms"].has(room):
+					candidates.append(room)
+	# Keep a shared cooking/sleeping hall as a last-resort candidate. If it is
+	# the only possible room, retain the existing bed-first/cooking arrangement;
+	# when another room exists, a separate dining room is tested first.
+	_append_dining_candidates(plan, candidates, [&"hall"], 0, true)
+	if candidates.size() == 1:
+		# Preserve the established random stream and avoid a second full room
+		# search when there is only one eligible dining room. Final group audit
+		# still proves whether the generated arrangement actually worked.
+		plan.domestic_layout["dining_room"] = candidates[0]
+		plan.domestic_layout["dining_selection"] = "pending_final_audit"
+		return
+	var deferred_room := -1
+	for room in candidates:
+		var has_cooking_function: bool = plan.rooms[room].get("domestic_functions", []).has(&"cooking") \
+			or bool(plan.rooms[room].get("shared_cooking", false))
+		var is_sleeping_hall: bool = plan.kind_of(room) == &"hall" and not _anybody_sleeps(plan)
+		var is_focus_host: bool = (plan.focus_room() == room and plan.focus_cat() != "") \
+			or plan.hearth_room() == room
+		if is_sleeping_hall or has_cooking_function or is_focus_host:
+			# The bare probe cannot reserve the bed, cooking core or focused hearth
+			# which the normal recipe will place first. Defer this hall, but keep
+			# searching later distinct dining rooms before accepting the fallback.
+			if deferred_room < 0:
+				deferred_room = room
+			continue
+		plan.domestic_layout["dining_probe_count"] = \
+			int(plan.domestic_layout.get("dining_probe_count", 0)) + 1
+		var group: Dictionary = _probe_complete_meal_group(plan, room, capacity)
+		if not group.is_empty():
+			plan.domestic_layout["dining_room"] = room
+			plan.domestic_layout["dining_group"] = group["pieces"]
+			plan.domestic_layout["dining_selection"] = "preflight_complete"
+			return
+	if deferred_room >= 0:
+		plan.domestic_layout["dining_room"] = deferred_room
+		plan.domestic_layout["dining_selection"] = "pending_final_audit"
+		plan.domestic_layout["dining_selection_reason"] = \
+			"shared cooking, sleeping or focused hearth order is reserved for normal room placement"
+		return
+	if not candidates.is_empty():
+		# No complete set passed the preflight. Let the largest ground dining or
+		# parlour room make one honest partial attempt; final audit keeps the room
+		# id and reports any missing capacity instead of erasing usable furniture.
+		var fallback_room: int = candidates[0]
+		var fallback_area: float = -1.0
+		for room in candidates:
+			if plan.storey_of_room(room) != 0 \
+					or plan.kind_of(room) not in [&"dining_room", &"dining", &"parlour"]:
+				continue
+			var area: float = HouseGeometry.room_area(plan, room)
+			if area > fallback_area:
+				fallback_area = area
+				fallback_room = room
+		plan.domestic_layout["dining_room"] = fallback_room
+		plan.domestic_layout["dining_selection"] = "pending_final_audit"
+		plan.domestic_layout["dining_selection_reason"] = \
+			"no measured complete group fit; retained one best available room for an explicit final attempt"
+		return
+	plan.domestic_layout["dining_room"] = -1
+	plan.domestic_layout["dining_selection"] = "unsatisfied"
+	plan.domestic_layout["dining_selection_reason"] = \
+		"no reachable hall, dining room or parlour is available for a meal group"
+
+
+## A ground hall that must also cook or sleep is not a free dining candidate.
+## The probe is deliberately not allowed to spend the same square metres twice.
+static func _meal_room_competes_with_sleep_or_cooking(plan: HousePlan, room: int) -> bool:
+	if plan.kind_of(room) != &"hall":
+		return false
+	var functions: Array = plan.rooms[room].get("domestic_functions", [])
+	if functions.has(&"cooking") or bool(plan.rooms[room].get("shared_cooking", false)):
+		return true
+	return not _anybody_sleeps(plan)
+
+
+static func _append_dining_candidates(plan: HousePlan, out: Array[int],
+		kinds: Array[StringName], storey: int, only_competing_halls := false) -> void:
+	for kind in kinds:
+		for room in plan.rooms_of(kind):
+			if plan.storey_of_room(room) != storey or out.has(room):
+				continue
+			var competing := _meal_room_competes_with_sleep_or_cooking(plan, room)
+			if only_competing_halls and not competing:
+				continue
+			if not only_competing_halls and competing:
+				continue
+			out.append(room)
+
+
+## Return the actual table key that passed, so the final recipe does not roll a
+## larger model than the one whose complete household group was measured.
+static func _probe_complete_meal_group(plan: HousePlan, room: int, seats: int) -> Dictionary:
+	var keys: Array[String] = PropCatalog.of_category_for_room("table", plan.kind_of(room))
+	for key in keys:
+		var probe := _meal_probe_plan(plan)
+		probe.domestic_layout["dining_room"] = room
+		var blocked: Array[Rect2] = HouseFurnishPlacement.initial_blocked(probe, room)
+		var original_blocked_count: int = blocked.size()
+		var borrowed: int = HouseFurnishPlacement._borrow_activity_band(
+			probe, room, "eating", blocked)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = int(plan.spec.seed) * 7919 + room * 104729
+		HouseFurnishPlacement.place_free(probe, room, key, blocked, [], rng,
+			true, "seat", seats, true, 1.0)
+		HouseFurnishPlacement._restore_borrowed_blocks(blocked, original_blocked_count, borrowed)
+		var tables: int = 0
+		var placed_seats: int = 0
+		for piece in probe.furniture:
+			if int(piece.get("room", -1)) != room:
+				continue
+			if String(piece.get("cat", "")) == "table":
+				tables += 1
+			elif String(piece.get("cat", "")) == "seat":
+				placed_seats += 1
+		if tables != 1 or placed_seats != seats:
+			continue
+		var nav: Dictionary = HouseNavCheck.new().check(probe)
+		if nav["unreached_rooms"].has(room):
+			continue
+		var unreachable_meal_piece := false
+		for item_index in nav["unreachable_items"]:
+			if int(probe.furniture[item_index].get("room", -1)) == room:
+				unreachable_meal_piece = true
+				break
+		if unreachable_meal_piece:
+			continue
+		var meal_pieces: Array[Dictionary] = []
+		for piece in probe.furniture:
+			if int(piece.get("room", -1)) == room:
+				meal_pieces.append(piece.duplicate(true))
+		return {"key": key, "pieces": meal_pieces}
+	return {}
+
+
+static func _meal_probe_plan(plan: HousePlan) -> HousePlan:
+	var probe := HousePlan.new()
+	probe.spec = plan.spec
+	probe.rooms = plan.rooms
+	probe.doors = plan.doors
+	probe.windows = plan.windows
+	probe.stairs = plan.stairs
+	probe.zones = plan.zones
+	probe.hearth = plan.hearth.duplicate(true)
+	probe.focus = plan.focus.duplicate(true)
+	probe.dais = plan.dais.duplicate(true)
+	probe.columns = plan.columns.duplicate(true)
+	probe.courts = plan.courts.duplicate(true)
+	probe.trapdoors = plan.trapdoors.duplicate(true)
+	probe.domestic_layout = plan.domestic_layout.duplicate(true)
+	probe.world_family = plan.world_family
+	probe.world_subkind = plan.world_subkind
+	return probe
+
+
+## The group travels with the placed item, including a seat created as a pair
+## with its table. Repair can then report that it broke an activity.
+static func _set_activity_group(piece: Dictionary, step: Dictionary) -> void:
+	var group_name: String = String(step.get("group", ""))
+	if not group_name.is_empty():
+		piece["activity_group"] = group_name
+	var near_category: String = String(step.get("near_cat", ""))
+	if not near_category.is_empty():
+		piece["activity_host_cat"] = near_category
+	var near_anchor: String = String(step.get("near_anchor", ""))
+	if not near_anchor.is_empty():
+		piece["activity_host_anchor"] = near_anchor
+
+
+## Repair may remove a required item, and a placement rule may fail before an
+## item exists to tag. Re-derive the required group from the room recipe after
+## repair, then record every category or seat count that did not survive.
+static func _audit_activity_groups(plan: HousePlan) -> void:
+	for room in range(plan.room_count()):
+		var kind: StringName = plan.kind_of(room)
+		var recipe: Array = HouseFurnishingRecipes.recipe_for_room(plan, room,
+			not _dining_table_lost(plan, room))
+		if HouseFurnishingRecipes.is_ordinary_house(plan) and kind == &"hall" \
+				and not _anybody_sleeps(plan):
+			recipe = recipe.duplicate()
+			recipe.append_array([
+				{"cat": "bed", "n": [1, 1], "opt": 1.0, "group": "sleep"},
+				{"cat": "chest", "key": "Chest_Wood", "rule": &"beside", "near_cat": "bed", "near_anchor": "head_end", "n": [1, 1], "opt": 1.0, "group": "sleep"},
+				{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "sleep"},
+				{"cat": "sconce", "n": [1, 1], "opt": 1.0, "group": "sleep"},
+			])
+		var ample: Dictionary = HouseFurnishingRecipes.AMPLE.get(kind, {})
+		if not ample.is_empty() and HouseGeometry.room_area(plan, room) >= float(ample["area"]):
+			recipe = recipe + HouseFurnishingRecipes.ample_steps_for_room(plan, room)
+		var required: Dictionary = {}
+		for step in recipe:
+			var recipe_group: String = String(step.get("group", ""))
+			if recipe_group.is_empty() or float(step.get("opt", 0.0)) < 1.0:
+				continue
+			var recipe_category: String = String(step["cat"])
+			if not required.has(recipe_group):
+				required[recipe_group] = {}
+			var groups_by_category: Dictionary = required[recipe_group]
+			groups_by_category[recipe_category] = int(groups_by_category.get(recipe_category, 0)) \
+				+ int(step.get("min_n", step["n"][0]))
+		for group_variant in required:
+			var audit_group: String = String(group_variant)
+			var category_counts: Dictionary = required[group_variant]
+			for category_variant in category_counts:
+				var audit_category: String = String(category_variant)
+				var actual: int = 0
+				for piece in plan.furniture:
+					if int(piece["room"]) == room and String(piece.get("activity_group", "")) == audit_group \
+							and String(piece["cat"]) == audit_category:
+						actual += 1
+				if actual < int(category_counts[category_variant]):
+					plan.note_compromise(room, "activity:" + audit_group)
+					plan.note_compromise(room, "activity:%s:%s" % [audit_group, audit_category])
+			if audit_group == "eating" and HouseFurnishingRecipes.is_ordinary_house(plan) \
+					and room == HouseFurnishingRecipes.dining_room_of(plan):
+				var seats: int = 0
+				for piece in plan.furniture:
+					if int(piece["room"]) == room and String(piece.get("activity_group", "")) == "eating" \
+							and String(piece["cat"]) == "seat":
+						seats += 1
+				if seats < _household_seat_capacity(plan):
+					plan.note_compromise(room, "activity:eating")
+					plan.note_compromise(room, "activity:eating:seat_capacity")
+		for piece in plan.furniture:
+			if HouseFurnishingRecipes.is_ordinary_house(plan) and int(piece["room"]) == room:
+				var activity_group: String = String(piece.get("activity_group", ""))
+				var activity_category: String = String(piece.get("cat", ""))
+				if activity_group == "eating" and activity_category == "table" \
+						and PropCatalog.placement_height(piece) \
+						< HouseFurnishingRecipes.DOMESTIC_TABLE_MIN_HEIGHT:
+					plan.note_compromise(room, "activity:eating:height:table")
+				if activity_group == "cooking" and activity_category == "workbench" \
+						and PropCatalog.placement_height(piece) \
+						< HouseFurnishingRecipes.DOMESTIC_PREP_MIN_HEIGHT:
+					plan.note_compromise(room, "activity:cooking:height:workbench")
+			if int(piece["room"]) != room or not piece.has("activity_host_cat"):
+				continue
+			var relation_ok := false
+			for host in plan.furniture:
+				if int(host["room"]) != room or String(host["cat"]) != String(piece["activity_host_cat"]):
+					continue
+				var edge_distance: float = _rect_edge_distance(Rect2(piece["rect"]), Rect2(host["rect"]))
+				if String(piece.get("activity_relation", "")) == "beside_work_zone":
+					relation_ok = String(piece.get("cat", "")) == "bucket" \
+						and edge_distance > 0.0 and edge_distance <= 1.0 \
+						and not Rect2(host.get("zone", Rect2())).intersects(Rect2(piece["rect"]))
+				elif String(piece.get("activity_relation", "")) == "opposed_work_aisle":
+					var host_facing := HouseFurnishScore._facing_of(float(host.get("yaw", 0.0))).normalized()
+					var piece_facing := HouseFurnishScore._facing_of(float(piece.get("yaw", 0.0))).normalized()
+					var toward_piece: Vector2 = (Rect2(piece["rect"]).get_center()
+						- Rect2(host["rect"]).get_center()).normalized()
+					var host_zone: Rect2 = Rect2(host.get("zone", Rect2()))
+					var piece_zone: Rect2 = Rect2(piece.get("zone", Rect2()))
+					relation_ok = edge_distance > 0.0 and edge_distance <= 2.5 \
+						and host_facing.dot(toward_piece) > 0.0 \
+						and piece_facing.dot(-host_facing) >= 0.99 \
+						and host_zone.has_area() and piece_zone.has_area() \
+						and not host_zone.intersects(Rect2(piece["rect"])) \
+						and not piece_zone.intersects(Rect2(host["rect"]))
+				elif edge_distance <= 0.2:
+					relation_ok = true
+					if String(piece.get("activity_host_anchor", "")) == "head_end":
+						var head_world: Vector3 = Basis(Vector3.UP,
+							float(host.get("yaw", 0.0))) * Vector3.BACK
+						var head_dir := Vector2(head_world.x, head_world.z).normalized()
+						var host_rect: Rect2 = Rect2(host["rect"])
+						var piece_rect: Rect2 = Rect2(piece["rect"])
+						var host_extent: float = absf(head_dir.x) * host_rect.size.x * 0.5 \
+							+ absf(head_dir.y) * host_rect.size.y * 0.5
+						var piece_extent: float = absf(head_dir.x) * piece_rect.size.x * 0.5 \
+							+ absf(head_dir.y) * piece_rect.size.y * 0.5
+						var head_offset: float = (piece_rect.get_center() - host_rect.get_center()).dot(head_dir)
+						# A useful bedside chest can sit beside the head third; it need
+						# not project past the mattress end into an exterior wall.
+						relation_ok = head_offset + piece_extent >= host_extent / 3.0 \
+							and PropCatalog.placement_height(piece) <= 0.8
+				if relation_ok:
+					break
+			if not relation_ok:
+				var related_group: String = String(piece.get("activity_group", ""))
+				if not related_group.is_empty():
+					plan.note_compromise(room, "activity:" + related_group)
+					plan.note_compromise(room, "activity:%s:relation:%s" % [
+						related_group, String(piece["activity_host_cat"])])
+					var anchor: String = String(piece.get("activity_host_anchor", ""))
+					if anchor == "head_end":
+						plan.note_compromise(room, "activity:%s:relation:%s" % [related_group, anchor])
+	_finalize_household_dining(plan)
+	_report_activity_brief(plan)
+
+
+## Replay the exact measured pose from selection. Re-searching with a different
+## RNG stream could turn a proved full household group into a partial table set.
+static func _commit_preflight_dining_group(plan: HousePlan, room: int,
+		blocked: Array[Rect2], zones: Array[Rect2]) -> void:
+	if room != int(plan.domestic_layout.get("dining_room", -1)):
+		return
+	var group: Array = plan.domestic_layout.get("dining_group", [])
+	if group.is_empty():
+		return
+	var original_blocked_count: int = blocked.size()
+	var borrowed: int = HouseFurnishPlacement._borrow_activity_band(
+		plan, room, "eating", blocked)
+	var table_index: int = -1
+	for source in group:
+		var piece: Dictionary = Dictionary(source).duplicate(true)
+		var planar_pos: Vector3 = piece.get("pos", Vector3.ZERO)
+		planar_pos.y = 0.0
+		piece["pos"] = planar_pos
+		piece["activity_group"] = "eating"
+		piece["must"] = true
+		if String(piece.get("cat", "")) == "table":
+			piece["host"] = -1
+		else:
+			piece["host"] = table_index
+		HouseFurnishGeometry.commit(plan, room, piece, blocked, zones)
+		plan.furniture[-1]["must"] = true
+		plan.furniture[-1]["activity_group"] = "eating"
+		if String(plan.furniture[-1].get("cat", "")) == "table":
+			table_index = plan.furniture.size() - 1
+	HouseFurnishPlacement._restore_borrowed_blocks(blocked,
+		original_blocked_count, borrowed)
+
+
+## The preflight is a room-selection aid. Only post-repair furniture and routes
+## can claim that the household actually has a complete meal arrangement.
+static func _finalize_household_dining(plan: HousePlan) -> void:
+	if not HouseFurnishingRecipes.is_ordinary_house(plan) \
+			or not plan.domestic_layout.has("dining_room"):
+		return
+	var room: int = int(plan.domestic_layout.get("dining_room", -1))
+	if room < 0:
+		plan.domestic_layout["dining_selection"] = "unsatisfied"
+		return
+	var capacity: int = _household_seat_capacity(plan)
+	var tables: Array[int] = []
+	var seats: Array[int] = []
+	for index in plan.furniture.size():
+		var piece: Dictionary = plan.furniture[index]
+		if int(piece.get("room", -1)) != room \
+				or String(piece.get("activity_group", "")) != "eating":
+			continue
+		if String(piece.get("cat", "")) == "table":
+			tables.append(index)
+		elif String(piece.get("cat", "")) == "seat":
+			seats.append(index)
+	var reason: String = ""
+	if tables.size() != 1:
+		reason = "selected room did not retain exactly one meal table"
+	elif seats.size() != capacity:
+		reason = "selected room retained %d of %d household seats" % [seats.size(), capacity]
+	else:
+		for seat_index in seats:
+			if int(plan.furniture[seat_index].get("host", -1)) != tables[0]:
+				reason = "an eating seat lost its table host"
+				break
+	if reason.is_empty():
+		var nav: Dictionary = HouseNavCheck.new().check(plan)
+		if nav["unreached_rooms"].has(room):
+			reason = "the selected dining room is unreachable in the completed house"
+		else:
+			for item_index in nav["unreachable_items"]:
+				if tables.has(int(item_index)) or seats.has(int(item_index)):
+					reason = "the completed dining group is not reachable from the entrance"
+					break
+	if reason.is_empty():
+		plan.domestic_layout["dining_selection"] = "complete"
+		plan.domestic_layout.erase("dining_selection_reason")
+	else:
+		plan.domestic_layout["dining_selection"] = "unsatisfied"
+		plan.domestic_layout["dining_selection_reason"] = reason
+		plan.note_compromise(room, "activity:eating")
+
+
+## Keep the result of bounded furnishing visible beside the architectural
+## programme. A geometrically planned shell is not proof of a complete home.
+static func _report_activity_brief(plan: HousePlan) -> void:
+	if not HouseFurnishingRecipes.is_ordinary_house(plan):
+		return
+	var shortfalls: Array[Dictionary] = []
+	for room in range(plan.room_count()):
+		var issues: Array[String] = []
+		for value in plan.compromises.get(room, []):
+			var issue := String(value)
+			if issue.begins_with("activity:") and not issues.has(issue):
+				issues.append(issue)
+		if not issues.is_empty():
+			shortfalls.append({"room": room, "kind": plan.kind_of(room), "issues": issues})
+	if String(plan.domestic_layout.get("dining_selection", "")) == "unsatisfied":
+		shortfalls.append({"room": -1, "kind": &"dining", "issues": ["activity:eating:no_verified_room"]})
+	plan.domestic_layout["activity_status"] = "complete" if shortfalls.is_empty() else "unsatisfied"
+	plan.domestic_layout["activity_shortfalls"] = shortfalls
+
+
+static func _rect_edge_distance(a: Rect2, b: Rect2) -> float:
+	var gap_x := maxf(maxf(a.position.x - b.end.x, b.position.x - a.end.x), 0.0)
+	var gap_y := maxf(maxf(a.position.y - b.end.y, b.position.y - a.end.y), 0.0)
+	return Vector2(gap_x, gap_y).length()
 
 
 ## Whether native furnishing can author any part of this plan's emitted shell.
@@ -41,7 +477,7 @@ static func shell_needs_furnishing(plan: HousePlan) -> bool:
 		return true
 	var hearth_room := plan.hearth_room()
 	if hearth_room >= 0:
-		for step in HouseFurnishingRecipes.RECIPES.get(plan.kind_of(hearth_room), []):
+		for step in HouseFurnishingRecipes.recipe_for_room(plan, hearth_room):
 			if step["cat"] == "hearth":
 				return true
 	for room in plan.rooms:
@@ -72,6 +508,18 @@ static func _anybody_sleeps(plan: HousePlan) -> bool:
 	return false
 
 
+## One sleeping room represents one household room, with two ordinary places
+## at the meal table. The measured table and chair footprints decide what can
+## physically fit; a shortfall is reported by the group audit.
+static func _household_seat_capacity(plan: HousePlan) -> int:
+	var sleeping_rooms := 0
+	for kind in HouseGeometry.SLEEPING:
+		sleeping_rooms += plan.rooms_of(kind).size()
+	if sleeping_rooms == 0:
+		sleeping_rooms = 1
+	return clampi(sleeping_rooms * 2, 2, 8)
+
+
 static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	var kind: StringName = plan.kind_of(room)
 	var steps: Array = []
@@ -81,19 +529,29 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	var sleeps_here: bool = not spec is ShopSpec and kind == &"hall" \
 		and not _anybody_sleeps(plan)
 	if sleeps_here:
-		steps.append({"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0})
-		steps.append({"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9})
-	var recipe: Array = HouseFurnishingRecipes.RECIPES.get(kind, [])
-	if HouseFurnishingRecipes.dines_elsewhere(plan, room) \
-			and not _dining_table_lost(plan, room):
-		recipe = HouseFurnishingRecipes.SITTING_PARLOUR
+		steps.append({"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0,
+			"group": "sleep" if HouseFurnishingRecipes.is_ordinary_house(plan) else ""})
+		if HouseFurnishingRecipes.is_ordinary_house(plan):
+			steps.append({"cat": "chest", "key": "Chest_Wood", "rule": &"beside", "near_cat": "bed",
+				"near_anchor": "head_end", "n": [1, 1], "opt": 1.0, "group": "sleep"})
+			steps.append({"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "sleep"})
+			steps.append({"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 1.0, "group": "sleep"})
+		else:
+			# Preserve the pre-overlay hall-sleep fallback for custom families.
+			steps.append({"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9})
+	var recipe: Array = HouseFurnishingRecipes.recipe_for_room(plan, room,
+		not _dining_table_lost(plan, room))
 	var ample: Dictionary = HouseFurnishingRecipes.AMPLE.get(kind, {})
 	if not ample.is_empty() and HouseGeometry.room_area(plan, room) >= float(ample["area"]):
-		recipe = recipe + ample["steps"]
+		recipe = recipe + HouseFurnishingRecipes.ample_steps_for_room(plan, room)
 	for s in recipe:
 		# A family without a supported flue omits the hearth prop, while its
 		# table/bed programme remains the same.
 		if String(s["cat"]) == "hearth" and not spec.allows_hearth_furniture():
+			var unsupported_group: String = String(s.get("group", ""))
+			if not unsupported_group.is_empty():
+				plan.note_compromise(room, "activity:" + unsupported_group)
+				plan.note_compromise(room, "activity:%s:hearth" % unsupported_group)
 			continue
 		# With a bed in it the hall has no middle left to stand a table in, so
 		# the table goes against a wall -- which is what a one-room cottage
@@ -178,6 +636,19 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 				# room for the least the step asks, up to a pair facing
 				steps[i2]["seat_n"] = clampi(int(steps[j2]["n"][0]), 1, 2)
 				break
+	if HouseFurnishingRecipes.is_ordinary_house(plan):
+		var seated_room: int = HouseFurnishingRecipes.dining_room_of(plan)
+		if seated_room == room:
+			var household_seats := _household_seat_capacity(plan)
+			for step in steps:
+				if String(step["cat"]) == "seat" and String(step.get("group", "")) == "eating":
+					step["n"] = [household_seats, household_seats]
+					step["min_n"] = household_seats
+			for step in steps:
+				if String(step["cat"]) == "table" and String(step.get("group", "")) == "eating" \
+						and step["rule"] == &"free":
+					step["seat_n"] = household_seats
+					step["seat_n_required"] = true
 	steps.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if not is_equal_approx(float(a["opt"]), float(b["opt"])):
 			return float(a["opt"]) > float(b["opt"])
@@ -191,6 +662,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	# beside a bed.
 	var zones: Array[Rect2] = []
 	var r: RandomNumberGenerator = spec.rng
+	_commit_preflight_dining_group(plan, room, blocked, zones)
 	# The dais belongs to the piece the room is arranged around and to whoever
 	# sits behind it. Those two steps come first and stand ON it; everything
 	# after them treats it as occupied ground, because a barrel on the dais is
@@ -214,13 +686,32 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 			continue
 		var placed_from := plan.furniture.size()
 		if step["rule"] == &"row":
+			var row_count_before: int = plan.furniture.size()
 			HouseFurnishPlacement.place_row(plan, room, step, blocked, zones, r)
 			for placed in range(placed_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = must
+				_set_activity_group(plan.furniture[placed], step)
+			var row_group: String = String(step.get("group", ""))
+			var row_minimum: int = int(step.get("min_n", step["n"][0]))
+			if must and not row_group.is_empty() \
+					and plan.furniture.size() - row_count_before < row_minimum:
+				plan.note_compromise(room, "activity:" + row_group)
+				plan.note_compromise(room, "activity:%s:%s" % [row_group, String(step["cat"])])
 			continue
 		var lo: int = int(step["n"][0])
 		var hi: int = int(step["n"][1])
 		var want: int = lo if hi <= lo else r.randi_range(lo, hi)
+		if HouseFurnishingRecipes.is_ordinary_house(plan) \
+				and String(step.get("group", "")) == "eating" \
+				and String(step.get("cat", "")) == "seat" \
+				and HouseFurnishingRecipes.dining_room_of(plan) == room:
+			var already_tagged_seats := 0
+			for existing_piece in plan.furniture:
+				if int(existing_piece["room"]) == room \
+						and String(existing_piece.get("activity_group", "")) == "eating" \
+						and String(existing_piece["cat"]) == "seat":
+					already_tagged_seats += 1
+			want = maxi(0, want - already_tagged_seats)
 		if step["rule"] == &"around" and String(step.get("host", "")) == "row":
 			# Seats for a row are seats for every table in it. Two benches
 			# for a hall of eight trestles is six tables nobody sits at
@@ -234,6 +725,10 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 				blocked, zones, r, step)
 			for placed in range(piece_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = must
+				_set_activity_group(plan.furniture[placed], step)
+				if HouseFurnishingRecipes.is_ordinary_house(plan) \
+						and String(step.get("cat", "")) == "bed":
+					_reserve_sleep_access_clearance(plan, room, zones)
 				if bool(step.get("settle", false)):
 					# a settle is a seat against a wall, sat on for itself; it
 					# is not drawn up to anything and nothing is missing
@@ -245,6 +740,11 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 				var stray: Dictionary = plan.furniture.pop_back()
 				blocked.erase(stray["rect"])
 				zones.erase(stray["zone"])
+		var placed_count: int = plan.furniture.size() - placed_from
+		var group_name: String = String(step.get("group", ""))
+		if must and not group_name.is_empty() and placed_count < want:
+			plan.note_compromise(room, "activity:" + group_name)
+			plan.note_compromise(room, "activity:%s:%s" % [group_name, String(step["cat"])])
 		# A table nobody can sit at is worse than no table: it takes the middle
 		# of the room and gives nothing back. If not one seat would go round it,
 		# the table goes instead, and the plan records why.
@@ -253,7 +753,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		# pitched, its own shared aisle), and "around" finding nowhere to draw
 		# a chair up to ONE end of a long trestle is not the same failure as a
 		# free-standing table nobody can reach at all.
-		if step["rule"] == &"around" and _count_cat(plan, room, ["seat", "bench"]) \
+		if want > 0 and step["rule"] == &"around" and _count_cat(plan, room, ["seat", "bench"]) \
 				== seats_before and _count_freestanding_tables(plan, room) > 0:
 			_drop_the_table(plan, room, blocked, zones)
 	if dais_open:
@@ -261,6 +761,25 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 	_ensure_seating(plan, room, blocked, zones, r)
 	_ensure_light(plan, room, r)
 	_keep_the_room_passable(plan, room, blocked, zones)
+
+
+## Keep a walker's shoulder width clear around the bedside access strip before
+## later storage is placed. A clothes chest can fit outside the bed's exact
+## use rectangle yet leave only a 21 cm gap that nobody can walk through.
+static func _reserve_sleep_access_clearance(plan: HousePlan, room: int,
+		zones: Array[Rect2]) -> void:
+	for index in plan.furniture_of(room):
+		var piece: Dictionary = plan.furniture[index]
+		if String(piece.get("cat", "")) != "bed" or String(piece.get("activity_group", "")) != "sleep":
+			continue
+		var access := Rect2(piece.get("zone", Rect2()))
+		if not access.has_area():
+			return
+		for zone_index in zones.size():
+			if zones[zone_index].is_equal_approx(access):
+				zones[zone_index] = access.grow(maxf(HouseGeometry.PATH_MIN,
+					HouseGeometry.PERSON_RADIUS * 2.0 + 0.06))
+				return
 
 
 ## The last step allowed to put something on the dais: the seat behind the
@@ -353,24 +872,55 @@ static func _recover_dining_pair(plan: HousePlan, room: int, blocked: Array[Rect
 	if plan.focus_room() == room and plan.focus_cat() == "table":
 		return # an altar or high table has its own authored seating contract
 	var required := false
-	for step in HouseFurnishingRecipes.RECIPES.get(plan.kind_of(room), []):
+	for step in HouseFurnishingRecipes.recipe_for_room(plan, room):
 		if step["cat"] == "table" and float(step["opt"]) >= 1.0 and step["rule"] == &"free":
 			required = true
 	if not required:
 		return
 	var local_rng := RandomNumberGenerator.new()
 	local_rng.seed = hash("dining|%d|%d" % [plan.spec.seed, room])
+	var original_blocked_count: int = blocked.size()
+	var borrowed_band_count := 0
+	if HouseFurnishingRecipes.is_ordinary_house(plan) \
+			and HouseFurnishingRecipes.dining_room_of(plan) == room:
+		borrowed_band_count = HouseFurnishPlacement._borrow_activity_band(
+			plan, room, "eating", blocked)
+	var required_seats: int = 1
+	if HouseFurnishingRecipes.is_ordinary_house(plan) \
+			and HouseFurnishingRecipes.dining_room_of(plan) == room:
+		required_seats = _household_seat_capacity(plan)
 	for key in PropCatalog.of_category("table"):
 		var placed_from := plan.furniture.size()
-		HouseFurnishPlacement.place_free(plan, room, key, blocked, zones, local_rng, true)
+		var placement_height_scale := -1.0
+		if HouseFurnishingRecipes.is_ordinary_house(plan) \
+				and HouseFurnishingRecipes.dining_room_of(plan) == room:
+			placement_height_scale = 1.0
+		HouseFurnishPlacement.place_free(plan, room, key, blocked, zones, local_rng,
+			true, "seat", required_seats, required_seats > 1, placement_height_scale)
 		if _count_cat(plan, room, ["table"]) > 0:
 			for placed in range(placed_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = true
+				if HouseFurnishingRecipes.is_ordinary_house(plan) \
+						and HouseFurnishingRecipes.dining_room_of(plan) == room:
+					_set_activity_group(plan.furniture[placed], {"group": "eating"})
+			var seated_count := 0
+			for piece in plan.furniture:
+				if int(piece["room"]) == room and String(piece.get("activity_group", "")) == "eating" \
+						and String(piece["cat"]) == "seat":
+					seated_count += 1
+			if seated_count < required_seats:
+				continue
 			# These two requirements have now been physically restored.
 			var dropped: Array = plan.compromises.get(room, [])
 			dropped.erase("table")
 			dropped.erase("seat")
+			dropped.erase("activity:eating")
+			dropped.erase("activity:eating:table")
+			dropped.erase("activity:eating:seat")
+			dropped.erase("activity:eating:seat_capacity")
 			break
+	HouseFurnishPlacement._restore_borrowed_blocks(blocked, original_blocked_count,
+		borrowed_band_count)
 
 
 static func _count_cat(plan: HousePlan, room: int, cats: Array) -> int:

@@ -38,3 +38,7 @@ scratch/*.json
 # Frozen addon releases (tools/release_brick_wild.ps1). They hold the licensed
 # prop packs, so they are never committed; consumers install from this folder.
 /releases/
+/visualqa/personality/brief_evidence
+/visualqa/personality/group_evidence
+/visualqa/personality/room_evidence
+/visualqa/personality/asset_evidence

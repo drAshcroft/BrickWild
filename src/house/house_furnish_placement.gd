@@ -23,11 +23,10 @@ const TABLE_GAP := 1.1
 
 static func _seating_probe(plan: HousePlan, room: int, table: Dictionary,
 		blocked: Array[Rect2], zones: Array[Rect2], seat_cat := "seat",
-		seat_n := 1) -> Dictionary:
-	if seat_n > 1:
-		# The table must take that many seats before the first one is kept:
-		# a trestle with room for one bench of the two it was given is a
-		# trestle jammed against its neighbour.
+		seat_n := 1, retain_seat_set := false) -> Dictionary:
+	if seat_n > 1 and not retain_seat_set:
+		# Keep the established shared-family probe contract outside the domestic
+		# overlay. Its callers retain the first tested seat as before.
 		var trial := _seating_probe(plan, room, table, blocked, zones, seat_cat, 1)
 		if trial.is_empty():
 			return {}
@@ -47,6 +46,37 @@ static func _seating_probe(plan: HousePlan, room: int, table: Dictionary,
 		if probe2.furniture.size() < 1 + seat_n:
 			return {}
 		return trial
+	if seat_n > 1 and retain_seat_set:
+		# Test a complete seat set at this exact table pose and return those exact
+		# placements. Reprobing a single chair later can choose the wrong side and
+		# leave the table with fewer seats than the contract requires.
+		# Choose the model for the whole set. A failed last chair must not silently
+		# turn one place into a stool while the other places remain tall chairs.
+		for seat_key in PropCatalog.of_category(seat_cat):
+			var occupied2: Array[Rect2] = blocked.duplicate()
+			var used2: Array[Rect2] = zones.duplicate()
+			var probe2 := HousePlan.new()
+			probe2.spec = plan.spec
+			probe2.rooms = plan.rooms
+			probe2.doors = plan.doors
+			probe2.windows = plan.windows
+			HouseFurnishGeometry.commit(probe2, room, table.duplicate(), occupied2, used2)
+			var rng2 := RandomNumberGenerator.new()
+			rng2.seed = 0
+			var selected_seats: Array[Dictionary] = []
+			for _seat_index in range(seat_n):
+				var before: int = probe2.furniture.size()
+				place_around(probe2, room, String(seat_key), occupied2, used2, rng2)
+				if probe2.furniture.size() == before:
+					break
+				var placed_seat: Dictionary = probe2.furniture[-1].duplicate(true)
+				var seat_pos: Vector3 = placed_seat["pos"]
+				seat_pos.y = 0.0
+				placed_seat["pos"] = seat_pos
+				selected_seats.append(placed_seat)
+			if selected_seats.size() == seat_n:
+				return {"paired_seats": selected_seats}
+		return {}
 	var probe := HousePlan.new()
 	probe.spec = plan.spec
 	probe.rooms = plan.rooms
@@ -179,19 +209,30 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		return
 	var key: String = choices[r.randi_range(0, choices.size() - 1)]
 	var before_place: int = plan.furniture.size()
+	var original_blocked_count: int = blocked.size()
+	var borrowed_band_count := _borrow_activity_band(plan, room,
+		String(step.get("group", "")), blocked)
 	match rule:
 		&"wall":
 			var had: int = plan.furniture.size()
-			_wall_clear_of_doors(plan, room, key, blocked, zones, r)
+			_wall_clear_of_doors(plan, room, key, blocked, zones, r, step)
 			_flag_door_approach(plan, room, had)
 			if plan.furniture.size() == had and not cat in WALL_ESSENTIAL:
-				# no wall will take it. A workbench can stand out in the room --
-				# a bed cannot, which is what WALL_ESSENTIAL is for -- and the
-				# placement records that it did, so the check that wants a wall
-				# behind it knows why there is none.
-				place_free(plan, room, key, blocked, zones, r)
-				if plan.furniture.size() > had:
-					plan.furniture[-1]["free_standing"] = true
+				var required_cooking_store: bool = HouseFurnishingRecipes.is_ordinary_house(plan) \
+					and String(step.get("group", "")) == "cooking" \
+					and cat == "storage"
+				var required_sleep_storage: bool = HouseFurnishingRecipes.is_ordinary_house(plan) \
+					and String(step.get("group", "")) == "sleep" \
+					and cat == "chest" \
+					and String(step.get("near_anchor", "")) != "head_end"
+				if not required_cooking_store and not required_sleep_storage:
+					# no wall will take it. A workbench can stand out in the room --
+					# a bed cannot, which is what WALL_ESSENTIAL is for -- and the
+					# placement records that it did, so the check that wants a wall
+					# behind it knows why there is none.
+					place_free(plan, room, key, blocked, zones, r)
+					if plan.furniture.size() > had:
+						plan.furniture[-1]["free_standing"] = true
 			elif plan.furniture.size() == had and _forced_wall(plan, room, key) >= 0:
 				# the wall the flue rises on would not take it, and a fire
 				# under no chimney is worse than no fire: the room goes
@@ -206,21 +247,30 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 				# on the best open floor and THEN found to have no room for a
 				# bench was a barracks mess's second table, dropped again
 				var seat_n := int(step.get("seat_n", 1))
-				place_free(plan, room, key, blocked, zones, r, true, seat_cat, seat_n)
-				if plan.furniture.size() == before and seat_n > 1:
+				var placement_height_scale := -1.0
+				if HouseFurnishingRecipes.is_ordinary_house(plan) \
+						and String(step.get("group", "")) == "eating" \
+						and HouseFurnishingRecipes.dining_room_of(plan) == room:
+					placement_height_scale = 1.0
+				place_free(plan, room, key, blocked, zones, r, true, seat_cat, seat_n,
+					bool(step.get("seat_n_required", false)), placement_height_scale)
+				if plan.furniture.size() == before and seat_n > 1 \
+						and not bool(step.get("seat_n_required", false)):
 					place_free(plan, room, key, blocked, zones, r, true, seat_cat, 1)
-			if plan.furniture.size() == before:
+			if plan.furniture.size() == before and not bool(step.get("seat_n_required", false)):
 				place_free(plan, room, key, blocked, zones, r)
-			if plan.furniture.size() == before:
+			if plan.furniture.size() == before and not bool(step.get("seat_n_required", false)):
 				# no room to stand it clear of the walls; against one is better
 				# than not at all, and is what a small cottage does
-				_wall_clear_of_doors(plan, room, key, blocked, zones, r)
+				_wall_clear_of_doors(plan, room, key, blocked, zones, r, step)
 				_flag_door_approach(plan, room, before)
 		&"corner":
 			_place_corner(plan, room, key, blocked, zones, r)
 		&"around":
 			place_around(plan, room, key, blocked, zones, r,
 				String(step.get("host", "")) == "row")
+		&"beside":
+			_place_beside(plan, room, key, step, blocked, zones)
 		&"behind":
 			_place_behind(plan, room, key, blocked, zones, r)
 		&"mounted":
@@ -228,8 +278,15 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		&"ceiling":
 			HouseFurnishSurface.place_ceiling(plan, room, key)
 		&"on":
-			HouseFurnishSurface.place_on_surface(plan, room, key, r,
-				String(step.get("host", "")) in ["row", "distributed"])
+			var preferred_host_category: String = String(step.get("host_category", ""))
+			if HouseFurnishingRecipes.is_ordinary_house(plan) \
+					and String(step.get("group", "")) == "cooking" \
+					and preferred_host_category == "workbench":
+				_place_on_preferred_category(plan, room, key, preferred_host_category, r)
+			else:
+				HouseFurnishSurface.place_on_surface(plan, room, key, r,
+					String(step.get("host", "")) in ["row", "distributed"])
+	_restore_borrowed_blocks(blocked, original_blocked_count, borrowed_band_count)
 	# The first focus piece placed writes back where it actually stood, so the
 	# check compares the plan with the furniture rather than with itself.
 	if plan.furniture.size() > before_place and plan.focus_room() == room \
@@ -247,15 +304,383 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		plan.note_compromise(room, cat)
 
 
+## Restrict an activity group to its authored clear-floor band. The complement
+## is borrowed as blocked space so the normal fit path also keeps use zones in
+## the band. Returns the number of temporary rectangles appended.
+static func _borrow_activity_band(plan: HousePlan, room: int, group: String,
+		blocked: Array[Rect2]) -> int:
+	if group.is_empty() or room < 0 or room >= plan.rooms.size():
+		return 0
+	var regions: Dictionary = plan.rooms[room].get("activity_regions", {})
+	if not regions.has(StringName(group)):
+		return 0
+	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var region: Rect2 = Rect2(regions[StringName(group)]).intersection(floor_rect)
+	if not region.has_area():
+		return 0
+	var start_count: int = blocked.size()
+	var top := Rect2(floor_rect.position, Vector2(floor_rect.size.x,
+		region.position.y - floor_rect.position.y))
+	var bottom := Rect2(Vector2(floor_rect.position.x, region.end.y),
+		Vector2(floor_rect.size.x, floor_rect.end.y - region.end.y))
+	var left := Rect2(Vector2(floor_rect.position.x, region.position.y),
+		Vector2(region.position.x - floor_rect.position.x, region.size.y))
+	var right := Rect2(Vector2(region.end.x, region.position.y),
+		Vector2(floor_rect.end.x - region.end.x, region.size.y))
+	for complement in [top, bottom, left, right]:
+		var rect: Rect2 = complement
+		if rect.size.x > 0.001 and rect.size.y > 0.001:
+			blocked.append(rect)
+	return blocked.size() - start_count
+
+
+## Remove only the borrowed complement, retaining every furniture footprint
+## committed by the placement strategy while it was active.
+static func _restore_borrowed_blocks(blocked: Array[Rect2], original_count: int,
+		borrowed_count: int) -> void:
+	if borrowed_count <= 0:
+		return
+	var committed: Array[Rect2] = blocked.slice(original_count + borrowed_count)
+	blocked.resize(original_count)
+	blocked.append_array(committed)
+
+
+## Place a piece beside an earlier activity component. The relation is measured
+## from the host and candidate bounds, then subjected to the ordinary overlap
+## and use-zone test; it cannot waive clearance.
+static func _place_beside(plan: HousePlan, room: int, key: String,
+		step: Dictionary, blocked: Array[Rect2], zones: Array[Rect2]) -> void:
+	var wanted_cat: String = String(step.get("near_cat", ""))
+	if wanted_cat.is_empty():
+		return
+	var host: Dictionary = {}
+	for piece in plan.furniture:
+		if int(piece["room"]) == room and String(piece["cat"]) == wanted_cat:
+			host = piece
+			break
+	if host.is_empty():
+		return
+	if HouseFurnishingRecipes.is_ordinary_house(plan) \
+			and String(step.get("group", "")) == "cooking" \
+			and String(step.get("cat", "")) == "workbench" \
+			and host.has("paired_workbench"):
+		var paired: Dictionary = Dictionary(host["paired_workbench"]).duplicate(true)
+		host.erase("paired_workbench")
+		paired["activity_group"] = "cooking"
+		paired["activity_host_cat"] = "storage"
+		HouseFurnishGeometry.commit(plan, room, paired, blocked, zones)
+		return
+	var host_rect := Rect2(host["rect"])
+	var host_center := host_rect.get_center()
+	var head_dir := Vector2.ZERO
+	if String(step.get("near_anchor", "")) == "head_end" and wanted_cat == "bed":
+		# Bed models are placed with the headboard on the back (+Z) side. The
+		# plan yaw therefore gives a real head-end anchor; a cardinal offset
+		# from the bed centre can otherwise leave a bedside item at mid-bed.
+		var host_yaw: float = float(host.get("yaw", 0.0))
+		# Godot's positive Y rotation maps Vector3.BACK (+Z) to
+		# (+sin(yaw), cos(yaw)) in the plan's X/Z plane.
+		var head_world: Vector3 = Basis(Vector3.UP, host_yaw) * Vector3.BACK
+		head_dir = Vector2(head_world.x, head_world.z).normalized()
+		var bedside := _head_support_candidate(plan, room, key, host, blocked, zones)
+		if not bedside.is_empty():
+			HouseFurnishGeometry.commit(plan, room, bedside, blocked, zones)
+		return
+	if bool(step.get("align_back", false)):
+		var height_scale := -1.0
+		var cooking_prep_member: bool = false
+		if HouseFurnishingRecipes.is_ordinary_house(plan) \
+				and String(step.get("group", "")) == "cooking" \
+				and String(step.get("cat", "")) == "workbench":
+			cooking_prep_member = true
+			if String(step.get("cat", "")) == "workbench":
+				height_scale = 1.0
+		var aligned := _aligned_beside_candidate(plan, room, key, host, blocked, zones, height_scale)
+		if aligned.is_empty() and cooking_prep_member:
+			aligned = _l_shaped_prep_candidate(plan, room, key, host, blocked, zones, height_scale)
+		if aligned.is_empty() and cooking_prep_member:
+			aligned = _opposed_prep_candidate(plan, room, key, host, blocked, zones, height_scale)
+		if aligned.is_empty() and HouseFurnishingRecipes.is_ordinary_house(plan) \
+				and String(step.get("group", "")) == "cooking" \
+				and String(step.get("cat", "")) == "bucket":
+			# A water vessel can stand just beyond the cabinet's standing zone.
+			# It has neither a working front nor a use-zone aisle of its own.
+			var vessel := _opposed_prep_candidate(plan, room, key, host, blocked, zones)
+			if not vessel.is_empty() and HouseFurnisher._rect_edge_distance(
+					Rect2(vessel["rect"]), Rect2(host["rect"])) <= 1.0:
+				vessel["activity_relation"] = "beside_work_zone"
+				aligned = vessel
+		if not aligned.is_empty():
+			HouseFurnishGeometry.commit(plan, room, aligned, blocked, zones)
+		return
+	for scale in HouseFurnishGeometry.scales(key):
+		for yaw in [0.0, PI / 2.0, PI, PI * 1.5]:
+			var probe := HouseFurnishGeometry.candidate(key, host_center, float(yaw), 1.0, float(scale))
+			var candidate_rect := Rect2(probe["rect"])
+			if head_dir != Vector2.ZERO:
+				continue
+			var offsets: Array[Vector2] = [
+				Vector2(-(host_rect.size.x + candidate_rect.size.x) / 2.0 - 0.06, 0.0),
+				Vector2((host_rect.size.x + candidate_rect.size.x) / 2.0 + 0.06, 0.0),
+				Vector2(0.0, -(host_rect.size.y + candidate_rect.size.y) / 2.0 - 0.06),
+				Vector2(0.0, (host_rect.size.y + candidate_rect.size.y) / 2.0 + 0.06),
+			]
+			for offset in offsets:
+				var center := host_center + offset
+				var candidate := HouseFurnishGeometry.candidate(key, center, float(yaw), 1.0, float(scale))
+				if HouseFurnishGeometry.fits(plan, room, candidate,
+						HouseGeometry.room_floor_rect(plan, room), blocked, zones, []):
+					HouseFurnishGeometry.commit(plan, room, candidate, blocked, zones)
+					return
+
+
+## Cooking tools belong on the work surface that was planned for them, rather
+## than whichever unrelated prop happened to win the random host draw.
+static func _place_on_preferred_category(plan: HousePlan, room: int, key: String,
+		preferred_category: String, r: RandomNumberGenerator) -> void:
+	var hosts: Array[int] = []
+	for index in plan.furniture_of(room):
+		var host: Dictionary = plan.furniture[index]
+		if String(host.get("cat", "")) == preferred_category \
+				and PropCatalog.has_tag(String(host["key"]), PropCatalog.SURFACE) \
+				and not bool(host.get("mounted", false)):
+			hosts.append(index)
+	if hosts.is_empty():
+		return
+	var host_index: int = hosts[0]
+	var host: Dictionary = plan.furniture[host_index]
+	var host_rect: Rect2 = Rect2(host["rect"])
+	var host_scale: float = PropCatalog.placement_height_scale(host)
+	var top: float = float(host["pos"].y) \
+		+ PropCatalog.surface_height(String(host["key"])) * host_scale
+	for scale in HouseFurnishGeometry.scales(key):
+		for _orientation_try in range(8):
+			var yaw := r.randf() * TAU
+			var physical_yaw: float = yaw + PropCatalog.face_offset(key)
+			var foot: Vector2 = PropCatalog.footprint_rotated(key, physical_yaw) * float(scale)
+			var margin := 0.06
+			var lo := host_rect.position + foot * 0.5 + Vector2.ONE * margin
+			var hi := host_rect.end - foot * 0.5 - Vector2.ONE * margin
+			if lo.x > hi.x or lo.y > hi.y:
+				continue
+			for tries in range(8):
+				var center := Vector2(lerpf(lo.x, hi.x, r.randf()), lerpf(lo.y, hi.y, r.randf()))
+				var rect := Rect2(center - foot / 2.0, foot)
+				var clash := false
+				for placed in plan.furniture_of(room):
+					if int(plan.furniture[placed].get("host", -1)) == host_index \
+							and Rect2(plan.furniture[placed]["rect"]).intersects(rect):
+						clash = true
+						break
+				if clash:
+					continue
+				plan.furniture.append({
+					"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
+					"pos": Vector3(center.x, top, center.y), "yaw": yaw,
+					"rect": rect, "zone": Rect2(), "host": host_index,
+					"cat": PropCatalog.category(key), "mounted": false, "scale": float(scale),
+				})
+				return
+
+
+## Return a bedside chest candidate without committing it. The bed-wall search
+## calls this first, so it only accepts bed positions that can take the whole
+## sleep pair with a usable approach.
+static func _head_support_candidate(plan: HousePlan, room: int, key: String,
+		host: Dictionary, blocked: Array[Rect2], zones: Array[Rect2]) -> Dictionary:
+	var host_rect: Rect2 = Rect2(host["rect"])
+	var host_center: Vector2 = host_rect.get_center()
+	var head_world: Vector3 = Basis(Vector3.UP, float(host.get("yaw", 0.0))) * Vector3.BACK
+	var head_dir := Vector2(head_world.x, head_world.z).normalized()
+	if head_dir == Vector2.ZERO:
+		return {}
+	var side_dir := Vector2(-head_dir.y, head_dir.x)
+	var host_radius: float = absf(head_dir.x) * host_rect.size.x * 0.5 \
+		+ absf(head_dir.y) * host_rect.size.y * 0.5
+	var host_side_radius: float = absf(side_dir.x) * host_rect.size.x * 0.5 \
+		+ absf(side_dir.y) * host_rect.size.y * 0.5
+	for scale in HouseFurnishGeometry.scales(key):
+		for yaw in [0.0, PI / 2.0, PI, PI * 1.5]:
+			var probe := HouseFurnishGeometry.candidate(key, host_center, float(yaw), 1.0, float(scale))
+			var candidate_rect: Rect2 = Rect2(probe["rect"])
+			var item_radius: float = absf(head_dir.x) * candidate_rect.size.x * 0.5 \
+				+ absf(head_dir.y) * candidate_rect.size.y * 0.5
+			var item_side_radius: float = absf(side_dir.x) * candidate_rect.size.x * 0.5 \
+				+ absf(side_dir.y) * candidate_rect.size.y * 0.5
+			var facing := HouseFurnishScore._facing_of(float(yaw)).normalized()
+			for side_sign in [-1.0, 1.0]:
+				var outward: Vector2 = side_dir * float(side_sign)
+				if facing.dot(outward) < 0.99:
+					continue
+				for gap in [0.06, 0.12, 0.18]:
+					for head_slide in [0.0, 0.2, 0.4, 0.6, 0.8]:
+						var head_offset: float = host_radius - item_radius - head_slide
+						if head_offset + item_radius < host_radius / 3.0:
+							continue
+						var center := host_center + head_dir * head_offset \
+							+ outward * (host_side_radius + item_side_radius + float(gap))
+						var candidate := HouseFurnishGeometry.candidate(key, center,
+							float(yaw), 1.0, float(scale))
+						if HouseFurnishGeometry.fits(plan, room, candidate,
+								HouseGeometry.room_floor_rect(plan, room), blocked, zones, []):
+							return candidate
+	return {}
+
+
+## Pair a deeper work surface beside its storage host, aligning their backs.
+## The same predicate reserves kitchen workbench space before the cabinet is
+## committed.
+static func _aligned_beside_candidate(plan: HousePlan, room: int, key: String,
+		host: Dictionary, blocked: Array[Rect2], zones: Array[Rect2],
+		height_scale := -1.0) -> Dictionary:
+	var host_rect: Rect2 = Rect2(host["rect"])
+	var host_center: Vector2 = host_rect.get_center()
+	var wall_facing := HouseFurnishScore._facing_of(float(host.get("yaw", 0.0))).normalized()
+	var tangent_dir := Vector2(-wall_facing.y, wall_facing.x)
+	var host_depth: float = absf(wall_facing.x) * host_rect.size.x \
+		+ absf(wall_facing.y) * host_rect.size.y
+	var host_span: float = absf(tangent_dir.x) * host_rect.size.x \
+		+ absf(tangent_dir.y) * host_rect.size.y
+	for scale in _domestic_prep_scales(key):
+		for yaw in [0.0, PI / 2.0, PI, PI * 1.5]:
+			var facing := HouseFurnishScore._facing_of(float(yaw)).normalized()
+			if facing.dot(wall_facing) < 0.99:
+				continue
+			var probe := HouseFurnishGeometry.candidate(key, host_center, float(yaw),
+				1.0, float(scale), height_scale)
+			var rect: Rect2 = Rect2(probe["rect"])
+			var depth: float = absf(wall_facing.x) * rect.size.x \
+				+ absf(wall_facing.y) * rect.size.y
+			var span: float = absf(tangent_dir.x) * rect.size.x \
+				+ absf(tangent_dir.y) * rect.size.y
+			for side_sign in [-1.0, 1.0]:
+				var center: Vector2 = host_center \
+					+ wall_facing * ((depth - host_depth) * 0.5) \
+					+ tangent_dir * float(side_sign) * ((host_span + span) * 0.5 + 0.06)
+				var candidate := HouseFurnishGeometry.candidate(key, center,
+					float(yaw), 1.0, float(scale), height_scale)
+				if HouseFurnishGeometry.fits(plan, room, candidate,
+						HouseGeometry.room_floor_rect(plan, room), blocked, zones, []):
+					return candidate
+	return {}
+
+
+## The compact shared kitchen cannot always fit a cabinet and workbench in one
+## straight run. Try a measured perpendicular attachment around the cabinet's
+## ends; the workbench keeps an independent front use zone and the ordinary
+## floor/door/obstacle fit rules still decide whether it is usable.
+static func _l_shaped_prep_candidate(plan: HousePlan, room: int, key: String,
+		host: Dictionary, blocked: Array[Rect2], zones: Array[Rect2],
+		height_scale := -1.0) -> Dictionary:
+	var host_rect: Rect2 = Rect2(host["rect"])
+	var host_center: Vector2 = host_rect.get_center()
+	var directions: Array[Vector2] = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]
+	for scale in _domestic_prep_scales(key):
+		for yaw in [0.0, PI / 2.0, PI, PI * 1.5]:
+			var probe := HouseFurnishGeometry.candidate(key, host_center,
+				float(yaw), 1.0, float(scale), height_scale)
+			var probe_rect: Rect2 = Rect2(probe["rect"])
+			for direction in directions:
+				var tangent := Vector2(-direction.y, direction.x)
+				var host_radius: float = absf(direction.x) * host_rect.size.x * 0.5 \
+					+ absf(direction.y) * host_rect.size.y * 0.5
+				var item_radius: float = absf(direction.x) * probe_rect.size.x * 0.5 \
+					+ absf(direction.y) * probe_rect.size.y * 0.5
+				var host_span: float = absf(tangent.x) * host_rect.size.x \
+					+ absf(tangent.y) * host_rect.size.y
+				var item_span: float = absf(tangent.x) * probe_rect.size.x \
+					+ absf(tangent.y) * probe_rect.size.y
+				var max_slide: float = maxf(0.0, (host_span + item_span) * 0.5 - 0.18)
+				var slide_offsets: Array[float] = [0.0]
+				for step_index in range(1, 9):
+					var slide: float = float(step_index) * 0.25
+					if slide > max_slide + 0.001:
+						break
+					slide_offsets.append(slide)
+					slide_offsets.append(-slide)
+				for slide_offset in slide_offsets:
+					var center: Vector2 = host_center \
+						+ direction * (host_radius + item_radius + 0.06) \
+						+ tangent * slide_offset
+					var candidate := HouseFurnishGeometry.candidate(key, center,
+						float(yaw), 1.0, float(scale), height_scale)
+					if HouseFurnishGeometry.fits(plan, room, candidate,
+							HouseGeometry.room_floor_rect(plan, room), blocked, zones, []):
+						return candidate
+	return {}
+
+
+## Opposing kitchen runs can share a clear service aisle when a narrow hall
+## cannot fit a same-wall prep line. Both fronts face the aisle; the measured
+## use zones must fit between the bodies and remain clear of the other body.
+static func _opposed_prep_candidate(plan: HousePlan, room: int, key: String,
+		host: Dictionary, blocked: Array[Rect2], zones: Array[Rect2],
+		height_scale := -1.0) -> Dictionary:
+	var host_rect: Rect2 = Rect2(host["rect"])
+	var host_yaw: float = float(host.get("yaw", 0.0))
+	var host_facing := HouseFurnishScore._facing_of(host_yaw).normalized()
+	var host_depth: float = absf(host_facing.x) * host_rect.size.x \
+		+ absf(host_facing.y) * host_rect.size.y
+	var host_key: String = String(host.get("key", "Cabinet"))
+	var host_zone_depth: float = PropCatalog.zone_depth(host_key)
+	var tangent := Vector2(-host_facing.y, host_facing.x)
+	for scale in _domestic_prep_scales(key):
+		for yaw in [0.0, PI / 2.0, PI, PI * 1.5]:
+			var facing := HouseFurnishScore._facing_of(float(yaw)).normalized()
+			if facing.dot(-host_facing) < 0.99:
+				continue
+			var probe := HouseFurnishGeometry.candidate(key, host_rect.get_center(),
+				float(yaw), 1.0, float(scale), height_scale)
+			var rect: Rect2 = Rect2(probe["rect"])
+			var depth: float = absf(host_facing.x) * rect.size.x \
+				+ absf(host_facing.y) * rect.size.y
+			var minimum_gap: float = maxf(host_zone_depth, PropCatalog.zone_depth(key)) + 0.08
+			for gap in [minimum_gap, 1.1, 1.35, 1.6, 1.85, 2.0, 2.25, 2.5]:
+				if float(gap) + 0.001 < minimum_gap:
+					continue
+				for side_offset in [0.0, 0.25, -0.25, 0.5, -0.5, 0.75, -0.75,
+						1.0, -1.0, 1.25, -1.25, 1.5, -1.5]:
+					var center: Vector2 = host_rect.get_center() \
+						+ host_facing * (host_depth * 0.5 + float(gap) + depth * 0.5) \
+						+ tangent * float(side_offset)
+					var candidate := HouseFurnishGeometry.candidate(key, center,
+						float(yaw), 1.0, float(scale), height_scale)
+					if HouseFurnishGeometry.fits(plan, room, candidate,
+							HouseGeometry.room_floor_rect(plan, room), blocked, zones, []):
+						candidate["activity_relation"] = "opposed_work_aisle"
+						return candidate
+	return {}
+
+
+static func _domestic_prep_scales(key: String) -> Array[float]:
+	var out: Array[float] = []
+	for scale in HouseFurnishGeometry.scales(key):
+		out.append(float(scale))
+	var measured_minimum: float = PropCatalog.min_scale(key)
+	if measured_minimum > 0.0 and not measured_minimum in out:
+		out.append(measured_minimum)
+	return out
+
+
 # ------------------------------------------------------------ floor pieces
 
 ## Back to a wall, sliding along it until somewhere fits.
 static func _place_against_wall(plan: HousePlan, room: int, key: String,
-		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
+		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator,
+		step: Dictionary = {}) -> void:
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
 	var best: Dictionary = {}
 	var best_score := -INF
+	var sleep_storage_by_wall: Dictionary = {}
+	var require_sleep_access: bool = HouseFurnishingRecipes.is_ordinary_house(plan) \
+		and String(step.get("group", "")) == "sleep" \
+		and PropCatalog.category(key) == "chest" \
+		and String(step.get("near_anchor", "")) != "head_end"
+	var require_cooking_pair: bool = HouseFurnishingRecipes.is_ordinary_house(plan) \
+		and String(step.get("group", "")) == "cooking" \
+		and PropCatalog.category(key) == "storage"
+	var cooking_storage_by_wall: Dictionary = {}
 	var extra: Array[Rect2] = _window_blocks(plan, room, key)
 	var hearth_only: int = _forced_wall(plan, room, key)
 	for wi in range(walls.size()):
@@ -313,6 +738,50 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 							continue
 						try_cand["breast"] = breast
 					if HouseFurnishGeometry.fits(plan, room, try_cand, floor_rect, blocked, zones, extra):
+						if HouseFurnishingRecipes.is_ordinary_house(plan) \
+								and PropCatalog.category(key) == "bed" \
+								and String(step.get("group", "")) == "sleep":
+							var paired_blocked: Array[Rect2] = blocked.duplicate()
+							paired_blocked.append(Rect2(try_cand["rect"]))
+							var paired_zones: Array[Rect2] = zones.duplicate()
+							var access: Rect2 = Rect2(try_cand["zone"])
+							if access.has_area():
+								paired_zones.append(access.grow(maxf(HouseGeometry.PATH_MIN,
+									HouseGeometry.PERSON_RADIUS * 2.0 + 0.06)))
+							var host: Dictionary = {"rect": try_cand["rect"], "yaw": try_cand["yaw"], "cat": "bed"}
+							if _head_support_candidate(plan, room, "Chest_Wood", host,
+									paired_blocked, paired_zones).is_empty():
+								continue
+						if HouseFurnishingRecipes.is_ordinary_house(plan) \
+								and PropCatalog.category(key) == "storage" \
+								and String(step.get("group", "")) == "cooking":
+							var prep_blocked: Array[Rect2] = blocked.duplicate()
+							prep_blocked.append(Rect2(try_cand["rect"]))
+							var prep_zones: Array[Rect2] = zones.duplicate()
+							var storage_zone: Rect2 = Rect2(try_cand.get("zone", Rect2()))
+							if storage_zone.has_area():
+								prep_zones.append(storage_zone)
+							var storage_host: Dictionary = {"rect": try_cand["rect"],
+								"yaw": try_cand["yaw"], "cat": "storage"}
+							var prep_fits := false
+							for workbench_key in PropCatalog.of_category("workbench"):
+								var prep_key: String = String(workbench_key)
+								var prep_candidate := _aligned_beside_candidate(plan, room,
+									prep_key, storage_host, prep_blocked, prep_zones, 1.0)
+								if prep_candidate.is_empty():
+									prep_candidate = _l_shaped_prep_candidate(plan, room,
+										prep_key, storage_host, prep_blocked, prep_zones, 1.0)
+								if prep_candidate.is_empty():
+									prep_candidate = _opposed_prep_candidate(plan, room,
+										prep_key, storage_host, prep_blocked, prep_zones, 1.0)
+								if not prep_candidate.is_empty():
+									prep_candidate["activity_group"] = "cooking"
+									prep_candidate["activity_host_cat"] = "storage"
+									try_cand["paired_workbench"] = prep_candidate
+									prep_fits = true
+									break
+							if not prep_fits:
+								continue
 						cand = try_cand
 						break
 					if bed_on_facet:
@@ -334,6 +803,8 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 				continue
 			var mid: float = 1.0 - absf(t - run / 2.0) / maxf(run / 2.0, 0.01)
 			var score: float = mid * 0.6 + r.randf() * HouseFurnishScore.JITTER + float(wi) * 0.01
+			if cand.has("paired_workbench"):
+				score += _workbench_daylight_preference(plan, room, cand["paired_workbench"])
 			score += HouseFurnishScore._affinity(plan, room, cand)
 			var placed: Vector3 = cand.pos
 			score -= Vector2(placed.x, placed.z).distance_to(centre)
@@ -341,10 +812,176 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 				# the flue rises on one wall only, so a hearth on any other is
 				# not a worse placement but no placement at all
 				score = -INF
-			if score > best_score:
+			if require_sleep_access:
+				var wall_options: Array = sleep_storage_by_wall.get(wi, [])
+				var nearby_option := -1
+				for option_index in range(wall_options.size()):
+					var option_candidate: Dictionary = wall_options[option_index]["candidate"]
+					if Vector2(option_candidate["pos"].x, option_candidate["pos"].z).distance_to(
+							Vector2(cand["pos"].x, cand["pos"].z)) < 1.0:
+						nearby_option = option_index
+						break
+				var new_option := {"candidate": cand, "score": score}
+				if nearby_option >= 0:
+					if score > float(wall_options[nearby_option]["score"]):
+						wall_options[nearby_option] = new_option
+				elif wall_options.size() < 2:
+					wall_options.append(new_option)
+				else:
+					var lowest := 0
+					for option_index in range(1, wall_options.size()):
+						if float(wall_options[option_index]["score"]) < float(wall_options[lowest]["score"]):
+							lowest = option_index
+					if score > float(wall_options[lowest]["score"]):
+						wall_options[lowest] = new_option
+				sleep_storage_by_wall[wi] = wall_options
+			elif require_cooking_pair:
+				var kitchen_options: Array = cooking_storage_by_wall.get(wi, [])
+				var nearby_kitchen := -1
+				for option_index in range(kitchen_options.size()):
+					var option_candidate: Dictionary = kitchen_options[option_index]["candidate"]
+					if Vector2(option_candidate["pos"].x, option_candidate["pos"].z).distance_to(
+							Vector2(cand["pos"].x, cand["pos"].z)) < 1.0:
+						nearby_kitchen = option_index
+						break
+				var new_kitchen_option := {"candidate": cand, "score": score}
+				if nearby_kitchen >= 0:
+					if score > float(kitchen_options[nearby_kitchen]["score"]):
+						kitchen_options[nearby_kitchen] = new_kitchen_option
+				elif kitchen_options.size() < 3:
+					kitchen_options.append(new_kitchen_option)
+				else:
+					var lowest_kitchen := 0
+					for option_index in range(1, kitchen_options.size()):
+						if float(kitchen_options[option_index]["score"]) \
+								< float(kitchen_options[lowest_kitchen]["score"]):
+							lowest_kitchen = option_index
+					if score > float(kitchen_options[lowest_kitchen]["score"]):
+						kitchen_options[lowest_kitchen] = new_kitchen_option
+				cooking_storage_by_wall[wi] = kitchen_options
+			elif score > best_score:
 				best_score = score
 				best = cand
+	if require_sleep_access:
+		var sleep_storage_options: Array[Dictionary] = []
+		for wall_options_variant in sleep_storage_by_wall.values():
+			for option in wall_options_variant:
+				sleep_storage_options.append(option)
+		sleep_storage_options.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return float(a["score"]) > float(b["score"]))
+		for candidate_index in mini(sleep_storage_options.size(), 8):
+			var option: Dictionary = sleep_storage_options[candidate_index]
+			var trial_candidate: Dictionary = Dictionary(option["candidate"]).duplicate(true)
+			trial_candidate["activity_group"] = "sleep"
+			if _sleep_access_survives_candidate(plan, room, trial_candidate):
+				best = trial_candidate
+				break
+	elif require_cooking_pair:
+		var cooking_storage_options: Array[Dictionary] = []
+		for wall_options_variant in cooking_storage_by_wall.values():
+			for option in wall_options_variant:
+				cooking_storage_options.append(option)
+		cooking_storage_options.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return float(a["score"]) > float(b["score"]))
+		for candidate_index in mini(cooking_storage_options.size(), 12):
+			var option: Dictionary = cooking_storage_options[candidate_index]
+			var pair_storage: Dictionary = Dictionary(option["candidate"]).duplicate(true)
+			var pair_prep: Dictionary = Dictionary(pair_storage.get("paired_workbench", {})).duplicate(true)
+			pair_storage["activity_group"] = "cooking"
+			if not pair_prep.is_empty() and _cooking_pair_survives_candidates(plan,
+					room, pair_storage, pair_prep):
+				best = pair_storage
+				break
 	HouseFurnishGeometry.commit(plan, room, best, blocked, zones)
+
+
+## Prefer lit kitchen work surfaces while retaining geometry and route checks.
+static func _workbench_daylight_preference(plan: HousePlan, room: int,
+		candidate: Dictionary) -> float:
+	if plan.windows_of(room).is_empty():
+		return 0.0
+	var rect: Rect2 = candidate["rect"]
+	var back_wall := HouseFurnishSpatialCheck.fs_back_wall(plan, room, rect, candidate)
+	if back_wall >= 0 and HouseFurnishSpatialCheck.fs_wall_lit(plan, room, back_wall):
+		return 100.0
+	var nearest := INF
+	for window_index in plan.windows_of(room):
+		nearest = minf(nearest, rect.get_center().distance_to(Vector2(plan.windows[window_index]["pos"])))
+	return 50.0 if nearest <= HouseFurnishAffinityCheck.FS_WINDOW_REACH else 0.0
+
+
+## Test the actual rasterized route to the bed and head-end chest with this
+## clothes-chest candidate present. Rectangle fit cannot detect a narrow gap
+## that closes after the walk grid expands furniture by a person's radius.
+static func _sleep_access_survives_candidate(plan: HousePlan, room: int,
+		candidate: Dictionary) -> bool:
+	var trial := HousePlan.new()
+	trial.spec = plan.spec
+	trial.rooms = plan.rooms
+	trial.doors = plan.doors
+	trial.windows = plan.windows
+	trial.stairs = plan.stairs
+	trial.columns = plan.columns
+	trial.courts = plan.courts
+	trial.zones = plan.zones
+	trial.hearth = plan.hearth
+	trial.dais = plan.dais
+	trial.furniture = plan.furniture.duplicate(true)
+	var trial_blocked: Array[Rect2] = []
+	var trial_zones: Array[Rect2] = []
+	HouseFurnishGeometry.commit(trial, room, candidate.duplicate(true),
+		trial_blocked, trial_zones)
+	var rep: Dictionary = HouseNavCheck.new().check(trial)
+	if room in rep.get("unreached_rooms", []):
+		return false
+	var targets: Array[int] = [trial.furniture.size() - 1]
+	for index in range(trial.furniture.size() - 1):
+		var piece: Dictionary = trial.furniture[index]
+		if int(piece.get("room", -1)) != room:
+			continue
+		if String(piece.get("activity_group", "")) == "sleep" \
+				and (String(piece.get("cat", "")) == "bed" \
+				or String(piece.get("activity_host_anchor", "")) == "head_end"):
+			targets.append(index)
+	var unreachable: Array = rep.get("unreachable_items", [])
+	for target in targets:
+		if target in unreachable:
+			return false
+	return true
+
+
+## Kitchen storage and its prep surface are selected as a pair. The clear
+## rectangles can fit separately while the actual walk grid leaves one behind
+## an inaccessible pinch point, so test only the best geometric candidates.
+static func _cooking_pair_survives_candidates(plan: HousePlan, room: int,
+		storage: Dictionary, prep: Dictionary) -> bool:
+	var trial := HousePlan.new()
+	trial.spec = plan.spec
+	trial.rooms = plan.rooms
+	trial.doors = plan.doors
+	trial.windows = plan.windows
+	trial.stairs = plan.stairs
+	trial.columns = plan.columns
+	trial.courts = plan.courts
+	trial.zones = plan.zones
+	trial.hearth = plan.hearth
+	trial.dais = plan.dais
+	trial.furniture = plan.furniture.duplicate(true)
+	var trial_blocked: Array[Rect2] = []
+	var trial_zones: Array[Rect2] = []
+	HouseFurnishGeometry.commit(trial, room, storage.duplicate(true),
+		trial_blocked, trial_zones)
+	HouseFurnishGeometry.commit(trial, room, prep.duplicate(true),
+		trial_blocked, trial_zones)
+	var rep: Dictionary = HouseNavCheck.new().check(trial)
+	if room in rep.get("unreached_rooms", []):
+		return false
+	var unreachable: Array = rep.get("unreachable_items", [])
+	for index in range(trial.furniture.size()):
+		if int(trial.furniture[index].get("room", -1)) == room \
+				and index in unreachable:
+			return false
+	return true
 
 
 ## N copies of the same prop, evenly spaced along a line, all facing the same
@@ -554,10 +1191,13 @@ static func _forced_wall(plan: HousePlan, room: int, key: String) -> int:
 ## Room in the middle of the floor, for a table or an anvil.
 static func place_free(plan: HousePlan, room: int, key: String,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator,
-		require_seat := false, seat_cat := "seat", seat_n := 1) -> void:
+		require_seat := false, seat_cat := "seat", seat_n := 1,
+		retain_seat_set := false, height_scale := -1.0) -> void:
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var extra: Array[Rect2] = _window_blocks(plan, room, key)
-	var result := {"best": {}, "score": -INF, "require_seat": require_seat, "seat_cat": seat_cat, "seat_n": seat_n}
+	var result := {"best": {}, "score": -INF, "require_seat": require_seat,
+		"seat_cat": seat_cat, "seat_n": seat_n, "retain_seat_set": retain_seat_set,
+		"height_scale": height_scale}
 	# Where the fire is does not change while the table hunts for a spot, and
 	# the hunt looks at thousands of spots. Found once here and carried on the
 	# candidate; leaving it inside the grid made every table in the sweep walk
@@ -610,11 +1250,24 @@ static func place_free(plan: HousePlan, room: int, key: String,
 				best["door_approach"] = true
 				break
 	var seat: Dictionary = best.get("paired_seat", {})
+	var seats: Array = best.get("paired_seats", [])
 	best.erase("paired_seat")
+	best.erase("paired_seats")
 	HouseFurnishGeometry.commit(plan, room, best, blocked, zones)
+	var paired_table_index: int = plan.furniture.size() - 1
 	if not seat.is_empty():
-		seat["host"] = plan.furniture.size() - 1
+		seat["host"] = paired_table_index
+		var seat_pos: Vector3 = seat["pos"]
+		seat_pos.y = 0.0
+		seat["pos"] = seat_pos
 		HouseFurnishGeometry.commit(plan, room, seat, blocked, zones)
+	for paired_seat in seats:
+		var seat_piece: Dictionary = paired_seat
+		seat_piece["host"] = paired_table_index
+		var paired_pos: Vector3 = seat_piece["pos"]
+		paired_pos.y = 0.0
+		seat_piece["pos"] = paired_pos
+		HouseFurnishGeometry.commit(plan, room, seat_piece, blocked, zones)
 
 
 ## The approach to every door of a room: the strip a person walks through
@@ -643,19 +1296,20 @@ static func door_approach_rects(door: Dictionary) -> Array[Rect2]:
 ## Against a wall, out of the approach to the doors if the piece is a table
 ## and the room has anywhere else for it; otherwise against a wall as before.
 static func _wall_clear_of_doors(plan: HousePlan, room: int, key: String,
-		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
+		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator,
+		step: Dictionary = {}) -> void:
 	var before := plan.furniture.size()
 	if PropCatalog.category(key) == "table":
 		var approach := door_approaches(plan, room)
 		var held: Array[Rect2] = blocked.duplicate()
 		blocked.append_array(approach)
-		_place_against_wall(plan, room, key, blocked, zones, r)
+		_place_against_wall(plan, room, key, blocked, zones, r, step)
 		# put the borrowed rectangles back out, keeping what was committed
 		var committed: Array[Rect2] = blocked.slice(held.size() + approach.size())
 		blocked.assign(held + committed)
 		if plan.furniture.size() > before:
 			return
-	_place_against_wall(plan, room, key, blocked, zones, r)
+	_place_against_wall(plan, room, key, blocked, zones, r, step)
 
 
 ## A table set against a wall had no door approach to avoid -- the wall rule
@@ -727,7 +1381,8 @@ static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 	# The measured model, yaw, scale and category are constant for this pass.
 	# Preserve the same candidates and RNG calls while doing those catalogue
 	# lookups once instead of once at every point of the search grid.
-	var prototype := HouseFurnishGeometry.candidate(key, Vector2.ZERO, yaw, 1.0, sc)
+	var prototype := HouseFurnishGeometry.candidate(key, Vector2.ZERO, yaw, 1.0, sc,
+		float(result.get("height_scale", -1.0)))
 	var has_zone := PropCatalog.zone_depth(key) > 0.0
 	# A customer can stand in the clear approach to the shop's entrance while
 	# using its counter or stall. The piece itself must still clear that door;
@@ -757,10 +1412,15 @@ static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 				+ HouseFurnishScore._affinity(plan, room, cand)
 			if score > float(result["score"]):
 				if bool(result.get("require_seat", false)):
-					var seat := _seating_probe(plan, room, cand, blocked, zones, String(result["seat_cat"]), int(result["seat_n"]))
+					var seat := _seating_probe(plan, room, cand, blocked, zones,
+						String(result["seat_cat"]), int(result["seat_n"]),
+						bool(result.get("retain_seat_set", false)))
 					if seat.is_empty():
 						continue
-					cand["paired_seat"] = seat
+					if int(result["seat_n"]) > 1:
+						cand["paired_seats"] = seat.get("paired_seats", [])
+					else:
+						cand["paired_seat"] = seat
 				result["score"] = score
 				result["best"] = cand
 

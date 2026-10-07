@@ -58,8 +58,12 @@ static func relax(plan: HousePlan) -> int:
 			if best < 0:
 				break
 		if plan.furniture[best].get("must", false):
-			plan.note_compromise(int(plan.furniture[best]["room"]),
-				String(plan.furniture[best]["cat"]))
+			var compromised: Dictionary = plan.furniture[best]
+			var compromised_room: int = int(compromised["room"])
+			plan.note_compromise(compromised_room, String(compromised["cat"]))
+			var activity_group: String = String(compromised.get("activity_group", ""))
+			if not activity_group.is_empty():
+				plan.note_compromise(compromised_room, "activity:" + activity_group)
 		var repair_indices := _repair_target_indices(plan, best)
 		for ri in range(repair_indices.size() - 1, -1, -1):
 			var index: int = repair_indices[ri]

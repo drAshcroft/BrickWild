@@ -496,3 +496,298 @@ Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=castle --see
    - camera (-0.54, 1.58, -7.89) looking (-0.74, 0.52, -0.42)
    - ![pin 14](walk_shots/1a10f9d8fd5f7eaa1a5_14.png)
 
+<!-- human-walk 1a113a20fda8c84783d house -->
+## Walk — House: cottage / none, seed 1 — 2026-10-06T23:52:30Z
+
+Building: Willowmill Cottage · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.6,"kind":"house","length":12.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"none","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"cottage","water":"none","width":9.0}`
+
+Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed=1 --style=cottage --purpose=none`
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (3)
+
+1. **collision** — collides with table.
+   - at (2.61, 0.71, -4.01) (building-local), normal (0.00, 1.00, 0.00), hit `Furniture/Stool/Stool`, room: hall #1 (storey 0)
+   - plan: furniture[7] Table_Large, furniture[10] Stool
+   - camera (2.20, 1.72, -5.21) looking (0.25, -0.63, 0.74)
+   - ![pin 1](walk_shots/1a113a20fda8c84783d_1.png)
+2. **collision** — chairs face the wrong way
+   - at (2.09, 0.62, -3.30) (building-local), normal (0.00, 1.00, 0.00), hit `Furniture/@Node3D@119/Chair_1`, room: hall #1 (storey 0)
+   - plan: furniture[9] Chair_1
+   - camera (2.20, 1.72, -5.21) looking (-0.05, -0.50, 0.87)
+   - ![pin 2](walk_shots/1a113a20fda8c84783d_2.png)
+3. **collision** — need to get some kitchen furnature from the assets
+   - at (-0.49, 0.71, 3.98) (building-local), normal (1.00, 0.00, 0.00), hit `Shell`, room: bedroom #3 (storey 0), kitchen #5 (storey 0)
+   - camera (3.30, 1.72, 4.29) looking (-0.96, -0.26, -0.08)
+   - ![pin 3](walk_shots/1a113a20fda8c84783d_3.png)
+
+<!-- human-walk 1a113a3c325506bad9a shop -->
+## Walk — Shop: cottage / barracks, seed 1 — 2026-10-06T23:54:21Z
+
+Building: Fox on Market Row · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.8,"kind":"shop","length":14.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"barracks","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"cottage","water":"none","width":11.0}`
+
+Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=shop --seed=1 --style=cottage --purpose=barracks`
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (2)
+
+1. **collision** — giant room with crowded two tables in the room
+   - at (0.01, 0.62, -1.57) (building-local), normal (0.00, 1.00, 0.00), hit `Furniture/@Node3D@154/Bench`, room: mess #2 (storey 0)
+   - plan: furniture[15] Bench
+   - camera (2.27, 1.72, -3.21) looking (-0.75, -0.37, 0.55)
+   - ![pin 1](walk_shots/1a113a3c325506bad9a_1.png)
+2. **collision** — give the baracks some dressers?
+   - at (-0.92, 0.12, 4.43) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`, room: dormitory #3 (storey 0)
+   - camera (4.81, 1.72, 4.37) looking (-0.96, -0.27, 0.01)
+   - ![pin 2](walk_shots/1a113a3c325506bad9a_2.png)
+
+<!-- human-walk 1a113eece1512b6faee hotel -->
+## Walk — Hotel: grand_budapest / , seed 1 — 2026-10-07T01:16:19Z
+
+Building: Imperial Alpine Hotel · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":3.6,"kind":"hotel","length":24.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":3,"style":"grand_budapest","water":"none","width":48.0}`
+
+Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=hotel --seed=1 --style=grand_budapest --purpose=`
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (11)
+
+1. **collision** — chair is backwards
+   - at (0.15, 0.61, -7.44) (building-local), normal (-0.01, 0.00, -1.00), hit `Furniture/@Node3D@181/Chair_1`, room: lobby #1 (storey 0)
+   - plan: furniture[22] Chair_1, furniture[33] CandleStick_Stand
+   - camera (-1.06, 1.72, -9.75) looking (0.00, -0.05, 1.00)
+   - ![pin 1](walk_shots/1a113eece1512b6faee_1.png)
+2. **collision** — light is right in the way of the table
+   - at (-0.22, 0.12, -6.99) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`, room: lobby #1 (storey 0)
+   - plan: furniture[33] CandleStick_Stand
+   - camera (-1.06, 1.72, -9.75) looking (0.00, -0.05, 1.00)
+   - ![pin 2](walk_shots/1a113eece1512b6faee_2.png)
+3. **collision** — why two kinds of chairs?
+   - at (-1.11, 0.71, -7.22) (building-local), normal (0.00, 1.00, 0.00), hit `Furniture/@Node3D@183/Stool`, room: lobby #1 (storey 0)
+   - plan: furniture[25] Stool
+   - camera (-1.06, 1.72, -8.82) looking (0.00, -0.05, 1.00)
+   - ![pin 3](walk_shots/1a113eece1512b6faee_3.png)
+4. **collision** — this is not very much like the lobby of a huge hotel.  find couches, plants, put a conseirge desk in
+   - at (2.20, 0.12, -7.89) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`, room: lobby #1 (storey 0)
+   - camera (-2.80, 1.72, -8.82) looking (0.94, -0.30, 0.17)
+   - ![pin 4](walk_shots/1a113eece1512b6faee_4.png)
+5. **collision** — this does not work.  what is it and why is it right in the way
+   - at (-1.04, 0.33, 0.08) (building-local), normal (1.00, 0.00, 0.00), hit `Furniture/BookStand/BookStand`, room: gallery #3 (storey 0)
+   - plan: furniture[49] BookStand
+   - camera (1.52, 1.72, 0.41) looking (-0.87, -0.48, -0.11)
+   - ![pin 5](walk_shots/1a113eece1512b6faee_5.png)
+6. **collision** — cannot get to the stairs
+   - at (-0.50, 1.95, 1.07) (building-local), normal (1.00, 0.00, 0.00), hit `Shell`, room: gallery #3 (storey 0)
+   - plan: doors[5] (0.82 m away)
+   - camera (1.52, 1.72, 0.41) looking (-0.95, 0.10, 0.31)
+   - ![pin 6](walk_shots/1a113eece1512b6faee_6.png)
+7. **collision** — no rails, narrow hallways
+   - at (-1.64, 3.72, 0.25) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`, room: gallery #3 (storey 0), gallery #17 (storey 1)
+   - camera (-0.25, 5.32, -0.41) looking (-0.63, -0.72, 0.30)
+   - ![pin 7](walk_shots/1a113eece1512b6faee_7.png)
+8. **collision** — z ordering problems
+   - at (-1.36, 3.73, 1.63) (building-local), normal (0.00, 0.00, -1.00), hit `Shell`, room: gallery #3 (storey 0), laundry #6 (storey 0), gallery #17 (storey 1), guest_room #21 (storey 1)
+   - camera (-0.25, 5.32, -0.41) looking (-0.39, -0.56, 0.73)
+   - ![pin 8](walk_shots/1a113eece1512b6faee_8.png)
+9. **collision** — huge rooms with nothing inside
+   - at (-13.42, 3.72, -5.78) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`, room: dining_room #0 (storey 0), guest_room #11 (storey 1)
+   - camera (-13.41, 5.32, -1.29) looking (-0.00, -0.34, -0.94)
+   - ![pin 9](walk_shots/1a113eece1512b6faee_9.png)
+10. **collision** — maybe the kitchen? needs a kitchen
+   - at (-13.82, 0.12, 7.82) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`, room: kitchen #4 (storey 0)
+   - camera (-17.57, 1.72, 4.25) looking (0.69, -0.30, 0.66)
+   - ![pin 10](walk_shots/1a113eece1512b6faee_10.png)
+11. **collision** — these doors are not inside?
+   - at (-4.97, 4.96, -11.84) (building-local), normal (0.00, 0.00, -1.00), hit `Shell`
+   - plan: windows[73] (0.26 m away)
+   - camera (-5.70, 1.58, -17.41) looking (0.11, 0.52, 0.85)
+   - ![pin 11](walk_shots/1a113eece1512b6faee_11.png)
+
+<!-- human-walk 1a113ef8bedb9eed501 temple -->
+## Walk — Temple: basilica / blood, seed 1 — 2026-10-07T01:17:08Z
+
+Building: The Rustreliquary of the Long Sleep · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":12.0,"kind":"temple","length":44.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"blood","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"basilica","water":"none","width":26.0}`
+
+Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=temple --seed=1 --style=basilica --purpose=blood`
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (1)
+
+1. **collision** — zordering problems
+   - at (-1.60, 2.09, -21.46) (building-local), normal (1.00, 0.00, 0.00), hit `Stone`
+   - camera (-0.65, 1.72, -21.34) looking (-0.93, 0.36, -0.12)
+   - ![pin 1](walk_shots/1a113ef8bedb9eed501_1.png)
+
+<!-- human-walk 1a113f01037f263d777 windmill -->
+## Walk — Windmill: tower / , seed 1 — 2026-10-07T01:17:42Z
+
+Building: Rook Mill · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":12.0,"kind":"windmill","length":6.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"tower","water":"none","width":12.0}`
+
+Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=windmill --seed=1 --style=tower --purpose=`
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (1)
+
+1. **collision** — door is missing some ribs
+   - at (-0.02, 1.23, -2.85) (building-local), normal (0.00, 0.09, -1.00), hit `Shell`
+   - camera (-0.50, 1.58, -4.86) looking (0.23, -0.17, 0.96)
+   - ![pin 1](walk_shots/1a113f01037f263d777_1.png)
+
+<!-- human-walk 1a113f41f088a9b6f32 world -->
+## Walk — World: courtyard_house / domus, seed 1 — 2026-10-07T01:22:08Z
+
+Building: Merchant's Domus · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":6.0,"kind":"world","length":30.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"domus","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"courtyard_house","water":"none","width":20.0}`
+
+Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=world --seed=1 --style=courtyard_house --purpose=domus`
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (4)
+
+1. **collision** — this is a pretty boring facade.  missing a lot of information and details
+   - at (0.98, 3.37, -15.00) (building-local), normal (0.00, 0.00, -1.00), hit `Shell`
+   - camera (-0.11, 1.58, -21.65) looking (0.16, 0.26, 0.95)
+   - ![pin 1](walk_shots/1a113f41f088a9b6f32_1.png)
+2. **collision** — no furnishing
+   - at (-1.57, 0.12, -8.34) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`, room: gallery #1 (storey 0)
+   - camera (0.39, 1.72, -12.07) looking (-0.44, -0.35, 0.83)
+   - ![pin 2](walk_shots/1a113f41f088a9b6f32_2.png)
+3. **collision** — missing lights
+   - at (2.78, 3.71, 2.91) (building-local), normal (1.00, 0.00, 0.00), hit `Shell`, room: dining_room #4 (storey 0), bedroom #5 (storey 0)
+   - plan: furniture[23] Table_Large
+   - camera (5.92, 1.72, 2.53) looking (-0.84, 0.53, 0.10)
+   - ![pin 3](walk_shots/1a113f41f088a9b6f32_3.png)
+4. **collision** — one bench, just a table in a huge room
+   - at (-6.98, 0.12, 5.55) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`, room: parlour #3 (storey 0)
+   - camera (-5.25, 1.72, 0.10) looking (-0.29, -0.27, 0.92)
+   - ![pin 4](walk_shots/1a113f41f088a9b6f32_4.png)
+
+<!-- human-walk 1a113f86d10724c5a87 village -->
+## Walk — Village: english / farming, seed 1 — 2026-10-07T01:26:50Z
+
+Building: Wolfmarch Green · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":1.0,"kind":"village","length":35.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"farming","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"english","water":"none","width":40.0}`
+
+Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=village --seed=1 --style=english --purpose=farming`
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (12)
+
+1. **collision** — what is this?  a pear?
+   - at (-26.29, 1.29, -35.77) (building-local), normal (-0.42, 0.23, 0.88), hit `Ground`
+   - camera (-26.61, 1.60, -34.18) looking (0.20, -0.19, -0.96)
+   - ![pin 1](walk_shots/1a113f86d10724c5a87_1.png)
+2. **collision** — zordering problems
+   - at (-63.42, 2.67, -31.76) (building-local), normal (-0.99, 0.00, -0.17), hit `Buildings/house_9/Shell`
+   - camera (-64.12, 2.11, -32.71) looking (0.54, 0.43, 0.73)
+   - ![pin 2](walk_shots/1a113f86d10724c5a87_2.png)
+3. **collision** — bench on stairs
+   - at (-63.52, 1.65, -32.09) (building-local), normal (0.04, 1.00, 0.01), hit `Buildings/house_9/Furniture/Shelf_Simple/Shelf_Simple`
+   - camera (-63.56, 2.10, -32.66) looking (0.06, -0.62, 0.78)
+   - ![pin 3](walk_shots/1a113f86d10724c5a87_3.png)
+4. **collision** — cannot climb stairs
+   - at (-63.89, 1.53, -31.63) (building-local), normal (0.17, 0.00, -0.99), hit `Buildings/house_9/Shell`
+   - camera (-63.56, 2.10, -32.66) looking (-0.27, -0.47, 0.84)
+   - ![pin 4](walk_shots/1a113f86d10724c5a87_4.png)
+5. **collision** — no railing
+   - at (-64.67, 2.72, -31.69) (building-local), normal (0.00, 1.00, 0.00), hit `Buildings/house_9/Shell`
+   - camera (-65.13, 4.32, -33.34) looking (0.20, -0.68, 0.70)
+   - ![pin 5](walk_shots/1a113f86d10724c5a87_5.png)
+6. **collision** — stairs go directly into the wall
+   - at (-64.12, 2.60, -30.46) (building-local), normal (0.00, 1.00, 0.00), hit `Buildings/house_9/Shell`
+   - camera (-65.13, 4.32, -33.34) looking (0.29, -0.49, 0.82)
+   - ![pin 6](walk_shots/1a113f86d10724c5a87_6.png)
+7. **collision** — stuck in the floor?
+   - at (-66.80, 2.72, -33.91) (building-local), normal (0.99, 0.00, 0.17), hit `Buildings/house_9/Shell`
+   - camera (-64.34, 4.32, -34.17) looking (-0.83, -0.54, 0.09)
+   - ![pin 7](walk_shots/1a113f86d10724c5a87_7.png)
+8. **collision** — these should not have colliders
+   - at (-2.45, 0.52, 7.65) (building-local), normal (0.41, 0.78, 0.48), hit `Plants/Wild_Clover_2_4/Clover_2`
+   - camera (-4.20, 1.63, 11.28) looking (0.42, -0.27, -0.87)
+   - ![pin 8](walk_shots/1a113f86d10724c5a87_8.png)
+9. **collision** — why?
+   - at (20.40, 0.01, 14.15) (building-local), normal (0.00, 1.00, 0.00), hit `Ground`
+   - camera (19.81, 1.63, 16.23) looking (0.22, -0.60, -0.77)
+   - ![pin 9](walk_shots/1a113f86d10724c5a87_9.png)
+10. **collision** — really short door
+   - at (19.56, 1.92, 15.61) (building-local), normal (-0.00, -1.00, 0.00), hit `Buildings/church_0/Shell`
+   - camera (20.29, 1.63, 16.13) looking (-0.78, 0.31, -0.55)
+   - ![pin 10](walk_shots/1a113f86d10724c5a87_10.png)
+11. **collision** — no entrance
+   - at (31.70, 1.66, 20.03) (building-local), normal (0.16, 0.00, 0.99), hit `Buildings/church_0/Shell`
+   - camera (31.49, 1.61, 24.47) looking (0.05, 0.01, -1.00)
+   - ![pin 11](walk_shots/1a113f86d10724c5a87_11.png)
+12. **collision** — tables do not go right in front of main entrances (most of the time they do not go in the front room.  especially in a house this big
+   - at (53.53, 0.74, 31.30) (building-local), normal (0.00, 1.00, 0.00), hit `Buildings/house_5/Furniture/Table_Large/Table_Large`
+   - camera (54.02, 1.72, 29.90) looking (-0.28, -0.55, 0.78)
+   - ![pin 12](walk_shots/1a113f86d10724c5a87_12.png)
+
+<!-- human-walk 1a113f97860b8a160d1 house -->
+## Walk — House: witch_hut / none, seed 1 — 2026-10-07T01:27:58Z
+
+Building: Hollowbarrow Steading · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.6,"kind":"house","length":12.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"none","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"witch_hut","water":"none","width":9.0}`
+
+Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed=1 --style=witch_hut --purpose=none`
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (1)
+
+1. **collision** — what makes this a witch's hut?  it is just a german style tract house from the 50s
+   - at (-0.13, 3.13, -6.00) (building-local), normal (0.00, 0.00, -1.00), hit `Shell`
+   - plan: windows[2] (0.83 m away)
+   - camera (-0.85, 1.58, -11.83) looking (0.12, 0.25, 0.96)
+   - ![pin 1](walk_shots/1a113f97860b8a160d1_1.png)
+
