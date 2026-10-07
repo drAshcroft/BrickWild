@@ -90,7 +90,7 @@ godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed=8102
 **Other projects use `releases/`, not this tree.** VoxelGames embeds
 `releases/<id>/addons/brick_wild` through that release's `install.ps1`;
 Dm_View and PaperFjord run `godot --path releases/<id>/project`. Do not tell a
-consumer to point at `C:\Projects\BigGlade` itself. See `docs/RELEASES.md`.
+consumer to point at `C:\Projects\BrickWild` itself. See `docs/RELEASES.md`.
 The addon manifest lists directories; a new `src/` family needs one line in
 its `script_trees` or the installer test fails.
 

@@ -76,6 +76,10 @@ const BAKERY_MIN_POP := 50
 const SHRINE_MIN_POP := 20
 const CHURCH_MIN_POP := 60
 const MANOR_MIN_POP := 200
+## A seat below MANOR_MIN_POP is a HOLD: one fortified house at the castle
+## family's house tier (<= 300 m2), not a 40 x 50 m enceinte. Its lot is a
+## fifth of the manor's, and its own interior QA has a sixth of the defects.
+const HOLD_SIZE := Vector3(12.0, 14.0, 8.0)
 
 
 ## Every `BuildingRequest` the population/purpose/culture/wealth/water earns:
@@ -97,7 +101,9 @@ static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 	if spec.site_brief:
 		_append_site_brief(out, spec, styles)
 
-	if spec.population >= MANOR_MIN_POP or spec.purpose == &"garrison":
+	# A brief's seat already is the lord's house: one castle per village.
+	if (spec.population >= MANOR_MIN_POP or spec.purpose == &"garrison") \
+			and not _has_kind(out, &"castle"):
 		out.append(BuildingRequest.castle(
 			_seed_for(spec, "manor"), styles["castle"], 40.0, 50.0, 10.0))
 
@@ -191,7 +197,7 @@ static func _append_seat(out: Array[BuildingRequest], spec: VillageSpec,
 	match requested_regime:
 		&"royal":
 			if not _has_kind(out, &"castle"):
-				_append_castle(out, spec, styles, "seat|royal", fraction)
+				_append_seat_castle(out, spec, styles, "seat|royal", fraction)
 		&"council":
 			if not _has_shop_purpose(out, &"town_hall"):
 				_append_shop(out, spec, "seat|council", &"town_hall", styles["house"], fraction)
@@ -203,7 +209,7 @@ static func _append_seat(out: Array[BuildingRequest], spec: VillageSpec,
 					styles["church"], 10.0, 20.0, 12.0))
 		&"military":
 			if not _has_kind(out, &"castle"):
-				_append_castle(out, spec, styles, "seat|military", fraction)
+				_append_seat_castle(out, spec, styles, "seat|military", fraction)
 
 
 static func _append_shop(out: Array[BuildingRequest], spec: VillageSpec, key: String,
@@ -211,6 +217,17 @@ static func _append_shop(out: Array[BuildingRequest], spec: VillageSpec, key: St
 	var size: float = lerpf(0.72, 1.0, clampf(fraction, 0.0, 1.0))
 	out.append(BuildingRequest.shop(_seed_for(spec, "brief|" + key), business, style,
 		11.0 * size, 14.0 * size, 2.8, 1))
+
+
+## A city's seat: a hold until the village earns a manor, then a castle.
+static func _append_seat_castle(out: Array[BuildingRequest], spec: VillageSpec,
+	styles: Dictionary, key: String, fraction: float) -> void:
+	if spec.population >= MANOR_MIN_POP:
+		_append_castle(out, spec, styles, key, fraction)
+		return
+	var size: float = lerpf(0.8, 1.0, clampf(fraction, 0.0, 1.0))
+	out.append(BuildingRequest.castle(_seed_for(spec, "brief|" + key), styles["castle"],
+		HOLD_SIZE.x * size, HOLD_SIZE.y * size, HOLD_SIZE.z))
 
 
 static func _append_castle(out: Array[BuildingRequest], spec: VillageSpec,

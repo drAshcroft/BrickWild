@@ -41,7 +41,7 @@ install from it instead; it is one verified commit and does not change while
 the repository is being edited:
 
 ```powershell
-C:\Projects\BigGlade\releases\brick_wild-0.1.0\install.ps1 `
+C:\Projects\BrickWild\releases\brick_wild-0.1.0\install.ps1 `
   -TargetProject C:\path\to\YourGodotProject
 ```
 

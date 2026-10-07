@@ -11,6 +11,7 @@ static func run() -> SuiteResult:
 	_check_language_and_palette(result)
 	_check_kept_fractions(result)
 	_check_refusals(result)
+	_check_royal_hamlet_placed(result)
 	return result
 
 
@@ -82,6 +83,10 @@ static func _check_regime_seats(result: SuiteResult) -> void:
 		result.checked += 1
 		if not _has_request(requests, seat_kind, seat_purpose):
 			result.fail("%s regime did not receive its %s seat" % [fixture[0], seat_kind])
+		var castles := requests.filter(func(r: BuildingRequest) -> bool: return r.kind == &"castle").size()
+		result.checked += 1
+		if castles > 1:
+			result.fail("%s regime asked for %d castles; a seat is the one castle" % [fixture[0], castles])
 		if fixture[0] == "military":
 			result.checked += 1
 			if spec.purpose != &"garrison":
@@ -169,3 +174,49 @@ static func _check_refusals(result: SuiteResult) -> void:
 		result.checked += 1
 		if errors.is_empty() or not errors[0].contains(field):
 			result.fail("impossible brief was not explicitly refused for %s" % field)
+
+
+## A royal seat must stand in a hamlet, not cost it the whole plan. Below a
+## manor's population it is a hold: the castle family's house tier. The 40 x
+## 50 m castle's manor lot used to cross a field track at every candidate in
+## a round village, so every royal brief of 20..60 people was refused with
+## "only N of N+1 requested buildings fit" on a site with room to spare.
+static func _check_royal_hamlet_placed(result: SuiteResult) -> void:
+	var text := FileAccess.get_file_as_string("res://tests/fixtures/site_requests/thorn-hamlet.json")
+	for population in [30, 60]:
+		# The raw text carries mythsim's unsigned 64-bit seed, which a parsed
+		# Dictionary loses: without it this is a different village from the
+		# one the exporter plans.
+		var raw := text.replace("\"population\": 26", "\"population\": %d" % population)
+		var request: Dictionary = JSON.parse_string(raw)
+		var spec: VillageSpec = EXPORTER.spec_from_request(request, raw)
+		spec.generate(spec.seed)
+		var wanted: Array[BuildingRequest] = VillageProgrammer.programme(spec)
+		var plan: VillagePlan = VillageLotPlanner.plan(spec)
+		var castles := plan.buildings.filter(func(b: Dictionary) -> bool:
+			return (b["request"] as BuildingRequest).kind == &"castle").size()
+		for b in plan.buildings:
+			var seat: BuildingRequest = b["request"]
+			result.checked += 1
+			if seat.kind == &"castle" and CastleSpec.tier_for(seat.width, seat.length) != &"house":
+				result.fail("royal hamlet of %d: the seat is a %s, not a hold" % [
+					population, CastleSpec.tier_for(seat.width, seat.length)])
+		result.checked += 1
+		if plan.buildings.size() < wanted.size() or castles != 1:
+			result.fail("royal hamlet of %d placed %d of %d buildings, %d castle(s)" % [
+				population, plan.buildings.size(), wanted.size(), castles])
+		result.checked += 1
+		if plan.site.size.x > float(request["site_m"]) or plan.site.size.y > float(request["site_m"]):
+			result.fail("royal hamlet of %d needs a %s site, beyond %s m" % [
+				population, plan.site.size, request["site_m"]])
+		var qa: Dictionary = VillageQA.new().check(plan, {}, false)
+		result.checked += 1
+		for failure in qa["failures"]:
+			# Open for every C1 brief, whatever the regime, and not about
+			# where the seat stands: `earned` (a brief's seat is not earned by
+			# population), `culture` (the norse palette lacks a wild tree), and
+			# `landmark` (whether a royal keep may out-top the shrine).
+			var rule := String(failure).get_slice(":", 0)
+			if rule in ["earned", "culture", "landmark"]:
+				continue
+			result.fail("royal hamlet of %d: QA: %s" % [population, String(failure)])

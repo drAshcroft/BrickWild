@@ -1,7 +1,7 @@
 # Releases: what other projects should use
 
 This repository is edited all day, often by several agents at once. A project
-that reads `C:\Projects\BigGlade` directly gets whatever state the tree is in
+that reads `C:\Projects\BrickWild` directly gets whatever state the tree is in
 that minute: half a refactor, a renamed class, an installer that moved. That
 has broken VoxelGames twice and drifted Dm_View's generator tag once.
 
@@ -55,7 +55,7 @@ releases/                       git-ignored (it holds the licensed packs)
 **Embedding the addon** (VoxelGames). Install from the release, not the repo:
 
 ```powershell
-C:\Projects\BigGlade\releases\brick_wild-0.1.0\install.ps1 -TargetProject C:\path\to\game
+C:\Projects\BrickWild\releases\brick_wild-0.1.0\install.ps1 -TargetProject C:\path\to\game
 godot --headless --path C:\path\to\game --editor --quit    # register class_name
 ```
 
@@ -68,7 +68,7 @@ own staging script; upgrading is changing that one string.
 frozen project instead of the repository:
 
 ```
-godot --headless --path C:/Projects/BigGlade/releases/brick_wild-0.1.0/project \
+godot --headless --path C:/Projects/BrickWild/releases/brick_wild-0.1.0/project \
     --script res://tools/export_village_plan.gd -- ...
 ```
 

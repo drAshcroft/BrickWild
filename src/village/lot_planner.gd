@@ -123,6 +123,49 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			unplaced = left
 			common_state = next_common
 			accepted = attempt
+	# A seat castle that is still unplaced is not short of ground. Its lot is
+	# ninety metres across on the lean, and the field tracks fifty apart cut
+	# every candidate (the gate form drops them for the same reason). Clear
+	# the eastern head only now, so a village that already planned is the
+	# same village it was.
+	var accepted_head := false
+	if unplaced > 0 and _manor_unplaced(out, jobs):
+		# Never narrower than the band `_place_manor` searches needs: the
+		# coarse ladder alone took a 12 m hold to a 270 m site and broke the
+		# density floor.
+		var least: float = _manor_site_scale(_replan(spec, jobs, 0, 1.0, minimum_depth, shore_depth), jobs)
+		# Every width with no extra lanes first: the ladder pairs its wide
+		# steps with twelve lanes, and lanes are what spread a farm village
+		# thin (a 30-person royal hamlet: 225 m at 5.7 %, or 270 m at 4.8 %).
+		var scales: Array[float] = [least]
+		for attempt in attempts:
+			var widened_scale := maxf(float(attempt[1]), least)
+			if not scales.has(widened_scale):
+				scales.append(widened_scale)
+		scales.sort()
+		var head_attempts: Array = []
+		for scale in scales:
+			head_attempts.append([0, scale])
+		for attempt in attempts:
+			var widened := [int(attempt[0]), maxf(float(attempt[1]), least)]
+			if not head_attempts.has(widened):
+				head_attempts.append(widened)
+		for attempt in head_attempts:
+			if unplaced <= 0 and bool(common_state["ready"]):
+				break
+			var again: VillagePlan = _replan(spec, jobs, int(attempt[0]), float(attempt[1]),
+				minimum_depth, shore_depth, true)
+			var left: int = cut_measured(again, jobs)
+			var next_common := _round_common_state(again)
+			var better_common: bool = (bool(next_common["ready"]) and not bool(common_state["ready"])) \
+				or (bool(next_common["ready"]) == bool(common_state["ready"]) \
+				and float(next_common["coverage"]) > float(common_state["coverage"]))
+			if left < unplaced or (left == unplaced and better_common):
+				out = again
+				unplaced = left
+				common_state = next_common
+				accepted = attempt
+				accepted_head = true
 	# A coarse width step can buy the common its frontage with ground the
 	# village does not need: a round hamlet that is ready at 1.1 was taken at
 	# 1.3 and then failed the density floor at 3.47 %. Take the narrowest
@@ -131,7 +174,8 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 		for scale in FINE_WIDTH_STEPS:
 			if scale >= float(accepted[1]):
 				break
-			var finer: VillagePlan = _replan(spec, jobs, int(accepted[0]), scale, minimum_depth, shore_depth)
+			var finer: VillagePlan = _replan(spec, jobs, int(accepted[0]), scale, minimum_depth,
+				shore_depth, accepted_head)
 			var finer_left: int = cut_measured(finer, jobs)
 			var finer_common := _round_common_state(finer)
 			if finer_left > unplaced or bool(finer_common["ready"]) != bool(common_state["ready"]) 					or float(finer_common["coverage"]) < float(common_state["coverage"]):
@@ -221,7 +265,7 @@ static func _manor_site_depth(plan: VillagePlan, jobs: Array[Dictionary]) -> flo
 		# A frontage midpoint can reach the end of the lane. Its far corner
 		# then extends half a frontage beyond that point; corner clearance
 		# means it cannot be assumed to start directly at the road junction.
-		var north := road_top + direction.y * (MANOR_LANE_MAX + frontage * 0.5) \
+		var north := road_top + direction.y * (_manor_lane_max(job) + frontage * 0.5) \
 			+ absf(direction.x) * (depth + LANE_HALF)
 		needed = maxf(needed, 2.0 * (north + SITE_MARGIN))
 	return needed
@@ -255,13 +299,62 @@ const FINE_WIDTH_STEPS: Array[float] = [1.05, 1.1, 1.15, 1.2, 1.25]
 ## One site attempt: the form's roads plus `lanes` extra ones, `scale` wider
 ## along the road. Through-road bends grow with width, so the manor's depth is
 ## reserved against the road actually offered, not the first narrow site.
+## `clear_head` keeps the field tracks off the eastern half, where
+## `_place_manor` looks for the lord's lane.
 static func _replan(spec: VillageSpec, jobs: Array[Dictionary], lanes: int, scale: float,
-		minimum_depth: float, shore_depth: float) -> VillagePlan:
+		minimum_depth: float, shore_depth: float, clear_head := false) -> VillagePlan:
 	var again: VillagePlan = VillageSitePlanner.plan(spec, lanes, scale, minimum_depth, shore_depth)
 	var retry_depth := _manor_site_depth(again, jobs)
 	if retry_depth > again.site.size.y + 0.001:
 		again = VillageSitePlanner.plan(spec, lanes, scale, maxf(minimum_depth, retry_depth), shore_depth)
+	if clear_head:
+		_drop_head_tracks(again)
 	return again
+
+
+## The same cut `VillageSitePlanner._plan_gate` makes: no field track leaves
+## the through road east of the site's centre. Runs before any lot is cut.
+static func _drop_head_tracks(plan: VillagePlan) -> void:
+	var centre_x: float = plan.site.get_center().x
+	for r in range(plan.roads.size() - 1, 0, -1):
+		var road: Dictionary = plan.roads[r]
+		if road["class"] == &"track" and Vector2(road["points"][0]).x > centre_x:
+			_drop_road(plan, r)
+
+
+## The width scale at which `_place_manor`'s band east of the common, from
+## ten metres past its centre to the edge less the lot, is at least four
+## metres wide (one lane step). Through-road bends are ignored: it is a floor.
+static func _manor_site_scale(plan: VillagePlan, jobs: Array[Dictionary]) -> float:
+	var least := 1.0
+	for job in jobs:
+		if job["class"] != &"manor": continue
+		var need: float = float(LOT_RULES[&"manor"]["use"]) + float(job["back"]) 			+ float(LOT_RULES[&"manor"]["yard"])
+		var end_x: float = VillageMeasure.common_centre(plan).x + 10.0 + 4.0 			+ SITE_MARGIN + LANE_HALF + need + 1.0
+		var width: float = 2.0 * (end_x - plan.site.get_center().x)
+		least = maxf(least, width / maxf(plan.site.size.x, 1.0))
+	return snappedf(least + 0.005, 0.01)
+
+
+## A hold (a castle at the family's house tier) needs an approach only as
+## long as `_manor_lane_at`'s own minimum and its own frontage ask; a manor or
+## castle keeps the full MANOR_LANE_MAX, so no existing manor moves. The
+## reserved depth follows the lane: a 40 m approach made a 30-person royal
+## hamlet too sparse for the density floor.
+static func _manor_lane_max(job: Dictionary) -> float:
+	var request: BuildingRequest = job["request"]
+	if CastleSpec.tier_for(request.width, request.length) != &"house":
+		return MANOR_LANE_MAX
+	# Its frontage may centre on the lane's end, so the lane must also carry
+	# half the frontage (fire gap included) clear of the through road.
+	var half_frontage: float = float(job["half_w"]) + float(LOT_RULES[&"manor"]["fire"]) * 0.5
+	return minf(MANOR_LANE_MAX, maxf(float(job["width"]) * 0.5 + 13.0, half_frontage + 6.0))
+
+
+static func _manor_unplaced(plan: VillagePlan, jobs: Array[Dictionary]) -> bool:
+	var wanted := jobs.filter(func(job: Dictionary) -> bool: return job["class"] == &"manor").size()
+	var placed := plan.buildings.filter(func(b: Dictionary) -> bool: return b["class"] == &"manor").size()
+	return placed < wanted
 
 
 ## Built area over site area, measured as VillageScaleCheck measures it.
@@ -1492,7 +1585,7 @@ static func _manor_lane_at(plan: VillagePlan, job: Dictionary, lane_x: float) ->
 	# away from the winding through road instead of laying a broad wing and
 	# fire gap back across the neighbouring junctions.
 	var direction := Vector2(MANOR_LANE_LEAN, 1.0).normalized()
-	var length: float = minf(MANOR_LANE_MAX, (plan.site.end.y - SITE_MARGIN - start_y) / direction.y)
+	var length: float = minf(_manor_lane_max(job), (plan.site.end.y - SITE_MARGIN - start_y) / direction.y)
 	if length < float(job["width"]) * 0.5 + 12.0:
 		return {}
 	var lane: Dictionary = _lane(PackedVector2Array([start, start + direction * length]),

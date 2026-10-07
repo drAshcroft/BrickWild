@@ -145,6 +145,20 @@ func _check_pure(plan: VillagePlan) -> void:
 	twin.compact_display = spec.compact_display
 	twin.decoration_level = spec.decoration_level
 	twin.upkeep = spec.upkeep
+	twin.orientation = spec.orientation
+	twin.period = spec.period
+	# A C1 site brief is part of the input too: without its regime and kept
+	# fractions the twin plans a different programme, and every brief failed
+	# this rule while the exporter itself was byte-identical run to run.
+	twin.site_brief = spec.site_brief
+	twin.regime = spec.regime
+	twin.tongue = spec.tongue
+	twin.source_culture = spec.source_culture
+	twin.plant_palette = spec.plant_palette
+	twin.kept_buildings = spec.kept_buildings.duplicate(true)
+	twin.enclosure_kept_fraction = spec.enclosure_kept_fraction
+	twin.terrain_envelope = spec.terrain_envelope.duplicate(true)
+	twin.requested_site_m = spec.requested_site_m
 	twin.generate(spec.seed)
 	var again: VillagePlan = VillageLotPlanner.plan(twin)
 	if not plan.equals(again):

@@ -80,15 +80,17 @@ func _init() -> void:
 			spec.population, plan.site.size.x, plan.site.size.y, spec.requested_site_m])
 		quit(3)
 		return
-	var requested_buildings: int = VillageProgrammer.programme(spec).size()
+	var programme: Array[BuildingRequest] = VillageProgrammer.programme(spec)
+	var requested_buildings: int = programme.size()
 	if requested_buildings > BUILDING_MAX:
 		printerr("SiteRequest refused: %d buildings exceeds site capacity %d" % [
 			requested_buildings, BUILDING_MAX])
 		quit(3)
 		return
 	if plan.buildings.size() < requested_buildings:
-		printerr("SiteRequest refused: only %d of %d requested buildings fit in %.1f m" % [
-			plan.buildings.size(), requested_buildings, spec.requested_site_m])
+		printerr("SiteRequest refused: only %d of %d requested buildings fit in %.1f m (unplaced: %s; planned site %.0f x %.0f m)" % [
+			plan.buildings.size(), requested_buildings, spec.requested_site_m,
+			", ".join(unplaced_labels(programme, plan)), plan.site.size.x, plan.site.size.y])
 		quit(3)
 		return
 	var out: Dictionary = site_plan(plan, request)
@@ -107,6 +109,25 @@ func _init() -> void:
 		(out["lots"] as Array).size(), (out["roads"] as Array).size(),
 		out["site"]["width_m"], out["site"]["depth_m"], opts["out"]])
 	quit(0)
+
+
+## What the programme asked for and the plan did not place, as `kind/purpose`.
+## A refusal that says only "N of M fit" reads as a full site; it usually
+## means one building had no legal lot.
+static func unplaced_labels(programme: Array[BuildingRequest], plan: VillagePlan) -> Array[String]:
+	var left := {}
+	for request in programme:
+		var key := "%s/%s" % [request.kind, request.purpose] if request.purpose != &"" else String(request.kind)
+		left[key] = int(left.get(key, 0)) + 1
+	for b in plan.buildings:
+		var request: BuildingRequest = b["request"]
+		var key := "%s/%s" % [request.kind, request.purpose] if request.purpose != &"" else String(request.kind)
+		left[key] = int(left.get(key, 0)) - 1
+	var out: Array[String] = []
+	for key in left:
+		for i in range(int(left[key])):
+			out.append(key)
+	return out
 
 
 # ------------------------------------------------------- request -> spec
