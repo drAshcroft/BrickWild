@@ -1,4 +1,4 @@
-# Personality implementation: first increment
+# Personality implementation evidence
 
 2026-10-06, America/Phoenix. This records implementation evidence, not visual
 acceptance of the buildings.
@@ -18,6 +18,13 @@ agents were editing during generation, so this is a development observation,
 not an immutable before/after snapshot. Root review and camera limitations are
 recorded in `visualqa/personality/README.md`. No family is visually accepted.
 
+`LIVE-BRIEF` and `LIVE-ASSETS` are complete and separately committed as
+`57658a3` and `47f85ae`. This completes the briefs and asset audit, not the
+building designs. `LIVE-ROOMS` is now complete as a planning foundation; its
+evidence and remaining design limitations are in
+`visualqa/personality/room_evidence/README.md`. All subsequent implementation
+and final style review tasks remain open.
+
 The activity-led planner is under review. Root's first actual engine runs
 caught type-inference parse errors, then bedroom-through-route defects and
 compact layouts falling back to legacy subdivision. A stronger dining-group
@@ -26,13 +33,32 @@ test itself is being corrected. Native exit 0 and a printed zero-failure
 summary are not sufficient when the engine log contains script errors.
 These intermediate failures are not accepted completion evidence.
 
+The ninth focused fixture passed all 45 style/size/seed cases, but the wider
+planning lane then exposed new farmhouse privacy and kitchen service-pole
+failures. Its 270 checks had 61 failures, compared with 49 baseline failures;
+the detailed failure sets differ and the counts alone do not establish
+regression safety. Root also found a rendered plan with two parlours, one
+silently demoted from a bedroom with stale activity metadata. `LIVE-ROOMS`
+remained executing while these were corrected. Intermediate evidence is under
+`artifacts/personality/current/focused9.log` and
+`artifacts/qa_fast/lane_house-plan-fast/20261006_225512/`.
+
+The final focused fixture passes, including the added farmhouse privacy
+regressions. The final planning suite passes 56 checks. The whole bounded lane
+still reports 57 furnishing/stair failures against 49 baseline failures;
+the evidence README classifies the differences rather than calling the lane
+green. Eighteen plan sheets and sixteen assembled views were rendered from
+stable sources. Root and Luna reviewed them. Private sleeping access and
+direct kitchen access are improved; bare rooms, gallery-like large halls and
+weak witch identity remain explicitly assigned to the next tasks.
+
 The asset audit now has actual model boards rendered through the existing
 assembler at measured scale. Root reviewed the cooking, sleeping, sitting,
 witch-work and wall/light palette. No catalogue or imported asset changed.
 See `INHABITED_ASSET_PALETTE.md` for approved current candidates and honest
 gaps. Stair, landing and guard work is in progress separately.
 
-## Implemented
+## Historical first increment (superseded by the execution checkpoint)
 
 - The design briefs now map all nine public families, their styles, purposes
   and world sub-kinds. See `BUILDING_PERSONALITY_BRIEFS.md`.
@@ -54,10 +80,10 @@ gaps. Stair, landing and guard work is in progress separately.
   views, supports published family/style selection, and returns failure for
   failed generation, assembly or image writes.
 
-The programme change does **not** change the rectangular subdivision method,
+At this earlier checkpoint, the programme change did **not** change the rectangular subdivision method,
 create a new silhouette, or deliver a fully furnished activity group. Those
 are still required parts of `LIVE-ROOMS`, `LIVE-GROUPS`, `LIVE-SURFACES` and
-the style rollout tasks. `LIVE-BRIEF` also remains in progress: all-family
+the style rollout tasks. `LIVE-BRIEF` was also in progress: all-family
 renders and first-person review are not yet complete.
 
 ## Current visual evidence

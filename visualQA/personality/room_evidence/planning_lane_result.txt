@@ -1,0 +1,6 @@
+selectors=lane:house-plan-fast
+status=FAIL
+native_exit=1
+wall_seconds=100.89
+godot_pid=36920
+verdict=1 SUITE(S) FAILED -- 2 suites, 270 checks, 57 failures, 34 warnings

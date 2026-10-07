@@ -771,6 +771,13 @@ static func _place_corner(plan: HousePlan, room: int, key: String,
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var foot: Vector2 = PropCatalog.footprint(key)
 	var g: float = HouseGeometry.WALL_GAP
+	# In a narrow passage, sliding along an end wall leaves the object in the
+	# walking strip. Search along the long walls instead. Polygon rooms keep
+	# their existing geometry-aware fit path; their AABB is not a wall frame.
+	var short_span := minf(floor_rect.size.x, floor_rect.size.y)
+	var long_span := maxf(floor_rect.size.x, floor_rect.size.y)
+	var narrow := not plan.is_polygonal(room) and (short_span < 2.6 or long_span > short_span * 3.5)
+	var along := Vector2.RIGHT if floor_rect.size.x >= floor_rect.size.y else Vector2.DOWN
 	var corners := [
 		Vector2(floor_rect.position.x + foot.x / 2.0 + g, floor_rect.position.y + foot.y / 2.0 + g),
 		Vector2(floor_rect.end.x - foot.x / 2.0 - g, floor_rect.position.y + foot.y / 2.0 + g),
@@ -790,6 +797,8 @@ static func _place_corner(plan: HousePlan, room: int, key: String,
 		# slide out of the corner along both walls until it fits
 		for slide in range(6):
 			for dir in [Vector2(1, 0), Vector2(0, 1)]:
+				if narrow and dir != along:
+					continue
 				var sign_x: float = 1.0 if ci == 0 or ci == 2 else -1.0
 				var sign_z: float = 1.0 if ci == 0 or ci == 1 else -1.0
 				var off := Vector2(dir.x * sign_x, dir.y * sign_z) * (float(slide) * 0.25)

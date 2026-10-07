@@ -32,6 +32,9 @@ static func plan(spec: HouseSpec) -> HousePlan:
 		HousePlanLevels.clone_upper_storeys(p, spec)
 	if spec.cellars > 0:
 		HousePlanLevels.dig_cellars(p, spec)
+	# Upper-floor naming and daylight repairs can change room kinds. Keep the
+	# programme annotations attached to what the finished plan actually is.
+	HousePlanRooms.refresh_domestic_metadata(p)
 	HousePlanFeatures.choose_hearth(p, spec)
 	HousePlanFeatures.choose_focus(p, spec)
 	_reserve_upper_flue(p, spec)

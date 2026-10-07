@@ -143,12 +143,26 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	return plan
 
 
-## The room program: the standard sequence, with the trade's own room promoted
-## so a smith gets a workshop before a second bedroom.
+## The room program: ordinary domestic styles may name a different sequence.
+## Family specs with their own room-program or authored-rectangle contract keep
+## the established shared-house sequence; their generator owns the actual
+## programme. The trade's room is promoted after the base sequence is chosen.
 static func _program_for(spec: HouseSpec) -> Array[StringName]:
 	var out: Array[StringName] = []
 	var trade_room: StringName = HouseSpec.TRADES[spec.trade]["room"]
-	for kind in HouseSpec.PROGRAM:
+	var style_row: Dictionary = HouseSpec.STYLES.get(spec.style, {})
+	# An explicit livelihood already owns the programme. Applying a domestic
+	# office/study overlay to an inn, for example, displaces guest-room uses.
+	var domestic_program: Array = style_row.get("domestic_program", HouseSpec.PROGRAM) \
+		if spec.trade == &"none" else HouseSpec.PROGRAM
+	# Shop, keep and custom room-rectangle families carry their own programme
+	# contract. Do not give them the domestic style overlay if they are routed
+	# through this helper by a caller.
+	if spec.has_method("room_program") or spec.has_method("custom_room_rects"):
+		if not spec.program.is_empty():
+			return spec.program.duplicate()
+		domestic_program = HouseSpec.PROGRAM
+	for kind in domestic_program:
 		out.append(kind)
 	if trade_room != &"" and spec.room_count >= 2:
 		out.erase(trade_room)

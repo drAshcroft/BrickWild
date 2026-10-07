@@ -23,7 +23,7 @@
                       "description":  "Extend the ordinary house planning path so activities and privacy determine room graph, proportions and usable wall runs before rectangular packing. Preserve custom plans and family adapters.",
                       "priority":  "P1",
                       "phase":  "inhabited-buildings",
-                      "status":  "executing",
+                      "status":  "complete",
                       "taskType":  "feature",
                       "targetCoord":  {
                                           "file":  "src/house/house_plan_rooms.gd"

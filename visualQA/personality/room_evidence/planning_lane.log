@@ -1,0 +1,129 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running hmultistory...
+--- house multistory ---
+    programme  200 two-storey houses, 488 bedrooms upstairs, 230 spare-room bedrooms down
+    elapsed 28.02s
+  WARN cottage 2-storey seed=32101: coplanar: HouseBuilder surfaces 3/0 fight over 0.142 m2 at (-2.99, 2.66, -1.13)
+  WARN cottage 2-storey seed=32101: coplanar: HouseBuilder surfaces 3/0 fight over 0.014 m2 at (-2.42, 2.60, -1.13)
+  WARN cottage 2-storey seed=32101: coplanar: HouseBuilder surfaces 3/0 fight over 0.137 m2 at (-2.01, 2.64, -1.13)
+  WARN cottage 2-storey seed=32101: coplanar: HouseBuilder surfaces 3/0 fight over 0.057 m2 at (-3.65, 2.64, -1.45)
+  WARN cottage 2-storey seed=32101: coplanar: HouseBuilder surfaces 3/0 fight over 0.063 m2 at (-3.65, 2.66, -1.87)
+  WARN townhouse 2-storey seed=32102: nav: 0.6 m2 of floor is walkable but cut off from the rest of the house
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 3/0 fight over 0.014 m2 at (-2.33, 2.90, 6.08)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 3/0 fight over 0.137 m2 at (-2.33, 2.94, 6.49)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 3/0 fight over 0.151 m2 at (-2.33, 2.96, 5.48)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.055 m2 at (-3.19, 9.06, -3.02)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.018 m2 at (-3.81, 8.49, -3.01)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.017 m2 at (-2.92, 9.31, -2.04)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.055 m2 at (-3.37, 8.90, -2.03)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.053 m2 at (-3.28, 8.98, -0.62)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.017 m2 at (-2.92, 9.31, 0.36)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.055 m2 at (-3.37, 8.90, 0.37)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.053 m2 at (-3.28, 8.98, 1.78)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.017 m2 at (-2.93, 9.31, 2.76)
+  WARN townhouse 2-storey seed=32102: coplanar: HouseBuilder surfaces 0/2 fight over 0.055 m2 at (-3.38, 8.89, 2.77)
+  WARN longhall 3-storey seed=32103: daylight: room 3 (bedroom) has 1.00 m2 of glass for 20.9 m2 of floor
+  WARN longhall 3-storey seed=32103: daylight: room 8 (bedroom) has 1.00 m2 of glass for 20.9 m2 of floor
+  WARN longhall 3-storey seed=32103: daylight: room 13 (bedroom) has 1.00 m2 of glass for 20.9 m2 of floor
+  WARN longhall 3-storey seed=32103: shelf_over: no shelf in room 2 (workshop) hangs over the bench it serves (0% cover, 0.19m away)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 3/0 fight over 0.151 m2 at (3.38, 5.46, -3.13)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 3/0 fight over 0.014 m2 at (3.98, 5.40, -3.13)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 3/0 fight over 0.137 m2 at (4.39, 5.44, -3.13)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 0/3 fight over 0.137 m2 at (-3.51, 2.74, -3.13)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 0/3 fight over 0.137 m2 at (-4.46, 2.76, -3.13)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 0/3 fight over 0.014 m2 at (-5.07, 2.78, -3.13)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 0/3 fight over 0.014 m2 at (-3.92, 2.70, -3.13)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 0/3 fight over 0.057 m2 at (-5.15, 2.74, -3.45)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 0/3 fight over 0.063 m2 at (-5.15, 2.76, -3.87)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 3/0 fight over 0.057 m2 at (5.15, 5.44, -3.81)
+  WARN longhall 3-storey seed=32103: coplanar: HouseBuilder surfaces 3/0 fight over 0.063 m2 at (5.15, 5.46, -3.39)
+  FAIL cottage 2-storey seed=32101: seat_kinds: room 0 (hall) sets its tables with Chair_1 and Stool
+  FAIL cottage 2-storey seed=32101: sparse: room 3 (parlour) is 26 m2 with 8% of it furnished
+  FAIL cottage 2-storey seed=32101: worktop: room 2 (kitchen) has a fire and nothing to prepare food on
+  FAIL cottage 2-storey seed=32101: bedside: Nightstand_Shelf in room 1 (bedroom) stands 1.24m from any bed
+  FAIL cottage 2-storey seed=32101: bedside: Nightstand_Shelf in room 4 (bedroom) stands 1.24m from any bed
+  FAIL cottage 2-storey seed=32101: front_door: Chair_1 in room 0 (hall) stands in the way in through the front door
+  FAIL cottage 2-storey seed=32101: stair_pitch: stair 0 rises 0.26m a step on a 0.24m going (2R+G 0.76, 47 deg) -- too steep to climb
+  FAIL cottage 2-storey seed=32101: stair_head: stair 0 climbs into a wall -- no floor of room 3 (parlour) beyond its top step
+  FAIL cottage 2-storey seed=32101: stair_guard: stair 0 has 2 open side(s) over a 2.6m drop and 0 rail(s)
+  FAIL cottage 2-storey seed=32101: stair_approach: the foot of stair 0 cannot be reached from the front door by a 0.9m wide walker
+  FAIL townhouse 2-storey seed=32102: tuck: Chair_1 in room 7 (parlour) is pushed 0.18m into the end of the table it is drawn up to
+  FAIL townhouse 2-storey seed=32102: tuck: Stool in room 7 (parlour) is pushed 0.15m into the end of the table it is drawn up to
+  FAIL townhouse 2-storey seed=32102: seat_kinds: room 7 (parlour) sets its tables with Chair_1 and Stool
+  FAIL townhouse 2-storey seed=32102: sparse: room 0 (hall) is 71 m2 with 6% of it furnished
+  FAIL townhouse 2-storey seed=32102: sparse: room 7 (parlour) is 72 m2 with 10% of it furnished
+  FAIL townhouse 2-storey seed=32102: lamps: room 0 (hall) is 71 m2 lit by 1 light(s), wants 3
+  FAIL townhouse 2-storey seed=32102: lamps: room 7 (parlour) is 72 m2 lit by 2 light(s), wants 3
+  FAIL townhouse 2-storey seed=32102: worktop: room 6 (kitchen) has a fire and nothing to prepare food on
+  FAIL townhouse 2-storey seed=32102: bedside: Nightstand_Shelf in room 4 (bedroom) stands 0.44m from any bed
+  FAIL townhouse 2-storey seed=32102: bedside: Nightstand_Shelf in room 5 (bedroom) stands 1.15m from any bed
+  FAIL townhouse 2-storey seed=32102: bedside: Nightstand_Shelf in room 8 (bedroom) stands 0.74m from any bed
+  FAIL townhouse 2-storey seed=32102: bedside: Nightstand_Shelf in room 9 (bedroom) stands 1.41m from any bed
+  FAIL townhouse 2-storey seed=32102: bedside: Nightstand_Shelf in room 10 (bedroom) stands 2.12m from any bed
+  FAIL townhouse 2-storey seed=32102: bedside: Nightstand_Shelf in room 11 (bedroom) stands 2.12m from any bed
+  FAIL townhouse 2-storey seed=32102: bedside: Nightstand_Shelf in room 12 (bedroom) stands 0.74m from any bed
+  FAIL townhouse 2-storey seed=32102: bedside: Nightstand_Shelf in room 13 (bedroom) stands 0.74m from any bed
+  FAIL townhouse 2-storey seed=32102: stair_pitch: stair 0 rises 0.29m a step on a 0.24m going (2R+G 0.82, 50 deg) -- too steep to climb
+  FAIL townhouse 2-storey seed=32102: stair_head: stair 0 climbs into a wall -- no floor of room 7 (parlour) beyond its top step
+  FAIL townhouse 2-storey seed=32102: stair_guard: stair 0 has 2 open side(s) over a 2.9m drop and 0 rail(s)
+  FAIL townhouse 2-storey seed=32102: stair_approach: the foot of stair 0 cannot be reached from the front door by a 0.9m wide walker
+  FAIL longhall 3-storey seed=32103: seat_kinds: room 0 (hall) sets its tables with Chair_1 and Stool
+  FAIL longhall 3-storey seed=32103: sparse: room 1 (kitchen) is 37 m2 with 8% of it furnished
+  FAIL longhall 3-storey seed=32103: sparse: room 5 (parlour) is 39 m2 with 7% of it furnished
+  FAIL longhall 3-storey seed=32103: sparse: room 6 (parlour) is 37 m2 with 1% of it furnished
+  FAIL longhall 3-storey seed=32103: sparse: room 10 (parlour) is 39 m2 with 4% of it furnished
+  FAIL longhall 3-storey seed=32103: sparse: room 11 (parlour) is 37 m2 with 6% of it furnished
+  FAIL longhall 3-storey seed=32103: lamps: room 1 (kitchen) is 37 m2 lit by 1 light(s), wants 2
+  FAIL longhall 3-storey seed=32103: lamps: room 5 (parlour) is 39 m2 lit by 1 light(s), wants 2
+  FAIL longhall 3-storey seed=32103: lamps: room 6 (parlour) is 37 m2 lit by 1 light(s), wants 2
+  FAIL longhall 3-storey seed=32103: lamps: room 10 (parlour) is 39 m2 lit by 1 light(s), wants 2
+  FAIL longhall 3-storey seed=32103: lamps: room 11 (parlour) is 37 m2 lit by 1 light(s), wants 2
+  FAIL longhall 3-storey seed=32103: worktop: room 1 (kitchen) has a fire and nothing to prepare food on
+  FAIL longhall 3-storey seed=32103: bedside: Nightstand_Shelf in room 3 (bedroom) stands 1.76m from any bed
+  FAIL longhall 3-storey seed=32103: bedside: Nightstand_Shelf in room 4 (bedroom) stands 3.38m from any bed
+  FAIL longhall 3-storey seed=32103: bedside: Nightstand_Shelf in room 8 (bedroom) stands 2.01m from any bed
+  FAIL longhall 3-storey seed=32103: bedside: Nightstand_Shelf in room 9 (bedroom) stands 3.38m from any bed
+  FAIL longhall 3-storey seed=32103: bedside: Nightstand_Shelf in room 13 (bedroom) stands 1.76m from any bed
+  FAIL longhall 3-storey seed=32103: bedside: Nightstand_Shelf in room 14 (bedroom) stands 3.38m from any bed
+  FAIL longhall 3-storey seed=32103: stair_pitch: stair 0 rises 0.27m a step on a 0.24m going (2R+G 0.78, 48 deg) -- too steep to climb
+  FAIL longhall 3-storey seed=32103: stair_head: stair 0 climbs into a wall -- no floor of room 5 (parlour) beyond its top step
+  FAIL longhall 3-storey seed=32103: stair_headroom: Shelf_Small_Bottles in room 0 (hall) is 0.99m above the stair 0 tread under it
+  FAIL longhall 3-storey seed=32103: stair_guard: stair 0 has 2 open side(s) over a 2.7m drop and 0 rail(s)
+  FAIL longhall 3-storey seed=32103: stair_approach: the foot of stair 0 cannot be reached from the front door by a 0.9m wide walker
+  FAIL longhall 3-storey seed=32103: stair_pitch: stair 1 rises 0.27m a step on a 0.24m going (2R+G 0.78, 48 deg) -- too steep to climb
+  FAIL longhall 3-storey seed=32103: stair_head: stair 1 climbs into a wall -- no floor of room 10 (parlour) beyond its top step
+  FAIL longhall 3-storey seed=32103: stair_headroom: Torch_Metal in room 5 (parlour) is 1.43m above the stair 1 tread under it
+  FAIL longhall 3-storey seed=32103: stair_guard: stair 1 has 2 open side(s) over a 2.7m drop and 0 rail(s)
+
+Running houseqaplan...
+house QA: START (quick; 24-house statistical sweeps)
+house QA: START upstairs programme fixture
+house QA: END upstairs programme fixture (0.22s)
+house QA: START stair fixture
+house QA: END stair fixture (0.20s)
+house QA: START stair sweep
+house QA: stair sweep 1/24
+house QA: stair sweep 16/24
+house QA: stair sweep 24/24
+house QA: END stair sweep (50.56s)
+house QA: START doors-in-line fixture
+house QA: END doors-in-line fixture (0.00s)
+house QA: START door-chimney fixture
+house QA: END door-chimney fixture (0.00s)
+house QA: START poles sweep
+house QA: poles sweep 1/24
+house QA: poles sweep 16/24
+house QA: poles sweep 24/24
+house QA: END poles sweep (5.83s)
+house QA: DONE (quick; 56.81s)
+--- house QA (planning) ---
+    stair       24/24 against a wall, 24/24 out of the door line, 24/24 halls with a table
+    poles       24 houses: back door on kitchen 22, store 1, other 0; kitchen on back wall 22/24
+    elapsed 56.81s
+
+============================================================
+  house multistory   FAIL  (214 checked, 57 failures, 34 warnings)
+  house QA (planning) PASS  (56 checked, 0 failures, 0 warnings)
+============================================================
+1 SUITE(S) FAILED -- 2 suites, 270 checks, 57 failures, 34 warnings

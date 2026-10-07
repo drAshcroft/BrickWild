@@ -1,0 +1,4304 @@
+{
+	"cases": [
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-4.15000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-0.178157925605774,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						1.31184208393097,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_cottage_none_1_small",
+			"image": "res://artifacts/personality/current/plans_final/house_cottage_none_1_small.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 3,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 3,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "cottage"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 3,
+					"exterior_doors": 1,
+					"interior_area": 52.29,
+					"private_rooms": 0,
+					"rooms": 3,
+					"rooms_reached": 3,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 4
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 7.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-3.15000009536743,
+						-4.15000009536743,
+						6.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-3.15000009536743,
+						-0.550000190734863,
+						3.71684217453003,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						0.566842138767242,
+						-0.550000190734863,
+						2.58315801620483,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-5.65000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.250999808311462,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						1.74100005626678,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 2,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.250999808311462,
+						1.44999980926514
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_cottage_none_1_default",
+			"image": "res://artifacts/personality/current/plans_final/house_cottage_none_1_default.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"parlour"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [
+					"bedroom",
+					"store"
+				],
+				"omitted_rooms": 2,
+				"planned_rooms": 4,
+				"reason": "",
+				"rejected_candidates": [
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"parlour",
+							"bedroom",
+							"store"
+						],
+						"reason": "yard kitchen and private wing need 11.1 m behind the hall; only 7.7 m remains"
+					},
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"parlour",
+							"bedroom"
+						],
+						"reason": "yard kitchen and private wing need 9.4 m behind the hall; only 7.7 m remains"
+					}
+				],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "cottage"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 4,
+					"exterior_doors": 1,
+					"interior_area": 93.79,
+					"private_rooms": 0,
+					"rooms": 4,
+					"rooms_reached": 4,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 7
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-4.15000009536743,
+						-5.65000009536743,
+						8.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						0.996000051498413,
+						-2.05000019073486,
+						3.15400004386902,
+						7.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_parlour"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_parlour",
+					"kind": "parlour",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						-2.05000019073486,
+						5.14599990844727,
+						3.5
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						1.45000004768372,
+						5.14599990844727,
+						4.20000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-8.64999961853027
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 5,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						3.18411731719971
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 6,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						3.18411731719971
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-2.71044111251831
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 4,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-2.71044111251831
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_cottage_none_1_large",
+			"image": "res://artifacts/personality/current/plans_final/house_cottage_none_1_large.jpg",
+			"layout": {
+				"capacity_expanded": true,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"parlour",
+					"bedroom",
+					"store",
+					"store"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 7,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "cottage"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 7,
+					"exterior_doors": 1,
+					"interior_area": 281.99,
+					"private_rooms": 0,
+					"rooms": 7,
+					"rooms_reached": 7,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 15
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.8,
+				"kind": "house",
+				"length": 18.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 17.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-2.7041175365448,
+						-8.64999961853027,
+						5.4082350730896,
+						17.2999992370605
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_parlour"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_parlour",
+					"kind": "parlour",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-8.64999961853027,
+						5.44588232040405,
+						5.19455862045288
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_store"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_store",
+					"kind": "store",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-8.64999961853027,
+						5.44588232040405,
+						5.19455862045288
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_store"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_store",
+					"kind": "store",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-3.45544099807739,
+						5.44588232040405,
+						5.89455842971802
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-3.45544099807739,
+						5.44588232040405,
+						5.89455842971802
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						2.43911743164063,
+						5.44588232040405,
+						6.21088218688965
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						2.43911743164063,
+						5.44588232040405,
+						6.21088218688965
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-4.15000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.178157866001129,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-1.31184208393097,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_cottage_none_8102_small",
+			"image": "res://artifacts/personality/current/plans_final/house_cottage_none_8102_small.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen"
+				],
+				"hall_role": "living_hall",
+				"mirror": false,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 3,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 3,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "cottage"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 3,
+					"exterior_doors": 1,
+					"interior_area": 52.29,
+					"private_rooms": 0,
+					"rooms": 3,
+					"rooms_reached": 3,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 4
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 7.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-3.15000009536743,
+						-4.15000009536743,
+						6.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						-3.15000009536743,
+						-0.550000190734863,
+						2.58315801620483,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-0.566842138767242,
+						-0.550000190734863,
+						3.71684217453003,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-5.65000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-0.251000046730042,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-1.74100005626678,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 2,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-0.251000046730042,
+						1.44999980926514
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_cottage_none_8102_default",
+			"image": "res://artifacts/personality/current/plans_final/house_cottage_none_8102_default.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"parlour"
+				],
+				"hall_role": "living_hall",
+				"mirror": false,
+				"omitted_activities": [
+					"bedroom",
+					"store"
+				],
+				"omitted_rooms": 2,
+				"planned_rooms": 4,
+				"reason": "",
+				"rejected_candidates": [
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"parlour",
+							"bedroom",
+							"store"
+						],
+						"reason": "yard kitchen and private wing need 11.1 m behind the hall; only 7.7 m remains"
+					},
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"parlour",
+							"bedroom"
+						],
+						"reason": "yard kitchen and private wing need 9.4 m behind the hall; only 7.7 m remains"
+					}
+				],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "cottage"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 4,
+					"exterior_doors": 1,
+					"interior_area": 93.79,
+					"private_rooms": 0,
+					"rooms": 4,
+					"rooms_reached": 4,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 7
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-4.15000009536743,
+						-5.65000009536743,
+						8.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						-2.05000019073486,
+						3.15400004386902,
+						7.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_parlour"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_parlour",
+					"kind": "parlour",
+					"meal_room": false,
+					"rect": [
+						-0.996000051498413,
+						-2.05000019073486,
+						5.14599990844727,
+						3.5
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-0.996000051498413,
+						1.45000004768372,
+						5.14599990844727,
+						4.20000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-8.64999961853027
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 5,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						3.18411731719971
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 6,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						3.18411731719971
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-2.71044111251831
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 4,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-2.71044111251831
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_cottage_none_8102_large",
+			"image": "res://artifacts/personality/current/plans_final/house_cottage_none_8102_large.jpg",
+			"layout": {
+				"capacity_expanded": true,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"parlour",
+					"bedroom",
+					"store",
+					"store"
+				],
+				"hall_role": "living_hall",
+				"mirror": false,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 7,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "cottage"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 7,
+					"exterior_doors": 1,
+					"interior_area": 281.99,
+					"private_rooms": 0,
+					"rooms": 7,
+					"rooms_reached": 7,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 15
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.8,
+				"kind": "house",
+				"length": 18.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 17.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-2.7041175365448,
+						-8.64999961853027,
+						5.4082350730896,
+						17.2999992370605
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_parlour"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_parlour",
+					"kind": "parlour",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-8.64999961853027,
+						5.44588232040405,
+						5.19455862045288
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_store"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_store",
+					"kind": "store",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-8.64999961853027,
+						5.44588232040405,
+						5.19455862045288
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_store"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_store",
+					"kind": "store",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-3.45544099807739,
+						5.44588232040405,
+						5.89455842971802
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-3.45544099807739,
+						5.44588232040405,
+						5.89455842971802
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						2.43911743164063,
+						5.44588232040405,
+						6.21088218688965
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						2.43911743164063,
+						5.44588232040405,
+						6.21088218688965
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-4.15000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-0.178157925605774,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						1.31184208393097,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 2,
+					"b": -1,
+					"exterior": true,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						2.35500001907349,
+						4.15000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				}
+			],
+			"furnished": false,
+			"id": "house_cottage_none_21325_small",
+			"image": "res://artifacts/personality/current/plans_final/house_cottage_none_21325_small.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 3,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 3,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "cottage"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 4,
+					"exterior_doors": 2,
+					"interior_area": 52.29,
+					"private_rooms": 0,
+					"rooms": 3,
+					"rooms_reached": 3,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 4
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "21325",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 7.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-3.15000009536743,
+						-4.15000009536743,
+						6.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-3.15000009536743,
+						-0.550000190734863,
+						3.71684217453003,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						0.566842138767242,
+						-0.550000190734863,
+						2.58315801620483,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-5.65000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.250999808311462,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						1.74100005626678,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 2,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.250999808311462,
+						1.44999980926514
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 1,
+					"b": -1,
+					"exterior": true,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						3.35500001907349,
+						5.65000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				}
+			],
+			"furnished": false,
+			"id": "house_cottage_none_21325_default",
+			"image": "res://artifacts/personality/current/plans_final/house_cottage_none_21325_default.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"parlour"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [
+					"bedroom",
+					"store"
+				],
+				"omitted_rooms": 2,
+				"planned_rooms": 4,
+				"reason": "",
+				"rejected_candidates": [
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"parlour",
+							"bedroom",
+							"store"
+						],
+						"reason": "yard kitchen and private wing need 11.1 m behind the hall; only 7.7 m remains"
+					},
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"parlour",
+							"bedroom"
+						],
+						"reason": "yard kitchen and private wing need 9.4 m behind the hall; only 7.7 m remains"
+					}
+				],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "cottage"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 5,
+					"exterior_doors": 2,
+					"interior_area": 93.79,
+					"private_rooms": 0,
+					"rooms": 4,
+					"rooms_reached": 4,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 7
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "21325",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-4.15000009536743,
+						-5.65000009536743,
+						8.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						0.996000051498413,
+						-2.05000019073486,
+						3.15400004386902,
+						7.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_parlour"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_parlour",
+					"kind": "parlour",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						-2.05000019073486,
+						5.14599990844727,
+						3.5
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						1.45000004768372,
+						5.14599990844727,
+						4.20000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-8.64999961853027
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 5,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						3.18411731719971
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 6,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						3.18411731719971
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-2.71044111251831
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 4,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-2.71044111251831
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 6,
+					"b": -1,
+					"exterior": true,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-7.35499954223633,
+						8.64999961853027
+					],
+					"storey": 0,
+					"width": 0.95
+				}
+			],
+			"furnished": false,
+			"id": "house_cottage_none_21325_large",
+			"image": "res://artifacts/personality/current/plans_final/house_cottage_none_21325_large.jpg",
+			"layout": {
+				"capacity_expanded": true,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"parlour",
+					"bedroom",
+					"store",
+					"store"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 7,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "cottage"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 8,
+					"exterior_doors": 2,
+					"interior_area": 281.99,
+					"private_rooms": 0,
+					"rooms": 7,
+					"rooms_reached": 7,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 15
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.8,
+				"kind": "house",
+				"length": 18.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "21325",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 17.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-2.7041175365448,
+						-8.64999961853027,
+						5.4082350730896,
+						17.2999992370605
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_parlour"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_parlour",
+					"kind": "parlour",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-8.64999961853027,
+						5.44588232040405,
+						5.19455862045288
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_store"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_store",
+					"kind": "store",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-8.64999961853027,
+						5.44588232040405,
+						5.19455862045288
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_store"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_store",
+					"kind": "store",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-3.45544099807739,
+						5.44588232040405,
+						5.89455842971802
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-3.45544099807739,
+						5.44588232040405,
+						5.89455842971802
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						2.43911743164063,
+						5.44588232040405,
+						6.21088218688965
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						2.43911743164063,
+						5.44588232040405,
+						6.21088218688965
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-4.15000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-0.178157925605774,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						1.31184208393097,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_witch_hut_none_1_small",
+			"image": "res://artifacts/personality/current/plans_final/house_witch_hut_none_1_small.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 3,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 3,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "witch_hut"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 3,
+					"exterior_doors": 1,
+					"interior_area": 52.29,
+					"private_rooms": 0,
+					"rooms": 3,
+					"rooms_reached": 3,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 4
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 7.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-3.15000009536743,
+						-4.15000009536743,
+						6.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-3.15000009536743,
+						-0.550000190734863,
+						3.71684217453003,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						0.566842138767242,
+						-0.550000190734863,
+						2.58315801620483,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-5.65000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.250999808311462,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						1.74100005626678,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 2,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.250999808311462,
+						1.53126120567322
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_witch_hut_none_1_default",
+			"image": "res://artifacts/personality/current/plans_final/house_witch_hut_none_1_default.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"workshop"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [
+					"records",
+					"store"
+				],
+				"omitted_rooms": 2,
+				"planned_rooms": 4,
+				"reason": "",
+				"rejected_candidates": [
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"workshop",
+							"records",
+							"store"
+						],
+						"reason": "yard kitchen and private wing need 9.8 m behind the hall; only 7.7 m remains"
+					},
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"workshop",
+							"records"
+						],
+						"reason": "yard kitchen and private wing need 8.1 m behind the hall; only 7.7 m remains"
+					}
+				],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "witch_hut"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 4,
+					"exterior_doors": 1,
+					"interior_area": 93.79,
+					"private_rooms": 0,
+					"rooms": 4,
+					"rooms_reached": 4,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 7
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 9.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-4.15000009536743,
+						-5.65000009536743,
+						8.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						0.996000051498413,
+						-2.05000019073486,
+						3.15400004386902,
+						7.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_workshop"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_workshop",
+					"kind": "workshop",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						-2.05000019073486,
+						5.14599990844727,
+						3.58126139640808
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						1.53126132488251,
+						5.14599990844727,
+						4.11873865127563
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-8.64999961853027
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 5,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						3.57829093933105
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 6,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						3.57829093933105
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-2.17221522331238
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 4,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-2.17221522331238
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_witch_hut_none_1_large",
+			"image": "res://artifacts/personality/current/plans_final/house_witch_hut_none_1_large.jpg",
+			"layout": {
+				"capacity_expanded": true,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"workshop",
+					"records",
+					"bedroom",
+					"store"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 7,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "witch_hut"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 7,
+					"exterior_doors": 1,
+					"interior_area": 281.99,
+					"private_rooms": 0,
+					"rooms": 7,
+					"rooms_reached": 7,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 16
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.8,
+				"kind": "house",
+				"length": 18.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 17.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-2.7041175365448,
+						-8.64999961853027,
+						5.4082350730896,
+						17.2999992370605
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_workshop"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_workshop",
+					"kind": "workshop",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-8.64999961853027,
+						5.44588232040405,
+						5.73278474807739
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_records"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_records",
+					"kind": "records",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-8.64999961853027,
+						5.44588232040405,
+						5.73278474807739
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_store"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_store",
+					"kind": "store",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-2.91721510887146,
+						5.44588232040405,
+						5.75050592422485
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-2.91721510887146,
+						5.44588232040405,
+						5.75050592422485
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						2.83329105377197,
+						5.44588232040405,
+						5.8167085647583
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						2.83329105377197,
+						5.44588232040405,
+						5.8167085647583
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-4.15000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.178157866001129,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-1.31184208393097,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 1,
+					"b": -1,
+					"exterior": true,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-2.35500001907349,
+						4.15000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				}
+			],
+			"furnished": false,
+			"id": "house_witch_hut_none_8102_small",
+			"image": "res://artifacts/personality/current/plans_final/house_witch_hut_none_8102_small.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen"
+				],
+				"hall_role": "living_hall",
+				"mirror": false,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 3,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 3,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "witch_hut"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 4,
+					"exterior_doors": 2,
+					"interior_area": 52.29,
+					"private_rooms": 0,
+					"rooms": 3,
+					"rooms_reached": 3,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 4
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 7.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-3.15000009536743,
+						-4.15000009536743,
+						6.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						-3.15000009536743,
+						-0.550000190734863,
+						2.58315801620483,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-0.566842138767242,
+						-0.550000190734863,
+						3.71684217453003,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-5.65000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-0.251000046730042,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-1.74100005626678,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 2,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-0.251000046730042,
+						1.53126120567322
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_witch_hut_none_8102_default",
+			"image": "res://artifacts/personality/current/plans_final/house_witch_hut_none_8102_default.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"workshop"
+				],
+				"hall_role": "living_hall",
+				"mirror": false,
+				"omitted_activities": [
+					"records",
+					"store"
+				],
+				"omitted_rooms": 2,
+				"planned_rooms": 4,
+				"reason": "",
+				"rejected_candidates": [
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"workshop",
+							"records",
+							"store"
+						],
+						"reason": "yard kitchen and private wing need 9.8 m behind the hall; only 7.7 m remains"
+					},
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"workshop",
+							"records"
+						],
+						"reason": "yard kitchen and private wing need 8.1 m behind the hall; only 7.7 m remains"
+					}
+				],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "witch_hut"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 4,
+					"exterior_doors": 1,
+					"interior_area": 93.79,
+					"private_rooms": 0,
+					"rooms": 4,
+					"rooms_reached": 4,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 7
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 9.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-4.15000009536743,
+						-5.65000009536743,
+						8.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						-2.05000019073486,
+						3.15400004386902,
+						7.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_workshop"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_workshop",
+					"kind": "workshop",
+					"meal_room": false,
+					"rect": [
+						-0.996000051498413,
+						-2.05000019073486,
+						5.14599990844727,
+						3.58126139640808
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-0.996000051498413,
+						1.53126132488251,
+						5.14599990844727,
+						4.11873865127563
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-8.64999961853027
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 5,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						3.57829093933105
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 6,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						3.57829093933105
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-2.17221522331238
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 4,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-2.17221522331238
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_witch_hut_none_8102_large",
+			"image": "res://artifacts/personality/current/plans_final/house_witch_hut_none_8102_large.jpg",
+			"layout": {
+				"capacity_expanded": true,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"workshop",
+					"records",
+					"bedroom",
+					"store"
+				],
+				"hall_role": "living_hall",
+				"mirror": false,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 7,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "witch_hut"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 7,
+					"exterior_doors": 1,
+					"interior_area": 281.99,
+					"private_rooms": 0,
+					"rooms": 7,
+					"rooms_reached": 7,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 16
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.8,
+				"kind": "house",
+				"length": 18.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 17.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-2.7041175365448,
+						-8.64999961853027,
+						5.4082350730896,
+						17.2999992370605
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_workshop"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_workshop",
+					"kind": "workshop",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-8.64999961853027,
+						5.44588232040405,
+						5.73278474807739
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_records"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_records",
+					"kind": "records",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-8.64999961853027,
+						5.44588232040405,
+						5.73278474807739
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_store"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_store",
+					"kind": "store",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-2.91721510887146,
+						5.44588232040405,
+						5.75050592422485
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-2.91721510887146,
+						5.44588232040405,
+						5.75050592422485
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						2.83329105377197,
+						5.44588232040405,
+						5.8167085647583
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						2.83329105377197,
+						5.44588232040405,
+						5.8167085647583
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-4.15000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-0.178157925605774,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						1.31184208393097,
+						-0.550000190734863
+					],
+					"storey": 0,
+					"width": 0.85
+				}
+			],
+			"furnished": false,
+			"id": "house_witch_hut_none_21325_small",
+			"image": "res://artifacts/personality/current/plans_final/house_witch_hut_none_21325_small.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 3,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 3,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "witch_hut"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 3,
+					"exterior_doors": 1,
+					"interior_area": 52.29,
+					"private_rooms": 0,
+					"rooms": 3,
+					"rooms_reached": 3,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 4
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "21325",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 7.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-3.15000009536743,
+						-4.15000009536743,
+						6.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-3.15000009536743,
+						-0.550000190734863,
+						3.71684217453003,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						0.566842138767242,
+						-0.550000190734863,
+						2.58315801620483,
+						4.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-5.65000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.250999808311462,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						1.74100005626678,
+						-2.05000019073486
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 2,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						0.250999808311462,
+						1.53126120567322
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 1,
+					"b": -1,
+					"exterior": true,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						3.35500001907349,
+						5.65000009536743
+					],
+					"storey": 0,
+					"width": 0.95
+				}
+			],
+			"furnished": false,
+			"id": "house_witch_hut_none_21325_default",
+			"image": "res://artifacts/personality/current/plans_final/house_witch_hut_none_21325_default.jpg",
+			"layout": {
+				"capacity_expanded": false,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"workshop"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [
+					"records",
+					"store"
+				],
+				"omitted_rooms": 2,
+				"planned_rooms": 4,
+				"reason": "",
+				"rejected_candidates": [
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"workshop",
+							"records",
+							"store"
+						],
+						"reason": "yard kitchen and private wing need 9.8 m behind the hall; only 7.7 m remains"
+					},
+					{
+						"activities": [
+							"hall",
+							"bedroom",
+							"kitchen",
+							"workshop",
+							"records"
+						],
+						"reason": "yard kitchen and private wing need 8.1 m behind the hall; only 7.7 m remains"
+					}
+				],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "witch_hut"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 5,
+					"exterior_doors": 2,
+					"interior_area": 93.79,
+					"private_rooms": 0,
+					"rooms": 4,
+					"rooms_reached": 4,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 7
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "21325",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 9.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-4.15000009536743,
+						-5.65000009536743,
+						8.30000019073486,
+						3.59999990463257
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						0.996000051498413,
+						-2.05000019073486,
+						3.15400004386902,
+						7.70000028610229
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_workshop"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_workshop",
+					"kind": "workshop",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						-2.05000019073486,
+						5.14599990844727,
+						3.58126139640808
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-4.15000009536743,
+						1.53126132488251,
+						5.14599990844727,
+						4.11873865127563
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		},
+		{
+			"doors": [
+				{
+					"a": 0,
+					"b": -1,
+					"exterior": true,
+					"front": true,
+					"normal": [
+						0.0,
+						-1.0
+					],
+					"pos": [
+						0.0,
+						-8.64999961853027
+					],
+					"storey": 0,
+					"width": 0.95
+				},
+				{
+					"a": 0,
+					"b": 5,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						3.57829093933105
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 6,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						3.57829093933105
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 3,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-2.17221522331238
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 4,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-2.17221522331238
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 1,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						2.7041175365448,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 0,
+					"b": 2,
+					"exterior": false,
+					"front": false,
+					"normal": [
+						1.0,
+						0.0
+					],
+					"pos": [
+						-2.70411729812622,
+						-7.90499973297119
+					],
+					"storey": 0,
+					"width": 0.85
+				},
+				{
+					"a": 6,
+					"b": -1,
+					"exterior": true,
+					"front": false,
+					"normal": [
+						0.0,
+						1.0
+					],
+					"pos": [
+						-7.35499954223633,
+						8.64999961853027
+					],
+					"storey": 0,
+					"width": 0.95
+				}
+			],
+			"furnished": false,
+			"id": "house_witch_hut_none_21325_large",
+			"image": "res://artifacts/personality/current/plans_final/house_witch_hut_none_21325_large.jpg",
+			"layout": {
+				"capacity_expanded": true,
+				"ground_activities": [
+					"hall",
+					"bedroom",
+					"kitchen",
+					"workshop",
+					"records",
+					"bedroom",
+					"store"
+				],
+				"hall_role": "living_hall",
+				"mirror": true,
+				"omitted_activities": [],
+				"omitted_rooms": 0,
+				"planned_rooms": 7,
+				"reason": "",
+				"rejected_candidates": [],
+				"requested_rooms": 6,
+				"shared_cooking": false,
+				"status": "planned",
+				"style": "witch_hut"
+			},
+			"plan_check": {
+				"failures": [],
+				"ok": true,
+				"replaced": {
+
+				},
+				"stats": {
+					"cellars": 0,
+					"courts": 0,
+					"doors": 8,
+					"exterior_doors": 2,
+					"interior_area": 281.99,
+					"private_rooms": 0,
+					"rooms": 7,
+					"rooms_reached": 7,
+					"stairs": 0,
+					"storeys": 1,
+					"windows": 16
+				},
+				"warnings": []
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.8,
+				"kind": "house",
+				"length": 18.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "21325",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 17.0
+			},
+			"rooms": [
+				{
+					"domestic_functions": [
+						"entry",
+						"circulation",
+						"dining",
+						"common_living"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "living_hall",
+					"kind": "hall",
+					"meal_room": true,
+					"rect": [
+						-2.7041175365448,
+						-8.64999961853027,
+						5.4082350730896,
+						17.2999992370605
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_workshop"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_workshop",
+					"kind": "workshop",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-8.64999961853027,
+						5.44588232040405,
+						5.73278474807739
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_records"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_records",
+					"kind": "records",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-8.64999961853027,
+						5.44588232040405,
+						5.73278474807739
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_store"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_store",
+					"kind": "store",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						-2.91721510887146,
+						5.44588232040405,
+						5.75050592422485
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						-2.91721510887146,
+						5.44588232040405,
+						5.75050592422485
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_bedroom"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_bedroom",
+					"kind": "bedroom",
+					"meal_room": false,
+					"rect": [
+						2.7041175365448,
+						2.83329105377197,
+						5.44588232040405,
+						5.8167085647583
+					],
+					"shared_cooking": false,
+					"storey": 0
+				},
+				{
+					"domestic_functions": [
+						"activity_kitchen"
+					],
+					"domestic_layout_storey": 0,
+					"domestic_role": "activity_kitchen",
+					"kind": "kitchen",
+					"meal_room": false,
+					"rect": [
+						-8.14999961853027,
+						2.83329105377197,
+						5.44588232040405,
+						5.8167085647583
+					],
+					"shared_cooking": false,
+					"storey": 0
+				}
+			]
+		}
+	],
+	"purpose": "unfurnished planning review, not design acceptance",
+	"source_changed": false,
+	"source_end": {
+		"script_count": 515,
+		"script_sha256": "aafcd520d077eaf97cf82cb90ca8108383a91cada540bad1e2a065c34fe04695"
+	},
+	"source_start": {
+		"script_count": 515,
+		"script_sha256": "aafcd520d077eaf97cf82cb90ca8108383a91cada540bad1e2a065c34fe04695"
+	}
+}

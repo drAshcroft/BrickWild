@@ -26,6 +26,11 @@ var canal_wall: StringName = &""
 var water_plane: float = 0.0
 var world_meta: Dictionary = {}
 
+## How an ordinary dwelling was partitioned. `status` is `planned` when the
+## activity layout met the room-size contracts, or `fallback` with a reason
+## when the legacy partition was needed. Family plans leave this empty.
+var domestic_layout: Dictionary = {}
+
 ## {"kind": StringName, "rect": Rect2, "storey": int,
 ##  "outline": PackedVector2Array (optional),
 ##  "wall_kinds": [StringName] (optional),

@@ -121,6 +121,8 @@ const TRADES := {
 const STYLES := {
 	&"cottage": {
 		"label": "Cottage",
+		# A small household first: shared sleeping, cooking and sitting spaces.
+		"domestic_program": [&"hall", &"bedroom", &"kitchen", &"bedroom", &"store", &"parlour"],
 		"timber": 0.95, "studs": [0.95, 1.5], "braces": 0.8, "rail": 0.5,
 		"roof_pitch": [0.85, 1.2], "porch": 0.5, "chimney": 0.9, "shutters": 0.7,
 		"roof_material": &"shingle", "pitch_reference": 7.0,
@@ -134,6 +136,8 @@ const STYLES := {
 	},
 	&"farmhouse": {
 		"label": "Farmhouse",
+		# The work of the farm shares the ground floor with the kitchen and bed.
+		"domestic_program": [&"hall", &"kitchen", &"bedroom", &"workshop", &"store", &"parlour"],
 		"timber": 0.9, "studs": [1.1, 1.7], "braces": 0.85, "rail": 0.4,
 		"roof_pitch": [0.7, 1.0], "porch": 0.7, "chimney": 0.95, "shutters": 0.5,
 		"roof_material": &"thatch", "pitch_reference": 9.0,
@@ -147,6 +151,8 @@ const STYLES := {
 	},
 	&"townhouse": {
 		"label": "Townhouse",
+		# A formal front parlour and a private office distinguish the town home.
+		"domestic_program": [&"hall", &"bedroom", &"kitchen", &"parlour", &"office", &"store"],
 		"timber": 1.0, "studs": [0.45, 0.7], "braces": 0.3, "rail": 0.9,
 		"roof_pitch": [1.0, 1.4], "porch": 0.2, "chimney": 1.0, "shutters": 0.35,
 		"roof_material": &"slate", "pitch_reference": 8.0,
@@ -160,6 +166,9 @@ const STYLES := {
 	},
 	&"longhall": {
 		"label": "Long Hall",
+		# Shared hearth, sleeping places, and work remain grouped around the
+		# household's communal hall instead of imitating a parlour house.
+		"domestic_program": [&"hall", &"bedroom", &"kitchen", &"store", &"workshop"],
 		"timber": 0.85, "studs": [1.0, 1.6], "braces": 0.9, "rail": 0.35,
 		"roof_pitch": [0.9, 1.25], "porch": 0.35, "chimney": 0.8, "shutters": 0.3,
 		"roof_material": &"thatch", "pitch_reference": 8.0,
@@ -173,6 +182,8 @@ const STYLES := {
 	},
 	&"witch_hut": {
 		"label": "Witch's Hut",
+		# A working room and records belong to the household's craft.
+		"domestic_program": [&"hall", &"bedroom", &"kitchen", &"workshop", &"records", &"store"],
 		"timber": 0.8, "studs": [0.8, 1.4], "braces": 0.6, "rail": 0.5,
 		"roof_pitch": [1.2, 1.7], "porch": 0.25, "chimney": 1.0, "shutters": 0.6,
 		"roof_material": &"shingle", "pitch_reference": 8.0, "pitch_exponent": 0.2,
