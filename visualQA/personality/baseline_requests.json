@@ -1,0 +1,214 @@
+﻿{
+    "cases":  [
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  12,
+                                      "kind":  "church",
+                                      "length":  22,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  1,
+                                      "style":  "romanesque",
+                                      "water":  "none",
+                                      "width":  10
+                                  },
+                      "id":  "church_romanesque__1_default",
+                      "size":  "default"
+                  },
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  18,
+                                      "kind":  "castle",
+                                      "length":  50,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  1,
+                                      "style":  "norman",
+                                      "water":  "none",
+                                      "width":  55
+                                  },
+                      "id":  "castle_norman__1_default",
+                      "size":  "default"
+                  },
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  2.6,
+                                      "kind":  "house",
+                                      "length":  12,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "none",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  1,
+                                      "style":  "cottage",
+                                      "water":  "none",
+                                      "width":  9
+                                  },
+                      "id":  "house_cottage_none_1_default",
+                      "size":  "default"
+                  },
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  2.8,
+                                      "kind":  "shop",
+                                      "length":  14,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "barracks",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  1,
+                                      "style":  "cottage",
+                                      "water":  "none",
+                                      "width":  11
+                                  },
+                      "id":  "shop_cottage_barracks_1_default",
+                      "size":  "default"
+                  },
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  3.6,
+                                      "kind":  "hotel",
+                                      "length":  24,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  3,
+                                      "style":  "grand_budapest",
+                                      "water":  "none",
+                                      "width":  48
+                                  },
+                      "id":  "hotel_grand_budapest__1_default",
+                      "size":  "default"
+                  },
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  12,
+                                      "kind":  "temple",
+                                      "length":  44,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "blood",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  1,
+                                      "style":  "basilica",
+                                      "water":  "none",
+                                      "width":  26
+                                  },
+                      "id":  "temple_basilica_blood_1_default",
+                      "size":  "default"
+                  },
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  12,
+                                      "kind":  "windmill",
+                                      "length":  6,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  1,
+                                      "style":  "tower",
+                                      "water":  "none",
+                                      "width":  12
+                                  },
+                      "id":  "windmill_tower__1_default",
+                      "size":  "default"
+                  },
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  6,
+                                      "kind":  "world",
+                                      "length":  30,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "domus",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  1,
+                                      "style":  "courtyard_house",
+                                      "water":  "none",
+                                      "width":  20
+                                  },
+                      "id":  "world_courtyard_house_domus_1_default",
+                      "size":  "default"
+                  },
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  1,
+                                      "kind":  "village",
+                                      "length":  35,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "farming",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  1,
+                                      "style":  "english",
+                                      "water":  "none",
+                                      "width":  40
+                                  },
+                      "id":  "village_english_farming_1_default",
+                      "size":  "default"
+                  },
+                  {
+                      "request":  {
+                                      "enclosure":  "none",
+                                      "height":  2.6,
+                                      "kind":  "house",
+                                      "length":  12,
+                                      "material":  "timber",
+                                      "orientation":  0.0,
+                                      "period":  1200,
+                                      "purpose":  "none",
+                                      "schema":  "brickwild.request",
+                                      "schema_version":  1,
+                                      "seed":  "1",
+                                      "storeys":  1,
+                                      "style":  "witch_hut",
+                                      "water":  "none",
+                                      "width":  9
+                                  },
+                      "id":  "house_witch_hut_none_1_default",
+                      "size":  "default"
+                  }
+              ]
+}

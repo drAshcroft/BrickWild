@@ -1,0 +1,2906 @@
+{
+	"families": [
+		{
+			"default_request": {
+				"enclosure": "none",
+				"height": 12.0,
+				"kind": "church",
+				"length": 22.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "romanesque",
+				"water": "none",
+				"width": 10.0
+			},
+			"descriptor": {
+				"api_version": 2,
+				"height": {
+					"max": 30.0,
+					"min": 6.0,
+					"step": 0.5,
+					"value": 12.0
+				},
+				"height_label": "Eaves height (m)",
+				"kind": "church",
+				"label": "Church",
+				"length": {
+					"max": 60.0,
+					"min": 10.0,
+					"step": 1.0,
+					"value": 22.0
+				},
+				"purpose_label": "",
+				"purposes": [],
+				"size_label": "Nave",
+				"style_label": "Style",
+				"styles": [
+					{
+						"id": "romanesque",
+						"label": "Romanesque"
+					},
+					{
+						"id": "gothic",
+						"label": "Gothic"
+					},
+					{
+						"id": "byzantine",
+						"label": "Byzantine"
+					},
+					{
+						"id": "nordic_stave",
+						"label": "Nordic Stave"
+					},
+					{
+						"id": "renaissance",
+						"label": "Renaissance"
+					},
+					{
+						"id": "russian",
+						"label": "Russian Orthodox"
+					}
+				],
+				"width": {
+					"max": 24.0,
+					"min": 6.0,
+					"step": 0.5,
+					"value": 10.0
+				}
+			},
+			"kind": "church",
+			"purposes": [],
+			"styles": [
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "romanesque",
+					"label": "Romanesque",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "gothic",
+					"label": "Gothic",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "byzantine",
+					"label": "Byzantine",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "nordic_stave",
+					"label": "Nordic Stave",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "renaissance",
+					"label": "Renaissance",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "russian",
+					"label": "Russian Orthodox",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				}
+			]
+		},
+		{
+			"default_request": {
+				"enclosure": "none",
+				"height": 18.0,
+				"kind": "castle",
+				"length": 50.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "norman",
+				"water": "none",
+				"width": 55.0
+			},
+			"descriptor": {
+				"api_version": 2,
+				"height": {
+					"max": 40.0,
+					"min": 3.0,
+					"step": 0.5,
+					"value": 18.0
+				},
+				"height_label": "Wall height (m)",
+				"kind": "castle",
+				"label": "Castle",
+				"length": {
+					"max": 400.0,
+					"min": 8.0,
+					"step": 1.0,
+					"value": 50.0
+				},
+				"purpose_label": "",
+				"purposes": [],
+				"size_label": "Site",
+				"style_label": "Style",
+				"styles": [
+					{
+						"id": "norman",
+						"label": "Norman"
+					},
+					{
+						"id": "edwardian",
+						"label": "Edwardian"
+					},
+					{
+						"id": "crusader",
+						"label": "Crusader"
+					},
+					{
+						"id": "french_chateau",
+						"label": "French Château"
+					},
+					{
+						"id": "bavarian",
+						"label": "Bavarian Romantic"
+					},
+					{
+						"id": "japanese",
+						"label": "Japanese"
+					},
+					{
+						"id": "moorish",
+						"label": "Moorish"
+					},
+					{
+						"id": "wizard",
+						"label": "Wizard's Tower"
+					},
+					{
+						"id": "dark",
+						"label": "Dark Fortress"
+					},
+					{
+						"id": "sky",
+						"label": "Sky Citadel"
+					},
+					{
+						"id": "elven",
+						"label": "Elven Hall"
+					}
+				],
+				"width": {
+					"max": 320.0,
+					"min": 6.0,
+					"step": 1.0,
+					"value": 55.0
+				}
+			},
+			"kind": "castle",
+			"purposes": [],
+			"styles": [
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "norman",
+					"label": "Norman",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "edwardian",
+					"label": "Edwardian",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "crusader",
+					"label": "Crusader",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "french_chateau",
+					"label": "French Château",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "bavarian",
+					"label": "Bavarian Romantic",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "japanese",
+					"label": "Japanese",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "moorish",
+					"label": "Moorish",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "wizard",
+					"label": "Wizard's Tower",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "dark",
+					"label": "Dark Fortress",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "sky",
+					"label": "Sky Citadel",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "elven",
+					"label": "Elven Hall",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				}
+			]
+		},
+		{
+			"default_request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"descriptor": {
+				"api_version": 2,
+				"height": {
+					"max": 3.6,
+					"min": 2.2,
+					"step": 0.1,
+					"value": 2.6
+				},
+				"height_label": "Ceiling (m)",
+				"kind": "house",
+				"label": "House",
+				"length": {
+					"max": 26.0,
+					"min": 6.0,
+					"step": 0.5,
+					"value": 12.0
+				},
+				"purpose_label": "Trade",
+				"purposes": [
+					{
+						"id": "none",
+						"label": "Household"
+					},
+					{
+						"id": "smith",
+						"label": "Smith"
+					},
+					{
+						"id": "alchemist",
+						"label": "Alchemist"
+					},
+					{
+						"id": "farmer",
+						"label": "Farmer"
+					},
+					{
+						"id": "innkeeper",
+						"label": "Innkeeper"
+					},
+					{
+						"id": "scholar",
+						"label": "Scholar"
+					}
+				],
+				"size_label": "House",
+				"storeys": {
+					"max": 3,
+					"min": 1,
+					"step": 1,
+					"value": 1
+				},
+				"style_label": "Style",
+				"styles": [
+					{
+						"id": "cottage",
+						"label": "Cottage"
+					},
+					{
+						"id": "farmhouse",
+						"label": "Farmhouse"
+					},
+					{
+						"id": "townhouse",
+						"label": "Townhouse"
+					},
+					{
+						"id": "longhall",
+						"label": "Long Hall"
+					},
+					{
+						"id": "witch_hut",
+						"label": "Witch's Hut"
+					},
+					{
+						"id": "rich",
+						"label": "Rich House"
+					},
+					{
+						"id": "mediterranean",
+						"label": "Mediterranean House"
+					},
+					{
+						"id": "asian",
+						"label": "Asian Timber House"
+					},
+					{
+						"id": "african",
+						"label": "African Compound House"
+					},
+					{
+						"id": "thatch_cottage",
+						"label": "Thatched Cottage"
+					},
+					{
+						"id": "mud_hut",
+						"label": "Mud Hut"
+					},
+					{
+						"id": "pueblo",
+						"label": "Pueblo Adobe House"
+					}
+				],
+				"width": {
+					"max": 20.0,
+					"min": 5.0,
+					"step": 0.5,
+					"value": 9.0
+				}
+			},
+			"kind": "house",
+			"purposes": [
+				{
+					"id": "none",
+					"label": "Household"
+				},
+				{
+					"id": "smith",
+					"label": "Smith"
+				},
+				{
+					"id": "alchemist",
+					"label": "Alchemist"
+				},
+				{
+					"id": "farmer",
+					"label": "Farmer"
+				},
+				{
+					"id": "innkeeper",
+					"label": "Innkeeper"
+				},
+				{
+					"id": "scholar",
+					"label": "Scholar"
+				}
+			],
+			"styles": [
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "cottage",
+					"label": "Cottage",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "farmhouse",
+					"label": "Farmhouse",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "townhouse",
+					"label": "Townhouse",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "longhall",
+					"label": "Long Hall",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "witch_hut",
+					"label": "Witch's Hut",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "rich",
+					"label": "Rich House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "mediterranean",
+					"label": "Mediterranean House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "asian",
+					"label": "Asian Timber House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "african",
+					"label": "African Compound House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "thatch_cottage",
+					"label": "Thatched Cottage",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "mud_hut",
+					"label": "Mud Hut",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "pueblo",
+					"label": "Pueblo Adobe House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				}
+			]
+		},
+		{
+			"default_request": {
+				"enclosure": "none",
+				"height": 2.8,
+				"kind": "shop",
+				"length": 14.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "barracks",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 11.0
+			},
+			"descriptor": {
+				"api_version": 2,
+				"height": {
+					"max": 4.2,
+					"min": 2.4,
+					"step": 0.1,
+					"value": 2.8
+				},
+				"height_label": "Ceiling (m)",
+				"kind": "shop",
+				"label": "Shop / Civic Building",
+				"length": {
+					"max": 32.0,
+					"min": 8.0,
+					"step": 0.5,
+					"value": 14.0
+				},
+				"purpose_label": "Business",
+				"purposes": [
+					{
+						"id": "barracks",
+						"label": "Barracks / Guardhouse"
+					},
+					{
+						"id": "library",
+						"label": "Library / Archive"
+					},
+					{
+						"id": "prison",
+						"label": "Prison / Dungeon"
+					},
+					{
+						"id": "palace",
+						"label": "Throne Hall / Palace"
+					},
+					{
+						"id": "blacksmith",
+						"label": "Blacksmith"
+					},
+					{
+						"id": "stable",
+						"label": "Stable"
+					},
+					{
+						"id": "restaurant",
+						"label": "Restaurant / Cookshop"
+					},
+					{
+						"id": "tavern",
+						"label": "Tavern"
+					},
+					{
+						"id": "inn",
+						"label": "Inn"
+					},
+					{
+						"id": "bakery",
+						"label": "Bakery"
+					},
+					{
+						"id": "butcher",
+						"label": "Butcher"
+					},
+					{
+						"id": "apothecary",
+						"label": "Apothecary"
+					},
+					{
+						"id": "general_store",
+						"label": "General Store"
+					},
+					{
+						"id": "tailor",
+						"label": "Tailor"
+					},
+					{
+						"id": "carpenter",
+						"label": "Carpenter"
+					},
+					{
+						"id": "town_hall",
+						"label": "Town Hall"
+					},
+					{
+						"id": "guildhall",
+						"label": "Guildhall"
+					},
+					{
+						"id": "market_hall",
+						"label": "Market Hall"
+					},
+					{
+						"id": "alchemist_laboratory",
+						"label": "Alchemist Laboratory"
+					},
+					{
+						"id": "bathhouse",
+						"label": "Bathhouse"
+					},
+					{
+						"id": "hospice",
+						"label": "Hospice"
+					},
+					{
+						"id": "school",
+						"label": "School"
+					},
+					{
+						"id": "thieves_den",
+						"label": "Thieves' Den"
+					}
+				],
+				"size_label": "Building",
+				"storeys": {
+					"max": 3,
+					"min": 1,
+					"step": 1,
+					"value": 1
+				},
+				"style_label": "Style",
+				"styles": [
+					{
+						"id": "cottage",
+						"label": "Cottage"
+					},
+					{
+						"id": "farmhouse",
+						"label": "Farmhouse"
+					},
+					{
+						"id": "townhouse",
+						"label": "Townhouse"
+					},
+					{
+						"id": "longhall",
+						"label": "Long Hall"
+					},
+					{
+						"id": "witch_hut",
+						"label": "Witch's Hut"
+					},
+					{
+						"id": "rich",
+						"label": "Rich House"
+					},
+					{
+						"id": "mediterranean",
+						"label": "Mediterranean House"
+					},
+					{
+						"id": "asian",
+						"label": "Asian Timber House"
+					},
+					{
+						"id": "african",
+						"label": "African Compound House"
+					},
+					{
+						"id": "thatch_cottage",
+						"label": "Thatched Cottage"
+					},
+					{
+						"id": "mud_hut",
+						"label": "Mud Hut"
+					},
+					{
+						"id": "pueblo",
+						"label": "Pueblo Adobe House"
+					}
+				],
+				"width": {
+					"max": 24.0,
+					"min": 7.0,
+					"step": 0.5,
+					"value": 11.0
+				}
+			},
+			"kind": "shop",
+			"purposes": [
+				{
+					"id": "barracks",
+					"label": "Barracks / Guardhouse"
+				},
+				{
+					"id": "library",
+					"label": "Library / Archive"
+				},
+				{
+					"id": "prison",
+					"label": "Prison / Dungeon"
+				},
+				{
+					"id": "palace",
+					"label": "Throne Hall / Palace"
+				},
+				{
+					"id": "blacksmith",
+					"label": "Blacksmith"
+				},
+				{
+					"id": "stable",
+					"label": "Stable"
+				},
+				{
+					"id": "restaurant",
+					"label": "Restaurant / Cookshop"
+				},
+				{
+					"id": "tavern",
+					"label": "Tavern"
+				},
+				{
+					"id": "inn",
+					"label": "Inn"
+				},
+				{
+					"id": "bakery",
+					"label": "Bakery"
+				},
+				{
+					"id": "butcher",
+					"label": "Butcher"
+				},
+				{
+					"id": "apothecary",
+					"label": "Apothecary"
+				},
+				{
+					"id": "general_store",
+					"label": "General Store"
+				},
+				{
+					"id": "tailor",
+					"label": "Tailor"
+				},
+				{
+					"id": "carpenter",
+					"label": "Carpenter"
+				},
+				{
+					"id": "town_hall",
+					"label": "Town Hall"
+				},
+				{
+					"id": "guildhall",
+					"label": "Guildhall"
+				},
+				{
+					"id": "market_hall",
+					"label": "Market Hall"
+				},
+				{
+					"id": "alchemist_laboratory",
+					"label": "Alchemist Laboratory"
+				},
+				{
+					"id": "bathhouse",
+					"label": "Bathhouse"
+				},
+				{
+					"id": "hospice",
+					"label": "Hospice"
+				},
+				{
+					"id": "school",
+					"label": "School"
+				},
+				{
+					"id": "thieves_den",
+					"label": "Thieves' Den"
+				}
+			],
+			"styles": [
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "cottage",
+					"label": "Cottage",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "farmhouse",
+					"label": "Farmhouse",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "townhouse",
+					"label": "Townhouse",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "longhall",
+					"label": "Long Hall",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "witch_hut",
+					"label": "Witch's Hut",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "rich",
+					"label": "Rich House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "mediterranean",
+					"label": "Mediterranean House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "asian",
+					"label": "Asian Timber House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "african",
+					"label": "African Compound House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "thatch_cottage",
+					"label": "Thatched Cottage",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "mud_hut",
+					"label": "Mud Hut",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "pueblo",
+					"label": "Pueblo Adobe House",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				}
+			]
+		},
+		{
+			"default_request": {
+				"enclosure": "none",
+				"height": 3.6,
+				"kind": "hotel",
+				"length": 24.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 3,
+				"style": "grand_budapest",
+				"water": "none",
+				"width": 48.0
+			},
+			"descriptor": {
+				"api_version": 2,
+				"height": {
+					"max": 4.5,
+					"min": 3.0,
+					"step": 0.1,
+					"value": 3.6
+				},
+				"height_label": "Floor height (m)",
+				"kind": "hotel",
+				"label": "Grand Hotel",
+				"length": {
+					"max": 42.0,
+					"min": 16.0,
+					"step": 1.0,
+					"value": 24.0
+				},
+				"purpose_label": "",
+				"purposes": [],
+				"size_label": "Hotel",
+				"storeys": {
+					"max": 3,
+					"min": 3,
+					"step": 1,
+					"value": 3
+				},
+				"style_label": "Style",
+				"styles": [
+					{
+						"id": "grand_budapest",
+						"label": "Grand Budapest"
+					},
+					{
+						"id": "alpine_palace",
+						"label": "Alpine Palace"
+					}
+				],
+				"width": {
+					"max": 80.0,
+					"min": 30.0,
+					"step": 1.0,
+					"value": 48.0
+				}
+			},
+			"kind": "hotel",
+			"purposes": [],
+			"styles": [
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "grand_budapest",
+					"label": "Grand Budapest",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "alpine_palace",
+					"label": "Alpine Palace",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				}
+			]
+		},
+		{
+			"default_request": {
+				"enclosure": "none",
+				"height": 12.0,
+				"kind": "temple",
+				"length": 44.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "blood",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "basilica",
+				"water": "none",
+				"width": 26.0
+			},
+			"descriptor": {
+				"api_version": 2,
+				"height": {
+					"max": 26.0,
+					"min": 6.0,
+					"step": 0.5,
+					"value": 12.0
+				},
+				"height_label": "Hall height (m)",
+				"kind": "temple",
+				"label": "Temple",
+				"length": {
+					"max": 100.0,
+					"min": 22.0,
+					"step": 1.0,
+					"value": 44.0
+				},
+				"purpose_label": "Cult",
+				"purposes": [
+					{
+						"id": "blood",
+						"label": "The Crimson Choir"
+					},
+					{
+						"id": "void",
+						"label": "The Starless Deep"
+					},
+					{
+						"id": "flame",
+						"label": "The Ashen Crown"
+					},
+					{
+						"id": "bone",
+						"label": "The Ossuary"
+					},
+					{
+						"id": "serpent",
+						"label": "The Coiled Fang"
+					}
+				],
+				"size_label": "Temple",
+				"style_label": "Form",
+				"styles": [
+					{
+						"id": "basilica",
+						"label": "Basilica"
+					},
+					{
+						"id": "pylon",
+						"label": "Pylon"
+					},
+					{
+						"id": "ziggurat",
+						"label": "Ziggurat"
+					},
+					{
+						"id": "rotunda",
+						"label": "Rotunda"
+					}
+				],
+				"width": {
+					"max": 60.0,
+					"min": 14.0,
+					"step": 1.0,
+					"value": 26.0
+				}
+			},
+			"kind": "temple",
+			"purposes": [
+				{
+					"id": "blood",
+					"label": "The Crimson Choir"
+				},
+				{
+					"id": "void",
+					"label": "The Starless Deep"
+				},
+				{
+					"id": "flame",
+					"label": "The Ashen Crown"
+				},
+				{
+					"id": "bone",
+					"label": "The Ossuary"
+				},
+				{
+					"id": "serpent",
+					"label": "The Coiled Fang"
+				}
+			],
+			"styles": [
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "basilica",
+					"label": "Basilica",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "pylon",
+					"label": "Pylon",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "ziggurat",
+					"label": "Ziggurat",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "rotunda",
+					"label": "Rotunda",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				}
+			]
+		},
+		{
+			"default_request": {
+				"enclosure": "none",
+				"height": 12.0,
+				"kind": "windmill",
+				"length": 6.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "tower",
+				"water": "none",
+				"width": 12.0
+			},
+			"descriptor": {
+				"api_version": 2,
+				"clamps": true,
+				"fields": [
+					"sail_span",
+					"body",
+					"height"
+				],
+				"height": {
+					"max": 24.0,
+					"min": 3.0,
+					"step": 0.5,
+					"value": 12.0
+				},
+				"height_label": "Tower height (m)",
+				"kind": "windmill",
+				"label": "Windmill",
+				"length": {
+					"max": 10.0,
+					"min": 2.0,
+					"step": 0.5,
+					"value": 6.0
+				},
+				"length_label": "Body (m)",
+				"purpose_label": "",
+				"purposes": [],
+				"size_label": "Mill",
+				"style_label": "Type",
+				"styles": [
+					{
+						"id": "tower",
+						"label": "Tower mill"
+					},
+					{
+						"id": "post",
+						"label": "Post mill"
+					},
+					{
+						"id": "smock",
+						"label": "Smock mill"
+					},
+					{
+						"id": "windpump",
+						"label": "Farm windpump"
+					},
+					{
+						"id": "paddle",
+						"label": "Polder mill"
+					}
+				],
+				"surfaces": 5,
+				"width": {
+					"max": 20.0,
+					"min": 2.5,
+					"step": 0.5,
+					"value": 12.0
+				},
+				"width_label": "Sail span (m)"
+			},
+			"kind": "windmill",
+			"purposes": [],
+			"styles": [
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "tower",
+					"label": "Tower mill",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "post",
+					"label": "Post mill",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "smock",
+					"label": "Smock mill",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "windpump",
+					"label": "Farm windpump",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "paddle",
+					"label": "Polder mill",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				}
+			]
+		},
+		{
+			"default_request": {
+				"enclosure": "none",
+				"height": 6.0,
+				"kind": "world",
+				"length": 30.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "domus",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "courtyard_house",
+				"water": "none",
+				"width": 20.0
+			},
+			"descriptor": {
+				"api_version": 2,
+				"families": [
+					{
+						"envelope": {
+							"height": {
+								"max": 24.0,
+								"min": 2.6
+							},
+							"length": {
+								"max": 50.0,
+								"min": 15.0
+							},
+							"width": {
+								"max": 30.0,
+								"min": 12.0
+							}
+						},
+						"id": "courtyard_house",
+						"kinds": [
+							"domus",
+							"riad",
+							"palazzo"
+						],
+						"label": "Courtyard house"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 30.0,
+								"min": 8.0
+							},
+							"length": {
+								"max": 130.0,
+								"min": 40.0
+							},
+							"width": {
+								"max": 180.0,
+								"min": 60.0
+							}
+						},
+						"id": "mosque",
+						"kinds": [
+							"hypostyle"
+						],
+						"label": "Hypostyle mosque"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 50.0,
+								"min": 32.0
+							},
+							"length": {
+								"max": 180.0,
+								"min": 60.0
+							},
+							"width": {
+								"max": 180.0,
+								"min": 60.0
+							}
+						},
+						"id": "cruciform_temple",
+						"kinds": [
+							"temple_of_four_winds"
+						],
+						"label": "Cruciform temple"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 24.0,
+								"min": 10.0
+							},
+							"length": {
+								"max": 42.0,
+								"min": 8.0
+							},
+							"width": {
+								"max": 120.0,
+								"min": 18.0
+							}
+						},
+						"id": "timber_hall",
+						"kinds": [
+							"great_hall",
+							"phoenix_pavilion"
+						],
+						"label": "Timber hall"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 20.7,
+								"min": 12.0
+							},
+							"length": {
+								"max": 38.0,
+								"min": 18.0
+							},
+							"width": {
+								"max": 45.0,
+								"min": 20.0
+							}
+						},
+						"id": "insula",
+						"kinds": [
+							"port_tenement"
+						],
+						"label": "Insula"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 85.5,
+								"min": 31.5
+							},
+							"length": {
+								"max": 15.2,
+								"min": 5.6
+							},
+							"width": {
+								"max": 15.2,
+								"min": 5.6
+							}
+						},
+						"id": "tower_house",
+						"kinds": [
+							"merchant_tower"
+						],
+						"label": "Tower house"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 12.0,
+								"min": 12.0
+							},
+							"length": {
+								"max": 105.0,
+								"min": 38.5
+							},
+							"width": {
+								"max": 133.0,
+								"min": 49.0
+							}
+						},
+						"id": "caravanserai",
+						"kinds": [
+							"sultan_han"
+						],
+						"label": "Caravanserai"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 12.0,
+								"min": 6.0
+							},
+							"length": {
+								"max": 32.0,
+								"min": 10.0
+							},
+							"width": {
+								"max": 48.0,
+								"min": 14.0
+							}
+						},
+						"id": "hammam",
+						"kinds": [
+							"steam_baths"
+						],
+						"label": "Hammam"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 144.0,
+								"min": 40.0
+							},
+							"length": {
+								"max": 57.0,
+								"min": 20.0
+							},
+							"width": {
+								"max": 57.0,
+								"min": 20.0
+							}
+						},
+						"id": "pagoda",
+						"kinds": [
+							"square_pagoda",
+							"octagonal_pagoda",
+							"dodecagonal_pagoda"
+						],
+						"label": "Pagoda"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 20.0,
+								"min": 14.0
+							},
+							"length": {
+								"max": 48.0,
+								"min": 32.0
+							},
+							"width": {
+								"max": 48.0,
+								"min": 32.0
+							}
+						},
+						"id": "stupa",
+						"kinds": [
+							"saints_mound"
+						],
+						"label": "Stupa"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 5.0,
+								"min": 5.0
+							},
+							"length": {
+								"max": 76.0,
+								"min": 28.0
+							},
+							"width": {
+								"max": 95.0,
+								"min": 35.0
+							}
+						},
+						"id": "vihara",
+						"kinds": [
+							"monks_cloister"
+						],
+						"label": "Vihara"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 16.0,
+								"min": 7.0
+							},
+							"length": {
+								"max": 48.0,
+								"min": 18.0
+							},
+							"width": {
+								"max": 36.0,
+								"min": 12.0
+							}
+						},
+						"id": "vastu",
+						"kinds": [
+							"merchants_haveli"
+						],
+						"label": "Haveli / vastu house"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 5.0,
+								"min": 4.0
+							},
+							"length": {
+								"max": 90.0,
+								"min": 30.0
+							},
+							"width": {
+								"max": 40.0,
+								"min": 22.0
+							}
+						},
+						"id": "siheyuan",
+						"kinds": [
+							"scholars_compound",
+							"two_court_compound"
+						],
+						"label": "Siheyuan"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 25.0,
+								"min": 9.0
+							},
+							"length": {
+								"max": 120.0,
+								"min": 40.0
+							},
+							"width": {
+								"max": 120.0,
+								"min": 40.0
+							}
+						},
+						"id": "tulou",
+						"kinds": [
+							"clan_ring"
+						],
+						"label": "Tulou"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 60.0,
+								"min": 24.0
+							},
+							"length": {
+								"max": 64.0,
+								"min": 20.0
+							},
+							"width": {
+								"max": 52.0,
+								"min": 18.0
+							}
+						},
+						"id": "nagara",
+						"kinds": [
+							"hundred_spires"
+						],
+						"label": "Nagara temple"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 38.0,
+								"min": 21.0
+							},
+							"length": {
+								"max": 87.4,
+								"min": 32.2
+							},
+							"width": {
+								"max": 155.8,
+								"min": 57.4
+							}
+						},
+						"id": "rock_cut_temple",
+						"kinds": [
+							"quarried_temple"
+						],
+						"label": "Rock-cut temple"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 90.0,
+								"min": 30.0
+							},
+							"length": {
+								"max": 380.0,
+								"min": 120.0
+							},
+							"width": {
+								"max": 380.0,
+								"min": 120.0
+							}
+						},
+						"id": "temple_mountain",
+						"kinds": [
+							"angkor_mountain"
+						],
+						"label": "Temple mountain"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 28.0,
+								"min": 16.8
+							},
+							"length": {
+								"max": 38.0,
+								"min": 14.0
+							},
+							"width": {
+								"max": 123.5,
+								"min": 45.5
+							}
+						},
+						"id": "stepwell",
+						"kinds": [
+							"queens_well"
+						],
+						"label": "Stepwell"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 120.0,
+								"min": 45.0
+							},
+							"length": {
+								"max": 240.0,
+								"min": 70.0
+							},
+							"width": {
+								"max": 380.0,
+								"min": 100.0
+							}
+						},
+						"id": "dravida",
+						"kinds": [
+							"god_kings_precinct"
+						],
+						"label": "Dravida compound"
+					}
+				],
+				"height": {
+					"max": 144.0,
+					"min": 2.2,
+					"step": 0.1,
+					"value": 6.0
+				},
+				"height_label": "Height (m)",
+				"kind": "world",
+				"label": "World building",
+				"length": {
+					"max": 380.0,
+					"min": 4.0,
+					"step": 0.5,
+					"value": 30.0
+				},
+				"purpose_label": "Kind",
+				"purposes": [
+					{
+						"family": "courtyard_house",
+						"id": "domus",
+						"label": "Domus"
+					},
+					{
+						"family": "courtyard_house",
+						"id": "riad",
+						"label": "Riad"
+					},
+					{
+						"family": "courtyard_house",
+						"id": "palazzo",
+						"label": "Palazzo"
+					},
+					{
+						"family": "mosque",
+						"id": "hypostyle",
+						"label": "Hypostyle"
+					},
+					{
+						"family": "cruciform_temple",
+						"id": "temple_of_four_winds",
+						"label": "Temple Of Four Winds"
+					},
+					{
+						"family": "timber_hall",
+						"id": "great_hall",
+						"label": "Great Hall"
+					},
+					{
+						"family": "timber_hall",
+						"id": "phoenix_pavilion",
+						"label": "Phoenix Pavilion"
+					},
+					{
+						"family": "insula",
+						"id": "port_tenement",
+						"label": "Port Tenement"
+					},
+					{
+						"family": "tower_house",
+						"id": "merchant_tower",
+						"label": "Merchant Tower"
+					},
+					{
+						"family": "caravanserai",
+						"id": "sultan_han",
+						"label": "Sultan Han"
+					},
+					{
+						"family": "hammam",
+						"id": "steam_baths",
+						"label": "Steam Baths"
+					},
+					{
+						"family": "pagoda",
+						"id": "square_pagoda",
+						"label": "Square Pagoda"
+					},
+					{
+						"family": "pagoda",
+						"id": "octagonal_pagoda",
+						"label": "Octagonal Pagoda"
+					},
+					{
+						"family": "pagoda",
+						"id": "dodecagonal_pagoda",
+						"label": "Dodecagonal Pagoda"
+					},
+					{
+						"family": "stupa",
+						"id": "saints_mound",
+						"label": "Saints Mound"
+					},
+					{
+						"family": "vihara",
+						"id": "monks_cloister",
+						"label": "Monks Cloister"
+					},
+					{
+						"family": "vastu",
+						"id": "merchants_haveli",
+						"label": "Merchants Haveli"
+					},
+					{
+						"family": "siheyuan",
+						"id": "scholars_compound",
+						"label": "Scholars Compound"
+					},
+					{
+						"family": "siheyuan",
+						"id": "two_court_compound",
+						"label": "Two Court Compound"
+					},
+					{
+						"family": "tulou",
+						"id": "clan_ring",
+						"label": "Clan Ring"
+					},
+					{
+						"family": "nagara",
+						"id": "hundred_spires",
+						"label": "Hundred Spires"
+					},
+					{
+						"family": "rock_cut_temple",
+						"id": "quarried_temple",
+						"label": "Quarried Temple"
+					},
+					{
+						"family": "temple_mountain",
+						"id": "angkor_mountain",
+						"label": "Angkor Mountain"
+					},
+					{
+						"family": "stepwell",
+						"id": "queens_well",
+						"label": "Queens Well"
+					},
+					{
+						"family": "dravida",
+						"id": "god_kings_precinct",
+						"label": "God Kings Precinct"
+					}
+				],
+				"size_label": "Building",
+				"style_label": "Family",
+				"styles": [
+					{
+						"envelope": {
+							"height": {
+								"max": 24.0,
+								"min": 2.6
+							},
+							"length": {
+								"max": 50.0,
+								"min": 15.0
+							},
+							"width": {
+								"max": 30.0,
+								"min": 12.0
+							}
+						},
+						"id": "courtyard_house",
+						"kinds": [
+							"domus",
+							"riad",
+							"palazzo"
+						],
+						"label": "Courtyard house"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 30.0,
+								"min": 8.0
+							},
+							"length": {
+								"max": 130.0,
+								"min": 40.0
+							},
+							"width": {
+								"max": 180.0,
+								"min": 60.0
+							}
+						},
+						"id": "mosque",
+						"kinds": [
+							"hypostyle"
+						],
+						"label": "Hypostyle mosque"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 50.0,
+								"min": 32.0
+							},
+							"length": {
+								"max": 180.0,
+								"min": 60.0
+							},
+							"width": {
+								"max": 180.0,
+								"min": 60.0
+							}
+						},
+						"id": "cruciform_temple",
+						"kinds": [
+							"temple_of_four_winds"
+						],
+						"label": "Cruciform temple"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 24.0,
+								"min": 10.0
+							},
+							"length": {
+								"max": 42.0,
+								"min": 8.0
+							},
+							"width": {
+								"max": 120.0,
+								"min": 18.0
+							}
+						},
+						"id": "timber_hall",
+						"kinds": [
+							"great_hall",
+							"phoenix_pavilion"
+						],
+						"label": "Timber hall"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 20.7,
+								"min": 12.0
+							},
+							"length": {
+								"max": 38.0,
+								"min": 18.0
+							},
+							"width": {
+								"max": 45.0,
+								"min": 20.0
+							}
+						},
+						"id": "insula",
+						"kinds": [
+							"port_tenement"
+						],
+						"label": "Insula"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 85.5,
+								"min": 31.5
+							},
+							"length": {
+								"max": 15.2,
+								"min": 5.6
+							},
+							"width": {
+								"max": 15.2,
+								"min": 5.6
+							}
+						},
+						"id": "tower_house",
+						"kinds": [
+							"merchant_tower"
+						],
+						"label": "Tower house"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 12.0,
+								"min": 12.0
+							},
+							"length": {
+								"max": 105.0,
+								"min": 38.5
+							},
+							"width": {
+								"max": 133.0,
+								"min": 49.0
+							}
+						},
+						"id": "caravanserai",
+						"kinds": [
+							"sultan_han"
+						],
+						"label": "Caravanserai"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 12.0,
+								"min": 6.0
+							},
+							"length": {
+								"max": 32.0,
+								"min": 10.0
+							},
+							"width": {
+								"max": 48.0,
+								"min": 14.0
+							}
+						},
+						"id": "hammam",
+						"kinds": [
+							"steam_baths"
+						],
+						"label": "Hammam"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 144.0,
+								"min": 40.0
+							},
+							"length": {
+								"max": 57.0,
+								"min": 20.0
+							},
+							"width": {
+								"max": 57.0,
+								"min": 20.0
+							}
+						},
+						"id": "pagoda",
+						"kinds": [
+							"square_pagoda",
+							"octagonal_pagoda",
+							"dodecagonal_pagoda"
+						],
+						"label": "Pagoda"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 20.0,
+								"min": 14.0
+							},
+							"length": {
+								"max": 48.0,
+								"min": 32.0
+							},
+							"width": {
+								"max": 48.0,
+								"min": 32.0
+							}
+						},
+						"id": "stupa",
+						"kinds": [
+							"saints_mound"
+						],
+						"label": "Stupa"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 5.0,
+								"min": 5.0
+							},
+							"length": {
+								"max": 76.0,
+								"min": 28.0
+							},
+							"width": {
+								"max": 95.0,
+								"min": 35.0
+							}
+						},
+						"id": "vihara",
+						"kinds": [
+							"monks_cloister"
+						],
+						"label": "Vihara"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 16.0,
+								"min": 7.0
+							},
+							"length": {
+								"max": 48.0,
+								"min": 18.0
+							},
+							"width": {
+								"max": 36.0,
+								"min": 12.0
+							}
+						},
+						"id": "vastu",
+						"kinds": [
+							"merchants_haveli"
+						],
+						"label": "Haveli / vastu house"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 5.0,
+								"min": 4.0
+							},
+							"length": {
+								"max": 90.0,
+								"min": 30.0
+							},
+							"width": {
+								"max": 40.0,
+								"min": 22.0
+							}
+						},
+						"id": "siheyuan",
+						"kinds": [
+							"scholars_compound",
+							"two_court_compound"
+						],
+						"label": "Siheyuan"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 25.0,
+								"min": 9.0
+							},
+							"length": {
+								"max": 120.0,
+								"min": 40.0
+							},
+							"width": {
+								"max": 120.0,
+								"min": 40.0
+							}
+						},
+						"id": "tulou",
+						"kinds": [
+							"clan_ring"
+						],
+						"label": "Tulou"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 60.0,
+								"min": 24.0
+							},
+							"length": {
+								"max": 64.0,
+								"min": 20.0
+							},
+							"width": {
+								"max": 52.0,
+								"min": 18.0
+							}
+						},
+						"id": "nagara",
+						"kinds": [
+							"hundred_spires"
+						],
+						"label": "Nagara temple"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 38.0,
+								"min": 21.0
+							},
+							"length": {
+								"max": 87.4,
+								"min": 32.2
+							},
+							"width": {
+								"max": 155.8,
+								"min": 57.4
+							}
+						},
+						"id": "rock_cut_temple",
+						"kinds": [
+							"quarried_temple"
+						],
+						"label": "Rock-cut temple"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 90.0,
+								"min": 30.0
+							},
+							"length": {
+								"max": 380.0,
+								"min": 120.0
+							},
+							"width": {
+								"max": 380.0,
+								"min": 120.0
+							}
+						},
+						"id": "temple_mountain",
+						"kinds": [
+							"angkor_mountain"
+						],
+						"label": "Temple mountain"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 28.0,
+								"min": 16.8
+							},
+							"length": {
+								"max": 38.0,
+								"min": 14.0
+							},
+							"width": {
+								"max": 123.5,
+								"min": 45.5
+							}
+						},
+						"id": "stepwell",
+						"kinds": [
+							"queens_well"
+						],
+						"label": "Stepwell"
+					},
+					{
+						"envelope": {
+							"height": {
+								"max": 120.0,
+								"min": 45.0
+							},
+							"length": {
+								"max": 240.0,
+								"min": 70.0
+							},
+							"width": {
+								"max": 380.0,
+								"min": 100.0
+							}
+						},
+						"id": "dravida",
+						"kinds": [
+							"god_kings_precinct"
+						],
+						"label": "Dravida compound"
+					}
+				],
+				"width": {
+					"max": 380.0,
+					"min": 4.0,
+					"step": 0.5,
+					"value": 20.0
+				}
+			},
+			"kind": "world",
+			"purposes": [
+				{
+					"family": "courtyard_house",
+					"id": "domus",
+					"label": "Domus"
+				},
+				{
+					"family": "courtyard_house",
+					"id": "riad",
+					"label": "Riad"
+				},
+				{
+					"family": "courtyard_house",
+					"id": "palazzo",
+					"label": "Palazzo"
+				},
+				{
+					"family": "mosque",
+					"id": "hypostyle",
+					"label": "Hypostyle"
+				},
+				{
+					"family": "cruciform_temple",
+					"id": "temple_of_four_winds",
+					"label": "Temple Of Four Winds"
+				},
+				{
+					"family": "timber_hall",
+					"id": "great_hall",
+					"label": "Great Hall"
+				},
+				{
+					"family": "timber_hall",
+					"id": "phoenix_pavilion",
+					"label": "Phoenix Pavilion"
+				},
+				{
+					"family": "insula",
+					"id": "port_tenement",
+					"label": "Port Tenement"
+				},
+				{
+					"family": "tower_house",
+					"id": "merchant_tower",
+					"label": "Merchant Tower"
+				},
+				{
+					"family": "caravanserai",
+					"id": "sultan_han",
+					"label": "Sultan Han"
+				},
+				{
+					"family": "hammam",
+					"id": "steam_baths",
+					"label": "Steam Baths"
+				},
+				{
+					"family": "pagoda",
+					"id": "square_pagoda",
+					"label": "Square Pagoda"
+				},
+				{
+					"family": "pagoda",
+					"id": "octagonal_pagoda",
+					"label": "Octagonal Pagoda"
+				},
+				{
+					"family": "pagoda",
+					"id": "dodecagonal_pagoda",
+					"label": "Dodecagonal Pagoda"
+				},
+				{
+					"family": "stupa",
+					"id": "saints_mound",
+					"label": "Saints Mound"
+				},
+				{
+					"family": "vihara",
+					"id": "monks_cloister",
+					"label": "Monks Cloister"
+				},
+				{
+					"family": "vastu",
+					"id": "merchants_haveli",
+					"label": "Merchants Haveli"
+				},
+				{
+					"family": "siheyuan",
+					"id": "scholars_compound",
+					"label": "Scholars Compound"
+				},
+				{
+					"family": "siheyuan",
+					"id": "two_court_compound",
+					"label": "Two Court Compound"
+				},
+				{
+					"family": "tulou",
+					"id": "clan_ring",
+					"label": "Clan Ring"
+				},
+				{
+					"family": "nagara",
+					"id": "hundred_spires",
+					"label": "Hundred Spires"
+				},
+				{
+					"family": "rock_cut_temple",
+					"id": "quarried_temple",
+					"label": "Quarried Temple"
+				},
+				{
+					"family": "temple_mountain",
+					"id": "angkor_mountain",
+					"label": "Angkor Mountain"
+				},
+				{
+					"family": "stepwell",
+					"id": "queens_well",
+					"label": "Queens Well"
+				},
+				{
+					"family": "dravida",
+					"id": "god_kings_precinct",
+					"label": "God Kings Precinct"
+				}
+			],
+			"styles": [
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "courtyard_house",
+					"label": "Courtyard house",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "mosque",
+					"label": "Hypostyle mosque",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "cruciform_temple",
+					"label": "Cruciform temple",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "timber_hall",
+					"label": "Timber hall",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "insula",
+					"label": "Insula",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "tower_house",
+					"label": "Tower house",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "caravanserai",
+					"label": "Caravanserai",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "hammam",
+					"label": "Hammam",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "pagoda",
+					"label": "Pagoda",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "stupa",
+					"label": "Stupa",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "vihara",
+					"label": "Vihara",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "vastu",
+					"label": "Haveli / vastu house",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "siheyuan",
+					"label": "Siheyuan",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "tulou",
+					"label": "Tulou",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "nagara",
+					"label": "Nagara temple",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "rock_cut_temple",
+					"label": "Rock-cut temple",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "temple_mountain",
+					"label": "Temple mountain",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "stepwell",
+					"label": "Stepwell",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "dravida",
+					"label": "Dravida compound",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				}
+			]
+		},
+		{
+			"default_request": {
+				"enclosure": "none",
+				"height": 1.0,
+				"kind": "village",
+				"length": 35.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "farming",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "english",
+				"water": "none",
+				"width": 40.0
+			},
+			"descriptor": {
+				"api_version": 2,
+				"compact_display": {
+					"available": true,
+					"default": false,
+					"requires": {
+						"enclosure": "none",
+						"water": "none"
+					}
+				},
+				"decoration_level": {
+					"label": "Decoration",
+					"max": 1.0,
+					"max_label": "Lush / storybook",
+					"min": 0.0,
+					"min_label": "Bare / basic",
+					"step": 0.05,
+					"value": 0.5
+				},
+				"enclosure_label": "Edge",
+				"enclosures": [
+					{
+						"id": "none",
+						"label": "None"
+					},
+					{
+						"id": "hedge",
+						"label": "Hedge"
+					},
+					{
+						"id": "palisade",
+						"label": "Palisade"
+					},
+					{
+						"id": "wall",
+						"label": "Wall"
+					}
+				],
+				"height": {
+					"max": 1,
+					"min": 1,
+					"step": 1,
+					"value": 1
+				},
+				"height_label": "",
+				"kind": "village",
+				"label": "Village",
+				"length": {
+					"max": 100,
+					"min": 0,
+					"step": 5,
+					"value": 35
+				},
+				"length_label": "Wealth (%)",
+				"purpose_label": "Purpose",
+				"purposes": [
+					{
+						"id": "farming",
+						"label": "Farming"
+					},
+					{
+						"id": "crossroads",
+						"label": "Crossroads"
+					},
+					{
+						"id": "market",
+						"label": "Market"
+					},
+					{
+						"id": "mill",
+						"label": "Mill"
+					},
+					{
+						"id": "fishing",
+						"label": "Fishing"
+					},
+					{
+						"id": "mining",
+						"label": "Mining"
+					},
+					{
+						"id": "garrison",
+						"label": "Garrison"
+					},
+					{
+						"id": "pilgrim",
+						"label": "Pilgrim"
+					},
+					{
+						"id": "forest",
+						"label": "Forest"
+					}
+				],
+				"size_label": "Village",
+				"style_label": "Culture",
+				"styles": [
+					{
+						"id": "english",
+						"label": "English"
+					},
+					{
+						"id": "frankish",
+						"label": "Frankish"
+					},
+					{
+						"id": "norse",
+						"label": "Norse"
+					},
+					{
+						"id": "alpine",
+						"label": "Alpine"
+					},
+					{
+						"id": "moorish",
+						"label": "Moorish"
+					},
+					{
+						"id": "eastern",
+						"label": "Eastern"
+					},
+					{
+						"id": "blighted",
+						"label": "Blighted"
+					},
+					{
+						"id": "mediterranean",
+						"label": "Mediterranean"
+					},
+					{
+						"id": "east_asian",
+						"label": "East Asian"
+					},
+					{
+						"id": "saharan",
+						"label": "Saharan"
+					}
+				],
+				"upkeep": {
+					"label": "Upkeep",
+					"max": 1.0,
+					"max_label": "Clean",
+					"min": 0.0,
+					"min_label": "Worn / slum",
+					"step": 0.05,
+					"value": 1.0
+				},
+				"water_label": "Water",
+				"waters": [
+					{
+						"id": "none",
+						"label": "None"
+					},
+					{
+						"id": "pond",
+						"label": "Pond"
+					},
+					{
+						"id": "stream",
+						"label": "Stream"
+					},
+					{
+						"id": "river",
+						"label": "River"
+					},
+					{
+						"id": "coast",
+						"label": "Coast"
+					}
+				],
+				"width": {
+					"max": 500,
+					"min": 12,
+					"step": 1,
+					"value": 40
+				},
+				"width_label": "Population"
+			},
+			"kind": "village",
+			"purposes": [
+				{
+					"id": "farming",
+					"label": "Farming"
+				},
+				{
+					"id": "crossroads",
+					"label": "Crossroads"
+				},
+				{
+					"id": "market",
+					"label": "Market"
+				},
+				{
+					"id": "mill",
+					"label": "Mill"
+				},
+				{
+					"id": "fishing",
+					"label": "Fishing"
+				},
+				{
+					"id": "mining",
+					"label": "Mining"
+				},
+				{
+					"id": "garrison",
+					"label": "Garrison"
+				},
+				{
+					"id": "pilgrim",
+					"label": "Pilgrim"
+				},
+				{
+					"id": "forest",
+					"label": "Forest"
+				}
+			],
+			"styles": [
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "english",
+					"label": "English",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "frankish",
+					"label": "Frankish",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "norse",
+					"label": "Norse",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "alpine",
+					"label": "Alpine",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "moorish",
+					"label": "Moorish",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "eastern",
+					"label": "Eastern",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "blighted",
+					"label": "Blighted",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "mediterranean",
+					"label": "Mediterranean",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "east_asian",
+					"label": "East Asian",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				},
+				{
+					"brief": "docs/BUILDING_PERSONALITY_BRIEFS.md",
+					"generated": false,
+					"id": "saharan",
+					"label": "Saharan",
+					"mechanically_checked": false,
+					"visually_reviewed": false
+				}
+			]
+		}
+	],
+	"purpose": "scope and source baseline; no quality claims",
+	"script_count": 512,
+	"script_sha256": "1cc95aee0a5d769c5cd4de5300ef2f1366cf0d61c66256e7a3bbfde0cce3a2fe",
+	"seed_matrix": [
+		1,
+		8102,
+		21325
+	],
+	"size_matrix": [
+		"small",
+		"default",
+		"large"
+	],
+	"size_policy": "Use each family's supported envelope; never shrink furniture to fit.",
+	"source_revision": "af86a2476819265713663b708a9e9aab224476a9",
+	"style_rows": 81
+}

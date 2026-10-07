@@ -1,0 +1,347 @@
+{
+	"cases": [
+		{
+			"id": "church_romanesque__1_default",
+			"key": "church_romanesque_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 12.0,
+				"kind": "church",
+				"length": 22.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "romanesque",
+				"water": "none",
+				"width": 10.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_three_quarter",
+						"pitch_degrees": -2.2918307985077471,
+						"position": "(24.2752, 13.40656, -56.18491)",
+						"target": "(0.0, 11.01797, -1.661913)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/church_romanesque_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 74.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132335326325867,
+						"position": "(0.0, 1.58, -17.99978)",
+						"target": "(0.0, 1.42, -15.14978)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/church_romanesque_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 74.0,
+						"mode": "first_person_nave_axis",
+						"pitch_degrees": -0.85784085746758287,
+						"position": "(0.0, 1.58, -8.0)",
+						"target": "(0.0, 1.3, 10.7)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/church_romanesque_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "nave",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252962236096671,
+						"position": "(33.73687, 50.40343, 27.97518)",
+						"target": "(0.0, 11.01797, -1.661913)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/cameras2/church_romanesque_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "house_cottage_none_1_default",
+			"key": "house_cottage_none_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 2.6000000000000001,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_three_quarter",
+						"pitch_degrees": -2.2918312611350053,
+						"position": "(14.50403, 5.192151, -30.43509)",
+						"target": "(1.172734, 3.880402, -0.492501)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/house_cottage_none_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 74.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132340691163019,
+						"position": "(0.0, 1.58, -4.9)",
+						"target": "(0.0, 1.42, -2.05)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/house_cottage_none_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 74.0,
+						"mode": "first_person_activity_room",
+						"pitch_degrees": -14.555503380104568,
+						"position": "(-3.4, 1.58, -2.22)",
+						"target": "(-2.225, 1.12, -0.894118)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/house_cottage_none_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "kitchen",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252961717006485,
+						"position": "(19.70013, 25.50985, 15.7834)",
+						"target": "(1.172734, 3.880402, -0.492501)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/cameras2/house_cottage_none_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "temple_basilica_blood_1_default",
+			"key": "temple_basilica_blood_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 12.0,
+				"kind": "temple",
+				"length": 44.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "blood",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "basilica",
+				"water": "none",
+				"width": 26.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_three_quarter",
+						"pitch_degrees": -2.2918309079441475,
+						"position": "(36.79122, 12.1437, -82.63443)",
+						"target": "(0.0, 8.523581, 0.0)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/temple_basilica_blood_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 74.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132335326325867,
+						"position": "(0.0, 1.58, -21.25)",
+						"target": "(0.0, 1.42, -18.4)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/temple_basilica_blood_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 74.0,
+						"mode": "first_person_ritual_axis",
+						"pitch_degrees": 2.2021583576918973,
+						"position": "(0.0, 1.75, -19.58)",
+						"target": "(0.0, 3.225728, 18.79659)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/temple_basilica_blood_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "sanctuary",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252960245938525,
+						"position": "(51.13121, 68.21573, 44.91763)",
+						"target": "(0.0, 8.523581, 0.0)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/cameras2/temple_basilica_blood_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "windmill_tower__1_default",
+			"key": "windmill_tower_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 12.0,
+				"kind": "windmill",
+				"length": 6.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "tower",
+				"water": "none",
+				"width": 12.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_three_quarter",
+						"pitch_degrees": -2.2918304091407746,
+						"position": "(12.26439, 10.05763, -27.12557)",
+						"target": "(0.0, 8.850861, 0.420697)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/windmill_tower_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 74.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132340691163019,
+						"position": "(0.0, 1.58, -2.25)",
+						"target": "(0.0, 1.42, 0.6)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/windmill_tower_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 74.0,
+						"mode": "front_threshold_fallback",
+						"pitch_degrees": 24.714809167525686,
+						"position": "(0.0, 1.58, -1.8)",
+						"target": "(0.0, 3.982887, 3.420697)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/cameras2/windmill_tower_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252960444500339,
+						"position": "(17.04464, 28.7493, 15.39403)",
+						"target": "(0.0, 8.850861, 0.420697)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/cameras2/windmill_tower_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		}
+	],
+	"failures": [],
+	"family_selector": "house",
+	"output_dir": "res://artifacts/personality/current/cameras2",
+	"provenance": {
+		"change_fingerprint": "d065c18f8590b7db37306776ad42579e4c3a05276e1d0693d811afcb93b77afb",
+		"revision": "af86a2476819265713663b708a9e9aab224476a9",
+		"source_changed": false,
+		"source_end": {
+			"revision": "af86a2476819265713663b708a9e9aab224476a9",
+			"script_count": 514,
+			"script_sha256": "d065c18f8590b7db37306776ad42579e4c3a05276e1d0693d811afcb93b77afb"
+		},
+		"source_start": {
+			"revision": "af86a2476819265713663b708a9e9aab224476a9",
+			"script_count": 514,
+			"script_sha256": "d065c18f8590b7db37306776ad42579e4c3a05276e1d0693d811afcb93b77afb"
+		}
+	},
+	"purpose": "visual baseline; no quality claim",
+	"scale_selector": "default",
+	"seed_selector": 1,
+	"source_changed": false,
+	"style_selector": ""
+}

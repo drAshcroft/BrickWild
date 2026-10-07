@@ -1,0 +1,827 @@
+{
+	"cases": [
+		{
+			"id": "church_romanesque__1_default",
+			"key": "church_romanesque_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 12.0,
+				"kind": "church",
+				"length": 22.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "romanesque",
+				"water": "none",
+				"width": 10.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -0.69731002926488905,
+						"position": "(0.0, 7.190423, -67.39217)",
+						"target": "(0.0, 6.390423, -1.661913)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/church_romanesque_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132335326325867,
+						"position": "(0.0, 1.58, -17.99978)",
+						"target": "(0.0, 1.42, -15.14978)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/church_romanesque_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": 10.140113228458901,
+						"position": "(0.0, 1.58, -17.54978)",
+						"target": "(0.0, 4.958087, 1.338087)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/church_romanesque_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252962187898184,
+						"position": "(33.02161, 49.56841, 27.34683)",
+						"target": "(0.0, 11.01797, -1.661913)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/church_romanesque_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "castle_norman__1_default",
+			"key": "castle_norman_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 18.0,
+				"kind": "castle",
+				"length": 50.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "norman",
+				"water": "none",
+				"width": 55.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -0.44032606450340883,
+						"position": "(0.0, 9.093905, -104.095)",
+						"target": "(0.0, 8.293905, 0.0)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/castle_norman_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132335326325867,
+						"position": "(0.0, 1.58, -24.25)",
+						"target": "(0.0, 1.42, -21.4)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/castle_norman_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": 10.26800313470399,
+						"position": "(0.0, 1.58, -23.8)",
+						"target": "(0.0, 6.434926, 3.0)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/castle_norman_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252960732724276,
+						"position": "(67.26945, 92.83226, 59.09472)",
+						"target": "(0.0, 14.29984, 0.0)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/castle_norman_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "house_cottage_none_1_default",
+			"key": "house_cottage_none_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 2.6000000000000001,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -1.3735409509672267,
+						"position": "(-0.0625, 3.050633, -33.85724)",
+						"target": "(-0.0625, 2.250633, -0.492501)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/house_cottage_none_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132340691163019,
+						"position": "(0.0, 1.58, -4.9)",
+						"target": "(0.0, 1.42, -2.05)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/house_cottage_none_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": -24.145539112525647,
+						"position": "(1.933333, 1.58, -2.42)",
+						"target": "(1.758293, 0.87, -0.845856)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/house_cottage_none_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "parlour",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252959863003952,
+						"position": "(17.07714, 23.88974, 14.56429)",
+						"target": "(-0.0625, 3.880402, -0.492501)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/house_cottage_none_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "shop_cottage_barracks_1_default",
+			"key": "shop_cottage_barracks_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 2.7999999999999998,
+				"kind": "shop",
+				"length": 14.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "barracks",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 11.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -1.6042796166581899,
+						"position": "(0.0, 3.295276, -28.944)",
+						"target": "(0.0, 2.495276, -0.38)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/shop_cottage_barracks_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132340691163019,
+						"position": "(1.9055, 1.58, -5.9)",
+						"target": "(1.9055, 1.42, -3.05)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/shop_cottage_barracks_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": -19.544863297149195,
+						"position": "(1.822071, 1.58, -3.494308)",
+						"target": "(1.822071, 0.87, -1.494308)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/shop_cottage_barracks_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "mess",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252961666630391,
+						"position": "(14.54989, 18.44099, 12.28476)",
+						"target": "(0.0, 1.455, -0.497001)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/shop_cottage_barracks_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "hotel_grand_budapest__1_default",
+			"key": "hotel_grand_budapest_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 3.6000000000000001,
+				"kind": "hotel",
+				"length": 24.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 3,
+				"style": "grand_budapest",
+				"water": "none",
+				"width": 48.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -0.95690435534551899,
+						"position": "(0.0, 5.6865, -48.3415)",
+						"target": "(0.0, 4.8865, -0.444999)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/hotel_grand_budapest_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132335326325867,
+						"position": "(0.0, 1.58, -10.9)",
+						"target": "(0.0, 1.42, -8.049999)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/hotel_grand_budapest_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": -85.289843728103065,
+						"position": "(-22.226, 1.58, -11.1)",
+						"target": "(-22.226, 0.87, -11.0415)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/hotel_grand_budapest_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "dining_room",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252963719665878,
+						"position": "(43.14813, 57.24746, 37.36468)",
+						"target": "(0.0, 6.875, -0.54)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/hotel_grand_budapest_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "temple_basilica_blood_1_default",
+			"key": "temple_basilica_blood_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 12.0,
+				"kind": "temple",
+				"length": 44.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "blood",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "basilica",
+				"water": "none",
+				"width": 26.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -0.5481372237030514,
+						"position": "(0.0, 5.743677, -83.62)",
+						"target": "(0.0, 4.943677, 0.0)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/temple_basilica_blood_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132335326325867,
+						"position": "(0.0, 1.58, -21.25)",
+						"target": "(0.0, 1.42, -18.4)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/temple_basilica_blood_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": 5.4139560347419415,
+						"position": "(0.0, 1.58, -20.8)",
+						"target": "(0.0, 3.835611, 3.0)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/temple_basilica_blood_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252960586813835,
+						"position": "(50.04716, 66.95018, 43.96532)",
+						"target": "(0.0, 8.523581, 0.0)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/temple_basilica_blood_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "windmill_tower__1_default",
+			"key": "windmill_tower_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 12.0,
+				"kind": "windmill",
+				"length": 6.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "tower",
+				"water": "none",
+				"width": 12.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -3.0898350782922481,
+						"position": "(0.0, 5.933499, -14.39957)",
+						"target": "(0.0, 5.133499, 0.420697)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/windmill_tower_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132340691163019,
+						"position": "(0.0, 1.58, -2.25)",
+						"target": "(0.0, 1.42, 0.6)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/windmill_tower_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": 24.714809167525686,
+						"position": "(0.0, 1.58, -1.8)",
+						"target": "(0.0, 3.982887, 3.420697)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/windmill_tower_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252964233125937,
+						"position": "(16.68327, 28.32743, 15.07658)",
+						"target": "(0.0, 8.850861, 0.420697)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/windmill_tower_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "world_courtyard_house_domus_1_default",
+			"key": "world_courtyard_house_domus_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 6.0,
+				"kind": "world",
+				"length": 30.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "domus",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "courtyard_house",
+				"water": "none",
+				"width": 20.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -0.82253834761309885,
+						"position": "(0.0, 2.743, -55.722)",
+						"target": "(0.0, 1.943, 0.0)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/world_courtyard_house_domus_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132335326325867,
+						"position": "(0.0, 1.58, -13.65)",
+						"target": "(0.0, 1.42, -10.8)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/world_courtyard_house_domus_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": -19.544863297149195,
+						"position": "(-6.089999, 1.58, 3.889999)",
+						"target": "(-6.089999, 0.87, 5.889999)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/world_courtyard_house_domus_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "parlour",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252962177715027,
+						"position": "(27.95638, 35.59714, 24.55906)",
+						"target": "(0.0, 2.96, 0.0)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/world_courtyard_house_domus_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "village_english_farming_1_default",
+			"key": "village_english_farming_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 1.0,
+				"kind": "village",
+				"length": 35.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "farming",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "english",
+				"water": "none",
+				"width": 40.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -0.26505319345116096,
+						"position": "(0.324341, 4.555543, -172.951)",
+						"target": "(0.324341, 3.755543, -0.018612)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/village_english_farming_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132356785685219,
+						"position": "(-5.0, 1.58, -44.25)",
+						"target": "(-5.0, 1.42, -41.4)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/village_english_farming_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": 1.622646756677842,
+						"position": "(-5.0, 1.58, -43.8)",
+						"target": "(0.324341, 2.913784, 2.981388)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/village_english_farming_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252962772264425,
+						"position": "(158.6656, 191.3276, 139.0807)",
+						"target": "(0.324341, 6.475075, -0.018612)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/village_english_farming_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		},
+		{
+			"id": "house_witch_hut_none_1_default",
+			"key": "house_witch_hut_none_1_default",
+			"request": {
+				"enclosure": "none",
+				"height": 2.6000000000000001,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 9.0
+			},
+			"size": "default",
+			"views": [
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "front_elevation",
+						"pitch_degrees": -1.6781483862380022,
+						"position": "(0.117293, 3.679187, -28.436)",
+						"target": "(0.117293, 2.879187, -1.13)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/house_witch_hut_none_1_default_exterior.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "exterior"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_entry_inside_threshold",
+						"pitch_degrees": -3.2132340691163019,
+						"position": "(0.0, 1.58, -4.9)",
+						"target": "(0.0, 1.42, -2.05)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/house_witch_hut_none_1_default_entry.jpg",
+					"roof_on": true,
+					"room": "",
+					"view": "entry"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "first_person_main_activity",
+						"pitch_degrees": -23.840470836516072,
+						"position": "(3.178, 1.58, 1.966579)",
+						"target": "(3.178, 0.87, 3.57329)"
+					},
+					"cutaway": false,
+					"image": "res://artifacts/personality/current/baseline/house_witch_hut_none_1_default_activity.jpg",
+					"roof_on": true,
+					"room": "kitchen",
+					"view": "activity"
+				},
+				{
+					"camera": {
+						"fov_degrees": 48.0,
+						"mode": "aerial_cutaway",
+						"pitch_degrees": -41.252959610559962,
+						"position": "(15.92589, 23.41956, 12.6855)",
+						"target": "(0.117293, 4.964116, -1.202)"
+					},
+					"cutaway": true,
+					"image": "res://artifacts/personality/current/baseline/house_witch_hut_none_1_default_cutaway.jpg",
+					"roof_on": false,
+					"room": "",
+					"view": "cutaway"
+				}
+			]
+		}
+	],
+	"failures": [],
+	"family_selector": "house",
+	"output_dir": "res://artifacts/personality/current/baseline",
+	"provenance": {
+		"change_fingerprint": "7366c8ca2b809b1dd50c89fd471dfb2d27f49ef14b90dad3cf0a3a4c8d76a76c",
+		"revision": "af86a2476819265713663b708a9e9aab224476a9",
+		"source_changed": true,
+		"source_end": {
+			"revision": "af86a2476819265713663b708a9e9aab224476a9",
+			"script_count": 513,
+			"script_sha256": "a8393d63f5820543cb0e91cab8e05374c9425131a2e44026716e887b0f336e65"
+		},
+		"source_start": {
+			"revision": "af86a2476819265713663b708a9e9aab224476a9",
+			"script_count": 513,
+			"script_sha256": "7366c8ca2b809b1dd50c89fd471dfb2d27f49ef14b90dad3cf0a3a4c8d76a76c"
+		}
+	},
+	"purpose": "visual baseline; no quality claim",
+	"scale_selector": "default",
+	"seed_selector": 1,
+	"source_changed": true,
+	"style_selector": ""
+}

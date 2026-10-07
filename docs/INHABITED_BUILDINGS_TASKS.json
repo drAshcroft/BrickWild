@@ -1,0 +1,253 @@
+﻿{
+    "tasks":  [
+                  {
+                      "key":  "LIVE-BRIEF",
+                      "title":  "Establish inhabited-building briefs and current visual baseline",
+                      "description":  "Establish activity and identity briefs plus current evidence across every published family and style. The witch hut is one example, not the endpoint.",
+                      "priority":  "P0",
+                      "phase":  "inhabited-buildings",
+                      "status":  "complete",
+                      "taskType":  "review",
+                      "targetCoord":  {
+                                          "file":  "docs/INHABITED_BUILDINGS_PLAN.md"
+                                      },
+                      "dependsOn":  [
+
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Capture full requests and current source state; label each sampled historical issue fixed, reproduced, or unverified with evidence. Define inhabitants, activities, privacy, adjacency, usable-space and identity requirements. Produce a labelled proposed witch-hut plan and silhouette direction; define review views and rubric. Freeze seed 1 plus two other seeds and small/default/large supported sizes before tuning. No pin-count or density score may stand in for design approval."
+                  },
+                  {
+                      "key":  "LIVE-ROOMS",
+                      "title":  "Plan household rooms around activities and deliberate circulation",
+                      "description":  "Extend the ordinary house planning path so activities and privacy determine room graph, proportions and usable wall runs before rectangular packing. Preserve custom plans and family adapters.",
+                      "priority":  "P1",
+                      "phase":  "inhabited-buildings",
+                      "status":  "executing",
+                      "taskType":  "feature",
+                      "targetCoord":  {
+                                          "file":  "src/house/house_plan_rooms.gd"
+                                      },
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-BRIEF",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Implement the smallest reusable plan contract needed by cottage and witch hut. Measure activity footprints, usable room width/aspect and residual corridors against the brief. Distinguish entrance hall from eating hall. Bedrooms have protected access; cooking/service adjacency is deliberate. Impossible briefs replan or report failure rather than silently becoming unfurnished rectangles. Compare plan sheets across the frozen matrix; run lane:house-plan-fast and applicable fixtures."
+                  },
+                  {
+                      "key":  "LIVE-THRESHOLDS",
+                      "title":  "Integrate human-scale doors halls and stairs into the plan",
+                      "description":  "Treat doors, halls, stair runs, landings and headroom as early architectural reservations. Keep historic repairs credited; diagnose only current failures before changing them.",
+                      "priority":  "P1",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "taskType":  "feature",
+                      "targetCoord":  {
+                                          "file":  "src/house/house_plan_levels.gd"
+                                      },
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-ROOMS",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Use existing stair and walk-grid checks; measure actual assembled door/collision clearance both ways with props enabled. Verify arrival route and complete stair approach/flight/landing route. Reserve usable wall runs and door swings; emit appropriate guards where needed. Negative controls block a landing or threshold. Record baseline vs new failures. Run lane:house-plan-fast, walkpins and lane:geom when emitters change."
+                  },
+                  {
+                      "key":  "LIVE-ASSETS",
+                      "title":  "Curate coherent owned assets for complete room activities",
+                      "description":  "Search the owned library by function for cooking/preparation/storage, seating, soft furnishings, wall objects, herb work and lighting. Inspect style coherence before selecting measured assets.",
+                      "priority":  "P1",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "taskType":  "feature",
+                      "targetCoord":  {
+                                          "file":  "src/house/prop_catalog.gd"
+                                      },
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-BRIEF",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Record candidate pack/path, rights, import state, appearance and room-role suitability. Inspect actual models and front/support dimensions; do not equate a kitchen keyword hit with suitable period design. Reuse existing assets where appropriate. Define coherent domestic and witch palettes; explain unavailable roles rather than disguising them with arbitrary props. If assets/props changes, rebuild catalogue and run lane:assets; otherwise lane:assets-fast for prop-code changes."
+                  },
+                  {
+                      "key":  "LIVE-GROUPS",
+                      "title":  "Compose complete domestic activity groups and preserve their purpose",
+                      "description":  "Extend existing relation recipes into complete cooking, sleeping, eating, sitting and storage arrangements sized to usable space and household capacity. Do not replace the furnisher wholesale.",
+                      "priority":  "P1",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "taskType":  "feature",
+                      "targetCoord":  {
+                                          "file":  "src/house/house_furnishing_recipes.gd"
+                                      },
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-THRESHOLDS",
+                                            "type":  "blocks"
+                                        },
+                                        {
+                                            "key":  "LIVE-ASSETS",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Every required activity in the brief has usable measured furniture and supporting relations. Verify prep/heat/storage/water handling for cooking, protected bed access/storage/light for sleeping, coherent seating and focus for eating/rest. A table fits together with seats and use zones. Required functions cannot disappear into optional rolls or navigation repair; bounded retry or honest unsatisfied brief follows. Preserve omission warnings. Test removed-group negative controls and review three room views; run lane:house-furnish-fast."
+                  },
+                  {
+                      "key":  "LIVE-SURFACES",
+                      "title":  "Compose walls ceilings and light as part of inhabited rooms",
+                      "description":  "Add room-appropriate surface and lighting composition using real wall hosts and structural bays: finishes, fitted storage, shelf groups, entrance pegs and optional soft detail. Preserve deliberate blank surfaces.",
+                      "priority":  "P1",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "taskType":  "feature",
+                      "targetCoord":  {
+                                          "file":  "src/house/house_plan_features.gd"
+                                      },
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-GROUPS",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Record semantic hosts and relations on the plan. Verify attachment, floor/ceiling clearance and light visibility in actual renders. Each reviewed wall has an intentional role: opening, structure, activity support or quiet surface. Reject uniform clutter coverage as acceptance. Match facade rhythms to interior and preserve courtyard privacy. Use lane:house-exterior-fast, lane:house-furnish-fast and lane:geom as touched."
+                  },
+                  {
+                      "key":  "LIVE-WITCH",
+                      "title":  "Deliver a recognizable inhabited witch hut as the first complete example",
+                      "description":  "Integrate the new planning and furnishing contracts with existing witch roof styling, cauldron dressing and herb-yard vocabulary. Establish identity through silhouette, room relationships and work/living arrangements.",
+                      "priority":  "P1",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "taskType":  "feature",
+                      "targetCoord":  {
+                                          "file":  "src/house/house_spec.gd"
+                                      },
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-SURFACES",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Deliver compact expressive mass/roof/chimney and sheltered entry, herb/brewing workspace with storage, hearth/eating/rest area and private sleeping place linked sensibly to the yard. Record supported fantasy exceptions. Render the frozen nine-case matrix with roofs on, cutaway and first-person views; compare unlabelled with cottage and record reviewer recognition and reasons. Palette swaps or three extra role names cannot close this task. Preserve bounds and deterministic generation; run harchetype plus relevant bounded lanes, recording baseline failures."
+                  },
+                  {
+                      "key":  "LIVE-SHOPS",
+                      "title":  "Give shops legible customer work and storage compositions",
+                      "description":  "Apply proven activity and composition mechanisms to shop-specific briefs and trade identity, retaining existing family-specific planning. Use historical barracks/shop pins as evidence only where applicable to the selected kind.",
+                      "priority":  "P1",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "taskType":  "feature",
+                      "targetCoord":  {
+                                          "file":  "src/shop/shop_planner.gd"
+                                      },
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-SURFACES",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Demonstrate arrival-to-counter browsing/customer route, usable staff work area and service/storage relation for the chosen representative trade. Inventory and fixtures make the trade identifiable without a label. Keep public circulation separate from work obstructions. Review the frozen matrix and role-removal negative controls. Run relevant house planning/furnishing lanes and lane:api if public rows or adapters change."
+                  },
+                  {
+                      "key":  "LIVE-SACRED",
+                      "title":  "Compose churches and temples around their distinct spatial purposes",
+                      "description":  "Implement representative church and temple design briefs with entry hierarchy, structural rhythm, meaningful light and ritual focus. Preserve existing church geometry and temple rite checks.",
+                      "priority":  "P1",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "taskType":  "feature",
+                      "targetCoord":  {
+                                          "file":  "docs/PROCEDURAL_ARCHITECTURE_RULES.md"
+                                      },
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-BRIEF",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Choose and record representative public requests for both families; include the pinned barn-like basilica temple for comparison. Review exterior identity, entry/processional sequence, congregation zones and focal visibility across frozen seeds/sizes. Intentional sacred empty space is accepted when explained by the brief; household density rules do not apply. Negative controls obscure the focus or break the axis. Run lane:church-change and lane:temple with relevant dressing gate; add dome fixture only for dome emitter changes."
+                  },
+                  {
+                      "key":  "LIVE-REVIEW",
+                      "title":  "Verify believable buildings across families with current visual evidence",
+                      "description":  "Complete cross-family review using the rubric established in LIVE-BRIEF. Keep mechanical defect status separate from visual design judgement.",
+                      "priority":  "P1",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "taskType":  "review",
+                      "targetCoord":  {
+                                          "file":  "visualqa/README.md"
+                                      },
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-WITCH",
+                                            "type":  "blocks"
+                                        },
+                                        {
+                                            "key":  "LIVE-HOUSE-STYLES",
+                                            "type":  "blocks"
+                                        },
+                                        {
+                                            "key":  "LIVE-SHOPS",
+                                            "type":  "blocks"
+                                        },
+                                        {
+                                            "key":  "LIVE-SACRED",
+                                            "type":  "blocks"
+                                        },
+                                        {
+                                            "key":  "LIVE-FAMILY-STYLES",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "rationale":  "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
+                      "acceptanceCriteria":  "Publish repeatable request/source metadata, plan sheets, roof-on exterior and first-person views for cottage, witch hut, chosen shop, church and temple matrices. Record human-facing critique for proportion, room purpose, comfort, light, circulation and identity; unresolved criticism remains open. Track fixed, regressed and unverified historical pins separately. Hotel/domus are diagnostic large-room stress cases, not an implicit whole-family rewrite. Record relevant gate outcomes and limitations without claiming scheduled sweeps passed. Coverage must include every published family/style, not only representative witch hut and cottage. Track each row as designed, generated, mechanically checked and visually reviewed separately."
+                  },
+                  {
+                      "taskType":  "feature",
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-SURFACES",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "description":  "Implement the complete house style inventory in docs/BUILDING_PERSONALITY_BRIEFS.md: spatial programme, silhouette, materials/detail and use. Witch hut is only one row.",
+                      "key":  "LIVE-HOUSE-STYLES",
+                      "acceptanceCriteria":  "Map every HouseSpec.STYLES row to a design brief and fixtures. Compare unlabelled exterior and interior views across fixed seeds/sizes, identify distinguishing spatial and visible traits, preserve trade overrides and supported custom plans. Do not close from unique labels, palettes or component counts. Record unsatisfied briefs. Run applicable bounded planning, furnishing and exterior lanes.",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "title":  "Give every published house style a distinct inhabited design",
+                      "priority":  "P1"
+                  },
+                  {
+                      "taskType":  "feature",
+                      "dependsOn":  [
+                                        {
+                                            "key":  "LIVE-BRIEF",
+                                            "type":  "blocks"
+                                        }
+                                    ],
+                      "description":  "Extend the coverage ledger to castle, hotel, windmill, world and village styles using the same purpose and identity criteria while preserving their specialist planners.",
+                      "key":  "LIVE-FAMILY-STYLES",
+                      "acceptanceCriteria":  "Every published kind/style has a mapped brief, actual request fixtures and explicit evidence state. Implement family-specific silhouette, space, structural/material rhythm and use where deficient; retain deliberate ritual/privacy/fantasy exceptions. Review fixed multiple seeds/sizes and applicable family lanes; never infer all-family completion from a house fixture.",
+                      "phase":  "inhabited-buildings",
+                      "status":  "pending",
+                      "title":  "Carry recognizable personality through every remaining building family",
+                      "priority":  "P1"
+                  }
+              ]
+}
