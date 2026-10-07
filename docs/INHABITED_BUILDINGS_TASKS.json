@@ -63,7 +63,7 @@
                       "description":  "Search the owned library by function for cooking/preparation/storage, seating, soft furnishings, wall objects, herb work and lighting. Inspect style coherence before selecting measured assets.",
                       "priority":  "P1",
                       "phase":  "inhabited-buildings",
-                      "status":  "pending",
+                      "status":  "complete",
                       "taskType":  "feature",
                       "targetCoord":  {
                                           "file":  "src/house/prop_catalog.gd"
