@@ -280,6 +280,18 @@ static func is_exterior_edge(spec: HouseSpec, axis: int, value: float) -> bool:
 ## would be buried half a partition deep in the wall beside it.
 ## The floor a body needs in front of a stair's first step: its radius.
 const STAIR_APPROACH := 0.3
+## A domestic straight flight needs a real, clear floor square at either end.
+## This is the usable landing depth, not the sliver the route check samples.
+const STAIR_LANDING := 0.9
+const STAIR_WIDTH_MIN := 1.1
+const STAIR_WIDTH_CLEAR_MIN := 0.9
+const STAIR_WIDTH_TARGET := 1.1
+const STAIR_GUARD_EDGE_OFFSET := 0.045
+const STAIR_GUARD_THICKNESS := 0.075
+const STAIR_RISER_MAX := 0.22
+const STAIR_GOING_MIN := 0.22
+const STAIR_STRIDE_MAX := 0.70
+const STAIR_PITCH_MAX := 42.0
 
 
 ## Which way a straight flight climbs along its long axis: +1.0 from its low
@@ -317,6 +329,23 @@ static func stair_approach(r: Rect2, climb: float, depth := STAIR_APPROACH) -> R
 		return Rect2(Vector2(x, r.position.y), Vector2(depth, r.size.y))
 	var z := r.position.y - depth if climb > 0.0 else r.end.y
 	return Rect2(Vector2(r.position.x, z), Vector2(r.size.x, depth))
+
+
+## Pick the smallest whole number of equal risers that respects the measured
+## domestic stair limits. Zero means the given run cannot be walked.
+static func stair_step_count(height: float, run: float) -> int:
+	if height <= 0.0 or run <= 0.0 \
+			or rad_to_deg(atan2(height, run)) > STAIR_PITCH_MAX + 0.001:
+		return 0
+	var first := maxi(4, ceili(height / STAIR_RISER_MAX))
+	var last := floori(run / STAIR_GOING_MIN)
+	for count in range(first, last + 1):
+		var riser := height / float(count)
+		var going := run / float(count)
+		if riser <= STAIR_RISER_MAX + 0.001 and going >= STAIR_GOING_MIN - 0.001 \
+				and 2.0 * riser + going <= STAIR_STRIDE_MAX + 0.001:
+			return count
+	return 0
 
 
 static func room_floor_rect(plan: HousePlan, i: int) -> Rect2:

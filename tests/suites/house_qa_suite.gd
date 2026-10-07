@@ -366,10 +366,6 @@ static func _stair_fixture(res: SuiteResult) -> void:
 	var f: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var size: Vector2 = Rect2(stair["rect"]).size
 	var centred := Rect2(f.get_center() - size / 2.0, size)
-	if in_hall:
-		var line: Rect2 = HousePlanLevels.door_line(plan, room, plan.doors[front])
-		centred.position.x = clampf(line.get_center().x - size.x / 2.0,
-			f.position.x, f.end.x - size.x)
 	for key in ["rect", "lower_rect", "upper_rect"]:
 		stair[key] = centred
 	stair["pos"] = centred.get_center()
@@ -378,9 +374,25 @@ static func _stair_fixture(res: SuiteResult) -> void:
 	var rep: Dictionary = HousePlanCheck.new().check(plan)
 	var saw_wall := false
 	var saw_line := false
+	if HousePlanCheck.stair_wall_gap(plan, stair) <= HousePlanCheck.STAIR_WALL_TOL:
+		res.fail("stair fixture did not move the flight away from every wall")
 	for m in rep["failures"]:
 		if String(m).begins_with("stair_line:") and "off every wall" in String(m):
 			saw_wall = true
+	# A relocated front door can be near a corner. Aligning this second
+	# corruption with it may put the stair against a wall, so exercise the two
+	# independent rules with separate mutations instead of assuming both fail.
+	if in_hall:
+		var line: Rect2 = HousePlanLevels.door_line(plan, room, plan.doors[front])
+		centred.position.x = clampf(line.get_center().x - size.x / 2.0,
+			f.position.x, f.end.x - size.x)
+		for key in ["rect", "lower_rect", "upper_rect"]:
+			stair[key] = centred
+		stair["pos"] = centred.get_center()
+		stair["lower_pos"] = centred.get_center()
+		stair["upper_pos"] = centred.get_center()
+		rep = HousePlanCheck.new().check(plan)
+	for m in rep["failures"]:
 		if String(m).begins_with("stair_line:") and "line of the front door" in String(m):
 			saw_line = true
 	if not saw_wall:

@@ -87,7 +87,8 @@ const PROPS := {
 	# frame of the full Workbench. It is measured correctly, but is not a
 	# standalone work surface and must never satisfy a workbench recipe.
 	"Workbench_Drawers": {"cat": "workbench_insert", "tags": [], "zone": 0.0},
-	"Chair_1": {"cat": "seat", "tags": [], "zone": 0.55},
+	# the model sits looking down +Z, its back at -Z (measured: house_assembly_suite)
+	"Chair_1": {"cat": "seat", "tags": [], "zone": 0.55, "face": PI},
 	"Stool": {"cat": "seat", "tags": [], "zone": 0.5},
 	"Bench": {"cat": "bench", "tags": [], "zone": 0.55},
 

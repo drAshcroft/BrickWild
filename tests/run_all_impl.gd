@@ -55,7 +55,7 @@ extends RefCounted
 ##                  (post, tower, smock, farm windpump, Dutch polder mill)
 const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cmotteaccess", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "cwater", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "houseqa", "hmultistory", "hrich", "harchetype", "court",
+	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "walkpins", "houseqa", "hmultistory", "hrich", "harchetype", "court",
 	"hvernacular",
 	"shop", "sarchetype",
 	"hotel", "hotelroof", "hlandmark",
@@ -124,7 +124,7 @@ const LANES: Dictionary = {
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
 	"lane:house-plan-fast": ["houseqaplan", "hmultistory"],
-	"lane:house-furnish-fast": ["houseqafurnishfast", "hassembly"],
+	"lane:house-furnish-fast": ["houseqafurnishfast", "hassembly", "walkpins"],
 	"lane:house-exterior-fast": ["hexterior", "hassembly"],
 	"lane:assets-fast": ["props", "hassembly"],
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
@@ -337,6 +337,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/prop_catalog_cache_suite.gd").run()
 		"hassembly":
 			return load("res://tests/suites/house_assembly_suite.gd").run()
+		"walkpins":
+			return load("res://tests/suites/walk_pin_suite.gd").run()
 		"houseqa":
 			return HouseQASuite.run()
 		"houseqacore":

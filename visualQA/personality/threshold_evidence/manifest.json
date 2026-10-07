@@ -1,0 +1,183 @@
+{
+	"rows": [
+		{
+			"fixture": {
+				"cellars": 0,
+				"height": 2.6,
+				"length": 12.0,
+				"seed": 8114,
+				"storeys": 2,
+				"style": "farmhouse",
+				"trade": "none",
+				"width": 9.0
+			},
+			"furniture": true,
+			"image": "farmhouse_8114_stair0_approach.jpg",
+			"roof_on": true,
+			"save_error": 0,
+			"stair": 0,
+			"view": {
+				"eye": "(-3.377334, 1.7, -2.68)",
+				"name": "approach",
+				"target": "(0.630259, 3.07, -2.68)"
+			}
+		},
+		{
+			"fixture": {
+				"cellars": 0,
+				"height": 2.6,
+				"length": 12.0,
+				"seed": 8114,
+				"storeys": 2,
+				"style": "farmhouse",
+				"trade": "none",
+				"width": 9.0
+			},
+			"furniture": true,
+			"image": "farmhouse_8114_stair0_upper_well.jpg",
+			"roof_on": true,
+			"save_error": 0,
+			"stair": 0,
+			"view": {
+				"eye": "(0.630259, 4.3, -2.68)",
+				"name": "upper_well",
+				"target": "(-3.377334, 1.32, -2.68)"
+			}
+		},
+		{
+			"fixture": {
+				"cellars": 0,
+				"height": 2.6,
+				"length": 12.0,
+				"seed": 9302,
+				"storeys": 3,
+				"style": "townhouse",
+				"trade": "none",
+				"width": 9.0
+			},
+			"furniture": true,
+			"image": "townhouse_9302_stair0_approach.jpg",
+			"roof_on": true,
+			"save_error": 0,
+			"stair": 0,
+			"view": {
+				"eye": "(-0.630258, 1.7, -1.65)",
+				"name": "approach",
+				"target": "(3.377334, 3.07, -1.65)"
+			}
+		},
+		{
+			"fixture": {
+				"cellars": 0,
+				"height": 2.6,
+				"length": 12.0,
+				"seed": 9302,
+				"storeys": 3,
+				"style": "townhouse",
+				"trade": "none",
+				"width": 9.0
+			},
+			"furniture": true,
+			"image": "townhouse_9302_stair0_upper_well.jpg",
+			"roof_on": true,
+			"save_error": 0,
+			"stair": 0,
+			"view": {
+				"eye": "(3.377334, 4.3, -1.65)",
+				"name": "upper_well",
+				"target": "(-0.630258, 1.32, -1.65)"
+			}
+		},
+		{
+			"fixture": {
+				"cellars": 0,
+				"height": 2.6,
+				"length": 12.0,
+				"seed": 9302,
+				"storeys": 3,
+				"style": "townhouse",
+				"trade": "none",
+				"width": 9.0
+			},
+			"furniture": true,
+			"image": "townhouse_9302_stair1_approach.jpg",
+			"roof_on": true,
+			"save_error": 0,
+			"stair": 1,
+			"view": {
+				"eye": "(-3.580821, 4.3, -5.390348)",
+				"name": "approach",
+				"target": "(0.426771, 5.67, -5.390348)"
+			}
+		},
+		{
+			"fixture": {
+				"cellars": 0,
+				"height": 2.6,
+				"length": 12.0,
+				"seed": 9302,
+				"storeys": 3,
+				"style": "townhouse",
+				"trade": "none",
+				"width": 9.0
+			},
+			"furniture": true,
+			"image": "townhouse_9302_stair1_upper_well.jpg",
+			"roof_on": true,
+			"save_error": 0,
+			"stair": 1,
+			"view": {
+				"eye": "(0.426771, 6.9, -5.390348)",
+				"name": "upper_well",
+				"target": "(-3.580821, 3.92, -5.390348)"
+			}
+		},
+		{
+			"fixture": {
+				"cellars": 0,
+				"height": 2.6,
+				"length": 18.0,
+				"seed": 17018,
+				"storeys": 2,
+				"style": "longhall",
+				"trade": "none",
+				"width": 17.0
+			},
+			"furniture": true,
+			"image": "longhall_17018_stair0_approach.jpg",
+			"roof_on": true,
+			"save_error": 0,
+			"stair": 0,
+			"view": {
+				"eye": "(2.074118, 1.7, 3.884007)",
+				"name": "approach",
+				"target": "(2.074118, 3.07, 7.8916)"
+			}
+		},
+		{
+			"fixture": {
+				"cellars": 0,
+				"height": 2.6,
+				"length": 18.0,
+				"seed": 17018,
+				"storeys": 2,
+				"style": "longhall",
+				"trade": "none",
+				"width": 17.0
+			},
+			"furniture": true,
+			"image": "longhall_17018_stair0_upper_well.jpg",
+			"roof_on": true,
+			"save_error": 0,
+			"stair": 0,
+			"view": {
+				"eye": "(2.074118, 4.3, 7.8916)",
+				"name": "upper_well",
+				"target": "(2.074118, 1.32, 3.884007)"
+			}
+		}
+	],
+	"source_changed": false,
+	"source_end": "216cb0a7971de4a740086434033ae212966458f674ccdc9fe2ae2f0ad24d16c4",
+	"source_start": "216cb0a7971de4a740086434033ae212966458f674ccdc9fe2ae2f0ad24d16c4"
+}

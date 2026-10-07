@@ -15,6 +15,10 @@ static func run() -> SuiteResult:
 	for key in ["Bed_Twin1", "Bed_Twin2"]:
 		for yaw in [0.0, PI / 2.0]:
 			_bed(res, key, float(yaw))
+	for key in PropCatalog.PROPS:
+		if PropCatalog.category(key) in ["seat", "bench"]:
+			for yaw in [0.0, PI / 2.0]:
+				_seat(res, key, float(yaw))
 	_workbench_semantics(res)
 	_legacy_exterior(res)
 	for scale in [0.65, 1.0]:
@@ -164,7 +168,32 @@ static func _bed(res: SuiteResult, key: String, yaw: float) -> void:
 	placed.free()
 
 
+## A seat with a back must have it BEHIND the way the plan faces it. The
+## furnisher and the seating rule share one yaw formula, so they agreed with
+## each other while every Chair_1 sat with its back to the table (walk QA,
+## 3 and 6 Oct, the same pin twice). Only the model can settle it.
+static func _seat(res: SuiteResult, key: String, yaw: float) -> void:
+	var p := HouseFurnishGeometry.candidate(key, Vector2(0.4, -1.2), yaw)
+	p.pos.y = 3.0
+	var placed := HouseAssembler._instance(p)
+	_expect(res, placed != null, key + ": missing seat model")
+	if placed == null:
+		return
+	var front := Vector3(-sin(yaw), 0, -cos(yaw))
+	var off := _top_offset(placed, p.pos)
+	# a stool or a bench has no back: its top is its seat, over its middle
+	if Vector2(off.x, off.z).length() > 0.12:
+		_expect(res, off.dot(front) < -0.12,
+			"%s at yaw %.2f: its back is toward the table it faces (set its face offset)" % [key, yaw])
+	placed.free()
+
+
 static func _headboard_behind(node: Node3D, centre: Vector3, yaw: float) -> bool:
+	return _top_offset(node, centre).dot(Vector3(sin(yaw), 0, cos(yaw))) > 0.5
+
+
+## The centre of the top tenth of a model, relative to `centre`.
+static func _top_offset(node: Node3D, centre: Vector3) -> Vector3:
 	var bounds := SceneBounds.of_node(node)
 	var vertices := PackedVector3Array()
 	_vertices(node, Transform3D.IDENTITY, vertices)
@@ -175,9 +204,8 @@ static func _headboard_behind(node: Node3D, centre: Vector3, yaw: float) -> bool
 			sum += point
 			count += 1
 	if count == 0:
-		return false
-	var head := sum / float(count)
-	return (head - centre).dot(Vector3(sin(yaw), 0, cos(yaw))) > 0.5
+		return Vector3.ZERO
+	return sum / float(count) - centre
 
 
 static func _vertices(node: Node, parent: Transform3D, out: PackedVector3Array) -> void:

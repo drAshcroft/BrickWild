@@ -1,0 +1,83 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running hassembly...
+--- house assembly ---
+    elapsed 12.62s
+
+Running walkpins...
+zfight house/cottage: 8 visible overlaps (budget 8)
+zfight shop/cottage: 0 visible overlaps (budget 0)
+zfight world/courtyard_house: 24 visible overlaps (budget 24)
+zfight temple/basilica: 12 visible overlaps (budget 12)
+zfight church/romanesque: 92 visible overlaps (budget 92)
+zfight windmill/tower: 40 visible overlaps (budget 40)
+--- walk pins ---
+    elapsed 10.98s
+  FAIL stair_headroom: village house_9 is no longer flagged -- if its stair is fixed, freeze a plan for this fixture
+  FAIL stair_approach: village house_9 is no longer flagged -- if its stair is fixed, freeze a plan for this fixture
+
+Running houseqafurnishfast...
+house QA: START (quick; 12-house statistical sweeps)
+house QA: START hearth fixture
+house QA: END hearth fixture (1.50s)
+house QA: START hearth sweep
+house QA: hearth sweep 1/12
+house QA: hearth sweep 12/12
+house QA: END hearth sweep (19.39s)
+house QA: START row fixture
+house QA: END row fixture (0.00s)
+house QA: START screens fixture
+house QA: END screens fixture (0.07s)
+house QA: START rule override fixture
+house QA: END rule override fixture (0.37s)
+house QA: START affinity sweep
+house QA: affinity sweep 1/12
+house QA: affinity sweep 12/12
+house QA: END affinity sweep (17.15s)
+house QA: START affinity variety
+house QA: affinity variety 1/8
+house QA: affinity variety 8/8
+house QA: END affinity variety (11.59s)
+house QA: START affinity fixture
+house QA: END affinity fixture (0.92s)
+house QA: START feng shui fixtures
+house QA: END feng shui fixtures (1.41s)
+house QA: START feng shui sweep
+house QA: feng shui sweep 1/12
+house QA: feng shui sweep 12/12
+house QA: END feng shui sweep (16.86s)
+house QA: START walk QA fixtures
+house QA: END walk QA fixtures (0.87s)
+house QA: DONE (quick; 70.13s)
+--- house QA (furnishing) ---
+    hearth      12 houses, 0 complaints, 7 with a single stack
+    affinity    quick canary: rates reported without statistical thresholds
+    affinity    corner_clutter      30/34    88.2% (want 90%)
+    affinity    sconce_pair         15/16    93.8% (want 90%)
+    affinity    chandelier_over      4/4    100.0% (want 98%)
+    affinity    workbench_daylight   4/4    100.0% (want 98%)
+    affinity    bed_window          14/15    93.3% (want 98%)
+    affinity    table_focus          0/3      0.0% (want 75%)
+    affinity    shelf_over           3/3    100.0% (want 70%)
+    affinity    table_face           2/3     66.7% (want 90%)
+    affinity    seeds differ        29/29   100.0% (want 95%)
+    feng shui   workbench_daylight   0 warnings
+    feng shui   bookcase_heat        0 warnings
+    feng shui   bed_window           0 warnings
+    feng shui   table_focus          2 warnings
+    feng shui   sconce_pair          1 warnings
+    feng shui   shelf_over           1 warnings
+    feng shui   chandelier_over      0 warnings
+    feng shui   corner_clutter       0 warnings
+    feng shui   command              1 warnings
+    feng shui   hearth               0 warnings
+    feng shui   focus                0 warnings
+    feng shui   12 houses, 0 failures
+    elapsed 70.13s
+
+============================================================
+  house assembly     PASS  (95 checked, 0 failures, 0 warnings)
+  walk pins          FAIL  (39 checked, 2 failures, 0 warnings)
+  house QA (furnishing) PASS  (93 checked, 0 failures, 0 warnings)
+============================================================
+1 SUITE(S) FAILED -- 3 suites, 227 checks, 2 failures, 0 warnings

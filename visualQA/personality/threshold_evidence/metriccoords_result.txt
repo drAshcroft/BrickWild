@@ -1,0 +1,6 @@
+selectors=metriccoords
+status=PASS
+native_exit=0
+wall_seconds=49.71
+godot_pid=19552
+verdict=ALL PASS -- 1 suites, 14 checks, 0 failures, 0 warnings

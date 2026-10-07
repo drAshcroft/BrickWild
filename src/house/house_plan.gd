@@ -429,6 +429,11 @@ func door_graph(has_keys := true, include_secret := true) -> Dictionary:
 				if x != y:
 					g[x].append(y)
 	for stair in stairs:
+		# A rejected stair is retained as plan provenance so the checker can
+		# explain why vertical circulation failed. It is not a connection.
+		# Older/custom plans without the field keep their historical behavior.
+		if not bool(stair.get("satisfied", true)):
+			continue
 		var a: int = int(stair["a"])
 		var b: int = int(stair["b"])
 		if a < 0 or b < 0 or a >= rooms.size() or b >= rooms.size():

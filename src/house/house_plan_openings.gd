@@ -52,7 +52,7 @@ static func place_doors(p: HousePlan, spec: HouseSpec) -> void:
 				if edge.is_empty():
 					continue
 				var run: float = edge[3] - edge[2]
-				if run < HouseGeometry.INNER_DOOR_W + HouseGeometry.DOOR_CORNER_MARGIN * 2.0:
+				if run < _inner_door_width(p) + HouseGeometry.DOOR_CORNER_MARGIN * 2.0:
 					continue
 				# prefer hanging a room off a public one, and prefer the widest
 				# wall to hang it on
@@ -100,7 +100,7 @@ static func open_up_privacy(p: HousePlan) -> void:
 			if edge.is_empty():
 				continue
 			var run: float = edge[3] - edge[2]
-			if run < HouseGeometry.INNER_DOOR_W + HouseGeometry.DOOR_CORNER_MARGIN * 2.0:
+			if run < _inner_door_width(p) + HouseGeometry.DOOR_CORNER_MARGIN * 2.0:
 				continue
 			if _door_between(p, j, stranded):
 				continue
@@ -160,7 +160,7 @@ static func add_inner_door(p: HousePlan, a: int, b: int, edge: Array) -> void:
 	var line: float = edge[1]
 	var t0: float = edge[2]
 	var t1: float = edge[3]
-	var w: float = HouseGeometry.INNER_DOOR_W
+	var w: float = _inner_door_width(p)
 	var m: float = HouseGeometry.DOOR_CORNER_MARGIN + w / 2.0
 	var t: float = clampf(t0 + m, t0 + m, t1 - m)
 	if (t1 - t0) > m * 2.0:
@@ -172,6 +172,19 @@ static func add_inner_door(p: HousePlan, a: int, b: int, edge: Array) -> void:
 	var pos: Vector2 = Vector2(line, t) if normal.x > 0.5 else Vector2(t, line)
 	p.doors.append({"a": a, "b": b, "pos": pos, "normal": normal, "width": w,
 		"exterior": false, "front": false, "storey": p.storey_of_room(a)})
+	_set_domestic_door_head(p, p.doors[-1])
+
+
+static func _inner_door_width(p: HousePlan) -> float:
+	# Leave room for the frame tuck around a 0.9 m clear carrying route.
+	return 0.95 if HousePlanLevels._is_plain_house_spec(p.spec) else HouseGeometry.INNER_DOOR_W
+
+
+static func _set_domestic_door_head(p: HousePlan, door: Dictionary) -> void:
+	if HousePlanLevels._is_plain_house_spec(p.spec) and not door.has("head"):
+		# Opening heights are measured from the storey datum; people stand on
+		# the floor slab. Preserve 2.1 m above that finished surface.
+		door["head"] = minf(p.spec.height - 0.06, HouseGeometry.FLOOR_T + 2.1)
 
 
 ## The front door, on the hall's own stretch of the front wall.
@@ -205,6 +218,7 @@ static func _place_front_door(p: HousePlan, spec: HouseSpec, hall: int) -> void:
 	p.doors.append({"a": room, "b": -1, "pos": Vector2(x, inner.position.y),
 		"normal": Vector2(0, -1), "width": w, "exterior": true, "front": true,
 		"storey": p.storey_of_room(room)})
+	_set_domestic_door_head(p, p.doors[-1])
 
 
 ## A back door out of the kitchen or the store, for the yard -- and never in
@@ -237,6 +251,7 @@ static func _place_back_door(p: HousePlan, spec: HouseSpec) -> void:
 			var door := {"a": i, "b": -1, "pos": Vector2(x, inner.end.y),
 				"normal": Vector2(0, 1), "width": w, "exterior": true, "front": false,
 				"storey": p.storey_of_room(i)}
+			_set_domestic_door_head(p, door)
 			if absf(x - fx) >= (w + fw) / 2.0 + 0.05:
 				p.doors.append(door)
 				return
@@ -437,4 +452,3 @@ static func _same_wall(pa: Vector2, na: Vector2, pb: Vector2, nb: Vector2,
 	if absf(na.x) > 0.5:
 		return absf(pa.x - pb.x) < 0.02
 	return absf(pa.y - pb.y) < 0.02
-

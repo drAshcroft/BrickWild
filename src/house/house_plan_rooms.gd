@@ -368,6 +368,17 @@ static func _fit_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: Rect2,
 	# entrance approach, rather than meeting the hall minimum by area alone.
 	if inner.size.y >= 8.0:
 		hall_min_depth = maxf(hall_min_depth, 3.6)
+	if spec.storeys >= 3 and HousePlanLevels._is_plain_house_spec(spec):
+		# The middle hall carries two flights, their protected well edge, a
+		# continuous body-width transfer path, and the rear doorway apron. Keep
+		# enough clear depth for that real arrangement before dividing the home
+		# into rooms; the ordinary activity-fit check below still governs what
+		# can remain behind this hall.
+		var stair_hall_depth := HouseGeometry.STAIR_WIDTH_TARGET * 2.0 \
+			+ HouseGeometry.STAIR_WIDTH_CLEAR_MIN \
+			+ HousePlanLevels.WELL_CLEAR * 2.0 \
+			+ HouseGeometry.DOOR_CLEAR + wall_half
+		hall_min_depth = maxf(hall_min_depth, stair_hall_depth)
 	var hall_ratio: float = _hall_ratio(spec.style, inner) + float(posmod(spec.seed, 3)) * 0.01
 	var hall_depth := maxf(hall_min_depth, inner.size.y * hall_ratio)
 	if kinds.has(&"kitchen") and kinds.size() > 2 \

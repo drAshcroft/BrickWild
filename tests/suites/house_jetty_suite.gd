@@ -70,6 +70,19 @@ static func run() -> SuiteResult:
 						arrays[Mesh.ARRAY_VERTEX] = vertices
 						wall_back.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 					_expect(res, "\n".join(HouseQA.check_jetty_geometry(p, wall_back)).contains("jetty_wall:"), who + " retracted wall mutation escaped")
+				if levels == 3 and enabled and p.stairs.size() >= 2:
+					# A supported upper projection is usable floor; space beyond
+					# that projection is not. Corrupt the upper flight itself.
+					var upper_stair: Dictionary = p.stairs[1]
+					var outside := Rect2(upper_stair["lower_rect"])
+					outside.position.y = HouseGeometry.site_rect(s, 1).position.y - outside.size.y - 0.5
+					for key in ["rect", "lower_rect", "upper_rect"]:
+						upper_stair[key] = outside
+					var caught := false
+					for failure in HousePlanCheck.new().check(p)["failures"]:
+						caught = caught or (String(failure).begins_with("stairs:") \
+							and "outside the interior" in String(failure))
+					_expect(res, caught, who + " flight beyond upper floor envelope escaped")
 	return res
 
 

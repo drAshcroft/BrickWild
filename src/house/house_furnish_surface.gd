@@ -64,6 +64,9 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 		for s in range(steps + 1):
 			var t: float = lo + float(s) * HouseFurnishScore.MOUNT_STEP
 			var pos: Vector2 = a + along * t
+			if _blocks_domestic_threshold(plan, room, key, pos,
+					HouseFurnishGeometry.yaw_facing(n), y, scale):
+				continue
 			if HouseFurnishScore._on_opening(plan, room, pos, n, width):
 				continue
 			if HouseFurnishScore._crowds_mounted(plan, room, pos, width):
@@ -91,6 +94,56 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
 		"mounted": true, "scale": scale,
 	})
+
+
+## A mount point can miss an opening while the shelf body projects into its
+## approach from the adjoining wall. Use the same measured pose as assembly.
+static func _blocks_domestic_threshold(plan: HousePlan, room: int, key: String,
+		pos: Vector2, yaw: float, y: float, scale: float) -> bool:
+	if plan.world_family != &"" or not HousePlanLevels._is_plain_house_spec(plan.spec):
+		return false
+	var model_yaw := yaw + PropCatalog.face_offset(key)
+	var placement := {"key": key, "pos": Vector3(pos.x, y, pos.y),
+		"yaw": yaw, "scale": scale}
+	var origin := PropCatalog.house_origin(placement)
+	var bottom := origin.y + PropCatalog.floor_offset(key) * scale
+	var centre := PropCatalog.plan_centre(key, origin, model_yaw, scale)
+	var size := PropCatalog.footprint_rotated(key, model_yaw) * scale
+	var body := Rect2(centre - size * 0.5, size)
+	if bottom < HouseGeometry.FLOOR_T + 2.0:
+		for di in plan.doors_of(room):
+			for side in [-1.0, 1.0]:
+				if body.intersects(HouseGeometry.door_clear_rect(plan.doors[di], side)):
+					return true
+	var level := plan.storey_of_room(room)
+	var world_bottom := bottom + float(level) * plan.spec.height
+	for stair in plan.stairs:
+		if not bool(stair.get("satisfied", true)):
+			continue
+		var lower := int(stair.get("storey", 0))
+		var upper := int(stair.get("to_storey", lower + 1))
+		if level != lower and level != upper:
+			continue
+		for end in [{"rect": stair.get("foot_landing", Rect2()), "level": lower},
+				{"rect": stair.get("head_landing", Rect2()), "level": upper}]:
+			var landing_floor := float(end["level"]) * plan.spec.height + HouseGeometry.FLOOR_T
+			if body.intersects(Rect2(end["rect"])) and world_bottom < landing_floor + 2.0:
+				return true
+		var flight := Rect2(stair.get("lower_rect", Rect2()))
+		var overlap := body.intersection(flight)
+		if not overlap.has_area():
+			continue
+		var along_x := flight.size.x > flight.size.y
+		var run := maxf(flight.size.x, flight.size.y)
+		var reach := overlap.end.x - flight.position.x if along_x else overlap.end.y - flight.position.y
+		if HouseGeometry.stair_climb(plan, stair) < 0.0:
+			reach = flight.end.x - overlap.position.x if along_x else flight.end.y - overlap.position.y
+		var steps := maxi(1, int(stair.get("steps", 10)))
+		var tread := ceilf(reach / run * float(steps)) / float(steps) * plan.spec.height
+		var walking_y := float(lower) * plan.spec.height + HouseGeometry.FLOOR_T + tread
+		if world_bottom < walking_y + 2.0:
+			return true
+	return false
 
 
 ## How close two wall lamps may hang. A third torch thirty-six centimetres
@@ -125,6 +178,8 @@ static func place_ceiling(plan: HousePlan, room: int, key: String) -> void:
 	var c: Vector2 = spots[0]
 	var best_score := -INF
 	for spot in spots:
+		if _blocks_domestic_threshold(plan, room, key, spot, 0.0, plan.spec.height, 1.0):
+			continue
 		var cand := {
 			"key": key, "pos": Vector3(spot.x, 0.0, spot.y),
 			"rect": Rect2(spot - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
@@ -134,6 +189,8 @@ static func place_ceiling(plan: HousePlan, room: int, key: String) -> void:
 		if score > best_score:
 			best_score = score
 			c = spot
+	if best_score == -INF:
+		return
 	plan.furniture.append({
 		"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
 		"pos": Vector3(c.x, HouseFurnishGeometry.storey_base(plan, room) + plan.spec.height, c.y),

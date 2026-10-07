@@ -1,0 +1,43 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+LAYOUT_FALLBACK seed=41012 style=cottage reason=bedroom room does not fit its minimum floor
+DISTRIBUTION 25/200
+LAYOUT_FALLBACK seed=41025 style=farmhouse reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41026 style=townhouse reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41027 style=longhall reason=bedroom room does not fit its minimum floor
+LAYOUT_FALLBACK seed=41028 style=witch_hut reason=hall room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41040 style=witch_hut reason=kitchen room aspect exceeds its limit
+DISTRIBUTION 50/200
+LAYOUT_FALLBACK seed=41060 style=cottage reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41061 style=farmhouse reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41062 style=townhouse reason=bedroom room does not fit its minimum floor
+LAYOUT_FALLBACK seed=41063 style=longhall reason=hall room aspect exceeds its limit
+DISTRIBUTION 75/200
+LAYOUT_FALLBACK seed=41075 style=longhall reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41076 style=witch_hut reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41096 style=cottage reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41097 style=farmhouse reason=bedroom room does not fit its minimum floor
+LAYOUT_FALLBACK seed=41098 style=townhouse reason=hall room aspect exceeds its limit
+DISTRIBUTION 100/200
+LAYOUT_FALLBACK seed=41110 style=townhouse reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41111 style=longhall reason=kitchen room aspect exceeds its limit
+DISTRIBUTION 125/200
+LAYOUT_FALLBACK seed=41132 style=cottage reason=bedroom room does not fit its minimum floor
+LAYOUT_FALLBACK seed=41133 style=farmhouse reason=hall room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41145 style=farmhouse reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41146 style=townhouse reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41148 style=witch_hut reason=hall room aspect exceeds its limit
+DISTRIBUTION 150/200
+LAYOUT_FALLBACK seed=41160 style=witch_hut reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41168 style=cottage reason=hall room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41172 style=witch_hut reason=bedroom room does not fit its minimum floor
+DISTRIBUTION 175/200
+LAYOUT_FALLBACK seed=41180 style=cottage reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41181 style=farmhouse reason=kitchen room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41183 style=longhall reason=hall room aspect exceeds its limit
+LAYOUT_FALLBACK seed=41195 style=longhall reason=kitchen room aspect exceeds its limit
+DISTRIBUTION 200/200
+{"african":{"cases":16,"domestic_stairs":0,"infeasible":0,"layout_fallback":0,"legacy_stairs":16,"off_wall":0,"other_plan_failures":0},"asian":{"cases":17,"domestic_stairs":0,"infeasible":0,"layout_fallback":0,"legacy_stairs":17,"off_wall":0,"other_plan_failures":0},"cottage":{"cases":17,"domestic_stairs":11,"infeasible":0,"layout_fallback":6,"legacy_stairs":6,"off_wall":0,"other_plan_failures":0},"farmhouse":{"cases":17,"domestic_stairs":11,"infeasible":0,"layout_fallback":6,"legacy_stairs":6,"off_wall":0,"other_plan_failures":0},"longhall":{"cases":17,"domestic_stairs":11,"infeasible":0,"layout_fallback":6,"legacy_stairs":6,"off_wall":0,"other_plan_failures":0},"mediterranean":{"cases":17,"domestic_stairs":0,"infeasible":0,"layout_fallback":0,"legacy_stairs":17,"off_wall":0,"other_plan_failures":0},"mud_hut":{"cases":16,"domestic_stairs":0,"infeasible":0,"layout_fallback":0,"legacy_stairs":16,"off_wall":0,"other_plan_failures":0},"pueblo":{"cases":16,"domestic_stairs":0,"infeasible":0,"layout_fallback":0,"legacy_stairs":16,"off_wall":0,"other_plan_failures":0},"rich":{"cases":17,"domestic_stairs":0,"infeasible":0,"layout_fallback":0,"legacy_stairs":17,"off_wall":0,"other_plan_failures":0},"thatch_cottage":{"cases":16,"domestic_stairs":0,"infeasible":0,"layout_fallback":0,"legacy_stairs":16,"off_wall":0,"other_plan_failures":0},"townhouse":{"cases":17,"domestic_stairs":12,"infeasible":0,"layout_fallback":5,"legacy_stairs":5,"off_wall":0,"other_plan_failures":0},"witch_hut":{"cases":17,"domestic_stairs":11,"infeasible":0,"layout_fallback":6,"legacy_stairs":6,"off_wall":0,"other_plan_failures":0}}
+stair distribution: 0 failures, 10.53 seconds
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2558)

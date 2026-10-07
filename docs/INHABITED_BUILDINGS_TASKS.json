@@ -43,7 +43,7 @@
                       "description":  "Treat doors, halls, stair runs, landings and headroom as early architectural reservations. Keep historic repairs credited; diagnose only current failures before changing them.",
                       "priority":  "P1",
                       "phase":  "inhabited-buildings",
-                      "status":  "pending",
+                      "status":  "complete",
                       "taskType":  "feature",
                       "targetCoord":  {
                                           "file":  "src/house/house_plan_levels.gd"
@@ -227,7 +227,7 @@
                                     ],
                       "description":  "Implement the complete house style inventory in docs/BUILDING_PERSONALITY_BRIEFS.md: spatial programme, silhouette, materials/detail and use. Witch hut is only one row.",
                       "key":  "LIVE-HOUSE-STYLES",
-                      "acceptanceCriteria":  "Map every HouseSpec.STYLES row to a design brief and fixtures. Compare unlabelled exterior and interior views across fixed seeds/sizes, identify distinguishing spatial and visible traits, preserve trade overrides and supported custom plans. Do not close from unique labels, palettes or component counts. Record unsatisfied briefs. Run applicable bounded planning, furnishing and exterior lanes.",
+                      "acceptanceCriteria":  "Map every HouseSpec.STYLES row to a design brief and fixtures. Compare unlabelled exterior and interior views across fixed seeds/sizes, identify distinguishing spatial and visible traits, preserve trade overrides and supported custom plans. Do not close from unique labels, palettes or component counts. Resolve the 29 domestic-layout fallbacks in the 200-plan threshold distribution and extend human-scale circulation to the seven styles still using legacy room plans; report profile coverage separately from a passing plan check. Record unsatisfied briefs. Run applicable bounded planning, furnishing and exterior lanes.",
                       "phase":  "inhabited-buildings",
                       "status":  "pending",
                       "title":  "Give every published house style a distinct inhabited design",

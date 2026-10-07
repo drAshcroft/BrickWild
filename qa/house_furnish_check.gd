@@ -37,6 +37,10 @@ extends RefCounted
 ## and the one the temple taught (INT-002):
 ##   FOCUS               the piece the plan is arranged around stands where
 ##                       the plan says, and looks at the door when it must
+## and the ones the walkers taught, pinned twice on the same seeds while every
+## rule above passed (HouseFurnishWalkCheck; walk QA 3-7 Oct):
+##   TUCK, PULL_OUT, TABLE_BAND, SEAT_KINDS, SEAT_COUNT, SPARSE, LAMPS,
+##   WORKTOP, BEDSIDE, STOWAGE, CORRIDOR, BED_DOOR, FRONT_DOOR
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {...}}
 
@@ -94,7 +98,9 @@ const GROUPS := {
 	"arrangement": ["against", "seating", "row", "clear"],
 	"feng shui": ["command", "hearth", "workbench_daylight", "bookcase_heat",
 		"bed_window", "table_focus", "sconce_pair", "shelf_over",
-		"chandelier_over", "corner_clutter", "focus"],
+		"chandelier_over", "corner_clutter", "focus", "bed_door", "front_door"],
+	"walk": ["tuck", "pull_out", "table_band", "seat_kinds", "seat_count", "sparse",
+		"lamps", "worktop", "bedside", "stowage", "corridor"],
 }
 
 ## Every rule, in the order it runs, by the name its messages carry. A family
@@ -103,7 +109,9 @@ const RULES: Array[StringName] = [&"placed", &"vertical", &"supported", &"doorwa
 	&"daylight", &"programme", &"against", &"seating", &"light", &"density",
 	&"command", &"hearth", &"row", &"clear", &"workbench_daylight", &"bookcase_heat",
 	&"bed_window", &"table_focus", &"sconce_pair", &"shelf_over",
-	&"chandelier_over", &"corner_clutter", &"focus"]
+	&"chandelier_over", &"corner_clutter", &"focus",
+	&"tuck", &"pull_out", &"table_band", &"seat_kinds", &"seat_count", &"sparse",
+	&"lamps", &"worktop", &"bedside", &"stowage", &"corridor", &"bed_door", &"front_door"]
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -134,7 +142,8 @@ func _rule_handlers(report: Dictionary) -> Dictionary:
 	var arrangement := HouseFurnishArrangementCheck.new(report)
 	var spatial := HouseFurnishSpatialCheck.new(report)
 	var affinity := HouseFurnishAffinityCheck.new(report)
-	_rule_owners.assign([physical, programme, arrangement, spatial, affinity])
+	var walk := HouseFurnishWalkCheck.new(report)
+	_rule_owners.assign([physical, programme, arrangement, spatial, affinity, walk])
 	return {
 		&"placed": physical.check_placed,
 		&"vertical": physical.check_vertical,
@@ -159,6 +168,19 @@ func _rule_handlers(report: Dictionary) -> Dictionary:
 		&"chandelier_over": affinity.check_chandelier_over,
 		&"corner_clutter": affinity.check_corner_clutter,
 		&"focus": affinity.check_focus,
+		&"tuck": walk.check_tuck,
+		&"pull_out": walk.check_pull_out,
+		&"table_band": walk.check_table_band,
+		&"seat_kinds": walk.check_seat_kinds,
+		&"seat_count": walk.check_seat_count,
+		&"sparse": walk.check_sparse,
+		&"lamps": walk.check_lamps,
+		&"worktop": walk.check_worktop,
+		&"bedside": walk.check_bedside,
+		&"stowage": walk.check_stowage,
+		&"corridor": walk.check_corridor,
+		&"bed_door": walk.check_bed_door,
+		&"front_door": walk.check_front_door,
 	}
 
 

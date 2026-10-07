@@ -1,0 +1,6 @@
+selectors=lane:geom__walkpins__houseqaplan
+status=TIMEOUT
+native_exit=TIMEOUT
+wall_seconds=300.11
+godot_pid=22256
+verdict=

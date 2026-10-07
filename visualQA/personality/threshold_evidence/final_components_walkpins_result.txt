@@ -1,0 +1,6 @@
+selectors=hcomponent__walkpins
+status=PASS
+native_exit=0
+wall_seconds=34.55
+godot_pid=1256
+verdict=ALL PASS -- 2 suites, 1731 checks, 0 failures, 0 warnings

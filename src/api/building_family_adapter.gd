@@ -42,6 +42,18 @@ func build_mesh(_building) -> ArrayMesh:
 
 
 ## The family's existing quality checks, before public diagnostic formatting.
+## Visible z-fighting, as warnings: walk QA pinned it fifteen times while the
+## probe that finds it was called by nothing. A ratchet in walk_pin_suite
+## holds the pinned buildings' counts from growing.
+static func _with_coplanar(report: Dictionary, mesh: ArrayMesh, where: String,
+		closed := true) -> Dictionary:
+	var found := CoplanarCheck.visible(mesh, where, closed)
+	var w: Array = report.get("warnings", [])
+	w.append_array(found)
+	report["warnings"] = w
+	return report
+
+
 func quality_report(_building) -> Dictionary:
 	return {"failures": ["unsupported_family: No QA adapter exists for this family."], "warnings": []}
 
@@ -262,7 +274,7 @@ class ChurchFamily extends BuildingFamilyAdapter:
 	func quality_report(building) -> Dictionary:
 		var builder := ChurchBuilder.new()
 		var mesh: ArrayMesh = builder.build(building.spec)
-		return BlueprintQA.new().check(building.spec, mesh, builder)
+		return _with_coplanar(BlueprintQA.new().check(building.spec, mesh, builder), mesh, "church")
 
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := ChurchSpec.new()
@@ -358,8 +370,8 @@ class CastleFamily extends BuildingFamilyAdapter:
 class TempleFamily extends BuildingFamilyAdapter:
 	func quality_report(building) -> Dictionary:
 		var builder := TempleBuilder.new()
-		builder.build(building.spec)
-		return TempleQA.new().check(building.spec, builder)
+		var mesh: ArrayMesh = builder.build(building.spec)
+		return _with_coplanar(TempleQA.new().check(building.spec, builder), mesh, "temple")
 
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := TempleSpec.new()
@@ -417,7 +429,7 @@ class WindmillFamily extends BuildingFamilyAdapter:
 	func quality_report(building) -> Dictionary:
 		var builder := WindmillBuilder.new()
 		var mesh: ArrayMesh = builder.build(building.spec)
-		return WindmillCheck.new().check(building.spec, mesh, builder)
+		return _with_coplanar(WindmillCheck.new().check(building.spec, mesh, builder), mesh, "windmill")
 
 	func generate(request: BuildingRequest, out) -> bool:
 		var spec := WindmillSpec.new(request.seed)

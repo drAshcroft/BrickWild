@@ -392,7 +392,6 @@ static func _world_shop_has_street_opening(plan: HousePlan, room: int) -> bool:
 func _check_stairs(plan: HousePlan) -> void:
 	var wanted: int = clampi(int(plan.spec.storeys), 1, plan.spec.max_storeys())
 	var lowest: int = _lowest(plan)
-	var interior: Rect2 = HouseGeometry.interior_rect(plan.spec)
 	var pairs := {}
 	for si in range(plan.stairs.size()):
 		var stair: Dictionary = plan.stairs[si]
@@ -401,6 +400,8 @@ func _check_stairs(plan: HousePlan) -> void:
 		if hi != lo + 1 or lo < lowest or hi >= wanted:
 			failures.append("stairs: stair %d does not join adjacent valid storeys (%d to %d)" % [si, lo, hi])
 			continue
+		var interior := HouseGeometry.interior_rect(plan.spec, lo).intersection(
+			HouseGeometry.interior_rect(plan.spec, hi))
 		var a: int = int(stair.get("a", -1))
 		var b: int = int(stair.get("b", -1))
 		if a < 0 or b < 0 or a >= plan.room_count() or b >= plan.room_count():

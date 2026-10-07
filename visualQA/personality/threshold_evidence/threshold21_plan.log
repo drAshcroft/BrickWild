@@ -1,0 +1,15 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+THRESHOLD_CASE default cottage two-storey seed=8102
+THRESHOLD_CASE default farmhouse two-storey seed=8114
+THRESHOLD_CASE default farmhouse three-storey seed=9127
+THRESHOLD_CASE default townhouse two-storey seed=9301
+THRESHOLD_CASE default townhouse three-storey seed=9302
+THRESHOLD_CASE default witch hut two-storey seed=9501
+THRESHOLD_CASE large longhall two-storey seed=17018
+THRESHOLD_CASE large farmhouse two-storey seed=17028
+THRESHOLD_CASE large farmhouse three-storey seed=17019
+THRESHOLD_CASE large townhouse three-storey seed=17103
+house threshold stairs: 0 failures
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2558)

@@ -58,3 +58,34 @@ windmill silhouette. These are usable review views. They visibly retain the
 building design problems above. Unsupported family activity cameras are
 explicitly labelled `front_threshold_fallback`; full review of those interiors
 still requires a family-specific view.
+
+## Domestic thresholds
+
+`threshold_evidence/` retains eight roof-on, furnished stair views from three
+complete requests: farmhouse 8114, three-storey townhouse 9302 and large
+longhall 17018. The final manifest has `source_changed=false`. Root reviewed
+the approaches and upper wells: the flights have usable end landings and
+continuous guards, and the window hood no longer intrudes into the townhouse
+flight. A second render caught coplanar flicker from the hood's newly flush
+inside face; recessing that hidden face removed it without moving the exterior
+edge. Sparse upper rooms and remaining wall/detail composition are still
+design work for GROUPS, SURFACES and HOUSE-STYLES.
+
+`threshold20.log` records ten furnished assembled-mesh cases with zero
+failures. `threshold21_plan.log` reruns those furnished plans with the final
+upper-flight route check (mesh sweeps omitted in that run), plus obstruction
+controls. `upper_approach.log` proves an inserted Cabinet blocks the actual
+middle-storey route. The sampled mesh probes are not a continuous physics
+capsule simulation. `stair_distribution3.log` separately reports converted
+and legacy/fallback coverage; zero plan failures does not mean every style
+uses the new stair profile.
+
+The combined geometry/planning run timed out at 300.11 seconds in its final
+`metriccoords` suite. All earlier suites completed with no reported failure;
+the remaining metric suite then passed all 14 checks independently. Both logs
+and results are retained. The wider furnished planning gate's known failures
+remain in `planning_known_failures.log`; its outdated off-wall negative
+fixture was corrected and rerun, while the 39 furnishing/legacy-trade findings
+remain assigned to the later design work. The furnishing log predates the
+corrected historical pin expectations; its assembly and furnishing suites
+passed, and the updated walk-pin fixtures were verified separately.

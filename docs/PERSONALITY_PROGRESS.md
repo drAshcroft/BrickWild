@@ -182,3 +182,37 @@ The narrow-corner fixtures were also replayed against the original placer
 from `HEAD`: both orientations report storage in the walking strip. The
 corrected placer passes both unchanged fixtures. Evidence:
 `artifacts/personality/corner_negative.log` and `corner_positive.log`.
+
+## LIVE-THRESHOLDS implementation and review
+
+The converted domestic room grammar now reserves a full stair run, integer
+steps, end landings and a continuous 0.9 m carrying route before furniture.
+Flights use the finished floor datum and emit inclined rails, intermediate
+rails and guards around the upper opening. An infeasible stair is recorded
+explicitly and emits neither a flight nor a navigation edge. Interior doors
+in ordinary houses provide 0.95 m nominal width and 2.1 m finished headroom.
+
+Stacked floors use their actual envelopes, including the townhouse projection.
+Door and landing clear floor can be shared; flights, wells and their guards
+cannot. The render review also exposed an exterior window hood projecting
+into a wall stair. Its outside profile is retained with its inner face now
+flush with the wall. Mounted furnishings are checked using their measured
+assembled pose and the highest overlapping tread, rather than an inflated
+plan rectangle.
+
+Scope remains explicit. The 200-case distribution fixture reports 56 converted
+domestic layouts and 144 legacy layouts, with no infeasible stair or plan-rule
+failure. Of those legacy cases, 29 requests in the five converted styles still
+fall back because their room programme cannot be packed; another 115 cover
+the remaining styles. LIVE-HOUSE-STYLES retains this work. The broader furnished
+multistorey gate still reports 30 furnishing findings and nine legacy trade
+stair findings. These are outstanding design work, not accepted exceptions to
+the final building-quality goal.
+
+The existing human-pin QA work in the working tree is credited as the basis
+for the stair and furnishing diagnostics. Its historical fixtures are adjusted
+only where current measured behaviour disproves an old expected symptom.
+The threshold mesh probe samples both directions, three lateral positions and
+three body heights through actual assembled triangles. It supplements the
+walking grid; it is not a continuous capsule-physics proof or a substitute for
+the final human walk.

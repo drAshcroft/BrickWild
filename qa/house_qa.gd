@@ -49,10 +49,13 @@ func check(plan: HousePlan, builder: HouseBuilder, overrides: Dictionary = {}) -
 
 	if builder != null:
 		failures.append_array(check_interior_details(plan, builder))
+		failures.append_array(HouseStairCheck.check(plan, builder))
 		failures.append_array(check_furniture_floor(plan, builder))
 		failures.append_array(check_exterior_geometry(plan, builder))
 		if builder.emitted_mesh != null:
 			failures.append_array(MeshIntegrityCheck.check(builder.emitted_mesh, "HouseBuilder"))
+			# a warning until the ratchet in walk_pin_suite reaches zero
+			warnings.append_array(CoplanarCheck.visible(builder.emitted_mesh, "HouseBuilder"))
 		for f2 in _check_shell(plan, builder):
 			failures.append(f2)
 		for f3 in _check_vertical_shell(plan, builder):

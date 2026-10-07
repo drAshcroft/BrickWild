@@ -516,6 +516,8 @@ func _stair_opening(level: int) -> Rect2:
 	for stair in stairs:
 		if not (stair is Dictionary):
 			continue
+		if not bool(stair.get("satisfied", true)):
+			continue
 		var from_level := int(stair.get("storey",
 			stair.get("from_storey", stair.get("from_level", level - 1))))
 		if from_level + 1 != level:
@@ -541,6 +543,8 @@ func _emit_stairs() -> void:
 		var footprint: Rect2 = raw
 		var from_level := int(stair.get("storey",
 			stair.get("from_storey", stair.get("from_level", 0))))
+		if not bool(stair.get("satisfied", true)):
+			continue
 		var steps := maxi(4, int(stair.get("steps", 10)))
 		var step_h := spec.height / float(steps)
 		# the flight climbs along the footprint's long side, which is the axis
@@ -549,6 +553,11 @@ func _emit_stairs() -> void:
 		var run: float = footprint.size.x if along_x else footprint.size.y
 		# from whichever end has floor in front of it (HouseGeometry.stair_climb)
 		var climb: float = HouseGeometry.stair_climb(plan, stair)
+		var step_base_y: float = float(from_level) * spec.height
+		if bool(stair.get("domestic_profile", false)):
+			# Domestic treads rise from the walking surface on top of the lower
+			# floor slab. Legacy/custom flights keep their original datum.
+			step_base_y += HouseGeometry.FLOOR_T
 		for s in range(steps):
 			var t: float = run * (float(s) + 0.5) / steps
 			if climb < 0.0:
@@ -557,12 +566,133 @@ func _emit_stairs() -> void:
 			var step_size := Vector3(run / steps, h, footprint.size.y) if along_x \
 				else Vector3(footprint.size.x, h, run / steps)
 			var step_center := Vector3(footprint.position.x + t,
-					from_level * spec.height + h / 2.0, footprint.get_center().y) \
+					step_base_y + h / 2.0, footprint.get_center().y) \
 				if along_x else Vector3(footprint.get_center().x,
-					from_level * spec.height + h / 2.0, footprint.position.y + t)
+					step_base_y + h / 2.0, footprint.position.y + t)
 			box(step_size, step_center, SURF_FLOOR)
 			_log_mass("stair_%d_step_%d" % [index, s],
-				AABB(step_center - step_size / 2.0, step_size), from_level * spec.height)
+				AABB(step_center - step_size / 2.0, step_size), step_base_y)
+		if bool(stair.get("domestic_profile", false)):
+			_emit_stair_guards(index, footprint, from_level, climb)
+
+
+## The open long edges of a domestic flight are guarded at both heights. These
+## are real emitted components, hosted to the stair, so exterior/component QA
+## can compare their log with the triangles that were built.
+func _emit_stair_guards(index: int, footprint: Rect2, from_level: int,
+		climb: float) -> void:
+	var along_x := footprint.size.x > footprint.size.y
+	var width := footprint.size.y if along_x else footprint.size.x
+	var foot_2d: Vector2
+	var head_2d: Vector2
+	if along_x:
+		foot_2d = Vector2(footprint.position.x if climb > 0.0 else footprint.end.x,
+			footprint.get_center().y)
+		head_2d = Vector2(footprint.end.x if climb > 0.0 else footprint.position.x,
+			footprint.get_center().y)
+	else:
+		foot_2d = Vector2(footprint.get_center().x,
+			footprint.position.y if climb > 0.0 else footprint.end.y)
+		head_2d = Vector2(footprint.get_center().x,
+			footprint.end.y if climb > 0.0 else footprint.position.y)
+	var base_y := float(from_level) * spec.height + HouseGeometry.FLOOR_T
+	var foot := Vector3(foot_2d.x, base_y, foot_2d.y)
+	var head := Vector3(head_2d.x, base_y + spec.height, head_2d.y)
+	var direction := (head - foot).normalized()
+	var side := Vector3(-direction.z, 0.0, direction.x).normalized()
+	var up := side.cross(direction).normalized()
+	var basis := Basis(direction, up, side)
+	host("stair_%d" % index, from_level)
+	for edge: float in [-1.0, 1.0]:
+		var offset: Vector3 = side * (width * 0.5 - HouseGeometry.STAIR_GUARD_EDGE_OFFSET) * edge
+		var a: Vector3 = foot + offset
+		var b: Vector3 = head + offset
+		_emit_stair_guard_beam("stair_rail_top", a + Vector3.UP * 0.9,
+			b + Vector3.UP * 0.9, basis)
+		_emit_stair_guard_beam("stair_rail_mid", a + Vector3.UP * 0.46,
+			b + Vector3.UP * 0.46, basis)
+		for fraction: float in [0.0, 0.5, 1.0]:
+			var at: Vector3 = a.lerp(b, fraction)
+			var rise: float = lerpf(0.0, spec.height, fraction)
+			var post_xf := Transform3D(Basis.IDENTITY,
+				Vector3(at.x, base_y + rise + 0.45, at.z))
+			component_box("stair_guard_post", Vector3(HouseGeometry.STAIR_GUARD_THICKNESS,
+				0.9, HouseGeometry.STAIR_GUARD_THICKNESS),
+				post_xf, SURF_TRIM)
+	_emit_upper_well_guards(index, footprint, from_level, climb)
+	host_end()
+
+
+## At the upper floor the inclined flight rail is not a substitute for the
+## guard at the edge of the open well. Emit a separate level rail along each
+## long edge of the floor opening; the head end stays open onto its landing.
+func _emit_upper_well_guards(index: int, footprint: Rect2, from_level: int,
+		climb: float) -> void:
+	var along_x := footprint.size.x > footprint.size.y
+	var run := footprint.size.x if along_x else footprint.size.y
+	var width := footprint.size.y if along_x else footprint.size.x
+	var floor_y := float(from_level + 1) * spec.height + HouseGeometry.FLOOR_T
+	var edge_offset := width * 0.5 - HouseGeometry.STAIR_GUARD_EDGE_OFFSET
+	for edge: float in [-1.0, 1.0]:
+		var cx := footprint.get_center().x
+		var cz := footprint.get_center().y
+		if along_x:
+			cz += edge_offset * edge
+		else:
+			cx += edge_offset * edge
+		var rail_size := Vector3(run, HouseGeometry.STAIR_GUARD_THICKNESS,
+			HouseGeometry.STAIR_GUARD_THICKNESS) if along_x else Vector3(
+			HouseGeometry.STAIR_GUARD_THICKNESS, HouseGeometry.STAIR_GUARD_THICKNESS, run)
+		component_box("stair_well_rail_top", rail_size,
+			Transform3D(Basis.IDENTITY, Vector3(cx, floor_y + 0.9, cz)), SURF_TRIM)
+		component_box("stair_well_rail_mid", rail_size,
+			Transform3D(Basis.IDENTITY, Vector3(cx, floor_y + 0.46, cz)), SURF_TRIM)
+		for fraction: float in [0.0, 0.5, 1.0]:
+			# The inclined guard already supplies this upper head-corner post.
+			# Keep one solid post at the joint, not two coincident boxes.
+			if is_equal_approx(fraction, 1.0 if climb > 0.0 else 0.0):
+				continue
+			var along := lerpf(-run * 0.5, run * 0.5, fraction)
+			var px := footprint.get_center().x + (along if along_x else 0.0)
+			var pz := footprint.get_center().y + (along if not along_x else 0.0)
+			if along_x:
+				pz += edge_offset * edge
+			else:
+				px += edge_offset * edge
+			component_box("stair_well_guard_post", Vector3(HouseGeometry.STAIR_GUARD_THICKNESS,
+				0.9, HouseGeometry.STAIR_GUARD_THICKNESS),
+				Transform3D(Basis.IDENTITY, Vector3(px, floor_y + 0.45, pz)), SURF_TRIM)
+	# The foot end borders the drop too. The head end stays open so the
+	# upper flight arrives onto its landing without a rail across the route.
+	var foot_x := footprint.position.x if climb > 0.0 else footprint.end.x
+	var foot_z := footprint.position.y if climb > 0.0 else footprint.end.y
+	var cross_size := Vector3(HouseGeometry.STAIR_GUARD_THICKNESS,
+		HouseGeometry.STAIR_GUARD_THICKNESS, width) if along_x else Vector3(
+		width, HouseGeometry.STAIR_GUARD_THICKNESS, HouseGeometry.STAIR_GUARD_THICKNESS)
+	var cross_center := Vector3(foot_x, floor_y, footprint.get_center().y) if along_x \
+		else Vector3(footprint.get_center().x, floor_y, foot_z)
+	for rail_height: float in [0.46, 0.9]:
+		component_box("stair_well_foot_rail", cross_size,
+			Transform3D(Basis.IDENTITY, cross_center + Vector3.UP * rail_height), SURF_TRIM)
+	# The two corner posts already belong to the long-side rails. One centre
+	# post splits this short rail span without placing another post on either
+	# corner; the adjacent boxes would overlap by more than their half-thickness.
+	var middle_post := Vector3(foot_x, floor_y + 0.45,
+		footprint.get_center().y) if along_x else Vector3(
+		footprint.get_center().x, floor_y + 0.45, foot_z)
+	component_box("stair_well_foot_guard_post", Vector3(
+			HouseGeometry.STAIR_GUARD_THICKNESS, 0.9,
+			HouseGeometry.STAIR_GUARD_THICKNESS),
+			Transform3D(Basis.IDENTITY, middle_post), SURF_TRIM)
+
+
+func _emit_stair_guard_beam(role: String, start: Vector3, finish: Vector3,
+		basis: Basis) -> void:
+	var centre := (start + finish) * 0.5
+	var length := start.distance_to(finish)
+	var xf := Transform3D(basis, centre)
+	component_box(role, Vector3(length, HouseGeometry.STAIR_GUARD_THICKNESS,
+		HouseGeometry.STAIR_GUARD_THICKNESS), xf, SURF_TRIM)
 
 
 # ------------------------------------------------------------------ plinth
@@ -1081,9 +1211,14 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 
 			# Dripstone hood moulding over window head
 			if spec.window_hoods:
+				# A dripstone projects OUTSIDE. A symmetric box also put a
+				# second hood indoors, through the shoulder space of wall stairs.
+				# Recess the inside face into the wall to avoid a coplanar skin;
+				# keep the visible outside edge at exactly the same projection.
+				var hood_mid := mid + normal * (HouseGeometry.HOOD_PROJECTION + TRIM_TUCK) * 0.5
 				var hood_xf := Transform3D(Basis(Vector3.UP, yaw),
-					Vector3(mid.x, y_offset + top + jamb + 0.05, mid.y))
-				component_box("opening_hood", Vector3(w + jamb * 2.4, 0.07, thick + HouseGeometry.HOOD_PROJECTION * 2.0),
+					Vector3(hood_mid.x, y_offset + top + jamb + 0.05, hood_mid.y))
+				component_box("opening_hood", Vector3(w + jamb * 2.4, 0.07, thick + HouseGeometry.HOOD_PROJECTION - TRIM_TUCK),
 					hood_xf, SURF_TRIM)
 
 			# Board-and-batten shutters with strap hinges

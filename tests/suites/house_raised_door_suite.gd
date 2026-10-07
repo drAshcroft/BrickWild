@@ -23,6 +23,14 @@ static func run() -> SuiteResult:
 
 	var ordinary_a := _plan()
 	var ordinary_b := _plan()
+	# Newly planned domestic doors author a taller head above the floor slab.
+	# The compatibility contract compares the historical explicit interval
+	# with its omitted-field fallback, not that new design with the old one.
+	for d in ordinary_a.doors:
+		_expect(res, float(d.get("head", 0.0)) - HouseGeometry.FLOOR_T >= 2.1 - 0.001,
+			"new domestic door lost its finished-floor head clearance")
+		d["sill"] = 0.0
+		d["head"] = HouseGeometry.DOOR_H
 	for d in ordinary_b.doors:
 		d.erase("sill")
 		d.erase("head")
