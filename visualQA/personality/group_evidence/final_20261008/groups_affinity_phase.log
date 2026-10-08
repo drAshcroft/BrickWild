@@ -1,0 +1,10 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+house QA: affinity sweep 1/12
+house QA: affinity sweep 12/12
+house QA: affinity variety 1/8
+house QA: affinity variety 8/8
+furnishing affinity PASS  (24 checked, 0 failures, 0 warnings)
+elapsed_seconds=125.392
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2558)

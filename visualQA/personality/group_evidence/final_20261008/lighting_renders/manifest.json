@@ -1,0 +1,102 @@
+{
+	"failed": false,
+	"renderer_sha256": "09afe4999379b4a2f8636d46555279793e333ef6183e78a7c7166434beaa70c8",
+	"renders": [
+		{
+			"body_clear": true,
+			"eye": [
+				-4.80999994277954,
+				1.70000004768372,
+				-6.30999994277954
+			],
+			"fov": 76.0,
+			"image": "res://artifacts/personality/resumed/lighting_renders/longhall_32103_room_0_roof_on.jpg",
+			"request": {
+				"enclosure": "none",
+				"height": 2.7,
+				"kind": "house",
+				"length": 14.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "smith",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "32103",
+				"storeys": 3,
+				"style": "longhall",
+				"water": "none",
+				"width": 11.0
+			},
+			"roof_on": true,
+			"room": 0,
+			"save_error": 0,
+			"target": [
+				0.0,
+				2.11999988555908,
+				-4.375
+			]
+		},
+		{
+			"body_clear": true,
+			"eye": [
+				-4.80999994277954,
+				4.40000009536743,
+				-6.57087373733521
+			],
+			"fov": 76.0,
+			"image": "res://artifacts/personality/resumed/lighting_renders/longhall_32103_room_4_roof_on.jpg",
+			"request": {
+				"enclosure": "none",
+				"height": 2.7,
+				"kind": "house",
+				"length": 14.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "smith",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "32103",
+				"storeys": 3,
+				"style": "longhall",
+				"water": "none",
+				"width": 11.0
+			},
+			"roof_on": true,
+			"room": 4,
+			"save_error": 0,
+			"target": [
+				0.0,
+				4.82000017166138,
+				-4.50543689727783
+			]
+		}
+	],
+	"request": {
+		"enclosure": "none",
+		"height": 2.7,
+		"kind": "house",
+		"length": 14.0,
+		"material": "timber",
+		"orientation": 0.0,
+		"period": 1200,
+		"purpose": "smith",
+		"schema": "brickwild.request",
+		"schema_version": 1,
+		"seed": "32103",
+		"storeys": 3,
+		"style": "longhall",
+		"water": "none",
+		"width": 11.0
+	},
+	"source_changed": false,
+	"source_end": {
+		"file_count": 230,
+		"sha256": "7d7729ab1ee5ce635a6c281a5bee8cc6b292b7b85ae6f0d5671bf03281b5b515"
+	},
+	"source_start": {
+		"file_count": 230,
+		"sha256": "7d7729ab1ee5ce635a6c281a5bee8cc6b292b7b85ae6f0d5671bf03281b5b515"
+	}
+}

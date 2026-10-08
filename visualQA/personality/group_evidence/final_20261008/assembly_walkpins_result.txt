@@ -1,0 +1,6 @@
+selectors=hassembly__walkpins
+status=PASS
+native_exit=0
+wall_seconds=60.97
+godot_pid=24852
+verdict=ALL PASS -- 2 suites, 139 checks, 0 failures, 0 warnings

@@ -1,0 +1,3891 @@
+{
+	"case_filter": "",
+	"expected_case_count": 4,
+	"expected_render_count": 16,
+	"purpose": "actual furnished cooking, sleeping and eating groups at human eye height; roof-on interior views plus cutaway context",
+	"renders": [
+		{
+			"activity_group": "cooking",
+			"camera": {
+				"activity_anchor_xz": [
+					-2.97918820381165,
+					1.52609705924988
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 156,
+				"eye": [
+					-3.81000018119812,
+					1.70000004768372,
+					5.11999988555908
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					-2.97918820381165,
+					1.07000005245209,
+					1.52609705924988
+				]
+			},
+			"case": "farmhouse_8102_9X12",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/farmhouse_8102_9X12_cooking_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 5,
+			"members": [
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "hearth",
+					"catalog_height_m": 0.815999984741211,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Cauldron",
+					"measured_height_m": 0.815999984741211,
+					"pos": [
+						-3.17799997329712,
+						0.119999997317791,
+						2.02084541320801
+					],
+					"rect": [
+						-3.65000009536743,
+						1.52634537220001,
+						0.944000005722046,
+						0.989000022411346
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-2.70599985122681,
+						1.52634537220001,
+						0.799999833106995,
+						0.988999962806702
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "storage",
+					"catalog_height_m": 0.996999979019165,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Cabinet",
+					"measured_height_m": 0.996999979019165,
+					"pos": [
+						-3.91149997711182,
+						0.119999997317791,
+						0.630666613578796
+					],
+					"rect": [
+						-4.09000015258789,
+						-0.0503333806991577,
+						0.35699999332428,
+						1.36199998855591
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-3.7330002784729,
+						-0.0503333806991577,
+						0.700000047683716,
+						1.36199998855591
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "storage",
+					"cat": "workbench",
+					"catalog_height_m": 0.894999980926514,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Workbench",
+					"measured_height_m": 0.894999980926514,
+					"pos": [
+						-3.63944005966187,
+						0.119999997317791,
+						-0.998693346977234
+					],
+					"rect": [
+						-4.09000015258789,
+						-1.88705337047577,
+						0.901120066642761,
+						1.77672004699707
+					],
+					"scale": 0.88,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-3.18887996673584,
+						-1.88705337047577,
+						0.900000095367432,
+						1.77672004699707
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "storage",
+					"cat": "bucket",
+					"catalog_height_m": 0.293000012636185,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Bucket_Wooden_1",
+					"measured_height_m": 0.293000012636185,
+					"pos": [
+						-2.76150035858154,
+						0.119999997317791,
+						0.630666613578796
+					],
+					"rect": [
+						-2.95300030708313,
+						0.413666605949402,
+						0.382999986410141,
+						0.433999985456467
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "cookware",
+					"catalog_height_m": 0.224000006914139,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Pot_1",
+					"measured_height_m": 0.224000006914139,
+					"pos": [
+						-1.40549993515015,
+						0.119999997317791,
+						5.34700012207031
+					],
+					"rect": [
+						-1.67499995231628,
+						5.10400009155273,
+						0.538999974727631,
+						0.486000001430511
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "farmhouse",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": true,
+			"room_index": 1,
+			"room_kind": "kitchen",
+			"save_error": 0,
+			"view": "cooking"
+		},
+		{
+			"activity_group": "sleep",
+			"camera": {
+				"activity_anchor_xz": [
+					1.06303191184998,
+					3.20995831489563
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 110,
+				"eye": [
+					3.67400002479553,
+					1.70000004768372,
+					5.21111106872559
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					1.06303191184998,
+					1.07000005245209,
+					3.20995831489563
+				]
+			},
+			"case": "farmhouse_8102_9X12",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/farmhouse_8102_9X12_sleep_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 4,
+			"members": [
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "bed",
+					"catalog_height_m": 0.805000007152557,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Bed_Twin1",
+					"measured_height_m": 0.805000007152557,
+					"pos": [
+						1.61699962615967,
+						0.119999997317791,
+						2.8871111869812
+					],
+					"rect": [
+						0.678999602794647,
+						1.68111121654511,
+						1.87600004673004,
+						2.41199994087219
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						2.55499958992004,
+						1.68111121654511,
+						0.75,
+						2.41199970245361
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "bed",
+					"cat": "chest",
+					"catalog_height_m": 0.714999973773956,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Chest_Wood",
+					"measured_height_m": 0.714999973773956,
+					"pos": [
+						0.241499423980713,
+						0.119999997317791,
+						3.11911082267761
+					],
+					"rect": [
+						-0.136000573635101,
+						2.48111081123352,
+						0.754999995231628,
+						1.27600002288818
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-0.736000597476959,
+						2.48111081123352,
+						0.600000023841858,
+						1.27600002288818
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "chest",
+					"catalog_height_m": 0.714999973773956,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Chest_Wood",
+					"measured_height_m": 0.714999973773956,
+					"pos": [
+						1.67812871932983,
+						0.119999997317791,
+						5.21250057220459
+					],
+					"rect": [
+						1.04012870788574,
+						4.83500051498413,
+						1.27600002288818,
+						0.754999995231628
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						1.04012870788574,
+						4.23500061035156,
+						1.27600002288818,
+						0.599999904632568
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "sconce",
+					"catalog_height_m": 0.648000001907349,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Torch_Metal",
+					"measured_height_m": 0.648000001907349,
+					"pos": [
+						0.715499937534332,
+						1.97800004482269,
+						1.62111115455627
+					],
+					"rect": [
+						0.665499925613403,
+						1.57111120223999,
+						0.100000001490116,
+						0.100000001490116
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "farmhouse",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": true,
+			"room_index": 3,
+			"room_kind": "bedroom",
+			"save_error": 0,
+			"view": "sleep"
+		},
+		{
+			"activity_group": "eating",
+			"camera": {
+				"activity_anchor_xz": [
+					2.0104615688324,
+					-3.97304797172546
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 258,
+				"eye": [
+					-3.81000018119812,
+					1.70000004768372,
+					-2.56000018119812
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					2.0104615688324,
+					1.07000005245209,
+					-3.97304797172546
+				]
+			},
+			"case": "farmhouse_8102_9X12",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/farmhouse_8102_9X12_eating_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 3,
+			"members": [
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "table",
+					"catalog_height_m": 0.813000023365021,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Table_Large",
+					"measured_height_m": 0.813000023365021,
+					"pos": [
+						2.0104615688324,
+						0.119999997317791,
+						-3.39771437644959
+					],
+					"rect": [
+						0.586461544036865,
+						-3.94621443748474,
+						2.84800004959106,
+						1.09700000286102
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				},
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "seat",
+					"catalog_height_m": 1.12300002574921,
+					"height_scale": 1.0,
+					"host_category": "table",
+					"host_index": 0,
+					"host_key": "Table_Large",
+					"key": "Chair_1",
+					"measured_height_m": 1.12300002574921,
+					"pos": [
+						1.63262820243835,
+						0.119999997317791,
+						-4.26071453094482
+					],
+					"rect": [
+						1.34212827682495,
+						-4.5352144241333,
+						0.580999970436096,
+						0.549000024795532
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						1.34212827682495,
+						-5.08521461486816,
+						0.580999851226807,
+						0.550000190734863
+					]
+				},
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "seat",
+					"catalog_height_m": 1.12300002574921,
+					"height_scale": 1.0,
+					"host_category": "table",
+					"host_index": 0,
+					"host_key": "Table_Large",
+					"key": "Chair_1",
+					"measured_height_m": 1.12300002574921,
+					"pos": [
+						2.38829493522644,
+						0.119999997317791,
+						-4.26071453094482
+					],
+					"rect": [
+						2.09779500961304,
+						-4.5352144241333,
+						0.580999970436096,
+						0.549000024795532
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						2.09779500961304,
+						-5.08521461486816,
+						0.580999851226807,
+						0.550000190734863
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "farmhouse",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": true,
+			"room_index": 0,
+			"room_kind": "hall",
+			"save_error": 0,
+			"view": "eating"
+		},
+		{
+			"camera": {
+				"eye": [
+					13.8510465621948,
+					16.9424228668213,
+					-16.7695045471191
+				],
+				"fov_degrees": 52.0,
+				"framing": "assembled cutaway bounds",
+				"pitch": -0.58,
+				"target": [
+					0.278000831604004,
+					3.77718758583069,
+					-1.95200061798096
+				],
+				"yaw": 2.4
+			},
+			"case": "farmhouse_8102_9X12",
+			"cutaway": true,
+			"image": "res://artifacts/personality/resumed/groups_renders5/farmhouse_8102_9X12_cutaway_context.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "farmhouse",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": false,
+			"save_error": 0,
+			"view": "cutaway_context"
+		},
+		{
+			"activity_group": "cooking",
+			"camera": {
+				"activity_anchor_xz": [
+					2.10600614547729,
+					-2.52441334724426
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 207,
+				"eye": [
+					-2.81000018119812,
+					1.70000004768372,
+					-0.0600001066923141
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					2.10600614547729,
+					1.07000005245209,
+					-2.52441334724426
+				]
+			},
+			"case": "cottage_1_7X9",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/cottage_1_7X9_cooking_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 0.76
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 5,
+			"members": [
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "hearth",
+					"catalog_height_m": 0.815999984741211,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Cauldron",
+					"measured_height_m": 0.815999984741211,
+					"pos": [
+						2.17799997329712,
+						0.119999997317791,
+						-0.71674108505249
+					],
+					"rect": [
+						1.7059999704361,
+						-1.21124112606049,
+						0.944000005722046,
+						0.989000022411346
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.906000018119812,
+						-1.21124112606049,
+						0.799999952316284,
+						0.989000082015991
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "storage",
+					"catalog_height_m": 0.996999979019165,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Cabinet",
+					"measured_height_m": 0.996999979019165,
+					"pos": [
+						2.91149997711182,
+						0.119999997317791,
+						-3.11228561401367
+					],
+					"rect": [
+						2.73300004005432,
+						-3.79328560829163,
+						0.35699999332428,
+						1.36199998855591
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						2.03299999237061,
+						-3.79328560829163,
+						0.700000047683716,
+						1.36199998855591
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "storage",
+					"cat": "workbench",
+					"catalog_height_m": 0.894999980926514,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Workbench",
+					"measured_height_m": 0.894999980926514,
+					"pos": [
+						1.2409999370575,
+						0.119999997317791,
+						-3.11228561401367
+					],
+					"rect": [
+						0.7289999127388,
+						-4.12178564071655,
+						1.02400004863739,
+						2.01900005340576
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						1.75300002098084,
+						-4.12178564071655,
+						0.899999856948853,
+						2.01900005340576
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "storage",
+					"cat": "bucket",
+					"catalog_height_m": 0.293000012636185,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Bucket_Wooden_1",
+					"measured_height_m": 0.293000012636185,
+					"pos": [
+						2.89849996566772,
+						0.119999997317791,
+						-2.15428566932678
+					],
+					"rect": [
+						2.70700001716614,
+						-2.37128567695618,
+						0.382999986410141,
+						0.433999985456467
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "cookware",
+					"catalog_height_m": 0.224000006914139,
+					"height_scale": 1.0,
+					"host_category": "workbench",
+					"host_index": 2,
+					"host_key": "Workbench",
+					"key": "Pot_1",
+					"measured_height_m": 0.224000006914139,
+					"pos": [
+						1.30103087425232,
+						1.01499998569489,
+						-3.52646851539612
+					],
+					"rect": [
+						0.948949456214905,
+						-3.86761140823364,
+						0.704162776470184,
+						0.682285606861115
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 7.0
+			},
+			"roof_on": true,
+			"room_index": 0,
+			"room_kind": "hall",
+			"save_error": 0,
+			"view": "cooking"
+		},
+		{
+			"activity_group": "sleep",
+			"camera": {
+				"activity_anchor_xz": [
+					-1.25162506103516,
+					1.98150026798248
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 140,
+				"eye": [
+					2.68999981880188,
+					1.70000004768372,
+					3.64000034332275
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					-1.25162506103516,
+					1.07000005245209,
+					1.98150026798248
+				]
+			},
+			"case": "cottage_1_7X9",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/cottage_1_7X9_sleep_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 0.76
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 4,
+			"members": [
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "bed",
+					"catalog_height_m": 0.759999990463257,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Bed_Twin2",
+					"measured_height_m": 0.759999990463257,
+					"pos": [
+						0.0,
+						0.119999997317791,
+						1.81600022315979
+					],
+					"rect": [
+						-0.938000023365021,
+						0.610000252723694,
+						1.87600004673004,
+						2.41199994087219
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.938000023365021,
+						0.610000252723694,
+						0.749999940395355,
+						2.41200017929077
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "bed",
+					"cat": "chest",
+					"catalog_height_m": 0.714999973773956,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Chest_Wood",
+					"measured_height_m": 0.714999973773956,
+					"pos": [
+						-1.37550020217896,
+						0.119999997317791,
+						2.04800009727478
+					],
+					"rect": [
+						-1.75300025939941,
+						1.41000008583069,
+						0.754999995231628,
+						1.27600002288818
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-2.35300016403198,
+						1.41000008583069,
+						0.599999904632568,
+						1.27600002288818
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "chest",
+					"catalog_height_m": 0.714999973773956,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Chest_Wood",
+					"measured_height_m": 0.714999973773956,
+					"pos": [
+						-2.71250009536743,
+						0.119999997317791,
+						3.5120005607605
+					],
+					"rect": [
+						-3.09000015258789,
+						2.87400054931641,
+						0.754999995231628,
+						1.27600002288818
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-2.33500003814697,
+						2.87400054931641,
+						0.599999904632568,
+						1.27600002288818
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "sconce",
+					"catalog_height_m": 0.648000001907349,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Torch_Metal",
+					"measured_height_m": 0.648000001907349,
+					"pos": [
+						-0.918500185012817,
+						1.97800004482269,
+						0.550000250339508
+					],
+					"rect": [
+						-0.968500196933746,
+						0.500000238418579,
+						0.100000001490116,
+						0.100000001490116
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 7.0
+			},
+			"roof_on": true,
+			"room_index": 1,
+			"room_kind": "bedroom",
+			"save_error": 0,
+			"view": "sleep"
+		},
+		{
+			"activity_group": "eating",
+			"camera": {
+				"activity_anchor_xz": [
+					-0.91531640291214,
+					-1.69281160831451
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 207,
+				"eye": [
+					2.43999981880188,
+					1.70000004768372,
+					-3.81000018119812
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					-0.91531640291214,
+					1.07000005245209,
+					-1.69281160831451
+				]
+			},
+			"case": "cottage_1_7X9",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/cottage_1_7X9_eating_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 0.76
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 3,
+			"members": [
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "table",
+					"catalog_height_m": 0.813000023365021,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Table_Large",
+					"measured_height_m": 0.813000023365021,
+					"pos": [
+						-0.42774310708046,
+						0.119999997317791,
+						-1.42889821529388
+					],
+					"rect": [
+						-0.844603061676025,
+						-2.51113820075989,
+						0.833719968795776,
+						2.16447997093201
+					],
+					"scale": 0.76,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				},
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "seat",
+					"catalog_height_m": 1.12300002574921,
+					"height_scale": 1.0,
+					"host_category": "table",
+					"host_index": 5,
+					"host_key": "Table_Large",
+					"key": "Chair_1",
+					"measured_height_m": 1.12300002574921,
+					"pos": [
+						-1.15910315513611,
+						0.119999997317791,
+						-1.42889821529388
+					],
+					"rect": [
+						-1.43360316753387,
+						-1.71939826011658,
+						0.549000024795532,
+						0.580999970436096
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-1.98360323905945,
+						-1.71939826011658,
+						0.550000071525574,
+						0.580999851226807
+					]
+				},
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "seat",
+					"catalog_height_m": 1.12300002574921,
+					"height_scale": 1.0,
+					"host_category": "table",
+					"host_index": 5,
+					"host_key": "Table_Large",
+					"key": "Chair_1",
+					"measured_height_m": 1.12300002574921,
+					"pos": [
+						-1.15910315513611,
+						0.119999997317791,
+						-2.22063827514648
+					],
+					"rect": [
+						-1.43360316753387,
+						-2.51113820075989,
+						0.549000024795532,
+						0.580999970436096
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-1.98360323905945,
+						-2.51113820075989,
+						0.550000071525574,
+						0.580999851226807
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 7.0
+			},
+			"roof_on": true,
+			"room_index": 0,
+			"room_kind": "hall",
+			"save_error": 0,
+			"view": "eating"
+		},
+		{
+			"camera": {
+				"eye": [
+					12.1849765777588,
+					15.3678464889526,
+					-13.6762275695801
+				],
+				"fov_degrees": 52.0,
+				"framing": "assembled cutaway bounds",
+				"pitch": -0.58,
+				"target": [
+					0.108492374420166,
+					3.65420818328857,
+					-0.492499828338623
+				],
+				"yaw": 2.4
+			},
+			"case": "cottage_1_7X9",
+			"cutaway": true,
+			"image": "res://artifacts/personality/resumed/groups_renders5/cottage_1_7X9_cutaway_context.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 0.76
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 7.0
+			},
+			"roof_on": false,
+			"save_error": 0,
+			"view": "cutaway_context"
+		},
+		{
+			"activity_group": "cooking",
+			"camera": {
+				"activity_anchor_xz": [
+					-3.11940670013428,
+					2.44478392601013
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 143,
+				"eye": [
+					-1.56000006198883,
+					1.70000004768372,
+					-1.63000011444092
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					-3.11940670013428,
+					1.07000005245209,
+					2.44478392601013
+				]
+			},
+			"case": "cottage_8102_9X12",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/cottage_8102_9X12_cooking_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 2,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 6,
+			"members": [
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "hearth",
+					"catalog_height_m": 0.815999984741211,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Cauldron",
+					"measured_height_m": 0.815999984741211,
+					"pos": [
+						-3.17799997329712,
+						0.119999997317791,
+						2.62366342544556
+					],
+					"rect": [
+						-3.65000009536743,
+						2.12916350364685,
+						0.944000005722046,
+						0.989000022411346
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-2.70599985122681,
+						2.12916350364685,
+						0.799999833106995,
+						0.988999843597412
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "storage",
+					"catalog_height_m": 0.996999979019165,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Cabinet",
+					"measured_height_m": 0.996999979019165,
+					"pos": [
+						-3.91149997711182,
+						0.119999997317791,
+						0.993466734886169
+					],
+					"rect": [
+						-4.09000015258789,
+						0.312466740608215,
+						0.35699999332428,
+						1.36199998855591
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-3.7330002784729,
+						0.312466740608215,
+						0.700000047683716,
+						1.36199998855591
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "storage",
+					"cat": "workbench",
+					"catalog_height_m": 0.894999980926514,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Workbench",
+					"measured_height_m": 0.894999980926514,
+					"pos": [
+						-3.63944005966187,
+						0.119999997317791,
+						-0.635893225669861
+					],
+					"rect": [
+						-4.09000015258789,
+						-1.5242532491684,
+						0.901120066642761,
+						1.77672004699707
+					],
+					"scale": 0.88,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-3.18887996673584,
+						-1.5242532491684,
+						0.900000095367432,
+						1.77672004699707
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "storage",
+					"cat": "bucket",
+					"catalog_height_m": 0.293000012636185,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Bucket_Wooden_1",
+					"measured_height_m": 0.293000012636185,
+					"pos": [
+						-2.76150035858154,
+						0.119999997317791,
+						0.993466734886169
+					],
+					"rect": [
+						-2.95300030708313,
+						0.776466727256775,
+						0.382999986410141,
+						0.433999985456467
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "cookware",
+					"catalog_height_m": 0.224000006914139,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Pot_1",
+					"measured_height_m": 0.224000006914139,
+					"pos": [
+						-1.40549993515015,
+						0.119999997317791,
+						5.34700012207031
+					],
+					"rect": [
+						-1.67499995231628,
+						5.10400009155273,
+						0.538999974727631,
+						0.486000001430511
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "cookware",
+					"catalog_height_m": 0.224000006914139,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Pot_1",
+					"measured_height_m": 0.224000006914139,
+					"pos": [
+						-3.82050013542175,
+						0.119999997317791,
+						5.34700012207031
+					],
+					"rect": [
+						-4.09000015258789,
+						5.10400009155273,
+						0.538999974727631,
+						0.486000001430511
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": true,
+			"room_index": 1,
+			"room_kind": "kitchen",
+			"save_error": 0,
+			"view": "cooking"
+		},
+		{
+			"activity_group": "sleep",
+			"camera": {
+				"activity_anchor_xz": [
+					2.29619741439819,
+					3.32193398475647
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 116,
+				"eye": [
+					-0.576000094413757,
+					1.70000004768372,
+					5.11999988555908
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					2.29619741439819,
+					1.07000005245209,
+					3.32193398475647
+				]
+			},
+			"case": "cottage_8102_9X12",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/cottage_8102_9X12_sleep_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 2,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 4,
+			"members": [
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "bed",
+					"catalog_height_m": 0.759999990463257,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Bed_Twin2",
+					"measured_height_m": 0.759999990463257,
+					"pos": [
+						2.88399982452393,
+						0.119999997317791,
+						3.96036815643311
+					],
+					"rect": [
+						1.67799985408783,
+						3.02236819267273,
+						2.41199994087219,
+						1.87600004673004
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						1.67799985408783,
+						4.89836835861206,
+						2.41199970245361,
+						0.749999523162842
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "bed",
+					"cat": "chest",
+					"catalog_height_m": 0.714999973773956,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Chest_Wood",
+					"measured_height_m": 0.714999973773956,
+					"pos": [
+						3.45199966430664,
+						0.119999997317791,
+						2.58486795425415
+					],
+					"rect": [
+						2.81399965286255,
+						2.20736789703369,
+						1.27600002288818,
+						0.754999995231628
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						2.81399965286255,
+						1.60736799240112,
+						1.27600002288818,
+						0.599999904632568
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "chest",
+					"catalog_height_m": 0.714999973773956,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Chest_Wood",
+					"measured_height_m": 0.714999973773956,
+					"pos": [
+						0.333290159702301,
+						0.119999997317791,
+						5.21250057220459
+					],
+					"rect": [
+						-0.304709851741791,
+						4.83500051498413,
+						1.27600002288818,
+						0.754999995231628
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-0.304709851741791,
+						4.23500061035156,
+						1.27600002288818,
+						0.599999904632568
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "sconce",
+					"catalog_height_m": 0.648000001907349,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Torch_Metal",
+					"measured_height_m": 0.648000001907349,
+					"pos": [
+						2.51549983024597,
+						1.97800004482269,
+						1.53000009059906
+					],
+					"rect": [
+						2.46549987792969,
+						1.48000013828278,
+						0.100000001490116,
+						0.100000001490116
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": true,
+			"room_index": 3,
+			"room_kind": "bedroom",
+			"save_error": 0,
+			"view": "sleep"
+		},
+		{
+			"activity_group": "eating",
+			"camera": {
+				"activity_anchor_xz": [
+					2.0104615688324,
+					-3.97304797172546
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 258,
+				"eye": [
+					-3.81000018119812,
+					1.70000004768372,
+					-2.56000018119812
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					2.0104615688324,
+					1.07000005245209,
+					-3.97304797172546
+				]
+			},
+			"case": "cottage_8102_9X12",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/cottage_8102_9X12_eating_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 2,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 3,
+			"members": [
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "table",
+					"catalog_height_m": 0.813000023365021,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Table_Large",
+					"measured_height_m": 0.813000023365021,
+					"pos": [
+						2.0104615688324,
+						0.119999997317791,
+						-3.39771437644959
+					],
+					"rect": [
+						0.586461544036865,
+						-3.94621443748474,
+						2.84800004959106,
+						1.09700000286102
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				},
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "seat",
+					"catalog_height_m": 1.12300002574921,
+					"height_scale": 1.0,
+					"host_category": "table",
+					"host_index": 0,
+					"host_key": "Table_Large",
+					"key": "Chair_1",
+					"measured_height_m": 1.12300002574921,
+					"pos": [
+						1.63262820243835,
+						0.119999997317791,
+						-4.26071453094482
+					],
+					"rect": [
+						1.34212827682495,
+						-4.5352144241333,
+						0.580999970436096,
+						0.549000024795532
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						1.34212827682495,
+						-5.08521461486816,
+						0.580999851226807,
+						0.550000190734863
+					]
+				},
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "seat",
+					"catalog_height_m": 1.12300002574921,
+					"height_scale": 1.0,
+					"host_category": "table",
+					"host_index": 0,
+					"host_key": "Table_Large",
+					"key": "Chair_1",
+					"measured_height_m": 1.12300002574921,
+					"pos": [
+						2.38829493522644,
+						0.119999997317791,
+						-4.26071453094482
+					],
+					"rect": [
+						2.09779500961304,
+						-4.5352144241333,
+						0.580999970436096,
+						0.549000024795532
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						2.09779500961304,
+						-5.08521461486816,
+						0.580999851226807,
+						0.550000190734863
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": true,
+			"room_index": 0,
+			"room_kind": "hall",
+			"save_error": 0,
+			"view": "eating"
+		},
+		{
+			"camera": {
+				"eye": [
+					13.7862453460693,
+					17.3283653259277,
+					-15.1109809875488
+				],
+				"fov_degrees": 52.0,
+				"framing": "assembled cutaway bounds",
+				"pitch": -0.58,
+				"target": [
+					-0.0624995231628418,
+					3.89571404457092,
+					0.00750064849853516
+				],
+				"yaw": 2.4
+			},
+			"case": "cottage_8102_9X12",
+			"cutaway": true,
+			"image": "res://artifacts/personality/resumed/groups_renders5/cottage_8102_9X12_cutaway_context.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 2,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": false,
+			"save_error": 0,
+			"view": "cutaway_context"
+		},
+		{
+			"activity_group": "cooking",
+			"camera": {
+				"activity_anchor_xz": [
+					-2.973788022995,
+					1.9164879322052
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 156,
+				"eye": [
+					-1.56000006198883,
+					1.70000004768372,
+					-1.63000011444092
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					-2.973788022995,
+					1.07000005245209,
+					1.9164879322052
+				]
+			},
+			"case": "witch_hut_8102_9X12",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/witch_hut_8102_9X12_cooking_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 5,
+			"members": [
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "hearth",
+					"catalog_height_m": 0.815999984741211,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Cauldron",
+					"measured_height_m": 0.815999984741211,
+					"pos": [
+						-3.17799997329712,
+						0.119999997317791,
+						2.50309991836548
+					],
+					"rect": [
+						-3.65000009536743,
+						2.00859999656677,
+						0.944000005722046,
+						0.989000022411346
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-2.70599985122681,
+						2.00859999656677,
+						0.799999833106995,
+						0.988999843597412
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "storage",
+					"catalog_height_m": 0.996999979019165,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Cabinet",
+					"measured_height_m": 0.996999979019165,
+					"pos": [
+						-3.91149997711182,
+						0.119999997317791,
+						1.11440002918243
+					],
+					"rect": [
+						-4.09000015258789,
+						0.43340003490448,
+						0.35699999332428,
+						1.36199998855591
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-3.7330002784729,
+						0.43340003490448,
+						0.700000047683716,
+						1.36199998855591
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "storage",
+					"cat": "workbench",
+					"catalog_height_m": 0.894999980926514,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Workbench",
+					"measured_height_m": 0.894999980926514,
+					"pos": [
+						-3.63944005966187,
+						0.119999997317791,
+						-0.514959931373596
+					],
+					"rect": [
+						-4.09000015258789,
+						-1.40331995487213,
+						0.901120066642761,
+						1.77672004699707
+					],
+					"scale": 0.88,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-3.18887996673584,
+						-1.40331995487213,
+						0.900000095367432,
+						1.77672004699707
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "storage",
+					"cat": "bucket",
+					"catalog_height_m": 0.293000012636185,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Bucket_Wooden_1",
+					"measured_height_m": 0.293000012636185,
+					"pos": [
+						-2.76150035858154,
+						0.119999997317791,
+						1.11440002918243
+					],
+					"rect": [
+						-2.95300030708313,
+						0.89740002155304,
+						0.382999986410141,
+						0.433999985456467
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				},
+				{
+					"activity_group": "cooking",
+					"activity_host_cat": "",
+					"cat": "cookware",
+					"catalog_height_m": 0.365000009536743,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Bucket_Metal",
+					"measured_height_m": 0.365000009536743,
+					"pos": [
+						-1.37849998474121,
+						0.119999997317791,
+						5.36549997329712
+					],
+					"rect": [
+						-1.62100005149841,
+						5.14099979400635,
+						0.485000014305115,
+						0.449000000953674
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": true,
+			"room_index": 1,
+			"room_kind": "kitchen",
+			"save_error": 0,
+			"view": "cooking"
+		},
+		{
+			"activity_group": "sleep",
+			"camera": {
+				"activity_anchor_xz": [
+					1.84619736671448,
+					3.33447647094727
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 121,
+				"eye": [
+					-0.576000094413757,
+					1.70000004768372,
+					5.20126152038574
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					1.84619736671448,
+					1.07000005245209,
+					3.33447647094727
+				]
+			},
+			"case": "witch_hut_8102_9X12",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/witch_hut_8102_9X12_sleep_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 4,
+			"members": [
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "bed",
+					"catalog_height_m": 0.759999990463257,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Bed_Twin2",
+					"measured_height_m": 0.759999990463257,
+					"pos": [
+						2.88399982452393,
+						0.119999997317791,
+						3.94482254981995
+					],
+					"rect": [
+						1.67799985408783,
+						3.00682258605957,
+						2.41199994087219,
+						1.87600004673004
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						1.67799985408783,
+						4.88282251358032,
+						2.41199970245361,
+						0.75
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "bed",
+					"cat": "chest",
+					"catalog_height_m": 0.714999973773956,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Chest_Wood",
+					"measured_height_m": 0.714999973773956,
+					"pos": [
+						3.45199966430664,
+						0.119999997317791,
+						2.56932258605957
+					],
+					"rect": [
+						2.81399965286255,
+						2.19182252883911,
+						1.27600002288818,
+						0.754999995231628
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						2.81399965286255,
+						1.59182262420654,
+						1.27600002288818,
+						0.599999904632568
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "chest",
+					"catalog_height_m": 0.714999973773956,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Chest_Wood",
+					"measured_height_m": 0.714999973773956,
+					"pos": [
+						0.333290159702301,
+						0.119999997317791,
+						5.21250009536743
+					],
+					"rect": [
+						-0.304709851741791,
+						4.83500003814697,
+						1.27600002288818,
+						0.754999995231628
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						-0.304709851741791,
+						4.2350001335144,
+						1.27600002288818,
+						0.599999904632568
+					]
+				},
+				{
+					"activity_group": "sleep",
+					"activity_host_cat": "",
+					"cat": "sconce",
+					"catalog_height_m": 0.648000001907349,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Torch_Metal",
+					"measured_height_m": 0.648000001907349,
+					"pos": [
+						0.715499937534332,
+						1.97800004482269,
+						1.61126136779785
+					],
+					"rect": [
+						0.665499925613403,
+						1.56126141548157,
+						0.100000001490116,
+						0.100000001490116
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": true,
+			"room_index": 3,
+			"room_kind": "bedroom",
+			"save_error": 0,
+			"view": "sleep"
+		},
+		{
+			"activity_group": "eating",
+			"camera": {
+				"activity_anchor_xz": [
+					2.0104615688324,
+					-3.84997630119324
+				],
+				"aim": "horizontal centroid of actual placed activity_group furniture",
+				"body_clear": true,
+				"candidate_count": 260,
+				"eye": [
+					-3.81000018119812,
+					1.70000004768372,
+					-5.30999994277954
+				],
+				"eye_height_above_storey_floor": 1.58,
+				"fov_degrees": 76.0,
+				"occlusion_blockers": 0,
+				"target": [
+					2.0104615688324,
+					1.07000005245209,
+					-3.84997630119324
+				]
+			},
+			"case": "witch_hut_8102_9X12",
+			"cutaway": false,
+			"image": "res://artifacts/personality/resumed/groups_renders5/witch_hut_8102_9X12_eating_roof_on.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"member_count": 3,
+			"members": [
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "table",
+					"catalog_height_m": 0.813000023365021,
+					"height_scale": 1.0,
+					"host_category": "",
+					"host_index": -1,
+					"host_key": "",
+					"key": "Table_Large",
+					"measured_height_m": 0.813000023365021,
+					"pos": [
+						2.0104615688324,
+						0.119999997317791,
+						-3.27464294433594
+					],
+					"rect": [
+						0.586461544036865,
+						-3.82314300537109,
+						2.84800004959106,
+						1.09700000286102
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						0.0,
+						0.0,
+						0.0,
+						0.0
+					]
+				},
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "seat",
+					"catalog_height_m": 1.12300002574921,
+					"height_scale": 1.0,
+					"host_category": "table",
+					"host_index": 0,
+					"host_key": "Table_Large",
+					"key": "Chair_1",
+					"measured_height_m": 1.12300002574921,
+					"pos": [
+						1.63262820243835,
+						0.119999997317791,
+						-4.1376428604126
+					],
+					"rect": [
+						1.34212827682495,
+						-4.41214275360107,
+						0.580999970436096,
+						0.549000024795532
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						1.34212827682495,
+						-4.96214294433594,
+						0.580999851226807,
+						0.550000190734863
+					]
+				},
+				{
+					"activity_group": "eating",
+					"activity_host_cat": "",
+					"cat": "seat",
+					"catalog_height_m": 1.12300002574921,
+					"height_scale": 1.0,
+					"host_category": "table",
+					"host_index": 0,
+					"host_key": "Table_Large",
+					"key": "Chair_1",
+					"measured_height_m": 1.12300002574921,
+					"pos": [
+						2.38829493522644,
+						0.119999997317791,
+						-4.1376428604126
+					],
+					"rect": [
+						2.09779500961304,
+						-4.41214275360107,
+						0.580999970436096,
+						0.549000024795532
+					],
+					"scale": 1.0,
+					"surface_anchor_id": "",
+					"wall_host_id": "",
+					"zone": [
+						2.09779500961304,
+						-4.96214294433594,
+						0.580999851226807,
+						0.550000190734863
+					]
+				}
+			],
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": true,
+			"room_index": 0,
+			"room_kind": "hall",
+			"save_error": 0,
+			"view": "eating"
+		},
+		{
+			"camera": {
+				"eye": [
+					13.2391471862793,
+					17.8903312683105,
+					-15.7037210464478
+				],
+				"fov_degrees": 52.0,
+				"framing": "assembled cutaway bounds",
+				"pitch": -0.58,
+				"target": [
+					-0.0624995231628418,
+					4.98834228515625,
+					-1.18249988555908
+				],
+				"yaw": 2.4
+			},
+			"case": "witch_hut_8102_9X12",
+			"cutaway": true,
+			"image": "res://artifacts/personality/resumed/groups_renders5/witch_hut_8102_9X12_cutaway_context.jpg",
+			"mechanical_composition_ok": true,
+			"mechanical_group_audit": {
+				"groups": [
+					{
+						"activity_group": "cooking",
+						"actual": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.894999980926514,
+								"category": "workbench",
+								"height_scale": 1.0,
+								"key": "Workbench",
+								"measured_height_m": 0.894999980926514,
+								"meets_minimum": true,
+								"minimum_height_m": 0.75,
+								"scale": 0.88
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"bucket": 1,
+							"cookware": 1,
+							"hearth": 1,
+							"storage": 1,
+							"workbench": 1
+						},
+						"required_roles_present": true,
+						"room_index": 1,
+						"room_kind": "kitchen"
+					},
+					{
+						"activity_group": "sleep",
+						"actual": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [],
+						"minimum_heights_ok": true,
+						"required": {
+							"bed": 1,
+							"chest": 2,
+							"sconce": 1
+						},
+						"required_roles_present": true,
+						"room_index": 3,
+						"room_kind": "bedroom"
+					},
+					{
+						"activity_group": "eating",
+						"actual": {
+							"seat": 2,
+							"table": 1
+						},
+						"dropped": false,
+						"minimum_height_checks": [
+							{
+								"catalog_height_m": 0.813000023365021,
+								"category": "table",
+								"height_scale": 1.0,
+								"key": "Table_Large",
+								"measured_height_m": 0.813000023365021,
+								"meets_minimum": true,
+								"minimum_height_m": 0.7,
+								"scale": 1.0
+							}
+						],
+						"minimum_heights_ok": true,
+						"required": {
+							"seat": 2,
+							"table": 1
+						},
+						"required_roles_present": true,
+						"room_index": 0,
+						"room_kind": "hall"
+					}
+				],
+				"mechanical_composition_ok": true,
+				"minimum_heights_ok": true,
+				"required_roles_present": true
+			},
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 9.0
+			},
+			"roof_on": false,
+			"save_error": 0,
+			"view": "cutaway_context"
+		}
+	],
+	"requests": [
+		{
+			"id": "farmhouse_8102_9X12",
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "farmhouse",
+				"water": "none",
+				"width": 9.0
+			}
+		},
+		{
+			"id": "cottage_1_7X9",
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 9.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "1",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 7.0
+			}
+		},
+		{
+			"id": "cottage_8102_9X12",
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "cottage",
+				"water": "none",
+				"width": 9.0
+			}
+		},
+		{
+			"id": "witch_hut_8102_9X12",
+			"request": {
+				"enclosure": "none",
+				"height": 2.6,
+				"kind": "house",
+				"length": 12.0,
+				"material": "timber",
+				"orientation": 0.0,
+				"period": 1200,
+				"purpose": "none",
+				"schema": "brickwild.request",
+				"schema_version": 1,
+				"seed": "8102",
+				"storeys": 1,
+				"style": "witch_hut",
+				"water": "none",
+				"width": 9.0
+			}
+		}
+	],
+	"source_changed": false,
+	"source_end": {
+		"file_count": 230,
+		"sha256": "7d7729ab1ee5ce635a6c281a5bee8cc6b292b7b85ae6f0d5671bf03281b5b515"
+	},
+	"source_start": {
+		"file_count": 230,
+		"sha256": "7d7729ab1ee5ce635a6c281a5bee8cc6b292b7b85ae6f0d5671bf03281b5b515"
+	}
+}

@@ -230,13 +230,36 @@ static func place_ceiling(plan: HousePlan, room: int, key: String) -> void:
 			spots.append(pc)
 	var c: Vector2 = spots[0]
 	var best_score := -INF
+	# Ordinary-house chandeliers hang below the slab, with measured standing clearance.
+	var scale := 1.0
+	var mount_height := plan.spec.height
+	if PropCatalog.category(key) == "chandelier" and HouseFurnishingRecipes.is_ordinary_house(plan):
+		var highest_storey := 0
+		for candidate_room in range(plan.room_count()):
+			highest_storey = maxi(highest_storey, plan.storey_of_room(candidate_room))
+		if plan.storey_of_room(room) < highest_storey:
+			mount_height -= HouseBuilder.SLAB_TUCK
+		scale = minf(1.0, (mount_height - HouseGeometry.FLOOR_T - 2.1) / maxf(PropCatalog.height(key), 0.01))
+		if scale < 0.1:
+			return
 	for spot in spots:
-		if _blocks_domestic_threshold(plan, room, key, spot, 0.0, plan.spec.height, 1.0):
+		if PropCatalog.category(key) == "chandelier" and HouseFurnishingRecipes.is_ordinary_house(plan):
+			var placement := {"key": key,
+				"pos": Vector3(spot.x, HouseFurnishGeometry.storey_base(plan, room) + mount_height, spot.y),
+				"yaw": 0.0, "scale": scale}
+			var origin := PropCatalog.house_origin(placement)
+			var model_yaw := PropCatalog.face_offset(key)
+			var centre := PropCatalog.plan_centre(key, origin, model_yaw, scale)
+			var footprint := PropCatalog.footprint_rotated(key, model_yaw) * scale
+			var body := Rect2(centre - footprint * 0.5, footprint)
+			if not floor_rect.encloses(body):
+				continue
+		if _blocks_domestic_threshold(plan, room, key, spot, 0.0, mount_height, scale):
 			continue
 		var cand := {
 			"key": key, "pos": Vector3(spot.x, 0.0, spot.y),
 			"rect": Rect2(spot - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
-			"host": -1, "mounted": true,
+			"host": -1, "mounted": true, "scale": scale,
 		}
 		var score: float = HouseFurnishScore._affinity(plan, room, cand)
 		if score > best_score:
@@ -246,10 +269,10 @@ static func place_ceiling(plan: HousePlan, room: int, key: String) -> void:
 		return
 	plan.furniture.append({
 		"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
-		"pos": Vector3(c.x, HouseFurnishGeometry.storey_base(plan, room) + plan.spec.height, c.y),
+		"pos": Vector3(c.x, HouseFurnishGeometry.storey_base(plan, room) + mount_height, c.y),
 		"yaw": 0.0, "rect": Rect2(c - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
-		"mounted": true, "scale": 1.0,
+		"mounted": true, "scale": scale,
 	})
 
 

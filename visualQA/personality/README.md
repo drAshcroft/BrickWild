@@ -89,3 +89,7 @@ fixture was corrected and rerun, while the 39 furnishing/legacy-trade findings
 remain assigned to the later design work. The furnishing log predates the
 corrected historical pin expectations; its assembly and furnishing suites
 passed, and the updated walk-pin fixtures were verified separately.
+
+## Domestic groups — final 8 October evidence
+
+See [GROUPS_REVIEW.md](GROUPS_REVIEW.md) and `group_evidence/final_20261008/` for the final 16 room/cutaway images, two lighting views, source fingerprints, and complete split test results. Group completeness is separate from overall building design acceptance.

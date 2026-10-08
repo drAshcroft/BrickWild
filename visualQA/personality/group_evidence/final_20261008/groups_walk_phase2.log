@@ -1,0 +1,18 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+START _wq_furniture_floor
+END _wq_furniture_floor
+START _wq_bench_at_table_end
+END _wq_bench_at_table_end
+START _wq_door_approach
+END _wq_door_approach
+START _wq_outdoor_lamp
+END _wq_outdoor_lamp
+START _wq_second_dining_table
+END _wq_second_dining_table
+START _wq_surface_in_reach
+END _wq_surface_in_reach
+furnishing walk    PASS  (25 checked, 0 failures, 0 warnings)
+elapsed_seconds=3.617
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2558)

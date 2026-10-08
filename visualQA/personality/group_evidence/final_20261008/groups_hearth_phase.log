@@ -1,0 +1,15 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+house QA: hearth sweep 1/12
+house QA: hearth sweep 12/12
+ERROR: rules: daylight was switched off with no replacement
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] run (res://qa/rule_set.gd:44)
+       [1] check (res://qa/house_furnish_check.gd:132)
+       [2] _rule_override_fixture (res://tests/suites/house_qa_suite.gd:227)
+       [3] _init (res://artifacts/personality/resumed/furnishing_phase_fixture.gd:14)
+furnishing hearth  PASS  (21 checked, 0 failures, 0 warnings)
+elapsed_seconds=63.802
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2558)

@@ -216,3 +216,7 @@ The threshold mesh probe samples both directions, three lateral positions and
 three body heights through actual assembled triangles. It supplements the
 walking grid; it is not a continuous capsule-physics proof or a substitute for
 the final human walk.
+
+### 2026-10-08 — LIVE-GROUPS completed
+
+Required domestic activity groups and safe light coverage are complete for the stated bounded coverage. Root reviewed 16 final room/cutaway images and two roof-on lighting views. All 232 original furnishing/assembly/walk-pin checks passed in split bounded runs; the combined lane timed out. The 15-case house matrix and two deterministic repeats passed. See `visualqa/personality/GROUPS_REVIEW.md`. Bare surfaces, porch intrusions, bulky bedside supports, legacy trade stairs and witch identity remain active design work.

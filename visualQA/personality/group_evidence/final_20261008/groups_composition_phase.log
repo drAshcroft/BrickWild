@@ -1,0 +1,8 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+house QA: feng shui sweep 1/12
+house QA: feng shui sweep 12/12
+furnishing composition PASS  (23 checked, 0 failures, 0 warnings)
+elapsed_seconds=77.919
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2558)

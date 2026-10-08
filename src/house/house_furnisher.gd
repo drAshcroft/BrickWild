@@ -995,15 +995,21 @@ static func _drop_the_table(plan: HousePlan, room: int, blocked: Array[Rect2],
 		return
 
 
-## A room nobody can see in is not furnished. If the recipe's sconces all
-## failed to find a stretch of clear wall, fall back to a candle on whatever
-## surface the room has, and failing that to a sconce anywhere at all.
+## A room nobody can see in is not furnished. Ordinary houses need one light
+## for each 35 m2 above the existing 30 m2 audit threshold. Large rooms prefer
+## a ceiling fixture or real hosted candles when an optional mirrored sconce
+## pair has no safe station; custom families keep the historic one-light fallback.
+const REQUIRED_LIGHT_ROOM_AREA := 30.0
+const REQUIRED_LIGHT_AREA := 35.0
+
 static func _ensure_light(plan: HousePlan, room: int, r: RandomNumberGenerator) -> void:
 	if not HouseGeometry.is_habitable(plan.kind_of(room)):
 		return
-	for f in plan.furniture_of(room):
-		if PropCatalog.has_tag(plan.furniture[f]["key"], PropCatalog.LIGHT):
-			return
+	if HouseFurnishingRecipes.is_ordinary_house(plan):
+		_ensure_ordinary_light_coverage(plan, room, r)
+		return
+	if _room_light_count(plan, room) > 0:
+		return
 	for cat in ["candle", "sconce"]:
 		var before: int = plan.furniture.size()
 		var rule: StringName = &"on" if cat == "candle" else &"mounted"
@@ -1017,3 +1023,70 @@ static func _ensure_light(plan: HousePlan, room: int, r: RandomNumberGenerator) 
 			HouseFurnishSurface.place_mounted(plan, room, key, r)
 		if plan.furniture.size() > before:
 			return
+
+
+static func _ensure_ordinary_light_coverage(plan: HousePlan, room: int,
+		r: RandomNumberGenerator) -> void:
+	var area := HouseGeometry.room_area(plan, room)
+	var required := _required_light_count(plan, room)
+	if area < REQUIRED_LIGHT_ROOM_AREA:
+		if _room_light_count(plan, room) == 0:
+			for cat in ["candle", "sconce"]:
+				var choices: Array[String] = PropCatalog.of_category_for_room(cat, plan.kind_of(room))
+				if choices.is_empty():
+					continue
+				var before: int = plan.furniture.size()
+				var key: String = choices[r.randi_range(0, choices.size() - 1)]
+				if cat == "candle":
+					HouseFurnishSurface.place_on_surface(plan, room, key, r)
+				else:
+					HouseFurnishSurface.place_mounted(plan, room, key, r)
+				if plan.furniture.size() > before:
+					break
+		return
+	while _room_light_count(plan, room) < required:
+		var before := _room_light_count(plan, room)
+		# A chandelier is a legitimate large-room source and does not depend on
+		# an available mirrored wall pair. Add at most one; subsequent sources
+		# must sit on actual supporting furniture.
+		var has_chandelier := false
+		for index in plan.furniture_of(room):
+			if PropCatalog.category(String(plan.furniture[index]["key"])) == "chandelier":
+				has_chandelier = true
+				break
+		if not has_chandelier:
+			var chandeliers: Array[String] = PropCatalog.of_category_for_room(
+				"chandelier", plan.kind_of(room))
+			if not chandeliers.is_empty():
+				HouseFurnishSurface.place_ceiling(plan, room,
+					chandeliers[r.randi_range(0, chandeliers.size() - 1)])
+		if _room_light_count(plan, room) == before:
+			# Candles are hosted by measured tables and work surfaces. Bounded
+			# retries let a room with several hosts avoid a full first surface.
+			var candles: Array[String] = PropCatalog.of_category_for_room(
+				"candle", plan.kind_of(room))
+			for attempt in range(6):
+				if candles.is_empty() or _room_light_count(plan, room) >= required:
+					break
+				var before_candle := _room_light_count(plan, room)
+				HouseFurnishSurface.place_on_surface(plan, room,
+					candles[r.randi_range(0, candles.size() - 1)], r)
+				if _room_light_count(plan, room) == before_candle:
+					continue
+		if _room_light_count(plan, room) == before:
+			break
+	if _room_light_count(plan, room) < required:
+		plan.note_compromise(room, "lighting:minimum")
+
+
+static func _required_light_count(plan: HousePlan, room: int) -> int:
+	var area := HouseGeometry.room_area(plan, room)
+	return int(ceil(area / REQUIRED_LIGHT_AREA)) if area >= REQUIRED_LIGHT_ROOM_AREA else 1
+
+
+static func _room_light_count(plan: HousePlan, room: int) -> int:
+	var count := 0
+	for index in plan.furniture_of(room):
+		if PropCatalog.has_tag(String(plan.furniture[index]["key"]), PropCatalog.LIGHT):
+			count += 1
+	return count

@@ -18,15 +18,7 @@ layout. The latest dining overlay retains its meal group. Explicit activity
 shortfalls are retained. Further
 architectural work belongs to LIVE-HOUSE-STYLES.
 
-Root reviewed all sixteen canonical images in `group_evidence/render4`:
-farmhouse 8102, cottage 1 at 7x9, cottage 8102 and witch hut 8102 at 9x12.
-Each has cooking, sleeping and eating views with the roof on, plus a cutaway.
-The fresh batch saved all sixteen requested views with a stable source fingerprint.
-The older development batch is retained separately: nineteen saved images from
-twenty requested views, including the failed 7x7 stress case. It is not a green
-twenty-view run. Render4 includes the daylight and measured hosted-footprint fixes
-and household dining selection. A subsequent defensive shared sleeping-hall
-selection guard does not apply to these four single-storey fixtures.
+Root reviewed all sixteen final images in `group_evidence/final_20261008/groups_renders5`: farmhouse 8102, cottage 1 at 7x9, cottage 8102 and witch hut 8102 at 9x12. Each has cooking, sleeping and eating views with the roof on, plus a cutaway. All requested views saved; the source fingerprint stayed stable. Two additional roof-on longhall 32103 views in `lighting_renders` verify the corrected light mounting. Older development batches are not the final acceptance evidence.
 
 The canonical views show usable work surfaces, related kitchen equipment,
 complete dining seats and sleeping storage. They also show unresolved design
@@ -59,3 +51,11 @@ called space behind masonry available. A clear-wall positive, a four-centimetre
 window-gap positive and an injected breast obstruction preserve meaningful
 placement and availability tests. This is an honest limitation, not acceptance
 of the kitchens' wall composition.
+
+## Final gate, 8 October 2026
+
+The final matrix passed fifteen cases and two deterministic repeats. The physical light fixture passed with native exit 0 in 32.88 seconds. Large ordinary-house rooms meet the existing area-based light count using measured ceiling fixtures or supported candles. Chandeliers clear the real floor by 2.1 m and hang below the actual slab underside. The Pueblo control retains one safe sconce; an optional candle is counted separately.
+
+The combined furnishing lane and a standalone furnishing process exceeded the 300-second bound. Neither is recorded as passed. The same original furnishing phases then passed in fresh processes: hearth 21 checks (68.22 s), affinity 24 (131.47 s), composition 23 (83.43 s), and walk fixtures 25 (9.24 s). Assembly and walk pins passed 139 checks in 60.97 s. Together these complete the lane's 232 checks without reducing its twelve-case sweeps or eight-case variety sample. Logs, native results and the phase driver are archived beside the final images. The slowdown cause remains unproven.
+
+The new longhall views still show sparse upper rooms and legacy trade stairs. They verify light fit, not acceptance of the whole building. The broader multi-storey planning failures remain assigned to HOUSE-STYLES; their remaining count has not been inferred from this focused fix.

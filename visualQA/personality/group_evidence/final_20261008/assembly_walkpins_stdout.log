@@ -1,0 +1,21 @@
+Godot Engine v4.5.2.stable.mono.official.6ce3de25a - https://godotengine.org
+
+Running hassembly...
+--- house assembly ---
+    elapsed 16.69s
+
+Running walkpins...
+zfight house/cottage: 8 visible overlaps (budget 8)
+zfight shop/cottage: 0 visible overlaps (budget 0)
+zfight world/courtyard_house: 24 visible overlaps (budget 24)
+zfight temple/basilica: 12 visible overlaps (budget 12)
+zfight church/romanesque: 92 visible overlaps (budget 92)
+zfight windmill/tower: 40 visible overlaps (budget 40)
+--- walk pins ---
+    elapsed 23.18s
+
+============================================================
+  house assembly     PASS  (95 checked, 0 failures, 0 warnings)
+  walk pins          PASS  (44 checked, 0 failures, 0 warnings)
+============================================================
+ALL PASS -- 2 suites, 139 checks, 0 failures, 0 warnings
