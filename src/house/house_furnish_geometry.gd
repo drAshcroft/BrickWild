@@ -118,6 +118,68 @@ static func inside_outline(plan: HousePlan, room: int, rect: Rect2) -> bool:
 	return true
 
 
+## Ordinary sleep beds reserve a reachable side approach while leaving their
+## head-corner clear for a head-end stand. Trim only the headward end by the
+## full measured stand span; keep the real access depth and footward approach.
+static func ordinary_sleep_access_zone(access: Rect2, bed_rect: Rect2, yaw: float) -> Rect2:
+	if not access.has_area() or not bed_rect.has_area():
+		return access
+	var facing := HouseFurnishScore._facing_of(yaw).normalized()
+	var head_dir := -facing
+	var support_footprint := PropCatalog.footprint("Nightstand_Shelf")
+	var bed_side_span := absf(head_dir.x) * bed_rect.size.x + absf(head_dir.y) * bed_rect.size.y
+	var minimum_approach := maxf(HouseGeometry.PATH_MIN,
+		HouseGeometry.PERSON_RADIUS * 2.0 + 0.06)
+	var trim := minf(maxf(support_footprint.x, support_footprint.y) + 0.06,
+		maxf(0.0, bed_side_span - minimum_approach))
+	var zone := access
+	if absf(head_dir.x) > 0.5:
+		if head_dir.x > 0.0:
+			zone.size.x -= trim
+		else:
+			zone.position.x += trim
+			zone.size.x -= trim
+	else:
+		if head_dir.y > 0.0:
+			zone.size.y -= trim
+		else:
+			zone.position.y += trim
+			zone.size.y -= trim
+	if zone.size.x <= 0.0 or zone.size.y <= 0.0:
+		return Rect2()
+	return zone
+
+
+## Reserve the bed's real access strip and a person-width aisle on only its chosen side.
+## The lane follows the use-zone direction; it does not grow behind the bed or
+## across its head and foot. Keep this shared by bed-pair preflight and room placement.
+static func ordinary_bedside_aisle(access: Rect2, bed_rect: Rect2, yaw: float) -> Rect2:
+	if not access.has_area() or not bed_rect.has_area():
+		return access
+	var facing := HouseFurnishScore._facing_of(yaw).normalized()
+	var access_dir := Vector2(facing.y, -facing.x)
+	var sign := 1.0 if (access.get_center() - bed_rect.get_center()).dot(access_dir) >= 0.0 else -1.0
+	var outward := access_dir * sign
+	var lane := access
+	var minimum_width := maxf(HouseGeometry.PATH_MIN,
+		HouseGeometry.PERSON_RADIUS * 2.0 + 0.06)
+	if absf(outward.x) > 0.5:
+		var x_deficit := maxf(0.0, minimum_width - access.size.x)
+		if outward.x > 0.0:
+			lane.size.x += x_deficit
+		else:
+			lane.position.x -= x_deficit
+			lane.size.x += x_deficit
+	else:
+		var y_deficit := maxf(0.0, minimum_width - access.size.y)
+		if outward.y > 0.0:
+			lane.size.y += y_deficit
+		else:
+			lane.position.y -= y_deficit
+			lane.size.y += y_deficit
+	return lane
+
+
 static func commit(plan: HousePlan, room: int, cand: Dictionary,
 		blocked: Array[Rect2], zones: Array[Rect2]) -> void:
 	if cand.is_empty():

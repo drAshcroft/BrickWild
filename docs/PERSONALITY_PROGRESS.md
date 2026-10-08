@@ -220,3 +220,9 @@ the final human walk.
 ### 2026-10-08 — LIVE-GROUPS completed
 
 Required domestic activity groups and safe light coverage are complete for the stated bounded coverage. Root reviewed 16 final room/cutaway images and two roof-on lighting views. All 232 original furnishing/assembly/walk-pin checks passed in split bounded runs; the combined lane timed out. The 15-case house matrix and two deterministic repeats passed. See `visualqa/personality/GROUPS_REVIEW.md`. Bare surfaces, porch intrusions, bulky bedside supports, legacy trade stairs and witch identity remain active design work.
+
+### 2026-10-08 — LIVE-SURFACES completed
+
+Wall hosts now follow surviving activity anchors. Reading binds a measured bedside support, supported book and useful task lamp; separate clothes storage remains required. Cooking binds preparation, heat, storage and task light. Floor-to-ceiling timber bays follow actual façade stations and clear opening spans. Root reviewed the Luna patches and critical saved views. All25 selected gates pass, including232 original furnishing/assembly/walk-pin checks,21 composition checks and1679 current component checks. Reviewed34 main renders and5 exactFarmhouse7441 views. Fixture-only cohort changes and earlier geometry/exterior lineage are recorded in `visualqa/personality/SURFACES_REVIEW.md`.
+
+The rooms still have broad bare plaster, heavy repeated frames and hot light. Generic cottage/Witch identity and wider two-storey/trade defects remain work for the next todos. This is foundation completion, not final building-design acceptance.

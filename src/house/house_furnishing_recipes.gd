@@ -164,7 +164,7 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 		recipe.append_array([
 			{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
 			{"cat": "alchemy", "rule": &"on", "host": "distributed", "n": [2, 2], "opt": 1.0, "group": "witchwork"},
-			{"cat": "books", "rule": &"on", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
+			{"cat": "books", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
 		])
 	var tagged: Array = []
 	for original in recipe:
@@ -181,12 +181,10 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 			if category == "bed":
 				step["group"] = "sleep"
 			elif category == "nightstand":
-				# This pack's only nightstand is a 1.216 m tall wall shelf. A
-				# low wooden chest is honest bedroom storage and a usable bedside
-				# support; place it at the bed end instead of calling that shelf a
-				# bedside table.
-				step["cat"] = "chest"
-				step["key"] = "Chest_Wood"
+				# Keep the measured bedside shelf in its actual role. Placement
+				# applies a bedroom-only scale and height cap. Clothes storage stays
+				# a separate chest step.
+				step["key"] = "Nightstand_Shelf"
 				step["rule"] = &"beside"
 				step["near_cat"] = "bed"
 				step["near_anchor"] = "head_end"
@@ -271,8 +269,8 @@ static func _sitting_parlour_recipe() -> Array:
 
 
 ## Optional large-room additions follow the same family boundary as the core
-## recipe. The general bedroom expansion asks for the tall Nightstand_Shelf;
-## an ordinary house already has a low head-end chest in its required overlay.
+## recipe. Ordinary bedrooms already receive a scaled Nightstand_Shelf bedside
+## support, so the ample recipe does not add a second one.
 static func ample_steps_for_room(plan: HousePlan, room: int) -> Array:
 	var kind: StringName = plan.kind_of(room)
 	var ample: Dictionary = AMPLE.get(kind, {})

@@ -17,7 +17,7 @@ const LEGACY_SITTING_PARLOUR := [
 
 func _init() -> void:
 	_check_recipe_group(&"kitchen", "cooking", ["hearth", "workbench", "storage", "bucket", "cookware"])
-	_check_recipe_group(&"bedroom", "sleep", ["bed", "chest", "sconce"])
+	_check_recipe_group(&"bedroom", "sleep", ["bed", "nightstand", "chest", "sconce"])
 	_check_recipe_group(&"hall", "eating", ["table", "seat"])
 	_check_recipe_group(&"dining_room", "eating", ["table", "seat"])
 	_check_recipe_group(&"parlour", "eating", ["table", "bench", "seat"])
@@ -41,15 +41,22 @@ func _check_recipe_group(room_kind: StringName, group_name: String, required: Ar
 	for category in required:
 		if not found.has(category):
 			failures.append("%s/%s lacks mandatory %s" % [room_kind, group_name, category])
-	if room_kind == &"bedroom" and int(found.get("chest", 0)) < 2:
-		failures.append("bedroom sleep group lacks bedside and clothes chests")
+	if room_kind == &"bedroom" and int(found.get("chest", 0)) != 1:
+		failures.append("bedroom sleep group must retain exactly one separate clothes chest")
+	var found_clothes_storage := false
 	var found_bedside := false
 	for step in recipe:
 		if String(step.get("group", "")) == "sleep" and String(step["cat"]) == "chest" \
+				and String(step.get("rule", "")) == "wall" and not step.has("near_cat"):
+			found_clothes_storage = true
+		if String(step.get("group", "")) == "sleep" and String(step["cat"]) == "nightstand" \
+				and String(step.get("key", "")) == "Nightstand_Shelf" \
 				and String(step.get("near_anchor", "")) == "head_end" and String(step.get("near_cat", "")) == "bed":
 			found_bedside = true
 	if room_kind == &"bedroom" and not found_bedside:
-		failures.append("bedroom lacks explicit low chest at bed head end")
+		failures.append("bedroom lacks explicit Nightstand_Shelf at bed head end")
+	if room_kind == &"bedroom" and not found_clothes_storage:
+		failures.append("bedroom lacks separate wall-placed Chest_Wood clothes storage")
 
 
 func _check_domestic_overlay_is_scoped() -> void:

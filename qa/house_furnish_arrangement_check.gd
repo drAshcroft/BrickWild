@@ -42,16 +42,19 @@ func check_against_wall(plan: HousePlan) -> void:
 				% [HouseFurnishCheck.who(plan, f), gap])
 
 
-## A low bedside chest may back onto the bed instead of the room wall. Prove
-## that alternative from its actual pose; an annotation alone is insufficient.
+## A bedside support may back onto the bed instead of the room wall. Prove that
+## alternative from its actual pose; an annotation alone is insufficient.
 static func _backs_bed_head(plan: HousePlan, piece: Dictionary) -> bool:
+	var category: String = String(piece.get("cat", ""))
 	if not HouseFurnishingRecipes.is_ordinary_house(plan) \
-			or String(piece.get("cat", "")) != "chest" \
+			or not category in ["chest", "nightstand"] \
+			or (category == "nightstand" and String(piece.get("key", "")) != "Nightstand_Shelf") \
 			or String(piece.get("activity_group", "")) != "sleep" \
 			or String(piece.get("activity_host_anchor", "")) != "head_end" \
 			or String(piece.get("activity_host_cat", "")) != "bed" \
 			or PropCatalog.placement_height(piece) > 0.8:
 		return false
+	var is_headwall_nightstand := category == "nightstand"
 	var rect: Rect2 = piece["rect"]
 	var facing := Vector2(-sin(float(piece["yaw"])), -cos(float(piece["yaw"])))
 	for bed in plan.furniture:
@@ -64,17 +67,41 @@ static func _backs_bed_head(plan: HousePlan, piece: Dictionary) -> bool:
 		var delta := rect.get_center() - bed_rect.get_center()
 		var half_head := (absf(head.x) * bed_rect.size.x + absf(head.y) * bed_rect.size.y) * 0.5
 		var child_head := (absf(head.x) * rect.size.x + absf(head.y) * rect.size.y) * 0.5
-		if delta.dot(head) + child_head < half_head / 3.0 or absf(facing.dot(head)) > 0.01:
+		if delta.dot(head) + child_head < half_head / 3.0:
+			continue
+		if is_headwall_nightstand:
+			if facing.dot(head) > -0.99:
+				continue
+			var bed_head_edge := bed_rect.get_center() + head * half_head
+			var shelf_back_edge := rect.get_center() + head * child_head
+			var tolerance := HouseGeometry.WALL_GAP + HouseGeometry.BED_HEAD_TOL
+			var on_head_wall := false
+			for wall in HouseGeometry.room_walls(plan, int(piece["room"])):
+				var normal: Vector2 = wall["normal"]
+				if normal.dot(head) > -0.99:
+					continue
+				var origin: Vector2 = wall["from"]
+				if absf((bed_head_edge - origin).dot(normal)) > tolerance:
+					continue
+				if absf((shelf_back_edge - origin).dot(normal)) > tolerance:
+					continue
+				on_head_wall = true
+				break
+			if not on_head_wall:
+				continue
+		elif absf(facing.dot(head)) > 0.01:
 			continue
 		var side := Vector2(-head.y, head.x) * signf(delta.dot(Vector2(-head.y, head.x)))
 		var side_half := (absf(side.x) * bed_rect.size.x + absf(side.y) * bed_rect.size.y) * 0.5
 		var child_side := (absf(side.x) * rect.size.x + absf(side.y) * rect.size.y) * 0.5
 		var gap := delta.dot(side) - side_half - child_side
-		if facing.dot(side) >= 0.99 and gap >= 0.0 and gap <= 0.2 \
-				and absf(delta.dot(head)) <= half_head + child_head:
+		if gap < 0.0 or gap > 0.2 or absf(delta.dot(head)) > half_head + child_head:
+			continue
+		if is_headwall_nightstand:
+			return true
+		if facing.dot(side) >= 0.99:
 			return true
 	return false
-
 
 ## Distance from the back of a piece to the room wall behind it.
 ##

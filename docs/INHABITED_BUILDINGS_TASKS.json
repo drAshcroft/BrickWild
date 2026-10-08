@@ -105,7 +105,7 @@
       "description": "Add room-appropriate surface and lighting composition using real wall hosts and structural bays: finishes, fitted storage, shelf groups, entrance pegs and optional soft detail. Preserve deliberate blank surfaces.",
       "priority": "P1",
       "phase": "inhabited-buildings",
-      "status": "pending",
+      "status": "complete",
       "taskType": "feature",
       "targetCoord": {
         "file": "src/house/house_plan_features.gd"
@@ -117,7 +117,8 @@
         }
       ],
       "rationale": "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
-      "acceptanceCriteria": "Record semantic hosts and relations on the plan. Verify attachment, floor/ceiling clearance and light visibility in actual renders. Each reviewed wall has an intentional role: opening, structure, activity support or quiet surface. Reject uniform clutter coverage as acceptance. Match facade rhythms to interior and preserve courtyard privacy. Use lane:house-exterior-fast, lane:house-furnish-fast and lane:geom as touched."
+      "acceptanceCriteria": "Record semantic hosts and relations on the plan. Verify attachment, floor/ceiling clearance and light visibility in actual renders. Each reviewed wall has an intentional role: opening, structure, activity support or quiet surface. Reject uniform clutter coverage as acceptance. Match facade rhythms to interior and preserve courtyard privacy. Use lane:house-exterior-fast, lane:house-furnish-fast and lane:geom as touched.",
+      "aiNotes": "2026-10-08:25 selected source-pinned gates passed,232 original furnishing/assembly/walk-pin checks,21 composition regressions and1679 current component checks. Reviewed34 main images plus5 exactFarmhouse7441 images. Production unchanged across fixture-only correction cohorts; see SURFACES_REVIEW.md and ignored local qa/FINAL_LEDGER.json. Full homely/style acceptance remains in WITCH,HOUSE-STYLES and REVIEW."
     },
     {
       "key": "LIVE-WITCH",

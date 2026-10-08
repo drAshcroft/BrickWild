@@ -139,6 +139,10 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 		var room: int = int(placement.get("room", -1))
 		placement["storey"] = plan.storey_of_room(room) if room >= 0 \
 			and room < plan.rooms.size() else 0
+	# Surface hosts depend on the surviving activity furniture, so compose them
+	# after bounded navigation repair and the explicit group audit. Legacy plans
+	# without activity annotations produce an empty surface list.
+	HousePlanFeatures.compose_wall_hosts(plan, spec)
 	HouseExterior.dress(plan)
 	return plan
 

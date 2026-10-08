@@ -5,6 +5,7 @@ extends RefCounted
 
 ## How far the foot of a hanging piece (a banner) clears the floor.
 const HANG_CLEAR := 0.45
+const ACTIVITY_TASK_LIGHT_REACH := 1.9
 
 ## A shelf, rack or sconce on a wall, above the furniture already there.
 static func place_mounted(plan: HousePlan, room: int, key: String,
@@ -59,7 +60,59 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 	var best_pos := Vector2.ZERO
 	var best_yaw := 0.0
 	var best_score := -INF
+	var best_task_light_score := -INF
+	var best_task_light_pos := Vector3.ZERO
+	var best_task_light_yaw := 0.0
+	var best_task_light_pose: Dictionary = {}
+	var task_prep_zones: Array[Dictionary] = []
+	var best_task_light_rank := 100
 	var best_over_cover := -1.0
+	# First ordinary-house lamps serve measured cooking or sleep tasks. Existing and later lamps keep flank-pair scoring.
+	if lamp and plan.spec.trade == &"none" and HouseFurnishingRecipes.is_ordinary_house(plan):
+		var has_existing_lamp := false
+		for existing_index in plan.furniture_of(room):
+			var existing: Dictionary = plan.furniture[existing_index]
+			if bool(existing.get("mounted", false)) \
+					and PropCatalog.category(String(existing.get("key", ""))) == "sconce":
+				has_existing_lamp = true
+				break
+		if not has_existing_lamp:
+			for existing_index in plan.furniture_of(room):
+				var existing: Dictionary = plan.furniture[existing_index]
+				if String(existing.get("activity_group", "")) == "cooking" \
+						and String(existing.get("cat", "")) == "workbench":
+					var prep := Rect2(existing.get("zone", Rect2()))
+					if not prep.has_area(): prep = Rect2(existing.get("rect", Rect2()))
+					if prep.has_area(): task_prep_zones.append({"rank": 0, "rect": prep, "source": existing_index})
+					break
+			if task_prep_zones.is_empty() and plan.kind_of(room) == &"bedroom":
+				var sleep_targets: Array[Dictionary] = []
+				for existing_index in plan.furniture_of(room):
+					var existing: Dictionary = plan.furniture[existing_index]
+					if String(existing.get("activity_group", "")) != "sleep": continue
+					var category := String(existing.get("cat", PropCatalog.category(String(existing.get("key", "")))))
+					var key_name := String(existing.get("key", ""))
+					var rank := 100
+					if key_name == "Nightstand_Shelf": rank = 0
+					elif category == "chest" and String(existing.get("activity_host_anchor", "")) != "head_end": rank = 1
+					elif category == "bed": rank = 2
+					if rank >= 100: continue
+					var prep := Rect2(existing.get("zone", Rect2()))
+					if not prep.has_area(): prep = Rect2(existing.get("rect", Rect2()))
+					if prep.has_area(): sleep_targets.append({"rank": rank, "rect": prep, "source": existing_index})
+				sleep_targets.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+					if int(left["rank"]) != int(right["rank"]): return int(left["rank"]) < int(right["rank"])
+					return int(left["source"]) < int(right["source"]))
+				task_prep_zones = sleep_targets
+	var task_light_clear_spans: Dictionary = {}
+	if not task_prep_zones.is_empty():
+		for wi in range(walls.size()):
+			var wall: Dictionary = walls[wi]
+			var model_yaw := HouseFurnishGeometry.yaw_facing(wall["normal"]) + PropCatalog.face_offset(key)
+			var dimensions := PropCatalog.footprint_rotated(key, model_yaw) * scale
+			var horizontal := absf(Vector2(wall["normal"]).y) > 0.5
+			var body_depth := dimensions.y if horizontal else dimensions.x
+			task_light_clear_spans[wi] = HousePlanFeatures.clear_wall_spans(plan, room, wi, body_depth)
 	# Every clear stretch of every wall is scored. A shelf wants the wall
 	# above the bench it serves and a sconce wants to mirror its mate about
 	# the door; neither is findable by trying six positions at random.
@@ -98,6 +151,47 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 				"host": -1, "mounted": true, "flank_anchor": anchor,
 			}
 			var score: float = HouseFurnishScore._affinity(plan, room, cand) + r.randf() * HouseFurnishScore.JITTER
+			if not task_prep_zones.is_empty():
+				var base := HouseFurnishGeometry.storey_base(plan, room)
+				var wall_along := pos.x if absf(n.y) > 0.5 else pos.y
+				var pose := HousePlanFeatures._wall_fixture_pose(key, wall, wall_along, base + y, scale)
+				var body_rect: Rect2 = pose["rect"]
+				var candidate_task_rank := 100
+				for task_variant in task_prep_zones:
+					var task: Dictionary = task_variant
+					if HousePlanFeatures._rect_distance(body_rect, Rect2(task["rect"])) <= ACTIVITY_TASK_LIGHT_REACH:
+						candidate_task_rank = mini(candidate_task_rank, int(task["rank"]))
+				if candidate_task_rank < 100:
+					var floor_y := base + HouseGeometry.FLOOR_T
+					var ceiling_y := base + plan.spec.height - HouseGeometry.FLOOR_T - 0.03
+					var body_bottom := float(pose["bottom"])
+					var body_top := float(pose["top"])
+					var task_pose_clear := body_bottom >= floor_y + 0.9 and body_top <= ceiling_y \
+							and HousePlanFeatures._wall_mount_clear_of_furniture(plan, room,
+								body_rect, body_bottom, body_top)
+					var horizontal := absf(n.y) > 0.5
+					var body_lo := body_rect.position.x if horizontal else body_rect.position.y
+					var body_hi := body_rect.end.x if horizontal else body_rect.end.y
+					var fits_clear_wall_span := false
+					for span_variant in task_light_clear_spans.get(wi, []):
+						var span: Vector2 = span_variant
+						if body_lo >= span.x - 0.01 and body_hi <= span.y + 0.01:
+							fits_clear_wall_span = true
+							break
+					task_pose_clear = task_pose_clear and fits_clear_wall_span
+					for zone_variant in plan.zones:
+						var zone: Dictionary = zone_variant
+						if int(zone.get("room", -1)) == room \
+								and String(zone.get("why", "")) in ["stair access route", "stair foot landing", "stair head landing"] \
+								and body_rect.intersects(Rect2(zone.get("rect", Rect2()))):
+							task_pose_clear = false
+					if task_pose_clear and (candidate_task_rank < best_task_light_rank \
+							or (candidate_task_rank == best_task_light_rank and score > best_task_light_score)):
+						best_task_light_rank = candidate_task_rank
+						best_task_light_score = score
+						best_task_light_pos = Vector3(pose["pos"])
+						best_task_light_yaw = float(pose["yaw"])
+						best_task_light_pose = pose.duplicate(true)
 			var over_cover := _mounted_over_coverage(plan, room, cand) if shelf else -1.0
 			var better_relation := shelf and over_cover > best_over_cover + 0.0001
 			var tied_relation := not shelf or absf(over_cover - best_over_cover) <= 0.0001
@@ -106,11 +200,19 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 				best_over_cover = over_cover
 				best_pos = pos
 				best_yaw = HouseFurnishGeometry.yaw_facing(n)
+	if best_task_light_score > -INF:
+		best_pos = Vector2(best_task_light_pos.x, best_task_light_pos.z)
+		best_yaw = best_task_light_yaw
+		best_score = best_task_light_score
 	if best_score == -INF:
 		return
+	var committed_position := Vector3(best_pos.x, HouseFurnishGeometry.storey_base(plan, room) + y, best_pos.y)
+	if not best_task_light_pose.is_empty() and best_task_light_score > -INF:
+		committed_position = Vector3(best_task_light_pose["pos"])
+		best_yaw = float(best_task_light_pose["yaw"])
 	plan.furniture.append({
 		"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
-		"pos": Vector3(best_pos.x, HouseFurnishGeometry.storey_base(plan, room) + y, best_pos.y),
+		"pos": committed_position,
 		"yaw": best_yaw,
 		"rect": Rect2(best_pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),

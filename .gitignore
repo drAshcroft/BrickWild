@@ -42,3 +42,5 @@ scratch/*.json
 /visualqa/personality/group_evidence
 /visualqa/personality/room_evidence
 /visualqa/personality/asset_evidence
+/visualqa/personality/surface_evidence
+/Godot/app_userdata

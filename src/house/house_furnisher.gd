@@ -250,7 +250,7 @@ static func _audit_activity_groups(plan: HousePlan) -> void:
 			recipe = recipe.duplicate()
 			recipe.append_array([
 				{"cat": "bed", "n": [1, 1], "opt": 1.0, "group": "sleep"},
-				{"cat": "chest", "key": "Chest_Wood", "rule": &"beside", "near_cat": "bed", "near_anchor": "head_end", "n": [1, 1], "opt": 1.0, "group": "sleep"},
+				{"cat": "nightstand", "key": "Nightstand_Shelf", "rule": &"beside", "near_cat": "bed", "near_anchor": "head_end", "n": [1, 1], "opt": 1.0, "group": "sleep"},
 				{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "sleep"},
 				{"cat": "sconce", "n": [1, 1], "opt": 1.0, "group": "sleep"},
 			])
@@ -532,7 +532,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		steps.append({"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0,
 			"group": "sleep" if HouseFurnishingRecipes.is_ordinary_house(plan) else ""})
 		if HouseFurnishingRecipes.is_ordinary_house(plan):
-			steps.append({"cat": "chest", "key": "Chest_Wood", "rule": &"beside", "near_cat": "bed",
+			steps.append({"cat": "nightstand", "key": "Nightstand_Shelf", "rule": &"beside", "near_cat": "bed",
 				"near_anchor": "head_end", "n": [1, 1], "opt": 1.0, "group": "sleep"})
 			steps.append({"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "sleep"})
 			steps.append({"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 1.0, "group": "sleep"})
@@ -777,8 +777,8 @@ static func _reserve_sleep_access_clearance(plan: HousePlan, room: int,
 			return
 		for zone_index in zones.size():
 			if zones[zone_index].is_equal_approx(access):
-				zones[zone_index] = access.grow(maxf(HouseGeometry.PATH_MIN,
-					HouseGeometry.PERSON_RADIUS * 2.0 + 0.06))
+				zones[zone_index] = HouseFurnishGeometry.ordinary_bedside_aisle(
+					access, Rect2(piece.get("rect", Rect2())), float(piece.get("yaw", 0.0)))
 				return
 
 

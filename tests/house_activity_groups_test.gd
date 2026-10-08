@@ -17,7 +17,7 @@ func _init() -> void:
 	else:
 		_check_group(plan, kitchen, "cooking", ["hearth", "workbench", "storage", "bucket", "cookware"])
 	if bedroom >= 0:
-		_check_group(plan, bedroom, "sleep", ["bed", "chest", "sconce"])
+		_check_group(plan, bedroom, "sleep", ["bed", "nightstand", "chest", "sconce"])
 		_check_bedside_support(plan, bedroom)
 		_check_bedside_backing(plan, bedroom)
 		_check_chest_floor(plan, bedroom)
@@ -44,15 +44,15 @@ func _check_bedside_backing(plan: HousePlan, room: int) -> void:
 		if int(piece["room"]) != room or String(piece.get("activity_host_anchor", "")) != "head_end":
 			continue
 		if not HouseFurnishArrangementCheck._backs_bed_head(plan, piece):
-			failures.append("actual bedside chest does not prove its bed backing")
+			failures.append("actual bedside support does not prove its bed backing")
 		var wrong_facing: Dictionary = piece.duplicate(true)
 		wrong_facing["yaw"] = float(piece["yaw"]) + PI
 		if HouseFurnishArrangementCheck._backs_bed_head(plan, wrong_facing):
-			failures.append("reversed bedside chest bypassed backing check")
+			failures.append("reversed bedside support bypassed backing check")
 		var detached: Dictionary = piece.duplicate(true)
 		detached["rect"] = Rect2(Vector2(100.0, 100.0), Rect2(piece["rect"]).size)
 		if HouseFurnishArrangementCheck._backs_bed_head(plan, detached):
-			failures.append("detached annotated chest bypassed backing check")
+			failures.append("detached annotated bedside support bypassed backing check")
 		return
 	failures.append("bedside backing fixture has no head support")
 
@@ -60,9 +60,10 @@ func _check_bedside_backing(plan: HousePlan, room: int) -> void:
 func _check_chest_floor(plan: HousePlan, room: int) -> void:
 	var floor_y := HouseFurnishGeometry.storey_base(plan, room) + HouseGeometry.FLOOR_T
 	for piece in plan.furniture:
-		if int(piece.get("room", -1)) == room and String(piece.get("cat", "")) == "chest":
+		if int(piece.get("room", -1)) == room \
+				and String(piece.get("cat", "")) in ["chest", "nightstand"]:
 			if not is_equal_approx(float(piece["pos"].y), floor_y):
-				failures.append("room %d clothes/bedside chest is not on the finished floor" % room)
+				failures.append("room %d clothes storage/bedside support is not on the finished floor" % room)
 
 
 func _check_group(plan: HousePlan, room: int, group_name: String, categories: Array[String]) -> void:
@@ -74,8 +75,8 @@ func _check_group(plan: HousePlan, room: int, group_name: String, categories: Ar
 				count += 1
 		if count == 0:
 			failures.append("room %d group %s missing %s" % [room, group_name, category])
-		if group_name == "sleep" and category == "chest" and count < 2:
-			failures.append("room %d sleep group lacks separate bedside support and clothes storage" % room)
+		if group_name == "sleep" and category == "chest" and count < 1:
+			failures.append("room %d sleep group must keep separate clothes storage" % room)
 		if group_name == "cooking" and category == "workbench":
 			_check_group_piece_height(plan, room, group_name, category, 0.75)
 	if plan.was_dropped(room, "activity:" + group_name):
@@ -85,20 +86,33 @@ func _check_group(plan: HousePlan, room: int, group_name: String, categories: Ar
 func _check_bedside_support(plan: HousePlan, room: int) -> void:
 	var child: Dictionary = {}
 	for piece in plan.furniture:
-		if int(piece["room"]) == room and String(piece["cat"]) == "chest" \
+		if int(piece["room"]) == room and String(piece["cat"]) == "nightstand" \
 				and String(piece.get("activity_host_cat", "")) == "bed":
 			child = piece
 			break
 	var host := _piece(plan, room, "bed")
 	if child.is_empty() or host.is_empty():
-		failures.append("room %d lacks bedside chest support and bed endpoints" % room)
+		failures.append("room %d lacks bedside nightstand support and bed endpoints" % room)
 		return
+	if String(child.get("key", "")) != "Nightstand_Shelf":
+		failures.append("room %d bedside role is not backed by the selected nightstand asset" % room)
+	var clothes_chests := 0
+	for piece in plan.furniture:
+		if int(piece.get("room", -1)) == room and String(piece.get("activity_group", "")) == "sleep" \
+				and String(piece.get("cat", "")) == "chest" \
+				and String(piece.get("key", "")) == "Chest_Wood" \
+				and String(piece.get("activity_host_cat", "")) != "bed":
+			clothes_chests += 1
+	if clothes_chests < 1:
+		failures.append("room %d must keep independent Chest_Wood clothes storage" % room)
 	if _edge_distance(Rect2(child["rect"]), Rect2(host["rect"])) > 0.2:
-		failures.append("room %d bedside chest is not beside bed" % room)
+		failures.append("room %d bedside nightstand is not beside bed" % room)
 	if Rect2(child["rect"]).intersects(Rect2(host.get("zone", Rect2()))):
-		failures.append("room %d bedside chest overlaps the bed access zone" % room)
-	if PropCatalog.height(String(child["key"])) > 0.8:
-		failures.append("room %d bedside support is too tall to use as a low chest" % room)
+		failures.append("room %d bedside nightstand overlaps the bed access zone" % room)
+	if PropCatalog.placement_height(child) > 0.8:
+		failures.append("room %d bedside support exceeds the 0.8 m height cap" % room)
+	if float(child.get("scale", 1.0)) < 0.62 or float(child.get("scale", 1.0)) > 1.0:
+		failures.append("room %d bedside role uses an out-of-policy scale" % room)
 	var head_world: Vector3 = Basis(Vector3.UP, float(host.get("yaw", 0.0))) * Vector3.BACK
 	var head_dir := Vector2(head_world.x, head_world.z).normalized()
 	var head_offset: float = (Rect2(child["rect"]).get_center() - Rect2(host["rect"]).get_center()).dot(head_dir)
@@ -131,7 +145,7 @@ func _check_bed_head_axis_orientations() -> void:
 			continue
 		if String(piece["cat"]) == "bed":
 			bed_index = i
-		elif String(piece["cat"]) == "chest" \
+		elif String(piece["cat"]) == "nightstand" \
 				and String(piece.get("activity_host_cat", "")) == "bed":
 			support_index = i
 	if bed_index < 0 or support_index < 0:
@@ -228,7 +242,7 @@ func _check_shared_cooking_hall() -> void:
 	_check_compact_meal_pair(plan, hall)
 	var bedroom := _first_room(plan, &"bedroom")
 	if bedroom >= 0:
-		_check_group(plan, bedroom, "sleep", ["bed", "chest", "sconce"])
+		_check_group(plan, bedroom, "sleep", ["bed", "nightstand", "chest", "sconce"])
 		_check_bedside_support(plan, bedroom)
 		_check_chest_floor(plan, bedroom)
 	var nav: Dictionary = HouseNavCheck.new().check(plan)
@@ -251,7 +265,7 @@ func _check_small_brief_reporting() -> void:
 	for contract in [
 		{"kind": &"hall", "group": "cooking", "counts": {"hearth": 1, "storage": 1, "workbench": 1, "bucket": 1, "cookware": 1}},
 		{"kind": &"hall", "group": "eating", "counts": {"table": 1, "seat": 2}},
-		{"kind": &"bedroom", "group": "sleep", "counts": {"bed": 1, "chest": 2, "sconce": 1}},
+		{"kind": &"bedroom", "group": "sleep", "counts": {"bed": 1, "nightstand": 1, "chest": 1, "sconce": 1}},
 	]:
 		var room := _first_room(plan, contract["kind"])
 		for category in contract["counts"]:

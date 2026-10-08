@@ -357,7 +357,8 @@ static func clear_wall_span(p: HousePlan, room: int, wi: int) -> Vector2:
 
 
 ## Every unbroken stretch of a wall, as (start, end) along its own axis.
-static func clear_wall_spans(p: HousePlan, room: int, wi: int) -> Array[Vector2]:
+static func clear_wall_spans(p: HousePlan, room: int, wi: int,
+		body_depth := 0.0) -> Array[Vector2]:
 	var wall: Dictionary = HouseGeometry.room_walls(p, room)[wi]
 	var from: Vector2 = wall["from"]
 	var to: Vector2 = wall["to"]
@@ -420,6 +421,38 @@ static func clear_wall_spans(p: HousePlan, room: int, wi: int) -> Array[Vector2]
 			cuts.append(Vector2(srect.position.x - 0.1, srect.end.x + 0.1))
 		else:
 			cuts.append(Vector2(srect.position.y - 0.1, srect.end.y + 0.1))
+	# A wall fitting may project into a body-width stair approach even when the
+	# wall face itself is clear. Clip only where the actual measured depth of the
+	# candidate meets a reserved foot/head landing or access-route rectangle.
+	if body_depth > 0.001:
+		var band := _wall_body_band(wall, lo, hi, line, body_depth)
+		for zone in p.zones:
+			if int(zone.get("room", -1)) != room \
+					or String(zone.get("why", "")) not in ["stair access route",
+					"stair foot landing", "stair head landing"]:
+				continue
+			var overlap := band.intersection(Rect2(zone.get("rect", Rect2())))
+			if overlap.size.x <= 0.01 or overlap.size.y <= 0.01:
+				continue
+			var cut := Vector2(overlap.position.x, overlap.end.x) if horizontal \
+				else Vector2(overlap.position.y, overlap.end.y)
+			cuts.append(Vector2(cut.x - 0.03, cut.y + 0.03))
+	# Existing mounted models reserve their real projection only for callers
+	# that supplied a measured body depth. Legacy span queries keep their old
+	# behavior, including for adapters outside the ordinary-house compositor.
+	if body_depth > 0.001:
+		for fi in p.furniture_of(room):
+			var item: Dictionary = p.furniture[fi]
+			if not bool(item.get("mounted", false)):
+				continue
+			var item_wall := HouseFurnishScore._back_wall_index(p, room,
+				Rect2(item.get("rect", Rect2())), item)
+			if item_wall != wi:
+				continue
+			var item_extent := HouseFurnishScore._piece_projection(
+				Rect2(item.get("rect", Rect2())), Vector2.RIGHT if horizontal else Vector2.DOWN,
+				item)
+			cuts.append(Vector2(item_extent.x - 0.03, item_extent.y + 0.03))
 	cuts.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
 	var spans: Array[Vector2] = []
 	var cursor: float = lo
@@ -432,3 +465,1282 @@ static func clear_wall_spans(p: HousePlan, room: int, wi: int) -> Array[Vector2]
 	if spans.is_empty():
 		spans.append(Vector2(lo, lo))
 	return spans
+
+
+static func _wall_body_band(wall: Dictionary, lo: float, hi: float,
+		line: float, body_depth: float) -> Rect2:
+	var normal: Vector2 = wall["normal"]
+	if absf(normal.y) > 0.5:
+		var start_y := line if normal.y > 0.0 else line - body_depth
+		return Rect2(Vector2(lo, start_y), Vector2(hi - lo, body_depth))
+	var start_x := line if normal.x > 0.0 else line - body_depth
+	return Rect2(Vector2(start_x, lo), Vector2(body_depth, hi - lo))
+
+
+static func _note_activity_surface_unavailable(p: HousePlan, room: int, group_name: String) -> void:
+	if group_name in ["cooking", "witchwork", "sleep"]:
+		p.note_compromise(room, "surface:%s:no_safe_station" % group_name)
+
+
+static func _activity_anchor_rank(group_name: String, category: String, item: Dictionary) -> int:
+	match group_name:
+		"cooking":
+			return {"workbench": 0, "hearth": 1, "storage": 2}.get(category, 100)
+		"witchwork":
+			return {"workbench": 0, "hearth": 1, "shelf": 2}.get(category, 100)
+		"sleep":
+			# Reading belongs at the bedside nightstand; independent clothes storage
+			# remains a fallback, while a head-end chest keeps its support role.
+			if String(item.get("key", "")) == "Nightstand_Shelf":
+				return 0
+			if category == "chest":
+				if String(item.get("activity_host_anchor", "")) == "head_end":
+					return 100
+				return 1
+			return {"bed": 2}.get(category, 100)
+		"eating":
+			return {"table": 0, "bench": 1}.get(category, 100)
+		"sitting":
+			return {"bench": 0, "seat": 1}.get(category, 100)
+	return 100
+
+
+static func _mounted_dimensions(key: String, wall: Dictionary) -> Vector2:
+	var yaw := PropCatalog.yaw_facing(Vector2(wall["normal"]))
+	var footprint := PropCatalog.footprint_rotated(key,
+		yaw + PropCatalog.face_offset(key))
+	return Vector2(footprint.x, footprint.y)
+
+
+static func _activity_mount_depth(group_name: String, style: StringName,
+		wall: Dictionary) -> float:
+	var keys: Array[String] = []
+	if group_name in ["cooking", "witchwork"]:
+		keys = ["Torch_Metal", "Shelf_Small_Bottles" if style == &"witch_hut" else "Shelf_Simple"]
+	elif group_name == "sleep":
+		keys = ["Shelf_Simple"]
+	var horizontal := absf(Vector2(wall["normal"]).y) > 0.5
+	var depth := HouseGeometry.BEAM_D
+	for key in keys:
+		var dimensions := _mounted_dimensions(key, wall)
+		depth = maxf(depth, dimensions.y if horizontal else dimensions.x)
+	return depth
+
+
+static func _wall_point(wall: Dictionary, along: float) -> Vector2:
+	var normal: Vector2 = wall["normal"]
+	return Vector2(along, wall["from"].y) if absf(normal.y) > 0.5 \
+		else Vector2(wall["from"].x, along)
+
+
+static func _append_wall_host(p: HousePlan, room: int, wall_index: int,
+		span: Vector2, wall: Dictionary, role: String, group_name: String,
+		anchor_id: String, category: String, host_id: String) -> void:
+	var from := _wall_point(wall, span.x)
+	var to := _wall_point(wall, span.y)
+	p.wall_hosts.append({"id": host_id, "room": room,
+		"storey": p.storey_of_room(room), "wall": wall_index,
+		"from": from, "to": to, "normal": wall["normal"], "span": span,
+		"role": role, "activity_group": group_name,
+		"anchor_id": anchor_id, "target_category": category})
+
+
+static func _clear_wall_mount_center(p: HousePlan, room: int, wall_index: int,
+		anchor_extent: Vector2, desired: float, width: float,
+		depth: float) -> float:
+	var best := INF
+	var best_gap := INF
+	for clear_span in clear_wall_spans(p, room, wall_index, depth):
+		var lo := maxf(clear_span.x + width * 0.5,
+			anchor_extent.x - 0.1 + width * 0.5)
+		var hi := minf(clear_span.y - width * 0.5,
+			anchor_extent.y + 0.1 - width * 0.5)
+		if hi < lo:
+			continue
+		var candidate := clampf(desired, lo, hi)
+		var gap := absf(candidate - desired)
+		if gap < best_gap:
+			best = candidate
+			best_gap = gap
+	return best
+
+
+static func _wall_fixture_pose(key: String, wall: Dictionary, along: float,
+		base_height: float, scale: float) -> Dictionary:
+	var normal: Vector2 = wall["normal"]
+	var point := _wall_point(wall, along)
+	# HouseAssembler applies face_offset to this semantic record yaw.
+	var yaw := PropCatalog.yaw_facing(normal)
+	var model_yaw := yaw + PropCatalog.face_offset(key)
+	var dimensions := PropCatalog.footprint_rotated(key, model_yaw) * scale
+	var horizontal := absf(normal.y) > 0.5
+	var depth := dimensions.y if horizontal else dimensions.x
+	var desired_centre := point + normal * depth * 0.5
+	var seed_placement := {"key": key, "pos": Vector3(point.x, base_height, point.y),
+		"yaw": yaw, "scale": scale}
+	var seed_origin := PropCatalog.house_origin(seed_placement)
+	var seed_centre := PropCatalog.plan_centre(key, seed_origin, model_yaw, scale)
+	var corrected_point := point + desired_centre - seed_centre
+	var placement := {"key": key, "pos": Vector3(corrected_point.x, base_height, corrected_point.y),
+		"yaw": yaw, "scale": scale}
+	var origin := PropCatalog.house_origin(placement)
+	var centre := PropCatalog.plan_centre(key, origin, model_yaw, scale)
+	return {"pos": placement["pos"], "yaw": yaw, "origin": origin,
+		"centre": centre, "rect": Rect2(centre - dimensions * 0.5, dimensions),
+		"dimensions": dimensions, "bottom": origin.y + PropCatalog.floor_offset(key) * scale,
+		"top": origin.y + (PropCatalog.floor_offset(key) + PropCatalog.height(key)) * scale}
+
+
+static func _append_wall_mount(p: HousePlan, room: int, wall_index: int,
+		wall: Dictionary, anchor_extent: Vector2, desired_along: float,
+		key: String, pivot_height: float, group_name: String,
+		anchor_id: String, relation: String, suffix: String) -> int:
+	if not PropCatalog.PROPS.has(key) or not PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED):
+		return -1
+	var scale := 1.0
+	var normal: Vector2 = wall["normal"]
+	var yaw := PropCatalog.yaw_facing(normal)
+	var dims := PropCatalog.footprint_rotated(key,
+		yaw + PropCatalog.face_offset(key)) * scale
+	var horizontal := absf(normal.y) > 0.5
+	var width := dims.x if horizontal else dims.y
+	var depth := dims.y if horizontal else dims.x
+	var along := _clear_wall_mount_center(p, room, wall_index,
+		anchor_extent, desired_along, width, depth)
+	if is_inf(along):
+		return -1
+	var base := HouseFurnishGeometry.storey_base(p, room)
+	var mount_y := base + pivot_height
+	var pose := _wall_fixture_pose(key, wall, along, mount_y, scale)
+	var floor_y := base + HouseGeometry.FLOOR_T
+	var ceiling_y := base + p.spec.height - HouseGeometry.FLOOR_T - 0.03
+	if float(pose["bottom"]) < floor_y + 0.9 or float(pose["top"]) > ceiling_y:
+		return -1
+	var body_rect: Rect2 = pose["rect"]
+	if not _wall_mount_clear_of_furniture(p, room, body_rect,
+			float(pose["bottom"]), float(pose["top"])):
+		return -1
+	for zone in p.zones:
+		if int(zone.get("room", -1)) != room or String(zone.get("why", "")) \
+				not in ["stair access route", "stair foot landing", "stair head landing"]:
+			continue
+		if body_rect.intersects(Rect2(zone.get("rect", Rect2()))):
+			return -1
+	var host_id := "wallhost:surface:%s:%s" % [anchor_id, suffix]
+	var body_lo := body_rect.position.x if horizontal else body_rect.position.y
+	var body_hi := body_rect.end.x if horizontal else body_rect.end.y
+	var host_span := Vector2(body_lo, body_hi)
+	_append_wall_host(p, room, wall_index, host_span, wall,
+		"lighting" if relation == "lights_activity" else "activity_support",
+		group_name, anchor_id, PropCatalog.category(key), host_id)
+	var furniture_rect := body_rect
+	var record := {"key": key, "room": room,
+		"storey": p.storey_of_room(room),
+		"pos": pose["pos"], "yaw": yaw,
+		"rect": furniture_rect, "zone": Rect2(), "host": -1,
+		"cat": PropCatalog.category(key), "mounted": true, "scale": scale,
+		"wall_host_id": host_id, "mount_relation": relation,
+		"activity_anchor_id": anchor_id, "activity_group": group_name,
+		"surface_anchor_id": "surface:%s:%s" % [anchor_id, suffix],
+		"surface_generated": true}
+	var index := p.furniture.size()
+	p.furniture.append(record)
+	return index
+
+
+## A mounted fitting occupies a 3D box, not just an interval on the wall.
+## Keep tall floor furniture (and any prior fitting) out of that same volume.
+static func _wall_mount_clear_of_furniture(p: HousePlan, room: int,
+		body_rect: Rect2, body_bottom: float, body_top: float) -> bool:
+	for item in p.furniture:
+		if int(item.get("room", -1)) != room or not item.has("pos"):
+			continue
+		var item_rect := Rect2(item.get("rect", Rect2()))
+		var item_key := String(item.get("key", ""))
+		var item_scale := float(item.get("scale", 1.0))
+		if bool(item.get("mounted", false)):
+			var item_yaw := float(item.get("yaw", 0.0)) + PropCatalog.face_offset(item_key)
+			var item_origin := PropCatalog.house_origin(item)
+			var item_centre := PropCatalog.plan_centre(item_key, item_origin, item_yaw, item_scale)
+			var item_size := PropCatalog.footprint_rotated(item_key, item_yaw) * item_scale
+			item_rect = Rect2(item_centre - item_size * 0.5, item_size)
+		if not body_rect.intersects(item_rect):
+			continue
+		# Mounted furniture's pos is its model origin, not its lower body edge.
+		# Use the same measured vertical convention as HouseAssembler so a raised
+		# wall fitting cannot be mistaken for empty space beneath its pivot.
+		var item_height_scale: float = PropCatalog.placement_height_scale(item)
+		var item_origin := PropCatalog.house_origin(item)
+		var item_bottom: float = item_origin.y \
+			+ PropCatalog.floor_offset(item_key) * item_height_scale
+		var item_top := item_bottom + PropCatalog.placement_height(item)
+		if minf(body_top, item_top) - maxf(body_bottom, item_bottom) > 0.03:
+			return false
+	return true
+
+
+static func _append_shelf_book(p: HousePlan, room: int, shelf_index: int,
+		wall: Dictionary, anchor_id: String, group_name: String) -> bool:
+	if shelf_index < 0 or shelf_index >= p.furniture.size():
+		return false
+	var shelf: Dictionary = p.furniture[shelf_index]
+	var shelf_key := String(shelf["key"])
+	if not PropCatalog.has_tag(shelf_key, PropCatalog.SURFACE):
+		return false
+	var shelf_origin := PropCatalog.house_origin(shelf)
+	var scale := float(shelf.get("scale", 1.0))
+	var shelf_top := shelf_origin.y \
+		+ PropCatalog.floor_offset(shelf_key) * PropCatalog.placement_height_scale(shelf) \
+		+ PropCatalog.surface_height(shelf_key) * PropCatalog.placement_height_scale(shelf)
+	var shelf_yaw := float(shelf.get("yaw", 0.0)) + PropCatalog.face_offset(shelf_key)
+	var shelf_centre := PropCatalog.plan_centre(shelf_key, shelf_origin, shelf_yaw, scale)
+	var shelf_size := PropCatalog.footprint_rotated(shelf_key, shelf_yaw) * scale
+	var shelf_rect := Rect2(shelf_centre - shelf_size * 0.5, shelf_size)
+	var shelf_id := String(shelf.get("surface_anchor_id", ""))
+	# An authored book already on this exact shelf is the useful result. Bind
+	# only derived relationships; its pose, scale, activity group, and host stay.
+	for item_index in range(p.furniture.size()):
+		if item_index == shelf_index:
+			continue
+		var item: Dictionary = p.furniture[item_index]
+		var item_key := String(item.get("key", ""))
+		if int(item.get("room", -1)) != room or bool(item.get("mounted", false)) \
+				or int(item.get("host", -1)) != shelf_index \
+				or not item_key.begins_with("Book_") \
+				or not PropCatalog.has_tag(item_key, PropCatalog.ON_SURFACE) \
+				or not item.has("pos") or not item.get("rect") is Rect2:
+			continue
+		if HousePlan.record_storey(item) != HousePlan.record_storey(shelf):
+			continue
+		var item_yaw := float(item.get("yaw", 0.0)) + PropCatalog.face_offset(item_key)
+		var item_scale := float(item.get("scale", 1.0))
+		var item_origin := PropCatalog.house_origin(item)
+		var item_centre := PropCatalog.plan_centre(item_key, item_origin, item_yaw, item_scale)
+		var item_size := PropCatalog.footprint_rotated(item_key, item_yaw) * item_scale
+		var item_rect := Rect2(item_centre - item_size * 0.5, item_size)
+		var expected_y := shelf_top
+		if absf(float(item["pos"].y) - expected_y) > 0.02 \
+				or not shelf_rect.grow(-0.02).encloses(item_rect) \
+				or not Rect2(item["rect"]).grow(0.02).encloses(item_rect):
+			continue
+		item["surface_parent_id"] = shelf_id
+		item["activity_anchor_id"] = anchor_id
+		item["activity_binding_group"] = group_name
+		if String(item.get("surface_anchor_id", "")) == "":
+			item["surface_anchor_id"] = "surface:%s:reading_book" % anchor_id
+		return true
+	var key := "Book_Stack_1"
+	var book_yaw := float(shelf.get("yaw", 0.0))
+	var model_yaw := book_yaw + PropCatalog.face_offset(shelf_key)
+	var book_size := PropCatalog.footprint_rotated(key, book_yaw)
+	var shelf_footprint := PropCatalog.footprint_rotated(shelf_key, model_yaw) * scale
+	if book_size.x > shelf_footprint.x - 0.06 or book_size.y > shelf_footprint.y - 0.04:
+		return false
+	var pos_xz := PropCatalog.plan_centre(shelf_key, shelf_origin, model_yaw, scale)
+	var horizontal := absf(Vector2(wall["normal"]).y) > 0.5
+	var along_axis := Vector2.RIGHT if horizontal else Vector2.DOWN
+	var book_along := book_size.x if horizontal else book_size.y
+	var shelf_along := shelf_footprint.x if horizontal else shelf_footprint.y
+	var max_offset := maxf((shelf_along - book_along) * 0.5 - 0.03, 0.0)
+	var offsets: Array[float] = [0.0]
+	var step := book_along + 0.04
+	var offset := step
+	while offset <= max_offset + 0.001:
+		offsets.append(offset)
+		offsets.append(-offset)
+		offset += step
+	var selected_rect := Rect2()
+	var selected_centre := pos_xz
+	var found_spot := false
+	for along_offset in offsets:
+		var candidate_centre := pos_xz + along_axis * along_offset
+		var candidate_rect := Rect2(candidate_centre - book_size * 0.5, book_size)
+		if not shelf_rect.grow(-0.02).encloses(candidate_rect):
+			continue
+		var occupied := false
+		for item_index in range(p.furniture.size()):
+			if item_index == shelf_index:
+				continue
+			var item: Dictionary = p.furniture[item_index]
+			if int(item.get("room", -1)) != room or not item.has("pos") \
+					or not item.get("rect") is Rect2:
+				continue
+			var same_host := int(item.get("host", -1)) == shelf_index
+			var same_level := absf(float(item["pos"].y) - shelf_top) <= 0.20
+			if (same_host or same_level) and Rect2(item["rect"]).intersects(candidate_rect):
+				occupied = true
+				break
+		if occupied:
+			continue
+		selected_centre = candidate_centre
+		selected_rect = candidate_rect
+		found_spot = true
+		break
+	if not found_spot:
+		return false
+	var pos := Vector3(selected_centre.x, shelf_top, selected_centre.y)
+	p.furniture.append({"key": key, "room": room,
+		"storey": HousePlan.record_storey(shelf), "pos": pos, "yaw": book_yaw,
+		"rect": selected_rect, "zone": Rect2(), "host": shelf_index,
+		"cat": PropCatalog.category(key), "mounted": false, "scale": 1.0,
+		"activity_group": group_name, "surface_parent_id": shelf_id,
+		"activity_anchor_id": anchor_id, "surface_anchor_id":
+		"surface:%s:reading_book" % anchor_id, "surface_generated": true})
+
+	return true
+
+## Try actual sleep supports in semantic order. Failed trials restore source
+## furniture, hosts, compromises, and interval reservations.
+static func _compose_sleep_anchor_with_fallback(p: HousePlan, spec: HouseSpec,
+		room: int, anchors: Array, occupied_by_room: Dictionary) -> bool:
+	for candidate_variant in anchors:
+		var candidate: Dictionary = candidate_variant
+		var item_index := int(candidate["index"])
+		if item_index < 0 or item_index >= p.furniture.size():
+			continue
+		var item: Dictionary = p.furniture[item_index]
+		if not item.has("rect") or not item.get("rect") is Rect2:
+			continue
+		var furniture_before: Array[Dictionary] = p.furniture.duplicate(true)
+		var hosts_before: Array[Dictionary] = p.wall_hosts.duplicate(true)
+		var compromises_before: Dictionary = p.compromises.duplicate(true)
+		var occupied_before: Dictionary = occupied_by_room.duplicate(true)
+		var prep_rect := Rect2(item.get("zone", Rect2()))
+		if not prep_rect.has_area():
+			prep_rect = Rect2(item["rect"])
+		var anchor_id := String(candidate["anchor_id"])
+		_add_activity_wall_composition(p, spec, room, "sleep",
+			String(candidate["category"]), anchor_id, String(item.get("key", "")),
+			Rect2(item["rect"]).get_center(), prep_rect, occupied_by_room)
+		if _sleep_anchor_has_complete_station(p, room, anchor_id):
+			return true
+		p.furniture = furniture_before
+		p.wall_hosts = hosts_before
+		p.compromises.clear()
+		for room_key in compromises_before:
+			p.compromises[room_key] = compromises_before[room_key]
+		occupied_by_room.clear()
+		for room_key in occupied_before:
+			occupied_by_room[room_key] = occupied_before[room_key]
+	return false
+
+
+static func _sleep_anchor_has_complete_station(p: HousePlan, room: int, anchor_id: String) -> bool:
+	var support_index := -1
+	for item_index in p.furniture_of(room):
+		var item: Dictionary = p.furniture[item_index]
+		if (String(item.get("activity_anchor_id", "")) == anchor_id
+				and String(item.get("mount_relation", "")) == "supports_activity"
+				and String(item.get("key", "")) == "Shelf_Simple"
+				and bool(item.get("mounted", false))):
+			support_index = item_index
+			break
+	if support_index < 0:
+		return false
+	var shelf: Dictionary = p.furniture[support_index]
+	var shelf_id := String(shelf.get("surface_anchor_id", ""))
+	var book_found := false
+	for item_index in p.furniture_of(room):
+		var item: Dictionary = p.furniture[item_index]
+		if (String(item.get("key", "")).begins_with("Book_")
+				and int(item.get("host", -1)) == support_index
+				and String(item.get("surface_parent_id", "")) == shelf_id):
+			book_found = true
+			break
+	if not book_found:
+		return false
+	for item_index in p.furniture_of(room):
+		var item: Dictionary = p.furniture[item_index]
+		if (String(item.get("activity_anchor_id", "")) == anchor_id
+				and String(item.get("mount_relation", "")) == "lights_activity"
+				and bool(item.get("mounted", false))):
+			return true
+	return false
+
+
+static func _add_activity_wall_composition(p: HousePlan, spec: HouseSpec,
+		room: int, group_name: String, category: String, anchor_id: String,
+		anchor_key: String, anchor_position: Vector2, prep_rect: Rect2,
+		occupied_by_room: Dictionary) -> void:
+	var support_key := _activity_support_key(group_name, category, spec.style, anchor_key)
+	if support_key == "":
+		_note_activity_surface_unavailable(p, room, group_name)
+		return
+	# Reuse an existing correctly mounted shelf when it is physically attached
+	# to a wall near this activity. Its placement and activity group are kept.
+	var support := _reuse_existing_activity_support(p, room, support_key,
+		group_name, anchor_id, prep_rect, occupied_by_room)
+	if support.is_empty():
+		support = _append_nearby_activity_support(p, room, support_key,
+			group_name, anchor_id, anchor_position, prep_rect, occupied_by_room)
+	if support.is_empty():
+		_note_activity_surface_unavailable(p, room, group_name)
+		return
+	var wall_index := int(support["wall"])
+	var wall: Dictionary = support["wall_row"]
+	var shelf_index := int(support["furniture_index"])
+	var shelf_along := float(support["along"])
+	var station_extent: Vector2 = support["station_extent"]
+	var host_span: Vector2 = support["span"]
+	var intervals: Array = occupied_by_room[room].get(wall_index, [])
+	intervals.append(host_span)
+	occupied_by_room[room][wall_index] = intervals
+	if group_name == "sleep":
+		var book_available := _append_shelf_book(p, room, shelf_index, wall,
+			anchor_id, group_name)
+		if not book_available:
+			_note_activity_surface_unavailable(p, room, group_name)
+	elif group_name == "cooking":
+		if not _compose_activity_shelf_contents(p, room, shelf_index,
+			anchor_id, group_name):
+			p.note_compromise(room, "surface:%s:no_safe_contents" % group_name)
+	elif group_name == "witchwork":
+		var shelf: Dictionary = p.furniture[shelf_index]
+		if String(shelf.get("key", "")) == "Shelf_Small_Bottles" \
+				and PropCatalog.has_tag("Shelf_Small_Bottles", PropCatalog.WALL_MOUNTED):
+			# The imported asset includes two bottle rows in its real mesh. This is
+			# an integrated rack, not a top surface for loose potions.
+			shelf["content_kind"] = "integrated_ingredient_rack"
+			shelf["content_asset_key"] = "Shelf_Small_Bottles"
+			shelf["content_layout"] = "integrated_two_tier_bottles"
+			for host_index in range(p.wall_hosts.size()):
+				var host: Dictionary = p.wall_hosts[host_index]
+				if String(host.get("id", "")) == String(shelf.get("wall_host_id", "")):
+					host["content_kind"] = "integrated_ingredient_rack"
+					host["content_asset_key"] = "Shelf_Small_Bottles"
+					host["content_layout"] = "integrated_two_tier_bottles"
+				p.wall_hosts[host_index] = host
+		else:
+			p.note_compromise(room, "surface:%s:no_safe_contents" % group_name)
+	if group_name not in ["cooking", "witchwork", "sleep"]:
+		return
+	# Prefer the shelf wall, then other nearby task walls. A fitted ingredient
+	# shelf can fill a narrow clear span; that does not make the neighboring
+	# return wall unsuitable for a real task light.
+	var support_rect := Rect2(p.furniture[shelf_index].get("rect", Rect2()))
+	if not _append_nearby_activity_light(p, room, wall_index, shelf_along,
+			prep_rect, support_rect, group_name, anchor_id, occupied_by_room):
+		p.note_compromise(room, "surface:%s:no_safe_light" % group_name)
+
+
+static func _append_nearby_activity_light(p: HousePlan, room: int,
+		preferred_wall: int, shelf_along: float, prep_rect: Rect2,
+		support_rect: Rect2, group_name: String, anchor_id: String,
+		occupied_by_room: Dictionary) -> bool:
+	if not occupied_by_room.has(room):
+		occupied_by_room[room] = {}
+	var walls := HouseGeometry.room_walls(p, room)
+	var candidates: Array[Dictionary] = []
+	var existing_sconces: Array[Dictionary] = []
+	for fi in p.furniture_of(room):
+		var placed: Dictionary = p.furniture[fi]
+		if bool(placed.get("mounted", false)) and PropCatalog.category(
+				String(placed.get("key", ""))) == "sconce":
+			existing_sconces.append(placed)
+	var mirrored_wall := -1
+	var mirrored_stations: Array[float] = []
+	if existing_sconces.size() == 1:
+		var existing := existing_sconces[0]
+		var old_wall := HouseFurnishScore._back_wall_index(p, room,
+			Rect2(existing.get("rect", Rect2())), existing)
+		if old_wall >= 0 and old_wall < walls.size():
+			mirrored_wall = old_wall
+			var old_normal: Vector2 = walls[old_wall]["normal"]
+			var mirror_axis := Vector2.RIGHT if absf(old_normal.y) > 0.5 else Vector2.DOWN
+			var old_center := Rect2(existing["rect"]).get_center()
+			var mirror_anchors: Array[Vector2] = [HouseGeometry.room_floor_rect(p, room).get_center()]
+			if p.is_polygonal(room):
+				mirror_anchors.append((Vector2(walls[old_wall]["from"])
+					+ Vector2(walls[old_wall]["to"])) * 0.5)
+			for fi in p.furniture_of(room):
+				var anchor_item: Dictionary = p.furniture[fi]
+				if PropCatalog.category(String(anchor_item.get("key", ""))) == "hearth":
+					mirror_anchors.append(Rect2(anchor_item["rect"]).get_center())
+			for di in p.doors_of(room):
+				mirror_anchors.append(Vector2(p.doors[di]["pos"]))
+			for anchor in mirror_anchors:
+				mirrored_stations.append(2.0 * anchor.dot(mirror_axis) - old_center.dot(mirror_axis))
+	for wi in walls.size():
+		var wall: Dictionary = walls[wi]
+		var dims := _mounted_dimensions("Torch_Metal", wall)
+		var horizontal := absf(Vector2(wall["normal"]).y) > 0.5
+		var width := dims.x if horizontal else dims.y
+		var depth := dims.y if horizontal else dims.x
+		var axis := Vector2.RIGHT if horizontal else Vector2.DOWN
+		for span in clear_wall_spans(p, room, wi, depth):
+			var lo := span.x + width * 0.5
+			var hi := span.y - width * 0.5
+			if hi < lo: continue
+			var desired := prep_rect.get_center().dot(axis)
+			var stations: Array[float] = [clampf(desired, lo, hi), lo, hi]
+			if wi == preferred_wall:
+				stations.push_front(clampf(shelf_along - 0.78, lo, hi))
+				stations.push_front(clampf(shelf_along + 0.78, lo, hi))
+			if wi == mirrored_wall:
+				for mirrored_along in mirrored_stations:
+					if mirrored_along >= lo and mirrored_along <= hi:
+						stations.append(mirrored_along)
+			for along in stations:
+				var pose := _wall_fixture_pose("Torch_Metal", wall, along,
+					HouseFurnishGeometry.storey_base(p, room) + HouseGeometry.SCONCE_HEIGHT, 1.0)
+				var body := Rect2(pose["rect"])
+				var prep_distance := _rect_distance(body, prep_rect)
+				var support_distance := _rect_distance(body, support_rect)
+				if prep_distance <= 1.9 and support_distance <= 1.9:
+					candidates.append({"wall": wi, "row": wall, "span": span,
+						"along": along, "distance": maxf(prep_distance, support_distance)})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var preferred_a := int(a["wall"]) == preferred_wall
+		var preferred_b := int(b["wall"]) == preferred_wall
+		if preferred_a != preferred_b: return preferred_a
+		if float(a["distance"]) != float(b["distance"]):
+			return float(a["distance"]) < float(b["distance"])
+		if int(a["wall"]) != int(b["wall"]): return int(a["wall"]) < int(b["wall"])
+		return float(a["along"]) < float(b["along"]))
+	# Reuse an eligible authored task light when its measured wall pose is
+	# actually near both the activity prep and its support.
+	for candidate in candidates:
+		var wi := int(candidate["wall"])
+		var wall: Dictionary = candidate["row"]
+		if _bind_existing_task_light(p, room, wi, wall, prep_rect,
+				support_rect, anchor_id, group_name, occupied_by_room):
+			return true
+	# A newly added task light must complete a real mirrored pair with the
+	# authored room sconce. A cross-wall pair or third lamp is not a fix.
+	if existing_sconces.size() > 1:
+		return false
+	if existing_sconces.size() == 1:
+		var paired_candidates: Array[Dictionary] = []
+		for candidate in candidates:
+			if _activity_light_mirrors_sconce(p, room, candidate, existing_sconces[0]):
+				paired_candidates.append(candidate)
+		candidates = paired_candidates
+	# Reuse every eligible authored light before adding a new one on any wall.
+	for candidate in candidates:
+		var wi := int(candidate["wall"])
+		var wall: Dictionary = candidate["row"]
+		var along := float(candidate["along"])
+		var index := _append_wall_mount(p, room, wi, wall, candidate["span"], along,
+			"Torch_Metal", HouseGeometry.SCONCE_HEIGHT, group_name,
+			anchor_id, "lights_activity", "task_light")
+		if index >= 0:
+			var intervals: Array = occupied_by_room[room].get(wi, [])
+			intervals.append(p.wall_hosts.back()["span"])
+			occupied_by_room[room][wi] = intervals
+			return true
+	return false
+
+
+static func _activity_light_mirrors_sconce(p: HousePlan, room: int,
+		candidate: Dictionary, existing: Dictionary) -> bool:
+	var walls := HouseGeometry.room_walls(p, room)
+	var existing_wall := HouseFurnishScore._back_wall_index(p, room,
+		Rect2(existing.get("rect", Rect2())), existing)
+	var candidate_wall := int(candidate.get("wall", -1))
+	if existing_wall < 0 or existing_wall != candidate_wall or existing_wall >= walls.size():
+		return false
+	var wall: Dictionary = walls[existing_wall]
+	var normal: Vector2 = wall["normal"]
+	var along := Vector2(normal.y, -normal.x)
+	var existing_center := Rect2(existing["rect"]).get_center()
+	var pose := _wall_fixture_pose("Torch_Metal", wall, float(candidate["along"]),
+		HouseFurnishGeometry.storey_base(p, room) + HouseGeometry.SCONCE_HEIGHT, 1.0)
+	var candidate_center := Rect2(pose["rect"]).get_center()
+	var anchors: Array[Vector2] = [HouseGeometry.room_floor_rect(p, room).get_center()]
+	if p.is_polygonal(room):
+		anchors.append((Vector2(wall["from"]) + Vector2(wall["to"])) * 0.5)
+	for fi in p.furniture_of(room):
+		var item: Dictionary = p.furniture[fi]
+		if PropCatalog.category(String(item.get("key", ""))) == "hearth":
+			anchors.append(Rect2(item["rect"]).get_center())
+	for di in p.doors_of(room):
+		anchors.append(Vector2(p.doors[di]["pos"]))
+	for anchor in anchors:
+		var error := absf((existing_center + candidate_center - anchor * 2.0).dot(along))
+		if error <= 0.15: # Match HouseFurnishAffinityCheck.FS_MIRROR_TOL.
+			return true
+	return false
+
+## Add one full-size useful object only when the measured shelf supports it.
+## Witch ingredient racks are integrated meshes and need no loose top props.
+static func _compose_activity_shelf_contents(p: HousePlan, room: int,
+		shelf_index: int, anchor_id: String, group_name: String) -> bool:
+	if group_name != "cooking" or shelf_index < 0 or shelf_index >= p.furniture.size():
+		return false
+	var shelf: Dictionary = p.furniture[shelf_index]
+	var shelf_key := String(shelf.get("key", ""))
+	if int(shelf.get("room", -1)) != room or not PropCatalog.has_tag(shelf_key, PropCatalog.SURFACE):
+		return false
+	var shelf_id := String(shelf.get("surface_anchor_id", ""))
+	for index in range(p.furniture.size()):
+		var child: Dictionary = p.furniture[index]
+		if not _is_supported_surface_child(child, shelf, shelf_index) or String(child.get("key", "")) != "Mug":
+			continue
+		child["surface_parent_id"] = shelf_id
+		child["activity_anchor_id"] = anchor_id
+		child["activity_binding_group"] = group_name
+		child["surface_anchor_id"] = "surface:%s:content:Mug" % anchor_id
+		p.furniture[index] = child
+		return true
+	if not PropCatalog.PROPS.has("Mug") or not PropCatalog.has_tag("Mug", PropCatalog.ON_SURFACE):
+		return false
+	var shelf_origin := PropCatalog.house_origin(shelf)
+	var shelf_yaw := float(shelf.get("yaw", 0.0)) + PropCatalog.face_offset(shelf_key)
+	var shelf_scale := float(shelf.get("scale", 1.0))
+	var shelf_centre := PropCatalog.plan_centre(shelf_key, shelf_origin, shelf_yaw, shelf_scale)
+	var shelf_size := PropCatalog.footprint_rotated(shelf_key, shelf_yaw) * shelf_scale
+	var shelf_rect := Rect2(shelf_centre - shelf_size * 0.5, shelf_size)
+	var shelf_top := shelf_origin.y + PropCatalog.floor_offset(shelf_key) * PropCatalog.placement_height_scale(shelf) \
+		+ PropCatalog.surface_height(shelf_key) * PropCatalog.placement_height_scale(shelf)
+	var wall_index := -1
+	for host_variant in p.wall_hosts:
+		var host: Dictionary = host_variant
+		if String(host.get("id", "")) == String(shelf.get("wall_host_id", "")):
+			wall_index = int(host.get("wall", -1))
+			break
+	var walls := HouseGeometry.room_walls(p, room)
+	if wall_index < 0 or wall_index >= walls.size():
+		return false
+	var normal: Vector2 = walls[wall_index]["normal"]
+	# Face the room, independent of the shelf model's asset correction yaw.
+	var content_yaw := 0.0 if absf(normal.y) > 0.5 else PI * 0.5
+	var model_yaw := content_yaw + PropCatalog.face_offset("Mug")
+	var mug_size := PropCatalog.footprint_rotated("Mug", model_yaw)
+	if mug_size.x > shelf_size.x - 0.06 or mug_size.y > shelf_size.y - 0.06:
+		return false
+	var centre := shelf_centre
+	var proposed_rect := Rect2(centre - mug_size * 0.5, mug_size)
+	if not shelf_rect.grow(-0.02).encloses(proposed_rect):
+		return false
+	var probe := {"key": "Mug", "room": room, "storey": HousePlan.record_storey(shelf),
+		"pos": Vector3(centre.x, shelf_top, centre.y), "yaw": content_yaw,
+		"rect": proposed_rect, "zone": proposed_rect, "host": shelf_index,
+		"cat": PropCatalog.category("Mug"), "mounted": false, "scale": 1.0}
+	var origin := PropCatalog.house_origin(probe)
+	var bottom := origin.y + PropCatalog.floor_offset("Mug") * PropCatalog.placement_height_scale(probe)
+	var height := PropCatalog.placement_height(probe)
+	var top := bottom + height
+	if absf(bottom - shelf_top) > 0.02:
+		return false
+	var measured_centre := PropCatalog.plan_centre("Mug", origin, model_yaw, 1.0)
+	var measured_size := PropCatalog.footprint_rotated("Mug", model_yaw)
+	var measured_rect := Rect2(measured_centre - measured_size * 0.5, measured_size)
+	var floor_rect := HouseGeometry.room_floor_rect(p, room)
+	if not shelf_rect.grow(-0.02).encloses(measured_rect) or not floor_rect.grow(0.01).encloses(measured_rect):
+		return false
+	var ceiling_y := HouseFurnishGeometry.storey_base(p, room) + float(p.spec.height) - HouseGeometry.FLOOR_T
+	if top > ceiling_y - 0.03:
+		return false
+	if not _wall_mount_clear_of_furniture(p, room, measured_rect, bottom, top):
+		return false
+	if not _wall_mount_route_clear(p, room, measured_rect):
+		return false
+	probe["rect"] = measured_rect
+	probe["surface_parent_id"] = shelf_id
+	probe["activity_anchor_id"] = anchor_id
+	probe["activity_binding_group"] = group_name
+	probe["surface_anchor_id"] = "surface:%s:content:Mug" % anchor_id
+	probe["surface_generated"] = true
+	p.furniture.append(probe)
+	if not _is_supported_surface_child(probe, shelf, shelf_index):
+		p.furniture.remove_at(p.furniture.size() - 1)
+		return false
+	return true
+
+
+static func _activity_support_key(group_name: String, category: String,
+		style: StringName, item_key := "") -> String:
+	if group_name in ["cooking", "witchwork"] and category == "workbench":
+		return "Shelf_Small_Bottles" if style == &"witch_hut" else "Shelf_Simple"
+	if group_name == "sleep" and (item_key == "Nightstand_Shelf" or category == "chest"):
+		return "Shelf_Simple"
+	return ""
+
+
+## Search room clear spans for a measured mounting station near the
+## activity's actual use/prep rectangle. A return wall remains eligible when
+## the fitting body is within 1.9 m of that usable task region.
+static func _activity_light_candidate_available(p: HousePlan, room: int,
+		preferred_wall: int, shelf_along: float, prep_rect: Rect2,
+		support_rect: Rect2, group_name: String, anchor_id: String,
+		occupied_by_room: Dictionary) -> bool:
+	# Trial only on duplicated arrays. The original authored furniture, wall hosts,
+	# and interval map are restored by reference after testing the full mount.
+	var original_furniture: Array[Dictionary] = p.furniture
+	var original_hosts: Array[Dictionary] = p.wall_hosts
+	var original_occupied := occupied_by_room.duplicate(true)
+	p.furniture = p.furniture.duplicate(true)
+	p.wall_hosts = p.wall_hosts.duplicate(true)
+	var available := _append_nearby_activity_light(p, room, preferred_wall,
+		shelf_along, prep_rect, support_rect, group_name, anchor_id, occupied_by_room)
+	p.furniture = original_furniture
+	p.wall_hosts = original_hosts
+	occupied_by_room.clear()
+	for room_key in original_occupied:
+		occupied_by_room[room_key] = original_occupied[room_key]
+	return available
+
+
+static func _append_nearby_activity_support(p: HousePlan, room: int,
+		key: String, group_name: String, anchor_id: String, anchor: Vector2,
+		prep_rect: Rect2, occupied_by_room: Dictionary) -> Dictionary:
+	const MAX_PREP_DISTANCE := 1.9
+	var walls := HouseGeometry.room_walls(p, room)
+	var candidates: Array[Dictionary] = []
+	var original_wall := HouseGeometry.backing_wall(p, room,
+		Rect2(anchor, Vector2.ZERO), 1000.0)
+	var base := HouseFurnishGeometry.storey_base(p, room)
+	for wi in walls.size():
+		var wall: Dictionary = walls[wi]
+		var normal: Vector2 = wall["normal"]
+		var horizontal := absf(normal.y) > 0.5
+		var axis := Vector2.RIGHT if horizontal else Vector2.DOWN
+		var dimensions := _mounted_dimensions(key, wall)
+		var width := dimensions.x if horizontal else dimensions.y
+		var depth := dimensions.y if horizontal else dimensions.x
+		var prep_along := prep_rect.get_center().dot(axis)
+		for clear_span in clear_wall_spans(p, room, wi, depth):
+			var lo := clear_span.x + width * 0.5
+			var hi := clear_span.y - width * 0.5
+			if hi < lo:
+				continue
+			# Probe bounded stations, not one pivot-derived point. A shelf near a
+			# return can be the only fit that also admits a lawful task light.
+			var stations: Array[float] = [clampf(prep_along, lo, hi), lo, hi,
+				(lo + hi) * 0.5, lerpf(lo, hi, 0.25), lerpf(lo, hi, 0.75)]
+			for station_index in range(stations.size()):
+				var station_along := stations[station_index]
+				var duplicate_station := false
+				for prior in range(station_index):
+					if absf(stations[prior] - station_along) < 0.001:
+						duplicate_station = true
+						break
+				if duplicate_station:
+					continue
+				var pose := _wall_fixture_pose(key, wall, station_along,
+					base + HouseGeometry.SHELF_HEIGHT, 1.0)
+				var body: Rect2 = pose["rect"]
+				var distance := _rect_distance(body, prep_rect)
+				if distance > MAX_PREP_DISTANCE:
+					continue
+				if not HouseGeometry.room_floor_rect(p, room).grow(0.01).encloses(body):
+					continue
+				candidates.append({"wall": wi, "wall_row": wall,
+					"along": station_along, "distance": distance,
+					"station_extent": clear_span, "body": body})
+	candidates.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		var left_bucket := roundi(float(left["distance"]) * 100.0)
+		var right_bucket := roundi(float(right["distance"]) * 100.0)
+		if left_bucket != right_bucket:
+			return left_bucket < right_bucket
+		var left_preferred := int(left["wall"]) == original_wall
+		var right_preferred := int(right["wall"]) == original_wall
+		if left_preferred != right_preferred:
+			return left_preferred
+		if int(left["wall"]) != int(right["wall"]):
+			return int(left["wall"]) < int(right["wall"])
+		if float(left["along"]) != float(right["along"]):
+			return float(left["along"]) < float(right["along"])
+		return float(left["distance"]) < float(right["distance"]))
+	for candidate in candidates:
+		var wall_index := int(candidate["wall"])
+		var wall: Dictionary = candidate["wall_row"]
+		var station_extent: Vector2 = candidate["station_extent"]
+		var station_along := float(candidate["along"])
+		var furniture_index := _append_wall_mount(p, room, wall_index, wall,
+			station_extent, station_along, key, HouseGeometry.SHELF_HEIGHT,
+			group_name, anchor_id, "supports_activity", "shelf")
+		if furniture_index < 0:
+			continue
+		var host: Dictionary = p.wall_hosts.back()
+		var body: Rect2 = Rect2(p.furniture[furniture_index].get("rect", Rect2()))
+		if not _activity_light_candidate_available(p, room, wall_index,
+				station_along, prep_rect, body, group_name, anchor_id, occupied_by_room):
+			p.furniture.remove_at(furniture_index)
+			p.wall_hosts.pop_back()
+			continue
+		return {"wall": wall_index, "wall_row": wall, "along": station_along,
+			"station_extent": station_extent, "span": host["span"],
+			"furniture_index": furniture_index}
+	return {}
+
+
+static func _rect_distance(a: Rect2, b: Rect2) -> float:
+	var dx := maxf(maxf(a.position.x - b.end.x, b.position.x - a.end.x), 0.0)
+	var dy := maxf(maxf(a.position.y - b.end.y, b.position.y - a.end.y), 0.0)
+	return Vector2(dx, dy).length()
+
+
+## Bind a previously placed shelf without changing its model pose, scale, or
+## source activity_group. It must face the wall, touch its real back edge, fit
+## inside the room and clear apertures, routes, and other objects in 3D.
+static func _reuse_existing_activity_support(p: HousePlan, room: int,
+		key: String, group_name: String, anchor_id: String,
+		prep_rect: Rect2, occupied_by_room: Dictionary) -> Dictionary:
+	var walls := HouseGeometry.room_walls(p, room)
+	var base := HouseFurnishGeometry.storey_base(p, room)
+	var floor_y := base + HouseGeometry.FLOOR_T
+	var ceiling_y := base + p.spec.height - HouseGeometry.FLOOR_T - 0.03
+	var best: Dictionary = {}
+	for item_index in range(p.furniture.size()):
+		var item: Dictionary = p.furniture[item_index]
+		if int(item.get("room", -1)) != room or not bool(item.get("mounted", false)) \
+				or String(item.get("key", "")) != key or not item.has("pos") \
+				or (String(item.get("activity_anchor_id", "")) != "" \
+					and String(item.get("activity_anchor_id", "")) != anchor_id):
+			continue
+		var origin := PropCatalog.house_origin(item)
+		var yaw := float(item.get("yaw", 0.0)) + PropCatalog.face_offset(key)
+		var scale := float(item.get("scale", 1.0))
+		var dimensions := PropCatalog.footprint_rotated(key, yaw) * scale
+		var centre := PropCatalog.plan_centre(key, origin, yaw, scale)
+		var body := Rect2(centre - dimensions * 0.5, dimensions)
+		if not HouseGeometry.room_floor_rect(p, room).grow(0.01).encloses(body):
+			continue
+		var distance := _rect_distance(body, prep_rect)
+		if distance > 1.9:
+			continue
+		var bottom := origin.y + PropCatalog.floor_offset(key) * PropCatalog.placement_height_scale(item)
+		var top := bottom + PropCatalog.placement_height(item)
+		if bottom < floor_y + 0.9 or top > ceiling_y:
+			continue
+		for wi in walls.size():
+			var wall: Dictionary = walls[wi]
+			var normal: Vector2 = wall["normal"]
+			var expected_yaw := PropCatalog.yaw_facing(normal) + PropCatalog.face_offset(key)
+			if absf(wrapf(yaw - expected_yaw, -PI, PI)) > 0.03:
+				continue
+			var wall_point := Vector2(wall["from"])
+			var wall_line := wall_point.dot(normal)
+			var support := (dimensions.x * absf(normal.x)
+				+ dimensions.y * absf(normal.y)) * 0.5
+			if absf(centre.dot(normal) - support - wall_line) > 0.015:
+				continue
+			var horizontal := absf(normal.y) > 0.5
+			var axis := Vector2.RIGHT if horizontal else Vector2.DOWN
+			var extent := HouseFurnishScore._piece_projection(body, axis, item)
+			var depth := dimensions.y if horizontal else dimensions.x
+			# A correctly supported on-surface child touches this shelf by design.
+			# Temporarily remove only measured children of this exact host while
+			# testing the shelf body's own collision volume.
+			var removal_rows: Array[Dictionary] = [{"index": item_index}]
+			for child_index in range(p.furniture.size()):
+				if child_index == item_index:
+					continue
+				var child: Dictionary = p.furniture[child_index]
+				if _is_supported_surface_child(child, item, item_index):
+					removal_rows.append({"index": child_index})
+			removal_rows.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+				return int(left["index"]) > int(right["index"]))
+			for row in removal_rows:
+				row["item"] = p.furniture.pop_at(int(row["index"]))
+			var span_clear := false
+			for span in clear_wall_spans(p, room, wi, depth):
+				if extent.x >= span.x - 0.03 and extent.y <= span.y + 0.03:
+					span_clear = true
+					break
+			var collision_free := _wall_mount_clear_of_furniture(p, room, body, bottom, top)
+			var route_free := _wall_mount_route_clear(p, room, body)
+			removal_rows.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+				return int(left["index"]) < int(right["index"]))
+			for row in removal_rows:
+				p.furniture.insert(int(row["index"]), row["item"])
+			if not span_clear or not collision_free or not route_free:
+				continue
+			var along := (extent.x + extent.y) * 0.5
+			if not _activity_light_candidate_available(p, room, wi, along,
+					prep_rect, body, group_name, anchor_id, occupied_by_room):
+				continue
+			if not best.is_empty() and distance >= float(best["distance"]):
+				continue
+			best = {"wall": wi, "wall_row": wall, "extent": extent,
+				"body": body, "distance": distance, "item_index": item_index}
+	if best.is_empty():
+		return {}
+	var wall_index := int(best["wall"])
+	var wall: Dictionary = best["wall_row"]
+	var extent: Vector2 = best["extent"]
+	var host_id := "wallhost:activity:%s:existing_support" % anchor_id
+	_append_wall_host(p, room, wall_index, extent, wall, "activity_support",
+		group_name, anchor_id, PropCatalog.category(key), host_id)
+	var item: Dictionary = p.furniture[int(best["item_index"])]
+	item["wall_host_id"] = host_id
+	item["mount_relation"] = "supports_activity"
+	item["activity_anchor_id"] = anchor_id
+	item["surface_anchor_id"] = "surface:%s:existing_support" % anchor_id
+	var intervals: Array = occupied_by_room[room].get(wall_index, [])
+	intervals.append(extent)
+	occupied_by_room[room][wall_index] = intervals
+	return {"wall": wall_index, "wall_row": wall, "along": (extent.x + extent.y) * 0.5,
+		"station_extent": extent, "span": extent,
+		"furniture_index": int(best["item_index"])}
+
+
+static func _is_supported_surface_child(child: Dictionary, host: Dictionary,
+		host_index: int) -> bool:
+	if int(child.get("host", -1)) != host_index or bool(child.get("mounted", false)):
+		return false
+	if not child.has("pos") or not child.get("rect") is Rect2:
+		return false
+	if int(child.get("room", -1)) != int(host.get("room", -1)):
+		return false
+	if HousePlan.record_storey(child) != HousePlan.record_storey(host):
+		return false
+	var child_key := String(child.get("key", ""))
+	var host_key := String(host.get("key", ""))
+	if not PropCatalog.has_tag(child_key, PropCatalog.ON_SURFACE):
+		return false
+	if not PropCatalog.has_tag(host_key, PropCatalog.SURFACE):
+		return false
+	var host_origin := PropCatalog.house_origin(host)
+	var host_scale := float(host.get("scale", 1.0))
+	var host_scale_y := PropCatalog.placement_height_scale(host)
+	var top := host_origin.y + PropCatalog.floor_offset(host_key) * host_scale_y
+	top += PropCatalog.surface_height(host_key) * host_scale_y
+	var child_origin := PropCatalog.house_origin(child)
+	var bottom := child_origin.y
+	bottom += PropCatalog.floor_offset(child_key) * PropCatalog.placement_height_scale(child)
+	if absf(bottom - top) > 0.02:
+		return false
+	var host_yaw := float(host.get("yaw", 0.0)) + PropCatalog.face_offset(host_key)
+	var host_centre := PropCatalog.plan_centre(host_key, host_origin, host_yaw, host_scale)
+	var host_size := PropCatalog.footprint_rotated(host_key, host_yaw) * host_scale
+	var host_rect := Rect2(host_centre - host_size * 0.5, host_size)
+	var child_yaw := float(child.get("yaw", 0.0)) + PropCatalog.face_offset(child_key)
+	var child_scale := float(child.get("scale", 1.0))
+	var child_centre := PropCatalog.plan_centre(child_key, child_origin, child_yaw, child_scale)
+	var child_size := PropCatalog.footprint_rotated(child_key, child_yaw) * child_scale
+	var child_rect := Rect2(child_centre - child_size * 0.5, child_size)
+	if not host_rect.grow(-0.02).encloses(child_rect):
+		return false
+	return Rect2(child["rect"]).grow(0.02).encloses(child_rect)
+
+
+static func _wall_mount_route_clear(p: HousePlan, room: int, body: Rect2) -> bool:
+	for zone in p.zones:
+		if int(zone.get("room", -1)) == room and String(zone.get("why", "")) \
+				in ["stair access route", "stair foot landing", "stair head landing"] \
+				and body.intersects(Rect2(zone.get("rect", Rect2()))):
+			return false
+	return true
+
+
+## Bind a pre-existing, measured wall light to this task when it truly
+## occupies the intended clear station. It stays authored furniture; only the
+## derived relationship and measured wall interval are added.
+static func _bind_existing_task_light(p: HousePlan, room: int, wall_index: int,
+		wall: Dictionary, prep_rect: Rect2, support_rect: Rect2,
+		anchor_id: String, group_name: String,
+		occupied_by_room: Dictionary) -> bool:
+	if not occupied_by_room.has(room):
+		occupied_by_room[room] = {}
+	var wall_normal: Vector2 = wall["normal"]
+	var horizontal := absf(wall_normal.y) > 0.5
+	var axis := Vector2.RIGHT if horizontal else Vector2.DOWN
+	var wall_point := Vector2(wall["from"])
+	var wall_line := wall_point.dot(wall_normal)
+	for item_index in range(p.furniture.size()):
+		var item: Dictionary = p.furniture[item_index]
+		if not bool(item.get("mounted", false)) or int(item.get("room", -1)) != room:
+			continue
+		if String(item.get("activity_anchor_id", "")) != "" \
+				and String(item.get("activity_anchor_id", "")) != anchor_id:
+			continue
+		var key := String(item.get("key", ""))
+		if key not in ["Torch_Metal", "Torch_Wall", "Sconce"]:
+			continue
+		if not item.has("pos") or not item.get("rect") is Rect2:
+			continue
+		var item_rect := Rect2(item["rect"])
+		var origin := PropCatalog.house_origin(item)
+		var yaw := float(item.get("yaw", 0.0)) + PropCatalog.face_offset(key)
+		var scale := float(item.get("scale", 1.0))
+		var centre := PropCatalog.plan_centre(key, origin, yaw, scale)
+		var measured_size := PropCatalog.footprint_rotated(key, yaw) * scale
+		var measured_rect := Rect2(centre - measured_size * 0.5, measured_size)
+		if _rect_distance(measured_rect, prep_rect) > 1.9 \
+				or _rect_distance(measured_rect, support_rect) > 1.9:
+			continue
+		# The model must face into this actual wall and its measured rear edge
+		# must touch it. Nav-rectangle proximity alone is not a mounting proof.
+		var expected_yaw := PropCatalog.yaw_facing(wall_normal) + PropCatalog.face_offset(key)
+		if absf(wrapf(yaw - expected_yaw, -PI, PI)) > 0.03:
+			continue
+		var inward_projection := centre.dot(wall_normal)
+		var back_edge := inward_projection - (measured_size.x * absf(wall_normal.x)
+			+ measured_size.y * absf(wall_normal.y)) * 0.5
+		if absf(back_edge - wall_line) > 0.015:
+			continue
+		var room_rect := HouseGeometry.room_floor_rect(p, room)
+		if not room_rect.grow(0.01).encloses(measured_rect):
+			continue
+		var extent := HouseFurnishScore._piece_projection(measured_rect, axis, item)
+		var bottom := origin.y + PropCatalog.floor_offset(key) * PropCatalog.placement_height_scale(item)
+		var top := bottom + PropCatalog.placement_height(item)
+		var base := HouseFurnishGeometry.storey_base(p, room)
+		var floor_y := base + HouseGeometry.FLOOR_T
+		var ceiling_y := base + p.spec.height - HouseGeometry.FLOOR_T - 0.03
+		if bottom < floor_y + 0.9 or top > ceiling_y:
+			continue
+		# Exclude the candidate while checking its full measured 3D body against
+		# other furniture. Then restore it at the same plan index.
+		var saved: Dictionary = p.furniture.pop_at(item_index)
+		var clear_spans := clear_wall_spans(p, room, wall_index,
+			measured_size.y if horizontal else measured_size.x)
+		var collision_free := _wall_mount_clear_of_furniture(p, room,
+			measured_rect, bottom, top)
+		p.furniture.insert(item_index, saved)
+		if not collision_free:
+			continue
+		var fully_clear := false
+		for span in clear_spans:
+			if extent.x >= span.x - 0.03 and extent.y <= span.y + 0.03:
+				fully_clear = true
+				break
+		if not fully_clear:
+			continue
+		var host_id := "wallhost:activity:%s:task_light_existing" % anchor_id
+		var category := PropCatalog.category(key)
+		_append_wall_host(p, room, wall_index, extent, wall,
+			"lighting", group_name, anchor_id, category, host_id)
+		item["wall_host_id"] = host_id
+		item["mount_relation"] = "lights_activity"
+		item["activity_anchor_id"] = anchor_id
+		item["surface_anchor_id"] = "surface:%s:existing_task_light" % anchor_id
+		var intervals: Array = occupied_by_room[room].get(wall_index, [])
+		intervals.append(extent)
+		occupied_by_room[room][wall_index] = intervals
+		return true
+	return false
+
+
+## Compose only after activity placement and repair. Each host is a real wall
+## interval left clear of apertures and stair wells, tied to surviving
+## activity furniture by a durable ID. Rooms without the LIVE-GROUPS
+## annotation stay empty; the surface pass does not invent activity.
+static func compose_wall_hosts(p: HousePlan, spec: HouseSpec) -> void:
+	# Exact public ordinary-HouseSpec gate. Shops, inns, hotels, keeps, insulae,
+	# and every wider-world adapter retain their own composition contract.
+	if spec == null or p.spec != spec or spec.trade != &"none" \
+		or spec.get_script() != BASE_HOUSE_SPEC \
+			or p.world_family != &"" or spec.has_method("room_program") \
+			or spec.has_method("custom_room_rects"):
+		return
+	p.wall_hosts.clear()
+	# This is the generator's final furnishing pass, after placement and repair.
+	# Remove only prior derived fittings so an unchanged source plan can be
+	# recomposed deterministically. Do not call it after adding non-generated
+	# children hosted by a generated fitting: HousePlan.host is an array index.
+	for fi in range(p.furniture.size() - 1, -1, -1):
+		if bool(p.furniture[fi].get("surface_generated", false)):
+			p.furniture.remove_at(fi)
+	# Recomposition removes only metadata derived by this pass. Retain the
+	# activity annotations and every authored placement field.
+	for item_variant in p.furniture:
+		var item: Dictionary = item_variant
+		if bool(item.get("surface_generated", false)):
+			continue
+		if String(item.get("activity_binding_group", "")) != "":
+			item.erase("surface_parent_id")
+		for key in ["wall_host_id", "mount_relation", "activity_anchor_id",
+				"activity_binding_group", "surface_anchor_id"]:
+			item.erase(key)
+	var found_activity := false
+	var ordinals: Dictionary = {}
+	var occupied_by_room: Dictionary = {}
+	var selected: Dictionary = {}
+	for item_index in range(p.furniture.size()):
+		var item: Dictionary = p.furniture[item_index]
+		var group_name := String(item.get("activity_group", ""))
+		if group_name not in ["cooking", "witchwork", "sleep", "eating", "sitting"]:
+			continue
+		found_activity = true
+		var room := int(item.get("room", -1))
+		if room < 0 or room >= p.room_count():
+			continue
+		if not occupied_by_room.has(room):
+			occupied_by_room[room] = {}
+		var category := String(item.get("cat", PropCatalog.category(String(item.get("key", "")))))
+		var ordinal_key := "%d|%s|%s" % [room, group_name, category]
+		var ordinal := int(ordinals.get(ordinal_key, 0))
+		ordinals[ordinal_key] = ordinal + 1
+		var anchor_id := "activity:%d:%s:%s:%d" % [room, group_name, category, ordinal]
+		item["surface_anchor_id"] = anchor_id
+		var rank := _activity_anchor_rank(group_name, category, item)
+		if rank >= 100:
+			continue
+		var selection_key := "%d|%s" % [room, group_name]
+		var prior: Dictionary = selected.get(selection_key, {})
+		if prior.is_empty():
+			prior = {"room": room, "group": group_name, "anchors": []}
+		var anchors: Array = prior["anchors"]
+		anchors.append({"index": item_index, "category": category,
+			"anchor_id": anchor_id, "rank": rank})
+		prior["anchors"] = anchors
+		selected[selection_key] = prior
+	if not found_activity:
+		return
+	for selection_variant in selected.values():
+		var source: Dictionary = selection_variant
+		var room := int(source["room"])
+		var group_name := String(source["group"])
+		var anchors: Array = source["anchors"]
+		anchors.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+			if int(left["rank"]) != int(right["rank"]):
+				return int(left["rank"]) < int(right["rank"])
+			return int(left["index"]) < int(right["index"]))
+		if group_name == "sleep":
+			if not _compose_sleep_anchor_with_fallback(p, spec, room, anchors, occupied_by_room):
+				_note_activity_surface_unavailable(p, room, group_name)
+			continue
+		var anchor: Dictionary = anchors[0]
+		var item: Dictionary = p.furniture[int(anchor["index"])]
+		var category := String(anchor["category"])
+		var anchor_id := String(anchor["anchor_id"])
+		if not item.has("rect") or not item.get("rect") is Rect2:
+			_note_activity_surface_unavailable(p, room, group_name)
+			continue
+		var prep_rect := Rect2(item.get("zone", Rect2()))
+		if not prep_rect.has_area():
+			prep_rect = Rect2(item["rect"])
+		var anchor_position := Rect2(item["rect"]).get_center()
+		_add_activity_wall_composition(p, spec, room, group_name, category,
+			anchor_id, String(item.get("key", "")), anchor_position, prep_rect, occupied_by_room)
+	# Every activity room gets one intentionally quiet wall interval when the
+	# architecture has a clear run for it. It is a named design choice, not a
+	# quota that encourages covering all available wall with props.
+	for room_variant in occupied_by_room:
+		var room := int(room_variant)
+		var best: Dictionary = {}
+		var walls := HouseGeometry.room_walls(p, room)
+		for wi in walls.size():
+			var cuts: Array = occupied_by_room[room].get(wi, [])
+			for span in clear_wall_spans(p, room, wi, HouseGeometry.BEAM_D):
+				var cursor := span.x
+				var ordered: Array = cuts.duplicate()
+				ordered.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+				for cut in ordered:
+					# Subtract only the part inside this already-clear interval.
+					# A later reservation must not extend its quiet endpoint.
+					if cut.y <= span.x or cut.x >= span.y:
+						continue
+					cut = Vector2(maxf(cut.x, span.x), minf(cut.y, span.y))
+					if cut.x - cursor > 0.6 and cut.x - cursor > float(best.get("length", 0.0)):
+						best = {"wall": wi, "span": Vector2(cursor, cut.x), "length": cut.x - cursor}
+					cursor = maxf(cursor, cut.y)
+				if span.y - cursor > 0.6 and span.y - cursor > float(best.get("length", 0.0)):
+					best = {"wall": wi, "span": Vector2(cursor, span.y), "length": span.y - cursor}
+		if best.is_empty():
+			continue
+		var quiet_wall: Dictionary = walls[int(best["wall"])]
+		var quiet_axis := Vector2.RIGHT if absf(Vector2(quiet_wall["normal"]).y) > 0.5 else Vector2(0.0, 1.0)
+		var quiet_span: Vector2 = best["span"]
+		var quiet_from := Vector2(quiet_span.x, quiet_wall["from"].y) if quiet_axis.x > 0.5 \
+			else Vector2(quiet_wall["from"].x, quiet_span.x)
+		var quiet_to := Vector2(quiet_span.y, quiet_wall["from"].y) if quiet_axis.x > 0.5 \
+			else Vector2(quiet_wall["from"].x, quiet_span.y)
+		var quiet_id := "wallhost:quiet:%d:%d" % [room, int(best["wall"])]
+		p.wall_hosts.append({"id": quiet_id, "room": room,
+			"storey": p.storey_of_room(room), "wall": int(best["wall"]),
+			"from": quiet_from, "to": quiet_to,
+			"normal": quiet_wall["normal"], "span": quiet_span,
+			"role": "quiet", "anchor_id": "", "activity_group": ""})
+		# A timber-framed house receives one interior bay on this already-clear
+		# quiet span per activity room. Other construction styles receive none.
+		if spec.timber_frame and spec.material != &"stone" and float(best["length"]) >= 1.5 \
+				and _timber_bay_clear_of_furniture(p, room, int(best["wall"]), quiet_span):
+			var bay_id := "wallhost:timber:%d:%d" % [room, int(best["wall"])]
+			p.wall_hosts.append({"id": bay_id, "room": room,
+				"storey": p.storey_of_room(room), "wall": int(best["wall"]),
+				"from": quiet_from, "to": quiet_to,
+				"normal": quiet_wall["normal"], "span": quiet_span,
+				"role": "timber_bay", "source_host_id": quiet_id,
+				"anchor_id": "", "activity_group": ""})
+	# Existing mounted models keep their measured placement. Bind each to the
+	# semantic span that actually contains it, so later checks and saves do not
+	# need to infer a wall relationship from a changing furniture index.
+	for item_variant in p.furniture:
+		var item: Dictionary = item_variant
+		if not bool(item.get("mounted", false)):
+			continue
+		if bool(item.get("surface_generated", false)):
+			continue
+		if String(item.get("wall_host_id", "")) != "":
+			continue
+		var room := int(item.get("room", -1))
+		if room < 0 or room >= p.room_count():
+			continue
+		var wall := HouseFurnishScore._back_wall_index(p, room,
+			Rect2(item.get("rect", Rect2())), item)
+		if wall < 0:
+			continue
+		var walls := HouseGeometry.room_walls(p, room)
+		if wall >= walls.size():
+			continue
+		var axis := Vector2.RIGHT if absf(Vector2(walls[wall]["normal"]).y) > 0.5 else Vector2(0.0, 1.0)
+		var extent := HouseFurnishScore._piece_projection(Rect2(item.get("rect", Rect2())), axis, item)
+		var preferred_anchor := String(item.get("surface_anchor_id", ""))
+		for host_variant in p.wall_hosts:
+			var host: Dictionary = host_variant
+			if int(host["room"]) != room or int(host["wall"]) != wall:
+				continue
+			if preferred_anchor != "" and String(host.get("anchor_id", "")) != preferred_anchor:
+				continue
+			if preferred_anchor == "" and String(host.get("role", "")) != "quiet":
+				continue
+			var host_span: Vector2 = host["span"]
+			if extent.x >= host_span.x - 0.03 and extent.y <= host_span.y + 0.03:
+				item["wall_host_id"] = host["id"]
+				item["mount_relation"] = "lights_activity" if host["role"] == "lighting" \
+					else ("supports_activity" if host["role"] == "activity_support" \
+					else "intentionally_quiet_wall")
+				item["activity_anchor_id"] = host.get("anchor_id", "")
+				break
+
+
+## The framing sits on the wall face, but its measured beam depth still occupies
+## a real strip of the room. Do not draw a decorative bay through furniture.
+## Stair and opening reservations have already been removed from clear spans.
+static func _timber_bay_clear_of_furniture(p: HousePlan, room: int,
+		wall_index: int, span: Vector2) -> bool:
+	if room < 0 or room >= p.room_count():
+		return false
+	var walls := HouseGeometry.room_walls(p, room)
+	if wall_index < 0 or wall_index >= walls.size():
+		return false
+	var body_rect := _timber_bay_body_rect(p, room, wall_index, span)
+	if not body_rect.has_area():
+		return false
+	for item in p.furniture:
+		if int(item.get("room", -1)) != room or not item.has("rect"):
+			continue
+		if body_rect.intersects(Rect2(item["rect"])):
+			return false
+	for zone in p.zones:
+		if int(zone.get("room", -1)) == room and body_rect.intersects(Rect2(zone.get("rect", Rect2()))):
+			return false
+	return true
+
+
+static func _timber_bay_body_rect(p: HousePlan, room: int,
+		wall_index: int, span: Vector2) -> Rect2:
+	if room < 0 or room >= p.room_count():
+		return Rect2()
+	var walls := HouseGeometry.room_walls(p, room)
+	if wall_index < 0 or wall_index >= walls.size():
+		return Rect2()
+	var bay_width: float = span.y - span.x - 0.08
+	if bay_width <= 0.0:
+		return Rect2()
+	var wall: Dictionary = walls[wall_index]
+	var normal: Vector2 = wall["normal"]
+	var horizontal: bool = absf(normal.y) > 0.5
+	var wall_coord: float = float(wall["from"].y) if horizontal else float(wall["from"].x)
+	var centre_along: float = (span.x + span.y) * 0.5
+	var centre_normal: float = wall_coord + (HouseGeometry.BEAM_D * 0.5 - 0.004) \
+		* (normal.y if horizontal else normal.x)
+	var centre := Vector2(centre_along, centre_normal) if horizontal \
+		else Vector2(centre_normal, centre_along)
+	var size := Vector2(bay_width, HouseGeometry.BEAM_D) if horizontal \
+		else Vector2(HouseGeometry.BEAM_D, bay_width)
+	return Rect2(centre - size * 0.5, size)

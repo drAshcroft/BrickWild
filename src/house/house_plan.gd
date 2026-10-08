@@ -59,6 +59,11 @@ var windows: Array[Dictionary] = []
 ## {"key": String, "room": int, "pos": Vector3, "yaw": float, "rect": Rect2,
 ##  "zone": Rect2, "host": int, "cat": String, "storey": int}
 var furniture: Array[Dictionary] = []
+## Semantic interior surface intervals composed from surviving activity anchors.
+## Rows identify a real room wall edge and one clear span, with role
+## `activity_support`, `lighting`, `quiet`, or `timber_bay`. Relationships use
+## stable `anchor_id` strings, never furniture array indices.
+var wall_hosts: Array[Dictionary] = []
 ## Walkable textile overlays: {id, table, room, storey, rect}. They never
 ## enter furniture obstruction lists; the builder lifts them 2 mm above floor.
 var rugs: Array[Dictionary] = []

@@ -19,6 +19,7 @@ const SURF_ROOF := 2
 const SURF_FLOOR := 3
 const HAN_DOME_SEGMENTS := 16
 const HAN_DOME_BANDS := 5
+const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
 var plan: HousePlan
 var spec: HouseSpec
 var emitted_mesh: ArrayMesh
@@ -56,6 +57,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	if spec.material != &"stone":
 		_build_jetty()
 		_build_timber_frame()
+		_build_interior_timber_bays()
 	# HOUSE-RICH: the crown, the belt bands and the pediments. Every one of
 	# them is behind its own spec field, so an ordinary house returns from this
 	# having emitted nothing and its mesh is unchanged vertex for vertex.
@@ -93,16 +95,94 @@ func _build_hearth_breast() -> void:
 	var breast := HouseGeometry.hearth_breast(plan)
 	if breast.is_empty():
 		return
+	if not _is_ordinary_domestic_hearth():
+		_emit_solid_hearth_breast(breast)
+		return
 	var level := int(breast["storey"])
 	var y0 := level * spec.height
 	var centre: Vector2 = breast["centre"]
-	var size := Vector3(breast["width"], spec.height, breast["depth"])
-	var xf := Transform3D(Basis(Vector3.UP, float(breast["yaw"])), Vector3(centre.x, y0 + spec.height * 0.5, centre.y))
+	var breast_width: float = float(breast["width"])
+	var breast_depth: float = float(breast["depth"])
+	var opening_width: float = minf(1.15, breast_width - 0.28)
+	var opening_bottom: float = 0.34
+	var opening_clear_top: float = minf(1.26, spec.height - 0.72)
+	var lintel_height: float = 0.18
+	if opening_width < 0.65 or opening_clear_top <= opening_bottom + 0.25:
+		_emit_solid_hearth_breast(breast)
+		return
+	tag("chimney_breast")
+	host("hearth", level)
+	var side_width: float = (breast_width - opening_width) * 0.5
+	var yaw: float = float(breast["yaw"])
+	var lintel_center_y: float = opening_clear_top + lintel_height * 0.5
+	# Keep the same breast envelope and flue mass, but leave a real firebox
+	# mouth through the room-facing masonry. The room wall behind it is the
+	# firebox back; the opening is a recess, not a dark rectangle on the face.
+	_hearth_breast_box("hearth_breast_left", Vector3(side_width, spec.height,
+		breast_depth), centre, y0, spec.height * 0.5, -opening_width * 0.5 - side_width * 0.5,
+		0.0, yaw, SURF_WALL)
+	_hearth_breast_box("hearth_breast_right", Vector3(side_width, spec.height,
+		breast_depth), centre, y0, spec.height * 0.5, opening_width * 0.5 + side_width * 0.5,
+		0.0, yaw, SURF_WALL)
+	_hearth_breast_box("hearth_breast_foot", Vector3(opening_width, opening_bottom,
+		breast_depth), centre, y0, opening_bottom * 0.5, 0.0, 0.0, yaw, SURF_WALL)
+	_hearth_breast_box("hearth_lintel", Vector3(opening_width, lintel_height,
+		breast_depth), centre, y0, lintel_center_y, 0.0, 0.0, yaw, SURF_TRIM)
+	var header_bottom: float = lintel_center_y + lintel_height * 0.5
+	if spec.height > header_bottom:
+		var mantel_depth: float = minf(0.12, breast_depth * 0.25)
+		_hearth_breast_box("hearth_breast_header", Vector3(opening_width,
+			spec.height - header_bottom, breast_depth - mantel_depth), centre, y0,
+			header_bottom + (spec.height - header_bottom) * 0.5,
+			0.0, mantel_depth * 0.5, yaw, SURF_WALL)
+	# Short returns form the inside cheeks of the recess; they stop at the host
+	# wall, which remains the firebox back.
+	var cheek_depth: float = breast_depth * 0.68
+	var cheek_height: float = opening_clear_top - opening_bottom
+	var cheek_z: float = -breast_depth * 0.5 + cheek_depth * 0.5
+	for side in [-1.0, 1.0]:
+		_hearth_breast_box("hearth_jamb", Vector3(0.10, cheek_height, cheek_depth),
+			centre, y0, opening_bottom + cheek_height * 0.5,
+			side * (opening_width * 0.5 - 0.05), cheek_z, yaw, SURF_TRIM)
+	# A restrained mantel sits on the lintel and within the recorded envelope.
+	var mantel_depth: float = minf(0.12, breast_depth * 0.25)
+	_hearth_breast_box("hearth_mantel", Vector3(opening_width + 0.24, 0.10,
+		mantel_depth), centre, y0, header_bottom + 0.05, 0.0,
+		-breast_depth * 0.5 + mantel_depth * 0.5, yaw, SURF_TRIM)
+	var rect: Rect2 = breast["rect"]
+	_log_mass("chimney_breast", AABB(Vector3(rect.position.x, y0, rect.position.y), Vector3(rect.size.x, spec.height, rect.size.y)), y0)
+	host_end()
+
+
+func _is_ordinary_domestic_hearth() -> bool:
+	return plan != null and spec != null and plan.spec == spec \
+		and spec.get_script() == BASE_HOUSE_SPEC \
+		and spec.trade == &"none" and plan.world_family == &"" \
+		and not spec.has_method("room_program") and not spec.has_method("custom_room_rects")
+
+
+func _emit_solid_hearth_breast(breast: Dictionary) -> void:
+	var level: int = int(breast["storey"])
+	var y0: float = float(level) * spec.height
+	var centre: Vector2 = breast["centre"]
+	var size := Vector3(float(breast["width"]), spec.height, float(breast["depth"]))
+	var xf := Transform3D(Basis(Vector3.UP, float(breast["yaw"])),
+		Vector3(centre.x, y0 + spec.height * 0.5, centre.y))
 	tag("chimney_breast")
 	host("hearth", level)
 	component_box("chimney_breast", size, xf, SURF_WALL)
 	var rect: Rect2 = breast["rect"]
-	_log_mass("chimney_breast", AABB(Vector3(rect.position.x, y0, rect.position.y), Vector3(rect.size.x, spec.height, rect.size.y)), y0)
+	_log_mass("chimney_breast", AABB(Vector3(rect.position.x, y0, rect.position.y),
+		Vector3(rect.size.x, spec.height, rect.size.y)), y0)
+	host_end()
+
+
+func _hearth_breast_box(role: String, size: Vector3, centre: Vector2, y0: float,
+		y_local: float, x_local: float, z_local: float, yaw: float, surface: int) -> void:
+	var basis := Basis(Vector3.UP, yaw)
+	var local_offset := basis * Vector3(x_local, 0.0, z_local)
+	var xf := Transform3D(basis, Vector3(centre.x, y0 + y_local, centre.y) + local_offset)
+	component_box(role, size, xf, surface)
 
 
 func _build_rugs() -> void:
@@ -1450,6 +1530,112 @@ static func _facade_studs(length: float, openings: Array[Dictionary], pitch: flo
 	return out
 
 
+## One framed quiet bay per surfaced room, only where the spec actually drew
+## exposed timber. Its interval comes from the plan's opening-aware quiet host;
+## walls with activity supports, doors or windows are not covered by an
+## ornamental grid.
+func _build_interior_timber_bays() -> void:
+	if not spec.timber_frame or spec.material == &"stone":
+		return
+	for surface in plan.wall_hosts:
+		if String(surface.get("role", "")) != "timber_bay":
+			continue
+		var room := int(surface.get("room", -1))
+		var wall_index := int(surface.get("wall", -1))
+		var storey := int(surface.get("storey", 0))
+		if room < 0 or room >= plan.room_count():
+			continue
+		var walls := HouseGeometry.room_walls(plan, room)
+		if wall_index < 0 or wall_index >= walls.size():
+			continue
+		var from: Vector2 = surface.get("from", Vector2.ZERO)
+		var to: Vector2 = surface.get("to", Vector2.ZERO)
+		var span := from.distance_to(to)
+		if span < 1.5:
+			continue
+		var wall: Dictionary = walls[wall_index]
+		var dir := (to - from).normalized()
+		var normal: Vector2 = wall["normal"]
+		var yaw := atan2(-dir.y, dir.x)
+		var bay_width := span - 0.08
+		if bay_width < 1.5:
+			continue
+		var inset := (span - bay_width) * 0.5
+		var depth := HouseGeometry.BEAM_D
+		var face_offset := normal * (depth * 0.5 - 0.004)
+		var start := from + dir * inset + face_offset
+		var finish := from + dir * (inset + bay_width) + face_offset
+		var floor_y := float(storey) * spec.height + HouseGeometry.FLOOR_T
+		# The top edge meets the actual ceiling underside. A short gap turns a
+		# structural post into a freestanding picture frame.
+		var top_y := float(storey + 1) * spec.height
+		var post_width := HouseGeometry.POST_W
+		var host_id := "interior_frame_%d_%d" % [room, wall_index]
+		var bay_axis := dir
+		var bay_lo := from.dot(bay_axis) + inset + post_width * 0.5
+		var bay_hi := to.dot(bay_axis) - inset - post_width * 0.5
+		var matched_shell_run := false
+		var post_positions: Array[Vector2] = []
+		# Shell runs sit on wall centre lines and point outward. Translate them to
+		# the room's inner face before matching the wall and its real stud stations.
+		for run in HouseGeometry.shell_runs(plan, storey):
+			var run_from: Vector2 = run["from"]
+			var run_to: Vector2 = run["to"]
+			var run_normal: Vector2 = run["normal"]
+			if run_normal.dot(normal) > -0.99:
+				continue
+			var half_wall := float(run.get("thickness", HouseGeometry.wall_thickness(spec))) * 0.5
+			var inner_from := run_from + normal * half_wall
+			var inner_to := run_to + normal * half_wall
+			var run_dir := (inner_to - inner_from).normalized()
+			if absf((inner_from - Vector2(wall["from"])).cross(dir)) > 0.025 \
+					or absf((inner_to - Vector2(wall["from"])).cross(dir)) > 0.025 \
+					or absf(run_dir.dot(dir)) < 0.99:
+				continue
+			matched_shell_run = true
+			var run_length := inner_from.distance_to(inner_to)
+			var openings := _openings_on(run_from, run_to, run_normal, storey)
+			var true_stations: Array[float] = [post_width * 0.5,
+				run_length - post_width * 0.5]
+			true_stations.append_array(_facade_studs(run_length, openings, spec.stud_pitch))
+			for station in true_stations:
+				var station_pos := inner_from + run_dir * station + face_offset
+				var station_along := station_pos.dot(bay_axis)
+				if station_along >= bay_lo - 0.001 and station_along <= bay_hi + 0.001:
+					post_positions.append(station_pos)
+		if not matched_shell_run:
+			# Partitions have no façade stations. Their end posts are inset so the
+			# measured beam bodies remain within the clear host envelope.
+			post_positions.append(start + dir * (post_width * 0.5))
+			post_positions.append(finish - dir * (post_width * 0.5))
+			var bay_count := maxi(1, ceili(bay_width / maxf(spec.stud_pitch, 0.3)))
+			for station_index in range(1, bay_count):
+				post_positions.append(start.lerp(finish, float(station_index) / bay_count))
+		elif post_positions.is_empty():
+			# The clear exterior span contains no corner, jamb, or true stud station.
+			continue
+		tag("interior_timber_bay")
+		host(host_id, storey)
+		post_positions.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+			return a.dot(bay_axis) < b.dot(bay_axis))
+		var unique_post_positions: Array[Vector2] = []
+		for pos in post_positions:
+			if unique_post_positions.is_empty() \
+					or pos.distance_to(unique_post_positions.back()) > post_width * 0.6:
+				unique_post_positions.append(pos)
+		for pos in unique_post_positions:
+			component_box("interior_frame_post",
+				Vector3(post_width, top_y - floor_y, depth),
+				Transform3D(Basis(Vector3.UP, yaw),
+					Vector3(pos.x, (floor_y + top_y) * 0.5, pos.y)), SURF_TRIM)
+		for beam_y in [floor_y + post_width * 0.5, top_y - post_width * 0.5]:
+			var centre := (start + finish) * 0.5
+			component_box("interior_frame_rail", Vector3(bay_width, post_width, depth),
+				Transform3D(Basis(Vector3.UP, yaw),
+					Vector3(centre.x, beam_y, centre.y)), SURF_TRIM)
+		host_end()
+
+
 func _build_stone_quoins(level: int) -> void:
 	tag("quoins")
 	var h: float = spec.height
@@ -2633,24 +2819,36 @@ func _build_porch() -> void:
 	var door: Dictionary = plan.doors[d]
 	var depth: float = HouseGeometry.porch_depth(spec)
 	var w: float = float(door["width"]) + 1.1
-	var c: Vector2 = door["pos"] + door["normal"] * (depth / 2.0)
+	var normal: Vector2 = Vector2(door["normal"]).normalized()
+	var wall_t: float = HouseGeometry.wall_thickness(spec)
+	# Door positions are on the interior wall face. Start the canopy at the
+	# exterior face, then run it outward to the existing porch bound. The old
+	# centre-at-door-plus-half-depth formula began 10 cm inside the room.
+	var outer_face: Vector2 = Vector2(door["pos"]) + normal * wall_t
+	var porch_along: float = depth + 0.1 - wall_t
+	var roof_centre: Vector2 = outer_face + normal * (porch_along / 2.0)
 	var head: float = HouseGeometry.DOOR_H + 0.35
-	var step := AABB(Vector3(c.x - w / 2.0, 0.0, c.y - depth / 2.0 - 0.1),
-		Vector3(w, HouseGeometry.FLOOR_T, depth + 0.2 + HouseGeometry.wall_thickness(spec)))
+	var step_depth: float = depth + 0.2 + wall_t
+	var step_centre: Vector2 = Vector2(door["pos"]) + normal * ((depth - wall_t) / 2.0)
+	var step_size: Vector3 = Vector3(step_depth, HouseGeometry.FLOOR_T, w) \
+		if absf(normal.x) > 0.5 else Vector3(w, HouseGeometry.FLOOR_T, step_depth)
+	var step := AABB(Vector3(step_centre.x - step_size.x * 0.5, 0.0,
+		step_centre.y - step_size.z * 0.5), step_size)
 	box(step.size, step.position + step.size / 2.0, SURF_FLOOR)
 	_log_mass("porch_step", step)
+	var across: Vector2 = Vector2(normal.y, -normal.x)
 	for side in [-1.0, 1.0]:
-		var p: Vector2 = c + Vector2(side * (w / 2.0 - 0.1), 0.0) \
-			+ door["normal"] * (depth / 2.0 - 0.12)
+		var p: Vector2 = Vector2(door["pos"]) + across * (side * (w / 2.0 - 0.1)) \
+			+ normal * (depth - 0.12)
 		box(Vector3(0.14, head, 0.14), Vector3(p.x, head / 2.0, p.y), SURF_TRIM)
 		_log_mass("porch_post_%s" % ("left" if side < 0.0 else "right"),
 			AABB(Vector3(p.x - 0.07, 0.0, p.y - 0.07), Vector3(0.14, head, 0.14)))
-	var xf := Transform3D(Basis(), Vector3(c.x, head, c.y))
-	var porch_along: float = depth + 0.2
+	var yaw: float = atan2(normal.x, normal.y)
+	var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(roof_centre.x, head, roof_centre.y))
 	component_note("porch_roof", "ridge", SURF_ROOF, {"xf": xf, "span": w,
 		"along": porch_along, "rise": 0.42,
-		"aabb": xf * AABB(Vector3(-w * 0.5, 0.0, -porch_along * 0.5),
-			Vector3(w, 0.42, porch_along))})
+		"aabb": xf * AABB(Vector3(-w * 0.5, -RoofShape.DEPTH * 0.5,
+			-porch_along * 0.5), Vector3(w, 0.42 + RoofShape.DEPTH, porch_along))})
 	_kit.ridge_roof(xf, w, porch_along, 0.42, SURF_ROOF)
 	host_end()
 
