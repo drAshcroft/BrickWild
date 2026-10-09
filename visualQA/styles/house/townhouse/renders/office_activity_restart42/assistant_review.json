@@ -1,0 +1,103 @@
+{
+  "reviewer": "root assistant; direct image inspection",
+  "human_rating": null,
+  "reviewed_images": 17,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "scoped_improvement": "Default and large offices have a measured chair, lowered workbench, supported books and required records storage. Small remains office-free.",
+  "findings": [
+    "The chair and work surface now form a seated group, but the book is at the opposite end of the oversized workbench. A recognizable writing place still needs reachable work, knee room and a purposeful desk.",
+    "Broad blank walls and isolated furnishing weaken domestic composition. Records storage outside the fixed office camera is present in the assembled inventory; its absence from that frame is not proof of an unfurnished office.",
+    "Large arrival and central hall remain excessively empty; storage and bedroom portraits remain generic.",
+    "The broad roof and repeated timber facade still lack the vertical street-house character of the target.",
+    "Kitchen heat and cauldron arrangement are unchanged HEAD behavior in this independent project. This scoped office change does not resolve them."
+  ],
+  "source_manifest_sha256": "24abf4f9ed5da195adcf92d439126386dbfcc8c29ef53a3191cee66b94ad7a4a",
+  "render_receipt": {
+    "script": "res://tools/render_house_style_gallery.gd",
+    "args": [
+      "--path",
+      "C:/Projects/BrickWild/artifacts/personality/resumed/office_head_gate_project",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart42_office_HEAD_render\\godot.log",
+      "--script",
+      "res://tools/render_house_style_gallery.gd",
+      "--",
+      "style=townhouse",
+      "run=office_activity_restart42"
+    ],
+    "native_exit": 0,
+    "seconds": 52.963,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_default_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "3cc51bc12a76e3fab3236b0aba956cc29f4cf84011b6c8c6e67be4e71ad4814f"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_default_8102/rooms/room_cooking_kitchen_1.jpg",
+      "sha256": "4ea0bbc7ee7489000834000db4bbacd542de1aaab1ba29d989527e81aa06e60e"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_default_8102/rooms/room_sleeping_bedroom_3.jpg",
+      "sha256": "2587ef0e96b22f9de5a68449d83a9f5b350be3c122eaf95577df0bb88da7ccb6"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_default_8102/rooms/room_work_office_2.jpg",
+      "sha256": "09c34a99e721ec1e430feae148a9725b39793fd09c398d4ba77d5c30231369dc"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_default_8102/views/cutaway_context.jpg",
+      "sha256": "0441e0007e7f254ebbe7c96ef07c90ce79f23aa602547f63c11ae0c8105faa04"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_default_8102/views/roof_on_exterior.jpg",
+      "sha256": "eac847f8f94e2c99ee5a812784be37dd2df2dd4be19068955388fdbd6d030dff"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_large_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "98f5df4c1104fa3bdf5e6789f5ae0f96ca2a12c2f64c11d59f54153df6a6431f"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_large_8102/rooms/room_cooking_kitchen_6.jpg",
+      "sha256": "5fe4e84c079ea15ebe89ad0cb5941c1564fb5141cff611c62b66313e5782254e"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_large_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "adda3849e94f4e31dc0f4411a01a6cb6eeae22cba299aa6f4d3b38fbc39f1065"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_large_8102/rooms/room_storage_store_3.jpg",
+      "sha256": "d6d2f37451ced1573fd777c88e852e7284b645566267ea4ff2556a2f5b8c1022"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_large_8102/rooms/room_work_office_2.jpg",
+      "sha256": "42505ff8c34cc9ded1d607d8b4673362943bb4272b5de57e15eb08bdebd60b52"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_large_8102/views/cutaway_context.jpg",
+      "sha256": "c7dde2414325575a3e3130d03cbf0a9598b3cedeb02afe9f3333f2c143b5279a"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_large_8102/views/roof_on_exterior.jpg",
+      "sha256": "2067cdd4b40749605bfcb991a91fd27975e3248c404026f60c2061190911ed73"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_small_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "71edf4f2cd3d7d858774c92eefc39fa8d2e1a28abfa1e25cd011bf2ca928c893"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_small_8102/rooms/room_sleeping_bedroom_1.jpg",
+      "sha256": "eb2c30381b97f452c12f22d9f3490184d09dfd1037bb6512d45a514acfe02a21"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_small_8102/views/cutaway_context.jpg",
+      "sha256": "0775173ce6d6381d67c56adf24c8620707e717ba009f081ee08c22dab3a41b65"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/office_activity_restart42/townhouse_small_8102/views/roof_on_exterior.jpg",
+      "sha256": "480945f7172086134bc7294ea6c673d756ec30204c4daae5736b95109a5909f3"
+    }
+  ]
+}

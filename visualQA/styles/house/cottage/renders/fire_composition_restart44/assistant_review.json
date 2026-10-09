@@ -1,0 +1,72 @@
+{
+  "reviewer": "root assistant; direct inspection of all 24 source images",
+  "human_rating": null,
+  "reviewed_images": 8,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "candidate_implementation_accepted": false,
+  "findings": [
+    "The mantel is stable and the fireplace is visible with the actual cooking station in all four sizes.",
+    "Restrained curved flames improve the previous straight-cone appearance; the dark faceted fuel still reads too much like flat stones, with weak split-log detail.",
+    "The bright pale firebox floor, generic white breast and sparse wall composition need further design work.",
+    "Large roof planes, oversized chimneys and generic house proportions remain unresolved. This cohort does not complete the house style."
+  ],
+  "render_receipt": {
+    "script": "res://tools/render_domestic_hearth_shell_host.gd",
+    "args": [
+      "--path",
+      "C:/Projects/BrickWild/artifacts/personality/resumed/domestic_hearth_gate_project",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart44_fire_HEAD_visual\\godot.log",
+      "--script",
+      "res://tools/render_domestic_hearth_shell_host.gd",
+      "--",
+      "out=C:/Projects/BrickWild/artifacts/personality/resumed/restart44_fire_HEAD_visual/renders"
+    ],
+    "native_exit": 0,
+    "seconds": 57.171,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/cottage/renders/fire_composition_restart44/cottage_small_7441/rooms/hearth_portrait.jpg",
+      "sha256": "745b196bea1b73153b0f6b3f6a49f61691ac72479eb0401ae5618628554c5141",
+      "source_row_index": 8
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/fire_composition_restart44/cottage_small_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "cd4b1b132b5dee9dc6a2360866d5c35e3a10abee484c80d4aeb2dc06e1c669cb",
+      "source_row_index": 9
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/fire_composition_restart44/cottage_default_7441/rooms/hearth_portrait.jpg",
+      "sha256": "8508ac1035e95dad7e50f546f952acfd055a3563f9c21f72a1235385d4f93fcc",
+      "source_row_index": 10
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/fire_composition_restart44/cottage_default_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "d669bcc7c43d7209f87bbddc48e5e2d9dc7df106f3bf419af01c80f42903ab6e",
+      "source_row_index": 11
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/fire_composition_restart44/cottage_large_7441/rooms/hearth_portrait.jpg",
+      "sha256": "8ef5d4e2725efc1016ee6700af484c0dfc2b83caac7c4183dd939e76c91d88bc",
+      "source_row_index": 12
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/fire_composition_restart44/cottage_large_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "8212032c21c0183e05049f494083845da0c07a6d51bee5cbe9ef404bdc255ac0",
+      "source_row_index": 13
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/fire_composition_restart44/cottage_original_11x14_7441/rooms/hearth_portrait.jpg",
+      "sha256": "123a590af0666a3e3e153a7cd0f37044b38703ba47a96537c958c74699ed0962",
+      "source_row_index": 14
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/fire_composition_restart44/cottage_original_11x14_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "775ecdd4d3ccb82bb4f244d304b84cbcd36631462bcf96b05cebf159132a4638",
+      "source_row_index": 15
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "reviewer": "root assistant; direct inspection of all 24 source images",
+  "human_rating": null,
+  "reviewed_images": 8,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "candidate_implementation_accepted": false,
+  "findings": [
+    "The mantel is stable and the fireplace is visible with the actual cooking station in all four sizes.",
+    "Restrained curved flames improve the previous straight-cone appearance; the dark faceted fuel still reads too much like flat stones, with weak split-log detail.",
+    "The bright pale firebox floor, generic white breast and sparse wall composition need further design work.",
+    "Large roof planes, oversized chimneys and generic house proportions remain unresolved. This cohort does not complete the house style."
+  ],
+  "render_receipt": {
+    "script": "res://tools/render_domestic_hearth_shell_host.gd",
+    "args": [
+      "--path",
+      "C:/Projects/BrickWild/artifacts/personality/resumed/domestic_hearth_gate_project",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart44_fire_HEAD_visual\\godot.log",
+      "--script",
+      "res://tools/render_domestic_hearth_shell_host.gd",
+      "--",
+      "out=C:/Projects/BrickWild/artifacts/personality/resumed/restart44_fire_HEAD_visual/renders"
+    ],
+    "native_exit": 0,
+    "seconds": 57.171,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/thatch_cottage/renders/fire_composition_restart44/thatch_cottage_small_7441/rooms/hearth_portrait.jpg",
+      "sha256": "cdb9755cfdab7bcd473988ee4cc03e8ba42a37c60bb80a2ec83425f6eff4156d",
+      "source_row_index": 16
+    },
+    {
+      "image": "visualqa/styles/house/thatch_cottage/renders/fire_composition_restart44/thatch_cottage_small_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "66ec2b246b9cea2209a747040b13621aa9a8298f26ab7311f02961472daeb1a3",
+      "source_row_index": 17
+    },
+    {
+      "image": "visualqa/styles/house/thatch_cottage/renders/fire_composition_restart44/thatch_cottage_default_7441/rooms/hearth_portrait.jpg",
+      "sha256": "98d9b08e586b3555e68ec8c4e0eb69e29a6037f148a4623c2eed74d2e623d195",
+      "source_row_index": 18
+    },
+    {
+      "image": "visualqa/styles/house/thatch_cottage/renders/fire_composition_restart44/thatch_cottage_default_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "b89b22434b4e433a1c24f84c70086156a2cf52c8b58ef780fa8d36abc5e37552",
+      "source_row_index": 19
+    },
+    {
+      "image": "visualqa/styles/house/thatch_cottage/renders/fire_composition_restart44/thatch_cottage_large_7441/rooms/hearth_portrait.jpg",
+      "sha256": "53219a09e5f160bbeecf2f929c4a43aec27a36252c48e97066f5366be8c2adf5",
+      "source_row_index": 20
+    },
+    {
+      "image": "visualqa/styles/house/thatch_cottage/renders/fire_composition_restart44/thatch_cottage_large_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "e2689607fe51e60d047ec5564ee03ae6c43d1ce78fefb9e7116d1692ebf1352b",
+      "source_row_index": 21
+    },
+    {
+      "image": "visualqa/styles/house/thatch_cottage/renders/fire_composition_restart44/thatch_cottage_original_11x14_7441/rooms/hearth_portrait.jpg",
+      "sha256": "8e3e7cf32157219daf675a8973518df278d2fd9041529c38152f365bc0e7738e",
+      "source_row_index": 22
+    },
+    {
+      "image": "visualqa/styles/house/thatch_cottage/renders/fire_composition_restart44/thatch_cottage_original_11x14_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "f48ce00b1c3a4d2b0eb8fdfc9ed9945c6f1af91b47776da49d473498513f41c7",
+      "source_row_index": 23
+    }
+  ]
+}

@@ -1,0 +1,1543 @@
+{
+  "purpose": "Archive projection of an isolated candidate render; original source manifest retained byte-for-byte.",
+  "source_manifest": "source_manifest.json",
+  "source_manifest_sha256": "48691a40827c8a9f7b8e2ae7276fae7063d215395079edaa169bee82cacdd66d",
+  "captured_project": "artifacts/personality/resumed/domestic_hearth_gate_project",
+  "captured_source_root": "artifacts/personality/resumed/domestic_hearth_gate_project/artifacts/personality/resumed/domestic_hearth_body_access_v3_diagnostics_v2/renders",
+  "image_path_mapping": "Source basename to archive case/rooms or case/views; all other original row fields retained.",
+  "visual_review_state": "not_assessed",
+  "rows": [
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          0.299999952316284,
+          1.58000004291534,
+          2.90561652183533
+        ],
+        "target": [
+          2.5,
+          0.949999988079071,
+          2.45561647415161
+        ]
+      },
+      "cooking_pot": {
+        "activity_group": "cooking",
+        "assembled_node": {
+          "basis": {
+            "x": [
+              -0.0119547815993428,
+              0.0,
+              -0.999928534030914
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              0.999928534030914,
+              0.0,
+              -0.0119547815993428
+            ]
+          },
+          "container_local_position": [
+            1.25190961360931,
+            1.03799998760223,
+            3.43969392776489
+          ],
+          "found": true,
+          "global_position": [
+            1.25190961360931,
+            1.03799998760223,
+            3.43969392776489
+          ],
+          "rotation_y_radians": 1.58275139331818,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "scene_bounds_note": "SceneBounds.of_node(node) includes the model root transform and returns bounds in its immediate parent space; Furniture is identity beneath the building here.",
+          "scene_bounds_parent_space": {
+            "position": [
+              1.0056939125061,
+              1.01539182662964,
+              3.1671507358551
+            ],
+            "size": [
+              0.492431402206421,
+              0.223816156387329,
+              0.54508638381958
+            ]
+          }
+        },
+        "assembled_node_match_count": 1,
+        "category": "cookware",
+        "expected_assembler_pose": {
+          "basis": {
+            "x": [
+              -0.0119547815993428,
+              0.0,
+              -0.999928534030914
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              0.999928534030914,
+              0.0,
+              -0.0119547815993428
+            ]
+          },
+          "container_local_position": [
+            1.25190961360931,
+            1.03799998760223,
+            3.43969392776489
+          ],
+          "scene_path": "res://assets/props/fantasy/Pot_1.gltf"
+        },
+        "host_index": 15,
+        "host_receipt": {
+          "activity_group": "cooking",
+          "category": "workbench",
+          "key": "Workbench",
+          "plan_position": [
+            0.563939929008484,
+            0.119999997317791,
+            3.42799997329712
+          ],
+          "room": 2
+        },
+        "key": "Pot_1",
+        "measured_catalog": {
+          "footprint": [
+            0.538999974727631,
+            0.486000001430511
+          ],
+          "height_m": 0.224000006914139,
+          "placement_height_m": 0.224000006914139,
+          "scene_path": "res://assets/props/fantasy/Pot_1.gltf",
+          "scene_sha256": "d925a5e5541d83d2d1885b9d3928fbf553cf4a37ff902cf22d33280805efcf6f"
+        },
+        "plan_footprint_rect": {
+          "position": [
+            1.00570511817932,
+            3.16730833053589
+          ],
+          "size": [
+            0.492408871650696,
+            0.544771432876587
+          ]
+        },
+        "plan_index": 17,
+        "plan_position": [
+          1.25190961360931,
+          1.01499998569489,
+          3.43969392776489
+        ],
+        "plan_scale": 1.0,
+        "plan_yaw_radians": 1.58275134015205,
+        "present": true,
+        "room": 2,
+        "use_zone_rect": {
+          "position": [
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "cooking_workbench": {
+        "activity_group": "cooking",
+        "assembled_node": {
+          "basis": {
+            "x": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "container_local_position": [
+            0.563939929008484,
+            0.119999997317791,
+            3.43099999427795
+          ],
+          "found": true,
+          "global_position": [
+            0.563939929008484,
+            0.119999997317791,
+            3.43099999427795
+          ],
+          "rotation_y_radians": 0.0,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "scene_bounds_note": "SceneBounds.of_node(node) includes the model root transform and returns bounds in its immediate parent space; Furniture is identity beneath the building here.",
+          "scene_bounds_parent_space": {
+            "position": [
+              -0.445608377456665,
+              0.12017460167408,
+              2.91620874404907
+            ],
+            "size": [
+              2.01909685134888,
+              0.894645273685455,
+              1.02423596382141
+            ]
+          }
+        },
+        "assembled_node_match_count": 1,
+        "category": "workbench",
+        "expected_assembler_pose": {
+          "basis": {
+            "x": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "container_local_position": [
+            0.563939929008484,
+            0.119999997317791,
+            3.43099999427795
+          ],
+          "scene_path": "res://assets/props/fantasy/Workbench.gltf"
+        },
+        "host_index": -1,
+        "host_receipt": {
+          "activity_group": "",
+          "category": "",
+          "key": "",
+          "plan_position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "room": -1
+        },
+        "key": "Workbench",
+        "measured_catalog": {
+          "footprint": [
+            2.01900005340576,
+            1.02400004863739
+          ],
+          "height_m": 0.894999980926514,
+          "placement_height_m": 0.894999980926514,
+          "scene_path": "res://assets/props/fantasy/Workbench.gltf",
+          "scene_sha256": "518fc5c955def18cfcb781b3b955da0e8edcf4f37830a21561ef32c03ad0397e"
+        },
+        "plan_footprint_rect": {
+          "position": [
+            -0.445560097694397,
+            2.91599988937378
+          ],
+          "size": [
+            2.01900005340576,
+            1.02400004863739
+          ]
+        },
+        "plan_index": 15,
+        "plan_position": [
+          0.563939929008484,
+          0.119999997317791,
+          3.42799997329712
+        ],
+        "plan_scale": 1.0,
+        "plan_yaw_radians": 0.0,
+        "present": true,
+        "room": 2,
+        "use_zone_rect": {
+          "position": [
+            -0.445560097694397,
+            2.01599979400635
+          ],
+          "size": [
+            2.01900005340576,
+            0.900000095367432
+          ]
+        }
+      },
+      "exterior_prop_count": 5,
+      "host_kind": "ordinary_fireplace",
+      "image": "thatch_cottage_small_7441/rooms/hearth_portrait.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "plan_tending_zone": {
+        "count": 1,
+        "rows": [
+          {
+            "rect": {
+              "position": [
+                1.66699993610382,
+                1.91561651229858
+              ],
+              "size": [
+                0.800000071525574,
+                1.07999992370605
+              ]
+            },
+            "room": 2,
+            "why": "domestic hearth tending"
+          }
+        ]
+      },
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 9.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "small",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 7.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6,
+      "source_row_index": 16
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          13.8951053619385,
+          11.1555547714233,
+          17.2407665252686
+        ],
+        "target": [
+          0.108492374420166,
+          3.98651552200317,
+          0.00750017166137695
+        ]
+      },
+      "exterior_prop_count": 5,
+      "image": "thatch_cottage_small_7441/views/roof_on_exterior_control.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 9.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "small",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 7.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -4.3580150604248,
+          -0.000293641583994031,
+          -7.00999975204468
+        ],
+        "size": [
+          8.93301486968994,
+          7.97361850738525,
+          14.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6,
+      "source_row_index": 17
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          1.29999995231628,
+          1.58000004291534,
+          3.70363640785217
+        ],
+        "target": [
+          3.5,
+          0.949999988079071,
+          3.25363636016846
+        ]
+      },
+      "cooking_pot": {
+        "activity_group": "cooking",
+        "assembled_node": {
+          "basis": {
+            "x": [
+              -0.993144094944,
+              0.0,
+              0.116896584630013
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              -0.116896584630013,
+              0.0,
+              -0.993144094944
+            ]
+          },
+          "container_local_position": [
+            1.0473153591156,
+            1.03799998760223,
+            4.06437301635742
+          ],
+          "found": true,
+          "global_position": [
+            1.0473153591156,
+            1.03799998760223,
+            4.06437301635742
+          ],
+          "rotation_y_radians": 3.2587571144104,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "scene_bounds_note": "SceneBounds.of_node(node) includes the model root transform and returns bounds in its immediate parent space; Furniture is identity beneath the building here.",
+          "scene_bounds_parent_space": {
+            "position": [
+              0.751099705696106,
+              1.01539182662964,
+              3.79150772094727
+            ],
+            "size": [
+              0.592431306838989,
+              0.223816156387329,
+              0.545730590820313
+            ]
+          }
+        },
+        "assembled_node_match_count": 1,
+        "category": "cookware",
+        "expected_assembler_pose": {
+          "basis": {
+            "x": [
+              -0.993144094944,
+              0.0,
+              0.116896584630013
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              -0.116896584630013,
+              0.0,
+              -0.993144094944
+            ]
+          },
+          "container_local_position": [
+            1.0473153591156,
+            1.03799998760223,
+            4.06437301635742
+          ],
+          "scene_path": "res://assets/props/fantasy/Pot_1.gltf"
+        },
+        "host_index": 23,
+        "host_receipt": {
+          "activity_group": "cooking",
+          "category": "workbench",
+          "key": "Workbench",
+          "plan_position": [
+            1.6125670671463,
+            0.119999997317791,
+            4.13627243041992
+          ],
+          "room": 4
+        },
+        "key": "Pot_1",
+        "measured_catalog": {
+          "footprint": [
+            0.538999974727631,
+            0.486000001430511
+          ],
+          "height_m": 0.224000006914139,
+          "placement_height_m": 0.224000006914139,
+          "scene_path": "res://assets/props/fantasy/Pot_1.gltf",
+          "scene_sha256": "d925a5e5541d83d2d1885b9d3928fbf553cf4a37ff902cf22d33280805efcf6f"
+        },
+        "plan_footprint_rect": {
+          "position": [
+            0.751257181167603,
+            3.79153537750244
+          ],
+          "size": [
+            0.592116415500641,
+            0.545675337314606
+          ]
+        },
+        "plan_index": 25,
+        "plan_position": [
+          1.0473153591156,
+          1.01499998569489,
+          4.06437301635742
+        ],
+        "plan_scale": 1.0,
+        "plan_yaw_radians": 3.25875717739107,
+        "present": true,
+        "room": 4,
+        "use_zone_rect": {
+          "position": [
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "cooking_workbench": {
+        "activity_group": "cooking",
+        "assembled_node": {
+          "basis": {
+            "x": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "container_local_position": [
+            1.6125670671463,
+            0.119999997317791,
+            4.13927221298218
+          ],
+          "found": true,
+          "global_position": [
+            1.6125670671463,
+            0.119999997317791,
+            4.13927221298218
+          ],
+          "rotation_y_radians": 0.0,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "scene_bounds_note": "SceneBounds.of_node(node) includes the model root transform and returns bounds in its immediate parent space; Furniture is identity beneath the building here.",
+          "scene_bounds_parent_space": {
+            "position": [
+              0.603018760681152,
+              0.12017460167408,
+              3.6244809627533
+            ],
+            "size": [
+              2.01909685134888,
+              0.894645273685455,
+              1.02423596382141
+            ]
+          }
+        },
+        "assembled_node_match_count": 1,
+        "category": "workbench",
+        "expected_assembler_pose": {
+          "basis": {
+            "x": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              0.0,
+              0.0,
+              1.0
+            ]
+          },
+          "container_local_position": [
+            1.6125670671463,
+            0.119999997317791,
+            4.13927221298218
+          ],
+          "scene_path": "res://assets/props/fantasy/Workbench.gltf"
+        },
+        "host_index": -1,
+        "host_receipt": {
+          "activity_group": "",
+          "category": "",
+          "key": "",
+          "plan_position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "room": -1
+        },
+        "key": "Workbench",
+        "measured_catalog": {
+          "footprint": [
+            2.01900005340576,
+            1.02400004863739
+          ],
+          "height_m": 0.894999980926514,
+          "placement_height_m": 0.894999980926514,
+          "scene_path": "res://assets/props/fantasy/Workbench.gltf",
+          "scene_sha256": "518fc5c955def18cfcb781b3b955da0e8edcf4f37830a21561ef32c03ad0397e"
+        },
+        "plan_footprint_rect": {
+          "position": [
+            0.60306704044342,
+            3.62427234649658
+          ],
+          "size": [
+            2.01900005340576,
+            1.02400004863739
+          ]
+        },
+        "plan_index": 23,
+        "plan_position": [
+          1.6125670671463,
+          0.119999997317791,
+          4.13627243041992
+        ],
+        "plan_scale": 1.0,
+        "plan_yaw_radians": 0.0,
+        "present": true,
+        "room": 4,
+        "use_zone_rect": {
+          "position": [
+            0.60306704044342,
+            2.72427225112915
+          ],
+          "size": [
+            2.01900005340576,
+            0.900000095367432
+          ]
+        }
+      },
+      "exterior_prop_count": 5,
+      "host_kind": "ordinary_fireplace",
+      "image": "thatch_cottage_default_7441/rooms/hearth_portrait.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "plan_tending_zone": {
+        "count": 1,
+        "rows": [
+          {
+            "rect": {
+              "position": [
+                2.66699981689453,
+                2.71363639831543
+              ],
+              "size": [
+                0.800000190734863,
+                1.07999992370605
+              ]
+            },
+            "room": 4,
+            "why": "domestic hearth tending"
+          }
+        ]
+      },
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 12.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "default",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 9.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6,
+      "source_row_index": 18
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          16.5187358856201,
+          12.7905292510986,
+          20.5203056335449
+        ],
+        "target": [
+          0.108492374420166,
+          4.25720262527466,
+          0.00750064849853516
+        ]
+      },
+      "exterior_prop_count": 5,
+      "image": "thatch_cottage_default_7441/views/roof_on_exterior_control.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 12.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "default",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 9.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -5.3580150604248,
+          -0.000293641583994031,
+          -8.50999927520752
+        ],
+        "size": [
+          10.9330148696899,
+          8.51499271392822,
+          17.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6,
+      "source_row_index": 19
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          -5.30000019073486,
+          1.58000004291534,
+          5.53962421417236
+        ],
+        "target": [
+          -7.5,
+          0.949999988079071,
+          5.9896240234375
+        ]
+      },
+      "cooking_pot": {
+        "activity_group": "cooking",
+        "assembled_node": {
+          "basis": {
+            "x": [
+              0.849896609783173,
+              0.0,
+              0.526949465274811
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              -0.526949465274811,
+              0.0,
+              0.849896609783173
+            ]
+          },
+          "container_local_position": [
+            -5.21882009506226,
+            1.03799998760223,
+            4.85321044921875
+          ],
+          "found": true,
+          "global_position": [
+            -5.21882009506226,
+            1.03799998760223,
+            4.85321044921875
+          ],
+          "rotation_y_radians": 5.72817802429199,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "scene_bounds_note": "SceneBounds.of_node(node) includes the model root transform and returns bounds in its immediate parent space; Furniture is identity beneath the building here.",
+          "scene_bounds_parent_space": {
+            "position": [
+              -5.57605457305908,
+              1.01539182662964,
+              4.50458145141602
+            ],
+            "size": [
+              0.714468955993652,
+              0.223816156387329,
+              0.697257995605469
+            ]
+          }
+        },
+        "assembled_node_match_count": 1,
+        "category": "cookware",
+        "expected_assembler_pose": {
+          "basis": {
+            "x": [
+              0.849896609783173,
+              0.0,
+              0.526949465274811
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              -0.526949465274811,
+              0.0,
+              0.849896609783173
+            ]
+          },
+          "container_local_position": [
+            -5.21882009506226,
+            1.03799998760223,
+            4.85321044921875
+          ],
+          "scene_path": "res://assets/props/fantasy/Pot_1.gltf"
+        },
+        "host_index": 28,
+        "host_receipt": {
+          "activity_group": "cooking",
+          "category": "workbench",
+          "key": "Workbench",
+          "plan_position": [
+            -5.60144758224487,
+            0.119999997317791,
+            4.83980846405029
+          ],
+          "room": 5
+        },
+        "key": "Pot_1",
+        "measured_catalog": {
+          "footprint": [
+            0.538999974727631,
+            0.486000001430511
+          ],
+          "height_m": 0.224000006914139,
+          "placement_height_m": 0.224000006914139,
+          "scene_path": "res://assets/props/fantasy/Pot_1.gltf",
+          "scene_sha256": "d925a5e5541d83d2d1885b9d3928fbf553cf4a37ff902cf22d33280805efcf6f"
+        },
+        "plan_footprint_rect": {
+          "position": [
+            -5.57591581344604,
+            4.50467252731323
+          ],
+          "size": [
+            0.714191675186157,
+            0.697075486183167
+          ]
+        },
+        "plan_index": 30,
+        "plan_position": [
+          -5.21882009506226,
+          1.01499998569489,
+          4.85321044921875
+        ],
+        "plan_scale": 1.0,
+        "plan_yaw_radians": 5.72817824998219,
+        "present": true,
+        "room": 5,
+        "use_zone_rect": {
+          "position": [
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "cooking_workbench": {
+        "activity_group": "cooking",
+        "assembled_node": {
+          "basis": {
+            "x": [
+              -0.879999995231628,
+              0.0,
+              7.69320465110468e-08
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              -7.69320465110468e-08,
+              0.0,
+              -0.879999995231628
+            ]
+          },
+          "container_local_position": [
+            -5.60144758224487,
+            0.119999997317791,
+            4.83716869354248
+          ],
+          "found": true,
+          "global_position": [
+            -5.60144758224487,
+            0.119999997317791,
+            4.83716869354248
+          ],
+          "rotation_y_radians": 3.14159274101257,
+          "scale": [
+            0.879999995231628,
+            1.0,
+            0.879999995231628
+          ],
+          "scene_bounds_note": "SceneBounds.of_node(node) includes the model root transform and returns bounds in its immediate parent space; Furniture is identity beneath the building here.",
+          "scene_bounds_parent_space": {
+            "position": [
+              -6.48985004425049,
+              0.12017460167408,
+              4.38885736465454
+            ],
+            "size": [
+              1.77680492401123,
+              0.894645273685455,
+              0.901327610015869
+            ]
+          }
+        },
+        "assembled_node_match_count": 1,
+        "category": "workbench",
+        "expected_assembler_pose": {
+          "basis": {
+            "x": [
+              -0.879999995231628,
+              0.0,
+              7.69320465110468e-08
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              -7.69320465110468e-08,
+              0.0,
+              -0.879999995231628
+            ]
+          },
+          "container_local_position": [
+            -5.60144758224487,
+            0.119999997317791,
+            4.83716869354248
+          ],
+          "scene_path": "res://assets/props/fantasy/Workbench.gltf"
+        },
+        "host_index": -1,
+        "host_receipt": {
+          "activity_group": "",
+          "category": "",
+          "key": "",
+          "plan_position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "room": -1
+        },
+        "key": "Workbench",
+        "measured_catalog": {
+          "footprint": [
+            2.01900005340576,
+            1.02400004863739
+          ],
+          "height_m": 0.894999980926514,
+          "placement_height_m": 0.894999980926514,
+          "scene_path": "res://assets/props/fantasy/Workbench.gltf",
+          "scene_sha256": "518fc5c955def18cfcb781b3b955da0e8edcf4f37830a21561ef32c03ad0397e"
+        },
+        "plan_footprint_rect": {
+          "position": [
+            -6.48980760574341,
+            4.38924837112427
+          ],
+          "size": [
+            1.77672004699707,
+            0.901120066642761
+          ]
+        },
+        "plan_index": 28,
+        "plan_position": [
+          -5.60144758224487,
+          0.119999997317791,
+          4.83980846405029
+        ],
+        "plan_scale": 0.88,
+        "plan_yaw_radians": 3.14159265358979,
+        "present": true,
+        "room": 5,
+        "use_zone_rect": {
+          "position": [
+            -6.48980760574341,
+            5.29036855697632
+          ],
+          "size": [
+            1.77672004699707,
+            0.900000095367432
+          ]
+        }
+      },
+      "exterior_prop_count": 5,
+      "host_kind": "ordinary_fireplace",
+      "image": "thatch_cottage_large_7441/rooms/hearth_portrait.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "plan_tending_zone": {
+        "count": 1,
+        "rows": [
+          {
+            "rect": {
+              "position": [
+                -7.46700000762939,
+                5.44962406158447
+              ],
+              "size": [
+                0.800000190734863,
+                1.07999992370605
+              ]
+            },
+            "room": 5,
+            "why": "domestic hearth tending"
+          }
+        ]
+      },
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.8,
+        "kind": "house",
+        "length": 18.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "large",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 17.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6,
+      "source_row_index": 20
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          23.5851287841797,
+          17.5121536254883,
+          29.5670394897461
+        ],
+        "target": [
+          -0.0625009536743164,
+          5.21538639068604,
+          0.00750064849853516
+        ]
+      },
+      "exterior_prop_count": 5,
+      "image": "thatch_cottage_large_7441/views/roof_on_exterior_control.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.8,
+        "kind": "house",
+        "length": 18.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "large",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 17.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -9.57499980926514,
+          -0.000293641583994031,
+          -11.5099992752075
+        ],
+        "size": [
+          19.0249977111816,
+          10.431360244751,
+          23.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6,
+      "source_row_index": 21
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          -2.29999995231628,
+          1.58000004291534,
+          4.03971290588379
+        ],
+        "target": [
+          -4.5,
+          0.949999988079071,
+          4.48971271514893
+        ]
+      },
+      "cooking_pot": {
+        "activity_group": "cooking",
+        "assembled_node": {
+          "basis": {
+            "x": [
+              0.99736875295639,
+              0.0,
+              0.0724950507283211
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              -0.0724950507283211,
+              0.0,
+              0.99736875295639
+            ]
+          },
+          "container_local_position": [
+            -3.14045095443726,
+            1.03799998760223,
+            6.06027507781982
+          ],
+          "found": true,
+          "global_position": [
+            -3.14045095443726,
+            1.03799998760223,
+            6.06027507781982
+          ],
+          "rotation_y_radians": 6.21062660217285,
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "scene_bounds_note": "SceneBounds.of_node(node) includes the model root transform and returns bounds in its immediate parent space; Furniture is identity beneath the building here.",
+          "scene_bounds_parent_space": {
+            "position": [
+              -3.42701578140259,
+              1.01539182662964,
+              5.79835605621338
+            ],
+            "size": [
+              0.573129653930664,
+              0.223816156387329,
+              0.523838043212891
+            ]
+          }
+        },
+        "assembled_node_match_count": 1,
+        "category": "cookware",
+        "expected_assembler_pose": {
+          "basis": {
+            "x": [
+              0.99736875295639,
+              0.0,
+              0.0724950507283211
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              -0.0724950507283211,
+              0.0,
+              0.99736875295639
+            ]
+          },
+          "container_local_position": [
+            -3.14045095443726,
+            1.03799998760223,
+            6.06027507781982
+          ],
+          "scene_path": "res://assets/props/fantasy/Pot_1.gltf"
+        },
+        "host_index": 24,
+        "host_receipt": {
+          "activity_group": "cooking",
+          "category": "workbench",
+          "key": "Workbench",
+          "plan_position": [
+            -2.87135410308838,
+            0.119999997317791,
+            6.07135963439941
+          ],
+          "room": 5
+        },
+        "key": "Pot_1",
+        "measured_catalog": {
+          "footprint": [
+            0.538999974727631,
+            0.486000001430511
+          ],
+          "height_m": 0.224000006914139,
+          "placement_height_m": 0.224000006914139,
+          "scene_path": "res://assets/props/fantasy/Pot_1.gltf",
+          "scene_sha256": "d925a5e5541d83d2d1885b9d3928fbf553cf4a37ff902cf22d33280805efcf6f"
+        },
+        "plan_footprint_rect": {
+          "position": [
+            -3.42685794830322,
+            5.79837703704834
+          ],
+          "size": [
+            0.572814226150513,
+            0.523795962333679
+          ]
+        },
+        "plan_index": 26,
+        "plan_position": [
+          -3.14045095443726,
+          1.01499998569489,
+          6.06027507781982
+        ],
+        "plan_scale": 1.0,
+        "plan_yaw_radians": 6.2106268174901,
+        "present": true,
+        "room": 5,
+        "use_zone_rect": {
+          "position": [
+            0.0,
+            0.0
+          ],
+          "size": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "cooking_workbench": {
+        "activity_group": "cooking",
+        "assembled_node": {
+          "basis": {
+            "x": [
+              0.720000028610229,
+              0.0,
+              0.0
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              0.0,
+              0.0,
+              0.720000028610229
+            ]
+          },
+          "container_local_position": [
+            -2.87135410308838,
+            0.119999997317791,
+            6.07351970672607
+          ],
+          "found": true,
+          "global_position": [
+            -2.87135410308838,
+            0.119999997317791,
+            6.07351970672607
+          ],
+          "rotation_y_radians": 0.0,
+          "scale": [
+            0.720000028610229,
+            1.0,
+            0.720000028610229
+          ],
+          "scene_bounds_note": "SceneBounds.of_node(node) includes the model root transform and returns bounds in its immediate parent space; Furniture is identity beneath the building here.",
+          "scene_bounds_parent_space": {
+            "position": [
+              -3.598228931427,
+              0.12017460167408,
+              5.70286989212036
+            ],
+            "size": [
+              1.45374989509583,
+              0.894645273685455,
+              0.737450122833252
+            ]
+          }
+        },
+        "assembled_node_match_count": 1,
+        "category": "workbench",
+        "expected_assembler_pose": {
+          "basis": {
+            "x": [
+              0.720000028610229,
+              0.0,
+              0.0
+            ],
+            "y": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "z": [
+              0.0,
+              0.0,
+              0.720000028610229
+            ]
+          },
+          "container_local_position": [
+            -2.87135410308838,
+            0.119999997317791,
+            6.07351970672607
+          ],
+          "scene_path": "res://assets/props/fantasy/Workbench.gltf"
+        },
+        "host_index": -1,
+        "host_receipt": {
+          "activity_group": "",
+          "category": "",
+          "key": "",
+          "plan_position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "room": -1
+        },
+        "key": "Workbench",
+        "measured_catalog": {
+          "footprint": [
+            2.01900005340576,
+            1.02400004863739
+          ],
+          "height_m": 0.894999980926514,
+          "placement_height_m": 0.894999980926514,
+          "scene_path": "res://assets/props/fantasy/Workbench.gltf",
+          "scene_sha256": "518fc5c955def18cfcb781b3b955da0e8edcf4f37830a21561ef32c03ad0397e"
+        },
+        "plan_footprint_rect": {
+          "position": [
+            -3.59819412231445,
+            5.70271968841553
+          ],
+          "size": [
+            1.45368003845215,
+            0.737280070781708
+          ]
+        },
+        "plan_index": 24,
+        "plan_position": [
+          -2.87135410308838,
+          0.119999997317791,
+          6.07135963439941
+        ],
+        "plan_scale": 0.72,
+        "plan_yaw_radians": 0.0,
+        "present": true,
+        "room": 5,
+        "use_zone_rect": {
+          "position": [
+            -3.59819412231445,
+            4.8027195930481
+          ],
+          "size": [
+            1.45368003845215,
+            0.900000095367432
+          ]
+        }
+      },
+      "exterior_prop_count": 4,
+      "host_kind": "ordinary_fireplace",
+      "image": "thatch_cottage_original_11x14_7441/rooms/hearth_portrait.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "plan_tending_zone": {
+        "count": 1,
+        "rows": [
+          {
+            "rect": {
+              "position": [
+                -4.46700000762939,
+                3.9497127532959
+              ],
+              "size": [
+                0.800000190734863,
+                1.07999992370605
+              ]
+            },
+            "room": 5,
+            "why": "domestic hearth tending"
+          }
+        ]
+      },
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 14.0,
+        "matrix_group": "original_request_control",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "original_11x14",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 11.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6,
+      "source_row_index": 22
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          18.4389514923096,
+          14.1198959350586,
+          23.1343154907227
+        ],
+        "target": [
+          -0.0624995231628418,
+          4.49914121627808,
+          0.00750064849853516
+        ]
+      },
+      "exterior_prop_count": 4,
+      "image": "thatch_cottage_original_11x14_7441/views/roof_on_exterior_control.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 14.0,
+        "matrix_group": "original_request_control",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "original_11x14",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 11.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -6.57499980926514,
+          -0.000293641583994031,
+          -9.50999927520752
+        ],
+        "size": [
+          13.0250005722046,
+          8.99886989593506,
+          19.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6,
+      "source_row_index": 23
+    }
+  ]
+}

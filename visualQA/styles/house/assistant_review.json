@@ -105,5 +105,48 @@
         "design_status": "needs_changes"
       }
     ]
+  },
+  "scoped_candidate_comparisons": {
+    "images": 41,
+    "requests": 15,
+    "scope": "Reviewed experimental candidates; no whole-style acceptance. Physical fixtures and production promotion are separate.",
+    "cohorts": [
+      {
+        "style": "farmhouse",
+        "run": "fire_composition_restart44",
+        "review": "visualqa/styles/house/farmhouse/renders/fire_composition_restart44/assistant_review.json",
+        "images": 8,
+        "all_images_opened": true,
+        "design_status": "needs_changes",
+        "source_manifest_sha256": "e45886325d278d7478f5dd2610f1dd79b46db78597aa86c0cd6d0b7be2dae5e8"
+      },
+      {
+        "style": "cottage",
+        "run": "fire_composition_restart44",
+        "review": "visualqa/styles/house/cottage/renders/fire_composition_restart44/assistant_review.json",
+        "images": 8,
+        "all_images_opened": true,
+        "design_status": "needs_changes",
+        "source_manifest_sha256": "8392b9ce6260226fbf2c7f6f9ea2a86cd6596e576b8db29485243bd7aec89203"
+      },
+      {
+        "style": "thatch_cottage",
+        "run": "fire_composition_restart44",
+        "review": "visualqa/styles/house/thatch_cottage/renders/fire_composition_restart44/assistant_review.json",
+        "images": 8,
+        "all_images_opened": true,
+        "design_status": "needs_changes",
+        "source_manifest_sha256": "07a3a002b81ff71cf20a83054572103f33569e7e967041c10ab64f77307c44df"
+      },
+      {
+        "style": "townhouse",
+        "run": "office_activity_restart42",
+        "review": "visualqa/styles/house/townhouse/renders/office_activity_restart42/assistant_review.json",
+        "images": 17,
+        "all_images_opened": true,
+        "design_status": "needs_changes",
+        "source_manifest_sha256": "24abf4f9ed5da195adcf92d439126386dbfcc8c29ef53a3191cee66b94ad7a4a"
+      }
+    ]
   }
 }

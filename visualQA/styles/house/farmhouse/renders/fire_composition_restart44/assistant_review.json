@@ -1,0 +1,72 @@
+{
+  "reviewer": "root assistant; direct inspection of all 24 source images",
+  "human_rating": null,
+  "reviewed_images": 8,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "candidate_implementation_accepted": false,
+  "findings": [
+    "The mantel is stable and the fireplace is visible with the actual cooking station in all four sizes.",
+    "Restrained curved flames improve the previous straight-cone appearance; the dark faceted fuel still reads too much like flat stones, with weak split-log detail.",
+    "The bright pale firebox floor, generic white breast and sparse wall composition need further design work.",
+    "Large roof planes, oversized chimneys and generic house proportions remain unresolved. This cohort does not complete the house style."
+  ],
+  "render_receipt": {
+    "script": "res://tools/render_domestic_hearth_shell_host.gd",
+    "args": [
+      "--path",
+      "C:/Projects/BrickWild/artifacts/personality/resumed/domestic_hearth_gate_project",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart44_fire_HEAD_visual\\godot.log",
+      "--script",
+      "res://tools/render_domestic_hearth_shell_host.gd",
+      "--",
+      "out=C:/Projects/BrickWild/artifacts/personality/resumed/restart44_fire_HEAD_visual/renders"
+    ],
+    "native_exit": 0,
+    "seconds": 57.171,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/farmhouse/renders/fire_composition_restart44/farmhouse_small_7441/rooms/hearth_portrait.jpg",
+      "sha256": "2dcebc70774c318806248cd5d9364efdf5d7f153f5d33c6c063f546f6e36e7dc",
+      "source_row_index": 0
+    },
+    {
+      "image": "visualqa/styles/house/farmhouse/renders/fire_composition_restart44/farmhouse_small_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "bdce9c040e189749f3548053e4276cf779a7469004d0e78ef111907e6543fe49",
+      "source_row_index": 1
+    },
+    {
+      "image": "visualqa/styles/house/farmhouse/renders/fire_composition_restart44/farmhouse_default_7441/rooms/hearth_portrait.jpg",
+      "sha256": "81579731a00a08badf6fdff5bc5df4d4ae4f922585ef49de3a3d95fbf8f1a537",
+      "source_row_index": 2
+    },
+    {
+      "image": "visualqa/styles/house/farmhouse/renders/fire_composition_restart44/farmhouse_default_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "fa22b8e22c1b0c223f2774d824f4cdb92afbdeb58cd42adf09453d28ac622dec",
+      "source_row_index": 3
+    },
+    {
+      "image": "visualqa/styles/house/farmhouse/renders/fire_composition_restart44/farmhouse_large_7441/rooms/hearth_portrait.jpg",
+      "sha256": "15f914df0e579692908f3e2efd704fd20b41e427666f4244e6b58f12f513dc05",
+      "source_row_index": 4
+    },
+    {
+      "image": "visualqa/styles/house/farmhouse/renders/fire_composition_restart44/farmhouse_large_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "c14f62cf97529c084ad911d7ae54b75ade1e604fdd5bbc33596c5b10569ed0ad",
+      "source_row_index": 5
+    },
+    {
+      "image": "visualqa/styles/house/farmhouse/renders/fire_composition_restart44/farmhouse_original_11x14_7441/rooms/hearth_portrait.jpg",
+      "sha256": "7be80f01e94a96cbf656738971ec0b53040c387382326f0cc8a5421a308eb4ff",
+      "source_row_index": 6
+    },
+    {
+      "image": "visualqa/styles/house/farmhouse/renders/fire_composition_restart44/farmhouse_original_11x14_7441/views/roof_on_exterior_control.jpg",
+      "sha256": "d2d07bb009f75bee4ff0171a2211c9deff2ac3ca90248d14136a409506c6fda6",
+      "source_row_index": 7
+    }
+  ]
+}
