@@ -855,6 +855,44 @@ static func nave_bay_windows(spec: ChurchSpec) -> Array[Dictionary]:
 	return out
 
 
+## Open archways share the same nave bearing stations as the lower-light plan.
+## Each mating wall receives this exact Z/width profile; only its head is
+## lowered to the shallower side of that interface.
+static func nave_arcade_openings(spec: ChurchSpec,
+		height_limit: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if spec.aisles <= 0:
+		return out
+	var supports := nave_support_zs(spec)
+	if supports.size() < 2:
+		return out
+	var aisle_span: Vector2 = aisle_z_range(spec)
+	var bearing: float = maxf(BUTTRESS_FACE, nave_pier_width(spec))
+	var arch_kind: StringName = &"gothic" if spec.style == &"gothic" else &"round"
+	for i in range(supports.size() - 1):
+		var left: float = supports[i]
+		var right: float = supports[i + 1]
+		if _nave_bay_intersects_crossing(spec, left, right):
+			continue
+		var clear_width: float = right - left - bearing - 0.42
+		var width: float = minf(clear_width * 0.78, 4.2)
+		if width < 1.2:
+			continue
+		var top: float = height_limit - 0.18
+		if top < 1.95:
+			continue
+		var center_z: float = (left + right) * 0.5
+		if center_z - width * 0.5 < aisle_span.x + 0.03 \
+				or center_z + width * 0.5 > aisle_span.y - 0.03:
+			continue
+		var spring: float = top - maxf(0.42, minf(top * 0.18, width * 0.14))
+		out.append({"u": center_z, "width": width,
+			"y": top * 0.5, "height": top, "spring_y": spring,
+			"arch": arch_kind, "style": spec.window_style, "log": false,
+			"support_left": left, "support_right": right})
+	return out
+
+
 ## Cross-wall support section by construction grammar. These are native bearing
 ## proportions: heavy Romanesque/Byzantine/Russian piers, lighter Gothic and
 ## Renaissance masonry, and compact timber posts for stave work.

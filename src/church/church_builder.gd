@@ -67,6 +67,19 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 				var ax: float = ChurchGeometry.aisle_center_x(spec, side, ring)
 				var aisle: AABB = ChurchGeometry.aisle_aabb(spec, side, ring)
 				var aisle_windows: Array[Dictionary] = []
+				var inner_height: float = ChurchGeometry.aisle_height(spec, ring)
+				if ring > 0:
+					inner_height = minf(inner_height,
+						ChurchGeometry.aisle_height(spec, ring - 1))
+				var inner_face: int = 3 if side > 0.0 else 1
+				for arcade in _arcade_wall_openings(inner_face, inner_height):
+					aisle_windows.append(arcade)
+				if ring < spec.aisles - 1:
+					var outer_height: float = minf(ChurchGeometry.aisle_height(spec, ring),
+						ChurchGeometry.aisle_height(spec, ring + 1))
+					var outer_face: int = 1 if side > 0.0 else 3
+					for arcade in _arcade_wall_openings(outer_face, outer_height):
+						aisle_windows.append(arcade)
 				if ring == spec.aisles - 1 and ChurchGeometry.hero_bays(spec):
 					for bay_window in ChurchGeometry.hero_aisle_windows(spec):
 						aisle_windows.append({"face": 1 if side > 0.0 else 3,
@@ -582,6 +595,11 @@ func _nave_openings() -> Array[Dictionary]:
 				holes.append({"face": face, "u": bay_window.z, "y": bay_window.y,
 					"width": bay_window.width, "height": bay_window.height,
 					"style": bay_window.style, "log": false})
+	elif spec.aisles > 0:
+		for face in [1, 3]:
+			for arcade in _arcade_wall_openings(face,
+					ChurchGeometry.aisle_height(spec, 0)):
+				holes.append(arcade)
 	for opening in _west_door_openings():
 		holes.append({"face": 2, "u": opening.pos.x,
 			"y": opening.pos.y, "width": opening.width,
@@ -600,6 +618,15 @@ func _nave_openings() -> Array[Dictionary]:
 			"arch": "gothic" if spec.style == &"gothic" else "round",
 			"style": &"pointed", "door": true, "log": true})
 	return holes
+
+
+func _arcade_wall_openings(face: int, height_limit: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for bay in ChurchGeometry.nave_arcade_openings(spec, height_limit):
+		var opening: Dictionary = bay.duplicate()
+		opening["face"] = face
+		out.append(opening)
+	return out
 
 
 func _tower_openings(lx: float, lz: float, tw: float, th: float) -> Array[Dictionary]:

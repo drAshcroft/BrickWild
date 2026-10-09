@@ -385,7 +385,7 @@
       "description": "Reproduce actual nave-to-aisle and nested aisle barriers. Cut matching floor-reaching arch profiles through both adjoining shells while preserving real piers, crowns, floor continuity and crossing supports.",
       "priority": "P1",
       "phase": "inhabited-buildings",
-      "status": "pending",
+      "status": "complete",
       "taskType": "impl",
       "targetCoord": {
         "file": "src/church/church_builder.gd"
@@ -396,7 +396,20 @@
           "type": "blocks"
         }
       ],
-      "acceptanceCriteria": "Actual body-height rays and routes through every interface; emitted wall-plug and removed-bearing negative controls; preserve crossing/dome, clerestory, chapel and hero behavior; applicable structural, church and geometry gates; root render review. Do not accept an opening in only one shell layer."
+      "acceptanceCriteria": "Actual body-height rays and routes through every interface; emitted wall-plug and removed-bearing negative controls; preserve crossing/dome, clerestory, chapel and hero behavior; applicable structural, church and geometry gates; root render review. Do not accept an opening in only one shell layer.",
+      "aiNotes": "Root reviewed all 18 original and six vault renders. Actual body, floor, crown and bearing contracts pass; 235 aperture checks, 5561 church-change checks, 47 dome checks and all 9633 bounded geometry checks pass. See visualqa/personality/CHURCH_ARCADES_REVIEW.md. Sacred personality and full matrix remain open."
+    },
+    {
+      "id": "b1ff7bdd-b6a7-45c5-937b-b1dd29eceaac",
+      "key": "LIVE-HEARTH-MESH-CONTRACT",
+      "title": "Measure actual hearth cheeks lintel recess and open mouth",
+      "description": "Committed baseline reproduces hearth center-face complaints. Diagnose actual mesh and material ownership; preserve dimensions, mass, surround, backgap and furniture collision checks. Require identical-predicate sealed-mouth and removed-surround controls.",
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "executing",
+      "targetCoord": {
+        "file": "qa/house_qa.gd"
+      }
     }
   ]
 }
