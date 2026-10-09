@@ -63,6 +63,7 @@ static func run() -> SuiteResult:
 		res.fail("rebuilding the same spec produced a different temple")
 	_column_grid_helper(res)
 	_compact_columns(res)
+	_rotunda_brazier_wall_negative(res)
 	return res
 
 
@@ -74,6 +75,10 @@ static func _brazier_clearance(res: SuiteResult, builder: TempleBuilder, where: 
 		var pos: Vector3 = p["pos"]
 		var size := PropCatalog.size("Cauldron") * float(p["scale"])
 		var bounds := AABB(pos + Vector3(-size.x * 0.5, 0, -size.z * 0.5), size)
+		var brazier_box := {"xf": Transform3D(Basis.IDENTITY,
+			pos + Vector3(0, size.y * 0.5, 0)), "size": size}
+		var rotunda_walls: Dictionary = TempleQA._rotunda_wall_components(builder) \
+			if builder.spec.form == &"rotunda" else {}
 		res.checked += 1
 		var footprint := Rect2(Vector2(bounds.position.x, bounds.position.z), Vector2(size.x, size.z))
 		for corner in Poly.from_rect(footprint):
@@ -84,7 +89,13 @@ static func _brazier_clearance(res: SuiteResult, builder: TempleBuilder, where: 
 				res.fail("brazier foot has no floor at %s, %s" % [corner, where])
 		for mass in builder.mass_log:
 			var name := String(mass["name"])
-			if name.begins_with("wall_") or name.begins_with("pylon_") \
+			if builder.spec.form == &"rotunda" and name.begins_with("wall_rotunda_"):
+				var component: Dictionary = rotunda_walls.get(name, {})
+				if component.is_empty():
+					res.fail("brazier clearance lacks actual oriented wall component %s, %s" % [name, where])
+				elif TempleQA._rotunda_box_overlap_depth(component, brazier_box) > MassRules.TOL:
+					res.fail("brazier intersects actual Rotunda wall %s at %s, %s" % [name, pos, where])
+			elif name.begins_with("wall_") or name.begins_with("pylon_") \
 					or name.begins_with("column_") or name == "dais":
 				if bounds.intersects(mass["aabb"]):
 					res.fail("brazier intersects %s at %s, %s" % [name, pos, where])
@@ -92,6 +103,32 @@ static func _brazier_clearance(res: SuiteResult, builder: TempleBuilder, where: 
 			if bounds.intersects(other):
 				res.fail("braziers overlap at %s, %s" % [pos, where])
 		bowls.append(bounds)
+
+
+## The rotated wall check must still reject the same Cauldron footprint when a
+## person moves it into an actual emitted panel. This control uses the same SAT
+## predicate as the live bowl checks; no wall-family exemption is involved.
+static func _rotunda_brazier_wall_negative(res: SuiteResult) -> void:
+	var spec := TempleSpec.new(54811)
+	spec.form = &"rotunda"
+	spec.cult = &"blood"
+	TempleGenerator.generate(spec, spec.seed)
+	var builder := TempleBuilder.new()
+	builder.build(spec)
+	var walls: Dictionary = TempleQA._rotunda_wall_components(builder)
+	if walls.is_empty():
+		res.fail("Rotunda brazier wall negative has no emitted panel geometry")
+		return
+	var names: Array = walls.keys()
+	names.sort()
+	var wall: Dictionary = walls[names[0]]
+	var wall_xf: Transform3D = wall["xf"]
+	var size: Vector3 = PropCatalog.size("Cauldron") * 0.75
+	var moved_brazier := {"xf": Transform3D(Basis.IDENTITY, wall_xf.origin),
+		"size": size}
+	res.checked += 1
+	if TempleQA._rotunda_box_overlap_depth(wall, moved_brazier) <= MassRules.TOL:
+		res.fail("actual Cauldron footprint inside %s escaped the Rotunda wall SAT negative" % names[0])
 
 
 static func _compact_columns(res: SuiteResult) -> void:

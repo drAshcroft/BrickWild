@@ -31,6 +31,34 @@ static func shared_edge(p: HousePlan, i: int, j: int) -> Array:
 
 ## Doors on a spanning tree from the hall, expanding through public rooms
 ## first so bedrooms and stores end up as leaves.
+static func _place_witch_workshop_yard_door(p: HousePlan, spec: HouseSpec) -> void:
+	var bay := HouseGeometry.witch_workshop_bay(p)
+	if bay.is_empty():
+		bay = HouseGeometry.witch_compact_service_threshold(p)
+	if bay.is_empty():
+		return
+	var room := int(bay.room)
+	var normal: Vector2 = bay.normal
+	var service_lo := float(bay.get("service_lo", bay.lo))
+	var service_hi := float(bay.get("service_hi", bay.hi))
+	var along := float(bay.get("door_line_parameter", (service_lo + service_hi) * 0.5))
+	var point := Vector2(float(bay.line), along) if absf(normal.x) > 0.5 else Vector2(along, float(bay.line))
+	var width := HouseGeometry.DOOR_W
+	var clearance := HouseGeometry.DOOR_CORNER_MARGIN + width * 0.5
+	if service_hi - service_lo < width + clearance * 2.0:
+		return
+	for existing in p.doors:
+		if not bool(existing.get("exterior", false)):
+			continue
+		if HouseGeometry.door_opening_rect(spec, existing).grow(0.08).intersects(HouseGeometry.door_opening_rect(spec, {"pos": point, "normal": normal, "width": width})):
+			return
+	var door := {"a": room, "b": -1, "pos": point, "normal": normal,
+		"width": width, "exterior": true, "front": false, "storey": 0,
+		"witch_workshop_yard": true,
+		"witch_compact_service_threshold": bool(bay.get("compact_shared_hall", false))}
+	_set_domestic_door_head(p, door)
+	p.doors.append(door)
+
 static func place_doors(p: HousePlan, spec: HouseSpec) -> void:
 	var n: int = p.rooms.size()
 	var hall: int = p.rooms_of(&"hall")[0] if p.has_kind(&"hall") else 0
@@ -73,6 +101,7 @@ static func place_doors(p: HousePlan, spec: HouseSpec) -> void:
 	demote_through_bedrooms(p)
 	if spec.back_door:
 		_place_back_door(p, spec)
+	_place_witch_workshop_yard_door(p, spec)
 
 
 ## A spanning tree can leave the only route to a room running through a

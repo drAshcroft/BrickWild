@@ -401,12 +401,22 @@ class TempleFamily extends BuildingFamilyAdapter:
 		var temple := building.spec as TempleSpec
 		var r: Rect2 = TempleGeometry.site_rect(temple)
 		var gh: float = minf(TempleGeometry.GATE_H, temple.height - 0.6)
+		if temple.form == &"rotunda":
+			return Vector3(0.0, gh / 2.0,
+				-TempleGeometry.rotunda_outer_radius(temple))
 		return Vector3(0.0, gh / 2.0, r.position.y)
 
 	func placement_metadata(building, bounds: AABB) -> Dictionary:
 		var temple := building.spec as TempleSpec
 		if temple.form == &"basilica":
 			var approach: Rect2 = TempleGeometry.basilica_approach_rect(temple)
+			if approach.size.x > 0.0 and approach.size.y > 0.0:
+				return {"approach": approach}
+			return {}
+		if temple.form == &"rotunda":
+			return {"approach": TempleGeometry.rotunda_approach_rect(temple)}
+		if temple.form == &"pylon":
+			var approach: Rect2 = TempleGeometry.pylon_approach_rect(temple)
 			if approach.size.x > 0.0 and approach.size.y > 0.0:
 				return {"approach": approach}
 			return {}

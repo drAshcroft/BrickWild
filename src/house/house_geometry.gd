@@ -17,6 +17,7 @@ extends RefCounted
 
 # ---- shell, in metres ----
 const WALL_T := 0.35          # exterior wall thickness
+const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
 const INNER_WALL_T := 0.16    # partition thickness
 const FLOOR_T := 0.12
 const CEILING_MIN := 2.2      # a room shorter than this is a crawlspace
@@ -522,11 +523,19 @@ static func window_area(win: Dictionary) -> float:
 # ---------------------------------------------------------------- envelope
 
 static func roof_rise(spec: HouseSpec) -> float:
-	return minf(spec.width, spec.length) * spec.roof_pitch * 0.5
+	var raw := minf(spec.width, spec.length) * spec.roof_pitch * 0.5
+	if spec.style == &"witch_hut":
+		# Retain a steep small hut, while preventing a broad lot from becoming
+		# one enormous blank gable. This cap is in metres and leaves the locked
+		# wall envelope unchanged.
+		var span := minf(spec.width, spec.length)
+		return minf(raw, clampf(span * 0.52, 3.6, 5.6))
+	return raw
 
 
 ## Art direction, not a structural limit. Broad houses gain roof rise more
-## slowly than width; witch huts deliberately keep their extravagant pitch.
+## slowly than width; the witch row retains a steep small roof while its
+## dimension-specific rise bound prevents a huge blank roof on a large lot.
 ## Applied only to generated pitch, never to an explicit emitter fixture.
 static func art_pitch_scale(spec: HouseSpec) -> float:
 	var row: Dictionary = HouseSpec.STYLES.get(spec.style, {})
@@ -540,19 +549,403 @@ static func art_pitch_scale(spec: HouseSpec) -> float:
 ## Pure plan-space roof layout. Attachments and the emitter read the same
 ## face coordinates; rebuilding a mutable spec never leaves cached holes on
 ## a former roof. The transform's origin is the top storey's wall head.
+static func uses_witch_asymmetric_roof(spec: HouseSpec, world_family: StringName = &"") -> bool:
+	if spec == null or world_family != &"":
+		return false
+	var spec_script := spec.get_script() as Script
+	return spec_script != null \
+		and spec_script.resource_path.ends_with("/src/house/house_spec.gd") \
+		and spec.style == &"witch_hut" and spec.trade == &"none" \
+		and spec.roof_type in [&"gable", &"half_hipped"]
+
+
+## Put the shifted ridge opposite the ordinary Workshop wing. The roof layout
+## and the Workshop-side validation share this value, so a bay cannot pass a
+## separate, hand-copied ridge test.
+static func witch_ridge_x(plan: HousePlan, full_span: float) -> float:
+	var offset := full_span * 0.18
+	if plan == null or plan.world_family != &"" or not uses_witch_asymmetric_roof(plan.spec, plan.world_family):
+		return offset
+	var top := storey_rect(plan, 0)
+	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if top.size.x > top.size.y else 0.0), Vector3(top.get_center().x, plan.spec.height, top.get_center().y))
+	var workshop_side := 0.0
+	for room_index in plan.rooms_of(&"workshop"):
+		var room: Rect2 = plan.rooms[room_index]["rect"]
+		var local_center := _witch_bay_local_point(xf, room.get_center())
+		workshop_side += local_center.x
+	if workshop_side > 0.02:
+		return -offset
+	return offset
+
+
+## The occupied unmarked rooms form the high Witch roof mass. Marked service
+## rooms sit beside them under their own lower roof. This derives the upper
+## footprint from the actual plan rather than the lot AABB.
+static func witch_high_core_rect(plan: HousePlan) -> Rect2:
+	if plan == null or plan.world_family != &"" \
+			or not uses_witch_asymmetric_roof(plan.spec, plan.world_family):
+		return Rect2()
+	var has_service_wing := false
+	for room in plan.rooms:
+		if bool(room.get("witch_service_wing", false)):
+			has_service_wing = true
+			break
+	if not has_service_wing:
+		return Rect2()
+	var bounds := Rect2()
+	var found_core := false
+	for room_index in plan.room_count():
+		if plan.storey_of_room(room_index) != 0 \
+				or bool(plan.rooms[room_index].get("witch_service_wing", false)):
+			continue
+		var room: Rect2 = plan.rooms[room_index]["rect"]
+		if room.size.x < 0.01 or room.size.y < 0.01:
+			return Rect2()
+		bounds = bounds.merge(room) if found_core else room
+		found_core = true
+	return bounds if found_core else Rect2()
+
+
+const WITCH_WORKSHOP_MIN_SITE_SPAN := 8.5
+
+
+static func witch_workshop_bay(plan: HousePlan) -> Dictionary:
+	if plan == null or not uses_witch_asymmetric_roof(plan.spec, plan.world_family) \
+			or plan.spec.storeys != 1 or plan.spec.cellars != 0 \
+			or minf(plan.spec.width, plan.spec.length) < WITCH_WORKSHOP_MIN_SITE_SPAN:
+		return {}
+	var inner := interior_rect(plan.spec)
+	var candidates: Array[Dictionary] = []
+	for room_index in plan.rooms_of(&"workshop"):
+		if plan.storey_of_room(room_index) != 0 or plan.is_polygonal(room_index):
+			continue
+		var room: Rect2 = plan.rooms[room_index]["rect"]
+		var floor := room_floor_rect(plan, room_index)
+		if not room_suits(plan, room_index, &"workshop") or floor.get_area() < 8.0 or minf(floor.size.x, floor.size.y) < 2.45:
+			continue
+		var edges := [
+			{"normal": Vector2(0, -1), "line": inner.position.y, "lo": room.position.x, "hi": room.end.x, "on": absf(room.position.y - inner.position.y) < 0.02, "rank": 1},
+			{"normal": Vector2(0, 1), "line": inner.end.y, "lo": room.position.x, "hi": room.end.x, "on": absf(room.end.y - inner.end.y) < 0.02, "rank": 4},
+			{"normal": Vector2(-1, 0), "line": inner.position.x, "lo": room.position.y, "hi": room.end.y, "on": absf(room.position.x - inner.position.x) < 0.02, "rank": 3},
+			{"normal": Vector2(1, 0), "line": inner.end.x, "lo": room.position.y, "hi": room.end.y, "on": absf(room.end.x - inner.end.x) < 0.02, "rank": 3},
+		]
+		var top := witch_high_core_rect(plan)
+		if top.size.x < 0.01 or top.size.y < 0.01:
+			top = storey_rect(plan, 0)
+		var span := minf(top.size.x, top.size.y)
+		var along := maxf(top.size.x, top.size.y)
+		var ridge := witch_ridge_x(plan, span + roof_span_out(plan.spec) * 2.0)
+		var xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if top.size.x > top.size.y else 0.0), Vector3(top.get_center().x, plan.spec.height, top.get_center().y))
+		for edge in edges:
+			if not edge["on"] or float(edge.hi) - float(edge.lo) < 3.3:
+				continue
+			var local_n := xf.basis.inverse() * Vector3(edge.normal.x, 0.0, edge.normal.y)
+			if absf(local_n.x) < 0.95:
+				continue # the shed must follow one eave, parallel to the ridge
+			var shell := site_rect(plan.spec, 0)
+			var roof_line := float(shell.position.x) if edge.normal.x < 0.0 else float(shell.end.x) if edge.normal.x > 0.0 else float(shell.position.y) if edge.normal.y < 0.0 else float(shell.end.y)
+			var outer_world := Vector2(roof_line, float(edge.lo)) if absf(edge.normal.x) > 0.5 else Vector2(float(edge.lo), roof_line)
+			var floor_inner_line := float(floor.end.x) if edge.normal.x < 0.0 else float(floor.position.x) if edge.normal.x > 0.0 else float(floor.end.y) if edge.normal.y < 0.0 else float(floor.position.y)
+			var inside_world := Vector2(floor_inner_line, float(edge.lo)) if absf(edge.normal.x) > 0.5 else Vector2(float(edge.lo), floor_inner_line)
+			var outer_local := xf.affine_inverse() * Vector3(outer_world.x, 0.0, outer_world.y)
+			var inner_local := xf.affine_inverse() * Vector3(inside_world.x, 0.0, inside_world.y)
+			if (outer_local.x - ridge) * (inner_local.x - ridge) <= 0.0:
+				continue # keep the bay join wholly on one roof plane
+			edge["room"] = room_index
+			edge["room_bounds"] = room
+			edge["rect"] = floor
+			edge["rank"] = int(edge.rank) * 100 + float(edge.hi - edge.lo)
+			candidates.append(edge)
+	if candidates.is_empty():
+		return {}
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.rank) > float(b.rank))
+	var chosen: Dictionary = candidates[0]
+	# The service roof follows the plan-marked connected wing, not only the
+	# Workshop room. This lets an adjoining kitchen/store share one honest
+	# lower roof while the yard threshold remains hosted by the Workshop.
+	if bool(plan.rooms[int(chosen.room)].get("witch_service_wing", false)):
+		var normal: Vector2 = chosen.normal
+		var service_lo := float(chosen.lo)
+		var service_hi := float(chosen.hi)
+		var wing_lo := service_lo
+		var wing_hi := service_hi
+		var wing_rect: Rect2 = chosen.rect
+		var wing_floor: Rect2 = chosen.rect
+		var wing_room_indices: Array[int] = [int(chosen.room)]
+		var room_bounds: Rect2 = chosen.get("room_bounds", wing_rect)
+		var wing_left := normal.x < -0.5 and absf(room_bounds.position.x - inner.position.x) < 0.03
+		var wing_right := normal.x > 0.5 and absf(room_bounds.end.x - inner.end.x) < 0.03
+		var wing_front := normal.y < -0.5 and absf(room_bounds.position.y - inner.position.y) < 0.03
+		var wing_back := normal.y > 0.5 and absf(room_bounds.end.y - inner.end.y) < 0.03
+		var expanded := true
+		while expanded:
+			expanded = false
+			for room_index in range(plan.rooms.size()):
+				if room_index == int(chosen.room) or not bool(plan.rooms[room_index].get("witch_service_wing", false)):
+					continue
+				var raw: Rect2 = plan.rooms[room_index]["rect"]
+				var floor := room_floor_rect(plan, room_index)
+				var same_exterior_edge := (wing_left and absf(raw.position.x - inner.position.x) < 0.03) \
+					or (wing_right and absf(raw.end.x - inner.end.x) < 0.03) \
+					or (wing_front and absf(raw.position.y - inner.position.y) < 0.03) \
+					or (wing_back and absf(raw.end.y - inner.end.y) < 0.03)
+				if not same_exterior_edge:
+					continue
+				var lo := raw.position.y if absf(normal.x) > 0.5 else raw.position.x
+				var hi := raw.end.y if absf(normal.x) > 0.5 else raw.end.x
+				if hi < wing_lo - 0.03 or lo > wing_hi + 0.03:
+					continue
+				if lo < wing_lo - 0.03 or hi > wing_hi + 0.03:
+					expanded = true
+				wing_lo = minf(wing_lo, lo)
+				wing_hi = maxf(wing_hi, hi)
+				wing_rect = wing_rect.merge(raw)
+				wing_floor = wing_floor.merge(floor)
+				if not wing_room_indices.has(room_index):
+					wing_room_indices.append(room_index)
+		chosen["service_lo"] = service_lo
+		chosen["service_hi"] = service_hi
+		chosen["lo"] = wing_lo
+		chosen["hi"] = wing_hi
+		chosen["rect"] = wing_floor
+		chosen["wing_rect"] = wing_floor
+		chosen["wing_rooms"] = wing_room_indices
+	chosen["wall_thickness"] = wall_thickness(plan.spec)
+	return chosen
+
+
+## A compact Witch shared hall can reach the service yard through its own
+## exterior side wall. This is only a threshold descriptor. It does not grant
+## the Hall a shed-roof bay: the asymmetric main roof's structural Workshop
+## eligibility remains exclusively in witch_workshop_bay().
+static func witch_compact_service_threshold(plan: HousePlan) -> Dictionary:
+	if plan == null or plan.spec == null or plan.spec.get_script() != BASE_HOUSE_SPEC \
+			or plan.spec.style != &"witch_hut" or plan.spec.trade != &"none" \
+			or plan.spec.storeys != 1 or plan.spec.cellars != 0 or not plan.world_family.is_empty() \
+			or plan.spec.has_method("room_program") or plan.spec.has_method("custom_room_rects") \
+			or plan.spec.has_method("landmark_footprint") \
+			or not HouseSpec.STYLES.get(plan.spec.style, {}).has("domestic_program"):
+		return {}
+	var inner := interior_rect(plan.spec)
+	var preferred_wall := 3 if posmod(plan.spec.seed, 2) == 0 else 2
+	var preferred_normal: Vector2 = exterior_runs(plan.spec)[preferred_wall]["normal"]
+	for room_index in plan.rooms_of(&"hall"):
+		var room_data: Dictionary = plan.rooms[room_index]
+		var functions: Array = room_data.get("domestic_functions", [])
+		if not bool(room_data.get("shared_witchwork", false)) \
+				or not functions.has(&"cooking") or not functions.has(&"witchwork"):
+			continue
+		var room: Rect2 = room_data["rect"]
+		var edge_length := room.size.y
+		var width := DOOR_W
+		var margin := DOOR_CORNER_MARGIN + width * 0.5
+		if edge_length < width + margin * 2.0:
+			continue
+		# The compact Witch grammar makes the shared Hall full-width at the
+		# front. Only a side edge that truly lies on the exterior wall qualifies.
+		for side in [2, 3]:
+			var run: Dictionary = exterior_runs(plan.spec)[side]
+			var normal: Vector2 = run["normal"]
+			if normal != preferred_normal:
+				continue
+			var exterior_x: float = inner.position.x if side == 2 else inner.end.x
+			var room_x: float = room.position.x if side == 2 else room.end.x
+			if absf(room_x - exterior_x) > 0.02:
+				continue
+			return {"room": room_index, "normal": normal, "line": exterior_x,
+				"lo": room.position.y, "hi": room.end.y,
+				"door_line_parameter": room.position.y + margin + 0.58,
+				"compact_shared_hall": true,
+				"wall_thickness": wall_thickness(plan.spec)}
+	return {}
+
+
+static func _witch_bay_local_point(xf: Transform3D, p: Vector2) -> Vector2:
+	var local := xf.affine_inverse() * Vector3(p.x, xf.origin.y, p.y)
+	return Vector2(local.x, local.z)
+
+
 static func roof_layout(plan: HousePlan) -> Dictionary:
 	var s := plan.spec
-	var top := storey_rect(plan, maxi(s.storeys - 1, 0))
+	var bay_candidate := witch_workshop_bay(plan)
+	var high_core := witch_high_core_rect(plan) if not bay_candidate.is_empty() else Rect2()
+	var has_high_core := high_core.size.x >= 0.01 and high_core.size.y >= 0.01
+	var top := high_core if has_high_core else storey_rect(plan, maxi(s.storeys - 1, 0))
 	var span := minf(top.size.x, top.size.y)
 	var along := maxf(top.size.x, top.size.y)
 	var rise := roof_rise(s)
+	if has_high_core:
+		# Keep the generated Witch pitch, but apply it to the measured high-core
+		# span. The lower service roof joins the actual core plane separately.
+		rise = minf(span * s.roof_pitch * 0.5, clampf(span * 0.52, 3.6, 5.6))
 	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if top.size.x > top.size.y else 0.0),
 		Vector3(top.get_center().x, s.height * maxi(s.storeys, 1), top.get_center().y))
 	var span_out := roof_span_out(s)
-	var roof := RoofShape.faces(span + span_out * 2.0,
-		along + roof_along_out(s) * 2.0, rise, s.roof_type)
+	var full_span := span + span_out * 2.0
+	var full_along := along + roof_along_out(s) * 2.0
+	var ridge_x := 0.0
+	var ridge_half := ridge_half_for(s, span, along, plan.world_family)
+	var roof: Array[PackedVector3Array]
+	if uses_witch_asymmetric_roof(s, plan.world_family):
+		# Preserve the structural off-axis ridge and cut only its end planes. The
+		# bay remains joined to the measured side planes; no room or roof type changes.
+		ridge_x = witch_ridge_x(plan, full_span)
+		if uses_witch_half_hip_roof(s, plan.world_family):
+			roof = RoofShape.asymmetric_half_hip(full_span, full_along, rise,
+				ridge_x, ridge_half)
+		else:
+			roof = RoofShape.asymmetric_gable(full_span, full_along, rise, ridge_x)
+	else:
+		roof = RoofShape.faces(full_span, full_along, rise, s.roof_type)
 	var layout := {"transform": xf, "span": span, "along": along, "rise": rise,
-		"faces": roof, "dormers": [], "rejections": [], "requested": 0}
+		"ridge_x": ridge_x, "ridge_half": ridge_half, "faces": roof,
+		"dormers": [], "rejections": [], "requested": 0}
+	var witch_bay := bay_candidate
+	if not witch_bay.is_empty():
+		var normal: Vector2 = witch_bay["normal"]
+		var shell := site_rect(s, 0)
+		var roof_line := float(shell.position.x) if normal.x < 0.0 else float(shell.end.x) if normal.x > 0.0 else float(shell.position.y) if normal.y < 0.0 else float(shell.end.y)
+		var outer_a := Vector2(roof_line, float(witch_bay.lo)) if absf(normal.x) > 0.5 else Vector2(float(witch_bay.lo), roof_line)
+		var outer_b := Vector2(roof_line, float(witch_bay.hi)) if absf(normal.x) > 0.5 else Vector2(float(witch_bay.hi), roof_line)
+		var inner_line := float(witch_bay.rect.end.x) if normal.x < 0.0 else float(witch_bay.rect.position.x) if normal.x > 0.0 else float(witch_bay.rect.end.y) if normal.y < 0.0 else float(witch_bay.rect.position.y)
+		var inner_a := Vector2(inner_line, float(witch_bay.lo)) if absf(normal.x) > 0.5 else Vector2(float(witch_bay.lo), inner_line)
+		var inner_b := Vector2(inner_line, float(witch_bay.hi)) if absf(normal.x) > 0.5 else Vector2(float(witch_bay.hi), inner_line)
+		var local_normal3 := xf.basis.inverse() * Vector3(normal.x, 0.0, normal.y)
+		var axis := 0 if absf(local_normal3.x) > 0.5 else 1
+		var outer_pad := span_out if axis == 0 else roof_along_out(s)
+		var local_outer_a := _witch_bay_local_point(xf, outer_a + normal * outer_pad)
+		var local_outer_b := _witch_bay_local_point(xf, outer_b + normal * outer_pad)
+		var local_inner_a := _witch_bay_local_point(xf, inner_a)
+		var local_inner_b := _witch_bay_local_point(xf, inner_b)
+		var local_poly := PackedVector2Array([local_outer_a, local_outer_b, local_inner_b, local_inner_a])
+		var outer_coord := local_outer_a.x if axis == 0 else local_outer_a.y
+		var inner_coord := local_inner_a.x if axis == 0 else local_inner_a.y
+		var wall_station_world := (float(witch_bay.lo) + float(witch_bay.hi)) * 0.5
+		var core_wall_world := Vector2(top.position.x if normal.x < 0.0 else top.end.x, wall_station_world) if absf(normal.x) > 0.5 else Vector2(wall_station_world, top.position.y if normal.y < 0.0 else top.end.y)
+		var core_wall_local := _witch_bay_local_point(xf, core_wall_world)
+		var wall_outer_coord := core_wall_local.x if axis == 0 else core_wall_local.y
+		var source_a_along: float = local_outer_a.y if axis == 0 else local_outer_a.x
+		var source_b_along: float = local_outer_b.y if axis == 0 else local_outer_b.x
+		var source_lo := minf(source_a_along, source_b_along)
+		var source_hi := maxf(source_a_along, source_b_along)
+		var interior_bounds := interior_rect(s)
+		var along_world_lo := float(interior_bounds.position.y) if absf(normal.x) > 0.5 else float(interior_bounds.position.x)
+		var along_world_hi := float(interior_bounds.end.y) if absf(normal.x) > 0.5 else float(interior_bounds.end.x)
+		var edge_lo_external := absf(float(witch_bay.lo) - along_world_lo) <= 0.035
+		var edge_hi_external := absf(float(witch_bay.hi) - along_world_hi) <= 0.035
+		var source_a_is_lo := source_a_along <= source_b_along
+		var source_lo_external := edge_lo_external if source_a_is_lo else edge_hi_external
+		var source_hi_external := edge_hi_external if source_a_is_lo else edge_lo_external
+		var full_along_half := full_along * 0.5
+		var along_lo := -full_along_half if source_lo_external else source_lo
+		var along_hi := full_along_half if source_hi_external else source_hi
+		var mid_along := (along_lo + along_hi) * 0.5
+		var eave_y := RoofShape.height_at(roof, Vector2(outer_coord, mid_along) if axis == 0 else Vector2(mid_along, outer_coord))
+		if not is_finite(eave_y):
+			eave_y = 0.0
+		# The service-room boundary is at the high roof's eave. Move its join
+		# into the measured main plane until the whole half-hip seam has enough
+		# fall to meet the lower roof. At the half-hip end stations the side-plane
+		# intersection is shared with the end triangles, so one constant joining
+		# line remains a real, continuous roof seam.
+		var join_found := false
+		var join_host := NAN
+		var join_coord := inner_coord
+		var join_direction := signf(ridge_x - inner_coord)
+		var required_host_height := eave_y + 0.54
+		if absf(join_direction) > 0.5:
+			for step in range(0, 1000):
+				var candidate_coord := inner_coord + join_direction * float(step) * 0.005
+				if (ridge_x - candidate_coord) * join_direction <= 0.025:
+					break
+				var heights: Array[float] = []
+				for station in [along_lo, mid_along, along_hi]:
+					var probe := Vector2(candidate_coord, float(station)) if axis == 0 else Vector2(float(station), candidate_coord)
+					heights.append(RoofShape.height_at(roof, probe))
+				if heights.any(func(y: float) -> bool: return not is_finite(y)):
+					continue
+				var minimum_host := minf(heights[0], minf(heights[1], heights[2]))
+				if minimum_host >= required_host_height:
+					join_found = true
+					join_coord = candidate_coord
+					join_host = heights[1]
+					break
+		if join_found:
+			inner_coord = join_coord
+			if axis == 0:
+				local_inner_a.x = join_coord
+				local_inner_b.x = join_coord
+			else:
+				local_inner_a.y = join_coord
+				local_inner_b.y = join_coord
+		var host_point := Vector2(inner_coord, mid_along) if axis == 0 else Vector2(mid_along, inner_coord)
+		var host_height := RoofShape.height_at(roof, host_point)
+		var host_a := RoofShape.height_at(roof, Vector2(inner_coord, along_lo) if axis == 0 else Vector2(along_lo, inner_coord))
+		var host_b := RoofShape.height_at(roof, Vector2(inner_coord, along_hi) if axis == 0 else Vector2(along_hi, inner_coord))
+		var floor_rect: Rect2 = witch_bay["rect"]
+		var floor_local_a := _witch_bay_local_point(xf, floor_rect.position)
+		var floor_local_b := _witch_bay_local_point(xf, Vector2(floor_rect.end.x, floor_rect.position.y))
+		var floor_local_c := _witch_bay_local_point(xf, floor_rect.end)
+		var floor_local_d := _witch_bay_local_point(xf, Vector2(floor_rect.position.x, floor_rect.end.y))
+		var floor_outline := PackedVector2Array([floor_local_a, floor_local_b, floor_local_c, floor_local_d])
+		var floor_bounds := Poly.bounding_rect(floor_outline)
+		var floor_cross_lo := floor_bounds.position.x if axis == 0 else floor_bounds.position.y
+		var floor_cross_hi := floor_bounds.end.x if axis == 0 else floor_bounds.end.y
+		var floor_along_lo := floor_bounds.position.y if axis == 0 else floor_bounds.position.x
+		var floor_along_hi := floor_bounds.end.y if axis == 0 else floor_bounds.end.x
+		# The occupied room stops at its partition, but the shed joins the high
+		# core farther in. Continue the interior roof liner from the actual inner
+		# wall face to that measured join so the strip above the partition is closed.
+		var ceiling_outer := floor_cross_lo if absf(floor_cross_lo - outer_coord) <= absf(floor_cross_hi - outer_coord) else floor_cross_hi
+		var ceiling_inner := join_coord
+		var ceiling_cross_lo := minf(ceiling_outer, ceiling_inner)
+		var ceiling_cross_hi := maxf(ceiling_outer, ceiling_inner)
+		var ceiling_outline := PackedVector2Array()
+		if axis == 0:
+			ceiling_outline = PackedVector2Array([Vector2(ceiling_cross_lo, floor_along_lo),
+				Vector2(ceiling_cross_hi, floor_along_lo), Vector2(ceiling_cross_hi, floor_along_hi),
+				Vector2(ceiling_cross_lo, floor_along_hi)])
+		else:
+			ceiling_outline = PackedVector2Array([Vector2(floor_along_lo, ceiling_cross_lo),
+				Vector2(floor_along_hi, ceiling_cross_lo), Vector2(floor_along_hi, ceiling_cross_hi),
+				Vector2(floor_along_lo, ceiling_cross_hi)])
+		var ceiling_bounds := Poly.bounding_rect(ceiling_outline)
+		var join_y := minf(rise * 0.55, host_height - 0.05) if join_found and is_finite(host_height) else -1.0
+		var minimum_clearance := s.height + minf(eave_y, join_y) - RoofShape.DEPTH * 0.5 - 0.015 - FLOOR_T
+		if join_found and is_finite(join_y) and join_y >= eave_y + 0.45 and absf(inner_coord - outer_coord) >= 2.45 and minimum_clearance >= 2.30:
+			var cut_poly := PackedVector2Array()
+			if axis == 0:
+				cut_poly = PackedVector2Array([Vector2(outer_coord, along_lo), Vector2(outer_coord, along_hi), Vector2(inner_coord, along_hi), Vector2(inner_coord, along_lo)])
+			else:
+				cut_poly = PackedVector2Array([Vector2(along_lo, outer_coord), Vector2(along_hi, outer_coord), Vector2(along_hi, inner_coord), Vector2(along_lo, inner_coord)])
+			var wall_end_a := _witch_bay_local_point(xf, outer_a)
+			var wall_end_b := _witch_bay_local_point(xf, outer_b)
+			var ceiling_lo := ceiling_bounds.position.y if axis == 0 else ceiling_bounds.position.x
+			var ceiling_hi := ceiling_bounds.end.y if axis == 0 else ceiling_bounds.end.x
+			layout["witch_bay"] = {"room": int(witch_bay.room), "outline": cut_poly,
+				"ceiling_outline": ceiling_outline, "normal": normal, "axis": axis,
+				"wing_rect": floor_rect, "wing_rooms": witch_bay.get("wing_rooms", [int(witch_bay.room)]),
+				"service_lo": witch_bay.get("service_lo", witch_bay.lo),
+				"service_hi": witch_bay.get("service_hi", witch_bay.hi),
+				"along_world_lo": witch_bay.lo, "along_world_hi": witch_bay.hi,
+				# The high-core wall now lies at the service roof's join edge.
+				# Clip that wall to the low roof plane, not the distant site facade.
+				"wall_outer": wall_outer_coord,
+				"wall_along_lo": wall_end_a.y if axis == 0 else wall_end_a.x,
+				"wall_along_hi": wall_end_b.y if axis == 0 else wall_end_b.x,
+				"minimum_clearance": minimum_clearance,
+				"return_at_lo": not source_lo_external, "return_at_hi": not source_hi_external,
+				"partition_head_y": 0.0,
+				"outer": outer_coord, "inner": inner_coord, "along_lo": along_lo, "along_hi": along_hi,
+				"ceiling_outer": ceiling_outer, "ceiling_inner": ceiling_inner,
+				"ceiling_along_lo": ceiling_lo, "ceiling_along_hi": ceiling_hi,
+				"eave_y": eave_y, "join_y": join_y, "host_y": host_height,
+				"host_y_lo": host_a, "host_y_hi": host_b, "transform": xf}
+		else:
+			layout["witch_bay_rejection"] = "workshop roof has no supported half-hip seam with 0.45 m fall, 2.45 m clear span, and 2.30 m headroom"
+			layout["witch_bay_rejection_detail"] = {"join_found": join_found, "required_host_y": required_host_height,
+				"join_host_y": join_host, "eave_y": eave_y, "join_y": join_y,
+				"join_backset": absf(join_coord - wall_outer_coord), "minimum_clearance": minimum_clearance}
 	# A candidate that is turned away says WHY. A fitter that silently drops
 	# dormers is indistinguishable from one that never tried, and the count
 	# nobody can explain is the count nobody notices going wrong.
@@ -639,6 +1032,60 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 	return layout
 
 
+## Top surface height at a world-space XZ point. The Witch chimney exits where
+## its flue actually crosses the roof, which may be the low service plane.
+static func roof_top_surface_at_plan(plan: HousePlan, world_xz: Vector2) -> float:
+	if plan == null:
+		return NAN
+	return _roof_top_surface_in_layout(plan, roof_layout(plan), world_xz)
+
+
+static func _roof_top_surface_in_layout(plan: HousePlan, layout: Dictionary,
+		world_xz: Vector2) -> float:
+	var xf: Transform3D = layout["transform"]
+	var local := xf.affine_inverse() * Vector3(world_xz.x, xf.origin.y, world_xz.y)
+	var bay: Dictionary = layout.get("witch_bay", {})
+	var plane := NAN
+	if not bay.is_empty():
+		var axis := int(bay["axis"])
+		var cross := local.x if axis == 0 else local.z
+		var along := local.z if axis == 0 else local.x
+		var outer := float(bay["outer"])
+		var inner := float(bay["inner"])
+		var along_lo := float(bay["along_lo"])
+		var along_hi := float(bay["along_hi"])
+		if cross >= minf(outer, inner) - 0.01 and cross <= maxf(outer, inner) + 0.01 \
+				and along >= along_lo - 0.01 and along <= along_hi + 0.01:
+			plane = lerpf(float(bay["eave_y"]), float(bay["join_y"]),
+				clampf((cross - outer) / (inner - outer), 0.0, 1.0))
+	if not is_finite(plane):
+		var faces: Array[PackedVector3Array] = layout["faces"]
+		plane = RoofShape.height_at(faces, Vector2(local.x, local.z))
+	if not is_finite(plane):
+		return NAN
+	# This point is on the roof skin. Ridge caps and thatch bundles are separate
+	# components, not a uniform vertical addition to every point on the roof.
+	return xf.origin.y + plane + RoofShape.DEPTH * 0.5
+
+
+## Highest roof surface sampled across a flue's physical footprint. A stack on
+## an exterior wall can straddle the eave, so its centre alone is not a safe
+## measure of where the roof pierces the masonry.
+static func roof_top_surface_in_footprint(plan: HousePlan, centre: Vector2,
+		footprint: Vector2) -> float:
+	if plan == null or footprint.x <= 0.0 or footprint.y <= 0.0:
+		return NAN
+	var layout := roof_layout(plan)
+	var highest := -INF
+	for fx in [-0.5, 0.0, 0.5]:
+		for fy in [-0.5, 0.0, 0.5]:
+			var sample := centre + Vector2(float(fx) * footprint.x, float(fy) * footprint.y)
+			var y := _roof_top_surface_in_layout(plan, layout, sample)
+			if is_finite(y):
+				highest = maxf(highest, y)
+	return highest if is_finite(highest) else NAN
+
+
 static func _dormer_reject(id: String, z: float, reason: StringName,
 		detail: String) -> Dictionary:
 	return {"id": id, "z": z, "reason": reason, "detail": detail}
@@ -709,6 +1156,7 @@ static func roof_opening_rejections(plan: HousePlan) -> Array[Dictionary]:
 
 ## Actual hearth-wall position shared by the chimney and roof attachments.
 const BREAST_DEPTH := 0.5
+const DOMESTIC_FIREPLACE_BREAST_WIDTH := 1.08
 
 ## A structural surround authored alongside the actual hearth placement.
 ## Its outline keeps diagonal walls honest; rect is only the broad-phase bound.
@@ -728,6 +1176,39 @@ static func breast_for_hearth(plan: HousePlan, room: int, item: Dictionary, wall
 		"outline": outline, "rect": Poly.bounding_rect(outline), "yaw": float(item["yaw"])}
 
 
+## Native ordinary-house fireplace host. Width is structural, not borrowed from a prop.
+## The opening is derived from this width by HouseBuilder, so planning and emitted
+## masonry share one measured envelope.
+static func breast_for_domestic_fireplace(plan: HousePlan, room: int, wall: int) -> Dictionary:
+	var width: float = DOMESTIC_FIREPLACE_BREAST_WIDTH
+	var walls: Array[Dictionary] = room_walls(plan, room)
+	if wall < 0 or wall >= walls.size() or width <= 0.0:
+		return {}
+	var host: Dictionary = walls[wall]
+	var normal: Vector2 = host["normal"]
+	var along: Vector2 = (Vector2(host["to"]) - Vector2(host["from"])).normalized()
+	var span: Vector2 = HousePlanFeatures.clear_wall_span(plan, room, wall)
+	if span.y - span.x < width + 0.10:
+		return {}
+	var along_coordinate := (span.x + span.y) * 0.5
+	var start: Vector2 = host["from"]
+	var finish: Vector2 = host["to"]
+	var axis_delta := finish.x - start.x if absf(normal.y) > 0.5 else finish.y - start.y
+	if absf(axis_delta) < 0.001:
+		return {}
+	var axis_start := start.x if absf(normal.y) > 0.5 else start.y
+	var wall_point := start.lerp(finish, (along_coordinate - axis_start) / axis_delta)
+	var centre: Vector2 = wall_point + normal * (BREAST_DEPTH * 0.5)
+	var outline := PackedVector2Array([centre - along * width * 0.5 - normal * BREAST_DEPTH * 0.5,
+		centre + along * width * 0.5 - normal * BREAST_DEPTH * 0.5,
+		centre + along * width * 0.5 + normal * BREAST_DEPTH * 0.5,
+		centre - along * width * 0.5 + normal * BREAST_DEPTH * 0.5])
+	return {"room": room, "storey": plan.storey_of_room(room), "wall": wall,
+		"centre": centre, "normal": normal, "width": width, "depth": BREAST_DEPTH,
+		"outline": outline, "rect": Poly.bounding_rect(outline),
+		"yaw": HouseFurnishGeometry.yaw_facing(normal)}
+
+
 static func hearth_breast(plan: HousePlan) -> Dictionary:
 	return plan.hearth.get("breast", {})
 
@@ -744,11 +1225,17 @@ static func chimney_center(plan: HousePlan) -> Vector2:
 	var along := (run.x + run.y) * 0.5
 	if plan.focus_room() == host and plan.focus_cat() == "hearth" and plan.focus_pos().is_finite():
 		along = plan.focus_pos().x if wall <= 1 else plan.focus_pos().y
+	# When a Witch workshop gets its own lower roof, the high-core roof ends at
+	# the site eave. Keep its flue axis on the actual exterior wall line so the
+	# emitted stack crosses that roof; the old half-stack exterior offset put
+	# the narrow flue 0.375 m outside the high-core roof. Other house grammars
+	# retain the established external-stack setback.
+	var split_witch_roof := not witch_workshop_bay(plan).is_empty()
 	match wall:
-		0: c = Vector2(along, r.position.y - s / 2.0 + 0.15)
-		1: c = Vector2(along, r.end.y + s / 2.0 - 0.15)
-		2: c = Vector2(r.position.x - s / 2.0 + 0.15, along)
-		_: c = Vector2(r.end.x + s / 2.0 - 0.15, along)
+		0: c = Vector2(along, r.position.y if split_witch_roof else r.position.y - s / 2.0 + 0.15)
+		1: c = Vector2(along, r.end.y if split_witch_roof else r.end.y + s / 2.0 - 0.15)
+		2: c = Vector2(r.position.x if split_witch_roof else r.position.x - s / 2.0 + 0.15, along)
+		_: c = Vector2(r.end.x if split_witch_roof else r.end.x + s / 2.0 - 0.15, along)
 	return c
 
 
@@ -915,14 +1402,31 @@ const THATCH_ROLL_TOP := ROLL_H
 ## stands. The ridge cap and a thatch roll compete for this one number, and
 ## both the emitter that measures the shell's height and the bound that
 ## promises it read it here, so the two cannot disagree about a thatched roof.
-static func roof_slab_top(spec: HouseSpec) -> float:
+static func has_witch_roofcraft(spec: HouseSpec, world_family: StringName = &"") -> bool:
+	return spec != null and uses_witch_asymmetric_roof(spec, world_family) \
+		and spec.roof_material == &"thatch"
+
+
+## The clipped end planes are part of the same exact built-in Witch path as
+## its bundled roof. A Witch trade or world-family roof keeps its source shape.
+static func uses_witch_half_hip_roof(spec: HouseSpec, world_family: StringName = &"") -> bool:
+	return has_witch_roofcraft(spec, world_family) and spec.roof_type == &"half_hipped"
+
+
+static func roof_has_thatch_roll(spec: HouseSpec, world_family: StringName = &"") -> bool:
+	if spec == null:
+		return false
+	return spec.thatch_roll or has_witch_roofcraft(spec, world_family)
+
+
+static func roof_slab_top(spec: HouseSpec, world_family: StringName = &"") -> float:
 	# A cone has no ridge, so there is nothing to cap and no reeds to bundle
 	# along one. Promising a cap's height here anyway would leave the bound
 	# reaching for a piece that was never emitted, and a bound loose by more
 	# than BOUNDS_TOL is as much a failure as one that is too tight.
-	if ridge_half(spec) <= 0.05:
+	if ridge_half(spec, world_family) <= 0.05:
 		return RIDGE_SLAB_TOP
-	return maxf(RIDGE_CAP_TOP, THATCH_ROLL_TOP if spec.thatch_roll else 0.0)
+	return maxf(RIDGE_CAP_TOP, THATCH_ROLL_TOP if roof_has_thatch_roll(spec, world_family) else 0.0)
 
 
 ## Rounded mud corners: a regular octagon standing on each corner of each
@@ -978,22 +1482,27 @@ static func parapet_top(spec: HouseSpec) -> float:
 ## `ridge_half_for` takes the span and along the roof was actually built from,
 ## so a plan whose top storey is shaped or opens onto a court is measured on
 ## the geometry that exists rather than on the rectangle its spec would give.
-static func ridge_half_for(spec: HouseSpec, span: float, along: float) -> float:
+static func ridge_half_for(spec: HouseSpec, span: float, along: float,
+		world_family: StringName = &"") -> float:
 	# A cone has an apex, and a flat roof has no ridge, so neither can carry a
 	# cap or a finial. One return keeps all ridge consumers in agreement.
 	if spec.roof_type in [&"conical", &"flat"]:
 		return 0.0
 	var half: float = along * 0.5 + roof_along_out(spec)
-	if spec.roof_type != &"gable":
+	if uses_witch_half_hip_roof(spec, world_family):
+		half = maxf(half - (span * 0.5 + roof_span_out(spec)) * (1.0 - RoofShape.HALF_HIP), 0.0)
+	elif spec.roof_type != &"gable":
+		# Preserve the established generic hip and half-hip arithmetic exactly.
+		# In particular, a full hipped roof subtracts its entire half-span.
 		var cut := RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else 0.0
 		half = maxf(half - (span * 0.5 + roof_span_out(spec)) * (1.0 - cut), 0.0)
 	return half
 
 
 ## The same ridge for a spec alone, which is all the exterior bound knows.
-static func ridge_half(spec: HouseSpec) -> float:
+static func ridge_half(spec: HouseSpec, world_family: StringName = &"") -> float:
 	var top := site_rect(spec, maxi(spec.storeys - 1, 0))
-	return ridge_half_for(spec, minf(top.size.x, top.size.y), maxf(top.size.x, top.size.y))
+	return ridge_half_for(spec, minf(top.size.x, top.size.y), maxf(top.size.x, top.size.y), world_family)
 
 
 ## Bounds are promised to CONTAIN every shell vertex exactly, and to be no
@@ -1029,14 +1538,15 @@ static func jetty_front_reach(spec: HouseSpec) -> float:
 
 ## How far above the wall head the roof and its attachments reach. Independent
 ## of which wall anything stands on, so it is exact from the spec alone.
-static func roof_top_above_walls(spec: HouseSpec) -> float:
+static func roof_top_above_walls(spec: HouseSpec, world_family: StringName = &"") -> float:
 	var rise: float = roof_rise(spec)
-	var top: float = rise + roof_slab_top(spec)
-	if spec.bargeboards and spec.roof_type == &"gable":
+	var witch_roll: bool = has_witch_roofcraft(spec, world_family)
+	var top: float = rise + roof_slab_top(spec, world_family)
+	if spec.bargeboards and spec.roof_type == &"gable" and not has_witch_roofcraft(spec, world_family):
 		top = maxf(top, rise + FINIAL_TOP)
 	if spec.chimney:
-		top = maxf(top, rise + CHIMNEY_TOP)
-	if spec.ridge_finial and ridge_half(spec) > 0.05:
+		top = maxf(top, rise + CHIMNEY_TOP + (THATCH_ROLL_TOP if witch_roll else 0.0))
+	if spec.ridge_finial and ridge_half(spec, world_family) > 0.05:
 		top = maxf(top, rise + RIDGE_CAP_TOP + CROWN_BASE_H + CROWN_H)
 	if spec.parapet:
 		top = maxf(top, parapet_top(spec))
@@ -1077,11 +1587,11 @@ static func shell_top(spec: HouseSpec) -> float:
 
 
 ## Exact top of the emitted shell, in world space.
-static func total_height(spec: HouseSpec) -> float:
+static func total_height(spec: HouseSpec, world_family: StringName = &"") -> float:
 	var raw_storeys = spec.get("storeys")
 	var storeys: int = maxi(1, int(raw_storeys)) if raw_storeys != null else 1
 	var wall_top: float = spec.height * storeys
-	var top: float = wall_top + roof_top_above_walls(spec)
+	var top: float = wall_top + roof_top_above_walls(spec, world_family)
 	if spec.porch:
 		# A porch is short, but a single-storey cottage with a shallow roof is
 		# shorter than you would think.
@@ -1097,10 +1607,13 @@ static func total_height(spec: HouseSpec) -> float:
 ## out past the eave and the board itself is tilted to the pitch, so how far it
 ## reaches depends on the pitch -- which is why a constant was 0.128 m short on
 ## every bargeboarded house.
-static func verge_overhang(spec: HouseSpec) -> Vector2:
+static func verge_overhang(spec: HouseSpec, world_family: StringName = &"",
+		conservative_unknown_scope := false) -> Vector2:
 	var span_out := roof_span_out(spec)
 	var along_out := roof_along_out(spec)
-	if not spec.bargeboards or spec.roof_type in [&"hipped", &"conical"]:
+	if not spec.bargeboards or (not conservative_unknown_scope \
+			and has_witch_roofcraft(spec, world_family)) \
+			or spec.roof_type in [&"hipped", &"conical"]:
 		return Vector2(span_out, along_out)
 	var top := site_rect(spec, maxi(spec.storeys - 1, 0))
 	var span: float = minf(top.size.x, top.size.y)
@@ -1117,8 +1630,9 @@ static func verge_overhang(spec: HouseSpec) -> Vector2:
 
 ## verge_overhang mapped onto the WORLD axes. The roof turns to follow the
 ## longer footprint dimension, so the span overhang lands on the shorter axis.
-static func roof_overhang(spec: HouseSpec) -> Vector2:
-	var v := verge_overhang(spec)
+static func roof_overhang(spec: HouseSpec, world_family: StringName = &"",
+		conservative_unknown_scope := false) -> Vector2:
+	var v := verge_overhang(spec, world_family, conservative_unknown_scope)
 	var top := site_rect(spec, maxi(spec.storeys - 1, 0))
 	return Vector2(v.x, v.y) if top.size.x <= top.size.y else Vector2(v.y, v.x)
 
@@ -1165,8 +1679,9 @@ static func porch_rect(plan: HousePlan) -> Rect2:
 	# is fixed to; only the outward half can leave the footprint. Centring a
 	# rect of the step's full length on the porch instead pushed the bound half
 	# a wall thickness too far out.
-	var out_p: Vector2 = door["pos"] + normal * (depth + 0.1)
-	var in_p: Vector2 = door["pos"] - normal * (0.1 + wall_thickness(spec))
+	var centre := porch_center(plan)
+	var out_p: Vector2 = centre + normal * (depth + 0.1)
+	var in_p: Vector2 = centre - normal * (0.1 + wall_thickness(spec))
 	var across: Vector2 = Vector2(normal.y, -normal.x) * (w * 0.5)
 	var r := Rect2(out_p + across, Vector2.ZERO)
 	for p in [out_p - across, in_p + across, in_p - across]:
@@ -1182,7 +1697,7 @@ static func porch_rect(plan: HousePlan) -> Rect2:
 ## chose, so they are deliberately conservative instead.
 static func exterior_bounds(plan: HousePlan) -> AABB:
 	var spec := plan.spec
-	var over := roof_overhang(spec)
+	var over := roof_overhang(spec, plan.world_family)
 	# The roof grows from the real top-storey envelope; ground attachments
 	# are merged separately, never added twice to the upper-storey overhang.
 	var neg := over
@@ -1207,7 +1722,7 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 	if spec.exterior_props:
 		for piece in plan.yard_pieces:
 			r = r.merge(piece["rect"])
-	var top: float = total_height(spec)
+	var top: float = total_height(spec, plan.world_family)
 	# A landmark declares the storybook elevation it stands in front of its
 	# walls (balconies, entrance canopy, cornices, cupolas), so those parts
 	# are planned exterior rather than leakage.
@@ -1238,7 +1753,10 @@ static func yard_rect(plan: HousePlan) -> Rect2:
 ## add. A superset of exterior_bounds(), never a subset -- and never presented
 ## as exact.
 static func spec_bounds(spec: HouseSpec) -> AABB:
-	var over := roof_overhang(spec)
+	# There is no plan here to establish an empty world family. Keep the legacy
+	# bargeboard allowance while also retaining the physical-thatch height from
+	# the built-in Witch path below; this is a superset of either context.
+	var over := roof_overhang(spec, &"", true)
 	if has_quoins(spec):
 		over = over.max(Vector2.ONE * QUOIN_OUT)
 	if spec.cornice:
@@ -1260,7 +1778,7 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 	if spec.exterior_props and not spec.has_method("room_program"):
 		pad += HouseYard.apron(spec)
 	r = r.grow(pad)
-	var top: float = total_height(spec)
+	var top: float = maxf(total_height(spec), total_height(spec, &"__unknown_world_scope__"))
 	return AABB(Vector3(r.position.x, 0.0, r.position.y),
 		Vector3(r.size.x, top, r.size.y))
 
@@ -1276,8 +1794,29 @@ static func plan_extent(spec: HouseSpec) -> Rect2:
 
 
 static func porch_depth(spec: HouseSpec) -> float:
-	return 1.35
+	return 1.8 if spec.style == &"witch_hut" else 1.35
+
+
+## The witch canopy shelters the same door but sits slightly off-centre. The
+## small offset gives the entry an accreted character without moving the door
+## or its approach and is shared by emission and bounds.
+static func porch_center(plan: HousePlan) -> Vector2:
+	var d := plan.entrance()
+	if d < 0:
+		return Vector2.ZERO
+	var door: Dictionary = plan.doors[d]
+	var centre: Vector2 = door["pos"]
+	if plan.spec.style == &"witch_hut":
+		var normal: Vector2 = door["normal"]
+		centre += Vector2(normal.y, -normal.x) * 0.24
+	return centre
 
 
 static func chimney_size(spec: HouseSpec) -> float:
 	return 1.05
+
+
+## A narrower upper flue is a Witch roofcraft detail. Its bearing breast and
+## stepped lower stack retain the existing chimney_size footprint.
+static func chimney_flue_size(spec: HouseSpec, world_family: StringName = &"") -> float:
+	return 0.76 if uses_witch_asymmetric_roof(spec, world_family) else chimney_size(spec)

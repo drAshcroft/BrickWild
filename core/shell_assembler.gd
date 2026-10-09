@@ -71,7 +71,8 @@ static func architectural_materials(node: MeshInstance3D, colors: Array,
 
 ## Restrained, metre-scale roof courses. Kept opt-in to ordinary houses;
 ## four-surface castle/church/hotel shells retain their material contract.
-static func house_materials(node: MeshInstance3D, spec: HouseSpec) -> void:
+static func house_materials(node: MeshInstance3D, spec: HouseSpec,
+		world_family: StringName = &"") -> void:
 	if DisplayServer.get_name() == "headless":
 		return # Dummy renderer has no shader instances; retain base material.
 	if spec.roof_material == &"earth":
@@ -89,7 +90,8 @@ static func house_materials(node: MeshInstance3D, spec: HouseSpec) -> void:
 	var course: float = 0.22 if kind == &"slate" else (0.38 if kind == &"tile" else 0.30)
 	var tile_w: float = 0.30 if kind == &"slate" else (0.26 if kind == &"tile" else 0.42)
 	node.set_surface_override_material(HouseBuilder.SURF_ROOF, MaterialKit.house_roof(
-		spec.roof_color, course, tile_w, kind == &"thatch"))
+		spec.roof_color, course, tile_w, kind == &"thatch",
+		HouseGeometry.has_witch_roofcraft(spec, world_family)))
 	house_floor_material(node, spec)
 
 

@@ -1,5 +1,7 @@
 class_name HouseFurnisher
 extends RefCounted
+
+const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
 ## Fills the rooms.
 ##
 ## Every piece is placed by a rule rather than a coordinate, and each rule
@@ -27,6 +29,15 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 	plan.furniture.clear()
 	plan.rugs.clear()
 	plan.hearth.erase("breast")
+	plan.hearth.erase("host_kind")
+	if _uses_native_domestic_fireplace(plan):
+		var room := plan.hearth_room()
+		var wall := plan.hearth_wall()
+		if room >= 0 and wall >= 0:
+			var breast := HouseGeometry.breast_for_domestic_fireplace(plan, room, wall)
+			if not breast.is_empty():
+				plan.hearth["breast"] = breast
+				plan.hearth["host_kind"] = "ordinary_fireplace"
 	if HouseFurnishingRecipes.is_ordinary_house(plan):
 		_select_household_dining_room(plan)
 	# This whole-plan report is also the pre-room baseline for the first room.
@@ -233,6 +244,10 @@ static func _set_activity_group(piece: Dictionary, step: Dictionary) -> void:
 	var group_name: String = String(step.get("group", ""))
 	if not group_name.is_empty():
 		piece["activity_group"] = group_name
+	var shared_groups: Array = step.get("shared_activity_groups", [])
+	if not shared_groups.is_empty():
+		piece["shared_activity_groups"] = shared_groups.duplicate()
+		piece["shared_station_id"] = String(step.get("shared_station_id", ""))
 	var near_category: String = String(step.get("near_cat", ""))
 	if not near_category.is_empty():
 		piece["activity_host_cat"] = near_category
@@ -247,6 +262,10 @@ static func _set_activity_group(piece: Dictionary, step: Dictionary) -> void:
 static func _audit_activity_groups(plan: HousePlan) -> void:
 	for room in range(plan.room_count()):
 		var kind: StringName = plan.kind_of(room)
+		var station_contract: Dictionary = plan.rooms[room].get("shared_activity_station", {})
+		var station_nav: Dictionary = {}
+		if not station_contract.is_empty():
+			station_nav = HouseNavCheck.new().check(plan)
 		var recipe: Array = HouseFurnishingRecipes.recipe_for_room(plan, room,
 			not _dining_table_lost(plan, room))
 		if HouseFurnishingRecipes.is_ordinary_house(plan) and kind == &"hall" \
@@ -267,20 +286,46 @@ static func _audit_activity_groups(plan: HousePlan) -> void:
 			if recipe_group.is_empty() or float(step.get("opt", 0.0)) < 1.0:
 				continue
 			var recipe_category: String = String(step["cat"])
-			if not required.has(recipe_group):
-				required[recipe_group] = {}
-			var groups_by_category: Dictionary = required[recipe_group]
-			groups_by_category[recipe_category] = int(groups_by_category.get(recipe_category, 0)) \
-				+ int(step.get("min_n", step["n"][0]))
+			var declared_groups: Array[String] = [recipe_group]
+			for shared_group_variant in step.get("shared_activity_groups", []):
+				var shared_group := String(shared_group_variant)
+				if not shared_group.is_empty() and not declared_groups.has(shared_group):
+					declared_groups.append(shared_group)
+			for required_group in declared_groups:
+				if not required.has(required_group):
+					required[required_group] = {}
+				var groups_by_category: Dictionary = required[required_group]
+				groups_by_category[recipe_category] = int(groups_by_category.get(recipe_category, 0)) \
+					+ int(step.get("min_n", step["n"][0]))
 		for group_variant in required:
 			var audit_group: String = String(group_variant)
 			var category_counts: Dictionary = required[group_variant]
 			for category_variant in category_counts:
 				var audit_category: String = String(category_variant)
-				var actual: int = 0
-				for piece in plan.furniture:
-					if int(piece["room"]) == room and String(piece.get("activity_group", "")) == audit_group \
-							and String(piece["cat"]) == audit_category:
+				var actual: int = 1 if audit_category == "hearth" \
+						and _uses_native_domestic_fireplace(plan) \
+						and room == plan.hearth_room() \
+						and not HouseGeometry.hearth_breast(plan).is_empty() else 0
+				var contract_groups: Array = station_contract.get("groups", [])
+				var contract_role: bool = not station_contract.is_empty() \
+					and audit_category == String(station_contract.get("category", "")) \
+					and contract_groups.has(StringName(audit_group))
+				for piece_index in range(plan.furniture.size()):
+					var piece: Dictionary = plan.furniture[piece_index]
+					if int(piece.get("room", -1)) != room \
+							or String(piece.get("cat", "")) != audit_category:
+						continue
+					var primary_group := String(piece.get("activity_group", ""))
+					var shared_groups: Array = piece.get("shared_activity_groups", [])
+					if contract_role:
+						if _shared_activity_station_valid(plan, room, piece_index,
+								audit_group, station_nav):
+							actual += 1
+					elif primary_group == audit_group:
+						actual += 1
+					elif shared_groups.has(audit_group) \
+							and _shared_activity_station_valid(plan, room, piece_index,
+								audit_group, station_nav):
 						actual += 1
 				if actual < int(category_counts[category_variant]):
 					plan.note_compromise(room, "activity:" + audit_group)
@@ -361,6 +406,85 @@ static func _audit_activity_groups(plan: HousePlan) -> void:
 						plan.note_compromise(room, "activity:%s:relation:%s" % [related_group, anchor])
 	_finalize_household_dining(plan)
 	_report_activity_brief(plan)
+
+
+## A shared role is valid only when this exact piece is the contracted physical
+## station, bears on the real flue breast, and serves a reachable work stance.
+static func _shared_activity_station_valid(plan: HousePlan, room: int,
+		station_index: int, role: String, nav: Dictionary) -> bool:
+	if room < 0 or room >= plan.rooms.size() or station_index < 0 \
+			or station_index >= plan.furniture.size():
+		return false
+	var room_data: Dictionary = plan.rooms[room]
+	var contract: Dictionary = room_data.get("shared_activity_station", {})
+	var groups: Array = contract.get("groups", [])
+	var station: Dictionary = plan.furniture[station_index]
+	var station_id := String(contract.get("id", ""))
+	var station_category := String(contract.get("category", ""))
+	if station_id != "compact_witch_hearth" or station_category != "hearth" \
+			or String(contract.get("scope", "")) != "compact_witch_shared_hall" \
+			or not HouseFurnishingRecipes.is_ordinary_house(plan) \
+			or plan.spec.style != &"witch_hut" or plan.spec.trade != &"none" \
+			or plan.kind_of(room) != &"hall" \
+			or not groups.has(&"cooking") or not groups.has(&"witchwork") \
+			or not groups.has(StringName(role)) \
+			or String(station.get("shared_station_id", "")) != station_id \
+			or String(station.get("cat", "")) != station_category \
+			or PropCatalog.category(String(station.get("key", ""))) != station_category:
+		return false
+	var declared_roles: Array = station.get("shared_activity_groups", [])
+	if String(station.get("activity_group", "")) != role and not declared_roles.has(role):
+		return false
+	var body: Rect2 = Rect2(station.get("rect", Rect2()))
+	var use: Rect2 = Rect2(station.get("zone", Rect2()))
+	var floor: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	if not body.has_area() or not use.has_area() \
+			or not floor.grow(0.01).encloses(body) or not floor.grow(0.01).encloses(use):
+		return false
+	var breast: Dictionary = HouseGeometry.hearth_breast(plan)
+	var host_wall := int(contract.get("host_wall", -1))
+	if plan.hearth_room() != room or plan.hearth_wall() != host_wall \
+			or int(breast.get("wall", -1)) != host_wall \
+			or _rect_edge_distance(Rect2(breast.get("rect", Rect2())), body) > 0.01:
+		return false
+	var activity_regions: Dictionary = room_data.get("activity_regions", {})
+	var cooking_region: Rect2 = Rect2(activity_regions.get(&"cooking", Rect2()))
+	var witchwork_region: Rect2 = Rect2(activity_regions.get(&"witchwork", Rect2()))
+	if not activity_regions.has(&"cooking") or not activity_regions.has(&"witchwork") \
+			or not cooking_region.position.is_equal_approx(witchwork_region.position) \
+			or not cooking_region.size.is_equal_approx(witchwork_region.size) \
+			or not HouseGeometry.room_floor_rect(plan, room).encloses(cooking_region) \
+			or not cooking_region.grow(0.01).encloses(body) \
+			or not cooking_region.grow(0.01).encloses(use):
+		return false
+	var max_distance := float(contract.get("max_usezone_distance", 0.0))
+	if max_distance <= 0.0:
+		return false
+	var bench_index := -1
+	var bench_count := 0
+	for candidate_index in plan.furniture_of(room):
+		var candidate: Dictionary = plan.furniture[candidate_index]
+		if String(candidate.get("cat", "")) == "workbench" \
+				and PropCatalog.category(String(candidate.get("key", ""))) == "workbench" \
+				and String(candidate.get("activity_group", "")) == role:
+			bench_index = candidate_index
+			bench_count += 1
+	if bench_count != 1 or bench_index < 0 or bench_index == station_index:
+		return false
+	var bench: Dictionary = plan.furniture[bench_index]
+	var bench_body: Rect2 = Rect2(bench.get("rect", Rect2()))
+	var bench_use: Rect2 = Rect2(bench.get("zone", Rect2()))
+	if not bench_body.has_area() or not bench_use.has_area() \
+			or not floor.grow(0.01).encloses(bench_body) \
+			or not floor.grow(0.01).encloses(bench_use) \
+			or _rect_edge_distance(use, bench_use) > max_distance \
+			or use.intersects(bench_body) or bench_use.intersects(body):
+		return false
+	if nav.get("unreached_rooms", []).has(room) \
+			or nav.get("unreachable_items", []).has(station_index) \
+			or nav.get("unreachable_items", []).has(bench_index):
+		return false
+	return true
 
 
 ## Replay the exact measured pose from selection. Re-searching with a different
@@ -524,6 +648,10 @@ static func _household_seat_capacity(plan: HousePlan) -> int:
 	return clampi(sleeping_rooms * 2, 2, 8)
 
 
+static func _uses_native_domestic_fireplace(plan: HousePlan) -> bool:
+	return HouseFurnishingRecipes.uses_native_domestic_fireplace(plan)
+
+
 static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 		before_room_nav: Dictionary) -> Dictionary:
 	var kind: StringName = plan.kind_of(room)
@@ -550,6 +678,12 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 	if not ample.is_empty() and HouseGeometry.room_area(plan, room) >= float(ample["area"]):
 		recipe = recipe + HouseFurnishingRecipes.ample_steps_for_room(plan, room)
 	for s in recipe:
+		# The ordinary masonry host is the required heat source. Do not invent a
+		# model row or collision footprint for a vessel that is not in the room.
+		if _uses_native_domestic_fireplace(plan) and String(s["cat"]) == "hearth":
+			if room == plan.hearth_room() and HouseGeometry.hearth_breast(plan).is_empty():
+				plan.note_compromise(room, "activity:cooking:hearth_host")
+			continue
 		# A family without a supported flue omits the hearth prop, while its
 		# table/bed programme remains the same.
 		if String(s["cat"]) == "hearth" and not spec.allows_hearth_furniture():
@@ -604,7 +738,9 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 	# The focus is the one piece the room is arranged around, so it goes in
 	# whether or not the recipe happened to list it: a tavern's bar is not in
 	# the dining-room recipe, a great hall's high table is not in any.
-	if plan.focus_room() == room and plan.focus_cat() != "":
+	if plan.focus_room() == room and plan.focus_cat() != "" \
+			and not (_uses_native_domestic_fireplace(plan) and plan.focus_cat() == "hearth"):
+
 		var listed := false
 		for s3 in steps:
 			if String(s3["cat"]) == plan.focus_cat():
@@ -1113,3 +1249,4 @@ static func _room_light_count(plan: HousePlan, room: int) -> int:
 		if PropCatalog.has_tag(String(plan.furniture[index]["key"]), PropCatalog.LIGHT):
 			count += 1
 	return count
+

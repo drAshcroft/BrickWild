@@ -567,6 +567,7 @@ uniform vec4 roof_colour : source_color;
 uniform float course = 0.28;
 uniform float tile_width = 0.36;
 uniform bool thatch = false;
+uniform bool witch_thatch = false;
 void fragment() {
 	vec2 p = UV / vec2(tile_width, course);
 	float row = floor(p.y);
@@ -579,6 +580,23 @@ void fragment() {
 	float reed = thatch ? 0.96 + 0.04 * sin(UV.x * 115.0) : 1.0;
 	ALBEDO = roof_colour.rgb * mix(0.68, 0.91 + tint * 0.16, seam) * reed;
 	ROUGHNESS = 0.94;
+	if (witch_thatch) {
+		// Roof UV.x follows the ridge and UV.y climbs the actual slope. Staggered
+		// bundles cross the eave in short laps; fine variation runs down-slope
+		// like individual reeds, rather than drawing rectangular tile courses.
+		float lap_wave = UV.y + 0.028 * sin(UV.x * 3.7)
+			+ 0.009 * sin(UV.x * 11.0 + UV.y * 1.8);
+		float lap_phase = fract(lap_wave / 0.54);
+		float lap_shadow = exp(-pow((lap_phase - 0.07) / 0.055, 2.0));
+		float bundle_variation = 0.94 + 0.035 * sin(UV.x * 5.2 + 0.8 * sin(UV.y * 2.4))
+			+ 0.018 * sin(UV.x * 15.7 + UV.y * 1.3);
+		float fiber = 0.5 + 0.5 * sin(UV.x * 146.0
+			+ sin(UV.y * 2.7 + sin(UV.x * 4.1) * 0.6) * 1.8);
+		float fiber_body = mix(0.82, 1.07, fiber);
+		float bundle_body = bundle_variation * fiber_body * (1.0 - 0.19 * lap_shadow);
+		ALBEDO = roof_colour.rgb * bundle_body;
+		ROUGHNESS = 0.99;
+	}
 	if (COLOR.r < 0.5) {
 		ALBEDO = vec3(0.1529, 0.3372, 0.3763);
 		ROUGHNESS = 0.22;
@@ -605,13 +623,14 @@ static func church_roof(colour: Color) -> ShaderMaterial:
 
 ## The house roof course: slate, shingle or thatch, from the spec's colour.
 static func house_roof(colour: Color, course: float, tile_width: float,
-		thatch: bool) -> ShaderMaterial:
+		thatch: bool, witch_thatch := false) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = _cached("house_roof", HOUSE_ROOF)
 	m.set_shader_parameter("roof_colour", colour)
 	m.set_shader_parameter("course", course)
 	m.set_shader_parameter("tile_width", tile_width)
 	m.set_shader_parameter("thatch", thatch)
+	m.set_shader_parameter("witch_thatch", thatch and witch_thatch)
 	return m
 
 

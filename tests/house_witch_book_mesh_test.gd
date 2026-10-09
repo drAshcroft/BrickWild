@@ -36,9 +36,48 @@ func _init() -> void:
 		tested += 1
 	if tested != 1:
 		failures.append("expected exactly one actual Witchwork book")
+	_check_compact_mesh_contact()
 	for failure in failures: printerr("FAIL ", failure)
 	print("witch book actual mesh contact: ", failures.size(), " failures")
 	quit(0 if failures.is_empty() else 1)
+
+func _check_compact_mesh_contact() -> void:
+	var request := BuildingRequest.from_dict({
+		"schema": "brickwild.request", "schema_version": 1, "kind": "house",
+		"style": "witch_hut", "purpose": "none", "seed": "1",
+		"width": 7.0, "length": 9.0, "height": 2.6, "storeys": 1,
+		"material": "timber", "enclosure": "none", "water": "none",
+		"orientation": 0.0, "period": 1200,
+	})
+	var built: GeneratedBuilding = BrickWild.generate(request)
+	if not built.is_ok() or built.plan == null:
+		failures.append("compact Witch public generation failed before mesh contact check")
+		return
+	var tested := 0
+	for item in built.plan.furniture:
+		if String(item.get("activity_group", "")) != "witchwork" or String(item.get("cat", "")) != "books":
+			continue
+		if String(item.get("key", "")) != "Book_Stack_1":
+			failures.append("compact shared-service Witchwork did not assemble Book_Stack_1")
+			continue
+		var host_index := int(item.get("host", -1))
+		if host_index < 0 or host_index >= built.plan.furniture.size():
+			failures.append("compact Witchwork book has no workbench host index")
+			continue
+		var host := HouseAssembler._instance(built.plan.furniture[host_index])
+		var child := HouseAssembler._instance(item)
+		if host == null or child == null:
+			failures.append("compact workbench or Book_Stack_1 did not assemble")
+			if host != null: host.free()
+			if child != null: child.free()
+			continue
+		if not _rests_on_mesh(child, _triangles(host)):
+			failures.append("compact Book_Stack_1 does not rest on actual workbench triangles")
+		host.free()
+		child.free()
+		tested += 1
+	if tested != 1:
+		failures.append("expected one actual compact shared-service Witchwork book; found %d" % tested)
 
 func _rests_on_mesh(child: Node3D, host_triangles: Array) -> bool:
 	var triangles := _triangles(child)

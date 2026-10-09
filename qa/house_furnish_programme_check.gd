@@ -96,6 +96,10 @@ static func could_hold(plan: HousePlan, room: int, cat: String) -> bool:
 
 
 static func _room_has(plan: HousePlan, room: int, cat: String) -> bool:
+	if cat == "hearth" and HouseFurnisher._uses_native_domestic_fireplace(plan) \
+			and room == plan.hearth_room() \
+			and not HouseGeometry.hearth_breast(plan).is_empty():
+		return true
 	for f in plan.furniture_of(room):
 		if PropCatalog.category(plan.furniture[f]["key"]) == cat:
 			return true

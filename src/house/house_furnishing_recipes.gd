@@ -90,6 +90,12 @@ static func is_ordinary_house(plan: HousePlan) -> bool:
 		and plan.world_family == &"" and spec.trade != &"innkeeper"
 
 
+static func uses_native_domestic_fireplace(plan: HousePlan) -> bool:
+	return is_ordinary_house(plan) and plan.spec.get_script() == BASE_HOUSE_SPEC \
+		and plan.world_family == &"" and plan.spec.trade == &"none" \
+		and plan.spec.style != &"witch_hut" and plan.spec.allows_hearth_furniture()
+
+
 ## The room this dwelling eats in, or -1. Rooms of the first DINING_KINDS kind
 ## present; the lowest-numbered of them.
 static func dining_room_of(plan: HousePlan) -> int:
@@ -150,21 +156,37 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 	# existing recipes.
 	if kind == &"workshop" and plan.spec.style == &"witch_hut" \
 			and plan.spec.trade == &"none":
+		var witch_steps: Array = []
 		for step_variant in recipe:
-			var step: Dictionary = step_variant
-			if String(step.get("cat", "")) == "workbench":
+			var step: Dictionary = step_variant.duplicate(true)
+			var category := String(step.get("cat", ""))
+			if category == "crate":
+				# Generic corner crates scatter anonymous stock through the room.
+				# One fitted ingredient cabinet replaces them below.
+				continue
+			if category == "workbench":
 				step["group"] = "witchwork"
 				step["opt"] = 1.0
-			elif String(step.get("cat", "")) == "shelf":
+				step["height_scale"] = 1.0
+			elif category == "shelf":
+				step["key"] = "Shelf_Small_Bottles"
 				step["group"] = "witchwork"
 				step["opt"] = 1.0
-			elif String(step.get("cat", "")) == "sconce":
+			elif category == "rack":
+				step["key"] = "Peg_Rack"
+				step["n"] = [1, 1]
 				step["group"] = "witchwork"
 				step["opt"] = 1.0
+			elif category == "sconce":
+				step["group"] = "witchwork"
+				step["opt"] = 1.0
+			witch_steps.append(step)
+		recipe = witch_steps
 		recipe.append_array([
+			{"cat": "storage", "rule": &"wall", "key": "Cabinet", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
 			{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
 			{"cat": "alchemy", "rule": &"on", "host": "distributed", "n": [2, 2], "opt": 1.0, "group": "witchwork"},
-			{"cat": "books", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
+			{"cat": "books", "rule": &"on", "host_category": "workbench", "key": "Book_Stack_1", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
 		])
 	var tagged: Array = []
 	for original in recipe:
@@ -199,12 +221,32 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 		if kind == &"kitchen" and category in ["hearth", "storage", "cookware"]:
 			step["group"] = "cooking"
 			step["opt"] = 1.0
+		if kind == &"store" and plan.spec.style == &"witch_hut" \
+				and plan.spec.trade == &"none" \
+				and plan.domestic_layout.get("added_activities", []).has(&"store") \
+				and category in ["barrel", "storage"]:
+			# The compact Witch plan's added rear room is a working dry pantry,
+			# not spare floor. Its container needs a measured access stance.
+			step["group"] = "witch_pantry"
+			step["n"] = [1, 1]
+			step["opt"] = 1.0
+			if category == "barrel":
+				step["zone_depth_override"] = 0.6
 		tagged.append(step)
 	if kind == &"kitchen":
 		var prep_pair: Array = [
 			{"cat": "workbench", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
 			{"cat": "bucket", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
 		]
+		if uses_native_domestic_fireplace(plan):
+			var without_loose_cookware: Array = []
+			for step: Dictionary in tagged:
+				if String(step.get("cat", "")) != "cookware":
+					without_loose_cookware.append(step)
+			tagged = without_loose_cookware
+			prep_pair.append({"cat": "cookware", "rule": &"on",
+				"host_category": "workbench", "key": "Pot_1", "n": [1, 1],
+				"opt": 1.0, "group": "cooking"})
 		var storage_index := -1
 		for step_index in range(tagged.size()):
 			if String(tagged[step_index].get("cat", "")) == "storage":
@@ -216,20 +258,82 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 				storage_index += 1
 		else:
 			tagged.append_array(prep_pair)
+	var shared_witchwork: bool = is_ordinary_house(plan) \
+		and kind in [&"hall", &"kitchen"] \
+		and plan.spec.style == &"witch_hut" and plan.spec.trade == &"none" \
+		and bool(plan.rooms[room].get("shared_witchwork", false)) \
+		and domestic_functions.has(&"witchwork")
+	var heat_contract: Dictionary = plan.rooms[room].get("shared_activity_station", {})
+	var heat_contract_groups: Array = heat_contract.get("groups", [])
+	var activity_regions: Dictionary = plan.rooms[room].get("activity_regions", {})
+	var cooking_region: Rect2 = Rect2(activity_regions.get(&"cooking", Rect2()))
+	var witchwork_region: Rect2 = Rect2(activity_regions.get(&"witchwork", Rect2()))
+	var shared_regions_match: bool = activity_regions.has(&"cooking") \
+		and activity_regions.has(&"witchwork") \
+		and cooking_region.position.is_equal_approx(witchwork_region.position) \
+		and cooking_region.size.is_equal_approx(witchwork_region.size)
+	var compact_shared_heat: bool = shared_witchwork and kind == &"hall" \
+		and String(heat_contract.get("id", "")) == "compact_witch_hearth" \
+		and String(heat_contract.get("category", "")) == "hearth" \
+		and String(heat_contract.get("scope", "")) == "compact_witch_shared_hall" \
+		and heat_contract_groups.has(&"cooking") and heat_contract_groups.has(&"witchwork") \
+		and shared_regions_match
+	if kind == &"store" and plan.spec.style == &"witch_hut" \
+			and plan.spec.trade == &"none" \
+			and plan.domestic_layout.get("added_activities", []).has(&"store"):
+		tagged.append({"cat": "storage", "rule": &"wall", "n": [1, 1],
+			"opt": 1.0, "group": "witch_pantry"})
+	if shared_witchwork:
+		tagged.append_array([
+			{"cat": "workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0,
+				"height_scale": 1.0, "preferred_walls": [0], "group": "witchwork"},
+			{"cat": "shelf", "rule": &"mounted", "key": "Shelf_Small_Bottles", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
+			{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
+			{"cat": "alchemy", "rule": &"on", "host": "distributed", "n": [2, 2], "opt": 1.0, "group": "witchwork"},
+			{"cat": "books", "rule": &"on", "host_category": "workbench", "key": "Book_Stack_1", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
+		])
+		if not compact_shared_heat:
+			tagged.append({"cat": "hearth", "rule": &"wall", "n": [1, 1],
+				"opt": 1.0, "group": "witchwork"})
 	if shared_cooking:
 		var cooking_core: Array = [
-			{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "cooking"},
+			{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "cooking",
+				"shared_activity_groups": ["witchwork"] if compact_shared_heat else [],
+				"shared_station_id": "compact_witch_hearth" if compact_shared_heat else ""},
 			{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "cooking"},
 			{"cat": "workbench", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
 			{"cat": "bucket", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
 			{"cat": "cookware", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "cooking"},
 		]
+		if compact_shared_heat or uses_native_domestic_fireplace(plan):
+			# The shell is the ordinary heat source. Keep a measured vessel on the
+			# separate preparation surface; buckets are not cooking pots.
+			var vessel_step: Dictionary = cooking_core[-1]
+			vessel_step["key"] = "Pot_1"
+			cooking_core[-1] = vessel_step
 		var without_duplicate_kitchen_storage: Array = []
 		for step in tagged:
 			if String(step.get("cat", "")) == "storage":
 				continue # cooking_core already supplied the household's store
 			without_duplicate_kitchen_storage.append(step)
-		tagged = cooking_core + without_duplicate_kitchen_storage
+		if compact_shared_heat:
+			# Place Witchwork first, but accept its measured wall candidate only
+			# when the following shared hearth and cooking storage/prep group also
+			# fit. The actual hearth-first order reserves its breast before that pair.
+			var witch_bench: Dictionary = {}
+			for index in range(without_duplicate_kitchen_storage.size()):
+				var candidate: Dictionary = without_duplicate_kitchen_storage[index]
+				if String(candidate.get("cat", "")) == "workbench" and String(candidate.get("group", "")) == "witchwork":
+					witch_bench = candidate
+					without_duplicate_kitchen_storage.remove_at(index)
+					break
+			if not witch_bench.is_empty():
+				var compact_core: Array = cooking_core.duplicate(true)
+				tagged = [witch_bench] + compact_core + without_duplicate_kitchen_storage
+			else:
+				tagged = cooking_core + without_duplicate_kitchen_storage
+		else:
+			tagged = cooking_core + without_duplicate_kitchen_storage
 	if is_ordinary_house(plan) and plan.domestic_layout.has("dining_room"):
 		var selected_room: int = int(plan.domestic_layout.get("dining_room", -1))
 		var dining_kinds: Array[StringName] = [&"hall", &"dining_room", &"dining", &"parlour"]
@@ -689,3 +793,4 @@ const TRADE_FITTINGS := {
 		{"cat": "books", "rule": &"on", "n": [1, 3], "opt": 0.95},
 	],
 }
+

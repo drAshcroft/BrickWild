@@ -19,11 +19,15 @@ const SUFFIXES := ["", "", " Cottage", " House", " Lodge", " Steading"]
 ## enough to sit and work in, shallow enough that a five-metre house still has
 ## a yard behind the posts.
 const VERANDA_DEPTH_RANGE := [1.35, 1.85]
+## A more compact roof rise is selected only for the exact built-in Witch
+## archetype; other uses of the Witch style row keep its historical pitch.
+const WITCH_ROOF_PITCH_RANGE := [1.05, 1.4]
 
 
 ## Generate the spec's derived fields, then plan and furnish. Returns the plan,
 ## which is what the builder and every check take from here on.
-static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> HousePlan:
+static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
+		world_family: StringName = &"") -> HousePlan:
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
 	spec.storeys = clampi(spec.storeys, 1, 3)
@@ -36,7 +40,12 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	# other style carries one.
 	spec.storeys = maxi(spec.storeys, int(s.get("min_storeys", 1)))
 
-	spec.roof_pitch = r.randf_range(float(s["roof_pitch"][0]), float(s["roof_pitch"][1]))
+	var pitch_range: Array = s["roof_pitch"]
+	if _uses_witch_pitch_scope(spec, s, world_family):
+		pitch_range = WITCH_ROOF_PITCH_RANGE
+	# This remains one draw at the historical position in the stream. Only its
+	# range changes for the exact built-in, non-trade, non-world Witch roof row.
+	spec.roof_pitch = r.randf_range(float(pitch_range[0]), float(pitch_range[1]))
 	spec.roof_pitch *= HouseGeometry.art_pitch_scale(spec)
 	spec.porch = GeneratorRandom.chance(r, s["porch"])
 	spec.chimney = GeneratorRandom.chance(r, s["chimney"])
@@ -63,6 +72,13 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	spec.roof_along_out = float(s.get("along_out", -1.0))
 	var roof_types: Array = s.get("roof_types", [&"gable", &"half_hipped"])
 	spec.roof_type = GeneratorRandom.pick(r, roof_types)
+	# The built-in Witch row's sole historical gable is emitted as a clipped
+	# upper half-hip. Record the resolved form on the spec so plans, blueprints,
+	# builders and API consumers all describe the roof that was actually built.
+	# This is a deterministic resolution after the same single roof-type draw;
+	# it consumes no RNG and is excluded for trades, worlds and custom specs.
+	if _uses_witch_pitch_scope(spec, s, world_family) and spec.roof_type == &"gable":
+		spec.roof_type = &"half_hipped"
 	# Read the same roll for a rotated footprint without shifting the historic
 	# RNG stream for subsequent framing, colours and furniture choices.
 	var dormer_rng := RandomNumberGenerator.new()
@@ -129,7 +145,7 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	spec.variant_name = "%s%s%s" % [GeneratorRandom.pick(r, FIRST_WORDS), GeneratorRandom.pick(r, SECOND_WORDS),
 		GeneratorRandom.pick(r, SUFFIXES)]
 
-	var plan: HousePlan = HousePlanner.plan(spec)
+	var plan: HousePlan = HousePlanner.plan(spec, world_family)
 	if with_furniture:
 		HouseFurnisher.furnish(plan, spec)
 	# HouseFurnisher deliberately works from room IDs and legacy 2D rectangles.
@@ -145,6 +161,24 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true) -> Ho
 	HousePlanFeatures.compose_wall_hosts(plan, spec)
 	HouseExterior.dress(plan)
 	return plan
+
+
+## The final roof type is drawn later, so establish the pitch exception from
+## the unchanged single-gable style row rather than moving that RNG draw. If
+## the row gains another form, this fails closed until its roof treatment is
+## reviewed for that form too. A caller that will assign a world family must
+## pass it here; the empty default means an ordinary non-world plan.
+static func _uses_witch_pitch_scope(spec: HouseSpec, style_row: Dictionary,
+		world_family: StringName) -> bool:
+	if spec == null or world_family != &"" or spec.style != &"witch_hut" \
+			or spec.trade != &"none":
+		return false
+	var script := spec.get_script() as Script
+	if script == null or not script.resource_path.ends_with("/src/house/house_spec.gd"):
+		return false
+	var roof_types: Array = style_row.get("roof_types", [])
+	return roof_types.size() == 1 and StringName(roof_types[0]) == &"gable" \
+		and StringName(style_row.get("roof_material", &"")) == &"thatch"
 
 
 ## The room program: ordinary domestic styles may name a different sequence.

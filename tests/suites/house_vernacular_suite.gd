@@ -80,7 +80,7 @@ class NoSweep extends HouseBuilder:
 
 
 class NoThatch extends HouseBuilder:
-	func _build_thatch_roll(_layout: Dictionary) -> void:
+	func _build_thatch_roll(_layout: Dictionary, _authored: Array) -> void:
 		pass
 
 

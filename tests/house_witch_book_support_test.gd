@@ -5,7 +5,6 @@ extends SceneTree
 
 const REQUESTS := "res://tests/fixtures/personality/witch_requests.json"
 var failures: Array[String] = []
-var deferred_compact: int = 0
 
 func _init() -> void:
 	_check_exact_reported_request()
@@ -13,7 +12,7 @@ func _init() -> void:
 	_check_fully_obstructed_support_negative()
 	for failure in failures:
 		printerr("FAIL " + failure)
-	print("witch required book support fixture: %d failures, %d compact programme cases deferred" % [failures.size(), deferred_compact])
+	print("witch required book support fixture: %d failures" % failures.size())
 	quit(1 if not failures.is_empty() else 0)
 
 
@@ -58,12 +57,18 @@ func _check_request(request: BuildingRequest, label: String) -> void:
 		failures.append("%s public generation failed: %s" % [label, str(built.errors)])
 		return
 	var plan: HousePlan = built.plan
+	var room := -1
 	var room_ids := plan.rooms_of(&"workshop")
-	if room_ids.is_empty():
-		deferred_compact += 1
-		print("DEFERRED ", label, ": compact Witchwork programme is a separate gate")
+	if not room_ids.is_empty():
+		room = room_ids[0]
+	else:
+		for candidate in plan.rooms_of(&"kitchen"):
+			if plan.rooms[candidate].get("domestic_functions", []).has(&"witchwork"):
+				room = candidate
+				break
+	if room < 0:
+		failures.append("%s has no generated Witchwork room or shared-service function" % label)
 		return
-	var room := room_ids[0]
 	var books: Array[Dictionary] = []
 	for index in plan.furniture_of(room):
 		var item: Dictionary = plan.furniture[index]
@@ -74,6 +79,9 @@ func _check_request(request: BuildingRequest, label: String) -> void:
 		failures.append("%s required Witchwork book count is %d, expected exactly 1" % [label, books.size()])
 		return
 	var book: Dictionary = books[0]
+	if String(book.get("key", "")) != "Book_Stack_1":
+		failures.append("%s Witchwork book is not the compact Book_Stack_1 stack" % label)
+		return
 	var host_index := int(book.get("host", -1))
 	if host_index < 0 or host_index >= plan.furniture.size():
 		failures.append("%s Witchwork book has no measured support host" % label)
@@ -88,11 +96,16 @@ func _check_request(request: BuildingRequest, label: String) -> void:
 	var book_rect: Rect2 = book.get("rect", Rect2())
 	if not support.grow(-0.05).encloses(book_rect):
 		failures.append("%s book footprint leaves the measured workbench top" % label)
-	var expected_top := float(host["pos"].y) \
-		+ PropCatalog.surface_height(String(host["key"])) \
-		* PropCatalog.placement_height_scale(host)
-	if absf(float(book["pos"].y) - expected_top) > 0.005:
-		failures.append("%s book is not resting on the measured workbench surface" % label)
+	var host_key := String(host["key"])
+	var host_scale := PropCatalog.placement_height_scale(host)
+	var expected_top := PropCatalog.house_origin(host).y \
+		+ PropCatalog.floor_offset(host_key) * host_scale \
+		+ PropCatalog.surface_height(host_key) * host_scale
+	var book_key := String(book["key"])
+	var book_bottom := PropCatalog.house_origin(book).y \
+		+ PropCatalog.floor_offset(book_key) * PropCatalog.placement_height_scale(book)
+	if absf(book_bottom - expected_top) > 0.005:
+		failures.append("%s book bottom does not meet the measured workbench top" % label)
 
 
 func _check_fully_obstructed_support_negative() -> void:

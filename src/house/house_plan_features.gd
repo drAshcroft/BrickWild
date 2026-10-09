@@ -28,7 +28,7 @@ static func choose_hearth(p: HousePlan, spec: HouseSpec) -> void:
 	# kind (the hall, then the workshop) takes the chimney instead; the kitchen
 	# keeps its cooking fire but not the flue. Only when NO room can hold a
 	# hearth does the longest short run win, as before.
-	var need: float = hearth_run_needed()
+	var need: float = hearth_run_needed(spec, p)
 	var room := -1
 	var fallback := -1
 	var door_blocked := false
@@ -68,6 +68,19 @@ static func choose_hearth(p: HousePlan, spec: HouseSpec) -> void:
 			best_run = run
 			best = wi
 	p.hearth = {"room": room, "wall": best}
+	# HouseGenerator has already consumed the style's historical chimney chance.
+	# A selected native domestic fireplace has a real shell host and therefore
+	# requires its matching exterior flue; resolve that plan fact before upper
+	# glazing reservation and furnishing. Specialist families retain the draw.
+	if best_run >= need and _requires_native_domestic_flue(p, spec):
+		spec.chimney = true
+
+
+static func _requires_native_domestic_flue(p: HousePlan, spec: HouseSpec) -> bool:
+	return p != null and p.world_family == &"" \
+		and spec.get_script() == BASE_HOUSE_SPEC and spec.trade == &"none" \
+		and spec.style in [&"farmhouse", &"cottage", &"thatch_cottage"] \
+		and spec.allows_hearth_furniture()
 
 
 ## The walls whose stack, centred on the middle of the wall's clear run, would
@@ -106,10 +119,14 @@ static func _stack_meets_door(p: HousePlan, spec: HouseSpec, room: int, wi: int)
 	return false
 
 
-## The clear stretch of outside wall a hearth needs: the widest hearth in the
-## catalogue and the chimney breast built round it (HouseGeometry.breast_for_hearth
-## adds 0.4 m to the piece's width). Measured from the catalogue, not authored.
-static func hearth_run_needed() -> float:
+## Required outside-wall run. Ordinary houses use their native masonry breast
+## envelope; legacy and specialist families keep the catalogue-based allowance.
+static func hearth_run_needed(spec: HouseSpec = null, plan: HousePlan = null) -> float:
+	if spec != null and plan != null and plan.world_family == &"" \
+			and spec.get_script() == BASE_HOUSE_SPEC \
+			and spec.trade == &"none" and spec.style != &"witch_hut" \
+			and spec.allows_hearth_furniture():
+		return HouseGeometry.DOMESTIC_FIREPLACE_BREAST_WIDTH + 0.10
 	var widest := 0.0
 	for key in PropCatalog.of_category("hearth"):
 		widest = maxf(widest, PropCatalog.footprint(key).x)
@@ -146,8 +163,16 @@ static func choose_focus(p: HousePlan, _spec: HouseSpec) -> void:
 	p.focus = {}
 	var shared_room: int = _shared_cooking_hall(p, _spec)
 	var cooking_region := Rect2()
-	if shared_room >= 0:
+	var witch_hall: int = _shared_witchwork_hall(p, _spec)
+	if witch_hall >= 0:
+		shared_room = witch_hall
+		cooking_region = _assign_compact_witch_hall_regions(p, shared_room)
+	elif shared_room >= 0:
 		cooking_region = _assign_shared_activity_regions(p, _spec, shared_room)
+	else:
+		shared_room = _shared_witchwork_kitchen(p, _spec)
+		if shared_room >= 0:
+			cooking_region = _assign_shared_kitchen_witchwork_regions(p, shared_room)
 	var room: int = p.hearth_room()
 	var wi: int = p.hearth_wall()
 	if room < 0 or wi < 0:
@@ -158,9 +183,19 @@ static func choose_focus(p: HousePlan, _spec: HouseSpec) -> void:
 		p.focus = focus_on_wall(p, room, wi, "hearth", false)
 		return
 	if room == shared_room:
-		var prefer_rear_end: bool = wi >= 2
-		var prefer: float = _focus_coordinate_in_region(p, room, wi, cooking_region,
-			prefer_rear_end)
+		# A compact Witch hall needs the fire between two distinct prep runs.
+		# Center it on the selected side-wall span so it clears the front-wall
+		# Witch bench and leaves the rear run available for cooking prep.
+		var compact_mid_fire: bool = room == witch_hall and wi >= 2
+		var prefer_rear_end: bool = wi >= 2 and not compact_mid_fire
+		var hearth_region: Rect2 = cooking_region
+		if compact_mid_fire:
+			# Move the cauldron just behind the front station stance. The full
+			# footprint must clear the bench use zone, not just its plan center.
+			hearth_region.position.y += 0.50
+			hearth_region.size.y -= 0.50
+		var prefer: float = _focus_coordinate_in_region(p, room, wi, hearth_region,
+			prefer_rear_end, false)
 		if not is_finite(prefer):
 			# Do not force the hearth onto a wall position outside its cooking
 			# region. Remove the bands so consumers use their established layout.
@@ -173,6 +208,9 @@ static func choose_focus(p: HousePlan, _spec: HouseSpec) -> void:
 		var preferred_focus: Dictionary = focus_on_wall(p, room, wi, "hearth", false, prefer)
 		if _focus_inside_region(p, room, wi, preferred_focus, cooking_region):
 			p.focus = preferred_focus
+			if room == witch_hall:
+				_relocate_compact_witch_workwall_window(p, room)
+				_relocate_compact_witch_service_windows(p, room)
 		else:
 			var room_data: Dictionary = p.rooms[shared_room]
 			room_data.erase("activity_regions")
@@ -202,6 +240,115 @@ static func _shared_cooking_hall(p: HousePlan, spec: HouseSpec) -> int:
 ## Split along the room's longer clear-floor axis. The rear is positive Z in
 ## plan coordinates; when the long axis runs left-to-right, place cooking next
 ## to the selected hearth side or the side with a feasible hearth run.
+## The compact no-trade Witch fallback merges only kitchen and workshop into the
+## front hall. A shared service reservation contains one physical fire and two distinct
+## prep benches; meals occupy the opposite strip.
+static func _shared_witchwork_hall(p: HousePlan, spec: HouseSpec) -> int:
+	if spec == null or spec.get_script() != BASE_HOUSE_SPEC \
+			 or spec.style != &"witch_hut" or spec.trade != &"none" \
+			 or spec.storeys != 1 or spec.cellars != 0 or not p.world_family.is_empty():
+		return -1
+	if String(p.domestic_layout.get("status", "")) != "planned" \
+			 or not p.domestic_layout.get("merged_activities", []).has(&"kitchen") \
+			 or not p.domestic_layout.get("merged_activities", []).has(&"workshop"):
+		return -1
+	for room in p.rooms_of(&"hall"):
+		var functions: Array = p.rooms[room].get("domestic_functions", [])
+		if p.storey_of_room(room) == 0 and bool(p.rooms[room].get("shared_cooking", false)) \
+				 and bool(p.rooms[room].get("shared_witchwork", false)) \
+				 and functions.has(&"cooking") and functions.has(&"witchwork"):
+			return room
+	return -1
+
+
+static func _assign_compact_witch_hall_regions(p: HousePlan, room: int) -> Rect2:
+	var floor: Rect2 = HouseGeometry.room_floor_rect(p, room)
+	# These are not promises for smaller rooms. The room programme marks their
+	# impossibility upstream; do not emit undersized reservations here.
+	if floor.size.x < 6.29 or floor.size.y < 4.61:
+		var insufficient: Dictionary = p.rooms[room]
+		insufficient.erase("activity_regions")
+		insufficient["activity_regions_status"] = "unavailable: compact Witch stations need 6.29x4.61 clear hall"
+		p.rooms[room] = insufficient
+		return Rect2()
+	var hearth_wall: int = p.hearth_wall() if p.hearth_room() == room else -1
+	if hearth_wall not in [2, 3]:
+		var unsupported: Dictionary = p.rooms[room]
+		unsupported.erase("activity_regions")
+		unsupported["activity_regions_status"] = "unavailable: compact Witch service requires a full side-wall chimney run"
+		p.rooms[room] = unsupported
+		return Rect2()
+	# A single cauldron serves both crafts from the shared left/right service
+	# area. Keep the complete hearth breast, use zone, and two distinct benches
+	# in that area; reserve the opposite 2.1 m strip for the tested meal group.
+	const SERVICE_WIDTH := 4.10
+	const BUFFER_WIDTH := 0.10
+	const MEAL_BAND_WIDTH := 2.10
+	var required_width := SERVICE_WIDTH + BUFFER_WIDTH + MEAL_BAND_WIDTH
+	if floor.size.x < required_width - 0.001 or floor.size.y < 4.61:
+		var insufficient: Dictionary = p.rooms[room]
+		insufficient.erase("activity_regions")
+		insufficient["activity_regions_status"] = "unavailable: compact Witch needs a 4.10m shared service zone, 0.10m buffer, and 2.10m meal strip"
+		p.rooms[room] = insufficient
+		return Rect2()
+	var cooking_left := hearth_wall == 2
+	var service_x := floor.position.x if cooking_left else floor.end.x - SERVICE_WIDTH
+	var eating_x := floor.end.x - MEAL_BAND_WIDTH if cooking_left else floor.position.x
+	var cooking := Rect2(Vector2(service_x, floor.position.y),
+		Vector2(SERVICE_WIDTH, floor.size.y))
+	var witchwork := cooking
+	var eating := Rect2(Vector2(eating_x, floor.position.y),
+		Vector2(MEAL_BAND_WIDTH, floor.size.y))
+	var room_data: Dictionary = p.rooms[room]
+	room_data["activity_regions"] = {
+		&"eating": eating, &"cooking": cooking, &"witchwork": witchwork,
+	}
+	room_data["activity_regions_status"] = "planned"
+	room_data["shared_activity_station"] = {
+		"id": "compact_witch_hearth", "category": "hearth",
+		"scope": "compact_witch_shared_hall", "groups": [&"cooking", &"witchwork"], "max_usezone_distance": 1.9,
+		"host_wall": hearth_wall,
+	}
+	p.rooms[room] = room_data
+	return cooking
+
+
+static func _shared_witchwork_kitchen(p: HousePlan, spec: HouseSpec) -> int:
+	if spec == null or spec.get_script() != BASE_HOUSE_SPEC or spec.style != &"witch_hut" or spec.trade != &"none":
+		return -1
+	if spec.storeys != 1 or spec.cellars != 0 or not p.world_family.is_empty():
+		return -1
+	for room in p.rooms_of(&"kitchen"):
+		if p.storey_of_room(room) == 0 and bool(p.rooms[room].get("shared_witchwork", false)):
+			return room
+	return -1
+
+
+## Divide a compact shared service kitchen into real cooking and Witchwork bands.
+## The dining group remains in the entry hall. Placement borrows the complement
+## of each band rectangle; navigation and activity audits judge the result.
+static func _assign_shared_kitchen_witchwork_regions(p: HousePlan, room: int) -> Rect2:
+	var floor: Rect2 = HouseGeometry.room_floor_rect(p, room)
+	if floor.size.x < 2.0 or floor.size.y < 2.0:
+		return Rect2()
+	var cooking := floor
+	var witchwork := floor
+	if floor.size.y >= floor.size.x:
+		var split_y := floor.position.y + floor.size.y * 0.5
+		cooking.size.y = split_y - floor.position.y
+		witchwork.position.y = split_y
+		witchwork.size.y = floor.end.y - split_y
+	else:
+		var split_x := floor.position.x + floor.size.x * 0.5
+		cooking.size.x = split_x - floor.position.x
+		witchwork.position.x = split_x
+		witchwork.size.x = floor.end.x - split_x
+	var room_data: Dictionary = p.rooms[room]
+	room_data["activity_regions"] = {&"cooking": cooking, &"witchwork": witchwork}
+	room_data["activity_regions_status"] = "planned"
+	p.rooms[room] = room_data
+	return cooking
+
 static func _assign_shared_activity_regions(p: HousePlan, spec: HouseSpec,
 		room: int) -> Rect2:
 	var floor: Rect2 = HouseGeometry.room_floor_rect(p, room)
@@ -237,7 +384,7 @@ static func _assign_shared_activity_regions(p: HousePlan, spec: HouseSpec,
 
 static func _feasible_cooking_half(p: HousePlan, room: int, floor: Rect2,
 		wall: int) -> bool:
-	var needed: float = hearth_run_needed()
+	var needed: float = hearth_run_needed(p.spec, p)
 	var left := Rect2(floor.position, Vector2(floor.size.x * 0.5, floor.size.y))
 	var right := Rect2(Vector2(floor.position.x + floor.size.x * 0.5, floor.position.y),
 		Vector2(floor.size.x * 0.5, floor.size.y))
@@ -267,15 +414,19 @@ static func _best_region_wall_run(p: HousePlan, room: int, wall: int,
 ## Return a preferred along-wall coordinate only when a whole hearth plus
 ## breast fits on a clear stretch inside the cooking band.
 static func _focus_coordinate_in_region(p: HousePlan, room: int, wall: int,
-		region: Rect2, prefer_hi_end: bool = false) -> float:
+		region: Rect2, prefer_hi_end: bool = false, prefer_lo_end: bool = false) -> float:
 	var horizontal: bool = wall <= 1
 	var lo: float = region.position.x if horizontal else region.position.y
 	var hi: float = region.end.x if horizontal else region.end.y
-	var half_needed: float = hearth_run_needed() * 0.5
+	var half_needed: float = hearth_run_needed(p.spec, p) * 0.5
 	var region_centre: float = (lo + hi) * 0.5
 	# Leave the return wall usable by shallow storage, including its backing
 	# gap, instead of letting the hearth approach clip that wall's fittings.
-	var target: float = hi - half_needed - 0.2 if prefer_hi_end else region_centre
+	var target: float = region_centre
+	if prefer_hi_end:
+		target = hi - half_needed - 0.2
+	elif prefer_lo_end:
+		target = lo + half_needed + 0.2
 	var preferred := target
 	var best_distance := INF
 	var found := false
@@ -1160,6 +1311,13 @@ static func _activity_support_key(group_name: String, category: String,
 ## Search room clear spans for a measured mounting station near the
 ## activity's actual use/prep rectangle. A return wall remains eligible when
 ## the fitting body is within 1.9 m of that usable task region.
+static func _allow_unlit_witchwork_support(p: HousePlan, group_name: String) -> bool:
+	return (group_name == "witchwork"
+		and HouseFurnishingRecipes.is_ordinary_house(p)
+		and p.spec.style == &"witch_hut"
+		and p.spec.trade == &"none")
+
+
 static func _activity_light_candidate_available(p: HousePlan, room: int,
 		preferred_wall: int, shelf_along: float, prep_rect: Rect2,
 		support_rect: Rect2, group_name: String, anchor_id: String,
@@ -1184,7 +1342,7 @@ static func _activity_light_candidate_available(p: HousePlan, room: int,
 static func _append_nearby_activity_support(p: HousePlan, room: int,
 		key: String, group_name: String, anchor_id: String, anchor: Vector2,
 		prep_rect: Rect2, occupied_by_room: Dictionary) -> Dictionary:
-	const MAX_PREP_DISTANCE := 1.9
+	var max_prep_distance: float = 0.75 if group_name == "witchwork" and _is_compact_witch_shared_hall(p, room) else 1.9
 	var walls := HouseGeometry.room_walls(p, room)
 	var candidates: Array[Dictionary] = []
 	var original_wall := HouseGeometry.backing_wall(p, room,
@@ -1221,7 +1379,7 @@ static func _append_nearby_activity_support(p: HousePlan, room: int,
 					base + HouseGeometry.SHELF_HEIGHT, 1.0)
 				var body: Rect2 = pose["rect"]
 				var distance := _rect_distance(body, prep_rect)
-				if distance > MAX_PREP_DISTANCE:
+				if distance > max_prep_distance:
 					continue
 				if not HouseGeometry.room_floor_rect(p, room).grow(0.01).encloses(body):
 					continue
@@ -1254,8 +1412,8 @@ static func _append_nearby_activity_support(p: HousePlan, room: int,
 			continue
 		var host: Dictionary = p.wall_hosts.back()
 		var body: Rect2 = Rect2(p.furniture[furniture_index].get("rect", Rect2()))
-		if not _activity_light_candidate_available(p, room, wall_index,
-				station_along, prep_rect, body, group_name, anchor_id, occupied_by_room):
+		if not _allow_unlit_witchwork_support(p, group_name) and not _activity_light_candidate_available(
+			p, room, wall_index, station_along, prep_rect, body, group_name, anchor_id, occupied_by_room):
 			p.furniture.remove_at(furniture_index)
 			p.wall_hosts.pop_back()
 			continue
@@ -1274,6 +1432,390 @@ static func _rect_distance(a: Rect2, b: Rect2) -> float:
 ## Bind a previously placed shelf without changing its model pose, scale, or
 ## source activity_group. It must face the wall, touch its real back edge, fit
 ## inside the room and clear apertures, routes, and other objects in 3D.
+
+
+## Preserve daylight while moving a front opening out of the measured compact
+## Witchwork bench bay. The window stays on the same exterior wall and passes
+## the normal door, flue and window crowd checks.
+static func _relocate_compact_witch_workwall_window(p: HousePlan, room: int) -> bool:
+	if not _is_compact_witch_shared_hall(p, room):
+		return false
+	var walls := HouseGeometry.room_walls(p, room)
+	if walls.is_empty():
+		return false
+	var bench_rect := _compact_witchwork_reserved_bench_rect(p, room)
+	if not bench_rect.has_area():
+		return false
+	var room_data: Dictionary = p.rooms[room]
+	var regions: Dictionary = room_data.get("activity_regions", {})
+	var conflicting_windows: Array[int] = []
+	for window_index in p.windows_of(room):
+		var window: Dictionary = p.windows[window_index]
+		if HouseGeometry.window_clear_rect(window).intersects(bench_rect.grow(0.75)):
+			conflicting_windows.append(window_index)
+	for window_index in conflicting_windows:
+		var original: Dictionary = p.windows[window_index].duplicate(true)
+		var width := float(original.get("width", HouseGeometry.WINDOW_W))
+		p.windows.remove_at(window_index)
+		var best: Dictionary = {}
+		var best_service_distance := -INF
+		for wall_variant in walls:
+			var wall: Dictionary = wall_variant
+			var wall_inward: Vector2 = Vector2(wall.get("normal", Vector2.ZERO)).normalized()
+			var wall_outward := -wall_inward
+			var from: Vector2 = Vector2(wall.get("from", Vector2.ZERO))
+			var to: Vector2 = Vector2(wall.get("to", Vector2.ZERO))
+			var normal_axis := 0 if absf(wall_inward.x) > 0.5 else 1
+			var line_value := from.x if normal_axis == 0 else from.y
+			if not HouseGeometry.is_exterior_edge(p.spec, normal_axis, line_value):
+				continue
+			var wall_axis := (to - from).normalized()
+			var run := from.distance_to(to)
+			var half := width * 0.5
+			var lo := half + 0.1
+			var hi := run - half - 0.1
+			if hi < lo:
+				continue
+			var steps := maxi(ceili((hi - lo) / 0.08), 1)
+			for station in range(steps + 1):
+				var offset := lo + (hi - lo) * float(station) / float(steps)
+				var pos := from + wall_axis * offset
+				if HousePlanOpenings._crowds(p, pos, wall_outward, width,
+						HousePlan.record_storey(original)):
+					continue
+				var candidate: Dictionary = original.duplicate(true)
+				candidate["pos"] = pos
+				candidate["normal"] = wall_outward
+				var clear: Rect2 = HouseGeometry.window_clear_rect(candidate)
+				if clear.intersects(bench_rect.grow(0.01)):
+					continue
+				var service_distance := _rect_distance(clear, Rect2(regions[&"witchwork"]))
+				if service_distance > best_service_distance:
+					best_service_distance = service_distance
+					best = candidate
+		if best.is_empty():
+			p.windows.insert(window_index, original)
+			return false
+		p.windows.insert(window_index, best)
+	return true
+
+
+## The planned bench pose is also the opening-clearance datum. Keeping this in
+## one helper prevents the service-window move from drifting away from the
+## same measured workwall pose used by the earlier workwall relocation.
+static func _compact_witchwork_reserved_bench_rect(p: HousePlan, room: int) -> Rect2:
+	if not _is_compact_witch_shared_hall(p, room):
+		return Rect2()
+	var walls := HouseGeometry.room_walls(p, room)
+	if walls.is_empty():
+		return Rect2()
+	var workwall: Dictionary = walls[0]
+	var inward: Vector2 = Vector2(workwall.get("normal", Vector2.ZERO)).normalized()
+	var work_from: Vector2 = Vector2(workwall.get("from", Vector2.ZERO))
+	var work_to: Vector2 = Vector2(workwall.get("to", Vector2.ZERO))
+	if absf(inward.y) < 0.5:
+		return Rect2()
+	var along := (work_to - work_from).normalized()
+	if along.x < 0.0:
+		along = -along
+	var key := "Workbench"
+	var yaw := HouseFurnishGeometry.yaw_facing(inward)
+	var bench_size: Vector2 = PropCatalog.footprint_rotated(key, yaw)
+	var regions: Dictionary = p.rooms[room].get("activity_regions", {})
+	if not regions.has(&"witchwork"):
+		return Rect2()
+	var service: Rect2 = Rect2(regions[&"witchwork"])
+	var wall_lo := minf(work_from.x, work_to.x)
+	var wall_hi := maxf(work_from.x, work_to.x)
+	var lo := maxf(wall_lo, service.position.x) + bench_size.x * 0.5 + HouseGeometry.WALL_GAP
+	var hi := minf(wall_hi, service.end.x) - bench_size.x * 0.5 - HouseGeometry.WALL_GAP
+	if hi < lo:
+		return Rect2()
+	# The actual workbench search may choose any legal station in the reserved
+	# Witchwork band. Its stable target is the band centre, not the house's
+	# arbitrary left endpoint (which is outside the band when the hearth is on
+	# the right wall).
+	var station_x := clampf(service.get_center().x, lo, hi)
+	var bench_center := Vector2(station_x, work_from.y)
+	bench_center += inward * (bench_size.y * 0.5 + HouseGeometry.WALL_GAP)
+	var expected: Dictionary = HouseFurnishGeometry.candidate(key, bench_center, yaw, 1.0, 1.0, 1.0)
+	var bench_rect: Rect2 = Rect2(expected.get("rect", Rect2()))
+	if not regions.has(&"witchwork") or not Rect2(regions[&"witchwork"]).grow(0.01).encloses(bench_rect):
+		return Rect2()
+	return bench_rect
+
+
+## Move the two openings that partition the compact Witch's service-side wall:
+## the Hall light to its front wall and the rear bedroom light to the back wall.
+## Their measured glazing is preserved. The canopy planner then tests the real
+## windows and door reservations without weakening exterior clearance.
+static func _relocate_compact_witch_service_windows(p: HousePlan, hall: int) -> void:
+	if not _is_compact_witch_shared_hall(p, hall):
+		return
+	var descriptor := HouseGeometry.witch_compact_service_threshold(p)
+	if descriptor.is_empty():
+		return
+	var service_normal: Vector2 = descriptor["normal"]
+	var reserved_bench := _compact_witchwork_reserved_bench_rect(p, hall)
+	if not reserved_bench.has_area():
+		return
+	var forbidden_rects: Array[Rect2] = [reserved_bench.grow(0.75)]
+	var hearth_breast := _compact_witch_hearth_breast_rect(p, hall)
+	# Keep the Hall's Witchwork front-wall bench bay clear. The workwall
+	# relocation above has already placed any front opening on another legal
+	# wall; do not put the service-side Hall light straight back into that bay.
+	var move_by_room: Dictionary = {hall: [Vector2(0.0, 1.0), -service_normal,
+		Vector2(0.0, -1.0)]}
+	var indices: Array[int] = []
+	for wi in range(p.windows.size()):
+		var window: Dictionary = p.windows[wi]
+		var room := int(window.get("room", -1))
+		if move_by_room.has(room) and Vector2(window.get("normal", Vector2.ZERO)) == service_normal:
+			indices.append(wi)
+	indices.sort()
+	for order in range(indices.size() - 1, -1, -1):
+		var index: int = indices[order]
+		var original: Dictionary = p.windows[index].duplicate(true)
+		var room := int(original.get("room", -1))
+		var replacement := _compact_window_on_alternate_wall(p, room, original,
+			Array(move_by_room[room]), forbidden_rects if room == hall else [],
+			[hearth_breast.grow(0.01)] if room == hall and hearth_breast.has_area() else [])
+		if replacement.is_empty():
+			continue
+		p.windows[index] = replacement
+	# Move Hall glazing off the service wall before packing bedroom openings into
+	# their rear bay. Otherwise that soon-to-move Hall window can make a legal
+	# area-preserving bedroom arrangement look crowded during the first pass.
+	for bedroom in p.rooms_of(&"bedroom"):
+		if p.storey_of_room(bedroom) == 0:
+			_relocate_compact_bedroom_service_glazing(p, bedroom, service_normal)
+
+
+## Reserve the real measured breast the same way the chimney planner does. The
+## widest catalogue hearth is used at the existing planned focus point, giving
+## a conservative structural interval without blocking the whole cooking band.
+static func _compact_witch_hearth_breast_rect(p: HousePlan, room: int) -> Rect2:
+	if p.hearth_room() != room or p.hearth_wall() < 0:
+		return Rect2()
+	var walls := HouseGeometry.room_walls(p, room)
+	var wall_index := p.hearth_wall()
+	if wall_index >= walls.size():
+		return Rect2()
+	var wall: Dictionary = walls[wall_index]
+	var inward := Vector2(wall.get("normal", Vector2.ZERO)).normalized()
+	var hearth_key := ""
+	var hearth_width := -INF
+	for key in PropCatalog.of_category("hearth"):
+		var width := PropCatalog.footprint(key).x
+		if width > hearth_width:
+			hearth_width = width
+			hearth_key = key
+	if hearth_key.is_empty():
+		return Rect2()
+	var yaw := HouseFurnishGeometry.yaw_facing(inward) + PropCatalog.face_offset(hearth_key)
+	var footprint := PropCatalog.footprint_rotated(hearth_key, yaw)
+	var centre := p.focus_pos() + inward * (footprint.y * 0.5 + HouseGeometry.WALL_GAP)
+	var hearth := HouseFurnishGeometry.candidate(hearth_key, centre, yaw)
+	var breast := HouseGeometry.breast_for_hearth(p, room, hearth, wall_index)
+	return Rect2(breast.get("rect", Rect2()))
+
+
+## A rear-corner bedroom may already use its back wall for another light. Pack
+## both bedroom openings into that real rear glazing bay, preserving each
+## measured opening and its daylight, rather than dropping the service-side one.
+static func _relocate_compact_bedroom_service_glazing(p: HousePlan, room: int,
+		service_normal: Vector2) -> bool:
+	var indices: Array[int] = []
+	for wi in p.windows_of(room):
+		var normal: Vector2 = p.windows[wi].get("normal", Vector2.ZERO)
+		if normal == service_normal or normal == Vector2(0.0, 1.0):
+			indices.append(wi)
+	var needs_relocation := false
+	for wi in indices:
+		needs_relocation = needs_relocation or Vector2(p.windows[wi].get("normal", Vector2.ZERO)) == service_normal
+	if not needs_relocation:
+		return true
+	var rear_wall: Dictionary = {}
+	for wall_variant in HouseGeometry.room_walls(p, room):
+		var wall: Dictionary = wall_variant
+		var inward: Vector2 = Vector2(wall.get("normal", Vector2.ZERO)).normalized()
+		if -inward != Vector2(0.0, 1.0):
+			continue
+		var from: Vector2 = wall["from"]
+		var normal_axis := 0 if absf(inward.x) > 0.5 else 1
+		var line := from.x if normal_axis == 0 else from.y
+		if HouseGeometry.is_exterior_edge(p.spec, normal_axis, line):
+			rear_wall = wall
+			break
+	if rear_wall.is_empty():
+		return false
+	var originals: Array[Dictionary] = []
+	var indices_in_order: Array[int] = indices.duplicate()
+	indices_in_order.sort()
+	for wi in indices_in_order:
+		originals.append(p.windows[wi].duplicate(true))
+	var all_windows: Array[Dictionary] = []
+	for win in p.windows:
+		all_windows.append(win.duplicate(true))
+	for order in range(indices_in_order.size() - 1, -1, -1):
+		p.windows.remove_at(indices_in_order[order])
+	var from: Vector2 = rear_wall["from"]
+	var to: Vector2 = rear_wall["to"]
+	var axis := (to - from).normalized()
+	var run := from.distance_to(to)
+	var total_width := 0.0
+	for original in originals:
+		total_width += float(original.get("width", HouseGeometry.WINDOW_W))
+	var minimum_gap := HouseGeometry.WINDOW_MIN_GAP
+	if originals.size() > 1:
+		minimum_gap *= float(originals.size() - 1)
+	var free := run - 0.2 - total_width - minimum_gap
+	var starts := maxi(ceili(free / 0.08), 1)
+	for station in range(starts + 1 if free >= 0.0 else 0):
+		var edge_gap := 0.1 + free * float(station) / float(starts)
+		var cursor := edge_gap
+		var moved_windows: Array[Dictionary] = []
+		var clear := true
+		for original in originals:
+			var width := float(original.get("width", HouseGeometry.WINDOW_W))
+			cursor += width * 0.5
+			var pos := from + axis * cursor
+			var normal: Vector2 = -Vector2(rear_wall.get("normal", Vector2.ZERO)).normalized()
+			if HousePlanOpenings._crowds(p, pos, normal, width, HousePlan.record_storey(original)):
+				clear = false
+				break
+			var moved := original.duplicate(true)
+			moved["pos"] = pos
+			moved["normal"] = normal
+			p.windows.append(moved)
+			moved_windows.append(moved)
+			cursor += width * 0.5 + HouseGeometry.WINDOW_MIN_GAP
+		if clear:
+			p.windows = all_windows
+			for i in range(indices_in_order.size()):
+				p.windows[indices_in_order[i]] = moved_windows[i]
+			return true
+		while not moved_windows.is_empty():
+			moved_windows.pop_back()
+			p.windows.pop_back()
+	p.windows = all_windows
+	# If the rear bay can fit the glazing only by removing its inter-window gap,
+	# preserve the same measured aperture area as one joined light. This is legal
+	# only when every source opening has the same sill and head; otherwise keep
+	# the original service-side light rather than changing its daylight profile.
+	if originals.size() < 2:
+		return false
+	var sill := float(originals[0].get("sill", HouseGeometry.WINDOW_SILL))
+	var head := float(originals[0].get("head", HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H))
+	var width_sum := 0.0
+	for original in originals:
+		if absf(float(original.get("sill", HouseGeometry.WINDOW_SILL)) - sill) > 0.001 \
+				or absf(float(original.get("head", HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H)) - head) > 0.001:
+			return false
+		width_sum += float(original.get("width", HouseGeometry.WINDOW_W))
+	var merged_width := width_sum
+	if run - 0.2 < merged_width:
+		return false
+	# Test the replacement against other openings, not its own source windows.
+	for order in range(indices_in_order.size() - 1, -1, -1):
+		p.windows.remove_at(indices_in_order[order])
+	for station in range(maxi(ceili((run - merged_width - 0.2) / 0.08), 1) + 1):
+		var edge_gap := 0.1 + maxf(0.0, run - merged_width - 0.2) * float(station) \
+			/ float(maxi(ceili((run - merged_width - 0.2) / 0.08), 1))
+		var pos := from + axis * (edge_gap + merged_width * 0.5)
+		var normal: Vector2 = -Vector2(rear_wall.get("normal", Vector2.ZERO)).normalized()
+		if HousePlanOpenings._crowds(p, pos, normal, merged_width, HousePlan.record_storey(originals[0])):
+			continue
+		var merged := originals[0].duplicate(true)
+		merged["pos"] = pos
+		merged["normal"] = normal
+		merged["width"] = merged_width
+		var before_area := 0.0
+		for original in originals:
+			before_area += HouseGeometry.window_area(original)
+		if absf(HouseGeometry.window_area(merged) - before_area) > 0.001:
+			p.windows = all_windows
+			return false
+		p.windows.append(merged)
+		return true
+	p.windows = all_windows
+	return false
+
+
+static func _compact_window_on_alternate_wall(p: HousePlan, room: int,
+		original: Dictionary, preferred_outward_normals: Array,
+		forbidden_rects: Array = [], forbidden_wall_rects: Array = []) -> Dictionary:
+	var width := float(original.get("width", HouseGeometry.WINDOW_W))
+	var storey := HousePlan.record_storey(original)
+	var walls := HouseGeometry.room_walls(p, room)
+	for preferred_variant in preferred_outward_normals:
+		var preferred: Vector2 = preferred_variant
+		for wall_variant in walls:
+			var wall: Dictionary = wall_variant
+			var inward := Vector2(wall.get("normal", Vector2.ZERO)).normalized()
+			var outward := -inward
+			if outward != preferred:
+				continue
+			var from: Vector2 = wall["from"]
+			var to: Vector2 = wall["to"]
+			var axis := (to - from).normalized()
+			var run := from.distance_to(to)
+			var half := width * 0.5
+			var lo := half + 0.1
+			var hi := run - half - 0.1
+			if hi < lo:
+				continue
+			var steps := maxi(ceili((hi - lo) / 0.08), 1)
+			for station in range(steps + 1):
+				var offset := lo + (hi - lo) * float(station) / float(steps)
+				var pos := from + axis * offset
+				var normal_axis := 0 if absf(inward.x) > 0.5 else 1
+				var line := from.x if normal_axis == 0 else from.y
+				if not HouseGeometry.is_exterior_edge(p.spec, normal_axis, line):
+					continue
+				if HousePlanOpenings._crowds(p, pos, outward, width, storey):
+					continue
+				var moved := original.duplicate(true)
+				moved["pos"] = pos
+				moved["normal"] = outward
+				var clear: Rect2 = HouseGeometry.window_clear_rect(moved)
+				var hits_reserved_work := false
+				for reserved_variant in forbidden_rects:
+					if clear.intersects(Rect2(reserved_variant)):
+						hits_reserved_work = true
+						break
+				if hits_reserved_work:
+					continue
+				var opening: Rect2 = HouseGeometry.window_rect(moved)
+				var hits_reserved_structure := false
+				for reserved_variant in forbidden_wall_rects:
+					if opening.intersects(Rect2(reserved_variant)):
+						hits_reserved_structure = true
+						break
+				if hits_reserved_structure:
+					continue
+				return moved
+	return {}
+
+
+static func _is_compact_witch_shared_hall(p: HousePlan, room: int) -> bool:
+	if p == null or p.spec == null or p.world_family != &"" or p.spec.get_script() != BASE_HOUSE_SPEC \
+			or p.spec.style != &"witch_hut" or p.spec.trade != &"none" \
+			or room < 0 or room >= p.rooms.size() or p.kind_of(room) != &"hall":
+		return false
+	var room_data: Dictionary = p.rooms[room]
+	var functions: Array = room_data.get("domestic_functions", [])
+	var station: Dictionary = room_data.get("shared_activity_station", {})
+	var groups: Array = station.get("groups", [])
+	return bool(room_data.get("shared_cooking", false)) \
+		and bool(room_data.get("shared_witchwork", false)) \
+		and functions.has(&"cooking") and functions.has(&"witchwork") \
+		and String(station.get("id", "")) == "compact_witch_hearth" \
+		and String(station.get("scope", "")) == "compact_witch_shared_hall" \
+		and String(station.get("category", "")) == "hearth" \
+		and groups.has(&"cooking") and groups.has(&"witchwork")
+
+
 static func _reuse_existing_activity_support(p: HousePlan, room: int,
 		key: String, group_name: String, anchor_id: String,
 		prep_rect: Rect2, occupied_by_room: Dictionary) -> Dictionary:
@@ -1298,7 +1840,8 @@ static func _reuse_existing_activity_support(p: HousePlan, room: int,
 		if not HouseGeometry.room_floor_rect(p, room).grow(0.01).encloses(body):
 			continue
 		var distance := _rect_distance(body, prep_rect)
-		if distance > 1.9:
+		var max_distance: float = 0.75 if group_name == "witchwork" and _is_compact_witch_shared_hall(p, room) else 1.9
+		if distance > max_distance:
 			continue
 		var bottom := origin.y + PropCatalog.floor_offset(key) * PropCatalog.placement_height_scale(item)
 		var top := bottom + PropCatalog.placement_height(item)
@@ -1348,8 +1891,10 @@ static func _reuse_existing_activity_support(p: HousePlan, room: int,
 			if not span_clear or not collision_free or not route_free:
 				continue
 			var along := (extent.x + extent.y) * 0.5
-			if not _activity_light_candidate_available(p, room, wi, along,
-					prep_rect, body, group_name, anchor_id, occupied_by_room):
+			# Keep a physically valid Witchwork rack when no lawful task-light
+			# station exists. The light pass below records that shortfall separately.
+			if not _allow_unlit_witchwork_support(p, group_name) and not _activity_light_candidate_available(
+				p, room, wi, along, prep_rect, body, group_name, anchor_id, occupied_by_room):
 				continue
 			if not best.is_empty() and distance >= float(best["distance"]):
 				continue
@@ -1578,6 +2123,7 @@ static func compose_wall_hosts(p: HousePlan, spec: HouseSpec) -> void:
 			"anchor_id": anchor_id, "rank": rank})
 		prior["anchors"] = anchors
 		selected[selection_key] = prior
+	_compose_witch_room_finish_hosts(p, spec)
 	if not found_activity:
 		return
 	for selection_variant in selected.values():
@@ -1696,6 +2242,63 @@ static func compose_wall_hosts(p: HousePlan, spec: HouseSpec) -> void:
 					else "intentionally_quiet_wall")
 				item["activity_anchor_id"] = host.get("anchor_id", "")
 				break
+
+
+	_apply_witch_work_light_profiles(p)
+
+
+static func _apply_witch_work_light_profiles(p: HousePlan) -> void:
+	if p == null or p.spec == null or p.spec.style != &"witch_hut" \
+			or p.spec.get_script() != BASE_HOUSE_SPEC or p.spec.trade != &"none" \
+			or p.world_family != &"":
+		return
+	for item_variant in p.furniture:
+		var item: Dictionary = item_variant
+		var room := int(item.get("room", -1))
+		if room < 0 or room >= p.room_count() or StringName(p.kind_of(room)) not in [&"workshop", &"hall"]:
+			continue
+		if String(item.get("activity_group", "")) not in ["cooking", "witchwork"]:
+			continue
+		if PropCatalog.has_tag(String(item.get("key", "")), PropCatalog.LIGHT):
+			item["house_light_profile"] = {"name": "witchwork", "energy_scale": 0.76, "range_scale": 0.84}
+
+
+static func _compose_witch_room_finish_hosts(p: HousePlan, spec: HouseSpec) -> void:
+	if p == null or spec == null or p.spec != spec or spec.style != &"witch_hut" \
+			 or spec.get_script() != BASE_HOUSE_SPEC or spec.trade != &"none" \
+			 or p.world_family != &"" or spec.has_method("room_program") \
+			 or spec.has_method("custom_room_rects"):
+		return
+	for room in p.room_count():
+		var kind := StringName(p.kind_of(room))
+		if kind == &"workshop":
+			pass
+		elif kind == &"hall":
+			var room_row: Dictionary = p.rooms[room]
+			var functions: Array = room_row.get("domestic_functions", [])
+			if not bool(room_row.get("shared_witchwork", false)) \
+					 or not bool(room_row.get("shared_cooking", false)) \
+					 or not functions.has(&"cooking") or not functions.has(&"witchwork"):
+				continue
+		else:
+			continue
+		var walls := HouseGeometry.room_walls(p, room)
+		for wi in walls.size():
+			var wall: Dictionary = walls[wi]
+			var clear_spans := clear_wall_spans(p, room, wi, 0.07)
+			for span_index in clear_spans.size():
+				var span: Vector2 = clear_spans[span_index]
+				if span.y - span.x < 0.55:
+					continue
+				var horizontal: bool = absf(Vector2(wall["normal"]).y) > 0.5
+				var from := Vector2(span.x, wall["from"].y) if horizontal else Vector2(wall["from"].x, span.x)
+				var to := Vector2(span.y, wall["from"].y) if horizontal else Vector2(wall["from"].x, span.y)
+				var host_id := "witch_finish_%d_%d_%d" % [room, wi, span_index]
+				p.wall_hosts.append({"id": host_id, "room": room, "storey": p.storey_of_room(room),
+					"wall": wi, "from": from, "to": to, "normal": wall["normal"],
+					"span": span, "role": "room_finish",
+					"finish_intent": "cleanable_working_room", "room_kind": String(kind),
+					"anchor_id": "", "activity_group": ""})
 
 
 ## The framing sits on the wall face, but its measured beam depth still occupies

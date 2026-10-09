@@ -19,9 +19,12 @@ extends RefCounted
 ## Every one of those rules is checked afterwards by HousePlanCheck -- this
 ## file tries to build it right, that file refuses to believe it did.
 
-static func plan(spec: HouseSpec) -> HousePlan:
+static func plan(spec: HouseSpec, world_family: StringName = &"") -> HousePlan:
 	var p := HousePlan.new()
 	p.spec = spec
+	# Scope-aware room layouts must see the family before subdivision, just as
+	# roof geometry and house features do later in the pipeline.
+	p.world_family = world_family
 	HousePlanRooms.subdivide(p, spec)
 	HousePlanRooms.name_rooms(p, spec)
 	HousePlanOpenings.place_doors(p, spec)

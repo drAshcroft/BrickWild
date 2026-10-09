@@ -670,31 +670,35 @@ static func _check_contract(res: SuiteResult, requests: Array[BuildingRequest]) 
 		var fp: Rect2 = pa.get("footprint", Rect2())
 		var door: Vector3 = pa.get("door", Vector3.ZERO)
 		var approach: Rect2 = pa.get("approach", Rect2())
-		if request.kind == &"temple" and request.style == &"basilica" \
+		if request.kind == &"temple" and request.style in [&"basilica", &"rotunda"] \
 				and approach.size.x > 0.0 and approach.size.y > 0.0:
 			if absf(approach.position.y - fp.position.y) > 0.2 \
 					or absf(approach.end.y - door.z) > 0.2 \
-					or door.x < approach.position.x - 0.1 \
-					or door.x > approach.end.x + 0.1:
-				res.fail("contract: Basilica approach does not join the published front to its actual wall gate")
+				or door.x < approach.position.x - 0.1 \
+				or door.x > approach.end.x + 0.1:
+				res.fail("contract: Temple approach does not join the published front to its actual wall gate")
 		else:
 			if absf(door.z - fp.position.y) > 0.6:
 				res.fail("contract: %s's door is %.2fm off the footprint's -Z edge" % [String(request.kind), door.z - fp.position.y])
 		var mesh: ArrayMesh = entry.get("mesh")
 		if mesh == null:
 			mesh = BrickWild.build_mesh(a)
-		if request.kind == &"temple" and request.style == &"basilica" \
+		if request.kind == &"temple" and request.style in [&"basilica", &"rotunda"] \
 				and approach.size.x > 0.0 and mesh != null:
 			var floor_triangles: Array = MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE)
 			var supported := true
 			var z: float = approach.position.y + 0.08
 			while z <= approach.end.y - 0.08:
-				if not MeshProbe.has_upward_support(floor_triangles, Vector2(0.0, z), 0.001, 0.03):
-					supported = false
+				for side in [-1.0, 0.0, 1.0]:
+					var x: float = side * TempleGeometry.PERSON_RADIUS
+					if not MeshProbe.has_upward_support(floor_triangles, Vector2(x, z), 0.001, 0.03):
+						supported = false
+						break
+				if not supported:
 					break
 				z += 0.4
 			if not supported:
-				res.fail("contract: Basilica entrance approach has no continuous emitted stone floor to its wall gate")
+				res.fail("contract: Temple entrance approach has no continuous body-width emitted stone floor to its wall gate")
 		var mesh_b: ArrayMesh = entry.get("again_mesh")
 		if mesh_b == null and b != null:
 			mesh_b = BrickWild.build_mesh(b)

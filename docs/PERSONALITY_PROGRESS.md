@@ -217,17 +217,17 @@ three body heights through actual assembled triangles. It supplements the
 walking grid; it is not a continuous capsule-physics proof or a substitute for
 the final human walk.
 
-### 2026-10-08 — LIVE-GROUPS completed
+### 2026-10-08 â€” LIVE-GROUPS completed
 
 Required domestic activity groups and safe light coverage are complete for the stated bounded coverage. Root reviewed 16 final room/cutaway images and two roof-on lighting views. All 232 original furnishing/assembly/walk-pin checks passed in split bounded runs; the combined lane timed out. The 15-case house matrix and two deterministic repeats passed. See `visualqa/personality/GROUPS_REVIEW.md`. Bare surfaces, porch intrusions, bulky bedside supports, legacy trade stairs and witch identity remain active design work.
 
-### 2026-10-08 — LIVE-SURFACES completed
+### 2026-10-08 â€” LIVE-SURFACES completed
 
-Wall hosts now follow surviving activity anchors. Reading binds a measured bedside support, supported book and useful task lamp; separate clothes storage remains required. Cooking binds preparation, heat, storage and task light. Floor-to-ceiling timber bays follow actual façade stations and clear opening spans. Root reviewed the Luna patches and critical saved views. All25 selected gates pass, including232 original furnishing/assembly/walk-pin checks,21 composition checks and1679 current component checks. Reviewed34 main renders and5 exactFarmhouse7441 views. Fixture-only cohort changes and earlier geometry/exterior lineage are recorded in `visualqa/personality/SURFACES_REVIEW.md`.
+Wall hosts now follow surviving activity anchors. Reading binds a measured bedside support, supported book and useful task lamp; separate clothes storage remains required. Cooking binds preparation, heat, storage and task light. Floor-to-ceiling timber bays follow actual faÃ§ade stations and clear opening spans. Root reviewed the Luna patches and critical saved views. All25 selected gates pass, including232 original furnishing/assembly/walk-pin checks,21 composition checks and1679 current component checks. Reviewed34 main renders and5 exactFarmhouse7441 views. Fixture-only cohort changes and earlier geometry/exterior lineage are recorded in `visualqa/personality/SURFACES_REVIEW.md`.
 
 The rooms still have broad bare plaster, heavy repeated frames and hot light. Generic cottage/Witch identity and wider two-storey/trade defects remain work for the next todos. This is foundation completion, not final building-design acceptance.
 
-### 2026-10-08 — Restart recovery and sacred entrance step
+### 2026-10-08 â€” Restart recovery and sacred entrance step
 
 LIVE-SACRED-ENTRY closes the ziggurat ground-paving gap and retains two metres
 of occupied first-chamber headroom. The focused emitted-mesh contract passes
@@ -241,7 +241,7 @@ The compact work shelter still needs opening and threshold coordination. Fresh
 sacred renders expose plain masonry volumes and incomplete dome/ambulatory
 spaces. Successful image generation is not visual acceptance.
 
-### 2026-10-08 — Render-camera checkpoint after computer restart
+### 2026-10-08 â€” Render-camera checkpoint after computer restart
 
 LIVE-RENDER-CAMERAS records the reproducible render tooling and actual reached
 Witch eye-station selector. Four positives and a room-filling obstruction
@@ -250,7 +250,7 @@ captures. See `visualqa/personality/CAMERAS_REVIEW.md`. Witch identity and sacre
 interior architecture remain open; sacred body clearance is explicitly
 unmeasured. The complete frozen review matrices are retained.
 
-### 2026-10-08 — Continued verification after the next computer restart
+### 2026-10-08 â€” Continued verification after the next computer restart
 
 The compact Witch opening reservation now follows its actual left/right work
 band. The unchanged three-seed service fixture passes (46.997 s), as does the
@@ -300,7 +300,7 @@ retains all quick API-lane coverage: 490 checks. The original combined placement
 selector timed out at 300.952 s; it is not reported as a pass. Scheduled sweeps
 and final family design acceptance remain separate.
 
-### 2026-10-09 — Continued after computer restart
+### 2026-10-09 â€” Continued after computer restart
 
 LIVE-SACRED-CHURCH completes the bounded occupied-structure slice. Real nave
 frames, dome bearings, open ambulatory paving/roof and Nordic timber surfaces
@@ -336,3 +336,102 @@ LIVE-SACRED-ROTUNDA records the next bounded form repair. The artifact proposal
 has a circular occupied drum, connected threshold and a real bearing gate head;
 its source and fixtures have not yet been run. Parent LIVE-SACRED and the wider
 house, shop and family rollout remain in progress.
+
+### 2026-10-09 — Restart8 review and native diagnostics
+
+The scoped Witch half-hip and continuous reed shader are promoted for testing,
+not accepted. Root opened all four fresh exact-pin views (native0, 23.017 s).
+The roof has changed but still reads as a conventional timber cottage. The
+focused fixture fails nine cases (10.354 s): end rafters enter the roof skin,
+and a component counter confuses individual rafters with complete frame sets.
+A corrected physical contact proposal is being reviewed. The original Witch
+48-image matrix and broad design acceptance remain required.
+
+A separate Workshop fixture measurement is repaired: its old roof-top ray
+minus half depth measured the roof middle plane rather than its underside.
+Actual oriented roof/ceiling triangles agree within 2 mm. A physically raised
+ceiling rejects the same contact check, and actual underside headroom now
+passes all fourteen existing cases (native0, 12.140 s). Its earlier parse-error
+receipt remains invalid evidence. No ceiling geometry was moved for this fix.
+
+The circular Rotunda drum, crown, actual gate head, conservative navigation
+floor and pit-split perimeter slabs are promoted. Root caught and rejected
+floor rows that filled the pit before promotion. The corrected native fixture
+still fails 1,109 checks (23.292 s): rectangular mass rules misread adjacent
+curved walls, while actual gate, floor-edge, route, pit/dais and lantern-removal
+failures need repair. Root opened all three fresh diagnostic public images
+(native0, 16.587 s). They show a circular room and the ritual pit crossing;
+plain walls and generic silhouette remain broader identity work. Read-only
+mesh/WalkGrid probes pass (5.220 s); a cross-cult pit probe (1.603 s) locates
+real small Flame/Bone dais slabs across the pit. No Rotunda acceptance is claimed.
+
+Church support-aligned openings and style sections remain an artifact proposal.
+Root requested removal of duplicated exterior piers at existing buttress
+stations and a bounded test queue. No new Church source has been promoted.
+
+## Restart 9: measurement committed, architecture still under review
+
+Computer restart recovery retained all uncommitted work. Commit c465003 closes LIVE-MESH-SUPPORT-EDGE only: inclusive actual triangle support passes239checks through2km translations,43world consumer checks and the full sacred structural fixture. It moves no geometry and does not close Rotunda or Witch design.
+
+The clipped Witch timber proposal parses after root renamed one duplicate local. Its native run fails27checks in11.931seconds. Hip supports have no selected upper-face samples, physical tie bearings fail, and the detached control has an inverted expectation. The proposal is not accepted.
+
+LIVE-SACRED-CHURCH-BAYS is executing. Root rejected regional triangle deletion and requested exact named-component multiset removal. The revised three-source packet is promoted. Its full fixture fails64checks in69.853seconds: the wall-preservation witness incorrectly requires a large wall-triangle centroid inside a narrow support box. No other failure is reported in that receipt. Root requested a physical wall witness and retained exact component removal. Church change lane is running.
+
+Root rejected Rotunda overlap-check suppression. The next packet must measure actual oriented walls with physical seam allowances, preserve other overlap pairs, and exercise emitted overlapping geometry as a negative control. Its architecture and cult identities remain open.
+
+## Restart 13: final church bay review and circular diagnostics
+
+Commit a8fd54d completes LIVE-SACRED-CHURCH-BAYS. The full structural fixture passes (86.424 s), Church change/aperture coverage passes 5,796 checks (30.900 s, 12 existing warnings), and VIS-008 passes 47 checks (5.172 s). All eleven geometry selectors pass 9,633 checks in the isolated c465003 checkout, split into three serial bounded processes (347.195 s aggregate). The live combined roof attempt failed unrelated Rotunda assertions and is excluded. Root opened all 18 final original renders (46.656 s) and all six vault views (23.006 s). Bay geometry is accepted; full sacred style identity remains open. See visualqa/personality/CHURCH_BAYS_REVIEW.md.
+
+The pending arcade diagnostic reproduces real barriers: Gothic default seed 8102 has 14 of 16 interface rays blocked (native0, 1.750 s). The two clear nested-ring west probes are not proof of a route because shell extents need checking. Luna is strengthening body, floor, route, crown and removed-bearing controls before promotion.
+
+The final Witch physical frame repair now passes its four focused gates: half-hip contact including the same raised/detached predicates (12.907 s), roofcraft (15.926 s), legacy gable (7.910 s), and all fourteen Workshop bay cases (9.227 s). This supersedes the earlier physical failures, but the exact-pin renders still do not establish Witch identity. A connected Kitchen/Workshop lower wing is staged; root rejected a hard-coded 9 x 12 layout guard and requested a capacity-based procedural rule and furnished diagnostics.
+
+Rotunda v4 was promoted for validation. Root fixed one inferred Vector2 parse error. The focused fixture fails 125 complaints across all fifteen canonical cases (native1, 39.258 s): altar/platform fit, actual jamb-panel overlap, lighting, procession/bridge access, lantern bearing datum and two floor-removal controls remain unresolved. The independent roof quick diagnostic retains 4,170 checks and fails six lantern attachment witnesses (61.537 s); exact circular dome/annulus grid, added-slab and removed-roof controls pass. No Rotunda completion is claimed. Luna is staging measured diagnostics and a focused repair against this exact live source state.
+
+
+## Restart 18: arcades committed; public threshold diagnosis corrected
+
+Commit9938683 closes LIVE-SACRED-CHURCH-ARCADES. Actual body-height/lateral rays, floor continuity, crowns, exact component bearings and same-predicate plug controls pass. Church-change5561, apertures235 and dome47 pass; all9633 original bounded geometry checks pass in three serial isolated processes (346.804s aggregate). Root opened18 original plus6 vault images. Renaissance side aisles are now visible through the nave wall; blank upper walls, generic exteriors and repetitive seating remain. See visualqa/personality/CHURCH_ARCADES_REVIEW.md. This does not complete sacred identity.
+
+Committed baseline house diagnostics reproduce42 older complaints. The three Cottage failure lists are unchanged by the Witch ell proposal; new Witch roof/placement complaints remain separate. LIVE-HEARTH-MESH-CONTRACT tracks exact hearth geometry/material measurement and must preserve genuine collision rules.
+
+Root rejected a Rotunda v5 regression that would reconstruct all authored column dimensions. Luna's revised packet preserves non-Rotunda records and filters surviving Rotunda records by their own radii. It remains staged and unverified.
+
+The furnished public Witch service-door lifecycle diagnostic currently contradicts the earlier missing-door premise: completed cases retain exactly one marker through planning, furnishing, shell refresh and BrickWild.generate. The existing yard renderer focuses a shelter/yard cluster instead of the actual threshold. No guessed door-search repair is promoted. Full native matrix and strengthened real mesh controls are pending. Witch identity remains visually rejected; a roof derived from actual tall-core rooms is still being staged.
+
+## Restart 19: floor seam committed; design acceptance stays separate
+
+Commit53ea8e5 completes the hearth mesh measurement task:78 controls pass, the full committed surface-host consumer passes, and exactly24 false face probes disappear while the other18 baseline complaints remain identical. Root opened all three corrected hearth portraits. Visible fire and domestic composition remain open.
+
+Commit689f26d completes LIVE-WALK-FLOOR-EDGE. Six floor/hazard controls and43 world support consumers pass. All five large Rotunda routes recover with2.72m processional clearance. Planning56 checks pass. Comparing the same isolated house-plan/walk-pin consumers with unchanged floor code gives exactly the same28 failures and32 warnings. The old multistory furnishing/stair complaints and sacred coplanar surfaces remain explicit work; no full consumer pass is claimed.
+
+The twelve-request public Witch service-door baseline passes native0/185.071s with exactly one retained marker on every Witch and none on Cottage controls. The stronger removed-wall/door fixture and corrected service-yard camera are promoted for verification; no speculative production door repair is included. The plan-derived high-core roof candidate fails8 requirements in6.597s. A corrected native diagnostic (6.397s) shows the bay candidate exists but its near-eave join cannot supply the required fall/headroom. Luna is repairing the geometry; all coverage and headroom guards remain.
+
+Rotunda v6 passes all15 canonical native cases including physical mutations (38.331s), public API focus31 checks (14.774s), rite60 and roof4176 checks. The broader temple suite reports10 brazier/panel AABB intersections; actual oriented clearance and a moved-bowl negative are being verified. Root opened all nine blood-cult size renders (29.409s). The drum, pit crossing and altar are clear, but the exterior is plain and the large room remains too empty. Sacred identity and the full matrix remain open.
+
+The ordinary hearth assembly proposal is promoted for verification. Its first fixture is invalid because scene-global transforms were queried before tree entry; root stopped only its owned process. Luna staged a deferred-start fixture with cached transforms. This invalid run is excluded from acceptance.
+
+## Restart 20–21: Basilica bearings committed; inhabited design remains open
+
+Computer restart recovery preserved the inherited working tree. Commit 2aae811 completes LIVE-SACRED-BASILICA-EAVES only. An isolated committed-baseline candidate passes all eleven geometry selectors (9,633 checks, 214.207 s), Temple/rite (3,737 checks, 40.495 s), actual bearing removal controls and edge-mapping controls. Root opened all nine fresh Basilica size/view renders. Roof and pilaster contacts are accepted. Bare walls, sparse sacred composition and the parent style identity are still open. The walk-pin lane retains its independent Romanesque coplanar failure (94 pairs against a 92 budget); no full walk-pin pass is claimed.
+
+The twelve public Witch service-door requests pass actual body-width/height rays and retained-log wall/door mesh mutations (96.379 s). The roof datum fixture passes fourteen cases plus six scope controls (7.646 s). These are structural receipts, not Witch identity acceptance. The exact default/seed1 four-view render still reads as a tidy timber house and shows a broad Workshop gable sky opening. The ceiling extension does not close that opening: its focused gate retains two failures (7.131 s). A valid actual-triangle diagnostic locates the eye ray beyond the ceiling end, through the missing gable infill. Luna is repairing the emitted wall profile, with same-eye removed-wall controls required.
+
+The Witch yard fixture retains nine failures (62.456 s): six default/large plans omit the required shelter, and all three compact plans put drying too far from the work threshold. A complete candidate trace (41.668 s, no script errors) identifies canopy roof rejection by the door/porch clearance reservation; compact drying candidates are rejected by the door or other yard pieces. Clearances remain requirements. Luna is staging a measured layout repair.
+
+The first ordinary shell-host hearth revision fails twelve missing Pot_1 requirements and is visually rejected in all 24 reviewed renders. The exact cause is now repaired: prep heat reach scanned furniture hearth rows, while the native fireplace has no proxy furniture row. A narrow measured structural-breast fallback passes the focused two checks (3.933 s) and all twelve retained fireplace cases (430 checks, 43.751 s). The hearth todo remains executing: cone-like flame geometry, undersized fuel and sharp rectangular soot need composition work, and every fire must be checked against an actual emitted chimney outlet. No hearth design commit or acceptance is claimed.
+
+The revised Witch exposed-eave/local-flue packet is promoted for verification. The first two attempts have parse errors and are excluded. Root corrected explicit inferred numeric/vector types; the fresh physical run is pending. Chapel threshold and Pylon structure proposals remain unpromoted. Full Rotunda public API coverage, cross-family style review and the complete inherited plan remain required.
+
+Restart21 continuation: roofcraft passes after explicit type fixes (13.967s after deriving layout/openings once, versus141.598s before). The unchanged full nine-case half-hip scope and actual nonempty raised-rafter controls pass79.736s; the corrected independent actual-triangle core flue oracle passes8.728s. Two gable infill candidates still fail the same three recorded eye rays and unchanged-log deletion witnesses (9.017s and10.416s). The actual high-core roof-wall run omits the whole outboard Workshop span; Luna is extending the emitted lower-wing end wall from real house/bay bounds.
+
+The shelter revision now retains default shelters, but its complete native gate remains red with nine requirements (43.005s): compact drying, default nearby herbs, and all large shelters. Root opened all four fresh exact default1 views (28.956s). The service work entrance is clearer, but its long bare awning, empty bench, crowded Workshop chests and tidy-cottage front remain visually unacceptable.
+
+LIVE-SACRED-PYLON is executing. Its first full native45 request gate fails195 assertions (28.387s). A valid three-size diagnostic (4.673s) proves the beam support probe was wholly inside the actual seated beam; large tower geometry and shrine/column overlap still require repairs. Root opened all nine blood seed1 size/view renders (26.041s): hall and restricted shrine are clearer, but exterior remains blank boxes. No Pylon completion.
+
+The ordinary fireplace actual-outlet trace fails12 requirements (28.990s): eight Cottage/Thatched Cottage generated plans have no chimney despite native indoor heat; four Farmhouse outlet witness/removal controls need precise actual ray diagnosis. Derived chimney choice must be resolved consistently with required cooking heat before accepting hearth design. Visual firebrick/faded-soot revision remains staged, not accepted; root caught its inherited half-height flame offset, which would float mesh tongues above the logs. No further todo is complete; no new commit is justified yet.
+
+Restart21 resumed root review: the actual outboard Workshop end gable now passes the complete bearing/closure fixture (7.511s). Root opened all four exact default/seed1 views (20.832s) and confirms the former sky triangle is closed. The Witch identity, service cluster and furnishing are still rejected. Large shelter operation containment has valid read-only diagnostic receipts at31.040s and29.831s; the attempted v4 helper call failed to load and is excluded.
+
+The ordinary native flue passes all twelve actual outlet/removal cases (28.293s) and all eight exclusion cases (16 checks,9.953s). The revised fireplace assembly fails26 of466 assertions (38.989s), including all backing witnesses and fuel scales plus two removed-backing controls. Root rendered and opened every one of24 fresh hearth/exterior images (69.524s): visible firebrick joints and soot are absent, the fire remains two paper-like tongues over a tiny fuel block, and large exteriors still have disproportionate roof/stack silhouettes. This revision is rejected. No task is completed and no new commit is justified. Pylon's next source-only proposal was also rejected before promotion because its surface probe was wholly inside stone and its short portal placed the lintel below the ritual line. These are repairs in progress, not acceptance receipts.

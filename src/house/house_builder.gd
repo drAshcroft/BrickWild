@@ -61,6 +61,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	# HOUSE-RICH: the crown, the belt bands and the pediments. Every one of
 	# them is behind its own spec field, so an ordinary house returns from this
 	# having emitted nothing and its mesh is unchanged vertex for vertex.
+	_build_witch_interior_finish()
 	_build_rich_trim()
 	# HOUSE-CULTURE: the two pieces that stand at or below the wall head. The
 	# three that belong to the roof are emitted from _build_roof, because they
@@ -72,6 +73,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_porch()
 	_build_chimney()
 	_build_yard()
+	_build_witch_cauldron_heat()
 	_build_hearth_breast()
 	_build_rugs()
 	_build_han_features()
@@ -445,6 +447,11 @@ func _build_ceiling(any_roof := false, roofed := false) -> void:
 	if _shaped_room(level) >= 0:
 		return
 	var r: Rect2 = HouseGeometry.storey_rect(plan, level).grow(-HouseGeometry.wall_thickness(spec) * 0.5)
+	var bay: Dictionary = HouseGeometry.roof_layout(plan).get("witch_bay", {})
+	if not bay.is_empty():
+		_build_witch_bay_ceiling(r, float(level + 1) * spec.height, bay, level)
+		_build_witch_hall_ceiling_ties(level, float(level + 1) * spec.height)
+		return
 	var y := float(level + 1) * spec.height
 	tag("ceiling")
 	host("ceiling", level)
@@ -452,6 +459,117 @@ func _build_ceiling(any_roof := false, roofed := false) -> void:
 		Transform3D(Basis(), Vector3(r.get_center().x, y + CEILING_T * 0.5, r.get_center().y)),
 		SURF_WALL)
 	host_end()
+	_build_witch_hall_ceiling_ties(level, y)
+
+
+func _build_witch_bay_ceiling(main_rect: Rect2, ceiling_y: float,
+		bay: Dictionary, level: int) -> void:
+	var room := int(bay["room"])
+	var room_rect: Rect2 = bay.get("wing_rect", HouseGeometry.room_floor_rect(plan, room))
+	var flat_pieces: Array[PackedVector2Array] = RoofShape.subtract(Poly.from_rect(main_rect), Poly.from_rect(room_rect))
+	tag("ceiling")
+	host("ceiling", level)
+	for piece in flat_pieces:
+		var points := PackedVector3Array()
+		for p in piece:
+			points.append(Vector3(p.x, ceiling_y + CEILING_T * 0.5, p.y))
+		component_slab("ceiling", points, CEILING_T, SURF_WALL, true)
+	host_end()
+	var xf: Transform3D = bay["transform"]
+	var axis := int(bay["axis"])
+	var outer := float(bay["ceiling_outer"])
+	var inner := float(bay["ceiling_inner"])
+	var lo := float(bay["ceiling_along_lo"])
+	var hi := float(bay["ceiling_along_hi"])
+	var outer_plane := float(bay["outer"])
+	var inner_plane := float(bay["inner"])	
+	var roof_bottom := float(bay["eave_y"]) - RoofShape.DEPTH * 0.5 - 0.0075
+	var slope_rise := float(bay["join_y"]) - float(bay["eave_y"])
+	var face := PackedVector3Array()
+	for p in bay["ceiling_outline"]:
+		var coord: float = p.x if axis == 0 else p.y
+		var t := clampf((coord - outer_plane) / (inner_plane - outer_plane), 0.0, 1.0)
+		var y := roof_bottom + slope_rise * t
+		face.append(xf * Vector3(p.x, y, p.y))
+	tag("witch_workshop_bay_ceiling")
+	host("witch_workshop_bay_ceiling", level)
+	component_slab("witch_workshop_bay_ceiling", face, 0.015, SURF_WALL, true)
+	host_end()
+
+
+func _build_witch_hall_ceiling_ties(level: int, ceiling_y: float) -> void:
+	if not HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family):
+		return
+	var wall_t: float = HouseGeometry.wall_thickness(spec)
+	var tie_h := 0.14
+	var end_bearing := wall_t * 0.35
+	for room_index in range(plan.rooms.size()):
+		if plan.kind_of(room_index) != &"hall" or plan.storey_of_room(room_index) != level:
+			continue
+		if plan.is_polygonal(room_index):
+			continue
+		var room: Rect2 = HouseGeometry.room_floor_rect(plan, room_index)
+		var short_span := minf(room.size.x, room.size.y)
+		var long_span := maxf(room.size.x, room.size.y)
+		if short_span < 2.4 or long_span < 3.6:
+			continue
+		var across_x := room.size.x <= room.size.y
+		var tie_count := clampi(int(floor((long_span - 2.4) / 2.4)) + 1, 1, 3)
+		var station_gap := long_span / float(tie_count + 1)
+		var span := short_span + end_bearing * 2.0
+		var size := Vector3(span, tie_h, 0.14) if across_x else Vector3(0.14, tie_h, span)
+		host("witch_hall_ceiling_ties_room%d" % room_index, level)
+		for tie_index in range(tie_count):
+			var station := station_gap * float(tie_index + 1)
+			var center := room.position + room.size * 0.5
+			if across_x:
+				center.y = room.position.y + station
+			else:
+				center.x = room.position.x + station
+			var xf := Transform3D(Basis(), Vector3(center.x, ceiling_y - tie_h * 0.5, center.y))
+			if _witch_tie_conflicts_with_aperture(room, center, size,
+					across_x, ceiling_y - tie_h, ceiling_y, plan.doors + plan.windows,
+					wall_t, plan.storey_of_room(room_index), float(level) * spec.height):
+				continue
+			component_box("witch_hall_ceiling_tie", size, xf, SURF_TRIM)
+		host_end()
+
+
+
+static func _witch_tie_conflicts_with_aperture(room: Rect2, center: Vector2,
+		tie_size: Vector3, across_x: bool, tie_bottom: float, tie_top: float,
+		openings: Array, wall_t: float, level: int, floor_datum := 0.0) -> bool:
+	for opening in openings:
+		if (opening.has("storey") or opening.has("level")) and int(opening.get("storey", opening.get("level", 0))) != level:
+			continue
+		var bottom := float(opening.get("bottom", float(opening.get("sill", 0.0)) + floor_datum))
+		var top := float(opening.get("top", float(opening.get("head", HouseGeometry.DOOR_H)) + floor_datum))
+		if top <= tie_bottom or bottom >= tie_top:
+			continue
+		var pos: Vector2 = opening["pos"]
+		var normal: Vector2 = opening["normal"].normalized()
+		var width := float(opening.get("w", opening.get("width", -1.0)))
+		if width <= 0.0:
+			continue
+		var same_support_wall := false
+		var opening_center: float
+		var tie_lo: float
+		var tie_hi: float
+		if across_x and absf(normal.x) > 0.9:
+			same_support_wall = absf(pos.x - room.position.x) <= wall_t or absf(pos.x - room.end.x) <= wall_t
+			opening_center = pos.y
+			tie_lo = center.y - tie_size.z * 0.5
+			tie_hi = center.y + tie_size.z * 0.5
+		elif not across_x and absf(normal.y) > 0.9:
+			same_support_wall = absf(pos.y - room.position.y) <= wall_t or absf(pos.y - room.end.y) <= wall_t
+			opening_center = pos.x
+			tie_lo = center.x - tie_size.x * 0.5
+			tie_hi = center.x + tie_size.x * 0.5
+		else:
+			continue
+		if same_support_wall and tie_lo < opening_center + width * 0.5 and tie_hi > opening_center - width * 0.5:
+			return true
+	return false
 
 
 func _build_floor() -> void:
@@ -1808,6 +1926,130 @@ func _proud(depth: float) -> float:
 ## and emits nothing at all. That is what keeps the five existing house styles
 ## byte-identical, and it means the vocabulary is reachable from a chance
 ## table rather than hard-wired to one word.
+func _build_witch_interior_finish() -> void:
+	if plan == null or spec == null or plan.spec != spec or spec.style != &"witch_hut" \
+			or spec.get_script() != BASE_HOUSE_SPEC or spec.trade != &"none" \
+			or plan.world_family != &"" or spec.has_method("room_program") \
+			or spec.has_method("custom_room_rects"):
+		return
+	for room in plan.room_count():
+		var kind := StringName(plan.kind_of(room))
+		var witch_workshop := kind == &"workshop"
+		var witch_shared_hall := kind == &"hall"
+		if not witch_workshop and not witch_shared_hall:
+			continue
+		var level := plan.storey_of_room(room)
+		var floor_y := HouseFurnishGeometry.storey_base(plan, room) + HouseGeometry.FLOOR_T
+		var panel_h := 0.90
+		var panel_depth := 0.045
+		var walls := HouseGeometry.room_walls(plan, room)
+		for wi in walls.size():
+			var wall: Dictionary = walls[wi]
+			var from: Vector2 = wall["from"]
+			var to: Vector2 = wall["to"]
+			var normal: Vector2 = wall["normal"]
+			var horizontal := absf(normal.y) > 0.5
+			var line := from.y if horizontal else from.x
+			var lo := minf(from.x, to.x) if horizontal else minf(from.y, to.y)
+			var hi := maxf(from.x, to.x) if horizontal else maxf(from.y, to.y)
+			var clear_spans: Array[Vector2] = HousePlanFeatures.clear_wall_spans(plan, room, wi, 0.07)
+			var candidate_spans: Array[Dictionary] = []
+			for host_variant in plan.wall_hosts:
+				var finish_host: Dictionary = host_variant
+				if int(finish_host.get("room", -1)) != room or int(finish_host.get("wall", -1)) != wi \
+						 or String(finish_host.get("role", "")) != "room_finish" \
+						 or String(finish_host.get("finish_intent", "")) != "cleanable_working_room":
+					continue
+				if String(finish_host.get("room_kind", "")) != String(kind):
+					continue
+				if witch_shared_hall and not _witch_hall_finish_is_shared_work_room(room):
+					continue
+				var host_span: Vector2 = finish_host.get("span", Vector2.ZERO)
+				for clear_span in clear_spans:
+					var overlap := Vector2(maxf(host_span.x, clear_span.x), minf(host_span.y, clear_span.y))
+					if overlap.y > overlap.x + 0.001:
+						candidate_spans.append({"id": String(finish_host.get("id", "")), "span": overlap})
+			for span_record in candidate_spans:
+				var span: Vector2 = span_record["span"]
+				var host_id := String(span_record["id"])
+				var a := maxf(lo, span.x)
+				var z := minf(hi, span.y)
+				var length := z - a
+				if length < 0.55:
+					continue
+				var mid := (a + z) * 0.5
+				var band_rect := Rect2(Vector2(a, line if normal.y > 0.0 else line - panel_depth) if horizontal else Vector2(line if normal.x > 0.0 else line - panel_depth, a), Vector2(length, panel_depth) if horizontal else Vector2(panel_depth, length))
+				var blocked := false
+				for item_variant in plan.furniture:
+					var item: Dictionary = item_variant
+					if int(item.get("room", -1)) != room:
+						continue
+					var occupied: Rect2 = item.get("zone", Rect2())
+					var key := String(item.get("key", ""))
+					var item_origin := PropCatalog.house_origin(item)
+					var item_bottom := item_origin.y + PropCatalog.floor_offset(key) * PropCatalog.placement_height_scale(item)
+					var item_top := item_bottom + PropCatalog.placement_height(item)
+					var model_yaw := float(item.get("yaw", 0.0)) + PropCatalog.face_offset(key)
+					var item_scale := float(item.get("scale", 1.0))
+					var item_centre := PropCatalog.plan_centre(key, item_origin, model_yaw, item_scale)
+					var item_size := PropCatalog.footprint_rotated(key, model_yaw) * item_scale
+					var solid := Rect2(item_centre - item_size * 0.5, item_size)
+					var solid_overlaps_height := item_bottom < floor_y + panel_h + 0.045 and item_top > floor_y
+					if (occupied.has_area() and occupied.grow(0.025).intersects(band_rect)) \
+							or (solid_overlaps_height and solid.has_area() and solid.intersects(band_rect)):
+						blocked = true
+						break
+				if blocked:
+					continue
+				var body_clear := true
+				var clearance_rect := band_rect.grow(0.01)
+				for zone_variant in plan.zones:
+					var use_zone: Dictionary = zone_variant
+					if int(use_zone.get("room", -1)) == room and Rect2(use_zone.get("rect", Rect2())).intersects(clearance_rect):
+						body_clear = false
+						break
+				if not body_clear:
+					continue
+				var point := Vector2(mid, line) if horizontal else Vector2(line, mid)
+				var centre := point + normal * (panel_depth * 0.5 - 0.004)
+				var yaw := atan2(-(to - from).y, (to - from).x)
+				var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(centre.x, floor_y + panel_h * 0.5, centre.y))
+				tag("witch_interior_finish")
+				host(host_id, level)
+				component_box("witch_service_wainscot", Vector3(length, panel_h, panel_depth), xf, SURF_TRIM)
+				component_box("witch_service_rail", Vector3(length, 0.045, panel_depth * 1.12), Transform3D(Basis(Vector3.UP, yaw), Vector3(centre.x, floor_y + panel_h + 0.0225, centre.y)), SURF_TRIM)
+				host_end()
+
+
+func _witch_hall_finish_is_shared_work_room(room: int) -> bool:
+	if room < 0 or room >= plan.room_count() or plan.kind_of(room) != &"hall":
+		return false
+	var row: Dictionary = plan.rooms[room]
+	var functions: Array = row.get("domestic_functions", [])
+	return bool(row.get("shared_witchwork", false)) \
+		and bool(row.get("shared_cooking", false)) \
+		and functions.has(&"cooking") and functions.has(&"witchwork")
+
+
+func _merge_witch_finish_spans(spans: Array[Vector2]) -> Array[Vector2]:
+	var sorted: Array[Vector2] = spans.duplicate()
+	for i in range(1, sorted.size()):
+		var value: Vector2 = sorted[i]
+		var j := i - 1
+		while j >= 0 and sorted[j].x > value.x:
+			sorted[j + 1] = sorted[j]
+			j -= 1
+		sorted[j + 1] = value
+	var merged: Array[Vector2] = []
+	for span in sorted:
+		if merged.is_empty() or span.x > merged[-1].y + 0.01:
+			merged.append(span)
+		else:
+			var last: Vector2 = merged[-1]
+			merged[-1] = Vector2(last.x, maxf(last.y, span.y))
+	return merged
+
+
 func _build_rich_trim() -> void:
 	if spec.cornice:
 		_build_rich_cornice()
@@ -2140,8 +2382,8 @@ func _build_eave_sweep(layout: Dictionary) -> void:
 ## rather than run as one continuous capping, so the roll is a short fin every
 ## ROLL_PITCH along it; the eave is one thick bundle capping both eaves. Only
 ## the roll stands above the slab, so only the roll moves the height bound.
-func _build_thatch_roll(layout: Dictionary) -> void:
-	if not spec.thatch_roll:
+func _build_thatch_roll(layout: Dictionary, authored: Array) -> void:
+	if not HouseGeometry.roof_has_thatch_roll(spec, plan.world_family):
 		return
 	tag("thatch_roll")
 	host("thatch_roll", _storeys() - 1)
@@ -2149,13 +2391,66 @@ func _build_thatch_roll(layout: Dictionary) -> void:
 	var hx: float = _eave_half_x(layout)
 	var hy: float = _eave_half_y(layout)
 	var rise: float = layout["rise"]
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	var witch_roofcraft: bool = HouseGeometry.has_witch_roofcraft(spec, plan.world_family)
+	var roll_cuts: Array = authored.duplicate()
+	roll_cuts.append_array(layout.get("dormers", []))
+	var bay_cut: Dictionary = layout.get("witch_bay", {})
+	if not bay_cut.is_empty():
+		roll_cuts.append({"polygon": bay_cut["outline"]})
 	var ew: float = HouseGeometry.THATCH_EAVE_W
 	for side in [-1.0, 1.0]:
-		component_box("thatch_eave", Vector3(ew, HouseGeometry.THATCH_EAVE_H, hy * 2.0),
-			xf * Transform3D(Basis(), Vector3(float(side) * (hx - ew * 0.5),
-		RoofShape.DEPTH * 0.5 - HouseGeometry.THATCH_EAVE_H * 0.5, 0.0)), SURF_ROOF)
+		if not witch_roofcraft:
+			component_box("thatch_eave", Vector3(ew, HouseGeometry.THATCH_EAVE_H, hy * 2.0),
+				xf * Transform3D(Basis(), Vector3(float(side) * (hx - ew * 0.5),
+				RoofShape.DEPTH * 0.5 - HouseGeometry.THATCH_EAVE_H * 0.5, 0.0)), SURF_ROOF)
+			continue
+		var eave_ranges: Array[Vector2] = [Vector2(-hy, hy)]
+		var bay: Dictionary = layout.get("witch_bay", {})
+		if int(bay.get("axis", -1)) == 0 and is_equal_approx(signf(float(bay.get("outer", 0.0))), float(side)):
+			eave_ranges = _subtract_thatch_interval(eave_ranges,
+				Vector2(float(bay["along_lo"]) - 0.01, float(bay["along_hi"]) + 0.01))
+		var eave_inner_x: float = float(side) * (hx - ew)
+		var eave_outer_x: float = float(side) * hx
+		var eave_lo_x := minf(eave_inner_x, eave_outer_x)
+		var eave_hi_x := maxf(eave_inner_x, eave_outer_x)
+		for op in roll_cuts:
+			var cut_polygon: PackedVector2Array = _thatch_cut_polygon(op)
+			if cut_polygon.size() < 3:
+				continue
+			var hole: Rect2 = Poly.bounding_rect(cut_polygon)
+			if hole.end.x <= eave_lo_x or hole.position.x >= eave_hi_x:
+				continue
+			eave_ranges = _subtract_thatch_interval(eave_ranges,
+				Vector2(hole.position.y - 0.01, hole.end.y + 0.01))
+		for eave_range in eave_ranges:
+			if eave_range.y - eave_range.x <= 0.10:
+				continue
+			var eave_face: PackedVector3Array = faces[0] if side < 0.0 else faces[1]
+			var inner_x: float = float(side) * (hx - ew)
+			var outer_x: float = float(side) * hx
+			var middle_x: float = (inner_x + outer_x) * 0.5
+			var z: float = (eave_range.x + eave_range.y) * 0.5
+			var inner_y: float = _roof_top_surface_y(eave_face, faces, Vector2(inner_x, z))
+			var middle_y: float = _roof_top_surface_y(eave_face, faces, Vector2(middle_x, z))
+			var outer_y: float = _roof_top_surface_y(eave_face, faces, Vector2(outer_x, z))
+			var shoulder_h: float = HouseGeometry.THATCH_EAVE_H * 0.42
+			var eave_profile := PackedVector3Array([
+				Vector3(inner_x, inner_y, z),
+				Vector3(lerpf(inner_x, outer_x, 0.25),
+					lerpf(inner_y, outer_y, 0.25) + shoulder_h, z),
+				Vector3(middle_x, middle_y + HouseGeometry.THATCH_EAVE_H, z),
+				Vector3(lerpf(inner_x, outer_x, 0.75),
+					lerpf(inner_y, outer_y, 0.75) + shoulder_h, z),
+				Vector3(outer_x, outer_y, z),
+			])
+			var eave_world := PackedVector3Array()
+			for profile_point in eave_profile:
+				eave_world.append(xf * profile_point)
+			component_slab("thatch_eave", eave_world, eave_range.y - eave_range.x,
+				SURF_ROOF, false)
 	var ridge: float = HouseGeometry.ridge_half_for(spec, float(layout["span"]),
-		float(layout["along"]))
+		float(layout["along"]), plan.world_family)
 	if ridge <= 0.05:
 		host_end()
 		return
@@ -2164,17 +2459,99 @@ func _build_thatch_roll(layout: Dictionary) -> void:
 	# last one stops a half-bundle short of the other. Spacing the centres off
 	# the ends rather than off -ridge is what keeps a 14 m cottage's roll from
 	# hanging half a metre over the gable.
-	var first: float = -ridge + HouseGeometry.ROLL_T * 0.5
-	var last: float = ridge - HouseGeometry.ROLL_T * 0.5
-	var count: int = maxi(int((last - first) / HouseGeometry.ROLL_PITCH) + 1, 1)
 	var rw: float = HouseGeometry.ROLL_W
-	for i in range(count):
-		var z: float = first if count == 1 else lerpf(first, last, float(i) / float(count - 1))
-		_roof_face(xf, PackedVector3Array([
-			Vector3(-rw * 0.5, rise, z), Vector3(rw * 0.5, rise, z),
-			Vector3(0.0, rise + HouseGeometry.ROLL_H, z)]),
-			SURF_ROOF, "thatch_roll_%d" % i, false, HouseGeometry.ROLL_T)
+	if not witch_roofcraft:
+		var legacy_first: float = -ridge + HouseGeometry.ROLL_T * 0.5
+		var legacy_last: float = ridge - HouseGeometry.ROLL_T * 0.5
+		var legacy_count: int = maxi(int((legacy_last - legacy_first) / HouseGeometry.ROLL_PITCH) + 1, 1)
+		for i in range(legacy_count):
+			var z: float = legacy_first if legacy_count == 1 else lerpf(legacy_first, legacy_last, float(i) / float(legacy_count - 1))
+			_roof_face(xf, PackedVector3Array([
+				Vector3(-rw * 0.5, rise, z), Vector3(rw * 0.5, rise, z),
+				Vector3(0.0, rise + HouseGeometry.ROLL_H, z)]),
+				SURF_ROOF, "thatch_roll_%d" % i, false, HouseGeometry.ROLL_T)
+		host_end()
+		return
+	var ridge_x: float = float(layout.get("ridge_x", 0.0))
+	var ranges: Array[Vector2] = [Vector2(-ridge, ridge)]
+	for op in roll_cuts:
+		var cut_polygon: PackedVector2Array = _thatch_cut_polygon(op)
+		if cut_polygon.size() < 3:
+			continue
+		var hole: Rect2 = Poly.bounding_rect(cut_polygon)
+		if hole.end.x <= ridge_x - rw * 0.5 or hole.position.x >= ridge_x + rw * 0.5:
+			continue
+		var next_ranges: Array[Vector2] = []
+		for span_range in ranges:
+			if hole.end.y <= span_range.x or hole.position.y >= span_range.y:
+				next_ranges.append(span_range)
+				continue
+			var hole_lo: float = hole.position.y - HouseGeometry.ROLL_T * 0.5
+			var hole_hi: float = hole.end.y + HouseGeometry.ROLL_T * 0.5
+			if hole_lo > span_range.x + 0.02:
+				next_ranges.append(Vector2(span_range.x, minf(hole_lo, span_range.y)))
+			if hole_hi < span_range.y - 0.02:
+				next_ranges.append(Vector2(maxf(hole_hi, span_range.x), span_range.y))
+		ranges = next_ranges
+	var roll_index := 0
+	for span_range in ranges:
+		var first: float = span_range.x + HouseGeometry.ROLL_T * 0.5
+		var last: float = span_range.y - HouseGeometry.ROLL_T * 0.5
+		if last < first:
+			continue
+		var count: int = maxi(int((last - first) / HouseGeometry.ROLL_PITCH) + 1, 1)
+		for i in range(count):
+			var z: float = first if count == 1 else lerpf(first, last, float(i) / float(count - 1))
+			var left_x: float = ridge_x - rw * 0.5
+			var right_x: float = ridge_x + rw * 0.5
+			var left_face: PackedVector3Array = faces[0] if left_x < ridge_x else faces[1]
+			var right_face: PackedVector3Array = faces[0] if right_x < ridge_x else faces[1]
+			var left_top: float = _roof_top_surface_y(left_face, faces, Vector2(left_x, z))
+			var right_top: float = _roof_top_surface_y(right_face, faces, Vector2(right_x, z))
+			if not is_finite(left_top) or not is_finite(right_top):
+				continue
+			var left_mid_x := lerpf(left_x, ridge_x, 0.55)
+			var right_mid_x := lerpf(right_x, ridge_x, 0.55)
+			var left_mid_face: PackedVector3Array = faces[0] if left_mid_x < ridge_x else faces[1]
+			var right_mid_face: PackedVector3Array = faces[0] if right_mid_x < ridge_x else faces[1]
+			var left_mid_y := _roof_top_surface_y(left_mid_face, faces, Vector2(left_mid_x, z)) + HouseGeometry.ROLL_H * 0.38
+			var right_mid_y := _roof_top_surface_y(right_mid_face, faces, Vector2(right_mid_x, z)) + HouseGeometry.ROLL_H * 0.38
+			_roof_face(xf, PackedVector3Array([
+				Vector3(left_x, left_top, z), Vector3(left_mid_x, left_mid_y, z),
+				Vector3(ridge_x, RoofShape.height_at(faces, Vector2(ridge_x, z)) + HouseGeometry.ROLL_H, z),
+				Vector3(right_mid_x, right_mid_y, z), Vector3(right_x, right_top, z)]),
+				SURF_ROOF, "thatch_roll_%d" % roll_index, false, HouseGeometry.ROLL_T)
+			roll_index += 1
 	host_end()
+
+
+func _subtract_thatch_interval(ranges: Array[Vector2], cut: Vector2) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for span_range in ranges:
+		if cut.y <= span_range.x or cut.x >= span_range.y:
+			out.append(span_range)
+			continue
+		if cut.x > span_range.x + 0.02:
+			out.append(Vector2(span_range.x, minf(cut.x, span_range.y)))
+		if cut.y < span_range.y - 0.02:
+			out.append(Vector2(maxf(cut.y, span_range.x), span_range.y))
+	return out
+
+
+func _thatch_cut_polygon(op: Dictionary) -> PackedVector2Array:
+	if op.has("polygon"):
+		return op["polygon"]
+	if op.has("opening"):
+		return op["opening"]
+	return PackedVector2Array()
+
+
+func _roof_top_surface_y(face: PackedVector3Array, faces: Array[PackedVector3Array], point: Vector2) -> float:
+	if face.size() < 3:
+		return NAN
+	# The main roof uses slab_poly(..., vertical_depth=true), so its upper face
+	# is a vertical offset, not a normal offset on the sloped plane.
+	return RoofShape.height_at(faces, point) + RoofShape.DEPTH * 0.5
 
 
 # ------------------------------------------------------------------- roof
@@ -2418,8 +2795,20 @@ func _build_roof() -> void:
 			for piece in pieces:
 				next_authored.append_array(RoofShape.subtract(piece, hole))
 			pieces = next_authored
+		var bay_cut: Dictionary = layout.get("witch_bay", {})
+		if not bay_cut.is_empty():
+			var remaining: Array[PackedVector2Array] = []
+			for piece in pieces:
+				remaining.append_array(RoofShape.subtract(piece, bay_cut["outline"]))
+			pieces = remaining
 		for piece in pieces:
 			_roof_face(xf, RoofShape.lift(piece, faces[fi]), SURF_ROOF, "roof_face_%d" % fi)
+	var bay_roof: Dictionary = layout.get("witch_bay", {})
+	if not bay_roof.is_empty():
+		_build_witch_workshop_bay_roof(xf, bay_roof, faces)
+		# Bay emitters have their own hosts. Resume the main roof before its wall and frame parts.
+		tag("roof")
+		host("roof", _storeys() - 1)
 	_record_sloped_roof_openings(layout, authored)
 
 	# Close the wall head to the roof UNDERSIDE on every facade. This also
@@ -2431,46 +2820,382 @@ func _build_roof() -> void:
 			[Vector2(-h, -f), Vector2(-h, f), Vector2(1, 0)],
 			[Vector2(h, -f), Vector2(h, f), Vector2(-1, 0)]]:
 		var profile := RoofShape.wall_profile(faces, run[0], run[1])
+		var wall_profiles: Array[PackedVector3Array] = [profile]
+		if not bay_roof.is_empty():
+			wall_profiles = _witch_bay_wall_profiles(faces, run[0], run[1], bay_roof, xf, profile)
 		var inward: Vector2 = run[2] * HouseGeometry.wall_thickness(spec) * 0.5
 		var shift := Transform3D(Basis(), Vector3(inward.x, 0, inward.y))
-		_roof_face(xf * shift, profile, SURF_WALL, "roof_wall", false, HouseGeometry.wall_thickness(spec))
+		for wall_profile in wall_profiles:
+			if wall_profile.size() >= 3:
+				_roof_face(xf * shift, wall_profile, SURF_WALL, "roof_wall", false, HouseGeometry.wall_thickness(spec))
+	if not bay_roof.is_empty():
+		_build_witch_bay_outboard_gables(xf, bay_roof, faces)
 
 	# One ridge length for the cap and the crown that may stand on it, so the
 	# two can never disagree about whether there IS a ridge.
-	var ridge: float = HouseGeometry.ridge_half_for(spec, span, along)
+	var ridge: float = HouseGeometry.ridge_half_for(spec, span, along, plan.world_family)
+	var ridge_x := float(layout.get("ridge_x", 0.0))
 	if ridge > 0.05:
-		_emit_ridge_cap_segments(xf, rise, ridge, authored)
+		_emit_ridge_cap_segments(xf, rise, ridge, authored, ridge_x)
 	var over_x := HouseGeometry.roof_span_out(spec)
 	var over_y := HouseGeometry.roof_along_out(spec)
 	var roof_bounds: AABB = xf * AABB(Vector3(-h - over_x, -RoofShape.DEPTH * 0.5, -f - over_y),
-		Vector3(span + over_x * 2.0, rise + RoofShape.DEPTH * 0.5 + HouseGeometry.roof_slab_top(spec),
+		Vector3(span + over_x * 2.0, rise + RoofShape.DEPTH * 0.5 + HouseGeometry.roof_slab_top(spec, plan.world_family),
 			along + over_y * 2.0))
 	_log_mass("roof" if _storeys() == 1 else "roof_%d" % (_storeys() - 1), roof_bounds)
-	total_height = maxf(total_height, xf.origin.y + rise + HouseGeometry.roof_slab_top(spec))
+	total_height = maxf(total_height, xf.origin.y + rise + HouseGeometry.roof_slab_top(spec, plan.world_family))
 	if spec.roof_type in [&"gable", &"half_hipped"]:
 		var wall_peak := RoofShape.height_at(faces, Vector2(0, f))
 		if spec.timber_frame:
-			_gable_frame(xf, span, along, rise, wall_peak)
+			if HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family):
+				_witch_gable_frame(xf, span, along, rise, ridge_x, bay_roof, faces)
+			else:
+				_gable_frame(xf, span, along, rise, wall_peak)
 		var verge_top := rise * RoofShape.HALF_HIP if spec.roof_type == &"half_hipped" else rise
-		_build_bargeboards(xf, span, along, rise, verge_top)
-	_build_ridge_crown(xf, rise, ridge)
+		if not HouseGeometry.has_witch_roofcraft(spec, plan.world_family):
+			_build_bargeboards(xf, span, along, rise, verge_top, ridge_x)
+	_build_ridge_crown(xf, rise, ridge, ridge_x)
 	_build_eaves_tails(xf, span, along, rise)
 	_build_dormers(xf, layout["dormers"])
 	_build_parapet(layout)
 	_build_eave_sweep(layout)
-	_build_thatch_roll(layout)
+	_build_thatch_roll(layout, authored)
 	host_end()
 
 
 ## A centred oculus can cross the ridge. The slope pieces are clipped above,
 ## but the decorative ridge cap is a separate solid box, so it must be split
 ## around the same local-XZ opening projection or a vertical ray still hits it.
+func _witch_bay_wall_profiles(_faces: Array[PackedVector3Array], run_a: Vector2, run_b: Vector2, bay: Dictionary, _xf: Transform3D, profile: PackedVector3Array) -> Array[PackedVector3Array]:
+	var unchanged: Array[PackedVector3Array] = [profile]
+	if int(bay["axis"]) != 0 or profile.size() < 3:
+		return unchanged
+	var d := run_b - run_a
+	var dir := d.normalized()
+	var outer := float(bay["outer"])
+	var inner := float(bay["inner"])
+	var zlo := float(bay["along_lo"])
+	var zhi := float(bay["along_hi"])
+	var plane_lo := float(bay["eave_y"])
+	var plane_hi := float(bay["join_y"])
+	var half_depth := maxf(RoofShape.DEPTH * 0.5 - 0.005, 0.0)
+	var t0 := 0.0
+	var t1 := 0.0
+	var y0 := 0.0
+	var y1 := 0.0
+	if absf(dir.y) > 0.95:
+		# Eave-side wall: its roof-local X is the actual wall plane.
+		var wall_x := run_a.x
+		if absf(wall_x - float(bay["wall_outer"])) > 0.12 or absf(run_b.x - wall_x) > 0.02:
+			return unchanged
+		if wall_x < minf(outer, inner) - 0.02 or wall_x > maxf(outer, inner) + 0.02:
+			return unchanged
+		var lo := maxf(minf(run_a.y, run_b.y), zlo)
+		var hi := minf(maxf(run_a.y, run_b.y), zhi)
+		if hi - lo < 0.02:
+			return unchanged
+		t0 = (lo - run_a.y) / dir.y
+		t1 = (hi - run_a.y) / dir.y
+		y0 = lerpf(plane_lo, plane_hi, clampf((wall_x - outer) / (inner - outer), 0.0, 1.0))
+		y1 = y0
+	elif absf(dir.x) > 0.95:
+		# Gable-end wall: the shed plane crosses this profile at a sloping line.
+		var wall_z := run_a.y
+		if absf(run_b.y - wall_z) > 0.02 or wall_z < zlo - 0.02 or wall_z > zhi + 0.02:
+			return unchanged
+		var lo_x := maxf(minf(run_a.x, run_b.x), minf(outer, inner))
+		var hi_x := minf(maxf(run_a.x, run_b.x), maxf(outer, inner))
+		if hi_x - lo_x < 0.02:
+			return unchanged
+		t0 = (lo_x - run_a.x) / dir.x
+		t1 = (hi_x - run_a.x) / dir.x
+		y0 = lerpf(plane_lo, plane_hi, clampf((lo_x - outer) / (inner - outer), 0.0, 1.0))
+		y1 = lerpf(plane_lo, plane_hi, clampf((hi_x - outer) / (inner - outer), 0.0, 1.0))
+	else:
+		return unchanged
+	var first_t := minf(t0, t1)
+	var last_t := maxf(t0, t1)
+	var first_y := y0 if t0 <= t1 else y1
+	var last_y := y1 if t0 <= t1 else y0
+	var flattened := PackedVector2Array()
+	for vertex in profile:
+		var t := (Vector2(vertex.x, vertex.z) - run_a).dot(dir)
+		flattened.append(Vector2(t, vertex.y))
+	var wall_top := -INF
+	for vertex in flattened:
+		wall_top = maxf(wall_top, vertex.y)
+	# The shed roof replaces the entire former gable/eave infill above its
+	# underside. Leaving the old upper triangle would make a floating wall.
+	var hole := PackedVector2Array([Vector2(first_t, first_y - half_depth), Vector2(last_t, last_y - half_depth), Vector2(last_t, wall_top + 0.2), Vector2(first_t, wall_top + 0.2)])
+	var clipped := RoofShape.subtract(flattened, hole)
+	var out: Array[PackedVector3Array] = []
+	for piece in clipped:
+		var points := PackedVector3Array()
+		for point in piece:
+			var pos := run_a + dir * point.x
+			points.append(Vector3(pos.x, point.y, pos.y))
+		if points.size() >= 3:
+			out.append(points)
+	if absf(dir.x) > 0.95:
+		out.append_array(_witch_bay_gable_closure_profiles(_faces, run_a, run_b, bay, profile))
+	return out
+
+
+
+func _witch_bay_gable_closure_profiles(faces: Array[PackedVector3Array], run_a: Vector2,
+		run_b: Vector2, bay: Dictionary, profile: PackedVector3Array) -> Array[PackedVector3Array]:
+	var out: Array[PackedVector3Array] = []
+	var wall_z := (run_a.y + run_b.y) * 0.5
+	var outer := float(bay["outer"])
+	var inner := float(bay["inner"])
+	var lo_x := maxf(minf(run_a.x, run_b.x), minf(outer, inner))
+	var hi_x := minf(maxf(run_a.x, run_b.x), maxf(outer, inner))
+	var wall_t := HouseGeometry.wall_thickness(spec)
+	var bay_lo := float(bay["along_lo"])
+	var bay_hi := float(bay["along_hi"])
+	# The bay roof can continue past the high-core roof profile to the actual
+	# facade run. Close that measured end-wall station whenever it lies inside
+	# the bay's emitted along-span; do not require it to equal a bay endpoint.
+	if hi_x - lo_x < 0.02 or wall_z < bay_lo - wall_t * 0.5 - 0.02 \
+			or wall_z > bay_hi + wall_t * 0.5 + 0.02:
+		return out
+	var stations: Array[float] = [lo_x, hi_x]
+	for vertex in profile:
+		var duplicate_station := false
+		for existing_station in stations:
+			if absf(float(existing_station) - vertex.x) < 0.001:
+				duplicate_station = true
+				break
+		if vertex.x > lo_x + 0.001 and vertex.x < hi_x - 0.001 and not duplicate_station:
+			stations.append(vertex.x)
+	stations.sort()
+	var roots: Array[float] = []
+	for root_index in range(stations.size() - 1):
+		var root_x0 := stations[root_index]
+		var root_x1 := stations[root_index + 1]
+		var root_main0 := _witch_bay_gable_wall_top(faces, root_x0, wall_z)
+		var root_main1 := _witch_bay_gable_wall_top(faces, root_x1, wall_z)
+		var root_bay0 := _witch_bay_shed_wall_top(bay, root_x0)
+		var root_bay1 := _witch_bay_shed_wall_top(bay, root_x1)
+		var root_gap0 := root_bay0 - root_main0
+		var root_gap1 := root_bay1 - root_main1
+		if root_gap0 * root_gap1 < -0.000001:
+			roots.append(lerpf(root_x0, root_x1, root_gap0 / (root_gap0 - root_gap1)))
+	stations.append_array(roots)
+	stations.sort()
+	for panel_index in range(stations.size() - 1):
+		var panel_x0 := stations[panel_index]
+		var panel_x1 := stations[panel_index + 1]
+		if panel_x1 - panel_x0 <= 0.001:
+			continue
+		var panel_main0 := _witch_bay_gable_wall_top(faces, panel_x0, wall_z)
+		var panel_main1 := _witch_bay_gable_wall_top(faces, panel_x1, wall_z)
+		var panel_bay0 := _witch_bay_shed_wall_top(bay, panel_x0)
+		var panel_bay1 := _witch_bay_shed_wall_top(bay, panel_x1)
+		var panel_gap0 := panel_bay0 - panel_main0
+		var panel_gap1 := panel_bay1 - panel_main1
+		if maxf(panel_gap0, panel_gap1) <= 0.001:
+			continue
+		var closure := PackedVector3Array()
+		if panel_gap0 <= 0.001:
+			closure.append(Vector3(panel_x0, panel_main0, wall_z))
+			closure.append(Vector3(panel_x1, panel_main1, wall_z))
+			closure.append(Vector3(panel_x1, panel_bay1, wall_z))
+		elif panel_gap1 <= 0.001:
+			closure.append(Vector3(panel_x0, panel_main0, wall_z))
+			closure.append(Vector3(panel_x1, panel_main1, wall_z))
+			closure.append(Vector3(panel_x0, panel_bay0, wall_z))
+		else:
+			closure.append(Vector3(panel_x0, panel_main0, wall_z))
+			closure.append(Vector3(panel_x1, panel_main1, wall_z))
+			closure.append(Vector3(panel_x1, panel_bay1, wall_z))
+			closure.append(Vector3(panel_x0, panel_bay0, wall_z))
+		if closure.size() >= 3:
+			out.append(closure)
+	return out
+func _build_witch_bay_outboard_gables(xf: Transform3D, bay: Dictionary,
+		faces: Array[PackedVector3Array]) -> void:
+	if int(bay.get("axis", -1)) != 0:
+		return
+	var service_normal: Vector2 = Vector2(bay["normal"]).normalized()
+	var core_edge := float(bay.get("wall_outer", bay["inner"]))
+	var wall_t := HouseGeometry.wall_thickness(spec)
+	for run_variant in HouseGeometry.exterior_runs(spec, 0):
+		var end_run: Dictionary = run_variant
+		var end_normal: Vector2 = end_run["normal"]
+		if absf(end_normal.dot(service_normal)) > 0.10:
+			continue
+		var from: Vector2 = end_run["from"]
+		var to: Vector2 = end_run["to"]
+		# The end wall meets the Witch service-side exterior wall at the corner
+		# farthest along the service normal. exterior_runs already locates this
+		# at the measured wall centre line (site edge inset by half wall depth).
+		var corner := from if from.dot(service_normal) >= to.dot(service_normal) else to
+		var local_corner: Vector3 = xf.affine_inverse() * Vector3(corner.x, xf.origin.y, corner.y)
+		var end_wall_z := local_corner.z
+		var cross_lo := minf(local_corner.x, core_edge)
+		var cross_hi := maxf(local_corner.x, core_edge)
+		if cross_hi - cross_lo <= 0.02:
+			continue
+		var actual_end_profile := RoofShape.wall_profile(faces,
+			Vector2(cross_lo, end_wall_z), Vector2(cross_hi, end_wall_z))
+		var panels := _witch_bay_gable_closure_profiles(faces,
+			Vector2(cross_lo, end_wall_z), Vector2(cross_hi, end_wall_z),
+			bay, actual_end_profile)
+		for panel in panels:
+			if panel.size() >= 3:
+				_roof_face(xf, panel, SURF_WALL, "roof_wall", false, wall_t)
+
+func _witch_bay_gable_wall_top(faces: Array[PackedVector3Array], x: float, z: float) -> float:
+	var roof_y := RoofShape.height_at(faces, Vector2(x, z))
+	return maxf(0.0, roof_y - RoofShape.DEPTH * 0.5) if is_finite(roof_y) else 0.0
+
+func _witch_bay_shed_wall_top(bay: Dictionary, x: float) -> float:
+	var cross_t := clampf((x - float(bay["outer"])) / (float(bay["inner"]) - float(bay["outer"])), 0.0, 1.0)
+	return float(bay["eave_y"]) + (float(bay["join_y"]) - float(bay["eave_y"])) * cross_t - RoofShape.DEPTH * 0.5 + 0.005
+
+
+func _build_witch_workshop_bay_roof(xf: Transform3D, bay: Dictionary, faces: Array[PackedVector3Array]) -> void:
+	var axis := int(bay["axis"])
+	var outer := float(bay["outer"])
+	var inner := float(bay["inner"])
+	var lo := float(bay["along_lo"])
+	var hi := float(bay["along_hi"])
+	var eave_y := float(bay["eave_y"])
+	var join_y := float(bay["join_y"])
+	var host_y := float(bay["host_y"])
+	var a := Vector3(outer, eave_y, lo) if axis == 0 else Vector3(lo, eave_y, outer)
+	var b := Vector3(outer, eave_y, hi) if axis == 0 else Vector3(hi, eave_y, outer)
+	var c := Vector3(inner, join_y, hi) if axis == 0 else Vector3(hi, join_y, inner)
+	var d := Vector3(inner, join_y, lo) if axis == 0 else Vector3(lo, join_y, inner)
+	tag("witch_workshop_bay")
+	host("roof", _storeys() - 1)
+	_roof_face(xf, PackedVector3Array([a, b, c, d]), SURF_ROOF, "witch_workshop_bay_roof")
+	if HouseGeometry.has_witch_roofcraft(spec, plan.world_family):
+		_build_witch_bay_thatch_eave(xf, bay)
+	# A framed infill closes the stepped junction against the higher host roof.
+	var fascia_a := Vector3(inner, join_y, lo) if axis == 0 else Vector3(lo, join_y, inner)
+	var host_y_lo := float(bay.get("host_y_lo", host_y))
+	var host_y_hi := float(bay.get("host_y_hi", host_y))
+	var fascia_b := Vector3(inner, host_y_lo, lo) if axis == 0 else Vector3(lo, host_y_lo, inner)
+	var fascia_c := Vector3(inner, host_y_hi, hi) if axis == 0 else Vector3(hi, host_y_hi, inner)
+	var fascia_d := Vector3(inner, join_y, hi) if axis == 0 else Vector3(hi, join_y, inner)
+	if maxf(host_y_lo, host_y_hi) > join_y + 0.04:
+		_roof_face(xf, PackedVector3Array([fascia_a, fascia_b, fascia_c, fascia_d]), SURF_WALL, "witch_workshop_bay_host_fascia", false, HouseGeometry.wall_thickness(spec))
+	_build_witch_workshop_bay_returns(xf, bay, faces)
+	_build_witch_workshop_bay_bearing(xf, bay)
+	_build_witch_workshop_bay_supports(xf, bay)
+
+
+## Combed reeds cap the exposed outer edge of the lower service roof. The
+## profile is derived from the actual shed plane and bears at both ends on that
+## plane; it does not pretend the interrupted high-roof eave continues through
+## the bay.
+func _build_witch_bay_thatch_eave(xf: Transform3D, bay: Dictionary) -> void:
+	var axis := int(bay["axis"])
+	var outer := float(bay["outer"])
+	var inner := float(bay["inner"])
+	var lo := float(bay["along_lo"])
+	var hi := float(bay["along_hi"])
+	var eave_y := float(bay["eave_y"]) + RoofShape.DEPTH * 0.5
+	var join_y := float(bay["join_y"]) + RoofShape.DEPTH * 0.5
+	var cross_run := absf(inner - outer)
+	if cross_run <= 0.10 or hi - lo <= 0.10:
+		return
+	var slope := Vector2(signf(inner - outer) * cross_run, join_y - eave_y)
+	var slope_length := slope.length()
+	if slope_length <= 0.10:
+		return
+	var outward_normal := Vector2(-slope.y, slope.x).normalized()
+	if outward_normal.y < 0.0:
+		outward_normal = -outward_normal
+	var bundle_run := minf(0.28, slope_length * 0.55)
+	var shoulder := HouseGeometry.THATCH_EAVE_H * 0.42
+	var crown := HouseGeometry.THATCH_EAVE_H
+	var profile := PackedVector3Array()
+	for entry in [Vector2(0.0, 0.0), Vector2(0.25, shoulder),
+			Vector2(0.5, crown), Vector2(0.75, shoulder), Vector2(1.0, 0.0)]:
+		var distance: float = bundle_run * entry.x
+		var t: float = distance / slope_length
+		var cross_coord := lerpf(outer, inner, t)
+		var roof_y := lerpf(eave_y, join_y, t)
+		var cross_point: Vector2 = Vector2(cross_coord, roof_y) + outward_normal * entry.y
+		profile.append(Vector3(cross_point.x, cross_point.y, (lo + hi) * 0.5)
+			if axis == 0 else Vector3((lo + hi) * 0.5, cross_point.y, cross_point.x))
+	tag("thatch_eave")
+	host("witch_workshop_bay_roof", _storeys() - 1)
+	_roof_face(xf, profile, SURF_ROOF, "thatch_eave_service", false, hi - lo)
+	host_end()
+
+
+func _build_witch_workshop_bay_returns(xf: Transform3D, bay: Dictionary, faces: Array[PackedVector3Array]) -> void:
+	if int(bay["axis"]) != 0:
+		return
+	var outer := float(bay["outer"])
+	var inner := float(bay["inner"])
+	var lo := float(bay["along_lo"])
+	var hi := float(bay["along_hi"])
+	var partition_head := float(bay.get("partition_head_y", 0.0))
+	var wall_t := HouseGeometry.wall_thickness(spec)
+	var endpoints: Array[Dictionary] = [
+		{"z": lo, "internal": bool(bay.get("return_at_lo", false))},
+		{"z": hi, "internal": bool(bay.get("return_at_hi", false))},
+	]
+	var emitted := false
+	for endpoint in endpoints:
+		if not bool(endpoint["internal"]):
+			continue # the outer gable continues to its roof edge; it is not a return wall
+		var z := float(endpoint["z"])
+		var main_outer := RoofShape.height_at(faces, Vector2(outer, z)) - RoofShape.DEPTH * 0.5
+		var main_inner := RoofShape.height_at(faces, Vector2(inner, z)) - RoofShape.DEPTH * 0.5
+		if not is_finite(main_inner):
+			continue
+		if not is_finite(main_outer):
+			main_outer = float(bay["eave_y"]) - RoofShape.DEPTH * 0.5
+		if maxf(maxf(partition_head, main_outer), main_inner) <= partition_head + 0.04:
+			continue
+		# The internal return rises from the actual partition wall head and
+		# closes only the remaining host-roof void above the shed junction.
+		var points := PackedVector3Array([
+			Vector3(outer, partition_head, z), Vector3(inner, partition_head, z),
+			Vector3(inner, main_inner, z), Vector3(outer, maxf(partition_head, main_outer), z)])
+		if not emitted:
+			tag("witch_workshop_bay_returns")
+			host("witch_workshop_bay_returns", 0)
+			emitted = true
+		_roof_face(xf, points, SURF_WALL, "witch_workshop_bay_return", false, wall_t)
+	if emitted:
+		host_end()
+
+
+func _build_witch_workshop_bay_supports(xf: Transform3D, bay: Dictionary, ground_offset := 0.0) -> void:
+	var axis := int(bay["axis"])
+	var outer := float(bay["outer"])
+	var lo := float(bay["along_lo"])
+	var hi := float(bay["along_hi"])
+	var eave_y := float(bay["eave_y"])
+	var beam_h := 0.16
+	var beam_w := 0.18
+	var beam_y := eave_y - RoofShape.DEPTH * 0.5 - beam_h * 0.5
+	var beam_center := Vector3(outer, beam_y, (lo + hi) * 0.5) if axis == 0 else Vector3((lo + hi) * 0.5, beam_y, outer)
+	var beam_size := Vector3(beam_w, beam_h, hi - lo) if axis == 0 else Vector3(hi - lo, beam_h, beam_w)
+	tag("witch_workshop_bay_supports")
+	host("witch_workshop_bay_frame", 0)
+	component_box("witch_workshop_bay_eave_beam", beam_size, xf * Transform3D(Basis(), beam_center), SURF_TRIM)
+	var post_h := maxf(xf.origin.y + beam_y - beam_h * 0.5 - ground_offset, 0.0)
+	var post_w := 0.16
+	for station in [lo + post_w * 0.5, hi - post_w * 0.5]:
+		var post_center := Vector3(outer, -xf.origin.y + ground_offset + post_h * 0.5, station) if axis == 0 else Vector3(station, -xf.origin.y + ground_offset + post_h * 0.5, outer)
+		component_box("witch_workshop_bay_post", Vector3(post_w, post_h, post_w), xf * Transform3D(Basis(), post_center), SURF_TRIM)
+	host_end()
+
+
 func _emit_ridge_cap_segments(xf: Transform3D, rise: float,
-		ridge_half: float, authored: Array) -> void:
+		ridge_half: float, authored: Array, ridge_x := 0.0) -> void:
 	var ranges: Array[Vector2] = [Vector2(-ridge_half, ridge_half)]
 	for op in authored:
 		var hole: Rect2 = Poly.bounding_rect(op["polygon"])
-		if hole.end.x < -0.11 or hole.position.x > 0.11:
+		if hole.end.x < ridge_x - 0.11 or hole.position.x > ridge_x + 0.11:
 			continue
 		var next: Array[Vector2] = []
 		for span in ranges:
@@ -2486,7 +3211,7 @@ func _emit_ridge_cap_segments(xf: Transform3D, rise: float,
 		if span.y - span.x <= 0.02:
 			continue
 		component_box("ridge_cap", Vector3(0.22, 0.16, span.y - span.x),
-			xf * Transform3D(Basis(), Vector3(0, rise + 0.14,
+			xf * Transform3D(Basis(), Vector3(ridge_x, rise + 0.14,
 			(span.x + span.y) * 0.5)), SURF_ROOF)
 
 
@@ -2576,7 +3301,7 @@ func _glazing_box(role: String, size: Vector3, xf: Transform3D) -> void:
 
 
 func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
-		top: float) -> void:
+		top: float, ridge_x := 0.0) -> void:
 	if not spec.bargeboards:
 		return
 	tag("bargeboards")
@@ -2594,11 +3319,12 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 		var z: float = float(end_v) * (along / 2.0 + HouseGeometry.VERGE_END_OUT)
 		for side in [-1.0, 1.0]:
 			var a := Vector2(float(side) * half, 0.0)
-			var b := Vector2(float(side) * up.x, up.y)
+			var b := Vector2(ridge_x + float(side) * (up.x if absf(ridge_x) < 0.001 else 0.0), up.y)
 			var dir: Vector2 = (a - b).normalized()
 			var foot: Vector2 = a + dir * kick
 			var mid: Vector2 = (foot + b) / 2.0
-			var t := xf * Transform3D(Basis(Vector3(0, 0, 1), -float(side) * ang),
+			var board_angle := -float(side) * ang if absf(ridge_x) < 0.001 else atan2((b - a).y, (b - a).x)
+			var t := xf * Transform3D(Basis(Vector3(0, 0, 1), board_angle),
 				Vector3(mid.x, mid.y, z))
 			component_box("verge_board", Vector3((foot - b).length(), bb_w, bb_thick),
 				t, SURF_TRIM)
@@ -2606,7 +3332,7 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 		if is_equal_approx(top, rise):
 			component_box("verge_finial",
 				Vector3(HouseGeometry.FINIAL_D, 0.55, HouseGeometry.FINIAL_D),
-				xf * Transform3D(Basis(), Vector3(0.0, rise + 0.22, z)), SURF_TRIM)
+				xf * Transform3D(Basis(), Vector3(ridge_x, rise + 0.22, z)), SURF_TRIM)
 		# Drop pendants at the eaves
 		for side2 in [-1.0, 1.0]:
 			component_box("verge_pendant", Vector3(HouseGeometry.VERGE_PENDANT_D,
@@ -2623,7 +3349,7 @@ func _build_bargeboards(xf: Transform3D, span: float, along: float, rise: float,
 ## exterior bound promises and the mesh that bound must contain agree to the
 ## millimetre rather than to a tolerance. A roof with no ridge to stand on
 ## gets no crown, and the bound knows it too.
-func _build_ridge_crown(xf: Transform3D, rise: float, ridge: float) -> void:
+func _build_ridge_crown(xf: Transform3D, rise: float, ridge: float, ridge_x := 0.0) -> void:
 	if not spec.ridge_finial or ridge <= 0.05:
 		return
 	tag("ridge_crown")
@@ -2632,11 +3358,11 @@ func _build_ridge_crown(xf: Transform3D, rise: float, ridge: float) -> void:
 	component_box("ridge_crown_plinth",
 		Vector3(HouseGeometry.CROWN_BASE_W, HouseGeometry.CROWN_BASE_H,
 			HouseGeometry.CROWN_BASE_W),
-		xf * Transform3D(Basis(), Vector3(0.0,
+		xf * Transform3D(Basis(), Vector3(ridge_x,
 			seat + HouseGeometry.CROWN_BASE_H * 0.5, 0.0)), SURF_TRIM)
 	component_box("ridge_crown",
 		Vector3(HouseGeometry.CROWN_W, HouseGeometry.CROWN_H, HouseGeometry.CROWN_W),
-		xf * Transform3D(Basis(), Vector3(0.0, seat + HouseGeometry.CROWN_BASE_H
+		xf * Transform3D(Basis(), Vector3(ridge_x, seat + HouseGeometry.CROWN_BASE_H
 			+ HouseGeometry.CROWN_H * 0.5, 0.0)), SURF_TRIM)
 	host_end()
 
@@ -2779,6 +3505,176 @@ func _gable_frame(xf: Transform3D, span: float, along: float, rise: float,
 ## The underside of the rafter over `x`, in the gable's own space, with the
 ## member's own depth already taken off -- a beam whose centre line lands here
 ## does not poke through the slates.
+func _witch_gable_frame(xf: Transform3D, span: float, along: float,
+		rise: float, ridge_x: float, bay: Dictionary = {},
+		roof_faces: Array[PackedVector3Array] = []) -> void:
+	# Rafters sit just inside the real roof slab and bear on the wall plate.
+	var roof_half := (span + HouseGeometry.roof_span_out(spec) * 2.0) * 0.5
+	var wall_half := span * 0.5
+	var frame_rise := rise
+	var collar_raw := frame_rise * 0.48
+	var collar_t := collar_raw / frame_rise
+	var left_collar_x := lerpf(-roof_half, ridge_x, collar_t)
+	var right_collar_x := lerpf(roof_half, ridge_x, collar_t)
+	var left_collar_y := _witch_roof_y(-roof_half, 0.0, ridge_x, frame_rise, left_collar_x)
+	var right_collar_y := _witch_roof_y(roof_half, 0.0, ridge_x, frame_rise, right_collar_x)
+	_frame_top = frame_rise
+	for end_v in [-1.0, 1.0]:
+		var z: float = float(end_v) * (along / 2.0 + HouseGeometry.BEAM_D / 2.0 - 0.01)
+		if not bay.is_empty() and z >= float(bay["along_lo"]) and z <= float(bay["along_hi"]):
+			continue # this gable frame station is cut by the actual shed roof plane
+		component_box("gable_tie", Vector3(span, HouseGeometry.PLATE_H, HouseGeometry.BEAM_D),
+			xf * Transform3D(Basis(), Vector3(0.0, HouseGeometry.PLATE_H / 2.0, z)), SURF_TRIM)
+		if HouseGeometry.uses_witch_half_hip_roof(spec, plan.world_family) and not roof_faces.is_empty():
+			# Use roof-plane-clipped timber strips. Their upper faces sit 2 mm
+			# below emitted slab undersides; inboard ends are the established
+			# analytic birdsmouth seats on the wall plate. Clipping every piece to
+			# its host roof polygon mitres the shoulder/hip edges.
+			_emit_witch_half_hip_end_frame(xf, span, along, rise, ridge_x,
+				roof_faces, float(end_v), z)
+			continue
+		var left_a := _witch_rafter_foot(-1.0, roof_half, wall_half, ridge_x, frame_rise)
+		var right_a := _witch_rafter_foot(1.0, roof_half, wall_half, ridge_x, frame_rise)
+		var ridge := Vector2(ridge_x, frame_rise)
+		var left_rafter := _witch_rafter_points(left_a, ridge)
+		var right_rafter := _witch_rafter_points(right_a, ridge)
+		_witch_gable_member(xf, left_rafter[0], left_rafter[1], z, HouseGeometry.BEAM_W, "witch_rafter")
+		_witch_gable_member(xf, right_rafter[0], right_rafter[1], z, HouseGeometry.BEAM_W, "witch_rafter")
+		var collar_offset := HouseGeometry.BEAM_W * 0.9 * 0.5
+		var left_n := _witch_roof_up_normal(left_a, ridge)
+		var right_n := _witch_roof_up_normal(right_a, ridge)
+		var left_collar := Vector2(left_collar_x, left_collar_y) - left_n * collar_offset
+		var right_collar := Vector2(right_collar_x, right_collar_y) - right_n * collar_offset
+		_witch_gable_member(xf, left_collar, right_collar, z, HouseGeometry.BEAM_W * 0.9, "witch_collar")
+		_witch_gable_member(xf, Vector2(ridge_x, HouseGeometry.PLATE_H),
+			Vector2(ridge_x, frame_rise - RoofShape.DEPTH * 0.5 - 0.001), z, HouseGeometry.BEAM_W, "witch_kingpost")
+		# Unequal roof pitches get paired raking braces. Each lower end bears on
+		# the collar and each upper end lands on the measured principal-rafter
+		# centreline, making the asymmetry structural rather than painted on.
+		var brace_width := HouseGeometry.BEAM_W * 0.72
+		var left_brace_start := left_collar.lerp(right_collar, 0.22)
+		var right_brace_start := left_collar.lerp(right_collar, 0.78)
+		var left_run := left_rafter[0].distance_to(left_rafter[1])
+		var right_run := right_rafter[0].distance_to(right_rafter[1])
+		# Give the longer roof plane the deeper brace. The measured sloping runs
+		# set unequal supports without moving either end off its bearing member.
+		var support_bias := clampf(absf(left_run - right_run) * 0.075, 0.0, 0.10)
+		var deep_t := 0.72 + support_bias
+		var shallow_t := 0.72 - support_bias
+		var left_t := deep_t if left_run > right_run else shallow_t
+		var right_t := deep_t if right_run > left_run else shallow_t
+		var left_brace_end := left_rafter[0].lerp(left_rafter[1], left_t)
+		var right_brace_end := right_rafter[0].lerp(right_rafter[1], right_t)
+		_witch_gable_member(xf, left_brace_start, left_brace_end, z, brace_width, "witch_gable_raking_brace")
+		_witch_gable_member(xf, right_brace_start, right_brace_end, z, brace_width, "witch_gable_raking_brace")
+
+
+func _emit_witch_half_hip_end_frame(xf: Transform3D, span: float, along: float,
+		rise: float, ridge_x: float, faces: Array[PackedVector3Array],
+		end_sign: float, station: float) -> void:
+	var roof_half := (span + HouseGeometry.roof_span_out(spec) * 2.0) * 0.5
+	var wall_half := span * 0.5
+	var band_half := HouseGeometry.BEAM_D * 0.5
+	for side in [-1.0, 1.0]:
+		var foot := _witch_rafter_foot(side, roof_half, wall_half, ridge_x, rise)
+		var side_face_index := 0 if side < 0.0 else 1
+		var subject := PackedVector2Array([
+			Vector2(minf(foot.x, ridge_x), station - band_half),
+			Vector2(maxf(foot.x, ridge_x), station - band_half),
+			Vector2(maxf(foot.x, ridge_x), station + band_half),
+			Vector2(minf(foot.x, ridge_x), station + band_half),
+		])
+		_emit_witch_roof_support_strip(xf, faces[side_face_index], subject,
+			"witch_half_hip_end_rafter")
+	# Each diagonal hip seam carries a timber under its actual hip plane. The
+	# clipped strips end on the shoulder and ridge edges, where the side rafters
+	# and ridge support meet them; no rectangular bar crosses either seam.
+	var hip_face_index := 2 if end_sign < 0.0 else 3
+	var hip_face: PackedVector3Array = faces[hip_face_index]
+	var ridge_tip := Vector2(hip_face[2].x, hip_face[2].z)
+	for shoulder_index in [0, 1]:
+		var shoulder := Vector2(hip_face[shoulder_index].x, hip_face[shoulder_index].z)
+		var direction := (ridge_tip - shoulder).normalized()
+		var across := Vector2(-direction.y, direction.x) * HouseGeometry.BEAM_W * 0.5
+		var subject := PackedVector2Array([
+			shoulder + across, ridge_tip + across,
+			ridge_tip - across, shoulder - across,
+		])
+		_emit_witch_roof_support_strip(xf, hip_face, subject,
+			"witch_half_hip_end_hip_rafter")
+
+
+func _emit_witch_roof_support_strip(xf: Transform3D,
+		face: PackedVector3Array, subject: PackedVector2Array, role: String) -> void:
+	var footprint := RoofShape.footprint(face)
+	var clipped := Poly.clip_convex(subject, footprint)
+	if Poly.area(clipped) < 0.003:
+		return
+	var normal := (face[1] - face[0]).cross(face[2] - face[0])
+	if normal.y < 0.0:
+		normal = -normal
+	normal = normal.normalized()
+	var points := RoofShape.lift(clipped, face)
+	for i in range(points.size()):
+		# The roof midpoint minus half DEPTH is its actual emitted underside.
+		# The timber prism is centred one half-width below that plane so its
+		# upper face has a measured 2 mm air gap and its lower face carries load.
+		points[i] -= Vector3.UP * (RoofShape.DEPTH * 0.5 + 0.002)
+		points[i] -= normal * (HouseGeometry.BEAM_W * 0.5)
+		points[i] = xf * points[i]
+	component_slab(role, points, HouseGeometry.BEAM_W, SURF_TRIM, false)
+
+
+func _witch_rafter_foot(side: float, roof_half: float, wall_half: float,
+		ridge_x: float, rise: float) -> Vector2:
+	var eave_x := side * roof_half
+	var ridge := Vector2(ridge_x, rise)
+	var eave := Vector2(eave_x, 0.0)
+	var normal := _witch_roof_up_normal(eave, ridge)
+	# Place the foot inside the wall span where the rafter underside meets the
+	# centre of the measured tie plate. This is a birdsmouth seat, not a guess.
+	# The rafter's lower face, not its centre plane, lands on the tie top.
+	# Account for the full beam depth and the vertical-depth roof underside.
+	var seat_y := HouseGeometry.PLATE_H + RoofShape.DEPTH * 0.5 + 0.002 \
+		+ normal.y * HouseGeometry.BEAM_W
+	var t := clampf(seat_y / rise, 0.0, 1.0)
+	var bearing_margin := 0.02
+	var min_roof_x := -wall_half + bearing_margin + normal.x * HouseGeometry.BEAM_W
+	var max_roof_x := wall_half - bearing_margin + normal.x * HouseGeometry.BEAM_W
+	var x := clampf(lerpf(eave_x, ridge_x, t), min_roof_x, max_roof_x)
+	return Vector2(x, _witch_roof_y(eave_x, 0.0, ridge_x, rise, x))
+
+
+func _witch_roof_y(eave_x: float, eave_y: float, ridge_x: float, rise: float, x: float) -> float:
+	if x <= ridge_x:
+		return lerpf(eave_y, rise, inverse_lerp(eave_x, ridge_x, x))
+	return lerpf(rise, eave_y, inverse_lerp(ridge_x, eave_x, x))
+
+
+func _witch_roof_up_normal(a: Vector2, b: Vector2) -> Vector2:
+	var direction := (b - a).normalized()
+	var normal := Vector2(-direction.y, direction.x)
+	return normal if normal.y >= 0.0 else -normal
+
+
+func _witch_rafter_points(eave: Vector2, ridge: Vector2) -> PackedVector2Array:
+	var normal := _witch_roof_up_normal(eave, ridge)
+	var offset := normal * (HouseGeometry.BEAM_W * 0.5) + Vector2(0.0, RoofShape.DEPTH * 0.5 + 0.001)
+	return PackedVector2Array([eave - offset, ridge - offset])
+
+
+func _witch_gable_member(xf: Transform3D, a: Vector2, b: Vector2, z: float,
+		width: float, role: String) -> void:
+	var delta := b - a
+	var length := delta.length()
+	if length < 0.05:
+		return
+	var centre := (a + b) * 0.5
+	component_box(role, Vector3(length, width, HouseGeometry.BEAM_D),
+		xf * Transform3D(Basis(Vector3(0, 0, 1), atan2(delta.y, delta.x)),
+			Vector3(centre.x, centre.y, z)), SURF_TRIM)
+
+
 func _under_rafter(x: float, roof_half: float, rise: float) -> float:
 	return clampf(rise * (1.0 - absf(x) / roof_half) - RoofShape.DEPTH * 0.5 - HouseGeometry.BEAM_W * 0.5 - 0.02,
 		0.0, maxf(_frame_top - RoofShape.DEPTH * 0.5 - HouseGeometry.BEAM_W * 0.5 - 0.02, 0.0))
@@ -2819,6 +3715,68 @@ func _build_porch() -> void:
 	var door: Dictionary = plan.doors[d]
 	var depth: float = HouseGeometry.porch_depth(spec)
 	var w: float = float(door["width"]) + 1.1
+	var head: float = HouseGeometry.DOOR_H + 0.35
+	if spec.style == &"witch_hut":
+		# The witch canopy follows the actual entrance wall. Its step has the same
+		# asymmetric in-wall/outward footprint as HouseGeometry.porch_rect().
+		var normal: Vector2 = door["normal"]
+		var across := Vector2(normal.y, -normal.x)
+		var normal3 := Vector3(normal.x, 0.0, normal.y)
+		var across3 := Vector3(across.x, 0.0, across.y)
+		var frame := Basis(across3, Vector3.UP, normal3)
+		var porch_wall: Vector2 = HouseGeometry.porch_center(plan)
+		var step_span: float = depth + 0.2 + HouseGeometry.wall_thickness(spec)
+		var step_centre2: Vector2 = porch_wall + normal * ((depth - HouseGeometry.wall_thickness(spec)) * 0.5)
+		var step_centre := Vector3(step_centre2.x, HouseGeometry.FLOOR_T * 0.5, step_centre2.y)
+		var step_xf := Transform3D(frame, step_centre)
+		component_box("witch_entry_step", Vector3(w, HouseGeometry.FLOOR_T, step_span), step_xf, SURF_FLOOR)
+		var step_half := across.abs() * (w * 0.5) + normal.abs() * (step_span * 0.5)
+		_log_mass("porch_step", AABB(Vector3(step_centre2.x - step_half.x, 0.0,
+			step_centre2.y - step_half.y), Vector3(step_half.x * 2.0, HouseGeometry.FLOOR_T,
+			step_half.y * 2.0)))
+		# Keep the full slab, including its normal thickness, between the
+		# exterior wall face and the planned porch end. The 2 cm inset exceeds
+		# this slope's 1.9 cm horizontal half-thickness.
+		var roof_edge_inset := 0.02
+		var roof_thickness := 0.10
+		var roof_rise: float = minf(0.42, maxf(spec.height - head - roof_thickness * 0.5 - 0.02, 0.0))
+		var porch_along: float = depth + 0.1 - HouseGeometry.wall_thickness(spec) - roof_edge_inset * 2.0
+		var roof_near: float = HouseGeometry.wall_thickness(spec) + roof_edge_inset
+		var roof_far: float = depth + 0.1 - roof_edge_inset
+		var roof_centre2: Vector2 = porch_wall + normal * ((roof_near + roof_far) * 0.5)
+		var roof_xf := Transform3D(frame, Vector3(roof_centre2.x, head, roof_centre2.y))
+		# A wall ledger carries the canopy high edge on every cardinal facade.
+		# Set the roof rise against the wall top, then place the ledger top at
+		# the measured slab underside at its outer face. Its inner face sits
+		# flush against the exterior wall; this is a bearing joint, not a gap.
+		var roof_angle := atan2(roof_rise, porch_along)
+		var ledger_depth := 0.10
+		var ledger_height := 0.12
+		var ledger_outer := HouseGeometry.wall_thickness(spec) + ledger_depth
+		var ledger_top := head + roof_rise * (roof_far - ledger_outer) / porch_along
+		ledger_top -= roof_thickness * 0.5 / cos(roof_angle)
+		var ledger_centre2: Vector2 = porch_wall + normal * (HouseGeometry.wall_thickness(spec) + ledger_depth * 0.5)
+		var ledger_xf := Transform3D(frame, Vector3(ledger_centre2.x, ledger_top - ledger_height * 0.5, ledger_centre2.y))
+		component_box("witch_entry_wall_ledger", Vector3(w + 0.12, ledger_height, ledger_depth), ledger_xf, SURF_TRIM)
+		var post_centre2: Vector2 = porch_wall + normal * (depth * 0.5)
+		var post_along: float = depth - 0.12
+		var post_top: float = head + roof_rise * (roof_far - post_along) / porch_along - roof_thickness * 0.5 / cos(roof_angle)
+		for side in [-1.0, 1.0]:
+			var post2: Vector2 = post_centre2 + across * side * (w * 0.5 - 0.1) + normal * (depth * 0.5 - 0.12)
+			var post_xf := Transform3D(frame, Vector3(post2.x, post_top * 0.5, post2.y))
+			component_box("witch_entry_support_%s" % ("left" if side < 0.0 else "right"),
+				Vector3(0.14, post_top, 0.14), post_xf, SURF_TRIM)
+			var post_half := across.abs() * 0.07 + normal.abs() * 0.07
+			_log_mass("porch_post_%s" % ("left" if side < 0.0 else "right"),
+				AABB(Vector3(post2.x - post_half.x, 0.0, post2.y - post_half.y),
+					Vector3(post_half.x * 2.0, post_top, post_half.y * 2.0)))
+		component_slab("witch_entry_lean_to", PackedVector3Array([
+			roof_xf * Vector3(-w * 0.5, roof_rise, -porch_along * 0.5),
+			roof_xf * Vector3(w * 0.5, roof_rise, -porch_along * 0.5),
+			roof_xf * Vector3(w * 0.5, 0.0, porch_along * 0.5),
+			roof_xf * Vector3(-w * 0.5, 0.0, porch_along * 0.5)]), roof_thickness, SURF_ROOF, false)
+		host_end()
+		return
 	var normal: Vector2 = Vector2(door["normal"]).normalized()
 	var wall_t: float = HouseGeometry.wall_thickness(spec)
 	# Door positions are on the interior wall face. Start the canopy at the
@@ -2827,7 +3785,6 @@ func _build_porch() -> void:
 	var outer_face: Vector2 = Vector2(door["pos"]) + normal * wall_t
 	var porch_along: float = depth + 0.1 - wall_t
 	var roof_centre: Vector2 = outer_face + normal * (porch_along / 2.0)
-	var head: float = HouseGeometry.DOOR_H + 0.35
 	var step_depth: float = depth + 0.2 + wall_t
 	var step_centre: Vector2 = Vector2(door["pos"]) + normal * ((depth - wall_t) / 2.0)
 	var step_size: Vector3 = Vector3(step_depth, HouseGeometry.FLOOR_T, w) \
@@ -2865,6 +3822,8 @@ func _build_yard() -> void:
 	for piece in plan.yard_pieces:
 		for part in piece["parts"]:
 			var surf := SURF_WALL if str(part["surf"]) == "wall" else SURF_TRIM
+			if str(part["surf"]) == "roof":
+				surf = SURF_ROOF
 			if str(part["surf"]) == "floor":
 				surf = SURF_FLOOR
 				_kit.surface(surf).set_color(Color(1, 0, 1)) # Exterior paving, not timber or rug.
@@ -2876,6 +3835,109 @@ func _build_yard() -> void:
 
 ## How far a flue finishes above the ridge it comes out of.
 const CHIMNEY_CLEAR := 0.6
+
+
+## Measure the roof where the flue actually passes through it. The roof skin
+## sampler returns the slab top; Witch eave bundles are separate logged slabs
+## emitted earlier in _build_roof, so include their local profile only where
+## their emitted footprint covers one of the flue samples.
+func _roof_top_surface_near_flue(centre: Vector2, footprint: Vector2, radius: float) -> float:
+	var highest := _roof_top_surface_in_flue_footprint(centre, footprint)
+	if not is_finite(highest):
+		return NAN
+	# Derive once for this measurement. Nothing is cached on the mutable plan.
+	var layout := HouseGeometry.roof_layout(plan)
+	var openings := HouseGeometry.roof_openings(plan)
+	# Sample the actual plan roof planes across a fixed safety neighbourhood,
+	# not only directly under masonry. The radial stations cover diagonal slopes
+	# and eaves while keeping the local contract bounded around this flue.
+	for ring in [0.25, 0.5, 1.0, 1.5, 2.0, 2.5, radius]:
+		if float(ring) > radius:
+			continue
+		for sector in range(96):
+			var angle := TAU * float(sector) / 96.0
+			var sample := centre + Vector2(cos(angle), sin(angle)) * float(ring)
+			if _witch_roof_sample_is_open(sample, layout, openings):
+				continue
+			var roof_y := HouseGeometry._roof_top_surface_in_layout(plan, layout, sample)
+			if is_finite(roof_y):
+				highest = maxf(highest, roof_y)
+	# The ridge/eave bundles are emitted components above the plane. Their
+	# measured profile vertices plus half the emitted slab depth bound the real
+	# crown; only bundles whose emitted footprint enters the same radius count.
+	for row in components("thatch_roll_") + components("thatch_eave"):
+		var points: PackedVector3Array = row.get("points", PackedVector3Array())
+		if points.is_empty():
+			continue
+		var depth_half := float(row.get("depth", 0.0)) * 0.5
+		var profile_normal_y := 0.0
+		if points.size() >= 3:
+			profile_normal_y = absf((points[1] - points[0]).cross(points[2] - points[0]).normalized().y)
+		var vertical_half := depth_half * profile_normal_y
+		var enters_neighbourhood := false
+		for point in points:
+			if Vector2(point.x - centre.x, point.z - centre.y).length() <= radius + depth_half:
+				enters_neighbourhood = true
+				break
+		if enters_neighbourhood:
+			for point in points:
+				highest = maxf(highest, point.y + vertical_half)
+	# A centimetre covers the remaining angular sampling error in the bounded
+	# neighbourhood. The public contract is minimum safe clearance, not a
+	# falsely exact equality to a sampled mesh maximum.
+	return highest + 0.01
+
+
+func _witch_roof_sample_is_open(world_xz: Vector2, layout: Dictionary,
+		openings: Array[Dictionary]) -> bool:
+	var xf: Transform3D = layout["transform"]
+	var local := xf.affine_inverse() * Vector3(world_xz.x, xf.origin.y, world_xz.y)
+	var point := Vector2(local.x, local.z)
+	for opening in openings:
+		var polygon: PackedVector2Array = opening.get("polygon", PackedVector2Array())
+		if polygon.size() >= 3 and Geometry2D.is_point_in_polygon(point, polygon):
+			return true
+	return false
+
+
+func _roof_top_surface_in_flue_footprint(centre: Vector2, footprint: Vector2) -> float:
+	var layout := HouseGeometry.roof_layout(plan)
+	var xf: Transform3D = layout["transform"]
+	var inverse := xf.affine_inverse()
+	var highest := HouseGeometry.roof_top_surface_in_footprint(plan, centre, footprint)
+	if not is_finite(highest):
+		return NAN
+	for fx in [-0.5, 0.0, 0.5]:
+		for fz in [-0.5, 0.0, 0.5]:
+			var world_sample := centre + Vector2(float(fx) * footprint.x,
+				float(fz) * footprint.y)
+			var local_sample := inverse * Vector3(world_sample.x, xf.origin.y, world_sample.y)
+			for row in components("thatch_eave"):
+				if String(row.get("role", "")) == "thatch_eave_service":
+					continue # measured in local-neighbourhood sampling below
+				if int(row.get("surface", -1)) != SURF_ROOF or String(row.get("form", "")) != "slab":
+					continue
+				var points: PackedVector3Array = row.get("points", PackedVector3Array())
+				if points.size() < 2:
+					continue
+				var local_points := PackedVector3Array()
+				for world_point in points:
+					local_points.append(inverse * Vector3(world_point))
+				var half_depth := float(row.get("depth", 0.0)) * 0.5
+				var z_lo := local_points[0].z - half_depth
+				var z_hi := local_points[0].z + half_depth
+				if local_sample.z < z_lo - 0.001 or local_sample.z > z_hi + 0.001:
+					continue
+				for i in range(local_points.size() - 1):
+					var a: Vector3 = local_points[i]
+					var b: Vector3 = local_points[i + 1]
+					if local_sample.x < minf(a.x, b.x) - 0.001 \
+							or local_sample.x > maxf(a.x, b.x) + 0.001 \
+							or absf(b.x - a.x) < 0.000001:
+						continue
+					var t := clampf((local_sample.x - a.x) / (b.x - a.x), 0.0, 1.0)
+					highest = maxf(highest, xf.origin.y + lerpf(a.y, b.y, t))
+	return highest
 
 
 func _build_chimney() -> void:
@@ -2891,7 +3953,23 @@ func _build_chimney() -> void:
 	# that, so a longhall with a 5.4 m rise got a flue that stopped two and a
 	# half metres short of its own ridge -- a chimney you could see the roof
 	# over, which both looks wrong and would smoke back down itself.
-	var top: float = wall_top + HouseGeometry.roof_rise(spec) + CHIMNEY_CLEAR
+	var roll_clearance: float = HouseGeometry.THATCH_ROLL_TOP \
+		if HouseGeometry.has_witch_roofcraft(spec, plan.world_family) else 0.0
+	var plan_roof_rise: float = HouseGeometry.roof_rise(spec)
+	var chimney_roof_layout := HouseGeometry.roof_layout(plan)
+	var chimney_bay: Dictionary = chimney_roof_layout.get("witch_bay", {})
+	var sampled_roof_top := NAN
+	if not chimney_bay.is_empty():
+		var measured_flue_s: float = HouseGeometry.chimney_flue_size(spec, plan.world_family)
+		sampled_roof_top = _roof_top_surface_near_flue(c,
+			Vector2.ONE * measured_flue_s, 3.0)
+		if is_finite(sampled_roof_top):
+			plan_roof_rise = sampled_roof_top - wall_top
+	# The sampled surface already includes the roof's slab crown/roll allowance.
+	# Add the physical 0.6 m flue clearance once, not a second roll height.
+	var top: float = sampled_roof_top + CHIMNEY_CLEAR if is_finite(sampled_roof_top) \
+		else wall_top + plan_roof_rise + roll_clearance + CHIMNEY_CLEAR
+	var flue_s: float = HouseGeometry.chimney_flue_size(spec, plan.world_family)
 
 	# Stepped chimney stack
 	var base_h: float = minf(top * 0.45, 2.5)
@@ -2902,16 +3980,29 @@ func _build_chimney() -> void:
 		box(Vector3(base_s - 0.08, sh_h, base_s - 0.08), Vector3(c.x, base_h + sh_h / 2.0, c.y), SURF_FLOOR)
 		var flue_h: float = top - (base_h + sh_h)
 		if flue_h > 0.05:
-			box(Vector3(s, flue_h, s), Vector3(c.x, base_h + sh_h + flue_h / 2.0, c.y), SURF_FLOOR)
+			var upper_s: float = flue_s if HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family) else s
+			box(Vector3(upper_s, flue_h, upper_s), Vector3(c.x, base_h + sh_h + flue_h / 2.0, c.y), SURF_FLOOR)
 	else:
 		box(Vector3(s, top, s), Vector3(c.x, top / 2.0, c.y), SURF_FLOOR)
 
-	_log_mass("chimney", AABB(Vector3(c.x - s / 2.0, 0.0, c.y - s / 2.0),
-		Vector3(s, top, s)))
-	box(Vector3(s + 0.22, 0.18, s + 0.22), Vector3(c.x, top + 0.09, c.y), SURF_TRIM)
+	var crown_s: float = flue_s + 0.22 if HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family) else s + 0.22
+	var chimney_footprint: float = s
+	var chimney_height: float = top
+	if HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family):
+		chimney_footprint = maxf(s + HouseGeometry.CHIMNEY_BASE_EXTRA, crown_s)
+		chimney_height = top + 0.18 + HouseGeometry.CHIMNEY_POT_H
+	_log_mass("chimney", AABB(Vector3(c.x - chimney_footprint / 2.0, 0.0, c.y - chimney_footprint / 2.0),
+		Vector3(chimney_footprint, chimney_height, chimney_footprint)))
+	box(Vector3(crown_s, 0.18, crown_s), Vector3(c.x, top + 0.09, c.y), SURF_TRIM)
 	total_height = maxf(total_height, top + 0.18)
 
-	# Flue pots at the top
+	_emit_chimney_pots(c, top, flue_s)
+	total_height = maxf(total_height, top + 0.18 + HouseGeometry.CHIMNEY_POT_H)
+
+
+## Emit only the removable pottery crown. Keeping it separate lets the roof QA
+## remove the real cap as a physical negative while retaining the masonry stack.
+func _emit_chimney_pots(c: Vector2, top: float, flue_s: float) -> void:
 	var pot_r: float = HouseGeometry.CHIMNEY_POT_R
 	var pot_h: float = HouseGeometry.CHIMNEY_POT_H
 	var pots: int = clampi(spec.chimney_pots, 1, 2)
@@ -2919,10 +4010,83 @@ func _build_chimney() -> void:
 		_kit.drum(Vector3(c.x, top + 0.18, c.y), pot_r, pot_r, pot_h, SURF_FLOOR, 10)
 		_kit.drum(Vector3(c.x, top + 0.18 + pot_h - 0.06, c.y), pot_r * 1.15, pot_r * 1.15, 0.06, SURF_TRIM, 10)
 	else:
-		var off: float = s * 0.22
+		var off: float = flue_s * 0.22 if HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family) else HouseGeometry.chimney_size(spec) * 0.22
 		for pside in [-1.0, 1.0]:
 			var px: float = c.x + (off * pside if plan.hearth_wall() <= 1 else 0.0)
 			var pz: float = c.y + (off * pside if plan.hearth_wall() > 1 else 0.0)
 			_kit.drum(Vector3(px, top + 0.18, pz), pot_r, pot_r, pot_h, SURF_FLOOR, 10)
 			_kit.drum(Vector3(px, top + 0.18 + pot_h - 0.06, pz), pot_r * 1.15, pot_r * 1.15, 0.06, SURF_TRIM, 10)
-	total_height = maxf(total_height, top + 0.18 + pot_h)
+
+
+## Low firewood belongs inside the measured footprint of the Witch's Cauldron.
+## These named shell components are supported by the same floor as the pot; they
+## add no separate obstacle or clearance reservation to the plan.
+func _build_witch_cauldron_heat() -> void:
+	if spec.style != &"witch_hut":
+		return
+	tag("witch_cauldron_heat")
+	for furniture_index in range(plan.furniture.size()):
+		var furniture_placement: Dictionary = plan.furniture[furniture_index]
+		if String(furniture_placement.get("key", "")) == "Cauldron":
+			_emit_witch_cauldron_logs(furniture_placement, true, "furniture_%d" % furniture_index)
+	for exterior_index in range(plan.exterior.size()):
+		var exterior_placement: Dictionary = plan.exterior[exterior_index]
+		if String(exterior_placement.get("key", "")) == "Cauldron":
+			_emit_witch_cauldron_logs(exterior_placement, false, "exterior_%d" % exterior_index)
+	for yard_index in range(plan.yard.size()):
+		var yard_placement: Dictionary = plan.yard[yard_index]
+		if String(yard_placement.get("key", "")) == "Cauldron":
+			_emit_witch_cauldron_logs(yard_placement, false, "yard_%d" % yard_index)
+	host_end()
+
+func _emit_witch_cauldron_logs(placement: Dictionary, centred: bool, placement_id: String) -> void:
+	var model_yaw: float = float(placement.get("yaw", 0.0)) + PropCatalog.face_offset("Cauldron")
+	var scale_factor: float = float(placement.get("scale", 1.0))
+	var height_scale: float = PropCatalog.placement_height_scale(placement)
+	var origin: Vector3
+	if centred:
+		origin = PropCatalog.house_origin(placement)
+	else:
+		var pos: Vector3 = Vector3(placement.get("pos", Vector3.ZERO))
+		var drop: float = PropCatalog.seat_offset("Cauldron") * height_scale
+		if PropCatalog.has_tag("Cauldron", PropCatalog.WALL_MOUNTED) or PropCatalog.has_tag("Cauldron", PropCatalog.CEILING):
+			drop = 0.0
+		origin = Vector3(pos.x, pos.y - drop, pos.z)
+	var floor_y: float = PropCatalog.floor_offset("Cauldron")
+	var lower_h := 0.035
+	var upper_h := 0.032
+	host("witch_cauldron_%s" % placement_id, int(placement.get("storey", 0)))
+	# Two parallel floor-supported sticks stay inside the measured three-leg
+	# ring (about 0.30 m radius) and leave the central bowl underside clear.
+	for side in [-1.0, 1.0]:
+		var centre_local := Vector3(side * 0.035, floor_y + lower_h * 0.5, 0.0)
+		var centre_world: Vector3 = origin + Basis(Vector3.UP, model_yaw) * Vector3(centre_local.x * scale_factor, centre_local.y * height_scale, centre_local.z * scale_factor)
+		var size := Vector3(0.035 * scale_factor, lower_h * height_scale, 0.22 * scale_factor)
+		component_box("witch_cauldron_heat_log_lower", size, Transform3D(Basis(Vector3.UP, model_yaw), centre_world), SURF_TRIM)
+	# A cross-piece bears on both lower logs instead of floating above the embers.
+	var top_local := Vector3(0.0, floor_y + lower_h + upper_h * 0.5, 0.0)
+	var top_world: Vector3 = origin + Basis(Vector3.UP, model_yaw) * Vector3(top_local.x * scale_factor, top_local.y * height_scale, top_local.z * scale_factor)
+	var top_size := Vector3(0.18 * scale_factor, upper_h * height_scale, 0.035 * scale_factor)
+	component_box("witch_cauldron_heat_log_upper", top_size, Transform3D(Basis(Vector3.UP, model_yaw), top_world), SURF_TRIM)
+
+func _build_witch_workshop_bay_bearing(xf: Transform3D, bay: Dictionary) -> void:
+	# Bear the raised roof seam on the actual shared room wall. The roof joins
+	# farther in over the high-core plane; a floor-to-roof post there would stand
+	# inside the Hall instead of supporting the wall plate.
+	var bearing_x := float(bay.get("wall_outer", bay["inner"]))
+	var outer := float(bay["outer"])
+	var inner := float(bay["inner"])
+	var eave_y := float(bay["eave_y"])
+	var join_y := float(bay["join_y"])
+	var along_lo := float(bay["ceiling_along_lo"])
+	var along_hi := float(bay["ceiling_along_hi"])
+	var wall_t := HouseGeometry.wall_thickness(spec)
+	var t := clampf((bearing_x - outer) / (inner - outer), 0.0, 1.0)
+	var top := lerpf(eave_y, join_y, t) - RoofShape.DEPTH * 0.5
+	if top <= 0.05:
+		return
+	var face := PackedVector3Array([Vector3(bearing_x, 0.0, along_lo), Vector3(bearing_x, 0.0, along_hi), Vector3(bearing_x, top, along_hi), Vector3(bearing_x, top, along_lo)])
+	tag("witch_workshop_bay_bearing")
+	host("witch_workshop_bay_bearing", 0)
+	_roof_face(xf, face, SURF_WALL, "witch_workshop_bay_bearing", false, wall_t)
+	host_end()

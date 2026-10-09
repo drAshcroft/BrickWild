@@ -44,3 +44,7 @@ scratch/*.json
 /visualqa/personality/asset_evidence
 /visualqa/personality/surface_evidence
 /Godot/app_userdata
+/%SystemDrive%/ProgramData
+*.import
+/visualqa/hearth/restart40_head_v3
+/visualqa/hearth

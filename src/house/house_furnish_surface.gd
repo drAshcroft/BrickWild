@@ -9,7 +9,7 @@ const ACTIVITY_TASK_LIGHT_REACH := 1.9
 
 ## A shelf, rack or sconce on a wall, above the furniture already there.
 static func place_mounted(plan: HousePlan, room: int, key: String,
-		r: RandomNumberGenerator) -> void:
+		r: RandomNumberGenerator, activity_group := "") -> void:
 	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
 	var y: float = HouseGeometry.SCONCE_HEIGHT if PropCatalog.category(key) == "sconce" \
 		else HouseGeometry.SHELF_HEIGHT
@@ -34,6 +34,11 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 	var width: float = PropCatalog.size(key).x * scale
 	var lamp := PropCatalog.category(key) == "sconce"
 	var shelf := PropCatalog.category(key) == "shelf"
+	var compact_witch_work: bool = HouseFurnishingRecipes.is_ordinary_house(plan) \
+			and plan.spec.style == &"witch_hut" and plan.spec.trade == &"none" \
+			and bool(plan.rooms[room].get("shared_witchwork", false)) \
+			and plan.rooms[room].get("activity_regions", {}).has(&"witchwork") \
+			and activity_group == "witchwork"
 	# Worked out once, not once per candidate: where a pair of these hangs is
 	# a fact about the room, and HouseFurnishScore._flank_anchor() scans the walls to find it.
 	# Leaving it inside the scoring loop made the house suites four times as
@@ -54,7 +59,8 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 		for existing_index in plan.furniture_of(room):
 			var existing: Dictionary = plan.furniture[existing_index]
 			if bool(existing.get("mounted", false)) \
-					and PropCatalog.category(String(existing.get("key", ""))) == "sconce":
+					and PropCatalog.category(String(existing.get("key", ""))) == "sconce" \
+					and (not compact_witch_work or String(existing.get("activity_group", "")) == activity_group):
 				plan.note_compromise(room, "sconce_pair:no_safe_mirrored_station")
 				return
 	var best_pos := Vector2.ZERO
@@ -64,6 +70,7 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 	var best_task_light_pos := Vector3.ZERO
 	var best_task_light_yaw := 0.0
 	var best_task_light_pose: Dictionary = {}
+	var best_mount_pose: Dictionary = {}
 	var task_prep_zones: Array[Dictionary] = []
 	var best_task_light_rank := 100
 	var best_over_cover := -1.0
@@ -73,13 +80,14 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 		for existing_index in plan.furniture_of(room):
 			var existing: Dictionary = plan.furniture[existing_index]
 			if bool(existing.get("mounted", false)) \
-					and PropCatalog.category(String(existing.get("key", ""))) == "sconce":
+					and PropCatalog.category(String(existing.get("key", ""))) == "sconce" \
+					and (not compact_witch_work or String(existing.get("activity_group", "")) == activity_group):
 				has_existing_lamp = true
 				break
 		if not has_existing_lamp:
 			for existing_index in plan.furniture_of(room):
 				var existing: Dictionary = plan.furniture[existing_index]
-				if String(existing.get("activity_group", "")) == "cooking" \
+				if String(existing.get("activity_group", "")) == ("witchwork" if compact_witch_work else "cooking") \
 						and String(existing.get("cat", "")) == "workbench":
 					var prep := Rect2(existing.get("zone", Rect2()))
 					if not prep.has_area(): prep = Rect2(existing.get("rect", Rect2()))
@@ -104,6 +112,8 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 					if int(left["rank"]) != int(right["rank"]): return int(left["rank"]) < int(right["rank"])
 					return int(left["source"]) < int(right["source"]))
 				task_prep_zones = sleep_targets
+	if lamp and compact_witch_work and task_prep_zones.is_empty():
+		return
 	var task_light_clear_spans: Dictionary = {}
 	if not task_prep_zones.is_empty():
 		for wi in range(walls.size()):
@@ -144,17 +154,28 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 				continue
 			if lamp and _near_lamp(plan, room, pos):
 				continue
+			var mount_yaw := HouseFurnishGeometry.yaw_facing(n)
+			var wall_along := pos.x if absf(n.y) > 0.5 else pos.y
+			var mount_pose := HousePlanFeatures._wall_fixture_pose(key, wall, wall_along,
+				HouseFurnishGeometry.storey_base(plan, room) + y, scale)
+			var mount_body: Rect2 = Rect2(mount_pose["rect"])
+			if compact_witch_work:
+				var activity_regions: Dictionary = plan.rooms[room].get("activity_regions", {})
+				var mounted_inside_floor := mount_body.intersection(HouseGeometry.room_floor_rect(plan, room))
+				if not activity_regions.has(StringName(activity_group)) \
+						or not mounted_inside_floor.has_area() \
+						or not Rect2(activity_regions[StringName(activity_group)]).grow(0.01).encloses(mounted_inside_floor):
+					continue
 			var cand := {
 				"key": key, "pos": Vector3(pos.x, 0.0, pos.y),
 				"yaw": HouseFurnishGeometry.yaw_facing(n), "scale": scale,
-				"rect": Rect2(pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
+				"rect": mount_body if compact_witch_work else Rect2(pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 				"host": -1, "mounted": true, "flank_anchor": anchor,
 			}
 			var score: float = HouseFurnishScore._affinity(plan, room, cand) + r.randf() * HouseFurnishScore.JITTER
 			if not task_prep_zones.is_empty():
 				var base := HouseFurnishGeometry.storey_base(plan, room)
-				var wall_along := pos.x if absf(n.y) > 0.5 else pos.y
-				var pose := HousePlanFeatures._wall_fixture_pose(key, wall, wall_along, base + y, scale)
+				var pose := mount_pose
 				var body_rect: Rect2 = pose["rect"]
 				var candidate_task_rank := 100
 				for task_variant in task_prep_zones:
@@ -199,7 +220,10 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 				best_score = score
 				best_over_cover = over_cover
 				best_pos = pos
-				best_yaw = HouseFurnishGeometry.yaw_facing(n)
+				best_yaw = mount_yaw
+				best_mount_pose = mount_pose.duplicate(true)
+	if lamp and compact_witch_work and best_task_light_pose.is_empty():
+		return
 	if best_task_light_score > -INF:
 		best_pos = Vector2(best_task_light_pos.x, best_task_light_pos.z)
 		best_yaw = best_task_light_yaw
@@ -207,14 +231,17 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 	if best_score == -INF:
 		return
 	var committed_position := Vector3(best_pos.x, HouseFurnishGeometry.storey_base(plan, room) + y, best_pos.y)
+	var committed_rect: Rect2 = Rect2(best_mount_pose.get("rect", Rect2(best_pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1))) if compact_witch_work else Rect2(best_pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1)
 	if not best_task_light_pose.is_empty() and best_task_light_score > -INF:
 		committed_position = Vector3(best_task_light_pose["pos"])
 		best_yaw = float(best_task_light_pose["yaw"])
+		if compact_witch_work:
+			committed_rect = Rect2(best_task_light_pose["rect"])
 	plan.furniture.append({
 		"key": key, "room": room, "storey": HousePlan.record_storey(plan.rooms[room]),
 		"pos": committed_position,
 		"yaw": best_yaw,
-		"rect": Rect2(best_pos - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
+		"rect": committed_rect,
 		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
 		"mounted": true, "scale": scale,
 	})

@@ -54,6 +54,57 @@ static func faces(span: float, along: float, rise: float,
 	return out
 
 
+## Two roof planes meet an off-centre ridge. This is a pitched gable with
+## unequal slopes, not a decorative mesh laid over a symmetric roof. The end
+## profile remains one continuous ridge across the full along span.
+static func asymmetric_gable(span: float, along: float, rise: float,
+		ridge_x: float) -> Array[PackedVector3Array]:
+	var out: Array[PackedVector3Array] = []
+	if minf(span, along) <= 0.0 or span <= 0.1 or rise <= 0.0:
+		return out
+	var half := span * 0.5
+	var ridge := clampf(ridge_x, -half + 0.05, half - 0.05)
+	var f := along * 0.5
+	out.append(PackedVector3Array([
+		Vector3(-half, 0.0, -f), Vector3(-half, 0.0, f),
+		Vector3(ridge, rise, f), Vector3(ridge, rise, -f)]))
+	out.append(PackedVector3Array([
+		Vector3(half, 0.0, -f), Vector3(half, 0.0, f),
+		Vector3(ridge, rise, f), Vector3(ridge, rise, -f)]))
+	return out
+
+
+## An off-axis upper half-hip. The lower end gable remains below the shoulder
+## line. The side slopes meet the end hip triangles on that line, then the
+## ridge ends at `ridge_half`; all shared points are built from the same
+## interpolation so there are no gaps or overlapping roof skins.
+static func asymmetric_half_hip(span: float, along: float, rise: float,
+		ridge_x: float, ridge_half: float) -> Array[PackedVector3Array]:
+	var out: Array[PackedVector3Array] = []
+	if minf(span, along) <= 0.0 or span <= 0.1 or rise <= 0.0:
+		return out
+	var half := span * 0.5
+	var f := along * 0.5
+	var ridge := clampf(ridge_x, -half + 0.05, half - 0.05)
+	var rz := clampf(ridge_half, 0.0, f - 0.001)
+	var cut := rise * HALF_HIP
+	var shoulder_left := lerpf(-half, ridge, cut / rise)
+	var shoulder_right := lerpf(half, ridge, cut / rise)
+	for side in [-1.0, 1.0]:
+		out.append(PackedVector3Array([
+			Vector3(side * half, 0.0, -f), Vector3(side * half, 0.0, f),
+			Vector3(shoulder_left if side < 0.0 else shoulder_right, cut, f),
+			Vector3(ridge, rise, rz), Vector3(ridge, rise, -rz),
+			Vector3(shoulder_left if side < 0.0 else shoulder_right, cut, -f)]))
+	out.append(PackedVector3Array([
+		Vector3(shoulder_left, cut, -f), Vector3(shoulder_right, cut, -f),
+		Vector3(ridge, rise, -rz)]))
+	out.append(PackedVector3Array([
+		Vector3(shoulder_left, cut, f), Vector3(shoulder_right, cut, f),
+		Vector3(ridge, rise, rz)]))
+	return out
+
+
 ## A ring of facets from the plan rectangle's own perimeter up to one apex.
 ##
 ## The base samples the RECTANGLE perimeter, not a circle inscribed in it, and

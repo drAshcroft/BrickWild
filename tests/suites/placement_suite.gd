@@ -53,6 +53,7 @@ static func run_quick() -> SuiteResult:
 	_check_family(res, "church", func(s: int): return BuildingRequest.church(s, &"gothic", 10.0, 22.0, 12.0), 1)
 	_check_family(res, "castle", func(s: int): return BuildingRequest.castle(s, &"norman", 55.0, 50.0, 18.0), 1)
 	_check_family(res, "temple", func(s: int): return BuildingRequest.temple(s, &"basilica", &"blood", 26.0, 44.0, 12.0), 1)
+	_check_family(res, "temple_pylon", func(s: int): return BuildingRequest.temple(s, &"pylon", &"blood", 26.0, 44.0, 12.0), 1)
 	# a world family places its door to the same 0.6 m the library suite allows
 	_check_family(res, "world", _world_request, 1, 0.6)
 	# the village's gate is placed to 0.6 m, as the library suite judges it
@@ -88,6 +89,7 @@ static func run() -> SuiteResult:
 	_check_family(res, "church", func(s: int): return BuildingRequest.church(s, &"gothic", 10.0, 22.0, 12.0))
 	_check_family(res, "castle", func(s: int): return BuildingRequest.castle(s, &"norman", 55.0, 50.0, 18.0))
 	_check_family(res, "temple", func(s: int): return BuildingRequest.temple(s, &"basilica", &"blood", 26.0, 44.0, 12.0))
+	_check_family(res, "temple_pylon", func(s: int): return BuildingRequest.temple(s, &"pylon", &"blood", 26.0, 44.0, 12.0))
 	_check_world_rect(res)
 	_check_orientation_and_period(res)
 	_notes(res)
@@ -210,12 +212,23 @@ static func _check_placed(res: SuiteResult, kind: String, request: BuildingReque
 	var door: Vector3 = placement.get("door", Vector3.INF)
 	var front_z: float = footprint.position.y
 	var approach: Rect2 = placement.get("approach", Rect2())
-	if kind == "temple" and request.style == &"basilica" \
+	if kind in ["temple", "temple_pylon"] and request.style in [&"basilica", &"rotunda", &"pylon"] \
 			and approach.size.x > 0.0 and approach.size.y > 0.0:
-		if absf(approach.position.y - front_z) > tolerance \
-				or absf(approach.end.y - door.z) > tolerance:
-			res.fail("%s seed=%d: actual portico approach does not join footprint front to wall door" %
-				[kind, request.seed])
+		if request.style == &"pylon":
+			var within_footprint: bool = approach.position.x >= footprint.position.x - tolerance \
+				and approach.end.x <= footprint.end.x + tolerance \
+				and approach.position.y >= front_z - tolerance \
+				and approach.end.y <= footprint.end.y + tolerance \
+				and door.x >= approach.position.x - tolerance \
+				and door.x <= approach.end.x + tolerance
+			if not within_footprint or absf(approach.end.y - door.z) > tolerance:
+				res.fail("%s seed=%d: Pylon approach is outside its paved placement reservation or misses the real gate" %
+					[kind, request.seed])
+		else:
+			if absf(approach.position.y - front_z) > tolerance \
+					or absf(approach.end.y - door.z) > tolerance:
+				res.fail("%s seed=%d: actual Temple approach does not join footprint front to wall door" %
+					[kind, request.seed])
 	else:
 		if absf(door.z - front_z) > tolerance:
 			res.fail("%s seed=%d: door.z=%.3f is not within %.1fm of footprint -Z edge %.3f" %

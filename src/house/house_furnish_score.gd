@@ -346,6 +346,11 @@ static func _nearest_cat_dist(plan: HousePlan, room: int, cat: String,
 ## the hearth itself if it has been placed, otherwise the middle of the wall
 ## the planner gave the chimney.
 static func _hearth_point(plan: HousePlan, room: int) -> Vector2:
+	var breast: Dictionary = HouseGeometry.hearth_breast(plan)
+	if HouseFurnisher._uses_native_domestic_fireplace(plan) \
+			and String(plan.hearth.get("host_kind", "")) == "ordinary_fireplace" \
+			and not breast.is_empty() and int(breast.get("room", -1)) == room:
+		return Vector2(breast["centre"])
 	for f in plan.furniture_of(room):
 		var p: Dictionary = plan.furniture[f]
 		if PropCatalog.category(p["key"]) == "hearth":

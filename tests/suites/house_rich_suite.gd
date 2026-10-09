@@ -49,7 +49,7 @@ class NoPediments extends HouseBuilder:
 
 
 class NoCrown extends HouseBuilder:
-	func _build_ridge_crown(_xf: Transform3D, _rise: float, _ridge: float) -> void:
+	func _build_ridge_crown(_xf: Transform3D, _rise: float, _ridge: float, _ridge_x := 0.0) -> void:
 		pass
 
 

@@ -210,6 +210,14 @@ func _render_exterior(plan: HousePlan, request: BuildingRequest, case_id: String
 
 func _render_service_yard(plan: HousePlan, request: BuildingRequest,
 		case_id: String, output: String) -> Dictionary:
+	if plan.spec.style == &"witch_hut" and plan.spec.trade == &"none" \
+			and plan.world_family == &"":
+		if _witch_service_door(plan).is_empty():
+			return _view_error(case_id, request.to_dict(), "service_yard",
+				"furnished public plan is missing its required Workshop/shared-Hall yard threshold")
+		if _witch_service_shelter(plan).is_empty():
+			return _view_error(case_id, request.to_dict(), "service_yard",
+				"furnished public plan is missing its required threshold-aligned Witch work shelter")
 	var extent: Rect2 = HouseYard.extent(plan)
 	if not extent.has_area():
 		return _view_error(case_id, request.to_dict(), "service_yard",
@@ -443,6 +451,11 @@ func _service_focus(plan: HousePlan, extent: Rect2) -> Vector2:
 	for piece in plan.yard_pieces:
 		if String(piece.get("role", "")) == "witch_work_shelter":
 			return Rect2(piece.get("rect", extent)).get_center()
+	var door := _witch_service_door(plan)
+	if not door.is_empty():
+		var pos: Vector2 = door["pos"]
+		var normal: Vector2 = door["normal"]
+		return pos + normal * (HouseGeometry.wall_thickness(plan.spec) + 1.0)
 	var focus := Vector2.ZERO
 	var count := 0
 	for prop in plan.yard:
@@ -456,11 +469,26 @@ func _service_focus(plan: HousePlan, extent: Rect2) -> Vector2:
 	return extent.get_center()
 
 
+func _witch_service_shelter(plan: HousePlan) -> Dictionary:
+	for piece in plan.yard_pieces:
+		if String(piece.get("role", "")) == "witch_work_shelter":
+			return piece
+	return {}
+
 func _service_focus_role(plan: HousePlan) -> String:
 	for piece in plan.yard_pieces:
 		if String(piece.get("role", "")) == "witch_work_shelter":
 			return "witch_work_shelter"
+	if not _witch_service_door(plan).is_empty():
+		return "workshop_threshold"
 	return "yard_cluster"
+
+
+func _witch_service_door(plan: HousePlan) -> Dictionary:
+	for door in plan.doors:
+		if bool(door.get("witch_workshop_yard", false)):
+			return door
+	return {}
 
 
 func _service_frame_rect(plan: HousePlan, fallback: Rect2) -> Rect2:

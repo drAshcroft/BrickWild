@@ -20,6 +20,11 @@ static func dress(plan: HousePlan) -> void:
 	var recipe: Array = [["Lantern_Wall", 0.45, 0, "entrance_light"],
 		["Bench", 0.8, 0, "entrance_seat"],
 		["Barrel", 1.0, service, "storage"], ["Bucket_Wooden_1", 1.0, service, "storage"]]
+	if s.style == &"witch_hut" and s.trade == &"none":
+		# The witch's work vessels live together under the planned service lean-to;
+		# retain only arrival pieces on the facade so the craft is not dispersed.
+		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"],
+			["Bench", 0.8, 0, "entrance_seat"]]
 	if s.trade == &"farmer" or s.style == &"farmhouse":
 		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"], ["Bench", 0.8, 0, "entrance_seat"],
 			["Barrel_Apples", 1.0, service, "produce"], ["FarmCrate_Carrot", 1.0, service, "produce"],
@@ -29,7 +34,7 @@ static func dress(plan: HousePlan) -> void:
 		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"], ["Bench", 0.7, 0, "entrance_seat"],
 			["Anvil_Log", 1.0, service, "smith_work"], ["Crate_Wooden", 0.8, service, "smith_work"]]
 		trade_recipe = true
-	elif s.trade == &"alchemist" or s.style == &"witch_hut":
+	elif s.trade == &"alchemist" or (s.style == &"witch_hut" and s.trade != &"none"):
 		recipe = [["Lantern_Wall", 0.45, 0, "entrance_light"], ["Cauldron", 0.7, service, "herb_work"],
 			["Pot_1", 1.4, service, "herb_work"], ["Bucket_Wooden_1", 1.0, service, "herb_work"]]
 		trade_recipe = true

@@ -16,14 +16,17 @@ static func storey_base(plan: HousePlan, room: int) -> float:
 
 ## A placement, before it is known whether it fits.
 static func candidate(key: String, centre: Vector2, yaw: float,
-		zone_side := 1.0, scale := 1.0, height_scale := -1.0) -> Dictionary:
+		zone_side := 1.0, scale := 1.0, height_scale := -1.0,
+		zone_depth_override := -1.0) -> Dictionary:
 	var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw) * scale
 	var rect := Rect2(centre - foot / 2.0, foot)
 	var placement := {
 		"key": key, "pos": Vector3(centre.x, 0.0, centre.y), "yaw": yaw,
-		"rect": rect, "zone": zone_rect(key, rect, yaw, zone_side), "host": -1,
+		"rect": rect, "zone": zone_rect(key, rect, yaw, zone_side, zone_depth_override), "host": -1,
 		"cat": PropCatalog.category(key), "mounted": false, "scale": scale,
 	}
+	if zone_depth_override > 0.0:
+		placement["zone_depth_override"] = zone_depth_override
 	if height_scale >= 0.0:
 		placement["height_scale"] = height_scale
 	return placement
@@ -36,8 +39,9 @@ static func candidate(key: String, centre: Vector2, yaw: float,
 ## from its long side. Getting this wrong is not a cosmetic matter -- the
 ## navigation check requires every one of these to be reachable, so a zone on
 ## the wrong side of a chair reports the whole room as unusable.
-static func zone_rect(key: String, rect: Rect2, yaw: float, side := 1.0) -> Rect2:
-	var depth: float = PropCatalog.zone_depth(key)
+static func zone_rect(key: String, rect: Rect2, yaw: float, side := 1.0,
+		depth_override := -1.0) -> Rect2:
+	var depth: float = depth_override if depth_override > 0.0 else PropCatalog.zone_depth(key)
 	if depth <= 0.0:
 		return Rect2()
 	var cat: String = PropCatalog.category(key)
