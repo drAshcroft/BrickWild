@@ -195,6 +195,8 @@ static func _public_api(res: SuiteResult) -> void:
 		var scene := BrickWild.instantiate(building)
 		_expect(res, scene != null and scene.get_child_count() > 0,
 			"%s: the assembler returned nothing." % mill_type)
+		if scene != null:
+			scene.free()
 		# and the document crossing the boundary is lossless
 		var doc := BrickWild.generate_document(request)
 		var again: ArrayMesh = BrickWild.build_mesh(doc)

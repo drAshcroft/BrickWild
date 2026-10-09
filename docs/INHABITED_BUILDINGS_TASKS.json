@@ -299,6 +299,31 @@
       "phase": "inhabited-buildings",
       "status": "complete",
       "aiNotes": "Root reviewed full canonical request/assertion union. Eleven source-frozen processes PASS,195 checks,702.046s aggregate; each native0 under300s (max268.386s). Union validator plus missing-exit/NaN/duplicate rejection controls pass. See docs/API_QUICK_PARTITIONS.md and artifacts/personality/resumed/restart5_library_parts. Full API lane and placement coverage remain separate."
+    },
+    {
+      "id": "88848950-f618-4b71-bd7c-abcfa89b0150",
+      "key": "LIVE-PLACEMENT-PARTITIONS",
+      "title": "Preserve complete quick placement coverage in bounded processes",
+      "description": "Keep the unchanged canonical placementquick seven family requests, ten orientation/period fixtures and world-rect control. Extract the exact request construction and per-request assertions into reusable helpers without relaxing any checks. Require all13 bounded partitions, complete18 marker union, finite host times below300seconds, native0, clean logs, matching stable source fingerprints and root-reviewed rejection controls. Record aggregate separately from the original300.952second timeout. Commit driver, runner, validator, helper extraction, ledger and docs after verification; preserve pending Basilica approach assertions separately.",
+      "targetCoord": {
+        "file": "tools/placement_partition_driver.gd"
+      },
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "executing"
+    },
+    {
+      "id": "69522761-f7c4-4aee-94a0-9e8b214acd1a",
+      "key": "LIVE-API-SCENE-LIFETIME",
+      "title": "Release temporary windmill API test scenes",
+      "description": "WindmillSuite instantiates five owned scenes but does not free them; the API remainder printed ALL PASS264 yet produced renderer mesh/material/instance leak ERRORs at exit. Free each scene after its existing assembly assertion, retain all positive and negative coverage, require rerun of poly/windmill/cultureapi/compactapi with native0 and clean engine output, then commit fixture-only correction.",
+      "targetCoord": {
+        "file": "tests/suites/windmill_suite.gd"
+      },
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "complete",
+      "aiNotes": "2026-10-08 root found five unfreed WindmillSuite assembler scenes after264 passing assertions emitted renderer exit ERRORs. Added null-guarded scene.free immediately after existing assembly check; no assertions removed. Same four-suite API remainder now ALL PASS264/0fail/0warning, native0/153.899s with no engine errors or leaks. Receipt restart5_api_remaining_scene_cleanup. Fixture-only correction."
     }
   ]
 }
