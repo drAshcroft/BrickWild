@@ -45,7 +45,7 @@ const KINDS: Array[StringName] = [&"church", &"castle", &"house", &"shop",
 ##                rejected.
 const KIND_ROWS := {
 	&"church": {
-		"label": "Church", "size_label": "Nave", "height_label": "Eaves height (m)",
+		"label": "Church", "surfaces": 6, "size_label": "Nave", "height_label": "Eaves height (m)",
 		"style_label": "Style", "purpose_label": "",
 		"width": {"min": 6.0, "max": 24.0, "step": 0.5, "value": 10.0},
 		"length": {"min": 10.0, "max": 60.0, "step": 1.0, "value": 22.0},

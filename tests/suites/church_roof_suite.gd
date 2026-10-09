@@ -134,6 +134,52 @@ static func _tower_and_domes(res: SuiteResult) -> void:
 			builder._build_dome()
 			var before := builder.commit()
 			var old_roofs := _triangles(before, 2)
+			if s.crossing_tower and is_equal_approx(pitch, 0.32):
+				var assembled := ChurchBuilder.new()
+				var assembled_mesh: ArrayMesh = assembled.build(s)
+				var stone_triangles: Array = MeshProbe.surface_triangles(null,
+					assembled_mesh, ChurchBuilder.SURF_STONE)
+				var tower_base: float = ChurchGeometry.crossing_tower_aabb(s).position.y
+				var bearing_y: float = tower_base + 0.03
+				var center_z: float = ChurchGeometry.crossing_center_z(s)
+				var bay_depth: float = ChurchGeometry.crossing_bay_depth(s)
+				var corner_points: Array[Vector2] = []
+				for side_x in [-1.0, 1.0]:
+					for side_z in [-1.0, 1.0]:
+						corner_points.append(Vector2(
+							side_x * (s.width * 0.5 - ChurchBuilder.NAVE_WALL_T * 0.5),
+							center_z + side_z * (bay_depth * 0.5 - ChurchBuilder.NAVE_WALL_T * 0.5)))
+				for corner in corner_points:
+					var bearing_from := Vector3(corner.x, bearing_y + 0.1, corner.y)
+					var bearing_to := Vector3(corner.x, bearing_y - 0.35, corner.y)
+					_expect(res, MeshProbe.ray_blocked(stone_triangles, bearing_from, bearing_to),
+						"crossing tower corner bearing has no emitted stone contact at %s" % corner)
+					for fraction in [0.15, 0.35, 0.8]:
+						var wall_y: float = s.height * fraction
+						var x_from := Vector3(signf(corner.x) * (s.width * 0.5 + 0.6), wall_y, corner.y)
+						var x_to := Vector3(signf(corner.x) * (s.width * 0.5 - 0.6), wall_y, corner.y)
+						_expect(res, _intersects(stone_triangles, x_from, x_to),
+							"tower corner has no wall-to-bearing path on X below y=%.2f" % wall_y)
+						var z_from := Vector3(corner.x, wall_y,
+							center_z + signf(corner.y - center_z) * (bay_depth * 0.5 + 0.6))
+						var z_to := Vector3(corner.x, wall_y,
+							center_z + signf(corner.y - center_z) * (bay_depth * 0.5 - 0.6))
+						_expect(res, _intersects(stone_triangles, z_from, z_to),
+							"tower corner has no wall-to-bearing path on Z below y=%.2f" % wall_y)
+				var control_corner: Vector2 = corner_points[0]
+				var control_from := Vector3(control_corner.x, bearing_y + 0.1, control_corner.y)
+				var control_to := Vector3(control_corner.x, bearing_y - 0.35, control_corner.y)
+				var detached_kit := MeshKit.new(1)
+				detached_kit.box(Vector3(ChurchBuilder.NAVE_WALL_T, 0.28, bay_depth),
+					Vector3(control_corner.x, bearing_y + 0.75, control_corner.y), 0)
+				var detached_mesh: ArrayMesh = detached_kit.commit()
+				var detached_triangles: Array = MeshProbe.surface_triangles(null, detached_mesh, 0)
+				_expect(res, not MeshProbe.ray_blocked(detached_triangles, control_from, control_to),
+					"detached-bearing negative control still contacts the tower datum")
+				_expect(res, not MeshProbe.ray_blocked(stone_triangles,
+					Vector3(0.0, bearing_y + 0.1, center_z),
+					Vector3(0.0, bearing_y - 0.35, center_z)),
+					"crossing tower bearing sealed its center opening")
 			if kind == "octagonal":
 				for k in range(8):
 					var a := TAU * float(k) / 8.0 + PI / 8.0
@@ -325,8 +371,8 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 		var who := String(kind)
 		var expected_rings := ChurchBuilder.PENDENTIVE_PROFILE_STEPS + 1 \
 			+ (0 if octagonal else ChurchBuilder.PENDENTIVE_LEDGE_ROWS.size() * 3)
-		_expect(res, points.size() == segments * expected_rings * 6,
-			"%s pendentive should emit a closed curved loft with %d facets" % [who, segments])
+		_expect(res, points.size() == segments * expected_rings * 12,
+			"%s pendentive should emit a closed annular curved loft with %d facets" % [who, segments])
 		var x_extent := 0.0
 		var z_extent := 0.0
 		var top_angles: Dictionary = {}
@@ -361,23 +407,32 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 			if absf(point.y - center.y) < 0.0001 \
 					and Vector2(point.x - center.x, point.z - center.z).length() > 0.1:
 				var square_edge := maxf(absf(point.x - center.x), absf(point.z - center.z))
-				if absf(square_edge - lower_half) > 0.01:
+				if square_edge > lower_half - ChurchBuilder.NAVE_WALL_T * 0.5 \
+						and absf(square_edge - lower_half) > 0.01:
 					square_ring_ok = false
 			if absf(point.y - center.y - height) < 0.0001 \
 					and Vector2(point.x - center.x, point.z - center.z).length() > 0.1:
-				if absf(Vector2(point.x - center.x, point.z - center.z).length() - upper_radius) > 0.01:
+				var ring_radius: float = Vector2(point.x - center.x, point.z - center.z).length()
+				if ring_radius > upper_radius - ChurchBuilder.NAVE_WALL_T * 0.5 \
+						and absf(ring_radius - upper_radius) > 0.01:
 					drum_ring_ok = false
 		_expect(res, square_ring_ok, "%s lower ring does not meet square crossing within 1 cm" % who)
 		_expect(res, drum_ring_ok, "%s upper ring does not meet drum within 1 cm" % who)
 		_expect(res, _closed_triangle_shell(points), "%s pendentive shell has an open edge" % who)
+		var stone_triangles: Array = MeshProbe.surface_triangles(null, mesh, 0)
+		var aperture_from := Vector3(center.x, center.y - 0.1, center.z)
+		var aperture_to := Vector3(center.x, center.y + height + 0.1, center.z)
+		_expect(res, not MeshProbe.ray_blocked(stone_triangles, aperture_from, aperture_to),
+			"%s pendentive bearing bands sealed the true center aperture" % who)
 		var curved_ring := false
 		if not octagonal:
 			for point in points:
 				if absf(point.y - center.y - height / 3.0) < 0.0001 \
 						and absf(atan2(point.z - center.z, point.x - center.x) - PI / 4.0) < 0.0001:
 					var linear_radius := lerpf(lower_half / cos(PI / 4.0), upper_radius, 1.0 / 3.0)
-					curved_ring = absf(Vector2(point.x - center.x, point.z - center.z).length()
-						- linear_radius) > 0.05
+					var radius: float = Vector2(point.x - center.x, point.z - center.z).length()
+					if radius > linear_radius + 0.05:
+						curved_ring = absf(radius - linear_radius) > 0.05
 		_expect(res, octagonal or curved_ring,
 			"hemisphere support profile is still a straight-sided square-to-drum funnel")
 		if not octagonal:
@@ -398,6 +453,9 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 			and builder.component_log[0]["role"] == "pendentive_support",
 			"pendentive support lost its part/component logging")
 		var good_normals := normals.size() == points.size()
+		var outer_faces := 0
+		var inner_faces := 0
+		var side_triangles: int = segments * (expected_rings - 1) * 4
 		if good_normals:
 			for i in range(0, points.size(), 3):
 				var a := points[i]
@@ -416,8 +474,18 @@ static func _pendentive_transition(res: SuiteResult) -> void:
 				else:
 					var radial := Vector3((a.x + b.x + c.x) / 3.0 - center.x, 0.0,
 						(a.z + b.z + c.z) / 3.0 - center.z)
-					if n.dot(radial) <= 0.0:
-						good_normals = false
+					var face_index: int = int(i / 3)
+					if face_index < side_triangles:
+						if face_index % 4 < 2:
+							outer_faces += 1
+							if n.dot(radial) <= 0.0:
+								good_normals = false
+						else:
+							inner_faces += 1
+							if n.dot(radial) >= 0.0:
+								good_normals = false
+		_expect(res, outer_faces > 0 and inner_faces > 0,
+			"%s pendentive must retain both outward and inward annular faces" % who)
 		_expect(res, good_normals, "%s pendentive shell or cap faces inward or lacks normals" % who)
 		_expect(res, uvs.size() == points.size(), "%s pendentive lacks metric UVs" % who)
 		var finite_uvs := true

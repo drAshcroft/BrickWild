@@ -23,6 +23,7 @@ const CASE_BATCH_SIZE := 10
 const FULL_REQUEST_COUNT := 234
 const MAX_CASES_PER_INVOCATION := 10
 const VIEWS: Array[String] = ["exterior", "axis", "cutaway"]
+const SUPPLEMENTAL_CHURCH_VIEWS: Array[String] = ["vault"]
 
 var _out_dir := OUT_DEFAULT
 var _family_filter := "all"
@@ -134,8 +135,8 @@ func _parse_args(args: PackedStringArray) -> bool:
 				return false
 			seen_views[view] = true
 		for view in chosen_views:
-			if view not in VIEWS:
-				push_error("--view must be all or a comma-separated subset of exterior,axis,cutaway")
+			if view not in VIEWS and view not in SUPPLEMENTAL_CHURCH_VIEWS:
+				push_error("--view must be all or a comma-separated subset of exterior,axis,cutaway,vault")
 				quit(2)
 				return false
 	if _cult_filter != &"all" and _cult_filter not in TempleSpec.CULTS:
@@ -165,6 +166,12 @@ func _parse_args(args: PackedStringArray) -> bool:
 		push_error("Selectors matched no sacred requests")
 		quit(2)
 		return false
+	if _view_filter != "all" and _view_filter.split(",", false).has("vault"):
+		for case in selected_cases:
+			if String(case.get("family", "")) != "church":
+				push_error("--view=vault is supplemental and only supports Church requests")
+				quit(2)
+				return false
 	var default_profile := _family_filter == "all" and _size_filter == "default" \
 		and _seed_filter == "all" and _style_filter.is_empty() and _case_filter.is_empty() \
 		and _batch_filter < 0
@@ -295,6 +302,10 @@ func _all_case_ids() -> Array[String]:
 
 func _selected_cases() -> Array[Dictionary]:
 	var filtered: Array[Dictionary] = []
+	var selected_seed_values: Dictionary = {}
+	if _seed_filter != "all":
+		for seed_text in _seed_filter.split(",", false):
+			selected_seed_values[int(seed_text)] = true
 	for case in _all_cases():
 		var family := String(case["family"])
 		var target: StringName = case["style"]
@@ -302,7 +313,7 @@ func _selected_cases() -> Array[Dictionary]:
 		if family == "temple" and _cult_filter != &"all" \
 				and StringName(case["request"].get("cult", "blood")) != _cult_filter: continue
 		if _size_filter != "all" and String(case["size"]) != _size_filter: continue
-		if _seed_filter != "all" and not _seed_filter.split(",", false).has(str(case["seed"])): continue
+		if _seed_filter != "all" and not selected_seed_values.has(int(case["seed"])): continue
 		if not _selected_style(target): continue
 		if not _case_filter.is_empty() and not _case_filter.split(",", false).has(String(case["id"])): continue
 		filtered.append(case)
@@ -425,6 +436,30 @@ func _render_subject(made: GeneratedBuilding, family: String, style: String,
 					"station_xz": [station_xz.x, station_xz.y],
 					"route_distance": float(station["route_distance"]),
 					"body_radius": TempleGeometry.PERSON_RADIUS}
+			"vault":
+				var vault_station: Dictionary = _church_axis_station(spec)
+				if not bool(vault_station.get("ok", false)):
+					var reason := "no entrance-connected Church vault camera station: " + case_id
+					push_error(reason)
+					_errors.append(reason)
+					_root3d.remove_child(scene)
+					scene.free()
+					return
+				var vault_station_xz: Vector2 = vault_station["position"]
+				var vault_floor_y: float = float(vault_station["floor_y"])
+				var vault_focus: Dictionary = _church_vault_focus(spec, vault_station_xz)
+				_cam.fov = 62.0
+				_cam.position = Vector3(vault_station_xz.x,
+					vault_floor_y + 1.65, vault_station_xz.y)
+				focus = vault_focus["position"]
+				camera_record = {"view_scope": "supplemental", "view_kind": "vault",
+					"focus_kind": String(vault_focus["kind"]), "roof_on": true,
+					"entrance_connected": true, "body_clear": false,
+					"clearance_status": "not measured against shell and props",
+					"floor_y": vault_floor_y,
+					"station_xz": [vault_station_xz.x, vault_station_xz.y],
+					"route_distance": float(vault_station["route_distance"]),
+					"body_radius": TempleGeometry.PERSON_RADIUS}
 			"cutaway":
 				_cam.fov = 52.0
 				var cutaway_direction := Vector3(sin(yaw), 1.0, cos(yaw)).normalized()
@@ -539,6 +574,68 @@ func _church_axis_station(spec: ChurchSpec) -> Dictionary:
 				"route_distance": route_distance, "body_clear": false,
 				"clearance_status": "not measured against shell and props"}
 	return {"ok": false}
+
+
+## Aim the supplemental shot at authored high structure from the same reached
+## human-eye station as the axis view. This is a camera target, not clearance proof.
+func _church_vault_focus(spec: ChurchSpec, station_xz: Vector2) -> Dictionary:
+	if spec.dome:
+		var shell_base: float = ChurchGeometry.dome_base_height(spec) \
+			+ ChurchGeometry.pendentive_height(spec) + spec.dome_drum_height
+		var dome_y: float = shell_base + ChurchGeometry.dome_shell_rise(spec) * 0.62
+		return {"position": Vector3(0.0, dome_y,
+			ChurchGeometry.crossing_center_z(spec)), "kind": "dome_interior"}
+	var zs: Array[float] = ChurchGeometry.nave_support_zs(spec)
+	var crossing_center: float = ChurchGeometry.crossing_center_z(spec)
+	var crossing_half: float = ChurchGeometry.crossing_bay_depth(spec) * 0.5
+	var has_crossing_roof: bool = spec.dome or spec.crossing_tower \
+			or spec.hero in [&"hagia", &"florence", &"basil"]
+	if has_crossing_roof:
+		var outside_crossing: Array[float] = []
+		for z in zs:
+			if z < crossing_center - crossing_half - 0.05 \
+					or z > crossing_center + crossing_half + 0.05:
+				outside_crossing.append(z)
+		zs = outside_crossing
+	var focus_z: float = INF
+	for index in range(maxi(zs.size() - 1, 0)):
+		var z: float = zs[index]
+		var next_z: float = zs[index + 1]
+		if z <= station_xz.y + 0.8:
+			continue
+		var crosses_roof_bay: bool = has_crossing_roof \
+			and z < crossing_center + crossing_half - 0.05 \
+			and next_z > crossing_center - crossing_half + 0.05
+		if crosses_roof_bay:
+			continue
+		focus_z = minf(focus_z, z)
+	if focus_z == INF:
+		for index in range(maxi(zs.size() - 1, 0)):
+			var z: float = zs[index]
+			var next_z: float = zs[index + 1]
+			var crosses_roof_bay: bool = has_crossing_roof \
+				and z < crossing_center + crossing_half - 0.05 \
+				and next_z > crossing_center - crossing_half + 0.05
+			if crosses_roof_bay:
+				continue
+			if focus_z == INF or absf(z - station_xz.y) < absf(focus_z - station_xz.y):
+				focus_z = z
+	var focus_kind := "nave_arch_crown"
+	if focus_z == INF:
+		focus_z = spec.length * 0.16
+		focus_kind = "nave_ridge_region"
+	var spring: float
+	var peak: float
+	if spec.style == &"nordic_stave":
+		var rafter: float = clampf(spec.width * 0.04, 0.28, 0.48)
+		peak = spec.height + spec.width * spec.roof_pitch \
+			- RoofShape.DEPTH * 0.5 - rafter * 0.5 + 0.005
+		return {"position": Vector3(0.0, peak, focus_z),
+			"kind": "stave_ridge_truss" if focus_kind == "nave_arch_crown" else focus_kind}
+	spring = minf(spec.height * 0.72, spec.height - 1.4)
+	var half_span: float = spec.width * 0.5 - ChurchBuilder.NAVE_WALL_T - 0.28
+	peak = spring + minf(spec.height * 0.18, half_span * 0.42)
+	return {"position": Vector3(0.0, peak, focus_z), "kind": focus_kind}
 
 func _temple_axis_station(spec: TempleSpec) -> Dictionary:
 	var floors: Array[Rect2] = TempleGeometry.floor_rects(spec)

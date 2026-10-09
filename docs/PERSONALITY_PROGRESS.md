@@ -299,3 +299,40 @@ pass. Together with the library partitions and four remaining suites, this
 retains all quick API-lane coverage: 490 checks. The original combined placement
 selector timed out at 300.952 s; it is not reported as a pass. Scheduled sweeps
 and final family design acceptance remain separate.
+
+### 2026-10-09 — Continued after computer restart
+
+LIVE-SACRED-CHURCH completes the bounded occupied-structure slice. Real nave
+frames, dome bearings, open ambulatory paving/roof and Nordic timber surfaces
+are verified. Later dome painting now respects logical material slots; the wall
+emitter honors its requested wood surface. Fresh upward renders exposed another
+defect: a string course was a solid slab across the whole nave at 62% of wall
+height. It is now named perimeter trim split at actual nave/tower openings.
+
+The full structural fixture passes (native0, 74.227 s), including 48 course cases
+and the exact former slab as a negative. Church lane plus aperture checks pass
+5,796 checks (45.555 s), retaining 12 warnings; VIS-008 passes 47 checks (5.377 s).
+All eleven geometry-lane selectors pass in three bounded processes: 9,633 checks,
+627.298 s aggregate, each below 300 s. One overlapping bounds process was stopped
+and excluded; its fresh serial replacement passes. The selector fixture passes
+(9.426 s) and an exact CLI seed8102 public capture passes (14.921 s).
+
+Root opened all 18 original six-style images and six supplemental upward views.
+The frames and dome interiors are exposed instead of hidden by the accidental
+ceiling. This is structural acceptance, not complete style acceptance. Plain
+walls, high small windows, pale Nordic timber, repetitive furnishing and cutaway
+trim visibility remain design work. Body clearance is unmeasured; the original
+234 requests and 702 images remain frozen. See
+`visualqa/personality/CHURCH_STRUCTURE_REVIEW.md`.
+
+LIVE-WITCH remains open. Its scoped physical thatch bundles and narrower flue
+parse and render, but the first mesh fixture found floating-point boundary
+measurement failures. A tolerance correction with a real undersized-envelope
+negative is staged. Root opened all four fresh exact-pin images; the high gable
+and tiled-looking roof still read as a generic cottage. A scoped roof/material
+revision is staged and unverified. No Witch identity acceptance is claimed.
+
+LIVE-SACRED-ROTUNDA records the next bounded form repair. The artifact proposal
+has a circular occupied drum, connected threshold and a real bearing gate head;
+its source and fixtures have not yet been run. Parent LIVE-SACRED and the wider
+house, shop and family rollout remain in progress.

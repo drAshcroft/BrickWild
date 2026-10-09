@@ -3,16 +3,15 @@ extends MassBuilder
 ## ChurchSpec -> ArrayMesh. Massing-first: nave box, optional aisles, transept,
 ## apse (half-cylinder), west tower + roof, then window/door/trim detailing.
 ##
-## Surfaces: 0 = stone walls, 1 = trim/string courses, 2 = roof, 3 = openings
-##           (dark recesses for windows/doors),
-##           4 = painted domes (vertex-coloured; only the hero St Basil's
-##           emits it, and an empty trailing surface is not committed).
+## Surfaces: 0 = stone/plinth, 1 = trim, 2 = roof, 3 = openings,
+##           4 = painted domes, 5 = Nordic stave timber.
 
 const SURF_STONE := 0
 const SURF_TRIM := 1
 const SURF_ROOF := 2
 const SURF_OPEN := 3
 const SURF_ACCENT := 4
+const SURF_WOOD := 5
 
 ## How far attached masses penetrate the host wall, so they read as joined
 ## rather than floating beside it or swallowing the nave.
@@ -35,7 +34,7 @@ var _roof_volumes: Array[PackedVector3Array] = []
 
 func build(p_spec: ChurchSpec) -> ArrayMesh:
 	spec = p_spec
-	begin_metric(5)
+	begin_metric(6)
 	_roof_volumes.clear()
 
 	var w: float = spec.width
@@ -47,6 +46,8 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	# ---------- nave ----------
 	tag("nave")
 	_nave_shell()
+	_build_nave_structure()
+	_build_apse_entrance_arch()
 	_log_mass("nave", AABB(Vector3(-w / 2.0, 0.0, -l / 2.0), Vector3(w, h, l)))
 	total_height = maxf(total_height, h + w * spec.roof_pitch)
 
@@ -83,7 +84,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 						aisle_windows.append({"face": 1 if side > 0.0 else 3,
 							"u": wz, "y": ah * 0.5, "width": 0.7,
 							"height": ah * 0.33, "style": spec.window_style})
-				_windowed_box_shell(aisle, aisle_windows)
+				_windowed_box_shell(aisle, aisle_windows, true, false)
 				_log_mass("aisle_%s_%d" % ["left" if side < 0.0 else "right", ring],
 					aisle)
 				# Only the OUTERMOST ring gets side windows. Every ring used to,
@@ -100,12 +101,27 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		var tz_z: float = ChurchGeometry.transept_center_z(spec)
 		var transept: AABB = ChurchGeometry.transept_aabb(spec)
 		var transept_windows: Array[Dictionary] = []
+		var crossing_arch := _crossing_arch_profile()
+		var crossing_opening_w: float = float(crossing_arch["half_span"]) * 2.0
+		var crossing_spring: float = float(crossing_arch["spring_y"])
+		var crossing_peak: float = float(crossing_arch["peak_y"])
+		for face in [0, 2]:
+			transept_windows.append({"face": face, "u": 0.0,
+				"y": crossing_peak * 0.5, "width": crossing_opening_w,
+				"height": crossing_peak, "spring_y": crossing_spring,
+				"arch": crossing_arch["kind"], "style": &"pointed", "door": true, "log": true})
 		for sx_v in [-1.0, 1.0]:
 			transept_windows.append({"face": 1 if sx_v > 0.0 else 3,
 				"u": tz_z, "y": h * 0.55, "width": spec.window_w,
 				"height": spec.window_h, "style": spec.window_style})
-		_windowed_box_shell(transept, transept_windows)
+		_windowed_box_shell(transept, transept_windows, true, false)
 		_log_mass("transept", transept)
+		_build_nave_arch(tz_z - tz_w * 0.5 + NAVE_WALL_T * 0.5, crossing_spring,
+			clampf(spec.width * 0.04, 0.28, 0.48),
+			clampf(spec.width * 0.045, 0.32, 0.58), false, crossing_arch)
+		_build_nave_arch(tz_z + tz_w * 0.5 - NAVE_WALL_T * 0.5, crossing_spring,
+			clampf(spec.width * 0.04, 0.28, 0.48),
+			clampf(spec.width * 0.045, 0.32, 0.58), false, crossing_arch)
 		if spec.corner_turrets:
 			for sx_v in [-1.0, 1.0]:
 				pinnacle(Vector3(sx_v * (tz_len / 2.0 - 0.3), h + 0.4, tz_z - tz_w / 2.0 + 0.3))
@@ -129,7 +145,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		_arc_window_shell(Vector3(0, 0, cy), spec.apse_radius,
 			h * ChurchGeometry.APSE_HEIGHT_RATIO, 11, PI, 0.0,
 			[-0.6, 0.0, 0.6], 0.6, apse_light_h,
-			apse_light_y, spec.window_style, true)
+			apse_light_y, spec.window_style, false, true)
 		# The drum is a HALF cylinder, so its roof is a HALF cone: it must cover
 		# z in [cy, cy + r] only. A full cone here would overhang the void west
 		# of the drum -- which is exactly what hid the detached apse from the
@@ -150,36 +166,8 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		var mass_name: String = "tower"
 		if spec.west_towers >= 2:
 			mass_name = "tower_%s" % ("left" if side < 0.0 else "right")
-		var tower_windows: Array[Dictionary] = []
-		for face in range(4):
-			tower_windows.append({"face": face,
-				"u": lz if face % 2 == 1 else lx,
-				"y": th - tw * 0.28, "width": tw * 0.32,
-				"height": tw * 0.26, "style": &"square"})
-		if spec.west_towers > 0:
-			var x0: float = lx - tw * 0.5
-			var x1: float = lx + tw * 0.5
-			for portal in _west_door_openings():
-				var left: float = maxf(x0, portal.pos.x - portal.width * 0.5)
-				var right: float = minf(x1, portal.pos.x + portal.width * 0.5)
-				if right <= left:
-					continue
-				for face in [0, 2]:
-					tower_windows.append({"face": face, "u": (left + right) * 0.5,
-						"y": portal.pos.y, "width": right - left,
-						"height": portal.height, "style": portal.style, "log": false})
-				if left <= x0 + NAVE_WALL_T:
-					tower_windows.append({"face": 3, "u": lz,
-						"y": portal.pos.y, "width": tw,
-						"height": portal.height, "style": portal.style, "log": false})
-				if right >= x1 - NAVE_WALL_T:
-					tower_windows.append({"face": 1, "u": lz,
-						"y": portal.pos.y, "width": tw,
-						"height": portal.height, "style": portal.style, "log": false})
-		if spec.west_towers == 1 and spec.rose_window:
-			tower_windows.append_array(_rose_holes(2, lx, _rose_y(),
-				_rose_radius()))
-		_windowed_box_shell(ChurchGeometry.tower_aabb(spec, side), tower_windows)
+		var tower_windows := _tower_openings(lx, lz, tw, th)
+		_windowed_box_shell(ChurchGeometry.tower_aabb(spec, side), tower_windows, true, false)
 		_log_mass(mass_name, ChurchGeometry.tower_aabb(spec, side))
 		total_height = maxf(total_height, th)
 		var rise: float = ChurchGeometry.tower_roof_rise(spec)
@@ -262,11 +250,25 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	# ---------- string course ----------
 	tag("trim")
 	if spec.string_course:
-		box(Vector3(w + 0.35, 0.18, l + 0.35), Vector3(0, h * 0.62, 0), SURF_TRIM)
-		if spec.tower:
-			var lz3: float = -l / 2.0 + TOWER_EMBED - spec.tower_width / 2.0
-			box(Vector3(spec.tower_width + 0.3, 0.18, spec.tower_width + 0.3),
-				Vector3(0, h * 0.62, lz3), SURF_TRIM)
+		var course_y: float = h * 0.62
+		var course_t: float = 0.18
+		_emit_perimeter_course("nave_string_course",
+			AABB(Vector3(-w * 0.5, 0.0, -l * 0.5), Vector3(w, h, l)),
+			_nave_openings(), course_y, course_t)
+		for side_v in ChurchGeometry.west_tower_sides(spec):
+			var side: float = side_v
+			var tower_aabb: AABB = ChurchGeometry.tower_aabb(spec, side)
+			if course_y - course_t * 0.5 < tower_aabb.position.y \
+					or course_y + course_t * 0.5 > tower_aabb.end.y:
+				continue
+			var lx: float = ChurchGeometry.tower_center_x(spec, side)
+			var lz: float = ChurchGeometry.tower_center_z(spec)
+			var tower_name := "tower_%s" % ("left" if side < 0.0 else "right")
+			if spec.west_towers == 1:
+				tower_name = "tower"
+			_emit_perimeter_course("%s_string_course" % tower_name,
+				tower_aabb, _tower_openings(lx, lz, spec.tower_width,
+					spec.tower_height), course_y, course_t)
 
 	# ---------- main door ----------
 	tag("door")
@@ -315,7 +317,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	# ChurchAssembler is the only thing that ever loads a model.
 	prop_log = ChurchFurnisher.dress(spec)
 
-	return commit()
+	return commit_named()
 
 
 ## The nave shell is split at its wall faces. Each masonry panel has measured
@@ -351,19 +353,28 @@ func _rose_holes(face: int, u: float, y: float, radius: float) -> Array[Dictiona
 ## the actual window bounds; the exposed box ends make physical stone returns.
 ## Rows use world-space u (X on north/south, Z on east/west) and a face index:
 ## +Z, +X, -Z, -X. Portal rows may set log=false when logged elsewhere.
-func _windowed_box_shell(a: AABB, openings: Array[Dictionary]) -> void:
+func _church_wall_surface() -> int:
+	return SURF_WOOD if spec.style == &"nordic_stave" else SURF_STONE
+
+
+func _windowed_box_shell(a: AABB, openings: Array[Dictionary],
+		cap_bottom := true, cap_top := true) -> void:
+	var wall_surface: int = _church_wall_surface()
 	for face in range(4):
 		var holes: Array[Dictionary] = []
 		for opening in openings:
 			if int(opening["face"]) == face:
 				holes.append(opening)
-		_box_wall_with_holes(a, face, holes)
-	var st: SurfaceTool = _kit.surface(SURF_STONE)
-	for y in [a.position.y, a.end.y]:
-		_nave_plane(st, Vector3(a.position.x, y, a.position.z),
+		_box_wall_with_holes(a, face, holes, wall_surface)
+	for cap_index in range(2):
+		if (cap_index == 0 and not cap_bottom) or (cap_index == 1 and not cap_top):
+			continue
+		var y: float = a.position.y if cap_index == 0 else a.end.y
+		var cap_surface: int = SURF_STONE if cap_index == 0 else wall_surface
+		_nave_plane(_kit.surface(cap_surface), Vector3(a.position.x, y, a.position.z),
 			Vector3(a.end.x, y, a.position.z), Vector3(a.end.x, y, a.end.z),
 			Vector3(a.position.x, y, a.end.z),
-			Vector3.DOWN if y == a.position.y else Vector3.UP)
+			Vector3.DOWN if cap_index == 0 else Vector3.UP)
 	for opening in openings:
 		if not bool(opening.get("log", true)):
 			continue
@@ -388,13 +399,18 @@ func _windowed_box_shell(a: AABB, openings: Array[Dictionary]) -> void:
 			bool(opening.get("door", false)), true)
 
 
-func _box_wall_with_holes(a: AABB, face: int, holes: Array[Dictionary]) -> void:
+func _box_wall_with_holes(a: AABB, face: int, holes: Array[Dictionary],
+		wall_surface: int = SURF_STONE) -> void:
 	var u0: float = a.position.x if face % 2 == 0 else a.position.z
 	var u1: float = a.end.x if face % 2 == 0 else a.end.z
 	var edges: Array[float] = [u0, u1]
 	for hole in holes:
 		edges.append(clampf(float(hole["u"]) - float(hole["width"]) * 0.5, u0, u1))
 		edges.append(clampf(float(hole["u"]) + float(hole["width"]) * 0.5, u0, u1))
+		if hole.has("arch"):
+			for sample in range(1, 33):
+				edges.append(clampf(float(hole["u"]) - float(hole["width"]) * 0.5
+					+ float(sample) * float(hole["width"]) / 32.0, u0, u1))
 	edges.sort()
 	for i in range(edges.size() - 1):
 		var left: float = edges[i]
@@ -408,8 +424,7 @@ func _box_wall_with_holes(a: AABB, face: int, holes: Array[Dictionary]) -> void:
 				continue
 			bands.append(clampf(float(hole["y"]) - float(hole["height"]) * 0.5,
 				a.position.y, a.end.y))
-			bands.append(clampf(float(hole["y"]) + float(hole["height"]) * 0.5,
-				a.position.y, a.end.y))
+			bands.append(clampf(_box_opening_top(hole, mid), a.position.y, a.end.y))
 		bands.sort()
 		for j in range(bands.size() - 1):
 			var bottom: float = bands[j]
@@ -419,8 +434,9 @@ func _box_wall_with_holes(a: AABB, face: int, holes: Array[Dictionary]) -> void:
 			var y: float = (bottom + top) * 0.5
 			var cut := false
 			for hole in holes:
+				var hole_bottom: float = float(hole["y"]) - float(hole["height"]) * 0.5
 				if absf(mid - float(hole["u"])) < float(hole["width"]) * 0.5 \
-						and absf(y - float(hole["y"])) < float(hole["height"]) * 0.5:
+						and y > hole_bottom and y < _box_opening_top(hole, mid):
 					cut = true
 					break
 			if cut:
@@ -436,7 +452,24 @@ func _box_wall_with_holes(a: AABB, face: int, holes: Array[Dictionary]) -> void:
 				3:
 					size = Vector3(NAVE_WALL_T, top - bottom, right - left)
 					pos = Vector3(a.position.x + NAVE_WALL_T * 0.5, y, mid)
-			box(size, pos, SURF_STONE)
+			box(size, pos, wall_surface)
+
+
+func _crossing_arch_profile() -> Dictionary:
+	var half_span: float = spec.width * 0.5 - NAVE_WALL_T - 0.28
+	var spring: float = spec.height * 0.78
+	var peak: float = spring + minf(spec.height * 0.18, half_span * 0.42)
+	var kind: StringName = &"gothic" if spec.style == &"gothic" else &"round"
+	return {"half_span": half_span, "spring_y": spring, "peak_y": peak, "kind": kind}
+
+
+func _box_opening_top(opening: Dictionary, u: float) -> float:
+	if not opening.has("arch"):
+		return float(opening["y"]) + float(opening["height"]) * 0.5
+	var spring: float = float(opening["spring_y"])
+	var peak: float = float(opening["y"]) + float(opening["height"]) * 0.5
+	return ChurchGeometry.arch_head_y(u - float(opening["u"]),
+		float(opening["width"]) * 0.5, spring, peak, StringName(opening["arch"]))
 
 
 ## Revolved wall facets are chords. The selected window is centred on its
@@ -445,14 +478,15 @@ func _box_wall_with_holes(a: AABB, face: int, holes: Array[Dictionary]) -> void:
 func _arc_window_shell(center: Vector3, radius: float, height: float,
 		segments: int, arc: float, start: float, face_angles: Array,
 		width: float, opening_h: float, opening_y: float,
-		style: StringName, cap_top := false) -> void:
+		style: StringName, cap_top := false, open_ends := false) -> void:
 	var cut_faces: Dictionary = {}
 	var step: float = arc / float(segments)
 	for angle in face_angles:
 		var theta: float = wrapf(PI * 0.5 - float(angle) - start, 0.0, TAU)
 		var index: int = clampi(roundi(theta / step - 0.5), 0, segments - 1)
 		cut_faces[index] = true
-	var st: SurfaceTool = _kit.surface(SURF_STONE)
+	var wall_surface: int = _church_wall_surface()
+	var st: SurfaceTool = _kit.surface(wall_surface)
 	var thickness: float = minf(NAVE_WALL_T, radius * 0.24)
 	for i in range(segments):
 		var a0: float = start + step * float(i)
@@ -485,7 +519,7 @@ func _arc_window_shell(center: Vector3, radius: float, height: float,
 		if cap_top:
 			_kit._tri(st, center + Vector3.UP * height,
 				p0 + Vector3.UP * height, p1 + Vector3.UP * height)
-	if arc < TAU - 0.001:
+	if arc < TAU - 0.001 and not open_ends:
 		for angle in [start, start + arc]:
 			var outer := center + Vector3(cos(angle) * radius, 0, sin(angle) * radius)
 			if angle == start:
@@ -505,7 +539,7 @@ func _arc_wall_panel(p0: Vector3, p1: Vector3, normal: Vector3,
 	var q1: Vector3 = p0.lerp(p1, u1)
 	box(Vector3(q0.distance_to(q1), y1 - y0, thickness),
 		(q0 + q1) * 0.5 - normal * thickness * 0.5
-			+ Vector3.UP * (y0 + y1) * 0.5, SURF_STONE, face)
+			+ Vector3.UP * (y0 + y1) * 0.5, _church_wall_surface(), face)
 
 
 func _cuts_clerestory() -> bool:
@@ -533,10 +567,9 @@ func _west_door_openings() -> Array[Dictionary]:
 	return out
 
 
-func _nave_shell() -> void:
+func _nave_openings() -> Array[Dictionary]:
 	var w: float = spec.width
 	var h: float = spec.height
-	var l: float = spec.length
 	var holes: Array[Dictionary] = []
 	if _cuts_clerestory():
 		for opening in ChurchGeometry.clerestory_windows(spec):
@@ -557,8 +590,293 @@ func _nave_shell() -> void:
 			"log": false})
 	if spec.rose_window and spec.west_towers != 1:
 		holes.append_array(_rose_holes(2, 0.0, _rose_y(), _rose_radius()))
+	if spec.apse:
+		var portal_spring: float = h * 0.72
+		var portal_half: float = w * 0.5 - NAVE_WALL_T - 0.28
+		var portal_rise: float = minf(h * 0.24, portal_half * 0.42)
+		var portal_peak: float = portal_spring + portal_rise
+		holes.append({"face": 0, "u": 0.0, "y": portal_peak * 0.5,
+			"width": portal_half * 2.0, "height": portal_peak,
+			"spring_y": portal_spring,
+			"arch": "gothic" if spec.style == &"gothic" else "round",
+			"style": &"pointed", "door": true, "log": true})
+	return holes
+
+
+func _tower_openings(lx: float, lz: float, tw: float, th: float) -> Array[Dictionary]:
+	var holes: Array[Dictionary] = []
+	for face in range(4):
+		holes.append({"face": face, "u": lz if face % 2 == 1 else lx,
+			"y": th - tw * 0.28, "width": tw * 0.32,
+			"height": tw * 0.26, "style": &"square"})
+	if spec.west_towers > 0:
+		var x0: float = lx - tw * 0.5
+		var x1: float = lx + tw * 0.5
+		for portal in _west_door_openings():
+			var left: float = maxf(x0, portal.pos.x - portal.width * 0.5)
+			var right: float = minf(x1, portal.pos.x + portal.width * 0.5)
+			if right <= left:
+				continue
+			for face in [0, 2]:
+				holes.append({"face": face, "u": (left + right) * 0.5,
+					"y": portal.pos.y, "width": right - left,
+					"height": portal.height, "style": portal.style, "log": false})
+			if left <= x0 + NAVE_WALL_T:
+				holes.append({"face": 3, "u": lz, "y": portal.pos.y,
+					"width": tw, "height": portal.height,
+					"style": portal.style, "log": false})
+			if right >= x1 - NAVE_WALL_T:
+				holes.append({"face": 1, "u": lz, "y": portal.pos.y,
+					"width": tw, "height": portal.height,
+					"style": portal.style, "log": false})
+	if spec.west_towers == 1 and spec.rose_window:
+		holes.append_array(_rose_holes(2, lx, _rose_y(), _rose_radius()))
+	return holes
+
+
+func _nave_shell() -> void:
+	var w: float = spec.width
+	var h: float = spec.height
+	var l: float = spec.length
 	_windowed_box_shell(AABB(Vector3(-w * 0.5, 0, -l * 0.5),
-		Vector3(w, h, l)), holes)
+		Vector3(w, h, l)), _nave_openings(), true, false)
+
+
+## Emit a string course as four exterior runs. Apertures crossing the course
+## elevation are removed from the run so the trim cannot cap a real opening.
+func _emit_perimeter_course(course_host: String, bounds: AABB,
+		openings: Array[Dictionary], course_y: float,
+		thickness: float) -> void:
+	var x0: float = bounds.position.x - 0.175
+	var x1: float = bounds.end.x + 0.175
+	var z0: float = bounds.position.z - 0.175
+	var z1: float = bounds.end.z + 0.175
+	var face_centres := {
+		0: Vector3(0.0, course_y, bounds.end.z + thickness * 0.5),
+		1: Vector3(bounds.end.x + thickness * 0.5, course_y, 0.0),
+		2: Vector3(0.0, course_y, bounds.position.z - thickness * 0.5),
+		3: Vector3(bounds.position.x - thickness * 0.5, course_y, 0.0)}
+	for face in range(4):
+		var is_end: bool = face == 0 or face == 2
+		var span_min: float = x0 if is_end else z0
+		var span_max: float = x1 if is_end else z1
+		var cuts: Array[Vector2] = []
+		for opening in openings:
+			if int(opening.get("face", -1)) != face:
+				continue
+			var low_y: float = float(opening["y"]) - float(opening["height"]) * 0.5
+			var high_y: float = _box_opening_top(opening, float(opening["u"]))
+			if high_y <= course_y - thickness * 0.5 or low_y >= course_y + thickness * 0.5:
+				continue
+			var half_opening: float = float(opening["width"]) * 0.5 + 0.04
+			var cut_min: float = maxf(span_min, float(opening["u"]) - half_opening)
+			var cut_max: float = minf(span_max, float(opening["u"]) + half_opening)
+			if cut_max > cut_min:
+				cuts.append(Vector2(cut_min, cut_max))
+		cuts.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+		var merged: Array[Vector2] = []
+		for cut in cuts:
+			if merged.is_empty() or cut.x > merged.back().y:
+				merged.append(cut)
+			else:
+				var previous: Vector2 = merged.back()
+				merged[merged.size() - 1] = Vector2(previous.x, maxf(previous.y, cut.y))
+		var cursor: float = span_min
+		var segment_index: int = 0
+		for cut in merged:
+			if cut.x > cursor + 0.02:
+				_emit_course_segment(course_host, face, segment_index,
+					cursor, cut.x, is_end, face_centres[face], thickness)
+				segment_index += 1
+			cursor = maxf(cursor, cut.y)
+		if span_max > cursor + 0.02:
+			_emit_course_segment(course_host, face, segment_index,
+				cursor, span_max, is_end, face_centres[face], thickness)
+
+
+func _emit_course_segment(course_host: String, face: int,
+		segment_index: int, low: float, high: float, is_end: bool,
+		face_center: Vector3, thickness: float) -> void:
+	var size: Vector3
+	var pos: Vector3 = face_center
+	if is_end:
+		size = Vector3(high - low, thickness, thickness)
+		pos.x = (low + high) * 0.5
+	else:
+		size = Vector3(thickness, thickness, high - low)
+		pos.z = (low + high) * 0.5
+	var face_name: String = ["east", "right", "west", "left"][face]
+	var role := "string_course_%s_%d" % [face_name, segment_index]
+	host(course_host)
+	var row: Dictionary = component_box(role, size,
+		Transform3D(Basis.IDENTITY, pos), SURF_TRIM)
+	_log_part("box", pos, size)
+	part_log.back()["component_id"] = row["id"]
+	host_end()
+
+
+## The east wall opening is a real nave-to-apse passage. Its curved ring bears
+## on the two surviving wall returns rather than floating over a solid wall.
+func _build_apse_entrance_arch() -> void:
+	if not spec.apse:
+		return
+	tag("apse")
+	host("apse_entrance_arch")
+	var spring: float = spec.height * 0.72
+	var z: float = spec.length * 0.5 - NAVE_WALL_T * 0.5
+	_build_nave_arch(z, spring, clampf(spec.width * 0.05, 0.34, 0.56),
+		clampf(spec.width * 0.055, 0.38, 0.62), true)
+	host_end()
+
+
+## Give the nave a visible load path. Frames follow outside buttress stations;
+## only stations and spans inside a dome/lantern crossing bay are omitted.
+func _build_nave_structure() -> void:
+	var zs: Array[float] = ChurchGeometry.nave_support_zs(spec)
+	var crossing_center: float = ChurchGeometry.crossing_center_z(spec)
+	var crossing_half: float = ChurchGeometry.crossing_bay_depth(spec) * 0.5
+	var has_crossing_roof: bool = spec.dome or spec.crossing_tower \
+			or spec.hero in [&"hagia", &"florence", &"basil"]
+	if has_crossing_roof:
+		var outside: Array[float] = []
+		for z in zs:
+			if z < crossing_center - crossing_half - 0.05 \
+					or z > crossing_center + crossing_half + 0.05:
+				outside.append(z)
+		zs = outside
+	if zs.size() < 2:
+		return
+	var wall_inner: float = spec.width * 0.5 - NAVE_WALL_T
+	var pier_projection: float = 0.34
+	var pier_width: float = clampf(spec.width * 0.065, 0.42, 0.78)
+	var spring: float = _stave_eave_y() if spec.style == &"nordic_stave" \
+		else minf(spec.height * 0.72, spec.height - 1.4)
+	var rib_depth: float = clampf(spec.width * 0.045, 0.32, 0.58)
+	var rib_thickness: float = clampf(spec.width * 0.04, 0.28, 0.48)
+	for bay_index in range(zs.size()):
+		var z: float = zs[bay_index]
+		var has_next: bool = bay_index < zs.size() - 1
+		var next_z: float = zs[bay_index + 1] if has_next else z
+		var crosses_roof_bay: bool = has_crossing_roof and has_next \
+			and z < crossing_center + crossing_half - 0.05 \
+			and next_z > crossing_center - crossing_half + 0.05
+		host("nave_bay_%d" % bay_index)
+		var pier_surface: int = SURF_WOOD if spec.style == &"nordic_stave" else SURF_STONE
+		for side in [-1.0, 1.0]:
+			var x: float = side * (wall_inner - pier_projection / 2.0)
+			var floor_y: float = ChurchGeometry.FLOOR_LIFT
+			var shaft_h: float = maxf(spring - floor_y - 0.16, 0.8)
+			var shaft_size := Vector3(pier_projection, shaft_h, pier_width)
+			var shaft_xf := Transform3D(Basis(), Vector3(x, floor_y + shaft_h / 2.0, z))
+			component_box("nave_engaged_pier", shaft_size, shaft_xf, pier_surface)
+			var cap_size := Vector3(pier_projection + 0.14, 0.32, pier_width + 0.2)
+			var cap_xf := Transform3D(Basis(), Vector3(x, spring, z))
+			component_box("nave_pier_capital", cap_size, cap_xf,
+				SURF_WOOD if spec.style == &"nordic_stave" else SURF_TRIM)
+		if has_next and not crosses_roof_bay and spec.style != &"nordic_stave":
+			var sanctuary: bool = spec.apse and bay_index == zs.size() - 2
+			_build_nave_arch(z, spring, rib_thickness, rib_depth, sanctuary)
+		if spec.style == &"nordic_stave":
+			_build_stave_truss(z, spring, rib_thickness, rib_depth)
+		host_end()
+		if spec.style == &"nordic_stave" and has_next and not crosses_roof_bay:
+			_build_stave_longitudinals(z, next_z, spring, rib_thickness, rib_depth)
+
+
+func _build_nave_arch(z: float, spring: float, thickness: float, depth: float,
+		sanctuary: bool = false, profile: Dictionary = {}) -> void:
+	var half_span: float = spec.width * 0.5 - NAVE_WALL_T - 0.28
+	var rise_ratio: float = 0.24 if sanctuary else 0.18
+	var peak: float = spring + minf(spec.height * rise_ratio, half_span * 0.42)
+	var arch_kind: StringName = &"gothic" if spec.style == &"gothic" else &"round"
+	if not profile.is_empty():
+		half_span = float(profile["half_span"])
+		spring = float(profile["spring_y"])
+		peak = float(profile["peak_y"])
+		arch_kind = StringName(profile["kind"])
+	var surface: int = SURF_TRIM if sanctuary else SURF_STONE
+	var role: String = "sanctuary_triumphal_arch" if sanctuary else "nave_transverse_arch"
+	var arch_depth: float = depth * 1.35 if sanctuary else depth
+	var arch_thickness: float = thickness * 1.2 if sanctuary else thickness
+	if sanctuary:
+		var impost_width: float = 0.80
+		for side in [-1.0, 1.0]:
+			var impost_x: float = side * (half_span + impost_width * 0.5 - 0.11)
+			var impost_size := Vector3(impost_width, arch_thickness, arch_depth * 1.1)
+			var impost_xf := Transform3D(Basis(), Vector3(impost_x, spring, z))
+			component_box("sanctuary_arch_impost", impost_size, impost_xf, SURF_TRIM)
+	var segments_per_side: int = 6
+	for side in [-1.0, 1.0]:
+		var previous := Vector3(side * half_span, spring, z)
+		for step in range(1, segments_per_side + 1):
+			var t: float = float(step) / float(segments_per_side)
+			var x: float = lerpf(side * half_span, 0.0, t)
+			# The wall cut and every emitted rib sample this same profile.
+			var y: float = ChurchGeometry.arch_head_y(x, half_span, spring, peak, arch_kind)
+			var current := Vector3(x, y, z)
+			var delta: Vector2 = Vector2(current.x - previous.x, current.y - previous.y)
+			var angle: float = atan2(delta.y, delta.x)
+			var centre := (current + previous) * 0.5
+			var xf := Transform3D(Basis(Vector3.BACK, angle), centre)
+			component_box(role, Vector3(delta.length() * 1.04,
+				arch_thickness, arch_depth), xf, surface)
+			previous = current
+
+
+func _stave_eave_y() -> float:
+	var half_span: float = spec.width * 0.5 - NAVE_WALL_T + 0.12
+	var roof_rise: float = spec.width * spec.roof_pitch
+	var roof_half: float = spec.width * 0.5 + ChurchGeometry.ROOF_EAVE_X * 0.5
+	var roof_line: float = spec.height + roof_rise * (1.0 - half_span / roof_half)
+	var rafter: float = clampf(spec.width * 0.04, 0.28, 0.48)
+	return roof_line - RoofShape.DEPTH * 0.5 - rafter * 0.5 + 0.005
+
+
+func _stave_ridge_y() -> float:
+	var rafter: float = clampf(spec.width * 0.04, 0.28, 0.48)
+	return spec.height + spec.width * spec.roof_pitch \
+		- RoofShape.DEPTH * 0.5 - rafter * 0.5 + 0.005
+
+
+func _build_stave_truss(z: float, spring: float, thickness: float, depth: float) -> void:
+	# Rafters rise to the underside of the generated gable roof and seat inside
+	# the nave wall thickness at their feet.
+	var half_span: float = spec.width * 0.5 - NAVE_WALL_T + 0.12
+	var peak: float = _stave_ridge_y()
+	var tie_xf := Transform3D(Basis(), Vector3(0.0, spring, z))
+	component_box("stave_tie_beam", Vector3(half_span * 2.0, thickness, depth),
+		tie_xf, SURF_WOOD)
+	for side in [-1.0, 1.0]:
+		var from_p := Vector3(side * half_span, spring, z)
+		var to_p := Vector3(0.0, peak, z)
+		var delta: Vector2 = Vector2(to_p.x - from_p.x, to_p.y - from_p.y)
+		var xf := Transform3D(Basis(Vector3.BACK, atan2(delta.y, delta.x)),
+			(from_p + to_p) * 0.5)
+		component_box("stave_raised_rafter", Vector3(delta.length() * 1.04,
+			thickness, depth), xf, SURF_WOOD)
+
+
+func _build_stave_longitudinals(z0: float, z1: float, spring: float,
+		thickness: float, depth: float) -> void:
+	var half_span: float = spec.width * 0.5 - NAVE_WALL_T + 0.12
+	var run: float = z1 - z0 + depth * 0.18
+	var center_z: float = (z0 + z1) * 0.5
+	var peak: float = _stave_ridge_y()
+	host("stave_roof_bay")
+	var roof_half: float = spec.width * 0.5 + ChurchGeometry.ROOF_EAVE_X * 0.5
+	var rafter: float = clampf(spec.width * 0.04, 0.28, 0.48)
+	var ridge_center_y: float = peak + rafter * 0.5 - 0.32 * 0.5
+	component_box("stave_ridge_beam", Vector3(0.34, 0.32, run),
+		Transform3D(Basis(), Vector3(0.0, ridge_center_y, center_z)), SURF_WOOD)
+	for side in [-1.0, 1.0]:
+		var x: float = side * half_span * 0.55
+		var roof_y: float = spec.height + spec.width * spec.roof_pitch \
+			* (1.0 - absf(x) / roof_half)
+		var purlin_center_y: float = roof_y - RoofShape.DEPTH * 0.5 \
+			- 0.28 * 0.5 + 0.005
+		component_box("stave_purlin", Vector3(0.28, 0.28, run),
+			Transform3D(Basis(), Vector3(x, purlin_center_y, center_z)), SURF_WOOD)
+	host_end()
 
 
 func _nave_plane(st: SurfaceTool, a: Vector3, b: Vector3,
@@ -584,7 +902,7 @@ func _build_narthex() -> void:
 				"y": opening.pos.y, "width": opening.width,
 				"height": opening.height, "style": opening.style,
 				"door": true, "log": face == 2})
-	_windowed_box_shell(a, holes)
+	_windowed_box_shell(a, holes, true, false)
 	_log_mass("narthex", a)
 
 
@@ -595,13 +913,7 @@ func _build_ambulatory_and_chapels() -> void:
 		return
 	var cy: float = ChurchGeometry.apse_springing_z(spec)
 	if spec.ambulatory and spec.apse:
-		tag("ambulatory")
-		var ar: float = ChurchGeometry.ambulatory_radius(spec)
-		var ah: float = spec.height * ChurchGeometry.AISLE_HEIGHT_RATIO
-		half_cylinder(ar, ah, Vector2(0, cy), SURF_STONE)
-		_log_mass("ambulatory", ChurchGeometry.ambulatory_aabb(spec))
-		_half_cone_cap(Vector3(0, ah, cy), ar + ChurchGeometry.APSE_EAVE,
-			ar * 0.55, SURF_ROOF)
+		_build_ambulatory_ring(cy)
 	if spec.radiating_chapels <= 0:
 		return
 	tag("chapel")
@@ -621,6 +933,112 @@ func _build_ambulatory_and_chapels() -> void:
 		else:
 			_kit.stepped_taper(Vector3(c.x, chh, c.z), chr_r * 2.0 + 0.2, chr_r * 0.6,
 				SURF_ROOF, 3, 0.15, true, 0.0, 0.8)
+
+
+## A half-annular ambulatory is a real roofed walk around the apse, not a
+## semicylinder with a disk over its void. The nave paving carries its west
+## half; clipped annular slabs continue the floor only beyond the nave end.
+func _build_ambulatory_ring(cy: float) -> void:
+	tag("ambulatory")
+	var outer_radius: float = ChurchGeometry.ambulatory_radius(spec)
+	var roof_outer: float = outer_radius + ChurchGeometry.APSE_EAVE
+	var floor_inner: float = ChurchGeometry.ambulatory_inner_radius(spec)
+	var roof_inner: float = ChurchGeometry.ambulatory_roof_inner_radius(spec)
+	var wall_inner: float = outer_radius - NAVE_WALL_T
+	var height: float = spec.height * ChurchGeometry.AISLE_HEIGHT_RATIO
+	var segments := 20
+	var origin := Vector3(0.0, 0.0, cy)
+	var stone := _kit.surface(SURF_STONE)
+	var roof := _kit.surface(SURF_ROOF)
+	var roof_bottom := Vector3.DOWN * 0.18
+	host("ambulatory")
+	for i in range(segments):
+		var a0: float = PI * float(i) / float(segments)
+		var a1: float = PI * float(i + 1) / float(segments)
+		var o0 := origin + Vector3(cos(a0) * outer_radius, 0.0, sin(a0) * outer_radius)
+		var o1 := origin + Vector3(cos(a1) * outer_radius, 0.0, sin(a1) * outer_radius)
+		var i0 := origin + Vector3(cos(a0) * wall_inner, 0.0, sin(a0) * wall_inner)
+		var i1 := origin + Vector3(cos(a1) * wall_inner, 0.0, sin(a1) * wall_inner)
+		_kit._quad(stone, o0, o1, o1 + Vector3.UP * height, o0 + Vector3.UP * height)
+		_kit._quad(stone, i1, i0, i0 + Vector3.UP * height, i1 + Vector3.UP * height)
+		_kit._quad(stone, o0 + Vector3.UP * height, o1 + Vector3.UP * height,
+			i1 + Vector3.UP * height, i0 + Vector3.UP * height)
+		_kit._quad(stone, i0, i1, o1, o0)
+		var roof_outer0 := origin + Vector3(cos(a0) * roof_outer, height, sin(a0) * roof_outer)
+		var roof_outer1 := origin + Vector3(cos(a1) * roof_outer, height, sin(a1) * roof_outer)
+		var roof_inner0 := origin + Vector3(cos(a0) * roof_inner, height, sin(a0) * roof_inner)
+		var roof_inner1 := origin + Vector3(cos(a1) * roof_inner, height, sin(a1) * roof_inner)
+		_kit._quad(roof, roof_outer0, roof_outer1, roof_inner1, roof_inner0)
+		_kit._quad(roof, roof_inner0 + roof_bottom, roof_inner1 + roof_bottom,
+			roof_outer1 + roof_bottom, roof_outer0 + roof_bottom)
+		_kit._quad(roof, roof_outer0 + roof_bottom, roof_outer1 + roof_bottom,
+			roof_outer1, roof_outer0)
+		_kit._quad(roof, roof_inner1 + roof_bottom, roof_inner0 + roof_bottom,
+			roof_inner0, roof_inner1)
+		var floor_outer0 := origin + Vector3(cos(a0) * wall_inner, 0.0, sin(a0) * wall_inner)
+		var floor_outer1 := origin + Vector3(cos(a1) * wall_inner, 0.0, sin(a1) * wall_inner)
+		var floor_inner0 := origin + Vector3(cos(a0) * floor_inner, 0.0, sin(a0) * floor_inner)
+		var floor_inner1 := origin + Vector3(cos(a1) * floor_inner, 0.0, sin(a1) * floor_inner)
+		var floor_points := PackedVector2Array([
+			Vector2(floor_outer0.x, floor_outer0.z), Vector2(floor_outer1.x, floor_outer1.z),
+			Vector2(floor_inner1.x, floor_inner1.z), Vector2(floor_inner0.x, floor_inner0.z)])
+		floor_points = _clip_polygon_z_min(floor_points, spec.length * 0.5)
+		if floor_points.size() >= 3:
+			var floor_poly := PackedVector3Array()
+			for point in floor_points:
+				floor_poly.append(Vector3(point.x,
+					ChurchGeometry.FLOOR_LIFT - ChurchGeometry.FLOOR_T * 0.5, point.y))
+			_kit.slab_poly(floor_poly, ChurchGeometry.FLOOR_T, SURF_STONE, true)
+		var disk_points := PackedVector2Array([
+			Vector2(0.0, cy), Vector2(floor_inner0.x, floor_inner0.z),
+			Vector2(floor_inner1.x, floor_inner1.z)])
+		disk_points = _clip_polygon_z_min(disk_points, spec.length * 0.5)
+		if disk_points.size() >= 3:
+			var disk_poly := PackedVector3Array()
+			for point in disk_points:
+				disk_poly.append(Vector3(point.x,
+					ChurchGeometry.FLOOR_LIFT - ChurchGeometry.FLOOR_T * 0.5, point.y))
+			_kit.slab_poly(disk_poly, ChurchGeometry.FLOOR_T, SURF_STONE, true)
+	for angle in [0.0, PI]:
+		var direction := Vector3(cos(angle), 0.0, sin(angle))
+		var inner_end := origin + direction * wall_inner
+		var outer_end := origin + direction * outer_radius
+		if is_zero_approx(angle):
+			_kit._quad(stone, inner_end, outer_end,
+				outer_end + Vector3.UP * height, inner_end + Vector3.UP * height)
+		else:
+			_kit._quad(stone, outer_end, inner_end,
+				inner_end + Vector3.UP * height, outer_end + Vector3.UP * height)
+		var roof_in := origin + direction * roof_inner
+		var roof_out := origin + direction * roof_outer
+		if is_zero_approx(angle):
+			_kit._quad(roof, roof_in + roof_bottom, roof_out + roof_bottom,
+				roof_out, roof_in)
+		else:
+			_kit._quad(roof, roof_out + roof_bottom, roof_in + roof_bottom,
+				roof_in, roof_out)
+	host_end()
+	_log_mass("ambulatory", ChurchGeometry.ambulatory_aabb(spec))
+	component_note("ambulatory", "half_annular_walk", SURF_STONE, {
+		"center": Vector2(0.0, cy), "outer_radius": outer_radius,
+		"floor_inner_radius": floor_inner, "roof_inner_radius": roof_inner,
+		"roof_outer_radius": roof_outer, "wall_inner_radius": wall_inner,
+		"height": height, "segments": segments})
+
+
+func _clip_polygon_z_min(poly: PackedVector2Array, minimum_z: float) -> PackedVector2Array:
+	var clipped := PackedVector2Array()
+	for i in range(poly.size()):
+		var a: Vector2 = poly[i]
+		var b: Vector2 = poly[(i + 1) % poly.size()]
+		var a_inside: bool = a.y >= minimum_z - 0.0001
+		var b_inside: bool = b.y >= minimum_z - 0.0001
+		if a_inside:
+			clipped.append(a)
+		if a_inside != b_inside:
+			var t: float = (minimum_z - a.y) / (b.y - a.y)
+			clipped.append(a.lerp(b, t))
+	return clipped
 
 
 ## A base, two set-backs and stone shoulders make the bearing legible. Every
@@ -726,6 +1144,22 @@ func _build_crossing_tower() -> void:
 	var side: float = a.size.x
 	var cz: float = ChurchGeometry.crossing_center_z(spec)
 	var th: float = spec.crossing_tower_height
+	var bearing_thickness: float = 0.28
+	var bearing_top: float = a.position.y + 0.03
+	var bay: float = a.size.z
+	# Tie the four crossing walls into a bearing frame; leave the crossing open.
+	host("crossing_tower_bearing")
+	for side_sign in [-1.0, 1.0]:
+		component_box("crossing_tower_bearing_side",
+			Vector3(NAVE_WALL_T, bearing_thickness, bay),
+			Transform3D(Basis(), Vector3(side_sign * (side * 0.5 - NAVE_WALL_T * 0.5),
+				bearing_top - bearing_thickness * 0.5, cz)), SURF_STONE)
+		component_box("crossing_tower_bearing_end",
+			Vector3(side, bearing_thickness, NAVE_WALL_T),
+			Transform3D(Basis(), Vector3(0.0,
+				bearing_top - bearing_thickness * 0.5,
+				cz + side_sign * (bay * 0.5 - NAVE_WALL_T * 0.5))), SURF_STONE)
+	host_end()
 	# the tower stands on the crossing BAY, so its plan is span x depth --
 	# emitting a square here made the mesh overhang its own logged mass
 	var tower_windows: Array[Dictionary] = []
@@ -734,10 +1168,9 @@ func _build_crossing_tower() -> void:
 			"u": cz if face % 2 == 1 else 0.0,
 			"y": th - side * 0.22, "width": side * 0.22,
 			"height": side * 0.3, "style": spec.window_style})
-	_windowed_box_shell(a, tower_windows)
-	_log_mass("crossing_tower", a)
+	_windowed_box_shell(a, tower_windows, false, false)
+	_log_mass("crossing_tower", a, a.position.y)
 	total_height = maxf(total_height, th)
-	var bay: float = a.size.z
 	_kit.hip_roof(side + 0.4, bay + 0.4, side * 0.42, cz, SURF_ROOF, th)
 	for cx_v in [-1.0, 1.0]:
 		for cz_v in [-1.0, 1.0]:
@@ -916,7 +1349,7 @@ func _hagia_bearing(cz: float, base: float, pendentive_h: float) -> void:
 			holes.append({"face": face, "u": cz + float(k - 2) * hr * 0.34,
 				"y": base + pendentive_h * 0.42, "width": hr * 0.12,
 				"height": pendentive_h * 0.40, "style": &"round"})
-	_windowed_box_shell(bearing, holes)
+	_windowed_box_shell(bearing, holes, true, false)
 	var top: float = ChurchGeometry.hagia_pier_top(spec)
 	var size: float = ChurchGeometry.hagia_pier_size(spec)
 	for sx_v in [-1.0, 1.0]:
@@ -1079,22 +1512,40 @@ func _pendentive_support(center: Vector3, lower_half: float, upper_radius: float
 				segments, start, ledge_top, true))
 			rings.append(_pendentive_ring(center, lower_half, upper_radius, height,
 				segments, start, ledge_top, false))
+	var wall_thickness: float = NAVE_WALL_T
+	var inner_rings: Array[PackedVector3Array] = []
 	var all_points := PackedVector3Array()
 	for ring in rings:
 		all_points.append_array(ring)
+		var inner := PackedVector3Array()
+		for point in ring:
+			var radial := Vector2(point.x - center.x, point.z - center.z)
+			var inner_radius: float = maxf(radial.length() - wall_thickness, 0.05)
+			var direction: Vector2 = radial.normalized()
+			var inner_point := Vector3(center.x + direction.x * inner_radius,
+				point.y, center.z + direction.y * inner_radius)
+			inner.append(inner_point)
+			all_points.append(inner_point)
+		inner_rings.append(inner)
 	var st: SurfaceTool = _kit.surface(SURF_STONE)
 	for row in range(rings.size() - 1):
 		var lower := rings[row]
 		var upper := rings[row + 1]
+		var inner_lower := inner_rings[row]
+		var inner_upper := inner_rings[row + 1]
 		for i in range(segments):
 			var next := (i + 1) % segments
 			_kit._quad(st, lower[i], lower[next], upper[next], upper[i])
+			_kit._quad(st, inner_lower[i], inner_upper[i], inner_upper[next], inner_lower[next])
 	var bottom := rings[0]
+	var inner_bottom := inner_rings[0]
 	var top: PackedVector3Array = rings[rings.size() - 1]
+	var inner_top: PackedVector3Array = inner_rings[inner_rings.size() - 1]
 	for i in range(segments):
 		var next := (i + 1) % segments
-		_kit._tri(st, center, bottom[next], bottom[i])
-		_kit._tri(st, center + Vector3.UP * height, top[i], top[next])
+		# Close only the bearing bands. The square and drum centers remain open.
+		_kit._quad(st, bottom[i], inner_bottom[i], inner_bottom[next], bottom[next])
+		_kit._quad(st, top[i], top[next], inner_top[next], inner_top[i])
 	var envelope := AABB(center + Vector3(-lower_half, 0.0, -lower_half),
 		Vector3(lower_half * 2.0, height, lower_half * 2.0))
 	_log_part("pendentive", center + Vector3.UP * (height * 0.5),
@@ -1157,8 +1608,9 @@ func _lean_roof(span: float, along: float, y_base: float, y_top: float, side: fl
 	_kit.lean_roof(span, along, y_base, y_top, side, s, zc)
 
 ## Apse drum: flat face at center.y (model Z), bulging to center.y + radius.
-func half_cylinder(radius: float, height: float, center: Vector2, s: int) -> void:
-	_kit.half_cylinder(radius, height, center, s)
+func half_cylinder(radius: float, height: float, center: Vector2, s: int,
+		open_ends: bool = false) -> void:
+	_kit.half_cylinder(radius, height, center, s, 10, open_ends)
 
 ## Conical cap over a HALF cylinder: covers z in [pos.z, pos.z + radius] only,
 ## so nothing overhangs the void west of the drum's flat face.

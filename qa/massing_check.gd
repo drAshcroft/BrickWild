@@ -205,8 +205,11 @@ func _check_size_match(spec: ChurchSpec, builder: ChurchBuilder,
 		_expect("dome drum height", by_name["dome_drum"].size.y, spec.dome_drum_height)
 
 	if spec.crossing_tower and by_name.has("crossing_tower"):
-		_expect("crossing tower height", by_name["crossing_tower"].size.y,
-			spec.crossing_tower_height)
+		var tower: AABB = by_name["crossing_tower"]
+		var expected_tower: AABB = ChurchGeometry.crossing_tower_aabb(spec)
+		_expect("crossing tower bearing elevation", tower.position.y, expected_tower.position.y)
+		_expect("crossing tower wall height above bearing", tower.size.y, expected_tower.size.y)
+		_expect("crossing tower top elevation", tower.end.y, expected_tower.end.y)
 
 
 func _expect(what: String, got: float, want: float) -> void:

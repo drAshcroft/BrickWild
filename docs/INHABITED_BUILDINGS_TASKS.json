@@ -326,6 +326,31 @@
       "phase": "inhabited-buildings",
       "status": "complete",
       "aiNotes": "2026-10-08 root found five unfreed WindmillSuite assembler scenes after264 passing assertions emitted renderer exit ERRORs. Added null-guarded scene.free immediately after existing assembly check; no assertions removed. Same four-suite API remainder now ALL PASS264/0fail/0warning, native0/153.899s with no engine errors or leaks. Receipt restart5_api_remaining_scene_cleanup. Fixture-only correction."
+    },
+    {
+      "id": "31300edc-3fd6-454f-841b-c770b7b69be5",
+      "key": "LIVE-SACRED-CHURCH",
+      "title": "Build occupied church interiors with actual roof and dome supports",
+      "description": "Complete the bounded church architecture slice: connected nave frames, supported crossing towers and hollow domes, open annular ambulatory floor and roof, Nordic timber material. Preserve original canonical fixtures and real geometry mutation controls. Require full sacred structural fixture, church change lane, VIS008 dome fixture, complete geometry-lane coverage in bounded processes and root review of all18 fresh views from six frozen style/size/seed requests. Existing twelve opening warnings remain visible. Does not close all church styles or sacred cult identity and exhaustive visual acceptance.",
+      "targetCoord": {
+        "file": "src/church/church_builder.gd"
+      },
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "complete",
+      "aiNotes": "2026-10-09: Full sacred structural fixture native0/74.227s with48 course cases; church lane and aperture5796checks native0/45.555s with12 retained warnings; VIS00847checks native0/5.377s. Full geometry lane coverage9633checks in three bounded processes,627.298s aggregate; aborted overlapping bounds receipt excluded and replaced by native0 serial run. Root reviewed all18 original and6 supplemental images; selector native0/9.426s, exact seed8102 integration capture passes. Bounded structure accepted; parent sacred identity open. See visualqa/personality/CHURCH_STRUCTURE_REVIEW.md."
+    },
+    {
+      "id": "b73efbc6-aeeb-49b7-9e2a-1138288d6372",
+      "key": "LIVE-SACRED-ROTUNDA",
+      "title": "Build a circular occupied temple drum with a supported dome and real gate",
+      "description": "Replace rectangular Rotunda enclosure with actual circular drum, inscribed floor bands, connected paved gate threshold, wall crown and concentric dome bearing. Preserve other forms, rite axis, public actual approach and frozen fixtures. Require15 canonical cult/size fixtures with actual triangle mutation controls including gate head and floor gap; Temple lane, focused public API, complete required API coverage and original representative renders reviewed by root. Parent sacred identity and full matrix remain open.",
+      "targetCoord": {
+        "file": "src/temple/temple_builder.gd"
+      },
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "pending"
     }
   ]
 }

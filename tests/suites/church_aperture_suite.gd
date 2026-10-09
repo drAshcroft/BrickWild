@@ -395,12 +395,17 @@ static func _blocked(mesh: ArrayMesh, a: Vector3, b: Vector3) -> bool:
 
 
 static func _first_hit(mesh: ArrayMesh, a: Vector3, b: Vector3,
-		stone_only := false) -> Dictionary:
+		wall_only := false) -> Dictionary:
 	for surface in range(mesh.get_surface_count()):
-		# A seated glass pane may cross the ray. Only masonry proves whether
-		# the host was actually cut; a dark panel over solid stone still fails.
-		if surface == ChurchBuilder.SURF_OPEN \
-				or (stone_only and surface != ChurchBuilder.SURF_STONE):
+		var slot := surface
+		var surface_name := mesh.surface_get_name(surface)
+		if surface_name.begins_with("material_slot:"):
+			slot = int(surface_name.trim_prefix("material_slot:"))
+		# Glass does not prove a wall cut. For wall-only probes, both masonry
+		# and the Nordic stave surface are structural wall material.
+		if slot == ChurchBuilder.SURF_OPEN \
+				or (wall_only and slot not in [ChurchBuilder.SURF_STONE,
+					ChurchBuilder.SURF_WOOD]):
 			continue
 		var arrays: Array = mesh.surface_get_arrays(surface)
 		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]

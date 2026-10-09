@@ -446,7 +446,7 @@ func tiered_taper(base_center: Vector3, base_w: float, height: float, surf: int,
 ## sweep for oval domes; its default preserves a true circular revolution.
 func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 		segments := 16, arc := TAU, start := 0.0,
-		ellipse_scale := Vector2.ONE) -> void:
+		ellipse_scale := Vector2.ONE, close_ends := true) -> void:
 	if profile.size() < 2:
 		return
 	var st: SurfaceTool = _sts[surf]
@@ -487,7 +487,7 @@ func revolve(profile: PackedVector2Array, center: Vector3, surf: int,
 						st.set_uv(Vector2(float(s) / segments, float(i) / rings))
 					_add_vertex(st, v[vi])
 	# close a partial sweep, so a half-dome is not hollow along its cut
-	if arc < TAU - 0.001:
+	if arc < TAU - 0.001 and close_ends:
 		for a in [start, start + arc]:
 			var dir := Vector3(cos(a) * ellipse_scale.x, 0,
 				sin(a) * ellipse_scale.y)
@@ -615,10 +615,10 @@ func inverted_batter(radius: float, depth: float, center: Vector3, surf: int,
 ## Half cylinder hugging +Z from center: flat face at center.y (model Z),
 ## bulging to center.y + radius. Used for apses.
 func half_cylinder(radius: float, height: float, center: Vector2, surf: int,
-		segments := 10) -> void:
+		segments := 10, open_ends := false) -> void:
 	var origin := Vector3(center.x, 0, center.y)
 	revolve(PackedVector2Array([Vector2(radius, 0.0), Vector2(radius, height)]),
-		origin, surf, segments, PI, 0.0)
+		origin, surf, segments, PI, 0.0, Vector2.ONE, not open_ends)
 	var st: SurfaceTool = _sts[surf]
 	var top_axes: Array = _surface_uv_axes(Vector3.UP) if metric_coordinates else []
 	for s in range(segments):

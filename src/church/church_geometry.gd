@@ -263,6 +263,23 @@ static func aisle_roof_high(spec: ChurchSpec, ring := 0) -> float:
 
 ## One opening in each structural bay, BETWEEN flyers rather than under an
 ## arch landing. Rectangle height excludes the pointed/round head.
+## `offset` is horizontal from the opening centre. Gothic heads use an
+## elliptical spring approach multiplied by a linear crown term: that keeps a
+## vertical tangent at each spring and a finite, non-zero crown angle. The
+## same profile is used for the cut wall and its emitted rib. Round heads keep
+## the existing segmental parabola.
+static func arch_head_y(offset: float, half_span: float, spring: float,
+		peak: float, kind: StringName) -> float:
+	if half_span <= 0.001:
+		return peak
+	var t := clampf(absf(offset) / half_span, 0.0, 1.0)
+	var rise := peak - spring
+	if kind == &"gothic":
+		var spring_curve := sqrt(maxf(1.0 - t * t, 0.0))
+		return spring + rise * spring_curve * (1.0 - 0.28 * t)
+	return spring + rise * (1.0 - t * t)
+
+
 static func clerestory_windows(spec: ChurchSpec) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if not has_clerestory(spec):
@@ -323,8 +340,10 @@ static func crossing_bay_depth(spec: ChurchSpec) -> float:
 
 static func crossing_tower_aabb(spec: ChurchSpec) -> AABB:
 	var d: float = crossing_bay_depth(spec)
-	return AABB(Vector3(-spec.width / 2.0, 0.0, crossing_center_z(spec) - d / 2.0),
-		Vector3(spec.width, spec.crossing_tower_height, d))
+	var base_y: float = minf(spec.height, spec.crossing_tower_height)
+	var wall_height: float = maxf(spec.crossing_tower_height - base_y, 0.0)
+	return AABB(Vector3(-spec.width / 2.0, base_y, crossing_center_z(spec) - d / 2.0),
+		Vector3(spec.width, wall_height, d))
 
 
 ## Height the dome drum springs from: the top of the walls it rests on.
@@ -444,6 +463,17 @@ static func half_dome_radius(spec: ChurchSpec) -> float:
 ## The ambulatory wraps the apse; chapels open off it when present.
 static func ambulatory_radius(spec: ChurchSpec) -> float:
 	return spec.apse_radius * (1.0 + AMBULATORY_W)
+
+
+## The ambulatory floor begins just outside the apse shell, leaving a walkable
+## ring between the chapel wall and the enclosing ambulatory wall.
+static func ambulatory_inner_radius(spec: ChurchSpec) -> float:
+	return spec.apse_radius + 0.02
+
+
+## The annular roof overlaps the apse wall so its inner edge has a real bearing.
+static func ambulatory_roof_inner_radius(spec: ChurchSpec) -> float:
+	return maxf(spec.apse_radius - 0.18, 0.05)
 
 
 static func ambulatory_aabb(spec: ChurchSpec) -> AABB:
@@ -714,6 +744,23 @@ static func nave_window_zs(spec: ChurchSpec) -> Array[float]:
 		var b: float = nave_buttress_z(spec, i + 1, n)
 		if b - a >= need:
 			out.append((a + b) * 0.5)
+	return out
+
+
+## Structural stations shared by the nave's interior piers and its exterior
+## buttresses. The end stations brace the east and west bays; windows remain
+## centred between supports.
+static func nave_support_zs(spec: ChurchSpec) -> Array[float]:
+	var out: Array[float] = []
+	if spec.buttresses and spec.buttress_count_per_side >= 2:
+		for i in range(spec.buttress_count_per_side):
+			out.append(nave_buttress_z(spec, i, spec.buttress_count_per_side))
+		return out
+	var span: Vector2 = aisle_z_range(spec)
+	var bays: int = maxi(int((span.y - span.x) / 4.8), 1)
+	for i in range(bays + 1):
+		out.append(lerpf(span.x + 0.55, span.y - 0.55,
+			float(i) / float(bays)))
 	return out
 
 

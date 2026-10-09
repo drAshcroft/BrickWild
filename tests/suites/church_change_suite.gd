@@ -19,8 +19,7 @@ static func run() -> SuiteResult:
 			var builder := ChurchBuilder.new()
 			var mesh: ArrayMesh = builder.build(spec)
 			var who := "%s seed=%d" % [String(style), TestSweep.seed_at(index)]
-			_expect(res, mesh != null and mesh.get_surface_count() == 4,
-				"%s has no four-surface mesh" % who)
+			_check_material_surfaces(res, mesh, style, who)
 			if mesh != null:
 				NormalsSuite.check_mesh(res, mesh, who)
 				NormalsSuite.check_openings(res, builder, who)
@@ -73,6 +72,30 @@ static func run() -> SuiteResult:
 	res.note("entrance routes %.2fs" % route_elapsed)
 	_negative_controls(res)
 	return res
+
+
+static func _check_material_surfaces(res: SuiteResult, mesh: ArrayMesh,
+		style: StringName, who: String) -> void:
+	_expect(res, mesh != null, "%s emitted no mesh" % who)
+	if mesh == null:
+		return
+	var slots: Dictionary = {}
+	for surface in range(mesh.get_surface_count()):
+		var slot := surface
+		var surface_name: String = mesh.surface_get_name(surface)
+		if surface_name.begins_with("material_slot:"):
+			slot = int(surface_name.trim_prefix("material_slot:"))
+		var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		_expect(res, not slots.has(slot) and not vertices.is_empty(),
+			"%s has a duplicate or empty material slot %d" % [who, slot])
+		slots[slot] = true
+	for slot in [ChurchBuilder.SURF_STONE, ChurchBuilder.SURF_TRIM,
+			ChurchBuilder.SURF_ROOF, ChurchBuilder.SURF_OPEN]:
+		_expect(res, slots.has(slot), "%s lacks required material slot %d" % [who, slot])
+	if style == &"nordic_stave":
+		_expect(res, slots.has(ChurchBuilder.SURF_WOOD), "%s lacks native timber geometry" % who)
+	_expect(res, mesh.get_surface_count() <= BuildingLibrary.surface_count(&"church"),
+		"%s exceeds the published material surface count" % who)
 
 
 static func _dome_cut_control(res: SuiteResult, spec: ChurchSpec,
