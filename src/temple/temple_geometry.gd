@@ -59,6 +59,9 @@ const ORDER_BAY := 4.6        # target pilaster spacing, metres
 ## Person radius for the walking checks: a robed celebrant, not a burglar.
 const PERSON_RADIUS := 0.28
 const NAV_CELL := 0.16
+## The lowest ziggurat terrace is an occupied chamber. Its ceiling and the
+## underside of its column entablature must both clear the human route.
+const RITUAL_HEADROOM_MIN := 2.0
 
 
 # ------------------------------------------------------------------ shell
@@ -424,6 +427,17 @@ static func column_height(spec: TempleSpec) -> float:
 	return spec.height - COLUMN_CAP * spec.column_r - 0.2
 
 
+## Underside of the beam course carried by the authored column capitals.
+static func column_entablature_height(spec: TempleSpec) -> float:
+	return column_height(spec) + COLUMN_CAP * spec.column_r
+
+
+## The top of the capital actually emitted for one authored column record.
+## Beam placement uses this per support, so its soffit rests on the capital.
+static func column_cap_top(column: Dictionary) -> float:
+	return float(column["height"]) + COLUMN_CAP * float(column["radius"])
+
+
 # ------------------------------------------------------------------ cells
 
 ## The holding cells: alcoves off the side walls, where whatever the rite needs
@@ -524,7 +538,13 @@ static func forecourt_rect(spec: TempleSpec) -> Rect2:
 	if depth <= 0.0:
 		return Rect2()
 	var w: float = minf(r.size.x, GATE_W + 8.0)
-	return Rect2(Vector2(-w / 2.0, r.position.y - depth), Vector2(w, depth + 0.4))
+	var end_y: float = r.position.y + 0.4
+	if spec.form == &"ziggurat":
+		# Join the ground-level approach to the hollow first-terrace doorway.
+		# Its inset is several metres on a normal ziggurat; stopping at the
+		# outer footprint leaves entry and forecourt as separate islands.
+		end_y = interior_rect(spec).position.y + 0.4
+	return Rect2(Vector2(-w / 2.0, r.position.y - depth), Vector2(w, end_y - (r.position.y - depth)))
 
 
 static func obelisk_height(spec: TempleSpec) -> float:

@@ -100,7 +100,16 @@ static func generate(spec: TempleSpec, p_seed: int) -> void:
 	# ---- what it shows the world ----
 	spec.spire = GeneratorRandom.chance(r, f["spire"])
 	spec.spire_height = spec.height * r.randf_range(0.5, 1.1) if spec.spire else 0.0
-	spec.terraces = GeneratorRandom.pick(r, f.get("terraces", [3])) if spec.form == &"ziggurat" else 0
+	if spec.form == &"ziggurat":
+		var selected_terraces: int = int(GeneratorRandom.pick(r, f.get("terraces", [3])))
+		# The first terrace contains the ritual chamber. Its ceiling is also
+		# where the supported column-beam course sits; retain at least the
+		# contract's human headroom instead of fitting a fifth low storey.
+		var max_terraces_for_headroom := maxi(floori(spec.height * 0.85 \
+			/ TempleGeometry.RITUAL_HEADROOM_MIN), 1)
+		spec.terraces = mini(selected_terraces, max_terraces_for_headroom)
+	else:
+		spec.terraces = 0
 	spec.obelisks = GeneratorRandom.chance(r, f.get("obelisks", 0.0))
 	if spec.form == &"ziggurat":
 		var summit := TempleGeometry.terrace_rect(spec, spec.terraces - 1)
