@@ -274,6 +274,31 @@
       "phase": "inhabited-buildings",
       "status": "complete",
       "aiNotes": "Root camera regression native0/41.968, four positives plus actual room-filling obstruction negative. Exact Witch seed1 pin four views native0/41.936; six-style church18 views native0/53.992. Root reviewed screenshots; generic Witch exterior and plain sacred interiors explicitly remain unresolved. See visualqa/personality/CAMERAS_REVIEW.md."
+    },
+    {
+      "id": "7d998f73-4e96-48f1-92fd-f0e95262ee16",
+      "key": "LIVE-SACRED-BASILICA",
+      "title": "Build a basilica with a raised nave, lower aisles and a supported pronaos",
+      "description": "Complete the native basilica structural slice of LIVE-SACRED. Preserve frozen small/default/large blood seed1 requests and exact barn-like walk pin. Require real column, roof and clerestory bearing checks with broken controls, zero new degenerate geometry, a physically paved entrance approach with truthful placement metadata, relevant Temple and API gates, and root-reviewed roof-on, axis and cutaway renders. This slice does not close remaining temple forms, church styles, cult-wide identity or final exhaustive visual review.",
+      "targetCoord": {
+        "file": "src/temple/temple_builder.gd"
+      },
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "executing"
+    },
+    {
+      "id": "07421c22-36ed-42ed-b26e-cf4c673d1389",
+      "key": "LIVE-API-PARTITIONS",
+      "title": "Retain public library QA coverage in bounded process partitions",
+      "description": "Preserve every canonical libraryquick request and existing family, contract, document, invalid, descriptor, stacked-house, village and world assertion when the combined selector exceeds five minutes. Require an explicit coverage ledger, root review, every partition native exit0 under300seconds and no engine errors, then record aggregate time separately from the timed-out combined run. Commit the reviewed driver and documentation after verification.",
+      "targetCoord": {
+        "file": "tools/library_partition_driver.gd"
+      },
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "complete",
+      "aiNotes": "Root reviewed full canonical request/assertion union. Eleven source-frozen processes PASS,195 checks,702.046s aggregate; each native0 under300s (max268.386s). Union validator plus missing-exit/NaN/duplicate rejection controls pass. See docs/API_QUICK_PARTITIONS.md and artifacts/personality/resumed/restart5_library_parts. Full API lane and placement coverage remain separate."
     }
   ]
 }

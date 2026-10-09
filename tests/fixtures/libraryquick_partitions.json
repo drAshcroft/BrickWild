@@ -1,0 +1,72 @@
+{
+  "source_suite": "tests/suites/library_suite.gd",
+  "assertion_policy": "Call the existing suite helpers without deleting, weakening, or skipping their assertions.",
+  "partitions": {
+    "church_101": [
+      "church:seed=101",
+      "family",
+      "contract",
+      "documents"
+    ],
+    "castle_202": [
+      "castle:seed=202",
+      "family",
+      "contract",
+      "documents"
+    ],
+    "house_303": [
+      "house:seed=303",
+      "family",
+      "contract",
+      "documents"
+    ],
+    "shop_353": [
+      "shop:seed=353",
+      "family",
+      "contract",
+      "documents"
+    ],
+    "hotel_373": [
+      "hotel:seed=373",
+      "family",
+      "contract",
+      "documents"
+    ],
+    "temple_404": [
+      "temple:seed=404",
+      "family",
+      "contract",
+      "documents"
+    ],
+    "windmill_505": [
+      "windmill tower:seed=505",
+      "family",
+      "contract",
+      "documents"
+    ],
+    "windmill_515": [
+      "windmill paddle:seed=515",
+      "family",
+      "contract",
+      "documents"
+    ],
+    "village": [
+      "village kind contract"
+    ],
+    "world": [
+      "world kind contract",
+      "generic world envelope"
+    ],
+    "globals": [
+      "nine invalid-request controls",
+      "published-kind coverage ledger",
+      "descriptor immutability",
+      "stacked-house plan/circulation"
+    ]
+  },
+  "wall_time_gate_seconds": 300,
+  "execution_rule": "Run each partition in a fresh Godot process and require every partition to finish under 300 host seconds and exit 0. Report aggregate elapsed time as the sum; do not claim a single-process libraryquick pass.",
+  "shared_controls": [
+    "the existing _check_contract helper also retains its unknown-family invalid-request control in each request partition"
+  ]
+}
