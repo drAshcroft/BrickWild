@@ -57,6 +57,21 @@
     {
       "subject": [
         "house",
+        "cottage",
+        "rooms",
+        "sleeping"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/cottage/rooms/sleeping/targets/design_board_v1.png",
+      "image_sha256": "f9b5b6e8c8cf659e88ecf5c58273b5a9202b71131d051eec9713decd18a89cb5",
+      "prompt": "house/cottage/rooms/sleeping/targets/prompt.txt",
+      "prompt_sha256": "e9028eccf70dec99ea340041a85d893d35accb42b1ac096ffa6ebfab9a3505ec",
+      "notes": "house/cottage/rooms/sleeping/targets/README.md",
+      "notes_sha256": "7e2a5a82b7957b5274f01dadc7def483b3a539611b38b95cab8d6cbaa0077700"
+    },
+    {
+      "subject": [
+        "house",
         "cottage"
       ],
       "classification": "imagegen_reference_not_actual_render",
