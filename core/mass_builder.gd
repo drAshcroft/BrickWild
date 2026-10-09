@@ -145,10 +145,12 @@ func component_box(role: String, size: Vector3, xform: Transform3D, surf: int) -
 ## Emit a polygon slab AND record it as a named component. `points` are the
 ## WORLD-space polygon actually handed to the kit.
 func component_slab(role: String, points: PackedVector3Array, depth: float,
-		surf: int, vertical := true) -> Dictionary:
+		surf: int, vertical := true,
+		open_edges: PackedInt32Array = PackedInt32Array()) -> Dictionary:
 	var row := _log_component(role, "slab", surf,
-		{"points": points, "depth": depth, "vertical": vertical})
-	_kit.slab_poly(points, depth, surf, vertical)
+		{"points": points, "depth": depth, "vertical": vertical,
+		"open_edges": open_edges})
+	_kit.slab_poly(points, depth, surf, vertical, open_edges)
 	return row
 
 

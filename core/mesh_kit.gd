@@ -314,10 +314,15 @@ func _add_vertex(st: SurfaceTool, point: Vector3) -> void:
 ##
 ## The polygon must be planar and convex, which every roof face here is.
 func slab_poly(points: PackedVector3Array, thickness: float, surf: int,
-		vertical_depth := false) -> void:
+		vertical_depth := false, open_edges: PackedInt32Array = PackedInt32Array()) -> void:
 	# Clipping can retain a repeated corner or a point on a straight edge.
 	# Remove those before choosing a normal and fanning the convex polygon.
+	# Keep each surviving edge tied to the original input edges: an open edge
+	# remains addressable after duplicate/collinear cleanup and winding reversal.
 	points = points.duplicate()
+	var edge_sources: Array = []
+	for edge_index in range(points.size()):
+		edge_sources.append([edge_index])
 	var changed := true
 	while changed and points.size() >= 3:
 		changed = false
@@ -325,6 +330,9 @@ func slab_poly(points: PackedVector3Array, thickness: float, surf: int,
 			var before := points[(i + points.size() - 1) % points.size()]
 			var after := points[(i + 1) % points.size()]
 			if (points[i] - before).cross(after - points[i]).length_squared() < 1e-12:
+				var previous_edge: int = posmod(i - 1, points.size())
+				edge_sources[previous_edge].append_array(edge_sources[i])
+				edge_sources.remove_at(i)
 				points.remove_at(i)
 				changed = true
 				break
@@ -336,10 +344,13 @@ func slab_poly(points: PackedVector3Array, thickness: float, surf: int,
 		return
 	# wind so the outer face is the upper one
 	var pts: PackedVector3Array = points
+	var normalized_edge_sources: Array = edge_sources.duplicate()
 	if nrm.y < 0.0:
 		pts = PackedVector3Array()
+		normalized_edge_sources = []
 		for i in range(n - 1, -1, -1):
 			pts.append(points[i])
+			normalized_edge_sources.append(edge_sources[posmod(i - 1, n)])
 		nrm = -nrm
 	var off: Vector3 = (Vector3.UP if vertical_depth else nrm.normalized()) * (thickness / 2.0)
 	var lo: Array = []
@@ -359,6 +370,15 @@ func slab_poly(points: PackedVector3Array, thickness: float, surf: int,
 		_tri_metric(st, lo[0], lo[i2], lo[i2 + 1], uv_u, uv_v)
 		_tri_metric(st, hi[0], hi[i2 + 1], hi[i2], uv_u, uv_v)
 	for i3 in range(n):
+		# A supported sheet can share an edge with a wall. The wall owns that
+		# face; emitting a second, coplanar skin here creates a visible fight.
+		var omit_face := false
+		for source_edge in normalized_edge_sources[i3]:
+			if int(source_edge) in open_edges:
+				omit_face = true
+				break
+		if omit_face:
+			continue
 		var j: int = (i3 + 1) % n
 		_quad(st, lo[i3], hi[i3], hi[j], lo[j])
 

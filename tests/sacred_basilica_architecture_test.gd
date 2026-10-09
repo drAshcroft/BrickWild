@@ -40,10 +40,162 @@ func _check_case(row: Dictionary) -> void:
 	_check_portico_load_path(spec, builder, mesh)
 	_check_nave_load_path(spec, builder, mesh)
 	_check_clerestory_ray(spec, builder, mesh)
+	_check_nave_eave_joint(spec, mesh)
+	_check_order_pilaster_bearings(builder, mesh)
+	var visible_overlaps := CoplanarCheck.visible(mesh, "basilica/%s" % row["name"])
+	print("basilica ", row["name"], " visible_overlaps=", visible_overlaps.size())
+	if visible_overlaps.size() > 12:
+		_fail("visible same-facing coplanar overlaps %d exceed the unchanged budget 12"
+			% visible_overlaps.size())
 	if row["name"] == "small":
 		_check_missing_column_negative(spec, builder, mesh)
 		_check_lifted_portico_roof_negative(spec, builder, mesh)
 		_check_no_columns_fallback(spec)
+
+
+func _check_order_pilaster_bearings(builder: TempleBuilder, mesh: ArrayMesh) -> void:
+	var shafts := _roles(builder.component_log, "basilica_order_pilaster_shaft")
+	var capitals := _roles(builder.component_log, "basilica_order_pilaster_capital")
+	if shafts.is_empty() or shafts.size() != capitals.size():
+		_fail("exterior pilasters lack their measured shafts and capitals")
+		return
+	var capitals_by_host: Dictionary = {}
+	for capital in capitals:
+		capitals_by_host[capital["host"]] = capital
+	for shaft in shafts:
+		var capital: Dictionary = capitals_by_host.get(shaft["host"], {})
+		if capital.is_empty() or not _pilaster_bears(mesh, shaft, capital):
+			_fail("exterior pilaster does not meet its actual capital underside: " + String(shaft["host"]))
+	# Delete actual component triangles while retaining all builder records.
+	# Both damaged components must fail the positive bearing predicate.
+	var first_shaft: Dictionary = shafts[0]
+	var first_capital: Dictionary = capitals_by_host[first_shaft["host"]]
+	for component in [first_shaft, first_capital]:
+		var removed := MeshProbe.remove_triangles(mesh, int(component["surface"]),
+			MeshProbe.any_face_in(MassBuilder.component_aabb(component).grow(0.001)))
+		var damaged: ArrayMesh = removed.get("mesh")
+		if int(removed.get("removed_triangles", 0)) < 12 or damaged == null \
+				or _pilaster_bears(damaged, first_shaft, first_capital):
+			_fail("removed actual pilaster component escaped the same bearing predicate: " + String(component["role"]))
+
+
+func _pilaster_bears(mesh: ArrayMesh, shaft: Dictionary, capital: Dictionary) -> bool:
+	var shaft_box := MassBuilder.component_aabb(shaft)
+	var capital_box := MassBuilder.component_aabb(capital)
+	if absf(shaft_box.end.y - capital_box.position.y) > 0.002 \
+			or not _component_box_emitted(mesh, shaft) or not _component_box_emitted(mesh, capital):
+		return false
+	var centre := shaft_box.get_center()
+	return MeshProbe.has_upward_support(
+		MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE),
+		Vector2(centre.x, centre.z), capital_box.position.y, 0.002)
+
+
+## The raised nave roof bears on both longitudinal walls. Its eave edge is
+## closed by the wall face; emitting a second roof side face on that plane
+## creates the 53 repeated surface-0/2 fights in the canonical default case.
+func _check_nave_eave_joint(spec: TempleSpec, mesh: ArrayMesh) -> void:
+	var half: float = TempleGeometry.basilica_nave_half_width(spec)
+	var eave: float = TempleGeometry.basilica_nave_eave_height(spec)
+	var eave_fights := _nave_eave_fight_count(mesh, half, eave)
+	if eave_fights != 0:
+		_fail("nave roof still emits %d coplanar wall/eave triangles" % eave_fights)
+	var portico_half: float = TempleGeometry.basilica_portico_half_width(spec)
+	var portico_eave: float = TempleGeometry.basilica_portico_eave_height(spec)
+	var portico_fights := _nave_eave_fight_count(mesh, portico_half, portico_eave)
+	if portico_fights != 0:
+		_fail("pronaos roof still emits %d coplanar beam/eave triangles" % portico_fights)
+	var wall_t: float = TempleGeometry.basilica_nave_wall_thickness(spec)
+	var wall_x: float = half - minf(wall_t * 0.05, 0.02)
+	var wall_support := MeshProbe.has_upward_support(
+		MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE),
+		Vector2(wall_x, 0.0), eave, 0.02)
+	var roof_triangles := MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_ROOF)
+	var roof_hit := _lowest_vertical_hit(roof_triangles, wall_x, 0.0,
+		eave - 0.25, eave + 0.35)
+	if not wall_support or roof_hit < eave - 0.15 or roof_hit > eave + 0.02:
+		_fail("actual nave eave wall/roof bearing was lost with its duplicate edge face")
+	var missing_panel := MeshProbe.remove_triangles(mesh, TempleBuilder.SURF_STONE,
+		func(a: Vector3, b: Vector3, c: Vector3) -> bool:
+			return MeshProbe.upward_triangle_contains_point([a, b, c],
+				Vector2(wall_x, 0.0), eave, 0.001))
+	var panel_mesh: ArrayMesh = missing_panel.get("mesh")
+	if int(missing_panel.get("removed_triangles", 0)) == 0 or panel_mesh == null \
+			or MeshProbe.has_upward_support(
+				MeshProbe.surface_triangles(null, panel_mesh, TempleBuilder.SURF_STONE),
+				Vector2(wall_x, 0.0), eave, 0.001):
+		_fail("removed actual wall-panel bearing still passes the same support probe")
+	var missing_roof := MeshProbe.remove_triangles(mesh, TempleBuilder.SURF_ROOF,
+		func(a: Vector3, b: Vector3, c: Vector3) -> bool:
+			var hit: Variant = Geometry3D.segment_intersects_triangle(
+				Vector3(wall_x, eave + 0.02, 0.0), Vector3(wall_x, eave - 0.22, 0.0), a, b, c)
+			if hit == null:
+				return false
+			return (c - a).cross(b - a).normalized().dot(Vector3.UP) < -0.05)
+	var roof_mesh: ArrayMesh = missing_roof.get("mesh")
+	var missing_roof_hit := _lowest_vertical_hit(
+		MeshProbe.surface_triangles(null, roof_mesh, TempleBuilder.SURF_ROOF),
+		wall_x, 0.0, eave - 0.25, eave + 0.35) if roof_mesh != null else -1.0
+	if int(missing_roof.get("removed_triangles", 0)) == 0 or roof_mesh == null \
+			or (missing_roof_hit >= eave - 0.15 and missing_roof_hit <= eave + 0.02):
+		_fail("removed actual roof underside still passes the same bearing probe")
+	var closed_roof := MeshKit.new(1)
+	var xf := Transform3D(Basis(), Vector3(0.0, eave, 0.0))
+	var span: float = half * 2.0
+	var rise: float = span * TempleGeometry.RIDGE_PITCH
+	var length: float = TempleGeometry.site_rect(spec).size.y + 0.8
+	for face in RoofShape.faces(span, length, rise):
+		var world_face := PackedVector3Array()
+		for point in face:
+			world_face.append(xf * point)
+		# This broken control re-emits the actual omitted eave side quads.
+		closed_roof.slab_poly(world_face, RoofShape.DEPTH, 0, true)
+	var site: Rect2 = TempleGeometry.site_rect(spec)
+	var portico_rise: float = TempleGeometry.basilica_portico_rise(spec)
+	var z0: float = site.position.y - TempleGeometry.basilica_portico_depth(spec)
+	var z1: float = site.position.y + 0.18
+	for side in [-1.0, 1.0]:
+		var x: float = side * portico_half
+		var points := PackedVector3Array([
+			Vector3(x, portico_eave, z0), Vector3(0.0, portico_eave + portico_rise, z0),
+			Vector3(0.0, portico_eave + portico_rise, z1), Vector3(x, portico_eave, z1)])
+		closed_roof.slab_poly(points, RoofShape.DEPTH, 0, true)
+	var closed_mesh: ArrayMesh = closed_roof.commit()
+	var mutant := _append_closed_roof_surface(mesh, closed_mesh, TempleBuilder.SURF_ROOF)
+	if mutant == null or _nave_eave_fight_count(mutant, half, eave) == 0:
+		_fail("re-emitted actual roof eave faces escaped the same coplanar predicate")
+
+
+func _nave_eave_fight_count(mesh: ArrayMesh, half: float, eave: float) -> int:
+	var count := 0
+	for finding in CoplanarCheck.find(mesh, [TempleBuilder.SURF_STONE, TempleBuilder.SURF_ROOF]):
+		var surfaces: Vector2i = finding["surfaces"]
+		if Vector2i(mini(surfaces.x, surfaces.y), maxi(surfaces.x, surfaces.y)) \
+				!= Vector2i(TempleBuilder.SURF_STONE, TempleBuilder.SURF_ROOF):
+			continue
+		var at: Vector3 = finding["at"]
+		if absf(absf(at.x) - half) < 0.002 and absf(at.y - eave) <= RoofShape.DEPTH + 0.01:
+			count += 1
+	return count
+
+
+func _append_closed_roof_surface(source: ArrayMesh, extra: ArrayMesh,
+		roof_surface: int) -> ArrayMesh:
+	if source == null or extra == null or roof_surface >= source.get_surface_count() \
+			or extra.get_surface_count() == 0:
+		return null
+	var out := ArrayMesh.new()
+	for surface in range(source.get_surface_count()):
+		if surface != roof_surface:
+			out.add_surface_from_arrays(source.surface_get_primitive_type(surface),
+				source.surface_get_arrays(surface))
+			continue
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		st.append_from(source, surface, Transform3D.IDENTITY)
+		st.append_from(extra, 0, Transform3D.IDENTITY)
+		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, st.commit_to_arrays())
+	return out
 
 
 func _check_hosted_components(rows: Array[Dictionary]) -> void:

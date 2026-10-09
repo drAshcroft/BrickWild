@@ -44,7 +44,7 @@ static func check(builder: MassBuilder, mesh: ArrayMesh) -> Dictionary:
 			kit.oriented_box(row["size"], row["xf"], 0)
 		else:
 			kit.slab_poly(row["points"], float(row["depth"]), 0,
-				bool(row["vertical"]))
+				bool(row["vertical"]), PackedInt32Array(row.get("open_edges", PackedInt32Array())))
 	for surf in isolated:
 		if int(surf) >= mesh.get_surface_count():
 			failures.append("components claim surface %d, mesh has %d"

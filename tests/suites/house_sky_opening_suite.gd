@@ -7,12 +7,13 @@ const Probe := preload("res://tests/roof_probe.gd")
 
 class FloatingCourtRoof extends HouseBuilder:
 	func component_slab(role: String, points: PackedVector3Array, depth: float,
-			surf: int, vertical := true) -> Dictionary:
+			surf: int, vertical := true,
+			open_edges: PackedInt32Array = PackedInt32Array()) -> Dictionary:
 		var shifted := points.duplicate()
 		if role.begins_with("roof_court_"):
 			for i in shifted.size():
 				shifted[i].y += 0.3
-		return super.component_slab(role, shifted, depth, surf, vertical)
+		return super.component_slab(role, shifted, depth, surf, vertical, open_edges)
 	func _log_mass(mass_name: String, aabb: AABB, ground := 0.0) -> void:
 		if mass_name.begins_with("roof_court_"):
 			aabb.position.y += 0.3

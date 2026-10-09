@@ -48,20 +48,21 @@ func component_box(role: String, size: Vector3, xform: Transform3D, surf: int) -
 
 
 func component_slab(role: String, points: PackedVector3Array, depth: float,
-		surf: int, vertical := true) -> Dictionary:
+		surf: int, vertical := true,
+		open_edges: PackedInt32Array = PackedInt32Array()) -> Dictionary:
 	if role != fault_role or fault == Fault.NONE:
-		return super.component_slab(role, points, depth, surf, vertical)
+		return super.component_slab(role, points, depth, surf, vertical, open_edges)
 	var mine := _seen
 	_seen += 1
 	if mine != fault_index:
-		return super.component_slab(role, points, depth, surf, vertical)
+		return super.component_slab(role, points, depth, surf, vertical, open_edges)
 	var shifted := PackedVector3Array()
 	for p in points:
 		shifted.append(p + move_by)
 	if fault == Fault.DISPLACE:
-		return super.component_slab(role, shifted, depth, surf, vertical)
+		return super.component_slab(role, shifted, depth, surf, vertical, open_edges)
 	var row := _log_component(role, "slab", surf,
-		{"points": points, "depth": depth, "vertical": vertical})
+		{"points": points, "depth": depth, "vertical": vertical, "open_edges": open_edges})
 	if fault == Fault.MOVE:
-		_kit.slab_poly(shifted, depth, surf, vertical)
+		_kit.slab_poly(shifted, depth, surf, vertical, open_edges)
 	return row

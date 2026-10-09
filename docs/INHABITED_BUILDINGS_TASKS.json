@@ -434,6 +434,23 @@
       "targetCoord": {
         "file": "src/house/house_assembler.gd"
       }
+    },
+    {
+      "key": "LIVE-SACRED-BASILICA-EAVES",
+      "title": "Give Basilica roof and pilaster capitals physical bearings",
+      "description": "The exact public Basilica blood seed1 default walk case currently has66 visible same-facing coplanar overlaps against the unchanged budget12. Actual-triangle census attributes53 to raised-nave eave/wall faces and5 to pronaos eave/beam faces. Omit only duplicate roof side faces at actual bearings, preserving roof skins, dimensions, support members and openings. Keep open-edge indices stable through polygon cleanup and winding normalization.",
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "owner": {
+        "type": "agent",
+        "name": "codex"
+      },
+      "status": "complete",
+      "targetCoord": {
+        "file": "src/temple/temple_builder.gd"
+      },
+      "acceptanceCriteria": "Actual nave and pronaos eave planes have zero duplicate roof/wall faces at frozen small/default/large blood seed1 sizes. Unchanged overall budget12 passes. Actual bearing wall-top and roof-underside probes pass; removing those triangles fails the same predicates; restoring closed roof edges is detected. Shared emitter fixture covers original edge indices, both windings, repeated/collinear cleanup and wrong-edge controls. Complete bounded lane:geom coverage and focused Temple checks pass; rerun walkpins and report any independent baseline failures honestly. Inspect actual roof-on/axis/cutaway renders for all three sizes. Validate an isolated HEAD-based production slice before committing; preserve live Rotunda WIP. This repairs roof contacts and does not close broad sacred style identity.",
+      "aiNotes": "2026-10-09: See visualqa/personality/BASILICA_BEARINGS_REVIEW.md. Independent HEAD-based eight-source candidate passed complete lane:geom and lane:temple plus focused physical removal and edge mapping controls. Nine fresh public-API images inspected. Basilica visible overlaps8 at each frozen size, budget12 unchanged. Full walkpins remains red on independent Romanesque94>92. Parent sacred design stays open. Live Rotunda WIP preserved."
     }
   ]
 }

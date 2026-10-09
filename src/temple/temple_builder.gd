@@ -495,8 +495,17 @@ func _build_basilica_hierarchical_roof() -> void:
 	var nave_xf := Transform3D(Basis(), Vector3(0.0, nave_eave, 0.0))
 	_build_basilica_nave_bearings(site, half, nave_eave)
 	host("basilica_nave_roof")
-	_kit.ridge_roof(nave_xf, nave_span, nave_length, nave_rise, SURF_ROOF)
-	component_note("basilica_nave_roof", "ridge_roof", SURF_ROOF, {
+	var roof_faces: Array[PackedVector3Array] = RoofShape.faces(nave_span, nave_length, nave_rise)
+	for face in roof_faces:
+		var world_face := PackedVector3Array()
+		for point in face:
+			world_face.append(nave_xf * point)
+		# In RoofShape.gable, edge zero is the eave bearing line on either
+		# slope. The wall closes this edge; keep both roof skins and the other
+		# three thickness faces, including the ridge and gable end contacts.
+		component_slab("basilica_nave_roof", world_face, RoofShape.DEPTH,
+			SURF_ROOF, true, PackedInt32Array([0]))
+	component_note("basilica_nave_roof_profile", "ridge_roof", SURF_ROOF, {
 		"xf": nave_xf, "span_x": nave_span, "along_z": nave_length,
 		"rise": nave_rise,
 		"aabb": AABB(Vector3(-nave_span * 0.5,
@@ -715,7 +724,10 @@ func _build_basilica_portico(site: Rect2) -> void:
 		var points := PackedVector3Array([
 			Vector3(x, eave, z0), Vector3(0.0, eave + rise, z0),
 			Vector3(0.0, eave + rise, z1), Vector3(x, eave, z1)])
-		component_slab("basilica_portico_roof_slope", points, RoofShape.DEPTH, SURF_ROOF, true)
+		# The outer eave edge is a wall/beam bearing. Let the bearing own its
+		# vertical face; retain the two skins and the ridge/end faces.
+		component_slab("basilica_portico_roof_slope", points, RoofShape.DEPTH,
+			SURF_ROOF, true, PackedInt32Array([3]))
 	var front_gable := PackedVector3Array([
 		Vector3(-half, eave, front_beam_z), Vector3(half, eave, front_beam_z),
 		Vector3(0.0, eave + rise, front_beam_z)])
@@ -817,7 +829,9 @@ func _build_order() -> void:
 			var s: float = stations[i]
 			var at_gate: bool = wall == 2 and absf(s) < aedicule_half + pw
 			if not at_gate:
+				host("basilica_order_pilaster_%d_%d" % [wall, i])
 				_pilaster(normal, face, s, runs_z, r, pw, p_out, podium, p_h)
+				host_end()
 			if not eave_wall or i == stations.size() - 1:
 				continue
 			var mid: float = (s + stations[i + 1]) / 2.0
@@ -896,12 +910,20 @@ func _pilaster(normal: Vector3, face: float, s: float, runs_z: bool, r: Rect2,
 	var c: Vector3 = _on_wall(normal, face, s, runs_z, r)
 	var sz := func(w: float, hh: float, d: float) -> Vector3:
 		return Vector3(d, hh, w) if runs_z else Vector3(w, hh, d)
-	box(sz.call(pw, height, out), c + normal * (out / 2.0)
-		+ Vector3(0.0, y0 + height / 2.0, 0.0), SURF_STONE)
-	box(sz.call(pw + 0.16, 0.3, out + 0.08), c + normal * ((out + 0.08) / 2.0)
+	# The shaft carries its capital. It must stop at the capital's underside,
+	# rather than extending through it and duplicating its visible top face.
+	var shaft_height := height - 0.34
+	_order_pilaster_box("basilica_order_pilaster_shaft", sz.call(pw, shaft_height, out),
+		c + normal * (out / 2.0) + Vector3(0.0, y0 + shaft_height / 2.0, 0.0), SURF_STONE)
+	_order_pilaster_box("basilica_order_pilaster_base", sz.call(pw + 0.16, 0.3, out + 0.08), c + normal * ((out + 0.08) / 2.0)
 		+ Vector3(0.0, y0 + 0.15, 0.0), SURF_STONE)
-	box(sz.call(pw + 0.22, 0.34, out + 0.14), c + normal * ((out + 0.14) / 2.0)
+	_order_pilaster_box("basilica_order_pilaster_capital", sz.call(pw + 0.22, 0.34, out + 0.14), c + normal * ((out + 0.14) / 2.0)
 		+ Vector3(0.0, y0 + height - 0.17, 0.0), SURF_TRIM)
+
+
+func _order_pilaster_box(role: String, size: Vector3, position: Vector3, surface: int) -> void:
+	component_box(role, size, Transform3D(Basis(), position), surface)
+	_log_part("box", position, size)
 
 
 ## A clerestory light: a dark opening on the outer face with a stone sill and
