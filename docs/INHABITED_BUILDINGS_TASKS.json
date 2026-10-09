@@ -418,10 +418,11 @@
       "title": "Preserve real shared floor edges in the walking grid",
       "priority": "P1",
       "phase": "inhabited-buildings",
-      "status": "pending",
+      "status": "complete",
       "targetCoord": {
         "file": "qa/walk_grid.gd"
-      }
+      },
+      "aiNotes": "Six floor-edge/hazard controls pass; all five large Rotunda routes recover with 2.72m clearance. All43 world support consumers pass native0/49.993s. Planning56 checks pass. The28 multistory/walk-pin failures and32 warnings exactly match unchanged floor code, with no changed complaint rows. See visualqa/personality/WALK_FLOOR_EDGE_REVIEW.md. Building design and identity remain open."
     },
     {
       "key": "LIVE-DOMESTIC-HEARTH-DESIGN",

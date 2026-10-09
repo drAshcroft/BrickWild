@@ -30,6 +30,10 @@ var _level: PackedFloat32Array = PackedFloat32Array()
 ## levels differ by more than this are not neighbours -- a dais is a step you
 ## walk onto, a terrace two metres up is a drop you do not. (CAS-010)
 const MAX_STEP := 0.6
+## Metric tolerance for a shared floor edge whose independently calculated
+## endpoints differ by floating-point roundoff. This is 0.05 mm; it does not
+## bridge a physical crack a person could measure.
+const FLOOR_COVERAGE_EDGE_EPS := 0.00005
 
 
 ## Start a grid covering `bounds`. Everything is blocked until floor is added.
@@ -324,7 +328,17 @@ func _fill(rect: Rect2, value: int, level := 0.0) -> void:
 	for x in range(x0, x1 + 1):
 		for z in range(z0, z1 + 1):
 			# a cell counts as covered when its centre is inside the rectangle
-			if rect.has_point(world_of(x, z)):
+			var point: Vector2 = world_of(x, z)
+			var covered: bool = rect.has_point(point)
+			if not covered and value == 1:
+				# Floor bands may be computed by separate geometry paths and meet
+				# at a shared edge. Treat that edge as closed within a fixed metric
+				# tolerance so a rounded seam cannot erase a whole walk cell.
+				covered = point.x >= rect.position.x - FLOOR_COVERAGE_EDGE_EPS \
+					and point.x <= rect.end.x + FLOOR_COVERAGE_EDGE_EPS \
+					and point.y >= rect.position.y - FLOOR_COVERAGE_EDGE_EPS \
+					and point.y <= rect.end.y + FLOOR_COVERAGE_EDGE_EPS
+			if covered:
 				_free[x * nz + z] = value
 				if value == 1:
 					_level[x * nz + z] = level
