@@ -58,23 +58,57 @@ static func all_triangles(builder: MassBuilder, mesh: ArrayMesh,
 ## True when an upward-facing triangle crosses (point.x, y, point.y).
 static func has_upward_support(triangles: Array, point: Vector2, y: float,
 		tolerance := 0.02) -> bool:
-	var from := Vector3(point.x, y + tolerance + 0.005, point.y)
-	var to := Vector3(point.x, y - tolerance - 0.005, point.y)
 	for triangle in triangles:
 		var a: Vector3 = triangle[0]
 		var b: Vector3 = triangle[1]
 		var c: Vector3 = triangle[2]
-		if point.x < minf(a.x, minf(b.x, c.x)) - 0.01 or point.x > maxf(a.x, maxf(b.x, c.x)) + 0.01 \
-				or point.y < minf(a.z, minf(b.z, c.z)) - 0.01 or point.y > maxf(a.z, maxf(b.z, c.z)) + 0.01:
+		const EDGE_TOLERANCE_METERS := 0.00005
+		if point.x < minf(a.x, minf(b.x, c.x)) - EDGE_TOLERANCE_METERS \
+				or point.x > maxf(a.x, maxf(b.x, c.x)) + EDGE_TOLERANCE_METERS \
+				or point.y < minf(a.z, minf(b.z, c.z)) - EDGE_TOLERANCE_METERS \
+				or point.y > maxf(a.z, maxf(b.z, c.z)) + EDGE_TOLERANCE_METERS:
 			continue
-		# Godot front faces are clockwise: outward normal is (c - a) x (b - a).
-		var face := (c - a).cross(b - a)
-		if face.length_squared() < 1e-12 or face.normalized().dot(Vector3.UP) < 0.95:
-			continue
-		var hit: Variant = Geometry3D.segment_intersects_triangle(from, to, a, b, c)
-		if hit != null and absf((hit as Vector3).y - y) <= tolerance:
+		if upward_triangle_contains_point(triangle, point, y, tolerance):
 			return true
 	return false
+
+
+## Inclusive projected-triangle test for a vertical support sample. Godot's
+## segment/triangle query can omit exact shared edges and vertices. Barycentric
+## containment treats the triangle as a closed set, then interpolates its real
+## plane height at the requested XZ point.
+static func upward_triangle_contains_point(triangle: Array, point: Vector2,
+		y: float, tolerance := 0.02) -> bool:
+	var a: Vector3 = triangle[0]
+	var b: Vector3 = triangle[1]
+	var c: Vector3 = triangle[2]
+	var face := (c - a).cross(b - a)
+	if face.length_squared() < 1e-12 or face.normalized().dot(Vector3.UP) < 0.95:
+		return false
+	var ab := Vector2(b.x - a.x, b.z - a.z)
+	var ac := Vector2(c.x - a.x, c.z - a.z)
+	var ap := point - Vector2(a.x, a.z)
+	var denominator: float = ab.x * ac.y - ab.y * ac.x
+	if absf(denominator) < 1e-12:
+		return false
+	var v: float = (ap.x * ac.y - ap.y * ac.x) / denominator
+	var w: float = (ab.x * ap.y - ab.y * ap.x) / denominator
+	var u: float = 1.0 - v - w
+	const EDGE_TOLERANCE_METERS := 0.00005
+	var orientation: float = signf(denominator)
+	for edge in [[Vector2(a.x, a.z), Vector2(b.x, b.z)],
+			[Vector2(b.x, b.z), Vector2(c.x, c.z)],
+			[Vector2(c.x, c.z), Vector2(a.x, a.z)]]:
+		var start: Vector2 = edge[0]
+		var finish: Vector2 = edge[1]
+		var delta: Vector2 = finish - start
+		var rel: Vector2 = point - start
+		var signed_distance: float = orientation * (delta.x * rel.y - delta.y * rel.x) \
+			/ maxf(delta.length(), 1e-12)
+		if signed_distance < -EDGE_TOLERANCE_METERS:
+			return false
+	var plane_y: float = u * a.y + v * b.y + w * c.y
+	return absf(plane_y - y) <= tolerance
 
 
 ## True when ANY face, whatever its orientation, crosses the segment.

@@ -350,7 +350,20 @@
       },
       "priority": "P1",
       "phase": "inhabited-buildings",
-      "status": "pending"
+      "status": "executing"
+    },
+    {
+      "id": "fabb3d6a-d87a-4dbb-ab1e-40a2b105583a",
+      "key": "LIVE-MESH-SUPPORT-EDGE",
+      "title": "Count closed mesh edges as floor support without inventing floor",
+      "description": "Use inclusive metric projected containment and the actual triangle plane height for upward support. Preserve normals, degeneracy, outside rejection and real mesh removal controls. Geometry and render acceptance remain separate.",
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "complete",
+      "targetCoord": {
+        "file": "qa/mesh_probe.gd"
+      },
+      "aiNotes": "Root reviewed Luna implementation. Emitted split slabs at 1/11.67208/80m and translations through2km pass239checks native0/0.872s; same-point triangle removal and1mm outside controls retained. World mesh consumers43checks native0/53.142s; full sacred structural fixture0fail native0/54.257s. See visualqa/personality/MESH_SUPPORT_EDGE_REVIEW.md. No geometry moved; Rotunda and Witch acceptance remain open."
     }
   ]
 }
