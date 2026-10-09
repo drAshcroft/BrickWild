@@ -107,8 +107,8 @@
     ]
   },
   "scoped_candidate_comparisons": {
-    "images": 41,
-    "requests": 15,
+    "images": 65,
+    "requests": 27,
     "scope": "Reviewed experimental candidates; no whole-style acceptance. Physical fixtures and production promotion are separate.",
     "cohorts": [
       {
@@ -146,6 +146,33 @@
         "all_images_opened": true,
         "design_status": "needs_changes",
         "source_manifest_sha256": "24abf4f9ed5da195adcf92d439126386dbfcc8c29ef53a3191cee66b94ad7a4a"
+      },
+      {
+        "style": "farmhouse",
+        "run": "firewood_restart48",
+        "review": "visualqa/styles/house/farmhouse/renders/firewood_restart48/assistant_review.json",
+        "images": 8,
+        "all_images_opened": true,
+        "design_status": "needs_changes",
+        "source_manifest_sha256": "94dd10d54af6346111ce3f361d5c53245a3719056f3f4d6779265a3c8c1dd2cc"
+      },
+      {
+        "style": "cottage",
+        "run": "firewood_restart48",
+        "review": "visualqa/styles/house/cottage/renders/firewood_restart48/assistant_review.json",
+        "images": 8,
+        "all_images_opened": true,
+        "design_status": "needs_changes",
+        "source_manifest_sha256": "91be0508ce6c610d296be8e14fa066cbefe90da72ad8baeb9dbddb69f3c7a4d1"
+      },
+      {
+        "style": "thatch_cottage",
+        "run": "firewood_restart48",
+        "review": "visualqa/styles/house/thatch_cottage/renders/firewood_restart48/assistant_review.json",
+        "images": 8,
+        "all_images_opened": true,
+        "design_status": "needs_changes",
+        "source_manifest_sha256": "a31c488343beb55bafcdfaee0266a920fed9173cc3a2036259f5008ed1161111"
       }
     ]
   }

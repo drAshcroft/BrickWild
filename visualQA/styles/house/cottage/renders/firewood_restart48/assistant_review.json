@@ -1,0 +1,75 @@
+{
+  "reviewer": "root; direct inspection of all 24 source images",
+  "human_rating": null,
+  "reviewed_images": 8,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "candidate_implementation_accepted": false,
+  "findings": [
+    "Fuel still reads as dark flattened stones; the end-grain detail is too small to read at room scale.",
+    "The flames remain simplified and the rooms look generic and bare.",
+    "Farmhouse and cottage massing still reads as broad boxes, especially at large size; the thatch-cottage roof remains too plain.",
+    "This cohort remains a visual-review finding, not style acceptance. The unrelated NavCheck change is not represented by these images."
+  ],
+  "images": [
+    {
+      "image": "visualqa/styles/house/cottage/renders/firewood_restart48/cottage_small_7441/rooms/room_00_hall/cooking_and_hearth/hearth_portrait.jpg",
+      "sha256": "3dba096dc2e48a9cc0a5e2604816873946cb20af9e7bcda78aa24430ccc9c520",
+      "source_row_index": 8
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/firewood_restart48/cottage_small_7441/views/exterior/roof_on_exterior_control.jpg",
+      "sha256": "341aa2c6c92d07cb95bb0f03365e3f1f61801d29dc884cf15650b2dcf85b6bf6",
+      "source_row_index": 9
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/firewood_restart48/cottage_default_7441/rooms/room_01_kitchen/cooking_and_hearth/hearth_portrait.jpg",
+      "sha256": "508612a1992a48ba06a938fd81322e18d397666c8686b74b92d4de44ae91393f",
+      "source_row_index": 10
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/firewood_restart48/cottage_default_7441/views/exterior/roof_on_exterior_control.jpg",
+      "sha256": "d669bcc7c43d7209f87bbddc48e5e2d9dc7df106f3bf419af01c80f42903ab6e",
+      "source_row_index": 11
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/firewood_restart48/cottage_large_7441/rooms/room_06_kitchen/cooking_and_hearth/hearth_portrait.jpg",
+      "sha256": "bed408ab64d17d05f91fe5c51ea58d40b35360ee6f3b23d5b907099e07103763",
+      "source_row_index": 12
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/firewood_restart48/cottage_large_7441/views/exterior/roof_on_exterior_control.jpg",
+      "sha256": "8212032c21c0183e05049f494083845da0c07a6d51bee5cbe9ef404bdc255ac0",
+      "source_row_index": 13
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/firewood_restart48/cottage_original_11x14_7441/rooms/room_01_kitchen/cooking_and_hearth/hearth_portrait.jpg",
+      "sha256": "d74f092440d83cd7c7015d6ed07c322117aec82fba24ca78fe9d6bed40c90984",
+      "source_row_index": 14
+    },
+    {
+      "image": "visualqa/styles/house/cottage/renders/firewood_restart48/cottage_original_11x14_7441/views/exterior/roof_on_exterior_control.jpg",
+      "sha256": "775ecdd4d3ccb82bb4f244d304b84cbcd36631462bcf96b05cebf159132a4638",
+      "source_row_index": 15
+    }
+  ],
+  "review_cohort_images": 24,
+  "review_cohort": "The root reviewer inspected the complete 24-image cohort.",
+  "source_manifest_sha256": "04d6fd64157c31277950cfbbe5a3f69e7c62a0d99ecbafce48f8d531c56642a7",
+  "render_receipt": {
+    "script": "res://tools/render_domestic_hearth_shell_host.gd",
+    "args": [
+      "--path",
+      "C:/Projects/BrickWild/artifacts/personality/resumed/domestic_hearth_gate_project",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart48_firewood_HEAD_visual\\godot.log",
+      "--script",
+      "res://tools/render_domestic_hearth_shell_host.gd",
+      "--",
+      "--out=C:/Projects/BrickWild/artifacts/personality/resumed/restart48_firewood_HEAD_visual/renders"
+    ],
+    "native_exit": 0,
+    "seconds": 69.952,
+    "invalid": null
+  }
+}
