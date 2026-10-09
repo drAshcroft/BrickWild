@@ -126,7 +126,6 @@
       "description": "Integrate the new planning and furnishing contracts with existing witch roof styling, cauldron dressing and herb-yard vocabulary. Establish identity through silhouette, room relationships and work/living arrangements.",
       "priority": "P1",
       "phase": "inhabited-buildings",
-      "status": "pending",
       "taskType": "feature",
       "targetCoord": {
         "file": "src/house/house_spec.gd"
@@ -138,7 +137,9 @@
         }
       ],
       "rationale": "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
-      "acceptanceCriteria": "Deliver compact expressive mass/roof/chimney and sheltered entry, herb/brewing workspace with storage, hearth/eating/rest area and private sleeping place linked sensibly to the yard. Record supported fantasy exceptions. Render the frozen nine-case matrix with roofs on, cutaway and first-person views; compare unlabelled with cottage and record reviewer recognition and reasons. Palette swaps or three extra role names cannot close this task. Preserve bounds and deterministic generation; run harchetype plus relevant bounded lanes, recording baseline failures."
+      "acceptanceCriteria": "Deliver compact expressive mass/roof/chimney and sheltered entry, herb/brewing workspace with storage, hearth/eating/rest area and private sleeping place linked sensibly to the yard. Record supported fantasy exceptions. Render the frozen nine-case matrix with roofs on, cutaway and first-person views; compare unlabelled with cottage and record reviewer recognition and reasons. Palette swaps or three extra role names cannot close this task. Preserve bounds and deterministic generation; run harchetype plus relevant bounded lanes, recording baseline failures.",
+      "status": "executing",
+      "aiNotes": "2026-10-08 resumed: roof bearing native0 (nine frozen Witch cases + rotated and cottage/trade/custom/world controls); heat geometry native0 with imported-model collision and floor support controls. Compact v7 improves real heat/prep roles but seed8102 loses meals/chest. Corrected furnished nine-case finish check remains red: all small cases lack panels; small8102 and large21325 lack true work-support shelves. Current four actual renders are rejected for tidy-cottage exterior identity and unfinished wall composition. Luna narrow repairs staged/reviewed; no WITCH completion or commit claimed.\n\n2026-10-08 continued: actual Hall ceiling ties pass; corrected first-person camera produces four reachable body-clear compact8102 views. Current v16 compact furniture remains red (required Cooking storage/prep/water), large21325 fitted task support remains absent, and blind exterior review still reads cottage. v17 joint search was rejected in root source review because its scale loop still stopped at first individually valid bench; v18 repair pending. Geometry roofquick passes107.679s and shell hroof/hcomponent/hopening/hsky/hdoor passes2466checks/native0 in292.289s. Workshop roof bay is staged only; root rejected opening-test inversion and support/coordinate faults. No WITCH completion claimed.\n\n2026-10-08 restart recovery: v20 five focused tasks pass (compact layout 9.272s, furnished service 37.761s, unequal roof 19.743s, nine-case finish/light/rack/host-clearance 96.542s, gable brace 14.096s). Fourteen-case Workshop bay passes v21 15.985s after root isolated its bearing-wall omission probe from the pitched ceiling liner. Partial queue is not full acceptance. Compact8102 real exterior still reads as cottage; no service work shelter or separate yard threshold is retained. Interior render fails closed because legacy0.25m sample misses actual reached cells; read-only diagnostic finds640 body-clear reached cells with unchanged0.52m body. Luna staging camera repair and compact Hall-to-workyard architecture. No Witch completion claimed.\n\nRestart recovery: actual reached-grid camera regression native0/25.087s, small8102 four images native0/59.68s, exact default1 pin four images native0/44.646s. Root reviewed roof exterior and supported service bay. Craft functions clearer but front remains generic pale timber cottage. Compact8102 shelter has no valid production candidate because actual Hall/Bedroom glazing and side door veto all canopy stations; optional pail is not cause. Luna coordinating openings/daylight and required work shelter without relaxing clearances. No identity acceptance.\n\n2026-10-08 restart recovery: compact threshold v27 FAIL3 (missing canopy all three compact seeds). Actual-branch trace revealed 7.671m canopy and operation-zone/door clearance conflict, plus remaining bedroom glazing. Root promoted narrow compact-cluster/Hall-first-window v28 proposal for testing; no pass or identity acceptance yet."
     },
     {
       "key": "LIVE-SHOPS",
@@ -166,7 +167,6 @@
       "description": "Implement representative church and temple design briefs with entry hierarchy, structural rhythm, meaningful light and ritual focus. Preserve existing church geometry and temple rite checks.",
       "priority": "P1",
       "phase": "inhabited-buildings",
-      "status": "pending",
       "taskType": "feature",
       "targetCoord": {
         "file": "docs/PROCEDURAL_ARCHITECTURE_RULES.md"
@@ -178,7 +178,9 @@
         }
       ],
       "rationale": "See docs/INHABITED_BUILDINGS_PLAN.md. User clarified that some historic pin defects are already handled; the remaining objective is design quality. Extend existing planning, recipes and checks; do not reopen completed fixes without current reproduction.",
-      "acceptanceCriteria": "Choose and record representative public requests for both families; include the pinned barn-like basilica temple for comparison. Review exterior identity, entry/processional sequence, congregation zones and focal visibility across frozen seeds/sizes. Intentional sacred empty space is accepted when explained by the brief; household density rules do not apply. Negative controls obscure the focus or break the axis. Run lane:church-change and lane:temple with relevant dressing gate; add dome fixture only for dome emitter changes."
+      "acceptanceCriteria": "Choose and record representative public requests for both families; include the pinned barn-like basilica temple for comparison. Review exterior identity, entry/processional sequence, congregation zones and focal visibility across frozen seeds/sizes. Intentional sacred empty space is accepted when explained by the brief; household density rules do not apply. Negative controls obscure the focus or break the axis. Run lane:church-change and lane:temple with relevant dressing gate; add dome fixture only for dome emitter changes.",
+      "status": "executing",
+      "aiNotes": "2026-10-08 root source review: actual bearing and sanctuary/transept aperture changes integrated after exact baseline hashes and git apply check. Renderer corrected to roof-on axis views and floor-derived, entrance-reached camera stations. Representative 11 public requests and 33 views include exact pinned blood basilica 26x44x12 seed1. Runtime, visual review and final completion are pending.\n\n2026-10-08 restart continuation: church-change plus temple native0/55.47s. Labeled structural fixture native1/81.328s with22 failures: actual apse/transept hits, suspect chord and shifted-bearing controls, and ziggurat ground-datum route sampling. Six church representative requests produced18 images native0/87.489s but visual acceptance failed: cutaway cameras inside shell, tower foyer axis views, generic plain masonry interiors and weak stave identity. Exact pinned basilica render shows improved colonnade/ritual axis but barn-like exterior persists. Representative Temple run ongoing. No sacred completion or commit claimed.\n\nRestart recovery: Temple route/headroom lane passes 3737 checks, zero failures/warnings, native0/100.375s. Church cap/crossing/impost/rib repairs focused v4 native1/68.527s now have four failures: three actual dome stone ceilings and one horizontal Temple probe crossing an intentional dais riser. That probe needs a truthful flat-approach limit and preserved injected blockers; TempleRiteCheck does not validate vertical ascent. Representative old renders remain visually unacceptable. Luna continues native basilica hierarchy, annular ambulatory roof, timber stave construction, and camera repairs. No parent completion.\n\n2026-10-08 restart recovery: hollow annular pendentive and emitted crossing-tower bearings pass church-change 5449 checks (12 retained opening warnings), plus VIS-008 47 checks. Fresh six-style/18-image render batch native0/53.992; Byzantine and Renaissance roof-on interiors still visually read as plain masonry halls, so parent remains executing. Basilica v3 focused mesh fixture reports 23 failures; corrections pending, not accepted."
     },
     {
       "key": "LIVE-REVIEW",
@@ -247,6 +249,31 @@
       "status": "pending",
       "title": "Carry recognizable personality through every remaining building family",
       "priority": "P1"
+    },
+    {
+      "id": "4f8d84f4-9b44-4612-a682-df2884b18c9e",
+      "key": "LIVE-SACRED-ENTRY",
+      "title": "Join ziggurat ground approach and preserve occupied chamber headroom",
+      "description": "Repair the actual occupied first-terrace headroom and the paving gap from forecourt to chamber entrance. Complete this structural step with emitted-floor and low-ceiling mutation checks, Temple lane, and fresh roof-on/axis/cutaway renders. Broader LIVE-SACRED architecture and vertical ascent acceptance remain separate.",
+      "targetCoord": {
+        "file": "src/temple/temple_generator.gd"
+      },
+      "priority": "P1",
+      "status": "complete",
+      "aiNotes": "Root-reviewed Luna generator/forecourt repair. Emitted-mesh fixture45 cases0fail native0/4.073s with removed-floor and injected-ceiling negatives. Temple lane3737 checks0fail0warning native0/100.375s. Fresh frozen default flame21325 axis/cutaway inspected, 21-image seven-request batch native0/87.57s unchanged source fingerprint. No ascent or full-family appearance acceptance. Review visualqa/personality/SACRED_ENTRY_REVIEW.md."
+    },
+    {
+      "id": "96f9105b-896c-4cd7-90aa-01320f1e5be7",
+      "key": "LIVE-RENDER-CAMERAS",
+      "title": "Make personality renders reproducible and use reachable eye stations",
+      "description": "Preserve frozen Witch and sacred public request matrices. Select Witch eye stations from the actual reached walking grid with measured prop clearance; keep sacred body-clearance claims explicitly unproven. Save source fingerprints and pending visual acceptance separately from render completion. Completion requires camera-selector positives and a room-filling measured-prop negative, real Witch and six-style sacred captures, and root review identifying unresolved design defects.",
+      "targetCoord": {
+        "file": "tools/render_witch_personality.gd"
+      },
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "complete",
+      "aiNotes": "Root camera regression native0/41.968, four positives plus actual room-filling obstruction negative. Exact Witch seed1 pin four views native0/41.936; six-style church18 views native0/53.992. Root reviewed screenshots; generic Witch exterior and plain sacred interiors explicitly remain unresolved. See visualqa/personality/CAMERAS_REVIEW.md."
     }
   ]
 }

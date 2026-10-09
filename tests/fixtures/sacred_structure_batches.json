@@ -1,0 +1,360 @@
+{
+  "schema": "brickwild.sacred-render-batches.v1",
+  "max_cases_per_invocation": 10,
+  "batches": [
+    {
+      "id": "batch_00",
+      "case_ids": [
+        "church/romanesque/small/1",
+        "church/romanesque/small/8102",
+        "church/romanesque/small/21325",
+        "church/romanesque/default/1",
+        "church/romanesque/default/8102",
+        "church/romanesque/default/21325",
+        "church/romanesque/large/1",
+        "church/romanesque/large/8102",
+        "church/romanesque/large/21325",
+        "church/gothic/small/1"
+      ]
+    },
+    {
+      "id": "batch_01",
+      "case_ids": [
+        "church/gothic/small/8102",
+        "church/gothic/small/21325",
+        "church/gothic/default/1",
+        "church/gothic/default/8102",
+        "church/gothic/default/21325",
+        "church/gothic/large/1",
+        "church/gothic/large/8102",
+        "church/gothic/large/21325",
+        "church/byzantine/small/1",
+        "church/byzantine/small/8102"
+      ]
+    },
+    {
+      "id": "batch_02",
+      "case_ids": [
+        "church/byzantine/small/21325",
+        "church/byzantine/default/1",
+        "church/byzantine/default/8102",
+        "church/byzantine/default/21325",
+        "church/byzantine/large/1",
+        "church/byzantine/large/8102",
+        "church/byzantine/large/21325",
+        "church/nordic_stave/small/1",
+        "church/nordic_stave/small/8102",
+        "church/nordic_stave/small/21325"
+      ]
+    },
+    {
+      "id": "batch_03",
+      "case_ids": [
+        "church/nordic_stave/default/1",
+        "church/nordic_stave/default/8102",
+        "church/nordic_stave/default/21325",
+        "church/nordic_stave/large/1",
+        "church/nordic_stave/large/8102",
+        "church/nordic_stave/large/21325",
+        "church/renaissance/small/1",
+        "church/renaissance/small/8102",
+        "church/renaissance/small/21325",
+        "church/renaissance/default/1"
+      ]
+    },
+    {
+      "id": "batch_04",
+      "case_ids": [
+        "church/renaissance/default/8102",
+        "church/renaissance/default/21325",
+        "church/renaissance/large/1",
+        "church/renaissance/large/8102",
+        "church/renaissance/large/21325",
+        "church/russian/small/1",
+        "church/russian/small/8102",
+        "church/russian/small/21325",
+        "church/russian/default/1",
+        "church/russian/default/8102"
+      ]
+    },
+    {
+      "id": "batch_05",
+      "case_ids": [
+        "church/russian/default/21325",
+        "church/russian/large/1",
+        "church/russian/large/8102",
+        "church/russian/large/21325",
+        "temple/basilica/small/1",
+        "temple/basilica/small/8102",
+        "temple/basilica/small/21325",
+        "temple/basilica/default/1",
+        "temple/basilica/default/8102",
+        "temple/basilica/default/21325"
+      ]
+    },
+    {
+      "id": "batch_06",
+      "case_ids": [
+        "temple/basilica/large/1",
+        "temple/basilica/large/8102",
+        "temple/basilica/large/21325",
+        "temple/pylon/small/1",
+        "temple/pylon/small/8102",
+        "temple/pylon/small/21325",
+        "temple/pylon/default/1",
+        "temple/pylon/default/8102",
+        "temple/pylon/default/21325",
+        "temple/pylon/large/1"
+      ]
+    },
+    {
+      "id": "batch_07",
+      "case_ids": [
+        "temple/pylon/large/8102",
+        "temple/pylon/large/21325",
+        "temple/ziggurat/small/1",
+        "temple/ziggurat/small/8102",
+        "temple/ziggurat/small/21325",
+        "temple/ziggurat/default/1",
+        "temple/ziggurat/default/8102",
+        "temple/ziggurat/default/21325",
+        "temple/ziggurat/large/1",
+        "temple/ziggurat/large/8102"
+      ]
+    },
+    {
+      "id": "batch_08",
+      "case_ids": [
+        "temple/ziggurat/large/21325",
+        "temple/rotunda/small/1",
+        "temple/rotunda/small/8102",
+        "temple/rotunda/small/21325",
+        "temple/rotunda/default/1",
+        "temple/rotunda/default/8102",
+        "temple/rotunda/default/21325",
+        "temple/rotunda/large/1",
+        "temple/rotunda/large/8102",
+        "temple/rotunda/large/21325"
+      ]
+    },
+    {
+      "id": "batch_09",
+      "case_ids": [
+        "temple/basilica/void/small/1",
+        "temple/basilica/void/small/8102",
+        "temple/basilica/void/small/21325",
+        "temple/basilica/void/default/1",
+        "temple/basilica/void/default/8102",
+        "temple/basilica/void/default/21325",
+        "temple/basilica/void/large/1",
+        "temple/basilica/void/large/8102",
+        "temple/basilica/void/large/21325",
+        "temple/pylon/void/small/1"
+      ]
+    },
+    {
+      "id": "batch_10",
+      "case_ids": [
+        "temple/pylon/void/small/8102",
+        "temple/pylon/void/small/21325",
+        "temple/pylon/void/default/1",
+        "temple/pylon/void/default/8102",
+        "temple/pylon/void/default/21325",
+        "temple/pylon/void/large/1",
+        "temple/pylon/void/large/8102",
+        "temple/pylon/void/large/21325",
+        "temple/ziggurat/void/small/1",
+        "temple/ziggurat/void/small/8102"
+      ]
+    },
+    {
+      "id": "batch_11",
+      "case_ids": [
+        "temple/ziggurat/void/small/21325",
+        "temple/ziggurat/void/default/1",
+        "temple/ziggurat/void/default/8102",
+        "temple/ziggurat/void/default/21325",
+        "temple/ziggurat/void/large/1",
+        "temple/ziggurat/void/large/8102",
+        "temple/ziggurat/void/large/21325",
+        "temple/rotunda/void/small/1",
+        "temple/rotunda/void/small/8102",
+        "temple/rotunda/void/small/21325"
+      ]
+    },
+    {
+      "id": "batch_12",
+      "case_ids": [
+        "temple/rotunda/void/default/1",
+        "temple/rotunda/void/default/8102",
+        "temple/rotunda/void/default/21325",
+        "temple/rotunda/void/large/1",
+        "temple/rotunda/void/large/8102",
+        "temple/rotunda/void/large/21325",
+        "temple/basilica/flame/small/1",
+        "temple/basilica/flame/small/8102",
+        "temple/basilica/flame/small/21325",
+        "temple/basilica/flame/default/1"
+      ]
+    },
+    {
+      "id": "batch_13",
+      "case_ids": [
+        "temple/basilica/flame/default/8102",
+        "temple/basilica/flame/default/21325",
+        "temple/basilica/flame/large/1",
+        "temple/basilica/flame/large/8102",
+        "temple/basilica/flame/large/21325",
+        "temple/pylon/flame/small/1",
+        "temple/pylon/flame/small/8102",
+        "temple/pylon/flame/small/21325",
+        "temple/pylon/flame/default/1",
+        "temple/pylon/flame/default/8102"
+      ]
+    },
+    {
+      "id": "batch_14",
+      "case_ids": [
+        "temple/pylon/flame/default/21325",
+        "temple/pylon/flame/large/1",
+        "temple/pylon/flame/large/8102",
+        "temple/pylon/flame/large/21325",
+        "temple/ziggurat/flame/small/1",
+        "temple/ziggurat/flame/small/8102",
+        "temple/ziggurat/flame/small/21325",
+        "temple/ziggurat/flame/default/1",
+        "temple/ziggurat/flame/default/8102",
+        "temple/ziggurat/flame/default/21325"
+      ]
+    },
+    {
+      "id": "batch_15",
+      "case_ids": [
+        "temple/ziggurat/flame/large/1",
+        "temple/ziggurat/flame/large/8102",
+        "temple/ziggurat/flame/large/21325",
+        "temple/rotunda/flame/small/1",
+        "temple/rotunda/flame/small/8102",
+        "temple/rotunda/flame/small/21325",
+        "temple/rotunda/flame/default/1",
+        "temple/rotunda/flame/default/8102",
+        "temple/rotunda/flame/default/21325",
+        "temple/rotunda/flame/large/1"
+      ]
+    },
+    {
+      "id": "batch_16",
+      "case_ids": [
+        "temple/rotunda/flame/large/8102",
+        "temple/rotunda/flame/large/21325",
+        "temple/basilica/bone/small/1",
+        "temple/basilica/bone/small/8102",
+        "temple/basilica/bone/small/21325",
+        "temple/basilica/bone/default/1",
+        "temple/basilica/bone/default/8102",
+        "temple/basilica/bone/default/21325",
+        "temple/basilica/bone/large/1",
+        "temple/basilica/bone/large/8102"
+      ]
+    },
+    {
+      "id": "batch_17",
+      "case_ids": [
+        "temple/basilica/bone/large/21325",
+        "temple/pylon/bone/small/1",
+        "temple/pylon/bone/small/8102",
+        "temple/pylon/bone/small/21325",
+        "temple/pylon/bone/default/1",
+        "temple/pylon/bone/default/8102",
+        "temple/pylon/bone/default/21325",
+        "temple/pylon/bone/large/1",
+        "temple/pylon/bone/large/8102",
+        "temple/pylon/bone/large/21325"
+      ]
+    },
+    {
+      "id": "batch_18",
+      "case_ids": [
+        "temple/ziggurat/bone/small/1",
+        "temple/ziggurat/bone/small/8102",
+        "temple/ziggurat/bone/small/21325",
+        "temple/ziggurat/bone/default/1",
+        "temple/ziggurat/bone/default/8102",
+        "temple/ziggurat/bone/default/21325",
+        "temple/ziggurat/bone/large/1",
+        "temple/ziggurat/bone/large/8102",
+        "temple/ziggurat/bone/large/21325",
+        "temple/rotunda/bone/small/1"
+      ]
+    },
+    {
+      "id": "batch_19",
+      "case_ids": [
+        "temple/rotunda/bone/small/8102",
+        "temple/rotunda/bone/small/21325",
+        "temple/rotunda/bone/default/1",
+        "temple/rotunda/bone/default/8102",
+        "temple/rotunda/bone/default/21325",
+        "temple/rotunda/bone/large/1",
+        "temple/rotunda/bone/large/8102",
+        "temple/rotunda/bone/large/21325",
+        "temple/basilica/serpent/small/1",
+        "temple/basilica/serpent/small/8102"
+      ]
+    },
+    {
+      "id": "batch_20",
+      "case_ids": [
+        "temple/basilica/serpent/small/21325",
+        "temple/basilica/serpent/default/1",
+        "temple/basilica/serpent/default/8102",
+        "temple/basilica/serpent/default/21325",
+        "temple/basilica/serpent/large/1",
+        "temple/basilica/serpent/large/8102",
+        "temple/basilica/serpent/large/21325",
+        "temple/pylon/serpent/small/1",
+        "temple/pylon/serpent/small/8102",
+        "temple/pylon/serpent/small/21325"
+      ]
+    },
+    {
+      "id": "batch_21",
+      "case_ids": [
+        "temple/pylon/serpent/default/1",
+        "temple/pylon/serpent/default/8102",
+        "temple/pylon/serpent/default/21325",
+        "temple/pylon/serpent/large/1",
+        "temple/pylon/serpent/large/8102",
+        "temple/pylon/serpent/large/21325",
+        "temple/ziggurat/serpent/small/1",
+        "temple/ziggurat/serpent/small/8102",
+        "temple/ziggurat/serpent/small/21325",
+        "temple/ziggurat/serpent/default/1"
+      ]
+    },
+    {
+      "id": "batch_22",
+      "case_ids": [
+        "temple/ziggurat/serpent/default/8102",
+        "temple/ziggurat/serpent/default/21325",
+        "temple/ziggurat/serpent/large/1",
+        "temple/ziggurat/serpent/large/8102",
+        "temple/ziggurat/serpent/large/21325",
+        "temple/rotunda/serpent/small/1",
+        "temple/rotunda/serpent/small/8102",
+        "temple/rotunda/serpent/small/21325",
+        "temple/rotunda/serpent/default/1",
+        "temple/rotunda/serpent/default/8102"
+      ]
+    },
+    {
+      "id": "batch_23",
+      "case_ids": [
+        "temple/rotunda/serpent/default/21325",
+        "temple/rotunda/serpent/large/1",
+        "temple/rotunda/serpent/large/8102",
+        "temple/rotunda/serpent/large/21325"
+      ]
+    }
+  ]
+}

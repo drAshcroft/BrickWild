@@ -1,0 +1,365 @@
+{
+  "schema": "brickwild.personality_render_request",
+  "task": "LIVE-WITCH public render matrix",
+  "status": "staged_request_not_rendered",
+  "request_source": "tests/fixtures/witch_family_requests.json",
+  "case_count": 12,
+  "witch_matrix": {
+    "sizes": [
+      "small",
+      "default",
+      "large"
+    ],
+    "seeds": [
+      "1",
+      "8102",
+      "21325"
+    ],
+    "expected_cases": 9
+  },
+  "matched_cottage_controls": {
+    "sizes": [
+      "small",
+      "default",
+      "large"
+    ],
+    "seed": "8102",
+    "expected_cases": 3
+  },
+  "expected_total_cases": 12,
+  "expected_views_per_case": 4,
+  "expected_images": 48,
+  "view_profiles": {
+    "witch_hut": [
+      "roof_on_exterior",
+      "service_yard",
+      "workshop_eye_level",
+      "cutaway_context"
+    ],
+    "cottage": [
+      "roof_on_exterior",
+      "service_yard",
+      "ordinary_interior_eye_level",
+      "cutaway_context"
+    ]
+  },
+  "cases": [
+    {
+      "id": "witch_small_1",
+      "role": "witch",
+      "size": "small",
+      "seed": "1",
+      "profile": "witch_hut",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "witch_hut",
+        "purpose": "none",
+        "seed": "1",
+        "width": 7,
+        "length": 9,
+        "height": 2.6,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "witch_small_8102",
+      "role": "witch",
+      "size": "small",
+      "seed": "8102",
+      "profile": "witch_hut",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "witch_hut",
+        "purpose": "none",
+        "seed": "8102",
+        "width": 7,
+        "length": 9,
+        "height": 2.6,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "witch_small_21325",
+      "role": "witch",
+      "size": "small",
+      "seed": "21325",
+      "profile": "witch_hut",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "witch_hut",
+        "purpose": "none",
+        "seed": "21325",
+        "width": 7,
+        "length": 9,
+        "height": 2.6,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "witch_default_1",
+      "role": "witch",
+      "size": "default",
+      "seed": "1",
+      "profile": "witch_hut",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "witch_hut",
+        "purpose": "none",
+        "seed": "1",
+        "width": 9,
+        "length": 12,
+        "height": 2.6,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "witch_default_8102",
+      "role": "witch",
+      "size": "default",
+      "seed": "8102",
+      "profile": "witch_hut",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "witch_hut",
+        "purpose": "none",
+        "seed": "8102",
+        "width": 9,
+        "length": 12,
+        "height": 2.6,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "witch_default_21325",
+      "role": "witch",
+      "size": "default",
+      "seed": "21325",
+      "profile": "witch_hut",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "witch_hut",
+        "purpose": "none",
+        "seed": "21325",
+        "width": 9,
+        "length": 12,
+        "height": 2.6,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "witch_large_1",
+      "role": "witch",
+      "size": "large",
+      "seed": "1",
+      "profile": "witch_hut",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "witch_hut",
+        "purpose": "none",
+        "seed": "1",
+        "width": 17,
+        "length": 18,
+        "height": 2.8,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "witch_large_8102",
+      "role": "witch",
+      "size": "large",
+      "seed": "8102",
+      "profile": "witch_hut",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "witch_hut",
+        "purpose": "none",
+        "seed": "8102",
+        "width": 17,
+        "length": 18,
+        "height": 2.8,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "witch_large_21325",
+      "role": "witch",
+      "size": "large",
+      "seed": "21325",
+      "profile": "witch_hut",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "witch_hut",
+        "purpose": "none",
+        "seed": "21325",
+        "width": 17,
+        "length": 18,
+        "height": 2.8,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "control_cottage_small",
+      "role": "negative_control",
+      "size": "small",
+      "seed": "8102",
+      "profile": "cottage",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "cottage",
+        "purpose": "none",
+        "seed": "8102",
+        "width": 7,
+        "length": 9,
+        "height": 2.6,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "control_cottage_default",
+      "role": "negative_control",
+      "size": "default",
+      "seed": "8102",
+      "profile": "cottage",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "cottage",
+        "purpose": "none",
+        "seed": "8102",
+        "width": 9,
+        "length": 12,
+        "height": 2.6,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    },
+    {
+      "id": "control_cottage_large",
+      "role": "negative_control",
+      "size": "large",
+      "seed": "8102",
+      "profile": "cottage",
+      "request": {
+        "schema": "brickwild.request",
+        "schema_version": 1,
+        "kind": "house",
+        "style": "cottage",
+        "purpose": "none",
+        "seed": "8102",
+        "width": 17,
+        "length": 18,
+        "height": 2.8,
+        "storeys": 1,
+        "material": "timber",
+        "enclosure": "none",
+        "water": "none",
+        "orientation": 0,
+        "period": 1200
+      }
+    }
+  ],
+  "camera_contract": "Deterministic geometry-derived camera poses. Exact eye, target, FOV, scene bounds, and image path are recorded per view in renders/manifest.json at runtime.",
+  "views": [
+    {
+      "id": "roof_on_exterior",
+      "camera": "Roof-on front -Z three-quarter; shell-envelope framing; FOV 46 degrees."
+    },
+    {
+      "id": "service_yard",
+      "camera": "Roof-on service-side at 1.58 m eye height, focused on built yard shelter or ordinary garden; FOV 72 degrees."
+    },
+    {
+      "id": "workshop_eye_level",
+      "camera": "Roof-on eye-level workshop activity camera, aimed at placed Witchwork stations."
+    },
+    {
+      "id": "ordinary_interior_eye_level",
+      "camera": "Matched cottage eye-level domestic interior camera."
+    },
+    {
+      "id": "cutaway_context",
+      "camera": "Assembled cutaway, elevated front-right from generated scene bounds; FOV 48 degrees."
+    }
+  ],
+  "review_questions": [
+    "Does the Witch read as a working home before labels are shown?",
+    "Are the service shelter and work objects visible together?",
+    "Does the workshop show activity, lighting, storage and access?",
+    "Does the ordinary cottage remain a valid negative control?"
+  ]
+}

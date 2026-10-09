@@ -240,3 +240,12 @@ craft groups and a lower work roof, but its front remains a generic cottage.
 The compact work shelter still needs opening and threshold coordination. Fresh
 sacred renders expose plain masonry volumes and incomplete dome/ambulatory
 spaces. Successful image generation is not visual acceptance.
+
+### 2026-10-08 — Render-camera checkpoint after computer restart
+
+LIVE-RENDER-CAMERAS records the reproducible render tooling and actual reached
+Witch eye-station selector. Four positives and a room-filling obstruction
+control pass. Root reviewed fresh exact-pin Witch views and six-style church
+captures. See `visualqa/personality/CAMERAS_REVIEW.md`. Witch identity and sacred
+interior architecture remain open; sacred body clearance is explicitly
+unmeasured. The complete frozen review matrices are retained.
