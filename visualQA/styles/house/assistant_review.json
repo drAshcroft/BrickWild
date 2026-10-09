@@ -1,0 +1,28 @@
+{
+  "reviewer": "root assistant; direct image inspection",
+  "date": "2026-10-09",
+  "human_rating": false,
+  "cohorts": {
+    "restart21_witch_joint_cluster_full_render": {
+      "requests_reviewed": 12,
+      "images_reviewed": 48,
+      "design_state": "needs_changes",
+      "findings": [
+        "Witch architecture still reads as a tidy generic timber house with broad blank roof and gable surfaces.",
+        "Covered service work and ingredient access are physically improved; the long awning and oversized cauldron still dominate the composition.",
+        "Workrooms and storage need fitted groups and useful wall relationships. The actual default seed 8102 bedroom trace confirms a bed and storage exist; a sparse view alone is not evidence that the room is unfurnished."
+      ]
+    },
+    "domestic_hearth_shell_host_v1": {
+      "requests_reviewed": 12,
+      "images_reviewed": 24,
+      "design_state": "needs_changes",
+      "findings": [
+        "Firebrick joints and actual backing are now visible, with supported fuel and volumetric heat cues.",
+        "Both mantel corners shimmer from coincident faces. Three straight bright flame tongues still read as cones.",
+        "The default thatched cottage workbench and vessel obscure most of the fireplace in the fixed portrait.",
+        "Broad plain roofs, excessive chimney proportions and sparse room composition remain broader domestic design work."
+      ]
+    }
+  }
+}

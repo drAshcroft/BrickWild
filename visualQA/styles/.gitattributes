@@ -1,0 +1,2 @@
+# Imported manifests are provenance records. Preserve their exact source bytes.
+**/source_manifest.json -text

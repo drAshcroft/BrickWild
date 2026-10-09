@@ -1,0 +1,1220 @@
+{
+  "clearance_claim": "unmeasured",
+  "image_count": 24,
+  "purpose": "9 canonical domestic hearth requests plus the 3 original 11x14 requests; each has hearth and roof-on exterior views",
+  "renderer": "real SubViewport render; current production assemblers",
+  "request_count": 12,
+  "rows": [
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          0.450000047683716,
+          1.58000004291534,
+          -1.42999982833862
+        ],
+        "target": [
+          2.65000009536743,
+          0.949999988079071,
+          -1.87999987602234
+        ]
+      },
+      "exterior_prop_count": 3,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/farmhouse_small_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 9.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "small",
+        "storeys": 1,
+        "style": "farmhouse",
+        "trade": "none",
+        "width": 7.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 2
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          12.6486082077026,
+          9.57400608062744,
+          14.1976451873779
+        ],
+        "target": [
+          0.386493682861328,
+          3.19770646095276,
+          -1.12999963760376
+        ]
+      },
+      "exterior_prop_count": 3,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/farmhouse_small_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 9.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "small",
+        "storeys": 1,
+        "style": "farmhouse",
+        "trade": "none",
+        "width": 7.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -4.3580150604248,
+          -0.000293641583994031,
+          -7.00999975204468
+        ],
+        "size": [
+          9.48901748657227,
+          6.39600038528442,
+          11.7600002288818
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 2
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          1.45000004768372,
+          1.58000004291534,
+          2.60000014305115
+        ],
+        "target": [
+          3.65000009536743,
+          0.949999988079071,
+          2.15000009536743
+        ]
+      },
+      "exterior_prop_count": 4,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/farmhouse_default_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 12.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "default",
+        "storeys": 1,
+        "style": "farmhouse",
+        "trade": "none",
+        "width": 9.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 2
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          15.3373765945435,
+          11.3244094848633,
+          17.5586051940918
+        ],
+        "target": [
+          0.386493682861328,
+          3.54995036125183,
+          -1.12999963760376
+        ]
+      },
+      "exterior_prop_count": 4,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/farmhouse_default_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 12.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "default",
+        "storeys": 1,
+        "style": "farmhouse",
+        "trade": "none",
+        "width": 9.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -5.3580150604248,
+          -0.000293641583994031,
+          -8.50999927520752
+        ],
+        "size": [
+          11.4890174865723,
+          7.10048818588257,
+          14.7599992752075
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 2
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          -5.44999980926514,
+          1.58000004291534,
+          4.76724147796631
+        ],
+        "target": [
+          -7.64999961853027,
+          0.949999988079071,
+          5.21724128723145
+        ]
+      },
+      "exterior_prop_count": 4,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/farmhouse_large_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.8,
+        "kind": "house",
+        "length": 18.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "large",
+        "storeys": 1,
+        "style": "farmhouse",
+        "trade": "none",
+        "width": 17.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 2
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          22.588565826416,
+          15.8448543548584,
+          26.7582054138184
+        ],
+        "target": [
+          0.278000831604004,
+          4.24336099624634,
+          -1.13000011444092
+        ]
+      },
+      "exterior_prop_count": 4,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/farmhouse_large_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.8,
+        "kind": "house",
+        "length": 18.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "large",
+        "storeys": 1,
+        "style": "farmhouse",
+        "trade": "none",
+        "width": 17.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -9.57499980926514,
+          -0.000293641583994031,
+          -11.5099992752075
+        ],
+        "size": [
+          19.7060012817383,
+          8.48730945587158,
+          20.7599983215332
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 2
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          2.45000004768372,
+          1.58000004291534,
+          2.59999966621399
+        ],
+        "target": [
+          4.65000009536743,
+          0.949999988079071,
+          2.14999961853027
+        ]
+      },
+      "exterior_prop_count": 5,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/farmhouse_original_11x14_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 14.0,
+        "matrix_group": "original_request_control",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "original_11x14",
+        "storeys": 1,
+        "style": "farmhouse",
+        "trade": "none",
+        "width": 11.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 2
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          17.3966846466064,
+          12.5625438690186,
+          20.132740020752
+        ],
+        "target": [
+          0.386493682861328,
+          3.71724390983582,
+          -1.13000011444092
+        ]
+      },
+      "exterior_prop_count": 5,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/farmhouse_original_11x14_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 14.0,
+        "matrix_group": "original_request_control",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "original_11x14",
+        "storeys": 1,
+        "style": "farmhouse",
+        "trade": "none",
+        "width": 11.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -6.3580150604248,
+          -0.000293641583994031,
+          -9.50999927520752
+        ],
+        "size": [
+          13.4890174865723,
+          7.43507528305054,
+          16.7599983215332
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 2
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          0.450000047683716,
+          1.58000004291534,
+          -1.42999982833862
+        ],
+        "target": [
+          2.65000009536743,
+          0.949999988079071,
+          -1.87999987602234
+        ]
+      },
+      "exterior_prop_count": 2,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/cottage_small_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 9.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "small",
+        "storeys": 1,
+        "style": "cottage",
+        "trade": "none",
+        "width": 7.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          13.574577331543,
+          10.4638805389404,
+          16.8401069641113
+        ],
+        "target": [
+          0.108492374420166,
+          3.46151542663574,
+          0.00750017166137695
+        ]
+      },
+      "exterior_prop_count": 2,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/cottage_small_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 9.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "small",
+        "storeys": 1,
+        "style": "cottage",
+        "trade": "none",
+        "width": 7.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -4.3580150604248,
+          -0.000293641583994031,
+          -7.00999975204468
+        ],
+        "size": [
+          8.93301486968994,
+          6.92361831665039,
+          14.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          1.45000004768372,
+          1.58000004291534,
+          2.60000014305115
+        ],
+        "target": [
+          3.65000009536743,
+          0.949999988079071,
+          2.15000009536743
+        ]
+      },
+      "exterior_prop_count": 3,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/cottage_default_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 12.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "default",
+        "storeys": 1,
+        "style": "cottage",
+        "trade": "none",
+        "width": 9.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          16.1946640014648,
+          12.0267181396484,
+          20.1152153015137
+        ],
+        "target": [
+          0.108492851257324,
+          3.6619086265564,
+          0.00750064849853516
+        ]
+      },
+      "exterior_prop_count": 3,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/cottage_default_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 12.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "default",
+        "storeys": 1,
+        "style": "cottage",
+        "trade": "none",
+        "width": 9.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -5.3580150604248,
+          -0.000293641583994031,
+          -8.50999927520752
+        ],
+        "size": [
+          10.9330158233643,
+          7.3244047164917,
+          17.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          -5.44999980926514,
+          1.58000004291534,
+          4.70955848693848
+        ],
+        "target": [
+          -7.64999961853027,
+          0.949999988079071,
+          5.15955829620361
+        ]
+      },
+      "exterior_prop_count": 4,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/cottage_large_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.8,
+        "kind": "house",
+        "length": 18.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "large",
+        "storeys": 1,
+        "style": "cottage",
+        "trade": "none",
+        "width": 17.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          23.210693359375,
+          16.4992942810059,
+          29.0989952087402
+        ],
+        "target": [
+          -0.0625009536743164,
+          4.39723300933838,
+          0.00750064849853516
+        ]
+      },
+      "exterior_prop_count": 4,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/cottage_large_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.8,
+        "kind": "house",
+        "length": 18.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "large",
+        "storeys": 1,
+        "style": "cottage",
+        "trade": "none",
+        "width": 17.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -9.57499980926514,
+          -0.000293641583994031,
+          -11.5099992752075
+        ],
+        "size": [
+          19.0249977111816,
+          8.79505348205566,
+          23.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          2.45000004768372,
+          1.58000004291534,
+          2.59999966621399
+        ],
+        "target": [
+          4.65000009536743,
+          0.949999988079071,
+          2.14999961853027
+        ]
+      },
+      "exterior_prop_count": 4,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/cottage_original_11x14_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 14.0,
+        "matrix_group": "original_request_control",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "original_11x14",
+        "storeys": 1,
+        "style": "cottage",
+        "trade": "none",
+        "width": 11.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          18.2388191223145,
+          13.2687883377075,
+          22.6704063415527
+        ],
+        "target": [
+          0.108492851257324,
+          3.84101843833923,
+          0.00750064849853516
+        ]
+      },
+      "exterior_prop_count": 4,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/cottage_original_11x14_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 14.0,
+        "matrix_group": "original_request_control",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "original_11x14",
+        "storeys": 1,
+        "style": "cottage",
+        "trade": "none",
+        "width": 11.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -6.3580150604248,
+          -0.000293641583994031,
+          -9.50999927520752
+        ],
+        "size": [
+          12.9330158233643,
+          7.68262434005737,
+          19.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          0.299999952316284,
+          1.58000004291534,
+          2.90561652183533
+        ],
+        "target": [
+          2.5,
+          0.949999988079071,
+          2.45561647415161
+        ]
+      },
+      "exterior_prop_count": 5,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/thatch_cottage_small_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 9.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "small",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 7.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          13.8951053619385,
+          11.1555547714233,
+          17.2407665252686
+        ],
+        "target": [
+          0.108492374420166,
+          3.98651552200317,
+          0.00750017166137695
+        ]
+      },
+      "exterior_prop_count": 5,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/thatch_cottage_small_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 9.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "small",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 7.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -4.3580150604248,
+          -0.000293641583994031,
+          -7.00999975204468
+        ],
+        "size": [
+          8.93301486968994,
+          7.97361850738525,
+          14.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          1.29999995231628,
+          1.58000004291534,
+          3.70363640785217
+        ],
+        "target": [
+          3.5,
+          0.949999988079071,
+          3.25363636016846
+        ]
+      },
+      "exterior_prop_count": 5,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/thatch_cottage_default_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 12.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "default",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 9.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          16.5187358856201,
+          12.7905292510986,
+          20.5203056335449
+        ],
+        "target": [
+          0.108492374420166,
+          4.25720262527466,
+          0.00750064849853516
+        ]
+      },
+      "exterior_prop_count": 5,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/thatch_cottage_default_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 12.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "default",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 9.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -5.3580150604248,
+          -0.000293641583994031,
+          -8.50999927520752
+        ],
+        "size": [
+          10.9330148696899,
+          8.51499271392822,
+          17.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          -5.30000019073486,
+          1.58000004291534,
+          5.53962421417236
+        ],
+        "target": [
+          -7.5,
+          0.949999988079071,
+          5.9896240234375
+        ]
+      },
+      "exterior_prop_count": 5,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/thatch_cottage_large_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.8,
+        "kind": "house",
+        "length": 18.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "large",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 17.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          23.5851287841797,
+          17.5121536254883,
+          29.5670394897461
+        ],
+        "target": [
+          -0.0625009536743164,
+          5.21538639068604,
+          0.00750064849853516
+        ]
+      },
+      "exterior_prop_count": 5,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/thatch_cottage_large_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.8,
+        "kind": "house",
+        "length": 18.0,
+        "matrix_group": "canonical",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "large",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 17.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -9.57499980926514,
+          -0.000293641583994031,
+          -11.5099992752075
+        ],
+        "size": [
+          19.0249977111816,
+          10.431360244751,
+          23.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 66.0,
+        "position": [
+          -2.29999995231628,
+          1.58000004291534,
+          4.03971290588379
+        ],
+        "target": [
+          -4.5,
+          0.949999988079071,
+          4.48971271514893
+        ]
+      },
+      "exterior_prop_count": 4,
+      "host_kind": "ordinary_fireplace",
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/thatch_cottage_original_11x14_7441_hearth.jpg",
+      "mouth_recess": true,
+      "ordinary_hearth_model_rows": 0,
+      "pot_1_rows": 1,
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 14.0,
+        "matrix_group": "original_request_control",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "original_11x14",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 11.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "view": "hearth_portrait",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    },
+    {
+      "body_clearance": "unmeasured",
+      "camera": {
+        "fov_degrees": 48.0,
+        "position": [
+          18.4389514923096,
+          14.1198959350586,
+          23.1343154907227
+        ],
+        "target": [
+          -0.0624995231628418,
+          4.49914121627808,
+          0.00750064849853516
+        ]
+      },
+      "exterior_prop_count": 4,
+      "image": "res://artifacts/personality/resumed/domestic_hearth_shell_host_v1/renders_shell_host_v1/thatch_cottage_original_11x14_7441_exterior.jpg",
+      "props_present": true,
+      "request": {
+        "exterior_props": true,
+        "height": 2.6,
+        "kind": "house",
+        "length": 14.0,
+        "matrix_group": "original_request_control",
+        "roof_on": true,
+        "seed": 7441,
+        "size": "original_11x14",
+        "storeys": 1,
+        "style": "thatch_cottage",
+        "trade": "none",
+        "width": 11.0
+      },
+      "roof_on": true,
+      "save_error": 0,
+      "scene_bounds": {
+        "position": [
+          -6.57499980926514,
+          -0.000293641583994031,
+          -9.50999927520752
+        ],
+        "size": [
+          13.0250005722046,
+          8.99886989593506,
+          19.0349998474121
+        ]
+      },
+      "view": "roof_on_exterior_control",
+      "viewport": {
+        "height": 760,
+        "width": 1100
+      },
+      "yard_prop_count": 6
+    }
+  ],
+  "source_code_overrides": false,
+  "source_fingerprints_end": {
+    "res://qa/house_furnish_programme_check.gd": "c6fc2624aa09442d66784df2f0b24992db8d57a6a011a2532677be8abdf8f55b",
+    "res://qa/house_furnish_spatial_check.gd": "7ef20ddbc114c40248a6370d99b08fc4bab70efc6db165ab14747e2e26aa3957",
+    "res://qa/house_qa.gd": "6100721b9f9d0e91b63907833e0400c51eeaafbc4c58b8e322d98606cb56cdf8",
+    "res://src/house/house_assembler.gd": "5d4dbf7b06d0f98fc69b1c6aa44f5f0cfd6e054586439e2981937b8a78ded542",
+    "res://src/house/house_builder.gd": "5a70140475fdffd247b602d82f01988439ea3c55c82a55c0fa385ad64b747068",
+    "res://src/house/house_furnish_placement.gd": "ab2b964c056d9c43738f32e017779b0961398d51cc41dfbd19e2442b26c49229",
+    "res://src/house/house_furnish_score.gd": "c1ee863cf8f1ff4da52afd01e75749f29949d49b3b8f391497b1383d7ff83470",
+    "res://src/house/house_furnisher.gd": "db5a5ddcd8ec706d365af69ae0e3d46899fe7c09ccebdb9ec884170aad69d6ec",
+    "res://src/house/house_furnishing_recipes.gd": "562f7b6b9ba1b08cf6efcda14b7268bc61d886a35dfdddc62bf681991b014fb8",
+    "res://src/house/house_generator.gd": "60aaa9b876b41a40901fc90d3c375a7fcc31a721c2a79aa7ef448510c9e2062d",
+    "res://src/house/house_geometry.gd": "95cfda412c33773662830d0456a40623184be2036be930694ee5c5c09bd25b4c",
+    "res://src/house/house_plan_features.gd": "7fa4cf4028c430fd129ce18bcb63ca4666fa30c17aa75123dffbf93d4bdabd00",
+    "res://src/house/house_plan_openings.gd": "9a568665f9b653239b7f4c2ff88ed672ee33e60c4b2624e8f6fde83384385e51",
+    "res://src/house/house_plan_rooms.gd": "329aec37522ec86ea2060a4e9beb23c750fa78892e68c4b0adfdf5393fa39ad0",
+    "res://src/house/house_spec.gd": "f30115b4251124ffb6fe75c944f4f4a9fbd6f3c752b43dd1721911fa20ef24e9"
+  },
+  "source_fingerprints_start": {
+    "res://qa/house_furnish_programme_check.gd": "c6fc2624aa09442d66784df2f0b24992db8d57a6a011a2532677be8abdf8f55b",
+    "res://qa/house_furnish_spatial_check.gd": "7ef20ddbc114c40248a6370d99b08fc4bab70efc6db165ab14747e2e26aa3957",
+    "res://qa/house_qa.gd": "6100721b9f9d0e91b63907833e0400c51eeaafbc4c58b8e322d98606cb56cdf8",
+    "res://src/house/house_assembler.gd": "5d4dbf7b06d0f98fc69b1c6aa44f5f0cfd6e054586439e2981937b8a78ded542",
+    "res://src/house/house_builder.gd": "5a70140475fdffd247b602d82f01988439ea3c55c82a55c0fa385ad64b747068",
+    "res://src/house/house_furnish_placement.gd": "ab2b964c056d9c43738f32e017779b0961398d51cc41dfbd19e2442b26c49229",
+    "res://src/house/house_furnish_score.gd": "c1ee863cf8f1ff4da52afd01e75749f29949d49b3b8f391497b1383d7ff83470",
+    "res://src/house/house_furnisher.gd": "db5a5ddcd8ec706d365af69ae0e3d46899fe7c09ccebdb9ec884170aad69d6ec",
+    "res://src/house/house_furnishing_recipes.gd": "562f7b6b9ba1b08cf6efcda14b7268bc61d886a35dfdddc62bf681991b014fb8",
+    "res://src/house/house_generator.gd": "60aaa9b876b41a40901fc90d3c375a7fcc31a721c2a79aa7ef448510c9e2062d",
+    "res://src/house/house_geometry.gd": "95cfda412c33773662830d0456a40623184be2036be930694ee5c5c09bd25b4c",
+    "res://src/house/house_plan_features.gd": "7fa4cf4028c430fd129ce18bcb63ca4666fa30c17aa75123dffbf93d4bdabd00",
+    "res://src/house/house_plan_openings.gd": "9a568665f9b653239b7f4c2ff88ed672ee33e60c4b2624e8f6fde83384385e51",
+    "res://src/house/house_plan_rooms.gd": "329aec37522ec86ea2060a4e9beb23c750fa78892e68c4b0adfdf5393fa39ad0",
+    "res://src/house/house_spec.gd": "f30115b4251124ffb6fe75c944f4f4a9fbd6f3c752b43dd1721911fa20ef24e9"
+  }
+}
