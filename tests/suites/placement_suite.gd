@@ -103,8 +103,9 @@ static func run_orientation() -> SuiteResult:
 	return res
 
 
-static func _check_orientation_and_period(res: SuiteResult, quick := false) -> void:
-	# the quick selector turns the smallest hotel, not the 48 x 24 default
+static func _orientation_requests(quick := false) -> Array[BuildingRequest]:
+	# The same ten seed-821..830 request fixtures serve both the original
+	# aggregate selector and the partition driver. Only quick uses the small hotel.
 	var hotel := BuildingRequest.hotel(823)
 	if quick:
 		hotel = BuildingRequest.hotel(823, &"grand_budapest", 30.0, 16.0, 3.0)
@@ -133,7 +134,17 @@ static func _check_orientation_and_period(res: SuiteResult, quick := false) -> v
 	stupa.length = 40.0
 	stupa.height = 17.0
 	requests.append(stupa)
+	return requests
 
+
+static func _check_orientation_and_period(res: SuiteResult, quick := false) -> void:
+	_check_orientation_requests(res, _orientation_requests(quick), quick)
+
+
+## The exact per-request assertion body also powers the artifact partition driver.
+## Extracting it changes selector boundaries, not request construction or checks.
+static func _check_orientation_requests(res: SuiteResult,
+		requests: Array[BuildingRequest], quick := false) -> void:
 	for request in requests:
 		res.checked += 1
 		if request.orientation != 0.0 or request.period != 1200:

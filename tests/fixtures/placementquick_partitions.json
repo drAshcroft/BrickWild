@@ -1,0 +1,123 @@
+{
+  "packet": "placementquick_partitions_20261008",
+  "status": "verified_bounded_aggregate",
+  "aggregate_selector": "placementquick",
+  "reported_aggregate_attempt": {
+    "native_exit": -1,
+    "host_seconds": 300.952,
+    "status": "timeout",
+    "last_reached": "temple orientation",
+    "partial_timings_seconds": {
+      "hotel": 75.616,
+      "castle": 40.463,
+      "village": 17.625
+    },
+    "interpretation": "failed bounded run; not a pass or complete aggregate measurement"
+  },
+  "source_baseline_sha256": {
+    "tests/suites/placement_suite.gd": "2F5F6ECDC5139D95563E01DB5677E5DE2F13A2B8B7A1AF010C0B4D2603150C49",
+    "tools/library_partition_driver.gd": "1295098A8E80283AB03A6D2E34682E41575CDBFFF44AAE81048AAE49244B0B7B",
+    "tools/validate_library_partitions.ps1": "ACB78C26FF2E42936932E2DA7F0C41634DD603D960EF4997DD46232D51E8B158"
+  },
+  "canonical_requests": [
+    "house:1000",
+    "shop:1000",
+    "church:1000",
+    "castle:1000",
+    "temple:1000",
+    "world:1000",
+    "village:1000"
+  ],
+  "orientation_period_requests": [
+    "house:821",
+    "shop:822",
+    "hotel:823",
+    "church:824",
+    "castle:825",
+    "temple:826",
+    "village:827",
+    "world:828",
+    "world:829",
+    "world:830"
+  ],
+  "controls": [
+    "world_rect:house:42"
+  ],
+  "partitions": {
+    "house_shop": [
+      "house:1000",
+      "shop:1000",
+      "house:821",
+      "shop:822"
+    ],
+    "church": [
+      "church:1000",
+      "church:824"
+    ],
+    "castle": [
+      "castle:1000"
+    ],
+    "castle_orientation": [
+      "castle:825"
+    ],
+    "temple": [
+      "temple:1000"
+    ],
+    "temple_orientation": [
+      "temple:826"
+    ],
+    "hotel_orientation": [
+      "hotel:823"
+    ],
+    "village": [
+      "village:1000",
+      "village:827"
+    ],
+    "world_insula": [
+      "world:1000"
+    ],
+    "world_insula_orientation": [
+      "world:828"
+    ],
+    "world_hall_orientation": [
+      "world:829"
+    ],
+    "world_stupa_orientation": [
+      "world:830"
+    ],
+    "world_rect": [
+      "world_rect:house:42"
+    ]
+  },
+  "expected_marker_count": 18,
+  "run_invariants": [
+    "unchanged canonical dimensions, style, purpose, and family adapters",
+    "orientation PI/2 generation and period 1789 transfer",
+    "default request metadata and both JSON round trips",
+    "north vector equals Vector3.LEFT",
+    "hotel orientation fixture includes the existing placement contract",
+    "door position against each family measured footprint and wider bounds",
+    "world_rect rotated/transformed bounds and footprint area"
+  ],
+  "artifact_hashes_sha256": {
+    "baseline/placement_suite.gd": "2F5F6ECDC5139D95563E01DB5677E5DE2F13A2B8B7A1AF010C0B4D2603150C49",
+    "proposal/placement_suite.proposed.gd": "685D05B829E653F6A6963E54700CA6AE5335DC781DC81DC5350D4D142BD18E5C",
+    "proposal/placement_suite.diff": "1145BE39D91CC86ED6635AB9E5B81FA7BCBCEF416A9B30FE84F4D76760A58C39",
+    "proposal/tools/placement_partition_driver.gd": "6C40C5DE9FF07950A731A43217D8E68F786AAB7B5EBC922498462BF1AB1AA003",
+    "validator/validate_placement_partitions.ps1": "D7DC162F920E0F754C262E5162E53A9398826F963AA9CD8975B2805330BF1297",
+    "validator/test_validator_selftest.ps1": "F16AC53261D5C48551D824DB6ED83E5C79C160DDDE873453210A1C0D4AE440E6",
+    "proposal/tools/run_placement_partitions.ps1": "1F756991D8B03DB0622161B18388F8BDBD4277A9F0DF23E4886C501D78DAB004",
+    "README.md": "224357A4D23B7D5AA7B2B1CA8F6E41FABC554DE87902BF773C0B637CD6F9AB71"
+  },
+  "validator_requirements": [
+    "receipt source_stable must be JSON Boolean true",
+    "before/after receipt and CSV fingerprints must each be 64 hexadecimal SHA256 characters",
+    "receipt and CSV fingerprints agree for each partition"
+  ],
+  "runner_stop_policy": [
+    "source drift stops after preserving incremental receipt",
+    "script/parse error stops after preserving incremental receipt",
+    "stable-source ordinary test failure records and continues"
+  ],
+  "verified_receipts": "artifacts/personality/resumed/restart5_placement_parts"
+}

@@ -310,7 +310,8 @@
       },
       "priority": "P1",
       "phase": "inhabited-buildings",
-      "status": "executing"
+      "status": "complete",
+      "aiNotes": "Root reviewed helper-only extraction. All13 partitions PASS31 checks,0fail/0warning,434.399s aggregate/max95.811s, unchanged source per receipts. Full18-marker union and root string-false/fingerprint rejection controls pass. See docs/PLACEMENT_QUICK_PARTITIONS.md. Wider sweeps and appearance remain separate."
     },
     {
       "id": "69522761-f7c4-4aee-94a0-9e8b214acd1a",
