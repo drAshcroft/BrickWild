@@ -1,6 +1,6 @@
 # Procedural building visual targets
 
-The user requested imagegen references and actual renders grouped by style and room. The first domestic comparison task is complete: Witch hut, cottage, farmhouse, and thatched cottage each have a saved four-panel exterior/room/prop board, its exact prompt, and interpretation notes. All 72 reviewed Godot images are copied into the same style tree with unchanged pixels and source manifests.
+The user requested imagegen references and actual renders grouped by style and room. All twelve published house styles now have a saved four-panel exterior/room/prop board, its exact prompt, and interpretation notes. All 72 reviewed Godot images are copied into the same style tree with unchanged pixels and source manifests. Actual comparison coverage currently includes Witch hut, cottage, farmhouse and thatched cottage; the eight additional boards still need matching current renders.
 
 Open [the house comparison gallery](../visualqa/styles/house/index.html). Concept boards live in `visualqa/styles/house/<style>/targets/`. Actual results live in `<style>/renders/<run>/<request>/rooms/` or `views/`. The index records image and source-manifest hashes. [Assistant findings](../visualqa/styles/house/assistant_review.json) describe the remaining defects; they are not human ratings.
 
@@ -10,7 +10,7 @@ The references do not finish any building design task. The two actual cohorts re
 
 ## Remaining reference coverage
 
-Extend this workflow to townhouse, longhall, rich, Mediterranean, Asian, African, mud-hut and Pueblo style rows, then the published church, temple, shop, hotel, castle, windmill, world and village families. Use a specific architectural brief per style rather than one generic building with alternate props. Cultural labels in the existing API need more precise reference briefs before making authenticity claims.
+Extend actual comparison coverage to townhouse, longhall, rich, Mediterranean, Asian, African, mud-hut and Pueblo style rows, then generate targets and actual comparisons for the published church, temple, shop, hotel, castle, windmill, world and village families. Use a specific architectural brief per style rather than one generic building with alternate props. The broad cultural API labels have fictional, explicitly narrowed household briefs in their target notes; they do not establish cultural authenticity.
 
 Room views must include arrival/circulation, cooking/work, living/eating, sleeping/privacy, storage, and service thresholds where those functions exist. Sacred buildings need entrance-to-ritual-axis and sanctuary views. Shops need customer, work and stock sequences. A decorated exterior cannot substitute for these interiors.
 
@@ -18,4 +18,4 @@ Room views must include arrival/circulation, cooking/work, living/eating, sleepi
 
 `python tools/organize_visualqa_renders.py` prints a dry-run plan for the two current cohorts. Add `--apply` to copy. For another cohort, repeat `--source <render-directory> <unique-run-name>`. Include all desired cohorts when rebuilding the gallery. The tool refuses changed image destinations, checks copied hashes, and preserves the existing human ratings, walk pins and rating selector.
 
-Verification: 72 unique destination files matched their source SHA-256 values; five style/run copies matched their exact source manifests; four generated boards, prompts and notes were saved. Root inspected all 72 actual images and all four targets.
+Verification: 72 unique destination files matched their source SHA-256 values; five style/run copies matched their exact source manifests; twelve generated boards, prompts and notes were saved. Root inspected all 72 actual images and all twelve targets. Geometry, support, ventilation and circulation errors visible in generated concepts are called out in each target note rather than treated as implementation instructions.
