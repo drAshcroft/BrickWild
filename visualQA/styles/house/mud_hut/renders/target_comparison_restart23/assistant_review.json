@@ -1,0 +1,104 @@
+{
+  "reviewer": "root assistant",
+  "human_rating": null,
+  "reviewed_images": 17,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "scope": "Three public requests at seed 8102. Roof-on exterior, sampled functional room groups and secondary cutaway. This is comparison evidence, not the full house-style acceptance matrix.",
+  "findings": [
+    "The actual style is a square earth-coloured cottage with a golden hipped roof. Its plan has no strong compact earth-dwelling character.",
+    "Default rooms repeat cottage partitions, with a narrow parlour, generic kitchen bench and raised single-bed group.",
+    "Large and default cooking corners use disconnected rough wood furniture, metal-band barrels and exposed cookware rather than fitted earthen storage and work surfaces.",
+    "Wall surfaces are bare apart from generic shelves and torches. Roof texture and exterior corner posts need a convincing construction vocabulary.",
+    "Large roof-on exterior is a wide repeated two-storey rectangle with a tiny porch; the cutaway has broad under-composed rooms.",
+    "The small sleeping area shares entrance/living space. The images do not show deliberate privacy or a calm sleeping alcove."
+  ],
+  "source_manifest_sha256": "3512df5ddc7f42d2e05f71ab079dd1af29c2c120d75268409b26dce331f1d64f",
+  "render_receipt": {
+    "script": "res://tools/render_house_style_gallery.gd",
+    "args": [
+      "--path",
+      "C:\\Projects\\BrickWild",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_house_mud_hut_gallery\\godot.log",
+      "--script",
+      "res://tools/render_house_style_gallery.gd",
+      "--",
+      "style=mud_hut",
+      "run=target_comparison_restart23"
+    ],
+    "native_exit": 0,
+    "seconds": 37.926,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_small_8102/views/roof_on_exterior.jpg",
+      "sha256": "a0c41ce1fe55fc13906db48933e7f77183c564c1cc4544dced9ee988b2b34b63"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_small_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "ee0c43785bbc6fc8c12eb33e3418bf8306dbf4a74b642a0c042f9f2ddd20a272"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_small_8102/rooms/room_cooking_kitchen_1.jpg",
+      "sha256": "08752bee1348e64aa6f2bd1100fb034ce3f56b13e048b83317b565ee681a78b4"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_small_8102/views/cutaway_context.jpg",
+      "sha256": "71b93eade1214f0c8b1fb226acf852b41fcbe1aa6dce460a626a152661a0fa3a"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_default_8102/views/roof_on_exterior.jpg",
+      "sha256": "f4814ed3acd3475d6a3c2dfb1f0523c8c970938f92cd3ac65d4c4fb77ebb5b88"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_default_8102/rooms/room_arrival_hall_1.jpg",
+      "sha256": "b36551417965c90394cdee453b5eaac697e5cae65b3f87b15c60c070a1c81200"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_default_8102/rooms/room_living_parlour_0.jpg",
+      "sha256": "4bed69fb2d522a4634ae3bc592d58d1611ede3a896c0a78c3223bbf83f1ea9e1"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_default_8102/rooms/room_cooking_kitchen_4.jpg",
+      "sha256": "d720cd33658ec32ca25c82e1dea47bf85233848e52e44d4f80c2f5996340bc07"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_default_8102/rooms/room_sleeping_bedroom_3.jpg",
+      "sha256": "288757139d39783a2e177b37a604f75350e2bb2ed9ca49500f59746cc1b10a2c"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_default_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "ec4f5afc7333df9ebedfe56a8de0480bba1efd3c977dbc9dd54677cd65c249a9"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_default_8102/views/cutaway_context.jpg",
+      "sha256": "6f67904b23bfd0f6aa17ba5e83cf5f8d9992128f30cc91a414f030b57ce4a03a"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_large_8102/views/roof_on_exterior.jpg",
+      "sha256": "8f048f2caa30fd8e59deafee906a6e8b966102ab0f8cabc4bf4284e6fdc985c1"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_large_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "ca7b76aa5db99c100a489bc0147a18f48aa82a3436077d099dd6e9876d3f7018"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_large_8102/rooms/room_cooking_kitchen_5.jpg",
+      "sha256": "dda3a927814b20539b5f76e529ed95d574b5553f7870038b01b8c0ef45796b5e"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_large_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "bcdf3b4dfc26b7f633d9904b2f14cc9e35544be4cbdce166b6590701e328a54f"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_large_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "ac0219486d0d0b40536c509c8802f0aa523bf0bf02fc52543d80a2112b0826ad"
+    },
+    {
+      "image": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/mud_hut_large_8102/views/cutaway_context.jpg",
+      "sha256": "8bf4326767569054d5f98d3586186c60c1e245728e45c8c8279c879120cfc67a"
+    }
+  ]
+}

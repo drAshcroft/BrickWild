@@ -1,0 +1,103 @@
+{
+  "reviewer": "root assistant",
+  "human_rating": null,
+  "reviewed_images": 17,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "findings": [
+    "Small/default roofs and footprint read as a cottage rather than a vertical street household.",
+    "Default and large offices show a workbench and single book, without a writing seat or coherent records storage.",
+    "Walls and ceilings remain largely bare; bedroom groups remain isolated objects rather than fitted domestic composition.",
+    "Large arrival view shows a bare wall and doorway; cutaway shows an excessively long empty central hall.",
+    "Large timber facade repeats bays without a clear arrival or roof hierarchy.",
+    "Current source still enables the pending ordinary native hearth on townhouse; this gallery records that exact uncommitted state."
+  ],
+  "render_receipt": {
+    "script": "res://tools/render_house_style_gallery.gd",
+    "args": [
+      "--path",
+      "C:\\Projects\\BrickWild",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_house_townhouse_gallery\\godot.log",
+      "--script",
+      "res://tools/render_house_style_gallery.gd",
+      "--",
+      "style=townhouse",
+      "run=target_comparison_restart23"
+    ],
+    "native_exit": 0,
+    "seconds": 52.455,
+    "invalid": null
+  },
+  "source_manifest_sha256": "88bf374b309b2a5ec3dd04b20b443ba795be8b9087e6addc7f5f3c3036d64dca",
+  "images": [
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_small_8102/views/roof_on_exterior.jpg",
+      "sha256": "1abbcde5c27c28e6fcdc46d724888715e65dcff97c601ea0a27e2dc376633620"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_small_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "1602295a40c190900c29dbf93ec6f29ed4a2230b301f60c3182d5b2b5c2ca4df"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_small_8102/rooms/room_sleeping_bedroom_1.jpg",
+      "sha256": "a05964687becc4b3578c7b196a5ffbf992b8278cb3b13557b71986fcc0cb2846"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_small_8102/views/cutaway_context.jpg",
+      "sha256": "4d54e20843383e6865dc5e617c01fb46dd66d8100d2e95e2a1008e4df057bbbd"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_default_8102/views/roof_on_exterior.jpg",
+      "sha256": "d90e3250bd4cf976adfd2022fa37a5bf0f2f001cb7b55753158dad3f2bcf3f77"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_default_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "4b517e97430d75e5b0607a3eab2b12070df4a42b425ab4e521e9c75b22ec22f7"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_default_8102/rooms/room_cooking_kitchen_1.jpg",
+      "sha256": "4de0c529db4e3815252d64a4026405e420fe640b8218aeb2c9bcf2117c548542"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_default_8102/rooms/room_work_office_2.jpg",
+      "sha256": "8f56371b29bf0514768210933850b17dfb6fd6a0cefd7f7592bdad95788f7595"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_default_8102/rooms/room_sleeping_bedroom_3.jpg",
+      "sha256": "440bbeef74a1184953ed358a1258149b093d147aa7080d2e8907308bfb955cba"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_default_8102/views/cutaway_context.jpg",
+      "sha256": "6fcc213d16d8c496af314ea5cefde92e115e585a1583ccc242096b0c8d6052eb"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_large_8102/views/roof_on_exterior.jpg",
+      "sha256": "2db88f3dbbb6807096f17cf5df518323386945226d7022c0f58d52f824b66a04"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_large_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "95739a4825b24715b6ab94131aa0c488e0c17a6ef321b371cef4bdfa716305c6"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_large_8102/rooms/room_cooking_kitchen_6.jpg",
+      "sha256": "5c94a9a698175c118c58768093d7a56890e1a271de8076960376d01e41b3d1d2"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_large_8102/rooms/room_work_office_2.jpg",
+      "sha256": "838706dc01459854c4300c6059e6c24a554837dc6bad7feffaecf73e463b4207"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_large_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "74bd279adea4d3e2ad18ab36a6afacd4f7560b202cb15da66317d5a07ab089c1"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_large_8102/rooms/room_storage_store_3.jpg",
+      "sha256": "b6e9565b8bd17e3133549292cca0344529ef23cf493b283d3027a825bad9c64b"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/townhouse_large_8102/views/cutaway_context.jpg",
+      "sha256": "4d597477adf10ba586dd31160a5ad935eea6085cdcbeb518261988a1fc81224c"
+    }
+  ]
+}

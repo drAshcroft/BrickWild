@@ -1,0 +1,104 @@
+{
+  "reviewer": "root assistant",
+  "human_rating": null,
+  "reviewed_images": 17,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "scope": "Three public requests at seed 8102. Roof-on exterior, sampled functional room groups and secondary cutaway. This is comparison evidence, not the full house-style acceptance matrix.",
+  "findings": [
+    "The small and default shells still read as a cottage. The brown roof courses do not give a convincing thatch identity.",
+    "Default and large cutaways divide the house into cottage rooms around an empty central corridor; there is no readable communal longhall.",
+    "The workshops use an isolated workbench; the default oversized empty shelving is not a composed craft wall.",
+    "Sleeping rooms have generic bed/chest/nightstand arrangements and tall torches against bare walls.",
+    "The large kitchen has an isolated prep bench and sparse wall storage. The store groups barrels/crate in a bare corner.",
+    "The large three-storey silhouette reads as a generic timber manor rather than a longhall."
+  ],
+  "source_manifest_sha256": "fef225dd916721fb74489a2baa408fa9e514176af3c5504b135b72f7f2debc5f",
+  "render_receipt": {
+    "script": "res://tools/render_house_style_gallery.gd",
+    "args": [
+      "--path",
+      "C:\\Projects\\BrickWild",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_house_longhall_gallery\\godot.log",
+      "--script",
+      "res://tools/render_house_style_gallery.gd",
+      "--",
+      "style=longhall",
+      "run=target_comparison_restart23"
+    ],
+    "native_exit": 0,
+    "seconds": 61.06,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_small_8102/views/roof_on_exterior.jpg",
+      "sha256": "aedcfaf2ddb5a429fd53ce6234c37fc2aa55dbdbc76a52575e70d9f4c5e197f2"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_small_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "5e38b65ffa8824c3a7142430660bb36375cac353477f65762942a2c0eb7fe1fd"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_small_8102/rooms/room_sleeping_bedroom_1.jpg",
+      "sha256": "16cf96c048f6099ef3c7df25b4a3304668432990e58a6448b9be47efd85d797c"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_small_8102/views/cutaway_context.jpg",
+      "sha256": "54a5f377fbb86c5c7dc24e2c7632e651dbd7103bdc39eb7aac3f584898a54d50"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_default_8102/views/roof_on_exterior.jpg",
+      "sha256": "d42e7d8ea4d6f8d6b2d01add25a3490d8cf051de5ed1f6af6d2d8cc66eba2504"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_default_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "98c650a480e266aa8b4bec50b910d800cc3319345cf1858399b9df3a845c6c94"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_default_8102/rooms/room_cooking_kitchen_1.jpg",
+      "sha256": "e775c565000776112a5acecccce113c69ac1ae945d68deb1d6e32ea6a982e0e6"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_default_8102/rooms/room_work_workshop_2.jpg",
+      "sha256": "be957d7a98fa007318ed2c427d51c71642f62ad76712171552339d30f11c557e"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_default_8102/rooms/room_sleeping_bedroom_3.jpg",
+      "sha256": "e7466f3647f70dff5b72bcf19eadf3b628e5eab6598df9151f64c8a7d02280bd"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_default_8102/views/cutaway_context.jpg",
+      "sha256": "b1553fd71eff05a62552344903ed47807d88b8fcd3dfd9829009b8452c9d8d77"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_large_8102/views/roof_on_exterior.jpg",
+      "sha256": "02d8c3bbce5cb952294eea613f5ee2d48198e9e7cb6a67abe99ad93e1ffeedbc"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_large_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "86e5cd37f3444db6b4887e7b12c19006e47b1a825854a58c022218dfe97e9fc6"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_large_8102/rooms/room_cooking_kitchen_6.jpg",
+      "sha256": "75f6bc192f99592e0d963c19c63b4427d8fc26fe411067b821a9b6809495b653"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_large_8102/rooms/room_work_workshop_1.jpg",
+      "sha256": "2d851f2bfc271d705b3ec04ceab511c84fd3e421b38bc097d4871bce1aec1883"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_large_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "df5e6022025432b63888f23fac998e47ecb349ceae5c51b9f6faef69ac55e541"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_large_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "6c94a243c86099fcd195b5b7ad36d0220d5bdad60f854229f8688a496cfb57b4"
+    },
+    {
+      "image": "visualqa/styles/house/longhall/renders/target_comparison_restart23/longhall_large_8102/views/cutaway_context.jpg",
+      "sha256": "7a9aa9f00d44b95a032aee38469b918458ee491b4aa419bff2e61b1a1c30a524"
+    }
+  ]
+}

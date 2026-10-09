@@ -1,0 +1,13 @@
+{
+	"purpose": "Reference gallery only. This does not replace or reduce the HouseStyles acceptance matrix.",
+	"styles": ["townhouse", "longhall", "rich", "mediterranean", "asian", "african", "mud_hut", "pueblo"],
+	"sizes": ["small", "default", "large"],
+	"seed": 8102,
+	"request_factory": "BrickWild.default_request(\"house\", 8102); set each public style; preserve default trade",
+	"scale_method": "For width, length, height, and storeys, use BrickWild.describe_kind(\"house\") public min/default/max values and midpoint interpolation exactly as tools/render_personality_baseline.gd._apply_scale.",
+	"case_count": 24,
+	"primary_views": ["roof_on_exterior", "arrival eye-level", "one representative eye-level room for each present activity group: living, cooking, work, sleeping, storage"],
+	"secondary_views": ["assembled cutaway context"],
+	"room_policy": "Room groups are selected from the generated public plan. If groups share one actual room, it is rendered once and tagged with both groups. If a group has no actual room, the manifest records absent_from_generated_plan. The renderer never creates rooms or moves props.",
+	"output_layout": "visualqa/styles/house/<style>/renders/<unique-run>/<style>_<size>_8102/{request.json,views,rooms}"
+}

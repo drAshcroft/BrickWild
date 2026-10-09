@@ -1,0 +1,100 @@
+{
+  "reviewer": "root assistant",
+  "human_rating": null,
+  "reviewed_images": 16,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "scope": "Three public requests at seed 8102. Roof-on exterior, sampled functional room groups and secondary cutaway. This is comparison evidence, not the full house-style acceptance matrix.",
+  "findings": [
+    "The hipped roof and porch suggest the narrowed fictional timber-house brief, but the repeated Tudor-like wall grid and cottage room layout do not carry that character inside.",
+    "Actual rooms use the same high western dining chairs, single bed, rough workbench, metal-band chests and torches as ordinary styles. The target's low furniture, quiet partitions and entry hierarchy are absent.",
+    "The default arrival and cooking cameras face large bare wall and floor runs. They are single viewpoints; the cutaway and planned inventory must supplement them.",
+    "The large kitchen has generic high tables in open floor, disconnected barrel stand and wall shelving.",
+    "Sleeping rooms have a generic bed against plain walls. Storage is isolated crates/chests rather than integrated household storage.",
+    "Roof tiers and sheltered thresholds need more purposeful proportions; the large shell remains a broad repeated rectangle."
+  ],
+  "source_manifest_sha256": "eb592633374fd48f7e01060e2bb95579b6b4afe6e587e7394ad09af1474a1a7a",
+  "render_receipt": {
+    "script": "res://tools/render_house_style_gallery.gd",
+    "args": [
+      "--path",
+      "C:\\Projects\\BrickWild",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_house_asian_gallery\\godot.log",
+      "--script",
+      "res://tools/render_house_style_gallery.gd",
+      "--",
+      "style=asian",
+      "run=target_comparison_restart23"
+    ],
+    "native_exit": 0,
+    "seconds": 49.008,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_small_8102/views/roof_on_exterior.jpg",
+      "sha256": "3b2e89e71a960f0d9df10972100b9633aaa934c41ac45d30a70035a92f6aac32"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_small_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "dbce22e2281bb7b05be2191bcc1b268cc3a848388174c3097f1a8883499adc7f"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_small_8102/rooms/room_cooking_kitchen_1.jpg",
+      "sha256": "6d9df159d235f25345f972cef831eecc27f4c9d736ca5026f607e72b5d05cd07"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_small_8102/views/cutaway_context.jpg",
+      "sha256": "cfeefaa559a3510caec1b398282429e55d6bc89c37073a90895a1613c4a040de"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_default_8102/views/roof_on_exterior.jpg",
+      "sha256": "102b9308909de8a0da1e1cf6d0c2eddf5aca5217472630b35d5158ca5302b0f4"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_default_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "493aec34db0b168c2ee117ef781324ada11cfe80a13ef1facf026459038118ae"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_default_8102/rooms/room_cooking_kitchen_4.jpg",
+      "sha256": "c65354307e603cbcfde46570b3d266e8133663330dade9f659eee25560f6fbc9"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_default_8102/rooms/room_sleeping_bedroom_1.jpg",
+      "sha256": "4cfbe7866af1bdb599cbc10adc2cfd5b4330c35cdb266b08eee880aa2583e760"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_default_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "437e2bf8ab4e53627ccb2eec40b3bc0785caf70c045d24fa4768dbd2091d3b94"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_default_8102/views/cutaway_context.jpg",
+      "sha256": "f37de342aef39e8c161aae2ea4042a787f877e7f8a811686257566f056177e4b"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_large_8102/views/roof_on_exterior.jpg",
+      "sha256": "a1da23369cc635c709428f34006020323a59baba5b9eaf5b3052ec22b0853c4b"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_large_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "c2ddf4cd6396762c65c3d1caa94d5037eb6986d6b63696efd34fedca8646da1c"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_large_8102/rooms/room_cooking_kitchen_5.jpg",
+      "sha256": "1b3aa3ccd3761fa3c90bf461c9693c34a19b292141be8e9c5794034c7c8f90ac"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_large_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "23d611c1353e2e40abc9d88bbdb5ce1d6b4bc7030a46970ad1fd20ed9965f64f"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_large_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "c1bef97154ad03fc479d4480117ef4b7ac189fd4642015b7b4d4fe71fbf262b3"
+    },
+    {
+      "image": "visualqa/styles/house/asian/renders/target_comparison_restart23/asian_large_8102/views/cutaway_context.jpg",
+      "sha256": "3b2be11dfd0c314c7d98d37a05265b44e7c30b8b2d2745de832e6b052f6e2e1a"
+    }
+  ]
+}

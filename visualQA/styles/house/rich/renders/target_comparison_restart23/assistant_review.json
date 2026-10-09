@@ -1,0 +1,116 @@
+{
+  "reviewer": "root assistant",
+  "human_rating": null,
+  "reviewed_images": 20,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "scope": "Three public requests at seed 8102. Roof-on exterior, sampled functional room groups and secondary cutaway. This is comparison evidence, not the full house-style acceptance matrix.",
+  "findings": [
+    "Exterior close-studding gives a recognizable richer timber surface, but the repeated rectangular mass and broad roof lack bay and arrival hierarchy.",
+    "Default and large parlour eye views show a bench against long bare walls and broad empty floor. The cutaways confirm an under-composed living room.",
+    "Kitchens repeat the ordinary rough workbench and pots, with disconnected or empty storage.",
+    "Bedrooms repeat the ordinary single-bed, chest and nightstand composition rather than a richer domestic furnishing vocabulary.",
+    "The small dining group fits beside the staircase but the room lacks a composed arrival, storage and social focal point.",
+    "Current assembly still gives this off-scope style an ordinary native fireplace; the guarded hearth candidate is pending."
+  ],
+  "source_manifest_sha256": "e7ff416fd8045e589c38ea1fa5101a5c21a4f1b9efa1d9ddb394b3ae31cf194d",
+  "render_receipt": {
+    "script": "res://tools/render_house_style_gallery.gd",
+    "args": [
+      "--path",
+      "C:\\Projects\\BrickWild",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_house_rich_gallery\\godot.log",
+      "--script",
+      "res://tools/render_house_style_gallery.gd",
+      "--",
+      "style=rich",
+      "run=target_comparison_restart23"
+    ],
+    "native_exit": 0,
+    "seconds": 49.646,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_small_8102/views/roof_on_exterior.jpg",
+      "sha256": "e6a98f1af622525b1efc785f3d2abb7fb766a45f49cf180d56a2baded4ceb2bd"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_small_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "b42241974f4448cff7f9a7841ac9a0027bba937663ae6451e3918ad30061a3f5"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_small_8102/rooms/room_cooking_kitchen_1.jpg",
+      "sha256": "5bd18033b869d31776caeec689b37651e859c937a1e43c312d530baac55289c6"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_small_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "2eab1baf38d7bf37f433fa14133c1b9596344a579fd5bf0b2dbde2c39d0ff907"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_small_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "5901f3bfc6ba1d0d54a8e7ff63a44927071fd967b635baa9f4ae9411e36fb2d3"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_small_8102/views/cutaway_context.jpg",
+      "sha256": "d8d8c0a1f1848ca3a55fec458601f29a08aa6aea7e913404847011d30ec59d0f"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_default_8102/views/roof_on_exterior.jpg",
+      "sha256": "693f26cc46fbbf8e2327ab80f9601bf065a188fb82a6dc0d9f112d711df2df57"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_default_8102/rooms/room_arrival_hall_2.jpg",
+      "sha256": "2828bb73ae52deb70b335092cf8c25aeee24e66ce4d7e847022a1a64fd5b00f3"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_default_8102/rooms/room_living_parlour_0.jpg",
+      "sha256": "fa1c3c790b79328ebe8f4210fc1462cf5fc9c605558a6ff53817fb40ee426749"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_default_8102/rooms/room_cooking_kitchen_5.jpg",
+      "sha256": "d6973a8f8f8e20a0ef12217a5861375f875045846ade488ba25d1bdee1157b27"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_default_8102/rooms/room_sleeping_bedroom_3.jpg",
+      "sha256": "7bb4c2dd4881a255641ad8c029606208e723cb5fe86e00a872f647236320d239"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_default_8102/rooms/room_storage_store_1.jpg",
+      "sha256": "4b36412be0fe3b53f18495f5b7929a1bb597577a5c51742377ee3973e4e47a43"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_default_8102/views/cutaway_context.jpg",
+      "sha256": "33f710be5f8742d3371b1c068ce78a6b5ffee4b9550134d8252f2da02ccbbdaa"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_large_8102/views/roof_on_exterior.jpg",
+      "sha256": "ebe45fba79a4c5bbf2b21a609631278b98f92228d911229b1e042ca7804ff50a"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_large_8102/rooms/room_arrival_hall_1.jpg",
+      "sha256": "16d428d0c2b729e8cbf41eb26509649bfd24e438e77da02a4a1377e60cc5351f"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_large_8102/rooms/room_living_parlour_0.jpg",
+      "sha256": "de09fb1ad553895a0a7b86785b5f01cae90c3e312b9537d0d76e3bcb0e34601d"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_large_8102/rooms/room_cooking_kitchen_5.jpg",
+      "sha256": "7735904627cefca0b01de62754a56ca9441982cfd3fd86cb80d01d5ced3709c5"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_large_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "c239657872567d501cb43bb31101c36c5035a9838273c6d3b0a0557887d39f5c"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_large_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "f7cb96a23f913bcea85a973607bdbac54282a8955d1048c4b0c8784308e13e76"
+    },
+    {
+      "image": "visualqa/styles/house/rich/renders/target_comparison_restart23/rich_large_8102/views/cutaway_context.jpg",
+      "sha256": "17e14f662ffeae96b58573d4ffc6e9f2e11b2e767bb1a3e01a34a9a3fd699358"
+    }
+  ]
+}

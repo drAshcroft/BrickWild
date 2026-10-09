@@ -1,0 +1,100 @@
+{
+  "reviewer": "root assistant",
+  "human_rating": null,
+  "reviewed_images": 16,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "scope": "Three public requests at seed 8102. Representative functional room groups; not the full style acceptance matrix.",
+  "findings": [
+    "The parapet roof and earth palette are recognizable cues, but the shell is a single broad rectangular block with no useful terrace, roof access or stepped mass hierarchy.",
+    "Interior furniture repeats raised single beds, high wood tables/chairs, metal-band chests and barrels; it does not follow the target's fitted earthen surfaces and compact household material vocabulary.",
+    "The default arrival room includes the sleeping bed by the entrance. Privacy and gathering hierarchy are unclear.",
+    "The default parlour is a tight generic dining arrangement between long bare walls. The large rooms have broad empty wall and floor runs.",
+    "Cooking stations are isolated workbenches with pots and crates; the stores remain generic barrel/chest groups.",
+    "The large facade repeats small windows and a tiny entrance. Roof construction, terrace drainage and thresholds need plan-owned architectural purpose."
+  ],
+  "source_manifest_sha256": "bacd501d96a864e27f36e322d07c087548c5de5b5440348158bb9a6eae5db6b0",
+  "render_receipt": {
+    "script": "res://tools/render_house_style_gallery.gd",
+    "args": [
+      "--path",
+      "C:\\Projects\\BrickWild",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_house_pueblo_gallery\\godot.log",
+      "--script",
+      "res://tools/render_house_style_gallery.gd",
+      "--",
+      "style=pueblo",
+      "run=target_comparison_restart23"
+    ],
+    "native_exit": 0,
+    "seconds": 36.038,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_small_8102/views/roof_on_exterior.jpg",
+      "sha256": "8cc26833a29f4fa5cf425ec53590b32f93d7edfb8b2b9c1add94d527d4601b43"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_small_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "362cd1ded14a677d8ab45aee1e0d993ec209c9b404b020a1aa31701016b05e4d"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_small_8102/rooms/room_cooking_kitchen_1.jpg",
+      "sha256": "3a7bab6944b5c436cb816c7666cdda66a04fa76316191fa4079ae91c676218b6"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_small_8102/views/cutaway_context.jpg",
+      "sha256": "aaeba681d70a60764d68a5f6c976c4f69095d005a763a1f26388802757a1ae3c"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_default_8102/views/roof_on_exterior.jpg",
+      "sha256": "e26c3689c8fe56c4df173b3a616a6fa83d2a529e58ffb66c95c7fc40e05dfe3f"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_default_8102/rooms/room_arrival_hall_1.jpg",
+      "sha256": "32459d5bc3d4c927bb5f8fdb7c83fae95f9e6454e731a2be258e66c9cefa9e41"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_default_8102/rooms/room_living_parlour_0.jpg",
+      "sha256": "79f15c95113cf13377b1d56f1f959821dc1a4ad7402caa3bbb4c24391178af00"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_default_8102/rooms/room_cooking_kitchen_4.jpg",
+      "sha256": "329621cd0cf3ec88fdbfabfb54b08a78946c99c82096ccd45e9d87178327c01d"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_default_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "65992fefd2725e987bace8e5ee669871dc244b6ac61346c51a2dcaf46d899f78"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_default_8102/views/cutaway_context.jpg",
+      "sha256": "7a3b1c3cbbf617b02ad98968368aa72a413de0597f89a8ac9d75557f44f21f53"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_large_8102/views/roof_on_exterior.jpg",
+      "sha256": "a5cb8f874968ab9a3c7c547882ac90f81d8104b6014ff629c218b7fbe83a7bd2"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_large_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "92f6fc4c82aa8c14b912c1205665479162018451d7ce776345b33b70f152633c"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_large_8102/rooms/room_cooking_kitchen_5.jpg",
+      "sha256": "6b74fe5680e44cf4590939a3e35ec4eb7931a72ea8b0e8f7856164a211950746"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_large_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "d69f0c3f357170e184a5b7b47e51dd3db724b38267e8a2db84751b67b30853e8"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_large_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "438a785892b104c692ef567d5f9ca0b19867c16adc65884fbaeaf233aa5d3774"
+    },
+    {
+      "image": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/pueblo_large_8102/views/cutaway_context.jpg",
+      "sha256": "d96dcc5bc8ce5d550970300c15477b71ccc8acc8d86c01869e007cfe072df057"
+    }
+  ]
+}

@@ -24,5 +24,86 @@
         "Broad plain roofs, excessive chimney proportions and sparse room composition remain broader domestic design work."
       ]
     }
+  },
+  "public_style_comparisons": {
+    "requests": 24,
+    "images": 139,
+    "all_images_opened": true,
+    "design_status": "needs_changes",
+    "scope": "Reference comparison only; the full HouseStyles matrix remains required.",
+    "styles": [
+      {
+        "style": "townhouse",
+        "requests": 3,
+        "images": 17,
+        "review": "visualqa/styles/house/townhouse/renders/target_comparison_restart23/assistant_review.json",
+        "source_manifest_sha256": "88bf374b309b2a5ec3dd04b20b443ba795be8b9087e6addc7f5f3c3036d64dca",
+        "seconds": 52.455,
+        "design_status": "needs_changes"
+      },
+      {
+        "style": "longhall",
+        "requests": 3,
+        "images": 17,
+        "review": "visualqa/styles/house/longhall/renders/target_comparison_restart23/assistant_review.json",
+        "source_manifest_sha256": "fef225dd916721fb74489a2baa408fa9e514176af3c5504b135b72f7f2debc5f",
+        "seconds": 61.06,
+        "design_status": "needs_changes"
+      },
+      {
+        "style": "rich",
+        "requests": 3,
+        "images": 20,
+        "review": "visualqa/styles/house/rich/renders/target_comparison_restart23/assistant_review.json",
+        "source_manifest_sha256": "e7ff416fd8045e589c38ea1fa5101a5c21a4f1b9efa1d9ddb394b3ae31cf194d",
+        "seconds": 49.646,
+        "design_status": "needs_changes"
+      },
+      {
+        "style": "mediterranean",
+        "requests": 3,
+        "images": 17,
+        "review": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/assistant_review.json",
+        "source_manifest_sha256": "8d825a7e33137a79f6d4d4cc1c029ba8fba766f00a1c6c71da0b23fbe892f1e0",
+        "seconds": 44.818,
+        "design_status": "needs_changes"
+      },
+      {
+        "style": "asian",
+        "requests": 3,
+        "images": 16,
+        "review": "visualqa/styles/house/asian/renders/target_comparison_restart23/assistant_review.json",
+        "source_manifest_sha256": "eb592633374fd48f7e01060e2bb95579b6b4afe6e587e7394ad09af1474a1a7a",
+        "seconds": 49.008,
+        "design_status": "needs_changes"
+      },
+      {
+        "style": "african",
+        "requests": 3,
+        "images": 19,
+        "review": "visualqa/styles/house/african/renders/target_comparison_restart23/assistant_review.json",
+        "source_manifest_sha256": "71e6d270d035f04cae209b9147bd3fe060c3b2e00f1537473ff8e3cb0d05bf9d",
+        "seconds": 45.654,
+        "design_status": "needs_changes"
+      },
+      {
+        "style": "mud_hut",
+        "requests": 3,
+        "images": 17,
+        "review": "visualqa/styles/house/mud_hut/renders/target_comparison_restart23/assistant_review.json",
+        "source_manifest_sha256": "3512df5ddc7f42d2e05f71ab079dd1af29c2c120d75268409b26dce331f1d64f",
+        "seconds": 37.926,
+        "design_status": "needs_changes"
+      },
+      {
+        "style": "pueblo",
+        "requests": 3,
+        "images": 16,
+        "review": "visualqa/styles/house/pueblo/renders/target_comparison_restart23/assistant_review.json",
+        "source_manifest_sha256": "bacd501d96a864e27f36e322d07c087548c5de5b5440348158bb9a6eae5db6b0",
+        "seconds": 36.038,
+        "design_status": "needs_changes"
+      }
+    ]
   }
 }

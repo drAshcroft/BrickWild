@@ -1,0 +1,112 @@
+{
+  "reviewer": "root assistant",
+  "human_rating": null,
+  "reviewed_images": 19,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "scope": "Three public requests at seed 8102. Roof-on exterior, sampled functional room groups and secondary cutaway. This is comparison evidence, not the full house-style acceptance matrix.",
+  "findings": [
+    "Warm earth-coloured walls give a distinct palette, but the roof reads as broad golden courses rather than a convincing local thatch assembly.",
+    "The narrowed fictional savanna household brief is not expressed by room sequence or household material choices. Small/default/large use cottage-like rectangles and partitions.",
+    "The default parlour is a long bench against a bare wall; the large parlour remains mostly empty floor with a bench and cupboard.",
+    "Kitchens use the same rough metal-banded bench and metal pot, with generic bottles, shelves and barrels.",
+    "Sleeping rooms repeat the same raised single bed, chest and nightstand as the other styles; little privacy or fitted comfort is legible.",
+    "The three scales have no strong shaded social threshold or relation between gathering, cooking and the exterior. Do not equate the API label with cultural authenticity."
+  ],
+  "source_manifest_sha256": "71e6d270d035f04cae209b9147bd3fe060c3b2e00f1537473ff8e3cb0d05bf9d",
+  "render_receipt": {
+    "script": "res://tools/render_house_style_gallery.gd",
+    "args": [
+      "--path",
+      "C:\\Projects\\BrickWild",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_house_african_gallery\\godot.log",
+      "--script",
+      "res://tools/render_house_style_gallery.gd",
+      "--",
+      "style=african",
+      "run=target_comparison_restart23"
+    ],
+    "native_exit": 0,
+    "seconds": 45.654,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_small_8102/views/roof_on_exterior.jpg",
+      "sha256": "08ed98b000d23f84a7ea934f568cc96fc530eb6f3327aa19c45a8eee21dab495"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_small_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "9f1b2f41700b471e95eee54da4e8f74feae00d2135aa48bab460132c4f44da7b"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_small_8102/rooms/room_cooking_kitchen_1.jpg",
+      "sha256": "7a02150dd919e0d9ae22260c2ef8a7ea3e7c9d077e7481a44af722430c496158"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_small_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "0b8a08388069770b11a94ccc2b93a5090cc2c5ea2656ef43b75bf9fa198396af"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_small_8102/views/cutaway_context.jpg",
+      "sha256": "9c2d5c35f8f6ceb7ab41fbe402d173b7147c1e846ba2a2c4b6e69a3223fe1685"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_default_8102/views/roof_on_exterior.jpg",
+      "sha256": "513ec91396f2da03619dbb28bb391a908fc02a6eb31bc184ee8c39853faa9a65"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_default_8102/rooms/room_arrival_hall_1.jpg",
+      "sha256": "877b436508f6efdd30e5a7ec03bcf389f2fa9e341ddefa6732bf3c5689d4484c"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_default_8102/rooms/room_living_parlour_0.jpg",
+      "sha256": "9fc3c32dd5d5a465a2cfd7e85a51b85b633dd9b8e9bec92322111ce20cd28b2d"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_default_8102/rooms/room_cooking_kitchen_3.jpg",
+      "sha256": "b5f5e30fdb191dbd6c49271b85a4e5e4866f42cbccabc3dedafd1405dd2c4e3c"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_default_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "6476f0e626fa177d08536b8764f8886740e814b4356c1a0fb1cde8ddcc652fed"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_default_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "8b9cb2d35fd89647393d9a461698b43d7e49716ca3234d25f4a75a770a96c3a1"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_default_8102/views/cutaway_context.jpg",
+      "sha256": "81bff9a256f29dada1d741837b38ced634891cb50135e4332d3afeec8a416720"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_large_8102/views/roof_on_exterior.jpg",
+      "sha256": "f14045d4d9e9366c33064fcf1d799056d340473fae096608b85fa73e9b4c4685"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_large_8102/rooms/room_arrival_hall_1.jpg",
+      "sha256": "92d1a92fd48475a1d0271f2843f624f94ed208ba83f83e78cdc3b62701b32e5c"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_large_8102/rooms/room_living_parlour_0.jpg",
+      "sha256": "b15dd2ffc76b2ac897dcf22a5fab5c8355a9ddb113b84a801b6f5f9c7c36d04f"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_large_8102/rooms/room_cooking_kitchen_5.jpg",
+      "sha256": "beeb2078d88f92be5d2c4ef0916b9e4a257111655f5f93827aee5a3bc8767c51"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_large_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "b62a4a62e5d10610258d49cb2457ee678248792e222e47fe73f5d8b711382921"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_large_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "b8f6b7dd87fe94fa327ec3db9361eb1034714b80fbd27676963a8e2565ecf1ab"
+    },
+    {
+      "image": "visualqa/styles/house/african/renders/target_comparison_restart23/african_large_8102/views/cutaway_context.jpg",
+      "sha256": "3b2591d60b739e956593ccd52dca012a4d60756c9f4be55776530c1fe14f8942"
+    }
+  ]
+}

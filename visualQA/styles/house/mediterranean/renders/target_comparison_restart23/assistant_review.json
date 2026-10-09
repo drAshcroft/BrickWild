@@ -1,0 +1,104 @@
+{
+  "reviewer": "root assistant",
+  "human_rating": null,
+  "reviewed_images": 17,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "scope": "Three public requests at seed 8102. Roof-on exterior, sampled functional room groups and secondary cutaway. This is comparison evidence, not the full house-style acceptance matrix.",
+  "findings": [
+    "Terracotta roof and teal shutters provide some identity, but the exterior is a plain rectangle with little shaded arrival, veranda or garden relation.",
+    "The interior keeps generic cottage furniture and plank floors; it lacks the plaster/stone, shade and fitted household arrangements in the target.",
+    "The default parlour is a bench in a long bare room. The small arrival camera faces an empty entrance wall; it is only one eye view and does not establish that the whole hall is empty.",
+    "Kitchen prep stations and wall storage are isolated objects rather than a fitted cooking corner.",
+    "The large cutaway repeats sparse rooms around an empty corridor. The large exterior has a blank side wall and a tiny entrance.",
+    "Bedrooms and stores repeat generic bed/chest and barrel/crate layouts without a coherent style-specific material or use arrangement."
+  ],
+  "source_manifest_sha256": "8d825a7e33137a79f6d4d4cc1c029ba8fba766f00a1c6c71da0b23fbe892f1e0",
+  "render_receipt": {
+    "script": "res://tools/render_house_style_gallery.gd",
+    "args": [
+      "--path",
+      "C:\\Projects\\BrickWild",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_house_mediterranean_gallery\\godot.log",
+      "--script",
+      "res://tools/render_house_style_gallery.gd",
+      "--",
+      "style=mediterranean",
+      "run=target_comparison_restart23"
+    ],
+    "native_exit": 0,
+    "seconds": 44.818,
+    "invalid": null
+  },
+  "images": [
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_small_8102/views/roof_on_exterior.jpg",
+      "sha256": "074877f88984ebc1290b1b0366557ec79cdecf0c0f7081d09e056b88e7ca7da8"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_small_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "83ab783530330138c7e2e39e433b99d57d9e3aef49156178ed9534b37673fcf7"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_small_8102/rooms/room_cooking_kitchen_1.jpg",
+      "sha256": "dfaf9c5a0f3f575122d0cb7a9368de57f2d2b77165daa2fb86205e8a2b4be99b"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_small_8102/views/cutaway_context.jpg",
+      "sha256": "3eb2cd260e99c6c6d42b4118cc01cc3ef63529a52598a7d09c374f675cbd4b5c"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_default_8102/views/roof_on_exterior.jpg",
+      "sha256": "a2d235689a7d802c2880ee4b320c0b94c414855196b579608017152f7b7b3301"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_default_8102/rooms/room_arrival_hall_1.jpg",
+      "sha256": "051ee197f9891992977c4145ed9b57eb59f3d80b44e4dfec5044a073659de8dd"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_default_8102/rooms/room_living_parlour_0.jpg",
+      "sha256": "7dde4a2671da0af9cd18ac17b6a73f953ffe09e742c0f50c1610c6066c9ed798"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_default_8102/rooms/room_cooking_kitchen_3.jpg",
+      "sha256": "6f458bd095d1ca68d8cda5412eb71c89aea69ebf892753e902bc500ccdf68aff"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_default_8102/rooms/room_sleeping_bedroom_4.jpg",
+      "sha256": "46e51f1eefbfdd83d1afbb1c860607091635fc6f6c55e3fd27a6aca056c1b364"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_default_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "a9a887d254223c738f276fa76b36495bc621940a5cf4851d64a73cb9056d46b3"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_default_8102/views/cutaway_context.jpg",
+      "sha256": "163551f6177abaad652e1a542bac60ce2439f8529a5b24cd5645781634dbf536"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_large_8102/views/roof_on_exterior.jpg",
+      "sha256": "3304e8002fdf1f6d6ab3c01486af6a405df6265b54cdcbddb8998e9842417c46"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_large_8102/rooms/room_arrival_living_hall_0.jpg",
+      "sha256": "f4b2eb5b8260d3d2f849e019bcae762f301af8b89be1605cec9a521503fc368c"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_large_8102/rooms/room_cooking_kitchen_4.jpg",
+      "sha256": "3abb9b964e5b923a0cd34ed2f94a82c6027747134dcabba43450568ca4afc4cd"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_large_8102/rooms/room_sleeping_bedroom_5.jpg",
+      "sha256": "96a3f916de8bbfb4337404633722744df699a4b7d9b2a9cd96c20fcbb53507a1"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_large_8102/rooms/room_storage_store_2.jpg",
+      "sha256": "bd6b15c27893af6d7fa5140be5f1d20b5a88d3fc4818ac0acaaf92b608cbd372"
+    },
+    {
+      "image": "visualqa/styles/house/mediterranean/renders/target_comparison_restart23/mediterranean_large_8102/views/cutaway_context.jpg",
+      "sha256": "47dd2dad2a0fd1b8d60e6a5ece7a9860bdac09dd27bf785186a088e03c48242f"
+    }
+  ]
+}

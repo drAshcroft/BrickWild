@@ -1,0 +1,17 @@
+{
+	"enclosure": "none",
+	"height": 2.4000000000000004,
+	"kind": "house",
+	"length": 9.0,
+	"material": "timber",
+	"orientation": 0.0,
+	"period": 1200,
+	"purpose": "none",
+	"schema": "brickwild.request",
+	"schema_version": 1,
+	"seed": "8102",
+	"storeys": 1,
+	"style": "longhall",
+	"water": "none",
+	"width": 7.0
+}
