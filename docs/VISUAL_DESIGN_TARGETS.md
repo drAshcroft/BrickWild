@@ -20,6 +20,8 @@ The [target catalogue](../visualqa/styles/index.html) also links the Pylon, Rotu
 
 The [Cottage cooking reference](../visualqa/styles/house/cottage/rooms/cooking/targets/design_board_v1.png) focuses on a linked hearth, preparation surface, food storage and usable standing floor. Visible split fuel and a small irregular fire are part of the target. It does not approve the current procedural fire or establish measured trivet, vessel or combustible clearances.
 
+The [Townhouse writing office reference](../visualqa/styles/house/townhouse/rooms/work/targets/design_board_v1.png) adds a compact desk, chair facing the writing edge, reachable ledger, nearby records and daylight. Keep the visible door route and chair pull-back space. Its dimensions are concept labels, not measurements of owned assets. Current office comparisons expose the next arrangement problem: a supported book at the far end of a large workbench does not establish a usable writing place. Eighteen boards are now saved with exact prompts and interpretation notes.
+
 ## Reusing the archive tool
 
 `python tools/organize_visualqa_renders.py` prints a dry-run plan for the two legacy cohorts. Add `--apply` to copy. For more cohorts, repeat `--source <render-directory> <run-name>` and include all desired cohorts when rebuilding the gallery. Already nested images stay at their exact path. Source identity includes the manifest path and hash, so eight styles can share a run name without acquiring one another's metadata. The tool refuses changed image destinations and escaped source paths, checks hashes, and preserves existing human ratings, walk pins and the rating selector.

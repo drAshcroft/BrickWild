@@ -161,6 +161,21 @@
     {
       "subject": [
         "house",
+        "townhouse",
+        "rooms",
+        "work"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/townhouse/rooms/work/targets/design_board_v1.png",
+      "image_sha256": "53e1a688ad20101cea24d7915e0bcc7aa2e3f2c5762f3858132cc8e7e1e63b35",
+      "prompt": "house/townhouse/rooms/work/targets/prompt.txt",
+      "prompt_sha256": "fa208d989ccec93547e183c4b8adda162ae4936933fbe6cd9a496c062479f079",
+      "notes": "house/townhouse/rooms/work/targets/README.md",
+      "notes_sha256": "f22f65a39620b24f7ec6d6b7ab5bd202e362b0759e8d2cbfbdbae69366bd0a55"
+    },
+    {
+      "subject": [
+        "house",
         "townhouse"
       ],
       "classification": "imagegen_reference_not_actual_render",
