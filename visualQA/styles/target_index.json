@@ -1,0 +1,227 @@
+{
+  "targets": [
+    {
+      "subject": [
+        "church",
+        "gothic"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "church/gothic/targets/design_board_v1.png",
+      "image_sha256": "132047d6a83c1059e16baac864fbe965c5738e7e113625a41b452b56303eedf9",
+      "prompt": "church/gothic/targets/prompt.txt",
+      "prompt_sha256": "c5920fb7750f8985b416ffe336294af0d83632def3bff2b5eb710789367180f3",
+      "notes": "church/gothic/targets/README.md",
+      "notes_sha256": "7a258b5bdd763104500b5e9c5535bd8723d5659ee138eb9528246ab05fd89056"
+    },
+    {
+      "subject": [
+        "house",
+        "african"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/african/targets/design_board_v1.png",
+      "image_sha256": "4a150c13c67811d6898da497549dc1da8ae4cc481329aaedbccf4665616f9972",
+      "prompt": "house/african/targets/prompt.txt",
+      "prompt_sha256": "efc039fa61cc742499851bcd3173c2222e2db4bab9121bec8ee5bc43b957fe6f",
+      "notes": "house/african/targets/README.md",
+      "notes_sha256": "472ff6129cb0aacae1b8ed9be7f3016ad637d22f66238b9c7f8cab9ec696e51c"
+    },
+    {
+      "subject": [
+        "house",
+        "asian"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/asian/targets/design_board_v1.png",
+      "image_sha256": "d13a42fbf5fc5d2ae218eae0842642628c7d07da11928b83c74e9a043131d5ed",
+      "prompt": "house/asian/targets/prompt.txt",
+      "prompt_sha256": "10a493d78935f31ffcc40250337c8e77e2df6cb3d09b58d2c87afaa9d7a8f2bd",
+      "notes": "house/asian/targets/README.md",
+      "notes_sha256": "4ecf4d6472f3d1b9043d05cb2f89162a7d50e77c061bee90bab409c512abb476"
+    },
+    {
+      "subject": [
+        "house",
+        "cottage",
+        "rooms",
+        "cooking"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/cottage/rooms/cooking/targets/design_board_v1.png",
+      "image_sha256": "6873b19da7c914edec096a70a35505f8ef1faa6c956f65369b4855cb6fd812d5",
+      "prompt": "house/cottage/rooms/cooking/targets/prompt.txt",
+      "prompt_sha256": "c9a475cd5189b8b07f417bb6b43aeb43a4f4b84021a095afa12abcee6abc264b",
+      "notes": "house/cottage/rooms/cooking/targets/README.md",
+      "notes_sha256": "a1a2990bca3d11376852d3b651c9e8c36d6a0707287927a59b64154123e71ed5"
+    },
+    {
+      "subject": [
+        "house",
+        "cottage"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/cottage/targets/design_board_v1.png",
+      "image_sha256": "b65d3346ba11528fb83e60d45574e032e66411d147fd49fcffb8fd831d83dbed",
+      "prompt": "house/cottage/targets/prompt.txt",
+      "prompt_sha256": "c30d4fe44c1ef0ebd601406a5e9fafe10f64da63d6f32f2b44892272bdf7fd19",
+      "notes": "house/cottage/targets/README.md",
+      "notes_sha256": "2d9dcf93d9c115ab8f95f2d413dfd134fe1b96e7fa213e6dcfa1bd6583de2e28"
+    },
+    {
+      "subject": [
+        "house",
+        "farmhouse"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/farmhouse/targets/design_board_v1.png",
+      "image_sha256": "49bf82a025c2b597e0aea90dceb42ad037ade02cbec300c02a011be8ed76e4bd",
+      "prompt": "house/farmhouse/targets/prompt.txt",
+      "prompt_sha256": "4fd984e314e079f4b07fd70bd94e8cbe2e5fdd22caed43eccbd66320a5ab1926",
+      "notes": "house/farmhouse/targets/README.md",
+      "notes_sha256": "bae7a0d3587ae7e5c1a868487d921ec22f2bc636595d86049ab04257476ddcb9"
+    },
+    {
+      "subject": [
+        "house",
+        "longhall"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/longhall/targets/design_board_v1.png",
+      "image_sha256": "911b97a85c49ecf8c5dbf986f0906ce4c6258951ece3df87ab9e75dfe624cb67",
+      "prompt": "house/longhall/targets/prompt.txt",
+      "prompt_sha256": "52d53f79403da7fada4b8124befaa54d495cbb28c9f0ece47281ca6bbb10210e",
+      "notes": "house/longhall/targets/README.md",
+      "notes_sha256": "0f285db320ea27a7af8e0e9578362891c05a58f2d678f3a746d1d236ba1e3abc"
+    },
+    {
+      "subject": [
+        "house",
+        "mediterranean"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/mediterranean/targets/design_board_v1.png",
+      "image_sha256": "2dfa12cfe2eb0f23bf76273bd2927205eef2b1f8c32565308340ba8ef1e01979",
+      "prompt": "house/mediterranean/targets/prompt.txt",
+      "prompt_sha256": "3b23c4cb0878d402dc16845503c66979bae786ca8e042516e597ecca85cab560",
+      "notes": "house/mediterranean/targets/README.md",
+      "notes_sha256": "4b8664da8a86c3f0fd2e0b5b28b4ca127cad45d16021792b08a2e077941b90bb"
+    },
+    {
+      "subject": [
+        "house",
+        "mud_hut"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/mud_hut/targets/design_board_v1.png",
+      "image_sha256": "034279aba7333968e61f47683f605a516b1c751612f07b68bd1f3a5c70af1887",
+      "prompt": "house/mud_hut/targets/prompt.txt",
+      "prompt_sha256": "6b30fca54c23307743fbb48c308c107361cfc24b739ae5c5c51ee44ae4d76897",
+      "notes": "house/mud_hut/targets/README.md",
+      "notes_sha256": "943f46fa2f685681b1e861750b3567a3027c31fe5d616321efa8bd584afa9ef4"
+    },
+    {
+      "subject": [
+        "house",
+        "pueblo"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/pueblo/targets/design_board_v1.png",
+      "image_sha256": "425a22bd1347bd7b837f1c6c61720c653b6d2acb9bdfba8eb79eb25e525d0e42",
+      "prompt": "house/pueblo/targets/prompt.txt",
+      "prompt_sha256": "9273182662c3b96a7575ae363893b33121c2d845357b346be1984f7ed9a8bdf1",
+      "notes": "house/pueblo/targets/README.md",
+      "notes_sha256": "136c9b941c4f7a24dcfe391f9d8558bd6fe7b314730e0d0ad86698546ced679e"
+    },
+    {
+      "subject": [
+        "house",
+        "rich"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/rich/targets/design_board_v1.png",
+      "image_sha256": "ee22f7bea9c001c100f72306f1bf8f7452af108b32652e1430eee24af74301a9",
+      "prompt": "house/rich/targets/prompt.txt",
+      "prompt_sha256": "d8ebe3b82571b36ed1d28eb39b6ef0716ffc2ce0e0f9b5d3fb12efe36d0d247f",
+      "notes": "house/rich/targets/README.md",
+      "notes_sha256": "b5bd38c6754d846209da0a595e1ff6de0f6ab3047298445eaf5eba54e4800524"
+    },
+    {
+      "subject": [
+        "house",
+        "thatch_cottage"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/thatch_cottage/targets/design_board_v1.png",
+      "image_sha256": "b94f3a54159e369fa5466bdd4afa4836af76ffc40c01aed1398b5cff88b3bcde",
+      "prompt": "house/thatch_cottage/targets/prompt.txt",
+      "prompt_sha256": "3e9a5414cefdefd1c59b27d53025b126ec5276c4508b928bc727b75c27c1d070",
+      "notes": "house/thatch_cottage/targets/README.md",
+      "notes_sha256": "a1ed4e34fff42a03f79ec16c976d042573c1d52b274f79148812cad439c7700b"
+    },
+    {
+      "subject": [
+        "house",
+        "townhouse"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/townhouse/targets/design_board_v1.png",
+      "image_sha256": "a623b7bbd05ff419ddcb236acac63c20e5f52577c175221560563cba687727eb",
+      "prompt": "house/townhouse/targets/prompt.txt",
+      "prompt_sha256": "aff7476535976f022dcb3e2b140d6f9ec5df8cd2a6d23309f22d99509b08d945",
+      "notes": "house/townhouse/targets/README.md",
+      "notes_sha256": "b7466860af5e5bc7d1fa47b6f8beaaf2925f0b8d13bc1072140ee223fa4b0e6e"
+    },
+    {
+      "subject": [
+        "house",
+        "witch_hut"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "house/witch_hut/targets/design_board_v1.png",
+      "image_sha256": "d6d181338a735f9a758f58ff95d8ff68e4a525bf8084546164c605cc7bc4adf5",
+      "prompt": "house/witch_hut/targets/prompt.txt",
+      "prompt_sha256": "fdcd97fb806e00742a49fea50a7bafd9298f8bb7f883c7780ebf35dbf9c77809",
+      "notes": "house/witch_hut/targets/README.md",
+      "notes_sha256": "bd5a2c5e6010d11c026538aa566deea5df02f68aa605495cf193b65c773c7109"
+    },
+    {
+      "subject": [
+        "temple",
+        "basilica"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "temple/basilica/targets/design_board_v1.png",
+      "image_sha256": "aa9080f1907c1b0f1242b45b5f2ac0916a684624d49f2af1daaa8c1f71c3504d",
+      "prompt": "temple/basilica/targets/prompt.txt",
+      "prompt_sha256": "308ce0e4caff1e5584a6dba02beb662dd4c7889b4434b016159a1bb0d7c430cd",
+      "notes": "temple/basilica/targets/README.md",
+      "notes_sha256": "361e4b73b69848a6b1e5c66adeb3775972b31381439450e282a61b1f2f8fe6d8"
+    },
+    {
+      "subject": [
+        "temple",
+        "pylon"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "temple/pylon/targets/design_board_v1.png",
+      "image_sha256": "993a2023b84d7027161aa9d7fe80b1e5ee2712c0d7a05fecd4b4474e060c849e",
+      "prompt": "temple/pylon/targets/prompt.txt",
+      "prompt_sha256": "b55eea882d978d24d5b2e568f811cadec0e50d1e166611972cf2977d497a919d",
+      "notes": "temple/pylon/targets/README.md",
+      "notes_sha256": "ac9bae0fb83d2d22d91d46ef58f6dc7760d635d06445b5696853615babb393b6"
+    },
+    {
+      "subject": [
+        "temple",
+        "rotunda"
+      ],
+      "classification": "imagegen_reference_not_actual_render",
+      "image": "temple/rotunda/targets/design_board_v1.png",
+      "image_sha256": "63b8e59049b2e08659f0087729682b66314f7550121e67caf43115d60e68d022",
+      "prompt": "temple/rotunda/targets/prompt.txt",
+      "prompt_sha256": "58be46a392242bb2ddda38ba6bc5984259c8eda639f14f328cd418dd8b978951",
+      "notes": "temple/rotunda/targets/README.md",
+      "notes_sha256": "2775bbd06e1a457beb5502c23599958d61422b74c3cd6baf9885d0dcb0253214"
+    }
+  ]
+}

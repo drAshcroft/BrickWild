@@ -341,10 +341,10 @@ def main() -> int:
         label = " / ".join(x for x in (row["style"], row["request_id"], row.get("room_kind") or row["view"]) if x)
         cards.append(f'<figure><a href="{html.escape(rel)}"><img loading="lazy" src="{html.escape(rel)}" alt="{html.escape(label)}"></a><figcaption>{html.escape(label)}<br><small>render={html.escape(str(row["render_state"]))}; visual review={html.escape(str(row["source_visual_review_state"]))}</small></figcaption></figure>')
     target_cards = []
-    for target_image in sorted(root.glob("*/targets/*.png")):
+    for target_image in sorted(root.glob("*/**/targets/*.png")):
         rel = target_image.relative_to(root).as_posix()
-        style = target_image.parents[1].name
-        title = f"{style} concept target (not a render)"
+        subject = " / ".join(target_image.parent.relative_to(root).parts[:-1])
+        title = f"{subject} concept target (not a render)"
         siblings = []
         for name in ("prompt.txt", "README.md"):
             sibling = target_image.parent / name

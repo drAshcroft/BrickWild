@@ -14,6 +14,12 @@ House comparison coverage now includes all twelve styles. The new 24-request ref
 
 Room views must include arrival/circulation, cooking/work, living/eating, sleeping/privacy, storage, and service thresholds where those functions exist. Sacred buildings need entrance-to-ritual-axis and sanctuary views. Shops need customer, work and stock sequences. A decorated exterior cannot substitute for these interiors.
 
+## Focused room and sacred targets
+
+The [target catalogue](../visualqa/styles/index.html) also links the Pylon, Rotunda and Basilica temple boards and Gothic church board. Rotunda and Basilica are Temple API forms in this repository. Their current boards use the blood cult for comparison; the architectural form must remain recognisable across other cults. Each target note identifies generated inconsistencies and excess props to discard.
+
+The [Cottage cooking reference](../visualqa/styles/house/cottage/rooms/cooking/targets/design_board_v1.png) focuses on a linked hearth, preparation surface, food storage and usable standing floor. Visible split fuel and a small irregular fire are part of the target. It does not approve the current procedural fire or establish measured trivet, vessel or combustible clearances.
+
 ## Reusing the archive tool
 
 `python tools/organize_visualqa_renders.py` prints a dry-run plan for the two legacy cohorts. Add `--apply` to copy. For more cohorts, repeat `--source <render-directory> <run-name>` and include all desired cohorts when rebuilding the gallery. Already nested images stay at their exact path. Source identity includes the manifest path and hash, so eight styles can share a run name without acquiring one another's metadata. The tool refuses changed image destinations and escaped source paths, checks hashes, and preserves existing human ratings, walk pins and the rating selector.
