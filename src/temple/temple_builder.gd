@@ -32,6 +32,7 @@ func build(p_spec: TempleSpec) -> ArrayMesh:
 	_build_floor()
 	_build_walls()
 	_build_columns()
+	_build_column_entablature()
 	_build_dais()
 	_build_altar()
 	_build_idol()
@@ -146,6 +147,96 @@ func _build_columns() -> void:
 		_log_mass("column_%d" % i, AABB(Vector3(c.x - r * 1.2, 0.0, c.z - r * 1.2),
 			Vector3(r * 2.4, h + TempleGeometry.COLUMN_CAP * r, r * 2.4)))
 		i += 1
+
+
+## Capitals should carry a visible beam course. Use the final authored column
+## records, not a second spacing calculation; the rotunda receives a polygonal
+## ring and rectilinear halls receive cross and longitudinal spans.
+func _build_column_entablature() -> void:
+	if spec.columns.is_empty():
+		return
+	tag("structure")
+	host("column_entablature")
+	var beam_h: float = clampf(spec.column_r * 0.34, 0.18, 0.38)
+	var beam_w: float = clampf(spec.column_r * 0.46, 0.24, 0.52)
+	if spec.form == &"basilica":
+		# The nave wall is borne by this actual inner colonnade. Give its
+		# continuous architrave enough width to carry the masonry above.
+		beam_w = maxf(beam_w, spec.column_r * 1.8)
+	if spec.form == &"rotunda":
+		for i in range(spec.columns.size()):
+			var column_a: Dictionary = spec.columns[i]
+			var column_b: Dictionary = spec.columns[(i + 1) % spec.columns.size()]
+			var a: Vector3 = column_a["pos"]
+			var b: Vector3 = column_b["pos"]
+			var capital_top_a: float = TempleGeometry.column_cap_top(column_a)
+			var capital_top_b: float = TempleGeometry.column_cap_top(column_b)
+			if absf(capital_top_a - capital_top_b) > 0.01:
+				continue
+			var y: float = capital_top_a + beam_h * 0.5
+			var delta := Vector3(b.x - a.x, 0.0, b.z - a.z)
+			var length: float = delta.length() + beam_w * 0.45
+			var yaw: float = atan2(-delta.z, delta.x)
+			var xf := Transform3D(Basis(Vector3.UP, yaw), Vector3((a.x + b.x) * 0.5,
+				y, (a.z + b.z) * 0.5))
+			component_box("rotunda_ring_architrave", Vector3(length, beam_h, beam_w),
+				xf, SURF_TRIM)
+		host_end()
+		return
+	for i in range(spec.columns.size()):
+		var column_a: Dictionary = spec.columns[i]
+		var a: Vector3 = column_a["pos"]
+		var ring_a: int = int(spec.columns[i]["ring"])
+		for j in range(i + 1, spec.columns.size()):
+			var column_b: Dictionary = spec.columns[j]
+			var b: Vector3 = column_b["pos"]
+			if int(spec.columns[j]["ring"]) != ring_a:
+				continue
+			if absf(a.z - b.z) < 0.01 and absf(a.x - b.x) > 0.01:
+				var left_x: float = minf(a.x, b.x)
+				var right_x: float = maxf(a.x, b.x)
+				var nearest_cross: bool = true
+				for k in range(spec.columns.size()):
+					if k == i or k == j or int(spec.columns[k]["ring"]) != ring_a:
+						continue
+					var middle: Vector3 = spec.columns[k]["pos"]
+					if absf(middle.z - a.z) < 0.01 and middle.x > left_x and middle.x < right_x:
+						nearest_cross = false
+						break
+				if not nearest_cross:
+					continue
+				var cross_top_a: float = TempleGeometry.column_cap_top(column_a)
+				var cross_top_b: float = TempleGeometry.column_cap_top(column_b)
+				if absf(cross_top_a - cross_top_b) > 0.01:
+					continue
+				var cross_y: float = cross_top_a + beam_h * 0.5
+				var cross_xf := Transform3D(Basis(), Vector3((left_x + right_x) * 0.5, cross_y, a.z))
+				component_box("column_cross_architrave",
+					Vector3(right_x - left_x + beam_w * 0.45, beam_h, beam_w),
+					cross_xf, SURF_TRIM)
+			elif absf(a.x - b.x) < 0.01 and absf(a.z - b.z) > 0.01:
+				var near_z: float = minf(a.z, b.z)
+				var far_z: float = maxf(a.z, b.z)
+				var nearest: bool = true
+				for k in range(spec.columns.size()):
+					if k == i or k == j or int(spec.columns[k]["ring"]) != ring_a:
+						continue
+					var c: Vector3 = spec.columns[k]["pos"]
+					if absf(c.x - a.x) < 0.01 and c.z > near_z and c.z < far_z:
+						nearest = false
+						break
+				if nearest:
+					var along_top_a: float = TempleGeometry.column_cap_top(column_a)
+					var along_top_b: float = TempleGeometry.column_cap_top(column_b)
+					if absf(along_top_a - along_top_b) > 0.01:
+						continue
+					var along_y: float = along_top_a + beam_h * 0.5
+					var along_xf := Transform3D(Basis(),
+						Vector3(a.x, along_y, (near_z + far_z) * 0.5))
+					component_box("column_longitudinal_architrave",
+						Vector3(beam_w, beam_h, far_z - near_z + beam_w * 0.45),
+						along_xf, SURF_TRIM)
+	host_end()
 
 
 # ------------------------------------------------------------------- dais
@@ -322,13 +413,18 @@ func _build_roof() -> void:
 	var h: float = spec.height
 	match TempleSpec.FORMS[spec.form]["roof"]:
 		&"ridge":
-			var along_x: bool = r.size.x > r.size.y
-			var yaw: float = PI / 2.0 if along_x else 0.0
-			var span: float = r.size.y if along_x else r.size.x
-			var along: float = r.size.x if along_x else r.size.y
-			_kit.ridge_roof(Transform3D(Basis(Vector3.UP, yaw), Vector3(0.0, h, 0.0)),
-				span + 1.2, along + 0.8, span * TempleGeometry.RIDGE_PITCH, SURF_ROOF,
-				SURF_STONE, span, along)
+			if spec.form == &"basilica" and TempleGeometry.basilica_has_nave_bearings(spec):
+				_build_basilica_hierarchical_roof()
+			else:
+				var along_x: bool = r.size.x > r.size.y
+				var yaw: float = PI / 2.0 if along_x else 0.0
+				var span: float = r.size.y if along_x else r.size.x
+				var along: float = r.size.x if along_x else r.size.y
+				_kit.ridge_roof(Transform3D(Basis(Vector3.UP, yaw), Vector3(0.0, h, 0.0)),
+					span + 1.2, along + 0.8, span * TempleGeometry.RIDGE_PITCH, SURF_ROOF,
+					SURF_STONE, span, along)
+				if spec.form == &"basilica" and not TempleGeometry.basilica_has_nave_bearings(spec):
+					_build_basilica_shell_roof_bearings(r, along_x)
 			total_height = maxf(total_height, TempleGeometry.roof_height(spec))
 		&"flat":
 			box(Vector3(r.size.x + 0.8, 0.5, r.size.y + 0.8),
@@ -351,6 +447,285 @@ func _build_roof() -> void:
 			base, spec.spire_height, SURF_ROOF, 5, 0.2)
 		total_height = maxf(total_height,
 			TempleGeometry.roof_height(spec) + spec.spire_height)
+
+
+## When generated columns are absent, the fallback ridge still needs a real
+## shell bearing. These stone heads fill the wedge between each wall top and
+## the measured underside of the roof at both wall faces.
+func _build_basilica_shell_roof_bearings(site: Rect2, along_x: bool) -> void:
+	var profile: Vector2 = TempleGeometry.basilica_fallback_roof_wall_profile(spec)
+	var span: float = minf(site.size.x, site.size.y)
+	var wall_t: float = spec.wall_t
+	var along: float = site.size.x if along_x else site.size.y
+	var depth: float = along - wall_t * 2.0
+	if depth <= 0.1:
+		return
+	for side in [-1.0, 1.0]:
+		var points := PackedVector3Array()
+		if along_x:
+			var outer_z: float = side * span * 0.5
+			var inner_z: float = side * (span * 0.5 - wall_t)
+			points = PackedVector3Array([
+				Vector3(0.0, spec.height, outer_z),
+				Vector3(0.0, spec.height, inner_z),
+				Vector3(0.0, profile.y, inner_z),
+				Vector3(0.0, profile.x, outer_z)])
+		else:
+			var outer_x: float = side * span * 0.5
+			var inner_x: float = side * (span * 0.5 - wall_t)
+			points = PackedVector3Array([
+				Vector3(outer_x, spec.height, 0.0),
+				Vector3(inner_x, spec.height, 0.0),
+				Vector3(inner_x, profile.y, 0.0),
+				Vector3(outer_x, profile.x, 0.0)])
+		host("basilica_shell_roof_bearing_%s" % ("left" if side < 0.0 else "right"))
+		component_slab("basilica_shell_roof_bearing", points, depth, SURF_STONE, false)
+		host_end()
+
+
+## A basilica is a nave carried above lower side aisles, with a projecting
+## pronaos on its own columns. Every roof sheet meets a bearing wall or beam.
+func _build_basilica_hierarchical_roof() -> void:
+	var site: Rect2 = TempleGeometry.site_rect(spec)
+	var half: float = TempleGeometry.basilica_nave_half_width(spec)
+	var nave_eave: float = TempleGeometry.basilica_nave_eave_height(spec)
+	var nave_span: float = half * 2.0
+	var nave_rise: float = nave_span * TempleGeometry.RIDGE_PITCH
+	var nave_length: float = site.size.y + 0.8
+	var nave_xf := Transform3D(Basis(), Vector3(0.0, nave_eave, 0.0))
+	_build_basilica_nave_bearings(site, half, nave_eave)
+	host("basilica_nave_roof")
+	_kit.ridge_roof(nave_xf, nave_span, nave_length, nave_rise, SURF_ROOF)
+	component_note("basilica_nave_roof", "ridge_roof", SURF_ROOF, {
+		"xf": nave_xf, "span_x": nave_span, "along_z": nave_length,
+		"rise": nave_rise,
+		"aabb": AABB(Vector3(-nave_span * 0.5,
+			nave_eave - RoofShape.DEPTH * 0.5, -nave_length * 0.5),
+			Vector3(nave_span, nave_rise + RoofShape.DEPTH, nave_length))})
+	host_end()
+	_build_basilica_aisle_roofs(site, half, nave_eave)
+	_build_basilica_portico(site)
+	_build_basilica_gable_returns(site, half, nave_eave, nave_rise)
+	total_height = maxf(total_height, TempleGeometry.roof_height(spec))
+
+
+func _build_basilica_nave_bearings(site: Rect2, _half: float, top: float) -> void:
+	var columns: Array[Dictionary] = spec.columns
+	if columns.is_empty():
+		return
+	var bearing_x := INF
+	for column in columns:
+		var pos: Vector3 = column["pos"]
+		bearing_x = minf(bearing_x, absf(pos.x))
+	var primary: Array[Dictionary] = []
+	for column in columns:
+		var pos: Vector3 = column["pos"]
+		if absf(absf(pos.x) - bearing_x) < 0.01:
+			primary.append(column)
+	primary.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var pos_a: Vector3 = a["pos"]
+		var pos_b: Vector3 = b["pos"]
+		return pos_a.z < pos_b.z)
+	if primary.size() < 2:
+		return
+	var beam_h: float = clampf(spec.column_r * 0.34, 0.18, 0.38)
+	var wall_base: float = TempleGeometry.column_cap_top(primary[0]) + beam_h
+	var wall_t: float = TempleGeometry.basilica_nave_wall_thickness(spec)
+	var opening_bottom: float = TempleGeometry.basilica_clerestory_opening_bottom(spec)
+	var opening_top: float = top - 0.30
+	var bearing_points: Array[float] = []
+	for column in primary:
+		var p: Vector3 = column["pos"]
+		if bearing_points.is_empty() or absf(bearing_points.back() - p.z) > 0.01:
+			bearing_points.append(p.z)
+	host("basilica_nave_bearings")
+	for side in [-1.0, 1.0]:
+		var wall_x: float = side * bearing_x
+		for index in range(bearing_points.size() - 1):
+			var z0: float = bearing_points[index]
+			var z1: float = bearing_points[index + 1]
+			var mid: float = (z0 + z1) * 0.5
+			var bay: float = z1 - z0
+			var opening_w: float = minf(bay * 0.40, 1.65)
+			var left_end: float = mid - opening_w * 0.5
+			var right_start: float = mid + opening_w * 0.5
+			# Continuous lower spandrel bears on the longitudinal architrave.
+			var lower_h: float = opening_bottom - wall_base
+			component_box("basilica_nave_lower_spandrel",
+				Vector3(wall_t, lower_h, bay),
+				Transform3D(Basis(), Vector3(wall_x, wall_base + lower_h * 0.5, mid)), SURF_STONE)
+			var sill_h: float = minf(0.16, (opening_top - opening_bottom) * 0.22)
+			component_box("basilica_clerestory_sill",
+				Vector3(wall_t, sill_h, opening_w),
+				Transform3D(Basis(), Vector3(wall_x, opening_bottom + sill_h * 0.5,
+					mid)), SURF_STONE)
+			for segment in [[z0, left_end], [right_start, z1]]:
+				var segment_len: float = float(segment[1]) - float(segment[0])
+				if segment_len <= 0.05:
+					continue
+				var z_mid: float = (float(segment[0]) + float(segment[1])) * 0.5
+				component_box("basilica_nave_pier_wall",
+					Vector3(wall_t, opening_top - opening_bottom, segment_len),
+					Transform3D(Basis(), Vector3(wall_x,
+						(opening_bottom + opening_top) * 0.5, z_mid)), SURF_STONE)
+			var head_h: float = top - opening_top
+			component_box("basilica_clerestory_head",
+				Vector3(wall_t, head_h, bay),
+				Transform3D(Basis(), Vector3(wall_x, opening_top + head_h * 0.5, mid)), SURF_STONE)
+		# The terminal crossheads tie each end bay back to the existing side
+		# wall, so the longitudinal bearing wall is supported at both ends too.
+		var crosshead_h: float = beam_h
+		var crosshead_bottom: float = wall_base - crosshead_h
+		var side_wall_center: float = side * (site.size.x * 0.5 - spec.wall_t * 0.5)
+		for station_z in [bearing_points.front(), bearing_points.back()]:
+			var crosshead_w: float = absf(side_wall_center - wall_x) + spec.wall_t * 0.5
+			var crosshead_center_x: float = (side_wall_center + wall_x) * 0.5
+			component_box("basilica_nave_end_crosshead",
+				Vector3(crosshead_w, crosshead_h, maxf(spec.column_r * 1.8, 0.62)),
+				Transform3D(Basis(), Vector3(crosshead_center_x,
+					crosshead_bottom + crosshead_h * 0.5, station_z)), SURF_TRIM)
+		# Gable returns tie this elevated wall back to the front and rear shell.
+		for end_z in [site.position.y, site.end.y]:
+			var connector_depth: float = absf(end_z - (bearing_points[0] if end_z < 0.0 else bearing_points.back()))
+			if connector_depth <= 0.02:
+				continue
+			var connector_center: float = (end_z + (bearing_points[0] if end_z < 0.0 else bearing_points.back())) * 0.5
+			component_box("basilica_nave_end_return",
+				Vector3(wall_t, top - wall_base, connector_depth),
+				Transform3D(Basis(), Vector3(wall_x,
+					wall_base + (top - wall_base) * 0.5, connector_center)), SURF_STONE)
+	host_end()
+
+
+func _build_basilica_aisle_roofs(site: Rect2, _half: float, _nave_eave: float) -> void:
+	var outer: float = site.size.x * 0.5 + TempleGeometry.ORDER_REACH
+	var inner: float = TempleGeometry.basilica_nave_bearing_x(spec) \
+		+ TempleGeometry.basilica_nave_wall_thickness(spec) * 0.5
+	var sill_bottom: float = TempleGeometry.basilica_clerestory_opening_bottom(spec)
+	var inner_y: float = minf(sill_bottom - RoofShape.DEPTH * 0.5 - 0.15,
+		spec.height + 0.42)
+	var z0: float = site.position.y - 0.4
+	var z1: float = site.end.y + 0.4
+	for side in [-1.0, 1.0]:
+		var outer_x: float = side * outer
+		var inner_x: float = side * inner
+		var outer_y: float = spec.height + 0.10
+		var points := PackedVector3Array([
+			Vector3(outer_x, outer_y, z0), Vector3(inner_x, inner_y, z0),
+			Vector3(inner_x, inner_y, z1), Vector3(outer_x, outer_y, z1)])
+		host("basilica_aisle_roof_%s" % ("left" if side < 0.0 else "right"))
+		component_slab("basilica_aisle_roof", points, RoofShape.DEPTH, SURF_ROOF, true)
+		host_end()
+		var front_face := PackedVector3Array([
+			Vector3(outer_x, spec.height, site.position.y),
+			Vector3(inner_x, spec.height, site.position.y),
+			Vector3(inner_x, inner_y, site.position.y)])
+		var back_face := PackedVector3Array([
+			Vector3(outer_x, spec.height, site.end.y),
+			Vector3(inner_x, inner_y, site.end.y),
+			Vector3(inner_x, spec.height, site.end.y)])
+		host("basilica_aisle_rakes")
+		component_slab("basilica_aisle_rake", front_face, 0.24, SURF_TRIM, false)
+		component_slab("basilica_aisle_rake", back_face, 0.24, SURF_TRIM, false)
+		host_end()
+
+
+func _build_basilica_gable_returns(site: Rect2, half: float, eave: float, rise: float) -> void:
+	var half_width: float = half
+	var depth: float = maxf(spec.wall_t, 0.5)
+	var profile_rect := Rect2(Vector2(-half_width, spec.height),
+		Vector2(half_width * 2.0, eave - spec.height))
+	for end in [-1.0, 1.0]:
+		var z: float = site.position.y if end < 0.0 else site.end.y
+		host("basilica_nave_gable")
+		component_box("basilica_nave_gable_spandrel",
+			Vector3(profile_rect.size.x, profile_rect.size.y, depth),
+			Transform3D(Basis(), Vector3(0.0, spec.height + profile_rect.size.y * 0.5, z)), SURF_STONE)
+		var tri := PackedVector3Array([
+			Vector3(-half_width, eave, z), Vector3(half_width, eave, z),
+			Vector3(0.0, eave + rise, z)])
+		component_slab("basilica_nave_gable_triangle", tri, depth, SURF_STONE, false)
+		host_end()
+		for side in [-1.0, 1.0]:
+			var inner_x: float = side * (TempleGeometry.basilica_nave_bearing_x(spec)
+				+ TempleGeometry.basilica_nave_wall_thickness(spec) * 0.5)
+			var outer_x: float = side * (site.size.x * 0.5 + TempleGeometry.ORDER_REACH)
+			var inner_y: float = minf(
+				TempleGeometry.basilica_clerestory_opening_bottom(spec) \
+				- RoofShape.DEPTH * 0.5 - 0.15, spec.height + 0.42)
+			var outer_y: float = spec.height + 0.10
+			var points := PackedVector3Array([
+				Vector3(outer_x, outer_y, z), Vector3(inner_x, spec.height, z),
+				Vector3(inner_x, inner_y, z)])
+			host("basilica_aisle_gable")
+			component_slab("basilica_aisle_gable_fill", points, depth, SURF_STONE, false)
+			host_end()
+
+
+func _build_basilica_portico(site: Rect2) -> void:
+	var half: float = TempleGeometry.basilica_portico_half_width(spec)
+	var depth: float = TempleGeometry.basilica_portico_depth(spec)
+	var eave: float = TempleGeometry.basilica_portico_eave_height(spec)
+	var rise: float = TempleGeometry.basilica_portico_rise(spec)
+	var column_points: Array[Vector2] = TempleGeometry.basilica_portico_column_positions(spec)
+	var shaft_d: float = TempleGeometry.basilica_portico_shaft_diameter(spec)
+	var base_d: float = shaft_d * 1.34
+	var capital_d: float = shaft_d * 1.48
+	var beam_h: float = shaft_d * 0.70
+	var capital_h: float = shaft_d * 0.62
+	var bearing_underside: float = eave + rise * (shaft_d * 0.5 / half) \
+		- RoofShape.DEPTH * 0.5
+	var capital_top: float = bearing_underside - beam_h
+	var capital_bottom: float = capital_top - capital_h
+	var base_h: float = shaft_d * 0.48
+	var outer_z: float = site.position.y - depth + 0.5
+	host("basilica_pronaos")
+	for index in range(column_points.size()):
+		var p: Vector2 = column_points[index]
+		var base := component_box("basilica_portico_column_base", Vector3(base_d, base_h, base_d),
+			Transform3D(Basis(), Vector3(p.x, base_h * 0.5, p.y)), SURF_STONE)
+		var shaft_h: float = capital_bottom - base_h
+		var shaft := component_box("basilica_portico_column_shaft", Vector3(shaft_d, shaft_h, shaft_d),
+			Transform3D(Basis(), Vector3(p.x, base_h + shaft_h * 0.5, p.y)), SURF_STONE)
+		var capital := component_box("basilica_portico_column_capital",
+			Vector3(capital_d, capital_h, capital_d),
+			Transform3D(Basis(), Vector3(p.x, capital_bottom + capital_h * 0.5, p.y)), SURF_TRIM)
+		if base.is_empty() or shaft.is_empty() or capital.is_empty():
+			continue
+		_log_mass("basilica_portico_column_%d" % index,
+			AABB(Vector3(p.x - base_d * 0.5, 0.0, p.y - base_d * 0.5),
+				Vector3(base_d, capital_top, base_d)))
+	var front_beam_z: float = outer_z
+	var front_beam := component_box("basilica_portico_architrave",
+		Vector3(half * 2.0, beam_h, shaft_d),
+		Transform3D(Basis(), Vector3(0.0, capital_top + beam_h * 0.5, front_beam_z)), SURF_STONE)
+	var side_beam_x: float = half - shaft_d * 0.5
+	var side_beam_length: float = maxf(depth - 0.5 + spec.wall_t * 0.5, 0.5)
+	for side in [-1.0, 1.0]:
+		component_box("basilica_portico_side_beam", Vector3(shaft_d, beam_h, side_beam_length),
+			Transform3D(Basis(), Vector3(side * side_beam_x, capital_top + beam_h * 0.5,
+				outer_z + side_beam_length * 0.5)), SURF_STONE)
+	if front_beam.is_empty():
+		host_end()
+		return
+	var z0: float = site.position.y - depth
+	var z1: float = site.position.y + 0.18
+	for side in [-1.0, 1.0]:
+		var x: float = side * half
+		var points := PackedVector3Array([
+			Vector3(x, eave, z0), Vector3(0.0, eave + rise, z0),
+			Vector3(0.0, eave + rise, z1), Vector3(x, eave, z1)])
+		component_slab("basilica_portico_roof_slope", points, RoofShape.DEPTH, SURF_ROOF, true)
+	var front_gable := PackedVector3Array([
+		Vector3(-half, eave, front_beam_z), Vector3(half, eave, front_beam_z),
+		Vector3(0.0, eave + rise, front_beam_z)])
+	component_slab("basilica_portico_gable", front_gable, 0.35, SURF_STONE, false)
+	var roof_aabb := AABB(Vector3(-half, eave - RoofShape.DEPTH * 0.5, z0),
+		Vector3(half * 2.0, rise + RoofShape.DEPTH, z1 - z0))
+	component_note("basilica_portico_roof", "gable_roof", SURF_ROOF,
+		{"aabb": roof_aabb, "eave": eave, "rise": rise, "half_span": half,
+		"z0": z0, "z1": z1})
+	host_end()
 
 
 # ------------------------------------------------------------------ the order
@@ -453,17 +828,21 @@ func _build_order() -> void:
 				clampf(h * 0.2, 1.0, 3.2), h * 0.66)
 
 	# raking cornices: each gable end becomes a pediment framed top and bottom
-	var span: float = r.size.y if along_x else r.size.x
+	var has_nave_bearings: bool = TempleGeometry.basilica_has_nave_bearings(spec)
+	var span: float = TempleGeometry.basilica_nave_half_width(spec) * 2.0 \
+		if has_nave_bearings else minf(spec.width, spec.length)
 	var along: float = r.size.x if along_x else r.size.y
-	var roof_rise: float = span * TempleGeometry.RIDGE_PITCH
-	var hs: float = (span + 1.2) / 2.0
+	var roof_span: float = span
+	var roof_rise: float = roof_span * TempleGeometry.RIDGE_PITCH
+	var hs: float = span / 2.0
+	var gable_base_y: float = TempleGeometry.basilica_nave_eave_height(spec)
 	var roof_xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if along_x else 0.0),
-		Vector3(0.0, h, 0.0))
+		Vector3(0.0, gable_base_y, 0.0))
 	var rake_h: float = 0.32
 	var rake_d: float = 0.5
 	for end in [-1.0, 1.0]:
 		for side in [-1.0, 1.0]:
-			var x0: float = side * (span / 2.0 + 0.45)
+			var x0: float = side * span / 2.0
 			var under0: float = roof_rise * (1.0 - absf(x0) / hs) - RoofShape.DEPTH * 0.5 - rake_h / 2.0
 			var under1: float = roof_rise - RoofShape.DEPTH * 0.5 - rake_h / 2.0
 			var a := Vector3(x0, under0, 0.0)
@@ -471,22 +850,43 @@ func _build_order() -> void:
 			var d: Vector3 = (b - a).normalized()
 			var basis := Basis(d, Vector3(-d.y, d.x, 0.0), Vector3(0.0, 0.0, 1.0))
 			var mid3: Vector3 = (a + b) / 2.0 + Vector3(0.0, 0.0, end * (along / 2.0 + rake_d / 2.0))
-			_kit.oriented_box(Vector3(a.distance_to(b), rake_h, rake_d),
+			host("basilica_nave_rakes")
+			component_box("basilica_nave_rake", Vector3(a.distance_to(b), rake_h, rake_d),
 				roof_xf * Transform3D(basis, mid3), SURF_TRIM)
+			host_end()
 
 	# the aedicule round the gate: two pilasters, a lintel, a little pediment
-	var ped_y: float = gh + 0.8
+	host("basilica_gate")
+	var capital_top: float = gh + 0.8
+	var capital_h: float = 0.34
+	var capital_bottom: float = capital_top - capital_h
+	var lintel_h: float = 0.48
+	var ped_y: float = capital_top + lintel_h
+	var pier_w: float = clampf(r.size.x * 0.085, 0.9, 1.45)
+	var pier_d: float = 0.55
+	var pier_offset: float = gate_half + pier_w * 0.5 + 0.28
 	for side in [-1.0, 1.0]:
-		box(Vector3(0.7, ped_y - podium, 0.4),
-			Vector3(side * (gate_half + 0.45 + 0.35), podium + (ped_y - podium) / 2.0,
-				front - 0.2), SURF_TRIM)
-	box(Vector3((gate_half + 1.15) * 2.0, ped_y - gh, 0.46),
-		Vector3(0.0, gh + (ped_y - gh) / 2.0, front - 0.23), SURF_STONE)
+		var pier_center := Vector3(side * pier_offset, (podium + capital_bottom) / 2.0,
+			front - pier_d * 0.45)
+		var pier_xf := Transform3D(Basis(), pier_center)
+		component_box("basilica_gate_pier", Vector3(pier_w, capital_bottom - podium, pier_d),
+			pier_xf, SURF_STONE)
+		component_box("basilica_gate_base", Vector3(pier_w + 0.24, 0.24, pier_d + 0.12),
+			Transform3D(Basis(), Vector3(pier_center.x, podium + 0.12,
+				front - pier_d * 0.45)), SURF_TRIM)
+		component_box("basilica_gate_capital", Vector3(pier_w + 0.32, capital_h,
+			pier_d + 0.18), Transform3D(Basis(), Vector3(pier_center.x,
+				capital_top - capital_h * 0.5, front - pier_d * 0.45)), SURF_TRIM)
+	var lintel_w: float = pier_offset * 2.0 + pier_w
+	component_box("basilica_gate_lintel", Vector3(lintel_w, lintel_h, 0.62),
+		Transform3D(Basis(), Vector3(0.0, capital_top + lintel_h * 0.5,
+			front - 0.31)), SURF_STONE)
 	var ped_half: float = gate_half + 1.2
 	var ped_rise: float = ped_half * 0.32
 	if ped_y + ped_rise < ent_y - 0.2:
 		_kit.gable_end_at(Transform3D(Basis(), Vector3(0.0, ped_y, front)),
 			ped_half, ped_rise, -0.5, 0.0, SURF_TRIM)
+	host_end()
 
 
 ## One pilaster on an outer wall: a shaft standing a little proud, on a base,

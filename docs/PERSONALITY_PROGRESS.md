@@ -249,3 +249,53 @@ control pass. Root reviewed fresh exact-pin Witch views and six-style church
 captures. See `visualqa/personality/CAMERAS_REVIEW.md`. Witch identity and sacred
 interior architecture remain open; sacred body clearance is explicitly
 unmeasured. The complete frozen review matrices are retained.
+
+### 2026-10-08 — Continued verification after the next computer restart
+
+The compact Witch opening reservation now follows its actual left/right work
+band. The unchanged three-seed service fixture passes (46.997 s), as does the
+assembled shelter/threshold mesh fixture (18.216 s). The broader finish fixture
+then exposed a generic cookware choice selecting a water bucket instead of the
+required cooking pot for seed 21325. The scoped Pot_1 recipe now passes all nine
+finish/light cases (136.796 s), compact service (49.555 s), threshold mesh
+(21.893 s) and Workshop bay (15.874 s). Fresh exact-pin four-view capture passes
+(46.324 s), but root still sees a generic tidy cottage. Visual identity is not
+accepted. The shader's horizontal courses lack physical thatch bundles, and
+the broad upper flue needs a purposeful proportion; those proposals are staged.
+
+Native basilica hierarchy now includes the raised nave, lower aisles, supported
+pronaos and real clerestory openings. Vertical gable slabs have actual normal
+extrusion rather than flat in-plane thickness. The three-size structural fixture
+and its controls pass (52.168 s); the focused basilica/Gothic public API check
+passes 25 checks (27.532 s). The corrected Temple lane passes 3,737 checks with
+zero failures or warnings (150.978 s). Root inspected all nine fresh three-size
+blood seed1 renders (50.211 s): the nave, aisles and projecting entrance read as
+deliberate architecture. Dark interiors, repeated braziers and the generic rear
+spire remain broader design work. See `visualqa/personality/BASILICA_REVIEW.md`.
+LIVE-SACRED-BASILICA is complete for this bounded architecture slice. The complete
+quick API coverage passes in bounded processes; LIVE-SACRED stays open.
+
+The full sacred structural fixture passes (112.977 s). Its crossing-tower control
+now removes an actual bearing component while retaining the tower wall base.
+Nordic timber has its own logical material slot. The obsolete four-surface
+count is replaced with populated logical-slot checks; the church change lane
+still needs its rerun. Its 12 existing opening warnings remain visible.
+
+LIVE-API-PARTITIONS is committed as `18b5730`. All eleven exact canonical library
+partitions pass, 195 checks, with a common unchanged source fingerprint. Each
+native exit is 0 and each process is under 300 seconds; 702.046 s is the aggregate,
+not a passing combined selector. The union validator and root rejection controls
+for missing exit, NaN and duplicate rows pass. The original 300.727 s library
+timeout remains incomplete evidence. See `docs/API_QUICK_PARTITIONS.md`.
+
+LIVE-API-SCENE-LIFETIME is committed as `fccfae2`. Five temporary WindmillSuite
+scenes were never freed: 264 passing API assertions still produced renderer exit
+ERRORs. Null-guarded scene cleanup preserves every assertion; the same four
+remaining API suites now pass all 264 checks, native0/153.899 s, with clean output.
+LIVE-PLACEMENT-PARTITIONS is committed as `406b12a`. All thirteen bounded
+processes pass 31 checks and preserve the eighteen original coverage markers
+(434.399 s aggregate, 95.811 s maximum). Source stability and rejection controls
+pass. Together with the library partitions and four remaining suites, this
+retains all quick API-lane coverage: 490 checks. The original combined placement
+selector timed out at 300.952 s; it is not reported as a pass. Scheduled sweeps
+and final family design acceptance remain separate.

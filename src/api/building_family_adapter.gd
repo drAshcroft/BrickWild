@@ -391,14 +391,11 @@ class TempleFamily extends BuildingFamilyAdapter:
 	func instantiate(building, cutaway: bool) -> Node3D:
 		return TempleAssembler.build(building.spec as TempleSpec, cutaway)
 
-	## The ziggurat's twin stair flights are physical architecture outside its
-	## terraces. Lots must retain their full depth even though the door recedes.
+	## Temple plans keep their real outworks inside the placement reservation:
+	## basilica pronaos and roof overhangs, ziggurat stairs, and obelisk apron.
 	func footprint(building) -> Rect2:
 		var temple := building.spec as TempleSpec
-		var rect := TempleGeometry.site_rect(temple)
-		if temple.form == &"ziggurat":
-			rect = rect.merge(TempleGeometry.stair_rect(temple))
-		return rect
+		return TempleGeometry.plan_extent(temple)
 
 	func door(building) -> Vector3:
 		var temple := building.spec as TempleSpec
@@ -408,6 +405,11 @@ class TempleFamily extends BuildingFamilyAdapter:
 
 	func placement_metadata(building, bounds: AABB) -> Dictionary:
 		var temple := building.spec as TempleSpec
+		if temple.form == &"basilica":
+			var approach: Rect2 = TempleGeometry.basilica_approach_rect(temple)
+			if approach.size.x > 0.0 and approach.size.y > 0.0:
+				return {"approach": approach}
+			return {}
 		if temple.form != &"ziggurat":
 			return {}
 		# The twin summit flights flank an open ground-level processional axis

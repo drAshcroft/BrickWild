@@ -209,9 +209,17 @@ static func _check_placed(res: SuiteResult, kind: String, request: BuildingReque
 	var footprint: Rect2 = placement.get("footprint", Rect2())
 	var door: Vector3 = placement.get("door", Vector3.INF)
 	var front_z: float = footprint.position.y
-	if absf(door.z - front_z) > tolerance:
-		res.fail("%s seed=%d: door.z=%.3f is not within %.1fm of footprint -Z edge %.3f" %
-			[kind, request.seed, door.z, tolerance, front_z])
+	var approach: Rect2 = placement.get("approach", Rect2())
+	if kind == "temple" and request.style == &"basilica" \
+			and approach.size.x > 0.0 and approach.size.y > 0.0:
+		if absf(approach.position.y - front_z) > tolerance \
+				or absf(approach.end.y - door.z) > tolerance:
+			res.fail("%s seed=%d: actual portico approach does not join footprint front to wall door" %
+				[kind, request.seed])
+	else:
+		if absf(door.z - front_z) > tolerance:
+			res.fail("%s seed=%d: door.z=%.3f is not within %.1fm of footprint -Z edge %.3f" %
+				[kind, request.seed, door.z, tolerance, front_z])
 	if door.x < footprint.position.x - tolerance \
 			or door.x > footprint.position.x + footprint.size.x + tolerance:
 		res.fail("%s seed=%d: door.x=%.3f falls outside footprint's X span" % [kind, request.seed, door.x])

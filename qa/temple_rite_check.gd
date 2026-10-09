@@ -69,7 +69,7 @@ func check(spec: TempleSpec, builder: TempleBuilder, overrides: Dictionary = {})
 
 func _walk() -> void:
 	_grid = WalkGrid.new()
-	_grid.setup(TempleGeometry.site_rect(_spec).grow(1.0), TempleGeometry.NAV_CELL)
+	_grid.setup(TempleGeometry.plan_extent(_spec).grow(1.0), TempleGeometry.NAV_CELL)
 	for r in TempleGeometry.floor_rects(_spec):
 		_grid.add_floor(r)
 	for o in TempleGeometry.obstacle_rects(_spec):

@@ -55,6 +55,18 @@ const ORDER_REACH := 0.6
 const PODIUM_STEPS := 3
 const PODIUM_RISE := 0.22
 const ORDER_BAY := 4.6        # target pilaster spacing, metres
+## Basilica plan and vertical hierarchy. The central nave carries the high
+## ridge; the two aisles meet it at the raised side walls.
+const BASILICA_NAVE_FRACTION := 0.62
+const BASILICA_NAVE_RISE_FRACTION := 0.16
+const BASILICA_PORTICO_WIDTH_FRACTION := 0.68
+const BASILICA_PORTICO_DEPTH_FRACTION := 0.18
+const BASILICA_PORTICO_MIN_DEPTH := 2.6
+const BASILICA_PORTICO_MAX_DEPTH := 4.2
+const BASILICA_PORTICO_APPROACH_APRON := 0.6
+const BASILICA_PORTICO_ROOF_PITCH := 0.08
+const BASILICA_PORTICO_MIN_COLUMNS := 4
+const BASILICA_PORTICO_MAX_COLUMNS := 8
 
 ## Person radius for the walking checks: a robed celebrant, not a burglar.
 const PERSON_RADIUS := 0.28
@@ -80,6 +92,194 @@ static func interior_rect(spec: TempleSpec) -> Rect2:
 	if spec.form == &"ziggurat":
 		return site_rect(spec).grow(-terrace_inset(spec))
 	return site_rect(spec).grow(-spec.wall_t)
+
+
+static func basilica_nave_half_width(spec: TempleSpec) -> float:
+	if not basilica_has_nave_bearings(spec):
+		# A single nave roof lands on the outer shell walls when the generated
+		# sanctum has no interior bearing row. This span includes the real eaves.
+		return spec.width * 0.5 + 0.6 - spec.wall_t * 0.5
+	return basilica_nave_bearing_x(spec) + basilica_nave_wall_thickness(spec) * 0.5
+
+
+static func basilica_has_nave_bearings(spec: TempleSpec) -> bool:
+	if spec.columns.is_empty():
+		return false
+	var bearing_x := INF
+	for column in spec.columns:
+		var p: Vector3 = column["pos"]
+		bearing_x = minf(bearing_x, absf(p.x))
+	var negative_z: Array[float] = []
+	var positive_z: Array[float] = []
+	for column in spec.columns:
+		var p: Vector3 = column["pos"]
+		if absf(absf(p.x) - bearing_x) > 0.01:
+			continue
+		var stations: Array[float] = negative_z if p.x < 0.0 else positive_z
+		var duplicate := false
+		for z in stations:
+			if absf(z - p.z) < 0.01:
+				duplicate = true
+				break
+		if not duplicate:
+			stations.append(p.z)
+	return negative_z.size() >= 2 and positive_z.size() >= 2
+
+
+## The nave walls sit over the innermost final generated colonnade. Do not
+## derive a second bay layout: TempleGenerator's records are the bearings.
+static func basilica_nave_bearing_x(spec: TempleSpec) -> float:
+	var columns: Array[Dictionary] = spec.columns if not spec.columns.is_empty() \
+		else column_records(spec)
+	var nearest := INF
+	for column in columns:
+		var p: Vector3 = column["pos"]
+		nearest = minf(nearest, absf(p.x))
+	if nearest == INF:
+		return minf(spec.width * BASILICA_NAVE_FRACTION * 0.5,
+			spec.width * 0.5 - spec.wall_t)
+	return nearest
+
+
+static func basilica_nave_wall_thickness(spec: TempleSpec) -> float:
+	return maxf(spec.column_r * 2.0, spec.wall_t * 0.7)
+
+
+## Underside heights of the no-bearing fallback ridge at its actual shell-wall
+## faces. This profile gives the emitted bearing head its true roof contact.
+static func basilica_fallback_roof_wall_profile(spec: TempleSpec) -> Vector2:
+	var span: float = minf(spec.width, spec.length)
+	var roof_half: float = (span + 1.2) * 0.5
+	var rise: float = span * RIDGE_PITCH
+	var outer: float = span * 0.5
+	var inner: float = maxf(0.0, outer - spec.wall_t)
+	var outer_y: float = spec.height + rise * (1.0 - outer / roof_half) \
+		- RoofShape.DEPTH * 0.5
+	var inner_y: float = spec.height + rise * (1.0 - inner / roof_half) \
+		- RoofShape.DEPTH * 0.5
+	return Vector2(outer_y, inner_y)
+
+
+static func basilica_fallback_roof_wall_center_y(spec: TempleSpec) -> float:
+	var profile: Vector2 = basilica_fallback_roof_wall_profile(spec)
+	return (profile.x + profile.y) * 0.5
+
+
+static func basilica_nave_eave_height(spec: TempleSpec) -> float:
+	if not basilica_has_nave_bearings(spec):
+		return spec.height
+	return spec.height + clampf(spec.height * BASILICA_NAVE_RISE_FRACTION, 1.6, 3.2)
+
+
+## The lower clerestory opening is measured from the final column-capital
+## record and the same architrave height used by the builder.
+static func basilica_clerestory_opening_bottom(spec: TempleSpec) -> float:
+	var wall_base: float = spec.height
+	if basilica_has_nave_bearings(spec):
+		var bearing_x := INF
+		var bearing: Dictionary = {}
+		for column in spec.columns:
+			var p: Vector3 = column["pos"]
+			if absf(p.x) < bearing_x:
+				bearing_x = absf(p.x)
+				bearing = column
+		if not bearing.is_empty():
+			var beam_h: float = clampf(spec.column_r * 0.34, 0.18, 0.38)
+			wall_base = column_cap_top(bearing) + beam_h
+	var opening_bottom: float = maxf(wall_base + 0.62, spec.height + 0.62)
+	var opening_top: float = basilica_nave_eave_height(spec) - 0.30
+	if opening_top <= opening_bottom + 0.35:
+		opening_bottom = maxf(wall_base + 0.08, minf(opening_bottom, opening_top - 0.35))
+	return opening_bottom
+
+
+static func basilica_portico_eave_height(spec: TempleSpec) -> float:
+	return spec.height + 0.15
+
+
+static func basilica_portico_rise(spec: TempleSpec) -> float:
+	return basilica_portico_half_width(spec) * BASILICA_PORTICO_ROOF_PITCH
+
+
+static func basilica_portico_shaft_diameter(spec: TempleSpec) -> float:
+	return clampf(basilica_portico_eave_height(spec) * 0.08, 0.70, 1.55)
+
+
+static func basilica_portico_depth(spec: TempleSpec) -> float:
+	return clampf(spec.width * BASILICA_PORTICO_DEPTH_FRACTION,
+		BASILICA_PORTICO_MIN_DEPTH, BASILICA_PORTICO_MAX_DEPTH)
+
+
+static func basilica_portico_half_width(spec: TempleSpec) -> float:
+	return minf(spec.width * BASILICA_PORTICO_WIDTH_FRACTION * 0.5,
+		spec.width * 0.5 - spec.wall_t - 0.4)
+
+
+static func basilica_portico_column_positions(spec: TempleSpec) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	if not basilica_has_nave_bearings(spec):
+		return out
+	var half := basilica_portico_half_width(spec)
+	var shaft_r: float = basilica_portico_shaft_diameter(spec) * 0.5
+	var bearing_half: float = maxf(half - shaft_r, 0.5)
+	var z: float = site_rect(spec).position.y - basilica_portico_depth(spec) + 0.5
+	var count: int = clampi(int(round(bearing_half * 2.0 / ORDER_BAY)) + 1,
+		BASILICA_PORTICO_MIN_COLUMNS, BASILICA_PORTICO_MAX_COLUMNS)
+	if count % 2 != 0:
+		count = count - 1 if count > BASILICA_PORTICO_MIN_COLUMNS \
+			else mini(count + 1, BASILICA_PORTICO_MAX_COLUMNS)
+	for i in range(count):
+		var t := float(i) / float(count - 1)
+		out.append(Vector2(lerpf(-bearing_half, bearing_half, t), z))
+	return out
+
+
+## Exterior forehall paving ends at the gate's outer wall face. A short 0.6m
+## uncovered apron extends beyond the portico roof as a real approach surface.
+static func basilica_portico_floor_rect(spec: TempleSpec) -> Rect2:
+	if spec.form != &"basilica" or not basilica_has_nave_bearings(spec):
+		return Rect2()
+	var r := site_rect(spec)
+	var half := basilica_portico_half_width(spec)
+	var depth: float = basilica_portico_depth(spec)
+	var apron: float = BASILICA_PORTICO_APPROACH_APRON
+	return Rect2(Vector2(-half, r.position.y - depth - apron),
+		Vector2(half * 2.0, depth + apron))
+
+
+## The body-clear passage beneath the real pronaos floor, from its outside
+## edge to the gate threshold. This is placement approach metadata, not a
+## substitute door position.
+static func basilica_approach_rect(spec: TempleSpec) -> Rect2:
+	var floor: Rect2 = basilica_portico_floor_rect(spec)
+	if floor.size.x <= 0.0:
+		return Rect2()
+	var gate_z: float = site_rect(spec).position.y
+	var width: float = minf(TempleGeometry.PROCESSION_MIN,
+		TempleGeometry.GATE_W - TempleGeometry.PERSON_RADIUS * 2.0)
+	return Rect2(Vector2(-width * 0.5, floor.position.y),
+		Vector2(width, gate_z - floor.position.y))
+
+
+## A threshold floor joins the forehall slab to the interior floor through the
+## actual gate opening, without paving under the solid front-wall returns.
+static func basilica_threshold_rect(spec: TempleSpec) -> Rect2:
+	if spec.form != &"basilica":
+		return Rect2()
+	var r := site_rect(spec)
+	return Rect2(Vector2(-GATE_W * 0.5, r.position.y),
+		Vector2(GATE_W, spec.wall_t))
+
+
+static func basilica_portico_rect(spec: TempleSpec) -> Rect2:
+	var floor: Rect2 = basilica_portico_floor_rect(spec)
+	if floor.size.x <= 0.0:
+		return Rect2()
+	return floor
+
+
+static func basilica_aisle_roof_run(spec: TempleSpec) -> float:
+	return site_rect(spec).size.y + 0.8
 
 
 ## Where a person coming in stands, on the axis, one stride inside the gate.
@@ -587,6 +787,12 @@ static func floor_rects(spec: TempleSpec) -> Array[Rect2]:
 			out.append(b)
 	for cell in cell_rects(spec):
 		out.append(cell)
+	var portico_floor := basilica_portico_floor_rect(spec)
+	if portico_floor.size.x > 0.0:
+		out.append(portico_floor)
+	var threshold := basilica_threshold_rect(spec)
+	if threshold.size.x > 0.0:
+		out.append(threshold)
 	var court: Rect2 = forecourt_rect(spec)
 	if court.size.x > 0.0:
 		out.append(court)
@@ -623,6 +829,13 @@ static func dome_radius(spec: TempleSpec) -> float:
 
 static func roof_height(spec: TempleSpec) -> float:
 	match spec.form:
+		&"basilica":
+			if not basilica_has_nave_bearings(spec):
+				return spec.height + minf(spec.width, spec.length) * RIDGE_PITCH \
+					+ RoofShape.DEPTH * 0.5
+			var nave_span: float = basilica_nave_half_width(spec) * 2.0
+			return basilica_nave_eave_height(spec) + nave_span * RIDGE_PITCH \
+				+ RoofShape.DEPTH * 0.5
 		&"ziggurat":
 			return terrace_top(spec)
 		&"rotunda":
@@ -660,6 +873,14 @@ static func pylon_rects(spec: TempleSpec) -> Array[Rect2]:
 ## Everything the temple covers in plan, its outworks included.
 static func plan_extent(spec: TempleSpec) -> Rect2:
 	var e: Rect2 = site_rect(spec)
+	if spec.form == &"basilica":
+		# Include actual main-roof overhang, side-aisle soffits, and the projecting
+		# covered pronaos so public placement reserves the architecture it emits.
+		e = e.grow(maxf(maxf(ORDER_REACH, 0.6), maxf(spec.wall_t, 0.5) * 0.5))
+		# The covered portico already ends at its real outer floor face. Growing
+		# this front edge invents an unbuilt apron and separates the published
+		# footprint front from the actual arrival surface.
+		e = e.merge(basilica_portico_floor_rect(spec))
 	if spec.form == &"ziggurat":
 		e = e.merge(stair_rect(spec))
 	if spec.obelisks:
