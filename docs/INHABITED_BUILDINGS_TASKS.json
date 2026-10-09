@@ -406,9 +406,32 @@
       "description": "Committed baseline reproduces hearth center-face complaints. Diagnose actual mesh and material ownership; preserve dimensions, mass, surround, backgap and furniture collision checks. Require identical-predicate sealed-mouth and removed-surround controls.",
       "priority": "P1",
       "phase": "inhabited-buildings",
-      "status": "executing",
+      "status": "complete",
       "targetCoord": {
         "file": "qa/house_qa.gd"
+      },
+      "aiNotes": "Root verified78 actual mesh/fault controls native0/14.994s, committed full surface-host consumer native0/72.270s. Baseline42 complaints becomes18, exactly24 false face probes removed and every other complaint unchanged. Root reviewed3 fresh hearth views. See visualqa/personality/HEARTH_MESH_REVIEW.md. Hearth realism remains open."
+    },
+    {
+      "key": "LIVE-WALK-FLOOR-EDGE",
+      "id": "ece2359f-e80d-41d9-9c85-51a663c76cd6",
+      "title": "Preserve real shared floor edges in the walking grid",
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "pending",
+      "targetCoord": {
+        "file": "qa/walk_grid.gd"
+      }
+    },
+    {
+      "key": "LIVE-DOMESTIC-HEARTH-DESIGN",
+      "id": "4b5eabe8-d4a4-4010-8f4c-972da8d12a57",
+      "title": "Give ordinary cooking hearths a visible working fire and fitted surround",
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "executing",
+      "targetCoord": {
+        "file": "src/house/house_assembler.gd"
       }
     }
   ]

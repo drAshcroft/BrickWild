@@ -1,5 +1,7 @@
 class_name HouseQA
 extends RefCounted
+const ComponentCheck = preload("res://qa/component_check.gd")
+const MeshKit = preload("res://core/mesh_kit.gd")
 ## The whole house harness in one call: the plan, the furnishing, the walking,
 ## and the shell the mesh actually came out as.
 ##
@@ -88,20 +90,33 @@ static func check_interior_details(plan: HousePlan, builder: HouseBuilder) -> Ar
 		var found := false
 		for mass in builder.mass_log:
 			if String(mass["name"]) == "chimney_breast":
-				found = absf(AABB(mass["aabb"]).size.y - plan.spec.height) < 0.001
+				var bounds: AABB = mass["aabb"]
+				var footprint: Rect2 = breast["rect"]
+				found = absf(bounds.position.y - y0) < 0.001 \
+					and absf(bounds.size.y - plan.spec.height) < 0.001 \
+					and absf(bounds.position.x - footprint.position.x) < 0.01 \
+					and absf(bounds.position.z - footprint.position.y) < 0.01 \
+					and absf(bounds.size.x - footprint.size.x) < 0.01 \
+					and absf(bounds.size.z - footprint.size.y) < 0.01
 		if not found:
-			errors.append("hearth_breast: missing full-storey structural mass")
-		var triangles := _mesh_triangles(builder.emitted_mesh, HouseBuilder.SURF_WALL)
-		for rise in [0.3, plan.spec.height * 0.5, plan.spec.height - 0.05]:
-			var face := Vector3(centre.x + normal.x * depth * 0.5, y0 + rise, centre.y + normal.y * depth * 0.5)
-			var delta := Vector3(normal.x, 0, normal.y) * 0.02
-			var hit := false
-			for triangle in triangles:
-				if Geometry3D.segment_intersects_triangle(face - delta, face + delta, triangle[0], triangle[1], triangle[2]) != null:
-					hit = true
-					break
-			if not hit:
-				errors.append("hearth_breast: actual masonry missing at " + str(face))
+			errors.append("hearth_breast: structural mass dimensions or storey placement disagree with the planned breast")
+		if _has_hearth_component(builder, "hearth_lintel"):
+			var required_roles := {
+				"hearth_breast_left": 1, "hearth_breast_right": 1,
+				"hearth_breast_foot": 1, "hearth_lintel": 1,
+				"hearth_breast_header": 1, "hearth_jamb": 2,
+				"hearth_mantel": 1,
+			}
+			for role in required_roles:
+				if not _hearth_role_mesh_matches(builder, String(role), int(required_roles[role])):
+					errors.append("hearth_breast: actual emitted geometry missing or displaced for " + String(role))
+			if not _hearth_opening_has_recess(plan, builder):
+				errors.append("hearth_breast: open firebox mouth does not reach its actual backing wall")
+		else:
+			# Legacy, trade, custom, and world builders deliberately keep the solid
+			# breast emitter. Prove that solid component on its real wall slot.
+			if not _hearth_role_mesh_matches(builder, "chimney_breast", 1):
+				errors.append("hearth_breast: actual solid legacy breast geometry is missing")
 		for item in plan.furniture:
 			if int(item["room"]) != room:
 				continue
@@ -139,6 +154,154 @@ static func check_interior_details(plan: HousePlan, builder: HouseBuilder) -> Ar
 			if count < 6:
 				errors.append("rug: no actual quad 2 mm above floor for " + String(rug["id"]))
 	return errors
+
+
+## A role is evidence only when its exact logged box triangles are present on
+## the mesh surface that owns the row's logical material slot.
+static func _hearth_role_mesh_matches(builder: HouseBuilder, role: String,
+		expected_count: int) -> bool:
+	var mesh: ArrayMesh = builder.emitted_mesh
+	var rows: Array[Dictionary] = []
+	for row in builder.component_log:
+		if String(row.get("role", "")) == role \
+				and String(row.get("host", "")) == "hearth":
+			rows.append(row)
+	if rows.size() != expected_count:
+		return false
+	for row in rows:
+		if String(row.get("form", "")) != "box":
+			return false
+		var surface: int = _logical_mesh_surface(mesh, int(row["surface"]))
+		if surface < 0:
+			return false
+		var kit := MeshKit.new(1)
+		kit.oriented_box(row["size"], row["xf"], 0)
+		var expected: PackedVector3Array = kit.commit().surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		var actual := _surface_triangle_vertices(mesh, surface)
+		if ComponentCheck.missing_triangles(actual, expected) != 0:
+			return false
+	return true
+
+
+static func _has_hearth_component(builder: HouseBuilder, role: String) -> bool:
+	for row in builder.component_log:
+		if String(row.get("role", "")) == role and String(row.get("host", "")) == "hearth":
+			return true
+	return false
+
+
+## The room-facing mouth is intentionally empty. The first physical hit along
+## its axis must be the host wall behind the recess, not masonry on the breast
+## face. This replaces the invalid centre-face samples that landed inside the
+## designed opening.
+static func _hearth_opening_has_recess(plan: HousePlan, builder: HouseBuilder) -> bool:
+	var breast: Dictionary = HouseGeometry.hearth_breast(plan)
+	if breast.is_empty():
+		return false
+	var mouth := _hearth_mouth_metrics(builder, breast)
+	if mouth.is_empty():
+		return false
+	var centre: Vector2 = breast["centre"]
+	var normal2: Vector2 = breast["normal"]
+	var normal := Vector3(normal2.x, 0.0, normal2.y).normalized()
+	var depth: float = float(breast["depth"])
+	var y: float = float(mouth["center_y"])
+	var face := Vector3(centre.x, y, centre.y) + normal * depth * 0.5
+	var start := face + normal * 0.10
+	var finish := face - normal * (depth + HouseGeometry.wall_thickness(plan.spec) * 1.5)
+	var hit: Variant = _first_mesh_hit(builder.emitted_mesh, start, finish)
+	if hit == null:
+		return false
+	var hit_row: Dictionary = hit
+	var wall_surface: int = _logical_mesh_surface(builder.emitted_mesh,
+		HouseBuilder.SURF_WALL)
+	return int(hit_row["surface"]) == wall_surface \
+		and start.distance_to(hit_row["point"]) >= depth * 0.65
+
+
+## Derive the aperture from emitted supports: the foot gives its sill, the
+## lintel gives its head, and its two jamb transforms give its clear width.
+static func _hearth_mouth_metrics(builder: HouseBuilder, breast: Dictionary) -> Dictionary:
+	var foot: Dictionary = {}
+	var lintel: Dictionary = {}
+	var jambs: Array[Dictionary] = []
+	for row in builder.component_log:
+		if String(row.get("host", "")) != "hearth":
+			continue
+		match String(row.get("role", "")):
+			"hearth_breast_foot":
+				foot = row
+			"hearth_lintel":
+				lintel = row
+			"hearth_jamb":
+				jambs.append(row)
+	if foot.is_empty() or lintel.is_empty() or jambs.size() != 2:
+		return {}
+	var foot_xf: Transform3D = foot["xf"]
+	var foot_size: Vector3 = foot["size"]
+	var lintel_xf: Transform3D = lintel["xf"]
+	var lintel_size: Vector3 = lintel["size"]
+	var sill: float = foot_xf.origin.y + foot_size.y * 0.5
+	var head: float = lintel_xf.origin.y - lintel_size.y * 0.5
+	var normal2: Vector2 = breast["normal"]
+	var tangent := Vector3(normal2.y, 0.0, -normal2.x).normalized()
+	var left_xf: Transform3D = jambs[0]["xf"]
+	var right_xf: Transform3D = jambs[1]["xf"]
+	var centre_separation: float = absf((left_xf.origin - right_xf.origin).dot(tangent))
+	var left_size: Vector3 = jambs[0]["size"]
+	var right_size: Vector3 = jambs[1]["size"]
+	# The jambs intrude into the opening. Subtract their half-widths from
+	# the distance between their centres to measure the actual clear span.
+	var clear_width: float = centre_separation \
+		- (left_size.x + right_size.x) * 0.5
+	if head <= sill or clear_width <= 0.0:
+		return {}
+	return {"bottom": sill, "top": head, "center_y": (sill + head) * 0.5,
+		"width": clear_width, "height": head - sill}
+
+
+static func _logical_mesh_surface(mesh: ArrayMesh, logical: int) -> int:
+	var has_slot_names := false
+	for surface in range(mesh.get_surface_count()):
+		var name: String = mesh.surface_get_name(surface)
+		if name.begins_with("material_slot:"):
+			has_slot_names = true
+			if int(name.trim_prefix("material_slot:")) == logical:
+				return surface
+	if has_slot_names:
+		return -1
+	# Ordinary HouseBuilder.commit() preserves its four fixed SurfaceTools.
+	if mesh.get_surface_count() == 4 and logical >= 0 and logical < 4:
+		return logical
+	return -1
+
+
+static func _surface_triangle_vertices(mesh: ArrayMesh, surface: int) -> PackedVector3Array:
+	var result := PackedVector3Array()
+	for triangle in _mesh_triangles(mesh, surface):
+		result.append(triangle[0])
+		result.append(triangle[1])
+		result.append(triangle[2])
+	return result
+
+
+static func _first_mesh_hit(mesh: ArrayMesh, start: Vector3, finish: Vector3) -> Variant:
+	var nearest: Variant = null
+	var nearest_distance := INF
+	var nearest_surface := -1
+	for surface in range(mesh.get_surface_count()):
+		for triangle in _mesh_triangles(mesh, surface):
+			var hit: Variant = Geometry3D.segment_intersects_triangle(start, finish,
+				triangle[0], triangle[1], triangle[2])
+			if hit == null:
+				continue
+			var point: Vector3 = hit
+			var distance: float = start.distance_to(point)
+			if distance < nearest_distance:
+				nearest = point
+				nearest_distance = distance
+				nearest_surface = surface
+	return null if nearest == null else {"point": nearest, "surface": nearest_surface}
 
 
 ## Every piece that stands on the floor stands on the floor the builder
