@@ -731,19 +731,8 @@ static func flyer_z(spec: ChurchSpec, i: int) -> float:
 ## (walk-QA, Abbey Ivo pin 1). A bay too short for a window keeps none.
 static func nave_window_zs(spec: ChurchSpec) -> Array[float]:
 	var out: Array[float] = []
-	if not spec.buttresses or spec.buttress_count_per_side < 2:
-		var count: int = int(spec.length / NAVE_WINDOW_BAY)
-		for i in range(count):
-			out.append(-spec.length * 0.5 + spec.length / float(count + 1) * (i + 1))
-		return out
-	var n: int = spec.buttress_count_per_side
-	# a buttress is BUTTRESS_FACE wide along the wall; leave a hand either side
-	var need: float = spec.window_w + BUTTRESS_FACE + 0.4
-	for i in range(n - 1):
-		var a: float = nave_buttress_z(spec, i, n)
-		var b: float = nave_buttress_z(spec, i + 1, n)
-		if b - a >= need:
-			out.append((a + b) * 0.5)
+	for opening in nave_bay_windows(spec):
+		out.append(float(opening["z"]))
 	return out
 
 
@@ -755,13 +744,188 @@ static func nave_support_zs(spec: ChurchSpec) -> Array[float]:
 	if spec.buttresses and spec.buttress_count_per_side >= 2:
 		for i in range(spec.buttress_count_per_side):
 			out.append(nave_buttress_z(spec, i, spec.buttress_count_per_side))
+	else:
+		var span: Vector2 = aisle_z_range(spec)
+		var bays: int = maxi(int((span.y - span.x) / 4.8), 1)
+		for i in range(bays + 1):
+			out.append(lerpf(span.x + 0.55, span.y - 0.55,
+				float(i) / float(bays)))
+	var has_crossing_roof: bool = spec.dome or spec.crossing_tower \
+		or spec.hero in [&"hagia", &"florence", &"basil"]
+	var supported: Array[float] = []
+	var center: float = crossing_center_z(spec)
+	var half: float = crossing_bay_depth(spec) * 0.5
+	for z in out:
+		if not has_crossing_roof or z < center - half - 0.05 \
+				or z > center + half + 0.05:
+			supported.append(z)
+	# Buttress layouts can start well inside the west tower because their
+	# historic spacing formula includes the tower width twice. Give the nave a
+	# real end bearing from the measured tower footprint (and a matching east
+	# return) so compact churches still have a supported lower-light bay.
+	var side_start: float = -spec.length * 0.5 + 0.55
+	if spec.tower:
+		side_start = tower_aabb(spec).end.z + 0.4
+	var side_end: float = spec.length * 0.5 - 0.55
+	if spec.transept:
+		side_end = minf(side_end, transept_front_z(spec) - 0.4)
+	elif spec.apse:
+		side_end = minf(side_end, apse_springing_z(spec) - 0.4)
+	var perimeter_stations: Array[float] = [side_start, side_end]
+	if has_crossing_roof:
+		perimeter_stations.append(center - half - 0.05)
+		perimeter_stations.append(center + half + 0.05)
+	for perimeter_z in perimeter_stations:
+		if perimeter_z < side_start or perimeter_z > side_end:
+			continue
+		if has_crossing_roof and perimeter_z > center - half + 0.05 \
+				and perimeter_z < center + half - 0.05:
+			continue
+		var separated: bool = true
+		for station in supported:
+			if absf(station - perimeter_z) < 0.85:
+				separated = false
+				break
+		if separated:
+			supported.append(perimeter_z)
+	supported.sort()
+	return supported
+
+
+## One lower nave light per supported bay. The same support stations frame the
+## opening and the interior rib, so its position and clear size cannot drift
+## onto a pier when bay spacing changes. The wall remains a real through-cut.
+static func nave_bay_windows(spec: ChurchSpec) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var supports := nave_support_zs(spec)
+	if supports.size() < 2:
 		return out
-	var span: Vector2 = aisle_z_range(spec)
-	var bays: int = maxi(int((span.y - span.x) / 4.8), 1)
-	for i in range(bays + 1):
-		out.append(lerpf(span.x + 0.55, span.y - 0.55,
-			float(i) / float(bays)))
+	var clear_height: float = maxf(spec.height - 1.6, 0.0)
+	var sill: float = 1.0
+	var target_height: float = 2.0
+	var minimum_width: float = 1.25
+	match spec.style:
+		&"romanesque":
+			sill = 1.05
+			target_height = maxf(2.0, minf(spec.height * 0.24, 2.8))
+			minimum_width = 1.45
+		&"gothic":
+			sill = 1.25
+			target_height = maxf(2.6, minf(spec.height * 0.30, 4.0))
+			minimum_width = 1.3
+		&"byzantine":
+			sill = 1.1
+			target_height = maxf(2.1, minf(spec.height * 0.23, 3.4))
+			minimum_width = 1.45
+		&"nordic_stave":
+			sill = 0.95
+			target_height = maxf(1.7, minf(spec.height * 0.22, 2.4))
+			minimum_width = 1.1
+		&"renaissance":
+			sill = 1.15
+			target_height = maxf(2.2, minf(spec.height * 0.23, 3.2))
+			minimum_width = 1.4
+		&"russian":
+			sill = 1.05
+			target_height = maxf(2.0, minf(spec.height * 0.22, 3.4))
+			minimum_width = 1.4
+	var opening_height: float = minf(maxf(spec.window_h, target_height), clear_height)
+	if opening_height < 1.4:
+		return out
+	sill = minf(sill, maxf(spec.height - opening_height - 0.6, 0.0))
+	var support_width: float = maxf(BUTTRESS_FACE, nave_pier_width(spec))
+	for i in range(supports.size() - 1):
+		var left: float = supports[i]
+		var right: float = supports[i + 1]
+		if _nave_bay_intersects_crossing(spec, left, right):
+			continue
+		var pitch: float = right - left
+		# Leave masonry around both the bearing width and the window reveal.
+		var reveal_allowance: float = 0.30 if pitch < 2.7 else 0.48
+		var usable: float = pitch - support_width - reveal_allowance
+		if usable < 0.9:
+			continue
+		var opening_width: float = minf(maxf(spec.window_w, minimum_width), usable * 0.72)
+		if opening_width < 0.8:
+			continue
+		out.append({"z": (left + right) * 0.5, "width": opening_width,
+			"height": opening_height, "y": sill + opening_height * 0.5,
+			"style": spec.window_style, "support_left": left,
+			"support_right": right})
 	return out
+
+
+## Cross-wall support section by construction grammar. These are native bearing
+## proportions: heavy Romanesque/Byzantine/Russian piers, lighter Gothic and
+## Renaissance masonry, and compact timber posts for stave work.
+static func nave_pier_width(spec: ChurchSpec) -> float:
+	match spec.style:
+		&"romanesque": return clampf(spec.width * 0.085, 0.65, 1.0)
+		&"gothic": return clampf(spec.width * 0.060, 0.48, 0.72)
+		&"byzantine": return clampf(spec.width * 0.080, 0.68, 0.95)
+		&"nordic_stave": return clampf(spec.width * 0.070, 0.48, 0.70)
+		&"renaissance": return clampf(spec.width * 0.055, 0.46, 0.66)
+		&"russian": return clampf(spec.width * 0.075, 0.62, 0.90)
+	return clampf(spec.width * 0.065, 0.42, 0.78)
+
+
+static func nave_pier_projection(spec: ChurchSpec) -> float:
+	match spec.style:
+		&"romanesque": return clampf(spec.width * 0.040, 0.34, 0.52)
+		&"gothic": return clampf(spec.width * 0.030, 0.28, 0.40)
+		&"byzantine": return clampf(spec.width * 0.038, 0.34, 0.50)
+		&"nordic_stave": return clampf(spec.width * 0.032, 0.26, 0.38)
+		&"renaissance": return clampf(spec.width * 0.028, 0.25, 0.36)
+		&"russian": return clampf(spec.width * 0.036, 0.32, 0.48)
+	return 0.34
+
+
+## Lower lights in outer aisle walls follow the nave support stations. The
+## bounded height stays below the aisle roof, and the width leaves a real wall
+## pier on both sides. Hero landmarks retain their dedicated bay layouts.
+static func aisle_bay_windows(spec: ChurchSpec, ring: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var range_z: Vector2 = aisle_z_range(spec)
+	var supports := nave_support_zs(spec)
+	var stations: Array[float] = []
+	for z in supports:
+		if z > range_z.x + 0.2 and z < range_z.y - 0.2:
+			stations.append(z)
+	if stations.size() < 2:
+		return out
+	var height_wall: float = aisle_height(spec, ring)
+	var sill: float = maxf(0.75, height_wall * 0.12)
+	var target_height: float = minf(maxf(spec.window_h, 1.5), height_wall * 0.58)
+	if spec.style == &"gothic":
+		target_height = minf(maxf(spec.window_h, height_wall * 0.60), height_wall * 0.68)
+	elif spec.style == &"nordic_stave":
+		target_height = minf(maxf(spec.window_h, 1.6), height_wall * 0.50)
+	var opening_height: float = minf(target_height, height_wall - sill - 0.35)
+	if opening_height < 0.8:
+		return out
+	for i in range(stations.size() - 1):
+		if _nave_bay_intersects_crossing(spec, stations[i], stations[i + 1]):
+			continue
+		var pitch: float = stations[i + 1] - stations[i]
+		var width: float = minf(maxf(spec.window_w, 1.1),
+			(pitch - maxf(BUTTRESS_FACE, nave_pier_width(spec)) - 0.48) * 0.72)
+		if width < 0.75:
+			continue
+		out.append({"z": (stations[i] + stations[i + 1]) * 0.5,
+			"width": width, "height": opening_height,
+			"y": sill + opening_height * 0.5, "style": spec.window_style})
+	return out
+
+
+static func _nave_bay_intersects_crossing(spec: ChurchSpec, left: float,
+		right: float) -> bool:
+	var has_crossing_roof: bool = spec.dome or spec.crossing_tower \
+		or spec.hero in [&"hagia", &"florence", &"basil"]
+	if not has_crossing_roof:
+		return false
+	var center: float = crossing_center_z(spec)
+	var half: float = crossing_bay_depth(spec) * 0.5
+	return left < center + half - 0.05 and right > center - half + 0.05
 
 
 ## A nave buttress's width along the wall (ChurchBuilder emits it at this).

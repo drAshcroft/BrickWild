@@ -18,6 +18,7 @@ func _init() -> void:
 		_check_sealed_east_wall_negative(church_style)
 		_check_compact_church_route(church_style)
 		_check_dome_frame_exemption(church_style)
+	_check_representative_nave_elevations()
 	_check_string_course_perimeters()
 	active_case = "ambulatory annular shell, roof and paving"
 	_check_ambulatory_architecture()
@@ -31,6 +32,245 @@ func _init() -> void:
 		push_error(failure)
 	print("sacred structural fixture: %d failures" % failures.size())
 	quit(1 if not failures.is_empty() else 0)
+
+
+## Fixed public requests from the reviewed six-style image set. These are the
+## actual requested footprints and seeds, not aliases for sweep indices.
+func _check_representative_nave_elevations() -> void:
+	var cases: Array[Dictionary] = [
+		{"style": &"romanesque", "width": 8.0, "length": 14.0, "height": 7.0, "seed": 1},
+		{"style": &"gothic", "width": 10.0, "length": 22.0, "height": 12.0, "seed": 8102},
+		{"style": &"byzantine", "width": 16.0, "length": 48.0, "height": 24.0, "seed": 21325},
+		{"style": &"nordic_stave", "width": 8.0, "length": 14.0, "height": 7.0, "seed": 8102},
+		{"style": &"renaissance", "width": 10.0, "length": 22.0, "height": 12.0, "seed": 21325},
+		{"style": &"russian", "width": 16.0, "length": 48.0, "height": 24.0, "seed": 1},
+	]
+	for row in cases:
+		var spec := ChurchSpec.new()
+		spec.style = row.style
+		spec.width = row.width
+		spec.length = row.length
+		spec.height = row.height
+		ChurchGenerator.generate(spec, int(row.seed))
+		active_case = "nave elevation style=%s size=%.0fx%.0fx%.0f seed=%d aisles=%d" % [
+			String(spec.style), spec.width, spec.length, spec.height, spec.seed, spec.aisles]
+		var builder := ChurchBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		_check_nave_supports(mesh, builder, spec)
+		_check_nave_elevation_openings(mesh, builder, spec)
+
+
+func _check_nave_supports(mesh: ArrayMesh, builder: ChurchBuilder,
+		spec: ChurchSpec) -> void:
+	var rows: Array[Dictionary] = []
+	var buttress_rows: Array[Dictionary] = []
+	for row in builder.component_log:
+		var role: String = String(row.get("role", ""))
+		var host_name: String = String(row.get("host", ""))
+		if role == "nave_exterior_pier":
+			rows.append(row)
+		elif role == "shaft_0" and (host_name.begins_with("nave_left_") \
+				or host_name.begins_with("nave_right_")):
+			buttress_rows.append(row)
+	var supports := ChurchGeometry.nave_support_zs(spec)
+	if supports.is_empty():
+		_fail("no nave support stations supplied to the elevation")
+	var verified_support_rows: Array[Dictionary] = []
+	for z in supports:
+		for side in [-1.0, 1.0]:
+			var matches: Array[Dictionary] = []
+			for row in rows + buttress_rows:
+				var xf: Transform3D = row.xf
+				if absf(xf.origin.z - z) <= 0.001 and signf(xf.origin.x) == side:
+					matches.append(row)
+			if matches.size() != 1:
+				_fail("support station z=%.3f side=%.0f has %d exterior bearings, expected one" % [
+					z, side, matches.size()])
+			else:
+				verified_support_rows.append(matches[0])
+	if verified_support_rows.size() != supports.size() * 2:
+		return
+	for row in verified_support_rows:
+		var expected_surface: int = ChurchBuilder.SURF_STONE
+		if String(row.get("role", "")) == "nave_exterior_pier" \
+				and spec.style == &"nordic_stave":
+			expected_surface = ChurchBuilder.SURF_WOOD
+		if int(row.surface) != expected_surface:
+			_fail("%s uses logical slot %d, expected %d" % [
+				row.id, int(row.surface), expected_surface])
+		var row_surface: int = _logical_mesh_surface(mesh, expected_surface)
+		if row_surface < 0:
+			_fail("nave support material slot %d is empty" % int(row.surface))
+			continue
+		var bounds: AABB = MassBuilder.component_aabb(row)
+		if String(row.get("role", "")) == "nave_exterior_pier" \
+				and absf(bounds.position.y - ChurchGeometry.FLOOR_LIFT) > 0.02:
+			_fail("%s foot does not meet the nave floor" % row.id)
+		if String(row.get("role", "")) == "nave_exterior_pier":
+			var expected_width: float = ChurchGeometry.nave_pier_width(spec)
+			var expected_projection: float = ChurchGeometry.nave_pier_projection(spec) * 0.65
+			if absf(float(row.size.z) - expected_width) > 0.001 \
+					or absf(float(row.size.x) - expected_projection) > 0.001:
+				_fail("%s does not use the %s structural section" % [row.id, spec.style])
+		elif absf(float(row.size.z) - ChurchGeometry.BUTTRESS_FACE) > 0.001:
+			_fail("%s lost the existing stepped-buttress face width" % row.id)
+		_check_support_component_removal(mesh, row, row_surface, spec)
+
+
+func _check_support_component_removal(mesh: ArrayMesh, row: Dictionary,
+		surface: int, spec: ChurchSpec) -> void:
+	var label: String = String(row.get("id", "nave support"))
+	_check_components_emitted(mesh, [row], label)
+	var expected_kit := MeshKit.new(1)
+	expected_kit.oriented_box(Vector3(row["size"]), row["xf"], 0)
+	var expected_mesh: ArrayMesh = expected_kit.commit()
+	var expected_counts: Dictionary = ComponentCheck.triangle_counts(
+		_surface_vertex_soup(expected_mesh, 0))
+	var before_counts: Dictionary = ComponentCheck.triangle_counts(
+		_surface_vertex_soup(mesh, surface))
+	var expected_total: int = 0
+	for key in expected_counts:
+		var count: int = int(expected_counts[key])
+		expected_total += count
+		if int(before_counts.get(key, 0)) < count:
+			_fail("%s exact emitted triangle multiset is absent before removal" % label)
+			return
+	if expected_total != 12:
+		_fail("%s box control expected 12 triangles, got %d" % [label, expected_total])
+		return
+	var bounds: AABB = MassBuilder.component_aabb(row).grow(0.01)
+	var component_xf: Transform3D = row["xf"]
+	var side: float = signf(component_xf.origin.x)
+	var wall_plane: float = side * spec.width * 0.5
+	var wall_key: String = ""
+	for triangle in MeshProbe.surface_triangles(null, mesh, surface):
+		var a: Vector3 = triangle[0]
+		var b: Vector3 = triangle[1]
+		var c: Vector3 = triangle[2]
+		var key: String = ComponentCheck.triangle_key(
+			a, b, c)
+		if expected_counts.has(key):
+			continue
+		var low_y: float = minf(a.y, minf(b.y, c.y))
+		var high_y: float = maxf(a.y, maxf(b.y, c.y))
+		var low_z: float = minf(a.z, minf(b.z, c.z))
+		var high_z: float = maxf(a.z, maxf(b.z, c.z))
+		var lies_on_wall: bool = absf(a.x - wall_plane) <= 0.0001 \
+			and absf(b.x - wall_plane) <= 0.0001 \
+			and absf(c.x - wall_plane) <= 0.0001
+		var overlaps_support_projection: bool = high_y >= bounds.position.y \
+			and low_y <= bounds.end.y and high_z >= bounds.position.z \
+			and low_z <= bounds.end.z
+		if lies_on_wall and overlaps_support_projection:
+			wall_key = key
+			break
+	if wall_key.is_empty():
+		_fail("%s has no distinct nave-wall triangle in its local control region" % label)
+		return
+	var remaining_counts: Dictionary = expected_counts.duplicate()
+	var removed := MeshProbe.remove_triangles(mesh, surface,
+		func(a: Vector3, b: Vector3, c: Vector3) -> bool:
+			var key: String = ComponentCheck.triangle_key(a, b, c)
+			var count: int = int(remaining_counts.get(key, 0))
+			if count <= 0:
+				return false
+			remaining_counts[key] = count - 1
+			return true)
+	if int(removed.get("removed_triangles", 0)) != expected_total:
+		_fail("%s mutation removed %d triangles, expected exactly %d" % [
+			label, int(removed.get("removed_triangles", 0)), expected_total])
+		return
+	for key in remaining_counts:
+		if int(remaining_counts[key]) != 0:
+			_fail("%s component triangle occurrence was not removed" % label)
+			return
+	var after_counts: Dictionary = ComponentCheck.triangle_counts(
+		_surface_vertex_soup(removed.mesh as ArrayMesh, surface))
+	for key in expected_counts:
+		var expected_after: int = int(before_counts.get(key, 0)) - int(expected_counts[key])
+		if int(after_counts.get(key, 0)) != expected_after:
+			_fail("%s exact triangle count after mutation differs for %s" % [label, key])
+			return
+	if int(after_counts.get(wall_key, 0)) != int(before_counts.get(wall_key, 0)):
+		_fail("%s component removal also removed the separate nave-wall triangle" % label)
+
+
+func _check_nave_elevation_openings(mesh: ArrayMesh, builder: ChurchBuilder,
+		spec: ChurchSpec) -> void:
+	var cases: Array[Dictionary] = []
+	if spec.aisles == 0 and spec.hero != &"basil":
+		for opening in ChurchGeometry.nave_bay_windows(spec):
+			for side in [-1.0, 1.0]:
+				cases.append({"pos": Vector3(side * (spec.width * 0.5
+					+ ChurchGeometry.OPENING_EPS), opening.y, opening.z),
+					"face": side * PI * 0.5, "opening": opening})
+	elif spec.aisles > 0 and not ChurchGeometry.hero_bays(spec):
+		var ring: int = spec.aisles - 1
+		for opening in ChurchGeometry.aisle_bay_windows(spec, ring):
+			for side in [-1.0, 1.0]:
+				var aisle: AABB = ChurchGeometry.aisle_aabb(spec, side, ring)
+				var x: float = aisle.end.x + ChurchGeometry.OPENING_EPS \
+					if side > 0.0 else aisle.position.x - ChurchGeometry.OPENING_EPS
+				cases.append({"pos": Vector3(x, opening.y, opening.z),
+					"face": side * PI * 0.5, "opening": opening})
+	elif spec.aisles > 0:
+		for opening in ChurchGeometry.hero_aisle_windows(spec):
+			for side in [-1.0, 1.0]:
+				var aisle: AABB = ChurchGeometry.aisle_aabb(spec, side, spec.aisles - 1)
+				var x: float = aisle.end.x + ChurchGeometry.OPENING_EPS \
+					if side > 0.0 else aisle.position.x - ChurchGeometry.OPENING_EPS
+				cases.append({"pos": Vector3(x, opening.y, opening.z),
+					"face": side * PI * 0.5, "opening": opening})
+	if cases.is_empty():
+		_fail("no lower nave/aisle bay lights were planned")
+		return
+	for index in range(cases.size()):
+		var case: Dictionary = cases[index]
+		var opening: Dictionary = case.opening
+		var pos: Vector3 = case.pos
+		var face: float = case.face
+		var aperture_result := SuiteResult.new("nave bay apertures")
+		ChurchApertures._check_opening(aperture_result, mesh, builder, pos, face,
+			float(opening.width), float(opening.height), "bay light %d" % index)
+		for message in aperture_result.failures:
+			_fail(message)
+		if opening.has("support_left"):
+			var edge_margin: float = float(opening.width) * 0.5
+			var support_half: float = ChurchGeometry.nave_pier_width(spec) * 0.5
+			if pos.z - edge_margin - float(opening.support_left) < support_half + 0.2 \
+					or float(opening.support_right) - (pos.z + edge_margin) < support_half + 0.2:
+				_fail("bay light %d intrudes on its measured support bearing" % index)
+		if index > 0:
+			continue
+		# Inject solid masonry into this real through-opening. The same clear-ray
+		# sample that passed on the emitted mesh must hit the inserted wall.
+		var wall_slot: int = ChurchBuilder.SURF_WOOD \
+			if spec.style == &"nordic_stave" else ChurchBuilder.SURF_STONE
+		var surface: int = _logical_mesh_surface(mesh, wall_slot)
+		if surface < 0:
+			_fail("wall surface for aperture negative control is missing")
+			continue
+		var plug_size: Vector3 = Vector3(0.8, opening.height * 0.68,
+			opening.width * 0.68)
+		var plug := AABB(pos - plug_size * 0.5, plug_size)
+		var mutated := MeshProbe.add_box(mesh, surface, plug)
+		if int(mutated.added_triangles) != 12:
+			_fail("could not inject actual wall into bay-light negative control")
+			continue
+		var basis := Basis(Vector3.UP, face)
+		var outward: Vector3 = basis * Vector3.FORWARD * -1.0
+		var clear: Vector3 = pos + basis * Vector3.RIGHT * (float(opening.width) * 0.22)
+		if ChurchApertures._first_hit(mutated.mesh as ArrayMesh,
+				clear + outward * 0.45, clear - outward * 0.75, true).is_empty():
+			_fail("actual-wall aperture negative control stayed clear")
+
+
+func _triangles_matching(mesh: ArrayMesh, surface: int, predicate: Callable) -> int:
+	var count := 0
+	for triangle in MeshProbe.surface_triangles(null, mesh, surface):
+		if bool(predicate.call(triangle[0], triangle[1], triangle[2])):
+			count += 1
+	return count
 
 
 func _check_string_course_perimeters() -> void:
@@ -1174,7 +1414,8 @@ func _check_components_emitted(mesh: ArrayMesh, rows: Array[Dictionary], label: 
 		if String(row.get("form", "")) != "box":
 			_fail("%s contains an unverified non-box component" % label)
 			return
-		var surface := int(row.get("surface", -1))
+		var logical_surface := int(row.get("surface", -1))
+		var surface: int = _logical_mesh_surface(mesh, logical_surface)
 		if surface < 0 or surface >= mesh.get_surface_count():
 			_fail("%s component names a missing mesh surface" % label)
 			return

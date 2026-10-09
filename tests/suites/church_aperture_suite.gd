@@ -127,9 +127,11 @@ static func run() -> SuiteResult:
 
 ## Walk-QA, Abbey Ivo pin 1: a nave buttress standing across a side window,
 ## glass showing either side of it. Every style at three sizes, and a control
-## that moves one window onto a buttress.
+## that moves one compatible window record onto its matching buttress.
 static func _windows_between_buttresses(res: SuiteResult) -> void:
 	var swept := 0
+	var negative_checked := false
+	var negative_caught := false
 	for style in TestSweep.styles():
 		for i in [0, 7, 14]:
 			var spec: ChurchSpec = TestSweep.spec_at(style, i)
@@ -139,20 +141,45 @@ static func _windows_between_buttresses(res: SuiteResult) -> void:
 			_expect(res, clashes.is_empty(), "%s/%d: %s" % [String(style), i, ", ".join(clashes)])
 			if clashes.is_empty() and builder.components("shaft_0").size() > 0:
 				swept += 1
-				if swept == 1:
-					# the control: one window moved onto the first nave buttress
-					var shaft: Dictionary = {}
-					for row in builder.component_log:
-						if String(row.role) == "shaft_0" and String(row.host).begins_with("nave_"):
-							shaft = row
+			if negative_checked or not clashes.is_empty():
+				continue
+			# This is a plan-ledger control: move an actual lower nave-window
+			# record, not mesh geometry. Select a same-side shaft whose real Y
+			# interval overlaps the opening, so the negative is physically relevant.
+			for shaft in builder.component_log:
+				if String(shaft.get("role", "")) != "shaft_0" \
+						or not String(shaft.get("host", "")).begins_with("nave_"):
+					continue
+				var shaft_bounds: AABB = MassBuilder.component_aabb(shaft)
+				for part in builder.part_log:
+					if part.get("kind") != "window" or part.get("tag") != "window":
+						continue
+					var part_pos: Vector3 = part["pos"]
+					var part_size: Vector3 = part["size"]
+					if signf(part_pos.x) != signf(shaft_bounds.get_center().x):
+						continue
+					var window_bottom: float = part_pos.y - part_size.y * 0.5
+					var window_top: float = part_pos.y + part_size.y * 0.5
+					if window_top <= shaft_bounds.position.y \
+							or window_bottom >= shaft_bounds.end.y:
+						continue
+					var moved_pos := Vector3(part_pos.x, part_pos.y,
+						shaft_bounds.get_center().z)
+					part["pos"] = moved_pos
+					var mutated_clashes := _bay_clashes(builder)
+					var same_pair_caught := false
+					for clash in mutated_clashes:
+						if String(clash).begins_with(String(shaft.get("host", "")) \
+								+ " stands across the window"):
+							same_pair_caught = true
 							break
-					for part in builder.part_log:
-						if part.get("kind") == "window" and part.get("tag") == "window" \
-								and signf(Vector3(part.pos).x) == signf(MassBuilder.component_aabb(shaft).get_center().x):
-							part.pos = Vector3(part.pos.x, part.pos.y, MassBuilder.component_aabb(shaft).get_center().z)
-							break
-					_expect(res, not _bay_clashes(builder).is_empty(),
-						"control: a window moved onto a buttress was not caught")
+					negative_checked = true
+					negative_caught = same_pair_caught
+					break
+				if negative_checked:
+					break
+	_expect(res, negative_checked and negative_caught,
+		"no actual compatible side-window/buttress pair was mutated and caught by the same clash predicate")
 	_expect(res, swept > 0, "no buttressed church in the sweep to test")
 
 
@@ -321,7 +348,7 @@ static func _check_opening(res: SuiteResult, mesh: ArrayMesh,
 			continue
 		if absf(float(part["size"].x) - width) > 0.001 \
 				or absf(float(part["size"].y) - height) > 0.001 \
-				or absf(float(part["rot_y"]) - face) > 0.001:
+				or absf(wrapf(float(part["rot_y"]) - face + PI, 0.0, TAU) - PI) > 0.001:
 			continue
 		matching += 1
 	_expect(res, matching == 1, "%s log differs from emitted aperture" % label)

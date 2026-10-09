@@ -58,10 +58,6 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		# Aisles fit BETWEEN the tower zone (west) and the transept crossing
 		# (east) so they never slice through either. Whether there is room is
 		# decided in ChurchGenerator: build() must not rewrite its own input.
-		var zr: Vector2 = ChurchGeometry.aisle_z_range(spec)
-		var az0: float = zr.x
-		var al: float = zr.y - zr.x
-		var az: float = (zr.x + zr.y) / 2.0
 		# One pair of aisles per ring: single for most, double for Notre-Dame,
 		# and the outer pair of Cologne's five-aisled section.
 		for ring in range(spec.aisles):
@@ -78,15 +74,18 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 							"width": bay_window.width, "height": bay_window.height,
 							"style": spec.window_style})
 				elif ring == spec.aisles - 1:
-					var nwin: int = int(al / 3.0)
-					for i in range(nwin):
-						var wz: float = az0 + al / float(nwin + 1) * (i + 1)
+					for bay_window in ChurchGeometry.aisle_bay_windows(spec, ring):
 						aisle_windows.append({"face": 1 if side > 0.0 else 3,
-							"u": wz, "y": ah * 0.5, "width": 0.7,
-							"height": ah * 0.33, "style": spec.window_style})
+							"u": bay_window.z, "y": bay_window.y,
+							"width": bay_window.width, "height": bay_window.height,
+							"style": bay_window.style})
 				_windowed_box_shell(aisle, aisle_windows, true, false)
 				_log_mass("aisle_%s_%d" % ["left" if side < 0.0 else "right", ring],
 					aisle)
+				# The outer-aisle wall keeps its bay lights, but this slice does not
+				# add another set of posts at the nave buttress stations. That would
+				# duplicate the existing support vocabulary without a separate load
+				# path or a verified non-overlapping outer-wall bearing.
 				# Only the OUTERMOST ring gets side windows. Every ring used to,
 				# so on a double-aisled church the inner ring's windows were cut
 				# into a wall the outer ring stands hard against -- glazing that
@@ -288,11 +287,11 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	# ---------- nave windows when there are no aisles ----------
 	tag("window")
 	if spec.aisles == 0 and spec.hero != &"basil":
-		for wz2 in ChurchGeometry.nave_window_zs(spec):
+		for bay_window in ChurchGeometry.nave_bay_windows(spec):
 			for sx_v in [-1.0, 1.0]:
-				window(Vector3(sx_v * (w / 2.0 + 0.02), h * 0.58, wz2),
-					sx_v * PI / 2.0, spec.window_w, spec.window_h,
-					spec.window_style, false, true)
+				window(Vector3(sx_v * (w / 2.0 + 0.02), bay_window.y, bay_window.z),
+					sx_v * PI / 2.0, bay_window.width, bay_window.height,
+					bay_window.style, false, true)
 
 	# ---------- rose window ----------
 	tag("facade")
@@ -578,11 +577,11 @@ func _nave_openings() -> Array[Dictionary]:
 				"width": opening.width, "height": opening.height,
 				"style": spec.window_style, "log": false})
 	if spec.aisles == 0 and spec.hero != &"basil":
-		for z in ChurchGeometry.nave_window_zs(spec):
+		for bay_window in ChurchGeometry.nave_bay_windows(spec):
 			for face in [1, 3]:
-				holes.append({"face": face, "u": z, "y": h * 0.58,
-					"width": spec.window_w, "height": spec.window_h,
-					"style": spec.window_style, "log": false})
+				holes.append({"face": face, "u": bay_window.z, "y": bay_window.y,
+					"width": bay_window.width, "height": bay_window.height,
+					"style": bay_window.style, "log": false})
 	for opening in _west_door_openings():
 		holes.append({"face": 2, "u": opening.pos.x,
 			"y": opening.pos.y, "width": opening.width,
@@ -737,18 +736,11 @@ func _build_nave_structure() -> void:
 	var crossing_half: float = ChurchGeometry.crossing_bay_depth(spec) * 0.5
 	var has_crossing_roof: bool = spec.dome or spec.crossing_tower \
 			or spec.hero in [&"hagia", &"florence", &"basil"]
-	if has_crossing_roof:
-		var outside: Array[float] = []
-		for z in zs:
-			if z < crossing_center - crossing_half - 0.05 \
-					or z > crossing_center + crossing_half + 0.05:
-				outside.append(z)
-		zs = outside
 	if zs.size() < 2:
 		return
 	var wall_inner: float = spec.width * 0.5 - NAVE_WALL_T
-	var pier_projection: float = 0.34
-	var pier_width: float = clampf(spec.width * 0.065, 0.42, 0.78)
+	var pier_projection: float = ChurchGeometry.nave_pier_projection(spec)
+	var pier_width: float = ChurchGeometry.nave_pier_width(spec)
 	var spring: float = _stave_eave_y() if spec.style == &"nordic_stave" \
 		else minf(spec.height * 0.72, spec.height - 1.4)
 	var rib_depth: float = clampf(spec.width * 0.045, 0.32, 0.58)
@@ -769,6 +761,17 @@ func _build_nave_structure() -> void:
 			var shaft_size := Vector3(pier_projection, shaft_h, pier_width)
 			var shaft_xf := Transform3D(Basis(), Vector3(x, floor_y + shaft_h / 2.0, z))
 			component_box("nave_engaged_pier", shaft_size, shaft_xf, pier_surface)
+			# Existing stepped buttresses own their exact stations. Perimeter
+			# returns added beside a crossing still need an exterior bearing, so
+			# test the emitted component log instead of the global style flag.
+			if not _has_nave_buttress_at(z):
+				var exterior_projection: float = pier_projection * 0.65
+				var exterior_x: float = side * (spec.width * 0.5
+					+ exterior_projection * 0.5 - 0.01)
+				var exterior_size := Vector3(exterior_projection, shaft_h, pier_width)
+				component_box("nave_exterior_pier", exterior_size,
+					Transform3D(Basis(), Vector3(exterior_x,
+						floor_y + shaft_h / 2.0, z)), pier_surface)
 			var cap_size := Vector3(pier_projection + 0.14, 0.32, pier_width + 0.2)
 			var cap_xf := Transform3D(Basis(), Vector3(x, spring, z))
 			component_box("nave_pier_capital", cap_size, cap_xf,
@@ -781,6 +784,19 @@ func _build_nave_structure() -> void:
 		host_end()
 		if spec.style == &"nordic_stave" and has_next and not crosses_roof_bay:
 			_build_stave_longitudinals(z, next_z, spring, rib_thickness, rib_depth)
+
+
+func _has_nave_buttress_at(z: float) -> bool:
+	if not spec.buttresses or spec.buttress_count_per_side < 2:
+		return false
+	# Nave structure is emitted before the buttress components. Determine
+	# ownership from the same pure station planner used by the later emitter.
+	for index in range(spec.buttress_count_per_side):
+		var planned_z: float = ChurchGeometry.nave_buttress_z(spec, index,
+			spec.buttress_count_per_side)
+		if absf(planned_z - z) <= 0.001:
+			return true
+	return false
 
 
 func _build_nave_arch(z: float, spring: float, thickness: float, depth: float,

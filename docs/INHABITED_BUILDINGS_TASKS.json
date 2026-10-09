@@ -364,6 +364,39 @@
         "file": "qa/mesh_probe.gd"
       },
       "aiNotes": "Root reviewed Luna implementation. Emitted split slabs at 1/11.67208/80m and translations through2km pass239checks native0/0.872s; same-point triangle removal and1mm outside controls retained. World mesh consumers43checks native0/53.142s; full sacred structural fixture0fail native0/54.257s. See visualqa/personality/MESH_SUPPORT_EDGE_REVIEW.md. No geometry moved; Rotunda and Witch acceptance remain open."
+    },
+    {
+      "key": "LIVE-SACRED-CHURCH-BAYS",
+      "title": "Compose church lights and supports around real structural bays",
+      "description": "Use real structural bay intervals for lower nave and outer aisle lights, with style-appropriate supports and no duplicate exterior bearings.",
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "complete",
+      "taskType": "impl",
+      "targetCoord": {
+        "file": "src/church/church_geometry.gd"
+      },
+      "dependsOn": [],
+      "acceptanceCriteria": "Preserve assertions and frozen requests; actual emitted pier and aperture negative controls, full sacred fixture, church-change lane, full bounded geometry coverage and root review of 18 original plus six vault renders. See visualqa/personality/CHURCH_BAYS_REVIEW.md. Does not complete sacred personality or the full 234-request matrix."
+    },
+    {
+      "key": "LIVE-SACRED-CHURCH-ARCADES",
+      "title": "Open supported arcades through every adjoining church aisle wall",
+      "description": "Reproduce actual nave-to-aisle and nested aisle barriers. Cut matching floor-reaching arch profiles through both adjoining shells while preserving real piers, crowns, floor continuity and crossing supports.",
+      "priority": "P1",
+      "phase": "inhabited-buildings",
+      "status": "pending",
+      "taskType": "impl",
+      "targetCoord": {
+        "file": "src/church/church_builder.gd"
+      },
+      "dependsOn": [
+        {
+          "key": "LIVE-SACRED-CHURCH-BAYS",
+          "type": "blocks"
+        }
+      ],
+      "acceptanceCriteria": "Actual body-height rays and routes through every interface; emitted wall-plug and removed-bearing negative controls; preserve crossing/dome, clerestory, chapel and hero behavior; applicable structural, church and geometry gates; root render review. Do not accept an opening in only one shell layer."
     }
   ]
 }
