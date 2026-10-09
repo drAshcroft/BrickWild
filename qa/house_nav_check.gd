@@ -144,9 +144,10 @@ func _rasterize() -> void:
 		if _grids.has(dl):
 			_grids[dl].add_step(_plan.dais_rect(), _plan.dais_rise())
 	for p in _plan.furniture:
-		if p.get("mounted", false) or p["host"] >= 0:
-			continue
-		if not PropCatalog.blocks_floor(p["key"]):
+		# A host index can mean "chair belongs with this table," not "this
+		# object is above the floor." Floor-blocking hosted seats still occupy
+		# their body rectangle; surface-mounted and elevated props do not.
+		if p.get("mounted", false) or not PropCatalog.blocks_floor(String(p["key"])):
 			continue
 		var level := HousePlan.record_storey(p)
 		if _grids.has(level):
@@ -321,7 +322,9 @@ func _check_use_zones() -> void:
 		var p: Dictionary = _plan.furniture[f]
 		if _world_shop_has_street_opening(int(p.get("room", -1))):
 			continue
-		if p.get("mounted", false) or p["host"] >= 0:
+		# Host is an ownership/association link. Use zones belong to floor props
+		# whether they are freestanding or assigned to a table/work surface.
+		if p.get("mounted", false) or not PropCatalog.blocks_floor(String(p["key"])):
 			continue
 		var zone: Rect2 = p["zone"]
 		if zone.size.x <= 0.0:

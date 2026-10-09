@@ -29,8 +29,12 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 	plan.hearth.erase("breast")
 	if HouseFurnishingRecipes.is_ordinary_house(plan):
 		_select_household_dining_room(plan)
+	# This whole-plan report is also the pre-room baseline for the first room.
+	# Each room returns the final report after any bounded local repair, so the
+	# next room does not recompute an unchanged before-room walk of the house.
+	var nav_report: Dictionary = HouseNavCheck.new().check(plan)
 	for i in range(plan.room_count()):
-		_furnish_room(plan, spec, i)
+		nav_report = _furnish_room(plan, spec, i, nav_report)
 	HouseFurnishRepair.relax(plan)
 	_audit_activity_groups(plan)
 
@@ -520,7 +524,8 @@ static func _household_seat_capacity(plan: HousePlan) -> int:
 	return clampi(sleeping_rooms * 2, 2, 8)
 
 
-static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
+static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
+		before_room_nav: Dictionary) -> Dictionary:
 	var kind: StringName = plan.kind_of(room)
 	var steps: Array = []
 	# A house with no room big enough to be a bedroom sleeps in its hall, which
@@ -760,7 +765,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
 		blocked.append(plan.dais_rect())
 	_ensure_seating(plan, room, blocked, zones, r)
 	_ensure_light(plan, room, r)
-	_keep_the_room_passable(plan, room, blocked, zones)
+	return _keep_the_room_passable(plan, room, blocked, zones, before_room_nav)
 
 
 ## Keep a walker's shoulder width clear around the bedside access strip before
@@ -799,18 +804,19 @@ static func _dais_closes_after(plan: HousePlan, room: int, steps: Array) -> int:
 
 ## Check the walking as each room is finished, not only at the end.
 ##
-## Everything furnished before this room was sound, so if the house has just
-## become unwalkable, it is this room that did it -- and the piece responsible
-## is one of the ones just put in. Catching it here is worth the walk: by the
-## time the whole house is furnished, working out which of forty pieces is the
-## problem costs far more, and the answer is worse, because the room has been
-## dressed around the offending piece since.
+## Compare the current report with the report taken before this room. If the
+## same failures were already present, do not strip this room to answer for an
+## earlier room. A clean-to-blocked transition still gets the bounded local
+## repair below; a genuinely worsened report remains eligible too.
 static func _keep_the_room_passable(plan: HousePlan, room: int,
-		blocked: Array[Rect2], zones: Array[Rect2]) -> void:
+		blocked: Array[Rect2], zones: Array[Rect2], before_room_nav: Dictionary = {}) -> Dictionary:
 	for attempt in range(3):
 		var rep: Dictionary = HouseNavCheck.new().check(plan)
 		if rep["ok"]:
-			return
+			return rep
+		if not bool(before_room_nav.get("ok", true)) \
+				and _same_nav_failure_identity(before_room_nav, rep):
+			return rep
 		var victim := -1
 		var best_area := 0.0
 		for f in plan.furniture_of(room):
@@ -825,7 +831,7 @@ static func _keep_the_room_passable(plan: HousePlan, room: int,
 				best_area = area
 				victim = f
 		if victim < 0:
-			return
+			return rep
 		var repair_indices := HouseFurnishRepair._repair_target_indices(plan, victim)
 		for ri in range(repair_indices.size() - 1, -1, -1):
 			var index: int = repair_indices[ri]
@@ -835,6 +841,23 @@ static func _keep_the_room_passable(plan: HousePlan, room: int,
 			zones.erase(plan.furniture[index]["zone"])
 			plan.furniture.remove_at(index)
 			HouseFurnishRepair.reindex_hosts(plan, index)
+	# The third attempt may have removed furniture. Return a report of that
+	# final plan state, never the report taken before its last mutation.
+	return HouseNavCheck.new().check(plan)
+
+
+## Failure identity includes the actual messages and affected room/item indices.
+## Counts alone can hide one old failure being replaced by a different one.
+static func _same_nav_failure_identity(a: Dictionary, b: Dictionary) -> bool:
+	return _sorted_nav_values(a.get("failures", [])) == _sorted_nav_values(b.get("failures", [])) \
+		and _sorted_nav_values(a.get("unreached_rooms", [])) == _sorted_nav_values(b.get("unreached_rooms", [])) \
+		and _sorted_nav_values(a.get("unreachable_items", [])) == _sorted_nav_values(b.get("unreachable_items", []))
+
+
+static func _sorted_nav_values(values: Array) -> Array:
+	var out: Array = values.duplicate()
+	out.sort()
+	return out
 
 
 ## A table with nothing to sit at it is a table nobody uses.
