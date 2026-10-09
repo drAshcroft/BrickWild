@@ -107,8 +107,8 @@
     ]
   },
   "scoped_candidate_comparisons": {
-    "images": 82,
-    "requests": 30,
+    "images": 93,
+    "requests": 31,
     "scope": "Reviewed experimental candidates; no whole-style acceptance. Physical fixtures and production promotion are separate.",
     "cohorts": [
       {
@@ -182,6 +182,15 @@
         "all_images_opened": true,
         "design_status": "needs_changes",
         "source_manifest_sha256": "908aa660374015b021502150fae77a308a6980e0eef59f4d4d342d27b0ebe46a"
+      },
+      {
+        "style": "townhouse",
+        "run": "nav_inventory_restart56",
+        "review": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/assistant_review.json",
+        "images": 11,
+        "all_images_opened": true,
+        "design_status": "needs_changes",
+        "source_manifest_sha256": "8c91456760995e8a5df14d90ce0732d5082029c5b797fb1209d46fa067b88091"
       }
     ]
   }

@@ -1,0 +1,78 @@
+{
+  "reviewer": "root assistant; all eleven actual views opened directly",
+  "human_rating": null,
+  "reviewed_images": 11,
+  "all_images_opened": true,
+  "design_status": "needs_changes",
+  "candidate_design_accepted": false,
+  "source_manifest_sha256": "8c91456760995e8a5df14d90ce0732d5082029c5b797fb1209d46fa067b88091",
+  "render_receipt": {
+    "script": "res://tools/render_nav_inventory_townhouse.gd",
+    "args": [
+      "--path",
+      "C:/Projects/BrickWild/artifacts/personality/resumed/nav_head_gate_project",
+      "--log-file",
+      "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart57_nav_inventory_render\\godot.log",
+      "--script",
+      "res://tools/render_nav_inventory_townhouse.gd"
+    ],
+    "native_exit": 0,
+    "seconds": 32.224,
+    "invalid": null
+  },
+  "navigation_and_house_qa": "full exact-case findings retained in original manifest; renderer success is not building QA success",
+  "findings": [
+    "Storage and lights are retained in the measured assembled inventory, but portraits do not expose every cupboard or sconce. Objects outside the frame must not be reported absent.",
+    "Eight bedroom portraits remain bare repetitions of a bed, distant bedside furniture and isolated storage. They fail the inhabited room-composition brief despite retaining useful inventory.",
+    "Room9 cupboard stands free near the bed foot and dominates its portrait. Its original against-wall warning remains in the native report.",
+    "Room1 parlour has lost its unusable dining group; the visible portrait is an empty corner with one sconce. This is a recorded local compromise, not a satisfactory furnished room.",
+    "The upper-storey overview shows a very broad shared room with one table and repeated sleeping cells. It lacks the narrow stacked Townhouse hierarchy of the reference.",
+    "Both roof-off overviews keep both storeys in the scene; the upper floor occludes the lower plan. They do not prove every ground-floor route or stair headroom."
+  ],
+  "images": [
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/rooms/room_inventory_bedroom_10.jpg",
+      "sha256": "6f5c3f32c3ec8d6dd27a460df197c66bb406b205342b0a999137ea79420029c4"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/rooms/room_inventory_bedroom_11.jpg",
+      "sha256": "efcf0166308f99991e73c44b6524453dd998ab93540d7d4c0a484c5a41fdfb0c"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/rooms/room_inventory_bedroom_12.jpg",
+      "sha256": "11e988cae137728e3b21b628e03add96ff14825db79d1343d9f7f8ae040d3c56"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/rooms/room_inventory_bedroom_13.jpg",
+      "sha256": "ba4b1cb43525758ccb5689e81369e303be6fb7aa0d21cbcf9947e6be0b63619a"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/rooms/room_inventory_bedroom_4.jpg",
+      "sha256": "71fb57943425345dc15622e768f06448558c63a03310d0b6cecc0fa9e359cc83"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/rooms/room_inventory_bedroom_5.jpg",
+      "sha256": "2b1af8ae933446ab363464c0cfb08079be8594e480f0279c3163731ab49ec53f"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/rooms/room_inventory_bedroom_8.jpg",
+      "sha256": "367223219f906da954fc05ad550ffee5080437bb16ee6f0dc4ac873fee487571"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/rooms/room_inventory_bedroom_9.jpg",
+      "sha256": "8802cf18afed9091d5b9cfeecf290f23d13f3c15b06f01002f1b71349a81effe"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/rooms/room_inventory_parlour_1.jpg",
+      "sha256": "9351ed4500ebd08643041d6606f3c859a31d2b7b268ff35be7c1d29e3e7f4494"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/views/roof_off_all_levels_high_angle.jpg",
+      "sha256": "8f155afd4ac2099b98d4f81a700cfcd5a08f626fcd5eebd953309461c94d77ba"
+    },
+    {
+      "image": "visualqa/styles/house/townhouse/renders/nav_inventory_restart56/townhouse_innkeeper_32102_13x16_h2_9_storeys2/views/roof_off_all_levels_overhead.jpg",
+      "sha256": "8f5e7ca3fde83d502a4aff7181f70f652e5aadcad23c3a7b654376e08e1bc45e"
+    }
+  ]
+}

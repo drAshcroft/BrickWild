@@ -1,0 +1,17 @@
+{
+	"enclosure": "none",
+	"height": 2.8999999999999999,
+	"kind": "house",
+	"length": 16.0,
+	"material": "timber",
+	"orientation": 0.0,
+	"period": 1200,
+	"purpose": "innkeeper",
+	"schema": "brickwild.request",
+	"schema_version": 1,
+	"seed": "32102",
+	"storeys": 2,
+	"style": "townhouse",
+	"water": "none",
+	"width": 13.0
+}

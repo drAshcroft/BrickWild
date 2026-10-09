@@ -1,0 +1,14 @@
+{
+  "script": "res://tools/render_nav_inventory_townhouse.gd",
+  "args": [
+    "--path",
+    "C:/Projects/BrickWild/artifacts/personality/resumed/nav_head_gate_project",
+    "--log-file",
+    "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart57_nav_inventory_render\\godot.log",
+    "--script",
+    "res://tools/render_nav_inventory_townhouse.gd"
+  ],
+  "native_exit": 0,
+  "seconds": 32.224,
+  "invalid": null
+}
