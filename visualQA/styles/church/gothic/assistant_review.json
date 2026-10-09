@@ -1,0 +1,123 @@
+{
+  "task": "LIVE-CHAPEL-PASSAGE",
+  "scope": "physical connection and supported floor only",
+  "physical_status": "accepted",
+  "building_design_status": "needs_changes",
+  "human_rating": null,
+  "findings": [
+    "Continuous mouth and floor visible in both requests.",
+    "Plain rectangular heads, bare chapels and roof silhouette remain broader design defects."
+  ],
+  "runs": [
+    {
+      "run": "chapel_passage_restart22",
+      "manifest_sha256": "c9a14dd190e77526802e484c262b7c7431733dbc575b43c3bfa330a960a0ff9c",
+      "images": [
+        {
+          "path": "renders/chapel_passage_restart22/groups/gothic_chevet/requests/generated_gothic_seed5001/rooms/ambulatory_eye_toward_chapel_mouth.png",
+          "sha256": "f6f13f9fbe2595ce464e469da6572bc2db9b568f5bed7df2f005b7f11a9e5ebc"
+        },
+        {
+          "path": "renders/chapel_passage_restart22/groups/gothic_chevet/requests/generated_gothic_seed5001/rooms/chapel_eye_back_toward_mouth.png",
+          "sha256": "cb655ef562ab07f32d90d7a478e5ad765d0fedbeba140f52374da1448c0a336c"
+        },
+        {
+          "path": "renders/chapel_passage_restart22/groups/gothic_chevet/requests/generated_gothic_seed5001/views/east_3q_context.png",
+          "sha256": "4448a801e2071c07ee549de707b1d432c77b5732dc1260f3b70c6fc7db399d4a"
+        },
+        {
+          "path": "renders/chapel_passage_restart22/groups/gothic_chevet/requests/chartres_seed5003/rooms/ambulatory_eye_toward_chapel_mouth.png",
+          "sha256": "125595bca49bc94eb3d6a2e43ea4a79f5664d3ca0b14341adabe013f2321eda2"
+        },
+        {
+          "path": "renders/chapel_passage_restart22/groups/gothic_chevet/requests/chartres_seed5003/rooms/chapel_eye_back_toward_mouth.png",
+          "sha256": "5b6832eccf4b062963cecd3d5d8d2af28b688b30b5e0eefa763d35c183b1cb98"
+        },
+        {
+          "path": "renders/chapel_passage_restart22/groups/gothic_chevet/requests/chartres_seed5003/views/east_3q_context.png",
+          "sha256": "b549437db90447f551b99e5a3254b07bab9c331146c7521494641e545c07e571"
+        }
+      ]
+    },
+    {
+      "run": "chapel_passage_HEAD_restart23",
+      "manifest_sha256": "91a2b910667f5c57b6c92f8b8c8bbeea6b2b4135a85f5c25040b8d4c9cabef6b",
+      "images": [
+        {
+          "path": "renders/chapel_passage_HEAD_restart23/groups/gothic_chevet/requests/generated_gothic_seed5001/rooms/ambulatory_eye_toward_chapel_mouth.png",
+          "sha256": "f6f13f9fbe2595ce464e469da6572bc2db9b568f5bed7df2f005b7f11a9e5ebc"
+        },
+        {
+          "path": "renders/chapel_passage_HEAD_restart23/groups/gothic_chevet/requests/generated_gothic_seed5001/rooms/chapel_eye_back_toward_mouth.png",
+          "sha256": "cb655ef562ab07f32d90d7a478e5ad765d0fedbeba140f52374da1448c0a336c"
+        },
+        {
+          "path": "renders/chapel_passage_HEAD_restart23/groups/gothic_chevet/requests/generated_gothic_seed5001/views/east_3q_context.png",
+          "sha256": "4448a801e2071c07ee549de707b1d432c77b5732dc1260f3b70c6fc7db399d4a"
+        },
+        {
+          "path": "renders/chapel_passage_HEAD_restart23/groups/gothic_chevet/requests/chartres_seed5003/rooms/ambulatory_eye_toward_chapel_mouth.png",
+          "sha256": "125595bca49bc94eb3d6a2e43ea4a79f5664d3ca0b14341adabe013f2321eda2"
+        },
+        {
+          "path": "renders/chapel_passage_HEAD_restart23/groups/gothic_chevet/requests/chartres_seed5003/rooms/chapel_eye_back_toward_mouth.png",
+          "sha256": "5b6832eccf4b062963cecd3d5d8d2af28b688b30b5e0eefa763d35c183b1cb98"
+        },
+        {
+          "path": "renders/chapel_passage_HEAD_restart23/groups/gothic_chevet/requests/chartres_seed5003/views/east_3q_context.png",
+          "sha256": "e34887507322621dae3695b92807abeaaffc2ed41b92690437098d53c6e61544"
+        }
+      ]
+    }
+  ],
+  "isolated_receipts": [
+    {
+      "script": "res://tests/chapel_passage_test.gd",
+      "args": [
+        "--headless",
+        "--path",
+        "C:/Projects/BrickWild/artifacts/personality/resumed/domestic_hearth_gate_project",
+        "--log-file",
+        "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_chapel_isolated_HEAD\\godot.log",
+        "--script",
+        "res://tests/chapel_passage_test.gd"
+      ],
+      "native_exit": 0,
+      "seconds": 10.305,
+      "invalid": null
+    },
+    {
+      "script": "res://tests/run_all.gd",
+      "args": [
+        "--headless",
+        "--path",
+        "C:/Projects/BrickWild/artifacts/personality/resumed/domestic_hearth_gate_project",
+        "--log-file",
+        "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_chapel_isolated_church_change\\godot.log",
+        "--script",
+        "res://tests/run_all.gd",
+        "--",
+        "lane:church-change"
+      ],
+      "native_exit": 0,
+      "seconds": 19.943,
+      "invalid": null
+    },
+    {
+      "script": "res://tools/render_chapel_passage_review.gd",
+      "args": [
+        "--path",
+        "C:/Projects/BrickWild/artifacts/personality/resumed/domestic_hearth_gate_project",
+        "--log-file",
+        "C:\\Projects\\BrickWild\\artifacts\\personality\\resumed\\restart23_chapel_isolated_render\\godot.log",
+        "--script",
+        "res://tools/render_chapel_passage_review.gd",
+        "--",
+        "--out=res://visualqa/styles/church/gothic/renders/chapel_passage_HEAD_restart23"
+      ],
+      "native_exit": 0,
+      "seconds": 12.239,
+      "invalid": null
+    }
+  ]
+}

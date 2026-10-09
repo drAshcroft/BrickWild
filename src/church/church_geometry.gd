@@ -613,6 +613,22 @@ static func chapel_arc_start(spec: ChurchSpec, i: int) -> float:
 	return -chapel_angle(spec, i)
 
 
+## Physical mouth shared by the ambulatory wall cut and its threshold floor.
+static func chapel_mouth_width(spec: ChurchSpec, i: int) -> float:
+	return minf(1.25, spec.chapel_radius * 1.5)
+
+
+static func chapel_mouth_height(spec: ChurchSpec, i: int) -> float:
+	return minf(2.1, chapel_body_height(spec, i) * 0.7)
+
+
+## Angular half-width at the actual inner face of the segmented ring.
+static func chapel_mouth_half_angle(spec: ChurchSpec, i: int, wall_radius: float) -> float:
+	var radius: float = maxf(wall_radius, 0.01)
+	var ratio: float = clampf(chapel_mouth_width(spec, i) * 0.5 / radius, 0.0, 0.95)
+	return asin(ratio)
+
+
 ## True AABB of the half-drum, sampled around its arc. A full 2r box would
 ## overstate it inward and read as colliding with the mass it opens off.
 static func chapel_aabb(spec: ChurchSpec, i: int) -> AABB:

@@ -961,15 +961,22 @@ func _build_ambulatory_and_chapels() -> void:
 		return
 	tag("chapel")
 	var chr_r: float = spec.chapel_radius
+	var connected_cuts: Array[Dictionary] = _ambulatory_chapel_cuts(
+		ChurchGeometry.ambulatory_radius(spec) - NAVE_WALL_T,
+		spec.height * ChurchGeometry.AISLE_HEIGHT_RATIO)
 	for i in range(spec.radiating_chapels):
 		var c: Vector3 = ChurchGeometry.chapel_center(spec, i)
 		var a: float = ChurchGeometry.chapel_angle(spec, i)
 		var chh: float = ChurchGeometry.chapel_body_height(spec, i)
 		var domed: bool = spec.hero == &"basil"
+		var has_connected_mouth := false
+		for cut in connected_cuts:
+			if int(cut["index"]) == i:
+				has_connected_mouth = true
 		# each alcove is a little apse in its own right, facing outward
 		_arc_window_shell(Vector3(c.x, 0.0, c.z), chr_r, chh, 7, PI,
 			ChurchGeometry.chapel_arc_start(spec, i), [a], 0.6,
-			chh * 0.4, chh * 0.45, spec.window_style, domed)
+			chh * 0.4, chh * 0.45, spec.window_style, domed, has_connected_mouth)
 		_log_mass("chapel_%d" % i, ChurchGeometry.chapel_aabb(spec, i))
 		if domed:
 			_basil_chapel_tower(i)
@@ -989,6 +996,7 @@ func _build_ambulatory_ring(cy: float) -> void:
 	var roof_inner: float = ChurchGeometry.ambulatory_roof_inner_radius(spec)
 	var wall_inner: float = outer_radius - NAVE_WALL_T
 	var height: float = spec.height * ChurchGeometry.AISLE_HEIGHT_RATIO
+	var chapel_cuts: Array[Dictionary] = _ambulatory_chapel_cuts(wall_inner, height)
 	var segments := 20
 	var origin := Vector3(0.0, 0.0, cy)
 	var stone := _kit.surface(SURF_STONE)
@@ -1002,11 +1010,8 @@ func _build_ambulatory_ring(cy: float) -> void:
 		var o1 := origin + Vector3(cos(a1) * outer_radius, 0.0, sin(a1) * outer_radius)
 		var i0 := origin + Vector3(cos(a0) * wall_inner, 0.0, sin(a0) * wall_inner)
 		var i1 := origin + Vector3(cos(a1) * wall_inner, 0.0, sin(a1) * wall_inner)
-		_kit._quad(stone, o0, o1, o1 + Vector3.UP * height, o0 + Vector3.UP * height)
-		_kit._quad(stone, i1, i0, i0 + Vector3.UP * height, i1 + Vector3.UP * height)
-		_kit._quad(stone, o0 + Vector3.UP * height, o1 + Vector3.UP * height,
-			i1 + Vector3.UP * height, i0 + Vector3.UP * height)
-		_kit._quad(stone, i0, i1, o1, o0)
+		_emit_ambulatory_wall_panel(stone, o0, o1, i0, i1, a0, a1,
+			height, chapel_cuts)
 		var roof_outer0 := origin + Vector3(cos(a0) * roof_outer, height, sin(a0) * roof_outer)
 		var roof_outer1 := origin + Vector3(cos(a1) * roof_outer, height, sin(a1) * roof_outer)
 		var roof_inner0 := origin + Vector3(cos(a0) * roof_inner, height, sin(a0) * roof_inner)
@@ -1061,12 +1066,169 @@ func _build_ambulatory_ring(cy: float) -> void:
 			_kit._quad(roof, roof_out + roof_bottom, roof_in + roof_bottom,
 				roof_in, roof_out)
 	host_end()
+	_build_ambulatory_chapel_floors(chapel_cuts, origin, wall_inner, segments)
 	_log_mass("ambulatory", ChurchGeometry.ambulatory_aabb(spec))
 	component_note("ambulatory", "half_annular_walk", SURF_STONE, {
 		"center": Vector2(0.0, cy), "outer_radius": outer_radius,
 		"floor_inner_radius": floor_inner, "roof_inner_radius": roof_inner,
 		"roof_outer_radius": roof_outer, "wall_inner_radius": wall_inner,
 		"height": height, "segments": segments})
+
+
+
+func _ambulatory_chapel_cuts(wall_inner: float, height: float) -> Array[Dictionary]:
+	var cuts: Array[Dictionary] = []
+	if not spec.apse or not spec.ambulatory or spec.chapel_arrangement != &"chevet":
+		return cuts
+	for chapel_index in range(spec.radiating_chapels):
+		var theta: float = PI * 0.5 - ChurchGeometry.chapel_angle(spec, chapel_index)
+		var half_angle: float = ChurchGeometry.chapel_mouth_half_angle(
+			spec, chapel_index, wall_inner)
+		var opening_h: float = minf(
+			ChurchGeometry.chapel_mouth_height(spec, chapel_index), height - 0.25)
+		if opening_h < 1.9:
+			continue
+		cuts.append({"index": chapel_index, "theta": theta,
+			"a0": theta - half_angle, "a1": theta + half_angle,
+			"height": opening_h,
+			"width": ChurchGeometry.chapel_mouth_width(spec, chapel_index)})
+	return cuts
+
+
+func _emit_ambulatory_wall_panel(stone: SurfaceTool, o0: Vector3, o1: Vector3,
+		i0: Vector3, i1: Vector3, a0: float, a1: float, height: float,
+		cuts: Array[Dictionary]) -> void:
+	var local_cuts: Array[Dictionary] = []
+	for cut in cuts:
+		var lo: float = maxf(a0, float(cut["a0"]))
+		var hi: float = minf(a1, float(cut["a1"]))
+		if hi - lo <= 0.00001:
+			continue
+		local_cuts.append({"u0": (lo - a0) / (a1 - a0),
+			"u1": (hi - a0) / (a1 - a0), "cut_lo": float(cut["a0"]),
+			"cut_hi": float(cut["a1"]), "height": float(cut["height"])})
+	local_cuts.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		return float(left["u0"]) < float(right["u0"]))
+	var cursor := 0.0
+	for cut in local_cuts:
+		var u0: float = maxf(cursor, float(cut["u0"]))
+		var u1: float = float(cut["u1"])
+		if u0 > cursor + 0.00001:
+			_emit_ambulatory_wall_band(stone, o0, o1, i0, i1, cursor, u0, 0.0, height)
+		if u1 <= u0 + 0.00001:
+			continue
+		var opening_h: float = float(cut["height"])
+		_emit_ambulatory_wall_band(stone, o0, o1, i0, i1, u0, u1, opening_h, height)
+		var segment_start: float = lerpf(a0, a1, u0)
+		var segment_end: float = lerpf(a0, a1, u1)
+		if absf(segment_start - float(cut["cut_lo"])) <= 0.00001:
+			var jamb_outer_left: Vector3 = o0.lerp(o1, u0)
+			var jamb_inner_left: Vector3 = i0.lerp(i1, u0)
+			_kit._quad(stone, jamb_outer_left, jamb_inner_left,
+				jamb_inner_left + Vector3.UP * opening_h,
+				jamb_outer_left + Vector3.UP * opening_h)
+		if absf(segment_end - float(cut["cut_hi"])) <= 0.00001:
+			var jamb_outer_right: Vector3 = o0.lerp(o1, u1)
+			var jamb_inner_right: Vector3 = i0.lerp(i1, u1)
+			_kit._quad(stone, jamb_inner_right, jamb_outer_right,
+				jamb_outer_right + Vector3.UP * opening_h,
+				jamb_inner_right + Vector3.UP * opening_h)
+		var outer_left: Vector3 = o0.lerp(o1, u0)
+		var inner_left: Vector3 = i0.lerp(i1, u0)
+		var outer_right: Vector3 = o0.lerp(o1, u1)
+		var inner_right: Vector3 = i0.lerp(i1, u1)
+		_kit._quad(stone, outer_left + Vector3.UP * opening_h,
+			outer_right + Vector3.UP * opening_h, inner_right + Vector3.UP * opening_h,
+			inner_left + Vector3.UP * opening_h)
+		cursor = maxf(cursor, u1)
+	if cursor < 1.0 - 0.00001:
+		_emit_ambulatory_wall_band(stone, o0, o1, i0, i1, cursor, 1.0, 0.0, height)
+	# The upper and lower annular returns remain continuous across each mouth.
+	_kit._quad(stone, o0 + Vector3.UP * height, o1 + Vector3.UP * height,
+		i1 + Vector3.UP * height, i0 + Vector3.UP * height)
+	_kit._quad(stone, i0, i1, o1, o0)
+
+
+func _emit_ambulatory_wall_band(stone: SurfaceTool, o0: Vector3, o1: Vector3,
+		i0: Vector3, i1: Vector3, u0: float, u1: float, y0: float, y1: float) -> void:
+	if u1 - u0 <= 0.00001 or y1 - y0 <= 0.00001:
+		return
+	var outer_a: Vector3 = o0.lerp(o1, u0)
+	var outer_b: Vector3 = o0.lerp(o1, u1)
+	var inner_a: Vector3 = i0.lerp(i1, u0)
+	var inner_b: Vector3 = i0.lerp(i1, u1)
+	var low := Vector3.UP * y0
+	var high := Vector3.UP * y1
+	_kit._quad(stone, outer_a + low, outer_b + low, outer_b + high, outer_a + high)
+	_kit._quad(stone, inner_b + low, inner_a + low, inner_a + high, inner_b + high)
+
+
+func _build_ambulatory_chapel_floors(cuts: Array[Dictionary], origin: Vector3,
+		wall_inner: float, segments: int) -> void:
+	for cut in cuts:
+		var chapel_index: int = int(cut["index"])
+		var angle: float = ChurchGeometry.chapel_angle(spec, chapel_index)
+		var theta0: float = float(cut["a0"])
+		var theta1: float = float(cut["a1"])
+		var half_width: float = float(cut["width"]) * 0.5
+		var center: Vector3 = ChurchGeometry.chapel_center(spec, chapel_index)
+		var tangent := Vector3(cos(angle), 0.0, -sin(angle))
+		var floor_edge := PackedVector3Array()
+		floor_edge.append(_ambulatory_floor_boundary(origin, wall_inner, theta0, segments))
+		for boundary_index in range(1, segments):
+			var boundary_angle: float = PI * float(boundary_index) / float(segments)
+			if boundary_angle > theta0 + 0.00001 and boundary_angle < theta1 - 0.00001:
+				floor_edge.append(_ambulatory_floor_boundary(origin, wall_inner, boundary_angle, segments))
+		floor_edge.append(_ambulatory_floor_boundary(origin, wall_inner, theta1, segments))
+		# The first edge is exactly the piecewise-chord boundary emitted by the
+		# ambulatory floor. The far edge is the actual chapel mouth chord.
+		var bridge := PackedVector3Array()
+		for point in floor_edge:
+			bridge.append(Vector3(point.x,
+				ChurchGeometry.FLOOR_LIFT - ChurchGeometry.FLOOR_T * 0.5, point.z))
+		var mouth_left := center - tangent * half_width
+		var mouth_right := center + tangent * half_width
+		bridge.append(Vector3(mouth_left.x,
+			ChurchGeometry.FLOOR_LIFT - ChurchGeometry.FLOOR_T * 0.5, mouth_left.z))
+		bridge.append(Vector3(mouth_right.x,
+			ChurchGeometry.FLOOR_LIFT - ChurchGeometry.FLOOR_T * 0.5, mouth_right.z))
+		var chapel_floor := PackedVector3Array([Vector3(center.x,
+			ChurchGeometry.FLOOR_LIFT - ChurchGeometry.FLOOR_T * 0.5, center.z)])
+		var start: float = ChurchGeometry.chapel_arc_start(spec, chapel_index)
+		for arc_index in range(13):
+			var arc: float = start + PI * float(arc_index) / 12.0
+			chapel_floor.append(Vector3(center.x + cos(arc) * spec.chapel_radius,
+				ChurchGeometry.FLOOR_LIFT - ChurchGeometry.FLOOR_T * 0.5,
+				center.z + sin(arc) * spec.chapel_radius))
+		host("ambulatory_chapel_%02d" % chapel_index)
+		_emit_chapel_floor_polygon("chapel_threshold_floor", bridge)
+		_emit_chapel_floor_polygon("chapel_interior_floor", chapel_floor)
+		host_end()
+
+
+func _ambulatory_floor_boundary(origin: Vector3, radius: float,
+		theta: float, segments: int) -> Vector3:
+	var segment_index: int = clampi(floori(theta / PI * float(segments)), 0, segments - 1)
+	var a0: float = PI * float(segment_index) / float(segments)
+	var a1: float = PI * float(segment_index + 1) / float(segments)
+	var p0 := origin + Vector3(cos(a0) * radius, 0.0, sin(a0) * radius)
+	var p1 := origin + Vector3(cos(a1) * radius, 0.0, sin(a1) * radius)
+	return p0.lerp(p1, (theta - a0) / (a1 - a0))
+
+
+
+func _emit_chapel_floor_polygon(role: String, points: PackedVector3Array) -> void:
+	var polygon := PackedVector2Array()
+	for point in points:
+		polygon.append(Vector2(point.x, point.z))
+	var indices: PackedInt32Array = Geometry2D.triangulate_polygon(polygon)
+	if indices.is_empty() or indices.size() % 3 != 0:
+		return
+	for tri_start in range(0, indices.size(), 3):
+		var triangle := PackedVector3Array([
+			points[indices[tri_start]], points[indices[tri_start + 1]],
+			points[indices[tri_start + 2]]])
+		component_slab(role, triangle, ChurchGeometry.FLOOR_T, SURF_STONE, true)
 
 
 func _clip_polygon_z_min(poly: PackedVector2Array, minimum_z: float) -> PackedVector2Array:

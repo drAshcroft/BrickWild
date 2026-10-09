@@ -1,0 +1,354 @@
+{
+	"cases": [
+		{
+			"actual_prop_instances": 136,
+			"key": "chartres_seed5003",
+			"selection_reason": "exact frozen LandmarkSuite Chartres chapel-passage case",
+			"spec": {
+				"RefCounted": null,
+				"_omitted_object_fields": [
+					"rng"
+				],
+				"aisle_width": 4.0,
+				"aisles": 2,
+				"ambulatory": true,
+				"apse": true,
+				"apse_radius": 6.55557683706284,
+				"buttress_count_per_side": 4,
+				"buttress_depth": 0.599016010761261,
+				"buttresses": true,
+				"chapel_arrangement": "chevet",
+				"chapel_radius": 2.49111919808388,
+				"church_spec.gd": null,
+				"clerestory": true,
+				"corner_turrets": false,
+				"crossing_tower": true,
+				"crossing_tower_height": 64.277695119381,
+				"dome": false,
+				"dome_drum_height": 0.0,
+				"dome_lantern": false,
+				"dome_radius": 0.0,
+				"dome_shape": "",
+				"door_style": "portal",
+				"exedrae": false,
+				"flyer_tiers": 1,
+				"flying_buttresses": true,
+				"half_domes": false,
+				"height": 37.5,
+				"hero": "",
+				"length": 130.0,
+				"narthex": false,
+				"orientation": 0.0,
+				"period": 1200,
+				"radiating_chapels": 5,
+				"roof_color": {
+					"a": 1.0,
+					"b": 0.373992115259171,
+					"g": 0.330717176198959,
+					"r": 0.287579923868179
+				},
+				"roof_pitch": 0.829240679740906,
+				"rose_window": false,
+				"seed": 5003,
+				"spire": false,
+				"spire_pitch": 1.48296654224396,
+				"stone_color": {
+					"a": 1.0,
+					"b": 0.492544054985046,
+					"g": 0.539602875709534,
+					"r": 0.566904604434967
+				},
+				"string_course": true,
+				"style": "gothic",
+				"tower": true,
+				"tower_height": 64.8770928382874,
+				"tower_roof": "pyramid",
+				"tower_width": 14.467246222496,
+				"transept": true,
+				"transept_len": 41.9912014007568,
+				"trim_color": {
+					"a": 1.0,
+					"b": 0.568662464618683,
+					"g": 0.60866242647171,
+					"r": 0.631868898868561
+				},
+				"variant_name": "Saint Aldhelm-by-the-Ford",
+				"west_towers": 1,
+				"width": 16.4,
+				"window_h": 3.1617431640625,
+				"window_style": "pointed",
+				"window_w": 0.848541498184204
+			},
+			"spec_seed": 5003,
+			"views": [
+				{
+					"actual_production_assembly": true,
+					"camera": {
+						"eye": {
+							"x": 23.4066867828369,
+							"y": 18.118766784668,
+							"z": 95.4030456542969
+						},
+						"fov_degrees": 46.0,
+						"target": {
+							"x": 0.0,
+							"y": 8.25,
+							"z": 66.9354553222656
+						}
+					},
+					"file": "groups/gothic_chevet/requests/chartres_seed5003/views/east_3q_context.png",
+					"purpose": "eastern apse, covered ambulatory, and radiating chapel context",
+					"roof_on": true,
+					"size": [
+						1600,
+						1000
+					]
+				},
+				{
+					"actual_production_assembly": true,
+					"camera": {
+						"eye": {
+							"x": -8.47175025939941,
+							"y": 1.58000004291534,
+							"z": 67.8000717163086
+						},
+						"fov_degrees": 72.0,
+						"target": {
+							"x": -9.53293323516846,
+							"y": 1.58000004291534,
+							"z": 68.1883926391602
+						}
+					},
+					"file": "groups/gothic_chevet/requests/chartres_seed5003/rooms/ambulatory_eye_toward_chapel_mouth.png",
+					"purpose": "roof-on eye-level view from ambulatory through the actual mouth",
+					"roof_on": true,
+					"size": [
+						1600,
+						1000
+					]
+				},
+				{
+					"actual_production_assembly": true,
+					"camera": {
+						"eye": {
+							"x": -10.5942239761353,
+							"y": 1.58000004291534,
+							"z": 68.5767517089844
+						},
+						"fov_degrees": 72.0,
+						"target": {
+							"x": -8.72530746459961,
+							"y": 1.58000004291534,
+							"z": 67.8928604125977
+						}
+					},
+					"file": "groups/gothic_chevet/requests/chartres_seed5003/rooms/chapel_eye_back_toward_mouth.png",
+					"purpose": "eye-level view from inside the chapel back through its actual mouth",
+					"roof_on": true,
+					"size": [
+						1600,
+						1000
+					]
+				}
+			]
+		},
+		{
+			"actual_prop_instances": 138,
+			"key": "generated_gothic_seed5001",
+			"selection_reason": "exact frozen generated ambulatory chevet request",
+			"spec": {
+				"RefCounted": null,
+				"_omitted_object_fields": [
+					"rng"
+				],
+				"aisle_width": 3.20635950565338,
+				"aisles": 2,
+				"ambulatory": true,
+				"apse": true,
+				"apse_radius": 5.68525564670563,
+				"buttress_count_per_side": 3,
+				"buttress_depth": 0.616172790527344,
+				"buttresses": true,
+				"chapel_arrangement": "chevet",
+				"chapel_radius": 2.25912891744926,
+				"church_spec.gd": null,
+				"clerestory": true,
+				"corner_turrets": true,
+				"crossing_tower": true,
+				"crossing_tower_height": 41.7856693267822,
+				"dome": false,
+				"dome_drum_height": 0.0,
+				"dome_lantern": false,
+				"dome_radius": 0.0,
+				"dome_shape": "",
+				"door_style": "portal",
+				"exedrae": false,
+				"flyer_tiers": 1,
+				"flying_buttresses": true,
+				"half_domes": false,
+				"height": 24.0,
+				"hero": "",
+				"length": 80.0,
+				"narthex": false,
+				"orientation": 0.0,
+				"period": 1200,
+				"radiating_chapels": 5,
+				"roof_color": {
+					"a": 1.0,
+					"b": 0.367369472980499,
+					"g": 0.32372659444809,
+					"r": 0.28058934211731
+				},
+				"roof_pitch": 0.89226770401001,
+				"rose_window": false,
+				"seed": 5001,
+				"spire": true,
+				"spire_pitch": 1.07091808319092,
+				"stone_color": {
+					"a": 1.0,
+					"b": 0.52035391330719,
+					"g": 0.567412734031677,
+					"r": 0.594052314758301
+				},
+				"string_course": true,
+				"style": "gothic",
+				"tower": true,
+				"tower_height": 45.5555992126465,
+				"tower_roof": "spire",
+				"tower_width": 5.7,
+				"transept": true,
+				"transept_len": 34.3025808334351,
+				"trim_color": {
+					"a": 1.0,
+					"b": 0.592300832271576,
+					"g": 0.632300853729248,
+					"r": 0.654944479465485
+				},
+				"variant_name": "Black Denys Minster",
+				"west_towers": 2,
+				"width": 12.0,
+				"window_h": 2.3433952331543,
+				"window_style": "pointed",
+				"window_w": 0.897346138954163
+			},
+			"spec_seed": 5001,
+			"views": [
+				{
+					"actual_production_assembly": true,
+					"camera": {
+						"eye": {
+							"x": 20.4818592071533,
+							"y": 13.9155941009521,
+							"z": 66.5490417480469
+						},
+						"fov_degrees": 46.0,
+						"target": {
+							"x": 0.0,
+							"y": 5.28000020980835,
+							"z": 41.638671875
+						}
+					},
+					"file": "groups/gothic_chevet/requests/generated_gothic_seed5001/views/east_3q_context.png",
+					"purpose": "eastern apse, covered ambulatory, and radiating chapel context",
+					"roof_on": true,
+					"size": [
+						1600,
+						1000
+					]
+				},
+				{
+					"actual_production_assembly": true,
+					"camera": {
+						"eye": {
+							"x": -7.20490789413452,
+							"y": 1.58000004291534,
+							"z": 42.3365020751953
+						},
+						"fov_degrees": 72.0,
+						"target": {
+							"x": -8.26608943939209,
+							"y": 1.58000004291534,
+							"z": 42.7248191833496
+						}
+					},
+					"file": "groups/gothic_chevet/requests/generated_gothic_seed5001/rooms/ambulatory_eye_toward_chapel_mouth.png",
+					"purpose": "roof-on eye-level view from ambulatory through the actual mouth",
+					"roof_on": true,
+					"size": [
+						1600,
+						1000
+					]
+				},
+				{
+					"actual_production_assembly": true,
+					"camera": {
+						"eye": {
+							"x": -9.20755577087402,
+							"y": 1.58000004291534,
+							"z": 43.0693321228027
+						},
+						"fov_degrees": 72.0,
+						"target": {
+							"x": -7.4584641456604,
+							"y": 1.58000004291534,
+							"z": 42.4292869567871
+						}
+					},
+					"file": "groups/gothic_chevet/requests/generated_gothic_seed5001/rooms/chapel_eye_back_toward_mouth.png",
+					"purpose": "eye-level view from inside the chapel back through its actual mouth",
+					"roof_on": true,
+					"size": [
+						1600,
+						1000
+					]
+				}
+			]
+		}
+	],
+	"cutaway": false,
+	"failures": [],
+	"finished_utc": "2026-10-09T15:20:13",
+	"frozen_fixture": "tests/chapel_passage_test.gd",
+	"frozen_fixture_sha256": "79515fd796534ba574575c70e35e4b652e7863c7761220920b1472c5bab16349",
+	"headless": false,
+	"image_count": 6,
+	"live_fixture_path": "tests/chapel_passage_test.gd",
+	"output_root": "res://visualqa/styles/church/gothic/renders/chapel_passage_HEAD_restart23",
+	"props_enabled": true,
+	"renderer": "Godot SubViewport with ChurchAssembler.build(spec, false)",
+	"schema": "brickwild.chapel_passage_review_render",
+	"schema_version": 1,
+	"source_hashes_end": {
+		"res://assets/props/catalog.json": "4c38129d421ea7f2e0b92e6601002845ac98c4b94de0af8828f761dd649957b5",
+		"res://core/mass_builder.gd": "fb05f2d06e6f5f7582972bec211a0eaf6200eaf0e26ef77c3d181ad5c1aa455f",
+		"res://core/material_kit.gd": "f867c97bc143f510d1c27c9b5daaf0434ed035f7afc32be47ea878a9e8209386",
+		"res://core/mesh_kit.gd": "ebcf6fa7b0eda9ad90d7990c7c69b235f6c2b80cc070041fee470909f5f23977",
+		"res://core/shell_assembler.gd": "a811575d2a6b48b225ff8425352c65f3e4cc3b56d47e65d22a6f60131a651c92",
+		"res://src/church/church_assembler.gd": "f7ac0c74f4a1156f1ced6f1095be070193370e2620b0eddd0035a7396f441625",
+		"res://src/church/church_builder.gd": "70a1f34180748ab2fa1057fedef8c464acfd5da62b86b16d0f03705ed9106393",
+		"res://src/church/church_generator.gd": "7ed16f937f9ea1170b6d6e0e6990a5a7584c26a2cb659d5cd3bf7ceff025b2e4",
+		"res://src/church/church_geometry.gd": "892f74e47578f2cba930a463e7a03715d908f354e6b67d19c54b933e4f417d39",
+		"res://src/church/church_spec.gd": "0a30edc7a42412e319c84f85d151af33f84174811e98bf78f115968e35a79600",
+		"res://tests/chapel_passage_test.gd": "79515fd796534ba574575c70e35e4b652e7863c7761220920b1472c5bab16349",
+		"res://tests/suites/landmark_suite.gd": "e60a95d69f060cf9fd43c76290d07152958a29009a4bfe18ce979982bd93a0d4",
+		"res://tools/render_chapel_passage_review.gd": "c795feaac8ffb6645df1b1694bc32e74de0dd4255552f71c46f74882eade0ff3"
+	},
+	"source_hashes_start": {
+		"res://assets/props/catalog.json": "4c38129d421ea7f2e0b92e6601002845ac98c4b94de0af8828f761dd649957b5",
+		"res://core/mass_builder.gd": "fb05f2d06e6f5f7582972bec211a0eaf6200eaf0e26ef77c3d181ad5c1aa455f",
+		"res://core/material_kit.gd": "f867c97bc143f510d1c27c9b5daaf0434ed035f7afc32be47ea878a9e8209386",
+		"res://core/mesh_kit.gd": "ebcf6fa7b0eda9ad90d7990c7c69b235f6c2b80cc070041fee470909f5f23977",
+		"res://core/shell_assembler.gd": "a811575d2a6b48b225ff8425352c65f3e4cc3b56d47e65d22a6f60131a651c92",
+		"res://src/church/church_assembler.gd": "f7ac0c74f4a1156f1ced6f1095be070193370e2620b0eddd0035a7396f441625",
+		"res://src/church/church_builder.gd": "70a1f34180748ab2fa1057fedef8c464acfd5da62b86b16d0f03705ed9106393",
+		"res://src/church/church_generator.gd": "7ed16f937f9ea1170b6d6e0e6990a5a7584c26a2cb659d5cd3bf7ceff025b2e4",
+		"res://src/church/church_geometry.gd": "892f74e47578f2cba930a463e7a03715d908f354e6b67d19c54b933e4f417d39",
+		"res://src/church/church_spec.gd": "0a30edc7a42412e319c84f85d151af33f84174811e98bf78f115968e35a79600",
+		"res://tests/chapel_passage_test.gd": "79515fd796534ba574575c70e35e4b652e7863c7761220920b1472c5bab16349",
+		"res://tests/suites/landmark_suite.gd": "e60a95d69f060cf9fd43c76290d07152958a29009a4bfe18ce979982bd93a0d4",
+		"res://tools/render_chapel_passage_review.gd": "c795feaac8ffb6645df1b1694bc32e74de0dd4255552f71c46f74882eade0ff3"
+	},
+	"started_utc": "2026-10-09T15:20:07",
+	"status": "rendered",
+	"unique_output_refused_if_existing": true
+}
