@@ -10,6 +10,78 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
 
 Nothing yet.
 
+## 0.1.1 - 2026-10-10
+
+A city is planned for the people shown and built for the people implied.
+Tag `v0.1.1`.
+
+### Notable changes
+
+- **`--implied-population M`** on `tools/export_village_plan.gd`, beside
+  `--population N` (owner decision 2026-10-10). N, the visible people, sizes
+  the homes, their lots and the everyday trades. M, the city the history says
+  it is, sizes the civic programme only: the seat (hold below 200, castle from
+  200), the wall (from 150), the landmark, the market and halls (butcher,
+  tailor, town hall, guildhall) and the monuments. It never adds a home or a
+  residential lot. Civic scale stops at `VillageSpec.CIVIC_MAX` (500): every
+  civic threshold is below it, so a capital of millions plans the civic
+  programme of a town of 500 on one site of at most 400 m. With the flag the
+  plan carries `population_implied`, `population_civic`, a note, and on every
+  building `serves: "visible" | "implied"`. Example:
+  `--request wuunafu-schema2.json --population 60 --implied-population 6000`.
+- **Monuments are never the seat.** A kept `great-tomb` or `ziggurat` is a
+  castle mass marked `"monument": "<word>"`, sized as the seat is (the hold's
+  footprint below 200 civic people), on its own lot class, placed after every
+  home on the frontage nearest the site's edge or on its own plot and lane at
+  the edge. A royal or military city that kept one still gets its seat.
+- **A small city's kept wall is a palisade**, with a note, instead of a
+  refusal: below 150 people (implied counted) and not military. A wall kept
+  as fully as the palisade is now the wall.
+- Exporter refusals name an unplaced monument by its word (`great-tomb`), not
+  as `castle`.
+- New suite `dmvimplied` (the two real Voxel_Build cities planned, about
+  4.5 minutes); `dmvbrief` gained the small-wall, monument and implied checks.
+
+### Measured
+
+| Request | Buildings | Seat | Monuments | Enclosure | Homes | Site | Time |
+|---|---|---|---|---|---|---|---|
+| Thaannafu (military) 45 + 4000 implied | 21 | castle 40 x 50 | great-tomb 40 x 50 | wall | 9 | 400 x 235 m | 116 s |
+| Thaannafu 45 + 2942190 implied | identical to the row above but for the implied fields | | | | | | 115 s |
+| Wuunafu (royal) 60 + 6000 implied | 29 | castle 29 x 36 (palace 0.2) | great-tomb, ziggurat 40 x 50 | wall | 14 | 367 x 209 m | 151 s |
+| Wuunafu 60 + 10614806 implied | identical to the row above but for the implied fields | | | | | | 152 s |
+| Thaannafu 45, no implied | 17 | hold 12 x 14 | great-tomb 12 x 14 | wall | 9 | 225 x 150 m | 61-82 s |
+| Wuunafu 60, no implied (was refused) | 25 | hold 10 x 12 | great-tomb, ziggurat 12 x 14 | palisade | 14 | 246 x 125 m | 78-94 s |
+
+### Compatibility
+
+- Byte-identical output for every request that planned before and does not
+  keep a `great-tomb` or `ziggurat`, a wall as fully as a palisade, or a wall
+  below 150 people: `thorn-hamlet` at 26, 40 and 160, `veld-070`, and
+  `veld-100` at 220 were diffed against 0.1.0. Requests refused before are
+  refused the same way unless one of the three decisions above lifted the
+  refusal (Wuunafu at 60 and 150, Thaannafu at 150 now plan).
+- A request that keeps a monument changes: it gains a seat, and the
+  monument is resized and placed differently (Thaannafu at 45).
+- No new field appears in a plan made without `--implied-population`
+  except `monument` on a monument's building.
+
+### Known issues
+
+- `lane:plan` is not green: `hmultistory` reports the same 28 findings as
+  0.1.0 (finding lines identical).
+- `lane:temple` is not green: the Rotunda's upper arcade
+  (TEMPLE-ROTUNDA-ARCADE), unchanged from 0.1.0.
+- Market stalls on the square are still not planned at any population.
+
+### Migration
+
+- Callers of the exporter who show a slice of a large city: pass the shown
+  people with `--population` and the history's people with
+  `--implied-population`. Read `serves` to tell the city's buildings from the
+  shown people's, and `monument` to tell a tomb from the seat.
+- Install from `releases/brick_wild-0.1.1/`.
+
 ## 0.1.0 - 2026-10-09
 
 The first release. Tag `v0.1.0`.
