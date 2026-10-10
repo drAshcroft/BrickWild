@@ -94,7 +94,9 @@ const PROPS := {
 
 	# ---- storage ----
 	"Cabinet": {"cat": "storage", "tags": [WALL, SURFACE], "zone": 0.7},
-	"Bookcase_2": {"cat": "bookcase", "tags": [WALL], "zone": 0.7, "affinity": {"daylight": -1.0, "far": ["hearth"], "avoid_hearth_wall": true}},
+	# The model's open shelves are on its +Z side; turn the imported -Z front
+	# toward the room when the wall-placement rule stores an inward-facing yaw.
+	"Bookcase_2": {"cat": "bookcase", "tags": [WALL], "zone": 0.7, "face": PI, "affinity": {"daylight": -1.0, "far": ["hearth"], "avoid_hearth_wall": true}},
 	"Chest_Wood": {"cat": "chest", "tags": [WALL], "zone": 0.6, "affinity": {"away_from_doors": true}},
 	"Nightstand_Shelf": {"cat": "nightstand", "tags": [WALL, SURFACE], "zone": 0.4},
 	"Barrel": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true, "near": ["counter"]}},

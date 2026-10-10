@@ -195,17 +195,41 @@ func _render_exterior(plan: HousePlan, request: BuildingRequest, case_id: String
 	var target := Vector3(0.0, bounds.position.y + bounds.size.y * 0.46, 0.0)
 	var horizontal := Vector3(0.72, 0.0, -1.0).normalized() # front -Z, three-quarter
 	var radius := maxf(Vector3(request.width, bounds.size.y, request.length).length() * 0.5, 2.0)
+	var service_wing := _witch_service_shelter(plan)
+	var framing_bounds := bounds
+	if not service_wing.is_empty():
+		framing_bounds = HouseGeometry.exterior_bounds(plan)
+		radius = maxf(framing_bounds.size.length() * 0.5, 2.0)
+		var core := HouseGeometry.witch_high_core_rect(plan)
+		if core.has_area():
+			var roof_layout := HouseGeometry.roof_layout(plan)
+			var roof_transform: Transform3D = roof_layout.get("transform", Transform3D.IDENTITY)
+			var gable_end := Vector2(roof_transform.basis.z.x, roof_transform.basis.z.z).normalized()
+			var service_door := _witch_service_door(plan)
+			if not service_door.is_empty() and gable_end.dot(Vector2(service_door.get("normal", Vector2.ZERO))) < 0.0:
+				gable_end = -gable_end
+			var gable_tangent := Vector2(-gable_end.y, gable_end.x)
+			horizontal = Vector3((gable_end + gable_tangent * 0.20).x, 0.0,
+				(gable_end + gable_tangent * 0.20).y).normalized()
+			var core_center := core.get_center()
+			target = Vector3(core_center.x,
+				plan.spec.height + float(roof_layout.get("rise", 0.0)) * 0.48,
+				core_center.y)
+			horizontal = Vector3(0.24, 0.0, -1.0).normalized()
 	_cam.fov = 46.0
-	var distance := radius / sin(deg_to_rad(_cam.fov * 0.5)) * 1.08
 	var direction := Vector3(horizontal.x, 0.22, horizontal.z).normalized()
+	var aspect := float(_vp.size.x) / maxf(float(_vp.size.y), 1.0)
+	var distance := _fit_camera_distance(framing_bounds, target, direction, _cam.fov, aspect, 1.06)
 	var eye := target + direction * distance
 	_set_camera(eye, target, atan2(direction.x, direction.z), distance + radius)
 	var view := "roof_on_exterior"
 	var path := output.path_join(case_id + "_" + view + ".jpg")
 	var save_error := await _save_image(path)
 	return _view_row(case_id, request, view, path, save_error, {
-		"roof_on": true, "cutaway": false, "camera": _camera_data(eye, target, "front -Z three-quarter; shell envelope framing"),
-		"scene_bounds": _aabb_data(bounds), "visible_front": "-Z"})
+		"roof_on": true, "cutaway": false, "camera": _camera_data(eye, target,
+			"front gable three-quarter; high core and attached service wing framing" if not service_wing.is_empty() else "front -Z three-quarter; shell envelope framing"),
+		"scene_bounds": _aabb_data(bounds), "framing_bounds": _aabb_data(framing_bounds),
+		"visible_front": "gable end aligned to roof transform" if not service_wing.is_empty() else "-Z"})
 
 
 func _render_service_yard(plan: HousePlan, request: BuildingRequest,
@@ -224,22 +248,38 @@ func _render_service_yard(plan: HousePlan, request: BuildingRequest,
 			"generated plan has no yard extent to frame")
 	var focus := _service_focus(plan, extent)
 	var frame_rect := _service_frame_rect(plan, extent)
+	var witch_view_direction := Vector2.ZERO
+	if plan.spec.style == &"witch_hut":
+		var prep_zone := _witch_prep_zone(plan)
+		var brew_zone := _witch_brew_zone(plan)
+		if prep_zone.has_area() and brew_zone.has_area():
+			focus = (prep_zone.get_center() + brew_zone.get_center()) * 0.5
+			frame_rect = frame_rect.merge(prep_zone)
+			frame_rect = frame_rect.merge(brew_zone)
+			frame_rect = frame_rect.merge(_service_frame_rect(plan, extent).grow(0.28))
+		var service_door := _witch_service_door(plan)
+		if not service_door.is_empty():
+			witch_view_direction = Vector2(service_door.get("normal", Vector2.ZERO)).normalized()
 	var house_centre := Vector2.ZERO
-	var away := (focus - house_centre).normalized()
+	var away := witch_view_direction if witch_view_direction.length_squared() > 0.5 \
+		else (focus - house_centre).normalized()
 	if away.length_squared() < 0.01:
 		away = Vector2.RIGHT
 	var radius := maxf(frame_rect.size.length() * 0.5, 1.6)
-	var distance := maxf(4.4, radius / tan(deg_to_rad(36.0)) * 1.08)
-	var eye_xz := focus + away * distance
-	var eye := Vector3(eye_xz.x, HouseGeometry.FLOOR_T + 1.58, eye_xz.y)
+	var distance := maxf(5.8 if plan.spec.style == &"witch_hut" else 4.4,
+		radius / tan(deg_to_rad(36.0)) * (1.32 if plan.spec.style == &"witch_hut" else 1.08))
+	var tangent := Vector2(-away.y, away.x)
+	var yard_view := (away * 0.92 + tangent * 0.39).normalized() if plan.spec.style == &"witch_hut" else away
+	var eye_xz := focus + yard_view * distance
+	var eye := Vector3(eye_xz.x, HouseGeometry.FLOOR_T + 1.72, eye_xz.y)
 	var target := Vector3(focus.x, HouseGeometry.FLOOR_T + 0.85, focus.y)
 	_cam.fov = 72.0
-	_set_camera(eye, target, atan2(-away.x, -away.y), distance + radius)
+	_set_camera(eye, target, atan2(-yard_view.x, -yard_view.y), distance + radius)
 	var path := output.path_join(case_id + "_service_yard.jpg")
 	var save_error := await _save_image(path)
 	return _view_row(case_id, request, "service_yard", path, save_error, {
 		"roof_on": true, "cutaway": false,
-		"camera": _camera_data(eye, target, "eye height looking from yard toward attached service side"),
+		"camera": _camera_data(eye, target, "angled yard approach through service opening; prep, brew and shed front framed"),
 		"yard_extent_xz": _rect_data(extent), "yard_prop_count": plan.yard.size(),
 		"yard_frame_xz": _rect_data(frame_rect),
 		"yard_built_piece_count": plan.yard_pieces.size(),
@@ -266,6 +306,17 @@ func _render_interior(plan: HousePlan, request: BuildingRequest,
 			station = piece
 			anchor = Rect2(piece["rect"]).get_center()
 			break
+	if witch_case:
+		var storage_sum := Vector2.ZERO
+		var storage_count := 0
+		for piece in pieces:
+			var category := String(piece.get("cat", ""))
+			if category in ["shelf", "storage"] or String(piece.get("key", "")).to_lower().contains("rack"):
+				var pos: Vector3 = piece.get("pos", Vector3.ZERO)
+				storage_sum += Vector2(pos.x, pos.z)
+				storage_count += 1
+		if storage_count > 0:
+			anchor = anchor.lerp(storage_sum / float(storage_count), 0.62)
 	var room_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var floor_y: float = HouseFurnishGeometry.storey_base(plan, room) + HouseGeometry.FLOOR_T
 	var camera := _find_eye_camera(plan, room, pieces, anchor, floor_y, room_rect, station)
@@ -274,7 +325,7 @@ func _render_interior(plan: HousePlan, request: BuildingRequest,
 			"no clear human-height camera location")
 	var eye: Vector3 = camera["eye"]
 	var target: Vector3 = camera["target"]
-	_cam.fov = 76.0
+	_cam.fov = 84.0 if witch_case else 76.0
 	_set_camera(eye, target, atan2(target.x - eye.x, target.z - eye.z), 24.0)
 	var path := output.path_join(case_id + "_" + view + ".jpg")
 	var save_error := await _save_image(path)
@@ -282,7 +333,7 @@ func _render_interior(plan: HousePlan, request: BuildingRequest,
 		"roof_on": true, "cutaway": false, "room_index": room,
 		"room_kind": String(plan.kind_of(room)), "activity_group": "witchwork" if witch_case else "ordinary_control",
 		"members": _piece_summary(pieces), "camera": _camera_data(eye, target,
-			"reachable floor at 1.58m eye height; facing actual workbench when present"),
+			"reachable diagonal floor view; weighted bench and wall-storage composition"),
 		"camera_body_clear": camera["body_clear"],
 		"camera_reachable": camera["reachable"],
 		"occlusion_blockers": camera["occlusion_blockers"],
@@ -368,12 +419,14 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 					if not station.is_empty():
 						var facing: Vector2 = HouseFurnishScore._facing_of(float(station.get("yaw", 0.0)))
 						var front_amount := (candidate - anchor).normalized().dot(facing)
-						score += (1.0 - front_amount) * 4.0
+						score += (1.0 - front_amount) * 1.2
+						var diagonal_amount := (candidate - anchor).normalized().dot(facing.rotated(0.62))
+						score += (1.0 - diagonal_amount) * 2.6
 					if score < best_score:
 						best_score = score
 						best_eye = Vector3(candidate.x, floor_y + 1.58, candidate.y)
 						blocker_best = blockers
-	var target := Vector3(anchor.x, floor_y + 0.95, anchor.y)
+	var target := Vector3(anchor.x, floor_y + (1.18 if not station.is_empty() else 0.95), anchor.y)
 	return {"eye": best_eye, "target": target, "body_clear": candidate_count > 0,
 		"reachable": candidate_count > 0, "occlusion_blockers": blocker_best, "candidate_count": candidate_count}
 
@@ -496,6 +549,20 @@ func _service_frame_rect(plan: HousePlan, fallback: Rect2) -> Rect2:
 		if String(piece.get("role", "")) == "witch_work_shelter":
 			return Rect2(piece.get("rect", fallback))
 	return fallback
+
+
+func _witch_prep_zone(plan: HousePlan) -> Rect2:
+	for prop in plan.yard:
+		if String(prop.get("role", "")) == "witch_prep_bench":
+			return Rect2(prop.get("operation_zone", Rect2()))
+	return Rect2()
+
+
+func _witch_brew_zone(plan: HousePlan) -> Rect2:
+	for prop in plan.yard:
+		if String(prop.get("role", "")) == "witch_brewing_heat":
+			return Rect2(prop.get("operation_zone", Rect2()))
+	return Rect2()
 
 
 func _yard_roles(plan: HousePlan) -> Array[String]:
@@ -642,3 +709,21 @@ func _collect_all_files(path: String, paths: Array[String]) -> void:
 		paths.append(path.path_join(filename))
 	for child in directory.get_directories():
 		_collect_all_files(path.path_join(child), paths)
+
+func _fit_camera_distance(bounds: AABB, target: Vector3, direction: Vector3,
+		vertical_fov: float, aspect: float, margin: float) -> float:
+	var forward := -direction.normalized()
+	var right := forward.cross(Vector3.UP).normalized()
+	var up := right.cross(forward).normalized()
+	var tan_v := tan(deg_to_rad(vertical_fov * 0.5))
+	var tan_h := tan_v * maxf(aspect, 0.1)
+	var distance := 0.0
+	for ix in 2:
+		for iy in 2:
+			for iz in 2:
+				var corner := bounds.position + Vector3(bounds.size.x * float(ix), bounds.size.y * float(iy), bounds.size.z * float(iz))
+				var rel := corner - target
+				var depth := rel.dot(direction.normalized())
+				distance = maxf(distance, depth + absf(rel.dot(right)) / tan_h)
+				distance = maxf(distance, depth + absf(rel.dot(up)) / tan_v)
+	return maxf(distance, 1.0) * margin

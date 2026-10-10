@@ -38,6 +38,8 @@ func _check_frozen_matrix() -> void:
 			var cabinet_count := 0
 			var rack_count := 0
 			var bench_count := 0
+			var display_shelf_index := -1
+			var shelf_cluster_count := 0
 			for index in plan.furniture_of(workshop):
 				var item: Dictionary = plan.furniture[index]
 				if String(item.get("activity_group", "")) != "witchwork":
@@ -47,12 +49,23 @@ func _check_frozen_matrix() -> void:
 				if key == "Cabinet" and category == "storage": cabinet_count += 1
 				if key == "Peg_Rack" and category == "rack": rack_count += 1
 				if category == "workbench": bench_count += 1
+				if key == "Shelf_Simple" and category == "shelf": display_shelf_index = index
+				if key == "SmallBottles_1" and category == "alchemy" \
+					and int(item.get("host", -1)) == display_shelf_index:
+					shelf_cluster_count += 1
 			if cabinet_count != 1:
 				failures.append(label + " service Workshop has %d Witchwork ingredient cabinets, expected 1" % cabinet_count)
 			if rack_count != 1:
 				failures.append(label + " service Workshop has %d Witchwork tool racks, expected 1" % rack_count)
 			if bench_count != 1:
 				failures.append(label + " service Workshop has %d Witchwork benches, expected 1" % bench_count)
+			if display_shelf_index < 0:
+				failures.append(label + " service Workshop is missing its Witchwork display shelf")
+			if shelf_cluster_count != 2:
+				if label == "witch_default_8102":
+					for index in plan.furniture_of(workshop):
+						printerr("WITCH_STORAGE_DEBUG ", index, " ", plan.furniture[index])
+				failures.append(label + " service Workshop display shelf hosts %d of 2 measured bottle props" % shelf_cluster_count)
 		else:
 			# The documented 7x9 compact fallback has no separate workshop.
 			# Its shared hall must not acquire the dedicated Workshop cabinet.
@@ -80,6 +93,6 @@ func _check_out_of_scope_recipes() -> void:
 		var recipe := HouseFurnishingRecipes.recipe_for_room(plan, 0)
 		for step_variant in recipe:
 			var step: Dictionary = step_variant
-			if String(step.get("key", "")) in ["Cabinet", "Peg_Rack"] \
+			if String(step.get("key", "")) in ["Cabinet", "Peg_Rack", "Shelf_Simple", "SmallBottles_1"] \
 					and String(step.get("group", "")) == "witchwork":
 				failures.append("%s control recipe received Witchwork role-specific storage" % String(style))

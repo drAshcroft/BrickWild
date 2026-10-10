@@ -190,6 +190,11 @@ func _render_public_case(request: BuildingRequest, request_id: String, scale: St
 		var row: Dictionary = await _render_room_view(plan, request, request_id,
 			room_view, rooms_dir, nav_grids)
 		case_row["renders"].append(row)
+		if plan.spec.style == &"townhouse" \
+				and String(room_view.get("room_kind", "")) == "office":
+			var overview: Dictionary = await _render_office_overview(plan, request,
+				request_id, int(room_view["room_index"]), rooms_dir, nav_grids)
+			case_row["renders"].append(overview)
 	var missing_required_arrival: bool = plan.entrance_room() < 0
 	if missing_required_arrival:
 		_failed = true
@@ -354,6 +359,107 @@ func _render_room_view(plan: HousePlan, request: BuildingRequest,
 	return row
 
 
+## A second honest room-eye view for the Townhouse writing room. The primary
+## view remains focused on its workbench; this one frames the desk, drawn-up
+## chair, records and the actual doorway from a different reachable floor cell.
+func _render_office_overview(plan: HousePlan, request: BuildingRequest,
+		request_id: String, room: int, rooms_dir: String,
+		nav_grids: Dictionary) -> Dictionary:
+	var required := {"Workbench": {}, "Chair_1": {}, "Bookcase_2": {}}
+	var pieces: Array[Dictionary] = []
+	for index in plan.furniture_of(room):
+		var piece: Dictionary = plan.furniture[index]
+		var key := String(piece.get("key", ""))
+		if required.has(key):
+			required[key] = piece
+			pieces.append(piece)
+	for key in required:
+		if required[key].is_empty():
+			var missing := "Townhouse office overview lacks %s" % String(key)
+			_failed = true
+			_errors.append(request_id + ": " + missing)
+			return _view_error(request_id, request.to_dict(), "room_work_office_overview", missing)
+	var room_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var floor_y: float = HouseFurnishGeometry.storey_base(plan, room) + HouseGeometry.FLOOR_T
+	var target := Vector2.ZERO
+	for key in ["Workbench", "Chair_1", "Bookcase_2"]:
+		var pos: Vector3 = required[key].get("pos", Vector3.ZERO)
+		target += Vector2(pos.x, pos.z)
+	target /= 3.0
+	var door_pos := Vector2.ZERO
+	var door_count := 0
+	for door_variant in plan.doors:
+		var door: Dictionary = door_variant
+		if int(door.get("a", -1)) != room and int(door.get("b", -1)) != room:
+			continue
+		var pos: Vector2 = door.get("pos", Vector2.ZERO)
+		var normal: Vector2 = door.get("normal", Vector2.UP)
+		# The room side of the threshold follows the same convention as the
+		# public arrival view: subtract the outward normal.
+		door_pos += pos - normal * 0.35
+		door_count += 1
+	if door_count > 0:
+		door_pos /= float(door_count)
+		# Keep the writing group at the centre of this supplementary frame while
+		# reserving a visible slice of the real threshold and approach.
+		target = target * 0.88 + door_pos * 0.12
+	var focus: Array[Dictionary] = [required["Workbench"], required["Chair_1"], required["Bookcase_2"]]
+	var writing_anchor := Vector2.ZERO
+	for key in ["Workbench", "Chair_1", "Bookcase_2"]:
+		var pos: Vector3 = required[key].get("pos", Vector3.ZERO)
+		writing_anchor += Vector2(pos.x, pos.z)
+	writing_anchor /= 3.0
+	var bookcase: Dictionary = required["Bookcase_2"]
+	var bookcase_pos: Vector3 = bookcase.get("pos", Vector3.ZERO)
+	var bookcase_center := Vector2(bookcase_pos.x, bookcase_pos.z)
+	var bookcase_scale := float(bookcase.get("scale", 1.0))
+	var bookcase_yaw := float(bookcase.get("yaw", 0.0)) + PropCatalog.face_offset("Bookcase_2")
+	var bookcase_footprint: Vector2 = PropCatalog.footprint_rotated("Bookcase_2", bookcase_yaw) * bookcase_scale
+	# Keep the human-height camera body at least 0.6 m clear of the measured
+	# bookcase bounds. Its half-diagonal is conservative for arbitrary yaw.
+	var bookcase_clearance_radius := bookcase_footprint.length() * 0.5 + 0.6
+	var preferred_side_axis := (writing_anchor - bookcase_center).normalized()
+	var camera_bias := {"clearance_center": bookcase_center,
+		"clearance_radius": bookcase_clearance_radius,
+		"preferred_side_origin": writing_anchor,
+		"preferred_side_axis": preferred_side_axis}
+	var grid: WalkGrid = nav_grids.get(plan.storey_of_room(room))
+	var camera: Dictionary = _find_eye_camera(plan, room, focus, target,
+		floor_y, room_rect, {}, grid, camera_bias)
+	if not bool(camera.get("body_clear", false)) or not bool(camera.get("reachable", false)):
+		var reason := "no reachable, clear human-height camera cell for the full writing-room overview"
+		_failed = true
+		return _view_error(request_id, request.to_dict(), "room_work_office_overview", reason)
+	var eye: Vector3 = camera["eye"]
+	var look_at: Vector3 = camera["target"]
+	# The overview uses the same 1.58 m human eye as the primary room portraits.
+	# A modestly wider lens keeps the near doorway and far wall furniture honest.
+	_cam.fov = 84.0
+	var camera_yaw := atan2(look_at.x - eye.x, look_at.z - eye.z)
+	_set_camera(eye, look_at, camera_yaw, 24.0)
+	var view_id := "room_work_office_overview_%d" % room
+	var path := rooms_dir.path_join(view_id + ".jpg")
+	var save_error: Error = await _save_image(path)
+	return _view_row(request_id, request, view_id, path, save_error, {
+		"priority": "supplementary", "actual_room": {"index": room,
+			"kind": "office", "storey": plan.storey_of_room(room),
+			"floor_rect": _rect_data(room_rect)},
+		"camera": _camera_data(eye, look_at,
+			"wider 84-degree human-height overview from an entrance-reachable WalkGrid cell; desk, chair, records and doorway in one composition"),
+		"camera_focus_prop_ids": _piece_ids(focus),
+		"door_landing_target": _v2(door_pos) if door_count > 0 else [],
+		"door_count": door_count,
+		"light": _light_metadata(camera_yaw),
+		"camera_body_clear": bool(camera.get("body_clear", false)),
+		"camera_reachable": bool(camera.get("reachable", false)),
+		"camera_candidate_count": int(camera.get("candidate_count", 0)),
+		"occlusion_blocker_count": int(camera.get("occlusion_blockers", 0)),
+		"bookcase_clearance_radius_m": bookcase_clearance_radius,
+		"camera_bookcase_center_distance_m": Vector2(eye.x, eye.z).distance_to(bookcase_center),
+		"preferred_side_projection_m": (Vector2(eye.x, eye.z) - writing_anchor).dot(preferred_side_axis),
+		"visible_room_props": _placement_inventory(pieces)})
+
+
 func _render_exterior(plan: HousePlan, request: BuildingRequest, case_id: String,
 		output: String, bounds: AABB) -> Dictionary:
 	var target := Vector3(0.0, bounds.position.y + bounds.size.y * 0.46, 0.0)
@@ -399,7 +505,7 @@ func _render_cutaway(plan: HousePlan, request: BuildingRequest, case_id: String,
 
 func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 		anchor: Vector2, floor_y: float, room_rect: Rect2,
-		station: Dictionary, grid: WalkGrid) -> Dictionary:
+		station: Dictionary, grid: WalkGrid, camera_bias: Dictionary = {}) -> Dictionary:
 	var breast: Dictionary = HouseGeometry.hearth_breast(plan)
 	var breast_rect: Rect2 = breast.get("rect", Rect2()) if int(breast.get("room", -1)) == room else Rect2()
 	var half_body := Vector2(0.26, 0.26)
@@ -407,6 +513,7 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 	var best_eye := Vector3(room_rect.get_center().x, floor_y + 1.58, room_rect.get_center().y)
 	var blocker_best := 999
 	var candidate_count := 0
+	var preferred_side_best := -INF
 	var min_x := room_rect.position.x + half_body.x + 0.08
 	var max_x := room_rect.end.x - half_body.x - 0.08
 	var min_z := room_rect.position.y + half_body.y + 0.08
@@ -431,6 +538,11 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 						break
 				if not body_clear:
 					continue
+				var clearance_center: Vector2 = camera_bias.get("clearance_center", Vector2(INF, INF))
+				var clearance_radius := float(camera_bias.get("clearance_radius", 0.0))
+				if clearance_radius > 0.0 and clearance_center.x < INF \
+						and candidate.distance_to(clearance_center) < clearance_radius:
+					continue
 				candidate_count += 1
 				var distance: float = candidate.distance_to(anchor)
 				var blockers := 0
@@ -444,6 +556,17 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 				if breast_rect.has_area() and _segment_intersects_rect(candidate, anchor, breast_rect):
 					blockers += 1
 				var score: float = float(blockers) * 100.0 + absf(distance - 2.8)
+				var side_projection := 0.0
+				var side_axis: Vector2 = camera_bias.get("preferred_side_axis", Vector2.ZERO)
+				if side_axis.length_squared() > 0.5:
+					var side_origin: Vector2 = camera_bias.get("preferred_side_origin", anchor)
+					side_projection = (candidate - side_origin).dot(side_axis)
+					# The axis points from the bookcase toward the writing group;
+					# prefer reachable eyes beyond the group on that same side.
+					if side_projection <= 0.0:
+						score += 120.0 + absf(side_projection) * 10.0
+					else:
+						score += maxf(0.0, 0.8 - side_projection) * 8.0
 				if not station.is_empty():
 					var facing: Vector2 = HouseFurnishScore._facing_of(float(station.get("yaw", 0.0)))
 					var front_amount: float = (candidate - anchor).normalized().dot(facing)
@@ -452,10 +575,12 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 					best_score = score
 					best_eye = Vector3(candidate.x, floor_y + 1.58, candidate.y)
 					blocker_best = blockers
+					preferred_side_best = side_projection
 	var target := Vector3(anchor.x, floor_y + 0.95, anchor.y)
 	return {"eye": best_eye, "target": target,
 		"body_clear": candidate_count > 0, "reachable": candidate_count > 0,
-		"occlusion_blockers": blocker_best, "candidate_count": candidate_count}
+		"occlusion_blockers": blocker_best, "candidate_count": candidate_count,
+		"preferred_side_projection": preferred_side_best}
 
 
 func _camera_obstruction_rect(piece: Dictionary, floor_y: float) -> Rect2:

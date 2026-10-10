@@ -431,9 +431,17 @@ static func _witch_shelter_covers_threshold(shelter: Dictionary, door: Dictionar
 		return false
 	var body: Vector2 = Vector2(door["pos"]) + Vector2(door["normal"]) * \
 		(HouseGeometry.wall_thickness(spec) + HouseGeometry.PERSON_RADIUS + 0.05)
-	# Candidate pieces have not yet passed through _accept(), which is where the
-	# convenience rect is attached. Measure their emitted parts directly here.
-	var footprint: Rect2 = Rect2(shelter.get("rect", piece_rect(shelter)))
+	# The authored threshold must be covered by the actual threshold roof part.
+	# The piece's union rectangle can include distant work bays separated by open
+	# sky, so it is not evidence that the doorstep has a shelter.
+	var footprint := Rect2()
+	for part in shelter.get("parts", []):
+		if String(part.get("role", "")) != "witch_shelter_roof":
+			continue
+		var bounds: AABB = part_aabb(part)
+		footprint = Rect2(Vector2(bounds.position.x, bounds.position.z),
+			Vector2(bounds.size.x, bounds.size.z))
+		break
 	return footprint.grow(0.05).has_point(body)
 
 
@@ -1064,50 +1072,19 @@ static func _leanto(cell: Dictionary) -> Dictionary:
 
 
 ## A witch's covered processing station, attached to the service wall. The
-## wall carries the back edge; two outer posts carry a weathered roof plane.
+## wall carries the back edge; the enclosed service wing has its own bearing roof.
 ## Measured cauldron, pot, bucket and workbench are laid out as a use sequence,
 ## rather than as four unrelated wall props.
 static func _witch_work_shelter(ctx: Dictionary, cell: Dictionary, gap: float) -> Dictionary:
 	var threshold_layout := ctx.has("witch_service_door")
 	var layout: Dictionary = _witch_work_shelter_layout(ctx, cell) if threshold_layout else {}
-	var width: float = float(layout.get("width", 4.9))
 	var depth := 2.4
-	# Keep the full opening/approach reservation clear beneath the lean-to. The
-	# lower eave remains pitched, but its emitted underside clears DOOR_H + 0.25
-	# at the service threshold, as required by the shared facade rule.
+	# The full Workshop has a separate, narrow threshold hood and one measured
+	# enclosed work wing. The compact shared Hall keeps its existing canopy.
 	var wall_y: float = minf(float(ctx["plan"].spec.height) - 0.02, 2.58) if threshold_layout \
 		else minf(float(ctx["plan"].spec.height) - 0.12, 2.5)
 	var drop := 0.18 if threshold_layout else 0.28
 	var roof_thickness := 0.08
-	var slope := atan2(drop, depth)
-	# Query the rotated roof at fixed world-height rays. The roof is a rotated
-	# box; cosine-only offsets miss its horizontal normal projection.
-	var ledger_outer_d: float = gap + 0.12
-	var roof_underside_at_ledger: float = _witch_roof_under(cell, ledger_outer_d, gap,
-		depth, wall_y, drop, roof_thickness)
-	var post_outward: float = gap + depth - 0.06
-	var roof_underside_at_post: float = _witch_roof_under(cell, post_outward, gap,
-		depth, wall_y, drop, roof_thickness)
-	var parts: Array = []
-	for side in [-1.0, 1.0]:
-		parts.append(_part(cell, "witch_shelter_post", side * (width * 0.5 - 0.06), post_outward,
-			0.12, 0.12, 0.0, roof_underside_at_post, "trim"))
-	# A continuous ledger makes the attachment legible and gives the roof a
-	# believable bearing point against the house wall.
-	parts.append(_part(cell, "witch_shelter_ledger", 0.0, gap + 0.06,
-		width, 0.12, roof_underside_at_ledger - 0.12, 0.12, "trim"))
-	var out3 := Vector3((cell["out"] as Vector2).x, 0.0, (cell["out"] as Vector2).y)
-	# The roof box is authored across local X and out local Z. Build that
-	# cardinal frame first, then pitch its outward axis down toward the posts.
-	var roof_frame := Basis(Vector3.UP.cross(out3), Vector3.UP, out3)
-	var roof := _part(cell, "witch_shelter_roof", 0.0, gap + depth * 0.5,
-		width + 0.12, depth, wall_y - drop * 0.5 - roof_thickness * 0.5,
-		roof_thickness, "roof")
-	# _part returns world-axis bounds; this roof transform needs local dimensions.
-	roof["size"] = Vector3(width + 0.12, roof_thickness, depth)
-	roof["basis"] = roof_frame * Basis(Vector3.RIGHT, slope)
-	parts.append(roof)
-	var piece := _piece("witch_work_lean_to", "witch_work_shelter", parts, str(cell["host"]))
 	var props: Array = []
 	if not PropCatalog.known("Workbench") or not PropCatalog.known("Cauldron") \
 			or not PropCatalog.known("Pot_1") or not PropCatalog.known("Bucket_Wooden_1"):
@@ -1118,66 +1095,315 @@ static func _witch_work_shelter(ctx: Dictionary, cell: Dictionary, gap: float) -
 	var bucket_t: float = float(layout.get("bucket_t", 1.35))
 	var pot_d: float = float(layout.get("pot_d", 1.50))
 	var bucket_d: float = float(layout.get("bucket_d", 1.50))
-	props.append(_prop_at(cell, bench_t, gap + 0.12, "Workbench", 1.0, "witch_prep_bench"))
-	props.append(_prop_at(cell, cauldron_t, gap + 1.25, "Cauldron", 1.0, "witch_brewing_heat"))
+	var bench_depth := float(layout.get("bench_d", 0.12))
+	props.append(_prop_at(cell, bench_t, gap + bench_depth, "Workbench", 1.0, "witch_prep_bench"))
+	props.append(_prop_at(cell, cauldron_t, gap + float(layout.get("cauldron_d", 1.25)), "Cauldron", 1.0, "witch_brewing_heat"))
 	props.append(_prop_at(cell, pot_t, gap + pot_d, "Pot_1", 1.0, "witch_cookware"))
 	props.append(_prop_at(cell, bucket_t, gap + bucket_d, "Bucket_Wooden_1", 1.0, "witch_water_vessel"))
-	var roof_bounds: AABB = part_aabb(roof)
-	var roof_rect := Rect2(Vector2(roof_bounds.position.x, roof_bounds.position.z),
-		Vector2(roof_bounds.size.x, roof_bounds.size.z))
-	piece["work_clearance"] = {"origin": cell["o"], "out": cell["out"],
-		"tangent": cell["tan"], "gap": gap, "depth": depth, "wall_y": wall_y,
-		"drop": drop, "roof_thickness": roof_thickness,
-		"required_headroom": WITCH_WORK_CLEARANCE, "approach_size": WITCH_WORK_APPROACH,
-		"roof_rect": roof_rect}
 	var bench_index := _prop_index(props, "witch_prep_bench")
 	var cauldron_index := _prop_index(props, "witch_brewing_heat")
 	if bench_index < 0 or cauldron_index < 0:
 		return {}
+	var pot_index := _prop_index(props, "witch_cookware")
+	var bucket_index := _prop_index(props, "witch_water_vessel")
+	if pot_index < 0 or bucket_index < 0:
+		return {}
+	# The catalogue AABBs include each model's measured centre offset. Keep the
+	# pot and bucket on the same shelf line, but slide the bucket outward until
+	# their actual boxes clear by GAP. The small bounded steps also preserve a
+	# useful gap when a catalogue measurement changes slightly.
+	var pot_bounds: AABB = HouseExterior.bounds_of(props[pot_index])
+	var bucket_depth := bucket_d
+	var bucket_clear := false
+	for attempt in range(16):
+		var bucket_bounds: AABB = HouseExterior.bounds_of(props[bucket_index])
+		var bucket_local: Rect2 = _prop_cell_rect(cell, bucket_bounds)
+		if not pot_bounds.grow(GAP).intersects(bucket_bounds) \
+				and bucket_local.end.y <= depth - 0.2:
+			bucket_clear = true
+			break
+		bucket_depth += 0.05
+		props[bucket_index] = _prop_at(cell, bucket_t, gap + bucket_depth,
+			"Bucket_Wooden_1", 1.0, "witch_water_vessel")
+	if not bucket_clear:
+		return {}
+	bucket_d = bucket_depth
 	var bench_local: Rect2 = _prop_cell_rect(cell, HouseExterior.bounds_of(props[bench_index]))
 	var cauldron_local: Rect2 = _prop_cell_rect(cell, HouseExterior.bounds_of(props[cauldron_index]))
-	# The bench is worked from its outward face. The cauldron is tended from the
-	# threshold-facing side reserved by the measured entry/workstation layout.
-	# Both zones are measured 0.9 x 0.9 m clear floor.
+	# These measured use stances are kept independent of their roof bays.
 	var bench_zone_local := Rect2(Vector2(bench_local.get_center().x - WITCH_WORK_APPROACH * 0.5,
-		bench_local.end.y + 0.05), Vector2(WITCH_WORK_APPROACH, WITCH_WORK_APPROACH))
-	var cauldron_zone_t := cauldron_local.position.x - 0.05 - WITCH_WORK_APPROACH
-	if ctx.has("witch_service_door"):
-		var door_local_t := (Vector2(ctx["witch_service_door"]["pos"]) - Vector2(cell["o"])).dot(Vector2(cell["tan"]))
-		if cauldron_local.get_center().x < door_local_t:
-			cauldron_zone_t = cauldron_local.end.x + 0.05
+		bench_local.end.y + HouseGeometry.PERSON_RADIUS + 0.025),
+		Vector2(WITCH_WORK_APPROACH, WITCH_WORK_APPROACH))
+	var cauldron_zone_t := cauldron_local.position.x - GAP - WITCH_WORK_APPROACH
+	if threshold_layout and not bool(ctx["witch_compact_service_threshold"]):
+		# Face the tending stance inward so it stays under the short shed roof.
+		# Keep the vessels on the opposite tangent side, clear of the stance.
+		if cauldron_local.get_center().x > bench_local.get_center().x:
+			cauldron_zone_t = cauldron_local.end.x + GAP
+	else:
+		if ctx.has("witch_service_door"):
+			var door_local_t := (Vector2(ctx["witch_service_door"]["pos"]) - Vector2(cell["o"])) \
+				.dot(Vector2(cell["tan"]))
+			if cauldron_local.get_center().x < door_local_t:
+				cauldron_zone_t = cauldron_local.end.x + GAP
 	var cauldron_zone_local := Rect2(Vector2(cauldron_zone_t,
 		cauldron_local.get_center().y - WITCH_WORK_APPROACH * 0.5),
 		Vector2(WITCH_WORK_APPROACH, WITCH_WORK_APPROACH))
+	if threshold_layout and not bool(ctx["witch_compact_service_threshold"]):
+		cauldron_zone_local = Rect2(Vector2(cauldron_local.get_center().x - WITCH_WORK_APPROACH * 0.5,
+			cauldron_local.position.y - GAP - WITCH_WORK_APPROACH),
+			Vector2(WITCH_WORK_APPROACH, WITCH_WORK_APPROACH))
 	props[bench_index]["operation_zone"] = _cell_rect(cell, bench_zone_local)
 	props[bench_index]["operation_side"] = "outward"
 	props[cauldron_index]["operation_zone"] = _cell_rect(cell, cauldron_zone_local)
-	props[cauldron_index]["operation_side"] = "threshold_side"
+	props[cauldron_index]["operation_side"] = "inward"
+	var threshold_t := 0.0
+	if threshold_layout:
+		threshold_t = (Vector2(ctx["witch_service_door"]["pos"]) - Vector2(cell["o"])) \
+			.dot(Vector2(cell["tan"]))
+	var prep_bounds: AABB = HouseExterior.bounds_of(props[bench_index])
+	var prep_local: Rect2 = _prop_cell_rect(cell, prep_bounds)
+	var brew_min := INF
+	var brew_max := -INF
+	for index in [_prop_index(props, "witch_brewing_heat"),
+			_prop_index(props, "witch_cookware"), _prop_index(props, "witch_water_vessel")]:
+		var local: Rect2 = _prop_cell_rect(cell, HouseExterior.bounds_of(props[index]))
+		brew_min = minf(brew_min, local.position.x)
+		brew_max = maxf(brew_max, local.end.x)
+	# The brewing awning protects the tending stance as well as the cookware.
+	# Include its measured tangent extent when sizing the little roof bay.
+	brew_min = minf(brew_min, cauldron_zone_local.position.x)
+	brew_max = maxf(brew_max, cauldron_zone_local.end.x)
+	var modules: Array[Dictionary] = []
+	var wing_center := 0.0
+	var wing_width := 0.0
+	var wing_entry_half := 0.0
+	var wing_entry_center_d := 0.0
+	if threshold_layout and not bool(ctx["witch_compact_service_threshold"]):
+		var door_width := float(ctx["witch_service_door"].get("width", HouseGeometry.DOOR_W))
+		wing_entry_half = maxf(HouseGeometry.PERSON_RADIUS + 0.09, 0.36)
+		wing_entry_center_d = gap + 1.56
+		modules.append({"prefix": "witch_shelter", "center": threshold_t,
+			# The entry hood remains independently measured around the threshold.
+			"width": door_width + 1.5, "wall_y": wall_y, "drop": drop})
+		var wing_min := minf(prep_local.position.x, brew_min)
+		var wing_max := maxf(prep_local.end.x, brew_max)
+		wing_min = minf(wing_min, bench_zone_local.position.x)
+		wing_max = maxf(wing_max, bench_zone_local.end.x)
+		wing_min = minf(wing_min, cauldron_zone_local.position.x)
+		wing_max = maxf(wing_max, cauldron_zone_local.end.x)
+		wing_center = (wing_min + wing_max) * 0.5
+		# Wall thickness is 0.12 m total; the roof adds another 0.12 m, leaving
+		# 0.06 m of eave beyond each wall while keeping the measured bay compact.
+		wing_width = wing_max - wing_min + 0.12
+		wing_width = maxf(wing_width, 2.0 * wing_entry_half + 0.55)
+		modules.append({"prefix": "witch_work_wing", "center": wing_center,
+			"width": wing_width, "wall_y": wall_y, "drop": drop})
+	else:
+		modules.append({"prefix": "witch_shelter", "center": 0.0,
+			"width": float(layout.get("width", 4.9)), "wall_y": wall_y, "drop": drop})
+	var parts: Array = []
+	var roof_rects: Dictionary = {}
+	for module in modules:
+		var prefix := String(module["prefix"])
+		var module_parts := _witch_shelter_module_parts(cell, prefix, float(module["center"]),
+			float(module["width"]), gap, depth, float(module["wall_y"]),
+			float(module["drop"]), roof_thickness)
+		parts.append_array(module_parts)
+		for part in module_parts:
+			if String(part.get("role", "")) != prefix + "_roof":
+				continue
+			var bounds: AABB = part_aabb(part)
+			roof_rects[prefix] = Rect2(Vector2(bounds.position.x, bounds.position.z),
+				Vector2(bounds.size.x, bounds.size.z))
+	if threshold_layout and not bool(ctx["witch_compact_service_threshold"]):
+		# Timber returns and a closed yard-facing wall turn the measured station
+		# roof into a shed. The entry gap faces the actual door approach through
+		# the inboard side return; the house wall closes the back.
+		var wall_thickness := 0.12
+		var front_d := gap + depth - wall_thickness * 0.5
+		var wing_left := wing_center - wing_width * 0.5
+		var wing_right := wing_center + wing_width * 0.5
+		var inner_side := -1.0 if threshold_t <= wing_left else 1.0
+		var side_start := gap + 0.04
+		var side_end := gap + depth - 0.04
+		var entry_start := wing_entry_center_d - wing_entry_half
+		var entry_end := wing_entry_center_d + wing_entry_half
+		for side in [-1.0, 1.0]:
+			var side_t := wing_left + wall_thickness * 0.5 if side < 0.0 \
+				else wing_right - wall_thickness * 0.5
+			var runs: Array[Vector2] = [Vector2(side_start, side_end)]
+			if side == inner_side:
+				runs = [Vector2(side_start, entry_start), Vector2(entry_end, side_end)]
+			for run in runs:
+				var run_length := run.y - run.x
+				if run_length <= 0.02:
+					continue
+				var segment_count := maxi(1, ceili(run_length / 0.3))
+				var side_step := run_length / float(segment_count)
+				for segment in segment_count:
+					var d0 := run.x + float(segment) * side_step
+					var d1 := d0 + side_step
+					var bearing_y := _witch_roof_under(cell, d1, gap, depth, wall_y, drop, roof_thickness)
+					parts.append(_part(cell, "witch_work_wing_wall", side_t,
+						(d0 + d1) * 0.5, wall_thickness, side_step + 0.005,
+						0.0, bearing_y - 0.008, "trim"))
+		# The yard-facing wall has a measured service opening aligned with the prep
+		# stance. This leaves body-radius clearance at the work surface while the
+		# two side returns and the remaining front panels keep the wing enclosed.
+		var front_height := _witch_roof_under(cell, front_d, gap, depth, wall_y, drop, roof_thickness) - 0.008
+		var front_open_center := bench_zone_local.get_center().x
+		var front_open_half := WITCH_WORK_APPROACH * 0.5 + 0.18
+		var front_runs: Array[Vector2] = [Vector2(wing_left, front_open_center - front_open_half),
+			Vector2(front_open_center + front_open_half, wing_right)]
+		var vent_added := false
+		var vent_center_t := NAN
+		for run in front_runs:
+			var run_width := run.y - run.x
+			if run_width <= 0.02:
+				continue
+			if not vent_added and run_width > 0.95 and front_height > 1.55:
+				vent_added = true
+				var vent_width := 0.54
+				var vent_half := vent_width * 0.5
+				var vent_center := (run.x + run.y) * 0.5
+				vent_center_t = vent_center
+				var vent_left_width := vent_center - vent_half - run.x
+				var vent_right_width := run.y - (vent_center + vent_half)
+				parts.append(_part(cell, "witch_work_wing_wall", run.x + vent_left_width * 0.5,
+					front_d, vent_left_width, wall_thickness, 0.0, front_height, "trim"))
+				parts.append(_part(cell, "witch_work_wing_wall", vent_center + vent_half + vent_right_width * 0.5,
+					front_d, vent_right_width, wall_thickness, 0.0, front_height, "trim"))
+				# Keep the head panel bearing on the shed roof. The lower infill and
+				# four short frame pieces make a real high vent in the blank wall.
+				var vent_sill := 0.92
+				var vent_head := 1.42
+				parts.append(_part(cell, "witch_work_wing_wall", vent_center, front_d,
+					vent_width, wall_thickness, vent_head, front_height - vent_head, "trim"))
+				parts.append(_part(cell, "witch_work_wing_detail", vent_center, front_d,
+					vent_width, wall_thickness, 0.0, vent_sill, "trim"))
+				for side in [-1.0, 1.0]:
+					parts.append(_part(cell, "witch_work_wing_vent_frame",
+						vent_center + side * (vent_half - 0.035), front_d,
+						0.07, wall_thickness + 0.08, vent_sill, vent_head - vent_sill, "wall"))
+				for rail_y in [vent_sill, vent_head - 0.04]:
+					parts.append(_part(cell, "witch_work_wing_vent_frame", vent_center, front_d,
+						vent_width, wall_thickness + 0.08, rail_y, 0.08, "wall"))
+			else:
+				parts.append(_part(cell, "witch_work_wing_wall", (run.x + run.y) * 0.5,
+					front_d, run_width, wall_thickness, 0.0, front_height, "trim"))
+		# Full-height jambs and a bearing lintel frame the yard-facing opening.
+		var jamb_center_offset := front_open_half - wall_thickness * 0.5
+		for side in [-1.0, 1.0]:
+			parts.append(_part(cell, "witch_work_wing_wall",
+				front_open_center + side * jamb_center_offset, front_d,
+				wall_thickness, wall_thickness, 0.0, front_height, "trim"))
+		var lintel_width := WITCH_WORK_APPROACH + 0.12
+		parts.append(_part(cell, "witch_work_wing_header", front_open_center, front_d,
+			lintel_width, wall_thickness, front_height - 0.16, 0.16, "trim"))
+		# Pale timber accents break up the solid wall faces and make the service
+		# opening read as a working shed door. Keep them on the wall plane; they do
+		# not occupy either measured standing zone.
+		var frame_width := 0.075
+		var frame_stations: Array[float] = [wing_left + frame_width * 0.5,
+			front_open_center - front_open_half - frame_width * 0.5,
+			front_open_center + front_open_half + frame_width * 0.5,
+			wing_right - frame_width * 0.5]
+		for edge_t in frame_stations:
+			parts.append(_part(cell, "witch_work_wing_frame", edge_t, front_d,
+				frame_width, wall_thickness + 0.02, 0.0, front_height, "wall"))
+		for run in front_runs:
+			var run_width := run.y - run.x
+			if run_width <= 0.18:
+				continue
+			var rail_center := (run.x + run.y) * 0.5
+			parts.append(_part(cell, "witch_work_wing_frame", rail_center, front_d,
+					 run_width, wall_thickness + 0.02, 0.28, 0.07, "wall"))
+			parts.append(_part(cell, "witch_work_wing_frame", rail_center, front_d,
+					 run_width, wall_thickness + 0.02, front_height - 0.12, 0.07, "wall"))
+			if run_width > 0.75:
+				for fraction in [0.10, 0.90]:
+					var batten_t: float = float(run.x) + run_width * float(fraction)
+					if is_finite(vent_center_t) and absf(batten_t - vent_center_t) < 0.35:
+						continue
+					parts.append(_part(cell, "witch_work_wing_batten", batten_t, front_d,
+						0.12, wall_thickness + 0.08, 0.08, front_height - 0.16, "wall"))
+	var piece := _piece("witch_work_lean_to", "witch_work_shelter", parts, str(cell["host"]))
+	var threshold_rect: Rect2 = roof_rects.get("witch_shelter", Rect2())
+	var prep_roof: Rect2 = roof_rects.get("witch_work_wing", threshold_rect)
+	var brew_roof: Rect2 = roof_rects.get("witch_work_wing", threshold_rect)
+	var module_walls := {"witch_shelter": wall_y,
+		"witch_work_wing": wall_y}
+	var module_drops := {"witch_shelter": drop,
+		"witch_work_wing": drop}
+	piece["work_clearance"] = {"origin": cell["o"], "out": cell["out"],
+		"tangent": cell["tan"], "gap": gap, "depth": depth, "wall_y": wall_y,
+		"drop": drop, "roof_thickness": roof_thickness,
+		"required_headroom": WITCH_WORK_CLEARANCE, "approach_size": WITCH_WORK_APPROACH,
+		"roof_rect": threshold_rect, "threshold_roof_rect": threshold_rect,
+		"prep_roof_rect": prep_roof, "brew_roof_rect": brew_roof}
 	# Every item is checked against the others with its measured assembled bounds.
 	for i in range(props.size()):
 		var a: AABB = HouseExterior.bounds_of(props[i])
 		for j in range(i + 1, props.size()):
 			if a.grow(GAP).intersects(HouseExterior.bounds_of(props[j])):
 				return {}
-	var shelter := roof_rect
 	for prop in props:
-		var b: AABB = HouseExterior.bounds_of(prop)
-		var r := Rect2(Vector2(b.position.x, b.position.z), Vector2(b.size.x, b.size.z))
-		if not shelter.grow(-0.08).encloses(r):
+		var bounds: AABB = HouseExterior.bounds_of(prop)
+		var footprint := Rect2(Vector2(bounds.position.x, bounds.position.z),
+			Vector2(bounds.size.x, bounds.size.z))
+		var is_prep := String(prop["role"]) == "witch_prep_bench"
+		var assigned_roof := prep_roof if is_prep else brew_roof
+		var assigned_prefix := "witch_work_wing"
+		if not roof_rects.has(assigned_prefix):
+			assigned_roof = threshold_rect
+			assigned_prefix = "witch_shelter"
+		if not assigned_roof.grow(-0.08).encloses(footprint):
 			return {}
-		var local: Rect2 = _prop_cell_rect(cell, b)
-		if b.position.y + b.size.y > _witch_roof_under(cell, local.end.y, gap, depth,
-			wall_y, drop, roof_thickness) - 0.04:
+		var local: Rect2 = _prop_cell_rect(cell, bounds)
+		if bounds.position.y + bounds.size.y > _witch_roof_under(cell, local.end.y, gap, depth,
+			float(module_walls[assigned_prefix]), float(module_drops[assigned_prefix]), roof_thickness) - 0.04:
 			return {}
 	for prop in [props[bench_index], props[cauldron_index]]:
 		var zone: Rect2 = prop["operation_zone"]
-		if not roof_rect.encloses(zone) or _witch_zone_headroom(cell, zone, gap, depth,
-			wall_y, drop, roof_thickness) < WITCH_WORK_CLEARANCE:
+		var is_prep := String(prop["role"]) == "witch_prep_bench"
+		var zone_roof := prep_roof if is_prep else brew_roof
+		var zone_prefix := "witch_work_wing"
+		if not roof_rects.has(zone_prefix):
+			zone_roof = threshold_rect
+			zone_prefix = "witch_shelter"
+		if not zone_roof.encloses(zone) or _witch_zone_headroom(cell, zone, gap, depth,
+			float(module_walls[zone_prefix]), float(module_drops[zone_prefix]), roof_thickness) < WITCH_WORK_CLEARANCE:
 			return {}
 		if not _witch_zone_clear(ctx, cell, zone, props, piece, String(prop["role"])):
 			return {}
 	return {"pieces": [piece], "props": props}
 
+
+static func _witch_shelter_module_parts(cell: Dictionary, prefix: String, center_t: float,
+		width: float, gap: float, depth: float, wall_y: float, drop: float,
+		roof_thickness: float) -> Array[Dictionary]:
+	var parts: Array[Dictionary] = []
+	var ledger_y := _witch_roof_under(cell, gap + 0.12, gap, depth, wall_y, drop, roof_thickness)
+	var post_d := gap + depth - 0.06
+	var post_y := _witch_roof_under(cell, post_d, gap, depth, wall_y, drop, roof_thickness)
+	# The work wing has continuous side returns that bear the eaves. Separate
+	# corner posts there would occupy the same volume and z-fight against them.
+	if prefix != "witch_work_wing":
+		for side in [-1.0, 1.0]:
+			parts.append(_part(cell, prefix + "_post", center_t + side * (width * 0.5 - 0.06),
+				post_d, 0.12, 0.12, 0.0, post_y, "trim"))
+	parts.append(_part(cell, prefix + "_ledger", center_t, gap + 0.06,
+		width, 0.12, ledger_y - 0.12, 0.12, "trim"))
+	var out3 := Vector3((cell["out"] as Vector2).x, 0.0, (cell["out"] as Vector2).y)
+	var roof_frame := Basis(Vector3.UP.cross(out3), Vector3.UP, out3)
+	var roof := _part(cell, prefix + "_roof", center_t, gap + depth * 0.5,
+		width + 0.12, depth, wall_y - drop * 0.5 - roof_thickness * 0.5,
+		roof_thickness, "roof")
+	roof["size"] = Vector3(width + 0.12, roof_thickness, depth)
+	roof["basis"] = roof_frame * Basis(Vector3.RIGHT, atan2(drop, depth))
+	parts.append(roof)
+	return parts
 
 static func _point_rect_distance(point: Vector2, rect: Rect2) -> float:
 	var closest := Vector2(clampf(point.x, rect.position.x, rect.end.x),
@@ -1208,9 +1434,8 @@ static func _witch_tangent_half(cell: Dictionary, key: String, scale := 1.0) -> 
 	return _prop_cell_rect(cell, HouseExterior.bounds_of(probe)).size.x * 0.5
 
 
-## Lay a genuinely clear entrance lane beside the four measured Witch stations.
-## Coordinates are relative to the service threshold; the shelter is centered
-## on their combined envelope and sized with the posts outside both extremes.
+## Lay a clear threshold lane beside the measured Witch stations. The full
+## Workshop keeps its stations on one side and groups them into a short wing.
 static func _witch_work_shelter_layout(ctx: Dictionary, cell: Dictionary) -> Dictionary:
 	var door: Dictionary = ctx.get("witch_service_door", ctx["door"])
 	var lane_half := (float(door.get("width", HouseGeometry.DOOR_W)) + 1.1) * 0.5
@@ -1231,26 +1456,50 @@ static func _witch_work_shelter_layout(ctx: Dictionary, cell: Dictionary) -> Dic
 	var bench_from_door := bench_direction * (lane_half + clearance + bench_half)
 	var cauldron_from_door := -bench_direction * (lane_half + clearance \
 		+ WITCH_WORK_APPROACH + clearance + cauldron_half)
+	var pot_from_door := cauldron_from_door
+	var bucket_from_door := cauldron_from_door
+	var bench_d := 0.12
+	var cauldron_d := 1.25
+	var pot_d := 0.12
+	var bucket_d := 0.67
+	if not bool(door.get("witch_compact_service_threshold", false)):
+		bench_d = 0.085
+		# Place the stations side by side. The measured half-widths and explicit
+		# margin leave the required GAP between the Workbench and cauldron.
+		var brew_offset := bench_half + cauldron_half + GAP + 0.03
+		cauldron_from_door = bench_from_door + bench_direction * brew_offset
+		# Move vessels to the other tangent side of the cauldron. This makes room
+		# for the inward-facing tending stance without widening its roof bay.
+		var vessel_half := maxf(pot_half, bucket_half)
+		var vessel_offset := WITCH_WORK_APPROACH * 0.5 + GAP + vessel_half
+		pot_from_door = cauldron_from_door + bench_direction * vessel_offset
+		bucket_from_door = pot_from_door
+		# Place the brew stance inboard across shed depth. Measured AABBs below
+		# still decide whether the vessels and stance are truly clear.
+		cauldron_d = 1.25
+		pot_d = 0.12
+		bucket_d = 0.67
 	var minimum := minf(bench_from_door - bench_half, cauldron_from_door - cauldron_half)
 	var maximum := maxf(bench_from_door + bench_half, cauldron_from_door + cauldron_half)
+	minimum = minf(minimum, pot_from_door - pot_half)
+	maximum = maxf(maximum, pot_from_door + pot_half)
+	minimum = minf(minimum, bucket_from_door - bucket_half)
+	maximum = maxf(maximum, bucket_from_door + bucket_half)
 	var center_offset := (minimum + maximum) * 0.5
 	var span := maximum - minimum
 	var width := span + 2.0 * (0.12 + GAP + 0.03)
 	return {"width": width, "center_offset": center_offset,
 		"bench_t": bench_from_door - center_offset,
 		"cauldron_t": cauldron_from_door - center_offset,
-		# The cookware and water vessel are grouped against the wall at the
-		# cauldron's service end. Stagger their measured depth footprints so the
-		# full four-piece station fits a compact canopy instead of a 7.7 m row.
-		"pot_t": cauldron_from_door - center_offset,
-		"bucket_t": cauldron_from_door - center_offset,
-		"pot_d": 0.12, "bucket_d": 0.67}
+		"pot_t": pot_from_door - center_offset,
+		"bucket_t": bucket_from_door - center_offset,
+		"bench_d": bench_d, "cauldron_d": cauldron_d,
+		"pot_d": pot_d, "bucket_d": bucket_d}
 
 
 ## Put the bench on the side of its real service door that keeps its measured
-## upper body away from same-wall daylight openings. Low vessels can occupy
-## the opposite side because they remain below the window sill; facade_clear
-## still validates every emitted AABB after slot quantization.
+## upper body away from same-wall daylight openings. Facade clearance validates
+## every assembled AABB after slot quantization.
 static func _witch_bench_direction(ctx: Dictionary, cell: Dictionary, door: Dictionary,
 		lane_half: float, clearance: float, bench_half: float) -> float:
 	var plan: HousePlan = ctx["plan"]
@@ -1348,8 +1597,8 @@ static func _witch_zone_clear(ctx: Dictionary, cell: Dictionary, zone: Rect2,
 			Vector2(HouseExterior.bounds_of(prop).size.x, HouseExterior.bounds_of(prop).size.z))):
 			return false
 	for part in shelter["parts"]:
-		if String(part["role"]) == "witch_shelter_roof" \
-				or String(part["role"]) == "witch_shelter_ledger":
+		var part_role := String(part["role"])
+		if part_role.ends_with("_roof") or part_role.ends_with("_ledger"):
 			continue
 		if zone_box.intersects(part_aabb(part)):
 			return false

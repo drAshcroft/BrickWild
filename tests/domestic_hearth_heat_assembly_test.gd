@@ -60,6 +60,12 @@ func _check_style(style: StringName, size: Dictionary) -> void:
 			where + ": Pot_1 is not cookware hosted on the room's preparation surface")
 	_expect(cooking_vessels == 1,
 		where + ": ordinary cooking plan lacks exactly one measured Pot_1 vessel")
+	var hearth_vessel_plan: Dictionary = plan.hearth.get("cooking_vessel", {})
+	_expect(String(hearth_vessel_plan.get("key", "")) == "Pot_1" \
+		and String(hearth_vessel_plan.get("purpose", "")) == "hearth_cooking" \
+		and String(hearth_vessel_plan.get("host", "")) == "ordinary_fireplace" \
+		and String(hearth_vessel_plan.get("support", "")) == "iron_tripod",
+		where + ": no explicit plan-owned firebox vessel/support relation")
 	var builder := HouseBuilder.new()
 	builder.build(plan, true)
 	var scene_root := Node3D.new()
@@ -78,6 +84,18 @@ func _check_style(style: StringName, size: Dictionary) -> void:
 		return
 	var heat: Node3D = assembly["heat"]
 	var soot: Node3D = assembly["soot"]
+	var cooking_vessel := heat.find_child("HearthCookingVessel", true, false) as Node3D
+	var tripod := heat.find_child("HearthIronTripod", true, false) as Node3D
+	var support_ring := heat.find_child("TrivetSupportRing", true, false) as MeshInstance3D
+	_expect(cooking_vessel != null and tripod != null and support_ring != null,
+		where + ": planned firebox vessel has no real model and measured iron support")
+	if cooking_vessel != null:
+		var model_meshes := cooking_vessel.find_children("*", "MeshInstance3D", true, false)
+		_expect(not model_meshes.is_empty()
+			and cooking_vessel.scene_file_path == PropCatalog.scene_path("Pot_1")
+			and String(cooking_vessel.get_meta("planned_key", "")) == "Pot_1"
+			and String(cooking_vessel.get_meta("plan_role", "")) == "hearth_cooking",
+			where + ": firebox vessel is not the actual plan-owned Pot_1 model")
 	anchor.add_child(heat)
 	scene_root.add_child(soot)
 	var heat_names := ["FuelBed", "Firewood_0", "Firewood_1", "Flame_0", "Flame_1", "Flame_2", "HearthWarmth"]
@@ -101,6 +119,71 @@ func _check_style(style: StringName, size: Dictionary) -> void:
 		float(metrics["sill"]), float(metrics["head"]),
 		float(metrics["width"]), float(metrics["depth"])),
 		where + ": actual fire parts fail the shared measured-opening predicate")
+	_expect(cooking_vessel != null and HouseAssembler._hearth_cooking_vessel_fits(heat,
+		float(heat.get_meta("opening_sill_local_y")),
+		float(heat.get_meta("opening_head_local_y")),
+		float(metrics["width"]), float(metrics["depth"])),
+		where + ": planned vessel does not sit on its measured in-aperture trivet")
+	var base_split: MeshInstance3D = heat.find_child("Firewood_0", true, false)
+	var cross_split: MeshInstance3D = heat.find_child("Firewood_1", true, false)
+	_expect(absf(base_split.rotation.y - cross_split.rotation.y) > 0.7
+		and cross_split.position.y > base_split.position.y + 0.04
+		and base_split.position.z < 0.0,
+		where + ": firewood is not visibly crossed, layered at the mouth")
+	for flame_index in range(3):
+		var flame := heat.find_child("Flame_%d" % flame_index, true, false) as MeshInstance3D
+		var flame_arrays: Array = flame.mesh.surface_get_arrays(0)
+		var flame_vertices: PackedVector3Array = flame_arrays[Mesh.ARRAY_VERTEX]
+		var flame_normals: PackedVector3Array = flame_arrays[Mesh.ARRAY_NORMAL]
+		var flame_material := flame.material_override as StandardMaterial3D
+		var volumetric: bool = flame.mesh.get_aabb().size.z > 0.025 \
+			and flame.mesh.get_aabb().size.x > 0.025 \
+			and flame_arrays[Mesh.ARRAY_INDEX].size() >= 100 \
+			and flame_normals.size() == flame_vertices.size() \
+			and flame_material != null \
+			and flame_material.cull_mode != BaseMaterial3D.CULL_DISABLED \
+			and flame.mesh.get_aabb().size.y < 0.30
+		for triangle in range(0, flame_vertices.size(), 3):
+			if triangle + 2 >= flame_vertices.size():
+				break
+			var geometric := (flame_vertices[triangle + 2] - flame_vertices[triangle]).cross(
+				flame_vertices[triangle + 1] - flame_vertices[triangle]).normalized()
+			if geometric.dot(flame_normals[triangle]) < 0.98:
+				volumetric = false
+		_expect(volumetric, where + ": flame still reads as a flat paper triangle")
+	if tripod != null and support_ring != null and cooking_vessel != null:
+		var ring_parent := support_ring.get_parent()
+		var old_ring_y: float = support_ring.position.y
+		ring_parent.remove_child(support_ring)
+		_expect(not HouseAssembler._hearth_cooking_vessel_fits(heat,
+			float(heat.get_meta("opening_sill_local_y")),
+			float(heat.get_meta("opening_head_local_y")),
+			float(metrics["width"]), float(metrics["depth"])),
+			where + ": vessel support negative accepted a missing trivet ring")
+		ring_parent.add_child(support_ring)
+		support_ring.position.y = old_ring_y
+		var old_vessel_position: Vector3 = cooking_vessel.position
+		cooking_vessel.position.x += float(metrics["width"])
+		_expect(not HouseAssembler._hearth_cooking_vessel_fits(heat,
+			float(heat.get_meta("opening_sill_local_y")),
+			float(heat.get_meta("opening_head_local_y")),
+			float(metrics["width"]), float(metrics["depth"])),
+			where + ": aperture negative accepted a pot moved outside the real jambs")
+		cooking_vessel.position = old_vessel_position
+	var saved_hearth_vessel: Dictionary = plan.hearth["cooking_vessel"].duplicate(true)
+	plan.hearth.erase("cooking_vessel")
+	var unplanned_assembly: Dictionary = HouseAssembler._domestic_hearth_assembly(
+		anchor, placement, plan, builder)
+	var unplanned_heat: Node3D = unplanned_assembly.get("heat") as Node3D
+	_expect(unplanned_heat != null
+		and unplanned_heat.find_child("HearthCookingVessel", true, false) == null
+		and unplanned_heat.find_child("HearthIronTripod", true, false) == null,
+		where + ": assembly invented a firebox vessel without a plan-owned record")
+	if unplanned_heat != null:
+		unplanned_heat.free()
+	if unplanned_assembly.has("soot"):
+		(unplanned_assembly["soot"] as Node3D).free()
+	plan.hearth["cooking_vessel"] = saved_hearth_vessel
 	var moved_log := heat.find_child("Firewood_0", true, false) as MeshInstance3D
 	var original_log_position: Vector3 = moved_log.position
 	moved_log.position.x += 0.40
@@ -109,6 +192,37 @@ func _check_style(style: StringName, size: Dictionary) -> void:
 		float(metrics["width"]), float(metrics["depth"])),
 		where + ": measured-opening predicate accepted a log moved outside the real firebox")
 	moved_log.position = original_log_position
+	var removed_support := heat.find_child("Firewood_0", true, false) as MeshInstance3D
+	heat.remove_child(removed_support)
+	_expect(not HouseAssembler._heat_fits_measured_firebox(anchor, heat,
+		float(metrics["sill"]), float(metrics["head"]),
+		float(metrics["width"]), float(metrics["depth"])),
+		where + ": measured-opening predicate accepted fire without its supporting log")
+	heat.add_child(removed_support)
+	var raised_base_log := heat.find_child("Firewood_0", true, false) as MeshInstance3D
+	var original_base_log_position: Vector3 = raised_base_log.position
+	raised_base_log.position.y += 0.012
+	_expect(not HouseAssembler._heat_fits_measured_firebox(anchor, heat,
+		float(metrics["sill"]), float(metrics["head"]),
+		float(metrics["width"]), float(metrics["depth"])),
+		where + ": measured-opening predicate accepted a split log lifted 12 mm off the fuel bed")
+	raised_base_log.position = original_base_log_position
+	var raised_top_log := heat.find_child("Firewood_1", true, false) as MeshInstance3D
+	var original_top_log_position: Vector3 = raised_top_log.position
+	raised_top_log.position.y += 0.025
+	_expect(not HouseAssembler._heat_fits_measured_firebox(anchor, heat,
+		float(metrics["sill"]), float(metrics["head"]),
+		float(metrics["width"]), float(metrics["depth"])),
+		where + ": measured-opening predicate accepted an unsupported crossed upper log")
+	raised_top_log.position = original_top_log_position
+	var flame_clearance := heat.find_child("Flame_1", true, false) as MeshInstance3D
+	var original_flame_position: Vector3 = flame_clearance.position
+	flame_clearance.position.x += float(metrics["width"]) * 0.5
+	_expect(not HouseAssembler._heat_fits_measured_firebox(anchor, heat,
+		float(metrics["sill"]), float(metrics["head"]),
+		float(metrics["width"]), float(metrics["depth"])),
+		where + ": measured-opening predicate accepted a flame beyond the aperture")
+	flame_clearance.position = original_flame_position
 	var fuel := heat.find_child("FuelBed", true, false) as MeshInstance3D
 	var fuel_world: Vector3 = anchor.transform * heat.transform * fuel.position
 	_expect(absf(fuel_world.y - (float(metrics["sill"]) + 0.035)) < 0.002,
@@ -205,15 +319,44 @@ func _check_style(style: StringName, size: Dictionary) -> void:
 	var flame2 := heat.find_child("Flame_2", true, false) as MeshInstance3D
 	var readable_fuel := ember_bed.mesh.get_aabb().size.x >= float(metrics["width"]) * 0.45 \
 		and ember_bed.mesh.get_aabb().size.z >= float(metrics["depth"]) * 0.45
-	var readable_log := (log0.mesh as BoxMesh).size.x >= float(metrics["width"]) * 0.55
+	var log_bounds: AABB = log0.mesh.get_aabb()
+	var log_arrays: Array = log0.mesh.surface_get_arrays(0) if log0.mesh is ArrayMesh else []
+	var log_colours: PackedColorArray = log_arrays[Mesh.ARRAY_COLOR] \
+		if log_arrays.size() > Mesh.ARRAY_COLOR else PackedColorArray()
+	var log_vertices: PackedVector3Array = log_arrays[Mesh.ARRAY_VERTEX] \
+		if log_arrays.size() > Mesh.ARRAY_VERTEX else PackedVector3Array()
+	var log_normals: PackedVector3Array = log_arrays[Mesh.ARRAY_NORMAL] \
+		if log_arrays.size() > Mesh.ARRAY_NORMAL else PackedVector3Array()
+	var log_side_faces_outward := log_normals.size() == log_vertices.size() \
+		and log_vertices.size() >= 48
+	for triangle_start in range(0, 48, 3):
+		var a: Vector3 = log_vertices[triangle_start]
+		var b: Vector3 = log_vertices[triangle_start + 1]
+		var c: Vector3 = log_vertices[triangle_start + 2]
+		var godot_normal := (c - a).cross(b - a).normalized()
+		var centroid := (a + b + c) / 3.0
+		var expected_outward := Vector3(0.0, centroid.y, centroid.z).normalized()
+		if godot_normal.dot(expected_outward) < 0.70 \
+				or godot_normal.dot(log_normals[triangle_start]) < 0.98:
+			log_side_faces_outward = false
+	var wood_material := log0.material_override as StandardMaterial3D
+	var distinct_log_colours: Array[Color] = []
+	for colour in log_colours:
+		if not distinct_log_colours.has(colour):
+			distinct_log_colours.append(colour)
+	var readable_log := log0.mesh is ArrayMesh \
+		and log_bounds.size.x >= float(metrics["width"]) * 0.55 \
+		and distinct_log_colours.size() >= 4 \
+		and log_side_faces_outward \
+		and wood_material != null and wood_material.cull_mode != BaseMaterial3D.CULL_DISABLED
 	var flame0_bounds: AABB = flame0.mesh.get_aabb()
 	var flame1_bounds: AABB = flame1.mesh.get_aabb()
 	var flame2_bounds: AABB = flame2.mesh.get_aabb()
-	var readable_flames := flame0_bounds.size.y >= 0.30 \
-		and flame1_bounds.size.y >= 0.30 and flame2_bounds.size.y >= 0.30 \
-		and flame0_bounds.size.x >= float(metrics["width"]) * 0.15 \
-		and flame1_bounds.size.x >= float(metrics["width"]) * 0.15 \
-		and flame2_bounds.size.x >= float(metrics["width"]) * 0.15 \
+	var readable_flames := flame0_bounds.size.y >= 0.15 \
+		and flame1_bounds.size.y >= 0.15 and flame2_bounds.size.y >= 0.15 \
+		and flame0_bounds.size.x >= float(metrics["width"]) * 0.12 \
+		and flame1_bounds.size.x >= float(metrics["width"]) * 0.12 \
+		and flame2_bounds.size.x >= float(metrics["width"]) * 0.12 \
 		and flame0_bounds.size.z >= float(metrics["depth"]) * 0.20 \
 		and flame1_bounds.size.z >= float(metrics["depth"]) * 0.20 \
 		and flame2_bounds.size.z >= float(metrics["depth"]) * 0.20
@@ -222,11 +365,15 @@ func _check_style(style: StringName, size: Dictionary) -> void:
 	var flame_arrays: Array = flame0.mesh.surface_get_arrays(0)
 	var flame_colours: PackedColorArray = flame_arrays[Mesh.ARRAY_COLOR] \
 		if flame_arrays.size() > Mesh.ARRAY_COLOR else PackedColorArray()
+	var distinct_flame_colours: Array[Color] = []
+	for colour in flame_colours:
+		if not distinct_flame_colours.has(colour):
+			distinct_flame_colours.append(colour)
 	var flame_has_volume_gradient := flame_colours.size() >= 24 \
-		and flame_colours[0] != flame_colours[8]
+		and distinct_flame_colours.size() >= 4
 	var scale_note := " fuel=%.3fx%.3f log=%.3f flame=%.3fx%.3f" % [
 		ember_bed.mesh.get_aabb().size.x, ember_bed.mesh.get_aabb().size.z,
-		(log0.mesh as BoxMesh).size.x, flame1_bounds.size.x, flame1_bounds.size.y]
+		log_bounds.size.x, flame1_bounds.size.x, flame1_bounds.size.y]
 	_expect(readable_fuel and readable_log and readable_flames \
 		and flame_shapes_distinct and flame_has_volume_gradient,
 		where + ": measured fire bed, crossed logs or volumetric flame cluster is undersized" + scale_note)
@@ -268,21 +415,32 @@ func _check_firebox_bounds(host: Node3D, heat: Node3D,
 	_expect(fuel_bottom >= sill - 0.015 and fuel_bottom <= sill + 0.025,
 		where + ": fuel is below the real sill or floats above it")
 	var support_log := heat.find_child("Firewood_0", true, false) as MeshInstance3D
-	if support_log == null or not support_log.mesh is BoxMesh:
-		_fail(where + ": missing crossed-log support for flame cluster")
+	if support_log == null or not support_log.mesh is ArrayMesh:
+		_fail(where + ": missing low-poly log support for flame cluster")
 		return
-	var support_log_mesh := support_log.mesh as BoxMesh
+	var support_log_bounds: AABB = support_log.mesh.get_aabb()
 	var support_log_world := host.global_transform * heat.transform * support_log.position
-	var log_top_world: float = support_log_world.y + support_log_mesh.size.y * 0.5
+	var log_top_world: float = support_log_world.y + support_log_bounds.end.y
+	var fuel_top_origin := host.global_transform * heat.transform * fuel.position
+	var fuel_top_world: float = fuel_top_origin.y + fuel.mesh.get_aabb().end.y
+	_expect(absf(support_log_world.y + support_log_bounds.position.y - fuel_top_world) <= 0.006,
+		where + ": split logs do not rest on the measured fuel bed")
 	for index in range(2):
 		var log := heat.find_child("Firewood_%d" % index, true, false) as MeshInstance3D
-		if log == null or not log.mesh is BoxMesh:
-			_fail(where + ": missing actual crossed log")
+		if log == null or not log.mesh is ArrayMesh:
+			_fail(where + ": missing actual split low-poly log")
 			continue
-		var log_mesh := log.mesh as BoxMesh
+		var log_bounds: AABB = log.mesh.get_aabb()
 		var log_world := host.global_transform * heat.transform * log.position
-		_expect(log_world.y - log_mesh.size.y * 0.5 >= sill - 0.02,
+		_expect(log_world.y + log_bounds.position.y >= sill - 0.02,
 			where + ": log falls below the measured firebox sill")
+		if index == 0:
+			_expect(absf(log_world.y + log_bounds.position.y - fuel_top_world) <= 0.006,
+				where + ": base log is not physically supported by the measured fuel bed")
+		else:
+			_expect(log_world.y + log_bounds.position.y <= log_top_world + 0.006
+				and log_world.y + log_bounds.position.y >= log_top_world - 0.045,
+				where + ": crossed upper log is not physically supported by the base split")
 	for index in range(3):
 		var flame := heat.find_child("Flame_%d" % index, true, false) as MeshInstance3D
 		if flame == null or not flame.mesh is ArrayMesh:

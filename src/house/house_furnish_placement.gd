@@ -325,7 +325,8 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 				float(step.get("zone_depth_override", -1.0)))
 		&"around":
 			place_around(plan, room, key, blocked, zones, r,
-				String(step.get("host", "")) == "row")
+				String(step.get("host", "")) == "row",
+				Array(step.get("preferred_sides", [])))
 		&"beside":
 			_place_beside(plan, room, key, step, blocked, zones)
 		&"behind":
@@ -339,16 +340,32 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 			var ordinary_cooking_tool := HouseFurnishingRecipes.is_ordinary_house(plan) \
 				and String(step.get("group", "")) == "cooking" \
 				and preferred_host_category == "workbench"
+			var ordinary_witchwork_reagent := HouseFurnishingRecipes.is_ordinary_house(plan) \
+				and plan.spec.style == &"witch_hut" and plan.spec.trade == &"none" \
+				and plan.kind_of(room) == &"workshop" \
+				and String(step.get("group", "")) == "witchwork" and cat == "alchemy" \
+				and preferred_host_category in ["workbench", "shelf"]
 			var no_trade_witchwork_book := HouseFurnishingRecipes.is_ordinary_house(plan) \
 				and plan.spec.style == &"witch_hut" \
 				and plan.spec.trade == &"none" \
 				and String(step.get("group", "")) == "witchwork" \
 				and cat == "books" and preferred_host_category == "workbench"
-			if no_trade_witchwork_book:
+			var townhouse_office_records := HouseFurnishingRecipes.is_ordinary_house(plan) \
+				and plan.spec.style == &"townhouse" and plan.spec.trade == &"none" \
+				and plan.kind_of(room) == &"office" \
+				and String(step.get("group", "")) == "writing" \
+				and cat == "books" and key == "BookGroup_Small_1" \
+				and preferred_host_category == "bookcase"
+			if townhouse_office_records:
+				_place_townhouse_bookshelf_group(plan, room, key)
+			elif no_trade_witchwork_book:
 				_place_witchwork_book_on_support(plan, room, choices, key, preferred_host_category)
 			elif _has_compact_witch_shared_meal_contract(plan, room) \
 					and String(step.get("group", "")) == "witchwork" and cat == "alchemy":
 				_place_on_preferred_category(plan, room, key, "workbench", r,
+					String(step.get("group", "")))
+			elif ordinary_witchwork_reagent:
+				_place_on_preferred_category(plan, room, key, preferred_host_category, r,
 					String(step.get("group", "")))
 			elif ordinary_cooking_tool:
 				_place_on_preferred_category(plan, room, key, preferred_host_category, r,
@@ -700,17 +717,83 @@ static func _place_witchwork_book_on_support(plan: HousePlan, room: int,
 							return
 
 
+## Bookcase_2 has four real shelf boards. The writing recipe places one measured
+## book group on each of the three upper boards. These records remain ordinary
+## plan furniture, hosted by the case and assembled through the normal path.
+static func _place_townhouse_bookshelf_group(plan: HousePlan, room: int,
+		key: String) -> void:
+	var host_index := -1
+	for index in plan.furniture_of(room):
+		var host: Dictionary = plan.furniture[index]
+		if String(host.get("key", "")) == "Bookcase_2" \
+				and String(host.get("activity_group", "")) == "writing":
+			host_index = index
+			break
+	if host_index < 0:
+		return
+	var host: Dictionary = plan.furniture[host_index]
+	var levels: Array[float] = [1.151, 1.535, 1.919]
+	var used_levels: Array[float] = []
+	for index in plan.furniture_of(room):
+		var child: Dictionary = plan.furniture[index]
+		if int(child.get("host", -1)) == host_index \
+				and String(child.get("key", "")) == key:
+			used_levels.append(float(child.get("support_level_local_y", -1.0)))
+	var level := -1.0
+	for candidate_level in levels:
+		if not used_levels.has(candidate_level):
+			level = candidate_level
+			break
+	if level < 0.0:
+		return
+	var scale := 1.0
+	var host_scale := float(host.get("scale", 1.0))
+	var host_origin := PropCatalog.house_origin(host)
+	var model_yaw := float(host.get("yaw", 0.0)) + PropCatalog.face_offset("Bookcase_2")
+	var board_center := host_origin + Basis(Vector3.UP, model_yaw) * Vector3(0.0, level * host_scale, 0.0295 * host_scale)
+	var bottom_y := board_center.y
+	var pos_y := bottom_y
+	var book_yaw := float(host.get("yaw", 0.0))
+	var foot_local := PropCatalog.footprint_rotated(key,
+		float(host.get("yaw", 0.0)) + PropCatalog.face_offset(key) - model_yaw) * scale
+	var board_size := Vector2(1.186, 0.247) * host_scale
+	if foot_local.x > board_size.x - 0.025 or foot_local.y > board_size.y - 0.012:
+		return
+	var model_book_yaw := book_yaw + PropCatalog.face_offset(key)
+	var foot := PropCatalog.footprint_rotated(key, model_book_yaw) * scale
+	var center_offset := PropCatalog.plan_centre(key, Vector3.ZERO, model_book_yaw, scale)
+	var book_pos := Vector3(board_center.x - center_offset.x, pos_y,
+		board_center.z - center_offset.y)
+	var center := PropCatalog.plan_centre(key, book_pos, model_book_yaw, scale)
+	var rect := Rect2(center - foot * 0.5, foot)
+	var floor_rect := HouseGeometry.room_floor_rect(plan, room)
+	if not floor_rect.encloses(rect):
+		return
+	var child_number := used_levels.size() + 1
+	plan.furniture.append({"key": key, "room": room,
+		"storey": HousePlan.record_storey(host), "pos": book_pos,
+		"yaw": book_yaw, "scale": scale, "rect": rect, "zone": Rect2(),
+		"host": host_index, "cat": PropCatalog.category(key), "mounted": false,
+		"activity_group": "writing",
+		"support_level_local_y": level, "support_board": "Bookcase_2:shelf_%d" % child_number})
+
+
 ## Cooking tools belong on the work surface that was planned for them, rather
 ## than whichever unrelated prop happened to win the random host draw.
 static func _place_on_preferred_category(plan: HousePlan, room: int, key: String,
 		preferred_category: String, r: RandomNumberGenerator, group_name := "") -> void:
-	var group_bound_hosts := _has_compact_witch_shared_meal_contract(plan, room)
+	var group_bound_hosts := _has_compact_witch_shared_meal_contract(plan, room) \
+		or group_name == "witchwork"
 	var hosts: Array[int] = []
 	for index in plan.furniture_of(room):
 		var host: Dictionary = plan.furniture[index]
+		if preferred_category == "shelf" and group_name == "witchwork" \
+				and String(host.get("key", "")) != "Shelf_Simple":
+			continue
 		if (String(host.get("cat", "")) == preferred_category
 				and PropCatalog.has_tag(String(host["key"]), PropCatalog.SURFACE)
-				and not bool(host.get("mounted", false))
+				and (not bool(host.get("mounted", false))
+					or (preferred_category == "shelf" and group_name == "witchwork"))
 				and (not group_bound_hosts or String(host.get("activity_group", "")) == group_name)):
 			hosts.append(index)
 	if hosts.is_empty():
@@ -718,9 +801,44 @@ static func _place_on_preferred_category(plan: HousePlan, room: int, key: String
 	var host_index: int = hosts[0]
 	var host: Dictionary = plan.furniture[host_index]
 	var host_rect: Rect2 = Rect2(host["rect"])
+	if bool(host.get("mounted", false)) and preferred_category == "shelf" \
+			and group_name == "witchwork":
+		var host_key: String = String(host["key"])
+		var model_yaw: float = float(host.get("yaw", 0.0)) + PropCatalog.face_offset(host_key)
+		var model_basis := Basis(Vector3.UP, model_yaw)
+		var host_pos: Vector3 = host["pos"]
+		var body_center: Vector3 = host_pos + model_basis * PropCatalog.centre_offset(host_key)
+		var body_footprint: Vector2 = PropCatalog.footprint_rotated(host_key, model_yaw) \
+			* float(host.get("scale", 1.0))
+		host_rect = Rect2(Vector2(body_center.x, body_center.z) - body_footprint * 0.5,
+			body_footprint)
 	var host_scale: float = PropCatalog.placement_height_scale(host)
 	var top: float = float(host["pos"].y) \
 		+ PropCatalog.surface_height(String(host["key"])) * host_scale
+	if bool(host.get("mounted", false)) and preferred_category == "shelf" \
+			and group_name == "witchwork" and String(host.get("key", "")) == "Shelf_Simple":
+		var occupied := 0
+		for placed in plan.furniture_of(room):
+			if int(plan.furniture[placed].get("host", -1)) == host_index:
+				occupied += 1
+		if occupied >= 2:
+			return
+		var shelf_yaw: float = float(host.get("yaw", 0.0)) + PropCatalog.face_offset("Shelf_Simple")
+		var along3: Vector3 = Basis(Vector3.UP, shelf_yaw).x
+		var along := Vector2(along3.x, along3.z).normalized()
+		var center := host_rect.get_center() + along * (-0.28 if occupied == 0 else 0.28)
+		var bottle_yaw: float = shelf_yaw - PropCatalog.face_offset(key)
+		var bottle_scale: float = float(HouseFurnishGeometry.scales(key)[0])
+		var foot: Vector2 = PropCatalog.footprint_rotated(key, shelf_yaw) * bottle_scale
+		var rect := Rect2(center - foot * 0.5, foot)
+		if not host_rect.grow(-0.015).encloses(rect):
+			return
+		plan.furniture.append({"key": key, "room": room,
+			"storey": HousePlan.record_storey(plan.rooms[room]),
+			"pos": Vector3(center.x, top, center.y), "yaw": bottle_yaw,
+			"rect": rect, "zone": Rect2(), "host": host_index,
+			"cat": PropCatalog.category(key), "mounted": false, "scale": bottle_scale})
+		return
 	for scale in HouseFurnishGeometry.scales(key):
 		for _orientation_try in range(8):
 			var yaw := r.randf() * TAU
@@ -2013,7 +2131,7 @@ static func _place_corner(plan: HousePlan, room: int, key: String,
 ## Seats at a table, facing it, with pull-back space behind them.
 static func place_around(plan: HousePlan, room: int, key: String,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator,
-		want_row := false) -> void:
+		want_row := false, preferred_sides: Array = []) -> void:
 	var host: int = _find_host(plan, room, ["table", "workbench", "counter"], want_row)
 	if host < 0:
 		return
@@ -2025,44 +2143,69 @@ static func place_around(plan: HousePlan, room: int, key: String,
 	# the four sides of the table, each sampled along its length, first drawn
 	# up to it and then -- if the room is too tight for that -- tucked under it
 	var sides := [Vector2(0, -1), Vector2(0, 1), Vector2(-1, 0), Vector2(1, 0)]
-	for tucked in [false, true]:
+	var side_sets: Array = []
+	if preferred_sides.has("long_edge"):
+		# A chair at the desk's end faces along its writing edge. The preferred
+		# normals instead run across the desk's short axis, so the chair faces
+		# its long writing edge. If those placements cannot fit, the unchanged
+		# all-sides search below is the safe fallback.
+		if host_rect.size.x >= host_rect.size.y:
+			side_sets.append([Vector2(0, -1), Vector2(0, 1)])
+		else:
+			side_sets.append([Vector2(-1, 0), Vector2(1, 0)])
+	side_sets.append(sides)
+	for side_set_index in range(side_sets.size()):
 		if not best.is_empty():
 			break
-		for n in sides:
-			var yaw: float = HouseFurnishGeometry.yaw_facing(-n)        # face back toward the table
-			var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw)
-			var half: Vector2 = host_rect.size / 2.0
-			var depth: float = absf(n.x) * foot.x + absf(n.y) * foot.y
-			var out: float = absf(n.x) * half.x + absf(n.y) * half.y + depth / 2.0 + 0.04
-			if tucked:
-				# under the table, the way a stool lives. Only as far as its own
-				# front edge: pushed further it passes the middle of the table
-				# and ends up facing away from it. The pull-back space behind it
-				# is still required either way -- a seat you cannot get out of
-				# is not a seat, and the walking check would say so.
-				out -= depth * 0.4
-			var along := Vector2(n.y, -n.x)
-			var seat_span: float = absf(along.x) * foot.x + absf(along.y) * foot.y
-			var run: float = absf(along.x) * host_rect.size.x \
-				+ absf(along.y) * host_rect.size.y
-			if seat_span > run + LONG_SEAT_OVERHANG:
-				# A bench drawn up to the END of a trestle sticks out a metre
-				# either side of it, faces the wrong way along the room and
-				# blocks the floor beyond: a long seat belongs on a long side.
-				continue
-			var steps: int = maxi(int(run / 0.45), 1)
-			for s in range(steps + 1):
-				var t: float = lerpf(-run / 2.0 + seat_span / 2.0, run / 2.0 - seat_span / 2.0,
-					float(s) / float(steps))
-				var centre: Vector2 = hc + n * out + along * t
-				var cand: Dictionary = HouseFurnishGeometry.candidate(key, centre, yaw)
-				if not HouseFurnishGeometry.fits(plan, room, cand, floor_rect, blocked, zones, [],
-						host_rect if tucked else Rect2()):
+		var candidate_sides: Array = side_sets[side_set_index]
+		var candidate_zones: Array[Rect2] = zones
+		if side_set_index == 0 and preferred_sides.has("long_edge"):
+			# The chair's floor body intentionally occupies the work surface's
+			# own stance zone. Keep every other use zone reserved.
+			candidate_zones = zones.duplicate()
+			var host_zone: Rect2 = plan.furniture[host].get("zone", Rect2())
+			for zone_index in range(candidate_zones.size()):
+				if candidate_zones[zone_index].is_equal_approx(host_zone):
+					candidate_zones.remove_at(zone_index)
+					break
+		for tucked in [false, true]:
+			if not best.is_empty():
+				break
+			for n in candidate_sides:
+				var yaw: float = HouseFurnishGeometry.yaw_facing(-n)        # face back toward the table
+				var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw)
+				var half: Vector2 = host_rect.size / 2.0
+				var depth: float = absf(n.x) * foot.x + absf(n.y) * foot.y
+				var out: float = absf(n.x) * half.x + absf(n.y) * half.y + depth / 2.0 + 0.04
+				if tucked:
+					# under the table, the way a stool lives. Only as far as its own
+					# front edge: pushed further it passes the middle of the table
+					# and ends up facing away from it. The pull-back space behind it
+					# is still required either way -- a seat you cannot get out of
+					# is not a seat, and the walking check would say so.
+					out -= depth * 0.4
+				var along := Vector2(n.y, -n.x)
+				var seat_span: float = absf(along.x) * foot.x + absf(along.y) * foot.y
+				var run: float = absf(along.x) * host_rect.size.x \
+					+ absf(along.y) * host_rect.size.y
+				if seat_span > run + LONG_SEAT_OVERHANG:
+					# A bench drawn up to the END of a trestle sticks out a metre
+					# either side of it, faces the wrong way along the room and
+					# blocks the floor beyond: a long seat belongs on a long side.
 					continue
-				var score: float = r.randf() - absf(t) * 0.2
-				if score > best_score:
-					best_score = score
-					best = cand
+				var steps: int = maxi(int(run / 0.45), 1)
+				for s in range(steps + 1):
+					var t: float = lerpf(-run / 2.0 + seat_span / 2.0, run / 2.0 - seat_span / 2.0,
+						float(s) / float(steps))
+					var centre: Vector2 = hc + n * out + along * t
+					var cand: Dictionary = HouseFurnishGeometry.candidate(key, centre, yaw)
+					if not HouseFurnishGeometry.fits(plan, room, cand, floor_rect, blocked, candidate_zones, [],
+							host_rect if tucked else Rect2()):
+						continue
+					var score: float = r.randf() - absf(t) * 0.2
+					if score > best_score:
+						best_score = score
+						best = cand
 	if not best.is_empty():
 		best["host"] = host
 	HouseFurnishGeometry.commit(plan, room, best, blocked, zones)

@@ -12,10 +12,26 @@ func _init() -> void:
 		failures.append("fixed Witch requests produced no indoor Cauldron")
 	if not saw_outdoor_cauldron:
 		failures.append("fixed Witch requests produced no yard/exterior Cauldron")
+	_check_seed21143_bounds()
 	for failure in failures:
 		printerr("FAIL " + failure)
 	print("Witch Cauldron heat fixture: %d failures" % failures.size())
 	quit(1 if not failures.is_empty() else 0)
+
+
+func _check_seed21143_bounds() -> void:
+	var spec := HouseSpec.new(21143)
+	spec.style = &"witch_hut"
+	spec.trade = &"alchemist"
+	spec.width = 9.5
+	spec.length = 12.0
+	spec.height = 2.7
+	var plan := HouseGenerator.generate(spec, 21143)
+	var builder := HouseBuilder.new()
+	var mesh: ArrayMesh = builder.build(plan, true)
+	var planned := HouseGeometry.exterior_bounds(plan).grow(0.025)
+	if not planned.encloses(mesh.get_aabb()):
+		failures.append("seed 21143 scale-1 Witch alchemist shell escapes planned exterior bounds")
 
 
 func _check_case(trade: StringName, label: String) -> void:
@@ -60,11 +76,14 @@ func _check_case(trade: StringName, label: String) -> void:
 			if String(row.get("host", "")) == expected_host \
 						and String(row.get("role", "")) in CAULDRON_LOG_ROLES:
 				logs.append(row)
-		if logs.size() != 3:
-			failures.append("%s %s emitted %d native heat logs; expected three" % [label, id_part, logs.size()])
-			continue
-		structural_count += logs.size()
-		_check_log_support_and_mesh(placement, centred, logs, label)
+		if centred:
+			if logs.size() != 3:
+				failures.append("%s %s emitted %d indoor shell heat logs; expected three" % [label, id_part, logs.size()])
+				continue
+			structural_count += logs.size()
+			_check_log_support_and_mesh(placement, true, logs, label)
+		elif not logs.is_empty():
+			failures.append("%s %s external fuel leaked into the house shell mesh" % [label, id_part])
 	if shell.get_surface_count() <= 0:
 		failures.append("%s shell did not commit its heat geometry" % label)
 	if planned_counts != [plan.furniture.size(), plan.exterior.size(), plan.yard.size()]:
@@ -77,7 +96,27 @@ func _check_case(trade: StringName, label: String) -> void:
 	var cues := _find_heat_cues(assembled)
 	if cues.size() != cauldrons.size():
 		failures.append("%s assembled %d heat cues for %d Cauldrons" % [label, cues.size(), cauldrons.size()])
+	var matched_cues := 0
 	for cue in cues:
+		var prop_root := cue.get_parent() as Node3D
+		var collection := prop_root.get_parent() if prop_root != null else null
+		var external_fuel := collection != null and String(collection.name) == "Exterior"
+		var entry: Dictionary = {}
+		if prop_root != null:
+			for candidate in cauldrons:
+				var candidate_placement: Dictionary = candidate["placement"]
+				if external_fuel != (not bool(candidate["centred"])):
+					continue
+				if external_fuel and String(candidate_placement.get("id", "")) == String(prop_root.name):
+					entry = candidate
+					break
+				if not external_fuel and String(candidate_placement.get("key", "")) == String(prop_root.name):
+					entry = candidate
+					break
+		if entry.is_empty():
+			failures.append("%s heat cue is not matched to its real Cauldron placement by parent/id" % label)
+			continue
+		matched_cues += 1
 		var names := {}
 		for child in cue.get_children():
 			names[String(child.name)] = child
@@ -95,7 +134,19 @@ func _check_case(trade: StringName, label: String) -> void:
 			failures.append("%s Cauldron cue is not visibly emissive" % label)
 		if light.light_energy <= 0.0 or light.omni_range < 1.0:
 			failures.append("%s Cauldron warmth does not reach its immediate work area" % label)
-		_check_assembled_heat_geometry(cue, label)
+		if not _check_assembled_fuel_contract(cue) == external_fuel:
+			failures.append("%s Cauldron fuel ownership does not match its indoor/exterior placement" % label)
+		if external_fuel:
+			var upper_fuel := cue.get_node_or_null("FuelLogUpper") as Node3D
+			if upper_fuel != null:
+				var original_position := upper_fuel.position
+				upper_fuel.position.y += 0.04
+				if _check_assembled_fuel_contract(cue):
+					failures.append("%s moved fuel negative control still passed measured support" % label)
+				upper_fuel.position = original_position
+		_check_assembled_heat_geometry(cue, label, entry["placement"], external_fuel)
+	if matched_cues != cauldrons.size():
+		failures.append("%s matched %d heat cues to %d Cauldron placements" % [label, matched_cues, cauldrons.size()])
 	if structural_count == 0:
 		failures.append("%s emitted no structural heat components" % label)
 	assembled.free()
@@ -149,7 +200,8 @@ func _check_log_support_and_mesh(placement: Dictionary, centred: bool,
 		probe_size, model_yaw, origin, scale_factor, height_scale, model_triangles):
 		failures.append("%s imported-mesh collision negative did not detect a box at the bowl underside" % label)
 
-func _check_assembled_heat_geometry(cue: Node3D, label: String) -> void:
+func _check_assembled_heat_geometry(cue: Node3D, label: String,
+		placement: Dictionary, external_fuel: bool) -> void:
 	var prop_root := cue.get_parent() as Node3D
 	if prop_root == null:
 		failures.append("%s heat cue is detached from its Cauldron instance" % label)
@@ -162,6 +214,9 @@ func _check_assembled_heat_geometry(cue: Node3D, label: String) -> void:
 	var coal_bottom := INF
 	var coal_top := -INF
 	var flame_bottoms: Array[float] = []
+	var lower_fuel_tops: Array[float] = []
+	var upper_fuel_bottom := INF
+	var fuel_count := 0
 	for row in rows:
 		var node: MeshInstance3D = row["node"]
 		var relative_xf: Transform3D = row["xf"]
@@ -177,6 +232,18 @@ func _check_assembled_heat_geometry(cue: Node3D, label: String) -> void:
 				failures.append("%s floor-gap negative was accepted as a supported ember bed" % label)
 		elif String(node.name).begins_with("LowFlame_"):
 			flame_bottoms.append(world_bounds.position.y)
+		elif String(node.name).begins_with("FuelLogLower_"):
+			fuel_count += 1
+			lower_fuel_tops.append(world_bounds.end.y)
+			var measured_prop: AABB = HouseExterior.bounds_of(placement)
+			if not measured_prop.grow(0.001).encloses(world_bounds):
+				failures.append("%s exterior fuel exceeds the measured Cauldron bounds" % label)
+		elif String(node.name) == "FuelLogUpper":
+			fuel_count += 1
+			upper_fuel_bottom = world_bounds.position.y
+			var measured_prop: AABB = HouseExterior.bounds_of(placement)
+			if not measured_prop.grow(0.001).encloses(world_bounds):
+				failures.append("%s exterior cross-fuel exceeds the measured Cauldron bounds" % label)
 		if _mesh_aabb_intersects_cauldron(node.mesh.get_aabb(), mesh_xf,
 				cauldron_xf, triangles):
 			failures.append("%s actual assembled heat mesh intersects imported Cauldron triangles" % label)
@@ -186,6 +253,45 @@ func _check_assembled_heat_geometry(cue: Node3D, label: String) -> void:
 	for bottom in flame_bottoms:
 		if absf(bottom - coal_top) > 0.002:
 			failures.append("%s low flame does not sit on the assembled ember bed" % label)
+	if external_fuel:
+		if fuel_count != 3 or lower_fuel_tops.size() != 2 \
+				or not is_finite(upper_fuel_bottom):
+			failures.append("%s external Cauldron lacks three assembled fuel pieces" % label)
+		elif lower_fuel_tops.size() == 2:
+			for top in lower_fuel_tops:
+				if absf(upper_fuel_bottom - top) > 0.002:
+					failures.append("%s external cross-fuel does not bear on both lower logs" % label)
+	elif fuel_count != 0:
+		failures.append("%s indoor Cauldron duplicates its shell fuel in the assembly cue" % label)
+
+
+func _check_assembled_fuel_contract(cue: Node3D) -> bool:
+	var lower_tops: Array[float] = []
+	var upper_bottom := INF
+	var count := 0
+	var floor_y: float = PropCatalog.floor_offset("Cauldron")
+	for child in cue.get_children():
+		if not child is MeshInstance3D or (child as MeshInstance3D).mesh == null:
+			continue
+		var mesh_node := child as MeshInstance3D
+		var bounds := _transform_aabb(mesh_node.mesh.get_aabb(), mesh_node.transform)
+		match String(mesh_node.name):
+			"FuelLogLower_0", "FuelLogLower_1":
+				count += 1
+				if absf(bounds.position.y - floor_y) > 0.002:
+					return false
+				lower_tops.append(bounds.end.y)
+			"FuelLogUpper":
+				count += 1
+				upper_bottom = bounds.position.y
+	if count == 0:
+		return false
+	if count != 3 or lower_tops.size() != 2 or not is_finite(upper_bottom):
+		return false
+	for top in lower_tops:
+		if absf(upper_bottom - top) > 0.002:
+			return false
+	return true
 
 
 func _collect_heat_mesh_rows(node: Node, parent_xf: Transform3D,

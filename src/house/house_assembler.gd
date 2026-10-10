@@ -244,6 +244,8 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 	var local_fire_origin: Vector3 = parent_inverse * fire_origin_world
 	heat.position = local_fire_origin
 	heat.set_meta("opening_center_y", (sill + head) * 0.5)
+	heat.set_meta("opening_sill_local_y", sill - fire_origin_world.y)
+	heat.set_meta("opening_head_local_y", head - fire_origin_world.y)
 	heat.set_meta("opening_clear_width", clear_width)
 	heat.set_meta("opening_clear_height", opening_height)
 	heat.set_meta("recess_depth", recess_depth)
@@ -272,40 +274,103 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 	var local_log_height := 0.082 / y_scale
 	var local_log_depth := 0.078 / depth_scale
 	var wood_material := StandardMaterial3D.new()
-	wood_material.albedo_color = Color(0.24, 0.105, 0.045)
+	wood_material.albedo_color = Color.WHITE
+	wood_material.vertex_color_use_as_albedo = true
 	wood_material.roughness = 0.94
 	for index in range(2):
 		var log := MeshInstance3D.new()
 		log.name = "Firewood_%d" % index
-		var log_mesh := BoxMesh.new()
-		log_mesh.size = Vector3(local_log_length, local_log_height, local_log_depth)
-		log.mesh = log_mesh
+		log.mesh = _split_firewood_mesh(local_log_length, local_log_height,
+			local_log_depth, float(index) * 0.13)
+		var log_bounds: AABB = log.mesh.get_aabb()
 		log.material_override = wood_material
-		log.position = Vector3(0.0, fuel_height * 0.5 + local_log_height * 0.5,
-			(-0.025 if index == 0 else 0.025) / depth_scale)
-		log.rotation.y = 0.0 if index == 0 else 0.24
+		# One split length lies at the mouth, the second crosses it and rests on
+		# the first. The foreground placement keeps real timber visible below fire.
+		log.position = Vector3(0.0, fuel_height * 0.5 - log_bounds.position.y
+			+ (0.0 if index == 0 else 0.064 / y_scale),
+			(-0.035 if index == 0 else -0.006) / depth_scale)
+		log.rotation.y = -0.48 if index == 0 else 0.62
 		heat.add_child(log)
+	# A second vessel is a named plan feature, distinct from the required Pot_1
+	# on the Workbench. Instantiate its real measured model only when that record
+	# exists, and support it with native iron geometry inside the measured mouth.
+	var vessel_plan: Dictionary = plan.hearth.get("cooking_vessel", {})
+	if String(vessel_plan.get("key", "")) == "Pot_1" \
+			and String(vessel_plan.get("host", "")) == "ordinary_fireplace":
+		var pot_scale: float = minf(0.72, minf(clear_width / 0.539,
+			recess_depth / 0.486) * 0.72)
+		var pot_width := 0.539 * pot_scale
+		var pot_depth := 0.486 * pot_scale
+		var trivet_radius: float = minf(pot_width, pot_depth) * 0.30
+		var trivet_height := 0.145 / y_scale
+		var fuel_top_local := fuel_height * 0.5
+		var support_y := fuel_top_local + trivet_height
+		var iron := StandardMaterial3D.new()
+		iron.albedo_color = Color(0.075, 0.085, 0.09)
+		iron.metallic = 0.55
+		iron.roughness = 0.76
+		var trivet := Node3D.new()
+		trivet.name = "HearthIronTripod"
+		trivet.set_meta("support_radius", trivet_radius)
+		trivet.set_meta("support_y", support_y)
+		for leg_index in range(3):
+			var angle: float = TAU * float(leg_index) / 3.0 + PI * 0.5
+			var bottom := Vector3(cos(angle) * trivet_radius * 1.35,
+				fuel_top_local + 0.004 / y_scale, sin(angle) * trivet_radius * 1.35)
+			var top := Vector3(cos(angle) * trivet_radius * 0.78,
+				support_y, sin(angle) * trivet_radius * 0.78)
+			var direction := top - bottom
+			var leg_mesh := CylinderMesh.new()
+			leg_mesh.top_radius = 0.006 / x_scale
+			leg_mesh.bottom_radius = 0.009 / x_scale
+			leg_mesh.height = direction.length()
+			var leg := MeshInstance3D.new()
+			leg.name = "TripodLeg_%d" % leg_index
+			leg.mesh = leg_mesh
+			leg.material_override = iron
+			leg.transform = Transform3D(Basis(Quaternion(Vector3.UP, direction.normalized())),
+				(bottom + top) * 0.5)
+			trivet.add_child(leg)
+		var ring_mesh := TorusMesh.new()
+		ring_mesh.inner_radius = trivet_radius * 0.68
+		ring_mesh.outer_radius = trivet_radius
+		ring_mesh.rings = 8
+		ring_mesh.ring_segments = 12
+		var ring := MeshInstance3D.new()
+		ring.name = "TrivetSupportRing"
+		ring.mesh = ring_mesh
+		ring.material_override = iron
+		ring.position.y = support_y - ring_mesh.get_aabb().end.y
+		trivet.add_child(ring)
+		heat.add_child(trivet)
+		var vessel := _instance({"key": "Pot_1", "scale": pot_scale,
+			"yaw": 0.0, "pos": Vector3(0.0, support_y, 0.0)}, false)
+		if vessel != null:
+			vessel.name = "HearthCookingVessel"
+			vessel.set_meta("plan_role", "hearth_cooking")
+			vessel.set_meta("planned_key", String(vessel_plan["key"]))
+			vessel.set_meta("support_node", "HearthIronTripod/TrivetSupportRing")
+			heat.add_child(vessel)
 	var flame_material := StandardMaterial3D.new()
 	flame_material.albedo_color = Color.WHITE
 	flame_material.vertex_color_use_as_albedo = true
 	flame_material.emission_enabled = true
 	flame_material.emission = Color(1.0, 0.25, 0.025)
-	flame_material.emission_energy_multiplier = 1.35
+	flame_material.emission_energy_multiplier = 0.42
 	flame_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flame_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var flame_tip_material := StandardMaterial3D.new()
 	flame_tip_material.albedo_color = Color.WHITE
 	flame_tip_material.vertex_color_use_as_albedo = true
 	flame_tip_material.emission_enabled = true
 	flame_tip_material.emission = Color(1.0, 0.42, 0.06)
-	flame_tip_material.emission_energy_multiplier = 0.9
+	flame_tip_material.emission_energy_multiplier = 0.32
 	flame_tip_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flame_tip_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var flame_height: float = minf(0.54, opening_height * 0.58) / y_scale
-	var flame_height_fractions: Array[float] = [0.78, 1.0, 0.66]
-	var flame_width_fractions: Array[float] = [0.26, 0.28, 0.23]
+	var flame_height: float = minf(0.27, opening_height * 0.30) / y_scale
+	var flame_height_fractions: Array[float] = [0.74, 1.0, 0.61]
+	var flame_width_fractions: Array[float] = [0.17, 0.20, 0.15]
 	var flame_x_fractions: Array[float] = [-0.20, 0.0, 0.20]
-	var flame_z_fractions: Array[float] = [-0.10, 0.0, 0.10]
+	# Flames sit behind the crossed foreground logs and below the vessel rim.
+	var flame_z_fractions: Array[float] = [0.24, 0.30, 0.18]
 	var flame_leans: Array[float] = [0.10, -0.08, 0.04]
 	for index in range(3):
 		var flame := MeshInstance3D.new()
@@ -315,7 +380,7 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 			recess_depth * 0.65) / x_scale
 		var flame_depth: float = minf(recess_depth * 0.36, clear_width * 0.18) / depth_scale
 		flame.mesh = _flame_tongue_mesh(flame_width, tongue_height, flame_depth,
-			flame_leans[index] * flame_width)
+			flame_leans[index] * flame_width, float(index) * 1.7)
 		flame.material_override = flame_material if index == 1 else flame_tip_material
 		flame.position = Vector3(flame_x_fractions[index] * clear_width / x_scale,
 			fuel_height * 0.5 + local_log_height - 0.012 / y_scale,
@@ -332,6 +397,12 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 	glow.position = parent_inverse * fire_center_world - local_fire_origin
 	heat.add_child(glow)
 	if not _heat_fits_measured_firebox(hearth_node, heat, sill, head, clear_width, recess_depth):
+		soot.free()
+		heat.free()
+		return {}
+	if not vessel_plan.is_empty() and not _hearth_cooking_vessel_fits(
+			heat, float(heat.get_meta("opening_sill_local_y")),
+			float(heat.get_meta("opening_head_local_y")), clear_width, recess_depth):
 		soot.free()
 		heat.free()
 		return {}
@@ -421,59 +492,163 @@ static func _feathered_soot_mesh(width: float, height: float) -> ArrayMesh:
 	return mesh
 
 
-## A faceted tongue narrows and leans as it rises. It is mesh geometry rather
-## than the little cone that a renderer reads as a traffic marker.
-static func _flame_tongue_mesh(width: float, height: float, depth: float,
-		lean: float) -> ArrayMesh:
-	# Three rounded rings bend and narrow into a tip. Vertex colour carries a
-	# warm base-to-core gradient; the non-zero depth makes each tongue volumetric.
+## Eight-sided, vertex-colored log shells give the crossed fuel a split end grain.
+static func _split_firewood_mesh(length: float, height: float, depth: float,
+		variation: float) -> ArrayMesh:
+	# Eight measured facets keep each short log round in silhouette. Duplicate
+	# face vertices so every bark facet and cut end has a real flat normal.
 	const SIDES := 8
-	var levels: Array[float] = [0.0, 0.34, 0.70]
-	var radii: Array[float] = [1.0, 0.68, 0.34]
-	var colours: Array[Color] = [
-		Color(0.72, 0.045, 0.006), Color(1.0, 0.19, 0.012),
-		Color(1.0, 0.57, 0.035), Color(1.0, 0.86, 0.18)]
 	var vertices := PackedVector3Array()
-	var vertex_colours := PackedColorArray()
+	var colours := PackedColorArray()
+	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
-	for ring in range(levels.size()):
-		var level: float = levels[ring]
-		var radius: float = radii[ring]
+	var facets: Array[float] = [0.91, 1.0, 0.94, 0.98, 0.89, 1.0, 0.93, 0.97]
+	var ring0 := PackedVector3Array()
+	var ring1 := PackedVector3Array()
+	var colours0 := PackedColorArray()
+	var colours1 := PackedColorArray()
+	for end_index in range(2):
+		var x := (-0.5 if end_index == 0 else 0.5) * length
+		var taper := 0.91 if end_index == 0 else 1.0
 		for side in range(SIDES):
-			var angle: float = TAU * float(side) / float(SIDES)
-			vertices.append(Vector3(lean * level + cos(angle) * width * 0.5 * radius,
-				height * level, sin(angle) * depth * 0.5 * radius))
-			vertex_colours.append(colours[ring])
-	var base_center := vertices.size()
-	vertices.append(Vector3.ZERO)
-	vertex_colours.append(colours[0])
-	var tip_index := vertices.size()
-	vertices.append(Vector3(lean, height, 0.0))
-	vertex_colours.append(colours[3])
+			var angle: float = TAU * float(side) / float(SIDES) + variation
+			var facet: float = facets[side] * taper
+			var point := Vector3(x, cos(angle) * height * 0.5 * facet,
+				sin(angle) * depth * 0.5 * facet)
+			var shade: float = 0.90 + float((side + end_index) % 3) * 0.07
+			var bark_color := Color(0.47 * shade, 0.245 * shade, 0.105 * shade)
+			if end_index == 0:
+				ring0.append(point)
+				colours0.append(bark_color)
+			else:
+				ring1.append(point)
+				colours1.append(bark_color)
 	for side in range(SIDES):
 		var next := (side + 1) % SIDES
-		indices.append_array(PackedInt32Array([base_center, next, side]))
-	for ring in range(levels.size() - 1):
-		var inner_start := ring * SIDES
-		var outer_start := (ring + 1) * SIDES
+		var corners: Array[Vector3] = [ring0[side], ring0[next], ring1[next], ring1[side]]
+		var face_colors: Array[Color] = [colours0[side], colours0[next],
+			colours1[next], colours1[side]]
+		var mid_angle: float = TAU * (float(side) + 0.5) / float(SIDES) + variation
+		var face_normal := Vector3(0.0, cos(mid_angle), sin(mid_angle)).normalized()
+		for corner_index in [0, 2, 1, 0, 3, 2]:
+			vertices.append(corners[corner_index])
+			colours.append(face_colors[corner_index])
+			normals.append(face_normal)
+			indices.append(vertices.size() - 1)
+	for end_index in range(2):
+		var x := (-0.5 if end_index == 0 else 0.5) * length
+		var ring: PackedVector3Array = ring0 if end_index == 0 else ring1
+		var cap_normal := Vector3(-1.0 if end_index == 0 else 1.0, 0.0, 0.0)
+		var cap_color := Color(0.72, 0.49, 0.28) if end_index == 1 else Color(0.34, 0.19, 0.085)
 		for side in range(SIDES):
 			var next := (side + 1) % SIDES
-			indices.append_array(PackedInt32Array([
-				inner_start + side, inner_start + next, outer_start + next,
-				inner_start + side, outer_start + next, outer_start + side,
-			]))
-	var last_ring := (levels.size() - 1) * SIDES
-	for side in range(SIDES):
-		var next := (side + 1) % SIDES
-		indices.append_array(PackedInt32Array([last_ring + side, last_ring + next, tip_index]))
+			vertices.append(Vector3(x, 0.0, 0.0))
+			vertices.append(ring[side])
+			vertices.append(ring[next])
+			for _vertex in range(3):
+				colours.append(cap_color)
+				normals.append(cap_normal)
+			if end_index == 0:
+				indices.append_array(PackedInt32Array([vertices.size() - 3,
+					vertices.size() - 1, vertices.size() - 2]))
+			else:
+				indices.append_array(PackedInt32Array([vertices.size() - 3,
+					vertices.size() - 2, vertices.size() - 1]))
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_COLOR] = vertex_colours
+	arrays[Mesh.ARRAY_COLOR] = colours
+	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
+
+
+static func _flame_tongue_mesh(width: float, height: float, depth: float,
+		lean: float, phase: float = 0.0) -> ArrayMesh:
+	# Faceted, closed volumetric tongues. Each triangle owns its vertices and
+	# outward normal, so normal backface culling shows an actual rounded volume.
+	const SIDES := 8
+	var levels: Array[float] = [0.0, 0.16, 0.36, 0.60, 0.82]
+	var radii: Array[float] = [1.0, 0.88, 0.62, 0.32, 0.12]
+	var colours: Array[Color] = [
+		Color(0.55, 0.035, 0.006), Color(0.78, 0.095, 0.012),
+		Color(0.94, 0.25, 0.035), Color(1.0, 0.53, 0.10),
+		Color(1.0, 0.76, 0.25)]
+	var facet_variation: Array[float] = [0.94, 1.0, 0.88, 1.04, 0.91, 1.0, 0.86, 0.97]
+	var rings: Array[PackedVector3Array] = []
+	var vertices := PackedVector3Array()
+	var vertex_colours := PackedColorArray()
+	var normals := PackedVector3Array()
+	var indices := PackedInt32Array()
+	for ring in range(levels.size()):
+		var level: float = levels[ring]
+		var radius: float = radii[ring]
+		var bend: float = sin(level * PI * 1.65 + phase) * width * 0.11
+		var points := PackedVector3Array()
+		for side in range(SIDES):
+			var angle: float = TAU * float(side) / float(SIDES) + phase * 0.08
+			var facet: float = facet_variation[side]
+			points.append(Vector3(lean * level + bend + cos(angle) * width * 0.5 * radius * facet,
+				height * level, sin(angle) * depth * 0.5 * radius * facet))
+		rings.append(points)
+	var base_center := Vector3(0.0, 0.0, 0.0)
+	for side in range(SIDES):
+		var next := (side + 1) % SIDES
+		_append_fire_triangle(vertices, vertex_colours, normals, indices,
+			base_center, rings[0][next], rings[0][side], colours[0], colours[0], colours[0],
+			Vector3.DOWN)
+	for ring in range(levels.size() - 1):
+		for side in range(SIDES):
+			var next := (side + 1) % SIDES
+			var angle: float = TAU * (float(side) + 0.5) / SIDES + phase * 0.08
+			var radial := Vector3(cos(angle), 0.0, sin(angle)).normalized()
+			var low: PackedVector3Array = rings[ring]
+			var high: PackedVector3Array = rings[ring + 1]
+			_append_fire_triangle(vertices, vertex_colours, normals, indices,
+				low[side], high[next], low[next], colours[ring], colours[ring + 1],
+				colours[ring], radial)
+			_append_fire_triangle(vertices, vertex_colours, normals, indices,
+				low[side], high[side], high[next], colours[ring], colours[ring + 1],
+				colours[ring + 1], radial)
+	var tip := Vector3(lean + sin(phase) * width * 0.1, height, 0.0)
+	var last: PackedVector3Array = rings[levels.size() - 1]
+	for side in range(SIDES):
+		var next := (side + 1) % SIDES
+		var angle: float = TAU * (float(side) + 0.5) / SIDES + phase * 0.08
+		var radial := Vector3(cos(angle), 0.12, sin(angle)).normalized()
+		_append_fire_triangle(vertices, vertex_colours, normals, indices,
+			last[side], tip, last[next], colours[4], colours[4], colours[4], radial)
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = vertex_colours
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+static func _append_fire_triangle(vertices: PackedVector3Array,
+		colours: PackedColorArray, normals: PackedVector3Array,
+		indices: PackedInt32Array, a: Vector3, b: Vector3, c: Vector3,
+		ca: Color, cb: Color, cc: Color, expected: Vector3) -> void:
+	var face_normal := (c - a).cross(b - a)
+	if face_normal.dot(expected) < 0.0:
+		var old_b := b
+		b = c
+		c = old_b
+		var old_cb := cb
+		cb = cc
+		cc = old_cb
+	face_normal = (c - a).cross(b - a).normalized()
+	for pair in [[a, ca], [b, cb], [c, cc]]:
+		vertices.append(pair[0])
+		colours.append(pair[1])
+		normals.append(face_normal)
+		indices.append(vertices.size() - 1)
 
 
 ## Component rows are only a plan for geometry. Require the actual triangles on
@@ -617,33 +792,55 @@ static func _heat_fits_measured_firebox(host: Node3D, heat: Node3D,
 	if fuel_width > clear_width - 0.04 or fuel_depth > recess_depth - 0.04:
 		return false
 	var support_log := heat.find_child("Firewood_0", true, false) as MeshInstance3D
-	if support_log == null or not support_log.mesh is BoxMesh:
+	if support_log == null or not support_log.mesh is ArrayMesh:
 		return false
+	var fuel_top_y: float = fuel_world_y + fuel_half_height
 	for index in range(2):
 		var log := heat.find_child("Firewood_%d" % index, true, false) as MeshInstance3D
-		if log == null or not log.mesh is BoxMesh:
+		if log == null or not log.mesh is ArrayMesh:
 			return false
-		var log_mesh := log.mesh as BoxMesh
+		var log_bounds: AABB = log.mesh.get_aabb()
 		var log_basis: Basis = Basis(Vector3.UP, log.rotation.y)
-		var half_x: float = absf(log_basis.x.x) * log_mesh.size.x * 0.5 \
-				+ absf(log_basis.y.x) * log_mesh.size.y * 0.5 \
-				+ absf(log_basis.z.x) * log_mesh.size.z * 0.5
-		var half_z: float = absf(log_basis.x.z) * log_mesh.size.x * 0.5 \
-				+ absf(log_basis.y.z) * log_mesh.size.y * 0.5 \
-				+ absf(log_basis.z.z) * log_mesh.size.z * 0.5
+		var half_x: float = absf(log_basis.x.x) * log_bounds.size.x * 0.5 \
+				+ absf(log_basis.z.x) * log_bounds.size.z * 0.5
+		var half_z: float = absf(log_basis.x.z) * log_bounds.size.x * 0.5 \
+				+ absf(log_basis.z.z) * log_bounds.size.z * 0.5
+		var log_world_y: float = (fire_xf * log.position).y
+		var log_bottom_y: float = log_world_y + log_bounds.position.y * vertical_scale
+		var log_top_y: float = log_world_y + log_bounds.end.y * vertical_scale
 		if absf(log.position.x) + half_x > clear_width * 0.5 - 0.005 \
-				or absf(log.position.z) + half_z > recess_depth * 0.5 - 0.005:
+				or absf(log.position.z) + half_z > recess_depth * 0.5 - 0.005 \
+				or log_bottom_y < sill - 0.02 or log_top_y >= head - 0.08:
 			return false
-	var support_mesh := support_log.mesh as BoxMesh
+		if index == 0:
+			# The base split rests on the measured fuel bed.
+			if absf(log_bottom_y - fuel_top_y) > 0.006:
+				return false
+		else:
+			# The crossed upper split must overlap the lower timber vertically and
+			# in plan, with no unsupported gap or wholly buried piece.
+			var lower: MeshInstance3D = support_log
+			var lower_bounds: AABB = lower.mesh.get_aabb()
+			var lower_basis: Basis = Basis(Vector3.UP, lower.rotation.y)
+			var lower_top_y: float = (fire_xf * lower.position).y \
+				+ lower_bounds.end.y * vertical_scale
+			var lower_half_x: float = absf(lower_basis.x.x) * lower_bounds.size.x * 0.5 \
+				+ absf(lower_basis.z.x) * lower_bounds.size.z * 0.5
+			var lower_half_z: float = absf(lower_basis.x.z) * lower_bounds.size.x * 0.5 \
+				+ absf(lower_basis.z.z) * lower_bounds.size.z * 0.5
+			var vertical_overlap: float = lower_top_y - log_bottom_y
+			if vertical_overlap < -0.006 or vertical_overlap > 0.045 \
+					or absf(log.position.x - lower.position.x) >= half_x + lower_half_x \
+					or absf(log.position.z - lower.position.z) >= half_z + lower_half_z:
+				return false
+	var support_bounds: AABB = support_log.mesh.get_aabb()
 	var support_basis: Basis = Basis(Vector3.UP, support_log.rotation.y)
-	var support_half_x: float = absf(support_basis.x.x) * support_mesh.size.x * 0.5 \
-		+ absf(support_basis.y.x) * support_mesh.size.y * 0.5 \
-		+ absf(support_basis.z.x) * support_mesh.size.z * 0.5
-	var support_half_z: float = absf(support_basis.x.z) * support_mesh.size.x * 0.5 \
-		+ absf(support_basis.y.z) * support_mesh.size.y * 0.5 \
-		+ absf(support_basis.z.z) * support_mesh.size.z * 0.5
+	var support_half_x: float = absf(support_basis.x.x) * support_bounds.size.x * 0.5 \
+		+ absf(support_basis.z.x) * support_bounds.size.z * 0.5
+	var support_half_z: float = absf(support_basis.x.z) * support_bounds.size.x * 0.5 \
+		+ absf(support_basis.z.z) * support_bounds.size.z * 0.5
 	var support_top_y: float = (fire_xf * support_log.position).y \
-		+ support_mesh.size.y * vertical_scale * 0.5
+		+ support_bounds.end.y * vertical_scale
 	for index in range(3):
 		var flame := heat.find_child("Flame_%d" % index, true, false) as MeshInstance3D
 		if flame == null or not flame.mesh is ArrayMesh:
@@ -671,6 +868,64 @@ static func _heat_fits_measured_firebox(host: Node3D, heat: Node3D,
 				or flame_min_z < -recess_depth * 0.5 or flame_max_z > recess_depth * 0.5:
 			return false
 	return true
+
+
+## The fireplace cooking vessel is a plan-owned second use of a real catalogue
+## model. Its floor must sit on the measured iron ring and remain inside the
+## exact mouth; missing the plan record emits no vessel at all.
+static func _hearth_cooking_vessel_fits(heat: Node3D, sill: float, head: float,
+		clear_width: float, recess_depth: float) -> bool:
+	var vessel := heat.find_child("HearthCookingVessel", true, false) as Node3D
+	var trivet := heat.find_child("HearthIronTripod", true, false) as Node3D
+	var ring := heat.find_child("TrivetSupportRing", true, false) as MeshInstance3D
+	if vessel == null or trivet == null or ring == null or not ring.mesh is TorusMesh \
+			or not PropCatalog.known("Pot_1"):
+		return false
+	var leg_count := 0
+	var fuel := heat.find_child("FuelBed", true, false) as MeshInstance3D
+	if fuel == null or not fuel.mesh is BoxMesh:
+		return false
+	var fuel_mesh := fuel.mesh as BoxMesh
+	var fuel_top_y: float = fuel.position.y + fuel_mesh.size.y * 0.5
+	var support_y: float = float(trivet.get_meta("support_y", -INF))
+	var pot_center := trivet.position + ring.position
+	var ring_bounds: AABB = ring.mesh.get_aabb()
+	var ring_top_y: float = pot_center.y + ring_bounds.end.y
+	var ring_mesh := ring.mesh as TorusMesh
+	var footprint: Vector2 = PropCatalog.footprint_rotated("Pot_1", vessel.rotation.y) * vessel.scale.x
+	if absf(vessel.position.x - pot_center.x) > 0.004 \
+			or absf(vessel.position.z - pot_center.z) > 0.004 \
+			or absf(ring_top_y - support_y) > 0.004 \
+			or ring_mesh.outer_radius > minf(footprint.x, footprint.y) * 0.5 + 0.002:
+		return false
+	for child in trivet.get_children():
+		if String(child.name).begins_with("TripodLeg_"):
+			leg_count += 1
+			if not child is MeshInstance3D or not child.mesh is CylinderMesh:
+				return false
+			var leg := child as MeshInstance3D
+			var leg_mesh := leg.mesh as CylinderMesh
+			var leg_top: Vector3 = trivet.position + leg.position \
+				+ leg.transform.basis.y * leg_mesh.height * 0.5
+			var leg_bottom: Vector3 = trivet.position + leg.position \
+				- leg.transform.basis.y * leg_mesh.height * 0.5
+			if absf(leg_top.y - support_y) > 0.006 \
+					or absf(leg_bottom.y - fuel_top_y) > 0.012 \
+					or absf(leg_bottom.x) > clear_width * 0.5 \
+					or absf(leg_bottom.z) > recess_depth * 0.5:
+				return false
+	if leg_count != 3:
+		return false
+	var scale_x: float = vessel.scale.x
+	var scale_y: float = vessel.scale.y
+	var floor_y: float = vessel.position.y + PropCatalog.floor_offset("Pot_1") * scale_y
+	var top_y: float = floor_y + PropCatalog.height("Pot_1") * scale_y
+	var half_x: float = footprint.x * 0.5
+	var half_z: float = footprint.y * 0.5
+	return absf(floor_y - ring_top_y) <= 0.008 \
+		and floor_y > sill + 0.03 and top_y < head - 0.035 \
+		and absf(vessel.position.x) + half_x <= clear_width * 0.5 - 0.015 \
+		and absf(vessel.position.z) + half_z <= recess_depth * 0.5 - 0.015
 
 static func _uses_domestic_hearth_fire(plan: HousePlan) -> bool:
 	return plan != null and HouseFurnishingRecipes.is_ordinary_house(plan) \
@@ -780,6 +1035,30 @@ static func _add_witch_cauldron_heat(parent: Node3D, placement: Dictionary, plan
 	cue.name = "NativeCauldronHeat"
 	parent.add_child(cue)
 	var floor_y: float = PropCatalog.floor_offset("Cauldron")
+	if not placement.has("room"):
+		# Exterior Cauldrons are separate placed models, so their fuel belongs
+		# under this prop rather than as loose triangles in the house shell mesh.
+		var fuel_material := StandardMaterial3D.new()
+		fuel_material.albedo_color = Color(0.20, 0.095, 0.045)
+		fuel_material.roughness = 0.92
+		var lower_height := 0.035
+		for side in [-1.0, 1.0]:
+			var lower := MeshInstance3D.new()
+			lower.name = "FuelLogLower_%d" % (0 if side < 0.0 else 1)
+			var lower_mesh := BoxMesh.new()
+			lower_mesh.size = Vector3(0.035, lower_height, 0.22)
+			lower.mesh = lower_mesh
+			lower.position = Vector3(side * 0.035, floor_y + lower_height * 0.5, 0.0)
+			lower.material_override = fuel_material
+			cue.add_child(lower)
+		var upper := MeshInstance3D.new()
+		upper.name = "FuelLogUpper"
+		var upper_mesh := BoxMesh.new()
+		upper_mesh.size = Vector3(0.18, 0.032, 0.035)
+		upper.mesh = upper_mesh
+		upper.position = Vector3(0.0, floor_y + lower_height + 0.016, 0.0)
+		upper.material_override = fuel_material
+		cue.add_child(upper)
 	var ember_material := StandardMaterial3D.new()
 	ember_material.albedo_color = Color(0.30, 0.055, 0.012)
 	ember_material.emission_enabled = true

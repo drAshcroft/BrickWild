@@ -4,7 +4,7 @@ A chair assigned to a table still stands on the floor. HouseNavCheck formerly sk
 
 The corrected checker exposed a second defect. Room-end repair checked the entire house and removed the current room's optional furniture even when the same failure belonged to an earlier room. In the two-storey Townhouse innkeeper case (13 x 16 m, 2.9 m per storey, seed 32102), this stripped later bedrooms. Room repair now compares actual failure messages, unreachable room indices and unreachable item indices against the pre-room report. An unchanged inherited failure leaves that room's furniture intact. Newly blocked rooms still receive bounded repair.
 
-The furnisher carries each room's final report to the next room. No plan mutation occurs between those calls. Every removal is followed by a new check, including a removal on the third and final attempt. The cache is local to one furnishing call. Global repair and its compromise policy are unchanged.
+The furnisher carries each room's final report to the next room. No plan mutation occurs between those calls. Every removal is followed by a new check, including a removal on the third and final attempt. The cache is local to one furnishing call. Global repair now trials hosted floor seats and compares necessity, complete repair and retained inventory. It still records a necessary local compromise when every useful candidate is required.
 
 ## Native evidence
 
@@ -28,9 +28,17 @@ Production source fingerprints used for the isolated gates and images: NavCheck 
 
 ## Visual and functional limits
 
-Root opened all eleven [exact-case room and overview images](../visualQA/styles/house/townhouse/renders/nav_inventory_restart56/README.md). Their design status remains **needs_changes**. The bedrooms are repetitive and bare; the cupboard in room 9 stands free; the compromised parlour is empty. Upper floors occlude the lower plan in the roof-off overviews. Retaining inventory is necessary, but does not produce an inhabited home by itself.
+Root opened all eleven [earlier exact-case room and overview images](../visualQA/styles/house/townhouse/renders/nav_inventory_restart56/README.md). Their design status remains **needs_changes**. The bedrooms are repetitive and bare; the cupboard in room 9 stands free; the earlier compromised parlour was empty. Upper floors occlude the lower plan in the roof-off overviews. Retaining inventory is necessary, but does not produce an inhabited home by itself.
 
-The existing stowage rule also counts a nightstand as clothes storage. Rooms 4, 8 and 10 retain bedside shelves without separate clothes storage. `LIVE-SLEEP-CLOTHES-STORAGE` records this design and QA gap. Global group repair, useful dining recovery, architecture, stairs and room composition remain in their separate tasks.
+The existing stowage rule also counts a nightstand as clothes storage. Rooms 4, 8 and 10 retain bedside shelves without separate clothes storage. `LIVE-SLEEP-CLOTHES-STORAGE` records this design and QA gap. Architecture, stairs and room composition remain in their separate tasks.
+
+## 9 October group-preserving repair
+
+The exact innkeeper plan (13 x 16 m, two 2.9 m storeys, seed 32102) had one unreachable hosted Stool in room 1. The old candidate list excluded it, so global repair tried eight unrelated beds and then removed `Table_Large` with its hosted dining group. Repair now includes hosted floor-blocking pieces and appends named unreachable items beyond the bounded size cap. It prefers optional losses, complete repairs and smaller furniture losses in that order. In the exact native fixture, removing one optional Stool retains `Table_Large`, Bench and another Stool; 14/14 rooms and 33/33 use zones remain reachable.
+
+The focused `tests/house_nav_group_repair_test.gd` passed with native exit 0. The first eleven-view capture is diagnostic only: its source hashes changed during an unrelated recipe edit. The [final twelve-view capture](../visualqa/styles/house/townhouse/renders/nav_group_repair_final_20261009/manifest.json) saved every requested image with native exit 0 and `source_changed=false`. Root opened the assembled parlour and overview images: the table and long bench are visible as a retained dining group; the end Stool is recorded in the measured placement inventory but its room portrait does not show it clearly. The final plan has 78 furniture pieces versus the earlier 68 and one additional honest `tuck` complaint for the restored Stool, 0.15 m into the table end. `HOUSE-DINING-SEAT-TUCK` owns that placement defect. The existing sparse rooms, cupboard placement, stair and floor-gap findings remain visible to their own tasks.
+
+The bounded `lane:house-plan-fast` receipt finished native exit 1: planning passed 56/56 checks; multistorey reported 28 stair/furnishing/design failures and no unreachable-room or use-zone failure in the exact innkeeper case. `lane:house-furnish-fast` finished native exit 1: assembly passed 95/95; the four failures are one known Romanesque z-fight budget miss and the previously traced cottage/mediterranean missing-hearth and workbench-daylight complaints (tracked by `HOUSE-FENG-BOUNDED-HEARTH`). Neither lane is claimed green. Their logs are under `artifacts/personality/resumed/`.
 
 Run the focused regressions with the executable named in AGENTS.md:
 

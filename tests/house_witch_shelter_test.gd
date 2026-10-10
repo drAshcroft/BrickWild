@@ -53,7 +53,7 @@ func _check_witch(size: Dictionary, seed_value: int) -> void:
 	if HouseGeometry.porch_center(plan).distance_to(Vector2(door["pos"])) < 0.2:
 		failures.append("%s entry roof lost its deliberate offset" % label)
 	var builder := HouseBuilder.new()
-	builder.build(plan, true)
+	var mesh: ArrayMesh = builder.build(plan, true)
 	_check_witch_porch_bounds(plan, builder, label)
 	_check_workshop_routes(plan, label)
 	var found_roof := false
@@ -66,14 +66,49 @@ func _check_witch(size: Dictionary, seed_value: int) -> void:
 	if not found_roof or found_supports != 2:
 		failures.append("%s shelter lacks named roof and two emitted supports" % label)
 	var chimney_found := false
+	var roof_vertices: PackedVector3Array = mesh.surface_get_arrays(HouseBuilder.SURF_ROOF)[Mesh.ARRAY_VERTEX] \
+		if mesh.get_surface_count() > HouseBuilder.SURF_ROOF else PackedVector3Array()
+	var chimney_flue_size := HouseGeometry.chimney_flue_size(plan.spec, plan.world_family)
+	var chimney_exit_top := _roof_surface_height_in_footprint(roof_vertices,
+		HouseGeometry.chimney_center(plan), Vector2.ONE * chimney_flue_size)
+	var ridge_surface_top := -INF
+	for vertex in roof_vertices:
+		ridge_surface_top = maxf(ridge_surface_top, vertex.y)
 	for mass in builder.mass_log:
 		if mass.get("name", "") == "chimney":
 			chimney_found = true
 			var bounds: AABB = mass["aabb"]
-			if bounds.size.y > plan.spec.height * float(plan.spec.storeys) + cap + 0.85:
-				failures.append("%s chimney rises to the ridge instead of its roof exit" % label)
+			var chimney_top := bounds.position.y + bounds.size.y
+			if not is_finite(chimney_exit_top):
+				failures.append("%s chimney footprint has no emitted roof surface exit" % label)
+			elif not _chimney_fits_measured_exit(chimney_top, chimney_exit_top):
+				failures.append("%s chimney extends above its measured roof exit by more than the emitted crown, pot and clearance" % label)
+			# Negative control: the old ridge-height stack must fail this same
+			# local-exit rule whenever the ridge is measurably higher than the
+			# actual roof under the flue.
+			if is_finite(chimney_exit_top) and ridge_surface_top > chimney_exit_top + 0.05 \
+					and _chimney_fits_measured_exit(ridge_surface_top + HouseGeometry.CHIMNEY_TOP,
+						chimney_exit_top):
+				failures.append("%s chimney ridge-height negative control was incorrectly accepted" % label)
 	if not chimney_found:
 		failures.append("%s did not emit its required chimney" % label)
+
+
+func _roof_surface_height_in_footprint(vertices: PackedVector3Array, centre: Vector2,
+		footprint: Vector2) -> float:
+	if vertices.is_empty() or footprint.x <= 0.0 or footprint.y <= 0.0:
+		return NAN
+	var highest := -INF
+	for fx in [-0.5, 0.0, 0.5]:
+		for fy in [-0.5, 0.0, 0.5]:
+			var sample := centre + Vector2(float(fx) * footprint.x, float(fy) * footprint.y)
+			for y in _heights_at(vertices, sample):
+				highest = maxf(highest, y)
+	return highest if is_finite(highest) else NAN
+
+
+func _chimney_fits_measured_exit(chimney_top: float, roof_exit_top: float) -> bool:
+	return chimney_top <= roof_exit_top + HouseGeometry.CHIMNEY_TOP + 0.015
 
 
 func _check_witch_porch_bounds(plan: HousePlan, builder: HouseBuilder, label: String) -> void:
@@ -202,6 +237,77 @@ func _check_witch_occupation() -> void:
 				failures.append("witch shelter emitted ledger misses wall or roof contact")
 			_check_shelter_contact_negatives(emitted_ledger, roof_triangles, wall_surface, emitted_posts, shelter_clearance)
 			_check_shelter_cardinal_mesh_contacts(plan)
+			for prefix in ["witch_work_wing"]:
+				var bay_roof: Dictionary = {}
+				var bay_ledger: Dictionary = {}
+				var bay_posts: Array[Dictionary] = []
+				for component in builder.component_log:
+					if String(component.get("piece", "")) != shelter_piece_id:
+						continue
+					var component_role := String(component.get("role", ""))
+					if component_role == prefix + "_roof":
+						bay_roof = component
+					elif component_role == prefix + "_ledger":
+						bay_ledger = component
+					elif component_role == prefix + "_post":
+						bay_posts.append(component)
+				var expected_posts := 0 if prefix == "witch_work_wing" else 2
+				if bay_roof.is_empty() or bay_ledger.is_empty() or bay_posts.size() != expected_posts:
+					failures.append("%s lacks its emitted roof, ledger or required supports" % prefix)
+					continue
+				var bay_kit := MeshKit.new(1)
+				bay_kit.oriented_box(bay_roof["size"], bay_roof["xf"], 0)
+				var bay_mesh: ArrayMesh = bay_kit.commit()
+				var bay_triangles: PackedVector3Array = bay_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+				if not ComponentCheck.contains_triangles(roof_surface, bay_triangles):
+					failures.append("%s roof log is absent from the actual roof surface" % prefix)
+				if not bay_posts.is_empty() and not _emitted_posts_touch_roof(bay_triangles, bay_posts):
+					failures.append("%s support posts miss the actual roof underside" % prefix)
+				if not _emitted_ledger_touches_wall_and_roof(bay_ledger, bay_triangles,
+						wall_surface, shelter_clearance):
+					failures.append("%s ledger misses the wall or its measured roof" % prefix)
+			var wing_wall_components: Array[Dictionary] = []
+			var wing_header_components: Array[Dictionary] = []
+			var wing_frame_components: Array[Dictionary] = []
+			for component in builder.component_log:
+				if String(component.get("piece", "")) != shelter_piece_id:
+					continue
+				if String(component.get("role", "")) == "witch_work_wing_wall":
+					wing_wall_components.append(component)
+				elif String(component.get("role", "")) == "witch_work_wing_header":
+					wing_header_components.append(component)
+				elif String(component.get("role", "")) == "witch_work_wing_frame":
+					wing_frame_components.append(component)
+			if wing_wall_components.size() != 18:
+				failures.append("enclosed work wing emitted %d timber wall components, expected 18" % wing_wall_components.size())
+			if wing_header_components.size() != 1:
+				failures.append("enclosed work wing lacks its single measured yard-entry lintel")
+			if wing_frame_components.size() < 6:
+				failures.append("enclosed work wing lacks visible front framing around its service opening")
+			for component in wing_wall_components:
+				var wall_kit := MeshKit.new(1)
+				wall_kit.oriented_box(component["size"], component["xf"], 0)
+				var wall_mesh: ArrayMesh = wall_kit.commit()
+				var wall_triangles: PackedVector3Array = wall_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+				if not ComponentCheck.contains_triangles(trim_surface, wall_triangles):
+					failures.append("Witch work-wing timber wall log does not match emitted trim geometry")
+					break
+			for component in wing_header_components:
+				var lintel_kit := MeshKit.new(1)
+				lintel_kit.oriented_box(component["size"], component["xf"], 0)
+				var lintel_mesh: ArrayMesh = lintel_kit.commit()
+				var lintel_triangles: PackedVector3Array = lintel_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+				if not ComponentCheck.contains_triangles(trim_surface, lintel_triangles):
+					failures.append("Witch work-wing lintel log does not match emitted trim geometry")
+					break
+			for component in wing_frame_components:
+				var frame_kit := MeshKit.new(1)
+				frame_kit.oriented_box(component["size"], component["xf"], 0)
+				var frame_mesh: ArrayMesh = frame_kit.commit()
+				var frame_triangles: PackedVector3Array = frame_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+				if not ComponentCheck.contains_triangles(wall_surface, frame_triangles):
+					failures.append("Witch work-wing front frame log does not match emitted wall surface")
+					break
 	for role in ["herb_bed", "drying_line"]:
 		var found_group := false
 		for piece in plan.yard_pieces:
@@ -235,14 +341,42 @@ func _check_witch_occupation() -> void:
 	for category in counts:
 		if int(counts[category]) == 0:
 			failures.append("witchwork lacks placed %s activity" % category)
-	var surface_shelf := false
+	if not _has_witchwork_bottle_support(plan, room):
+		failures.append("witchwork lacks its measured bottle-support wall fitting")
+	else:
+		var broken_support := HousePlan.new()
+		broken_support.furniture = plan.furniture.duplicate(true)
+		broken_support.wall_hosts = plan.wall_hosts.duplicate(true)
+		for host_index in range(broken_support.wall_hosts.size() - 1, -1, -1):
+			var host: Dictionary = broken_support.wall_hosts[host_index]
+			if String(host.get("role", "")) == "activity_support" \
+					and String(host.get("activity_group", "")) == "witchwork":
+				broken_support.wall_hosts.remove_at(host_index)
+		if _has_witchwork_bottle_support(broken_support, room):
+			failures.append("removing the Witchwork bottle-rack wall host passed the support negative control")
+
+
+func _has_witchwork_bottle_support(plan: HousePlan, room: int) -> bool:
 	for item in plan.furniture:
-		if int(item.get("room", -1)) == room and String(item.get("key", "")) == "Shelf_Small_Bottles" \
-				and String(item.get("activity_group", "")) == "witchwork" \
-				and bool(item.get("surface_generated", false)):
-			surface_shelf = true
-	if not surface_shelf:
-		failures.append("witchwork lacks its generated bottle-support wall fitting")
+		if int(item.get("room", -1)) != room or String(item.get("key", "")) != "Shelf_Small_Bottles" \
+				or String(item.get("activity_group", "")) != "witchwork" \
+				or not bool(item.get("mounted", false)):
+			continue
+		var anchor_id := String(item.get("activity_anchor_id", ""))
+		var wall_host_id := String(item.get("wall_host_id", ""))
+		if anchor_id.is_empty() or wall_host_id.is_empty():
+			continue
+		for wall_host in plan.wall_hosts:
+			if String(wall_host.get("id", "")) == wall_host_id \
+					and int(wall_host.get("room", -1)) == room \
+					and String(wall_host.get("role", "")) == "activity_support" \
+					and String(wall_host.get("activity_group", "")) == "witchwork" \
+					and String(wall_host.get("anchor_id", "")) == anchor_id \
+					and String(wall_host.get("target_category", "")) == "shelf" \
+					and String(wall_host.get("content_kind", "")) == "integrated_ingredient_rack" \
+					and String(wall_host.get("content_asset_key", "")) == "Shelf_Small_Bottles":
+				return true
+	return false
 
 func _check_shelter_contact_negatives(ledger: Dictionary, roof: PackedVector3Array,
 		wall: PackedVector3Array, posts: Array[Dictionary], clearance: Dictionary) -> void:
@@ -483,8 +617,8 @@ func _check_workshop_routes(plan: HousePlan, label: String) -> void:
 			failures.append("%s entrance cannot reach %s use zone on the body-eroded floor grid" % [label, category])
 	if targets != 2:
 		failures.append("%s route proof found %d of 2 required Witchwork floor stations" % [label, targets])
-	if alchemy_materials < 2:
-		failures.append("%s Witchwork has only %d of 2 supported alchemy materials" % [label, alchemy_materials])
+	if alchemy_materials != 2:
+		failures.append("%s Witchwork has %d of exactly 2 alchemy materials on its measured workbench" % [label, alchemy_materials])
 	var support_check := HouseFurnishPhysicalCheck.new()
 	support_check.check_supported(plan)
 	for support_failure in support_check.failures:
@@ -519,9 +653,11 @@ func _check_witch_approach(plan: HousePlan, shelter: Dictionary, clearance: Dict
 	var size := float(clearance.get("approach_size", 0.0))
 	if absf(zone.size.x - size) > 0.001 or absf(zone.size.y - size) > 0.001:
 		failures.append("%s operation zone is not a measured %.1f m square" % [role, size])
-	var roof: Rect2 = clearance["roof_rect"]
+	var prep_role := role == "witch_prep_bench"
+	var roof_key := "prep_roof_rect" if prep_role else "brew_roof_rect"
+	var roof: Rect2 = clearance.get(roof_key, Rect2())
 	if not roof.encloses(zone):
-		failures.append("%s operation zone leaves the shelter roof projection" % role)
+		failures.append("%s operation zone leaves its assigned service-bay roof projection" % role)
 		return
 	var origin: Vector2 = clearance["origin"]
 	var outward: Vector2 = clearance["out"]
@@ -562,8 +698,8 @@ func _check_witch_approach(plan: HousePlan, shelter: Dictionary, clearance: Dict
 			failures.append("%s operation zone is blocked by yard prop %s" % [role, other.get("id", "?" )])
 	for piece in plan.yard_pieces:
 		for part in piece["parts"]:
-			if String(part["role"]) == "witch_shelter_roof" \
-					or String(part["role"]) == "witch_shelter_ledger":
+			var part_role := String(part["role"])
+			if part_role.ends_with("_roof") or part_role.ends_with("_ledger"):
 				continue
 			var bounds := HouseYard.part_aabb(part)
 			if bounds.position.y + bounds.size.y <= 0.2 or bounds.position.y >= required:

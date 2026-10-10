@@ -92,7 +92,7 @@ func check(spec: TempleSpec, builder: TempleBuilder, overrides: Dictionary = {})
 		var stone: Array = MeshProbe.surface_triangles(builder, null, TempleBuilder.SURF_STONE)
 		var roof: Array = MeshProbe.surface_triangles(builder, null, TempleBuilder.SURF_ROOF)
 		rotunda_bearing_failures = _rotunda_bearing_failures(spec, builder, stone, roof)
-		lantern_seat_supported = spec.spire and _rotunda_lantern_seat_supported(spec, roof)
+		lantern_seat_supported = false
 		for bearing_failure in rotunda_bearing_failures:
 			failures.append(bearing_failure)
 	var gaps: Dictionary = _rotunda_gap_report(masses,
@@ -128,9 +128,9 @@ func check(spec: TempleSpec, builder: TempleBuilder, overrides: Dictionary = {})
 		if pylon_spandrel_supported:
 			carried.append("pylon_shrine_portal_spandrel")
 	if spec.form == &"rotunda":
-		# The gate head is borne by the shortened jamb piers. The optional
-		# lantern stands on the measured dome-apex seat. Native fixture
-		# probes include removal controls for both actual bearing surfaces.
+		# The gate head is borne by the shortened jamb piers. The annular crown
+		# is continuous with the outer arcade and inner colonnade; it adds no
+		# detached roof mass that needs an exception in the connectivity graph.
 		carried.append("wall_rotunda_gate_head")
 		if spec.spire and lantern_seat_supported:
 			carried.append("rotunda_lantern")
@@ -167,7 +167,7 @@ static func _rotunda_wall_continuity_triangles(spec: TempleSpec,
 	var count: int = TempleGeometry.rotunda_wall_panel_count(spec)
 	var step: float = TAU / float(count)
 	var gate_half: float = TempleGeometry.rotunda_gate_panel_half_angle(spec)
-	var y: float = spec.height * 0.5
+	var y: float = TempleGeometry.rotunda_lower_drum_height(spec) * 0.5
 	var checked := 0
 	for i in range(count):
 		var angle: float = -PI + (float(i) + 0.5) * step
@@ -510,8 +510,6 @@ static func _rotunda_bearing_failures_for_components(spec: TempleSpec,
 				if not MeshProbe.has_upward_support(without_head,
 						Vector2(x, gate_z), gate_height, 0.03):
 					failures.append("size_match: Rotunda gate-head end at x=%.3f has no actual upward jamb bearing" % x)
-	if spec.spire and not _rotunda_lantern_seat_supported(spec, roof):
-		failures.append("size_match: emitted lantern seat is unsupported within its small footprint")
 	return failures
 
 
@@ -708,33 +706,4 @@ static func _rotunda_wall_pair_allowance(spec: TempleSpec,
 ## Separating-axis test for the exact oriented component boxes. The result is
 ## the shallowest physical penetration in metres, or zero when disjoint.
 static func _rotunda_box_overlap_depth(a: Dictionary, b: Dictionary) -> float:
-	var a_xf: Transform3D = a["xf"]
-	var b_xf: Transform3D = b["xf"]
-	var a_axes: Array[Vector3] = [a_xf.basis.x.normalized(), a_xf.basis.y.normalized(),
-		a_xf.basis.z.normalized()]
-	var b_axes: Array[Vector3] = [b_xf.basis.x.normalized(), b_xf.basis.y.normalized(),
-		b_xf.basis.z.normalized()]
-	var a_half: Vector3 = (a["size"] as Vector3) * 0.5
-	var b_half: Vector3 = (b["size"] as Vector3) * 0.5
-	var axes: Array[Vector3] = []
-	axes.append_array(a_axes)
-	axes.append_array(b_axes)
-	for a_axis in a_axes:
-		for b_axis in b_axes:
-			axes.append(a_axis.cross(b_axis))
-	var delta: Vector3 = b_xf.origin - a_xf.origin
-	var shallowest := INF
-	for candidate in axes:
-		if candidate.length_squared() < 1e-10:
-			continue
-		var axis: Vector3 = candidate.normalized()
-		var a_radius := 0.0
-		var b_radius := 0.0
-		for index in range(3):
-			a_radius += a_half[index] * absf(a_axes[index].dot(axis))
-			b_radius += b_half[index] * absf(b_axes[index].dot(axis))
-		var overlap: float = a_radius + b_radius - absf(delta.dot(axis))
-		if overlap <= 0.0:
-			return 0.0
-		shallowest = minf(shallowest, overlap)
-	return 0.0 if is_inf(shallowest) else shallowest
+	return TempleGeometry.obb_overlap_depth(a, b)

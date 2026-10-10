@@ -221,6 +221,43 @@ static func choose_focus(p: HousePlan, _spec: HouseSpec) -> void:
 	p.focus = focus_on_wall(p, room, wi, "hearth", false)
 
 
+## Reserve a human-sized tending stance only for ordinary one-storey domestic
+## hearths. It is plan-owned floor, so furnishing and navigation both respect it.
+static func reserve_domestic_hearth_tending(p: HousePlan, spec: HouseSpec) -> void:
+	if spec == null or p == null or p.spec != spec or p.world_family != &"" \
+			or spec.get_script() != BASE_HOUSE_SPEC or spec.trade != &"none" \
+			or spec.storeys != 1 or spec.cellars != 0 \
+			or not [&"cottage", &"farmhouse", &"thatch_cottage"].has(spec.style) \
+			or spec.has_method("room_program") or spec.has_method("custom_room_rects") \
+			or spec.has_method("landmark_footprint"):
+		return
+	var room := p.hearth_room()
+	var wall := p.hearth_wall()
+	if room < 0 or wall < 0 or p.storey_of_room(room) != 0 \
+			or String(p.hearth.get("host_kind", "")) != "ordinary_fireplace":
+		return
+	var breast := HouseGeometry.breast_for_domestic_fireplace(p, room, wall)
+	if breast.is_empty():
+		return
+	var normal: Vector2 = breast["normal"]
+	# Breast centre is half a depth behind its room-facing face. Leave 0.10m
+	# at the face, then 0.70m for a standing person and tending motion.
+	var centre: Vector2 = Vector2(breast["centre"]) + normal * (0.50 * float(breast["depth"]) + 0.45)
+	var size := Vector2(0.90, 0.70) if absf(normal.x) < 0.5 else Vector2(0.70, 0.90)
+	var patch := Rect2(centre - size * 0.5, size)
+	if not HouseGeometry.room_floor_rect(p, room).grow(0.001).encloses(patch):
+		return
+	var outline: PackedVector2Array = p.outline_of(room)
+	for corner in [patch.position, Vector2(patch.end.x, patch.position.y), patch.end,
+		Vector2(patch.position.x, patch.end.y)]:
+		if not Geometry2D.is_point_in_polygon(corner, outline):
+			return
+	for index in range(p.zones.size() - 1, -1, -1):
+		if String(p.zones[index].get("why", "")) == "hearth tending":
+			p.zones.remove_at(index)
+	p.zones.append({"room": room, "rect": patch, "why": "hearth tending"})
+
+
 ## A shared hall gets two actual clear-floor bands only in a plain, one-storey
 ## domestic house. Trades, adapters, world plans, cellars and upper floors keep
 ## their existing room-wide placement rules.

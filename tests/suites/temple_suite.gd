@@ -129,6 +129,78 @@ static func _rotunda_brazier_wall_negative(res: SuiteResult) -> void:
 	res.checked += 1
 	if TempleQA._rotunda_box_overlap_depth(wall, moved_brazier) <= MassRules.TOL:
 		res.fail("actual Cauldron footprint inside %s escaped the Rotunda wall SAT negative" % names[0])
+	_rotunda_recorded_brazier_controls(res)
+
+
+## Every captured wall-hit remains rejected. A nearby inward station must still
+## pass placement and have emitted floor support.
+static func _rotunda_recorded_brazier_controls(res: SuiteResult) -> void:
+	var cases: Array[Dictionary] = [
+		{"cult": &"blood", "seed": 31304, "positions": [Vector2(-6.716875, -8.562364), Vector2(6.716875, -8.562364)]},
+		{"cult": &"void", "seed": 31304, "positions": [Vector2(-6.716875, -8.562364), Vector2(6.716875, -8.562364)]},
+		{"cult": &"flame", "seed": 31316, "positions": [Vector2(-3.464875, -5.158746), Vector2(3.464875, -5.158746)]},
+		{"cult": &"bone", "seed": 31349, "positions": [Vector2(-3.464875, -5.118890), Vector2(3.464875, -5.118890)]},
+		{"cult": &"serpent", "seed": 31356, "positions": [Vector2(-3.464875, -5.171854), Vector2(3.464875, -5.171854)]},
+	]
+	for witness in cases:
+		var spec: TempleSpec = null
+		for i in range(TempleSweep.COUNT):
+			var candidate: TempleSpec = TempleSweep.spec_at(&"rotunda", witness["cult"], i)
+			if candidate.seed == int(witness["seed"]):
+				spec = candidate
+				break
+		if spec == null:
+			res.fail("recorded Rotunda brazier seed is no longer canonical: %s" % str(witness))
+			continue
+		var builder := TempleBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		builder.prop_log.clear()
+		var walls: Dictionary = TempleQA._rotunda_wall_components(builder)
+		var stone: Array = MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE)
+		var physical_size: Vector3 = PropCatalog.size("Cauldron") * TempleBuilder.BRAZIER_SCALE
+		for pos in witness["positions"]:
+			res.checked += 1
+			var actual_box := {"xf": Transform3D(Basis.IDENTITY,
+				Vector3(pos.x, 0.002 + physical_size.y * 0.5, pos.y)),
+				"size": physical_size}
+			var hit_name := ""
+			for name in walls:
+				if TempleQA._rotunda_box_overlap_depth(walls[name], actual_box) > MassRules.TOL:
+					hit_name = String(name)
+					break
+			if hit_name.is_empty():
+				res.fail("recorded Cauldron witness no longer hits an emitted Rotunda wall: seed=%d pos=%s" % [spec.seed, str(pos)])
+			if builder._brazier_clear(pos):
+				res.fail("Rotunda placement still accepts its wall-hit witness %s seed=%d pos=%s" % [hit_name, spec.seed, str(pos)])
+			var nearby_clear := false
+			for step in range(1, 13):
+				var inward: Vector2 = pos - pos.normalized() * (0.15 * float(step))
+				if not builder._brazier_clear(inward):
+					continue
+				var half: Vector2 = PropCatalog.footprint("Cauldron") \
+					* TempleBuilder.BRAZIER_SCALE * 0.5
+				var supported := true
+				for point in [inward, inward + Vector2(-half.x, -half.y),
+						inward + Vector2(-half.x, half.y), inward + Vector2(half.x, -half.y),
+						inward + Vector2(half.x, half.y)]:
+					if not MeshProbe.has_upward_support(stone, point, 0.001, 0.03):
+						supported = false
+						break
+				if not supported:
+					continue
+				var neighbor_box := {"xf": Transform3D(Basis.IDENTITY,
+					Vector3(inward.x, 0.002 + physical_size.y * 0.5, inward.y)),
+					"size": physical_size}
+				var hits_wall := false
+				for wall in walls.values():
+					if TempleQA._rotunda_box_overlap_depth(wall, neighbor_box) > MassRules.TOL:
+						hits_wall = true
+						break
+				if not hits_wall:
+					nearby_clear = true
+					break
+			if not nearby_clear:
+				res.fail("no nearby supported clear brazier station within 1.8m; seed=%d pos=%s" % [spec.seed, str(pos)])
 
 
 static func _compact_columns(res: SuiteResult) -> void:

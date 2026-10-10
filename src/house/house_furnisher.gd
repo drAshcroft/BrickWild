@@ -30,6 +30,7 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 	plan.rugs.clear()
 	plan.hearth.erase("breast")
 	plan.hearth.erase("host_kind")
+	plan.hearth.erase("cooking_vessel")
 	if _uses_native_domestic_fireplace(plan):
 		var room := plan.hearth_room()
 		var wall := plan.hearth_wall()
@@ -38,6 +39,7 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 			if not breast.is_empty():
 				plan.hearth["breast"] = breast
 				plan.hearth["host_kind"] = "ordinary_fireplace"
+	HousePlanFeatures.reserve_domestic_hearth_tending(plan, spec)
 	if HouseFurnishingRecipes.is_ordinary_house(plan):
 		_select_household_dining_room(plan)
 	# This whole-plan report is also the pre-room baseline for the first room.
@@ -48,6 +50,25 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 		nav_report = _furnish_room(plan, spec, i, nav_report)
 	HouseFurnishRepair.relax(plan)
 	_audit_activity_groups(plan)
+	# The existing Workbench Pot remains the prep vessel. A second, explicit
+	# structural record authorizes the actual model instance suspended over the
+	# native fireplace; the assembler must not invent one from a row count.
+	var has_domestic_tending := false
+	for zone: Dictionary in plan.zones:
+		if String(zone.get("why", "")) == "hearth tending":
+			has_domestic_tending = true
+			break
+	if has_domestic_tending and String(plan.hearth.get("host_kind", "")) == "ordinary_fireplace":
+		for row: Dictionary in plan.furniture:
+			var host := int(row.get("host", -1))
+			if String(row.get("key", "")) == "Pot_1" and host >= 0 \
+					and host < plan.furniture.size() \
+					and String(plan.furniture[host].get("cat", "")) == "workbench" \
+					and int(plan.furniture[host].get("room", -1)) == int(row.get("room", -2)):
+				plan.hearth["cooking_vessel"] = {
+					"key": "Pot_1", "purpose": "hearth_cooking",
+					"host": "ordinary_fireplace", "support": "iron_tripod"}
+				break
 
 
 ## Choose one room for the household's meal before room recipes run. This is a

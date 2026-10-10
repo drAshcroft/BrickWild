@@ -3913,8 +3913,6 @@ func _roof_top_surface_in_flue_footprint(centre: Vector2, footprint: Vector2) ->
 				float(fz) * footprint.y)
 			var local_sample := inverse * Vector3(world_sample.x, xf.origin.y, world_sample.y)
 			for row in components("thatch_eave"):
-				if String(row.get("role", "")) == "thatch_eave_service":
-					continue # measured in local-neighbourhood sampling below
 				if int(row.get("surface", -1)) != SURF_ROOF or String(row.get("form", "")) != "slab":
 					continue
 				var points: PackedVector3Array = row.get("points", PackedVector3Array())
@@ -3956,13 +3954,16 @@ func _build_chimney() -> void:
 	var roll_clearance: float = HouseGeometry.THATCH_ROLL_TOP \
 		if HouseGeometry.has_witch_roofcraft(spec, plan.world_family) else 0.0
 	var plan_roof_rise: float = HouseGeometry.roof_rise(spec)
-	var chimney_roof_layout := HouseGeometry.roof_layout(plan)
-	var chimney_bay: Dictionary = chimney_roof_layout.get("witch_bay", {})
 	var sampled_roof_top := NAN
-	if not chimney_bay.is_empty():
+	if HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family):
+		# The Witch flue exits through the roof at its own measured footprint.
+		# Sampling a three-metre neighbourhood chose the ridge when the stack sat
+		# at the eave, making the chimney tower far above its real roof opening.
+		# The exact footprint sampler includes the emitted eave roll where it
+		# crosses the flue, while leaving the distant ridge cap out of the stack.
 		var measured_flue_s: float = HouseGeometry.chimney_flue_size(spec, plan.world_family)
-		sampled_roof_top = _roof_top_surface_near_flue(c,
-			Vector2.ONE * measured_flue_s, 3.0)
+		sampled_roof_top = _roof_top_surface_in_flue_footprint(c,
+			Vector2.ONE * measured_flue_s)
 		if is_finite(sampled_roof_top):
 			plan_roof_rise = sampled_roof_top - wall_top
 	# The sampled surface already includes the roof's slab crown/roll allowance.
@@ -4029,14 +4030,6 @@ func _build_witch_cauldron_heat() -> void:
 		var furniture_placement: Dictionary = plan.furniture[furniture_index]
 		if String(furniture_placement.get("key", "")) == "Cauldron":
 			_emit_witch_cauldron_logs(furniture_placement, true, "furniture_%d" % furniture_index)
-	for exterior_index in range(plan.exterior.size()):
-		var exterior_placement: Dictionary = plan.exterior[exterior_index]
-		if String(exterior_placement.get("key", "")) == "Cauldron":
-			_emit_witch_cauldron_logs(exterior_placement, false, "exterior_%d" % exterior_index)
-	for yard_index in range(plan.yard.size()):
-		var yard_placement: Dictionary = plan.yard[yard_index]
-		if String(yard_placement.get("key", "")) == "Cauldron":
-			_emit_witch_cauldron_logs(yard_placement, false, "yard_%d" % yard_index)
 	host_end()
 
 func _emit_witch_cauldron_logs(placement: Dictionary, centred: bool, placement_id: String) -> void:

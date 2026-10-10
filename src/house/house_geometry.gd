@@ -777,7 +777,10 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 	if has_high_core:
 		# Keep the generated Witch pitch, but apply it to the measured high-core
 		# span. The lower service roof joins the actual core plane separately.
-		rise = minf(span * s.roof_pitch * 0.5, clampf(span * 0.52, 3.6, 5.6))
+		# A modest public Witch-only rise correction makes the high gable lead the
+		# silhouette. The independent metre cap and measured seam/headroom gates
+		# remain authoritative; trade/world/custom houses never enter this branch.
+		rise = minf(span * s.roof_pitch * 0.64, clampf(span * 0.52, 3.6, 5.6))
 	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if top.size.x > top.size.y else 0.0),
 		Vector3(top.get_center().x, s.height * maxi(s.storeys, 1), top.get_center().y))
 	var span_out := roof_span_out(s)

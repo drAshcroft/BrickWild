@@ -102,6 +102,11 @@ static func interior_rect(spec: TempleSpec) -> Rect2:
 
 ## The Rotunda uses a true circular drum inscribed in its published plan bounds.
 ## Its wall depth is radial, so both interior and roof support share one datum.
+static func rotunda_lower_drum_height(spec: TempleSpec) -> float:
+	# Keep a broad continuous base and reserve the upper third for open bays.
+	return spec.height * 0.69
+
+
 static func rotunda_outer_radius(spec: TempleSpec) -> float:
 	return minf(spec.width, spec.length) * 0.5
 
@@ -114,6 +119,41 @@ static func rotunda_wall_panel_count(spec: TempleSpec) -> int:
 	var circumference: float = TAU * (rotunda_outer_radius(spec) - spec.wall_t * 0.5)
 	var count: int = clampi(int(ceil(circumference / ROTUNDA_WALL_PANEL_MAX_CHORD)), 24, 96)
 	return count if count % 2 == 0 else mini(count + 1, 96)
+
+
+## Separating-axis test for two exact oriented component boxes.
+## Returns the shallowest penetration in metres, or zero when disjoint.
+static func obb_overlap_depth(a: Dictionary, b: Dictionary) -> float:
+	var a_xf: Transform3D = a["xf"]
+	var b_xf: Transform3D = b["xf"]
+	var a_axes: Array[Vector3] = [a_xf.basis.x.normalized(), a_xf.basis.y.normalized(),
+		a_xf.basis.z.normalized()]
+	var b_axes: Array[Vector3] = [b_xf.basis.x.normalized(), b_xf.basis.y.normalized(),
+		b_xf.basis.z.normalized()]
+	var a_half: Vector3 = (a["size"] as Vector3) * 0.5
+	var b_half: Vector3 = (b["size"] as Vector3) * 0.5
+	var axes: Array[Vector3] = []
+	axes.append_array(a_axes)
+	axes.append_array(b_axes)
+	for a_axis in a_axes:
+		for b_axis in b_axes:
+			axes.append(a_axis.cross(b_axis))
+	var delta: Vector3 = b_xf.origin - a_xf.origin
+	var shallowest := INF
+	for candidate in axes:
+		if candidate.length_squared() < 1e-10:
+			continue
+		var axis: Vector3 = candidate.normalized()
+		var a_radius := 0.0
+		var b_radius := 0.0
+		for index in range(3):
+			a_radius += a_half[index] * absf(a_axes[index].dot(axis))
+			b_radius += b_half[index] * absf(b_axes[index].dot(axis))
+		var overlap: float = a_radius + b_radius - absf(delta.dot(axis))
+		if overlap <= 0.0:
+			return 0.0
+		shallowest = minf(shallowest, overlap)
+	return 0.0 if is_inf(shallowest) else shallowest
 
 
 ## Omit tangent panels far enough from the portal that their actual inner-face
@@ -348,7 +388,21 @@ static func sight_point(spec: TempleSpec) -> Vector2:
 static func court_depth(spec: TempleSpec) -> float:
 	if spec.form != &"pylon":
 		return 0.0
-	return interior_rect(spec).size.y * 0.3
+	var interior: Rect2 = interior_rect(spec)
+	var desired: float = maxf(4.0, interior.size.y * 0.4)
+	# Preserve a useful hypostyle bay and the complete shrine behind the court.
+	# Compute the shrine's authored minimum directly: sanctum_depth() depends on
+	# hall_rect(), which depends on this court depth.
+	var shrine_need: float = spec.altar_l + ALTAR_CLEAR * 2.0 + IDOL_GAP \
+		+ spec.idol_width + 1.2
+	var maximum: float = maxf(0.0, interior.size.y - maxf(4.0, shrine_need) - 4.0)
+	return minf(desired, maximum)
+
+
+## Keep the first supported column row inside the hall so the open court reads
+## as a space of its own rather than a threshold directly under the colonnade.
+static func pylon_hypostyle_setback(spec: TempleSpec) -> float:
+	return 1.4 if spec.form == &"pylon" else 0.0
 
 
 ## The great hall: the roofed room the congregation stands in. For a pylon
@@ -367,7 +421,7 @@ static func pylon_roof_rect(spec: TempleSpec) -> Rect2:
 		return Rect2()
 	var site: Rect2 = site_rect(spec)
 	var hall: Rect2 = hall_rect(spec)
-	var front: float = hall.position.y
+	var front: float = hall.position.y + pylon_hypostyle_setback(spec)
 	if not spec.columns.is_empty():
 		front = INF
 		for column in spec.columns:
@@ -409,8 +463,19 @@ static func sanctum_rect(spec: TempleSpec) -> Rect2:
 	if spec.form == &"pylon":
 		# The shrine is narrower than the public hall, with room for the authored altar.
 		width = minf(h.size.x, maxf(spec.altar_w + 2.4, h.size.x * 0.62))
+		# The lowest dais tread grows sideways from the top platform. Reserve that
+		# full growth plus both return-wall thicknesses inside the shrine width.
+		var tread_growth: float = float(maxi(spec.dais_steps, 1) - 1) * DAIS_TREAD
+		var dais_min_width: float = spec.altar_w + ALTAR_CLEAR * 2.0
+		var dais_required_width: float = dais_min_width + spec.wall_t * 2.0 \
+			+ tread_growth * 2.0 + 0.1
+		width = minf(h.size.x, maxf(width, dais_required_width))
 		x = -width * 0.5
 	return Rect2(Vector2(x, h.end.y - d), Vector2(width, d))
+
+
+static func pylon_gate_width(spec: TempleSpec) -> float:
+	return clampf(spec.width * 0.19, 3.8, 7.0)
 
 
 static func pylon_sanctum_doorway_width(spec: TempleSpec) -> float:
@@ -459,7 +524,14 @@ static func pylon_sanctum_wall_rects(spec: TempleSpec) -> Array[Rect2]:
 ## The platform the altar stands on, stepped up from the hall floor.
 static func dais_rect(spec: TempleSpec) -> Rect2:
 	var s: Rect2 = sanctum_rect(spec)
-	var w: float = clampf(s.size.x * 0.55, spec.altar_w + ALTAR_CLEAR * 2.0, s.size.x - 1.0)
+	var minimum_width: float = spec.altar_w + ALTAR_CLEAR * 2.0
+	var maximum_width: float = s.size.x - 1.0
+	if spec.form == &"pylon":
+		var tread_growth: float = float(maxi(spec.dais_steps, 1) - 1) * DAIS_TREAD
+		# Keep the full lowest tread inside the clear width between the two return
+		# walls. sanctum_rect() reserves this width before placing the shrine.
+		maximum_width = s.size.x - spec.wall_t * 2.0 - tread_growth * 2.0 - 0.1
+	var w: float = clampf(s.size.x * 0.55, minimum_width, maximum_width)
 	var d: float = clampf(s.size.y * 0.6, spec.altar_l + ALTAR_CLEAR * 2.0, s.size.y - 0.6)
 	if spec.form == &"rotunda":
 		# Keep the complete stepped dais inside the circular room, including the
@@ -773,7 +845,8 @@ static func _generated_column_positions(spec: TempleSpec) -> Array[Vector3]:
 				out.append(Vector3(sin(a) * ring, 0.0, cos(a) * ring))
 		_:
 			var h: Rect2 = hall_rect(spec)
-			var z0: float = h.position.y + (0.12 if spec.form == &"pylon" else 1.6)
+			var z0: float = h.position.y + (pylon_hypostyle_setback(spec) \
+				if spec.form == &"pylon" else 1.6)
 			var terminal_clearance: float = 1.0
 			if spec.form == &"pylon":
 				terminal_clearance = maxf(terminal_clearance, spec.column_r * 1.2 + 0.12)
@@ -1010,14 +1083,20 @@ static func forecourt_rect(spec: TempleSpec) -> Rect2:
 			Vector2(w, outer_arrival - outer_radius + 0.4))
 	var depth: float = 0.0
 	if spec.obelisks:
-		depth = maxf(depth, obelisk_height(spec) * 0.14 + 2.4)
+		var obelisk_apron: float = obelisk_height(spec) * 0.14 + 2.4
+		if spec.form == &"pylon":
+			obelisk_apron = maxf(4.0, obelisk_apron)
+		depth = maxf(depth, obelisk_apron)
 	if spec.form == &"ziggurat":
 		# Only the part in front of the base needs paving. Extending the
 		# summit landing must not grow the building's outer placement bounds.
 		depth = maxf(depth, terrace_top(spec) * 1.25 + 2.3)
 	if depth <= 0.0:
 		return Rect2()
-	var w: float = minf(r.size.x, GATE_W + 8.0)
+	var apron_gate_width: float = GATE_W
+	if spec.form == &"pylon":
+		apron_gate_width = pylon_gate_width(spec)
+	var w: float = minf(r.size.x, apron_gate_width + 8.0)
 	var end_y: float = r.position.y + 0.4
 	if spec.form == &"pylon":
 		end_y = minf(end_y, interior_rect(spec).position.y)
@@ -1041,7 +1120,8 @@ static func pylon_threshold_rect(spec: TempleSpec) -> Rect2:
 	var depth: float = inside.position.y - apron.end.y
 	if depth <= 0.05:
 		return Rect2()
-	return Rect2(Vector2(-GATE_W * 0.5, apron.end.y), Vector2(GATE_W, depth))
+	var gate_width: float = pylon_gate_width(spec)
+	return Rect2(Vector2(-gate_width * 0.5, apron.end.y), Vector2(gate_width, depth))
 
 
 ## Recessed gate approach for public placement: the true door remains on the
@@ -1082,14 +1162,20 @@ static func rotunda_threshold_rect(spec: TempleSpec) -> Rect2:
 
 
 static func obelisk_height(spec: TempleSpec) -> float:
-	return spec.height * OBELISK_H * 2.0
+	var scale: float = 0.45 if spec.form == &"pylon" else 1.0
+	return spec.height * OBELISK_H * 2.0 * scale
 
 
 ## Where the obelisks stand: clear of the pylons behind them, on the paving.
 static func obelisk_center(spec: TempleSpec, side: float) -> Vector2:
 	var r: Rect2 = site_rect(spec)
 	var oh: float = obelisk_height(spec)
-	return Vector2(side * (GATE_W / 2.0 + 1.6),
+	var gate_half: float = GATE_W / 2.0
+	var lateral_offset: float = 1.6
+	if spec.form == &"pylon":
+		gate_half = pylon_gate_width(spec) / 2.0
+		lateral_offset = 2.2
+	return Vector2(side * (gate_half + lateral_offset),
 		r.position.y - maxf(1.2, oh * 0.07 + 0.7))
 
 
@@ -1280,7 +1366,7 @@ static func roof_height(spec: TempleSpec) -> float:
 		&"ziggurat":
 			return terrace_top(spec)
 		&"rotunda":
-			return spec.height + dome_radius(spec) * 0.55 + RoofShape.DEPTH * 0.5
+			return spec.height + RoofShape.DEPTH * 0.5
 		&"pylon":
 			return spec.height + 0.5
 	return spec.height + minf(spec.width, spec.length) * RIDGE_PITCH + RoofShape.DEPTH * 0.5
@@ -1288,11 +1374,11 @@ static func roof_height(spec: TempleSpec) -> float:
 
 static func total_height(spec: TempleSpec) -> float:
 	var top: float = roof_height(spec)
-	if spec.spire:
+	if spec.spire and spec.form != &"rotunda":
 		top = maxf(top, roof_height(spec) + spec.spire_height)
 	top = maxf(top, idol_apex(spec))
 	if spec.obelisks:
-		top = maxf(top, spec.height * OBELISK_H * 2.0)
+		top = maxf(top, obelisk_height(spec))
 	return top
 
 
@@ -1309,10 +1395,13 @@ static func pylon_rects(spec: TempleSpec) -> Array[Rect2]:
 	if spec.form != &"pylon":
 		return out
 	var r: Rect2 = site_rect(spec)
-	var d: float = spec.wall_t * 2.6
-	var w: float = (r.size.x - GATE_W) / 2.0
+	# A deep pair of battered gate towers must read in elevation as volumes, not
+	# as thin pilasters laid over the perimeter wall.
+	var d: float = clampf(spec.length * 0.22, 4.0, 6.0)
+	var gate_width: float = pylon_gate_width(spec)
+	var w: float = (r.size.x - gate_width) / 2.0
 	for side in [-1.0, 1.0]:
-		var x: float = r.position.x if side < 0.0 else GATE_W / 2.0
+		var x: float = r.position.x if side < 0.0 else gate_width / 2.0
 		out.append(Rect2(Vector2(x, r.position.y), Vector2(w, d)))
 	return out
 

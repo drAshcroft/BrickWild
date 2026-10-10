@@ -68,11 +68,51 @@ static func _check_assembly(res: SuiteResult, plan: HousePlan, who: String) -> v
 			_expect(res, absf(actual.position.y) < 0.02, who + " floating/sunken prop " + p["key"])
 		if PropCatalog.has_tag(p["key"], PropCatalog.LIGHT):
 			expected_lights.append(node.position + node.basis * PropCatalog.light_offset(p["key"]))
-	var lamps := exterior.find_children("*", "OmniLight3D", true, false)
+	# Facade LightKit nodes are direct Exterior children. Some Witch Cauldrons
+	# carry a separate nested CauldronWarmth cue; counting all descendants here
+	# mistakes contained firelight for an extra facade lamp.
+	var lamps: Array[Node] = []
+	for child in exterior.get_children():
+		if child is OmniLight3D:
+			lamps.append(child)
 	_expect(res, lamps.size() == expected_lights.size(), who + " wrong exterior light count")
 	for i in mini(lamps.size(), expected_lights.size()):
 		_expect(res, (lamps[i] as Node3D).position.distance_to(expected_lights[i]) < 0.01, who + " light detached from lamp")
+	if plan.spec.style == &"witch_hut":
+		var expected_heat := 0
+		var first_heat: OmniLight3D
+		for placement in plan.exterior + plan.yard:
+			if String(placement.get("key", "")) != "Cauldron":
+				continue
+			expected_heat += 1
+			var prop_node := exterior.get_node_or_null(NodePath(String(placement.get("id", "")))) as Node3D
+			var heat := prop_node.find_child("CauldronWarmth", true, false) as OmniLight3D \
+				if prop_node != null else null
+			_expect(res, heat != null, who + " Witch Cauldron lacks its contained warmth light")
+			if heat != null:
+				_expect(res, heat.get_parent() != null \
+					and String(heat.get_parent().name) == "NativeCauldronHeat" \
+					and heat.get_parent().get_parent() == prop_node,
+					who + " Witch Cauldron warmth escaped its measured prop")
+				if first_heat == null:
+					first_heat = heat
+		var actual_heat := _witch_heat_count(exterior)
+		_expect(res, actual_heat == expected_heat, who + " wrong Witch Cauldron warmth count")
+		if first_heat != null:
+			var heat_parent := first_heat.get_parent()
+			if heat_parent != null:
+				heat_parent.remove_child(first_heat)
+				first_heat.free()
+			_expect(res, _witch_heat_count(exterior) == maxi(expected_heat - 1, 0),
+				who + " Cauldron warmth removal negative control did not alter the measured count")
 	root.free()
+
+
+static func _witch_heat_count(exterior: Node) -> int:
+	var count := 0
+	for light in exterior.find_children("CauldronWarmth", "OmniLight3D", true, false):
+		count += 1
+	return count
 
 
 ## The yard (EVAL-B06): every style and trade, both orientations. The four

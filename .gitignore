@@ -48,3 +48,4 @@ scratch/*.json
 *.import
 /visualqa/hearth/restart40_head_v3
 /visualqa/hearth
+/visualqa/styles/house/townhouse

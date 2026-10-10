@@ -149,6 +149,20 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 		recipe = _sitting_parlour_recipe()
 	else:
 		recipe = recipe.duplicate(true)
+	# The merchant's townhouse office is a writing place, not a generic shop
+	# workbench. Keep this overlay inside ordinary HouseSpec so trade, world,
+	# custom-family and other house-style contracts retain their own recipes.
+	if is_ordinary_house(plan) and plan.spec.trade == &"none" \
+			and kind == &"office" and plan.spec.style == &"townhouse":
+		return [
+			{"cat": "workbench", "key": "Workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0, "height_scale": 0.85, "group": "writing"},
+			{"cat": "seat", "key": "Chair_1", "rule": &"around", "n": [1, 1], "opt": 1.0, "group": "writing", "preferred_sides": ["long_edge"]},
+			{"cat": "books", "key": "Book_5", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "writing"},
+			{"cat": "books", "key": "Scroll_1", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "writing"},
+			{"cat": "bookcase", "key": "Bookcase_2", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "writing"},
+			{"cat": "books", "key": "BookGroup_Small_1", "rule": &"on", "host_category": "bookcase", "n": [3, 3], "opt": 1.0, "group": "writing"},
+			{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
+		]
 	var domestic_functions: Array = plan.rooms[room].get("domestic_functions", [])
 	var shared_cooking: bool = kind == &"hall" and domestic_functions.has(&"cooking")
 	# A no-trade Witch's Hut has a real craft room. This is a style-local
@@ -169,7 +183,8 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 				step["opt"] = 1.0
 				step["height_scale"] = 1.0
 			elif category == "shelf":
-				step["key"] = "Shelf_Small_Bottles"
+				if not step.has("key"):
+					step["key"] = "Shelf_Small_Bottles"
 				step["group"] = "witchwork"
 				step["opt"] = 1.0
 			elif category == "rack":
@@ -185,7 +200,9 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 		recipe.append_array([
 			{"cat": "storage", "rule": &"wall", "key": "Cabinet", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
 			{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
-			{"cat": "alchemy", "rule": &"on", "host": "distributed", "n": [2, 2], "opt": 1.0, "group": "witchwork"},
+			{"cat": "shelf", "rule": &"mounted", "key": "Shelf_Simple", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
+			{"cat": "alchemy", "rule": &"on", "host_category": "shelf", "key": "SmallBottles_1", "n": [2, 2], "opt": 1.0, "group": "witchwork"},
+			{"cat": "alchemy", "rule": &"on", "host_category": "workbench", "n": [2, 2], "opt": 1.0, "group": "witchwork"},
 			{"cat": "books", "rule": &"on", "host_category": "workbench", "key": "Book_Stack_1", "n": [1, 1], "opt": 1.0, "group": "witchwork"},
 		])
 	var tagged: Array = []
@@ -377,6 +394,12 @@ static func _sitting_parlour_recipe() -> Array:
 ## support, so the ample recipe does not add a second one.
 static func ample_steps_for_room(plan: HousePlan, room: int) -> Array:
 	var kind: StringName = plan.kind_of(room)
+	# One measured desk group scales with the writer, not the office footprint.
+	# Additional generic tables and chairs make a large Townhouse office less
+	# usable by filling the pull-back space around its one writing chair.
+	if is_ordinary_house(plan) and plan.spec.trade == &"none" \
+			and kind == &"office" and plan.spec.style == &"townhouse":
+		return []
 	var ample: Dictionary = AMPLE.get(kind, {})
 	var steps: Array = ample.get("steps", []).duplicate(true)
 	if is_ordinary_house(plan) and kind == &"bedroom":

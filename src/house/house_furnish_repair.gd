@@ -15,9 +15,10 @@ const MAX_TRIALS := 8
 ## WHICH something is measured, not guessed. An earlier version removed the
 ## biggest thing in the room that had been reported, which is usually the wrong
 ## room -- what blocks a bedroom is in the parlour you would cross to reach it.
-## This version tries removing each candidate in turn and keeps whichever
-## actually opens up the most floor, which needs no theory about where the
-## blockage is.
+## This version tries removing each candidate in turn. It prefers an optional
+## loss, then a complete route repair, then the smallest complete removal
+## before comparing floor gains. That keeps one bad chair from costing its
+## table, and a kitchen route from costing its required hearth.
 ##
 ## Pieces the room cannot do without are only removed when nothing else helps,
 ## and when one goes the plan records it, so the furnishing check can report a
@@ -32,23 +33,31 @@ static func relax(plan: HousePlan) -> int:
 		var best := -1
 		var best_gain := 0
 		var best_must := true
+		var best_solved := false
+		var best_loss := 999999
 		for f in _candidates(plan, before):
 			var p: Dictionary = plan.furniture[f]
 			var must: bool = p.get("must", false)
 			var trial: HousePlan = _without(plan, f)
 			var after: Dictionary = HouseNavCheck.new().check(trial)
 			var gain: int = int(after["stats"].get("reached_cells", 0)) - base
-			if bool(after["ok"]):
-				gain += 10000        # the whole point: it fixes the house
-			if gain <= 0:
+			var solved: bool = bool(after["ok"])
+			var loss: int = plan.furniture.size() - trial.furniture.size()
+			if gain <= 0 and not solved:
 				continue
-			# an optional piece is always preferred to a necessary one, however
-			# much floor the necessary one would free
+			# Preserve required activities first. Among candidates with the same
+			# necessity, a complete repair outranks a partial floor gain. A chair
+			# should not take its table and the other seats with it.
 			if best < 0 or (best_must and not must) \
-					or (best_must == must and gain > best_gain):
+					or (best_must == must and solved and not best_solved) \
+					or (solved and best_solved and best_must == must and loss < best_loss) \
+					or (solved and best_solved and best_must == must and loss == best_loss and gain > best_gain) \
+					or (not solved and not best_solved and best_must == must and gain > best_gain):
 				best = f
 				best_gain = gain
 				best_must = must
+				best_solved = solved
+				best_loss = loss
 		if best < 0:
 			# A plateau: no single removal opens anything up, because two
 			# pieces are blocking the same route between them. Take out the
@@ -169,14 +178,15 @@ static func _biggest_in(plan: HousePlan, rooms: Dictionary, allow_must: bool) ->
 	return best
 
 
-## The pieces worth trying to remove: the ones standing on the floor, biggest
-## first, capped so the search stays cheap on a large house.
+## The pieces worth trying to remove: the ones standing on the floor, including
+## seats associated with a table. Biggest first, capped for large houses; a
+## named unreachable piece is always included after the cap.
 static func _candidates(plan: HousePlan, rep: Dictionary = {}) -> Array[int]:
 	var out: Array[int] = []
 	var seen_island_rows := {}
 	for f in range(plan.furniture.size()):
 		var p: Dictionary = plan.furniture[f]
-		if p.get("mounted", false) or p["host"] >= 0:
+		if p.get("mounted", false):
 			continue
 		if not PropCatalog.blocks_floor(p["key"]):
 			continue
@@ -195,6 +205,12 @@ static func _candidates(plan: HousePlan, rep: Dictionary = {}) -> Array[int]:
 	var picked: Array[int] = out.slice(0, MAX_TRIALS)
 	if rep.is_empty():
 		return picked
+	# A failed floor-use zone names the actual piece. It must get a trial even
+	# when it is hosted by a table and larger furniture filled the size cap.
+	for unreachable in rep.get("unreachable_items", []):
+		var target: int = int(unreachable)
+		if target in out and target not in picked:
+			picked.append(target)
 	# The cap keeps the search cheap, but "biggest first" can fill all eight
 	# slots with furniture from rooms nowhere near the trouble, leaving the
 	# crate that stands in the only gap to a stranded room untried (thorpe

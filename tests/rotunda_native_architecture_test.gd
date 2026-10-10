@@ -7,8 +7,6 @@ var active_case := "unlabelled"
 func _initialize() -> void:
 	_check_authored_column_record_controls()
 	var cases := 0
-	var spire_cases := 0
-	var plain_cases := 0
 	var open_pit_witnesses := 0
 	for size_index in range(TempleSweep.COUNT):
 		for cult in TempleSweep.cults():
@@ -39,19 +37,17 @@ func _initialize() -> void:
 				_check_threshold_removal_negative(spec, mesh)
 				_check_wall_crown_removal_negative(spec, mesh)
 				_check_dome_bearing_removal_negative(spec, mesh)
+				_check_oculus_fill_negative(spec, mesh)
+				_check_arcade_pier_removal_negative(spec, builder, mesh)
 				_check_runtime_rotunda_bearing_removals(spec, builder, mesh)
-			if spec.spire:
-				spire_cases += 1
-			else:
-				plain_cases += 1
 			cases += 1
-	if spire_cases == 0 or plain_cases == 0:
-		_fail("canonical fixed cases did not cover both dome-only and optional lantern geometry")
+	if cases != TempleSweep.COUNT * TempleSweep.cults().size():
+		_fail("canonical cult/size matrix did not cover the complete Rotunda set")
 	if open_pit_witnesses == 0:
 		_fail("canonical cases contain no pit-side floor support witness beside the bridge")
 	for failure in failures:
 		push_error(failure)
-	print("rotunda native architecture fixture: %d canonical cases, %d lantern, %d dome-only, %d failures" % [cases, spire_cases, plain_cases, failures.size()])
+	print("rotunda open-arcade architecture fixture: %d canonical cases, %d failures" % [cases, failures.size()])
 	quit(1 if not failures.is_empty() else 0)
 
 
@@ -410,8 +406,8 @@ func _check_gate_head_and_width(spec: TempleSpec, builder: TempleBuilder,
 		var size: Vector3 = row.get("size", Vector3.ZERO)
 		var xf: Transform3D = row.get("xf", Transform3D.IDENTITY)
 		if absf(size.x - (TempleGeometry.GATE_W + jamb * 2.0)) > 0.02 \
-				or absf(size.y - (spec.height - gate_height)) > 0.02 \
-				or absf(xf.origin.y - (spec.height + gate_height) * 0.5) > 0.02 \
+				or absf(size.y - (TempleGeometry.rotunda_lower_drum_height(spec) - gate_height)) > 0.02 \
+				or absf(xf.origin.y - (TempleGeometry.rotunda_lower_drum_height(spec) + gate_height) * 0.5) > 0.02 \
 				or String(row.get("host", "")).is_empty():
 			_fail("gate head is not dimensioned to the real jamb width and drum crown")
 	var stone: Array = MeshProbe.surface_triangles(null, mesh,
@@ -442,34 +438,41 @@ func _check_drum_dome_contact(spec: TempleSpec, builder: TempleBuilder, mesh: Ar
 	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
 	var mid_radius: float = outer - spec.wall_t * 0.5
 	var angle := 0.42
+	var lower: float = TempleGeometry.rotunda_lower_drum_height(spec)
 	var contact := Vector2(cos(angle) * mid_radius, sin(angle) * mid_radius)
 	var stone: Array = MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE)
 	var roof: Array = MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_ROOF)
-	if not MeshProbe.has_upward_support(stone, contact, spec.height, 0.04):
-		_fail("emitted drum panel has no masonry crown under the dome bearing")
-	if not MeshProbe.has_upward_support(roof, contact,
-			spec.height + RoofShape.DEPTH * 0.5, 0.04):
-		_fail("circular roof annulus has no emitted crown above the wall bearing")
-	var radial := Vector3(cos(angle), 0.0, sin(angle))
-	var wall_from := radial * (mid_radius + 0.08) + Vector3.UP * (spec.height - 0.2)
-	var wall_to := radial * (outer + 0.6) + Vector3.UP * (spec.height - 0.2)
-	var roof_from := radial * (mid_radius + 0.08) + Vector3.UP * spec.height
-	var roof_to := radial * (outer + 0.6) + Vector3.UP * spec.height
-	if not MeshProbe.ray_blocked(stone, wall_from, wall_to) \
-			or not MeshProbe.ray_blocked(roof, roof_from, roof_to):
-		_fail("real horizontal probes do not cross the wall crown and annular roof bearing")
-	var crown_rows: Array[Dictionary] = builder.components("rotunda_drum_crown")
-	if crown_rows.size() != 1 or String(crown_rows[0].get("host", "")).is_empty():
-		_fail("circular drum crown has no single hosted emitted roof component")
-	if spec.spire:
-		var apex: float = TempleGeometry.roof_height(spec)
-		var lantern_rows: Array[Dictionary] = builder.components("rotunda_lantern_drum")
-		if lantern_rows.size() != 1 or not MeshProbe.has_upward_support(roof,
-				Vector2.ZERO, apex, 0.03):
-			_fail("optional circular lantern has no actual emitted dome-apex seat")
-	else:
-		if not builder.components("rotunda_lantern_drum").is_empty():
-			_fail("an unrequested lantern was emitted above the Rotunda dome")
+	var wall_from := Vector3(cos(angle) * (TempleGeometry.rotunda_inner_radius(spec) - 0.08), lower * 0.5,
+		sin(angle) * (TempleGeometry.rotunda_inner_radius(spec) - 0.08))
+	var wall_to := Vector3(cos(angle) * (outer + 0.08), lower * 0.5,
+		sin(angle) * (outer + 0.08))
+	if not MeshProbe.ray_blocked(stone, wall_from, wall_to):
+		_fail("lower drum has no emitted wall at its continuity witness")
+	var roof_y: float = spec.height + RoofShape.DEPTH * 0.5
+	if not MeshProbe.has_upward_support(roof, contact, roof_y, 0.04):
+		_fail("annular crown has no emitted roof above the outer arcade bearing")
+	var center_from := Vector3(0.0, spec.height + 0.4, 0.0)
+	var center_to := Vector3(0.0, spec.height - 0.1, 0.0)
+	if MeshProbe.ray_blocked(roof, center_from, center_to):
+		_fail("Rotunda oculus is physically closed by roof triangles")
+	var roof_radius: float = (TempleGeometry.ring_radius(spec) + outer) * 0.5
+	var annulus_from := Vector3(roof_radius * cos(angle), spec.height + 0.4,
+		roof_radius * sin(angle))
+	var annulus_to := Vector3(roof_radius * cos(angle), spec.height - 0.4,
+		roof_radius * sin(angle))
+	if not MeshProbe.ray_blocked(roof, annulus_from, annulus_to):
+		_fail("annular roof witness has no actual emitted stone")
+	var arcade_rows: Array[Dictionary] = builder.components("rotunda_arcade_pier")
+	if arcade_rows.size() < 6:
+		_fail("open upper arcade has too few hosted emitted piers")
+	for row in arcade_rows:
+		var size: Vector3 = row["size"]
+		var xf: Transform3D = row["xf"]
+		if absf(xf.origin.y + size.y * 0.5 - (spec.height - RoofShape.DEPTH * 0.5)) > 0.03:
+			_fail("upper arcade pier does not reach the annular roof soffit")
+			break
+	if not builder.components("rotunda_lantern_drum").is_empty():
+		_fail("Rotunda emitted a lantern over the open oculus")
 
 
 func _check_gate_fill_negative(spec: TempleSpec, mesh: ArrayMesh) -> void:
@@ -654,47 +657,78 @@ func _check_wall_crown_removal_negative(spec: TempleSpec, mesh: ArrayMesh) -> vo
 	var mid_radius: float = outer - spec.wall_t * 0.5
 	var angle := 0.42
 	var point := Vector2(cos(angle) * mid_radius, sin(angle) * mid_radius)
-	var from := Vector3(point.x, spec.height + 0.08, point.y)
-	var to := Vector3(point.x, spec.height - 0.08, point.y)
+	var lower: float = TempleGeometry.rotunda_lower_drum_height(spec)
+	var from := Vector3(point.x, lower + 0.08, point.y)
+	var to := Vector3(point.x, lower - 0.08, point.y)
 	var removed := MeshProbe.remove_triangles(mesh, TempleBuilder.SURF_STONE,
 		func(a: Vector3, b: Vector3, c: Vector3) -> bool:
 			var face := (c - a).cross(b - a)
 			return face.length_squared() > 1e-12 and face.normalized().dot(Vector3.UP) > 0.95 \
-				and absf(((a + b + c) / 3.0).y - spec.height) < 0.01 \
+				and absf(((a + b + c) / 3.0).y - lower) < 0.01 \
 				and Geometry3D.segment_intersects_triangle(from, to, a, b, c) != null)
 	var without_crown: ArrayMesh = removed.get("mesh")
 	if int(removed.get("removed_triangles", 0)) == 0 or without_crown == null \
 			or MeshProbe.has_upward_support(MeshProbe.surface_triangles(null,
-				without_crown, TempleBuilder.SURF_STONE), point, spec.height, 0.04):
+				without_crown, TempleBuilder.SURF_STONE), point, lower, 0.04):
 		_fail("removed-wall-crown negative still reports a real bearing support")
+
+
+func _check_oculus_fill_negative(spec: TempleSpec, mesh: ArrayMesh) -> void:
+	var from := Vector3(0.0, spec.height + 0.4, 0.0)
+	var to := Vector3(0.0, spec.height - 0.1, 0.0)
+	var filled := MeshProbe.add_box(mesh, TempleBuilder.SURF_STONE,
+		AABB(Vector3(-0.5, spec.height - 0.15, -0.5), Vector3(1.0, 0.3, 1.0)))
+	var fill_triangles: Array = MeshProbe.surface_triangles(null,
+		filled.get("mesh"), TempleBuilder.SURF_STONE)
+	if int(filled.get("added_triangles", 0)) != 12 \
+			or not MeshProbe.ray_blocked(fill_triangles, from, to):
+		_fail("filled-oculus negative did not block the real vertical daylight ray")
+
+
+func _check_arcade_pier_removal_negative(spec: TempleSpec, builder: TempleBuilder,
+		mesh: ArrayMesh) -> void:
+	var rows: Array[Dictionary] = builder.components("rotunda_arcade_pier")
+	if rows.is_empty():
+		_fail("arcade-pier negative has no actual emitted support member")
+		return
+	var row: Dictionary = rows[0]
+	var size: Vector3 = row["size"]
+	var xf: Transform3D = row["xf"]
+	var inverse: Transform3D = xf.affine_inverse()
+	var half_size: Vector3 = size * 0.5
+	var removed := MeshProbe.remove_triangles(mesh, TempleBuilder.SURF_STONE,
+		func(a: Vector3, b: Vector3, c: Vector3) -> bool:
+			var local: Vector3 = inverse * ((a + b + c) / 3.0)
+			return absf(local.x) <= half_size.x + 0.01 \
+				and absf(local.y) <= half_size.y + 0.01 \
+				and absf(local.z) <= half_size.z + 0.01)
+	var remaining: Array = MeshProbe.surface_triangles(null,
+		removed.get("mesh"), TempleBuilder.SURF_STONE)
+	var from: Vector3 = xf * Vector3(0.0, 0.0, -size.z * 0.75)
+	var to: Vector3 = xf * Vector3(0.0, 0.0, size.z * 0.75)
+	var original: Array = MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE)
+	if int(removed.get("removed_triangles", 0)) == 0 \
+			or not MeshProbe.ray_blocked(original, from, to) \
+			or MeshProbe.ray_blocked(remaining, from, to):
+		_fail("removed-arcade-pier negative retained the emitted horizontal pier crossing")
 
 
 func _check_dome_bearing_removal_negative(spec: TempleSpec, mesh: ArrayMesh) -> void:
 	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
-	var mid_radius: float = outer - spec.wall_t * 0.5
-	var angle := 0.42
-	var radial := Vector3(cos(angle), 0.0, sin(angle))
-	var from := radial * (mid_radius + 0.08) + Vector3.UP * spec.height
-	var to := radial * (outer + 0.6) + Vector3.UP * spec.height
+	var inner: float = TempleGeometry.ring_radius(spec) - spec.column_r * 0.8
+	var radius: float = (inner + outer) * 0.5
+	var from := Vector3(radius, spec.height + 0.4, 0.0)
+	var to := Vector3(radius, spec.height - 0.4, 0.0)
 	var removed := MeshProbe.remove_triangles(mesh, TempleBuilder.SURF_ROOF,
 		func(a: Vector3, b: Vector3, c: Vector3) -> bool:
 			return Geometry3D.segment_intersects_triangle(from, to, a, b, c) != null)
-	var without_bearing: ArrayMesh = removed.get("mesh")
-	if int(removed.get("removed_triangles", 0)) == 0 or without_bearing == null \
-			or MeshProbe.ray_blocked(MeshProbe.surface_triangles(null,
-				without_bearing, TempleBuilder.SURF_ROOF), from, to):
-		_fail("removed-dome-bearing negative still detects the emitted circular seat")
-	if spec.spire:
-		var apex: float = TempleGeometry.roof_height(spec)
-		var removed_cap := MeshProbe.remove_triangles(mesh, TempleBuilder.SURF_ROOF,
-			func(a: Vector3, b: Vector3, c: Vector3) -> bool:
-				return MeshProbe.upward_triangle_contains_point([a, b, c],
-					Vector2.ZERO, apex, 0.03))
-		var without_apex: ArrayMesh = removed_cap.get("mesh")
-		if int(removed_cap.get("removed_triangles", 0)) < 12 or without_apex == null \
-				or MeshProbe.has_upward_support(MeshProbe.surface_triangles(null,
-					without_apex, TempleBuilder.SURF_ROOF), Vector2.ZERO, apex, 0.03):
-			_fail("removed lantern-seat negative still reports an apex support")
+	var remaining: Array = MeshProbe.surface_triangles(null,
+		removed.get("mesh"), TempleBuilder.SURF_ROOF)
+	var original: Array = MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_ROOF)
+	if int(removed.get("removed_triangles", 0)) == 0 or removed.get("mesh") == null \
+			or not MeshProbe.ray_blocked(original, from, to) \
+			or MeshProbe.ray_blocked(remaining, from, to):
+		_fail("annular roof removal negative did not remove the measured roof crossing")
 
 
 func _check_runtime_rotunda_bearing_removals(spec: TempleSpec,
@@ -727,40 +761,6 @@ func _check_runtime_rotunda_bearing_removals(spec: TempleSpec,
 			return_bearing_rejected = true
 	if int(removed_return.get("removed_triangles", 0)) == 0 or not return_bearing_rejected:
 		_fail("removed-return negative escaped the runtime gate-head bearing predicate")
-	if spec.spire:
-		# roof_height already includes the crown skin's half-depth and matches
-		# the emitted lantern drum's base_y exactly.
-		var seat_y: float = TempleGeometry.roof_height(spec)
-		var radius: float = TempleGeometry.rotunda_lantern_radius(spec)
-		var removed_seat := MeshProbe.remove_triangles(mesh, TempleBuilder.SURF_ROOF,
-			func(a: Vector3, b: Vector3, c: Vector3) -> bool:
-				var face := (c - a).cross(b - a)
-				var center := (a + b + c) / 3.0
-				return face.length_squared() > 1e-12 \
-					and face.normalized().dot(Vector3.UP) > 0.95 \
-					and absf(center.y - seat_y) < 0.01 \
-					and Vector2(center.x, center.z).length() <= radius + 0.02)
-		var without_seat: Array = MeshProbe.surface_triangles(null,
-			removed_seat.get("mesh"), TempleBuilder.SURF_ROOF)
-		var missing_seat := TempleQA._rotunda_bearing_failures_for_components(spec,
-			head_rows, return_rows, stone, without_seat)
-		var lantern_bearing_rejected := false
-		for issue in missing_seat:
-			if String(issue).contains("unsupported within its small footprint"):
-				lantern_bearing_rejected = true
-		if int(removed_seat.get("removed_triangles", 0)) == 0 \
-				or not lantern_bearing_rejected:
-			_fail("removed-seat negative escaped the runtime lantern footprint-bearing predicate")
-		var intact_seat_supported: bool = TempleQA._rotunda_lantern_seat_supported(spec, roof)
-		var intact_gap_report: Dictionary = TempleQA._rotunda_gap_report(
-			builder.mass_log, intact_seat_supported)
-		if not intact_seat_supported or _has_gap_for(intact_gap_report, "rotunda_lantern"):
-			_fail("intact measured lantern seat does not justify its connected-mass exception")
-		var removed_seat_supported: bool = TempleQA._rotunda_lantern_seat_supported(spec, without_seat)
-		var removed_gap_report: Dictionary = TempleQA._rotunda_gap_report(
-			builder.mass_log, removed_seat_supported)
-		if removed_seat_supported or not _has_gap_for(removed_gap_report, "rotunda_lantern"):
-			_fail("removed lantern-seat negative still receives a connected-mass exception")
 
 
 func _has_gap_for(report: Dictionary, mass_name: String) -> bool:

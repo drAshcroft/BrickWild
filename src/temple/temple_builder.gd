@@ -95,28 +95,39 @@ func _build_walls() -> void:
 	var r: Rect2 = TempleGeometry.site_rect(spec)
 	var t: float = spec.wall_t
 	var h: float = spec.height
+	var side_start_y: float = r.position.y + t
+	if spec.form == &"pylon":
+		var gate_towers: Array[Rect2] = TempleGeometry.pylon_rects(spec)
+		if not gate_towers.is_empty():
+			side_start_y = gate_towers[0].end.y
+	var side_depth: float = maxf(r.end.y - t - side_start_y, 0.0)
 	if spec.form == &"ziggurat":
 		_gate_void(r.position.y + TempleGeometry.terrace_inset(spec) / 2.0)
 		return
 	if spec.form == &"rotunda":
-		_build_rotunda_drum_walls(t, h)
+		_build_rotunda_drum_walls(t, TempleGeometry.rotunda_lower_drum_height(spec))
+		_build_rotunda_upper_arcade(t, h)
 		_gate_void(-TempleGeometry.rotunda_outer_radius(spec) + t * 0.5)
 		return
 	var runs := [
 		{"name": "wall_back", "rect": Rect2(Vector2(r.position.x, r.end.y - t),
 			Vector2(r.size.x, t))},
-		{"name": "wall_left", "rect": Rect2(Vector2(r.position.x, r.position.y + t),
-			Vector2(t, r.size.y - t * 2.0))},
-		{"name": "wall_right", "rect": Rect2(Vector2(r.end.x - t, r.position.y + t),
-			Vector2(t, r.size.y - t * 2.0))},
+		{"name": "wall_left", "rect": Rect2(Vector2(r.position.x, side_start_y),
+			Vector2(t, side_depth))},
+		{"name": "wall_right", "rect": Rect2(Vector2(r.end.x - t, side_start_y),
+			Vector2(t, side_depth))},
 	]
-	# the front wall, in two pieces either side of the gate
+	# The paired Pylon towers themselves form the two solid gate-wall piers.
+	# Other rectangular temples use the ordinary front-wall runs.
 	var gate: float = TempleGeometry.GATE_W
-	for side in [-1.0, 1.0]:
-		var x0: float = r.position.x if side < 0.0 else gate / 2.0
-		var w: float = (r.size.x - gate) / 2.0
-		runs.append({"name": "wall_front_%s" % ("left" if side < 0.0 else "right"),
-			"rect": Rect2(Vector2(x0, r.position.y), Vector2(w, t))})
+	if spec.form == &"pylon":
+		gate = TempleGeometry.pylon_gate_width(spec)
+	if spec.form != &"pylon":
+		for side in [-1.0, 1.0]:
+			var x0: float = r.position.x if side < 0.0 else gate / 2.0
+			var w: float = (r.size.x - gate) / 2.0
+			runs.append({"name": "wall_front_%s" % ("left" if side < 0.0 else "right"),
+				"rect": Rect2(Vector2(x0, r.position.y), Vector2(w, t))})
 	for run in runs:
 		var rect: Rect2 = run["rect"]
 		if rect.size.x <= 0.01 or rect.size.y <= 0.01:
@@ -260,6 +271,33 @@ func _build_rotunda_drum_walls(thickness: float, height: float) -> void:
 	_log_mass("wall_rotunda_gate_head", AABB(head_pos - head_size * 0.5, head_size))
 
 
+## A light, open upper storey stands on the broad drum. Its gate-facing bay
+## remains open above the existing portal, while each pier reaches the annular
+## crown and the interior colonnade bears the opposite roof edge.
+func _build_rotunda_upper_arcade(thickness: float, roof_y: float) -> void:
+	var count: int = TempleGeometry.ring_columns(spec)
+	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
+	var radius: float = outer - thickness * 0.5
+	var lower: float = TempleGeometry.rotunda_lower_drum_height(spec)
+	var band_h: float = roof_y - lower - RoofShape.DEPTH * 0.5
+	var step: float = TAU / float(count)
+	var pier_w: float = maxf(0.42, radius * 2.0 * tan(step * 0.31))
+	var gate_half: float = atan((TempleGeometry.GATE_W * 0.5 + pier_w * 0.55) / radius)
+	for i in range(count):
+		var angle: float = -PI + (float(i) + 0.5) * step
+		var relative: float = wrapf(angle + PI * 0.5 + PI, 0.0, TAU) - PI
+		if absf(relative) <= gate_half:
+			continue
+		var center := Vector3(cos(angle) * radius, lower + band_h * 0.5,
+			sin(angle) * radius)
+		var size := Vector3(pier_w, band_h, thickness * 0.72)
+		var xf := Transform3D(Basis(Vector3.UP, PI * 0.5 - angle), center)
+		host("rotunda_arcade_pier_%02d" % i)
+		component_box("rotunda_arcade_pier", size, xf, SURF_STONE)
+		host_end()
+		_log_mass("rotunda_arcade_pier_%02d" % i, _rotated_box_bounds(size, xf))
+
+
 func _rotated_box_bounds(size: Vector3, xform: Transform3D) -> AABB:
 	var bounds := AABB()
 	var first := true
@@ -287,14 +325,17 @@ func _rotated_box_bounds(size: Vector3, xform: Transform3D) -> AABB:
 func _gate_void(z: float) -> void:
 	var gh: float = minf(TempleGeometry.GATE_H, spec.height - 0.6)
 	var jamb: float = spec.wall_t * 0.35
+	var gate_width: float = TempleGeometry.GATE_W
+	if spec.form == &"pylon":
+		gate_width = TempleGeometry.pylon_gate_width(spec)
 	for side in [-1.0, 1.0]:
 		box(Vector3(jamb, gh, spec.wall_t * 1.05),
-			Vector3(side * (TempleGeometry.GATE_W / 2.0 + jamb / 2.0), gh / 2.0, z),
+			Vector3(side * (gate_width / 2.0 + jamb / 2.0), gh / 2.0, z),
 			SURF_TRIM)
-	box(Vector3(TempleGeometry.GATE_W + jamb * 2.0, 0.12, spec.wall_t * 1.05),
+	box(Vector3(gate_width + jamb * 2.0, 0.12, spec.wall_t * 1.05),
 		Vector3(0.0, 0.06, z), SURF_TRIM)
 	_log_part("window", Vector3(0.0, gh / 2.0, z),
-		Vector3(TempleGeometry.GATE_W, gh, 0.0), PI, Vector3(0, 0, -1))
+		Vector3(gate_width, gh, 0.0), PI, Vector3(0, 0, -1))
 
 
 # ---------------------------------------------------------------- columns
@@ -627,7 +668,7 @@ func _build_roof() -> void:
 		&"dome":
 			_build_dome_roof(r)
 			total_height = maxf(total_height, TempleGeometry.roof_height(spec))
-	if spec.spire:
+	if spec.spire and spec.form != &"rotunda":
 		var base: float = TempleGeometry.hall_rect(spec).size.x * TempleGeometry.SPIRE_BASE
 		var z: float = TempleGeometry.dais_rect(spec).get_center().y
 		# The dais can be away from the dome apex or a transverse ridge.
@@ -1179,9 +1220,10 @@ func _build_dome_roof(rect: Rect2) -> void:
 		var wall_outer: float = TempleGeometry.rotunda_outer_radius(spec)
 		var outer: float = wall_outer + 0.45
 		var half_depth: float = RoofShape.DEPTH * 0.5
+		var inner: float = maxf(TempleGeometry.ring_radius(spec) - spec.column_r * 0.8, 1.0)
 		var profile := PackedVector2Array([
-			Vector2(outer, half_depth), Vector2(radius - 0.08, half_depth),
-			Vector2(radius - 0.08, -half_depth), Vector2(outer, -half_depth),
+			Vector2(outer, half_depth), Vector2(inner, half_depth),
+			Vector2(inner, -half_depth), Vector2(outer, -half_depth),
 			Vector2(outer, half_depth)])
 		var center := Vector3(0.0, spec.height, 0.0)
 		host("rotunda_drum_crown")
@@ -1193,6 +1235,9 @@ func _build_dome_roof(rect: Rect2) -> void:
 			"aabb": AABB(Vector3(-outer, spec.height - half_depth, -outer),
 				Vector3(outer * 2.0, RoofShape.DEPTH, outer * 2.0))})
 		host_end()
+		# The center stays physically open. The annulus is supported at its outer
+		# arcade and at the existing inner colonnade; no dome or spire closes it.
+		return
 	else:
 		var rim := PackedVector2Array()
 		for i in range(TempleGeometry.DOME_SEGMENTS):
@@ -1375,11 +1420,12 @@ func _build_battered_pylon_tower(rect: Rect2, height: float, index: int) -> void
 	var right: float = rect.end.x - half
 	var front: float = rect.position.y + half
 	var back: float = rect.end.y - half
-	var inset_x: float = (right - left) * 0.07
-	var inset_z: float = (back - front) * 0.07
-	var base_course_h: float = clampf(depth, 0.18, 0.36)
+	var inset_x: float = (right - left) * 0.10
+	var inset_z: float = (back - front) * 0.10
+	var base_course_h: float = clampf(depth * 3.0, 0.6, 0.8)
 	var base_y: float = base_course_h
-	var top_y: float = height - half
+	var cap_h: float = clampf(depth * 2.0, 0.45, 0.7)
+	var top_y: float = height - cap_h
 	var top_front: float = front + inset_z
 	var top_back: float = back - inset_z
 	var top_left: float = left + inset_x
@@ -1409,10 +1455,10 @@ func _build_battered_pylon_tower(rect: Rect2, height: float, index: int) -> void
 		Vector3(right, base_y, front), Vector3(top_right, top_y, top_front),
 		Vector3(top_right, top_y, top_back), Vector3(right, base_y, back)]),
 		depth, SURF_STONE, false)
-	component_slab("pylon_battered_cap", PackedVector3Array([
-		Vector3(top_left, top_y, top_front), Vector3(top_right, top_y, top_front),
-		Vector3(top_right, top_y, top_back), Vector3(top_left, top_y, top_back)]),
-		depth, SURF_STONE, false)
+	component_box("pylon_tower_cap_course",
+		Vector3(rect.size.x, cap_h, rect.size.y),
+		Transform3D(Basis.IDENTITY, Vector3(rect.get_center().x,
+			height - cap_h * 0.5, rect.get_center().y)), SURF_TRIM)
 	_log_mass("pylon_%d" % index, AABB(Vector3(rect.position.x, 0.0, rect.position.y),
 		Vector3(rect.size.x, height, rect.size.y)))
 	total_height = maxf(total_height, height)
@@ -1509,6 +1555,17 @@ func _brazier_clear(pos: Vector2) -> bool:
 					float(z_sign) * size.y * 0.5)
 				if corner.length() > inner:
 					return false
+	if spec.form == &"rotunda":
+		# Tangent panel mass AABBs span empty wedges. Test the complete measured
+		# bowl bounds against emitted wall components instead.
+		var bowl_size: Vector3 = PropCatalog.size("Cauldron") * BRAZIER_SCALE
+		var bowl_box := {"xf": Transform3D(Basis.IDENTITY,
+			Vector3(pos.x, 0.002 + bowl_size.y * 0.5, pos.y)),
+			"size": bowl_size + Vector3(0.12, 0.0, 0.12)}
+		for role in ["rotunda_drum_panel", "rotunda_gate_return", "rotunda_gate_head"]:
+			for wall in components(role):
+				if TempleGeometry.obb_overlap_depth(wall, bowl_box) > 0.0:
+					return false
 	var pit := TempleGeometry.pit_rect(spec)
 	if pit.size.x > 0.0 and pit.grow(TempleGeometry.PIT_RIM).intersects(rect):
 		return false
@@ -1592,6 +1649,8 @@ func _dress_walls() -> void:
 	if spec.form == &"rotunda":
 		_dress_rotunda_walls()
 		return
+	if spec.form == &"pylon":
+		_dress_pylon_column_lights()
 	var hall: Rect2 = TempleGeometry.hall_rect(spec)
 	var n: int = clampi(int(hall.size.y / 6.0), 1, 5)
 	for i in range(n):
@@ -1604,6 +1663,26 @@ func _dress_walls() -> void:
 			if i % 2 == 0:
 				_prop("Banner_1", Vector3(x, spec.height * 0.62, z + 1.2), yaw, 1.0,
 					&"banner")
+
+
+## Mount a paired light at each authored inner-column bearing. The deep gate
+## pylons and first hypostyle bay leave too little floor beside the procession
+## for braziers; these torches use the actual column row and keep the floor clear.
+func _dress_pylon_column_lights() -> void:
+	for column in _columns:
+		if int(column.get("ring", -1)) != 0:
+			continue
+		var c: Vector3 = column["pos"]
+		var radius: float = float(column["radius"])
+		var side: float = signf(c.x)
+		var torch_y: float = 2.4
+		var shaft_height: float = float(column["height"])
+		var taper: float = clampf((torch_y - 0.22) / maxf(shaft_height - 0.22, 0.01),
+			0.0, 1.0)
+		var shaft_radius: float = lerpf(radius, radius * 0.86, taper)
+		var inner_face_x: float = c.x - side * shaft_radius
+		var yaw: float = -PI / 2.0 if side > 0.0 else PI / 2.0
+		_prop("Torch_Metal", Vector3(inner_face_x, torch_y, c.z), yaw, 1.0, &"light")
 
 
 ## Wall dressings follow the emitted circular inner face. The old square-AABB
