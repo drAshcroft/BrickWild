@@ -35,7 +35,7 @@ Tag `v0.1.2`.
   the instanced building. Churches, temples, castles, windmills, bridges and
   trees report `supported: false` (todo `NAV-INTERIOR-OTHER-FAMILIES`).
 - `NavBake` (core/nav_bake.gd): outlines in, canonical navigation mesh out.
-  `VillageNavCheck.sources()` and `HouseNavCheck.sources()` list the outlines
+  `VillageNavCheck.sources()` and `HouseWalkSources.sources()` list the outlines
   each check rasterises.
 - New suites `dmvwalk` (the two real Voxel_Build cities) and `bwalk` (in
   `lane:api`); `tests/walk_navserver_test.gd` asks Godot's NavigationServer3D

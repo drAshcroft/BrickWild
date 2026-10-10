@@ -978,7 +978,7 @@ with a use zone, on its own storey's mesh). Points are `[x, y, z]`, local.
 
 Each storey is the floor `HouseNavCheck` walks: rooms, courts and doorways,
 less blocking furniture, columns, the hearth breast and a dais too high to
-step onto. `HouseNavCheck.sources()` lists it beside the rasteriser it
+step onto. `HouseWalkSources.sources()` lists it beside the rasteriser it
 mirrors. Secret doors stay shut. Each stair links the centres of the landings
 the check climbs between.
 

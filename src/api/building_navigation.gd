@@ -26,10 +26,10 @@ static func of(building) -> Dictionary:
 	if building == null or not building.is_ok() or not (building.plan is HousePlan):
 		return {"schema": SCHEMA, "schema_version": SCHEMA_VERSION, "supported": false}
 	var plan: HousePlan = building.plan
-	var sources: Dictionary = HouseNavCheck.sources(plan)
+	var sources: Dictionary = HouseWalkSources.sources(plan)
 	var meshes := {}
 	var storeys: Array = []
-	for level in HouseNavCheck.levels_of(plan):
+	for level in HouseWalkSources.levels_of(plan):
 		var mesh: Dictionary = NavBake.bake(sources[level]["floor"], sources[level]["obstacles"], AGENT_RADIUS)
 		meshes[level] = mesh
 		var vertices: Array = []
@@ -98,8 +98,8 @@ static func _stairs(plan: HousePlan, meshes: Dictionary) -> Array:
 		var hi: int = int(stair.get("to_storey", lo + 1))
 		if not meshes.has(lo) or not meshes.has(hi):
 			continue
-		var lower: Vector2 = HouseNavCheck._stair_rect(stair, false).get_center()
-		var upper: Vector2 = HouseNavCheck._stair_rect(stair, true).get_center()
+		var lower: Vector2 = HouseWalkSources.stair_rect(stair, false).get_center()
+		var upper: Vector2 = HouseWalkSources.stair_rect(stair, true).get_center()
 		var lower_on: Vector2 = NavBake.closest_point(meshes[lo], lower)
 		var upper_on: Vector2 = NavBake.closest_point(meshes[hi], upper)
 		out.append({

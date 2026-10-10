@@ -36,9 +36,9 @@ static func _check_building(result: SuiteResult, request: BuildingRequest) -> vo
 	if JSON.stringify(data) != JSON.stringify(JSON.parse_string(JSON.stringify(BrickWild.navigation(building)))):
 		result.fail("%s: the same building baked two different walks" % label)
 	result.checked += 1
-	if not data["supported"] or data["storeys"].size() != HouseNavCheck.levels_of(building.plan).size():
+	if not data["supported"] or data["storeys"].size() != HouseWalkSources.levels_of(building.plan).size():
 		result.fail("%s: %d storeys walked of %d" % [label, data.get("storeys", []).size(),
-			HouseNavCheck.levels_of(building.plan).size()])
+			HouseWalkSources.levels_of(building.plan).size()])
 		return
 	var meshes := {}
 	var islands := {}
