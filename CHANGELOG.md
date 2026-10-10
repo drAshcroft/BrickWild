@@ -1,28 +1,107 @@
 # Changelog
 
-This file records public releases. The addon package currently declares
-`0.1.0` in `packaging/brick_wild/VERSION` and its source manifest. No public
-release tag or release notes have been established in this checkout.
+This file records public releases. A release is frozen and verified by
+`tools/release_brick_wild.ps1` into `releases/brick_wild-<version>/`; other
+projects consume that, never this working tree (`docs/RELEASES.md`).
+`BrickWild.API_VERSION` is a separate compatibility number; see `README.md`
+and `docs/PUBLIC_API_TRANSPORT.md`.
 
 ## Unreleased
 
-- Renamed the public facade, addon path, tools, and JSON schema namespace to
-  BrickWild. Existing scripts and serialized requests/documents need migration.
-- Raised the public API version to 2 for this breaking rename.
-- Added public contribution and development documentation.
-- Documented the incomplete asset-pack checkout and tested Godot target.
+Nothing yet.
+
+## 0.1.0 - 2026-10-09
+
+The first release. Tag `v0.1.0`.
+
+### Notable changes
+
+- **Renamed** the public facade, addon path, tools and JSON schema namespace
+  from BigGlade to BrickWild (`BrickWild`, `res://addons/brick_wild`,
+  `brickwild.request` / `brickwild.building`). The public API version is 2
+  for this breaking rename.
+- **The C1 site exporter takes the settlement's size from the caller.**
+  `tools/export_village_plan.gd` gained `--population N`. A Voxel_Build
+  SiteRequest of schema 2 (VXB-002) carries `population` as the people of the
+  whole polity node (`population_of: "node"`), often millions; it is never
+  read as a village. Such a request without `--population` is refused with one
+  line and exit 2. With it, N people are planned, `population_asked` is N, and
+  `notes` records the node's figure. Schema 1 requests plan their own
+  `population` as before; `--population` overrides it. See
+  `docs/VILLAGES.md` section 10a.
+- **A royal or military seat below 200 people is a hold**: one fortified house
+  at the castle family's house tier (about 12 x 14 m), on a lane sized to it,
+  not a 40 x 50 m castle. A royal or military hamlet of 30-60 people now
+  plans every building inside a 400 m site (measured on
+  `tests/fixtures/site_requests/thorn-hamlet.json` at 30, 45 and 60). A city
+  gets one seat castle.
+- A Pylon temple's published footprint is what it emits: it no longer
+  reserves 1.5 m a side for obelisks that stand on its forecourt.
+- Exporter refusals name the building that had no lot
+  (`unplaced: castle`), not only the count.
 - Added the `windmill` kind: post mills, tower mills, smock mills, American
   farm windpumps and Dutch polder mills, behind one family and one set of three
-  numbers. See `docs/WINDMILLS.md`. Its generator clamps those three to what the
-  requested mill type can really be built as, so `describe_kind()` publishes
-  `"clamps": true` for it and the envelope is the promise.
+  numbers (`docs/WINDMILLS.md`). Its generator clamps those numbers to what the
+  mill type can be built as, so `describe_kind()` publishes `"clamps": true`.
 - `BuildingLibrary` gained `dimension_fields()`, `clamps()` and
-  `surface_count()`, so a family whose spec names its dimensions differently
-  (a windmill's are a sail span and a body) or carries more than four surfaces
-  declares that in its own row instead of being special-cased by the harness.
-- Added `tools/render_windmills.gd` and the `lane:windmill` suite.
+  `surface_count()`, so a family whose spec names its dimensions differently or
+  carries more than four surfaces says so in its own row.
+- The addon manifest lists directories, not files, so a family can no longer
+  be left out of the package; the bridge and tree families now ship.
+- Release tooling: `tools/release_brick_wild.ps1` freezes a commit, installs
+  it into an empty project with the release's own `install.ps1`, imports and
+  smokes it, and only then publishes `releases/LATEST` and `releases/current`.
+- Added `tools/render_windmills.gd`, the `lane:windmill` suite, and public
+  contribution and development documentation.
 
-Before the first public release, record the shipped version, release date,
-notable changes, compatibility notes, and any migration steps here, then tag
-the release. `BrickWild.API_VERSION` is a separate compatibility number; see
-`README.md` and `docs/PUBLIC_API_TRANSPORT.md`.
+### Compatibility
+
+- Godot 4.5.2 (tested with `Godot_v4.5.2-stable_mono_win64`). Village and
+  exporter seeds come from GDScript `hash()`, so byte-identical plans hold for
+  that pinned binary, not across Godot upgrades.
+- `BrickWild.API_VERSION` 2; JSON schema version 1 for `brickwild.request`,
+  `brickwild.building` and `dmv.site.plan`.
+- Exporter exit codes: 0 written, 2 usage or I/O (including a schema 2
+  request without `--population`), 3 refused.
+- The release embeds licensed prop packs that git does not track. It is
+  built from a checkout that has them; `release.json` counts the files copied
+  in (`untracked_pack_files_from_local_checkout`).
+
+### Known issues
+
+- Any non-military request under 150 people that keeps a
+  `stone-wall` or `marble-wall` is refused: "a kept wall needs at least 150
+  people or a military regime". Voxel_Build's `site:city-0002` (Wuunafu,
+  royal) is refused at 60 people for this reason.
+- `great-tomb` and `ziggurat` are planned as castle masses of up to 40 x 50 m
+  whatever the population, and the seat is skipped when any castle is already
+  in the programme. A military city with a great-tomb gets the tomb and no
+  seat (`site:city-0004` at 45 people); Wuunafu at 150 people is refused
+  because its tomb and ziggurat find no lot.
+- `lane:plan` is not green: `hmultistory` reports 28 furnishing and stair
+  findings on the multi-storey house sweep (bedside tables away from beds,
+  sparse parlours, legacy trade stairs too steep or unguarded on townhouse
+  32102 and longhall 32103, a cottage kitchen without a hearth). The same
+  count has been tracked as known since 2026-10-07; the mix moved with the
+  furnishing work of 2026-10-09. `house` and `houseqaplan` pass.
+- `lane:temple` is not green: the Rotunda's new upper arcade (commit
+  abf5395) logs its piers as masses QA reads as floating about 5.5 m above
+  ground, and on some seeds a pier cuts into an interior column or the idol
+  (`temple` 26 and `temple rite` 246 failures, every one a Rotunda). The
+  Pylon passes its 45-case native fixture.
+
+### Migration
+
+- From BigGlade: rename `BigGlade` to `BrickWild`, `addons/big_glade` to
+  `addons/brick_wild`, and the `bigglade.request` / `bigglade.building` schema
+  strings to `brickwild.request` / `brickwild.building`. Install with the
+  release's own `install.ps1`.
+- Install from `releases/brick_wild-0.1.0/install.ps1` (embedding) or run
+  `godot --path releases/brick_wild-0.1.0/project` (tools), not from the
+  repository. Pin the version in your own staging script.
+- Callers of `tools/export_village_plan.gd` with schema 2 SiteRequests: pass
+  the settlement's people with `--population N`. The request's `population`
+  is the polity's size, not the village's.
+- A royal or military village of under 200 people now has a hold where it had
+  a castle. Anything placed by the seat (a throne room, guards) should expect
+  one building with no curtain wall or courtyard.
