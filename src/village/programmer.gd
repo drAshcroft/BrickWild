@@ -60,12 +60,12 @@ const SHOP_RULES := [
 	{"kind": &"inn", "min_pop": 80, "business": &"inn", "pilgrim_any_size": true},
 	{"kind": &"stable", "min_pop": 80, "business": &"stable"},
 	{"kind": &"carpenter", "min_pop": 80, "business": &"carpenter"},
-	{"kind": &"butcher", "min_pop": 100, "business": &"butcher"},
-	{"kind": &"tailor", "min_pop": 100, "business": &"tailor"},
-	{"kind": &"town_hall", "min_pop": 100, "business": &"town_hall"},
+	{"kind": &"butcher", "min_pop": 100, "business": &"butcher", "civic": true},
+	{"kind": &"tailor", "min_pop": 100, "business": &"tailor", "civic": true},
+	{"kind": &"town_hall", "min_pop": 100, "business": &"town_hall", "civic": true},
 	{"kind": &"apothecary", "min_pop": 120, "business": &"apothecary"},
 	{"kind": &"tavern_2", "min_pop": 120, "business": &"tavern"},
-	{"kind": &"guildhall", "min_pop": 150, "business": &"guildhall"},
+	{"kind": &"guildhall", "min_pop": 150, "business": &"guildhall", "civic": true},
 ]
 
 ## A waterside mill keeps the bakery's usable workrooms and storage. The lot
@@ -80,6 +80,9 @@ const MANOR_MIN_POP := 200
 ## family's house tier (<= 300 m2), not a 40 x 50 m enceinte. Its lot is a
 ## fifth of the manor's, and its own interior QA has a sixth of the defects.
 const HOLD_SIZE := Vector3(12.0, 14.0, 8.0)
+## mythsim's monuments. Each is a castle mass in this renderer, and none of
+## them is the ruler's seat (owner decision 2026-10-10).
+const MONUMENTS := ["great-tomb", "ziggurat"]
 
 
 ## Every `BuildingRequest` the population/purpose/culture/wealth/water earns:
@@ -102,8 +105,8 @@ static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 		_append_site_brief(out, spec, styles)
 
 	# A brief's seat already is the lord's house: one castle per village.
-	if (spec.population >= MANOR_MIN_POP or spec.purpose == &"garrison") \
-			and not _has_kind(out, &"castle"):
+	if (spec.civic_population() >= MANOR_MIN_POP or spec.purpose == &"garrison") \
+			and not _has_seat(out, spec):
 		out.append(BuildingRequest.castle(
 			_seed_for(spec, "manor"), styles["castle"], 40.0, 50.0, 10.0))
 
@@ -183,12 +186,11 @@ static func _append_site_brief(out: Array[BuildingRequest], spec: VillageSpec,
 			lerpf(6.0, 10.0, fraction), lerpf(10.0, 16.0, fraction), lerpf(6.0, 9.0, fraction)))
 	if float(built.get("palace", 0.0)) > 0.0:
 		_append_seat(out, spec, styles, &"royal", float(built["palace"]))
-	if float(built.get("great-tomb", 0.0)) > 0.0:
-		_append_castle(out, spec, styles, "great-tomb", float(built["great-tomb"]))
-	if float(built.get("ziggurat", 0.0)) > 0.0:
-		# Ziggurat is a stepped civic monument in this renderer. It uses a
-		# castle mass; only the explicit `temple` key earns TempleSpec geometry.
-		_append_castle(out, spec, styles, "ziggurat", float(built["ziggurat"]))
+	# Ziggurat is a stepped civic monument in this renderer. It uses a castle
+	# mass; only the explicit `temple` key earns TempleSpec geometry.
+	for word in MONUMENTS:
+		if float(built.get(word, 0.0)) > 0.0:
+			_append_monument(out, spec, styles, word, float(built[word]))
 	_append_seat(out, spec, styles, spec.regime, 1.0)
 
 
@@ -196,7 +198,7 @@ static func _append_seat(out: Array[BuildingRequest], spec: VillageSpec,
 		styles: Dictionary, requested_regime: StringName, fraction: float) -> void:
 	match requested_regime:
 		&"royal":
-			if not _has_kind(out, &"castle"):
+			if not _has_seat(out, spec):
 				_append_seat_castle(out, spec, styles, "seat|royal", fraction)
 		&"council":
 			if not _has_shop_purpose(out, &"town_hall"):
@@ -208,7 +210,7 @@ static func _append_seat(out: Array[BuildingRequest], spec: VillageSpec,
 				out.append(BuildingRequest.church(_seed_for(spec, "seat|theocracy"),
 					styles["church"], 10.0, 20.0, 12.0))
 		&"military":
-			if not _has_kind(out, &"castle"):
+			if not _has_seat(out, spec):
 				_append_seat_castle(out, spec, styles, "seat|military", fraction)
 
 
@@ -222,12 +224,47 @@ static func _append_shop(out: Array[BuildingRequest], spec: VillageSpec, key: St
 ## A city's seat: a hold until the village earns a manor, then a castle.
 static func _append_seat_castle(out: Array[BuildingRequest], spec: VillageSpec,
 	styles: Dictionary, key: String, fraction: float) -> void:
-	if spec.population >= MANOR_MIN_POP:
+	if spec.civic_population() >= MANOR_MIN_POP:
 		_append_castle(out, spec, styles, key, fraction)
 		return
 	var size: float = lerpf(0.8, 1.0, clampf(fraction, 0.0, 1.0))
 	out.append(BuildingRequest.castle(_seed_for(spec, "brief|" + key), styles["castle"],
 		HOLD_SIZE.x * size, HOLD_SIZE.y * size, HOLD_SIZE.z))
+
+
+## A monument is sized to the settlement as its seat is: the castle mass for
+## a city that earns a castle, the hold's footprint below that.
+static func _append_monument(out: Array[BuildingRequest], spec: VillageSpec,
+		styles: Dictionary, word: String, fraction: float) -> void:
+	_append_seat_castle(out, spec, styles, word, fraction)
+
+
+## The kept word when `request` is one of the brief's monuments, else "".
+static func monument_of(spec: VillageSpec, request: BuildingRequest) -> String:
+	if spec == null or not spec.site_brief or request.kind != &"castle":
+		return ""
+	for word in MONUMENTS:
+		if request.seed == _seed_for(spec, "brief|" + word):
+			return word
+	return ""
+
+
+## Whom a request serves: "visible" for the homes and the everyday trades of
+## the people shown, "implied" for the civic programme the implied population
+## sizes (seat, monuments, landmark, temples, halls, market and every kept
+## building of the brief).
+static func serves(spec: VillageSpec, request: BuildingRequest) -> String:
+	if request.kind == &"house":
+		return "visible"
+	if request.kind != &"shop":
+		return "implied"
+	for key in ["granary", "forge-hall", "seat|council"]:
+		if request.seed == _seed_for(spec, "brief|" + key):
+			return "implied"
+	for row in SHOP_RULES:
+		if row.get("civic", false) and request.seed == _seed_for(spec, row["kind"]):
+			return "implied"
+	return "visible"
 
 
 static func _append_castle(out: Array[BuildingRequest], spec: VillageSpec,
@@ -239,6 +276,11 @@ static func _append_castle(out: Array[BuildingRequest], spec: VillageSpec,
 
 static func _has_kind(requests: Array[BuildingRequest], kind: StringName) -> bool:
 	return requests.any(func(request: BuildingRequest) -> bool: return request.kind == kind)
+
+
+static func _has_seat(requests: Array[BuildingRequest], spec: VillageSpec) -> bool:
+	return requests.any(func(request: BuildingRequest) -> bool:
+		return request.kind == &"castle" and monument_of(spec, request).is_empty())
 
 
 static func _has_shop_purpose(requests: Array[BuildingRequest], purpose: StringName) -> bool:
@@ -288,9 +330,9 @@ static func _append_landmark(out: Array[BuildingRequest], spec: VillageSpec, sty
 				styles["temple_form"], styles["temple_cult"], lerpf(14.0, 26.0, temple_fraction),
 				lerpf(24.0, 44.0, temple_fraction), lerpf(10.0, 16.0, temple_fraction)))
 			return
-		if spec.population >= CHURCH_MIN_POP:
+		if spec.civic_population() >= CHURCH_MIN_POP:
 			out.append(BuildingRequest.church(_seed_for(spec, "church"), styles["church"], 10.0, 20.0, 12.0))
-		elif spec.population >= SHRINE_MIN_POP:
+		elif spec.civic_population() >= SHRINE_MIN_POP:
 			out.append(BuildingRequest.church(_seed_for(spec, "shrine"), styles["church"], 6.0, 10.0, 6.0))
 		return
 	elif spec.culture == &"blighted":
@@ -301,9 +343,9 @@ static func _append_landmark(out: Array[BuildingRequest], spec: VillageSpec, sty
 	elif spec.purpose == &"pilgrim":
 		out.append(BuildingRequest.temple(
 			_seed_for(spec, "temple"), styles["temple_form"], styles["temple_cult"], 26.0, 44.0, 12.0))
-	elif spec.population >= CHURCH_MIN_POP:
+	elif spec.civic_population() >= CHURCH_MIN_POP:
 		out.append(BuildingRequest.church(_seed_for(spec, "church"), styles["church"], 10.0, 20.0, 12.0))
-	elif spec.population >= SHRINE_MIN_POP:
+	elif spec.civic_population() >= SHRINE_MIN_POP:
 		# "a shrine ... small form, or church at 12 m" (§4): the small
 		# envelope of the same family, at the shrine's own request seed.
 		out.append(BuildingRequest.church(_seed_for(spec, "shrine"), styles["church"], 6.0, 10.0, 6.0))
@@ -311,7 +353,8 @@ static func _append_landmark(out: Array[BuildingRequest], spec: VillageSpec, sty
 
 static func _append_shops(out: Array[BuildingRequest], spec: VillageSpec, styles: Dictionary) -> void:
 	for row in SHOP_RULES:
-		var earns: bool = spec.population >= int(row["min_pop"])
+		var people: int = spec.civic_population() if row.get("civic", false) else spec.population
+		var earns: bool = people >= int(row["min_pop"])
 		if row.get("mining_any_size", false) and spec.purpose == &"mining":
 			earns = true
 		if row.get("pilgrim_any_size", false) and spec.purpose == &"pilgrim":

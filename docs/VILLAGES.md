@@ -200,6 +200,11 @@ and never draws one of its own.
 | `mining` | a mine mouth, a smithy at any size | a `MeshKit` adit + `shop(&"blacksmith")` | at the far end of the through road |
 | `fishing` | racks, boats, a smokehouse | props | on the strand in front of the row |
 
+A C1 brief given an implied population (§10a) reads the civic rows -- the
+landmark, butcher, tailor, town hall, guildhall, the wall and the lord's
+house -- at `civic_population()`; the households and every other row stay
+at the people shown.
+
 House trades follow the same idea: of the households, `farmer` fills most of
 a farming village, `none` most of a market town; `smith`, `alchemist`,
 `scholar`, `innkeeper` appear once the matching shop or the population
@@ -769,6 +774,50 @@ SiteRequest schema 2 population 2942190 is the whole node's people, not a settle
 With it, N is planned, `population_asked` is N, and `notes` records the
 node's figure. A schema 1 request plans its own `population` exactly as
 before (byte-identical output); `--population` overrides it the same way.
+
+**The visible and the implied population** (owner decision 2026-10-10). A
+game shows a slice of a city: 45 or 60 people, while the history says it is
+the capital of millions. The caller passes both:
+
+```
+godot --headless --path . --script res://tools/export_village_plan.gd -- \
+    --request wuunafu-schema2.json --population 60 --implied-population 6000 --out out.json
+```
+
+- `--population N`, the **visible** people: the homes, their lots and the
+  everyday trades (smithy, tavern, bakery, store, inn) are planned for N.
+- `--implied-population M`, the **implied** people, the city the history
+  says it is. M sizes the **civic programme** only: the seat (a hold below
+  200, a castle from 200), the wall (from 150), the landmark (shrine from 20,
+  church from 60), the market and halls (butcher, tailor and town hall from
+  100, guildhall from 150) and the monuments. It never adds a home or a
+  residential lot; those people exist in the game's logic, not on the
+  ground. `VillageSpec.civic_population()` is the number the civic rows read.
+- **The cap.** Civic scale stops at `VillageSpec.CIVIC_MAX`, 500, the largest
+  settlement BrickWild plans. Every civic threshold is at or below it, so a
+  city of 4 000 and a city of 10 million plan the same civic programme on one
+  site of at most 400 m; `notes` says so. The kept fractions in `buildings`
+  still size each temple, monument, granary and forge-hall.
+- **The plan says whom each building serves.** With the flag the plan carries
+  `population_implied` (M), `population_civic` (what the civic rows read) and,
+  on every building, `serves`: `"visible"` or `"implied"`. A note restates it.
+  Without the flag none of these fields appear.
+
+**Monuments are not the seat** (owner decision 2026-10-10). A kept
+`great-tomb` or `ziggurat` is a castle mass in this renderer, marked
+`"monument": "<word>"` on its building, and it never counts as the ruler's
+seat: a military or royal city that kept one still gets its seat. A monument
+is sized as the seat is (the hold's footprint below 200 civic people, the
+castle mass from 200), takes its own lot class, and is placed after every
+home: on whatever frontage is left nearest the site's edge, or failing that
+on its own plot at the edge reached by its own lane. It never takes the
+seat's lane, so it can block neither the seat nor the homes.
+
+**A small city's wall is a palisade** (owner decision 2026-10-10). Below 150
+people, counting the implied ones, a kept `stone-wall` or `marble-wall` is
+built as a palisade, the light enclosure, and `notes` says so; it is no longer
+refused. A military regime keeps its wall at any size. A wall kept as fully as
+the palisade is the wall.
 
 The contract is `C:/Projects/Dm_View/docs/contracts/c1-site.md` and it is
 binding. This is a serialiser over data the planners already produce; the

@@ -13,6 +13,9 @@ static func run() -> SuiteResult:
 	_check_refusals(result)
 	_check_royal_hamlet_placed(result)
 	_check_caller_size(result)
+	_check_monuments_are_not_seats(result)
+	_check_small_wall(result)
+	_check_implied_programme(result)
 	return result
 
 
@@ -286,3 +289,177 @@ static func _check_caller_size(result: SuiteResult) -> void:
 	result.checked += 1
 	if int(over["population"]) != 40 or int(hamlet["population"]) != 26:
 		result.fail("--population 40 did not override a schema 1 request's 26")
+
+
+const THAAN := "res://tests/fixtures/site_requests/thaannafu-schema2.json"
+const WUUN := "res://tests/fixtures/site_requests/wuunafu-schema2.json"
+
+
+## One of the real Voxel_Build cities, sized as the exporter sizes it.
+static func city_spec(path: String, visible: int, implied: String,
+		notes: Array[String] = []) -> VillageSpec:
+	var raw := FileAccess.get_file_as_string(path)
+	var request: Dictionary = EXPORTER.with_implied_population(
+		EXPORTER.with_caller_population(JSON.parse_string(raw), str(visible), notes), implied)
+	var spec: VillageSpec = EXPORTER.spec_from_request(request, raw, notes)
+	spec.generate(spec.seed)
+	return spec
+
+
+static func seats(spec: VillageSpec, requests: Array[BuildingRequest]) -> Array[BuildingRequest]:
+	var out: Array[BuildingRequest] = []
+	for r in requests:
+		if r.kind == &"castle" and VillageProgrammer.monument_of(spec, r).is_empty():
+			out.append(r)
+	return out
+
+
+static func monuments(spec: VillageSpec, requests: Array) -> Array[String]:
+	var out: Array[String] = []
+	for r in requests:
+		var word: String = VillageProgrammer.monument_of(spec, r)
+		if not word.is_empty():
+			out.append(word)
+	return out
+
+
+static func _homes(requests: Array[BuildingRequest]) -> int:
+	return requests.filter(func(r: BuildingRequest) -> bool: return r.kind == &"house").size()
+
+
+static func _tier(request: BuildingRequest) -> StringName:
+	return CastleSpec.tier_for(request.width, request.length)
+
+
+## Owner decision 2026-10-10 (C1-MONUMENT-SEAT): a great-tomb or ziggurat is a
+## monument and never the seat. Thaannafu kept a great-tomb and no palace; it
+## used to get the tomb and no seat.
+static func _check_monuments_are_not_seats(result: SuiteResult) -> void:
+	for row in [[THAAN, 45, ["great-tomb"]], [WUUN, 60, ["great-tomb", "ziggurat"]]]:
+		var label := "%s at %d" % [String(row[0]).get_file(), row[1]]
+		var spec: VillageSpec = city_spec(row[0], row[1], "")
+		var requests: Array[BuildingRequest] = VillageProgrammer.programme(spec)
+		var seat: Array[BuildingRequest] = seats(spec, requests)
+		result.checked += 1
+		if seat.size() != 1:
+			result.fail("%s asked for %d seats beside its monuments" % [label, seat.size()])
+		elif _tier(seat[0]) != &"house":
+			result.fail("%s: the seat is a %s, not a hold" % [label, _tier(seat[0])])
+		result.checked += 1
+		if str(monuments(spec, requests)) != str(row[2]):
+			result.fail("%s monuments %s, wanted %s" % [label, monuments(spec, requests), row[2]])
+		for r in requests:
+			if VillageProgrammer.monument_of(spec, r).is_empty():
+				continue
+			result.checked += 1
+			if _tier(r) != &"house":
+				result.fail("%s: a monument of %d people is a %s mass" % [label, row[1], _tier(r)])
+
+
+## Owner decision 2026-10-10 (C1-WALL-SMALL-ROYAL): below 150 people, counting
+## the implied ones, a kept wall is a palisade and the brief is planned. A
+## military regime keeps its wall; 150 implied people build the wall.
+static func _check_small_wall(result: SuiteResult) -> void:
+	var walled: Dictionary = _base()
+	walled["buildings"] = {"stone-wall": 1.0}
+	result.checked += 1
+	if not EXPORTER.request_errors(walled).is_empty():
+		result.fail("a royal brief of 80 with a kept wall was refused: %s" % [EXPORTER.request_errors(walled)])
+	var notes: Array[String] = []
+	var small: VillageSpec = EXPORTER.spec_from_request(walled, "", notes)
+	result.checked += 1
+	if small.enclosure != &"palisade" or not small.valid():
+		result.fail("a royal brief of 80 kept enclosure '%s' (valid %s), wanted a palisade" % [
+			small.enclosure, small.valid()])
+	result.checked += 1
+	if not notes.any(func(n: String) -> bool: return n.contains("palisade")):
+		result.fail("the palisade in place of a kept wall left no note: %s" % [notes])
+	var none: Array[String] = []
+	var implied: VillageSpec = EXPORTER.spec_from_request(
+		EXPORTER.with_implied_population(walled, "150"), "", none)
+	result.checked += 1
+	if implied.enclosure != &"wall" or not implied.valid():
+		result.fail("80 shown and 150 implied kept '%s' (valid %s), wanted the wall" % [
+			implied.enclosure, implied.valid()])
+	var military: Dictionary = walled.duplicate(true)
+	military["regime"] = "military"
+	result.checked += 1
+	if EXPORTER.spec_from_request(military).enclosure != &"wall":
+		result.fail("a military brief of 80 lost its kept wall")
+	var both: Dictionary = walled.duplicate(true)
+	both["population"] = 160
+	both["buildings"] = {"stone-wall": 1.0, "palisade": 1.0}
+	result.checked += 1
+	if EXPORTER.spec_from_request(both).enclosure != &"wall":
+		result.fail("a city of 160 that kept a wall and a palisade alike is not walled")
+	var thaan: VillageSpec = city_spec(THAAN, 45, "")
+	var wuun: VillageSpec = city_spec(WUUN, 60, "")
+	result.checked += 1
+	if thaan.enclosure != &"wall" or wuun.enclosure != &"palisade":
+		result.fail("military Thaannafu at 45 kept '%s' and royal Wuunafu at 60 kept '%s'" % [
+			thaan.enclosure, wuun.enclosure])
+
+
+static func _dicts(requests: Array[BuildingRequest]) -> Array:
+	return requests.map(func(r: BuildingRequest) -> Dictionary: return r.to_dict())
+
+
+## Owner decision 2026-10-10: the caller's implied population sizes the civic
+## programme and never the homes. Past CIVIC_MAX it is the same programme.
+static func _check_implied_programme(result: SuiteResult) -> void:
+	for row in [[THAAN, 45, "4000", "2942190"], [WUUN, 60, "6000", "10614806"]]:
+		var label := "%s at %d" % [String(row[0]).get_file(), row[1]]
+		var shown: VillageSpec = city_spec(row[0], row[1], "")
+		var notes: Array[String] = []
+		var city: VillageSpec = city_spec(row[0], row[1], row[2], notes)
+		var huge: VillageSpec = city_spec(row[0], row[1], row[3])
+		var shown_requests: Array[BuildingRequest] = VillageProgrammer.programme(shown)
+		var city_requests: Array[BuildingRequest] = VillageProgrammer.programme(city)
+		var huge_requests: Array[BuildingRequest] = VillageProgrammer.programme(huge)
+		result.checked += 1
+		if city.population != row[1] or city.households != shown.households or _homes(city_requests) != _homes(shown_requests):
+			result.fail("%s with %s implied planned %d homes for %d people; shown alone, %d" % [
+				label, row[2], _homes(city_requests), city.population, _homes(shown_requests)])
+		result.checked += 1
+		if city.civic_population() != VillageSpec.CIVIC_MAX or huge.civic_population() != VillageSpec.CIVIC_MAX:
+			result.fail("%s civic population %d / %d, wanted the cap %d" % [label,
+				city.civic_population(), huge.civic_population(), VillageSpec.CIVIC_MAX])
+		result.checked += 1
+		if _dicts(city_requests) != _dicts(huge_requests):
+			result.fail("%s: %s and %s implied people asked for different programmes past the cap" % [
+				label, row[2], row[3]])
+		var seat: Array[BuildingRequest] = seats(city, city_requests)
+		result.checked += 1
+		if seat.size() != 1 or _tier(seat[0]) == &"house":
+			result.fail("%s with %s implied has %d seat(s), the first a hold" % [label, row[2], seat.size()])
+		result.checked += 1
+		if city.enclosure != &"wall":
+			result.fail("%s with %s implied kept '%s', not the wall its history kept" % [
+				label, row[2], city.enclosure])
+		for hall in [&"town_hall", &"guildhall", &"butcher", &"tailor"]:
+			result.checked += 1
+			if not _has_request(city_requests, &"shop", hall):
+				result.fail("%s with %s implied has no %s" % [label, row[2], hall])
+		result.checked += 1
+		if not notes.any(func(n: String) -> bool: return n.contains("implied %s people" % row[2])):
+			result.fail("%s: the implied population left no note: %s" % [label, notes])
+		var homes_serve_city := city_requests.any(func(r: BuildingRequest) -> bool:
+			return r.kind == &"house" and VillageProgrammer.serves(city, r) != "visible")
+		result.checked += 1
+		if homes_serve_city or VillageProgrammer.serves(city, seat[0]) != "implied":
+			result.fail("%s: a home serves the implied city or the seat serves the shown people" % label)
+	var hamlet := FileAccess.get_file_as_string("res://tests/fixtures/site_requests/thorn-hamlet.json")
+	var plain: VillageSpec = EXPORTER.spec_from_request(JSON.parse_string(hamlet), hamlet)
+	result.checked += 1
+	if plain.implied_population != 0 or plain.civic_population() != plain.population:
+		result.fail("a request without --implied-population has civic population %d for %d people" % [
+			plain.civic_population(), plain.population])
+	for bad in ["many", "-3", "4.5"]:
+		result.checked += 1
+		if EXPORTER.implied_error(bad).is_empty():
+			result.fail("--implied-population '%s' was accepted" % bad)
+	var negative: Dictionary = _base()
+	negative["implied_population"] = -1
+	result.checked += 1
+	if EXPORTER.request_errors(negative).is_empty():
+		result.fail("a request with implied_population -1 was accepted")

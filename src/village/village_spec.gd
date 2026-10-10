@@ -23,6 +23,10 @@ var decoration_level: float = 0.5
 ## Care of optional outdoor dressing, independent of household wealth.
 var upkeep: float = 1.0
 var population: int = 40
+## The people the history says this settlement serves beyond the `population`
+## shown (C1, owner decision 2026-10-10). 0 is none. It sizes the civic
+## programme only -- seat, walls, landmark, halls, market -- never the homes.
+var implied_population: int = 0
 var culture: StringName = &"english"
 var purpose: StringName = &"farming"
 var wealth: float = 0.4
@@ -66,6 +70,10 @@ const WATERS: Array[StringName] = [&"none", &"pond", &"stream", &"river", &"coas
 ## Wall needs a population that could plausibly build and man one, or a
 ## garrison purpose that supplies the manpower regardless of headcount.
 const WALL_MIN_POPULATION := 150
+## The civic programme stops growing here. Every civic threshold is at or
+## below it, so a capital of millions plans the civic programme of a town of
+## this size on one site; the rest of its people are the caller's to imply.
+const CIVIC_MAX := POP_MAX
 
 ## §3: the road-graph/common vocabulary, in match order. Each row is tried in
 ## turn and the first whose predicate holds wins, so more specific forms
@@ -184,9 +192,17 @@ func errors() -> Array[String]:
 		out.append("unknown enclosure '%s'" % enclosure)
 	if not (water in WATERS):
 		out.append("unknown water '%s'" % water)
-	if enclosure == &"wall" and population < WALL_MIN_POPULATION and purpose != &"garrison":
+	if enclosure == &"wall" and civic_population() < WALL_MIN_POPULATION and purpose != &"garrison":
 		out.append("enclosure 'wall' needs population >= %d or purpose 'garrison'" % WALL_MIN_POPULATION)
 	return out
+
+
+## The people the civic programme is sized for: the shown population, or the
+## implied one up to CIVIC_MAX when the caller gave a larger one.
+func civic_population() -> int:
+	if implied_population <= population:
+		return population
+	return mini(implied_population, CIVIC_MAX)
 
 
 func valid() -> bool:
@@ -214,7 +230,7 @@ func generate(p_seed: int) -> void:
 
 	households = _derive_households(population, seed)
 	form = &"planted" if compact_display else _derive_form(population, purpose, culture)
-	programme = _derive_programme(population, purpose, water)
+	programme = _derive_programme(civic_population(), purpose, water)
 	if culture == &"blighted":
 		programme = programme.filter(func(row): return row["kind"] not in [&"shrine", &"church", &"temple"])
 		programme.append({"kind": &"temple", "min_pop": 0,

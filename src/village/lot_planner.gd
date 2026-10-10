@@ -42,6 +42,7 @@ const LOT_RULES := {
 	&"farm":      {"set_min": 4.0, "set_max": 12.0, "use": 7.0,  "fire": 6.0, "depth_k": 4.0, "yard": 6.0},
 	&"church":    {"set_min": 6.0, "set_max": 15.0, "use": 8.0,  "fire": 3.0, "depth_k": 4.0, "yard": 2.0},
 	&"manor":     {"set_min": 20.0, "set_max": 40.0, "use": 22.0, "fire": 15.0, "depth_k": 4.0, "yard": 4.0},
+	&"monument":  {"set_min": 6.0, "set_max": 20.0, "use": 10.0, "fire": 6.0, "depth_k": 4.0, "yard": 3.0},
 }
 
 ## A terrace -- townhouses allowed to touch -- is §5's one exception to the
@@ -85,6 +86,7 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 ## The jobs must describe this spec's exact programme. All placement, retries,
 ## crossings, enclosure and dressing still run through this one pipeline.
 static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> VillagePlan:
+	jobs = _classified(spec, jobs)
 	var out: VillagePlan = VillageSitePlanner.plan(spec)
 	if out.roads.is_empty():
 		return out
@@ -197,6 +199,20 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	return out
 
 
+## A brief's great-tomb or ziggurat is a castle mass but never the seat
+## (owner decision 2026-10-10): it takes no seat lane and is placed after the
+## homes, so it can block neither.
+static func _classified(spec: VillageSpec, jobs: Array[Dictionary]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for job in jobs:
+		var row: Dictionary = job
+		if row["class"] == &"manor" and not VillageProgrammer.monument_of(spec, row["request"]).is_empty():
+			row = row.duplicate()
+			row["class"] = &"monument"
+		out.append(row)
+	return out
+
+
 ## A round settlement must occupy the green, not only house its programme.
 ## Keep looking when a fully housed attempt leaves most of its common bare.
 ## This is the existing geometric contract; exhausted retries still return
@@ -215,7 +231,7 @@ static func _strand_row_depth(jobs: Array[Dictionary]) -> float:
 	var depth := 0.0
 	for job in jobs:
 		var cls: StringName = job["class"]
-		if cls in [&"church", &"manor"]: continue
+		if cls in [&"church", &"manor", &"monument"]: continue
 		var rule: Dictionary = LOT_RULES[cls]
 		depth = maxf(depth, _setback(rule, job) + float(job["back"]) + float(rule["yard"]))
 	return maxf(depth, 18.0)
@@ -461,7 +477,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	if plan == null or plan.roads.is_empty():
 		return measured.size()
 	var jobs: Array[Dictionary] = []
-	for measured_job in measured:
+	for measured_job in _classified(plan.spec, measured):
 		# Placement measurements are reusable across site retries. Per-attempt
 		# targets (especially an inn's companion stable) must not retain the
 		# previous site's coordinates through a shallow array copy.
@@ -502,6 +518,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	var placed: int = 0
 	var landmark_lane: int = -1
 	var manor_lane: int = -1
+	var monument_lanes: Array = []
 	var stable_lane: int = -1
 	# The wealth gradient (VILLAGES §6), enforced rather than hoped for: the
 	# households are handed over biggest first, and no house may stand nearer
@@ -528,6 +545,17 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 				placed += 1
 			# A manor requires its own approach. Falling through to an ordinary
 			# road counts an invalid placement as success and prevents retries.
+			continue
+		elif cls == &"monument":
+			var open_roads := _open_roads(plan, [landmark_lane, manor_lane] + monument_lanes)
+			if _place_on_road(plan, ctx, job, open_roads, 0.0) >= 0.0:
+				placed += 1
+				continue
+			var own: int = _place_monument_lane(plan, job)
+			if own >= 0:
+				monument_lanes.append(own)
+				ctx = _context(plan)
+				placed += 1
 			continue
 		elif req_kind(job) == &"stable" and not plan.spec.compact_display:
 			if stable_lane < 0:
@@ -590,6 +618,8 @@ const _ORDER_HOUSE := 4
 ## Farms last: they want the edge, and taking their frontage after the
 ## households have taken theirs is what keeps them out of the middle.
 const _ORDER_FARM := 5
+## Monuments after everything: what is left, or their own plot at the edge.
+const _ORDER_MONUMENT := 6
 
 ## How far inside an already-placed bigger house a smaller one may stand.
 const GRADIENT_SLACK := 6.0
@@ -604,6 +634,8 @@ static func _order_of(job: Dictionary) -> int:
 			return _ORDER_LORD
 		&"farm":
 			return _ORDER_FARM
+		&"monument":
+			return _ORDER_MONUMENT
 		&"shop":
 			if req_kind(job) == &"bakery":
 				return _ORDER_SITED_TRADE
@@ -864,6 +896,7 @@ const SITING := {
 	&"inn": {"road": &"through", "toward": &"gate"},
 	&"stable": {"road": &"through", "toward": &"gate"},
 	&"farm": {"road": &"track", "toward": &"outside"},
+	&"monument": {"toward": &"outside"},
 }
 const SITING_DEFAULT := {"toward": &"common"}
 
@@ -1601,6 +1634,58 @@ static func _manor_lane_at(plan: VillagePlan, job: Dictionary, lane_x: float) ->
 			return {}
 	for lot in plan.lots:
 		if _overlaps(ribbon, lot["poly"]):
+			return {}
+	return lane
+
+
+## A monument with no lot among the village's roads stands at its edge on a
+## plot of its own, reached by its own lane: east or west of the common, on
+## either side of the through road, leaning toward the common like the seat's
+## lane, and never across a lot, a road, the common or the landmark.
+static func _place_monument_lane(plan: VillagePlan, job: Dictionary) -> int:
+	var rule: Dictionary = LOT_RULES[&"monument"]
+	var need: float = float(rule["use"]) + float(job["back"]) + float(rule["yard"])
+	var centre_x: float = VillageMeasure.common_centre(plan).x
+	for sy in [-1.0, 1.0]:
+		for sx in [1.0, -1.0]:
+			var edge_x: float = plan.site.end.x if sx > 0.0 else plan.site.position.x
+			var lane_x: float = edge_x - sx * (SITE_MARGIN + LANE_HALF + need + 1.0)
+			while (lane_x - centre_x) * sx >= 10.0:
+				var lane := _monument_lane_at(plan, job, lane_x, sx, sy)
+				if not lane.is_empty():
+					plan.roads.append(lane)
+					var index := plan.roads.size() - 1
+					if _place_on_road(plan, _context(plan), job, [index], 0.0) >= 0.0:
+						return index
+					plan.roads.pop_back()
+				lane_x -= sx * 4.0
+	return -1
+
+
+static func _monument_lane_at(plan: VillagePlan, job: Dictionary, lane_x: float,
+		sx: float, sy: float) -> Dictionary:
+	var start := Vector2(lane_x, _polyline_y_at_x(plan.roads[0]["points"], lane_x))
+	var direction := Vector2(MANOR_LANE_LEAN * sx, sy).normalized()
+	var edge_y: float = plan.site.end.y if sy > 0.0 else plan.site.position.y
+	var length: float = minf(MANOR_LANE_MAX, (edge_y - sy * SITE_MARGIN - start.y) / direction.y)
+	if length < float(job["width"]) * 0.5 + 12.0:
+		return {}
+	var lane: Dictionary = _lane(PackedVector2Array([start, start + direction * length]),
+		plan.spec.wealth)
+	var ribbon: PackedVector2Array = VillageSitePlanner.road_ribbon(lane, true)
+	for c in plan.commons:
+		if _overlaps(ribbon, c["poly"]):
+			return {}
+	if plan.landmark_reserved() and _overlaps(ribbon, plan.landmark_site["poly"]):
+		return {}
+	for w in plan.water:
+		if _overlaps(ribbon, w["poly"]):
+			return {}
+	for lot in plan.lots:
+		if _overlaps(ribbon, lot["poly"]):
+			return {}
+	for r in range(1, plan.roads.size()):
+		if _overlaps(ribbon, VillageSitePlanner.road_ribbon(plan.roads[r], true)):
 			return {}
 	return lane
 

@@ -72,7 +72,7 @@ const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi"
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
 	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
-	"dmvbrief",
+	"dmvbrief", "dmvimplied",
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest", "cas013",
 	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015", "cground",
@@ -170,6 +170,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return VillageArchetypeSuite.run_contracts()
 		"dmvbrief":
 			return preload("res://tests/suites/site_brief_suite.gd").run()
+		"dmvimplied":
+			return preload("res://tests/suites/site_implied_suite.gd").run()
 		"vnativeqa":
 			return preload("res://tests/suites/village_native_qa_suite.gd").run()
 		"vwater":

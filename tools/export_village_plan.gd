@@ -36,6 +36,14 @@ extends SceneTree
 ## own `population` as before; `--population` overrides it. Either way the plan
 ## carries the caller's number as `population_asked` and a note.
 ##
+## The caller may also pass `--implied-population M`, the city the history
+## says it is (owner decision 2026-10-10). M sizes the CIVIC programme -- the
+## seat, the walls, the landmark, the halls and the market -- and never adds a
+## home or a residential lot: those people exist in the game's logic, not on
+## the ground. Civic scale stops at `VillageSpec.CIVIC_MAX`. The plan then
+## carries `population_implied`, `population_civic` and, per building,
+## `serves` ("visible" or "implied").
+##
 ## Exit codes: 0 written, 2 usage or I/O, 3 refused (cannot satisfy).
 ##
 ## Scope, deliberately: no mesh, no props-as-geometry, no assets. This is the
@@ -58,7 +66,7 @@ func _init() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var opts: Dictionary = _options(args)
 	if not opts.has("request") or not opts.has("out"):
-		printerr("usage: --request <in.json> --out <out.json> [--population <people>]")
+		printerr("usage: --request <in.json> --out <out.json> [--population <people>] [--implied-population <people>]")
 		quit(2)
 		return
 	var text: String = _read(opts["request"])
@@ -73,12 +81,16 @@ func _init() -> void:
 		return
 	var notes: Array[String] = []
 	var population_arg: String = String(opts.get("population", ""))
+	var implied_arg: String = String(opts.get("implied-population", ""))
 	var size_error: String = population_error(parsed, population_arg)
+	if size_error.is_empty():
+		size_error = implied_error(implied_arg)
 	if not size_error.is_empty():
 		printerr(size_error)
 		quit(2)
 		return
-	var request: Dictionary = with_caller_population(parsed, population_arg, notes)
+	var request: Dictionary = with_implied_population(
+		with_caller_population(parsed, population_arg, notes), implied_arg)
 	var spec: VillageSpec = spec_from_request(request, text, notes)
 	var brief_errors: Array[String] = request_errors(request)
 	if not brief_errors.is_empty():
@@ -162,6 +174,25 @@ static func with_caller_population(request: Dictionary, population_arg: String,
 	return out
 
 
+## Why `--implied-population` cannot be used, or "" when it can.
+static func implied_error(implied_arg: String) -> String:
+	if implied_arg.is_empty():
+		return ""
+	if not implied_arg.is_valid_int() or implied_arg.to_int() < 0:
+		return "--implied-population must be a whole number of people, not '%s'" % implied_arg
+	return ""
+
+
+## The request carrying the caller's implied population, or the request itself
+## when the caller gave none.
+static func with_implied_population(request: Dictionary, implied_arg: String) -> Dictionary:
+	if implied_arg.is_empty():
+		return request
+	var out: Dictionary = request.duplicate(true)
+	out["implied_population"] = implied_arg.to_int()
+	return out
+
+
 static func _whole(value: Variant) -> String:
 	return "%d" % int(value) if _is_number(value) else str(value)
 
@@ -172,17 +203,24 @@ static func _whole(value: Variant) -> String:
 static func unplaced_labels(programme: Array[BuildingRequest], plan: VillagePlan) -> Array[String]:
 	var left := {}
 	for request in programme:
-		var key := "%s/%s" % [request.kind, request.purpose] if request.purpose != &"" else String(request.kind)
+		var key := _label(plan.spec, request)
 		left[key] = int(left.get(key, 0)) + 1
 	for b in plan.buildings:
 		var request: BuildingRequest = b["request"]
-		var key := "%s/%s" % [request.kind, request.purpose] if request.purpose != &"" else String(request.kind)
+		var key := _label(plan.spec, request)
 		left[key] = int(left.get(key, 0)) - 1
 	var out: Array[String] = []
 	for key in left:
 		for i in range(int(left[key])):
 			out.append(key)
 	return out
+
+
+static func _label(spec: VillageSpec, request: BuildingRequest) -> String:
+	var monument: String = VillageProgrammer.monument_of(spec, request)
+	if not monument.is_empty():
+		return monument
+	return "%s/%s" % [request.kind, request.purpose] if request.purpose != &"" else String(request.kind)
 
 
 # ------------------------------------------------------- request -> spec
@@ -239,6 +277,7 @@ static func spec_from_request(request: Dictionary, raw: String = "",
 	out.seed = _seed_of(request, raw)
 	out.site_brief = true
 	out.population = int(request.get("population", 40))
+	out.implied_population = int(request.get("implied_population", 0))
 	out.source_culture = StringName(String(request.get("culture", "english")).to_lower())
 	out.tongue = StringName(String(request.get("tongue", "")).to_lower())
 	out.culture = _culture_of(String(out.source_culture))
@@ -256,8 +295,16 @@ static func spec_from_request(request: Dictionary, raw: String = "",
 	out.plant_palette = _plant_palette(String(out.source_culture), String(out.tongue))
 	out.water = _water_of(terrain)
 	out.purpose = _purpose_for_brief(built, terrain, out.population, out.regime)
-	out.enclosure = _enclosure_of(built, out.population, out.purpose)
+	out.enclosure = _enclosure_of(built, out.civic_population(), out.regime)
 	out.enclosure_kept_fraction = _enclosure_fraction(built)
+	if out.enclosure == &"palisade" and _walled(built) > 0.0 and _walled(built) >= float(built["palisade"]):
+		notes.append("the kept wall wants %d people or a military regime and the civic programme has %d; it is built as a palisade" % [
+			VillageSpec.WALL_MIN_POPULATION, out.civic_population()])
+	if out.implied_population > 0:
+		notes.append("the civic programme (seat, walls, landmark, temples, monuments, halls, market) is sized for the implied %d people%s; homes and lots are for the %d shown" % [
+			out.implied_population,
+			" (civic scale stops at %d)" % VillageSpec.CIVIC_MAX if out.implied_population > VillageSpec.CIVIC_MAX else "",
+			out.population])
 	return out
 
 
@@ -337,13 +384,10 @@ static func request_errors(request: Dictionary) -> Array[String]:
 		var kept: float = float(built[key])
 		if kept < 0.0 or kept > 1.0:
 			errors.append("building '%s' kept fraction %.3f is outside [0, 1]" % [String(key), kept])
-	if errors.any(func(message: String) -> bool: return message.contains("kept fraction must be numeric")):
-		return errors
-	var wall_fraction: float = maxf(float(built.get("stone-wall", 0.0)),
-		float(built.get("marble-wall", 0.0)))
-	if wall_fraction > 0.0 and population < VillageSpec.WALL_MIN_POPULATION \
-			and regime != "military":
-		errors.append("a kept wall needs at least %d people or a military regime" % VillageSpec.WALL_MIN_POPULATION)
+	var implied_value: Variant = request.get("implied_population", 0)
+	if not _is_number(implied_value) or float(implied_value) < 0.0 \
+			or not is_equal_approx(float(implied_value), float(int(implied_value))):
+		errors.append("implied_population must be a whole number of people")
 	return errors
 
 
@@ -513,20 +557,24 @@ static func _plant_palette(culture: String, tongue: String) -> StringName:
 
 
 ## What is round the edge, from what the city has built. A wall needs the
-## people to build and man it (`VillageSpec.WALL_MIN_POPULATION`) or a
-## garrison to supply them, so a city that has one but is now too small for
-## it keeps a palisade instead of an invalid spec.
-static func _enclosure_of(built: Dictionary, population: int, purpose: StringName) -> StringName:
-	var walled: float = maxf(float(built.get("marble-wall", 0.0)),
-		float(built.get("stone-wall", 0.0)))
+## people to build and man it (`VillageSpec.WALL_MIN_POPULATION`, counting the
+## implied people) or a military regime to supply them; a city with fewer
+## keeps a palisade, the light enclosure, rather than being refused (owner
+## decision 2026-10-10). A wall kept as fully as the palisade is the wall.
+static func _enclosure_of(built: Dictionary, people: int, regime: StringName) -> StringName:
+	var walled: float = _walled(built)
 	var palisade: float = float(built.get("palisade", 0.0))
-	if walled > palisade:
-		if population >= VillageSpec.WALL_MIN_POPULATION or purpose == &"garrison":
+	if walled > 0.0 and walled >= palisade:
+		if people >= VillageSpec.WALL_MIN_POPULATION or regime == &"military":
 			return &"wall"
 		return &"palisade"
 	if palisade > 0.0:
 		return &"palisade"
 	return &"none"
+
+
+static func _walled(built: Dictionary) -> float:
+	return maxf(float(built.get("marble-wall", 0.0)), float(built.get("stone-wall", 0.0)))
 
 
 static func _enclosure_fraction(built: Dictionary) -> float:
@@ -539,7 +587,7 @@ static func _enclosure_fraction(built: Dictionary) -> float:
 ## The SitePlan, in the contract's own shape and key order.
 static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 	var city_id: String = String(request.get("city_id", "site:unknown"))
-	return {
+	var out := {
 		"schema": OUT_SCHEMA,
 		"schema_version": OUT_SCHEMA_VERSION,
 		"city_id": city_id,
@@ -577,8 +625,12 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		"water": _polys(plan.water, "kind"),
 		"fields": _polys(plan.fields, "kind"),
 		"props": _props(plan),
-		"buildings": _buildings(plan, city_id),
+		"buildings": _buildings(plan, city_id, request.has("implied_population")),
 	}
+	if request.has("implied_population"):
+		out["population_implied"] = plan.spec.implied_population
+		out["population_civic"] = plan.spec.civic_population()
+	return out
 
 
 static func _roads(plan: VillagePlan) -> Array:
@@ -614,7 +666,7 @@ static func _lots(plan: VillagePlan) -> Array:
 ## Every building, with the join key C2 and C4 hang off. `rect_m` is the
 ## MEASURED footprint in world space -- the walls' own outline, turned onto
 ## its lot -- not the envelope the request asked for.
-static func _buildings(plan: VillagePlan, city_id: String) -> Array:
+static func _buildings(plan: VillagePlan, city_id: String, implied := false) -> Array:
 	var out: Array = []
 	for i in range(plan.buildings.size()):
 		var b: Dictionary = plan.buildings[i]
@@ -623,7 +675,7 @@ static func _buildings(plan: VillagePlan, city_id: String) -> Array:
 		var corners: PackedVector2Array = Placement.world_rect(b["placement"], xf, true)
 		var front: Vector3 = xf.basis * Vector3(0.0, 0.0, -1.0)
 		var door: Vector3 = b["door"]
-		out.append({
+		var row := {
 			"building_id": "%s/b-%03d" % [city_id, i],
 			"request": req.to_dict(),
 			"transform": {"origin": [xf.origin.x, xf.origin.y, xf.origin.z],
@@ -639,7 +691,13 @@ static func _buildings(plan: VillagePlan, city_id: String) -> Array:
 			"front": [_n(front.x), _n(front.z)],
 			"door_m": [_n(door.x), _n(door.z)],
 			"storeys": req.storeys,
-		})
+		}
+		var monument: String = VillageProgrammer.monument_of(plan.spec, req)
+		if not monument.is_empty():
+			row["monument"] = monument
+		if implied:
+			row["serves"] = VillageProgrammer.serves(plan.spec, req)
+		out.append(row)
 	return out
 
 
