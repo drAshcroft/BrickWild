@@ -17,7 +17,7 @@ extends RefCounted
 
 # ---- shell, in metres ----
 const WALL_T := 0.35          # exterior wall thickness
-const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+const BASE_HOUSE_SPEC := preload("house_spec.gd")
 const INNER_WALL_T := 0.16    # partition thickness
 const FLOOR_T := 0.12
 const CEILING_MIN := 2.2      # a room shorter than this is a crawlspace

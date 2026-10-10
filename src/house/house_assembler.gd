@@ -20,7 +20,7 @@ extends RefCounted
 
 ## Materials for the shell's four surfaces, in the builder's own order.
 const SURFACES := ["wall", "trim", "roof", "floor"]
-const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+const BASE_HOUSE_SPEC := preload("house_spec.gd")
 
 
 ## Build the whole thing. `cutaway` leaves the roof off, which is the only way

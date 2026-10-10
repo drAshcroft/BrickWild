@@ -1,7 +1,5 @@
 class_name HouseQA
 extends RefCounted
-const ComponentCheck = preload("res://qa/component_check.gd")
-const MeshKit = preload("res://core/mesh_kit.gd")
 ## The whole house harness in one call: the plan, the furnishing, the walking,
 ## and the shell the mesh actually came out as.
 ##

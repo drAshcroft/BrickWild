@@ -4,7 +4,7 @@ extends RefCounted
 
 const MIN_SPLIT := 0.36
 const MAX_SPLIT := 0.64
-const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+const BASE_HOUSE_SPEC := preload("house_spec.gd")
 const DOMESTIC_KITCHEN_MIN_SIDE := 3.0
 
 # --------------------------------------------------------------- subdivide

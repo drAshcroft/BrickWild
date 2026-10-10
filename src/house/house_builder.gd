@@ -19,7 +19,7 @@ const SURF_ROOF := 2
 const SURF_FLOOR := 3
 const HAN_DOME_SEGMENTS := 16
 const HAN_DOME_BANDS := 5
-const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+const BASE_HOUSE_SPEC := preload("house_spec.gd")
 var plan: HousePlan
 var spec: HouseSpec
 var emitted_mesh: ArrayMesh

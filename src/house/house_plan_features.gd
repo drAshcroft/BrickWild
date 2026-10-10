@@ -2,7 +2,7 @@ class_name HousePlanFeatures
 extends RefCounted
 ## Hearth and focus placement selected after circulation and glazing.
 
-const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+const BASE_HOUSE_SPEC := preload("house_spec.gd")
 
 ## Decide once, here, which wall the fire and the flue share.
 ##

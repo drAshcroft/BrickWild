@@ -1,7 +1,7 @@
 class_name HouseFurnisher
 extends RefCounted
 
-const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+const BASE_HOUSE_SPEC := preload("house_spec.gd")
 ## Fills the rooms.
 ##
 ## Every piece is placed by a rule rather than a coordinate, and each rule

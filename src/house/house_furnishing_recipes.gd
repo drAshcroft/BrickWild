@@ -2,7 +2,7 @@ class_name HouseFurnishingRecipes
 extends RefCounted
 ## Room, shop and trade recipes consumed by HouseFurnisher.
 
-const BASE_HOUSE_SPEC := preload("res://src/house/house_spec.gd")
+const BASE_HOUSE_SPEC := preload("house_spec.gd")
 const DOMESTIC_TABLE_MIN_HEIGHT := 0.70
 const DOMESTIC_PREP_MIN_HEIGHT := 0.75
 
