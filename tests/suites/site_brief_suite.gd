@@ -12,6 +12,7 @@ static func run() -> SuiteResult:
 	_check_kept_fractions(result)
 	_check_refusals(result)
 	_check_royal_hamlet_placed(result)
+	_check_caller_size(result)
 	return result
 
 
@@ -176,47 +177,112 @@ static func _check_refusals(result: SuiteResult) -> void:
 			result.fail("impossible brief was not explicitly refused for %s" % field)
 
 
-## A royal seat must stand in a hamlet, not cost it the whole plan. Below a
-## manor's population it is a hold: the castle family's house tier. The 40 x
-## 50 m castle's manor lot used to cross a field track at every candidate in
-## a round village, so every royal brief of 20..60 people was refused with
-## "only N of N+1 requested buildings fit" on a site with room to spare.
+## A royal or military seat must stand in a hamlet, not cost it the whole
+## plan. Below a manor's population it is a hold: the castle family's house
+## tier. The 40 x 50 m castle's manor lot used to cross a field track at every
+## candidate in a round village, so every royal brief of 20..60 people was
+## refused with "only N of N+1 requested buildings fit" on a site with room to
+## spare.
 static func _check_royal_hamlet_placed(result: SuiteResult) -> void:
 	var text := FileAccess.get_file_as_string("res://tests/fixtures/site_requests/thorn-hamlet.json")
-	for population in [30, 60]:
-		# The raw text carries mythsim's unsigned 64-bit seed, which a parsed
-		# Dictionary loses: without it this is a different village from the
-		# one the exporter plans.
-		var raw := text.replace("\"population\": 26", "\"population\": %d" % population)
-		var request: Dictionary = JSON.parse_string(raw)
-		var spec: VillageSpec = EXPORTER.spec_from_request(request, raw)
-		spec.generate(spec.seed)
-		var wanted: Array[BuildingRequest] = VillageProgrammer.programme(spec)
-		var plan: VillagePlan = VillageLotPlanner.plan(spec)
-		var castles := plan.buildings.filter(func(b: Dictionary) -> bool:
-			return (b["request"] as BuildingRequest).kind == &"castle").size()
-		for b in plan.buildings:
-			var seat: BuildingRequest = b["request"]
-			result.checked += 1
-			if seat.kind == &"castle" and CastleSpec.tier_for(seat.width, seat.length) != &"house":
-				result.fail("royal hamlet of %d: the seat is a %s, not a hold" % [
-					population, CastleSpec.tier_for(seat.width, seat.length)])
+	for regime in ["royal", "military"]:
+		for population in [30, 45, 60]:
+			# The raw text carries mythsim's unsigned 64-bit seed, which a parsed
+			# Dictionary loses: without it this is a different village from the
+			# one the exporter plans.
+			var raw := text.replace("\"population\": 26", "\"population\": %d" % population) \
+				.replace("\"regime\": \"royal\"", "\"regime\": \"%s\"" % regime)
+			var request: Dictionary = JSON.parse_string(raw)
+			# Village QA stays on the two royal sizes it always ran on: the
+			# military hamlet of 30 is 4.9% built against a 5.0% density floor,
+			# which is open and does not stop the plan being written.
+			_check_seat_placed(result, "%s hamlet of %d" % [regime, population], request, raw,
+				true, regime == "royal" and population != 45)
+
+
+## `hold` asks that the one castle be the seat at the house tier; a request
+## whose great-tomb or ziggurat is also a castle mass cannot promise that.
+static func _check_seat_placed(result: SuiteResult, label: String, request: Dictionary,
+		raw: String, hold: bool, qa_rules: bool) -> void:
+	var errors: Array[String] = EXPORTER.request_errors(request)
+	result.checked += 1
+	if not errors.is_empty():
+		result.fail("%s refused: %s" % [label, "; ".join(errors)])
+		return
+	var spec: VillageSpec = EXPORTER.spec_from_request(request, raw)
+	spec.generate(spec.seed)
+	var wanted: Array[BuildingRequest] = VillageProgrammer.programme(spec)
+	var plan: VillagePlan = VillageLotPlanner.plan(spec)
+	var castles := plan.buildings.filter(func(b: Dictionary) -> bool:
+		return (b["request"] as BuildingRequest).kind == &"castle").size()
+	for b in plan.buildings if hold else []:
+		var seat: BuildingRequest = b["request"]
 		result.checked += 1
-		if plan.buildings.size() < wanted.size() or castles != 1:
-			result.fail("royal hamlet of %d placed %d of %d buildings, %d castle(s)" % [
-				population, plan.buildings.size(), wanted.size(), castles])
+		if seat.kind == &"castle" and CastleSpec.tier_for(seat.width, seat.length) != &"house":
+			result.fail("%s: the seat is a %s, not a hold" % [
+				label, CastleSpec.tier_for(seat.width, seat.length)])
+	result.checked += 1
+	if plan.buildings.size() < wanted.size() or (hold and castles != 1):
+		result.fail("%s placed %d of %d buildings, %d castle(s)" % [
+			label, plan.buildings.size(), wanted.size(), castles])
+	result.checked += 1
+	if plan.site.size.x > float(request["site_m"]) or plan.site.size.y > float(request["site_m"]):
+		result.fail("%s needs a %s site, beyond %s m" % [label, plan.site.size, request["site_m"]])
+	if not qa_rules:
+		return
+	var qa: Dictionary = VillageQA.new().check(plan, {}, false)
+	result.checked += 1
+	for failure in qa["failures"]:
+		# Open for every C1 brief, whatever the regime, and not about
+		# where the seat stands: `earned` (a brief's seat is not earned by
+		# population), `culture` (the norse palette lacks a wild tree), and
+		# `landmark` (whether a royal keep may out-top the shrine).
+		var rule := String(failure).get_slice(":", 0)
+		if rule in ["earned", "culture", "landmark"]:
+			continue
+		result.fail("%s: QA: %s" % [label, String(failure)])
+
+
+## Schema 2's `population` is the people of the whole polity node, so the
+## settlement's size comes from the caller. Fixtures are two real requests from
+## Voxel_Build world genesis-000100-1024.
+static func _check_caller_size(result: SuiteResult) -> void:
+	var raw := FileAccess.get_file_as_string("res://tests/fixtures/site_requests/thaannafu-schema2.json")
+	var node: Dictionary = JSON.parse_string(raw)
+	var refusal: String = EXPORTER.population_error(node, "")
+	result.checked += 1
+	if refusal.is_empty() or not refusal.contains("--population"):
+		result.fail("schema 2 without a caller size was not refused with a pointer to --population: '%s'" % refusal)
+	var royal_raw := FileAccess.get_file_as_string("res://tests/fixtures/site_requests/wuunafu-schema2.json")
+	var royal_node: Dictionary = JSON.parse_string(royal_raw)
+	result.checked += 1
+	if EXPORTER.population_error(royal_node, "").is_empty():
+		result.fail("a schema 2 request of %d node people was read as a village" % int(royal_node["population"]))
+	for bad in ["sixty", "45.5", "-"]:
 		result.checked += 1
-		if plan.site.size.x > float(request["site_m"]) or plan.site.size.y > float(request["site_m"]):
-			result.fail("royal hamlet of %d needs a %s site, beyond %s m" % [
-				population, plan.site.size, request["site_m"]])
-		var qa: Dictionary = VillageQA.new().check(plan, {}, false)
-		result.checked += 1
-		for failure in qa["failures"]:
-			# Open for every C1 brief, whatever the regime, and not about
-			# where the seat stands: `earned` (a brief's seat is not earned by
-			# population), `culture` (the norse palette lacks a wild tree), and
-			# `landmark` (whether a royal keep may out-top the shrine).
-			var rule := String(failure).get_slice(":", 0)
-			if rule in ["earned", "culture", "landmark"]:
-				continue
-			result.fail("royal hamlet of %d: QA: %s" % [population, String(failure)])
+		if EXPORTER.population_error(node, bad).is_empty():
+			result.fail("--population '%s' was accepted" % bad)
+	result.checked += 1
+	if not EXPORTER.population_error(node, "45").is_empty():
+		result.fail("schema 2 with --population 45 was refused")
+	var notes: Array[String] = []
+	var sized: Dictionary = EXPORTER.with_caller_population(node, "45", notes)
+	var spec: VillageSpec = EXPORTER.spec_from_request(sized, raw)
+	result.checked += 1
+	if spec.population != 45 or int(node["population"]) != 2942190:
+		result.fail("schema 2 with --population 45 planned %d people (node request now %d)" % [
+			spec.population, int(node["population"])])
+	result.checked += 1
+	if notes.size() != 1 or not notes[0].contains("2942190"):
+		result.fail("the caller's size did not leave a note naming the node population: %s" % [notes])
+	_check_seat_placed(result, "Thaannafu (military, schema 2) at 45", sized, raw, false, false)
+	var hamlet_raw := FileAccess.get_file_as_string("res://tests/fixtures/site_requests/thorn-hamlet.json")
+	var hamlet: Dictionary = JSON.parse_string(hamlet_raw)
+	var kept: Array[String] = []
+	result.checked += 1
+	if not EXPORTER.population_error(hamlet, "").is_empty() 			or EXPORTER.with_caller_population(hamlet, "", kept) != hamlet or not kept.is_empty():
+		result.fail("a schema 1 request without --population no longer plans its own population")
+	var over: Dictionary = EXPORTER.with_caller_population(hamlet, "40", kept)
+	result.checked += 1
+	if int(over["population"]) != 40 or int(hamlet["population"]) != 26:
+		result.fail("--population 40 did not override a schema 1 request's 26")

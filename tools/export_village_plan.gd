@@ -24,6 +24,20 @@ extends SceneTree
 ##     number -- mythsim's seeds are unsigned 64-bit and do not survive a
 ##     JSON parse as integers.
 ##
+## The settlement's size comes from the CALLER (owner decision 2026-10-09).
+## A schema 2 SiteRequest's `population` is the people of the whole polity
+## node (`population_of: "node"`, Voxel_Build VXB-002): tens of thousands,
+## sometimes millions, sometimes 0. It is never read as a village. Such a
+## request needs `--population N`, the people of the settlement to plan:
+##
+##   godot --headless --path . --script res://tools/export_village_plan.gd ##       -- --request site-city-0004.json --population 45 --out out.json
+##
+## Without it the request is refused with exit 2. A schema 1 request plans its
+## own `population` as before; `--population` overrides it. Either way the plan
+## carries the caller's number as `population_asked` and a note.
+##
+## Exit codes: 0 written, 2 usage or I/O, 3 refused (cannot satisfy).
+##
 ## Scope, deliberately: no mesh, no props-as-geometry, no assets. This is the
 ## plan, not the build.
 
@@ -44,7 +58,7 @@ func _init() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var opts: Dictionary = _options(args)
 	if not opts.has("request") or not opts.has("out"):
-		printerr("usage: --request <in.json> --out <out.json>")
+		printerr("usage: --request <in.json> --out <out.json> [--population <people>]")
 		quit(2)
 		return
 	var text: String = _read(opts["request"])
@@ -57,8 +71,14 @@ func _init() -> void:
 		printerr("%s is not a JSON object" % opts["request"])
 		quit(2)
 		return
-	var request: Dictionary = parsed
 	var notes: Array[String] = []
+	var population_arg: String = String(opts.get("population", ""))
+	var size_error: String = population_error(parsed, population_arg)
+	if not size_error.is_empty():
+		printerr(size_error)
+		quit(2)
+		return
+	var request: Dictionary = with_caller_population(parsed, population_arg, notes)
 	var spec: VillageSpec = spec_from_request(request, text, notes)
 	var brief_errors: Array[String] = request_errors(request)
 	if not brief_errors.is_empty():
@@ -109,6 +129,41 @@ func _init() -> void:
 		(out["lots"] as Array).size(), (out["roads"] as Array).size(),
 		out["site"]["width_m"], out["site"]["depth_m"], opts["out"]])
 	quit(0)
+
+
+## True when the request's `population` counts a whole polity node, not a
+## settlement: schema 2 onward, or any request that says so.
+static func is_node_population(request: Dictionary) -> bool:
+	var version: Variant = request.get("schema_version", 1)
+	return (_is_number(version) and int(version) >= 2) 		or String(request.get("population_of", "")) == "node"
+
+
+## Why `--population` cannot be used with this request, or "" when it can.
+static func population_error(request: Dictionary, population_arg: String) -> String:
+	if not population_arg.is_empty() and not population_arg.is_valid_int():
+		return "--population must be a whole number of people, not '%s'" % population_arg
+	if population_arg.is_empty() and is_node_population(request):
+		return "SiteRequest schema %s population %s is the whole node's people, not a settlement; pass the settlement's size with --population N" % [
+			_whole(request.get("schema_version", "?")), _whole(request.get("population", 0))]
+	return ""
+
+
+## The request with the caller's settlement size in `population`, or the
+## request itself when the caller gave none.
+static func with_caller_population(request: Dictionary, population_arg: String,
+		notes: Array[String]) -> Dictionary:
+	if population_arg.is_empty():
+		return request
+	var out: Dictionary = request.duplicate(true)
+	out["population"] = population_arg.to_int()
+	var whose: String = "the node's" if is_node_population(request) else "the request's"
+	notes.append("planned for %d people from the caller's --population; %s population is %s" % [
+		population_arg.to_int(), whose, _whole(request.get("population", 0))])
+	return out
+
+
+static func _whole(value: Variant) -> String:
+	return "%d" % int(value) if _is_number(value) else str(value)
 
 
 ## What the programme asked for and the plan did not place, as `kind/purpose`.

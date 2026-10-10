@@ -749,8 +749,26 @@ with no scene, no mesh and no assets:
 
 ```
 godot --headless --path . --script res://tools/export_village_plan.gd \
-    -- --request in.json --out out.json
+    -- --request in.json --out out.json [--population <people>]
 ```
+
+Exit codes: 0 written, 2 usage or I/O, 3 refused (the request cannot be
+satisfied; the line names why).
+
+**The caller passes the settlement's size** (owner decision 2026-10-09). A
+schema 2 SiteRequest (Voxel_Build VXB-002) carries `population` as the people
+of the whole polity node (`population_of: "node"`, `node_cells`): tens of
+thousands, sometimes millions, sometimes 0. That is not a village, and the
+exporter never reads it as one. A schema 2 request needs `--population N`;
+without it the exporter prints one line and exits 2:
+
+```
+SiteRequest schema 2 population 2942190 is the whole node's people, not a settlement; pass the settlement's size with --population N
+```
+
+With it, N is planned, `population_asked` is N, and `notes` records the
+node's figure. A schema 1 request plans its own `population` exactly as
+before (byte-identical output); `--population` overrides it the same way.
 
 The contract is `C:/Projects/Dm_View/docs/contracts/c1-site.md` and it is
 binding. This is a serialiser over data the planners already produce; the
@@ -767,11 +785,11 @@ Three things are worth knowing:
   keeps the planner's own order, and the **seed is taken from the request's
   TEXT** — mythsim seeds are unsigned 64-bit and do not survive a JSON parse
   as integers.
-- **A city is bigger than a village.** The adapter clamps requested
-  population to the supported 12–500 range and records that adjustment.
-  All seven forms now have planners, so a supported `gate`, `round`,
-  `strand`, `planted` or `crossroads` request keeps its derived form and
-  population. The old 140–199 fallback band is no longer used for them.
+- **A city is bigger than a village.** The exporter does not clamp: a
+  population outside 12–500 is refused (exit 3), because a clamped city is a
+  different city. All seven forms now have planners, so a supported `gate`,
+  `round`, `strand`, `planted` or `crossroads` request keeps its derived form
+  and population. The old 140–199 fallback band is no longer used for them.
 - **Every concession is written down.** `_settle_form` first checks the
   planner's supported forms. Its retained fallback only applies to an
   unsupported derived form, and records any population or purpose change in

@@ -1,0 +1,60 @@
+{
+  "schema": "dmv.site.request",
+  "schema_version": 2,
+  "world_id": "genesis-000100-1024",
+  "which": "base",
+  "city_id": "site:city-0004",
+  "node": 8,
+  "cell": 731962,
+  "seed": 6999254075830157281,
+  "name": "Thaan\u00f1afu",
+  "population": 2942190,
+  "population_unit": "people",
+  "population_feeding_units": 14710.95,
+  "people_per_unit": 200.0,
+  "people_per_unit_from": "pack",
+  "population_of": "node",
+  "node_cells": 200,
+  "regime": "military",
+  "wealth": 150575.625,
+  "culture": "culture:river-crown-compact",
+  "tongue": "human",
+  "peoples": [
+    {
+      "people": "human",
+      "name": "Humans",
+      "share": 0.99852
+    },
+    {
+      "people": "pixie",
+      "name": "Pixies",
+      "share": 0.00147
+    },
+    {
+      "people": "elf",
+      "name": "The Chorus",
+      "share": 0.0
+    }
+  ],
+  "buildings": {
+    "forge-hall": 1.0,
+    "granary": 1.0,
+    "great-tomb": 1.0,
+    "marble-wall": 1.0,
+    "palisade": 1.0,
+    "shrine": 1.0,
+    "stone-wall": 1.0
+  },
+  "terrain": {
+    "resolution": "cell",
+    "cell_m": 4882.8,
+    "elevation": 0.76003,
+    "fertility": 0.54446,
+    "forest": 0.18535,
+    "flow": 3.25371,
+    "water_edges": [],
+    "slope": 0.0003,
+    "rock": "basalt"
+  },
+  "site_m": 400
+}

@@ -1,0 +1,68 @@
+{
+  "schema": "dmv.site.request",
+  "schema_version": 2,
+  "world_id": "genesis-000100-1024",
+  "which": "base",
+  "city_id": "site:city-0002",
+  "node": 5,
+  "cell": 740166,
+  "seed": 16729191949608881886,
+  "name": "Wuu\u00f1afu",
+  "population": 10614806,
+  "population_unit": "people",
+  "population_feeding_units": 53074.028,
+  "people_per_unit": 200.0,
+  "people_per_unit_from": "pack",
+  "population_of": "node",
+  "node_cells": 783,
+  "regime": "royal",
+  "wealth": 21643.985,
+  "culture": "culture:river-crown-compact",
+  "tongue": "human",
+  "peoples": [
+    {
+      "people": "human",
+      "name": "Humans",
+      "share": 0.99985
+    },
+    {
+      "people": "pixie",
+      "name": "Pixies",
+      "share": 0.00015
+    },
+    {
+      "people": "elf",
+      "name": "The Chorus",
+      "share": 0.0
+    },
+    {
+      "people": "pixie",
+      "name": "Hands",
+      "share": 0.0
+    }
+  ],
+  "buildings": {
+    "forge-hall": 1.0,
+    "granary": 1.0,
+    "great-tomb": 1.0,
+    "marble-wall": 1.0,
+    "palace": 0.19999999999999996,
+    "palisade": 1.0,
+    "shrine": 1.0,
+    "stone-wall": 1.0,
+    "temple": 0.6,
+    "ziggurat": 1.0
+  },
+  "terrain": {
+    "resolution": "cell",
+    "cell_m": 4882.8,
+    "elevation": 0.75856,
+    "fertility": 0.54869,
+    "forest": 0.18108,
+    "flow": 2.03069,
+    "water_edges": [],
+    "slope": 8e-05,
+    "rock": "basalt"
+  },
+  "site_m": 400
+}
