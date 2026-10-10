@@ -347,7 +347,7 @@ static func _nearest_cat_dist(plan: HousePlan, room: int, cat: String,
 ## the planner gave the chimney.
 static func _hearth_point(plan: HousePlan, room: int) -> Vector2:
 	var breast: Dictionary = HouseGeometry.hearth_breast(plan)
-	if HouseFurnisher._uses_native_domestic_fireplace(plan) \
+	if HouseFurnishingRecipes.uses_native_domestic_fireplace(plan) \
 			and String(plan.hearth.get("host_kind", "")) == "ordinary_fireplace" \
 			and not breast.is_empty() and int(breast.get("room", -1)) == room:
 		return Vector2(breast["centre"])

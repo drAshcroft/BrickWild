@@ -67,7 +67,7 @@ func check_hearth(plan: HousePlan) -> void:
 	for f in lit:
 		if plan.furniture[f]["room"] == room:
 			here.append(f)
-	var native_host: bool = HouseFurnisher._uses_native_domestic_fireplace(plan) \
+	var native_host: bool = HouseFurnishingRecipes.uses_native_domestic_fireplace(plan) \
 		and not HouseGeometry.hearth_breast(plan).is_empty()
 	if here.is_empty() and wants_one and native_host:
 		var breast: Dictionary = HouseGeometry.hearth_breast(plan)
