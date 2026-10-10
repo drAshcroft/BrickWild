@@ -10,6 +10,86 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
 
 Nothing yet.
 
+## 0.1.2 - 2026-10-10
+
+A village says where a person can walk, and a house says how to get upstairs.
+Tag `v0.1.2`.
+
+### Notable changes
+
+- **The SitePlan's `walk` key** (schema `brickwild.walk` v1), written by
+  `tools/export_village_plan.gd` for every plan: the ground `VillageNavCheck`
+  judges, in the site frame. `floor[]` and `obstacles[]` outlines (roads with
+  verges, commons, lots, courts, crossings; building bounds, yards, water,
+  wall runs, blocking props, trunks), a `navmesh` of convex polygons eroded by
+  the 0.24 m person radius, `gates[]`, `doors[]` (one per building: door,
+  `outside_m` on the mesh, `inside_m`, `level`, the check's `reachable`) and
+  `furniture[]` (every prop with a use zone: well, stalls, benches, with a
+  `use_m` on the mesh). A navigation mesh rather than a grid: it loads into
+  Godot as it is (`[x, z]` is `Vector3(x, 0, z)`). See docs/VILLAGES.md 10b.
+- **`BrickWild.navigation(building)` and `BrickWild.navigation_node(building)`**
+  for houses, shops and hotels: one navigation mesh per storey at its floor
+  height from the floor `HouseNavCheck` walks, a two-way link per stair, the
+  exterior doors and every piece of furniture's use point. `navigation_node()`
+  is a `Node3D` of `NavigationRegion3D`s and `NavigationLink3D`s to add under
+  the instanced building. Churches, temples, castles, windmills, bridges and
+  trees report `supported: false` (todo `NAV-INTERIOR-OTHER-FAMILIES`).
+- `NavBake` (core/nav_bake.gd): outlines in, canonical navigation mesh out.
+  `VillageNavCheck.sources()` and `HouseNavCheck.sources()` list the outlines
+  each check rasterises.
+- New suites `dmvwalk` (the two real Voxel_Build cities) and `bwalk` (in
+  `lane:api`); `tests/walk_navserver_test.gd` asks Godot's NavigationServer3D
+  for paths over the exported data.
+
+### Measured
+
+| Request | Buildings | Gates | Mesh polygons | Walkable | Doors reached | Furniture |
+|---|---|---|---|---|---|---|
+| Thaannafu 45 + 4000 implied | 21 | 4 | 475 | 8 043 m² | 21 of 21 | 6 |
+| Wuunafu 60 + 6000 implied | 29 | 5 | 499 | 9 023 m² | 29 of 29 | 6 |
+
+Every door and usable prop is on the gates' island; no mesh polygon stands on
+a building's walls (an arrival court excepted); 81 of 81 NavigationServer3D
+paths arrive (gate to every door and prop in both cities; front door to every
+upstairs piece in the two-storey innkeeper townhouse 32102).
+
+### Compatibility
+
+- Additive. Every SitePlan is byte-identical to 0.1.1 apart from the `walk`
+  key: Wuunafu 60 + 6000, Thaannafu 45 + 4000 and `thorn-hamlet` were diffed
+  against the 0.1.1 release's own exporter. The plan's `schema_version` stays 1.
+- The exporter costs a little more per plan (one more walk grid and one bake;
+  the bake itself is tens of milliseconds).
+- `HouseNavCheck` and `VillageNavCheck` judge exactly as before; the new
+  functions sit beside the rasterisers they mirror.
+
+### Known issues
+
+- **Set the 3D map's merge rasterizer cell scale to 0.04** (project setting
+  `navigation/3d/merge_rasterizer_cell_scale`, or
+  `NavigationServer3D.map_set_merge_rasterizer_cell_scale`). The meshes are on
+  a centimetre grid; at Godot's default 0.25 m merge grid 38 of the 81 test
+  paths failed and every stair link was lost.
+- Interior walks are published for HousePlan families only.
+- `lane:house-plan-fast` is not green: `hmultistory` reports 28 findings,
+  line for line the 0.1.1 baseline. `lane:temple` was not run (no temple code
+  changed); TEMPLE-ROTUNDA-ARCADE stands as in 0.1.1.
+
+### Lanes
+
+`lane:api` (with `bwalk`) 491 checks pass; `lane:village-fast` 47 pass;
+`dmvbrief` 189 pass; `dmvimplied` pass; `dmvwalk` 87 pass;
+`lane:house-plan-fast` 270 checks, the 28 known findings; the walk
+NavigationServer3D test 81 of 81 paths. A second Wuunafu export is
+byte-identical to the first.
+
+### Migration
+
+- Install from `releases/brick_wild-0.1.2/`. Read `walk` from the SitePlan for
+  the street navmesh; add `BrickWild.navigation_node(b)` under each instanced
+  building; link each site door's `outside_m` to the building's front
+  `inside_m` through the building's transform.
+
 ## 0.1.1 - 2026-10-10
 
 A city is planned for the people shown and built for the people implied.
