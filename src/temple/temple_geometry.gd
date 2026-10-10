@@ -1429,6 +1429,8 @@ static func plan_extent(spec: TempleSpec) -> Rect2:
 		e = Rect2(Vector2(-extent_radius, -extent_radius),
 			Vector2(extent_radius * 2.0, extent_radius * 2.0))
 		e = e.merge(forecourt_rect(spec))
-	if spec.obelisks:
+	# A Pylon's obelisks stand on its forecourt, already merged above; growing
+	# the whole rect for them reserved 1.5 m a side that nothing occupies.
+	if spec.obelisks and spec.form != &"pylon":
 		e = e.grow(1.5)
 	return e
