@@ -852,6 +852,156 @@ fallback. Those historical counts do not certify the newly retained forms;
 VIL-017's native form matrix and VIL-020's archetype matrix supply that
 acceptance.
 
+## 10b. Walking: the `walk` key and `BrickWild.navigation()`
+
+A consumer that instances the buildings from their requests has the meshes and
+no idea where a person may walk, so its people walk through walls. Since 0.1.2
+the SitePlan carries the ground `VillageNavCheck` judges (§9.5), and every
+building with a HousePlan publishes its own floors and stairs.
+
+### The site: `walk`, schema `brickwild.walk` v1
+
+An additive key. Readers that ignore it are unaffected, and every other byte of
+a SitePlan is what 0.1.1 wrote. Site frame as the rest of the plan (metres, +X
+east, +Z south), ground at y = 0 (the road, lot and common surfaces are all
+within 3.5 cm of it). Floats are snapped to a millimetre, lists are in a fixed
+order, and the same request writes the same bytes.
+
+| Field | What it is |
+|---|---|
+| `agent_radius_m` | 0.24, `HouseGeometry.PERSON_RADIUS`; the mesh is eroded by it |
+| `floor[]` | `{kind, ref, poly_m}`: every road ribbon with its verge, the commons, the lots, arrival courts, crossings and prop aprons. They overlap; union them |
+| `obstacles[]` | `{kind, ref, poly_m}`: building bounds (an arrival court cut out), yard pieces, water (crossings cut out), wall runs between gates, floor-blocking props and tree trunks |
+| `navmesh` | `{vertices_m: [[x, z]], polygons: [[i, ...]], area_m2}`: convex polygons over shared vertices, `floor` less `obstacles`, eroded |
+| `gates[]` | `{gate_id, kind ("gate" or "road_end"), road_id, width_m, pos_m, nav_m}`; `nav_m` is the nearest point of the mesh |
+| `doors[]` | one per building, in building order: `{building_id, level, door_m, outside_m, inside_m, reachable}` |
+| `furniture[]` | every prop with a use zone (the well, the stalls, the benches): `{prop_id, key, pos_m, rect_m, use_m}` |
+
+`ref` is the id the rest of the plan already uses (`through-000`, `l-004`,
+`<city>/b-007`); `prop-NNN` indexes `props`, `plant-NNN` the dresser's plants.
+A door's `outside_m` is the first ground outside it the village check can
+stand on, moved onto the mesh; `inside_m` is 0.6 m behind the door plane. The
+straight step between them is the doorway and crosses the building's outline
+by design. `reachable` is the village check's own verdict, written rather than
+hidden. `level` is 0: every village door is a ground door.
+
+```json
+"walk": {
+  "agent_radius_m": 0.24,
+  "doors": [{"building_id": "site:city-0002/b-000", "door_m": [11.284, 55.477],
+             "inside_m": [11.513, 56.031], "level": 0,
+             "outside_m": [11.077, 54.978], "reachable": true}],
+  "floor": [{"kind": "road", "ref": "through-000", "poly_m": [[-183.5, 3.2], "..."]}],
+  "frame": "site: metres, +X east, +Z south, ground y 0",
+  "furniture": [{"key": "well", "pos_m": [0.0, 28.0], "prop_id": "prop-000",
+                 "rect_m": [-1.2, 26.8, 2.4, 2.4], "use_m": [0.0, 27.031]}],
+  "gates": [{"gate_id": "gate-00", "kind": "gate", "nav_m": [-182.712, 0.212],
+             "pos_m": [-182.712, 0.212], "road_id": "through-000", "width_m": 6.0}],
+  "navmesh": {"area_m2": 9023.2, "polygons": [[0, 5, 9], "..."], "vertices_m": [[-184.9, -2.1], "..."]},
+  "obstacles": [{"kind": "building", "ref": "site:city-0002/b-000", "poly_m": ["..."]}],
+  "schema": "brickwild.walk", "schema_version": 1
+}
+```
+
+**Why a mesh and not a grid.** A walkability grid at the check's own half
+metre is 300 000 cells for a 400 m site, and every consumer would still have
+to turn it into polygons. The navmesh is a few thousand numbers, loads into
+Godot as it is, and `floor`/`obstacles` are there for a consumer that wants
+its own agent radius or its own baker.
+
+**Using it in Godot.** A 2D point `[x, z]` is `Vector3(x, 0, z)` and the
+polygons keep their winding under that mapping:
+
+```gdscript
+var nav := NavigationMesh.new()
+var v3 := PackedVector3Array()
+for v in walk["navmesh"]["vertices_m"]:
+	v3.append(Vector3(v[0], 0.0, v[1]))
+nav.vertices = v3
+for p in walk["navmesh"]["polygons"]:
+	nav.add_polygon(PackedInt32Array(p))
+var region := NavigationRegion3D.new()   # under the village root, untransformed
+region.navigation_mesh = nav
+```
+
+**Required: a finer merge grid on the map.** The mesh is baked on a 1 cm grid,
+and Godot's map merges polygon edges on a grid of `cell_size ×
+merge_rasterizer_cell_scale`, by default 0.25 m. At that default, vertices a few
+centimetres apart collide ("More than 2 edges tried to occupy the same map
+rasterization space"), edges are dropped, and paths stop short: 38 of 81 test
+paths failed, including every stair. Set the project setting
+`navigation/3d/merge_rasterizer_cell_scale` to `0.04` (1 cm on a 0.25 m map),
+or per map:
+
+```gdscript
+NavigationServer3D.map_set_merge_rasterizer_cell_scale(get_world_3d().navigation_map, 0.04)
+```
+
+With it, all 81 paths arrive with no warnings. The same applies to
+`navigation_node()` below.
+
+`NavBake.to_navigation_mesh()` does exactly this in-engine. To rebake from the
+outlines instead, give every outline one winding (Godot's baker unions by the
+non-zero rule, so opposite windings cancel into seams), grow each floor
+outline by a centimetre (lots and road ribbons meet at hairlines, not shared
+edges), then bake with your radius; `NavBake.bake()` is that recipe.
+
+**How it was made true.** `VillageNavCheck.sources()` lists the outlines its
+own `build_grid()` paints, so the mesh and the QA walk are the same ground;
+`NavBake` (core/nav_bake.gd) bakes them with Godot's `NavigationServer2D` and
+puts the result in a canonical order. The two gotchas above were both found
+on the real cities: opposite windings stranded the common and opened 84 m² of
+walkable floor inside a building; the hairlines stranded the seat behind its
+own lane.
+
+### Inside a building: `BrickWild.navigation()` and `navigation_node()`
+
+For a building with a HousePlan (houses, shops, hotels):
+
+```gdscript
+var building := BrickWild.generate(request)
+var scene := BrickWild.instantiate(building)
+var nav := BrickWild.navigation_node(building)   # null if not supported
+if nav != null:
+	scene.add_child(nav)
+```
+
+`navigation_node()` is a `Node3D` named `Navigation` holding one
+`NavigationRegion3D` per storey at its floor height and one two-way
+`NavigationLink3D` per stair, in the building's own frame, so it moves with the
+instanced scene. `navigation()` is the same as data (schema
+`brickwild.building_walk` v1): `storeys[] {storey, floor_y_m, navmesh}`,
+`stairs[] {from_storey, to_storey, lower_m, upper_m, width_m, linked}`,
+exterior `doors[] {door, storey, front, door_m, inside_m, outside_m}` and
+`furniture[] {item, key, room, storey, use_m}` (the use point of every piece
+with a use zone, on its own storey's mesh). Points are `[x, y, z]`, local.
+
+Each storey is the floor `HouseNavCheck` walks: rooms, courts and doorways,
+less blocking furniture, columns, the hearth breast and a dais too high to
+step onto. `HouseNavCheck.sources()` lists it beside the rasteriser it
+mirrors. Secret doors stay shut. Each stair links the centres of the landings
+the check climbs between.
+
+Churches, temples, castles (seats and monuments), windmills, bridges and
+trees return `{"supported": false}` and a null node: their interiors are
+walked by their own checks (the rite, castle routes and occupancy) and are
+not yet published. Walk them to the door.
+
+**Joining the street to the house.** The site `doors[i]` and the building's
+front door meet at the threshold. Add one two-way `NavigationLink3D` from the
+site's `outside_m` (y 0) to the building's front `inside_m` put through the
+building's `transform`. Upper-floor furniture is then reached by the stairs.
+
+### Tests
+
+`dmvwalk` (the two real cities, Thaannafu 45 + 4000 and Wuunafu 60 + 6000:
+every door and placed well, stall and bench on the gates' island, no mesh on a
+footprint, convex polygons, same bytes twice, a hole cut from a lake) and
+`bwalk` (in `lane:api`: a two-storey innkeeper townhouse, a cottage and a
+two-storey tavern against `HouseNavCheck`, determinism, `navigation_node`, a
+church refused). `tests/walk_navserver_test.gd` hands the exported SitePlans
+and the townhouse to Godot's own NavigationServer3D and asks it for paths.
+
 ---
 
 ## 11. What has to exist first

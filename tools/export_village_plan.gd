@@ -626,6 +626,7 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		"fields": _polys(plan.fields, "kind"),
 		"props": _props(plan),
 		"buildings": _buildings(plan, city_id, request.has("implied_population")),
+		"walk": VillageWalk.projection(plan, city_id),
 	}
 	if request.has("implied_population"):
 		out["population_implied"] = plan.spec.implied_population

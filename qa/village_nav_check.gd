@@ -186,6 +186,116 @@ static func _grid_for_bounds(plan: VillagePlan, bounds: Rect2, cell_size: float)
 	return grid
 
 
+## The same ground as `build_grid`, as outlines a navigation baker can union:
+## {"floor": [{kind, id, poly}], "obstacles": [{kind, id, poly}]}. The grid
+## paints in order and a baker does not, so what the grid restores after an
+## obstacle is cut out of that obstacle here: an arrival court out of its
+## building, a crossing out of its water. Change one, change the other.
+static func sources(plan: VillagePlan) -> Dictionary:
+	var floor: Array[Dictionary] = []
+	var obstacles: Array[Dictionary] = []
+	for r in plan.roads.size():
+		floor.append({"kind": "road", "id": r, "poly": VillageSitePlanner.road_ribbon(plan.roads[r], true)})
+	for c in plan.commons.size():
+		floor.append({"kind": "common", "id": c, "poly": plan.commons[c]["poly"]})
+	for l in plan.lots.size():
+		floor.append({"kind": "lot", "id": l, "poly": plan.lots[l]["poly"]})
+	var crossings: Array[PackedVector2Array] = []
+	for crossing in plan.water_crossings:
+		var ribbon: PackedVector2Array = Poly.ribbon(crossing["points"],
+			(float(crossing["width"]) + VillageBuilder.BRIDGE_MARGIN) * 0.5)
+		crossings.append(ribbon)
+		floor.append({"kind": "crossing", "id": crossings.size() - 1, "poly": ribbon})
+	for i in plan.props.size():
+		if plan.props[i].has("approach"):
+			floor.append({"kind": "approach", "id": i, "poly": plan.props[i]["approach"]})
+	for i in plan.buildings.size():
+		var b: Dictionary = plan.buildings[i]
+		var solid: Array[PackedVector2Array] = [VillageMeasure.bounds_poly(b)]
+		if b["placement"].has("approach"):
+			var court := PackedVector2Array()
+			var xf: Transform3D = b["transform"]
+			for point in Poly.from_rect(b["placement"]["approach"]):
+				var p: Vector3 = xf * Vector3(point.x, 0.0, point.y)
+				court.append(Vector2(p.x, p.z))
+			solid = _minus(solid, [court])
+			floor.append({"kind": "court", "id": i, "poly": court})
+		for poly in solid:
+			obstacles.append({"kind": "building", "id": i, "poly": poly})
+		for poly in VillageMeasure.yard_polys(b):
+			obstacles.append({"kind": "yard", "id": i, "poly": poly})
+	for w in plan.water.size():
+		for poly in _minus([plan.water[w]["poly"]], crossings):
+			obstacles.append({"kind": "water", "id": w, "poly": poly})
+	if plan.spec.enclosure != &"none":
+		for e in plan.enclosure.size():
+			for run in VillageBuilder._minus_gates(plan.enclosure[e], plan.enclosure[(e + 1) % plan.enclosure.size()], plan.gate_crossings):
+				for part in VillageBuilder._water_edge_runs(plan, run[0], run[1]):
+					if not part["wet"]:
+						obstacles.append({"kind": "wall", "id": e, "poly": Poly.ribbon(
+							PackedVector2Array([part["a"], part["b"]]), VillageBuilder.WALL_THICK * 0.5)})
+	for i in plan.props.size():
+		var p: Dictionary = plan.props[i]
+		var rect: Rect2 = p.get("rect", Rect2())
+		if rect.size.x <= 0.0 or not (bool(p.get("built", false)) or PropCatalog.blocks_floor(String(p["key"]))):
+			continue
+		if p["key"] == "adit" and bool(p.get("built", false)):
+			for solid in Geometry2D.clip_polygons(Poly.from_rect(rect), PropKit.adit_passage(p["pos"], p["yaw"])):
+				obstacles.append({"kind": "prop", "id": i, "poly": solid})
+		else:
+			obstacles.append({"kind": "prop", "id": i, "poly": Poly.from_rect(rect)})
+	for i in plan.plants.size():
+		var t: Dictionary = plan.plants[i]
+		var trunk: float = float(t.get("trunk", 0.0))
+		if trunk <= 0.0 or not PropCatalog.blocks_floor(String(t["key"])):
+			continue
+		obstacles.append({"kind": "trunk", "id": i, "poly": Poly.from_rect(
+			Rect2(Vector2(t["pos"]) - Vector2(trunk, trunk), Vector2(trunk, trunk) * 2.0))})
+	return {"floor": floor, "obstacles": obstacles}
+
+
+## `polys` with every cutter taken out. A cutter wholly inside a polygon would
+## leave a hole, which an obstruction outline cannot carry, so that polygon is
+## split through the cutter's centre first and each half cut on its own.
+static func _minus(polys: Array[PackedVector2Array], cutters: Array[PackedVector2Array]) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = polys.duplicate()
+	for cutter in cutters:
+		var next: Array[PackedVector2Array] = []
+		for poly in out:
+			next.append_array(_cut(poly, cutter))
+		out = next
+	return out
+
+
+static func _cut(poly: PackedVector2Array, cutter: PackedVector2Array) -> Array[PackedVector2Array]:
+	var pieces: Array = Geometry2D.clip_polygons(poly, cutter)
+	var holed := false
+	for piece in pieces:
+		if Geometry2D.is_polygon_clockwise(piece):
+			holed = true
+	var out: Array[PackedVector2Array] = []
+	if not holed:
+		for piece in pieces:
+			out.append(piece)
+		return out
+	var box: Rect2 = Poly.bounding_rect(poly).grow(1.0)
+	var mid: float = Poly.bounding_rect(cutter).get_center().x
+	for half in [Rect2(box.position, Vector2(mid - box.position.x, box.size.y)),
+			Rect2(Vector2(mid, box.position.y), Vector2(box.end.x - mid, box.size.y))]:
+		for piece in Geometry2D.intersect_polygons(poly, Poly.from_rect(half)):
+			if not Geometry2D.is_polygon_clockwise(piece):
+				out.append_array(_cut(piece, cutter))
+	return out
+
+
+## The first ground outside a building's door a person can stand on, on a
+## grid `build_grid` made: the check's own threshold, for an exporter.
+static func threshold_on(plan: VillagePlan, grid: WalkGrid, building: int) -> Vector2:
+	var nav := VillageNavCheck.new()
+	nav._grid = grid
+	return nav._threshold(plan, building)
+
+
 ## Walk in from the gates. A village with no enclosure is entered at the ends
 ## of its through road, which is what `VillageMeasure.gates` already says.
 func _flood_from_gates(plan: VillagePlan) -> bool:

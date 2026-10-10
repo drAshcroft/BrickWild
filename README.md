@@ -78,6 +78,16 @@ Use `BrickWild.build_mesh(generated)` when you only need an `ArrayMesh`.
 document, and `BrickWild.describe_kind()` exposes the supported sizes, styles,
 and purposes for data-driven tools.
 
+`BrickWild.navigation_node(generated)` (0.1.2) returns a `Node3D` with one
+`NavigationRegion3D` per storey and a two-way `NavigationLink3D` per stair, in
+the building's own frame: add it under the instanced building so people take
+the stairs. `BrickWild.navigation(generated)` is the same as plain data. Both
+cover the families with a HousePlan (houses, shops, hotels); the others report
+`supported: false`. Set the map's merge rasterizer cell scale to `0.04`
+(`NavigationServer3D.map_set_merge_rasterizer_cell_scale`): the meshes are on a
+centimetre grid. A village plan's `walk` key is the street side of the same
+walk. See [Villages, section 10b](docs/VILLAGES.md).
+
 House and shop styles share the house style catalogue. A caller can use the
 published option ids directly; it does not need to import `HouseSpec`:
 

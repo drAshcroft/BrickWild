@@ -204,6 +204,23 @@ static func _door(building) -> Vector3:
 	return family.door(building) if family != null else Vector3.ZERO
 
 
+## Where a person can walk inside the building, as plain data in its own
+## frame: one navigation mesh per storey, a link per stair, the exterior doors
+## and the furniture's use points. `supported` is false for a family whose
+## interior walk is not published (everything without a HousePlan).
+static func navigation(building) -> Dictionary:
+	return BuildingNavigation.of(building)
+
+
+## The same walk as Godot nodes: a NavigationRegion3D per storey and a
+## two-way NavigationLink3D per stair under one Node3D. Add it under the node
+## `instantiate()` returned. Null when `navigation()` is not supported. The
+## meshes are baked on a centimetre grid: set the map's merge rasterizer cell
+## scale to 0.04 (docs/VILLAGES.md 10b) or Godot drops the close edges.
+static func navigation_node(building) -> Node3D:
+	return BuildingNavigation.node(building)
+
+
 ## Create a fresh scene instance. Every family includes its prop models: a
 ## house and a hotel their furniture, a temple its braziers and cages, a church
 ## its pews and candelabra, a castle its trestles, banners and courtyard.
