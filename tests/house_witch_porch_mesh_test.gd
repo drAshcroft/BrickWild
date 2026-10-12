@@ -3,10 +3,10 @@ extends SceneTree
 ## applied to the project source. It checks named parts against the actual mesh.
 
 const CASES := [
-	{"label": "front", "normal": Vector2(0, -1)},
-	{"label": "rear", "normal": Vector2(0, 1)},
-	{"label": "west", "normal": Vector2(-1, 0)},
-	{"label": "east", "normal": Vector2(1, 0)},
+	{"label": "front", "normal": Vector2(0, -1), "width": 9.0, "length": 12.0, "seed": 8102},
+	{"label": "rear", "normal": Vector2(0, 1), "width": 7.0, "length": 9.0, "seed": 8102, "use_existing_rear_door": true},
+	{"label": "west", "normal": Vector2(-1, 0), "width": 9.0, "length": 12.0, "seed": 8102},
+	{"label": "east", "normal": Vector2(1, 0), "width": 9.0, "length": 12.0, "seed": 8102},
 ]
 const ROOF_ROLE := "witch_entry_lean_to"
 const LEDGER_ROLE := "witch_entry_wall_ledger"
@@ -26,12 +26,12 @@ func _init() -> void:
 func _check_case(fixture: Dictionary) -> void:
 	var spec := HouseSpec.new()
 	spec.style = &"witch_hut"
-	spec.width = 9.0
-	spec.length = 12.0
+	spec.width = float(fixture["width"])
+	spec.length = float(fixture["length"])
 	spec.height = 2.6
 	spec.storeys = 1
 	spec.exterior_props = false
-	var plan: HousePlan = HouseGenerator.generate(spec, 8102, false)
+	var plan: HousePlan = HouseGenerator.generate(spec, int(fixture["seed"]), false)
 	if plan == null:
 		failures.append("%s: Witch plan did not generate" % fixture["label"])
 		return
@@ -40,7 +40,24 @@ func _check_case(fixture: Dictionary) -> void:
 	if door_index < 0:
 		failures.append("%s: no entrance door" % fixture["label"])
 		return
+	var original_front_index := door_index
+	var original_front_door: Dictionary = plan.doors[door_index].duplicate(true)
 	var normal: Vector2 = Vector2(fixture["normal"]).normalized()
+	if bool(fixture.get("use_existing_rear_door", false)):
+		var rear_door_index := -1
+		for candidate_index in range(plan.doors.size()):
+			var candidate: Dictionary = plan.doors[candidate_index]
+			if bool(candidate.get("exterior", false)) \
+					and not bool(candidate.get("front", false)) \
+					and Vector2(candidate.get("normal", Vector2.ZERO)).dot(normal) > 0.999:
+				rear_door_index = candidate_index
+				break
+		if rear_door_index < 0:
+			failures.append("%s: frozen Witch request has no generated rear exterior door to reuse" % fixture["label"])
+			return
+		plan.doors[door_index]["front"] = false
+		plan.doors[rear_door_index]["front"] = true
+		door_index = rear_door_index
 	var placement := _cardinal_door(plan, door_index, normal)
 	if placement.is_empty():
 		failures.append("%s: no margin-safe door station on a real exterior wall" % fixture["label"])
@@ -52,6 +69,17 @@ func _check_case(fixture: Dictionary) -> void:
 			 or int(door.get("b", -2)) != -1 or not bool(door.get("exterior", false)):
 		failures.append("%s: cardinal entrance lost its true exterior room owner" % fixture["label"])
 	var owner_floor: Rect2 = placement["owner_floor"]
+	if bool(fixture.get("use_existing_rear_door", false)):
+		var inner: Rect2 = HouseGeometry.interior_rect(spec)
+		var selected_run: Dictionary = placement["run"]
+		var selected_from: Vector2 = selected_run["from"]
+		var selected_dir: Vector2 = (Vector2(selected_run["to"]) - selected_from).normalized()
+		var expected_pos: Vector2 = selected_from + selected_dir * float(placement["station"]) \
+			- normal * HouseGeometry.wall_thickness(spec) * 0.5
+		if absf(owner_floor.end.y - inner.end.y) > 0.02 \
+				or Vector2(door["normal"]).dot(normal) < 0.999 \
+				or Vector2(door["pos"]).distance_to(expected_pos) > 0.002:
+			failures.append("%s: promoted entry is not hosted on its measured rear exterior room wall" % fixture["label"])
 	var inside_threshold := HouseGeometry.door_threshold(door, -1.0)
 	var outside_threshold := HouseGeometry.door_threshold(door, 1.0)
 	if not owner_floor.grow(0.02).has_point(inside_threshold) or (inside_threshold - door_pos).dot(normal) >= 0.0:
@@ -79,13 +107,40 @@ func _check_case(fixture: Dictionary) -> void:
 	var step := _component(builder, STEP_ROLE)
 	var ledger := _component(builder, LEDGER_ROLE)
 	var posts: Array[Dictionary] = []
+	var knee_braces: Array[Dictionary] = []
 	for row in builder.component_log:
 		if String(row.get("role", "")).begins_with(POST_PREFIX):
 			posts.append(row)
+		elif String(row.get("role", "")) == "witch_entry_knee_brace":
+			knee_braces.append(row)
 	if roof.is_empty() or ledger.is_empty() or step.is_empty() or posts.size() != 2:
 		failures.append("%s: expected named roof, wall ledger, step, and two supports; got roof=%s ledger=%s step=%s posts=%d" % [
 			fixture["label"], not roof.is_empty(), not ledger.is_empty(), not step.is_empty(), posts.size()])
 		return
+	if knee_braces.size() != 2:
+		failures.append("%s: expected one ledger-to-post knee brace on each side; got %d" % [
+			fixture["label"], knee_braces.size()])
+	else:
+		var trim_surface: PackedVector3Array = mesh.surface_get_arrays(HouseBuilder.SURF_TRIM)[Mesh.ARRAY_VERTEX]
+		var brace_hits_per_post: Array[int] = [0, 0]
+		for brace in knee_braces:
+			var brace_vertices := _component_vertices(brace)
+			var brace_bounds := MassBuilder.component_aabb(brace)
+			if String(brace.get("host", "")) != "porch" or brace_vertices.is_empty() \
+					or not ComponentCheck.contains_triangles(trim_surface, brace_vertices):
+				failures.append("%s: knee brace is not present in the porch trim mesh" % fixture["label"])
+			if not brace_bounds.intersects(MassBuilder.component_aabb(ledger)):
+				failures.append("%s: knee brace misses the wall ledger" % fixture["label"])
+			var attached_post_count := 0
+			for post_index in posts.size():
+				var post: Dictionary = posts[post_index]
+				if brace_bounds.intersects(MassBuilder.component_aabb(post)):
+					attached_post_count += 1
+					brace_hits_per_post[post_index] += 1
+			if attached_post_count != 1:
+				failures.append("%s: each knee brace must meet exactly one roof-bearing post" % fixture["label"])
+		if brace_hits_per_post != [1, 1]:
+			failures.append("%s: the two braces do not support opposite porch posts" % fixture["label"])
 	if String(roof.get("host", "")) != "porch" or String(step.get("host", "")) != "porch":
 		failures.append("%s: porch components lost their named host" % fixture["label"])
 	var roof_triangles := _component_vertices(roof)
@@ -116,6 +171,21 @@ func _check_case(fixture: Dictionary) -> void:
 	if not roof_within_tangent or not step_within_tangent:
 		failures.append("%s: roof or step exceeds shifted porch_center tangent envelope" % fixture["label"])
 	var wall_vertices: PackedVector3Array = mesh.surface_get_arrays(HouseBuilder.SURF_WALL)[Mesh.ARRAY_VERTEX]
+	if bool(fixture.get("use_existing_rear_door", false)):
+		var retained_front: Dictionary = plan.doors[original_front_index]
+		if Vector2(retained_front["pos"]).distance_to(Vector2(original_front_door["pos"])) > 0.001 \
+				or Vector2(retained_front["normal"]).distance_to(Vector2(original_front_door["normal"])) > 0.001 \
+				or not is_equal_approx(float(retained_front["width"]), float(original_front_door["width"])) \
+				or int(retained_front["a"]) != int(original_front_door["a"]) \
+				or int(retained_front["b"]) != int(original_front_door["b"]) \
+				or not bool(retained_front["exterior"]) or bool(retained_front["front"]):
+			failures.append("%s: original front doorway geometry/host changed while promoting the real back door" % fixture["label"])
+		var original_pos: Vector2 = original_front_door["pos"]
+		var original_normal: Vector2 = original_front_door["normal"]
+		var opening_probe: Vector3 = Vector3(original_pos.x + original_normal.x * wall_t * 0.5,
+			HouseGeometry.DOOR_H * 0.5, original_pos.y + original_normal.y * wall_t * 0.5)
+		if _point_mesh_distance(opening_probe, wall_vertices) < 0.20:
+			failures.append("%s: original front exterior opening was not retained in the emitted wall mesh" % fixture["label"])
 	var trim_surface: PackedVector3Array = mesh.surface_get_arrays(HouseBuilder.SURF_TRIM)[Mesh.ARRAY_VERTEX]
 	var ledger_triangles := _component_vertices(ledger)
 	if ledger_triangles.is_empty() or not ComponentCheck.contains_triangles(trim_surface, ledger_triangles):

@@ -136,11 +136,11 @@ static func _rotunda_brazier_wall_negative(res: SuiteResult) -> void:
 ## pass placement and have emitted floor support.
 static func _rotunda_recorded_brazier_controls(res: SuiteResult) -> void:
 	var cases: Array[Dictionary] = [
-		{"cult": &"blood", "seed": 31304, "positions": [Vector2(-6.716875, -8.562364), Vector2(6.716875, -8.562364)]},
-		{"cult": &"void", "seed": 31304, "positions": [Vector2(-6.716875, -8.562364), Vector2(6.716875, -8.562364)]},
-		{"cult": &"flame", "seed": 31316, "positions": [Vector2(-3.464875, -5.158746), Vector2(3.464875, -5.158746)]},
-		{"cult": &"bone", "seed": 31349, "positions": [Vector2(-3.464875, -5.118890), Vector2(3.464875, -5.118890)]},
-		{"cult": &"serpent", "seed": 31356, "positions": [Vector2(-3.464875, -5.171854), Vector2(3.464875, -5.171854)]},
+		{"cult": &"blood", "seed": 31304},
+		{"cult": &"void", "seed": 31304},
+		{"cult": &"flame", "seed": 31316},
+		{"cult": &"bone", "seed": 31349},
+		{"cult": &"serpent", "seed": 31356},
 	]
 	for witness in cases:
 		var spec: TempleSpec = null
@@ -158,23 +158,29 @@ static func _rotunda_recorded_brazier_controls(res: SuiteResult) -> void:
 		var walls: Dictionary = TempleQA._rotunda_wall_components(builder)
 		var stone: Array = MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE)
 		var physical_size: Vector3 = PropCatalog.size("Cauldron") * TempleBuilder.BRAZIER_SCALE
-		for pos in witness["positions"]:
-			res.checked += 1
+		var found_by_side := {"left": false, "right": false}
+		var wall_names: Array = walls.keys()
+		wall_names.sort()
+		for name in wall_names:
+			var wall: Dictionary = walls[name]
+			var wall_xf: Transform3D = wall["xf"]
+			var pos := Vector2(wall_xf.origin.x, wall_xf.origin.z)
+			var side: String = "left" if pos.x < 0.0 else "right"
+			if found_by_side[side]:
+				continue
+			# Derive the wall-hit from the actual emitted oriented panel center.
+			# The older frozen positions belonged to the previous full-height drum.
 			var actual_box := {"xf": Transform3D(Basis.IDENTITY,
 				Vector3(pos.x, 0.002 + physical_size.y * 0.5, pos.y)),
 				"size": physical_size}
-			var hit_name := ""
-			for name in walls:
-				if TempleQA._rotunda_box_overlap_depth(walls[name], actual_box) > MassRules.TOL:
-					hit_name = String(name)
-					break
-			if hit_name.is_empty():
-				res.fail("recorded Cauldron witness no longer hits an emitted Rotunda wall: seed=%d pos=%s" % [spec.seed, str(pos)])
+			if TempleQA._rotunda_box_overlap_depth(wall, actual_box) <= MassRules.TOL:
+				continue
 			if builder._brazier_clear(pos):
-				res.fail("Rotunda placement still accepts its wall-hit witness %s seed=%d pos=%s" % [hit_name, spec.seed, str(pos)])
+				res.fail("Rotunda placement accepted Cauldron footprint overlapping emitted panel %s; seed=%d pos=%s" % [
+					String(name), spec.seed, str(pos)])
 			var nearby_clear := false
-			for step in range(1, 13):
-				var inward: Vector2 = pos - pos.normalized() * (0.15 * float(step))
+			for station_step in range(1, 13):
+				var inward: Vector2 = pos - pos.normalized() * (0.15 * float(station_step))
 				if not builder._brazier_clear(inward):
 					continue
 				var half: Vector2 = PropCatalog.footprint("Cauldron") \
@@ -192,15 +198,19 @@ static func _rotunda_recorded_brazier_controls(res: SuiteResult) -> void:
 					Vector3(inward.x, 0.002 + physical_size.y * 0.5, inward.y)),
 					"size": physical_size}
 				var hits_wall := false
-				for wall in walls.values():
-					if TempleQA._rotunda_box_overlap_depth(wall, neighbor_box) > MassRules.TOL:
+				for neighbor_wall in walls.values():
+					if TempleQA._rotunda_box_overlap_depth(neighbor_wall, neighbor_box) > MassRules.TOL:
 						hits_wall = true
 						break
 				if not hits_wall:
 					nearby_clear = true
 					break
-			if not nearby_clear:
-				res.fail("no nearby supported clear brazier station within 1.8m; seed=%d pos=%s" % [spec.seed, str(pos)])
+			if nearby_clear:
+				found_by_side[side] = true
+				res.checked += 2
+		if not found_by_side["left"] or not found_by_side["right"]:
+			res.fail("could not derive two actual Rotunda wall-hit/nearby-clear Cauldron controls from emitted panel bounds; seed=%d left=%s right=%s" % [
+				spec.seed, found_by_side["left"], found_by_side["right"]])
 
 
 static func _compact_columns(res: SuiteResult) -> void:

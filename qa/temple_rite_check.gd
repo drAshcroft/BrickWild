@@ -232,6 +232,12 @@ func _check_sightline() -> void:
 			continue
 		if _exempt_from_sightline(name):
 			continue
+		# These two basilica structural AABBs span the empty center of a
+		# curved shell. Their named triangles are checked by the architecture
+		# fixture; all aperture returns and heads remain ordinary blockers.
+		if _spec.form == &"basilica" and name in [
+				"basilica_apse_shell", "basilica_apse_half_dome"]:
+			continue
 		obstacles.append({"name": name, "aabb": m["aabb"]})
 	for i in range(_spec.columns.size()):
 		var column: Dictionary = _spec.columns[i]
@@ -326,7 +332,8 @@ func _check_dominance() -> void:
 	# and nothing in the sanctum with it may stand taller. Columns down the hall
 	# may -- they hold the roof up, and a colonnade taller than the god is what
 	# makes the walk toward him feel like a descent into somewhere smaller.
-	var sanctum: Rect2 = TempleGeometry.sanctum_rect(_spec)
+	var sanctum: Rect2 = TempleGeometry.basilica_sanctum_test_rect(_spec) \
+		if _spec.form == &"basilica" else TempleGeometry.sanctum_rect(_spec)
 	for m in _builder.mass_log:
 		var name: String = m["name"]
 		if not _indoor_mass(name):

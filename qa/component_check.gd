@@ -50,15 +50,37 @@ static func check(builder: MassBuilder, mesh: ArrayMesh) -> Dictionary:
 			failures.append("components claim surface %d, mesh has %d"
 				% [surf, mesh.get_surface_count()])
 			continue
-		var want: PackedVector3Array = (isolated[surf] as MeshKit).commit() \
-			.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-		var have: PackedVector3Array = mesh.surface_get_arrays(int(surf))[Mesh.ARRAY_VERTEX]
+		var want_arrays: Array = (isolated[surf] as MeshKit).commit().surface_get_arrays(0)
+		var have_arrays: Array = mesh.surface_get_arrays(int(surf))
+		var want: PackedVector3Array = _triangle_vertices(want_arrays)
+		var have: PackedVector3Array = _triangle_vertices(have_arrays)
 		var missing := missing_triangles(have, want)
 		if missing > 0:
 			failures.append("surface %d is missing %d logged component triangles"
 				% [surf, missing])
 	return {"ok": failures.is_empty(), "failures": failures,
 		"checked": checked, "unverified": unverified}
+
+
+## Expand indexed surfaces into the triangle stream used by the renderer.
+## A non-indexed surface keeps its vertex soup; a present but empty index array
+## means the surface has no triangles, even if its old vertices remain stored.
+static func _triangle_vertices(arrays: Array) -> PackedVector3Array:
+	if arrays.size() <= Mesh.ARRAY_INDEX:
+		return PackedVector3Array()
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var index_value: Variant = arrays[Mesh.ARRAY_INDEX]
+	if index_value == null:
+		return vertices
+	var indices: PackedInt32Array = index_value
+	if indices.size() % 3 != 0:
+		return PackedVector3Array()
+	var expanded := PackedVector3Array()
+	for index in indices:
+		if index < 0 or index >= vertices.size():
+			return PackedVector3Array()
+		expanded.append(vertices[index])
+	return expanded
 
 
 ## The component identities, in emission order. Two builds of the same plan

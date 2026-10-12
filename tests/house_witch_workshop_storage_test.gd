@@ -62,9 +62,6 @@ func _check_frozen_matrix() -> void:
 			if display_shelf_index < 0:
 				failures.append(label + " service Workshop is missing its Witchwork display shelf")
 			if shelf_cluster_count != 2:
-				if label == "witch_default_8102":
-					for index in plan.furniture_of(workshop):
-						printerr("WITCH_STORAGE_DEBUG ", index, " ", plan.furniture[index])
 				failures.append(label + " service Workshop display shelf hosts %d of 2 measured bottle props" % shelf_cluster_count)
 		else:
 			# The documented 7x9 compact fallback has no separate workshop.

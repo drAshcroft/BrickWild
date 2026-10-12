@@ -23,7 +23,7 @@ const CASE_BATCH_SIZE := 10
 const FULL_REQUEST_COUNT := 234
 const MAX_CASES_PER_INVOCATION := 10
 const VIEWS: Array[String] = ["exterior", "axis", "cutaway"]
-const SUPPLEMENTAL_CHURCH_VIEWS: Array[String] = ["vault"]
+const SUPPLEMENTAL_CHURCH_VIEWS: Array[String] = ["vault", "entry"]
 
 var _out_dir := OUT_DEFAULT
 var _family_filter := "all"
@@ -136,7 +136,7 @@ func _parse_args(args: PackedStringArray) -> bool:
 			seen_views[view] = true
 		for view in chosen_views:
 			if view not in VIEWS and view not in SUPPLEMENTAL_CHURCH_VIEWS:
-				push_error("--view must be all or a comma-separated subset of exterior,axis,cutaway,vault")
+				push_error("--view must be all or a comma-separated subset of exterior,axis,cutaway,vault,entry")
 				quit(2)
 				return false
 	if _cult_filter != &"all" and _cult_filter not in TempleSpec.CULTS:
@@ -170,6 +170,12 @@ func _parse_args(args: PackedStringArray) -> bool:
 		for case in selected_cases:
 			if String(case.get("family", "")) != "church":
 				push_error("--view=vault is supplemental and only supports Church requests")
+				quit(2)
+				return false
+	if _view_filter != "all" and _view_filter.split(",", false).has("entry"):
+		for case in selected_cases:
+			if String(case.get("family", "")) != "church":
+				push_error("--view=entry is supplemental and only supports Church requests")
 				quit(2)
 				return false
 	var default_profile := _family_filter == "all" and _size_filter == "default" \
@@ -436,6 +442,25 @@ func _render_subject(made: GeneratedBuilding, family: String, style: String,
 					"station_xz": [station_xz.x, station_xz.y],
 					"route_distance": float(station["route_distance"]),
 					"body_radius": TempleGeometry.PERSON_RADIUS}
+			"entry":
+				var doors: Array[Dictionary] = ChurchGeometry.west_door_layout(spec)
+				var door: Dictionary = doors[0]
+				var door_h: float = ChurchGeometry.door_height(spec)
+				var floor_y: float = ChurchGeometry.podium_height(spec)
+				var door_z: float = -spec.length * 0.5 - ChurchGeometry.OPENING_EPS
+				if spec.tower and spec.west_towers == 1:
+					door_z = -spec.length * 0.5 + ChurchGeometry.TOWER_EMBED \
+						- spec.tower_width - ChurchGeometry.OPENING_EPS
+				_cam.fov = 48.0
+				var door_center := Vector3(float(door.x), floor_y + door_h * 0.5, door_z)
+				var lateral := maxf(spec.width * 0.75, 4.5)
+				var setback := maxf(spec.width * 1.25, 8.0)
+				_cam.position = door_center + Vector3(lateral, 2.1, -setback)
+				focus = door_center + Vector3(0.0, 0.35, 0.55)
+				camera_record = {"view_scope": "supplemental", "view_kind": "west_entry",
+					"roof_on": true, "entrance_connected": true, "body_clear": false,
+					"door_center": [door_center.x, door_center.y, door_center.z],
+					"lateral_offset": lateral, "setback": setback}
 			"vault":
 				var vault_station: Dictionary = _church_axis_station(spec)
 				if not bool(vault_station.get("ok", false)):

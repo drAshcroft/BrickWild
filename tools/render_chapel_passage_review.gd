@@ -10,9 +10,11 @@ const SOURCE_PATHS := [
 	"res://src/church/church_builder.gd",
 	"res://src/church/church_geometry.gd",
 	"res://src/church/church_assembler.gd",
+	"res://src/church/church_furnisher.gd",
 	"res://src/church/church_generator.gd",
 	"res://core/shell_assembler.gd",
 	"res://tests/chapel_passage_test.gd",
+	"res://tests/suites/dressing_suite.gd",
 	"res://src/church/church_spec.gd",
 	"res://core/material_kit.gd",
 	"res://core/mesh_kit.gd",
@@ -20,7 +22,10 @@ const SOURCE_PATHS := [
 	"res://assets/props/catalog.json",
 	"res://tests/suites/landmark_suite.gd",
 	"res://tools/render_chapel_passage_review.gd",
+	"res://tests/fixtures/chapel_review_camera_fixture.gd",
+	"res://tests/chapel_review_camera_test.gd",
 ]
+const ChapelCameraFixture = preload("res://tests/fixtures/chapel_review_camera_fixture.gd")
 
 var _out: String = DEFAULT_OUT
 var _vp: SubViewport
@@ -56,12 +61,15 @@ func _init() -> void:
 		"schema_version": 1,
 		"started_utc": Time.get_datetime_string_from_system(true),
 		"finished_utc": "",
-		"renderer": "Godot SubViewport with ChurchAssembler.build(spec, false)",
+		"renderer": "Godot SubViewport with roof-on and chapel-detail cutaway ChurchAssembler builds",
 		"headless": DisplayServer.get_name() == "headless",
 		"props_enabled": true,
-		"cutaway": false,
+		"cutaway": true,
+		"cutaway_scope": "chapel detail view only; context and ambulatory views retain the roof",
 		"frozen_fixture": "tests/chapel_passage_test.gd",
 		"live_fixture_path": "tests/chapel_passage_test.gd",
+		"camera_fixture": "tests/fixtures/chapel_review_camera_fixture.gd",
+		"camera_test": "tests/chapel_review_camera_test.gd",
 		"frozen_fixture_sha256": source_hashes_start.get("res://tests/chapel_passage_test.gd", ""),
 		"source_hashes_start": source_hashes_start,
 		"source_hashes_end": {},
@@ -182,41 +190,114 @@ func _render_case(request: Dictionary, case_index: int) -> void:
 		row["actual_prop_instances"] = dressing.get_child_count()
 	# The assembler above uses the real production prop placement and instancing path.
 	# The explicit metadata records actual instantiated Dressing children.
-	var apse_z: float = ChurchGeometry.apse_springing_z(spec)
-	var outer: float = ChurchGeometry.ambulatory_radius(spec)
-	var chapels_reach: float = outer + spec.chapel_radius
-	var context_target := Vector3(0.0, maxf(2.2, spec.height * 0.22), apse_z + outer * 0.22)
-	var context_eye := context_target + Vector3(chapels_reach * 1.85,
-		chapels_reach * 0.78, chapels_reach * 2.25)
+	var context := ChapelCameraFixture.context_view(spec)
+	var context_target: Vector3 = context["target"]
+	var context_eye: Vector3 = context["eye"]
 	await _capture(request, row, "views", "east_3q_context.png", context_eye,
 		context_target, 46.0, "eastern apse, covered ambulatory, and radiating chapel context")
 
 	var chapel_index := 0
-	var angle: float = ChurchGeometry.chapel_angle(spec, chapel_index)
-	var direction := Vector3(sin(angle), 0.0, cos(angle))
-	var tangent := Vector3(cos(angle), 0.0, -sin(angle))
-	var origin := Vector3(0.0, 0.0, apse_z)
-	var wall_inner: float = outer - ChurchBuilder.NAVE_WALL_T
-	var center: Vector3 = ChurchGeometry.chapel_center(spec, chapel_index)
-	var ambulatory_eye := origin + direction * (wall_inner - 0.78) \
-		+ tangent * 0.0 + Vector3.UP * 1.58
-	var ambulatory_target := center + direction * 0.24 + Vector3.UP * 1.58
+	var ambulatory: Dictionary = ChapelCameraFixture.ambulatory_view(spec, chapel_index)
+	var ambulatory_eye: Vector3 = ambulatory["eye"]
+	var ambulatory_target: Vector3 = ambulatory["target"]
 	await _capture(request, row, "rooms", "ambulatory_eye_toward_chapel_mouth.png",
 		ambulatory_eye, ambulatory_target, 72.0,
-		"roof-on eye-level view from ambulatory through the actual mouth")
+		"roof-on eye-level view from ambulatory through the actual mouth",
+		ambulatory["clearance"])
 
-	var chapel_eye := center + direction * (spec.chapel_radius * 0.55) + Vector3.UP * 1.58
-	var chapel_target := center - direction * 0.62 + Vector3.UP * 1.58
-	await _capture(request, row, "rooms", "chapel_eye_back_toward_mouth.png",
-		chapel_eye, chapel_target, 72.0,
-		"eye-level view from inside the chapel back through its actual mouth")
 	await process_frame
 	assembled.queue_free()
 	await process_frame
+	var measured_placements: Array[Dictionary] = ChurchFurnisher.dress(spec)
+	var cutaway_assembled: Node3D = ChurchAssembler.build(spec, true)
+	_stage.add_child(cutaway_assembled)
+	await process_frame
+	var camera_wall_clipped: bool = _clip_chapel_camera_side_wall(cutaway_assembled,
+		spec, chapel_index)
+	var cutaway_view: Dictionary = ChapelCameraFixture.chapel_cutaway_view(spec,
+		chapel_index, measured_placements)
+	var detail_clearance: Dictionary = cutaway_view["clearance"]
+	detail_clearance["camera_side_wall_clipped"] = camera_wall_clipped
+	var detail_eye: Vector3 = cutaway_view["eye"]
+	var detail_target: Vector3 = cutaway_view["target"]
+	if not bool(detail_clearance.get("cutaway_view", false)) or not camera_wall_clipped:
+		_fail("chapel detail camera lacks a real camera-side wall clip for %s" % String(request["key"]))
+	await _capture(request, row, "rooms", "chapel_cutaway_altar_benches.png",
+		detail_eye, detail_target,
+		float(detail_clearance["camera_fov_degrees"]),
+		String(cutaway_view.get("purpose", "elevated chapel detail cutaway")),
+		detail_clearance)
+	await process_frame
+	cutaway_assembled.queue_free()
+	await process_frame
+
+
+func _clip_chapel_camera_side_wall(assembly: Node3D, spec: ChurchSpec,
+		chapel_index: int) -> bool:
+	var shell := assembly.get_node_or_null("Shell") as MeshInstance3D
+	if shell == null or shell.mesh == null:
+		return false
+	var stone_surface := -1
+	for surface in range(shell.mesh.get_surface_count()):
+		var surface_name: String = String(shell.mesh.surface_get_name(surface))
+		var slot := surface
+		if surface_name.begins_with("material_slot:"):
+			slot = int(surface_name.trim_prefix("material_slot:"))
+		if slot == ChurchBuilder.SURF_STONE:
+			stone_surface = surface
+			break
+	if stone_surface < 0:
+		return false
+	var angle: float = ChurchGeometry.chapel_angle(spec, chapel_index)
+	var center: Vector3 = ChurchGeometry.chapel_center(spec, chapel_index)
+	var floor_y: float = ChurchGeometry.FLOOR_LIFT - ChurchGeometry.FLOOR_T * 0.5
+	var shader := Shader.new()
+	shader.code = """shader_type spatial;
+render_mode cull_disabled;
+uniform vec3 chapel_center;
+uniform vec3 chapel_tangent;
+uniform float chapel_radius;
+uniform float chapel_floor_y;
+uniform float chapel_body_height;
+uniform vec3 stone_color;
+varying vec3 world_position;
+void vertex() {
+	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+}
+void fragment() {
+	vec3 delta = world_position - chapel_center;
+	float side = abs(dot(delta, chapel_tangent));
+	float radial = length(delta.xz);
+	bool camera_side_wall = side > chapel_radius * 0.06
+		&& radial < chapel_radius * 1.65
+		&& world_position.y > chapel_floor_y + 0.14
+		&& world_position.y < chapel_floor_y + chapel_body_height + 0.25;
+	if (camera_side_wall) discard;
+	ALBEDO = stone_color;
+	ROUGHNESS = 0.88;
+}
+"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("chapel_center", center)
+	material.set_shader_parameter("chapel_tangent",
+		Vector3(cos(angle), 0.0, -sin(angle)))
+	material.set_shader_parameter("chapel_radius", spec.chapel_radius)
+	material.set_shader_parameter("chapel_floor_y", floor_y)
+	material.set_shader_parameter("chapel_body_height",
+		ChurchGeometry.chapel_body_height(spec, chapel_index))
+	var active_material := shell.get_active_material(stone_surface) as StandardMaterial3D
+	var stone_color: Color = active_material.albedo_color if active_material != null \
+		else spec.stone_color
+	material.set_shader_parameter("stone_color", Vector3(stone_color.r,
+		stone_color.g, stone_color.b))
+	shell.set_surface_override_material(stone_surface, material)
+	return true
 
 
 func _capture(request: Dictionary, row: Dictionary, group: String, filename: String,
-		eye: Vector3, target: Vector3, fov: float, purpose: String) -> void:
+		eye: Vector3, target: Vector3, fov: float, purpose: String,
+		clearance: Dictionary = {}) -> void:
 	var relative := "%s/%s/%s/%s" % [GROUP_PATH, String(request["key"]), group, filename]
 	var absolute := ProjectSettings.globalize_path(_out + "/" + relative)
 	var folder := absolute.get_base_dir()
@@ -237,13 +318,17 @@ func _capture(request: Dictionary, row: Dictionary, group: String, filename: Str
 	if error != OK:
 		_failures.append("image save failed (%s): %s" % [error_string(error), absolute])
 	else:
+		var cutaway: bool = bool(clearance.get("cutaway_view", false))
 		row["views"].append({
 			"file": relative,
 			"purpose": purpose,
 			"camera": {"eye": _vector3_json(eye), "target": _vector3_json(target), "fov_degrees": fov},
 			"size": [VIEW_SIZE.x, VIEW_SIZE.y],
-			"roof_on": true,
+			"roof_on": not cutaway,
+			"cutaway": cutaway,
+			"camera_side_wall_clipped": bool(clearance.get("camera_side_wall_clipped", false)),
 			"actual_production_assembly": true,
+			"geometry_clearance": clearance,
 		})
 		print(relative)
 

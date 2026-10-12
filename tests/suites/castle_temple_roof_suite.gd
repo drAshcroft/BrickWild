@@ -187,7 +187,11 @@ static func _temples(res: SuiteResult) -> void:
 					and absf(_rotunda_effective_profile_radius(exact_vertex) - dome_radius) < 0.0001
 					and absf(_rotunda_effective_profile_radius(facet_midpoint) - dome_radius) < 0.0001,
 					"rotunda facet radius map must distinguish vertex radius from facet midpoint while recovering both profile radii")
-				var witness := Vector2(0.273, 0.417)
+				var annulus_inner: float = maxf(TempleGeometry.ring_radius(s) - s.column_r * 0.8, 1.0)
+				var annulus_outer: float = TempleGeometry.rotunda_outer_radius(s) + 0.45
+				var witness_radius: float = (annulus_inner + annulus_outer) * 0.5
+				var witness_angle: float = facet_step * 3.73
+				var witness := Vector2(cos(witness_angle), sin(witness_angle)) * witness_radius
 				for ix in range(1, 14):
 					for iz in range(1, 14):
 						var x: float = size.x * ((ix + 0.17) / 15.0 - 0.5)
@@ -195,7 +199,7 @@ static func _temples(res: SuiteResult) -> void:
 						var point := Vector2(x, z)
 						var hits := Probe._heights(roofs, x, z, s.height - 1, s.height + size.length())
 						Probe._expect(res, _rotunda_roof_profile_matches(s, point, hits),
-							"rotunda emitted roof does not match its exact dome/annulus profile at %s: %s" % [point, hits])
+							"rotunda emitted roof does not match its exact annulus profile at %s: %s" % [point, hits])
 				var positive := Probe._heights(roofs, witness.x, witness.y,
 					s.height - 1.0, s.height + size.length())
 				var witness_ok: bool = _rotunda_roof_profile_matches(s, witness, positive)
@@ -235,57 +239,46 @@ static func _temples(res: SuiteResult) -> void:
 				mesh = b.commit()
 				var top := TempleGeometry.roof_height(s)
 				if form == &"rotunda":
-					# The Rotunda lantern starts at the actual emitted dome apex. A
-					# lateral stone ray belongs to the old square spire and proves no
-					# Rotunda bearing. Test the full emitted circular seat instead.
+					# The Rotunda keeps its center open even when a spire is requested.
+					# Its annulus is a real roof; the optional lantern must not close
+					# the oculus or invent a dome seat.
 					var roof_triangles: Array = Probe._triangles(mesh, TempleBuilder.SURF_ROOF)
-					var lantern_radius: float = TempleGeometry.rotunda_lantern_radius(s)
-					var seat_supported := true
-					for ring in [0.0, 0.48, 0.92]:
-						for sample in range(TempleGeometry.DOME_SEGMENTS):
-							var angle: float = TAU * float(sample) / float(TempleGeometry.DOME_SEGMENTS)
-							var point: Vector2 = Vector2(cos(angle), sin(angle)) \
-								* lantern_radius * float(ring)
-							if not MeshProbe.has_upward_support(roof_triangles, point, top, 0.03):
-								seat_supported = false
+					var center_witness := Vector2(0.173, 0.239)
+					var center_hits := Probe._heights(roof_triangles, center_witness.x,
+						center_witness.y, top - 0.2, top + s.spire_height + 1.0)
 					res.checked += 1
-					Probe._expect(res, seat_supported,
-						"Rotunda spire base lacks full-footprint support on its emitted dome seat")
-					var removed_seat := MeshProbe.remove_triangles(mesh,
-						TempleBuilder.SURF_ROOF,
-						func(a: Vector3, b2: Vector3, c: Vector3) -> bool:
-							return MeshProbe.upward_triangle_contains_point([a, b2, c],
-								Vector2.ZERO, top, 0.03))
-					var without_seat: Array = Probe._triangles(
-						removed_seat.get("mesh"), TempleBuilder.SURF_ROOF)
+					Probe._expect(res, b.components("rotunda_lantern_drum").is_empty(),
+						"optional Rotunda spire emitted a lantern over the open oculus")
 					res.checked += 1
-					Probe._expect(res,
-						int(removed_seat.get("removed_triangles", 0)) > 0
-						and not MeshProbe.has_upward_support(without_seat,
+					Probe._expect(res, center_hits.is_empty()
+						and not MeshProbe.has_upward_support(roof_triangles,
 							Vector2.ZERO, top, 0.03),
-						"removed Rotunda dome-seat triangles still support the optional lantern")
+						"optional Rotunda spire closed or seated a roof over the central oculus")
 				else:
 					var walls := Probe._triangles(mesh, 0)
-					var base := TempleGeometry.hall_rect(s).size.x * TempleGeometry.SPIRE_BASE
-					var z := TempleGeometry.dais_rect(s).get_center().y
-					for side in [-1.0, 1.0]:
-						Probe._expect(res, Probe._intersects(walls, Vector3(side * (base * 0.5 + 0.1), top - 0.01, z), Vector3(side * (base * 0.5 - 0.1), top - 0.01, z)), "spire floats above %s roof" % form)
+					var bearing_rows: Array[Dictionary] = b.components("basilica_lantern_roof_bearing")
+					Probe._expect(res, bearing_rows.size() == 1,
+						"basilica lantern lacks its measured roof bearing")
+					if bearing_rows.size() == 1:
+						var bearing: AABB = MassBuilder.component_aabb(bearing_rows[0])
+						for side in [-1.0, 1.0]:
+							var face_x: float = bearing.get_center().x + side * bearing.size.x * 0.5
+							Probe._expect(res, Probe._intersects(walls,
+								Vector3(face_x + side * 0.1, top - 0.01, bearing.get_center().z),
+								Vector3(face_x - side * 0.1, top - 0.01, bearing.get_center().z)),
+								"basilica lantern bearing has no emitted wall contact")
 
 
 static func _rotunda_roof_profile_matches(spec: TempleSpec, point: Vector2,
 		actual: Array[float]) -> bool:
-	# Revolve emits a polygonal circle. Convert the point to the equivalent
+	# Revolve emits a polygonal annulus. Convert the point to the equivalent
 	# radial profile coordinate at its actual angular facet before measuring.
 	var effective_radius: float = _rotunda_effective_profile_radius(point)
-	var dome_radius: float = TempleGeometry.dome_radius(spec)
+	var inner_radius: float = maxf(TempleGeometry.ring_radius(spec) - spec.column_r * 0.8, 1.0)
 	var outer_radius: float = TempleGeometry.rotunda_outer_radius(spec) + 0.45
 	var half_depth: float = RoofShape.DEPTH * 0.5
 	var expected: Array[float] = []
-	if effective_radius <= dome_radius + 0.0001:
-		var dome_y := _rotunda_profile_height(dome_radius, effective_radius)
-		_append_unique_height(expected, spec.height + dome_y - half_depth)
-		_append_unique_height(expected, spec.height + dome_y + half_depth)
-	if effective_radius >= dome_radius - 0.08 - 0.0001 \
+	if effective_radius >= inner_radius - 0.0001 \
 			and effective_radius <= outer_radius + 0.0001:
 		_append_unique_height(expected, spec.height - half_depth)
 		_append_unique_height(expected, spec.height + half_depth)
@@ -306,21 +299,6 @@ static func _rotunda_effective_profile_radius(point: Vector2) -> float:
 	var angular_offset: float = fposmod(angle, segment_angle) - segment_angle * 0.5
 	return point.length() * cos(angular_offset) \
 		/ cos(PI / float(TempleGeometry.DOME_SEGMENTS))
-
-
-static func _rotunda_profile_height(radius: float, sample_radius: float) -> float:
-	var rise: float = radius * 0.55
-	for step in range(6):
-		var t0: float = float(step) / 6.0
-		var t1: float = float(step + 1) / 6.0
-		var r0: float = radius * cos(t0 * PI * 0.5)
-		var r1: float = radius * cos(t1 * PI * 0.5)
-		if sample_radius >= r1 - 0.0001 and sample_radius <= r0 + 0.0001:
-			var alpha: float = clampf((r0 - sample_radius) / maxf(r0 - r1, 0.0001), 0.0, 1.0)
-			var y0: float = rise * sin(t0 * PI * 0.5)
-			var y1: float = rise * sin(t1 * PI * 0.5)
-			return lerpf(y0, y1, alpha)
-	return rise
 
 
 static func _append_unique_height(values: Array[float], height: float) -> void:

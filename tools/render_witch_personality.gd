@@ -14,9 +14,12 @@ const WITCH_VIEWS: Array[String] = ["roof_on_exterior", "service_yard",
 	"workshop_eye_level", "cutaway_context"]
 const COTTAGE_VIEWS: Array[String] = ["roof_on_exterior", "service_yard",
 	"ordinary_interior_eye_level", "cutaway_context"]
+const HEAT_VIEWS: Array[String] = ["cauldron_heat_eye_level", "cauldron_heat_hidden_control",
+	"hall_cooking_heat_visible", "hall_cooking_heat_hidden_control"]
 
 var _failed := false
 var _errors: Array[String] = []
+var _heat_supplement_enabled := false
 
 
 func _init() -> void:
@@ -29,6 +32,8 @@ func _init() -> void:
 			output = String(arg).substr(4)
 		elif String(arg).begins_with("case="):
 			selected_case = String(arg).substr(5)
+		elif String(arg) == "supplement=cauldron_heat":
+			_heat_supplement_enabled = true
 	var absolute_out := ProjectSettings.globalize_path(output)
 	if DirAccess.make_dir_recursive_absolute(absolute_out) != OK:
 		printerr("Cannot create Witch render output directory: ", output)
@@ -175,6 +180,8 @@ func _render_case(plan: HousePlan, request: BuildingRequest, case_id: String,
 	rows.append(await _render_exterior(plan, request, case_id, output, scene_bounds))
 	rows.append(await _render_service_yard(plan, request, case_id, output))
 	rows.append(await _render_interior(plan, request, case_id, output))
+	if _heat_supplement_enabled and String(request.style) == "witch_hut":
+		rows.append_array(await _render_cauldron_heat(plan, request, case_id, output, roof_on))
 	roof_on.queue_free()
 	await process_frame
 	var cutaway: Node3D = HouseAssembler.build(plan, true)
@@ -188,6 +195,382 @@ func _render_case(plan: HousePlan, request: BuildingRequest, case_id: String,
 		cutaway.queue_free()
 		await process_frame
 	return rows
+
+
+## Supplemental framing for the actual indoor cauldron and its nearest workbench.
+## The paired hidden-control image changes only NativeCauldronHeat visibility.
+func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
+		case_id: String, output: String, assembled: Node3D) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	var room := _workshop_room(plan)
+	var cauldron: Dictionary = {}
+	var bench: Dictionary = {}
+	for piece in plan.furniture:
+		if int(piece.get("room", -1)) != room:
+			continue
+		if String(piece.get("key", "")) == "Cauldron":
+			cauldron = piece
+	if not cauldron.is_empty():
+		var found_cauldron_pos: Vector3 = cauldron.get("pos", Vector3.ZERO)
+		var nearest_distance := INF
+		for piece in plan.furniture:
+			if int(piece.get("room", -1)) != room \
+					or String(piece.get("cat", "")) != "workbench" \
+					or String(piece.get("activity_group", "")) != "witchwork":
+				continue
+			var piece_pos: Vector3 = piece.get("pos", Vector3.ZERO)
+			var distance := Vector2(piece_pos.x, piece_pos.z).distance_to(Vector2(found_cauldron_pos.x, found_cauldron_pos.z))
+			if distance < nearest_distance:
+				nearest_distance = distance
+				bench = piece
+	if room < 0 or cauldron.is_empty() or bench.is_empty():
+		for view in HEAT_VIEWS:
+			rows.append(_view_error(case_id, request.to_dict(), view,
+				"workshop must contain both an actual Cauldron and witchwork Workbench"))
+		return rows
+	var focus_pieces: Array[Dictionary] = [cauldron]
+	var cauldron_rect := Rect2(cauldron.get("rect", Rect2()))
+	var cauldron_pos: Vector3 = cauldron.get("pos", Vector3.ZERO)
+	var bench_pos: Vector3 = bench.get("pos", Vector3.ZERO)
+	var workbench_distance := Vector2(cauldron_pos.x, cauldron_pos.z).distance_to(Vector2(bench_pos.x, bench_pos.z))
+	var room_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var floor_y: float = HouseFurnishGeometry.storey_base(plan, room) + HouseGeometry.FLOOR_T
+	var camera := _find_eye_camera(plan, room, focus_pieces, cauldron_rect.get_center(),
+		floor_y, room_rect, {}, 2.8, true, 1.18)
+	if not bool(camera.get("body_clear", false)) or not bool(camera.get("reachable", false)):
+		for view in HEAT_VIEWS:
+			rows.append(_view_error(case_id, request.to_dict(), view,
+				"no reachable, body-clear human-height camera for the Cauldron"))
+		return rows
+	var eye: Vector3 = camera["eye"]
+	var target: Vector3 = camera["target"]
+	_cam.fov = 72.0
+	_set_camera(eye, target, atan2(target.x - eye.x, target.z - eye.z), 24.0)
+	var cue_match := _match_cauldron_heat_cue(assembled, cauldron)
+	var heat_node := cue_match.get("node") as Node3D
+	if heat_node == null or not bool(cue_match.get("matched", false)):
+		for view in HEAT_VIEWS:
+			var error_row := _view_error(case_id, request.to_dict(), view,
+				"no NativeCauldronHeat cue is within tolerance of the focused interior Cauldron")
+			error_row["heat_cue_candidates"] = cue_match.get("candidates", [])
+			error_row["heat_cue_match_tolerance_m"] = cue_match.get("tolerance_m", 0.10)
+			rows.append(error_row)
+		return rows
+	var cauldron_root := heat_node.get_parent()
+	var cauldron_body_visible := _has_visible_mesh(cauldron_root, heat_node)
+	var heat_mesh_visible := _has_visible_mesh(heat_node)
+	var cauldron_mesh_bounds := _mesh_bounds_excluding(cauldron_root, heat_node)
+	var cauldron_mesh_bounds_in_frame := _aabb_in_frame(cauldron_mesh_bounds)
+	var heat_mesh_bounds := _mesh_bounds_excluding(heat_node)
+	var heat_mesh_bounds_in_frame := _aabb_in_frame(heat_mesh_bounds)
+	var bounds_in_frame := bool(camera.get("focus_in_frame", false)) \
+		and _placement_bounds_in_frame(cauldron, floor_y) \
+		and cauldron_mesh_bounds_in_frame and heat_mesh_bounds_in_frame
+	var workbench_visible_corners := _placement_visible_corner_count(bench, floor_y)
+	var workbench_any_part_in_frame := workbench_visible_corners > 0
+	if not bounds_in_frame or not bool(camera.get("line_of_sight_clear", false)):
+		_failed = true
+		_errors.append(case_id + " cauldron supplement: framing or line-of-sight failed; focus_in_frame=" + str(camera["focus_in_frame"]) + " line_of_sight_clear=" + str(camera["line_of_sight_clear"]))
+	var base_details := {"roof_on": true, "cutaway": false, "room_index": room,
+		"room_kind": String(plan.kind_of(room)), "camera": _camera_data(eye, target,
+			"reachable 1.58 m eye camera aimed at actual Cauldron; Workbench is secondary context"),
+		"focused_placement_ids": [_placement_label(cauldron)],
+		"secondary_context_placement_id": _placement_label(bench),
+		"selected_heat_cue_path": cue_match["selected_path"],
+		"selected_heat_cue_global_position": _xyz(cue_match["cue_global_position"]),
+		"selected_heat_cue_global_pose": cue_match["cue_global_pose"],
+		"selected_heat_cue_parent_global_position": _xyz(cue_match["parent_global_position"]),
+		"expected_interior_cauldron_model_origin": cue_match["expected_model_origin"],
+		"focused_cauldron_plan_center": cue_match["expected_plan_center"],
+		"selected_heat_cue_parent_to_plan_center_distance_m": cue_match["distance_m"],
+		"heat_cue_match_tolerance_m": cue_match["tolerance_m"],
+		"heat_cue_candidates": cue_match["candidates"],
+		"heat_cue_match_state": "passed",
+		"workbench_distance_m": workbench_distance,
+		"workbench_any_part_in_frame": workbench_any_part_in_frame,
+		"workbench_any_bounds_corner_in_frame": workbench_any_part_in_frame,
+		"workbench_visible_bounds_corners": workbench_visible_corners,
+		"workbench_whole_bounds_in_frame": workbench_visible_corners == 8,
+		"camera_body_clear": camera["body_clear"], "camera_reachable": camera["reachable"],
+		"occlusion_blockers": camera["occlusion_blockers"],
+		"focus_in_frame": camera["focus_in_frame"],
+		"framing_candidate_count": camera["framing_candidate_count"],
+		"line_of_sight_clear": camera["line_of_sight_clear"],
+		"whole_prop_bounds_in_frustum": bounds_in_frame,
+		"whole_cauldron_mesh_bounds_in_frustum": cauldron_mesh_bounds_in_frame,
+		"whole_heat_cue_bounds_in_frustum": heat_mesh_bounds_in_frame,
+		"cauldron_operating_zone_xz": _rect_data(cauldron_rect), "cauldron_body_mesh_present": cauldron_body_visible}
+	var path := output.path_join(case_id + "_cauldron_heat_eye_level.jpg")
+	var lit_image := await _capture_view_image()
+	var save_error := _save_captured_image(lit_image, path)
+	var row := _view_row(case_id, request, "cauldron_heat_eye_level", path, save_error, base_details.duplicate(true))
+	if not bounds_in_frame or not cauldron_body_visible or not heat_mesh_visible:
+		_failed = true
+		_errors.append(case_id + " cauldron supplement: body, heat, or frustum acceptance failed")
+	rows.append(row)
+	heat_node.visible = false
+	var heat_hidden := not _has_visible_mesh(heat_node)
+	var control_body_visible := _has_visible_mesh(cauldron_root, heat_node)
+	var control_path := output.path_join(case_id + "_cauldron_heat_hidden_control.jpg")
+	var control_image := await _capture_view_image()
+	var control_error := _save_captured_image(control_image, control_path)
+	heat_node.visible = true
+	var image_difference := _compare_images(lit_image, control_image)
+	if not control_body_visible:
+		_failed = true
+		_errors.append(case_id + " cauldron supplement: Cauldron body disappeared with heat node hidden")
+	if not heat_hidden:
+		_failed = true
+		_errors.append(case_id + " cauldron supplement: hiding NativeCauldronHeat left a visible heat mesh")
+	if bool(image_difference.get("identical", true)):
+		_failed = true
+		_errors.append(case_id + " cauldron supplement: hidden-heat image is pixel-identical to the lit image")
+	var control_details := base_details.duplicate(true)
+	control_details["negative_control"] = {"mutation": "NativeCauldronHeat.visible = false",
+		"heat_hidden_during_capture": heat_hidden,
+		"cauldron_body_mesh_present": control_body_visible,
+		"image_difference": image_difference,
+		"image_difference_state": "passed" if not bool(image_difference.get("identical", true)) else "failed",
+		"expected": "pot remains visible; ember bed and flame cue disappear"}
+	rows.append(_view_row(case_id, request, "cauldron_heat_hidden_control", control_path, control_error, control_details))
+	var hall_cauldron: Dictionary = {}
+	for piece in plan.furniture:
+		if String(piece.get("key", "")) == "Cauldron" \
+				and int(piece.get("room", -1)) == plan.hearth_room():
+			hall_cauldron = piece
+			break
+	var hall_match := _match_cauldron_heat_cue(assembled, hall_cauldron) \
+		if not hall_cauldron.is_empty() else {}
+	var hall_heat := hall_match.get("node") as Node3D
+	if hall_cauldron.is_empty() or hall_heat == null or hall_heat == heat_node:
+		_failed = true
+		_errors.append(case_id + " cauldron supplement: separate Hall cooking heat cue was not found")
+		return rows
+	var hall_room := int(hall_cauldron["room"])
+	var hall_rect: Rect2 = Rect2(hall_cauldron.get("rect", Rect2()))
+	var hall_room_rect: Rect2 = HouseGeometry.room_floor_rect(plan, hall_room)
+	var hall_floor_y: float = HouseFurnishGeometry.storey_base(plan, hall_room) + HouseGeometry.FLOOR_T
+	var hall_camera := _find_eye_camera(plan, hall_room, [hall_cauldron],
+		hall_rect.get_center(), hall_floor_y, hall_room_rect, {}, 2.8, true, 1.18)
+	if not bool(hall_camera.get("body_clear", false)) or not bool(hall_camera.get("reachable", false)):
+		_failed = true
+		_errors.append(case_id + " cauldron supplement: no reachable human-height Hall cooking camera")
+		return rows
+	var hall_eye: Vector3 = hall_camera["eye"]
+	var hall_target: Vector3 = hall_camera["target"]
+	_set_camera(hall_eye, hall_target, atan2(hall_target.x - hall_eye.x,
+		hall_target.z - hall_eye.z), 24.0)
+	var hall_body := hall_heat.get_parent()
+	var hall_bounds := _mesh_bounds_excluding(hall_body, hall_heat)
+	var hall_in_frame := bool(hall_camera.get("focus_in_frame", false)) \
+		and _placement_bounds_in_frame(hall_cauldron, hall_floor_y) \
+		and _aabb_in_frame(hall_bounds) and _has_visible_mesh(hall_body, hall_heat)
+	if not hall_in_frame or not _has_visible_mesh(hall_heat):
+		_failed = true
+		_errors.append(case_id + " cauldron supplement: Hall cooking flame is not visibly framed")
+	var hall_lit := await _capture_view_image()
+	var hall_lit_path := output.path_join(case_id + "_hall_cooking_heat_visible.jpg")
+	var hall_lit_error := _save_captured_image(hall_lit, hall_lit_path)
+	rows.append(_view_row(case_id, request, "hall_cooking_heat_visible", hall_lit_path,
+		hall_lit_error, {"room_index": hall_room,
+		"focused_placement_ids": [_placement_label(hall_cauldron)],
+		"camera": _camera_data(hall_eye, hall_target, "reachable human-height Hall cooking Cauldron"),
+		"whole_prop_bounds_in_frustum": hall_in_frame,
+		"hall_heat_mesh_visible": _has_visible_mesh(hall_heat),
+		"separate_from_witchwork_station": true}))
+	# Keep the Hall camera fixed. Verify that the Workshop cue is the only node
+	# toggled and the separate Hall cooking flame remains visible. Full-frame
+	# image diffs are unstable across successive SubViewport captures.
+	heat_node.visible = false
+	var hall_control_visible := _has_visible_mesh(hall_heat)
+	var workshop_hidden_for_hall := not heat_node.visible
+	var hall_control := await _capture_view_image()
+	var hall_control_path := output.path_join(case_id + "_hall_cooking_heat_hidden_control.jpg")
+	var hall_control_error := _save_captured_image(hall_control, hall_control_path)
+	var hall_difference := _compare_images(hall_lit, hall_control)
+	heat_node.visible = true
+	var workshop_restored := heat_node.visible and _has_visible_mesh(heat_node)
+	var hall_visual_unchanged := hall_control_visible and workshop_hidden_for_hall and workshop_restored
+	if not hall_control_visible or not workshop_hidden_for_hall or not workshop_restored:
+		_failed = true
+		_errors.append(case_id + " cauldron supplement: hiding Workshop heat changed or hid the Hall cooking flame")
+	rows.append(_view_row(case_id, request, "hall_cooking_heat_hidden_control", hall_control_path,
+		hall_control_error, {"room_index": hall_room,
+		"focused_placement_ids": [_placement_label(hall_cauldron)],
+		"camera": _camera_data(hall_eye, hall_target, "same Hall camera with only Workshop heat hidden"),
+		"hall_heat_mesh_visible": hall_control_visible,
+		"workshop_heat_hidden": workshop_hidden_for_hall,
+		"workshop_heat_restored": workshop_restored,
+		"image_difference": hall_difference,
+		"image_visual_unchanged": hall_visual_unchanged,
+		"negative_control_state": "passed" if hall_control_visible and workshop_hidden_for_hall and hall_visual_unchanged else "failed"}))
+	return rows
+
+
+func _images_visually_unchanged(difference: Dictionary) -> bool:
+	if not bool(difference.get("valid", false)):
+		return false
+	var width := int(difference.get("width", 0))
+	var height := int(difference.get("height", 0))
+	if width <= 0 or height <= 0:
+		return false
+	var max_channel := int(difference.get("max_channel_difference", 255))
+	var average_channel := float(difference.get("absolute_rgb_difference", 1e20)) \
+		/ float(width * height * 3)
+	# Subviewport captures can differ by a few quantization levels across frames.
+	return max_channel <= 5 and average_channel <= 2.0
+
+
+func _placement_label(piece: Dictionary) -> String:
+	var pos: Vector3 = piece.get("pos", Vector3.ZERO)
+	return "%s|room=%d|x=%.3f|z=%.3f" % [String(piece.get("key", "")), int(piece.get("room", -1)), pos.x, pos.z]
+
+
+func _match_cauldron_heat_cue(assembled: Node3D, placement: Dictionary) -> Dictionary:
+	const MATCH_TOLERANCE_M := 0.10
+	var expected_origin: Vector3 = PropCatalog.house_origin(placement)
+	var expected_plan_center: Vector3 = placement.get("pos", Vector3.ZERO)
+	var key := String(placement.get("key", "Cauldron"))
+	var model_yaw := float(placement.get("yaw", 0.0)) + PropCatalog.face_offset(key)
+	var placement_scale := float(placement.get("scale", 1.0))
+	var cue_nodes: Array[Node3D] = []
+	_collect_heat_cue_nodes(assembled, cue_nodes)
+	var candidates: Array[Dictionary] = []
+	var selected: Node3D = null
+	var selected_parent_position := Vector3.ZERO
+	var selected_cue_position := Vector3.ZERO
+	var selected_cue_pose := {}
+	var selected_distance := INF
+	var selected_path := ""
+	for cue in cue_nodes:
+		var parent := cue.get_parent() as Node3D
+		if parent == null:
+			continue
+		var parent_position := parent.global_position
+		var origin_distance := Vector2(parent_position.x - expected_origin.x,
+			parent_position.z - expected_origin.z).length()
+		var parent_plan_center := PropCatalog.plan_centre(key, parent_position, model_yaw, placement_scale)
+		var plan_center_distance := parent_plan_center.distance_to(Vector2(expected_plan_center.x, expected_plan_center.z))
+		var under_furniture := _has_ancestor_named(cue, "Furniture")
+		var record := {"node_path": str(cue.get_path()),
+			"cue_global_position": _xyz(cue.global_position),
+			"cue_global_pose": _node_pose(cue),
+			"parent_global_position": _xyz(parent_position),
+			"parent_to_expected_model_origin_m": origin_distance,
+			"parent_derived_plan_center": [parent_plan_center.x, parent_plan_center.y],
+			"parent_derived_plan_center_distance_m": plan_center_distance,
+			"under_furniture": under_furniture,
+			"eligible": under_furniture and origin_distance <= MATCH_TOLERANCE_M
+				and plan_center_distance <= MATCH_TOLERANCE_M}
+		candidates.append(record)
+		if under_furniture and origin_distance <= MATCH_TOLERANCE_M \
+				and plan_center_distance < selected_distance:
+			selected = cue
+			selected_parent_position = parent_position
+			selected_cue_position = cue.global_position
+			selected_cue_pose = _node_pose(cue)
+			selected_distance = plan_center_distance
+			selected_path = str(cue.get_path())
+	return {"node": selected,
+		"matched": selected != null and selected_distance <= MATCH_TOLERANCE_M,
+		"selected_path": selected_path,
+		"parent_global_position": selected_parent_position,
+		"cue_global_position": selected_cue_position,
+		"cue_global_pose": selected_cue_pose,
+		"distance_m": selected_distance,
+		"tolerance_m": MATCH_TOLERANCE_M,
+		"expected_model_origin": _xyz(expected_origin),
+		"expected_plan_center": [expected_plan_center.x, expected_plan_center.z],
+		"candidates": candidates}
+
+
+func _collect_heat_cue_nodes(node: Node, out: Array[Node3D]) -> void:
+	if node is Node3D and String(node.name) == "NativeCauldronHeat":
+		out.append(node as Node3D)
+	for child in node.get_children():
+		_collect_heat_cue_nodes(child, out)
+
+
+func _has_ancestor_named(node: Node, ancestor_name: String) -> bool:
+	var parent := node.get_parent()
+	while parent != null:
+		if String(parent.name) == ancestor_name:
+			return true
+		parent = parent.get_parent()
+	return false
+
+
+func _node_pose(node: Node3D) -> Dictionary:
+	return {"position": _xyz(node.global_position),
+		"rotation_radians": _xyz(node.global_rotation),
+		"scale": _xyz(node.global_basis.get_scale())}
+
+
+func _placement_bounds_in_frame(piece: Dictionary, floor_y: float) -> bool:
+	return _placement_visible_corner_count(piece, floor_y) == 8
+
+
+func _placement_visible_corner_count(piece: Dictionary, floor_y: float) -> int:
+	var rect := Rect2(piece.get("rect", Rect2()))
+	if not rect.has_area():
+		return 0
+	var height := maxf(PropCatalog.placement_height(piece), 0.25)
+	var y0 := floor_y + PropCatalog.floor_offset(String(piece.get("key", "")))
+	var size := _vp.size
+	var visible_count := 0
+	for x in [rect.position.x, rect.end.x]:
+		for z in [rect.position.y, rect.end.y]:
+			for y in [y0, y0 + height]:
+				var point := _cam.unproject_position(Vector3(x, y, z))
+				if not _cam.is_position_behind(Vector3(x, y, z)) and point.x >= 1.0 and point.y >= 1.0 and point.x < size.x - 1.0 and point.y < size.y - 1.0:
+					visible_count += 1
+	return visible_count
+
+
+func _aabb_in_frame(bounds: AABB) -> bool:
+	if bounds.size == Vector3.ZERO:
+		return false
+	var size := _vp.size
+	for ix in 2:
+		for iy in 2:
+			for iz in 2:
+				var point_3d := bounds.position + Vector3(
+					bounds.size.x * float(ix), bounds.size.y * float(iy), bounds.size.z * float(iz))
+				var point_2d := _cam.unproject_position(point_3d)
+				if _cam.is_position_behind(point_3d) or point_2d.x < 1.0 or point_2d.y < 1.0 \
+						or point_2d.x >= size.x - 1.0 or point_2d.y >= size.y - 1.0:
+					return false
+	return true
+
+
+func _mesh_bounds_excluding(node: Node, excluded: Node = null) -> AABB:
+	if node == null or node == excluded:
+		return AABB()
+	var result := AABB()
+	var found := false
+	if node is MeshInstance3D:
+		var mesh_node := node as MeshInstance3D
+		if mesh_node.mesh != null and mesh_node.is_visible_in_tree():
+			result = mesh_node.global_transform * mesh_node.mesh.get_aabb()
+			found = result.size != Vector3.ZERO
+	for child in node.get_children():
+		var child_bounds := _mesh_bounds_excluding(child, excluded)
+		if child_bounds.size == Vector3.ZERO:
+			continue
+		result = child_bounds if not found else result.merge(child_bounds)
+		found = true
+	return result if found else AABB()
+
+
+func _has_visible_mesh(node: Node, excluded: Node = null) -> bool:
+	if node == null or node == excluded:
+		return false
+	if node is MeshInstance3D and (node as MeshInstance3D).is_visible_in_tree():
+		return true
+	for child in node.get_children():
+		if _has_visible_mesh(child, excluded):
+			return true
+	return false
 
 
 func _render_exterior(plan: HousePlan, request: BuildingRequest, case_id: String,
@@ -367,7 +750,9 @@ func _set_camera(eye: Vector3, target: Vector3, yaw: float, reach: float) -> voi
 
 
 func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
-		anchor: Vector2, floor_y: float, room_rect: Rect2, station: Dictionary = {}) -> Dictionary:
+		anchor: Vector2, floor_y: float, room_rect: Rect2, station: Dictionary = {},
+		preferred_distance: float = 2.8, require_focus_in_frame: bool = false,
+		focus_target_height: float = -1.0) -> Dictionary:
 	var nav := HouseNavCheck.new()
 	nav.check(plan)
 	var grid: WalkGrid = nav._grids.get(plan.storey_of_room(room))
@@ -378,6 +763,9 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 	var best_eye := Vector3(room_rect.get_center().x, floor_y + 1.58, room_rect.get_center().y)
 	var blocker_best := 999
 	var candidate_count := 0
+	var framing_candidate_count := 0
+	var best_focus_in_frame := false
+	var best_line_of_sight_clear := false
 	var min_x := room_rect.position.x + half_body.x + 0.08
 	var max_x := room_rect.end.x - half_body.x - 0.08
 	var min_z := room_rect.position.y + half_body.y + 0.08
@@ -415,7 +803,24 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 							blockers += 1
 					if breast_rect.has_area() and _segment_intersects_rect(candidate, anchor, breast_rect):
 						blockers += 1
-					var score := float(blockers) * 100.0 + absf(distance - 2.8)
+					var candidate_eye := Vector3(candidate.x, floor_y + 1.58, candidate.y)
+					var target_height := focus_target_height if focus_target_height >= 0.0 else (1.18 if not station.is_empty() else 0.95)
+					var candidate_target := Vector3(anchor.x, floor_y + target_height, anchor.y)
+					var focus_in_frame := true
+					if require_focus_in_frame:
+						for focus_piece in pieces:
+							if not _placement_visible_from_camera(focus_piece, floor_y,
+									candidate_eye, candidate_target, 72.0):
+								focus_in_frame = false
+								break
+						if focus_in_frame:
+							framing_candidate_count += 1
+					var score := float(blockers) * 100.0 + absf(distance - preferred_distance)
+					var line_of_sight_clear := blockers == 0
+					if require_focus_in_frame and not focus_in_frame:
+						score += 1000000.0
+					if require_focus_in_frame and not line_of_sight_clear:
+						score += 100000.0
 					if not station.is_empty():
 						var facing: Vector2 = HouseFurnishScore._facing_of(float(station.get("yaw", 0.0)))
 						var front_amount := (candidate - anchor).normalized().dot(facing)
@@ -424,11 +829,40 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 						score += (1.0 - diagonal_amount) * 2.6
 					if score < best_score:
 						best_score = score
-						best_eye = Vector3(candidate.x, floor_y + 1.58, candidate.y)
+						best_eye = candidate_eye
+						best_focus_in_frame = focus_in_frame
+						best_line_of_sight_clear = line_of_sight_clear
 						blocker_best = blockers
-	var target := Vector3(anchor.x, floor_y + (1.18 if not station.is_empty() else 0.95), anchor.y)
+	var target_height := focus_target_height if focus_target_height >= 0.0 else (1.18 if not station.is_empty() else 0.95)
+	var target := Vector3(anchor.x, floor_y + target_height, anchor.y)
 	return {"eye": best_eye, "target": target, "body_clear": candidate_count > 0,
-		"reachable": candidate_count > 0, "occlusion_blockers": blocker_best, "candidate_count": candidate_count}
+		"reachable": candidate_count > 0, "occlusion_blockers": blocker_best,
+		"candidate_count": candidate_count, "focus_in_frame": best_focus_in_frame,
+		"framing_candidate_count": framing_candidate_count,
+		"line_of_sight_clear": best_line_of_sight_clear}
+
+
+func _placement_visible_from_camera(piece: Dictionary, floor_y: float,
+		eye: Vector3, target: Vector3, fov_degrees: float) -> bool:
+	var rect := Rect2(piece.get("rect", Rect2()))
+	if not rect.has_area():
+		return false
+	var height := maxf(PropCatalog.placement_height(piece), 0.25)
+	var y0 := floor_y + PropCatalog.floor_offset(String(piece.get("key", "")))
+	var forward := (target - eye).normalized()
+	var right := forward.cross(Vector3.UP).normalized()
+	var up := right.cross(forward).normalized()
+	var tan_vertical := tan(deg_to_rad(fov_degrees * 0.5))
+	var tan_horizontal := tan_vertical * float(_vp.size.x) / maxf(float(_vp.size.y), 1.0)
+	for x in [rect.position.x, rect.end.x]:
+		for z in [rect.position.y, rect.end.y]:
+			for y in [y0, y0 + height]:
+				var relative := Vector3(x, y, z) - eye
+				var depth := relative.dot(forward)
+				if depth <= 0.05 or absf(relative.dot(right)) > depth * tan_horizontal \
+						or absf(relative.dot(up)) > depth * tan_vertical:
+					return false
+	return true
 
 
 ## Floor textiles are walkable. Raised and wall-mounted bodies matter only
@@ -592,6 +1026,8 @@ func _required_views(case_id: String) -> Array[String]:
 	var out: Array[String] = []
 	for view in source:
 		out.append(view)
+	if _heat_supplement_enabled and not case_id.begins_with("control_cottage"):
+		out.append_array(HEAT_VIEWS)
 	return out
 
 
@@ -642,12 +1078,54 @@ func _aabb_data(bounds: AABB) -> Array[float]:
 
 
 func _save_image(path: String) -> Error:
+	var image: Image = await _capture_view_image()
+	return _save_captured_image(image, path)
+
+
+func _capture_view_image() -> Image:
 	await process_frame
 	await RenderingServer.frame_post_draw
 	await process_frame
 	await RenderingServer.frame_post_draw
-	var image: Image = _vp.get_texture().get_image()
+	return _vp.get_texture().get_image()
+
+
+func _save_captured_image(image: Image, path: String) -> Error:
 	return image.save_jpg(ProjectSettings.globalize_path(path), 0.94)
+
+
+func _compare_images(first: Image, second: Image) -> Dictionary:
+	if first == null or second == null or first.is_empty() or second.is_empty() \
+			or first.get_width() != second.get_width() or first.get_height() != second.get_height():
+		return {"valid": false, "identical": true, "changed_pixel_count": 0,
+			"absolute_rgb_difference": 0}
+	var first_rgba: Image = first.duplicate()
+	var second_rgba: Image = second.duplicate()
+	first_rgba.convert(Image.FORMAT_RGBA8)
+	second_rgba.convert(Image.FORMAT_RGBA8)
+	var first_bytes := first_rgba.get_data()
+	var second_bytes := second_rgba.get_data()
+	if first_bytes.size() != second_bytes.size() or first_bytes.size() % 4 != 0:
+		return {"valid": false, "identical": true, "changed_pixel_count": 0,
+			"absolute_rgb_difference": 0}
+	var changed_pixel_count := 0
+	var absolute_rgb_difference := 0
+	var max_channel_difference := 0
+	for offset in range(0, first_bytes.size(), 4):
+		var pixel_changed := false
+		for channel in 3:
+			var difference := absi(int(first_bytes[offset + channel]) - int(second_bytes[offset + channel]))
+			if difference > 0:
+				pixel_changed = true
+				absolute_rgb_difference += difference
+				max_channel_difference = maxi(max_channel_difference, difference)
+		if pixel_changed:
+			changed_pixel_count += 1
+	return {"valid": true, "identical": changed_pixel_count == 0,
+		"changed_pixel_count": changed_pixel_count,
+		"absolute_rgb_difference": absolute_rgb_difference,
+		"max_channel_difference": max_channel_difference,
+		"width": first.get_width(), "height": first.get_height()}
 
 
 func _load_cases() -> Array[Dictionary]:

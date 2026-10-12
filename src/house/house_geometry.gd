@@ -790,8 +790,9 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 	var ridge_half := ridge_half_for(s, span, along, plan.world_family)
 	var roof: Array[PackedVector3Array]
 	if uses_witch_asymmetric_roof(s, plan.world_family):
-		# Preserve the structural off-axis ridge and cut only its end planes. The
-		# bay remains joined to the measured side planes; no room or roof type changes.
+		# Preserve the structural off-axis ridge. A measured Witch gable keeps
+		# its full end planes; a genuinely selected half-hip retains its clipped
+		# shoulder planes. The bay still joins the measured side planes.
 		ridge_x = witch_ridge_x(plan, full_span)
 		if uses_witch_half_hip_roof(s, plan.world_family):
 			roof = RoofShape.asymmetric_half_hip(full_span, full_along, rise,
@@ -1160,6 +1161,8 @@ static func roof_opening_rejections(plan: HousePlan) -> Array[Dictionary]:
 ## Actual hearth-wall position shared by the chimney and roof attachments.
 const BREAST_DEPTH := 0.5
 const DOMESTIC_FIREPLACE_BREAST_WIDTH := 1.08
+const DOMESTIC_FIREPLACE_MAX_WIDTH := 1.90
+const DOMESTIC_FIREPLACE_DEPTH := 0.72
 
 ## A structural surround authored alongside the actual hearth placement.
 ## Its outline keeps diagonal walls honest; rect is only the broad-phase bound.
@@ -1183,15 +1186,16 @@ static func breast_for_hearth(plan: HousePlan, room: int, item: Dictionary, wall
 ## The opening is derived from this width by HouseBuilder, so planning and emitted
 ## masonry share one measured envelope.
 static func breast_for_domestic_fireplace(plan: HousePlan, room: int, wall: int) -> Dictionary:
-	var width: float = DOMESTIC_FIREPLACE_BREAST_WIDTH
 	var walls: Array[Dictionary] = room_walls(plan, room)
-	if wall < 0 or wall >= walls.size() or width <= 0.0:
+	if wall < 0 or wall >= walls.size():
 		return {}
 	var host: Dictionary = walls[wall]
 	var normal: Vector2 = host["normal"]
 	var along: Vector2 = (Vector2(host["to"]) - Vector2(host["from"])).normalized()
 	var span: Vector2 = HousePlanFeatures.clear_wall_span(plan, room, wall)
-	if span.y - span.x < width + 0.10:
+	var span_length: float = span.y - span.x
+	var width: float = minf(DOMESTIC_FIREPLACE_MAX_WIDTH, span_length - 0.10)
+	if width < DOMESTIC_FIREPLACE_BREAST_WIDTH:
 		return {}
 	var along_coordinate := (span.x + span.y) * 0.5
 	var start: Vector2 = host["from"]
@@ -1201,13 +1205,15 @@ static func breast_for_domestic_fireplace(plan: HousePlan, room: int, wall: int)
 		return {}
 	var axis_start := start.x if absf(normal.y) > 0.5 else start.y
 	var wall_point := start.lerp(finish, (along_coordinate - axis_start) / axis_delta)
-	var centre: Vector2 = wall_point + normal * (BREAST_DEPTH * 0.5)
-	var outline := PackedVector2Array([centre - along * width * 0.5 - normal * BREAST_DEPTH * 0.5,
-		centre + along * width * 0.5 - normal * BREAST_DEPTH * 0.5,
-		centre + along * width * 0.5 + normal * BREAST_DEPTH * 0.5,
-		centre - along * width * 0.5 + normal * BREAST_DEPTH * 0.5])
+	var depth := DOMESTIC_FIREPLACE_DEPTH
+	var centre: Vector2 = wall_point + normal * (depth * 0.5)
+	var outline := PackedVector2Array([centre - along * width * 0.5 - normal * depth * 0.5,
+		centre + along * width * 0.5 - normal * depth * 0.5,
+		centre + along * width * 0.5 + normal * depth * 0.5,
+		centre - along * width * 0.5 + normal * depth * 0.5])
 	return {"room": room, "storey": plan.storey_of_room(room), "wall": wall,
-		"centre": centre, "normal": normal, "width": width, "depth": BREAST_DEPTH,
+		"centre": centre, "normal": normal, "width": width, "depth": depth,
+		"clear_wall_span": span_length,
 		"outline": outline, "rect": Poly.bounding_rect(outline),
 		"yaw": HouseFurnishGeometry.yaw_facing(normal)}
 

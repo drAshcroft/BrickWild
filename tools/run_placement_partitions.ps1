@@ -28,13 +28,18 @@ function Get-SourceFingerprint {
     $files.Add((Join-Path $workspace 'tools/placement_partition_driver.gd'))
     $rows = [System.Collections.Generic.List[string]]::new()
     foreach ($path in @($files | Sort-Object -Unique)) {
-        $rel = [IO.Path]::GetRelativePath($workspace, $path).Replace('\', '/')
+        $prefix = $workspace.TrimEnd('\') + '\'
+        if (-not $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Fingerprint path is outside workspace: $path"
+        }
+        $rel = $path.Substring($prefix.Length).Replace('\', '/')
         $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
         $rows.Add("$rel`t$hash")
     }
     $bytes = [Text.Encoding]::UTF8.GetBytes(($rows -join "`n"))
-    $sha = [Security.Cryptography.SHA256]::HashData($bytes)
-    return [Convert]::ToHexString($sha).ToLowerInvariant()
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() }
+    finally { $sha.Dispose() }
 }
 
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
@@ -69,6 +74,8 @@ foreach ($partition in $partitions) {
     $start.CreateNoWindow = $true
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
+    $start.EnvironmentVariables['APPDATA'] = Join-Path $workspace 'artifacts/townhouse_office/qa_tmp/Roaming'
+    $start.EnvironmentVariables['LOCALAPPDATA'] = Join-Path $workspace 'artifacts/townhouse_office/qa_tmp/Local'
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $start
     $timer = [Diagnostics.Stopwatch]::StartNew()

@@ -64,6 +64,19 @@ func _check_ordinary(style: StringName, size: Dictionary) -> void:
 				continue
 			var body := Rect2(furniture.get("rect", Rect2()))
 			_expect(not patch.intersects(body, true), where + ": tending patch overlaps furniture body")
+		var breast := HouseGeometry.hearth_breast(plan)
+		if not breast.is_empty():
+			var normal: Vector2 = breast["normal"]
+			# A standing-body rectangle must fit in the owned patch and remain
+			# 80 mm clear of the actual breast face.
+			var body_size := Vector2(0.48, 0.40) if absf(normal.x) > 0.5 else Vector2(0.40, 0.48)
+			var body_rect := Rect2(patch.get_center() - body_size * 0.5, body_size)
+			var face_center: Vector2 = Vector2(breast["centre"]) + normal * (float(breast["depth"]) * 0.5)
+			var half_depth: float = (body_size.x * absf(normal.x) + body_size.y * absf(normal.y)) * 0.5
+			var nearest_body: Vector2 = body_rect.get_center() - normal * half_depth
+			var face_gap: float = (nearest_body - face_center).dot(normal)
+			_expect(patch.encloses(body_rect), where + ": standing body does not fit in the tending patch")
+			_expect(face_gap >= 0.08, where + ": standing body lacks 80 mm clearance from the measured breast face")
 	var workbenches := 0
 	var pots := 0
 	for i in plan.furniture.size():

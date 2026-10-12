@@ -32,9 +32,194 @@ static func run() -> SuiteResult:
 static func run_quick() -> SuiteResult:
 	var res := SuiteResult.new("dressing (quick)")
 	_churches(res, true)
+	_gothic_chevet(res)
 	_castles(res, true)
 	_negative_control(res)
 	return res
+
+
+## A real generated Gothic ambulatory case. The checks use the same catalogue
+## measurements as the furnisher, then confirm ChurchAssembler instantiates
+## those exact positions through the ordinary production path.
+static func _gothic_chevet(res: SuiteResult) -> void:
+	var spec := ChurchSpec.new()
+	spec.style = &"gothic"
+	spec.width = 12.0
+	spec.length = 80.0
+	spec.height = 24.0
+	ChurchGenerator.generate(spec, 5001)
+	var label := "Gothic chevet seed %d" % spec.seed
+	if not ChurchGeometry.has_gothic_chevet_roof(spec) or spec.radiating_chapels <= 0:
+		res.checked += 1
+		res.fail("%s no longer generates a Gothic chevet" % label)
+		return
+	var builder := ChurchBuilder.new()
+	builder.build(spec)
+	var chapel_rows: Array = []
+	for row in builder.prop_log:
+		if row.has("chapel_index"):
+			chapel_rows.append(row)
+	var usable_radius: float = spec.chapel_radius \
+		- minf(ChurchBuilder.NAVE_WALL_T, spec.chapel_radius * 0.24) \
+		- ChurchFurnisher.CHAPEL_WALL_CLEAR
+	for chapel_index in range(spec.radiating_chapels):
+		var rows: Array = chapel_rows.filter(func(p): return int(p.chapel_index) == chapel_index)
+		_check_chapel_inventory(res, rows, chapel_index, label)
+		var angle: float = ChurchGeometry.chapel_angle(spec, chapel_index)
+		var center: Vector3 = ChurchGeometry.chapel_center(spec, chapel_index)
+		var radial := Vector3(sin(angle), 0.0, cos(angle))
+		var tangent := Vector3(cos(angle), 0.0, -sin(angle))
+		var floor_rows: Array = rows.filter(func(p): return not p.rect.size.is_zero_approx())
+		for p in floor_rows:
+			var corners: Array[Vector3] = _placement_corners(p)
+			var min_depth := INF
+			for corner in corners:
+				var delta: Vector3 = corner - center
+				var depth: float = delta.dot(radial)
+				var lateral: float = delta.dot(tangent)
+				min_depth = minf(min_depth, depth)
+				res.checked += 1
+				if depth < -0.001 or depth * depth + lateral * lateral > usable_radius * usable_radius + 0.002:
+					res.fail("%s chapel %d %s measured footprint leaves its half-disc" % [
+						label, chapel_index, String(p.key)])
+			if min_depth < ChurchFurnisher.CHAPEL_THRESHOLD_CLEAR - 0.001:
+				res.fail("%s chapel %d %s enters the physical mouth threshold" % [
+					label, chapel_index, String(p.key)])
+		# Verify the route against each bench and altar after all independent
+		# footprint measurements are available.
+		var altar_row: Dictionary = {}
+		for p in floor_rows:
+			if String(p.key) == ChurchFurnisher.ALTAR:
+				altar_row = p
+		if altar_row.is_empty():
+			res.checked += 1
+			res.fail("%s chapel %d has no floor altar" % [label, chapel_index])
+			continue
+		var altar_depth := INF
+		for corner in _placement_corners(altar_row):
+			altar_depth = minf(altar_depth, (corner - center).dot(radial))
+		_check_chapel_tabletop(res, rows, altar_row, radial, tangent,
+			chapel_index, label)
+		var route_rect := Rect2(Vector2(-ChurchFurnisher.CHAPEL_ROUTE_W * 0.5,
+			ChurchFurnisher.CHAPEL_THRESHOLD_CLEAR), Vector2(ChurchFurnisher.CHAPEL_ROUTE_W,
+			maxf(0.0, altar_depth - ChurchFurnisher.CHAPEL_THRESHOLD_CLEAR - 0.02)))
+		for p in floor_rows:
+			if String(p.key) != ChurchFurnisher.PEW:
+				continue
+			var bounds := _local_chapel_bounds(_placement_corners(p), center, radial, tangent)
+			res.checked += 1
+			if route_rect.intersects(bounds):
+				res.fail("%s chapel %d bench obstructs the central %.2f m mouth route" % [
+					label, chapel_index, ChurchFurnisher.CHAPEL_ROUTE_W])
+
+	var assembled := ChurchAssembler.build(spec, false)
+	var dressing := assembled.get_node_or_null("Dressing") as Node3D
+	res.checked += 1
+	if dressing == null:
+		res.fail("%s production assembly has no Dressing node" % label)
+	else:
+		var actual := dressing.get_children()
+		res.checked += chapel_rows.size()
+		if actual.size() < chapel_rows.size():
+			res.fail("%s assembled %d props for %d chapel placements" % [
+				label, actual.size(), chapel_rows.size()])
+		for p in chapel_rows:
+			var expected_origin: Vector3 = ShellAssembler.world_origin(p)
+			var expected_scene_path: String = PropCatalog.scene_path(String(p.key))
+			var found := false
+			for node in actual:
+				var expected_yaw: float = float(p.yaw) + PropCatalog.face_offset(String(p.key))
+				if node.scene_file_path == expected_scene_path \
+						and node.position.distance_to(expected_origin) < 0.001 \
+						and node.scale.distance_to(Vector3.ONE * float(p.scale)) < 0.001:
+					if absf(wrapf(node.rotation.y - expected_yaw, -PI, PI)) >= 0.001:
+						continue
+					found = true
+					break
+			if not found:
+				res.fail("%s %s at its measured chapel placement was not assembled" % [
+					label, String(p.key)])
+	assembled.free()
+	for row in chapel_rows:
+		var scene_path: String = PropCatalog.scene_path(String(row.key))
+		res.checked += 1
+		if not ResourceLoader.exists(scene_path):
+			res.fail("%s measured prop %s has no loadable source scene at %s" % [
+				label, String(row.key), scene_path])
+		if String(row.key) in ["CandleStick_Triple", "Chalice", "Book_Stack_1"] \
+				and not PropCatalog.has_tag(String(row.key), PropCatalog.ON_SURFACE):
+			res.checked += 1
+			res.fail("%s tabletop prop %s is not tagged for measured surface placement" % [
+				label, String(row.key)])
+
+
+static func _check_chapel_inventory(res: SuiteResult, rows: Array,
+		chapel_index: int, label: String) -> void:
+	var expected := {"Table_Large": 1, "Bench": 2, "Chalice": 1,
+		"CandleStick_Triple": 2, "Book_Stack_1": 1}
+	for key in expected:
+		var count := 0
+		for p in rows:
+			if String(p.key) == key:
+				count += 1
+		res.checked += 1
+		if count != int(expected[key]):
+			res.fail("%s chapel %d expected %d %s placements; got %d" % [
+				label, chapel_index, int(expected[key]), key, count])
+
+
+static func _check_chapel_tabletop(res: SuiteResult, rows: Array, altar: Dictionary,
+		radial: Vector3, tangent: Vector3, chapel_index: int,
+		label: String) -> void:
+	var altar_scale: float = float(altar.scale)
+	var altar_yaw: float = float(altar.yaw)
+	var altar_plan_center: Vector2 = PropCatalog.plan_centre(String(altar.key),
+		altar.pos, altar_yaw, altar_scale)
+	var altar_center := Vector3(altar_plan_center.x, float(altar.pos.y), altar_plan_center.y)
+	var top: float = altar_center.y + PropCatalog.surface_height(String(altar.key)) * altar_scale
+	var table_foot: Vector2 = PropCatalog.footprint(String(altar.key)) * altar_scale * 0.5
+	for p in rows:
+		if String(p.key) not in ["Chalice", "CandleStick_Triple", "Book_Stack_1"]:
+			continue
+		res.checked += 1
+		if absf(float(p.pos.y) - top) > 0.001:
+			res.fail("%s chapel %d %s is not at the measured altar surface height" % [
+				label, chapel_index, String(p.key)])
+		for corner in _placement_corners(p):
+			var altar_delta: Vector3 = corner - altar_center
+			if absf(altar_delta.dot(tangent)) > table_foot.x + 0.001 \
+					or absf(altar_delta.dot(radial)) > table_foot.y + 0.001:
+				res.fail("%s chapel %d %s misses its measured table top" % [
+					label, chapel_index, String(p.key)])
+
+
+static func _placement_corners(p: Dictionary) -> Array[Vector3]:
+	var key := String(p.key)
+	var scale := float(p.get("scale", 1.0))
+	var yaw := float(p.yaw)
+	var footprint: Vector2 = PropCatalog.footprint(key) * scale * 0.5
+	var local_x := Vector3(cos(yaw), 0.0, -sin(yaw))
+	var local_z := Vector3(sin(yaw), 0.0, cos(yaw))
+	var center: Vector2 = PropCatalog.plan_centre(key, p.pos, yaw, scale)
+	var out: Array[Vector3] = []
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			out.append(Vector3(center.x, p.pos.y, center.y)
+				+ local_x * (float(sx) * footprint.x)
+				+ local_z * (float(sz) * footprint.y))
+	return out
+
+
+static func _local_chapel_bounds(corners: Array[Vector3], center: Vector3,
+		radial: Vector3, tangent: Vector3) -> Rect2:
+	var low := Vector2(INF, INF)
+	var high := Vector2(-INF, -INF)
+	for corner in corners:
+		var delta: Vector3 = corner - center
+		var point := Vector2(delta.dot(tangent), delta.dot(radial))
+		low = low.min(point)
+		high = high.max(point)
+	return Rect2(low, high - low)
 
 
 static func _churches(res: SuiteResult, quick: bool) -> void:
@@ -134,6 +319,10 @@ static func _church_bounds(spec: ChurchSpec) -> Rect2:
 		var a: AABB = ChurchGeometry.apse_aabb(spec)
 		out = out.merge(Rect2(Vector2(a.position.x, a.position.z),
 			Vector2(a.size.x, a.size.z)))
+	for chapel_index in range(spec.radiating_chapels):
+		var chapel: AABB = ChurchGeometry.chapel_aabb(spec, chapel_index)
+		out = out.merge(Rect2(Vector2(chapel.position.x, chapel.position.z),
+			Vector2(chapel.size.x, chapel.size.z)))
 	if spec.tower:
 		for side in ChurchGeometry.west_tower_sides(spec):
 			var tw: AABB = ChurchGeometry.tower_aabb(spec, side)

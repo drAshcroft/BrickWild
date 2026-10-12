@@ -124,14 +124,20 @@ func _check_case(trade: StringName, label: String) -> void:
 				or not names.has("LowFlame_0") or not names.has("LowFlame_1"):
 			failures.append("%s Cauldron cue lacks embers, low flame or warmth" % label)
 			continue
+		if not names.has("FlameCore_0") or not names.has("FlameCore_1"):
+			failures.append("%s Cauldron cue lacks the inner warm flame cores" % label)
+			continue
 		var ember: MeshInstance3D = names["EmberBed"]
 		var flame: MeshInstance3D = names["LowFlame_0"]
 		var light: OmniLight3D = names["CauldronWarmth"]
 		var ember_mat := ember.material_override as StandardMaterial3D
 		var flame_mat := flame.material_override as StandardMaterial3D
+		var core_mat := (names["FlameCore_0"] as MeshInstance3D).material_override as StandardMaterial3D
 		if ember_mat == null or not ember_mat.emission_enabled \
 				or flame_mat == null or not flame_mat.emission_enabled:
 			failures.append("%s Cauldron cue is not visibly emissive" % label)
+		if core_mat == null or not core_mat.emission_enabled:
+			failures.append("%s Cauldron inner flame core is not visibly emissive" % label)
 		if light.light_energy <= 0.0 or light.omni_range < 1.0:
 			failures.append("%s Cauldron warmth does not reach its immediate work area" % label)
 		if not _check_assembled_fuel_contract(cue) == external_fuel:
@@ -214,6 +220,7 @@ func _check_assembled_heat_geometry(cue: Node3D, label: String,
 	var coal_bottom := INF
 	var coal_top := -INF
 	var flame_bottoms: Array[float] = []
+	var flame_core_bottoms: Array[float] = []
 	var lower_fuel_tops: Array[float] = []
 	var upper_fuel_bottom := INF
 	var fuel_count := 0
@@ -232,6 +239,8 @@ func _check_assembled_heat_geometry(cue: Node3D, label: String,
 				failures.append("%s floor-gap negative was accepted as a supported ember bed" % label)
 		elif String(node.name).begins_with("LowFlame_"):
 			flame_bottoms.append(world_bounds.position.y)
+		elif String(node.name).begins_with("FlameCore_"):
+			flame_core_bottoms.append(world_bounds.position.y)
 		elif String(node.name).begins_with("FuelLogLower_"):
 			fuel_count += 1
 			lower_fuel_tops.append(world_bounds.end.y)
@@ -247,12 +256,16 @@ func _check_assembled_heat_geometry(cue: Node3D, label: String,
 		if _mesh_aabb_intersects_cauldron(node.mesh.get_aabb(), mesh_xf,
 				cauldron_xf, triangles):
 			failures.append("%s actual assembled heat mesh intersects imported Cauldron triangles" % label)
-	if not is_finite(coal_bottom) or not is_finite(coal_top) or flame_bottoms.size() != 2:
+	if not is_finite(coal_bottom) or not is_finite(coal_top) \
+			or flame_bottoms.size() != 2 or flame_core_bottoms.size() != 2:
 		failures.append("%s assembled heat mesh bounds are incomplete" % label)
 		return
 	for bottom in flame_bottoms:
 		if absf(bottom - coal_top) > 0.002:
 			failures.append("%s low flame does not sit on the assembled ember bed" % label)
+	for bottom in flame_core_bottoms:
+		if absf(bottom - coal_top) > 0.002:
+			failures.append("%s inner flame core does not sit on the assembled ember bed" % label)
 	if external_fuel:
 		if fuel_count != 3 or lower_fuel_tops.size() != 2 \
 				or not is_finite(upper_fuel_bottom):

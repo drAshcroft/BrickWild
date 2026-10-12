@@ -185,8 +185,10 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 		return {}
 	var normal2: Vector2 = breast["normal"]
 	var normal := Vector3(normal2.x, 0.0, normal2.y).normalized()
-	var firebrick_height: float = opening_height * 0.90
-	var firebrick_width: float = clear_width * 0.95
+	# The backing ray identifies the actual host wall. Fill the measured aperture
+	# at this rear plane so no strip of host-wall material remains around the panel.
+	var firebrick_height: float = opening_height
+	var firebrick_width: float = clear_width
 	var soot_height: float = minf(0.42, opening_height * 0.42)
 	var soot_width: float = firebrick_width * 0.94
 	var soot_y: float = (sill + head) * 0.5
@@ -202,6 +204,11 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 	soot.name = "FireboxSoot"
 	var backing_point: Vector3 = backing["point"]
 	soot.position = backing_point + normal * (soot_depth * 0.5)
+	# The ground-floor wall uses SURF_FLOOR. Its room-facing stone course
+	# stands about 35 mm ahead of the wall backer at the hearth. Bring the
+	# refractory panel 60 mm toward the room to give the wall face clearance.
+	var firebrick_roomward_offset := 0.06
+	soot.set_meta("firebrick_roomward_offset", firebrick_roomward_offset)
 	soot.rotation.y = HouseFurnishGeometry.yaw_facing(normal2)
 	soot.set_meta("measured_backing_surface", int(backing["surface"]))
 	soot.set_meta("measured_backing_depth", soot_depth)
@@ -216,7 +223,7 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 	firebrick.name = "FirebrickRecessBack"
 	firebrick.mesh = firebrick_mesh
 	firebrick.material_override = firebrick_material
-	firebrick.position.y = 0.0
+	firebrick.position = Vector3(0.0, 0.0, -firebrick_roomward_offset)
 	soot.add_child(firebrick)
 	_add_firebrick_mortar(firebrick, firebrick_width, firebrick_height, soot_depth)
 	var soot_mesh := _feathered_soot_mesh(soot_width, soot_height)
@@ -232,7 +239,7 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 	soot_face.mesh = soot_mesh
 	soot_face.material_override = soot_material
 	# The local -Z face points toward the room after yaw_facing(normal).
-	soot_face.position.z = -soot_depth * 0.5 - 0.003
+	soot_face.position.z = -soot_depth * 0.5 - 0.003 - firebrick_roomward_offset
 	soot_face.set_meta("backing_depth", soot_depth)
 	soot.add_child(soot_face)
 
@@ -270,9 +277,12 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 	fuel.mesh = fuel_mesh
 	fuel.material_override = ember_material
 	heat.add_child(fuel)
-	var local_log_length: float = minf(clear_width * 0.60, clear_width - 0.08) / x_scale
-	var local_log_height := 0.082 / y_scale
-	var local_log_depth := 0.078 / depth_scale
+	var depth_limited_log: float = maxf(0.0, recess_depth - 0.22) \
+		/ sin(0.38) / x_scale
+	var local_log_length: float = minf(minf(clear_width * 0.72,
+		clear_width - 0.08) / x_scale, depth_limited_log)
+	var local_log_height := 0.11 / y_scale
+	var local_log_depth := 0.12 / depth_scale
 	var wood_material := StandardMaterial3D.new()
 	wood_material.albedo_color = Color.WHITE
 	wood_material.vertex_color_use_as_albedo = true
@@ -287,24 +297,34 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 		# One split length lies at the mouth, the second crosses it and rests on
 		# the first. The foreground placement keeps real timber visible below fire.
 		log.position = Vector3(0.0, fuel_height * 0.5 - log_bounds.position.y
-			+ (0.0 if index == 0 else 0.064 / y_scale),
+			+ (0.0 if index == 0 else 0.08 / y_scale),
 			(-0.035 if index == 0 else -0.006) / depth_scale)
-		log.rotation.y = -0.48 if index == 0 else 0.62
+		log.rotation.y = 0.38 if index == 0 else -0.38
 		heat.add_child(log)
 	# A second vessel is a named plan feature, distinct from the required Pot_1
 	# on the Workbench. Instantiate its real measured model only when that record
 	# exists, and support it with native iron geometry inside the measured mouth.
 	var vessel_plan: Dictionary = plan.hearth.get("cooking_vessel", {})
+	var vessel_half_width := 0.0
 	if String(vessel_plan.get("key", "")) == "Pot_1" \
 			and String(vessel_plan.get("host", "")) == "ordinary_fireplace":
-		var pot_scale: float = minf(0.72, minf(clear_width / 0.539,
-			recess_depth / 0.486) * 0.72)
-		var pot_width := 0.539 * pot_scale
-		var pot_depth := 0.486 * pot_scale
-		var trivet_radius: float = minf(pot_width, pot_depth) * 0.30
+		var head_local: float = float(heat.get_meta("opening_head_local_y"))
+		var pot_height: float = PropCatalog.height("Pot_1")
+		var pot_footprint: Vector2 = PropCatalog.footprint("Pot_1")
+		var pot_scale: float = minf(0.92, minf((clear_width - 0.03) / pot_footprint.x,
+			(recess_depth - 0.03) / pot_footprint.y))
 		var trivet_height := 0.145 / y_scale
 		var fuel_top_local := fuel_height * 0.5
 		var support_y := fuel_top_local + trivet_height
+		if pot_height > 0.001:
+			pot_scale = minf(pot_scale,
+				maxf(0.0, (head_local - support_y - 0.035) / pot_height))
+		# Keep modest side fire visible even in the tightest supported mouth.
+		pot_scale = minf(pot_scale, (clear_width * 0.76) / pot_footprint.x)
+		var pot_width := pot_footprint.x * pot_scale
+		var pot_depth := pot_footprint.y * pot_scale
+		vessel_half_width = pot_width * 0.5
+		var trivet_radius: float = minf(pot_width, pot_depth) * 0.30
 		var iron := StandardMaterial3D.new()
 		iron.albedo_color = Color(0.075, 0.085, 0.09)
 		iron.metallic = 0.55
@@ -350,6 +370,11 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 			vessel.set_meta("plan_role", "hearth_cooking")
 			vessel.set_meta("planned_key", String(vessel_plan["key"]))
 			vessel.set_meta("support_node", "HearthIronTripod/TrivetSupportRing")
+			var pot_material := StandardMaterial3D.new()
+			pot_material.albedo_color = Color(0.105, 0.095, 0.082)
+			pot_material.metallic = 0.32
+			pot_material.roughness = 0.78
+			_set_model_material(vessel, pot_material)
 			heat.add_child(vessel)
 	var flame_material := StandardMaterial3D.new()
 	flame_material.albedo_color = Color.WHITE
@@ -365,12 +390,13 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 	flame_tip_material.emission = Color(1.0, 0.42, 0.06)
 	flame_tip_material.emission_energy_multiplier = 0.32
 	flame_tip_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var flame_height: float = minf(0.27, opening_height * 0.30) / y_scale
-	var flame_height_fractions: Array[float] = [0.74, 1.0, 0.61]
-	var flame_width_fractions: Array[float] = [0.17, 0.20, 0.15]
-	var flame_x_fractions: Array[float] = [-0.20, 0.0, 0.20]
-	# Flames sit behind the crossed foreground logs and below the vessel rim.
-	var flame_z_fractions: Array[float] = [0.24, 0.30, 0.18]
+	var flame_height: float = minf(0.29, opening_height * 0.34) / y_scale
+	var flame_height_fractions: Array[float] = [0.82, 1.0, 0.70]
+	var flame_width_fractions: Array[float] = [0.27, 0.20, 0.27]
+	# Flames rise from the logs under the vessel. The pot occludes their rear
+	# geometry while the outer tongues remain visible around its sides.
+	var flame_x_fractions: Array[float] = [-0.26, 0.0, 0.26]
+	var flame_z_fractions: Array[float] = [0.10, 0.18, 0.07]
 	var flame_leans: Array[float] = [0.10, -0.08, 0.04]
 	for index in range(3):
 		var flame := MeshInstance3D.new()
@@ -382,7 +408,15 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 		flame.mesh = _flame_tongue_mesh(flame_width, tongue_height, flame_depth,
 			flame_leans[index] * flame_width, float(index) * 1.7)
 		flame.material_override = flame_material if index == 1 else flame_tip_material
-		flame.position = Vector3(flame_x_fractions[index] * clear_width / x_scale,
+		var flame_x: float = flame_x_fractions[index] * clear_width / x_scale
+		if index == 1 and vessel_half_width > 0.0:
+			# Keep the central tongue connected to the fire under the pot, but put
+			# its tip just outside the measured vessel silhouette. It may overlap
+			# the body volume at the base; the tip must not pierce the pot.
+			var tip_local_x: float = flame_leans[index] * flame_width \
+				+ sin(float(index) * 1.7) * flame_width * 0.1
+			flame_x = vessel_half_width + 0.012 / x_scale - tip_local_x
+		flame.position = Vector3(flame_x,
 			fuel_height * 0.5 + local_log_height - 0.012 / y_scale,
 			flame_z_fractions[index] * recess_depth / depth_scale)
 		heat.add_child(flame)
@@ -406,7 +440,234 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 		soot.free()
 		heat.free()
 		return {}
+	var lintel_top: float = lintel_xf.origin.y + lintel_size.y * 0.5
+	_add_domestic_hearth_stone_finish(hearth_node, breast, clear_width, sill, head,
+		plan, jambs, lintel)
+	_add_domestic_hearth_wood_mantel(hearth_node, breast, placement_pos,
+		clear_width, lintel_top)
 	return {"heat": heat, "soot": soot}
+
+
+## Clad only the measured room-facing breast and leave the jamb-bounded mouth
+## clear. Small course gaps and a restrained warm palette make the surround read
+## as masonry at the camera distance without creating a second structural host.
+static func _add_domestic_hearth_stone_finish(parent: Node3D, breast: Dictionary,
+		opening_width: float, sill: float, head: float, plan: HousePlan,
+		jambs: Array[Dictionary], lintel: Dictionary) -> void:
+	var width: float = float(breast.get("width", 0.0))
+	var depth: float = float(breast.get("depth", 0.0))
+	if width <= opening_width or depth <= 0.0 or head <= sill:
+		return
+	var finish := Node3D.new()
+	finish.name = "DomesticHearthStoneFinish"
+	finish.position.z = -depth * 0.5 - 0.012
+	parent.add_child(finish)
+	var side_left := Rect2(-width * 0.5, 0.0,
+		(width - opening_width) * 0.5, plan.spec.height)
+	var side_right := Rect2(opening_width * 0.5, 0.0,
+		(width - opening_width) * 0.5, plan.spec.height)
+	var foot := Rect2(-opening_width * 0.5, 0.0, opening_width, sill)
+	var crown := Rect2(-opening_width * 0.5, head,
+		opening_width, maxf(0.0, plan.spec.height - head))
+	var regions: Array[Rect2] = [side_left, side_right, foot, crown]
+	for index in range(regions.size()):
+		var region: Rect2 = regions[index]
+		_hearth_stone_mortar(finish, region, index)
+		_hearth_stone_region(finish, region)
+	# The refractory tread rests on the measured sill and meets the fuel-bed
+	# underside. Its rear edge ends at the measured breast plane.
+	var liner_depth: float = depth + 0.012
+	var floor_depth: float = liner_depth
+	var floor_mesh := BoxMesh.new()
+	floor_mesh.size = Vector3(opening_width, 0.024, floor_depth)
+	var refractory_floor := MeshInstance3D.new()
+	refractory_floor.name = "HearthRefractoryFloor"
+	refractory_floor.mesh = floor_mesh
+	var refractory_material := StandardMaterial3D.new()
+	refractory_material.albedo_color = Color(0.105, 0.055, 0.032)
+	refractory_material.roughness = 0.99
+	refractory_floor.material_override = refractory_material
+	refractory_floor.position = Vector3(0.0, sill + 0.012, floor_depth * 0.5)
+	refractory_floor.set_meta("hearth_floor", true)
+	finish.add_child(refractory_floor)
+	# Dark, warm stone in the opening returns hides the bright structural trim.
+	# The thin plates are flush to the measured jamb planes and do not narrow the mouth.
+	var reveal_material := StandardMaterial3D.new()
+	reveal_material.albedo_color = Color(0.19, 0.105, 0.065)
+	reveal_material.roughness = 0.98
+	# Finish local z=0 is just ahead of the breast front. Extend each return
+	# through the recess and end exactly at the measured back plane.
+	for side in [-1.0, 1.0]:
+		var reveal := MeshInstance3D.new()
+		var side_sign: float = float(side)
+		reveal.name = "HearthDarkRevealLeft" if side_sign < 0.0 else "HearthDarkRevealRight"
+		var reveal_mesh := BoxMesh.new()
+		reveal_mesh.size = Vector3(0.002, maxf(0.02, head - sill), liner_depth)
+		reveal.mesh = reveal_mesh
+		reveal.material_override = reveal_material
+		reveal.position = Vector3(side_sign * (opening_width * 0.5 + 0.001),
+			(sill + head) * 0.5, liner_depth * 0.5)
+		reveal.set_meta("hearth_reveal", true)
+		finish.add_child(reveal)
+	# The builder's white trim is a real measured component. Overlay its actual
+	# front faces with warm stone veneer, keeping the jamb clear edge and lintel
+	# underside exactly on the measured aperture planes.
+	var parent_inverse: Transform3D = parent.transform.affine_inverse()
+	var front_stone := StandardMaterial3D.new()
+	front_stone.albedo_color = Color(0.19, 0.105, 0.065)
+	front_stone.roughness = 0.98
+	for index in range(2):
+		var jamb: Dictionary = jambs[index]
+		var jamb_size: Vector3 = jamb["size"]
+		var jamb_xf: Transform3D = jamb["xf"]
+		var jamb_center: Vector3 = parent_inverse * jamb_xf.origin
+		var face := MeshInstance3D.new()
+		face.name = "HearthFrontStoneJambLeft" if index == 0 else "HearthFrontStoneJambRight"
+		var face_mesh := BoxMesh.new()
+		face_mesh.size = Vector3(jamb_size.x, jamb_size.y, 0.024)
+		face.mesh = face_mesh
+		face.material_override = front_stone
+		face.position = Vector3(jamb_center.x, jamb_center.y, -0.002)
+		face.set_meta("hearth_front_face", true)
+		finish.add_child(face)
+	var lintel_size: Vector3 = lintel["size"]
+	var lintel_xf: Transform3D = lintel["xf"]
+	var lintel_center: Vector3 = parent_inverse * lintel_xf.origin
+	var lintel_face := MeshInstance3D.new()
+	lintel_face.name = "HearthFrontStoneLintel"
+	var lintel_mesh := BoxMesh.new()
+	lintel_mesh.size = Vector3(lintel_size.x, lintel_size.y, 0.024)
+	lintel_face.mesh = lintel_mesh
+	lintel_face.material_override = front_stone
+	lintel_face.position = Vector3(lintel_center.x, lintel_center.y, -0.002)
+	lintel_face.set_meta("hearth_front_face", true)
+	finish.add_child(lintel_face)
+	var sill_finish := MeshInstance3D.new()
+	sill_finish.name = "HearthDarkRevealSill"
+	var sill_mesh := BoxMesh.new()
+	sill_mesh.size = Vector3(opening_width, 0.003, liner_depth)
+	sill_finish.mesh = sill_mesh
+	sill_finish.material_override = reveal_material
+	# Straddle the measured sill plane slightly to cover the pale structural top.
+	sill_finish.position = Vector3(0.0, sill, liner_depth * 0.5)
+	sill_finish.set_meta("hearth_reveal", true)
+	finish.add_child(sill_finish)
+
+
+static func _hearth_stone_mortar(parent: Node3D, region: Rect2, index: int) -> void:
+	if region.size.x <= 0.02 or region.size.y <= 0.02:
+		return
+	var mortar := MeshInstance3D.new()
+	mortar.name = "HearthStoneMortar_%d" % index
+	var mortar_mesh := BoxMesh.new()
+	mortar_mesh.size = Vector3(region.size.x, region.size.y, 0.006)
+	mortar.mesh = mortar_mesh
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.12, 0.075, 0.048)
+	material.roughness = 0.99
+	mortar.material_override = material
+	mortar.position = Vector3(region.get_center().x, region.get_center().y, 0.009)
+	mortar.set_meta("hearth_finish", true)
+	parent.add_child(mortar)
+
+
+static func _add_domestic_hearth_wood_mantel(parent: Node3D, breast: Dictionary,
+		placement_pos: Vector3, clear_width: float, lintel_top: float) -> void:
+	var breast_width: float = float(breast.get("width", 0.0))
+	var breast_depth: float = float(breast.get("depth", 0.0))
+	var shelf_width: float = minf(clear_width + 0.32, breast_width - 0.04)
+	if shelf_width <= clear_width or breast_depth <= 0.12:
+		return
+	var shelf_depth: float = minf(0.34, breast_depth * 0.62)
+	var shelf_height: float = 0.18
+	var corbel_height: float = 0.07
+	var shelf_bottom: float = lintel_top + corbel_height
+	var parent_inverse: Transform3D = parent.transform.affine_inverse()
+	var shelf_origin := parent_inverse * Vector3(placement_pos.x,
+		placement_pos.y + shelf_bottom + shelf_height * 0.5, placement_pos.z)
+	var mantel := Node3D.new()
+	mantel.name = "DomesticHearthWoodMantel"
+	mantel.set_meta("opening_clear_width", clear_width)
+	mantel.set_meta("shelf_bottom", shelf_bottom)
+	mantel.set_meta("support_datum", lintel_top)
+	parent.add_child(mantel)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.22, 0.105, 0.045)
+	wood.roughness = 0.88
+	var shelf := MeshInstance3D.new()
+	shelf.name = "WoodMantelShelf"
+	var shelf_mesh := BoxMesh.new()
+	shelf_mesh.size = Vector3(shelf_width, shelf_height, shelf_depth)
+	shelf.mesh = shelf_mesh
+	shelf.material_override = wood
+	shelf.position = Vector3(0.0, shelf_origin.y, -breast_depth * 0.5 - shelf_depth * 0.5)
+	shelf.set_meta("hearth_mantel", true)
+	mantel.add_child(shelf)
+	var corbel_width: float = minf(0.14, maxf(0.08, (shelf_width - clear_width) * 0.5))
+	var corbel_depth: float = minf(0.20, shelf_depth * 0.78)
+	var support_x: float = minf(clear_width * 0.34,
+		maxf(0.0, (shelf_width - corbel_width) * 0.5))
+	var corbel_center_y: float = lintel_top + corbel_height * 0.5
+	var corbel_local: Vector3 = parent_inverse * Vector3(placement_pos.x,
+		placement_pos.y + corbel_center_y, placement_pos.z)
+	for side in [-1.0, 1.0]:
+		var side_sign: float = float(side)
+		var corbel := MeshInstance3D.new()
+		corbel.name = "WoodMantelCorbelLeft" if side_sign < 0.0 else "WoodMantelCorbelRight"
+		var corbel_mesh := BoxMesh.new()
+		corbel_mesh.size = Vector3(corbel_width, corbel_height, corbel_depth)
+		corbel.mesh = corbel_mesh
+		corbel.material_override = wood
+		corbel.position = Vector3(side_sign * support_x, corbel_local.y,
+			-breast_depth * 0.5 + corbel_depth * 0.55)
+		corbel.set_meta("hearth_mantel_support", true)
+		mantel.add_child(corbel)
+
+
+static func _hearth_stone_region(parent: Node3D, region: Rect2) -> void:
+	if region.size.x <= 0.02 or region.size.y <= 0.02:
+		return
+	var columns: int = maxi(1, ceili(region.size.x / 0.38))
+	var rows: int = maxi(1, ceili(region.size.y / 0.32))
+	var gap := 0.012
+	var palette: Array[Color] = [Color(0.25, 0.16, 0.095), Color(0.29, 0.19, 0.11),
+		Color(0.22, 0.145, 0.09), Color(0.27, 0.175, 0.10)]
+	for row in range(rows):
+		var cell_h: float = region.size.y / float(rows)
+		var offset: float = region.size.x / float(columns) * (0.5 if row % 2 == 1 else 0.0)
+		for column in range(-1, columns + 1):
+			var cell_w: float = region.size.x / float(columns)
+			var raw_x0: float = region.position.x + float(column) * cell_w - offset
+			var raw_x1: float = raw_x0 + cell_w
+			var x0: float = maxf(region.position.x, raw_x0) + gap * 0.5
+			var x1: float = minf(region.end.x, raw_x1) - gap * 0.5
+			if x1 <= x0:
+				continue
+			var tile_w: float = x1 - x0
+			var tile_h: float = cell_h - gap
+			if tile_w <= 0.01 or tile_h <= 0.01:
+				continue
+			var tile := MeshInstance3D.new()
+			tile.name = "HearthStone_%d_%d" % [row, column]
+			var tile_mesh := BoxMesh.new()
+			tile_mesh.size = Vector3(tile_w, tile_h, 0.024)
+			tile.mesh = tile_mesh
+			var material := StandardMaterial3D.new()
+			material.albedo_color = palette[posmod(row * 3 + column, palette.size())]
+			material.roughness = 0.94
+			tile.material_override = material
+			tile.position = Vector3(x0 + tile_w * 0.5,
+				region.position.y + float(row) * cell_h + cell_h * 0.5, 0.0)
+			tile.set_meta("hearth_finish", true)
+			tile.set_meta("hearth_stone_tile", true)
+			parent.add_child(tile)
+
+
+static func _set_model_material(node: Node, material: Material) -> void:
+	if node is MeshInstance3D:
+		(node as MeshInstance3D).material_override = material
+	for child in node.get_children():
+		_set_model_material(child, material)
 
 
 ## Mortar joints make the measured backing read as a firebrick recess.
@@ -516,7 +777,7 @@ static func _split_firewood_mesh(length: float, height: float, depth: float,
 			var point := Vector3(x, cos(angle) * height * 0.5 * facet,
 				sin(angle) * depth * 0.5 * facet)
 			var shade: float = 0.90 + float((side + end_index) % 3) * 0.07
-			var bark_color := Color(0.47 * shade, 0.245 * shade, 0.105 * shade)
+			var bark_color := Color(0.27 * shade, 0.125 * shade, 0.045 * shade)
 			if end_index == 0:
 				ring0.append(point)
 				colours0.append(bark_color)
@@ -539,7 +800,7 @@ static func _split_firewood_mesh(length: float, height: float, depth: float,
 		var x := (-0.5 if end_index == 0 else 0.5) * length
 		var ring: PackedVector3Array = ring0 if end_index == 0 else ring1
 		var cap_normal := Vector3(-1.0 if end_index == 0 else 1.0, 0.0, 0.0)
-		var cap_color := Color(0.72, 0.49, 0.28) if end_index == 1 else Color(0.34, 0.19, 0.085)
+		var cap_color := Color(0.36, 0.19, 0.07) if end_index == 1 else Color(0.26, 0.12, 0.04)
 		for side in range(SIDES):
 			var next := (side + 1) % SIDES
 			vertices.append(Vector3(x, 0.0, 0.0))
@@ -1033,6 +1294,19 @@ static func _add_witch_cauldron_heat(parent: Node3D, placement: Dictionary, plan
 		return
 	var cue := Node3D.new()
 	cue.name = "NativeCauldronHeat"
+	var station_id := String(placement.get("heat_setting_id", ""))
+	if not station_id.is_empty():
+		var setting_matches := false
+		for setting: Dictionary in plan.heat_settings:
+			if String(setting.get("id", "")) == station_id \
+					and String(setting.get("station_id", "")) == station_id \
+					and int(setting.get("room", -1)) == int(placement.get("room", -2)):
+				setting_matches = true
+				break
+		if setting_matches:
+			cue.set_meta("heat_setting_id", station_id)
+	cue.set_meta("heat_station_room", int(placement.get("room", -1)))
+	cue.set_meta("heat_activity_group", String(placement.get("activity_group", "")))
 	parent.add_child(cue)
 	var floor_y: float = PropCatalog.floor_offset("Cauldron")
 	if not placement.has("room"):
@@ -1060,37 +1334,55 @@ static func _add_witch_cauldron_heat(parent: Node3D, placement: Dictionary, plan
 		upper.material_override = fuel_material
 		cue.add_child(upper)
 	var ember_material := StandardMaterial3D.new()
-	ember_material.albedo_color = Color(0.30, 0.055, 0.012)
+	ember_material.albedo_color = Color(0.24, 0.055, 0.018)
 	ember_material.emission_enabled = true
-	ember_material.emission = Color(1.0, 0.105, 0.012)
-	ember_material.emission_energy_multiplier = 1.8
+	ember_material.emission = Color(1.0, 0.22, 0.035)
+	ember_material.emission_energy_multiplier = 2.2
 	var coal := MeshInstance3D.new()
 	coal.name = "EmberBed"
 	var coal_mesh := CylinderMesh.new()
-	coal_mesh.top_radius = 0.052
-	coal_mesh.bottom_radius = 0.052
-	coal_mesh.height = 0.014
+	coal_mesh.top_radius = 0.082
+	coal_mesh.bottom_radius = 0.082
+	coal_mesh.height = 0.020
 	coal.mesh = coal_mesh
 	coal.position = Vector3(0.0, floor_y + coal_mesh.height * 0.5, 0.0)
 	coal.material_override = ember_material
 	cue.add_child(coal)
 	var flame_material := StandardMaterial3D.new()
-	flame_material.albedo_color = Color(0.9, 0.19, 0.025)
+	flame_material.albedo_color = Color(1.0, 0.24, 0.035)
 	flame_material.emission_enabled = true
-	flame_material.emission = Color(1.0, 0.20, 0.025)
-	flame_material.emission_energy_multiplier = 2.4
+	flame_material.emission = Color(1.0, 0.32, 0.055)
+	flame_material.emission_energy_multiplier = 3.0
 	var coal_top := floor_y + coal_mesh.height
+	var flame_core_material := StandardMaterial3D.new()
+	flame_core_material.albedo_color = Color(1.0, 0.70, 0.22)
+	flame_core_material.emission_enabled = true
+	flame_core_material.emission = Color(1.0, 0.74, 0.32)
+	flame_core_material.emission_energy_multiplier = 2.0
 	for index in range(2):
 		var flame := MeshInstance3D.new()
 		flame.name = "LowFlame_%d" % index
 		var flame_mesh := CylinderMesh.new()
-		flame_mesh.bottom_radius = 0.014 if index == 0 else 0.010
+		flame_mesh.bottom_radius = 0.028 if index == 0 else 0.025
 		flame_mesh.top_radius = 0.0
-		flame_mesh.height = 0.068 if index == 0 else 0.052
+		flame_mesh.height = 0.15 if index == 0 else 0.13
 		flame.mesh = flame_mesh
-		flame.position = Vector3(-0.022 if index == 0 else 0.024, coal_top + flame_mesh.height * 0.5, 0.0 if index == 0 else 0.018)
+		var flame_x := -0.052 if index == 0 else 0.052
+		var flame_z := -0.025 if index == 0 else -0.040
+		flame.position = Vector3(flame_x, coal_top + flame_mesh.height * 0.5, flame_z)
 		flame.material_override = flame_material
 		cue.add_child(flame)
+		var flame_core := MeshInstance3D.new()
+		flame_core.name = "FlameCore_%d" % index
+		var core_mesh := CylinderMesh.new()
+		core_mesh.bottom_radius = 0.010 if index == 0 else 0.009
+		core_mesh.top_radius = 0.0
+		core_mesh.height = 0.105 if index == 0 else 0.091
+		flame_core.mesh = core_mesh
+		var core_z := flame_z - 0.018
+		flame_core.position = Vector3(flame_x, coal_top + core_mesh.height * 0.5, core_z)
+		flame_core.material_override = flame_core_material
+		cue.add_child(flame_core)
 	var glow := OmniLight3D.new()
 	glow.name = "CauldronWarmth"
 	glow.light_color = Color(1.0, 0.24, 0.055)

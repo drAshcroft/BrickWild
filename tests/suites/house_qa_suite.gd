@@ -67,6 +67,7 @@ static func run(full: bool = false, group: StringName = &"all",
 	if _in_group(group, &"furnishing"):
 		phase_start = _phase_start("hearth fixture")
 		_hearth_fixture(res)
+		_native_hearth_qa_fixture(res)
 		_phase_end("hearth fixture", phase_start)
 		phase_start = _phase_start("hearth sweep")
 		_hearth_sweep(res, sweep_count)
@@ -581,6 +582,91 @@ static func _hearth_fixture(res: SuiteResult) -> void:
 	for f in HouseFurnishCheck.new().check(plan)["failures"]:
 		if str(f).begins_with("hearth:"):
 			res.fail("hearth fixture: a hearth on the chimney wall was reported: %s" % str(f))
+
+
+## An ordinary fireplace is part of the measured shell, not a furniture row.
+## Its flue, QA focus, and table affinity all use the same breast centre.
+static func _native_hearth_qa_fixture(res: SuiteResult) -> void:
+	var med_spec := HouseSpec.new(60006)
+	med_spec.style = &"mediterranean"
+	var med_plan := HouseGenerator.generate(med_spec, 60006)
+	var med_breast: Dictionary = HouseGeometry.hearth_breast(med_plan)
+	res.checked += 1
+	if not HouseFurnishingRecipes.uses_native_domestic_fireplace(med_plan) \
+			or med_breast.is_empty():
+		res.fail("native hearth fixture: Mediterranean plan lacks its ordinary measured host")
+		return
+	var med_spatial := HouseFurnishSpatialCheck.new()
+	med_spatial.check_hearth(med_plan)
+	if not med_spatial.failures.is_empty():
+		res.fail("native hearth fixture: a correct .72 m host was rejected: %s" % str(med_spatial.failures))
+	var saved_breast: Dictionary = med_breast.duplicate(true)
+	med_breast["wall"] = (int(med_breast["wall"]) + 1) % 4
+	var wrong_wall := HouseFurnishSpatialCheck.new()
+	wrong_wall.check_hearth(med_plan)
+	if not _contains_prefix(wrong_wall.failures,
+		"hearth: ordinary fireplace host is detached"):
+		res.fail("native hearth fixture: wrong-wall host escaped the negative")
+	var wrong_wall_focus := HouseFurnishAffinityCheck.new()
+	wrong_wall_focus.check_focus(med_plan)
+	if not _contains_prefix(wrong_wall_focus.failures, "focus: room"):
+		res.fail("native hearth fixture: wrong-wall focus escaped the negative")
+	med_breast["wall"] = saved_breast["wall"]
+	med_breast["depth"] = HouseGeometry.BREAST_DEPTH
+	var wrong_depth := HouseFurnishSpatialCheck.new()
+	wrong_depth.check_hearth(med_plan)
+	if not _contains_prefix(wrong_depth.failures,
+		"hearth: ordinary fireplace host is detached"):
+		res.fail("native hearth fixture: legacy-depth host escaped the negative")
+	var wrong_depth_focus := HouseFurnishAffinityCheck.new()
+	wrong_depth_focus.check_focus(med_plan)
+	if not _contains_prefix(wrong_depth_focus.failures, "focus: room"):
+		res.fail("native hearth fixture: legacy-depth focus escaped the negative")
+	med_plan.hearth.erase("breast")
+	var missing_host := HouseFurnishSpatialCheck.new()
+	missing_host.check_hearth(med_plan)
+	if not _contains_prefix(missing_host.failures,
+		"hearth: ordinary fireplace host is detached"):
+		res.fail("native hearth fixture: missing structural host escaped the negative")
+
+	var cottage_spec := HouseSpec.new(60000)
+	cottage_spec.style = &"cottage"
+	var cottage_plan := HouseGenerator.generate(cottage_spec, 60000)
+	var breast: Dictionary = HouseGeometry.hearth_breast(cottage_plan)
+	if breast.is_empty():
+		res.fail("native hearth fixture: cottage plan lacks its ordinary measured host")
+		return
+	var focus_check := HouseFurnishAffinityCheck.new()
+	focus_check.check_focus(cottage_plan)
+	if _contains_prefix(focus_check.failures, "focus: room"):
+		res.fail("native hearth fixture: structural fireplace was treated as missing focus")
+	var actual_focus: Vector2 = HouseFurnishAffinityCheck._planned_hearth_focus(
+		cottage_plan, cottage_plan.hearth_room())
+	var wall: Dictionary = HouseGeometry.room_walls(cottage_plan,
+		cottage_plan.hearth_room())[cottage_plan.hearth_wall()]
+	var wall_mid: Vector2 = (Vector2(wall["from"]) + Vector2(wall["to"])) * 0.5
+	res.checked += 1
+	if actual_focus.distance_to(Vector2(breast["centre"])) > 0.001 \
+			or actual_focus.distance_to(wall_mid) < 0.10:
+		res.fail("native hearth fixture: table focus did not use the measured breast instead of wall midpoint")
+	var table_check := HouseFurnishAffinityCheck.new()
+	table_check.check_table_focus(cottage_plan)
+	if _contains_prefix(table_check.failures, "table_focus:"):
+		res.fail("native hearth fixture: table focus used a stale wall-midpoint bearing: %s" % str(table_check.failures))
+	var saved_cottage: Dictionary = breast.duplicate(true)
+	cottage_plan.hearth.erase("breast")
+	var missing_focus := HouseFurnishAffinityCheck.new()
+	missing_focus.check_focus(cottage_plan)
+	if not _contains_prefix(missing_focus.failures, "focus: room"):
+		res.fail("native hearth fixture: missing-fire focus escaped the negative")
+	cottage_plan.hearth["breast"] = saved_cottage
+
+
+static func _contains_prefix(messages: Array, prefix: String) -> bool:
+	for message in messages:
+		if String(message).begins_with(prefix):
+			return true
+	return false
 
 
 ## A hearth placement stood against wall `wi` of `room`, by hand: backed onto
@@ -1404,6 +1490,25 @@ static func _fs_workbench_daylight(res: SuiteResult) -> void:
 	var c: Vector2 = _fs_against(plan, key, 1, -3.0)
 	plan.furniture = [_fs_piece(key, c)]
 	var near: float = c.distance_to(Vector2(plan.windows[0]["pos"]))
+	var daylight_candidate: bool = HouseFurnishAffinityCheck._lit_run_takes_bench(
+		plan, 0, plan.furniture[0], 0)
+	var floor_rect := HouseGeometry.room_floor_rect(plan, 0)
+	var window_wall := HouseFurnishAffinityCheck._lit_wall_of_window(plan, 0, 0)
+	var wall: Dictionary = HouseGeometry.room_walls(plan, 0)[window_wall]
+	var segment: Vector2 = Vector2(wall["to"]) - Vector2(wall["from"])
+	var along := segment.normalized()
+	var blocker := Rect2(floor_rect.get_center() - Vector2.ONE * 0.25, Vector2.ONE * 0.5)
+	if absf(along.x) > 0.5:
+		blocker = Rect2(Vector2(minf(wall["from"].x, wall["to"].x), floor_rect.position.y),
+			Vector2(segment.length(), floor_rect.size.y))
+	else:
+		blocker = Rect2(Vector2(floor_rect.position.x, minf(wall["from"].y, wall["to"].y)),
+			Vector2(floor_rect.size.x, segment.length()))
+	var blocked_candidate: bool = HouseFurnishAffinityCheck._lit_run_takes_bench(
+		plan, 0, plan.furniture[0], 0, [blocker])
+	res.checked += 1
+	if not daylight_candidate or blocked_candidate:
+		res.fail("feng shui fixture: daylight feasibility ignored a clear or fully blocked window-wall candidate")
 	_fs_expect(res, plan,
 		"workbench_daylight: %s in room 0 (workshop) works %.2fm from the nearest window, with its back to a blind wall"
 		% [key, near])
@@ -1438,6 +1543,21 @@ static func _fs_table_focus(res: SuiteResult) -> void:
 	plan.hearth = {"room": 0, "wall": 0}
 	var f: Rect2 = HouseGeometry.room_floor_rect(plan, 0)
 	plan.furniture = [_fs_piece(key, f.get_center() + Vector2(0.0, 2.0))]
+	var table_rect: Rect2 = plan.furniture[0]["rect"]
+	var offset: float = (table_rect.get_center() - f.get_center()).dot(Vector2.DOWN)
+	var open_mirror: bool = HouseFurnishAffinityCheck._fs_mirror_free(
+		plan, 0, 0, Vector2.DOWN, -offset)
+	var blocked_plan := _fs_plan(&"hall", 8104)
+	blocked_plan.hearth = {"room": 0, "wall": 0}
+	blocked_plan.furniture = [plan.furniture[0].duplicate(true)]
+	var mirror_centre := table_rect.get_center() + Vector2.DOWN * (2.0 * -offset)
+	var obstacle_key: String = PropCatalog.of_category("storage")[0]
+	blocked_plan.furniture.append(_fs_piece(obstacle_key, mirror_centre))
+	var blocked_mirror: bool = HouseFurnishAffinityCheck._fs_mirror_free(
+		blocked_plan, 0, 0, Vector2.DOWN, -offset)
+	res.checked += 1
+	if not open_mirror or blocked_mirror:
+		res.fail("feng shui fixture: table relocation did not distinguish a complete seatable slot from an obstructed one")
 	_fs_expect(res, plan,
 		"table_focus: %s in room 0 (hall) stands 2.00m on the far side of the room from the fire" % key)
 
@@ -1503,8 +1623,13 @@ static func _fs_focus_pos(res: SuiteResult) -> void:
 	plan.focus = {"room": 0, "cat": "hearth", "pos": at, "facing": 0.0,
 		"faces_door": false}
 	plan.furniture = [_fs_piece(key, _fs_against(plan, key, 0, 2.0))]
-	_fs_expect(res, plan,
-		"focus: %s in room 0 (hall) stands 2.00m from the focus the plan recorded" % key)
+	var affinity := HouseFurnishAffinityCheck.new()
+	affinity.check_focus(plan)
+	var expected := "focus: %s in room 0 (hall) stands 2.00m from the focus the plan recorded" % key
+	res.checked += 1
+	if not affinity.failures.has(expected):
+		res.fail("feng shui fixture: legacy furniture hearth lost its recorded focus; wanted %s, got %s"
+			% [expected, str(affinity.failures)])
 
 
 ## A counter with its back to the door it is supposed to serve: the plan says
@@ -1550,6 +1675,8 @@ static func _feng_shui_sweep(res: SuiteResult, count: int, full: bool) -> void:
 		spec.storeys = 1 + (n % 2)
 		var plan: HousePlan = HouseGenerator.generate(spec, 60000 + n)
 		res.checked += 1
+		if n == 15 and spec.style == &"longhall":
+			_fs_longhall_daylight_seed(plan, res)
 		var rep: Dictionary = HouseFurnishCheck.new().check(plan)
 		for f in rep["failures"]:
 			for rule in FENG_SHUI_RULES:
@@ -1574,6 +1701,30 @@ static func _feng_shui_sweep(res: SuiteResult, count: int, full: bool) -> void:
 			if not expected_seen.has(seed):
 				res.fail("expected feng shui baseline seed=%d did not reproduce; review and remove/update the baseline" % seed)
 	res.note("feng shui   %d houses, %d failures" % [count, bad])
+
+
+## Seed 60015 has no legal window-wall station once the plan's reserved floor
+## and use zones are included. Its distant workbench is therefore a warning.
+## Keep this measured reproduction beside the blocked-slot negative.
+static func _fs_longhall_daylight_seed(plan: HousePlan, res: SuiteResult) -> void:
+	var workbench_index := -1
+	for i in plan.furniture_of(0):
+		if PropCatalog.category(plan.furniture[i]["key"]) == "workbench":
+			workbench_index = i
+			break
+	res.checked += 1
+	if workbench_index < 0:
+		res.fail("feng shui fixture: seed 60015 Longhall no longer has its room-zero workbench")
+		return
+	var probe := HouseFurnishAffinityCheck.new()
+	var workbench: Dictionary = plan.furniture[workbench_index]
+	if HouseFurnishAffinityCheck._lit_run_takes_bench(plan, 0,
+		workbench, workbench_index):
+		res.fail("feng shui fixture: seed 60015 Longhall found a legal window-wall workbench pose")
+	probe.check_workbench_daylight(plan)
+	if not _contains_prefix(probe.warnings, "workbench_daylight: Workbench") \
+			or _contains_prefix(probe.failures, "workbench_daylight: Workbench"):
+		res.fail("feng shui fixture: seed 60015 should warn because no legal daylight pose exists")
 
 
 ## The furnishing rules the walk-through of 6 Oct added, each with the

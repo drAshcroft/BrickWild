@@ -44,6 +44,26 @@ func _check_witch(size: Dictionary, seed: int) -> void:
 	if plan == null:
 		_fail("%s plan did not generate" % who)
 		return
+	var generated_layout := HouseGeometry.roof_layout(plan)
+	if plan.spec.roof_type != &"gable":
+		_fail("%s built-in roof draw no longer resolves to the authored gable" % who)
+	var generated_faces: Array[PackedVector3Array] = generated_layout["faces"]
+	if generated_faces.size() != 2:
+		_fail("%s expected two asymmetric gable slope panels; got %d" % [who, generated_faces.size()])
+	else:
+		var gable_profile := RoofShape.wall_profile(generated_faces,
+			Vector2(-float(generated_layout["span"]) * 0.5, float(generated_layout["along"]) * 0.5),
+			Vector2(float(generated_layout["span"]) * 0.5, float(generated_layout["along"]) * 0.5))
+		var gable_top := -INF
+		for point in gable_profile:
+			gable_top = maxf(gable_top, point.y)
+		var underside_top: float = float(generated_layout["rise"]) - RoofShape.DEPTH * 0.5
+		if absf(gable_top - underside_top) > 0.01:
+			_fail("%s front gable wall is not full height to the roof underside: top %.3f, expected %.3f" % [who, gable_top, underside_top])
+	# Keep this suite's clipped half-hip seam and member probes as coverage for
+	# the explicitly selected Witch half-hip. The built-in archetype above now
+	# retains its authored gable for the inhabited front elevation.
+	plan.spec.roof_type = &"half_hipped"
 	var layout := HouseGeometry.roof_layout(plan)
 	var faces: Array[PackedVector3Array] = layout["faces"]
 	if not HouseGeometry.uses_witch_half_hip_roof(plan.spec, plan.world_family):

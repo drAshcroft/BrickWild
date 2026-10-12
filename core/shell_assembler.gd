@@ -82,17 +82,30 @@ static func house_materials(node: MeshInstance3D, spec: HouseSpec,
 		node.set_surface_override_material(HouseBuilder.SURF_ROOF, roof)
 		house_floor_material(node, spec)
 		return
-	# Course and tile width are the roof's own two numbers: slate is small and
-	# square, a pantile is long and narrow, a shingle or a thatch is neither.
-	# `thatch` is the shader's own flag and is the only one of the three that
-	# changes anything but the tiling.
-	var kind := spec.roof_material
-	var course: float = 0.22 if kind == &"slate" else (0.38 if kind == &"tile" else 0.30)
-	var tile_w: float = 0.30 if kind == &"slate" else (0.26 if kind == &"tile" else 0.42)
+	var appearance := house_roof_appearance(spec, world_family)
 	node.set_surface_override_material(HouseBuilder.SURF_ROOF, MaterialKit.house_roof(
-		spec.roof_color, course, tile_w, kind == &"thatch",
-		HouseGeometry.has_witch_roofcraft(spec, world_family)))
+		spec.roof_color, appearance["course"], appearance["tile_width"],
+		appearance["thatch"], appearance["witch_thatch"]))
 	house_floor_material(node, spec)
+
+
+## Resolve rendered course parameters independently from structural roof metadata.
+## The Witch keeps its thatch spec for pitch and roofcraft geometry, while its
+## built-in exterior is rendered with dark slate courses to match its target.
+static func house_roof_appearance(spec: HouseSpec,
+		world_family: StringName = &"") -> Dictionary:
+	var kind: StringName = spec.roof_material
+	var script := spec.get_script() as Script
+	var built_in_witch := spec.style == &"witch_hut" and world_family == &"" \
+		and kind != &"earth" and script != null \
+		and script.resource_path.ends_with("/src/house/house_spec.gd")
+	if built_in_witch:
+		kind = &"slate"
+	var thatch := kind == &"thatch"
+	var course: float = 0.22 if kind == &"slate" else (0.38 if kind == &"tile" else 0.30)
+	var tile_width: float = 0.30 if kind == &"slate" else (0.26 if kind == &"tile" else 0.42)
+	return {"kind": kind, "course": course, "tile_width": tile_width,
+		"thatch": thatch, "witch_thatch": thatch and HouseGeometry.has_witch_roofcraft(spec, world_family)}
 
 
 ## Textiles share the floor material slot, including stone houses. Roofing

@@ -188,7 +188,7 @@ const STYLES := {
 		"roof_pitch": [1.2, 1.7], "porch": 1.0, "chimney": 1.0, "shutters": 0.6,
 		"roof_material": &"thatch", "pitch_reference": 8.0, "pitch_exponent": 0.8,
 		"wall": ["87684b", "73563e"], "trim": ["402a1b", "2f1f14"],
-		"roof": ["806844", "675233"], "floor": ["6c6250", "51493c"],
+		"roof": ["2B3034", "1E2227"], "floor": ["6c6250", "51493c"],
 		"clutter": [0.75, 1.0],
 		"plinth": [0.25, 0.45], "roof_types": [&"gable"],
 		"framing": [&"arch_brace", &"square_panel"], "truss": [&"king_post"],

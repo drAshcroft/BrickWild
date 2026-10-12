@@ -1,7 +1,10 @@
 extends RefCounted
 
+const CUSTOM_WITCH_SPEC := preload("res://tests/fixtures/witch_custom_house_spec.gd")
+
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("house materials")
+	_check_witch_roof_visual(res)
 	for kind in [&"gable", &"half_hipped", &"hipped", &"conical"]:
 		for rotated in [false, true]:
 			var s := HouseSpec.new()
@@ -48,6 +51,36 @@ static func run() -> SuiteResult:
 			shell.free()
 	return res
 
+
+static func _check_witch_roof_visual(res: SuiteResult) -> void:
+	var witch := HouseSpec.new()
+	witch.style = &"witch_hut"
+	witch.roof_material = &"thatch"
+	var style: Dictionary = HouseSpec.STYLES[&"witch_hut"]
+	var palette: Array = style["roof"]
+	_expect(res, style["roof_material"] == &"thatch" and witch.roof_material == &"thatch",
+		"Witch style no longer retains structural thatch metadata")
+	_expect(res, palette == ["2B3034", "1E2227"], "Witch roof palette is not dark slate")
+	var visual := ShellAssembler.house_roof_appearance(witch)
+	_expect(res, witch.roof_material == &"thatch", "Witch visual roof override changed structural roof metadata")
+	_expect(res, visual["kind"] == &"slate" and is_equal_approx(visual["course"], 0.22)
+		and is_equal_approx(visual["tile_width"], 0.30) and not bool(visual["thatch"])
+		and not bool(visual["witch_thatch"]), "built-in Witch roof does not resolve to slate course material")
+	var world_witch := ShellAssembler.house_roof_appearance(witch, &"mediterranean")
+	_expect(res, world_witch["kind"] == &"thatch" and bool(world_witch["thatch"])
+		and not bool(world_witch["witch_thatch"]), "world-family Witch roof entered the slate visual override")
+	var custom := CUSTOM_WITCH_SPEC.new() as HouseSpec
+	custom.style = &"witch_hut"
+	custom.roof_material = &"thatch"
+	var custom_appearance := ShellAssembler.house_roof_appearance(custom)
+	_expect(res, custom_appearance["kind"] == &"thatch" and bool(custom_appearance["thatch"]),
+		"custom Witch-shaped spec entered the built-in slate visual override")
+	var thatch_cottage := HouseSpec.new()
+	thatch_cottage.style = &"thatch_cottage"
+	thatch_cottage.roof_material = &"thatch"
+	var ordinary_thatch := ShellAssembler.house_roof_appearance(thatch_cottage)
+	_expect(res, ordinary_thatch["kind"] == &"thatch" and bool(ordinary_thatch["thatch"])
+		and not bool(ordinary_thatch["witch_thatch"]), "ordinary thatch roof changed its shader treatment")
 
 static func _expect(res: SuiteResult, ok: bool, why: String) -> void:
 	res.checked += 1

@@ -50,6 +50,7 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 		nav_report = _furnish_room(plan, spec, i, nav_report)
 	HouseFurnishRepair.relax(plan)
 	_audit_activity_groups(plan)
+	_bind_witchwork_cauldron_heat(plan)
 	# The existing Workbench Pot remains the prep vessel. A second, explicit
 	# structural record authorizes the actual model instance suspended over the
 	# native fireplace; the assembler must not invent one from a row count.
@@ -268,13 +269,41 @@ static func _set_activity_group(piece: Dictionary, step: Dictionary) -> void:
 	var shared_groups: Array = step.get("shared_activity_groups", [])
 	if not shared_groups.is_empty():
 		piece["shared_activity_groups"] = shared_groups.duplicate()
-		piece["shared_station_id"] = String(step.get("shared_station_id", ""))
+	piece["shared_station_id"] = String(step.get("shared_station_id", ""))
 	var near_category: String = String(step.get("near_cat", ""))
 	if not near_category.is_empty():
 		piece["activity_host_cat"] = near_category
 	var near_anchor: String = String(step.get("near_anchor", ""))
 	if not near_anchor.is_empty():
 		piece["activity_host_anchor"] = near_anchor
+
+
+## Bind only the distinct Witchwork Cauldron in a real Workshop. The compact
+## Witch plan has no Workshop; its shared Hall station stays on the cooking
+## heat path and receives no independent flue setting.
+static func _bind_witchwork_cauldron_heat(plan: HousePlan) -> void:
+	plan.heat_settings.clear()
+	if plan.spec.style != &"witch_hut":
+		return
+	for room_index in range(plan.rooms.size()):
+		var room: Dictionary = plan.rooms[room_index]
+		if String(room.get("kind", "")).to_lower() != "workshop":
+			continue
+		var matches: Array[int] = []
+		for i in range(plan.furniture.size()):
+			var item: Dictionary = plan.furniture[i]
+			if String(item.get("key", "")) == "Cauldron" \
+					and int(item.get("room", -1)) == room_index \
+					and String(item.get("activity_group", "")) == "witchwork":
+				matches.append(i)
+		if matches.size() != 1:
+			continue
+		var station: Dictionary = plan.furniture[matches[0]]
+		station["heat_setting_id"] = "witchwork_cauldron"
+		plan.furniture[matches[0]] = station
+		plan.heat_settings.append({"id": "witchwork_cauldron", "room": room_index,
+			"storey": int(station.get("storey", plan.storey_of_room(room_index))),
+			"station_id": "witchwork_cauldron", "opening_id": "witchwork_cauldron_flue"})
 
 
 ## Repair may remove a required item, and a placement rule may fail before an

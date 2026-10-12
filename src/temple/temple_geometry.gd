@@ -61,12 +61,12 @@ const ORDER_BAY := 4.6        # target pilaster spacing, metres
 ## ridge; the two aisles meet it at the raised side walls.
 const BASILICA_NAVE_FRACTION := 0.62
 const BASILICA_NAVE_RISE_FRACTION := 0.16
-const BASILICA_PORTICO_WIDTH_FRACTION := 0.68
+const BASILICA_PORTICO_WIDTH_FRACTION := 0.76
 const BASILICA_PORTICO_DEPTH_FRACTION := 0.18
 const BASILICA_PORTICO_MIN_DEPTH := 2.6
 const BASILICA_PORTICO_MAX_DEPTH := 4.2
 const BASILICA_PORTICO_APPROACH_APRON := 0.6
-const BASILICA_PORTICO_ROOF_PITCH := 0.08
+const BASILICA_PORTICO_ROOF_PITCH := 0.16
 const BASILICA_PORTICO_MIN_COLUMNS := 4
 const BASILICA_PORTICO_MAX_COLUMNS := 8
 
@@ -83,6 +83,123 @@ const RITUAL_HEADROOM_MIN := 2.0
 static func site_rect(spec: TempleSpec) -> Rect2:
 	return Rect2(Vector2(-spec.width / 2.0, -spec.length / 2.0),
 		Vector2(spec.width, spec.length))
+
+
+
+
+# Candidate Stage 1 half-ellipse contract. Consumers must share these samples.
+const BASILICA_APSE_ARC_SEGMENTS := 128
+
+static func basilica_apse_chord_z(spec: TempleSpec) -> float:
+	return site_rect(spec).end.y if spec.form == &"basilica" else 0.0
+
+
+static func basilica_apse_inner_radius(spec: TempleSpec) -> float:
+	if spec.form != &"basilica":
+		return 0.0
+	return maxf(0.0, basilica_nave_half_width(spec) - spec.wall_t - 0.25)
+
+
+static func basilica_apse_projection(spec: TempleSpec) -> float:
+	var half_width: float = basilica_apse_inner_radius(spec)
+	if half_width <= 0.0:
+		return 0.0
+	var chord: float = basilica_apse_chord_z(spec)
+	var projection: float = maxf(2.4,
+		(spec.idol_width * 0.5 + spec.wall_t + 1.10) / 0.55)
+	while projection <= maxf(spec.length, spec.idol_width * 6.0):
+		var center := Vector2(0.0, chord + projection * 0.55)
+		var half: float = spec.idol_width * 0.5
+		var corners: Array[Vector2] = [center + Vector2(-half, -half),
+			center + Vector2(half, -half), center + Vector2(half, half),
+			center + Vector2(-half, half)]
+		var fits := true
+		for corner in corners:
+			var normalized: Vector2 = Vector2(corner.x / half_width, (corner.y - chord) / projection)
+			var idol_front: float = center.y - chord - spec.idol_width * 0.5
+			if corner.y < chord + 0.30 or normalized.length() > 1.0 \
+				or idol_front < spec.wall_t + 1.10 or _distance_to_basilica_apse_arc(
+				corner, half_width, projection, chord) < 0.30:
+				fits = false
+				break
+		if fits:
+			return projection
+		projection += 0.05
+	return 0.0
+
+
+static func basilica_apse_inner_arc(spec: TempleSpec) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	if spec.form != &"basilica":
+		return points
+	var a: float = basilica_apse_inner_radius(spec)
+	var b: float = basilica_apse_projection(spec)
+	if a <= 0.0 or b <= 0.0:
+		return points
+	var chord: float = basilica_apse_chord_z(spec)
+	for i in range(BASILICA_APSE_ARC_SEGMENTS + 1):
+		var theta: float = PI - PI * float(i) / float(BASILICA_APSE_ARC_SEGMENTS)
+		points.append(Vector2(a * cos(theta), chord + b * sin(theta)))
+	return points
+
+
+# Horizontal half-width where the shared faceted inner arc crosses this Z row.
+static func basilica_apse_inner_half_width_at(spec: TempleSpec, z: float) -> float:
+	return _basilica_apse_half_width_at_arc(basilica_apse_inner_arc(spec), z)
+
+
+static func _basilica_apse_half_width_at_arc(arc: PackedVector2Array, z: float) -> float:
+	var half_width := 0.0
+	if arc.size() < 2:
+		return half_width
+	for i in range(arc.size() - 1):
+		var a: Vector2 = arc[i]
+		var b: Vector2 = arc[i + 1]
+		if z < minf(a.y, b.y) - 0.0001 or z > maxf(a.y, b.y) + 0.0001:
+			continue
+		var dy: float = b.y - a.y
+		if absf(dy) <= 0.000001:
+			if absf(z - a.y) <= 0.0001:
+				half_width = maxf(half_width, maxf(absf(a.x), absf(b.x)))
+			continue
+		var t: float = clampf((z - a.y) / dy, 0.0, 1.0)
+		half_width = maxf(half_width, absf(lerpf(a.x, b.x, t)))
+	return half_width
+
+
+static func basilica_apse_inner_axes(spec: TempleSpec) -> Vector2:
+	return Vector2(basilica_apse_inner_radius(spec), basilica_apse_projection(spec))
+
+
+static func basilica_apse_outer_axes(spec: TempleSpec) -> Vector2:
+	var axes: Vector2 = basilica_apse_inner_axes(spec)
+	return axes + Vector2.ONE * spec.wall_t if spec.form == &"basilica" else Vector2.ZERO
+
+
+static func basilica_apse_outer_arc(spec: TempleSpec) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	if spec.form != &"basilica":
+		return points
+	var axes: Vector2 = basilica_apse_outer_axes(spec)
+	var chord: float = basilica_apse_chord_z(spec)
+	for i in range(BASILICA_APSE_ARC_SEGMENTS + 1):
+		var theta: float = PI - PI * float(i) / float(BASILICA_APSE_ARC_SEGMENTS)
+		points.append(Vector2(axes.x * cos(theta), chord + axes.y * sin(theta)))
+	return points
+
+
+static func _distance_to_basilica_apse_arc(point: Vector2, half_width: float,
+		projection: float, chord: float) -> float:
+	var nearest := INF
+	var previous := Vector2(-half_width, chord)
+	for i in range(1, BASILICA_APSE_ARC_SEGMENTS + 1):
+		var theta: float = PI - PI * float(i) / float(BASILICA_APSE_ARC_SEGMENTS)
+		var current := Vector2(half_width * cos(theta), chord + projection * sin(theta))
+		var segment: Vector2 = current - previous
+		var t: float = clampf((point - previous).dot(segment) / maxf(segment.length_squared(), 0.000001), 0.0, 1.0)
+		nearest = minf(nearest, point.distance_to(previous + segment * t))
+		previous = current
+	return nearest
 
 
 ## Everything inside the outer walls: the ground the rite happens on.
@@ -113,6 +230,17 @@ static func rotunda_outer_radius(spec: TempleSpec) -> float:
 
 static func rotunda_inner_radius(spec: TempleSpec) -> float:
 	return maxf(0.5, rotunda_outer_radius(spec) - spec.wall_t)
+
+
+## Exterior gate trim projects beyond the circular drum. The builder and
+## published placement extent use the same measured projection.
+static func rotunda_portal_depth(spec: TempleSpec) -> float:
+	return clampf(spec.wall_t * 0.55, 0.30, 0.48)
+
+
+static func rotunda_front_projection(spec: TempleSpec) -> float:
+	# The cornice front is 0.045 m past the surround's nominal depth.
+	return maxf(0.45, rotunda_portal_depth(spec) + 0.05)
 
 
 static func rotunda_wall_panel_count(spec: TempleSpec) -> int:
@@ -432,6 +560,41 @@ static func pylon_roof_rect(spec: TempleSpec) -> Rect2:
 		Vector2(site.size.x + 0.8, site.end.y + 0.4 - front))
 
 
+## Narrow rooflights follow the real cross-architrave bays. Their ends stop
+## before the beam faces, leaving a full bearing course at every column row.
+static func pylon_roof_slot_rects(spec: TempleSpec) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	if spec.form != &"pylon":
+		return out
+	var rows: Array[float] = []
+	for column in column_records(spec):
+		var pos: Vector3 = column["pos"]
+		var found_row := false
+		for row_z in rows:
+			if absf(row_z - pos.z) < 0.02:
+				found_row = true
+				break
+		if not found_row:
+			rows.append(pos.z)
+	rows.sort()
+	if rows.size() < 2:
+		return out
+	var roof: Rect2 = pylon_roof_rect(spec)
+	var slot_w: float = minf(1.2, axis_half_width(spec) * 0.72)
+	var beam_w: float = clampf(spec.column_r * 0.46, 0.24, 0.52)
+	var end_margin: float = beam_w * 0.5 + 0.24
+	for i in range(rows.size() - 1):
+		var front: float = rows[i] + end_margin
+		var back: float = rows[i + 1] - end_margin
+		if back - front < 0.7:
+			continue
+		var slot := Rect2(Vector2(-slot_w * 0.5, front), Vector2(slot_w, back - front))
+		var clipped := slot.intersection(roof)
+		if clipped.size.x > 0.0 and clipped.size.y > 0.0:
+			out.append(clipped)
+	return out
+
+
 ## The sanctum: the far end, where the dais, the altar and the idol are. It is
 ## part of the hall, not a separate room -- what makes it the sanctum is that
 ## it is raised and that everything points at it.
@@ -517,6 +680,109 @@ static func pylon_sanctum_wall_rects(spec: TempleSpec) -> Array[Rect2]:
 	out.append(Rect2(Vector2(shrine.end.x - t, return_front),
 		Vector2(t, return_depth)))
 	return out
+
+
+static func basilica_apse_rect(spec: TempleSpec) -> Rect2:
+	var axes: Vector2 = basilica_apse_outer_axes(spec)
+	if spec.form != &"basilica" or axes.x <= 0.0 or axes.y <= 0.0:
+		return Rect2()
+	return Rect2(Vector2(-axes.x, basilica_apse_chord_z(spec)), Vector2(axes.x * 2.0, axes.y))
+
+
+static func basilica_apse_portal_width(spec: TempleSpec) -> float:
+	return basilica_apse_inner_radius(spec) * 2.0
+
+
+static func basilica_apse_arch_spring(spec: TempleSpec) -> float:
+	if spec.form != &"basilica":
+		return 0.0
+	var eye: Vector2 = sight_point(spec)
+	var idol: Vector3 = idol_center(spec)
+	var target_z: float = idol.z - spec.idol_width * 0.5 - 0.05
+	var chord: float = basilica_apse_chord_z(spec)
+	var t: float = clampf((chord - eye.y) / maxf(target_z - eye.y, 0.001), 0.0, 1.0)
+	return maxf(3.0, lerpf(1.65, idol.y + spec.idol_height * 0.7, t) + 0.30)
+
+
+static func basilica_apse_arch_crown(spec: TempleSpec) -> float:
+	return basilica_apse_arch_spring(spec) + basilica_apse_inner_radius(spec)
+
+
+static func basilica_apse_outer_arch_crown(spec: TempleSpec) -> float:
+	return basilica_apse_arch_spring(spec) + basilica_apse_outer_axes(spec).x
+
+
+static func basilica_apse_cap_clearance(spec: TempleSpec) -> float:
+	if spec.form != &"basilica":
+		return 0.0
+	return basilica_nave_eave_height(spec) - 0.30 - basilica_apse_outer_arch_crown(spec)
+
+
+static func basilica_apse_cap_fits(spec: TempleSpec) -> bool:
+	return spec.form == &"basilica" and basilica_apse_cap_clearance(spec) >= 0.0
+
+
+static func basilica_apse_portal_height(spec: TempleSpec) -> float:
+	return basilica_apse_arch_crown(spec)
+
+
+static func basilica_apse_throat_rect(spec: TempleSpec) -> Rect2:
+	if spec.form != &"basilica":
+		return Rect2()
+	var front: float = interior_rect(spec).end.y
+	var rear: float = site_rect(spec).end.y
+	return Rect2(Vector2(-basilica_apse_inner_radius(spec), front),
+		Vector2(basilica_apse_portal_width(spec), rear - front))
+
+
+static func basilica_apse_floor_rows(spec: TempleSpec) -> Array[Rect2]:
+	var rows: Array[Rect2] = []
+	if spec.form != &"basilica":
+		return rows
+	var axes: Vector2 = basilica_apse_inner_axes(spec)
+	var chord: float = basilica_apse_chord_z(spec)
+	var arc: PackedVector2Array = basilica_apse_inner_arc(spec)
+	if axes.x <= 0.0 or axes.y <= 0.0 or arc.size() < 3:
+		return rows
+	const BAND := 0.20
+	var z0: float = chord
+	while z0 < chord + axes.y - 0.001:
+		var z1: float = minf(chord + axes.y, z0 + BAND)
+		var half_at_front: float = _basilica_apse_half_width_at_arc(arc, z0)
+		var half_at_back: float = _basilica_apse_half_width_at_arc(arc, z1)
+		var half_width: float = minf(half_at_front, half_at_back)
+		if half_width > 0.05:
+			rows.append(Rect2(Vector2(-half_width, z0), Vector2(half_width * 2.0, z1 - z0)))
+		z0 = z1
+	return rows
+
+
+static func basilica_apse_floor_polygon(spec: TempleSpec) -> PackedVector2Array:
+	return basilica_apse_inner_arc(spec)
+
+
+static func basilica_apse_focal_rect(spec: TempleSpec) -> Rect2:
+	return idol_rect(spec) if spec.form == &"basilica" else Rect2()
+
+
+static func basilica_apse_stand_zone(spec: TempleSpec) -> Rect2:
+	if spec.form != &"basilica":
+		return Rect2()
+	var idol: Rect2 = basilica_apse_focal_rect(spec)
+	var front: float = basilica_apse_chord_z(spec) + spec.wall_t + 0.25
+	# WalkGrid erodes by radius + half a cell. A blocked-cell centre can sit
+	# another half-cell inside the idol footprint, so reserve radius + one cell.
+	var body_clearance: float = PERSON_RADIUS + NAV_CELL
+	var depth: float = idol.position.y - body_clearance - front
+	var arc: PackedVector2Array = basilica_apse_inner_arc(spec)
+	if depth < 0.30 or _basilica_apse_half_width_at_arc(arc, front + depth) < 0.75:
+		return Rect2()
+	# Each row is bounded by both arc intersections. The back edge supports the
+	# full centered stand rectangle and the whole rectangle stays body-clear.
+	return Rect2(Vector2(-0.75, front), Vector2(1.5, depth))
+
+static func basilica_sanctum_test_rect(spec: TempleSpec) -> Rect2:
+	return sanctum_rect(spec).merge(basilica_apse_rect(spec)) if spec.form == &"basilica" else sanctum_rect(spec)
 
 
 # ------------------------------------------------------------------- dais
@@ -623,7 +889,10 @@ static func altar_center(spec: TempleSpec) -> Vector3:
 	var d: Rect2 = dais_rect(spec)
 	var z: float = d.position.y + spec.altar_l / 2.0 + ALTAR_CLEAR * 0.8
 	var idol: Vector3 = idol_center(spec)
-	var limit: float = idol.z - spec.idol_width / 2.0 - IDOL_GAP - spec.altar_l / 2.0
+	var limit_idol_z: float = idol.z
+	if spec.form == &"basilica":
+		limit_idol_z = sanctum_rect(spec).end.y - spec.idol_width * 0.5 - 0.5
+	var limit: float = limit_idol_z - spec.idol_width / 2.0 - IDOL_GAP - spec.altar_l / 2.0
 	if spec.form == &"rotunda":
 		var foot: Rect2 = dais_footprint(spec)
 		var minimum: float = foot.position.y + ALTAR_CLEAR + spec.altar_l / 2.0
@@ -657,6 +926,8 @@ static func idol_center(spec: TempleSpec) -> Vector3:
 		# The coil/plinth is wider than the nominal idol rectangle. Its full
 		# base remains on the highest terrace, with a half-metre rear margin.
 		z = s.end.y - spec.idol_width * 0.7
+	elif spec.form == &"basilica":
+		z = basilica_apse_chord_z(spec) + basilica_apse_projection(spec) * 0.55
 	return Vector3(0.0, _idol_base_height(spec), z)
 
 
@@ -1069,7 +1340,7 @@ static func forecourt_rect(spec: TempleSpec) -> Rect2:
 	var r: Rect2 = site_rect(spec)
 	if spec.form == &"rotunda":
 		var outer_radius: float = rotunda_outer_radius(spec)
-		var outer_arrival: float = outer_radius + 0.45
+		var outer_arrival: float = outer_radius + rotunda_front_projection(spec)
 		var w: float = GATE_W + 1.2
 		if spec.obelisks:
 			var obelisk_x: float = absf(obelisk_center(spec, 1.0).x)
@@ -1208,6 +1479,11 @@ static func floor_rects(spec: TempleSpec) -> Array[Rect2]:
 			var b: Rect2 = bridge_rect(spec)
 			if b.size.x > 0.0:
 				out.append(b)
+	if spec.form == &"basilica":
+		var throat: Rect2 = basilica_apse_throat_rect(spec)
+		if throat.size.x > 0.0 and throat.size.y > 0.0:
+			out.append(throat)
+		out.append_array(basilica_apse_floor_rows(spec))
 	for cell in cell_rects(spec):
 		out.append(cell)
 	var portico_floor := basilica_portico_floor_rect(spec)
@@ -1327,6 +1603,14 @@ static func obstacle_rects(spec: TempleSpec) -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	for wall in pylon_sanctum_wall_rects(spec):
 		out.append(wall)
+	if spec.form == &"basilica":
+		var half: float = basilica_apse_inner_radius(spec)
+		var edge: float = site_rect(spec).size.x * 0.5
+		var chord: float = basilica_apse_chord_z(spec)
+		var pier: float = maxf(edge - half, 0.0)
+		if pier > 0.05:
+			out.append(Rect2(Vector2(-edge, chord), Vector2(pier, spec.wall_t)))
+			out.append(Rect2(Vector2(half, chord), Vector2(pier, spec.wall_t)))
 	var columns: Array[Dictionary] = column_records(spec)
 	for column in columns:
 		var c: Vector3 = column["pos"]
@@ -1418,6 +1702,7 @@ static func plan_extent(spec: TempleSpec) -> Rect2:
 		# Include actual main-roof overhang, side-aisle soffits, and the projecting
 		# covered pronaos so public placement reserves the architecture it emits.
 		e = e.grow(maxf(maxf(ORDER_REACH, 0.6), maxf(spec.wall_t, 0.5) * 0.5))
+		e = e.merge(basilica_apse_rect(spec))
 		# The covered portico already ends at its real outer floor face. Growing
 		# this front edge invents an unbuilt apron and separates the published
 		# footprint front from the actual arrival surface.
@@ -1425,7 +1710,8 @@ static func plan_extent(spec: TempleSpec) -> Rect2:
 	if spec.form == &"ziggurat":
 		e = e.merge(stair_rect(spec))
 	if spec.form == &"rotunda":
-		var extent_radius: float = rotunda_outer_radius(spec) + 0.45
+		var extent_radius: float = rotunda_outer_radius(spec) \
+			+ rotunda_front_projection(spec)
 		e = Rect2(Vector2(-extent_radius, -extent_radius),
 			Vector2(extent_radius * 2.0, extent_radius * 2.0))
 		e = e.merge(forecourt_rect(spec))

@@ -142,6 +142,9 @@ var compromises: Dictionary = {}
 ## INT-018 owns the compluvium/oculus/court-sky kinds and fills this list.
 ## HOUSE-EXT-007 owns only the dormer/sloped-polygon subset and the schema.
 var roof_openings: Array[Dictionary] = []
+## Semantic heat settings that bind a real station to a dedicated heat feature.
+## Witchwork roof flues use {id, room, storey, station_id, opening_id}.
+var heat_settings: Array[Dictionary] = []
 ## Where the fire is: {"room": int, "wall": int, "breast": Dictionary}, or empty when the house has
 ## no hearth room at all. The wall index is into HouseGeometry.room_walls().
 ##

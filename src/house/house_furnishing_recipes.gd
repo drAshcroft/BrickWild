@@ -68,6 +68,11 @@ const AMPLE := {
 		{"cat": "nightstand", "rule": &"wall", "n": [1, 1], "opt": 0.9, "always_attempt": true},
 		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.8, "always_attempt": true},
 	]},
+	# Marker thresholds for the style-and-trade overlay below. Empty base steps
+	# keep every other house family unchanged.
+	&"hall": {"area": 60.0, "steps": []},
+	&"parlour": {"area": 30.0, "steps": []},
+	&"workshop": {"area": 30.0, "steps": []},
 }
 
 
@@ -394,6 +399,32 @@ static func _sitting_parlour_recipe() -> Array:
 ## support, so the ample recipe does not add a second one.
 static func ample_steps_for_room(plan: HousePlan, room: int) -> Array:
 	var kind: StringName = plan.kind_of(room)
+	if plan.spec.style == &"witch_hut" and plan.spec.trade == &"alchemist":
+		var area := HouseGeometry.room_area(plan, room)
+		if kind == &"workshop" and area >= 30.0:
+			# Ingredient cabinet: the laboratory needs a place to keep its stock.
+			return [{"cat": "storage", "key": "Cabinet", "rule": &"wall",
+				"n": [1, 1], "opt": 1.0, "group": "trade_stock"}]
+		if kind == &"hall" and area >= 120.0:
+			# A great Hall gets distinct places to sit and store books and
+			# household goods. The trade's laboratory remains in its Workshop.
+			return [
+				{"cat": "bench", "rule": &"wall", "n": [7, 7], "opt": 1.0, "settle": true},
+				{"cat": "chest", "rule": &"wall", "n": [2, 2], "opt": 1.0},
+				{"cat": "bookcase", "rule": &"wall", "n": [2, 2], "opt": 1.0},
+				{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+			]
+		if kind == &"hall" and area >= 60.0:
+			return [
+				{"cat": "bench", "rule": &"wall", "n": [3, 3], "opt": 1.0, "settle": true},
+				{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+			]
+		if kind == &"parlour" and area >= 30.0:
+			return [
+				{"cat": "bench", "rule": &"wall", "n": [2, 2], "opt": 1.0, "settle": true, "group": "sitting"},
+				{"cat": "bookcase", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+				{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+			]
 	# One measured desk group scales with the writer, not the office footprint.
 	# Additional generic tables and chairs make a large Townhouse office less
 	# usable by filling the pull-back space around its one writing chair.

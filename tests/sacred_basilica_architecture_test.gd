@@ -33,6 +33,7 @@ func _check_case(row: Dictionary) -> void:
 	var builder := TempleBuilder.new()
 	var mesh: ArrayMesh = builder.build(spec)
 	_check_no_degenerate_triangles(mesh)
+	_check_basilica_apse(spec, builder, mesh, row["name"])
 	_check_hosted_components(builder.component_log)
 	_check_vertical_profile_slabs(builder, mesh)
 	_check_roof_hierarchy(spec, builder, mesh)
@@ -51,6 +52,327 @@ func _check_case(row: Dictionary) -> void:
 		_check_missing_column_negative(spec, builder, mesh)
 		_check_lifted_portico_roof_negative(spec, builder, mesh)
 		_check_no_columns_fallback(spec)
+
+
+## Stage 1 apse contract. Geometry helpers are the shared source of truth;
+## these probes independently check the emitted portal and the navigable route.
+func _check_basilica_apse(spec: TempleSpec, builder: TempleBuilder,
+		mesh: ArrayMesh, case_name: String) -> void:
+	var rite_report: Dictionary = TempleRiteCheck.new().check(spec, builder)
+	if not bool(rite_report.get("ok", false)):
+		_fail("unchanged TempleRiteCheck fails: %s" % str(rite_report.get("failures", [])))
+	var chord: float = TempleGeometry.basilica_apse_chord_z(spec)
+	var spring: float = TempleGeometry.basilica_apse_arch_spring(spec)
+	var portal_radius: float = TempleGeometry.basilica_apse_portal_width(spec) * 0.5
+	var inner_arc: PackedVector2Array = TempleGeometry.basilica_apse_floor_polygon(spec)
+	_check_footprint_in_apse(TempleGeometry.idol_rect(spec), inner_arc, chord, "idol")
+	_check_footprint_in_apse(TempleGeometry.basilica_apse_focal_rect(spec),
+		inner_arc, chord, "focal support")
+	var old_dais := _legacy_basilica_dais(case_name)
+	var actual_dais: Rect2 = TempleGeometry.dais_rect(spec)
+	if actual_dais.position.distance_to(old_dais.position) > 0.002 \
+			or actual_dais.size.distance_to(old_dais.size) > 0.002:
+		_fail("the pre-apse dais footprint moved")
+	var fixed_altar_z := _expected_basilica_altar_z(case_name)
+	if absf(TempleGeometry.altar_center(spec).z - fixed_altar_z) > 0.002:
+		_fail("the pre-apse altar station moved from its frozen case value")
+
+	var triangles := MeshProbe.all_triangles(null, mesh, mesh.get_surface_count())
+	var wall_t: float = spec.wall_t
+	var portal_x: float = TempleGeometry.basilica_apse_portal_width(spec) * 0.20
+	var rays := [
+		[Vector3(portal_x, spring - 0.20, chord - wall_t - 0.15),
+		 Vector3(portal_x, spring - 0.20, chord + wall_t + 0.15)],
+		[Vector3(0.0, spring + portal_radius * 0.45, chord - wall_t - 0.15),
+		 Vector3(0.0, spring + portal_radius * 0.45, chord + wall_t + 0.15)],
+	]
+	for ray in rays:
+		if MeshProbe.ray_blocked(triangles, ray[0], ray[1]):
+			_fail("actual rear wall or gable-spandrel triangles seal an apse portal ray")
+			break
+	var filled := MeshProbe.add_box(mesh, TempleBuilder.SURF_STONE,
+		AABB(Vector3(portal_x - 0.12, spring - 0.34, chord - wall_t - 0.2),
+			Vector3(0.24, 0.28, wall_t + 0.4)))
+	var filled_mesh: ArrayMesh = filled.get("mesh")
+	var lower_ray: Array = rays[0]
+	if filled_mesh == null or not MeshProbe.ray_blocked(
+		MeshProbe.all_triangles(null, filled_mesh, filled_mesh.get_surface_count()),
+		lower_ray[0], lower_ray[1]):
+		_fail("filled-portal negative did not detect the emitted stone obstruction")
+	var eye: Vector2 = TempleGeometry.sight_point(spec)
+	var idol_center: Vector3 = TempleGeometry.idol_center(spec)
+	var from := Vector3(0.0, 1.65, eye.y)
+	var to := Vector3(idol_center.x, idol_center.y + spec.idol_height * 0.7,
+		idol_center.z - spec.idol_width / 2.0 - 0.05)
+	if MeshProbe.ray_blocked(triangles, from, to):
+		_fail("the actual eye-to-idol-front ray is blocked by the apse portal")
+	_check_basilica_apse_windows(spec, builder, mesh, triangles)
+
+	var extent: Rect2 = TempleGeometry.plan_extent(spec).grow(1.0)
+	var grid := WalkGrid.new()
+	grid.setup(extent, TempleGeometry.NAV_CELL)
+	for floor in TempleGeometry.floor_rects(spec):
+		grid.add_floor(floor)
+	for obstacle in TempleGeometry.obstacle_rects(spec):
+		grid.add_obstacle(obstacle)
+	grid.build(TempleGeometry.PERSON_RADIUS)
+	var stand_zone: Rect2 = TempleGeometry.basilica_apse_stand_zone(spec)
+	var idol_footprint: Rect2 = TempleGeometry.idol_rect(spec)
+	if stand_zone.position.y < chord + 0.30 - 0.002 \
+			or stand_zone.end.y > idol_footprint.position.y + 0.002:
+		_fail("the measured stand zone lacks 0.30m beyond the rear wall or overlaps the idol")
+	if not grid.flood_from(TempleGeometry.entry_point(spec), 1.2) \
+			or not grid.reached(stand_zone):
+		_fail("a continuous body-clear WalkGrid route does not reach the rear apse stand zone")
+	var stand_point: Vector2 = stand_zone.get_center()
+	if not MeshProbe.has_upward_support(
+			MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE),
+			stand_point, 0.001, 0.03):
+		_fail("the reached apse stand zone has no actual emitted stone floor underfoot")
+	var throat: Rect2 = TempleGeometry.basilica_apse_throat_rect(spec)
+	var throat_clear: float = throat.size.x - 2.0 * TempleGeometry.PERSON_RADIUS
+	if throat_clear < TempleGeometry.PROCESSION_MIN - 0.002:
+		_fail("the apse throat leaves only %.2fm clear for a procession" % throat_clear)
+	var blocked_grid := WalkGrid.new()
+	blocked_grid.setup(extent, TempleGeometry.NAV_CELL)
+	for floor in TempleGeometry.floor_rects(spec):
+		blocked_grid.add_floor(floor)
+	for obstacle in TempleGeometry.obstacle_rects(spec):
+		blocked_grid.add_obstacle(obstacle)
+	blocked_grid.add_obstacle(throat)
+	blocked_grid.build(TempleGeometry.PERSON_RADIUS)
+	blocked_grid.flood_from(TempleGeometry.entry_point(spec), 1.2)
+	if blocked_grid.reached(stand_zone):
+		_fail("blocked-throat negative reaches the apse by routing around the rear returns")
+
+	var plinths := _roles(builder.component_log, "basilica_apse_focal_plinth")
+	if plinths.size() != 1:
+		_fail("apse focal support is not one named emitted plinth")
+	else:
+		var plinth_box: AABB = MassBuilder.component_aabb(plinths[0])
+		if absf(plinth_box.end.y - TempleGeometry.dais_top(spec)) > 0.002 \
+				or not MeshProbe.has_upward_support(
+					MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE),
+					Vector2(plinth_box.get_center().x, plinth_box.get_center().z),
+					plinth_box.end.y, 0.02):
+			_fail("actual focal plinth does not bear at the unchanged dais top")
+
+
+func _check_basilica_apse_windows(spec: TempleSpec, builder: TempleBuilder,
+		mesh: ArrayMesh, triangles: Array) -> void:
+	var rows := _roles(builder.component_log, "basilica_apse_window_sill")
+	var crowns := _roles(builder.component_log, "basilica_apse_window_crown")
+	var jambs := _roles(builder.component_log, "basilica_apse_window_jamb")
+	var arches := _roles(builder.component_log, "basilica_apse_window_arch")
+	if rows.size() < 8 or crowns.size() < 8 or arches.size() < 8 or jambs.size() != 8:
+		_fail("rear apse does not emit four fit-framed openings with sill, crown and jamb parts")
+		return
+	for row in jambs + arches:
+		if String(row.get("host", "")) != "basilica_apse" \
+				or not _component_slab_emitted(mesh, row):
+			_fail("named curved window jamb/arch differs from its emitted component mesh")
+	var outer_arc: PackedVector2Array = TempleGeometry.basilica_apse_outer_arc(spec)
+	var inner_arc: PackedVector2Array = TempleGeometry.basilica_apse_inner_arc(spec)
+	var axes: Vector2 = TempleGeometry.basilica_apse_outer_axes(spec)
+	var sill: float = spec.height * 0.36
+	var spring: float = spec.height * 0.53
+	var rise: float = minf(spec.height * 0.22, spec.height - spring - 1.0)
+	var half_width: float = minf(0.58, maxf(0.40, spec.width * 0.035))
+	var centers: Array[float] = [0.72, 1.18, PI - 1.18, PI - 0.72]
+	var half_angles: Array[float] = []
+	var clear_rays: Array = []
+	var support_rays: Array = []
+	var pier_rays: Array = []
+	for center in centers:
+		var local_radius: float = sqrt(pow(axes.x * sin(center), 2.0)
+			+ pow(axes.y * cos(center), 2.0))
+		var half_angle: float = half_width / maxf(local_radius, 0.1)
+		half_angles.append(half_angle)
+		var outer: Vector2 = _apse_arc_point(outer_arc, center)
+		var inner: Vector2 = _apse_arc_point(inner_arc, center)
+		var outward: Vector2 = (outer - inner).normalized()
+		var from_xz: Vector2 = outer + outward * 0.25
+		var to_xz: Vector2 = inner - outward * 0.25
+		var clear_y: float = sill + (spring + rise - sill) * 0.52
+		var opening_ray := [Vector3(from_xz.x, clear_y, from_xz.y),
+			Vector3(to_xz.x, clear_y, to_xz.y)]
+		clear_rays.append(opening_ray)
+		if MeshProbe.ray_blocked(triangles, opening_ray[0], opening_ray[1]) \
+				or MeshProbe.ray_blocked(triangles, opening_ray[1], opening_ray[0]):
+			_fail("a rear apse opening is not pierced through the real shell in both directions")
+		var below_sill := [Vector3(from_xz.x, sill - 0.18, from_xz.y),
+			Vector3(to_xz.x, sill - 0.18, to_xz.y)]
+		var above_crown := [Vector3(from_xz.x, spring + rise + 0.20, from_xz.y),
+			Vector3(to_xz.x, spring + rise + 0.20, to_xz.y)]
+		support_rays.append([below_sill, above_crown])
+		if not MeshProbe.ray_blocked(triangles, below_sill[0], below_sill[1]):
+			_fail("window sill negative: real wall below the clear opening is missing")
+		if not MeshProbe.ray_blocked(triangles, above_crown[0], above_crown[1]):
+			_fail("window crown negative: solid wall above the arch is missing")
+		# The neighboring arc position is a bearing pier, not another opening.
+		var pier_theta: float = center + half_angle + 0.12
+		var pier_outer: Vector2 = _apse_arc_point(outer_arc, pier_theta)
+		var pier_inner: Vector2 = _apse_arc_point(inner_arc, pier_theta)
+		var pier_normal: Vector2 = (pier_outer - pier_inner).normalized()
+		var pier_a: Vector2 = pier_outer + pier_normal * 0.25
+		var pier_b: Vector2 = pier_inner - pier_normal * 0.25
+		var pier_ray := [Vector3(pier_a.x, spring, pier_a.y),
+			Vector3(pier_b.x, spring, pier_b.y)]
+		if not MeshProbe.ray_blocked(triangles, pier_ray[0], pier_ray[1]):
+			_fail("a load-bearing pier between rear apse openings is hollow")
+		pier_rays.append(pier_ray)
+	# Measure solid arc length between each pair of window edges and from the
+	# outermost openings to the two chord returns. These are bearing piers, not
+	# merely rays that happen to find some wall nearby.
+	var minimum_pier: float = maxf(0.75, spec.wall_t)
+	var measured_piers: Array[float] = []
+	for i in range(centers.size() - 1):
+		var start_theta: float = centers[i] + half_angles[i]
+		var end_theta: float = centers[i + 1] - half_angles[i + 1]
+		measured_piers.append(_apse_sampled_arc_length(outer_arc, start_theta, end_theta))
+	measured_piers.append(_apse_sampled_arc_length(outer_arc, 0.0,
+		centers[0] - half_angles[0]))
+	measured_piers.append(_apse_sampled_arc_length(outer_arc,
+		centers[centers.size() - 1] + half_angles[half_angles.size() - 1], PI))
+	for pier_width in measured_piers:
+		if pier_width < minimum_pier - 0.01:
+			_fail("rear apse window bay leaves only %.3fm of sampled solid pier; need %.3fm"
+				% [pier_width, minimum_pier])
+	# Add a measured obstruction across one clear bay; the same actual-triangle
+	# ray must then fail. This guards against an opening probe that misses shell.
+	if not clear_rays.is_empty():
+		var ray: Array = clear_rays[0]
+		var a: Vector3 = ray[0]
+		var b: Vector3 = ray[1]
+		var fill_ray_a := Vector3(a.x, a.y + 0.031, a.z)
+		var fill_ray_b := Vector3(b.x, b.y + 0.031, b.z)
+		var fill_center := (fill_ray_a + fill_ray_b) * 0.5
+		var fill := MeshProbe.add_box(mesh, TempleBuilder.SURF_STONE,
+			AABB(fill_center - Vector3.ONE * 0.08, Vector3.ONE * 0.16))
+		var fill_mesh: ArrayMesh = fill.get("mesh")
+		if fill_mesh == null or not MeshProbe.ray_blocked(
+				MeshProbe.all_triangles(null, fill_mesh, fill_mesh.get_surface_count()),
+				fill_ray_a, fill_ray_b):
+			_fail("filled-window negative does not detect a real emitted obstruction")
+	# Remove the actual crown triangle crossing a crown ray. A surviving hit
+	# means some unrelated shell has made the support probe non-specific.
+	if not support_rays.is_empty():
+		var crown_ray: Array = support_rays[0][1]
+		var removed := MeshProbe.remove_triangles(mesh, TempleBuilder.SURF_STONE,
+			func(a: Vector3, b: Vector3, c: Vector3) -> bool:
+				return Geometry3D.segment_intersects_triangle(crown_ray[0], crown_ray[1],
+					a, b, c) != null)
+		var cut_mesh: ArrayMesh = removed.get("mesh")
+		if int(removed.get("removed_triangles", 0)) < 1 or cut_mesh == null \
+				or MeshProbe.ray_blocked(MeshProbe.all_triangles(null, cut_mesh,
+					cut_mesh.get_surface_count()), crown_ray[0], crown_ray[1]):
+			_fail("crown-removal negative did not remove the measured wall crown triangle")
+		if not pier_rays.is_empty():
+			var pier_ray: Array = pier_rays[0]
+			var pier_removed := MeshProbe.remove_triangles(mesh, TempleBuilder.SURF_STONE,
+				func(a: Vector3, b: Vector3, c: Vector3) -> bool:
+					return Geometry3D.segment_intersects_triangle(pier_ray[0], pier_ray[1],
+						a, b, c) != null)
+			var pier_mesh: ArrayMesh = pier_removed.get("mesh")
+			if int(pier_removed.get("removed_triangles", 0)) < 1 or pier_mesh == null \
+					or MeshProbe.ray_blocked(MeshProbe.all_triangles(null, pier_mesh,
+						pier_mesh.get_surface_count()), pier_ray[0], pier_ray[1]):
+				_fail("pier-removal negative did not remove the measured bearing-wall triangles")
+
+
+func _component_slab_emitted(mesh: ArrayMesh, row: Dictionary) -> bool:
+	if String(row.get("form", "")) != "slab":
+		return false
+	var surface: int = int(row.get("surface", -1))
+	if surface < 0 or surface >= mesh.get_surface_count():
+		return false
+	var kit := MeshKit.new(1)
+	kit.slab_poly(PackedVector3Array(row["points"]), float(row["depth"]), 0,
+		bool(row.get("vertical", true)), PackedInt32Array(row.get("open_edges", [])))
+	var expected: PackedVector3Array = _surface_vertex_soup(kit.commit(), 0)
+	var actual: PackedVector3Array = _surface_vertex_soup(mesh, surface)
+	return ComponentCheck.missing_triangles(actual, expected) == 0
+
+
+func _apse_arc_point(arc: PackedVector2Array, theta: float) -> Vector2:
+	if arc.is_empty():
+		return Vector2.ZERO
+	var index_position: float = clampf((PI - theta) / PI * float(arc.size() - 1),
+		0.0, float(arc.size() - 1))
+	var index: int = floori(index_position)
+	var next: int = mini(index + 1, arc.size() - 1)
+	return arc[index].lerp(arc[next], index_position - float(index))
+
+
+func _apse_sampled_arc_length(arc: PackedVector2Array, theta_a: float,
+		theta_b: float) -> float:
+	if arc.size() < 2:
+		return 0.0
+	var first: float = clampf((PI - theta_a) / PI * float(arc.size() - 1),
+		0.0, float(arc.size() - 1))
+	var last: float = clampf((PI - theta_b) / PI * float(arc.size() - 1),
+		0.0, float(arc.size() - 1))
+	var low: float = minf(first, last)
+	var high: float = maxf(first, last)
+	var total := 0.0
+	for index in range(floori(low), ceili(high)):
+		var segment_start: float = maxf(low, float(index))
+		var segment_end: float = minf(high, float(index + 1))
+		if segment_end <= segment_start:
+			continue
+		var a: Vector2 = arc[index].lerp(arc[index + 1], segment_start - float(index))
+		var b: Vector2 = arc[index].lerp(arc[index + 1], segment_end - float(index))
+		total += a.distance_to(b)
+	return total
+
+
+func _expected_basilica_altar_z(case_name: String) -> float:
+	match case_name:
+		"small":
+			return 6.979039
+		"default":
+			return 14.96487
+		"large":
+			return 27.1075
+	return -INF
+
+
+func _check_footprint_in_apse(rect: Rect2, polygon: PackedVector2Array,
+		chord_z: float, label: String) -> void:
+	if polygon.size() < 4:
+		_fail("%s has no measured faceted apse boundary" % label)
+		return
+	for xside in [0.0, 1.0]:
+		for zside in [0.0, 1.0]:
+			var corner := rect.position + rect.size * Vector2(xside, zside)
+			var point := Vector2(corner.x, corner.y)
+			if corner.y < chord_z + 0.30 or not Geometry2D.is_point_in_polygon(point, polygon):
+				_fail("%s corner %s is outside the faceted inner apse" % [label, corner])
+				continue
+			var arc_margin := INF
+			for i in range(polygon.size()):
+				var a: Vector2 = polygon[i]
+				var b: Vector2 = polygon[(i + 1) % polygon.size()]
+				if absf(a.y - chord_z) < 0.002 and absf(b.y - chord_z) < 0.002:
+					continue # The straight chord is not the curved shell web.
+				arc_margin = minf(arc_margin, point.distance_to(
+					Geometry2D.get_closest_point_to_segment(point, a, b)))
+			if arc_margin < 0.30 - 0.002:
+				_fail("%s corner %s has only %.3fm of measured arc web"
+					% [label, corner, arc_margin])
+
+
+func _legacy_basilica_dais(case_name: String) -> Rect2:
+	match case_name:
+		"small":
+			return Rect2(Vector2(-4.466, 6.264691), Vector2(8.932, 4.855309))
+		"default":
+			return Rect2(Vector2(-6.424, 13.73152), Vector2(12.848, 6.94848))
+		"large":
+			return Rect2(Vector2(-11.99, 25.0992), Vector2(23.98, 12.7008))
+	return Rect2()
+
+
 
 
 func _check_order_pilaster_bearings(builder: TempleBuilder, mesh: ArrayMesh) -> void:
@@ -206,7 +528,8 @@ func _check_hosted_components(rows: Array[Dictionary]) -> void:
 		"basilica_portico_side_beam", "basilica_nave_lower_spandrel",
 		"basilica_nave_pier_wall", "basilica_nave_end_crosshead",
 		"basilica_nave_end_return", "basilica_clerestory_sill",
-		"basilica_clerestory_head", "basilica_nave_gable_spandrel"]
+		"basilica_clerestory_head", "basilica_nave_gable_spandrel",
+		"basilica_apse_gable_return", "basilica_apse_gable_arch_head"]
 	for role in required:
 		var matches := 0
 		for row in rows:
@@ -220,7 +543,7 @@ func _check_hosted_components(rows: Array[Dictionary]) -> void:
 
 func _check_vertical_profile_slabs(builder: TempleBuilder, mesh: ArrayMesh) -> void:
 	var profile_roles := ["basilica_nave_gable_triangle", "basilica_aisle_gable_fill",
-		"basilica_aisle_rake", "basilica_portico_gable"]
+		"basilica_aisle_rake", "basilica_portico_gable", "basilica_apse_gable_arch_head"]
 	var wrong_axis_control_done := false
 	for row in builder.component_log:
 		if String(row.get("role", "")) not in profile_roles:
@@ -516,20 +839,50 @@ func _check_nave_load_path(spec: TempleSpec, builder: TempleBuilder, mesh: Array
 	var support_rows := _roles(builder.component_log, "basilica_nave_end_crosshead") \
 		+ _roles(builder.component_log, "basilica_nave_end_return")
 	var stone := MeshProbe.surface_triangles(null, mesh, TempleBuilder.SURF_STONE)
+	var west_gable_rows := _roles(builder.component_log, "basilica_nave_gable_spandrel")
+	var east_gable_rows := _roles(builder.component_log, "basilica_apse_gable_return")
+	var portal_half: float = TempleGeometry.basilica_apse_portal_width(spec) * 0.5
 	for row in lower_rows + support_rows + _roles(builder.component_log, "basilica_nave_pier_wall") \
 			+ _roles(builder.component_log, "basilica_clerestory_sill") \
 			+ _roles(builder.component_log, "basilica_clerestory_head") \
-			+ _roles(builder.component_log, "basilica_nave_gable_spandrel"):
+			+ west_gable_rows + east_gable_rows:
 		if not _component_box_emitted(mesh, row):
 			_fail("raised nave bearing component differs from its emitted mesh: %s" % row.get("role", ""))
 	if _roles(builder.component_log, "basilica_nave_end_crosshead").size() != 4 \
-			or _roles(builder.component_log, "basilica_nave_end_return").size() != 4:
+			 or _roles(builder.component_log, "basilica_nave_end_return").size() != 4:
 		_fail("raised nave longitudinal bearings are not tied to both end gables and side walls")
 	var crossheads := _roles(builder.component_log, "basilica_nave_end_crosshead")
-	var gable_rows := _roles(builder.component_log, "basilica_nave_gable_spandrel")
 	var return_rows := _roles(builder.component_log, "basilica_nave_end_return")
-	if gable_rows.size() != 2:
-		_fail("raised nave does not have two emitted gable bearing spandrels")
+	if west_gable_rows.size() != 1:
+		_fail("raised nave lost its single full-width west gable bearing spandrel")
+	else:
+		var west_box: AABB = MassBuilder.component_aabb(west_gable_rows[0])
+		if west_box.size.x < TempleGeometry.basilica_nave_half_width(spec) * 2.0 - 0.02:
+			_fail("west gable bearing spandrel no longer spans the nave supports")
+	if east_gable_rows.size() != 2:
+		_fail("rear gable lacks its paired residual supports beside the chancel arch")
+	var left_east: Dictionary = {}
+	var right_east: Dictionary = {}
+	for row in east_gable_rows:
+		var box: AABB = MassBuilder.component_aabb(row)
+		if box.get_center().x < 0.0:
+			left_east = row
+			if box.end.x > -portal_half + 0.02:
+				_fail("left rear gable support intrudes into the measured portal")
+		else:
+			right_east = row
+			if box.position.x < portal_half - 0.02:
+				_fail("right rear gable support intrudes into the measured portal")
+	if left_east.is_empty() or right_east.is_empty():
+		_fail("rear gable support pair is not mirrored across the basilica axis")
+	else:
+		var left_box: AABB = MassBuilder.component_aabb(left_east)
+		var right_box: AABB = MassBuilder.component_aabb(right_east)
+		if absf(left_box.position.x + right_box.end.x) > 0.02 \
+				or absf(left_box.size.x - right_box.size.x) > 0.02 \
+				or absf(left_box.position.y - right_box.position.y) > 0.02 \
+				or absf(left_box.size.y - right_box.size.y) > 0.02:
+			_fail("rear gable residual supports are not a measured mirrored pair")
 	for row in crossheads:
 		var bounds := MassBuilder.component_aabb(row)
 		var nearest: Dictionary = {}
@@ -546,15 +899,19 @@ func _check_nave_load_path(spec: TempleSpec, builder: TempleBuilder, mesh: Array
 			* (spec.width * 0.5 - spec.wall_t * 0.5)
 		if side_wall_center < bounds.position.x or side_wall_center > bounds.end.x:
 			_fail("end crosshead misses the actual outer side-wall bearing")
+	var site: Rect2 = TempleGeometry.site_rect(spec)
 	for row in return_rows:
 		var bounds := MassBuilder.component_aabb(row)
-		var touches_gable := false
-		for gable in gable_rows:
-			if bounds.intersects(MassBuilder.component_aabb(gable)):
-				touches_gable = true
+		var at_rear: bool = absf(bounds.get_center().z - site.end.y) \
+			< absf(bounds.get_center().z - site.position.y)
+		var candidates: Array[Dictionary] = east_gable_rows if at_rear else west_gable_rows
+		var touches_matching_support := false
+		for support in candidates:
+			if bounds.grow(0.02).intersects(MassBuilder.component_aabb(support).grow(0.02)):
+				touches_matching_support = true
 				break
-		if not touches_gable:
-			_fail("nave end return is detached from both measured gable supports")
+		if not touches_matching_support:
+			_fail("nave end return is detached from its matching measured gable support")
 	var primary_columns := 0
 	for column in spec.columns:
 		var p: Vector3 = column["pos"]

@@ -46,6 +46,14 @@ const FLYER_PIER_GAP := 0.9      # gap between aisle wall and flyer pier
 const FLYER_PIER_W := 0.9        # minimum flyer pier plan size
 const FLYER_TIER_DROP := 0.34    # vertical gap between stacked flyers, x height
 const CHAPEL_LAP := 0.25         # chapel mouth buried in the wall it opens off
+const GOTHIC_CHEVET_ROOF_RISE_RATIO := 0.92
+const GOTHIC_CHEVET_ROOF_OVERHANG := 0.34
+const GOTHIC_CHEVET_ROOF_FACETS := 4
+const GOTHIC_CHEVET_BUTTRESS_DEPTH := 0.36
+const GOTHIC_CHEVET_BUTTRESS_WIDTH := 0.34
+const GOTHIC_CHEVET_BUTTRESS_FOOT_DEPTH := 0.46
+const GOTHIC_CHEVET_BUTTRESS_FOOT_WIDTH := 0.52
+const GOTHIC_CHEVET_BUTTRESS_FOOT_HEIGHT := 0.48
 const AMBULATORY_W := 0.55       # ambulatory width, x apse radius
 const DOME_DRUM_RATIO := 0.45    # drum height, x dome radius
 const OCTAGONAL_RADIUS_FACTOR := 1.06  # shared circumradius of drum and shell rim
@@ -613,6 +621,75 @@ static func chapel_arc_start(spec: ChurchSpec, i: int) -> float:
 	return -chapel_angle(spec, i)
 
 
+static func has_gothic_chevet_roof(spec: ChurchSpec) -> bool:
+	return spec.style == &"gothic" and spec.chapel_arrangement == &"chevet" \
+		and spec.hero != &"basil"
+
+
+static func chapel_gothic_spacing_clearance(spec: ChurchSpec, i: int) -> float:
+	var nearest: float = INF
+	var center: Vector3 = chapel_center(spec, i)
+	for other in range(spec.radiating_chapels):
+		if other == i:
+			continue
+		nearest = minf(nearest, center.distance_to(chapel_center(spec, other))
+			- spec.chapel_radius * 2.0)
+	return GOTHIC_CHEVET_ROOF_OVERHANG * 2.0 if not is_finite(nearest) \
+		else maxf(nearest, 0.0)
+
+
+static func chapel_gothic_roof_overhang(spec: ChurchSpec, i: int) -> float:
+	var clearance: float = chapel_gothic_spacing_clearance(spec, i)
+	return minf(GOTHIC_CHEVET_ROOF_OVERHANG, clearance * 0.30)
+
+
+static func chapel_gothic_buttress_scale(spec: ChurchSpec, i: int) -> float:
+	var spacing_scale: float = chapel_gothic_spacing_clearance(spec, i) / 0.55
+	var radius_scale: float = spec.chapel_radius / 1.25
+	return clampf(minf(spacing_scale, radius_scale), 0.12, 1.0)
+
+
+static func chapel_gothic_roof_radius(spec: ChurchSpec, i: int) -> float:
+	return spec.chapel_radius + chapel_gothic_roof_overhang(spec, i)
+
+
+static func chapel_gothic_extent_radius(spec: ChurchSpec, i: int) -> float:
+	var radius: float = spec.chapel_radius
+	var overhang: float = chapel_gothic_roof_overhang(spec, i)
+	var support_scale: float = chapel_gothic_buttress_scale(spec, i)
+	var support_out: float = GOTHIC_CHEVET_BUTTRESS_FOOT_DEPTH * support_scale * 0.5 \
+		- 0.05 * support_scale
+	var half_width: float = GOTHIC_CHEVET_BUTTRESS_FOOT_WIDTH * support_scale * 0.5
+	var support_radial_extent: float = support_out \
+		+ half_width * half_width / (2.0 * maxf(radius, 0.1))
+	return radius + maxf(overhang, support_radial_extent)
+
+
+static func chapel_gothic_roof_rise(spec: ChurchSpec) -> float:
+	return maxf(0.35, spec.chapel_radius * GOTHIC_CHEVET_ROOF_RISE_RATIO)
+
+
+## Four engaged supports on the half-drum's curved shoulder. Each station is
+## given in world space so the builder and its triangle fixture share bearings.
+static func chapel_gothic_buttress_stations(spec: ChurchSpec, i: int) -> Array[Dictionary]:
+	var radius: float = spec.chapel_radius
+	if radius <= 0.0:
+		return []
+	var angle: float = chapel_angle(spec, i)
+	var radial := Vector3(sin(angle), 0.0, cos(angle))
+	var tangent := Vector3(cos(angle), 0.0, -sin(angle))
+	var center: Vector3 = chapel_center(spec, i)
+	var out: Array[Dictionary] = []
+	for depth_ratio in [0.20, 0.62]:
+		var radial_depth: float = radius * float(depth_ratio)
+		var lateral: float = sqrt(maxf(0.0, radius * radius - radial_depth * radial_depth))
+		for side in [-1.0, 1.0]:
+			var normal := radial * (radial_depth / radius) + tangent * (float(side) * lateral / radius)
+			var position := center + radial * radial_depth + tangent * (float(side) * lateral)
+			out.append({"position": position, "normal": normal.normalized()})
+	return out
+
+
 ## Physical mouth shared by the ambulatory wall cut and its threshold floor.
 static func chapel_mouth_width(spec: ChurchSpec, i: int) -> float:
 	return minf(1.25, spec.chapel_radius * 1.5)
@@ -633,7 +710,8 @@ static func chapel_mouth_half_angle(spec: ChurchSpec, i: int, wall_radius: float
 ## overstate it inward and read as colliding with the mass it opens off.
 static func chapel_aabb(spec: ChurchSpec, i: int) -> AABB:
 	var c: Vector3 = chapel_center(spec, i)
-	var r: float = spec.chapel_radius
+	var r: float = chapel_gothic_extent_radius(spec, i) \
+		if has_gothic_chevet_roof(spec) else spec.chapel_radius
 	var start: float = chapel_arc_start(spec, i)
 	var lo := Vector2(c.x, c.z)
 	var hi := Vector2(c.x, c.z)
@@ -1300,7 +1378,9 @@ static func chapel_drum_center(spec: ChurchSpec, i: int) -> Vector3:
 ## Ground to the tip of the cross: what the elevation draws.
 static func chapel_tower_height(spec: ChurchSpec, i: int) -> float:
 	if spec.hero != &"basil":
-		return spec.height * 0.42
+		var body_height: float = chapel_body_height(spec, i)
+		return body_height + chapel_gothic_roof_rise(spec) \
+			if has_gothic_chevet_roof(spec) else body_height
 	return chapel_body_height(spec, i) + chapel_drum_height(spec, i) \
 		+ chapel_onion_rise(spec) + chapel_spike_height(spec)
 

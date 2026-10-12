@@ -71,13 +71,15 @@ func check(spec: TempleSpec, builder: TempleBuilder, overrides: Dictionary = {})
 	var pylon_lintel_supported := false
 	var pylon_upper_piers_supported := false
 	var pylon_spandrel_supported := false
+	var rotunda_arcade_supported := false
 	if spec.form == &"pylon":
 		var pylon_stone: Array = MeshProbe.surface_triangles(builder, null, TempleBuilder.SURF_STONE)
+		var pylon_trim: Array = MeshProbe.surface_triangles(builder, null, TempleBuilder.SURF_TRIM)
 		var pylon_lintel_failures: Array[String] = _pylon_lintel_bearing_failures(spec, builder, pylon_stone)
 		var pylon_upper_failures: Array[String] = _pylon_upper_pier_bearing_failures(builder, pylon_stone)
 		var pylon_spandrel_failures: Array[String] = _pylon_spandrel_bearing_failures(builder, pylon_stone)
 		var pylon_tower_base_issues: Array[String] = _pylon_tower_base_failures(
-			spec, builder, pylon_stone)
+			spec, builder, pylon_stone, pylon_trim)
 		var pylon_all_issues: Array[String] = []
 		pylon_all_issues.append_array(pylon_lintel_failures)
 		pylon_all_issues.append_array(pylon_upper_failures)
@@ -92,9 +94,13 @@ func check(spec: TempleSpec, builder: TempleBuilder, overrides: Dictionary = {})
 		var stone: Array = MeshProbe.surface_triangles(builder, null, TempleBuilder.SURF_STONE)
 		var roof: Array = MeshProbe.surface_triangles(builder, null, TempleBuilder.SURF_ROOF)
 		rotunda_bearing_failures = _rotunda_bearing_failures(spec, builder, stone, roof)
-		lantern_seat_supported = false
 		for bearing_failure in rotunda_bearing_failures:
 			failures.append(bearing_failure)
+		var arcade_failures: Array[String] = _rotunda_arcade_support_failures(builder, stone)
+		for arcade_failure in arcade_failures:
+			failures.append(arcade_failure)
+		rotunda_arcade_supported = arcade_failures.is_empty()
+		lantern_seat_supported = false
 	var gaps: Dictionary = _rotunda_gap_report(masses,
 		spec.form == &"rotunda" and lantern_seat_supported)
 	for f in gaps["failures"]:
@@ -132,6 +138,8 @@ func check(spec: TempleSpec, builder: TempleBuilder, overrides: Dictionary = {})
 		# is continuous with the outer arcade and inner colonnade; it adds no
 		# detached roof mass that needs an exception in the connectivity graph.
 		carried.append("wall_rotunda_gate_head")
+		if rotunda_arcade_supported:
+			carried.append("rotunda_arcade_pier_")
 		if spec.spire and lantern_seat_supported:
 			carried.append("rotunda_lantern")
 	for g in MassRules.grounded(masses, carried):
@@ -174,12 +182,18 @@ static func _rotunda_wall_continuity_triangles(spec: TempleSpec,
 		var rel: float = wrapf(angle + PI * 0.5 + PI, 0.0, TAU) - PI
 		if absf(rel) <= gate_half:
 			continue
-		var ray_from := Vector3(cos(angle) * (inner - 0.08), y,
-			sin(angle) * (inner - 0.08))
-		var ray_to := Vector3(cos(angle) * (outer + 0.08), y,
-			sin(angle) * (outer + 0.08))
-		if not MeshProbe.ray_blocked(triangles, ray_from, ray_to):
-			failures.append("no_overlap: rotunda drum panel has no actual wall surface at angle %.3f" % angle)
+		# The center ray can run exactly along a box-face triangle diagonal.
+		# Require two nearby rays within the same panel face so tessellation-edge
+		# ambiguity cannot create a false gap, while either real opening still fails.
+		for face_offset in [-0.01, 0.01]:
+			var witness_angle: float = angle + face_offset
+			var ray_from := Vector3(cos(witness_angle) * (inner - 0.08), y,
+				sin(witness_angle) * (inner - 0.08))
+			var ray_to := Vector3(cos(witness_angle) * (outer + 0.08), y,
+				sin(witness_angle) * (outer + 0.08))
+			if not MeshProbe.ray_blocked(triangles, ray_from, ray_to):
+				failures.append("no_overlap: rotunda drum panel has no actual wall surface at angle %.3f" % witness_angle)
+				return failures
 		checked += 1
 	# Every seam must be covered just inside each adjacent face. Sampling on the
 	# face interiors avoids relying on an engine ray's treatment of an exact edge.
@@ -202,45 +216,66 @@ static func _rotunda_wall_continuity_triangles(spec: TempleSpec,
 	return failures
 
 
-## The Pylon's battered wall panels start at the top of a real ground course.
-## Require the exact emitted base box and support beneath every authored face
-## edge. Removing that box must remove the same upward support.
+## The Pylon's battered wall panels start at the top of a stone bearing course,
+## above a grounded red footing. Require both exact emitted boxes and support
+## beneath every authored face edge. Removing the bearing course must remove
+## that same upward support.
 static func _pylon_tower_base_failures(spec: TempleSpec, builder: TempleBuilder,
-		stone: Array) -> Array[String]:
+		stone: Array, trim: Array) -> Array[String]:
 	var failures: Array[String] = []
 	var towers: Array[Rect2] = TempleGeometry.pylon_rects(spec)
 	for index in range(towers.size()):
 		var host_name: String = "pylon_tower_%d" % index
 		var host_rows: Array[Dictionary] = builder.components_of(host_name)
+		var band_rows: Array[Dictionary] = []
 		var base_rows: Array[Dictionary] = []
 		var face_rows: Array[Dictionary] = []
 		for row in host_rows:
-			if String(row.get("role", "")) == "pylon_tower_base_course":
+			if String(row.get("role", "")) == "pylon_tower_base_band":
+				band_rows.append(row)
+			elif String(row.get("role", "")) == "pylon_tower_base_course":
 				base_rows.append(row)
 			elif String(row.get("role", "")) == "pylon_battered_face":
 				face_rows.append(row)
-		if base_rows.size() != 1 or face_rows.size() != 4:
-			failures.append("size_match: Pylon tower %d lacks one base course and four battered faces" % index)
+		if band_rows.size() != 1 or base_rows.size() != 1 or face_rows.size() != 4:
+			failures.append("size_match: Pylon tower %d lacks its red footing, stone bearing course, or four battered faces" % index)
 			continue
 		var base: Dictionary = base_rows[0]
-		if not _rotunda_box_component_emitted(stone, base):
-			failures.append("size_match: Pylon tower %d base-course box is absent from emitted stone" % index)
+		var band: Dictionary = band_rows[0]
+		if not _rotunda_box_component_emitted(stone, base) \
+				or not _rotunda_box_component_emitted(trim, band):
+			failures.append("size_match: Pylon tower %d footing or bearing-course box is absent from emitted mesh" % index)
 			continue
 		var base_xf: Transform3D = base["xf"]
 		var base_size: Vector3 = base["size"]
 		var bottom: float = base_xf.origin.y - base_size.y * 0.5
 		var top: float = base_xf.origin.y + base_size.y * 0.5
+		var band_xf: Transform3D = band["xf"]
+		var band_size: Vector3 = band["size"]
+		var band_bottom: float = band_xf.origin.y - band_size.y * 0.5
+		var band_top: float = band_xf.origin.y + band_size.y * 0.5
 		var rect: Rect2 = towers[index]
 		var footprint := Rect2(Vector2(base_xf.origin.x - base_size.x * 0.5,
 			base_xf.origin.z - base_size.z * 0.5), Vector2(base_size.x, base_size.z))
-		if absf(bottom) > 0.001 or absf(top - base_size.y) > 0.001 \
+		var band_footprint := Rect2(Vector2(band_xf.origin.x - band_size.x * 0.5,
+			band_xf.origin.z - band_size.z * 0.5), Vector2(band_size.x, band_size.z))
+		if absf(band_bottom) > 0.001 or absf(bottom - band_top) > 0.001 \
+				or absf(band_footprint.position.x - rect.position.x) > 0.001 \
+				or absf(band_footprint.position.y - rect.position.y) > 0.001 \
+				or absf(band_footprint.size.x - rect.size.x) > 0.001 \
+				or absf(band_footprint.size.y - rect.size.y) > 0.001 \
 				or absf(footprint.position.x - rect.position.x) > 0.001 \
 				or absf(footprint.position.y - rect.position.y) > 0.001 \
 				or absf(footprint.size.x - rect.size.x) > 0.001 \
 				or absf(footprint.size.y - rect.size.y) > 0.001:
-			failures.append("size_match: Pylon tower %d foundation misses ground or published footprint" % index)
+			failures.append("size_match: Pylon tower %d red footing and stone bearing course miss ground or published footprint" % index)
 			continue
 		var without_base: Array = _rotunda_without_box_component(stone, base)
+		var without_band: Array = _rotunda_without_box_component(trim, band)
+		var center := rect.get_center()
+		if not MeshProbe.has_upward_support(trim, center, bottom, 0.003) \
+				or MeshProbe.has_upward_support(without_band, center, bottom, 0.003):
+			failures.append("size_match: Pylon tower %d red footing has no actual emitted bearing or removal negative" % index)
 		var checked := 0
 		for face in face_rows:
 			if String(face.get("form", "")) != "slab":
@@ -475,6 +510,34 @@ static func _rotunda_lantern_seat_supported(spec: TempleSpec, roof: Array) -> bo
 	return true
 
 
+## Arcade piers are carried only when their own emitted boxes have real
+## upward support from the lower drum. The support samples are inset from each
+## pier edge and its own triangles are removed before testing.
+static func _rotunda_arcade_support_failures(builder: TempleBuilder,
+		stone: Array) -> Array[String]:
+	var failures: Array[String] = []
+	var rows: Array[Dictionary] = builder.components("rotunda_arcade_pier")
+	if rows.size() < 6:
+		failures.append("size_match: Rotunda upper arcade has too few emitted piers")
+		return failures
+	for row in rows:
+		if not _rotunda_box_component_emitted(stone, row):
+			failures.append("size_match: Rotunda arcade pier is absent from emitted stone triangles")
+			return failures
+		var size: Vector3 = row["size"]
+		var xf: Transform3D = row["xf"]
+		var bottom: float = xf.origin.y - size.y * 0.5
+		var without_pier: Array = _rotunda_without_box_component(stone, row)
+		for sx in [-0.2, 0.2]:
+			for sz in [-0.2, 0.2]:
+				var world: Vector3 = xf * Vector3(size.x * sx, -size.y * 0.5, size.z * sz)
+				if not MeshProbe.has_upward_support(without_pier,
+						Vector2(world.x, world.z), bottom, 0.04):
+					failures.append("size_match: Rotunda arcade pier %s lacks emitted drum support at its base" % String(row.get("id", "?")))
+					return failures
+	return failures
+
+
 ## Runtime bearing exceptions require actual emitted support triangles.
 ## Remove a member's own emitted box triangles before measuring its contacts,
 ## so a floating component cannot support itself.
@@ -491,7 +554,7 @@ static func _rotunda_bearing_failures_for_components(spec: TempleSpec,
 	var failures: Array[String] = []
 	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
 	var jamb: float = spec.wall_t * 0.35
-	var gate_height: float = minf(TempleGeometry.GATE_H, spec.height - 0.6)
+	var gate_height: float = minf(TempleGeometry.GATE_H, TempleGeometry.rotunda_lower_drum_height(spec) - 0.6)
 	if head_rows.size() != 1:
 		failures.append("size_match: Rotunda gate head has no unique measured bearing member")
 	elif return_rows.size() != 2:

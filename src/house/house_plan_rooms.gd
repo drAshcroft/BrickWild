@@ -101,6 +101,36 @@ static func _domestic_layout(p: HousePlan, spec: HouseSpec) -> Dictionary:
 	var trade_room: StringName = HouseSpec.TRADES.get(spec.trade, {}).get("room", &"")
 	if trade_room != &"" and wanted >= 3 and kinds.has(trade_room):
 		required.append(trade_room)
+	# The compact Witch Alchemist keeps a direct Hall door to the bedroom and
+	# workshop, but moves those doors onto separate stations along the Hall's
+	# long side. Its front-to-back alternative crowds a two-seat meal group.
+	if _compact_witch_alchemist_side_hall_case(spec, wanted, kinds, inner):
+		var sidehall_attempt := _fit_compact_witch_alchemist_side_hall(p, spec, inner)
+		if bool(sidehall_attempt.get("ok", false)):
+			var sidehall_rooms: Array[Dictionary] = sidehall_attempt["rooms"]
+			for row in sidehall_rooms:
+				var kind: StringName = row["kind"]
+				if kind == &"hall":
+					row["domestic_role"] = &"living_hall"
+					row["domestic_functions"] = [&"entry", &"circulation", &"dining", &"common_living", &"cooking"]
+					row["meal_room"] = true
+					row["shared_cooking"] = true
+				elif kind == &"bedroom":
+					row["domestic_role"] = &"sleeping"
+					row["domestic_functions"] = [&"sleeping"]
+				else:
+					row["domestic_role"] = &"workshop"
+					row["domestic_functions"] = [&"workshop"]
+				row["domestic_layout_storey"] = 0
+			return {"ok": true, "rooms": sidehall_rooms, "provenance": {
+				"status": &"planned", "style": spec.style,
+				"requested_rooms": requested, "planned_rooms": sidehall_rooms.size(),
+				"ground_activities": kinds.duplicate(), "merged_activities": [&"kitchen"],
+				"capacity_expanded": false, "omitted_rooms": maxi(requested - sidehall_rooms.size(), 0),
+				"omitted_activities": [], "rejected_candidates": rejected,
+				"reason": "compact Alchemist Hall runs beside a split Workshop and private Bedroom; cooking stays in the Hall",
+				"mirror": false, "hall_role": &"living_hall", "shared_cooking": true,
+				"witch_alchemist_side_hall": true}}
 
 	if _compact_witch_service_case(spec, wanted, kinds, inner):
 		var shared_attempt := _fit_compact_witch_shared_hall_candidate(p, spec, inner)
@@ -439,6 +469,30 @@ static func _compact_witch_service_case(spec: HouseSpec, wanted: int,
 		and spec.storeys == 1 and spec.cellars == 0 and wanted == 3 \
 		and kinds.has(&"hall") and kinds.has(&"kitchen") and kinds.has(&"bedroom") \
 		and inner.size.x <= 7.5 and inner.size.y <= 9.0
+
+
+static func _compact_witch_alchemist_side_hall_case(spec: HouseSpec, wanted: int,
+		kinds: Array[StringName], inner: Rect2) -> bool:
+	return spec != null and spec.get_script() == BASE_HOUSE_SPEC \
+		and spec.style == &"witch_hut" and spec.trade == &"alchemist" \
+		and not spec.has_method("room_program") and not spec.has_method("custom_room_rects") \
+		and not spec.has_method("landmark_footprint") \
+		and spec.storeys == 1 and spec.cellars == 0 and wanted == 3 \
+		and kinds.size() == 3 and kinds.has(&"hall") and kinds.has(&"workshop") \
+		and kinds.has(&"bedroom") and inner.size.x >= 6.35 and inner.size.y >= 7.6
+
+
+static func _fit_compact_witch_alchemist_side_hall(p: HousePlan, spec: HouseSpec,
+		inner: Rect2) -> Dictionary:
+	var hall_width := 3.0
+	var service_width := inner.size.x - hall_width
+	var split_y := inner.position.y + inner.size.y * 0.5
+	var rooms: Array[Dictionary] = [
+		{"kind": &"hall", "rect": Rect2(inner.position, Vector2(hall_width, inner.size.y)), "storey": 0},
+		{"kind": &"workshop", "rect": Rect2(Vector2(inner.position.x + hall_width, inner.position.y), Vector2(service_width, inner.size.y * 0.5)), "storey": 0},
+		{"kind": &"bedroom", "rect": Rect2(Vector2(inner.position.x + hall_width, split_y), Vector2(service_width, inner.size.y * 0.5)), "storey": 0},
+	]
+	return _validate_domestic_rooms(p, inner, rooms, false)
 
 
 static func _large_domestic_grammar(spec: HouseSpec) -> bool:

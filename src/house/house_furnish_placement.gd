@@ -17,6 +17,8 @@ const LONG_SEAT_OVERHANG := 0.3
 ## as you come in (walk QA, 6 Oct).
 const DOOR_APPROACH := 1.6
 const DOOR_APPROACH_SIDE := 0.3
+## Match the domestic bed-door QA margin for the compact Alchemist's side Hall.
+const COMPACT_ALCHEMIST_BED_DOOR_GAP := 0.4
 ## Clear floor kept round a table before another table may stand there: a
 ## seat's depth and its pull-back space.
 const TABLE_GAP := 1.1
@@ -183,6 +185,22 @@ static func initial_blocked(plan: HousePlan, room: int) -> Array[Rect2]:
 			elif stair.has("rect"):
 				out.append(Rect2(stair["rect"]))
 	return out
+
+
+static func _is_compact_witch_alchemist(plan: HousePlan) -> bool:
+	return HouseFurnishingRecipes.is_ordinary_house(plan) \
+		and plan.spec.style == &"witch_hut" and plan.spec.trade == &"alchemist" \
+		and bool(plan.domestic_layout.get("witch_alchemist_side_hall", false))
+
+
+static func _bed_candidate_clears_door_gaps(plan: HousePlan, room: int, body: Rect2) -> bool:
+	for door_index in plan.doors_of(room):
+		var door: Dictionary = plan.doors[door_index]
+		for side in [-1.0, 1.0]:
+			if body.intersects(HouseGeometry.door_clear_rect(door, side).grow(
+					COMPACT_ALCHEMIST_BED_DOOR_GAP)):
+				return false
+	return true
 
 
 ## Windows only block furniture that would stand IN them. A chest under a
@@ -1205,6 +1223,11 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 						try_cand["zone"] = HouseFurnishGeometry.ordinary_sleep_access_zone(
 							Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
 							float(try_cand["yaw"]))
+					if _is_compact_witch_alchemist(plan) and plan.kind_of(room) == &"bedroom" \
+							and PropCatalog.category(key) == "bed" \
+							and String(step.get("group", "")) == "sleep" \
+							and not _bed_candidate_clears_door_gaps(plan, room, Rect2(try_cand["rect"])):
+						continue
 					if try_cand["cat"] in ["seat", "bench"]:
 						# A seat backed to a wall is sat on facing the room: the
 						# floor it needs is in FRONT of it, for the legs, not the

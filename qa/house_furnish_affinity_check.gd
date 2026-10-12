@@ -37,9 +37,6 @@ func _fs_report(plan: HousePlan, p: Dictionary, cat: String, msg: String) -> voi
 ## nothing; this is the same shape the `shelf_over` rule already uses, where a
 ## station found but unused is a failure and no station at all is a warning.
 const FS_WINDOW_REACH := 2.5
-## Slack on the run test, so a bench that IS on the window wall is never
-## reported as one that could not have been.
-const FS_LIT_RUN_TOL := 0.12
 
 func check_workbench_daylight(plan: HousePlan) -> void:
 	for f in range(plan.furniture.size()):
@@ -60,7 +57,7 @@ func check_workbench_daylight(plan: HousePlan) -> void:
 			near = minf(near, c.distance_to(Vector2(plan.windows[w]["pos"])))
 		if near <= FS_WINDOW_REACH:
 			continue
-		if _lit_run_takes_bench(plan, room, p):
+		if _lit_run_takes_bench(plan, room, p, f):
 			_fs_report(plan, p, "workbench",
 				"workbench_daylight: %s works %.2fm from the nearest window, with its back to a blind wall"
 				% [HouseFurnishCheck.who(plan, f), near])
@@ -71,20 +68,84 @@ func check_workbench_daylight(plan: HousePlan) -> void:
 
 
 ## Could this room have put the bench on a wall that has a window?
-##
-## The run a piece is offered on is the wall LESS whatever the window in it
-## keeps clear, because a bench stood in front of a window is the one
-## arrangement this whole rule exists to prevent. Both pieces are measured, so
-## a room that could have done it and did not still fails.
-static func _lit_run_takes_bench(plan: HousePlan, room: int, p: Dictionary) -> bool:
-	var rect: Rect2 = p["rect"]
-	var span: float = maxf(rect.size.x, rect.size.y) + FS_LIT_RUN_TOL
+## A legal station must fit the measured bench, its stance zone, the actual
+## blocked floor, and the window clearance. Raw wall length is not a station.
+static func _lit_run_takes_bench(plan: HousePlan, room: int, p: Dictionary,
+		furniture_index: int, added_obstructions: Array[Rect2] = []) -> bool:
+	return not _lit_workbench_candidate(plan, room, p, furniture_index,
+		added_obstructions).is_empty()
+
+
+## Return one full-size witness pose, using the same shell/prop obstructions
+## and wall/window fit rules as the actual workbench placement search.
+static func _lit_workbench_candidate(plan: HousePlan, room: int, p: Dictionary,
+		furniture_index: int, added_obstructions: Array[Rect2] = []) -> Dictionary:
+	var environment := _fs_candidate_environment(plan, room, furniture_index)
+	var blocked: Array[Rect2] = environment["blocked"]
+	blocked.append_array(added_obstructions)
+	blocked.append_array(HouseFurnishPlacement.initial_blocked(plan, room))
+	var zones: Array[Rect2] = environment["zones"]
+	var floor_rect := HouseGeometry.room_floor_rect(plan, room)
+	var key := String(p["key"])
+	var extra: Array[Rect2] = HouseFurnishPlacement._window_blocks(plan, room, key)
+	var walls := HouseGeometry.room_walls(plan, room)
 	for wi in plan.windows_of(room):
-		if _lit_wall_of_window(plan, room, wi) < 0:
+		var wall_index := _lit_wall_of_window(plan, room, wi)
+		if wall_index < 0:
 			continue
-		if _clear_run(plan, room, wi) >= span:
-			return true
-	return false
+		var wall: Dictionary = walls[wall_index]
+		var a: Vector2 = wall["from"]
+		var b: Vector2 = wall["to"]
+		var segment := b - a
+		var run := segment.length()
+		if run <= 0.0:
+			continue
+		var along := segment / run
+		var inward: Vector2 = wall["normal"]
+		var yaw := atan2(-inward.x, -inward.y)
+		for scale in HouseFurnishGeometry.scales(key):
+			var footprint := PropCatalog.footprint_rotated(key, yaw) * float(scale)
+			var half_along := (absf(along.x) * footprint.x + absf(along.y) * footprint.y) * 0.5
+			var half_inward := (absf(inward.x) * footprint.x + absf(inward.y) * footprint.y) * 0.5
+			var first := half_along + 0.06
+			var last := run - half_along - 0.06
+			if first > last:
+				continue
+			var steps := maxi(1, int(ceil((last - first) / 0.12)))
+			for step in range(steps + 1):
+				var station := lerpf(first, last, float(step) / steps)
+				var centre := a + along * station + inward * (half_inward + 0.04)
+				for zone_side in [1.0, -1.0]:
+					var candidate := HouseFurnishGeometry.candidate(key, centre, yaw, zone_side,
+						float(scale), float(p.get("height_scale", -1.0)))
+					if not HouseFurnishGeometry.fits(plan, room, candidate, floor_rect,
+						blocked, zones, extra):
+						continue
+					if HouseFurnishSpatialCheck.fs_back_wall(plan, room, candidate["rect"], candidate) == wall_index \
+						and HouseFurnishSpatialCheck.fs_wall_lit(plan, room, wall_index):
+						return candidate
+	return {}
+
+
+## Existing furniture geometry, excluding the piece being relocated and any
+## seats attached to it. These are the same occupied rectangles and use zones
+## the placement search must respect.
+static func _fs_candidate_environment(plan: HousePlan, room: int,
+		exclude_index: int) -> Dictionary:
+	var blocked: Array[Rect2] = []
+	var zones: Array[Rect2] = []
+	for i in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[i]
+		if i == exclude_index or int(p.get("host", -1)) == exclude_index \
+				or p.get("mounted", false):
+			continue
+		var rect := Rect2(p.get("rect", Rect2()))
+		if rect.has_area():
+			blocked.append(rect)
+		var zone := Rect2(p.get("zone", Rect2()))
+		if zone.has_area():
+			zones.append(zone)
+	return {"blocked": blocked, "zones": zones}
 
 
 ## Which of this room's walls, if any, carries the window `wi`.
@@ -103,32 +164,6 @@ static func _lit_wall_of_window(plan: HousePlan, room: int, wi: int) -> int:
 		if t >= 0.0 and t <= 1.0:
 			return i
 	return -1
-
-
-## The longest unbroken stretch of window wall `wi`, measured along the wall and
-## with the window's own clear area taken out of it.
-static func _clear_run(plan: HousePlan, room: int, wi: int) -> float:
-	var walls := HouseGeometry.room_walls(plan, room)
-	var lit := _lit_wall_of_window(plan, room, wi)
-	if lit < 0 or lit >= walls.size():
-		return 0.0
-	var a: Vector2 = walls[lit]["from"]
-	var b: Vector2 = walls[lit]["to"]
-	var run: float = (b - a).length()
-	if run <= 0.0:
-		return 0.0
-	var along: Vector2 = (b - a) / run
-	var clear := HouseGeometry.window_clear_rect(plan.windows[wi])
-	var lo := INF
-	var hi := -INF
-	for corner in [clear.position, Vector2(clear.end.x, clear.position.y),
-			Vector2(clear.position.x, clear.end.y), clear.end]:
-		var s: float = (corner - a).dot(along)
-		lo = minf(lo, s)
-		hi = maxf(hi, s)
-	lo = maxf(lo, 0.0)
-	hi = minf(hi, run)
-	return maxf(0.0, lo + (run - hi))
 
 
 ## Heat and parchment do not mix: a bookcase keeps off the wall the chimney is
@@ -259,9 +294,7 @@ func check_table_focus(plan: HousePlan) -> void:
 		if PropCatalog.category(plan.furniture[i]["key"]) == "hearth":
 			focus = Rect2(plan.furniture[i]["rect"]).get_center()
 	if not focus.is_finite():
-		var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
-		focus = (Vector2(walls[plan.hearth_wall()]["from"])
-			+ Vector2(walls[plan.hearth_wall()]["to"])) / 2.0
+		focus = _planned_hearth_focus(plan, room)
 	var mid: Vector2 = f_rect.get_center()
 	var dir: Vector2 = focus - mid
 	if dir.length() < 0.01:
@@ -302,36 +335,36 @@ func check_table_focus(plan: HousePlan) -> void:
 ## count as being in its way.
 static func _fs_mirror_free(plan: HousePlan, room: int, me: int, dir: Vector2,
 		back: float) -> bool:
-	var rect: Rect2 = plan.furniture[me]["rect"]
-	var moved: Rect2 = Rect2(rect.position + dir * (2.0 * back), rect.size)
-	if not HouseGeometry.room_floor_rect(plan, room).grow(0.05).encloses(moved):
+	var original: Dictionary = plan.furniture[me]
+	var rect: Rect2 = original["rect"]
+	var moved_centre := rect.get_center() + dir * (2.0 * back)
+	var key := String(original["key"])
+	var yaw := float(original.get("yaw", 0.0))
+	var scale := float(original.get("scale", 1.0))
+	var candidate := HouseFurnishGeometry.candidate(key, moved_centre, yaw, 1.0,
+		scale, float(original.get("height_scale", -1.0)))
+	var environment := _fs_candidate_environment(plan, room, me)
+	var blocked: Array[Rect2] = environment["blocked"]
+	blocked.append_array(HouseFurnishPlacement.initial_blocked(plan, room))
+	var zones: Array[Rect2] = environment["zones"]
+	var extra: Array[Rect2] = HouseFurnishPlacement._window_blocks(plan, room, key)
+	extra.append_array(HouseFurnishPlacement.door_approaches(plan, room))
+	for i in plan.furniture_of(room):
+		if i == me or PropCatalog.category(plan.furniture[i]["key"]) != "table":
+			continue
+		blocked.append(Rect2(plan.furniture[i]["rect"]).grow(HouseFurnishPlacement.TABLE_GAP))
+	var floor_rect := HouseGeometry.room_floor_rect(plan, room)
+	if not HouseFurnishGeometry.fits(plan, room, candidate, floor_rect,
+		blocked, zones, extra):
 		return false
-	for f in plan.furniture_of(room):
-		if f == me:
-			continue
-		var q: Dictionary = plan.furniture[f]
-		if q.get("mounted", false) or int(q["host"]) >= 0:
-			continue
-		var cat: String = PropCatalog.category(q["key"])
-		if cat == "seat" or cat == "bench":
-			continue
-		var over: Rect2 = Rect2(q["rect"]).intersection(moved)
-		if over.size.x > TOL and over.size.y > TOL:
-			return false
-		var zone: Rect2 = q["zone"]
-		if zone.size.x > 0.0:
-			var zover: Rect2 = zone.intersection(moved)
-			if zover.size.x > TOL and zover.size.y > TOL:
-				return false
-	# and it would have to be out of the way of every door, which is the other
-	# reason the placer leaves the middle of a hall alone
-	for d in plan.doors_of(room):
-		for side in [-1.0, 1.0]:
-			var clear: Rect2 = HouseGeometry.door_clear_rect(plan.doors[d], side)
-			var dover: Rect2 = clear.intersection(moved)
-			if dover.size.x > TOL and dover.size.y > TOL:
-				return false
-	return true
+	var seats_needed := 0
+	for i in plan.furniture_of(room):
+		if int(plan.furniture[i].get("host", -1)) == me \
+				and PropCatalog.category(plan.furniture[i]["key"]) in ["seat", "bench"]:
+			seats_needed += 1
+	seats_needed = maxi(seats_needed, 1)
+	return not HouseFurnishPlacement._seating_probe(plan, room, candidate,
+		blocked, zones, "seat", seats_needed, seats_needed > 1).is_empty()
 
 
 ## Two lamps in a room are a pair: one wall, and the same distance either side
@@ -706,6 +739,18 @@ func check_focus(plan: HousePlan) -> void:
 	var cat: String = plan.focus_cat()
 	if cat == "":
 		return
+	if cat == "hearth" and HouseFurnishingRecipes.uses_native_domestic_fireplace(plan) \
+			and room == plan.hearth_room() \
+			and String(plan.hearth.get("host_kind", "")) == "ordinary_fireplace":
+		var breast: Dictionary = HouseGeometry.hearth_breast(plan)
+		if int(breast.get("room", -1)) == room \
+				and int(breast.get("wall", -1)) == plan.hearth_wall() \
+				and absf(float(breast.get("depth", 0.0)) \
+					- HouseGeometry.DOMESTIC_FIREPLACE_DEPTH) <= 0.001:
+			return
+		failures.append("focus: room %d (%s) has no hearth to be arranged around"
+			% [room, String(plan.kind_of(room))])
+		return
 	var pieces: Array[int] = []
 	for f in plan.furniture_of(room):
 		var p: Dictionary = plan.furniture[f]
@@ -810,6 +855,25 @@ func check_focus(plan: HousePlan) -> void:
 	if not hit.is_empty():
 		warnings.append("focus: the %s in room %d cannot be seen from the door past the %s"
 			% [cat, room, names[hit[0]]])
+
+
+## Native hearths have no furniture row. Their measured host is the focus point.
+static func _planned_hearth_focus(plan: HousePlan, room: int) -> Vector2:
+	if HouseFurnishingRecipes.uses_native_domestic_fireplace(plan) \
+			and room == plan.hearth_room() \
+			and String(plan.hearth.get("host_kind", "")) == "ordinary_fireplace":
+		var breast: Dictionary = HouseGeometry.hearth_breast(plan)
+		if int(breast.get("room", -1)) == room \
+				and int(breast.get("wall", -1)) == plan.hearth_wall() \
+				and absf(float(breast.get("depth", 0.0)) \
+					- HouseGeometry.DOMESTIC_FIREPLACE_DEPTH) <= 0.001:
+			return Vector2(breast.get("centre", Vector2(INF, INF)))
+	if plan.focus_room() == room and plan.focus_cat() == "hearth" \
+			and plan.focus_pos().is_finite():
+		return plan.focus_pos()
+	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
+	return (Vector2(walls[plan.hearth_wall()]["from"])
+		+ Vector2(walls[plan.hearth_wall()]["to"])) * 0.5
 
 
 ## Floor the plan keeps clear stays clear.

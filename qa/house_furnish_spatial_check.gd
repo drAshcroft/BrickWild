@@ -68,11 +68,13 @@ func check_hearth(plan: HousePlan) -> void:
 		if plan.furniture[f]["room"] == room:
 			here.append(f)
 	var native_host: bool = HouseFurnishingRecipes.uses_native_domestic_fireplace(plan) \
-		and not HouseGeometry.hearth_breast(plan).is_empty()
+		and String(plan.hearth.get("host_kind", "")) == "ordinary_fireplace"
 	if here.is_empty() and wants_one and native_host:
 		var breast: Dictionary = HouseGeometry.hearth_breast(plan)
-		if int(breast.get("room", -1)) != room or int(breast.get("wall", -1)) != wall \
-				or absf(float(breast.get("depth", 0.0)) - HouseGeometry.BREAST_DEPTH) > 0.001:
+		var expected_depth: float = HouseGeometry.DOMESTIC_FIREPLACE_DEPTH
+		if breast.is_empty() or int(breast.get("room", -1)) != room \
+				or int(breast.get("wall", -1)) != wall \
+				or absf(float(breast.get("depth", 0.0)) - expected_depth) > 0.001:
 			failures.append("hearth: ordinary fireplace host is detached from its planned flue wall")
 	elif here.is_empty() and wants_one:
 		if plan.was_dropped(room, "hearth") or not HouseFurnishProgrammeCheck.could_hold(plan, room, "hearth"):

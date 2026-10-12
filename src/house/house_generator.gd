@@ -72,13 +72,9 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	spec.roof_along_out = float(s.get("along_out", -1.0))
 	var roof_types: Array = s.get("roof_types", [&"gable", &"half_hipped"])
 	spec.roof_type = GeneratorRandom.pick(r, roof_types)
-	# The built-in Witch row's sole historical gable is emitted as a clipped
-	# upper half-hip. Record the resolved form on the spec so plans, blueprints,
-	# builders and API consumers all describe the roof that was actually built.
-	# This is a deterministic resolution after the same single roof-type draw;
-	# it consumes no RNG and is excluded for trades, worlds and custom specs.
-	if _uses_witch_pitch_scope(spec, s, world_family) and spec.roof_type == &"gable":
-		spec.roof_type = &"half_hipped"
+	# Keep the built-in Witch row's measured gable as a gable. Its asymmetric
+	# roof layout already shifts the ridge away from the Workshop without
+	# clipping the inhabited end wall into an upper half-hip.
 	# Read the same roll for a rotated footprint without shifting the historic
 	# RNG stream for subsequent framing, colours and furniture choices.
 	var dormer_rng := RandomNumberGenerator.new()

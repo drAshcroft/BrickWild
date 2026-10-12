@@ -2,6 +2,7 @@ extends SceneTree
 ## Physical chapel-mouth contract. Uses emitted structural and floor triangles.
 
 const Apertures = preload("res://tests/suites/church_aperture_suite.gd")
+const Components = preload("res://qa/component_check.gd")
 
 var result := SuiteResult.new("chapel passage")
 var multi_panel_mouths := 0
@@ -157,6 +158,42 @@ func _check_case(label: String, spec: ChurchSpec, add_fault_controls: bool) -> v
 				lateral, start_radial, end_radial, chapel_index)
 		_check_threshold_floor_full_footprint(label, spec, mesh, chapel_index,
 			add_fault_controls and chapel_index == 0)
+		if spec.style == &"gothic":
+			var opening_h: float = ChurchGeometry.chapel_mouth_height(spec, chapel_index)
+			var head_rise: float = minf(width * 0.24,
+				maxf(0.0, spec.height * ChurchGeometry.AISLE_HEIGHT_RATIO - opening_h - 0.02))
+			var crown_ray_y: float = opening_h + head_rise * 0.65
+			var crown_ray_a: Vector3 = origin + direction * (wall_inner - 0.16) \
+				+ Vector3.UP * crown_ray_y
+			var crown_ray_b: Vector3 = origin + direction * (outer_radius + 0.16) \
+				+ Vector3.UP * crown_ray_y
+			_expect(Apertures._first_hit(mesh, crown_ray_a, crown_ray_b, true).is_empty(),
+				"%s chapel %d pointed crown intrudes into its center route" % [label, chapel_index])
+			var shoulder_ray_a: Vector3 = crown_ray_a + tangent * (width * 0.46)
+			var shoulder_ray_b: Vector3 = crown_ray_b + tangent * (width * 0.46)
+			_expect(not Apertures._first_hit(mesh, shoulder_ray_a, shoulder_ray_b, true).is_empty(),
+				"%s chapel %d pointed head lost solid shoulder support" % [label, chapel_index])
+			var soffit_point: Vector3 = origin \
+				+ direction * ((wall_inner + outer_radius) * 0.5) \
+				+ tangent * (width * 0.25) + Vector3.UP * (opening_h + head_rise * 0.5)
+			var soffit_a: Vector3 = soffit_point + Vector3.UP * 0.12
+			var soffit_b: Vector3 = soffit_point - Vector3.UP * 0.12
+			_expect(not Apertures._first_hit(mesh, soffit_a, soffit_b, true).is_empty(),
+				"%s chapel %d pointed head has no emitted sloped soffit at its reveal" % [label, chapel_index])
+			var removed_soffit := MeshProbe.remove_triangles(mesh, ChurchBuilder.SURF_STONE,
+				func(a: Vector3, b: Vector3, c: Vector3) -> bool:
+					var face: Vector3 = (c - a).cross(b - a)
+					var tri_center: Vector3 = (a + b + c) / 3.0
+					return face.length_squared() > 1e-12 \
+						and absf(face.normalized().dot(Vector3.UP)) > 0.5 \
+						and tri_center.distance_to(soffit_point) < 0.7 \
+						and tri_center.y >= opening_h - 0.02 \
+						and tri_center.y <= opening_h + head_rise + 0.05)
+			_expect(int(removed_soffit.get("removed_triangles", 0)) > 0,
+				"%s chapel %d soffit negative did not remove its nearby sloped faces" % [label, chapel_index])
+			if removed_soffit.get("mesh") != null:
+				_expect(Apertures._first_hit(removed_soffit["mesh"], soffit_a, soffit_b, true).is_empty(),
+					"%s chapel %d removed-soffit negative retained reveal support" % [label, chapel_index])
 
 		# A nearby lane through the uncut wall must remain masonry.
 		var outside_lateral: float = width * 0.5 + 0.2
@@ -183,6 +220,109 @@ func _check_case(label: String, spec: ChurchSpec, add_fault_controls: bool) -> v
 			outer_radius)
 		_check_removed_wall_control(label, spec, mesh, origin, wall_inner,
 			outer_radius)
+	if ChurchGeometry.has_gothic_chevet_roof(spec):
+		_check_gothic_chapel_exterior(label, spec, builder, mesh)
+
+
+func _check_gothic_chapel_exterior(label: String, spec: ChurchSpec,
+		builder: ChurchBuilder, mesh: ArrayMesh) -> void:
+	var components := ChurchBuilder.new()
+	var first_roof_face: Dictionary = {}
+	for chapel_index in range(spec.radiating_chapels):
+		var chapel_host := "chapel_%d" % chapel_index
+		var roof_side_count := 0
+		var roof_gable_count := 0
+		var buttress_count := 0
+		var grounded_feet := 0
+		var body_height: float = ChurchGeometry.chapel_body_height(spec, chapel_index)
+		var peak_height: float = body_height + ChurchGeometry.chapel_gothic_roof_rise(spec)
+		for row in builder.component_log:
+			if String(row.get("host", "")) != chapel_host:
+				continue
+			var role: String = String(row.get("role", ""))
+			if role.begins_with("chapel_gothic_roof_"):
+				components.component_log.append(row)
+				if first_roof_face.is_empty() and role != "chapel_gothic_roof_gable":
+					first_roof_face = row
+				var points: PackedVector3Array = row["points"]
+				var lo_y: float = INF
+				var hi_y: float = -INF
+				for point in points:
+					lo_y = minf(lo_y, point.y)
+					hi_y = maxf(hi_y, point.y)
+				_expect(absf(lo_y - body_height) < 0.002
+					and absf(hi_y - peak_height) < 0.002,
+					"%s chapel %d roof facet does not span its eave and ridge" % [
+						label, chapel_index])
+				if role == "chapel_gothic_roof_gable":
+					roof_gable_count += 1
+				else:
+					roof_side_count += 1
+			elif role.begins_with("chapel_gothic_buttress_"):
+				components.component_log.append(row)
+				buttress_count += 1
+				if role == "chapel_gothic_buttress_foot":
+					var foot_center: Vector3 = row["xf"].origin
+					var foot_size: Vector3 = row["size"]
+					_expect(absf(foot_center.y - foot_size.y * 0.5) < 0.002,
+						"%s chapel %d corner buttress foot is not grounded" % [label, chapel_index])
+					grounded_feet += 1
+		_expect(roof_side_count == ChurchGeometry.GOTHIC_CHEVET_ROOF_FACETS * 4,
+			"%s chapel %d lacks both measured faceted roof slopes" % [label, chapel_index])
+		_expect(roof_gable_count == 1,
+			"%s chapel %d lacks its stone gable infill" % [label, chapel_index])
+		_expect(buttress_count == 12 and grounded_feet == 4,
+			"%s chapel %d lacks four grounded three-course buttresses" % [label, chapel_index])
+		var bounds: AABB = ChurchGeometry.chapel_aabb(spec, chapel_index)
+		_expect(absf(bounds.end.y - peak_height) < 0.002,
+			"%s chapel %d mass bounds omit its pointed roof peak" % [label, chapel_index])
+
+	var report: Dictionary = Components.check(components, mesh)
+	_expect(bool(report["ok"]) and int(report["checked"]) == components.component_log.size()
+		and int(report["unverified"]) == 0,
+		"%s Gothic chapel roof/buttress log differs from its actual triangles: %s" % [
+			label, str(report["failures"])])
+	_expect(not first_roof_face.is_empty(),
+		"%s Gothic roof triangle fixture found no emitted side face" % label)
+	if first_roof_face.is_empty():
+		return
+	# Re-emit the logged component in isolation and use one of its actual output
+	# triangles as the negative witness. This keeps the fixture aligned with
+	# slab_poly's winding, depth direction, and fan triangulation.
+	var witness_kit := MeshKit.new(1)
+	witness_kit.slab_poly(first_roof_face["points"],
+		float(first_roof_face["depth"]), 0,
+		bool(first_roof_face.get("vertical", true)),
+		PackedInt32Array(first_roof_face.get("open_edges", PackedInt32Array())))
+	var witness_mesh: ArrayMesh = witness_kit.commit()
+	var witness_triangles: Array = MeshProbe.surface_triangles(null, witness_mesh, 0)
+	_expect(not witness_triangles.is_empty(),
+		"%s isolated Gothic roof component emitted no triangle witness" % label)
+	if witness_triangles.is_empty():
+		return
+	var target_keys := {}
+	for target_triangle in witness_triangles:
+		var key: String = Components.triangle_key(
+			target_triangle[0], target_triangle[1], target_triangle[2])
+		target_keys[key] = true
+	var removed := MeshProbe.remove_triangles(mesh, ChurchBuilder.SURF_ROOF,
+		func(a: Vector3, b: Vector3, c: Vector3) -> bool:
+			return target_keys.has(Components.triangle_key(a, b, c)))
+	_expect(int(removed.get("removed_triangles", 0)) > 0,
+		"%s Gothic roof triangle negative removed no real emitted face" % label)
+	if removed.get("mesh") != null:
+		# The mutation rebuilds only ARRAY_INDEX and retains the original vertices.
+		# Keep indices nonempty so this is a genuine indexed-surface regression.
+		var source_arrays: Array = mesh.surface_get_arrays(ChurchBuilder.SURF_ROOF)
+		var mutated_arrays: Array = removed["mesh"].surface_get_arrays(ChurchBuilder.SURF_ROOF)
+		var source_vertices: PackedVector3Array = source_arrays[Mesh.ARRAY_VERTEX]
+		var retained_vertices: PackedVector3Array = mutated_arrays[Mesh.ARRAY_VERTEX]
+		var retained_indices: PackedInt32Array = mutated_arrays[Mesh.ARRAY_INDEX]
+		_expect(not retained_indices.is_empty()
+			and retained_vertices.size() == source_vertices.size(),
+			"%s Gothic indexed removal did not retain vertices and surviving triangle indices" % label)
+		_expect(not bool(Components.check(components, removed["mesh"])["ok"]),
+			"%s Gothic roof component QA missed a removed roof triangle" % label)
 
 
 func _check_threshold_floor_full_footprint(label: String, spec: ChurchSpec,

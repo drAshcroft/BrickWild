@@ -43,6 +43,7 @@ func build(p_spec: TempleSpec) -> ArrayMesh:
 	_build_roof()
 	if spec.form == &"basilica":
 		_build_order()
+		_build_basilica_processional_inlay()
 	_build_outworks()
 	_dress()
 	return commit()
@@ -56,12 +57,17 @@ func _build_floor() -> void:
 	var plates: Array[Rect2] = TempleGeometry.floor_rects(spec)
 	var i := 0
 	for r in plates:
+		if spec.form == &"basilica" \
+				and r.position.y >= TempleGeometry.basilica_apse_chord_z(spec) - spec.wall_t - 0.01:
+			continue # conservative WalkGrid rows are not emitted as overlapping boxes.
 		box(Vector3(r.size.x, t, r.size.y),
 			Vector3(r.get_center().x, -t / 2.0 + 0.001, r.get_center().y), SURF_STONE)
 		_log_mass("floor" if i == 0 else "floor_%d" % i,
 			AABB(Vector3(r.position.x, -t, r.position.y),
 				Vector3(r.size.x, t, r.size.y)))
 		i += 1
+	if spec.form == &"basilica":
+		_build_basilica_apse_floor()
 	if spec.form == &"rotunda":
 		var wing_index := 0
 		for polygon in TempleGeometry.rotunda_floor_wing_polygons(spec):
@@ -83,6 +89,213 @@ func _build_floor() -> void:
 				AABB(Vector3(min_x, -t + 0.001, min_z),
 					Vector3(max_x - min_x, t, max_z - min_z)))
 			wing_index += 1
+
+
+## Emit the apse's exact shared floor polygon, not its conservative route rows.
+func _build_basilica_apse_floor() -> void:
+	var polygon: PackedVector2Array = TempleGeometry.basilica_apse_floor_polygon(spec)
+	if polygon.size() < 3:
+		return
+	var points := PackedVector3Array()
+	var min_x := INF
+	var min_z := INF
+	var max_x := -INF
+	var max_z := -INF
+	for p in polygon:
+		points.append(Vector3(p.x, -TempleGeometry.FLOOR_T * 0.5 + 0.001, p.y))
+		min_x = minf(min_x, p.x); min_z = minf(min_z, p.y)
+		max_x = maxf(max_x, p.x); max_z = maxf(max_z, p.y)
+	host("basilica_apse")
+	component_slab("basilica_apse_floor", points, TempleGeometry.FLOOR_T, SURF_STONE)
+	host_end()
+	_log_mass("floor_apse", AABB(Vector3(min_x, -TempleGeometry.FLOOR_T, min_z),
+		Vector3(max_x - min_x, TempleGeometry.FLOOR_T, max_z - min_z)))
+
+
+## The wall and gable use one measured round arch. Arc samples are returned by
+## TempleGeometry in world plan coordinates; the shell consumes those same rows.
+func _build_basilica_apse_chancel(site: Rect2) -> void:
+	var t: float = spec.wall_t
+	var chord: float = TempleGeometry.basilica_apse_chord_z(spec)
+	var portal_half: float = TempleGeometry.basilica_apse_portal_width(spec) * 0.5
+	var spring: float = TempleGeometry.basilica_apse_arch_spring(spec)
+	var crown: float = TempleGeometry.basilica_apse_arch_crown(spec)
+	var rear_z: float = site.end.y - t * 0.5
+	var half_width: float = site.size.x * 0.5
+	host("basilica_apse")
+	# Actual residual side panels only. The component rows preserve their exact
+	# boxes; the curved structural assembly is checked from emitted triangles.
+	for side in [-1.0, 1.0]:
+		var x0: float = -half_width if side < 0.0 else portal_half
+		var x1: float = -portal_half if side < 0.0 else half_width
+		if x1 - x0 <= 0.01:
+			continue
+		var size := Vector3(x1 - x0, spec.height, t)
+		var center := Vector3((x0 + x1) * 0.5, spec.height * 0.5, rear_z)
+		component_box("basilica_apse_return", size, Transform3D(Basis.IDENTITY, center), SURF_STONE)
+	var arch_segments: int = 24
+	for i in range(arch_segments):
+		var x0: float = lerpf(-portal_half, portal_half, float(i) / arch_segments)
+		var x1: float = lerpf(-portal_half, portal_half, float(i + 1) / arch_segments)
+		var y0: float = spring + sqrt(maxf(portal_half * portal_half - x0 * x0, 0.0))
+		var y1: float = spring + sqrt(maxf(portal_half * portal_half - x1 * x1, 0.0))
+		if minf(y0, y1) >= crown:
+			continue
+		var face := PackedVector3Array([Vector3(x0, y0, rear_z),
+			Vector3(x1, y1, rear_z), Vector3(x1, crown, rear_z),
+			Vector3(x0, crown, rear_z)])
+		component_slab("basilica_apse_arch_head", face, t, SURF_STONE, false)
+	if spec.height > crown:
+		var head_size := Vector3(2.0 * portal_half, spec.height - crown, t)
+		var head_center := Vector3(0.0, (spec.height + crown) * 0.5, rear_z)
+		component_box("basilica_apse_head", head_size,
+			Transform3D(Basis.IDENTITY, head_center), SURF_STONE)
+	# Arc endpoints are the nave-width junction. The paired inner/outer samples
+	# form a continuous faceted shell without extending into aisle-roof space.
+	var arc: PackedVector2Array = TempleGeometry.basilica_apse_outer_arc(spec)
+	var inner_arc: PackedVector2Array = TempleGeometry.basilica_apse_inner_arc(spec)
+	var min_x := INF; var min_z := INF; var max_x := -INF; var max_z := -INF
+	var window_bays: Array[Dictionary] = _basilica_apse_window_bays(spec)
+	for i in range(mini(arc.size(), inner_arc.size()) - 1):
+		var outer_a: Vector2 = arc[i]
+		var outer_b: Vector2 = arc[i + 1]
+		var a: Vector2 = (outer_a + inner_arc[i]) * 0.5
+		var b: Vector2 = (outer_b + inner_arc[i + 1]) * 0.5
+		var theta: float = PI - PI * (float(i) + 0.5) / float(arc.size() - 1)
+		var bay: Dictionary = _basilica_apse_window_at(theta, window_bays)
+		if bay.is_empty():
+			_emit_basilica_apse_wall_panel(a, b, 0.0, spec.height,
+				"basilica_apse_shell_facet", t)
+		else:
+			# Each sampled wall facet is a real through opening over the arch
+			# profile. Keep the sill and a substantial wall crown intact.
+			var sill: float = float(bay["sill"])
+			var arch_top: float = _basilica_apse_window_crown(bay, theta)
+			_emit_basilica_apse_wall_panel(a, b, 0.0, sill,
+				"basilica_apse_window_sill", t)
+			_emit_basilica_apse_wall_panel(a, b, arch_top, spec.height,
+				"basilica_apse_window_crown", t)
+			var band_outer: Vector2 = ((outer_a + inner_arc[i]) * 0.5) \
+				+ (outer_a - inner_arc[i]).normalized() * (t * 0.5 + 0.035)
+			var band_inner: Vector2 = ((outer_b + inner_arc[i + 1]) * 0.5) \
+				+ (outer_b - inner_arc[i + 1]).normalized() * (t * 0.5 + 0.035)
+			var band_top: float = minf(spec.height - 0.12, arch_top + 0.18)
+			var arch_band := PackedVector3Array([Vector3(band_outer.x, arch_top, band_outer.y),
+				Vector3(band_inner.x, arch_top, band_inner.y),
+				Vector3(band_inner.x, band_top, band_inner.y),
+				Vector3(band_outer.x, band_top, band_outer.y)])
+			component_slab("basilica_apse_window_arch", arch_band, 0.10,
+				SURF_TRIM, false)
+		min_x = minf(min_x, minf(outer_a.x, outer_b.x)); max_x = maxf(max_x, maxf(outer_a.x, outer_b.x))
+		min_z = minf(min_z, minf(outer_a.y, outer_b.y)); max_z = maxf(max_z, maxf(outer_a.y, outer_b.y))
+	var shell_aabb := AABB(Vector3(min_x - t * 0.5, 0.0, min_z - t * 0.5),
+		Vector3(max_x - min_x + t, spec.height, max_z - min_z + t))
+	component_note("basilica_apse_shell", "structural_shell", SURF_STONE, {
+		"aabb": shell_aabb, "chord_z": chord, "segments": maxi(arc.size() - 1, 0)})
+	var throat: Rect2 = TempleGeometry.basilica_apse_throat_rect(spec)
+	var floor_t: float = TempleGeometry.FLOOR_T
+	var throat_size := Vector3(throat.size.x, floor_t, throat.size.y)
+	var throat_center := Vector3(throat.get_center().x, -floor_t * 0.5 + 0.001,
+		throat.get_center().y)
+	component_box("basilica_apse_throat", throat_size,
+		Transform3D(Basis.IDENTITY, throat_center), SURF_STONE)
+	_log_mass("floor_apse_throat", AABB(Vector3(throat.position.x, -floor_t,
+		throat.position.y), Vector3(throat.size.x, floor_t, throat.size.y)))
+	host_end()
+	_build_basilica_apse_half_dome(TempleGeometry.basilica_apse_outer_axes(spec), chord)
+	_build_basilica_apse_window_returns(window_bays, arc, inner_arc)
+
+
+func _emit_basilica_apse_wall_panel(a: Vector2, b: Vector2, bottom: float,
+		top: float, role: String, thickness: float) -> void:
+	if top - bottom <= 0.02:
+		return
+	var face := PackedVector3Array([Vector3(a.x, bottom, a.y),
+		Vector3(b.x, bottom, b.y), Vector3(b.x, top, b.y),
+		Vector3(a.x, top, a.y)])
+	component_slab(role, face, thickness, SURF_STONE, false)
+
+
+func _basilica_apse_window_bays(p_spec: TempleSpec) -> Array[Dictionary]:
+	var bays: Array[Dictionary] = []
+	var axes: Vector2 = TempleGeometry.basilica_apse_outer_axes(p_spec)
+	if axes.x <= 0.0 or axes.y <= 0.0:
+		return bays
+	# The arch uses the same circular profile on every scale. Its crown leaves
+	# at least 1.0 m of solid wall below the springing half-dome.
+	var sill: float = p_spec.height * 0.36
+	var spring: float = p_spec.height * 0.53
+	var rise: float = minf(p_spec.height * 0.22, p_spec.height - spring - 1.0)
+	if rise < 0.65:
+		return bays
+	var half_width: float = minf(0.58, maxf(0.40, p_spec.width * 0.035))
+	var centers: Array[float] = [0.72, 1.18, PI - 1.18, PI - 0.72]
+	for center in centers:
+		var local_radius: float = sqrt(pow(axes.x * sin(center), 2.0)
+			+ pow(axes.y * cos(center), 2.0))
+		var half_angle: float = half_width / maxf(local_radius, 0.1)
+		bays.append({"theta": center, "half_angle": half_angle,
+			"sill": sill, "spring": spring, "rise": rise,
+			"crown": spring + rise})
+	return bays
+
+
+func _basilica_apse_window_at(theta: float, bays: Array[Dictionary]) -> Dictionary:
+	for bay in bays:
+		if absf(theta - float(bay["theta"])) <= float(bay["half_angle"]):
+			return bay
+	return {}
+
+
+func _basilica_apse_window_crown(bay: Dictionary, theta: float) -> float:
+	var normalized: float = absf(theta - float(bay["theta"])) / maxf(float(bay["half_angle"]), 0.001)
+	return float(bay["spring"]) + float(bay["rise"]) * sqrt(maxf(0.0, 1.0 - normalized * normalized))
+
+
+func _build_basilica_apse_window_returns(bays: Array[Dictionary],
+		outer_arc: PackedVector2Array, inner_arc: PackedVector2Array) -> void:
+	if outer_arc.size() < 2 or inner_arc.size() != outer_arc.size():
+		return
+	host("basilica_apse")
+	for bay in bays:
+		var center: float = float(bay["theta"])
+		var half_angle: float = float(bay["half_angle"])
+		for side in [-1.0, 1.0]:
+			var theta: float = center + half_angle * side
+			var index: int = clampi(roundi((PI - theta) / PI * float(outer_arc.size() - 1)),
+				0, outer_arc.size() - 1)
+			var outer: Vector2 = outer_arc[index]
+			var inner: Vector2 = inner_arc[index]
+			var ytop: float = float(bay["spring"])
+			var points := PackedVector3Array([Vector3(outer.x, float(bay["sill"]), outer.y),
+				Vector3(inner.x, float(bay["sill"]), inner.y),
+				Vector3(inner.x, ytop, inner.y), Vector3(outer.x, ytop, outer.y)])
+			component_slab("basilica_apse_window_jamb", points, 0.08,
+				SURF_TRIM, false)
+	host_end()
+
+
+func _build_basilica_apse_half_dome(axes: Vector2, chord_z: float) -> void:
+	var radius: float = axes.x
+	var rise: float = axes.y * 0.42
+	var depth: float = RoofShape.DEPTH
+	var mid_profile: PackedVector2Array = _dome_profile(radius, rise, 0.08)
+	var profile := PackedVector2Array()
+	for point in mid_profile:
+		profile.append(point + Vector2(0.0, depth * 0.5))
+	for i in range(mid_profile.size() - 1, -1, -1):
+		profile.append(mid_profile[i] - Vector2(0.0, depth * 0.5))
+	profile.append(profile[0])
+	var center := Vector3(0.0, spec.height, chord_z)
+	var scale := Vector2(1.0, axes.y / radius)
+	var aabb := AABB(Vector3(-radius, spec.height - depth * 0.5, chord_z),
+		Vector3(2.0 * radius, rise + depth, axes.y))
+	host("basilica_apse")
+	_kit.revolve(profile, center, SURF_ROOF, 24, PI, 0.0, scale, false)
+	component_note("basilica_apse_half_dome", "revolve", SURF_ROOF, {
+		"profile": profile, "center": center, "segments": 24, "arc": PI,
+		"start": 0.0, "ellipse_scale": scale, "close_ends": false, "aabb": aabb})
+	host_end()
 
 
 # ------------------------------------------------------------------ walls
@@ -108,15 +321,19 @@ func _build_walls() -> void:
 		_build_rotunda_drum_walls(t, TempleGeometry.rotunda_lower_drum_height(spec))
 		_build_rotunda_upper_arcade(t, h)
 		_gate_void(-TempleGeometry.rotunda_outer_radius(spec) + t * 0.5)
+		_build_rotunda_gate_surround()
 		return
 	var runs := [
-		{"name": "wall_back", "rect": Rect2(Vector2(r.position.x, r.end.y - t),
-			Vector2(r.size.x, t))},
 		{"name": "wall_left", "rect": Rect2(Vector2(r.position.x, side_start_y),
 			Vector2(t, side_depth))},
 		{"name": "wall_right", "rect": Rect2(Vector2(r.end.x - t, side_start_y),
 			Vector2(t, side_depth))},
 	]
+	if spec.form == &"basilica":
+		_build_basilica_apse_chancel(r)
+	else:
+		runs.append({"name": "wall_back", "rect": Rect2(
+			Vector2(r.position.x, r.end.y - t), Vector2(r.size.x, t))})
 	# The paired Pylon towers themselves form the two solid gate-wall piers.
 	# Other rectangular temples use the ordinary front-wall runs.
 	var gate: float = TempleGeometry.GATE_W
@@ -142,9 +359,53 @@ func _build_walls() -> void:
 		r.position.y + t / 2.0), SURF_STONE)
 	_gate_void(r.position.y + t / 2.0)
 	if spec.form == &"pylon":
+		_build_pylon_gate_portal()
 		_build_pylon_sanctum_screen()
 	total_height = maxf(total_height, h)
 
+
+## A framed outer Pylon portal. The pilasters stand beyond the dynamic clear
+## gate width; their capitals carry the projecting lintel and cornice.
+func _build_pylon_gate_portal() -> void:
+	var site: Rect2 = TempleGeometry.site_rect(spec)
+	var gate: float = TempleGeometry.pylon_gate_width(spec)
+	var gh: float = minf(TempleGeometry.GATE_H, spec.height - 0.6)
+	var base_h: float = 0.38
+	var frame_w: float = clampf(spec.wall_t * 0.28, 0.30, 0.52)
+	var frame_d: float = clampf(spec.wall_t * 0.62, 0.48, 0.82)
+	var capital_h: float = 0.34
+	var capital_top: float = minf(gh + 0.72, spec.height - 0.9)
+	var shaft_top: float = capital_top - capital_h
+	var lintel_h: float = 0.52
+	var cornice_h: float = 0.22
+	var z: float = site.position.y + frame_d * 0.40
+	var jamb: float = spec.wall_t * 0.35
+	var offset: float = gate * 0.5 + jamb + frame_w * 0.5 + 0.10
+	var capital_w: float = frame_w + 0.28
+	var lintel_w: float = gate + 2.0 * (jamb + frame_w * 0.5 + 0.16)
+	host("pylon_gate_portal")
+	for side in [-1.0, 1.0]:
+		var x: float = side * offset
+		component_box("pylon_gate_portal_base",
+			Vector3(frame_w + 0.20, base_h, frame_d + 0.16),
+			Transform3D(Basis.IDENTITY, Vector3(x, base_h * 0.5, z)), SURF_STONE)
+		component_box("pylon_gate_portal_shaft",
+			Vector3(frame_w * 0.72, shaft_top - base_h, frame_d),
+			Transform3D(Basis.IDENTITY, Vector3(x, (shaft_top + base_h) * 0.5, z)),
+			SURF_TRIM)
+		component_box("pylon_gate_portal_capital",
+			Vector3(capital_w, capital_h, frame_d + 0.20),
+			Transform3D(Basis.IDENTITY, Vector3(x,
+				capital_top - capital_h * 0.5, z)), SURF_TRIM)
+	component_box("pylon_gate_portal_lintel",
+		Vector3(lintel_w, lintel_h, frame_d + 0.24),
+		Transform3D(Basis.IDENTITY, Vector3(0.0,
+			capital_top + lintel_h * 0.5, z)), SURF_TRIM)
+	component_box("pylon_gate_portal_cornice",
+		Vector3(lintel_w + 0.34, cornice_h, frame_d + 0.38),
+		Transform3D(Basis.IDENTITY, Vector3(0.0,
+			capital_top + lintel_h + cornice_h * 0.5, z)), SURF_TRIM)
+	host_end()
 
 ## A real inner portal and return walls turn the far end into a restricted
 ## shrine. The axis remains human-sized and clear.
@@ -276,26 +537,90 @@ func _build_rotunda_drum_walls(thickness: float, height: float) -> void:
 ## crown and the interior colonnade bears the opposite roof edge.
 func _build_rotunda_upper_arcade(thickness: float, roof_y: float) -> void:
 	var count: int = TempleGeometry.ring_columns(spec)
+	# The portal leaves a paired opening; an odd count would put unmatched
+	# bays on one side of the processional axis.
+	if count % 2 != 0:
+		count += 1
 	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
 	var radius: float = outer - thickness * 0.5
 	var lower: float = TempleGeometry.rotunda_lower_drum_height(spec)
 	var band_h: float = roof_y - lower - RoofShape.DEPTH * 0.5
 	var step: float = TAU / float(count)
-	var pier_w: float = maxf(0.42, radius * 2.0 * tan(step * 0.31))
+	var panel_count: int = TempleGeometry.rotunda_wall_panel_count(spec)
+	var panel_step: float = TAU / float(panel_count)
+	var panel_width: float = radius * 2.0 * tan(panel_step * 0.5) + 0.025
+	# Keep each bearing foot within one real drum-panel crown. The upper ring's
+	# preferred spacing need not coincide with the lower panel seams, so snap
+	# each foot to its nearest unused panel center instead of bridging a seam.
+	var pier_w: float = minf(clampf(spec.column_r * 1.6, 0.65, 1.35),
+		panel_width * 0.55)
 	var gate_half: float = atan((TempleGeometry.GATE_W * 0.5 + pier_w * 0.55) / radius)
+	var portal_half: float = maxf(TempleGeometry.rotunda_gate_panel_half_angle(spec), gate_half)
+	var used_panels: Dictionary = {}
 	for i in range(count):
-		var angle: float = -PI + (float(i) + 0.5) * step
-		var relative: float = wrapf(angle + PI * 0.5 + PI, 0.0, TAU) - PI
-		if absf(relative) <= gate_half:
+		var target_angle: float = -PI + (float(i) + 0.5) * step
+		var angle: float = 0.0
+		var nearest_panel: int = -1
+		var nearest_delta: float = INF
+		for panel_index in range(panel_count):
+			var candidate: float = -PI + (float(panel_index) + 0.5) * panel_step
+			var relative: float = wrapf(candidate + PI * 0.5 + PI, 0.0, TAU) - PI
+			if absf(relative) <= portal_half or used_panels.has(panel_index):
+				continue
+			var delta: float = absf(wrapf(candidate - target_angle + PI, 0.0, TAU) - PI)
+			if delta < nearest_delta:
+				nearest_delta = delta
+				nearest_panel = panel_index
+				angle = candidate
+		if nearest_panel < 0:
 			continue
+		used_panels[nearest_panel] = true
 		var center := Vector3(cos(angle) * radius, lower + band_h * 0.5,
 			sin(angle) * radius)
-		var size := Vector3(pier_w, band_h, thickness * 0.72)
+		var size := Vector3(pier_w, band_h, thickness * 0.90)
 		var xf := Transform3D(Basis(Vector3.UP, PI * 0.5 - angle), center)
 		host("rotunda_arcade_pier_%02d" % i)
 		component_box("rotunda_arcade_pier", size, xf, SURF_STONE)
 		host_end()
 		_log_mass("rotunda_arcade_pier_%02d" % i, _rotated_box_bounds(size, xf))
+
+
+## A shallow stone surround gives the -Z entry a legible classical face.
+## Every upright stays beyond the measured clear gate width; the lintel bears
+## on the two capitals and the cornice bears on the lintel.
+func _build_rotunda_gate_surround() -> void:
+	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
+	var gate_w: float = TempleGeometry.GATE_W
+	var gate_h: float = minf(TempleGeometry.GATE_H,
+		TempleGeometry.rotunda_lower_drum_height(spec) - 0.6)
+	var jamb_w: float = clampf(spec.wall_t * 0.7, 0.42, 0.72)
+	var base_w: float = jamb_w + 0.18
+	var depth: float = TempleGeometry.rotunda_portal_depth(spec)
+	var z: float = -outer - depth * 0.5 + 0.025
+	var base_h: float = 0.30
+	var capital_h: float = 0.36
+	var shaft_h: float = gate_h - base_h - capital_h
+	var lintel_h: float = 0.38
+	var lintel_w: float = gate_w + base_w * 2.0 + 0.18
+	var lintel_z: float = z
+	host("rotunda_gate_surround")
+	for side in [-1.0, 1.0]:
+		var x: float = side * (gate_w * 0.5 + base_w * 0.5 + 0.03)
+		component_box("rotunda_portal_base", Vector3(base_w, base_h, depth + 0.12),
+			Transform3D(Basis.IDENTITY, Vector3(x, base_h * 0.5, z)), SURF_STONE)
+		component_box("rotunda_portal_shaft", Vector3(jamb_w, shaft_h, depth),
+			Transform3D(Basis.IDENTITY, Vector3(x, base_h + shaft_h * 0.5, z)), SURF_STONE)
+		component_box("rotunda_portal_capital", Vector3(jamb_w + 0.14, capital_h, depth + 0.08),
+			Transform3D(Basis.IDENTITY, Vector3(x, gate_h - capital_h * 0.5, z)), SURF_STONE)
+	component_box("rotunda_portal_lintel", Vector3(lintel_w, lintel_h, depth + 0.08),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, gate_h + lintel_h * 0.5, lintel_z)),
+		SURF_STONE)
+	var cornice_h: float = 0.16
+	component_box("rotunda_portal_cornice",
+		Vector3(lintel_w + 0.24, cornice_h, depth + 0.14),
+		Transform3D(Basis.IDENTITY, Vector3(0.0,
+			gate_h + lintel_h + cornice_h * 0.5, lintel_z)), SURF_STONE)
+	host_end()
 
 
 func _rotated_box_bounds(size: Vector3, xform: Transform3D) -> AABB:
@@ -517,6 +842,14 @@ func _build_idol() -> void:
 	var c: Vector3 = TempleGeometry.idol_center(spec)
 	var w: float = spec.idol_width
 	var h: float = spec.idol_height
+	if spec.form == &"basilica":
+		var top: float = TempleGeometry.dais_top(spec)
+		var plinth_size := Vector3(w, top, w)
+		var plinth_center := Vector3(c.x, top * 0.5, c.z)
+		host("basilica_apse")
+		component_box("basilica_apse_focal_plinth", plinth_size,
+			Transform3D(Basis.IDENTITY, plinth_center), SURF_STONE)
+		host_end()
 	match spec.idol_kind:
 		&"monolith":
 			# a leaning slab, unworked, older than the temple round it
@@ -656,9 +989,15 @@ func _build_roof() -> void:
 		&"flat":
 			if spec.form == &"pylon":
 				var roof_rect: Rect2 = TempleGeometry.pylon_roof_rect(spec)
-				box(Vector3(roof_rect.size.x, 0.5, roof_rect.size.y),
-					Vector3(roof_rect.get_center().x, h + 0.25,
-						roof_rect.get_center().y), SURF_ROOF)
+				var roof_panels: Array[Rect2] = [roof_rect]
+				for slot in TempleGeometry.pylon_roof_slot_rects(spec):
+					roof_panels = _subtract_roof_rects(roof_panels, slot)
+				for panel in roof_panels:
+					if panel.size.x < 0.1 or panel.size.y < 0.1:
+						continue
+					box(Vector3(panel.size.x, 0.5, panel.size.y),
+						Vector3(panel.get_center().x, h + 0.25,
+							panel.get_center().y), SURF_ROOF)
 			else:
 				box(Vector3(r.size.x + 0.8, 0.5, r.size.y + 0.8),
 					Vector3(0.0, h + 0.25, 0.0), SURF_ROOF)
@@ -677,12 +1016,112 @@ func _build_roof() -> void:
 		if spec.form == &"rotunda":
 			_build_rotunda_lantern()
 		else:
-			if top > h:
-				box(Vector3(base, top - h, base), Vector3(0, (h + top) * 0.5, z), SURF_STONE)
-			_kit.stepped_taper(Vector3(0.0, TempleGeometry.roof_height(spec), z),
-				base, spec.spire_height, SURF_ROOF, 5, 0.2)
-			total_height = maxf(total_height,
-				TempleGeometry.roof_height(spec) + spec.spire_height)
+			if spec.form == &"basilica":
+				_build_basilica_lantern(base, z)
+			else:
+				if top > h:
+					box(Vector3(base, top - h, base), Vector3(0, (h + top) * 0.5, z), SURF_STONE)
+				_kit.stepped_taper(Vector3(0.0, TempleGeometry.roof_height(spec), z),
+					base, spec.spire_height, SURF_ROOF, 5, 0.2)
+				total_height = maxf(total_height,
+					TempleGeometry.roof_height(spec) + spec.spire_height)
+
+
+## A compact basilica lantern: a solid octagonal drum carries a short arcade,
+## with a separate roof bearing down to the ridge. Only basilicas use this form.
+func _build_basilica_lantern(old_base: float, z: float) -> void:
+	var roof_y: float = TempleGeometry.roof_height(spec)
+	var width: float = clampf(old_base * 0.72, 2.6, 5.2)
+	var bearing_h: float = roof_y - spec.height
+	var drum_h: float = spec.spire_height * 0.42
+	var arcade_h: float = spec.spire_height * 0.25
+	var ring_h: float = clampf(width * 0.05, 0.12, 0.22)
+	var finial_h: float = minf(0.25, spec.spire_height * 0.05)
+	var cap_h: float = maxf(spec.spire_height - drum_h - arcade_h - ring_h - finial_h, 0.3)
+	var radius: float = width * 0.5
+	var drum_top: float = roof_y + drum_h
+	var arcade_base: float = drum_top
+	var spring_y: float = arcade_base + arcade_h * 0.56
+	var arcade_top: float = arcade_base + arcade_h
+	var cap_base: float = arcade_top + ring_h
+	var post_w: float = clampf(width * 0.075, 0.22, 0.42)
+	var post_radius: float = radius * 0.82
+	var arch_thickness: float = clampf(width * 0.042, 0.14, 0.24)
+	var arch_depth: float = clampf(width * 0.055, 0.16, 0.28)
+	host("basilica_lantern")
+	if bearing_h > 0.03:
+		component_box("basilica_lantern_roof_bearing", Vector3(width * 0.82, bearing_h,
+			width * 0.82), Transform3D(Basis(), Vector3(0.0, spec.height + bearing_h * 0.5, z)),
+			SURF_STONE)
+	_kit.drum(Vector3(0.0, roof_y, z), radius, radius * 0.90, drum_h, SURF_STONE, 8)
+	component_note("basilica_lantern_drum", "drum", SURF_STONE, {
+		"center": Vector3(0.0, roof_y, z), "base_r": radius, "top_r": radius * 0.90,
+		"height": drum_h, "sides": 8,
+		"aabb": AABB(Vector3(-radius, roof_y, z - radius),
+			Vector3(width, drum_h, width))})
+	for index in range(8):
+		var angle: float = TAU * float(index) / 8.0
+		var px: float = sin(angle) * post_radius
+		var pz: float = cos(angle) * post_radius
+		component_box("basilica_lantern_arcade_pier", Vector3(post_w, spring_y - arcade_base,
+			post_w), Transform3D(Basis(), Vector3(px, arcade_base + (spring_y - arcade_base) * 0.5,
+				z + pz)), SURF_STONE)
+	for index in range(8):
+		var a0: float = TAU * float(index) / 8.0
+		var a1: float = TAU * float(index + 1) / 8.0
+		var from_p := Vector3(sin(a0) * post_radius, spring_y, z + cos(a0) * post_radius)
+		var to_p := Vector3(sin(a1) * post_radius, spring_y, z + cos(a1) * post_radius)
+		var prev: Vector3 = from_p
+		for segment_index in range(6):
+			var t: float = float(segment_index + 1) / 6.0
+			var point: Vector3 = from_p.lerp(to_p, t)
+			point.y += (arcade_top - spring_y) * 4.0 * t * (1.0 - t)
+			var delta: Vector3 = point - prev
+			var segment_len: float = delta.length()
+			if segment_len > 0.001:
+				var xf := Transform3D(Basis().looking_at(delta / segment_len, Vector3.UP),
+					(prev + point) * 0.5)
+				component_box("basilica_lantern_arch_segment",
+					Vector3(arch_depth, arch_thickness, segment_len * 1.08), xf, SURF_STONE)
+			prev = point
+	_kit.drum(Vector3(0.0, arcade_top, z), radius * 0.92, radius * 0.87,
+		ring_h, SURF_TRIM, 8)
+	component_note("basilica_lantern_capital_ring", "drum", SURF_TRIM, {
+		"center": Vector3(0.0, arcade_top, z), "base_r": radius * 0.92,
+		"top_r": radius * 0.87, "height": ring_h, "sides": 8,
+		"aabb": AABB(Vector3(-radius * 0.92, arcade_top, z - radius * 0.92),
+			Vector3(radius * 1.84, ring_h, radius * 1.84))})
+	_kit.cone(width * 0.52, cap_h, Vector3(0.0, cap_base, z), SURF_ROOF, 8)
+	component_note("basilica_lantern_cap", "cone", SURF_ROOF, {
+		"radius": width * 0.52, "height": cap_h,
+		"center": Vector3(0.0, cap_base, z), "segments": 8,
+		"aabb": AABB(Vector3(-width * 0.52, cap_base, z - width * 0.52),
+			Vector3(width * 1.04, cap_h, width * 1.04))})
+	component_box("basilica_lantern_finial", Vector3(0.12, finial_h, 0.12),
+		Transform3D(Basis(), Vector3(0.0, cap_base + cap_h + finial_h * 0.5, z)), SURF_ROOF)
+	host_end()
+	total_height = maxf(total_height, roof_y + spec.spire_height)
+
+func _subtract_roof_rects(panels: Array[Rect2], cut: Rect2) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for panel in panels:
+		var overlap: Rect2 = panel.intersection(cut)
+		if overlap.size.x <= 0.0 or overlap.size.y <= 0.0:
+			out.append(panel)
+			continue
+		if overlap.position.x > panel.position.x:
+			out.append(Rect2(panel.position,
+				Vector2(overlap.position.x - panel.position.x, panel.size.y)))
+		if overlap.end.x < panel.end.x:
+			out.append(Rect2(Vector2(overlap.end.x, panel.position.y),
+				Vector2(panel.end.x - overlap.end.x, panel.size.y)))
+		if overlap.position.y > panel.position.y:
+			out.append(Rect2(Vector2(overlap.position.x, panel.position.y),
+				Vector2(overlap.size.x, overlap.position.y - panel.position.y)))
+		if overlap.end.y < panel.end.y:
+			out.append(Rect2(Vector2(overlap.position.x, overlap.end.y),
+				Vector2(overlap.size.x, panel.end.y - overlap.end.y)))
+	return out
 
 
 func _build_rotunda_lantern() -> void:
@@ -911,13 +1350,17 @@ func _build_basilica_gable_returns(site: Rect2, half: float, eave: float, rise: 
 	for end in [-1.0, 1.0]:
 		var z: float = site.position.y if end < 0.0 else site.end.y
 		host("basilica_nave_gable")
-		component_box("basilica_nave_gable_spandrel",
-			Vector3(profile_rect.size.x, profile_rect.size.y, depth),
-			Transform3D(Basis(), Vector3(0.0, spec.height + profile_rect.size.y * 0.5, z)), SURF_STONE)
+		if end < 0.0:
+			component_box("basilica_nave_gable_spandrel",
+				Vector3(profile_rect.size.x, profile_rect.size.y, depth),
+				Transform3D(Basis(), Vector3(0.0, spec.height + profile_rect.size.y * 0.5, z)), SURF_STONE)
+		else:
+			_build_basilica_rear_spandrel_cut(z, half_width, eave, depth)
 		var tri := PackedVector3Array([
 			Vector3(-half_width, eave, z), Vector3(half_width, eave, z),
 			Vector3(0.0, eave + rise, z)])
-		component_slab("basilica_nave_gable_triangle", tri, depth, SURF_STONE, false)
+		if end < 0.0 or TempleGeometry.basilica_apse_outer_arch_crown(spec) <= eave - 0.30:
+			component_slab("basilica_nave_gable_triangle", tri, depth, SURF_STONE, false)
 		host_end()
 		for side in [-1.0, 1.0]:
 			var inner_x: float = side * (TempleGeometry.basilica_nave_bearing_x(spec)
@@ -933,6 +1376,38 @@ func _build_basilica_gable_returns(site: Rect2, half: float, eave: float, rise: 
 			host("basilica_aisle_gable")
 			component_slab("basilica_aisle_gable_fill", points, depth, SURF_STONE, false)
 			host_end()
+
+
+func _build_basilica_rear_spandrel_cut(z: float, half_width: float,
+		eave: float, depth: float) -> void:
+	var half: float = TempleGeometry.basilica_apse_portal_width(spec) * 0.5
+	var spring: float = TempleGeometry.basilica_apse_arch_spring(spec)
+	var segments: int = 24
+	host("basilica_apse")
+	for side in [-1.0, 1.0]:
+		var x0: float = -half_width if side < 0.0 else half
+		var x1: float = -half if side < 0.0 else half_width
+		if x1 - x0 <= 0.01:
+			continue
+		var size := Vector3(x1 - x0, eave - spec.height, depth)
+		var center := Vector3((x0 + x1) * 0.5, (eave + spec.height) * 0.5, z)
+		component_box("basilica_apse_gable_return", size,
+			Transform3D(Basis.IDENTITY, center), SURF_STONE)
+	for i in range(segments):
+		var x0: float = lerpf(-half, half, float(i) / segments)
+		var x1: float = lerpf(-half, half, float(i + 1) / segments)
+		var y0: float = spring + sqrt(maxf(half * half - x0 * x0, 0.0))
+		var y1: float = spring + sqrt(maxf(half * half - x1 * x1, 0.0))
+		if minf(y0, y1) >= eave:
+			continue
+		var points := PackedVector3Array([Vector3(x0, y0, z), Vector3(x1, y1, z),
+			Vector3(x1, eave, z), Vector3(x0, eave, z)])
+		component_slab("basilica_apse_gable_arch_head", points, depth, SURF_STONE, false)
+	component_note("basilica_apse_gable_cut", "round_arch", SURF_STONE, {
+		"radius": half, "spring": spring, "aabb": AABB(
+			Vector3(-half, spring, z - depth * 0.5),
+			Vector3(2.0 * half, eave - spring, depth))})
+	host_end()
 
 
 func _build_basilica_portico(site: Rect2) -> void:
@@ -1092,7 +1567,10 @@ func _build_order() -> void:
 		for i in range(stations.size()):
 			var s: float = stations[i]
 			var at_gate: bool = wall == 2 and absf(s) < aedicule_half + pw
-			if not at_gate:
+			var apse_portal_half: float = TempleGeometry.basilica_apse_portal_width(spec) * 0.5 \
+				if spec.form == &"basilica" else 0.0
+			var at_apse_portal: bool = wall == 3 and absf(s) < apse_portal_half + (pw + 0.22) * 0.5
+			if not at_gate and not at_apse_portal:
 				host("basilica_order_pilaster_%d_%d" % [wall, i])
 				_pilaster(normal, face, s, runs_z, r, pw, p_out, podium, p_h)
 				host_end()
@@ -1164,6 +1642,26 @@ func _build_order() -> void:
 	if ped_y + ped_rise < ent_y - 0.2:
 		_kit.gable_end_at(Transform3D(Basis(), Vector3(0.0, ped_y, front)),
 			ped_half, ped_rise, -0.5, 0.0, SURF_TRIM)
+	host_end()
+
+
+## A shallow red-stone line carries the west entry across the hall to the dais.
+## It sits just above the measured floor top and never changes the route floor.
+func _build_basilica_processional_inlay() -> void:
+	var approach: Rect2 = TempleGeometry.basilica_approach_rect(spec)
+	var dais: Rect2 = TempleGeometry.dais_footprint(spec)
+	var z0: float = approach.position.y
+	var z1: float = dais.position.y - 0.08
+	if z1 <= z0 + 1.0:
+		return
+	var width: float = clampf(spec.width * 0.016, 0.22, 0.42)
+	var thickness: float = 0.025
+	var floor_top: float = 0.001
+	var center_y: float = floor_top + 0.001 + thickness * 0.5
+	host("basilica_processional_inlay")
+	component_box("basilica_processional_inlay",
+		Vector3(width, thickness, z1 - z0),
+		Transform3D(Basis(), Vector3(0.0, center_y, (z0 + z1) * 0.5)), SURF_TRIM)
 	host_end()
 
 
@@ -1420,23 +1918,32 @@ func _build_battered_pylon_tower(rect: Rect2, height: float, index: int) -> void
 	var right: float = rect.end.x - half
 	var front: float = rect.position.y + half
 	var back: float = rect.end.y - half
-	var inset_x: float = (right - left) * 0.10
-	var inset_z: float = (back - front) * 0.10
+	# The face batter must survive the cap in the exterior silhouette. A tenth
+	# of the plan span was so shallow that the full-width cap made the towers
+	# read as vertical boxes.
+	var inset_x: float = (right - left) * 0.16
+	var inset_z: float = (back - front) * 0.16
 	var base_course_h: float = clampf(depth * 3.0, 0.6, 0.8)
 	var base_y: float = base_course_h
 	var cap_h: float = clampf(depth * 2.0, 0.45, 0.7)
+	var base_band_h: float = minf(0.18, base_course_h * 0.30)
+	var cornice_band_h: float = minf(0.20, cap_h * 0.35)
 	var top_y: float = height - cap_h
 	var top_front: float = front + inset_z
 	var top_back: float = back - inset_z
 	var top_left: float = left + inset_x
 	var top_right: float = right - inset_x
 	host("pylon_tower_%d" % index)
-	# A continuous stone footing reaches the ground and supports the sloped
-	# shell faces. Their centre profiles begin at its top plane; slab thickness
-	# embeds each lower edge into the course instead of leaving an air gap.
-	var base_size := Vector3(rect.size.x, base_course_h, rect.size.y)
-	var base_center := Vector3(rect.get_center().x, base_course_h * 0.5,
+	# A grounded red-brown course keys the tower into the court. The stone
+	# bearing course above it still carries the four battered shell faces.
+	var base_band_size := Vector3(rect.size.x, base_band_h, rect.size.y)
+	var base_band_center := Vector3(rect.get_center().x, base_band_h * 0.5,
 		rect.get_center().y)
+	component_box("pylon_tower_base_band", base_band_size,
+		Transform3D(Basis.IDENTITY, base_band_center), SURF_TRIM)
+	var base_size := Vector3(rect.size.x, base_course_h - base_band_h, rect.size.y)
+	var base_center := Vector3(rect.get_center().x,
+		base_band_h + base_size.y * 0.5, rect.get_center().y)
 	component_box("pylon_tower_base_course", base_size,
 		Transform3D(Basis.IDENTITY, base_center), SURF_STONE)
 	component_slab("pylon_battered_face", PackedVector3Array([
@@ -1455,10 +1962,46 @@ func _build_battered_pylon_tower(rect: Rect2, height: float, index: int) -> void
 		Vector3(right, base_y, front), Vector3(top_right, top_y, top_front),
 		Vector3(top_right, top_y, top_back), Vector3(right, base_y, back)]),
 		depth, SURF_STONE, false)
-	component_box("pylon_tower_cap_course",
-		Vector3(rect.size.x, cap_h, rect.size.y),
+	# Twin shallow bands sit on the measured front batter. Their four vertices
+	# follow the same taper as the wall, and their inner faces meet its outer skin.
+	var relief_depth: float = clampf(depth * 0.16, 0.06, 0.10)
+	var relief_half: float = clampf((right - left) * 0.012, 0.07, 0.13)
+	var relief_y0: float = base_y + maxf(0.55, depth * 2.0)
+	var relief_y1: float = top_y - maxf(0.9, depth * 3.0)
+	var front_normal := Vector3(0.0, inset_z, -(top_y - base_y)).normalized()
+	var relief_offset: Vector3 = front_normal * (depth * 0.5 + relief_depth * 0.5)
+	for fraction in [0.28, 0.72]:
+		var lower_x: float = lerpf(left, right, fraction)
+		var upper_x: float = lerpf(top_left, top_right, fraction)
+		var lower_z: float = lerpf(front, top_front,
+			(relief_y0 - base_y) / maxf(top_y - base_y, 0.01))
+		var upper_z: float = lerpf(front, top_front,
+			(relief_y1 - base_y) / maxf(top_y - base_y, 0.01))
+		var band_points := PackedVector3Array([
+			Vector3(lower_x - relief_half, relief_y0, lower_z),
+			Vector3(lower_x + relief_half, relief_y0, lower_z),
+			Vector3(upper_x + relief_half, relief_y1, upper_z),
+			Vector3(upper_x - relief_half, relief_y1, upper_z)])
+		for point_index in range(band_points.size()):
+			band_points[point_index] += relief_offset
+		component_slab("pylon_tower_face_band", band_points,
+			relief_depth, SURF_TRIM, false)
+	# The red lower cornice band follows the narrowed wall head. A stone coping
+	# course above it projects by a modest amount, creating a stepped crown while
+	# staying inside the tower's published footprint.
+	var top_span_x: float = top_right - top_left
+	var top_span_z: float = top_back - top_front
+	var cornice_band_size := Vector3(top_span_x + 0.14, cornice_band_h,
+		top_span_z + 0.14)
+	component_box("pylon_tower_cornice_band", cornice_band_size,
 		Transform3D(Basis.IDENTITY, Vector3(rect.get_center().x,
-			height - cap_h * 0.5, rect.get_center().y)), SURF_TRIM)
+			top_y + cornice_band_h * 0.5, rect.get_center().y)), SURF_TRIM)
+	var cap_size := Vector3(top_span_x + 0.34, cap_h - cornice_band_h,
+		top_span_z + 0.34)
+	component_box("pylon_tower_cap_course", cap_size,
+		Transform3D(Basis.IDENTITY, Vector3(rect.get_center().x,
+			top_y + cornice_band_h + cap_size.y * 0.5,
+			rect.get_center().y)), SURF_STONE)
 	_log_mass("pylon_%d" % index, AABB(Vector3(rect.position.x, 0.0, rect.position.y),
 		Vector3(rect.size.x, height, rect.size.y)))
 	total_height = maxf(total_height, height)

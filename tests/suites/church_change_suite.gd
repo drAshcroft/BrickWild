@@ -66,12 +66,113 @@ static func run() -> SuiteResult:
 		var elapsed := (Time.get_ticks_msec() - started) / 1000.0
 		res.note("%s %.2fs" % [key, elapsed])
 
+	_gothic_bell_stage(res)
+
 	var route_start := Time.get_ticks_msec()
 	Apertures._entrance_routes(res)
 	var route_elapsed := (Time.get_ticks_msec() - route_start) / 1000.0
 	res.note("entrance routes %.2fs" % route_elapsed)
 	_negative_controls(res)
 	return res
+
+
+## Public single/twin tower builds prove paired Gothic belfry apertures on the
+## three exterior faces. The attached east face remains solid at this height.
+## A ray through each exposed center pier is the negative aperture probe.
+static func _gothic_bell_stage(res: SuiteResult) -> void:
+	for tower_count in [1, 2]:
+		var spec := ChurchSpec.new()
+		spec.style = &"gothic"
+		ChurchGenerator.generate(spec, 7120 + tower_count)
+		spec.width = 16.0
+		spec.length = 82.0
+		spec.height = 30.0
+		spec.aisles = 1
+		spec.tower = true
+		spec.west_towers = tower_count
+		spec.tower_width = 6.0
+		spec.tower_height = 38.0
+		spec.tower_roof = &"spire"
+		spec.spire_pitch = 0.9
+		var builder := ChurchBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		var upper_plan_count := 0
+		for side in ChurchGeometry.west_tower_sides(spec):
+			var cx: float = ChurchGeometry.tower_center_x(spec, side)
+			var cz: float = ChurchGeometry.tower_center_z(spec)
+			var openings := builder._tower_openings(cx, cz,
+				spec.tower_width, spec.tower_height)
+			for opening in openings:
+				if float(opening.get("y", 0.0)) <= spec.tower_height * 0.5:
+					continue
+				upper_plan_count += 1
+				_expect(res, int(opening.face) != 0
+					and opening.get("style") == &"pointed"
+					and opening.get("arch") == &"gothic",
+					"Gothic tower %d face %d has a non-pointed bell light"
+					% [tower_count, int(opening.face)])
+		_expect(res, upper_plan_count == tower_count * 6,
+			"Gothic %d-tower build has %d upper plans, expected pairs on three exposed faces"
+				% [tower_count, upper_plan_count])
+		var upper_parts: Array[Dictionary] = []
+		for part in builder.part_log:
+			if part.get("kind") == "window" and part.get("tag") == "tower" \
+					and float(part.pos.y) > spec.tower_height * 0.5:
+				upper_parts.append(part)
+		_expect(res, upper_parts.size() == tower_count * 6,
+			"Gothic %d-tower public build logged %d upper lights, expected %d"
+			% [tower_count, upper_parts.size(), tower_count * 6])
+		for side in ChurchGeometry.west_tower_sides(spec):
+			var cx: float = ChurchGeometry.tower_center_x(spec, side)
+			var cz: float = ChurchGeometry.tower_center_z(spec)
+			for face in range(4):
+				var face_parts: Array[Dictionary] = []
+				for part in upper_parts:
+					var logged_face: int = posmod(roundi(float(part.rot_y) / (PI * 0.5)), 4)
+					var on_tower: bool = absf(float(part.pos.x) - cx) < spec.tower_width * 0.5 + 0.2 \
+						and absf(float(part.pos.z) - cz) < spec.tower_width * 0.5 + 0.2
+					if logged_face == face and on_tower:
+						face_parts.append(part)
+				var expected_count: int = 0 if face == 0 else 2
+				_expect(res, face_parts.size() == expected_count,
+					"Gothic %d-tower face %d has %d emitted bell lights; expected %d"
+					% [tower_count, face, face_parts.size(), expected_count])
+				if face == 0 or face_parts.size() != 2:
+					continue
+				var u0: float = float(face_parts[0].pos.z if face % 2 == 1 else face_parts[0].pos.x)
+				var u1: float = float(face_parts[1].pos.z if face % 2 == 1 else face_parts[1].pos.x)
+				var expected_center: float = cz if face % 2 == 1 else cx
+				_expect(res, absf((u0 + u1) * 0.5 - expected_center) < 0.01
+					and absf(absf(u1 - u0) - spec.tower_width * 0.18) < 0.01,
+					"Gothic %d-tower face %d lights are not mirrored around a measured pier"
+					% [tower_count, face])
+				var outward := Basis(Vector3.UP, face * PI * 0.5) * Vector3.BACK
+				var face_mid := Vector3(cx, spec.tower_height - spec.tower_width * 0.28, cz)
+				var pier_start: Vector3 = face_mid + outward * (spec.tower_width * 0.5 + 0.3)
+				var pier_end: Vector3 = pier_start - outward * 0.5
+				_expect(res, Apertures._blocked(mesh, pier_start, pier_end),
+					"Gothic %d-tower face %d center pier ray passed through instead of hitting stone"
+					% [tower_count, face])
+				for part in face_parts:
+					Apertures._check_opening(res, mesh, builder, part.pos,
+						part.rot_y, part.size.x, part.size.y,
+						"Gothic %d-tower face %d bell light" % [tower_count, face], 0.45)
+
+	# The style branch is deliberately narrow. Romanesque keeps one square
+	# opening per tower face, including its prior clear width.
+	var roman := ChurchSpec.new()
+	roman.style = &"romanesque"
+	roman.tower_width = 6.0
+	roman.tower_height = 38.0
+	var roman_builder := ChurchBuilder.new()
+	roman_builder.spec = roman
+	var roman_openings := roman_builder._tower_openings(0.0, -10.0, 6.0, 38.0)
+	_expect(res, roman_openings.size() == 4,
+		"Romanesque tower opening count changed")
+	for opening in roman_openings:
+		_expect(res, opening.get("style") == &"square"
+			and is_equal_approx(float(opening.width), 6.0 * 0.32),
+			"Romanesque tower opening recipe changed")
 
 
 static func _check_material_surfaces(res: SuiteResult, mesh: ArrayMesh,

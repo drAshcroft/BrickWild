@@ -67,7 +67,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi", "vground", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "vis009", "vis010", "vis016", "catalogcache",
-	"houseqafurnish", "houseqafurnishfast", "houseqafull", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
+	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
@@ -123,9 +123,9 @@ const LANES: Dictionary = {
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
-	"lane:house-plan-fast": ["houseqaplan", "hmultistory"],
+	"lane:house-plan-fast": ["houseqaplan", "hmultistory", "hwitchcompact"],
 	"lane:house-furnish-fast": ["houseqafurnishfast", "hassembly", "walkpins"],
-	"lane:house-exterior-fast": ["hexterior", "hassembly"],
+	"lane:house-exterior-fast": ["hexterior", "hassembly", "hwitchflue"],
 	"lane:assets-fast": ["props", "hassembly"],
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
 	"lane:palace-change": ["palace"],
@@ -319,6 +319,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/roof_probe.gd").self_test()
 		"hexterior":
 			return preload("res://tests/suites/house_exterior_suite.gd").run()
+		"hwitchflue":
+			return preload("res://tests/suites/witchwork_cauldron_flue_suite.gd").run()
 		"hcomponent":
 			return preload("res://tests/suites/house_component_suite.gd").run()
 		"hmesh":
@@ -349,6 +351,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return HouseQASuite.run()
 		"houseqacore":
 			return HouseQASuite.run(false, &"core")
+		"hwitchcompact":
+			return preload("res://tests/suites/house_witch_compact_suite.gd").run()
 		"houseqaplan":
 			return HouseQASuite.run(false, &"planning")
 		"houseqafurnish":

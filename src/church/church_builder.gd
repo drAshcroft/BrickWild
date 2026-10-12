@@ -632,9 +632,29 @@ func _arcade_wall_openings(face: int, height_limit: float) -> Array[Dictionary]:
 func _tower_openings(lx: float, lz: float, tw: float, th: float) -> Array[Dictionary]:
 	var holes: Array[Dictionary] = []
 	for face in range(4):
-		holes.append({"face": face, "u": lz if face % 2 == 1 else lx,
-			"y": th - tw * 0.28, "width": tw * 0.32,
-			"height": tw * 0.26, "style": &"square"})
+		var center_u: float = lz if face % 2 == 1 else lx
+		var center_y: float = th - tw * 0.28
+		# Face zero joins the nave at the west wall. It has no bell-stage cut;
+		# the other three faces carry the Gothic pair.
+		if spec.style == &"gothic":
+			if face == 0:
+				continue
+			# A pair of bell lights keeps a central pier and fits inside the old
+			# single opening's horizontal envelope. The pointed head rises from
+			# its spring without approaching the tower roof.
+			var light_width: float = tw * 0.14
+			var pier_gap: float = tw * 0.04
+			var offset: float = (light_width + pier_gap) * 0.5
+			for sign in [-1.0, 1.0]:
+				var opening := {"face": face, "u": center_u + sign * offset,
+					"y": center_y, "width": light_width, "height": tw * 0.26,
+					"arch": &"gothic", "spring_y": center_y + tw * 0.13
+						- light_width * 0.35, "style": &"pointed"}
+				holes.append(opening)
+		else:
+			holes.append({"face": face, "u": center_u,
+				"y": center_y, "width": tw * 0.32,
+				"height": tw * 0.26, "style": &"square"})
 	if spec.west_towers > 0:
 		var x0: float = lx - tw * 0.5
 		var x1: float = lx + tw * 0.5
@@ -980,9 +1000,85 @@ func _build_ambulatory_and_chapels() -> void:
 		_log_mass("chapel_%d" % i, ChurchGeometry.chapel_aabb(spec, i))
 		if domed:
 			_basil_chapel_tower(i)
+		elif ChurchGeometry.has_gothic_chevet_roof(spec):
+			_build_gothic_chevet_chapel_roof(i, c, a, chh)
 		else:
 			_kit.stepped_taper(Vector3(c.x, chh, c.z), chr_r * 2.0 + 0.2, chr_r * 0.6,
 				SURF_ROOF, 3, 0.15, true, 0.0, 0.8)
+
+
+## A steep faceted half-hip roof follows the semicircular chapel footprint.
+## Its ridge runs from the ambulatory mouth to the curved rear of the chapel.
+func _build_gothic_chevet_chapel_roof(chapel_index: int, center: Vector3,
+		angle: float, body_height: float) -> void:
+	var radial := Vector3(sin(angle), 0.0, cos(angle))
+	var tangent := Vector3(cos(angle), 0.0, -sin(angle))
+	var radius: float = ChurchGeometry.chapel_gothic_roof_radius(spec, chapel_index)
+	var rise: float = ChurchGeometry.chapel_gothic_roof_rise(spec)
+	var facets: int = ChurchGeometry.GOTHIC_CHEVET_ROOF_FACETS
+	var roof_peak_y: float = body_height + rise
+	host("chapel_%d" % chapel_index)
+	for side in [-1.0, 1.0]:
+		var side_name := "left" if float(side) < 0.0 else "right"
+		for segment in range(facets):
+			var z0: float = radius * float(segment) / float(facets)
+			var z1: float = radius * float(segment + 1) / float(facets)
+			var x0: float = sqrt(maxf(0.0, radius * radius - z0 * z0))
+			var x1: float = sqrt(maxf(0.0, radius * radius - z1 * z1))
+			var eave0: Vector3 = center + radial * z0 + tangent * (float(side) * x0) \
+				+ Vector3.UP * body_height
+			var eave1: Vector3 = center + radial * z1 + tangent * (float(side) * x1) \
+				+ Vector3.UP * body_height
+			var ridge0 := center + radial * z0 + Vector3.UP * roof_peak_y
+			var ridge1 := center + radial * z1 + Vector3.UP * roof_peak_y
+			var role := "chapel_gothic_roof_%s" % side_name
+			component_slab(role, PackedVector3Array([eave0, eave1, ridge1]),
+				0.12, SURF_ROOF)
+			component_slab(role, PackedVector3Array([eave0, ridge1, ridge0]),
+				0.12, SURF_ROOF)
+	var gable_left: Vector3 = center - tangent * radius + Vector3.UP * body_height
+	var gable_right: Vector3 = center + tangent * radius + Vector3.UP * body_height
+	var gable_peak: Vector3 = center + Vector3.UP * roof_peak_y
+	component_slab("chapel_gothic_roof_gable",
+		PackedVector3Array([gable_left, gable_right, gable_peak]), 0.10, SURF_STONE)
+	_build_gothic_chevet_chapel_buttresses(chapel_index, body_height)
+	host_end()
+
+
+func _build_gothic_chevet_chapel_buttresses(chapel_index: int,
+		body_height: float) -> void:
+	var scale: float = ChurchGeometry.chapel_gothic_buttress_scale(spec, chapel_index)
+	var stations: Array[Dictionary] = ChurchGeometry.chapel_gothic_buttress_stations(
+		spec, chapel_index)
+	for station_index in range(stations.size()):
+		var station: Dictionary = stations[station_index]
+		var normal: Vector3 = station["normal"]
+		var base: Vector3 = station["position"]
+		var face: float = atan2(normal.x, normal.z)
+		var depth: float = ChurchGeometry.GOTHIC_CHEVET_BUTTRESS_DEPTH * scale
+		var center_offset: float = -0.05 * scale
+		var anchor: Vector3 = base + normal * center_offset
+		var foot_height: float = ChurchGeometry.GOTHIC_CHEVET_BUTTRESS_FOOT_HEIGHT * scale
+		var foot_size := Vector3(
+			ChurchGeometry.GOTHIC_CHEVET_BUTTRESS_FOOT_WIDTH * scale,
+			foot_height, ChurchGeometry.GOTHIC_CHEVET_BUTTRESS_FOOT_DEPTH * scale)
+		component_box("chapel_gothic_buttress_foot",
+			foot_size, Transform3D(Basis(Vector3.UP, face), anchor + Vector3.UP * foot_height * 0.5),
+			SURF_STONE)
+		var shaft_bottom: float = foot_height * 0.68
+		var shaft_top: float = body_height * 0.86
+		var shaft_height: float = maxf(shaft_top - shaft_bottom, 0.25)
+		var shaft_size := Vector3(
+			ChurchGeometry.GOTHIC_CHEVET_BUTTRESS_WIDTH * scale,
+			shaft_height, depth * 0.86)
+		component_box("chapel_gothic_buttress_shaft", shaft_size,
+			Transform3D(Basis(Vector3.UP, face),
+				anchor + Vector3.UP * (shaft_bottom + shaft_height * 0.5)), SURF_STONE)
+		var cap_height: float = 0.20 * scale
+		var cap_size := Vector3(foot_size.x * 0.86, cap_height, foot_size.z * 0.86)
+		component_box("chapel_gothic_buttress_cap", cap_size,
+			Transform3D(Basis(Vector3.UP, face),
+				anchor + Vector3.UP * (shaft_top + cap_height * 0.5)), SURF_TRIM)
 
 
 ## A half-annular ambulatory is a real roofed walk around the apse, not a
@@ -1106,7 +1202,8 @@ func _emit_ambulatory_wall_panel(stone: SurfaceTool, o0: Vector3, o1: Vector3,
 			continue
 		local_cuts.append({"u0": (lo - a0) / (a1 - a0),
 			"u1": (hi - a0) / (a1 - a0), "cut_lo": float(cut["a0"]),
-			"cut_hi": float(cut["a1"]), "height": float(cut["height"])})
+			"cut_hi": float(cut["a1"]), "height": float(cut["height"]),
+			"width": float(cut["width"]), "pointed": spec.style == &"gothic"})
 	local_cuts.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
 		return float(left["u0"]) < float(right["u0"]))
 	var cursor := 0.0
@@ -1118,7 +1215,12 @@ func _emit_ambulatory_wall_panel(stone: SurfaceTool, o0: Vector3, o1: Vector3,
 		if u1 <= u0 + 0.00001:
 			continue
 		var opening_h: float = float(cut["height"])
-		_emit_ambulatory_wall_band(stone, o0, o1, i0, i1, u0, u1, opening_h, height)
+		if bool(cut["pointed"]):
+			_emit_ambulatory_pointed_head(stone, o0, o1, i0, i1, a0, a1,
+				u0, u1, float(cut["cut_lo"]), float(cut["cut_hi"]),
+				opening_h, height, float(cut["width"]))
+		else:
+			_emit_ambulatory_wall_band(stone, o0, o1, i0, i1, u0, u1, opening_h, height)
 		var segment_start: float = lerpf(a0, a1, u0)
 		var segment_end: float = lerpf(a0, a1, u1)
 		if absf(segment_start - float(cut["cut_lo"])) <= 0.00001:
@@ -1137,9 +1239,10 @@ func _emit_ambulatory_wall_panel(stone: SurfaceTool, o0: Vector3, o1: Vector3,
 		var inner_left: Vector3 = i0.lerp(i1, u0)
 		var outer_right: Vector3 = o0.lerp(o1, u1)
 		var inner_right: Vector3 = i0.lerp(i1, u1)
-		_kit._quad(stone, outer_left + Vector3.UP * opening_h,
-			outer_right + Vector3.UP * opening_h, inner_right + Vector3.UP * opening_h,
-			inner_left + Vector3.UP * opening_h)
+		if not bool(cut["pointed"]):
+			_kit._quad(stone, outer_left + Vector3.UP * opening_h,
+				outer_right + Vector3.UP * opening_h, inner_right + Vector3.UP * opening_h,
+				inner_left + Vector3.UP * opening_h)
 		cursor = maxf(cursor, u1)
 	if cursor < 1.0 - 0.00001:
 		_emit_ambulatory_wall_band(stone, o0, o1, i0, i1, cursor, 1.0, 0.0, height)
@@ -1147,6 +1250,35 @@ func _emit_ambulatory_wall_panel(stone: SurfaceTool, o0: Vector3, o1: Vector3,
 	_kit._quad(stone, o0 + Vector3.UP * height, o1 + Vector3.UP * height,
 		i1 + Vector3.UP * height, i0 + Vector3.UP * height)
 	_kit._quad(stone, i0, i1, o1, o0)
+
+
+## Raises only the center of a Gothic chevet mouth. The spring points retain
+## their authored opening height, while the pointed crown remains below the
+## ambulatory roof and above the measured body-width route.
+func _emit_ambulatory_pointed_head(stone: SurfaceTool, o0: Vector3, o1: Vector3,
+		i0: Vector3, i1: Vector3, a0: float, a1: float, u0: float, u1: float,
+		cut_lo: float, cut_hi: float, opening_h: float, height: float,
+		width: float) -> void:
+	var rise: float = minf(width * 0.24, maxf(0.0, height - opening_h - 0.02))
+	var steps: int = maxi(1, ceili((u1 - u0) * 8.0))
+	for step in range(steps):
+		var ua: float = lerpf(u0, u1, float(step) / float(steps))
+		var ub: float = lerpf(u0, u1, float(step + 1) / float(steps))
+		var ta: float = clampf((lerpf(a0, a1, ua) - cut_lo) / (cut_hi - cut_lo), 0.0, 1.0)
+		var tb: float = clampf((lerpf(a0, a1, ub) - cut_lo) / (cut_hi - cut_lo), 0.0, 1.0)
+		var ya: float = opening_h + rise * (1.0 - absf(2.0 * ta - 1.0))
+		var yb: float = opening_h + rise * (1.0 - absf(2.0 * tb - 1.0))
+		var oa: Vector3 = o0.lerp(o1, ua)
+		var ob: Vector3 = o0.lerp(o1, ub)
+		var ia: Vector3 = i0.lerp(i1, ua)
+		var ib: Vector3 = i0.lerp(i1, ub)
+		# Close the reveal with the same segmented profile as both wall faces.
+		_kit._quad(stone, oa + Vector3.UP * ya, ob + Vector3.UP * yb,
+			ib + Vector3.UP * yb, ia + Vector3.UP * ya)
+		_kit._quad(stone, oa + Vector3.UP * ya, ob + Vector3.UP * yb,
+			ob + Vector3.UP * height, oa + Vector3.UP * height)
+		_kit._quad(stone, ib + Vector3.UP * yb, ia + Vector3.UP * ya,
+			ia + Vector3.UP * height, ib + Vector3.UP * height)
 
 
 func _emit_ambulatory_wall_band(stone: SurfaceTool, o0: Vector3, o1: Vector3,
@@ -1909,7 +2041,45 @@ func _portal_moulding(opening: Dictionary, index: int) -> void:
 		for side in [-1.0, 1.0]:
 			_portal_hood_segment(xf, Vector2(side * width * 0.5, spring),
 				Vector2(0, crown))
+		# Two stone archivolts give the pointed portal enough depth to read at
+		# the west-entry review distance. Their feet begin above the opening and
+		# outside its jambs; they do not narrow the through route.
+		var band := clampf(width * 0.12, 0.14, 0.24)
+		for side in [-1.0, 1.0]:
+			_portal_archivolt_segment(xf,
+				Vector2(side * (width * 0.5 + band * 1.2), spring + band * 0.6),
+				Vector2(0, crown + band * 1.2), "portal_archivolt_inner", 0.14)
+			_portal_archivolt_segment(xf,
+				Vector2(side * (width * 0.5 + band * 2.5), spring + band * 1.4),
+				Vector2(0, crown + band * 2.8), "portal_archivolt_outer", 0.18)
+		# Heavy engaged colonnettes carry the archivolt visually. The shafts
+		# and their bases/capitals stay entirely outside the clear doorway width.
+		var shaft_w := clampf(width * 0.18, 0.28, 0.42)
+		var shaft_h: float = maxf(height - 0.38, 0.20)
+		var shaft_x: float = width * 0.5 + jamb + 0.15 + shaft_w * 0.5
+		for side in [-1.0, 1.0]:
+			component_box("portal_colonette",
+				Vector3(shaft_w, shaft_h, shaft_w),
+				xf.translated_local(Vector3(side * shaft_x, 0, 0.10)), SURF_TRIM)
+			component_box("portal_base",
+				Vector3(shaft_w * 1.50, 0.20, shaft_w * 1.35),
+				xf.translated_local(Vector3(side * shaft_x,
+					-height * 0.5 + 0.10, 0.10)), SURF_STONE)
+			component_box("portal_capital",
+				Vector3(shaft_w * 1.50, 0.20, shaft_w * 1.35),
+				xf.translated_local(Vector3(side * shaft_x,
+					height * 0.5 - 0.10, 0.10)), SURF_STONE)
 	host_end()
+
+
+func _portal_archivolt_segment(xf: Transform3D, start: Vector2,
+		finish: Vector2, role: String, band_width: float) -> void:
+	var edge := (finish - start).normalized()
+	var cross := Vector2(-edge.y, edge.x) * band_width * 0.5
+	var points := PackedVector3Array()
+	for p in [start + cross, finish + cross, finish - cross, start - cross]:
+		points.append(xf * Vector3(p.x, p.y, 0.12))
+	component_slab(role, points, 0.24, SURF_STONE, false)
 
 
 func _portal_hood_segment(xf: Transform3D, start: Vector2, finish: Vector2) -> void:

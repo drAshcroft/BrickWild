@@ -59,6 +59,14 @@ const STATUES := ["Dungeon_Statue_Stag", "Dungeon_Statue_Fox"]
 ## look up at one.
 const STATUE_MIN_H := 6.0
 
+# ---- Gothic chevet chapels ----
+const CHAPEL_ALTAR_SCALE := 0.62
+const CHAPEL_BENCH_SCALE := 0.42
+const CHAPEL_ROUTE_W := 0.75
+const CHAPEL_THRESHOLD_CLEAR := ChurchBuilder.NAVE_WALL_T + 0.04
+const CHAPEL_SIDE_GAP := 0.04
+const CHAPEL_WALL_CLEAR := 0.06
+
 
 ## Everything the church is furnished with, in the order it would be installed.
 static func dress(spec: ChurchSpec) -> Array[Dictionary]:
@@ -75,7 +83,121 @@ static func dress(spec: ChurchSpec) -> Array[Dictionary]:
 	_dress_transept(spec, out)
 	_dress_aisles(spec, out)
 	_dress_west_end(spec, out)
+	_dress_gothic_chapels(spec, out)
 	return out
+
+
+## Each Gothic radiating chapel gets a small altar and a pair of short benches.
+## All stations follow the measured half-drum: the altar sits under its outer
+## window, the benches face it, and a 0.75 m central route remains clear for a
+## visitor with a measured 0.28 m body radius.
+static func _dress_gothic_chapels(spec: ChurchSpec, out: Array[Dictionary]) -> void:
+	if not ChurchGeometry.has_gothic_chevet_roof(spec):
+		return
+	var altar_scale: float = CHAPEL_ALTAR_SCALE
+	var altar_foot: Vector2 = PropCatalog.footprint(ALTAR) * altar_scale
+	var altar_half_width: float = altar_foot.x * 0.5
+	var altar_half_depth: float = altar_foot.y * 0.5
+	var usable_radius: float = spec.chapel_radius \
+		- minf(ChurchBuilder.NAVE_WALL_T, spec.chapel_radius * 0.24) \
+		- CHAPEL_WALL_CLEAR
+	var back_limit: float = sqrt(maxf(usable_radius * usable_radius \
+		- altar_half_width * altar_half_width, 0.0))
+	var altar_depth: float = back_limit - altar_half_depth
+	if altar_depth - altar_half_depth < CHAPEL_THRESHOLD_CLEAR:
+		return
+	for chapel_index in range(spec.radiating_chapels):
+		var center: Vector3 = ChurchGeometry.chapel_center(spec, chapel_index)
+		var angle: float = ChurchGeometry.chapel_angle(spec, chapel_index)
+		var radial := Vector3(sin(angle), 0.0, cos(angle))
+		var tangent := Vector3(cos(angle), 0.0, -sin(angle))
+		var altar_center: Vector3 = center + radial * altar_depth
+		var altar_pos: Vector3 = _chapel_origin_at_plan_center(ALTAR,
+			altar_center, angle, altar_scale)
+		_put_chapel(out, chapel_index, ALTAR, altar_pos, angle,
+			altar_scale, &"altar")
+		var table_top: float = PropCatalog.surface_height(ALTAR) * altar_scale
+		var candle_x: float = altar_foot.x * 0.30
+		_put_chapel(out, chapel_index, "Chalice",
+			Vector3(altar_center.x, table_top, altar_center.z), angle, 1.0, &"vessel")
+		for side in [-1.0, 1.0]:
+			_put_chapel(out, chapel_index, "CandleStick_Triple",
+				altar_center + tangent * (float(side) * candle_x) + Vector3.UP * table_top,
+				angle, 1.0, &"light")
+		_put_chapel(out, chapel_index, "Book_Stack_1",
+			Vector3(altar_center.x, table_top, altar_center.z) - radial * 0.20,
+			angle, 1.0, &"book")
+		var bench_scale: float = CHAPEL_BENCH_SCALE
+		var bench_foot: Vector2 = PropCatalog.footprint(PEW) * bench_scale
+		var bench_half_width: float = bench_foot.x * 0.5
+		var bench_half_depth: float = bench_foot.y * 0.5
+		var bench_side: float = bench_half_width + CHAPEL_ROUTE_W * 0.5 + CHAPEL_SIDE_GAP
+		var bench_depth: float = CHAPEL_THRESHOLD_CLEAR + bench_half_depth
+		# Keep the altar when the measured full bench pair cannot fit. The reduced
+		# benches preserve their pair while leaving a body-clear central route.
+		if not _chapel_benches_fit(center, radial, tangent, angle,
+				bench_side, bench_depth, bench_scale, usable_radius):
+			continue
+		for side2 in [-1.0, 1.0]:
+			var bench_center: Vector3 = center + radial * bench_depth \
+				+ tangent * (float(side2) * bench_side)
+			var bench_pos: Vector3 = _chapel_origin_at_plan_center(PEW,
+				bench_center, angle + PI, bench_scale)
+			_put_chapel(out, chapel_index, PEW, bench_pos, angle + PI,
+				bench_scale, &"pew")
+
+
+static func _chapel_benches_fit(center: Vector3, radial: Vector3, tangent: Vector3,
+		angle: float, side: float, depth: float, scale: float, usable_radius: float) -> bool:
+	for sign in [-1.0, 1.0]:
+		var target_center: Vector3 = center + radial * depth \
+			+ tangent * (float(sign) * side)
+		var pos: Vector3 = _chapel_origin_at_plan_center(PEW, target_center,
+			angle + PI, scale)
+		var corners: Array[Vector3] = _chapel_footprint_corners(PEW, pos,
+			angle + PI, scale)
+		for corner in corners:
+			var delta := corner - center
+			var d: float = delta.dot(radial)
+			if d < CHAPEL_THRESHOLD_CLEAR - 0.001 \
+					or delta.length_squared() > usable_radius * usable_radius + 0.001:
+				return false
+	return true
+
+
+## The family placement API records model origins. Solve back from the measured
+## footprint centre so asymmetric imported pivots do not push furniture beyond
+## the chapel's round wall.
+static func _chapel_origin_at_plan_center(key: String, target: Vector3,
+		yaw: float, scale: float) -> Vector3:
+	var offset: Vector2 = PropCatalog.plan_centre(key, Vector3.ZERO, yaw, scale)
+	return Vector3(target.x - offset.x, target.y, target.z - offset.y)
+
+
+static func _chapel_footprint_corners(key: String, pos: Vector3, yaw: float,
+		scale: float) -> Array[Vector3]:
+	var half: Vector2 = PropCatalog.footprint(key) * scale * 0.5
+	var local_x := Vector3(cos(yaw), 0.0, -sin(yaw))
+	var local_z := Vector3(sin(yaw), 0.0, cos(yaw))
+	var center: Vector2 = PropCatalog.plan_centre(key, pos, yaw, scale)
+	var out: Array[Vector3] = []
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var point: Vector3 = Vector3(center.x, pos.y, center.y) \
+				+ local_x * (float(sx) * half.x) + local_z * (float(sz) * half.y)
+			out.append(point)
+	return out
+
+
+## The host index is review metadata only. ChurchAssembler still consumes the
+## same measured PropCatalog placement and ignores the extra identification.
+static func _put_chapel(out: Array[Dictionary], chapel_index: int, key: String,
+		pos: Vector3, yaw: float, scale: float, kind: StringName) -> Dictionary:
+	var placement := PropCatalog.placement(key, pos, yaw, scale, kind)
+	placement["chapel_index"] = chapel_index
+	placement["chapel_host"] = "chapel_%d" % chapel_index
+	out.append(placement)
+	return placement
 
 
 ## The altar, what stands on it, and the lights that flank it.
