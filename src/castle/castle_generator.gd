@@ -601,6 +601,15 @@ static func _fit_ridge(spec: CastleSpec, r: RandomNumberGenerator) -> void:
 		spec.keep_l = spec.keep_w
 		spec.keep_height = maxf(spec.height * 2.0, spec.tower_height * 1.45)
 		spec.chapel = false
+	# A zigzag whose pitch is smaller than two tower reaches plus a room leaves
+	# every range as masonry (dark 40 x 55 m seed 9249: five vertices, no range
+	# long enough once the towers and the mitre are paid for). Draw fewer
+	# vertices until every range can hold rooms; three is the floor.
+	while spec.ridge_points > 3 and CastleGeometry.spine(spec).size() > 3:
+		var layout: Dictionary = preload("castle_ridge_plan.gd").layout(spec)
+		if layout.ranges.all(func(seg): return bool(seg.usable)):
+			break
+		spec.ridge_points -= 1
 
 
 ## The tower house (CAS-006): storeys by height, the type by proportion --

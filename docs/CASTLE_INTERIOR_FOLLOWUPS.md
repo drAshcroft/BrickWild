@@ -47,11 +47,15 @@ Still open (this is why the task stays pending). `tools/castle_occupancy_sweep.g
 reproduces every line below; the counts are from the canonical grid at the
 pass's last full sweep:
 
-- Tight ridge zigzags (`dark castle` seed 9249, 40 m): the ranges are as wide as
-  the pitch between vertices, so the mitre-safe cut leaves no room and the
-  ranges, towers and spire stay solid with their required records missing. A real
-  answer clips the end bays to mitred convex outlines. (The other dark and
-  bavarian ridges plan and pass.)
+- Tight ridge zigzags (`dark castle` seed 9249, 40 m): FIXED 14 October. The
+  ranges were as wide as the pitch between five vertices, so towers plus the
+  mitre-safe cut left no run for a room and everything stayed solid. Mitring the
+  end bays was not needed: `CastleGenerator._fit_ridge` now draws fewer vertices
+  (floor three) until every `CastleRidgePlan` range is `usable`. Seed 9249 is a
+  three-vertex ridge; the occupancy sweep reports no `occupied_shells` failure.
+  `castle_change_suite._tight_ridge_contract` pins it, with the old five-vertex
+  spine as the negative control. (The sweep's remaining raw-HouseQA furnishing
+  lines for the dark ridges predate this and are unfurnished-plan noise.)
 - Tower-house shaft (not the jogs): the roof-platform room is emitted as a full
   storey of walls above the deck and fills the stair opening; the platform room
   sticks out of its interior and is reached only through a lord's chamber; the
