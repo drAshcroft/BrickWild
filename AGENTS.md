@@ -231,6 +231,12 @@ file.
   furnishing, dressing or render result in a new worktree is wrong until you
   run `cp -rn <main checkout>/assets/props/. ./assets/props/` and re-import
   with `--editor --quit`. The fingerprint worktree recipe above needs it too.
+* **Never archive a `.gd` with a `class_name` inside the project.** A
+  snapshot that redeclares `HouseFurnisher` can win the class cache in a
+  fresh checkout, so the suites silently run the stale copy. Store snapshots
+  as `.gd.txt`. Commits before 72ae848 still carry three such files; a
+  worktree at an older commit needs them renamed and
+  `.godot/global_script_class_cache.cfg` deleted before import.
 * Godot's front faces are **clockwise**, so a triangle wound (a, b, c) has
   outward normal `(c - a).cross(b - a)` -- the opposite hand from the usual
   formula. `MeshKit._face_normal` is the single place this is decided.
