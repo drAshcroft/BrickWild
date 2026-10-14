@@ -18,6 +18,23 @@ const TOWNHOUSE_OFFICE_ACTIVITY := [
 	{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
 ]
 
+## A commercial kitchen (restaurant, tavern, inn, bakery) is a line, not a
+## pantry: the fire, a prep bench with plates on it, the larder, and a lamp pair over the work. The generic kitchen
+## recipe leaves the bench to a dice roll and one sconce, which is how a 38 m2
+## cookshop kitchen came out 7% furnished with a fire and nowhere to chop.
+const SHOP_KITCHEN := [
+	{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+	{"cat": "workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0, "height_scale": 1.0},
+	{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+	{"cat": "workbench", "rule": &"wall", "n": [1, 1], "opt": 0.9, "height_scale": 1.0},
+	{"cat": "barrel", "rule": &"corner", "n": [1, 2], "opt": 0.9},
+	{"cat": "crate", "rule": &"corner", "n": [1, 1], "opt": 0.8},
+	{"cat": "shelf", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
+	{"cat": "sconce", "rule": &"mounted", "n": [2, 2], "opt": 1.0},
+	{"cat": "cookware", "rule": &"corner", "n": [1, 1], "opt": 0.9},
+	{"cat": "tableware", "rule": &"on", "host_category": "workbench", "n": [1, 2], "opt": 1.0},
+]
+
 const RUG_ROOM_KINDS := [&"hall", &"parlour", &"dining", &"dining_room"]
 
 ## Where a household eats, best first. A dwelling has ONE dining table: in the
@@ -203,6 +220,8 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 				step["seat_n_required"] = true
 			public_dining.append(step)
 		return public_dining
+	if kind == &"kitchen" and plan.spec is ShopSpec:
+		return SHOP_KITCHEN.duplicate(true)
 	if not is_ordinary_house(plan):
 		# Keep the old public/private parlour substitution for a keep, custom
 		# house or trade family that the broader dwelling predicate includes.
@@ -864,7 +883,11 @@ const SHOP_FITTINGS := {
 		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "anvil", "rule": &"free", "n": [1, 1], "opt": 1.0},
 	],
-	&"bakery": [{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0}],
+	# the oven in the shop, and flour in sacks in the bakehouse behind it
+	&"bakery": [
+		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 1.0, "room": "kitchen"},
+	],
 	&"butcher": [{"cat": "blade", "rule": &"on", "n": [1, 2], "opt": 1.0}],
 	&"apothecary": [{"cat": "alchemy", "rule": &"on", "n": [2, 4], "opt": 1.0}],
 	&"alchemist_laboratory": [

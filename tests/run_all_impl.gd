@@ -57,7 +57,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cmotteaccess", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "cwater", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
 	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "walkpins", "houseqa", "hmultistory", "hrich", "harchetype", "court",
 	"hvernacular",
-	"shop", "sarchetype",
+	"shop", "sarchetype", "shoptrade",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
 	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001", "wld002", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld014", "wld015", "wld016", "wld017", "wld018", "wld019",
@@ -129,6 +129,7 @@ const LANES: Dictionary = {
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
+	"lane:shop-trade": ["shoptrade", "sarchetype"],
 	"lane:house-plan-fast": ["houseqaplan", "hmultistory", "hwitchcompact"],
 	"lane:house-furnish-fast": ["houseqafurnishfast", "hassembly", "walkpins"],
 	"lane:house-furnish-rules": ["houseqafurnishfast"],
@@ -389,6 +390,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return ShopSuite.run()
 		"sarchetype":
 			return ShopArchetypeSuite.run()
+		"shoptrade":
+			return ShopTradeSuite.run()
 		"int013":
 			return ShopArchetypeSuite.run_int013()
 		"int012":
