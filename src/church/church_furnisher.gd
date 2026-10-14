@@ -512,7 +512,7 @@ static func _dress_west_end(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 	var fx: float = AISLE_W / 2.0 + 0.6
 	var font_half: float = PropCatalog.footprint(FONT).x / 2.0
 	# Twin doors stand at +-0.8: a font at 1.35 sat in the left one's way, so
-	# that door opened on a stone basin (found by the public walk, cwalk). The
+	# that door opened on a stone basin (found by the public walk, chwalk). The
 	# basin goes beside the outermost doorway, a body's width clear of it.
 	for door in ChurchGeometry.west_door_layout(spec):
 		var edge: float = absf(float(door.x)) + float(door.width) * 0.5

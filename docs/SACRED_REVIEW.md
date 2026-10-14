@@ -281,7 +281,7 @@ Change (`src/church/church_furnisher.gd`, `ChurchGeometry.chancel_step_rect`,
   is the brief's intentional empty space, not a defect.
 
 Gates: dressingquick 72221 checks, 0 failures (first attempt: 66, benches buried in the chancel step and the engaged piers, a lectern against the rail; the outer block now stops a pier projection short of the wall and the rail and step stand 0.4 m further west in a wide nave). lane:church-change 5942 checks, 0 failures, 16 warnings (the 12 known
-opening warnings and 4 sacredseq warnings); cwalk 125 / 0 (a first attempt made
+opening warnings and 4 sacredseq warnings); chwalk 125 / 0 (a first attempt made
 the baker and the grid disagree about a 0.4 m pocket between the scaled altar
 and the brazier, 22 stranded vertices; the reader and the fire now stand a body
 width clear of the larger altar). Renders: artifacts/church_seating_20261014/

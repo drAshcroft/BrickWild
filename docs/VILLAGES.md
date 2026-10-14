@@ -992,7 +992,7 @@ gate is the single front door and the altar is the one `furniture[]` entry
 `BuildingNavigation` bakes whatever they publish. `twalk` holds it to the rite
 check cell by cell.
 
-**Churches** are walked too (ChurchGeometry.walk_rects, `cwalk`): the nave, each
+**Churches** are walked too (ChurchGeometry.walk_rects, `chwalk`): the nave, each
 aisle ring joined through the arcade openings, and every west doorway, less the
 engaged piers and the dressing DressingCheck cuts out. `doors[]` are the west
 doors (all `front`), `furniture[]` the nave altar. The transept, apse, chapels,
