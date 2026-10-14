@@ -4333,6 +4333,8 @@ func _build_porch() -> void:
 			roof_xf * Vector3(w * 0.5, roof_rise, -porch_along * 0.5),
 			roof_xf * Vector3(w * 0.5, 0.0, porch_along * 0.5),
 			roof_xf * Vector3(-w * 0.5, 0.0, porch_along * 0.5)]), roof_thickness, SURF_ROOF, false)
+		if _witch_wants_entry_gablet():
+			_build_witch_entry_gablet(roof_xf, w, porch_along, roof_rise)
 		host_end()
 		return
 	var normal: Vector2 = Vector2(door["normal"]).normalized()
@@ -4366,6 +4368,110 @@ func _build_porch() -> void:
 			-porch_along * 0.5), Vector3(w, 0.42 + RoofShape.DEPTH, porch_along))})
 	_kit.ridge_roof(xf, w, porch_along, 0.42, SURF_ROOF)
 	host_end()
+
+
+## A hut of any size gets the stone stack; a broad one (either side of the
+## footprint at least this long) also gets a hooded entry gable and a second,
+## front-facing stack, because one long low wall is what makes it read as a hall.
+const WITCH_BROAD_SIDE := 15.0
+## From here the entry earns a hooded gable (the default 9 x 12 hut; not the 7 x 9).
+const WITCH_GABLET_SIDE := 11.0
+
+
+func _witch_wants_entry_gablet() -> bool:
+	return spec.style == &"witch_hut" 		and maxf(spec.width, spec.length) >= WITCH_GABLET_SIDE 		and HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family)
+
+
+func _witch_wants_front_stack() -> bool:
+	return _witch_wants_entry_gablet() and maxf(spec.width, spec.length) >= WITCH_BROAD_SIDE
+
+
+## A steep cross-gable hood over the entry, inside the footprint the lean-to
+## already owns (same width, same depth), so plot bounds do not move. It rises
+## above the eave line and breaks the long front into a gabled entry, a stepped
+## roof and a plain flank. `lean_rise` is the lean-to's drop at the wall end.
+func _build_witch_entry_gablet(roof_xf: Transform3D, w: float, along: float,
+		lean_rise: float) -> void:
+	var half_w := w * 0.5 - 0.06
+	var z_in := -along * 0.5 + 0.04
+	var z_out := along * 0.5 - 0.04
+	var eave_y := lean_rise + 0.05
+	# Steep, but kept under the front-gable casement's sill (about one wall height
+	# plus a metre and a quarter above the floor).
+	var head_y := roof_xf.origin.y
+	var ridge_y := minf(eave_y + half_w * 1.7, spec.height + 1.3 - head_y)
+	var thick := 0.09
+	component_slab("witch_entry_gablet_left", PackedVector3Array([
+		roof_xf * Vector3(-half_w, eave_y, z_in), roof_xf * Vector3(0.0, ridge_y, z_in),
+		roof_xf * Vector3(0.0, ridge_y, z_out), roof_xf * Vector3(-half_w, eave_y, z_out)]),
+		thick, SURF_ROOF, false)
+	component_slab("witch_entry_gablet_right", PackedVector3Array([
+		roof_xf * Vector3(0.0, ridge_y, z_in), roof_xf * Vector3(half_w, eave_y, z_in),
+		roof_xf * Vector3(half_w, eave_y, z_out), roof_xf * Vector3(0.0, ridge_y, z_out)]),
+		thick, SURF_ROOF, false)
+	# The open gable end above the canopy edge is closed with a plaster infill.
+	var infill_z := z_out - 0.07
+	component_slab("witch_entry_gablet_infill", PackedVector3Array([
+		roof_xf * Vector3(-half_w, -0.02, infill_z), roof_xf * Vector3(half_w, -0.02, infill_z),
+		roof_xf * Vector3(half_w, eave_y, infill_z), roof_xf * Vector3(0.0, ridge_y, infill_z),
+		roof_xf * Vector3(-half_w, eave_y, infill_z)]), 0.08, SURF_WALL, true)
+	# Raked barge boards and a king post carry the gable end.
+	var rake := Vector2(half_w, ridge_y - eave_y)
+	var rake_len := rake.length()
+	var rake_angle := atan2(rake.y, rake.x)
+	for side in [-1.0, 1.0]:
+		var mid := Vector3(float(side) * half_w * 0.5, (eave_y + ridge_y) * 0.5, z_out)
+		var basis := Basis(Vector3.BACK, -rake_angle * float(side))
+		component_box("witch_entry_gablet_barge", Vector3(rake_len + 0.12, 0.11, 0.07),
+			Transform3D(roof_xf.basis * basis, roof_xf * mid), SURF_TRIM)
+	var post_h := ridge_y - 0.0
+	component_box("witch_entry_gablet_kingpost", Vector3(0.09, post_h, 0.07),
+		Transform3D(roof_xf.basis, roof_xf * Vector3(0.0, post_h * 0.5 - 0.02, z_out)), SURF_TRIM)
+
+
+## The second stack of a broad Witch hut: a short, stained stone flue on the
+## entry side of the roof, so the front of the house has a chimney of its own.
+func _build_witch_front_stack() -> void:
+	if not _witch_wants_front_stack():
+		return
+	var d: int = plan.entrance()
+	if d < 0:
+		return
+	var door: Dictionary = plan.doors[d]
+	var normal: Vector2 = door["normal"]
+	var across := Vector2(normal.y, -normal.x)
+	var w: float = float(door["width"]) + 1.1
+	var flue_s := HouseGeometry.chimney_flue_size(spec, plan.world_family) * 1.2
+	var wall_top: float = spec.height * _storeys()
+	var main_c := HouseGeometry.chimney_center(plan)
+	# Try both flanks of the entry and take the lower roof: a stack that climbs
+	# out of the low roof reads against the high core instead of vanishing into it.
+	var best_c := Vector2.ZERO
+	var top_surface := NAN
+	for side in [1.0, -1.0]:
+		var cand: Vector2 = Vector2(door["pos"]) - normal * 1.0 \
+			+ across * float(side) * (w * 0.5 + 2.4)
+		if cand.distance_to(main_c) < 3.0:
+			continue
+		var sampled := _roof_top_surface_in_flue_footprint(cand, Vector2.ONE * flue_s)
+		if is_finite(sampled) and (not is_finite(top_surface) or sampled < top_surface):
+			top_surface = sampled
+			best_c = cand
+	if not is_finite(top_surface):
+		return
+	var c := best_c
+	var top := top_surface + 1.6
+	var base_y := wall_top - 0.1
+	tag("chimney")
+	host("witch_front_stack", 0)
+	component_box("witch_front_stack_shaft", Vector3(flue_s, top - base_y, flue_s),
+		Transform3D(Basis(), Vector3(c.x, (top + base_y) * 0.5, c.y)), SURF_FLOOR)
+	component_box("witch_front_stack_cap", Vector3(flue_s + 0.2, 0.16, flue_s + 0.2),
+		Transform3D(Basis(), Vector3(c.x, top + 0.08, c.y)), SURF_TRIM)
+	host_end()
+	_log_mass("witch_front_stack", AABB(Vector3(c.x - (flue_s + 0.2) * 0.5, wall_top,
+		c.y - (flue_s + 0.2) * 0.5), Vector3(flue_s + 0.2, top + 0.16 - wall_top, flue_s + 0.2)))
+	total_height = maxf(total_height, top + 0.16)
 
 
 ## The yard's BUILT pieces (HouseYard): rails, posts, logs, a trough, a lean-to.
@@ -4569,6 +4675,7 @@ func _build_chimney() -> void:
 
 	_emit_chimney_pots(c, top, flue_s)
 	total_height = maxf(total_height, top + 0.18 + HouseGeometry.CHIMNEY_POT_H)
+	_build_witch_front_stack()
 
 
 ## The upper courses of a Witch stack: a stone collar, then a shaft that has
