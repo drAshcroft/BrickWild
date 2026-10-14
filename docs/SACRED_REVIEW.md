@@ -156,7 +156,7 @@ walls. Images are not committed. Each id has a 2x2 sheet
 and singles `renders/<slug>__<view>.jpg`; `<slug>` is the id with `/` as `_`
 (for example `church_gothic_default_1`).
 
-Tallies: 31 accepted, 18 needs_changes (churches 10 / 14, temples 21 / 4). After the 14 Oct stave pass: 34 accepted, 15 needs_changes (churches 13 / 11).
+Tallies: 31 accepted, 18 needs_changes (churches 10 / 14, temples 21 / 4). After the 14 Oct stave pass: 34 accepted, 15 needs_changes (churches 13 / 11). After the seating increment (two-abreast pew blocks, chancel step, scaled altar group): renaissance_large and nordic_stave_large move to accepted: 36 accepted, 13 needs_changes (churches 15 / 9). Russian rows still cite the floating blocks fixed on 14 Oct (SACRED-RUSSIAN-FLOATING-BLOCKS); re-review them before counting.
 Accepted means "reads as its family, the way in leads to the focus, the focus
 is visible from the entry". It does not mean "matches the design board"; the
 Gothic and basilica notes above still stand. Sparse floor in the temples and
@@ -172,7 +172,7 @@ procession; Focus = focal visibility from the entry image. The slug is
 |---|---|---|---|---|---|
 | romanesque_small_1 | partly: round apse, lombard pilasters, but square windows and the west tower ends in stepped blocks and bare posts | door in tower base, straight nave, pews to the rail | two pew blocks either side of the aisle, empty chancel (brief) | altar and candles clear at the end of the aisle, apse lights above | needs_changes: tower crown reads unfinished (todo SACRED-TOWER-CROWN) |
 | romanesque_default_8102 | partly: tower, apse, gable porch read Romanesque; flat uncapped tower | door, aisle, apse | pews both sides, empty chancel | altar visible under the chancel arch | accepted |
-| romanesque_large_21325 | no: a 24 m gabled box, pilasters and two tiny slit windows, no tower, no apse visible from the front | door in a blank gable, then a hall far wider than the pew block | pews are a small cluster far down a bare floor; the west half is empty with nothing in the brief to explain it | altar is a speck washed out against the bright end wall | needs_changes: large size is a barn; furnishing does not scale with the nave |
+| romanesque_large_21325 | no: a 24 m gabled box, pilasters and two tiny slit windows, no tower, no apse visible from the front | door in a blank gable, then the nave | FIXED 14 Oct (seating increment): two benches abreast either side of a 1.5 m aisle, 33 rows from the chancel step to 2 m inside the door, one cross-aisle slot every eighth row (132 pews, against a 30-row single-bench strip) | altar group on a 0.15 m chancel step, 1.5x scaled with candelabra and floor candles, now a readable lit table with its candles at the end of the aisle (still small at 46 m) | needs_changes: interior accepted; the exterior is still a plain gabled box |
 | romanesque_default_1 | partly: as small/1, with a row of tall lights on the flank | door, aisle, apse | pews both sides | altar and candles clear | needs_changes: same tower crown fault (SACRED-TOWER-CROWN) |
 | gothic_small_1 | partly: twin squat towers with domed caps, round chevet; pointed heads only on the windows, so it reads as a Romanesque variant | portal in the west front, aisle, apse | pews both sides | altar and candles clear, three apse lights | needs_changes: no spire, flyers or lancets at small size, so no Gothic silhouette |
 | gothic_default_8102 | yes: twin octagonal spires, flying buttresses, clerestory | portal, aisle between piers | pews both sides, aisles beyond the piers empty | altar clear at the end | accepted (design-board gaps in the section above stand) |
@@ -180,19 +180,19 @@ procession; Focus = focal visibility from the entry image. The slug is
 | gothic_default_1 | yes: single tapering spire, flyers on the east bays | portal in tower base, aisle | pews both sides | altar and candles clear | accepted |
 | byzantine_small_1 | yes: dome on a drum over a gabled cross-body, low apse | door, aisle, apse | pews both sides | altar clear, apse arch frames it | accepted: partly Byzantine, the dome sits over a basilican body |
 | byzantine_default_8102 | yes: as small, with pilasters | door, aisle | pews both sides | altar clear | accepted |
-| byzantine_large_21325 | partly: dome pushed to the east end of a long barn body, flat flank | door in a blank gable, aisle | pews a distant cluster, bare floor before them unexplained | altar lost against the bright end wall | needs_changes: large size is a barn; dome not visible from the entry |
+| byzantine_large_21325 | partly: dome pushed to the east end of a long barn body, flat flank | door in a blank gable, aisle | Orthodox standing worship: the open floor is intentional and is NOT filled with pews. Seats are now 14 stalls along the walls, 2.2 m of wall clear between them, facing across the nave (see "Seating the large naves") | altar group on the chancel step, scaled, candelabra either side, readable as a table with candles at the end of the open floor | needs_changes: dome not visible from the entry; seating and altar accepted |
 | byzantine_default_1 | yes | door, aisle | pews both sides | altar clear | accepted |
 | nordic_stave_small_1 | yes, 14 Oct stave pass: tarred dark boards, steep shingle roofs, a three-tier tower of shingled hips ending in a needle spire with crossed boards, a covered svalgang along the flanks, dragon heads on the ridge ends. Still a west tower on a plain nave (no stepped nave roofs, no ridge turret) | door at the foot of the tower, aisle | pews both sides | altar clear in a dark plank hall | accepted: reads as a Scandinavian timber church, not a Borgund copy |
 | nordic_stave_default_8102 | yes: as small | as small | pews both sides | altar clear at the end of a long dark hall (dim) | accepted |
-| nordic_stave_large_21325 | yes outside: as small, svalgang runs the whole flank; nave roof still one big plane | door, aisle into a huge hall | a distant pew cluster, bare floor unexplained | altar small at the far end | needs_changes: large-size furnishing and entry scale only (identity fixed) |
+| nordic_stave_large_21325 | yes outside: as small, svalgang runs the whole flank; nave roof still one big plane | door, aisle into a huge hall | FIXED 14 Oct: pew blocks fill the nave from the chancel step to the door | altar group on its step, candelabra and candles visible down the aisle | accepted (stave identity and seating both fixed 14 Oct) |
 | nordic_stave_default_1 | yes: as small | as small | pews both sides | altar clear | accepted |
 | renaissance_small_1 | partly: dome with lantern, pilaster cornice; no pediment or orders | door with a small porch, aisle | pews both sides | altar clear under a round arch | accepted |
 | renaissance_default_8102 | partly: dome, lantern, twin stepped tower crowns, round-headed lights | door, aisle | pews both sides | altar clear | accepted |
-| renaissance_large_21325 | partly: rose window, dome and a lean-to roof read Italian; flank is a long blank wall | door, long aisle | pews begin well down a bare floor | altar lost | needs_changes: large size is a barn; altar not findable |
+| renaissance_large_21325 | partly: rose window, dome and a lean-to roof read Italian; flank is a long blank wall | door, long aisle | FIXED 14 Oct: 112 pews in two-abreast blocks to the chancel step, cross-aisle every eighth row | altar group on its step, scaled, candelabra and candles read at the end of the aisle | accepted (seating and focus; exterior as before) |
 | renaissance_default_1 | partly: dome and lantern, stepped tower | door, aisle | pews both sides | altar clear | accepted |
 | russian_small_1 | partly: one squat onion dome, round chevet; no cluster of domes, no kokoshniki | door in tower base, aisle | pews both sides | altar clear | needs_changes: floating blocks on the nave walls (SACRED-RUSSIAN-FLOATING-BLOCKS) and the tower crown fault |
 | russian_default_8102 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
-| russian_large_21325 | partly: one onion dome on a box, two half-round buttress turrets | door, aisle | a distant pew cluster | altar a glow, brown blocks near the ceiling pull the eye | needs_changes: large-size furnishing, floating blocks |
+| russian_large_21325 | partly: one onion dome on a box, two half-round buttress turrets | door, aisle | Orthodox standing worship: open floor intentional, wall stalls only (16 seats), no pew blocks | altar group on its step with candelabra, readable at the end of the open floor | needs_changes: floating blocks near the ceiling (SACRED-RUSSIAN-FLOATING-BLOCKS); seating accepted |
 | russian_default_1 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
 
 ### Temples
@@ -253,3 +253,37 @@ rebuilt afterwards.
    Not counted in the verdicts above except as a note.
 7. Large rotunda: a 1.2 m door flush in a 24 m blank drum. 2 ids.
 8. Gothic small has no Gothic silhouette (squat domed towers). 1 id.
+
+## Seating the large naves (2026-10-14, LIVE-SACRED increment)
+
+Fault: in the five large churches (16 x 48 m nave) the furnisher put one bench
+per side in a 16 m hall, capped the rows at 30 (about 34 m of a 48 m nave), and
+set the altar at the 2.85 m house scale, so the pews were a thin strip, the west
+floor was bare and the altar was a speck.
+
+Change (`src/church/church_furnisher.gd`, `ChurchGeometry.chancel_step_rect`,
+`ChurchBuilder._build_floor`):
+
+* Pew blocks: as many benches abreast as the half-nave holds (a 0.9 m side
+  aisle between them), the row cap raised 30 to 60, and every ninth slot left
+  open as a cross-aisle on a wide, long nave. The centre aisle stays 1.5 m and
+  the rail gate stays 1.44 m. The churches have no side doors, so the cross-aisle
+  is simply a mid-nave passage. Narrow and default naves have a single block
+  and no cross-aisle: their layout is unchanged.
+* Chancel: a 0.15 m stone step (mesh, 3.8 m deep from the east wall) carries
+  the altar, candelabra, floor candles, lectern, brazier and rail. The altar
+  group is scaled by nave width (1.0 to 1.5x) so it reads from the door. A
+  banner pair is hung either side of the altar (a reredos) in a wide nave.
+* Orthodox (Russian, Byzantine): standing worship has no pews. When the nave is
+  wide enough for a pew congregation, the floor is deliberately left open and
+  the only seating is one stall at a time along each side wall, facing across the
+  nave (pew-kind, so the congregation rule still finds somewhere to sit). That
+  is the brief's intentional empty space, not a defect.
+
+Gates: dressingquick 72221 checks, 0 failures (first attempt: 66, benches buried in the chancel step and the engaged piers, a lectern against the rail; the outer block now stops a pier projection short of the wall and the rail and step stand 0.4 m further west in a wide nave). lane:church-change 5942 checks, 0 failures, 16 warnings (the 12 known
+opening warnings and 4 sacredseq warnings); cwalk 125 / 0 (a first attempt made
+the baker and the grid disagree about a 0.4 m pocket between the scaled altar
+and the brazier, 22 stranded vertices; the reader and the fire now stand a body
+width clear of the larger altar). Renders: artifacts/church_seating_20261014/
+before and after. Still open: the altar remains small at the far end of a 46 m
+nave, and the reredos banners are not visible from the door.

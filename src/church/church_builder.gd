@@ -2053,6 +2053,13 @@ func _build_floor() -> void:
 		box(Vector3(r.size.x, t, r.size.y),
 			Vector3(r.get_center().x, ChurchGeometry.FLOOR_LIFT - t / 2.0, r.get_center().y),
 			SURF_STONE)
+	# the raised chancel the altar group stands on (LIVE-SACRED)
+	var step: Rect2 = ChurchGeometry.chancel_step_rect(spec)
+	if step.size.x > 0.0:
+		var h: float = ChurchGeometry.CHANCEL_STEP_H
+		box(Vector3(step.size.x, h, step.size.y),
+			Vector3(step.get_center().x, ChurchGeometry.FLOOR_LIFT + h / 2.0,
+				step.get_center().y), SURF_TRIM)
 
 
 # ------------------------------------------------------------ St Basil's

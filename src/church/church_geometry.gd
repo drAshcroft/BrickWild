@@ -75,6 +75,12 @@ const PODIUM_RATIO := 0.045      # St Basil: podium height, x core height
 const PODIUM_MARGIN := 2.4       # podium reach beyond the outermost chapel
 const FLOOR_T := 0.05            # paved floor slab, under the rooms a person walks
 const FLOOR_LIFT := 0.001        # its top, just proud of a village's ground at y=0
+## The chancel step (LIVE-SACRED): the east end of the nave is raised this much,
+## so the altar group stands above the pews and reads from the door. Low enough
+## that a person steps up it (the walk's own riser limit is far above this).
+const CHANCEL_STEP_H := 0.15
+## The step's depth back from the east wall's centre line: 2.5 m in front of the altar.
+const CHANCEL_STEP_DEPTH := 3.8
 const BASIL_PATTERN := [0.34, 0.46, 0.38, 0.52, 0.42, 0.48, 0.36, 0.54]
 const BASIL_DRUM_PATTERN := [0.9, 1.25, 1.0, 1.35, 1.1, 0.85, 1.3, 1.05]
 const HAGIA_BEARING_RATIO := 0.74   # bearing block height, x dome radius
@@ -1419,6 +1425,25 @@ static func floor_rects(spec: ChurchSpec) -> Array[Rect2]:
 	if spec.narthex:
 		rooms.append(_plan_rect(narthex_aabb(spec)))
 	return disjoint_rects(rooms)
+
+
+## A wide nave carries a bigger altar group, so the rail and the step stand this
+## much further west to leave the reader and the fire a body-width of floor.
+static func chancel_extra(spec: ChurchSpec) -> float:
+	return 0.4 if spec.width > 10.0 else 0.0
+
+
+## The raised chancel, as a plan rect (x, z), or an empty rect when the nave is
+## too narrow, or a podium or non-nave plan has no such floor. It stops short of
+## the nave walls so it overlaps none of them.
+static func chancel_step_rect(spec: ChurchSpec) -> Rect2:
+	if podium_height(spec) > 0.0 or spec.width < 6.0:
+		return Rect2()
+	var inset: float = ChurchBuilder.NAVE_WALL_T + 0.04
+	var z_east: float = spec.length / 2.0 - inset
+	var z_west: float = spec.length / 2.0 - CHANCEL_STEP_DEPTH - chancel_extra(spec)
+	return Rect2(Vector2(-spec.width / 2.0 + inset, z_west),
+		Vector2(spec.width - inset * 2.0, z_east - z_west))
 
 
 ## Walls are `ChurchBuilder.NAVE_WALL_T` thick; the walk's rooms start inside them.
