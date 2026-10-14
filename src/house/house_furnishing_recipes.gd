@@ -85,6 +85,7 @@ const AMPLE := {
 	&"hall": {"area": 60.0, "steps": []},
 	&"parlour": {"area": 30.0, "steps": []},
 	&"workshop": {"area": 30.0, "steps": []},
+	&"records": {"area": 30.0, "steps": []},
 }
 
 
@@ -461,9 +462,17 @@ static func _sitting_parlour_recipe() -> Array:
 ## support, so the ample recipe does not add a second one.
 static func ample_steps_for_room(plan: HousePlan, room: int) -> Array:
 	var kind: StringName = plan.kind_of(room)
-	if plan.spec.style == &"witch_hut" and plan.spec.trade == &"alchemist":
+	if plan.spec.style == &"witch_hut":
 		var area := HouseGeometry.room_area(plan, room)
-		if kind == &"workshop" and area >= 30.0:
+		# A large Witch house keeps records and a great Hall whatever its trade:
+		# the room must be furnished for the household that lives in it.
+		if kind == &"records" and area >= 30.0:
+			return [
+				{"cat": "bookcase", "rule": &"wall", "n": [2, 2], "opt": 1.0, "private_rng": true},
+				{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0, "private_rng": true},
+				{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 1.0, "private_rng": true},
+			]
+		if kind == &"workshop" and area >= 30.0 and plan.spec.trade == &"alchemist":
 			# Ingredient cabinet: the laboratory needs a place to keep its stock.
 			return [{"cat": "storage", "key": "Cabinet", "rule": &"wall",
 				"n": [1, 1], "opt": 1.0, "group": "trade_stock"}]
@@ -477,6 +486,17 @@ static func ample_steps_for_room(plan: HousePlan, room: int) -> Array:
 				{"cat": "storage", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 			]
 		if kind == &"hall" and area >= 60.0:
+			if plan.spec.trade != &"alchemist":
+				# Not essential (opt below 1.0), so the walkability repair may thin
+				# these. Each draws from its own stream and the corner pieces never
+				# stand in a doorway's approach.
+				return [
+					{"cat": "bench", "rule": &"wall", "n": [3, 3], "opt": 0.9, "settle": true, "always_attempt": true, "private_rng": true},
+					{"cat": "chest", "rule": &"wall", "n": [2, 2], "opt": 0.9, "always_attempt": true, "private_rng": true},
+					{"cat": "bookcase", "rule": &"wall", "n": [2, 2], "opt": 0.9, "always_attempt": true, "private_rng": true},
+					{"cat": "barrel", "rule": &"corner", "n": [2, 2], "opt": 0.9, "always_attempt": true, "private_rng": true},
+					{"cat": "crate", "rule": &"corner", "n": [2, 2], "opt": 0.9, "always_attempt": true, "private_rng": true},
+				]
 			return [
 				{"cat": "bench", "rule": &"wall", "n": [3, 3], "opt": 1.0, "settle": true},
 				{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0},

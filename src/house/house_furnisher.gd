@@ -876,6 +876,13 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 				and r.randf() > float(step["opt"]) * lerpf(0.75, 1.15, spec.clutter):
 			continue
 		var placed_from := plan.furniture.size()
+		# An additive overlay (the large Witch Hall and records room) draws from
+		# its own stream, so adding it cannot reshuffle every room furnished
+		# after it from the shared house stream.
+		var step_rng: RandomNumberGenerator = r
+		if bool(step.get("private_rng", false)):
+			step_rng = RandomNumberGenerator.new()
+			step_rng.seed = hash("ample|%d|%d|%d" % [plan.spec.seed, room, si])
 		if step["rule"] == &"row":
 			var row_count_before: int = plan.furniture.size()
 			HouseFurnishPlacement.place_row(plan, room, step, blocked, zones, r)
@@ -891,7 +898,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 			continue
 		var lo: int = int(step["n"][0])
 		var hi: int = int(step["n"][1])
-		var want: int = lo if hi <= lo else r.randi_range(lo, hi)
+		var want: int = lo if hi <= lo else step_rng.randi_range(lo, hi)
 		if HouseFurnishingRecipes.is_ordinary_house(plan) \
 				and String(step.get("group", "")) == "eating" \
 				and String(step.get("cat", "")) == "seat" \
@@ -913,7 +920,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 		for k in range(want):
 			var piece_from := plan.furniture.size()
 			HouseFurnishPlacement.place_one(plan, spec, room, String(step["cat"]), step["rule"],
-				blocked, zones, r, step)
+				blocked, zones, step_rng, step)
 			for placed in range(piece_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = must
 				_set_activity_group(plan.furniture[placed], step)
