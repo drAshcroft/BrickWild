@@ -325,11 +325,43 @@ class ChurchFamily extends BuildingFamilyAdapter:
 	## west door sits on the nave's own front wall, UNLESS a single axial
 	## tower carries it out to that tower's own west face instead.
 	static func door_z(church: ChurchSpec) -> float:
-		var l: float = church.length
-		var out: float = -l / 2.0 - 0.02
-		if church.tower and church.west_towers == 1:
-			out = -l / 2.0 + ChurchGeometry.TOWER_EMBED - church.tower_width - 0.02
-		return out
+		return ChurchGeometry.west_door_z(church)
+
+	## The walkable nave, aisles and doorways less piers and dressing: the
+	## rectangles `ChurchGeometry.walk_rects` derives. Empty for a podium church.
+	func walk_sources(building) -> Dictionary:
+		var church := building.spec as ChurchSpec
+		return ChurchGeometry.walk_sources(church, ChurchFurnisher.dress(church))
+
+	## One storey at the paving's top. Every west doorway faces -Z; the altar is
+	## the focus, approached from the west (the way a person walks up the nave).
+	func walk_frame(building) -> Dictionary:
+		var church := building.spec as ChurchSpec
+		var doors: Array = []
+		for d in ChurchGeometry.west_door_layout(church):
+			doors.append({"pos": Vector2(float(d.x), ChurchGeometry.west_door_z(church)),
+				"normal": Vector2(0.0, -1.0), "front": true})
+		var focus: Array = []
+		var altar: Rect2 = altar_rect(church)
+		if altar.size.x > 0.0:
+			focus.append({"key": "altar", "storey": 0,
+				"pos": Vector2(altar.get_center().x, altar.position.y - HouseGeometry.PERSON_RADIUS * 2.0)})
+		return {"floor_y": {0: 0.0}, "links": [], "doors": doors, "focus": focus}
+
+	## The nave altar the furnisher places (not a chapel's small one), or an
+	## empty rect when the nave was too narrow to take one.
+	static func altar_rect(church: ChurchSpec) -> Rect2:
+		var best := Rect2()
+		for p in ChurchFurnisher.dress(church):
+			if String(p["key"]) != ChurchFurnisher.ALTAR:
+				continue
+			var r: Rect2 = p["rect"]
+			if absf(r.get_center().x) > church.width * 0.25 \
+					or r.get_center().y > church.length / 2.0 - 0.4:
+				continue
+			if best.size.x <= 0.0 or r.get_center().y > best.get_center().y:
+				best = r
+		return best
 
 
 # ------------------------------------------------------------- the castles

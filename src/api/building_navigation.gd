@@ -11,7 +11,8 @@ extends RefCounted
 ##
 ## Families that keep a HousePlan (houses, shops, hotels) are walked, and so is
 ## any family whose adapter publishes `walk_sources` / `walk_frame` (temples:
-## the floor and obstruction `TempleRiteCheck` walks). Churches, castles,
+## the floor and obstruction `TempleRiteCheck` walks; churches: nave, aisles
+## and west doors less piers and dressing). Castles,
 ## windmills, bridges and trees report `supported: false`: their walks live in
 ## their own checks and are not yet published (see docs/VILLAGES.md,
 ## "Walking inside").

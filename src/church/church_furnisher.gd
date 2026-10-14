@@ -25,7 +25,8 @@ const AISLE_W := 1.5         # clear width of the central processional aisle
 const PEW_PITCH := 1.15      # front of one pew to the front of the next
 const PEW_GAP := 0.35        # between the outer end of a pew and the wall
 const CHANCEL := 2.6         # clear floor west of the altar
-const ENTRY := 2.0           # clear floor inside the west door
+const PERSON_CLEAR := 0.1    # a font keeps this far from a doorway's jambs
+const ENTRY := 2.0          # clear floor inside the west door
 const ALTAR_SETBACK := 1.3   # altar face to the east wall
 
 # ---- fire ----
@@ -412,7 +413,15 @@ static func _dress_aisles(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 static func _dress_west_end(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 	var half: float = _interior_half(spec)
 	var fx: float = AISLE_W / 2.0 + 0.6
-	if fx + PropCatalog.footprint(FONT).x / 2.0 <= half:
+	var font_half: float = PropCatalog.footprint(FONT).x / 2.0
+	# Twin doors stand at +-0.8: a font at 1.35 sat in the left one's way, so
+	# that door opened on a stone basin (found by the public walk, cwalk). The
+	# basin goes beside the outermost doorway, a body's width clear of it.
+	for door in ChurchGeometry.west_door_layout(spec):
+		var edge: float = absf(float(door.x)) + float(door.width) * 0.5
+		if fx - font_half < edge + PERSON_CLEAR and fx + font_half > absf(float(door.x)) - float(door.width) * 0.5 - PERSON_CLEAR:
+			fx = maxf(fx, edge + PERSON_CLEAR + font_half)
+	if fx + font_half <= half:
 		_put(out, FONT, Vector3(-fx, 0.0, -spec.length / 2.0 + 1.1), 0.0, 1.0, &"font")
 	if not spec.tower:
 		return

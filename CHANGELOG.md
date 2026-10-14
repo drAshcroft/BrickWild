@@ -10,7 +10,9 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
 
 - `BrickWild.navigation()` and `navigation_node()` now walk temples (one
   storey, gate to altar; `BuildingFamilyAdapter.walk_sources` / `walk_frame`).
-  Churches, castles, windmills, bridges and trees still report
+  Churches too (nave, one aisle ring, west doors to altar; transept, apse and
+  chapels are not walked yet; a twin-door church no longer has its font in a
+  doorway). Castles, windmills, bridges and trees still report
   `supported: false` (todo `NAV-INTERIOR-OTHER-FAMILIES`).
 
 ## 0.1.2 - 2026-10-10

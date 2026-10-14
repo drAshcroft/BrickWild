@@ -559,9 +559,7 @@ func _cuts_clerestory() -> bool:
 
 
 func _west_door_z() -> float:
-	if spec.tower and spec.west_towers == 1:
-		return -spec.length / 2.0 + TOWER_EMBED - spec.tower_width - ChurchGeometry.OPENING_EPS
-	return -spec.length / 2.0 - ChurchGeometry.OPENING_EPS
+	return ChurchGeometry.west_door_z(spec)
 
 
 func _west_door_openings() -> Array[Dictionary]:

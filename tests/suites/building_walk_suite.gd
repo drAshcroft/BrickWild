@@ -16,10 +16,11 @@ static func run() -> SuiteResult:
 			BuildingRequest.house(8102, &"cottage", &"none", 8.0, 10.0, 2.6, 1),
 			BuildingRequest.shop(4410, &"tavern", &"townhouse", 11.0, 14.0, 2.8, 2)]:
 		_check_building(result, request)
-	var church: GeneratedBuilding = BrickWild.generate(BuildingRequest.church(7, &"romanesque"))
+	# temples and churches publish a walk of their own (twalk, cwalk); a castle does not yet
+	var castle: GeneratedBuilding = BrickWild.generate(BuildingRequest.castle(3))
 	result.checked += 1
-	if BrickWild.navigation(church)["supported"] or BrickWild.navigation_node(church) != null:
-		result.fail("a church claims an interior walk it does not publish")
+	if BrickWild.navigation(castle)["supported"] or BrickWild.navigation_node(castle) != null:
+		result.fail("a castle claims an interior walk it does not publish")
 	return result
 
 

@@ -992,7 +992,14 @@ gate is the single front door and the altar is the one `furniture[]` entry
 `BuildingNavigation` bakes whatever they publish. `twalk` holds it to the rite
 check cell by cell.
 
-Churches, castles (seats and monuments), windmills, bridges and trees return
+**Churches** are walked too (ChurchGeometry.walk_rects, `cwalk`): the nave, each
+aisle ring joined through the arcade openings, and every west doorway, less the
+engaged piers and the dressing DressingCheck cuts out. `doors[]` are the west
+doors (all `front`), `furniture[]` the nave altar. The transept, apse, chapels,
+narthex and tower interiors are not walked yet, and a podium church (St Basil)
+reports `supported: false`.
+
+Castles (seats and monuments), windmills, bridges and trees return
 `{"supported": false}` and a null node: their interiors are walked by their
 own checks (castle routes and occupancy; a windmill has no walk check at all)
 and are not yet published. Walk them to the door. Todo

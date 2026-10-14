@@ -1289,6 +1289,104 @@ static func floor_rects(spec: ChurchSpec) -> Array[Rect2]:
 	return disjoint_rects(rooms)
 
 
+## Walls are `ChurchBuilder.NAVE_WALL_T` thick; the walk's rooms start inside them.
+const WALK_WALL_T := 0.36
+## Dressing below this height stands in a person's way (DressingCheck.walk's rule).
+const WALK_PROP_CEILING := 1.0
+## A doorway strip runs this far into the nave from the west wall.
+const WALK_DOOR_REACH := 1.0
+
+
+## Where the west doorways are cut: on the nave's front wall, unless a single
+## axial tower carries them out to its own west face. The builder and the API
+## adapter both ask here.
+static func west_door_z(spec: ChurchSpec) -> float:
+	if spec.tower and spec.west_towers == 1:
+		return -spec.length / 2.0 + TOWER_EMBED - spec.tower_width - OPENING_EPS
+	return -spec.length / 2.0 - OPENING_EPS
+
+
+## What a person walks inside a church, as plan rectangles: the nave, the
+## aisles, and the way between them -- each west doorway out to the front and
+## each arcade opening through the wall to the aisle -- less the engaged piers
+## the builder stands at `nave_support_zs` and the dressing on the floor
+## (`props` is `ChurchFurnisher.dress`, whose rects are what DressingCheck.walk
+## cuts out). Returns {"floor": Array[Rect2], "obstacles": Array[Rect2]}, or
+## empty for a church with no paved floor of its own (St Basil's podium).
+## Transept, crossing, apse, narthex, chapels and tower interiors are not
+## walked yet: the nave's walls close them off.
+static func walk_rects(spec: ChurchSpec, props: Array) -> Dictionary:
+	if floor_rects(spec).is_empty():
+		return {}
+	var t: float = WALK_WALL_T
+	var floor: Array[Rect2] = []
+	var obstacles: Array[Rect2] = []
+	var nave := Rect2(-spec.width / 2.0 + t, -spec.length / 2.0 + t,
+		spec.width - t * 2.0, spec.length - t * 2.0)
+	if nave.size.x < 0.6 or nave.size.y < 0.6:
+		return {}
+	floor.append(nave)
+	var door_z: float = west_door_z(spec)
+	for door in west_door_layout(spec):
+		var half: float = float(door.width) * 0.5
+		floor.append(Rect2(float(door.x) - half, door_z, half * 2.0,
+			nave.position.y + WALK_DOOR_REACH - door_z))
+	# the engaged piers: the one thing standing in the nave besides the dressing
+	var pier_w: float = nave_pier_width(spec)
+	var pier_d: float = nave_pier_projection(spec)
+	for z in nave_support_zs(spec):
+		for side in [-1.0, 1.0]:
+			var x: float = side * (spec.width * 0.5 - t - pier_d * 0.5)
+			obstacles.append(Rect2(x - pier_d * 0.5, z - pier_w * 0.5, pier_d, pier_w))
+	# the aisles, ring by ring, joined through the arcade the builder cuts
+	var zr: Vector2 = aisle_z_range(spec)
+	var inner_edge: float = nave.end.x   # the inside face of the room just walked
+	var inner_height: float = aisle_height(spec, 0)
+	for ring in range(spec.aisles):
+		var cx: float = absf(aisle_center_x(spec, 1.0, ring))
+		var lo: float = cx - spec.aisle_width * 0.5 + t
+		var hi: float = cx + spec.aisle_width * 0.5 - t
+		if hi - lo < 0.6 or zr.y - zr.x - t * 2.0 < 0.6:
+			break
+		var limit: float = inner_height if ring == 0 \
+			else minf(aisle_height(spec, ring), aisle_height(spec, ring - 1))
+		var opened := false
+		for bay in nave_arcade_openings(spec, limit):
+			var half2: float = float(bay["width"]) * 0.5
+			for side in [-1.0, 1.0]:
+				var a: float = minf(inner_edge, lo) - 0.05
+				var b: float = maxf(inner_edge, lo) + 0.05
+				var x0: float = a if side > 0.0 else -b
+				floor.append(Rect2(x0, float(bay["u"]) - half2, b - a, half2 * 2.0))
+			opened = true
+		if not opened:
+			break
+		for side in [-1.0, 1.0]:
+			var x1: float = lo if side > 0.0 else -hi
+			floor.append(Rect2(x1, zr.x + t, hi - lo, zr.y - zr.x - t * 2.0))
+		inner_edge = hi
+	for p in props:
+		var rect: Rect2 = p["rect"]
+		if rect.size.x > 0.0 and (p["pos"] as Vector3).y < WALK_PROP_CEILING:
+			obstacles.append(rect)
+	return {"floor": floor, "obstacles": obstacles}
+
+
+## `walk_rects` as the outlines a navigation baker unions:
+## {0: {"floor": [...], "obstacles": [...]}}. A church is one storey.
+static func walk_sources(spec: ChurchSpec, props: Array) -> Dictionary:
+	var rects: Dictionary = walk_rects(spec, props)
+	if rects.is_empty():
+		return {}
+	var floor: Array[PackedVector2Array] = []
+	var obstacles: Array[PackedVector2Array] = []
+	for r in rects["floor"]:
+		floor.append(Poly.from_rect(r))
+	for o in rects["obstacles"]:
+		obstacles.append(Poly.from_rect(o))
+	return {0: {"floor": floor, "obstacles": obstacles}}
+
+
 static func _plan_rect(a: AABB) -> Rect2:
 	return Rect2(a.position.x, a.position.z, a.size.x, a.size.z)
 

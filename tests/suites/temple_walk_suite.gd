@@ -31,12 +31,11 @@ static func run() -> SuiteResult:
 	for c in CASES:
 		_check_temple(result, BuildingRequest.temple(c[5], c[0], c[1], c[2], c[3], c[4]))
 	_negative_control(result)
-	var church: GeneratedBuilding = BrickWild.generate(BuildingRequest.church(7, &"romanesque"))
+	# churches are walked now (suite cwalk); a castle still is not
 	var castle: GeneratedBuilding = BrickWild.generate(BuildingRequest.castle(3))
 	result.checked += 1
-	for unwalked in [church, castle]:
-		if unwalked.is_ok() and (BrickWild.navigation(unwalked)["supported"] or BrickWild.navigation_node(unwalked) != null):
-			result.fail("%s claims an interior walk it does not publish" % unwalked.request.kind)
+	if castle.is_ok() and (BrickWild.navigation(castle)["supported"] or BrickWild.navigation_node(castle) != null):
+		result.fail("castle claims an interior walk it does not publish")
 	return result
 
 
