@@ -4,9 +4,32 @@ extends RefCounted
 ##     surfaces face the right way, and the same seed rebuilds the identical
 ##     temple.
 
+## The whole contract, in one process. `lane:temple-contract` runs the same
+## assertions as five bounded processes (one per form, plus the extras).
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("temple")
-	for form in TempleSweep.forms():
+	_sweep(res, TempleSweep.forms())
+	_extras(res)
+	return res
+
+
+## Only the per-(form, cult, size) sweep for the given forms.
+static func run_forms(forms: Array) -> SuiteResult:
+	var res := SuiteResult.new("temple " + ",".join(PackedStringArray(forms.map(func(f): return String(f)))))
+	_sweep(res, forms)
+	return res
+
+
+## Determinism, idempotence and the fixed controls: everything that is not
+## the sweep.
+static func run_extras() -> SuiteResult:
+	var res := SuiteResult.new("temple extras")
+	_extras(res)
+	return res
+
+
+static func _sweep(res: SuiteResult, forms: Array) -> void:
+	for form in forms:
 		for cult in TempleSweep.cults():
 			for i in range(TempleSweep.COUNT):
 				var spec: TempleSpec = TempleSweep.spec_at(form, cult, i)
@@ -44,6 +67,8 @@ static func run() -> SuiteResult:
 				_brazier_clearance(res, builder, where)
 				NormalsSuite.check_mesh(res, mesh, where)
 
+
+static func _extras(res: SuiteResult) -> void:
 	# determinism: same seed, same temple
 	res.checked += 1
 	var a: TempleSpec = TempleSweep.spec_at(&"basilica", &"blood", 1)
@@ -64,7 +89,6 @@ static func run() -> SuiteResult:
 	_column_grid_helper(res)
 	_compact_columns(res)
 	_rotunda_brazier_wall_negative(res)
-	return res
 
 
 static func _brazier_clearance(res: SuiteResult, builder: TempleBuilder, where: String) -> void:
