@@ -35,6 +35,238 @@ const SHOP_KITCHEN := [
 	{"cat": "tableware", "rule": &"on", "host_category": "workbench", "n": [1, 2], "opt": 1.0},
 ]
 
+## What a shop's public and working rooms hold once they are big. The base
+## recipes were written for a cottage-sized room: a 50 m2 sales floor furnished
+## from one counter, one cabinet and two crates is 6% stocked, which reads as an
+## empty hall with a label. Each candidate is {cat, rule, fp (footprint m2),
+## max}; `shop_composition_steps` takes them in order, round and round, until
+## the room's share of floor is met. Bulk goods (barrels, crates, sacks) go in
+## corners, which are never a door approach; tables and cabinets stand on a wall
+## so the middle of the floor stays the customer's.
+const SHOP_FLOOR_SHARE := 0.13
+## A counting-house or clerk's office is also furnished by an AMPLE overlay whose
+## table and chairs are thinned by the walk; its share is asked for more firmly.
+const SHOP_SHARE_BY_KIND := {&"office": 0.18}
+const SHOP_COMPOSITION_MIN_AREA := 20.0
+const SHOP_COMPOSITION_MAX_PIECES := 22
+const SHOP_COMPOSITION := {
+	&"sales_floor": {
+		# a bread table and the flour, the proving bins in the corners
+		&"bakery": [
+			{"cat": "counter", "rule": &"wall", "fp": 1.72, "max": 4},
+			{"cat": "barrel", "rule": &"corner", "fp": 0.49, "max": 2},
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 1},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 2},
+			{"cat": "shelf", "rule": &"mounted", "fp": 0.0, "per_area": 12.0, "max": 4},
+		],
+		# a cutting table with a block beside it, hanging rails above
+		&"butcher": [
+			{"cat": "counter", "rule": &"wall", "fp": 1.72, "max": 4},
+			{"cat": "barrel", "rule": &"corner", "fp": 0.49, "max": 2},
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 1},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 2},
+			{"cat": "shelf", "rule": &"mounted", "fp": 0.0, "per_area": 12.0, "max": 4},
+		],
+		# cases of remedies: cabinets and a book of receipts
+		&"apothecary": [
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 2},
+			{"cat": "counter", "rule": &"wall", "fp": 1.72, "max": 3},
+			{"cat": "bookcase", "rule": &"wall", "fp": 0.63, "max": 2},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 1},
+			{"cat": "shelf", "rule": &"mounted", "fp": 0.0, "per_area": 12.0, "max": 4},
+		],
+		# a little of everything: bins, bags, a table of goods
+		&"general_store": [
+			{"cat": "counter", "rule": &"wall", "fp": 1.72, "max": 4},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 2},
+			{"cat": "barrel", "rule": &"corner", "fp": 0.49, "max": 2},
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 2},
+			{"cat": "sack", "rule": &"corner", "fp": 0.36, "max": 2},
+			{"cat": "shelf", "rule": &"mounted", "fp": 0.0, "per_area": 12.0, "max": 4},
+		],
+		&"carpenter": [
+			{"cat": "counter", "rule": &"wall", "fp": 1.72, "max": 4},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 2},
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 1},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 2},
+			{"cat": "shelf", "rule": &"mounted", "fp": 0.0, "per_area": 12.0, "max": 4},
+		],
+		&"thieves_den": [
+			{"cat": "counter", "rule": &"wall", "fp": 1.72, "max": 8},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 4},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 3},
+			{"cat": "barrel", "rule": &"corner", "fp": 0.49, "max": 3},
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 3},
+			{"cat": "shelf", "rule": &"mounted", "fp": 0.0, "per_area": 12.0, "max": 4},
+		],
+		&"": [
+			{"cat": "counter", "rule": &"wall", "fp": 1.72, "max": 4},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 2},
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 2},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 2},
+			{"cat": "shelf", "rule": &"mounted", "fp": 0.0, "per_area": 12.0, "max": 4},
+		],
+	},
+	# the work behind the shop: benches to work at, stock beside them
+	&"workshop": {
+		&"": [
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 3},
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 2},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 2},
+			{"cat": "barrel", "rule": &"corner", "fp": 0.49, "max": 2},
+			{"cat": "sack", "rule": &"corner", "fp": 0.36, "max": 2},
+		],
+	},
+	&"office": {
+		&"": [
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 8},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 4},
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 4},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 3},
+		],
+	},
+	&"records": {
+		&"": [
+			{"cat": "bookcase", "rule": &"wall", "fp": 0.63, "max": 7},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 3},
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 2},
+			{"cat": "candelabrum", "rule": &"free", "fp": 0.53, "light": true, "max": 4},
+		],
+	},
+	# the great rooms of the public buildings: places to sit and to keep things,
+	# and standing lights where the walls cannot carry enough
+	&"reading_room": {
+		&"": [
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 6},
+			{"cat": "bookcase", "rule": &"wall", "fp": 0.63, "max": 8},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 3},
+			{"cat": "sconce", "rule": &"mounted", "fp": 0.0, "light": true, "max": 6},
+		],
+	},
+	&"scriptorium": {
+		&"": [
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 6},
+			{"cat": "bookcase", "rule": &"wall", "fp": 0.63, "max": 5},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 3},
+			{"cat": "candelabrum", "rule": &"free", "fp": 0.53, "light": true, "max": 4},
+		],
+	},
+	&"stacks": {
+		&"": [
+			{"cat": "bookcase", "rule": &"wall", "fp": 0.63, "max": 12},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 3},
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 2},
+			{"cat": "candelabrum", "rule": &"free", "fp": 0.53, "light": true, "max": 4},
+		],
+	},
+	&"guardroom": {
+		&"": [
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 2},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 2},
+			{"cat": "barrel", "rule": &"corner", "fp": 0.49, "max": 2},
+			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 2},
+			{"cat": "candelabrum", "rule": &"free", "fp": 0.53, "light": true, "max": 2},
+		],
+	},
+	&"antechamber": {
+		&"": [
+			{"cat": "bench", "rule": &"wall", "fp": 1.5, "max": 3, "settle": true},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 3},
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 2},
+			{"cat": "candelabrum", "rule": &"free", "fp": 0.53, "light": true, "max": 3},
+		],
+	},
+	&"throne_room": {
+		&"": [
+			{"cat": "bench", "rule": &"wall", "fp": 1.5, "max": 4, "settle": true},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 4},
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 3},
+			{"cat": "candelabrum", "rule": &"free", "fp": 0.53, "light": true, "max": 5},
+		],
+	},
+	&"gallery": {
+		&"": [
+			{"cat": "bench", "rule": &"wall", "fp": 1.5, "max": 4, "settle": true},
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 3},
+			{"cat": "bookcase", "rule": &"wall", "fp": 0.63, "max": 3},
+		],
+	},
+	&"tack_room": {
+		&"": [
+			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 3},
+			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 2},
+			{"cat": "barrel", "rule": &"corner", "fp": 0.49, "max": 2},
+			{"cat": "sack", "rule": &"corner", "fp": 0.36, "max": 2},
+			{"cat": "bench", "rule": &"wall", "fp": 1.5, "max": 2, "settle": true},
+			{"cat": "candelabrum", "rule": &"free", "fp": 0.53, "light": true, "max": 4},
+		],
+	},
+}
+
+
+## Additive, area-scaled steps for a shop room whose base recipe leaves it bare.
+## They draw from private streams (the rest of the house is not reshuffled),
+## are always attempted LAST (opt 0.5 sorts after every recipe step, so the room's
+## own table and its chairs have had their say) and are below 1.0 so the
+## walkability repair may thin them: the customer's way matters more than a third crate.
+static func shop_composition_steps(plan: HousePlan, room: int) -> Array:
+	if not plan.spec is ShopSpec:
+		return []
+	var kind: StringName = plan.kind_of(room)
+	var by_business: Dictionary = SHOP_COMPOSITION.get(kind, {})
+	if by_business.is_empty():
+		return []
+	var business: StringName = (plan.spec as ShopSpec).business
+	var candidates: Array = by_business.get(business, by_business.get(&"", []))
+	var area := HouseGeometry.room_area(plan, room)
+	if candidates.is_empty():
+		return []
+	# Wall goods (shelving) are asked for by the metre of wall a room has, so
+	# they apply to a small sales floor too; the floor share is for big rooms.
+	var share_applies: bool = area >= SHOP_COMPOSITION_MIN_AREA
+	var target: float = area * float(SHOP_SHARE_BY_KIND.get(kind, SHOP_FLOOR_SHARE))
+	var counts: Array[int] = []
+	counts.resize(candidates.size())
+	counts.fill(0)
+	var have := 0.0
+	var pieces := 0
+	var progressed := true
+	while share_applies and have < target and pieces < SHOP_COMPOSITION_MAX_PIECES and progressed:
+		progressed = false
+		for i in range(candidates.size()):
+			if have >= target or pieces >= SHOP_COMPOSITION_MAX_PIECES:
+				break
+			if bool(candidates[i].get("light", false)) or candidates[i].has("per_area"):
+				continue # lights and wall goods are scaled to the room below
+			if counts[i] >= int(candidates[i]["max"]):
+				continue
+			counts[i] += 1
+			have += float(candidates[i]["fp"])
+			pieces += 1
+			progressed = true
+	var steps: Array = []
+	for j in range(candidates.size()):
+		if candidates[j].has("per_area"):
+			counts[j] = clampi(int(ceil(area / float(candidates[j]["per_area"]))), 1,
+				int(candidates[j]["max"]))
+		elif bool(candidates[j].get("light", false)):
+			if not share_applies:
+				continue
+			# a standing light for each LAMP_AREA of floor the walls and tables
+			# cannot be counted on to light (one is assumed from the base recipe; a free spot may be refused)
+			counts[j] = clampi(int(ceil(area / 35.0)) - 1, 0, int(candidates[j]["max"]))
+		if counts[j] <= 0:
+			continue
+		# a wall may refuse a piece; whatever fits is kept
+		steps.append({"cat": candidates[j]["cat"], "rule": candidates[j]["rule"],
+			"n": [counts[j], counts[j]], "opt": 0.5, "always_attempt": true,
+			"private_rng": true, "settle": bool(candidates[j].get("settle", false)),
+			# an overlay piece that no wall will take is dropped, not stood in the
+			# middle of the floor where the customer walks
+			"wall_only": true})
+	return steps
+
+
 const RUG_ROOM_KINDS := [&"hall", &"parlour", &"dining", &"dining_room"]
 
 ## Where a household eats, best first. A dwelling has ONE dining table: in the

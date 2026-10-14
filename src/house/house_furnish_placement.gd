@@ -281,7 +281,8 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 					break
 			_flag_door_approach(plan, room, had)
 			var compact_witchwork_wall: bool = _requires_compact_witchwork_wall(plan, room, key, step)
-			if plan.furniture.size() == had and not cat in WALL_ESSENTIAL and not compact_witchwork_wall:
+			if plan.furniture.size() == had and not cat in WALL_ESSENTIAL and not compact_witchwork_wall \
+					and not bool(step.get("wall_only", false)):
 				var required_cooking_store: bool = HouseFurnishingRecipes.is_ordinary_house(plan) \
 					and String(step.get("group", "")) == "cooking" \
 					and cat == "storage"

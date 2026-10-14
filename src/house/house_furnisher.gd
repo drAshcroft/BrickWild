@@ -785,6 +785,9 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 			if s3.has("room") and StringName(s3["room"]) == kind:
 				steps.append(s3)
 
+	# A big shop room is stocked in proportion to its floor.
+	steps.append_array(HouseFurnishingRecipes.shop_composition_steps(plan, room))
+
 	# The focus is the one piece the room is arranged around, so it goes in
 	# whether or not the recipe happened to list it: a tavern's bar is not in
 	# the dining-room recipe, a great hall's high table is not in any.
@@ -1223,6 +1226,13 @@ static func _ensure_light(plan: HousePlan, room: int, r: RandomNumberGenerator) 
 		return
 	if HouseFurnishingRecipes.is_ordinary_house(plan):
 		_ensure_ordinary_light_coverage(plan, room, r)
+		return
+	if plan.spec is ShopSpec:
+		# a shop floor is lit in proportion to its area as a house is; a private
+		# stream keeps the lamps from reshuffling every room furnished after
+		var lamp_rng := RandomNumberGenerator.new()
+		lamp_rng.seed = hash("shoplight|%d|%d" % [plan.spec.seed, room])
+		_ensure_ordinary_light_coverage(plan, room, lamp_rng)
 		return
 	if _room_light_count(plan, room) > 0:
 		return

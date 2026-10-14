@@ -18,6 +18,12 @@ const STORAGE_CATS: Array[String] = ["storage", "barrel", "crate", "sack", "ches
 
 const WORK_STANCE := 0.6 # where the baker stands to use a bench or an oven
 
+## The general store's matrix: 3 footprints x 2 seeds, frozen before tuning.
+const STORE_SEEDS: Array[int] = [1, 8102]
+const GOODS_CATS: Array[String] = ["table", "crate", "barrel", "sack", "shelf", "storage", "chest"]
+const STOCK_CATS: Array[String] = ["storage", "barrel", "crate", "sack", "chest"]
+const BROWSE_STANCE := 0.45 # where the customer stands to look at a table of goods
+
 
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("shop trade (bakery)")
@@ -41,7 +47,93 @@ static func run() -> SuiteResult:
 	var store_failures := contract(store)
 	if not store_failures.any(func(f: String) -> bool: return f.begins_with("identity")):
 		res.fail("a general store passes as a bakery")
+	_run_store(res)
 	return res
+
+
+## The general store, judged as a store: goods on show, a counter, stock behind.
+static func _run_store(res: SuiteResult) -> void:
+	for size in SIZES:
+		for seed_ in STORE_SEEDS:
+			var label := "general store %dx%d seed %d" % [int(size.x), int(size.y), seed_]
+			var plan := _make(&"general_store", size, seed_)
+			res.checked += 1
+			for failure in store_contract(plan):
+				res.fail("%s: %s" % [label, failure])
+			res.checked += 1
+			if _signature(plan) != _signature(_make(&"general_store", size, seed_)):
+				res.fail("%s: a repeat generation produced a different shop" % label)
+			_store_controls(res, plan, label)
+	# a bakery's goods are an oven and a bench, not a shopkeeper's stock
+	var bakery := _make(&"bakery", Vector2(11.0, 15.0), 1)
+	res.checked += 1
+	if not store_contract(bakery).any(func(f: String) -> bool: return f.begins_with("identity")):
+		res.fail("a bakery passes as a general store")
+
+
+## Each role of the store, removed in turn, must break the rule that names it.
+static func _store_controls(res: SuiteResult, plan: HousePlan, label: String) -> void:
+	var front := plan.entrance_room()
+	var cases := {
+		"counter": {"drop": ["counter"], "room": -1, "expect": "counter"},
+		"goods": {"drop": GOODS_CATS, "room": front, "expect": "stock"},
+		"stockroom": {"drop": STOCK_CATS, "room": -2, "expect": "storage"},
+	}
+	for role in cases:
+		var spec: Dictionary = cases[role]
+		var original := plan.furniture
+		plan.furniture = _without_in(plan, spec["drop"], int(spec["room"]), front)
+		var found := store_contract(plan)
+		plan.furniture = original
+		res.checked += 1
+		if not found.any(func(f: String) -> bool: return f.begins_with(String(spec["expect"]))):
+			res.fail("%s: control '%s' removed and the '%s' rule did not fail" % [label, role, spec["expect"]])
+	# a hearth makes the premises a cookshop: it is not a store's fitting
+	var oven := {}
+	for p in plan.furniture:
+		if PropCatalog.category(String(p["key"])) == "workbench":
+			oven = p.duplicate(true)
+			break
+	if not oven.is_empty():
+		oven["key"] = "Cauldron"
+		oven["host"] = -1
+		var with_oven := plan.furniture.duplicate(true)
+		with_oven.append(oven)
+		var saved := plan.furniture
+		plan.furniture = with_oven
+		var found3 := store_contract(plan)
+		plan.furniture = saved
+		res.checked += 1
+		if not found3.any(func(f: String) -> bool: return f.begins_with("identity")):
+			res.fail("%s: a hearth in a general store did not fail identity" % label)
+	# a run of bench right across the shop is no way to the counter
+	var lane_case := _bench_in_lane(plan)
+	res.checked += 1
+	if lane_case.is_empty():
+		res.fail("%s: no lane to put a bench in" % label)
+		return
+	var saved2 := plan.furniture
+	plan.furniture = lane_case
+	var found2 := store_contract(plan)
+	plan.furniture = saved2
+	if not found2.any(func(f: String) -> bool: return f.begins_with("lane") or f.begins_with("route")):
+		res.fail("%s: a bench in the customer lane did not fail the lane or route rule" % label)
+
+
+## Everything but the named categories: in `room` only when room >= 0, outside
+## the front room only when room == -2, anywhere when room == -1.
+static func _without_in(plan: HousePlan, cats: Array, room: int, front: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for p in plan.furniture:
+		var in_cat: bool = String(PropCatalog.category(String(p["key"]))) in cats
+		var in_scope: bool = room == -1 or (room == -2 and int(p["room"]) != front) \
+			or (room >= 0 and int(p["room"]) == room)
+		if in_cat and in_scope:
+			continue
+		var copy: Dictionary = p.duplicate(true)
+		copy["host"] = -1
+		out.append(copy)
+	return out
 
 
 static func _make(business: StringName, size: Vector2, seed_: int) -> HousePlan:
@@ -297,6 +389,104 @@ static func contract(plan: HousePlan) -> Array[String]:
 	for need in ["counter", "hearth", "workbench", "sack"]:
 		if not cats.has(need):
 			out.append("identity: a bakery has no %s" % need)
+	return out
+
+
+## The general store's contract. Rule names: counter, route, lane, stock,
+## storage, identity.
+static func store_contract(plan: HousePlan) -> Array[String]:
+	var out: Array[String] = []
+	var door := plan.entrance()
+	var room := plan.entrance_room()
+	if door < 0 or room < 0 or plan.kind_of(room) != &"sales_floor":
+		out.append("route: the front door does not open onto the sales floor")
+		return out
+	var counter := _counter(plan, room)
+	if counter.is_empty():
+		out.append("counter: the sales floor has no counter to be served at")
+		return out
+	var nav := HouseNavCheck.new()
+	nav.check(plan)
+	var level := HousePlan.record_storey(plan.doors[door])
+	var grid: WalkGrid = nav._grids.get(level)
+	var geometry := _lane(plan)
+	var inside: Vector2 = geometry["from"]
+	var stance: Vector2 = geometry["to"]
+	if grid == null or not grid.flood_from(inside):
+		out.append("route: nowhere to stand inside the front door")
+		return out
+
+	# 1. arrival to counter, and by no great detour
+	var walked := grid.distance_to(stance, 0.5)
+	var straight := inside.distance_to(stance)
+	if walked == INF:
+		out.append("route: the counter cannot be reached from the door")
+	elif walked > straight * 1.6 + 1.5:
+		out.append("route: the customer walks %.1fm to a counter %.1fm away" % [walked, straight])
+
+	# 2. a customer browsing a table or a bin stands beside it: with that
+	# standing room taken out of the floor the counter must still be reachable
+	var saved := plan.furniture
+	var padded: Array[Dictionary] = []
+	for p in plan.furniture:
+		var copy: Dictionary = p.duplicate(true)
+		copy["host"] = -1
+		if int(p["room"]) == room and not p.get("mounted", false) \
+				and String(PropCatalog.category(String(p["key"]))) in ["table", "crate", "barrel", "sack"]:
+			copy["rect"] = Rect2(p["rect"]).grow(BROWSE_STANCE)
+		padded.append(copy)
+	plan.furniture = padded
+	var padded_nav := HouseNavCheck.new()
+	padded_nav.check(plan)
+	plan.furniture = saved
+	var padded_grid: WalkGrid = padded_nav._grids.get(level)
+	if padded_grid == null or not padded_grid.flood_from(inside):
+		out.append("lane: browsing room leaves no standing room inside the door")
+	elif walked != INF:
+		var around := padded_grid.distance_to(stance, 0.5)
+		if around == INF or around > walked * 1.4 + 1.0:
+			out.append("lane: reaching the counter means standing where the goods are looked at")
+
+	# 3. goods on show: several kinds, some of them shelving
+	var shown := {}
+	var shelved := false
+	for f in plan.furniture_of(room):
+		var cat := String(PropCatalog.category(String(plan.furniture[f]["key"])))
+		if cat in GOODS_CATS:
+			shown[cat] = true
+		if cat == "shelf":
+			shelved = true
+	if shown.size() < 3:
+		out.append("stock: only %d kind(s) of goods are on show" % shown.size())
+	if not shelved:
+		out.append("stock: nothing is shelved on the sales floor")
+
+	# 4. stock kept behind the shop, joined to it and reachable from the lane
+	var stocked := 0
+	var linked := false
+	for p in plan.furniture:
+		var r := int(p["room"])
+		if r == room or p.get("mounted", false):
+			continue
+		if not (String(PropCatalog.category(String(p["key"]))) in STOCK_CATS):
+			continue
+		stocked += 1
+		if (_door_neighbours(plan, room).has(r) or _two_doors(plan, room, r)) \
+				and grid.reached(Rect2(p["rect"]), 0.8):
+			linked = true
+	if stocked < 2:
+		out.append("storage: no stock is kept behind the shop")
+	elif not linked:
+		out.append("storage: stock is kept, but not in a room the shop opens onto")
+
+	# 5. identity: a counter and a spread of goods, no oven, no forge
+	var cats := _cats(plan)
+	for banned in ["hearth", "anvil"]:
+		if cats.has(banned):
+			out.append("identity: a general store has a %s" % banned)
+	for need in ["crate", "barrel"]:
+		if not cats.has(need):
+			out.append("identity: a general store has no %s" % need)
 	return out
 
 
