@@ -18,9 +18,91 @@ extends RefCounted
 # ---- shell, in metres ----
 const WALL_T := 0.35          # exterior wall thickness
 const BASE_HOUSE_SPEC := preload("house_spec.gd")
+const DOMESTIC_CEILING_TIE_HEIGHT := 0.14
 const INNER_WALL_T := 0.16    # partition thickness
 const FLOOR_T := 0.12
 const CEILING_MIN := 2.2      # a room shorter than this is a crawlspace
+
+
+## Exposed ceiling joists for the ordinary timber-and-plaster households.
+## Each short-span member seats in the actual room walls. Openings, stair
+## wells, the chimney and high fittings retain their own space.
+static func domestic_ceiling_ties(plan: HousePlan, level: int, ceiling_y: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var spec := plan.spec
+	if spec.get_script() != BASE_HOUSE_SPEC or spec.trade != &"none" \
+			or plan.world_family != &"" or plan.has_court() \
+			or spec.style not in [&"cottage", &"farmhouse", &"thatch_cottage", &"townhouse"]:
+		return out
+	var tie_height := minf(DOMESTIC_CEILING_TIE_HEIGHT,
+		ceiling_y - float(level) * spec.height - FLOOR_T - CEILING_MIN)
+	if tie_height < 0.08 - 0.00001:
+		return out
+	var breast := hearth_breast(plan)
+	var reserved: Array[Rect2] = []
+	if not breast.is_empty() and int(breast["storey"]) == level:
+		reserved.append(Rect2(breast["rect"]).grow(0.08))
+	for stair in plan.stairs:
+		if int(stair.get("storey", 0)) != level:
+			continue
+		for key in ["rect", "opening", "upper_rect"]:
+			if stair.has(key) and stair[key] is Rect2:
+				reserved.append(Rect2(stair[key]).grow(0.10))
+	for hatch in plan.trapdoors:
+		if int(hatch.get("upper_storey", 0)) == level + 1 and hatch.get("rect") is Rect2:
+			reserved.append(Rect2(hatch["rect"]).grow(0.10))
+	var bottom := ceiling_y - tie_height
+	for piece in plan.furniture:
+		if HousePlan.record_storey(piece) != level:
+			continue
+		var key := String(piece["key"])
+		var origin := PropCatalog.house_origin(piece)
+		var top := origin.y + (PropCatalog.floor_offset(key) + PropCatalog.height(key)) \
+			* PropCatalog.placement_height_scale(piece)
+		if top > bottom:
+			var yaw := float(piece["yaw"]) + PropCatalog.face_offset(key)
+			var scale := float(piece.get("scale", 1.0))
+			var centre := PropCatalog.plan_centre(key, origin, yaw, scale)
+			var footprint := PropCatalog.footprint_rotated(key, yaw) * scale
+			reserved.append(Rect2(centre - footprint * 0.5, footprint).grow(0.03))
+	for room in plan.rooms_on_storey(level):
+		if plan.is_polygonal(room) or plan.kind_of(room) in [&"corridor", &"stairwell", &"cellar"]:
+			continue
+		var floor := room_floor_rect(plan, room)
+		var across_x := floor.size.x <= floor.size.y
+		var short_span := minf(floor.size.x, floor.size.y)
+		var long_span := maxf(floor.size.x, floor.size.y)
+		if short_span < 2.1 or long_span < 2.4:
+			continue
+		var count := clampi(int(ceil(long_span / 1.8)) - 1, 1, 7)
+		var span := short_span + INNER_WALL_T * 0.8
+		var size := Vector3(span, tie_height, 0.16) if across_x \
+			else Vector3(0.16, tie_height, span)
+		for index in range(count):
+			var centre := floor.get_center()
+			if across_x:
+				centre.y = floor.position.y + long_span * float(index + 1) / float(count + 1)
+			else:
+				centre.x = floor.position.x + long_span * float(index + 1) / float(count + 1)
+			var footprint := Rect2(centre - Vector2(size.x, size.z) * 0.5, Vector2(size.x, size.z))
+			var clear := true
+			for obstruction in reserved:
+				if footprint.intersects(obstruction):
+					clear = false
+			for opening in plan.doors + plan.windows:
+				if HousePlan.record_storey(opening) != level:
+					continue
+				var top := float(opening.get("top", float(opening.get("head", DOOR_H)) + level * spec.height))
+				if top <= bottom:
+					continue
+				var opening_rect := window_rect(opening).grow(wall_thickness(spec) * 0.5 + 0.02)
+				if footprint.intersects(opening_rect):
+					clear = false
+			if clear:
+				out.append({"room": room, "size": size,
+					"xf": Transform3D(Basis(), Vector3(centre.x,
+						ceiling_y - tie_height * 0.5, centre.y))})
+	return out
 
 # ---- openings ----
 const DOOR_W := 0.95          # front door leaf width
@@ -1163,6 +1245,44 @@ const BREAST_DEPTH := 0.5
 const DOMESTIC_FIREPLACE_BREAST_WIDTH := 1.08
 const DOMESTIC_FIREPLACE_MAX_WIDTH := 1.90
 const DOMESTIC_FIREPLACE_DEPTH := 0.72
+const WITCH_RECESS_BACK_CLEAR := 0.12
+const WITCH_RECESS_FRONT_CLEAR := 0.08
+const WITCH_RECESS_SIDE_BUILDUP := 0.72
+const WITCH_RECESS_SEAT_Y := 0.14
+const WITCH_CAULDRON_LOWER_LOG := Vector3(0.075, 0.07, 0.40)
+const WITCH_CAULDRON_UPPER_LOG := Vector3(0.38, 0.056, 0.075)
+const WITCH_CAULDRON_LOG_SPREAD := 0.08625
+
+
+static func uses_domestic_finish(plan: HousePlan) -> bool:
+	return plan.spec.get_script() == BASE_HOUSE_SPEC and plan.world_family == &"" \
+		and plan.spec.trade == &"none" and plan.spec.style in \
+		[&"cottage", &"farmhouse", &"thatch_cottage", &"townhouse", &"witch_hut"]
+
+
+static func uses_witch_cooking_recess(plan: HousePlan, room: int, key: String) -> bool:
+	return plan != null and plan.spec.get_script() == BASE_HOUSE_SPEC \
+		and plan.spec.style == &"witch_hut" and plan.spec.trade == &"none" \
+		and plan.world_family == &"" and room == plan.hearth_room() and key == "Cauldron"
+
+
+static func witch_recess_size(item: Dictionary) -> Vector2:
+	var foot := PropCatalog.footprint("Cauldron") * float(item.get("scale", 1.0))
+	return Vector2(foot.x + WITCH_RECESS_SIDE_BUILDUP,
+		foot.y + WITCH_RECESS_BACK_CLEAR + WITCH_RECESS_FRONT_CLEAR)
+
+
+## Mouth dimensions shared by the breast and any chimney masonry behind it.
+## The lower chimney may cross the room wall when its flue follows a split roof.
+static func hearth_mouth(plan: HousePlan) -> Dictionary:
+	var breast := hearth_breast(plan)
+	if breast.is_empty():
+		return {}
+	if String(breast.get("kind", "")) == "witch_cauldron_recess":
+		return {"width": float(breast["width"]) - 0.42,
+			"bottom": WITCH_RECESS_SEAT_Y, "top": minf(1.48, plan.spec.height - 0.68)}
+	return {"width": minf(1.48, maxf(0.80, float(breast["width"]) - 0.42)),
+		"bottom": 0.28, "top": minf(1.48, plan.spec.height - 0.68)}
 
 ## A structural surround authored alongside the actual hearth placement.
 ## Its outline keeps diagonal walls honest; rect is only the broad-phase bound.
@@ -1171,6 +1291,21 @@ static func breast_for_hearth(plan: HousePlan, room: int, item: Dictionary, wall
 	var normal: Vector2 = host["normal"]
 	var along: Vector2 = (Vector2(host["to"]) - Vector2(host["from"])).normalized()
 	var foot := PropCatalog.footprint(String(item["key"])) * float(item.get("scale", 1.0))
+	if uses_witch_cooking_recess(plan, room, String(item["key"])):
+		var size := witch_recess_size(item)
+		var wall_point := Rect2(item["rect"]).get_center() \
+			- normal * (foot.y * 0.5 + WITCH_RECESS_BACK_CLEAR)
+		var recess_centre := wall_point + normal * size.y * 0.5
+		var recess_outline := PackedVector2Array([
+			recess_centre - along * size.x * 0.5 - normal * size.y * 0.5,
+			recess_centre + along * size.x * 0.5 - normal * size.y * 0.5,
+			recess_centre + along * size.x * 0.5 + normal * size.y * 0.5,
+			recess_centre - along * size.x * 0.5 + normal * size.y * 0.5])
+		return {"kind": "witch_cauldron_recess", "room": room,
+			"storey": plan.storey_of_room(room), "wall": wall, "centre": recess_centre,
+			"normal": normal, "width": size.x, "depth": size.y,
+			"outline": recess_outline, "rect": Poly.bounding_rect(recess_outline),
+			"yaw": float(item["yaw"])}
 	var centre: Vector2 = Rect2(item["rect"]).get_center() - normal * (foot.y * 0.5 + BREAST_DEPTH * 0.5)
 	var width := foot.x + 0.4
 	var outline := PackedVector2Array([centre - along * width * 0.5 - normal * BREAST_DEPTH * 0.5,

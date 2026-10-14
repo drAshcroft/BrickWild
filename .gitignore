@@ -52,3 +52,5 @@ scratch/*.json
 /out/
 /visualqa/styles/church/gothic/renders/chapel_clipped_preview_20261011_03/groups/gothic_chevet/requests
 /visualqa/styles/church/gothic/renders
+/visualqa/styles/house/cottage/renders
+/visualqa/styles/house

@@ -72,6 +72,8 @@ static func fits(plan: HousePlan, room: int, cand: Dictionary, floor_rect: Rect2
 	var rect: Rect2 = cand["rect"]
 	if not floor_rect.grow(0.01).encloses(rect):
 		return false
+	if not clears_domestic_entry(plan, room, rect):
+		return false
 	for b in blocked:
 		# a seat tucked under its own table overlaps it on purpose, so the
 		# table is passed in as the one rectangle this placement may share
@@ -118,6 +120,30 @@ static func inside_outline(plan: HousePlan, room: int, rect: Rect2) -> bool:
 	for p in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end,
 			Vector2(rect.position.x, rect.end.y)]:
 		if not Poly.contains_point(outline, p, 0.01):
+			return false
+	return true
+
+
+## A domestic entrance needs its actual doorway width clear beyond the swing.
+## This excludes solid furniture only: empty use zones may share the approach.
+static func clears_domestic_entry(plan: HousePlan, room: int, rect: Rect2) -> bool:
+	if not HouseFurnishingRecipes.is_ordinary_house(plan):
+		return true
+	var entrance := plan.entrance()
+	if entrance < 0:
+		return true
+	var door: Dictionary = plan.doors[entrance]
+	if HousePlan.record_storey(door) != plan.storey_of_room(room):
+		return true
+	var normal: Vector2 = door["normal"]
+	var tangent := Vector2(normal.y, -normal.x).abs()
+	var centre: Vector2 = door["pos"]
+	for side in [-1.0, 1.0]:
+		var start: Vector2 = centre - tangent * float(door["width"]) * 0.5
+		var finish: Vector2 = centre + tangent * float(door["width"]) * 0.5 \
+			+ normal * side * HouseFurnishPlacement.DOOR_APPROACH
+		var overlap := rect.intersection(Rect2(start.min(finish), (finish - start).abs()))
+		if overlap.size.x > 0.005 and overlap.size.y > 0.005:
 			return false
 	return true
 

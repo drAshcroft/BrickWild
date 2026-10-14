@@ -69,7 +69,9 @@ func check_hearth(plan: HousePlan) -> void:
 			here.append(f)
 	var native_host: bool = HouseFurnishingRecipes.uses_native_domestic_fireplace(plan) \
 		and String(plan.hearth.get("host_kind", "")) == "ordinary_fireplace"
-	if here.is_empty() and wants_one and native_host:
+	# A planned native fireplace is required even in a combined hall/kitchen.
+	# Its physical host cannot depend on the room's programme label.
+	if native_host:
 		var breast: Dictionary = HouseGeometry.hearth_breast(plan)
 		var expected_depth: float = HouseGeometry.DOMESTIC_FIREPLACE_DEPTH
 		if breast.is_empty() or int(breast.get("room", -1)) != room \

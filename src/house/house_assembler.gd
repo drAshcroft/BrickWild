@@ -47,6 +47,10 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 		ShellAssembler.house_materials(shell, plan.spec, plan.world_family)
 	else:
 		ShellAssembler.house_floor_material(shell, plan.spec)
+	if _uses_domestic_finish(plan):
+		shell.set_surface_override_material(HouseBuilder.SURF_WALL,
+			MaterialKit.plaster(plan.spec.wall_color, false,
+				{"hearth_stone_colour": Color(0.43, 0.40, 0.35, 1.0)}))
 	if plan.world_family != &"":
 		# a family of the wider world is built of its own things (EVAL-B04)
 		WorldAssembler.dress_house(shell, plan)
@@ -93,11 +97,20 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 	var props := Node3D.new()
 	props.name = "Furniture"
 	root.add_child(props)
+	var witch_backing_added := false
 	for p in plan.furniture:
 		var node: Node3D = _instance(p)
 		if node != null:
+			if _uses_domestic_finish(plan):
+				_finish_domestic_wood(node)
 			props.add_child(node)
 			_add_witch_cauldron_heat(node, p, plan)
+			if builder != null and not witch_backing_added and String(p["key"]) == "Cauldron" \
+					and int(p.get("room", -1)) == plan.hearth_room():
+				var backing := _domestic_hearth_assembly(node, p, plan, builder, true)
+				if not backing.is_empty():
+					props.add_child(backing["soot"])
+					witch_backing_added = true
 	if builder != null and _uses_domestic_hearth_fire(plan):
 		var breast: Dictionary = HouseGeometry.hearth_breast(plan)
 		if not breast.is_empty():
@@ -133,13 +146,44 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 	root.add_child(lights)
 
 
+## These plaster-and-timber households share a restrained interior finish.
+## Specialist and trade assemblers continue to own their own material choices.
+static func _uses_domestic_finish(plan: HousePlan) -> bool:
+	return HouseGeometry.uses_domestic_finish(plan)
+
+
+static func _finish_domestic_wood(node: Node) -> void:
+	if node is MeshInstance3D and node.mesh != null:
+		for surface in node.mesh.get_surface_count():
+			var original := node.get_active_material(surface) as BaseMaterial3D
+			if original == null or original.resource_name != "MI_Trim_Furniture":
+				continue
+			# Per-instance copies retain the owned model's grain/ORM textures.
+			# Mutating the imported resource would also recolour shops and castles.
+			var wood := original.duplicate() as BaseMaterial3D
+			wood.albedo_color *= Color(0.68, 0.67, 0.65)
+			wood.normal_scale *= 0.5
+			wood.metallic_specular = 0.3
+			node.set_surface_override_material(surface, wood)
+	for child in node.get_children():
+		_finish_domestic_wood(child)
+
+
 ## A plain domestic fireplace needs fuel and light in the opening that was
 ## measured for its selected hearth. Read the foot, lintel and jambs from the
 ## actual build so this assembly follows the same aperture as the shell.
 ## Witch cauldron heat stays on its established path above.
 static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary,
-		plan: HousePlan, builder: HouseBuilder) -> Dictionary:
-	if not _uses_domestic_hearth_fire(plan) or hearth_node == null \
+		plan: HousePlan, builder: HouseBuilder, backing_only := false) -> Dictionary:
+	if hearth_node == null:
+		return {}
+	if backing_only:
+		# Reuse the physically witnessed lining for the ordinary Witch cooking
+		# recess. Its own cauldron already owns the fuel and heat assembly.
+		if plan.spec.get_script() != BASE_HOUSE_SPEC or plan.spec.style != &"witch_hut" \
+				or plan.spec.trade != &"none" or plan.world_family != &"":
+			return {}
+	elif not _uses_domestic_hearth_fire(plan) \
 			or String(plan.hearth.get("host_kind", "")) != "ordinary_fireplace":
 		return {}
 	var breast: Dictionary = HouseGeometry.hearth_breast(plan)
@@ -242,6 +286,8 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 	soot_face.position.z = -soot_depth * 0.5 - 0.003 - firebrick_roomward_offset
 	soot_face.set_meta("backing_depth", soot_depth)
 	soot.add_child(soot_face)
+	if backing_only:
+		return {"soot": soot}
 
 	var placement_pos: Vector3 = placement["pos"]
 	var fire_origin_world := Vector3(placement_pos.x, sill + 0.035, placement_pos.z)
@@ -281,7 +327,7 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 		/ sin(0.38) / x_scale
 	var local_log_length: float = minf(minf(clear_width * 0.72,
 		clear_width - 0.08) / x_scale, depth_limited_log)
-	var local_log_height := 0.11 / y_scale
+	var local_log_height := 0.15 / y_scale
 	var local_log_depth := 0.12 / depth_scale
 	var wood_material := StandardMaterial3D.new()
 	wood_material.albedo_color = Color.WHITE
@@ -297,7 +343,7 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 		# One split length lies at the mouth, the second crosses it and rests on
 		# the first. The foreground placement keeps real timber visible below fire.
 		log.position = Vector3(0.0, fuel_height * 0.5 - log_bounds.position.y
-			+ (0.0 if index == 0 else 0.08 / y_scale),
+			+ (0.0 if index == 0 else 0.12 / y_scale),
 			(-0.035 if index == 0 else -0.006) / depth_scale)
 		log.rotation.y = 0.38 if index == 0 else -0.38
 		heat.add_child(log)
@@ -313,7 +359,8 @@ static func _domestic_hearth_assembly(hearth_node: Node3D, placement: Dictionary
 		var pot_footprint: Vector2 = PropCatalog.footprint("Pot_1")
 		var pot_scale: float = minf(0.92, minf((clear_width - 0.03) / pot_footprint.x,
 			(recess_depth - 0.03) / pot_footprint.y))
-		var trivet_height := 0.145 / y_scale
+		# The pot rests above the crossed timber, not inside its upper split.
+		var trivet_height := local_log_height + 0.138 / y_scale
 		var fuel_top_local := fuel_height * 0.5
 		var support_y := fuel_top_local + trivet_height
 		if pot_height > 0.001:
@@ -491,7 +538,8 @@ static func _add_domestic_hearth_stone_finish(parent: Node3D, breast: Dictionary
 	refractory_floor.set_meta("hearth_floor", true)
 	finish.add_child(refractory_floor)
 	# Dark, warm stone in the opening returns hides the bright structural trim.
-	# The thin plates are flush to the measured jamb planes and do not narrow the mouth.
+	# Each return finishes 2 mm inside its structural jamb plane. Coincident
+	# faces let the bright structural surface flicker through the dark lining.
 	var reveal_material := StandardMaterial3D.new()
 	reveal_material.albedo_color = Color(0.19, 0.105, 0.065)
 	reveal_material.roughness = 0.98
@@ -502,7 +550,7 @@ static func _add_domestic_hearth_stone_finish(parent: Node3D, breast: Dictionary
 		var side_sign: float = float(side)
 		reveal.name = "HearthDarkRevealLeft" if side_sign < 0.0 else "HearthDarkRevealRight"
 		var reveal_mesh := BoxMesh.new()
-		reveal_mesh.size = Vector3(0.002, maxf(0.02, head - sill), liner_depth)
+		reveal_mesh.size = Vector3(0.006, maxf(0.02, head - sill), liner_depth)
 		reveal.mesh = reveal_mesh
 		reveal.material_override = reveal_material
 		reveal.position = Vector3(side_sign * (opening_width * 0.5 + 0.001),
@@ -753,68 +801,71 @@ static func _feathered_soot_mesh(width: float, height: float) -> ArrayMesh:
 	return mesh
 
 
-## Eight-sided, vertex-colored log shells give the crossed fuel a split end grain.
+## A split billet has a broad cut plane and a darker curved bark underside.
+## Keep that distinction in its silhouette and large faces: room cameras cannot
+## resolve tiny painted end-grain marks.
 static func _split_firewood_mesh(length: float, height: float, depth: float,
 		variation: float) -> ArrayMesh:
-	# Eight measured facets keep each short log round in silhouette. Duplicate
-	# face vertices so every bark facet and cut end has a real flat normal.
-	const SIDES := 8
+	const SECTION := [Vector2(0.50, -0.36), Vector2(0.46, -0.12),
+		Vector2(0.50, 0.12), Vector2(0.46, 0.36), Vector2(0.12, 0.50),
+		Vector2(-0.28, 0.42), Vector2(-0.50, 0.06),
+		Vector2(-0.34, -0.37), Vector2(0.10, -0.50)]
 	var vertices := PackedVector3Array()
 	var colours := PackedColorArray()
 	var normals := PackedVector3Array()
 	var indices := PackedInt32Array()
-	var facets: Array[float] = [0.91, 1.0, 0.94, 0.98, 0.89, 1.0, 0.93, 0.97]
-	var ring0 := PackedVector3Array()
-	var ring1 := PackedVector3Array()
-	var colours0 := PackedColorArray()
-	var colours1 := PackedColorArray()
+	var rings: Array[PackedVector3Array] = []
+	for ring_index in range(3):
+		var ring := PackedVector3Array()
+		var x: float = [-0.5, -0.08, 0.5][ring_index] * length
+		var taper: float = [0.91, 1.0, 0.95][ring_index]
+		for point: Vector2 in SECTION:
+			# A slight twist at the sawn end avoids two identical regular prisms.
+			var section := point.rotated(variation * float(ring_index) * 0.25)
+			ring.append(Vector3(x, section.x * height * taper,
+				section.y * depth * taper))
+		rings.append(ring)
+	for ring_index in range(2):
+		for side in range(SECTION.size()):
+			var next := (side + 1) % SECTION.size()
+			var cut_face := side < 3
+			var shade := 0.86 + float(side % 3) * 0.07
+			var colour := Color(0.30, 0.17, 0.065) * (0.72 if side == 1 else 1.0) if cut_face \
+				else Color(0.075, 0.030, 0.012) * shade
+			var corners: Array[Vector3] = [rings[ring_index][side],
+				rings[ring_index][next], rings[ring_index + 1][next],
+				rings[ring_index + 1][side]]
+			for triangle: Array in [[0, 2, 1], [0, 3, 2]]:
+				var normal := (corners[triangle[2]] - corners[triangle[0]]).cross(
+					corners[triangle[1]] - corners[triangle[0]]).normalized()
+				for corner: int in triangle:
+					vertices.append(corners[corner])
+					colours.append(colour)
+					normals.append(normal)
+					indices.append(vertices.size() - 1)
 	for end_index in range(2):
-		var x := (-0.5 if end_index == 0 else 0.5) * length
-		var taper := 0.91 if end_index == 0 else 1.0
-		for side in range(SIDES):
-			var angle: float = TAU * float(side) / float(SIDES) + variation
-			var facet: float = facets[side] * taper
-			var point := Vector3(x, cos(angle) * height * 0.5 * facet,
-				sin(angle) * depth * 0.5 * facet)
-			var shade: float = 0.90 + float((side + end_index) % 3) * 0.07
-			var bark_color := Color(0.27 * shade, 0.125 * shade, 0.045 * shade)
-			if end_index == 0:
-				ring0.append(point)
-				colours0.append(bark_color)
-			else:
-				ring1.append(point)
-				colours1.append(bark_color)
-	for side in range(SIDES):
-		var next := (side + 1) % SIDES
-		var corners: Array[Vector3] = [ring0[side], ring0[next], ring1[next], ring1[side]]
-		var face_colors: Array[Color] = [colours0[side], colours0[next],
-			colours1[next], colours1[side]]
-		var mid_angle: float = TAU * (float(side) + 0.5) / float(SIDES) + variation
-		var face_normal := Vector3(0.0, cos(mid_angle), sin(mid_angle)).normalized()
-		for corner_index in [0, 2, 1, 0, 3, 2]:
-			vertices.append(corners[corner_index])
-			colours.append(face_colors[corner_index])
-			normals.append(face_normal)
-			indices.append(vertices.size() - 1)
-	for end_index in range(2):
-		var x := (-0.5 if end_index == 0 else 0.5) * length
-		var ring: PackedVector3Array = ring0 if end_index == 0 else ring1
+		var ring: PackedVector3Array = rings[0 if end_index == 0 else 2]
+		var centre := Vector3(ring[0].x, 0.0, 0.0)
 		var cap_normal := Vector3(-1.0 if end_index == 0 else 1.0, 0.0, 0.0)
-		var cap_color := Color(0.36, 0.19, 0.07) if end_index == 1 else Color(0.26, 0.12, 0.04)
-		for side in range(SIDES):
-			var next := (side + 1) % SIDES
-			vertices.append(Vector3(x, 0.0, 0.0))
-			vertices.append(ring[side])
-			vertices.append(ring[next])
-			for _vertex in range(3):
-				colours.append(cap_color)
-				normals.append(cap_normal)
-			if end_index == 0:
-				indices.append_array(PackedInt32Array([vertices.size() - 3,
-					vertices.size() - 1, vertices.size() - 2]))
-			else:
-				indices.append_array(PackedInt32Array([vertices.size() - 3,
-					vertices.size() - 2, vertices.size() - 1]))
+		for side in range(SECTION.size()):
+			var next := (side + 1) % SECTION.size()
+			var bark_edge := side >= 3
+			var inner_a: Vector3 = centre.lerp(ring[side], 0.84)
+			var inner_b: Vector3 = centre.lerp(ring[next], 0.84)
+			var cap_triangles: Array = [[centre, inner_a, inner_b],
+				[inner_a, ring[side], ring[next]], [inner_a, ring[next], inner_b]]
+			for triangle_index in range(cap_triangles.size()):
+				var triangle: Array = cap_triangles[triangle_index]
+				if end_index == 1:
+					triangle.reverse()
+				var colour := Color(0.36, 0.21, 0.085)
+				if triangle_index > 0 and bark_edge:
+					colour = Color(0.075, 0.030, 0.012)
+				for point: Vector3 in triangle:
+					vertices.append(point)
+					colours.append(colour)
+					normals.append(cap_normal)
+					indices.append(vertices.size() - 1)
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -827,6 +878,41 @@ static func _split_firewood_mesh(length: float, height: float, depth: float,
 
 
 static func _flame_tongue_mesh(width: float, height: float, depth: float,
+		lean: float, phase: float = 0.0) -> ArrayMesh:
+	# Several narrow, unequal tongues share a low base. A single broad cone
+	# reads as a solid ornament at the room camera, however many facets it has.
+	var vertices := PackedVector3Array()
+	var colours := PackedColorArray()
+	var normals := PackedVector3Array()
+	var indices := PackedInt32Array()
+	for branch in range(3):
+		var fraction: float = [0.54, 1.0, 0.67][branch]
+		var offset: float = [-0.27, 0.0, 0.27][branch] * width
+		var branch_phase: float = phase if branch == 1 else phase + float(branch + 1) * 1.3
+		var branch_lean: float = lean + sin(phase) * width * 0.058 if branch == 1 \
+			else [-0.05, 0.0, 0.09][branch] * width
+		var tongue := _single_flame_tongue_mesh(width * 0.42, height * fraction,
+			depth * (1.0 if branch == 1 else 0.72), branch_lean, branch_phase)
+		var data := tongue.surface_get_arrays(0)
+		var first := vertices.size()
+		for point: Vector3 in data[Mesh.ARRAY_VERTEX]:
+			vertices.append(point + Vector3(offset, 0.0, 0.0))
+		colours.append_array(data[Mesh.ARRAY_COLOR])
+		normals.append_array(data[Mesh.ARRAY_NORMAL])
+		for index: int in data[Mesh.ARRAY_INDEX]:
+			indices.append(first + index)
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = colours
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+static func _single_flame_tongue_mesh(width: float, height: float, depth: float,
 		lean: float, phase: float = 0.0) -> ArrayMesh:
 	# Faceted, closed volumetric tongues. Each triangle owns its vertices and
 	# outward normal, so normal backface culling shows an actual rounded volume.
@@ -1015,21 +1101,28 @@ static func _hearth_has_actual_recess(mesh: ArrayMesh, breast: Dictionary,
 	var start := face + normal * 0.10
 	var finish := face - normal * (depth + HouseGeometry.wall_thickness(spec) * 1.5)
 	var nearest_distance := INF
-	var arrays: Array = mesh.surface_get_arrays(wall_surface)
-	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-	var index_value: Variant = arrays[Mesh.ARRAY_INDEX]
-	var indices: PackedInt32Array = index_value if index_value != null else PackedInt32Array()
-	var order := indices
-	if order.is_empty():
-		order = PackedInt32Array()
-		for i in range(vertices.size()):
-			order.append(i)
-	for i in range(0, order.size() - 2, 3):
-		var hit: Variant = Geometry3D.segment_intersects_triangle(start, finish,
-			vertices[order[i]], vertices[order[i + 1]], vertices[order[i + 2]])
-		if hit != null:
-			nearest_distance = minf(nearest_distance, start.distance_to(Vector3(hit)))
-	return is_finite(nearest_distance) and nearest_distance >= depth * 0.65
+	# A stone chimney uses the floor slot. Looking only at wall triangles can
+	# see the backing THROUGH an obstructing stack and attach soot inside it.
+	for surface in range(mesh.get_surface_count()):
+		var arrays: Array = mesh.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var index_value: Variant = arrays[Mesh.ARRAY_INDEX]
+		var indices: PackedInt32Array = index_value if index_value != null else PackedInt32Array()
+		var order := indices
+		if order.is_empty():
+			order = PackedInt32Array()
+			for i in range(vertices.size()):
+				order.append(i)
+		for i in range(0, order.size() - 2, 3):
+			var hit: Variant = Geometry3D.segment_intersects_triangle(start, finish,
+				vertices[order[i]], vertices[order[i + 1]], vertices[order[i + 2]])
+			if hit != null:
+				nearest_distance = minf(nearest_distance, start.distance_to(Vector3(hit)))
+	# The breast's rear plane meets its host wall. Permit its shallow stone
+	# face relief, but not an unrelated plate partway through the recess.
+	var wall_offset := depth + 0.10 - nearest_distance
+	return is_finite(nearest_distance) and nearest_distance >= depth * 0.65 \
+		and wall_offset >= -0.02 and wall_offset <= 0.07
 
 
 ## Fuel and flame volumes must fit the measured open shell. A fixture checks
@@ -1183,6 +1276,15 @@ static func _hearth_cooking_vessel_fits(heat: Node3D, sill: float, head: float,
 	var top_y: float = floor_y + PropCatalog.height("Pot_1") * scale_y
 	var half_x: float = footprint.x * 0.5
 	var half_z: float = footprint.y * 0.5
+	var pot_bounds := AABB(Vector3(vessel.position.x - half_x, floor_y,
+		vessel.position.z - half_z), Vector3(footprint.x, top_y - floor_y, footprint.y))
+	for index in range(2):
+		var log := heat.find_child("Firewood_%d" % index, true, false) as MeshInstance3D
+		if log == null or log.mesh == null:
+			return false
+		var timber_bounds: AABB = log.transform * log.mesh.get_aabb()
+		if timber_bounds.intersects(pot_bounds.grow(-0.002)):
+			return false
 	return absf(floor_y - ring_top_y) <= 0.008 \
 		and floor_y > sill + 0.03 and top_y < head - 0.035 \
 		and absf(vessel.position.x) + half_x <= clear_width * 0.5 - 0.015 \
@@ -1286,12 +1388,30 @@ static func _instance(p: Dictionary, centred := true) -> Node3D:
 
 
 
+## Cast iron retains its imported relief without the polished pale-metal finish.
+## The copied material belongs to this Witch Cauldron instance only.
+static func _finish_witch_cauldron_iron(node: Node) -> void:
+	if node is MeshInstance3D and node.mesh != null:
+		for surface in node.mesh.get_surface_count():
+			var original := node.get_active_material(surface) as BaseMaterial3D
+			if original == null or original.resource_name != "MI_Trim_Metal":
+				continue
+			var iron := original.duplicate() as BaseMaterial3D
+			iron.albedo_color *= Color(0.18, 0.16, 0.14)
+			iron.metallic = 0.5
+			iron.metallic_specular = 0.25
+			node.set_surface_override_material(surface, iron)
+	for child in node.get_children():
+		_finish_witch_cauldron_iron(child)
+
+
 ## A contained heat cue makes the Witch's existing Cauldron read as active.
 ## The coals and short emissive tongues stay below the measured bowl and between
 ## the pot legs. The cue is a child of the real prop, so its pose is not rebuilt.
 static func _add_witch_cauldron_heat(parent: Node3D, placement: Dictionary, plan: HousePlan) -> void:
 	if plan.spec.style != &"witch_hut" or String(placement.get("key", "")) != "Cauldron":
 		return
+	_finish_witch_cauldron_iron(parent)
 	var cue := Node3D.new()
 	cue.name = "NativeCauldronHeat"
 	var station_id := String(placement.get("heat_setting_id", ""))
@@ -1315,22 +1435,24 @@ static func _add_witch_cauldron_heat(parent: Node3D, placement: Dictionary, plan
 		var fuel_material := StandardMaterial3D.new()
 		fuel_material.albedo_color = Color(0.20, 0.095, 0.045)
 		fuel_material.roughness = 0.92
-		var lower_height := 0.035
+		var lower_size := HouseGeometry.WITCH_CAULDRON_LOWER_LOG
+		var upper_size := HouseGeometry.WITCH_CAULDRON_UPPER_LOG
+		var lower_height := lower_size.y
 		for side in [-1.0, 1.0]:
 			var lower := MeshInstance3D.new()
 			lower.name = "FuelLogLower_%d" % (0 if side < 0.0 else 1)
 			var lower_mesh := BoxMesh.new()
-			lower_mesh.size = Vector3(0.035, lower_height, 0.22)
+			lower_mesh.size = lower_size
 			lower.mesh = lower_mesh
-			lower.position = Vector3(side * 0.035, floor_y + lower_height * 0.5, 0.0)
+			lower.position = Vector3(side * HouseGeometry.WITCH_CAULDRON_LOG_SPREAD, floor_y + lower_height * 0.5, 0.0)
 			lower.material_override = fuel_material
 			cue.add_child(lower)
 		var upper := MeshInstance3D.new()
 		upper.name = "FuelLogUpper"
 		var upper_mesh := BoxMesh.new()
-		upper_mesh.size = Vector3(0.18, 0.032, 0.035)
+		upper_mesh.size = upper_size
 		upper.mesh = upper_mesh
-		upper.position = Vector3(0.0, floor_y + lower_height + 0.016, 0.0)
+		upper.position = Vector3(0.0, floor_y + lower_height + upper_size.y * 0.5, 0.0)
 		upper.material_override = fuel_material
 		cue.add_child(upper)
 	var ember_material := StandardMaterial3D.new()
@@ -1341,15 +1463,16 @@ static func _add_witch_cauldron_heat(parent: Node3D, placement: Dictionary, plan
 	var coal := MeshInstance3D.new()
 	coal.name = "EmberBed"
 	var coal_mesh := CylinderMesh.new()
-	coal_mesh.top_radius = 0.082
-	coal_mesh.bottom_radius = 0.082
+	coal_mesh.top_radius = 0.14
+	coal_mesh.bottom_radius = 0.14
 	coal_mesh.height = 0.020
 	coal.mesh = coal_mesh
 	coal.position = Vector3(0.0, floor_y + coal_mesh.height * 0.5, 0.0)
 	coal.material_override = ember_material
 	cue.add_child(coal)
 	var flame_material := StandardMaterial3D.new()
-	flame_material.albedo_color = Color(1.0, 0.24, 0.035)
+	flame_material.albedo_color = Color.WHITE
+	flame_material.vertex_color_use_as_albedo = true
 	flame_material.emission_enabled = true
 	flame_material.emission = Color(1.0, 0.32, 0.055)
 	flame_material.emission_energy_multiplier = 3.0
@@ -1362,14 +1485,12 @@ static func _add_witch_cauldron_heat(parent: Node3D, placement: Dictionary, plan
 	for index in range(2):
 		var flame := MeshInstance3D.new()
 		flame.name = "LowFlame_%d" % index
-		var flame_mesh := CylinderMesh.new()
-		flame_mesh.bottom_radius = 0.028 if index == 0 else 0.025
-		flame_mesh.top_radius = 0.0
-		flame_mesh.height = 0.15 if index == 0 else 0.13
-		flame.mesh = flame_mesh
-		var flame_x := -0.052 if index == 0 else 0.052
-		var flame_z := -0.025 if index == 0 else -0.040
-		flame.position = Vector3(flame_x, coal_top + flame_mesh.height * 0.5, flame_z)
+		var flame_height := 0.17 if index == 0 else 0.15
+		flame.mesh = _single_flame_tongue_mesh(0.080, flame_height, 0.068,
+			0.012 if index == 0 else -0.009, float(index) * 1.4)
+		var flame_x := -0.09 if index == 0 else 0.09
+		var flame_z := -0.08 if index == 0 else -0.095
+		flame.position = Vector3(flame_x, coal_top, flame_z)
 		flame.material_override = flame_material
 		cue.add_child(flame)
 		var flame_core := MeshInstance3D.new()

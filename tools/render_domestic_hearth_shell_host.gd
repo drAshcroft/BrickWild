@@ -9,6 +9,15 @@ const CANONICAL_SIZES: Array[Dictionary] = [
 const ORIGINAL_REQUEST := {"name": "original_11x14", "width": 11.0,
 	"length": 14.0, "height": 2.6}
 const SOURCE_FILES: Array[String] = [
+	"res://core/material_kit.gd",
+	"res://core/shell_assembler.gd",
+	"res://core/mesh_kit.gd",
+	"res://core/mass_builder.gd",
+	"res://src/house/prop_catalog.gd",
+	"res://src/house/house_furnish_geometry.gd",
+	"res://src/house/house_furnish_surface.gd",
+	"res://tools/render_shots.gd",
+	"res://tools/render_domestic_hearth_shell_host.gd",
 	"res://src/house/house_generator.gd",
 	"res://src/house/house_builder.gd",
 	"res://src/house/house_assembler.gd",

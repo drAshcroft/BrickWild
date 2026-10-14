@@ -1,5 +1,21 @@
 # Procedural building visual targets
 
+## Current implementation review — 13 October 2026
+
+See [the todo review and verification record](TODO_REVIEW_2026_10_13.md) for
+current results. Eight focused todos are now complete: writing reach and chair
+fit, closed clothes storage, dining seat tuck, entrance/hearth clearance, split
+fuel readability, fitted working hearths, Romanesque buttress courses and the
+stale Rotunda report.
+Their reviewed native cohorts and exact acceptance scopes are recorded there.
+Ordinary ceiling construction, material finish and Witch shelf contact have
+also advanced. Whole-style acceptance remains open.
+
+The dated cohorts below are retained history. Their earlier office, fuel and
+bedroom findings should not be read as the verdict on the repaired cohorts.
+
+## Reference archive and earlier comparisons
+
 The user requested imagegen references and actual renders grouped by style and room. All twelve published house styles have a saved four-panel exterior/room/prop board, its exact prompt, and interpretation notes. The gallery retains 72 prior reviewed Godot images and adds 24 public requests across the eight remaining styles, with roof-on exterior, representative functional room views and secondary cutaways. Each current run records exact requests, actual assembled prop transforms, model hashes, source fingerprints and native receipts.
 
 Open [the house comparison gallery](../visualqa/styles/house/index.html). Concept boards live in `visualqa/styles/house/<style>/targets/`. Actual results live in `<style>/renders/<run>/<request>/rooms/` or `views/`. The index records image and source-manifest hashes. [Assistant findings](../visualqa/styles/house/assistant_review.json) describe the remaining defects; they are not human ratings.

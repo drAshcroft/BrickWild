@@ -44,6 +44,28 @@ times rather than an idle-machine promise.
 | church and castle dressing, bounded | `dressingquick` | under 5 m | pass |
 | the public API, every kind once | `lane:api` | 283 s (1 Oct, loaded host) | 141 checks, pass; `libraryquick` 82 checks about 3.5 m, `placementquick` 31 checks about 1.2 m, `poly` 28 checks |
 
+On 13 October the combined geometry lane reached the 300 s cap during
+`hbounds` (`artifacts/qa_fast/lane_geom/20261013_064539`). It did not pass.
+The additive selectors `lane:geom-core`, `lane:geom-openings`, and
+`lane:geom-envelope` partition exactly the same eleven suites into three
+processes. Use all three for that coverage when the combined lane exceeds
+the routine cap. No cases or assertions are removed; `lane:geom` remains
+the combined batch selector. Record the individual receipts, not an inferred
+pass for the timed-out process.
+
+The same day's combined furnishing lane reached the cap during its final
+feng-shui sweep (`lane_house-furnish-fast/20261013_065039`). For a loaded
+host, `lane:house-furnish-rules`, `lane:assets-fast` and `walkpins` retain
+all its coverage in separate bounded processes, with the asset lane also
+covering procedural props. The original combined selector is unchanged.
+
+Final 13 October partition receipts: geometry core 6,424 checks in 186.29 s,
+openings 306 in 152.36 s, envelope 3,059 in 130.00 s; furnishing rules 97 in
+284.50 s, assets-fast 155 in 42.51 s, and walkpins 45 in 89.13 s. All returned
+native zero with no failures or warnings. The first envelope process exited
+`-1` without a summary; its unchanged assertions passed after adding stage
+markers and rerunning. See `docs/TODO_REVIEW_2026_10_13.md` for exact paths.
+
 The first furnishing candidate used the existing 24-house statistical sweep.
 It passed its assertions but took 343 seconds, so it is **not** the routine
 selector. `houseqafurnishfast` uses 12 houses and 8 variety cases; the

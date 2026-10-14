@@ -315,9 +315,10 @@ static func _assign_compact_witch_hall_regions(p: HousePlan, room: int) -> Rect2
 		unsupported["activity_regions_status"] = "unavailable: compact Witch service requires a full side-wall chimney run"
 		p.rooms[room] = unsupported
 		return Rect2()
-	# A single cauldron serves both crafts from the shared left/right service
-	# area. Keep the complete hearth breast, use zone, and two distinct benches
-	# in that area; reserve the opposite 2.1 m strip for the tested meal group.
+	# Reserve the rear part of the opposite side for dining. Its front wall
+	# remains available for a daylight brewing bench, beside the entrance.
+	# The two work groups share the remaining L-shaped floor, with the eating
+	# rectangle borrowed as an obstacle by their placement search.
 	const SERVICE_WIDTH := 4.10
 	const BUFFER_WIDTH := 0.10
 	const MEAL_BAND_WIDTH := 2.10
@@ -329,13 +330,12 @@ static func _assign_compact_witch_hall_regions(p: HousePlan, room: int) -> Rect2
 		p.rooms[room] = insufficient
 		return Rect2()
 	var cooking_left := hearth_wall == 2
-	var service_x := floor.position.x if cooking_left else floor.end.x - SERVICE_WIDTH
 	var eating_x := floor.end.x - MEAL_BAND_WIDTH if cooking_left else floor.position.x
-	var cooking := Rect2(Vector2(service_x, floor.position.y),
-		Vector2(SERVICE_WIDTH, floor.size.y))
+	var cooking := floor
 	var witchwork := cooking
-	var eating := Rect2(Vector2(eating_x, floor.position.y),
-		Vector2(MEAL_BAND_WIDTH, floor.size.y))
+	const FRONT_WORK_DEPTH := 2.05
+	var eating := Rect2(Vector2(eating_x, floor.position.y + FRONT_WORK_DEPTH),
+		Vector2(MEAL_BAND_WIDTH, floor.size.y - FRONT_WORK_DEPTH))
 	var room_data: Dictionary = p.rooms[room]
 	room_data["activity_regions"] = {
 		&"eating": eating, &"cooking": cooking, &"witchwork": witchwork,
@@ -614,6 +614,13 @@ static func clear_wall_spans(p: HousePlan, room: int, wi: int,
 	# candidate meets a reserved foot/head landing or access-route rectangle.
 	if body_depth > 0.001:
 		var band := _wall_body_band(wall, lo, hi, line, body_depth)
+		var breast := HouseGeometry.hearth_breast(p)
+		if not breast.is_empty() and int(breast["room"]) == room:
+			var overlap := band.intersection(Rect2(breast["rect"]))
+			if overlap.has_area():
+				var cut := Vector2(overlap.position.x, overlap.end.x) if horizontal \
+					else Vector2(overlap.position.y, overlap.end.y)
+				cuts.append(Vector2(cut.x - 0.03, cut.y + 0.03))
 		for zone in p.zones:
 			if int(zone.get("room", -1)) != room \
 					or String(zone.get("why", "")) not in ["stair access route",
@@ -840,6 +847,10 @@ static func _append_wall_mount(p: HousePlan, room: int, wall_index: int,
 ## Keep tall floor furniture (and any prior fitting) out of that same volume.
 static func _wall_mount_clear_of_furniture(p: HousePlan, room: int,
 		body_rect: Rect2, body_bottom: float, body_top: float) -> bool:
+	var breast := HouseGeometry.hearth_breast(p)
+	if not breast.is_empty() and int(breast["room"]) == room \
+			and Poly.intersection_area(Poly.from_rect(body_rect), breast["outline"]) > 0.002:
+		return false
 	for item in p.furniture:
 		if int(item.get("room", -1)) != room or not item.has("pos"):
 			continue

@@ -202,14 +202,32 @@ static func _domestic_layout(p: HousePlan, spec: HouseSpec) -> Dictionary:
 	while candidate.size() >= required.size():
 		var compact_shared: bool = kitchen_merged and _compact_shared_cooking_square(spec, inner, candidate)
 		var attempt: Dictionary
+		var used_large_spine := large_grammar
 		if compact_shared:
 			attempt = _fit_compact_shared_cooking_candidate(p, spec, inner, candidate)
 		else:
 			attempt = _fit_large_domestic_candidate(p, spec, inner, candidate) \
 				if large_grammar else _fit_domestic_candidate(p, spec, inner, candidate)
+			if large_grammar and not bool(attempt.get("ok", false)) \
+					and spec.get_script() == BASE_HOUSE_SPEC and spec.trade == &"none" \
+					and p.world_family == &"":
+				# A long house is not necessarily wide enough for two habitable
+				# wings beside a central hall. Try the existing front-hall grammar
+				# before discarding activities or falling into legacy partitions
+				# (which also lose the domestic stair and landing contract).
+				var spine_reason := String(attempt.get("reason", "large spine did not fit"))
+				var front_attempt := _fit_domestic_candidate(p, spec, inner, candidate)
+				if bool(front_attempt.get("ok", false)):
+					rejected.append({"activities": candidate.duplicate(), "reason": spine_reason,
+						"resolution": "fit the same activities behind a front hall"})
+					attempt = front_attempt
+					used_large_spine = false
+				else:
+					attempt["reason"] = spine_reason + "; front hall: " \
+						+ String(front_attempt.get("reason", "did not fit"))
 		if bool(attempt.get("ok", false)):
 			var rooms: Array[Dictionary] = attempt["rooms"]
-			if large_grammar and p.world_family == &"" and _ordinary_domestic_no_trade(spec) \
+			if used_large_spine and p.world_family == &"" and _ordinary_domestic_no_trade(spec) \
 					and spec.get_script() == BASE_HOUSE_SPEC and spec.style == &"witch_hut" \
 					and spec.roof_material == &"thatch":
 				var work_rect := Rect2()

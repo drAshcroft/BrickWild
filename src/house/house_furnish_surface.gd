@@ -159,6 +159,10 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 			var mount_pose := HousePlanFeatures._wall_fixture_pose(key, wall, wall_along,
 				HouseFurnishGeometry.storey_base(plan, room) + y, scale)
 			var mount_body: Rect2 = Rect2(mount_pose["rect"])
+			var breast := HouseGeometry.hearth_breast(plan)
+			if not breast.is_empty() and int(breast["room"]) == room \
+					and Poly.intersection_area(Poly.from_rect(mount_body), breast["outline"]) > 0.002:
+				continue
 			if compact_witch_work:
 				var activity_regions: Dictionary = plan.rooms[room].get("activity_regions", {})
 				var mounted_inside_floor := mount_body.intersection(HouseGeometry.room_floor_rect(plan, room))
@@ -403,6 +407,56 @@ static func place_ceiling(plan: HousePlan, room: int, key: String) -> void:
 		"zone": Rect2(), "host": -1, "cat": PropCatalog.category(key),
 		"mounted": true, "scale": scale,
 	})
+
+
+## A ledger belongs in front of its reader. Derive the working edge from the
+## actual hosted seat, then fit the rotated body on the measured desk top.
+## This is called only by the ordinary Townhouse writing recipe.
+static func place_at_writing_seat(plan: HousePlan, room: int, key: String) -> void:
+	for index in plan.furniture_of(room):
+		var chair: Dictionary = plan.furniture[index]
+		if String(chair.get("activity_group", "")) != "writing" \
+				or PropCatalog.category(String(chair.get("key", ""))) != "seat":
+			continue
+		var host_index: int = int(chair.get("host", -1))
+		if host_index < 0 or host_index >= plan.furniture.size():
+			continue
+		var desk: Dictionary = plan.furniture[host_index]
+		if PropCatalog.category(String(desk.get("key", ""))) != "workbench":
+			continue
+		var table: Rect2 = desk["rect"]
+		var seat: Rect2 = chair["rect"]
+		var yaw: float = float(chair.get("yaw", 0.0))
+		var facing := HouseFurnishScore._facing_of(yaw).normalized()
+		var along := Vector2(-facing.y, facing.x)
+		var foot := PropCatalog.footprint_rotated(key, yaw + PropCatalog.face_offset(key))
+		var seat_depth: float = absf(facing.x) * seat.size.x + absf(facing.y) * seat.size.y
+		var item_depth: float = absf(facing.x) * foot.x + absf(facing.y) * foot.y
+		var near_edge := seat.get_center() + facing * (seat_depth * 0.5 + 0.04)
+		var lateral := 0.0 if key == "Book_5" else 0.30
+		var center := near_edge + facing * (0.08 + item_depth * 0.5) + along * lateral
+		var body := Rect2(center - foot * 0.5, foot)
+		if not table.grow(-0.06).encloses(body):
+			continue
+		var clash := false
+		for other_index in plan.furniture_of(room):
+			var other: Dictionary = plan.furniture[other_index]
+			if int(other.get("host", -1)) == host_index \
+					and PropCatalog.has_tag(String(other.get("key", "")), PropCatalog.ON_SURFACE) \
+					and Rect2(other["rect"]).grow(0.015).intersects(body):
+				clash = true
+				break
+		if clash:
+			continue
+		var top: float = Vector3(desk["pos"]).y + PropCatalog.surface_height(String(desk["key"])) \
+			* PropCatalog.placement_height_scale(desk)
+		plan.furniture.append({"key": key, "room": room,
+			"storey": HousePlan.record_storey(plan.rooms[room]),
+			"pos": Vector3(center.x, top, center.y), "yaw": yaw,
+			"rect": body, "zone": Rect2(), "host": host_index,
+			"cat": PropCatalog.category(key), "mounted": false, "scale": 1.0,
+			"activity_group": "writing"})
+		return
 
 
 ## A mug, a candle, a stack of books -- set ON something, never on the floor.

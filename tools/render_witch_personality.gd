@@ -20,6 +20,7 @@ const HEAT_VIEWS: Array[String] = ["cauldron_heat_eye_level", "cauldron_heat_hid
 var _failed := false
 var _errors: Array[String] = []
 var _heat_supplement_enabled := false
+var _shared_heat_cases: Dictionary = {}
 
 
 func _init() -> void:
@@ -97,6 +98,7 @@ func _init() -> void:
 				render_rows.append(_view_error(case_id, request.to_dict(), view, generation_error))
 			continue
 		var plan: HousePlan = generated.plan
+		_shared_heat_cases[case_id] = _has_shared_cooking_cauldron(plan)
 		var nav_checker := HouseNavCheck.new()
 		var nav_report: Dictionary = nav_checker.check(plan)
 		var nav_state := "passed" if bool(nav_report.get("ok", false)) else "failed"
@@ -202,6 +204,8 @@ func _render_case(plan: HousePlan, request: BuildingRequest, case_id: String,
 func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 		case_id: String, output: String, assembled: Node3D) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
+	var heat_views: Array[String] = HEAT_VIEWS.slice(0, 2) \
+		if bool(_shared_heat_cases.get(case_id, false)) else HEAT_VIEWS
 	var room := _workshop_room(plan)
 	var cauldron: Dictionary = {}
 	var bench: Dictionary = {}
@@ -224,7 +228,7 @@ func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 				nearest_distance = distance
 				bench = piece
 	if room < 0 or cauldron.is_empty() or bench.is_empty():
-		for view in HEAT_VIEWS:
+		for view in heat_views:
 			rows.append(_view_error(case_id, request.to_dict(), view,
 				"workshop must contain both an actual Cauldron and witchwork Workbench"))
 		return rows
@@ -235,10 +239,12 @@ func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 	var workbench_distance := Vector2(cauldron_pos.x, cauldron_pos.z).distance_to(Vector2(bench_pos.x, bench_pos.z))
 	var room_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var floor_y: float = HouseFurnishGeometry.storey_base(plan, room) + HouseGeometry.FLOOR_T
+	var cue_match := _match_cauldron_heat_cue(assembled, cauldron)
+	var heat_node := cue_match.get("node") as Node3D
 	var camera := _find_eye_camera(plan, room, focus_pieces, cauldron_rect.get_center(),
-		floor_y, room_rect, {}, 2.8, true, 1.18)
+		floor_y, room_rect, {}, 2.8, true, 1.18, _heat_sight_targets(heat_node))
 	if not bool(camera.get("body_clear", false)) or not bool(camera.get("reachable", false)):
-		for view in HEAT_VIEWS:
+		for view in heat_views:
 			rows.append(_view_error(case_id, request.to_dict(), view,
 				"no reachable, body-clear human-height camera for the Cauldron"))
 		return rows
@@ -246,10 +252,8 @@ func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 	var target: Vector3 = camera["target"]
 	_cam.fov = 72.0
 	_set_camera(eye, target, atan2(target.x - eye.x, target.z - eye.z), 24.0)
-	var cue_match := _match_cauldron_heat_cue(assembled, cauldron)
-	var heat_node := cue_match.get("node") as Node3D
 	if heat_node == null or not bool(cue_match.get("matched", false)):
-		for view in HEAT_VIEWS:
+		for view in heat_views:
 			var error_row := _view_error(case_id, request.to_dict(), view,
 				"no NativeCauldronHeat cue is within tolerance of the focused interior Cauldron")
 			error_row["heat_cue_candidates"] = cue_match.get("candidates", [])
@@ -272,6 +276,7 @@ func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 		_failed = true
 		_errors.append(case_id + " cauldron supplement: framing or line-of-sight failed; focus_in_frame=" + str(camera["focus_in_frame"]) + " line_of_sight_clear=" + str(camera["line_of_sight_clear"]))
 	var base_details := {"roof_on": true, "cutaway": false, "room_index": room,
+		"shared_cooking_and_witchwork_station": bool(_shared_heat_cases.get(case_id, false)),
 		"room_kind": String(plan.kind_of(room)), "camera": _camera_data(eye, target,
 			"reachable 1.58 m eye camera aimed at actual Cauldron; Workbench is secondary context"),
 		"focused_placement_ids": [_placement_label(cauldron)],
@@ -333,6 +338,10 @@ func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 		"image_difference_state": "passed" if not bool(image_difference.get("identical", true)) else "failed",
 		"expected": "pot remains visible; ember bed and flame cue disappear"}
 	rows.append(_view_row(case_id, request, "cauldron_heat_hidden_control", control_path, control_error, control_details))
+	if bool(_shared_heat_cases.get(case_id, false)):
+		# The compact plan deliberately shares one actual heat station. Its
+		# lit/hidden pair tests both roles; inventing a second pot is a defect.
+		return rows
 	var hall_cauldron: Dictionary = {}
 	for piece in plan.furniture:
 		if String(piece.get("key", "")) == "Cauldron" \
@@ -351,7 +360,8 @@ func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 	var hall_room_rect: Rect2 = HouseGeometry.room_floor_rect(plan, hall_room)
 	var hall_floor_y: float = HouseFurnishGeometry.storey_base(plan, hall_room) + HouseGeometry.FLOOR_T
 	var hall_camera := _find_eye_camera(plan, hall_room, [hall_cauldron],
-		hall_rect.get_center(), hall_floor_y, hall_room_rect, {}, 2.8, true, 1.18)
+		hall_rect.get_center(), hall_floor_y, hall_room_rect, {}, 2.8, true, 1.18,
+		_heat_sight_targets(hall_heat))
 	if not bool(hall_camera.get("body_clear", false)) or not bool(hall_camera.get("reachable", false)):
 		_failed = true
 		_errors.append(case_id + " cauldron supplement: no reachable human-height Hall cooking camera")
@@ -365,9 +375,10 @@ func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 	var hall_in_frame := bool(hall_camera.get("focus_in_frame", false)) \
 		and _placement_bounds_in_frame(hall_cauldron, hall_floor_y) \
 		and _aabb_in_frame(hall_bounds) and _has_visible_mesh(hall_body, hall_heat)
-	if not hall_in_frame or not _has_visible_mesh(hall_heat):
+	if not hall_in_frame or not _has_visible_mesh(hall_heat) \
+			or not bool(hall_camera.get("line_of_sight_clear", false)):
 		_failed = true
-		_errors.append(case_id + " cauldron supplement: Hall cooking flame is not visibly framed")
+		_errors.append(case_id + " cauldron supplement: Hall cooking flame lacks clear framing or sight line")
 	var hall_lit := await _capture_view_image()
 	var hall_lit_path := output.path_join(case_id + "_hall_cooking_heat_visible.jpg")
 	var hall_lit_error := _save_captured_image(hall_lit, hall_lit_path)
@@ -376,6 +387,9 @@ func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 		"focused_placement_ids": [_placement_label(hall_cauldron)],
 		"camera": _camera_data(hall_eye, hall_target, "reachable human-height Hall cooking Cauldron"),
 		"whole_prop_bounds_in_frustum": hall_in_frame,
+		"line_of_sight_clear": bool(hall_camera.get("line_of_sight_clear", false)),
+		"camera_body_clear": bool(hall_camera.get("body_clear", false)),
+		"camera_reachable": bool(hall_camera.get("reachable", false)),
 		"hall_heat_mesh_visible": _has_visible_mesh(hall_heat),
 		"separate_from_witchwork_station": true}))
 	# Keep the Hall camera fixed. Verify that the Workshop cue is the only node
@@ -405,6 +419,15 @@ func _render_cauldron_heat(plan: HousePlan, request: BuildingRequest,
 		"image_visual_unchanged": hall_visual_unchanged,
 		"negative_control_state": "passed" if hall_control_visible and workshop_hidden_for_hall and hall_visual_unchanged else "failed"}))
 	return rows
+
+
+func _heat_sight_targets(heat: Node3D) -> Array[Vector3]:
+	var targets: Array[Vector3] = []
+	if heat != null:
+		for node in heat.find_children("LowFlame_*", "MeshInstance3D", true, false):
+			if node.mesh != null:
+				targets.append(node.global_transform * node.mesh.get_aabb().get_center())
+	return targets
 
 
 func _images_visually_unchanged(difference: Dictionary) -> bool:
@@ -752,12 +775,47 @@ func _set_camera(eye: Vector3, target: Vector3, yaw: float, reach: float) -> voi
 func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 		anchor: Vector2, floor_y: float, room_rect: Rect2, station: Dictionary = {},
 		preferred_distance: float = 2.8, require_focus_in_frame: bool = false,
-		focus_target_height: float = -1.0) -> Dictionary:
+		focus_target_height: float = -1.0, sight_targets: Array[Vector3] = []) -> Dictionary:
 	var nav := HouseNavCheck.new()
 	nav.check(plan)
 	var grid: WalkGrid = nav._grids.get(plan.storey_of_room(room))
 	var breast := HouseGeometry.hearth_breast(plan)
 	var breast_rect: Rect2 = breast.get("rect", Rect2()) if int(breast.get("room", -1)) == room else Rect2()
+	var recess_focus := false
+	var recess_triangles: Array = []
+	var sight_obstacles: Array[AABB] = []
+	if not sight_targets.is_empty():
+		for piece in plan.furniture:
+			if int(piece.get("room", -1)) != room or _is_focus_piece(piece, pieces):
+				continue
+			var key := String(piece["key"])
+			var yaw := float(piece["yaw"]) + PropCatalog.face_offset(key)
+			var scale := float(piece.get("scale", 1.0))
+			var origin := PropCatalog.house_origin(piece)
+			var centre := PropCatalog.plan_centre(key, origin, yaw, scale)
+			var size := PropCatalog.footprint_rotated(key, yaw) * scale
+			var bottom := origin.y + PropCatalog.floor_offset(key) * PropCatalog.placement_height_scale(piece)
+			sight_obstacles.append(AABB(Vector3(centre.x - size.x * 0.5, bottom, centre.y - size.y * 0.5),
+				Vector3(size.x, PropCatalog.placement_height(piece), size.y)))
+	if breast_rect.has_area() and String(breast.get("kind", "")) == "witch_cauldron_recess":
+		for piece in pieces:
+			if HouseGeometry.uses_witch_cooking_recess(plan, room, String(piece.get("key", ""))) \
+					and breast_rect.has_point(anchor):
+				recess_focus = true
+		if recess_focus:
+			# The camera looks through the emitted opening. A solid breast AABB
+			# cannot distinguish its stone jambs from the empty firebox volume.
+			var builder := HouseBuilder.new()
+			var mesh := builder.build(plan)
+			var bounds := AABB(Vector3(breast_rect.position.x, floor_y, breast_rect.position.y),
+				Vector3(breast_rect.size.x, plan.spec.height, breast_rect.size.y)).grow(0.02)
+			for triangle in MeshProbe.all_triangles(builder, mesh, mesh.get_surface_count()):
+				var triangle_bounds := AABB(triangle[0], Vector3.ZERO)
+				triangle_bounds = triangle_bounds.expand(triangle[1]).expand(triangle[2])
+				if bounds.intersects(triangle_bounds.grow(0.001)):
+					recess_triangles.append(triangle)
+			focus_target_height = 0.58
+			preferred_distance = 2.0
 	var half_body := Vector2(0.26, 0.26)
 	var best_score := INF
 	var best_eye := Vector3(room_rect.get_center().x, floor_y + 1.58, room_rect.get_center().y)
@@ -801,11 +859,23 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 							continue
 						if _segment_intersects_rect(candidate, anchor, Rect2(piece.get("rect", Rect2()))):
 							blockers += 1
-					if breast_rect.has_area() and _segment_intersects_rect(candidate, anchor, breast_rect):
+					if not recess_focus and breast_rect.has_area() and _segment_intersects_rect(candidate, anchor, breast_rect):
 						blockers += 1
 					var candidate_eye := Vector3(candidate.x, floor_y + 1.58, candidate.y)
 					var target_height := focus_target_height if focus_target_height >= 0.0 else (1.18 if not station.is_empty() else 0.95)
 					var candidate_target := Vector3(anchor.x, floor_y + target_height, anchor.y)
+					if recess_focus and MeshProbe.ray_blocked(recess_triangles, candidate_eye, candidate_target):
+						blockers += 1
+					# A bench below eye height can still hide the floor-level fire.
+					# Test the actual flame centres against measured 3D prop bodies.
+					for sight_target in sight_targets:
+						var hidden := recess_focus and MeshProbe.ray_blocked(recess_triangles, candidate_eye, sight_target)
+						for obstacle in sight_obstacles:
+							if obstacle.intersects_segment(candidate_eye, sight_target) != null:
+								hidden = true
+								break
+						if hidden:
+							blockers += 1
 					var focus_in_frame := true
 					if require_focus_in_frame:
 						for focus_piece in pieces:
@@ -816,6 +886,9 @@ func _find_eye_camera(plan: HousePlan, room: int, pieces: Array[Dictionary],
 						if focus_in_frame:
 							framing_candidate_count += 1
 					var score := float(blockers) * 100.0 + absf(distance - preferred_distance)
+					if recess_focus:
+						var front := (candidate - anchor).normalized().dot(Vector2(breast["normal"]))
+						score += (1.0 - front) * 5.0
 					var line_of_sight_clear := blockers == 0
 					if require_focus_in_frame and not focus_in_frame:
 						score += 1000000.0
@@ -1021,13 +1094,25 @@ func _segment_intersects_rect(start: Vector2, finish: Vector2, rect: Rect2) -> b
 	return false
 
 
+func _has_shared_cooking_cauldron(plan: HousePlan) -> bool:
+	var cauldrons: Array[Dictionary] = []
+	for piece in plan.furniture:
+		if String(piece.get("key", "")) == "Cauldron":
+			cauldrons.append(piece)
+	if cauldrons.size() != 1 or int(cauldrons[0].get("room", -1)) != plan.hearth_room():
+		return false
+	var groups: Array = Array(cauldrons[0].get("shared_activity_groups", []))
+	groups.append(String(cauldrons[0].get("activity_group", "")))
+	return "cooking" in groups and "witchwork" in groups
+
+
 func _required_views(case_id: String) -> Array[String]:
 	var source: Array[String] = COTTAGE_VIEWS if case_id.begins_with("control_cottage") else WITCH_VIEWS
 	var out: Array[String] = []
 	for view in source:
 		out.append(view)
 	if _heat_supplement_enabled and not case_id.begins_with("control_cottage"):
-		out.append_array(HEAT_VIEWS)
+		out.append_array(HEAT_VIEWS.slice(0, 2) if bool(_shared_heat_cases.get(case_id, false)) else HEAT_VIEWS)
 	return out
 
 

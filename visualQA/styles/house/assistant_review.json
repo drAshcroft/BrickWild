@@ -193,5 +193,73 @@
         "source_manifest_sha256": "8c91456760995e8a5df14d90ce0732d5082029c5b797fb1209d46fa067b88091"
       }
     ]
+  },
+  "latest_review": "2026-10-13",
+  "current_review_record": "../../../docs/TODO_REVIEW_2026_10_13.md",
+  "scoped_20261013": {
+    "design_state": "whole_styles_still_need_changes",
+    "gallery_images": 677,
+    "accepted_focused_tasks": [
+      "LIVE-TOWNHOUSE-WRITING",
+      "LIVE-HEARTH-FUEL-READABILITY",
+      "LIVE-SLEEP-CLOTHES-STORAGE",
+      "HOUSE-DINING-SEAT-TUCK",
+      "HOUSE-FENG-BOUNDED-HEARTH",
+      "LIVE-DOMESTIC-HEARTH-DESIGN"
+    ],
+    "finish_cohort": {
+      "run": "finish_20261013_v3",
+      "images": 70,
+      "directly_inspected_images": 25,
+      "scope": "Sampled ceiling members and restrained per-instance wood/plaster finish; each source cohort has an assistant_review.json with exact image hashes."
+    },
+    "witch_cohort": {
+      "run": "witch_finish_20261013_v3",
+      "images": 22,
+      "directly_inspected_images": 22,
+      "scope": "Ingredient shelf contact, dark iron, wood finish and shared/independent heat controls only."
+    },
+    "limitations": [
+      "Large Cottage/Farmhouse/Townhouse volumes remain similar broad boxes.",
+      "Thatch roofs and bare gables need stronger construction character.",
+      "Some shelves remain empty; dense prebuilt bottle racks elsewhere need a quieter arrangement.",
+      "The Witch small/default prep benches now have actual wall backing, supported cookware and usable fronts. Sparse large rooms and broad exterior masses remain open."
+    ],
+    "historical_findings": "Earlier dated cohorts are preserved below; their defects do not describe every later repaired cohort.",
+    "witch_lining": {
+      "cohort": "witch_lining_20261013_v5",
+      "rendered_images": 22,
+      "directly_reviewed_images": 9,
+      "scope": "measured cooking firebox lining only",
+      "whole_style_state": "needs_changes"
+    },
+    "farmhouse_front_hall": {
+      "cohort": "visualqa/styles/house/farmhouse/renders/front_hall_20261013_v1",
+      "rendered_images": 6,
+      "directly_reviewed_images": 6,
+      "stair_fixture_state": "passed",
+      "whole_style_state": "needs_changes"
+    },
+    "working_hearth_recess": {
+      "cohorts": [
+        "witch_recess_20261013_v2",
+        "hearth_stone_20261013_v2"
+      ],
+      "rendered_images": 102,
+      "directly_reviewed_images": 51,
+      "scope": "fitted and visibly working cooking hearths",
+      "whole_style_state": "needs_changes"
+    },
+    "witch_preparation": {
+      "cohorts": [
+        "witch_wall_prep_20261013_v3",
+        "witch_cooking_prep_20261013_v5"
+      ],
+      "rendered_images": 84,
+      "directly_reviewed_images": 36,
+      "scope": "fitted small/default working areas",
+      "whole_style_state": "needs_changes",
+      "historical_cohort": "witch_wall_prep_20261013_v3 precedes the final short-shelf/preparation-pot recipe"
+    }
   }
 }

@@ -917,7 +917,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 			for placed in range(piece_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = must
 				_set_activity_group(plan.furniture[placed], step)
-				if HouseFurnishingRecipes.is_ordinary_house(plan) \
+				if HouseFurnishingRecipes.uses_bedside_pair(plan) \
 						and String(step.get("cat", "")) == "bed":
 					_reserve_sleep_access_clearance(plan, room, zones)
 				if bool(step.get("settle", false)):

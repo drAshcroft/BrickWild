@@ -1385,10 +1385,14 @@ func _stepped_buttress(name: String, anchor: Vector3, outward: Vector3,
 	host(name)
 	var levels := [0.0, 0.38, 0.70, 1.0]
 	var widths := [1.0, 0.72, 0.44]
+	var shoulder_height: float = clampf(height * 0.012, 0.12, 0.28)
 	for i in range(3):
 		var d: float = depth * widths[i]
-		var y0: float = height * levels[i]
-		var y1: float = height * levels[i + 1]
+		# Each dressed course occupies its own height. Embedding half the
+		# shoulder into each shaft duplicated their outward stone/trim faces.
+		# Butt the shaft ends to the course while retaining its existing outline.
+		var y0: float = height * levels[i] + (shoulder_height * 0.5 if i > 0 else 0.0)
+		var y1: float = height * levels[i + 1] - shoulder_height * 0.5
 		var z_width: float = d if corner else face_width * (1.0 - i * 0.12)
 		_buttress_piece("shaft_%d" % i,
 			Vector3(d, y1 - y0, z_width),
@@ -1399,7 +1403,7 @@ func _stepped_buttress(name: String, anchor: Vector3, outward: Vector3,
 		var y: float = height * levels[i + 1]
 		var z_width: float = d if corner else face_width * (1.1 - i * 0.12)
 		_buttress_piece("shoulder_%d" % i,
-			Vector3(d, clampf(height * 0.012, 0.12, 0.28), z_width),
+			Vector3(d, shoulder_height, z_width),
 			anchor + outward * (d / 2.0 - ChurchGeometry.BUTTRESS_INSET)
 				+ Vector3.UP * y, SURF_TRIM)
 	host_end()

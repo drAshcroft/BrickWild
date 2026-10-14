@@ -74,7 +74,16 @@ pass's last full sweep:
   programme with a second dining table (fortress keeps), `hall`/`chapel`/`apse`
   records in a few fortress shapes (the fallback plans cover most).
 
-## Plans for ridge castles, tower houses and motte shell keeps
+## Earlier implementation inventory (historical)
+
+The following inventory predates the 6 October pass above. Its statements
+about missing jog, manor, ridge-tower and sky plans are historical, not the
+current implementation state. Source review on 13 October confirms the
+dispatches in `castle_interiors.gd` to `castle_manor_plan.gd` for these forms.
+The unresolved physical failures in the current-status section still govern
+completion; no new castle sweep is claimed by this documentation correction.
+
+### Plans for ridge castles, tower houses and motte shell keeps
 
 Current entry points:
 

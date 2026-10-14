@@ -80,6 +80,15 @@ func _check_case(row: Dictionary) -> void:
 	var chair_to_table := Vector2(table_pos.x - chair_pos.x, table_pos.z - chair_pos.z)
 	var table_rect: Rect2 = table.get("rect", Rect2())
 	var chair_rect: Rect2 = chair.get("rect", Rect2())
+	if not _knee_pocket_clear(table, chair):
+		failures.append("%s measured Workbench blocks the seated knee pocket" % who)
+	var at_trestle := chair.duplicate(true)
+	var desk_along := Vector2.RIGHT if table_rect.size.x >= table_rect.size.y else Vector2.DOWN
+	var shifted: Vector3 = at_trestle["pos"]
+	shifted += Vector3(desk_along.x, 0.0, desk_along.y) * 0.76
+	at_trestle["pos"] = shifted
+	if _knee_pocket_clear(table, at_trestle):
+		failures.append("%s shifted-chair negative did not find the real trestle" % who)
 	var edge_gap := _rect_gap(table_rect, chair_rect)
 	if edge_gap > 0.10:
 		failures.append("%s Chair_1 is %.3fm from the writing surface edge" % [who, edge_gap])
@@ -120,7 +129,8 @@ func _check_case(row: Dictionary) -> void:
 			failures.append("%s %s sits %.3fm off the measured Workbench top" % [who, item_key,
 				float(item.get("pos", Vector3.ZERO).y) - table_top])
 		var item_scale := float(item.get("scale", 1.0))
-		var measured_footprint: Vector2 = PropCatalog.footprint(item_key) * item_scale
+		var measured_footprint: Vector2 = PropCatalog.footprint_rotated(item_key,
+			float(item.get("yaw", 0.0)) + PropCatalog.face_offset(item_key)) * item_scale
 		if not item_rect.size.is_equal_approx(measured_footprint):
 			failures.append("%s %s footprint differs from its measured model: stored=%s measured=%s" % [
 				who, item_key, str(item_rect.size), str(measured_footprint)])
@@ -136,6 +146,16 @@ func _check_case(row: Dictionary) -> void:
 				who, item_key, str(physical_rect), str(table_rect)])
 		if String(item.get("activity_group", "")) != "writing":
 			failures.append("%s %s is absent from the writing activity" % [who, item_key])
+		if not _within_writing_reach(chair, item):
+			failures.append("%s %s is outside seated writing reach" % [who, item_key])
+	# Moving a supported ledger to the far edge must fail the same reach test.
+	var remote_book: Dictionary = book.duplicate(true)
+	var facing := HouseFurnishScore._facing_of(float(chair.get("yaw", 0.0)))
+	var remote_center := table_rect.get_center() + facing * 0.35
+	remote_book["rect"] = Rect2(remote_center - Rect2(book["rect"]).size * 0.5,
+		Rect2(book["rect"]).size)
+	if _within_writing_reach(chair, remote_book):
+		failures.append("%s far-edge ledger negative escaped the writing reach check" % who)
 	if String(chair.get("activity_group", "")) != "writing" \
 			or String(book.get("activity_group", "")) != "writing" \
 			or String(scroll.get("activity_group", "")) != "writing" \
@@ -179,6 +199,16 @@ func _check_case(row: Dictionary) -> void:
 	plan.furniture = retained
 	if not _missing_office_activity(plan, office).has("writing/seat"):
 		failures.append("%s missing-seat negative escaped the writing activity audit" % who)
+
+
+func _within_writing_reach(chair: Dictionary, item: Dictionary) -> bool:
+	var seat: Rect2 = chair["rect"]
+	var body: Rect2 = item["rect"]
+	var facing := HouseFurnishScore._facing_of(float(chair.get("yaw", 0.0)))
+	var along := Vector2(-facing.y, facing.x)
+	var offset := body.get_center() - seat.get_center()
+	return offset.dot(facing) > 0.25 and offset.dot(facing) <= 0.65 \
+		and absf(offset.dot(along)) <= 0.36
 
 
 func _check_controls() -> void:
@@ -273,8 +303,29 @@ func _check_bookcase_groups(plan: HousePlan, room: int, host_index: int,
 			who, removed_level, removed_triangles])
 
 
-func _bookcase_triangles() -> Array:
-	var packed := load(PropCatalog.scene_path("Bookcase_2")) as PackedScene
+func _knee_pocket_clear(desk: Dictionary, chair: Dictionary) -> bool:
+	var triangles := _bookcase_triangles("Workbench")
+	if triangles.is_empty():
+		return false
+	var scale := float(desk.get("scale", 1.0))
+	var basis := Basis(Vector3.UP, float(desk["yaw"]) + PropCatalog.face_offset("Workbench")) \
+		* Basis.from_scale(Vector3(scale, PropCatalog.placement_height_scale(desk), scale))
+	var inverse := Transform3D(basis, PropCatalog.house_origin(desk)).affine_inverse()
+	var direction := HouseFurnishScore._facing_of(float(chair["yaw"]))
+	var facing := Vector3(direction.x, 0.0, direction.y)
+	var along := Vector3(-direction.y, 0.0, direction.x)
+	var seat: Vector3 = chair["pos"]
+	for lateral in [-0.18, 0.0, 0.18]:
+		for height in [0.54, 0.60, 0.65]:
+			var start: Vector3 = seat + along * lateral + Vector3.UP * height + facing * 0.20
+			var end: Vector3 = start + facing * 0.48
+			if MeshProbe.ray_blocked(triangles, inverse * start, inverse * end):
+				return false
+	return true
+
+
+func _bookcase_triangles(key := "Bookcase_2") -> Array:
+	var packed := load(PropCatalog.scene_path(key)) as PackedScene
 	if packed == null:
 		return []
 	var root := packed.instantiate()

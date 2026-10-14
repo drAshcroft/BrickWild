@@ -14,12 +14,19 @@ const EPS := 0.0005
 
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("house bounds")
+	print("house bounds: START fixtures")
 	_fixtures(res)
+	print("house bounds: START feature matrix; completed checks=", res.checked)
 	_features(res)
+	print("house bounds: START chimney walls; completed checks=", res.checked)
 	_chimney_walls(res)
+	print("house bounds: START conservative bounds; completed checks=", res.checked)
 	_conservative(res)
+	print("house bounds: START rich matrix; completed checks=", res.checked)
 	_rich(res)
+	print("house bounds: START injected faults; completed checks=", res.checked)
 	_injected(res)
+	print("house bounds: END checks=", res.checked)
 	return res
 
 

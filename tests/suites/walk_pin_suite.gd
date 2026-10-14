@@ -201,8 +201,11 @@ static func _bedroom(res: SuiteResult, plan: HousePlan) -> void:
 	_put(plan, room, "Bed_Twin1", far + inward * (bed.x + 0.2))
 	_expect(res, plan, "stowage", true, "two beds and no chest")
 	_put(plan, room, "Bed_Twin1", far)
+	_put(plan, room, "Nightstand_Shelf", r.position + Vector2(0.7, 0.4))
+	_expect(res, plan, "stowage", true, "an open bedside shelf is not clothes storage")
+	_put(plan, room, "Bed_Twin1", far)
 	_put(plan, room, "Bed_Twin1", far + inward * (bed.x + 0.2))
-	_put(plan, room, "Chest_Wood", r.position + Vector2(0.7, 0.4))
+	_put(plan, room, "Chest_Wood", r.position + Vector2(0.7, 0.4), PI)
 	_expect(res, plan, "stowage", false, "two beds and a chest")
 
 
@@ -435,7 +438,7 @@ const ZFIGHT_BUDGET := {
 	"shop/cottage": 0,
 	"world/courtyard_house": 24,
 	"temple/basilica": 12,
-	"church/romanesque": 92,
+	"church/romanesque": 12,
 	"windmill/tower": 40,
 }
 

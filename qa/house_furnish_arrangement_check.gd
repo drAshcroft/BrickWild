@@ -122,6 +122,10 @@ static func back_gap(plan: HousePlan, p: Dictionary) -> float:
 	if PropCatalog.category(String(p["key"])) == "hearth" and not breast.is_empty() \
 			and int(breast["room"]) == int(p["room"]):
 		var normal: Vector2 = breast["normal"]
+		if String(breast.get("kind", "")) == "witch_cauldron_recess" \
+				and HouseGeometry.uses_witch_cooking_recess(plan, int(p["room"]), String(p["key"])):
+			var rear := Vector2(breast["centre"]) - normal * float(breast["depth"]) * 0.5
+			return absf((edge - rear).dot(normal) - HouseGeometry.WITCH_RECESS_BACK_CLEAR)
 		var face: Vector2 = breast["centre"] + normal * float(breast["depth"]) * 0.5
 		return absf((edge - face).dot(normal))
 	var best := INF

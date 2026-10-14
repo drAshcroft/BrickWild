@@ -18,6 +18,10 @@ func _run() -> void:
 	spec.height = 2.9
 	spec.storeys = 2
 	var plan: HousePlan = HouseGenerator.generate(spec, 32102)
+	var walk := HouseFurnishWalkCheck.new()
+	walk.check_tuck(plan)
+	for failure: String in walk.failures:
+		failures.append("exact innkeeper: " + failure)
 	var nav: Dictionary = HouseNavCheck.new().check(plan)
 	if not bool(nav["ok"]):
 		failures.append("exact innkeeper remains unreachable: %s" % [nav["failures"]])

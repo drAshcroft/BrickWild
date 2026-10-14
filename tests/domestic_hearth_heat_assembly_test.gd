@@ -185,10 +185,35 @@ func _check_style(style: StringName, size: Dictionary) -> void:
 			central_flame.position = original_flame_position
 	var base_split: MeshInstance3D = heat.find_child("Firewood_0", true, false)
 	var cross_split: MeshInstance3D = heat.find_child("Firewood_1", true, false)
+	var cross_position: Vector3 = cross_split.position
+	cross_split.position.y += 0.05
+	_expect(not HouseAssembler._hearth_cooking_vessel_fits(heat,
+		float(heat.get_meta("opening_sill_local_y")),
+		float(heat.get_meta("opening_head_local_y")),
+		float(metrics["width"]), float(metrics["depth"])),
+		where + ": timber raised into the pot escaped the vessel-clearance check")
+	cross_split.position = cross_position
 	_expect(absf(base_split.rotation.y - cross_split.rotation.y) > 0.7
 		and cross_split.position.y > base_split.position.y + 0.04
 		and base_split.position.z < 0.0,
 		where + ": firewood is not visibly crossed, layered at the mouth")
+	for log_mesh: MeshInstance3D in [base_split, cross_split]:
+		var log_arrays: Array = log_mesh.mesh.surface_get_arrays(0)
+		_expect(_firewood_winding_matches(log_arrays),
+			where + ": bark or cut end is culled from outside the log")
+		var reversed: Array = log_arrays.duplicate(true)
+		var log_indices: PackedInt32Array = reversed[Mesh.ARRAY_INDEX]
+		var log_normals: PackedVector3Array = reversed[Mesh.ARRAY_NORMAL]
+		for triangle in range(0, log_indices.size(), 3):
+			if absf(log_normals[log_indices[triangle]].x) < 0.99:
+				continue
+			var saved: int = log_indices[triangle + 1]
+			log_indices[triangle + 1] = log_indices[triangle + 2]
+			log_indices[triangle + 2] = saved
+			break
+		reversed[Mesh.ARRAY_INDEX] = log_indices
+		_expect(not _firewood_winding_matches(reversed),
+			where + ": reversed cut-end negative escaped the winding check")
 	for flame_index in range(3):
 		var flame := heat.find_child("Flame_%d" % flame_index, true, false) as MeshInstance3D
 		var flame_arrays: Array = flame.mesh.surface_get_arrays(0)
@@ -448,14 +473,16 @@ func _check_style(style: StringName, size: Dictionary) -> void:
 	for colour in log_colours:
 		if not distinct_log_colours.has(colour):
 			distinct_log_colours.append(colour)
-	var log_vertices_dark := true
+	var dark_bark := false
+	var pale_cut_face := false
 	for colour: Color in log_colours:
-		if maxf(colour.r, maxf(colour.g, colour.b)) > 0.40:
-			log_vertices_dark = false
+		var lightness := colour.get_luminance()
+		dark_bark = dark_bark or lightness < 0.10
+		pale_cut_face = pale_cut_face or lightness > 0.20
 	var readable_log := log0.mesh is ArrayMesh \
 		and log_bounds.size.x >= float(metrics["width"]) * 0.55 \
 		and distinct_log_colours.size() >= 4 \
-		and log_side_faces_outward and log_vertices_dark \
+		and log_side_faces_outward and dark_bark and pale_cut_face \
 		and wood_material != null and wood_material.cull_mode != BaseMaterial3D.CULL_DISABLED
 	var flame0_bounds: AABB = flame0.mesh.get_aabb()
 	var flame1_bounds: AABB = flame1.mesh.get_aabb()
@@ -667,6 +694,10 @@ func _check_hearth_finish(anchor: Node3D, builder: HouseBuilder,
 		_expect(not _hearth_reveals_fit(reveal_nodes, anchor, breast_metrics, metrics),
 			where + ": reveal intrusion negative accepted finish inside the clear aperture")
 		moved_reveal.position.x = old_reveal_x
+		moved_reveal.position.x += signf(old_reveal_x) * 0.002
+		_expect(not _hearth_reveals_fit(reveal_nodes, anchor, breast_metrics, metrics),
+			where + ": coplanar cheek finish escaped the actual surface-separation check")
+		moved_reveal.position.x = old_reveal_x
 		var reveal_mesh := moved_reveal.mesh as BoxMesh
 		var old_depth: float = reveal_mesh.size.z
 		reveal_mesh.size.z -= 0.12
@@ -757,8 +788,9 @@ func _hearth_reveals_fit(reveals: Array, anchor: Node3D,
 				return false
 		else:
 			cheek_count += 1
-			if bounds.end.x <= clear_width * 0.5 + 0.0005 \
-				and bounds.position.x >= -clear_width * 0.5 - 0.0005:
+			var inner_x := bounds.position.x if bounds.get_center().x > 0.0 else bounds.end.x
+			var face_separation := clear_width * 0.5 - absf(inner_x)
+			if face_separation < 0.0015 or face_separation > 0.003:
 				return false
 	return cheek_count == 2 and sill_count == 1
 
@@ -791,10 +823,7 @@ func _check_wood_mantel(anchor: Node3D, builder: HouseBuilder,
 		and absf(shelf_bounds.end.z + float(breast_metrics["depth"]) * 0.5) <= 0.003 \
 		and shelf_bounds.position.x >= -float(breast_metrics["width"]) * 0.5 - 0.003 \
 		and shelf_bounds.end.x <= float(breast_metrics["width"]) * 0.5 + 0.003
-	var trim_surface: int = HouseQA._logical_mesh_surface(builder.emitted_mesh,
-		HouseBuilder.SURF_TRIM)
-	var lintel_triangles: Array = MeshProbe.surface_triangles(null,
-		builder.emitted_mesh, trim_surface)
+	var lintel_triangles := _actual_lintel_triangles(builder)
 	for corbel_variant in corbels:
 		var corbel := corbel_variant as MeshInstance3D
 		var bounds: AABB = _aabb_in_space(corbel, anchor)
@@ -818,6 +847,30 @@ func _check_wood_mantel(anchor: Node3D, builder: HouseBuilder,
 	_expect(not _wood_mantel_stack_valid(mantel, anchor, breast_metrics,
 		metrics, builder), where + ": removed-corbel negative accepted a one-sided mantel")
 	saved_parent.add_child(corbels[0])
+	for row in builder.component_log:
+		if String(row.get("role", "")) != "hearth_lintel" or String(row.get("host", "")) != "hearth":
+			continue
+		var source := builder.emitted_mesh
+		var bounds: AABB = Transform3D(row["xf"]) * AABB(-Vector3(row["size"]) * 0.5, row["size"])
+		var rect := Rect2(Vector2(bounds.position.x, bounds.position.z), Vector2(bounds.size.x, bounds.size.z))
+		var surface := HouseQA._logical_mesh_surface(source, int(row["surface"]))
+		var removed := MeshProbe.remove_triangles(source, surface,
+			MeshProbe.top_face_in(rect, bounds.end.y))
+		builder.emitted_mesh = removed["mesh"]
+		_expect(not _wood_mantel_stack_valid(mantel, anchor, breast_metrics, metrics, builder),
+			where + ": deleted actual lintel support escaped the mantel check")
+		builder.emitted_mesh = source
+		break
+
+
+func _actual_lintel_triangles(builder: HouseBuilder) -> Array:
+	# Stone lintels belong to the wall material; legacy timber lintels use
+	# trim. Read the actual owning surface rather than assuming its finish.
+	for row in builder.component_log:
+		if String(row.get("role", "")) == "hearth_lintel" and String(row.get("host", "")) == "hearth":
+			var surface := HouseQA._logical_mesh_surface(builder.emitted_mesh, int(row["surface"]))
+			return MeshProbe.surface_triangles(null, builder.emitted_mesh, surface) if surface >= 0 else []
+	return []
 
 
 func _check_front_face_overlays(anchor: Node3D, builder: HouseBuilder,
@@ -913,10 +966,7 @@ func _wood_mantel_stack_valid(mantel: Node3D, anchor: Node3D,
 	var shelf_bounds: AABB = _aabb_in_space(shelf, anchor)
 	var shelf_bottom: float = float(mantel.get_meta("shelf_bottom", -INF))
 	var support_datum: float = float(mantel.get_meta("support_datum", INF))
-	var trim_surface: int = HouseQA._logical_mesh_surface(builder.emitted_mesh,
-		HouseBuilder.SURF_TRIM)
-	var lintel_triangles: Array = MeshProbe.surface_triangles(null,
-		builder.emitted_mesh, trim_surface)
+	var lintel_triangles := _actual_lintel_triangles(builder)
 	if absf(shelf_bounds.position.y - shelf_bottom) > 0.003 \
 			or shelf_bounds.position.y < float(metrics["head"]) + 0.12 \
 			or shelf_bounds.position.y > support_datum + 0.075 \
@@ -1282,6 +1332,25 @@ func _check_family_exclusions() -> void:
 			placement, plan, empty_builder).is_empty(),
 			"excluded family received domestic fire cues: " + String(control["name"]))
 	prop.free()
+
+func _firewood_winding_matches(arrays: Array) -> bool:
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var cap_triangles := 0
+	for triangle in range(0, indices.size(), 3):
+		var a: int = indices[triangle]
+		var b: int = indices[triangle + 1]
+		var c: int = indices[triangle + 2]
+		var geometric := (vertices[c] - vertices[a]).cross(vertices[b] - vertices[a])
+		if geometric.length_squared() < 0.000000001 \
+				or geometric.normalized().dot(normals[a]) < 0.99 \
+				or normals[a].dot((vertices[a] + vertices[b] + vertices[c]) / 3.0) <= 0.0:
+			return false
+		if absf(normals[a].x) > 0.99:
+			cap_triangles += 1
+	return cap_triangles >= 2
+
 
 func _expect(ok: bool, message: String) -> void:
 	checks += 1

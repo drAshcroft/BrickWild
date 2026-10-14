@@ -5,6 +5,18 @@ extends RefCounted
 const BASE_HOUSE_SPEC := preload("house_spec.gd")
 const DOMESTIC_TABLE_MIN_HEIGHT := 0.70
 const DOMESTIC_PREP_MIN_HEIGHT := 0.75
+const TOWNHOUSE_WRITING_SURFACE_HEIGHT_SCALE := 0.85
+
+## Keep the seated worktop, chair and records together as one measured activity.
+const TOWNHOUSE_OFFICE_ACTIVITY := [
+	{"cat": "workbench", "key": "Workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0, "height_scale": TOWNHOUSE_WRITING_SURFACE_HEIGHT_SCALE, "group": "writing"},
+	{"cat": "seat", "key": "Chair_1", "rule": &"around", "n": [1, 1], "opt": 1.0, "group": "writing", "preferred_sides": ["long_edge"]},
+	{"cat": "books", "key": "Book_5", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "writing"},
+	{"cat": "books", "key": "Scroll_1", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "writing"},
+	{"cat": "bookcase", "key": "Bookcase_2", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "writing"},
+	{"cat": "books", "key": "BookGroup_Small_1", "rule": &"on", "host_category": "bookcase", "n": [3, 3], "opt": 1.0, "group": "writing"},
+	{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
+]
 
 const RUG_ROOM_KINDS := [&"hall", &"parlour", &"dining", &"dining_room"]
 
@@ -101,6 +113,13 @@ static func uses_native_domestic_fireplace(plan: HousePlan) -> bool:
 		and plan.spec.style != &"witch_hut" and plan.spec.allows_hearth_furniture()
 
 
+## Base-house guest bedrooms use the same measured bed/headstand pair. This
+## does not opt an inn into domestic cooking, dining or custom-family recipes.
+static func uses_bedside_pair(plan: HousePlan) -> bool:
+	return plan.spec != null and plan.spec.get_script() == BASE_HOUSE_SPEC \
+		and plan.world_family == &""
+
+
 ## The room this dwelling eats in, or -1. Rooms of the first DINING_KINDS kind
 ## present; the lowest-numbered of them.
 static func dining_room_of(plan: HousePlan) -> int:
@@ -143,6 +162,46 @@ static func dines_elsewhere(plan: HousePlan, room: int) -> bool:
 static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := true) -> Array:
 	var kind: StringName = plan.kind_of(room)
 	var recipe: Array = RECIPES.get(kind, [])
+	if plan.spec.get_script() == BASE_HOUSE_SPEC and plan.world_family == &"" \
+			and plan.spec.trade == &"innkeeper" and kind == &"bedroom":
+		# Guest rooms retain both clothes storage and bedside support. These are
+		# separate necessities, not independent optional dressing rolls.
+		var guest_sleep: Array = []
+		for original: Dictionary in recipe:
+			if String(original["cat"]) == "storage":
+				continue # the required clothes cupboard replaces this optional one
+			var step: Dictionary = original.duplicate(true)
+			if String(step["cat"]) in ["bed", "chest", "nightstand"]:
+				step["opt"] = 1.0
+				step["group"] = "sleep"
+			if String(step["cat"]) == "chest":
+				# This measured closed cupboard is shallower than the metal-bound
+				# chest. Its doors retain their full 0.7 m opening/standing zone.
+				step["cat"] = "storage"
+				step["key"] = "Cabinet"
+			if String(step["cat"]) == "nightstand":
+				step["key"] = "Nightstand_Shelf"
+				step["rule"] = &"beside"
+				step["near_cat"] = "bed"
+				step["near_anchor"] = "head_end"
+			guest_sleep.append(step)
+		return guest_sleep
+	if plan.spec.get_script() == BASE_HOUSE_SPEC and plan.world_family == &"" \
+			and plan.spec.trade == &"innkeeper" and kind == &"parlour":
+		# Public dining is separate from the ordinary household's one-table
+		# programme. Reserve this table and its two matching seats together;
+		# a later optional stool cannot repair a table placed for one bench.
+		var public_dining: Array = []
+		for original: Dictionary in recipe:
+			if String(original["cat"]) in ["seat", "bench"]:
+				continue
+			var step: Dictionary = original.duplicate(true)
+			if String(step["cat"]) == "table":
+				step["seat_cat"] = "seat"
+				step["seat_n"] = 2
+				step["seat_n_required"] = true
+			public_dining.append(step)
+		return public_dining
 	if not is_ordinary_house(plan):
 		# Keep the old public/private parlour substitution for a keep, custom
 		# house or trade family that the broader dwelling predicate includes.
@@ -159,17 +218,17 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 	# custom-family and other house-style contracts retain their own recipes.
 	if is_ordinary_house(plan) and plan.spec.trade == &"none" \
 			and kind == &"office" and plan.spec.style == &"townhouse":
-		return [
-			{"cat": "workbench", "key": "Workbench", "rule": &"wall", "n": [1, 1], "opt": 1.0, "height_scale": 0.85, "group": "writing"},
-			{"cat": "seat", "key": "Chair_1", "rule": &"around", "n": [1, 1], "opt": 1.0, "group": "writing", "preferred_sides": ["long_edge"]},
-			{"cat": "books", "key": "Book_5", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "writing"},
-			{"cat": "books", "key": "Scroll_1", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "writing"},
-			{"cat": "bookcase", "key": "Bookcase_2", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "writing"},
-			{"cat": "books", "key": "BookGroup_Small_1", "rule": &"on", "host_category": "bookcase", "n": [3, 3], "opt": 1.0, "group": "writing"},
-			{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
-		]
+		return TOWNHOUSE_OFFICE_ACTIVITY.duplicate(true)
 	var domestic_functions: Array = plan.rooms[room].get("domestic_functions", [])
 	var shared_cooking: bool = kind == &"hall" and domestic_functions.has(&"cooking")
+	if kind == &"kitchen" and (plan.spec.style != &"witch_hut" or plan.spec.trade == &"none"):
+		# The cooking compositor needs a usable board for its supported crockery.
+		# A random tall display rack can occupy the only nearby shelf/light bay
+		# while offering no clear top below the ceiling. Start with the measured
+		# kitchen shelf; the compositor still proves its wall, light and contents.
+		for step in recipe:
+			if String(step.get("cat", "")) == "shelf" and not step.has("key"):
+				step["key"] = "Shelf_Simple"
 	# A no-trade Witch's Hut has a real craft room. This is a style-local
 	# overlay; the alchemist trade and every non-witch workshop keep their own
 	# existing recipes.
@@ -260,7 +319,8 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 			{"cat": "workbench", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
 			{"cat": "bucket", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
 		]
-		if uses_native_domestic_fireplace(plan):
+		if uses_native_domestic_fireplace(plan) \
+				or (plan.spec.style == &"witch_hut" and plan.spec.trade == &"none"):
 			var without_loose_cookware: Array = []
 			for step: Dictionary in tagged:
 				if String(step.get("cat", "")) != "cookware":
@@ -327,9 +387,11 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 			{"cat": "bucket", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
 			{"cat": "cookware", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "cooking"},
 		]
-		if compact_shared_heat or uses_native_domestic_fireplace(plan):
-			# The shell is the ordinary heat source. Keep a measured vessel on the
-			# separate preparation surface; buckets are not cooking pots.
+		if compact_shared_heat or uses_native_domestic_fireplace(plan) \
+				or bool(plan.domestic_layout.get("witch_alchemist_side_hall", false)):
+			# These Hall cooking contracts require a measured preparation vessel.
+			# The cookware catalogue also contains a metal bucket, which does not
+			# meet the authored pot role of the compact Alchemist household.
 			var vessel_step: Dictionary = cooking_core[-1]
 			vessel_step["key"] = "Pot_1"
 			cooking_core[-1] = vessel_step

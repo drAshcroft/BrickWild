@@ -4,7 +4,7 @@ var failures: Array[String] = []
 var checks := 0
 
 static func run() -> SuiteResult:
-	var fixture := load("res://tests/suites/witchwork_cauldron_flue_suite.gd").new()
+	var fixture = load("res://tests/suites/witchwork_cauldron_flue_suite.gd").new()
 	fixture._run()
 	var result := SuiteResult.new("Witchwork Cauldron flue")
 	result.checked = fixture.checks

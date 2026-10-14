@@ -226,6 +226,7 @@ uniform vec4 frame_colour : source_color = vec4(0.2, 0.14, 0.1, 1.0);
 uniform float frame_bay = 0.0;
 uniform float frame_floor = 0.0;
 uniform float frame_top = 10.0;
+uniform vec4 hearth_stone_colour : source_color = vec4(0.0);
 void fragment() {
 	vec3 n = normalize(mnrm);
 	vec2 q = metric(UV);
@@ -248,6 +249,15 @@ void fragment() {
 		float tb = max(post, rail);
 		float grain = 0.88 + 0.2 * vnoise(vec2(q.x * 30.0, q.y * 1.5));
 		c = mix(c, frame_colour.rgb * grain, tb);
+	}
+	if (hearth_stone_colour.a > 0.5 && COLOR.r < 0.5) {
+		vec2 p = q / vec2(0.48, 0.24);
+		p.x += mod(floor(p.y), 2.0) * 0.5;
+		vec2 cell = floor(p);
+		float j = joint(fract(p), fwidth(p), 0.025);
+		float grain = 0.90 + 0.14 * vnoise(q * 18.0);
+		vec3 stone = hearth_stone_colour.rgb * (0.88 + 0.22 * hash21(cell)) * grain;
+		c = mix(hearth_stone_colour.rgb * 0.62, stone, j);
 	}
 	ALBEDO = c;
 	ROUGHNESS = 0.96;

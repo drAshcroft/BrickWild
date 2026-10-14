@@ -83,7 +83,16 @@ static func check_interior_details(plan: HousePlan, builder: HouseBuilder) -> Ar
 		var depth := float(breast["depth"])
 		var y0 := int(breast["storey"]) * plan.spec.height
 		var wall: Dictionary = HouseGeometry.room_walls(plan, room)[int(breast["wall"])]
-		if depth < 0.4 or depth > 0.6 or absf((centre - Vector2(wall["from"])).dot(normal) - depth * 0.5) > 0.02:
+		var native_fireplace := String(plan.hearth.get("host_kind", "")) == "ordinary_fireplace"
+		var depth_valid := absf(depth - HouseGeometry.DOMESTIC_FIREPLACE_DEPTH) < 0.001 \
+			if native_fireplace else depth >= 0.4 and depth <= 0.6
+		if String(breast.get("kind", "")) == "witch_cauldron_recess":
+			depth_valid = false
+			for item in plan.furniture:
+				if HouseGeometry.uses_witch_cooking_recess(plan, int(item["room"]), String(item["key"])):
+					depth_valid = absf(depth - HouseGeometry.witch_recess_size(item).y) < 0.001
+					break
+		if not depth_valid or absf((centre - Vector2(wall["from"])).dot(normal) - depth * 0.5) > 0.02:
 			errors.append("hearth_breast: invalid depth or wall contact")
 		var found := false
 		for mass in builder.mass_log:
@@ -118,7 +127,22 @@ static func check_interior_details(plan: HousePlan, builder: HouseBuilder) -> Ar
 		for item in plan.furniture:
 			if int(item["room"]) != room:
 				continue
-			if Poly.intersection_area(Poly.from_rect(item["rect"]), breast["outline"]) > 0.002:
+			if String(breast.get("kind", "")) == "witch_cauldron_recess" \
+					and HouseGeometry.uses_witch_cooking_recess(plan, room, String(item["key"])):
+				if not _hearth_recess_vessel_fits(plan, builder, item):
+					errors.append("hearth_breast: cooking vessel does not fit its actual recess")
+				continue
+			var body: Rect2 = item["rect"]
+			if bool(item.get("mounted", false)):
+				# Legacy mounted rows store a 10 cm anchor marker. The imported
+				# shelf's full body must clear the masonry, including on returns.
+				var key := String(item["key"])
+				var yaw := float(item["yaw"]) + PropCatalog.face_offset(key)
+				var scale := float(item.get("scale", 1.0))
+				var mounted_centre := PropCatalog.plan_centre(key, PropCatalog.house_origin(item), yaw, scale)
+				var size := PropCatalog.footprint_rotated(key, yaw) * scale
+				body = Rect2(mounted_centre - size * 0.5, size)
+			if Poly.intersection_area(Poly.from_rect(body), breast["outline"]) > 0.002:
 				errors.append("hearth_breast: furniture intersects masonry: " + String(item["key"]))
 			if PropCatalog.category(item["key"]) == "hearth":
 				var width := PropCatalog.footprint(item["key"]).x * float(item.get("scale", 1.0))
@@ -152,6 +176,44 @@ static func check_interior_details(plan: HousePlan, builder: HouseBuilder) -> Ar
 			if count < 6:
 				errors.append("rug: no actual quad 2 mm above floor for " + String(rug["id"]))
 	return errors
+
+
+## Only the declared Cauldron may occupy the empty firebox volume. Re-derive
+## its assembled bounds from catalogue measurements and actual emitted mouth
+## supports; a moved pot or a narrowed/raised opening must fail this predicate.
+static func _hearth_recess_vessel_fits(plan: HousePlan, builder: HouseBuilder,
+		item: Dictionary) -> bool:
+	var breast := HouseGeometry.hearth_breast(plan)
+	if breast.is_empty() or not HouseGeometry.uses_witch_cooking_recess(
+			plan, int(item.get("room", -1)), String(item.get("key", ""))):
+		return false
+	var mouth := _hearth_mouth_metrics(builder, breast)
+	if mouth.is_empty():
+		return false
+	var origin := PropCatalog.house_origin(item)
+	var key := String(item["key"])
+	var yaw := float(item["yaw"]) + PropCatalog.face_offset(key)
+	var scale := float(item.get("scale", 1.0))
+	var height_scale := PropCatalog.placement_height_scale(item)
+	var centre := PropCatalog.plan_centre(key, origin, yaw, scale)
+	var footprint := PropCatalog.footprint_rotated(key, yaw) * scale
+	var claimed: Rect2 = item.get("rect", Rect2())
+	if claimed.position.distance_to(centre - footprint * 0.5) > 0.002 \
+			or claimed.size.distance_to(footprint) > 0.002:
+		return false
+	var normal: Vector2 = breast["normal"]
+	var tangent := Vector2(normal.y, -normal.x)
+	var breast_centre: Vector2 = breast["centre"]
+	var rear := breast_centre - normal * float(breast["depth"]) * 0.5
+	for corner in Poly.from_rect(Rect2(centre - footprint * 0.5, footprint)):
+		var depth := (corner - rear).dot(normal)
+		if depth < 0.09 or depth > float(breast["depth"]) - 0.04 \
+				or absf((corner - breast_centre).dot(tangent)) > float(mouth["width"]) * 0.5 - 0.03:
+			return false
+	var bottom := origin.y + PropCatalog.floor_offset(key) * height_scale
+	var top := bottom + PropCatalog.height(key) * height_scale
+	return absf(bottom - float(mouth["bottom"])) < 0.002 \
+		and top < float(mouth["top"]) - 0.08
 
 
 ## A role is evidence only when its exact logged box triangles are present on
@@ -213,8 +275,18 @@ static func _hearth_opening_has_recess(plan: HousePlan, builder: HouseBuilder) -
 	var hit_row: Dictionary = hit
 	var wall_surface: int = _logical_mesh_surface(builder.emitted_mesh,
 		HouseBuilder.SURF_WALL)
-	return int(hit_row["surface"]) == wall_surface \
-		and start.distance_to(hit_row["point"]) >= depth * 0.65
+	var stone_surface: int = _logical_mesh_surface(builder.emitted_mesh,
+		HouseBuilder.SURF_FLOOR)
+	# Ground-floor masonry uses the floor material slot. Prove that either
+	# material's actual triangle sits at the host wall, rather than accepting
+	# an arbitrary floor-coloured plate somewhere inside the mouth.
+	var host: Dictionary = HouseGeometry.room_walls(plan, int(breast["room"]))[int(breast["wall"])]
+	var wall_point: Vector2 = host["from"]
+	var point: Vector3 = hit_row["point"]
+	var backing_offset := (Vector2(point.x, point.z) - wall_point).dot(normal2)
+	return int(hit_row["surface"]) in [wall_surface, stone_surface] \
+		and backing_offset >= -0.02 and backing_offset <= 0.07 \
+		and start.distance_to(point) >= depth * 0.65
 
 
 ## Derive the aperture from emitted supports: the foot gives its sill, the
@@ -330,12 +402,21 @@ static func check_furniture_floor(plan: HousePlan, builder: HouseBuilder) -> Arr
 			continue
 		var at: Vector2 = Rect2(item["rect"]).get_center()
 		var base: float = float(item["pos"].y)
+		var support_triangles := triangles
+		if HouseGeometry.uses_witch_cooking_recess(plan, room, key) \
+				and String(HouseGeometry.hearth_breast(plan).get("kind", "")) == "witch_cauldron_recess":
+			# The measured masonry seat is 20 mm above the floorboards. Check
+			# its actual surface; the vessel is not hovering over those boards.
+			if not _hearth_role_mesh_matches(builder, "hearth_breast_foot", 1):
+				errors.append("furniture_floor: Cauldron has no emitted fireplace seat")
+				continue
+			support_triangles = _mesh_triangles(builder.emitted_mesh, HouseBuilder.SURF_WALL)
 		if plan.on_dais(room, at):
 			base -= plan.dais_rise()
 		var top := -INF
 		var from := Vector3(at.x, base + 0.3, at.y)
 		var to := Vector3(at.x, base - 0.6, at.y)
-		for tri in triangles:
+		for tri in support_triangles:
 			var hit: Variant = Geometry3D.segment_intersects_triangle(from, to, tri[0], tri[1], tri[2])
 			if hit != null:
 				top = maxf(top, (hit as Vector3).y)

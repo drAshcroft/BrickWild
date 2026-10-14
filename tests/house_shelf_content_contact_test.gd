@@ -17,6 +17,13 @@ const CASES := [
 
 
 func _init() -> void:
+	if "phase=ingredients" in OS.get_cmdline_user_args():
+		_check_ingredient_shelves()
+		for failure in failures:
+			printerr("FAIL ", failure)
+		print("Witch ingredient shelves: %d supported groups, %d failures" % [positives, failures.size()])
+		quit(1 if not failures.is_empty() else 0)
+		return
 	for row in CASES:
 		print("SHELF_CONTENT_CASE_START ", row.id)
 		_check_case(row)
@@ -26,6 +33,38 @@ func _init() -> void:
 	for failure in failures:
 		printerr("FAIL ", failure)
 	quit(1 if not failures.is_empty() else 0)
+
+
+func _check_ingredient_shelves() -> void:
+	for size in [Vector2(9, 12), Vector2(17, 18)]:
+		var request := BuildingRequest.house(1, &"witch_hut", &"none", size.x, size.y,
+			2.6 if size.x < 10.0 else 2.8, 1)
+		var plan: HousePlan = BrickWild.generate(request).plan
+		var groups := 0
+		for child in plan.furniture:
+			var host_index := int(child.get("host", -1))
+			if String(child.get("key", "")) != "SmallBottles_1" or host_index < 0:
+				continue
+			var shelf: Dictionary = plan.furniture[host_index]
+			if String(shelf.get("key", "")) != "Shelf_Simple":
+				continue
+			groups += 1
+			if "trace" in OS.get_cmdline_user_args():
+				print("INGREDIENT_CONTACT ", size, " shelf=", shelf, " child=", child)
+			if not _actual_mesh_contact(shelf, child):
+				failures.append("%s ingredient group does not contact the imported shelf board" % size)
+			else:
+				positives += 1
+			var raised: Dictionary = child.duplicate(true)
+			raised["pos"] = Vector3(raised["pos"]) + Vector3.UP * 0.10
+			if _actual_mesh_contact(shelf, raised):
+				failures.append("raised bottle negative still reports shelf contact")
+			var lowered_shelf: Dictionary = shelf.duplicate(true)
+			lowered_shelf["pos"] = Vector3(shelf["pos"]) - Vector3.UP * 0.10
+			if _actual_mesh_contact(lowered_shelf, child):
+				failures.append("lowered support negative still reports shelf contact")
+		if groups != 2:
+			failures.append("%s retained %d ingredient groups; expected two" % [size, groups])
 
 
 func _check_case(row: Dictionary) -> void:
@@ -239,6 +278,8 @@ func _actual_mesh_contact(shelf: Dictionary, child: Dictionary) -> bool:
 		for triangle in support_triangles:
 			support_y = maxf(support_y, _triangle_height_at(triangle, sample))
 		if not is_finite(support_y) or absf(support_y - low.y) > 0.02:
+			if "trace" in OS.get_cmdline_user_args():
+				print("CONTACT_MISS sample=", sample, " board_y=", support_y, " child_y=", low.y)
 			return false
 	return true
 

@@ -309,16 +309,39 @@ func check_bedside(plan: HousePlan) -> void:
 func check_stowage(plan: HousePlan) -> void:
 	for i in range(plan.room_count()):
 		var beds := 0
-		var kept := 0
+		var capacity := 0
 		for f in plan.furniture_of(i):
 			var cat := PropCatalog.category(String(plan.furniture[f]["key"]))
 			if cat == "bed":
 				beds += 1
-			elif cat in ["chest", "storage", "nightstand"]:
-				kept += 1
-		if beds > 0 and kept < int(ceil(beds / 2.0)):
-			failures.append("stowage: room %d (%s) sleeps %d with %d chest(s) or cupboard(s)"
-				% [i, String(plan.kind_of(i)), beds, kept])
+			else:
+				capacity += _accessible_clothes_capacity(plan, f)
+		if beds > capacity:
+			failures.append("stowage: room %d (%s) sleeps %d with accessible clothes storage for %d bed(s)"
+				% [i, String(plan.kind_of(i)), beds, capacity])
+
+
+## Closed storage is a model role, independent of a bedside surface. Re-derive
+## its opening/standing zone, rather than trusting an arbitrary placement tag.
+## Whole-house reachability remains the shared HouseNavCheck's responsibility.
+static func _accessible_clothes_capacity(plan: HousePlan, index: int) -> int:
+	var piece: Dictionary = plan.furniture[index]
+	var capacity := PropCatalog.clothes_capacity(piece)
+	if capacity == 0 or not _on_floor(piece):
+		return 0
+	var room := int(piece["room"])
+	var zone := HouseFurnishGeometry.zone_rect(String(piece["key"]),
+		Rect2(piece["rect"]), float(piece["yaw"]))
+	if not zone.has_area() or not HouseGeometry.room_floor_rect(plan, room).grow(TOL).encloses(zone) \
+			or not HouseFurnishGeometry.inside_outline(plan, room, zone):
+		return 0
+	for other in plan.furniture_of(room):
+		if other == index or not _on_floor(plan.furniture[other]):
+			continue
+		var overlap := zone.intersection(Rect2(plan.furniture[other]["rect"]))
+		if overlap.size.x > TOL and overlap.size.y > TOL:
+			return 0
+	return capacity
 
 
 func check_bed_door(plan: HousePlan) -> void:

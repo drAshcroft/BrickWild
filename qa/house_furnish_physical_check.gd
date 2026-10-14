@@ -108,7 +108,15 @@ func check_supported(plan: HousePlan) -> void:
 		if absf(float(p["pos"].y) - top) > 0.02:
 			failures.append("supported: %s floats %.2fm above the %s it sits on"
 				% [HouseFurnishCheck.who(plan, f), float(p["pos"].y) - top, host_key])
-		if not Rect2(plan.furniture[host]["rect"]).grow(0.02).encloses(p["rect"]):
+		var support_rect := Rect2(host_placement["rect"])
+		if bool(host_placement.get("mounted", false)):
+			# The stored rectangle reserves a mount, not necessarily the board.
+			var yaw := float(host_placement.get("yaw", 0.0)) + PropCatalog.face_offset(host_key)
+			var scale := float(host_placement.get("scale", 1.0))
+			var centre := PropCatalog.plan_centre(host_key, host_origin, yaw, scale)
+			var footprint := PropCatalog.footprint_rotated(host_key, yaw) * scale
+			support_rect = Rect2(centre - footprint * 0.5, footprint)
+		if not support_rect.grow(0.02).encloses(p["rect"]):
 			failures.append("supported: %s hangs over the edge of the %s"
 				% [HouseFurnishCheck.who(plan, f), host_key])
 
@@ -164,11 +172,12 @@ func check_windows(plan: HousePlan) -> void:
 		var p: Dictionary = plan.furniture[f]
 		if p.get("mounted", false) or p["host"] >= 0:
 			continue
-		if PropCatalog.height(p["key"]) <= HouseGeometry.WINDOW_SILL:
+		var height := PropCatalog.placement_height(p)
+		if height <= HouseGeometry.WINDOW_SILL:
 			continue
 		for w in plan.windows_of(p["room"]):
 			var clear: Rect2 = HouseGeometry.window_clear_rect(plan.windows[w])
 			var over: Rect2 = clear.intersection(p["rect"])
 			if over.size.x > TOL and over.size.y > TOL:
 				failures.append("daylight: %s (%.2fm tall) stands across window %d"
-					% [HouseFurnishCheck.who(plan, f), PropCatalog.height(p["key"]), w])
+					% [HouseFurnishCheck.who(plan, f), height, w])

@@ -109,9 +109,10 @@ func _build_hearth_breast() -> void:
 	var centre: Vector2 = breast["centre"]
 	var breast_width: float = float(breast["width"])
 	var breast_depth: float = float(breast["depth"])
-	var opening_width: float = minf(1.48, maxf(0.80, breast_width - 0.42))
-	var opening_bottom: float = 0.28
-	var opening_clear_top: float = minf(1.48, spec.height - 0.68)
+	var mouth := HouseGeometry.hearth_mouth(plan)
+	var opening_width: float = float(mouth["width"])
+	var opening_bottom: float = float(mouth["bottom"])
+	var opening_clear_top: float = float(mouth["top"])
 	var lintel_height: float = 0.18
 	if opening_width < 0.65 or opening_clear_top <= opening_bottom + 0.25:
 		_emit_solid_hearth_breast(breast)
@@ -188,7 +189,15 @@ func _hearth_breast_box(role: String, size: Vector3, centre: Vector2, y0: float,
 	var basis := Basis(Vector3.UP, yaw)
 	var local_offset := basis * Vector3(x_local, 0.0, z_local)
 	var xf := Transform3D(basis, Vector3(centre.x, y0 + y_local, centre.y) + local_offset)
+	var masonry := HouseGeometry.uses_domestic_finish(plan) and role != "hearth_mantel"
+	if masonry:
+		# A named region on the existing wall surface. There is one set of
+		# structural triangles; the stone finish adds no coincident cladding.
+		surface = SURF_WALL
+		_kit._sts[surface].set_color(Color.BLACK)
 	component_box(role, size, xf, surface)
+	if masonry:
+		_kit._sts[surface].set_color(Color.WHITE)
 
 
 func _build_rugs() -> void:
@@ -464,6 +473,18 @@ func _build_ceiling(any_roof := false, roofed := false) -> void:
 		SURF_WALL)
 	host_end()
 	_build_witch_hall_ceiling_ties(level, y)
+	_build_domestic_ceiling_ties(level, y)
+	for lower_level in levels:
+		if lower_level < level and lower_level + 1 in levels:
+			_build_domestic_ceiling_ties(lower_level,
+				float(lower_level + 1) * spec.height - SLAB_TUCK)
+
+
+func _build_domestic_ceiling_ties(level: int, ceiling_y: float) -> void:
+	for member in HouseGeometry.domestic_ceiling_ties(plan, level, ceiling_y):
+		host("domestic_ceiling_room%d" % int(member["room"]), level)
+		component_box("domestic_ceiling_joist", member["size"], member["xf"], SURF_TRIM)
+		host_end()
 
 
 func _build_witch_bay_ceiling(main_rect: Rect2, ceiling_y: float,
@@ -4501,15 +4522,15 @@ func _build_chimney() -> void:
 	var base_h: float = minf(top * 0.45, 2.5)
 	if spec.chimney_style == &"stepped":
 		var base_s: float = s + HouseGeometry.CHIMNEY_BASE_EXTRA
-		box(Vector3(base_s, base_h, base_s), Vector3(c.x, base_h / 2.0, c.y), SURF_FLOOR)
+		_chimney_box(Vector3(base_s, base_h, base_s), Vector3(c.x, base_h / 2.0, c.y))
 		var sh_h := 0.25
-		box(Vector3(base_s - 0.08, sh_h, base_s - 0.08), Vector3(c.x, base_h + sh_h / 2.0, c.y), SURF_FLOOR)
+		_chimney_box(Vector3(base_s - 0.08, sh_h, base_s - 0.08), Vector3(c.x, base_h + sh_h / 2.0, c.y))
 		var flue_h: float = top - (base_h + sh_h)
 		if flue_h > 0.05:
 			var upper_s: float = flue_s if HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family) else s
-			box(Vector3(upper_s, flue_h, upper_s), Vector3(c.x, base_h + sh_h + flue_h / 2.0, c.y), SURF_FLOOR)
+			_chimney_box(Vector3(upper_s, flue_h, upper_s), Vector3(c.x, base_h + sh_h + flue_h / 2.0, c.y))
 	else:
-		box(Vector3(s, top, s), Vector3(c.x, top / 2.0, c.y), SURF_FLOOR)
+		_chimney_box(Vector3(s, top, s), Vector3(c.x, top / 2.0, c.y))
 
 	var crown_s: float = flue_s + 0.22 if HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family) else s + 0.22
 	var chimney_footprint: float = s
@@ -4524,6 +4545,53 @@ func _build_chimney() -> void:
 
 	_emit_chimney_pots(c, top, flue_s)
 	total_height = maxf(total_height, top + 0.18 + HouseGeometry.CHIMNEY_POT_H)
+
+
+## Preserve the stack envelope while leaving the emitted fireplace mouth open.
+## Most stacks stand outside the wall and take the unchanged single-box path.
+func _chimney_box(size: Vector3, centre: Vector3) -> void:
+	var breast := HouseGeometry.hearth_breast(plan)
+	if not _is_ordinary_domestic_hearth() or breast.is_empty():
+		box(size, centre, SURF_FLOOR)
+		return
+	var normal: Vector2 = breast["normal"]
+	if maxf(absf(normal.x), absf(normal.y)) < 0.999:
+		box(size, centre, SURF_FLOOR)
+		return
+	var mouth := HouseGeometry.hearth_mouth(plan)
+	var depth := float(breast["depth"])
+	var footprint := Vector2(float(mouth["width"]) + 0.01, depth + 0.01)
+	if absf(normal.x) > 0.5:
+		footprint = Vector2(footprint.y, footprint.x)
+	var c: Vector2 = breast["centre"]
+	var y0 := float(breast["storey"]) * spec.height
+	var opening := AABB(Vector3(c.x - footprint.x * 0.5,
+		y0 + float(mouth["bottom"]), c.y - footprint.y * 0.5),
+		Vector3(footprint.x, float(mouth["top"]) - float(mouth["bottom"]), footprint.y))
+	var remaining := AABB(centre - size * 0.5, size)
+	var cut := remaining.intersection(opening)
+	if cut.size.x < 0.00001 or cut.size.y < 0.00001 or cut.size.z < 0.00001:
+		box(size, centre, SURF_FLOOR)
+		return
+	# Six disjoint slabs cover the original box minus the aperture. Each is
+	# recorded at emission so component QA can prove the actual cut masonry.
+	host("chimney", int(breast["storey"]))
+	for axis in range(3):
+		var low_size := remaining.size
+		low_size[axis] = cut.position[axis] - remaining.position[axis]
+		if low_size[axis] > 0.00001:
+			component_box("chimney_recess_surround", low_size,
+				Transform3D(Basis(), remaining.position + low_size * 0.5), SURF_FLOOR)
+		var high_pos := remaining.position
+		high_pos[axis] = cut.end[axis]
+		var high_size := remaining.size
+		high_size[axis] = remaining.end[axis] - cut.end[axis]
+		if high_size[axis] > 0.00001:
+			component_box("chimney_recess_surround", high_size,
+				Transform3D(Basis(), high_pos + high_size * 0.5), SURF_FLOOR)
+		remaining.position[axis] = cut.position[axis]
+		remaining.size[axis] = cut.size[axis]
+	host_end()
 
 
 ## Emit only the removable pottery crown. Keeping it separate lets the roof QA
@@ -4574,20 +4642,22 @@ func _emit_witch_cauldron_logs(placement: Dictionary, centred: bool, placement_i
 			drop = 0.0
 		origin = Vector3(pos.x, pos.y - drop, pos.z)
 	var floor_y: float = PropCatalog.floor_offset("Cauldron")
-	var lower_h := 0.035
-	var upper_h := 0.032
+	var lower := HouseGeometry.WITCH_CAULDRON_LOWER_LOG
+	var upper := HouseGeometry.WITCH_CAULDRON_UPPER_LOG
+	var lower_h := lower.y
+	var upper_h := upper.y
 	host("witch_cauldron_%s" % placement_id, int(placement.get("storey", 0)))
-	# Two parallel floor-supported sticks stay inside the measured three-leg
+	# Two parallel floor-supported billets stay inside the measured three-leg
 	# ring (about 0.30 m radius) and leave the central bowl underside clear.
 	for side in [-1.0, 1.0]:
-		var centre_local := Vector3(side * 0.035, floor_y + lower_h * 0.5, 0.0)
+		var centre_local := Vector3(side * HouseGeometry.WITCH_CAULDRON_LOG_SPREAD, floor_y + lower_h * 0.5, 0.0)
 		var centre_world: Vector3 = origin + Basis(Vector3.UP, model_yaw) * Vector3(centre_local.x * scale_factor, centre_local.y * height_scale, centre_local.z * scale_factor)
-		var size := Vector3(0.035 * scale_factor, lower_h * height_scale, 0.22 * scale_factor)
+		var size := Vector3(lower.x * scale_factor, lower_h * height_scale, lower.z * scale_factor)
 		component_box("witch_cauldron_heat_log_lower", size, Transform3D(Basis(Vector3.UP, model_yaw), centre_world), SURF_TRIM)
 	# A cross-piece bears on both lower logs instead of floating above the embers.
 	var top_local := Vector3(0.0, floor_y + lower_h + upper_h * 0.5, 0.0)
 	var top_world: Vector3 = origin + Basis(Vector3.UP, model_yaw) * Vector3(top_local.x * scale_factor, top_local.y * height_scale, top_local.z * scale_factor)
-	var top_size := Vector3(0.18 * scale_factor, upper_h * height_scale, 0.035 * scale_factor)
+	var top_size := Vector3(upper.x * scale_factor, upper_h * height_scale, upper.z * scale_factor)
 	component_box("witch_cauldron_heat_log_upper", top_size, Transform3D(Basis(Vector3.UP, model_yaw), top_world), SURF_TRIM)
 
 func _build_witch_workshop_bay_bearing(xf: Transform3D, bay: Dictionary) -> void:

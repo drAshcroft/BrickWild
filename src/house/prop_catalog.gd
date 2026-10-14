@@ -93,11 +93,12 @@ const PROPS := {
 	"Bench": {"cat": "bench", "tags": [], "zone": 0.55},
 
 	# ---- storage ----
-	"Cabinet": {"cat": "storage", "tags": [WALL, SURFACE], "zone": 0.7},
+	# The cabinet's metal door fittings are on raw +Z, measured in its glTF.
+	"Cabinet": {"cat": "storage", "tags": [WALL, SURFACE], "zone": 0.7, "face": PI, "clothes_beds": 2},
 	# The model's open shelves are on its +Z side; turn the imported -Z front
 	# toward the room when the wall-placement rule stores an inward-facing yaw.
 	"Bookcase_2": {"cat": "bookcase", "tags": [WALL], "zone": 0.7, "face": PI, "affinity": {"daylight": -1.0, "far": ["hearth"], "avoid_hearth_wall": true}},
-	"Chest_Wood": {"cat": "chest", "tags": [WALL], "zone": 0.6, "affinity": {"away_from_doors": true}},
+	"Chest_Wood": {"cat": "chest", "tags": [WALL], "zone": 0.6, "clothes_beds": 2, "affinity": {"away_from_doors": true}},
 	"Nightstand_Shelf": {"cat": "nightstand", "tags": [WALL, SURFACE], "zone": 0.4},
 	"Barrel": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true, "near": ["counter"]}},
 	"Barrel_Apples": {"cat": "barrel", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true, "near": ["counter"]}},
@@ -132,7 +133,9 @@ const PROPS := {
 	"Bag": {"cat": "sack", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 
 	# ---- shelves and wall furniture ----
-	"Shelf_Simple": {"cat": "shelf", "tags": [WALL_MOUNTED, SURFACE], "zone": 0.0, "face": PI, "affinity": {"over": ["workbench", "counter"]}},
+	# Usable board face: local Y 0.102 above the measured -0.201 bracket foot.
+	# The 0.309 m whole-model height includes a raised edge, not its support plane.
+	"Shelf_Simple": {"cat": "shelf", "tags": [WALL_MOUNTED, SURFACE], "zone": 0.0, "face": PI, "top": 0.303, "affinity": {"over": ["workbench", "counter"]}},
 	"Shelf_Arch": {"cat": "shelf", "tags": [WALL_MOUNTED, SURFACE], "zone": 0.0, "face": PI, "affinity": {"over": ["workbench", "counter"]}},
 	"Shelf_Small_Bottles": {"cat": "shelf", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI, "affinity": {"over": ["workbench", "counter"]}},
 	"Peg_Rack": {"cat": "rack", "tags": [WALL_MOUNTED], "zone": 0.0, "face": PI},
@@ -520,6 +523,23 @@ static func placement_height_scale(placement: Dictionary) -> float:
 ## Measured vertical size after placement scaling.
 static func placement_height(placement: Dictionary) -> float:
 	return height(String(placement.get("key", ""))) * placement_height_scale(placement)
+
+
+## Authored household capacity, reduced with the actual scaled storage body.
+## An open nightstand has no closed clothes compartment. Tiny decorative
+## versions of a real chest cannot satisfy this role either.
+static func clothes_capacity(placement: Dictionary) -> int:
+	var key := String(placement.get("key", ""))
+	var nominal := int(Dictionary(PROPS.get(key, {})).get("clothes_beds", 0))
+	if nominal == 0:
+		return 0
+	var horizontal := float(placement.get("scale", 1.0))
+	var vertical := placement_height_scale(placement)
+	var measured := size(key)
+	if measured.y * vertical < 0.30 \
+			or maxf(measured.x, measured.z) * horizontal < 0.60:
+		return 0
+	return maxi(1, int(floor(float(nominal) * horizontal * horizontal * vertical + 0.0001)))
 
 
 ## Height of the top a prop offers to things set on it, or 0 if it offers none.

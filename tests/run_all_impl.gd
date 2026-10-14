@@ -118,6 +118,11 @@ const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi"
 ## Lanes and bare suite names can be mixed; duplicates run once.
 const LANES: Dictionary = {
 	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "hmesh", "metriccoords"],
+	# Same coverage in three bounded processes when the combined lane exceeds
+	# the five-minute host cap. Keep lane:geom as the complete batch selector.
+	"lane:geom-core": ["roofquick", "hroof", "hcomponent", "hsky", "hdoor", "hmesh", "metriccoords"],
+	"lane:geom-openings": ["hopening"],
+	"lane:geom-envelope": ["hbounds", "hjetty", "hmaterials"],
 	"lane:rich": ["hrich", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty"],
 	"lane:culture": ["hvernacular", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty", "hmaterials", "cultureapi"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
@@ -125,6 +130,7 @@ const LANES: Dictionary = {
 	"lane:assets": ["assets", "props", "hassembly"],
 	"lane:house-plan-fast": ["houseqaplan", "hmultistory", "hwitchcompact"],
 	"lane:house-furnish-fast": ["houseqafurnishfast", "hassembly", "walkpins"],
+	"lane:house-furnish-rules": ["houseqafurnishfast"],
 	"lane:house-exterior-fast": ["hexterior", "hassembly", "hwitchflue"],
 	"lane:assets-fast": ["props", "hassembly"],
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],

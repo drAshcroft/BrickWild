@@ -8,6 +8,10 @@ class SolidCompatibilityBuilder extends HouseBuilder:
 	func _is_ordinary_domestic_hearth() -> bool:
 		return false
 
+class BlockedChimneyBuilder extends HouseBuilder:
+	func _chimney_box(size: Vector3, centre: Vector3) -> void:
+		box(size, centre, SURF_FLOOR)
+
 var failures: Array[String] = []
 var checks := 0
 
@@ -16,6 +20,7 @@ func _init() -> void:
 		{"style": &"farmhouse", "seed": 7441},
 		{"style": &"cottage", "seed": 7441},
 		{"style": &"witch_hut", "seed": 7441},
+		{"style": &"witch_hut", "seed": 1, "width": 9.0, "length": 12.0},
 	]:
 		_check_ordinary_fixture(fixture)
 	_check_solid_compatibility()
@@ -27,8 +32,8 @@ func _init() -> void:
 func _check_ordinary_fixture(fixture: Dictionary) -> void:
 	var spec := HouseSpec.new(int(fixture["seed"]))
 	spec.style = fixture["style"]
-	spec.width = 11.0
-	spec.length = 14.0
+	spec.width = float(fixture.get("width", 11.0))
+	spec.length = float(fixture.get("length", 14.0))
 	var plan := HouseGenerator.generate(spec, spec.seed, true)
 	var breast: Dictionary = HouseGeometry.hearth_breast(plan)
 	var where := "%s seed=%d" % [String(spec.style), spec.seed]
@@ -38,8 +43,14 @@ func _check_ordinary_fixture(fixture: Dictionary) -> void:
 	var builder := HouseBuilder.new()
 	builder.build(plan, true)
 	var qa_errors: Array[String] = HouseQA.check_interior_details(plan, builder)
-	if qa_errors.any(func(error: String): return error.contains("actual masonry missing")):
-		_fail(where + ": QA still treats the intended open mouth as missing masonry")
+	_expect(qa_errors.is_empty(), where + ": actual interior details rejected: " + str(qa_errors))
+	var component_report := ComponentCheck.check(builder, builder.emitted_mesh)
+	_expect(component_report["failures"].is_empty(), where + ": logged components differ from the emitted mesh")
+	if not builder.components("chimney_recess_surround").is_empty():
+		var blocked_builder := BlockedChimneyBuilder.new()
+		blocked_builder.build(plan, true)
+		_expect(not HouseQA._hearth_opening_has_recess(plan, blocked_builder),
+			where + ": restoring the old solid chimney did not obstruct the recess")
 	for role in ["hearth_breast_left", "hearth_breast_right", "hearth_breast_foot",
 			"hearth_lintel", "hearth_breast_header", "hearth_jamb", "hearth_mantel"]:
 		var count: int = _role_count(builder, role)
@@ -53,6 +64,8 @@ func _check_ordinary_fixture(fixture: Dictionary) -> void:
 	_check_removed_component_control(plan, builder, where, "hearth_lintel", 1)
 	_check_removed_component_control(plan, builder, where, "hearth_breast_header", 1)
 	_check_sealed_mouth_control(plan, builder, breast, where)
+	_check_sealed_mouth_control(plan, builder, breast, where, HouseBuilder.SURF_FLOOR)
+	_check_sealed_mouth_control(plan, builder, breast, where, HouseBuilder.SURF_TRIM)
 	_check_dimensions_and_back_gap(plan, builder, breast, where)
 	_check_furniture_collision_negative(plan, builder, breast, where)
 
@@ -72,6 +85,19 @@ func _check_dimensions_and_back_gap(plan: HousePlan, builder: HouseBuilder,
 			and absf(bounds.size.z - expected.size.y) < 0.01
 	_expect(mass_found, where + ": full-storey breast envelope dimensions drifted")
 	_check_mass_dimensions_negative(plan, builder, where)
+	if String(plan.hearth.get("host_kind", "")) == "ordinary_fireplace":
+		# A native firebox has a structural vessel record, not floor hearth
+		# furniture. Its actual wall seat still needs an independent fault.
+		_expect(not Dictionary(plan.hearth.get("cooking_vessel", {})).is_empty(),
+			where + ": native fireplace lost its cooking vessel")
+		var shifted := breast.duplicate(true)
+		shifted["centre"] = Vector2(breast["centre"]) + Vector2(breast["normal"]) * 0.12
+		plan.hearth["breast"] = shifted
+		var shifted_errors := HouseQA.check_interior_details(plan, builder)
+		plan.hearth["breast"] = breast
+		_expect(shifted_errors.has("hearth_breast: invalid depth or wall contact"),
+			where + ": displaced native breast escaped its wall-contact check")
+		return
 	for item in plan.furniture:
 		if int(item["room"]) != int(breast["room"]) or PropCatalog.category(item["key"]) != "hearth":
 			continue
@@ -120,8 +146,11 @@ func _check_back_gap_negative(plan: HousePlan, builder: HouseBuilder,
 	hearth["rect"] = Rect2(original.position + normal * direction * 0.12, original.size)
 	plan.furniture[index] = hearth
 	var errors := HouseQA.check_interior_details(plan, builder)
+	var expected_error := "hearth_breast: cooking vessel does not fit its actual recess" \
+		if String(breast.get("kind", "")) == "witch_cauldron_recess" \
+		else "hearth_breast: measured hearth does not fit or touch its surround"
 	var caught := errors.any(func(error: String):
-		return error == "hearth_breast: measured hearth does not fit or touch its surround")
+		return error == expected_error)
 	var restored_hearth: Dictionary = plan.furniture[index]
 	restored_hearth["rect"] = original
 	plan.furniture[index] = restored_hearth
@@ -164,7 +193,7 @@ func _check_removed_component_control(plan: HousePlan, builder: HouseBuilder,
 		where + ": same component-presence predicate accepted removed " + role)
 
 func _check_sealed_mouth_control(plan: HousePlan, builder: HouseBuilder,
-		breast: Dictionary, where: String) -> void:
+		breast: Dictionary, where: String, logical_surface := HouseBuilder.SURF_WALL) -> void:
 	var mesh: ArrayMesh = builder.emitted_mesh
 	var centre: Vector2 = breast["centre"]
 	var n2: Vector2 = breast["normal"]
@@ -178,7 +207,7 @@ func _check_sealed_mouth_control(plan: HousePlan, builder: HouseBuilder,
 	var opening_height: float = float(aperture["height"])
 	var mouth := Vector3(centre.x, float(aperture["center_y"]),
 		centre.y) + normal * depth * 0.5
-	var wall_surface: int = HouseQA._logical_mesh_surface(mesh, HouseBuilder.SURF_WALL)
+	var wall_surface: int = HouseQA._logical_mesh_surface(mesh, logical_surface)
 	if wall_surface < 0:
 		_fail(where + ": wall material slot is unavailable for the sealed-mouth control")
 		return
