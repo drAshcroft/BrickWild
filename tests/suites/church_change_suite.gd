@@ -73,7 +73,86 @@ static func run() -> SuiteResult:
 	var route_elapsed := (Time.get_ticks_msec() - route_start) / 1000.0
 	res.note("entrance routes %.2fs" % route_elapsed)
 	_negative_controls(res)
+	_nave_intrusion(res)
+	_tower_crowns(res)
 	return res
+
+
+const MATRIX := "res://tests/fixtures/sacred_sequence_requests.json"
+
+
+## Roof or accent surface standing INSIDE the nave's clear interior, below the
+## eaves, is a roof that holds nothing: the Russian alcove caps were stepped
+## boxes laid toward +Z whatever the alcove faced, and hung over the nave as
+## terracotta blocks on the walls (SACRED-RUSSIAN-FLOATING-BLOCKS).
+## Returns the offending vertices, as world points.
+static func nave_roof_intruders(spec: ChurchSpec, mesh: ArrayMesh) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	for surface in [ChurchBuilder.SURF_ROOF, ChurchBuilder.SURF_ACCENT]:
+		if surface >= mesh.get_surface_count():
+			continue
+		var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		for p in vertices:
+			if p.y > 0.2 and p.y < spec.height - 0.5 and ChurchGeometry.inside_nave(spec, p):
+				out.append(p)
+	return out
+
+
+static func _nave_intrusion(res: SuiteResult) -> void:
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(MATRIX))
+	var built_one := false
+	for c in parsed["cases"]:
+		if c["family"] != "church" or c["style"] not in ["russian", "romanesque"]:
+			continue
+		var made := BrickWild.generate(BuildingRequest.from_dict(c["request"]))
+		var spec := made.spec as ChurchSpec
+		var mesh: ArrayMesh = ChurchBuilder.new().build(spec)
+		var bad := nave_roof_intruders(spec, mesh)
+		_expect(res, bad.is_empty(), "%s: %d roof vertices hang inside the nave, first at %s"
+			% [c["id"], bad.size(), str(bad[0]) if not bad.is_empty() else ""])
+		if c["id"] == "church/russian/default/1":
+			built_one = true
+			# negative control: the old stepped cap, laid toward +Z on the wall line
+			var kit := MeshKit.new(5)
+			for surface in range(5):
+				kit.box(Vector3.ONE, Vector3(-100, -100, -100), surface)
+			kit.box(Vector3(2.2, 0.6, 1.1), Vector3(-spec.width / 2.0 + 0.2, 5.3, 0.0),
+				ChurchBuilder.SURF_ROOF)
+			_expect(res, not nave_roof_intruders(spec, kit.commit()).is_empty(),
+				"floating-roof control was not detected")
+	_expect(res, built_one, "matrix has no church/russian/default/1 case")
+
+
+## A west tower ends in a crown: Romanesque a hipped cap, Russian an onion or
+## tent on a drum, never a bare deck. The roof (or gilded accent) must reach
+## the logged tower_roof_rise, and nothing may exceed it.
+static func _tower_crowns(res: SuiteResult) -> void:
+	var crowns := 0
+	for style in [&"romanesque", &"russian"]:
+		for index in [0, 1, 2, 3, 4, 5]:
+			var spec: ChurchSpec = TestSweep.spec_at(style, index)
+			if (not spec.tower or spec.tower_roof == &"flat" or spec.west_towers != 1
+					or spec.crossing_tower_height > 0.0):
+				continue
+			crowns += 1
+			var builder := ChurchBuilder.new()
+			var mesh: ArrayMesh = builder.build(spec)
+			var who := "%s #%d crown" % [String(style), index]
+			var rise: float = ChurchGeometry.tower_roof_rise(spec)
+			var top := 0.0
+			for surface in [ChurchBuilder.SURF_ROOF, ChurchBuilder.SURF_ACCENT, ChurchBuilder.SURF_TRIM]:
+				if surface >= mesh.get_surface_count():
+					continue
+				var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+				for p in vertices:
+					if (absf(p.x - ChurchGeometry.tower_center_x(spec, 0.0)) < spec.tower_width * 0.5 + 0.6
+							and absf(p.z - ChurchGeometry.tower_center_z(spec)) < spec.tower_width * 0.5 + 0.6):
+						top = maxf(top, p.y)
+			var crown_top: float = spec.tower_height + rise
+			_expect(res, top > crown_top - 0.5 and top < crown_top + 0.05,
+				"%s tops out at %.2f, expected about %.2f (tower %.2f + rise %.2f)"
+				% [who, top, crown_top, spec.tower_height, rise])
+	_expect(res, crowns > 0, "no single-tower Romanesque or Russian case reached the crown check")
 
 
 ## Public single/twin tower builds prove paired Gothic belfry apertures on the

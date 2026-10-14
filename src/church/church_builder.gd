@@ -183,7 +183,12 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		_log_mass(mass_name, ChurchGeometry.tower_aabb(spec, side))
 		total_height = maxf(total_height, th)
 		var rise: float = ChurchGeometry.tower_roof_rise(spec)
-		match spec.tower_roof:
+		var crowned: bool = ChurchGeometry.tower_crown_kind(spec) != &""
+		if crowned:
+			_tower_crown(Vector3(lx, th, lz), tw, rise)
+		match spec.tower_roof if not crowned else &"crowned":
+			&"crowned":
+				pass
 			&"spire":
 				var sp: float = tw * spec.spire_pitch * ChurchGeometry.SPIRE_RISE_FACTOR
 				if spec.style == &"gothic":
@@ -505,7 +510,8 @@ func _box_opening_top(opening: Dictionary, u: float) -> float:
 func _arc_window_shell(center: Vector3, radius: float, height: float,
 		segments: int, arc: float, start: float, face_angles: Array,
 		width: float, opening_h: float, opening_y: float,
-		style: StringName, cap_top := false, open_ends := false) -> void:
+		style: StringName, cap_top := false, open_ends := false,
+		clip_nave := false) -> void:
 	var cut_faces: Dictionary = {}
 	var step: float = arc / float(segments)
 	for angle in face_angles:
@@ -524,6 +530,15 @@ func _arc_window_shell(center: Vector3, radius: float, height: float,
 			sin((a0 + a1) * 0.5))
 		var face: float = atan2(normal.x, normal.z)
 		var chord: float = p0.distance_to(p1)
+		if clip_nave:
+			# An alcove opens OFF the nave wall; whatever of its arc would stand
+			# inside the nave does not exist.
+			var spans: Array[Vector2] = ChurchGeometry.outside_nave_spans(spec, p0, p1, -0.34)
+			if spans.size() != 1 or spans[0].x > 0.001 or spans[0].y < 0.999:
+				for span in spans:
+					_arc_wall_panel(p0, p1, normal, face, span.x, span.y,
+						0.0, height, thickness)
+				continue
 		if not cut_faces.has(i):
 			_arc_wall_panel(p0, p1, normal, face, 0.0, 1.0,
 				0.0, height, thickness)
@@ -549,6 +564,8 @@ func _arc_window_shell(center: Vector3, radius: float, height: float,
 	if arc < TAU - 0.001 and not open_ends:
 		for angle in [start, start + arc]:
 			var outer := center + Vector3(cos(angle) * radius, 0, sin(angle) * radius)
+			if clip_nave and ChurchGeometry.inside_nave(spec, outer):
+				continue
 			if angle == start:
 				_kit._quad(st, center, outer, outer + Vector3.UP * height,
 					center + Vector3.UP * height)
@@ -1009,15 +1026,36 @@ func _build_ambulatory_and_chapels() -> void:
 		# each alcove is a little apse in its own right, facing outward
 		_arc_window_shell(Vector3(c.x, 0.0, c.z), chr_r, chh, 7, PI,
 			ChurchGeometry.chapel_arc_start(spec, i), [a], 0.6,
-			chh * 0.4, chh * 0.45, spec.window_style, domed, has_connected_mouth)
+			chh * 0.4, chh * 0.45, spec.window_style, domed, has_connected_mouth,
+			not domed and spec.chapel_arrangement == &"cluster")
 		_log_mass("chapel_%d" % i, ChurchGeometry.chapel_aabb(spec, i))
 		if domed:
 			_basil_chapel_tower(i)
 		elif ChurchGeometry.has_gothic_chevet_roof(spec):
 			_build_gothic_chevet_chapel_roof(i, c, a, chh)
 		else:
-			_kit.stepped_taper(Vector3(c.x, chh, c.z), chr_r * 2.0 + 0.2, chr_r * 0.6,
-				SURF_ROOF, 3, 0.15, true, 0.0, 0.8)
+			_chapel_cone_cap(Vector3(c.x, chh, c.z), chr_r + 0.1, chr_r * 0.6,
+				ChurchGeometry.chapel_arc_start(spec, i),
+				spec.chapel_arrangement == &"cluster")
+
+
+## The alcove's roof: a faceted half cone over the SAME seven-sided arc the
+## alcove wall is built on, turned to face outward. The stepped half-box this
+## replaces was always laid toward +Z, so on a side-wall chapel it hung over
+## the nave as unsupported terracotta blocks.
+func _chapel_cone_cap(pos: Vector3, radius: float, height: float, start: float,
+		clip_nave := false) -> void:
+	for k in range(7):
+		var a0: float = start + PI * float(k) / 7.0
+		var a1: float = start + PI * float(k + 1) / 7.0
+		var p0: Vector3 = pos + Vector3(cos(a0) * radius, 0, sin(a0) * radius)
+		var p1: Vector3 = pos + Vector3(cos(a1) * radius, 0, sin(a1) * radius)
+		var spans: Array[Vector2] = [Vector2(0.0, 1.0)]
+		if clip_nave:
+			spans = ChurchGeometry.outside_nave_spans(spec, p0, p1, -0.34)
+		for span in spans:
+			_kit.slab_poly(PackedVector3Array([p0.lerp(p1, span.x), p0.lerp(p1, span.y),
+				pos + Vector3(0, height, 0)]), RoofShape.DEPTH, SURF_ROOF, true)
 
 
 ## A steep faceted half-hip roof follows the semicircular chapel footprint.
@@ -1420,6 +1458,55 @@ func _stepped_buttress(name: String, anchor: Vector3, outward: Vector3,
 			anchor + outward * (d / 2.0 - ChurchGeometry.BUTTRESS_INSET)
 				+ Vector3.UP * y, SURF_TRIM)
 	host_end()
+
+
+## A Romanesque tower ends in a true four-faced hipped cap on an eave course.
+## A Russian tower ends in an octagonal drum under an onion (a tent when the
+## style asked for a spire), roofed in the terracotta surface like the central
+## dome so the church keeps its four material surfaces (the church suite
+## requires exactly four). Both stay inside tower_roof_rise().
+func _tower_crown(base: Vector3, tw: float, rise: float) -> void:
+	var kind: StringName = ChurchGeometry.tower_crown_kind(spec)
+	var eave: float = minf(0.3, rise * 0.1)
+	host("tower_cornice")
+	_buttress_piece("cornice", Vector3(tw + 0.5, eave, tw + 0.5),
+		base + Vector3(0, eave * 0.5, 0), SURF_TRIM)
+	host_end()
+	var y0: float = base.y + eave
+	if kind == &"hipped":
+		var circ: float = (tw + 0.4) * 0.5 * sqrt(2.0)
+		_kit.revolve(PackedVector2Array([Vector2(circ, 0.0), Vector2(0.0, rise - eave)]),
+			Vector3(base.x, y0, base.z), SURF_ROOF, 4, TAU, PI / 4.0)
+		return
+	var rd: float = tw * 0.36
+	var drum_h: float = minf(tw * 0.35, rise * 0.3)
+	_arc_window_shell(Vector3(base.x, y0, base.z), rd, drum_h, 8, TAU, PI / 8.0,
+		[0.0, PI / 2.0, PI, -PI / 2.0], rd * 0.36, drum_h * 0.5, drum_h * 0.5,
+		&"round", true)
+	var top: float = y0 + drum_h
+	_kit.prism(rd * 1.1, 0.2, 8, Vector3(base.x, top - 0.2, base.z), SURF_TRIM, PI / 8.0)
+	var left: float = rise - eave - drum_h
+	var spike: float = left * 0.14
+	if kind == &"tent":
+		var cap: float = minf(tw * 0.45, left * 0.3)
+		var tent_h: float = left - cap - spike
+		var tent := PackedVector2Array()
+		for row in [Vector2(1.0, 0.0), Vector2(0.96, 0.10), Vector2(0.80, 0.30),
+				Vector2(0.58, 0.55), Vector2(0.36, 0.78), Vector2(0.18, 0.93),
+				Vector2(0.14, 1.0)]:
+			tent.append(Vector2(rd * 1.05 * row.x, tent_h * row.y))
+		_kit.revolve(tent, Vector3(base.x, top, base.z), SURF_ROOF, 8, TAU, PI / 8.0)
+		var neck: float = cap * 0.3
+		var tip := Vector3(base.x, top + tent_h, base.z)
+		_kit.prism(rd * 0.17, neck, 8, tip, SURF_STONE)
+		_kit.revolve(_onion_profile(rd * 0.3, cap - neck), tip + Vector3(0, neck, 0), SURF_ROOF, 12)
+		_kit.spike(Vector2(rd * 0.06, rd * 0.06), spike,
+			tip + Vector3(0, cap, 0), SURF_TRIM)
+	else:
+		var onion_h: float = left - spike
+		_kit.revolve(_onion_profile(rd, onion_h), Vector3(base.x, top, base.z), SURF_ROOF, 12)
+		_kit.spike(Vector2(rd * 0.1, rd * 0.1), spike,
+			Vector3(base.x, top + onion_h, base.z), SURF_TRIM)
 
 
 ## A Gothic tower finishes in a true octagonal spire: a corbelled cornice with

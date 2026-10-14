@@ -22,6 +22,7 @@ const TRANSEPT_DEPTH_RATIO := 0.55   # transept depth along Z, x nave width
 const SPIRE_RISE_FACTOR := 2.2       # spire rise, x tower width x spire pitch
 const PYRAMID_RISE_FACTOR := 0.75    # pyramid tower roof rise, x tower width
 const BELFRY_RISE_FACTOR := 0.4      # belfry cap rise, x tower width
+const RUSSIAN_ONION_RISE_FACTOR := 1.0  # onion crown rise, x tower width
 const FLAT_CAP_RISE := 0.3           # flat tower gets a thin parapet slab
 const PINNACLE_RISE := 1.8           # shaft (1.2) + its little pyramid (0.6)
 const RIDGE_CAP := 0.25              # ridge timber sitting proud of the slabs
@@ -147,6 +148,19 @@ static func west_tower_sides(spec: ChurchSpec) -> Array[float]:
 	return []
 
 
+## Which finished crown a west tower takes, or &"" for the generic roof kinds.
+## Romanesque: a hipped four-faced cap. Russian: an onion on a drum, or a tent
+## on a drum where the style chose a spire.
+static func tower_crown_kind(spec: ChurchSpec) -> StringName:
+	if not spec.tower or spec.tower_roof == &"flat":
+		return &""
+	if spec.style == &"romanesque":
+		return &"hipped"
+	if spec.style == &"russian":
+		return &"tent" if spec.tower_roof == &"spire" else &"onion"
+	return &""
+
+
 ## Rise of the tower roof above the tower top, for every roof kind the builder
 ## emits. A spire also carries a pinnacle, which is part of the silhouette and
 ## so part of the height the sheet dimensions.
@@ -154,6 +168,9 @@ static func tower_roof_rise(spec: ChurchSpec) -> float:
 	if not spec.tower:
 		return 0.0
 	var tw: float = spec.tower_width
+	var crown: StringName = tower_crown_kind(spec)
+	if crown == &"onion":
+		return tw * RUSSIAN_ONION_RISE_FACTOR
 	match spec.tower_roof:
 		&"spire":
 			return tw * spec.spire_pitch * SPIRE_RISE_FACTOR + PINNACLE_RISE
@@ -524,6 +541,86 @@ static func chapel_reach_at(spec: ChurchSpec, i: int) -> float:
 	if not is_finite(best) or best <= 0.0:
 		best = spec.width / 2.0
 	return maxf(best - CHAPEL_LAP, 0.1)
+
+
+## The nave's clear interior in plan (x, z), inside the inner wall faces.
+## An alcove, a roof or a dressing may not put anything of its own in here.
+const NAVE_WALL_FACE := 0.36
+
+static func nave_interior(spec: ChurchSpec) -> Rect2:
+	return Rect2(-spec.width / 2.0 + NAVE_WALL_FACE, -spec.length / 2.0 + NAVE_WALL_FACE,
+		spec.width - NAVE_WALL_FACE * 2.0, spec.length - NAVE_WALL_FACE * 2.0)
+
+
+static func inside_nave(spec: ChurchSpec, p: Vector3, eps := 0.02) -> bool:
+	if nave_interior(spec).grow(-eps).has_point(Vector2(p.x, p.z)):
+		return true
+	if spec.apse and p.z > apse_springing_z(spec):
+		var rel := Vector2(p.x, p.z - apse_springing_z(spec))
+		return rel.length() < spec.apse_radius - NAVE_WALL_FACE - eps
+	return false
+
+
+## The parts of chord p0->p1, as [u0, u1] spans, that lie OUTSIDE the clear
+## interior: the nave rectangle and, when there is one, the apse half-disc.
+## `margin` > 0 shrinks the interior, < 0 grows it into the wall.
+static func outside_nave_spans(spec: ChurchSpec, p0: Vector3, p1: Vector3,
+		margin := 0.02) -> Array[Vector2]:
+	var inside: Array[Vector2] = []
+	var r: Rect2 = nave_interior(spec).grow(-margin)
+	var lo := 0.0
+	var hi := 1.0
+	var d := Vector2(p1.x - p0.x, p1.z - p0.z)
+	var o := Vector2(p0.x, p0.z)
+	var lows := [r.position.x, r.position.y]
+	var highs := [r.end.x, r.end.y]
+	var hit := true
+	for axis in range(2):
+		var da: float = d[axis]
+		if absf(da) < 0.00001:
+			if o[axis] <= lows[axis] or o[axis] >= highs[axis]:
+				hit = false
+			continue
+		var t0: float = (lows[axis] - o[axis]) / da
+		var t1: float = (highs[axis] - o[axis]) / da
+		lo = maxf(lo, minf(t0, t1))
+		hi = minf(hi, maxf(t0, t1))
+	if hit and lo < hi:
+		inside.append(Vector2(lo, hi))
+	if spec.apse:
+		var cz: float = apse_springing_z(spec)
+		var rad: float = spec.apse_radius - NAVE_WALL_FACE - margin
+		var rel := Vector2(o.x, o.y - cz)
+		var qa: float = d.dot(d)
+		var qb: float = 2.0 * rel.dot(d)
+		var qc: float = rel.dot(rel) - rad * rad
+		var disc: float = qb * qb - 4.0 * qa * qc
+		if qa > 0.00001 and disc > 0.0:
+			var t0: float = (-qb - sqrt(disc)) / (2.0 * qa)
+			var t1: float = (-qb + sqrt(disc)) / (2.0 * qa)
+			# only the half east of the springing plane belongs to the apse
+			if absf(d.y) > 0.00001:
+				var tz: float = (cz - o.y) / d.y
+				if d.y > 0.0:
+					t0 = maxf(t0, tz)
+				else:
+					t1 = minf(t1, tz)
+			elif o.y < cz:
+				t1 = t0 - 1.0
+			t0 = maxf(t0, 0.0)
+			t1 = minf(t1, 1.0)
+			if t0 < t1:
+				inside.append(Vector2(t0, t1))
+	inside.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+	var out: Array[Vector2] = []
+	var cursor := 0.0
+	for span in inside:
+		if span.x - cursor > 0.001:
+			out.append(Vector2(cursor, span.x))
+		cursor = maxf(cursor, span.y)
+	if 1.0 - cursor > 0.001:
+		out.append(Vector2(cursor, 1.0))
+	return out
 
 
 ## Nominal reach, used where a single representative value is wanted.
