@@ -207,7 +207,8 @@ static func _door(building) -> Vector3:
 ## Where a person can walk inside the building, as plain data in its own
 ## frame: one navigation mesh per storey, a link per stair, the exterior doors
 ## and the furniture's use points. `supported` is false for a family whose
-## interior walk is not published (everything without a HousePlan).
+## interior walk is not published (everything but the HousePlan families and
+## temples; see `BuildingFamilyAdapter.walk_sources`).
 static func navigation(building) -> Dictionary:
 	return BuildingNavigation.of(building)
 

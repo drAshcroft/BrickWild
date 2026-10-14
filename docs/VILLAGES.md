@@ -982,10 +982,21 @@ step onto. `HouseWalkSources.sources()` lists it beside the rasteriser it
 mirrors. Secret doors stay shut. Each stair links the centres of the landings
 the check climbs between.
 
-Churches, temples, castles (seats and monuments), windmills, bridges and
-trees return `{"supported": false}` and a null node: their interiors are
-walked by their own checks (the rite, castle routes and occupancy) and are
-not yet published. Walk them to the door.
+**Temples** (all four forms) are walked too: one storey at y 0 with no stairs,
+the floor and obstruction `TempleRiteCheck` feeds its WalkGrid
+(`TempleGeometry.walk_sources`, beside `floor_rects` / `obstacle_rects`). The
+gate is the single front door and the altar is the one `furniture[]` entry
+(`key: "altar"`, `use_m` on the gate's side). A family opts in through two
+`BuildingFamilyAdapter` methods, `walk_sources(building)` and
+`walk_frame(building)` (floor heights, stair links, doors, focus points);
+`BuildingNavigation` bakes whatever they publish. `twalk` holds it to the rite
+check cell by cell.
+
+Churches, castles (seats and monuments), windmills, bridges and trees return
+`{"supported": false}` and a null node: their interiors are walked by their
+own checks (castle routes and occupancy; a windmill has no walk check at all)
+and are not yet published. Walk them to the door. Todo
+`NAV-INTERIOR-OTHER-FAMILIES`.
 
 **Joining the street to the house.** The site `doors[i]` and the building's
 front door meet at the threshold. Add one two-way `NavigationLink3D` from the

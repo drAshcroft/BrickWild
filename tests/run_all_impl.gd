@@ -73,7 +73,7 @@ const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi"
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
 	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
-	"dmvbrief", "dmvimplied", "dmvwalk", "bwalk",
+	"dmvbrief", "dmvimplied", "dmvwalk", "bwalk", "twalk",
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest", "cas013",
 	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015", "cground",
@@ -144,7 +144,7 @@ const LANES: Dictionary = {
 	"lane:castle": ["castle", "cnormals", "cmassing", "clandmark", "cvoxelqa", "ctowerplan", "cmotteplan", "cmotteaccess", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried", "cterrace"],
 	"lane:church-change": ["churchroof", "churchchange"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
-	"lane:temple": ["temple", "rite"],
+	"lane:temple": ["temple", "rite", "twalk"],
 	# Same assertions as `temple`, split so no process nears the 300 s cap.
 	"lane:temple-contract": ["temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras"],
 	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "matkit"],
@@ -152,7 +152,7 @@ const LANES: Dictionary = {
 	"lane:bridge": ["bridge"],
 	"lane:windmill": ["windmill"],
 	"lane:dungeon": ["dungeon"],
-	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi", "bwalk"],
+	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi", "bwalk", "twalk"],
 	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "interior", "cvoxelqa", "library", "placement"],
 	"lane:sweep": ORDER,
 }
@@ -186,6 +186,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/site_walk_suite.gd").run()
 		"bwalk":
 			return preload("res://tests/suites/building_walk_suite.gd").run()
+		"twalk":
+			return preload("res://tests/suites/temple_walk_suite.gd").run()
 		"vnativeqa":
 			return preload("res://tests/suites/village_native_qa_suite.gd").run()
 		"vwater":

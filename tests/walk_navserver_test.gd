@@ -25,6 +25,7 @@ func _run() -> void:
 	for path in paths:
 		await _check_site(path)
 	await _check_house()
+	await _check_temples()
 	print("walk navserver: %d paths, %d failures" % [_checked, _failures.size()])
 	for f in _failures:
 		print("  FAIL ", f)
@@ -82,6 +83,30 @@ func _check_house() -> void:
 	if upstairs == 0:
 		_failures.append("townhouse: no furniture upstairs to walk to")
 	nav.queue_free()
+
+
+func _check_temples() -> void:
+	for c in [[&"basilica", &"blood", 26.0, 44.0, 12.0, 11], [&"pylon", &"flame", 24.0, 46.0, 12.0, 21],
+			[&"rotunda", &"void", 26.0, 26.0, 13.0, 41]]:
+		var building: GeneratedBuilding = BrickWild.generate(
+			BuildingRequest.temple(c[5], c[0], c[1], c[2], c[3], c[4]))
+		var data: Dictionary = BrickWild.navigation(building)
+		var nav: Node3D = BrickWild.navigation_node(building)
+		root.add_child(nav)
+		var map: RID = root.get_world_3d().navigation_map
+		NavigationServer3D.map_set_merge_rasterizer_cell_scale(map, MERGE_SCALE)
+		await _settle(map)
+		var gate: Array = data["doors"].filter(func(d: Dictionary) -> bool: return d["front"])[0]["inside_m"]
+		var from := Vector3(gate[0], gate[1], gate[2])
+		var altars := 0
+		for f in data["furniture"]:
+			altars += 1
+			_arrive(map, from, Vector3(f["use_m"][0], f["use_m"][1], f["use_m"][2]),
+				"temple %s %s" % [c[0], f["key"]])
+		if altars == 0:
+			_failures.append("temple %s: no altar to walk to" % c[0])
+		nav.queue_free()
+		await physics_frame
 
 
 func _arrive(map: RID, from: Vector3, to: Vector3, label: String) -> PackedVector3Array:

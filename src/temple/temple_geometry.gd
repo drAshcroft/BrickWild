@@ -1621,6 +1621,20 @@ static func obstacle_rects(spec: TempleSpec) -> Array[Rect2]:
 	return out
 
 
+## The walk `TempleRiteCheck._walk` rasterises, as outlines a navigation baker
+## can union: {0: {"floor": [...], "obstacles": [...]}}. A temple is one storey.
+## The floor is `floor_rects` and the obstruction is `obstacle_rects`, the same
+## two lists the check feeds its WalkGrid; change one, change the other.
+static func walk_sources(spec: TempleSpec) -> Dictionary:
+	var floor: Array[PackedVector2Array] = []
+	var obstacles: Array[PackedVector2Array] = []
+	for r in floor_rects(spec):
+		floor.append(Poly.from_rect(r))
+	for o in obstacle_rects(spec):
+		obstacles.append(Poly.from_rect(o))
+	return {0: {"floor": floor, "obstacles": obstacles}}
+
+
 # ---------------------------------------------------------------- envelope
 
 ## The dome and its surrounding deck share this exact polygonal rim.

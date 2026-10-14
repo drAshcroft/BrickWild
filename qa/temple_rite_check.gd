@@ -81,6 +81,12 @@ func _walk() -> void:
 	stats["walkable_area"] = snappedf(_grid.walkable_area(), 0.1)
 
 
+## The grid the last `check` walked, so a consumer of the same walk (the
+## public navigation mesh) can be judged cell by cell against it.
+func walk_grid() -> WalkGrid:
+	return _grid
+
+
 ## A picture of what the walker saw, with the gate, the altar and the idol
 ## marked. Reading a procession failure off the map takes a second; reading it
 ## off a list of coordinates does not.
