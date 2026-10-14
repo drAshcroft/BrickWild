@@ -156,7 +156,7 @@ walls. Images are not committed. Each id has a 2x2 sheet
 and singles `renders/<slug>__<view>.jpg`; `<slug>` is the id with `/` as `_`
 (for example `church_gothic_default_1`).
 
-Tallies: 31 accepted, 18 needs_changes (churches 10 / 14, temples 21 / 4).
+Tallies: 31 accepted, 18 needs_changes (churches 10 / 14, temples 21 / 4). After the 14 Oct stave pass: 34 accepted, 15 needs_changes (churches 13 / 11).
 Accepted means "reads as its family, the way in leads to the focus, the focus
 is visible from the entry". It does not mean "matches the design board"; the
 Gothic and basilica notes above still stand. Sparse floor in the temples and
@@ -182,10 +182,10 @@ procession; Focus = focal visibility from the entry image. The slug is
 | byzantine_default_8102 | yes: as small, with pilasters | door, aisle | pews both sides | altar clear | accepted |
 | byzantine_large_21325 | partly: dome pushed to the east end of a long barn body, flat flank | door in a blank gable, aisle | pews a distant cluster, bare floor before them unexplained | altar lost against the bright end wall | needs_changes: large size is a barn; dome not visible from the entry |
 | byzantine_default_1 | yes | door, aisle | pews both sides | altar clear | accepted |
-| nordic_stave_small_1 | no: pale stone-textured walls, a black stepped-block spire; no tiered shingle roofs, no dark timber, no dragon heads | door at the foot of the tower, aisle | pews both sides | altar clear, but in a pale plank hall | needs_changes: does not read as a stave church |
-| nordic_stave_default_8102 | no: as small | as small | pews both sides | altar clear at the end of a long plank hall | needs_changes: stave identity |
-| nordic_stave_large_21325 | no: stone-coloured box with a stepped spire | door, aisle into a huge hall | a distant pew cluster, bare floor unexplained | altar a glow on the far wall, hard to find | needs_changes: stave identity and large-size furnishing |
-| nordic_stave_default_1 | no: as small | as small | pews both sides | altar clear | needs_changes: stave identity |
+| nordic_stave_small_1 | yes, 14 Oct stave pass: tarred dark boards, steep shingle roofs, a three-tier tower of shingled hips ending in a needle spire with crossed boards, a covered svalgang along the flanks, dragon heads on the ridge ends. Still a west tower on a plain nave (no stepped nave roofs, no ridge turret) | door at the foot of the tower, aisle | pews both sides | altar clear in a dark plank hall | accepted: reads as a Scandinavian timber church, not a Borgund copy |
+| nordic_stave_default_8102 | yes: as small | as small | pews both sides | altar clear at the end of a long dark hall (dim) | accepted |
+| nordic_stave_large_21325 | yes outside: as small, svalgang runs the whole flank; nave roof still one big plane | door, aisle into a huge hall | a distant pew cluster, bare floor unexplained | altar small at the far end | needs_changes: large-size furnishing and entry scale only (identity fixed) |
+| nordic_stave_default_1 | yes: as small | as small | pews both sides | altar clear | accepted |
 | renaissance_small_1 | partly: dome with lantern, pilaster cornice; no pediment or orders | door with a small porch, aisle | pews both sides | altar clear under a round arch | accepted |
 | renaissance_default_8102 | partly: dome, lantern, twin stepped tower crowns, round-headed lights | door, aisle | pews both sides | altar clear | accepted |
 | renaissance_large_21325 | partly: rose window, dome and a lean-to roof read Italian; flank is a long blank wall | door, long aisle | pews begin well down a bare floor | altar lost | needs_changes: large size is a barn; altar not findable |
@@ -237,8 +237,11 @@ rebuilt afterwards.
    from the door, the west half of the floor is bare and not explained by the
    brief, and the altar is a washed-out speck. Furnishing and the entry
    station do not scale with nave length. 5 ids.
-2. Nordic stave never reads as stave: pale stone-textured walls, a black
-   stepped-block spire, no tiered shingle roofs or dark timber. 4 ids.
+2. Nordic stave never read as stave (pale stone-textured walls, a black
+   stepped-block spire). FIXED 14 Oct: tarred timber, a shingled three-tier
+   tower with a needle spire, a svalgang, dragon heads and crossed boards;
+   renders in artifacts/stave_20261014 (before/after). Left: no stepped nave
+   roofs or ridge turret; large size still has the furnishing fault in 1.
 3. Towers with an unfinished crown (flat deck, stepped red blocks, bare posts):
    Romanesque and Russian. Filed as SACRED-TOWER-CROWN.
 4. Russian nave interiors carry floating brown blocks. Filed as

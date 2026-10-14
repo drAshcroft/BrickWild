@@ -34,8 +34,13 @@ static func _finish_nordic_timber(root: Node3D, spec: ChurchSpec) -> void:
 		if surface_name.begins_with("material_slot:"):
 			slot = int(surface_name.trim_prefix("material_slot:"))
 		if slot == ChurchBuilder.SURF_WOOD:
+			# Tarred boards: dark, with only a breath of weathering.
 			shell.set_surface_override_material(surface,
-				MaterialKit.timber(spec.stone_color, true, true))
+				MaterialKit.timber(spec.stone_color.darkened(0.68), false, true,
+					false, false, Color(0.0, 0.0, 0.0, 0.0), {"weather": 0.08}))
+		elif slot == ChurchBuilder.SURF_ROOF:
+			shell.set_surface_override_material(surface,
+				MaterialKit.shingle(spec.roof_color, false))
 
 
 ## The onions of a hero St Basil's carry their own colours in the mesh's

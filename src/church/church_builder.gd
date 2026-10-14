@@ -4,14 +4,16 @@ extends MassBuilder
 ## apse (half-cylinder), west tower + roof, then window/door/trim detailing.
 ##
 ## Surfaces: 0 = stone/plinth, 1 = trim, 2 = roof, 3 = openings,
-##           4 = painted domes, 5 = Nordic stave timber.
+##           4 = painted domes. Nordic stave timber shares slot 0 with stone
+##           (the church suite requires exactly four mesh surfaces) and the
+##           assembler dresses that slot as tarred boards for a stave church.
 
 const SURF_STONE := 0
 const SURF_TRIM := 1
 const SURF_ROOF := 2
 const SURF_OPEN := 3
 const SURF_ACCENT := 4
-const SURF_WOOD := 5
+const SURF_WOOD := SURF_STONE
 
 ## How far attached masses penetrate the host wall, so they read as joined
 ## rather than floating beside it or swallowing the nave.
@@ -343,6 +345,8 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	_build_crossing_tower()
 	_build_dome()
 	preload("church_roofs.gd").emit(spec, _kit, mass_log, _roof_volumes)
+	_build_stave_skirt()
+	_build_stave_finials()
 
 	# The masons are finished; the parish moves in. The dressing is prop
 	# PLACEMENTS rather than geometry, so it costs the mesh nothing and
@@ -1467,6 +1471,9 @@ func _stepped_buttress(name: String, anchor: Vector3, outward: Vector3,
 ## requires exactly four). Both stay inside tower_roof_rise().
 func _tower_crown(base: Vector3, tw: float, rise: float) -> void:
 	var kind: StringName = ChurchGeometry.tower_crown_kind(spec)
+	if kind == &"stave":
+		_stave_crown(base, tw, rise)
+		return
 	var eave: float = minf(0.3, rise * 0.1)
 	host("tower_cornice")
 	_buttress_piece("cornice", Vector3(tw + 0.5, eave, tw + 0.5),
@@ -1507,6 +1514,160 @@ func _tower_crown(base: Vector3, tw: float, rise: float) -> void:
 		_kit.revolve(_onion_profile(rd, onion_h), Vector3(base.x, top, base.z), SURF_ROOF, 12)
 		_kit.spike(Vector2(rd * 0.1, rd * 0.1), spike,
 			Vector3(base.x, top + onion_h, base.z), SURF_TRIM)
+
+
+## A stave tower is a stack of steep shingle roofs: each one a flared four-sided
+## hip, a narrower timber band standing out of its crown, the next roof on that
+## band, three tiers diminishing to a slender needle with crossed finial boards.
+## Roofs take the roof surface and the bands the timber one, so the church keeps
+## its four mesh surfaces. The stack stays inside `rise`.
+func _stave_crown(base: Vector3, tw: float, rise: float) -> void:
+	var eave: float = 0.26
+	host("tower_cornice")
+	_buttress_piece("cornice", Vector3(tw + 0.5, eave, tw + 0.5),
+		base + Vector3(0, eave * 0.5, 0), SURF_TRIM)
+	host_end()
+	var y: float = base.y + eave + 0.03
+	var roof_w: float = tw + 0.7
+	var roof_f: Array[float] = [0.22, 0.15, 0.11]
+	var band_f: Array[float] = [0.07, 0.06, 0.0]
+	var band_w: Array[float] = [tw * 0.62, tw * 0.40, 0.0]
+	var top: float = y
+	for tier in range(3):
+		var roof_h: float = rise * roof_f[tier]
+		var circ: float = roof_w * 0.5 * sqrt(2.0)
+		# Flared eave: shallow at the foot, steep above, as a stave roof is.
+		_kit.revolve(PackedVector2Array([Vector2(circ, 0.0),
+			Vector2(circ * 0.80, roof_h * 0.14), Vector2(circ * 0.06, roof_h)]),
+			Vector3(base.x, y, base.z), SURF_ROOF, 4, TAU, PI / 4.0)
+		top = y + roof_h
+		if tier == 2:
+			break
+		var band_h: float = rise * band_f[tier]
+		var wall_y0: float = y + roof_h * 0.5
+		var wall_h: float = roof_h * 0.5 + band_h
+		host("stave_tier_%d" % tier)
+		component_box("tier_wall", Vector3(band_w[tier], wall_h, band_w[tier]),
+			Transform3D(Basis.IDENTITY, Vector3(base.x, wall_y0 + wall_h * 0.5, base.z)),
+			SURF_WOOD)
+		host_end()
+		y = wall_y0 + wall_h + 0.03
+		roof_w = band_w[tier] + 0.6
+	# The needle rises out of the crown of the top roof.
+	var spire_h: float = rise * 0.30
+	var spire_r: float = maxf(tw * 0.06, 0.16)
+	var spire_y: float = top - rise * roof_f[2] * 0.2
+	_kit.revolve(PackedVector2Array([Vector2(spire_r, 0.0),
+		Vector2(spire_r * 0.55, spire_h * 0.55), Vector2(0.02, spire_h)]),
+		Vector3(base.x, spire_y, base.z), SURF_ROOF, 4, TAU, PI / 4.0)
+	_stave_cross_boards(Vector3(base.x, spire_y + spire_h - 0.1, base.z),
+		Vector3.BACK, clampf(tw * 0.14, 0.5, 0.9), "spire_cross_z")
+	_stave_cross_boards(Vector3(base.x, spire_y + spire_h - 0.1, base.z),
+		Vector3.RIGHT, clampf(tw * 0.14, 0.5, 0.9), "spire_cross_x")
+
+
+## Two boards crossed over a gable apex, in the plane across `dir`: the
+## "crossed gables" a stave church sets on its roof ends.
+func _stave_cross_boards(apex: Vector3, dir: Vector3, s: float, role: String) -> void:
+	var side: Vector3 = Vector3.UP.cross(dir)
+	var frame := Basis(side, Vector3.UP, dir)
+	host("stave_finial")
+	for k in [-1.0, 1.0]:
+		var xf := Transform3D(Basis(dir, k * 0.42) * frame,
+			apex + Vector3.UP * (0.5 * s) + dir * 0.02)
+		component_box(role, Vector3(0.14 * s, 2.0 * s, 0.14 * s), xf, SURF_WOOD)
+	host_end()
+
+
+## A dragon's head on the end of a ridge: a neck rising and curving outward, a
+## head with a lower jaw, a swept-back horn. `dir` points out along the ridge.
+func _stave_dragon_head(anchor: Vector3, dir: Vector3, s: float, role: String) -> void:
+	var frame := Basis(dir, Vector3.UP, dir.cross(Vector3.UP))
+	var zaxis: Vector3 = dir.cross(Vector3.UP)
+	host("dragon_head")
+	var neck_to: Vector3 = anchor + dir * (0.5 * s) + Vector3.UP * (1.1 * s)
+	var pieces: Array = [
+		["%s_neck" % role, anchor, neck_to, Vector2(0.24, 0.24) * s],
+		["%s_head" % role, neck_to, neck_to + dir * (0.95 * s) + Vector3.DOWN * (0.12 * s),
+			Vector2(0.26, 0.22) * s],
+		["%s_jaw" % role, neck_to + dir * (0.05 * s) + Vector3.DOWN * (0.22 * s),
+			neck_to + dir * (0.8 * s) + Vector3.DOWN * (0.40 * s), Vector2(0.12, 0.16) * s],
+		["%s_horn" % role, neck_to - dir * (0.05 * s),
+			neck_to + Vector3.UP * (0.55 * s) - dir * (0.35 * s), Vector2(0.1, 0.1) * s]]
+	for piece in pieces:
+		var a: Vector3 = piece[1]
+		var b: Vector3 = piece[2]
+		var d: Vector3 = b - a
+		var along: float = d.dot(dir)
+		var lift: float = d.y
+		var bas := Basis(zaxis, atan2(lift, along)) * frame
+		var thick: Vector2 = piece[3]
+		component_box(String(piece[0]), Vector3(d.length(), thick.x, thick.y),
+			Transform3D(bas, (a + b) * 0.5), SURF_WOOD)
+	host_end()
+
+
+## The svalgang: a shingled lean-to round the nave flanks on slender posts, a
+## wall plate along its outer edge and a low rail between the posts.
+func _build_stave_skirt() -> void:
+	var skirt: Dictionary = ChurchGeometry.stave_skirt(spec)
+	if skirt.is_empty():
+		return
+	tag("svalgang")
+	var w: float = spec.width
+	var eave: float = skirt["eave"]
+	var top: float = skirt["top"]
+	var reach: float = skirt["reach"]
+	var z0: float = skirt["z0"]
+	var z1: float = skirt["z1"]
+	var post: float = ChurchGeometry.STAVE_SKIRT_POST
+	var count: int = maxi(int(ceil((z1 - z0) / 2.4)), 2)
+	for side in [-1.0, 1.0]:
+		var x_in: float = side * (w * 0.5 - 0.1)
+		var x_out: float = side * (w * 0.5 + reach)
+		_kit.slab_poly(PackedVector3Array([Vector3(x_in, top, z0), Vector3(x_out, eave, z0),
+			Vector3(x_out, eave, z1), Vector3(x_in, top, z1)]),
+			RoofShape.DEPTH, SURF_ROOF, true)
+		var px: float = x_out - side * 0.15
+		host("svalgang_%s" % ("left" if side < 0.0 else "right"))
+		for i in range(count + 1):
+			var pz: float = lerpf(z0 + post * 0.5, z1 - post * 0.5, float(i) / count)
+			component_box("svalgang_post", Vector3(post, eave - 0.1, post),
+				Transform3D(Basis.IDENTITY, Vector3(px, (eave - 0.1) * 0.5, pz)), SURF_WOOD)
+		component_box("svalgang_plate", Vector3(post * 1.1, 0.22, z1 - z0),
+			Transform3D(Basis.IDENTITY, Vector3(px, eave - 0.32, (z0 + z1) * 0.5)), SURF_WOOD)
+		component_box("svalgang_rail", Vector3(post * 0.5, 0.12, z1 - z0),
+			Transform3D(Basis.IDENTITY, Vector3(px, 1.0, (z0 + z1) * 0.5)), SURF_WOOD)
+		component_box("svalgang_sill", Vector3(post * 0.9, 0.16, z1 - z0),
+			Transform3D(Basis.IDENTITY, Vector3(px, 0.08, (z0 + z1) * 0.5)), SURF_WOOD)
+		host_end()
+
+
+## Dragon heads and crossed boards on the ridge ends of the nave and transept.
+func _build_stave_finials() -> void:
+	if spec.style != &"nordic_stave" or spec.hero != &"":
+		return
+	tag("finials")
+	var s: float = clampf(spec.width * 0.16, 1.0, 2.0)
+	var h: float = spec.height
+	var nave_ridge: float = h + spec.width * spec.roof_pitch
+	var ends: Array = []
+	if spec.transept:
+		var rise: float = spec.width * spec.roof_pitch * 0.9
+		var half: float = spec.transept_len * 0.5 + ChurchGeometry.ROOF_EAVE_Z * 0.5
+		ends.append([Vector3(half, h + rise, ChurchGeometry.transept_center_z(spec)), Vector3.RIGHT])
+		ends.append([Vector3(-half, h + rise, ChurchGeometry.transept_center_z(spec)), Vector3.LEFT])
+	else:
+		ends.append([Vector3(0.0, nave_ridge, spec.length * 0.5 + ChurchGeometry.ROOF_EAVE_Z * 0.5),
+			Vector3.BACK])
+	if not spec.tower:
+		ends.append([Vector3(0.0, nave_ridge, -spec.length * 0.5 - ChurchGeometry.ROOF_EAVE_Z * 0.5),
+			Vector3.FORWARD])
+	for i in range(ends.size()):
+		var anchor: Vector3 = ends[i][0]
+		var dir: Vector3 = ends[i][1]
+		_stave_dragon_head(anchor, dir, s, "dragon_%d" % i)
+		_stave_cross_boards(anchor - dir * (0.9 * s), dir, s * 0.8, "gable_cross_%d" % i)
 
 
 ## A Gothic tower finishes in a true octagonal spire: a corbelled cornice with

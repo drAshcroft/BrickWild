@@ -156,9 +156,35 @@ static func tower_crown_kind(spec: ChurchSpec) -> StringName:
 		return &""
 	if spec.style == &"romanesque":
 		return &"hipped"
+	if spec.style == &"nordic_stave":
+		return &"stave"
 	if spec.style == &"russian":
 		return &"tent" if spec.tower_roof == &"spire" else &"onion"
 	return &""
+
+
+## The svalgang of a stave church: a low covered walk round the nave, a lean-to
+## roof from `top` on the nave wall down to `eave` on a row of posts `reach`
+## out. It runs along both flanks from the west tower to the crossing (or the
+## apse). Empty when the nave is too low to keep its lights above it, or too
+## short to be worth the posts.
+const STAVE_SKIRT_EAVE := 2.3
+const STAVE_SKIRT_TOP := 3.1
+const STAVE_SKIRT_REACH := 1.5
+const STAVE_SKIRT_SILL_GAP := 0.35
+const STAVE_SKIRT_POST := 0.24
+
+static func stave_skirt(spec: ChurchSpec) -> Dictionary:
+	if spec.style != &"nordic_stave" or spec.height < 6.2 or spec.hero != &"":
+		return {}
+	var z0: float = -spec.length / 2.0 + TOWER_EMBED + 0.2
+	var z1: float = spec.length / 2.0 - 0.2
+	if spec.transept:
+		z1 = transept_front_z(spec) - 0.2
+	if z1 - z0 < 3.5:
+		return {}
+	return {"eave": STAVE_SKIRT_EAVE, "top": STAVE_SKIRT_TOP,
+		"reach": STAVE_SKIRT_REACH, "z0": z0, "z1": z1}
 
 
 ## Rise of the tower roof above the tower top, for every roof kind the builder
@@ -1025,6 +1051,13 @@ static func nave_bay_windows(spec: ChurchSpec) -> Array[Dictionary]:
 	if opening_height < 1.4:
 		return out
 	sill = minf(sill, maxf(spec.height - opening_height - 0.6, 0.0))
+	# A stave church's lights sit ABOVE its covered svalgang, not behind it.
+	var skirt: Dictionary = stave_skirt(spec)
+	if not skirt.is_empty():
+		sill = float(skirt["top"]) + STAVE_SKIRT_SILL_GAP
+		opening_height = minf(opening_height, spec.height - sill - 0.7)
+		if opening_height < 1.2:
+			return out
 	var support_width: float = maxf(BUTTRESS_FACE, nave_pier_width(spec))
 	for i in range(supports.size() - 1):
 		var left: float = supports[i]

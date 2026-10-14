@@ -138,6 +138,12 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 
 	spec.corner_turrets = spec.style == &"gothic" and GeneratorRandom.chance(r, 0.5)
 	spec.string_course = GeneratorRandom.chance(r, 0.7)
+	# A timber church has no stone buttresses; its svalgang stands there.
+	if spec.style == &"nordic_stave":
+		spec.buttresses = false
+		spec.buttress_count_per_side = 0
+		# ...and its nave roof is steep: a stave roof sheds snow, not a hipped hall.
+		spec.roof_pitch = maxf(spec.roof_pitch, 0.85)
 
 	var first: String = GeneratorRandom.pick(r, FIRST_WORDS).trim_suffix(".")
 	var second: String = GeneratorRandom.pick(r, SECOND_WORDS)
