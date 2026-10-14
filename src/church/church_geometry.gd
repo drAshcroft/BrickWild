@@ -309,7 +309,8 @@ static func clerestory_windows(spec: ChurchSpec) -> Array[Dictionary]:
 	var sill: float = aisle_roof_high(spec) + RoofShape.DEPTH + 0.18
 	var head: float = spec.height - 0.22
 	var band: float = head - sill
-	var width: float = minf(pitch * 0.48, band * 0.7)
+	var pitch_share: float = 0.64 if spec.style == &"gothic" else 0.48
+	var width: float = minf(pitch * pitch_share, band * (0.8 if spec.style == &"gothic" else 0.7))
 	var crown: float = width * (0.35 if spec.window_style == &"pointed" else 0.25)
 	var height: float = band - crown
 	if width < 0.2 or height < 0.25:
@@ -905,7 +906,7 @@ static func nave_bay_windows(spec: ChurchSpec) -> Array[Dictionary]:
 			minimum_width = 1.45
 		&"gothic":
 			sill = 1.25
-			target_height = maxf(2.6, minf(spec.height * 0.30, 4.0))
+			target_height = maxf(3.4, minf(spec.height * 0.46, 6.5))
 			minimum_width = 1.3
 		&"byzantine":
 			sill = 1.1
@@ -939,7 +940,8 @@ static func nave_bay_windows(spec: ChurchSpec) -> Array[Dictionary]:
 		var usable: float = pitch - support_width - reveal_allowance
 		if usable < 0.9:
 			continue
-		var opening_width: float = minf(maxf(spec.window_w, minimum_width), usable * 0.72)
+		var width_share: float = 0.86 if spec.style == &"gothic" else 0.72
+		var opening_width: float = minf(maxf(spec.window_w, minimum_width), usable * width_share)
 		if opening_width < 0.8:
 			continue
 		out.append({"z": (left + right) * 0.5, "width": opening_width,

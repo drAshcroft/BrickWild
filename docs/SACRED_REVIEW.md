@@ -100,3 +100,38 @@ Gothic exterior (true spire, traceried windows, pinnacled buttresses), the
 basilica's plain flank and low roof (colour or relief per bay, a clerestory
 hip), a roof-on look at all 49 matrix ids, and focal visibility from the
 congregation zone as an image.
+
+## Gothic exterior pass (2026-10-14, second increment)
+
+Changed (src/church/church_builder.gd, church_geometry.gd), Gothic only:
+
+* The tower roof (`spire` and `pyramid`) is now `_gothic_spire`: a corbelled
+  cornice, four corner pinnacles, a short octagonal drum, then an eight-faced
+  tapering spire (five-ring profile, true apex) with crockets on the ridges.
+  Same total rise as before, so `tower_roof_rise()` and the height contract are
+  unchanged. The box-stepped "ziggurat" spire and the stepped twin-tower caps
+  are gone.
+* Clerestory lights are wider (64% of the bay pitch, band-limited) and nave bay
+  lights taller and wider (to 46% of nave height); both are still cut through
+  the wall surface by the existing opening path.
+* A flyerless Gothic nave gets a pinnacle on each stepped buttress; with flying
+  buttresses the flyer pier pinnacles already carry the line and the arcs cross
+  that cap, so none is added.
+
+Renders (roof on, front / side / rear), before in
+`artifacts/gothic_20261014/before/`, after in `artifacts/gothic_20261014/after/`,
+ids `church/gothic/default/1` and `church/gothic/large/21325`.
+
+Verdict, honest: the silhouette is now Gothic. Default 1 reads as a church with
+a spire instead of a stack of blocks, and the large twin-tower west front now
+ends in pinnacled octagonal caps. The large clerestory is visibly glazed. It is
+STILL short of the design board: walls remain smooth pale stone with no rubble
+or relief, the windows have no tracery (a pointed head and nothing in it), the
+default-1 aisle lights barely changed (band-limited), the chevet is plain
+cylinders against the board's faceted pinnacled chevet, and there is no
+parapet or pinnacle line along the nave eaves. Not accepted as complete.
+
+Receipts: lane:church-change 5926 checks / 0 failures / 16 warnings (12 known
+opening + 4 sacredseq); visible coplanar overlaps (church warnings, not
+budgeted for churches) Gothic small/default8102/large/default1 before
+69/74/77/72, after 69/78/77/74.

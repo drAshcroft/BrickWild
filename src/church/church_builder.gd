@@ -186,10 +186,17 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 		match spec.tower_roof:
 			&"spire":
 				var sp: float = tw * spec.spire_pitch * ChurchGeometry.SPIRE_RISE_FACTOR
-				_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, sp, SURF_ROOF, true)
-				pinnacle(Vector3(lx, th + sp, lz), ChurchGeometry.ornament_scale(spec))
+				if spec.style == &"gothic":
+					_gothic_spire(Vector3(lx, th, lz), tw, sp)
+				else:
+					_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, sp, SURF_ROOF, true)
+				pinnacle(Vector3(lx, th + sp - (0.05 if spec.style == &"gothic" else 0.0), lz),
+					ChurchGeometry.ornament_scale(spec))
 			&"pyramid":
-				_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, rise, SURF_ROOF, false)
+				if spec.style == &"gothic":
+					_gothic_spire(Vector3(lx, th, lz), tw, rise)
+				else:
+					_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, rise, SURF_ROOF, false)
 			&"belfry":
 				_pyramid_roof(Vector3(lx, th, lz), tw + 0.5, rise, SURF_ROOF, false)
 				for cx_v in [-1.0, 1.0]:
@@ -212,6 +219,14 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 				_stepped_buttress("nave_%s_%d" % ["left" if side_v < 0.0 else "right", i],
 					Vector3(side_v * w / 2.0, 0.0, bz), Vector3(side_v, 0.0, 0.0),
 					h * 0.72, bd, ChurchGeometry.BUTTRESS_FACE, false)
+				# Flying buttresses carry their own pier pinnacles and their arcs
+				# cross this cap; only a flyerless Gothic nave takes one here.
+				if spec.style == &"gothic" and not spec.flying_buttresses:
+					var cap_d: float = bd * 0.44
+					var course: float = clampf(h * 0.72 * 0.012, 0.12, 0.28)
+					pinnacle(Vector3(side_v * (w / 2.0 + cap_d / 2.0
+						- ChurchGeometry.BUTTRESS_INSET), h * 0.72 + course * 0.5 - 0.03, bz),
+						ChurchGeometry.ornament_scale(spec) * 0.5)
 		if spec.tower:
 			var tw2: float = spec.tower_width
 			var th2: float = spec.tower_height
@@ -1406,6 +1421,48 @@ func _stepped_buttress(name: String, anchor: Vector3, outward: Vector3,
 				+ Vector3.UP * y, SURF_TRIM)
 	host_end()
 
+
+## A Gothic tower finishes in a true octagonal spire: a corbelled cornice with
+## four corner pinnacles, a short octagonal drum, then eight tapering faces
+## whose ridges carry crockets. The whole stack stays inside `rise` (the same
+## height the old stepped pyramid used), so tower_roof_rise() is unchanged.
+func _gothic_spire(base: Vector3, tw: float, rise: float) -> void:
+	var orn: float = ChurchGeometry.ornament_scale(spec)
+	var cornice_h: float = 0.3
+	var cornice_w: float = tw + 0.5
+	host("tower_cornice")
+	_buttress_piece("cornice", Vector3(cornice_w, cornice_h, cornice_w),
+		base + Vector3(0, cornice_h * 0.5, 0), SURF_TRIM)
+	host_end()
+	var pin: float = orn * 0.55
+	var inset: float = cornice_w * 0.5 - 0.22 * pin - 0.05
+	for cx_v in [-1.0, 1.0]:
+		for cz_v in [-1.0, 1.0]:
+			pinnacle(base + Vector3(cx_v * inset, cornice_h - 0.04, cz_v * inset), pin)
+	# Corner pinnacles are 1.8*pin tall; the spire starts above the cornice.
+	var y0: float = base.y + cornice_h
+	var drum_h: float = rise * 0.16
+	var r_flat: float = tw * 0.5 - 0.1                  # apothem of the drum
+	var circ: float = r_flat / cos(PI / 8.0)             # circumradius
+	_kit.revolve(PackedVector2Array([Vector2(circ, 0.0), Vector2(circ * 0.96, drum_h)]),
+		Vector3(base.x, y0, base.z), SURF_STONE, 8, TAU, PI / 8.0)
+	var spire_h: float = rise - cornice_h - drum_h
+	var profile := PackedVector2Array([
+		Vector2(circ * 1.04, 0.0), Vector2(circ * 0.80, spire_h * 0.30),
+		Vector2(circ * 0.52, spire_h * 0.62), Vector2(circ * 0.24, spire_h * 0.88),
+		Vector2(0.0, spire_h)])
+	var sc := Vector3(base.x, y0 + drum_h, base.z)
+	_kit.revolve(profile, sc, SURF_ROOF, 8, TAU, PI / 8.0)
+	# Crockets on the eight ridges, one per interior profile ring.
+	host("spire_crockets")
+	for k in range(8):
+		var a: float = PI / 8.0 + float(k) * PI / 4.0
+		for j in range(1, 4):
+			var ring: Vector2 = profile[j]
+			var p := sc + Vector3(cos(a) * ring.x, ring.y, sin(a) * ring.x)
+			_buttress_piece("crocket_%d_%d" % [k, j],
+				Vector3(0.2 * pin, 0.34 * pin, 0.2 * pin), p, SURF_TRIM)
+	host_end()
 
 func _buttress_piece(role: String, size: Vector3, pos: Vector3, surf: int) -> void:
 	_log_part("box", pos, size)
