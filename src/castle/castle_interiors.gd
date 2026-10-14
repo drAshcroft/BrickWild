@@ -25,9 +25,18 @@ static func primary(spec: CastleSpec) -> Dictionary:
 					jog_boxes.append(out[id].bounds)
 					var against: Array[AABB] = [shaft, steps]
 					drop_buried_windows(spec, out[id], against)
+					# A jog's stair stacks solid steps against its wall: a window
+					# opening onto them looks at masonry.
+					drop_stair_windows(out[id], 1.2, false)
 					restore_daylight(out[id], against)
 			if not jog_boxes.is_empty():
 				drop_buried_windows(spec, out["tower_house"], jog_boxes)
+			# The shaft's own stairs hug a wall; a window planned at that wall's
+			# middle opens onto the solid flight (faceted wizard shafts most).
+			var shaft_walls: Array[AABB] = jog_boxes.duplicate()
+			shaft_walls.append(steps)
+			if drop_stair_windows(out["tower_house"], 1.2, false) > 0:
+				restore_daylight(out["tower_house"], shaft_walls)
 		return out
 	if CastleGeometry.is_motte(spec):
 		var shell_plan: HousePlan = CastleMottePlan.generate(spec, true)

@@ -975,6 +975,8 @@ func _build_exterior_walls() -> void:
 	tag("wall")
 	var h: float = spec.height
 	for level in _levels():
+		if _open_air_storey(level):
+			continue
 		var y0 := float(level) * h
 		var surf: int = SURF_FLOOR if (spec.stone_ground_floor and level == 0) else SURF_WALL
 		for run in HouseGeometry.shell_runs(plan, level):
@@ -1572,6 +1574,16 @@ func _emit_floor_round_courts(r: Rect2, y0: float, t: float, level: int,
 
 
 ## The shaped room on `level`, or -1 when that storey is rectangular.
+## A storey that is a deck under the sky (a tower house's roof platform): the
+## room carries `open_air`, so the floor is laid and no walls are raised round
+## it. The caller's roof or parapet is its own business.
+func _open_air_storey(level: int) -> bool:
+	for room in plan.rooms:
+		if HousePlan.record_storey(room) == level and bool(room.get("open_air", false)):
+			return true
+	return false
+
+
 func _shaped_room(level: int) -> int:
 	for i in range(plan.room_count()):
 		if HousePlan.record_storey(plan.rooms[i]) == level and plan.is_polygonal(i):

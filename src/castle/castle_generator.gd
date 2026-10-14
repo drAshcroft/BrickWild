@@ -633,6 +633,10 @@ static func _fit_tower_house(spec: CastleSpec, r: RandomNumberGenerator) -> void
 	# leave an interior
 	spec.wall_thickness = clampf(spec.wall_thickness, 0.6, minf(spec.width, spec.length) * 0.15)
 	spec.merlon_h = clampf(spec.height * 0.03, 0.5, 1.2)
+	# A jog that the entrance steps would leave too narrow to hold a room is
+	# not a jog: the shaft stands alone rather than carry a closet.
+	if spec.jog != &"none" and CastleGeometry.tower_jog_width(spec) < CastleGeometry.TOWER_JOG_MIN_W:
+		spec.jog = &"none"
 
 
 static func _fit_sky(spec: CastleSpec) -> void:

@@ -688,10 +688,18 @@ func _build_tower_house() -> void:
 		_log_mass("storey_%d" % s, a)
 	tag("platform")
 	var p: AABB = CastleGeometry.tower_platform_aabb(spec)
+	# The deck is the planned roof_platform room: open sky inside the wall
+	# heads. A solid slab here filled the stair well and the standing room, so
+	# with a plan the platform is the parapet ring over the walls only.
+	var deck_wall: float = CastleGeometry.tower_wall_thickness(spec, n - 1)
 	if spec.style == &"wizard":
+		var ring_t: float = minf(p.size.x, p.size.z) * 0.49
+		if planned_tower:
+			ring_t = CastleGeometry.TOWER_PLATFORM_OVER + deck_wall
 		_kit.oval_ring(p.position + Vector3(p.size.x / 2.0, 0.0, p.size.z / 2.0),
-			p.size.x / 2.0, p.size.z / 2.0, minf(p.size.x, p.size.z) * 0.49,
-			p.size.y, SURF_STONE, 24)
+			p.size.x / 2.0, p.size.z / 2.0, ring_t, p.size.y, SURF_STONE, 24)
+	elif planned_tower:
+		_platform_parapet(p, CastleGeometry.TOWER_PLATFORM_OVER + deck_wall)
 	else:
 		_box_aabb(p, SURF_STONE)
 	_log_mass("platform", p)
@@ -780,13 +788,31 @@ func _build_tower_house() -> void:
 		j += 1
 
 
+## The wall-head course of a tower house's roof, as four slabs round an open
+## deck: `rim` is how far the course reaches in from the platform's edge.
+func _platform_parapet(p: AABB, rim: float) -> void:
+	var inner_x0: float = p.position.x + rim
+	var inner_x1: float = p.position.x + p.size.x - rim
+	var inner_z0: float = p.position.z + rim
+	var inner_z1: float = p.position.z + p.size.z - rim
+	var y: float = p.position.y
+	_box_aabb(AABB(Vector3(p.position.x, y, p.position.z),
+		Vector3(p.size.x, p.size.y, rim)), SURF_STONE)
+	_box_aabb(AABB(Vector3(p.position.x, y, inner_z1),
+		Vector3(p.size.x, p.size.y, rim)), SURF_STONE)
+	_box_aabb(AABB(Vector3(p.position.x, y, inner_z0),
+		Vector3(rim, p.size.y, inner_z1 - inner_z0)), SURF_STONE)
+	_box_aabb(AABB(Vector3(inner_x1, y, inner_z0),
+		Vector3(rim, p.size.y, inner_z1 - inner_z0)), SURF_STONE)
+
+
 ## A short, physical stair from the terrain to the raised tower entrance.  The
 ## rows are appended far-to-near so route QA can verify the chain without
 ## reconstructing it from a mass AABB.
 func _tower_approach_steps(t: AABB, sill: float, door_xz: Vector2) -> void:
 	var count := maxi(4, int(ceil(sill / 0.28)))
 	var depth := clampf(maxf(t.size.z * 0.08, 0.8), 0.8, 1.5)
-	var width := clampf(maxf(t.size.x * 0.28, 2.0), 2.0, 3.6)
+	var width := CastleGeometry.tower_approach_width(spec)
 	for i in range(count):
 		var h := sill * float(i + 1) / float(count)
 		var centre := Vector3(door_xz.x,

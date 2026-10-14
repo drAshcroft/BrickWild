@@ -349,6 +349,8 @@ const TOWER_PLATFORM_OVER := 0.3   # its machicolated overhang
 const TOWER_JOG_W := 0.45          # jog width, x tower width
 const TOWER_JOG_D := 0.4           # jog projection, x tower length
 const TOWER_JOG_H := 0.85          # jog height, x tower height
+const TOWER_JOG_MIN_W := 2.6       # narrowest jog that still holds a room
+const TOWER_APPROACH_MARGIN := 0.5 # air between the approach steps and a jog
 const WIZARD_BALCONY_WIDTH := 1.25
 const WIZARD_BALCONY_ARC := TAU * 0.72
 const WIZARD_BALCONY_THICK := 0.28
@@ -431,6 +433,40 @@ static func tower_door_sill(spec: CastleSpec) -> float:
 	return clampf(minf(storey, 4.0), TOWER_LIFT_MIN, fit)
 
 
+## Width of the stair of steps that climbs to the raised door.
+static func tower_approach_width(spec: CastleSpec) -> float:
+	var t: AABB = tower_house_aabb(spec)
+	return clampf(maxf(t.size.x * 0.28, 2.0), 2.0, 3.6)
+
+
+## Local x of the raised door and the steps below it. A front jog stands on the
+## right of the front wall; a door in the middle of that wall would open into
+## the jog's masonry and its steps would run along the jog's flank. So the
+## entrance slides left until the steps clear the jog, as far as the front
+## chord allows (`tower_jog_width` takes in the jog by whatever remains).
+static func tower_entry_x(spec: CastleSpec) -> float:
+	if spec.jog != &"l" and spec.jog != &"z":
+		return 0.0
+	var t: AABB = tower_house_aabb(spec)
+	var jog_x0: float = t.end.x - t.size.x * TOWER_JOG_W
+	var wanted: float = jog_x0 - TOWER_APPROACH_MARGIN - tower_approach_width(spec) * 0.5
+	var foot: float = spec.wall_thickness * TOWER_FOOT_RATIO
+	var limit: float = -(t.size.x * 0.5 - foot - 0.7 - 0.4)
+	return clampf(minf(0.0, wanted), minf(limit, 0.0), 0.0)
+
+
+## Width of each jog: the nominal one, narrowed so the approach steps keep
+## their margin. Below TOWER_JOG_MIN_W the generator drops the jog altogether.
+static func tower_jog_width(spec: CastleSpec) -> float:
+	var t: AABB = tower_house_aabb(spec)
+	var nominal: float = t.size.x * TOWER_JOG_W
+	if spec.jog != &"l" and spec.jog != &"z":
+		return nominal
+	var free: float = t.end.x - (tower_entry_x(spec) + tower_approach_width(spec) * 0.5
+		+ TOWER_APPROACH_MARGIN)
+	return minf(nominal, free)
+
+
 ## The jog: an L plan has one block off the front-right corner, projecting
 ## toward the gate and sharing the front wall; a Z plan adds its mirror off
 ## the back-left corner. Each laps the shaft by WING_LAP.
@@ -439,7 +475,7 @@ static func tower_jog_aabbs(spec: CastleSpec) -> Array[AABB]:
 	if spec.jog != &"l" and spec.jog != &"z":
 		return out
 	var t: AABB = tower_house_aabb(spec)
-	var jw: float = t.size.x * TOWER_JOG_W
+	var jw: float = tower_jog_width(spec)
 	var jd: float = t.size.z * TOWER_JOG_D
 	var jh: float = t.size.y * TOWER_JOG_H
 	out.append(AABB(Vector3(t.position.x + t.size.x - jw, 0.0,
