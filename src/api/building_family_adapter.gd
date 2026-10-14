@@ -382,6 +382,15 @@ class CastleFamily extends BuildingFamilyAdapter:
 	func build_mesh(building) -> ArrayMesh:
 		return CastleBuilder.new().build(building.spec as CastleSpec)
 
+	## The ward ground and the ranges' floors, joined by the doors, the keep's
+	## forebuilding stair and the ranges' own stairs. Empty for the castles that
+	## `CastleWalkSources` does not walk (see its header).
+	func walk_sources(building) -> Dictionary:
+		return CastleWalkSources.sources(building.spec as CastleSpec)
+
+	func walk_frame(building) -> Dictionary:
+		return CastleWalkSources.frame(building.spec as CastleSpec)
+
 	func instantiate(building, cutaway: bool) -> Node3D:
 		return CastleAssembler.build(building.spec as CastleSpec, cutaway)
 

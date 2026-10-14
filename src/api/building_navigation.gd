@@ -12,10 +12,12 @@ extends RefCounted
 ## Families that keep a HousePlan (houses, shops, hotels) are walked, and so is
 ## any family whose adapter publishes `walk_sources` / `walk_frame` (temples:
 ## the floor and obstruction `TempleRiteCheck` walks; churches: nave, aisles
-## and west doors less piers and dressing). Castles,
-## windmills, bridges and trees report `supported: false`: their walks live in
-## their own checks and are not yet published (see docs/VILLAGES.md,
-## "Walking inside").
+## and west doors less piers and dressing; walled castles: the ward and each
+## range as storeys, a door a link). The mural towers and wall walk of a castle
+## are not walked yet, and manors, tower houses, mottes, ridge, sky and
+## terraced castles and a castle with a barbican, windmills, bridges and trees
+## report `supported: false`: their walks live in their own checks and are not
+## yet published (see docs/VILLAGES.md, "Walking inside").
 
 const SCHEMA := "brickwild.building_walk"
 const SCHEMA_VERSION := 1

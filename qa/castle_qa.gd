@@ -814,17 +814,10 @@ static func _walk_obstacles(grid: WalkGrid, actual: ArrayMesh) -> int:
 static func _walk_props(grid: WalkGrid, placements: Array[Dictionary]) -> int:
 	var count := 0
 	for prop in placements:
-		var key := String(prop.key)
-		if not PropCatalog.blocks_floor(key):
+		var rect := CastleWalkSources.prop_rect(prop)
+		if rect.size.x <= 0.0 and rect.size.y <= 0.0:
 			continue
-		var scale := float(prop.scale)
-		var size := PropCatalog.size(key) * scale
-		var centre := Vector3(prop.pos) + PropCatalog.centre_offset(key) * scale
-		if centre.y + size.y * 0.5 <= WalkGrid.MAX_STEP or centre.y - size.y * 0.5 >= 1.8:
-			continue
-		var span := PropCatalog.footprint_rotated(key, float(prop.yaw)) * scale
-		var plan_centre := PropCatalog.plan_centre(key, Vector3(prop.pos), float(prop.yaw), scale)
-		grid.add_obstacle(Rect2(plan_centre - span * 0.5, span))
+		grid.add_obstacle(rect)
 		count += 1
 	return count
 

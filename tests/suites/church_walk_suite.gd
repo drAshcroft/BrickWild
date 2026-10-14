@@ -211,8 +211,8 @@ static func _negative_control(result: SuiteResult) -> void:
 		result.fail("negative control: a mesh baked without obstacles is not caught standing on them")
 
 
-## A podium church has no paved floor of its own and publishes no walk; a
-## castle still publishes none.
+## A podium church has no paved floor of its own and publishes no walk; nor
+## does a manor (walled castles are walked, suite kwalk).
 static func _unsupported(result: SuiteResult) -> void:
 	var spec: ChurchSpec = TestSweep.spec_at(&"russian", 6)
 	spec.hero = &"basil"
@@ -225,7 +225,7 @@ static func _unsupported(result: SuiteResult) -> void:
 	var castle: GeneratedBuilding = BrickWild.generate(BuildingRequest.castle(3))
 	result.checked += 1
 	if castle.is_ok() and (BrickWild.navigation(castle)["supported"] or BrickWild.navigation_node(castle) != null):
-		result.fail("castle claims an interior walk it does not publish")
+		result.fail("a manor claims an interior walk it does not publish")
 
 
 static func _grid(rects: Dictionary) -> WalkGrid:

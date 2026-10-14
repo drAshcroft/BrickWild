@@ -1171,6 +1171,12 @@ static func gatehouse_aabb(spec: CastleSpec, r: int) -> AABB:
 		Vector3(gw, gate_height(spec, r), d))
 
 
+## The opening through a gatehouse of this width: the rest of the block is
+## the masonry either side of it. The builder cuts it, the walk reads it.
+static func passage_width(gate_w: float) -> float:
+	return minf(gate_w * 0.4, 4.0)
+
+
 static func gate_height(spec: CastleSpec, r: int) -> float:
 	if is_motte(spec):
 		# The guard chamber opens onto the curtain walk; leave a full room

@@ -73,7 +73,7 @@ const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi"
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
 	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
-	"dmvbrief", "dmvimplied", "dmvwalk", "bwalk", "twalk", "cwalk",
+	"dmvbrief", "dmvimplied", "dmvwalk", "bwalk", "twalk", "cwalk", "kwalk", "kwalk2",
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest", "cas013",
 	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015", "cground",
@@ -139,7 +139,7 @@ const LANES: Dictionary = {
 	"lane:palace-change": ["palace"],
 	"lane:village-fast": ["vquick", "vcompact", "compactapi", "vground"],
 	"lane:village-appearance-fast": ["vdecoration", "vdecorationapi", "vappearance"],
-	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cmotteaccess"],
+	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cmotteaccess", "kwalk"],
 	"lane:motte-change": ["cmotteplan", "cmotteaccess", "coccupancy"],
 	"lane:castle-spot": ["castlechange", "chimeji"],
 	"lane:castle": ["castle", "cnormals", "cmassing", "clandmark", "cvoxelqa", "ctowerplan", "cmotteplan", "cmotteaccess", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried", "cterrace"],
@@ -153,7 +153,7 @@ const LANES: Dictionary = {
 	"lane:bridge": ["bridge"],
 	"lane:windmill": ["windmill"],
 	"lane:dungeon": ["dungeon"],
-	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi", "bwalk", "twalk", "cwalk"],
+	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi", "bwalk", "twalk", "cwalk", "kwalk"],
 	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "interior", "cvoxelqa", "library", "placement"],
 	"lane:sweep": ORDER,
 }
@@ -189,6 +189,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/building_walk_suite.gd").run()
 		"cwalk":
 			return preload("res://tests/suites/church_walk_suite.gd").run()
+		"kwalk":
+			return preload("res://tests/suites/castle_navigation_suite.gd").run()
+		"kwalk2":
+			return preload("res://tests/suites/castle_navigation_suite.gd").run_more()
 		"twalk":
 			return preload("res://tests/suites/temple_walk_suite.gd").run()
 		"vnativeqa":

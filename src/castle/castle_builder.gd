@@ -1250,7 +1250,7 @@ func _build_ring(r: int) -> void:
 		if _planned_interiors.has(gate_id):
 			_build_gate_chamber(g, r, door_h, _planned_interiors[gate_id])
 		else:
-			_passage(g, minf(g.size.x * 0.4, 4.0), door_h, r)
+			_passage(g, CastleGeometry.passage_width(g.size.x), door_h, r)
 		_log_mass("gate_%d" % r, g)
 		_crenellate_rect(g, g.size.y, SURF_TRIM)
 		if not _planned_interiors.has(gate_id):
@@ -1272,7 +1272,7 @@ func _build_gate_chamber(gate: AABB, ring: int, passage_h: float, row: Dictionar
 	# the original full-height header would fill every new room and window.
 	var base := AABB(gate.position, Vector3(gate.size.x,
 		room.position.y - gate.position.y, gate.size.z))
-	_passage(base, minf(gate.size.x * 0.4, 4.0), passage_h, ring)
+	_passage(base, CastleGeometry.passage_width(gate.size.x), passage_h, ring)
 	Interiors.emit(self, row)
 	host(row.id)
 	component_box("gate_chamber_ceiling", Vector3(gate.size.x, 0.18, gate.size.z),
