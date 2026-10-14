@@ -226,6 +226,11 @@ file.
 * A GDScript **parse error makes the headless runner hang** rather than exit.
   If a run stops producing output, read the top of the log for "Parse Error"
   instead of waiting on it.
+* **A fresh git worktree is missing most prop models.** Only about 313 of the
+  790 files under `assets/props/` are tracked; the rest are gitignored. Any
+  furnishing, dressing or render result in a new worktree is wrong until you
+  run `cp -rn <main checkout>/assets/props/. ./assets/props/` and re-import
+  with `--editor --quit`. The fingerprint worktree recipe above needs it too.
 * Godot's front faces are **clockwise**, so a triangle wound (a, b, c) has
   outward normal `(c - a).cross(b - a)` -- the opposite hand from the usual
   formula. `MeshKit._face_normal` is the single place this is decided.
