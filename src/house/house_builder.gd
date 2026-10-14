@@ -4381,6 +4381,8 @@ func _build_yard() -> void:
 
 ## How far a flue finishes above the ridge it comes out of.
 const CHIMNEY_CLEAR := 0.6
+## Extra climb of a Witch stack above its roof exit (LIVE-WITCH massing).
+const WITCH_STACK_EXTRA := 1.25
 
 
 ## Measure the roof where the flue actually passes through it. The roof skin
@@ -4517,6 +4519,13 @@ func _build_chimney() -> void:
 	var top: float = sampled_roof_top + CHIMNEY_CLEAR if is_finite(sampled_roof_top) \
 		else wall_top + plan_roof_rise + roll_clearance + CHIMNEY_CLEAR
 	var flue_s: float = HouseGeometry.chimney_flue_size(spec, plan.world_family)
+	# LIVE-WITCH massing: the stack is the hut's tallest, most obstinate mass. It
+	# leaves the roof exactly as before, then climbs a further WITCH_STACK_EXTRA
+	# as a leaning, slightly twisted upper course (emitted below).
+	var witch_stack := HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family)
+	var straight_top := top
+	if witch_stack:
+		top += WITCH_STACK_EXTRA
 
 	# Stepped chimney stack
 	var base_h: float = minf(top * 0.45, 2.5)
@@ -4527,8 +4536,11 @@ func _build_chimney() -> void:
 		_chimney_box(Vector3(base_s - 0.08, sh_h, base_s - 0.08), Vector3(c.x, base_h + sh_h / 2.0, c.y))
 		var flue_h: float = top - (base_h + sh_h)
 		if flue_h > 0.05:
-			var upper_s: float = flue_s if HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family) else s
-			_chimney_box(Vector3(upper_s, flue_h, upper_s), Vector3(c.x, base_h + sh_h + flue_h / 2.0, c.y))
+			var upper_s: float = flue_s if witch_stack else s
+			var straight_h: float = (straight_top - (base_h + sh_h)) if witch_stack else flue_h
+			_chimney_box(Vector3(upper_s, straight_h, upper_s), Vector3(c.x, base_h + sh_h + straight_h / 2.0, c.y))
+			if witch_stack:
+				_build_witch_crooked_stack(c, straight_top, flue_s)
 	else:
 		_chimney_box(Vector3(s, top, s), Vector3(c.x, top / 2.0, c.y))
 
@@ -4545,6 +4557,24 @@ func _build_chimney() -> void:
 
 	_emit_chimney_pots(c, top, flue_s)
 	total_height = maxf(total_height, top + 0.18 + HouseGeometry.CHIMNEY_POT_H)
+
+
+## The upper courses of a Witch stack: a stone collar, then a shaft that has
+## settled a hand's width off true and a few degrees out of square. Every part
+## overlaps the one below it, so it is one stack, not a pile.
+func _build_witch_crooked_stack(c: Vector2, y0: float, flue_s: float) -> void:
+	host("chimney", 0)
+	var collar_h := 0.22
+	var collar_s := flue_s + 0.2
+	component_box("witch_stack_collar", Vector3(collar_s, collar_h, collar_s),
+		Transform3D(Basis(), Vector3(c.x, y0 + collar_h * 0.5 - 0.02, c.y)), SURF_FLOOR)
+	var shaft_h := WITCH_STACK_EXTRA - collar_h + 0.02
+	var shaft_s := flue_s * 0.92
+	var lean := Vector3(0.07, 0.0, -0.05)
+	var shaft_xf := Transform3D(Basis(Vector3.UP, 0.12),
+		Vector3(c.x + lean.x, y0 + collar_h - 0.02 + shaft_h * 0.5, c.y + lean.z))
+	component_box("witch_stack_shaft", Vector3(shaft_s, shaft_h, shaft_s), shaft_xf, SURF_FLOOR)
+	host_end()
 
 
 ## Preserve the stack envelope while leaving the emitted fireplace mouth open.

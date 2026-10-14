@@ -862,7 +862,10 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 		# A modest public Witch-only rise correction makes the high gable lead the
 		# silhouette. The independent metre cap and measured seam/headroom gates
 		# remain authoritative; trade/world/custom houses never enter this branch.
-		rise = minf(span * s.roof_pitch * 0.64, clampf(span * 0.52, 3.6, 5.6))
+		# LIVE-WITCH massing: the high core is the hut's one steep gesture, so it
+		# climbs further than the shared witch rise; the lower service roof
+		# below still has to meet it through the measured seam gates.
+		rise = minf(span * s.roof_pitch * 0.84, clampf(span * 0.66, 3.6, 6.6))
 	var xf := Transform3D(Basis(Vector3.UP, PI / 2.0 if top.size.x > top.size.y else 0.0),
 		Vector3(top.get_center().x, s.height * maxi(s.storeys, 1), top.get_center().y))
 	var span_out := roof_span_out(s)
