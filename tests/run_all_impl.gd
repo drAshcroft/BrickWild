@@ -68,7 +68,7 @@ const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi"
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "vis009", "vis010", "vis016", "catalogcache",
-	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad",
+	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad", "wunchecked",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
@@ -148,7 +148,7 @@ const LANES: Dictionary = {
 	"lane:temple": ["temple", "rite", "twalk", "sacredseq"],
 	# Same assertions as `temple`, split so no process nears the 300 s cap.
 	"lane:temple-contract": ["temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras"],
-	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "matkit"],
+	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "wunchecked", "matkit"],
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
 	"lane:windmill": ["windmill"],
@@ -542,6 +542,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/vav_suite.gd").run()
 		"wld019":
 			return preload("res://tests/suites/vastu_suite.gd").run()
+		"wunchecked":
+			return load("res://tests/suites/world_unchecked_subkinds_suite.gd").run()
 		"wld001_domus":
 			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"domus")
 		"wld001_riad":
