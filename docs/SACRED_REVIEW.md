@@ -135,3 +135,118 @@ Receipts: lane:church-change 5926 checks / 0 failures / 16 warnings (12 known
 opening + 4 sacredseq); visible coplanar overlaps (church warnings, not
 budgeted for churches) Gothic small/default8102/large/default1 before
 69/74/77/72, after 69/78/77/74.
+
+## 49-id roof-on matrix review (2026-10-14)
+
+Every id of `tests/fixtures/sacred_sequence_requests.json` was rendered roof on
+through the public API and every contact sheet was read by eye:
+
+```
+godot --path . --script res://tools/render_sacred_exterior.gd -- --out=res://artifacts/sacred_matrix_20261014/renders
+python -I tools/sacred_contact_sheets.py artifacts/sacred_matrix_20261014/renders artifacts/sacred_matrix_20261014/sheets
+```
+
+`render_sacred_exterior.gd` now also takes `--views=front,side,rear,entry`.
+`entry` is a first-person view at 1.65 m from the first reached floor inside the
+door (the same `WalkGrid` flood the acceptance tool uses, so the eye is on
+reached floor), aimed at the altar prop (church) or the idol (temple). A
+ziggurat is lit with the dusk rig, because the night rig blacks out its stair
+walls. Images are not committed. Each id has a 2x2 sheet
+`artifacts/sacred_matrix_20261014/sheets/<slug>.jpg` (front, side, entry, rear)
+and singles `renders/<slug>__<view>.jpg`; `<slug>` is the id with `/` as `_`
+(for example `church_gothic_default_1`).
+
+Tallies: 31 accepted, 18 needs_changes (churches 10 / 14, temples 21 / 4).
+Accepted means "reads as its family, the way in leads to the focus, the focus
+is visible from the entry". It does not mean "matches the design board"; the
+Gothic and basilica notes above still stand. Sparse floor in the temples and
+the empty chancel in the churches are accepted where the brief names them.
+
+Columns: Identity = exterior identity (yes / partly / no); Entry = entry and
+procession; Focus = focal visibility from the entry image. The slug is
+`church_` or `temple_` plus the first column.
+
+### Churches
+
+| Id | Identity | Entry | Congregation | Focus (entry image) | Verdict |
+|---|---|---|---|---|---|
+| romanesque_small_1 | partly: round apse, lombard pilasters, but square windows and the west tower ends in stepped blocks and bare posts | door in tower base, straight nave, pews to the rail | two pew blocks either side of the aisle, empty chancel (brief) | altar and candles clear at the end of the aisle, apse lights above | needs_changes: tower crown reads unfinished (todo SACRED-TOWER-CROWN) |
+| romanesque_default_8102 | partly: tower, apse, gable porch read Romanesque; flat uncapped tower | door, aisle, apse | pews both sides, empty chancel | altar visible under the chancel arch | accepted |
+| romanesque_large_21325 | no: a 24 m gabled box, pilasters and two tiny slit windows, no tower, no apse visible from the front | door in a blank gable, then a hall far wider than the pew block | pews are a small cluster far down a bare floor; the west half is empty with nothing in the brief to explain it | altar is a speck washed out against the bright end wall | needs_changes: large size is a barn; furnishing does not scale with the nave |
+| romanesque_default_1 | partly: as small/1, with a row of tall lights on the flank | door, aisle, apse | pews both sides | altar and candles clear | needs_changes: same tower crown fault (SACRED-TOWER-CROWN) |
+| gothic_small_1 | partly: twin squat towers with domed caps, round chevet; pointed heads only on the windows, so it reads as a Romanesque variant | portal in the west front, aisle, apse | pews both sides | altar and candles clear, three apse lights | needs_changes: no spire, flyers or lancets at small size, so no Gothic silhouette |
+| gothic_default_8102 | yes: twin octagonal spires, flying buttresses, clerestory | portal, aisle between piers | pews both sides, aisles beyond the piers empty | altar clear at the end | accepted (design-board gaps in the section above stand) |
+| gothic_large_21325 | yes: tall twin towers, flyer arcade, glazed clerestory | portal, long aisle | pews from the first bay, aisles empty | altar small but readable, apse arch above it | accepted |
+| gothic_default_1 | yes: single tapering spire, flyers on the east bays | portal in tower base, aisle | pews both sides | altar and candles clear | accepted |
+| byzantine_small_1 | yes: dome on a drum over a gabled cross-body, low apse | door, aisle, apse | pews both sides | altar clear, apse arch frames it | accepted: partly Byzantine, the dome sits over a basilican body |
+| byzantine_default_8102 | yes: as small, with pilasters | door, aisle | pews both sides | altar clear | accepted |
+| byzantine_large_21325 | partly: dome pushed to the east end of a long barn body, flat flank | door in a blank gable, aisle | pews a distant cluster, bare floor before them unexplained | altar lost against the bright end wall | needs_changes: large size is a barn; dome not visible from the entry |
+| byzantine_default_1 | yes | door, aisle | pews both sides | altar clear | accepted |
+| nordic_stave_small_1 | no: pale stone-textured walls, a black stepped-block spire; no tiered shingle roofs, no dark timber, no dragon heads | door at the foot of the tower, aisle | pews both sides | altar clear, but in a pale plank hall | needs_changes: does not read as a stave church |
+| nordic_stave_default_8102 | no: as small | as small | pews both sides | altar clear at the end of a long plank hall | needs_changes: stave identity |
+| nordic_stave_large_21325 | no: stone-coloured box with a stepped spire | door, aisle into a huge hall | a distant pew cluster, bare floor unexplained | altar a glow on the far wall, hard to find | needs_changes: stave identity and large-size furnishing |
+| nordic_stave_default_1 | no: as small | as small | pews both sides | altar clear | needs_changes: stave identity |
+| renaissance_small_1 | partly: dome with lantern, pilaster cornice; no pediment or orders | door with a small porch, aisle | pews both sides | altar clear under a round arch | accepted |
+| renaissance_default_8102 | partly: dome, lantern, twin stepped tower crowns, round-headed lights | door, aisle | pews both sides | altar clear | accepted |
+| renaissance_large_21325 | partly: rose window, dome and a lean-to roof read Italian; flank is a long blank wall | door, long aisle | pews begin well down a bare floor | altar lost | needs_changes: large size is a barn; altar not findable |
+| renaissance_default_1 | partly: dome and lantern, stepped tower | door, aisle | pews both sides | altar clear | accepted |
+| russian_small_1 | partly: one squat onion dome, round chevet; no cluster of domes, no kokoshniki | door in tower base, aisle | pews both sides | altar clear | needs_changes: floating blocks on the nave walls (SACRED-RUSSIAN-FLOATING-BLOCKS) and the tower crown fault |
+| russian_default_8102 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
+| russian_large_21325 | partly: one onion dome on a box, two half-round buttress turrets | door, aisle | a distant pew cluster | altar a glow, brown blocks near the ceiling pull the eye | needs_changes: large-size furnishing, floating blocks |
+| russian_default_1 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
+
+### Temples
+
+| Id | Identity | Entry | Congregation | Focus (entry image) | Verdict |
+|---|---|---|---|---|---|
+| basilica_blood_small_1 | yes: pedimented pronaos, clerestory, apse | portico, orange inlay down the axis | open hall floor with braziers either side (sparse is the brief) | altar and idol under the apse arch, clear | accepted |
+| basilica_bone_small_8102 | yes: as above plus a belfry | as above | open floor, very dark | idol lit and clear at the end; columns near-black | accepted |
+| basilica_flame_default_8102 | yes: long hall, pediment, belfry | portico, inlay, colonnade | braziers between colonnade and aisle | idol small but clear | accepted |
+| basilica_serpent_default_21325 | partly: identical in form and colour to flame | as flame | as flame | idol is an orange cone, same as flame; a serpent cult is not told apart | accepted for sequence; cult identity open (see faults) |
+| basilica_void_large_21325 | yes: long, with a belfry; flank is a plain window grid | portico, inlay | long floor, braziers | idol tiny, camera sits against a column but the axis is clear | accepted |
+| basilica_blood_large_1 | yes: pedimented pronaos on a long hall | as above | braziers in two lines | idol clear under the apse arch | accepted |
+| basilica_blood_default_1_pinned-barn | yes: pronaos and apse; flank is long and plain (the known barn comparison) | portico, inlay | open floor, braziers | idol visible, hall very dark | accepted as the comparison id; the flank is still plain |
+| pylon_bone_small_1 | yes: two tapering pylons, gate, wall behind | gate between the pylons, hall of columns | open floor, braziers | altar and idol framed by the far gate | accepted |
+| pylon_bone_large_1 | yes: pylons dwarfed by a long blank box | gate, long hypostyle | open floor | altar clear at the end | accepted |
+| pylon_flame_small_8102 | yes | gate, columns | open floor | altar and idol clear | accepted |
+| pylon_serpent_default_8102 | yes | gate, columns | open floor, nearly black | idol lit, clear | accepted |
+| pylon_void_default_21325 | yes | gate, columns | open floor, nearly black | idol lit, clear | accepted |
+| pylon_blood_large_21325 | yes | gate, long hall | open floor | idol small but clear | accepted |
+| ziggurat_flame_small_1 | yes: three tiers, a stair, a cone idol on top | foot of the stair, two gate frames | the paved forecourt is the congregation (brief) | altar rail visible through the lower gate; the idol is not visible from the foot | accepted |
+| ziggurat_serpent_small_8102 | yes | as above | as above | as above | accepted |
+| ziggurat_void_default_8102 | yes | foot of a longer stair | forecourt | altar a thin sliver through the gate | accepted: marginal |
+| ziggurat_blood_default_21325 | yes | as above | forecourt | altar a thin sliver through the gate | accepted: marginal |
+| ziggurat_bone_large_21325 | yes | foot of a long stair canyon | forecourt | altar a near-invisible slit at the top, idol hidden | needs_changes: the focus is not readable from the entry at large size |
+| ziggurat_flame_large_1 | yes | as above | forecourt | as above | needs_changes: same |
+| rotunda_serpent_small_1 | partly: drum with open pier clerestory and a thin ring roof; reads as an arena | door in the drum with a framed porch | open floor, braziers round the pit | altar and cone idol large and central | accepted |
+| rotunda_void_small_8102 | partly: as above | door | as above | altar and idol clear | accepted |
+| rotunda_blood_default_8102 | partly | door, a plain frame | open floor, a pit either side of the path (the pit is in the brief) | altar and idol clear across the pit | accepted |
+| rotunda_bone_default_21325 | partly | as above | as above | clear | accepted |
+| rotunda_flame_large_21325 | partly: a 24 m blank drum; the door is a 1.2 m orange frame flush with the wall, easy to miss | door | wide open floor | idol clear, altar rail visible | needs_changes: entrance is lost on a large drum |
+| rotunda_serpent_large_1 | partly: as above | as above | as above | as above | needs_changes: same |
+
+Images per id: `artifacts/sacred_matrix_20261014/sheets/<slug>.jpg`, with
+singles `renders/<slug>__front.jpg`, `__side.jpg`, `__entry.jpg`, `__rear.jpg`.
+The ziggurat entry singles were re-shot with the dusk rig; the sheets were
+rebuilt afterwards.
+
+### Most common faults
+
+1. Large churches (romanesque, byzantine, nordic stave, renaissance, russian at
+   16 to 24 m wide) are blank gabled boxes. The pew block is a small cluster far
+   from the door, the west half of the floor is bare and not explained by the
+   brief, and the altar is a washed-out speck. Furnishing and the entry
+   station do not scale with nave length. 5 ids.
+2. Nordic stave never reads as stave: pale stone-textured walls, a black
+   stepped-block spire, no tiered shingle roofs or dark timber. 4 ids.
+3. Towers with an unfinished crown (flat deck, stepped red blocks, bare posts):
+   Romanesque and Russian. Filed as SACRED-TOWER-CROWN.
+4. Russian nave interiors carry floating brown blocks. Filed as
+   SACRED-RUSSIAN-FLOATING-BLOCKS.
+5. Ziggurat at large size: the altar is a slit at the top of the stair canyon
+   and the idol is out of sight from the foot. 2 ids.
+6. Cult identity is only a tint: every cult has the same orange cone idol and
+   the same braziers, so a serpent temple cannot be told from a flame one.
+   Not counted in the verdicts above except as a note.
+7. Large rotunda: a 1.2 m door flush in a 24 m blank drum. 2 ids.
+8. Gothic small has no Gothic silhouette (squat domed towers). 1 id.

@@ -555,7 +555,7 @@ func _render_subject(made: GeneratedBuilding, family: String, style: String,
 	scene.free()
 
 
-func _church_axis_station(spec: ChurchSpec) -> Dictionary:
+func _church_axis_station(spec: ChurchSpec, fractions: Array = [0.34, 0.43, 0.28, 0.52]) -> Dictionary:
 	var floor_y: float = ChurchGeometry.podium_height(spec)
 	var floors: Array[Rect2] = ChurchGeometry.floor_rects(spec)
 	if floors.is_empty() and floor_y > 0.0:
@@ -589,7 +589,7 @@ func _church_axis_station(spec: ChurchSpec) -> Dictionary:
 	# Select a centerline station well past the west facade and tower vestibule.
 	# This records floor connectivity only; shell/prop capsule clearance remains
 	# explicitly unmeasured until a triangle-level body probe exists.
-	for fraction in [0.34, 0.43, 0.28, 0.52]:
+	for fraction in fractions:
 		var candidate := Vector2(0.0, nave.position.z + nave.size.z * float(fraction))
 		var cell: Vector2i = grid.cell_of(candidate)
 		var station: Vector2 = grid.world_of(cell.x, cell.y)
