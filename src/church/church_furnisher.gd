@@ -254,11 +254,14 @@ static func _dress_rail(spec: ChurchSpec, out: Array[Dictionary], z: float) -> v
 	# the section is modelled running along its own Z, so a quarter turn lays it
 	# across the church
 	var section: float = PropCatalog.footprint(RAIL).y
-	if section <= 0.0 or half <= AISLE_W / 2.0 + section:
+	# the finishing post stands OUTSIDE the aisle, so the gate through the rail
+	# is the full aisle wide (LIVE-SACRED: it used to stand in it, 0.78 m clear)
+	var post: float = PropCatalog.footprint(RAIL_END).x
+	if section <= 0.0 or half <= AISLE_W / 2.0 + post + section:
 		return
 	var yaw: float = PropCatalog.yaw_facing(Vector2(0.0, -1.0)) + PI / 2.0
 	for side in [-1.0, 1.0]:
-		var x: float = AISLE_W / 2.0
+		var x: float = AISLE_W / 2.0 + post
 		var placed := 0
 		while x + section <= half and placed < 6:
 			_put(out, RAIL, Vector3(side * (x + section / 2.0), 0.0, z), yaw, 1.0,
@@ -267,7 +270,7 @@ static func _dress_rail(spec: ChurchSpec, out: Array[Dictionary], z: float) -> v
 			placed += 1
 		if placed > 0:
 			# a post to finish the run at the aisle, where a person walks through
-			_put(out, RAIL_END, Vector3(side * (AISLE_W / 2.0 - 0.18), 0.0, z), yaw,
+			_put(out, RAIL_END, Vector3(side * (AISLE_W / 2.0 + post / 2.0), 0.0, z), yaw,
 				1.0, &"rail")
 
 
