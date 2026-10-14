@@ -154,10 +154,10 @@ static func _plan_palace(plan: HousePlan) -> void:
 ## Place a measured banner on either side wall at the throne's depth. These
 ## wall records carry no floor rectangle, so the axis and walking checks read
 ## them without treating them as obstacles.
-static func place_palace_banners(plan: HousePlan) -> void:
+static func place_palace_banners(plan: HousePlan) -> bool:
 	var room := plan.focus_room()
 	if room < 0 or plan.kind_of(room) != &"throne_room":
-		return
+		return false
 	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
 	var base: float = HouseFurnishGeometry.storey_base(plan, room)
 	var key := "Banner_2"
@@ -172,6 +172,12 @@ static func place_palace_banners(plan: HousePlan) -> void:
 	var upper_x: float = float(wall["to"].x) - PropCatalog.size(key).x * 0.5 - 0.2
 	var banner_distance := 0.0
 	var found := false
+	var bw: float = PropCatalog.size(key).x
+	# The ordinary furnisher has already hung its wall torches, mirrored about a
+	# rear door rather than about the throne. They are movable lighting; the
+	# banners are the throne room's declared axis. So the station search ignores
+	# sconces (doors, windows and other mounted pieces still veto a station) and
+	# the sconces that end up under a banner are re-hung beyond it.
 	for step in range(24):
 		var distance := 2.4 + float(step) * 0.15
 		var left := Vector2(plan.focus_pos().x - distance, float(wall["from"].y))
@@ -180,8 +186,7 @@ static func place_palace_banners(plan: HousePlan) -> void:
 			continue
 		var clear_pair := true
 		for point in [left, right]:
-			if HouseFurnishScore._on_opening(plan, room, point, normal, PropCatalog.size(key).x) \
-					or HouseFurnishScore._crowds_mounted(plan, room, point, PropCatalog.size(key).x):
+			if HouseFurnishScore._on_opening(plan, room, point, normal, bw) 					or HouseFurnishScore._crowds_mounted(plan, room, point, bw, "sconce"):
 				clear_pair = false
 		if clear_pair:
 			banner_distance = distance
@@ -189,7 +194,9 @@ static func place_palace_banners(plan: HousePlan) -> void:
 			break
 	if not found:
 		push_error("ShopPlanner: palace cannot find a mirrored banner station")
-		return
+		return false
+	_rehang_sconces_clear_of_banners(plan, room, normal, plan.focus_pos().x,
+		float(wall["from"].y), banner_distance, bw, float(wall["from"].x), float(wall["to"].x))
 	for side in [-1.0, 1.0]:
 		var point := Vector2(plan.focus_pos().x + banner_distance * side,
 			float(wall["from"].y)) + normal * 0.02
@@ -200,6 +207,52 @@ static func place_palace_banners(plan: HousePlan) -> void:
 			"rect": Rect2(point - Vector2.ONE * 0.05, Vector2.ONE * 0.1),
 			"zone": Rect2(), "host": -1, "cat": "banner",
 			"mounted": true, "scale": 1.0})
+	return true
+
+
+## Sconces that sit within a banner's span move out beyond the pair, mirrored
+## about the throne axis. If no clear mirrored station exists they are dropped
+## with a warning: lighting is optional, the axis is not.
+static func _rehang_sconces_clear_of_banners(plan: HousePlan, room: int, normal: Vector2,
+		axis_x: float, wall_y: float, banner_distance: float, bw: float,
+		wall_from_x: float, wall_to_x: float) -> void:
+	var template := {}
+	var lamp_w := 0.0
+	var moved := 0
+	for f in range(plan.furniture.size() - 1, -1, -1):
+		var p: Dictionary = plan.furniture[f]
+		if int(p.get("room", -1)) != room or not bool(p.get("mounted", false)) 				or PropCatalog.category(String(p["key"])) != "sconce":
+			continue
+		if absf(float(p["pos"].z) - wall_y) > 0.2:
+			continue
+		lamp_w = maxf(PropCatalog.size(String(p["key"])).x, 0.05)
+		if absf(absf(float(p["pos"].x) - axis_x) - banner_distance) < (bw + lamp_w) * 0.5 + 0.1:
+			template = p.duplicate(true)
+			plan.furniture.remove_at(f)
+			moved += 1
+	if moved == 0:
+		return
+	var base_d := banner_distance + (bw + lamp_w) * 0.5 + 0.15
+	var d := base_d
+	while axis_x - d >= wall_from_x + lamp_w and axis_x + d <= wall_to_x - lamp_w:
+		var ok := true
+		for side in [-1.0, 1.0]:
+			var pt := Vector2(axis_x + d * side, wall_y)
+			if HouseFurnishScore._on_opening(plan, room, pt, normal, lamp_w) 					or HouseFurnishScore._crowds_mounted(plan, room, pt, lamp_w):
+				ok = false
+		if ok:
+			for side in [-1.0, 1.0]:
+				var lamp: Dictionary = template.duplicate(true)
+				var pos3: Vector3 = lamp["pos"]
+				pos3.x = axis_x + d * side
+				lamp["pos"] = pos3
+				var r: Rect2 = lamp["rect"]
+				r.position.x = pos3.x - r.size.x * 0.5
+				lamp["rect"] = r
+				plan.furniture.append(lamp)
+			return
+		d += HouseFurnishScore.MOUNT_STEP
+	push_warning("ShopPlanner: palace sconces displaced by banners found no mirrored station")
 
 
 ## The market hall's open arcade is plan data. Its front doorway remains a

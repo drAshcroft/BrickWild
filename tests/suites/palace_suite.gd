@@ -24,7 +24,69 @@ static func run() -> SuiteResult:
 			result.warn("%s HouseQA: %s" % [who, warning])
 		if is_equal_approx(float(scale), 1.0):
 			_negative_controls(result, plan)
+	_banner_regression(result)
 	return result
+
+
+## SHOP-PALACE-BANNER. The small 11 x 14 palace at seed 8102 used to log "cannot
+## find a mirrored banner station": the furnisher's rear-wall torches, hung about
+## a door, sat on every candidate station. Banners must now hang, mirrored about
+## the throne, and no torch may be left under one. Sweep seeds and sizes too.
+static func _banner_regression(result: SuiteResult) -> void:
+	var cases: Array = [[11.0, 14.0, 8102]]
+	for size in [[11.0, 14.0], [14.0, 20.0], [20.0, 30.0], [28.0, 42.0]]:
+		for seed_value in [1, 7, 8102, 9118, 31337]:
+			cases.append([size[0], size[1], seed_value])
+	var small_plan: HousePlan = null
+	for c in cases:
+		var spec := ShopSpec.new()
+		spec.business = &"palace"
+		spec.style = &"townhouse"
+		spec.width = float(c[0])
+		spec.length = float(c[1])
+		spec.height = 2.8
+		var plan: HousePlan = ShopGenerator.generate(spec, int(c[2]))
+		var who := "banners %sx%s seed %d" % [str(c[0]), str(c[1]), int(c[2])]
+		result.checked += 1
+		var banners: Array[Dictionary] = []
+		for item in plan.furniture:
+			if String(item.get("cat", "")) == "banner":
+				banners.append(item)
+		if banners.size() != 2:
+			result.fail("%s: %d banners, wants a mirrored pair" % [who, banners.size()])
+			continue
+		var axis_x := plan.focus_pos().x
+		if absf((banners[0]["pos"].x - axis_x) + (banners[1]["pos"].x - axis_x)) > 0.01:
+			result.fail("%s: banners do not mirror about the throne" % who)
+		for item2 in plan.furniture:
+			if String(item2.get("cat", "")) != "sconce" or int(item2["room"]) != plan.focus_room():
+				continue
+			for b in banners:
+				if absf(item2["pos"].x - b["pos"].x) < 0.9 and absf(item2["pos"].z - b["pos"].z) < 0.3:
+					result.fail("%s: a torch hangs under a banner" % who)
+		if int(c[2]) == 8102 and float(c[0]) == 11.0:
+			small_plan = plan
+	if small_plan == null:
+		return
+	# Negative control: fill the rear wall with mounted shelves and the stations
+	# are genuinely gone, so the planner must still refuse (and say so).
+	var blocked := _copy_plan(small_plan)
+	var throne := blocked.focus_room()
+	var wall: Dictionary = HouseGeometry.room_walls(blocked, throne)[1]
+	var kept: Array[Dictionary] = []
+	for item3 in blocked.furniture:
+		if String(item3.get("cat", "")) != "banner":
+			kept.append(item3)
+	blocked.furniture = kept
+	var x := float(wall["from"].x) + 0.3
+	while x < float(wall["to"].x):
+		blocked.furniture.append({"key": "Shelf_Simple", "room": throne, "storey": 0,
+			"pos": Vector3(x, 1.5, float(wall["from"].y)), "yaw": 0.0, "rect": Rect2(),
+			"zone": Rect2(), "host": -1, "cat": "shelf", "mounted": true, "scale": 1.0})
+		x += 0.4
+	result.checked += 1
+	if ShopPlanner.place_palace_banners(blocked):
+		result.fail("negative control: a fully blocked rear wall still produced banners")
 
 
 static func _spec(scale: float) -> ShopSpec:
