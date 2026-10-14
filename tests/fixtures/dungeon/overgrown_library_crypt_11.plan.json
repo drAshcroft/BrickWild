@@ -1,0 +1,710 @@
+{
+	"api_version": 5,
+	"archetype": "crypt",
+	"entrance_key": "threshold",
+	"goal_key": "sealed_chamber",
+	"keys": [],
+	"links": [
+		{
+			"from": "gallery",
+			"kind": "door",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_3_2"
+			},
+			"portal": "gallery->loop_1",
+			"shares_lock_with": [
+				"gallery->test_2"
+			],
+			"to": "loop_1",
+			"wall": "east"
+		},
+		{
+			"from": "gallery",
+			"kind": "stairs",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_3_2"
+			},
+			"portal": "gallery->test_2",
+			"shares_lock_with": [
+				"gallery->loop_1"
+			],
+			"to": "test_2",
+			"wall": "north"
+		},
+		{
+			"from": "lesson_1",
+			"kind": "stairs",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_2_2"
+			},
+			"portal": "lesson_1->test_1",
+			"to": "test_1",
+			"wall": "north"
+		},
+		{
+			"from": "loop_1",
+			"kind": "door",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_3"
+			},
+			"portal": "loop_1->sealed_chamber",
+			"shares_lock_with": [
+				"test_2->sealed_chamber"
+			],
+			"to": "sealed_chamber",
+			"wall": "north"
+		},
+		{
+			"from": "test_1",
+			"kind": "door",
+			"lock": {
+				"kind": "breakable",
+				"ref": ""
+			},
+			"portal": "test_1->cache_1",
+			"to": "cache_1",
+			"wall": "west"
+		},
+		{
+			"from": "test_1",
+			"kind": "stairs",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_2"
+			},
+			"portal": "test_1->gallery",
+			"to": "gallery",
+			"wall": "north"
+		},
+		{
+			"from": "test_2",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "test_2->late_key_1",
+			"to": "late_key_1",
+			"wall": "west"
+		},
+		{
+			"from": "test_2",
+			"kind": "stairs",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_3"
+			},
+			"portal": "test_2->sealed_chamber",
+			"shares_lock_with": [
+				"loop_1->sealed_chamber"
+			],
+			"to": "sealed_chamber",
+			"wall": "east"
+		},
+		{
+			"from": "threshold",
+			"kind": "stairs",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "threshold->lesson_1",
+			"to": "lesson_1",
+			"wall": "north"
+		},
+		{
+			"from": "threshold",
+			"kind": "door",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_1"
+			},
+			"portal": "threshold->sealed_1",
+			"to": "sealed_1",
+			"wall": "east"
+		},
+		{
+			"from": "threshold",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "threshold->vault_1",
+			"to": "vault_1",
+			"wall": "south"
+		},
+		{
+			"from": "threshold",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "threshold->vault_2",
+			"to": "vault_2",
+			"wall": "west"
+		}
+	],
+	"lock_kinds": [
+		"breakable",
+		"switch"
+	],
+	"plan_seed": 11,
+	"planner_version": "0.3.0-dev",
+	"request": {
+		"archetype": "crypt",
+		"complexity": 2,
+		"seed": 11,
+		"size": "medium",
+		"theme": "overgrown_library"
+	},
+	"requires": [
+		{
+			"count": 5,
+			"mechanic": "switch",
+			"prop": "switch",
+			"properties": [
+				"stateful",
+				"emits_signal"
+			]
+		}
+	],
+	"rooms": [
+		{
+			"boss_tier": 0,
+			"cell": [
+				0,
+				0
+			],
+			"hazard": 0.0,
+			"key": "threshold",
+			"label": "Threshold",
+			"level": 0,
+			"purpose": "",
+			"role": "entrance",
+			"space_id": "threshold",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				2,
+				0
+			],
+			"hazard": 0.0,
+			"key": "sealed_1",
+			"label": "Sealed Chamber",
+			"level": 0,
+			"purpose": "",
+			"role": "secret",
+			"space_id": "sealed_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				1,
+				1
+			],
+			"hazard": 0.0,
+			"key": "vault_1",
+			"label": "Side Chamber",
+			"level": 0,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "vault_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-2,
+				0
+			],
+			"hazard": 0.0,
+			"key": "vault_2",
+			"label": "Side Chamber",
+			"level": 0,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "vault_2",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				0,
+				-2
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_2_2",
+					"kind": "switch",
+					"targets": [
+						"lesson_1->test_1"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"hero_space": {
+				"base_level": 0,
+				"bridges": 0,
+				"depth": 1,
+				"entrance_level": 0,
+				"exit_level": 0,
+				"kind": "shaft",
+				"levels": 1,
+				"radius": 1.0
+			},
+			"key": "lesson_1",
+			"label": "Practice Room",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "lesson_1",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-1,
+				-4
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_2",
+					"kind": "switch",
+					"targets": [
+						"test_1->gallery"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"hero_space": {
+				"base_level": 0,
+				"bridges": 1,
+				"depth": 1,
+				"entrance_level": 0,
+				"exit_level": 0,
+				"kind": "shaft",
+				"levels": 1,
+				"radius": 1.0
+			},
+			"key": "test_1",
+			"label": "Test 1 (test)",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "test_1",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-3,
+				-3
+			],
+			"hazard": 0.0,
+			"key": "cache_1",
+			"label": "Hollow Behind the Wall",
+			"level": 0,
+			"purpose": "",
+			"role": "secret",
+			"space_id": "cache_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				0,
+				-6
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_3_2",
+					"kind": "switch",
+					"targets": [
+						"gallery->test_2"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "gallery",
+			"label": "Gallery of Niches",
+			"level": 0,
+			"purpose": "",
+			"role": "hub",
+			"space_id": "gallery",
+			"span": [
+				3,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				0,
+				-8
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_3",
+					"kind": "switch",
+					"targets": [
+						"test_2->sealed_chamber"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"hero_space": {
+				"base_level": 0,
+				"bridges": 1,
+				"depth": 1,
+				"entrance_level": 0,
+				"exit_level": 0,
+				"kind": "shaft",
+				"levels": 1,
+				"radius": 1.0
+			},
+			"key": "test_2",
+			"label": "Test 2 (test)",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "test_2",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-2,
+				-7
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_1",
+					"kind": "switch",
+					"targets": [
+						"threshold->sealed_1"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "late_key_1",
+			"label": "Old Workshop",
+			"level": 0,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "late_key_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				3,
+				-6
+			],
+			"hazard": 0.0,
+			"key": "loop_1",
+			"label": "Side Passage",
+			"level": 0,
+			"purpose": "",
+			"role": "corridor",
+			"space_id": "loop_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				2,
+				-8
+			],
+			"hazard": 0.0,
+			"key": "sealed_chamber",
+			"label": "Sealed Chamber",
+			"level": 0,
+			"purpose": "",
+			"role": "goal",
+			"space_id": "sealed_chamber",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		}
+	],
+	"schema": "dmv.dungeon.plan",
+	"schema_version": 2,
+	"spaces": {
+		"cache_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Hollow Behind the Wall",
+			"landmark": "",
+			"signature": {
+				"openness": 0.477379456162453,
+				"region": "inner",
+				"verticality": 0.0383768409490585
+			},
+			"size_class": "tiny",
+			"span": [
+				2,
+				1
+			]
+		},
+		"gallery": {
+			"archetype": "great_hall",
+			"elevation": 0,
+			"label": "Gallery of Niches",
+			"landmark": "",
+			"signature": {
+				"openness": 0.927313327789307,
+				"region": "inner",
+				"verticality": 0.186607038974762
+			},
+			"size_class": "large",
+			"span": [
+				3,
+				2
+			]
+		},
+		"late_key_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Old Workshop",
+			"landmark": "",
+			"signature": {
+				"openness": 0.496905028820038,
+				"region": "core",
+				"verticality": 0.0869648337364197
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"lesson_1": {
+			"archetype": "shaft",
+			"elevation": 0,
+			"label": "Practice Room",
+			"landmark": "shaft",
+			"signature": {
+				"openness": 0.306275315582752,
+				"region": "inner",
+				"verticality": 0.871548795700073
+			},
+			"size_class": "medium",
+			"span": [
+				2,
+				2
+			]
+		},
+		"loop_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Side Passage",
+			"landmark": "",
+			"signature": {
+				"openness": 0.336369328200817,
+				"region": "core",
+				"verticality": 0.0270716041326523
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"sealed_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Sealed Chamber",
+			"landmark": "",
+			"signature": {
+				"openness": 0.405683144927025,
+				"region": "outer",
+				"verticality": 0.10189516544342
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"sealed_chamber": {
+			"archetype": "tower",
+			"elevation": 0,
+			"label": "Sealed Chamber",
+			"landmark": "tower",
+			"signature": {
+				"openness": 0.374747477471828,
+				"region": "core",
+				"verticality": 0.919422946870327
+			},
+			"size_class": "medium",
+			"span": [
+				2,
+				2
+			]
+		},
+		"test_1": {
+			"archetype": "shaft",
+			"elevation": 0,
+			"label": "Test 1 (test)",
+			"landmark": "shaft",
+			"signature": {
+				"openness": 0.251283944235183,
+				"region": "inner",
+				"verticality": 0.994415962696075
+			},
+			"size_class": "medium",
+			"span": [
+				2,
+				2
+			]
+		},
+		"test_2": {
+			"archetype": "shaft",
+			"elevation": 0,
+			"label": "Test 2 (test)",
+			"landmark": "shaft",
+			"signature": {
+				"openness": 0.411086484789848,
+				"region": "core",
+				"verticality": 0.966613781452179
+			},
+			"size_class": "medium",
+			"span": [
+				2,
+				2
+			]
+		},
+		"threshold": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Threshold",
+			"landmark": "",
+			"signature": {
+				"openness": 0.36648216098547,
+				"region": "outer",
+				"verticality": 0.0529336035251617
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"vault_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Side Chamber",
+			"landmark": "",
+			"signature": {
+				"openness": 0.34421456605196,
+				"region": "outer",
+				"verticality": 0.0893877923488617
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"vault_2": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Side Chamber",
+			"landmark": "",
+			"signature": {
+				"openness": 0.272470697760582,
+				"region": "outer",
+				"verticality": 0.048041170835495
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		}
+	},
+	"theme": {
+		"atmosphere_tags": [
+			"overgrown",
+			"dusty",
+			"forgotten"
+		],
+		"boss_aesthetic": "librarian_construct",
+		"corridor_width_bias": 0.45,
+		"description": "Open stacks that narrow, shelf by shelf, into a claustrophobic climax.",
+		"id": "overgrown_library",
+		"label": "Overgrown Library",
+		"macro_shape": "concentric",
+		"materials": [
+			"oak",
+			"mossed_stone",
+			"bound_leather",
+			"verdigris_brass"
+		],
+		"motifs": [
+			"endless_shelves",
+			"reading_alcove",
+			"creeping_ivy"
+		],
+		"prop_palette": [
+			"bookcase",
+			"torch",
+			"reading_table",
+			"loose_page",
+			"bookworm"
+		],
+		"verticality_bias": 0.5
+	}
+}

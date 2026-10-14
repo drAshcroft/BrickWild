@@ -61,7 +61,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"hotel", "hotelroof", "hlandmark",
 	"temple", "rite", "tarchetype",
 	"village", "vsite", "vlot", "vcheck", "vforms", "venclosure", "varchetype", "world", "warchetype", "wld001", "wld002", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld014", "wld015", "wld016", "wld017", "wld018", "wld019",
-	"tree", "bridge", "windmill"]
+	"tree", "bridge", "windmill", "dungeon"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi", "vground", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
@@ -148,6 +148,7 @@ const LANES: Dictionary = {
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
 	"lane:windmill": ["windmill"],
+	"lane:dungeon": ["dungeon"],
 	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi", "bwalk"],
 	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "interior", "cvoxelqa", "library", "placement"],
 	"lane:sweep": ORDER,
@@ -544,6 +545,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/bridge_suite.gd").run()
 		"windmill":
 			return preload("res://tests/suites/windmill_suite.gd").run()
+		"dungeon":
+			return preload("res://tests/suites/dungeon_suite.gd").run()
 	return null
 
 

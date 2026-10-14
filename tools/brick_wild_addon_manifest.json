@@ -42,6 +42,10 @@
       "destination": "families/hotel"
     },
     {
+      "source": "src/dungeon",
+      "destination": "families/dungeon"
+    },
+    {
       "source": "src/house",
       "destination": "families/house"
     },

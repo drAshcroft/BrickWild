@@ -1,0 +1,740 @@
+{
+  "archetype": "temple",
+  "entrance_key": "entrance",
+  "goal_key": "goal",
+  "keys": [
+    {
+      "color": "green",
+      "room": "antechamber_1"
+    },
+    {
+      "color": "blue",
+      "room": "test_2"
+    },
+    {
+      "color": "yellow",
+      "room": "hub"
+    },
+    {
+      "color": "red",
+      "room": "late_key_1"
+    }
+  ],
+  "links": [
+    {
+      "from": "antechamber_1",
+      "kind": "door",
+      "lock": {
+        "kind": "item",
+        "ref": "green"
+      },
+      "locked": "green",
+      "portal": "antechamber_1->test_2",
+      "to": "test_2",
+      "wall": "west"
+    },
+    {
+      "from": "boss_1",
+      "kind": "door",
+      "lock": {
+        "kind": "",
+        "ref": ""
+      },
+      "portal": "boss_1->alcove_1",
+      "to": "alcove_1",
+      "wall": "north"
+    },
+    {
+      "from": "boss_1",
+      "guarded": true,
+      "kind": "door",
+      "lock": {
+        "kind": "monster",
+        "ref": "boss_1"
+      },
+      "portal": "boss_1->test_1",
+      "to": "test_1",
+      "wall": "south"
+    },
+    {
+      "from": "entrance",
+      "kind": "door",
+      "lock": {
+        "kind": "",
+        "ref": ""
+      },
+      "portal": "entrance->relic_hall_1",
+      "to": "relic_hall_1",
+      "wall": "west"
+    },
+    {
+      "from": "entrance",
+      "kind": "door",
+      "lock": {
+        "kind": "item",
+        "ref": "red"
+      },
+      "locked": "red",
+      "portal": "entrance->sealed_1",
+      "to": "sealed_1",
+      "wall": "south"
+    },
+    {
+      "from": "entrance",
+      "kind": "door",
+      "lock": {
+        "kind": "ability",
+        "ref": "relic_1"
+      },
+      "portal": "entrance->sealed_alcove_1",
+      "to": "sealed_alcove_1",
+      "wall": "north"
+    },
+    {
+      "from": "entrance",
+      "kind": "door",
+      "lock": {
+        "kind": "",
+        "ref": ""
+      },
+      "portal": "entrance->vault_1",
+      "to": "vault_1",
+      "wall": "east"
+    },
+    {
+      "from": "hub",
+      "kind": "door",
+      "lock": {
+        "kind": "",
+        "ref": ""
+      },
+      "portal": "hub->rest_1",
+      "to": "rest_1",
+      "wall": "north"
+    },
+    {
+      "from": "loop_1",
+      "kind": "door",
+      "lock": {
+        "kind": "",
+        "ref": ""
+      },
+      "portal": "loop_1->rest_1",
+      "to": "rest_1",
+      "wall": "west"
+    },
+    {
+      "from": "miniboss_1",
+      "guarded": true,
+      "kind": "door",
+      "lock": {
+        "kind": "monster",
+        "ref": "miniboss_1"
+      },
+      "portal": "miniboss_1->reliquary_1",
+      "to": "reliquary_1",
+      "wall": "west"
+    },
+    {
+      "from": "relic_hall_1",
+      "kind": "door",
+      "lock": {
+        "kind": "ability",
+        "ref": "relic_1"
+      },
+      "portal": "relic_hall_1->antechamber_1",
+      "to": "antechamber_1",
+      "wall": "north"
+    },
+    {
+      "from": "relic_hall_1",
+      "kind": "door",
+      "lock": {
+        "kind": "",
+        "ref": ""
+      },
+      "portal": "relic_hall_1->miniboss_1",
+      "to": "miniboss_1",
+      "wall": "south"
+    },
+    {
+      "from": "rest_1",
+      "kind": "stairs",
+      "lock": {
+        "kind": "",
+        "ref": ""
+      },
+      "portal": "rest_1->boss_1",
+      "to": "boss_1"
+    },
+    {
+      "from": "test_1",
+      "kind": "door",
+      "lock": {
+        "kind": "",
+        "ref": ""
+      },
+      "portal": "test_1->alcove_2",
+      "to": "alcove_2",
+      "wall": "east"
+    },
+    {
+      "from": "test_1",
+      "kind": "door",
+      "lock": {
+        "kind": "item",
+        "ref": "yellow"
+      },
+      "locked": "yellow",
+      "portal": "test_1->goal",
+      "to": "goal",
+      "wall": "south"
+    },
+    {
+      "from": "test_1",
+      "kind": "door",
+      "lock": {
+        "kind": "",
+        "ref": ""
+      },
+      "portal": "test_1->late_key_1",
+      "to": "late_key_1",
+      "wall": "west"
+    },
+    {
+      "from": "test_2",
+      "kind": "door",
+      "lock": {
+        "kind": "item",
+        "ref": "blue"
+      },
+      "locked": "blue",
+      "portal": "test_2->hub",
+      "shares_lock_with": [
+        "test_2->loop_1"
+      ],
+      "to": "hub",
+      "wall": "west"
+    },
+    {
+      "from": "test_2",
+      "kind": "door",
+      "lock": {
+        "kind": "item",
+        "ref": "blue"
+      },
+      "locked": "blue",
+      "portal": "test_2->loop_1",
+      "shares_lock_with": [
+        "test_2->hub"
+      ],
+      "to": "loop_1",
+      "wall": "north"
+    }
+  ],
+  "lock_kinds": [
+    "ability",
+    "item",
+    "monster"
+  ],
+  "plan_seed": -1436416650880427663,
+  "planner_version": "0.3.0-dev",
+  "request": {
+    "anchor": {
+      "id": "dungeon:cursed-hall-event-a3-012027"
+    },
+    "archetype": "temple",
+    "complexity": 3,
+    "seed": "-1436416650880427663",
+    "size": "large",
+    "theme": "overgrown_library"
+  },
+  "requires": [
+    {
+      "count": 4,
+      "mechanic": "key",
+      "prop": "key",
+      "properties": [
+        "portable"
+      ]
+    },
+    {
+      "count": 1,
+      "mechanic": "tool",
+      "prop": "tool",
+      "properties": [
+        "portable",
+        "tool"
+      ]
+    }
+  ],
+  "rooms": [
+    {
+      "boss_tier": 0,
+      "cell": [
+        0,
+        0
+      ],
+      "hazard": 0.0,
+      "key": "entrance",
+      "label": "Vestibule",
+      "level": 0,
+      "purpose": "",
+      "role": "entrance",
+      "space_id": "entrance",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        1,
+        1
+      ],
+      "hazard": 0.0,
+      "key": "sealed_1",
+      "label": "Sealed Chamber",
+      "level": 0,
+      "purpose": "",
+      "role": "secret",
+      "space_id": "sealed_1",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        1,
+        -1
+      ],
+      "hazard": 0.0,
+      "key": "sealed_alcove_1",
+      "label": "Sealed Alcove",
+      "level": 0,
+      "purpose": "",
+      "role": "treasure",
+      "space_id": "sealed_alcove_1",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        2,
+        0
+      ],
+      "hazard": 0.0,
+      "key": "vault_1",
+      "label": "Side Chamber",
+      "level": 0,
+      "purpose": "",
+      "role": "treasure",
+      "space_id": "vault_1",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -2,
+        0
+      ],
+      "fixtures": [
+        {
+          "ability": "bomb",
+          "id": "relic_1",
+          "kind": "tool",
+          "targets": [
+            "entrance->sealed_alcove_1",
+            "relic_hall_1->antechamber_1"
+          ]
+        }
+      ],
+      "hazard": 0.0,
+      "hero_space": {
+        "base_level": 0,
+        "bridges": 3,
+        "depth": 1,
+        "entrance_level": 0,
+        "exit_level": 0,
+        "kind": "shaft",
+        "levels": 1,
+        "radius": 1.0
+      },
+      "key": "relic_hall_1",
+      "label": "Relic Hall",
+      "level": 0,
+      "purpose": "",
+      "role": "room",
+      "space_id": "relic_hall_1",
+      "span": [
+        2,
+        2
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -3,
+        2
+      ],
+      "hazard": 0.0,
+      "key": "miniboss_1",
+      "label": "Guarded Hall",
+      "level": 0,
+      "purpose": "",
+      "role": "arena",
+      "space_id": "miniboss_1",
+      "span": [
+        2,
+        3
+      ],
+      "wave": 4
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -5,
+        2
+      ],
+      "hazard": 0.0,
+      "key": "reliquary_1",
+      "label": "Reliquary",
+      "level": 0,
+      "purpose": "",
+      "role": "treasure",
+      "space_id": "reliquary_1",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -2,
+        -1
+      ],
+      "fixtures": [
+        {
+          "color": "green",
+          "id": "key_puzzle_2_2",
+          "kind": "key",
+          "targets": [
+            "antechamber_1->test_2"
+          ]
+        }
+      ],
+      "hazard": 0.0,
+      "key": "antechamber_1",
+      "label": "Antechamber",
+      "level": 0,
+      "purpose": "",
+      "role": "corridor",
+      "space_id": "antechamber_1",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -4,
+        -1
+      ],
+      "fixtures": [
+        {
+          "color": "blue",
+          "id": "key_puzzle_2",
+          "kind": "key",
+          "targets": [
+            "test_2->hub"
+          ]
+        }
+      ],
+      "hazard": 0.0,
+      "hero_space": {
+        "base_level": 0,
+        "bridges": 3,
+        "depth": 1,
+        "entrance_level": 0,
+        "exit_level": 0,
+        "kind": "shaft",
+        "levels": 1,
+        "radius": 1.0
+      },
+      "key": "test_2",
+      "label": "Test 2 (test)",
+      "level": 0,
+      "purpose": "",
+      "role": "room",
+      "space_id": "test_2",
+      "span": [
+        2,
+        2
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -3,
+        -2
+      ],
+      "hazard": 0.0,
+      "key": "loop_1",
+      "label": "Side Passage",
+      "level": 0,
+      "purpose": "",
+      "role": "corridor",
+      "space_id": "loop_1",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -6,
+        -1
+      ],
+      "fixtures": [
+        {
+          "color": "yellow",
+          "id": "key_puzzle_3",
+          "kind": "key",
+          "targets": [
+            "test_1->goal"
+          ]
+        }
+      ],
+      "hazard": 0.0,
+      "key": "hub",
+      "label": "Reading Floor",
+      "level": 0,
+      "purpose": "",
+      "role": "hub",
+      "space_id": "hub",
+      "span": [
+        2,
+        2
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -5,
+        -3
+      ],
+      "hazard": 0.0,
+      "key": "rest_1",
+      "label": "Quiet Room",
+      "level": 0,
+      "purpose": "",
+      "role": "room",
+      "space_id": "rest_1",
+      "span": [
+        2,
+        2
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 3,
+      "cell": [
+        -6,
+        -3
+      ],
+      "hazard": 0.0,
+      "key": "boss_1",
+      "label": "Boss Chamber",
+      "level": 1,
+      "purpose": "",
+      "role": "boss",
+      "space_id": "boss_1",
+      "span": [
+        2,
+        3
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -7,
+        -4
+      ],
+      "hazard": 0.0,
+      "key": "alcove_1",
+      "label": "Alcove 1 (treasure)",
+      "level": 1,
+      "purpose": "",
+      "role": "treasure",
+      "space_id": "alcove_1",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -7,
+        0
+      ],
+      "hazard": 0.0,
+      "hero_space": {
+        "base_level": 1,
+        "bridges": 4,
+        "depth": 1,
+        "entrance_level": 0,
+        "exit_level": 0,
+        "kind": "shaft",
+        "levels": 1,
+        "radius": 1.0
+      },
+      "key": "test_1",
+      "label": "Test 1 (test)",
+      "level": 1,
+      "purpose": "",
+      "role": "room",
+      "space_id": "test_1",
+      "span": [
+        2,
+        2
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -5,
+        0
+      ],
+      "hazard": 0.0,
+      "key": "alcove_2",
+      "label": "Alcove 2 (treasure)",
+      "level": 1,
+      "purpose": "",
+      "role": "treasure",
+      "space_id": "alcove_2",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -9,
+        1
+      ],
+      "fixtures": [
+        {
+          "color": "red",
+          "id": "key_puzzle_1",
+          "kind": "key",
+          "targets": [
+            "entrance->sealed_1"
+          ]
+        }
+      ],
+      "hazard": 0.0,
+      "key": "late_key_1",
+      "label": "Old Workshop",
+      "level": 1,
+      "purpose": "",
+      "role": "treasure",
+      "space_id": "late_key_1",
+      "span": [
+        2,
+        1
+      ],
+      "wave": 0
+    },
+    {
+      "boss_tier": 0,
+      "cell": [
+        -6,
+        2
+      ],
+      "hazard": 0.0,
+      "key": "goal",
+      "label": "Treasure Chamber",
+      "level": 1,
+      "purpose": "",
+      "role": "goal",
+      "space_id": "goal",
+      "span": [
+        2,
+        2
+      ],
+      "wave": 0
+    }
+  ],
+  "schema": "dmv.dungeon.plan",
+  "schema_version": 2,
+  "voxelgames": {
+    "attempt": 23,
+    "audit": {
+      "crowded_walls": [],
+      "lock_kinds": [
+        "ability",
+        "item",
+        "monster"
+      ],
+      "ok": true,
+      "shut_kinds": [],
+      "shut_links": [],
+      "unbuildable_mechanics": []
+    },
+    "causes": [
+      "event:a3-012027",
+      "event:a2-007853",
+      "event:a2-008102",
+      "event:a2-008289",
+      "event:a2-010427"
+    ],
+    "cell": 748338,
+    "complexity": 3,
+    "depth": 8,
+    "display_name": "The Crumbling Sanctum",
+    "dungeon_id": "dungeon:cursed-hall-event-a3-012027",
+    "goal": "Treasure",
+    "kind": "cursed-hall",
+    "layout": "temple",
+    "patron": "vael",
+    "planner_theme": "overgrown_library",
+    "record": "event:a3-012027",
+    "schema": "voxelgames.dungeon.plan",
+    "schema_version": 1,
+    "seed": "-1436416650880427663",
+    "size": 8,
+    "surface_theme": "Crypt",
+    "tier": 5,
+    "tone": "withheld",
+    "which": "base",
+    "world_id": "genesis-000100-1024"
+  }
+}

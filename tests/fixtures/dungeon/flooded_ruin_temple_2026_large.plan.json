@@ -1,0 +1,1125 @@
+{
+	"api_version": 5,
+	"archetype": "temple",
+	"entrance_key": "entrance",
+	"goal_key": "goal",
+	"keys": [],
+	"links": [
+		{
+			"from": "antechamber_1",
+			"kind": "stairs",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "antechamber_1->gallery_1",
+			"to": "gallery_1"
+		},
+		{
+			"from": "basin_1",
+			"kind": "door",
+			"lock": {
+				"kind": "mode",
+				"ref": "mode_1:1"
+			},
+			"portal": "basin_1->basin_2",
+			"to": "basin_2",
+			"wall": "west"
+		},
+		{
+			"from": "basin_2",
+			"kind": "door",
+			"lock": {
+				"kind": "mode",
+				"ref": "mode_1:1"
+			},
+			"portal": "basin_2->test_3",
+			"to": "test_3",
+			"wall": "north"
+		},
+		{
+			"from": "boss_1",
+			"guarded": true,
+			"kind": "door",
+			"lock": {
+				"kind": "monster",
+				"ref": "boss_1"
+			},
+			"portal": "boss_1->test_1",
+			"to": "test_1",
+			"wall": "west"
+		},
+		{
+			"from": "entrance",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "entrance->alcove_1",
+			"to": "alcove_1",
+			"wall": "south"
+		},
+		{
+			"from": "entrance",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "entrance->lever_room_1",
+			"to": "lever_room_1",
+			"wall": "north"
+		},
+		{
+			"from": "entrance",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "entrance->lever_room_2",
+			"to": "lever_room_2",
+			"wall": "east"
+		},
+		{
+			"from": "entrance",
+			"kind": "door",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_2_2"
+			},
+			"portal": "entrance->test_2",
+			"to": "test_2",
+			"wall": "west"
+		},
+		{
+			"from": "gallery_1",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "gallery_1->boss_1",
+			"to": "boss_1",
+			"wall": "south"
+		},
+		{
+			"from": "hub",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "hub->relic_hall_1",
+			"to": "relic_hall_1",
+			"wall": "east"
+		},
+		{
+			"from": "hub",
+			"kind": "door",
+			"lock": {
+				"kind": "ability",
+				"ref": "relic_1"
+			},
+			"portal": "hub->sealed_alcove_1",
+			"to": "sealed_alcove_1",
+			"wall": "south"
+		},
+		{
+			"from": "relic_hall_1",
+			"kind": "door",
+			"lock": {
+				"kind": "ability",
+				"ref": "relic_1"
+			},
+			"portal": "relic_hall_1->antechamber_1",
+			"to": "antechamber_1",
+			"wall": "north"
+		},
+		{
+			"from": "statuary",
+			"kind": "door",
+			"lock": {
+				"kind": "mode",
+				"ref": "mode_1:1"
+			},
+			"portal": "statuary->basin_1",
+			"to": "basin_1",
+			"wall": "south"
+		},
+		{
+			"from": "switching_room_1",
+			"kind": "door",
+			"lock": {
+				"kind": "mode",
+				"ref": "mode_1:0"
+			},
+			"portal": "switching_room_1->cache_1",
+			"to": "cache_1",
+			"wall": "east"
+		},
+		{
+			"from": "test_1",
+			"kind": "door",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_4"
+			},
+			"portal": "test_1->goal",
+			"to": "goal",
+			"wall": "west"
+		},
+		{
+			"from": "test_1",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "test_1->late_key_1",
+			"to": "late_key_1",
+			"wall": "south"
+		},
+		{
+			"from": "test_2",
+			"kind": "door",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_1"
+			},
+			"portal": "test_2->sealed_1",
+			"to": "sealed_1",
+			"wall": "west"
+		},
+		{
+			"from": "test_2",
+			"kind": "door",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_2"
+			},
+			"portal": "test_2->statuary",
+			"to": "statuary",
+			"wall": "south"
+		},
+		{
+			"from": "test_2",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "test_2->switching_room_1",
+			"to": "switching_room_1",
+			"wall": "north"
+		},
+		{
+			"from": "test_3",
+			"kind": "stairs",
+			"lock": {
+				"kind": "switch",
+				"ref": "switch_puzzle_3"
+			},
+			"portal": "test_3->hub",
+			"to": "hub"
+		},
+		{
+			"from": "test_3",
+			"kind": "door",
+			"lock": {
+				"kind": "barred",
+				"ref": "test_3"
+			},
+			"one_way": true,
+			"portal": "test_3->statuary",
+			"to": "statuary",
+			"wall": "east"
+		}
+	],
+	"lock_kinds": [
+		"ability",
+		"barred",
+		"mode",
+		"monster",
+		"switch"
+	],
+	"plan_seed": 2026,
+	"planner_version": "0.3.0-dev",
+	"request": {
+		"archetype": "temple",
+		"complexity": 3,
+		"seed": 2026,
+		"size": "large",
+		"theme": "flooded_ruin"
+	},
+	"requires": [
+		{
+			"count": 1,
+			"mechanic": "mode_lever",
+			"prop": "mode_lever",
+			"properties": [
+				"stateful"
+			]
+		},
+		{
+			"count": 5,
+			"mechanic": "switch",
+			"prop": "switch",
+			"properties": [
+				"stateful",
+				"emits_signal"
+			]
+		},
+		{
+			"count": 1,
+			"mechanic": "tool",
+			"prop": "tool",
+			"properties": [
+				"portable",
+				"tool"
+			]
+		}
+	],
+	"rooms": [
+		{
+			"boss_tier": 0,
+			"cell": [
+				0,
+				0
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_2_2",
+					"kind": "switch",
+					"targets": [
+						"entrance->test_2"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "entrance",
+			"label": "Landing",
+			"level": 0,
+			"purpose": "",
+			"role": "entrance",
+			"space_id": "entrance",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-1,
+				1
+			],
+			"hazard": 0.0,
+			"key": "alcove_1",
+			"label": "Alcove 1 (treasure)",
+			"level": 0,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "alcove_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				0,
+				-2
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_4",
+					"kind": "switch",
+					"targets": [
+						"test_1->goal"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "lever_room_1",
+			"label": "Lever Room",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "lever_room_1",
+			"span": [
+				3,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				2,
+				0
+			],
+			"hazard": 0.0,
+			"key": "lever_room_2",
+			"label": "Side Chamber",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "lever_room_2",
+			"span": [
+				2,
+				3
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-3,
+				-1
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_2",
+					"kind": "switch",
+					"targets": [
+						"test_2->statuary"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "test_2",
+			"label": "Test 2 (test)",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "test_2",
+			"span": [
+				3,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-5,
+				-1
+			],
+			"hazard": 0.0,
+			"key": "sealed_1",
+			"label": "Sealed Chamber",
+			"level": 0,
+			"purpose": "",
+			"role": "secret",
+			"space_id": "sealed_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-3,
+				-4
+			],
+			"fixtures": [
+				{
+					"id": "mode_1",
+					"kind": "mode_lever",
+					"mode": 0,
+					"targets": [
+						"basin_1->basin_2",
+						"basin_2->test_3",
+						"statuary->basin_1",
+						"switching_room_1->cache_1"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "switching_room_1",
+			"label": "Switching Room",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "switching_room_1",
+			"span": [
+				2,
+				3
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-1,
+				-4
+			],
+			"hazard": 0.0,
+			"key": "cache_1",
+			"label": "Drained Cache",
+			"level": 0,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "cache_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-5,
+				1
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_3",
+					"kind": "switch",
+					"targets": [
+						"test_3->hub"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "statuary",
+			"label": "Sunken Statuary",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "statuary",
+			"span": [
+				3,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-6,
+				2
+			],
+			"hazard": 0.0,
+			"key": "basin_1",
+			"label": "Tide Basin",
+			"level": 0,
+			"purpose": "",
+			"role": "corridor",
+			"space_id": "basin_1",
+			"span": [
+				3,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-9,
+				2
+			],
+			"hazard": 0.0,
+			"key": "basin_2",
+			"label": "Tide Basin",
+			"level": 0,
+			"purpose": "",
+			"role": "corridor",
+			"space_id": "basin_2",
+			"span": [
+				3,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-7,
+				-1
+			],
+			"hazard": 0.0,
+			"key": "test_3",
+			"label": "Test 3 (test)",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "test_3",
+			"span": [
+				2,
+				3
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-7,
+				-2
+			],
+			"hazard": 0.0,
+			"key": "hub",
+			"label": "Great Hall",
+			"level": 2,
+			"purpose": "",
+			"role": "hub",
+			"space_id": "hub",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-6,
+				0
+			],
+			"hazard": 0.0,
+			"key": "sealed_alcove_1",
+			"label": "Sealed Alcove",
+			"level": 2,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "sealed_alcove_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-5,
+				-3
+			],
+			"fixtures": [
+				{
+					"ability": "grapple",
+					"id": "relic_1",
+					"kind": "tool",
+					"targets": [
+						"hub->sealed_alcove_1",
+						"relic_hall_1->antechamber_1"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "relic_hall_1",
+			"label": "Relic Hall",
+			"level": 2,
+			"purpose": "",
+			"role": "room",
+			"space_id": "relic_hall_1",
+			"span": [
+				3,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-5,
+				-4
+			],
+			"hazard": 0.0,
+			"key": "antechamber_1",
+			"label": "Antechamber",
+			"level": 2,
+			"purpose": "",
+			"role": "corridor",
+			"space_id": "antechamber_1",
+			"span": [
+				3,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-3,
+				-4
+			],
+			"hazard": 0.0,
+			"key": "gallery_1",
+			"label": "Great Gallery",
+			"level": 3,
+			"purpose": "",
+			"role": "room",
+			"space_id": "gallery_1",
+			"span": [
+				3,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 3,
+			"cell": [
+				-4,
+				-3
+			],
+			"hazard": 0.0,
+			"key": "boss_1",
+			"label": "Boss Chamber",
+			"level": 3,
+			"purpose": "",
+			"role": "boss",
+			"space_id": "boss_1",
+			"span": [
+				3,
+				3
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-6,
+				-4
+			],
+			"hazard": 0.0,
+			"key": "test_1",
+			"label": "Test 1 (test)",
+			"level": 3,
+			"purpose": "",
+			"role": "room",
+			"space_id": "test_1",
+			"span": [
+				2,
+				3
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-6,
+				-1
+			],
+			"fixtures": [
+				{
+					"id": "switch_puzzle_1",
+					"kind": "switch",
+					"targets": [
+						"test_2->sealed_1"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "late_key_1",
+			"label": "Old Workshop",
+			"level": 3,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "late_key_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-8,
+				-5
+			],
+			"hazard": 0.0,
+			"key": "goal",
+			"label": "Treasure Chamber",
+			"level": 3,
+			"purpose": "",
+			"role": "goal",
+			"space_id": "goal",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		}
+	],
+	"schema": "dmv.dungeon.plan",
+	"schema_version": 2,
+	"spaces": {
+		"alcove_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Alcove 1 (treasure)",
+			"landmark": "",
+			"signature": {
+				"openness": 0.484604880213737,
+				"region": "threshold",
+				"verticality": 0.0153277724981308
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"antechamber_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 2,
+			"label": "Antechamber",
+			"landmark": "",
+			"signature": {
+				"openness": 0.284896150231361,
+				"region": "abyss",
+				"verticality": 0.102788436412811
+			},
+			"size_class": "wide",
+			"span": [
+				3,
+				1
+			]
+		},
+		"basin_1": {
+			"archetype": "chasm",
+			"elevation": 0,
+			"label": "Tide Basin",
+			"landmark": "chasm",
+			"signature": {
+				"openness": 0.358979843556881,
+				"region": "spiral",
+				"verticality": 0.664237140119076
+			},
+			"size_class": "wide",
+			"span": [
+				3,
+				1
+			]
+		},
+		"basin_2": {
+			"archetype": "chasm",
+			"elevation": 0,
+			"label": "Tide Basin",
+			"landmark": "chasm",
+			"signature": {
+				"openness": 0.330005705356598,
+				"region": "ruins",
+				"verticality": 0.833243662118912
+			},
+			"size_class": "wide",
+			"span": [
+				3,
+				1
+			]
+		},
+		"boss_1": {
+			"archetype": "cavern",
+			"elevation": 3,
+			"label": "Boss Chamber",
+			"landmark": "",
+			"signature": {
+				"openness": 0.716514348983765,
+				"region": "abyss",
+				"verticality": 0.457978284358978
+			},
+			"size_class": "huge",
+			"span": [
+				3,
+				3
+			]
+		},
+		"cache_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Drained Cache",
+			"landmark": "",
+			"signature": {
+				"openness": 0.35552928596735,
+				"region": "spiral",
+				"verticality": 0.195037519931793
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"entrance": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Landing",
+			"landmark": "",
+			"signature": {
+				"openness": 0.284945223480463,
+				"region": "threshold",
+				"verticality": 0.053792279958725
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"gallery_1": {
+			"archetype": "chasm",
+			"elevation": 3,
+			"label": "Great Gallery",
+			"landmark": "chasm",
+			"signature": {
+				"openness": 0.496086835861206,
+				"region": "abyss",
+				"verticality": 0.896355164051056
+			},
+			"size_class": "medium",
+			"span": [
+				3,
+				1
+			]
+		},
+		"goal": {
+			"archetype": "tower",
+			"elevation": 3,
+			"label": "Treasure Chamber",
+			"landmark": "tower",
+			"signature": {
+				"openness": 0.299129504710436,
+				"region": "abyss",
+				"verticality": 0.900879038125277
+			},
+			"size_class": "medium",
+			"span": [
+				2,
+				2
+			]
+		},
+		"hub": {
+			"archetype": "atrium",
+			"elevation": 2,
+			"label": "Great Hall",
+			"landmark": "",
+			"signature": {
+				"openness": 0.978635847568512,
+				"region": "ruins",
+				"verticality": 0.459833431243896
+			},
+			"size_class": "huge",
+			"span": [
+				2,
+				2
+			]
+		},
+		"late_key_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 3,
+			"label": "Old Workshop",
+			"landmark": "",
+			"signature": {
+				"openness": 0.250174603192136,
+				"region": "abyss",
+				"verticality": 0.00893350318074226
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"lever_room_1": {
+			"archetype": "great_hall",
+			"elevation": 0,
+			"label": "Lever Room",
+			"landmark": "",
+			"signature": {
+				"openness": 0.880331516265869,
+				"region": "threshold",
+				"verticality": 0.045456451177597
+			},
+			"size_class": "large",
+			"span": [
+				3,
+				2
+			]
+		},
+		"lever_room_2": {
+			"archetype": "cavern",
+			"elevation": 0,
+			"label": "Side Chamber",
+			"landmark": "",
+			"signature": {
+				"openness": 0.655991777777672,
+				"region": "threshold",
+				"verticality": 0.3620052292943
+			},
+			"size_class": "large",
+			"span": [
+				2,
+				3
+			]
+		},
+		"relic_hall_1": {
+			"archetype": "great_hall",
+			"elevation": 2,
+			"label": "Relic Hall",
+			"landmark": "",
+			"signature": {
+				"openness": 0.939833879470825,
+				"region": "ruins",
+				"verticality": 0.261593109369278
+			},
+			"size_class": "large",
+			"span": [
+				3,
+				2
+			]
+		},
+		"sealed_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Sealed Chamber",
+			"landmark": "",
+			"signature": {
+				"openness": 0.339660957455635,
+				"region": "spiral",
+				"verticality": 0.0137113720178604
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"sealed_alcove_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 2,
+			"label": "Sealed Alcove",
+			"landmark": "",
+			"signature": {
+				"openness": 0.257458031643182,
+				"region": "ruins",
+				"verticality": 0.0612450778484345
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"statuary": {
+			"archetype": "chasm",
+			"elevation": 0,
+			"label": "Sunken Statuary",
+			"landmark": "chasm",
+			"signature": {
+				"openness": 0.371383935213089,
+				"region": "spiral",
+				"verticality": 0.702094396948814
+			},
+			"size_class": "large",
+			"span": [
+				3,
+				1
+			]
+		},
+		"switching_room_1": {
+			"archetype": "cavern",
+			"elevation": 0,
+			"label": "Switching Room",
+			"landmark": "",
+			"signature": {
+				"openness": 0.669537648558617,
+				"region": "spiral",
+				"verticality": 0.574519872665405
+			},
+			"size_class": "large",
+			"span": [
+				2,
+				3
+			]
+		},
+		"test_1": {
+			"archetype": "cavern",
+			"elevation": 3,
+			"label": "Test 1 (test)",
+			"landmark": "",
+			"signature": {
+				"openness": 0.695162281394005,
+				"region": "abyss",
+				"verticality": 0.552672153711319
+			},
+			"size_class": "large",
+			"span": [
+				2,
+				3
+			]
+		},
+		"test_2": {
+			"archetype": "great_hall",
+			"elevation": 0,
+			"label": "Test 2 (test)",
+			"landmark": "",
+			"signature": {
+				"openness": 0.997620075941086,
+				"region": "threshold",
+				"verticality": 0.0356480464339256
+			},
+			"size_class": "large",
+			"span": [
+				3,
+				2
+			]
+		},
+		"test_3": {
+			"archetype": "cavern",
+			"elevation": 0,
+			"label": "Test 3 (test)",
+			"landmark": "",
+			"signature": {
+				"openness": 0.619305953383446,
+				"region": "ruins",
+				"verticality": 0.558443319797516
+			},
+			"size_class": "large",
+			"span": [
+				2,
+				3
+			]
+		}
+	},
+	"theme": {
+		"atmosphere_tags": [
+			"ancient",
+			"flooded",
+			"sacred"
+		],
+		"boss_aesthetic": "water_elemental",
+		"corridor_width_bias": 0.8,
+		"description": "Wide, waterlogged halls that rise to a drowned reckoning.",
+		"id": "flooded_ruin",
+		"label": "Flooded Ruin",
+		"macro_shape": "descent",
+		"materials": [
+			"wet_stone",
+			"silt",
+			"green_marble",
+			"rotted_timber"
+		],
+		"motifs": [
+			"rising_water",
+			"broken_aqueduct",
+			"sunken_statue"
+		],
+		"prop_palette": [
+			"water_trap",
+			"stepping_stone",
+			"drowned_statue",
+			"pressure_plate"
+		],
+		"verticality_bias": 0.8
+	}
+}
