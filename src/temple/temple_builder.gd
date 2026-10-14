@@ -1410,6 +1410,44 @@ func _build_basilica_rear_spandrel_cut(z: float, half_width: float,
 	host_end()
 
 
+## What makes the pronaos gable a pediment rather than a barn end (LIVE-SACRED
+## exterior identity): a cult emblem standing proud in the tympanum, a trim
+## cornice along its base, and acroteria -- a tall one on the apex and a low one
+## on each eave corner -- so the skyline of the front is a temple's, not a
+## shed's. Everything stands clear of the roof slabs (it rests on their upper
+## faces or sits in front of the gable face) and outside every walked rect.
+func _build_basilica_pediment_dress(half: float, eave: float, rise: float,
+		z0: float, gable_z: float) -> void:
+	var roof_top: float = RoofShape.DEPTH * 0.5
+	var ac_w: float = clampf(half * 0.07, 0.45, 0.9)
+	var ac_d: float = 0.4
+	var ac_z: float = z0 + ac_d * 0.5 + 0.05
+	var apex_h: float = clampf(rise * 0.9, 0.7, 1.9)
+	# the apex acroterion: plinth, tall block, finial
+	var apex_y: float = eave + rise + roof_top
+	component_box("basilica_pediment_acroterion_plinth", Vector3(ac_w * 1.5, 0.2, ac_d * 1.2),
+		Transform3D(Basis(), Vector3(0.0, apex_y + 0.1, ac_z)), SURF_STONE)
+	component_box("basilica_pediment_acroterion", Vector3(ac_w, apex_h, ac_d),
+		Transform3D(Basis(), Vector3(0.0, apex_y + 0.2 + apex_h * 0.5, ac_z)), SURF_TRIM)
+	component_box("basilica_pediment_finial", Vector3(ac_w * 0.5, ac_w * 0.5, ac_d * 0.7),
+		Transform3D(Basis(Vector3(0, 0, 1), PI * 0.25),
+			Vector3(0.0, apex_y + 0.2 + apex_h + ac_w * 0.3, ac_z)), SURF_STONE)
+	# a low block on each eave corner, set on the roof's upper face
+	for side in [-1.0, 1.0]:
+		var cx: float = side * (half - ac_w * 0.75)
+		var surface: float = eave + roof_top + rise * (ac_w * 0.75 / half)
+		component_box("basilica_pediment_corner_acroterion", Vector3(ac_w, apex_h * 0.55, ac_d),
+			Transform3D(Basis(), Vector3(cx, surface + apex_h * 0.275 + 0.02, ac_z)), SURF_TRIM)
+	# the tympanum: a base cornice on the gable face and a lozenge emblem
+	var face_z: float = gable_z - 0.35 * 0.5
+	component_box("basilica_pediment_base_cornice", Vector3(half * 2.0 - 0.4, 0.22, 0.14),
+		Transform3D(Basis(), Vector3(0.0, eave + 0.12, face_z - 0.07)), SURF_TRIM)
+	var emblem: float = clampf(rise * 0.55, 0.45, 1.2)
+	component_box("basilica_pediment_emblem", Vector3(emblem, emblem, 0.22),
+		Transform3D(Basis(Vector3(0, 0, 1), PI * 0.25),
+			Vector3(0.0, eave + 0.22 + rise * 0.36 + emblem * 0.3, face_z - 0.11)), SURF_TRIM)
+
+
 func _build_basilica_portico(site: Rect2) -> void:
 	var half: float = TempleGeometry.basilica_portico_half_width(spec)
 	var depth: float = TempleGeometry.basilica_portico_depth(spec)
@@ -1471,6 +1509,7 @@ func _build_basilica_portico(site: Rect2) -> void:
 		Vector3(-half, eave, front_beam_z), Vector3(half, eave, front_beam_z),
 		Vector3(0.0, eave + rise, front_beam_z)])
 	component_slab("basilica_portico_gable", front_gable, 0.35, SURF_STONE, false)
+	_build_basilica_pediment_dress(half, eave, rise, z0, front_beam_z)
 	var roof_aabb := AABB(Vector3(-half, eave - RoofShape.DEPTH * 0.5, z0),
 		Vector3(half * 2.0, rise + RoofShape.DEPTH, z1 - z0))
 	component_note("basilica_portico_roof", "gable_roof", SURF_ROOF,
