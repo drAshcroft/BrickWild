@@ -332,7 +332,7 @@ const AMPLE := {
 	# Marker thresholds for the style-and-trade overlay below. Empty base steps
 	# keep every other house family unchanged.
 	&"hall": {"area": 60.0, "steps": []},
-	&"parlour": {"area": 30.0, "steps": []},
+	&"parlour": {"area": 20.0, "steps": []},
 	&"workshop": {"area": 30.0, "steps": []},
 	&"records": {"area": 30.0, "steps": []},
 }
@@ -436,6 +436,13 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 				step["near_anchor"] = "head_end"
 			guest_sleep.append(step)
 		return guest_sleep
+	if plan.spec.get_script() == BASE_HOUSE_SPEC and plan.world_family == &"" \
+			and plan.spec.trade == &"innkeeper" and kind == &"kitchen":
+		# An inn's kitchen has a fire; it also needs a board to prepare food on.
+		var inn_kitchen: Array = recipe.duplicate(true)
+		inn_kitchen.append({"cat": "table", "rule": &"free", "n": [1, 1],
+			"opt": 1.0, "private_rng": true})
+		return inn_kitchen
 	if plan.spec.get_script() == BASE_HOUSE_SPEC and plan.world_family == &"" \
 			and plan.spec.trade == &"innkeeper" and kind == &"parlour":
 		# Public dining is separate from the ordinary household's one-table
@@ -758,6 +765,24 @@ static func ample_steps_for_room(plan: HousePlan, room: int) -> Array:
 				{"cat": "bookcase", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 				{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 			]
+	# A big hall or sitting parlour of any other base house (an innkeeper's
+	# townhouse included) was a few pieces in an acre of floor with one lamp.
+	# Fit its walls and corners to its size. Each step draws from its own
+	# stream, so the rooms furnished after it keep their rolls, and the pieces
+	# are optional (the walkability repair may thin them).
+	if plan.spec.get_script() == BASE_HOUSE_SPEC and plan.world_family == &"" \
+			and plan.spec.style != &"witch_hut" and kind in [&"hall", &"parlour"] \
+			and room !=int(plan.domestic_layout.get("dining_room", -1)):
+		var room_area := HouseGeometry.room_area(plan, room)
+		var scale_n := clampi(int(room_area / 20.0), 1, 4)
+		var lights := clampi(int(ceil(room_area / 35.0)), 1, 4)
+		return [
+			{"cat": "bench", "rule": &"wall", "n": [scale_n, scale_n], "opt": 0.9, "settle": true, "always_attempt": true, "private_rng": true},
+			{"cat": "bookcase", "rule": &"wall", "n": [1, scale_n], "opt": 0.9, "always_attempt": true, "private_rng": true},
+			{"cat": "chest", "rule": &"wall", "n": [1, scale_n], "opt": 0.9, "always_attempt": true, "private_rng": true},
+			{"cat": "storage", "rule": &"wall", "n": [1, scale_n], "opt": 0.9, "always_attempt": true, "private_rng": true},
+			{"cat": "sconce", "rule": &"mounted", "n": [lights, lights], "opt": 0.9, "always_attempt": true, "private_rng": true},
+		]
 	# One measured desk group scales with the writer, not the office footprint.
 	# Additional generic tables and chairs make a large Townhouse office less
 	# usable by filling the pull-back space around its one writing chair.

@@ -1431,12 +1431,26 @@ static func _append_nearby_activity_support(p: HousePlan, room: int,
 					continue
 				if not HouseGeometry.room_floor_rect(p, room).grow(0.01).encloses(body):
 					continue
+				# How much of the shelf hangs over the work surface it serves,
+				# measured along this wall against the prep rectangle.
+				var body_lo := body.position[0 if horizontal else 1]
+				var body_hi := body.end[0 if horizontal else 1]
+				var prep_lo := prep_rect.position[0 if horizontal else 1]
+				var prep_hi := prep_rect.end[0 if horizontal else 1]
+				var cover_span := minf(body_hi - body_lo, prep_hi - prep_lo)
+				var covered := (minf(body_hi, prep_hi) - maxf(body_lo, prep_lo)) \
+					/ maxf(cover_span, 0.05)
 				candidates.append({"wall": wi, "wall_row": wall,
 					"along": station_along, "distance": distance,
+					"covers": covered >= 0.5,
 					"station_extent": clear_span, "body": body})
 	candidates.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
 		var left_bucket := roundi(float(left["distance"]) * 100.0)
 		var right_bucket := roundi(float(right["distance"]) * 100.0)
+		# a station over the bench is the shelf's job; one beside it is a
+		# fallback (shelf_over)
+		if bool(left["covers"]) != bool(right["covers"]):
+			return bool(left["covers"])
 		if left_bucket != right_bucket:
 			return left_bucket < right_bucket
 		var left_preferred := int(left["wall"]) == original_wall

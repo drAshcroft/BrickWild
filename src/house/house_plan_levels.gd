@@ -366,8 +366,36 @@ static func add_stair(p: HousePlan, lower_room: int, upper_room: int,
 	# and temples use separate planners. Their stair work needs family-specific
 	# fixtures; sharing HousePlan alone does not make their circulation domestic.
 	if _uses_domestic_stairs(p):
+		if p.spec.trade == &"none":
+			_add_domestic_stair(p, lower_room, upper_room, lower_storey, upper_storey)
+			return
+		# A trade keeps its own room partition, which may have no hall that
+		# carries a human-scale flight. Try the climbable flight; if the
+		# partition cannot hold it, undo the attempt and keep the trade's
+		# legacy stair rather than a house with no way upstairs.
+		var stairs_before := p.stairs.size()
+		var zones_before := p.zones.size()
+		var layout_before: Dictionary = p.domestic_layout.duplicate(true)
+		var compromises_before: Dictionary = p.compromises.duplicate(true)
+		var doors_before: Array[Dictionary] = p.doors.duplicate(true)
 		_add_domestic_stair(p, lower_room, upper_room, lower_storey, upper_storey)
-		return
+		if p.stairs.size() > stairs_before and bool(p.stairs.back().get("satisfied", false)):
+			return
+		p.stairs.resize(stairs_before)
+		p.zones.resize(zones_before)
+		p.domestic_layout = layout_before
+		p.compromises = compromises_before
+		p.doors = doors_before
+		# _slide_front_door may have moved the door while trying; the legacy
+		# search below re-evaluates from wherever it now stands.
+	add_legacy_stair(p, lower_room, upper_room, lower_storey, upper_storey)
+
+
+## The two-wall-lane flight that family adapters and custom contracts keep:
+## a fixed 2.4 m run whatever the storey height. It cannot be climbed in a
+## tall house, which is why the walk-pin fixture asks for it by name.
+static func add_legacy_stair(p: HousePlan, lower_room: int, upper_room: int,
+		lower_storey: int, upper_storey: int) -> void:
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(p, lower_room)
 	var along_x: bool = floor_rect.size.x > floor_rect.size.y
 	var long_side: float = maxf(floor_rect.size.x, floor_rect.size.y)
@@ -422,14 +450,24 @@ static func _is_plain_house_spec(spec: HouseSpec) -> bool:
 	return (spec.get_script() as Script).resource_path.ends_with("/src/house/house_spec.gd")
 
 
+## Test hook: a fixture that pins a defect of the legacy flight regenerates its
+## plan with this set, so the pin survives the generator being put right.
+static var legacy_stairs_only := false
+
+
 ## A human-scale domestic stair requires the matching household room grammar.
-## Family adapters, trades, legacy fallback partitions, and custom world
-## families keep their existing path until they have their own circulation
-## contract; a shared HousePlan type is not evidence that their plans are alike.
+## Family adapters, legacy fallback partitions and custom world families keep
+## their existing path until they have their own circulation contract; a
+## shared HousePlan type is not evidence that their plans are alike.
 static func _uses_domestic_stairs(p: HousePlan) -> bool:
-	if p == null or not _is_plain_house_spec(p.spec) \
-			or p.spec.trade != &"none" or p.world_family != &"":
+	if legacy_stairs_only:
 		return false
+	if p == null or not _is_plain_house_spec(p.spec) or p.world_family != &"":
+		return false
+	if p.spec.trade != &"none":
+		# A trade keeps its own room partition, but a person still has to climb
+		# its stair: the human-scale flight, landings and guards apply to it.
+		return p.spec.storeys > 1
 	var style: Dictionary = HouseSpec.STYLES.get(p.spec.style, {})
 	return style.has("domestic_program") \
 		and p.domestic_layout.get("status", &"") == &"planned"
