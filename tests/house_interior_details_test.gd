@@ -122,7 +122,37 @@ func _dining_fixture() -> void:
 	print("DETAIL_DINING rugs=", plan.rugs.size())
 
 
+## A desk chair drawn up to its desk in a narrow office is a seat in use; the
+## same chair unhosted, or left away from the desk, is loose in the passage.
+func _corridor_chair_control(plan: HousePlan) -> void:
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		var room := int(p["room"])
+		if not HouseFurnishWalkCheck._seat_in_use(plan, p) or not HouseFurnishWalkCheck._corridor(HouseGeometry.room_floor_rect(plan, room)):
+			continue
+		var host := int(p["host"])
+		var wall_side := HouseFurnishWalkCheck.new({"failures": [], "warnings": []})
+		wall_side.check_corridor(plan)
+		_expect(not wall_side.failures.any(func(e: String) -> bool: return e.contains(HouseFurnishCheck.who(plan, f))),
+			"hosted desk chair flagged loose in a narrow room")
+		var rect: Rect2 = p["rect"]
+		p["host"] = -1
+		var loose := HouseFurnishWalkCheck.new({"failures": [], "warnings": []})
+		loose.check_corridor(plan)
+		_expect(loose.failures.any(func(e: String) -> bool: return e.begins_with("corridor:") and e.contains(HouseFurnishCheck.who(plan, f))),
+			"unhosted chair loose in a corridor escaped the corridor rule")
+		p["host"] = host
+		p["rect"] = Rect2(rect.position + Vector2(2.5, 0.0), rect.size)
+		var away := HouseFurnishWalkCheck.new({"failures": [], "warnings": []})
+		away.check_corridor(plan)
+		_expect(away.failures.any(func(e: String) -> bool: return e.begins_with("corridor:") and e.contains(HouseFurnishCheck.who(plan, f))),
+			"hosted chair left off its desk escaped the corridor rule")
+		p["rect"] = rect
+		return
+
+
 func _mutations(plan: HousePlan) -> void:
+	_corridor_chair_control(plan)
 	var breast := HouseGeometry.hearth_breast(plan)
 	if not breast.is_empty():
 		var absent := MissingBreast.new()

@@ -89,6 +89,24 @@ func door(_building) -> Vector3:
 	return Vector3.ZERO
 
 
+## The family's walkable interior as outlines a navigation baker can union:
+## {storey: {"floor": [PackedVector2Array], "obstacles": [PackedVector2Array]}},
+## in the building's frame, read from the same geometry the family's own walk
+## check rasterises. Empty (the default) means the family publishes no interior
+## walk and `BrickWild.navigation()` reports `supported: false`.
+func walk_sources(_building) -> Dictionary:
+	return {}
+
+
+## What goes with `walk_sources`: {"floor_y": {storey: metres}, "links":
+## [{from_storey, to_storey, lower: Vector2, upper: Vector2, width}], "doors":
+## [{pos: Vector2, normal: Vector2 (outward), front: bool}], "focus":
+## [{key, storey, pos: Vector2}] (where a person stands to use the thing the
+## family's building exists for)}.
+func walk_frame(_building) -> Dictionary:
+	return {}
+
+
 # ------------------------------------------------------------- the registry
 
 ## Every family, by kind. Built once and shared; the adapters are stateless.
@@ -307,11 +325,43 @@ class ChurchFamily extends BuildingFamilyAdapter:
 	## west door sits on the nave's own front wall, UNLESS a single axial
 	## tower carries it out to that tower's own west face instead.
 	static func door_z(church: ChurchSpec) -> float:
-		var l: float = church.length
-		var out: float = -l / 2.0 - 0.02
-		if church.tower and church.west_towers == 1:
-			out = -l / 2.0 + ChurchGeometry.TOWER_EMBED - church.tower_width - 0.02
-		return out
+		return ChurchGeometry.west_door_z(church)
+
+	## The walkable nave, aisles and doorways less piers and dressing: the
+	## rectangles `ChurchGeometry.walk_rects` derives. Empty for a podium church.
+	func walk_sources(building) -> Dictionary:
+		var church := building.spec as ChurchSpec
+		return ChurchGeometry.walk_sources(church, ChurchFurnisher.dress(church))
+
+	## One storey at the paving's top. Every west doorway faces -Z; the altar is
+	## the focus, approached from the west (the way a person walks up the nave).
+	func walk_frame(building) -> Dictionary:
+		var church := building.spec as ChurchSpec
+		var doors: Array = []
+		for d in ChurchGeometry.west_door_layout(church):
+			doors.append({"pos": Vector2(float(d.x), ChurchGeometry.west_door_z(church)),
+				"normal": Vector2(0.0, -1.0), "front": true})
+		var focus: Array = []
+		var altar: Rect2 = altar_rect(church)
+		if altar.size.x > 0.0:
+			focus.append({"key": "altar", "storey": 0,
+				"pos": Vector2(altar.get_center().x, altar.position.y - HouseGeometry.PERSON_RADIUS * 2.0)})
+		return {"floor_y": {0: 0.0}, "links": [], "doors": doors, "focus": focus}
+
+	## The nave altar the furnisher places (not a chapel's small one), or an
+	## empty rect when the nave was too narrow to take one.
+	static func altar_rect(church: ChurchSpec) -> Rect2:
+		var best := Rect2()
+		for p in ChurchFurnisher.dress(church):
+			if String(p["key"]) != ChurchFurnisher.ALTAR:
+				continue
+			var r: Rect2 = p["rect"]
+			if absf(r.get_center().x) > church.width * 0.25 \
+					or r.get_center().y > church.length / 2.0 - 0.4:
+				continue
+			if best.size.x <= 0.0 or r.get_center().y > best.get_center().y:
+				best = r
+		return best
 
 
 # ------------------------------------------------------------- the castles
@@ -331,6 +381,15 @@ class CastleFamily extends BuildingFamilyAdapter:
 
 	func build_mesh(building) -> ArrayMesh:
 		return CastleBuilder.new().build(building.spec as CastleSpec)
+
+	## The ward ground and the ranges' floors, joined by the doors, the keep's
+	## forebuilding stair and the ranges' own stairs. Empty for the castles that
+	## `CastleWalkSources` does not walk (see its header).
+	func walk_sources(building) -> Dictionary:
+		return CastleWalkSources.sources(building.spec as CastleSpec)
+
+	func walk_frame(building) -> Dictionary:
+		return CastleWalkSources.frame(building.spec as CastleSpec)
 
 	func instantiate(building, cutaway: bool) -> Node3D:
 		return CastleAssembler.build(building.spec as CastleSpec, cutaway)
@@ -405,6 +464,23 @@ class TempleFamily extends BuildingFamilyAdapter:
 			return Vector3(0.0, gh / 2.0,
 				-TempleGeometry.rotunda_outer_radius(temple))
 		return Vector3(0.0, gh / 2.0, r.position.y)
+
+	func walk_sources(building) -> Dictionary:
+		return TempleGeometry.walk_sources(building.spec as TempleSpec)
+
+	## One storey at the slab's top (y 0). The gate is the front door, facing
+	## -Z; the altar is the focus, approached from the gate's side.
+	func walk_frame(building) -> Dictionary:
+		var temple := building.spec as TempleSpec
+		var gate: Vector3 = door(building)
+		var altar: Rect2 = TempleGeometry.altar_rect(temple)
+		return {
+			"floor_y": {0: 0.0},
+			"links": [],
+			"doors": [{"pos": Vector2(gate.x, gate.z), "normal": Vector2(0.0, -1.0), "front": true}],
+			"focus": [{"key": "altar", "storey": 0,
+				"pos": Vector2(altar.get_center().x, altar.position.y - TempleGeometry.PERSON_RADIUS * 2.0)}],
+		}
 
 	func placement_metadata(building, bounds: AABB) -> Dictionary:
 		var temple := building.spec as TempleSpec

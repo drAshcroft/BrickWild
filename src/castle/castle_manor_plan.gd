@@ -411,7 +411,7 @@ static func tower_approach_box(spec: CastleSpec, door_xz: Vector2) -> AABB:
 	var sill := CastleGeometry.tower_door_sill(spec)
 	var count := maxi(4, int(ceil(sill / 0.28)))
 	var depth := clampf(maxf(t.size.z * 0.08, 0.8), 0.8, 1.5)
-	var width := clampf(maxf(t.size.x * 0.28, 2.0), 2.0, 3.6)
+	var width := CastleGeometry.tower_approach_width(spec)
 	var total := float(count) * depth
 	return AABB(Vector3(door_xz.x - width * 0.5 - 0.3, 0.0, door_xz.y - total - 0.3),
 		Vector3(width + 0.6, sill + 3.5, total + 0.3))

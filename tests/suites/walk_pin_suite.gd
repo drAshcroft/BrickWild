@@ -306,6 +306,22 @@ static func _stairs(res: SuiteResult) -> void:
 		res.fail("stairs: village house_9 is infeasible, so legacy defects cannot be claimed reproduced: %s" \
 			% String(plan.stairs[0].get("reason", "no reason")))
 		return
+	# The generator now climbs this house with a human-scale flight (trade
+	# houses take the domestic profile). That current plan must pass every
+	# stair rule...
+	var current_builder := HouseBuilder.new()
+	current_builder.build(plan)
+	for rule in ["stair_pitch", "stair_head", "stair_guard"]:
+		res.checked += 1
+		for m in HouseStairCheck.check(plan, current_builder):
+			if String(m).begins_with(rule + ":"):
+				res.fail("village house_9 current stair: " + String(m))
+	# ...and the pre-fix flight the village reported stays frozen here: the same
+	# request generated with the legacy two-wall-lane stair.
+	HousePlanLevels.legacy_stairs_only = true
+	b = BrickWild.generate(BuildingRequest.from_dict(HOUSE_9))
+	HousePlanLevels.legacy_stairs_only = false
+	plan = b.plan as HousePlan
 	var builder := HouseBuilder.new()
 	builder.build(plan)
 	var said := HouseStairCheck.check(plan, builder)

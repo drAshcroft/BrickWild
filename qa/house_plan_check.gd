@@ -280,7 +280,9 @@ func _check_entrance(plan: HousePlan) -> void:
 			continue
 		if not d["exterior"]:
 			continue
-		var entry_level: int = plan.spec.entry_storey if plan.spec is KeepSpec else 0
+		var entry_level: int = 0
+		if plan.spec is KeepSpec or plan.spec is CastleTowerPlan.TowerSpec:
+			entry_level = plan.spec.entry_storey
 		if HousePlan.record_storey(d) != entry_level:
 			failures.append("way in: exterior door is on storey %d, expected entry storey %d" % [HousePlan.record_storey(d), entry_level])
 		exteriors += 1
@@ -489,6 +491,10 @@ func _check_privacy(plan: HousePlan) -> void:
 			continue
 		if plan.spec is ShopSpec and plan.spec.business == &"prison" \
 				and plan.kind_of(i) == &"oubliette" and bool(plan.rooms[i].get("sealed", false)):
+			continue
+		# A roof deck is open sky, not a room anyone is walked through: the way
+		# up to it is the stair from the top chamber, as in any tower.
+		if bool(plan.rooms[i].get("open_air", false)):
 			continue
 		if not polite.has(i):
 			failures.append("privacy: the only way into room %d (%s) is through a %s"

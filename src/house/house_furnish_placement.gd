@@ -232,6 +232,17 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 	if choices.is_empty():
 		return
 	var key: String = choices[r.randi_range(0, choices.size() - 1)]
+	if cat == "seat" and rule == &"around" and not step.has("key"):
+		# The tables of one room are set with one kind of seat (seat_kinds): a
+		# stool drawn up to one table and a chair to the next is a dice roll,
+		# not a design. Follow the kind already set out here.
+		for placed_index in plan.furniture_of(room):
+			var placed_piece: Dictionary = plan.furniture[placed_index]
+			if PropCatalog.category(String(placed_piece["key"])) == "seat" \
+					and int(placed_piece.get("host", -1)) >= 0 \
+					and choices.has(String(placed_piece["key"])):
+				key = String(placed_piece["key"])
+				break
 	var before_place: int = plan.furniture.size()
 	var original_blocked_count: int = blocked.size()
 	var borrowed_band_count := _borrow_activity_band(plan, room,
@@ -281,7 +292,8 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 					break
 			_flag_door_approach(plan, room, had)
 			var compact_witchwork_wall: bool = _requires_compact_witchwork_wall(plan, room, key, step)
-			if plan.furniture.size() == had and not cat in WALL_ESSENTIAL and not compact_witchwork_wall:
+			if plan.furniture.size() == had and not cat in WALL_ESSENTIAL and not compact_witchwork_wall \
+					and not bool(step.get("wall_only", false)):
 				var required_cooking_store: bool = HouseFurnishingRecipes.is_ordinary_house(plan) \
 					and String(step.get("group", "")) == "cooking" \
 					and cat == "storage"

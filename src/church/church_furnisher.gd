@@ -25,7 +25,8 @@ const AISLE_W := 1.5         # clear width of the central processional aisle
 const PEW_PITCH := 1.15      # front of one pew to the front of the next
 const PEW_GAP := 0.35        # between the outer end of a pew and the wall
 const CHANCEL := 2.6         # clear floor west of the altar
-const ENTRY := 2.0           # clear floor inside the west door
+const PERSON_CLEAR := 0.1    # a font keeps this far from a doorway's jambs
+const ENTRY := 2.0          # clear floor inside the west door
 const ALTAR_SETBACK := 1.3   # altar face to the east wall
 
 # ---- fire ----
@@ -38,7 +39,12 @@ const CHANDELIER_BAY := 9.0
 # ---- what is not worth placing at all ----
 const MIN_PEW := 1.3         # a pew shorter than this seats nobody
 const MIN_ALTAR_SCALE := 0.62  # PropCatalog.SHRINKABLE says a table stops here
-const MAX_PEW_ROWS := 30     # a cathedral, not a stadium
+const MAX_PEW_ROWS := 60     # a cathedral, not a stadium
+const PEW_SIDE_AISLE := 0.9  # between two benches abreast in one block
+const CROSS_AISLE_EVERY := 8 # rows between cross-aisles (one pew slot left open)
+const ORTHODOX := [&"russian", &"byzantine"]  # standing worship: no pew blocks
+const STALL_GAP := 2.2       # clear wall between two stalls of an Orthodox nave
+const GROUP_MAX_SCALE := 1.5 # the altar group grows with the nave, to here
 
 # ---- the pieces, by what they are for ----
 const ALTAR := "Table_Large"
@@ -207,41 +213,82 @@ static func _dress_chancel(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 	if scale <= 0.0:
 		return
 	var az: float = altar_z(spec)
+	# The whole group stands on the chancel step, and grows with a wide nave so
+	# it still reads from the door of a 16 m hall (LIVE-SACRED large-nave review).
+	var step_h: float = 0.0
+	if ChurchGeometry.chancel_step_rect(spec).size.x > 0.0:
+		step_h = ChurchGeometry.CHANCEL_STEP_H
+	var g: float = group_scale(spec)
+	if scale >= 1.0:
+		scale = minf(scale * g, GROUP_MAX_SCALE)
 	var aw: float = PropCatalog.footprint(ALTAR).x * scale
-	_put(out, ALTAR, Vector3(0.0, 0.0, az), 0.0, scale, &"altar")
+	_put(out, ALTAR, Vector3(0.0, step_h, az), 0.0, scale, &"altar")
 
 	# on the altar: a cup on the axis, candles at either end, the book beside
-	var top: float = PropCatalog.height(ALTAR) * scale
-	_put(out, "Chalice", Vector3(0.0, top, az), 0.0, 1.0, &"vessel")
+	var top: float = step_h + PropCatalog.height(ALTAR) * scale
+	var small: float = maxf(g, 1.0)
+	_put(out, "Chalice", Vector3(0.0, top, az), 0.0, small, &"vessel")
 	for side in [-1.0, 1.0]:
-		_put(out, "CandleStick_Triple", Vector3(side * aw * 0.36, top, az), 0.0, 1.0,
+		_put(out, "CandleStick_Triple", Vector3(side * aw * 0.36, top, az), 0.0, small,
 			&"light")
-	_put(out, "Book_Stack_1", Vector3(aw * 0.18, top, az - 0.22), 0.4, 1.0, &"book")
+	_put(out, "Book_Stack_1", Vector3(aw * 0.18, top, az - 0.22), 0.4, small, &"book")
 
 	# a pair of standing candelabra outside the altar, if the nave is wide
 	# enough to hold them clear of its own walls
-	var cx: float = aw / 2.0 + 0.75
-	if cx + PropCatalog.footprint(CANDELABRUM).x / 2.0 <= half:
+	var cand_w: float = PropCatalog.footprint(CANDELABRUM).x * g
+	var cx: float = aw / 2.0 + 0.75 * g + (0.35 if g > 1.0 else 0.0)
+	if cx + cand_w / 2.0 <= half:
 		for side2 in [-1.0, 1.0]:
-			_put(out, CANDELABRUM, Vector3(side2 * cx, 0.0, az - 0.15), 0.0, 1.0, &"light")
+			_put(out, CANDELABRUM, Vector3(side2 * cx, step_h, az - 0.15), 0.0, g, &"light")
 
 	# the chancel step: the reader on one side, fire on the other
 	var step_z: float = az - 1.5
+	if g > 1.0:
+		# a bigger altar leaves the reader and the fire a full body-width clear of it
+		step_z = az - (PropCatalog.footprint(ALTAR).y * scale * 0.5 + 1.25)
 	var off: float = AISLE_W / 2.0 + 0.5
 	if off + 0.3 <= half:
-		_put(out, LECTERN, Vector3(-off, 0.0, step_z), 0.0, 1.0, &"lectern")
-		_put(out, BRAZIER, Vector3(off, 0.0, step_z), 0.0, 1.0, &"light")
+		_put(out, LECTERN, Vector3(-off, step_h, step_z), 0.0, 1.0, &"lectern")
+		_put(out, BRAZIER, Vector3(off, step_h, step_z), 0.0, 1.0, &"light")
 	# Standing candles either side of the altar, outboard of the candelabra.
 	# The chancel step was the obvious place and the wrong one: the lectern, the
 	# brazier and the rail are already in that metre of floor, and beside the
 	# altar there is nothing at all.
 	for side3 in [-1.0, 1.0]:
 		var cand: String = FLOOR_CANDLES[0 if side3 < 0.0 else 1]
-		var candle_x: float = cx + PropCatalog.footprint(CANDELABRUM).x / 2.0 \
+		var candle_x: float = cx + cand_w / 2.0 \
 			+ PropCatalog.footprint(cand).x / 2.0 + 0.25
 		if candle_x + PropCatalog.footprint(cand).x / 2.0 <= half:
-			_put(out, cand, Vector3(side3 * candle_x, 0.0, az - 0.15), 0.0, 1.0, &"light")
-	_dress_rail(spec, out, az - CHANCEL + 0.35)
+			_put(out, cand, Vector3(side3 * candle_x, step_h, az - 0.15), 0.0, 1.0, &"light")
+	_dress_reredos(spec, out, step_h, aw)
+	_dress_rail(spec, out, az - CHANCEL + 0.35 - ChurchGeometry.chancel_extra(spec), step_h)
+
+
+## How much bigger than the house-scale altar group is for this nave: 1.0 up to
+## a 10 m nave, then in proportion, to GROUP_MAX_SCALE.
+static func group_scale(spec: ChurchSpec) -> float:
+	return clampf(spec.width / 10.0, 1.0, GROUP_MAX_SCALE)
+
+
+## A reredos behind the altar: two tall hangings on the east wall either side of
+## the axis, in proportion to the nave's height, so the altar has a backdrop
+## rather than a bare, bright wall. Only on a wide nave with the height for it,
+## and off the axis, so the altar is seen in the gap between them.
+static func _dress_reredos(spec: ChurchSpec, out: Array[Dictionary], step_h: float,
+		altar_w: float) -> void:
+	if spec.height < BANNER_MIN_H or group_scale(spec) <= 1.0:
+		return
+	var key: String = BANNERS[0]
+	var h: float = PropCatalog.height(key)
+	var k: float = clampf(spec.height * 0.22 / maxf(h, 0.1), 1.0, 3.2)
+	var half_w: float = PropCatalog.footprint(key).x * k * 0.5
+	var x: float = altar_w * 0.5 + half_w + 0.3
+	if x + half_w > _interior_half(spec):
+		return
+	var z: float = spec.length / 2.0 - 0.12
+	for side in [-1.0, 1.0]:
+		_put(out, key, Vector3(side * x, step_h + 1.3, z),
+			PropCatalog.mount_yaw(key, Vector2(0.0, -1.0)), k, &"banner")
 
 
 ## The altar rail across the chancel, with the aisle left open in the middle.
@@ -249,25 +296,29 @@ static func _dress_chancel(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 ## Laid in whole sections from the middle outward rather than stretched to fit:
 ## a rail is joinery, and half a section is not a thing a carpenter makes. The
 ## last section on each side is dropped if it would run past the wall.
-static func _dress_rail(spec: ChurchSpec, out: Array[Dictionary], z: float) -> void:
+static func _dress_rail(spec: ChurchSpec, out: Array[Dictionary], z: float,
+		y: float = 0.0) -> void:
 	var half: float = _interior_half(spec)
 	# the section is modelled running along its own Z, so a quarter turn lays it
 	# across the church
 	var section: float = PropCatalog.footprint(RAIL).y
-	if section <= 0.0 or half <= AISLE_W / 2.0 + section:
+	# the finishing post stands OUTSIDE the aisle, so the gate through the rail
+	# is the full aisle wide (LIVE-SACRED: it used to stand in it, 0.78 m clear)
+	var post: float = PropCatalog.footprint(RAIL_END).x
+	if section <= 0.0 or half <= AISLE_W / 2.0 + post + section:
 		return
 	var yaw: float = PropCatalog.yaw_facing(Vector2(0.0, -1.0)) + PI / 2.0
 	for side in [-1.0, 1.0]:
-		var x: float = AISLE_W / 2.0
+		var x: float = AISLE_W / 2.0 + post
 		var placed := 0
 		while x + section <= half and placed < 6:
-			_put(out, RAIL, Vector3(side * (x + section / 2.0), 0.0, z), yaw, 1.0,
+			_put(out, RAIL, Vector3(side * (x + section / 2.0), y, z), yaw, 1.0,
 				&"rail")
 			x += section
 			placed += 1
 		if placed > 0:
 			# a post to finish the run at the aisle, where a person walks through
-			_put(out, RAIL_END, Vector3(side * (AISLE_W / 2.0 - 0.18), 0.0, z), yaw,
+			_put(out, RAIL_END, Vector3(side * (AISLE_W / 2.0 + post / 2.0), y, z), yaw,
 				1.0, &"rail")
 
 
@@ -278,33 +329,83 @@ static func _dress_rail(spec: ChurchSpec, out: Array[Dictionary], z: float) -> v
 ## short one fewer, and neither has to know how long the other is. A row that
 ## would land in the crossing is dropped rather than shortened -- the crossing
 ## is the transept's own floor, and a pew across it blocks both arms.
+## The benches of one block, from the aisle outward, as (centre x, scale).
+static func _pew_blocks(room: float) -> Array[Vector2]:
+	var blocks: Array[Vector2] = []
+	var foot_x: float = PropCatalog.footprint(PEW).x
+	var min_scale: float = PropCatalog.min_scale(PEW)
+	var x0: float = AISLE_W / 2.0
+	var remaining: float = room
+	while remaining >= MIN_PEW:
+		var sc: float = maxf(minf(remaining / foot_x, 1.0), min_scale)
+		var length: float = foot_x * sc
+		if length > remaining + 0.01 or length < MIN_PEW:
+			break
+		blocks.append(Vector2(x0 + length / 2.0, sc))
+		x0 += length + PEW_SIDE_AISLE
+		remaining -= length + PEW_SIDE_AISLE
+	return blocks
+
+
 static func _dress_pews(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 	var half: float = _interior_half(spec)
 	var room: float = half - AISLE_W / 2.0 - PEW_GAP
 	if room < MIN_PEW:
 		return
-	var scale: float = minf(room / PropCatalog.footprint(PEW).x, 1.0)
-	scale = maxf(scale, PropCatalog.min_scale(PEW))
-	var length: float = PropCatalog.footprint(PEW).x * scale
-	if length > room + 0.01 or length < MIN_PEW:
+	# One block per side of the aisle. A wide nave seats two benches abreast, a
+	# side-aisle apart, so the congregation fills the nave rather than a strip
+	# down its middle (LIVE-SACRED). A narrow nave gets the single bench as before.
+	var blocks: Array[Vector2] = _pew_blocks(room)   # (centre x, scale), right-hand side
+	if blocks.size() > 1:
+		# the outer block must stop short of the engaged piers, not just the wall
+		var limit: float = spec.width / 2.0 - ChurchBuilder.NAVE_WALL_T - ChurchGeometry.nave_pier_projection(spec) - 0.15
+		blocks = _pew_blocks(minf(room, limit - AISLE_W / 2.0))
+	if blocks.is_empty():
 		return
-	var x: float = AISLE_W / 2.0 + length / 2.0
 	# ENTRY is kept clear whether or not there is a narthex: the font stands
 	# just inside the west door, and a narthex is another room in front of it
 	# rather than licence to pew right up to the threshold.
-	var z_east: float = altar_z(spec) - CHANCEL
+	var z_east: float = altar_z(spec) - CHANCEL - 0.2 - ChurchGeometry.chancel_extra(spec)
 	var z_west: float = -spec.length / 2.0 + ENTRY
 	# Pews only ever run westward from the chancel, so anything still east of
 	# the crossing front is standing in the crossing.
 	var crossing_west: float = ChurchGeometry.transept_front_z(spec) - 0.4
+	# Standing worship: an Orthodox nave wide enough for a congregation of pews
+	# is left open on purpose, with stalls along its walls.
+	if blocks.size() > 1 and spec.style in ORTHODOX:
+		_dress_stalls(spec, out, z_west, z_east, crossing_west)
+		return
 	var z: float = z_east
 	var rows := 0
+	var slot := 0
 	while z >= z_west and rows < MAX_PEW_ROWS:
-		if not (spec.transept and z > crossing_west):
+		slot += 1
+		# a cross-aisle every few rows of a long nave: one pew slot left open
+		var cross: bool = blocks.size() > 1 and z_east - z_west > 14.0 and slot % (CROSS_AISLE_EVERY + 1) == 0
+		if not cross and not (spec.transept and z > crossing_west):
 			for side in [-1.0, 1.0]:
-				_put(out, PEW, Vector3(side * x, 0.0, z), PI, scale, &"pew")
+				for b in blocks:
+					_put(out, PEW, Vector3(side * b.x, 0.0, z), PI, b.y, &"pew")
 			rows += 1
 		z -= PEW_PITCH
+
+
+## Orthodox worship is standing worship. The nave floor is open on purpose and
+## the only seats are stalls along the side walls, each facing across the nave
+## and pew-kind so the congregation rule still finds somewhere to sit. (The
+## large Byzantine and Russian naves are NOT given pew blocks; see
+## docs/SACRED_REVIEW.md.)
+static func _dress_stalls(spec: ChurchSpec, out: Array[Dictionary], z_west: float,
+		z_east: float, crossing_west: float) -> void:
+	var foot: Vector2 = PropCatalog.footprint(PEW)
+	var wall_x: float = spec.width / 2.0 - ChurchBuilder.NAVE_WALL_T \
+		- ChurchGeometry.nave_pier_projection(spec) - foot.y / 2.0 - 0.1
+	var z: float = z_east - foot.x / 2.0
+	while z - foot.x / 2.0 >= z_west:
+		if not (spec.transept and z + foot.x / 2.0 > crossing_west):
+			_put(out, PEW, Vector3(-wall_x, 0.0, z), PI / 2.0, 1.0, &"pew")
+			_put(out, PEW, Vector3(wall_x, 0.0, z), -PI / 2.0, 1.0, &"pew")
+		z -= foot.x + STALL_GAP
 
 
 ## Torches down both nave walls, and banners between them.
@@ -409,7 +510,15 @@ static func _dress_aisles(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 static func _dress_west_end(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 	var half: float = _interior_half(spec)
 	var fx: float = AISLE_W / 2.0 + 0.6
-	if fx + PropCatalog.footprint(FONT).x / 2.0 <= half:
+	var font_half: float = PropCatalog.footprint(FONT).x / 2.0
+	# Twin doors stand at +-0.8: a font at 1.35 sat in the left one's way, so
+	# that door opened on a stone basin (found by the public walk, chwalk). The
+	# basin goes beside the outermost doorway, a body's width clear of it.
+	for door in ChurchGeometry.west_door_layout(spec):
+		var edge: float = absf(float(door.x)) + float(door.width) * 0.5
+		if fx - font_half < edge + PERSON_CLEAR and fx + font_half > absf(float(door.x)) - float(door.width) * 0.5 - PERSON_CLEAR:
+			fx = maxf(fx, edge + PERSON_CLEAR + font_half)
+	if fx + font_half <= half:
 		_put(out, FONT, Vector3(-fx, 0.0, -spec.length / 2.0 + 1.1), 0.0, 1.0, &"font")
 	if not spec.tower:
 		return

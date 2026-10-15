@@ -1,0 +1,743 @@
+{
+	"api_version": 5,
+	"archetype": "ascent",
+	"entrance_key": "entrance",
+	"goal_key": "summit",
+	"keys": [],
+	"links": [
+		{
+			"from": "boss_1",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "boss_1->annex_1",
+			"to": "annex_1",
+			"wall": "west"
+		},
+		{
+			"from": "boss_1",
+			"guarded": true,
+			"kind": "stairs",
+			"lock": {
+				"kind": "monster",
+				"ref": "boss_1"
+			},
+			"portal": "boss_1->test_3",
+			"to": "test_3"
+		},
+		{
+			"from": "climb",
+			"kind": "stairs",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "climb->test_2",
+			"to": "test_2",
+			"wall": "east"
+		},
+		{
+			"from": "entrance",
+			"kind": "stairs",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "entrance->boss_1",
+			"to": "boss_1"
+		},
+		{
+			"from": "entrance",
+			"kind": "stairs",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "entrance->dive",
+			"to": "dive",
+			"wall": "south"
+		},
+		{
+			"from": "entrance",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "entrance->lever_room_1",
+			"to": "lever_room_1",
+			"wall": "east"
+		},
+		{
+			"from": "entrance",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "entrance->lever_room_2",
+			"to": "lever_room_2",
+			"wall": "north"
+		},
+		{
+			"from": "passage_1",
+			"kind": "stairs",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "passage_1->test_1",
+			"to": "test_1",
+			"wall": "west"
+		},
+		{
+			"from": "test_1",
+			"kind": "stairs",
+			"lock": {
+				"kind": "tool",
+				"ref": "tool_puzzle_2"
+			},
+			"portal": "test_1->climb",
+			"to": "climb",
+			"wall": "south"
+		},
+		{
+			"from": "test_1",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"portal": "test_1->vault_1",
+			"to": "vault_1",
+			"wall": "north"
+		},
+		{
+			"from": "test_2",
+			"kind": "door",
+			"lock": {
+				"kind": "",
+				"ref": ""
+			},
+			"one_way": true,
+			"portal": "test_2->passage_1",
+			"to": "passage_1",
+			"wall": "north"
+		},
+		{
+			"from": "test_2",
+			"kind": "stairs",
+			"lock": {
+				"kind": "tool",
+				"ref": "tool_puzzle_3"
+			},
+			"portal": "test_2->summit",
+			"to": "summit"
+		},
+		{
+			"from": "test_3",
+			"kind": "stairs",
+			"lock": {
+				"kind": "tool",
+				"ref": "tool_puzzle_1"
+			},
+			"portal": "test_3->passage_1",
+			"to": "passage_1"
+		}
+	],
+	"lock_kinds": [
+		"monster",
+		"tool"
+	],
+	"plan_seed": 7,
+	"planner_version": "0.3.0-dev",
+	"request": {
+		"archetype": "ascent",
+		"complexity": 2,
+		"seed": 7,
+		"size": "medium",
+		"theme": "crystalline_sanctum"
+	},
+	"requires": [
+		{
+			"count": 3,
+			"mechanic": "tool",
+			"prop": "tool",
+			"properties": [
+				"portable",
+				"tool"
+			]
+		}
+	],
+	"rooms": [
+		{
+			"boss_tier": 0,
+			"cell": [
+				0,
+				0
+			],
+			"hazard": 0.0,
+			"key": "entrance",
+			"label": "Landing",
+			"level": 0,
+			"purpose": "",
+			"role": "entrance",
+			"space_id": "entrance",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				0,
+				1
+			],
+			"hazard": 0.0,
+			"key": "dive",
+			"label": "The Drop",
+			"level": 0,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "dive",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				2,
+				-1
+			],
+			"fixtures": [
+				{
+					"id": "tool_puzzle_2",
+					"kind": "tool",
+					"targets": [
+						"test_1->climb"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"hero_space": {
+				"base_level": 0,
+				"bridges": 1,
+				"depth": 1,
+				"entrance_level": 0,
+				"exit_level": 0,
+				"kind": "shaft",
+				"levels": 1,
+				"radius": 1.0
+			},
+			"key": "lever_room_1",
+			"label": "Tool Room",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "lever_room_1",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				0,
+				-2
+			],
+			"fixtures": [
+				{
+					"id": "tool_puzzle_1",
+					"kind": "tool",
+					"targets": [
+						"test_3->passage_1"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"hero_space": {
+				"base_level": 0,
+				"bridges": 1,
+				"depth": 1,
+				"entrance_level": 0,
+				"exit_level": 0,
+				"kind": "shaft",
+				"levels": 1,
+				"radius": 1.0
+			},
+			"key": "lever_room_2",
+			"label": "Tool Room",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "lever_room_2",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 2,
+			"cell": [
+				-1,
+				0
+			],
+			"hazard": 0.0,
+			"key": "boss_1",
+			"label": "Boss Chamber",
+			"level": 2,
+			"purpose": "",
+			"role": "boss",
+			"space_id": "boss_1",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-3,
+				1
+			],
+			"hazard": 0.0,
+			"key": "annex_1",
+			"label": "Annex",
+			"level": 2,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "annex_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-2,
+				0
+			],
+			"hazard": 0.0,
+			"hero_space": {
+				"base_level": 0,
+				"bridges": 0,
+				"depth": 3,
+				"entrance_level": 2,
+				"exit_level": 1,
+				"kind": "shaft",
+				"levels": 3,
+				"radius": 1.0
+			},
+			"key": "test_3",
+			"label": "Test 3 (test)",
+			"level": 0,
+			"purpose": "",
+			"role": "room",
+			"space_id": "test_3",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-3,
+				1
+			],
+			"hazard": 0.0,
+			"key": "passage_1",
+			"label": "Long Passage",
+			"level": 1,
+			"purpose": "",
+			"role": "corridor",
+			"space_id": "passage_1",
+			"span": [
+				3,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-5,
+				0
+			],
+			"hazard": 0.0,
+			"hero_space": {
+				"base_level": 1,
+				"bridges": 1,
+				"depth": 1,
+				"entrance_level": 0,
+				"exit_level": 0,
+				"kind": "shaft",
+				"levels": 1,
+				"radius": 1.0
+			},
+			"key": "test_1",
+			"label": "Test 1 (test)",
+			"level": 1,
+			"purpose": "",
+			"role": "room",
+			"space_id": "test_1",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-6,
+				-1
+			],
+			"fixtures": [
+				{
+					"id": "tool_puzzle_3",
+					"kind": "tool",
+					"targets": [
+						"test_2->summit"
+					]
+				}
+			],
+			"hazard": 0.0,
+			"key": "vault_1",
+			"label": "Tool Room",
+			"level": 1,
+			"purpose": "",
+			"role": "treasure",
+			"space_id": "vault_1",
+			"span": [
+				2,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-4,
+				2
+			],
+			"hazard": 0.0,
+			"key": "climb",
+			"label": "The Long Climb",
+			"level": 1,
+			"purpose": "",
+			"role": "corridor",
+			"space_id": "climb",
+			"span": [
+				3,
+				1
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-1,
+				2
+			],
+			"hazard": 0.0,
+			"hero_space": {
+				"base_level": 1,
+				"bridges": 1,
+				"depth": 2,
+				"entrance_level": 0,
+				"exit_level": 0,
+				"kind": "shaft",
+				"levels": 2,
+				"radius": 1.0
+			},
+			"key": "test_2",
+			"label": "Test 2 (test)",
+			"level": 1,
+			"purpose": "",
+			"role": "room",
+			"space_id": "test_2",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		},
+		{
+			"boss_tier": 0,
+			"cell": [
+				-1,
+				2
+			],
+			"hazard": 0.0,
+			"key": "summit",
+			"label": "The Summit",
+			"level": 2,
+			"purpose": "",
+			"role": "goal",
+			"space_id": "summit",
+			"span": [
+				2,
+				2
+			],
+			"wave": 0
+		}
+	],
+	"schema": "dmv.dungeon.plan",
+	"schema_version": 2,
+	"spaces": {
+		"annex_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 2,
+			"label": "Annex",
+			"landmark": "",
+			"signature": {
+				"openness": 0.309318643063307,
+				"region": "wings",
+				"verticality": 0.0408988863229752
+			},
+			"size_class": "tiny",
+			"span": [
+				2,
+				1
+			]
+		},
+		"boss_1": {
+			"archetype": "tower",
+			"elevation": 2,
+			"label": "Boss Chamber",
+			"landmark": "tower",
+			"signature": {
+				"openness": 0.287961814552546,
+				"region": "wings",
+				"verticality": 0.902432290092111
+			},
+			"size_class": "large",
+			"span": [
+				2,
+				2
+			]
+		},
+		"climb": {
+			"archetype": "gallery",
+			"elevation": 1,
+			"label": "The Long Climb",
+			"landmark": "",
+			"signature": {
+				"openness": 0.551963239908218,
+				"region": "summit",
+				"verticality": 0.191734284162521
+			},
+			"size_class": "narrow",
+			"span": [
+				3,
+				1
+			]
+		},
+		"dive": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "The Drop",
+			"landmark": "",
+			"signature": {
+				"openness": 0.47749637067318,
+				"region": "base",
+				"verticality": 0.100702571868896
+			},
+			"size_class": "tiny",
+			"span": [
+				2,
+				1
+			]
+		},
+		"entrance": {
+			"archetype": "narrow_tunnel",
+			"elevation": 0,
+			"label": "Landing",
+			"landmark": "",
+			"signature": {
+				"openness": 0.403139561414719,
+				"region": "base",
+				"verticality": 0.136376976966858
+			},
+			"size_class": "small",
+			"span": [
+				2,
+				1
+			]
+		},
+		"lever_room_1": {
+			"archetype": "shaft",
+			"elevation": 0,
+			"label": "Tool Room",
+			"landmark": "shaft",
+			"signature": {
+				"openness": 0.348458282649517,
+				"region": "base",
+				"verticality": 0.9980344414711
+			},
+			"size_class": "tall",
+			"span": [
+				2,
+				2
+			]
+		},
+		"lever_room_2": {
+			"archetype": "shaft",
+			"elevation": 0,
+			"label": "Tool Room",
+			"landmark": "shaft",
+			"signature": {
+				"openness": 0.44055300951004,
+				"region": "wings",
+				"verticality": 0.89272854924202
+			},
+			"size_class": "tall",
+			"span": [
+				2,
+				2
+			]
+		},
+		"passage_1": {
+			"archetype": "gallery",
+			"elevation": 1,
+			"label": "Long Passage",
+			"landmark": "",
+			"signature": {
+				"openness": 0.656213030219078,
+				"region": "tower",
+				"verticality": 0.132869412004948
+			},
+			"size_class": "narrow",
+			"span": [
+				3,
+				1
+			]
+		},
+		"summit": {
+			"archetype": "tower",
+			"elevation": 2,
+			"label": "The Summit",
+			"landmark": "tower",
+			"signature": {
+				"openness": 0.388730749487877,
+				"region": "summit",
+				"verticality": 0.958960956335068
+			},
+			"size_class": "medium",
+			"span": [
+				2,
+				2
+			]
+		},
+		"test_1": {
+			"archetype": "shaft",
+			"elevation": 1,
+			"label": "Test 1 (test)",
+			"landmark": "shaft",
+			"signature": {
+				"openness": 0.332185477018356,
+				"region": "tower",
+				"verticality": 0.873423433303833
+			},
+			"size_class": "tall",
+			"span": [
+				2,
+				2
+			]
+		},
+		"test_2": {
+			"archetype": "shaft",
+			"elevation": 1,
+			"label": "Test 2 (test)",
+			"landmark": "shaft",
+			"signature": {
+				"openness": 0.322395578026772,
+				"region": "summit",
+				"verticality": 0.950672674179077
+			},
+			"size_class": "tall",
+			"span": [
+				2,
+				2
+			]
+		},
+		"test_3": {
+			"archetype": "shaft",
+			"elevation": 0,
+			"label": "Test 3 (test)",
+			"landmark": "shaft",
+			"signature": {
+				"openness": 0.477785214781761,
+				"region": "tower",
+				"verticality": 0.820776075124741
+			},
+			"size_class": "tall",
+			"span": [
+				2,
+				2
+			]
+		},
+		"vault_1": {
+			"archetype": "narrow_tunnel",
+			"elevation": 1,
+			"label": "Tool Room",
+			"landmark": "",
+			"signature": {
+				"openness": 0.439077824354172,
+				"region": "summit",
+				"verticality": 0.166029322147369
+			},
+			"size_class": "tiny",
+			"span": [
+				2,
+				1
+			]
+		}
+	},
+	"theme": {
+		"atmosphere_tags": [
+			"crystalline",
+			"luminous",
+			"echoing"
+		],
+		"boss_aesthetic": "crystal_golem",
+		"corridor_width_bias": 0.2,
+		"description": "Narrow shafts and echoing halls climbing toward a peak.",
+		"id": "crystalline_sanctum",
+		"label": "Crystalline Sanctum",
+		"macro_shape": "vertical",
+		"materials": [
+			"quartz",
+			"pale_granite",
+			"polished_crystal",
+			"iron_lattice"
+		],
+		"motifs": [
+			"central_shaft",
+			"refracted_light",
+			"resonant_chime"
+		],
+		"prop_palette": [
+			"crystal_formation",
+			"mirror_puzzle",
+			"time_delay_trap",
+			"hanging_crystal"
+		],
+		"verticality_bias": 0.95
+	}
+}

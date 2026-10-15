@@ -129,6 +129,14 @@ static func _guard(plan: HousePlan, si: int, st: Dictionary, builder: MassBuilde
 			% [si, open, plan.spec.height, rails])
 
 
+## The approach rule alone, for one stair: the furnisher asks it while it works, so
+## a flight whose foot it has walled in is found before the whole plan is judged.
+static func approach_failures(plan: HousePlan, si: int) -> Array[String]:
+	var out: Array[String] = []
+	_approach(plan, si, plan.stairs[si], out)
+	return out
+
+
 static func _approach(plan: HousePlan, si: int, st: Dictionary, out: Array[String]) -> void:
 	var lo := int(st["storey"])
 	var nav := HouseNavCheck.new()

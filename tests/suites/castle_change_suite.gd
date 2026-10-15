@@ -45,6 +45,7 @@ static func run() -> SuiteResult:
 			_expect(res, qa.ok, "%s voxel QA: %s" % [who, qa.failures])
 		res.note("%s %.2fs" % [who, (Time.get_ticks_msec() - started) / 1000.0])
 	_keep_entrance_contract(res)
+	_tight_ridge_contract(res)
 	_negative_controls(res)
 	return res
 
@@ -110,6 +111,40 @@ static func _ridge_interior_contract(res: SuiteResult, builder: CastleBuilder,
 			window.pos = original
 	_expect(res, found_window, "%s ridge ranges emitted no plan windows" % who)
 	_expect(res, checked_openings > 0, "%s ridge ranges forwarded no openings" % who)
+
+
+## The dark 40 x 55 m ridge (seed 9249) once drew five vertices: 12 m ranges
+## 12 m apart, so the towers and the mitre left no range long enough for a
+## room and every range, tower and the spire stayed solid. The generator now
+## draws fewer vertices until each range holds rooms. The control puts the five
+## vertices back and demands the occupancy check see the solid buildings.
+static func _tight_ridge_contract(res: SuiteResult) -> void:
+	var spec := CastleSweep.spec_at(&"dark", &"castle", 0)
+	var who := "tight dark ridge seed=%d" % spec.seed
+	_expect(res, spec.plan_kind == &"ridge" and spec.seed == 9249,
+		"%s is no longer the canonical tight ridge" % who)
+	var layout: Dictionary = preload("res://src/castle/castle_ridge_plan.gd").layout(spec)
+	for seg in layout.ranges:
+		_expect(res, bool(seg.usable), "%s %s is too short for rooms (%.2f m)"
+			% [who, seg.name, seg.length])
+	var builder := CastleBuilder.new()
+	var mesh: ArrayMesh = builder.build(spec)
+	var occupancy := CastleOccupancyCheck.check(spec, builder, mesh)
+	_expect(res, occupancy.failures.is_empty(), "%s occupancy: %s" % [who, occupancy.failures])
+	var ids := {}
+	for row in builder.interiors:
+		ids[String(row.id)] = true
+	_expect(res, ids.has("keep") and ids.has("hall") and ids.has("range_1"),
+		"%s lost its spire or ranges: %s" % [who, ids.keys()])
+	# Negative control: the old five-vertex zigzag.
+	var tight := CastleSweep.spec_at(&"dark", &"castle", 0)
+	tight.ridge_points = 5
+	var solid_builder := CastleBuilder.new()
+	var solid_mesh: ArrayMesh = solid_builder.build(tight)
+	var solid := CastleOccupancyCheck.check(tight, solid_builder, solid_mesh)
+	_expect(res, not solid.failures.is_empty() and solid.failures.any(
+		func(f): return str(f).contains("required occupied building has no interior record")),
+		"%s five-vertex control was not rejected: %s" % [who, solid.failures])
 
 
 static func _spec(row: Dictionary) -> CastleSpec:

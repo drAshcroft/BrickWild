@@ -27,6 +27,11 @@ class TowerSpec extends HouseSpec:
 	func allows_hearth_furniture() -> bool:
 		return false
 
+	## The storey the raised door opens into. A tower's way in is a storey up
+	## (a short storey carries it on the next floor), and HousePlanCheck holds
+	## the door to this storey, as it does a keep's `entry_storey`.
+	var entry_storey := 0
+
 	func room_program(count: int) -> Array[StringName]:
 		var out: Array[StringName] = []
 		for level in range(maxi(count, 1)):
@@ -75,6 +80,9 @@ static func generate(source: CastleSpec, with_furniture := true) -> HousePlan:
 	hs.exterior_props = false
 	hs.clutter = 0.35
 	plan.spec = hs
+	var sill := CastleGeometry.tower_door_sill(source)
+	var door_level := clampi(int(floor(sill / maxf(storey_h, 0.01))), 0, levels - 1)
+	hs.entry_storey = door_level
 
 	for level in range(levels):
 		var outer := CastleGeometry.tower_storey_aabb(source, level)
@@ -91,20 +99,19 @@ static func generate(source: CastleSpec, with_furniture := true) -> HousePlan:
 		})
 	# The roof fighting deck is a real final level. INT-004 stair landings and
 	# nav grids can therefore prove the top is reachable instead of stopping at
-	# the last enclosed chamber.
+	# the last enclosed chamber. It is open to the sky: the floor is the clear
+	# floor of the chamber below (the parapet ring and merlons stand outside it,
+	# on the wall heads), and no walls are raised round it.
 	var platform := CastleGeometry.tower_platform_aabb(source)
-	var deck := Vector2(maxf(platform.size.x - 0.6, 0.5),
-		maxf(platform.size.z - 0.6, 0.5))
-	var deck_outline := Poly.from_rect(Rect2(-deck * 0.5, deck))
+	var top_room: Dictionary = plan.rooms[levels - 1]
+	var deck_outline: PackedVector2Array = top_room["outline"]
 	plan.rooms.append({"kind": &"roof_platform", "storey": levels,
 		"rect": Poly.bounding_rect(deck_outline), "outline": deck_outline,
 		"outer_aabb": platform, "outer_outline": _outer_outline(source, platform),
-		"wall_thickness": 0.3})
+		"wall_thickness": 0.3, "open_air": true})
 
 	# The tower is entered at the real sill, not at a fictitious ground door.
-	var sill := CastleGeometry.tower_door_sill(source)
 	var door_h := CastleGeometry.tower_door_height(source)
-	var door_level := clampi(int(floor(sill / maxf(storey_h, 0.01))), 0, levels - 1)
 	var front := _front_wall(plan, door_level)
 	# Use the actual faceted wall chord. A small wizard shaft has a short
 	# front chord even when its AABB suggests room for a full-size door.
@@ -113,6 +120,10 @@ static func generate(source: CastleSpec, with_furniture := true) -> HousePlan:
 		maxf(0.45, front_length - 2.0 * HouseGeometry.DOOR_CORNER_MARGIN))
 	var local_sill := sill - float(door_level) * storey_h
 	var door_pos := (Vector2(front["from"]) + Vector2(front["to"])) * 0.5
+	# Clear of the front jog (CastleGeometry.tower_entry_x); a faceted wizard
+	# shaft has no jog and keeps the middle of its front chord.
+	if source.style != &"wizard":
+		door_pos.x = CastleGeometry.tower_entry_x(source)
 	var door_normal := -Vector2(front["normal"])
 	plan.doors.append({
 		"a": door_level,

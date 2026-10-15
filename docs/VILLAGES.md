@@ -982,10 +982,43 @@ step onto. `HouseWalkSources.sources()` lists it beside the rasteriser it
 mirrors. Secret doors stay shut. Each stair links the centres of the landings
 the check climbs between.
 
-Churches, temples, castles (seats and monuments), windmills, bridges and
-trees return `{"supported": false}` and a null node: their interiors are
-walked by their own checks (the rite, castle routes and occupancy) and are
-not yet published. Walk them to the door.
+**Temples** (all four forms) are walked too: one storey at y 0 with no stairs,
+the floor and obstruction `TempleRiteCheck` feeds its WalkGrid
+(`TempleGeometry.walk_sources`, beside `floor_rects` / `obstacle_rects`). The
+gate is the single front door and the altar is the one `furniture[]` entry
+(`key: "altar"`, `use_m` on the gate's side). A family opts in through two
+`BuildingFamilyAdapter` methods, `walk_sources(building)` and
+`walk_frame(building)` (floor heights, stair links, doors, focus points);
+`BuildingNavigation` bakes whatever they publish. `twalk` holds it to the rite
+check cell by cell.
+
+**Churches** are walked too (ChurchGeometry.walk_rects, `chwalk`): the nave, each
+aisle ring joined through the arcade openings, and every west doorway, less the
+engaged piers and the dressing DressingCheck cuts out. `doors[]` are the west
+doors (all `front`), `furniture[]` the nave altar. The transept, apse, chapels,
+narthex and tower interiors are not walked yet, and a podium church (St Basil)
+reports `supported: false`.
+
+**Castles** (seats and monuments) with a curtain, a gate and a keep are walked
+(`CastleWalkSources`, suites `kwalk` and `kwalk2`). Storey 0 is the ward: the
+ground inside the curtain and the way in through the gate (`doors[0]`, the only
+`front` door), less the towers, the inner ring's wall, the gatehouse masonry
+beside the passage, the wall stairs and their piers, the keep's forebuilding,
+the yard fittings and the floor-blocking props. Every range (apse, hall, keep,
+chapel, yard buildings) is storeys of its own, numbered `(index + 1) * 100 +
+level`, with a `stairs[]` link at each ground door and each of its own stairs;
+the keep's entrance, a storey up, is a link from the forebuilding's toe to its
+first-floor door. `furniture[]` holds the `hall`, the `chapel` and the
+`lords_chamber`. A chapel whose only door opens on its apse is genuinely not
+reached from the ward, and the walk says so. The mural towers and gate
+chambers (entered from the wall walk), the wall walk itself, manors, tower
+houses, mottes, ridge, sky and terraced castles and a castle with a barbican
+return `{"supported": false}`. The cost is that of planning the castle's
+interiors (seconds, minutes for a fortress), cached per spec.
+
+Windmills, bridges and trees return `{"supported": false}` and a null node:
+a windmill has no walk check at all, and the others are not yet published.
+Walk them to the door. Todo `NAV-INTERIOR-OTHER-FAMILIES`.
 
 **Joining the street to the house.** The site `doors[i]` and the building's
 front door meet at the threshold. Add one two-way `NavigationLink3D` from the

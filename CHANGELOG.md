@@ -8,7 +8,20 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
 
 ## Unreleased
 
-Nothing yet.
+- `BrickWild.navigation()` and `navigation_node()` now walk temples (one
+  storey, gate to altar; `BuildingFamilyAdapter.walk_sources` / `walk_frame`).
+  Churches too (nave, one aisle ring, west doors to altar; transept, apse and
+  chapels are not walked yet; a twin-door church no longer has its font in a
+  doorway). Walled castles too (`CastleWalkSources`): the ward from the gate,
+  each range (hall, chapel, apse, yard buildings, keep) as storeys joined to it
+  by a link at every door, the keep up its forebuilding stair and its own
+  stairs to the lord's chamber. The mural towers, gate chambers and wall walk
+  are not walked yet, nor are manors, tower houses, mottes, ridge and sky
+  castles, terraced castles or a castle with a barbican (all report
+  `supported: false`). Walking a castle costs about what building its interiors
+  does: seconds for a castle, minutes for a fortress; the result is cached per
+  spec. Windmills, bridges and trees still report `supported: false` (todo
+  `NAV-INTERIOR-OTHER-FAMILIES`).
 
 ## 0.1.2 - 2026-10-10
 

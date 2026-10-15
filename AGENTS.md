@@ -32,6 +32,10 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:church-change
 godot --headless --path . --script res://tools/castle_occupancy_sweep.gd -- fortress norman 1
 # the public API, every published kind once (libraryquick placementquick poly windmill)
 godot --headless --path . --script res://tests/run_all.gd -- lane:api
+# realise a dungeon planner export (C:\Projects\dungeon) into rooms in metres
+# for VoxelGames, and draw it; see docs/DUNGEONS.md
+godot --headless --path . --script res://tools/realise_dungeon.gd -- --plan plan.json --out rooms.json
+godot --headless --path . --script res://tools/draw_dungeon_sheet.gd -- --plan plan.json --out sheet.png
 # the five windmills, every one of them, against WindmillCheck
 godot --headless --path . --script res://tests/run_all.gd -- lane:windmill
 # the slow gates that must pass before a merge, not per task (hours; background it)
@@ -127,6 +131,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | church shell, opening or roof geometry | `lane:church-change` | 20 s host |
 | windmill geometry, or anything in `src/windmill/` | `lane:windmill` | 52 s host, 185 checks |
+| anything in `src/dungeon/`, `qa/dungeon_room_check.gd` or the dungeon fixtures | `lane:dungeon` | 84 s host (14 Oct); see docs/DUNGEONS.md |
 | `BuildingLibrary` rows, the family adapters, `BuildingRequest` factories | `lane:api` | ~10 m host; `libraryquick` alone is ~3.5 m and catches an unpublished kind |
 | church or castle dressing, props placed in them | `dressingquick` | under 5 m host |
 | the dwellings the generator must furnish | `harchetype` | 2.5 m host (5 m on 7 Oct; red with the walk rules until the furnisher catches up, see docs/WALK_PINS.md) |
@@ -221,6 +226,17 @@ file.
 * A GDScript **parse error makes the headless runner hang** rather than exit.
   If a run stops producing output, read the top of the log for "Parse Error"
   instead of waiting on it.
+* **A fresh git worktree is missing most prop models.** Only about 313 of the
+  790 files under `assets/props/` are tracked; the rest are gitignored. Any
+  furnishing, dressing or render result in a new worktree is wrong until you
+  run `cp -rn <main checkout>/assets/props/. ./assets/props/` and re-import
+  with `--editor --quit`. The fingerprint worktree recipe above needs it too.
+* **Never archive a `.gd` with a `class_name` inside the project.** A
+  snapshot that redeclares `HouseFurnisher` can win the class cache in a
+  fresh checkout, so the suites silently run the stale copy. Store snapshots
+  as `.gd.txt`. Commits before 72ae848 still carry three such files; a
+  worktree at an older commit needs them renamed and
+  `.godot/global_script_class_cache.cfg` deleted before import.
 * Godot's front faces are **clockwise**, so a triangle wound (a, b, c) has
   outward normal `(c - a).cross(b - a)` -- the opposite hand from the usual
   formula. `MeshKit._face_normal` is the single place this is decided.

@@ -9,10 +9,15 @@ extends RefCounted
 ## check climbs between. Building-local frame: metres, the building's own axes
 ## (front -Z), y up; it moves with the instanced building.
 ##
-## Families that keep a HousePlan (houses, shops, hotels) are walked. Churches,
-## temples, castles, windmills, bridges and trees report `supported: false`:
-## their walks live in their own checks and are not yet published (see
-## docs/VILLAGES.md, "Walking inside").
+## Families that keep a HousePlan (houses, shops, hotels) are walked, and so is
+## any family whose adapter publishes `walk_sources` / `walk_frame` (temples:
+## the floor and obstruction `TempleRiteCheck` walks; churches: nave, aisles
+## and west doors less piers and dressing; walled castles: the ward and each
+## range as storeys, a door a link). The mural towers and wall walk of a castle
+## are not walked yet, and manors, tower houses, mottes, ridge, sky and
+## terraced castles and a castle with a barbican, windmills, bridges and trees
+## report `supported: false`: their walks live in their own checks and are not
+## yet published (see docs/VILLAGES.md, "Walking inside").
 
 const SCHEMA := "brickwild.building_walk"
 const SCHEMA_VERSION := 1
@@ -23,8 +28,10 @@ const LINK_REACH := 1.0
 
 
 static func of(building) -> Dictionary:
-	if building == null or not building.is_ok() or not (building.plan is HousePlan):
+	if building == null or not building.is_ok():
 		return {"schema": SCHEMA, "schema_version": SCHEMA_VERSION, "supported": false}
+	if not (building.plan is HousePlan):
+		return _of_family(building)
 	var plan: HousePlan = building.plan
 	var sources: Dictionary = HouseWalkSources.sources(plan)
 	var meshes := {}
@@ -50,6 +57,85 @@ static func of(building) -> Dictionary:
 		"stairs": _stairs(plan, meshes),
 		"doors": _doors(plan, meshes),
 		"furniture": _furniture(plan, meshes),
+	}
+
+
+## A family that is not a HousePlan: its adapter's walk sources, baked the same
+## way, with the front door and the focus (altar, ...) in the shapes the house
+## walk uses so one reader serves both.
+static func _of_family(building) -> Dictionary:
+	var adapter: BuildingFamilyAdapter = BuildingFamilyAdapter.for_building(building)
+	var sources: Dictionary = adapter.walk_sources(building) if adapter != null else {}
+	if sources.is_empty():
+		return {"schema": SCHEMA, "schema_version": SCHEMA_VERSION, "supported": false}
+	var frame: Dictionary = adapter.walk_frame(building)
+	var floor_ys: Dictionary = frame.get("floor_y", {})
+	var levels: Array = sources.keys()
+	levels.sort()
+	var meshes := {}
+	var storeys: Array = []
+	for level in levels:
+		var mesh: Dictionary = NavBake.bake(sources[level]["floor"], sources[level]["obstacles"], AGENT_RADIUS)
+		meshes[level] = mesh
+		var vertices: Array = []
+		for v in mesh["vertices"]:
+			vertices.append([_n(v.x), _n(v.y)])
+		var polygons: Array = []
+		for p in mesh["polygons"]:
+			polygons.append(Array(p))
+		storeys.append({"storey": level, "floor_y_m": _n(float(floor_ys.get(level, 0.0))),
+			"navmesh": {"vertices_m": vertices, "polygons": polygons, "area_m2": _n(NavBake.area(mesh))}})
+	var stairs: Array = []
+	for link in frame.get("links", []):
+		var lo: int = int(link["from_storey"])
+		var hi: int = int(link["to_storey"])
+		if not meshes.has(lo) or not meshes.has(hi):
+			continue
+		var lower_on: Vector2 = NavBake.closest_point(meshes[lo], link["lower"])
+		var upper_on: Vector2 = NavBake.closest_point(meshes[hi], link["upper"])
+		stairs.append({
+			"from_storey": lo, "to_storey": hi,
+			"lower_m": [_n(lower_on.x), _n(float(floor_ys.get(lo, 0.0))), _n(lower_on.y)],
+			"upper_m": [_n(upper_on.x), _n(float(floor_ys.get(hi, 0.0))), _n(upper_on.y)],
+			"width_m": _n(float(link.get("width", 0.0))),
+			"linked": lower_on.distance_to(link["lower"]) <= LINK_REACH and upper_on.distance_to(link["upper"]) <= LINK_REACH,
+		})
+	var doors: Array = []
+	for i in frame.get("doors", []).size():
+		var d: Dictionary = frame["doors"][i]
+		var pos: Vector2 = d["pos"]
+		var normal: Vector2 = d["normal"]
+		var level: int = int(d.get("storey", 0))
+		if not meshes.has(level):
+			continue
+		var y: float = float(floor_ys.get(level, 0.0))
+		var inside: Vector2 = NavBake.closest_point(meshes[level], pos - normal * 0.5)
+		var outside: Vector2 = pos + normal * 0.3
+		doors.append({
+			"door": i, "storey": level, "front": bool(d.get("front", false)),
+			"door_m": [_n(pos.x), _n(y), _n(pos.y)],
+			"inside_m": [_n(inside.x), _n(y), _n(inside.y)],
+			"outside_m": [_n(outside.x), _n(y), _n(outside.y)],
+		})
+	var focus: Array = []
+	for i in frame.get("focus", []).size():
+		var f: Dictionary = frame["focus"][i]
+		var level: int = int(f.get("storey", 0))
+		if not meshes.has(level):
+			continue
+		var use: Vector2 = NavBake.closest_point(meshes[level], f["pos"])
+		focus.append({"item": i, "key": String(f["key"]), "room": -1, "storey": level,
+			"use_m": [_n(use.x), _n(float(floor_ys.get(level, 0.0))), _n(use.y)]})
+	return {
+		"schema": SCHEMA,
+		"schema_version": SCHEMA_VERSION,
+		"supported": true,
+		"frame": "building local: metres, front -Z, y up",
+		"agent_radius_m": _n(AGENT_RADIUS),
+		"storeys": storeys,
+		"stairs": stairs,
+		"doors": doors,
+		"furniture": focus,
 	}
 
 

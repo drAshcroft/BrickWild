@@ -124,6 +124,9 @@ static func _special_fixture(building_id: String) -> Dictionary:
 	for i in 4:
 		b.part_log.append({"kind": step_kind, "pos": Vector3(0, 0.15 + i * 0.15, -10.0 + i * 2.0),
 			"size": Vector3(2.0, 0.3, 2.0), "tag": building_id})
+		# The strict route measures the emitted mesh, not the log: a logged
+		# tread with no geometry under it is exactly the defect it hunts.
+		b._kit.box(Vector3(2.0, 0.3, 2.0), Vector3(0, 0.15 + i * 0.15, -10.0 + i * 2.0), CastleBuilder.SURF_STONE)
 	return {"spec": s, "builder": b, "plan": p}
 
 
@@ -137,6 +140,9 @@ static func _fixture(polygon: bool, concentric: bool) -> Dictionary:
 	s.sides_override = 6 if polygon else 4
 	CastleGenerator.generate(s, 77107)
 	s.inner_ward = concentric
+	# The synthetic keep is a single ground-floor room, so its door is at
+	# storey 0: the terraced plan's entrance, not the raised forebuilding door.
+	s.terraced_fallback = true
 	s.ward_gap = 8.0
 	s.gatehouse = true
 	s.gate_width = 5.0
@@ -240,7 +246,9 @@ static func _apse_entry(res: SuiteResult) -> void:
 	s.chapel = true
 	s.keep = false
 	s.inner_ward = false
-	s.hall_w = 6
+	# A drum narrower than CastleGeometry.APSE_MIN_RADIUS (2.8m, i.e. a chapel
+	# under 7m wide) is deliberately not built, so the fixture needs 8m.
+	s.hall_w = 8
 	s.hall_l = 18
 	s.hall_height = 6
 	var p := CastleInteriorPlans.chapel_plan(s)

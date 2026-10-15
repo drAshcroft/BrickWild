@@ -785,6 +785,9 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 			if s3.has("room") and StringName(s3["room"]) == kind:
 				steps.append(s3)
 
+	# A big shop room is stocked in proportion to its floor.
+	steps.append_array(HouseFurnishingRecipes.shop_composition_steps(plan, room))
+
 	# The focus is the one piece the room is arranged around, so it goes in
 	# whether or not the recipe happened to list it: a tavern's bar is not in
 	# the dining-room recipe, a great hall's high table is not in any.
@@ -876,6 +879,13 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 				and r.randf() > float(step["opt"]) * lerpf(0.75, 1.15, spec.clutter):
 			continue
 		var placed_from := plan.furniture.size()
+		# An additive overlay (the large Witch Hall and records room) draws from
+		# its own stream, so adding it cannot reshuffle every room furnished
+		# after it from the shared house stream.
+		var step_rng: RandomNumberGenerator = r
+		if bool(step.get("private_rng", false)):
+			step_rng = RandomNumberGenerator.new()
+			step_rng.seed = hash("ample|%d|%d|%d" % [plan.spec.seed, room, si])
 		if step["rule"] == &"row":
 			var row_count_before: int = plan.furniture.size()
 			HouseFurnishPlacement.place_row(plan, room, step, blocked, zones, r)
@@ -891,7 +901,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 			continue
 		var lo: int = int(step["n"][0])
 		var hi: int = int(step["n"][1])
-		var want: int = lo if hi <= lo else r.randi_range(lo, hi)
+		var want: int = lo if hi <= lo else step_rng.randi_range(lo, hi)
 		if HouseFurnishingRecipes.is_ordinary_house(plan) \
 				and String(step.get("group", "")) == "eating" \
 				and String(step.get("cat", "")) == "seat" \
@@ -913,7 +923,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 		for k in range(want):
 			var piece_from := plan.furniture.size()
 			HouseFurnishPlacement.place_one(plan, spec, room, String(step["cat"]), step["rule"],
-				blocked, zones, r, step)
+				blocked, zones, step_rng, step)
 			for placed in range(piece_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = must
 				_set_activity_group(plan.furniture[placed], step)
@@ -951,7 +961,9 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 		blocked.append(plan.dais_rect())
 	_ensure_seating(plan, room, blocked, zones, r)
 	_ensure_light(plan, room, r)
-	return _keep_the_room_passable(plan, room, blocked, zones, before_room_nav)
+	var passable := _keep_the_room_passable(plan, room, blocked, zones, before_room_nav)
+	_keep_the_stair_foot_reachable(plan, room, blocked, zones)
+	return passable
 
 
 ## Keep a walker's shoulder width clear around the bedside access strip before
@@ -1030,6 +1042,68 @@ static func _keep_the_room_passable(plan: HousePlan, room: int,
 	# The third attempt may have removed furniture. Return a report of that
 	# final plan state, never the report taken before its last mutation.
 	return HouseNavCheck.new().check(plan)
+
+
+## The nav check walks THROUGH a flight (its rectangle is floor), so it never
+## notices furniture that walls in the stair's foot; HouseStairCheck blocks the
+## flight and asks whether a 0.9 m walker reaches the foot landing. Ask it here
+## too. Overlays (big-hall benches, kitchen storage dropped into open floor)
+## piled three pieces across the hall and the foot was reachable only
+## sideways (townhouse 32102). Drop the smallest optional piece whose absence
+## restores the approach; if no single piece does, the largest and try again.
+static func _keep_the_stair_foot_reachable(plan: HousePlan, room: int,
+		blocked: Array[Rect2], zones: Array[Rect2]) -> void:
+	var mine: Array[int] = []
+	for si in range(plan.stairs.size()):
+		if int(plan.stairs[si].get("a", -1)) == room or int(plan.stairs[si].get("b", -1)) == room:
+			mine.append(si)
+	if mine.is_empty():
+		return
+	for attempt in range(3):
+		var failing := false
+		for si in mine:
+			if not HouseStairCheck.approach_failures(plan, si).is_empty():
+				failing = true
+				break
+		if not failing:
+			return
+		var pool: Array[int] = []
+		for f in plan.furniture_of(room):
+			var p: Dictionary = plan.furniture[f]
+			if p.get("must", false) or p.get("mounted", false) or int(p["host"]) >= 0:
+				continue
+			if PropCatalog.blocks_floor(p["key"]):
+				pool.append(f)
+		pool.sort_custom(func(x: int, y: int) -> bool:
+			var rx: Rect2 = plan.furniture[x]["rect"]
+			var ry: Rect2 = plan.furniture[y]["rect"]
+			return rx.size.x * rx.size.y < ry.size.x * ry.size.y)
+		var victim := -1
+		for f in pool:
+			# lift it out of the walker's world without touching the plan
+			plan.furniture[f]["mounted"] = true
+			var clear := true
+			for si in mine:
+				if not HouseStairCheck.approach_failures(plan, si).is_empty():
+					clear = false
+					break
+			plan.furniture[f].erase("mounted")
+			if clear:
+				victim = f
+				break
+		if victim < 0:
+			if pool.is_empty():
+				return
+			victim = pool[pool.size() - 1]
+		var repair_indices := HouseFurnishRepair._repair_target_indices(plan, victim)
+		for ri in range(repair_indices.size() - 1, -1, -1):
+			var index: int = repair_indices[ri]
+			if index >= plan.furniture.size():
+				continue
+			blocked.erase(plan.furniture[index]["rect"])
+			zones.erase(plan.furniture[index]["zone"])
+			plan.furniture.remove_at(index)
+			HouseFurnishRepair.reindex_hosts(plan, index)
 
 
 ## Failure identity includes the actual messages and affected room/item indices.
@@ -1216,6 +1290,13 @@ static func _ensure_light(plan: HousePlan, room: int, r: RandomNumberGenerator) 
 		return
 	if HouseFurnishingRecipes.is_ordinary_house(plan):
 		_ensure_ordinary_light_coverage(plan, room, r)
+		return
+	if plan.spec is ShopSpec:
+		# a shop floor is lit in proportion to its area as a house is; a private
+		# stream keeps the lamps from reshuffling every room furnished after
+		var lamp_rng := RandomNumberGenerator.new()
+		lamp_rng.seed = hash("shoplight|%d|%d" % [plan.spec.seed, room])
+		_ensure_ordinary_light_coverage(plan, room, lamp_rng)
 		return
 	if _room_light_count(plan, room) > 0:
 		return

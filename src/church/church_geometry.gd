@@ -22,6 +22,7 @@ const TRANSEPT_DEPTH_RATIO := 0.55   # transept depth along Z, x nave width
 const SPIRE_RISE_FACTOR := 2.2       # spire rise, x tower width x spire pitch
 const PYRAMID_RISE_FACTOR := 0.75    # pyramid tower roof rise, x tower width
 const BELFRY_RISE_FACTOR := 0.4      # belfry cap rise, x tower width
+const RUSSIAN_ONION_RISE_FACTOR := 1.0  # onion crown rise, x tower width
 const FLAT_CAP_RISE := 0.3           # flat tower gets a thin parapet slab
 const PINNACLE_RISE := 1.8           # shaft (1.2) + its little pyramid (0.6)
 const RIDGE_CAP := 0.25              # ridge timber sitting proud of the slabs
@@ -74,6 +75,12 @@ const PODIUM_RATIO := 0.045      # St Basil: podium height, x core height
 const PODIUM_MARGIN := 2.4       # podium reach beyond the outermost chapel
 const FLOOR_T := 0.05            # paved floor slab, under the rooms a person walks
 const FLOOR_LIFT := 0.001        # its top, just proud of a village's ground at y=0
+## The chancel step (LIVE-SACRED): the east end of the nave is raised this much,
+## so the altar group stands above the pews and reads from the door. Low enough
+## that a person steps up it (the walk's own riser limit is far above this).
+const CHANCEL_STEP_H := 0.15
+## The step's depth back from the east wall's centre line: 2.5 m in front of the altar.
+const CHANCEL_STEP_DEPTH := 3.8
 const BASIL_PATTERN := [0.34, 0.46, 0.38, 0.52, 0.42, 0.48, 0.36, 0.54]
 const BASIL_DRUM_PATTERN := [0.9, 1.25, 1.0, 1.35, 1.1, 0.85, 1.3, 1.05]
 const HAGIA_BEARING_RATIO := 0.74   # bearing block height, x dome radius
@@ -147,6 +154,45 @@ static func west_tower_sides(spec: ChurchSpec) -> Array[float]:
 	return []
 
 
+## Which finished crown a west tower takes, or &"" for the generic roof kinds.
+## Romanesque: a hipped four-faced cap. Russian: an onion on a drum, or a tent
+## on a drum where the style chose a spire.
+static func tower_crown_kind(spec: ChurchSpec) -> StringName:
+	if not spec.tower or spec.tower_roof == &"flat":
+		return &""
+	if spec.style == &"romanesque":
+		return &"hipped"
+	if spec.style == &"nordic_stave":
+		return &"stave"
+	if spec.style == &"russian":
+		return &"tent" if spec.tower_roof == &"spire" else &"onion"
+	return &""
+
+
+## The svalgang of a stave church: a low covered walk round the nave, a lean-to
+## roof from `top` on the nave wall down to `eave` on a row of posts `reach`
+## out. It runs along both flanks from the west tower to the crossing (or the
+## apse). Empty when the nave is too low to keep its lights above it, or too
+## short to be worth the posts.
+const STAVE_SKIRT_EAVE := 2.3
+const STAVE_SKIRT_TOP := 3.1
+const STAVE_SKIRT_REACH := 1.5
+const STAVE_SKIRT_SILL_GAP := 0.35
+const STAVE_SKIRT_POST := 0.24
+
+static func stave_skirt(spec: ChurchSpec) -> Dictionary:
+	if spec.style != &"nordic_stave" or spec.height < 6.2 or spec.hero != &"":
+		return {}
+	var z0: float = -spec.length / 2.0 + TOWER_EMBED + 0.2
+	var z1: float = spec.length / 2.0 - 0.2
+	if spec.transept:
+		z1 = transept_front_z(spec) - 0.2
+	if z1 - z0 < 3.5:
+		return {}
+	return {"eave": STAVE_SKIRT_EAVE, "top": STAVE_SKIRT_TOP,
+		"reach": STAVE_SKIRT_REACH, "z0": z0, "z1": z1}
+
+
 ## Rise of the tower roof above the tower top, for every roof kind the builder
 ## emits. A spire also carries a pinnacle, which is part of the silhouette and
 ## so part of the height the sheet dimensions.
@@ -154,6 +200,9 @@ static func tower_roof_rise(spec: ChurchSpec) -> float:
 	if not spec.tower:
 		return 0.0
 	var tw: float = spec.tower_width
+	var crown: StringName = tower_crown_kind(spec)
+	if crown == &"onion":
+		return tw * RUSSIAN_ONION_RISE_FACTOR
 	match spec.tower_roof:
 		&"spire":
 			return tw * spec.spire_pitch * SPIRE_RISE_FACTOR + PINNACLE_RISE
@@ -309,7 +358,8 @@ static func clerestory_windows(spec: ChurchSpec) -> Array[Dictionary]:
 	var sill: float = aisle_roof_high(spec) + RoofShape.DEPTH + 0.18
 	var head: float = spec.height - 0.22
 	var band: float = head - sill
-	var width: float = minf(pitch * 0.48, band * 0.7)
+	var pitch_share: float = 0.64 if spec.style == &"gothic" else 0.48
+	var width: float = minf(pitch * pitch_share, band * (0.8 if spec.style == &"gothic" else 0.7))
 	var crown: float = width * (0.35 if spec.window_style == &"pointed" else 0.25)
 	var height: float = band - crown
 	if width < 0.2 or height < 0.25:
@@ -523,6 +573,86 @@ static func chapel_reach_at(spec: ChurchSpec, i: int) -> float:
 	if not is_finite(best) or best <= 0.0:
 		best = spec.width / 2.0
 	return maxf(best - CHAPEL_LAP, 0.1)
+
+
+## The nave's clear interior in plan (x, z), inside the inner wall faces.
+## An alcove, a roof or a dressing may not put anything of its own in here.
+const NAVE_WALL_FACE := 0.36
+
+static func nave_interior(spec: ChurchSpec) -> Rect2:
+	return Rect2(-spec.width / 2.0 + NAVE_WALL_FACE, -spec.length / 2.0 + NAVE_WALL_FACE,
+		spec.width - NAVE_WALL_FACE * 2.0, spec.length - NAVE_WALL_FACE * 2.0)
+
+
+static func inside_nave(spec: ChurchSpec, p: Vector3, eps := 0.02) -> bool:
+	if nave_interior(spec).grow(-eps).has_point(Vector2(p.x, p.z)):
+		return true
+	if spec.apse and p.z > apse_springing_z(spec):
+		var rel := Vector2(p.x, p.z - apse_springing_z(spec))
+		return rel.length() < spec.apse_radius - NAVE_WALL_FACE - eps
+	return false
+
+
+## The parts of chord p0->p1, as [u0, u1] spans, that lie OUTSIDE the clear
+## interior: the nave rectangle and, when there is one, the apse half-disc.
+## `margin` > 0 shrinks the interior, < 0 grows it into the wall.
+static func outside_nave_spans(spec: ChurchSpec, p0: Vector3, p1: Vector3,
+		margin := 0.02) -> Array[Vector2]:
+	var inside: Array[Vector2] = []
+	var r: Rect2 = nave_interior(spec).grow(-margin)
+	var lo := 0.0
+	var hi := 1.0
+	var d := Vector2(p1.x - p0.x, p1.z - p0.z)
+	var o := Vector2(p0.x, p0.z)
+	var lows := [r.position.x, r.position.y]
+	var highs := [r.end.x, r.end.y]
+	var hit := true
+	for axis in range(2):
+		var da: float = d[axis]
+		if absf(da) < 0.00001:
+			if o[axis] <= lows[axis] or o[axis] >= highs[axis]:
+				hit = false
+			continue
+		var t0: float = (lows[axis] - o[axis]) / da
+		var t1: float = (highs[axis] - o[axis]) / da
+		lo = maxf(lo, minf(t0, t1))
+		hi = minf(hi, maxf(t0, t1))
+	if hit and lo < hi:
+		inside.append(Vector2(lo, hi))
+	if spec.apse:
+		var cz: float = apse_springing_z(spec)
+		var rad: float = spec.apse_radius - NAVE_WALL_FACE - margin
+		var rel := Vector2(o.x, o.y - cz)
+		var qa: float = d.dot(d)
+		var qb: float = 2.0 * rel.dot(d)
+		var qc: float = rel.dot(rel) - rad * rad
+		var disc: float = qb * qb - 4.0 * qa * qc
+		if qa > 0.00001 and disc > 0.0:
+			var t0: float = (-qb - sqrt(disc)) / (2.0 * qa)
+			var t1: float = (-qb + sqrt(disc)) / (2.0 * qa)
+			# only the half east of the springing plane belongs to the apse
+			if absf(d.y) > 0.00001:
+				var tz: float = (cz - o.y) / d.y
+				if d.y > 0.0:
+					t0 = maxf(t0, tz)
+				else:
+					t1 = minf(t1, tz)
+			elif o.y < cz:
+				t1 = t0 - 1.0
+			t0 = maxf(t0, 0.0)
+			t1 = minf(t1, 1.0)
+			if t0 < t1:
+				inside.append(Vector2(t0, t1))
+	inside.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+	var out: Array[Vector2] = []
+	var cursor := 0.0
+	for span in inside:
+		if span.x - cursor > 0.001:
+			out.append(Vector2(cursor, span.x))
+		cursor = maxf(cursor, span.y)
+	if 1.0 - cursor > 0.001:
+		out.append(Vector2(cursor, 1.0))
+	return out
 
 
 ## Nominal reach, used where a single representative value is wanted.
@@ -905,7 +1035,7 @@ static func nave_bay_windows(spec: ChurchSpec) -> Array[Dictionary]:
 			minimum_width = 1.45
 		&"gothic":
 			sill = 1.25
-			target_height = maxf(2.6, minf(spec.height * 0.30, 4.0))
+			target_height = maxf(3.4, minf(spec.height * 0.46, 6.5))
 			minimum_width = 1.3
 		&"byzantine":
 			sill = 1.1
@@ -927,6 +1057,13 @@ static func nave_bay_windows(spec: ChurchSpec) -> Array[Dictionary]:
 	if opening_height < 1.4:
 		return out
 	sill = minf(sill, maxf(spec.height - opening_height - 0.6, 0.0))
+	# A stave church's lights sit ABOVE its covered svalgang, not behind it.
+	var skirt: Dictionary = stave_skirt(spec)
+	if not skirt.is_empty():
+		sill = float(skirt["top"]) + STAVE_SKIRT_SILL_GAP
+		opening_height = minf(opening_height, spec.height - sill - 0.7)
+		if opening_height < 1.2:
+			return out
 	var support_width: float = maxf(BUTTRESS_FACE, nave_pier_width(spec))
 	for i in range(supports.size() - 1):
 		var left: float = supports[i]
@@ -939,7 +1076,8 @@ static func nave_bay_windows(spec: ChurchSpec) -> Array[Dictionary]:
 		var usable: float = pitch - support_width - reveal_allowance
 		if usable < 0.9:
 			continue
-		var opening_width: float = minf(maxf(spec.window_w, minimum_width), usable * 0.72)
+		var width_share: float = 0.86 if spec.style == &"gothic" else 0.72
+		var opening_width: float = minf(maxf(spec.window_w, minimum_width), usable * width_share)
 		if opening_width < 0.8:
 			continue
 		out.append({"z": (left + right) * 0.5, "width": opening_width,
@@ -1287,6 +1425,123 @@ static func floor_rects(spec: ChurchSpec) -> Array[Rect2]:
 	if spec.narthex:
 		rooms.append(_plan_rect(narthex_aabb(spec)))
 	return disjoint_rects(rooms)
+
+
+## A wide nave carries a bigger altar group, so the rail and the step stand this
+## much further west to leave the reader and the fire a body-width of floor.
+static func chancel_extra(spec: ChurchSpec) -> float:
+	return 0.4 if spec.width > 10.0 else 0.0
+
+
+## The raised chancel, as a plan rect (x, z), or an empty rect when the nave is
+## too narrow, or a podium or non-nave plan has no such floor. It stops short of
+## the nave walls so it overlaps none of them.
+static func chancel_step_rect(spec: ChurchSpec) -> Rect2:
+	if podium_height(spec) > 0.0 or spec.width < 6.0:
+		return Rect2()
+	var inset: float = ChurchBuilder.NAVE_WALL_T + 0.04
+	var z_east: float = spec.length / 2.0 - inset
+	var z_west: float = spec.length / 2.0 - CHANCEL_STEP_DEPTH - chancel_extra(spec)
+	return Rect2(Vector2(-spec.width / 2.0 + inset, z_west),
+		Vector2(spec.width - inset * 2.0, z_east - z_west))
+
+
+## Walls are `ChurchBuilder.NAVE_WALL_T` thick; the walk's rooms start inside them.
+const WALK_WALL_T := 0.36
+## Dressing below this height stands in a person's way (DressingCheck.walk's rule).
+const WALK_PROP_CEILING := 1.0
+## A doorway strip runs this far into the nave from the west wall.
+const WALK_DOOR_REACH := 1.0
+
+
+## Where the west doorways are cut: on the nave's front wall, unless a single
+## axial tower carries them out to its own west face. The builder and the API
+## adapter both ask here.
+static func west_door_z(spec: ChurchSpec) -> float:
+	if spec.tower and spec.west_towers == 1:
+		return -spec.length / 2.0 + TOWER_EMBED - spec.tower_width - OPENING_EPS
+	return -spec.length / 2.0 - OPENING_EPS
+
+
+## What a person walks inside a church, as plan rectangles: the nave, the
+## aisles, and the way between them -- each west doorway out to the front and
+## each arcade opening through the wall to the aisle -- less the engaged piers
+## the builder stands at `nave_support_zs` and the dressing on the floor
+## (`props` is `ChurchFurnisher.dress`, whose rects are what DressingCheck.walk
+## cuts out). Returns {"floor": Array[Rect2], "obstacles": Array[Rect2]}, or
+## empty for a church with no paved floor of its own (St Basil's podium).
+## Transept, crossing, apse, narthex, chapels and tower interiors are not
+## walked yet: the nave's walls close them off.
+static func walk_rects(spec: ChurchSpec, props: Array) -> Dictionary:
+	if floor_rects(spec).is_empty():
+		return {}
+	var t: float = WALK_WALL_T
+	var floor: Array[Rect2] = []
+	var obstacles: Array[Rect2] = []
+	var nave := Rect2(-spec.width / 2.0 + t, -spec.length / 2.0 + t,
+		spec.width - t * 2.0, spec.length - t * 2.0)
+	if nave.size.x < 0.6 or nave.size.y < 0.6:
+		return {}
+	floor.append(nave)
+	var door_z: float = west_door_z(spec)
+	for door in west_door_layout(spec):
+		var half: float = float(door.width) * 0.5
+		floor.append(Rect2(float(door.x) - half, door_z, half * 2.0,
+			nave.position.y + WALK_DOOR_REACH - door_z))
+	# the engaged piers: the one thing standing in the nave besides the dressing
+	var pier_w: float = nave_pier_width(spec)
+	var pier_d: float = nave_pier_projection(spec)
+	for z in nave_support_zs(spec):
+		for side in [-1.0, 1.0]:
+			var x: float = side * (spec.width * 0.5 - t - pier_d * 0.5)
+			obstacles.append(Rect2(x - pier_d * 0.5, z - pier_w * 0.5, pier_d, pier_w))
+	# the aisles, ring by ring, joined through the arcade the builder cuts
+	var zr: Vector2 = aisle_z_range(spec)
+	var inner_edge: float = nave.end.x   # the inside face of the room just walked
+	var inner_height: float = aisle_height(spec, 0)
+	for ring in range(spec.aisles):
+		var cx: float = absf(aisle_center_x(spec, 1.0, ring))
+		var lo: float = cx - spec.aisle_width * 0.5 + t
+		var hi: float = cx + spec.aisle_width * 0.5 - t
+		if hi - lo < 0.6 or zr.y - zr.x - t * 2.0 < 0.6:
+			break
+		var limit: float = inner_height if ring == 0 \
+			else minf(aisle_height(spec, ring), aisle_height(spec, ring - 1))
+		var opened := false
+		for bay in nave_arcade_openings(spec, limit):
+			var half2: float = float(bay["width"]) * 0.5
+			for side in [-1.0, 1.0]:
+				var a: float = minf(inner_edge, lo) - 0.05
+				var b: float = maxf(inner_edge, lo) + 0.05
+				var x0: float = a if side > 0.0 else -b
+				floor.append(Rect2(x0, float(bay["u"]) - half2, b - a, half2 * 2.0))
+			opened = true
+		if not opened:
+			break
+		for side in [-1.0, 1.0]:
+			var x1: float = lo if side > 0.0 else -hi
+			floor.append(Rect2(x1, zr.x + t, hi - lo, zr.y - zr.x - t * 2.0))
+		inner_edge = hi
+	for p in props:
+		var rect: Rect2 = p["rect"]
+		if rect.size.x > 0.0 and (p["pos"] as Vector3).y < WALK_PROP_CEILING:
+			obstacles.append(rect)
+	return {"floor": floor, "obstacles": obstacles}
+
+
+## `walk_rects` as the outlines a navigation baker unions:
+## {0: {"floor": [...], "obstacles": [...]}}. A church is one storey.
+static func walk_sources(spec: ChurchSpec, props: Array) -> Dictionary:
+	var rects: Dictionary = walk_rects(spec, props)
+	if rects.is_empty():
+		return {}
+	var floor: Array[PackedVector2Array] = []
+	var obstacles: Array[PackedVector2Array] = []
+	for r in rects["floor"]:
+		floor.append(Poly.from_rect(r))
+	for o in rects["obstacles"]:
+		obstacles.append(Poly.from_rect(o))
+	return {0: {"floor": floor, "obstacles": obstacles}}
 
 
 static func _plan_rect(a: AABB) -> Rect2:

@@ -245,6 +245,21 @@ func check_sparse(plan: HousePlan) -> void:
 				% [i, String(plan.kind_of(i)), area, used / area * 100.0])
 
 
+## A seat drawn up to the table that hosts it is a person at work, not loose
+## furniture: the table stands against the wall and the chair has to stand
+## somewhere. Only a hosted seat whose rect is within SEAT_BAND of its table,
+## in the same room, qualifies; an unhosted chair, or one left off its table,
+## is still furniture in the passage.
+static func _seat_in_use(plan: HousePlan, p: Dictionary) -> bool:
+	var host := int(p.get("host", -1))
+	if host < 0 or host >= plan.furniture.size() or not _is_seat(String(p["key"])):
+		return false
+	var h: Dictionary = plan.furniture[host]
+	if int(h["room"]) != int(p["room"]) or PropCatalog.category(String(h["key"])) not in ["table", "workbench", "counter"]:
+		return false
+	return Rect2(h["rect"]).grow(SEAT_BAND).intersects(Rect2(p["rect"]).grow(-TOL))
+
+
 func check_corridor(plan: HousePlan) -> void:
 	for i in range(plan.room_count()):
 		var r := HouseGeometry.room_floor_rect(plan, i)
@@ -253,7 +268,7 @@ func check_corridor(plan: HousePlan) -> void:
 		var across := 1 if r.size.x >= r.size.y else 0      # the short axis
 		for f in plan.furniture_of(i):
 			var p: Dictionary = plan.furniture[f]
-			if not _on_floor(p):
+			if not _on_floor(p) or _seat_in_use(plan, p):
 				continue
 			var q: Rect2 = p["rect"]
 			var gap := minf(q.position[across] - r.position[across], r.end[across] - q.end[across])

@@ -82,7 +82,7 @@ and purposes for data-driven tools.
 `NavigationRegion3D` per storey and a two-way `NavigationLink3D` per stair, in
 the building's own frame: add it under the instanced building so people take
 the stairs. `BrickWild.navigation(generated)` is the same as plain data. Both
-cover the families with a HousePlan (houses, shops, hotels); the others report
+cover the families with a HousePlan (houses, shops, hotels), temples, churches and walled castles (ward and ranges; not yet the towers or the wall walk); the others report
 `supported: false`. Set the map's merge rasterizer cell scale to `0.04`
 (`NavigationServer3D.map_set_merge_rasterizer_cell_scale`): the meshes are on a
 centimetre grid. A village plan's `walk` key is the street side of the same

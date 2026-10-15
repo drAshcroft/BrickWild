@@ -47,17 +47,32 @@ Still open (this is why the task stays pending). `tools/castle_occupancy_sweep.g
 reproduces every line below; the counts are from the canonical grid at the
 pass's last full sweep:
 
-- Tight ridge zigzags (`dark castle` seed 9249, 40 m): the ranges are as wide as
-  the pitch between vertices, so the mitre-safe cut leaves no room and the
-  ranges, towers and spire stay solid with their required records missing. A real
-  answer clips the end bays to mitred convex outlines. (The other dark and
-  bavarian ridges plan and pass.)
-- Tower-house shaft (not the jogs): the roof-platform room is emitted as a full
-  storey of walls above the deck and fills the stair opening; the platform room
-  sticks out of its interior and is reached only through a lord's chamber; the
-  approach steps block `lords_walk`; jog windows can face the approach steps and
-  the Z jog's second block still has a window against masonry. `ctowerplan`
-  (wizard oval) and `cforms` were red before this pass.
+- Tight ridge zigzags (`dark castle` seed 9249, 40 m): FIXED 14 October. The
+  ranges were as wide as the pitch between five vertices, so towers plus the
+  mitre-safe cut left no run for a room and everything stayed solid. Mitring the
+  end bays was not needed: `CastleGenerator._fit_ridge` now draws fewer vertices
+  (floor three) until every `CastleRidgePlan` range is `usable`. Seed 9249 is a
+  three-vertex ridge; the occupancy sweep reports no `occupied_shells` failure.
+  `castle_change_suite._tight_ridge_contract` pins it, with the old five-vertex
+  spine as the negative control. (The sweep's remaining raw-HouseQA furnishing
+  lines for the dark ridges predate this and are unfurnished-plan noise.)
+- Tower-house shaft: FIXED 14 Oct (`tools/castle_tower_house_sweep.gd` reproduces
+  every style x seed x three footprints; pinned by `ctowerhouse`
+  `_platform_entry_contract`, each probe with a built-to-break negative control).
+  The roof platform is a planned open-air deck (`open_air` room: the top
+  chamber's clear floor, floor slab and no walls; `HouseBuilder` raises none and
+  `CastleBuilder` caps the walls with a parapet ring, not a solid slab that filled
+  the stair well). `TowerSpec.entry_storey` carries the raised door's storey
+  (as a keep's), and `HousePlanCheck` exempts only an `open_air` deck from the
+  walk-through-a-bedroom privacy rule. The L/Z front jog no longer stands in the
+  entrance: `CastleGeometry.tower_entry_x` slides the door and steps left of the
+  jog, `tower_jog_width` narrows the jog, and `_fit_tower_house` drops a jog
+  narrower than `TOWER_JOG_MIN_W`. Windows that opened onto a solid stair flight
+  (jog block, faceted wizard shaft) are dropped and daylight restored.
+  Still red in these cases and NOT this item: furnishing findings
+  (`sparse`, `lamps`, `seat_count`, `seat_kinds`, `stowage`, `table_band` in every
+  tower house), being baselined separately. `ctowerplan` (wizard oval) and
+  `cforms` were not re-run after this change.
 - The smallest tier of every walled style (40 x 55 m): the corner towers are
   embedded in a 5 m footing, no clear gallery reaches the coping, and the ground
   door a fallback gives them meets the 0.65 m wall footing (door clearance fails);
