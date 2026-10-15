@@ -8,7 +8,17 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
 
 ## Unreleased
 
-- `BrickWild.navigation()` and `navigation_node()` now walk temples (one
+## 0.1.3 - 2026-10-14
+
+Temples, churches and walled castles say where a person can walk; BrickWild
+realises dungeon plans; a compact village can be a garden. Tag `v0.1.3`.
+`API_VERSION` stays 2: everything is additive, but some buildings look
+different at the same seed (see Compatibility).
+
+### Notable changes
+
+- **Interior walks for temples, churches and walled castles.**
+  `BrickWild.navigation()` and `navigation_node()` now walk temples (one
   storey, gate to altar; `BuildingFamilyAdapter.walk_sources` / `walk_frame`).
   Churches too (nave, one aisle ring, west doors to altar; transept, apse and
   chapels are not walked yet; a twin-door church no longer has its font in a
@@ -22,6 +32,115 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
   does: seconds for a castle, minutes for a fortress; the result is cached per
   spec. Windmills, bridges and trees still report `supported: false` (todo
   `NAV-INTERIOR-OTHER-FAMILIES`).
+- **Dungeon rooms (for VoxelGames).** `DungeonRealiser.realise()` (the addon's
+  `families/dungeon`) and `tools/realise_dungeon.gd` (the frozen `project/`)
+  read a `dmv.dungeon.plan` export from `C:\Projects\dungeon` and write
+  `brickwild.dungeon.rooms` v1: each room's size in metres, the planner's
+  ceiling/wall/floor grammar per archetype and style, an ordered carve list
+  (box / cylinder / ellipsoid, carve or fill), doorways along their walls,
+  gates by lock kind, and sockets for fixtures, torches and set pieces. Data
+  only: no voxels, no godot_voxel dependency. The default sizes are
+  VoxelGames' old formulas, so nothing moves until a style asks it to. Every
+  pit has a ledge and a stair out of it. See `docs/DUNGEONS.md`.
+- **The garden village (for PaperFjord).** `VillageSpec.garden` (0 to 1,
+  default 0) plants a compact display's open ground: beds along house fronts
+  and path verges, flower scatter, flowering shrubs, trees where a canopy
+  fits, lamp posts along the paths and small ponds in the gaps. Buildings,
+  lots and roads never move for it, and a full (non-compact) village ignores
+  it. It is a spec field only: the site request JSON and
+  `tools/export_village_plan.gd` do not carry it yet.
+- **Furnishing.** Shops stock, light and shelve big sales floors, workshops and
+  offices by area. Shop kitchens (restaurant, tavern, inn, bakery) get a
+  proper commercial kitchen. The palace hangs its banners again (seed 8102 had
+  none). Big halls (60 m² and up) and parlours (20 m² and up) are furnished to
+  size. The furnisher keeps the foot of every stair reachable. Large churches
+  get pews to the door, a raised chancel and an altar group scaled to the nave.
+  The Witch hut's large Hall and records room are furnished.
+- **Exteriors.** Gothic churches get an octagonal crocketed spire, pinnacles
+  and wider lights. The Nordic stave church reads as stave: tarred timber, a
+  tiered shingle tower, a svalgang and dragon heads. Romanesque and Russian
+  west towers get finished crowns (a hipped cap; a drum and onion). The temple
+  basilica gets a pediment. The Witch hut gets a steeper roof, a leaning stack,
+  a hooded entry and (large) a second stack. Tower houses get an open-air roof
+  deck, and the entrance clears the front jog.
+- **Fixes.** Trade houses (innkeeper townhouse, smith longhall) climb by the
+  human-scale domestic stair instead of the legacy 2.4 m flight. A tight ridge
+  castle (seed 9249) no longer stays solid. Three archived source snapshots no
+  longer register duplicate `class_name`s.
+
+### Compatibility
+
+- **Same request, different building.** Regenerating at the same seed changes
+  these:
+  - The **Witch hut**: dark slate roof colour (was thatch brown), no longer
+    clipped to a half-hip, plus the massing above. Plans are unchanged.
+  - **Churches**: Gothic, Nordic stave, Romanesque and Russian exteriors;
+    larger naves furnished differently. A church's footprint can grow by a
+    few centimetres to a few decimetres, and its landmark lot with it.
+  - **Trade houses** with more than one storey: a new stair, so the rooms and
+    the front door can move.
+  - **Shops, palaces, tower houses and big halls**, as above.
+- **SitePlans**, diffed against the 0.1.2 release's own exporter (garden 0):
+  - Thorn-hamlet: only the church lot `l-000` and the walk round it differ.
+  - Wuunafu 60 + 6000: only the smith townhouse `b-013` differs. Its door
+    moved 2.7 m, and its yard and three tree trunks moved with it.
+  - Thaannafu 45 + 4000: the two church lots grew by 0.1 to 0.2 m, one site
+    door moved, and the navmesh has 476 polygons (was 475).
+  - Every other building, lot, road and gate is identical. `schema_version`
+    stays 1, and the `walk` schema stays `brickwild.walk` v1.
+- A Dm_View or PaperFjord map baked from 0.1.2 will not line up exactly with
+  0.1.3 at the church and that one townhouse. Re-export rather than mixing the
+  two versions.
+
+### Known issues
+
+- **`lane:castle-change` is not green**: 17 failures in `cmotteaccess` and
+  `castlechange`. Castle guardroom and great-hall tables seat no one
+  (`seat_count`), and some tower and range rooms are under-furnished
+  (`sparse`, `lamps`). Not a regression: the 0.1.2 release fails the same two
+  suites on the same cases with 18 failures. Its extra sanctuary corridor
+  failure is fixed in 0.1.3. A fix is in progress (`CastleKeepPlan.furnish_minimum_programme` seats only
+  halls and parlours).
+- Temple Rotunda arcade piers 04/10 and 04/13 have no twin across the axis.
+  These are 4 symmetry warnings now; TEMPLE-ROTUNDA-ARCADE is still open.
+- `lane:church-change` carries 12 warnings for transept openings walled in
+  from outside (Byzantine, Gothic and Renaissance at seeds 5003 and 5008).
+- Set the 3D map's merge rasterizer cell scale to 0.04, as in 0.1.2.
+
+### Lanes
+
+Run on the release commit's tree, on a loaded host (times are wall-clock and
+about three times the recorded ones):
+
+| Lane | Checks | Result | Time |
+|---|---|---|---|
+| `lane:api` | 798 | pass | 706 s |
+| `lane:dungeon` | 432 | pass | 121 s |
+| `lane:village-fast` | 47 | pass | 863 s |
+| `dmvbrief` `dmvimplied` `dmvwalk` | 308 | pass | 2674 s |
+| `lane:church-change` | 5940 | pass, 16 warnings | 388 s |
+| `lane:temple` | 3467 | pass, 4 warnings | 747 s |
+| `lane:house-plan-fast` | 293 | pass, 34 warnings | 348 s |
+| `lane:castle-change` | 701 | **17 failures** | 1446 s |
+| `walk_navserver_test` (Wuunafu, Thaannafu) | 114 paths | all arrive | |
+
+`lane:house-plan-fast` is green for the first time in a release. Releases
+0.1.0 to 0.1.2 recorded 28 `hmultistory` failures; it now reports 0 failures
+and 34 warnings. The warnings were not compared item by item with the old
+findings.
+
+### Migration
+
+- Install from `releases/brick_wild-0.1.3/`. Re-export SitePlans and
+  regenerate any cached Witch huts, churches and trade houses.
+- VoxelGames: realise dungeon plans with `DungeonRealiser.realise()`, or run
+  `tools/realise_dungeon.gd -- --plan plan.json --out rooms.json` from the
+  frozen project. Carve the ops in order. Apply the ROOT overlap as written:
+  shapes reach a metre below the floor so a signed-distance carve meshes
+  cleanly.
+- Add `BrickWild.navigation_node(b)` under temples, churches and walled
+  castles as for houses. Check `navigation(b).supported` first; the castle
+  forms listed above still return false.
 
 ## 0.1.2 - 2026-10-10
 
