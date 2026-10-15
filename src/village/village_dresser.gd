@@ -36,6 +36,10 @@ static func dress(plan: VillagePlan) -> VillagePlan:
 	plan.plants.clear()
 	if not plan.spec.compact_display:
 		VillageDressContext.outer_land(plan)
+	# A garden village digs its ponds first, so every host keeps off the water
+	# and the water's own hosts dress the banks. At garden 0 this only removes
+	# ponds an earlier dressing dug, which a default plan never has.
+	VillageGarden.dig_ponds(plan)
 	var ctx: Dictionary = VillageDressContext.make_context(plan)
 	VillageDressContext.enclosure_hedge(plan, ctx)
 	VillageDressContext.mill_wheels(plan, ctx)
@@ -59,6 +63,7 @@ static func dress(plan: VillagePlan) -> VillagePlan:
 	VillageDressHosts.dress_place(plan, ctx, &"strand")
 	VillageDressHosts.dress_place(plan, ctx, &"reeds")
 	_lush_pass(plan, ctx)
+	VillageGarden.plant(plan, ctx)
 	open_ground(plan, ctx)
 	return plan
 

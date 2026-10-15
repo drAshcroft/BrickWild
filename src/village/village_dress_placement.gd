@@ -18,8 +18,9 @@ static func place(plan: VillagePlan, ctx: Dictionary, step: Dictionary,
 			return false
 		var looks: Array = plant_looks(plan, step, key, at)
 		var marginal: bool = String(step.get("palette", "")) == "reed"
+		var bed: bool = bool(step.get("bed", false))
 		for look in looks:
-			if not plant_is_clear(plan, ctx, at, look["trunk"], look["canopy"], marginal):
+			if not plant_is_clear(plan, ctx, at, look["trunk"], look["canopy"], marginal, bed):
 				continue
 			plan.plants.append(plant_row(key, at, look, snappedf(rng.randf_range(0.0, TAU), 0.001)))
 			remember(ctx, at, Rect2(at - Vector2(look["trunk"], look["trunk"]),
@@ -275,8 +276,15 @@ static func prop_is_clear(plan: VillagePlan, ctx: Dictionary, rect: Rect2,
 ## A trunk off every road and every building, and a canopy over no roof.
 ## Same functions as the checks -- `overlap_area` over `Geometry2D`, not the
 ## convex clipper, because a road ribbon bends.
+##
+## A `bed` plant (a garden's flower bed, `VillageGarden`) edges a path: it is
+## held off the verged ribbon by BED_ROAD_CLEAR instead of a tree's metre,
+## which is all `DressCheck`'s road and cover rules ask of a stem. Its
+## distance from every building is a trunk's, unchanged.
+const BED_ROAD_CLEAR := 0.15
+
 static func plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
-		trunk: float, canopy: float, marginal := false) -> bool:
+		trunk: float, canopy: float, marginal := false, bed := false) -> bool:
 	if not plan.site.has_point(at):
 		return false
 	# The green's working space belongs to the well. Large boulders from a
@@ -292,7 +300,7 @@ static func plant_is_clear(plan: VillagePlan, ctx: Dictionary, at: Vector2,
 		if Poly.contains_point(w["poly"], at) or VillageMeasure.point_to_poly(at, w["poly"]) < margin:
 			return false
 	var stem_rect: Rect2 = Rect2(at - Vector2(trunk, trunk),
-		Vector2(trunk, trunk) * 2.0).grow(VillageDressCatalog.TRUNK_CLEAR)
+		Vector2(trunk, trunk) * 2.0).grow(BED_ROAD_CLEAR if bed else VillageDressCatalog.TRUNK_CLEAR)
 	var stem: PackedVector2Array = Poly.from_rect(stem_rect)
 	for prop in plan.props:
 		if prop["key"] in ["boat", "drying_rack"] and prop.has("approach") \

@@ -155,6 +155,20 @@ const PALETTES := {
 ## not a row of PALETTES: `palette_keys` falls back to this for the `reed` slot.
 const REEDS: Array = ["Wild_Grass_Wispy_Tall", "Wild_Grass_Common_Tall", "Nature_Grass_Large"]
 
+## What a garden village plants (`VillageSpec.garden`), in every culture: a
+## flower bed is a flower bed in Wessex and in the Alps alike. Like REEDS these
+## are not a PALETTES row; `palette_keys` falls back to them for the `garden`
+## (flowers), `bloom` (flowering shrubs) and `petal` (fallen-petal cover)
+## slots, and `DressCheck`'s culture rule admits them only when the spec
+## asked for a garden. Prefixes end in `*`, which is the only wildcard
+## `palette_keys` expands -- a star in the middle of a key matches nothing.
+const GARDEN: Dictionary = {
+	"garden": ["Nature_Flower_*", "Wild_Flower_3_*", "Wild_Flower_4_*"],
+	"bloom": ["Nature_Bush_Flowers", "Nature_Bush_Small_Flowers",
+		"Nature_Bush_Large_Flowers", "Wild_Bush_Common_Flowers"],
+	"petal": ["Wild_Petal_*"],
+}
+
 ## The props that are BUILT rather than loaded (VIL-010). A recipe step marked
 ## `built` names one of these instead of a catalogue category; the assembler
 ## emits it from `PropKit` and the checks measure the AABB it returns.

@@ -182,6 +182,7 @@ static func _spec_equal(a: VillageSpec, b: VillageSpec) -> bool:
 		and a.compact_display == b.compact_display
 		and is_equal_approx(a.decoration_level, b.decoration_level)
 		and is_equal_approx(a.upkeep, b.upkeep)
+		and is_equal_approx(a.garden, b.garden)
 		and a.enclosure == b.enclosure and a.water == b.water
 		and a.households == b.households and a.form == b.form
 		and a.variant_name == b.variant_name and a.site == b.site

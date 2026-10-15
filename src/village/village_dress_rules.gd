@@ -162,7 +162,8 @@ static func _slot_for(cat: String) -> String:
 static func palette_keys(ctx: Dictionary, slot: String) -> Array[String]:
 	var out: Array[String] = []
 	var palette: Dictionary = ctx["palette"]
-	for pattern in palette.get(slot, VillageDressCatalog.REEDS if slot == "reed" else []):
+	var fallback: Array = VillageDressCatalog.REEDS if slot == "reed" 		else VillageDressCatalog.GARDEN.get(slot, [])
+	for pattern in palette.get(slot, fallback):
 		var text: String = String(pattern)
 		if text.ends_with("*"):
 			var prefix: String = text.substr(0, text.length() - 1)

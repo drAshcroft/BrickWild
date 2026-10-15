@@ -78,7 +78,7 @@ func check(plan: VillagePlan, overrides: Dictionary = {}) -> Dictionary:
 
 ## Presentation controls are bounded independent inputs, not wealth aliases.
 func _check_controls(plan: VillagePlan) -> void:
-	for field in ["decoration_level", "upkeep"]:
+	for field in ["decoration_level", "upkeep", "garden"]:
 		var value: float = float(plan.spec.get(field))
 		if not is_finite(value) or value < 0.0 or value > 1.0:
 			failures.append("controls: %s %.3f is outside [0, 1]" % [field, value])
@@ -513,7 +513,10 @@ func _check_wood(plan: VillagePlan) -> void:
 ## palettes reads as two villages, and this is the rule that says so.
 func _check_culture(plan: VillagePlan) -> void:
 	var allowed := {}
-	for slot in ["edge", "green", "hedge", "ground", "wild", "reed"]:
+	var slots: Array[String] = ["edge", "green", "hedge", "ground", "wild", "reed"]
+	if plan.spec.garden > 0.0:
+		slots.append_array(VillageDressCatalog.GARDEN.keys())
+	for slot in slots:
 		for key in VillageDressRules.palette_keys(
 				{"palette": VillageDressCatalog.PALETTES.get(plan.spec.culture,
 					VillageDressCatalog.PALETTES[&"english"])}, slot):

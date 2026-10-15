@@ -22,6 +22,13 @@ var compact_display: bool = false
 var decoration_level: float = 0.5
 ## Care of optional outdoor dressing, independent of household wealth.
 var upkeep: float = 1.0
+## The lavish garden village (PaperFjord's request): 0 is today's dressing,
+## untouched; above it `VillageGarden` plants a compact display's open ground
+## -- beds along every house front and path verge, flower scatter, flowering
+## shrubs, trees where a canopy fits, lamp posts along the paths and small
+## ponds dug in the gaps the layout leaves. Buildings, lots and roads never
+## move for it. Compact displays only; a full village ignores it.
+var garden: float = 0.0
 var population: int = 40
 ## The people the history says this settlement serves beyond the `population`
 ## shown (C1, owner decision 2026-10-10). 0 is none. It sizes the civic
@@ -188,6 +195,8 @@ func errors() -> Array[String]:
 		out.append("decoration_level %f out of range [0, 1]" % decoration_level)
 	if not is_finite(upkeep) or upkeep < 0.0 or upkeep > 1.0:
 		out.append("upkeep %f out of range [0, 1]" % upkeep)
+	if not is_finite(garden) or garden < 0.0 or garden > 1.0:
+		out.append("garden %f out of range [0, 1]" % garden)
 	if not (enclosure in ENCLOSURES):
 		out.append("unknown enclosure '%s'" % enclosure)
 	if not (water in WATERS):
