@@ -52,6 +52,11 @@ var _dress_used := false
 var _planned_interiors := {}
 const Interiors = preload("castle_interiors.gd")
 const KeepPlan = preload("castle_keep_plan.gd")
+const Slope = preload("castle_slope.gd")
+## Falling ground (VTER-CASTLE-SLOPE): the platform's plan outline and the
+## flight from its edge to the ground at the entrance. Empty on flat ground.
+var slope_outline := PackedVector2Array()
+var slope_flight: Dictionary = {}
 
 
 func build(p_spec: CastleSpec) -> ArrayMesh:
@@ -68,6 +73,8 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 	_yards.clear()
 	_skin_used = false
 	_dress_used = false
+	slope_outline = PackedVector2Array()
+	slope_flight = {}
 	_planned_interiors = Interiors.primary(spec)
 	total_height = spec.height
 
@@ -111,6 +118,9 @@ func _dressed() -> ArrayMesh:
 	if CastleGeometry.is_enclosed(spec):
 		yard_report = CastleFurnisher.yard_report(spec, prop_log, interiors,
 			{"ranges": _yard_ranges, "well": _yard_well, "yards": _yards})
+	# On falling ground the whole castle, its yard and its props stand on a
+	# revetted platform; on flat ground this emits nothing.
+	Slope.emit(self)
 	_keep_surface_slots()
 	var mesh: ArrayMesh = commit()
 	return _elevate_sky(mesh) if CastleGeometry.is_sky(spec) else mesh

@@ -1938,3 +1938,70 @@ static func plan_extent(spec: CastleSpec) -> Rect2:
 		var ch: AABB = chimney_aabb(spec, 0)
 		e = e.expand(Vector2(ch.position.x, ch.position.z + ch.size.z))
 	return e
+
+
+# ------------------------------------------------------ falling ground
+## A castle on falling ground (VTER-CASTLE-SLOPE). Nothing above y = 0 moves:
+## the castle stands on a revetted PLATFORM whose top is the flat castle's
+## ground. The platform's outline is the union of every part that stands on
+## the ground, each grown by SLOPE_SETOUT -- so the revetment runs at the foot
+## of each curtain and round each tower, and the ward inside is filled -- or,
+## for the unwalled tiers (house, manor, tower house), the convex hull of
+## them, a terrace with the forecourt on it. The revetment is a stepped talus:
+## SLOPE_WALL_T thick at its top, each GroundFall.COURSE lower course set out
+## SLOPE_TALUS further, down to the ground. See src/castle/castle_slope.gd.
+
+## The deepest fall a castle stands on, metres. Beyond it the request is
+## refused (`ground_too_steep`), never clamped, as a house or church is.
+const SLOPE_MAX_FALL := 6.0
+## Berm left between a part's foot and the platform's edge.
+const SLOPE_SETOUT := 0.5
+## The revetment's thickness at its top course.
+const SLOPE_WALL_T := 0.8
+## How far each course of the talus steps out from the one above (1 in 4).
+const SLOPE_TALUS := 0.075
+## The platform's top: just under the castle's own ground, as the church's
+## terrace is, so no paving face lies in the plane of a floor.
+const SLOPE_TOP := -0.03
+const SLOPE_PAVING_T := 0.12
+## Platform kept in front of the entry, so the gate approach is level ground.
+const SLOPE_APPROACH := 2.5
+
+
+## The ground under `spec`, or null when it is flat.
+static func slope_ground(spec: CastleSpec) -> GroundFall:
+	return GroundFall.of_spec(spec)
+
+
+## Why this castle cannot stand on falling ground at all, or "".
+static func slope_unsupported(spec: CastleSpec) -> String:
+	if is_sky(spec):
+		return "a sky citadel stands on its own floating rock, not on the ground."
+	if spec.plan_kind == &"water" and is_enclosed(spec):
+		return "a water castle's moats need level ground; water does not lie on a slope."
+	return ""
+
+
+## True when the platform is the convex hull of the parts (a terrace with its
+## forecourt), false when it follows them (a talus round a walled castle).
+static func slope_hull(spec: CastleSpec) -> bool:
+	return not is_enclosed(spec) and not is_ridge(spec)
+
+
+## Where the castle is entered from outside: {"x", "front", "width"}, with
+## `front` the plan z of the entrance's outer face, INF when the entrance has
+## no fixed front (the platform's own edge is then the front).
+static func slope_entry(spec: CastleSpec) -> Dictionary:
+	var porch: AABB = porch_aabb(spec)
+	if porch.size.x > 0.0:
+		return {"x": porch.get_center().x, "front": porch.position.z, "width": porch.size.x}
+	var g: AABB = gatehouse_aabb(spec, 0)
+	if g.size.x > 0.0 and gate_width(spec, 0) > 0.0:
+		var front: float = g.position.z
+		var bar: AABB = barbican_aabb(spec)
+		if bar.size.x > 0.0:
+			front = minf(front, bar.position.z)
+		return {"x": 0.0, "front": front, "width": maxf(gate_width(spec, 0), 2.0)}
+	if is_tower_house(spec):
+		return {"x": tower_entry_x(spec), "front": INF, "width": tower_approach_width(spec)}
+	return {"x": 0.0, "front": INF, "width": 2.0}

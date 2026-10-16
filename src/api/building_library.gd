@@ -400,7 +400,8 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 
 
 ## Falling ground (VTER-HOUSE-SLOPE). A house or shop stands on up to two
-## storeys of fall, a church on a terrace up to CHURCH_MAX_FALL; neither on
+## storeys of fall, a church on a terrace up to CHURCH_MAX_FALL, a castle on a
+## revetted platform up to CastleGeometry.SLOPE_MAX_FALL; none on
 ## ground steeper than 1 in 2 across its footprint. A fall beyond that is
 ## REFUSED, not clamped: a clamped building would float over its own downhill
 ## edge, and a village planner that is told why can terrace or move the lot.
@@ -420,11 +421,22 @@ static func _validate_ground(request: BuildingRequest, out: Array[Dictionary]) -
 		return
 	if f <= 0.0:
 		return
-	if request.kind not in [&"house", &"shop", &"church"]:
+	if request.kind not in [&"house", &"shop", &"church", &"castle"]:
 		out.append(_error(&"unsupported_option", &"ground_fall_m",
-			"ground_fall_m is only available for houses, shops and churches."))
+			"ground_fall_m is only available for houses, shops, churches and castles."))
 		return
-	var ceiling: float = CHURCH_MAX_FALL if request.kind == &"church" 		else HouseSlope.max_fall(request.height)
+	# A castle stands on a revetted platform (VTER-CASTLE-SLOPE) -- except a
+	# sky citadel, which stands on its own floating rock.
+	if request.kind == &"castle" and request.style == &"sky" \
+			and CastleSpec.tier_for(request.width, request.length) in [&"castle", &"fortress"]:
+		out.append(_error(&"unsupported_option", &"ground_fall_m",
+			"A sky citadel stands on its own floating rock, not on the ground."))
+		return
+	var ceiling: float = HouseSlope.max_fall(request.height)
+	if request.kind == &"church":
+		ceiling = CHURCH_MAX_FALL
+	elif request.kind == &"castle":
+		ceiling = CastleGeometry.SLOPE_MAX_FALL
 	var why := GroundFall.refusal(f, request.width, request.length, deg, ceiling)
 	if not why.is_empty():
 		out.append(_error(&"ground_too_steep", &"ground_fall_m",

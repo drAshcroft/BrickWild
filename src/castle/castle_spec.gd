@@ -18,6 +18,13 @@ var length: float = 50.0    # site length, metres (Z); the gate is at -Z
 var height: float = 10.0    # main wall / eaves height, metres
 var orientation: float = 0.0
 var period: int = 1200
+## Falling ground (VTER-CASTLE-SLOPE): metres of fall across the requested
+## width x length and the downhill direction in the castle's own frame (0 =
+## toward the front and the gate, -Z; 90 = toward +X). Zero is flat, and a
+## flat castle is untouched. Never drawn from `rng`. The builder answers with
+## a revetted platform; see CastleGeometry.SLOPE_* and castle_slope.gd.
+var ground_fall: float = 0.0
+var ground_downhill_deg: float = 0.0
 ## Force a tier instead of deriving it from the footprint. &"" means derive.
 var tier_override: StringName = &""
 ## Force a plan kind instead of deriving it from style and tier. &"" derives.

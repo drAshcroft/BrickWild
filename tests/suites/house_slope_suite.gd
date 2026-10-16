@@ -4,7 +4,8 @@ extends RefCounted
 ## (toward the front, -Z, where the door is).
 ##
 ##   the request contract: flat is omitted from to_dict, a fall round-trips,
-##     a 10 m fall is REFUSED with `ground_too_steep`, a castle refuses any fall
+##     a 10 m fall is REFUSED with `ground_too_steep`, a temple refuses any
+##     fall (castles stand on a platform since VTER-CASTLE-SLOPE: suite cslope)
 ##   fall 0 is vertex-identical to a request that never heard of the field
 ##   below a storey of fall the flat building is all still there, triangle for
 ##     triangle: the slope only adds what stands under it
@@ -29,7 +30,6 @@ static func run() -> SuiteResult:
 	_contract(res)
 	for kind in [&"house", &"shop", &"church"]:
 		_family(res, kind)
-	_castle_note(res)
 	return res
 
 
@@ -75,11 +75,13 @@ static func _contract(res: SuiteResult) -> void:
 				% [kind, made.errors])
 		else:
 			res.note("%s at 10 m refused: %s" % [kind, made.errors[0]["message"]])
-	var castle := BuildingRequest.castle(5)
-	castle.ground_fall_m = 1.0
+	# castles take the ground since VTER-CASTLE-SLOPE (suite cslope); a temple
+	# still refuses any fall
+	var temple := BuildingRequest.temple(5)
+	temple.ground_fall_m = 1.0
 	res.checked += 1
-	if not _has_code(BuildingLibrary.validate(castle), &"unsupported_option"):
-		res.fail("contract: a castle must refuse ground_fall_m (unsupported_option)")
+	if not _has_code(BuildingLibrary.validate(temple), &"unsupported_option"):
+		res.fail("contract: a temple must refuse ground_fall_m (unsupported_option)")
 	var negative := _request(&"house")
 	negative.ground_fall_m = -1.0
 	res.checked += 1
@@ -317,21 +319,6 @@ static func _church_doors(res: SuiteResult, label: String, g: GroundFall,
 		res.fail("%s: the west flight is not in the walk export" % label)
 	res.note("%s: terrace rise %.2f m at the west front, %d steps %s" % [label, rise,
 		(f["steps"] as Array).size(), f["direction"]])
-
-
-# ------------------------------------------------------------------ castle
-
-## Castles take no ground yet. Record how far a castle's own masonry reaches
-## below its floor, which is how far a fall it could meet without floating.
-static func _castle_note(res: SuiteResult) -> void:
-	var made := BrickWild.generate(BuildingRequest.castle(5))
-	if not made.is_ok():
-		return
-	var mesh := BrickWild.build_mesh(made)
-	var low := INF
-	for v in _vertices(mesh):
-		low = minf(low, v.y)
-	res.note("castle norman seed 5: lowest masonry at y = %.3f m; any fall beyond that leaves the downhill wall foot in the air" % low)
 
 
 # ------------------------------------------------------------------ helpers
