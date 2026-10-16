@@ -361,6 +361,46 @@ shoulder) the village goes there, and its steep street length is the field
 tracks climbing out of it: `vtplan` applies the 0.45-0.80 band only where
 most of the street length stands on steep ground (`street_steep_share` >= 0.5).
 
+### Every fixture, 2026-10-16
+
+A 50-person `street` village (seed 4242, 16 buildings measured once) on every
+fixture, `tools/village_terrain_sweep.gd -- --forms street --qa`. Grades are
+the steepest per class on the final points; "contour" is
+street_contour_share / street_steep_share; "QA" is VillageQA without
+per-building QA and without `pure` (the form is forced).
+
+| Fixture | Anchor, yaw | through | others | contour | common | Placed | QA |
+|---|---|---|---|---|---|---|---|
+| plane_5 | (0, 0), 358 | 0.3 % | path, track, lane 5 % | - | 5.0 % | 16/16 | ok |
+| plane_15 | (0, 0), 358 | 0.5 % | path, track 15 % | 0.65 / 1.0 | 15 % | 16/16 | ok |
+| plane_30 | (0, 0), 358 | 1.0 % | path, track 30 % | 0.65 / 1.0 | 30 % | 16/16 | ok |
+| plane_50 | (0, 0), 358 | 1.6 % | steps 50 % | 1.0 / 1.0 | 50 % | 16/16 | ok |
+| valley | (0, 0), 0 | 0 % | path, track 30 % | - | 0 % | 16/16 | ok |
+| river_valley | (0, -51), 359 | 0.5 % | path, track 30 % | 0.65 / 1.0 | 28 % | 16/16 | ok |
+| spur | (-28, 0), 71 | 1.4 % | path, track 27 % | 0.64 / 1.0 | 27 % | 16/16 | ok |
+| crest | (14, -318), 180 | 0.1 % | path, track 20 % | - | 0 % | 16/16 | ok |
+| saddle | (0, 0), 45 | 0.1 % | lane 8 %, track 5 % | - | 1.3 % | 16/16 | ok |
+| cliff_band | (0, 0), 0 | 0 % | 0 % | - | 0 % | 16/16 | ok |
+| lake_shore | (0, 0), 358 | 0.5 % | 8 % | 0.77 / 0.38 | 8 % | 16/16 | ok |
+| island | (-3, -87), 181 | 8.1 % | path, track 16 %, **lane 15.6 %** | 0.55 / 1.0 | 16 % | 16/16 | common fronting, lane hierarchy |
+| Castelmezzano | (180, 203), 262 | 6.7 % | path 6 %, steps 43 % | - | 11 % | **7/16** | housed |
+| Èze | (-23, -219), 323 | 10.8 % | lane 11.9 %, track 23 %, steps 53 % | 0.52 / 0.85 | 5.5 % | 16/16 | tavern 78 m from a gate |
+| Giethoorn | (0, 0), 121 | 2.7 % | under 4 % | - | 0.1 % | 16/16 | ok |
+| Hallstatt | (93, 3), 158 | 11.9 % | track 15 %, steps 49 % | 0.31 / 0.79 | 9.3 % | 16/16 | tavern 90 m from a gate; one stair pinched |
+| Manarola | (-87, 6), 59 | 3.5 % | path 27 %, track 25 % | 0.17 / 0.43 | 3.0 % | 16/16 | ok |
+| Masouleh | (-3, 135), 357 | 2.5 % | street, track 24 % | 0.41 / 0.95 | 24 % | **5/16** | housed |
+| Monemvasia | (-143, 228), 145 | 8.2 % | track 16 % | 0.06 / 0.57 | 3.3 % | 16/16 | ok |
+| Monpazier | (31, -8), 265 | 3.9 % | track 11 % | 0.23 / 0.42 | 3.6 % | 16/16 | ok |
+| Positano | (127, 138), 160 | 7.9 % | path 26 %, steps 27 % | - | 7.0 % | **12/16** | housed |
+| Rocamadour | (-177, -84), 265 | 9.2 % | track 16 % | 0.35 / 0.42 | 5.1 % | 16/16 | ok |
+| Satemin | (0, 0), 236 | 2.9 % | under 4 % | - | 3.5 % | 16/16 | ok |
+| Ushguli | (-53, -37), 169 | 10.5 % | street 18 %, steps 31 % | 0.41 / 0.56 | 8.3 % | 16/16 | ok |
+
+Every road is within its class's cap except the island's landmark lane
+(15.6 %: the lot planner's service lanes are laid after grading and a lane
+is the only class that may dead-end at its lot). No lot is on water or across
+the cliff band. Plan time 7-13 s each with the buildings measured.
+
 ### For VoxelGames
 
 The plan arrives turned and placed: apply `site.anchor_m` and `site.yaw_deg`
@@ -376,6 +416,17 @@ as flights, not ramps.
   people need a 270-315 m site and no such road crosses it at 12 % (0.27-0.50
   if allowed), so the lot planner keeps the narrower site whose road kept the
   cap and leaves households unhoused (VillageQA `housed`);
+* **the real hillsides' contour share** -- on Hallstatt, Masouleh, Monemvasia
+  and Ushguli the field tracks, laid straight up to 30 %, outweigh the
+  contour road, and the share is 0.06-0.41 against the survey's 0.57;
+  Positano and Castelmezzano have too little steep street length to measure.
+  Tracks that traverse the slope would raise it -- and would lift the planes
+  over 0.8 -- so this wants the hillside form, not a weight;
+* **graded service lanes** -- the landmark, stable, monument and manor lanes
+  are laid by the lot planner after grading; a steep one stays a lane,
+  because only a lane may dead-end at its lot (§9.2);
+* **a tavern near a gate on a stretched site** -- Èze and Hallstatt stretch
+  to 270-315 m to house everyone, and the tavern's 60 m from a gate goes;
 * **per-lot platforms and stepped plinths** -- a house on 2.7 m of fall stands
   on a plinth or over a basement, not on a pad;
 * **landform forms** (`hillside`, `crest`, `shore`, `valley`, ...) -- the form
