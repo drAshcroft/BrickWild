@@ -363,6 +363,7 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 				"storeys must be between %d and %d for a %s." % [
 					int(limits2["min"]), int(limits2["max"]), String(request.kind)]))
 	_validate_options(request, out)
+	_validate_ground(request, out)
 	if request.material not in [&"stone", &"timber"]:
 		out.append(_error(&"invalid_material", &"material", "Shell material must be stone or timber."))
 	if request.kind == &"village":
@@ -396,6 +397,38 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 		# which sub-kinds it comes in
 		out.append_array(validate_world_envelope(request))
 	return out
+
+
+## Falling ground (VTER-HOUSE-SLOPE). A house or shop stands on up to two
+## storeys of fall, a church on a terrace up to CHURCH_MAX_FALL; neither on
+## ground steeper than 1 in 2 across its footprint. A fall beyond that is
+## REFUSED, not clamped: a clamped building would float over its own downhill
+## edge, and a village planner that is told why can terrace or move the lot.
+const CHURCH_MAX_FALL := 6.0
+
+
+static func _validate_ground(request: BuildingRequest, out: Array[Dictionary]) -> void:
+	var f: float = request.ground_fall_m
+	var deg: float = request.ground_downhill_deg
+	if not is_finite(f) or f < 0.0:
+		out.append(_error(&"invalid_ground", &"ground_fall_m",
+			"ground_fall_m must be a finite number of metres, 0 or more."))
+		return
+	if not is_finite(deg):
+		out.append(_error(&"invalid_ground", &"ground_downhill_deg",
+			"ground_downhill_deg must be a finite angle in degrees."))
+		return
+	if f <= 0.0:
+		return
+	if request.kind not in [&"house", &"shop", &"church"]:
+		out.append(_error(&"unsupported_option", &"ground_fall_m",
+			"ground_fall_m is only available for houses, shops and churches."))
+		return
+	var ceiling: float = CHURCH_MAX_FALL if request.kind == &"church" 		else HouseSlope.max_fall(request.height)
+	var why := GroundFall.refusal(f, request.width, request.length, deg, ceiling)
+	if not why.is_empty():
+		out.append(_error(&"ground_too_steep", &"ground_fall_m",
+			"A %s cannot stand here: %s" % [String(request.kind), why]))
 
 
 ## The style and the purpose, against the same option lists `describe()`

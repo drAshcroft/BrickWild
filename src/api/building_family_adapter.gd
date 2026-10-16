@@ -341,6 +341,16 @@ class ChurchFamily extends BuildingFamilyAdapter:
 		for d in ChurchGeometry.west_door_layout(church):
 			doors.append({"pos": Vector2(float(d.x), ChurchGeometry.west_door_z(church)),
 				"normal": Vector2(0.0, -1.0), "front": true})
+		# On falling ground the terrace is the floor outside the doors and its
+		# west flight is the way down (VTER-HOUSE-SLOPE). Flat: no key at all.
+		if GroundFall.of_spec(church) != null:
+			var builder := ChurchBuilder.new()
+			builder.build(church)
+			if not builder.terrace_flight.is_empty():
+				for door in doors:
+					var route: Array = [Vector3(door["pos"].x, 0.0, door["pos"].y)]
+					route.append_array(builder.terrace_flight["route"])
+					door["route"] = route
 		var focus: Array = []
 		var altar: Rect2 = altar_rect(church)
 		if altar.size.x > 0.0:
@@ -845,3 +855,8 @@ static func _copy_size_and_style(request: BuildingRequest, spec: RefCounted) -> 
 static func _copy_orientation_and_period(request: BuildingRequest, spec: RefCounted) -> void:
 	spec.set("orientation", request.orientation)
 	spec.set("period", request.period)
+	# Only the specs that declare the ground take it (house, shop, church);
+	# validate() has already refused a fall for any other kind.
+	if "ground_fall" in spec:
+		spec.set("ground_fall", request.ground_fall_m)
+		spec.set("ground_downhill_deg", request.ground_downhill_deg)

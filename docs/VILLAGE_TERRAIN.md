@@ -190,3 +190,60 @@ need it (see the gap counts from `vworld`):
 
 When that work starts, relax the "ground changes nothing" check in `vterrain`
 deliberately and replace it with the new rules.
+
+## A building on falling ground (VTER-HOUSE-SLOPE)
+
+The "per-lot platforms and stepped plinths" item, for one building at a time.
+A village does not call it yet; the request contract is ready for when it does.
+
+**The request.** `BuildingRequest.ground_fall_m` is the total fall across the
+building's requested width x length (centred on the origin): the exporter's
+`buildings[].ground.span_m`. `ground_downhill_deg` is the way the ground falls
+in the building's LOCAL frame, clockwise seen from above with the front at the
+top: 0 = toward the front (-Z, the door), 90 = toward +X, 180 = toward the
+back, 270 = toward -X. Subtract the building's yaw from a world bearing. Both
+default to 0 (flat) and are left out of `to_dict()` then, so every request,
+SitePlan and fixture written before them is byte-identical.
+
+**The site model** (`core/ground_fall.gd`). Local y = 0 is the ground at the
+uphill-most point of the footprint, and the floor stays where a flat building
+has it, so a caller places the origin on the uphill ground. The ground is a
+plane from 0 there to -fall at the downhill-most point, continuing beyond it
+downhill; uphill of the footprint the site is cut level at 0.
+
+**What stands under a house or shop** (`src/house/house_slope.gd`), by band:
+
+| fall | model |
+|---|---|
+| up to 1.2 m | coursed foundation: the plinth carried down to the ground under every wall run in 0.30 m courses, each clipped to the ground (`foundation_course`); entry steps wherever a door ends up more than a riser above the ground |
+| 1.2 m to one storey | the same, now a raised ground floor: every door above the ground gets `entry_landing` + `entry_steps` (0.17 m risers, 0.30 m treads) straight out or along the wall, whichever reaches the ground in fewest steps without crossing the house, the chimney or another door's flight; a porch or veranda deck is the landing, carried down |
+| one to two storeys | a BANK STOREY: the plan digs its cellar (INT-016) and gives it its own exterior door on the downhill wall (`"undercroft": true`, storey -1) with its own steps; uphill it is dug into the bank |
+| more than two storeys, or steeper than 1 in 2 | REFUSED by `validate()` with `ground_too_steep`, not clamped: a clamped house would float over its downhill edge, and a planner told why can terrace or move the lot |
+
+Why the cellar for band 3: it is already a real lower storey the planner,
+furnisher, nav check, walk export and sheet all know; the only new plan fact
+is its one exterior door. Below a storey of fall the plan is untouched and
+the flat shell is all still there, triangle for triangle.
+
+**A church** stands on a terrace: the rectangle round its ground masses,
+1.2 m wider, held by a coursed `terrace_wall` and paved (`terrace_paving`,
+top at -0.03), with a west flight from the terrace edge. Its ceiling is 6 m.
+
+**Castles take no ground yet** (`unsupported_option`). Measured: the lowest
+masonry of a Norman castle is at y = 0, so on any fall its downhill wall foot
+would be in the air. The batter widens the wall foot but does not carry any
+masonry below the floor line. A castle needs its own terrace or a sloped wall
+foot; that is not a trivial change, so it is left open.
+
+**Walking.** The flights are in the walk export: `BrickWild.navigation()`
+adds `route_m` (threshold, landing, each tread, the foot on the ground) to a
+door that has one, for houses, shops and churches. Flat buildings gain no key.
+
+**Not yet.** Yard dressing (barrels, benches, gardens, fences) still stands at
+y = 0 and floats on the downhill side; the village walk (`VillageWalk`) does
+not read routes; a front-downhill house in band 3 keeps its front door on the
+downhill side and climbs to it by a long flight along the facade -- the
+village should turn such lots so the front faces uphill or across the slope.
+
+Suite: `hslope` (house, shop, church at 0 / 1.0 / 2.5 / 4.0 m, sideways and
+front-to-back). Pictures: `godot --path . --script res://tools/render_slopes.gd`.

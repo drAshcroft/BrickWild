@@ -117,6 +117,8 @@ static func _of_family(building) -> Dictionary:
 			"inside_m": [_n(inside.x), _n(y), _n(inside.y)],
 			"outside_m": [_n(outside.x), _n(y), _n(outside.y)],
 		})
+		if d.has("route"):
+			doors[-1]["route_m"] = _route(d["route"])
 	var focus: Array = []
 	for i in frame.get("focus", []).size():
 		var f: Dictionary = frame["focus"][i]
@@ -204,6 +206,12 @@ static func _stairs(plan: HousePlan, meshes: Dictionary) -> Array:
 static func _doors(plan: HousePlan, meshes: Dictionary) -> Array:
 	var out: Array = []
 	var half: float = HouseGeometry.wall_thickness(plan.spec) * 0.5
+	# On falling ground a door may stand above the ground: its way down is the
+	# landing and steps HouseSlope planned, published as `route_m`. On flat
+	# ground there are none and no door row changes.
+	var routes := {}
+	for f in HouseSlope.flights(plan):
+		routes[int(f["door"])] = f["route"]
 	for d in plan.doors.size():
 		var door: Dictionary = plan.doors[d]
 		if not bool(door.get("exterior", false)) or bool(door.get("secret", false)):
@@ -224,6 +232,16 @@ static func _doors(plan: HousePlan, meshes: Dictionary) -> Array:
 			"inside_m": [_n(inside.x), _n(y), _n(inside.y)],
 			"outside_m": [_n(outside.x), _n(float(level) * plan.spec.height), _n(outside.y)],
 		})
+		if routes.has(d):
+			out[-1]["route_m"] = _route(routes[d])
+	return out
+
+
+## A door's way down to the ground, threshold first, foot last.
+static func _route(points: Array) -> Array:
+	var out: Array = []
+	for p in points:
+		out.append([_n(p.x), _n(p.y), _n(p.z)])
 	return out
 
 

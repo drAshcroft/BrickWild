@@ -347,6 +347,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	preload("church_roofs.gd").emit(spec, _kit, mass_log, _roof_volumes)
 	_build_stave_skirt()
 	_build_stave_finials()
+	_build_terrace()
 
 	# The masons are finished; the parish moves in. The dressing is prop
 	# PLACEMENTS rather than geometry, so it costs the mesh nothing and
@@ -2066,6 +2067,65 @@ func _build_floor() -> void:
 
 ## Podium: two stone courses reaching past the outermost chapel, so the whole
 ## cluster stands on one raised platform. The door is lifted onto it.
+## Falling ground (VTER-HOUSE-SLOPE): the church stands on a TERRACE. Its
+## floor stays at y = 0, the ground at the uphill edge; a rectangle round
+## every mass that stands on the ground, TERRACE_MARGIN wider, is held up by a
+## coursed retaining wall down to the ground and paved over, and the west door
+## is reached by a flight from the terrace's front edge. Nothing on flat
+## ground: `terrace_flight` stays empty and the mesh is unchanged.
+const TERRACE_MARGIN := 1.2
+const TERRACE_WALL_T := 0.6
+const TERRACE_TOP := -0.03
+const TERRACE_PAVING_T := 0.12
+var terrace_rect := Rect2()
+var terrace_flight: Dictionary = {}
+
+
+func _build_terrace() -> void:
+	terrace_rect = Rect2()
+	terrace_flight = {}
+	var g := GroundFall.of_spec(spec)
+	if g == null:
+		return
+	var first := true
+	for m in mass_log:
+		var a: AABB = m["aabb"]
+		if a.position.y > 0.05:
+			continue
+		var fr := Rect2(Vector2(a.position.x, a.position.z), Vector2(a.size.x, a.size.z))
+		terrace_rect = fr if first else terrace_rect.merge(fr)
+		first = false
+	if first:
+		return
+	terrace_rect = terrace_rect.grow(TERRACE_MARGIN)
+	tag("terrace")
+	host("terrace", 0)
+	var r := terrace_rect.grow(-TERRACE_WALL_T * 0.5)
+	var c := GroundFall.corners(r)
+	for i in 4:
+		g.emit_run(self, "terrace_wall", c[i], c[(i + 1) % 4], TERRACE_WALL_T,
+			TERRACE_TOP, SURF_STONE, TERRACE_WALL_T * 0.5)
+	var inner := terrace_rect.grow(-TERRACE_WALL_T)
+	var y := TERRACE_TOP - TERRACE_PAVING_T * 0.5
+	var paving := PackedVector3Array()
+	for p2 in GroundFall.corners(inner):
+		paving.append(Vector3(p2.x, y, p2.y))
+	component_slab("terrace_paving", paving, TERRACE_PAVING_T, SURF_STONE, true)
+	host_end()
+	var doors := ChurchGeometry.west_door_layout(spec)
+	var door_w := 1.4
+	if not doors.is_empty():
+		door_w = maxf(float(doors[0]["width"]), 1.4)
+	var outer := Vector2(0.0, terrace_rect.position.y)
+	var blocked: Array[Rect2] = [terrace_rect.grow(-0.01)]
+	terrace_flight = g.plan_flight(outer, Vector2(0.0, -1.0), door_w, TERRACE_TOP,
+		Rect2(), blocked)
+	if not terrace_flight.is_empty():
+		host("entry_west", 0)
+		g.emit_flight(self, terrace_flight, SURF_STONE, TERRACE_TOP)
+		host_end()
+
+
 func _build_podium() -> void:
 	var ph: float = ChurchGeometry.podium_height(spec)
 	if ph <= 0.0:

@@ -83,6 +83,9 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_han_features()
 	_build_vihara_features()
 	_build_vastu_features()
+	# Falling ground: foundation, footings and entry steps, all below the
+	# floor. Nothing at all on flat ground (VTER-HOUSE-SLOPE).
+	HouseSlope.emit(self)
 	return commit()
 
 
