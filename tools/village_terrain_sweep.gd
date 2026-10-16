@@ -55,7 +55,7 @@ func _init() -> void:
 			var ms := Time.get_ticks_msec() - t1
 			var row := measure(plan)
 			row["ms"] = ms
-			print(line(name, String(form), row))
+			print(line(name, String(form) if form != "derived" else "~" + String(s.form), row))
 			if qa:
 				var t2 := Time.get_ticks_msec()
 				# the form is forced, so the purity twin (which derives its own)
@@ -85,6 +85,11 @@ static func _spec(population: int, seed: int, form: StringName, ground: VillageT
 	s.population = population
 	s.purpose = purpose
 	s.water = water
+	if form == &"derived":
+		# the form the ground derives (VTER-FORM-DERIVE), as a real request gets
+		s.terrain = ground
+		s.generate(seed)
+		return s
 	s.generate(seed)
 	s.form = form
 	s.terrain = ground
@@ -120,6 +125,30 @@ static func measure(plan: VillagePlan) -> Dictionary:
 	out["contour"] = shape.get("street_contour_share")
 	out["steep_share"] = shape.get("street_steep_share")
 	out["slope_med"] = shape.get("slope_median_pct")
+	out["span"] = shape.get("elev_span_m")
+	out["relief"] = shape.get("relief_disc_m")
+	out["band"] = relief_band(shape)
+	# VTER-LOTS: lots on water, and the most fall any building stands on
+	# against what its family accepts in a village
+	var water_lots := 0
+	for lot in plan.lots:
+		for w in plan.water:
+			if VillageLotPlanner.overlap_area(lot["poly"], w["poly"]) > VillageLotPlanner.AREA_EPS:
+				water_lots += 1
+				break
+	out["water_lots"] = water_lots
+	var worst_fall := 0.0
+	var worst_share := 0.0
+	for b in plan.buildings:
+		var req: BuildingRequest = b["request"]
+		var lim := VillageLotGround.fall_limit(req)
+		worst_fall = maxf(worst_fall, req.ground_fall_m)
+		if lim > 0.0:
+			worst_share = maxf(worst_share, req.ground_fall_m / lim)
+		elif req.ground_fall_m > 0.0:
+			worst_share = INF
+	out["max_fall"] = worst_fall
+	out["max_fall_share"] = worst_share
 	if not plan.commons.is_empty():
 		var u := g.under(plan.commons[0]["poly"])
 		out["common_slope"] = u["slope_mean"]
@@ -137,11 +166,43 @@ static func measure(plan: VillagePlan) -> Dictionary:
 	return out
 
 
+## The world set's real p10-p90 bands by relief class (VTER-LOTS,
+## docs/VILLAGE_TERRAIN.md "Lots on the ground"): VillageShape's
+## elev_span_m and slope_median_pct by relief_disc_m.
+const BANDS := {
+	"low": {"span": Vector2(0.5, 16.0), "slope": Vector2(0.4, 5.0)},
+	"mid": {"span": Vector2(2.0, 44.0), "slope": Vector2(1.2, 14.0)},
+	"high": {"span": Vector2(7.5, 72.0), "slope": Vector2(5.0, 36.0)},
+}
+
+
+static func relief_class(relief: float) -> String:
+	return "low" if relief < 60.0 else ("mid" if relief < 250.0 else "high")
+
+
+## {"class", "span": "ok"/"LOW"/"HIGH", "slope": ...} for a VillageShape reading.
+static func relief_band(shape: Dictionary) -> Dictionary:
+	if shape.get("relief_disc_m") == null or shape.get("elev_span_m") == null \
+			or shape.get("slope_median_pct") == null:
+		return {}
+	var cls := relief_class(float(shape["relief_disc_m"]))
+	var b: Dictionary = BANDS[cls]
+	return {"class": cls, "span": _verdict(float(shape["elev_span_m"]), b["span"]),
+		"slope": _verdict(float(shape["slope_median_pct"]), b["slope"])}
+
+
+static func _verdict(v: float, band: Vector2) -> String:
+	return "ok" if v >= band.x and v <= band.y else ("LOW" if v < band.x else "HIGH")
+
+
 static func line(name: String, form: String, m: Dictionary) -> String:
 	var gs := ""
 	for cls in m["grades"]:
 		gs += "%s=%.3f " % [cls, m["grades"][cls]]
-	return "%-22s %-10s at (%.0f, %.0f) yaw %5.1f site %s  bld %d/%d  %s contour %s/%s  common %.3f/%.3f  cliff %d wet %d  %.1f s %s" % [
+	var band: Dictionary = m.get("band", {})
+	return "%-22s %-10s at (%.0f, %.0f) yaw %5.1f site %s  bld %d/%d  %s contour %s/%s  common %.3f/%.3f  cliff %d wet %d water %d  relief %s %s span %s %s slope %s %s  fall %.2f (%.0f%% of limit)  %.1f s %s" % [
 		name, form, m["anchor"].x, m["anchor"].y, m["yaw"], m["site"], m["buildings"], m["programme"], gs,
 		str(m["contour"]), str(m["steep_share"]), float(m.get("common_slope", -1.0)), float(m.get("common_slope_max", -1.0)),
-		m["cliff_lots"], m["wet_lots"], m["ms"] / 1000.0, "OVER " + ", ".join(m["over"]) if not m["over"].is_empty() else ""]
+		m["cliff_lots"], m["wet_lots"], m["water_lots"], str(m["relief"]), band.get("class", "-"), str(m["span"]),
+		band.get("span", "-"), str(m["slope_med"]), band.get("slope", "-"), m["max_fall"], 100.0 * m["max_fall_share"],
+		m["ms"] / 1000.0, "OVER " + ", ".join(m["over"]) if not m["over"].is_empty() else ""]

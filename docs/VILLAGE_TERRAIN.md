@@ -531,6 +531,91 @@ as flights, not ramps.
   off it and lots refuse it, but a river in the grid is not yet a `plan.water`
   polygon with bridges.
 
+## Lots on the ground (VTER-LOTS)
+
+With `plan.ground` every lot is fitted to the ground it stands on and every
+building is asked for the fall it stands on. **Without ground none of this
+runs**: thorn-hamlet and veld-070 exported before and after, `cmp` identical.
+
+| Piece | Where |
+|---|---|
+| the platform, the fall, the walls | `src/village/village_lot_ground.gd`, `VillageLotGround` |
+| the lot planner's use of it | `VillageLotPlanner._ground_fit`, `_depths`, `_place_on_road` (door rise), `_lane_too_steep` |
+| the ground's own water | `src/village/village_ground_water.gd`, `VillageGroundWater` |
+| the record | `lots[i]["ground_fit"]` in the plan; `lots[].platform`, `buildings[].ground.platform_m / fall_m / downhill_deg / door_rise_m`, `water[].source = "ground"` in the SitePlan |
+| the suite | `vtplan` (its `_lots_on_ground` checks, and Thorn on Hallstatt and Manarola) |
+| the table | `tools/village_terrain_sweep.gd -- --forms street,derived --qa` (band, fall, water columns) |
+
+**The platform.** A building's floor stands at the balanced cut-and-fill
+level of the ground under its requested rectangle (the least-squares plane's
+height at its origin). Below the floor the lot is GRADED to the family's own
+ground model (`GroundFall`): level at the platform uphill of the walls (the
+bank is cut back), GroundFall's plane across the footprint and on downhill.
+The plane's fall is the least that keeps it at or below the natural ground
+under the whole footprint, so no foundation is hung over a hollow; on a plane
+of natural fall N it is N / 2 -- half is cut away uphill, half is foundation
+and steps downhill. The fall is snapped up to 0.25 m and the direction to
+15 degrees; the request carries both (`ground_fall_m`, `ground_downhill_deg`,
+in the building's LOCAL frame). Because the lot is graded to exactly the plane
+the family plans its flights on, every flight lands on the lot's ground.
+
+**Terrace walls.** Where the graded ground leaves the natural ground by more
+than 0.6 m along the lot's edge, the lot records a wall there: a polyline,
+the most it holds, and whether it holds a `cut` bank above the lot or a
+`fill` under it. VTER-GROUND-MESH emits them; nothing here builds geometry.
+
+**What a family accepts in a village.** A house or a shop: one storey of fall
+(a raised floor and entry steps; the family's own bank storey digs a cellar
+and moves the plan, so a village moves the lot instead). A church: its 6 m
+terrace. A castle: its 6 m revetted platform. Every other family (a temple)
+stands on a level pad cutting or filling at most 1.2 m. A lot whose building
+would stand on more, or on more than 1 in 2, is refused and the search moves on.
+
+**The steps are reserved, not guessed.** A house's or a shop's entry flights
+are `HouseSlope.flights` run on the building's own flat plan with the lot's
+fall set -- below a storey the plan does not move, so these ARE the sloped
+house's flights, and the job keeps its generated building for exactly this.
+A church's terrace and flight and a castle's talus and entrance flight come
+from its sloped mesh, measured once per lattice point of fall and direction
+and cached on the job across every retry. Whatever lies outside the lot must
+be on its own road's verge at most: never a carriageway, another lot, the
+common, the water. The placement keeps the FLAT measured bounds (the walk and
+the fire gaps are unchanged); the parts are recorded as `entry_parts` and the
+dresser keeps off them. `vtplan` measures the steepest house of each case for
+real and requires its sloped bounds inside the flat bounds plus its parts.
+
+**Orientation.** A lot whose front door would stand more than 1.2 m
+(seven risers) over its graded ground -- a house set front-downhill -- is
+taken only when no lot on the same search has its door nearer the ground. On
+a contour road that puts the houses on its downhill side, fronts uphill and
+level with the road, and the uphill side across the fall or not at all; every
+building still fronts its road.
+
+**Shorter plots on slopes.** A dwelling's or a shop's back yard shortens with
+the slope under it, by half at a house plot's cap (35 %); the full depth is
+tried after it, for a back door that needs its flight.
+
+**The ground's own water** (`VillageGroundWater`). A grid with
+`water_level_m` gives the plan water polygons: the site rastered at 2.5 m,
+wet where the ground is at or under the level plus a 0.5 m freeboard (the
+strand the water floods; a 30 m grid's shoreline is uncertain by more), kind
+`coast` at about 0 m, else `lake`, `"ground": true`. It replaces a coast or
+lake spec's own rectangle (not the strand's). Every road is cut back to the
+shore where it ran into it; one cut off from the network with it is taken up.
+`VillageRoadCheck` accepts a road ending at that shore as it accepts one at
+the site's edge (a landing: the through road's own side 4). Lots and service
+lanes refuse the water; a road crosses it only on a bridge landing dry.
+
+**Service lanes are graded** (`_lane_too_steep`). The landmark's, the seat's,
+a monument's and the stable's lanes are laid after the site planner graded
+its roads, and a lane is the one class that may dead-end at its lot, so a
+steep one cannot become a footway: on given ground one over a cart's 12 %, or
+running down into the water, is not laid and its building looks elsewhere.
+The seat (`_place_manor`) then tries both sides of the through road, east of
+the common first, at five leans, keeping only a gate that looks at the common
+(§9.4 `manor`) -- which is how Thorn's hold finds its terraced lot on
+Manarola's hillside above the strand.
+
 ## A building on falling ground (VTER-HOUSE-SLOPE)
 
 The "per-lot platforms and stepped plinths" item, for one building at a time.

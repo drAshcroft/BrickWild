@@ -69,8 +69,8 @@ func _check_through(plan: VillagePlan) -> void:
 		var pts: PackedVector2Array = plan.roads[r]["points"]
 		var a: Vector2 = pts[0]
 		var b: Vector2 = pts[pts.size() - 1]
-		var sa: int = VillageMeasure.boundary_side(plan.site, a)
-		var sb: int = VillageMeasure.boundary_side(plan.site, b)
+		var sa: int = _end_side(plan, r, a)
+		var sb: int = _end_side(plan, r, b)
 		if sa < 0 or sb < 0:
 			failures.append("through: road %d does not reach the edge of the site at both ends" % r)
 		elif sa == sb:
@@ -82,6 +82,24 @@ func _check_through(plan: VillagePlan) -> void:
 				near = minf(near, VillageMeasure.point_to_polyline(p, pts))
 			if near > THROUGH_TO_COMMON:
 				failures.append("through: road %d passes %.0fm from the common, wants %.0f" % [r, near, THROUGH_TO_COMMON])
+
+
+## Which side of the site a through road's end leaves by: the site's own
+## edge (0-3), or, on given ground, the shore of the ground's own water
+## (VTER-LOTS: a road that ran into a lake is cut back to it; its end is a
+## landing, its own side, 4); -1 when neither.
+func _end_side(plan: VillagePlan, r: int, p: Vector2) -> int:
+	var side: int = VillageMeasure.boundary_side(plan.site, p)
+	if side < 0 and _at_shore(plan, r, p):
+		return 4
+	return side
+
+
+func _at_shore(plan: VillagePlan, r: int, p: Vector2) -> bool:
+	if plan.ground == null:
+		return false
+	var road: Dictionary = plan.roads[r]
+	return VillageGroundWater.on_shore(plan, p, float(road["width"]) * 0.5 + float(road["verge"]) 		+ VillageGroundWater.SHORE_GAP + VillageGroundWater.SHORE_EPS)
 
 
 ## Where an endpoint of `road` lands: on another road of one of `classes`,
@@ -132,7 +150,7 @@ func _check_hierarchy(plan: VillagePlan) -> void:
 						and not _endpoint_on_common(plan, p):
 						failures.append("hierarchy: lane %d ends at %v on nothing -- a lane joins a street or ends at a lot" % [r, p])
 				&"street":
-					if not _endpoint_on(plan, r, p, [&"street", &"through"]):
+					if not _endpoint_on(plan, r, p, [&"street", &"through"]) and not _at_shore(plan, r, p):
 						failures.append("hierarchy: street %d ends at %v off the through road and every street" % [r, p])
 
 
@@ -142,7 +160,7 @@ func _check_dead_ends(plan: VillagePlan) -> void:
 		var pts: PackedVector2Array = road["points"]
 		var cls: StringName = road["class"]
 		for p in [pts[0], pts[pts.size() - 1]]:
-			if VillageMeasure.on_boundary(plan.site, p):
+			if VillageMeasure.on_boundary(plan.site, p) or _at_shore(plan, r, p):
 				continue
 			if _endpoint_on(plan, r, p, [&"through", &"street", &"lane", &"track", &"path", &"steps"]):
 				continue
