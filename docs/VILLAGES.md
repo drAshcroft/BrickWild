@@ -852,6 +852,14 @@ fallback. Those historical counts do not certify the newly retained forms;
 VIL-017's native form matrix and VIL-020's archetype matrix supply that
 acceptance.
 
+**The ground** (VIL-TERRAIN-READ). A caller with real terrain passes a
+`brickwild.terrain` height grid, as `terrain.height` in the request or with
+`--terrain <grid.json>`; the plan then carries how the ground lies under
+every lot, building, road and common. The planners do not use it yet, and
+without it the output is byte-identical. See
+[VILLAGE_TERRAIN.md](VILLAGE_TERRAIN.md). Real settlements to compare
+against are in [SETTLEMENT_TESTSET.md](SETTLEMENT_TESTSET.md).
+
 ## 10b. Walking: the `walk` key and `BrickWild.navigation()`
 
 A consumer that instances the buildings from their requests has the meshes and

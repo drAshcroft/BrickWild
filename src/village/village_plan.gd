@@ -193,8 +193,14 @@ static func _spec_equal(a: VillageSpec, b: VillageSpec) -> bool:
 		and _value_equal(a.kept_buildings, b.kept_buildings)
 		and is_equal_approx(a.enclosure_kept_fraction, b.enclosure_kept_fraction)
 		and _value_equal(a.terrain_envelope, b.terrain_envelope)
+		and _terrain_key(a) == _terrain_key(b)
 		and is_equal_approx(a.requested_site_m, b.requested_site_m)
 	)
+
+
+## The ground's fingerprint, or "" for a flat (terrain-less) spec.
+static func _terrain_key(s: VillageSpec) -> String:
+	return s.terrain.fingerprint() if s.terrain != null else ""
 
 
 static func _array_of_dict_equal(a: Array, b: Array) -> bool:

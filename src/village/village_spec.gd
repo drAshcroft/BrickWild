@@ -51,6 +51,11 @@ var plant_palette: StringName = &"english"
 var kept_buildings: Dictionary = {}
 var enclosure_kept_fraction: float = 1.0
 var terrain_envelope: Dictionary = {}
+## The measured ground under the site (VillageTerrain), or null for flat.
+## Optional and read-only to the planners today: with it the exporter reports
+## how the ground lies under every lot, building and road
+## (docs/VILLAGE_TERRAIN.md); without it every output is byte-identical.
+var terrain: VillageTerrain = null
 var requested_site_m: float = 400.0
 
 # ---- derived from seed + the six above ----
@@ -203,6 +208,8 @@ func errors() -> Array[String]:
 		out.append("unknown water '%s'" % water)
 	if enclosure == &"wall" and civic_population() < WALL_MIN_POPULATION and purpose != &"garrison":
 		out.append("enclosure 'wall' needs population >= %d or purpose 'garrison'" % WALL_MIN_POPULATION)
+	if terrain != null and not terrain.valid():
+		out.append("terrain: %s" % "; ".join(terrain.errors()))
 	return out
 
 
