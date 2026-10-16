@@ -49,8 +49,10 @@ extends SceneTree
 ## or a path relative to the request), or `--terrain <grid.json>`. It must
 ## cover the planned site. The plan then carries `ground` (the whole site) and
 ## a `ground` block on every lot, building and road: how high, how much fall,
-## how steep, which way down. The planners do not yet use it; without it the
-## output is byte-identical to before.
+## how steep, which way down. With it the village is also PLANNED on it
+## (VTER-SITING, VTER-ROADS): placed and turned on the grid (`site.anchor_m`,
+## `site.yaw_deg`) and its roads laid by grade. Without it the output is
+## byte-identical to before.
 ##
 ## Exit codes: 0 written, 2 usage or I/O, 3 refused (cannot satisfy).
 ##
@@ -140,7 +142,7 @@ func _init() -> void:
 			", ".join(unplaced_labels(programme, plan)), plan.site.size.x, plan.site.size.y])
 		quit(3)
 		return
-	if ground != null and not ground.covers(plan.site):
+	if ground != null and not covers_plan(ground, plan):
 		var b: Rect2 = ground.bounds()
 		printerr("SiteRequest refused: terrain covers [%.1f, %.1f]-[%.1f, %.1f] m, the planned site needs [%.1f, %.1f]-[%.1f, %.1f] m" % [
 			b.position.x, b.position.y, b.end.x, b.end.y,
@@ -149,6 +151,8 @@ func _init() -> void:
 		return
 	var out: Dictionary = site_plan(plan, request)
 	if ground != null:
+		if plan.ground != null:
+			notes.append(siting_note(plan))
 		notes.append(ground_note(out))
 	out["notes"] = notes
 	for note in notes:
@@ -666,14 +670,27 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 
 ## The ground the caller gave, read under everything the plan placed. Only
 ## called with terrain, so a flat request's bytes never change.
+##
+## A village sited on its ground (VTER-SITING) is written in its OWN frame,
+## like every plan: the site centred on the origin, the through road west to
+## east. `site.anchor_m` and `site.yaw_deg` place that frame on the caller's
+## grid -- a plan point (x, z) stands at anchor + (x cos yaw - z sin yaw,
+## x sin yaw + z cos yaw) in the grid's own (x, z) -- and every `ground`
+## reading below is the caller's ground at that place. The `ground` block
+## describes the caller's grid as given (origin, cells, fingerprint).
 static func _add_ground(out: Dictionary, plan: VillagePlan) -> void:
-	var t: VillageTerrain = plan.spec.terrain
+	var t: VillageTerrain = plan.terrain()
+	var given: VillageTerrain = t.parent if t.parent != null else t
 	out["ground"] = {"schema": VillageTerrain.SCHEMA, "schema_version": VillageTerrain.SCHEMA_VERSION,
-		"source": t.source, "origin_m": [_n(t.origin.x), _n(t.origin.y)], "cell_m": _n(t.cell_m),
-		"cols": t.cols, "rows": t.rows, "min_m": _n(t.min_height()), "max_m": _n(t.max_height()),
-		"relief_m": _n(t.relief()), "site": _ground(t.under(_rect_poly(plan.site))),
-		"water_level_m": null if is_nan(t.water_level_m) else _n(t.water_level_m),
-		"fingerprint": t.fingerprint()}
+		"source": given.source, "origin_m": [_n(given.origin.x), _n(given.origin.y)], "cell_m": _n(given.cell_m),
+		"cols": given.cols, "rows": given.rows, "min_m": _n(given.min_height()), "max_m": _n(given.max_height()),
+		"relief_m": _n(given.relief()), "site": _ground(t.under(_rect_poly(plan.site))),
+		"water_level_m": null if is_nan(given.water_level_m) else _n(given.water_level_m),
+		"fingerprint": given.fingerprint()}
+	if plan.ground != null:
+		out["site"]["anchor_m"] = [_n(plan.site_anchor.x), _n(plan.site_anchor.y)]
+		out["site"]["yaw_deg"] = _n(rad_to_deg(plan.site_yaw))
+		out["site"]["frame"] = "plan point p stands on the given ground at anchor_m + p rotated by yaw_deg (x toward z)"
 	for i in range(plan.lots.size()):
 		out["lots"][i]["ground"] = _ground(t.under(plan.lots[i]["poly"]))
 	for i in range(plan.buildings.size()):
@@ -705,6 +722,27 @@ static func _ground(u: Dictionary) -> Dictionary:
 		"low_m": [_n(u["low_m"][0]), _n(u["low_m"][1])], "high_m": [_n(u["high_m"][0]), _n(u["high_m"][1])]}
 
 
+## Whether the caller's grid covers the planned site where it stands: the
+## site's four corners carried onto the grid by the siting, or the site itself
+## for a plan laid out flat.
+static func covers_plan(ground: VillageTerrain, plan: VillagePlan) -> bool:
+	if plan.ground == null:
+		return ground.covers(plan.site)
+	var b := ground.bounds().grow(0.01)
+	for p in _rect_poly(plan.site):
+		if not b.has_point(plan.site_anchor + p.rotated(plan.site_yaw)):
+			return false
+	return true
+
+
+## Where the village was put on its ground, in one line.
+static func siting_note(plan: VillagePlan) -> String:
+	return "siting: the village stands at (%.1f, %.1f) m on the given ground, its through road turned %.1f degrees from east, laid by grade (through road and lanes to %d %%, streets, tracks and paths to %d %%, steeper as steps)" % [
+		plan.site_anchor.x, plan.site_anchor.y, rad_to_deg(plan.site_yaw),
+		roundi(100.0 * float(VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"])),
+		roundi(100.0 * float(VillageSitePlanner.ROAD_CLASSES[&"path"]["grade_max"]))]
+
+
 ## The ground under a building larger than this is called out in the notes.
 const GROUND_FALL_NOTE_M := 1.5
 
@@ -721,9 +759,10 @@ static func ground_note(out: Dictionary) -> String:
 		if span > worst:
 			worst = span
 			worst_id = String(b["building_id"])
-	return "terrain: %.1f m of relief under the site; %d of %d buildings stand on more than %.1f m of fall (most: %s, %.1f m). The plan is laid out flat; buildings[].ground says where to cut, fill or step" % [
+	return "terrain: %.1f m of relief under the site; %d of %d buildings stand on more than %.1f m of fall (most: %s, %.1f m). %s; buildings[].ground says where to cut, fill or step" % [
 		float(out["ground"]["site"].get("span_m", 0.0)), steep, (out["buildings"] as Array).size(),
-		GROUND_FALL_NOTE_M, worst_id, worst]
+		GROUND_FALL_NOTE_M, worst_id, worst,
+		"The roads follow the ground" if (out["site"] as Dictionary).has("anchor_m") else "The plan is laid out flat"]
 
 
 ## The request's ground, or null for none. `--terrain` wins over the request's

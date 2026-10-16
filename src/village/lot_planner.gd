@@ -54,7 +54,7 @@ const TERRACE_FORM := &"planted"
 
 ## Which road outranks which, for the corner rule (§5, "corner lots front the
 ## more important road"). Lower is more important.
-const ROAD_RANK := {&"through": 0, &"street": 1, &"lane": 2, &"track": 3, &"path": 4}
+const ROAD_RANK := {&"through": 0, &"street": 1, &"lane": 2, &"track": 3, &"path": 4, &"steps": 5}
 ## A lot this close to a junction is a corner lot and must front the most
 ## important road meeting there.
 const CORNER_RADIUS := 10.0
@@ -115,6 +115,8 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			continue
 		previous_scale = float(attempt[1])
 		var again: VillagePlan = _replan(spec, jobs, int(attempt[0]), float(attempt[1]), minimum_depth, shore_depth)
+		if _through_over_cap(again) and not _through_over_cap(out):
+			continue
 		var left: int = cut_measured(again, jobs)
 		var next_common := _round_common_state(again)
 		var better_common: bool = (bool(next_common["ready"]) and not bool(common_state["ready"])) \
@@ -365,6 +367,19 @@ static func _manor_lane_max(job: Dictionary) -> float:
 	# half the frontage (fire gap included) clear of the through road.
 	var half_frontage: float = float(job["half_w"]) + float(LOT_RULES[&"manor"]["fire"]) * 0.5
 	return minf(MANOR_LANE_MAX, maxf(float(job["width"]) * 0.5 + 13.0, half_frontage + 6.0))
+
+
+## On given ground, a wider site whose through road the router could not
+## keep to a cart's grade is no improvement on a narrower one that could: the
+## retries buy frontage, never a road a cart cannot climb (VTER-ROADS).
+static func _through_over_cap(plan: VillagePlan) -> bool:
+	if plan.ground == null:
+		return false
+	var cap: float = float(VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"])
+	for r in plan.roads_of_class(&"through"):
+		if VillageRoadRouter.grade_of(plan.ground, plan.roads[r]["points"]) > cap + 1e-6:
+			return true
+	return false
 
 
 static func _manor_unplaced(plan: VillagePlan, jobs: Array[Dictionary]) -> bool:
@@ -1311,10 +1326,46 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 	return true
 
 
+## On given ground (VTER-SITING) a lot stands on DRY ground and does not
+## cross a cliff: its corners, edge midpoints and centre are all above the
+## water level (inclusive: a DEM records a lake at its surface), and no two
+## neighbouring samples of them rise more steeply than a footpath
+## (VillageSiteAnalysis.PATH_MAX). A house on a 50 % hillside stands on a
+## stepped plinth; a lot across a 15 m cliff band does not stand at all.
+static func ground_clear(ground: VillageTerrain, poly: PackedVector2Array) -> bool:
+	var n := poly.size()
+	if n < 3:
+		return true
+	var centre := Vector2.ZERO
+	for p in poly:
+		centre += p
+	centre /= float(n)
+	var wl: float = ground.water_level_m
+	var hc := ground.height_at(centre)
+	if not is_nan(wl) and hc <= wl:
+		return false
+	for i in range(n):
+		var a: Vector2 = poly[i]
+		var b: Vector2 = poly[(i + 1) % n]
+		var m := (a + b) * 0.5
+		var ha := ground.height_at(a)
+		var hm := ground.height_at(m)
+		var hb := ground.height_at(b)
+		if not is_nan(wl) and (ha <= wl or hm <= wl):
+			return false
+		for pair in [[a, ha, m, hm], [m, hm, b, hb], [centre, hc, a, ha], [centre, hc, m, hm]]:
+			var d: float = (pair[0] as Vector2).distance_to(pair[2])
+			if d > 0.01 and absf(float(pair[1]) - float(pair[3])) / d > VillageSiteAnalysis.PATH_MAX:
+				return false
+	return true
+
+
 ## Site reservations are independent of the building's purpose and footprint.
 static func _site_clear(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 		poly: PackedVector2Array) -> bool:
 	if not _inside_site(plan.site, poly):
+		return false
+	if plan.ground != null and not ground_clear(plan.ground, poly):
 		return false
 	if plan.spec.purpose == &"mining":
 		# Leave the terminal workyard beyond the last through-road gateway.

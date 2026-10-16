@@ -9,9 +9,10 @@ median height under the whole site and blended a 48 m skirt back into the land
 says how far that is from how villages are built: most real ones stand on
 ground that falls metres under a single house.
 
-This is the first half of fixing it: **BrickWild can now read the caller's
-ground and say how it lies under everything it planned.** The planners do
-not use it yet. That is the second half, below.
+**BrickWild reads the caller's ground, says how it lies under everything it
+planned, and plans on it**: the village is sited (an anchor and a yaw) and its
+roads are laid by grade (VTER-SITING, VTER-ROADS, "Planning on the ground"
+below).
 
 | Piece | Where |
 |---|---|
@@ -119,8 +120,10 @@ through a plot whose centre is flat and requires `under()` to see it.
 ## What the SitePlan gains
 
 Only when the request has ground. **Without it the plan is byte-identical to
-before**, and `vterrain` checks that the ground adds readings and changes
-nothing else.
+before.** With it the plan itself may differ (decision 1): `vterrain` checks
+that every key the flat SitePlan has is still present with its type, that the
+sited plan says where it stands (`site.anchor_m`, `site.yaw_deg`), and that a
+flat request grows no ground block.
 
 ```json
 "ground": { "schema": "brickwild.terrain", "source": "city-0002.terrain.r32",
@@ -237,23 +240,149 @@ carry as `water_level_m`):
 | Castelmezzano, Masouleh, Èze | open_slope 93–96 % |
 | Rocamadour | open_slope 68 %, flat 20 %, valley_floor 8 %, crest 3 % |
 
-## Not yet: planning on the ground
+## Planning on the ground: siting and roads (VTER-SITING, VTER-ROADS)
 
-The planners still lay the village out flat; `vterrain` asserts that the
-ground does not change the plan, so that this step is a deliberate one. What
-the survey says the planners must learn, in order of how often real villages
-need it (see the gap counts from `vworld`):
+With `spec.terrain` the site planner no longer lays the village on a table.
+**Without terrain none of this runs** and every output is byte-identical to
+the flat planner's: `thorn-hamlet` and `veld-070` exported before and after,
+`cmp` identical.
 
-* **slope-aware frontage** — streets that follow the contours on steep ground
-  (most hill villages in the set do), lots cut along the contour, and the
-  through road choosing a grade a cart can climb;
-* **per-lot platforms and stepped plinths** — a house on 2.7 m of fall stands
+| Piece | Where |
+|---|---|
+| where the village stands | `src/village/village_siting.gd`, `VillageSiting` |
+| the plan's own ground | `VillageTerrain.sited_view(anchor, yaw, rect, cell)` -> `plan.ground`; `plan.terrain()` |
+| roads by grade | `src/village/village_road_router.gd`; `VillageSitePlanner._route_through`, `grade_roads` |
+| per-class grade caps | `VillageSitePlanner.ROAD_CLASSES[cls]["grade_max"]`, via `road_rule` |
+| lots on dry ground, off cliffs | `VillageLotPlanner.ground_clear` |
+| the suite | `vtplan` (about 5 min; planning is the cost) |
+| a table over every fixture | `tools/village_terrain_sweep.gd -- [--fixtures a,b] [--forms street,green] [--qa]` |
+
+### Siting: an anchor and a yaw
+
+The planners keep their own frame: an axis-aligned site centred on the
+origin, the through road west to east, the common north of it.
+`VillageSiting` chooses where that frame is laid on the caller's grid -- an
+**anchor** (the site centre, in the grid's metres) and a **yaw** (the frame's
++X, counter-clockwise from the grid's +X in its (x, y)) -- and resamples the
+ground into the frame (`sited_view`, at the grid's cell but at most 5 m, over
+the largest site plus 160 m). A plan point p stands on the caller's ground at
+
+    anchor + p.rotated(yaw) = anchor + (x cos yaw - y sin yaw, x sin yaw + y cos yaw)
+
+`plan.site_anchor`, `plan.site_yaw` and `plan.ground` carry it; every reading
+of a plan point (`plan.terrain().height_at(p)`, `profile`, `under`) needs no
+transform. The exporter adds `site.anchor_m`, `site.yaw_deg`, `site.frame` and
+a `siting:` note, only with terrain; every `ground` reading is the caller's
+ground where the village stands, and the `ground` block still describes the
+caller's grid as given (origin, cells, fingerprint).
+
+The choice is a score over candidate frames, lower is better, read off the
+FLAT plan of the same spec: its site lattice (11 x 11), its common, and its
+through road stretched 2 x along itself (the retries grow the site along its
+road):
+
+| Term | Weight | What |
+|---|---|---|
+| cliff | 20 x share | lattice neighbours steeper than a footpath (60 %) |
+| wet | 200 x share | lattice points at or under the water level: nothing on wet ground if any dry ground will do |
+| steep | 4 x share | lattice neighbours steeper than a house plot (35 %) |
+| road | 20 x grade over 10 %, + 2 x mean grade | the road runs along the frame's X, so this turns X onto the contour |
+| common | 30 x slope over 4 %, + 10 x share wet or cliff | the common on level ground |
+| water | 2 x (distance - 120 m) / 300 m | only when `spec.water` wants water |
+| centre | 1 x distance / 400 m | stay near the caller's centre |
+
+Anchors: a lattice through the caller's origin (step half the site's short
+side, 20-60 m) over the grid less the site's half-diagonal, never more than
+400 m from the origin (the survey's disc). Yaws every 15 degrees, then four
+rounds of halved anchor and yaw steps round the best (under a degree). **A
+grid that only just covers the site** -- a consumer that fixes the centre --
+keeps the anchor at the origin and chooses the yaw alone, among the yaws that
+keep the site's corners on the grid. Deterministic: cached on the ground's
+fingerprint, the seed, the form and the flat site.
+
+### Roads by grade
+
+| Class | `grade_max` | Why |
+|---|---|---|
+| `through` | 12 % | a loaded cart |
+| `lane` | 12 % | a cart to the farms |
+| `street` | 30 % | the village's own walked way: people, a led mule, a handcart |
+| `track` | 30 % | a field track on a hillside is walked and led as much as driven |
+| `path` | 30 % | a footpath |
+| `steps` | 100 % | NEW: a stair as a street, 2 m wide with 0.5 m verges; only the ground makes one |
+
+* **The through road** is routed by dynamic programming over columns 10 m
+  apart (`VillageRoadRouter.route_across`), monotone along the frame's X
+  (what every form planner assumes), the state being the lateral offset (1 m
+  lattice) AND the heading of the incoming segment, which may change by one
+  notch per column (1 m per 10 m, under 6 degrees). §5's bend rule holds by
+  construction and there is no staircase to smooth. Cost per metre: 1 +
+  25 x grade, + 4000 x grade over 90 % of the cap (never, if there is another
+  way), + 500 on standing water; + 3 per notch of turn; + 0.35 per metre off
+  the form's own seeded bow. So on gentle ground it is the flat planner's road
+  and on a hillside the contour line nearest it, within half the site's depth
+  either side. A form that moves its road to stand beside its common (round,
+  planted) routes it again through that place (`_repin`). The grade is
+  measured again on the FINAL points with `VillageTerrain.profile`, and the
+  lot planner never takes a wider retry site whose through road broke the
+  cap over a narrower one whose road kept it.
+* **Every other road** is laid by its form as before and then graded on its
+  final points (`grade_roads`): over its class's cap it becomes a `path`,
+  past a path's, `steps`. A lane or field track so re-classed runs straight
+  out to the site edge, meeting it square (a footway goes somewhere, and one
+  meeting the edge obliquely had no clear width in its last metre), or is
+  dropped if that would cross the common or the landmark. The hierarchy is
+  restored the same way: a street no longer ending on a street or the through
+  road becomes a footway too. Where footways exist and none reaches the well,
+  one is laid from the nearest road vertex (crossroads and round forms have
+  none of their own).
+* **Lots** (`ground_clear`) stand on dry ground and do not cross a cliff:
+  corners, edge midpoints and centre above the water level (inclusive), and
+  no neighbouring pair of those samples steeper than a footpath.
+
+The checks learned the new class and the new input, nothing else: `steps`
+may end on any road (`dead_ends`), a stair must be as clear as a path (nav
+`paths`), a well reached by steps is reached (place `well`), the purity twin
+carries the ground, and two plans sited differently are not equal.
+
+### What the caps imply
+
+`street_contour_share` counts streets only (`steps` and `path` are excluded,
+as in the survey), within 30 degrees of the contour. A way of grade g on a
+slope s runs asin(g / s) off the contour: on a 30 % slope every 12 % way is
+within 24 degrees of it, which is why streets and field tracks are laid to
+30 % -- a village of cart-graded ways only is all contour (share 1.0). On a
+**50 % slope** every way a cart, a street or a track may climb is within 37
+degrees, and in practice only the contour road survives: the plan there is a
+contour road with stairs, share 1.0. The survey's real 50 % villages reach
+0.57 with streets steeper than any cap here. Where the siting finds level
+ground within reach (a valley floor, the plain beyond a crest, Manarola's
+shoulder) the village goes there, and its steep street length is the field
+tracks climbing out of it: `vtplan` applies the 0.45-0.80 band only where
+most of the street length stands on steep ground (`street_steep_share` >= 0.5).
+
+### For VoxelGames
+
+The plan arrives turned and placed: apply `site.anchor_m` and `site.yaw_deg`
+to every plan point before grounding it, and stand each building on its own
+`ground` (`door_m` for the threshold). `steps` roads are stairs: grade them
+as flights, not ramps.
+
+### Not yet
+
+* **switchbacks and a hillside form** -- the through road is monotone along
+  its axis and the bend rule (25 degrees per 20 m) forbids a hairpin. On the
+  two steepest real grids (Masouleh, Castelmezzano: 40-60 % hillsides) fifty
+  people need a 270-315 m site and no such road crosses it at 12 % (0.27-0.50
+  if allowed), so the lot planner keeps the narrower site whose road kept the
+  cap and leaves households unhoused (VillageQA `housed`);
+* **per-lot platforms and stepped plinths** -- a house on 2.7 m of fall stands
   on a plinth or over a basement, not on a pad;
-* **stairs as streets** — where the grade is past a cart (Hallstatt has 27
-  stepped ways in one disc);
-* **siting by the ground** — the landmark on the crest or the spur, the
-  common on the level ground, the mill in the valley floor, the edge where
-  the ground turns too steep or too wet.
-
-When that work starts, relax the "ground changes nothing" check in `vterrain`
-deliberately and replace it with the new rules.
+* **landform forms** (`hillside`, `crest`, `shore`, `valley`, ...) -- the form
+  still comes from population, purpose and culture; on a crest the village
+  goes to level ground within reach rather than onto the summit, because no
+  cart-graded through road passes a common on a 40 m summit ringed by 20 %
+  flanks;
+* **the ground's own water as plan water** -- the siting keeps the village
+  off it and lots refuse it, but a river in the grid is not yet a `plan.water`
+  polygon with bridges.

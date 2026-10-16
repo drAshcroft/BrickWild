@@ -7,9 +7,10 @@ extends RefCounted
 ##   height, gradient, `under()` and `profile()` are right on a known plane
 ##   a footprint crossed by a cliff is seen even when its centre is gentle
 ##   real ground from the world survey reads, steep where it should be
-##   a SitePlan with ground has a reading under every lot, building and road;
-##   without ground it is byte-identical to before; the plan purity check
-##   tells two grounds apart
+##   a SitePlan with ground has a reading under every lot, building and road,
+##   says where it stands, and keeps every key the flat SitePlan has; a flat
+##   request grows no ground block; the plan purity check tells two grounds
+##   apart
 
 const EXPORTER := preload("res://tools/export_village_plan.gd")
 const HAMLET := "res://tests/fixtures/site_requests/thorn-hamlet.json"
@@ -247,24 +248,36 @@ static func _real(res: SuiteResult) -> void:
 
 
 ## The exporter on the smallest real request: once flat, once on Manarola.
+##
+## Since VTER-SITING / VTER-ROADS the planners USE the ground (owner decision
+## 1: a plan given terrain may differ from the flat plan), so the two are
+## planned separately -- the buildings measured once -- and the check that
+## the ground "changed nothing" is replaced by: every key the flat SitePlan
+## has, at every level the contract fixes, is still present with the same
+## type; the sited plan says where it stands; and a flat request still grows
+## no ground block. Byte-identity of flat output is the exporter diff in
+## docs/VILLAGE_TERRAIN.md, not this suite.
 static func _exporter(res: SuiteResult) -> void:
 	var raw := FileAccess.get_file_as_string(HAMLET)
 	var request: Dictionary = JSON.parse_string(raw)
 	var ground := VillageTerrain.from_file("res://tests/fixtures/terrain/manarola.json")
-	# planned once (a minute of building measurement); the planners do not
-	# read the ground, so the same plan is written with it and without it
-	var plan: VillagePlan = VillageLotPlanner.plan(_spec(request, raw, ground))
-	var hilly: Dictionary = JSON.parse_string(JSON.stringify(EXPORTER.site_plan(plan, request), "\t", true))
-	plan.spec.terrain = null
-	var flat: Dictionary = JSON.parse_string(JSON.stringify(EXPORTER.site_plan(plan, request), "\t", true))
-	plan.spec.terrain = ground
+	var flat_spec := _spec(request, raw, null)
+	var jobs: Array[Dictionary] = VillageLotPlanner.measure_all(VillageProgrammer.programme(flat_spec))
+	var flat_plan: VillagePlan = VillageLotPlanner.plan_measured(flat_spec, jobs)
+	var plan: VillagePlan = VillageLotPlanner.plan_measured(_spec(request, raw, ground), jobs)
+	var hilly: Dictionary = JSON.parse_string(JSON.stringify(EXPORTER.site_plan(plan, request), "	", true))
+	var flat: Dictionary = JSON.parse_string(JSON.stringify(EXPORTER.site_plan(flat_plan, request), "	", true))
 	res.checked += 1
-	if flat.has("ground") or (flat["buildings"] as Array).any(func(b): return b.has("ground")):
+	if flat.has("ground") or (flat["buildings"] as Array).any(func(b): return b.has("ground")) 			or (flat["site"] as Dictionary).has("anchor_m"):
 		res.fail("exporter: a request without terrain grew a ground block")
 	res.checked += 1
 	if not hilly.has("ground") or String(hilly["ground"]["fingerprint"]) != ground.fingerprint():
 		res.fail("exporter: the plan on Manarola has no site ground, or the wrong one")
 		return
+	res.checked += 1
+	var site: Dictionary = hilly["site"]
+	if not site.has("anchor_m") or not site.has("yaw_deg") or (site["anchor_m"] as Array).size() != 2:
+		res.fail("exporter: the plan on Manarola does not say where it stands (site.anchor_m, site.yaw_deg)")
 	for key in ["lots", "buildings", "roads", "commons"]:
 		for row in hilly[key]:
 			res.checked += 1
@@ -277,21 +290,48 @@ static func _exporter(res: SuiteResult) -> void:
 				res.fail("exporter: a %s reads %.2f m, outside the grid's %.1f..%.1f" % [
 					key, lo, ground.min_height(), ground.max_height()])
 				break
-	# the same plan, the ground taken away again, is the flat plan exactly
-	for key in ["lots", "buildings", "roads", "commons"]:
-		for row in hilly[key]:
-			row.erase("ground")
-	hilly.erase("ground")
+	# the ground may change the plan, never its shape: every key the flat
+	# plan has, the sited plan has, with the same type, down every level
+	var missing: Array[String] = []
+	_same_keys(flat, hilly, "", missing)
 	res.checked += 1
-	# both sides went through one parse: JSON reads every number back as a float
-	if JSON.stringify(hilly, "\t", true) != JSON.stringify(flat, "\t", true):
-		res.fail("exporter: ground changed the plan itself, not only added readings")
+	if not missing.is_empty():
+		res.fail("exporter: the sited plan lost or retyped SitePlan keys: %s" % ", ".join(missing.slice(0, 6)))
+	# and it is still a plan: roads, lots, buildings, every building on a lot
+	res.checked += 1
+	if (hilly["roads"] as Array).is_empty() or (hilly["buildings"] as Array).size() != (flat["buildings"] as Array).size():
+		res.fail("exporter: the sited plan has %d buildings, the flat plan %d" % [
+			(hilly["buildings"] as Array).size(), (flat["buildings"] as Array).size()])
 	# two grounds, two plans as far as purity is concerned
 	var a := _spec(request, raw, ground)
 	var b := _spec(request, raw, VillageTerrain.from_file("res://tests/fixtures/terrain/varennes.json"))
 	res.checked += 1
 	if VillagePlan._spec_equal(a, b) or not VillagePlan._spec_equal(a, _spec(request, raw, ground)):
 		res.fail("exporter: the plan purity check does not tell two grounds apart")
+
+
+## Every key of `flat` is in `sited` with a value of the same JSON type; a
+## list is compared through its first row (rows are alike).
+static func _same_keys(flat: Variant, sited: Variant, at: String, missing: Array[String]) -> void:
+	if flat is Dictionary:
+		if not sited is Dictionary:
+			missing.append(at + " (not an object)")
+			return
+		for k in flat:
+			if k == "notes":
+				continue
+			if not (sited as Dictionary).has(k):
+				missing.append(at + "." + str(k))
+				continue
+			_same_keys(flat[k], sited[k], at + "." + str(k), missing)
+	elif flat is Array:
+		if not sited is Array:
+			missing.append(at + " (not a list)")
+			return
+		if not (flat as Array).is_empty() and not (sited as Array).is_empty():
+			_same_keys(flat[0], sited[0], at + "[0]", missing)
+	elif flat != null and sited != null and typeof(flat) != typeof(sited):
+		missing.append(at + " (%s, was %s)" % [type_string(typeof(sited)), type_string(typeof(flat))])
 
 
 static func _spec(request: Dictionary, raw: String, ground: VillageTerrain) -> VillageSpec:

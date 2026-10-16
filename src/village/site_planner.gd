@@ -18,12 +18,25 @@ extends RefCounted
 ## §5's road table. `width` is the carriageway, `verge` the strip either side
 ## that nothing may stand on; `surface` is indexed by wealth band (poor,
 ## middling, rich).
+##
+## `grade_max` is the steepest a road of the class may climb on given ground
+## (VTER-ROADS; rise over run, read by `VillageTerrain.profile` on the road's
+## final points). A loaded cart takes 12 %: the through road and a lane to
+## the farms. A street is the village's own walked way -- people, a led mule,
+## a handcart -- paved, and a field track on a hillside is walked and led as
+## much as driven (a sledge, a mule, a basket); both are laid to a footpath's
+## 30 %, as the survey's hill villages lay theirs: a cart-graded way on a 30 %
+## slope is within 24 degrees of the contour, and no real hill village is all
+## contour (street_contour_share, median 0.57). Past 30 % people still walk, on
+## `steps`: a stair as a street (Hallstatt has 27 in one disc), to 45 degrees.
+## Steps never come out of the flat planner; only the ground makes them.
 const ROAD_CLASSES := {
-	&"through": {"width": 6.0, "verge": 1.5, "surface": ["dirt", "gravel", "cobble"]},
-	&"street": {"width": 4.0, "verge": 1.0, "surface": ["dirt", "dirt", "cobble"]},
-	&"lane": {"width": 2.5, "verge": 0.5, "surface": ["dirt", "dirt", "dirt"]},
-	&"path": {"width": 1.2, "verge": 0.7, "surface": ["trodden", "trodden", "stones"]},
-	&"track": {"width": 3.0, "verge": 0.0, "surface": ["dirt", "dirt", "dirt"]},
+	&"through": {"width": 6.0, "verge": 1.5, "surface": ["dirt", "gravel", "cobble"], "grade_max": 0.12},
+	&"street": {"width": 4.0, "verge": 1.0, "surface": ["dirt", "dirt", "cobble"], "grade_max": 0.30},
+	&"lane": {"width": 2.5, "verge": 0.5, "surface": ["dirt", "dirt", "dirt"], "grade_max": 0.12},
+	&"path": {"width": 1.2, "verge": 0.7, "surface": ["trodden", "trodden", "stones"], "grade_max": 0.30},
+	&"track": {"width": 3.0, "verge": 0.0, "surface": ["dirt", "dirt", "dirt"], "grade_max": 0.30},
+	&"steps": {"width": 2.0, "verge": 0.5, "surface": ["stones", "stones", "stone"], "grade_max": 1.0},
 }
 
 ## The forms this planner knows. Everything else is VIL-006 and later.
@@ -110,8 +123,34 @@ const JUNCTION_EPS := 0.5       ## two road vertices this close are the same jun
 ## the form's streets and lanes. Returns a fresh `VillagePlan`; `spec` is not
 ## modified. An unsupported form returns a plan with the site and nothing
 ## else, so callers can tell "not mine" from "failed".
+##
+## With `spec.terrain` (VTER-SITING, VTER-ROADS) the village is first placed
+## on the ground (`VillageSiting`: an anchor and a yaw, the ground resampled
+## into the plan's frame as `plan.ground`), the through road is routed by
+## grade, and every other road is graded and re-classed by what it climbs.
+## Without terrain none of that runs and the plan is the flat plan exactly.
 static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
 		minimum_depth := 0.0, shore_depth := 0.0) -> VillagePlan:
+	var ground: VillageTerrain = null
+	if sites_on_ground(spec):
+		ground = VillageSiting.site(spec)["ground"]
+	return _plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
+
+
+## The form's layout with the ground ignored: what the siting scores.
+static func plan_flat(spec: VillageSpec) -> VillagePlan:
+	return _plan(spec, 0, 1.0, 0.0, 0.0, null)
+
+
+## Whether this spec is planned on its ground: valid terrain, a supported
+## form, and not the compact display layout.
+static func sites_on_ground(spec: VillageSpec) -> bool:
+	return spec != null and spec.terrain != null and spec.terrain.valid() and spec.valid() \
+		and spec.form in FORMS_SUPPORTED and not spec.compact_display
+
+
+static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
+		minimum_depth: float, shore_depth: float, ground: VillageTerrain) -> VillagePlan:
 	var out := VillagePlan.new(spec)
 	if spec == null or not spec.valid():
 		push_error("VillageSitePlanner: invalid spec")
@@ -148,9 +187,15 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("site|%d|%s" % [spec.seed, spec.form])
+	if ground != null:
+		out.ground = ground
+		out.site_anchor = ground.site_anchor
+		out.site_yaw = ground.site_yaw
 
 	# 1. the road that goes through, before anything else
 	var through: PackedVector2Array = _through_road(out.site, spec, rng)
+	if ground != null:
+		through = _route_through(through, out.site, ground)
 	out.roads.append(_road(through, &"through", spec.wealth))
 	if spec.form == &"strand":
 		# The shore row's church envelope needs inland depth beyond the common.
@@ -189,6 +234,8 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
 	# the road when it needs more houses.
 	if spec.form not in [&"strand", &"planted"]:
 		_extra_lanes(out, spec, through, extra_lanes)
+	if ground != null:
+		grade_roads(out)
 	# VIL-018 water is authored before lot cutting, so lots can avoid the
 	# polygon and every later bridge/ford check reads the same geometry. Strand
 	# owns a deliberately shifted coast rectangle above; preserve it exactly.
@@ -335,6 +382,207 @@ static func _through_road(site: Rect2, spec: VillageSpec, rng: RandomNumberGener
 	return pts
 
 
+## How far either side of its seeded bow the routed through road may stray,
+## as a share of the site's depth.
+const ROUTE_BAND := 0.5
+
+
+## The through road on the ground (VTER-ROADS): the same columns as the seeded
+## road, each vertex moved across the site to the least-cost line at a cart's
+## grade (`VillageRoadRouter.route_across`), kept inside the site with its
+## verges and margin. `pin` >= 0 holds that column at `pin_y` -- a form that
+## needs its road at a fixed place beside its common (round, planted) routes
+## through that place instead of shifting a routed road off its contour.
+static func _route_through(seed: PackedVector2Array, site: Rect2, ground: VillageTerrain,
+		pin := -1, pin_y := 0.0) -> PackedVector2Array:
+	var half_road: float = float(ROAD_CLASSES[&"through"]["width"]) * 0.5 \
+		+ float(ROAD_CLASSES[&"through"]["verge"])
+	var lo: float = site.position.y + half_road + SITE_MARGIN_M
+	var hi: float = site.end.y - half_road - SITE_MARGIN_M
+	if hi < lo:
+		return seed
+	# the road stays within a band round the form's own bow: a third of the
+	# site's depth either side is a hillside's worth of contour, and the
+	# router's cost grows with the band
+	var band: float = maxf(15.0, ROUTE_BAND * site.size.y)
+	var seed_lo := INF
+	var seed_hi := -INF
+	for p in seed:
+		seed_lo = minf(seed_lo, p.y)
+		seed_hi = maxf(seed_hi, p.y)
+	lo = maxf(lo, seed_lo - band)
+	hi = minf(hi, seed_hi + band)
+	if pin >= 0:
+		if pin_y < lo or pin_y > hi:
+			return seed
+		# the pinned offset must be a lattice offset
+		lo = pin_y - VillageRoadRouter.OFFSET_STEP_M * floor((pin_y - lo) / VillageRoadRouter.OFFSET_STEP_M)
+	var xs := PackedFloat64Array()
+	var ys := PackedFloat64Array()
+	for p in seed:
+		xs.append(p.x)
+		ys.append(clampf(p.y, lo, hi))
+	var h := func(along: float, across: float) -> float: return ground.height_at(Vector2(along, across))
+	var routed := VillageRoadRouter.route_across(h, xs, ys, lo, hi,
+		float(ROAD_CLASSES[&"through"]["grade_max"]), ground.water_level_m, pin, pin_y)
+	var out := PackedVector2Array()
+	for i in range(seed.size()):
+		out.append(Vector2(xs[i], routed[i]))
+	return out
+
+
+## A form moved its routed road sideways to stand beside its common. On the
+## ground that shift takes the road off its contour; route it again, through
+## the shifted road's own vertex nearest `x`, at the shifted offset there.
+static func _repin(shifted: PackedVector2Array, x: float, site: Rect2,
+		ground: VillageTerrain) -> PackedVector2Array:
+	var i := _vertex_near_x(shifted, x)
+	var at: float = shifted[i].y
+	var routed := _route_through(shifted, site, ground, i, at)
+	# keep the pinned vertex exactly where the form put it
+	routed[i] = Vector2(routed[i].x, at)
+	return routed
+
+
+## Every road but the routed through road, measured on the ground and
+## re-classed by what it climbs (VTER-ROADS): over its class's `grade_max` it
+## becomes a footpath, and past a footpath's, steps. Then the hierarchy is
+## restored the same way -- a street that no longer ends on a street or the
+## through road (its neighbour became steps) is itself a footpath, a lane
+## that no longer leaves one likewise -- so §9.2's hierarchy holds by
+## construction. Only ever called with ground.
+static func grade_roads(out: VillagePlan) -> void:
+	for r in range(out.roads.size()):
+		var road: Dictionary = out.roads[r]
+		if r == 0 and road["class"] == &"through":
+			continue
+		var g: float = VillageRoadRouter.grade_of(out.ground, road["points"])
+		if g <= float(ROAD_CLASSES[road["class"]]["grade_max"]) + 1e-6:
+			continue
+		out.roads[r] = _reclassed(road, _foot_class(g), out.spec.wealth)
+		if road["class"] in [&"lane", &"track"]:
+			_foot_way_out(out, r)
+	# a lane that became a footway and still stops short of anything is not
+	# a way anywhere: dropped (see _foot_way_out)
+	for r in range(out.roads.size() - 1, 0, -1):
+		if out.roads[r].get("drop", false):
+			out.roads.remove_at(r)
+	var changed := true
+	while changed:
+		changed = false
+		for r in range(out.roads.size()):
+			var road: Dictionary = out.roads[r]
+			var pts: PackedVector2Array = road["points"]
+			var ends: Array = []
+			match road["class"]:
+				&"street":
+					ends = [pts[0], pts[pts.size() - 1]]
+				&"lane":
+					ends = [pts[0]]
+				_:
+					continue
+			for p in ends:
+				if not _ends_on(out, r, p, [&"street", &"through"]):
+					var g2: float = VillageRoadRouter.grade_of(out.ground, pts)
+					out.roads[r] = _reclassed(road, _foot_class(g2), out.spec.wealth)
+					changed = true
+					break
+	_well_path(out)
+
+
+## A back lane is frontage that may dead-end at its last lot (§9.2); a
+## footpath or a stair may not -- it goes somewhere. A lane or a field track
+## too steep for a cart, re-classed, runs from where it leaves its road
+## straight out to the site edge (a way out to the fields and the hillside
+## above), meeting the edge square: a footway that met it obliquely had no
+## clear width in its last metre. One whose far end is on another road is
+## left where it is; one that would cross the common or the landmark slot on
+## its way out is marked to be dropped, unless it already reached the edge.
+static func _foot_way_out(out: VillagePlan, r: int) -> void:
+	var road: Dictionary = out.roads[r]
+	var pts: PackedVector2Array = road["points"]
+	if pts.size() != 2:
+		return
+	var far: Vector2 = pts[1]
+	if _ends_on(out, r, far, [&"through", &"street", &"lane", &"track", &"path", &"steps"]):
+		return
+	var on_edge: bool = VillageMeasure.on_boundary(out.site, far)
+	var side: float = signf(pts[1].y - pts[0].y)
+	if side == 0.0:
+		road["drop"] = not on_edge
+		return
+	var longer := PackedVector2Array([pts[0],
+		Vector2(pts[0].x, out.site.end.y if side > 0.0 else out.site.position.y)])
+	var ribbon := Poly.ribbon(longer, float(road["width"]) * 0.5 + float(road["verge"]))
+	var blocked := false
+	for c in out.commons:
+		blocked = blocked or VillageLotPlanner.overlap_area(ribbon, c["poly"]) > 0.05
+	if out.landmark_reserved():
+		blocked = blocked or VillageLotPlanner.overlap_area(ribbon, out.landmark_site["poly"]) > 0.05
+	if blocked:
+		road["drop"] = not on_edge
+		return
+	var g: float = VillageRoadRouter.grade_of(out.ground, longer)
+	var cls: StringName = road["class"] if g <= float(ROAD_CLASSES[road["class"]]["grade_max"]) + 1e-6 		else _foot_class(g)
+	road["points"] = longer
+	out.roads[r] = _reclassed(road, cls, out.spec.wealth)
+
+
+## Where a village has footways the well on its common is reached by one
+## (§9.4's `well`). The street and green forms lay that approach themselves;
+## a crossroads or a round village has none on flat ground, and gains its
+## first footways only from the ground. Lay one from the nearest vertex of a
+## road to a stride short of the common's centre, where the well stands.
+static func _well_path(out: VillagePlan) -> void:
+	if out.commons.is_empty():
+		return
+	var feet: Array[int] = out.roads_of_class(&"path") + out.roads_of_class(&"steps")
+	if feet.is_empty():
+		return
+	var well: Vector2 = VillageMeasure.centre(out.commons[0]["poly"])
+	for r in feet:
+		if VillageMeasure.point_to_polyline(well, out.roads[r]["points"]) <= 1.9:
+			return
+	var join := Vector2.INF
+	for road in out.roads:
+		if road["class"] in [&"path", &"steps"]:
+			continue
+		for p in road["points"]:
+			if join == Vector2.INF or p.distance_to(well) < join.distance_to(well):
+				join = p
+	if join == Vector2.INF or join.distance_to(well) < 3.0:
+		return
+	var walk: Vector2 = (well - join).normalized()
+	var pts := PackedVector2Array([join, well - walk * 1.9])
+	out.roads.append(_road(pts, _foot_class(VillageRoadRouter.grade_of(out.ground, pts)), out.spec.wealth))
+
+
+static func _foot_class(grade: float) -> StringName:
+	return &"path" if grade <= float(ROAD_CLASSES[&"path"]["grade_max"]) + 1e-6 else &"steps"
+
+
+## The road with a new class: its points and every other key it carries,
+## the class's own width, verge and surface.
+static func _reclassed(road: Dictionary, cls: StringName, wealth: float) -> Dictionary:
+	var out: Dictionary = road.duplicate()
+	var fresh := _road(road["points"], cls, wealth)
+	for k in fresh:
+		out[k] = fresh[k]
+	return out
+
+
+## VillageRoadCheck's own test: `p` on another road of `classes`, within half
+## its width and the check's tolerance.
+static func _ends_on(plan: VillagePlan, road: int, p: Vector2, classes: Array) -> bool:
+	for j in range(plan.roads.size()):
+		if j == road or not (plan.roads[j]["class"] in classes):
+			continue
+		if VillageMeasure.point_to_polyline(p, plan.roads[j]["points"]) \
+				<= VillageRoadCheck.ON_ROAD_EPS + float(plan.roads[j]["width"]) / 2.0:
+			return true
+	return false
+
+
 ## How far the polyline strays from the straight line between its ends. §5's
 ## "never a straight line the whole width of the site" is this being > 0.
 static func bow(points: PackedVector2Array) -> float:
@@ -444,6 +692,8 @@ static func _plan_round(out: VillagePlan, spec: VillageSpec,
 	var target_y: float = centre.y - radius - through_half - 3.0
 	var current_y: float = VillageLotPlanner._polyline_y_at_x(through, centre.x)
 	through = _shift_points(through, Vector2(0.0, target_y - current_y))
+	if out.ground != null:
+		through = _repin(through, centre.x, site, out.ground)
 	out.roads[0]["points"] = through
 	var common := _circle_polygon(centre, radius, 16)
 	out.commons.append({"poly": common, "kind": &"common"})
@@ -517,6 +767,8 @@ static func _plan_planted(out: VillagePlan, spec: VillageSpec,
 	# square rather than shifting its seed-dependent bow by a fixed amount.
 	var at_centre: float = VillageLotPlanner._polyline_y_at_x(through, centre.x)
 	through = _shift_points(through, Vector2(0.0, -square_side * 0.5 - 8.0 - at_centre))
+	if out.ground != null:
+		through = _repin(through, centre.x, site, out.ground)
 	out.roads[0]["points"] = through
 	var square := Rect2(centre - Vector2(square_side, square_side) * 0.5,
 		Vector2(square_side, square_side))

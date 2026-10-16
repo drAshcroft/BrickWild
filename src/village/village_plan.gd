@@ -88,6 +88,24 @@ var props: Array[Dictionary] = []
 ## "canopy": float, "trunk": float}
 var plants: Array[Dictionary] = []
 
+## The ground in the plan's own frame (VTER-SITING), or null for a flat plan.
+## When `spec.terrain` is given the site planner places the village on it --
+## `site_anchor` and `site_yaw` say where: a plan point p stands on the
+## caller's ground at `site_anchor + p.rotated(site_yaw)` -- and `ground` is
+## that ground resampled into the plan's frame, so every reading of a plan
+## point (`ground.height_at(p)`, `profile`, `under`) needs no transform.
+var ground: VillageTerrain = null
+var site_anchor := Vector2.ZERO
+var site_yaw := 0.0     ## radians, counter-clockwise from the caller's +X in its own (x, y)
+
+
+## The ground readings of this plan are taken on: `ground` when the village
+## was sited, else the spec's own (null when flat).
+func terrain() -> VillageTerrain:
+	if ground != null:
+		return ground
+	return spec.terrain if spec != null else null
+
 
 func _init(p_spec: VillageSpec = null) -> void:
 	spec = p_spec
@@ -153,6 +171,8 @@ func equals(other: VillagePlan) -> bool:
 	if not _spec_equal(spec, other.spec):
 		return false
 	if site != other.site:
+		return false
+	if not site_anchor.is_equal_approx(other.site_anchor) or not is_equal_approx(site_yaw, other.site_yaw):
 		return false
 	if not _value_equal(landmark_site, other.landmark_site):
 		return false

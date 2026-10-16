@@ -144,9 +144,9 @@ func _check_dead_ends(plan: VillagePlan) -> void:
 		for p in [pts[0], pts[pts.size() - 1]]:
 			if VillageMeasure.on_boundary(plan.site, p):
 				continue
-			if _endpoint_on(plan, r, p, [&"through", &"street", &"lane", &"track", &"path"]):
+			if _endpoint_on(plan, r, p, [&"through", &"street", &"lane", &"track", &"path", &"steps"]):
 				continue
-			if cls in [&"lane", &"path"] and _endpoint_on_common(plan, p):
+			if cls in [&"lane", &"path", &"steps"] and _endpoint_on_common(plan, p):
 				continue
 			# a dead end: only a short lane ending at a lot may
 			if cls != &"lane":
