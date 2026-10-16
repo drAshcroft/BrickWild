@@ -170,6 +170,73 @@ What changes now, without waiting for terrain-aware planning:
 The grid is in BrickWild's site frame. Pass the city centre into the sampler,
 as above, and the plan's points and the grid agree without any transform.
 
+## Reading the ground: `VillageSiteAnalysis` (VTER-ANALYSIS)
+
+Before a planner places anything it reads the ground once, over the site:
+
+```gdscript
+var a := VillageSiteAnalysis.of(spec.terrain, plan_site_rect)   # 5 m cells, cached
+a.class_at(p)            # &"crest" &"spur" &"bench" &"open_slope" &"valley_floor" &"shore" &"flat" &"water"
+a.slope_at(p)            # the cell's mean slope, rise over run
+a.buildable(p, &"plot")  # dry and the cell's STEEPEST facet within the cap (&"cart" &"plot" &"path" &"steps")
+a.level_regions(VillageSiteAnalysis.LEVEL_MAX, 2000.0)   # gentle dry components, largest first
+a.highest_point(region); a.best_bench(1500.0)
+a.contours(5.0)          # [{height_m, points, closed}] by marching squares
+a.streams()              # D8 drainage polylines, only when no water_level_m was given
+a.wet_at(p); a.water_distance_at(p); a.tpi_at(p); a.flow_area_at(p)
+print(a.ascii_map({}, true))   # ~ , ^ A v = _ . per class, # past a footpath, * stream
+```
+
+`src/village/village_site_analysis.gd`; suite `vanalysis` (~15 s; every
+synthetic landform's defining cells, and the twelve real 30 m grids).
+
+| Constant | Value | Why |
+|---|---|---|
+| `CART_MAX` | 0.12 | a loaded cart; the classic upper limit of a made road |
+| `PLOT_MAX` | 0.35 | a house plot on a stepped plinth; the survey's hill villages build to here |
+| `PATH_MAX` | 0.60 | a footpath; beyond it, steps or nothing |
+| `LEVEL_MAX` | 0.08 | level ground: a bench, a level region |
+| `FLAT_MAX` | = `CART_MAX` | `flat` is ground a cart crosses in any direction; at 0.08 Monpazier's rolling plateau (median 10 % on the 30 m grid) read two-thirds `open_slope` |
+| TPI annulus | square ring 30–150 m | a village's scale: a street to a quarter; summed-area table, O(cells) |
+| `TPI_HIGH_M` / `TPI_LOW_M` | +10 / −10 m | clears the synthetic cliff's rim (±7.4 m) and keeps a 40 m hill top (+19), a spur ridge (+19) and a valley floor (−15) |
+| summit | within 3 m of the highest ground in ±60 m | a crest is the top, not the shoulder |
+| ridge / trough | both sides 30 m off ≥ 3 m lower (higher) in one of four directions | a spur's ridge line, not a round hill's shoulder (2.8 m at r = 25) |
+| `VALLEY_FLOOR_MAX` | 0.20 | a low cell steeper than this is a valley side |
+| bench | slope < 0.08, ground ≥ 0.15 steep both 2 m above and 2 m below within ±60 m | a shelf in a slope |
+| `SHORE_M` | 30 m | one or two house rows from the waterline |
+| streams | ≥ 5 ha of catchment; none below 2 m relief | a brook that turns a mill |
+
+Decisions worth knowing:
+
+* **Wet is inclusive** (`h <= water_level_m`) where `VillageTerrain.is_wet`
+  is strict: a DEM records a lake or the sea at exactly its surface.
+* **The analysis reads past the site.** It pads the site with up to 150 m of
+  the terrain round it, so the edge cells' TPI, shore and catchment see the
+  ground beyond the edge. Where the TERRAIN ends, the annulus is clipped and
+  the reading is biased; give a site a margin.
+* **A saddle centre reads `flat`**: level, and its ridge and trough cancel in
+  the TPI. A planner wanting the pass looks for flat between two crests.
+* **Slope has two readings.** `slope` is the mean of the cell's facets (the
+  landform); `slope_max` the steepest facet (buildability). A coarse centre
+  proves only its centre.
+* **Drainage** is priority-flood filled, D8, and flats drained toward their
+  outlet and away from higher ground (Barnes et al. 2014), so a dead-level
+  valley floor drains down its middle.
+* **The analysis cell** is never finer than half the terrain cell: 15 m on the
+  real 30 m grids.
+
+Class shares inside ±400 m of the twelve real 30 m grids (`vanalysis` notes;
+Hallstatt with the lake the grid records at 503 m, which its fixture does not
+carry as `water_level_m`):
+
+| Site | Reading |
+|---|---|
+| Hallstatt | open_slope 54 %, water 39 %, shore 4 %, valley_floor 2 % |
+| Monpazier | flat 55 %, open_slope 44 %, valley_floor 1 %, bench 1 % |
+| Satemin, Giethoorn | flat 100 % |
+| Castelmezzano, Masouleh, Èze | open_slope 93–96 % |
+| Rocamadour | open_slope 68 %, flat 20 %, valley_floor 8 %, crest 3 % |
+
 ## Not yet: planning on the ground
 
 The planners still lay the village out flat; `vterrain` asserts that the
