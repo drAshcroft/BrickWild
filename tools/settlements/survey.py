@@ -1412,7 +1412,7 @@ def stage_terrain(data: Path, repo: Path, names: list[str], half_m: float = 450.
                         f"{lat:.5f}, {lon:.5f}; written by tools/settlements/survey.py terrain",
                "origin_m": [float(xs[0]), float(ys_plan[0])], "cell_m": step,
                "cols": int(len(xs)), "rows": int(len(ys_plan))}
-        slug = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower().replace(" ", "_")
+        slug = _slug(name)
         if source != "mapzen":
             out_dir = repo / "tests" / "fixtures" / "terrain" / "real30"
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -1430,8 +1430,13 @@ def stage_terrain(data: Path, repo: Path, names: list[str], half_m: float = 450.
         log(f"terrain: {f} {doc['cols']}x{doc['rows']} relief {sub.max() - sub.min():.0f} m")
 
 
+# letters NFKD does not take apart: without these, Øksfjord would be "ksfjord"
+_FOLD = str.maketrans({"ø": "o", "Ø": "O", "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE", "ß": "ss",
+                       "ł": "l", "Ł": "L", "đ": "d", "Đ": "D", "þ": "th", "Þ": "Th", "ı": "i"})
+
+
 def _slug(name: str) -> str:
-    return unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower().replace(" ", "_")
+    return unicodedata.normalize("NFKD", name.translate(_FOLD)).encode("ascii", "ignore").decode().lower().replace(" ", "_")
 
 
 LAKE_MIN_HA = 15.0     # adjacent_water_ha at or above this, not coastal: a lake shore
