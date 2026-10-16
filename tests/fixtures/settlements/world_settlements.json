@@ -456,13 +456,15 @@
     "purpose": "market",
     "water": "pond",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "shore",
     "unsupported": [
      "stairs: 16 stepped ways",
      "island: landmass 1.0 km2",
      "bridges: 25 bridges",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "medium"
    }
   },
   {
@@ -533,10 +535,12 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "shore",
     "unsupported": [
      "island: landmass 113.6 km2"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "low"
    }
   },
   {
@@ -610,13 +614,15 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "shore",
     "unsupported": [
      "slope: median 54.74 % under the buildings",
      "vertical: 73.8 m between low and high houses",
      "contour streets: streets follow the contours",
      "island: landmass 1.0 km2"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "medium"
    }
   },
   {
@@ -695,7 +701,9 @@
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 24.0 % under the buildings",
      "vertical: 44.4 m between low and high houses"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -775,7 +783,9 @@
      "bridges: 4 bridges",
      "tunnel",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "crossroads",
+    "label_confidence": "low"
    }
   },
   {
@@ -849,7 +859,9 @@
     "nearest_form": "planted",
     "unsupported": [
      "scale: 719 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "high"
    }
   },
   {
@@ -919,7 +931,9 @@
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "island: landmass 1.0 km2"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "medium"
    }
   },
   {
@@ -992,13 +1006,15 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "round",
+    "nearest_form": "water",
     "unsupported": [
      "lake shore: 19334.79 ha of standing water, mapped to coast",
      "over water: 54 % of buildings stand in water",
      "waterfront: most houses within 30 m of water",
      "scale: 2376 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "water",
+    "label_confidence": "high"
    }
   },
   {
@@ -1079,7 +1095,9 @@
     "nearest_form": "street",
     "unsupported": [
      "contour streets: streets follow the contours"
-    ]
+    ],
+    "label_form": "street",
+    "label_confidence": "high"
    }
   },
   {
@@ -1153,11 +1171,13 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "planted",
     "unsupported": [
      "lake shore: 1456.51 ha of standing water, mapped to coast",
      "scale: 987 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -1237,7 +1257,9 @@
      "slope: median 32.22 % under the buildings",
      "vertical: 47.0 m between low and high houses",
      "contour streets: streets follow the contours"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -1310,12 +1332,13 @@
     "purpose": "farming",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "dispersed",
+    "nearest_form": "planted",
     "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "bridges: 5 bridges",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -1388,12 +1411,15 @@
     "purpose": "farming",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "dispersed",
     "unsupported": [
+     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 37.0 % under the buildings",
      "contour streets: streets follow the contours",
      "valley floor: the body sits in a deep valley"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "low"
    }
   },
   {
@@ -1467,12 +1493,14 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 22.03 % under the buildings",
      "vertical: 63.0 m between low and high houses",
      "contour streets: streets follow the contours"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "medium"
    }
   },
   {
@@ -1547,7 +1575,9 @@
     "water": "river",
     "enclosure": "none",
     "nearest_form": "street",
-    "unsupported": []
+    "unsupported": [],
+    "label_form": "dispersed",
+    "label_confidence": "low"
    }
   },
   {
@@ -1627,7 +1657,7 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 28.04 % under the buildings",
      "vertical: 51.8 m between low and high houses",
@@ -1636,7 +1666,9 @@
      "lake shore: 36320.34 ha of standing water, mapped to coast",
      "bridges: 10 bridges",
      "tunnel"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "medium"
    }
   },
   {
@@ -1717,7 +1749,9 @@
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 8.44 % under the buildings",
      "contour streets: streets follow the contours"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "low"
    }
   },
   {
@@ -1793,7 +1827,9 @@
     "water": "river",
     "enclosure": "none",
     "nearest_form": "planted",
-    "unsupported": []
+    "unsupported": [],
+    "label_form": "crossroads",
+    "label_confidence": "low"
    }
   },
   {
@@ -1865,7 +1901,9 @@
     "nearest_form": "dispersed",
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "medium"
    }
   },
   {
@@ -1943,7 +1981,9 @@
     "nearest_form": "planted",
     "unsupported": [
      "bridges: 4 bridges"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "high"
    }
   },
   {
@@ -2016,10 +2056,12 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "shore",
     "unsupported": [
      "stairs: 7 stepped ways"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "medium"
    }
   },
   {
@@ -2093,12 +2135,14 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "valley",
     "unsupported": [
      "slope: median 16.57 % under the buildings",
      "vertical: 67.0 m between low and high houses",
      "island: landmass 329.2 km2"
-    ]
+    ],
+    "label_form": "valley",
+    "label_confidence": "medium"
    }
   },
   {
@@ -2174,7 +2218,9 @@
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "bridges: 18 bridges"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -2248,10 +2294,12 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "crossroads",
     "unsupported": [
      "polar climate ET"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "low"
    }
   },
   {
@@ -2319,10 +2367,12 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "planted",
     "unsupported": [
      "crest: the body sits on the high ground of its surroundings"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "low"
    }
   },
   {
@@ -2395,7 +2445,9 @@
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 25.76 % under the buildings",
      "altitude: 3013.8 m"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "medium"
    }
   },
   {
@@ -2471,7 +2523,7 @@
     "purpose": "market",
     "water": "stream",
     "enclosure": "wall",
-    "nearest_form": "crossroads",
+    "nearest_form": "crest",
     "unsupported": [
      "slope: median 19.5 % under the buildings",
      "vertical: 38.2 m between low and high houses",
@@ -2479,7 +2531,9 @@
      "island: landmass 25.1 km2",
      "scale: 518 buildings in the body, past the 500-person cap",
      "crest: the body sits on the high ground of its surroundings"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "high"
    }
   },
   {
@@ -2555,7 +2609,9 @@
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "bridges: 5 bridges"
-    ]
+    ],
+    "label_form": "valley",
+    "label_confidence": "medium"
    }
   },
   {
@@ -2624,7 +2680,9 @@
     "water": "none",
     "enclosure": "none",
     "nearest_form": "street",
-    "unsupported": []
+    "unsupported": [],
+    "label_form": "dispersed",
+    "label_confidence": "low"
    }
   },
   {
@@ -2695,7 +2753,9 @@
     "nearest_form": "green",
     "unsupported": [
      "scale: 690 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "medium"
    }
   },
   {
@@ -2773,7 +2833,7 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 17.69 % under the buildings",
      "vertical: 41.2 m between low and high houses",
@@ -2783,7 +2843,9 @@
      "bridges: 12 bridges",
      "scale: 463 buildings in the body, past the 500-person cap",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "valley",
+    "label_confidence": "medium"
    }
   },
   {
@@ -2866,7 +2928,9 @@
      "stairs: 3 stepped ways",
      "lake shore: 99.4 ha of standing water, mapped to coast",
      "scale: 1168 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "high"
    }
   },
   {
@@ -2942,13 +3006,14 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "dispersed",
+    "nearest_form": "hillside",
     "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 12.7 % under the buildings",
      "vertical: 54.6 m between low and high houses",
      "tunnel"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "high"
    }
   },
   {
@@ -3020,8 +3085,10 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "street",
-    "unsupported": []
+    "nearest_form": "valley",
+    "unsupported": [],
+    "label_form": "valley",
+    "label_confidence": "medium"
    }
   },
   {
@@ -3097,13 +3164,15 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "shore",
     "unsupported": [
      "slope: median 20.4 % under the buildings",
      "island: landmass 1.0 km2",
      "bridges: 9 bridges",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "medium"
    }
   },
   {
@@ -3187,7 +3256,9 @@
      "vertical: 26.9 m between low and high houses",
      "altitude: 3160.3 m",
      "valley floor: the body sits in a deep valley"
-    ]
+    ],
+    "label_form": "valley",
+    "label_confidence": "low"
    }
   },
   {
@@ -3260,10 +3331,12 @@
     "purpose": "farming",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "planted",
     "unsupported": [
      "tunnel"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -3340,13 +3413,14 @@
     "purpose": "farming",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "dispersed",
+    "nearest_form": "valley",
     "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 18.72 % under the buildings",
      "contour streets: streets follow the contours",
      "bridges: 7 bridges"
-    ]
+    ],
+    "label_form": "valley",
+    "label_confidence": "high"
    }
   },
   {
@@ -3428,7 +3502,9 @@
      "contour streets: streets follow the contours",
      "lake shore: 1689.21 ha of standing water, mapped to coast",
      "scale: 2915 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "crossroads",
+    "label_confidence": "medium"
    }
   },
   {
@@ -3502,10 +3578,12 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "planted",
     "unsupported": [
      "bridges: 5 bridges"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -3581,7 +3659,9 @@
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "island: landmass 131.3 km2"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "low"
    }
   },
   {
@@ -3654,7 +3734,9 @@
     "nearest_form": "dispersed",
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "medium"
    }
   },
   {
@@ -3738,7 +3820,9 @@
     "unsupported": [
      "stairs: 3 stepped ways",
      "lake shore: 43.6 ha of standing water, mapped to coast"
-    ]
+    ],
+    "label_form": "crossroads",
+    "label_confidence": "low"
    }
   },
   {
@@ -3818,7 +3902,9 @@
     "unsupported": [
      "lake shore: 128452.21 ha of standing water, mapped to coast",
      "altitude: 3829.4 m"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "high"
    }
   },
   {
@@ -3893,7 +3979,9 @@
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "island: landmass 131.3 km2"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -3963,10 +4051,10 @@
     "purpose": "farming",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "dispersed",
-    "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus"
-    ]
+    "nearest_form": "planted",
+    "unsupported": [],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -4045,7 +4133,9 @@
      "vertical: 25.5 m between low and high houses",
      "contour streets: streets follow the contours",
      "bridges: 4 bridges"
-    ]
+    ],
+    "label_form": "street",
+    "label_confidence": "medium"
    }
   },
   {
@@ -4120,7 +4210,9 @@
     "unsupported": [
      "island: landmass 1.0 km2",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -4199,7 +4291,9 @@
     "nearest_form": "planted",
     "unsupported": [
      "scale: 3104 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "high"
    }
   },
   {
@@ -4274,13 +4368,15 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 18.42 % under the buildings",
      "vertical: 47.8 m between low and high houses",
      "contour streets: streets follow the contours",
      "stairs: 3 stepped ways"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "medium"
    }
   },
   {
@@ -4352,11 +4448,12 @@
     "purpose": "farming",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "dispersed",
+    "nearest_form": "planted",
     "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -4432,7 +4529,9 @@
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 27.58 % under the buildings",
      "vertical: 34.2 m between low and high houses"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -4511,7 +4610,9 @@
      "slope: median 10.75 % under the buildings",
      "altitude: 2514.2 m",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -4587,7 +4688,9 @@
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 24.23 % under the buildings",
      "vertical: 83.9 m between low and high houses"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -4658,8 +4761,10 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
-    "unsupported": []
+    "nearest_form": "planted",
+    "unsupported": [],
+    "label_form": "dispersed",
+    "label_confidence": "low"
    }
   },
   {
@@ -4740,7 +4845,9 @@
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 11.07 % under the buildings",
      "vertical: 35.4 m between low and high houses"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -4818,7 +4925,9 @@
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "island: landmass 169.6 km2"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "medium"
    }
   },
   {
@@ -4892,12 +5001,14 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "shore",
     "unsupported": [
      "stairs: 5 stepped ways",
      "lake shore: 3338.24 ha of standing water, mapped to coast",
      "scale: 1755 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "medium"
    }
   },
   {
@@ -4974,13 +5085,14 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "dispersed",
+    "nearest_form": "planted",
     "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "stairs: 35 stepped ways",
      "bridges: 81 bridges",
      "tunnel"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "high"
    }
   },
   {
@@ -5055,7 +5167,9 @@
     "nearest_form": "planted",
     "unsupported": [
      "bridges: 4 bridges"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "low"
    }
   },
   {
@@ -5134,7 +5248,9 @@
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 8.16 % under the buildings",
      "contour streets: streets follow the contours"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "low"
    }
   },
   {
@@ -5202,11 +5318,12 @@
     "purpose": "farming",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "dispersed",
+    "nearest_form": "planted",
     "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "altitude: 3487.2 m"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -5289,7 +5406,9 @@
      "contour streets: streets follow the contours",
      "stairs: 11 stepped ways",
      "scale: 487 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "crossroads",
+    "label_confidence": "medium"
    }
   },
   {
@@ -5359,10 +5478,12 @@
     "purpose": "farming",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "planted",
     "unsupported": [
      "island: landmass 1.0 km2"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -5439,7 +5560,7 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 26.71 % under the buildings",
      "vertical: 72.2 m between low and high houses",
@@ -5448,7 +5569,9 @@
      "island: landmass 1.0 km2",
      "bridges: 5 bridges",
      "tunnel"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "high"
    }
   },
   {
@@ -5526,14 +5649,16 @@
     "purpose": "market",
     "water": "stream",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "crest",
     "unsupported": [
      "slope: median 28.17 % under the buildings",
      "vertical: 36.6 m between low and high houses",
      "stairs: 4 stepped ways",
      "tunnel",
      "crest: the body sits on the high ground of its surroundings"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "high"
    }
   },
   {
@@ -5610,13 +5735,15 @@
     "purpose": "market",
     "water": "stream",
     "enclosure": "none",
-    "nearest_form": "round",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 36.13 % under the buildings",
      "vertical: 67.0 m between low and high houses",
      "stairs: 37 stepped ways",
      "tunnel"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "high"
    }
   },
   {
@@ -5701,7 +5828,9 @@
      "stairs: 16 stepped ways",
      "bridges: 12 bridges",
      "tunnel"
-    ]
+    ],
+    "label_form": "valley",
+    "label_confidence": "medium"
    }
   },
   {
@@ -5778,14 +5907,16 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "wall",
-    "nearest_form": "street",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 55.56 % under the buildings",
      "vertical: 77.5 m between low and high houses",
      "contour streets: streets follow the contours",
      "stairs: 27 stepped ways",
      "tunnel"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "high"
    }
   },
   {
@@ -5860,13 +5991,15 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "crest",
     "unsupported": [
      "slope: median 9.42 % under the buildings",
      "stairs: 51 stepped ways",
      "island: landmass 1.0 km2",
      "crest: the body sits on the high ground of its surroundings"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "medium"
    }
   },
   {
@@ -5939,14 +6072,16 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "wall",
-    "nearest_form": "strand",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 37.8 % under the buildings",
      "vertical: 50.2 m between low and high houses",
      "stairs: 13 stepped ways",
      "island: landmass 1.0 km2",
      "crest: the body sits on the high ground of its surroundings"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "medium"
    }
   },
   {
@@ -6025,7 +6160,7 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "wall",
-    "nearest_form": "round",
+    "nearest_form": "crest",
     "unsupported": [
      "slope: median 18.04 % under the buildings",
      "vertical: 26.3 m between low and high houses",
@@ -6034,7 +6169,9 @@
      "waterfront: most houses within 30 m of water",
      "bridges: 6 bridges",
      "tunnel"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "medium"
    }
   },
   {
@@ -6114,7 +6251,7 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "shore",
     "unsupported": [
      "slope: median 42.64 % under the buildings",
      "vertical: 38.6 m between low and high houses",
@@ -6124,7 +6261,9 @@
      "waterfront: most houses within 30 m of water",
      "bridges: 13 bridges",
      "tunnel"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "high"
    }
   },
   {
@@ -6199,12 +6338,14 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "planted",
     "unsupported": [
      "lake shore: 25.75 ha of standing water, mapped to coast",
      "bridges: 15 bridges",
      "scale: 566 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "street",
+    "label_confidence": "medium"
    }
   },
   {
@@ -6281,7 +6422,9 @@
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "waterfront: most houses within 30 m of water"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -6356,14 +6499,16 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "water",
     "unsupported": [
      "stairs: 4 stepped ways",
      "lake shore: 424.22 ha of standing water, mapped to coast",
      "over water: 100 % of buildings stand in water",
      "waterfront: most houses within 30 m of water",
      "bridges: 113 bridges"
-    ]
+    ],
+    "label_form": "water",
+    "label_confidence": "high"
    }
   },
   {
@@ -6393,10 +6538,13 @@
     "purpose": "farming",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "green",
+    "nearest_form": "dispersed",
     "unsupported": [
+     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "unmeasured: OSM has too few buildings here"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "high"
    }
   },
   {
@@ -6471,13 +6619,15 @@
     "purpose": "market",
     "water": "stream",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 20.73 % under the buildings",
      "contour streets: streets follow the contours",
      "stairs: 17 stepped ways",
      "valley floor: the body sits in a deep valley"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "medium"
    }
   },
   {
@@ -6507,10 +6657,13 @@
     "purpose": "farming",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "green",
+    "nearest_form": "dispersed",
     "unsupported": [
+     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "unmeasured: OSM has too few buildings here"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "medium"
    }
   },
   {
@@ -6588,7 +6741,7 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "wall",
-    "nearest_form": "planted",
+    "nearest_form": "crest",
     "unsupported": [
      "slope: median 9.52 % under the buildings",
      "contour streets: streets follow the contours",
@@ -6596,7 +6749,9 @@
      "tunnel",
      "scale: 501 buildings in the body, past the 500-person cap",
      "crest: the body sits on the high ground of its surroundings"
-    ]
+    ],
+    "label_form": "round",
+    "label_confidence": "medium"
    }
   },
   {
@@ -6674,11 +6829,13 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "wall",
-    "nearest_form": "round",
+    "nearest_form": "crossroads",
     "unsupported": [
      "contour streets: streets follow the contours",
      "tunnel"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "low"
    }
   },
   {
@@ -6754,7 +6911,9 @@
     "nearest_form": "dispersed",
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus"
-    ]
+    ],
+    "label_form": "round",
+    "label_confidence": "low"
    }
   },
   {
@@ -6835,7 +6994,9 @@
     "unsupported": [
      "contour streets: streets follow the contours",
      "stairs: 21 stepped ways"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "low"
    }
   },
   {
@@ -6916,7 +7077,9 @@
     "unsupported": [
      "bridges: 5 bridges",
      "scale: 680 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "low"
    }
   },
   {
@@ -6988,12 +7151,14 @@
     "purpose": "market",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 20.02 % under the buildings",
      "vertical: 48.1 m between low and high houses",
      "scale: 1057 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "low"
    }
   },
   {
@@ -7069,11 +7234,13 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "water",
     "unsupported": [
      "lake shore: 78.98 ha of standing water, mapped to coast",
      "scale: 5944 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "water",
+    "label_confidence": "high"
    }
   },
   {
@@ -7159,7 +7326,9 @@
      "contour streets: streets follow the contours",
      "bridges: 8 bridges",
      "valley floor: the body sits in a deep valley"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -7231,7 +7400,7 @@
     "purpose": "mining",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 23.45 % under the buildings",
      "vertical: 100.8 m between low and high houses",
@@ -7239,7 +7408,9 @@
      "scale: 2213 buildings in the body, past the 500-person cap",
      "altitude: 5013.8 m",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "high"
    }
   },
   {
@@ -7316,15 +7487,16 @@
     "purpose": "farming",
     "water": "river",
     "enclosure": "palisade",
-    "nearest_form": "dispersed",
+    "nearest_form": "planted",
     "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "stairs: 13 stepped ways",
      "waterfront: most houses within 30 m of water",
      "bridges: 16 bridges",
      "altitude: 2845.8 m",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "medium"
    }
   },
   {
@@ -7399,13 +7571,15 @@
     "purpose": "market",
     "water": "pond",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "shore",
     "unsupported": [
      "stairs: 8 stepped ways",
      "island: landmass 1.0 km2",
      "scale: 497 buildings in the body, past the 500-person cap",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "low"
    }
   },
   {
@@ -7479,14 +7653,15 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "dispersed",
+    "nearest_form": "shore",
     "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "stairs: 3 stepped ways",
      "island: landmass 1.0 km2",
      "bridges: 8 bridges",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "valley",
+    "label_confidence": "medium"
    }
   },
   {
@@ -7560,10 +7735,12 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "shore",
     "unsupported": [
      "island: landmass 1.0 km2"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "high"
    }
   },
   {
@@ -7638,14 +7815,16 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 28.65 % under the buildings",
      "vertical: 36.0 m between low and high houses",
      "island: landmass 1.0 km2",
      "bridges: 6 bridges",
      "tunnel"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "low"
    }
   },
   {
@@ -7734,7 +7913,9 @@
      "island: landmass 1.0 km2",
      "bridges: 6 bridges",
      "scale: 474 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "low"
    }
   },
   {
@@ -7813,7 +7994,7 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "valley",
     "unsupported": [
      "vertical: 25.3 m between low and high houses",
      "contour streets: streets follow the contours",
@@ -7822,7 +8003,9 @@
      "bridges: 14 bridges",
      "tunnel",
      "valley floor: the body sits in a deep valley"
-    ]
+    ],
+    "label_form": "valley",
+    "label_confidence": "high"
    }
   },
   {
@@ -7852,10 +8035,13 @@
     "purpose": "farming",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "green",
+    "nearest_form": "dispersed",
     "unsupported": [
+     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "unmeasured: OSM has too few buildings here"
-    ]
+    ],
+    "label_form": "round",
+    "label_confidence": "low"
    }
   },
   {
@@ -7885,10 +8071,13 @@
     "purpose": "farming",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "green",
+    "nearest_form": "dispersed",
     "unsupported": [
+     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "unmeasured: OSM has too few buildings here"
-    ]
+    ],
+    "label_form": "water",
+    "label_confidence": "low"
    }
   },
   {
@@ -7972,7 +8161,9 @@
      "slope: median 20.9 % under the buildings",
      "stairs: 13 stepped ways",
      "bridges: 5 bridges"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "low"
    }
   },
   {
@@ -8050,12 +8241,14 @@
     "purpose": "market",
     "water": "stream",
     "enclosure": "none",
-    "nearest_form": "street",
+    "nearest_form": "planted",
     "unsupported": [
      "contour streets: streets follow the contours",
      "tunnel",
      "scale: 655 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "planted",
+    "label_confidence": "high"
    }
   },
   {
@@ -8130,8 +8323,10 @@
     "purpose": "market",
     "water": "stream",
     "enclosure": "none",
-    "nearest_form": "crossroads",
-    "unsupported": []
+    "nearest_form": "round",
+    "unsupported": [],
+    "label_form": "round",
+    "label_confidence": "high"
    }
   },
   {
@@ -8209,7 +8404,7 @@
     "purpose": "farming",
     "water": "stream",
     "enclosure": "palisade",
-    "nearest_form": "crossroads",
+    "nearest_form": "crest",
     "unsupported": [
      "slope: median 13.86 % under the buildings",
      "contour streets: streets follow the contours",
@@ -8217,7 +8412,9 @@
      "bridges: 13 bridges",
      "tunnel",
      "crest: the body sits on the high ground of its surroundings"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "high"
    }
   },
   {
@@ -8295,12 +8492,14 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "water",
     "unsupported": [
      "stairs: 25 stepped ways",
      "waterfront: most houses within 30 m of water",
      "bridges: 49 bridges"
-    ]
+    ],
+    "label_form": "water",
+    "label_confidence": "medium"
    }
   },
   {
@@ -8372,10 +8571,10 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "dispersed",
-    "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus"
-    ]
+    "nearest_form": "street",
+    "unsupported": [],
+    "label_form": "street",
+    "label_confidence": "medium"
    }
   },
   {
@@ -8454,7 +8653,9 @@
     "unsupported": [
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "lake shore: 106.8 ha of standing water, mapped to coast"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "high"
    }
   },
   {
@@ -8535,7 +8736,9 @@
      "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "stairs: 20 stepped ways",
      "bridges: 12 bridges"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "low"
    }
   },
   {
@@ -8608,10 +8811,13 @@
     "purpose": "market",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "dispersed",
     "unsupported": [
+     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "contour streets: streets follow the contours"
-    ]
+    ],
+    "label_form": "dispersed",
+    "label_confidence": "medium"
    }
   },
   {
@@ -8689,13 +8895,15 @@
     "purpose": "mill",
     "water": "river",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 13.84 % under the buildings",
      "vertical: 35.3 m between low and high houses",
      "altitude: 4120.5 m",
      "polar climate ET"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "medium"
    }
   },
   {
@@ -8770,14 +8978,16 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "wall",
-    "nearest_form": "strand",
+    "nearest_form": "crest",
     "unsupported": [
      "slope: median 11.38 % under the buildings",
      "contour streets: streets follow the contours",
      "stairs: 44 stepped ways",
      "island: landmass 1.0 km2",
      "tunnel"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "high"
    }
   },
   {
@@ -8857,7 +9067,7 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "green",
+    "nearest_form": "hillside",
     "unsupported": [
      "slope: median 41.38 % under the buildings",
      "vertical: 156.5 m between low and high houses",
@@ -8867,7 +9077,9 @@
      "bridges: 14 bridges",
      "tunnel",
      "scale: 884 buildings in the body, past the 500-person cap"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "high"
    }
   },
   {
@@ -8944,16 +9156,17 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "dispersed",
+    "nearest_form": "hillside",
     "unsupported": [
-     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "slope: median 27.9 % under the buildings",
      "vertical: 29.0 m between low and high houses",
      "contour streets: streets follow the contours",
      "stairs: 25 stepped ways",
      "bridges: 6 bridges",
      "tunnel"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "high"
    }
   },
   {
@@ -9028,12 +9241,14 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "none",
-    "nearest_form": "strand",
+    "nearest_form": "water",
     "unsupported": [
      "stairs: 4 stepped ways",
      "lake shore: 21210.22 ha of standing water, mapped to coast",
      "waterfront: most houses within 30 m of water"
-    ]
+    ],
+    "label_form": "water",
+    "label_confidence": "high"
    }
   },
   {
@@ -9109,11 +9324,13 @@
     "purpose": "market",
     "water": "pond",
     "enclosure": "none",
-    "nearest_form": "crossroads",
+    "nearest_form": "crest",
     "unsupported": [
      "slope: median 14.12 % under the buildings",
      "crest: the body sits on the high ground of its surroundings"
-    ]
+    ],
+    "label_form": "crest",
+    "label_confidence": "high"
    }
   },
   {
@@ -9190,13 +9407,15 @@
     "purpose": "fishing",
     "water": "coast",
     "enclosure": "wall",
-    "nearest_form": "strand",
+    "nearest_form": "shore",
     "unsupported": [
      "slope: median 20.53 % under the buildings",
      "contour streets: streets follow the contours",
      "stairs: 43 stepped ways",
      "waterfront: most houses within 30 m of water"
-    ]
+    ],
+    "label_form": "shore",
+    "label_confidence": "high"
    }
   },
   {
@@ -9226,10 +9445,13 @@
     "purpose": "farming",
     "water": "none",
     "enclosure": "none",
-    "nearest_form": "green",
+    "nearest_form": "dispersed",
     "unsupported": [
+     "dispersed: several bodies or loosely spaced farms, not one nucleus",
      "unmeasured: OSM has too few buildings here"
-    ]
+    ],
+    "label_form": "hillside",
+    "label_confidence": "low"
    }
   }
  ]

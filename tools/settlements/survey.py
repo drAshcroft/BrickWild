@@ -1024,6 +1024,93 @@ CC_CULTURE = {
 }
 
 
+FORMS = ("street", "green", "crossroads", "round", "planted", "gate", "shore", "hillside",
+         "dispersed", "crest", "valley", "water")
+
+
+def classify_form(m, e, water) -> str:
+    """The arrangement the measurements describe, in the owner's vocabulary
+    (docs/VILLAGE_TERRAIN.md, Decisions): street, green, crossroads, round,
+    planted, shore, hillside, dispersed, crest, valley, water. (`gate` needs a
+    manor or keep at the head of the street, which no measure here sees, so it
+    is never returned.) Ground and water are read first, then the plan of the
+    body. Fitted to tools/settlements/form_labels.json; every threshold is on
+    a metric, none on a name."""
+    body_n = m.get("body_buildings", 0)
+    share = m.get("body_share", 1)
+    clusters = m.get("clusters_ge5", 0)
+    nn = m.get("nn_median_m") or 0
+    oo = m.get("orientation_order") or 0.0
+    el = m.get("elongation", 1.0)
+    comp = m.get("compactness", 0)
+    inter = m.get("intersections_per_ha", 0)
+    road = m.get("road_km_per_ha", 0)
+    slope = m.get("slope_median_pct", 0)
+    span = m.get("elev_span_m", 0)
+    pct = m.get("body_elev_pctile", 0.5)
+    relief = m.get("relief_disc_m", 0)
+    wat30 = m.get("water_within_30m", 0)
+    adj = m.get("adjacent_water_ha") or 0
+    over = m.get("over_water_share", 0)
+    wall = bool(m.get("city_wall"))
+    centre = m.get("worship_centrality", 9)
+    # water: houses on stilts, or an island or lagoon town filled edge to edge
+    if over > 0.3:
+        return "water"
+    if wat30 >= 0.55 and slope < 5 and share >= 0.6:
+        return "water"
+    if adj >= 50 and share > 0.95 and comp >= 0.8 and oo < 0.3 and body_n > 4000 and wat30 < 0.2:
+        return "water"   # an island of dense house in a floodplain or delta
+    steep = slope >= 12
+    # a walled compact place standing above its surroundings
+    if wall and pct >= 0.7 and relief >= 40 and slope < 30 and body_n >= 30 and share >= 0.4 and el < 3.0:
+        return "crest"
+    # a ribbon on the floor of a valley, under steep sides
+    if pct < 0.35 and el >= 3.5 and relief >= 150 and slope < 20:
+        return "valley"
+    if pct < 0.2 and relief >= 150 and slope < 20 and share >= 0.35 and el >= 1.3:
+        return "valley"
+    # a street grid: crossings in two directions. A grid whose buildings are
+    # thin still shows in the road length per hectare of its hull.
+    if oo > 0.6 and inter > 0.4 and el < 2.7 and share >= 0.3 and body_n >= 25 and slope < 12:
+        return "planted"
+    if slope < 12 and oo >= 0.5 and inter > 2 and el < 2.7 and share >= 0.8 and body_n >= 300:
+        return "planted"
+    if slope < 12 and oo > 0.8 and (body_n >= 100 or road > 0.9):
+        return "planted"
+    if slope < 12 and oo > 0.7 and road > 0.6 and body_n < 100 and share < 0.9:
+        return "planted"
+    # steep ground and compact: terraces or a perch
+    if steep and body_n >= 50 and share >= 0.2 and clusters < 20 and el < 3.1:
+        if pct >= 0.85 and relief >= 40 and slope < 30:
+            return "crest"
+        return "hillside"
+    # a row along a coast or lake
+    shore_water = ((m.get("coast_in_disc") or e.get("coast_km", 99) < 1.5) and wat30 >= 0.02) or (adj >= 15 and wat30 >= 0.15)
+    if shore_water and el >= 2.0 and (share >= 0.35 or body_n >= 30):
+        return "shore"
+    if el >= 4.5 and body_n >= 30 and slope < 30:
+        return "street"   # one long row along a road
+    # no one nucleus, or houses far apart
+    if (share < 0.35 and clusters >= 3) or (share < 0.45 and clusters >= 8) or nn > 35 or body_n < 8:
+        return "dispersed"
+    if body_n < 10 and share < 0.3:
+        return "dispersed"
+    if pct >= 0.9 and relief >= 40 and body_n >= 30 and el < 3.2:
+        return "crest"
+    if shore_water and el >= 1.5 and wat30 >= 0.04 and body_n >= 30 and slope < 5:
+        return "shore"
+    if steep and body_n >= 30 and (share < 0.8 or el >= 2.4):
+        return "hillside"
+    if el > 2.4:
+        return "street"
+    if comp >= 0.8 and el < 1.5 and share > 0.9 and body_n < 1000 and oo < 0.7:
+        return "round"
+    if inter > 0.6:
+        return "crossroads"
+    return "green"
+
+
 def map_to_spec(s) -> dict:
     """The NEAREST VillageSpec the generator can be asked for, and the list of
     things about this place that no VillageSpec can say. The second list is
@@ -1053,28 +1140,7 @@ def map_to_spec(s) -> dict:
         "mining" if s.get("phenomenon") == "extreme_altitude_mining" else \
         "market" if pop >= 150 else "farming"
     enclosure = "wall" if m.get("city_wall") and pop >= 150 else "palisade" if m.get("city_wall") else "none"
-    # the arrangement the measurements describe, in the generator's words
-    oo = m.get("orientation_order") or 0.0
-    el = m.get("elongation", 1.0)
-    # dispersed: no one nucleus holds most of the stock, or houses stand far
-    # apart. (Clark-Evans over a ribbon's hull calls every street village
-    # dispersed, so it is reported, not used here.)
-    if (m.get("body_share", 1) < 0.35 and m.get("clusters_ge5", 0) >= 3)             or (m.get("nn_median_m") or 0) > 35 or m.get("body_buildings", 99) < 8:
-        form = "dispersed"
-    elif water == "coast" and el > 1.8:
-        form = "strand"
-    elif el > 2.4:
-        form = "street"
-    elif oo > 0.6 and m.get("intersections_per_ha", 0) > 0.4 and el < 2.2:
-        # a small network has few bearings and scores high on order by
-        # accident; a grid needs crossings as well as two directions
-        form = "planted"
-    elif m.get("compactness", 0) > 0.7 and m.get("worship_centrality", 9) < 0.35:
-        form = "round"
-    elif m.get("intersections_per_ha", 0) > 0.6:
-        form = "crossroads"
-    else:
-        form = "green"
+    form = classify_form(m, e, water)
     gaps = []
     if form == "dispersed":
         gaps.append("dispersed: several bodies or loosely spaced farms, not one nucleus")
@@ -1140,12 +1206,41 @@ def spearman(a, b):
     return float(np.corrcoef(ra, rb)[0, 1]), int(ok.sum())
 
 
+def _draw_site(ax, s, cache):
+    """One site's map on ax: shared by the contact sheets and draw-site."""
+    from matplotlib.collections import LineCollection, PatchCollection
+    from matplotlib.patches import Polygon as MPoly
+    loc = Local(s["lat"], s["lon"])
+    geo = parse_site(overpass(cache, site_query(s["lat"], s["lon"], RADIUS_M)), loc)
+    dem = site_dem(cache, s["lat"], s["lon"], s["env"].get("coast_km", 99) < 3.0)
+    ax.contour(dem.xs, dem.ys, dem.z, levels=14, colors="#b8a98a", linewidths=0.5)
+    for p in geo["water_poly"]:
+        ax.add_patch(MPoly(np.asarray(p.exterior.coords), closed=True, fc="#9cc3e6", ec="none"))
+    lines = [np.asarray(ln.coords) for ln, _ in geo["water_line"]] + [np.asarray(c.coords) for c in geo["coast"]]
+    ax.add_collection(LineCollection(lines, colors="#4f8fcf", linewidths=1.0))
+    ax.add_collection(LineCollection([np.asarray(r["line"].coords) for r in geo["roads"]],
+                                     colors="#555555", linewidths=0.9))
+    ax.add_collection(LineCollection([np.asarray(r["line"].coords) for r in geo["paths"]],
+                                     colors="#999999", linewidths=0.4))
+    ax.add_collection(LineCollection([np.asarray(w.coords) for w in geo["walls"]],
+                                     colors="#8b1a1a", linewidths=1.6))
+    pc = PatchCollection([MPoly(np.asarray(p.exterior.coords), closed=True) for p in geo["buildings"]],
+                         fc="#2b2b2b", ec="none")
+    ax.add_collection(pc)
+    ax.set_xlim(-RADIUS_M, RADIUS_M)
+    ax.set_ylim(-RADIUS_M, RADIUS_M)
+    ax.set_aspect("equal")
+    m, sp = s["morph"], s["spec"]
+    tag = s.get("phenomenon") or f"maximin #{s.get('maximin_rank')}"
+    ax.set_title(f"{s['name']} ({s['cc'].upper()}) {s['env'].get('koppen')}\n{tag}\n"
+                 f"{sp['nearest_form']} | span {m.get('elev_span_m')} m | slope {m.get('slope_median_pct')} %",
+                 fontsize=9)
+
+
 def draw_sheets(data: Path, sites, out_dir: Path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.collections import LineCollection, PatchCollection
-    from matplotlib.patches import Polygon as MPoly
     cache = Cache(data)
     usable = [s for s in sites if s["morph"].get("usable")]
     per = 24
@@ -1156,31 +1251,7 @@ def draw_sheets(data: Path, sites, out_dir: Path):
         for ax in axes.ravel():
             ax.set_axis_off()
         for ax, s in zip(axes.ravel(), chunk):
-            loc = Local(s["lat"], s["lon"])
-            geo = parse_site(overpass(cache, site_query(s["lat"], s["lon"], RADIUS_M)), loc)
-            dem = site_dem(cache, s["lat"], s["lon"], s["env"].get("coast_km", 99) < 3.0)
-            ax.contour(dem.xs, dem.ys, dem.z, levels=14, colors="#b8a98a", linewidths=0.5)
-            for p in geo["water_poly"]:
-                ax.add_patch(MPoly(np.asarray(p.exterior.coords), closed=True, fc="#9cc3e6", ec="none"))
-            lines = [np.asarray(ln.coords) for ln, _ in geo["water_line"]] + [np.asarray(c.coords) for c in geo["coast"]]
-            ax.add_collection(LineCollection(lines, colors="#4f8fcf", linewidths=1.0))
-            ax.add_collection(LineCollection([np.asarray(r["line"].coords) for r in geo["roads"]],
-                                             colors="#555555", linewidths=0.9))
-            ax.add_collection(LineCollection([np.asarray(r["line"].coords) for r in geo["paths"]],
-                                             colors="#999999", linewidths=0.4))
-            ax.add_collection(LineCollection([np.asarray(w.coords) for w in geo["walls"]],
-                                             colors="#8b1a1a", linewidths=1.6))
-            pc = PatchCollection([MPoly(np.asarray(p.exterior.coords), closed=True) for p in geo["buildings"]],
-                                 fc="#2b2b2b", ec="none")
-            ax.add_collection(pc)
-            ax.set_xlim(-RADIUS_M, RADIUS_M)
-            ax.set_ylim(-RADIUS_M, RADIUS_M)
-            ax.set_aspect("equal")
-            m, sp = s["morph"], s["spec"]
-            tag = s.get("phenomenon") or f"maximin #{s.get('maximin_rank')}"
-            ax.set_title(f"{s['name']} ({s['cc'].upper()}) {s['env'].get('koppen')}\n{tag}\n"
-                         f"{sp['nearest_form']} | span {m.get('elev_span_m')} m | slope {m.get('slope_median_pct')} %",
-                         fontsize=9)
+            _draw_site(ax, s, cache)
         fig.suptitle("BrickWild settlement coverage set -- 1.4 km discs, north up. "
                      "Buildings, streets, paths, water, walls (red), 14 DEM contours. "
                      "Map data (c) OpenStreetMap contributors, ODbL; elevation Mapzen terrain via OpenTopoData.",
@@ -1193,6 +1264,24 @@ def draw_sheets(data: Path, sites, out_dir: Path):
         files.append(f)
         log(f"report: drew {f}")
     return files
+
+
+def stage_draw_site(data: Path, repo: Path, name: str, out: Path):
+    """One site at full size, from the cache (no network): for judging a label."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fx = json.loads((repo / "tests" / "fixtures" / "settlements" / "world_settlements.json").read_text(encoding="utf-8"))
+    s = next((x for x in fx["sites"] if x["name"] == name), None)
+    if s is None or not s["morph"].get("usable"):
+        log(f"draw-site: {name} not found or not measured")
+        return
+    fig, ax = plt.subplots(1, 1, figsize=(10, 10), dpi=80)
+    _draw_site(ax, s, Cache(data))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out)
+    plt.close(fig)
+    log(f"draw-site: {out}")
 
 
 def _palette_png(path: Path, colours: int = 64):
@@ -1221,8 +1310,17 @@ def stage_report(data: Path, repo: Path, draw: bool):
             twin["phenomenon"], twin["why"] = s["phenomenon"], s["why"]
             log(f"report: curated {s['name']} merged into sampled {twin['name']}")
     sites = merged
+    labels_f = Path(__file__).with_name("form_labels.json")
+    labels = {}
+    if labels_f.exists():
+        labels = {(r["name"], r["cc"].upper()): r
+                  for r in json.loads(labels_f.read_text(encoding="utf-8"))["labels"]}
     for s in sites:
         s["spec"] = map_to_spec(s)
+        lab = labels.get((s["name"], s["cc"].upper()))
+        if lab is not None:
+            s["spec"]["label_form"] = lab["label_form"]
+            s["spec"]["label_confidence"] = lab["confidence"]
     usable = [s for s in sites if s["morph"].get("usable")]
     corr = {}
     for ek in ENV_AXES:
@@ -1321,7 +1419,9 @@ def stage_terrain(data: Path, repo: Path, names: list[str], half_m: float = 450.
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=["pool", "relief", "select", "morph", "report", "terrain", "all"])
+    ap.add_argument("stage", choices=["pool", "relief", "select", "morph", "report", "terrain", "draw-site", "all"])
+    ap.add_argument("--name", default="", help="draw-site: one site name")
+    ap.add_argument("--out", type=Path, default=Path("site.png"), help="draw-site: output png")
     ap.add_argument("--names", default="", help="terrain: comma-separated site names")
     ap.add_argument("--data", required=True, type=Path)
     ap.add_argument("--repo", required=True, type=Path)
@@ -1344,6 +1444,8 @@ def main():
             stage_morph(a.data, a.sample, a.curated_only)
         elif st == "report":
             stage_report(a.data, a.repo, not a.no_draw)
+        elif st == "draw-site":
+            stage_draw_site(a.data, a.repo, a.name, a.out)
         elif st == "terrain":
             stage_terrain(a.data, a.repo, [n.strip() for n in a.names.split(",") if n.strip()], a.half, a.source)
 

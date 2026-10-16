@@ -13,6 +13,7 @@ not to average it, measured so that the generator can be compared with it.
 | `docs/images/settlements/settlement_sheet_*.png` | every measured site drawn at one scale: buildings, streets, paths, water, walls, contours |
 | `tools/settlements/survey.py` | the pipeline that makes both, from public data, cached |
 | `tools/settlements/curated_sites.json` | the hand-picked unusual sites and the phenomenon each covers |
+| `tools/settlements/form_labels.json` | a hand label for every site: which form it really is, how sure, and why |
 | `tests/suites/village_world_sample_suite.gd` | suite `vworld`: keeps the coverage, maps every site to a spec, reports the gaps |
 
 ```
@@ -96,9 +97,17 @@ most footprint near the centre; most arrangement measures are taken on it.
 Then each site is mapped to the **nearest** `VillageSpec` (population from
 the body's buildings, culture by country, purpose and water from what is
 there, a wall if one is mapped), its arrangement is named in the generator's
-own words (`street`, `green`, `crossroads`, `round`, `strand`, `planted`, or
-`dispersed`, which no spec can ask for), and every feature that no spec can
-express is listed under `unsupported`.
+the owner's vocabulary (`street`, `green`, `crossroads`, `round`, `planted`,
+`gate`, `shore`, `hillside`, `dispersed`, `crest`, `valley`, `water`; see
+VILLAGE_TERRAIN.md, Decisions; the old `strand` is now `shore`), and every
+feature that no spec can express is listed under `unsupported`. The form is
+fitted to the hand labels below: ground and water are read first (stilts and
+islands, a walled compact place above its surroundings, a ribbon on a valley
+floor), then the street grid, then steep ground (terraces or a perch), then
+dispersion, then a row along a shore, then the plan of the body. `gate` is
+never returned: it needs a manor at the head of the street, which no measure
+sees. `survey.py draw-site --name <name> --out <png>` draws one site at full
+size from the cache, for judging a label.
 
 ## What the set says
 
@@ -160,16 +169,20 @@ alone explain little of the street pattern; the ground does.
 **Where the generator stands** (`vworld`'s report). Mapping every site to its
 nearest `VillageSpec`:
 
-* **103 of 109** have a feature no spec can say. By frequency: slope 46,
-  stairs 37, bridges 34, dispersed 34, contour streets 33, vertical span 32,
+* **101 of 109** have a feature no spec can say. By frequency: slope 46,
+  stairs 37, bridges 34, contour streets 33, vertical span 32, dispersed 25,
   island 22, tunnel 21, beyond the 500-person scale 21, lake shore 16,
   polar 14, waterfront 10, crest 8, altitude 8, valley floor 5, over water 2.
 * **The form the spec derives matches the measured one for 2 of 109.**
   `VillageSpec._derive_form` reads only population, purpose and culture, and
   `gate` wins at 200 people, so most real places come out `gate` whatever
-  their ground. The measured labels are a heuristic (below), but the
-  disagreement is not: nothing in the spec can say *hillside*, *lake shore*
-  or *several hamlets*.
+  their ground. Against the hand labels it matches 2 of 109 (1 of 84 at
+  high or medium confidence, `strand` read as `shore`): nothing in the spec
+  can say *hillside*, *lake shore* or *several hamlets*.
+* The gap list is unchanged in its rules. The new forms do not close any gap,
+  because `VillageSpec` cannot yet be asked for them. Its `dispersed` entry
+  follows the fitted form, so it fell from 34 to 25 sites, and the sites with
+  any gap from 103 to 101.
 
 The first job this points at is the ground. See
 [VILLAGE_TERRAIN.md](VILLAGE_TERRAIN.md): the exporter now reads a real
@@ -190,12 +203,45 @@ height grid and reports how it lies under every lot, building and road, and
 * **Bathymetry is clipped.** Mapzen includes the sea floor. Below −30 m is
   sea level; on a coast all negatives are sea level; inland a shallow
   negative is kept (polders, Siwa).
-* **The form names are a heuristic.** They put the place in the
-  generator's vocabulary so the two can be compared; they are not a
-  morphological classification of record, and they miss: Satemin, the
-  textbook Rundling, reads `crossroads`; Monpazier, the textbook bastide,
-  reads `street` because its modern ribbon stretches the body; Shibam reads
-  `planted`. Trust the measurements over the label.
+* **The labels are one person's judgement, and the classifier is fitted to
+  them.** `tools/settlements/form_labels.json` holds a hand label for all 114
+  sites (the 5 unmeasured ones from knowledge, all `low`), judged from the
+  drawn map with the curated `phenomenon` as context; for a modern town
+  whose old core is still readable, the old core. Confidence is the
+  labeller's: 41 high, 45 medium, 28 low (the low ones are thin maps, modern
+  sprawl round a small old core, or a form the 700 m disc cannot show). The
+  rules in `classify_form` are on metrics only, but their thresholds were
+  chosen to fit these labels, so the agreement below is a fit, not a held-out
+  test. Add labels and re-check before trusting it on new sites.
+
+  Agreement of `nearest_form` with `label_form`, over the 109 measured
+  sites: **73 of 84 (87 %) at high or medium confidence, 80 of 109 (73 %)
+  over all** (39 of 40 at high). Before the refit, with the old six-name
+  heuristic: 24 of 91 and 27 of 109 (the 91 counted seven sites since
+  re-rated `low`). The old rules had missed Satemin (`crossroads`), Monpazier
+  (`street`) and Shibam (`planted`); the new ones get Satemin and Monpazier
+  right and still read Shibam as `crest`.
+
+  | label \ nearest | street | crossroads | round | planted | shore | hillside | dispersed | crest | valley | water | green | n |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | street | 2 | 1 | . | 1 | . | . | . | . | . | . | . | 4 |
+  | crossroads | . | 4 | . | 1 | . | . | . | . | . | . | . | 5 |
+  | round | . | . | 1 | . | . | . | 1 | 1 | . | . | . | 3 |
+  | planted | . | 1 | . | 18 | . | . | . | . | . | . | . | 19 |
+  | shore | . | 1 | 1 | . | 9 | 1 | 1 | . | . | . | . | 13 |
+  | hillside | . | 2 | . | . | 1 | 12 | 2 | . | . | . | . | 17 |
+  | dispersed | 2 | . | . | 2 | . | . | 18 | . | . | . | 1 | 23 |
+  | crest | . | . | 1 | . | . | 2 | 1 | 7 | . | . | . | 11 |
+  | valley | . | 1 | . | . | 1 | 1 | 2 | . | 4 | . | . | 9 |
+  | water | . | . | . | . | . | . | . | . | . | 5 | . | 5 |
+
+  Label counts (all 114): dispersed 23, hillside 20, planted 19, shore 13,
+  crest 11, valley 9, water 6, crossroads 5, street 4, round 4; no site is
+  labelled `green` or `gate`. The weak classes are the ones the disc cannot
+  show: a valley whose floor is only a few degrees of slope (Koshi,
+  Haldenstein, Longyearbyen, Setenil), an old core inside a modern town
+  (Aït Benhaddou, Beni Isguen, Siwa), and terraced hamlets that read as
+  scatter (Batad, Göreme). `vworld` reports both agreements as notes.
 * **Tiny bodies give noise.** Under about eight buildings the ratios mean
   nothing (Abra Pampa's "coverage" is 12.5); such sites are `dispersed`.
 * **DEM holes.** At Kangaatsiaq and Uummannaq (Greenland) the elevation

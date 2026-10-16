@@ -27,7 +27,15 @@ const MIN_OVER_WATER := 2     # over_water_share >= 0.05 (Ganvie, Kampong Ayer)
 const MIN_HIGH := 2           # elev_m >= 3000
 const MIN_POLAR := 2          # |lat| >= 66
 const MIN_DISPERSED := 3      # nearest_form == dispersed
-const MIN_FORMS := 6          # distinct nearest_form values
+## The owner's vocabulary (VILLAGE_TERRAIN.md, Decisions) is twelve forms and
+## the fitted classifier uses eleven of them (`gate` needs a manor no measure
+## sees); the old six-form floor would pass a classifier that never said
+## hillside, shore, crest, valley or water. Nine keeps the new names in.
+const MIN_FORMS := 9          # distinct nearest_form values
+## Hand labels (tools/settlements/form_labels.json), copied into spec.label_form.
+const MIN_LABELLED := 100     # measured sites carrying a label_form
+## The spec's old `strand` is the owner's `shore` (the vocabulary folded it in).
+const FORM_ALIAS := {"strand": "shore"}
 
 
 static func run() -> SuiteResult:
@@ -116,6 +124,12 @@ static func _specs(res: SuiteResult, measured: Array) -> void:
 	var confusion := {}
 	var gaps := {}
 	var sites_with_gaps := 0
+	var labelled := 0
+	var near_agree := 0
+	var near_agree_hm := 0
+	var labelled_hm := 0
+	var derived_agree := 0
+	var derived_agree_hm := 0
 	for i in range(measured.size()):
 		var s: Dictionary = measured[i]
 		var m: Dictionary = s["spec"]
@@ -134,6 +148,17 @@ static func _specs(res: SuiteResult, measured: Array) -> void:
 		var derived := String(spec.form)
 		if real == derived:
 			agree += 1
+		if m.has("label_form"):
+			var label := String(m["label_form"])
+			var firm: bool = String(m.get("label_confidence", "low")) != "low"
+			var derived_v := String(FORM_ALIAS.get(derived, derived))
+			labelled += 1
+			near_agree += int(real == label)
+			derived_agree += int(derived_v == label)
+			if firm:
+				labelled_hm += 1
+				near_agree_hm += int(real == label)
+				derived_agree_hm += int(derived_v == label)
 		var key := "%s->%s" % [real, derived]
 		confusion[key] = int(confusion.get(key, 0)) + 1
 		var unsupported: Array = m["unsupported"]
@@ -142,6 +167,14 @@ static func _specs(res: SuiteResult, measured: Array) -> void:
 		for g in unsupported:
 			var tag := String(g).get_slice(":", 0)
 			gaps[tag] = int(gaps.get(tag, 0)) + 1
+	res.checked += 1
+	if labelled < MIN_LABELLED:
+		res.fail("only %d measured sites carry a label_form, the set needs %d" % [labelled, MIN_LABELLED])
+	else:
+		res.note("labels: nearest_form (the survey's classifier) matches label_form for %d of %d labelled sites, %d of %d at high or medium confidence"
+			% [near_agree, labelled, near_agree_hm, labelled_hm])
+		res.note("labels: the spec-derived VillageSpec.form (strand read as shore) matches label_form for %d of %d labelled sites, %d of %d at high or medium confidence"
+			% [derived_agree, labelled, derived_agree_hm, labelled_hm])
 	res.note("form agreement: the spec derives the measured form for %d of %d sites" % [agree, measured.size()])
 	var keys := confusion.keys()
 	keys.sort_custom(func(a, b): return confusion[a] > confusion[b])
