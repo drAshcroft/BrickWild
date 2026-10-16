@@ -32,6 +32,24 @@ var compact_display: bool = false
 var decoration_level: float = 0.5
 ## Village-only condition of buildings, from worn/slum to clean.
 var upkeep: float = 1.0
+## Falling ground under a house, shop or church (VTER-HOUSE-SLOPE).
+## `ground_fall_m` is the total fall, in metres, across the building's
+## requested width x length rectangle (centred on the origin): the height of
+## its uphill-most corner above its downhill-most one -- the exporter's
+## `buildings[].ground.span_m`. `ground_downhill_deg` is the way the ground
+## falls, in the building's LOCAL frame, in degrees clockwise seen from above
+## with the front at the top: 0 = downhill toward the front (local -Z, where
+## the door is), 90 = toward local +X, 180 = toward the back (+Z), 270 =
+## toward -X. It is not a compass bearing; subtract the building's own yaw.
+##
+## The building keeps its floor where a flat one has it: local y = 0 is the
+## ground at the UPHILL edge, so a caller places the origin there. Default
+## 0 / 0 is flat ground, and both fields are left out of to_dict() then, so
+## every request written before them reads and writes byte for byte the same.
+## A fall the family cannot stand on is refused by validate() with
+## `ground_too_steep`; other kinds refuse any fall with `unsupported_option`.
+var ground_fall_m: float = 0.0
+var ground_downhill_deg: float = 0.0
 var _decode_errors: Array[Dictionary] = []
 
 const SCHEMA := "brickwild.request"
@@ -53,6 +71,10 @@ func to_dict() -> Dictionary:
 		out["decoration_level"] = decoration_level
 	if upkeep != 1.0:
 		out["upkeep"] = upkeep
+	if ground_fall_m != 0.0:
+		out["ground_fall_m"] = ground_fall_m
+	if ground_downhill_deg != 0.0:
+		out["ground_downhill_deg"] = ground_downhill_deg
 	return out
 
 
@@ -100,7 +122,7 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 			out.compact_display = data["compact_display"]
 		else:
 			out._decode_errors.append(_field_error("compact_display", "must be a boolean"))
-	for field in ["decoration_level", "upkeep"]:
+	for field in ["decoration_level", "upkeep", "ground_fall_m", "ground_downhill_deg"]:
 		if not data.has(field):
 			continue
 		var value: Variant = data[field]
@@ -201,6 +223,8 @@ func copy() -> BuildingRequest:
 	out.compact_display = compact_display
 	out.decoration_level = decoration_level
 	out.upkeep = upkeep
+	out.ground_fall_m = ground_fall_m
+	out.ground_downhill_deg = ground_downhill_deg
 	out.orientation = orientation
 	out.period = period
 	out._decode_errors = _decode_errors.duplicate(true)

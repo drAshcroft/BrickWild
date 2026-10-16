@@ -96,6 +96,12 @@ var material: StringName = &"timber" # timber | stone
 ## Site frame metadata. These do not participate in seeded plan generation.
 var orientation: float = 0.0
 var period: int = 1200
+## Falling ground (VTER-HOUSE-SLOPE): metres of fall across the footprint and
+## the downhill direction in the house's own frame (0 = toward the front, -Z;
+## 90 = toward +X). Zero is flat ground, and a flat house is untouched. Never
+## drawn from `rng`. See GroundFall and HouseSlope.
+var ground_fall: float = 0.0
+var ground_downhill_deg: float = 0.0
 ## Optional explicit masonry thickness for non-house shells.  Castle plans
 ## carry their measured shell thickness here; the negative value preserves the
 ## historical material-derived default for ordinary houses.

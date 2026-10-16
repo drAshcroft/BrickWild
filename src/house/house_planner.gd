@@ -33,8 +33,13 @@ static func plan(spec: HouseSpec, world_family: StringName = &"") -> HousePlan:
 	demote_unlit(p)
 	if spec.storeys > 1:
 		HousePlanLevels.clone_upper_storeys(p, spec)
+	# More than a storey of fall: the downhill side stands a storey clear of
+	# the ground, and the house gets a bank storey there (HouseSlope band 3).
+	if HouseSlope.band(spec) >= 3:
+		spec.cellars = maxi(spec.cellars, 1)
 	if spec.cellars > 0:
 		HousePlanLevels.dig_cellars(p, spec)
+		HouseSlope.add_undercroft_door(p, spec)
 	# Upper-floor naming and daylight repairs can change room kinds. Keep the
 	# programme annotations attached to what the finished plan actually is.
 	HousePlanRooms.refresh_domestic_metadata(p)

@@ -13,6 +13,11 @@ var length: float = 20.0    # nave length (Z), before tower/apse additions
 var height: float = 12.0    # wall height to eaves, meters
 var orientation: float = 0.0
 var period: int = 1200
+## Falling ground (VTER-HOUSE-SLOPE): metres of fall across the requested
+## width x length and the downhill direction (0 = toward the west front, -Z;
+## 90 = toward +X). Zero is flat. The builder answers with a terrace.
+var ground_fall: float = 0.0
+var ground_downhill_deg: float = 0.0
 
 # ---- derived from seed + style ----
 var variant_name: String
