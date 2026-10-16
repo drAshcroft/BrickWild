@@ -64,7 +64,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"tree", "bridge", "windmill", "dungeon"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi", "vworld", "vterrain", "vshape", "vground", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
+const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi", "vworld", "vterrain", "vshape", "vanalysis", "vground", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "vis009", "vis010", "vis016", "catalogcache",
@@ -446,6 +446,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_shape_suite.gd").run()
 		"vterrain":
 			return preload("res://tests/suites/village_terrain_suite.gd").run()
+		"vanalysis":
+			return preload("res://tests/suites/village_site_analysis_suite.gd").run()
 		"vground":
 			return preload("res://tests/village_ground_test.gd").run()
 		"vdecoration":
