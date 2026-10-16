@@ -32,7 +32,9 @@ var compact_display: bool = false
 var decoration_level: float = 0.5
 ## Village-only condition of buildings, from worn/slum to clean.
 var upkeep: float = 1.0
-## Falling ground under a house, shop or church (VTER-HOUSE-SLOPE).
+## Falling ground under a house, shop or church (VTER-HOUSE-SLOPE), or a
+## castle (VTER-CASTLE-SLOPE: a revetted platform, at most
+## CastleGeometry.SLOPE_MAX_FALL; a sky citadel refuses any fall).
 ## `ground_fall_m` is the total fall, in metres, across the building's
 ## requested width x length rectangle (centred on the origin): the height of
 ## its uphill-most corner above its downhill-most one -- the exporter's

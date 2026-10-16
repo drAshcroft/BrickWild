@@ -384,11 +384,30 @@ the flat shell is all still there, triangle for triangle.
 1.2 m wider, held by a coursed `terrace_wall` and paved (`terrace_paving`,
 top at -0.03), with a west flight from the terrace edge. Its ceiling is 6 m.
 
-**Castles take no ground yet** (`unsupported_option`). Measured: the lowest
-masonry of a Norman castle is at y = 0, so on any fall its downhill wall foot
-would be in the air. The batter widens the wall foot but does not carry any
-masonry below the floor line. A castle needs its own terrace or a sloped wall
-foot; that is not a trivial change, so it is left open.
+**A castle** stands on a revetted PLATFORM (VTER-CASTLE-SLOPE,
+`src/castle/castle_slope.gd`; sizes in `CastleGeometry.SLOPE_*`). Measured
+first: every mass of a Norman castle stands at y = 0, so on any fall its
+downhill wall foot was in the air. Nothing above y = 0 moves; per part:
+
+| part | model | why |
+|---|---|---|
+| curtain, towers, gatehouse, barbican | a stepped TALUS (`talus_course`, one host `talus_<edge>` per run): 0.8 m thick at the top, each 0.30 m course set out 0.075 m (1 in 4) further, its outer foot on the ground | the revetted scarp a castle on a hillside is built on; it runs round the union of every grounded part grown by 0.5 m, so it follows the curtain's battered foot and wraps each tower |
+| bailey | filled to the castle's ground and paved (`platform_paving`, top at -0.03) behind the talus: retaining wall plus fill | a ward that followed the slope would put the keep, ranges, wall stairs and yard on different levels, and the castle geometry has one ground per ward |
+| keep, hall, chapel, yard buildings, props | on the filled bailey | the keep's plinth is the terrace |
+| house and manor tiers (the hold, the village's seat), tower house | a terrace: the convex hull of the parts, so the forecourt between the wings is paved | a manor on a levelled platform with its court on it |
+| the entrance | the platform runs 2.5 m in front of the gate or porch; a flight (`entry_landing`, `entry_step`, host `entry_gate`) goes from its edge to the ground, straight out or along the front, whichever is shortest | the gate is reached on the level and the flight obeys GroundFall's riser and tread |
+
+The ceiling is `CastleGeometry.SLOPE_MAX_FALL` = 6 m (and 1 in 2 across the
+requested rectangle): beyond it `validate()` refuses with `ground_too_steep`.
+A sky citadel refuses any fall (`unsupported_option`); a water castle (only
+reachable by `plan_override`) emits no platform and says so with an error.
+Suite: `cslope` (the 40 x 50 manor seat, the 12 x 14 hold, a 60 x 90 Norman
+motte-and-bailey, at 1.0 / 2.5 / 4.0 m, front-to-back and sideways).
+
+Not yet: the castle walk export (`CastleWalkSources`) does not publish the
+entrance flight as `route_m` -- the flight is planned from the built outline,
+and the walk export never builds the mesh; a castle's `ground_apron`
+(off by default) still lies flat at y = 0; the flight is steps, not a ramp.
 
 **Walking.** The flights are in the walk export: `BrickWild.navigation()`
 adds `route_m` (threshold, landing, each tread, the foot on the ground) to a

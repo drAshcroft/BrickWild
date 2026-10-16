@@ -125,6 +125,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | rich-house trim, its bound, its rules | `lane:rich` | see docs/RICH_HOUSES.md |
 | prop code or assembly | `lane:assets-fast` | 40 s host |
 | anything under `assets/props/` or `catalog.json` | rebuild catalogue, then `lane:assets` | required exception: over 5 m |
+| a castle on falling ground (`src/castle/castle_slope.gd`, `SLOPE_*`) | `cslope`, then `lane:castle-change` | ~4 m host |
 | castle geometry and openings | `lane:castle-change` | 310 s host (1 Oct; over the 5 m gate under load) |
 | temple geometry | `lane:temple` | 52 s host; with `lane:church-change`, tree and bridge, 230 s together |
 | village site, lots, plan rules | `lane:village-fast` | 2.5 m host, green, 10 checks |

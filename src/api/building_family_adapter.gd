@@ -855,7 +855,8 @@ static func _copy_size_and_style(request: BuildingRequest, spec: RefCounted) -> 
 static func _copy_orientation_and_period(request: BuildingRequest, spec: RefCounted) -> void:
 	spec.set("orientation", request.orientation)
 	spec.set("period", request.period)
-	# Only the specs that declare the ground take it (house, shop, church);
+	# Only the specs that declare the ground take it (house, shop, church,
+	# castle);
 	# validate() has already refused a fall for any other kind.
 	if "ground_fall" in spec:
 		spec.set("ground_fall", request.ground_fall_m)
