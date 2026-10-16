@@ -128,6 +128,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | castle geometry and openings | `lane:castle-change` | 310 s host (1 Oct; over the 5 m gate under load) |
 | temple geometry | `lane:temple` | 52 s host; with `lane:church-change`, tree and bridge, 230 s together |
 | village site, lots, plan rules | `lane:village-fast` | 2.5 m host, green, 10 checks |
+| `qa/village_shape.gd` or `survey.py` `measure()` | `vshape`, then `tools/shape_parity.gd` + `tools/settlements/shape_parity.py` | see docs/SETTLEMENT_TESTSET.md |
 | `VillageTerrain`, the exporter's `ground` output | `vterrain` | ~70 s host, 74+ checks; see docs/VILLAGE_TERRAIN.md |
 | the world settlement set, `tools/settlements/` | `vworld` | seconds; see docs/SETTLEMENT_TESTSET.md |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |

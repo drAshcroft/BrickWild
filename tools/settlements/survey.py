@@ -692,13 +692,18 @@ def clusters(cent: np.ndarray, link: float):
     return k, lab
 
 
-def measure(site, dem: Dem, geo: dict):
+def measure(site, dem: Dem, geo: dict, radius: float = RADIUS_M, min_buildings: int = MIN_BUILDINGS):
+    """Every arrangement metric of one site. `radius` is the disc measured
+    about the local origin and `min_buildings` the fewest that make a site
+    worth judging; both default to the survey's own and are parameters so a
+    generated plan (`measure-plan`) is measured by THIS function, unchanged,
+    rather than by a copy. qa/village_shape.gd is its GDScript port."""
     from scipy.spatial import cKDTree
     B = geo["buildings"]
-    disc = Point(0, 0).buffer(RADIUS_M, 64)
+    disc = Point(0, 0).buffer(radius, 64)
     B = [p for p in B if disc.contains(p.centroid)]
     m: dict = {"osm_buildings": len(B)}
-    if len(B) < MIN_BUILDINGS:
+    if len(B) < min_buildings:
         m["usable"] = False
         return m, None
     m["usable"] = True
@@ -1417,14 +1422,176 @@ def stage_terrain(data: Path, repo: Path, names: list[str], half_m: float = 450.
         log(f"terrain: {f} {doc['cols']}x{doc['rows']} relief {sub.max() - sub.min():.0f} m")
 
 
+# ------------------------------------------------------------ measure-plan
+
+# A generated village, measured by `measure()` exactly as a real one is. The
+# SitePlan (tools/export_village_plan.gd) is in PLAN axes: x east, second
+# coordinate +Z SOUTH. The survey is x east, y NORTH, so every plan point is
+# (x, -z) here. qa/village_shape.gd ports this conversion and `measure()`;
+# tools/shape_parity.gd holds the two to the same numbers.
+
+PLAN_NODE_TOL_M = 0.5      # road vertices closer than this are one junction node
+PLAN_FLAT_STEP_M = 10.0    # the flat DEM's spacing when a plan has no terrain
+PLAN_DISC_MARGIN_M = 25.0  # the disc reaches this far past the farthest building
+PLAN_WORSHIP = ("church", "temple")   # a shrine is a small church request
+
+
+def _seg_closest(p, a, b):
+    """The point of segment ab nearest p, and its parameter t in [0, 1]."""
+    d = (b[0] - a[0], b[1] - a[1])
+    L2 = d[0] * d[0] + d[1] * d[1]
+    t = 0.0 if L2 <= 0.0 else max(0.0, min(1.0, ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / L2))
+    return (a[0] + d[0] * t, a[1] + d[1] * t), t
+
+
+def _seg_cross(a, b, c, d):
+    """Proper crossing of ab and cd: (point, t on ab, u on cd) or None."""
+    r = (b[0] - a[0], b[1] - a[1])
+    s = (d[0] - c[0], d[1] - c[1])
+    den = r[0] * s[1] - r[1] * s[0]
+    if abs(den) < 1e-12:
+        return None
+    qp = (c[0] - a[0], c[1] - a[1])
+    t = (qp[0] * s[1] - qp[1] * s[0]) / den
+    u = (qp[0] * r[1] - qp[1] * r[0]) / den
+    if 0.0 < t < 1.0 and 0.0 < u < 1.0:
+        return (a[0] + r[0] * t, a[1] + r[1] * t), t, u
+    return None
+
+
+def plan_road_network(lines, tol=PLAN_NODE_TOL_M):
+    """OSM ways share a node where they meet; plan roads are bare polylines.
+    Give them the same topology: a road's vertex within `tol` of another
+    road's segment, and two segments that cross, put a vertex on both; then
+    vertices within `tol` of an earlier one are that node. Returns, per road,
+    its vertex list (junctions included) and its node ids, consecutive
+    repeats dropped. Deterministic: roads, segments and vertices in plan order."""
+    ins = [[] for _ in lines]          # per road: (segment index, t, point)
+    for i, li in enumerate(lines):
+        for j, lj in enumerate(lines):
+            if i == j:
+                continue
+            for v in li:
+                for k in range(len(lj) - 1):
+                    q, t = _seg_closest(v, lj[k], lj[k + 1])
+                    if math.hypot(q[0] - v[0], q[1] - v[1]) <= tol:
+                        ins[j].append((k, t, q))
+            if j > i:
+                for a in range(len(li) - 1):
+                    for b in range(len(lj) - 1):
+                        hit = _seg_cross(li[a], li[a + 1], lj[b], lj[b + 1])
+                        if hit is not None:
+                            ins[i].append((a, hit[1], hit[0]))
+                            ins[j].append((b, hit[2], hit[0]))
+    out_pts = []
+    for i, li in enumerate(lines):
+        pts = [tuple(li[0])]
+        for k in range(len(li) - 1):
+            for _, _, q in sorted((x for x in ins[i] if x[0] == k), key=lambda x: x[1]):
+                if (math.hypot(q[0] - pts[-1][0], q[1] - pts[-1][1]) > tol
+                        and math.hypot(q[0] - li[k + 1][0], q[1] - li[k + 1][1]) > tol):
+                    pts.append(tuple(q))
+            pts.append(tuple(li[k + 1]))
+        out_pts.append(pts)
+    nodes: list[tuple] = []
+    out_ids = []
+    for pts in out_pts:
+        ids = []
+        for p in pts:
+            nid = next((n for n, q in enumerate(nodes) if math.hypot(q[0] - p[0], q[1] - p[1]) <= tol), -1)
+            if nid < 0:
+                nid = len(nodes)
+                nodes.append(p)
+            if not ids or ids[-1] != nid:
+                ids.append(nid)
+        out_ids.append(ids)
+    return out_pts, out_ids
+
+
+def plan_dem(terrain: dict | None, terrain_dir: Path | None, radius: float) -> Dem:
+    """The survey's Dem from a `brickwild.terrain` grid (its rows run SOUTH,
+    so they are flipped to the survey's north-up order), or flat zeros over
+    the disc when the plan has no ground."""
+    if terrain is None:
+        half = radius + PLAN_FLAT_STEP_M
+        xs = np.arange(-half, half + 0.1, PLAN_FLAT_STEP_M)
+        return Dem(xs, xs.copy(), np.zeros((len(xs), len(xs))))
+    cols, rows, cell = int(terrain["cols"]), int(terrain["rows"]), float(terrain["cell_m"])
+    if "heights_m" in terrain:
+        h = np.asarray(terrain["heights_m"], dtype=float)
+    else:
+        h = np.fromfile(terrain_dir / terrain["file"], dtype="<f4").astype(float)
+    h = h.reshape(rows, cols)
+    ox, oz = float(terrain["origin_m"][0]), float(terrain["origin_m"][1])
+    xs = ox + cell * np.arange(cols)
+    ys = -(oz + cell * np.arange(rows))[::-1]        # north = -z, ascending
+    return Dem(xs, ys, h[::-1, :].copy())
+
+
+def plan_geo(plan: dict) -> tuple[dict, float]:
+    """A SitePlan as the `geo` dict `parse_site()` makes from OpenStreetMap,
+    in the survey frame, and the disc radius that holds the whole site."""
+    def xy(pts):
+        return [(float(p[0]), -float(p[1])) for p in pts]
+
+    b, worship = [], []
+    for row in plan.get("buildings", []):
+        poly = Polygon(xy(row["poly_m"]))
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty:
+            continue
+        b.append(poly)
+        if str(row.get("kind", "")) in PLAN_WORSHIP:
+            worship.append(poly.centroid)
+    b = [p for p in b if p.area >= 6.0]       # parse_site's own floor
+    rows = [r for r in plan.get("roads", []) if len(r.get("points_m", [])) >= 2]
+    pts, ids = plan_road_network([xy(r["points_m"]) for r in rows])
+    water_poly = [Polygon(xy(w["poly_m"])).buffer(0) for w in plan.get("water", []) if len(w["poly_m"]) >= 3]
+    water_poly = [w for w in water_poly if not w.is_empty]
+    roads, paths = [], []
+    for r, p, n in zip(rows, pts, ids):
+        c = str(r.get("class", ""))
+        hw = "steps" if "steps" in c else c     # the class IS the highway tag
+        ln = LineString(p)
+        item = {"line": ln, "nodes": n, "hw": hw,
+                # a road that crosses water is a bridge (or a ford)
+                "bridge": any(ln.intersects(w) for w in water_poly), "tunnel": False,
+                "steps": hw == "steps"}
+        (paths if hw in MINOR_PATH else roads).append(item)
+    squares = [Polygon(xy(c["poly_m"])).buffer(0) for c in plan.get("commons", []) if len(c["poly_m"]) >= 3]
+    walls = [LineString([(0, 0), (1, 0)])] if str(plan.get("enclosure", "")) == "wall" else []
+    geo = {"buildings": b, "roads": roads, "paths": paths, "water_poly": water_poly,
+           "water_line": [], "coast": [], "walls": walls, "worship": worship,
+           "squares": [s for s in squares if not s.is_empty], "piers": []}
+    far = max((math.hypot(p.centroid.x, p.centroid.y) for p in b), default=0.0)
+    return geo, far + PLAN_DISC_MARGIN_M
+
+
+def stage_measure_plan(plan_path: Path, terrain_path: Path | None, out: Path):
+    """`measure()` on a generated SitePlan: no network, no cache."""
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    terrain = json.loads(terrain_path.read_text(encoding="utf-8")) if terrain_path else None
+    geo, radius = plan_geo(plan)
+    dem = plan_dem(terrain, terrain_path.parent if terrain_path else None, radius)
+    m, _ = measure(None, dem, geo, radius=radius, min_buildings=1)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(m, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    log(f"measure-plan: {plan_path.name}{' on ' + terrain_path.name if terrain_path else ' flat'}: "
+        f"{m.get('osm_buildings')} buildings, disc {radius:.0f} m -> {out}")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=["pool", "relief", "select", "morph", "report", "terrain", "draw-site", "all"])
+    ap.add_argument("stage", choices=["pool", "relief", "select", "morph", "report", "terrain", "draw-site",
+                                      "all", "measure-plan"])
     ap.add_argument("--name", default="", help="draw-site: one site name")
-    ap.add_argument("--out", type=Path, default=Path("site.png"), help="draw-site: output png")
     ap.add_argument("--names", default="", help="terrain: comma-separated site names")
-    ap.add_argument("--data", required=True, type=Path)
-    ap.add_argument("--repo", required=True, type=Path)
+    ap.add_argument("--data", type=Path, help="every stage but measure-plan")
+    ap.add_argument("--repo", type=Path, help="every stage but measure-plan")
+    ap.add_argument("--plan", type=Path, help="measure-plan: a SitePlan JSON")
+    ap.add_argument("--terrain", type=Path, help="measure-plan: the brickwild.terrain grid it stands on")
+    ap.add_argument("--out", type=Path, help="measure-plan: metrics JSON; draw-site: png (default site.png)")
     ap.add_argument("--per-stratum", type=int, default=10)
     ap.add_argument("--sample", type=int, default=SAMPLE_N)
     ap.add_argument("--source", default="mapzen", choices=["mapzen", "srtm30m", "aster30m"])
@@ -1432,6 +1599,13 @@ def main():
     ap.add_argument("--no-draw", action="store_true")
     ap.add_argument("--curated-only", action="store_true")
     a = ap.parse_args()
+    if a.stage == "measure-plan":
+        if a.plan is None or a.out is None:
+            ap.error("measure-plan needs --plan and --out")
+        stage_measure_plan(a.plan, a.terrain, a.out)
+        return
+    if a.data is None or a.repo is None:
+        ap.error(f"{a.stage} needs --data and --repo")
     stages = ["pool", "relief", "select", "morph", "report"] if a.stage == "all" else [a.stage]
     for st in stages:
         if st == "pool":
@@ -1445,7 +1619,7 @@ def main():
         elif st == "report":
             stage_report(a.data, a.repo, not a.no_draw)
         elif st == "draw-site":
-            stage_draw_site(a.data, a.repo, a.name, a.out)
+            stage_draw_site(a.data, a.repo, a.name, a.out or Path("site.png"))
         elif st == "terrain":
             stage_terrain(a.data, a.repo, [n.strip() for n in a.names.split(",") if n.strip()], a.half, a.source)
 
