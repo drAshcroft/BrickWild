@@ -216,10 +216,12 @@ func _check_well(plan: VillagePlan) -> void:
 				failures.append("well: building %d stands %.1fm from the well, wants %.0f" % [i, d, VillageLotPlanner.well_clearance(plan.spec)])
 				break
 		var pathed := false
-		for r in plan.roads_of_class(&"path"):
+		# on given ground a footway too steep for a path is steps (VTER-ROADS)
+		var footways: Array[int] = plan.roads_of_class(&"path") + plan.roads_of_class(&"steps")
+		for r in footways:
 			if VillageMeasure.point_to_polyline(pos, plan.roads[r]["points"]) <= 2.0:
 				pathed = true
-		if not pathed and not plan.roads_of_class(&"path").is_empty():
+		if not pathed and not footways.is_empty():
 			failures.append("well: no path reaches the well at %v" % pos)
 
 

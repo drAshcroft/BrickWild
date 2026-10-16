@@ -38,6 +38,13 @@ var water_level_m := NAN
 ## Where the ground came from, for the plan's notes: "inline", a file name,
 ## "sampler", "flat".
 var source := ""
+## Set only on a VILLAGE-FRAME view (`sited_view`, VTER-SITING): the caller's
+## ground this view was resampled from, and where the village frame lies on
+## it -- a village point p is the caller's point `site_anchor + p.rotated(site_yaw)`.
+## Null / zero on every grid a caller made.
+var parent: VillageTerrain = null
+var site_anchor := Vector2.ZERO
+var site_yaw := 0.0
 
 var _errors: Array[String] = []
 var _min := INF
@@ -254,6 +261,31 @@ func gradient_at(p: Vector2) -> Vector2:
 	var e := cell_m * 0.5
 	return Vector2(height_at(p + Vector2(e, 0)) - height_at(p - Vector2(e, 0)),
 		height_at(p + Vector2(0, e)) - height_at(p - Vector2(0, e))) / (2.0 * e)
+
+
+## The ground in a village's own frame (VTER-SITING): this grid resampled
+## over `rect` of the VILLAGE frame at `p_cell_m`, where village point p is
+## this grid's point `anchor + p.rotated(yaw)`. The planners lay their
+## axis-aligned site out in that frame; the plan carries the anchor and yaw.
+## Outside this grid the edge is held, as in `height_at`.
+func sited_view(anchor: Vector2, yaw: float, rect: Rect2, p_cell_m: float) -> VillageTerrain:
+	var c := cos(yaw)
+	var s := sin(yaw)
+	var view := VillageTerrain.from_sampler(func(x: float, y: float) -> float:
+			return height_at(anchor + Vector2(x * c - y * s, x * s + y * c)),
+		rect, p_cell_m, water_level_m)
+	view.source = source
+	view.parent = self
+	view.site_anchor = anchor
+	view.site_yaw = yaw
+	return view
+
+
+## A village-frame point on the caller's grid; the identity on a caller's own.
+func to_parent(p: Vector2) -> Vector2:
+	if parent == null:
+		return p
+	return site_anchor + p.rotated(site_yaw)
 
 
 ## Rise over run at a point: 0.1 is a 10 % grade, 1.0 is 45 degrees.

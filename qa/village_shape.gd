@@ -15,7 +15,8 @@ extends RefCounted
 ## (x, z) with +z south is (x, -z) here, so a bearing (0 = north, clockwise)
 ## means the same thing on both sides.
 ##
-## The ground: `plan.spec.terrain` when there is one, flat zero otherwise.
+## The ground: `plan.terrain()` -- the sited view in the plan's frame, or the
+## spec's own -- when there is one, flat zero otherwise.
 ## Heights are `VillageTerrain.height_at` (the survey's Dem is the same
 ## bilinear surface). Slopes are NOT `gradient_at`: the survey takes
 ## `np.gradient` over the grid NODES (central inside, one-sided at the edge)
@@ -43,7 +44,8 @@ const MINOR_PATH: Array[String] = ["footway", "path", "steps", "cycleway", "brid
 
 ## Every survey metric of one plan, the survey's keys.
 static func measure(plan: VillagePlan) -> Dictionary:
-	var terrain: VillageTerrain = plan.spec.terrain if plan.spec != null else null
+	# the ground in the plan's own frame when the village was sited on it
+	var terrain: VillageTerrain = plan.terrain()
 	return measure_geo(geo_of(plan), Ground.new(terrain))
 
 

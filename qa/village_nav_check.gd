@@ -431,14 +431,15 @@ func _check_paths(plan: VillagePlan) -> void:
 		if b["placement"].has("approach"):
 			if _approach_clearance(plan, b) < PATH_WIDTH:
 				pinched.append("%d (courtyard approach)" % i)
-	var paths: Array[int] = plan.roads_of_class(&"path")
+	# a stair is a footway too: it must be as clear as a path (VTER-ROADS)
+	var paths: Array[int] = plan.roads_of_class(&"path") + plan.roads_of_class(&"steps")
 	stats["paths"] = paths.size()
 	for r in paths:
 		var pts: PackedVector2Array = plan.roads[r]["points"]
 		for k in range(pts.size() - 1):
 			var wide: float = _grid.clearance_along(pts[k], pts[k + 1], 3.0)
 			if wide < PATH_WIDTH:
-				pinched.append("path %d (%.1fm)" % [r, wide])
+				pinched.append("%s %d (%.1fm)" % [String(plan.roads[r]["class"]), r, wide])
 				break
 	stats["pinched_paths"] = pinched.size()
 	if not pinched.is_empty():
