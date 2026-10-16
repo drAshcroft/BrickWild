@@ -309,7 +309,7 @@ static func _strand_bank(plan: VillagePlan, ctx: Dictionary) -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	var walk: WalkGrid = ctx["strand_walk"]
 	for water in plan.water:
-		if water["kind"] != &"coast":
+		if water["kind"] not in [&"coast", &"lake"]:
 			continue
 		# The working strand includes rear yards within the documented
 		# eighteen-metre bank reach, not only the water polygon's corners.

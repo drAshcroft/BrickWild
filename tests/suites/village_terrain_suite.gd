@@ -282,6 +282,12 @@ static func _exporter(res: SuiteResult) -> void:
 		for row in hilly[key]:
 			row.erase("ground")
 	hilly.erase("ground")
+	# with ground the SitePlan also says which form the ground derived
+	# (VTER-FORM-DERIVE); a flat one never does
+	res.checked += 1
+	if String(hilly.get("form_intent", "")) != String(plan.spec.form_intent) or flat.has("form_intent"):
+		res.fail("exporter: form_intent is missing with ground, or present without it")
+	hilly.erase("form_intent")
 	res.checked += 1
 	# both sides went through one parse: JSON reads every number back as a float
 	if JSON.stringify(hilly, "\t", true) != JSON.stringify(flat, "\t", true):

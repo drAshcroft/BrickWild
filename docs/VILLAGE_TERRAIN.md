@@ -19,7 +19,8 @@ not use it yet. That is the second half, below.
 | the spec's ground | `VillageSpec.terrain` (null = flat, as before) |
 | the exporter | `tools/export_village_plan.gd`: `terrain.height` in the request, or `--terrain <grid.json>` |
 | the suite | `vterrain`: refusals, three readers agreeing, a known plane, a cliff under a plot, real ground, the exporter |
-| real ground | `tests/fixtures/terrain/` (Manarola, Limone sul Garda, Varennes), written by `tools/settlements/survey.py terrain` |
+| real ground | `tests/fixtures/terrain/` (Manarola, Limone sul Garda, Varennes), written by `tools/settlements/survey.py terrain`; `world90/`, every measured world site, by `survey.py terrain-world` |
+| the form from the ground | `VillageSpec.read_ground` / `_derive_form_on_ground`, `form_intent`, `FORM_FALLBACK`; see "The form", below |
 
 ```
 godot --headless --path . --script res://tests/run_all.gd -- vterrain    # ~70 s; the hamlet plan is the cost
@@ -236,6 +237,93 @@ carry as `water_level_m`):
 | Satemin, Giethoorn | flat 100 % |
 | Castelmezzano, Masouleh, Èze | open_slope 93–96 % |
 | Rocamadour | open_slope 68 %, flat 20 %, valley_floor 8 %, crest 3 % |
+
+## The form: derived from the ground (VTER-FORM-DERIVE)
+
+Decision 2, in code. `VillageSpec.generate()` with `terrain` reads the ground
+once (`VillageSpec.read_ground`: a `VillageSiteAnalysis` over the planner's
+site, `form_window_m()` = `requested_site_m` clamped to 120–400 m, at a 20 m
+cell or half the terrain cell) and derives the form from it. **Without
+terrain the old rule runs unchanged** — `gate` at 200 people included — and
+`form_intent` is simply `form`. `compact_display` is still `planted`.
+
+The reading: class shares over the window, the median and p75 slope of the
+dry cells, the level (≤ `CART_MAX`) regions, the window's relief, the
+centre's TPI and its **rank** (the share of the ground within 350 m lower
+than it), and water: the window's wet share, the wider ground's (450 m) wet
+share and the distance from the centre to the nearest wet ground.
+
+First row that holds wins:
+
+| # | the ground and the spec | form |
+|---|---|---|
+| 1 | half the window is wet (`FORM_DROWNED` 0.5): the DEM drowns the site, it stands at the edge | shore |
+| 2 | ≥ 40 % of the ground within 450 m is wet (`FORM_WATER_ROUND`) | water |
+| 3 | the centre ≥ 9 m over its 30–150 m ring and over ≥ 75 % of the ground within 350 m | crest |
+| 4 | water `coast` or `lake`, and wet ground within 350 m of the centre | shore |
+| 5 | water `river` or `lake`, p75 dry slope ≥ 0.25 (steep sides), centre below 55 % of its ground | valley |
+| 6 | median dry slope ≥ 0.17, purpose farming/forest, and population < 150 or ≥ 3 separate level shelves | dispersed |
+| 7 | median dry slope ≥ 0.17 | hillside |
+| 8 | (level ground from here) purpose garrison | gate |
+| 9 | water `lake`, purpose fishing | water |
+| 10 | water `coast`, purpose fishing | shore |
+| 11 | purpose crossroads | crossroads |
+| 12 | anything else (market on level ground included) | planted |
+
+Population enters only at row 6. On level ground the survey's real villages
+read `planted` at every size from 12 people to 500; the flat rule's `gate` at
+200 people is a flat-world habit the ground replaces.
+
+**Fitted, and how well.** The thresholds were fitted on the 109 measured
+world sites, each on its own cached 90 m ground (below), against the hand
+labels in `tools/settlements/form_labels.json`. Agreement of `form_intent`
+with `label_form`: **48 of 84 (57 %) at high or medium confidence, 54 of
+109 overall**; the flat rule managed 1 of 84 and 2 of 109. Moving any one
+threshold ±20 % keeps it at 54–57 %. `vworld` fails under 52 %. No rule names
+a site. The rest of the confusion is mostly flat ground: 9 of the 17 firm
+`dispersed` labels and 3 of the 4 `street` labels stand on ground as level as
+the `planted` ones, and nothing in the ground or the seven inputs tells them
+apart (the survey's own classifier sees the buildings; the spec does not).
+
+**Fallback until each form has a planner.** `VillageSitePlanner` lays the
+seven old forms only. `form_intent` keeps the derived form; `form` is what is
+planned, through `VillageSpec.FORM_FALLBACK`:
+
+| intent | planned as | why |
+|---|---|---|
+| hillside | street | the one-street row a contour street will replace |
+| valley | street | a ribbon along the through road, as a valley village is |
+| crest | round | houses ringed round the top's common |
+| shore | strand | one row facing the water |
+| water | strand | the row along the water the stilts will stand in |
+| dispersed | green | the loosest planned form: lots round a large common |
+
+Each VTER-FORM-* task that gives a form its planner deletes that form's one
+line in `FORM_FALLBACK`. The exporter writes `form_intent` beside `form`
+(only with ground, so a flat SitePlan's bytes never change) and adds a note:
+`the ground derives the 'hillside' form, which has no planner yet; planned as
+'street' (form_intent keeps 'hillside')`.
+
+**`lake`.** A new `water` kind: standing fresh water along one side.
+`VillageWaterPlan` lays it as it lays a coast (a shore band, kind `lake`);
+the mill race and the strand's boats treat it as a coast.
+
+**The world ground.** `tests/fixtures/terrain/world90/<slug>.json` (+
+`index.json`, name → file) holds the cached mapzen 90 m grid, ±450 m, of every
+measured site, written by `survey.py terrain-world --data <survey dir> --repo .`.
+It runs OFFLINE: a cache miss skips the site and names it, never fetches.
+Coastal sites (coast within 3 km, or in the measured disc) stand at
+`water_level_m` 0; a site with ≥ 15 ha of adjacent water that is not coastal
+is a lake shore at the lowest grid height + 0.5 m, and its `about` says
+`; lake:` — that is how `vworld` gives its spec `water = lake`. At 90 m most
+of that water lies beyond the window, so the spec's `water` carries most of
+the water evidence; a finer grid will let the ground say more.
+
+```
+python -I -X utf8 tools/settlements/survey.py terrain-world --data <survey dir> --repo .
+godot --headless --path . --script res://tools/dump_form_ground.gd   # the readings the rule was fitted on
+godot --headless --path . --script res://tests/run_all.gd -- vworld
+```
 
 ## Not yet: planning on the ground
 
