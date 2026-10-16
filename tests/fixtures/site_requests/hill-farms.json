@@ -1,0 +1,28 @@
+{
+  "schema": "dmv.site.request",
+  "schema_version": 1,
+  "world_id": "genesis-000001-1024",
+  "which": "story-1",
+  "node": 7,
+  "cell": 271043,
+  "seed": 4242,
+  "regime": "royal",
+  "terrain": {
+    "elevation": 0.7,
+    "slope": 0.2,
+    "water_edges": [],
+    "forest": 0.3,
+    "fertility": 0.5,
+    "rock": "granite"
+  },
+  "site_m": 400,
+  "city_id": "site:city-0060",
+  "name": "Hill Farms",
+  "population": 60,
+  "wealth": 300.0,
+  "culture": "alpine",
+  "tongue": "",
+  "buildings": {
+    "granary": 0.5
+  }
+}

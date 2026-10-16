@@ -131,14 +131,13 @@ const FORM_VOCABULARY: Array[StringName] = [&"street", &"green", &"crossroads", 
 ##   crest     -> round   houses ringed round the top's common
 ##   shore     -> strand  one row facing the water
 ##   water     -> strand  the row along the water the stilts will stand in
-##   dispersed -> green   the loosest planned form: lots round a large common
+## (`dispersed` has its planner: VillageDispersedForm, VTER-FORM-DISPERSED.)
 const FORM_FALLBACK := {
 	&"hillside": &"street",
 	&"valley": &"street",
 	&"crest": &"round",
 	&"shore": &"strand",
 	&"water": &"strand",
-	&"dispersed": &"green",
 }
 ## The terrain form rule's thresholds (`_derive_form_on_ground`). Fitted on
 ## the 109 measured world sites against their hand labels and stable under
