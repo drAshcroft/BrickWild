@@ -1,0 +1,802 @@
+{
+ "labels": [
+  {
+   "name": "Kangaatsiaq",
+   "cc": "GL",
+   "label_form": "shore",
+   "confidence": "medium",
+   "note": "houses scatter round a rocky shore and inlet"
+  },
+  {
+   "name": "Lelu",
+   "cc": "FM",
+   "label_form": "shore",
+   "confidence": "low",
+   "note": "island settlement strung along a lagoon edge"
+  },
+  {
+   "name": "Øksfjord",
+   "cc": "NO",
+   "label_form": "shore",
+   "confidence": "medium",
+   "note": "ribbon between fjord and slope"
+  },
+  {
+   "name": "Lugar de Guene",
+   "cc": "CV",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "a few houses spread over steep ground"
+  },
+  {
+   "name": "Sunndalsøra",
+   "cc": "NO",
+   "label_form": "crossroads",
+   "confidence": "low",
+   "note": "modern industrial river town; old core small"
+  },
+  {
+   "name": "Varennes",
+   "cc": "CA",
+   "label_form": "planted",
+   "confidence": "high",
+   "note": "modern suburban street grid"
+  },
+  {
+   "name": "Ifalik Village",
+   "cc": "FM",
+   "label_form": "dispersed",
+   "confidence": "medium",
+   "note": "atoll houses spread thinly"
+  },
+  {
+   "name": "Ganvié",
+   "cc": "BJ",
+   "label_form": "water",
+   "confidence": "high",
+   "note": "stilt town filling a lagoon"
+  },
+  {
+   "name": "Pakil",
+   "cc": "PH",
+   "label_form": "street",
+   "confidence": "high",
+   "note": "one road with a dense row of houses"
+  },
+  {
+   "name": "Sfântu Gheorghe",
+   "cc": "RO",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "regular grid of streets by the canal port"
+  },
+  {
+   "name": "Kisinga",
+   "cc": "UG",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "farms scattered on a steep hillside"
+  },
+  {
+   "name": "Ust-Nera",
+   "cc": "RU",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "Soviet-era block grid"
+  },
+  {
+   "name": "Cayumba",
+   "cc": "PE",
+   "label_form": "dispersed",
+   "confidence": "low",
+   "note": "too few mapped buildings to show a nucleus"
+  },
+  {
+   "name": "Hauknes",
+   "cc": "NO",
+   "label_form": "hillside",
+   "confidence": "medium",
+   "note": "rows stepping along contours above a fjord"
+  },
+  {
+   "name": "Lake Argyle",
+   "cc": "AU",
+   "label_form": "dispersed",
+   "confidence": "low",
+   "note": "small modern cluster, few buildings"
+  },
+  {
+   "name": "Limone sul Garda",
+   "cc": "IT",
+   "label_form": "shore",
+   "confidence": "medium",
+   "note": "lakeside town, steep slope behind"
+  },
+  {
+   "name": "Santa Brígida",
+   "cc": "ES",
+   "label_form": "dispersed",
+   "confidence": "low",
+   "note": "loose houses and one industrial block"
+  },
+  {
+   "name": "Mailag",
+   "cc": "PH",
+   "label_form": "crossroads",
+   "confidence": "low",
+   "note": "thin scatter round two crossing roads"
+  },
+  {
+   "name": "Tofta",
+   "cc": "SE",
+   "label_form": "dispersed",
+   "confidence": "medium",
+   "note": "loose houses on a road net"
+  },
+  {
+   "name": "Baños",
+   "cc": "EC",
+   "label_form": "planted",
+   "confidence": "high",
+   "note": "rectangular grid"
+  },
+  {
+   "name": "Zýgi",
+   "cc": "CY",
+   "label_form": "shore",
+   "confidence": "medium",
+   "note": "small harbour village on the coast road"
+  },
+  {
+   "name": "Vermont",
+   "cc": "VC",
+   "label_form": "valley",
+   "confidence": "medium",
+   "note": "ribbon along a stream under steep sides"
+  },
+  {
+   "name": "Moose Wilson Road",
+   "cc": "US",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "rural estates along a road"
+  },
+  {
+   "name": "Naujaat",
+   "cc": "CA",
+   "label_form": "shore",
+   "confidence": "low",
+   "note": "small modern community on a bay"
+  },
+  {
+   "name": "Vijayapuri North",
+   "cc": "IN",
+   "label_form": "planted",
+   "confidence": "low",
+   "note": "small planned colony grid"
+  },
+  {
+   "name": "Mount Crested Butte",
+   "cc": "US",
+   "label_form": "dispersed",
+   "confidence": "medium",
+   "note": "resort houses on contour loops"
+  },
+  {
+   "name": "Giglio Castello",
+   "cc": "IT",
+   "label_form": "crest",
+   "confidence": "high",
+   "note": "walled compact village on a hilltop"
+  },
+  {
+   "name": "Koshi",
+   "cc": "JP",
+   "label_form": "valley",
+   "confidence": "medium",
+   "note": "houses in a narrow valley along a stream"
+  },
+  {
+   "name": "Bir Lehlou",
+   "cc": "EH",
+   "label_form": "dispersed",
+   "confidence": "low",
+   "note": "almost no buildings, radiating tracks"
+  },
+  {
+   "name": "Usenge",
+   "cc": "KE",
+   "label_form": "dispersed",
+   "confidence": "medium",
+   "note": "scattered compounds with a loose centre"
+  },
+  {
+   "name": "Haldenstein",
+   "cc": "CH",
+   "label_form": "valley",
+   "confidence": "medium",
+   "note": "old core small, band along the Rhine under steep sides"
+  },
+  {
+   "name": "Urzhum",
+   "cc": "RU",
+   "label_form": "planted",
+   "confidence": "high",
+   "note": "regular rectangular street grid"
+  },
+  {
+   "name": "Posillipo",
+   "cc": "IT",
+   "label_form": "hillside",
+   "confidence": "high",
+   "note": "terraced steep coastal slope"
+  },
+  {
+   "name": "Jargalant",
+   "cc": "MN",
+   "label_form": "valley",
+   "confidence": "medium",
+   "note": "ribbon along a stream on a slope"
+  },
+  {
+   "name": "Akutan",
+   "cc": "US",
+   "label_form": "shore",
+   "confidence": "medium",
+   "note": "row along a bay in a narrow valley"
+  },
+  {
+   "name": "Gangotri",
+   "cc": "IN",
+   "label_form": "valley",
+   "confidence": "low",
+   "note": "small cluster along a river in a gorge"
+  },
+  {
+   "name": "Guanshan",
+   "cc": "TW",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "grid of streets, thin building"
+  },
+  {
+   "name": "Bălan",
+   "cc": "RO",
+   "label_form": "valley",
+   "confidence": "high",
+   "note": "long ribbon along a river under slopes"
+  },
+  {
+   "name": "Bakel",
+   "cc": "SN",
+   "label_form": "crossroads",
+   "confidence": "medium",
+   "note": "organic dense town beside the river"
+  },
+  {
+   "name": "Namyang",
+   "cc": "KP",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "parallel rows of regular housing"
+  },
+  {
+   "name": "Aoloau",
+   "cc": "AS",
+   "label_form": "shore",
+   "confidence": "low",
+   "note": "coastal row along one road"
+  },
+  {
+   "name": "Río Campo",
+   "cc": "GQ",
+   "label_form": "dispersed",
+   "confidence": "medium",
+   "note": "a few separate clusters"
+  },
+  {
+   "name": "Killaloe",
+   "cc": "IE",
+   "label_form": "crossroads",
+   "confidence": "low",
+   "note": "river town on a slope round a bridge"
+  },
+  {
+   "name": "Desaguadero",
+   "cc": "BO",
+   "label_form": "planted",
+   "confidence": "high",
+   "note": "rectangular grid"
+  },
+  {
+   "name": "Malaeimi",
+   "cc": "AS",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "houses scattered over a wide area"
+  },
+  {
+   "name": "Priozersk",
+   "cc": "KZ",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "grid of wide streets with large blocks"
+  },
+  {
+   "name": "Sainte-Rose",
+   "cc": "RE",
+   "label_form": "street",
+   "confidence": "medium",
+   "note": "ribbon along a road on a slope"
+  },
+  {
+   "name": "Kugluktuk",
+   "cc": "CA",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "compact grid-like modern community"
+  },
+  {
+   "name": "Villa Vásquez",
+   "cc": "DO",
+   "label_form": "planted",
+   "confidence": "high",
+   "note": "dense rectangular grid"
+  },
+  {
+   "name": "Bastelica",
+   "cc": "FR",
+   "label_form": "hillside",
+   "confidence": "medium",
+   "note": "houses along contour roads on a steep slope"
+  },
+  {
+   "name": "Klyuchi",
+   "cc": "RU",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "grid of streets and large buildings"
+  },
+  {
+   "name": "Kampung Kundassang",
+   "cc": "MY",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "scattered hamlets on a ridge"
+  },
+  {
+   "name": "Yungay",
+   "cc": "PE",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "rebuilt on a grid after the 1970 earthquake"
+  },
+  {
+   "name": "Rubanda",
+   "cc": "UG",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "scattered farms on steep hills"
+  },
+  {
+   "name": "Doringbaai",
+   "cc": "ZA",
+   "label_form": "dispersed",
+   "confidence": "low",
+   "note": "two clusters along one road"
+  },
+  {
+   "name": "Lweeza",
+   "cc": "UG",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "houses scattered round wetland"
+  },
+  {
+   "name": "Noord",
+   "cc": "AW",
+   "label_form": "dispersed",
+   "confidence": "medium",
+   "note": "loose suburban scatter"
+  },
+  {
+   "name": "Paimboeuf",
+   "cc": "FR",
+   "label_form": "shore",
+   "confidence": "medium",
+   "note": "old town as a front along the Loire estuary"
+  },
+  {
+   "name": "Cheung Sha Wan Estate",
+   "cc": "HK",
+   "label_form": "planted",
+   "confidence": "high",
+   "note": "modern urban grid"
+  },
+  {
+   "name": "Urausunai",
+   "cc": "JP",
+   "label_form": "dispersed",
+   "confidence": "low",
+   "note": "a few houses along a road"
+  },
+  {
+   "name": "Gariep Dam",
+   "cc": "ZA",
+   "label_form": "crest",
+   "confidence": "low",
+   "note": "planned dam town on a hill"
+  },
+  {
+   "name": "Abra Pampa",
+   "cc": "AR",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "grid of streets, thinly built"
+  },
+  {
+   "name": "Le Noirmont",
+   "cc": "CH",
+   "label_form": "crossroads",
+   "confidence": "medium",
+   "note": "nucleus at a road junction, hillside beyond"
+  },
+  {
+   "name": "Comandante Luis Piedrabuena",
+   "cc": "AR",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "grid of streets, thinly built"
+  },
+  {
+   "name": "Manarola",
+   "cc": "IT",
+   "label_form": "hillside",
+   "confidence": "high",
+   "note": "cliff terraces stepping down a narrow gully"
+  },
+  {
+   "name": "Civita di Bagnoregio",
+   "cc": "IT",
+   "label_form": "crest",
+   "confidence": "high",
+   "note": "compact village on an eroding mesa"
+  },
+  {
+   "name": "Castelmezzano",
+   "cc": "IT",
+   "label_form": "hillside",
+   "confidence": "high",
+   "note": "houses clinging to the slope under pinnacles"
+  },
+  {
+   "name": "Setenil de las Bodegas",
+   "cc": "ES",
+   "label_form": "valley",
+   "confidence": "medium",
+   "note": "houses along the gorge under overhanging rock"
+  },
+  {
+   "name": "Rocamadour",
+   "cc": "FR",
+   "label_form": "hillside",
+   "confidence": "high",
+   "note": "terraced up a cliff face"
+  },
+  {
+   "name": "Oia",
+   "cc": "GR",
+   "label_form": "crest",
+   "confidence": "medium",
+   "note": "strip along a caldera rim"
+  },
+  {
+   "name": "Monemvasia",
+   "cc": "GR",
+   "label_form": "hillside",
+   "confidence": "medium",
+   "note": "walled lower town stepping down a rock slope"
+  },
+  {
+   "name": "Le Mont-Saint-Michel",
+   "cc": "FR",
+   "label_form": "crest",
+   "confidence": "medium",
+   "note": "compact walled village on a tidal rock cone"
+  },
+  {
+   "name": "Hallstatt",
+   "cc": "AT",
+   "label_form": "shore",
+   "confidence": "high",
+   "note": "row on a lake shore under a mountain"
+  },
+  {
+   "name": "Giethoorn",
+   "cc": "NL",
+   "label_form": "street",
+   "confidence": "medium",
+   "note": "houses in a ribbon along a canal"
+  },
+  {
+   "name": "Hogebeintum",
+   "cc": "NL",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "a terp and a few farms"
+  },
+  {
+   "name": "Kampong Ayer",
+   "cc": "BN",
+   "label_form": "water",
+   "confidence": "high",
+   "note": "stilt houses over a river"
+  },
+  {
+   "name": "Masouleh",
+   "cc": "IR",
+   "label_form": "hillside",
+   "confidence": "high",
+   "note": "terraced mountain village, roofs are streets (not measured)"
+  },
+  {
+   "name": "Kandovan",
+   "cc": "IR",
+   "label_form": "hillside",
+   "confidence": "medium",
+   "note": "houses carved in rock cones on a valley side"
+  },
+  {
+   "name": "Abyaneh",
+   "cc": "IR",
+   "label_form": "hillside",
+   "confidence": "medium",
+   "note": "stepped village on a valley side (not measured)"
+  },
+  {
+   "name": "Shibam",
+   "cc": "YE",
+   "label_form": "round",
+   "confidence": "medium",
+   "note": "dense walled block of tower houses on a mound"
+  },
+  {
+   "name": "Aït Benhaddou",
+   "cc": "MA",
+   "label_form": "hillside",
+   "confidence": "low",
+   "note": "old ksar stepping up its hill; the measured body is the modern ribbon beside it"
+  },
+  {
+   "name": "Ghadames",
+   "cc": "LY",
+   "label_form": "round",
+   "confidence": "low",
+   "note": "roofed compact old town (map is poor)"
+  },
+  {
+   "name": "Siwa",
+   "cc": "EG",
+   "label_form": "crest",
+   "confidence": "low",
+   "note": "old core compact on a rock; the measured body is the modern town"
+  },
+  {
+   "name": "Beni Isguen",
+   "cc": "DZ",
+   "label_form": "hillside",
+   "confidence": "low",
+   "note": "old ksar terraced up a hill; the measured body is the modern grid beside it"
+  },
+  {
+   "name": "Tireli",
+   "cc": "ML",
+   "label_form": "hillside",
+   "confidence": "low",
+   "note": "granaries scattered up an escarpment foot"
+  },
+  {
+   "name": "Djenné",
+   "cc": "ML",
+   "label_form": "water",
+   "confidence": "high",
+   "note": "town filling an island of the floodplain"
+  },
+  {
+   "name": "Ushguli",
+   "cc": "GE",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "several hamlets under the peaks"
+  },
+  {
+   "name": "La Rinconada",
+   "cc": "PE",
+   "label_form": "hillside",
+   "confidence": "high",
+   "note": "dense terraced mining town on a steep valley side"
+  },
+  {
+   "name": "Ollantaytambo",
+   "cc": "PE",
+   "label_form": "planted",
+   "confidence": "medium",
+   "note": "Inca grid in the valley"
+  },
+  {
+   "name": "Uummannaq",
+   "cc": "GL",
+   "label_form": "hillside",
+   "confidence": "low",
+   "note": "houses climbing a rocky island; DEM is a hole here"
+  },
+  {
+   "name": "Longyearbyen",
+   "cc": "NO",
+   "label_form": "valley",
+   "confidence": "medium",
+   "note": "town along a valley floor between steep sides"
+  },
+  {
+   "name": "Reine",
+   "cc": "NO",
+   "label_form": "shore",
+   "confidence": "high",
+   "note": "row along a fjord shore on islets"
+  },
+  {
+   "name": "Gásadalur",
+   "cc": "FO",
+   "label_form": "crest",
+   "confidence": "low",
+   "note": "small cluster on a cliff-top"
+  },
+  {
+   "name": "Edinburgh of the Seven Seas",
+   "cc": "SH",
+   "label_form": "shore",
+   "confidence": "low",
+   "note": "rows on a ledge over the sea"
+  },
+  {
+   "name": "Shirakawa-go",
+   "cc": "JP",
+   "label_form": "valley",
+   "confidence": "high",
+   "note": "houses along a river valley floor"
+  },
+  {
+   "name": "Batad",
+   "cc": "PH",
+   "label_form": "hillside",
+   "confidence": "low",
+   "note": "hamlets among rice terraces; could read as dispersed"
+  },
+  {
+   "name": "Monpazier",
+   "cc": "FR",
+   "label_form": "planted",
+   "confidence": "high",
+   "note": "textbook bastide grid"
+  },
+  {
+   "name": "Satemin",
+   "cc": "DE",
+   "label_form": "round",
+   "confidence": "high",
+   "note": "textbook Rundling"
+  },
+  {
+   "name": "Monteriggioni",
+   "cc": "IT",
+   "label_form": "crest",
+   "confidence": "high",
+   "note": "walled ring on a hilltop"
+  },
+  {
+   "name": "Lehde",
+   "cc": "DE",
+   "label_form": "water",
+   "confidence": "medium",
+   "note": "houses on islands between canals"
+  },
+  {
+   "name": "Kampong Phluk",
+   "cc": "KH",
+   "label_form": "street",
+   "confidence": "medium",
+   "note": "stilt houses in one long row along a creek"
+  },
+  {
+   "name": "Oymyakon",
+   "cc": "RU",
+   "label_form": "dispersed",
+   "confidence": "high",
+   "note": "scattered houses on a wide plain"
+  },
+  {
+   "name": "Göreme",
+   "cc": "TR",
+   "label_form": "hillside",
+   "confidence": "low",
+   "note": "houses and cave dwellings up a valley side; the map shows one scatter"
+  },
+  {
+   "name": "Matmata",
+   "cc": "TN",
+   "label_form": "dispersed",
+   "confidence": "medium",
+   "note": "pit and cave houses scattered"
+  },
+  {
+   "name": "Kibber",
+   "cc": "IN",
+   "label_form": "hillside",
+   "confidence": "medium",
+   "note": "small cluster on a slope"
+  },
+  {
+   "name": "Bonifacio",
+   "cc": "FR",
+   "label_form": "crest",
+   "confidence": "high",
+   "note": "walled old town on a sea-cliff promontory"
+  },
+  {
+   "name": "Positano",
+   "cc": "IT",
+   "label_form": "hillside",
+   "confidence": "high",
+   "note": "terraced amphitheatre down to the sea"
+  },
+  {
+   "name": "Èze",
+   "cc": "FR",
+   "label_form": "crest",
+   "confidence": "high",
+   "note": "perched village on a spur"
+  },
+  {
+   "name": "Isola dei Pescatori",
+   "cc": "IT",
+   "label_form": "water",
+   "confidence": "high",
+   "note": "small lake island filled edge to edge"
+  },
+  {
+   "name": "Acoma Pueblo",
+   "cc": "US",
+   "label_form": "crest",
+   "confidence": "high",
+   "note": "compact pueblo on a mesa top"
+  },
+  {
+   "name": "Perast",
+   "cc": "ME",
+   "label_form": "shore",
+   "confidence": "high",
+   "note": "one long row along a bay under steep slopes"
+  },
+  {
+   "name": "Hongcun",
+   "cc": "CN",
+   "label_form": "round",
+   "confidence": "low",
+   "note": "planned water village round a pond (not measured; from knowledge)"
+  },
+  {
+   "name": "Zhouzhuang",
+   "cc": "CN",
+   "label_form": "water",
+   "confidence": "low",
+   "note": "canal town (not measured; from knowledge)"
+  },
+  {
+   "name": "Guoliang",
+   "cc": "CN",
+   "label_form": "hillside",
+   "confidence": "low",
+   "note": "cliff-shelf village (not measured; from knowledge)"
+  }
+ ]
+}
