@@ -682,6 +682,17 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		# ground, so a flat request's bytes never change
 		out["form_intent"] = String(plan.spec.form_intent)
 		_add_ground(out, plan)
+	if not plan.hamlets.is_empty():
+		# a dispersed village's hamlets (VillageDispersedForm); no other form
+		# has any, so no other plan's bytes change
+		var hamlets: Array = []
+		for i in range(plan.hamlets.size()):
+			var h: Dictionary = plan.hamlets[i]
+			var seat: Vector2 = h["seat"]
+			hamlets.append({"seat_m": [_n(seat.x), _n(seat.y)], "common": int(h["common"]),
+				"spine_road": VillageDispersedForm.spine_of(plan, i), "households": int(h["households"]),
+				"main": bool(h["main"]), "ground_m2": _n(Poly.area(h["ground"]))})
+		out["hamlets"] = hamlets
 	return out
 
 

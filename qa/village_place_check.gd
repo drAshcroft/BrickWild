@@ -208,7 +208,11 @@ func _check_well(plan: VillagePlan) -> void:
 	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
 	for w in wells:
 		var pos: Vector2 = w["pos"]
-		if not common.is_empty() and not Poly.contains_point(common, pos):
+		# a dispersed village has a well on every hamlet's common
+		var on_common: bool = common.is_empty()
+		for c in plan.commons:
+			on_common = on_common or Poly.contains_point(c["poly"], pos)
+		if not on_common:
 			failures.append("well: the well at %v is off the common" % pos)
 		for i in range(plan.buildings.size()):
 			var d: float = VillageMeasure.point_to_poly(pos, VillageMeasure.bounds_poly(plan.buildings[i]))
@@ -554,7 +558,9 @@ func _check_gradient(plan: VillagePlan) -> void:
 	for i in houses:
 		var fp: Rect2 = plan.buildings[i]["placement"]["footprint"]
 		areas.append(fp.size.x * fp.size.y)
-		dists.append(VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[i])).distance_to(cc))
+		var at: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[i]))
+		# in a dispersed village, from its own hamlet's common
+		dists.append(at.distance_to(_hamlet_seat(plan, at, cc)))
 	var rho: float = VillageMeasure.spearman(areas, dists)
 	stats["gradient"] = snappedf(rho, 0.01)
 	var want: float = GRADIENT_MAX if houses.size() >= 8 else 0.0
@@ -570,6 +576,15 @@ func _check_farms(plan: VillagePlan) -> void:
 		if (b["request"] as BuildingRequest).purpose != &"farmer":
 			continue
 		var c: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(b))
+		var reach_rect: Rect2 = plan.site
+		if not plan.hamlets.is_empty():
+			# a dispersed village's farms stand in their hamlets, among their
+			# fields: the edge a farm is measured to is its own hamlet's ground
+			var seat: Vector2 = _hamlet_seat(plan, c, c)
+			for h in plan.hamlets:
+				if Vector2(h["seat"]) == seat:
+					edge = h["ground"]
+			reach_rect = Poly.bounding_rect(edge)
 		var d: float = VillageMeasure.point_to_poly(c, edge) if not Poly.contains_point(edge, c) else _to_boundary(edge, c)
 		# Thirty metres, or a share of the site on a village whose ground has
 		# grown to hold its farms -- measured on the site's SHORTER side.
@@ -578,7 +593,7 @@ func _check_farms(plan: VillagePlan) -> void:
 		# inside a farm can get, and scaling by it let a farm stand dead
 		# centre and pass.
 		var reach: float = maxf(FARM_TO_EDGE,
-			minf(plan.site.size.x, plan.site.size.y) * 0.4)
+			minf(reach_rect.size.x, reach_rect.size.y) * 0.4)
 		if d > reach:
 			failures.append("farms: farm %d stands %.0fm inside the edge, wants <= %.0f" % [i, d, reach])
 		# the yard is behind the house: its back (local +Z) toward the edge
@@ -589,6 +604,19 @@ func _check_farms(plan: VillagePlan) -> void:
 			# yard toward the village: the edge is what matters, the yard
 			# side is worth saying
 			warnings.append("farms: farm %d turns its yard away from the fields" % i)
+
+
+## The seat (common centre) of the hamlet nearest `p` in a dispersed village;
+## `otherwise` for every other form.
+static func _hamlet_seat(plan: VillagePlan, p: Vector2, otherwise: Vector2) -> Vector2:
+	var best := otherwise
+	var best_d := INF
+	for h in plan.hamlets:
+		var d: float = p.distance_to(h["seat"])
+		if d < best_d:
+			best_d = d
+			best = h["seat"]
+	return best
 
 
 static func _to_boundary(poly: PackedVector2Array, p: Vector2) -> float:
