@@ -1,7 +1,7 @@
 {
  "schema": "brickwild.terrain",
  "schema_version": 1,
- "about": "Hallstatt: srtm30m terrain via OpenTopoData, 30 m grid about 47.56217, 13.64867; written by tools/settlements/survey.py terrain",
+ "about": "Hallstatt: srtm30m terrain via OpenTopoData, 30 m grid about 47.56217, 13.64867; written by tools/settlements/survey.py terrain; water_level_m 503 = the Hallstaetter See surface, which SRTM stores as level ground",
  "origin_m": [
   -800.0,
   -790.0
@@ -2926,5 +2926,6 @@
   503.0,
   503.0,
   503.0
- ]
+ ],
+ "water_level_m": 503.0
 }
