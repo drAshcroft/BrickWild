@@ -41,6 +41,11 @@ godot --headless --path . --script res://tests/run_all.gd -- vterrain    # ~70 s
    river under steep sides), `water` (stilts and islands).
 4. **Fixtures hold metrics and elevation grids only.** Raw OpenStreetMap
    geometry stays in the gitignored survey cache.
+6. **Grade caps by class** (2026-10-16, accepting VTER-ROADS' proposal):
+   through roads and lanes 12 % (carts); streets, tracks and paths 30 %
+   (walked and led, as hill-village streets are); steeper ways are `steps`.
+   A 12 % street on a 30 % hillside could only run along the contour; real
+   hill villages climb.
 5. **Cross-project changes are made here too:** BrickWild work may amend
    Dm_View's C1 contract and VoxelGames' city grounding directly, on
    branches, with their own tests run.
