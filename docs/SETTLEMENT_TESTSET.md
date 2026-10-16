@@ -179,6 +179,11 @@ nearest `VillageSpec`:
   their ground. Against the hand labels it matches 2 of 109 (1 of 84 at
   high or medium confidence, `strand` read as `shore`): nothing in the spec
   can say *hillside*, *lake shore* or *several hamlets*.
+  **With its ground (VTER-FORM-DERIVE)** the spec derives the form from the
+  land first: each site on its cached 90 m grid (`tests/fixtures/terrain/world90/`),
+  `form_intent` matches the label for 54 of 109, **48 of 84 (57 %)** at high
+  or medium confidence, and `vworld` fails under 52 %. The rule and its
+  confusion are in [VILLAGE_TERRAIN.md](VILLAGE_TERRAIN.md), "The form".
 * The gap list is unchanged in its rules. The new forms do not close any gap,
   because `VillageSpec` cannot yet be asked for them. Its `dispersed` entry
   follows the fitted form, so it fell from 34 to 25 sites, and the sites with

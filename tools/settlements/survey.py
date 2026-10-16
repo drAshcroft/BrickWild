@@ -77,6 +77,8 @@ class Cache:
         self.root = root / "cache"
         self.root.mkdir(parents=True, exist_ok=True)
         self.last: dict[str, float] = {}
+        # True: a miss raises CacheMiss instead of calling the network
+        self.offline = False
 
     def _path(self, kind: str, key: str) -> Path:
         h = hashlib.sha1(key.encode("utf-8")).hexdigest()[:20]
@@ -314,6 +316,10 @@ def stratified_candidates(pool, per_stratum, seed=7):
     return out, strata
 
 
+class CacheMiss(RuntimeError):
+    """An offline cache was asked for an answer it does not hold."""
+
+
 def fetch_elevations(cache: Cache, lats, lons, dataset: str = "mapzen") -> list[float]:
     """OpenTopoData `mapzen` (a global SRTM/ETOPO/GMTED composite, ~30-90 m),
     100 points per call, 1 call per second, cached per call. Open-Meteo's
@@ -327,6 +333,8 @@ def fetch_elevations(cache: Cache, lats, lons, dataset: str = "mapzen") -> list[
     for s in range(0, len(lats), 100):
         locs = "|".join(f"{a:.5f},{b:.5f}" for a, b in zip(lats[s:s + 100], lons[s:s + 100]))
         hit = cache.get(kind, locs)
+        if hit is None and cache.offline:
+            raise CacheMiss(f"{kind}: {len(lats[s:s + 100])} points not cached")
         if hit is None:
             for attempt in range(8):
                 cache.throttle("elev", 1.15)
@@ -1422,6 +1430,80 @@ def stage_terrain(data: Path, repo: Path, names: list[str], half_m: float = 450.
         log(f"terrain: {f} {doc['cols']}x{doc['rows']} relief {sub.max() - sub.min():.0f} m")
 
 
+def _slug(name: str) -> str:
+    return unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower().replace(" ", "_")
+
+
+LAKE_MIN_HA = 15.0     # adjacent_water_ha at or above this, not coastal: a lake shore
+
+
+def stage_terrain_world(data: Path, repo: Path, half_m: float = 450.0):
+    """The cached 90 m mapzen grid of EVERY measured site of the world fixture,
+    as `tests/fixtures/terrain/world90/<slug>.json` (VTER-FORM-DERIVE), so the
+    form can be derived from the real ground in `vworld`. OFFLINE: the cache
+    must already hold every call (`morph` made them); a site whose grid would
+    need the network is skipped and named, never fetched.
+
+    Water: a coastal site (coast_km < 3, or the coast inside the measured
+    disc) is clipped as the survey clips it and stands at water_level_m 0. A
+    site whose morph saw >= LAKE_MIN_HA of adjacent water and is not coastal
+    is a lake shore: its level is the lowest grid height + 0.5 m, a DEM
+    records a lake at its surface. Elevation only; no OSM geometry."""
+    cache = Cache(data)
+    cache.offline = True
+    fixture = json.loads((repo / "tests" / "fixtures" / "settlements" / "world_settlements.json")
+                         .read_text(encoding="utf-8"))
+    measured_by_id = {s["id"]: s for s in json.loads((data / "sites.json").read_text(encoding="utf-8"))}
+    out_dir = repo / "tests" / "fixtures" / "terrain" / "world90"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written, skipped, slugs = 0, [], {}
+    for s in fixture["sites"]:
+        m = s.get("morph", {})
+        if not m.get("usable", False):
+            continue
+        name = s["name"]
+        slug = _slug(name)
+        if slug in slugs:
+            slug = f"{slug}_{s['id']}"
+        slugs[slug] = name
+        src = measured_by_id.get(s["id"], s)     # the very lat/lon the morph stage asked for
+        lat, lon = float(src["lat"]), float(src["lon"])
+        coastal = float(s["env"].get("coast_km", 99.0)) < 3.0 or bool(m.get("coast_in_disc", False))
+        try:
+            dem = site_dem(cache, lat, lon, coastal)
+        except CacheMiss as e:
+            skipped.append(name)
+            log(f"terrain-world: {name} skipped, would need the network ({e})")
+            continue
+        keep_x = np.where(np.abs(dem.xs) <= half_m + 1e-6)[0]
+        keep_y = np.where(np.abs(dem.ys) <= half_m + 1e-6)[0]
+        sub = dem.z[np.ix_(keep_y, keep_x)][::-1, :]
+        xs = dem.xs[keep_x]
+        ys_plan = -dem.ys[keep_y][::-1]
+        about = (f"{name}: mapzen terrain via OpenTopoData, {DEM_STEP_M:.0f} m grid about {lat:.5f}, {lon:.5f}; "
+                 f"written from the survey cache by tools/settlements/survey.py terrain-world")
+        level = None
+        if coastal:
+            level = 0.0
+            about += "; coastal: the sea at 0 m"
+        elif float(m.get("adjacent_water_ha", 0.0)) >= LAKE_MIN_HA:
+            level = round(float(sub.min()) + 0.5, 2)
+            about += (f"; lake: {float(m['adjacent_water_ha']):.0f} ha of adjacent water in the survey, "
+                      f"water_level_m taken as the lowest grid height + 0.5 m")
+        doc = {"schema": "brickwild.terrain", "schema_version": 1, "about": about,
+               "origin_m": [float(xs[0]), float(ys_plan[0])], "cell_m": DEM_STEP_M,
+               "cols": int(len(xs)), "rows": int(len(ys_plan)),
+               "heights_m": [round(float(v), 2) for v in sub.ravel()]}
+        if level is not None:
+            doc["water_level_m"] = level
+        (out_dir / f"{slug}.json").write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
+        written += 1
+    index = {"about": "site name -> world90 grid; written by survey.py terrain-world", "sites":
+             {name: f"{slug}.json" for slug, name in slugs.items() if name not in skipped}}
+    (out_dir / "index.json").write_text(json.dumps(index, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    log(f"terrain-world: wrote {written} grids, skipped {len(skipped)}: {skipped}")
+
+
 # ------------------------------------------------------------ measure-plan
 
 # A generated village, measured by `measure()` exactly as a real one is. The
@@ -1583,7 +1665,7 @@ def stage_measure_plan(plan_path: Path, terrain_path: Path | None, out: Path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("stage", choices=["pool", "relief", "select", "morph", "report", "terrain", "draw-site",
+    ap.add_argument("stage", choices=["pool", "relief", "select", "morph", "report", "terrain", "terrain-world", "draw-site",
                                       "all", "measure-plan"])
     ap.add_argument("--name", default="", help="draw-site: one site name")
     ap.add_argument("--names", default="", help="terrain: comma-separated site names")
@@ -1622,6 +1704,8 @@ def main():
             stage_draw_site(a.data, a.repo, a.name, a.out or Path("site.png"))
         elif st == "terrain":
             stage_terrain(a.data, a.repo, [n.strip() for n in a.names.split(",") if n.strip()], a.half, a.source)
+        elif st == "terrain-world":
+            stage_terrain_world(a.data, a.repo, a.half)
 
 
 if __name__ == "__main__":

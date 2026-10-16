@@ -69,7 +69,7 @@ static func mill_race(plan: VillagePlan, placement: Dictionary, xf: Transform3D)
 						shore = closest
 				# A broad coastal bank can need a longer leat than a streamside
 				# mill. It still reserves real, clear ground for its entire run.
-				var reach := maxf(14.0, plan.site.size.y * 0.35) if water["kind"] == &"coast" else 14.0
+				var reach := maxf(14.0, plan.site.size.y * 0.35) if water["kind"] in [&"coast", &"lake"] else 14.0
 				if distance > reach or (shore - wall).dot(normal) < 0.3:
 					continue
 				var flow := (shore - wheel).normalized()
@@ -117,7 +117,9 @@ static func build(spec: VillageSpec, site: Rect2,
 	if spec == null or spec.water == &"none":
 		return {"water": water, "crossings": []}
 	match spec.water:
-		&"coast":
+		&"coast", &"lake":
+			# A lake shore is laid as a coast is: standing water along one
+			# edge, with its own kind so a reader can tell the two apart.
 			# Keep a usable dry bank between the winding road and the shore.
 			# Thirty percent consumed that bank on 90m sites, leaving no legal
 			# mill or service yard despite plenty of unused land inland.
@@ -128,7 +130,7 @@ static func build(spec: VillageSpec, site: Rect2,
 			var shore_y := site.position.y if spec.form == &"gate" else site.end.y - depth
 			water.append({"poly": Poly.from_rect(Rect2(
 				Vector2(site.position.x + SITE_MARGIN, shore_y),
-				Vector2(site.size.x - SITE_MARGIN * 2.0, depth))), "kind": &"coast"})
+				Vector2(site.size.x - SITE_MARGIN * 2.0, depth))), "kind": spec.water})
 		&"pond":
 			water.append({"poly": _pond(site, commons, roads), "kind": &"pond"})
 		&"stream", &"river":

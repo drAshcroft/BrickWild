@@ -13,6 +13,11 @@ extends RefCounted
 ##      seven inputs agrees with the arrangement the real place has, and
 ##      which unsupported features recur. Those counts are the to-do list
 ##      for terrain-aware villages; they shrink as the generator learns.
+##   3. every measured site with real ground (tests/fixtures/terrain/world90,
+##      written by survey.py terrain-world) builds its spec WITH that ground,
+##      and the form the ground derives (VillageSpec.form_intent) must agree
+##      with the hand label at least MIN_INTENT_AGREE_HM of the time over the
+##      high and medium confidence labels. That one IS a failure.
 
 const FIXTURE := "res://tests/fixtures/settlements/world_settlements.json"
 
@@ -36,6 +41,17 @@ const MIN_FORMS := 9          # distinct nearest_form values
 const MIN_LABELLED := 100     # measured sites carrying a label_form
 ## The spec's old `strand` is the owner's `shore` (the vocabulary folded it in).
 const FORM_ALIAS := {"strand": "shore"}
+## Real 90 m ground for each measured site; index.json maps name -> grid.
+const WORLD90 := "res://tests/fixtures/terrain/world90/"
+## A grid's `about` says "; lake:" when survey.py read the site as a lake
+## shore (>= 15 ha of adjacent water, not coastal): its spec water is `lake`.
+const LAKE_MARK := "; lake:"
+## The terrain form rule (VillageSpec._derive_form_on_ground) agreed with
+## 48 of 84 high/medium labels (57 %) when it was fitted (VTER-FORM-DERIVE,
+## 2026-10-16; the flat rule: 1 of 84). Every threshold moved +-20 % alone
+## kept it at 54-57 %. The floor sits a few points under: a change that
+## costs four or more correct forms fails here and must say why.
+const MIN_INTENT_AGREE_HM := 0.52
 
 
 static func run() -> SuiteResult:
@@ -55,9 +71,36 @@ static func run() -> SuiteResult:
 	if measured.size() < MIN_MEASURED:
 		res.fail("only %d measured sites, the set needs %d" % [measured.size(), MIN_MEASURED])
 
-	_coverage(res, sites, measured)
+	var ground := _world_ground(res)
+	_coverage(res, sites, measured, ground)
 	_specs(res, measured)
+	_intents(res, measured, ground)
 	return res
+
+
+## name -> {"path", "lake"} for every world90 grid the index lists.
+static func _world_ground(res: SuiteResult) -> Dictionary:
+	var out := {}
+	res.checked += 1
+	var text := FileAccess.get_file_as_string(WORLD90 + "index.json")
+	var idx = JSON.parse_string(text) if not text.is_empty() else null
+	if typeof(idx) != TYPE_DICTIONARY or not idx.has("sites"):
+		res.fail("cannot read %sindex.json (survey.py terrain-world writes it)" % WORLD90)
+		return out
+	for name in idx["sites"]:
+		var path: String = WORLD90 + String(idx["sites"][name])
+		var doc = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if typeof(doc) != TYPE_DICTIONARY:
+			res.fail("world90 grid %s is unreadable" % path)
+			continue
+		out[name] = {"path": path, "lake": String(doc.get("about", "")).contains(LAKE_MARK)}
+	return out
+
+
+## The spec water a site has WITH its ground: the fixture's, or `lake`.
+static func _water_with_ground(s: Dictionary, ground: Dictionary) -> String:
+	var g: Dictionary = ground.get(s["name"], {})
+	return "lake" if bool(g.get("lake", false)) else String(s["spec"]["water"])
 
 
 static func _count(rows: Array, pred: Callable) -> int:
@@ -68,7 +111,7 @@ static func _count(rows: Array, pred: Callable) -> int:
 	return n
 
 
-static func _coverage(res: SuiteResult, sites: Array, measured: Array) -> void:
+static func _coverage(res: SuiteResult, sites: Array, measured: Array, ground: Dictionary) -> void:
 	var groups := {}
 	for s in measured:
 		groups[String(s["env"].get("koppen", "?")).left(1)] = true
@@ -102,7 +145,7 @@ static func _coverage(res: SuiteResult, sites: Array, measured: Array) -> void:
 	var water := {}
 	var forms := {}
 	for s in measured:
-		water[s["spec"]["water"]] = true
+		water[_water_with_ground(s, ground)] = true
 		forms[s["spec"]["nearest_form"]] = true
 	for w in VillageSpec.WATERS:
 		res.checked += 1
@@ -185,3 +228,68 @@ static func _specs(res: SuiteResult, measured: Array) -> void:
 	gk.sort_custom(func(a, b): return gaps[a] > gaps[b])
 	for k in gk:
 		res.note("  %s: %d" % [k, gaps[k]])
+
+
+## The form each measured site's own ground derives, against its hand label.
+static func _intents(res: SuiteResult, measured: Array, ground: Dictionary) -> void:
+	var with_ground := 0
+	var agree := 0
+	var labelled := 0
+	var agree_hm := 0
+	var labelled_hm := 0
+	var confusion := {}
+	var intents := {}
+	for i in range(measured.size()):
+		var s: Dictionary = measured[i]
+		if not ground.has(s["name"]):
+			continue
+		var m: Dictionary = s["spec"]
+		var spec := VillageSpec.new(9000 + i)
+		spec.population = int(m["population"])
+		spec.culture = StringName(m["culture"])
+		spec.purpose = StringName(m["purpose"])
+		spec.water = StringName(_water_with_ground(s, ground))
+		spec.enclosure = StringName(m["enclosure"])
+		spec.terrain = VillageTerrain.from_file(ground[s["name"]]["path"])
+		res.checked += 1
+		if not spec.valid():
+			res.fail("%s with its ground maps to an invalid spec: %s" % [s["name"], "; ".join(spec.errors())])
+			continue
+		spec.generate(9000 + i)
+		with_ground += 1
+		var intent := String(spec.form_intent)
+		intents[intent] = int(intents.get(intent, 0)) + 1
+		res.checked += 1
+		if not (spec.form_intent in VillageSpec.FORM_VOCABULARY) or not (spec.form in VillageSitePlanner.FORMS_SUPPORTED):
+			res.fail("%s: intent '%s' planned as '%s', outside the vocabulary or the planners"
+				% [s["name"], intent, spec.form])
+		res.checked += 1
+		if spec.form != VillageSpec.FORM_FALLBACK.get(spec.form_intent, spec.form_intent):
+			res.fail("%s: intent '%s' planned as '%s', not its FORM_FALLBACK" % [s["name"], intent, spec.form])
+		if not m.has("label_form"):
+			continue
+		var label := String(m["label_form"])
+		labelled += 1
+		agree += int(intent == label)
+		if String(m.get("label_confidence", "low")) != "low":
+			labelled_hm += 1
+			agree_hm += int(intent == label)
+			var key := "%s->%s" % [label, intent]
+			confusion[key] = int(confusion.get(key, 0)) + 1
+	res.checked += 1
+	if with_ground < MIN_MEASURED:
+		res.fail("only %d measured sites have world90 ground, the set needs %d" % [with_ground, MIN_MEASURED])
+	var share := float(agree_hm) / maxi(1, labelled_hm)
+	res.checked += 1
+	if share < MIN_INTENT_AGREE_HM:
+		res.fail("the ground-derived form_intent matches label_form for %d of %d high/medium labels (%.0f %%), under the %.0f %% floor"
+			% [agree_hm, labelled_hm, share * 100.0, MIN_INTENT_AGREE_HM * 100.0])
+	res.note("ground: %d measured sites specified on their world90 ground; form_intent matches label_form for %d of %d labelled, %d of %d (%.0f %%) at high or medium confidence"
+		% [with_ground, agree, labelled, agree_hm, labelled_hm, share * 100.0])
+	var ik := intents.keys()
+	ik.sort()
+	res.note("  form_intent counts: %s" % ", ".join(ik.map(func(k): return "%s %d" % [k, intents[k]])))
+	var keys := confusion.keys()
+	keys.sort_custom(func(a, b): return confusion[a] > confusion[b] or (confusion[a] == confusion[b] and a < b))
+	for k in keys:
+		res.note("  label->intent (high/medium) %s: %d" % [k, confusion[k]])

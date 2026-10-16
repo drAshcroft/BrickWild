@@ -60,7 +60,12 @@ var requested_site_m: float = 400.0
 
 # ---- derived from seed + the six above ----
 var households: int = 0
+## The form the PLANNERS lay: one of VillageSitePlanner.FORMS_SUPPORTED.
 var form: StringName = &""
+## The form the village SHOULD have: with terrain, derived from the ground
+## (one of FORM_VOCABULARY); without, the same as `form`. Where it has no
+## planner yet `form` is its FORM_FALLBACK.
+var form_intent: StringName = &""
 var programme: Array[Dictionary] = []   # {kind, min_pop, request, where}
 var site: Rect2 = Rect2()
 var variant_name: String = ""
@@ -77,7 +82,9 @@ const PURPOSES: Array[StringName] = [
 	&"farming", &"crossroads", &"market", &"mill", &"fishing", &"mining",
 	&"garrison", &"pilgrim", &"forest"]
 const ENCLOSURES: Array[StringName] = [&"none", &"hedge", &"palisade", &"wall"]
-const WATERS: Array[StringName] = [&"none", &"pond", &"stream", &"river", &"coast"]
+## `lake`: standing fresh water along one side (VILLAGE_TERRAIN.md, Decision
+## 3). Laid like a coast; a mill earns it like any water.
+const WATERS: Array[StringName] = [&"none", &"pond", &"stream", &"river", &"coast", &"lake"]
 
 ## Wall needs a population that could plausibly build and man one, or a
 ## garrison purpose that supplies the manpower regardless of headcount.
@@ -106,6 +113,55 @@ const FORMS := [
 	{"form": &"round", "min_pop": 12, "max_pop": 60, "purposes": [&"farming", &"forest"], "cultures": [&"blighted"], "force": &"round"},
 	{"form": &"street", "min_pop": 12, "max_pop": 80, "purposes": [&"farming", &"forest", &"mining"], "cultures": []},
 ]
+## The forms the ground can derive (VILLAGE_TERRAIN.md, Decision 3). Only a
+## spec WITH terrain derives them; FORMS above is the flat vocabulary.
+const TERRAIN_FORMS: Array[StringName] = [&"hillside", &"dispersed", &"crest", &"shore",
+	&"valley", &"water"]
+## Every form a spec can intend: the seven the planners lay, then the six the
+## ground adds.
+const FORM_VOCABULARY: Array[StringName] = [&"street", &"green", &"crossroads", &"round",
+	&"strand", &"planted", &"gate", &"hillside", &"dispersed", &"crest", &"shore",
+	&"valley", &"water"]
+## Until a terrain form has its own planner, the spec PLANS the nearest form
+## that has one and keeps the derived form in `form_intent`. Each VTER-FORM-*
+## task that gives a form its planner deletes that form's ONE line here.
+##   hillside  -> street  one street along the slope, the row a contour
+##                        street will replace
+##   valley    -> street  a ribbon along the through road, as a valley is
+##   crest     -> round   houses ringed round the top's common
+##   shore     -> strand  one row facing the water
+##   water     -> strand  the row along the water the stilts will stand in
+##   dispersed -> green   the loosest planned form: lots round a large common
+const FORM_FALLBACK := {
+	&"hillside": &"street",
+	&"valley": &"street",
+	&"crest": &"round",
+	&"shore": &"strand",
+	&"water": &"strand",
+	&"dispersed": &"green",
+}
+## The terrain form rule's thresholds (`_derive_form_on_ground`). Fitted on
+## the 109 measured world sites against their hand labels and stable under
+## a +-20 % change of any one of them (VILLAGE_TERRAIN.md, "The form").
+const FORM_HILL_SLOPE := 0.17       ## median dry slope: a hill village from here
+const FORM_CREST_TPI_M := 9.0       ## the centre this far over its 30-150 m ring...
+const FORM_CREST_RANK := 0.75       ## ...and over this share of the ground round it
+const FORM_SHORE_REACH_M := 350.0   ## coast or lake water within this of the centre
+const FORM_VALLEY_SIDES := 0.25     ## p75 dry slope: steep sides
+const FORM_VALLEY_RANK := 0.55      ## the centre lies in the lower part of its ground
+const FORM_DROWNED := 0.5           ## the window this wet: the ground is the water's edge
+const FORM_WATER_ROUND := 0.4       ## the wider ground this wet: water all round
+const FORM_DISPERSED_POP := 150     ## a farming hill people under this scatters
+const FORM_DISPERSED_REGIONS := 3   ## or this many separate level shelves to farm from
+## Reading the ground for the form (read_ground): the analysis cell, the
+## smallest level region that counts as a place to build a hamlet, and how far
+## round the centre the "is this the top" rank looks.
+const FORM_READ_CELL_M := 20.0
+const FORM_REGION_M2 := 4000.0
+const FORM_RANK_M := 350.0
+const FORM_WATER_M := 450.0
+const FORM_WINDOW_MIN_M := 120.0
+const FORM_WINDOW_MAX_M := 400.0
 ## Below 25 people every form's common shrinks to the well; VILLAGES §3.
 const HAMLET_POPULATION := 25
 
@@ -245,7 +301,16 @@ func generate(p_seed: int) -> void:
 		return   # nothing sane to derive without a population in range
 
 	households = _derive_households(population, seed)
-	form = &"planted" if compact_display else _derive_form(population, purpose, culture)
+	if compact_display:
+		form = &"planted"
+		form_intent = form
+	elif terrain != null and terrain.valid():
+		form_intent = _derive_form_on_ground(read_ground(terrain, form_window_m()),
+			population, purpose, water, culture)
+		form = FORM_FALLBACK.get(form_intent, form_intent)
+	else:
+		form = _derive_form(population, purpose, culture)
+		form_intent = form
 	programme = _derive_programme(civic_population(), purpose, water)
 	if culture == &"blighted":
 		programme = programme.filter(func(row): return row["kind"] not in [&"shrine", &"church", &"temple"])
@@ -296,6 +361,165 @@ static func _form_predicate(row: Dictionary, p_population: int, p_purpose: Strin
 	if not cultures.is_empty() and p_culture in cultures:
 		return true
 	return false
+
+
+## The side of the square the form is read over: the planner's own site,
+## never smaller than a hamlet's nor larger than SITE_MAX.
+func form_window_m() -> float:
+	return clampf(requested_site_m, FORM_WINDOW_MIN_M, FORM_WINDOW_MAX_M)
+
+
+## The form WITH terrain (VILLAGE_TERRAIN.md, Decision 2: landform first,
+## then water and purpose, then population). First row that holds wins:
+##
+##   | # | the ground (read_ground) and the spec              | form      |
+##   |---|----------------------------------------------------|-----------|
+##   | 1 | window wet_share >= FORM_DROWNED                   | shore     |
+##   | 2 | ground within FORM_WATER_M wet >= FORM_WATER_ROUND | water     |
+##   | 3 | centre_tpi >= FORM_CREST_TPI_M and                 | crest     |
+##   |   |   centre_rank >= FORM_CREST_RANK                   |           |
+##   | 4 | water coast/lake, wet ground <= FORM_SHORE_REACH_M | shore     |
+##   | 5 | water river/lake, slope_p75 >= FORM_VALLEY_SIDES,  | valley    |
+##   |   |   centre_rank < FORM_VALLEY_RANK                   |           |
+##   | 6 | slope_median >= FORM_HILL_SLOPE, farming/forest,   | dispersed |
+##   |   |   population < FORM_DISPERSED_POP or               |           |
+##   |   |   level_regions >= FORM_DISPERSED_REGIONS          |           |
+##   | 7 | slope_median >= FORM_HILL_SLOPE                    | hillside  |
+##   |   | -- level ground: water and purpose --              |           |
+##   | 8 | purpose garrison                                   | gate      |
+##   | 9 | water lake, purpose fishing                        | water     |
+##   |10 | water coast, purpose fishing                       | shore     |
+##   |11 | purpose crossroads                                 | crossroads|
+##   |12 | anything else                                      | planted   |
+##
+## Population enters at row 6 only: on level ground the survey's real
+## villages read `planted` at every size from 12 people to 500, and the
+## flat rule's `gate` at 200 people is a flat-world habit the ground replaces.
+## Unreadable ground (an empty reading) falls back to the flat rule.
+static func _derive_form_on_ground(g: Dictionary, p_population: int, p_purpose: StringName,
+		p_water: StringName, p_culture: StringName) -> StringName:
+	if g.is_empty():
+		return _derive_form(p_population, p_purpose, p_culture)
+	if float(g["wet_share"]) >= FORM_DROWNED:
+		return &"shore"
+	if float(g["wide_wet_share"]) >= FORM_WATER_ROUND:
+		return &"water"
+	if float(g["centre_tpi"]) >= FORM_CREST_TPI_M and float(g["centre_rank"]) >= FORM_CREST_RANK:
+		return &"crest"
+	if p_water in [&"coast", &"lake"] and float(g["water_far_m"]) <= FORM_SHORE_REACH_M:
+		return &"shore"
+	if p_water in [&"river", &"lake"] and float(g["slope_p75"]) >= FORM_VALLEY_SIDES \
+			and float(g["centre_rank"]) < FORM_VALLEY_RANK:
+		return &"valley"
+	if float(g["slope_median"]) >= FORM_HILL_SLOPE:
+		if p_purpose in [&"farming", &"forest"] and (p_population < FORM_DISPERSED_POP
+				or int(g["level_regions"]) >= FORM_DISPERSED_REGIONS):
+			return &"dispersed"
+		return &"hillside"
+	if p_purpose == &"garrison":
+		return &"gate"
+	if p_water == &"lake" and p_purpose == &"fishing":
+		return &"water"
+	if p_water == &"coast" and p_purpose == &"fishing":
+		return &"shore"
+	if p_purpose == &"crossroads":
+		return &"crossroads"
+	return &"planted"
+
+
+## How the ground lies under a village of this spec, read once for the form
+## rule (`_derive_form_on_ground`). The window is the planner's site at most,
+## `side_m` square about the plan origin, read at FORM_READ_CELL_M (never finer
+## than half the terrain cell): a form is a village-scale fact, and the same
+## ground at 1 m and at 90 m should read alike. {} when the ground is unread.
+##   shares          {class: share of the window's cells} (VillageSiteAnalysis)
+##   wet_share       share of window cells under water_level_m
+##   slope_median    median mean-facet slope of the DRY window cells
+##   slope_p75       its 75th percentile
+##   steep_share     dry cells steeper than PLOT_MAX: a house there needs steps
+##   level_share     dry cells at or under CART_MAX
+##   level_regions   gentle (<= CART_MAX) dry components of >= FORM_REGION_M2
+##   level_largest   the largest one's share of the window
+##   relief_m        highest minus lowest window cell
+##   centre_tpi      the centre's height over its 30-150 m surroundings
+##   centre_rank     share of the ground within FORM_RANK_M lower than the centre
+##   water_near_m    metres from the centre to the nearest wet cell (INF: none)
+##   water_far_m     the same over the ground within FORM_WATER_M (wider than
+##                   the window: a fjord 400 m off still makes a shore village)
+##   wide_wet_share  share of that wider ground under water_level_m
+static func read_ground(ground: VillageTerrain, side_m: float) -> Dictionary:
+	if ground == null or not ground.valid():
+		return {}
+	var half := side_m * 0.5
+	var a := VillageSiteAnalysis.of(ground, Rect2(-half, -half, side_m, side_m), FORM_READ_CELL_M)
+	if not a.valid():
+		return {}
+	var n := a.cell_count()
+	var counts := a.histogram()
+	var shares := {}
+	for k in counts:
+		shares[String(k)] = float(counts[k]) / maxi(1, n)
+	var slopes: Array[float] = []
+	var lo := INF
+	var hi := -INF
+	var wet := 0
+	for i in range(n):
+		var h := a.height_of(i)
+		lo = minf(lo, h)
+		hi = maxf(hi, h)
+		if a.wet_of(i):
+			wet += 1
+		else:
+			slopes.append(a.slope_of(i))
+	slopes.sort()
+	var dry := slopes.size()
+	var steep := 0
+	var level := 0
+	for s in slopes:
+		steep += int(s > VillageSiteAnalysis.PLOT_MAX)
+		level += int(s <= VillageSiteAnalysis.CART_MAX)
+	var regions: Array = a.level_regions(VillageSiteAnalysis.CART_MAX, FORM_REGION_M2)
+	var site_area := float(n) * a.cell_m * a.cell_m
+	var centre := a.cell_at(Vector2.ZERO)
+	var ch := a.height_of(centre)
+	var below := 0
+	var seen := 0
+	var wide := 0
+	var wide_wet := 0
+	var water_far := INF
+	var level_m := ground.water_level_m
+	var step := maxf(a.cell_m, ground.cell_m)
+	var reach := int(floor(FORM_WATER_M / step))
+	var box := ground.bounds().grow(1e-6)
+	for j in range(-reach, reach + 1):
+		for i in range(-reach, reach + 1):
+			var p := Vector2(i, j) * step
+			if not box.has_point(p) or p.length() > FORM_WATER_M + 1e-6:
+				continue
+			var h := ground.height_at(p)
+			wide += 1
+			if not is_nan(level_m) and h <= level_m:   # inclusive, as the analysis is
+				wide_wet += 1
+				water_far = minf(water_far, p.length())
+			if p.length() <= FORM_RANK_M + 1e-6:
+				seen += 1
+				below += int(h < ch)
+	return {
+		"shares": shares,
+		"wet_share": float(wet) / maxi(1, n),
+		"slope_median": slopes[dry / 2] if dry > 0 else 0.0,
+		"slope_p75": slopes[mini(dry - 1, (dry * 3) / 4)] if dry > 0 else 0.0,
+		"steep_share": float(steep) / maxi(1, dry),
+		"level_share": float(level) / maxi(1, dry),
+		"level_regions": regions.size(),
+		"level_largest": float(regions[0]["area_m2"]) / site_area if not regions.is_empty() else 0.0,
+		"relief_m": hi - lo,
+		"centre_tpi": a.tpi_of(centre),
+		"centre_rank": float(below) / maxi(1, seen),
+		"water_near_m": a.water_distance_of(centre),
+		"water_far_m": water_far,
+		"wide_wet_share": float(wide_wet) / maxi(1, wide),
+	}
 
 
 ## §4's population->programme table, RECIPES, filtered to what this village's

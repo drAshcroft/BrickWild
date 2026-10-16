@@ -66,7 +66,7 @@ var enclosure_kept_fraction: float = 1.0
 var gate_crossings: Array[Dictionary] = []
 
 ## A water body on the site. {"poly": PackedVector2Array, "kind": StringName
-## ("pond"/"stream"/"river"/"coast")}
+## ("pond"/"stream"/"river"/"coast"/"lake")}
 var water: Array[Dictionary] = []
 
 ## Persistent bridges and fords, after the final roads have been trimmed.

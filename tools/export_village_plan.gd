@@ -117,6 +117,9 @@ func _init() -> void:
 		quit(3)
 		return
 	spec.generate(spec.seed)
+	var intent_note := form_intent_note(spec)
+	if not intent_note.is_empty():
+		notes.append(intent_note)
 	var plan: VillagePlan = VillageLotPlanner.plan(spec)
 	if plan.roads.is_empty():
 		printerr("SiteRequest refused: no roads could be planned for form '%s'" % String(spec.form))
@@ -472,6 +475,17 @@ static func _settle_form(spec: VillageSpec, notes: Array[String],
 	spec.generate(spec.seed)
 
 
+## With ground, the spec derives its form from the land
+## (VillageSpec._derive_form_on_ground); a form with no planner yet is planned
+## as its VillageSpec.FORM_FALLBACK, and this says so, as _settle_form says
+## when it changes a form. "" when the planned form is the derived one.
+static func form_intent_note(spec: VillageSpec) -> String:
+	if spec.terrain == null or spec.form_intent == spec.form or spec.form_intent == &"":
+		return ""
+	return "the ground derives the '%s' form, which has no planner yet; planned as '%s' (form_intent keeps '%s')" % [
+		String(spec.form_intent), String(spec.form), String(spec.form_intent)]
+
+
 ## The population at which VillageSpec.FORMS forces the `gate` row.
 const GATE_POPULATION := 200
 ## What is left of a bigger city once it is planned as a village. Anything at
@@ -660,6 +674,9 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		out["population_implied"] = plan.spec.implied_population
 		out["population_civic"] = plan.spec.civic_population()
 	if plan.spec.terrain != null:
+		# the form the ground derived, beside the form planned; only with
+		# ground, so a flat request's bytes never change
+		out["form_intent"] = String(plan.spec.form_intent)
 		_add_ground(out, plan)
 	return out
 
