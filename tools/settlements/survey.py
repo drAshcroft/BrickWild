@@ -29,6 +29,7 @@ See docs/SETTLEMENT_TESTSET.md.
 from __future__ import annotations
 
 import argparse
+import unicodedata
 import csv
 import hashlib
 import io
@@ -313,27 +314,31 @@ def stratified_candidates(pool, per_stratum, seed=7):
     return out, strata
 
 
-def fetch_elevations(cache: Cache, lats, lons) -> list[float]:
+def fetch_elevations(cache: Cache, lats, lons, dataset: str = "mapzen") -> list[float]:
     """OpenTopoData `mapzen` (a global SRTM/ETOPO/GMTED composite, ~30-90 m),
     100 points per call, 1 call per second, cached per call. Open-Meteo's
     elevation API counts every POINT against its quota, which allows about a
-    hundred 100-point calls a day -- far too few for a DEM grid per site."""
+    hundred 100-point calls a day -- far too few for a DEM grid per site.
+    `dataset` picks another OpenTopoData set (srtm30m, aster30m); its answers
+    are cached under their own kind so a 30 m grid never reuses 90 m ones."""
+    url = ELEVATION if dataset == "mapzen" else ELEVATION.rsplit("/", 1)[0] + "/" + dataset
+    kind = "elev_otd" if dataset == "mapzen" else "elev_otd_" + dataset
     out = []
     for s in range(0, len(lats), 100):
         locs = "|".join(f"{a:.5f},{b:.5f}" for a, b in zip(lats[s:s + 100], lons[s:s + 100]))
-        hit = cache.get("elev_otd", locs)
+        hit = cache.get(kind, locs)
         if hit is None:
             for attempt in range(8):
                 cache.throttle("elev", 1.15)
                 try:
-                    resp = requests.post(ELEVATION, json={"locations": locs}, headers={"User-Agent": UA}, timeout=90)
+                    resp = requests.post(url, json={"locations": locs}, headers={"User-Agent": UA}, timeout=90)
                 except requests.RequestException as e:
                     log(f"  elevation: {e}")
                     time.sleep(10)
                     continue
                 if resp.status_code == 200 and resp.json().get("status") == "OK":
                     hit = [r["elevation"] for r in resp.json()["results"]]
-                    cache.put("elev_otd", locs, hit)
+                    cache.put(kind, locs, hit)
                     break
                 log(f"  elevation HTTP {resp.status_code}, retry {attempt}")
                 time.sleep(10 * (attempt + 1))
@@ -633,10 +638,10 @@ class Dem:
         return self._bil(self.gx, x, y), self._bil(self.gy, x, y)
 
 
-def site_dem(cache: Cache, lat, lon, coastal=True) -> Dem:
+def site_dem(cache: Cache, lat, lon, coastal=True, dataset="mapzen", step=DEM_STEP_M, half=None) -> Dem:
     loc = Local(lat, lon)
-    half = RADIUS_M + DEM_STEP_M
-    xs = np.arange(-half, half + 0.1, DEM_STEP_M)
+    half = RADIUS_M + step if half is None else half
+    xs = np.arange(-half, half + 0.1, step)
     ys = xs.copy()
     lats, lons = [], []
     for y in ys:
@@ -644,7 +649,7 @@ def site_dem(cache: Cache, lat, lon, coastal=True) -> Dem:
             la, lo = loc.ll(x, y)
             lats.append(la)
             lons.append(lo)
-    z = np.array(fetch_elevations(cache, lats, lons)).reshape(len(ys), len(xs))
+    z = np.array(fetch_elevations(cache, lats, lons, dataset)).reshape(len(ys), len(xs))
     if np.isnan(z).any():
         z = np.where(np.isnan(z), np.nanmean(z), z)
     return Dem(xs, ys, sea_clip(z, coastal))
@@ -1256,7 +1261,8 @@ def stage_report(data: Path, repo: Path, draw: bool):
         draw_sheets(data, sites, img)
 
 
-def stage_terrain(data: Path, repo: Path, names: list[str], half_m: float = 450.0):
+def stage_terrain(data: Path, repo: Path, names: list[str], half_m: float = 450.0,
+                  source: str = "mapzen"):
     """Real ground for the village terrain reader's tests: each named site's
     cached DEM, cropped to +-half_m about its centre and written as a
     `brickwild.terrain` grid in PLAN axes (+X east, +Y = +Z south; the survey's
@@ -1280,21 +1286,34 @@ def stage_terrain(data: Path, repo: Path, names: list[str], half_m: float = 450.
                 continue
             lat, lon = where["lat"], where["lon"]
             coastal = environment_for(cache, data, lat, lon)["coast_km"] < 3.0
-        dem = site_dem(cache, lat, lon, coastal)
+        step = DEM_STEP_M if source == "mapzen" else 30.0
+        if source == "mapzen":
+            dem = site_dem(cache, lat, lon, coastal)
+        else:
+            dem = site_dem(cache, lat, lon, coastal, source, step, half_m)
         keep_x = np.where(np.abs(dem.xs) <= half_m + 1e-6)[0]
         keep_y = np.where(np.abs(dem.ys) <= half_m + 1e-6)[0]
         sub = dem.z[np.ix_(keep_y, keep_x)][::-1, :]   # north-up rows -> south-going rows
         xs = dem.xs[keep_x]
         ys_plan = -dem.ys[keep_y][::-1]
         doc = {"schema": "brickwild.terrain", "schema_version": 1,
-               "about": f"{name}: Mapzen terrain via OpenTopoData, {DEM_STEP_M:.0f} m grid about "
+               "about": f"{name}: {source} terrain via OpenTopoData, {step:.0f} m grid about "
                         f"{lat:.5f}, {lon:.5f}; written by tools/settlements/survey.py terrain",
-               "origin_m": [float(xs[0]), float(ys_plan[0])], "cell_m": DEM_STEP_M,
-               "cols": int(len(xs)), "rows": int(len(ys_plan)),
-               "heights_m": [round(float(v), 2) for v in sub.ravel()]}
+               "origin_m": [float(xs[0]), float(ys_plan[0])], "cell_m": step,
+               "cols": int(len(xs)), "rows": int(len(ys_plan))}
+        slug = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower().replace(" ", "_")
+        if source != "mapzen":
+            out_dir = repo / "tests" / "fixtures" / "terrain" / "real30"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            if sub.size * 7 > 400_000:    # inline JSON would pass ~400 KB: raw float32 beside it
+                sub.astype("<f4").tofile(out_dir / f"{slug}.r32")
+                doc["file"] = f"{slug}.r32"
+            else:
+                doc["heights_m"] = [round(float(v), 2) for v in sub.ravel()]
+        else:
+            doc["heights_m"] = [round(float(v), 2) for v in sub.ravel()]
         if coastal:
             doc["water_level_m"] = 0.0
-        slug = name.lower().replace(" ", "_")
         f = out_dir / f"{slug}.json"
         f.write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
         log(f"terrain: {f} {doc['cols']}x{doc['rows']} relief {sub.max() - sub.min():.0f} m")
@@ -1308,6 +1327,8 @@ def main():
     ap.add_argument("--repo", required=True, type=Path)
     ap.add_argument("--per-stratum", type=int, default=10)
     ap.add_argument("--sample", type=int, default=SAMPLE_N)
+    ap.add_argument("--source", default="mapzen", choices=["mapzen", "srtm30m", "aster30m"])
+    ap.add_argument("--half", type=float, default=450.0, help="terrain: half-extent in metres")
     ap.add_argument("--no-draw", action="store_true")
     ap.add_argument("--curated-only", action="store_true")
     a = ap.parse_args()
@@ -1324,7 +1345,7 @@ def main():
         elif st == "report":
             stage_report(a.data, a.repo, not a.no_draw)
         elif st == "terrain":
-            stage_terrain(a.data, a.repo, [n.strip() for n in a.names.split(",") if n.strip()])
+            stage_terrain(a.data, a.repo, [n.strip() for n in a.names.split(",") if n.strip()], a.half, a.source)
 
 
 if __name__ == "__main__":

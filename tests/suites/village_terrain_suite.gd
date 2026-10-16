@@ -19,6 +19,52 @@ const REAL := {
 	"res://tests/fixtures/terrain/varennes.json": [0.0, 20.0],
 }
 const EPS := 1e-4
+const SYNTH := preload("res://tests/fixtures/terrain/synthetic_terrain.gd")
+const REAL30_DIR := "res://tests/fixtures/terrain/real30/"
+## name -> [probe x, probe z, expected dh/dx, expected dh/dz, expected relief m].
+## The formulas are in synthetic_terrain.gd's header.
+const SYNTH_EXPECT := {
+	"plane_5": [10.0, 20.0, 0.0, -0.05, 40.0],
+	"plane_15": [10.0, 20.0, 0.0, -0.15, 120.0],
+	"plane_30": [10.0, 20.0, 0.0, -0.30, 240.0],
+	"plane_50": [10.0, 20.0, 0.0, -0.50, 400.0],
+	"valley": [0.0, 100.0, 0.0, 0.30, 111.0],
+	"river_valley": [0.0, 100.0, 0.0, 0.30, 114.0],
+	"spur": [100.0, 0.0, -0.25, -0.10, 180.0],
+	"crest": [170.0, 0.0, -0.20, 0.0, 60.0],
+	"saddle": [100.0, 0.0, 0.10, 0.0, 160.0],
+	"cliff_band": [0.0, 47.5, 0.0, 3.0, 15.0],
+	"lake_shore": [0.0, 0.0, 0.0, -0.08, 64.0],
+	"island": [100.0, 0.0, -0.16, 0.0, 50.0],
+}
+## Relief (m) over the inner +-430 m, measured from the 90 m Mapzen DEM that
+## `survey.py terrain` caches (OpenTopoData mapzen, nodes with |x|,|y| <= 430
+## of the 790 m site DEM), which is the ground the 90 m fixtures are cut from.
+## Manarola and Limone are the whole-file reliefs of the existing fixtures.
+const REAL30_90M_RELIEF := {
+	"hallstatt": 492.0,
+	"manarola": 194.0,
+	"masouleh": 379.0,
+	"positano": 361.0,
+	"rocamadour": 137.0,
+	"castelmezzano": 323.0,
+	"monemvasia": 165.0,
+	"ushguli": 181.0,
+	"eze": 377.0,
+	"monpazier": 58.0,
+	"giethoorn": 8.0,
+	"satemin": 9.0,
+}
+## Per-site tolerance where the 30 m grid resolves what 90 m smooths; the
+## reason sits beside the entry. Default 0.15.
+const REAL30_TOL := {
+	# 30 m resolves the ravine walls and the harbour cliff that a 90 m cell averages away: 230 m vs 194 m
+	"manarola": 0.20,
+	# flat polder / Wendland plain: relief is 8-11 m, so one or two whole metres of SRTM
+	# integer quantisation and the 90 m / 30 m source difference is 20-25 %
+	"giethoorn": 0.30,
+	"satemin": 0.30,
+}
 
 
 static func run() -> SuiteResult:
@@ -28,6 +74,8 @@ static func run() -> SuiteResult:
 	_readers_agree(res)
 	_cliff(res)
 	_real(res)
+	_synthetic(res)
+	_real30(res)
 	_exporter(res)
 	return res
 
@@ -264,3 +312,88 @@ static func _without(a: Dictionary, key: String) -> Dictionary:
 	var out := a.duplicate(true)
 	out.erase(key)
 	return out
+
+
+## Every landform builds, and its slope at a defining point and its relief
+## match the formula (synthetic_terrain.gd) within 1 %.
+static func _synthetic(res: SuiteResult) -> void:
+	var names: PackedStringArray = SYNTH.names()
+	res.checked += 1
+	if names.size() != SYNTH_EXPECT.size():
+		res.fail("synthetic: %d landforms, %d expectations" % [names.size(), SYNTH_EXPECT.size()])
+	for n in names:
+		var t: VillageTerrain = SYNTH.make(n)
+		res.checked += 1
+		if not t.valid() or not t.covers(Rect2(-400, -400, 800, 800)):
+			res.fail("synthetic: %s invalid or does not cover 800 m: %s" % [n, t.errors()])
+			continue
+		if not SYNTH_EXPECT.has(n):
+			res.fail("synthetic: %s has no expectation" % n)
+			continue
+		var e: Array = SYNTH_EXPECT[n]
+		var g := t.gradient_at(Vector2(e[0], e[1]))
+		var want := Vector2(e[2], e[3])
+		res.checked += 1
+		if absf(g.length() - want.length()) > 0.01 * want.length() or g.distance_to(want) > 0.01 * want.length():
+			res.fail("synthetic: %s gradient %s at (%s, %s), want %s" % [n, g, e[0], e[1], want])
+		res.checked += 1
+		if absf(t.relief() - float(e[4])) > 0.01 * float(e[4]):
+			res.fail("synthetic: %s relief %.2f m, want %.0f" % [n, t.relief(), e[4]])
+	# standing water
+	var lake: VillageTerrain = SYNTH.make("lake_shore")
+	res.checked += 1
+	if not lake.is_wet(Vector2(0, 300)) or lake.is_wet(Vector2(0, 100)) or absf(lake.water_level_m - 4.0) > EPS:
+		res.fail("synthetic: lake_shore is not wet in the south quarter only")
+	var river: VillageTerrain = SYNTH.make("river_valley")
+	res.checked += 1
+	if not river.is_wet(Vector2(0, 0)) or river.is_wet(Vector2(0, 20)):
+		res.fail("synthetic: river_valley water is not confined to the channel")
+	var isle: VillageTerrain = SYNTH.make("island")
+	res.checked += 1
+	if isle.is_wet(Vector2(0, 0)) or not isle.is_wet(Vector2(380, 0)):
+		res.fail("synthetic: island is not dry on the cone and wet in the sea")
+	var cliff: VillageTerrain = SYNTH.make("cliff_band")
+	res.checked += 1
+	if absf(cliff.height_at(Vector2(0, 40)) - 10.0) > EPS or absf(cliff.height_at(Vector2(0, 60)) - 25.0) > EPS:
+		res.fail("synthetic: cliff_band is not 10 m north and 25 m south of z = 50")
+	# deterministic, and a different cell size is still the same ground
+	res.checked += 1
+	if SYNTH.make("spur").fingerprint() != SYNTH.make("spur").fingerprint():
+		res.fail("synthetic: spur is not deterministic")
+	var fine: VillageTerrain = SYNTH.make("saddle", Rect2(-100, -100, 200, 200), 2.0)
+	res.checked += 1
+	if not fine.valid() or absf(fine.height_at(Vector2(60, 40)) - (40.0 + 0.0005 * (3600.0 - 1600.0))) > 0.01:
+		res.fail("synthetic: saddle at 2 m disagrees with its formula")
+
+
+## The 30 m real grids load, cover a 800 m site, and agree with the 90 m
+## relief over the inner +-430 m.
+static func _real30(res: SuiteResult) -> void:
+	for slug in REAL30_90M_RELIEF:
+		var t := VillageTerrain.from_file(REAL30_DIR + slug + ".json")
+		res.checked += 1
+		if not t.valid():
+			res.fail("real30: %s refused: %s" % [slug, t.errors()])
+			continue
+		res.checked += 1
+		if not t.covers(Rect2(-400, -400, 800, 800)) or absf(t.cell_m - 30.0) > EPS:
+			res.fail("real30: %s does not cover 800 m at 30 m (cell %.1f)" % [slug, t.cell_m])
+			continue
+		var lo := INF
+		var hi := -INF
+		for r in range(t.rows):
+			for c in range(t.cols):
+				var p := t.origin + Vector2(c, r) * t.cell_m
+				if absf(p.x) <= 430.0 and absf(p.y) <= 430.0:
+					var h := t.heights[r * t.cols + c]
+					lo = minf(lo, h)
+					hi = maxf(hi, h)
+		var inner := hi - lo
+		var want: float = REAL30_90M_RELIEF[slug]
+		var tol: float = REAL30_TOL.get(slug, 0.15)
+		res.checked += 1
+		if absf(inner - want) > tol * want:
+			res.fail("real30: %s inner relief %.0f m vs 90 m %.0f m (tol %.0f %%)" % [slug, inner, want, tol * 100.0])
+		else:
+			res.note("real30: %s %d x %d at %.0f m, inner relief %.0f m (90 m: %.0f m), whole %.0f m" % [
+				slug, t.cols, t.rows, t.cell_m, inner, want, t.relief()])
