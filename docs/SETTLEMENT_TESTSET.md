@@ -226,3 +226,49 @@ survey keeps to them:
   survey needs about 900. A thin-OSM site costs no elevation calls.
 * **Open-Meteo's elevation API counts each point**, so it allows about a
   hundred such calls a day. Do not switch back to it.
+
+## Measuring a generated village the same way (VTER-SHAPE)
+
+One definition of every metric, for real villages and generated ones:
+
+| Piece | Where |
+|---|---|
+| the survey's own `measure()` on a SitePlan | `survey.py measure-plan --plan p.json [--terrain grid.json] --out m.json` |
+| the GDScript port | `qa/village_shape.gd`, `VillageShape.measure(plan) -> Dictionary`, the same keys |
+| known answers | `vshape` suite: a street row, a street grid, a 20 % plane, contour and fall-line streets |
+| parity | `tools/shape_parity.gd` writes plans and GDScript metrics to `artifacts/shape/`; `tools/settlements/shape_parity.py artifacts/shape` measures them in Python and compares |
+
+```
+godot --headless --path . --script res://tools/shape_parity.gd        # ~2 min: plans the hamlet twice
+C:/projects/.local/Scripts/python.exe -I -X utf8 tools/settlements/shape_parity.py artifacts/shape
+```
+
+How a SitePlan becomes the `geo` dict `parse_site()` makes from OSM:
+
+* Plan points are (x, +z south); the survey is (x, y north): every point is
+  `(x, -z)`. A terrain grid's rows run south and are flipped north-up.
+* Buildings are `buildings[].poly_m` (the measured footprint,
+  `Placement.world_rect(..., true)`), with `parse_site`'s 6 m² floor.
+* A road's `class` is its highway tag, so `path` is a path (`MINOR_PATH`)
+  and anything with `steps` in it is steps. OSM ways share a node at a
+  junction and plan polylines do not: a vertex within 0.5 m of another
+  road's segment, and a proper crossing of two segments, become a shared
+  node on both, so dead ends and intersections count as they do in OSM.
+* A road that crosses a `water[]` polygon is a bridge. `water[]` is
+  standing water (polygons); plans have no coastline or waterway lines.
+* Worship is a `church` or `temple` building (a shrine is a small church
+  request); squares are the commons; `city_wall` is `enclosure == wall`.
+* The disc is the farthest building plus 25 m (`measure()` now takes
+  `radius` and `min_buildings`, defaulting to the survey's 700 m and 25),
+  and a plan needs one building, not 25, to be measured.
+* Without terrain the ground is flat zeros: every slope and relief metric
+  is 0 and the contour shares are absent, as for a flat real site.
+
+The slope is the survey's: `np.gradient` over the grid NODES, then
+interpolated. `VillageTerrain.gradient_at` (a central difference of the
+interpolated surface) differs on real ground, so `VillageShape` rebuilds the
+node field rather than calling it. Heights are `height_at`, the same surface.
+
+First parity run (16 Oct): thorn-hamlet flat and on Manarola, a native
+40-person farming village, and a 90-person river village on Manarola agree
+on every key to the printed decimal.
