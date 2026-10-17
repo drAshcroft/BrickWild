@@ -68,7 +68,7 @@ static func run() -> SuiteResult:
 		_case(res, jobs, case[0], case[1], case[2])
 	_pure(res, jobs)
 	for case in BRIEF_CASES:
-		_brief_case(res, case[0], case[1])
+		_brief_case(res, case[0], case[1], case[2])
 	res.note("total %.1f s" % ((Time.get_ticks_msec() - t0) / 1000.0))
 	return res
 
@@ -77,14 +77,19 @@ static func run() -> SuiteResult:
 ## it and the form the ground derives (VTER-LOTS' review cases): Thorn on
 ## Hallstatt's lake shore (its through road ran forty metres into the lake)
 ## and on Manarola's sea cliff (refused: the hold found no lot).
+##
+## Hallstatt's case keeps the form it was reviewed in (green): the ground now
+## derives `dispersed`, which sites Thorn up the hill away from the lake and
+## leaves its hold unplaced on terrain-villages already (VTER-FORM-DISPERSED's).
 const BRIEF_CASES := [
-	["thorn-hamlet", "real30/hallstatt"],
-	["thorn-hamlet", "real30/manarola"],
+	["thorn-hamlet", "real30/hallstatt", &"green"],
+	["thorn-hamlet", "real30/manarola", &""],
 ]
 const EXPORTER := preload("res://tools/export_village_plan.gd")
 
 
-static func _brief_case(res: SuiteResult, request_name: String, ground_name: String) -> void:
+static func _brief_case(res: SuiteResult, request_name: String, ground_name: String,
+		form: StringName) -> void:
 	var label := "%s on %s" % [request_name, ground_name]
 	var text := FileAccess.get_file_as_string("res://tests/fixtures/site_requests/%s.json" % request_name)
 	var request: Dictionary = JSON.parse_string(text)
@@ -92,6 +97,8 @@ static func _brief_case(res: SuiteResult, request_name: String, ground_name: Str
 	var spec: VillageSpec = EXPORTER.spec_from_request(request, text, notes)
 	spec.terrain = terrain(ground_name)
 	spec.generate(spec.seed)
+	if form != &"":
+		spec.form = form
 	var t0 := Time.get_ticks_msec()
 	var programme := VillageProgrammer.programme(spec)
 	var plan := VillageLotPlanner.plan(spec)

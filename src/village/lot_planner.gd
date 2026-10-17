@@ -1045,6 +1045,8 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 			for lot_depth in _depths(plan, spot, depth, setback, job, rule):
 				var lot: Dictionary = _make_lot(spot["e"], float(spot["m"]), frontage, lot_depth, setback)
 				_round_lot(plan, lot)
+				if cls == &"manor" and plan.ground != null:
+					lot["terraced"] = true
 				if cls == &"church":
 					# This reserved civic ground belongs to the native landmark;
 					# a fallback street frontage may use its own preliminary slot.
@@ -1053,14 +1055,26 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 					continue
 				if _door_rise(lot) > VillageLotGround.DOOR_RISE_PREFERRED:
 					if high_door.is_empty():
-						high_door = {"lot": lot, "d": float(spot["d"])}
+						high_door = {"lot": lot, "d": float(spot["d"]), "mid": spot["mid"]}
 					break
+				# the turn is local -- across the road, or a few lots along it --
+				# never a move away from where the village wanted this house
+				if not high_door.is_empty() and Vector2(spot["mid"]).distance_to(high_door["mid"]) > DOOR_TURN_REACH:
+					_commit(plan, high_door["lot"], job, rule)
+					return float(high_door["d"])
 				_commit(plan, lot, job, rule)
 				return float(spot["d"])
 		if not high_door.is_empty():
 			_commit(plan, high_door["lot"], job, rule)
 			return float(high_door["d"])
 	return -1.0
+
+
+## How far along the road a house set front-downhill may move to turn its
+## front uphill or across the fall (VTER-LOTS): the frontage across the road,
+## or a couple of lots on. Beyond it the arrangement (the common's fronts,
+## the gradient, a hamlet's green) wins and the house takes its steps.
+const DOOR_TURN_REACH := 25.0
 
 
 ## Whether the bakery is this village's water mill: it has water, and that
@@ -1392,7 +1406,11 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 ## neighbouring samples of them rise more steeply than a footpath
 ## (VillageSiteAnalysis.PATH_MAX). A house on a 50 % hillside stands on a
 ## stepped plinth; a lot across a 15 m cliff band does not stand at all.
-static func ground_clear(ground: VillageTerrain, poly: PackedVector2Array) -> bool:
+## A seat's lot (`cliffs` false) is TERRACED: it must be dry, and its castle
+## stands on its own revetted platform within the family's fall
+## (VillageLotGround, _ground_fit), so a steep pitch across its forecourt is
+## held by the terrace walls the lot records rather than refused (VTER-LOTS).
+static func ground_clear(ground: VillageTerrain, poly: PackedVector2Array, cliffs := true) -> bool:
 	var n := poly.size()
 	if n < 3:
 		return true
@@ -1413,6 +1431,8 @@ static func ground_clear(ground: VillageTerrain, poly: PackedVector2Array) -> bo
 		var hb := ground.height_at(b)
 		if not is_nan(wl) and (ha <= wl or hm <= wl):
 			return false
+		if not cliffs:
+			continue
 		for pair in [[a, ha, m, hm], [m, hm, b, hb], [centre, hc, a, ha], [centre, hc, m, hm]]:
 			var d: float = (pair[0] as Vector2).distance_to(pair[2])
 			if d > 0.01 and absf(float(pair[1]) - float(pair[3])) / d > VillageSiteAnalysis.PATH_MAX:
@@ -1489,7 +1509,7 @@ static func _site_clear(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 		poly: PackedVector2Array) -> bool:
 	if not _inside_site(plan.site, poly):
 		return false
-	if plan.ground != null and not ground_clear(plan.ground, poly):
+	if plan.ground != null and not ground_clear(plan.ground, poly, not bool(lot.get("terraced", false))):
 		return false
 	if plan.spec.purpose == &"mining":
 		# Leave the terminal workyard beyond the last through-road gateway.
@@ -1827,8 +1847,10 @@ static func _place_manor(plan: VillagePlan, job: Dictionary) -> int:
 
 
 ## The leans a seat's lane is tried at on given ground, as a share of its
-## length across the road's line (toward the common first; 0 is square).
-const MANOR_GROUND_LEANS := [MANOR_LANE_LEAN, 0.0, -0.7, 0.35, 0.7]
+## length across the road's line (toward the common first; 0 is square). The
+## last four run nearly along a contour road: on a hillside steeper than a
+## cart's grade only a lane within thirty degrees of the contour keeps it.
+const MANOR_GROUND_LEANS := [MANOR_LANE_LEAN, 0.0, -0.7, 0.35, 0.7, -1.5, 1.5, -3.0, 3.0]
 
 
 ## §9.4's `manor` rule, asked before the lot is kept: the gate looks at the
