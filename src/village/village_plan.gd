@@ -98,6 +98,11 @@ var ground: VillageTerrain = null
 var site_anchor := Vector2.ZERO
 var site_yaw := 0.0     ## radians, counter-clockwise from the caller's +X in its own (x, y)
 
+## The hamlets of a `dispersed` village (VillageDispersedForm), empty for
+## every other form: {"seat", "common", "spine", "households", "shelf",
+## "main", "ground"}. The first is the main hamlet, on the through road.
+var hamlets: Array[Dictionary] = []
+
 
 ## The ground readings of this plan are taken on: `ground` when the village
 ## was sited, else the spec's own (null when flat).
@@ -189,6 +194,7 @@ func equals(other: VillagePlan) -> bool:
 		and _array_of_dict_equal(fields, other.fields)
 		and _array_of_dict_equal(props, other.props)
 		and _array_of_dict_equal(plants, other.plants)
+		and _array_of_dict_equal(hamlets, other.hamlets)
 	)
 
 

@@ -294,8 +294,9 @@ the `planted` ones, and nothing in the ground or the seven inputs tells them
 apart (the survey's own classifier sees the buildings; the spec does not).
 
 **Fallback until each form has a planner.** `VillageSitePlanner` lays the
-seven old forms only. `form_intent` keeps the derived form; `form` is what is
-planned, through `VillageSpec.FORM_FALLBACK`:
+seven old forms and `dispersed` (VTER-FORM-DISPERSED, below). `form_intent`
+keeps the derived form; `form` is what is planned, through
+`VillageSpec.FORM_FALLBACK`:
 
 | intent | planned as | why |
 |---|---|---|
@@ -304,7 +305,7 @@ planned, through `VillageSpec.FORM_FALLBACK`:
 | crest | round | houses ringed round the top's common |
 | shore | strand | one row facing the water |
 | water | strand | the row along the water the stilts will stand in |
-| dispersed | green | the loosest planned form: lots round a large common |
+| ~~dispersed~~ | ~~green~~ | planned as itself since VTER-FORM-DISPERSED |
 
 Each VTER-FORM-* task that gives a form its planner deletes that form's one
 line in `FORM_FALLBACK`. The exporter writes `form_intent` beside `form`
@@ -669,6 +670,61 @@ the refusal of falls over a storey leaves 11-12 of 16 placed (16 before:
 they stood on up to 4 m of fall nobody built for). `vtplan`'s Thorn on
 Manarola is a strand on the shore flat (span 0.8 m against 2 m): the form's
 choice, noted as a warning (VTER-FORM-SHORE).
+
+## The dispersed form (VTER-FORM-DISPERSED)
+
+Row 6 of the form rule, given its planner: `src/village/forms/dispersed_form.gd`,
+`VillageDispersedForm`, reached from `VillageSitePlanner._plan` by one early
+dispatch; `dispersed` is in `FORMS_SUPPORTED` and out of `FORM_FALLBACK`.
+Without terrain the form is never derived, so nothing flat changes
+(`thorn-hamlet` and `veld-070` exported before and after, `cmp` identical).
+
+| Step | What |
+|---|---|
+| site | a square of 200 + 40 m per hamlet, 260-360 m, within the caller's `site_m`; the lot planner's retries widen it along the road |
+| through road | laid and routed by grade as every form's |
+| main hamlet | on the through road where the ground just beside it is gentlest in the middle 40 % of the road: the street form's core (common, approach path, ring street, landmark behind the ring). The most central hamlet takes the landmark |
+| other hamlets | seats on a 10 m lattice, best "shelf" first: within 30 m, each dry cell counts 1 level falling to 0 at 60 %; first only seats whose ground averages under a house plot's 35 %, then -- never one hamlet -- any. 110 m apart (two hamlets' houses stay beyond the survey's 45 m linkage) |
+| spine | each hamlet's way: square off the through road at the seat's own x, through the hamlet, straight out to the site edge (to the fields above); a `track` to 30 %, else `steps` from the start (re-classing would straighten it). It meets the edge square, a quarter metre inside the far edges (the walk grid stops at `end`) |
+| hamlet common | 14 m square beside the spine, a path to its well; no house nearer the well than 7 m |
+| hamlets | 2-5: one per 4.5 households; households by shelf, at least 3 each, and one hamlet besides the main with 5 where the households allow |
+| lots | `assign_jobs` (lot planner hook): each household is cut its lot nearest its own hamlet's well, biggest house first round the hamlets; trades keep their §6 addresses (smithy east, tavern by a gate), the landmark its slot |
+| fields | strip fields (to 15 %) and pasture (to 30 %) beside the spines beyond each hamlet, clear of everything (`finish`) |
+| wells | the dresser's own well step on every other hamlet's common (`dress_hamlets`) |
+
+`plan.hamlets` carries them; the exporter writes `hamlets` (seat, common,
+spine road, households, main, ground) only when there are any.
+
+**What the checks learned.** ScaleCheck's density is measured over the
+hamlets' own ground (a 90 m square about each seat): the settlement is its
+hamlets, not the fields between, and every household of every hamlet is
+counted by `housed`. PlaceCheck: a well may stand on any common; the wealth
+gradient measures each house from its own hamlet's common; a farm's edge is
+its hamlet's ground. Every other rule is unchanged, and each change is a
+no-op for a plan without hamlets.
+
+Suite `vdispersed` (161 checks, ~5 min, most of it measuring the 19
+buildings once): 60 farming people on Ushguli (real30), the synthetic
+valley, the spur (which derives `crest`; forced) and Rubanda (world90,
+labelled dispersed, high confidence).
+
+| Ground | Hamlets (houses / buildings) | body_share | clusters_ge5 | Placed | QA |
+|---|---|---|---|---|---|
+| Ushguli | 4/7, 5/6, 5/6 | 0.368 | 3 | 19/19 | ok |
+| valley | 5/8, 5/6, 4/5 | 0.421 | 3 | 19/19 | ok |
+| spur (forced) | 5/8, 5/6, 4/5 | 0.421 | 2 | 19/19 | ok |
+| Rubanda | 4/8, 5/5, 5/6 | 0.368 | 3 | 19/19 | ok |
+
+Every hamlet's well is walked to from every gate; every road is within its
+class's grade. The survey's dispersed sites read body_share 0.2-0.6.
+
+Not yet: the spines run straight up the fall-line, where real hamlet links
+(Ushguli's valley road, Batad's terrace paths) wind along the contour; the
+site is 260-360 m where real hamlets lie two to four hundred metres apart; a
+hamlet earns no shrine of its own (the programme earns one landmark); the
+tavern and the smithy keep their §6 addresses at the gates and often stand
+alone on the road; an enclosed dispersed village gets one enclosure round
+everything.
 
 ## A building on falling ground (VTER-HOUSE-SLOPE)
 

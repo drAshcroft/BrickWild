@@ -189,6 +189,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			common_state = finer_common
 			break
 	_trim_lanes(out)
+	VillageDispersedForm.finish(out)
 	# Lot cutting can add service lanes, drop roads and add a mill race.
 	# Store crossings only against these final road/water indices.
 	out.water_crossings = VillageWaterPlan.crossings(out.water, out.roads)
@@ -198,6 +199,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	# stands on the common, what is in a doorway, what is in the road -- are
 	# judging the props as much as the buildings.
 	VillageDresser.dress(out)
+	VillageDispersedForm.dress_hamlets(out)
 	return out
 
 
@@ -512,6 +514,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 			# Reserve the companion yard immediately after the corner inn,
 			# before general shops consume its neighbouring frontages.
 			job["siting"] = {"road": &"through", "insists": true, "toward": &"common"}
+	VillageDispersedForm.assign_jobs(plan, jobs)
 	# The arrangement order (VILLAGES §6): the landmark and the lord first
 	# because they take their own lanes; then the trades that INSIST on where
 	# they stand -- the smithy on the through road at the downwind edge, the
@@ -587,7 +590,9 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 				if _place_on_road(plan, ctx, companion, [stable_lane], 0.0) >= 0.0:
 					placed += 1
 					continue
-		var floor_for: float = gradient_floor if _order_of(job) == _ORDER_HOUSE else 0.0
+		# a dispersed village's household is placed by its own hamlet's well
+		var floor_for: float = gradient_floor if _order_of(job) == _ORDER_HOUSE \
+			and not job.has("hamlet") else 0.0
 		# The stable is a companion to the inn, not merely another through-road
 		# shop.  The inn has already been committed by this ordering pass, so
 		# carry its measured centre into the stable's frontage sort.
