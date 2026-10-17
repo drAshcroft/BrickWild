@@ -515,21 +515,18 @@ as flights, not ramps.
   Positano and Castelmezzano have too little steep street length to measure.
   Tracks that traverse the slope would raise it -- and would lift the planes
   over 0.8 -- so this wants the hillside form, not a weight;
-* **graded service lanes** -- the landmark, stable, monument and manor lanes
-  are laid by the lot planner after grading; a steep one stays a lane,
-  because only a lane may dead-end at its lot (§9.2);
+* ~~graded service lanes~~ -- done in VTER-LOTS: a steep one is not laid;
 * **a tavern near a gate on a stretched site** -- Èze and Hallstatt stretch
   to 270-315 m to house everyone, and the tavern's 60 m from a gate goes;
-* **per-lot platforms and stepped plinths** -- a house on 2.7 m of fall stands
-  on a plinth or over a basement, not on a pad;
+* ~~per-lot platforms and stepped plinths~~ -- done in VTER-LOTS;
 * **landform forms** (`hillside`, `crest`, `shore`, `valley`, ...) -- the form
   still comes from population, purpose and culture; on a crest the village
   goes to level ground within reach rather than onto the summit, because no
   cart-graded through road passes a common on a 40 m summit ringed by 20 %
   flanks;
-* **the ground's own water as plan water** -- the siting keeps the village
-  off it and lots refuse it, but a river in the grid is not yet a `plan.water`
-  polygon with bridges.
+* **the ground's own water as plan water** -- a lake or sea at
+  `water_level_m` is plan water since VTER-LOTS; a river read from the
+  drainage (`streams()`) is not yet a `plan.water` polygon with bridges.
 
 ## Lots on the ground (VTER-LOTS)
 
@@ -615,6 +612,63 @@ The seat (`_place_manor`) then tries both sides of the through road, east of
 the common first, at five leans, keeping only a gate that looks at the common
 (§9.4 `manor`) -- which is how Thorn's hold finds its terraced lot on
 Manarola's hillside above the strand.
+
+**Not yet.**
+
+* **the walk on the steps (VTER-STEPS-NAV)** -- `VillageNavCheck` and
+  `VillageWalk` reach every door on the lot's flat floor; they do not see a
+  flight's treads or heights (the parts are lot floor to them, never an
+  obstacle, so no door is cut off). The flights are in each lot's
+  `entry_parts` and in `BrickWild.navigation()`'s `route_m` per building.
+* **the graded ground itself (VTER-GROUND-MESH)** -- the platform, the plane
+  and the walls are recorded; nothing emits them, and VillageBuilder still
+  stands the 3D village at y = 0.
+* **a bank storey in a village** -- a house over one storey of fall moves lot
+  rather than dig its cellar (HouseSlope band 3 is the family's; the plan
+  changes under it, so the flights cannot be reserved from the flat plan).
+* **cost** -- the fit samples the ground per candidate lot and a church or a
+  castle is measured once per lattice point of fall and direction: a
+  50-person plan takes 16-36 s on a real grid (7-13 s before).
+
+### Against the world set, 2026-10-16
+
+VillageShape over every real fixture (`village_terrain_sweep.gd -- --forms
+street,derived --qa`, 50 people, seed 4242; "~" is the form the ground
+derives), against the world set's p10-p90 band by relief class -- low
+(< 60 m): span 0.5-16 m, slope 0.4-5 %; mid (60-250 m): 2-44 m, 1.2-14 %;
+high (>= 250 m): 7.5-72 m, 5-36 %. "Fall" is the most any building stands on
+and its share of what its family takes in a village. QA as in the table above.
+
+| Fixture | Form | Relief | Span | Slope | Fall | Placed | QA |
+|---|---|---|---|---|---|---|---|
+| Castelmezzano | street | high 302 | 8.3 ok | 21.6 ok | 2.50 (96 %) | 8/16 | housed |
+| Castelmezzano | ~green | high 369 | **4.8 low** | 18.0 ok | 2.00 (71 %) | 10/16 | housed, stairs pinched |
+| Èze | street | high 308 | 14.9 ok | 17.3 ok | 2.50 (96 %) | 16/16 | tavern 78 m from a gate |
+| Èze | ~round | high 320 | 10.3 ok | 14.6 ok | 2.25 (80 %) | 16/16 | ok |
+| Giethoorn | street / ~planted | low 10 | 1.2 / 1.4 ok | 2.6 / 3.3 ok | 0.50 | 16/16 | ok |
+| Hallstatt | street | high 372 | 20.4 ok | 13.9 ok | 2.50 (96 %) | 15/16 | a stair pinched |
+| Hallstatt | ~green | high 345 | 17.9 ok | 14.5 ok | 2.50 (96 %) | 15/16 | a stair pinched |
+| Manarola | street | mid 215 | 4.5 ok | 7.0 ok | 1.25 (48 %) | 16/16 | ok |
+| Manarola | ~strand | mid 230 | 4.7 ok | 6.3 ok | 1.00 | 9/16 | housed |
+| Masouleh | street | high 320 | 9.4 ok | 22.9 ok | 2.50 (89 %) | 6/16 | housed |
+| Masouleh | ~green | high 279 | 23.2 ok | 23.7 ok | 2.75 (98 %) | 16/16 | stairs pinched |
+| Monemvasia | street / ~green | mid 144-172 | 4.1 / 7.2 ok | 9.5 / 13.4 ok | 1.25 | 16/16 | ok |
+| Monpazier | street | low 56 | 5.4 ok | **5.1 high** | 0.75 | 16/16 | ok |
+| Monpazier | ~planted | low 56 | 2.4 ok | 4.1 ok | 0.75 | 16/16 | ok |
+| Positano | street / ~green | high 314-319 | 11.1 / 10.6 ok | 18.8 / 19.3 ok | 2.50 | 14/16 | housed |
+| Rocamadour | street / ~green | mid 137 | 5.3 / 3.7 ok | 7.1 / 8.9 ok | 1.25 | 16/16 | ok |
+| Satemin | street / ~planted | low 10 | 1.9 / 2.0 ok | 0.5 / 3.9 ok | 0.75 | 16/16 | ok |
+| Ushguli | street / ~green | mid 144-155 | 7.5 / 5.6 ok | 13.8 / 12.8 ok | 1.75 (67 %) | 16/16 | ok |
+
+22 of 24 inside both bands; the two outside are marginal (Monpazier's
+street at 5.1 % against 5 %, Castelmezzano's green at 4.8 m against 7.5 m on
+a site that houses ten of sixteen). No building stands on more fall than its
+family takes; no lot is on water. The synthetic planes read one slope
+everywhere and so sit above every band's slope by construction; on `plane_50`
+the refusal of falls over a storey leaves 11-12 of 16 placed (16 before:
+they stood on up to 4 m of fall nobody built for). `vtplan`'s Thorn on
+Manarola is a strand on the shore flat (span 0.8 m against 2 m): the form's
+choice, noted as a warning (VTER-FORM-SHORE).
 
 ## A building on falling ground (VTER-HOUSE-SLOPE)
 

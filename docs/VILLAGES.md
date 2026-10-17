@@ -302,6 +302,14 @@ wealth and the household, and every request is sent through
 bounds afterwards, never from the requested envelope, for the same reason
 the massing check reads `mass_log` and not the spec.
 
+**On given ground** (VTER-LOTS, [VILLAGE_TERRAIN.md](VILLAGE_TERRAIN.md)
+"Lots on the ground") each lot also stands on a platform: the building is
+asked for the fall under it (`ground_fall_m`, `ground_downhill_deg`), a
+fall its family does not take refuses the lot, its entry steps stay on its
+own lot or verge, a lot with its door high over the ground is taken last,
+back yards shorten with the slope, and the ground's own lake or sea is plan
+water. A flat plan is untouched.
+
 ---
 
 ## 6. Arrangement: where things go and why
