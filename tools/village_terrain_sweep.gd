@@ -9,6 +9,9 @@ extends SceneTree
 ## on the plan's own ground AND on the caller's grid at the carried points),
 ## street_contour_share, the common's slope, lots across a cliff or on water,
 ## plan time, and with --qa the VillageQA failures (no per-building QA).
+## A second line (VTER-PLACE): VillageShape's worship_elev_pctile,
+## worship_centrality, body_elev_pctile and water_within_30m beside the world
+## set's (VillagePlaceCheck.WORLD_*), and PlaceCheck's ground reading.
 
 const SYNTH := preload("res://tests/fixtures/terrain/synthetic_terrain.gd")
 const REAL30 := "res://tests/fixtures/terrain/real30/"
@@ -128,6 +131,12 @@ static func measure(plan: VillagePlan) -> Dictionary:
 	out["span"] = shape.get("elev_span_m")
 	out["relief"] = shape.get("relief_disc_m")
 	out["band"] = relief_band(shape)
+	# VTER-PLACE: where the landmark and the body stand against the world set
+	out["worship_pct"] = shape.get("worship_elev_pctile")
+	out["worship_centre"] = shape.get("worship_centrality")
+	out["body_pct"] = shape.get("body_elev_pctile")
+	out["water30"] = shape.get("water_within_30m")
+	out["place"] = VillagePlaceCheck.ground_reading(plan)
 	# VTER-LOTS: lots on water, and the most fall any building stands on
 	# against what its family accepts in a village
 	var water_lots := 0
@@ -200,9 +209,11 @@ static func line(name: String, form: String, m: Dictionary) -> String:
 	for cls in m["grades"]:
 		gs += "%s=%.3f " % [cls, m["grades"][cls]]
 	var band: Dictionary = m.get("band", {})
+	var place := "  worship %s centre %s body %s water30 %s %s" % [str(m.get("worship_pct")),
+		str(m.get("worship_centre")), str(m.get("body_pct")), str(m.get("water30")), str(m.get("place", ""))]
 	return "%-22s %-10s at (%.0f, %.0f) yaw %5.1f site %s  bld %d/%d  %s contour %s/%s  common %.3f/%.3f  cliff %d wet %d water %d  relief %s %s span %s %s slope %s %s  fall %.2f (%.0f%% of limit)  %.1f s %s" % [
 		name, form, m["anchor"].x, m["anchor"].y, m["yaw"], m["site"], m["buildings"], m["programme"], gs,
 		str(m["contour"]), str(m["steep_share"]), float(m.get("common_slope", -1.0)), float(m.get("common_slope_max", -1.0)),
 		m["cliff_lots"], m["wet_lots"], m["water_lots"], str(m["relief"]), band.get("class", "-"), str(m["span"]),
 		band.get("span", "-"), str(m["slope_med"]), band.get("slope", "-"), m["max_fall"], 100.0 * m["max_fall_share"],
-		m["ms"] / 1000.0, "OVER " + ", ".join(m["over"]) if not m["over"].is_empty() else ""]
+		m["ms"] / 1000.0, "OVER " + ", ".join(m["over"]) if not m["over"].is_empty() else ""] + "\n   " + place

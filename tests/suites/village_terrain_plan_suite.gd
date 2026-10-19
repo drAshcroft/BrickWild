@@ -27,6 +27,9 @@ extends RefCounted
 ##              its site plan; vcheck's `pure` covers it)
 ##   fixed      a grid that only just covers the site keeps the caller's
 ##              centre and chooses the yaw alone
+##   place      (VTER-PLACE) PlaceCheck's seven ground rules run inside
+##              VillageQA on every case; they are silent on a flat village
+##              (`pure`); each case notes worship_elev_pctile and the reading
 ##
 ## Timings per plan are in the notes; planning is the cost.
 
@@ -240,6 +243,9 @@ static func _case(res: SuiteResult, jobs: Array[Dictionary], name: String, form:
 	res.note("%-24s at (%.0f, %.0f) yaw %.1f site %.0fx%.0f |%s | contour %s | common %.1f%% | plan %.1f s, qa %.1f s" % [
 		label, plan.site_anchor.x, plan.site_anchor.y, rad_to_deg(plan.site_yaw), plan.site.size.x, plan.site.size.y,
 		gs, "-" if share == null else "%.3f (steep %.2f)" % [float(share), steep_share], common_slope * 100.0, plan_s, qa_s])
+	# VTER-PLACE: how the programme lies on the ground (the rules are in VillageQA above)
+	res.note("%-24s place: worship_elev_pctile %s | %s" % [label, str(shape.get("worship_elev_pctile")),
+		VillagePlaceCheck.ground_reading(plan)])
 
 
 ## VTER-LOTS, on every sited plan:
@@ -452,7 +458,7 @@ static func _fixed_centre(res: SuiteResult) -> void:
 
 ## The same spec on the same ground twice, the siting cache cleared between:
 ## the same site plan. And a flat spec is still sited nowhere.
-static func _pure(res: SuiteResult, _jobs: Array[Dictionary]) -> void:
+static func _pure(res: SuiteResult, jobs: Array[Dictionary]) -> void:
 	var a := VillageSitePlanner.plan(spec_for(&"street", terrain("spur")))
 	VillageSiting.clear_cache()
 	var b := VillageSitePlanner.plan(spec_for(&"street", terrain("spur")))
@@ -468,3 +474,18 @@ static func _pure(res: SuiteResult, _jobs: Array[Dictionary]) -> void:
 		if road["class"] == &"steps":
 			res.fail("pure: a flat plan has steps")
 			break
+	# VTER-PLACE: the ground rules are silent on a flat village -- no reading,
+	# no failure -- so a flat village is judged exactly as before
+	var flat_lots := VillageLotPlanner.plan_measured(spec_for(&"street", null), jobs)
+	var place := VillagePlaceCheck.new()
+	var rep: Dictionary = place.check(flat_lots)
+	res.checked += 1
+	for key in ["landmark_elev_rank", "common_slope", "manor_elev_rank", "mill_elev_rank", "race_fall_m", "wood_slope"]:
+		if (rep["stats"] as Dictionary).has(key):
+			res.fail("pure: PlaceCheck read the ground (%s) on a flat village" % key)
+	for f in rep["failures"]:
+		if String(f).contains("_ground:"):
+			res.fail("pure: a ground rule failed a flat village: %s" % f)
+	res.checked += 1
+	if VillagePlaceCheck.ground_reading(flat_lots) != "":
+		res.fail("pure: a flat village has a ground reading")

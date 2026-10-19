@@ -27,6 +27,9 @@ extends RefCounted
 ##             until X is the contour
 ##   common    the common's slope above 4 %, and any of it wet or cliff
 ##   water     how far the nearest water is, when the programme wants water
+##   landmark  the landmark slot's height ranked among the site lattice's,
+##             short of the world set's median church (VTER-PLACE): the
+##             church on the high side of its village, its common below it
 ##   centre    how far the anchor is from the caller's own centre
 ##
 ## If the grid is larger than the site (with its corners free to turn) the
@@ -58,6 +61,13 @@ const W_COMMON := 30.0
 const W_COMMON_BAD := 10.0
 const W_WATER := 2.0
 const W_CENTRE := 1.0               ## per 400 m
+## VTER-PLACE: per unit of rank short of the world's median church
+## (VillagePlaceCheck.WORLD_WORSHIP_ELEV_MEDIAN). Small beside the road and
+## the common: it decides between frames that are otherwise alike -- above
+## all the two ways round a contour road, the common's side uphill or down.
+const W_LANDMARK := 2.0
+## Below this much relief across the lattice the rank is noise.
+const LANDMARK_RELIEF_M := 3.0
 
 static var _cache := {}
 static var _order: Array[String] = []
@@ -191,7 +201,10 @@ static func _samples(flat: VillagePlan) -> Dictionary:
 				long.append(Vector2(cx + (p.x - cx) * ROAD_STRETCH, p.y))
 			pts = long
 		roads.append(pts)
-	return {"lattice": lattice, "spacing": site.size / float(LATTICE - 1), "common": common, "roads": roads}
+	var out := {"lattice": lattice, "spacing": site.size / float(LATTICE - 1), "common": common, "roads": roads}
+	if flat.landmark_reserved():
+		out["landmark"] = VillageMeasure.centre(flat.landmark_site["poly"])
+	return out
 
 
 static func _score(t: VillageTerrain, samples: Dictionary, anchor: Vector2, yaw: float,
@@ -258,7 +271,21 @@ static func _score(t: VillageTerrain, samples: Dictionary, anchor: Vector2, yaw:
 		"common": W_COMMON * common_ex / maxf(cpts.size(), 1) + W_COMMON_BAD * float(common_bad) / maxf(cpts.size(), 1),
 		"water": 0.0,
 		"centre": W_CENTRE * anchor.length() / 400.0,
+		"landmark": 0.0,
 	}
+	if samples.has("landmark"):
+		var lp: Vector2 = samples["landmark"]
+		var hl := t.height_at(anchor + Vector2(lp.x * c - lp.y * s, lp.x * s + lp.y * c))
+		var lo := INF
+		var hi := -INF
+		var below := 0
+		for h2 in hs:
+			lo = minf(lo, h2)
+			hi = maxf(hi, h2)
+			below += 1 if h2 < hl else 0
+		if hi - lo >= LANDMARK_RELIEF_M:
+			var rank := float(below) / maxf(hs.size(), 1)
+			terms["landmark"] = W_LANDMARK * maxf(0.0, VillagePlaceCheck.WORLD_WORSHIP_ELEV_MEDIAN - rank)
 	if not water.is_empty():
 		var near := INF
 		for w in water:

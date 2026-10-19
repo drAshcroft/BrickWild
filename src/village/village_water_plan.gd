@@ -41,6 +41,8 @@ static func mill_race(plan: VillagePlan, placement: Dictionary, xf: Transform3D)
 	var centre := Poly.bounding_rect(walls).get_center()
 	var forward3: Vector3 = xf.basis * Vector3(0, 0, -1)
 	var forward := Vector2(forward3.x, forward3.z)
+	var best := {}
+	var best_fall := INF
 	for edge in walls.size():
 		var a := walls[edge]
 		var b := walls[(edge + 1) % walls.size()]
@@ -85,8 +87,18 @@ static func mill_race(plan: VillagePlan, placement: Dictionary, xf: Transform3D)
 				var race: PackedVector2Array = union[0]
 				if not _race_clear(plan, race, walls):
 					continue
-				return {"kind": &"race", "poly": race, "source": wi,
+				var found := {"kind": &"race", "poly": race, "source": wi,
 					"wheel": wheel, "normal": normal, "wall": wall}
+				if plan.ground == null:
+					return found
+				# on given ground (VTER-PLACE) a leat follows the contour: the
+				# race whose ground falls least along it, none past the cap
+				var fall: float = float(plan.ground.under(race)["span_m"])
+				if fall < best_fall - 1e-6:
+					best_fall = fall
+					best = found
+	if not best.is_empty() and best_fall <= VillagePlaceCheck.RACE_FALL_MAX_M:
+		return best
 	return {}
 
 
