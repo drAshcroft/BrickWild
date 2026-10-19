@@ -92,13 +92,36 @@ const GATE_WIDTH := 4.0
 const BRIDGE_MARGIN := 0.8
 const BRIDGE_RAIL := 0.9
 
+## On given ground (VTER-GROUND-MESH): a terrace or retaining wall is this
+## thick, its coping stands this far over the ground it holds, its footing
+## this far under the ground in front of it, and its face this far proud of
+## the riser it covers.
+const TERRACE_THICK := 0.45
+const TERRACE_COPING := 0.1
+const TERRACE_FOOTING := 0.25
+const TERRACE_PROUD := 0.02
+## The overlays draped on given ground, this far over it.
+const DRAPE_TREAD := 0.012
+const DRAPE_APPROACH := 0.015
+## A run of edge on given ground is cut into pieces this long, each on its
+## own ground.
+const EDGE_PIECE := 3.0
+
+## The finished ground when the plan has ground; null on a flat village, and
+## then nothing below that reads it runs.
+var _surface: VillageGroundSurface = null
+
 
 func build(plan: VillagePlan) -> ArrayMesh:
 	begin(SURFACES)
 	if plan == null:
 		return commit()
+	_surface = VillageGroundSurface.of(plan)
 	tag("ground")
-	_ground(plan)
+	if _surface != null:
+		_ground_on_terrain(plan)
+	else:
+		_ground(plan)
 	tag("water")
 	_water(plan)
 	tag("edge")
@@ -170,7 +193,7 @@ func _ground(plan: VillagePlan) -> void:
 
 ## Each lot is its own bit of worked ground: a small, deterministic shift in
 ## lightness and warmth, so a row of yards is not one stamped colour.
-func _lot_tint(plan: VillagePlan, index: int) -> Color:
+static func _lot_tint(plan: VillagePlan, index: int) -> Color:
 	var h := fposmod(sin(float(index) * 12.9898 + float(plan.spec.seed) * 0.0137) * 43758.5453, 1.0)
 	var k := fposmod(sin(float(index) * 78.233 + float(plan.spec.seed) * 0.0291) * 24634.6345, 1.0)
 	var light := 0.90 + h * 0.18
@@ -211,6 +234,9 @@ static func _disc(centre: Vector2, radius: float) -> PackedVector2Array:
 ## Emit the final, serialized crossing routes. Each bend shares its mitered
 ## edge with the next deck panel, so neither holes nor shortcut chords appear.
 func _water(plan: VillagePlan) -> void:
+	if _surface != null:
+		_water_on_terrain(plan)
+		return
 	for w in plan.water:
 		if w["kind"] == &"race":
 			_flat(w["poly"], Y_WATER, SURF_WATER)
@@ -230,6 +256,9 @@ func _crossing(crossing: Dictionary, index: int) -> void:
 	var name := "%s%d" % [crossing["kind"], index]
 	var ribbon := Poly.ribbon(points, (float(crossing["width"]) + BRIDGE_MARGIN) * 0.5)
 	var height := 0.15 if bridge else 0.08
+	if _surface != null:
+		# on given ground the deck is level with the higher of its landings
+		height += maxf(_gy(points[0]), _gy(points[points.size() - 1]))
 	var depth := 0.25 if bridge else 0.12
 	var surface := SURF_WOOD if bridge else SURF_STONE
 	host(name)
@@ -287,9 +316,12 @@ func _crossing(crossing: Dictionary, index: int) -> void:
 		var far := near + direction * (1.5 if bridge else 0.8)
 		var ramp := PackedVector3Array()
 		var top := height + depth * 0.5
+		var foot := Y_ROAD
+		if _surface != null:
+			foot = _gy(far) + Y_ROAD
 		for corner in [Vector3(near.x + across.x, top - 0.03, near.y + across.y),
-			Vector3(far.x + across.x, Y_ROAD, far.y + across.y),
-			Vector3(far.x - across.x, Y_ROAD, far.y - across.y),
+			Vector3(far.x + across.x, foot, far.y + across.y),
+			Vector3(far.x - across.x, foot, far.y - across.y),
 			Vector3(near.x - across.x, top - 0.03, near.y - across.y)]:
 			ramp.append(corner)
 		var row := component_slab("crossing_ramp", ramp, 0.06, surface)
@@ -313,7 +345,10 @@ func _race_banks(plan: VillagePlan, race: Dictionary) -> void:
 		if mouth:
 			continue
 		var d := b - a
-		box(Vector3(0.12, 0.18, d.length()), Vector3(mid.x, 0.08, mid.y),
+		var y := 0.08
+		if _surface != null:
+			y += _gy(mid)
+		box(Vector3(0.12, 0.18, d.length()), Vector3(mid.x, y, mid.y),
 			SURF_WOOD, atan2(d.x, d.y))
 
 
@@ -331,6 +366,9 @@ func _enclosure(plan: VillagePlan) -> void:
 		return
 	var gates: Array[Dictionary] = plan.gate_crossings if plan.enclosure.size() >= 3 else derived["gates"]
 	var kit := PropKit.new(_kit, SURF_STONE, SURF_WOOD, SURF_ROOF, SURF_DARK)
+	if _surface != null:
+		_enclosure_on_terrain(plan, kind, edge, gates, kit)
+		return
 	var n: int = edge.size()
 	var made := 0
 	for i in range(n):
@@ -385,18 +423,28 @@ func _gate(gate: Dictionary, index: int, kind: StringName) -> void:
 	var surface := SURF_STONE if kind == &"wall" else SURF_WOOD
 	var yaw := atan2(-tangent.y, tangent.x)
 	var bounds := AABB()
+	# on given ground each post stands on its own ground and the lintel is
+	# level over the higher of them
+	var lift := 0.0
+	if _surface != null:
+		lift = maxf(_gy(at), maxf(_gy(at - tangent * (span * 0.5 + 0.2)), _gy(at + tangent * (span * 0.5 + 0.2))))
 	host("gate%d" % index)
 	for side in [-1.0, 1.0]:
 		var centre: Vector2 = at + tangent * side * (span * 0.5 + 0.2)
-		var row := component_box("gate_post", Vector3(0.4, height, 0.55),
-			Transform3D(Basis(Vector3.UP, yaw), Vector3(centre.x, height * 0.5, centre.y)), surface)
+		var post_xf := Transform3D(Basis(Vector3.UP, yaw), Vector3(centre.x, height * 0.5, centre.y))
+		var post_size := Vector3(0.4, height, 0.55)
+		if _surface != null:
+			var foot := _gy(centre)
+			post_size.y = lift + height - foot
+			post_xf.origin.y = (lift + height + foot) * 0.5
+		var row := component_box("gate_post", post_size, post_xf, surface)
 		bounds = component_aabb(row) if side < 0.0 else bounds.merge(component_aabb(row))
 	var lintel := component_box("gate_lintel", Vector3(span + 0.95, 0.3, 0.6),
-		Transform3D(Basis(Vector3.UP, yaw), Vector3(at.x, height - 0.15, at.y)), SURF_WOOD)
+		Transform3D(Basis(Vector3.UP, yaw), Vector3(at.x, lift + height - 0.15, at.y)), SURF_WOOD)
 	bounds = bounds.merge(component_aabb(lintel))
 	# A contrasting cap makes the entrance legible above the hedge or stakes.
 	var cap := component_box("gate_cap", Vector3(span + 1.2, 0.12, 0.8),
-		Transform3D(Basis(Vector3.UP, yaw), Vector3(at.x, height + 0.06, at.y)), SURF_ROOF)
+		Transform3D(Basis(Vector3.UP, yaw), Vector3(at.x, lift + height + 0.06, at.y)), SURF_ROOF)
 	bounds = bounds.merge(component_aabb(cap))
 	_log_mass("gate%d" % index, bounds)
 	total_height = maxf(total_height, bounds.end.y)
@@ -439,7 +487,7 @@ func _mill_culvert(a: Vector2, b: Vector2, index: int, kind: StringName) -> void
 	var mid := (a + b) * 0.5
 	var surface := SURF_STONE if kind == &"wall" else SURF_WOOD
 	var row := component_box("mill_culvert", Vector3(run.length(), height - 0.6, WALL_THICK),
-		Transform3D(Basis(Vector3.UP, atan2(-run.y, run.x)), Vector3(mid.x, (height + 0.6) * 0.5, mid.y)), surface)
+		Transform3D(Basis(Vector3.UP, atan2(-run.y, run.x)), Vector3(mid.x, (height + 0.6) * 0.5 + _gy(mid), mid.y)), surface)
 	_log_mass("mill_culvert%d" % index, component_aabb(row))
 
 func _hedge(a: Vector2, b: Vector2, index: int) -> void:
@@ -540,10 +588,17 @@ func _built_props(plan: VillagePlan) -> void:
 			continue
 		var at := Vector3(float(p["pos"].x), 0.0, float(p["pos"].y))
 		at.y = float(p["elevation"]) if p.has("elevation") else ground_height(plan, p["pos"])
+		if _surface != null and not p.has("elevation"):
+			at.y = _surface.stand_height(p["pos"], prop_radius(p))
 		var yaw: float = float(p.get("yaw", 0.0))
 		var box_of := AABB()
 		if p.has("approach"):
-			_flat(p["approach"], 0.035, SURF_ROAD)
+			if _surface != null:
+				var over := {}
+				_surface.drape(p["approach"], DRAPE_APPROACH, SURF_ROAD, over)
+				_emit_tris(over)
+			else:
+				_flat(p["approach"], 0.035, SURF_ROAD)
 		match String(p["key"]):
 			"well":
 				box_of = kit.well(at, yaw)
@@ -605,6 +660,9 @@ static func bank_height(d: float) -> float:
 ## Where the ground really is at a point, for whatever stands on it: the bank
 ## where there is water, level land everywhere else.
 static func ground_height(plan: VillagePlan, p: Vector2) -> float:
+	var surface := VillageGroundSurface.of(plan)
+	if surface != null:
+		return surface.ground_at(p)
 	var h := 0.0
 	var found := false
 	for poly in natural_water(plan):
@@ -754,3 +812,227 @@ func _flat(poly: PackedVector2Array, y: float, surf: int, tint := Color(0, 0, 0,
 					st.set_color(tint)
 				st.set_uv(Vector2.ZERO)
 				st.add_vertex(v)
+
+
+# ---------------------------------------------------- on given ground
+
+## The ground on given terrain (VTER-GROUND-MESH): VillageGroundSurface's
+## partition -- lots on their platforms, roads on their beds, the natural
+## ground carved by the water, risers wherever two of them meet at different
+## heights -- then the trodden patches draped over it, and the walls that
+## hold every riser over VillageLotGround.TERRACE_MIN as named components.
+func _ground_on_terrain(plan: VillagePlan) -> void:
+	_surface.build_mesh()
+	_emit_tris(_surface.mesh_tris)
+	var over := {}
+	for p in plan.props:
+		if String(p["key"]) == "well":
+			_surface.drape(_disc(p["pos"], WELL_TREAD), DRAPE_TREAD, SURF_TREAD, over)
+	for b in plan.buildings:
+		var door: Vector3 = b.get("door", Vector3.INF)
+		if door.is_finite():
+			_surface.drape(_disc(Vector2(door.x, door.z), DOOR_TREAD), DRAPE_TREAD, SURF_TREAD, over)
+	_emit_tris(over)
+	_log_mass("ground", _surface.bounds())
+	_terrace_walls(plan)
+	_retaining_walls(plan)
+
+
+## Triangles the surface laid out, per surface, into the kit.
+func _emit_tris(tris: Dictionary) -> void:
+	for surf in tris:
+		var st: SurfaceTool = _kit.surface(int(surf))
+		var vs: Array = tris[surf]["v"]
+		var ns: Array = tris[surf]["n"]
+		var cs: Array = tris[surf]["c"]
+		for k in range(vs.size()):
+			st.set_normal(ns[k])
+			if not cs.is_empty():
+				st.set_color(cs[k])
+			st.set_uv(Vector2.ZERO)
+			st.add_vertex(vs[k])
+
+
+## The finished ground at a plan point (0 on a flat village).
+func _gy(p: Vector2) -> float:
+	return 0.0 if _surface == null else _surface.height_at(p)
+
+
+## Half the larger side of what a prop covers on the ground: its recorded
+## rect, else the catalogue's measured size.
+static func prop_radius(p: Dictionary) -> float:
+	var rect: Variant = p.get("rect")
+	if rect is Rect2:
+		return 0.5 * maxf((rect as Rect2).size.x, (rect as Rect2).size.y)
+	var key := String(p.get("key", ""))
+	if PropCatalog.known(key):
+		var size: Vector3 = PropCatalog.size(key)
+		return 0.5 * maxf(size.x, size.z) * float(p.get("scale", 1.0))
+	return 0.0
+
+
+## Every terrace wall the lot planner recorded (lots[i].ground_fit.terraces),
+## host `lot<i>`, role `terrace_wall`: one panel per metre of its polyline,
+## standing on the riser between the lot's platform and the ground beside it.
+## A stretch where the two grounds meet (under a road bed) gets no panel.
+func _terrace_walls(plan: VillagePlan) -> void:
+	for li in range(plan.lots.size()):
+		var lot: Dictionary = plan.lots[li]
+		if not lot.has("ground_fit"):
+			continue
+		var walls: Array = lot["ground_fit"].get("terraces", [])
+		if walls.is_empty():
+			continue
+		host("lot%d" % li)
+		var poly: PackedVector2Array = lot["poly"]
+		for t in walls:
+			var pts: PackedVector2Array = t["points"]
+			for k in range(pts.size() - 1):
+				var a: Vector2 = pts[k]
+				var b: Vector2 = pts[k + 1]
+				var n := Vector2(b.y - a.y, a.x - b.x).normalized()
+				if Geometry2D.is_point_in_polygon((a + b) * 0.5 + n * 0.05, poly):
+					n = -n # n points out of the lot
+				_wall_panel("terrace_wall", a, b, n)
+		host_end()
+
+
+## The retaining walls of the road beds: along each road's verge, wherever
+## its bed stands more than TERRACE_MIN over or under the ground beside it
+## (and that ground is not another road's), host `road<i>`.
+func _retaining_walls(plan: VillagePlan) -> void:
+	for i in range(plan.roads.size()):
+		var ribbon := VillageSitePlanner.road_ribbon(plan.roads[i], true)
+		var opened := false
+		for e in range(ribbon.size()):
+			var a0: Vector2 = ribbon[e]
+			var b0: Vector2 = ribbon[(e + 1) % ribbon.size()]
+			var steps := maxi(1, int(ceil(a0.distance_to(b0) / 1.0)))
+			var n := Vector2(b0.y - a0.y, a0.x - b0.x).normalized()
+			if Geometry2D.is_point_in_polygon((a0 + b0) * 0.5 + n * 0.05, ribbon):
+				n = -n
+			for k in range(steps):
+				var a := a0.lerp(b0, float(k) / float(steps))
+				var b := a0.lerp(b0, float(k + 1) / float(steps))
+				var mid := (a + b) * 0.5
+				var mine := _surface.region_at(mid - n * 0.05)
+				var there := _surface.region_at(mid + n * 0.05)
+				if not _is_road_of(mine, i) or there <= mine or _surface.kind_of(there) in [
+						VillageGroundSurface.K_WEAR, VillageGroundSurface.K_ROAD,
+						VillageGroundSurface.K_VERGE, VillageGroundSurface.K_WATER]:
+					continue
+				var step := maxf(absf(_surface.height_in(mine, a) - _surface.height_in(there, a)),
+					absf(_surface.height_in(mine, b) - _surface.height_in(there, b)))
+				if step <= VillageLotGround.TERRACE_MIN:
+					continue
+				if not opened:
+					host("road%d" % i)
+					opened = true
+				_wall_panel("retaining_wall", a, b, n)
+		if opened:
+			host_end()
+
+
+func _is_road_of(ri: int, road: int) -> bool:
+	if ri >= _surface.regions.size():
+		return false
+	var r: Dictionary = _surface.regions[ri]
+	return int(r["owner"]) == road and int(r["kind"]) in [VillageGroundSurface.K_WEAR,
+		VillageGroundSurface.K_ROAD, VillageGroundSurface.K_VERGE]
+
+
+## One panel of wall on the line a-b, `out` the side away from what it
+## bounds: from TERRACE_FOOTING under the lower ground to TERRACE_COPING over
+## the higher, its body on the higher (held) side and its face TERRACE_PROUD
+## in front of the riser. Nothing where the two grounds meet.
+func _wall_panel(role: String, a: Vector2, b: Vector2, out: Vector2) -> void:
+	var in_a := _surface.height_at(a - out * 0.03)
+	var in_b := _surface.height_at(b - out * 0.03)
+	var out_a := _surface.height_at(a + out * 0.03)
+	var out_b := _surface.height_at(b + out * 0.03)
+	if maxf(absf(in_a - out_a), absf(in_b - out_b)) < 0.05:
+		return
+	var high_side := -out if in_a + in_b >= out_a + out_b else out
+	var shift := high_side * (TERRACE_THICK * 0.5 - TERRACE_PROUD)
+	var pa := a + shift
+	var pb := b + shift
+	var panel := PackedVector3Array([
+		Vector3(pa.x, minf(in_a, out_a) - TERRACE_FOOTING, pa.y),
+		Vector3(pb.x, minf(in_b, out_b) - TERRACE_FOOTING, pb.y),
+		Vector3(pb.x, maxf(in_b, out_b) + TERRACE_COPING, pb.y),
+		Vector3(pa.x, maxf(in_a, out_a) + TERRACE_COPING, pa.y)])
+	component_slab(role, panel, TERRACE_THICK, SURF_STONE, false)
+
+
+## Natural water on given ground: its sheet at its own surface (the level of
+## ground water; the terrain less the flat depth for a river the spec drew),
+## the bank already in the ground's partition; a mill race draped over the
+## ground; the crossings on their landings.
+func _water_on_terrain(plan: VillagePlan) -> void:
+	var over := {}
+	for wi in range(plan.water.size()):
+		var w: Dictionary = plan.water[wi]
+		if w["kind"] == &"race":
+			_surface.drape(w["poly"], Y_WATER, SURF_WATER, over)
+			_race_banks(plan, w)
+			continue
+		for sw in _surface.waters:
+			if int(sw["index"]) == wi:
+				_surface.water_sheet(sw, SURF_WATER, over)
+	_emit_tris(over)
+	for index in plan.water_crossings.size():
+		_crossing(plan.water_crossings[index], index)
+
+
+## The edge on given ground: each run cut into EDGE_PIECE pieces, each piece
+## standing on the lowest ground under it and as much taller as the ground
+## under it rises; a gate's posts each on their own ground.
+func _enclosure_on_terrain(plan: VillagePlan, kind: StringName, edge: PackedVector2Array,
+		gates: Array[Dictionary], kit: PropKit) -> void:
+	var n: int = edge.size()
+	var made := 0
+	for i in range(n):
+		var a: Vector2 = edge[i]
+		var b: Vector2 = edge[(i + 1) % n]
+		for run in _keep_fraction(_minus_gates(a, b, gates), plan.enclosure_kept_fraction):
+			for part in _water_edge_runs(plan, run[0], run[1]):
+				if part["natural"]:
+					continue
+				var pa: Vector2 = part["a"]
+				var pb: Vector2 = part["b"]
+				if part["wet"]:
+					_mill_culvert(pa, pb, made, kind)
+					made += 1
+					continue
+				var pieces := maxi(1, int(ceil(pa.distance_to(pb) / EDGE_PIECE)))
+				var bounds := AABB()
+				var label := ("hedge%d" if kind == &"hedge" else ("palisade%d" if kind == &"palisade" else "wall%d")) % made
+				for k in range(pieces):
+					var qa := pa.lerp(pb, float(k) / float(pieces))
+					var qb := pa.lerp(pb, float(k + 1) / float(pieces))
+					var lo := minf(minf(_gy(qa), _gy(qb)), _gy((qa + qb) * 0.5))
+					var hi := maxf(maxf(_gy(qa), _gy(qb)), _gy((qa + qb) * 0.5))
+					var piece := AABB()
+					if kind == &"hedge":
+						piece = _edge_box("hedge_bank", label, qa, qb, lo - 0.1, hi + 0.45, 0.5, SURF_COMMON)
+					elif kind == &"palisade":
+						piece = kit.palisade(qa, qb, lo - 0.1, PALISADE_HEIGHT + (hi - lo) + 0.1)
+					else:
+						piece = _edge_box("enclosure_wall", label, qa, qb, lo - 0.3, hi + WALL_HEIGHT,
+							WALL_THICK, SURF_STONE)
+					bounds = piece if k == 0 else bounds.merge(piece)
+				_log_mass(label, bounds)
+				made += 1
+	for g in gates.size():
+		_gate(gates[g], g, kind)
+
+
+func _edge_box(role: String, host_name: String, a: Vector2, b: Vector2, bottom: float, top: float,
+		thick: float, surf: int) -> AABB:
+	var run := b - a
+	var mid := (a + b) * 0.5
+	host(host_name)
+	var row := component_box(role, Vector3(run.length(), top - bottom, thick),
+		Transform3D(Basis(Vector3.UP, atan2(-run.y, run.x)), Vector3(mid.x, (top + bottom) * 0.5, mid.y)), surf)
+	host_end()
+	return component_aabb(row)
