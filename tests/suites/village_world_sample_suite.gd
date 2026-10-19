@@ -79,7 +79,7 @@ static func run() -> SuiteResult:
 	return res
 
 
-## VTER-PLACE: the targets VillagePlaceCheck and VillageSiting read from the
+## VTER-PLACE: the targets VillagePlaceCheck reads from the
 ## world set are still the world set's -- numpy's linear percentiles of each
 ## metric over the sites that have it, to the third decimal.
 const PLACE_TOL := 0.0015

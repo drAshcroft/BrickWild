@@ -549,11 +549,26 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	for job in jobs:
 		var cls: StringName = job["class"]
 		if cls == &"church" and plan.landmark_reserved():
+			# on given ground (VTER-PLACE), a slot on the low side of the
+			# village gives way to the high ground near the common (§6)
+			var high: Vector2 = landmark_high_ground(plan) if plan.ground != null else Vector2.INF
+			if high != Vector2.INF and _place_landmark_near(plan, job, high):
+				# recorded: PlaceCheck's `landmark_ground` says it went as high
+				# as a church can stand, as a warning, if that is still low
+				plan.lots.back()["landmark_high_ground"] = true
+				placed += 1
+				ctx = _context(plan)
+				continue
 			if landmark_lane < 0:
 				landmark_lane = _add_landmark_lane(plan)
 				ctx = _context(plan)
 			if landmark_lane >= 0 and _place_landmark(plan, ctx, job, landmark_lane):
 				placed += 1
+				continue
+			if plan.ground != null and _place_landmark_near(plan, job,
+					VillageMeasure.centre(plan.landmark_site["poly"])):
+				placed += 1
+				ctx = _context(plan)
 				continue
 		elif cls == &"manor":
 			if manor_lane < 0:
@@ -1796,6 +1811,124 @@ static func _place_landmark(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 			_commit(plan, lot, job, rule)
 			return true
 	return false
+
+
+## On given ground (VTER-PLACE): §6 puts the church "on the common, or on
+## the highest ground". The reserved slot is the common's. It is ranked among
+## the places the houses will stand -- both sides of every through road,
+## street and lane already laid, LANDMARK_ROW_M out, every
+## LANDMARK_HIGH_STEP_M -- and where it is below LANDMARK_SLOT_RANK of them,
+## the highest buildable ground within LANDMARK_HIGH_REACH_M of the common is
+## returned: the church seeks the frontage nearest it. Vector2.INF: the slot
+## will do (or there is no ground, or the rows are level within
+## LANDMARK_HIGH_RELIEF_M, or the form is a strand, whose slot is inland of
+## its single shore row and so above it).
+##
+## The common is kept in view first: the highest ground within
+## LANDMARK_NEAR_COMMON_M of the common's edge is taken when it stands in the
+## upper half of the house rows -- a church there still fronts the common, and
+## a hamlet's common needs its fronts (§9.4 `common`); only then the farther
+## high ground.
+const LANDMARK_HIGH_REACH_M := 70.0
+const LANDMARK_HIGH_STEP_M := 5.0
+const LANDMARK_ROW_M := 14.0          ## a setback and half a house from the road
+const LANDMARK_SLOT_RANK := 0.65      ## the slot not clearly on the high side: go up
+const LANDMARK_HIGH_RELIEF_M := 1.0
+const LANDMARK_NEAR_COMMON_M := 30.0
+const LANDMARK_ROW_CLASSES: Array[StringName] = [&"through", &"street", &"lane"]
+
+
+static func landmark_high_ground(plan: VillagePlan) -> Vector2:
+	if plan.ground == null or not plan.landmark_reserved() or plan.commons.is_empty():
+		return Vector2.INF
+	# a strand's slot is inland of its one row by construction: above it
+	if plan.spec.form == &"strand":
+		return Vector2.INF
+	var g: VillageTerrain = plan.ground
+	var cc: Vector2 = VillageMeasure.common_centre(plan)
+	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
+	var slot_h: float = g.height_at(VillageMeasure.centre(plan.landmark_site["poly"]))
+	var inner: Rect2 = plan.site.grow(-SITE_MARGIN - 6.0)
+	# where the houses will stand
+	var lo := INF
+	var hi := -INF
+	var below := 0
+	var n := 0
+	var rows := PackedFloat64Array()
+	for road in plan.roads:
+		if not (road["class"] in LANDMARK_ROW_CLASSES):
+			continue
+		var pts: PackedVector2Array = road["points"]
+		for k in range(pts.size() - 1):
+			var a: Vector2 = pts[k]
+			var b: Vector2 = pts[k + 1]
+			var nrm := Vector2(-(b - a).y, (b - a).x).normalized()
+			var steps := maxi(1, int(a.distance_to(b) / LANDMARK_HIGH_STEP_M))
+			for m in range(steps):
+				for side in [-1.0, 1.0]:
+					var q: Vector2 = a.lerp(b, float(m) / steps) + nrm * side * LANDMARK_ROW_M
+					if not inner.has_point(q) or Poly.contains_point(common, q) 							or not ground_clear(g, Poly.from_rect(Rect2(q - Vector2(4, 4), Vector2(8, 8)))):
+						continue
+					var hq: float = g.height_at(q)
+					rows.append(hq)
+					n += 1
+					below += 1 if hq < slot_h else 0
+					lo = minf(lo, hq)
+					hi = maxf(hi, hq)
+	if n == 0 or hi - lo < LANDMARK_HIGH_RELIEF_M or float(below) / n >= LANDMARK_SLOT_RANK:
+		return Vector2.INF
+	rows.sort()
+	var median: float = rows[rows.size() / 2]
+	# the highest buildable ground near the common, and the highest within
+	# reach; whether a church stands there is the frontage search's own fit
+	var near := Vector2.INF
+	var near_h := slot_h
+	var best := Vector2.INF
+	var best_h := slot_h
+	var reach := int(LANDMARK_HIGH_REACH_M / LANDMARK_HIGH_STEP_M)
+	for j in range(-reach, reach + 1):
+		for i in range(-reach, reach + 1):
+			var p: Vector2 = cc + Vector2(i, j) * LANDMARK_HIGH_STEP_M
+			if p.distance_to(cc) > LANDMARK_HIGH_REACH_M or not inner.has_point(p):
+				continue
+			if Poly.contains_point(common, p) or g.slope_at(p) > VillageSiteAnalysis.PLOT_MAX 					or not ground_clear(g, Poly.from_rect(Rect2(p - Vector2(5, 5), Vector2(10, 10)))):
+				continue
+			var h: float = g.height_at(p)
+			if h > best_h:
+				best_h = h
+				best = p
+			if h > near_h and VillageMeasure.point_to_poly(p, common) <= LANDMARK_NEAR_COMMON_M:
+				near_h = h
+				near = p
+	if near != Vector2.INF and near_h >= median:
+		return near
+	return best
+
+
+## On given ground (VTER-PLACE) the landmark's own lane may be refused: it
+## climbs from the through road to a slot behind the common, past a cart's
+## 12 % (`_lane_too_steep`). The church then takes
+## the frontage nearest its slot on the roads already laid -- the street round
+## the common, most often -- and may stand on the slot it was reserved. Before
+## this it fell through to the first legal frontage, which on a contour road
+## is as often the low side: Hallstatt's church stood at rank 0.06 of its
+## village's ground. The same placement takes the church to the high ground
+## (`landmark_high_ground`).
+static func _place_landmark_near(plan: VillagePlan, job: Dictionary, target: Vector2) -> bool:
+	if not plan.landmark_reserved():
+		return false
+	var kept: Dictionary = plan.landmark_site
+	var near: Dictionary = job.duplicate()
+	near["near_point"] = target
+	plan.landmark_site = {}
+	if _place_on_road(plan, _context(plan), near, _open_roads(plan, []), 0.0) < 0.0:
+		plan.landmark_site = kept
+		return false
+	var actual: Dictionary = plan.lots.back()
+	actual["landmark"] = true
+	plan.landmark_site = {"poly": actual["poly"], "front": actual["front"],
+		"kind": kept.get("kind", &"church")}
+	return true
 
 
 ## §6: the manor is at the head of the village on its own short lane. Search
