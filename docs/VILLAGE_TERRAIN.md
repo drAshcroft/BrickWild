@@ -821,7 +821,7 @@ before and after hash vertex for vertex the same (below).
 | the emission | `VillageBuilder._ground_on_terrain`, `_terrace_walls`, `_retaining_walls`, `_water_on_terrain`, `_enclosure_on_terrain` |
 | where things stand | `VillageBuilder.ground_height` (the emitted mesh), `VillageGroundSurface.stand_height`; `VillageAssembler` (buildings at `platform_m`, `_ground_yard`) |
 | the check | `qa/village_ground_check.gd` (`GroundProbe` reads the Ground mesh back) |
-| the suite | `vground` (Wolfmarch Green flat, then three grounds and five controls) |
+| the suites | `vground` (Wolfmarch Green flat, in lane:village-fast); `vgroundterrain` (three grounds and five controls) |
 | the flat proof | `tools/fingerprint_village_ground.gd` |
 | pictures | `godot --path . --script res://tools/render_village_ground.gd` |
 
@@ -894,7 +894,8 @@ never the field it was laid from:
 | water | no ground over a natural water's surface (2 m lattice) |
 
 `vground` (40 checks, all pass; 10 min on a loaded host, of which the three
-terrain villages, 20 people each, are about 6), 2026-10-19:
+terrain villages, 20 people each, are about 6), 2026-10-19. The terrain
+villages are now their own suite, `vgroundterrain`:
 
 | Ground | Lots | Pieces / risers (tallest) | Panels terrace / retaining | Pads | Seams (stepped), open | Layers | Water |
 |---|---|---|---|---|---|---|---|
@@ -950,5 +951,5 @@ water region drops a riser (an abutment) to a road bed that runs into it.
   sheet following the terrain, not a chain of pools and falls;
 * **a building alone** -- yard models of a sloped house generated outside a
   village still stand at y = 0 (the family's own note in VTER-HOUSE-SLOPE);
-* **the vground cost** -- its three terrain villages add about 6 minutes on a
-  loaded host to `lane:village-fast`.
+* ~~**the vground cost**~~ -- its three terrain villages moved to
+  `vgroundterrain`, out of `lane:village-fast`.

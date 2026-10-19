@@ -98,7 +98,6 @@ static func run() -> SuiteResult:
 	if not check.check(plan, scene)["ok"]:
 		res.fail("negative controls did not restore the scene")
 	scene.free()
-	_terrain(res)
 	return res
 
 
@@ -142,6 +141,16 @@ static func _yard_model(scene: Node3D, key: String) -> Node3D:
 ## its crossings on their landings). Then, on the plane, one negative control
 ## per rule the ground check gained.
 const VT := preload("res://tests/suites/village_terrain_plan_suite.gd")
+
+
+## Suite `vgroundterrain`: kept out of `vground` (and so out of
+## lane:village-fast) because measuring and assembling three villages on
+## ground takes minutes where the flat suite takes seconds.
+static func run_terrain() -> SuiteResult:
+	var res := SuiteResult.new("vgroundterrain")
+	_terrain(res)
+	return res
+
 const TERRAIN_POP := 20
 const TERRAIN_SEED := 4242
 ## [ground, form, assemble, the spec's water]
