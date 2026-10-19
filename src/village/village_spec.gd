@@ -129,14 +129,13 @@ const FORM_VOCABULARY: Array[StringName] = [&"street", &"green", &"crossroads", 
 ##                        street will replace
 ##   valley    -> street  a ribbon along the through road, as a valley is
 ##   crest     -> round   houses ringed round the top's common
-##   shore     -> strand  one row facing the water
 ##   water     -> strand  the row along the water the stilts will stand in
-## (`dispersed` has its planner: VillageDispersedForm, VTER-FORM-DISPERSED.)
+## (`dispersed` has its planner: VillageDispersedForm, VTER-FORM-DISPERSED;
+## `shore`: VillageShoreForm, VTER-FORM-SHORE.)
 const FORM_FALLBACK := {
 	&"hillside": &"street",
 	&"valley": &"street",
 	&"crest": &"round",
-	&"shore": &"strand",
 	&"water": &"strand",
 }
 ## The terrain form rule's thresholds (`_derive_form_on_ground`). Fitted on

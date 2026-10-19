@@ -294,7 +294,8 @@ the `planted` ones, and nothing in the ground or the seven inputs tells them
 apart (the survey's own classifier sees the buildings; the spec does not).
 
 **Fallback until each form has a planner.** `VillageSitePlanner` lays the
-seven old forms and `dispersed` (VTER-FORM-DISPERSED, below). `form_intent`
+seven old forms, `dispersed` (VTER-FORM-DISPERSED, below) and `shore`
+(VTER-FORM-SHORE, last section). `form_intent`
 keeps the derived form; `form` is what is planned, through
 `VillageSpec.FORM_FALLBACK`:
 
@@ -303,7 +304,7 @@ keeps the derived form; `form` is what is planned, through
 | hillside | street | the one-street row a contour street will replace |
 | valley | street | a ribbon along the through road, as a valley village is |
 | crest | round | houses ringed round the top's common |
-| shore | strand | one row facing the water |
+| ~~shore~~ | ~~strand~~ | planned as itself since VTER-FORM-SHORE |
 | water | strand | the row along the water the stilts will stand in |
 | ~~dispersed~~ | ~~green~~ | planned as itself since VTER-FORM-DISPERSED |
 
