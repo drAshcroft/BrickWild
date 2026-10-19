@@ -270,6 +270,13 @@ static func make_context(plan: VillagePlan) -> Dictionary:
 		for yard_poly in VillageMeasure.yard_polys(b):
 			bounds.append(yard_poly)
 			boxes.append(Poly.bounding_rect(yard_poly))
+		# on given ground (VTER-LOTS), the entry flights, a church's terrace
+		# and a castle's talus are the building's too: nothing stands on them
+		var lot: Dictionary = plan.lots[int(b["lot"])] if int(b["lot"]) < plan.lots.size() else {}
+		if lot.has("ground_fit"):
+			for part in lot["ground_fit"].get("entry_parts", []):
+				bounds.append(part)
+				boxes.append(Poly.bounding_rect(part))
 		var d: Vector2 = VillageMeasure.door(b)
 		doors.append(Rect2(d - Vector2(VillageDressCatalog.DOOR_CLEAR, VillageDressCatalog.DOOR_CLEAR),
 			Vector2(VillageDressCatalog.DOOR_CLEAR, VillageDressCatalog.DOOR_CLEAR) * 2.0))

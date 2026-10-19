@@ -83,9 +83,21 @@ def main():
     for c in plan.get("commons", []):
         ax.add_patch(MPoly(poly(c["poly_m"]), closed=True, fc="#cfe3b4", ec="#8fb36a", lw=0.6))
     for w in plan.get("water", []):
-        ax.add_patch(MPoly(poly(w["poly_m"]), closed=True, fc="#9cc3e6", ec="none"))
+        # the plan's own water outlined, so it reads apart from the grid's
+        # wet ground drawn under it
+        ax.add_patch(MPoly(poly(w["poly_m"]), closed=True, fc="#9cc3e6", ec="#3f78b0", lw=0.6))
     for lot in plan.get("lots", []):
         ax.add_patch(MPoly(poly(lot["poly_m"]), closed=True, fc="none", ec="#c9c9c9", lw=0.4))
+        platform = lot.get("platform") or {}
+        # VTER-LOTS: terrace walls (cut: holding the bank above the lot,
+        # fill: under its edge) and what the building puts on the ground
+        # outside its walls (entry flights, a terrace, a talus)
+        for wall in platform.get("terrace_walls", []):
+            q = poly(wall["points_m"])
+            col = "#8a5a2b" if wall.get("holds") == "cut" else "#c08a3e"
+            ax.plot(q[:, 0], q[:, 1], color=col, lw=0.6 + min(2.5, float(wall["height_m"])), solid_capstyle="butt")
+        for part in platform.get("ground_parts_m", []):
+            ax.add_patch(MPoly(poly(part), closed=True, fc="#e0a040", ec="none", alpha=0.8))
     for r in plan.get("roads", []):
         col, lw, ls = ROAD_STYLE.get(r.get("class", ""), ("#777777", 1.0, "-"))
         q = poly(r["points_m"])

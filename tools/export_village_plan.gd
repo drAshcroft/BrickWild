@@ -721,13 +721,27 @@ static func _add_ground(out: Dictionary, plan: VillagePlan) -> void:
 		out["site"]["frame"] = "plan point p stands on the given ground at anchor_m + p rotated by yaw_deg (x toward z)"
 	for i in range(plan.lots.size()):
 		out["lots"][i]["ground"] = _ground(t.under(plan.lots[i]["poly"]))
+		if plan.lots[i].has("ground_fit"):
+			out["lots"][i]["platform"] = _platform(plan.lots[i]["ground_fit"])
 	for i in range(plan.buildings.size()):
 		var b: Dictionary = plan.buildings[i]
 		var corners: PackedVector2Array = Placement.world_rect(b["placement"], b["transform"], true)
 		var g: Dictionary = _ground(t.under(corners))
 		var door: Vector3 = b["door"]
 		g["door_m"] = _n(t.height_at(Vector2(door.x, door.z)))
+		var lot: Dictionary = plan.lots[int(b["lot"])]
+		if lot.has("ground_fit"):
+			# where the building stands (VTER-LOTS): its floor on the lot's
+			# platform, the fall its request carries and which way
+			var fit: Dictionary = lot["ground_fit"]
+			g["platform_m"] = _n(float(fit["platform_m"]))
+			g["fall_m"] = _n(float(fit["fall_m"]))
+			g["downhill_deg"] = _n(float(fit["downhill_deg"]))
+			g["door_rise_m"] = _n(float(fit["door_rise_m"]))
 		out["buildings"][i]["ground"] = g
+	for w in range(plan.water.size()):
+		if bool(plan.water[w].get("ground", false)):
+			out["water"][w]["source"] = "ground"
 	for r in range(plan.roads.size()):
 		var pts: PackedVector2Array = plan.roads[r]["points"]
 		var pr: Dictionary = t.profile(pts)
@@ -738,6 +752,29 @@ static func _add_ground(out: Dictionary, plan: VillagePlan) -> void:
 			"rise_m": _n(pr["rise_m"]), "fall_m": _n(pr["fall_m"]), "grade_max": _n(pr["grade_max"])}
 	for i in range(plan.commons.size()):
 		out["commons"][i]["ground"] = _ground(t.under(plan.commons[i]["poly"]))
+
+
+## A lot's platform (VTER-LOTS, VillageLotGround.record): the level the
+## building's floor stands at, the fall its request carries (local direction,
+## and in the plan's frame), how much is cut and filled under it, what it puts
+## on the ground outside its walls (entry flights, a terrace, a talus), and
+## the terrace walls along the lot's edge -- for a consumer that grades the
+## ground (VTER-GROUND-MESH): inside the lot the ground is the platform uphill
+## of the building and GroundFall's plane from it downhill.
+static func _platform(fit: Dictionary) -> Dictionary:
+	var walls: Array = []
+	for w in fit["terraces"]:
+		walls.append({"points_m": _points(w["points"]), "height_m": _n(float(w["height_m"])),
+			"holds": String(w["holds"])})
+	var parts: Array = []
+	for p in fit.get("entry_parts", []):
+		parts.append(_points(p))
+	var down: Vector2 = fit["downhill"]
+	return {"platform_m": _n(float(fit["platform_m"])), "fall_m": _n(float(fit["fall_m"])),
+		"downhill_deg": _n(float(fit["downhill_deg"])), "downhill": [_n(down.x), _n(down.y)],
+		"natural_fall_m": _n(float(fit["natural_m"])), "slope": _n(float(fit["slope"])),
+		"cut_m": _n(float(fit["cut_m"])), "fill_m": _n(float(fit["fill_m"])),
+		"door_rise_m": _n(float(fit["door_rise_m"])), "ground_parts_m": parts, "terrace_walls": walls}
 
 
 ## One `under()` reading, snapped.

@@ -237,12 +237,17 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 	# the road when it needs more houses.
 	if spec.form not in [&"strand", &"planted"]:
 		_extra_lanes(out, spec, through, extra_lanes)
+	var ground_shore := false
 	if ground != null:
 		grade_roads(out)
+		# the ground's own lake or sea as plan water, every road cut back to
+		# its shore (VTER-LOTS); it is the shore a coast or lake spec asks for
+		ground_shore = VillageGroundWater.add(out)
 	# VIL-018 water is authored before lot cutting, so lots can avoid the
 	# polygon and every later bridge/ford check reads the same geometry. Strand
 	# owns a deliberately shifted coast rectangle above; preserve it exactly.
-	if spec.water != &"none" and spec.form != &"strand":
+	if spec.water != &"none" and spec.form != &"strand" \
+			and not (ground_shore and spec.water in [&"coast", &"lake"]):
 		var water_plan: Dictionary = VillageWaterPlan.build(spec, out.site,
 			out.roads, out.commons)
 		for water in water_plan["water"]:
