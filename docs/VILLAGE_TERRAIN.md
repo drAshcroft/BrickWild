@@ -560,7 +560,8 @@ the family plans its flights on, every flight lands on the lot's ground.
 **Terrace walls.** Where the graded ground leaves the natural ground by more
 than 0.6 m along the lot's edge, the lot records a wall there: a polyline,
 the most it holds, and whether it holds a `cut` bank above the lot or a
-`fill` under it. VTER-GROUND-MESH emits them; nothing here builds geometry.
+`fill` under it. VillageBuilder emits them as `terrace_wall` components
+(VTER-GROUND-MESH, "The ground mesh" below); nothing here builds geometry.
 
 **What a family accepts in a village.** A house or a shop: one storey of fall
 (a raised floor and entry steps; the family's own bank storey digs a cellar
@@ -621,9 +622,9 @@ Manarola's hillside above the strand.
   flight's treads or heights (the parts are lot floor to them, never an
   obstacle, so no door is cut off). The flights are in each lot's
   `entry_parts` and in `BrickWild.navigation()`'s `route_m` per building.
-* **the graded ground itself (VTER-GROUND-MESH)** -- the platform, the plane
-  and the walls are recorded; nothing emits them, and VillageBuilder still
-  stands the 3D village at y = 0.
+* ~~the graded ground itself (VTER-GROUND-MESH)~~ -- done: VillageBuilder
+  emits the platforms, the road beds and the walls on the terrain, and the
+  assembler stands each building on its platform ("The ground mesh" below).
 * **a bank storey in a village** -- a house over one storey of fall moves lot
   rather than dig its cellar (HouseSlope band 3 is the family's; the plan
   changes under it, so the flights cannot be reserved from the flat plan).
@@ -793,11 +794,161 @@ and the walk export never builds the mesh; a castle's `ground_apron`
 adds `route_m` (threshold, landing, each tread, the foot on the ground) to a
 door that has one, for houses, shops and churches. Flat buildings gain no key.
 
-**Not yet.** Yard dressing (barrels, benches, gardens, fences) still stands at
-y = 0 and floats on the downhill side; the village walk (`VillageWalk`) does
+**Not yet.** ~~Yard dressing (barrels, benches, gardens, fences) still stands
+at y = 0 and floats on the downhill side~~ -- in a village on given ground the
+assembler now sets each yard model on the lowest ground under its footprint
+(VTER-GROUND-MESH); a building generated alone, outside a village, still
+stands its yard at y = 0. The village walk (`VillageWalk`) does
 not read routes; a front-downhill house in band 3 keeps its front door on the
 downhill side and climbs to it by a long flight along the facade -- the
 village should turn such lots so the front faces uphill or across the slope.
 
 Suite: `hslope` (house, shop, church at 0 / 1.0 / 2.5 / 4.0 m, sideways and
 front-to-back). Pictures: `godot --path . --script res://tools/render_slopes.gd`.
+
+## The ground mesh (VTER-GROUND-MESH)
+
+With `plan.ground` the 3D village stands on its terrain: VillageBuilder
+emits the ground from the terrain, the lots on their platforms, the roads on
+graded beds, the walls that hold them, and the water merged into the banks;
+VillageAssembler stands every building, prop, plant and yard model on it.
+**Without ground none of the new code runs**: seven flat villages built
+before and after hash vertex for vertex the same (below).
+
+| Piece | Where |
+|---|---|
+| the finished ground (field and mesh) | `src/village/village_ground_surface.gd`, `VillageGroundSurface` (cached per plan) |
+| the emission | `VillageBuilder._ground_on_terrain`, `_terrace_walls`, `_retaining_walls`, `_water_on_terrain`, `_enclosure_on_terrain` |
+| where things stand | `VillageBuilder.ground_height` (the emitted mesh), `VillageGroundSurface.stand_height`; `VillageAssembler` (buildings at `platform_m`, `_ground_yard`) |
+| the check | `qa/village_ground_check.gd` (`GroundProbe` reads the Ground mesh back) |
+| the suite | `vground` (Wolfmarch Green flat, then three grounds and five controls) |
+| the flat proof | `tools/fingerprint_village_ground.gd` |
+| pictures | `godot --path . --script res://tools/render_village_ground.gd` |
+
+**The field.** The site is a partition into regions, claimed in priority
+order, each with its own height:
+
+| Region | Height | Surface |
+|---|---|---|
+| natural water | the natural ground, carved | bank colours |
+| each road by rank (through first): worn line, carriageway, verges | its BED | wear, road, verge |
+| each lot, split on GroundFall's crease | its platform, graded exactly as `VillageLotGround.graded_at` | yard, tinted |
+| commons, fields, the bank ring, open land | the natural ground, carved | common, field, bank, ground |
+
+The **natural ground** is the terrain sampled at `CELL` = 2.5 m and carved
+by the water, linear over each cell's two triangles -- so the mesh IS it,
+not an approximation. A river or pond the spec drew keeps the flat village's
+bank (`bank_height`) set on the terrain, its sheet following the ground; the
+ground's own water (`"ground": true`) is a level sheet at `water_level_m`,
+the bank shelving under it and handed back to the terrain over 1.5 m.
+
+A **road bed** is level across and follows the natural profile along its
+centreline (stations every 2 m, averaged over 2 stations each side). Where a
+lesser road leaves a greater road's ribbon, the step between the two beds is
+spread over `JUNCTION_TAPER` = 8 m. `VillageGroundSurface.road_bed(i)` is the
+bed: stations, metres along, heights.
+
+**The mesh.** Every grid triangle is clipped (Geometry2D) against the regions
+that reach it, highest first; each piece is triangulated and its vertices set
+on its region's height. Where two regions meet at different heights the
+higher one drops a vertical **riser** to the lower along the shared edge, so
+the ground is closed by construction: pads and road beds are stitched by
+setting vertex heights, never by CSG. A region wholly inside a triangle (a
+hole) splits the triangle, up to three times. Round the site a skirt carries
+the edge down to a common foot. Top faces are single-sided with per-face
+normals; risers are double-sided.
+
+**The walls.** Every recorded terrace wall (`ground_fit.terraces`) is emitted
+as `terrace_wall` panels, host `lot<i>`; every stretch of a road's verge more
+than `TERRACE_MIN` (0.6 m) over or under the ground beside it as
+`retaining_wall` panels, host `road<i>`. A panel is a 1 m slab
+(`component_slab`, not vertical-depth), 0.45 m thick, from 0.25 m under the
+lower ground to 0.1 m over the higher, its body on the held side and its face
+2 cm proud of the riser. ComponentCheck re-emits them in `vground`.
+
+**Standing on it.** A building's node stands at its lot's `platform_m`. A
+prop, a built prop and a yard model stand on the LOWEST ground under their
+footprint (centre and eight points round the rim, radius half the larger
+side), so the downhill edge is on the ground and the uphill edge sits into it.
+A yard model up on a deck or a porch (planned above 5 cm) stays there. A
+plant stands at its origin. "The ground" is the emitted mesh
+(`VillageGroundSurface.ground_at`): a point ON an edge between a pad and the
+terrain is held by both triangles, and a thing set there stands on the upper
+one -- the dresser plants its hedgerow bushes exactly on lot edges, and
+standing them on the field's lower side buried them 0.5-3 m in the riser's
+face (caught by the check, the first time it ran). Gates, palisades, hedges,
+walls and a mill race follow the ground in 3 m pieces; a bridge deck is level
+with the higher of its landings and ramps down to the ground at both.
+
+**The check** (`VillageGroundCheck`, on given ground) reads the emitted Ground
+mesh back triangle by triangle -- upward faces, vertical faces, water --
+never the field it was laid from:
+
+| Rule | Measure |
+|---|---|
+| prop, yard | lowest point vs the mesh's lowest ground under its footprint, within 6 cm |
+| plant | ground line vs the mesh at its origin, as on the flat village |
+| building | node at `platform_m` (1 cm), the mesh under its footprint within 5 cm of `platform + GroundFall.ground_y` |
+| seam | every metre of every lot edge and road verge: a step over 5 cm is closed by risers (`uncovered` <= 5 cm), and no two ground layers lie more than 5 cm apart |
+| terrace | a lot whose recorded wall the mesh steps across has a `terrace_wall` component hosted by it |
+| water | no ground over a natural water's surface (2 m lattice) |
+
+`vground` (40 checks, all pass; 10 min on a loaded host, of which the three
+terrain villages, 20 people each, are about 6), 2026-10-19:
+
+| Ground | Lots | Pieces / risers (tallest) | Panels terrace / retaining | Pads | Seams (stepped), open | Layers | Water |
+|---|---|---|---|---|---|---|---|
+| plane_30, street | 6 | 3553 / 583 (5.33 m) | 273 / 223 | 0.012 m | 757 (681), 0.028 m | 0.020 m | - |
+| Hallstatt, green | 6 | 7264 / 1033 (2.86 m) | 189 / 207 | 0.012 m | 1174 (984), 0.016 m | 0.012 m | 961 pts, 0.000 m |
+| plane_15, green, a river | 6 | 4037 / 726 (2.59 m) | 204 / 186 | - | 959 (751), 0.016 m | 0.012 m | 168 pts, 0.000 m |
+
+The 50-person street village on plane_30 and green village on Hallstatt
+(16 buildings each) pass as well: 661 and 530 terrace panels, every terraced
+lot named, open seams 0.020 / 0.018 m, pads 0.012 m. The ground costs 1-7 s
+per village (Hallstatt's 12 600 pieces: 7.4 s on a loaded host).
+
+The five **negative controls** on plane_30: a yard model at its centre's
+ground on the slope (the old placement) floats; a building 0.3 m off its
+platform; the risers removed (every step an open seam); the yard laid twice,
+0.3 m apart (two layers, and off the pads); the terrace walls unlogged.
+
+**Flat stays flat.** `tools/fingerprint_village_ground.gd` hashes every
+surface's vertex, normal, colour and uv arrays, the component and mass logs,
+and -- for two of them, assembled -- every building, prop, plant and yard
+model transform, for seven flat villages covering every form planner used,
+every water (river, stream, coast, pond) and every edge (palisade, wall,
+hedge). Base (f10be7e, run from a copy of the untouched tree) and this change:
+`diff` empty, all seven lines identical (`artifacts/vter_ground_mesh/flat_base.log`,
+`flat_new.log`; e.g. `street-none-none mesh=e5da7c34d26d909e`).
+
+**For VTER-STEPS-NAV.** A `steps` road has a bed like any road (level across,
+on its profile): `VillageGroundSurface.of(plan).road_bed(i)` gives its
+stations, distances and heights, and its ribbon is already in the mesh as
+road and verge pieces, with risers to the lots beside it. Treads go on that
+bed; replacing the ramp with flights is a matter of emitting treads over the
+bed (or making `bed_at` stepped for that class) -- the check's seams will
+then see the treads' risers as any other.
+
+**For VTER-CROSSINGS.** `_crossing` lifts a deck to the higher of its
+landings (`height_at` at its two ends) and ramps it down to the ground;
+`VillageGroundSurface.water_surface(w, p)` is the water under it, and the
+water region drops a riser (an abutment) to a road bed that runs into it.
+
+### Not yet
+
+* **a stepped bed for `steps`** -- a stair street is a ramp on its profile
+  until VTER-STEPS-NAV puts treads on it;
+* **earth risers under 0.6 m** -- where a pad meets the terrain or a road bed
+  by less than `TERRACE_MIN` the step is a vertical face of earth (closed, not
+  walled, not blended); two lots' pads meeting each other, or a road's
+  junction residual (up to about grade x half-width, 0.25 m on a 12 % road),
+  the same. A blend band inside the lot, kept clear of the footprint and the
+  entry flights, would soften them;
+* **one wall per metre** -- the panels are 1 m each (hundreds per village);
+  merging collinear runs would shrink the component log;
+* **rivers on steep ground** -- a river the spec draws on given ground is a
+  sheet following the terrain, not a chain of pools and falls;
+* **a building alone** -- yard models of a sloped house generated outside a
+  village still stand at y = 0 (the family's own note in VTER-HOUSE-SLOPE);
+* **the vground cost** -- its three terrain villages add about 6 minutes on a
+  loaded host to `lane:village-fast`.
