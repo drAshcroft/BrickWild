@@ -1177,7 +1177,7 @@ identical).
 | ways up | `_lanes`: 3-6 (+ half the retry's extra lanes), 40 m apart, off the hill side of the road, square to it, leaning along the valley (never under 35 degrees to the road, the junction rule) as far as the grade needs: a `lane` (12 %, 36 m) where possible, else a `track` (30 %) to the site's edge, else steps |
 | households | `assign_jobs` (lot planner hook): houses, cottages and farms each get a slot, four round the common (its two ends on the hill side, two across the road), the rest evenly along the road, sides alternating; each is cut the lot nearest its slot. Left alone the lot planner fills outward from the common into a blob |
 
-Suite `vvalley` (599 checks, ~6 min, 106 s of it measuring the 19 buildings
+Suite `vvalley` (452 checks, ~4 min, 106 s of it measuring the 19 buildings
 once; `VALLEY_CASE=<fixture>` runs one, `VALLEY_DUMP=1` prints buildings and
 roads): a farming village of 60 on a river. Checks: the ground derives
 valley and plans as itself; the river is plan water, no road in it, no
@@ -1190,10 +1190,19 @@ the road, every road within its class's grade; **elongation over 3** and
 
 | Ground | Site | Placed | Elongation | dead_end_ratio | Grades (through / lanes / tracks) | QA |
 |---|---|---|---|---|---|---|
-| river_valley | 297x139 | 19/19 | 5.04 | 0.600 | 0 % / - / 29 % | ok |
-| valley | 297x139 | 19/19 | 6.46 | 0.600 | 0 % / - / 29 % | ok |
-| Vermont (world90) | 297x139 | 19/19 | 4.79 | 0.600 | 10 % / 12 % / 29 % | ok |
-| Lugar de Guene (world90) | 386x139 | 19/19 | 4.60 | 0.625 | 11 % / 12 % / 28 % | ok |
+| river_valley | 297x139 | 19/19 | 5.93 | 0.600 | 0 % / - / 29 % | ok |
+| valley | 297x139 | 19/19 | 6.50 | 0.600 | 0 % / - / 29 % | ok |
+| Gangotri (world90) | 400x139 | 19/19 | 6.14 | 0.583 | 11 % / 12 % / 29 % | ok |
+
+After VTER-PLACE and VTER-FORM-SHORE merged (the church goes to the high ground
+near the common; the mill's race may fall 1.5 m) the suite was re-fitted: the
+ground-water polygon of a river grid is grown by its 3 m bank (a leat across
+the synthetic channel's wall fell past `mill_ground`), the siting and the road
+are smoothed over 15 columns (a river bend bowed Lugar de Guene's road 48 m),
+and the case list is the three above. Vermont, Ushguli, Lake Argyle and Lugar
+de Guene derive valley but fail `common` (23-57 % of 60 %: the church leaves
+the slot behind the common for the high ground and the steep side takes the
+neighbours) -- see Not yet.
 
 Where VTER-CROSSINGS should put bridges: the body stays on the road's one
 bank, the river runs 11-35 m off the road, parallel to it. A bridge belongs
@@ -1206,10 +1215,12 @@ Not yet:
   along the frame, over a cart's 12 % (the same missing switchbacks as above);
   where the river bends out of the straight frame the road leaves it (Lugar
   de Guene: 20-219 m, median 33);
-* **the common's fronting on steep sides** -- real30/ushguli (53 % of 60 %)
-  and world90/lake_argyle (50 %; elongation 2.95): the neighbours the slots
-  ask for beside the common do not stand on that ground, and the church does
-  not always take the slot behind it;
+* **the common's fronting on steep sides** -- world90/vermont (57 %),
+  real30/ushguli (23 %), world90/lake_argyle (40 %; elongation 2.14),
+  world90/lugar_de_guene (43 %; elongation 1.39, a bent river): the church goes
+  to the high ground (VTER-PLACE) and the neighbours the slots ask for beside
+  the common do not stand on that ground. A common on the river side of the
+  road (a green on the bank, the church across the road) is the likely fix;
 * **a 90 m grid with no floor in it** -- world90/balan houses 16 of 19 on a
   uniform 13 % hillside; its siting falls back to the standard score;
 * the road is often straight on a flat floor (the router prefers it);

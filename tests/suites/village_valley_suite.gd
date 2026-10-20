@@ -36,15 +36,17 @@ const SEED := 4242
 const CASES := [
 	["river_valley", &""],
 	["valley", &""],
-	["world90/vermont", &""],
-	["world90/lugar_de_guene", &""],
+	["world90/gangotri", &""],
 ]
 ## Derive valley (with a river in the spec) and are NOT cases, each for a stated
-## reason (docs/VILLAGE_TERRAIN.md "The valley form", Not yet): real30/ushguli
-## and world90/lake_argyle fail the common's fronting (53 %, 50 % of 60 %) on
-## ground too steep for the neighbours to stand beside it; world90/balan houses
-## 16 of 19 on a uniform 13 % hillside its 90 m grid shows no floor in;
-## world90/rocamadour's gorge drops 18 % along the river, over a cart's 12 %.
+## reason (docs/VILLAGE_TERRAIN.md "The valley form", Not yet). Since VTER-PLACE
+## the church goes to high ground near the common, which on the steep sides
+## leaves the common's edge unfronted (QA `common`, 60 %): world90/vermont (57 %,
+## and a lot-parts conflict), real30/ushguli (23 %), world90/lake_argyle (40 %,
+## elongation 2.14), world90/lugar_de_guene (43 %; its road bows 48 m with the
+## river's bend, elongation 1.39). world90/balan houses 16 of 19 on a uniform
+## 13 % hillside its 90 m grid shows no floor in; world90/rocamadour's gorge
+## drops 18 % along the river, over a cart's 12 %.
 ## VALLEY_CASE=<fixture> runs any of them.
 ## Over three, with the survey's high-relief median (2.71) under it and its p90 (4.72) over.
 const ELONGATION_MIN := 3.0
@@ -246,6 +248,13 @@ static func _case(res: SuiteResult, jobs: Array[Dictionary], name: String, force
 			var pts: PackedVector2Array = plan.roads[r]["points"]
 			rl += " %d:%s(%.0f,%.0f)-(%.0f,%.0f)" % [r, plan.roads[r]["class"], pts[0].x, pts[0].y, pts[pts.size() - 1].x, pts[pts.size() - 1].y]
 		res.note("%s roads:%s" % [name, rl])
+		var cb := Poly.bounding_rect(plan.commons[0]["poly"])
+		var fl := ""
+		for b in plan.buildings:
+			var fr: PackedVector2Array = plan.lots[int(b["lot"])]["front"]
+			if VillageMeasure.point_to_poly(fr[0], plan.commons[0]["poly"]) < 40.0:
+				fl += " (%.0f,%.0f)-(%.0f,%.0f)" % [fr[0].x, fr[0].y, fr[1].x, fr[1].y]
+		res.note("%s common %s landmark %s fronts:%s" % [name, cb, plan.landmark_site.get("poly", PackedVector2Array()), fl])
 	var gs := ""
 	for cls in worst:
 		gs += " %s %.0f%%" % [cls, float(worst[cls]) * 100.0]

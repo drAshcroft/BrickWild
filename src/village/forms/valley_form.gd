@@ -59,6 +59,7 @@ const RIVER_EDGE_MARGIN_M := 25.0 ## a river nearer the site's edge than this is
 const PLATEAU_M := 0.3
 ## the height the router is told the river's bank stands at: under any water level it is asked about
 const FORBIDDEN_M := -100000.0
+const RIVER_BANK_GROW_M := 3.0   ## a ground river's polygon is grown by its bank
 const BANK_M := 3.0               ## clear ground between the river's edge and the road's verge
 const FLAT_RIVER_OFFSET_M := 26.0 ## without ground: the river this far south of the road
 const OFFSET_STEP_M := 2.0        ## road offsets tried from the river
@@ -70,8 +71,8 @@ const BOW_KEPT := 0.4             ## of the seeded bow, so the road is never str
 const HILL_ROOM_M := 46.0
 ## relaxation passes after the bank raised the road
 const RELAX_PASSES := 200
-const SMOOTH_COLUMNS := 9
-const MEDIAN_COLUMNS := 7         ## the offsets and the river line are median-filtered
+const SMOOTH_COLUMNS := 15
+const MEDIAN_COLUMNS := 9         ## the offsets and the river line are median-filtered
 const LANE_PITCH_M := 40.0
 const LANE_LENGTH_M := 36.0
 const LANE_CAP := 0.12
@@ -89,7 +90,7 @@ const LANE_SPOTS := [0.14, 0.86, 0.30, 0.70, 0.06, 0.94, 0.42, 0.58, 0.22, 0.78,
 ## the households' slots: this far in from the site's ends, this far off the road's line
 const SLOT_END_M := 14.0
 const SLOT_OFFSET_M := 11.0
-const SLOT_COMMON_END_M := 20.0   ## the neighbours of the common stand this far beyond its ends
+const SLOT_COMMON_END_M := 11.0   ## the neighbours of the common stand this far beyond its ends
 const COMMON_CLEAR_M := 12.0      ## a lane's foot this far from the common's x range
 const COMMON_ASPECT := 1.8        ## the common's width over its depth, squared: wide and shallow
 const COMMON_WIDTH_MIN := 18.0
@@ -136,6 +137,11 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
 			for w in out.water:
 				if bool(w.get("ground", false)) and spec.water in [&"river", &"stream"]:
 					w["kind"] = spec.water
+					# the water's margin is its bank: a leat across a 3 m channel
+					# wall falls past what PlaceCheck's `mill_ground` allows
+					var grown: PackedVector2Array = Poly.offset(w["poly"], RIVER_BANK_GROW_M)
+					if grown.size() >= 3:
+						w["poly"] = grown
 	if not ground_shore and spec.water != &"none":
 		var ribbon := river_polygon(valley, spec, out.site)
 		if not ribbon.is_empty():
