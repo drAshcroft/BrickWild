@@ -294,21 +294,17 @@ the `planted` ones, and nothing in the ground or the seven inputs tells them
 apart (the survey's own classifier sees the buildings; the spec does not).
 
 **Fallback until each form has a planner.** `VillageSitePlanner` lays the
-seven old forms, `dispersed` (VTER-FORM-DISPERSED, below) and `shore`
-(VTER-FORM-SHORE, last section). `form_intent`
-keeps the derived form; `form` is what is planned, through
-`VillageSpec.FORM_FALLBACK`:
+seven old forms, `dispersed`, `shore`, `valley` and `crest` (each in its own
+section below). `form_intent` keeps the derived form; `form` is what is
+planned, through `VillageSpec.FORM_FALLBACK`:
 
 | intent | planned as | why |
 |---|---|---|
 | hillside | street | the one-street row a contour street will replace |
-| ~~valley~~ | ~~street~~ | planned as itself since VTER-FORM-VALLEY |
-| ~~shore~~ | ~~strand~~ | planned as itself since VTER-FORM-SHORE |
-
-| valley | street | a ribbon along the through road, as a valley village is |
-| ~~crest~~ | ~~round~~ | planned as itself since VTER-FORM-CREST |
-| shore | strand | one row facing the water |
 | water | strand | the row along the water the stilts will stand in |
+| ~~valley~~ | ~~street~~ | planned as itself since VTER-FORM-VALLEY |
+| ~~crest~~ | ~~round~~ | planned as itself since VTER-FORM-CREST |
+| ~~shore~~ | ~~strand~~ | planned as itself since VTER-FORM-SHORE |
 | ~~dispersed~~ | ~~green~~ | planned as itself since VTER-FORM-DISPERSED |
 
 Each VTER-FORM-* task that gives a form its planner deletes that form's one
