@@ -106,6 +106,10 @@ var hamlets: Array[Dictionary] = []
 ## column in the plan's frame, water on +y. Empty for every other form.
 var shoreline := PackedVector2Array()
 
+## A `crest` village's summit, ring and church bearing (VillageCrestForm);
+## empty for every other form.
+var crest: Dictionary = {}
+
 
 ## The ground readings of this plan are taken on: `ground` when the village
 ## was sited, else the spec's own (null when flat).
@@ -199,6 +203,7 @@ func equals(other: VillagePlan) -> bool:
 		and _array_of_dict_equal(plants, other.plants)
 		and _array_of_dict_equal(hamlets, other.hamlets)
 		and _poly_equal(shoreline, other.shoreline)
+		and crest == other.crest
 	)
 
 

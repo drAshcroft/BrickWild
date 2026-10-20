@@ -80,6 +80,7 @@ const EXTRA: Array[String] = ["hslope", "library", "placement", "cultureapi", "c
 	"vdispersed",
 	"vshore",
 	"vvalley",
+	"vcrest",
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest", "cas013",
 	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015", "cground",
@@ -462,6 +463,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_terrain_plan_suite.gd").run()
 		"vcrossterrain":
 			return preload("res://tests/village_crossterrain_test.gd").run()
+		"vcrest":
+			return preload("res://tests/suites/village_crest_suite.gd").run()
 		"vdispersed":
 			return preload("res://tests/suites/village_dispersed_suite.gd").run()
 		"vshore":

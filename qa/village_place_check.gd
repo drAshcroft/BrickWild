@@ -157,8 +157,15 @@ func _check_common(plan: VillagePlan) -> void:
 		if plan.spec.population < VillageSpec.HAMLET_POPULATION else FRONTED_SHARE
 	stats["common_fronted"] = snappedf(share, 0.01)
 	if plan.buildings.size() >= 3 and share < wanted_share:
-		failures.append("common: only %.0f%% of the common's edge has a house front near it, wants %.0f%%"
-			% [share * 100.0, wanted_share * 100.0])
+		var msg := "common: only %.0f%% of the common's edge has a house front near it, wants %.0f%%" \
+			% [share * 100.0, wanted_share * 100.0]
+		if plan.crest.is_empty():
+			failures.append(msg)
+		else:
+			# a crest village's houses front the ring street, which circles the
+			# summit; the church alone stands between it and the common
+			# (VTER-FORM-CREST): said, not failed
+			warnings.append(msg)
 	for i2 in range(plan.buildings.size()):
 		if VillageLotPlanner.overlap_area(VillageMeasure.bounds_poly(plan.buildings[i2]), common) > VillageLotPlanner.AREA_EPS:
 			failures.append("common: building %d stands on the common" % i2)
@@ -598,6 +605,10 @@ func _check_churchyard(plan: VillagePlan) -> void:
 ## than convenient: a village that is nine farms and a smithy has no wealth
 ## gradient to have, and `farms` is the rule that judges where it put them.
 func _check_gradient(plan: VillagePlan) -> void:
+	# on a crest the wealth runs up the hill, not out from the common: the
+	# landmark_ground and highest-building rules say it (VTER-FORM-CREST)
+	if not plan.crest.is_empty():
+		return
 	var houses: Array[int] = []
 	for i in plan.buildings_of_kind(&"house"):
 		if (plan.buildings[i]["request"] as BuildingRequest).purpose != &"farmer":

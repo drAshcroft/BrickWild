@@ -76,7 +76,9 @@ func _check_through(plan: VillagePlan) -> void:
 		elif sa == sb:
 			failures.append("through: road %d comes in and goes out on the same side" % r)
 		var common: PackedVector2Array = VillageMeasure.common_poly(plan)
-		if not common.is_empty():
+		# a crest village's through road passes at the hill's foot and its
+		# approach climbs to the common (VTER-FORM-CREST): not near it
+		if not common.is_empty() and plan.crest.is_empty():
 			var near := INF
 			for p in common:
 				near = minf(near, VillageMeasure.point_to_polyline(p, pts))

@@ -682,6 +682,11 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		# ground, so a flat request's bytes never change
 		out["form_intent"] = String(plan.spec.form_intent)
 		_add_ground(out, plan)
+	if not plan.crest.is_empty():
+		# a crest village's summit and ring (VillageCrestForm); no other form has one
+		var c: Dictionary = plan.crest
+		out["crest"] = {"summit_m": [_n(c["summit"].x), _n(c["summit"].y)], "ring_radius_m": _n(c["radius"]),
+			"approaches": int(c["approaches"])}
 	if not plan.hamlets.is_empty():
 		# a dispersed village's hamlets (VillageDispersedForm); no other form
 		# has any, so no other plan's bytes change

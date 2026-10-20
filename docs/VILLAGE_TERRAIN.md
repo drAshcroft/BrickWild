@@ -305,6 +305,10 @@ keeps the derived form; `form` is what is planned, through
 | ~~valley~~ | ~~street~~ | planned as itself since VTER-FORM-VALLEY |
 | crest | round | houses ringed round the top's common |
 | ~~shore~~ | ~~strand~~ | planned as itself since VTER-FORM-SHORE |
+
+| valley | street | a ribbon along the through road, as a valley village is |
+| ~~crest~~ | ~~round~~ | planned as itself since VTER-FORM-CREST |
+| shore | strand | one row facing the water |
 | water | strand | the row along the water the stilts will stand in |
 | ~~dispersed~~ | ~~green~~ | planned as itself since VTER-FORM-DISPERSED |
 
@@ -1300,3 +1304,74 @@ each cross the river once and pass.
 * **a ford** on terrain is still the level stone slab at the higher landing;
 * **abutment walls to the bank** -- the stone is a box under the deck's end,
   not a wing wall; a bank much higher than the deck shows it buried.
+
+## The crest form (VTER-FORM-CREST)
+
+Row 3 of the form rule, given its planner: `src/village/forms/crest_form.gd`,
+`VillageCrestForm`, reached from `VillageSitePlanner._plan` by one early
+dispatch; `crest` is in `FORMS_SUPPORTED` and out of `FORM_FALLBACK`.
+Without terrain the form is never derived, so nothing flat changes
+(`thorn-hamlet` and `veld-070` exported on b3e163d and on this branch, `cmp`
+identical: `artifacts/vter_form_crest/flat.log`).
+
+| Step | What |
+|---|---|
+| frame | `VillageCrestForm.frame`, called by `VillageSiting.site` for the form: the ANCHOR IS THE SUMMIT -- the highest dry point within 200 m of the caller's origin that stands 5 m over the mean of the 30-150 m ring round it (ties within 0.5 m: nearest the origin), with the site on the grid. Only the yaw is chosen: the siting's own score of the flat plan, its common term replaced (the common is on the summit whatever the yaw) and its road term doubled, plus how steeply the straight way from the through road to the ring's gate climbs. Falls back to the generic frame when the ground has no such summit |
+| site | the summit is the plan's origin; the site runs from the ring's outer row and the church behind it in the north to the through road's strip in the south (an asymmetric rectangle) |
+| through road | at the hill's foot, 12 m beyond the outer row's back, routed by grade within 15 m of that line; the village is not on it |
+| common | a 16-gon of 8 m radius on the summit, its well, a `path` from the gate to it |
+| ring | closed, of straight chords about 19 m long (a lot must not out-reach its chord: a wide church lot overlapped the next chord's ribbon on the inside of the bend at 16 m), each a `street`. Laid on a contour: the height is the mean round the ring radius, and at each bearing the ring goes where the ground is at that height, within 0.6-1.8 of the radius, then smoothed. Radius `8 + 28 + 3` = 39 m up to 25 households, 1.2 m more per household after; the lot planner's retries scale it |
+| approach | a `street` from the through road's nearest vertex to the ring vertex due south of the summit; `grade_roads` makes it a path or steps where the ground says so. From 100 people a second approach, to the vertex about 65 degrees round on the gentler side |
+| landmark | the church is placed first (`VillageCrestForm.place_landmark`, one hook in `cut_measured`) on the ring's inner frontage at the bearing 40 degrees or more round from the gate where the ground at its depth is highest, nearest 60 degrees on a tie. The lot planner's front-uphill preference is waived for it (`door_ok`: a church inside the ring faces downhill, its steps are the terrace's). Afterwards no other lot whose middle stands within 0.5 m of the church's height is cut (`holds_high_ground`), so it is the highest building |
+| houses | on both sides of the ring; the lot planner's own orientation rule puts the big ones on the outer side (their fronts face uphill) |
+
+`plan.crest` carries {summit, radius, ring_height, gate, approaches,
+church_dir, high_m}; the exporter writes `crest` (summit, ring radius,
+approaches) only when there is one.
+
+**What the checks learned** (each a no-op for a plan without `plan.crest`):
+the road check's `through ... passes Nm from the common` is not asked of a
+village whose road passes at the foot; PlaceCheck's `gradient` (big houses
+nearer the common) is not asked -- on a hill the wealth runs up it, and the
+landmark rules say so -- and `common` fronted is a WARNING, not a failure:
+the houses front the ring, and between the ring and the common stands the
+church.
+
+Suite `vcrest` (209 checks, 5 m 9 s: 65 s of it measuring 16 buildings once;
+`tools/crest_probe.gd -- <case>` runs one case; `tools/list_crest_sites.gd`
+lists the world sites that derive `crest`: Cayumba, Civita di Bagnoregio,
+Oia, Monteriggioni, Bonifacio, Eze, Acoma Pueblo -- Beni Isguen derives
+something else). 50 people, `market`, seed 4242. The first three are strict;
+Eze and Civita are measured in full and their failures are warnings headed
+`open:`.
+
+| Ground | Ring (spread) | Church / tallest other | body_elev_pctile | compactness | Near ring | Through | QA |
+|---|---|---|---|---|---|---|---|
+| crest (synthetic) | 39 m (0.0 m) | 59.57 / 58.82 m | 0.995 | 0.837 | 0.88 | 6 % | ok |
+| spur (synthetic, forced) | 39 m (10.3 m) | 81.10 / 78.28 m | 0.869 | 0.904 | 0.88 | 1 % | ok |
+| Monteriggioni (world90) | 39 m (2.0 m) | 271.03 / 270.62 m | 0.991 | 0.927 | 0.88 | 10 % | ok |
+| Eze (real30) | 39 m (5.5 m) | 398.40 / 398.00 m | 0.955 | 0.874 | 0.93 | **12.8 %** | tavern unplaced, 15/16 |
+| Civita di Bagnoregio (world90) | 50.7 m (6.7 m) | 430.88 / 427.37 m | 0.982 | **0.589** | 0.60 | 11 % | every ring chord steps; no smithy; density 4.5 % |
+
+The acceptance (body_elev_pctile over 0.85, compactness over 0.5, the
+landmark the highest building, the walk reaching the church and the well
+from the gate) holds on all five; on the three strict grounds the village QA
+passes too.
+
+### Not yet
+
+* **a ridge's ring** -- a spur's summit is the top of a ramp, so no contour
+  closes round it: the ring spans 10 m of height (the north side is cut at
+  0.6 of the radius). It is a ring street all the same, in grade;
+* **steep hills** -- Eze (40-50 % flanks) keeps its road 0.8 % over the cart
+  cap and loses its tavern; Civita's butte (a 90 m grid, 49 % under the
+  common) turns every chord into steps, so the lots lose their frontage;
+  both want a ring that climbs (a spiral) where a closed contour is not
+  there, and a hillside form's terraced lots (VTER-FORM-HILLSIDE);
+* **the houses do not front the common** -- they front the ring;
+* **no wall** -- an enclosed spec (Monteriggioni's palisade is dropped in
+  the suite's spec) has not been tried round the outer row; the
+  enclosure planner sees only the plan's site;
+* **larger villages** -- over about 25 households the ring simply grows;
+  a second ring or a lower town below the gate is not laid;
+* **Beni Isguen** derives another form on its 90 m ground.

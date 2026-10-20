@@ -84,7 +84,11 @@ static func site(spec: VillageSpec) -> Dictionary:
 		spec.water, spec.purpose, spec.households]
 	if _cache.has(key):
 		return _cache[key]
-	var out := choose(t, flat, spec.water != &"none")
+	var out := {}
+	if spec.form == &"crest" and not spec.compact_display:
+		out = VillageCrestForm.frame(t, flat, spec)   # the anchor is the summit
+	if out.is_empty():
+		out = choose(t, flat, spec.water != &"none")
 	var w: float = VillageSitePlanner.SITE_MAX_SIDE * 0.5 + VIEW_PAD_M
 	out["ground"] = t.sited_view(out["anchor"], out["yaw"], Rect2(-w, -w, 2.0 * w, 2.0 * w),
 		minf(t.cell_m, VIEW_CELL_MAX))
