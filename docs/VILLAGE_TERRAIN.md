@@ -802,3 +802,78 @@ village should turn such lots so the front faces uphill or across the slope.
 
 Suite: `hslope` (house, shop, church at 0 / 1.0 / 2.5 / 4.0 m, sideways and
 front-to-back). Pictures: `godot --path . --script res://tools/render_slopes.gd`.
+
+## The shore form (VTER-FORM-SHORE)
+
+Rows 1, 4 and 10 of the form rule, given their planner:
+`src/village/forms/shore_form.gd`, `VillageShoreForm`, reached from
+`VillageSitePlanner._plan` by one early dispatch (and from `plan()` for the
+siting); `shore` is in `FORMS_SUPPORTED` and out of `FORM_FALLBACK`. Where the
+ground has no water level the form is the straight strand, laid as before.
+Without terrain the form is never derived, so nothing flat changes
+(`thorn-hamlet` and `veld-070` exported before and after, `cmp` identical).
+`lake` (a `water` kind) was already added by VTER-FORM-DERIVE; checked:
+`VillageSpec.WATERS` holds it and `VillageWaterPlan` lays it as it lays a coast.
+
+| Step | What |
+|---|---|
+| siting | `VillageShoreForm.site`, its own: anchor ON the shoreline, yaw so the water is +y. Candidates are the interpolated crossings of the water level (plus `VillageGroundWater.FREEBOARD_M`, so the two agree) on the caller's grid within 400 m of its centre, 36 m apart, nearest first; yaw from the mean direction of the wet ground about each, 7 yaws 15 degrees apart, refined. Scored over the shoreline the frame would see (13 columns): a column with none, the shore's tilt and bends, the steep and cliff share of the strip between the street and the bank, the street's grade, distance from the caller's centre. The site's corners must lie on the grid. The generic siting turns a village away from water (W_WET); this one turns it to face it |
+| shoreline | per 10 m column of the frame, the first y from the inland end that is wet and stays wet for 14 m (a pond on the way is no shore); holes filled, median-filtered, smoothed. `plan.shoreline` (exported as `shoreline_m`) |
+| shore street | the through road: the shoreline pulled inland by the strand's own lead (4.5 m of road, the measured waterfront row depth, 2 m of bank) along its normal, kept inside the bend rule (9 degrees a vertex), then routed by grade (`VillageRoadRouter.route_across`, the through class's 12 %) within 7 m inland and 1.5 m seaward of that curve |
+| common, landmark | the common (18 x 10 m) between the street and the bank at the point among the middle half of the street where it is flattest and the bank 26 m either side is driest and gentlest; the approach path; the landmark inland of it on its own lane (the strand's reservation, unchanged) |
+| water | `VillageGroundWater` turns the wet ground into plan water (`ground: true`); lots refuse it |
+| lots | the lot planner's ordinary frontage cutting on the through road, both sides (the strand's one seaward row would make a `water_within_30m` of 0.9). The sited trades keep their VILLAGES 6 addresses (the mill's yard must reach the water); households are held to `SEAWARD_SHARE` (0.4) of the street's lots on the water side, so the rest stand behind the street. The lot planner's retries widen the site along the street and deepen the shore reserve exactly as for a strand |
+| landing | the dresser's `strand` step: boats and drying racks on the reached bank, unchanged |
+
+**What the fixtures say.** The real water-within-30-m distribution is in
+`tests/fixtures/settlements/world_settlements.json` (`morph.water_within_30m`,
+building centres within 30 m of mapped water): the 13 sites labelled `shore`
+run 0.0-0.658, median 0.121; the three of high confidence 0.284 (Reine), 0.433
+(Perast), 0.658 (Hallstatt); the 109 measured sites p10 0, median 0.017, p90
+0.324. The suite requires 0.20-0.66.
+
+Suite `vshore` (133 checks, ~15 min on a loaded host, 88-145 s of it measuring
+the 16 buildings once): a 50-person fishing village on each ground.
+
+| Ground | Street from water | Bow | Water side / behind | Farthest | `water_within_30m` | Site | QA |
+|---|---|---|---|---|---|---|---|
+| `lake_shore` (synthetic, straight) | 23.9 m flat | 0.0 | 6 / 10 | 41.4 m | 0.500 | 180 m | ok |
+| cove (suite-local, bank a 140 m circle) | 21.8-24.3 m | 24.6 | 6 / 10 | 41.8 m | 0.375 | 180 m | ok |
+| Hallstatt (real30, lake 503 m) | 19.8-26.3 m | 3.7 | 6 / 10 | 40.2 m | 0.375 | 144 m | ok |
+| Limone sul Garda (world90, lake 62.5 m) | 22.0-27.4 m | 13.4 | 6 / 10 | 40.8 m | 0.438 | 180 m | ok |
+| Perast (world90, sea) | 15.2-24.3 m | 11.9 | 6 / 10 | 41.8 m | 0.625 | 180 m | ok |
+| Manarola (real30, forced; the ground derives `water`) | 18.5-27.2 m | 7.5 | 6 / 10 | 43.8 m | 0.467 | 225 m | ok |
+
+The street keeps one distance from the water along the curve (spread at most
+14 m; the checks are about the plan water, not the fixture's contour), really
+bends on the cove (a chord deviation of 24.6 m), every building stands within
+the street's mean distance plus 48 m of the water and none on it, boats stand
+within 30 m of it, every road is within its class's grade, and VillageQA
+passes. The root `tests/fixtures/terrain/limone_sul_garda.json` has no water
+level (it derives `valley`), so Limone is read from `world90/`. The siting
+takes 0.3-0.6 s; the plan 30-210 s (the lot fit, as for every form).
+
+**Not yet.**
+
+* **water-side structures (VTER-FORM-WATER)** -- no stilts, piers or
+  boardwalks; the water is plan water and the boats stand on the bank.
+* **a shore that folds back** -- the shoreline is read once per column
+  (the first wet ground from inland), so a headland, an islet chain (Reine) or
+  a river mouth is followed by its inland side only, and a shore the frame
+  cannot make single-valued is smoothed, not traced. One frame, one shore.
+* **other water** -- a river or stream spec on a ground with a lake is not
+  drawn (the ground's water is); a spec of `none` or `pond` on a drowned site
+  gets the ground's water too.
+* **resolution** -- on a 30-90 m grid the shoreline is uncertain by more than
+  the freeboard; the plan water is the DEM's, not the map's.
+* **density** -- the retries widen the site along the street to 144-225 m, so
+  the built share is 7.7-13.7 % (the floor is 5 %); the real set's shore
+  villages are denser along the water than behind it.
+* **the seaward share** is a fitted constant (0.4), not read from a site;
+  the real set cannot say which side of its street a house stands.
+
+Lanes at the commit: `vshore` 133 checks green; `vtplan` 1414 green (1 old
+warning: Thorn on Manarola); `vdispersed` 161 green; `lane:village-fast` 47
+green. `vforms` has one failure (`round` seed 17077, one entrance lane) and
+`varchetype_strand` 20 (hall furnishing): the latter fails identically on the
+base commit; neither form is touched here.
