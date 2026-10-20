@@ -32,6 +32,10 @@ const SEA_LEVEL_M := 0.5
 const SHORE_GAP := 0.25
 const SHORE_EPS := 1.0
 const TRIM_STEP := 0.5
+## A reach of the ground's water this narrow, and this much longer than wide,
+## is a river (VTER-CROSSINGS); the synthetic river_valley's is 13 m.
+const RIVER_MAX_M := 40.0
+const RIVER_ELONGATION := 3.0
 
 
 ## Add the ground's water inside `plan.site` to `plan.water` and cut every
@@ -45,9 +49,57 @@ static func add(plan: VillagePlan) -> bool:
 		return false
 	var kind: StringName = &"coast" if absf(g.water_level_m) <= SEA_LEVEL_M else &"lake"
 	for p in polys:
-		plan.water.append({"poly": p, "kind": kind, "ground": true})
+		var channel := channel_width(p, plan.site)
+		if channel > 0.0 and kind == &"lake":
+			# a long thin reach of the ground's water is a river: the
+			# measured channel width is carried for the bridges over it
+			plan.water.append({"poly": p, "kind": &"river", "ground": true, "width": channel})
+		else:
+			plan.water.append({"poly": p, "kind": kind, "ground": true})
 	trim_roads(plan)
 	return true
+
+
+## Is the ground's water inside this polygon a river rather than a lake? A
+## reach no wider than RIVER_MAX_M and at least RIVER_ELONGATION times as
+## long as it is wide: its measured width (that of the rectangle with its
+## area and perimeter), else 0. The polygon is clipped at the site, so a river runs off
+## its edges.
+static func channel_width(poly: PackedVector2Array, site: Rect2) -> float:
+	var area := Poly.area(poly)
+	var perimeter := Poly.polyline_length(poly) + poly[poly.size() - 1].distance_to(poly[0])
+	if perimeter <= 0.0:
+		return 0.0
+	# the rectangle with this area and perimeter: w = (s - sqrt(s^2 - 4A)) / 2
+	# with s = P / 2 (exact for a strip, a little under for a bent one)
+	var half_p := perimeter * 0.5
+	var width := (half_p - sqrt(maxf(0.0, half_p * half_p - 4.0 * area))) * 0.5
+	var length := half_p - width
+	if width > RIVER_MAX_M or length < RIVER_ELONGATION * width:
+		return 0.0
+	# a lake clipped at the site's edge is a strip too, but its long side
+	# lies ON the edge; a river has dry land along both of its banks
+	var on_edge := 0.0
+	for i in range(poly.size()):
+		var a := poly[i]
+		var b := poly[(i + 1) % poly.size()]
+		for side in [site.position.x, site.end.x]:
+			if absf(a.x - side) < 0.05 and absf(b.x - side) < 0.05:
+				on_edge += a.distance_to(b)
+		for side in [site.position.y, site.end.y]:
+			if absf(a.y - side) < 0.05 and absf(b.y - side) < 0.05:
+				on_edge += a.distance_to(b)
+	if on_edge > 0.35 * perimeter:
+		return 0.0
+	return snappedf(width, 0.1)
+
+
+## Has the plan a river of the ground's own (a channel of `add`)?
+static func has_river(plan: VillagePlan) -> bool:
+	for w in plan.water:
+		if w["kind"] == &"river" and bool(w.get("ground", false)):
+			return true
+	return false
 
 
 ## The wet ground inside `site` as simple polygons: cells of CELL_M whose

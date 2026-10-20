@@ -1226,3 +1226,77 @@ Not yet:
 * the road is often straight on a flat floor (the router prefers it);
 * lots on the river side exist only where the bank row is 14 m or more;
 * a lake spec with no lake in the site gets a river ribbon.
+
+## Bridges on the ground (VTER-CROSSINGS)
+
+Where a routed road meets water on terrain, the bridge is fitted to the
+ground. **Without ground nothing changes** (flat evidence below).
+
+| Piece | Where |
+|---|---|
+| the measure | `src/village/village_bridge.gd`, `VillageBridge.measure(surface, crossing)` |
+| the emission | `VillageBuilder._crossing` (deck at `deck_y`, ramps of `ramp`, a `bridge_abutment` component per end) |
+| the ground's river | `VillageGroundWater.add` / `channel_width` / `has_river` |
+| the check | `qa/village_bridge_check.gd`, `VillageBridgeCheck.check(plan, builder, mesh)` |
+| the suite | `vcrossterrain` (`tests/village_crossterrain_test.gd`, about 40 s) |
+
+**The measure.** From the finished ground (`VillageGroundSurface.height_at`,
+`ground_at`, `water_at`, `water_surface`), for a crossing route `points`:
+the two landing heights, the span (route length) and the wet reach, the
+highest water surface under it, and then
+
+* deck centre `deck_y` = higher landing + 0.15, raised if need be to 0.45 m
+  (soffit) over the highest water;
+* ramp at each end = rise over that landing / 12 %, 1.5 to 6 m;
+* abutment at each end: 1.2 m along the road under the deck's end, deck width
+  + 0.5 m across, its base at the LOWEST ground under its footprint (centre,
+  corners, edge midpoints) and its top 5 cm into the deck.
+
+**The ground's river.** A reach of the ground's own water (`water_level_m`)
+that is at most 40 m wide, three times longer than wide, and whose long side
+is not on the site edge (a lake clipped to a strip lies along it) is plan
+water of kind `river`, `"ground": true`, `"width"` its measured channel
+(`river_valley`: 12.5 m). Crossing kind is then a bridge as for any river. If
+the spec asks for a river or stream and the ground has one, the spec's strip
+is not laid beside it.
+
+**The check** reads the emitted Ground mesh back (`GroundProbe`):
+
+| Rule | Measure |
+|---|---|
+| abutment | base within 0.1 m of the lowest mesh ground under its footprint; top reaches the deck's underside |
+| clearance | the deck's underside at least 0.3 m over the water mesh at every metre of the span |
+| landing | each deck end within 1.2 m of the ground it lands on (a ramp carries the rest) |
+| count | exactly two abutments per bridge |
+
+**For the valley form (and any form).** Nothing to call: the bridges come out
+of the normal pipeline once `plan.water` has the river and `plan.roads`
+cross it -- `VillageWaterPlan.crossings(plan.water, plan.roads)` records them,
+`VillageBuilder.build(plan)` fits and emits them, `VillageBridgeCheck` judges
+them. A form that lays its own river polygon should add it to `plan.water`
+(kind `river` or `stream`, `"ground": false` for a sheet that follows the
+terrain, `true` for a level one) before `crossings()`.
+
+**Acceptance (river_valley).** `vcrossterrain` lays three roads across the
+12.5 m channel (two straight, one oblique with two bends) and checks each:
+3 bridges, 6 abutments, base worst 0.000 m of the 0.1 m allowed, deck at
+least 1.38 m over the water, spans 16.7 / 16.7 / 17.9 m, and the walk crosses
+every one (and does not once the crossings are taken up). Three negative
+controls: an abutment 0.5 m off the ground, a deck 1.5 m low, a bridge with
+one abutment. The siting's own plans on river_valley (crossroads, green)
+each cross the river once and pass.
+
+**Not yet.**
+
+* **drainage streams as plan water** -- a stream read from the D8 drainage
+  (`VillageSiteAnalysis.streams()`) on a grid without `water_level_m` is not
+  yet a polygon; a river the spec draws there is still the spec's strip laid
+  on the terrain (bridged and checked as above);
+* **the siting and the channel** -- the siting keeps the village beside a
+  channel and the roads run the contour, so a planned village on river_valley
+  has one crossing, not the dozen a real river valley would; a through road
+  forced along the channel (a 91 m grid, no room to move) runs inside the water
+  as one long "bridge" -- the road router's to keep dry (VTER-ROADS);
+* **a ford** on terrain is still the level stone slab at the higher landing;
+* **abutment walls to the bank** -- the stone is a box under the deck's end,
+  not a wing wall; a bank much higher than the deck shows it buried.
