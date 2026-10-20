@@ -93,7 +93,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	# every request is generated and measured ONCE; the retries below only
 	# redo the geometry
 	var minimum_depth := maxf(_landmark_site_depth(out, jobs), _manor_site_depth(out, jobs))
-	var shore_depth := _strand_row_depth(jobs) if spec.form == &"strand" else 0.0
+	var shore_depth := _strand_row_depth(jobs) if spec.form in [&"strand", &"shore"] else 0.0
 	if minimum_depth > out.site.size.y or shore_depth > 0.0:
 		out = VillageSitePlanner.plan(spec, 0, 1.0, minimum_depth, shore_depth)
 	# every household gets a lot (VIL-006 "housed"): when the form's own
@@ -111,7 +111,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			break
 		# These authored forms deliberately ignore generic extra lanes. Do
 		# not recut an identical site six times before trying more frontage.
-		if spec.form in [&"strand", &"planted"] and is_equal_approx(float(attempt[1]), previous_scale):
+		if spec.form in [&"strand", &"shore", &"planted"] and is_equal_approx(float(attempt[1]), previous_scale):
 			continue
 		previous_scale = float(attempt[1])
 		var again: VillagePlan = _replan(spec, jobs, int(attempt[0]), float(attempt[1]), minimum_depth, shore_depth)
@@ -1357,8 +1357,13 @@ static func _through_crossing(plan: VillagePlan) -> Vector2:
 static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 		job: Dictionary, gap: float) -> bool:
 	var poly: PackedVector2Array = lot["poly"]
-	if plan.spec.form == &"strand" and job["class"] not in [&"church", &"manor"]:
-		if plan.roads[int(lot["road"])]["class"] != &"through" or Vector2(lot["normal"]).y <= 0.0:
+	if plan.spec.form in [&"strand", &"shore"] and job["class"] not in [&"church", &"manor"]:
+		# the strand's one row stands on the water side of its road; a shore
+		# street has houses on both sides (VTER-FORM-SHORE): the seaward row
+		# on the bank, the landward row behind the street
+		if plan.roads[int(lot["road"])]["class"] != &"through" 				or (plan.spec.form == &"strand" and Vector2(lot["normal"]).y <= 0.0):
+			return false
+		if plan.spec.form == &"shore" and VillageShoreForm.seaward_full(plan, lot, job):
 			return false
 	var mill_request: BuildingRequest = job["request"]
 	if mill_request.kind == &"shop" and mill_request.purpose == &"bakery" and _mill_water(plan):
@@ -1743,7 +1748,7 @@ static func _add_landmark_lane(plan: VillagePlan) -> int:
 	if plan.spec.compact_display and rect.position.y > start_y:
 		# Keep the service lane's verge inside the compact site's civic end.
 		end_y = minf(end_y, plan.site.end.y - lane_half)
-	if plan.spec.form == &"strand" and rect.position.y < start_y:
+	if plan.spec.form in [&"strand", &"shore"] and rect.position.y < start_y:
 		# The church's measured frontage is wider than the reserved slot.
 		# Give it the full legal dead-end length, measured from its junction;
 		# adding forty metres behind the slot made an overlong access road.
@@ -1793,7 +1798,7 @@ static func _place_landmark(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 		var dir: Vector2 = e["dir"]
 		var want_t: float = 0.0
 		var t: float
-		if plan.spec.form == &"strand" and absf(dir.y) > 1e-6:
+		if plan.spec.form in [&"strand", &"shore"] and absf(dir.y) > 1e-6:
 			# Align the south end of the measured frontage with the slot's
 			# common-facing edge; the full edge then stays inland of the common.
 			want_t = (rect.end.y - frontage * 0.5 - origin.y) / dir.y

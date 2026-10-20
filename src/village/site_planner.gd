@@ -42,7 +42,7 @@ const ROAD_CLASSES := {
 ## The forms this planner knows. Everything else is VIL-006 and later.
 const FORMS_SUPPORTED: Array[StringName] = [&"street", &"green", &"crossroads",
 	&"round", &"strand", &"planted", &"gate",
-	&"dispersed"]
+	&"dispersed", &"shore"]
 
 const SITE_MIN_SIDE := 90.0     ## below this a 6 m road, a common and a landmark do not fit
 const SITE_MAX_SIDE := 400.0    ## §9.1 "not a city"
@@ -134,7 +134,8 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
 		minimum_depth := 0.0, shore_depth := 0.0) -> VillagePlan:
 	var ground: VillageTerrain = null
 	if sites_on_ground(spec):
-		ground = VillageSiting.site(spec)["ground"]
+		# a shore village is turned to face its water (VTER-FORM-SHORE)
+		ground = (VillageShoreForm.site(spec) if spec.form == &"shore" else VillageSiting.site(spec))["ground"]
 	return _plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
 
 
@@ -161,6 +162,13 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 		return out
 	if spec.form == &"dispersed" and not spec.compact_display:
 		return VillageDispersedForm.plan(spec, extra_lanes, site_scale, ground)
+	# `shore` follows the ground's own shoreline; with none to follow it is a
+	# straight strand, laid as one below
+	var form: StringName = &"strand" if spec.form == &"shore" else spec.form
+	if form != spec.form and ground != null and not spec.compact_display and not is_nan(ground.water_level_m):
+		var shore_plan := VillageShoreForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
+		if not shore_plan.shoreline.is_empty():
+			return shore_plan
 	out.site = site_rect(spec)
 	if spec.form == &"round":
 		minimum_depth = maxf(minimum_depth, 2.0 * (6.0 + _round_ring_radius(10.5)
@@ -200,7 +208,7 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 	if ground != null:
 		through = _route_through(through, out.site, ground)
 	out.roads.append(_road(through, &"through", spec.wealth))
-	if spec.form == &"strand":
+	if form == &"strand":
 		# The shore row's church envelope needs inland depth beyond the common.
 		# Extend only that boundary after the road is fixed: the through road,
 		# common and coast retain their sampled coordinates, while the lot
@@ -210,7 +218,7 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 			Vector2(out.site.size.x, out.site.size.y + STRAND_INLAND_GROW))
 
 	# 2. the common and the form's characteristic road graph
-	match spec.form:
+	match form:
 		&"green":
 			_plan_green(out, spec, through)
 		&"crossroads":
@@ -235,7 +243,7 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 	# generic back lanes on the retry path would cut through the coast and turn
 	# the row into a second village; the lot planner instead grows frontage along
 	# the road when it needs more houses.
-	if spec.form not in [&"strand", &"planted"]:
+	if form not in [&"strand", &"planted"]:
 		_extra_lanes(out, spec, through, extra_lanes)
 	var ground_shore := false
 	if ground != null:
@@ -246,7 +254,7 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 	# VIL-018 water is authored before lot cutting, so lots can avoid the
 	# polygon and every later bridge/ford check reads the same geometry. Strand
 	# owns a deliberately shifted coast rectangle above; preserve it exactly.
-	if spec.water != &"none" and spec.form != &"strand" \
+	if spec.water != &"none" and form != &"strand" \
 			and not (ground_shore and spec.water in [&"coast", &"lake"]):
 		var water_plan: Dictionary = VillageWaterPlan.build(spec, out.site,
 			out.roads, out.commons)

@@ -102,6 +102,9 @@ var site_yaw := 0.0     ## radians, counter-clockwise from the caller's +X in it
 ## every other form: {"seat", "common", "spine", "households", "shelf",
 ## "main", "ground"}. The first is the main hamlet, on the through road.
 var hamlets: Array[Dictionary] = []
+## The shoreline a `shore` village follows (VillageShoreForm): (x, y) per
+## column in the plan's frame, water on +y. Empty for every other form.
+var shoreline := PackedVector2Array()
 
 
 ## The ground readings of this plan are taken on: `ground` when the village
@@ -195,6 +198,7 @@ func equals(other: VillagePlan) -> bool:
 		and _array_of_dict_equal(props, other.props)
 		and _array_of_dict_equal(plants, other.plants)
 		and _array_of_dict_equal(hamlets, other.hamlets)
+		and _poly_equal(shoreline, other.shoreline)
 	)
 
 

@@ -693,6 +693,12 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 				"spine_road": VillageDispersedForm.spine_of(plan, i), "households": int(h["households"]),
 				"main": bool(h["main"]), "ground_m2": _n(Poly.area(h["ground"]))})
 		out["hamlets"] = hamlets
+	if not plan.shoreline.is_empty():
+		# a shore village's shoreline (VillageShoreForm); no other form has one
+		var line: Array = []
+		for p in plan.shoreline:
+			line.append([_n(p.x), _n(p.y)])
+		out["shoreline_m"] = line
 	return out
 
 
