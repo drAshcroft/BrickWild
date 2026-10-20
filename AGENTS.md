@@ -142,6 +142,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | church or castle dressing, props placed in them | `dressingquick` | under 5 m host |
 | the dwellings the generator must furnish | `harchetype` | 2.5 m host (5 m on 7 Oct; red with the walk rules until the furnisher catches up, see docs/WALK_PINS.md) |
 | a walk-QA pin, a walk rule, a stair rule, a z-fight budget | `walkpins` | ~1 m host, 40 checks |
+| the crest form: `src/village/forms/crest_form.gd`, the crest frame in `VillageSiting`, the crest hooks in the lot planner and the place/road checks | `vcrest` | ~5 m host (measures 16 buildings once, ~75 s); see docs/VILLAGE_TERRAIN.md "The crest form" |
 | buildings on falling ground: `core/ground_fall.gd`, `src/house/house_slope.gd`, the church terrace, the ground request fields | `hslope` | ~2.5 m host, 253 checks; see docs/VILLAGE_TERRAIN.md |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |

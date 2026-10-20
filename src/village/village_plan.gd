@@ -103,6 +103,10 @@ var site_yaw := 0.0     ## radians, counter-clockwise from the caller's +X in it
 ## "main", "ground"}. The first is the main hamlet, on the through road.
 var hamlets: Array[Dictionary] = []
 
+## A `crest` village's summit, ring and church bearing (VillageCrestForm);
+## empty for every other form.
+var crest: Dictionary = {}
+
 
 ## The ground readings of this plan are taken on: `ground` when the village
 ## was sited, else the spec's own (null when flat).
@@ -195,6 +199,7 @@ func equals(other: VillagePlan) -> bool:
 		and _array_of_dict_equal(props, other.props)
 		and _array_of_dict_equal(plants, other.plants)
 		and _array_of_dict_equal(hamlets, other.hamlets)
+		and crest == other.crest
 	)
 
 

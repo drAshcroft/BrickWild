@@ -549,6 +549,11 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	for job in jobs:
 		var cls: StringName = job["class"]
 		if cls == &"church" and plan.landmark_reserved():
+			# a crest village's church stands inside the ring, high (VTER-FORM-CREST)
+			if VillageCrestForm.place_landmark(plan, job):
+				placed += 1
+				ctx = _context(plan)
+				continue
 			# on given ground (VTER-PLACE), a slot on the low side of the
 			# village gives way to the high ground near the common (§6)
 			var high: Vector2 = landmark_high_ground(plan) if plan.ground != null else Vector2.INF
@@ -1068,7 +1073,7 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 					lot["landmark"] = true
 				if not _lot_is_legal(plan, ctx, lot, job, gap):
 					continue
-				if _door_rise(lot) > VillageLotGround.DOOR_RISE_PREFERRED:
+				if _door_rise(lot) > VillageLotGround.DOOR_RISE_PREFERRED and not bool(job.get("door_ok", false)):
 					if high_door.is_empty():
 						high_door = {"lot": lot, "d": float(spot["d"]), "mid": spot["mid"]}
 					break
@@ -1552,6 +1557,8 @@ static func _site_clear(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 	for other in plan.lots:
 		if _overlaps(poly, other["poly"]):
 			return false
+	if not plan.crest.is_empty() and not bool(lot["landmark"]) and VillageCrestForm.holds_high_ground(plan, poly):
+		return false
 	return not _corner_blocked(plan, ctx, lot)
 
 
