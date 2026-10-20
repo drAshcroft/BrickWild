@@ -515,6 +515,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 			# before general shops consume its neighbouring frontages.
 			job["siting"] = {"road": &"through", "insists": true, "toward": &"common"}
 	VillageDispersedForm.assign_jobs(plan, jobs)
+	VillageValleyForm.assign_jobs(plan, jobs)
 	# The arrangement order (VILLAGES §6): the landmark and the lord first
 	# because they take their own lanes; then the trades that INSIST on where
 	# they stand -- the smithy on the through road at the downwind edge, the

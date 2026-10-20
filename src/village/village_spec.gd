@@ -127,14 +127,13 @@ const FORM_VOCABULARY: Array[StringName] = [&"street", &"green", &"crossroads", 
 ## task that gives a form its planner deletes that form's ONE line here.
 ##   hillside  -> street  one street along the slope, the row a contour
 ##                        street will replace
-##   valley    -> street  a ribbon along the through road, as a valley is
 ##   crest     -> round   houses ringed round the top's common
 ##   water     -> strand  the row along the water the stilts will stand in
 ## (`dispersed` has its planner: VillageDispersedForm, VTER-FORM-DISPERSED;
-## `shore`: VillageShoreForm, VTER-FORM-SHORE.)
+## `shore`: VillageShoreForm, VTER-FORM-SHORE;
+## `valley`: VillageValleyForm, VTER-FORM-VALLEY.)
 const FORM_FALLBACK := {
 	&"hillside": &"street",
-	&"valley": &"street",
 	&"crest": &"round",
 	&"water": &"strand",
 }

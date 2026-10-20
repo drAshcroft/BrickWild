@@ -302,7 +302,7 @@ keeps the derived form; `form` is what is planned, through
 | intent | planned as | why |
 |---|---|---|
 | hillside | street | the one-street row a contour street will replace |
-| valley | street | a ribbon along the through road, as a valley village is |
+| ~~valley~~ | ~~street~~ | planned as itself since VTER-FORM-VALLEY |
 | crest | round | houses ringed round the top's common |
 | ~~shore~~ | ~~strand~~ | planned as itself since VTER-FORM-SHORE |
 | water | strand | the row along the water the stilts will stand in |
@@ -521,7 +521,7 @@ as flights, not ramps.
 * **a tavern near a gate on a stretched site** -- Èze and Hallstatt stretch
   to 270-315 m to house everyone, and the tavern's 60 m from a gate goes;
 * ~~per-lot platforms and stepped plinths~~ -- done in VTER-LOTS;
-* **landform forms** (`hillside`, `crest`, `shore`, `valley`, ...) -- the form
+* **landform forms** (`hillside`, `crest`, `shore`, ... ; `valley` done in VTER-FORM-VALLEY) -- the form
   still comes from population, purpose and culture; on a crest the village
   goes to level ground within reach rather than onto the summit, because no
   cart-graded through road passes a common on a 40 m summit ringed by 20 %
@@ -1155,3 +1155,63 @@ warning: Thorn on Manarola); `vdispersed` 161 green; `lane:village-fast` 47
 green. `vforms` has one failure (`round` seed 17077, one entrance lane) and
 `varchetype_strand` 20 (hall furnishing): the latter fails identically on the
 base commit; neither form is touched here.
+
+## The valley form (VTER-FORM-VALLEY)
+
+Row 5 of the form rule, given its planner: `src/village/forms/valley_form.gd`,
+`VillageValleyForm`, reached from `VillageSitePlanner._plan` by one early
+dispatch; `valley` is in `FORMS_SUPPORTED` and out of `FORM_FALLBACK`.
+Oksfjord, Sunndalsora, Hallstatt, Kandovan: a long body between a river and
+steep sides. Without terrain the form is never derived, so nothing flat
+changes (`thorn-hamlet` and `veld-070` exported before and after, `cmp`
+identical).
+
+| Step | What |
+|---|---|
+| site | long and shallow: 3 street-form sides along the road (260-400 m), 1.4 deep (120-150 m); the lot planner's retries grow it along the road only |
+| siting | `VillageSiting` gains a `valley` term (only for this form): per sample of the flat road, the lateral section +-60 m is read in the frame, the lowest ground (middle of a flat floor) must lie 30 m to the road's -y side. The river's wet ground costs a tenth. The anchor keeps `VALLEY_STRETCH` 1.6 of room along the road. If the best frame is over half off a valley floor (a coarse grid, a plain slope) the term is dropped and the standard score is used |
+| the river | read per column off the sited ground: the widest wet run when the grid has a water level, else the middle of the lowest ground across the site; median and moving-average smoothed. Not read in a third of the columns: laid 26 m from the road as laid |
+| through road | seeded at river + the offset that makes both lot rows most buildable (the hill row beyond the road, the bank row between road and river where 14 m or more), routed by grade (`VillageRoadRouter`) with the river's bank forbidden to the router (its water cost, pointed at the strip), then relaxed above the bank. The road never runs in the river and never crosses it |
+| river as plan water | kind `river` (`stream` for a stream spec), "ground": true; with a grid water level the ground's own wet polygons (`VillageGroundWater`) relabelled `river` |
+| core | a common long and shallow along the road on its hill side (`_core`), approach path to the well, the landmark straight behind it. No ring street: it put a blob in the middle of a ribbon |
+| ways up | `_lanes`: 3-6 (+ half the retry's extra lanes), 40 m apart, off the hill side of the road, square to it, leaning along the valley (never under 35 degrees to the road, the junction rule) as far as the grade needs: a `lane` (12 %, 36 m) where possible, else a `track` (30 %) to the site's edge, else steps |
+| households | `assign_jobs` (lot planner hook): houses, cottages and farms each get a slot, four round the common (its two ends on the hill side, two across the road), the rest evenly along the road, sides alternating; each is cut the lot nearest its slot. Left alone the lot planner fills outward from the common into a blob |
+
+Suite `vvalley` (599 checks, ~6 min, 106 s of it measuring the 19 buildings
+once; `VALLEY_CASE=<fixture>` runs one, `VALLEY_DUMP=1` prints buildings and
+roads): a farming village of 60 on a river. Checks: the ground derives
+valley and plans as itself; the river is plan water, no road in it, no
+crossing; the road keeps within 45 m of the river at the median; ways leave
+the road, every road within its class's grade; **elongation over 3** and
+**dead_end_ratio within the survey's high-relief p10-p90 band, 0.22-0.65**
+(40 sites with relief >= 250 m: 0.22 / 0.44 / 0.65; elongation there 1.48 /
+2.71 / 4.72); every lot fitted to its ground within its family's fall
+(`_lots_on_ground`); VillageQA; the export; a flat spec is never valley.
+
+| Ground | Site | Placed | Elongation | dead_end_ratio | Grades (through / lanes / tracks) | QA |
+|---|---|---|---|---|---|---|
+| river_valley | 297x139 | 19/19 | 5.04 | 0.600 | 0 % / - / 29 % | ok |
+| valley | 297x139 | 19/19 | 6.46 | 0.600 | 0 % / - / 29 % | ok |
+| Vermont (world90) | 297x139 | 19/19 | 4.79 | 0.600 | 10 % / 12 % / 29 % | ok |
+| Lugar de Guene (world90) | 386x139 | 19/19 | 4.60 | 0.625 | 11 % / 12 % / 28 % | ok |
+
+Where VTER-CROSSINGS should put bridges: the body stays on the road's one
+bank, the river runs 11-35 m off the road, parallel to it. A bridge belongs
+at a lane or a track off the river side of the road across to the far bank;
+no way is laid there today (`plan.water_crossings` is empty).
+
+Not yet:
+
+* **steep real gorges and bends** -- world90/rocamadour's river drops 18 %
+  along the frame, over a cart's 12 % (the same missing switchbacks as above);
+  where the river bends out of the straight frame the road leaves it (Lugar
+  de Guene: 20-219 m, median 33);
+* **the common's fronting on steep sides** -- real30/ushguli (53 % of 60 %)
+  and world90/lake_argyle (50 %; elongation 2.95): the neighbours the slots
+  ask for beside the common do not stand on that ground, and the church does
+  not always take the slot behind it;
+* **a 90 m grid with no floor in it** -- world90/balan houses 16 of 19 on a
+  uniform 13 % hillside; its siting falls back to the standard score;
+* the road is often straight on a flat floor (the router prefers it);
+* lots on the river side exist only where the bank row is 14 m or more;
+* a lake spec with no lake in the site gets a river ribbon.

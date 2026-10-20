@@ -57,6 +57,18 @@ const W_ROAD_MEAN := 2.0
 const W_COMMON := 30.0
 const W_COMMON_BAD := 10.0
 const W_WATER := 2.0
+## A valley village stands ON its river (VTER-FORM-VALLEY): its road runs this
+## far from the river, scored along the whole road, and the river's own wet
+## ground costs a tenth of what it does to any other form.
+const W_VALLEY := 16.0
+const VALLEY_ROAD_M := 30.0
+const VALLEY_WET := 0.1
+const VALLEY_STRETCH := 1.6
+## the best frame this far from a valley floor (share of the term) is no frame along one
+const VALLEY_GIVE_UP := 0.5
+const VALLEY_SECTION_M := 60.0
+const VALLEY_STEP_M := 4.0
+const VALLEY_FLAT_M := 0.3
 const W_CENTRE := 1.0               ## per 400 m
 
 static var _cache := {}
@@ -90,10 +102,15 @@ static func clear_cache() -> void:
 
 ## The frame for `flat` on `t`. Separate from `site` so a test can score a
 ## frame it names itself.
-static func choose(t: VillageTerrain, flat: VillagePlan, wants_water: bool) -> Dictionary:
+static func choose(t: VillageTerrain, flat: VillagePlan, wants_water: bool, use_valley := true) -> Dictionary:
 	var samples := _samples(flat)
 	var bounds := t.bounds()
-	var reach: float = flat.site.size.length() * 0.5 + CORNER_MARGIN
+	var is_valley: bool = flat.spec != null and flat.spec.form == &"valley"
+	var valley: bool = is_valley and use_valley
+	# a valley village grows ALONG its river as the retries ask: keep the anchor
+	# far enough in for the site at VALLEY_STRETCH
+	var stretch := VALLEY_STRETCH if is_valley else 1.0
+	var reach: float = Vector2(flat.site.size.x * stretch, flat.site.size.y).length() * 0.5 + CORNER_MARGIN
 	var free := bounds.grow(-reach)
 	var fixed := free.size.x <= 0.0 or free.size.y <= 0.0
 	var water := _water_points(t) if wants_water else PackedVector2Array()
@@ -124,7 +141,7 @@ static func choose(t: VillageTerrain, flat: VillagePlan, wants_water: bool) -> D
 			var yaw := TAU * float(k) / float(YAW_STEPS)
 			if fixed and (not _covered(bounds, flat.site, a, yaw) if any_cover else k != 0):
 				continue
-			var s := _score(t, samples, a, yaw, water)
+			var s := _score(t, samples, a, yaw, water, valley)
 			if best.is_empty() or float(s["score"]) < float(best["score"]) - 1e-9:
 				best = s
 	# refine: half and quarter steps of anchor and yaw round the best
@@ -145,9 +162,13 @@ static func choose(t: VillageTerrain, flat: VillagePlan, wants_water: bool) -> D
 					var yaw2: float = float(centre["yaw"]) + dk * dyaw
 					if fixed and dk != 0 and not _covered(bounds, flat.site, a2, yaw2):
 						continue
-					var s2 := _score(t, samples, a2, yaw2, water)
+					var s2 := _score(t, samples, a2, yaw2, water, valley)
 					if float(s2["score"]) < float(best["score"]) - 1e-9:
 						best = s2
+	if valley and float((best["terms"] as Dictionary).get("valley", 0.0)) > W_VALLEY * VALLEY_GIVE_UP:
+		# no frame on this ground lies along a valley floor (a coarse grid, a
+		# plain hillside): the term only adds noise to the frame; score without it
+		return choose(t, flat, wants_water, false)
 	best["fixed_centre"] = fixed
 	best["yaw"] = fposmod(float(best["yaw"]), TAU)
 	return best
@@ -195,7 +216,7 @@ static func _samples(flat: VillagePlan) -> Dictionary:
 
 
 static func _score(t: VillageTerrain, samples: Dictionary, anchor: Vector2, yaw: float,
-		water: PackedVector2Array) -> Dictionary:
+		water: PackedVector2Array, valley := false) -> Dictionary:
 	var c := cos(yaw)
 	var s := sin(yaw)
 	var wl: float = t.water_level_m
@@ -252,7 +273,7 @@ static func _score(t: VillageTerrain, samples: Dictionary, anchor: Vector2, yaw:
 			common_bad += 1
 	var terms := {
 		"cliff": W_CLIFF * float(cliff) / maxf(edges, 1),
-		"wet": W_WET * float(wet) / maxf(lattice.size(), 1),
+		"wet": W_WET * (VALLEY_WET if valley else 1.0) * float(wet) / maxf(lattice.size(), 1),
 		"steep": W_STEEP * float(steep) / maxf(edges, 1),
 		"road": W_ROAD_OVER * over / maxf(length, 1.0) + W_ROAD_MEAN * mean / maxf(length, 1.0),
 		"common": W_COMMON * common_ex / maxf(cpts.size(), 1) + W_COMMON_BAD * float(common_bad) / maxf(cpts.size(), 1),
@@ -264,10 +285,49 @@ static func _score(t: VillageTerrain, samples: Dictionary, anchor: Vector2, yaw:
 		for w in water:
 			near = minf(near, w.distance_to(anchor))
 		terms["water"] = W_WATER * clampf((near - WATER_REACH_M) / 300.0, 0.0, 1.0)
+	if valley:
+		terms["valley"] = W_VALLEY * _valley_off(t, samples, anchor, c, s)
 	var total := 0.0
 	for k2 in terms:
 		total += float(terms[k2])
 	return {"anchor": anchor, "yaw": yaw, "score": total, "terms": terms}
+
+
+## How far the frame is from lying along a valley with its river 30 m to the
+## road's -y side: per sample of the flat through road, the lateral section
+## +-VALLEY_SECTION_M is read in the frame, the lowest ground found (the middle
+## of it where the floor is flat, to VALLEY_FLAT_M), and its offset from the road
+## compared with -VALLEY_ROAD_M. 0 is a river exactly there, 1 anywhere it is
+## not (or no lower ground inside the section: that is a slope, not a floor).
+static func _valley_off(t: VillageTerrain, samples: Dictionary, anchor: Vector2,
+		c: float, s: float) -> float:
+	var total := 0.0
+	var count := 0
+	var n_lat := int(VALLEY_SECTION_M * 2.0 / VALLEY_STEP_M) + 1
+	for pts in samples["roads"]:
+		for k in range(0, pts.size(), 2):
+			var p: Vector2 = pts[k]
+			var low := INF
+			var first := -1
+			var last := -1
+			var hs := PackedFloat64Array()
+			for j in range(n_lat):
+				var y: float = p.y - VALLEY_SECTION_M + float(j) * VALLEY_STEP_M
+				var h := t.height_at(anchor + Vector2(p.x * c - y * s, p.x * s + y * c))
+				hs.append(h)
+				low = minf(low, h)
+			for j in range(n_lat):
+				if hs[j] <= low + VALLEY_FLAT_M:
+					if first < 0:
+						first = j
+					last = j
+			count += 1
+			if first <= 0 or last >= n_lat - 1:
+				total += 1.0
+				continue
+			var mid_y: float = -VALLEY_SECTION_M + (float(first + last) * 0.5) * VALLEY_STEP_M
+			total += clampf(absf(mid_y + VALLEY_ROAD_M) / 45.0, 0.0, 1.0)
+	return total / maxf(count, 1)
 
 
 ## Standing water (nodes at or under the water level) or, without a water
