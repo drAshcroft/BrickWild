@@ -644,6 +644,13 @@ village is the building most in need of being *looked at*.
 | **gradient** | the big houses are in the middle | Spearman correlation of house floor area with distance to the common's centre ≤ −0.3 |
 | **farms outside** | farms face the fields | every `farmer` house is within 30 m of the enclosure and its yard side faces outward |
 
+Seven more read the GROUND, and only when the plan has it (`plan.ground`;
+VTER-PLACE): `landmark_ground`, `common_ground`, `mill_ground`,
+`manor_ground`, `fields_ground`, `wood_ground`, `edge_ground`. A flat
+village is judged exactly as above. Their sentences, measurements and the
+world-set numbers they read are in docs/VILLAGE_TERRAIN.md, "Placing the
+programme on the ground".
+
 ### 9.5 `VillageNavCheck` — can a person walk it?
 
 Implemented as `qa/village_nav_check.gd` (VIL-016), on the same `WalkGrid`

@@ -75,7 +75,50 @@ static func run() -> SuiteResult:
 	_coverage(res, sites, measured, ground)
 	_specs(res, measured)
 	_intents(res, measured, ground)
+	_place_targets(res, sites)
 	return res
+
+
+## VTER-PLACE: the targets VillagePlaceCheck reads from the
+## world set are still the world set's -- numpy's linear percentiles of each
+## metric over the sites that have it, to the third decimal.
+const PLACE_TOL := 0.0015
+
+
+static func _place_targets(res: SuiteResult, sites: Array) -> void:
+	for row in [["worship_elev_pctile", VillagePlaceCheck.WORLD_WORSHIP_ELEV_IQR],
+			["worship_centrality", VillagePlaceCheck.WORLD_WORSHIP_CENTRALITY_IQR],
+			["body_elev_pctile", VillagePlaceCheck.WORLD_BODY_ELEV_IQR],
+			["water_within_30m", VillagePlaceCheck.WORLD_WATERFRONT_IQR]]:
+		var vals := PackedFloat64Array()
+		for site in sites:
+			var v = site["morph"].get(row[0])
+			if v != null and typeof(v) in [TYPE_FLOAT, TYPE_INT]:
+				vals.append(float(v))
+		vals.sort()
+		var iqr := Vector2(_percentile(vals, 25.0), _percentile(vals, 75.0))
+		res.checked += 1
+		var want: Vector2 = row[1]
+		if absf(iqr.x - want.x) > PLACE_TOL or absf(iqr.y - want.y) > PLACE_TOL:
+			res.fail("place targets: %s IQR is %.3f-%.3f over %d sites, VillagePlaceCheck says %.3f-%.3f"
+				% [row[0], iqr.x, iqr.y, vals.size(), want.x, want.y])
+		if row[0] == "worship_elev_pctile":
+			res.checked += 1
+			var med := _percentile(vals, 50.0)
+			if absf(med - VillagePlaceCheck.WORLD_WORSHIP_ELEV_MEDIAN) > PLACE_TOL:
+				res.fail("place targets: worship_elev_pctile median is %.3f, VillagePlaceCheck says %.3f"
+					% [med, VillagePlaceCheck.WORLD_WORSHIP_ELEV_MEDIAN])
+		res.note("place target %s: IQR %.3f-%.3f over %d sites" % [row[0], iqr.x, iqr.y, vals.size()])
+
+
+## numpy.percentile's default (linear) over a sorted array.
+static func _percentile(sorted: PackedFloat64Array, q: float) -> float:
+	if sorted.is_empty():
+		return NAN
+	var r: float = q / 100.0 * (sorted.size() - 1)
+	var i := int(floor(r))
+	var j := mini(i + 1, sorted.size() - 1)
+	return lerpf(sorted[i], sorted[j], r - i)
 
 
 ## name -> {"path", "lake"} for every world90 grid the index lists.
