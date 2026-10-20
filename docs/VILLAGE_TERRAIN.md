@@ -303,7 +303,6 @@ keeps the derived form; `form` is what is planned, through
 |---|---|---|
 | hillside | street | the one-street row a contour street will replace |
 | ~~valley~~ | ~~street~~ | planned as itself since VTER-FORM-VALLEY |
-| crest | round | houses ringed round the top's common |
 | ~~shore~~ | ~~strand~~ | planned as itself since VTER-FORM-SHORE |
 
 | valley | street | a ribbon along the through road, as a valley village is |
