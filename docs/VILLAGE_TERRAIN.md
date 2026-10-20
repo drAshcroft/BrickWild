@@ -801,3 +801,129 @@ village should turn such lots so the front faces uphill or across the slope.
 
 Suite: `hslope` (house, shop, church at 0 / 1.0 / 2.5 / 4.0 m, sideways and
 front-to-back). Pictures: `godot --path . --script res://tools/render_slopes.gd`.
+
+## Placing the programme on the ground (VTER-PLACE)
+
+With `plan.ground` the programme is placed by the landform as well as by
+§6, and PlaceCheck has seven rules about the ground. **Without ground none
+of this runs**: every new branch tests `plan.ground`, and every new rule
+returns at once without it (vtplan's `pure` plans a flat village and
+requires no ground reading and no `*_ground` failure). `thorn-hamlet` and
+`veld-070` exported before and after, `cmp` identical.
+
+**The targets are the world set's.** `VillagePlaceCheck.WORLD_*` are numpy's
+linear quartiles over `tests/fixtures/settlements/world_settlements.json`
+(`survey.py measure()`, ported by `VillageShape`); `vworld` re-reads the
+file and fails if they drift.
+
+| Metric | Sites | p25 | median | p75 |
+|---|---|---|---|---|
+| `worship_elev_pctile` (the highest place of worship ranked among the body's buildings) | 61 | **0.380** | 0.724 | **0.950** |
+| `worship_centrality` | 61 | 0.307 | 0.599 | 0.725 |
+| `body_elev_pctile` | 109 | 0.389 | 0.528 | 0.716 |
+| `water_within_30m` | 109 | 0.000 | 0.017 | 0.099 |
+
+### What the planners do
+
+| Thing | On given ground | Where |
+|---|---|---|
+| the church | §6: "on the common, or on the highest ground". Its slot behind the common is ranked among the places the houses will stand (both sides of every through road, street and lane already laid, 14 m out, every 5 m). Below 0.65 of them, it goes up: first to the highest buildable ground within 30 m of the common's edge if that is in the upper half of the rows (it still fronts the common), else the highest within 70 m of the common's centre; it takes the frontage nearest that point and the reservation moves to its lot (`landmark_high_ground` on the lot). Where its own lane would climb past a cart's 12 % it takes the frontage nearest its slot instead of the first legal frontage | `VillageLotPlanner.landmark_high_ground`, `_place_landmark_near`, in `cut_measured` |
+| a strand's church | keeps its slot: inland of the one shore row, above it by construction | same |
+| the common | already on the levellest ground the siting finds (its `common` term, VTER-SITING); now checked | `VillageSiting` |
+| the mill race | of the candidate races the one whose ground falls least along it, none past 1.5 m (a leat follows the contour); the mill then looks along the bank for one | `VillageWaterPlan.mill_race` |
+| the seat | unchanged: VTER-LOTS' search already lays it at the head, and on these grounds high; now checked | `VillageLotPlanner._place_manor` |
+| the outer field | the gentlest of the track-end candidates (then the site bands), dry and no steeper than pasture (30 %); a `field` to 15 %, else `pasture`; none where all are steeper | `VillageDressContext._field_on_ground` |
+| the wood | the steepest of its candidates (beyond the common's far side, the four corners): woods stand where nobody ploughs | `VillageEnclosurePlan.wood_candidates`, `wood_slope` |
+
+**Tried and withdrawn: a landmark term in the siting.** Scoring each frame
+by its slot's rank lifted Manarola's church from 0.0 to 0.81 but dropped
+Hallstatt's from 0.44 to 0.13, and every moved frame moved roads with it
+(two dispersed plans grew junctions 6-8 m apart; Èze's edge lost its
+dressing). The slot is mid-village on a contour road whichever way round
+it is laid, so the frame is the wrong lever; the church's own placement is
+the right one. The siting is unchanged from VTER-LOTS.
+
+### The rules (`qa/village_place_check.gd`)
+
+Every building is ranked by the ground's height under its footprint centre,
+the survey's searchsorted rank (the share strictly below). In a dispersed
+village each building is ranked within its own hamlet (the nearest seat, as
+`gradient` already reads it): a hamlet's church is not "low" because the
+next hamlet is forty metres up the mountain. A rank is read only where the
+buildings stand on 3 m of fall or more (p95 - p5).
+
+| Rule | The sentence | The measurement |
+|---|---|---|
+| `landmark_ground` | the church is not at the bottom of its village; with a crest or spur among the houses, it takes the high ground | rank >= 0.38 (the world's p25); >= 0.5 when a `crest` or `spur` cell of `VillageSiteAnalysis` lies within 30 m of a lot. A WARNING, not a failure, when the planner sent the church to the high ground and that is the nearest frontage it could stand on (`landmark_high_ground` on its lot) |
+| `common_ground` | the common is on the most level ground the village has | its mean slope <= max(8 %, the median lot's + 2 %) |
+| `mill_ground` | the mill is low, at the water; its race runs along the contour | the race's ground falls <= 1.5 m under it; the mill's rank <= 0.5 |
+| `manor_ground` | the seat at a prominence or the head | rank >= 0.5, or the outermost building on its side of the common (>= 75 % of the farthest) |
+| `fields_ground` | fields on gentle ground | `field` <= 15 %, `pasture` <= 30 % mean slope, none on standing water |
+| `wood_ground` | the wood on the steepest ground offered to it | no candidate more than 3 % steeper than the one taken |
+| `edge_ground` | the edge stops where the ground turns too steep or too wet | no lot on standing water, none steeper on the mean than a footpath (60 %) |
+
+`VillagePlaceCheck.ground_reading(plan)` prints the readings on one line;
+`tools/village_terrain_sweep.gd` prints it under each plan with VillageShape's
+`worship_elev_pctile`, `worship_centrality`, `body_elev_pctile` and
+`water_within_30m`.
+
+### Against the world set, 2026-10-19
+
+`tools/village_terrain_sweep.gd -- --forms street,derived --qa` over the
+twelve real 30 m grids (50 people, seed 4242, 16 buildings). "Survey" is
+VillageShape's `worship_elev_pctile` (the survey's definition: the church
+ranked among the BODY's buildings, `null` when it stands more than 40 m from
+the body's hull); "rank" is PlaceCheck's, among every building (in a
+dispersed village, its hamlet's). The real IQR is 0.380-0.950. Before is
+f10be7e.
+
+| Fixture | street: before | street: survey / rank | derived form | derived: survey / rank | ground rules |
+|---|---|---|---|---|---|
+| Castelmezzano | 0.375 | **0.250** / 0.250 (8/16 placed) | dispersed | 0.333 / 0.429 | warn (went high; the nearest frontage a church stands on) |
+| Èze | 0.417 | 0.750 / 0.688 | round | 0.813 / 0.813 | ok |
+| Giethoorn | 0.438 | 0.813 / 0.813 | planted | null / 0.750 | ok |
+| Hallstatt | 0.438 | 0.688 / 0.688 | dispersed | null / 0.333 | **dispersed: landmark_ground** (spur among the houses, wants 0.5) |
+| Manarola | 0.000 | 0.692 / 0.750 | strand | 0.444 / 0.444 | ok |
+| Masouleh | 0.000 | **0.333** / 0.333 (6/16 placed) | dispersed | 0.200 / 0.200 | ok (span under 3 m in the hamlet, or warned) |
+| Monemvasia | 0.625 | 0.625 / 0.625 | dispersed | null / 0.200 | **dispersed: landmark_ground, common_ground** (its main common on 48 %) |
+| Monpazier | 0.750 | 0.750 / 0.750 | planted | null / 0.813 | ok |
+| Positano | 0.333 | **0.333** / 0.385 (13/16 placed) | dispersed | null / 0.600 | ok |
+| Rocamadour | 0.563 | 0.813 / 0.813 | dispersed | 0.800 / 0.800 | ok |
+| Satemin | 0.000 | 0.500 / 0.500 | planted | null / 0.438 | ok |
+| Ushguli | 0.625 | 0.625 / 0.625 | dispersed | null / 0.800 | ok |
+
+**Street form: 9 of 12 inside the real IQR (7 before), median 0.69 against
+the world's 0.724.** The three outside are the three that do not house their
+village (6, 8 and 13 of 16 placed: VillageQA `housed`, unchanged from before):
+their high side is a 40-60 % hillside on which no church terrace fits, and
+the frontage the ground fit allows is mid-village. PlaceCheck says so as a
+warning. Every suite fixture passes every ground rule: vtplan's nine cases
+and two briefs, vdispersed's four, vcheck.
+
+The survey reads `null` for most derived planted and dispersed plans: their
+church stands beyond 40 m of the body's hull (a planted grid's slot is
+behind the far street; a dispersed body is one hamlet). That is the survey's
+definition holding, not a missing church; PlaceCheck's rank reads them.
+
+### Not yet
+
+* **the dispersed form's main hamlet** -- Monemvasia's main common lies on
+  48 % and its church low; Hallstatt's church sits below a spur among its
+  hamlet's houses. The main hamlet is seated where the through road's flank
+  is gentlest (VTER-FORM-DISPERSED), not on the hamlet's high or level
+  ground; these two derived plans fail `landmark_ground` (and Monemvasia
+  `common_ground`) in the sweep, though no suite fixture does;
+* **the church on the steepest hillsides** -- Masouleh, Castelmezzano and
+  Positano: the high ground is too steep for a church's 6 m terrace; a
+  hillside form with a terraced church plot (VTER-FORM-HILLSIDE) is the fix;
+* **the mill at the valley floor** -- the race is graded and the rule
+  checks the mill is low, but a `river` spec's water is still laid where the
+  flat village lays it, not along the ground's drainage, so the mill is low
+  only where the water is the ground's own (VTER-FORM-VALLEY);
+* **the waterfront share** -- `WORLD_WATERFRONT_IQR` is read and checked by
+  `vworld` but no planner aims at it yet (VTER-FORM-SHORE);
+* **woods** are the dresser's few far-side trees; a wooded steep slope as a
+  plan polygon is not made;
+* **a crest village** -- the rank rule wants the church at or above the
+  median where a crest or spur is among the houses; the compact ring on the
+  summit with the church highest is VTER-FORM-CREST's.
