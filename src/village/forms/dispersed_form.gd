@@ -137,7 +137,8 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 		for k in range(out.hamlets.size()):
 			if spines[k] != null:
 				out.hamlets[k]["spine"] = out.roads.find(spines[k])
-	if spec.water != &"none" and not (ground_shore and spec.water in [&"coast", &"lake"]):
+	if spec.water != &"none" and not (ground_shore and spec.water in [&"coast", &"lake"]) \
+			and not (ground_shore and spec.water in [&"river", &"stream"] and VillageGroundWater.has_river(out)):
 		var water_plan: Dictionary = VillageWaterPlan.build(spec, out.site, out.roads, out.commons)
 		for water in water_plan["water"]:
 			out.water.append(water)

@@ -256,9 +256,17 @@ func _crossing(crossing: Dictionary, index: int) -> void:
 	var name := "%s%d" % [crossing["kind"], index]
 	var ribbon := Poly.ribbon(points, (float(crossing["width"]) + BRIDGE_MARGIN) * 0.5)
 	var height := 0.15 if bridge else 0.08
+	var measured := {}
 	if _surface != null:
-		# on given ground the deck is level with the higher of its landings
-		height += maxf(_gy(points[0]), _gy(points[points.size() - 1]))
+		if bridge:
+			# on given ground the bridge is fitted to what the ground does
+			# there (VTER-CROSSINGS): the deck over the higher landing and the
+			# water under it, abutments on the earth at both ends
+			measured = VillageBridge.measure(_surface, crossing)
+			height = float(measured["deck_y"])
+		else:
+			# a ford is level with the higher of its landings
+			height += maxf(_gy(points[0]), _gy(points[points.size() - 1]))
 	var depth := 0.25 if bridge else 0.12
 	var surface := SURF_WOOD if bridge else SURF_STONE
 	host(name)
@@ -313,7 +321,10 @@ func _crossing(crossing: Dictionary, index: int) -> void:
 		var direction := (points[end] - points[inside]).normalized()
 		var across := Vector2(-direction.y, direction.x) * (float(crossing["width"]) + BRIDGE_MARGIN) * 0.5
 		var near := points[end]
-		var far := near + direction * (1.5 if bridge else 0.8)
+		var reach := 1.5 if bridge else 0.8
+		if not measured.is_empty():
+			reach = float(measured["ramp"][0 if end == 0 else 1])
+		var far := near + direction * reach
 		var ramp := PackedVector3Array()
 		var top := height + depth * 0.5
 		var foot := Y_ROAD
@@ -326,6 +337,15 @@ func _crossing(crossing: Dictionary, index: int) -> void:
 			ramp.append(corner)
 		var row := component_slab("crossing_ramp", ramp, 0.06, surface)
 		bounds = bounds.merge(component_aabb(row))
+	if not measured.is_empty():
+		# the abutments: stone from the earth they stand on to the deck
+		for a in measured["abutments"]:
+			var at: Vector2 = a["pos"]
+			var dir: Vector2 = a["dir"]
+			var size: Vector3 = a["size"]
+			var xf := Transform3D(Basis(Vector3.UP, atan2(-dir.y, dir.x)),
+				Vector3(at.x, float(a["base_y"]) + size.y * 0.5, at.y))
+			bounds = bounds.merge(component_aabb(component_box("bridge_abutment", size, xf, SURF_STONE)))
 	_log_mass(name, bounds)
 	host_end()
 

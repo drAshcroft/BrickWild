@@ -247,7 +247,8 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 	# polygon and every later bridge/ford check reads the same geometry. Strand
 	# owns a deliberately shifted coast rectangle above; preserve it exactly.
 	if spec.water != &"none" and spec.form != &"strand" \
-			and not (ground_shore and spec.water in [&"coast", &"lake"]):
+			and not (ground_shore and spec.water in [&"coast", &"lake"]) \
+			and not (ground_shore and spec.water in [&"river", &"stream"] and VillageGroundWater.has_river(out)):
 		var water_plan: Dictionary = VillageWaterPlan.build(spec, out.site,
 			out.roads, out.commons)
 		for water in water_plan["water"]:
