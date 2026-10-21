@@ -2061,6 +2061,62 @@ func _build_floor() -> void:
 		box(Vector3(step.size.x, h, step.size.y),
 			Vector3(step.get_center().x, ChurchGeometry.FLOOR_LIFT + h / 2.0,
 				step.get_center().y), SURF_TRIM)
+	_build_reredos()
+
+
+## Painted grounds, gilt panels, dark gilt frames and a cross: a reredos the eye
+## finds from the west door of a 46 m nave (LIVE-SACRED). Western churches get
+## crimson behind the gold, the Orthodox an iconostasis blue. Every piece is a
+## named component on the vertex-coloured accent surface. Same-facing fronts
+## stand at distinct depths, backs run into the wall and the foot into the step,
+## so no two faces fight. Every piece lies inside ChurchGeometry.reredos_aabb.
+const REREDOS_GROUND_W := Color("3c0d14")
+const REREDOS_GROUND_E := Color("142a55")
+const REREDOS_GILT := Color("c8901f")
+const REREDOS_FRAME := Color("7a5a1c")
+
+func _build_reredos() -> void:
+	var box_a: AABB = ChurchGeometry.reredos_aabb(spec)
+	if box_a.size.x <= 0.0:
+		return
+	tag("reredos")
+	var W: float = box_a.size.x
+	var H: float = box_a.size.y
+	var y0: float = box_a.position.y
+	var back: float = box_a.end.z   # inside the wall
+	var ground: Color = REREDOS_GROUND_E if spec.style in [&"russian", &"byzantine"] \
+		else REREDOS_GROUND_W
+	var st: SurfaceTool = _kit.surface(SURF_ACCENT)
+	# [role, x0, x1, y0, y1 (fractions of W and H), front depth, colour]
+	var pieces: Array = [
+		["reredos_ground", -0.485, -0.22, 0.0, 0.75, 0.05, ground],
+		["reredos_ground", -0.22, 0.22, 0.0, 0.87, 0.05, ground],
+		["reredos_ground", 0.22, 0.485, 0.0, 0.75, 0.05, ground],
+		["reredos_panel", -0.15, 0.15, 0.19, 0.82, 0.08, REREDOS_GILT],
+		["reredos_panel", -0.42, -0.20, 0.19, 0.66, 0.08, REREDOS_GILT],
+		["reredos_panel", 0.20, 0.42, 0.19, 0.66, 0.08, REREDOS_GILT],
+		["reredos_post", -0.495, -0.46, 0.0, 0.76, 0.11, REREDOS_FRAME],
+		["reredos_post", -0.19, -0.155, 0.0, 0.88, 0.11, REREDOS_FRAME],
+		["reredos_post", 0.155, 0.19, 0.0, 0.88, 0.11, REREDOS_FRAME],
+		["reredos_post", 0.46, 0.495, 0.0, 0.76, 0.11, REREDOS_FRAME],
+		["reredos_predella", -0.5, 0.5, 0.16, 0.19, 0.13, REREDOS_FRAME],
+		["reredos_cornice", -0.5, -0.18, 0.74, 0.78, 0.13, REREDOS_GILT],
+		["reredos_cornice", 0.18, 0.5, 0.74, 0.78, 0.13, REREDOS_GILT],
+		["reredos_cornice", -0.25, 0.25, 0.865, 0.90, 0.13, REREDOS_GILT],
+		["reredos_cross", -0.0175, 0.0175, 0.895, 1.0, 0.11, REREDOS_GILT],
+		["reredos_cross", -0.07, 0.07, 0.935, 0.96, 0.13, REREDOS_GILT],
+	]
+	for p in pieces:
+		var x0: float = float(p[1]) * W
+		var x1: float = float(p[2]) * W
+		var ya: float = y0 + float(p[3]) * H
+		var yb: float = y0 + float(p[4]) * H
+		var front: float = box_a.end.z - ChurchGeometry.REREDOS_EMBED - float(p[5])
+		var size := Vector3(x1 - x0, yb - ya, back - front)
+		var centre := Vector3((x0 + x1) * 0.5, (ya + yb) * 0.5, (front + back) * 0.5)
+		st.set_color(p[6])
+		component_box(String(p[0]), size, Transform3D(Basis(), centre), SURF_ACCENT)
+	st.set_color(Color.WHITE)
 
 
 # ------------------------------------------------------------ St Basil's
