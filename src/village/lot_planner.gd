@@ -194,6 +194,9 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	# Store crossings only against these final road/water indices.
 	out.water_crossings = VillageWaterPlan.crossings(out.water, out.roads)
 	VillageEnclosurePlan.author(out)
+	# on given ground, a flight from the road to every lot that stands off
+	# it (VTER-STEPS-NAV), reserved before the dresser places anything
+	VillageAccessSteps.plan(out)
 	# and what is standing about outside (VIL-013): a planned village is a
 	# dressed one, because the checks that judge the arrangement -- what
 	# stands on the common, what is in a doorway, what is in the road -- are
@@ -1708,6 +1711,11 @@ static func _commit(plan: VillagePlan, lot: Dictionary, job: Dictionary, _rule: 
 		for rect in fit["parts"]["rects"]:
 			parts.append(_local_rect_world(rect, xf))
 		ground_record["entry_parts"] = parts
+		# the flights themselves, in the plan's frame on the platform, for
+		# the walk (VTER-STEPS-NAV): houses and shops only, the families
+		# whose flights are planned rather than measured off a mesh
+		ground_record["entry_flights"] = VillageAccessSteps.entry_flights(
+			fit["parts"].get("flight_rows", []), xf, float(ground_record["platform_m"]))
 		record["ground_fit"] = ground_record
 		request = VillageLotGround.request_for(request, fit["reading"])
 	plan.lots.append(record)

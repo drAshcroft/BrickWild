@@ -94,6 +94,7 @@ func check(plan: VillagePlan, scene: Node3D) -> Dictionary:
 		_seams(plan)
 		_terraces(plan, scene)
 		_water(plan)
+		_stairs(plan, scene)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
 		"stats": stats}
 
@@ -374,6 +375,102 @@ func _terraces(plan: VillagePlan, scene: Node3D) -> void:
 	if not missing.is_empty():
 		failures.append("ground: %d terraced lots have no terrace_wall component: %s"
 			% [missing.size(), ", ".join(missing.slice(0, 8))])
+
+
+## The stairs (VTER-STEPS-NAV): every tread of a `steps` road its own regions
+## hold, and every tread of a lot's access flight, is in the MESH at its level
+## (within SEAM_TOL at its middle), its riser is at most STAIR_RISER_MAX, an
+## inner tread of a stair street is at least STAIR_GOING_MIN deep, and each
+## has its `stair_tread` component (host `road<i>`, `lot<i>_steps`).
+const STAIR_RISER_MAX := 0.18
+const STAIR_GOING_MIN := 0.28
+
+
+func _stairs(plan: VillagePlan, scene: Node3D) -> void:
+	var ground := scene.get_node_or_null("Ground")
+	var rows: Array = ground.get_meta(&"components", []) if ground != null else []
+	var named := {}
+	for row in rows:
+		if String(row["role"]) == "stair_tread":
+			named[String(row["host"])] = int(named.get(String(row["host"]), 0)) + 1
+	var surface := VillageGroundSurface.of(plan)
+	var stairs := 0
+	var treads := 0
+	var worst := 0.0
+	var riser_max := 0.0
+	var going_min := INF
+	var off: Array[String] = []
+	var short: Array[String] = []
+	var unnamed: Array[String] = []
+	for i in range(plan.roads.size()):
+		var bed: Dictionary = surface.road_bed(i)
+		if not bed.has("treads"):
+			continue
+		stairs += 1
+		var ts: Array = bed["treads"]
+		var sv: PackedFloat32Array = bed["s"]
+		var length: float = sv[sv.size() - 1]
+		var owned := 0
+		for k in range(ts.size()):
+			var s0: float = maxf(float(ts[k]["s0"]), 0.0)
+			var s1: float = minf(float(ts[k]["s1"]), length)
+			if s1 - s0 < 0.02:
+				continue
+			var mid := surface.point_along(i, (s0 + s1) * 0.5)
+			var ri := surface.region_at(mid)
+			if ri >= surface.regions.size() or int(surface.regions[ri]["owner"]) != i \
+					or int(surface.regions[ri].get("tread", -1)) != k:
+				continue
+			owned += 1
+			treads += 1
+			var top := _probe.top(mid)
+			if not is_nan(top):
+				worst = maxf(worst, absf(top - float(ts[k]["h"])))
+				if absf(top - float(ts[k]["h"])) > SEAM_TOL and off.size() < 4:
+					off.append("road%d tread %d at (%.1f, %.1f): mesh %.2f, tread %.2f" % [i, k, mid.x, mid.y, top, float(ts[k]["h"])])
+			if k > 0:
+				riser_max = maxf(riser_max, absf(float(ts[k]["h"]) - float(ts[k - 1]["h"])))
+			# an inner tread: both its ends inside the stair
+			if k > 0 and k < ts.size() - 1 and float(ts[k]["s0"]) > 0.0 and float(ts[k]["s1"]) < length:
+				going_min = minf(going_min, s1 - s0)
+				if s1 - s0 < STAIR_GOING_MIN and short.size() < 4:
+					short.append("road%d tread %d %.2f m" % [i, k, s1 - s0])
+		if owned > 0 and int(named.get("road%d" % i, 0)) < owned:
+			unnamed.append("road%d (%d of %d)" % [i, int(named.get("road%d" % i, 0)), owned])
+	for li in range(plan.lots.size()):
+		var access: Dictionary = plan.lots[li].get("ground_fit", {}).get("access", {})
+		var ts: Array = access.get("treads", [])
+		if ts.is_empty():
+			continue
+		stairs += 1
+		var below: float = (access["foot_m"] as Vector3).y
+		for k in range(ts.size()):
+			var poly: PackedVector2Array = ts[k]["poly"]
+			var mid: Vector2 = (poly[0] + poly[1] + poly[2] + poly[3]) * 0.25
+			var h: float = float(ts[k]["h"])
+			treads += 1
+			riser_max = maxf(riser_max, absf(h - below))
+			below = h
+			var top := _probe.top(mid)
+			if not is_nan(top):
+				worst = maxf(worst, absf(top - h))
+				if absf(top - h) > SEAM_TOL and off.size() < 4:
+					off.append("lot%d step %d: mesh %.2f, tread %.2f" % [li, k, top, h])
+		if int(named.get("lot%d_steps" % li, 0)) < ts.size():
+			unnamed.append("lot%d_steps (%d of %d)" % [li, int(named.get("lot%d_steps" % li, 0)), ts.size()])
+	stats["stairs"] = stairs
+	stats["stair_treads"] = treads
+	stats["stair_mesh_worst"] = snappedf(worst, 0.001)
+	stats["stair_riser_max"] = snappedf(riser_max, 0.001)
+	stats["stair_going_min"] = snappedf(going_min, 0.001) if going_min < INF else 0.0
+	if not off.is_empty():
+		failures.append("stairs: the mesh is not at a tread's level: %s" % "; ".join(off))
+	if riser_max > STAIR_RISER_MAX + 1e-3:
+		failures.append("stairs: a riser of %.2f m (at most %.2f)" % [riser_max, STAIR_RISER_MAX])
+	if not short.is_empty():
+		failures.append("stairs: treads shallower than %.2f m: %s" % [STAIR_GOING_MIN, "; ".join(short)])
+	if not unnamed.is_empty():
+		failures.append("stairs: treads without their stair_tread component: %s" % ", ".join(unnamed))
 
 
 ## Inside natural water the ground is under the water's surface: a 2 m

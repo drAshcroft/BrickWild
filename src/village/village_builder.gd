@@ -100,6 +100,11 @@ const TERRACE_THICK := 0.45
 const TERRACE_COPING := 0.1
 const TERRACE_FOOTING := 0.25
 const TERRACE_PROUD := 0.02
+## A stair's stone (VTER-STEPS-NAV): treads this thick, their tops this far
+## over the stepped ground, risers this thick at each nosing.
+const STAIR_TREAD_T := 0.08
+const STAIR_PROUD := 0.02
+const STAIR_RISER_T := 0.04
 ## The overlays draped on given ground, this far over it.
 const DRAPE_TREAD := 0.012
 const DRAPE_APPROACH := 0.015
@@ -856,6 +861,7 @@ func _ground_on_terrain(plan: VillagePlan) -> void:
 	_log_mass("ground", _surface.bounds())
 	_terrace_walls(plan)
 	_retaining_walls(plan)
+	_stairs(plan)
 
 
 ## Triangles the surface laid out, per surface, into the kit.
@@ -913,6 +919,11 @@ func _terrace_walls(plan: VillagePlan) -> void:
 				var n := Vector2(b.y - a.y, a.x - b.x).normalized()
 				if Geometry2D.is_point_in_polygon((a + b) * 0.5 + n * 0.05, poly):
 					n = -n # n points out of the lot
+				# an access flight's edge is held by its own cheeks, and a
+				# level way in is left open
+				if _surface.kind_of(_surface.region_at((a + b) * 0.5 - n * 0.05)) == VillageGroundSurface.K_STAIR \
+						or _in_gate(plan, (a + b) * 0.5):
+					continue
 				_wall_panel("terrace_wall", a, b, n)
 		host_end()
 
@@ -939,11 +950,12 @@ func _retaining_walls(plan: VillagePlan) -> void:
 				var there := _surface.region_at(mid + n * 0.05)
 				if not _is_road_of(mine, i) or there <= mine or _surface.kind_of(there) in [
 						VillageGroundSurface.K_WEAR, VillageGroundSurface.K_ROAD,
-						VillageGroundSurface.K_VERGE, VillageGroundSurface.K_WATER]:
+						VillageGroundSurface.K_VERGE, VillageGroundSurface.K_WATER,
+						VillageGroundSurface.K_STAIR]:
 					continue
 				var step := maxf(absf(_surface.height_in(mine, a) - _surface.height_in(there, a)),
 					absf(_surface.height_in(mine, b) - _surface.height_in(there, b)))
-				if step <= VillageLotGround.TERRACE_MIN:
+				if step <= VillageLotGround.TERRACE_MIN or _in_gate(plan, mid):
 					continue
 				if not opened:
 					host("road%d" % i)
@@ -951,6 +963,122 @@ func _retaining_walls(plan: VillagePlan) -> void:
 				_wall_panel("retaining_wall", a, b, n)
 		if opened:
 			host_end()
+
+
+## The stairs on given ground (VTER-STEPS-NAV): on every tread of a `steps`
+## road's bed (VillageGroundSurface.treads_of), a stone `stair_tread` across
+## its carriageway, STAIR_PROUD over the ground, and a `stair_riser` at each
+## nosing, host `road<i>`; on every access flight (VillageAccessSteps) the
+## same, host `lot<i>_steps`, with a `stair_cheek` panel wherever a tread
+## stands more than TERRACE_MIN off the ground beside it. Only treads the
+## road's own regions hold are dressed: under a greater road's ribbon the
+## bed is that road's.
+func _stairs(plan: VillagePlan) -> void:
+	for i in range(plan.roads.size()):
+		var bed: Dictionary = _surface.road_bed(i)
+		if not bed.has("treads"):
+			continue
+		var treads: Array = bed["treads"]
+		var sv: PackedFloat32Array = bed["s"]
+		var length: float = sv[sv.size() - 1]
+		var width: float = float(plan.roads[i]["width"])
+		var opened := false
+		for k in range(treads.size()):
+			var t: Dictionary = treads[k]
+			var s0: float = maxf(float(t["s0"]), 0.0)
+			var s1: float = minf(float(t["s1"]), length)
+			if s1 - s0 < 0.02 or not _tread_owned(i, k, _surface.point_along(i, (s0 + s1) * 0.5)):
+				continue
+			if not opened:
+				host("road%d" % i)
+				opened = true
+			var line := _surface.centre_between(i, s0, s1)
+			for m in range(line.size() - 1):
+				var a: Vector2 = line[m]
+				var b: Vector2 = line[m + 1]
+				if a.distance_to(b) < 0.01:
+					continue
+				_stair_box("stair_tread", a, b, width, float(t["h"]) - STAIR_TREAD_T, float(t["h"]) + STAIR_PROUD)
+			if k == 0 or float(t["s0"]) <= 0.0:
+				continue
+			var at: Vector2 = _surface.point_along(i, float(t["s0"]))
+			var dir: Vector2 = (_surface.point_along(i, float(t["s0"]) + 0.05) - at).normalized()
+			if not _tread_owned(i, k - 1, at - dir * 0.05):
+				continue
+			var lo := minf(float(t["h"]), float(treads[k - 1]["h"]))
+			var hi := maxf(float(t["h"]), float(treads[k - 1]["h"]))
+			_stair_box("stair_riser", at - dir * STAIR_RISER_T * 0.5, at + dir * STAIR_RISER_T * 0.5, width,
+				lo - STAIR_TREAD_T, hi + STAIR_PROUD - 0.005)
+		if opened:
+			host_end()
+	for li in range(plan.lots.size()):
+		var access: Dictionary = plan.lots[li].get("ground_fit", {}).get("access", {})
+		var treads: Array = access.get("treads", [])
+		if treads.is_empty():
+			continue
+		host("lot%d_steps" % li)
+		var foot_h: float = (access["foot_m"] as Vector3).y
+		var run: Vector2 = access["dir"]
+		var origin: Vector2 = access["origin"]
+		for k in range(treads.size()):
+			var poly: PackedVector2Array = treads[k]["poly"]
+			var h: float = float(treads[k]["h"])
+			var c: Vector2 = origin + run * float(treads[k]["d"])
+			var going: float = float(treads[k]["len"])
+			var across: float = float(access.get("width_m", VillageAccessSteps.ACCESS_WIDTH))
+			_stair_box("stair_tread", c - run * going * 0.5, c + run * going * 0.5, across,
+				h - STAIR_TREAD_T, h + STAIR_PROUD)
+			var below: float = foot_h if k == 0 else float(treads[k - 1]["h"])
+			var nose: Vector2 = c - run * going * 0.5
+			if absf(h - below) > 0.01:
+				_stair_box("stair_riser", nose - run * STAIR_RISER_T * 0.5, nose + run * STAIR_RISER_T * 0.5, across,
+					minf(h, below) - STAIR_TREAD_T, maxf(h, below) + STAIR_PROUD - 0.005)
+			for e in range(4):
+				var a: Vector2 = poly[e]
+				var b: Vector2 = poly[(e + 1) % 4]
+				var mid := (a + b) * 0.5
+				var out := (mid - c).normalized()
+				out = Vector2(b.y - a.y, a.x - b.x).normalized() * signf(Vector2(b.y - a.y, a.x - b.x).dot(out))
+				var there := _surface.region_at(mid + out * 0.05)
+				# no cheek on a road: a flight on a verge drops to its road open
+				if _surface.kind_of(there) in [VillageGroundSurface.K_STAIR, VillageGroundSurface.K_WATER,
+						VillageGroundSurface.K_WEAR, VillageGroundSurface.K_ROAD, VillageGroundSurface.K_VERGE]:
+					continue
+				var step := maxf(absf(h - _surface.height_in(there, a + out * 0.05)),
+					absf(h - _surface.height_in(there, b + out * 0.05)))
+				if step > VillageLotGround.TERRACE_MIN:
+					_wall_panel("stair_cheek", a, b, out, true)
+		host_end()
+
+
+## Whether tread k of road i is the ground at p (not a greater road's).
+func _tread_owned(i: int, k: int, p: Vector2) -> bool:
+	var ri := _surface.region_at(p)
+	if ri >= _surface.regions.size():
+		return false
+	var r: Dictionary = _surface.regions[ri]
+	return int(r["owner"]) == i and int(r.get("tread", -1)) == k and int(r["kind"]) in [
+		VillageGroundSurface.K_WEAR, VillageGroundSurface.K_ROAD, VillageGroundSurface.K_VERGE]
+
+
+## A stone box on the line a-b, `across` wide, from `bottom` to `top`.
+func _stair_box(role: String, a: Vector2, b: Vector2, across: float, bottom: float, top: float) -> void:
+	var run := b - a
+	var mid := (a + b) * 0.5
+	component_box(role, Vector3(run.length(), top - bottom, across),
+		Transform3D(Basis(Vector3.UP, atan2(-run.y, run.x)), Vector3(mid.x, (top + bottom) * 0.5, mid.y)), SURF_STONE)
+
+
+## Whether plan point p is in a lot's level way in (VillageAccessSteps,
+## layout "level"): its width, and a panel's half-length either side.
+func _in_gate(plan: VillagePlan, p: Vector2) -> bool:
+	for lot in plan.lots:
+		var access: Dictionary = lot.get("ground_fit", {}).get("access", {})
+		if access.get("layout", "") != "level":
+			continue
+		if p.distance_to(access["at"]) <= float(access["width_m"]) * 0.5 + 0.5:
+			return true
+	return false
 
 
 func _is_road_of(ri: int, road: int) -> bool:
@@ -965,7 +1093,7 @@ func _is_road_of(ri: int, road: int) -> bool:
 ## bounds: from TERRACE_FOOTING under the lower ground to TERRACE_COPING over
 ## the higher, its body on the higher (held) side and its face TERRACE_PROUD
 ## in front of the riser. Nothing where the two grounds meet.
-func _wall_panel(role: String, a: Vector2, b: Vector2, out: Vector2) -> void:
+func _wall_panel(role: String, a: Vector2, b: Vector2, out: Vector2, body_out := false) -> void:
 	var in_a := _surface.height_at(a - out * 0.03)
 	var in_b := _surface.height_at(b - out * 0.03)
 	var out_a := _surface.height_at(a + out * 0.03)
@@ -973,6 +1101,9 @@ func _wall_panel(role: String, a: Vector2, b: Vector2, out: Vector2) -> void:
 	if maxf(absf(in_a - out_a), absf(in_b - out_b)) < 0.05:
 		return
 	var high_side := -out if in_a + in_b >= out_a + out_b else out
+	if body_out:
+		# a stair's cheek stands beside the flight, never on its treads
+		high_side = out
 	var shift := high_side * (TERRACE_THICK * 0.5 - TERRACE_PROUD)
 	var pa := a + shift
 	var pb := b + shift

@@ -50,8 +50,21 @@ const RISER_MIN := 0.002
 const SEAM_EPS := 0.002
 ## A shore of ground water hands back to the natural ground over this much.
 const SHORE_BLEND := 1.5
-## Regions, by kind.
-enum { K_WATER, K_WEAR, K_ROAD, K_VERGE, K_LOT, K_COMMON, K_FIELD, K_BANK, K_LAND }
+## A `steps` road's bed is a stair (VTER-STEPS-NAV): level treads, each
+## RISER_STEPS above or below the last, a tread starting wherever the smoothed
+## profile has left the tread's level by STEP_SWITCH risers -- so a tread is
+## never more than STEP_SWITCH x RISER_STEPS (9 cm) off the profile the ramp
+## had, and the lots and verges beside it meet it as they met the ramp.
+const RISER_STEPS := 0.15
+const STEP_SWITCH := 0.6
+## the profile is read this finely along the centreline for the treads
+const STEP_SAMPLE := 0.05
+## an edge's far side is read at least this often for the regions there
+## (narrower than any tread, so a flight beside a long edge is all seen)
+const RISER_SAMPLE := 0.25
+## Regions, by kind. K_STAIR: an access flight cut into (or built onto) a
+## lot where its pad stands off its road (VillageAccessSteps).
+enum { K_WATER, K_WEAR, K_ROAD, K_VERGE, K_LOT, K_COMMON, K_FIELD, K_BANK, K_LAND, K_STAIR }
 
 var plan: VillagePlan
 var terrain: VillageTerrain
@@ -90,6 +103,12 @@ static func of(p_plan: VillagePlan) -> VillageGroundSurface:
 	s._make(p_plan)
 	_cache[key] = s
 	return s
+
+
+## Forget every cached surface: a plan whose ground changed under the same
+## shape (VillageAccessSteps reserves its flights after the lots) reads anew.
+static func forget() -> void:
+	_cache.clear()
 
 
 func _make(p_plan: VillagePlan) -> void:
@@ -315,7 +334,99 @@ func _bed_of(i: int, greater: Array[int]) -> Dictionary:
 					offset[m] += delta * (1.0 - away / JUNCTION_TAPER)
 	for k in range(h.size()):
 		h[k] += offset[k]
-	return {"stations": st, "s": s, "h": h, "class": road["class"], "width": float(road["width"])}
+	var bed := {"stations": st, "s": s, "h": h, "class": road["class"], "width": float(road["width"])}
+	if road["class"] == &"steps" and st.size() >= 2:
+		bed["treads"] = treads_of(s, h)
+	return bed
+
+
+## The treads of a stair laid on profile (s, h): [{"s0", "s1", "h"}] in order
+## along it, the first from -INF and the last to +INF. Each is level; the
+## next starts where the profile has left this one's level by STEP_SWITCH
+## risers, one RISER_STEPS up or down. Static and pure: a consumer can lay
+## the same stair from the exported profile.
+static func treads_of(s: PackedFloat32Array, h: PackedFloat32Array) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var h0: float = h[0]
+	var level := 0
+	var start := -INF
+	var length: float = s[s.size() - 1]
+	var n := maxi(1, int(ceil(length / STEP_SAMPLE)))
+	var k := 0
+	for m in range(n + 1):
+		var sv: float = length * float(m) / float(n)
+		while k < s.size() - 2 and s[k + 1] < sv:
+			k += 1
+		var span: float = s[k + 1] - s[k]
+		var hv: float = lerpf(h[k], h[k + 1], clampf((sv - s[k]) / span, 0.0, 1.0)) if span > 1e-6 else h[k]
+		var x := (hv - h0) / RISER_STEPS
+		while x > float(level) + STEP_SWITCH or x < float(level) - STEP_SWITCH:
+			out.append({"s0": start, "s1": sv, "h": h0 + float(level) * RISER_STEPS})
+			start = sv
+			level += 1 if x > float(level) else -1
+	out.append({"s0": start, "s1": INF, "h": h0 + float(level) * RISER_STEPS})
+	return out
+
+
+## The height of the tread at `sv` metres along.
+static func tread_height(treads: Array, sv: float) -> float:
+	var lo := 0
+	var hi := treads.size() - 1
+	while lo < hi:
+		var mid := (lo + hi) / 2
+		if sv >= float(treads[mid]["s1"]):
+			lo = mid + 1
+		else:
+			hi = mid
+	return float(treads[lo]["h"])
+
+
+## The point `sv` metres along road `i`'s centreline (its bed stations),
+## carried straight on past either end.
+func point_along(i: int, sv: float) -> Vector2:
+	var st: PackedVector2Array = beds[i]["stations"]
+	var s: PackedFloat32Array = beds[i]["s"]
+	var k := 0
+	while k < s.size() - 2 and s[k + 1] < sv:
+		k += 1
+	var a: Vector2 = st[k]
+	var b: Vector2 = st[k + 1]
+	var span: float = s[k + 1] - s[k]
+	if span < 1e-6:
+		return a
+	return a + (b - a) * ((sv - s[k]) / span)
+
+
+## The centreline of road `i` from s0 to s1 (the stations between kept).
+func centre_between(i: int, s0: float, s1: float) -> PackedVector2Array:
+	var st: PackedVector2Array = beds[i]["stations"]
+	var s: PackedFloat32Array = beds[i]["s"]
+	var out := PackedVector2Array([point_along(i, s0)])
+	for k in range(st.size()):
+		if s[k] > s0 + 0.01 and s[k] < s1 - 0.01:
+			out.append(st[k])
+	out.append(point_along(i, s1))
+	return out
+
+
+## Metres along road `i` of the point of its centreline nearest `p`.
+func along(i: int, p: Vector2) -> float:
+	var st: PackedVector2Array = beds[i]["stations"]
+	var s: PackedFloat32Array = beds[i]["s"]
+	if st.size() == 1:
+		return 0.0
+	var best := INF
+	var out := 0.0
+	for k in range(st.size() - 1):
+		var a: Vector2 = st[k]
+		var d: Vector2 = st[k + 1] - a
+		var len2 := d.length_squared()
+		var t := 0.0 if len2 < 1e-12 else clampf((p - a).dot(d) / len2, 0.0, 1.0)
+		var dist := p.distance_squared_to(a + d * t)
+		if dist < best:
+			best = dist
+			out = lerpf(s[k], s[k + 1], t)
+	return out
 
 
 ## The bed of road `i` at a point: the profile at the point's projection on
@@ -326,6 +437,8 @@ func bed_at(i: int, p: Vector2) -> float:
 	var h: PackedFloat32Array = bed["h"]
 	if st.size() == 1:
 		return h[0]
+	if bed.has("treads"):
+		return tread_height(bed["treads"], along(i, p))
 	var best := INF
 	var out: float = h[0]
 	for k in range(st.size() - 1):
@@ -414,19 +527,64 @@ func _lot_halves(li: int, poly: PackedVector2Array) -> Array[PackedVector2Array]
 
 # ---------------------------------------------------------------- regions
 
-func _add(poly: PackedVector2Array, kind: int, surf: int, owner := -1, tint := Color(0, 0, 0, 0)) -> void:
+func _add(poly: PackedVector2Array, kind: int, surf: int, owner := -1, tint := Color(0, 0, 0, 0)) -> Dictionary:
 	if poly.size() < 3:
-		return
+		return {}
 	regions.append({"poly": poly, "box": Poly.bounding_rect(poly), "kind": kind, "surf": surf,
 		"owner": owner, "tint": tint})
+	return regions[regions.size() - 1]
+
+
+## A stair road's treads as regions, each level at its own height, ahead of
+## the road's own ribbons (which keep whatever a tread's slab misses). A
+## tread's slab is the ribbon of its stretch of centreline, so two treads
+## meet on the square cut between them.
+func _tread_regions(i: int) -> void:
+	var road: Dictionary = plan.roads[i]
+	var ribbons := [
+		[Poly.ribbon(road["points"], float(road["width"]) * 0.5 * VillageBuilder.WEAR_SHARE), K_WEAR, VillageBuilder.SURF_WEAR],
+		[VillageSitePlanner.road_ribbon(road, false), K_ROAD, VillageBuilder.SURF_ROAD],
+		[VillageSitePlanner.road_ribbon(road, true), K_VERGE, VillageBuilder.SURF_VERGE]]
+	var half: float = float(road["width"]) * 0.5 \
+		+ float(VillageSitePlanner.road_rule(road["class"], plan.spec)["verge"]) + 1.0
+	var sv: PackedFloat32Array = beds[i]["s"]
+	var length: float = sv[sv.size() - 1]
+	var treads: Array = beds[i]["treads"]
+	for k in range(treads.size()):
+		var t: Dictionary = treads[k]
+		var s0: float = maxf(float(t["s0"]), -3.0)
+		var s1: float = minf(float(t["s1"]), length + 3.0)
+		if s1 - s0 < 1e-3:
+			continue
+		var slab := Poly.ribbon(centre_between(i, s0, s1), half)
+		for rb in ribbons:
+			if (rb[0] as PackedVector2Array).size() < 3 or slab.size() < 3:
+				continue
+			for piece in Geometry2D.intersect_polygons(rb[0], slab):
+				if not Geometry2D.is_polygon_clockwise(piece):
+					var r := _add(piece, rb[1], rb[2], i)
+					if not r.is_empty():
+						r["h"] = float(t["h"])
+						r["tread"] = k
 
 
 func _regions() -> void:
 	_lot_records()
 	for w in waters:
 		_add(w["poly"], K_WATER, VillageBuilder.SURF_BANK, int(w["index"]))
+	# the access flights (VillageAccessSteps), cut into or built onto the
+	# lots, or standing on their own road's verge -- never a carriageway, so
+	# ahead of the roads they claim only lot and verge
+	for li in range(plan.lots.size()):
+		var access: Dictionary = plan.lots[li].get("ground_fit", {}).get("access", {})
+		for t in access.get("treads", []):
+			var r := _add(t["poly"], K_STAIR, VillageBuilder.SURF_ROAD, li)
+			if not r.is_empty():
+				r["h"] = float(t["h"])
 	for i in stats["road_order"]:
 		var road: Dictionary = plan.roads[i]
+		if beds[i].has("treads"):
+			_tread_regions(i)
 		_add(Poly.ribbon(road["points"], float(road["width"]) * 0.5 * VillageBuilder.WEAR_SHARE),
 			K_WEAR, VillageBuilder.SURF_WEAR, i)
 		_add(VillageSitePlanner.road_ribbon(road, false), K_ROAD, VillageBuilder.SURF_ROAD, i)
@@ -484,6 +642,8 @@ func height_in(ri: int, p: Vector2) -> float:
 	if ri >= regions.size():
 		return natural_at(p)
 	var r: Dictionary = regions[ri]
+	if r.has("h"):
+		return float(r["h"])
 	match int(r["kind"]):
 		K_WEAR, K_ROAD, K_VERGE:
 			return bed_at(int(r["owner"]), p)
@@ -702,7 +862,15 @@ func _risers(q: PackedVector2Array, ri: int) -> void:
 		# the regions across the edge, with the points where they change
 		var ts: Array[float] = [0.0]
 		var rs: Array[int] = []
+		# at least every RISER_SAMPLE metres: a stair's treads (0.28 m and
+		# more) along a road's or a lot's edge are each read, not stepped over
 		var samples := [0.02, 0.26, 0.5, 0.74, 0.98]
+		var dense := int(ceil(d.length() / RISER_SAMPLE))
+		if dense > 4:
+			samples = [0.02]
+			for m in range(1, dense):
+				samples.append(float(m) / float(dense))
+			samples.append(0.98)
 		var prev := region_at(a.lerp(b, samples[0]) + n * SEAM_EPS)
 		rs.append(prev)
 		var t_prev: float = samples[0]
