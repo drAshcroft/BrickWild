@@ -117,7 +117,7 @@ static func hall_plan(spec: CastleSpec) -> HousePlan:
 	plan.focus = {"room": 0, "cat": "table",
 		"pos": dais.get_center() - up * (depth * HIGH_TABLE_SET_IN),
 		"facing": atan2(up.x, up.y), "faces_door": faces}
-	HouseFurnisher.furnish(plan, hs)
+	CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 
@@ -246,7 +246,7 @@ static func chapel_plan(spec: CastleSpec) -> HousePlan:
 		aisle.size.x = sanctuary.position.x - aisle.position.x
 	plan.zones.append({"room": 0, "rect": aisle, "why": "chapel centre aisle"})
 	preload("castle_apse_plan.gd").connect_chapel(plan, spec)
-	HouseFurnisher.furnish(plan, hs)
+	CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 
@@ -633,7 +633,7 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	# describe.
 	plan.hearth = {"room": 0, "wall": 2}
 	hs.room_count = plan.rooms.size()
-	HouseFurnisher.furnish(plan, hs)
+	CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 

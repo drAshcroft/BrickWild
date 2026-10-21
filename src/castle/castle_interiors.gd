@@ -124,7 +124,7 @@ static func primary(spec: CastleSpec, with_towers := true) -> Dictionary:
 				restore_daylight(out[kind], curtain_boxes(spec))
 				blind_rooms_to_stores(plan)
 				if furnish_keep:
-					HouseFurnisher.furnish(plan, plan.spec)
+					CastleRoomTopUp.furnish(plan, plan.spec)
 				else:
 					CastleKeepPlan.furnish_minimum_programme(plan, plan.spec)
 			elif yaw != 0.0:
