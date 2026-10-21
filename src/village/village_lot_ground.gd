@@ -230,7 +230,8 @@ static func _house_parts(building, fall: float, deg: float) -> Dictionary:
 		if int(f["door"]) == entrance:
 			rise = float(f["rise"])
 		rects.append_array(GroundFall.flight_rects(f))
-	return {"rects": rects, "rise": rise, "feasible": feasible, "flights": flights.size()}
+	return {"rects": rects, "rise": rise, "feasible": feasible, "flights": flights.size(),
+		"flight_rows": flights}
 
 
 static func _measured_parts(job: Dictionary, request: BuildingRequest, fall: float, deg: float) -> Dictionary:

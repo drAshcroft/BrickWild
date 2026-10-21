@@ -617,11 +617,11 @@ Manarola's hillside above the strand.
 
 **Not yet.**
 
-* **the walk on the steps (VTER-STEPS-NAV)** -- `VillageNavCheck` and
-  `VillageWalk` reach every door on the lot's flat floor; they do not see a
-  flight's treads or heights (the parts are lot floor to them, never an
-  obstacle, so no door is cut off). The flights are in each lot's
-  `entry_parts` and in `BrickWild.navigation()`'s `route_m` per building.
+* ~~**the walk on the steps (VTER-STEPS-NAV)**~~ -- done: on given ground
+  the SitePlan's walk also carries `navmesh_3d`, baked from the emitted
+  ground with every flight as a link, and every lot has a way in from its
+  road ("Steps and the 3D walk" below). `VillageNavCheck` itself still
+  judges the flat floor.
 * ~~the graded ground itself (VTER-GROUND-MESH)~~ -- done: VillageBuilder
   emits the platforms, the road beds and the walls on the terrain, and the
   assembler stands each building on its platform ("The ground mesh" below).
@@ -798,8 +798,9 @@ door that has one, for houses, shops and churches. Flat buildings gain no key.
 at y = 0 and floats on the downhill side~~ -- in a village on given ground the
 assembler now sets each yard model on the lowest ground under its footprint
 (VTER-GROUND-MESH); a building generated alone, outside a village, still
-stands its yard at y = 0. The village walk (`VillageWalk`) does
-not read routes; a front-downhill house in band 3 keeps its front door on the
+stands its yard at y = 0. ~~The village walk (`VillageWalk`) does
+not read routes~~ -- it does since VTER-STEPS-NAV: each house's flights are
+in its lot's `entry_flights` and the 3D walk links them. A front-downhill house in band 3 keeps its front door on the
 downhill side and climbs to it by a long flight along the facade -- the
 village should turn such lots so the front faces uphill or across the slope.
 
@@ -937,8 +938,8 @@ water region drops a riser (an abutment) to a road bed that runs into it.
 
 ### Not yet
 
-* **a stepped bed for `steps`** -- a stair street is a ramp on its profile
-  until VTER-STEPS-NAV puts treads on it;
+* ~~**a stepped bed for `steps`**~~ -- done in VTER-STEPS-NAV: a stair
+  street's bed is level treads with stone `stair_tread` / `stair_riser`;
 * **earth risers under 0.6 m** -- where a pad meets the terrain or a road bed
   by less than `TERRACE_MIN` the step is a vertical face of earth (closed, not
   walled, not blended); two lots' pads meeting each other, or a road's
@@ -1370,3 +1371,206 @@ passes too.
 * **larger villages** -- over about 25 households the ring simply grows;
   a second ring or a lower town below the gate is not laid;
 * **Beni Isguen** derives another form on its 90 m ground.
+
+## Steps and the 3D walk (VTER-STEPS-NAV)
+
+On given ground a `steps` road is a stair, every lot has a way in from its
+road, and the SitePlan's `walk` gains a 3D navigation mesh that
+NavigationServer3D paths climb. **Without ground none of it runs**: thorn-hamlet
+exported on 6affc0d and on the first cut of this branch is `cmp`-identical, and
+`tools/fingerprint_village_ground.gd` prints the same seven lines on
+terrain-villages 77d97ab (a copy of the tree with the base code) and on this
+branch (`street-none-none mesh=e5da7c34d26d909e`, ...).
+
+| Piece | Where |
+|---|---|
+| stair street treads | `VillageGroundSurface.treads_of` (pure, static), `road_bed(i)["treads"]`, `_tread_regions`; `bed_at` is stepped on a `steps` road |
+| stair stone | `VillageBuilder._stairs`: `stair_tread`, `stair_riser` (host `road<i>`, `lot<i>_steps`), `stair_cheek` |
+| a lot's way in | `src/village/village_access_steps.gd`, `VillageAccessSteps.plan` (from `VillageLotPlanner.plan_measured`, before the dresser) -> `lots[i].ground_fit.access` |
+| a house's flights in the plan | `lots[i].ground_fit.entry_flights` (`VillageAccessSteps.entry_flights`, from `HouseSlope.flights` kept by `VillageLotGround._house_parts` as `flight_rows`) |
+| the 3D walk | `src/village/village_walk_3d.gd`, `VillageWalk3D.bake`; exported by `VillageWalk._add_3d` |
+| the check | `VillageGroundCheck` rule `stairs` |
+| the suite | `vstepswalk` (`tests/suites/village_steps_walk_suite.gd`) |
+
+### Stair streets
+
+A `steps` road's bed (level across, its smoothed profile along) becomes level
+TREADS: the profile is read every 5 cm, and a new tread starts, one
+`RISER_STEPS` = 0.15 m up or down, wherever the profile has left the current
+tread's level by `STEP_SWITCH` = 0.6 risers. So every riser is 0.15 m and a
+tread is never more than 9 cm off the ramp it replaces -- the lots and verges
+beside it meet it as they met the ramp, and their risers close the seams as
+before. A tread's going follows the grade: 0.45-0.50 m at the beds' steepest
+(the smoothed `steps` beds on Manarola and Positano reach 25-31 %); on a
+gentle stretch a tread is a landing metres long. Each tread is a region (its
+three ribbons cut by the square slab of its stretch of centreline), so the
+mesh is stepped exactly (`stairs` measures the mesh at every tread's middle:
+0.000 m). On top, VillageBuilder lays a stone `stair_tread` 2 cm proud across
+the carriageway and a `stair_riser` at each nosing, host `road<i>`, only where
+the road's own regions hold the tread (not under a greater road's ribbon).
+
+### A lot's way in
+
+`VillageLotGround` grades each lot to its building, and the road bed follows
+its own profile, so a pad meets its road with a step (0.4-3 m on these two
+hillsides). Nothing climbed it, and the flat walk could not see it.
+`VillageAccessSteps` reads the step at the lot's front edge opposite the door
+(the road found within 2 m outward):
+
+| Step | Way in | Record (`ground_fit.access`) |
+|---|---|---|
+| at most `STEP_FREE` 0.2 m | `layout: "level"`: the terrace and retaining walls along the front leave a gap there (`VillageBuilder._in_gate`) | `at`, `width_m` |
+| more | a FLIGHT: 0.15 m risers, 0.36 m goings (the baking cell's diagonal: no cell touches three treads), 1.2 m wide, else 0.75 m | `poly`, `treads` [{`poly`, `h`, `d`, `len`}], `rise_m`, `riser_m`, `going_m`, `layout`, `width_m`, `origin`, `dir`, `foot_m`, `head_m` |
+| no room | `refused`, and why (`tried`) | the walk says the door is cut off |
+
+A flight is tried `straight` in from the front toward the door, then `along`
+the front edge inside the lot, then on the `verge` outside it (its own road's
+verge, never a carriageway); along the edge it starts with a landing level
+with the road, one flight-width long, so a person steps on across its width,
+and on the verge it ends with one at the pad's level. It keeps 0.1 m off the
+walls, off the yards, off the house's own entry flights and the other lots,
+with 0.6 m of pad clear past its head; the nearest head to the door wins. The
+strip goes into `entry_parts`, so the dresser keeps off it. The ground cuts
+its treads in as regions ahead of the roads (risers close every side), the
+builder lays its stone (host `lot<i>_steps`) and a `stair_cheek` panel beside
+a tread more than 0.6 m off the pad (never on a road: a verge flight drops to
+its road open). On Manarola 6 lots got a flight, on Positano 12 (on terrain-villages 77d97ab, after the crest, valley, shore and place work); none was
+refused (before the 0.15 m riser and the verge layout, two were: their walls
+stand 0.9 m behind the front).
+
+### The 3D walk
+
+`VillageWalk3D.bake(plan)` bakes with Godot's own baker (Recast,
+`NavigationServer3D.bake_from_source_geometry_data`, headless) from what was
+BUILT, not from the plan:
+
+* **source**: the emitted ground's upward triangles in the floor regions
+  (worn line, carriageway, verge, lot, common -- the stair streets' treads
+  among them), each house's entry LANDING (`entry_flights`), each crossing's
+  deck and ramps, and the props' aprons;
+* **obstructions** (projected, all heights): the flat walk's obstacles
+  (`VillageNavCheck.sources`) except that a building is its walls
+  (`footprint_poly`), not its eaves -- an eave is over head and over the
+  landing -- plus the footprints of every `terrace_wall`, `retaining_wall` and
+  `stair_cheek`, plus the treads of the entry flights;
+* **agent**: radius 0.25 m, height 1.8 m, climb 0.24 m (12 cells of 2 cm),
+  slope 46 degrees; cells 0.25 x 0.02 m; outlines simplified at most half a
+  cell and 4 m long; a detail sample every 5 m within 4 cm.
+
+Then, because Recast's heights sit a few centimetres (up to 0.4 m) off:
+
+1. **every vertex is set on the source**: on a stair street, on its PITCH (the
+   treads' heights at their middles, a long tread level between points a
+   quarter metre from its ends: never more than half a riser, 0.075 m, off a
+   tread), when the baker put it near that; else the nearest source layer;
+   a vertex the raster set a cell past a raised edge takes the edge it belongs
+   to (scored by plan distance plus height);
+2. **overlaps are removed**: Godot's conversion of the detail triangles now and
+   then lays two triangles on one side of an edge, and the map drops an edge
+   three polygons share -- which cut Manarola's through road in two;
+3. **coplanar neighbours are merged** (convex, every vertex within 3 cm of one
+   plane): Godot's path search stops after 4096 polygons
+   (`path_search_max_polygons`), and the raw detail triangles were 16-23 000;
+4. **a sagging edge gets a vertex**: where an edge's middle is more than 3 cm
+   off the ground (a 5 m edge across a curved road profile sagged 0.11 m), a
+   vertex at the ground's height goes into it, in every polygon that has it;
+5. **every vertex on a centimetre grid** (plan and height), so the map's vertex
+   merge (cell x `MERGE_SCALE` 0.02: 5 mm in plan, 0.4 mm in height) never
+   joins two nor parts one.
+
+**Links.** A flight 1 m wide with 0.30 m goings, turned off the 0.25 m grid,
+loses treads to the raster and comes out in islands and smears. So a house's
+entry flight and a lot's access flight are not baked (an access flight's
+strip is no floor; an entry flight's treads are obstacles, its landing floor)
+and each is a LINK along its pitch: from the lower ground where the pitch line
+through the treads' middles reaches it, to the upper level half a going past
+the top nosing. The link's straight line is then never more than half a riser
+off a tread. Stair streets (treads 0.45 m and longer, 2 m and more wide) are
+baked and walked.
+
+**The export** (only with ground; every flat key unchanged):
+
+| Key | What |
+|---|---|
+| `walk.navmesh_3d` | `vertices_m` [[x, y, z]], `polygons` (Godot's winding), `cell_size_m`, `cell_height_m`, `merge_rasterizer_cell_scale`, `path_search_max_polygons`, `agent` {radius, height, climb, slope}, `links` [{`kind` entry / access, `building_id`, `door`, `from_m`, `to_m`, `bidirectional`}] |
+| `walk.gates[].nav_3d_m` | the gate on the 3D mesh |
+| `walk.doors[].outside_3d_m`, `reachable_3d`, `route_m` | where a walker arrives (a house with an entry flight: its landing at the threshold), whether it is on a gate's island (links counted), and the flight's route |
+| `walk.stairs` | each stair street (treads, riser, least going, rise), each lot's way in (level, a flight, or refused), each entry flight's route |
+
+**For a consumer.** A `NavigationMesh` with `vertices` = `vertices_m` and one
+`add_polygon` per row; the map at `cell_size_m` / `cell_height_m` with
+`map_set_merge_rasterizer_cell_scale(merge_rasterizer_cell_scale)`; one
+bidirectional NavigationLink3D per `links` row; and a path query allowing
+`path_search_max_polygons` (Godot's default 4096 is enough for these two,
+2603 and 3817 polygons; a larger village needs the value). For synchronous
+use (a headless test), `map_set_use_async_iterations(false)` and
+`region_set_use_async_iterations(false)` then `map_force_update(map)`.
+
+### The check and the suite
+
+`VillageGroundCheck` rule `stairs`: every tread of a stair street its regions
+hold and every tread of an access flight is in the MESH at its level (5 cm),
+no riser over 0.18 m, no inner stair-street tread under 0.28 m, and each has
+its `stair_tread` component.
+
+`vstepswalk` (84 checks, ~5.5 min loaded): 50 people, seed 4242, the green form
+(the one with stair streets on both), on Manarola and Positano (real30). The
+ground and its components (`ComponentCheck`) and the whole `VillageGroundCheck`;
+the walk read back out of JSON; one island; NavigationServer3D paths from the
+first gate to every door (default query, links loaded); heights; the same
+bytes twice; and a CONTROL -- the same bake without the access flights and
+the level gaps strands doors.
+
+The vertical error is measured against the emitted Ground mesh read back
+(GroundProbe) and the entry flights' treads: at every mesh vertex, at every
+path point, and every 0.25 m along every path on the mesh under it (on a link,
+the link's own straight line against the treads). A step is a discontinuity a
+mesh cannot follow and a voxel bake resolves an edge to its cell, so a point
+within a cell's diagonal (0.354 m) of a riser and between its foot and top is
+on the step; the "strict" figure leaves that out except at climbable steps.
+
+| Ground | Stair streets (treads) | Access flights | Entry flights | Navmesh | Doors on the gates' island | Server paths | Vertices | Path points | Mesh along paths (strict) | Control |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Manarola, green | 1 (67), riser 0.150, going >= 0.45 | 6, none refused | 18 | 5129 v / 2603 p, 252 KB | 16/16 | 16/16, up to 4.2 m of climb | 0.046 m | 0.043 m | 0.092 m (0.092) over 7825 samples | 5 doors stranded |
+| Positano, green | 2 (241), riser 0.150, going >= 0.50 | 12, none refused | 18 | 7233 v / 3817 p, 305 KB | 14/14 | 14/14, up to 10.4 m | 0.048 m | 0.048 m | 0.088 m (0.088) over 6683 samples | 8 doors stranded |
+
+Lanes on terrain-villages 77d97ab with this change (20 Oct, loaded host):
+`vstepswalk` 84/0, `vterrain` 161/0, `vground` 13/0, `vgroundterrain` 27/0,
+`vcrossterrain` 24/0, `hslope` 253/0, `lane:village-fast` 47/0, `vcrest`
+209/0 (7 warnings, all the crest form's own "open" rows on Eze and Civita),
+`vtplan` 1436/0 (1 warning, thorn-hamlet's band on Manarola). Logs in
+`artifacts/vter_steps_nav/`.
+
+The bake costs 4-8 s a village (11-15 s for the whole walk export, twice the
+flat one's). The straight chords between path points run up to 0.20 m off on
+convex ground: a consumer's agent follows the mesh, not the chord.
+
+### For VTER-FORM-HILLSIDE
+
+Contour streets joined by stepped lanes reuse all of it as it stands: lay a
+lane as class `steps` and its bed is a stair with stone and a walk
+(`treads_of` is pure, so a planner can ask how many treads a lane would take
+before laying it); every lot it fronts gets its way in from
+`VillageAccessSteps.plan` (or a level gap); `vstepswalk`'s case list takes a
+new fixture in one row. Two things a hillside form should know: a lot whose
+walls stand within a metre of a front well below or above its road needs the
+verge or a narrow flight (both tried) -- a deeper front setback on falling
+ground would make every flight straight; and a long uniform flight has no
+landing (below).
+
+### Not yet
+
+* **landings in a long stair street** -- a gentle stretch is a landing, but a
+  long steady climb is one flight (Positano's: 120+ treads); a landing every
+  12-16 risers would move the treads off the profile by the landing's rise;
+* **the flat walk's check** -- `VillageNavCheck` still judges the plan's flat
+  floor; the 3D walk is measured by `vstepswalk`, not by `VillageQA`;
+* **the church's and the castle's flights** -- only houses' and shops' entry
+  flights are in `entry_flights` (theirs are measured off a mesh); their doors
+  are reached at the ground in front;
+* **a flight's foot below a higher verge** -- a house's entry flight that ends
+  on its road's verge can end a few centimetres under the verge's bed (the
+  flight is planned on the lot's ground model, the verge is the road's);
+* **cost** -- the walk export bakes and builds the village (11-15 s); the
+  exporter does both once per SitePlan;
+* **the castle walk export** -- unchanged (`CastleWalkSources`, above).
