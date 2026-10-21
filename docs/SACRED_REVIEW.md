@@ -172,15 +172,15 @@ procession; Focus = focal visibility from the entry image. The slug is
 |---|---|---|---|---|---|
 | romanesque_small_1 | partly: round apse, lombard pilasters, but square windows and the west tower ends in stepped blocks and bare posts | door in tower base, straight nave, pews to the rail | two pew blocks either side of the aisle, empty chancel (brief) | altar and candles clear at the end of the aisle, apse lights above | needs_changes: tower crown reads unfinished (todo SACRED-TOWER-CROWN) |
 | romanesque_default_8102 | partly: tower, apse, gable porch read Romanesque; flat uncapped tower | door, aisle, apse | pews both sides, empty chancel | altar visible under the chancel arch | accepted |
-| romanesque_large_21325 | no: a 24 m gabled box, pilasters and two tiny slit windows, no tower, no apse visible from the front | door in a blank gable, then the nave | FIXED 14 Oct (seating increment): two benches abreast either side of a 1.5 m aisle, 33 rows from the chancel step to 2 m inside the door, one cross-aisle slot every eighth row (132 pews, against a 30-row single-bench strip) | altar group on a 0.15 m chancel step, 1.5x scaled with candelabra and floor candles, now a readable lit table with its candles at the end of the aisle (still small at 46 m) | needs_changes: interior accepted; the exterior is still a plain gabled box |
+| romanesque_large_21325 | no: a 24 m gabled box, pilasters and two tiny slit windows, no tower, no apse visible from the front | door in a blank gable, then the nave | FIXED 14 Oct: two benches abreast either side of a 1.5 m aisle, 33 rows, cross-aisles | FIXED 20 Oct: a built reredos (dark ground, pale panels, frames, cross, 6.7 x 10.6 m) on the east wall behind the altar, red banners either side on the wall face; reads at once from the door | needs_changes: interior and focus accepted; the exterior is still a plain gabled box |
 | romanesque_default_1 | partly: as small/1, with a row of tall lights on the flank | door, aisle, apse | pews both sides | altar and candles clear | needs_changes: same tower crown fault (SACRED-TOWER-CROWN) |
-| gothic_small_1 | partly: twin squat towers with domed caps, round chevet; pointed heads only on the windows, so it reads as a Romanesque variant | portal in the west front, aisle, apse | pews both sides | altar and candles clear, three apse lights | needs_changes: no spire, flyers or lancets at small size, so no Gothic silhouette |
+| gothic_small_1 | yes, 20 Oct: the twin towers now end in octagonal spires with crockets and finials (every Gothic tower draws `spire`); round chevet, pointed lights | portal in the west front, aisle, apse | pews both sides | altar and candles clear, three apse lights | accepted |
 | gothic_default_8102 | yes: twin octagonal spires, flying buttresses, clerestory | portal, aisle between piers | pews both sides, aisles beyond the piers empty | altar clear at the end | accepted (design-board gaps in the section above stand) |
 | gothic_large_21325 | yes: tall twin towers, flyer arcade, glazed clerestory | portal, long aisle | pews from the first bay, aisles empty | altar small but readable, apse arch above it | accepted |
 | gothic_default_1 | yes: single tapering spire, flyers on the east bays | portal in tower base, aisle | pews both sides | altar and candles clear | accepted |
 | byzantine_small_1 | yes: dome on a drum over a gabled cross-body, low apse | door, aisle, apse | pews both sides | altar clear, apse arch frames it | accepted: partly Byzantine, the dome sits over a basilican body |
 | byzantine_default_8102 | yes: as small, with pilasters | door, aisle | pews both sides | altar clear | accepted |
-| byzantine_large_21325 | partly: dome pushed to the east end of a long barn body, flat flank | door in a blank gable, aisle | Orthodox standing worship: the open floor is intentional and is NOT filled with pews. Seats are now 14 stalls along the walls, 2.2 m of wall clear between them, facing across the nave (see "Seating the large naves") | altar group on the chancel step, scaled, candelabra either side, readable as a table with candles at the end of the open floor | needs_changes: dome not visible from the entry; seating and altar accepted |
+| byzantine_large_21325 | partly: dome pushed to the east end of a long barn body, flat flank | door in a blank gable, aisle | Orthodox standing worship: open floor intentional, 14 wall stalls | 20 Oct: reredos (an iconostasis-like screen) and banners behind the altar group; the focus reads from the door | needs_changes: dome not visible from the entry; focus, seating and altar accepted |
 | byzantine_default_1 | yes | door, aisle | pews both sides | altar clear | accepted |
 | nordic_stave_small_1 | yes, 14 Oct stave pass: tarred dark boards, steep shingle roofs, a three-tier tower of shingled hips ending in a needle spire with crossed boards, a covered svalgang along the flanks, dragon heads on the ridge ends. Still a west tower on a plain nave (no stepped nave roofs, no ridge turret) | door at the foot of the tower, aisle | pews both sides | altar clear in a dark plank hall | accepted: reads as a Scandinavian timber church, not a Borgund copy |
 | nordic_stave_default_8102 | yes: as small | as small | pews both sides | altar clear at the end of a long dark hall (dim) | accepted |
@@ -192,7 +192,7 @@ procession; Focus = focal visibility from the entry image. The slug is
 | renaissance_default_1 | partly: dome and lantern, stepped tower | door, aisle | pews both sides | altar clear | accepted |
 | russian_small_1 | partly: one squat onion dome, round chevet; no cluster of domes, no kokoshniki | door in tower base, aisle | pews both sides | altar clear | needs_changes: floating blocks on the nave walls (SACRED-RUSSIAN-FLOATING-BLOCKS) and the tower crown fault |
 | russian_default_8102 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
-| russian_large_21325 | partly: one onion dome on a box, two half-round buttress turrets | door, aisle | Orthodox standing worship: open floor intentional, wall stalls only (16 seats), no pew blocks | altar group on its step with candelabra, readable at the end of the open floor | needs_changes: floating blocks near the ceiling (SACRED-RUSSIAN-FLOATING-BLOCKS); seating accepted |
+| russian_large_21325 | partly: one onion dome on a box, two half-round buttress turrets | door, aisle | Orthodox standing worship: open floor intentional, wall stalls only | 20 Oct: reredos and banners behind the altar group, readable from the door; no floating blocks in the nave (fixed 14 Oct under SACRED-RUSSIAN-FLOATING-BLOCKS, re-reviewed 20 Oct) | accepted (identity partly, as renaissance) |
 | russian_default_1 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
 
 ### Temples
@@ -202,7 +202,7 @@ procession; Focus = focal visibility from the entry image. The slug is
 | basilica_blood_small_1 | yes: pedimented pronaos, clerestory, apse | portico, orange inlay down the axis | open hall floor with braziers either side (sparse is the brief) | altar and idol under the apse arch, clear | accepted |
 | basilica_bone_small_8102 | yes: as above plus a belfry | as above | open floor, very dark | idol lit and clear at the end; columns near-black | accepted |
 | basilica_flame_default_8102 | yes: long hall, pediment, belfry | portico, inlay, colonnade | braziers between colonnade and aisle | idol small but clear | accepted |
-| basilica_serpent_default_21325 | partly: identical in form and colour to flame | as flame | as flame | idol is an orange cone, same as flame; a serpent cult is not told apart | accepted for sequence; cult identity open (see faults) |
+| basilica_serpent_default_21325 | yes, re-rendered 20 Oct with its real cult: green trim and inlay, a coiled serpent idol (the 14 Oct images were flame; see "Cult identity was the render tool") | as flame | as flame | coil idol clear under the apse arch | accepted |
 | basilica_void_large_21325 | yes: long, with a belfry; flank is a plain window grid | portico, inlay | long floor, braziers | idol tiny, camera sits against a column but the axis is clear | accepted |
 | basilica_blood_large_1 | yes: pedimented pronaos on a long hall | as above | braziers in two lines | idol clear under the apse arch | accepted |
 | basilica_blood_default_1_pinned-barn | yes: pronaos and apse; flank is long and plain (the known barn comparison) | portico, inlay | open floor, braziers | idol visible, hall very dark | accepted as the comparison id; the flank is still plain |
@@ -216,14 +216,14 @@ procession; Focus = focal visibility from the entry image. The slug is
 | ziggurat_serpent_small_8102 | yes | as above | as above | as above | accepted |
 | ziggurat_void_default_8102 | yes | foot of a longer stair | forecourt | altar a thin sliver through the gate | accepted: marginal |
 | ziggurat_blood_default_21325 | yes | as above | forecourt | altar a thin sliver through the gate | accepted: marginal |
-| ziggurat_bone_large_21325 | yes | foot of a long stair canyon | forecourt | altar a near-invisible slit at the top, idol hidden | needs_changes: the focus is not readable from the entry at large size |
-| ziggurat_flame_large_1 | yes | as above | forecourt | as above | needs_changes: same |
+| ziggurat_bone_large_21325 | yes; with the right cult (20 Oct) a pale bone cairn on the summit | foot of a long stair canyon | forecourt | the god is hidden: measured 20 Oct, an apex 39.6 m high would clear the summit edge from the stair foot; it has 23.4 m | needs_changes: the summit god stands at the back of a 56 m summit; see "Ziggurat focus, measured" |
+| ziggurat_flame_large_1 | yes | as above | forecourt | as above (needs 39.6 m, has 23.4 m) | needs_changes: same |
 | rotunda_serpent_small_1 | partly: drum with open pier clerestory and a thin ring roof; reads as an arena | door in the drum with a framed porch | open floor, braziers round the pit | altar and cone idol large and central | accepted |
 | rotunda_void_small_8102 | partly: as above | door | as above | altar and idol clear | accepted |
 | rotunda_blood_default_8102 | partly | door, a plain frame | open floor, a pit either side of the path (the pit is in the brief) | altar and idol clear across the pit | accepted |
 | rotunda_bone_default_21325 | partly | as above | as above | clear | accepted |
-| rotunda_flame_large_21325 | partly: a 24 m blank drum; the door is a 1.2 m orange frame flush with the wall, easy to miss | door | wide open floor | idol clear, altar rail visible | needs_changes: entrance is lost on a large drum |
-| rotunda_serpent_large_1 | partly: as above | as above | as above | as above | needs_changes: same |
+| rotunda_flame_large_21325 | yes, 20 Oct: a pedimented aedicule in the cult trim (pilasters, entablature, dark tablet, dark tympanum under raking cornices) frames the 5.5 m gate; reads from across the forecourt | door | wide open floor | idol clear, altar rail visible | accepted |
+| rotunda_serpent_large_1 | yes, 20 Oct: as flame, in serpent green, with the coiled serpent idol | as above | as above | coil idol clear in the centre | accepted |
 
 Images per id: `artifacts/sacred_matrix_20261014/sheets/<slug>.jpg`, with
 singles `renders/<slug>__front.jpg`, `__side.jpg`, `__entry.jpg`, `__rear.jpg`.
@@ -248,7 +248,7 @@ rebuilt afterwards.
    SACRED-RUSSIAN-FLOATING-BLOCKS.
 5. Ziggurat at large size: the altar is a slit at the top of the stair canyon
    and the idol is out of sight from the foot. 2 ids.
-6. Cult identity is only a tint: every cult has the same orange cone idol and
+6. WITHDRAWN 20 Oct (the render tool rendered every temple as flame; see "Cult identity was the render tool"). Was: cult identity is only a tint: every cult has the same orange cone idol and
    the same braziers, so a serpent temple cannot be told from a flame one.
    Not counted in the verdicts above except as a note.
 7. Large rotunda: a 1.2 m door flush in a 24 m blank drum. 2 ids.
@@ -287,3 +287,100 @@ and the brazier, 22 stranded vertices; the reader and the fire now stand a body
 width clear of the larger altar). Renders: artifacts/church_seating_20261014/
 before and after. Still open: the altar remains small at the far end of a 46 m
 nave, and the reredos banners are not visible from the door.
+
+## Focus, gate and silhouette pass (2026-10-20, LIVE-SACRED)
+
+Renders: `artifacts/live_sacred_20261020/before/` (7 ids, before) and
+`artifacts/live_sacred_20261020/after/` with sheets in `.../sheets/` (all 25
+temples, the six large churches, the four Gothic ids). Gitignored.
+
+### The far altar: a built reredos, and banners nobody had seen
+
+At 46 m the scaled altar group was still a speck against a bare pale east wall.
+The 14 Oct "reredos" banner pair was never visible at all: a banner is
+WALL_MOUNTED, so its position is its TOP, and it was placed with its top at
+1.45 m (3.8 m of cloth hanging through the floor) and its plane at
+length/2 - 0.12, i.e. 0.24 m inside the 0.36 m east wall. The nave banners and
+torches had the same fault on the side walls (width/2 - 0.12).
+
+* `ChurchGeometry.reredos_aabb` / `ChurchBuilder._build_reredos`: on a nave
+  wider than 10 m with a solid east wall (no apse arch, no hero, a chancel
+  step), a screen 0.42 x nave width by 0.44 x nave height (6.7 x 10.6 m on a
+  16 x 24 m nave) stands on the step against the east wall: a dark ground (the
+  opening slot), pale panels, frames, predella, cornices and a cross (trim),
+  every piece a named component inside the declared box. It uses the existing
+  four surfaces: a first version on the painted accent slot (crimson and gilt)
+  read better, but gave the sweep a fifth surface (the `church` suite requires
+  four) and tripped the floating-block guard. Rather than loosen either, the
+  screen was moved to the existing slots.
+* The banner pair now hangs on the east wall's face either side of the screen,
+  from the screen's cornice to 1.6 m above the step; none where the east wall
+  is an apse arch. Side-wall banners and torches hang on the wall face.
+* `DressingCheck` now also fails a wall-mounted piece that hangs below the
+  floor; the old rule (top above 0.8 m) passed the buried banners.
+
+Verdict, by eye from the door (entry views): romanesque, renaissance,
+byzantine, russian and nordic stave large all show the screen, cross and
+banners at the end of the aisle. The focus now reads. Gothic large keeps its
+apse arch (no screen there) and was already accepted.
+
+### The large rotunda door
+
+`TempleBuilder._build_rotunda_aedicule` (outer radius >= 18 m only): two
+pilasters on bases with capitals, an entablature, a dark tablet over the door,
+a dark tympanum and two raking cornices, in the cult trim, round the existing
+5.5 m gate. Every back runs into the drum at the piece's outermost x, so no
+edge floats off the curve; nothing projects past `rotunda_front_projection`.
+No masses are logged (as with the existing surround), so the rite and the
+overlap QA are unchanged. Both large ids now read as a pedimented entrance from
+across the forecourt.
+
+### Gothic small silhouette
+
+Gothic `towers_roof` is now `[spire, spire]` (two entries, so the generator's
+random draw is unchanged): every Gothic tower ends in `_gothic_spire` at the
+spire rise. Gothic small/1 now has twin crocketed spires; large/21325 has a
+twin-spired west front. Accepted.
+
+### Cult identity was the render tool
+
+The matrix stores the cult as `purpose`; `render_sacred_exterior.gd` read
+`r.get("cult", &"flame")`, so every temple of the 14 Oct review was rendered as
+a flame temple. The tool now builds the request with
+`BuildingRequest.from_dict`, as `sacredseq` does. Rendered correctly, the cults
+differ in trim, inlay, braziers and idol (serpent: green trim and a coiled
+serpent; bone: pale trim and a skull cairn; blood: a figure; void: a leaning
+monolith; flame: a pyre). Fault 6 ("cult identity is only a tint") is
+withdrawn.
+
+### Ziggurat focus, measured (not fixed)
+
+From the stair foot (`TempleGeometry.sight_point`, eye 1.65 m), the summit god
+is hidden behind the summit's own front edge at EVERY size. The apex height that
+would clear the highest terrace edge against the apex each ziggurat has:
+
+| ids | summit (z from - to) | idol z | apex needed | apex has |
+|---|---|---|---|---|
+| small | -7.5 to 7.5 | 5.6 | 11.2 m | 9.4-9.6 m |
+| default | -15.5 to 15.5 | 13.6 | 21.8 m | 13.5 m |
+| large | -28 to 28 | 24.3 | 39.6 m | 23.4 m |
+
+The god stands at the back of the summit (`idol_center`, behind the chamber
+altar on the same axis), and the rite sightline cannot see the problem because
+`TempleRiteCheck._exempt_from_sightline` exempts every `terrace` mass. No
+dressing fixes this. For a large ziggurat the summit's front edge would have to
+move from z = -28 to about z = -1.5 (and terrace 1 from -34 to about -24),
+i.e. upper terraces set back more at the front than at the sides, with the
+stair flights re-run to the new summit edge. Then the terrace exemption can be
+removed from the sightline rule. That is a reshaping of the form, left open.
+
+### Tallies after this pass
+
+40 accepted, 9 needs_changes (churches 17 / 7, temples 23 / 2). Open:
+romanesque small/1 and default/1 (tower crown, SACRED-TOWER-CROWN), romanesque
+large (plain gabled exterior), byzantine large (dome not visible from the
+entry), russian small/1, default/8102 and default/1 (tower crown; not
+re-reviewed this pass), ziggurat large x2 (focus, above). The small and default
+ziggurats stay "accepted: marginal" on the chamber altar seen through the lower
+gate, but by the measurement above their god is not visible from the foot
+either.

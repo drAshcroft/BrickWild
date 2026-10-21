@@ -37,17 +37,11 @@ func _init() -> void:
 
 
 func _render_case(case: Dictionary) -> bool:
-	var r: Dictionary = case["request"]
-	var request: BuildingRequest
-	var seed := int(r["seed"])
-	var w := float(r["width"])
-	var l := float(r["length"])
-	var h := float(r["height"])
-	if String(case["family"]) == "church":
-		request = BuildingRequest.church(seed, StringName(case["style"]), w, l, h)
-	else:
-		request = BuildingRequest.temple(seed, StringName(case["style"]),
-			StringName(r.get("cult", &"flame")), w, l, h)
+	# The request exactly as the matrix froze it, as `sacredseq` reads it. This
+	# tool used to rebuild it by hand from r.get("cult", &"flame"), but the matrix
+	# stores the cult as `purpose`: every temple was rendered as a flame temple
+	# (LIVE-SACRED, 20 Oct), which is what "cult identity is a tint" was seeing.
+	var request := BuildingRequest.from_dict(case["request"])
 	var made := BrickWild.generate(request)
 	if not made.is_ok():
 		push_error("generate failed " + String(case["id"]))
