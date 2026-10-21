@@ -73,6 +73,44 @@ pass's last full sweep:
   (`sparse`, `lamps`, `seat_count`, `seat_kinds`, `stowage`, `table_band` in every
   tower house), being baselined separately. `ctowerplan` (wizard oval) and
   `cforms` were not re-run after this change.
+- Furnishing walk-QA in castle rooms (`seat_count`, `sparse`, `lamps`): FIXED
+  20 October for the castlechange and README hero fixtures by
+  `src/castle/castle_room_top_up.gd` (`CastleRoomTopUp`), run after the minimum
+  programme and after every castle call to the full furnisher. Causes: the
+  minimum programme seated only hall/parlour, so every guardroom table seated 0;
+  `_place_behind` committed the lord's bench with no `host`, so a great hall's
+  high table seated 0; a 55-254 m2 tower guardroom held one table (1-4 %) and no
+  light. The pass seats short tables in pairs (one seat model per room), fills
+  sparse rooms with a free table set (first clear spot nearest the middle on a
+  0.5 m grid, then two seats drawn up to that table), trestle rows, wall and
+  corner stores, and hangs sconces. It changes no check. A room is dressed in
+  one go and judged once: every HouseFurnishCheck complaint except the two whose
+  text carries the changing measure (`sparse`, `lamps`) must not grow, and a
+  room-local WalkGrid (HouseNavCheck's cell and alignment, only this room's
+  floor) must still reach every door threshold, landing, plan zone and use zone
+  of the room. A worse room is cut back to its longest good prefix by halving,
+  then continued piece by piece. A parlour in a household that eats elsewhere
+  gets no table (the programme rule's own question, asked first).
+  Measured interior failures (scratch probe = `HouseQA` on every interior, as
+  CastleQA does): square 1 -> 0, round 9 -> 0, battered 226 -> 5, ridge 82 -> 11,
+  tower house 13 -> 2, README hero 37 -> 0; every remaining line was present at
+  baseline (ridge hall `corridor` on a 38 x 10.8 m great hall the corridor rule
+  classifies as a corridor, `stowage` in lords' chambers, two `front_door`, a
+  battered keep parlour of 187 m2 that the programme forbids a table and no
+  wall will take a piece). Pass cost on a loaded host: battered 62 s, ridge 71 s,
+  tower house 9 s, hero 6 s (the 14 October WIP took 700-940 s for battered
+  alone: whole-plan HouseNavCheck per trial plus place_free's 128 x 128 scored
+  search per table). The whole-plan HouseNavCheck safety net
+  (`CastleRoomTopUp.verify_whole_plan`, env `BW_TOPUP_VERIFY=1`) undid no room
+  in any of the six builds, so it is off by default; CastleQA still runs
+  HouseNavCheck on every interior. Lanes, same host and day: castlechange +
+  cmotteaccess 17 failures (354 checks) -> 3 (castlechange: battered `front_door`
+  + 187 m2 keep parlour; ridge hall `corridor` x2 rows); `cmotteaccess` passes.
+  `lane:castle-change` 7 suites green but castlechange; `lane:house-furnish-fast`
+  240/240 green before and after (the `_place_behind` host link is the only
+  house-family change). Remaining cost: sconce placement
+  (`HouseFurnishSurface.place_mounted`, 20-28 s per big castle) and the whole
+  furnishing check (~0.3 s per room judged).
 - The smallest tier of every walled style (40 x 55 m): the corner towers are
   embedded in a 5 m footing, no clear gallery reaches the coping, and the ground
   door a fallback gives them meets the 0.65 m wall footing (door clearance fails);

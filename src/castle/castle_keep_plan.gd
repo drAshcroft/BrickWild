@@ -107,7 +107,7 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 	var top_walls := HouseGeometry.room_walls(plan, levels - 1)
 	plan.hearth = {"room": levels - 1, "wall": _facing_wall(top_walls, Vector2(1, 0))}
 	if with_furniture:
-		HouseFurnisher.furnish(plan, hs)
+		CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 
@@ -154,6 +154,10 @@ static func furnish_minimum_programme(plan: HousePlan, spec: HouseSpec) -> void:
 			if has_table and not has_seat:
 				HouseFurnishPlacement.place_one(plan, spec, room, "seat", &"around",
 					blocked, zones, rng, {"opt": 1.0})
+	# The minimum names each room truly; the walk QA also wants its tables laid
+	# for two and a large room not left bare. CastleRoomTopUp does both under
+	# the same placement rules, keeping only what leaves a room no worse.
+	CastleRoomTopUp.apply(plan, spec)
 
 
 static func _facing_wall(walls: Array[Dictionary], inward: Vector2) -> int:

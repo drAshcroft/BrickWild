@@ -2368,8 +2368,11 @@ static func _place_corner(plan: HousePlan, room: int, key: String,
 ## Seats at a table, facing it, with pull-back space behind them.
 static func place_around(plan: HousePlan, room: int, key: String,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator,
-		want_row := false, preferred_sides: Array = []) -> void:
-	var host: int = _find_host(plan, room, ["table", "workbench", "counter"], want_row)
+		want_row := false, preferred_sides: Array = [], forced_host := -1) -> void:
+	# A caller that is seating one particular table names it; otherwise the
+	# host is the least-seated table in the room.
+	var host: int = forced_host if forced_host >= 0 \
+		else _find_host(plan, room, ["table", "workbench", "counter"], want_row)
 	if host < 0:
 		return
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
@@ -2525,9 +2528,11 @@ static func _find_host(plan: HousePlan, room: int, cats: Array,
 ## for a kitchen table and wrong for anything with a front and a back. Nobody
 ## sits between the high table and the hall. (CAS-010)
 ##
-## The bench stands on its own feet -- no `host` -- because it is not drawn up
-## to the table and pushed back in again: it is where the lord sits, the walk
-## has to reach it, and a body crossing the dais has to go round it.
+## The bench is not drawn up to the table and pushed back in again: it is
+## where the lord sits, the walk has to reach it, and a body crossing the dais
+## has to go round it. It is still that table's seat, and carries the table as
+## its `host`: without the link the walk QA's seat count reads a high table
+## with the lord behind it as a table that seats nobody (seat_count, 14 Oct).
 static func _place_behind(plan: HousePlan, room: int, key: String,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
 	var host: int = _find_host(plan, room, ["table", "workbench", "counter"], false, true)
@@ -2560,4 +2565,6 @@ static func _place_behind(plan: HousePlan, room: int, key: String,
 		if score > best_score:
 			best_score = score
 			best = cand
+	if not best.is_empty():
+		best["host"] = host
 	HouseFurnishGeometry.commit(plan, room, best, blocked, zones)

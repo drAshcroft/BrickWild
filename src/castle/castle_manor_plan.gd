@@ -165,7 +165,7 @@ static func _closet_plan(spec: CastleSpec, box: AABB) -> HousePlan:
 	plan.doors.append({"a": 0, "b": -1, "pos": Vector2(room.get_center().x, room.position.y),
 		"normal": Vector2(0.0, -1.0), "width": CLOSET_DOOR, "exterior": true,
 		"front": true, "storey": 0})
-	HouseFurnisher.furnish(plan, hs)
+	CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 
@@ -236,7 +236,7 @@ static func front_range_plan(spec: CastleSpec, box: AABB) -> HousePlan:
 		for window in range(before, plan.windows.size()):
 			plan.windows[window]["storey"] = int(plan.rooms[index].storey)
 	hs.room_count = plan.rooms.size()
-	HouseFurnisher.furnish(plan, hs)
+	CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 
