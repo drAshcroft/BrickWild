@@ -774,10 +774,16 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 	var fittings: Array = HouseFurnishingRecipes.TRADE_FITTINGS.get(spec.trade, []) if not spec is ShopSpec \
 		else HouseFurnishingRecipes.SHOP_FITTINGS.get((spec as ShopSpec).business, [])
 	if trade_room == kind:
+		# a fitting marked `first` (a smithy's forge, which only one wall can
+		# take) goes ahead even of the focus piece that stands beside it
+		var first_n := 0
 		for s2 in fittings:
 			if StringName(s2.get("room", trade_room)) == kind:
-				if plan.focus_room() == room and String(s2["cat"]) == plan.focus_cat():
-					steps.insert(0, s2)
+				if bool(s2.get("first", false)):
+					steps.insert(first_n, s2)
+					first_n += 1
+				elif plan.focus_room() == room and String(s2["cat"]) == plan.focus_cat():
+					steps.insert(first_n, s2)
 				else:
 					steps.append(s2)
 	else:

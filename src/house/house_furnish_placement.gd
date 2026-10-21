@@ -229,6 +229,7 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		choices = [exact_key]
 	else:
 		choices = PropCatalog.of_category_for_room(cat, plan.kind_of(room))
+		choices = HouseFurnishingRecipes.shop_key_choices(plan, room, choices) # LIVE-SHOPS
 	if choices.is_empty():
 		return
 	var key: String = choices[r.randi_range(0, choices.size() - 1)]
@@ -247,6 +248,7 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 	var original_blocked_count: int = blocked.size()
 	var borrowed_band_count := _borrow_activity_band(plan, room,
 		String(step.get("group", "")), blocked)
+	borrowed_band_count += HouseFurnishingRecipes.borrow_serving_place(plan, room, step, blocked) # LIVE-SHOPS
 	var witch_trace: bool = bool(plan.domestic_layout.get("_witch_placement_trace", false)) and HouseFurnishingRecipes.is_ordinary_house(plan) and plan.spec.style == &"witch_hut" and plan.spec.trade == &"none" and String(step.get("group", "")) in ["cooking", "witchwork", "eating", "sleep"]
 	if witch_trace:
 		print("WITCH_STEP_BEGIN room=", room, " category=", cat, " key=", key, " group=", step.get("group", ""), " rule=", rule, " blocked=", blocked.size(), " zones=", zones.size(), " blocked_rects=", str(blocked), " usezones=", str(zones))

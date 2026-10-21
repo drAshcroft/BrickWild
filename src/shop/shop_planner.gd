@@ -459,31 +459,50 @@ static func _light_workshops(out: HousePlan, spec: ShopSpec) -> void:
 	for room in range(out.room_count()):
 		if out.kind_of(room) != &"workshop":
 			continue
-		var windows := out.windows_of(room)
-		if windows.is_empty():
+		_cross_light_workshop(out, spec, room)
+
+
+static func _cross_light_workshop(out: HousePlan, spec: ShopSpec, room: int) -> void:
+	var windows := out.windows_of(room)
+	if windows.is_empty():
+		return
+	var first := Vector2(out.windows[windows[0]].normal)
+	for index in windows:
+		if absf(Vector2(out.windows[index].normal).dot(first)) < 0.5:
+			return # already lit from two sides
+	var rect: Rect2 = out.rooms[room].rect
+	# The chimney wall was chosen, before this, for the clear run its fire
+	# needs. Light the workshop from another wall first, and glaze the
+	# chimney wall only if the fire still fits beside the new window: a
+	# smithy cross-lit through its forge's wall has no forge (shoptrade
+	# blacksmith 11x15 seed 8102; LIVE-SHOPS).
+	var walls: Array = HouseGeometry.room_walls(out, room)
+	var order: Array[int] = []
+	var fire_wall := out.hearth_wall() if out.hearth_room() == room else -1
+	for wi in range(walls.size()):
+		if wi != fire_wall:
+			order.append(wi)
+	if fire_wall >= 0:
+		order.append(fire_wall)
+	for wi in order:
+		var wall: Dictionary = walls[wi]
+		var normal := -Vector2(wall.normal)
+		if absf(normal.dot(first)) > 0.5:
 			continue
-		var first := Vector2(out.windows[windows[0]].normal)
-		var cross_lit := false
-		for index in windows:
-			if absf(Vector2(out.windows[index].normal).dot(first)) < 0.5:
-				cross_lit = true
-		if cross_lit:
+		var horizontal := absf(normal.y) > 0.5
+		var line: float = wall.from.y if horizontal else wall.from.x
+		if not HouseGeometry.is_exterior_edge(spec, 1 if horizontal else 0, line):
 			continue
-		var rect: Rect2 = out.rooms[room].rect
-		for wall in HouseGeometry.room_walls(out, room):
-			var normal := -Vector2(wall.normal)
-			if absf(normal.dot(first)) > 0.5:
-				continue
-			var horizontal := absf(normal.y) > 0.5
-			var line: float = wall.from.y if horizontal else wall.from.x
-			if not HouseGeometry.is_exterior_edge(spec, 1 if horizontal else 0, line):
-				continue
-			var side := {"normal": normal, "line": line,
-				"t0": rect.position.x if horizontal else rect.position.y,
-				"t1": rect.end.x if horizontal else rect.end.y}
-			HousePlanOpenings.windows_along(out, spec, room, side, INF, windows.size() + 1)
-			if out.windows_of(room).size() > windows.size():
-				break
+		var side := {"normal": normal, "line": line,
+			"t0": rect.position.x if horizontal else rect.position.y,
+			"t1": rect.end.x if horizontal else rect.end.y}
+		var had := out.windows.duplicate()
+		HousePlanOpenings.windows_along(out, spec, room, side, INF, windows.size() + 1)
+		if wi == fire_wall and HousePlanFeatures._clear_wall_run(out, room, wi) \
+				< HousePlanFeatures.hearth_run_needed(spec, out):
+			out.windows = had
+		if out.windows_of(room).size() > windows.size():
+			break
 
 
 ## A reader starts with the book by the light. Pin the first lectern to a
