@@ -24,9 +24,46 @@ const GOODS_CATS: Array[String] = ["table", "crate", "barrel", "sack", "shelf", 
 const STOCK_CATS: Array[String] = ["storage", "barrel", "crate", "sack", "chest"]
 const BROWSE_STANCE := 0.45 # where the customer stands to look at a table of goods
 
+## The other trades, 3 footprints x 2 seeds each, frozen before tuning
+## (2026-10-20). Counter shops serve across a counter on the sales floor and
+## work at a bench in the workshop behind it, as the bakery does; workshop-front
+## trades take the customer into the work and serve him at it.
+const TRADE_SEEDS: Array[int] = [1, 8102]
+const COUNTER_TRADES: Array[StringName] = [&"butcher", &"apothecary", &"tailor"]
+const WORK_FRONT_TRADES := {&"carpenter": "workbench", &"blacksmith": "anvil"}
+## What makes each trade legible without its sign. `need`: categories the shop
+## must hold; `work`: one of these must be in a work room beside the bench (the
+## trade's own work, not just a bench); `ban`: another trade's fixtures; `sign`:
+## the category whose removal must fail identity in the negative control.
+const IDENTITY := {
+	&"bakery": {"need": ["counter", "hearth", "workbench", "sack"], "work": [], "ban": [], "sign": "hearth"},
+	&"butcher": {"need": ["counter", "blade", "workbench", "barrel"], "work": ["blade"],
+		"ban": ["hearth", "anvil", "alchemy"], "sign": "blade"},
+	&"apothecary": {"need": ["counter", "alchemy", "storage", "workbench"], "work": ["alchemy"],
+		"ban": ["anvil", "hearth", "blade"], "sign": "alchemy"},
+	&"tailor": {"need": ["counter", "rack", "sack", "shelf", "workbench"], "work": ["sack", "rack"],
+		"ban": ["anvil", "hearth", "alchemy"], "sign": "rack"},
+	&"carpenter": {"need": ["workbench", "rack", "bench", "crate"], "work": [],
+		"ban": ["anvil", "hearth", "alchemy"], "sign": "rack"},
+	&"blacksmith": {"need": ["hearth", "anvil", "workbench"], "work": [],
+		"ban": ["alchemy", "counter"], "sign": "hearth"},
+}
+## Another trade's sign: a piece the customer must not see on the public floor
+## of any trade but these. A rack of bottles is the apothecary; a sword is the
+## smith's; a crate of apples or carrots is the grocer.
+const SIGN_KEYS := {
+	"Shelf_Small_Bottles": [&"apothecary", &"general_store"],
+	"Sword_Bronze": [&"blacksmith"],
+	"FarmCrate_Apple": [&"general_store", &"bakery"],
+	"FarmCrate_Carrot": [&"general_store", &"bakery"],
+	"Barrel_Apples": [&"general_store", &"bakery"],
+}
+## The fixtures a workshop-front trade works at, padded by WORK_STANCE.
+const FRONT_WORK_CATS: Array[String] = ["workbench", "hearth", "anvil", "bench"]
+
 
 static func run() -> SuiteResult:
-	var res := SuiteResult.new("shop trade (bakery)")
+	var res := SuiteResult.new("shop trade (bakery, store, five trades)")
 	for size in SIZES:
 		for seed_ in SEEDS:
 			var label := "bakery %dx%d seed %d" % [int(size.x), int(size.y), seed_]
@@ -48,6 +85,7 @@ static func run() -> SuiteResult:
 	if not store_failures.any(func(f: String) -> bool: return f.begins_with("identity")):
 		res.fail("a general store passes as a bakery")
 	_run_store(res)
+	_run_trades(res)
 	return res
 
 
@@ -139,7 +177,8 @@ static func _without_in(plan: HousePlan, cats: Array, room: int, front: int) -> 
 static func _make(business: StringName, size: Vector2, seed_: int) -> HousePlan:
 	var spec := ShopSpec.new()
 	spec.business = business
-	spec.style = &"townhouse"
+	# as sarchetype builds them: the workshop-front trades in a long hall
+	spec.style = &"longhall" if WORK_FRONT_TRADES.has(business) else &"townhouse"
 	spec.width = size.x
 	spec.length = size.y
 	spec.height = 2.9
@@ -195,8 +234,8 @@ static func _without(plan: HousePlan, cats: Array) -> Array[Dictionary]:
 	return out
 
 
-static func _bench_in_lane(plan: HousePlan) -> Array[Dictionary]:
-	var geometry := _lane(plan)
+static func _bench_in_lane(plan: HousePlan, cat := "counter") -> Array[Dictionary]:
+	var geometry := _lane(plan, cat)
 	if geometry.is_empty():
 		return []
 	var template := {}
@@ -225,12 +264,12 @@ static func _bench_in_lane(plan: HousePlan) -> Array[Dictionary]:
 
 ## The customer's lane: from just inside the front door to the counter's
 ## door-side stance. {} when there is no counter in the entry room.
-static func _lane(plan: HousePlan) -> Dictionary:
+static func _lane(plan: HousePlan, cat := "counter") -> Dictionary:
 	var door := plan.entrance()
 	var room := plan.entrance_room()
 	if door < 0 or room < 0:
 		return {}
-	var counter := _counter(plan, room)
+	var counter := _counter(plan, room, cat)
 	if counter.is_empty():
 		return {}
 	var inside: Vector2 = Vector2(plan.doors[door]["pos"]) \
@@ -248,10 +287,10 @@ static func _lane(plan: HousePlan) -> Dictionary:
 	return {"from": inside, "to": best_point, "counter": r}
 
 
-static func _counter(plan: HousePlan, room: int) -> Dictionary:
+static func _counter(plan: HousePlan, room: int, cat := "counter") -> Dictionary:
 	for f in plan.furniture_of(room):
 		var p: Dictionary = plan.furniture[f]
-		if PropCatalog.category(String(p["key"])) == "counter" and not p.get("mounted", false):
+		if PropCatalog.category(String(p["key"])) == cat and not p.get("mounted", false):
 			return p
 	return {}
 
@@ -284,7 +323,14 @@ static func _door_neighbours(plan: HousePlan, room: int) -> Array[int]:
 ## Each begins with the name of its rule: counter, route, lane, work area,
 ## storage, identity.
 static func contract(plan: HousePlan) -> Array[String]:
+	return counter_contract(plan, &"bakery")
+
+
+## The counter-shop contract for `business` (bakery, butcher, apothecary,
+## tailor): the bakery's rules, with the trade's own identity from IDENTITY.
+static func counter_contract(plan: HousePlan, business: StringName) -> Array[String]:
 	var out: Array[String] = []
+	var ident: Dictionary = IDENTITY[business]
 	var door := plan.entrance()
 	var room := plan.entrance_room()
 	if door < 0 or room < 0 or plan.kind_of(room) != &"sales_floor":
@@ -362,6 +408,16 @@ static func contract(plan: HousePlan) -> Array[String]:
 			out.append("work area: no door joins the shop to its work rooms")
 		if not behind:
 			out.append("work area: no bench is reachable behind the counter")
+		# the bench is the trade's: its own work lies beside it
+		var work_signs: Array = ident["work"]
+		if not work_signs.is_empty():
+			var signed := false
+			for w3 in work_rooms:
+				for sign_cat in work_signs:
+					if _cats(plan, w3).has(String(sign_cat)):
+						signed = true
+			if not signed:
+				out.append("work area: no %s at the %s's bench" % ["/".join(work_signs), business])
 
 	# 4. stores that the work can draw on
 	var linked := false
@@ -384,11 +440,28 @@ static func contract(plan: HousePlan) -> Array[String]:
 	elif not linked:
 		out.append("storage: stock is kept, but not where the work can reach it")
 
-	# 5. recognisable without its sign: oven, counter, bench and flour
+	# 5. recognisable without its sign (the bakery: oven, counter, bench, flour)
+	out.append_array(_identity(plan, business))
+	return out
+
+
+## The identity rule shared by every trade: what it must hold, what it must
+## not, and no other trade's sign where the customer stands.
+static func _identity(plan: HousePlan, business: StringName) -> Array[String]:
+	var out: Array[String] = []
+	var ident: Dictionary = IDENTITY[business]
 	var cats := _cats(plan)
-	for need in ["counter", "hearth", "workbench", "sack"]:
-		if not cats.has(need):
-			out.append("identity: a bakery has no %s" % need)
+	for need in ident["need"]:
+		if not cats.has(String(need)):
+			out.append("identity: a %s has no %s" % [business, need])
+	for banned in ident["ban"]:
+		if cats.has(String(banned)):
+			out.append("identity: a %s has a %s" % [business, banned])
+	var front := plan.entrance_room()
+	for f in plan.furniture_of(front):
+		var key := String(plan.furniture[f]["key"])
+		if SIGN_KEYS.has(key) and not (SIGN_KEYS[key] as Array).has(business):
+			out.append("identity: a %s shows a %s, another trade's sign" % [business, key])
 	return out
 
 
@@ -495,3 +568,224 @@ static func _two_doors(plan: HousePlan, a: int, b: int) -> bool:
 		if _door_neighbours(plan, mid).has(b):
 			return true
 	return false
+
+
+## The five other trades over their frozen matrix, each with its controls.
+static func _run_trades(res: SuiteResult) -> void:
+	var trades: Array[StringName] = []
+	trades.append_array(COUNTER_TRADES)
+	for t in WORK_FRONT_TRADES:
+		trades.append(t)
+	for business in trades:
+		for si in range(SIZES.size()):
+			for seed_ in TRADE_SEEDS:
+				var size: Vector2 = SIZES[si]
+				var label := "%s %dx%d seed %d" % [business, int(size.x), int(size.y), seed_]
+				var plan := _make(business, size, seed_)
+				res.checked += 1
+				for failure in trade_contract(plan, business):
+					res.fail("%s: %s" % [label, failure])
+				if si == 1 and seed_ == TRADE_SEEDS[0]:
+					res.checked += 1
+					if _signature(plan) != _signature(_make(business, size, seed_)):
+						res.fail("%s: a repeat generation produced a different shop" % label)
+				_trade_controls(res, plan, business, label)
+	# a trade is not another trade: each, judged by the next one's identity
+	# (not its whole contract, which may stop at the route before it gets there)
+	for i in range(trades.size()):
+		var plan2 := _make(trades[i], SIZES[1], TRADE_SEEDS[0])
+		var other: StringName = trades[(i + 1) % trades.size()]
+		res.checked += 1
+		if _identity(plan2, other).is_empty():
+			res.fail("a %s passes as a %s" % [trades[i], other])
+
+
+static func trade_contract(plan: HousePlan, business: StringName) -> Array[String]:
+	if WORK_FRONT_TRADES.has(business):
+		return work_front_contract(plan, business)
+	return counter_contract(plan, business)
+
+
+## Every role of a trade, removed in turn, must break the rule that names it.
+static func _trade_controls(res: SuiteResult, plan: HousePlan, business: StringName, label: String) -> void:
+	var front := plan.entrance_room()
+	var focus: String = WORK_FRONT_TRADES.get(business, "counter")
+	var cases := {
+		"serving place": {"drop": [focus], "room": front, "expect": "counter"},
+		"stores": {"drop": STORAGE_CATS, "room": -2, "expect": "storage"},
+		"sign": {"drop": [String(IDENTITY[business]["sign"])], "room": -1, "expect": "identity"},
+	}
+	if not WORK_FRONT_TRADES.has(business):
+		cases["work"] = {"drop": ["workbench"], "room": -1, "expect": "work area"}
+		var work_signs: Array = IDENTITY[business]["work"]
+		cases["trade work"] = {"drop": work_signs, "room": -2, "expect": "work area"}
+	for role in cases:
+		var spec: Dictionary = cases[role]
+		var original := plan.furniture
+		plan.furniture = _without_in(plan, spec["drop"], int(spec["room"]), front)
+		var found := trade_contract(plan, business)
+		plan.furniture = original
+		res.checked += 1
+		if not found.any(func(f: String) -> bool: return f.begins_with(String(spec["expect"]))):
+			res.fail("%s: control '%s' removed and the '%s' rule did not fail" % [label, role, spec["expect"]])
+	# another trade's sign hung where the customer stands
+	var foreign := ""
+	for key in SIGN_KEYS:
+		if not (SIGN_KEYS[key] as Array).has(business):
+			foreign = key
+			break
+	var front_items := plan.furniture_of(front)
+	if not front_items.is_empty():
+		var with_sign := _without_in(plan, [], -1, front)
+		var piece: Dictionary = with_sign[front_items[0]].duplicate(true)
+		piece["key"] = foreign
+		piece["mounted"] = true # stands nowhere: only its sign is under test
+		with_sign.append(piece)
+		var saved := plan.furniture
+		plan.furniture = with_sign
+		var found3 := trade_contract(plan, business)
+		plan.furniture = saved
+		res.checked += 1
+		if not found3.any(func(f: String) -> bool: return f.begins_with("identity")):
+			res.fail("%s: a %s on the shop floor did not fail identity" % [label, foreign])
+	# a run of bench right across the floor between the door and the serving place
+	var lane_case := _bench_in_lane(plan, focus)
+	res.checked += 1
+	if lane_case.is_empty():
+		res.fail("%s: no lane to put a bench in" % label)
+	else:
+		var saved2 := plan.furniture
+		plan.furniture = lane_case
+		var found2 := trade_contract(plan, business)
+		plan.furniture = saved2
+		if not found2.any(func(f: String) -> bool: return f.begins_with("lane") or f.begins_with("route")):
+			res.fail("%s: a bench in the customer lane did not fail the lane or route rule" % label)
+	# a workshop-front trade's work boxed in: no room left to stand at it
+	if WORK_FRONT_TRADES.has(business):
+		var boxed := _box_in_work(plan, business)
+		res.checked += 1
+		if boxed.is_empty():
+			res.fail("%s: no work fixture to box in" % label)
+			return
+		var saved3 := plan.furniture
+		plan.furniture = boxed
+		var found4 := trade_contract(plan, business)
+		plan.furniture = saved3
+		if not found4.any(func(f: String) -> bool: return f.begins_with("work area")):
+			res.fail("%s: work boxed in and the 'work area' rule did not fail" % label)
+
+
+## The plan with a crate stack built round the first work fixture that is not
+## the serving place: the fixture is still there, its standing room is not.
+static func _box_in_work(plan: HousePlan, business: StringName) -> Array[Dictionary]:
+	var front := plan.entrance_room()
+	var serving := _counter(plan, front, WORK_FRONT_TRADES[business])
+	var serving_rect: Rect2 = serving.get("rect", Rect2())
+	var out: Array[Dictionary] = []
+	var box := {}
+	for p in plan.furniture:
+		var copy: Dictionary = p.duplicate(true)
+		copy["host"] = -1
+		out.append(copy)
+		var cat := String(PropCatalog.category(String(p["key"])))
+		if box.is_empty() and int(p["room"]) == front and not p.get("mounted", false) \
+				and cat in FRONT_WORK_CATS and Rect2(p["rect"]) != serving_rect:
+			box = copy.duplicate(true)
+			box["key"] = "Crate_Wooden"
+			box["rect"] = Rect2(p["rect"]).grow(1.2)
+			box["zone"] = box["rect"]
+	if box.is_empty():
+		return []
+	out.append(box)
+	return out
+
+
+## The workshop-front contract (carpenter, smith). Rule names: counter (the
+## serving place), route, lane, work area, storage, identity.
+static func work_front_contract(plan: HousePlan, business: StringName) -> Array[String]:
+	var out: Array[String] = []
+	var focus_cat: String = WORK_FRONT_TRADES[business]
+	var door := plan.entrance()
+	var room := plan.entrance_room()
+	if door < 0 or room < 0 or plan.kind_of(room) != &"workshop":
+		out.append("route: the front door does not open onto the workshop")
+		return out
+	var focus := _counter(plan, room, focus_cat)
+	if focus.is_empty():
+		out.append("counter: the workshop has no %s to be served at" % focus_cat)
+		return out
+	var nav := HouseNavCheck.new()
+	nav.check(plan)
+	var level := HousePlan.record_storey(plan.doors[door])
+	var grid: WalkGrid = nav._grids.get(level)
+	var geometry := _lane(plan, focus_cat)
+	var inside: Vector2 = geometry["from"]
+	var stance: Vector2 = geometry["to"]
+	if grid == null or not grid.flood_from(inside):
+		out.append("route: nowhere to stand inside the front door")
+		return out
+
+	# 1. arrival at the serving place: the customer gets to the near side of
+	# the bench or the anvil, and by no great detour
+	var walked := grid.distance_to(stance, 0.5)
+	var straight := inside.distance_to(stance)
+	if walked == INF:
+		out.append("route: the %s cannot be reached from the door" % focus_cat)
+	elif walked > straight * 1.6 + 1.5:
+		out.append("route: the customer walks %.1fm to a %s %.1fm away" % [walked, focus_cat, straight])
+
+	# 2. the customer does not stand where the work is done: every other work
+	# fixture's standing room is taken out of the floor, and he still gets there
+	var saved := plan.furniture
+	var padded: Array[Dictionary] = []
+	var focus_rect: Rect2 = focus["rect"]
+	var work_rects: Array[Rect2] = []
+	for p in plan.furniture:
+		var copy: Dictionary = p.duplicate(true)
+		copy["host"] = -1
+		var cat := String(PropCatalog.category(String(p["key"])))
+		if int(p["room"]) == room and not p.get("mounted", false) and cat in FRONT_WORK_CATS \
+				and Rect2(p["rect"]) != focus_rect:
+			copy["rect"] = Rect2(p["rect"]).grow(WORK_STANCE)
+			work_rects.append(Rect2(p["rect"]))
+		padded.append(copy)
+	plan.furniture = padded
+	var padded_nav := HouseNavCheck.new()
+	padded_nav.check(plan)
+	plan.furniture = saved
+	var padded_grid: WalkGrid = padded_nav._grids.get(level)
+	if padded_grid == null or not padded_grid.flood_from(inside):
+		out.append("lane: the work leaves no standing room inside the door")
+	elif walked != INF:
+		var around := padded_grid.distance_to(stance, 0.5)
+		if around == INF or around > walked * 1.4 + 1.0:
+			out.append("lane: reaching the %s means standing where the work is done" % focus_cat)
+
+	# 3. the work itself can be stood at: each fixture in the workshop has floor
+	# beside it that a person reaches from the door
+	work_rects.append(focus_rect)
+	for wr in work_rects:
+		if not grid.reached(wr, 0.8):
+			out.append("work area: a work fixture at %s has no room to stand and work at it" % str(wr.get_center()))
+
+	# 4. stock kept in a room the workshop opens onto, reachable
+	var stored := false
+	var linked := false
+	for p2 in plan.furniture:
+		var r2 := int(p2["room"])
+		if r2 == room or p2.get("mounted", false):
+			continue
+		if not (String(PropCatalog.category(String(p2["key"]))) in STORAGE_CATS):
+			continue
+		stored = true
+		if (_door_neighbours(plan, room).has(r2) or _two_doors(plan, room, r2)) \
+				and grid.reached(Rect2(p2["rect"]), 0.8):
+			linked = true
+	if not stored:
+		out.append("storage: no stock is kept behind the workshop")
+	elif not linked:
+		out.append("storage: stock is kept, but not in a room the workshop opens onto")
+
+	# 5. identity
+	out.append_array(_identity(plan, business))
+	return out

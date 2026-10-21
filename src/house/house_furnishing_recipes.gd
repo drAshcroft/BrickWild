@@ -110,7 +110,7 @@ const SHOP_COMPOSITION := {
 	# the work behind the shop: benches to work at, stock beside them
 	&"workshop": {
 		&"": [
-			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 3},
+			{"cat": "workbench", "rule": &"wall", "fp": 1.9, "max": 3, "clear_of_doors": true},
 			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 2},
 			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 2},
 			{"cat": "barrel", "rule": &"corner", "fp": 0.49, "max": 2},
@@ -261,6 +261,7 @@ static func shop_composition_steps(plan: HousePlan, room: int) -> Array:
 		steps.append({"cat": candidates[j]["cat"], "rule": candidates[j]["rule"],
 			"n": [counts[j], counts[j]], "opt": 0.5, "always_attempt": true,
 			"private_rng": true, "settle": bool(candidates[j].get("settle", false)),
+			"clear_of_doors": bool(candidates[j].get("clear_of_doors", false)),
 			# an overlay piece that no wall will take is dropped, not stood in the
 			# middle of the floor where the customer walks
 			"wall_only": true})
@@ -1137,7 +1138,7 @@ const SHOP_FITTINGS := {
 	# the forge first, on the chimney wall the planner chose, and the anvil
 	# beside it (its affinity says so) facing the door (the plan's focus)
 	&"blacksmith": [
-		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0, "first": true},
 		{"cat": "anvil", "rule": &"free", "n": [1, 1], "opt": 1.0},
 	],
 	# the oven in the shop, and flour in sacks in the bakehouse behind it
@@ -1145,8 +1146,16 @@ const SHOP_FITTINGS := {
 		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 1.0, "room": "kitchen"},
 	],
-	&"butcher": [{"cat": "blade", "rule": &"on", "n": [1, 2], "opt": 1.0}],
-	&"apothecary": [{"cat": "alchemy", "rule": &"on", "n": [2, 4], "opt": 1.0}],
+	# the trade's own work at the bench behind the counter, not only on it: a
+	# cleaver at the block, remedies being made up, cloth to be cut (LIVE-SHOPS)
+	&"butcher": [
+		{"cat": "blade", "rule": &"on", "n": [1, 2], "opt": 1.0},
+		{"cat": "blade", "rule": &"on", "n": [1, 1], "opt": 1.0, "room": "workshop"},
+	],
+	&"apothecary": [
+		{"cat": "alchemy", "rule": &"on", "n": [2, 4], "opt": 1.0},
+		{"cat": "alchemy", "rule": &"on", "n": [1, 2], "opt": 1.0, "room": "workshop"},
+	],
 	&"alchemist_laboratory": [
 		{"cat": "alchemy", "rule": &"on", "n": [2, 4], "host": "distributed", "opt": 1.0},
 	],
@@ -1174,13 +1183,111 @@ const SHOP_FITTINGS := {
 		{"cat": "rack", "rule": &"mounted", "n": [1, 1], "opt": 1.0},
 		{"cat": "shelf", "rule": &"mounted", "n": [1, 1], "opt": 1.0},
 		{"cat": "sack", "rule": &"corner", "n": [1, 2], "opt": 1.0},
+		{"cat": "sack", "rule": &"corner", "n": [1, 1], "opt": 1.0, "room": "workshop"},
 	],
 	&"carpenter": [
 		{"cat": "rack", "rule": &"mounted", "n": [1, 1], "opt": 1.0},
-		{"cat": "bench", "rule": &"free", "n": [1, 1], "opt": 1.0},
+		# against a wall, out of the customer's place and out of the doorways:
+		# a 2.8 m trestle standing free cut the workshop in two (shoptrade)
+		{"cat": "bench", "rule": &"wall", "n": [1, 1], "opt": 1.0,
+			"clear_of_serving": true},
 		{"cat": "crate", "rule": &"corner", "n": [1, 2], "opt": 0.9},
 	],
 }
+
+## Another trade's sign: a piece kept off the floors a shop works and sells on
+## (its front room and its workshop) unless the trade is one of these. A rack
+## of bottles reads as the apothecary, a sword as the smith, a crate of apples
+## or carrots as the grocer: on a butcher's or a tailor's floor each made the
+## shop read as some other trade (shoptrade identity, LIVE-SHOPS).
+const SHOP_FOREIGN_SIGNS := {
+	"Shelf_Small_Bottles": [&"apothecary", &"general_store"],
+	"Sword_Bronze": [&"blacksmith"],
+	"FarmCrate_Apple": [&"general_store", &"bakery"],
+	"FarmCrate_Carrot": [&"general_store", &"bakery"],
+	"Barrel_Apples": [&"general_store", &"bakery"],
+}
+## The trades the signs are kept apart for; every other building draws freely.
+const SHOP_SIGN_TRADES: Array[StringName] = [&"bakery", &"butcher", &"apothecary",
+	&"general_store", &"tailor", &"carpenter", &"blacksmith"]
+
+
+## The keys a shop room may draw for a category: the choices less another
+## trade's sign, on the floors where the trade is seen. Unchanged for every
+## other building, and never emptied.
+static func shop_key_choices(plan: HousePlan, room: int, choices: Array[String]) -> Array[String]:
+	if not plan.spec is ShopSpec:
+		return choices
+	var business: StringName = (plan.spec as ShopSpec).business
+	if not business in SHOP_SIGN_TRADES:
+		return choices
+	if room != plan.entrance_room() and plan.kind_of(room) != &"workshop":
+		return choices
+	var out: Array[String] = []
+	for key in choices:
+		if not SHOP_FOREIGN_SIGNS.has(key) or (SHOP_FOREIGN_SIGNS[key] as Array).has(business):
+			out.append(key)
+	return out if not out.is_empty() else choices
+
+
+## Where the customer stands at a shop's focus piece, and the sawyer must not:
+## a fitting marked `clear_of_serving` is placed with the strip before the
+## focus piece's door-facing side borrowed as blocked. The carpenter's 2.8 m saw
+## bench stood with its end 0.44 m from the customer's place at the workbench
+## (shoptrade carpenter 11x15 seed 1); 0.55 m of stance plus the sawyer's 0.6 m
+## is 1.15.
+const SERVING_CLEAR := 1.2
+## How far past every door approach (already 0.3 m to each side of the leaf) a
+## step marked `clear_of_doors` keeps its piece: two benches flanking the
+## carpenter's 1.2 m street door left 0.16 m between their workers (shoptrade
+## carpenter 14x18 seed 1). 0.15 m more leaves ~0.9 m between two 0.6 m work
+## stances, over PATH_MIN; 0.6 m pushed the sarchetype smithy's bench onto a
+## blind wall (workbench_daylight).
+const WORK_STANCE_CLEAR := 0.15
+
+
+## Borrow the shop clearances a step asks for into `blocked`; returns how many
+## rectangles were borrowed (the caller gives them back with its other
+## borrowed blocks). Nothing for a step that asks for none.
+static func borrow_serving_place(plan: HousePlan, room: int, step: Dictionary,
+		blocked: Array[Rect2]) -> int:
+	var n := 0
+	if bool(step.get("clear_of_doors", false)):
+		for d in plan.doors_of(room):
+			for approach in HouseFurnishPlacement.door_approach_rects(plan.doors[d]):
+				blocked.append(Rect2(approach).grow(WORK_STANCE_CLEAR))
+				n += 1
+	if not bool(step.get("clear_of_serving", false)) or plan.focus_room() != room:
+		return n
+	var door := plan.entrance()
+	if door < 0:
+		return n
+	var inside: Vector2 = Vector2(plan.doors[door]["pos"]) \
+		- Vector2(plan.doors[door]["normal"]) * (HouseGeometry.wall_thickness(plan.spec) * 0.5 + 0.2)
+	for f in plan.furniture_of(room):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(String(p["key"])) != plan.focus_cat() or p.get("mounted", false):
+			continue
+		# the side the customer comes to: the one nearest the way in
+		var r: Rect2 = p["rect"]
+		var c := r.get_center()
+		var sides := [
+			[Vector2(c.x, r.position.y - 0.55), Rect2(r.position.x - 0.3, r.position.y - SERVING_CLEAR, r.size.x + 0.6, SERVING_CLEAR)],
+			[Vector2(c.x, r.end.y + 0.55), Rect2(r.position.x - 0.3, r.end.y, r.size.x + 0.6, SERVING_CLEAR)],
+			[Vector2(r.position.x - 0.55, c.y), Rect2(r.position.x - SERVING_CLEAR, r.position.y - 0.3, SERVING_CLEAR, r.size.y + 0.6)],
+			[Vector2(r.end.x + 0.55, c.y), Rect2(r.end.x, r.position.y - 0.3, SERVING_CLEAR, r.size.y + 0.6)],
+		]
+		var best: Rect2 = sides[0][1]
+		var best_d := INF
+		for side in sides:
+			var d2: float = Vector2(side[0]).distance_to(inside)
+			if d2 < best_d:
+				best_d = d2
+				best = side[1]
+		blocked.append(best)
+		return n + 1
+	return n
+
 
 ## What a trade adds to its workshop, on top of the generic bench and crates.
 const TRADE_FITTINGS := {
