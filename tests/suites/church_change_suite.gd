@@ -86,21 +86,13 @@ const MATRIX := "res://tests/fixtures/sacred_sequence_requests.json"
 ## boxes laid toward +Z whatever the alcove faced, and hung over the nave as
 ## terracotta blocks on the walls (SACRED-RUSSIAN-FLOATING-BLOCKS).
 ## Returns the offending vertices, as world points.
-## The one accent piece that belongs inside is the reredos: a painted screen
-## whose back runs into the east wall (ChurchGeometry.reredos_aabb). Only its
-## own declared box is excused, grown by a centimetre; a block anywhere else in
-## the nave, the east wall included, still fails.
 static func nave_roof_intruders(spec: ChurchSpec, mesh: ArrayMesh) -> PackedVector3Array:
 	var out := PackedVector3Array()
-	var screen: AABB = ChurchGeometry.reredos_aabb(spec)
-	var excused := screen.grow(0.01) if screen.size.x > 0.0 else AABB()
 	for surface in [ChurchBuilder.SURF_ROOF, ChurchBuilder.SURF_ACCENT]:
 		if surface >= mesh.get_surface_count():
 			continue
 		var vertices: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
 		for p in vertices:
-			if excused.size.x > 0.0 and excused.has_point(p):
-				continue
 			if p.y > 0.2 and p.y < spec.height - 0.5 and ChurchGeometry.inside_nave(spec, p):
 				out.append(p)
 	return out
@@ -128,18 +120,6 @@ static func _nave_intrusion(res: SuiteResult) -> void:
 				ChurchBuilder.SURF_ROOF)
 			_expect(res, not nave_roof_intruders(spec, kit.commit()).is_empty(),
 				"floating-roof control was not detected")
-		if c["id"] == "church/russian/large/21325":
-			# negative control for the reredos excuse: an accent block on the same
-			# east wall, just outside the declared screen, must still be caught
-			var screen: AABB = ChurchGeometry.reredos_aabb(spec)
-			_expect(res, screen.size.x > 0.0, "large Russian nave has no reredos to excuse")
-			var kit2 := MeshKit.new(5)
-			for surface2 in range(5):
-				kit2.box(Vector3.ONE, Vector3(-100, -100, -100), surface2)
-			kit2.box(Vector3(0.6, 0.6, 0.1), Vector3(screen.end.x + 0.6, 5.0,
-				screen.get_center().z), ChurchBuilder.SURF_ACCENT)
-			_expect(res, not nave_roof_intruders(spec, kit2.commit()).is_empty(),
-				"an accent block beside the reredos was excused with it")
 	_expect(res, built_one, "matrix has no church/russian/default/1 case")
 
 

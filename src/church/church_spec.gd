@@ -95,7 +95,10 @@ const STYLES := {
 		"tower": 0.9, "spire": 0.6, "apse": 0.8, "transept": 0.75,
 		"aisles": [1, 2], "buttresses": 1.0, "windows": &"pointed",
 		"rose": 0.65, "clerestory": 0.8, "door": [&"portal"],
-		"towers_roof": [&"spire", &"pyramid"],
+		# Every Gothic tower ends in a true spire (LIVE-SACRED, 20 Oct): the low
+		# pyramid cap left a small Gothic church with two squat domed towers and
+		# no Gothic silhouette. Two entries keep the generator's random draw.
+		"towers_roof": [&"spire", &"spire"],
 		# Notre-Dame / Cologne / Chartres: flyers, twin towers, chapels.
 		"twin_towers": 0.8, "flying": 0.9, "crossing_tower": 0.3,
 		"dome": 0.0, "dome_shapes": [], "ambulatory": 0.7,
