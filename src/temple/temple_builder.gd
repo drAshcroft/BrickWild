@@ -621,6 +621,89 @@ func _build_rotunda_gate_surround() -> void:
 		Transform3D(Basis.IDENTITY, Vector3(0.0,
 			gate_h + lintel_h + cornice_h * 0.5, lintel_z)), SURF_STONE)
 	host_end()
+	_build_rotunda_aedicule(lintel_w * 0.5 + 0.12, gate_h + lintel_h + cornice_h)
+
+
+## A large drum (LIVE-SACRED, 20 Oct): the stone surround is the drum's own
+## colour, so on a 48 m rotunda the way in was a small orange frame in a blank
+## wall. A pedimented aedicule in the cult's trim -- two pilasters, an
+## entablature, a dark tympanum under raking cornices -- marks the gate from
+## across the forecourt. Nothing projects past the published front projection;
+## every back runs into the drum at the piece's outermost x, so no edge floats
+## off the curve.
+const AEDICULE_MIN_RADIUS := 18.0
+
+func _build_rotunda_aedicule(surround_half: float, surround_top: float) -> void:
+	var R: float = TempleGeometry.rotunda_outer_radius(spec)
+	if R < AEDICULE_MIN_RADIUS:
+		return
+	var drum_h: float = TempleGeometry.rotunda_lower_drum_height(spec)
+	var d: float = TempleGeometry.rotunda_portal_depth(spec)
+	var front: float = -R - d
+	var proud: float = front - 0.04
+	var pw: float = clampf(R * 0.04, 0.7, 1.2)
+	var x_in: float = surround_half + 0.35
+	var x_out: float = x_in + pw
+	var e_y: float = maxf(surround_top + 1.6, drum_h * 0.6)
+	var e_h: float = clampf(drum_h * 0.06, 0.5, 0.9)
+	var half: float = x_out + 0.3
+	var rise: float = minf(half * 0.45, drum_h - (e_y + e_h) - 0.4)
+	if rise < 0.8:
+		return
+	host("rotunda_aedicule")
+	for side in [-1.0, 1.0]:
+		var xc: float = side * (x_in + x_out) * 0.5
+		var back: float = _drum_face_z(R, x_out + 0.12) + 0.1
+		var base_h: float = 0.45
+		var cap_h: float = 0.5
+		component_box("rotunda_aedicule_base", Vector3(pw + 0.24, base_h, back - proud),
+			Transform3D(Basis.IDENTITY, Vector3(xc, base_h * 0.5, (proud + back) * 0.5)),
+			SURF_TRIM)
+		component_box("rotunda_aedicule_pilaster", Vector3(pw, e_y - cap_h - base_h, back - front),
+			Transform3D(Basis.IDENTITY, Vector3(xc, (base_h + e_y - cap_h) * 0.5,
+				(front + back) * 0.5)), SURF_TRIM)
+		component_box("rotunda_aedicule_capital", Vector3(pw + 0.24, cap_h, back - proud),
+			Transform3D(Basis.IDENTITY, Vector3(xc, e_y - cap_h * 0.5, (proud + back) * 0.5)),
+			SURF_TRIM)
+	var e_back: float = _drum_face_z(R, half) + 0.1
+	component_box("rotunda_aedicule_entablature", Vector3(half * 2.0, e_h, e_back - proud),
+		Transform3D(Basis.IDENTITY, Vector3(0.0, e_y + e_h * 0.5, (proud + e_back) * 0.5)),
+		SURF_TRIM)
+	# a dark tablet over the door, between the surround and the entablature
+	var tab_y0: float = surround_top + 0.3
+	var tab_y1: float = e_y - 0.3
+	if tab_y1 - tab_y0 > 0.4:
+		var tab_back: float = _drum_face_z(R, surround_half) + 0.1
+		var tab_front: float = front + 0.12
+		component_box("rotunda_aedicule_tablet",
+			Vector3(surround_half * 2.0 - 0.4, tab_y1 - tab_y0, tab_back - tab_front),
+			Transform3D(Basis.IDENTITY, Vector3(0.0, (tab_y0 + tab_y1) * 0.5,
+				(tab_front + tab_back) * 0.5)), SURF_DARK)
+	# the tympanum: a triangle slab on the entablature, filling back to the drum
+	var py: float = e_y + e_h
+	var t_back: float = e_back
+	var t_front: float = front + 0.08
+	var zc: float = (t_front + t_back) * 0.5
+	var tri := PackedVector3Array([Vector3(-half + 0.2, py, zc),
+		Vector3(0.0, py + rise - 0.15, zc), Vector3(half - 0.2, py, zc)])
+	component_slab("rotunda_aedicule_tympanum", tri, t_back - t_front, SURF_DARK, false)
+	# raking cornices along the two slopes
+	var slope_len: float = sqrt(half * half + rise * rise)
+	var angle: float = atan2(rise, half)
+	var rc_h: float = clampf(e_h * 0.5, 0.28, 0.45)
+	for side2 in [-1.0, 1.0]:
+		var mid := Vector3(side2 * half * 0.5, py + rise * 0.5, (proud + e_back) * 0.5)
+		var basis := Basis(Vector3.BACK, -side2 * angle)
+		component_box("rotunda_aedicule_raking_cornice",
+			Vector3(slope_len + rc_h * 0.6, rc_h, e_back - proud),
+			Transform3D(basis, mid + basis.y * rc_h * 0.5), SURF_TRIM)
+	host_end()
+
+
+## Where the circular drum's outer face is, at plan offset x from the axis, on
+## the gate (-Z) side.
+static func _drum_face_z(radius: float, x: float) -> float:
+	return -sqrt(maxf(radius * radius - x * x, 0.0))
 
 
 func _rotated_box_bounds(size: Vector3, xform: Transform3D) -> AABB:
