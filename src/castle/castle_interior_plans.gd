@@ -199,6 +199,14 @@ static func chapel_plan(spec: CastleSpec) -> HousePlan:
 	var lengthwise: bool = floor_rect.size.y >= floor_rect.size.x
 	var up := Vector2(0, 1) if lengthwise else Vector2(1, 0)
 	_hall_door(plan, floor_rect, up)
+	# An apse on the axial end wall stands exactly where `_hall_door` put the
+	# way in, so that door becomes the sanctuary arch and the pair is sealed
+	# from the ward (bavarian 55x50 seed 3). The way in then comes off the
+	# bailey, which is the chapel's own west face: enter at the side, altar
+	# and apse ahead down the nave.
+	var apse_on_front: bool = lengthwise and CastleGeometry.apse_radius(spec) > 0.0
+	if apse_on_front:
+		_bailey_door(plan, floor_rect, Vector2.LEFT)
 	# The chapel is the east range: its west face looks into the bailey.
 	_courtyard_windows(plan, floor_rect, Vector2.LEFT, hs)
 
@@ -768,6 +776,22 @@ static func _hall_door(plan: HousePlan, floor_rect: Rect2, up: Vector2) -> void:
 	# append, not assign: a multi-bay range has already recorded the doors
 	# through its own partitions and this is one more way in, not the only one.
 	plan.doors.append({"a": 0, "b": -1, "pos": pos, "normal": -up,
+		"width": HouseGeometry.DOOR_W, "exterior": true, "front": true,
+		"storey": 0})
+
+
+## The way in off the ward, on a long wall, when the apse (or another annex)
+## already owns the axial end wall. Placed at the corner end of the wall,
+## `DOOR_CORNER_MARGIN` clear of it, so the pew rows keep their aisle: call it
+## before the windows, which split their run around a door on the same face.
+static func _bailey_door(plan: HousePlan, floor_rect: Rect2, normal: Vector2) -> void:
+	var margin := HouseGeometry.DOOR_CORNER_MARGIN + HouseGeometry.DOOR_W * 0.5
+	var along := floor_rect.position.y + margin if absf(normal.x) > 0.5 \
+		else floor_rect.position.x + margin
+	var pos := Vector2(floor_rect.position.x if normal.x < 0.0 else floor_rect.end.x, along) \
+		if absf(normal.x) > 0.5 else Vector2(along,
+			floor_rect.position.y if normal.y < 0.0 else floor_rect.end.y)
+	plan.doors.append({"a": 0, "b": -1, "pos": pos, "normal": normal,
 		"width": HouseGeometry.DOOR_W, "exterior": true, "front": true,
 		"storey": 0})
 

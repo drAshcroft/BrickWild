@@ -248,3 +248,49 @@ generation benchmarks. Preserve complete plans, RNG state, furniture and
 navigation resolution while identifying the cost. The implementation and
 [verification commands](CASTLE_INTERIORS.md#verification) include `hassembly`
 to protect the measured model-pivot, wall-mount and bed-headboard corrections.
+
+## 21 October 2026: every occupied range must be reachable from the gate
+
+CASTLE-CHAPEL-SEALED. `kwalk` reported `castle bavarian 55x50 seed 3` only as
+"the mesh does not claim what the grid cannot enter", because nothing asked
+whether a range has a way in from the ward.
+
+The defect: `CastleApsePlan` builds the apse as a projecting half-drum on the
+chapel's axial end wall, entered only from the chapel; `_hall_door` put the
+chapel's one entrance on that same wall; `connect_chapel` then widened that
+door and kept it as the entrance. So each of the pair had exactly one door and
+it opened onto the other. `CastleOccupancyCheck` passed both: it requires *an*
+exterior entrance per building, never that the entrance leads anywhere the ward
+can reach.
+
+Fixed in the planning, not the check:
+
+- `CastleInteriorPlans._bailey_door` adds the chapel's way in on its bailey
+  face (the west long wall, `DOOR_CORNER_MARGIN` off the corner) whenever an
+  apse owns the axial end wall. It is recorded before `_courtyard_windows`, so
+  the window run splits around it instead of the door landing on a window.
+- `CastleApsePlan.connect_chapel` demotes the axial door to the sanctuary arch
+  (`front: false`, `connects_to: "apse"`, head 2.3 m) once the plan has another
+  exterior door, so `entrance()` is the way in and not the way through.
+
+New rule: `CastleOccupancyCheck.unreachable_ranges(builder)` links every
+exterior door to the range whose footprint it opens onto (or to the ward), then
+floods from the ward. Every range with a way in of its own must be reached; a
+range with no exterior door is an annex entered through its host and is not
+reported; mural towers and gate chambers are `CastleRouteCheck`'s wall-walk
+route and are left out. `check()` fails each unreached range.
+
+Negative controls in `tests/suites/castle_occupancy_suite.gd`
+(`_sanctuary_contract`): strip the chapel's `front` door from the README motte
+and both the chapel and the apse must fail the rule; restore it and
+`unreachable_ranges` must be empty.
+
+`tools/castle_range_reach_probe.gd` prints the same flood from
+`CastleWalkSources` (with the plan's doors) for any spec:
+
+```
+godot --headless --path . --script res://tools/castle_range_reach_probe.gd -- bavarian castle 55 50 3 chapel apse
+```
+
+Before: `apse SEALED`, `chapel SEALED`. After: all four ranges reachable, and
+the walk gains the link `0 -> 400` (ward to chapel).
