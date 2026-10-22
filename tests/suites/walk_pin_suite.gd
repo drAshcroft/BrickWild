@@ -265,6 +265,14 @@ static func _big_room(res: SuiteResult, plan: HousePlan) -> void:
 
 ## 1a113e/5 the hotel gallery: "what is it and why is it right in the way"
 static func _corridor(res: SuiteResult, plan: HousePlan) -> void:
+	# The shape alone, before any furniture: a great hall is not a passage
+	# however long it is, and a 3 m gallery is one. The ridge castle's hall
+	# (38 x 10.8) was held to the corridor rule on its 3.5 ratio.
+	res.checked += 2
+	if HouseFurnishWalkCheck._corridor(Rect2(0.0, 0.0, 38.0, 10.8)):
+		res.fail("corridor: a 38 x 10.8 m great hall was called a corridor")
+	if not HouseFurnishWalkCheck._corridor(Rect2(0.0, 0.0, 3.0, 12.0)):
+		res.fail("corridor: a 3 x 12 m gallery was not called a corridor")
 	var room := -1
 	for i in plan.room_count():
 		if HouseFurnishWalkCheck._corridor(HouseGeometry.room_floor_rect(plan, i)):

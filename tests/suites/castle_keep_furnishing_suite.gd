@@ -25,9 +25,13 @@ static func run() -> SuiteResult:
 			_expect(res, HouseFurnishArrangementCheck.back_gap(plan, placed) \
 				<= HouseGeometry.WALL_GAP + HouseGeometry.BED_HEAD_TOL + 0.001,
 				label + ": bed floats away from its headboard wall")
-			for corner in Poly.from_rect(placed.zone):
-				_expect(res, Poly.contains_point(plan.outline_of(top), corner, 0.01),
-					label + ": bed access crosses a polygon wall")
+			# The access strip is a turned rectangle; on a drum or an octagon
+			# its bounding box reaches into the cut-off corners while the
+			# floor a person stands on is inside (CASTLE-CHANGE-17).
+			var strip := HouseFurnishGeometry.zone_strip(String(placed.key),
+				Rect2(placed.rect), float(placed.yaw), float(placed.get("zone_side", 1.0)))
+			_expect(res, Poly.encloses_corners(plan.outline_of(top), strip, 0.01),
+				label + ": bed access crosses a polygon wall")
 		_expect(res, beds > 0, label + ": lord's chamber has no actual bed")
 		var report := HouseQA.new().check(plan, null)
 		_expect(res, report.failures.is_empty(), label + ": " + str(report.failures))
@@ -86,6 +90,66 @@ static func _bounds(res: SuiteResult) -> void:
 	var cut_corner := HouseFurnishPhysicalCheck.new()
 	cut_corner.check_placed(plan)
 	_expect(res, not cut_corner.failures.is_empty(), "QA accepted furniture through a polygon chamfer")
+	_turned_wall(res, key, angle)
+	_notch(res)
+
+
+## A piece square against a diagonal facet is inside the room although the
+## corners of its axis-aligned box are not: the box reaches into the triangle
+## the chamfer cuts off. The physical check must test the piece, not the box,
+## or every wall piece on a drum is reported as being in the masonry
+## (CASTLE-CHANGE-17).
+static func _turned_wall(res: SuiteResult, key: String, angle: float) -> void:
+	var room := PackedVector2Array([Vector2(-1.8,-4.4),Vector2(1.8,-4.4),
+		Vector2(4.4,-1.8),Vector2(4.4,1.8),Vector2(1.8,4.4),
+		Vector2(-1.8,4.4),Vector2(-4.4,1.8),Vector2(-4.4,-1.8)])
+	var plan := HousePlan.new()
+	plan.spec = HouseSpec.new()
+	plan.rooms = [{"kind": &"bedroom", "storey": 0, "rect": Rect2(-4.4,-4.4,8.8,8.8),
+		"outline": room}]
+	var raw := PropCatalog.footprint(key)
+	var normal := Vector2(1.0, 1.0).normalized()
+	var centre := Vector2(3.1, 3.1) - normal * (raw.y * 0.5 + HouseGeometry.WALL_GAP)
+	var seated := HouseFurnishGeometry.candidate(key, centre,
+		HouseFurnishGeometry.yaw_facing(-normal))
+	seated.room = 0
+	seated.storey = 0
+	plan.furniture = [seated]
+	# the fixture must exercise the bug: its AABB corner is in the cut-off
+	# triangle, so the old corner-of-the-box test rejected it
+	var box_out := false
+	for corner in Poly.from_rect(Rect2(seated.rect)):
+		box_out = box_out or not Poly.contains_point(room, corner, 0.01)
+	_expect(res, box_out, "turned-wall fixture: its AABB does not reach the chamfer")
+	var check := HouseFurnishPhysicalCheck.new()
+	check.check_placed(plan)
+	_expect(res, check.failures.is_empty(),
+		"a piece square against a diagonal wall was called masonry: " + str(check.failures))
+
+
+## The negative control for the same rule: a piece whose four corners are all
+## on the floor, but which spans a notch cut into it. A corner-only test says
+## yes; the edge test must say no.
+static func _notch(res: SuiteResult) -> void:
+	var room := PackedVector2Array([Vector2(-5,-5),Vector2(5,-5),Vector2(5,5),
+		Vector2(0.6,5),Vector2(0.6,1),Vector2(-0.6,1),Vector2(-0.6,5),Vector2(-5,5)])
+	var key := "Table_Large"
+	var raw := PropCatalog.footprint(key)
+	var plan := HousePlan.new()
+	plan.spec = HouseSpec.new()
+	plan.rooms = [{"kind": &"hall", "storey": 0, "rect": Rect2(-5,-5,10,10), "outline": room}]
+	var across := HouseFurnishGeometry.candidate(key, Vector2(0.0, 3.0), 0.0)
+	across.room = 0
+	across.storey = 0
+	plan.furniture = [across]
+	var corners_in := true
+	for corner in Poly.from_rect(Rect2(across.rect)):
+		corners_in = corners_in and Poly.contains_point(room, corner, 0.01)
+	_expect(res, corners_in, "notch fixture: corners are not all on the floor")
+	var check := HouseFurnishPhysicalCheck.new()
+	check.check_placed(plan)
+	_expect(res, not check.failures.is_empty(),
+		"QA accepted a piece spanning a notch with all four corners on the floor")
 
 
 static func _expect(res: SuiteResult, ok: bool, message: String) -> void:

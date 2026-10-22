@@ -111,6 +111,24 @@ pass's last full sweep:
   house-family change). Remaining cost: sconce placement
   (`HouseFurnishSurface.place_mounted`, 20-28 s per big castle) and the whole
   furnishing check (~0.3 s per room judged).
+- **CASTLE-CHANGE-17 CLOSED (21 October).** `lane:castle-change` is green on
+  `terrain-villages`: 7 suites, 706 checks, 0 failures, 0 warnings
+  (`artifacts/castle_change17/lane4.log`; `castlechange` 264 checks in 310.63 s:
+  square 1.50, round 35.52, battered 141.84, ridge 92.62, tower house 18.40 s;
+  `ctowerhouse` 65, `cmotteaccess` 91, `caperture` 150, `cgatestairs` 16,
+  `cbergfried` 19, `kwalk` 101). Seven causes, each fixed where it is
+  generated: the corridor rule is narrow first (2.6 m, then 3.0 m, then a 3.5
+  ratio) so a 38 x 10.8 m great hall is a room; a polygonal tower takes one
+  window per `KEEP_WINDOW_PITCH` around its perimeter rather than one per
+  facet; the placer tests a turned piece's own corners, not its AABB, so a
+  square can stand on a chamfer of a 14-sided keep (the physical check follows
+  the turned footprint); a parlour gets a wall bench (battered 187 m2 parlour
+  1% -> 11%); a relocated seat carries its exact zone strip; a front-door focus
+  stands clear of the way in (`ShopPlanner._choose_focus`, `place_free`) so
+  `cshop` is 21/21 where HEAD had two `front_door` failures; and a range's
+  upper storeys take their own bays (3.4:1 aspect, 250 m2 cap) so the ridge's
+  441 m2 parlours at 8-9% become six 219.8 m2 rooms at 11-13%. No check was
+  relaxed. `main` coverage follows a merge.
 - The smallest tier of every walled style (40 x 55 m): the corner towers are
   embedded in a 5 m footing, no clear gallery reaches the coping, and the ground
   door a fallback gives them meets the 0.65 m wall footing (door clearance fails);

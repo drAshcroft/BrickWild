@@ -179,11 +179,26 @@ static func _windows(plan: HousePlan, level: int) -> void:
 	var blind := _facing_wall(walls, Vector2(0, 1) if walls.size() > 4 else Vector2(-1, 0))
 	var head := minf(CastleInteriorPlans.WINDOW_SILL + CastleInteriorPlans.WINDOW_H,
 		plan.spec.height - 0.2)
+	# FEW AND TALL, the same rule the rectangular keep follows, measured along
+	# the perimeter instead of counted per wall. A fourteen-sided drum 15 m
+	# across has facets 3.5 m long; a window at the middle of every one leaves
+	# a metre of wall on either side of it, which is less than a chest or a
+	# cupboard stands on, and the only clean facets are the ones the stair
+	# takes. The battered keep's 187 m2 parlour could then take no wall piece
+	# at all, and failed "sparse" at 1% (CASTLE-CHANGE-17). One window every
+	# keep pitch leaves whole facets of wall on a small drum, and still puts
+	# one on every facet of a large one.
+	var across := 0.0
+	var last := -INF
 	for wi in range(walls.size()):
-		if plan.kind_of(level) == &"lords_chamber" and wi == blind:
-			continue
 		var wall: Dictionary = walls[wi]
 		var length := Vector2(wall.from).distance_to(wall.to)
+		var centre := across + length * 0.5
+		across += length
+		if plan.kind_of(level) == &"lords_chamber" and wi == blind:
+			continue
+		if centre - last < CastleInteriorPlans.KEEP_WINDOW_PITCH:
+			continue
 		var width := minf(CastleInteriorPlans.WINDOW_W,
 			length - 2.0 * HouseGeometry.WINDOW_CORNER_MARGIN)
 		if width < COMPACT_FACET_WINDOW_MIN:
@@ -202,6 +217,7 @@ static func _windows(plan: HousePlan, level: int) -> void:
 				"pos": Vector2(wall.from).lerp(wall.to, (float(i) + 0.5) / float(count)),
 				"normal": -Vector2(wall.normal), "width": width,
 				"sill": CastleInteriorPlans.WINDOW_SILL, "head": head, "storey": level})
+		last = centre
 
 
 ## A common footprint touches a real wall on either landing and fits BOTH

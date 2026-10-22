@@ -155,6 +155,11 @@ const CHIMNEY_POT_R := 0.13   # terracotta flue pot radius
 const CHIMNEY_POT_H := 0.55   # flue pot height
 
 # ---- furnishing ----
+## The strip inside a front door that a person walks through before the room
+## begins. Nothing stands IN it: HouseFurnishWalkCheck's `front_door` rule
+## measures every piece's body against it, and the plan stands a free focus
+## back by it rather than at the middle of a shallow room (CASTLE-CHANGE-17).
+const ENTRY_APPROACH := 1.6
 const WALL_GAP := 0.06        # how close a wall-hugging piece sits to the wall
 const FURNITURE_DENSITY_MAX := 0.42   # of a room's floor, before it reads as a junk shop
 const SHELF_HEIGHT := 1.55    # mounting height of a wall shelf or rack

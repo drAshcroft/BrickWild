@@ -14,8 +14,9 @@ const LONG_SEAT_OVERHANG := 0.3
 ## How deep into a room the approach to a door is kept clear of tables and
 ## other free-standing pieces, beyond the swing itself, and how far either
 ## side of the leaf. A table a hand's breadth past the swing still meets you
-## as you come in (walk QA, 6 Oct).
-const DOOR_APPROACH := 1.6
+## as you come in (walk QA, 6 Oct). The plan uses the same strip to stand a
+## free focus back from the entrance, so it lives in HouseGeometry.
+const DOOR_APPROACH := HouseGeometry.ENTRY_APPROACH
 const DOOR_APPROACH_SIDE := 0.3
 ## Match the domestic bed-door QA margin for the compact Alchemist's side Hall.
 const COMPACT_ALCHEMIST_BED_DOOR_GAP := 0.4
@@ -763,7 +764,7 @@ static func _place_witchwork_book_on_support(plan: HousePlan, room: int,
 							if clash:
 								continue
 							piece["rect"] = rect
-							piece["zone"] = Rect2()
+							HouseFurnishGeometry.set_zone(piece, Rect2())
 							plan.furniture.append(piece)
 							return
 
@@ -1398,13 +1399,14 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 						try_cand["pos"] = seated
 						var tending: Rect2 = try_cand["zone"]
 						tending.position += n * (HouseGeometry.WITCH_RECESS_FRONT_CLEAR + 0.02)
-						try_cand["zone"] = tending
+						HouseFurnishGeometry.set_zone(try_cand, tending)
 					if HouseFurnishingRecipes.uses_bedside_pair(plan) \
 							and PropCatalog.category(key) == "bed" \
 							and String(step.get("group", "")) == "sleep":
-						try_cand["zone"] = HouseFurnishGeometry.ordinary_sleep_access_zone(
-							Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
-							float(try_cand["yaw"]))
+						HouseFurnishGeometry.set_zone(try_cand,
+							HouseFurnishGeometry.ordinary_sleep_access_zone(
+								Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
+								float(try_cand["yaw"])))
 					if _is_compact_witch_alchemist(plan) and plan.kind_of(room) == &"bedroom" \
 							and PropCatalog.category(key) == "bed" \
 							and String(step.get("group", "")) == "sleep" \
@@ -1417,7 +1419,15 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 						# would be inside the masonry.
 						var z0: Rect2 = try_cand["zone"]
 						var c0: Vector2 = Rect2(try_cand["rect"]).get_center()
-						try_cand["zone"] = Rect2(c0 * 2.0 - z0.get_center() - z0.size / 2.0, z0.size)
+						var strip0: PackedVector2Array = try_cand.get("zone_strip",
+							PackedVector2Array())
+						HouseFurnishGeometry.set_zone(try_cand,
+							Rect2(c0 * 2.0 - z0.get_center() - z0.size / 2.0, z0.size))
+						var mirrored := PackedVector2Array()
+						for corner in strip0:
+							mirrored.append(c0 * 2.0 - corner)
+						if not mirrored.is_empty():
+							try_cand["zone_strip"] = mirrored
 					if hearth_only >= 0:
 						var breast := HouseGeometry.breast_for_hearth(plan, room, try_cand, wi)
 						if not _breast_fits(plan, room, breast, floor_rect, blocked, zones):
@@ -1511,9 +1521,10 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 							if HouseFurnishingRecipes.is_ordinary_house(plan) \
 									and PropCatalog.category(key) == "bed" \
 									and String(step.get("group", "")) == "sleep":
-								try_cand["zone"] = HouseFurnishGeometry.ordinary_sleep_access_zone(
-									Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
-									float(try_cand["yaw"]))
+								HouseFurnishGeometry.set_zone(try_cand,
+									HouseFurnishGeometry.ordinary_sleep_access_zone(
+										Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
+										float(try_cand["yaw"])))
 							if HouseFurnishGeometry.fits(plan, room, try_cand, floor_rect, blocked, zones, extra):
 								cand = try_cand
 								break
@@ -1995,7 +2006,7 @@ static func place_row(plan: HousePlan, room: int, step: Dictionary,
 						# not one bench of a row would ever fit. Pews in a
 						# chapel are the case the row rule was written for
 						# (INT-001) and could not do until this line.
-						cand["zone"] = Rect2()
+						HouseFurnishGeometry.set_zone(cand, Rect2())
 						if not HouseFurnishGeometry.fits(plan, room, cand, floor_rect, blocked, zones, extra):
 							break
 						try_row.append(cand)
@@ -2055,7 +2066,7 @@ static func place_row(plan: HousePlan, room: int, step: Dictionary,
 		return
 	var row_group: String = "%d_%s_%d" % [room, cat, plan.furniture.size()]
 	for cand in best_row:
-		cand["zone"] = best_zone
+		HouseFurnishGeometry.set_zone(cand, best_zone)
 		cand["row"] = row_group
 		if bool(step.get("free_standing", false)):
 			cand["free_standing"] = true
@@ -2105,9 +2116,14 @@ static func place_free(plan: HousePlan, room: int, key: String,
 	# approach to every door, and only if the room has nowhere else for it is
 	# it allowed back in -- and then it says so, so the check can tell a
 	# cramped room's compromise from a careless placement. The focus piece is
-	# the exception: a counter that faces the shop door is MEANT to meet you.
+	# the exception to the other doors -- a counter that faces the shop door is
+	# MEANT to meet you -- but the way in through the front door is a walk, not
+	# a place to stand: the plan stands it back by that strip and the placer
+	# keeps its body out of it (CASTLE-CHANGE-17).
 	var approach: Array[Rect2] = []
-	if not _is_focus_piece(plan, room, key):
+	if _is_focus_piece(plan, room, key):
+		approach = entrance_approach(plan, room)
+	else:
 		approach = door_approaches(plan, room)
 	var with_approach: Array[Rect2] = extra.duplicate()
 	with_approach.append_array(approach)
@@ -2163,6 +2179,17 @@ static func door_approaches(plan: HousePlan, room: int) -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	for d in plan.doors_of(room):
 		out.append_array(door_approach_rects(plan.doors[d]))
+	return out
+
+
+## The way in through the building's front door, when it opens into this room.
+## The room's focus may meet you at the swing, but nothing its plan arranged
+## around stands IN the walk through the door.
+static func entrance_approach(plan: HousePlan, room: int) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var entrance := plan.entrance()
+	if entrance >= 0 and int(plan.doors[entrance].get("a", -1)) == room:
+		out = door_approach_rects(plan.doors[entrance])
 	return out
 
 
@@ -2288,7 +2315,8 @@ static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 			cand["pos"] = Vector3(centre.x, 0.0, centre.y)
 			cand["rect"] = Rect2(centre - foot / 2.0, foot)
 			if has_zone:
-				cand["zone"] = HouseFurnishGeometry.zone_rect(key, cand["rect"], yaw)
+				HouseFurnishGeometry.set_zone(cand,
+					HouseFurnishGeometry.zone_rect(key, cand["rect"], yaw))
 			if not HouseFurnishGeometry.fits(plan, room, cand, floor_rect, blocked, zones, extra):
 				continue
 			cand["focus_point"] = focus

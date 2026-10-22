@@ -369,7 +369,12 @@ static func _fill_steps(kind: StringName) -> Array:
 				"pitch": 0.0, "aisle": 1.2, "seat_clearance": 0.0, "along": "wall", "opt": 0.5}
 			return [pews, pews]
 		&"parlour", &"lounge":
-			return [{"cat": "bookcase", "rule": &"wall"}, table_set] + stores
+			# A sitting room. When the household eats elsewhere the table goes
+			# and only wall storage is left, which leaves a great drum parlour
+			# under the sparse rule's share with nowhere to sit at all: a
+			# settle along the wall is what the room is for (CASTLE-CHANGE-17).
+			return [{"cat": "bookcase", "rule": &"wall"}, {"cat": "bench", "rule": &"wall"},
+				table_set] + stores
 		&"bedroom", &"guest_room", &"lords_chamber", &"suite":
 			return [{"cat": "chest", "rule": &"wall"}, {"cat": "storage", "rule": &"wall"},
 				{"cat": "bookcase", "rule": &"wall"}, table_set]

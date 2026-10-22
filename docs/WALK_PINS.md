@@ -65,14 +65,14 @@ hotel, world, village houses and castle interiors. They report under the
 | `table_band` | "light is right in the way of the table" | a non-seat floor piece in the 0.45 m strip along a sat-at table's long side |
 | `seat_kinds` | "why two kinds of chairs?" | more than one seat model round the tables of one room |
 | `seat_count` | "one bench, just a table" | a table seating one, or none in an eating room |
-| `sparse` | "huge room with nothing in it" (x7) | habitable, ≥ 20 m², not corridor-shaped, < 10 % furnished |
+| `sparse` | "huge room with nothing in it" (x7) | habitable, ≥ 20 m², not a corridor (see `corridor`), < 10 % furnished |
 | `lamps` | "missing lights" | habitable, ≥ 30 m², fewer than one light per 35 m² |
 | `worktop` | "needs a kitchen" (x3) | a kitchen with no table, workbench or counter |
 | `bedside` | domus nightstand 2.3 m from its bed | a nightstand more than 0.35 m from every bed |
 | `stowage` | "give the barracks some dressers" | fewer than one chest, cupboard or nightstand per two beds |
-| `corridor` | hotel lectern "right in the way" | a floor piece more than 0.21 m off the long walls of a corridor |
+| `corridor` | hotel lectern "right in the way" | a floor piece more than 0.21 m off the long walls of a corridor. Narrow first: under 2.6 m wide, or under 3.0 m and 3.5× as long; a 10 m span is a hall, not a passage |
 | `bed_door` | "feng shui is bad to put bed right by door" | a bed within 0.4 m of a door's swing |
-| `front_door` | "tables do not go right in front of main entrances" (x2) | any floor piece, hosted or not, in the entrance's 1.6 m way in, never downgraded |
+| `front_door` | "tables do not go right in front of main entrances" (x2) | any floor piece, hosted or not, in the entrance's 1.6 m way in, never downgraded. The plan stands a free focus (a stall, an anvil) back beyond it; only its use zone may meet the doorway |
 
 `tests/suites/walk_pin_suite.gd` (`-- walkpins`, in `lane:house-furnish-fast`)
 proves each rule twice. It must fail on the pinned furniture rebuilt in a

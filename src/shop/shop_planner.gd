@@ -711,10 +711,25 @@ static func _choose_focus(out: HousePlan, spec: ShopSpec, front: int) -> void:
 		facing = door_n
 		out.focus = HousePlanFeatures.focus_in_room(out, front, cat, facing, faces_door)
 		var depth: float = f.size.y if absf(door_n.y) > 0.5 else f.size.x
-		var pos: Vector2 = door_pos - door_n * (depth / 2.0)
+		# The middle of a shallow room is still the way in: a stall set there in
+		# a 3.6 m stable stood 0.75 m inside the strip a person walks through
+		# from the front door (CASTLE-CHANGE-17). The focus keeps its way in
+		# clear, and the furnisher pins the piece to that spot.
+		var back: float = maxf(depth / 2.0,
+			HouseGeometry.ENTRY_APPROACH + _focus_half_depth(choices))
+		var pos: Vector2 = door_pos - door_n * back
 		out.focus["pos"] = Vector2(clampf(pos.x, f.position.x + 1.0, f.end.x - 1.0),
 			clampf(pos.y, f.position.y + 1.0, f.end.y - 1.0))
 		return
 	elif out.hearth_room() == front and out.hearth_wall() >= 0:
 		facing = HouseGeometry.room_walls(out, front)[out.hearth_wall()]["normal"]
 	out.focus = HousePlanFeatures.focus_in_room(out, front, cat, facing, faces_door)
+
+
+## Half the depth of the deepest model of the focus category, so a shallow
+## room can stand the piece clear of its front door whichever key is chosen.
+static func _focus_half_depth(choices: Array[String]) -> float:
+	var deepest := 0.0
+	for key in choices:
+		deepest = maxf(deepest, PropCatalog.footprint(key).y)
+	return deepest * 0.5
