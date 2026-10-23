@@ -66,7 +66,7 @@ func _check_witch(size: Dictionary, seed: int) -> void:
 		_check_service_eave_contact(builder, mesh, surface_map, layout, who)
 	_check_ridge_contacts(builder, mesh, roof_triangles, layout, who)
 	_check_bundles_clear_of_roof_cuts(plan, builder, layout, who)
-	_check_chimney(plan, builder, mesh, rolls, surface_map, who)
+	_check_chimney(plan, builder, mesh, surface_map, who)
 	_check_bounds(plan, mesh, who)
 	mesh.clear_surfaces()
 
@@ -385,31 +385,30 @@ func _check_bundles_clear_of_roof_cuts(plan: HousePlan, builder: HouseBuilder,
 
 
 func _check_chimney(plan: HousePlan, builder: HouseBuilder, mesh: ArrayMesh,
-		rolls: Array, surface_map: Dictionary, who: String) -> void:
-	var roll_top := -INF
-	for row in rolls:
-		var points: PackedVector3Array = row["points"]
-		roll_top = maxf(roll_top, points[2].y)
+		surface_map: Dictionary, who: String) -> void:
 	var flue_size := HouseGeometry.chimney_flue_size(plan.spec, plan.world_family)
 	var flue_top := -INF
 	for part in builder.part_log:
 		if String(part.get("tag", "")) == "chimney" and is_equal_approx(float(part["size"].x), flue_size) \
 				and float(part["size"].y) > 0.5:
 			flue_top = maxf(flue_top, float(part["pos"].y) + float(part["size"].y) * 0.5)
-	var layout := HouseGeometry.roof_layout(plan)
-	var bay: Dictionary = layout.get("witch_bay", {})
 	if not is_finite(flue_top):
 		_fail("%s stepped flue top is not measured from its emitted masonry" % who)
-	elif not bay.is_empty():
+	else:
+		# The stack is sized from the roof it actually leaves: the emitted roof
+		# triangles under its own flue footprint. The old 3 m neighbourhood rule
+		# made an eave flue tower over the high core, and the old ridge-roll
+		# equality assumed a flue that exits on the ridge; neither is what the
+		# emitter builds. The sampler allows its documented 10 mm for angular
+		# sampling error, hence the 15 mm floor.
 		var centre := HouseGeometry.chimney_center(plan)
 		var roof_surface := int(surface_map.get(ROOF_SURFACE, -1))
-		var adjacent_top := _actual_surface_height_near(mesh, roof_surface, centre, 3.0)
+		var adjacent_top := _actual_surface_height_near(mesh, roof_surface, centre,
+			flue_size * 0.5)
 		var measured_clearance := flue_top - adjacent_top
-		if not is_finite(adjacent_top) or measured_clearance < FLUE_CLEAR - 0.002 \
+		if not is_finite(adjacent_top) or measured_clearance < FLUE_CLEAR - 0.015 \
 				or measured_clearance > FLUE_CLEAR + 0.02:
-			_fail("%s flue misses its 0.6 m measured local-roof clearance (%.3f m)" % [who, measured_clearance])
-	elif not is_finite(roll_top) or absf(flue_top - roll_top - FLUE_CLEAR) > 0.002:
-		_fail("%s legacy flue does not retain its established 0.6 m ridge-roll clearance" % who)
+			_fail("%s flue misses its 0.6 m measured flue-footprint clearance (%.3f m)" % [who, measured_clearance])
 	var mass := builder.mass_aabb("chimney")
 	if mass.size == Vector3.ZERO:
 		_fail("%s chimney structural mass is missing" % who)
@@ -441,7 +440,11 @@ func _check_chimney(plan: HousePlan, builder: HouseBuilder, mesh: ArrayMesh,
 			Vector3(chimney_center.x, flue_top, chimney_center.y), 0.0001):
 		_fail("%s chimney structural mass omits the real upper-flue top" % who)
 	var mass_top := mass.position.y + mass.size.y
-	var expected_mass_top := flue_top + 0.18 + HouseGeometry.CHIMNEY_POT_H
+	# The straight flue is the foot of the Witch stack; the crooked upper
+	# courses climb WITCH_STACK_EXTRA above it before the crown and pot, and
+	# the logged mass contains all of them.
+	var expected_mass_top := flue_top + HouseBuilder.WITCH_STACK_EXTRA + 0.18 \
+		+ HouseGeometry.CHIMNEY_POT_H
 	if absf(mass_top - expected_mass_top) > 0.002:
 		_fail("%s chimney mass top does not include the complete emitted pot envelope" % who)
 	var mesh_top := _actual_chimney_crown_top(mesh, HouseGeometry.chimney_center(plan), flue_top, mass.size.x)

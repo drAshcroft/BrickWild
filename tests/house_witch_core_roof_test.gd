@@ -62,8 +62,11 @@ func _check_case(style: StringName, size: Vector2, seed: int, expect_ell: bool) 
 	var expected_span := minf(core.size.x, core.size.y)
 	if absf(float(layout.span) - expected_span) > 0.01:
 		failures.append("%.1fx%.1f seed%d: roof span %.3f does not match occupied core %.3f" % [size.x, size.y, seed, layout.span, expected_span])
-	var expected_rise := minf(expected_span * spec.roof_pitch * 0.5,
-		clampf(expected_span * 0.52, 3.6, 5.6))
+	# LIVE-WITCH massing derives the high-core rise from the measured core
+	# span at 0.84 of the generated pitch, bounded by 0.66 of the span within
+	# 3.6-6.6 m. The old 0.52-of-span / 5.6 m profile predates the raised core.
+	var expected_rise := minf(expected_span * float(plan.spec.roof_pitch) * 0.84,
+		clampf(expected_span * 0.66, 3.6, 6.6))
 	if absf(float(layout.rise) - expected_rise) > 0.01:
 		failures.append("%.1fx%.1f seed%d: main rise %.3f is not derived from core width %.3f" % [size.x, size.y, seed, layout.rise, expected_span])
 	var builder := HouseBuilder.new()
@@ -79,8 +82,11 @@ func _check_case(style: StringName, size: Vector2, seed: int, expect_ell: bool) 
 		failures.append("%.1fx%.1f seed%d: split-roof Witch flue is not centred on its actual exterior host wall" % [size.x, size.y, seed])
 	var roof_top := builder._roof_top_surface_in_flue_footprint(chimney_point,
 		Vector2.ONE * flue_s)
+	# The Witch stack's contract is the roof it actually leaves: its own flue
+	# footprint. Sampling three metres chose the high core's ridge whenever the
+	# flue sat at the eave, which is why the emitter stopped doing it.
 	var emitted_local_roof_top := _actual_surface_height_near(mesh,
-		HouseBuilder.SURF_ROOF, chimney_point, 3.0)
+		HouseBuilder.SURF_ROOF, chimney_point, flue_s * 0.5)
 	var emitted_flue_top := _emitted_flue_top(builder, flue_s)
 	if not is_finite(roof_top):
 		failures.append("%.1fx%.1f seed%d: plan roof sampler has no roof crossing anywhere under the flue footprint" % [size.x, size.y, seed])
@@ -93,15 +99,26 @@ func _check_case(style: StringName, size: Vector2, seed: int, expect_ell: bool) 
 		if not is_finite(emitted_local_roof_top) or not is_finite(emitted_flue_top):
 			failures.append("%.1fx%.1f seed%d: emitted roof triangle oracle or flue component top is missing" % [size.x, size.y, seed])
 		else:
+			# The sampler allows its documented 10 mm for angular sampling
+			# error, so the distance measured against the mesh may fall a
+			# centimetre under the nominal 0.6 m. Requiring 2 mm exactness
+			# asked the mesh to beat the allowance the emitter promises.
 			var local_clearance := emitted_flue_top - emitted_local_roof_top
-			if local_clearance < HouseBuilder.CHIMNEY_CLEAR - 0.002 \
+			if local_clearance < HouseBuilder.CHIMNEY_CLEAR - 0.015 \
 					or local_clearance > HouseBuilder.CHIMNEY_CLEAR + 0.02:
-				failures.append("%.1fx%.1f seed%d: emitted flue top clears the exact 3 m roof-triangle neighbourhood by %.3f m; require %.3f–%.3f m" % [
-					size.x, size.y, seed, local_clearance, HouseBuilder.CHIMNEY_CLEAR - 0.002,
+				failures.append("%.1fx%.1f seed%d: emitted flue top clears the roof triangles under its own flue footprint by %.3f m; require %.3f–%.3f m" % [
+					size.x, size.y, seed, local_clearance, HouseBuilder.CHIMNEY_CLEAR - 0.015,
 					HouseBuilder.CHIMNEY_CLEAR + 0.02])
-		var expected_chimney_top := emitted_flue_top + 0.18 + HouseGeometry.CHIMNEY_POT_H
+			if absf(emitted_local_roof_top - roof_top) > 0.02:
+				failures.append("%.1fx%.1f seed%d: emitted flue-footprint roof top %.3f disagrees with the plan sampler %.3f" % [
+					size.x, size.y, seed, emitted_local_roof_top, roof_top])
+		# The straight flue is only the foot of the Witch stack: the crooked
+		# upper courses climb HouseBuilder.WITCH_STACK_EXTRA above it, and the
+		# logged mass carries the crown slab and pot above those.
+		var expected_chimney_top := emitted_flue_top + HouseBuilder.WITCH_STACK_EXTRA \
+			+ 0.18 + HouseGeometry.CHIMNEY_POT_H
 		if not is_finite(chimney_mass_top) or absf(chimney_mass_top - expected_chimney_top) > 0.025:
-			failures.append("%.1fx%.1f seed%d: chimney mass top does not contain emitted flue, crown and pot (mass %.3f, emitted stack %.3f)" % [size.x, size.y, seed, chimney_mass_top, expected_chimney_top])
+			failures.append("%.1fx%.1f seed%d: chimney mass top does not contain emitted flue, crooked courses, crown and pot (mass %.3f, emitted stack %.3f)" % [size.x, size.y, seed, chimney_mass_top, expected_chimney_top])
 	var roof_rows := builder.components("roof_face_")
 	var bay_rows := builder.components("witch_workshop_bay_roof")
 	if roof_rows.is_empty() or bay_rows.is_empty():
@@ -380,19 +397,14 @@ func _check_emitted_join(mesh: ArrayMesh, layout: Dictionary, bay: Dictionary,
 
 func _check_emitted_chimney_top(mesh: ArrayMesh, centre: Vector2,
 		size: Vector2, seed: int, flue_size: float, expected_plan_roof_top: float) -> void:
-	var roof_y := -INF
-	var crossing_samples := 0
-	for fx in [-0.5, 0.0, 0.5]:
-		for fz in [-0.5, 0.0, 0.5]:
-			var point := centre + Vector2(float(fx) * flue_size, float(fz) * flue_size)
-			var actual_y := _emitted_roof_height(mesh, point.x, point.y)
-			if is_finite(actual_y):
-				crossing_samples += 1
-				roof_y = maxf(roof_y, actual_y)
-	if crossing_samples < 3:
-		failures.append("%.1fx%.1f seed%d: only %d of nine measured flue-footprint samples cross emitted roof triangles" % [size.x, size.y, seed, crossing_samples])
+	# Nine point samples can straddle a thatch crown that crosses the footprint
+	# between them, which under-reported the emitted roof by 0.28 m. Measure
+	# every emitted roof triangle that overlaps the same footprint.
+	var roof_y := _actual_surface_height_near(mesh, HouseBuilder.SURF_ROOF, centre, flue_size * 0.5)
+	if not is_finite(roof_y):
+		failures.append("%.1fx%.1f seed%d: no emitted roof triangle overlaps the flue footprint" % [size.x, size.y, seed])
 		return
-	if absf(roof_y - expected_plan_roof_top) > 0.08:
+	if absf(roof_y - expected_plan_roof_top) > 0.02:
 		failures.append("%.1fx%.1f seed%d: plan roof footprint top %.3f differs from emitted triangle top %.3f" % [size.x, size.y, seed, expected_plan_roof_top, roof_y])
 	if is_finite(_emitted_roof_height(ArrayMesh.new(), centre.x, centre.y)):
 		failures.append("%.1fx%.1f seed%d: roof crossing probe accepted a mesh with no emitted roof surface" % [size.x, size.y, seed])
