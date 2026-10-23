@@ -1010,6 +1010,16 @@ const RECIPES := {
 		{"cat": "table", "rule": &"free", "n": [1, 1], "opt": 1.0},
 		{"cat": "seat", "rule": &"around", "n": [2, 4], "opt": 1.0},
 	],
+	# The wall circuit of a small tower: a bench to watch from, an arms rack,
+	# and the stores the post keeps. No table: the stair has the floor a
+	# diner's chair would need (see HouseGeometry.HABITABLE).
+	&"watch_room": [
+		{"cat": "bench", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "stand", "key": "WeaponStand", "rule": &"wall", "n": [1, 1], "opt": 0.9},
+		{"cat": "chest", "rule": &"wall", "n": [0, 1], "opt": 0.7},
+		{"cat": "storage", "rule": &"wall", "n": [0, 1], "opt": 0.6},
+		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
+	],
 	&"cell": [
 		{"cat": "cage", "key": "Cage_Small", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 	],

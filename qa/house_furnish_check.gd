@@ -71,6 +71,9 @@ const REQUIRED := {
 	&"nave": ["table"],
 	&"sanctuary": ["table"],
 	&"guardroom": ["table"],
+	# A watch room is a post, not a mess: the guard has somewhere to sit and
+	# his arms and stores about him, and there is no dining table in it.
+	&"watch_room": ["bench"],
 	&"cell": ["cage"],
 }
 

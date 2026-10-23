@@ -202,6 +202,7 @@ const MIN_AREA := {
 	&"antechamber": 10.0, &"throne_room": 18.0, &"treasury": 6.0,
 	&"royal_chamber": 11.0,
 	&"guardroom": 8.0, &"corridor": 2.4, &"cell": 4.0, &"oubliette": 4.0,
+	&"watch_room": 5.0,
 }
 
 ## And the narrowest it may be. Area alone is not enough: a bed is 1.9 x 2.4 m
@@ -222,6 +223,7 @@ const MIN_SIDE := {
 	&"antechamber": 2.6, &"throne_room": 3.0, &"treasury": 2.0,
 	&"royal_chamber": 3.3,
 	&"guardroom": 2.4, &"corridor": 1.15, &"cell": 2.0, &"oubliette": 2.0,
+	&"watch_room": 2.0,
 }
 
 
@@ -245,7 +247,13 @@ const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour",
 	&"lounge", &"suite", &"gallery", &"laundry", &"great_hall",
 	&"lords_chamber", &"nave", &"sanctuary", &"reading_room", &"stacks", &"scriptorium",
 	&"antechamber", &"throne_room", &"royal_chamber",
-	&"guardroom"]
+	&"guardroom", &"watch_room"]
+
+## A mural tower storey too small to seat a dining table is a watch room: a
+## bench, an arms rack, its stores and a light, where a guard stands his watch.
+## The castle plans one whenever the guardroom's own table cannot be sat at
+## (CastleKeepPlan.furnish_minimum_programme), so nobody dines in a post the
+## stair has taken the floor of.
 
 ## Rooms someone sleeps in. Nobody should have to walk through one of these
 ## to reach anywhere else -- not just the house's own "bedroom".

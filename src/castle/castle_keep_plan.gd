@@ -119,6 +119,17 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 ## Rooms wider than this furnish their guardroom table against a wall.
 const WIDE_ROOM_AREA := 24.0
 
+## What a watch room keeps: somewhere to sit the watch, the arms rack, the
+## post's stores and a light. Placed under the ordinary rules, with the room's
+## own door, stair and window reservations.
+const WATCH_ROOM := [
+	{"cat": "bench", "rule": &"wall"},
+	{"cat": "stand", "key": "WeaponStand", "rule": &"wall"},
+	{"cat": "chest", "rule": &"wall"},
+	{"cat": "storage", "rule": &"wall"},
+	{"cat": "sconce", "rule": &"mounted"},
+]
+
 
 static func furnish_minimum_programme(plan: HousePlan, spec: HouseSpec) -> void:
 	var rng := RandomNumberGenerator.new()
@@ -158,6 +169,73 @@ static func furnish_minimum_programme(plan: HousePlan, spec: HouseSpec) -> void:
 	# for two and a large room not left bare. CastleRoomTopUp does both under
 	# the same placement rules, keeping only what leaves a room no worse.
 	CastleRoomTopUp.apply(plan, spec)
+	# A table nobody can sit at is not a dining table. A mural tower's storey
+	# often cannot take one -- the stair owns the long side a chair is drawn up
+	# to -- so the post becomes the watch room it is. Measured from the
+	# placements above, not guessed from the floor area.
+	_demote_unseated_guardrooms(plan, spec)
+
+
+## A guardroom whose table holds nobody has an unusable table in it: an 11.8 m2
+## tower storey with a stair across it takes a 2.85 m table but no chair beside
+## it. Plan the post as a watch room instead -- a bench, an arms rack, stores
+## and a light, and no dining table -- and say so in the room's own kind, so the
+## programme, sparse, lamp and seat rules all judge what the room really is.
+static func _demote_unseated_guardrooms(plan: HousePlan, spec: HouseSpec) -> void:
+	for room in range(plan.room_count()):
+		if plan.kind_of(room) != &"guardroom":
+			continue
+		var table := -1
+		for index in plan.furniture_of(room):
+			var piece: Dictionary = plan.furniture[index]
+			if PropCatalog.category(String(piece["key"])) == "table" \
+					and not bool(piece.get("mounted", false)) \
+					and String(piece.get("row", "")) == "":
+				table = index
+				break
+		# A trestle row seats itself with benches and is judged elsewhere.
+		if table < 0 or CastleRoomTopUp._holds_at(plan, room, table) >= 2:
+			continue
+		# Take the table and the one chair that came with it out of the room.
+		for index in range(plan.furniture.size() - 1, -1, -1):
+			if index == table or int(plan.furniture[index].get("host", -1)) == table:
+				plan.furniture.remove_at(index)
+		plan.rooms[room]["kind"] = &"watch_room"
+		if room < spec.program.size() and spec.program[room] == &"guardroom":
+			spec.program[room] = &"watch_room"
+		_dress_watch_room(plan, spec, room)
+
+
+## The watch room's furniture. In the smallest tower storey -- 11.8 m2 in a
+## hexagon, with a 2.4 x 1.0 stair across it -- the bench and a cupboard stand
+## and the arms rack, a metre deep, does not; the pieces are placed in the
+## WATCH_ROOM order and a piece that does not fit is simply absent. Each one is
+## judged against the room's own walk and taken back out if it closes floor the
+## room had.
+static func _dress_watch_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.seed) ^ 0x57_41_54_43
+	var blocked: Array[Rect2] = HouseFurnishPlacement.initial_blocked(plan, room)
+	var zones: Array[Rect2] = []
+	for index in plan.furniture_of(room):
+		var piece: Dictionary = plan.furniture[index]
+		if bool(piece.get("mounted", false)):
+			continue
+		blocked.append(Rect2(piece["rect"]))
+		var zone: Rect2 = piece.get("zone", Rect2())
+		if zone.size != Vector2.ZERO:
+			zones.append(zone)
+	var walk := CastleRoomTopUp.room_walk_faults(plan, room)
+	var mark := plan.furniture.size()
+	for step in WATCH_ROOM:
+		var row: Dictionary = step.duplicate()
+		row["opt"] = 1.0
+		row["wall_only"] = String(step["rule"]) == "wall"
+		HouseFurnishPlacement.place_one(plan, spec, room, String(step["cat"]),
+			StringName(step["rule"]), blocked, zones, rng, row)
+	while plan.furniture.size() > mark \
+			and CastleRoomTopUp.room_walk_faults(plan, room) > walk:
+		plan.furniture.resize(plan.furniture.size() - 1)
 
 
 static func _facing_wall(walls: Array[Dictionary], inward: Vector2) -> int:

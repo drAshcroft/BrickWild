@@ -76,7 +76,8 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 	if aff.is_empty():
 		# a counter or a cauldron has no wishes of its own, but it may still
 		# be the piece the plan is arranged around
-		return _pin_bonus(plan, room, cand)
+		return _pin_bonus(plan, room, cand) \
+			- BAND_W * _band_crowding(plan, room, cand)
 	var rect: Rect2 = cand["rect"]
 	var c: Vector2 = rect.get_center()
 	# Only these preferences inspect a wall. Free-standing tables ask about
@@ -153,7 +154,48 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 		score += _bed_bonus(plan, room, cand)
 	if String(aff.get("face", "")) == "focus":
 		score += _broadside_bonus(plan, room, rect)
-	return score + _pin_bonus(plan, room, cand)
+	return score + _pin_bonus(plan, room, cand) \
+		- BAND_W * _band_crowding(plan, room, cand)
+
+
+## Nothing but a seat stands in the strip along a table's long side, the floor a
+## diner pulls out into (HouseFurnishWalkCheck's TABLE_BAND). A table placed
+## with the fire or a cupboard in that strip is one nobody can sit at, so such a
+## spot is scored down; the search still takes it when the room offers nothing
+## better, and the walk check remains the judge of the result.
+const BAND_W := 10.0
+
+
+static func _band_crowding(plan: HousePlan, room: int, cand: Dictionary) -> int:
+	if PropCatalog.category(String(cand["key"])) != "table":
+		return 0
+	var rect: Rect2 = cand["rect"]
+	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var long := Vector2(1, 0) if rect.size.x >= rect.size.y else Vector2(0, 1)
+	var across := Vector2(0, 1) if long.x > 0.0 else Vector2(1, 0)
+	var crowded := 0
+	for side in [-1.0, 1.0]:
+		var band: Rect2
+		if across.x > 0.0:
+			band = Rect2(Vector2(rect.position.x - HouseFurnishWalkCheck.SEAT_BAND
+				if side < 0 else rect.end.x, rect.position.y),
+				Vector2(HouseFurnishWalkCheck.SEAT_BAND, rect.size.y))
+		else:
+			band = Rect2(Vector2(rect.position.x, rect.position.y
+				- HouseFurnishWalkCheck.SEAT_BAND if side < 0 else rect.end.y),
+				Vector2(rect.size.x, HouseFurnishWalkCheck.SEAT_BAND))
+		if not floor_rect.intersects(band.grow(-HouseFurnishWalkCheck.TOL)):
+			continue
+		for f in plan.furniture_of(room):
+			var q: Dictionary = plan.furniture[f]
+			if HouseFurnishWalkCheck._is_seat(String(q["key"])) \
+					or HouseFurnishWalkCheck._is_table(String(q["key"])) \
+					or not HouseFurnishWalkCheck._on_floor(q):
+				continue
+			var overlap := band.intersection(Rect2(q["rect"]))
+			if overlap.size.x > 0.1 and overlap.size.y > 0.1:
+				crowded += 1
+	return crowded
 
 
 ## The focus piece itself: pinned to the point the planner chose, and turned
