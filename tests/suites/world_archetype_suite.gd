@@ -31,8 +31,10 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 60.0, "length": 12.0, "height": 14.0,
 		"must": ["platform", "column", "dais", "image", "roof", "water", "wing"],
 		"check": &"hall_check", "about": "Phoenix Hall with mirrored wings"},
+	# The published 20..45 x 18..38 m insula envelope refuses 0.7 (14 m
+	# length) and 1.9 (57 m width), so only the scales it admits are asked.
 	{"key": "port_tenement", "family": &"insula", "kind": &"port_tenement",
-		"width": 30.0, "length": 20.0, "height": 18.0,
+		"width": 30.0, "length": 20.0, "height": 18.0, "scales": [1.0, 1.4],
 		"must": ["shop", "stair", "bedroom", "parlour"],
 		"check": &"insula_check", "about": "five-storey port tenement with six flats"},
 	{"key": "merchant_tower", "family": &"tower_house", "kind": &"merchant_tower",
@@ -51,6 +53,14 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 30.0, "length": 30.0, "height": 65.0,
 		"must": ["floor_0", "eave_tier", "mast", "finial"],
 		"check": &"pagoda_check", "about": "Nine-Storey Pagoda"},
+	{"key": "octagonal_pagoda", "family": &"pagoda", "kind": &"octagonal_pagoda",
+		"width": 30.0, "length": 30.0, "height": 65.0,
+		"must": ["floor_0", "eave_tier", "mast", "finial"],
+		"check": &"pagoda_check", "about": "eight-sided pagoda, one eave per storey"},
+	{"key": "dodecagonal_pagoda", "family": &"pagoda", "kind": &"dodecagonal_pagoda",
+		"width": 30.0, "length": 30.0, "height": 65.0,
+		"must": ["floor_0", "eave_tier", "mast", "finial"],
+		"check": &"pagoda_check", "about": "twelve-sided pagoda, one eave per storey"},
 	{"key": "saints_mound", "family": &"stupa", "kind": &"saints_mound",
 		"width": 40.0, "length": 40.0, "height": 17.0, "scales": [1.0],
 		"must": ["stupa_dome", "ground_circumambulatory_ring", "drum_circumambulatory_ring",
@@ -60,20 +70,29 @@ const ARCHETYPES: Array[Dictionary] = [
 		"width": 50.0, "length": 40.0, "height": 5.0,
 		"must": ["cell", "vihara_shrine", "verandah", "vihara_well"],
 		"check": &"vihara_check", "about": "Vihara cells around the cloister court"},
+	# The published 12..36 x 18..48 m vastu envelope refuses 0.7 (8.4 m wide)
+	# and 1.9 (53.2 m long), so only the scales it admits are asked.
 	{"key": "merchants_haveli", "family": &"vastu", "kind": &"merchants_haveli",
-		"width": 15.0, "length": 28.0, "height": 10.0,
+		"width": 15.0, "length": 28.0, "height": 10.0, "scales": [1.0, 1.4],
 		"must": ["kitchen", "vastu_main_hall", "vastu_well", "jharokha"],
 		"check": &"vastu_check", "about": "Merchant's Haveli around a vastu light well"},
 	{"key": "scholars_compound", "family": &"siheyuan", "kind": &"scholars_compound",
 		"width": 22.0, "length": 32.0, "height": 5.0, "scales": [1.0],
 		"must": ["fauces", "blind_screen", "main_hall", "wing", "verandah", "siheyuan_main_hall_ridge"],
 		"check": &"siheyuan_check", "about": "south-facing Scholar's Compound with paired wings"},
+	{"key": "two_court_compound", "family": &"siheyuan", "kind": &"two_court_compound",
+		"width": 22.0, "length": 70.0, "height": 5.0, "scales": [1.0],
+		"must": ["fauces", "blind_screen", "main_hall", "wing", "verandah", "rear_hall",
+			"siheyuan_main_hall_ridge"],
+		"check": &"siheyuan_check", "about": "two courts in line, a private rear court behind the hall"},
 	{"key": "clan_ring", "family": &"tulou", "kind": &"clan_ring",
 		"width": 60.0, "length": 60.0, "height": 15.0,
 		"must": ["ancestral_hall", "gallery", "clan_room", "stair", "roof_ring"],
 		"check": &"tulou_check", "about": "Hakka clan fortress with inward galleries"},
+	# The published 18..52 x 20..64 m Nagara envelope refuses 0.7 (14 m long)
+	# and 1.9 (58.9 m wide), so only the scales it admits are asked.
 	{"key": "nagara_hundred_spires", "family": &"nagara", "kind": &"hundred_spires",
-		"width": 31.0, "length": 20.0, "height": 31.0,
+		"width": 31.0, "length": 20.0, "height": 31.0, "scales": [1.0, 1.4],
 		"must": ["ardhamandapa", "mandapa", "mahamandapa", "garbhagriha", "plinth", "shikhara", "urushringa"],
 		"check": &"shikhara_check", "about": "Spire of a Hundred Spires"},
 	{"key": "quarried_temple", "family": &"rock_cut_temple", "kind": &"quarried_temple",
@@ -95,49 +114,74 @@ const ARCHETYPES: Array[Dictionary] = [
 ]
 
 
+## The three published sub-kinds whose only check used to be a smoke test
+## (`wunchecked`): both pagoda footprints and the two-court compound. They are
+## ordinary archetype rows everywhere else; this picks just them for the
+## bounded lane:world check, with the same failing controls.
+const BOUNDED_KEYS: Array[String] = ["octagonal_pagoda", "dodecagonal_pagoda",
+	"two_court_compound"]
+
+
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("world archetype")
 	for row in ARCHETYPES:
-		var key: String = row["key"]
-		var defects := 0
-		for scale in row.get("scales", SCALES):
-			var request := BuildingRequest.new()
-			request.kind = &"world"
-			request.seed = _seed_for(key, scale)
-			request.style = row["family"]
-			request.purpose = row["kind"]
-			request.width = snappedf(float(row["width"]) * scale, 0.01)
-			request.length = snappedf(float(row["length"]) * scale, 0.01)
-			request.height = float(row["height"]) * scale if row["family"] == &"pagoda" else float(row["height"])
-			if row["family"] == &"tulou":
-				request.storeys = 4
-			var building: GeneratedBuilding = BrickWild.generate(request)
-			res.checked += 1
-			var who := "%s scale=%.2f" % [key, scale]
-			var before: int = res.failures.size()
-			if building == null or not building.is_ok():
-				res.fail("%s: did not generate: %s" % [who, str(building.errors) if building != null else "null"])
-				defects += 1
-				continue
-			for f in assert_contains(building, row.get("must", [])):
-				res.fail("%s: %s" % [who, f])
-			var mesh: ArrayMesh = BrickWild.build_mesh(building)
-			if mesh == null:
-				res.fail("%s: no family mesh" % who)
-			else:
-				NormalsSuite.check_mesh(res, mesh, who)
-				if building.spec is TimberHallSpec:
-					_opening_rays(res, building.spec as TimberHallSpec, mesh, who)
-			for f2 in _family_check(building, row.get("check", &"")):
-				res.fail("%s: %s" % [who, f2])
-			if res.failures.size() > before:
-				defects += 1
-		res.note("  %-17s %d scales, %d defects -- %s" % [key, SCALES.size(), defects, String(row.get("about", ""))])
+		_run_archetype_row(res, row)
 	if ARCHETYPES.is_empty():
 		res.note("  0 archetypes")
 	_negative_hall_fixtures(res)
 	_negative_tower_fixtures(res)
+	_negative_pagoda_fixtures(res)
+	_negative_twocourt_fixtures(res)
 	return res
+
+
+static func run_subkinds() -> SuiteResult:
+	var res := SuiteResult.new("world polygon and two-court sub-kinds")
+	for row in ARCHETYPES:
+		if String(row["key"]) in BOUNDED_KEYS:
+			_run_archetype_row(res, row)
+	_negative_pagoda_fixtures(res)
+	_negative_twocourt_fixtures(res)
+	return res
+
+
+static func _run_archetype_row(res: SuiteResult, row: Dictionary) -> void:
+	var key: String = row["key"]
+	var scales: Array = row.get("scales", SCALES)
+	var defects := 0
+	for scale in scales:
+		var request := BuildingRequest.new()
+		request.kind = &"world"
+		request.seed = _seed_for(key, scale)
+		request.style = row["family"]
+		request.purpose = row["kind"]
+		request.width = snappedf(float(row["width"]) * scale, 0.01)
+		request.length = snappedf(float(row["length"]) * scale, 0.01)
+		request.height = float(row["height"]) * scale if row["family"] == &"pagoda" else float(row["height"])
+		if row["family"] == &"tulou":
+			request.storeys = 4
+		var building: GeneratedBuilding = BrickWild.generate(request)
+		res.checked += 1
+		var who := "%s scale=%.2f" % [key, scale]
+		var before: int = res.failures.size()
+		if building == null or not building.is_ok():
+			res.fail("%s: did not generate: %s" % [who, str(building.errors) if building != null else "null"])
+			defects += 1
+			continue
+		for f in assert_contains(building, row.get("must", [])):
+			res.fail("%s: %s" % [who, f])
+		var mesh: ArrayMesh = BrickWild.build_mesh(building)
+		if mesh == null:
+			res.fail("%s: no family mesh" % who)
+		else:
+			NormalsSuite.check_mesh(res, mesh, who)
+			if building.spec is TimberHallSpec:
+				_opening_rays(res, building.spec as TimberHallSpec, mesh, who)
+		for f2 in _family_check(building, row.get("check", &"")):
+			res.fail("%s: %s" % [who, f2])
+		if res.failures.size() > before:
+			defects += 1
+	res.note("  %-17s %d scales, %d defects -- %s" % [key, scales.size(), defects, String(row.get("about", ""))])
 
 
 static func run_nagara() -> SuiteResult:
@@ -342,6 +386,87 @@ static func _negative_tower_fixtures(res: SuiteResult) -> void:
 	ungrounded.build(spec)
 	ungrounded.mass_log.append({"name": "floating_fixture", "aabb": AABB(Vector3(0, 1, 0), Vector3.ONE)})
 	_expect_tower_rule(res, "size_match", TowerCheck.new().check(spec, ungrounded))
+
+
+## A pagoda without its eave tiers is a shaft, and a polygon sub-kind whose
+## plan is not its own polygon is a different building under the wrong name.
+## Both are refused; otherwise the two new archetype rows prove only that some
+## mesh was produced.
+static func _negative_pagoda_fixtures(res: SuiteResult) -> void:
+	var tierless := PagodaGenerator.generate(&"octagonal_pagoda", 8102,
+		30.0, 30.0, 65.0)
+	var tier_plan: HousePlan = tierless["plan"]
+	tier_plan.world_meta["eave_tiers"] = []
+	var tier_builder := PagodaBuilder.new()
+	tier_builder.build(tier_plan)
+	res.checked += 1
+	if not _refused(res, "pagoda without eave tiers",
+			PagodaCheck.new().check(tier_plan, tier_builder), "taper:"):
+		res.fail("negative pagoda fixture: a pagoda without eave tiers was accepted")
+
+	var wrong_sides := PagodaGenerator.generate(&"octagonal_pagoda", 8102,
+		30.0, 30.0, 65.0)
+	var sides_plan: HousePlan = wrong_sides["plan"]
+	sides_plan.world_meta["side_count"] = 4
+	var sides_builder := PagodaBuilder.new()
+	sides_builder.build(sides_plan)
+	res.checked += 1
+	if not _refused(res, "octagonal pagoda with four sides",
+			PagodaCheck.new().check(sides_plan, sides_builder), "kind:"):
+		res.fail("negative pagoda fixture: an octagonal pagoda planned with four sides was accepted")
+
+
+## A two-court compound missing its second court, and one whose second court
+## no door reaches, must both be refused by SiheyuanCheck. The second case is
+## the one the old smoke check could not see: the rectangle exists, the plan
+## even keeps it clear of roofs, and nothing opens onto it.
+static func _negative_twocourt_fixtures(res: SuiteResult) -> void:
+	var missing := _two_court_plan(8102)
+	if missing == null:
+		res.checked += 1
+		res.fail("negative court fixture: the two-court plan did not generate")
+		return
+	missing.courts.pop_back()
+	var missing_builder := HouseBuilder.new()
+	missing_builder.build(missing)
+	res.checked += 1
+	if not _refused(res, "two-court compound without its second court",
+			SiheyuanCheck.new().check(missing, missing_builder), "courts:"):
+		res.fail("negative court fixture: a two-court compound without its second court was accepted")
+
+	var sealed := _two_court_plan(8102)
+	var kept: Array[Dictionary] = []
+	for door in sealed.doors:
+		var role := String(door.get("role", ""))
+		if role == "hall_inner_court" or role == "rear_hall_court":
+			continue
+		kept.append(door)
+	sealed.doors = kept
+	var sealed_builder := HouseBuilder.new()
+	sealed_builder.build(sealed)
+	res.checked += 1
+	if not _refused(res, "sealed second court with no opening",
+			SiheyuanCheck.new().check(sealed, sealed_builder), "courts:"):
+		res.fail("negative court fixture: a sealed second court with no opening was accepted")
+
+
+## Report the planted defect the control expects, so a green suite still shows
+## the rule refusing it by name in the log.
+static func _refused(res: SuiteResult, label: String, report: Dictionary,
+		prefix: String) -> bool:
+	for failure in report.get("failures", []):
+		if String(failure).begins_with(prefix):
+			res.note("  refused (%s): %s" % [label, String(failure)])
+			return true
+	return false
+
+
+static func _two_court_plan(seed: int) -> HousePlan:
+	var made := SiheyuanGenerator.generate(seed, 22.0, 70.0, 5.0, 0.0, 1200,
+		&"two_court_compound")
+	if made.has("error"):
+		return null
+	return made["plan"]
 
 
 static func _expect_tower_rule(res: SuiteResult, rule: String, report: Dictionary) -> void:

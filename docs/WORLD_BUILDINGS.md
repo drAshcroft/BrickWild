@@ -230,12 +230,17 @@ yamen, the walled compound of a great family.
 | **wings** | the side halls mirror | every `wing` room has a twin across the axis with the same rect mirrored within 0.1 m |
 | **walk** | the covered way joins the three halls | a `verandah` floor strip runs continuously from the main hall's door to both wings' doors; the court flood reaches all three without leaving it |
 | **courts in line** | a bigger house is more courts, not a bigger court | every court's centre lies on the axis; courts are ordered front to back with a hall between each pair |
+| **court count** | the sub-kind says how many courts it has | `two_court_compound` plans exactly two courts, `scholars_compound` exactly one |
+| **court access** | a court is a room outdoors, not a yard walled off | each court touches at least one room and at least one of those rooms has a door onto it |
 
 The public world registry exposes `scholars_compound` for the one-court
 22 x 32 x 5 m archetype and `two_court_compound` for an axial two-court
-variant. The latter refuses an envelope too short to contain both courts and
-their intervening hall. Orientation is stored in the local-frame convention:
-at zero yaw, local -Z is the south-facing entrance side.
+variant. The two-court plan puts the public court one gate depth behind the
+front wall, the main hall between the courts, and a `rear_hall` behind the
+private court; the hall and the rear hall each open onto the private court.
+It refuses an envelope too short to contain both courts and the rear hall.
+Orientation is stored in the local-frame convention: at zero yaw, local -Z is
+the south-facing entrance side.
 
 ### 2.2 The timber hall on a platform
 
@@ -303,6 +308,7 @@ rooms cannot — polygon rooms, section 4.
 | **taper** | every storey is a little smaller and a little shorter than the one below | eave tier *i* is 0.88–0.98 × tier *i−1* in width and ≤ it in height; the sequence is monotone |
 | **mast** | one axis runs through the whole tower | a `mast` mass on the axis intersects every storey's AABB, or for solid brick types, the storeys' centres lie on the axis within 0.02 × base width |
 | **plan** | a regular polygon | the base is square, octagonal or twelve-sided; every storey has the same polygon |
+| **kind** | the sub-kind's footprint is the footprint built | `octagonal_pagoda` plans 8 sides, `dodecagonal_pagoda` 12 and `square_pagoda` 4; a plan that reports a different count fails by name |
 | **slender** | tall but not thin | total height ÷ base width between 2.0 and 4.0 |
 | **crown** | a steeple, in proportion | the finial is 0.1–0.2 × total height and the topmost mass |
 | **climb** (hollow types) | the stair reaches the top | `stairs` chain storey 0 to the top; each landing standable |
@@ -662,9 +668,12 @@ plus `MassRules`.
 | The Steam Baths | hammam | 24 × 16 × 8 | four rooms in a chain, three domes, oculi, a furnace |
 | Sultan's Han | caravanserai | 70 × 55 × 12 | one gate, a court, cells, stables, a winter hall, a kiosk |
 | Scholar's compound | siheyuan | 22 × 32 × 5 | a corner gate, a screen, a main hall, two wings |
+| Two-Court Siheyuan | siheyuan | 22 × 70 × 5 | two courts in line, a hall between them, a rear hall, doors onto both courts |
 | The Great Hall of the East | timber hall | 34 × 18 × 20 | seven bays, two column rings, a plinth, an image |
 | Phoenix Pavilion | timber hall | 60 × 12 × 14 | a central hall, two wings, a pond |
 | Nine-Storey Pagoda | pagoda | 30 × 30 × 65 | odd storeys, a taper, a mast, a stair to the top |
+| Octagonal Pagoda | pagoda | 30 × 30 × 65 | 8-sided floors, an eave per storey, a mast, a finial |
+| Dodecagonal Pagoda | pagoda | 30 × 30 × 65 | 12-sided floors, an eave per storey, a mast, a finial |
 | Clan Ring | tulou | 60 × 60 × 15 | a ring, one gate, galleries, an ancestral hall, four stairs |
 | Temple Mountain | temple mountain | 200 × 200 × 60 | three enclosures, a moat, a causeway, a quincunx |
 | Temple of Four Winds | cruciform | 90 × 90 × 50 | four porches, four images, two corridor rings |
@@ -675,6 +684,10 @@ plus `MassRules`.
 | Saint's Mound | stupa | 40 × 40 × 17 | a dome, a drum terrace, four toranas, a harmika |
 | Monks' Cloister | vihara | 50 × 40 × 5 | cells round a court, a shrine on the axis, a verandah |
 | Merchant's Haveli | vastu house | 15 × 28 × 10 | a light-well court, a SE kitchen, a NE well, jharokhas |
+
+The two siheyuan rows run at 100 % only: the family's own envelope (22–40 m
+wide, 30–90 m deep) refuses the other scales, and `two_court_compound` needs
+the depth for both courts, the hall between them and the rear hall.
 
 ## 6. Where the rules come from
 

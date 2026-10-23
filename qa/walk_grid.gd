@@ -142,7 +142,11 @@ func build(radius: float) -> void:
 ## there is nowhere to stand there at all.
 func flood_from(from: Vector2, search := 0.6) -> bool:
 	var start := Vector2i(-1, -1)
-	var steps: int = maxi(int(search / cell), 1)
+	# Whole cells inside `search`. Truncating 0.6/0.2 -- which floats to
+	# 2.9999999999999996 -- searched only 0.4 m, so a door whose walkable
+	# floor starts 0.42 m inside the wall found nowhere to stand. Rounding
+	# keeps the documented radius.
+	var steps: int = maxi(int(round(search / cell)), 1)
 	for k in range(steps + 1):
 		for dx in range(-k, k + 1):
 			for dz in range(-k, k + 1):

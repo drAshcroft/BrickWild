@@ -126,18 +126,30 @@ These directions preserve variety within a row: vary secondary openings,
 finishes, and household details while retaining the defining spatial and
 structural cues. Do not randomize away the thing that makes the style legible.
 
-Household trades in `HouseSpec.TRADES` remain overlays on a domestic style.
-Each trade should add a coherent work zone and storage/access story while
-preserving the household's kitchen, rest, and social life.
+### Household trade briefs
 
-| Trade id | Proposed household personality |
-|---|---|
-| `none` | A household with no extra occupation room; the ordinary domestic activities remain complete. |
-| `smith` | A work zone near a safe exterior/service threshold, with forge/anvil, bench, fuel, and tool storage separated from sleeping and food preparation. |
-| `alchemist` | A private preparation workshop with bench, books/ingredients, heat and ventilation access; its fantastical materials should still be organized as a working craft. |
-| `farmer` | A direct path between kitchen, store, and yard with harvest/tool storage; the household remains more than an attached barn. |
-| `innkeeper` | A social parlour or service room faces a clear guest arrival, while family sleeping and kitchen routes retain privacy. |
-| `scholar` | A quiet study/parlour has useful book storage and a writing/reading surface, connected to but not swallowed by household life. |
+Household trades in `HouseSpec.TRADES` remain overlays on a domestic style.
+Each trade adds one room to the programme (`room` in `HouseSpec.TRADES`),
+promoted to the third slot by `HouseGenerator._program_for` and
+`HousePlanRooms._domestic_kinds`: after the hall, before the bedrooms. The
+trade's fittings are in `HouseFurnishingRecipes.TRADE_FITTINGS`, its exterior
+pieces in `HouseExterior.dress`, and `HouseFurnisher` puts the required work
+before optional dressing ("a workshop is a workshop because of its bench").
+The household's kitchen, rest, and social life must survive each overlay.
+
+The evidence column is what the code carries today, read 2026-10-23. The
+direction is the future review contract, and every row is judged on three
+views: what the street sees, what the plan says about who may go where, and
+where the customer or client actually stands.
+
+| Trade id | Current capability evidence | Proposed recognizable personality |
+|---|---|---|
+| `none` | Empty `room` and `extra`; no trade fittings. The ordinary domestic programme and the default facade recipe (lantern, entrance bench, service barrel/bucket) apply. | The baseline every trade must still read as. Visible: an ordinary front under the same roof shape as its neighbours, with nothing for sale at the threshold. Plan: hearth, table, beds and stores in the household's own order, with no room set aside for work. Customer: there is none; a visitor is a guest. If a trade row reads like this one, the trade has failed. |
+| `smith` | `workshop`; fittings `anvil` (free), `stand` (wall), `barrel` (corner); exterior `Anvil_Log` and `Crate_Wooden` at the service wall with a smaller (0.7) entrance bench. | A forge is the loud, hot, dirty room at the service end. Visible: fuel and a crate against the service wall, a short bench at the door rather than a visitor's seat. Plan: the workshop sits between hall and household, its anvil keeps a clear swing side, and the stand and barrel keep tools and stock within a step; sleeping and cooking stay off the work route. Customer: a customer waits at the service side and never crosses the work zone, while the domestic door stays domestic. |
+| `alchemist` | `workshop`; fittings `bookcase` (wall), `hearth` (wall), `alchemy` set on 2–4 surfaces, `books` on 1–2; an added `Cabinet` in a workshop of 30 m² or more; exterior `Cauldron`, `Pot_1` and `Bucket_Wooden_1` at the service wall (a witch hut uses the same recipe). | A workshop that is part library, part kitchen. Visible: cauldron and pots under the service lean-to, not beside the front door; the street face stays domestic. Plan: one wall banked with books and ingredients, a heat source with a real flue or vent, and apparatus set out on the work surfaces; the household hearth remains separate and the bench run does not block the door. Customer: rarely admitted — a client is received at the hall threshold while the workroom stays a controlled interior. |
+| `farmer` | `store`; `barrel` and `crate` in corners (1–2 each); exterior produce — `Barrel_Apples`, `FarmCrate_Carrot`, `Bag` — at the service wall. A `farmhouse` style takes this recipe even with no trade. | A working store between kitchen and yard. Visible: produce barrels and a crate by the back or side wall, not a shop display; the front stays the family's. Plan: a dry, stackable store on a short kitchen–store–yard carry path, and a utility threshold wide enough for a sack. Customer: the farm's business is the yard, so callers arrive there; the household remains more than an attached barn. |
+| `innkeeper` | `parlour`; `barrel` (corner) and `tableware` on 2–3 surfaces; the parlour's table must seat two; bedrooms take a required bed, cupboard and nightstand group; the kitchen gains a second, free table; exterior adds a `Barrel_Holder`. | A public room inside a private house. Visible: a barrel holder and serving stock at the service wall, a bench and lantern at the door. Plan: the parlour sits by the entrance with a table set for guests; the kitchen's second table is the service board; guest bedrooms keep a complete sleep group while family rooms keep their own. Customer: arrives into the parlour and is served there; the family's kitchen and sleeping rooms are behind a door, not on the guest's route. |
+| `scholar` | `parlour`; fittings `bookcase` (wall), `lectern` (free, optional 0.7), `books` on 1–3 surfaces; no trade exterior recipe, so the street read stays domestic. | A quiet room with a working library. Visible: little from the street beyond an ordinary door and lamp; the study is not advertised. Plan: shelving against a solid wall away from the door, a lectern or writing surface with daylight, books set out on the work surfaces, and a route from the hall that does not pass through the kitchen or a bedroom. Customer: a visitor is met in the hall and admitted deliberately; the study must not become a passage. |
 
 ## Shop and civic business briefs
 

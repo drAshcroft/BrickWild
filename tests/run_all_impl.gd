@@ -590,7 +590,7 @@ static func _run_one(key: String) -> SuiteResult:
 		"wld019":
 			return preload("res://tests/suites/vastu_suite.gd").run()
 		"wunchecked":
-			return load("res://tests/suites/world_unchecked_subkinds_suite.gd").run()
+			return WorldArchetypeSuite.run_subkinds()
 		"wld001_domus":
 			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"domus")
 		"wld001_riad":
