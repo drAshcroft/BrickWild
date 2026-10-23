@@ -384,3 +384,253 @@ re-reviewed this pass), ziggurat large x2 (focus, above). The small and default
 ziggurats stay "accepted: marginal" on the chamber altar seen through the lower
 gate, but by the measurement above their god is not visible from the foot
 either.
+
+## Acceptance evidence, 23 October 2026 (LIVE-SACRED)
+
+The earlier sections are review-by-eye and measured geometry. This section is
+the acceptance record the task asked for: a chosen set of public requests, a
+rendered frozen matrix, an UNLABELLED review with the local vision tool, and a
+verdict per case with the trait that supports it. The geometry was not changed
+to get this evidence; one render-tool fault was found by the first blind pass
+and fixed (below). No check was weakened.
+
+### The chosen requests
+
+From `tests/fixtures/sacred_sequence_requests.json` (49 public requests, all
+generated through `BrickWild.generate` as a consumer would). Eighteen carry the
+matrix: every church style and every temple form, across the three frozen
+sizes and the three frozen seeds, with the cults rotated. The pinned barn is
+included at its stated request: **basilica / blood / default / seed 1,
+26 x 44 x 12 m**.
+
+| id | family | form / style | size (w x l x h) | seed | notes |
+|---|---|---|---|---|---|
+| `church/romanesque/small/1` | church | romanesque | 8 x 14 x 7 | 1 | apse and west tower at their tightest |
+| `church/gothic/small/1` | church | gothic | 8 x 14 x 7 | 1 | twin-spired west front |
+| `church/byzantine/default/8102` | church | byzantine | 10 x 22 x 12 | 8102 | dome on a drum |
+| `church/nordic_stave/default/1` | church | nordic stave | 10 x 22 x 12 | 1 | timber, tiered tower, svalgang |
+| `church/renaissance/large/21325` | church | renaissance | 16 x 48 x 24 | 21325 | dome, rose window, 46 m nave |
+| `church/russian/large/21325` | church | russian | 16 x 48 x 24 | 21325 | onion dome, open floor with stalls |
+| `temple/basilica/void/large/21325` | temple | basilica / void | 48 x 80 x 20 | 21325 | largest hall, near-black cult stone |
+| `temple/basilica/bone/small/8102` | temple | basilica / bone | 18 x 24 x 8 | 8102 | smallest basilica |
+| `temple/pylon/bone/small/1` | temple | pylon / bone | 18 x 24 x 8 | 1 | pylons and gate at the smallest size |
+| `temple/pylon/serpent/default/8102` | temple | pylon / serpent | 26 x 44 x 12 | 8102 | default hypostyle |
+| `temple/pylon/blood/large/21325` | temple | pylon / blood | 48 x 80 x 20 | 21325 | largest hypostyle |
+| `temple/ziggurat/flame/small/1` | temple | ziggurat / flame | 18 x 24 x 8 | 1 | stair foot is the gate |
+| `temple/ziggurat/blood/default/21325` | temple | ziggurat / blood | 26 x 44 x 12 | 21325 | default terraces |
+| `temple/ziggurat/bone/large/21325` | temple | ziggurat / bone | 48 x 80 x 20 | 21325 | largest summit |
+| `temple/rotunda/void/small/8102` | temple | rotunda / void | 18 x 24 x 8 | 8102 | ring, pit and monolith |
+| `temple/rotunda/bone/default/21325` | temple | rotunda / bone | 26 x 44 x 12 | 21325 | default ring |
+| `temple/rotunda/flame/large/21325` | temple | rotunda / flame | 48 x 80 x 20 | 21325 | framed gate and cone idol |
+| **`temple/basilica/blood/default/1/pinned-barn`** | temple | basilica / blood | **26 x 44 x 12** | **1** | **the pinned barn-like comparison id** |
+
+Three negative controls, rendered by the same tool with a dark box across the
+axis (they are NOT part of the 18):
+
+| id | control | what the box does |
+|---|---|---|
+| `church/romanesque/default/1` | `hide_focus` | 3.0 m screen across the nave |
+| `church/gothic/default/8102` | `break_axis` | 1.35 m body-high barrier across the nave |
+| `temple/basilica/flame/default/8102` | `hide_focus` | 8.0 m veil across the hall |
+
+### The frozen matrix and the renders
+
+Tool: `tools/render_sacred_exterior.gd`, through the public API
+(`BuildingRequest.from_dict` -> `BrickWild.generate` -> `BrickWild.instantiate`),
+run WITHOUT `--headless` (the dummy renderer makes no image). Four views per
+request:
+
+* `front`, `side` - roof ON, exterior portrait;
+* `entry` - roof ON, first person at 1.65 m on the first reached `WalkGrid`
+  cell inside the door, aimed at the altar prop (church) or the idol (temple);
+* `cutaway` - roof OFF, aerial 3/4 section.
+
+One scene is instantiated per view. The first attempt shared one cutaway scene
+across all four views, so every "exterior" was roofless and the roof-mounted
+finials floated in the sky; the blind review caught it (it reported floating
+trim in the exteriors). Fixed in the tool before the final pass: `BrickWild.instantiate`
+now gets `cutaway = (view == "cutaway")` per view.
+
+```
+godot --path . --script res://tools/render_sacred_exterior.gd -- \
+  --out=res://artifacts/sacred_review_20261023/renders \
+  --ids=<the 18 ids above, comma-separated> --views=front,side,entry,cutaway
+
+godot --path . --script res://tools/render_sacred_exterior.gd -- \
+  --out=res://artifacts/sacred_review_20261023/renders_controls \
+  --ids=church/romanesque/default/1 --control=hide_focus      # likewise the other two
+```
+
+Output: `artifacts/sacred_review_20261023/renders/` (72 jpg, 18 x 4; the
+unlabelled pass then copies the 3 controls in, so the directory shows 75) and
+`.../renders_controls/` (the 3 originals). Render logs: `render_matrix.log`,
+`render_control_*.log`; all exited 0 (the only errors are the host's missing
+WASAPI audio device).
+
+### The unlabelled review
+
+The renders are labelled by id in their file names. `tools/sacred_unlabelled_review.py`
+copies them to neutral names, `case_01` to `case_21` (the three controls are
+mixed in, so the reviewer cannot tell which are controls), shuffles the order
+with seed `20261024`, and keeps the mapping in `key.json`. The key was not
+opened until `verdicts.json` was written; the join is `joined.json` (key and
+verdicts SHA-256 recorded there).
+
+Tool: `waterfree vision look` (skill `waterfree-vision`), model
+`qwen2.5vl:7b`, purpose `describe`, two images per call (the exterior pair;
+the entry image plus its cutaway). The questions are verbatim in
+`answers.json` and `tools/sacred_unlabelled_review.py`; the exterior one asks
+what kind of building it is, style, massing, entrance, roof, towers/domes,
+windows, material, ornament and whether it is structurally finished; the
+interior one asks (a) is the way ahead clear, (b) what stands at the far end
+and is it visible from the entrance, (c) where people would stand or sit and
+whether that zone is around the axis, (d) any broken or floating geometry.
+The cutaway question says that roof-mounted trim may appear to float.
+
+Answers: `artifacts/sacred_review_20261023/answers.json` (all 21 cases, one
+retry after an Ollama timeout on `case_13`). Verdicts as written before the
+map: `verdicts.json`. Measurements: `measurements.json`, produced by
+
+```
+godot --headless --path . --script res://tools/sacred_sequence_report.gd -- \
+  --ids=<the 18 ids> --out=res://artifacts/sacred_review_20261023/measurements.json
+```
+
+which runs the same judges the gates run (`qa/sacred_sequence_check.gd` for a
+church, `TempleRiteCheck` for a temple) and writes their stats and failures.
+
+**Honest limits of the blind pass.** The model is a 7B vision model: it names
+broad types well when the silhouette is strong, and it invents detail when the
+image is dark. It missed the body-high barrier in the `break_axis` control
+(answered "clear of obstructions") and it called Gothic "Romanesque" in one
+answer. Where its answer and the image disagree, the verdict uses the image
+and the disagreement is stated in the row. Five images had been seen during
+render plumbing before the blind pass (gothic small front and cutaway,
+renaissance large front, pinned barn entry, ziggurat large entry); the rest of
+the 75 were first seen unlabelled. Verdicts were assigned from the neutral
+images and the answers, then matched to ids.
+
+### Measured sequence (independent of the pictures)
+
+All 18 chosen requests pass the sequence rules; `measurements.json`,
+`failed: 0`.
+
+| id | axis run (m) | procession (m) | sightline blockers | congregation | pews | walkable (m2) |
+|---|---|---|---|---|---|---|
+| church/romanesque/small/1 | 12.2 | 1.32 | 0 | 0.38 | 14 | - |
+| church/gothic/small/1 | 12.2 | 1.32 | 0 | 0.39 | 12 | - |
+| church/byzantine/default/8102 | 20.2 | 1.44 | 0 | 0.49 | 28 | - |
+| church/nordic_stave/default/1 | 20.2 | 1.44 | 0 | 0.54 | 24 | - |
+| church/renaissance/large/21325 | 45.9 | 1.44 | 0 | 0.52 | 112 | - |
+| church/russian/large/21325 | 45.9 | 1.44 | 0 | 0.91 | 16 | - |
+| temple/basilica/void/large/21325 | 76.9 | 3.36 | 0 | 0.93 | - | 3078.2 |
+| temple/basilica/bone/small/8102 | 25.0 | 3.52 | 0 | 0.93 | - | 336.4 |
+| temple/pylon/bone/small/1 | 20.1 | 3.04 | 0 | 1.52 | - | 329.5 |
+| temple/pylon/serpent/default/8102 | 38.9 | 3.04 | 0 | 1.47 | - | 854.9 |
+| temple/pylon/blood/large/21325 | 72.6 | 3.04 | 0 | 1.53 | - | 3023.9 |
+| temple/ziggurat/flame/small/1 | 14.4 | 2.88 | 0 | 1.32 | - | 348.5 |
+| temple/ziggurat/blood/default/21325 | 31.6 | 3.52 | 0 | 1.16 | - | 851.7 |
+| temple/ziggurat/bone/large/21325 | 57.4 | 3.52 | 0 | 1.07 | - | 2608.5 |
+| temple/rotunda/void/small/8102 | 12.8 | 2.88 | 0 | 0.45 | - | 117.5 |
+| temple/rotunda/bone/default/21325 | 19.4 | 2.88 | 0 | 0.45 | - | 247.8 |
+| temple/rotunda/flame/large/21325 | 39.2 | 2.88 | 0 | 0.61 | - | 1157.4 |
+| temple/basilica/blood/default/1/pinned-barn | 45.6 | 2.88 | 0 | 0.98 | - | 945.9 |
+
+The temple "congregation" stat is the check's walkable share of the hall; it
+exceeds 1.0 where the walkable area it counts includes the forecourt around a
+compact hall. The stat is quoted as the check reports it.
+
+### Verdicts, by case
+
+Rule: accepted = identity yes or partly, entry pass, congregation pass, focus
+pass. A case that shows an obstruction is failing whatever the model says. The
+one exception is the pinned barn comparison, which is `needs_changes` on its
+known identity fault even though its sequence passes. The traits are the
+model's words where quoted, and what the image shows otherwise.
+
+Churches (6 of 6 accepted):
+
+| id | identity | entry | congregation | focus | verdict |
+|---|---|---|---|---|---|
+| `church/nordic_stave/default/1` | yes: model "a church ... tall bell tower ... steeply pitched roof ... dark-colored wood ... shingled ... cross at the very top"; image: tarred planks, tiered shingled tower, needle spire, dragon heads | pass: "way ahead is clear"; open aisle between pews | pass: "benches on either side ... arranged around the axis" | pass: "altar ... candles ... visible and recognizable" | accepted |
+| `church/renaissance/large/21325` | partly: model "central dome ... Italian or Spanish ... circular window"; image: dome + lantern, rose window, long plain flank | pass: aisle from the door | pass: pew blocks, cross-aisles | pass: reredos, cross, banners, altar read at 46 m | accepted |
+| `church/russian/large/21325` | partly: model "central dome ... Islamic or Middle Eastern"; image: onion dome, two half-round corner turrets, long body | pass: long open floor | pass: one stall at a time along each wall (standing worship, the brief) | pass: reredos, banners and altar at the east end | accepted |
+| `church/romanesque/small/1` | partly: model "two-story structure ... red-tiled roof ... classical"; image: west tower, gabled nave, buttress fins, round apse | pass: door, aisle, pews | pass: pews both sides | pass: altar and candles under the apse arch | accepted |
+| `church/byzantine/default/8102` | yes: model "dome ... Byzantine ... church or a similar religious building" | pass: aisle between pews | pass: pews both sides | pass: altar and chandeliers at the end | accepted |
+| `church/gothic/small/1` | yes: model "church ... twin spires ... Gothic or Romanesque ... pointed arch"; image: twin crocketed spires, portal, apse | pass: portal, aisle | pass: pews both sides | pass: altar and candles down the aisle | accepted |
+
+Temples (5 of 12 accepted):
+
+| id | identity | entry | congregation | focus | verdict |
+|---|---|---|---|---|---|
+| `temple/basilica/bone/small/8102` | yes: model "classical ... colonnaded entrance ... portico"; image: pedimented pronaos, colonnade, apse | pass: portico, colonnade, aisle | pass: open floor with braziers | pass: pale idol on the altar in the apse | accepted |
+| `temple/pylon/serpent/default/8102` | partly: model "rectangular ... green accents"; image: battered pylons, cut gate, hypostyle, green trim | pass: gate, columns, aisle | pass: open floor between the columns | pass: "a green glowing object" - the coil idol lit in the apse | accepted |
+| `temple/pylon/bone/small/1` | partly: model "central entrance with columns ... classical"; image: two pylons, cut gate, short hall | pass: gate, aisle | pass: open floor | pass: pale stepped idol on the altar, central | accepted |
+| `temple/rotunda/bone/default/21325` | partly: model "circular structure ... evenly spaced columns"; image: drum, open pier colonnade, ring roof | pass: door, path between the pits | pass: open floor, braziers | pass: pale stepped idol on the central altar | accepted |
+| `temple/rotunda/flame/large/21325` | partly: model "circular ... columns ... triangular pediment ... Greek or Roman"; image: drum, colonnade, pedimented aedicule in the cult trim | pass: framed door, path across the pit | pass: wide open floor | pass: orange cone idol, large and central | accepted |
+| `temple/basilica/void/large/21325` | partly: model "public building ... government office or a school"; image: long hall, colonnaded portico and pediment, roof belfry, near-black Starless Deep stone | pass: clear axis | pass: open floor, braziers | **fail**: the far end is lost in darkness; no idol is recognisable ("not fully visible from the entrance") | needs_changes |
+| `temple/rotunda/void/small/8102` | partly: model "circular ... watchtower or a small observatory"; image: drum, open pier arcade, ring roof | pass: door, clear path | pass: open floor, braziers (sparse is the brief) | **fail**: only the altar group reads ("a table with two candelabras and a chalice"); the monolith is not legible from the door | needs_changes |
+| `temple/pylon/blood/large/21325` | partly: model "simple rectangular massing ... dark color with red accents"; image: battered pylons, cut gate, long dark hypostyle | pass: gate, aisle | pass: open floor, braziers | **fail**: the end of the axis is a red doorway; the blood idol does not read from the entry | needs_changes |
+| `temple/ziggurat/flame/small/1` | yes: model "stepped ... Mesoamerican ... conical structure on the roof"; image: terraces, stair flights, cone on the summit | pass: stair canyon and gate clear | pass: forecourt at the stair foot | **fail**: the gate frames the chamber altar, not the summit god; the summit edge hides it | needs_changes |
+| `temple/ziggurat/blood/default/21325` | yes: model "stepped pyramid ... Mesoamerican ... flat top"; image: terraces, stair, red figure on the summit | pass: stair and gate clear | pass: forecourt | **fail**: the summit god is not visible from the stair foot | needs_changes |
+| `temple/ziggurat/bone/large/21325` | yes: model "stepped pyramid ... Maya ... staircase ... flat top"; image: terraces, long stair, summit shrine | pass: stair canyon and gate clear | pass: forecourt | **fail**: the summit edge hides the god at 48 x 80 | needs_changes |
+| **`temple/basilica/blood/default/1/pinned-barn`** | **partly**: model "church ... bell tower ... portico ... classical"; image: pedimented west front and belfry, but a long unbroken flank and a flat dark roof - the known barn comparison | pass: portico, aisle, columns | pass: open floor, braziers | pass: blood idol and altar legible in the apse | **needs_changes** (identity) |
+
+Negative controls (all three recorded failing, as the rule requires):
+
+| id | control | evidence | verdict |
+|---|---|---|---|
+| `church/gothic/default/8102` | break_axis | image: a body-high black barrier spans the nave between the pews; the altar is hidden behind it. The model said "clear of obstructions" and missed it; the image is the evidence. | needs_changes: entry fail, focus fail |
+| `church/romanesque/default/1` | hide_focus | model: "large black structure, possibly a screen or a wall ... visible"; image: the screen fills the nave and the altar behind it is invisible | needs_changes: entry fail, focus fail |
+| `temple/basilica/flame/default/8102` | hide_focus | model: "dark, enclosed space ... not possible to see inside this space from the entrance"; image: the veil closes the axis | needs_changes: entry fail, focus fail |
+
+### Open failures
+
+1. **Ziggurat focus, all three sizes** (`ziggurat/flame/small/1`,
+   `ziggurat/blood/default/21325`, `ziggurat/bone/large/21325`). The stair foot
+   is the gate; the god stands at the back of the summit and the summit's own
+   front edge hides it. The measured apex table is the one in "Ziggurat focus,
+   measured" above: needs 11.2 / 21.8 / 39.6 m, has 9.4-9.6 / 13.5 / 23.4 m.
+   Open: the upper terraces have to be set back at the front and the flights
+   re-run; no dressing fixes it.
+2. **Rotunda void, small** (`rotunda/void/small/8102`). The measured sightline
+   has no blocker, but from the door only the altar group reads: the monolith
+   is dark against a dark drum and does not separate from it. Recorded as a
+   legibility failure (focus), open. Its siblings (bone default, flame large)
+   pass with their brighter idols.
+3. **Large dark halls** (`basilica/void/large/21325`,
+   `pylon/blood/large/21325`). The measured sightline is clear (0 blockers),
+   but the entry image loses the focus: the void hall is near-black, and the
+   pylon apse is a bright red doorway. Recorded as focus failures of the
+   entry image, open; this is contrast and lighting (cult palette + the
+   night-within entry rig), not a geometric occlusion.
+4. **Pinned barn identity** (`basilica/blood/default/1/pinned-barn`). Entry,
+   procession, congregation and focus pass (procession 2.88 m, 0 blockers,
+   idol visible). The long flank and flat dark roof still read as a barn, the
+   reason the id exists. Open, as before.
+5. **Rotunda and pylon identity is only partly read** (7 of the 12 temples,
+   and 4 of the 6 churches). The blind model names the massing (circular
+   colonnade, battered pylons, stepped terraces) but not the sacred
+   purpose; for the rotundas and pylons it said "observatory", "watchtower",
+   "public building", "classical structure". Recorded as partly, not as a
+   new fault; the accepted rotundas and pylons pass on sequence and focus.
+6. **Identity via cult is weak in the dark.** The void basilica reads as an
+   institutional block and the blood pylon as a plain dark hall, because the
+   cult palettes (`2f3138`/`1b1d22` void, `4a3b39` blood) are almost
+   unlit at the entry rig. This is the same finding as 3, from the outside.
+
+### Receipts
+
+Final run in this worktree, logs redirected:
+
+| lane | suites | checks | failures | warnings | log |
+|---|---|---|---|---|---|
+| `lane:church-change` | 4 | 5940 | 0 | 16 (12 opening, 4 sacredseq rotunda symmetry) | `artifacts/sacred_review_20261023/lane_church_change_final.log` |
+| `lane:temple` | 4 | 3467 | 0 | 4 (rotunda symmetry, judged by `rite`) | `artifacts/sacred_review_20261023/lane_temple_final.log` |
+
+Measured sequence: 18 / 18 cases, 0 failures
+(`artifacts/sacred_review_20261023/measurements.log`).
+Renders: 72 matrix images + 3 controls, exit 0
+(`render_matrix.log`, `render_control_*.log`). Unlabelled answers:
+`answers.json`; join: `joined.json`; key: `key.json` (do not read before the
+verdicts). Images are not committed (artifacts is gitignored).
