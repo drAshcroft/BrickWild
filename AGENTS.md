@@ -26,6 +26,10 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 # fixed structural cases and selected real voxel QA
 godot --headless --path . --script res://tests/run_all.gd -- lane:castle-change
 godot --headless --path . --script res://tests/run_all.gd -- lane:plan
+# bounded terrain gate: villages on plane_30, lake_shore, cliff_band, Manarola,
+# Masouleh and Monpazier; road grades, lot fall, the stair walk, wet ground and
+# siting, each with a failing control (docs/VILLAGE_TERRAIN.md)
+godot --headless --path . --script res://tests/run_all.gd -- lane:village-terrain
 godot --headless --path . --script res://tests/run_all.gd -- lane:church-change
 # which form of which castle is still solid or unreachable (build + occupancy + routes
 # per plan, minutes per case; see docs/CASTLE_INTERIOR_FOLLOWUPS.md)
@@ -131,6 +135,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | village site, lots, plan rules | `lane:village-fast` | 2.5 m host, green, 10 checks |
 | `qa/village_shape.gd` or `survey.py` `measure()` | `vshape`, then `tools/shape_parity.gd` + `tools/settlements/shape_parity.py` | see docs/SETTLEMENT_TESTSET.md |
 | `VillageTerrain`, the exporter's `ground` output | `vterrain` | ~70 s host, 74+ checks; see docs/VILLAGE_TERRAIN.md |
+| village planning on given ground: siting, road grades, lot fall, the stair walk, wet ground | `lane:village-terrain` | 196 s host, 148 s body (23 Oct), 476 checks; six fixtures and six failing controls; see docs/VILLAGE_TERRAIN.md |
 | the village ground mesh: `VillageGroundSurface`, `VillageBuilder` on terrain, `VillageGroundCheck` | `vground`, then `vgroundterrain` | ~6 m loaded host for the terrain cases; see docs/VILLAGE_TERRAIN.md |
 | `VillageBridge`, a bridge on given ground, the ground's river (`VillageGroundWater`), `qa/village_bridge_check.gd` | `vcrossterrain`, then `tests/village_crossings_test.gd` as a script | ~40 s host, 24 checks; see docs/VILLAGE_TERRAIN.md |
 | stair streets, access flights, the 3D village walk: `VillageAccessSteps`, `VillageWalk3D`, `VillageWalk` on terrain | `vstepswalk`, then `vgroundterrain` | ~5.5 m loaded host, 84 checks (Manarola, Positano); see docs/VILLAGE_TERRAIN.md "Steps and the 3D walk" |
