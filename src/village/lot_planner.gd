@@ -106,12 +106,22 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	var attempts: Array = RETRIES
 	if spec.compact_display:
 		attempts = [[0, 1.05], [0, 1.1], [0, 1.15], [0, 1.2], [0, 1.25]] + RETRIES
+	elif spec.form == &"round":
+		# A round village's authored road graph is its one civic lane and its
+		# ring street. The generic back lanes the retry ladder adds are not
+		# part of that form: buy extra frontage by widening the site instead,
+		# so the plan still retains exactly one entrance lane after placement
+		# (VIL-ROUND-17077).
+		attempts = []
+		for scale in [1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.6, 2.0, 2.5, 3.0, 3.5]:
+			attempts.append([0, scale])
 	for attempt in attempts:
 		if unplaced <= 0 and bool(common_state["ready"]):
 			break
 		# These authored forms deliberately ignore generic extra lanes. Do
 		# not recut an identical site six times before trying more frontage.
-		if spec.form in [&"strand", &"shore", &"planted"] and is_equal_approx(float(attempt[1]), previous_scale):
+		if spec.form in [&"strand", &"shore", &"planted", &"round"] \
+				and is_equal_approx(float(attempt[1]), previous_scale):
 			continue
 		previous_scale = float(attempt[1])
 		var again: VillagePlan = _replan(spec, jobs, int(attempt[0]), float(attempt[1]), minimum_depth, shore_depth)
