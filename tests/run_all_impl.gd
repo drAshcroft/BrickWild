@@ -64,7 +64,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"tree", "bridge", "windmill", "dungeon"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["hslope", "library", "placement", "cultureapi", "compactapi", "vworld", "vterrain", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
+const EXTRA: Array[String] = ["hslope", "library", "placement", "cultureapi", "compactapi", "vworld", "vterrain", "vterrainlane", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "vis009", "vis010", "vis016", "catalogcache",
@@ -145,6 +145,12 @@ const LANES: Dictionary = {
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
 	"lane:palace-change": ["palace"],
 	"lane:village-fast": ["vquick", "vcompact", "compactapi", "vground"],
+	# Bounded terrain gate: one village on each of plane_30, lake_shore,
+	# cliff_band, Manarola, Masouleh and Monpazier, with the five terrain rules
+	# (grades, fall, the stair walk, wet ground, siting) and one failing
+	# control per rule. Under the five-minute host cap; the fuller suites stay
+	# vtplan, vstepswalk, vterrain and vanalysis.
+	"lane:village-terrain": ["vterrainlane"],
 	"lane:village-appearance-fast": ["vdecoration", "vdecorationapi", "vappearance"],
 	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cmotteaccess", "kwalk"],
 	"lane:motte-change": ["cmotteplan", "cmotteaccess", "coccupancy"],
@@ -457,6 +463,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_shape_suite.gd").run()
 		"vterrain":
 			return preload("res://tests/suites/village_terrain_suite.gd").run()
+		"vterrainlane":
+			return preload("res://tests/suites/village_terrain_lane_suite.gd").run()
 		"vanalysis":
 			return preload("res://tests/suites/village_site_analysis_suite.gd").run()
 		"vtplan":

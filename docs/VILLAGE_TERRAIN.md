@@ -25,6 +25,10 @@ below).
 
 ```
 godot --headless --path . --script res://tests/run_all.gd -- vterrain    # ~70 s; the hamlet plan is the cost
+# the bounded terrain lane: six villages (plane_30, lake_shore, cliff_band,
+# Manarola, Masouleh, Monpazier), the five terrain rules, and one failing
+# control per rule -- `tests/suites/village_terrain_lane_suite.gd`
+godot --headless --path . --script res://tests/run_all.gd -- lane:village-terrain   # 196 s host
 ```
 
 ## Decisions (VTER-DECIDE, owner, 2026-10-16)
