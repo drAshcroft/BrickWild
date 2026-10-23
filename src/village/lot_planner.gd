@@ -529,6 +529,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 			job["siting"] = {"road": &"through", "insists": true, "toward": &"common"}
 	VillageDispersedForm.assign_jobs(plan, jobs)
 	VillageValleyForm.assign_jobs(plan, jobs)
+	VillageHillsideForm.assign_jobs(plan, jobs)
 	# The arrangement order (VILLAGES §6): the landmark and the lord first
 	# because they take their own lanes; then the trades that INSIST on where
 	# they stand -- the smithy on the through road at the downwind edge, the
@@ -625,8 +626,13 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 					placed += 1
 					continue
 		# a dispersed village's household is placed by its own hamlet's well
+		# A hillside's households are assigned a level each
+		# (VillageHillsideForm.assign_jobs), and a distance floor from the
+		# common would forbid returning to an upper terrace after a lower one.
+		# The form's level assignment is the gradient there, as the ring is on
+		# a crest.
 		var floor_for: float = gradient_floor if _order_of(job) == _ORDER_HOUSE \
-			and not job.has("hamlet") else 0.0
+			and not job.has("hamlet") and plan.spec.form != &"hillside" else 0.0
 		# The stable is a companion to the inn, not merely another through-road
 		# shop.  The inn has already been committed by this ordering pass, so
 		# carry its measured centre into the stable's frontage sort.

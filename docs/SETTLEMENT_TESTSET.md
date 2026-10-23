@@ -135,6 +135,18 @@ the measured sites):
 | median hillside slope under the houses, % | 0.8 | 5.3 | 28 |
 | street length along the contour, on steep ground (random ⅓) | 0.32 | 0.57 | 0.80 |
 
+**The steep sites alone** (46 of the 109 measured sites stand on ground whose
+median slope is at least 8 %, the threshold the contour measure uses; the
+bands a generated hillside village is held to):
+
+| Measure | p10 | median | p90 |
+|---|---|---|---|
+| elongation of the body | 1.32 | 2.44 | 4.88 |
+| elevation span under the houses, m | 14.4 | 35.7 | 73.0 |
+| street length along the contour | 0.389 | 0.571 | 0.798 |
+| stepped ways (`steps_ways`) | 0 | 2 | 46.5 |
+| median slope under the houses, % | 9.3 | 20.5 | 37.4 |
+
 The ends of each axis are the test cases: Positano spans 157 m between its
 lowest and highest house, La Rinconada 101 m; Rocamadour's houses stand on a
 56 % hillside and 89 % of its steep street length runs along the contour;
