@@ -42,7 +42,7 @@ const ROAD_CLASSES := {
 ## The forms this planner knows. Everything else is VIL-006 and later.
 const FORMS_SUPPORTED: Array[StringName] = [&"street", &"green", &"crossroads",
 	&"round", &"strand", &"planted", &"gate",
-	&"dispersed", &"shore", &"valley", &"crest"]
+	&"dispersed", &"shore", &"valley", &"crest", &"hillside"]
 
 const SITE_MIN_SIDE := 90.0     ## below this a 6 m road, a common and a landmark do not fit
 const SITE_MAX_SIDE := 400.0    ## §9.1 "not a city"
@@ -166,6 +166,8 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 		return VillageCrestForm.plan(spec, extra_lanes, site_scale, ground)
 	if spec.form == &"valley" and not spec.compact_display:
 		return VillageValleyForm.plan(spec, extra_lanes, site_scale, minimum_depth, ground)
+	if spec.form == &"hillside" and not spec.compact_display:
+		return VillageHillsideForm.plan(spec, extra_lanes, site_scale, ground, minimum_depth)
 	# `shore` follows the ground's own shoreline; with none to follow it is a
 	# straight strand, laid as one below
 	var form: StringName = &"strand" if spec.form == &"shore" else spec.form

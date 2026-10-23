@@ -304,7 +304,7 @@ planned, through `VillageSpec.FORM_FALLBACK`:
 
 | intent | planned as | why |
 |---|---|---|
-| hillside | street | the one-street row a contour street will replace |
+| ~~hillside~~ | ~~street~~ | planned as itself since VTER-FORM-HILLSIDE |
 | water | strand | the row along the water the stilts will stand in |
 | ~~valley~~ | ~~street~~ | planned as itself since VTER-FORM-VALLEY |
 | ~~crest~~ | ~~round~~ | planned as itself since VTER-FORM-CREST |
@@ -314,8 +314,8 @@ planned, through `VillageSpec.FORM_FALLBACK`:
 Each VTER-FORM-* task that gives a form its planner deletes that form's one
 line in `FORM_FALLBACK`. The exporter writes `form_intent` beside `form`
 (only with ground, so a flat SitePlan's bytes never change) and adds a note:
-`the ground derives the 'hillside' form, which has no planner yet; planned as
-'street' (form_intent keeps 'hillside')`.
+`the ground derives the 'water' form, which has no planner yet; planned as
+'strand' (form_intent keeps 'water')`.
 
 **`lake`.** A new `water` kind: standing fresh water along one side.
 `VillageWaterPlan` lays it as it lays a coast (a shore band, kind `lake`);
@@ -508,27 +508,26 @@ as flights, not ramps.
 
 ### Not yet
 
-* **switchbacks and a hillside form** -- the through road is monotone along
-  its axis and the bend rule (25 degrees per 20 m) forbids a hairpin. On the
-  two steepest real grids (Masouleh, Castelmezzano: 40-60 % hillsides) fifty
-  people need a 270-315 m site and no such road crosses it at 12 % (0.27-0.50
-  if allowed), so the lot planner keeps the narrower site whose road kept the
-  cap and leaves households unhoused (VillageQA `housed`);
-* **the real hillsides' contour share** -- on Hallstatt, Masouleh, Monemvasia
-  and Ushguli the field tracks, laid straight up to 30 %, outweigh the
-  contour road, and the share is 0.06-0.41 against the survey's 0.57;
-  Positano and Castelmezzano have too little steep street length to measure.
-  Tracks that traverse the slope would raise it -- and would lift the planes
-  over 0.8 -- so this wants the hillside form, not a weight;
+* **switchbacks** -- the through road is monotone along its axis and the
+  bend rule (25 degrees per 20 m) forbids a hairpin. On the two steepest real
+  grids (Masouleh, Castelmezzano: 40-60 % hillsides) fifty people need a
+  270-315 m site and no such road crosses it at 12 % (0.27-0.50 if allowed),
+  so the lot planner keeps the narrower site whose road kept the cap and
+  leaves households unhoused (VillageQA `housed`). The hillside form lays
+  terraces and stairs (VTER-FORM-HILLSIDE) but not a hairpin;
+* ~~**the real hillsides' contour share**~~ -- mostly done in
+  VTER-FORM-HILLSIDE: the form's terraces are contour streets and its risers
+  keep non-contour length in the denominator, so the 30 % plane reads 0.739
+  inside the steep sites' band. The real fixtures have not been measured yet
+  (see "The hillside form", Not yet);
 * ~~graded service lanes~~ -- done in VTER-LOTS: a steep one is not laid;
 * **a tavern near a gate on a stretched site** -- Èze and Hallstatt stretch
   to 270-315 m to house everyone, and the tavern's 60 m from a gate goes;
 * ~~per-lot platforms and stepped plinths~~ -- done in VTER-LOTS;
-* **landform forms** (`hillside`, `crest`, `shore`, ... ; `valley` done in VTER-FORM-VALLEY) -- the form
-  still comes from population, purpose and culture; on a crest the village
-  goes to level ground within reach rather than onto the summit, because no
-  cart-graded through road passes a common on a 40 m summit ringed by 20 %
-  flanks;
+* ~~**landform forms**~~ -- `hillside` (VTER-FORM-HILLSIDE), `crest`
+  (VTER-FORM-CREST), `shore` (VTER-FORM-SHORE), `valley`
+  (VTER-FORM-VALLEY) and `dispersed` (VTER-FORM-DISPERSED) all have planners;
+  `water` is the one still planned as its fallback (`strand`);
 * **the ground's own water as plan water** -- a lake or sea at
   `water_level_m` is plan water since VTER-LOTS; a river read from the
   drainage (`streams()`) is not yet a `plan.water` polygon with bridges.
@@ -1375,6 +1374,66 @@ passes too.
 * **larger villages** -- over about 25 households the ring simply grows;
   a second ring or a lower town below the gate is not laid;
 * **Beni Isguen** derives another form on its 90 m ground.
+
+## The hillside form (VTER-FORM-HILLSIDE)
+
+Row 7 of the form rule, given its planner: `src/village/forms/hillside_form.gd`,
+`VillageHillsideForm`, reached from `VillageSitePlanner._plan` by one early
+dispatch; `hillside` is in `FORMS_SUPPORTED` and its line is out of
+`FORM_FALLBACK`. The old fallback was a one-street row, and on the 30 % plane
+that row was the survey gap: one contour road, no stair streets, houses on
+one level. Without terrain the form is never derived, so nothing flat changes.
+
+| Step | What |
+|---|---|
+| site | the flat planner's square grown into a band along the contour (220 x 164 m for fifty people), deep enough for the terraces below the road and the common above it. The lot planner's retries widen it along the contour only (`site_scale`) |
+| through road | routed by grade like every form's, set toward the uphill side of the band to leave room for the terraces below |
+| common, landmark | on the UPHILL side of the road; the church or shrine stands over the village, its slot reserved before any lot |
+| terraces | three `street`s below the road, 30 m apart, each routed by the SAME router (`VillageSitePlanner._route_through`) over a seed line parallel to the through road: on the 30 % plane all three come out at 1 % and stay streets; on a steeper real hillside `grade_roads` re-classes them as it does every way. The pitch is a lot's depth as well as a terrace: at 20-25 m a house or farm lot between two terraces was refused and the cutter put every house on the through road and the lowest terrace, splitting the survey's body |
+| end risers | two `street`s from the through road down to the lowest terrace, through every terrace end. They lean 18 degrees off the fall line, so on a 30 % slope they climb 28.5 % (under a street's 30 %), and they keep real non-contour street length in the metric's denominator |
+| cross-lanes | twice per gap, straight down the fall line, class `steps`: on ground this steep a way between terraces is stairs, not a path. Every gap uses the same x, so the two lanes meet a shared terrace at one junction, not two a metre apart |
+| field tracks | two `track`s off the lowest terrace out to the boundary, leaning 15 degrees off the fall line (30 % tracks) -- the way to the fields above and a farm's own address |
+| households | `VillageHillsideForm.assign_jobs` (the lot planner's hook): the biggest house first, round robin over the through road and the three terraces, each level's homes spread along its whole length. The distance-from-the-common floor is not applied to them: it would forbid returning to an upper terrace after a lower one, which is exactly what a terraced village does |
+
+`plan` carries the terraces as ordinary roads with a `terrace` index (which
+the exporter does not serialise; it is a planning key). The exporter's
+`form_intent` note is no longer produced for `hillside`.
+
+**Measured on the 30 % plane.** 50 people, farming, seed 4242, the same
+fixture and programme as the baseline street row, measured by
+`VillageShape` (`tools/village_terrain_sweep.gd -- --fixtures plane_30
+--forms hillside --qa`; log `artifacts/hills_contour/after_final.txt`).
+The bands are the real steep sites' p10-p90: the 46 measured sites whose
+median ground slope is at least 8 %, the survey's own steep threshold
+(`world_settlements.json`; recorded below and in SETTLEMENT_TESTSET.md).
+
+| Measure | Before (street) | After (hillside) | Steep sites p10-p90 |
+|---|---|---|---|
+| street_contour_share | 0.65 | **0.739** | 0.389-0.798 |
+| elevation span, m | 16.0 | **31.3** | 14.4-73.0 |
+| steps ways | 0 | **4** | 0-46.5 |
+| elongation | 2.52 | **3.54** | 1.32-4.88 |
+| houses / households | 12 / 12 | **12 / 12** | -- |
+| roads | 1 through, 0 terrace streets | **1 through, 3 terrace streets, 2 risers, 4 stair cross-lanes, 2 field tracks** | -- |
+
+The road check and VillageQA pass (`qa ok`); every road is inside its class's
+grade (through 1 %, terraces 1 %, risers 28.8/28.2 %, steps 30 %, tracks
+28.7/29.2 %). Suite `vhillside` (`tests/suites/village_hillside_suite.gd`)
+holds these four bands against the form, checks all three terraces are
+streets with a house fronting each, the two risers and four cross-lanes, and
+that every household is housed.
+
+### Not yet
+
+* **the real hillsides** -- the form has not been measured on Masouleh,
+  Castelmezzano or the world90 sites yet; on their 40-60 % ground the risers
+  and terraces will pass to `steps` through `grade_roads`, and the terraces
+  may then lose their frontage (the crest's ring has the same open item);
+* **switchbacks** -- the router is monotone along the contour, so a hairpin
+  up a spur is still not laid;
+* **terraces from the ground** -- the terrace lines are offsets of the
+  through road re-routed at 12 %, not read from `VillageSiteAnalysis.contours`;
+  on a uniform plane they coincide, on a curved hill they may converge.
 
 ## Steps and the 3D walk (VTER-STEPS-NAV)
 

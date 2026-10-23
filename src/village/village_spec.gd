@@ -125,15 +125,13 @@ const FORM_VOCABULARY: Array[StringName] = [&"street", &"green", &"crossroads", 
 ## Until a terrain form has its own planner, the spec PLANS the nearest form
 ## that has one and keeps the derived form in `form_intent`. Each VTER-FORM-*
 ## task that gives a form its planner deletes that form's ONE line here.
-##   hillside  -> street  one street along the slope, the row a contour
-##                        street will replace
 ##   water     -> strand  the row along the water the stilts will stand in
 ## (`dispersed` has its planner: VillageDispersedForm, VTER-FORM-DISPERSED;
 ## `shore`: VillageShoreForm, VTER-FORM-SHORE;
 ## `valley`: VillageValleyForm, VTER-FORM-VALLEY;
-## `crest`: VillageCrestForm, VTER-FORM-CREST.)
+## `crest`: VillageCrestForm, VTER-FORM-CREST;
+## `hillside`: VillageHillsideForm, VTER-FORM-HILLSIDE.)
 const FORM_FALLBACK := {
-	&"hillside": &"street",
 	&"water": &"strand",
 }
 ## The terrain form rule's thresholds (`_derive_form_on_ground`). Fitted on
