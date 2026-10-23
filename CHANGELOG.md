@@ -8,6 +8,16 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
 
 ## Unreleased
 
+### Fixes
+
+- A small smithy keeps its forge. On a 9x12 m footprint (seed 1) the front
+  workshop's only outside wall carried its one window and lost the rest of its
+  clear run to the swing of the door at the corner beside it, so the fire had
+  nowhere to stand. Shop planning now re-hangs that interior door at the far
+  end of its partition when the chimney wall cannot hold the measured hearth
+  run, before the plan is furnished (`ShopPlanner._hold_the_fire_wall`).
+  `shoptrade` is green; shops whose fire already fits are unchanged.
+
 ## 0.1.3 - 2026-10-14
 
 Temples, churches and walled castles say where a person can walk; BrickWild

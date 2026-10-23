@@ -62,6 +62,15 @@ into the front room and is as wide as the trade needs, the smithy's forge is
 on the chimney wall under one chimney, the shopfront hatch is there, and the
 tavern's casks stand behind its bar.
 
+The forge also fixes the front room's shape before the furnisher sees it. A
+workshop whose chimney wall has no unbroken 1.39 m run for the fire -- the
+measured widest hearth plus 0.4 m -- is replanned: the interior door whose
+swing would eat the end of that wall is re-hung at the far end of its own
+partition, and the hearth is elected again over the new spans
+(`ShopPlanner._hold_the_fire_wall`). The room keeps its one window on that
+wall and its shopfront beside it, and nothing moves unless the fire does not
+fit as drawn (blacksmith 9x12 seed 1).
+
 ## Harness evaluation
 
 The house harness was reusable for shops because it measures plans rather than
