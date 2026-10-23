@@ -41,12 +41,20 @@ static func generate(seed: int, width: float, length: float, depth: float) -> Di
 	var landing_count := LEVELS + 1
 	var landing_width := 3.5 * scale
 	var stair_width := 1.8 * scale
-	var channel_width := spec.length * 0.11
+	# The published envelope allows a 14 m length, where 11 % is a 1.54 m
+	# corridor and every landing fails the check's own 2 m standable rule.
+	# Keep the passage a person's width at every published size; the 20 m
+	# archetype is already 2.2 m, so its geometry does not move.
+	var channel_width := maxf(2.2, spec.length * 0.11)
 	var tank_width := minf(9.5 * scale, spec.width * 0.22)
 	var tank_depth := minf(9.4 * scale, spec.length * 0.47)
+	# The grade entrance is a floor a person walks on, not a 0.3 m lip: at that
+	# depth the apron is narrower than a body once the walk grid shrinks it, and
+	# the first landing is reachable only by snapping the start point.
+	var apron_depth := 1.0
 	var shaft_diameter := minf(10.0 * scale,
-		minf(spec.length * 0.40, spec.length - 0.3 - channel_width - tank_depth))
-	var corridor_center := site.position.y + 0.3 + channel_width * 0.5
+		minf(spec.length * 0.40, spec.length - apron_depth - channel_width - tank_depth))
+	var corridor_center := site.position.y + apron_depth + channel_width * 0.5
 	var landings: Array[Dictionary] = []
 	var descent: Array[Dictionary] = []
 	var stair_rows: Array[Dictionary] = []
@@ -114,13 +122,23 @@ static func generate(seed: int, width: float, length: float, depth: float) -> Di
 	var tank_walk: Array[Rect2] = [
 		Rect2(Vector2(tank_access.position.x, tank_access.position.y),
 			Vector2(tank_access.size.x, tank_rect.position.y - tank_access.position.y)),
-		Rect2(Vector2(tank_access.position.x, tank_rect.end.y),
-			Vector2(tank_access.size.x, tank_access.end.y - tank_rect.end.y)),
 		Rect2(Vector2(tank_access.position.x, tank_rect.position.y),
 			Vector2(tank_rect.position.x - tank_access.position.x, tank_rect.size.y)),
 		Rect2(Vector2(tank_rect.end.x, tank_rect.position.y),
 			Vector2(tank_access.end.x - tank_rect.end.x, tank_rect.size.y)),
 	]
+	# The draw shaft opens immediately south of the tank. A walk strip across
+	# that side would roof the shaft's north lip (and did: a 4.2 m shaft at the
+	# published 14 m length had one of its five sky rays blocked by it), so the
+	# south walk is built as two pieces either side of the mouth.
+	var south_y := tank_rect.end.y
+	var south_h := tank_access.end.y - tank_rect.end.y
+	if shaft_rect.position.x > tank_access.position.x:
+		tank_walk.append(Rect2(Vector2(tank_access.position.x, south_y),
+			Vector2(shaft_rect.position.x - tank_access.position.x, south_h)))
+	if tank_access.end.x > shaft_rect.end.x:
+		tank_walk.append(Rect2(Vector2(shaft_rect.end.x, south_y),
+			Vector2(tank_access.end.x - shaft_rect.end.x, south_h)))
 	var corridor := Rect2(Vector2(tank_rect.end.x, corridor_center - channel_width * 0.5),
 		Vector2(site.end.x - tank_rect.end.x, channel_width))
 

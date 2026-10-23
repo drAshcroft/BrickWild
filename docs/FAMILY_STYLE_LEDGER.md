@@ -2,8 +2,11 @@
 
 Coverage ledger for LIVE-FAMILY-STYLES, acceptance item 1: every published
 kind, style and purpose has a mapped brief, actual request fixtures and an
-explicit evidence state. Written 2026-10-14 from code and file reading. No
-suite or render was run to produce this table.
+explicit evidence state. Written 2026-10-14 from code and file reading; no
+suite or render was run to produce the original table. Recomputed 2026-10-23
+from the code and the fixture files, and the three sub-kind rows that had a
+smoke check now carry the archetype rows and family checks (see
+"Recomputed state").
 
 ## Source of the published list
 
@@ -56,9 +59,12 @@ every review found says needs_changes, not accepted, or unreviewed.
 ## Brief and fixture sources
 
 - Briefs: `docs/BUILDING_PERSONALITY_BRIEFS.md`. Sections: House style briefs
-  (line 104), Shop and civic business briefs (142), Church style briefs (183),
-  Temple forms and cults (205), Castles (241), Hotels (262), Windmills (273),
-  World buildings (287), Villages (316).
+  (line 104), Household trade briefs (129), Shop and civic business briefs
+  (154), Church style briefs (195), Temple forms and cults (217), Castles (253),
+  Hotels (274), Windmills (285), World buildings (299), Villages (328).
+  The household trade table carries one row per `HouseSpec.TRADES` entry
+  (`none`, `smith`, `alchemist`, `farmer`, `innkeeper`, `scholar`) with its
+  current code evidence and its visible/plan/customer direction.
 - Request fixtures: `tests/fixtures/family_style_requests.json` (106 frozen
   requests, seed 8102, added 2026-10-14; run by `tools/generate_family_requests.gd`,
   not a lane); `tests/fixtures/sacred_sequence_requests.json` (church
@@ -70,8 +76,20 @@ every review found says needs_changes, not accepted, or unreviewed.
   windmill tower, world courtyard_house with domus, village english with farming);
   `visualqa/personality/baseline_requests.json` (same ten, default size);
   `tools/house_style_visual_matrix.json` (eight house styles, as a matrix spec, not expanded requests).
+  The 106 cases in `family_style_requests.json` cover 125 rows: 82 non-world
+  rows, plus 19 world families and 24 world sub-kinds (a world case names both
+  its family and its sub-kind). The remaining 24 rows are the church and temple
+  rows in `sacred_sequence_requests.json`, the witch hut, and the eleven
+  family representatives in `frozen_requests.json`. Measured 2026-10-23 by
+  matching every published id to a case: all 149 rows have a saved request.
+  The twelve `shop_shell/*` cases are real shop-context requests (kind `shop`,
+  a named business purpose), not the house requests seen twice.
 - Suites: `tests/suites/*.gd`. The lane definitions are in `tests/run_all_impl.gd`
-  (`LANES`, around line 120).
+  (`LANES`, around line 120). The `wunchecked` lane:world key runs
+  `WorldArchetypeSuite.run_subkinds()`: the two polygon pagodas and the
+  two-court compound through their own archetype rows and family checks, plus
+  the failing controls. `world`/`warchetype` runs the same rows with the rest
+  of the archetype table.
 - Reviews: `visualqa/personality/README.md` (root review table, default-size
   views), `visualqa/styles/house/assistant_review.json` and per-style
   `assistant_review.json` files under `visualqa/styles/house/<style>/renders/`,
@@ -131,12 +149,12 @@ every review found says needs_changes, not accepted, or unreviewed.
 
 | row | brief | request fixture | mechanical checks | visual review | evidence state |
 |---|---|---|---|---|---|
-| none | MISSING (no house-trade section in BUILDING_PERSONALITY_BRIEFS.md) | tests/fixtures/family_style_requests.json (house_trade/none/8102) | house_sweep.gd trades() (line 26) via house_qa_suite.gd | none | mechanically-checked |
-| smith | MISSING (the word appears only in the shop business section) | tests/fixtures/family_style_requests.json (house_trade/smith/8102) | house_qa_suite.gd (HouseSweep.trades) | none | mechanically-checked |
-| alchemist | MISSING | tests/fixtures/family_style_requests.json (house_trade/alchemist/8102) | house_qa_suite.gd | none | mechanically-checked |
-| farmer | MISSING | tests/fixtures/family_style_requests.json (house_trade/farmer/8102) | house_qa_suite.gd | none | mechanically-checked |
-| innkeeper | MISSING | tests/fixtures/family_style_requests.json (house_trade/innkeeper/8102) | house_qa_suite.gd | none | mechanically-checked |
-| scholar | MISSING | tests/fixtures/family_style_requests.json (house_trade/scholar/8102) | house_qa_suite.gd | none | mechanically-checked |
+| none | BUILDING_PERSONALITY_BRIEFS.md § Household trade briefs | tests/fixtures/family_style_requests.json (house_trade/none/8102) | house_sweep.gd trades() (line 26) via house_qa_suite.gd | none | mechanically-checked |
+| smith | same | tests/fixtures/family_style_requests.json (house_trade/smith/8102) | house_qa_suite.gd (HouseSweep.trades) | none | mechanically-checked |
+| alchemist | same | tests/fixtures/family_style_requests.json (house_trade/alchemist/8102) | house_qa_suite.gd | none | mechanically-checked |
+| farmer | same | tests/fixtures/family_style_requests.json (house_trade/farmer/8102) | house_qa_suite.gd | none | mechanically-checked |
+| innkeeper | same | tests/fixtures/family_style_requests.json (house_trade/innkeeper/8102) | house_qa_suite.gd | none | mechanically-checked |
+| scholar | same | tests/fixtures/family_style_requests.json (house_trade/scholar/8102) | house_qa_suite.gd | none | mechanically-checked |
 
 ## shop (shells, the 12 house rows)
 
@@ -259,13 +277,13 @@ every review found says needs_changes, not accepted, or unreviewed.
 | sultan_han | same (caravanserai row) | tests/fixtures/family_style_requests.json (world/caravanserai/sultan_han/8102) | world_archetype_suite.gd; world_han_suite.gd | none | mechanically-checked |
 | steam_baths | same (hammam row) | tests/fixtures/family_style_requests.json (world/hammam/steam_baths/8102) | world_archetype_suite.gd | none | mechanically-checked |
 | square_pagoda | same (pagoda row) | tests/fixtures/family_style_requests.json (world/pagoda/square_pagoda/8102) | world_archetype_suite.gd | none | mechanically-checked |
-| octagonal_pagoda | same (pagoda row) | tests/fixtures/family_style_requests.json (world/pagoda/octagonal_pagoda/8102) | world_unchecked_subkinds_suite.gd (`wunchecked`, lane:world, 2026-10-14) | none | mechanically-checked |
-| dodecagonal_pagoda | same (pagoda row) | tests/fixtures/family_style_requests.json (world/pagoda/dodecagonal_pagoda/8102) | world_unchecked_subkinds_suite.gd (`wunchecked`, lane:world, 2026-10-14) | none | mechanically-checked |
+| octagonal_pagoda | same (pagoda row) | tests/fixtures/family_style_requests.json (world/pagoda/octagonal_pagoda/8102) | world_archetype_suite.gd ARCHETYPES row `octagonal_pagoda` (4 scales; must floor/eave/mast/finial; PagodaCheck kind=8, taper, mast, climb, crown); `wunchecked` runs the same row in lane:world | none | mechanically-checked |
+| dodecagonal_pagoda | same (pagoda row) | tests/fixtures/family_style_requests.json (world/pagoda/dodecagonal_pagoda/8102) | world_archetype_suite.gd ARCHETYPES row `dodecagonal_pagoda` (4 scales; PagodaCheck kind=12); `wunchecked` runs the same row in lane:world | none | mechanically-checked |
 | saints_mound | same (stupa row) | tests/fixtures/family_style_requests.json (world/stupa/saints_mound/8102) | world_archetype_suite.gd; world_stupa_suite.gd | none | mechanically-checked |
 | monks_cloister | same (vihara row) | tests/fixtures/family_style_requests.json (world/vihara/monks_cloister/8102) | world_archetype_suite.gd | none | mechanically-checked |
 | merchants_haveli | same (vastu row) | tests/fixtures/family_style_requests.json (world/vastu/merchants_haveli/8102) | world_archetype_suite.gd | none | mechanically-checked |
 | scholars_compound | same (siheyuan row) | tests/fixtures/family_style_requests.json (world/siheyuan/scholars_compound/8102) | world_archetype_suite.gd; world_siheyuan_suite.gd | none | mechanically-checked |
-| two_court_compound | same (siheyuan row) | tests/fixtures/family_style_requests.json (world/siheyuan/two_court_compound/8102) | world_unchecked_subkinds_suite.gd (`wunchecked`, lane:world, 2026-10-14) | none | mechanically-checked |
+| two_court_compound | same (siheyuan row) | tests/fixtures/family_style_requests.json (world/siheyuan/two_court_compound/8102) | world_archetype_suite.gd ARCHETYPES row `two_court_compound` (22x70x5; must fauces/screen/main_hall/wing/verandah/rear_hall/ridge; SiheyuanCheck 2-court count, per-court room and opening, courts in line); `wunchecked` runs the same row in lane:world | none | mechanically-checked |
 | clan_ring | same (tulou row) | tests/fixtures/family_style_requests.json (world/tulou/clan_ring/8102) | world_archetype_suite.gd | none | mechanically-checked |
 | hundred_spires | same (nagara row) | tests/fixtures/family_style_requests.json (world/nagara/hundred_spires/8102) | world_archetype_suite.gd | none | mechanically-checked |
 | quarried_temple | same (rock_cut_temple row) | tests/fixtures/family_style_requests.json (world/rock_cut_temple/quarried_temple/8102) | world_archetype_suite.gd | none | mechanically-checked |
@@ -331,40 +349,92 @@ Findings that are not failures:
 - A `world` request's `style` is the family and `purpose` the sub-kind; the
   fixture ids read `world/<family>/<kind>/<seed>`.
 
+## Recomputed state (2026-10-23)
+
+Counts are taken from the per-row tables above and by matching every published
+id against the fixture files. No render was made. Only the three sub-kind rows
+and the six trade rows changed evidence in this pass; no other row was
+re-labelled, and no row was marked reviewed without a verdict file read.
+
+| Measure | Count |
+|---|---|
+| Published rows (styles, purposes, sub-kinds, trades, shells, businesses, cultures) | 149 |
+| Rows with a brief row | 149 |
+| Rows with a saved request fixture | 149 |
+| Rows named or iterated by a suite | 149 |
+| Rows with a per-row visual review (all needs_changes / not accepted) | 17 |
+| Rows accepted | 0 |
+| Rows still lacking a per-row visual review | 132 |
+
 ## Biggest gaps
 
-1. **Request fixtures.** Closed 2026-10-14 for every row below by
-   `tests/fixtures/family_style_requests.json`. As found: 10 of 11 castle styles, 4 of 5 windmill types, 18 of 19
-   world families, 24 of 25 world sub-kinds, 22 of 23 shop businesses, 9 of 10
-   village cultures, 8 of 9 village purposes, 1 of 2 hotel styles and 10 of 12
-   house styles (8 appear only as entries in `tools/house_style_visual_matrix.json`,
-   and 2 have no entry at all) have no saved request. Church and temple forms
-   and cults are covered by `sacred_sequence_requests.json`. The rest are
-   covered only by a generator or a sweep, not a saved request.
-2. **Accepted visual review: none.** Every review found says needs_changes or
-   not accepted, or it is unreviewed. Per-row reviews exist for 12 house styles,
-   church romanesque and gothic, hotel grand_budapest, temple basilica, and world
-   domus, and they are not accepted. Castle, windmill, shop, village, world (other
-   than domus) and the temple cults have no per-row review at all.
-3. **Windmills.** Three of five types have neither a fixture nor a review. The
-   tower's only review is a camera check that concluded nothing about design.
-4. **Three published rows had no mechanical check:** world sub-kinds
-   `octagonal_pagoda`, `dodecagonal_pagoda` and `two_court_compound`. Closed
-   2026-10-14 by `tests/suites/world_unchecked_subkinds_suite.gd` (`wunchecked`,
-   in lane:world): generate, non-empty mesh, inside the family envelope,
-   deterministic twice. PASS, 3 checks. It is a smoke check, not the
-   archetype `must` list the other sub-kinds carry.
-5. **House trades (6 rows) have no brief section.** They are checked by
-   `house_qa_suite.gd` but have no entry in BUILDING_PERSONALITY_BRIEFS.md and no fixture.
-6. **Shop shells.** The 12 shell rows are checked through the house suites, but
-   no shop-context request or review exists for any shell.
+1. **Request fixtures: closed.** 149 of 149 rows have a saved request. Before
+   the 2026-10-14 batch, 125 of 149 had none; the 106 cases added that day
+   cover 125 rows (82 non-world rows, 19 world families, 24 world sub-kinds),
+   and the other 24 were already covered by the sacred, witch, frozen and
+   baseline fixtures. The house trades are `house_trade/<id>/8102`; the shop
+   shells are `shop_shell/<style>/8102` with a real business purpose.
+2. **Accepted visual review: none.** 17 rows have a per-row verdict and all of
+   them say needs_changes or "Not accepted": the twelve house styles
+   (`visualqa/styles/house/<style>/renders/**/assistant_review.json`, plus the
+   `restart21_witch_joint_cluster_full_render` cohort for witch_hut), church
+   gothic (`visualqa/styles/church/gothic/assistant_review.json`), and church
+   romanesque, hotel grand_budapest, temple basilica and world domus (the root
+   table in `visualqa/personality/README.md`, against those exact default-size
+   requests). 132 rows have no per-row review; castle, windmill, shop, village,
+   world (other than domus) and the temple cults are among them.
+3. **Windmills.** All five types now have a saved request; none has a per-row
+   review. The tower's only review is a camera check that concluded nothing
+   about design.
+4. **Three published sub-kinds had only a smoke check: closed.** The
+   `octagonal_pagoda`, `dodecagonal_pagoda` and `two_court_compound` rows are
+   now ordinary `ARCHETYPES` rows in `tests/suites/world_archetype_suite.gd`,
+   judged by `PagodaCheck` and `SiheyuanCheck` with the same `must` names as
+   the other world rows. New rules: `PagodaCheck._check_plan` refuses a
+   footprint whose side count is not the sub-kind's (8 or 12) and refuses a
+   plan with no eave tiers; `SiheyuanCheck._check_court_count` requires two
+   courts under `two_court_compound`, and `_check_court_access` requires a room
+   on each court with a door onto it. Four failing controls live in
+   `_negative_pagoda_fixtures` and `_negative_twocourt_fixtures`; the
+   `wunchecked` lane:world key runs the three rows and the controls (13
+   checks, `artifacts/family_styles/wunchecked.log`).
+   The two-court plan itself was wrong and is fixed: at 22x70 the gate passage
+   was longer than the main hall (`south: main hall is not the largest planned
+   room`), and the old "second court" touched no room and had no opening. The
+   first court now starts one gate depth behind the front wall, the second
+   court runs from the hall's back wall to a rear hall, and the hall and rear
+   hall both open onto it.
+5. **House trades: closed.** All six have a brief row in
+   BUILDING_PERSONALITY_BRIEFS.md § Household trade briefs, written from
+   `HouseSpec.TRADES`, `HouseFurnishingRecipes.TRADE_FITTINGS` and
+   `HouseExterior.dress`, with visible/plan/customer direction, and a saved
+   request (`house_trade/<id>/8102`). All six are iterated by
+   `house_qa_suite.gd` through `HouseSweep.trades()`.
+6. **Shop shells.** All twelve have shop-context requests
+   (`shop_shell/<style>/8102`), checked through the house and shop suites. No
+   shell has a shop-context review.
 7. **Stale inventory.** `visualqa/personality/style_inventory.json` marks all 81
    of its rows unchecked and unreviewed. Its own `README.md` says it is a scope
    snapshot. Refresh it before using it as a coverage source.
-8. **Hotel alpine_palace** has no fixture and no review; the family has a single
-   reviewed row out of two.
+8. **Hotel alpine_palace** has a saved request
+   (`hotel/alpine_palace/8102`) but no review; the family has one reviewed row
+   out of two.
 
-Not verified in this task: whether any suite passes today; the content of the
-`wld*` lane suites beyond their names; and the verdicts of the
-`fire_composition`, `firewood`, and `office` review files, which were noted but
-not read.
+Verified on 2026-10-23 (logs under `artifacts/family_styles/`, not
+committed): `wunchecked` passes 13 checks with the four planted defects
+refused by name (`taper:`, `kind:`, `courts:` twice); `warchetype` passes 122
+checks with the same refusals in its log; `wld007` passes 13 checks;
+`wld016` passes 15 checks and the `queens_well` archetype row passes all
+four scales, 45.5x14 to 123.5x38; `lane:api` passes 11 suites, 924 checks.
+Running the world suite also exposed four red rows that this pass had to
+repair, and the repairs are measured in the log:
+three archetypes were asked for sizes their own published envelopes refuse
+(insula at 57 m wide, vastu at 8.4 m wide, Nagara at 58.9 m wide) and now
+list only the scales their envelope admits; the Queen's Well at the
+published 14 m minimum built a 1.54 m corridor, a 0.3 m entry apron and a
+south tank-walk strip across its draw shaft, now a 2.2 m corridor, a 1.0 m
+apron and a walk split round the shaft mouth, with `WalkGrid.flood_from`
+searching the 0.6 m its signature promises (0.6/0.2 floats below 3 and used
+to truncate to a 0.4 m search).
+Not re-verified here: the exhaustive `wld*` lane contents, and the visual
+verdicts themselves, which were read but not re-rendered.
