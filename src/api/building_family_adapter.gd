@@ -548,6 +548,14 @@ class WindmillFamily extends BuildingFamilyAdapter:
 	func build_mesh(building) -> ArrayMesh:
 		return WindmillBuilder.new().build(building.spec as WindmillSpec)
 
+	## The miller's own floor: the burr floor of a post mill, the ground floor of
+	## a tower, smock or paddle mill. A windpump is a lattice and publishes none.
+	func walk_sources(building) -> Dictionary:
+		return WindmillGeometry.walk_sources(building.spec as WindmillSpec)
+
+	func walk_frame(building) -> Dictionary:
+		return WindmillGeometry.walk_frame(building.spec as WindmillSpec)
+
 	func instantiate(building, _cutaway: bool) -> Node3D:
 		return WindmillAssembler.build(building.spec as WindmillSpec)
 

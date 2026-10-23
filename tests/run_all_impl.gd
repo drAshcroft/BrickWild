@@ -75,6 +75,7 @@ const EXTRA: Array[String] = ["hslope", "library", "placement", "cultureapi", "c
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
 	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
 	"dmvbrief", "dmvimplied", "dmvwalk", "bwalk", "twalk", "chwalk", "kwalk", "kwalk2",
+	"wwalk",
 	"vtplan",
 	"vcrossterrain",
 	"vdispersed",
@@ -164,7 +165,7 @@ const LANES: Dictionary = {
 	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "wunchecked", "matkit"],
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
-	"lane:windmill": ["windmill"],
+	"lane:windmill": ["windmill", "wwalk"],
 	"lane:dungeon": ["dungeon"],
 	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi", "bwalk", "twalk", "chwalk", "kwalk"],
 	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "interior", "cvoxelqa", "library", "placement"],
@@ -208,6 +209,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/castle_navigation_suite.gd").run_more()
 		"twalk":
 			return preload("res://tests/suites/temple_walk_suite.gd").run()
+		"wwalk":
+			return preload("res://tests/suites/windmill_walk_suite.gd").run()
 		"vnativeqa":
 			return preload("res://tests/suites/village_native_qa_suite.gd").run()
 		"vwater":
