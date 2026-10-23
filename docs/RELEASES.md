@@ -81,6 +81,21 @@ Delete its folder. Nothing else refers to it except a consumer pinned to it.
 Do not edit files inside a release; `install.ps1` refuses a release whose
 files no longer match their recorded hashes.
 
+### 0.1.1 and 0.1.2 bind a stale class (RELEASE-SNAPSHOT-SHADOW)
+
+Their frozen `project/.godot/global_script_class_cache.cfg` resolves
+`HouseFurnisher` and `HouseNavCheck` to the render snapshot archived under
+`project/visualQA/styles/house/townhouse/renders/nav_inventory_restart56/sources/`
+— copies taken before `72ae848`, so a tool that runs those projects gets a
+furnisher without the witchwork cauldron binding and the later shop, castle and
+walk rules. The snapshot was renamed to `.gd.txt` in the source at `72ae848`.
+
+`brick_wild-0.1.3` (LATEST and `current`) binds the real classes
+(`res://src/house/house_furnisher.gd`, `res://qa/house_nav_check.gd`); measured
+2026-10-22 from each release's own cache. **Do not pin a consumer at 0.1.1 or
+0.1.2**; move it to 0.1.3 or later. The two old releases are left as they are:
+they are frozen, and editing a release in place is what `install.ps1` refuses.
+
 ## The addon manifest
 
 `tools/brick_wild_addon_manifest.json` lists **directories**, not files. Every
