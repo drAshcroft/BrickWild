@@ -312,3 +312,70 @@ godot --headless --path . --script res://tools/castle_range_reach_probe.gd -- ba
 
 Before: `apse SEALED`, `chapel SEALED`. After: all four ranges reachable, and
 the walk gains the link `0 -> 400` (ward to chapel).
+
+## 22 October 2026: the live occupancy inventory (CIF-INVENTORY)
+
+Measured with `tools/castle_occupancy_sweep.gd` over every style at the
+`castle` and `fortress` tiers, index 0 (seed 9249 for `castle`, 9117 for
+`fortress`). Each case builds the castle, runs `CastleOccupancyCheck`,
+`CastleRouteCheck` and `HouseQA` on every interior, and groups the failures by
+message. Logs: `artifacts/castle_if_1022/inventory_cf0.log` and
+`inventory_fortress_rest.log`.
+
+| style | tier | failures |
+|---|---|---|
+| norman | castle | 0 |
+| edwardian | castle | 0 |
+| crusader | castle | 0 |
+| dark | castle | 0 |
+| french_chateau | castle | 6 |
+| moorish | castle | 7 |
+| wizard | castle | 8 |
+| japanese | castle | 12 |
+| bavarian | castle | 15 |
+| sky | castle | 20 |
+| elven | castle | 28 |
+| norman | fortress | 1 |
+| japanese | fortress | 2 |
+| wizard | fortress | 1 |
+| bavarian | fortress | 0 |
+| dark | fortress | 0 |
+| sky | fortress | 0 |
+| crusader | fortress | 10 |
+| edwardian | fortress | 12 |
+| elven | fortress | 67 |
+| moorish | fortress | 68 |
+| french_chateau | fortress | 76 |
+
+Four defect classes account for almost all of it, and they are not evenly
+spread:
+
+1. **Outdoor lanterns in demoted stores** (the whole of `french_chateau`
+   fortress's 76, 67 of `elven` fortress's, 68 of `moorish` fortress's, 12 of
+   `edwardian` fortress's and 10 of `crusader` fortress's failures): a mural
+   tower storey is furnished as a guardroom and only later demoted to a store
+   by `blind_rooms_to_stores`, keeping the one OUTDOOR-tagged prop. Fixed in
+   `CIF-STORE-FURNITURE` (361a65c, after these fortress runs): the demotion now
+   takes the piece out. The fortress numbers in the table are therefore
+   PRE-FIX upper bounds; each style's chunk reruns its own case.
+2. **Mural tower door thresholds on the side and corner towers of the rect
+   castles** (`bavarian` 15, `japanese` 12, `wizard` 8): "exterior entrance has
+   insufficient standing height above its emitted threshold". The corner towers
+   of the polygon castles were fixed in `CIF-MURAL-DOORS`; the rect tiers place
+   their side-tower doors differently.
+3. **Curtain routes on the polygon castles** (`moorish` 7, `french_chateau` 6,
+   `elven` 28): "masonry blocks wall-walk route" and, on `elven`, every tower's
+   "curtain route does not reach an emitted stair down to the courtyard" --
+   a curved curtain has no wall stair at all, so the whole walk is stranded.
+   `elven` also reports "room 2 has no emitted floor with standing clearance" on
+   every corner tower and masonry-filled windows on the curved towers.
+4. **Sky towers** (`sky` 20): "final mesh blocks exterior door clearance" and
+   "Chair_1 in room 5 (watch_room)" on the sky towers, which stand in the air
+   with their own door geometry.
+
+Smaller, one-off findings: `norman`, `wizard` and `japanese` fortress each
+report `yard_general_store: planned window has no matching emitted aperture`;
+`japanese` fortress also reports the keep's 344 m2 parlour as sparse; `sky`
+fortress is clean at this index.
+
+Each class below is a chunk of CASTLE-INTERIOR-FORMS with its own acceptance.
