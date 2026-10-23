@@ -4833,6 +4833,29 @@ func _roof_top_surface_in_flue_footprint(centre: Vector2, footprint: Vector2) ->
 						continue
 					var t := clampf((local_sample.x - a.x) / (b.x - a.x), 0.0, 1.0)
 					highest = maxf(highest, xf.origin.y + lerpf(a.y, b.y, t))
+	# Nine interpolated stations can straddle a bundle that crosses the
+	# footprint: its crown stands up to THATCH_EAVE_H above the plane, and on a
+	# service eave -- which runs along the ridge rather than across it -- it can
+	# fall entirely between two stations. That sized a Witch flue 0.28 m short
+	# of the thatch it stands beside. Measure the emitted bundle profile points
+	# that fall inside the same footprint as well.
+	var local_centre := inverse * Vector3(centre.x, xf.origin.y, centre.y)
+	for row in components("thatch_eave"):
+		if int(row.get("surface", -1)) != SURF_ROOF or String(row.get("form", "")) != "slab":
+			continue
+		var bundle_points: PackedVector3Array = row.get("points", PackedVector3Array())
+		if bundle_points.size() < 3:
+			continue
+		var local_bundle := PackedVector3Array()
+		for world_point in bundle_points:
+			local_bundle.append(inverse * Vector3(world_point))
+		var bundle_half := float(row.get("depth", 0.0)) * 0.5
+		if local_centre.z < local_bundle[0].z - bundle_half - 0.001 \
+				or local_centre.z > local_bundle[0].z + bundle_half + 0.001:
+			continue
+		for local_point in local_bundle:
+			if absf(local_point.x - local_centre.x) <= footprint.x * 0.5 + 0.001:
+				highest = maxf(highest, xf.origin.y + local_point.y)
 	return highest
 
 

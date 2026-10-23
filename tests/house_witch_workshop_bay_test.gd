@@ -7,7 +7,8 @@ class CustomWitchSpec extends HouseSpec:
 		return []
 
 class MissingBayRoofBuilder extends HouseBuilder:
-	func _build_witch_workshop_bay_roof(_xf: Transform3D, _bay: Dictionary, _faces: Array[PackedVector3Array]) -> void:
+	func _build_witch_workshop_bay_roof(_xf: Transform3D, _bay: Dictionary,
+			_faces: Array[PackedVector3Array], _flue_opening: Dictionary = {}) -> void:
 		pass
 
 class MissingBayWallClipBuilder extends HouseBuilder:
@@ -245,8 +246,15 @@ func _check_case(fixture: Dictionary) -> void:
 	var main_side := signf(bearing_x - float(bay.outer))
 	var bearing_from := bearing_point + xf.basis * Vector3(main_side * (HouseGeometry.wall_thickness(spec) * 0.5 + 0.08), 0, 0)
 	var bearing_to := bearing_point + xf.basis * Vector3(main_side * 0.03, 0, 0)
-	if absf(bearing_x - float(bay.inner)) < 0.20:
-		failures.append("%s: bearing was not kept on the actual room wall below the roof inset" % fixture.name)
+	# The bearing must stand on the room wall OUTBOARD of the roof inset: the
+	# shed joins the high plane inboard of the wall it bears on. The raised join
+	# now sits 0.165 m from the core wall, so a fixed 0.20 m separation is no
+	# longer the truth; what matters is that the two stations are distinct and
+	# ordered, and the ray below measures which one carries wall triangles.
+	var wall_is_outboard := (bearing_x - float(bay.inner)) * signf(float(bay.outer) - float(bay.inner)) > 0.0
+	if not wall_is_outboard or absf(bearing_x - float(bay.inner)) < 0.02:
+		failures.append("%s: bearing %.3f is not outboard of the roof inset %.3f" % [
+			fixture.name, bearing_x, float(bay.inner)])
 	if not _segment_hits(mesh, 0, bearing_from, bearing_to):
 		failures.append("%s: workshop bearing has no emitted wall-plate support at the roof joint" % fixture.name)
 	if fixture.name == "witch_9x12_s1":
@@ -334,9 +342,13 @@ func _check_case(fixture: Dictionary) -> void:
 		var edge_t := clampf((edge_cross - float(bay["outer"])) / (float(bay["inner"]) - float(bay["outer"])), 0.0, 1.0)
 		var edge_center_y := float(bay["eave_y"]) - RoofShape.DEPTH * 0.5 - 0.0075 + (float(bay["join_y"]) - float(bay["eave_y"])) * edge_t
 		var edge_world := xf * Vector3(edge_xz.x, edge_center_y + 0.0075, edge_xz.y)
-		if not _segment_hits(mesh, WALL_SURFACE, edge_world + Vector3.UP * 0.025, edge_world - Vector3.UP * 0.025):
+		# Measure the LINER at its own plane. A plain wall-triangle ray here also
+		# hits the high core's wall top, which is not the ceiling.
+		var edge_top := _oriented_face_height(mesh, WALL_SURFACE, edge_world, true)
+		if not is_finite(edge_top) or absf(edge_top - edge_world.y) > 0.002:
 			failures.append("positive liner-edge control has no actual ceiling triangle at its clipped-edge station")
-		if _segment_hits(shortened_mesh, WALL_SURFACE, edge_world + Vector3.UP * 0.025, edge_world - Vector3.UP * 0.025):
+		var shortened_edge_top := _oriented_face_height(shortened_mesh, WALL_SURFACE, edge_world, true)
+		if is_finite(shortened_edge_top) and absf(shortened_edge_top - edge_world.y) <= 0.002:
 			failures.append("negative liner-joint control: shortened physical ceiling still covers its clipped-edge station")
 		var missing_closure_builder := MissingWitchEndWallClosureBuilder.new()
 		missing_closure_builder.closure_rays = gap_rays
@@ -591,8 +603,13 @@ func _pitched_liner_contact_failures(mesh: ArrayMesh, xf: Transform3D, bay: Dict
 			var along := lerpf(along_lo, along_hi, float(along_t))
 			var local_xz := Vector2(cross, along) if axis == 0 else Vector2(along, cross)
 			var roof_t := clampf((cross - float(bay["outer"])) / (float(bay["inner"]) - float(bay["outer"])), 0.0, 1.0)
-			var roof_y := float(bay["eave_y"]) + (float(bay["join_y"]) - float(bay["eave_y"])) * roof_t
-			var world := xf * Vector3(local_xz.x, roof_y, local_xz.y)
+			# Probe at the liner's own plane, not at the shed roof's mid-plane.
+			# Near the join the high core's wall top is an upward-facing wall
+			# triangle a few millimetres above the liner, and the nearest-face
+			# oracle would measure that wall instead of the ceiling.
+			var liner_y := float(bay["eave_y"]) - RoofShape.DEPTH * 0.5 - 0.0075 \
+				+ (float(bay["join_y"]) - float(bay["eave_y"])) * roof_t
+			var world := xf * Vector3(local_xz.x, liner_y, local_xz.y)
 			if not _ceiling_contacts_roof(mesh, world):
 				out.append("actual pitched liner/roof underside miss at cross=%.2f along=%.2f (2 mm limit)" % [cross_t, along_t])
 	if station_count != 15:
@@ -631,8 +648,14 @@ func _ray_hits_surface(mesh: ArrayMesh, surface: int, start: Vector3, finish: Ve
 ## A roof top ray measures the other side of the slab; it is not its underside.
 func _ceiling_contacts_roof(mesh: ArrayMesh, point: Vector3) -> bool:
 	var ceiling_top := _oriented_face_height(mesh, 0, point, true)
-	var roof_bottom := _oriented_face_height(mesh, ROOF_SURFACE, point, false)
-	return is_finite(ceiling_top) and is_finite(roof_bottom) and absf(ceiling_top - roof_bottom) <= 0.002
+	if not is_finite(ceiling_top):
+		return false
+	# Look for the roof's underside ABOVE the ceiling's own top face. Probing
+	# both faces from one station let the liner's own underside win the
+	# nearest-downward face and hid the roof it is meant to meet.
+	var roof_bottom := _oriented_face_height(mesh, ROOF_SURFACE,
+		Vector3(point.x, ceiling_top + 0.05, point.z), false)
+	return is_finite(roof_bottom) and absf(ceiling_top - roof_bottom) <= 0.002
 
 
 func _oriented_face_height(mesh: ArrayMesh, surface: int, point: Vector3, upward: bool) -> float:

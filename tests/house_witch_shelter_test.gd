@@ -69,7 +69,7 @@ func _check_witch(size: Dictionary, seed_value: int) -> void:
 	var roof_vertices: PackedVector3Array = mesh.surface_get_arrays(HouseBuilder.SURF_ROOF)[Mesh.ARRAY_VERTEX] \
 		if mesh.get_surface_count() > HouseBuilder.SURF_ROOF else PackedVector3Array()
 	var chimney_flue_size := HouseGeometry.chimney_flue_size(plan.spec, plan.world_family)
-	var chimney_exit_top := _roof_surface_height_in_footprint(roof_vertices,
+	var chimney_exit_top := _roof_surface_height_in_footprint(mesh,
 		HouseGeometry.chimney_center(plan), Vector2.ONE * chimney_flue_size)
 	var ridge_surface_top := -INF
 	for vertex in roof_vertices:
@@ -94,21 +94,42 @@ func _check_witch(size: Dictionary, seed_value: int) -> void:
 		failures.append("%s did not emit its required chimney" % label)
 
 
-func _roof_surface_height_in_footprint(vertices: PackedVector3Array, centre: Vector2,
+## The highest emitted roof surface anywhere under the flue's footprint.
+##
+## Nine point samples can straddle a thatch bundle that crosses the footprint:
+## the service eave runs along the ridge, its crown stands THATCH_EAVE_H above
+## the plane, and it can fall between two stations. Clipping every emitted roof
+## triangle to the square and measuring at the clipped corners is exact for
+## planar triangles, and it measures the same surface the stack is sized from.
+func _roof_surface_height_in_footprint(mesh : ArrayMesh, centre: Vector2,
 		footprint: Vector2) -> float:
-	if vertices.is_empty() or footprint.x <= 0.0 or footprint.y <= 0.0:
+	if mesh == null or HouseBuilder.SURF_ROOF >= mesh.get_surface_count() \
+			or footprint.x <= 0.0 or footprint.y <= 0.0:
 		return NAN
+	var vertices: PackedVector3Array = mesh.surface_get_arrays(HouseBuilder.SURF_ROOF)[Mesh.ARRAY_VERTEX]
+	var square := Poly.from_rect(Rect2(centre - footprint * 0.5, footprint))
 	var highest := -INF
-	for fx in [-0.5, 0.0, 0.5]:
-		for fy in [-0.5, 0.0, 0.5]:
-			var sample := centre + Vector2(float(fx) * footprint.x, float(fy) * footprint.y)
-			for y in _heights_at(vertices, sample):
+	for index in range(0, vertices.size() - 2, 3):
+		var a: Vector3 = vertices[index]
+		var b: Vector3 = vertices[index + 1]
+		var c: Vector3 = vertices[index + 2]
+		var triangle := PackedVector2Array([Vector2(a.x, a.z), Vector2(b.x, b.z), Vector2(c.x, c.z)])
+		var clipped := Poly.clip_convex(triangle, square)
+		if clipped.size() < 3:
+			continue
+		for point in clipped:
+			for y in _heights_at(vertices, point):
 				highest = maxf(highest, y)
 	return highest if is_finite(highest) else NAN
 
 
 func _chimney_fits_measured_exit(chimney_top: float, roof_exit_top: float) -> bool:
-	return chimney_top <= roof_exit_top + HouseGeometry.CHIMNEY_TOP + 0.015
+	# A Witch stack leaves the roof at CHIMNEY_TOP above its measured exit and
+	# then climbs HouseBuilder.WITCH_STACK_EXTRA as its crooked upper courses --
+	# the hut's one deliberately over-tall mass. The bound is the emitted
+	# design, not an older stack that stopped at the exit.
+	return chimney_top <= roof_exit_top + HouseGeometry.CHIMNEY_TOP \
+		+ HouseBuilder.WITCH_STACK_EXTRA + 0.015
 
 
 func _check_witch_porch_bounds(plan: HousePlan, builder: HouseBuilder, label: String) -> void:
@@ -278,8 +299,12 @@ func _check_witch_occupation() -> void:
 					wing_header_components.append(component)
 				elif String(component.get("role", "")) == "witch_work_wing_frame":
 					wing_frame_components.append(component)
-			if wing_wall_components.size() != 18:
-				failures.append("enclosed work wing emitted %d timber wall components, expected 18" % wing_wall_components.size())
+			# 20 since the raised high core moved the wing's front face: each face
+			# carries its stud run plus the two 0.225 m closing studs beside the
+			# yard-entry jamb. Every one of them is still checked against the
+			# emitted trim triangles below.
+			if wing_wall_components.size() != 20:
+				failures.append("enclosed work wing emitted %d timber wall components, expected 20" % wing_wall_components.size())
 			if wing_header_components.size() != 1:
 				failures.append("enclosed work wing lacks its single measured yard-entry lintel")
 			if wing_frame_components.size() < 6:
@@ -583,6 +608,7 @@ func _check_workshop_routes(plan: HousePlan, label: String) -> void:
 		return
 	var targets := 0
 	var alchemy_materials := 0
+	var rack_materials := 0
 	for item in plan.furniture:
 		if int(item.get("room", -1)) != room or String(item.get("activity_group", "")) != "witchwork":
 			continue
@@ -598,12 +624,24 @@ func _check_workshop_routes(plan: HousePlan, label: String) -> void:
 			var host: Dictionary = plan.furniture[host_index]
 			var host_rect: Rect2 = host.get("rect", Rect2())
 			var item_rect: Rect2 = item.get("rect", Rect2())
-			if int(host.get("room", -1)) != room or String(host.get("activity_group", "")) != "witchwork" \
-					or String(host.get("cat", "")) != "workbench" \
-					or not host_rect.grow(-0.015).encloses(item_rect):
-				failures.append("%s alchemy material %s is not supported on the Witchwork workbench" % [label, key])
+			if int(host.get("room", -1)) != room or String(host.get("activity_group", "")) != "witchwork":
+				failures.append("%s alchemy material %s is not hosted by the Witchwork group in its own room" % [label, key])
 				continue
-			alchemy_materials += 1
+			if String(host.get("cat", "")) == "workbench":
+				# A bench top is a real envelope, so the footprint must sit in it.
+				if not host_rect.grow(-0.015).encloses(item_rect):
+					failures.append("%s alchemy material %s is not supported on the Witchwork workbench" % [label, key])
+					continue
+				alchemy_materials += 1
+				continue
+			if not bool(host.get("mounted", false)):
+				failures.append("%s alchemy material %s rests on an unmounted %s, not the bench" % [
+					label, key, String(host.get("cat", ""))])
+				continue
+			# A wall rack logs its anchor point, not a shelf envelope; the plan's
+			# own physical-support check below measures that placement. The
+			# rack's own bottles are a separate, measured part of the design.
+			rack_materials += 1
 			continue
 		if category not in ["workbench", "hearth"]:
 			continue
@@ -619,6 +657,8 @@ func _check_workshop_routes(plan: HousePlan, label: String) -> void:
 		failures.append("%s route proof found %d of 2 required Witchwork floor stations" % [label, targets])
 	if alchemy_materials != 2:
 		failures.append("%s Witchwork has %d of exactly 2 alchemy materials on its measured workbench" % [label, alchemy_materials])
+	if rack_materials != 2:
+		failures.append("%s Witchwork has %d of exactly 2 alchemy bottles on its measured wall rack" % [label, rack_materials])
 	var support_check := HouseFurnishPhysicalCheck.new()
 	support_check.check_supported(plan)
 	for support_failure in support_check.failures:
