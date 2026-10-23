@@ -1116,7 +1116,10 @@ func _on_walk_band(point: Vector2, ring: int) -> bool:
 		var mid: Vector2 = (Vector2(seg.a) + Vector2(seg.b)) * 0.5
 		var outward := Vector2(seg.outward.x, seg.outward.z).normalized()
 		var local := Vector2(point) - mid
-		var across := local.dot(outward)
+		# The run's a/b lie on the OUTER face and the wall reaches inward, so the
+		# inward distance from that face is the negative of the outward dot. Read
+		# the other way round it only ever found walks on the +x and +z sides.
+		var across := -local.dot(outward)
 		if absf(local.dot(Vector2(-outward.y, outward.x))) <= float(seg.length) * 0.5 \
 				and across >= -CastleGeometry.WALK_LIP \
 				and across <= thickness + CastleGeometry.WALK_LIP:
@@ -1756,6 +1759,9 @@ func _walk_door_gaps(inner: Vector3, outward: Vector3, run_axis: Vector3, run: f
 	# coordinates; the lip overhangs each face by WALK_LIP.
 	var strip := Rect2(Vector2(-run * 0.5, -CastleGeometry.WALK_LIP),
 		Vector2(run, t + 2.0 * CastleGeometry.WALK_LIP))
+	# The walk reaches INWARD from the run's outer face, and that face is one
+	# wall thickness out from `inner`.
+	var outer_xz := inner_xz + across * t
 	for row in _planned_interiors.values():
 		if not bool(row.get("mural_tower", false)) \
 				or bool(row.get("ground_entry", false)):
@@ -1783,7 +1789,10 @@ func _walk_door_gaps(inner: Vector3, outward: Vector3, run_axis: Vector3, run: f
 				var deep := reach if corner_index & 2 else -reach
 				var corner: Vector2 = at + tangent * along + normal * deep
 				var local := corner - inner_xz
-				var point := Vector2(local.dot(axis), local.dot(across))
+				# measured inward from the OUTER face, which is where the strip
+				# starts and where a slab's lip overhangs
+				var inward := -(corner - outer_xz).dot(across)
+				var point := Vector2(local.dot(axis), inward)
 				door_box = Rect2(point, Vector2.ZERO) if corner_index == 0 \
 					else door_box.expand(point)
 			if not strip.intersects(door_box):
