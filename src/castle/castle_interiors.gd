@@ -267,6 +267,21 @@ static func blind_rooms_to_stores(plan: HousePlan) -> void:
 			plan.rooms[index]["kind"] = &"store"
 			if index < plan.spec.program.size():
 				plan.spec.program[index] = &"store"
+			_settle_store_furniture(plan, index)
+
+
+## A room demoted to a store keeps the furniture it was dressed with as a
+## guardroom, and a guardroom may hang an outdoor lantern. A store may not: the
+## arrangement rule calls it an outdoor fitting in a domestic room (french
+## chateau fortress, ring 1). The piece has no place on a store floor and no
+## indoor twin of its category to be swapped for, so it comes out.
+static func _settle_store_furniture(plan: HousePlan, room: int) -> void:
+	var index := plan.furniture.size() - 1
+	while index >= 0:
+		if int(plan.furniture[index].get("room", -1)) == room \
+				and not PropCatalog.suits_room(String(plan.furniture[index]["key"]), &"store"):
+			plan.furniture.remove_at(index)
+		index -= 1
 
 
 ## A habitable room that lost every window to a neighbour gets one on its
