@@ -149,17 +149,30 @@ static func annexe_plan(spec: CastleSpec, box: AABB) -> HousePlan:
 
 static func _closet_plan(spec: CastleSpec, box: AABB) -> HousePlan:
 	var plan := HousePlan.new()
-	var hs: HouseSpec = CastleInteriorPlans._hall_spec(spec, box)
+	# Plan in the range frame, as ridge_range_plan does: local X along the
+	# range, local Z across it. The record turns the plan onto its box, so a
+	# plan built in the box's own axes instead lands crosswise -- outside its
+	# logged bounds, with its door in whatever building stands next door.
+	var run := maxf(box.size.x, box.size.z)
+	var across := minf(box.size.x, box.size.z)
+	var hs: HouseSpec = CastleInteriorPlans._hall_spec(spec,
+		AABB(Vector3(-run * 0.5, 0.0, -across * 0.5), Vector3(run, box.size.y, across)))
 	hs.height = clampf(box.size.y, 2.4, 3.2)
 	hs.storeys = 1
-	hs.program = [&"store"] as Array[StringName]
-	hs.variant_name = "%s: a store" % spec.variant_name
-	hs.clutter = 0.3
 	var room := HouseGeometry.interior_rect(hs)
-	if not _suits(room, &"store"):
+	# A 3.7 m mass with 0.6 m walls leaves a 2.5 m room: a passage, not a
+	# store. The walk QA calls a room that shape a corridor and will not have
+	# anything standing out in its aisle, so plan it as the passage it is.
+	# A store's chest against the end wall of one is the defect that reported.
+	var kind: StringName = &"corridor" if HouseFurnishWalkCheck._corridor(room) else &"store"
+	hs.program = [kind] as Array[StringName]
+	hs.variant_name = "%s: %s" % [spec.variant_name,
+		"a passage" if kind == &"corridor" else "a store"]
+	hs.clutter = 0.3
+	if not _suits(room, kind):
 		return plan
 	plan.spec = hs
-	plan.rooms.append({"kind": &"store", "rect": room, "storey": 0})
+	plan.rooms.append({"kind": kind, "rect": room, "storey": 0})
 	# On the local -Z wall, like every range's door; the record's yaw turns it
 	# away from the building the block leans on.
 	plan.doors.append({"a": 0, "b": -1, "pos": Vector2(room.get_center().x, room.position.y),
