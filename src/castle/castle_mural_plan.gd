@@ -9,6 +9,10 @@ const MAX_TOWER_STOREYS := 8
 const DOOR_FACET := 1.56
 ## Curtain points beyond this from a tower door are searched only as a fallback.
 const NEAR_REACH := 14.0
+## The compactest storey a tower may take when that is the only way to reach the
+## coping: 2.3 m floor to floor leaves a 2.0 m doorway and 2.2 m clear, which is
+## a cramped guardroom but a real one. The ordinary minimum stays 2.4 m.
+const COMPACT_STOREY := 2.3
 
 
 static var _geometry_cache := {}
@@ -52,50 +56,23 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 	var height := CastleGeometry.tower_height_at(spec, ring, vertex)
 	var half := CastleGeometry.tower_half_at(spec, ring, vertex)
 	var walk_y := CastleGeometry.wall_height(spec, ring) + CastleGeometry.PARAPET_RISE
-	var levels := 2
-	var entry := 1
-	var score := INF
-	# Keep the raised entrance within an ordinary step of the curtain walk.
-	# All storeys still fit exactly under the existing tower cap.
-	for count in range(2, 9):
-		var storey_h := height / float(count)
-		if storey_h < 2.4:
-			continue
-		var candidate := clampi(roundi((walk_y - HouseGeometry.FLOOR_T) / storey_h), 1, count - 1)
-		var delta := absf(candidate * storey_h + HouseGeometry.FLOOR_T - walk_y)
-		var cost := delta + absf(storey_h - 3.0) * 0.02
-		if cost < score:
-			score = cost
-			levels = count
-			entry = candidate
-	# Uniform storeys may land the raised door more than a step off the coping
-	# (battered Crusader towers: 0.61 m). Then fit the storey height to the
-	# walk instead, and let the walls rise unbroken over any short last void.
-	var storey_override := 0.0
-	# Always align the door floor with the coping, which stands 0.25 m proud of
-	# the wall: a sill a third of a metre below it leaves the walk slab across
-	# the doorway (the door-clearance rays caught it on every polygon castle).
-	if true:
-		var gap := INF
-		for fit_entry in range(1, 8):
-			var fit_h := (walk_y - HouseGeometry.FLOOR_T) / float(fit_entry)
-			if fit_h < 2.4 or fit_h > 7.0:
-				continue
-			var fit_levels := int(floor(height / fit_h + 0.001))
-			if fit_levels <= fit_entry or fit_levels > MAX_TOWER_STOREYS:
-				continue
-			# A short void under the cap is harmless; thirty-centimetre storeys
-			# or a dozen furnished rooms are not. Favour ordinary storey heights.
-			var fit_gap := height - float(fit_levels) * fit_h + absf(fit_h - 3.5)
-			if fit_gap < gap:
-				gap = fit_gap
-				levels = fit_levels
-				entry = fit_entry
-				storey_override = fit_h
+	var fit := _select_storeys(height, walk_y, 2.4)
+	if not bool(fit.raised):
+		# This tower would have to be entered at courtyard level, where the
+		# curtain's own footing (base thickness, often over 5 m at the smallest
+		# tier) buries its ground storey and the door rays meet solid masonry.
+		# A compact storey may still land the entrance on the coping; take it
+		# only when it does, so every tower which already reaches the walk keeps
+		# exactly the plan it had.
+		var compact := _select_storeys(height, walk_y, COMPACT_STOREY)
+		if bool(compact.raised):
+			fit = compact
+	var levels := int(fit.levels)
+	var entry := int(fit.entry)
+	var storey_override := float(fit.storey_override)
+	var raised := bool(fit.raised)
 	# A tower lower than the coping, or whose storeys cannot be fitted to it,
 	# has no raised door that meets the walk. It is entered from the ward.
-	var raised := absf(float(entry) * (storey_override if storey_override > 0.0
-		else height / float(levels)) + HouseGeometry.FLOOR_T - walk_y) <= WalkGrid.MAX_STEP
 	if not raised:
 		entry = 0
 		storey_override = 0.0
@@ -214,6 +191,55 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 	out[id] = row
 
 
+## Pick a storey count and a raised entrance level that put the door floor on the
+## curtain walk. `min_storey` is the shortest storey allowed: 2.4 m ordinarily,
+## COMPACT_STOREY for a tower that could not otherwise reach the coping at all.
+static func _select_storeys(height: float, walk_y: float, min_storey: float) -> Dictionary:
+	var levels := 2
+	var entry := 1
+	var score := INF
+	# Keep the raised entrance within an ordinary step of the curtain walk.
+	# All storeys still fit exactly under the existing tower cap.
+	for count in range(2, 9):
+		var storey_h := height / float(count)
+		if storey_h < min_storey:
+			continue
+		var candidate := clampi(roundi((walk_y - HouseGeometry.FLOOR_T) / storey_h), 1, count - 1)
+		var delta := absf(candidate * storey_h + HouseGeometry.FLOOR_T - walk_y)
+		var cost := delta + absf(storey_h - 3.0) * 0.02
+		if cost < score:
+			score = cost
+			levels = count
+			entry = candidate
+	# Uniform storeys may land the raised door more than a step off the coping
+	# (battered Crusader towers: 0.61 m). Then fit the storey height to the
+	# walk instead, and let the walls rise unbroken over any short last void.
+	var storey_override := 0.0
+	# Always align the door floor with the coping, which stands 0.25 m proud of
+	# the wall: a sill a third of a metre below it leaves the walk slab across
+	# the doorway (the door-clearance rays caught it on every polygon castle).
+	var gap := INF
+	for fit_entry in range(1, 8):
+		var fit_h := (walk_y - HouseGeometry.FLOOR_T) / float(fit_entry)
+		if fit_h < min_storey or fit_h > 7.0:
+			continue
+		var fit_levels := int(floor(height / fit_h + 0.001))
+		if fit_levels <= fit_entry or fit_levels > MAX_TOWER_STOREYS:
+			continue
+		# A short void under the cap is harmless; thirty-centimetre storeys
+		# or a dozen furnished rooms are not. Favour ordinary storey heights.
+		var fit_gap := height - float(fit_levels) * fit_h + absf(fit_h - 3.5)
+		if fit_gap < gap:
+			gap = fit_gap
+			levels = fit_levels
+			entry = fit_entry
+			storey_override = fit_h
+	var raised := absf(float(entry) * (storey_override if storey_override > 0.0
+		else height / float(levels)) + HouseGeometry.FLOOR_T - walk_y) <= WalkGrid.MAX_STEP
+	return {"levels": levels, "entry": entry, "storey_override": storey_override,
+		"raised": raised}
+
+
 ## A slender tower has facets too short for a doorway and its margins. Coarsen
 ## the plan (12, 8, 6, 4 sides) until a facet takes one; the shell is raised
 ## from this plan, so a six-sided turret really is six-sided.
@@ -301,6 +327,12 @@ static func _door(plan: HousePlan, spec: CastleSpec, ring: int, centre: Vector3,
 			var target: Vector2 = route[-1]
 			var landing := Rect2(outside - Vector2.ONE * 0.72, Vector2.ONE * 1.44)
 			var gallery := _route_gallery(route)
+			# The first span carries the walker from the doorway to the curtain
+			# walk. It is decked at the door's own threshold: the tower's raised
+			# entrance may stand a step below the coping, and a deck at coping
+			# height would then be the threshold the doorway is measured against.
+			if not gallery.is_empty():
+				gallery[0]["sill"] = true
 			gallery.append_array(corner_links)
 			best = {"door": {"a": level, "b": -1, "pos": pos,
 				"normal": normal, "width": half_width * 2.0, "exterior": true,
