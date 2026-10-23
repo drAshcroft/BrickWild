@@ -29,8 +29,10 @@ func _init() -> void:
 	print("range %s %s plan doors=%d windows=%d rooms=%d ground_entry=%s" % [want,
 		String(plan.spec.style), plan.doors.size(), plan.windows.size(), plan.rooms.size(),
 		str(row.get("ground_entry", false))])
+	var entrance: Dictionary = plan.doors[plan.entrance()] if plan.entrance() >= 0 else {}
 	print("  spec w=%.2f l=%.2f h=%.2f storeys=%d entry=%d" % [plan.spec.width,
-		plan.spec.length, plan.spec.height, plan.spec.storeys, plan.spec.entry_storey])
+		plan.spec.length, plan.spec.height, plan.spec.storeys,
+		int(entrance.get("storey", 0))])
 	print("  row transform origin=%s  bounds=%s" % [str(row.transform.origin),
 		str(row.bounds)])
 	for ring in CastleGeometry.rings(spec):
@@ -61,8 +63,8 @@ func _init() -> void:
 		CastleGeometry.wall_height(spec, 0),
 		CastleGeometry.wall_height(spec, 0) + CastleGeometry.PARAPET_RISE])
 	var raised_door: Dictionary = mural._door(plan, spec, 0, row.transform.origin,
-		plan.spec.entry_storey, vertex)
-	print("  raised door (entry %d): %s" % [plan.spec.entry_storey,
+		int(entrance.get("storey", 0)), vertex)
+	print("  raised door (entry %d): %s" % [int(entrance.get("storey", 0)),
 		"found" if not raised_door.is_empty() else "EMPTY"])
 	var room0: Dictionary = plan.rooms[0]
 	print("  room0 rect=%s outline_n=%d" % [str(room0.get("rect", Rect2())),

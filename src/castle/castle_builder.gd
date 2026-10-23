@@ -1064,7 +1064,16 @@ func _build_wall_stairs() -> void:
 		var bounds := AABB()
 		var first := true
 		for piece in preload("castle_access_geometry.gd").pieces(stair):
-			var surface := SURF_TRIM if "rail" in String(piece.role) else SURF_STONE
+			# A stair makes its top landing on the coping it serves. Its guards
+			# stand on the landing's edges, and an edge that has been laid over
+			# the walkway itself is masonry in the middle of the walk: the
+			# coping is the floor there, with no drop to guard.
+			var role := String(piece.role)
+			if ("rail" in role or "guard_post" in role) \
+					and _in_walkway(Vector2(piece.xf.origin.x, piece.xf.origin.z),
+						int(stair.ring)):
+				continue
+			var surface := SURF_TRIM if "rail" in role else SURF_STONE
 			var row := component_box(piece.role, piece.size, piece.xf, surface)
 			bounds = component_aabb(row) if first else bounds.merge(component_aabb(row))
 			first = false
@@ -1074,6 +1083,45 @@ func _build_wall_stairs() -> void:
 		mass_log.back()["footprint"] = stair.poly
 		host_end()
 		index += 1
+
+
+## Whether a point stands where people walk: the coping of the ring, or the
+## deck of a mural tower's gallery. A stair's guard rail or post standing here
+## is masonry across the way it guards.
+func _in_walkway(point: Vector2, ring: int) -> bool:
+	if _on_walk_band(point, ring):
+		return true
+	for row in _planned_interiors.values():
+		if not bool(row.get("mural_tower", false)):
+			continue
+		for span in row.get("walk_gallery", []):
+			var a: Vector2 = span.a
+			var b: Vector2 = span.b
+			if a.distance_to(b) < 0.03:
+				continue
+			# The whole deck is walkway, not just its centreline: a gallery is
+			# 1.4 m wide and its own parapet guards the drop on one side.
+			if Geometry2D.get_closest_point_to_segment(point, a, b).distance_to(point) \
+					<= float(span.get("width", 1.4)) * 0.5 + 0.1:
+				return true
+	return false
+
+
+## Whether a point stands on a ring's wall walk, over the coping itself.
+func _on_walk_band(point: Vector2, ring: int) -> bool:
+	if not CastleGeometry.is_enclosed(spec):
+		return false
+	var thickness: float = CastleGeometry.wall_thickness(spec, ring)
+	for seg in CastleGeometry.wall_segments(spec, ring):
+		var mid: Vector2 = (Vector2(seg.a) + Vector2(seg.b)) * 0.5
+		var outward := Vector2(seg.outward.x, seg.outward.z).normalized()
+		var local := Vector2(point) - mid
+		var across := local.dot(outward)
+		if absf(local.dot(Vector2(-outward.y, outward.x))) <= float(seg.length) * 0.5 \
+				and across >= -CastleGeometry.WALK_LIP \
+				and across <= thickness + CastleGeometry.WALK_LIP:
+			return true
+	return false
 
 
 ## No slot narrower than a passage between a ward building and the curtain.
@@ -2675,8 +2723,13 @@ func _mural_landing(row: Dictionary) -> void:
 				side = -side
 			var rail_width := 0.16
 			var rail_height := 0.62
-			var rail_start := a + delta.normalized() * (0.8 if bool(span.get("open_start", false)) else 0.0)
-			var rail_end := b - delta.normalized() * (0.8 if bool(span.get("open_end", false)) else 0.0)
+			# A parapet that reaches the joint where the gallery turns stands
+			# across the walker's way round. Hold it back from every joint by
+			# its own lateral offset, so its end can never meet the next span's
+			# centreline; an open end keeps the wider arrival gap.
+			var joint_inset := deck_width * 0.5 - rail_width * 0.5
+			var rail_start := a + delta.normalized() * (0.8 if bool(span.get("open_start", false)) else joint_inset)
+			var rail_end := b - delta.normalized() * (0.8 if bool(span.get("open_end", false)) else joint_inset)
 			var rail_mid := (rail_start + rail_end) * 0.5
 			var rail_length := rail_start.distance_to(rail_end)
 			if rail_length < 0.1:

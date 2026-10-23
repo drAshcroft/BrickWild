@@ -57,7 +57,10 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 	var half := CastleGeometry.tower_half_at(spec, ring, vertex)
 	var walk_y := CastleGeometry.wall_height(spec, ring) + CastleGeometry.PARAPET_RISE
 	var fit := _select_storeys(height, walk_y, 2.4)
-	if not bool(fit.raised):
+	# A gate tower is entered through its own gate passage, not off the walk:
+	# it keeps the ordinary storeys it had, and its compact-only fallback (a
+	# tighter storey just to reach the coping) is not offered to it.
+	if not bool(fit.raised) and not id.contains("_gate_"):
 		# This tower would have to be entered at courtyard level, where the
 		# curtain's own footing (base thickness, often over 5 m at the smallest
 		# tier) buries its ground storey and the door rays meet solid masonry.
@@ -324,9 +327,15 @@ static func _door(plan: HousePlan, spec: CastleSpec, ring: int, centre: Vector3,
 				if corner_links.is_empty():
 					continue
 			score = distance
+			if vertex >= 0:
+				route = _gallery_route(route, corner_links)
 			var target: Vector2 = route[-1]
 			var landing := Rect2(outside - Vector2.ONE * 0.72, Vector2.ONE * 1.44)
-			var gallery := _route_gallery(route)
+			# The doorway's own leg, and on a corner the leg from it to the
+			# joint of the L the walker actually steps onto: without that second
+			# deck the arrival landing and the corner gallery do not meet.
+			var head := 3 if vertex >= 0 and route.size() > 2 else route.size()
+			var gallery := _route_gallery(route.slice(0, head))
 			# The first span carries the walker from the doorway to the curtain
 			# walk. It is decked at the door's own threshold: the tower's raised
 			# entrance may stand a step below the coping, and a deck at coping
@@ -508,6 +517,36 @@ static func _route_gallery(route: Array[Vector2]) -> Array[Dictionary]:
 		var b: Vector2 = route[i]
 		if a.distance_to(b) > 0.03:
 			out.append({"a": a, "b": b, "width": 1.4})
+	return out
+
+
+## A corner tower's walker goes round its ward face, not straight across the
+## galleries that close the angle: the parapet guarding the drop stands on
+## those decks, and a route cutting the corner walks through it. The joints the
+## plan already decks are the way round.
+static func _gallery_route(route: Array[Vector2], links: Array[Dictionary]) -> Array[Vector2]:
+	if route.size() < 2 or links.is_empty():
+		return route
+	var chain: Array[Vector2] = [Vector2(links[0].a)]
+	for link in links:
+		chain.append(Vector2(link.b))
+	var arrival: Vector2 = route[1]
+	# Enter the L at the joint nearest the doorway, then leave by the shorter
+	# of its two arms: the door faces the ward, so the far coping is at one end
+	# of the chain and the near one at the other.
+	var entry := 0
+	var nearest := INF
+	for index in chain.size():
+		var distance := arrival.distance_to(chain[index])
+		if distance < nearest:
+			nearest = distance
+			entry = index
+	var finish := chain.size() - 1 if entry <= chain.size() - 1 - entry else 0
+	var step := 1 if finish > entry else -1
+	var out: Array[Vector2] = [route[0], arrival]
+	for index in range(entry, finish + step, step):
+		if out[-1].distance_to(chain[index]) > 0.02:
+			out.append(chain[index])
 	return out
 
 

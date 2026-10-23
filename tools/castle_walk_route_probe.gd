@@ -5,6 +5,7 @@ extends SceneTree
 ## ray and every triangle it crosses, with the part the builder logged for it.
 ##
 ##   godot --headless --path . --script res://tools/castle_walk_route_probe.gd -- castle crusader 0 tower_0_corner_2
+##   godot --headless --path . --script res://tools/castle_walk_route_probe.gd -- castle motte 0 tower_0_gate_0
 ##   arguments: tier style index [range-id]
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -12,7 +13,9 @@ func _init() -> void:
 	var style := StringName(args[1] if args.size() > 1 else "crusader")
 	var index := int(args[2] if args.size() > 2 else 0)
 	var want := String(args[3] if args.size() > 3 else "")
-	var spec := CastleSweep.spec_at(style, tier, index)
+	# `motte` builds the castle motte-access suite's own fixture (the README hero).
+	var spec: CastleSpec = preload("res://tests/suites/castle_motte_access_suite.gd").hero_spec() \
+		if tier == &"motte" else CastleSweep.spec_at(style, tier, index)
 	var builder := CastleBuilder.new()
 	var mesh: ArrayMesh = builder.build(spec)
 	var triangles := CastleRouteCheck.masonry_triangles(mesh)
@@ -68,11 +71,15 @@ static func _nearest_parts(builder: CastleBuilder, triangle: PackedVector3Array)
 				str(part.get("kind", "")), str(part.get("pos", Vector3.ZERO)),
 				str(part.get("size", Vector3.ZERO))])
 	for component in builder.component_log:
-		if String(component.get("kind", "")) != "box":
+		if String(component.get("form", "")) != "box":
 			continue
 		var xf: Transform3D = component.get("xf", Transform3D())
 		var size: Vector3 = component.get("size", Vector3.ZERO)
-		var part_box := AABB(xf.origin - size * 0.5, size)
+		var part_box := AABB(xf * Vector3(-size.x, -size.y, -size.z) * 0.5, Vector3.ZERO)
+		for corner in Poly.from_rect(Rect2(-Vector2(size.x, size.z) * 0.5,
+				Vector2(size.x, size.z))):
+			for height in [-size.y * 0.5, size.y * 0.5]:
+				part_box = part_box.expand(xf * Vector3(corner.x, height, corner.y))
 		if part_box.grow(0.05).has_point(centre):
 			rows.append("COMPONENT %s host=%s pos=%s size=%s" % [
 				str(component.get("role", "")), str(component.get("host", "")),
