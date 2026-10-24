@@ -60,6 +60,7 @@ var dome_shape: StringName       # &"hemisphere", &"onion", &"octagonal"
 var dome_radius: float
 var dome_drum_height: float      # vertical drum the dome springs from
 var dome_lantern: bool
+var dome_west: bool              # the dome stands over the WEST bay, so the entry sees it (SACRED-BYZANTINE-DOME)
 var half_domes: bool             # buttressing half-domes east/west, Byzantine
 var exedrae: bool                # small semi-domed niches flanking the half-domes
 var ambulatory: bool             # aisle carried around the apse

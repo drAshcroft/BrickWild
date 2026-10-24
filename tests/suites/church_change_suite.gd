@@ -76,6 +76,7 @@ static func run() -> SuiteResult:
 	_nave_intrusion(res)
 	_tower_crowns(res)
 	_romanesque_large_front(res)
+	_byzantine_large_dome(res)
 	return res
 
 
@@ -378,6 +379,66 @@ static func _romanesque_large_front(res: SuiteResult) -> void:
 				Vector3(60.0, 80.0, 1.0))})
 			_expect(res, _front_visible_fraction(walled, "tower") < 0.05,
 				"%s: occlusion control (a wall in front) must hide the tower" % who)
+
+
+## SACRED-BYZANTINE-DOME: a large Byzantine church's dome crown must be in a
+## clear sight line from the exterior entry eye (1.6 m, on the axis, at the
+## door approach). Occluders are every logged mass except the dome's own
+## pendentive and drum, plus the nave roof up to its ridge. Controls: a raised
+## west gable, and the dome back over the east crossing, must both fail.
+static func _byzantine_large_dome(res: SuiteResult) -> void:
+	for seed_v in [21325, 1, 8102, 9, 77]:
+		var spec := ChurchSpec.new()
+		spec.style = &"byzantine"
+		spec.width = 16.0
+		spec.length = 48.0
+		spec.height = 24.0
+		ChurchGenerator.generate(spec, seed_v)
+		var who := "Byzantine large seed=%d" % seed_v
+		if not spec.dome:
+			_expect(res, false, "%s: no dome" % who)
+			continue
+		var builder := ChurchBuilder.new()
+		builder.build(spec)
+		var crown := Vector3(0.0, ChurchGeometry.dome_crown_height(spec),
+			ChurchGeometry.crossing_center_z(spec))
+		var eye: Vector3 = ChurchGeometry.entry_eye(spec)
+		var occluders := _dome_occluders(spec, builder.mass_log)
+		_expect(res, not _any_hit(eye, crown, occluders),
+			"%s: dome crown unobstructed from the entry eye" % who)
+		if seed_v == 21325:
+			_expect(res, spec.width == 16.0 and spec.length == 48.0 and spec.height == 24.0,
+				"%s: pinned dimensions unchanged" % who)
+			var raised: Array = occluders.duplicate()
+			raised.append(AABB(Vector3(-spec.width / 2.0, 0.0, -spec.length / 2.0 - 0.5),
+				Vector3(spec.width, crown.y + 4.0, 0.5)))
+			_expect(res, _any_hit(eye, crown, raised),
+				"%s: control (raised west gable) must hide the dome" % who)
+			spec.dome_west = false
+			var east := ChurchBuilder.new()
+			east.build(spec)
+			var east_crown := Vector3(0.0, ChurchGeometry.dome_crown_height(spec),
+				ChurchGeometry.crossing_center_z(spec))
+			_expect(res, _any_hit(eye, east_crown, _dome_occluders(spec, east.mass_log)),
+				"%s: control (dome back over the east crossing) must hide the dome" % who)
+
+
+static func _dome_occluders(spec: ChurchSpec, log: Array) -> Array:
+	var out: Array = []
+	for row in log:
+		if String(row["name"]) in ["pendentive", "dome_drum"]:
+			continue
+		out.append(row["aabb"])
+	out.append(AABB(Vector3(-spec.width / 2.0, spec.height, -spec.length / 2.0),
+		Vector3(spec.width, ChurchGeometry.nave_ridge_height(spec) - spec.height, spec.length)))
+	return out
+
+
+static func _any_hit(a: Vector3, b: Vector3, boxes: Array) -> bool:
+	for box in boxes:
+		if _segment_hits(a, b, box):
+			return true
+	return false
 
 
 static func _mass_aabb(log: Array, mass_name: String) -> AABB:

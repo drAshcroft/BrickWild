@@ -81,6 +81,27 @@ func _render_case(case: Dictionary) -> bool:
 			_root3d.remove_child(scene)
 			scene.free()
 			continue
+		if name == "approach" and made.spec is ChurchSpec:
+			# the exterior entry eye (SACRED-BYZANTINE-DOME): 1.6 m on the axis,
+			# looking at the dome crown if there is one, else the ridge
+			var cs: ChurchSpec = made.spec
+			var eye := ChurchGeometry.entry_eye(cs)
+			var aim := Vector3(0.0, ChurchGeometry.dome_crown_height(cs) if cs.dome 					else ChurchGeometry.nave_ridge_height(cs),
+				ChurchGeometry.crossing_center_z(cs) if cs.dome else 0.0)
+			_cam.fov = 60.0
+			_cam.position = eye
+			_cam.look_at(aim, Vector3.UP)
+			_set_shot_lighting(atan2(-_cam.global_transform.basis.z.x, -_cam.global_transform.basis.z.z), 80.0)
+			await process_frame
+			await RenderingServer.frame_post_draw
+			await process_frame
+			await RenderingServer.frame_post_draw
+			var atarget := ProjectSettings.globalize_path(_out).path_join("%s__approach.jpg" % slug)
+			_vp.get_texture().get_image().save_jpg(atarget, 0.92)
+			print("  ", atarget)
+			_root3d.remove_child(scene)
+			scene.free()
+			continue
 		if cutaway:
 			await _cutaway_view(slug, c, radius)
 			_root3d.remove_child(scene)

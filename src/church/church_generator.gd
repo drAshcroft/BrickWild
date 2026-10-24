@@ -98,6 +98,7 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 	if spec.crossing_tower:
 		spec.crossing_tower_height = spec.height * r.randf_range(1.35, 1.9)
 
+	spec.dome_west = false
 	spec.dome = GeneratorRandom.chance(r, s.get("dome", 0.0))
 	var shapes: Array = s.get("dome_shapes", [])
 	if spec.dome and shapes.is_empty():
@@ -146,6 +147,7 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 		spec.roof_pitch = maxf(spec.roof_pitch, 0.85)
 
 	_ensure_west_front_mass(spec)
+	_ensure_entry_dome(spec)
 
 	var first: String = GeneratorRandom.pick(r, FIRST_WORDS).trim_suffix(".")
 	var second: String = GeneratorRandom.pick(r, SECOND_WORDS)
@@ -177,12 +179,36 @@ static func _ensure_west_front_mass(spec: ChurchSpec) -> void:
 		spec.clerestory = false
 
 
+## A large Byzantine church must show its dome from the entry
+## (SACRED-BYZANTINE-DOME, byzantine_large_21325). The dice put the dome over
+## the crossing, east of a 24 m nave, where no ground eye can see it. For a
+## domed Byzantine 14 m wide or more the dome is moved over the west bay
+## (`dome_west`), the transept and half-domes that belonged to the east crossing
+## are dropped, and the drum is grown until the apex clears the west gable peak
+## on the sight line from the entry eye. Set after every roll, none drawn.
+const BYZANTINE_LARGE_WIDTH := 14.0
+
+static func _ensure_entry_dome(spec: ChurchSpec) -> void:
+	if spec.style != &"byzantine" or not spec.dome or spec.width < BYZANTINE_LARGE_WIDTH:
+		return
+	spec.dome_west = true
+	spec.transept = false
+	spec.transept_len = 0.0
+	spec.half_domes = false
+	spec.exedrae = false
+	var need: float = ChurchGeometry.entry_view_min_apex(spec)
+	var apex: float = ChurchGeometry.dome_crown_height(spec)
+	if apex < need:
+		spec.dome_drum_height += need - apex
+
+
 ## The three famous domed churches, composed rather than rolled. Call this
 ## after generate(): it overrides whatever the dice chose, sets `spec.hero`
 ## (which switches on the landmark geometry in ChurchGeometry/ChurchBuilder),
 ## and sizes the parts from the dimensions docs/LANDMARKS.md gives. `key` is
 ## the landmark key: "florence_duomo", "st_basil" or "hagia_sophia".
 static func apply_landmark(spec: ChurchSpec, key: String) -> void:
+	spec.dome_west = false
 	match key:
 		"florence_duomo":
 			_landmark_florence(spec)
