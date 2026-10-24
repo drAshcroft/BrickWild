@@ -145,11 +145,37 @@ static func generate(spec: ChurchSpec, p_seed: int) -> void:
 		# ...and its nave roof is steep: a stave roof sheds snow, not a hipped hall.
 		spec.roof_pitch = maxf(spec.roof_pitch, 0.85)
 
+	_ensure_west_front_mass(spec)
+
 	var first: String = GeneratorRandom.pick(r, FIRST_WORDS).trim_suffix(".")
 	var second: String = GeneratorRandom.pick(r, SECOND_WORDS)
 	var suffix: String = GeneratorRandom.pick(r, SUFFIXES)
 	var separator: String = "" if suffix.begins_with("-") or suffix.is_empty() else " "
 	spec.variant_name = "%s %s%s%s" % [first, second, separator, suffix]
+
+## A large Romanesque church seen from the west must show a mass there. The
+## dice give a tower 80% of the time; the other 20% left a 24 m plain gabled
+## box (SACRED-ROMANESQUE-LARGE, romanesque_large_21325). The apse stands at
+## the EAST end and the nave hides it from the front, so the guarantee is a
+## single west tower. It is set after every roll and uses none, so no other
+## case's stream moves, and it is fixed fractions of the locked size so the
+## pinned dimensions are untouched.
+const ROMANESQUE_LARGE_WIDTH := 14.0
+
+static func _ensure_west_front_mass(spec: ChurchSpec) -> void:
+	if spec.style != &"romanesque" or spec.width < ROMANESQUE_LARGE_WIDTH or spec.tower:
+		return
+	spec.tower = true
+	spec.west_towers = 1
+	spec.tower_width = clampf(spec.width * 0.55, 3.0, spec.width)
+	spec.tower_height = spec.height * 1.7
+	spec.tower_roof = &"pyramid"
+	spec.spire = false
+	spec.rose_window = false  # a single tower carries the front; no rose beside it
+	if spec.aisles > 0 and not ChurchGeometry.aisle_fits(spec):
+		spec.aisles = 0
+		spec.clerestory = false
+
 
 ## The three famous domed churches, composed rather than rolled. Call this
 ## after generate(): it overrides whatever the dice chose, sets `spec.hero`
