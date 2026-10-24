@@ -170,10 +170,10 @@ procession; Focus = focal visibility from the entry image. The slug is
 
 | Id | Identity | Entry | Congregation | Focus (entry image) | Verdict |
 |---|---|---|---|---|---|
-| romanesque_small_1 | partly: round apse, lombard pilasters, but square windows and the west tower ends in stepped blocks and bare posts | door in tower base, straight nave, pews to the rail | two pew blocks either side of the aisle, empty chancel (brief) | altar and candles clear at the end of the aisle, apse lights above | needs_changes: tower crown reads unfinished (todo SACRED-TOWER-CROWN) |
+| romanesque_small_1 | partly: round apse, lombard pilasters, but square windows and the west tower ends in stepped blocks and bare posts | door in tower base, straight nave, pews to the rail | two pew blocks either side of the aisle, empty chancel (brief) | altar and candles clear at the end of the aisle, apse lights above | needs_changes: tower crown reads unfinished (todo SACRED-TOWER-CROWN). **Re-ticked 2026-10-24 on ed96101: approved; cornice and pyramidal cap seated, no stepped blocks or posts** |
 | romanesque_default_8102 | partly: tower, apse, gable porch read Romanesque; flat uncapped tower | door, aisle, apse | pews both sides, empty chancel | altar visible under the chancel arch | accepted |
 | romanesque_large_21325 | no: a 24 m gabled box, pilasters and two tiny slit windows, no tower, no apse visible from the front | door in a blank gable, then the nave | FIXED 14 Oct: two benches abreast either side of a 1.5 m aisle, 33 rows, cross-aisles | FIXED 20 Oct: a built reredos (dark ground, pale panels, frames, cross, 6.7 x 10.6 m) on the east wall behind the altar, red banners either side on the wall face; reads at once from the door | FIXED 24 Oct (SACRED-ROMANESQUE-LARGE): the dice gave this seed no tower, so `ChurchGenerator._ensure_west_front_mass` now guarantees a single west tower (0.55 of the width, 1.7 of the wall height, hipped cap) on any Romanesque 14 m wide or more; the apse is east and the nave hides it, so the tower is the front mass. `churchchange` casts rays from the front 3/4 camera at the tower faces (visible fraction >= 0.6, with a wall-in-front control). Render: artifacts/goal/SACRED-ROMANESQUE-LARGE/after. needs an independent reviewer tick |
-| romanesque_default_1 | partly: as small/1, with a row of tall lights on the flank | door, aisle, apse | pews both sides | altar and candles clear | needs_changes: same tower crown fault (SACRED-TOWER-CROWN) |
+| romanesque_default_1 | partly: as small/1, with a row of tall lights on the flank | door, aisle, apse | pews both sides | altar and candles clear | needs_changes: same tower crown fault (SACRED-TOWER-CROWN). **Re-ticked 2026-10-24 on ed96101: approved; crown seated** |
 | gothic_small_1 | yes, 20 Oct: the twin towers now end in octagonal spires with crockets and finials (every Gothic tower draws `spire`); round chevet, pointed lights | portal in the west front, aisle, apse | pews both sides | altar and candles clear, three apse lights | accepted |
 | gothic_default_8102 | yes: twin octagonal spires, flying buttresses, clerestory | portal, aisle between piers | pews both sides, aisles beyond the piers empty | altar clear at the end | accepted (design-board gaps in the section above stand) |
 | gothic_large_21325 | yes: tall twin towers, flyer arcade, glazed clerestory | portal, long aisle | pews from the first bay, aisles empty | altar small but readable, apse arch above it | accepted |
@@ -190,10 +190,10 @@ procession; Focus = focal visibility from the entry image. The slug is
 | renaissance_default_8102 | partly: dome, lantern, twin stepped tower crowns, round-headed lights | door, aisle | pews both sides | altar clear | accepted |
 | renaissance_large_21325 | partly: rose window, dome and a lean-to roof read Italian; flank is a long blank wall | door, long aisle | FIXED 14 Oct: 112 pews in two-abreast blocks to the chancel step, cross-aisle every eighth row | altar group on its step, scaled, candelabra and candles read at the end of the aisle | accepted (seating and focus; exterior as before) |
 | renaissance_default_1 | partly: dome and lantern, stepped tower | door, aisle | pews both sides | altar clear | accepted |
-| russian_small_1 | partly: one squat onion dome, round chevet; no cluster of domes, no kokoshniki | door in tower base, aisle | pews both sides | altar clear | needs_changes: floating blocks on the nave walls (SACRED-RUSSIAN-FLOATING-BLOCKS) and the tower crown fault |
-| russian_default_8102 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
+| russian_small_1 | partly: one squat onion dome, round chevet; no cluster of domes, no kokoshniki | door in tower base, aisle | pews both sides | altar clear | needs_changes: floating blocks on the nave walls (SACRED-RUSSIAN-FLOATING-BLOCKS) and the tower crown fault. **Re-ticked 2026-10-24 on ed96101: approved; slab, lantern and onion seated, turrets attached, no floating blocks** |
+| russian_default_8102 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above. **Re-ticked 2026-10-24 on ed96101: approved; crown seated, no floating blocks** |
 | russian_large_21325 | partly: one onion dome on a box, two half-round buttress turrets | door, aisle | Orthodox standing worship: open floor intentional, wall stalls only | 20 Oct: reredos and banners behind the altar group, readable from the door; no floating blocks in the nave (fixed 14 Oct under SACRED-RUSSIAN-FLOATING-BLOCKS, re-reviewed 20 Oct) | accepted (identity partly, as renaissance) |
-| russian_default_1 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
+| russian_default_1 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above. **Re-ticked 2026-10-24 on ed96101: approved; crown seated, no floating blocks** |
 
 ### Temples
 
@@ -742,3 +742,7 @@ A fresh reviewer, given only the checklist and the 24 front/side renders
   from inside.
 
 Receipts: `lane:temple` 3106 checks / 0 failures / 0 warnings (`artifacts/goal/SACRED-IDENTITY/lane2.log`).
+
+## LIVE-SACRED close-out (2026-10-24)
+
+All six sub-tasks done (676e5e6, 41f0414, 15b30ad, 5e92c0b, ecfaa49, ed96101). The five rows that cited since-fixed defects were re-rendered once on ed96101 with `tools/render_sacred_exterior.gd` (front, side, entry, cutaway; `artifacts/goal/LIVE-SACRED/`) and re-ticked above. Open findings have their own tasks: SACRED-ROTUNDA-PERISTYLE (ring colonnade 0/6 from outside) and TEMPLE-STAIR-TEST-STALE.
