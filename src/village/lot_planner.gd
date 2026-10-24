@@ -185,6 +185,33 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	# 1.3 and then failed the density floor at 3.47 %. Take the narrowest
 	# finer step that houses everyone and keeps the common as good as it is.
 	if float(accepted[1]) > 1.0 and _density(out) < _density_floor(spec):
+		# A lane-free ladder (round, VIL-ROUND-17077) can house a seat by
+		# widening alone, so the head is never cleared and the seat takes the
+		# wide step: Thorn's royal hamlet of 30 was taken at 270 m (4.2 %) when
+		# clearing the head houses it at 225 m (5.1 %). Try the head at every
+		# narrower width before the finer steps.
+		if not accepted_head and jobs.any(func(j: Dictionary) -> bool: return j["class"] == &"manor"):
+			var least: float = _manor_site_scale(_replan(spec, jobs, 0, 1.0, minimum_depth, shore_depth), jobs)
+			var narrower: Array[float] = []
+			for attempt in attempts:
+				var scale := maxf(float(attempt[1]), least)
+				if scale < float(accepted[1]) and not narrower.has(scale):
+					narrower.append(scale)
+			narrower.sort()
+			for scale in narrower:
+				var headed: VillagePlan = _replan(spec, jobs, int(accepted[0]), scale, minimum_depth,
+					shore_depth, true)
+				var headed_left: int = cut_measured(headed, jobs)
+				var headed_common := _round_common_state(headed)
+				if headed_left > unplaced or bool(headed_common["ready"]) != bool(common_state["ready"]) \
+						or float(headed_common["coverage"]) < float(common_state["coverage"]):
+					continue
+				out = headed
+				unplaced = headed_left
+				common_state = headed_common
+				accepted = [int(accepted[0]), scale]
+				accepted_head = true
+				break
 		for scale in FINE_WIDTH_STEPS:
 			if scale >= float(accepted[1]):
 				break
