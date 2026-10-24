@@ -66,6 +66,10 @@
       "destination": "families/village"
     },
     {
+      "source": "src/village/forms",
+      "destination": "families/village/forms"
+    },
+    {
       "source": "src/windmill",
       "destination": "families/windmill"
     },
