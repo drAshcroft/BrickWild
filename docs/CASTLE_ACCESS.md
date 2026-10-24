@@ -33,3 +33,23 @@ checks alone do not establish that the occupied castle works as a whole.
 The focused runner passed 285 checks on 2026-09-25: 199 for wall stairs,
 70 for forebuildings and 16 for gate access, with zero failures or warnings.
 Its log is `artifacts/todo_completion/cas004_access.log`.
+
+## Polygon corner galleries (CASTLE-CURVED-CURTAIN-ROUTES)
+
+Three things made the polygon castles' corner routes cross masonry that the
+rect castles do not have. All three apply to `CastleGeometry.is_polygonal` only,
+so the rect layouts are untouched.
+
+* The corner L's elbow is where the two curtain-parallel arms meet
+  (`CastleMuralPlan._corner_gallery`), not an axis-aligned corner. On a slanted
+  curtain the axis-aligned elbow made a 36 degree hairpin whose parapets and
+  deck seams crossed the walker.
+* `wall_stairs` reserves the corner towers' decks (it did so only on a motte), so
+  a stair's piers and end rails stay off the route.
+* `_clear_gallery` takes the L's arm that is clear of the keep, hall, chapel and
+  apse. The L is still decked whole: trimming the unused arm cut the coping's
+  continuity and stranded every corner on french_chateau. Do not use
+  `bailey_obstacles` there; it asks for the wall stairs, which ask for the routes.
+
+Elven (bowed) curtains are a different class: `_curved_wall_run` never cuts the
+towers out, so they stay `CASTLE-ELVEN-TOWERS`.

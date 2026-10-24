@@ -188,7 +188,12 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 	# to the layout without it. CastleRouteCheck still rejects a stair whose
 	# headroom is blocked.
 	var tower_decks: Array[Rect2] = []
-	if CastleGeometry.is_motte(spec):
+	# A polygon's corner towers meet the coping through slanted curtain faces, so
+	# their route can land beside a stair's piers and end rails: reserve their
+	# decks there too (CASTLE-CURVED-CURTAIN-ROUTES). The rect castles keep the
+	# layout their routes were proven on, and so does the bergfried hexagon:
+	# the Thorncliffe walk-QA stair controls are pinned to its stairs.
+	if CastleGeometry.is_motte(spec) or (spec.plan_kind == &"polygon" and CastleGeometry.is_polygonal(spec)):
 		var mural := preload("castle_mural_plan.gd").records(spec, true)
 		for row in mural.values():
 			if Rect2(row.walk_landing).has_area():
