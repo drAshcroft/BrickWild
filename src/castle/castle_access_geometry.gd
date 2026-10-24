@@ -198,6 +198,11 @@ static func wall_stairs(spec: CastleSpec) -> Array[Dictionary]:
 		for row in mural.values():
 			if Rect2(row.walk_landing).has_area():
 				tower_decks.append(Rect2(row.walk_landing))
+			if spec.curved_edges:
+				# A bowed curtain's walk is narrow beside a tower: keep a stair's
+				# rails and piers a body's width clear of where the route lands.
+				for stop in row.get("walk_route", []):
+					tower_decks.append(Rect2(Vector2(stop) - Vector2.ONE * 2.2, Vector2.ONE * 4.4))
 			for span in row.get("walk_gallery", []):
 				var a: Vector2 = span.a
 				var b: Vector2 = span.b
@@ -253,6 +258,8 @@ static func _plan_wall_stairs(spec: CastleSpec, galleries: Array[Rect2],
 		var span := run + LANDING * 2.0
 		var edge := CastleGeometry.enceinte_polygon(spec, ring)
 		var clear_ward := CastleGeometry.inner_polygon(spec, ring)
+		if spec.curved_edges:
+			clear_ward = _bowed_ward(spec, ring, edge, clear_ward)
 		var gate := CastleGeometry.gatehouse_aabb(spec, ring)
 		var gate_at := Vector2(gate.get_center().x, gate.get_center().z)
 		var blocked: Array[Rect2] = []
@@ -317,6 +324,65 @@ static func _plan_wall_stairs(spec: CastleSpec, galleries: Array[Rect2],
 	return out
 
 
+## An elven stair's back stands on a straight line against a bowed wall. It
+## must neither run into the wall nor leave a slot behind it: the wall's inner
+## face is within `BOW_GAP` of the back line along the whole `span`.
+const BOW_GAP := 0.25
+
+
+static func _backs_onto_bow(spec: CastleSpec, ring: int, centreline: PackedVector2Array,
+		boundary: Vector2, along: Vector2, inside: Vector2, span: float) -> bool:
+	var half_t := CastleGeometry.wall_thickness(spec, ring) * 0.5
+	for u in [-0.5, -0.25, 0.0, 0.25, 0.5]:
+		var q: Vector2 = boundary + along * span * float(u)
+		var c := _closest_on_line(centreline, q)
+		var gap := (q - c).dot(inside) - half_t - CastleGeometry.WALK_LIP
+		if gap < -0.02 or gap > BOW_GAP:
+			return false
+	return true
+
+
+## An elven ward is the chord polygon's clear ward plus what the bow gives
+## back: the curtains' inner faces sampled along their curves, less each
+## curve's first and last sample so the corners keep the straight geometry.
+static func _bowed_ward(spec: CastleSpec, ring: int, edge: PackedVector2Array,
+		straight: PackedVector2Array) -> PackedVector2Array:
+	var samples := PackedVector2Array()
+	var t := CastleGeometry.wall_thickness(spec, ring)
+	for e in edge.size():
+		var a := edge[e]
+		var b := edge[(e + 1) % edge.size()]
+		var length := a.distance_to(b)
+		var out_v := CastleGeometry.edge_outward(a, b)
+		var line := CastleGeometry.bowed_centreline(spec, ring,
+			{"a": a, "b": b, "length": length, "outward": Vector3(out_v.x, 0.0, out_v.y)}, 64)
+		for i in range(1, line.size() - 1):
+			samples.append(line[i] - out_v * (t * 0.5))
+	var merged := Geometry2D.merge_polygons(straight, samples)
+	var best := straight
+	var best_area := 0.0
+	for poly in merged:
+		if Geometry2D.is_polygon_clockwise(poly):
+			continue
+		var area := absf(Poly.signed_area(poly))
+		if area > best_area:
+			best_area = area
+			best = poly
+	return best
+
+
+static func _closest_on_line(line: PackedVector2Array, p: Vector2) -> Vector2:
+	var best := line[0]
+	var best_d := INF
+	for i in range(line.size() - 1):
+		var c := Geometry2D.get_closest_point_to_segment(p, line[i], line[i + 1])
+		var d := p.distance_squared_to(c)
+		if d < best_d:
+			best_d = d
+			best = c
+	return best
+
+
 static func _mass_rect(spec: CastleSpec, ring: int, centre: Vector3, vertex := -1) -> Rect2:
 	var box := CastleGeometry.tower_aabb(spec, ring, centre, vertex)
 	return Rect2(box.position.x, box.position.z, box.size.x, box.size.z).grow(0.05)
@@ -333,8 +399,13 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 		var a := edge[e]
 		var b := edge[(e + 1) % edge.size()]
 		var length := a.distance_to(b)
-		var along := (b - a) / length
-		var inside := -CastleGeometry.edge_outward(a, b)
+		var chord_along := (b - a) / length
+		var chord_inside := -CastleGeometry.edge_outward(a, b)
+		var bowed := spec.curved_edges
+		var centreline := PackedVector2Array()
+		if bowed:
+			centreline = CastleGeometry.bowed_centreline(spec, ring,
+				{"a": a, "b": b, "length": length, "outward": Vector3(-chord_inside.x, 0.0, -chord_inside.y)}, 64)
 		# A transverse stair uses only its width along the curtain. Sampling by
 		# the full flight span rejects short octagon facets before it is considered.
 		for transverse in [false, true]:
@@ -363,12 +434,26 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 			var edge_offset := edge_span * 0.5 + 0.2
 			var samples := maxi(1, int(ceil((length - edge_span) / 0.2)))
 			for sample in range(samples + 1):
-				var boundary := a.lerp(b, (edge_offset + (length - edge_span - 0.4) \
-					* float(sample) / samples) / length)
+				var f_at := (edge_offset + (length - edge_span - 0.4) \
+					* float(sample) / samples) / length
+				var boundary := a.lerp(b, f_at)
 				# Stand clear of the coping's lip. Flush with the inner face,
 				# the top landing and the lip shared one plane at walk height
 				# and z-fought (walk-QA, Thorncliffe pin 6).
-				boundary += inside * (CastleGeometry.wall_thickness(spec, ring) + CastleGeometry.WALK_LIP)
+				var along := chord_along
+				var inside := chord_inside
+				if bowed:
+					# An elven curtain bows: stand against the flat of it, the
+					# stair squared to the curtain's tangent where it is.
+					var sag := CastleGeometry.bow_sagitta(length)
+					var out_v := -chord_inside
+					var tangent := ((b - a) + out_v * CastleGeometry.bow_slope(sag, f_at)).normalized()
+					along = tangent
+					inside = Vector2(-tangent.y, tangent.x)
+					boundary += out_v * (CastleGeometry.bow_offset(sag, f_at) - CastleGeometry.wall_thickness(spec, ring) * 0.5)
+					boundary += inside * (CastleGeometry.wall_thickness(spec, ring) * 0.5 + CastleGeometry.WALK_LIP)
+				else:
+					boundary += inside * (CastleGeometry.wall_thickness(spec, ring) + CastleGeometry.WALK_LIP)
 				if absf(side) > 0.1 and boundary.x * side <= 0.0:
 					continue
 				var axis := inside if transverse else along
@@ -378,6 +463,9 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 					at + axis * f_span * 0.5, at + axis * f_span * 0.5 + across * width,
 					at - axis * f_span * 0.5 + across * width])
 				if not Array(poly).all(func(p): return Poly.contains_point(clear_ward, p, 0.01)):
+					continue
+				if bowed and not _backs_onto_bow(spec, ring, centreline, boundary, along, inside,
+						width if transverse else f_span):
 					continue
 				var footprint := Poly.bounding_rect(poly)
 				if blocked.any(func(rect): return rect.grow(-0.001).intersects(footprint)):
@@ -407,6 +495,8 @@ static func _best_wall_stair(spec: CastleSpec, ring: int, edge: PackedVector2Arr
 				var coping := Geometry2D.get_closest_point_to_segment(arrival,
 					a + inside * CastleGeometry.wall_thickness(spec, ring) * 0.5,
 					b + inside * CastleGeometry.wall_thickness(spec, ring) * 0.5)
+				if bowed:
+					coping = _closest_on_line(centreline, arrival)
 				var arrival_side := Vector2(-(coping - arrival).y, (coping - arrival).x).normalized() * 0.3
 				var arrival_poly := PackedVector2Array([arrival + arrival_side, coping + arrival_side,
 					coping - arrival_side, arrival - arrival_side])

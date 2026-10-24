@@ -1855,7 +1855,7 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 	var a: Vector2 = seg["a"]
 	var b: Vector2 = seg["b"]
 	var outward: Vector2 = Vector2(float(seg["outward"].x), float(seg["outward"].z))
-	var sagitta: float = run * 0.16
+	var sagitta: float = CastleGeometry.bow_sagitta(run)
 	var slit_y: float = h * 0.62
 	var slit_h := minf(1.5, h * 0.24)
 	var slit_w := 0.32
@@ -1881,7 +1881,7 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 	var distances := PackedFloat32Array([0.0])
 	for i in range(unique_ts.size()):
 		var f: float = unique_ts[i]
-		var p: Vector2 = a.lerp(b, f) + outward * (4.0 * sagitta * f * (1.0 - f))
+		var p: Vector2 = a.lerp(b, f) + outward * (CastleGeometry.bow_offset(sagitta, f) - t * 0.5)
 		pts.append(Vector3(p.x, 0.0, p.y))
 		if i > 0:
 			distances.append(distances[i - 1] + pts[i - 1].distance_to(pts[i]))
@@ -1895,20 +1895,24 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 				break
 		var distance: float = distances[index]
 		openings.append(Rect2(distance - slit_w * 0.5, wall_band.x, slit_w, wall_band.y))
-	var wall_bounds := _kit.curved_wall(pts, h, tb, t, SURF_STONE, openings)
+	var cut_fn := func(_lo: float, hi: float) -> Array:
+		if _tag != "curtain" or not CastleGeometry.is_enclosed(spec):
+			return []
+		return _curtain_cuts(hi, 0.04)
+	var wall_bounds := _kit.curved_wall(pts, h, tb, t, SURF_STONE, openings, 0.0, cut_fn)
 	_log_mass("wall_%d_%s" % [r, String(seg["name"])], wall_bounds)
 
 	# A bowed wall walk is a second shallow curved shell, not a box on the chord.
 	var walk_h: float = CastleGeometry.PARAPET_RISE
-	_kit.curved_wall(pts, walk_h, t + 2.0 * CastleGeometry.WALK_LIP, t + 2.0 * CastleGeometry.WALK_LIP, SURF_TRIM, [], h)
+	_kit.curved_wall(pts, walk_h, t + 2.0 * CastleGeometry.WALK_LIP, t + 2.0 * CastleGeometry.WALK_LIP, SURF_TRIM, [], h, cut_fn)
 	if spec.battlements:
 		var mw: float = CastleGeometry.merlon_width(spec)
 		var pitch: float = mw + CastleGeometry.MERLON_GAP
 		var count: int = int(run / pitch)
 		for i in range(count):
 			var f: float = (float(i) + 0.5) / float(count)
-			var p: Vector2 = a.lerp(b, f) + outward * (4.0 * sagitta * f * (1.0 - f))
-			var derivative: Vector2 = (b - a) + outward * (4.0 * sagitta * (1.0 - 2.0 * f))
+			var p: Vector2 = a.lerp(b, f) + outward * (CastleGeometry.bow_offset(sagitta, f) - t * 0.5)
+			var derivative: Vector2 = (b - a) + outward * CastleGeometry.bow_slope(sagitta, f)
 			var tangent := derivative.normalized()
 			var face_yaw := atan2(tangent.y, tangent.x) + PI * 0.5
 			_emit_merlon(Vector3(mw, spec.merlon_h, t + 0.3),
@@ -1916,8 +1920,8 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 
 	for center_t in slit_t:
 		var f: float = center_t
-		var p: Vector2 = a.lerp(b, f) + outward * (4.0 * sagitta * f * (1.0 - f))
-		var derivative: Vector2 = (b - a) + outward * (4.0 * sagitta * (1.0 - 2.0 * f))
+		var p: Vector2 = a.lerp(b, f) + outward * (CastleGeometry.bow_offset(sagitta, f) - t * 0.5)
+		var derivative: Vector2 = (b - a) + outward * CastleGeometry.bow_slope(sagitta, f)
 		var tangent := derivative.normalized()
 		var normal := Vector2(tangent.y, -tangent.x)
 		var thick: float = lerpf(tb, t, slit_y / h)
@@ -2920,6 +2924,42 @@ func _emit_merlon(size: Vector3, pos: Vector3, surf: int, yaw := 0.0) -> void:
 ## An AABB emitted as a box, which is how nearly every castle mass is drawn.
 func _box_aabb(a: AABB, surf: int) -> void:
 	box(a.size, a.position + a.size / 2.0, surf)
+
+
+## The plan polygons a curtain course reaching `top_y` must not enter: every
+## mural tower's room outline, and above the walk the arrival landing and galleries.
+func _curtain_cuts(top_y: float, overlap := 0.0) -> Array[PackedVector2Array]:
+	var cuts: Array[PackedVector2Array] = []
+	for row in _planned_interiors.values():
+		if not bool(row.get("mural_tower", false)):
+			continue
+		var plan: HousePlan = row.plan
+		var origin: Vector3 = row.transform.origin
+		var hole := PackedVector2Array()
+		for point in plan.outline_of(0):
+			hole.append(point + Vector2(origin.x, origin.z))
+		cuts.append(hole)
+		# The walkway's merlons may stand across a perfectly cut tower door.
+		# Reserve the full authored arrival landing above its walking surface.
+		if top_y > float(row.walk_y) + 0.05 and row.walk_landing.has_area():
+			cuts.append_array(_shrunk(Poly.from_rect(row.walk_landing), overlap))
+			for span in row.get("walk_gallery", []):
+				var a: Vector2 = span.a
+				var b: Vector2 = span.b
+				var tangent := (b - a).normalized()
+				var side := Vector2(-tangent.y, tangent.x) * float(span.width) * 0.5
+				cuts.append_array(_shrunk(PackedVector2Array([a + side, b + side, b - side, a - side]), overlap))
+	return cuts
+
+
+## `poly` drawn in by `overlap`, so the curtain's walk laps a deck's edge instead of
+## meeting it on a hairline the walk grid reads as a crack (CASTLE-ELVEN-TOWERS).
+static func _shrunk(poly: PackedVector2Array, overlap: float) -> Array[PackedVector2Array]:
+	if overlap <= 0.0:
+		return [poly]
+	var out: Array[PackedVector2Array] = []
+	out.assign(Geometry2D.offset_polygon(poly, -overlap))
+	return out
 
 
 ## Curtains terminate at occupied tower rooms. The old complete wall boxes

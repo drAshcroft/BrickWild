@@ -699,6 +699,15 @@ static func _window_curtain_clear(spec: CastleSpec, ring: int, centre: Vector3,
 		for side in [-0.6, 0.0, 0.6]:
 			var sample: Vector2 = pos + normal * (THICKNESS + 0.1) + tangent * width * side
 			var point := centre + Vector3(sample.x, bottom, sample.y)
+			if spec.curved_edges:
+				# The wall is the bowed shell, not the chord's box: look through
+				# the window's own reach (its sill face and its outer ray end).
+				for reach_at in [0.0, THICKNESS + 0.1]:
+					var probe: Vector2 = pos + normal * reach_at + tangent * width * side
+					if CastleGeometry.bowed_wall_near(spec, ring, segment,
+							Vector2(centre.x + probe.x, centre.z + probe.y), 0.15):
+						return false
+				continue
 			if wall.grow(0.05).has_point(point):
 				return false
 	return true
