@@ -391,6 +391,28 @@ summit) is in `sacred_sequence_suite` and must fail on `sightline`. The "open
 failure 1" above is closed; legibility at large size (a ~5 percent silhouette) stays
 modest and is the next lever if a taller idol is wanted.
 
+### Rotunda void monolith, fixed (24 October 2026, SACRED-ROTUNDA-FOCUS)
+
+Cause: the void cult's stone is `2f3138`/`1b1d22` and the monolith was a SURF_STONE
+slab, so it was the same tone as the drum behind it. In the old entry image
+(`artifacts/goal/SACRED-ROTUNDA-FOCUS/before/temple_rotunda_void_small_8102__entry.jpg`)
+nothing stands above the altar: the monolith is simply absent. The slab is now the
+cult's lighter trim hue (`46506b`) with a black rune cut down its face
+(`TempleBuilder._build_idol`, `&"monolith"`). After
+(`.../after/temple_rotunda_void_small_8102__entry.jpg`): a pale blue-slate slab,
+about 1.3 altar-widths wide, rises from the altar to above the drum wall line,
+lighter than the near-black brick on both sides (a clear value step) with a
+vertical black rune as an internal silhouette. It is the largest, brightest mass on
+the axis. No geometry moved, so the sightline numbers are unchanged.
+
+Rotunda symmetry warning (4 cases): explained and fixed, not a cult exception.
+`rotunda_arcade_pier_04` and `_10` (or `_04`/`_13` on the large rotundas) had no
+twin because the pier-to-drum-panel snap in `_build_rotunda_upper_arcade` ran pier
+by pier: the first pier to claim a contested panel changed what its mirror could
+get. Each pier now claims its panel and the panel's mirror for its mirror pier, and a pier
+on the gate axis (the portal one, the rear one) may only stand on an axis panel, else
+it is left out. `lane:temple`: 3028 checks, 0 failures, 0 warnings (was 4 warnings).
+
 ### Tallies after this pass
 
 40 accepted, 9 needs_changes (churches 17 / 7, temples 23 / 2). Open:

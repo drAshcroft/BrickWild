@@ -557,9 +557,17 @@ func _build_rotunda_upper_arcade(thickness: float, roof_y: float) -> void:
 	var gate_half: float = atan((TempleGeometry.GATE_W * 0.5 + pier_w * 0.55) / radius)
 	var portal_half: float = maxf(TempleGeometry.rotunda_gate_panel_half_angle(spec), gate_half)
 	var used_panels: Dictionary = {}
+	# SACRED-ROTUNDA-FOCUS: the snap used to run pier by pier, so the first pier
+	# to claim a contested panel decided the second's and the ring came out
+	# lop-sided (piers 04/10 or 04/13 had no twin across the axis). Each pier
+	# now claims its panel AND the panel's mirror for its own mirror pier, so
+	# the ring is symmetric about the gate axis by construction.
+	var mirrored_ok: bool = count % 2 == 0 and panel_count % 2 == 0
+	var chosen: Dictionary = {}
 	for i in range(count):
+		if chosen.has(i):
+			continue
 		var target_angle: float = -PI + (float(i) + 0.5) * step
-		var angle: float = 0.0
 		var nearest_panel: int = -1
 		var nearest_delta: float = INF
 		for panel_index in range(panel_count):
@@ -567,14 +575,30 @@ func _build_rotunda_upper_arcade(thickness: float, roof_y: float) -> void:
 			var relative: float = wrapf(candidate + PI * 0.5 + PI, 0.0, TAU) - PI
 			if absf(relative) <= portal_half or used_panels.has(panel_index):
 				continue
+			if mirrored_ok and used_panels.has(posmod(panel_count / 2 - panel_index - 1, panel_count)):
+				continue
+			# a pier whose own mirror is itself (on the gate axis) may only
+			# stand on a panel that is its own mirror, or it has no twin
+			if mirrored_ok and posmod(count / 2 - i - 1, count) == i 					and posmod(panel_count / 2 - panel_index - 1, panel_count) != panel_index:
+				continue
 			var delta: float = absf(wrapf(candidate - target_angle + PI, 0.0, TAU) - PI)
 			if delta < nearest_delta:
 				nearest_delta = delta
 				nearest_panel = panel_index
-				angle = candidate
 		if nearest_panel < 0:
 			continue
 		used_panels[nearest_panel] = true
+		chosen[i] = nearest_panel
+		if mirrored_ok:
+			var twin_panel: int = posmod(panel_count / 2 - nearest_panel - 1, panel_count)
+			var twin_pier: int = posmod(count / 2 - i - 1, count)
+			used_panels[twin_panel] = true
+			if twin_pier != i and not chosen.has(twin_pier):
+				chosen[twin_pier] = twin_panel
+	for i in range(count):
+		if not chosen.has(i):
+			continue
+		var angle: float = -PI + (float(chosen[i]) + 0.5) * panel_step
 		var center := Vector3(cos(angle) * radius, lower + band_h * 0.5,
 			sin(angle) * radius)
 		var size := Vector3(pier_w, band_h, thickness * 0.90)
@@ -936,9 +960,16 @@ func _build_idol() -> void:
 	match spec.idol_kind:
 		&"monolith":
 			# a leaning slab, unworked, older than the temple round it
-			_kit.oriented_box(Vector3(w, h, w * 0.32),
-				Transform3D(Basis(Vector3(0, 0, 1), 0.05), Vector3(c.x, c.y + h / 2.0, c.z)),
-				SURF_STONE)
+			# SACRED-ROTUNDA-FOCUS: the void cult's stone is near-black, so a
+			# stone slab vanished against the drum. The slab is the cult's
+			# lighter trim hue, with a dark rune cut down its face, so it
+			# separates from the wall behind it in tone and has a mark to read.
+			var slab := Transform3D(Basis(Vector3(0, 0, 1), 0.05),
+				Vector3(c.x, c.y + h / 2.0, c.z))
+			_kit.oriented_box(Vector3(w, h, w * 0.32), slab, SURF_TRIM)
+			_kit.oriented_box(Vector3(w * 0.12, h * 0.62, w * 0.04),
+				Transform3D(slab.basis, slab.origin + slab.basis * Vector3(0, h * 0.04, -w * 0.17)),
+				SURF_DARK)
 			box(Vector3(w * 1.3, 0.3, w * 0.7), Vector3(c.x, c.y + 0.15, c.z), SURF_TRIM)
 		&"figure":
 			# legs, body, arms, and a head too small for them
