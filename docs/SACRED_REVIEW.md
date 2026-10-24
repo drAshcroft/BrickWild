@@ -673,3 +673,24 @@ Renders: 72 matrix images + 3 controls, exit 0
 (`render_matrix.log`, `render_control_*.log`). Unlabelled answers:
 `answers.json`; join: `joined.json`; key: `key.json` (do not read before the
 verdicts). Images are not committed (artifacts is gitignored).
+
+## Basilica focus and flank (SACRED-BASILICA-FOCUS, 2026-10-24)
+
+Changed in `TempleBuilder` only; the pinned request (26 x 44 x 12, seed 1) is unchanged.
+
+* **Idol backdrop** (`_build_idol`, basilica and pylon): a panel 0.16 m thick just
+  behind the god. Pale cult trim behind a monolith (the monolith itself turns
+  dark with a trim rune, the reverse of the rotunda), a dark panel behind a
+  figure. Traits per case: `basilica/void/large/21325` - a dark slab framed by a
+  pale arch at the end of the axis; `pylon/blood/large/21325` - the figure
+  stands against a dark panel instead of dissolving into the red doorway.
+  Sightline is unchanged (0 blockers; the panel is behind the idol, unlogged).
+  Honest limit: the void hall remains dark, and the idol is small at 80 m; the
+  gain is an edge to find, not a bright god.
+* **Flank marker** (`_flank_niche`, basilica eave walls): `basilica_flank_niche_<wall>_<bay>`
+  hosts, each a trim frame (`basilica_flank_niche_frame`) and a dark recess
+  (`basilica_flank_niche_recess`) below the clerestory light, between the
+  pilasters. In the component log; visible in the side render
+  (`artifacts/goal/SACRED-BASILICA-FOCUS/after/`). The roof is still a low
+  dark slab. An independent reviewer has NOT yet ticked the render.
+* Receipts: `lane:temple` 3028 / 0 / 0; `lane:church-change` 5941 / 0 / 12 (the known opening warnings).

@@ -957,6 +957,18 @@ func _build_idol() -> void:
 		component_box("basilica_apse_focal_plinth", plinth_size,
 			Transform3D(Basis.IDENTITY, plinth_center), SURF_STONE)
 		host_end()
+	# SACRED-BASILICA-FOCUS: in a long hall the god is a small shape at the far
+	# end of a dark or glowing nave, and lost either way. A backdrop panel just
+	# behind him gives the eye an edge to find: pale cult trim behind a dark
+	# monolith, a dark panel behind a figure that stood against a lit wall.
+	var halo: bool = spec.form == &"basilica" or spec.form == &"pylon"
+	var pale_halo: bool = halo and spec.idol_kind == &"monolith"
+	if halo:
+		var hh: float = h * 1.25
+		var hw2: float = minf(w * 1.5, w + 2.0) if spec.form == &"pylon" else w * 1.15
+		_kit.oriented_box(Vector3(hw2, hh, 0.16),
+			Transform3D(Basis.IDENTITY, Vector3(c.x, c.y + hh * 0.5, c.z + w * 0.5 + 0.22)),
+			SURF_TRIM if pale_halo else SURF_DARK)
 	match spec.idol_kind:
 		&"monolith":
 			# a leaning slab, unworked, older than the temple round it
@@ -966,10 +978,10 @@ func _build_idol() -> void:
 			# separates from the wall behind it in tone and has a mark to read.
 			var slab := Transform3D(Basis(Vector3(0, 0, 1), 0.05),
 				Vector3(c.x, c.y + h / 2.0, c.z))
-			_kit.oriented_box(Vector3(w, h, w * 0.32), slab, SURF_TRIM)
+			_kit.oriented_box(Vector3(w, h, w * 0.32), slab, SURF_DARK if pale_halo else SURF_TRIM)
 			_kit.oriented_box(Vector3(w * 0.12, h * 0.62, w * 0.04),
 				Transform3D(slab.basis, slab.origin + slab.basis * Vector3(0, h * 0.04, -w * 0.17)),
-				SURF_DARK)
+				SURF_TRIM if pale_halo else SURF_DARK)
 			box(Vector3(w * 1.3, 0.3, w * 0.7), Vector3(c.x, c.y + 0.15, c.z), SURF_TRIM)
 		&"figure":
 			# legs, body, arms, and a head too small for them
@@ -1735,6 +1747,14 @@ func _build_order() -> void:
 				continue
 			_clerestory(normal, face, mid, runs_z, r, minf(bay * 0.3, 1.4),
 				clampf(h * 0.2, 1.0, 3.2), h * 0.66)
+			# SACRED-BASILICA-FOCUS: the flank used to be a row of identical
+			# pilasters over bare wall. Each bay now carries a blind niche
+			# below its light: a trim frame with a dark recess, so the flank
+			# reads as an arcaded order rather than a shed wall.
+			if spec.form == &"basilica":
+				_flank_niche(normal, face, mid, runs_z, r, bay - pw - 0.5,
+					podium + 0.7, h * 0.66 - clampf(h * 0.2, 1.0, 3.2) * 0.5 - 0.4,
+					"basilica_flank_niche_%d_%d" % [wall, i])
 
 	# raking cornices: each gable end becomes a pediment framed top and bottom
 	var has_nave_bearings: bool = TempleGeometry.basilica_has_nave_bearings(spec)
@@ -1839,6 +1859,24 @@ func _pilaster(normal: Vector3, face: float, s: float, runs_z: bool, r: Rect2,
 func _order_pilaster_box(role: String, size: Vector3, position: Vector3, surface: int) -> void:
 	component_box(role, size, Transform3D(Basis(), position), surface)
 	_log_part("box", position, size)
+
+
+## One blind niche on a flank: a trim frame standing 0.08 m proud with a dark
+## recess in front of it, between two pilasters and below the clerestory light.
+func _flank_niche(normal: Vector3, face: float, s: float, runs_z: bool, r: Rect2,
+		w: float, y0: float, y1: float, role: String) -> void:
+	if w < 0.8 or y1 - y0 < 1.2:
+		return
+	var c: Vector3 = _on_wall(normal, face, s, runs_z, r)
+	var sz := func(ww: float, yy: float, d: float) -> Vector3:
+		return Vector3(d, yy, ww) if runs_z else Vector3(ww, yy, d)
+	var cy: float = (y0 + y1) * 0.5
+	host(role)
+	component_box("basilica_flank_niche_frame", sz.call(w, y1 - y0, 0.08),
+		Transform3D(Basis(), c + normal * 0.04 + Vector3(0.0, cy, 0.0)), SURF_TRIM)
+	component_box("basilica_flank_niche_recess", sz.call(w - 0.4, y1 - y0 - 0.4, 0.04),
+		Transform3D(Basis(), c + normal * 0.10 + Vector3(0.0, cy, 0.0)), SURF_DARK)
+	host_end()
 
 
 ## A clerestory light: a dark opening on the outer face with a stone sill and
