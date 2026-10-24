@@ -1783,10 +1783,15 @@ func _walk_door_gaps(inner: Vector3, outward: Vector3, run_axis: Vector3, run: f
 				HouseGeometry.wall_thickness(plan.spec)))
 			var half_width := float(door.get("width", 1.2)) * 0.5 + 0.12
 			var reach := thickness * 0.5 + 0.2
+			# Outward, a traveller stands on the threshold a full reach beyond
+			# the emitted door, which is itself half a wall out from the plan's
+			# point. A door facing ALONG the run (a rect corner tower's) meets
+			# the slab's end inside that reach and nowhere else.
+			var reach_out := thickness * 1.5 + 0.2
 			var door_box := Rect2()
 			for corner_index in 4:
 				var along := half_width if corner_index & 1 else -half_width
-				var deep := reach if corner_index & 2 else -reach
+				var deep := reach_out if corner_index & 2 else -reach
 				var corner: Vector2 = at + tangent * along + normal * deep
 				var local := corner - inner_xz
 				# measured inward from the OUTER face, which is where the strip
@@ -2561,22 +2566,33 @@ func _wall_top(a: AABB, outward: Vector3, top_thick: float) -> void:
 	var cx: float = walk if axis == 0 else a.position.x + a.size.x / 2.0
 	var cz: float = a.position.z + a.size.z / 2.0 if axis == 0 else walk
 	var coping: float = top_thick + 2.0 * CastleGeometry.WALK_LIP
-	box(Vector3(coping if axis == 0 else run, CastleGeometry.PARAPET_RISE,
-			run if axis == 0 else coping),
-		Vector3(cx, a.size.y + CastleGeometry.PARAPET_RISE / 2.0, cz), SURF_TRIM)
-	if not spec.battlements:
-		return
+	var coping_top: float = a.size.y + CastleGeometry.PARAPET_RISE
+	var run_axis := Vector3(0.0, 0.0, 1.0) if axis == 0 else Vector3(1.0, 0.0, 0.0)
+	# A rect castle's curtain is courses, not runs, so it never met the polygon
+	# path's doorway notch: a raised tower door here had the whole coping drawn
+	# across it. Build the run frame the polygon path uses - `inner` on the
+	# wall's inner face, the run centred on zero - and notch it the same way.
+	var walk_centre := Vector3(cx, 0.0, cz)
+	var inner_point: Vector3 = walk_centre - outward * (top_thick / 2.0)
+	var gaps := _walk_door_gaps(inner_point, outward, run_axis, run, top_thick, coping_top)
 	var edge: float = inner + outward[axis] * (top_thick - spec.merlon_h * 0.35)
-	var from_p: Vector3
-	var to_p: Vector3
-	if axis == 0:
-		from_p = Vector3(edge, 0.0, a.position.z)
-		to_p = Vector3(edge, 0.0, a.position.z + a.size.z)
-	else:
-		from_p = Vector3(a.position.x, 0.0, edge)
-		to_p = Vector3(a.position.x + a.size.x, 0.0, edge)
-	_crenellate(from_p, to_p, a.size.y + CastleGeometry.PARAPET_RISE,
-		spec.merlon_h * 0.7, SURF_TRIM)
+	var edge_point: Vector3 = Vector3(edge, 0.0, cz) if axis == 0 \
+		else Vector3(cx, 0.0, edge)
+	for span in _walk_spans(gaps, run, coping_top):
+		var u0 := float(span.u0)
+		var u1 := float(span.u1)
+		if u1 - u0 < 0.01:
+			continue
+		var mid: Vector3 = walk_centre + run_axis * ((u0 + u1) * 0.5)
+		box(Vector3(coping if axis == 0 else u1 - u0, CastleGeometry.PARAPET_RISE,
+				u1 - u0 if axis == 0 else coping),
+			Vector3(mid.x, float(span.top) - CastleGeometry.PARAPET_RISE / 2.0, mid.z),
+			SURF_TRIM)
+		# A merlon cannot stand on the lowered threshold strip before a doorway.
+		if not spec.battlements or bool(span.lowered) or u1 - u0 < 0.5:
+			continue
+		_crenellate(edge_point + run_axis * u0, edge_point + run_axis * u1,
+			coping_top, spec.merlon_h * 0.7, SURF_TRIM)
 
 
 ## Arrow slits down the outer face of a wall run. The face is battered, so the
