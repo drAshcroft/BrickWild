@@ -374,6 +374,23 @@ i.e. upper terraces set back more at the front than at the sides, with the
 stair flights re-run to the new summit edge. Then the terrace exemption can be
 removed from the sightline rule. That is a reshaping of the form, left open.
 
+### Ziggurat focus, fixed (24 October 2026, SACRED-ZIGGURAT-FOCUS)
+
+The god no longer stands at the back of the summit. `TempleGeometry.ziggurat_idol_limit`
+finds the furthest-back centre from which the eye at the stair foot (1.65 m) still
+clears the front edge of every terrace and sees the idol's upper half; the sanctum
+(chamber dais, altar) is anchored under that point, so gate, altar, idol still run
+in order. `TempleRiteCheck` no longer exempts `terrace*` and `stair*` masses from
+the sightline for a ziggurat. Measured with `tools/sacred_sequence_report.gd`:
+`sightline_blockers` 0 for small/1, default/21325 and large/21325 (axis run 7.5 /
+8.4 / 17.2 m, procession 6.08 m). Idol apex is unchanged (9.6 / 13.5 / 23.4 m), so
+the god shows ABOVE the summit's front edge as a small silhouette, not a full
+figure: entry renders in `artifacts/goal/SACRED-ZIGGURAT-FOCUS/renders`. A negative
+control (`stair_wall_control`, a wall across the axis between the foot and the
+summit) is in `sacred_sequence_suite` and must fail on `sightline`. The "open
+failure 1" above is closed; legibility at large size (a ~5 percent silhouette) stays
+modest and is the next lever if a taller idol is wanted.
+
 ### Tallies after this pass
 
 40 accepted, 9 needs_changes (churches 17 / 7, temples 23 / 2). Open:

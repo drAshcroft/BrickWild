@@ -237,7 +237,12 @@ func _check_sightline() -> void:
 		if name.begins_with("column_"):
 			continue
 		if _exempt_from_sightline(name):
-			continue
+			# SACRED-ZIGGURAT-FOCUS: a ziggurat's terraces and stair flights ARE
+			# its sightline (the god is seen over them from the stair foot), so
+			# they are no longer exempt; the idol, floor and dais still are.
+			if not (_spec.form == &"ziggurat" and (name.begins_with("terrace")
+					or name.begins_with("stair"))):
+				continue
 		# These two basilica structural AABBs span the empty center of a
 		# curved shell. Their named triangles are checked by the architecture
 		# fixture; all aperture returns and heads remain ordinary blockers.
