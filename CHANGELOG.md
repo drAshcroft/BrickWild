@@ -6,6 +6,20 @@ projects consume that, never this working tree (`docs/RELEASES.md`).
 `BrickWild.API_VERSION` is a separate compatibility number; see `README.md`
 and `docs/PUBLIC_API_TRANSPORT.md`.
 
+## Unreleased
+
+### Fixes
+
+- **A caller's wall thickness survives `HouseGenerator.generate`.** Since
+  62b60eb (2026-10-05) the generator wrote the style's `wall_t`, or -1, over
+  `HouseSpec.wall_thickness_override` unconditionally. A caller that authored
+  a thickness lost it without a word. PaperFjord's 0.12 m paper shell became
+  0.6 m stone, and every measured house footprint moved 0.48 m inward under
+  an unchanged roof. The style's `wall_t` now applies only when the caller
+  left the override at its default. BrickWild's own adapters always build a
+  fresh spec, so nothing BrickWild generates changes. Pinned by
+  `tests/house_wall_thickness_override_test.gd`, which fails on 0.1.4.
+
 ## 0.1.4 - 2026-10-23
 
 Villages can be planned on real ground. Buildings stand on falling ground,
