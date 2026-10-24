@@ -694,3 +694,51 @@ Changed in `TempleBuilder` only; the pinned request (26 x 44 x 12, seed 1) is un
   (`artifacts/goal/SACRED-BASILICA-FOCUS/after/`). The roof is still a low
   dark slab. An independent reviewer has NOT yet ticked the render.
 * Receipts: `lane:temple` 3028 / 0 / 0; `lane:church-change` 5941 / 0 / 12 (the known opening warnings).
+
+## Rotunda and pylon identity as a trait checklist (SACRED-IDENTITY, 2026-10-24)
+
+The qwen 7B naming test ("what building is this?") was noisy and flipped with
+no change to the building, so it no longer judges identity. Each family now
+carries a short checklist, measured from `mass_log` / `component_log` by
+`qa/sacred_identity_check.gd` and asserted by `sacredid`
+(`tests/suites/sacred_identity_suite.gd`, in `lane:temple`) on all twelve frozen
+rotunda and pylon requests in `sacred_sequence_requests.json`.
+
+| family | trait | measured as |
+|---|---|---|
+| rotunda | round drum plan | >= 12 `wall_rotunda_NN` panels, centres on one radius (spread < 12 % of outer, inside the outer radius), largest angular gap <= 70 deg (the door) |
+| rotunda | dome or ring roof | a full-circle `rotunda_drum_crown` revolve at the drum top, outer radius >= the wall, inner radius > 0.5 m and < 90 % of outer: an open ring |
+| rotunda | ring colonnade at the door | >= 8 `rotunda_arcade_pier_NN` on one circle, mirrored about the axis, at least one pier within 40 deg either side of the door, and >= 8 inner `column_N` on one ring |
+| pylon | twin battered towers flanking the gate | `pylon_0`/`pylon_1` mirror twins on the front line, gap >= the gate width, 1.2 x the wall height or more, and each tower's `pylon_battered_face` slabs are < 90 % of their foot area at the top (measured about 0.46) |
+| pylon | hypostyle hall behind the gate | >= 4 `column_N` in >= 2 rows and >= 2 files, all behind the towers' back edge, not standing on one circle |
+
+Controls (a measure that cannot fail is not a measure): for every trait on every
+case the same measure runs on logs with that trait's rows deleted and must
+fail; and a rotunda measured as a pylon, and a pylon as a rotunda, must miss
+every trait of the other.
+
+Result: all 12 cases carry all their traits; 78 checks, 0 failures. No trait
+was missed, so there is no miss list. Writing the controls found two real
+holes in the first draft of the hypostyle measure (it passed a rotunda's inner
+column ring because it looked only at row/file counts; and it passed with no
+towers at all), both closed above.
+
+### Independent exterior read of the traits (24 Oct)
+
+A fresh reviewer, given only the checklist and the 24 front/side renders
+(`artifacts/goal/SACRED-IDENTITY/renders/`, 6 rotunda and 6 pylon cases), ticked:
+
+* Rotunda: round drum 6/6, ring roof with open centre 6/6 (no dome anywhere),
+  **ring colonnade at the door 0/6**. The piers are a ring of square piers on
+  the upper drum above a solid wall; the door is a pier-framed gap (small) or
+  a pedimented aedicule (large) with no column ring at door level. The
+  measure passes (the piers are mirrored and flank the door in plan); the eye
+  reads a clerestory ring. Listed as a MISS, not softened: the fix would be a
+  door-level peristyle, which is a design change for a later task.
+* Pylon: twin battered towers flanking the gate 6/6. Hypostyle hall 0/6 clear
+  (blood/large gives a hint of posts under the roof edge): an exterior render
+  cannot show a hall under a flat roof. The plan measure (columns in a grid
+  behind the towers) is the evidence; the entry views in the matrix show it
+  from inside.
+
+Receipts: `lane:temple` 3106 checks / 0 failures / 0 warnings (`artifacts/goal/SACRED-IDENTITY/lane2.log`).

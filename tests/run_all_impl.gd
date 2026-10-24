@@ -67,7 +67,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 const EXTRA: Array[String] = ["hslope", "library", "placement", "cultureapi", "compactapi", "vworld", "vterrain", "vterrainlane", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
-	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "vis009", "vis010", "vis016", "catalogcache",
+	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "sacredid", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad", "wunchecked",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"cslope",
@@ -159,7 +159,7 @@ const LANES: Dictionary = {
 	"lane:castle": ["castle", "cnormals", "cmassing", "clandmark", "cvoxelqa", "ctowerplan", "cmotteplan", "cmotteaccess", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried", "cterrace"],
 	"lane:church-change": ["churchroof", "churchchange", "sacredseq", "chwalk"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
-	"lane:temple": ["temple", "rite", "twalk", "sacredseq"],
+	"lane:temple": ["temple", "rite", "twalk", "sacredseq", "sacredid"],
 	# Same assertions as `temple`, split so no process nears the 300 s cap.
 	"lane:temple-contract": ["temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras"],
 	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "wunchecked", "matkit"],
@@ -227,6 +227,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/church_load_suite.gd").run()
 		"sacredseq":
 			return preload("res://tests/suites/sacred_sequence_suite.gd").run()
+		"sacredid":
+			return preload("res://tests/suites/sacred_identity_suite.gd").run()
 		"churchchange":
 			return preload("res://tests/suites/church_change_suite.gd").run()
 		"vis016":
