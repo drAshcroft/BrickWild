@@ -34,7 +34,7 @@ func _init() -> void:
 				return
 			seeds = [selected]
 	for seed_value in seeds:
-		for size in [Vector2(7, 9), Vector2(9, 12), Vector2(17, 18)]:
+		for size in [Vector2(7, 9)]:
 			_check_case(size, seed_value)
 	for failure in failures:
 		printerr("FAIL ", failure)

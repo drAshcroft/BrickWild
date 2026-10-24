@@ -19,7 +19,7 @@ const LONG_SEAT_OVERHANG := 0.3
 const DOOR_APPROACH := HouseGeometry.ENTRY_APPROACH
 const DOOR_APPROACH_SIDE := 0.3
 ## Match the domestic bed-door QA margin for the compact Alchemist's side Hall.
-const COMPACT_ALCHEMIST_BED_DOOR_GAP := 0.4
+const WITCH_BED_DOOR_GAP := 0.4
 ## Clear floor kept round a table before another table may stand there: a
 ## seat's depth and its pull-back space.
 const TABLE_GAP := 1.1
@@ -188,10 +188,10 @@ static func initial_blocked(plan: HousePlan, room: int) -> Array[Rect2]:
 	return out
 
 
-static func _is_compact_witch_alchemist(plan: HousePlan) -> bool:
-	return HouseFurnishingRecipes.is_ordinary_house(plan) \
-		and plan.spec.style == &"witch_hut" and plan.spec.trade == &"alchemist" \
-		and bool(plan.domestic_layout.get("witch_alchemist_side_hall", false))
+## Any ordinary witch hut (WITCH-SIZE): a bed keeps its door-swing gap, so a
+## 5.5 x 7 hut does not put its double bed beside the bedroom door.
+static func _is_witch_hut(plan: HousePlan) -> bool:
+	return HouseFurnishingRecipes.is_ordinary_house(plan) and plan.spec.style == &"witch_hut"
 
 
 static func _bed_candidate_clears_door_gaps(plan: HousePlan, room: int, body: Rect2) -> bool:
@@ -199,7 +199,7 @@ static func _bed_candidate_clears_door_gaps(plan: HousePlan, room: int, body: Re
 		var door: Dictionary = plan.doors[door_index]
 		for side in [-1.0, 1.0]:
 			if body.intersects(HouseGeometry.door_clear_rect(door, side).grow(
-					COMPACT_ALCHEMIST_BED_DOOR_GAP)):
+					WITCH_BED_DOOR_GAP)):
 				return false
 	return true
 
@@ -1407,7 +1407,7 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 							HouseFurnishGeometry.ordinary_sleep_access_zone(
 								Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
 								float(try_cand["yaw"])))
-					if _is_compact_witch_alchemist(plan) and plan.kind_of(room) == &"bedroom" \
+					if _is_witch_hut(plan) and plan.kind_of(room) == &"bedroom" \
 							and PropCatalog.category(key) == "bed" \
 							and String(step.get("group", "")) == "sleep" \
 							and not _bed_candidate_clears_door_gaps(plan, room, Rect2(try_cand["rect"])):

@@ -22,6 +22,13 @@ const VERANDA_DEPTH_RANGE := [1.35, 1.85]
 ## A more compact roof rise is selected only for the exact built-in Witch
 ## archetype; other uses of the Witch style row keep its historical pitch.
 const WITCH_ROOF_PITCH_RANGE := [1.05, 1.4]
+## A hut is small (WITCH-SIZE): a witch_hut footprint is at most 7 x 9 m (the
+## short side 7, the long side 9, in whichever orientation was asked for) and
+## one storey, clamped the way CastleGenerator clamps against CastleGeometry.
+const WITCH_MAX_SHORT := 7.0
+const WITCH_MAX_LONG := 9.0
+const WITCH_MAX_STOREYS := 1
+const WITCH_MAX_ROOMS := 3
 
 
 ## Generate the spec's derived fields, then plan and furnish. Returns the plan,
@@ -30,6 +37,7 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 		world_family: StringName = &"") -> HousePlan:
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
+	clamp_witch_hut(spec)
 	spec.storeys = clampi(spec.storeys, 1, 3)
 	spec.cellars = clampi(spec.cellars, 0, 1)
 	var s: Dictionary = HouseSpec.STYLES[spec.style]
@@ -128,6 +136,8 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y
 	spec.room_count = HouseSpec.rooms_for(area)
+	if spec.style == &"witch_hut":
+		spec.room_count = mini(spec.room_count, WITCH_MAX_ROOMS)
 	spec.program = _program_for(spec)
 	# a back door is only worth having when there is a room at the back to put
 	# it in, and something to go out to
@@ -157,6 +167,20 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	HousePlanFeatures.compose_wall_hosts(plan, spec)
 	HouseExterior.dress(plan)
 	return plan
+
+
+## WITCH-SIZE: a witch_hut is clamped to 7 x 9 m and one storey. Any other
+## style is left alone; a request already inside the bound is unchanged.
+static func clamp_witch_hut(spec: HouseSpec) -> void:
+	if spec == null or spec.style != &"witch_hut":
+		return
+	var along_x: bool = spec.width >= spec.length
+	var long_side: float = minf(maxf(spec.width, spec.length), WITCH_MAX_LONG)
+	var short_side: float = minf(minf(spec.width, spec.length), WITCH_MAX_SHORT)
+	spec.width = long_side if along_x else short_side
+	spec.length = short_side if along_x else long_side
+	spec.storeys = mini(spec.storeys, WITCH_MAX_STOREYS)
+	spec.cellars = 0
 
 
 ## The final roof type is drawn later, so establish the pitch exception from

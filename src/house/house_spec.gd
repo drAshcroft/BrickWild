@@ -188,8 +188,11 @@ const STYLES := {
 	},
 	&"witch_hut": {
 		"label": "Witch's Hut",
-		# A working room and records belong to the household's craft.
-		"domestic_program": [&"hall", &"bedroom", &"kitchen", &"workshop", &"records", &"store"],
+		# A hut is small (WITCH-SIZE): at most three rooms. The kitchen names
+		# the cooking, eating and brewing the main room carries (the planner
+		# merges it into the hall); then a sleeping room or nook. The compact
+		# planner adds the optional dry store as the third room.
+		"domestic_program": [&"hall", &"kitchen", &"bedroom"],
 		"timber": 0.8, "studs": [0.8, 1.4], "braces": 0.6, "rail": 0.5,
 		"roof_pitch": [1.2, 1.7], "porch": 1.0, "chimney": 1.0, "shutters": 0.6,
 		"roof_material": &"thatch", "pitch_reference": 8.0, "pitch_exponent": 0.8,

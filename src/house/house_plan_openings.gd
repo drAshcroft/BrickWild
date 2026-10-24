@@ -32,9 +32,7 @@ static func shared_edge(p: HousePlan, i: int, j: int) -> Array:
 ## Doors on a spanning tree from the hall, expanding through public rooms
 ## first so bedrooms and stores end up as leaves.
 static func _place_witch_workshop_yard_door(p: HousePlan, spec: HouseSpec) -> void:
-	var bay := HouseGeometry.witch_workshop_bay(p)
-	if bay.is_empty():
-		bay = HouseGeometry.witch_compact_service_threshold(p)
+	var bay := HouseGeometry.witch_compact_service_threshold(p)
 	if bay.is_empty():
 		return
 	var room := int(bay.room)
@@ -244,13 +242,6 @@ static func _place_front_door(p: HousePlan, spec: HouseSpec, hall: int) -> void:
 		w = HouseGeometry.DOOR_W
 	var m: float = HouseGeometry.DOOR_CORNER_MARGIN + w / 2.0
 	var x: float = clampf(rect.get_center().x, rect.position.x + m, rect.end.x - m)
-	# In the compact Alchemist side Hall, the cooking and meal groups use the
-	# long west wall. Keep the entrance lane beside the service partition so
-	# both wall work and the dining group can stay out of its approach.
-	if spec.style == &"witch_hut" and spec.trade == &"alchemist" \
-			and bool(p.domestic_layout.get("witch_alchemist_side_hall", false)) \
-			and p.kind_of(room) == &"hall":
-		x = rect.end.x - m
 	p.doors.append({"a": room, "b": -1, "pos": Vector2(x, inner.position.y),
 		"normal": Vector2(0, -1), "width": w, "exterior": true, "front": true,
 		"storey": p.storey_of_room(room)})

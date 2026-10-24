@@ -4,8 +4,6 @@ extends SceneTree
 
 const SIZES := [
 	{"id":"compact","width":7.0,"length":9.0,"height":2.6,"bay":false},
-	{"id":"default","width":9.0,"length":12.0,"height":2.6,"bay":true},
-	{"id":"large","width":17.0,"length":18.0,"height":2.8,"bay":true},
 ]
 const SEEDS := [1, 8102, 21325]
 var failures: Array[String] = []

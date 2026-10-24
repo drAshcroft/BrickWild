@@ -65,6 +65,9 @@ const KIND_ROWS := {
 		"length": {"min": 22.0, "max": 100.0, "step": 1.0, "value": 44.0},
 		"height": {"min": 6.0, "max": 26.0, "step": 0.5, "value": 12.0},
 	},
+	# A `witch_hut` is small: HouseGenerator.clamp_witch_hut brings any request
+	# down to at most 7 x 9 m (short x long side) and one storey, whatever these
+	# slider limits allow. Every other house style takes the full envelope.
 	&"house": {
 		"label": "House", "size_label": "House", "height_label": "Ceiling (m)",
 		"style_label": "Style", "purpose_label": "Trade",

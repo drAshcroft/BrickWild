@@ -126,7 +126,6 @@ func _check_generated_house_sizes() -> void:
 		{"style": &"farmhouse", "width": 9.0, "length": 12.0, "storeys": 3, "seed": 9127, "name": "default farmhouse three-storey"},
 		{"style": &"townhouse", "width": 9.0, "length": 12.0, "storeys": 2, "seed": 9301, "name": "default townhouse two-storey"},
 		{"style": &"townhouse", "width": 9.0, "length": 12.0, "storeys": 3, "seed": 9302, "name": "default townhouse three-storey"},
-		{"style": &"witch_hut", "width": 9.0, "length": 12.0, "storeys": 2, "seed": 9501, "name": "default witch hut two-storey"},
 		{"style": &"longhall", "width": 17.0, "length": 18.0, "storeys": 2, "seed": 17018, "name": "large longhall two-storey"},
 		{"style": &"farmhouse", "width": 17.0, "length": 18.0, "storeys": 2, "seed": 17028, "name": "large farmhouse two-storey"},
 		{"style": &"farmhouse", "width": 17.0, "length": 18.0, "storeys": 3, "seed": 17019, "name": "large farmhouse three-storey"},

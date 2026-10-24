@@ -68,7 +68,7 @@ const EXTRA: Array[String] = ["hslope", "library", "placement", "cultureapi", "c
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "sacredid", "vis009", "vis010", "vis016", "catalogcache",
-	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad", "wunchecked",
+	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchsize", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad", "wunchecked",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"cslope",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -138,7 +138,7 @@ const LANES: Dictionary = {
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
 	"lane:shop-trade": ["shoptrade", "sarchetype"],
-	"lane:house-plan-fast": ["houseqaplan", "hmultistory", "hwitchcompact"],
+	"lane:house-plan-fast": ["houseqaplan", "hmultistory", "hwitchcompact", "hwitchsize"],
 	"lane:house-furnish-fast": ["houseqafurnishfast", "hassembly", "walkpins"],
 	"lane:house-furnish-rules": ["houseqafurnishfast"],
 	"lane:house-exterior-fast": ["hexterior", "hassembly", "hwitchflue"],
@@ -394,6 +394,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return HouseQASuite.run()
 		"houseqacore":
 			return HouseQASuite.run(false, &"core")
+		"hwitchsize":
+			return preload("res://tests/suites/house_witch_size_suite.gd").run()
 		"hwitchcompact":
 			return preload("res://tests/suites/house_witch_compact_suite.gd").run()
 		"houseqaplan":

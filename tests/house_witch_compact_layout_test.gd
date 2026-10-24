@@ -15,7 +15,6 @@ func _init() -> void:
 	_check_role_loss_fallback(plan)
 	var second := HouseGenerator.generate(spec, 1, false)
 	_check_store_loss_fallback(second)
-	_check_existing_kitchen_witchwork_refresh()
 	for failure in failures:
 		printerr("FAIL " + failure)
 	print("witch compact layout: %d failures" % failures.size())
@@ -123,53 +122,6 @@ func _check_store_loss_fallback(plan: HousePlan) -> void:
 	HousePlanRooms.refresh_domestic_metadata(plan)
 	if plan.domestic_layout.get("status", &"") != &"fallback":
 		failures.append("removing the added dry store did not mark the compact plan fallback")
-
-
-func _check_existing_kitchen_witchwork_refresh() -> void:
-	var spec := HouseSpec.new()
-	spec.style = &"witch_hut"
-	spec.width = 9.0
-	spec.length = 12.0
-	spec.height = 2.6
-	var positive := HouseGenerator.generate(spec, 8102, false)
-	var kitchen := _configure_existing_shared_kitchen(positive)
-	if kitchen < 0:
-		failures.append("legacy merged-kitchen fixture has no generated kitchen")
-		return
-	HousePlanRooms.refresh_domestic_metadata(positive)
-	var kitchen_functions: Array = positive.rooms[kitchen].get("domestic_functions", [])
-	var hall := positive.rooms_of(&"hall")[0]
-	var hall_functions: Array = positive.rooms[hall].get("domestic_functions", [])
-	if not kitchen_functions.has(&"witchwork") or hall_functions.has(&"witchwork"):
-		failures.append("refresh did not preserve Witchwork on the existing kitchen host")
-	if positive.domestic_layout.get("status", &"") != &"planned":
-		failures.append("valid existing kitchen-hosted Witchwork was marked fallback")
-	var negative := HouseGenerator.generate(spec, 8102, false)
-	var negative_kitchen := _configure_existing_shared_kitchen(negative)
-	if negative_kitchen < 0:
-		return
-	var row: Dictionary = negative.rooms[negative_kitchen]
-	row["shared_witchwork"] = false
-	negative.rooms[negative_kitchen] = row
-	HousePlanRooms.refresh_domestic_metadata(negative)
-	if negative.domestic_layout.get("status", &"") != &"fallback":
-		failures.append("removing the existing kitchen-hosted Witchwork role escaped merged-activity validation")
-
-
-func _configure_existing_shared_kitchen(plan: HousePlan) -> int:
-	var kitchens := plan.rooms_of(&"kitchen")
-	if kitchens.is_empty():
-		return -1
-	var kitchen := kitchens[0]
-	var row: Dictionary = plan.rooms[kitchen]
-	row["shared_witchwork"] = true
-	plan.rooms[kitchen] = row
-	plan.domestic_layout = {
-		"status": &"planned", "style": &"witch_hut", "hall_role": &"living_hall",
-		"ground_activities": [&"hall", &"kitchen", &"bedroom", &"workshop"],
-		"merged_activities": [&"workshop"], "shared_witchwork": true
-	}
-	return kitchen
 
 
 func _rooms_share_door(plan: HousePlan, a: int, b: int) -> bool:

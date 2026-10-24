@@ -42,8 +42,8 @@ func _init() -> void:
 func _spec(style: StringName) -> HouseSpec:
 	var spec := HouseSpec.new()
 	spec.style = style
-	spec.width = 9.0
-	spec.length = 12.0
+	spec.width = 7.0
+	spec.length = 9.0
 	spec.height = 2.6
 	spec.storeys = 1
 	spec.exterior_props = false

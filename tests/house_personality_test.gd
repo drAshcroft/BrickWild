@@ -23,6 +23,9 @@ var failures: Array[String] = []
 func _init() -> void:
 	for style in STYLES:
 		for scale in SCALES:
+			# WITCH-SIZE: a hut is small; it has no default or large case.
+			if style == &"witch_hut" and scale["name"] != "small":
+				continue
 			for seed in SEEDS:
 				_check_case({"style": style, "w": scale["w"], "l": scale["l"], "h": scale["h"],
 					"seed": seed, "scale": scale["name"], "signature": STYLES[style]})
@@ -67,9 +70,6 @@ func _check_case(row: Dictionary) -> void:
 			failures.append("%s kitchen does not touch the rear service wall" % who)
 	if row["style"] == &"longhall" and plan.domestic_layout.get("hall_role") != &"communal_hall":
 		failures.append("%s presents the communal hall as a small entry hall" % who)
-	if row["style"] == &"witch_hut" and row["scale"] == "large" \
-			and not plan.has_kind(&"records"):
-		failures.append("%s large witch hut has no records or dry herb storage activity" % who)
 	if row["scale"] == "large":
 		for bedroom in plan.rooms_of(&"bedroom"):
 			var bed_rect: Rect2 = plan.rooms[bedroom]["rect"]
@@ -387,7 +387,7 @@ func _check_negative_control() -> void:
 func _check_determinism() -> void:
 	for row in [
 		{"style": &"cottage", "w": 9.0, "l": 12.0, "h": 2.6, "seed": 8102},
-		{"style": &"witch_hut", "w": 17.0, "l": 18.0, "h": 2.8, "seed": 21325},
+		{"style": &"witch_hut", "w": 7.0, "l": 9.0, "h": 2.6, "seed": 21325},
 	]:
 		var a := HouseGenerator.generate(_spec(row), int(row["seed"]), false)
 		var b := HouseGenerator.generate(_spec(row), int(row["seed"]), false)

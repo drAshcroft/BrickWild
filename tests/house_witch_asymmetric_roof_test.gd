@@ -6,8 +6,6 @@ const ROOF_SURFACE := 2
 const WALL_SURFACE := 0
 const SIZES := [
 	{"name": "small", "width": 7.0, "length": 9.0, "height": 2.6},
-	{"name": "default", "width": 9.0, "length": 12.0, "height": 2.6},
-	{"name": "large", "width": 17.0, "length": 18.0, "height": 2.8},
 ]
 const SEEDS := [1, 8102, 21325]
 const CUSTOM_SPEC := preload("res://tests/fixtures/witch_custom_house_spec.gd")

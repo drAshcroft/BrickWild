@@ -3,8 +3,6 @@ extends SceneTree
 
 const SIZES := [
 	{"name": "small", "width": 7.0, "length": 9.0, "height": 2.6},
-	{"name": "default", "width": 9.0, "length": 12.0, "height": 2.6},
-	{"name": "large", "width": 17.0, "length": 18.0, "height": 2.8},
 ]
 const SEEDS := [1, 8102, 21325]
 const CUSTOM_SPEC := preload("res://tests/fixtures/witch_custom_house_spec.gd")
@@ -121,28 +119,12 @@ func _check_witch(size: Dictionary, seed: int) -> void:
 				lerpf(-f, f, float(iz) / 12.0))
 			if not is_finite(RoofShape.height_at(faces, point)):
 				_fail("%s roof plane union has an interior hole at %s" % [who, point])
-	# Plan/headroom and compact-vs-Workshop eligibility remain unchanged.
+	# Plan/headroom and stay unchanged.
 	if not is_equal_approx(plan.spec.height, float(size.height)):
 		_fail("%s wall/headroom datum changed" % who)
-	var eligible_bay := HouseGeometry.witch_workshop_bay(plan)
-	if size.name == "small" and not eligible_bay.is_empty():
-		_fail("%s compact shared Hall was incorrectly promoted into a Workshop bay" % who)
-	var bay: Dictionary = layout.get("witch_bay", {})
-	if not eligible_bay.is_empty() and bay.is_empty():
-		_fail("%s eligible Workshop bay lost its roof-plane fit" % who)
-	if not bay.is_empty():
-		var axis := int(bay["axis"])
-		var coord := float(bay["inner"])
-		var lo := float(bay["along_lo"])
-		var hi := float(bay["along_hi"])
-		var mid := (lo + hi) * 0.5
-		var p_mid := Vector2(coord, mid) if axis == 0 else Vector2(mid, coord)
-		var p_lo := Vector2(coord, lo) if axis == 0 else Vector2(lo, coord)
-		var p_hi := Vector2(coord, hi) if axis == 0 else Vector2(hi, coord)
-		if absf(float(bay["host_y"]) - RoofShape.height_at(faces, p_mid)) > 0.002 \
-				or absf(float(bay["host_y_lo"]) - RoofShape.height_at(faces, p_lo)) > 0.002 \
-				or absf(float(bay["host_y_hi"]) - RoofShape.height_at(faces, p_hi)) > 0.002:
-			_fail("%s Workshop bay lost measured contact with the new roof planes" % who)
+	# WITCH-SIZE: no hut is promoted into a Workshop bay any more.
+	if not layout.get("witch_bay", {}).is_empty():
+		_fail("%s gained a Workshop bay roof" % who)
 	# Build and compare named components against the committed mesh. This catches
 	# missing/reversed roof panels while the vertex seam checks above catch joins.
 	plan.spec.timber_frame = true

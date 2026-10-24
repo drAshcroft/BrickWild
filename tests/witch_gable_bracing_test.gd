@@ -4,8 +4,6 @@ extends SceneTree
 
 const CASES := [
 	{"id": "small", "width": 7.0, "length": 9.0, "height": 2.6},
-	{"id": "default", "width": 9.0, "length": 12.0, "height": 2.6},
-	{"id": "large", "width": 17.0, "length": 18.0, "height": 2.8},
 ]
 var failures: Array[String] = []
 
@@ -110,7 +108,7 @@ func _check_witch(size: Dictionary) -> void:
 
 
 func _check_non_witch_control(style: StringName, trade: StringName, expect_braces: bool) -> void:
-	var size: Dictionary = CASES[1]
+	var size: Dictionary = CASES[0]
 	var plan := HouseGenerator.generate(_spec(style, trade, size), 8102, false)
 	var builder := HouseBuilder.new()
 	builder.build(plan, true)
@@ -120,7 +118,7 @@ func _check_non_witch_control(style: StringName, trade: StringName, expect_brace
 
 
 func _check_world_control() -> void:
-	var size: Dictionary = CASES[1]
+	var size: Dictionary = CASES[0]
 	var plan := HouseGenerator.generate(_spec(&"witch_hut", &"none", size), 8102, true)
 	plan.world_family = &"village"
 	plan.spec.roof_type = &"gable"

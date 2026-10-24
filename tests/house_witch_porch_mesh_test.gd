@@ -3,10 +3,10 @@ extends SceneTree
 ## applied to the project source. It checks named parts against the actual mesh.
 
 const CASES := [
-	{"label": "front", "normal": Vector2(0, -1), "width": 9.0, "length": 12.0, "seed": 8102},
+	{"label": "front", "normal": Vector2(0, -1), "width": 7.0, "length": 9.0, "seed": 8102},
 	{"label": "rear", "normal": Vector2(0, 1), "width": 7.0, "length": 9.0, "seed": 8102, "use_existing_rear_door": true},
-	{"label": "west", "normal": Vector2(-1, 0), "width": 9.0, "length": 12.0, "seed": 8102},
-	{"label": "east", "normal": Vector2(1, 0), "width": 9.0, "length": 12.0, "seed": 8102},
+	{"label": "west", "normal": Vector2(-1, 0), "width": 7.0, "length": 9.0, "seed": 8102},
+	{"label": "east", "normal": Vector2(1, 0), "width": 7.0, "length": 9.0, "seed": 8102},
 ]
 const ROOF_ROLE := "witch_entry_lean_to"
 const LEDGER_ROLE := "witch_entry_wall_ledger"

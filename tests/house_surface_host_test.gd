@@ -65,8 +65,7 @@ func _check_six_renderer_cases() -> void:
 		{"id": "farmhouse_ample_1", "style": &"farmhouse", "width": 11.0, "length": 14.0, "seed": 1},
 		{"id": "cottage_small_8102", "style": &"cottage", "width": 9.0, "length": 12.0, "seed": 8102},
 		{"id": "cottage_ample_1", "style": &"cottage", "width": 11.0, "length": 14.0, "seed": 1},
-		{"id": "witch_hut_small_8102", "style": &"witch_hut", "width": 9.0, "length": 12.0, "seed": 8102},
-		{"id": "witch_hut_ample_1", "style": &"witch_hut", "width": 11.0, "length": 14.0, "seed": 1},
+		{"id": "witch_hut_small_8102", "style": &"witch_hut", "width": 7.0, "length": 9.0, "seed": 8102},
 	]
 	for row in cases:
 		if selected_phase != "all" and selected_phase != "cases_" + String(row["style"]):

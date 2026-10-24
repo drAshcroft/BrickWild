@@ -647,8 +647,7 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 			{"cat": "bucket", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
 			{"cat": "cookware", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "cooking"},
 		]
-		if compact_shared_heat or uses_native_domestic_fireplace(plan) \
-				or bool(plan.domestic_layout.get("witch_alchemist_side_hall", false)):
+		if compact_shared_heat or uses_native_domestic_fireplace(plan):
 			# These Hall cooking contracts require a measured preparation vessel.
 			# The cookware catalogue also contains a metal bucket, which does not
 			# meet the authored pot role of the compact Alchemist household.

@@ -313,7 +313,7 @@ make it that kind of house, and each put through the whole harness.
 | Family cottage | Cottage | 8 × 10.5 | hall, table, seat |
 | Farmhouse | Farmhouse | 10 × 13 | hall, barrels or crates |
 | Smithy | Long Hall | 11 × 13 | hall, workshop, anvil, workbench |
-| Alchemist | Witch's Hut | 9.5 × 12 | hall, workshop, bookcase, workbench |
+| Alchemist | Witch's Hut | 7 × 9 (clamped) | hall, workshop, bookcase, workbench |
 | Inn | Townhouse | 13 × 16 | hall, parlour, bedroom, table, seating |
 | Scholar's house | Townhouse | 10 × 12 | hall, parlour, bookcase |
 | Rich merchant's house | Rich | 12 × 15, three storeys | hall, parlour, table, seating, **and the ornament** |
@@ -351,3 +351,7 @@ footprint is how furniture ends up half inside a wall.
   https://fengshuireport.com/blog/bed-placement-feng-shui
 - Privacy gradients and adjacency in procedural floor plans.
   https://graphics.tudelft.nl/~rafa/myPapers/bidarra.GAMEON10.pdf
+
+## The witch hut is small (WITCH-SIZE)
+
+A hut is small. `HouseGenerator.clamp_witch_hut` brings any `witch_hut` request down to at most 7 x 9 m (short side 7, long side 9) and one storey, and no cellar; a 5.5 x 7 request is unchanged. Its `domestic_program` is three rooms (hall, kitchen, bedroom): the planner merges the kitchen into the hall, so cooking, eating and brewing share the main room, and adds a dry store beside the bedroom, giving hall + bedroom + store at 7 x 9 (hall + bedroom at 5.5 x 7). Gone with the large and default cases: the service ell and workshop bay (`witch_workshop_bay`, `witch_high_core_rect`, `witch_service_wing`), the entry hood, entry gablet and second front stack, and their tests. The frozen fixture (`tests/fixtures/personality/witch_requests.json`, `witch_family_requests.json`) is 3 seeds (1, 8102, 21325) x 2 sizes (5.5 x 7, 7 x 9) plus `witch_oversize_clamp` (17 x 18, two storeys) as the clamp control; `hwitchsize` proves it.
