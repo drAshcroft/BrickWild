@@ -61,6 +61,12 @@ static func dress(plan: HousePlan) -> void:
 		var walls: Array[int] = [int(item[2])]
 		if int(item[2]) != 0:
 			walls.append(1)
+		elif s.style == &"witch_hut" and s.trade == &"none":
+			# HEXT-WITCH-DRESSING: the compact 7 m hut front (WITCH-SIZE/WITCH-ROOF) is
+			# door, two shuttered windows and the reserved approach, with no clear run
+			# left for a lamp or a bench. The arrival pieces then stand on a side wall
+			# rather than vanish and leave the hut with no dressing at all.
+			walls.append_array([2, 3, 1])
 		for wall in walls:
 			for fraction in [0.22, 0.78, 0.38, 0.62, 0.5, 0.12, 0.88]:
 				var placement := _candidate(plan, key, scale, wall, fraction, item[3])
