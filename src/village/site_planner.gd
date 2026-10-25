@@ -417,7 +417,7 @@ const ROUTE_BAND := 0.5
 ## needs its road at a fixed place beside its common (round, planted) routes
 ## through that place instead of shifting a routed road off its contour.
 static func _route_through(seed: PackedVector2Array, site: Rect2, ground: VillageTerrain,
-		pin := -1, pin_y := 0.0) -> PackedVector2Array:
+		pin := -1, pin_y := 0.0, band_m := -1.0, deviate_scale := 1.0) -> PackedVector2Array:
 	var half_road: float = float(ROAD_CLASSES[&"through"]["width"]) * 0.5 \
 		+ float(ROAD_CLASSES[&"through"]["verge"])
 	var lo: float = site.position.y + half_road + SITE_MARGIN_M
@@ -428,6 +428,8 @@ static func _route_through(seed: PackedVector2Array, site: Rect2, ground: Villag
 	# site's depth either side is a hillside's worth of contour, and the
 	# router's cost grows with the band
 	var band: float = maxf(15.0, ROUTE_BAND * site.size.y)
+	if band_m > 0.0:
+		band = band_m   # a terrace keeps to its own corridor (VillageHillsideForm)
 	var seed_lo := INF
 	var seed_hi := -INF
 	for p in seed:
@@ -447,7 +449,7 @@ static func _route_through(seed: PackedVector2Array, site: Rect2, ground: Villag
 		ys.append(clampf(p.y, lo, hi))
 	var h := func(along: float, across: float) -> float: return ground.height_at(Vector2(along, across))
 	var routed := VillageRoadRouter.route_across(h, xs, ys, lo, hi,
-		float(ROAD_CLASSES[&"through"]["grade_max"]), ground.water_level_m, pin, pin_y)
+		float(ROAD_CLASSES[&"through"]["grade_max"]), ground.water_level_m, pin, pin_y, deviate_scale)
 	var out := PackedVector2Array()
 	for i in range(seed.size()):
 		out.append(Vector2(xs[i], routed[i]))

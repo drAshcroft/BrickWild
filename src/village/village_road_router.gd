@@ -40,7 +40,8 @@ const W_TURN := 3.0             ## per notch of heading change
 ## own offsets per column (the flat road); offsets stay inside [lo, hi].
 ## `wet_level` NAN for no standing water. Returns the offsets per column.
 static func route_across(height: Callable, xs: PackedFloat64Array, seed: PackedFloat64Array,
-		lo: float, hi: float, cap: float, wet_level := NAN, pin := -1, pin_at := 0.0) -> PackedFloat64Array:
+		lo: float, hi: float, cap: float, wet_level := NAN, pin := -1, pin_at := 0.0,
+		deviate_scale := 1.0) -> PackedFloat64Array:
 	var n := xs.size()
 	var ny := int(floor((hi - lo) / OFFSET_STEP_M)) + 1
 	if n < 2 or ny < 1:
@@ -66,7 +67,7 @@ static func route_across(height: Callable, xs: PackedFloat64Array, seed: PackedF
 	for j in range(ny):
 		for k in range(nk):
 			# the first column: any offset, any heading, paid only for leaving the bow
-			cost[j * nk + k] = W_DEVIATE * absf(lo + j * OFFSET_STEP_M - seed[0]) * 3.0
+			cost[j * nk + k] = W_DEVIATE * deviate_scale * absf(lo + j * OFFSET_STEP_M - seed[0]) * 3.0
 	var pin_j := int(round((pin_at - lo) / OFFSET_STEP_M)) if pin >= 0 else -1
 	if pin == 0:
 		_pin(cost, pin_j, nk, big)
@@ -103,7 +104,7 @@ static func route_across(height: Callable, xs: PackedFloat64Array, seed: PackedF
 						c += W_OVER * (g - limit) * length
 					if not is_nan(wet_level) and (hb <= wet_level or hm <= wet_level):
 						c += W_WET * length
-					c += W_DEVIATE * absf(lo + j2 * OFFSET_STEP_M - seed[i + 1]) * dx / COLUMN_M
+					c += W_DEVIATE * deviate_scale * absf(lo + j2 * OFFSET_STEP_M - seed[i + 1]) * dx / COLUMN_M
 					var s := j2 * nk + k2
 					if c < nxt[s]:
 						nxt[s] = c

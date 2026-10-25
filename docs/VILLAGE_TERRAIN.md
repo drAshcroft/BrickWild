@@ -518,8 +518,8 @@ as flights, not ramps.
 * ~~**the real hillsides' contour share**~~ -- mostly done in
   VTER-FORM-HILLSIDE: the form's terraces are contour streets and its risers
   keep non-contour length in the denominator, so the 30 % plane reads 0.739
-  inside the steep sites' band. The real fixtures have not been measured yet
-  (see "The hillside form", Not yet);
+  inside the steep sites' band, and Manarola (0.737) and Masouleh (0.516)
+  since HILLS-FIXTURES (see "On the real hillsides");
 * ~~graded service lanes~~ -- done in VTER-LOTS: a steep one is not laid;
 * **a tavern near a gate on a stretched site** -- Èze and Hallstatt stretch
   to 270-315 m to house everyone, and the tavern's 60 m from a gate goes;
@@ -1423,12 +1423,43 @@ holds these four bands against the form, checks all three terraces are
 streets with a house fronting each, the two risers and four cross-lanes, and
 that every household is housed.
 
+### On the real hillsides (HILLS-FIXTURES)
+
+The same form, 50 people, seed 4242, forced to `hillside` on `real30/manarola`
+and `real30/masouleh` (Manarola derives `shore`, Masouleh `hillside`). What
+the plane did not need, the real ground did:
+
+| Change | Why |
+|---|---|
+| siting scores a SLOPE (`VillageSiting` `hill` term, hillside only): the 40th percentile of the lattice's cross-site fall against 22 % | the standard score takes the flattest ground, and Manarola was sited on a 5 % shelf (span 3.8 m) |
+| the through road and the terraces are LEVEL lines (`_level`: the router's DP over the ground's height measured from the seed's, the seed column pinned) | routed at the cart's 12 % and re-routed per terrace, the three ran together onto one least-grade line on a curved face and crossed each other |
+| terrace pitch grows on gentle ground (`TERRACE_RISE_M` 6 m, 30-44 m) and the site deepens with it | Manarola's body slope is 14 %: 30 m gave a 9 m span |
+| risers: the pair of tops (`pick_pair`) and each lean (`pick_lean`) are chosen so the riser really is a street on THIS ground; where the face is steeper than the plane's the pair lean the SAME way (parallel) and the site widens by the drift | a street must end on a street: one riser that is stairs re-classes every terrace to a footpath (`grade_roads`), and the contour share is then measured on the through road alone (1.0) |
+| field tracks: on given ground each spot takes the least lean, either side, whose track really is one (`_field_tracks`), and four more leave the through road UPHILL | on 35-45 % ground a street that climbs at 30 % is 40-50 degrees off the contour, the only non-contour street the metric can see |
+| the common stands on the flattest part of the road's middle 80 % | the place check wants it no steeper than the median lot |
+| households per level 3:2:2:5, staggered from the lowest level up (`LEVEL_WEIGHTS`) | measured: the split that keeps span, elongation and contour share in band on the plane AND both fixtures; equal shares failed one or the other |
+
+| Measure | plane_30 | Manarola | Masouleh | Steep sites p10-p90 |
+|---|---|---|---|---|
+| street_contour_share | 0.611 | **0.737** | **0.516** | 0.389-0.798 |
+| elevation span, m | 34.4 | **14.7** | **17.5** | 14.4-73.0 |
+| steps ways | 4 | **6** | **6** | 0-46.5 |
+| elongation | 1.35 | **2.92** | **4.48** | 1.32-4.88 |
+| households unhoused | 0 | 0 | 0 | -- |
+
+Suite `vhillside` (111 checks; ~10 min host, Masouleh alone ~5 min in the suite) holds the four bands, the housing and the grade
+caps on all three. Span on Manarola (14.7 against a 14.4 floor) and the plane's
+elongation (1.35 against 1.32) have little margin.
+
 ### Not yet
 
-* **the real hillsides** -- the form has not been measured on Masouleh,
-  Castelmezzano or the world90 sites yet; on their 40-60 % ground the risers
-  and terraces will pass to `steps` through `grade_roads`, and the terraces
-  may then lose their frontage (the crest's ring has the same open item);
+* **the real hillsides' own QA** -- the bands and the housing hold, but on
+  these two faces `VillageQA` and the road check still fail: the terraces are
+  re-classed to footpaths where a riser is stairs (small bends and 13-28
+  degree junctions), the lot density is 4.4-4.6 % (a 5 % floor; the site is
+  wide for twelve houses), the common stands on 35 % ground against a 31 %
+  median lot, and Manarola's level through road leaves its site on the west
+  and climbs 24 % (a cart road is 12 %). Only the bands are gated;
 * **switchbacks** -- the router is monotone along the contour, so a hairpin
   up a spur is still not laid;
 * **terraces from the ground** -- the terrace lines are offsets of the
