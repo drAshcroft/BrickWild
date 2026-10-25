@@ -746,3 +746,23 @@ Receipts: `lane:temple` 3106 checks / 0 failures / 0 warnings (`artifacts/goal/S
 ## LIVE-SACRED close-out (2026-10-24)
 
 All six sub-tasks done (676e5e6, 41f0414, 15b30ad, 5e92c0b, ecfaa49, ed96101). The five rows that cited since-fixed defects were re-rendered once on ed96101 with `tools/render_sacred_exterior.gd` (front, side, entry, cutaway; `artifacts/goal/LIVE-SACRED/`) and re-ticked above. Open findings have their own tasks: SACRED-ROTUNDA-PERISTYLE (ring colonnade 0/6 from outside) and TEMPLE-STAIR-TEST-STALE.
+
+## SACRED-ROTUNDA-PERISTYLE (25 October 2026)
+
+The 0/6 ring-colonnade miss is addressed by a door-level peristyle:
+`TempleBuilder._build_rotunda_peristyle`, geometry in
+`TempleGeometry.rotunda_peristyle_*`. A ring of columns stands on the ground
+1.3 m outside the drum (plinth to just under the upper arcade), with an
+architrave over each bay, a flat ceiling slab tying each bay back to the drum,
+and a paved stylobate ring (`floor_rotunda_peristyle`, the one mass that lets
+the columns pass `no_gaps`). The two columns nearest the axis frame the door;
+the bay between them is the forecourt width (4.4 m) and nothing crosses it.
+The forecourt, `plan_extent` and the obelisk positions follow the peristyle
+extent, so the published footprint and approach reach the real arrival edge.
+Architraves are component rows, not masses (as the inner ring's are): a
+skewed beam's AABB overlaps its neighbours and the drum. `sacredid`'s
+colonnade trait now also measures the ring (>= 8 columns on one circle outside
+the drum, on the ground, below the drum top, mirrored, door bay >= gate
+width) with a second removal control. Renders:
+`artifacts/goal/SACRED-ROTUNDA-PERISTYLE/renders/` (six cases x front, side,
+rear, entry). The reviewer tick is the coordinator's.

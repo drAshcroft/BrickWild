@@ -106,7 +106,7 @@ static func _roof(spec: TempleSpec, comps: Array) -> Dictionary:
 
 ## (3) a ring colonnade at the door: arcade piers on one circle with a pier
 ## either side of the door, mirrored about the axis, and the inner column ring.
-static func _colonnade(_spec: TempleSpec, masses: Array) -> Dictionary:
+static func _colonnade(spec: TempleSpec, masses: Array) -> Dictionary:
 	var piers := _named(masses, "rotunda_arcade_pier_")
 	if piers.size() < 8:
 		return _ok(false, "%d arcade piers (need 8)" % piers.size())
@@ -149,8 +149,62 @@ static func _colonnade(_spec: TempleSpec, masses: Array) -> Dictionary:
 		ch = maxf(ch, r)
 	if ch - cl > 0.6:
 		return _ok(false, "inner columns span r %.2f..%.2f: not a ring" % [cl, ch])
-	return _ok(true, "%d piers r %.1f, %d columns r %.1f, door flanked %d/%d" % [
-		piers.size(), hi, cols.size(), ch, left, right])
+	var peri := _peristyle(spec, masses)
+	if not peri["ok"]:
+		return peri
+	return _ok(true, "%d piers r %.1f, %d columns r %.1f, door flanked %d/%d; %s" % [
+		piers.size(), hi, cols.size(), ch, left, right, peri["note"]])
+
+
+## SACRED-ROTUNDA-PERISTYLE: a ring of columns standing on the ground OUTSIDE
+## the drum, mirrored about the gate axis, below the drum top, with the door
+## between the two nearest columns (a clear bay at least a gate wide).
+static func _peristyle(spec: TempleSpec, masses: Array) -> Dictionary:
+	var cols := _named(masses, "rotunda_peristyle_column_")
+	if cols.size() < 8:
+		return _ok(false, "%d door-level peristyle columns (need 8)" % cols.size())
+	var outer := TempleGeometry.rotunda_outer_radius(spec)
+	var lower := TempleGeometry.rotunda_lower_drum_height(spec)
+	var lo := INF
+	var hi := -INF
+	var left_x := -INF  # nearest column left of the axis (x < 0), at the door
+	var right_x := INF
+	var xs: Array = []
+	for m in cols:
+		var box: AABB = m["aabb"]
+		var p := _polar(box)
+		lo = minf(lo, p.x)
+		hi = maxf(hi, p.x)
+		if box.position.y > 0.05:
+			return _ok(false, "peristyle column %s does not stand on the ground" % m["name"])
+		if box.end.y > lower:
+			return _ok(false, "peristyle column %s rises above the drum (%.1f > %.1f)" % [
+				m["name"], box.end.y, lower])
+		var c := box.get_center()
+		xs.append(c.x)
+		if c.z < 0.0 and absf(p.y) <= DOOR_FLANK:
+			if c.x < 0.0:
+				left_x = maxf(left_x, c.x + box.size.x * 0.5)
+			else:
+				right_x = minf(right_x, c.x - box.size.x * 0.5)
+	if lo <= outer:
+		return _ok(false, "peristyle r %.2f is not outside the drum (r %.2f)" % [lo, outer])
+	if hi - lo > 0.3:
+		return _ok(false, "peristyle columns span r %.2f..%.2f: not one ring" % [lo, hi])
+	if left_x == -INF or right_x == INF:
+		return _ok(false, "no peristyle column either side of the door")
+	if right_x - left_x < TempleGeometry.GATE_W:
+		return _ok(false, "door bay %.2f m is narrower than the gate" % (right_x - left_x))
+	for x in xs:
+		var found := false
+		for y in xs:
+			if absf(float(x) + float(y)) < 0.06:
+				found = true
+				break
+		if not found:
+			return _ok(false, "peristyle column at x %.2f has no mirror twin" % float(x))
+	return _ok(true, "%d peristyle columns r %.1f, door bay %.1f m" % [
+		cols.size(), hi, right_x - left_x])
 
 
 ## Pylon (1): twin mirrored battered towers either side of the gate, on the front line.

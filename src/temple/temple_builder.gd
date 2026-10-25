@@ -322,6 +322,7 @@ func _build_walls() -> void:
 		_build_rotunda_upper_arcade(t, h)
 		_gate_void(-TempleGeometry.rotunda_outer_radius(spec) + t * 0.5)
 		_build_rotunda_gate_surround()
+		_build_rotunda_peristyle()
 		return
 	var runs := [
 		{"name": "wall_left", "rect": Rect2(Vector2(r.position.x, side_start_y),
@@ -607,6 +608,83 @@ func _build_rotunda_upper_arcade(thickness: float, roof_y: float) -> void:
 		component_box("rotunda_arcade_pier", size, xf, SURF_STONE)
 		host_end()
 		_log_mass("rotunda_arcade_pier_%02d" % i, _rotated_box_bounds(size, xf))
+
+
+## SACRED-ROTUNDA-PERISTYLE: columns on the ground round the drum, an
+## architrave over each bay and a flat ceiling slab tying it back to the drum.
+## The two columns nearest the axis flank the door; no beam or slab crosses
+## the door bay, so the procession lane stays open.
+func _build_rotunda_peristyle() -> void:
+	var cols: Array[Vector2] = TempleGeometry.rotunda_peristyle_columns(spec)
+	var h: float = TempleGeometry.rotunda_peristyle_column_height(spec)
+	if cols.size() < 8 or h < 1.8:
+		return
+	_build_rotunda_peristyle_paving()
+	tag("column")
+	var r: float = spec.column_r
+	var cap: float = TempleGeometry.COLUMN_CAP * r
+	var beam_h: float = TempleGeometry.ROTUNDA_PERISTYLE_BEAM
+	var slab_t: float = TempleGeometry.ROTUNDA_PERISTYLE_SLAB
+	for i in range(cols.size()):
+		var c: Vector2 = cols[i]
+		box(Vector3(r * 2.4, 0.22, r * 2.4), Vector3(c.x, 0.11, c.y), SURF_STONE)
+		_kit.drum(Vector3(c.x, 0.22, c.y), r, r * 0.86, h - 0.22, SURF_STONE, 12)
+		_kit.drum(Vector3(c.x, h, c.y), r * 1.25, r * 1.1, cap, SURF_TRIM, 12)
+		_log_mass("rotunda_peristyle_column_%02d" % i,
+			AABB(Vector3(c.x - r * 1.2, 0.0, c.y - r * 1.2),
+				Vector3(r * 2.4, h + cap, r * 2.4)))
+	tag("structure")
+	var arch_y: float = h + cap + beam_h * 0.5
+	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
+	host("rotunda_peristyle")
+	for i in range(cols.size() - 1):
+		var a: Vector2 = cols[i]
+		var b: Vector2 = cols[i + 1]
+		var delta: Vector2 = b - a
+		var asize := Vector3(delta.length() + r * 0.9, beam_h, r * 1.6)
+		var xf := Transform3D(Basis(Vector3.UP, atan2(-delta.y, delta.x)),
+			Vector3((a.x + b.x) * 0.5, arch_y, (a.y + b.y) * 0.5))
+		# a component row, not a mass: the ring architrave is one too, and a
+		# bare AABB of a skewed beam would "overlap" its neighbours
+		component_box("rotunda_peristyle_architrave", asize, xf, SURF_TRIM)
+		# the ceiling bay: out to the architrave, back to the drum face
+		var half: float = atan2(delta.length() * 0.5, a.length())
+		var inner: float = outer / cos(half) - 0.01
+		var pa: Vector2 = a.normalized() * inner
+		var pb: Vector2 = b.normalized() * inner
+		var y: float = h + cap + beam_h + slab_t * 0.5
+		var quad := PackedVector3Array([
+			Vector3(a.x, y, a.y), Vector3(b.x, y, b.y),
+			Vector3(pb.x, y, pb.y), Vector3(pa.x, y, pa.y)])
+		component_slab("rotunda_peristyle_ceiling", quad, slab_t, SURF_STONE)
+	host_end()
+
+
+## The stylobate: a ring of paving from the drum to the column plinths, so the
+## columns stand on something. It stops short of the door bay, which the
+## forecourt paves. Logged as one floor mass, as the perimeter wings are.
+func _build_rotunda_peristyle_paving() -> void:
+	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
+	var reach: float = TempleGeometry.rotunda_peristyle_extent(spec)
+	var t: float = 0.2
+	var door_half: float = (TempleGeometry.GATE_W + 1.2) * 0.5
+	var segments := 48
+	tag("floor")
+	host("rotunda_peristyle_paving")
+	for k in range(segments):
+		var a0: float = TAU * float(k) / float(segments)
+		var a1: float = TAU * float(k + 1) / float(segments)
+		var mid: float = (a0 + a1) * 0.5
+		if cos(mid) > 0.0 and absf(sin(mid)) * reach < door_half + 0.4:
+			continue # the door bay: the forecourt paves it
+		var quad := PackedVector3Array()
+		for p in [Vector2(sin(a0), -cos(a0)) * outer, Vector2(sin(a1), -cos(a1)) * outer,
+				Vector2(sin(a1), -cos(a1)) * reach, Vector2(sin(a0), -cos(a0)) * reach]:
+			quad.append(Vector3(p.x, -t * 0.5 + 0.001, p.y))
+		component_slab("rotunda_peristyle_paving", quad, t, SURF_STONE)
+	host_end()
+	_log_mass("floor_rotunda_peristyle", AABB(Vector3(-reach, -t + 0.001, -reach),
+		Vector3(reach * 2.0, t, reach * 2.0)))
 
 
 ## A shallow stone surround gives the -Z entry a legible classical face.

@@ -13,6 +13,8 @@ const REMOVE := {
 	"drum": {"m": ["wall_rotunda_"], "c": []},
 	"roof": {"m": [], "c": ["rotunda_drum_crown"]},
 	"colonnade": {"m": ["rotunda_arcade_pier_"], "c": []},
+	# the door-level ring is also part of the colonnade trait
+	"peristyle": {"trait": "colonnade", "m": ["rotunda_peristyle_column_"], "c": []},
 	"towers": {"m": ["pylon_0", "pylon_1"], "c": ["pylon_battered_face"]},
 	"hypostyle": {"m": ["column_"], "c": []},
 }
@@ -49,6 +51,8 @@ static func run() -> SuiteResult:
 			else:
 				res.fail("%s: trait '%s' missing: %s" % [c["id"], t, r["note"]])
 			_removal(res, c["id"], spec, builder, t)
+			if t == "colonnade":
+				_removal(res, c["id"], spec, builder, "peristyle")
 	res.checked += 1
 	if cases != 12:
 		res.fail("expected 6 rotunda + 6 pylon frozen cases, measured %d" % cases)
@@ -60,6 +64,7 @@ static func run() -> SuiteResult:
 static func _removal(res: SuiteResult, id: String, spec: TempleSpec, builder: TempleBuilder,
 		trait_name: String) -> void:
 	var rm: Dictionary = REMOVE[trait_name]
+	var measured: String = rm.get("trait", trait_name)
 	var masses: Array = []
 	for m in builder.mass_log:
 		var drop := false
@@ -77,7 +82,7 @@ static func _removal(res: SuiteResult, id: String, spec: TempleSpec, builder: Te
 		if not drop:
 			comps.append(c)
 	res.checked += 1
-	var r: Dictionary = Id.measure(spec, masses, comps)[trait_name]
+	var r: Dictionary = Id.measure(spec, masses, comps)[measured]
 	if r["ok"]:
 		res.fail("%s: removal control for '%s' still passes; the measure cannot fail" % [id, trait_name])
 
