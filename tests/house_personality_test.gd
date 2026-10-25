@@ -81,7 +81,11 @@ func _check_case(row: Dictionary) -> void:
 func _check_tiling_and_shapes(plan: HousePlan, who: String) -> void:
 	var inner := HouseGeometry.interior_rect(plan.spec)
 	var area := 0.0
-	for i in range(plan.rooms.size()):
+	# HS-TOWNHOUSE: a townhouse is now two or three storeys (min_storeys 2), and
+	# upper storeys repeat the ground partition. The tiling contract is per
+	# storey, so judge the ground floor, not the sum of every floor.
+	var ground: Array = plan.rooms_on_storey(0)
+	for i in ground:
 		var rect: Rect2 = plan.rooms[i]["rect"]
 		area += rect.get_area()
 		if not inner.grow(0.02).encloses(rect):
@@ -90,7 +94,9 @@ func _check_tiling_and_shapes(plan: HousePlan, who: String) -> void:
 			failures.append("%s room %d is too small for %s" % [who, i, plan.kind_of(i)])
 		if HouseGeometry.room_aspect(plan, i) > HouseGeometry.aspect_max(plan.kind_of(i)):
 			failures.append("%s room %d is a corridor-shaped %s" % [who, i, plan.kind_of(i)])
-		for j in range(i + 1, plan.rooms.size()):
+		for j in ground:
+			if j <= i:
+				continue
 			var overlap: Rect2 = rect.intersection(plan.rooms[j]["rect"])
 			if overlap.size.x > 0.02 and overlap.size.y > 0.02:
 				failures.append("%s rooms %d and %d overlap" % [who, i, j])

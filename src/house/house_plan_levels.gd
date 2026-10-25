@@ -183,7 +183,22 @@ static func move_beds_upstairs(p: HousePlan, spec: HouseSpec) -> void:
 				continue
 			if HouseGeometry.room_suits(p, i, kind) or kind == &"store":
 				p.rooms[i]["kind"] = kind
+				_rename_ground_activity(p, &"bedroom", kind)
 				break
+
+
+## HS-TOWNHOUSE: the layout provenance lists the ground activities the planner
+## laid out. A deliberate bedroom -> work-room rename is part of the plan, not a
+## room lost to repair, so the record follows it; otherwise
+## refresh_domestic_metadata reports a fallback for every beds-upstairs house.
+static func _rename_ground_activity(p: HousePlan, from_kind: StringName, to_kind: StringName) -> void:
+	if p.domestic_layout.is_empty():
+		return
+	var activities: Array = p.domestic_layout.get("ground_activities", [])
+	var at := activities.find(from_kind)
+	if at >= 0:
+		activities[at] = to_kind
+		p.domestic_layout["ground_activities"] = activities
 
 
 ## Would the upper storey be able to hold a bedroom at all?
