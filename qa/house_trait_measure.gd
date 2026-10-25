@@ -54,7 +54,76 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable()) -> Dictio
 	out["porch_roof_count"] = roofs
 	out["door_sheltered"] = _door_sheltered(plan, builder, roofs)
 	_farm_keys(plan, builder, out)
+	_town_keys(plan, out)
 	return out
+
+
+## HS-TOWNHOUSE keys: `frontage` and `depth` (the entrance facade's length and
+## the house's depth behind it, m), `frontage_narrower`, `room_storeys`,
+## `ground_bedrooms`, `ground_work` (a work room on the ground floor: office,
+## workshop or shop), `upper_bedrooms`, and the stair spine walked from the
+## entrance room: `spine_storeys` (storeys reached by satisfied stairs),
+## `spine_landings` (storeys whose foot or head landing is a real rectangle) and
+## `spine_lit` (storeys whose landing room has a window).
+static func _town_keys(plan: HousePlan, out: Dictionary) -> void:
+	var r := HouseGeometry.site_rect(plan.spec)
+	var e := plan.entrance()
+	var along_x := true
+	if e >= 0:
+		along_x = absf(Vector2(plan.doors[e]["normal"]).y) > 0.5
+	out["frontage"] = r.size.x if along_x else r.size.y
+	out["depth"] = r.size.y if along_x else r.size.x
+	out["frontage_narrower"] = out["frontage"] < out["depth"]
+	var top := 0
+	var ground_bed := 0
+	var upper_bed := 0
+	var work := false
+	for i in range(plan.rooms.size()):
+		var st := plan.storey_of_room(i)
+		top = maxi(top, st)
+		var kind := plan.kind_of(i)
+		if st == 0 and kind in [&"office", &"workshop", &"shop"]:
+			work = true
+		if kind in [&"bedroom", &"guest_room", &"suite"]:
+			if st == 0:
+				ground_bed += 1
+			elif st > 0:
+				upper_bed += 1
+	out["room_storeys"] = top + 1
+	out["ground_bedrooms"] = ground_bed
+	out["upper_bedrooms"] = upper_bed
+	out["ground_work"] = work
+	var here := plan.entrance_room()
+	var reached := 1 if here >= 0 else 0
+	var landings := 0
+	var lit := 0
+	var spent := {}
+	if here >= 0 and not plan.windows_of(here).is_empty():
+		lit += 1
+	var guard := 0
+	while here >= 0 and guard < 6:
+		guard += 1
+		var next := -1
+		for k in range(plan.stairs.size()):
+			var s: Dictionary = plan.stairs[k]
+			if spent.has(k) or int(s["a"]) != here or int(s["to_storey"]) != int(s["storey"]) + 1:
+				continue
+			if not bool(s.get("satisfied", true)):
+				continue
+			spent[k] = true
+			next = int(s["b"])
+			if Rect2(s.get("foot_landing", Rect2())).has_area() 					and Rect2(s.get("head_landing", Rect2())).has_area():
+				landings += 1
+			break
+		if next < 0:
+			break
+		reached += 1
+		if not plan.windows_of(next).is_empty():
+			lit += 1
+		here = next
+	out["spine_storeys"] = reached
+	out["spine_landings"] = landings
+	out["spine_lit"] = lit
 
 
 ## HS-FARMHOUSE keys: the yard door, the byre, and the working props.

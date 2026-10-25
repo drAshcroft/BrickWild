@@ -79,3 +79,59 @@ Reviewer tick: DONE 2026-10-24 (coordinator). Round 1: byre 3/3, yard props NO
 (hay read as white cubes), back door UNCLEAR. Round 2 (c7e9745, renders2): back door
 plain in all three interior views, byre 3/3, straw bales + shafted cart + sacks read.
 Weak: the trough still reads as a plain box with no water.
+
+## townhouse (HS-TOWNHOUSE)
+
+Traits: (1) two or three storeys, the street frontage (the entrance facade)
+narrower than the depth; (2) one stair from the entry reaches every floor, with
+a foot and head landing and a window in the landing room on each; (3) the
+ground floor holds the shop or work room and no bedroom, the beds are above.
+
+Measured first (40 seeds, 8 x 10 m, request storeys 1): frontage 8 against depth
+10 on 40 of 40; every house was ONE storey (the row had no `min_storeys`, only
+the rich row did), so there was no stair; the ground held hall, bedroom, kitchen.
+Work room: none (the office is in the programme but the one-storey plan kept
+the bedroom instead).
+
+Built, as style constants with no new random draw: the townhouse row gains
+`min_storeys: 2` (the existing generator floor) and `beds_upstairs: true`.
+`HousePlanLevels.move_beds_upstairs` (called by `HousePlanner.plan` after the
+upper storeys are cloned and named) renames each ground-floor bedroom of a
+`beds_upstairs` house to office (the work room), else workshop, parlour or
+store, once a bed is known to stand above. Only a no-trade townhouse is changed: a
+trade townhouse keeps its own programme (with the innkeeper 13 x 16 m seed 32102
+of `hmultistory` the rename makes the kitchen seat count fail, a furnishing
+sensitivity not chased here; such a house can still have a ground bedroom). The partition and stair do not move:
+a first attempt that dropped bedrooms from the ground programme re-flowed the
+ground floor and left some upper floors with only thin rooms and no bedroom
+(programme sweep seeds 41050, 41170). Upper storeys keep their own naming (2
+bedrooms above on 40 of 40 seeds at 8 x 10 m), and the stair, landings and
+windows come from the domestic stair profile already in place. Three storeys also hold, tested at seeds 1, 8102 and
+21325.
+
+Known consequence: `min_storeys` also lifts trade townhouses to two storeys, so
+the `lane:house-furnish-fast` feng shui sweep seed 60002 (townhouse, alchemist,
+10 x 10.6, once one storey) now fails `sconce_pair` in the ground workshop (two
+lamps on walls 2 and 0). It is a furnisher pair-lamp weakness the new geometry
+exposes, not a changed check; left open for the furnisher owner.
+
+Test: `tests/house_townhouse_traits_test.gd` (58 checks) over the frozen requests
+`house/townhouse/{1,8102,21325}` (the 8102 row existed; 1 and 21325 added),
+plus the same three at three storeys. Controls: spec back to one storey, width
+and length swapped, stairs removed, head landings removed, upper windows
+removed, the office turned into a bedroom. Keys added to
+`HouseTraitMeasure.measure`: `frontage`, `depth`, `frontage_narrower`,
+`room_storeys`, `ground_work`, `ground_bedrooms`, `upper_bedrooms`,
+`spine_storeys`, `spine_landings`, `spine_lit`.
+
+Note for LHS-STAIRS (a domestic stair profile for multistorey requests): the
+townhouse already runs the domestic profile (`domestic_profile: true`, foot and
+head landing rectangles) at 2 and 3 storeys through `HousePlanLevels`; the
+spine keys above are a ready check for it.
+
+Renders for review: `artifacts/goal/HS-TOWNHOUSE/renders/` (`tools/render_hs_townhouse.gd`,
+not headless): `_front` roof-on three-quarter, `_workroom` ground floor eye level,
+`_stairfoot` the spine from the entry hall, `_landing` the upper landing
+looking back at the stair opening.
+
+Reviewer tick: OPEN

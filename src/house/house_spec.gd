@@ -171,6 +171,8 @@ const STYLES := {
 		"framing": [&"close_studding", &"saltire"], "truss": [&"queen_post", &"collar_strut"],
 		"jetty": 0.9, "dormers": 0.6, "bargeboards": 0.95, "stone_ground": 0.35,
 		"chimney_style": &"stepped", "pots": [1, 2],
+		# HS-TOWNHOUSE: tall and narrow, never one storey (style constant, no draw).
+		"min_storeys": 2, "beds_upstairs": true,
 	},
 	&"longhall": {
 		"label": "Long Hall",

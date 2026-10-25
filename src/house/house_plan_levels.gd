@@ -154,6 +154,38 @@ static func clone_upper_storeys(p: HousePlan, spec: HouseSpec) -> void:
 		_ensure_a_bed(p)
 
 
+## HS-TOWNHOUSE: work below, beds above. A style row with `beds_upstairs` gives
+## its ground-floor bedroom to the work the house does: the planner laid the
+## ground out with its usual private wing (so no partition or stair moves), and
+## the room is renamed here, once the upper storeys have been named and a bed
+## is known to stand above. Office first, then workshop, parlour, store.
+static func move_beds_upstairs(p: HousePlan, spec: HouseSpec) -> void:
+	# A trade house keeps its own programme (the innkeeper townhouse of
+	# hmultistory seed 32102 fails its kitchen seat count when its ground changes).
+	if not has_upstairs(spec) or spec.trade != &"none" \
+			or not bool(HouseSpec.STYLES.get(spec.style, {}).get("beds_upstairs", false)):
+		return
+	var slept := false
+	for i in range(p.rooms.size()):
+		if p.storey_of_room(i) > 0 and p.kind_of(i) in HouseGeometry.SLEEPING:
+			slept = true
+	if not slept:
+		return
+	for i in p.rooms_on_storey(0):
+		if p.kind_of(i) not in HouseGeometry.SLEEPING:
+			continue
+		var has_work := false
+		for j in p.rooms_on_storey(0):
+			has_work = has_work or p.kind_of(j) in [&"office", &"workshop"]
+		var order: Array = [&"parlour", &"store"] if has_work 			else [&"office", &"workshop", &"parlour", &"store"]
+		for kind in order:
+			if kind == &"parlour" and p.rooms_of(&"parlour").size() > 0 and has_work:
+				continue
+			if HouseGeometry.room_suits(p, i, kind) or kind == &"store":
+				p.rooms[i]["kind"] = kind
+				break
+
+
 ## Would the upper storey be able to hold a bedroom at all?
 ##
 ## The upper floors are clones of the ground partition, so this is the same
