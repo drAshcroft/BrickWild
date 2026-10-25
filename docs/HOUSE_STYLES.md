@@ -469,4 +469,33 @@ headless), per seed: `_front` roof-on three-quarter from the eyebrow's side, hig
 `_eyebrow` roof-on, lower and closer on the same side; `_garden` eye level from the
 road; `_interior` eye level in the entrance room, looking at the door.
 
-Reviewer: pending
+Independent reviewer: fresh agent, from the renders of commit fa87736 (all 12 images opened). Judged only from `artifacts/hs_thatch/renders/thatch_<seed>_{front,eyebrow,garden,interior}.jpg`.
+
+| seed | (1) thick rounded thatch, ridge roll | (2) eyebrow dormer | (3) white cob, no timber frame | (4) flower-garden front |
+|---|---|---|---|---|
+| 1 | YES (borderline) | YES (borderline) | YES | YES (borderline) |
+| 8102 | YES (borderline) | YES (borderline) | YES | YES (borderline) |
+| 21325 | YES (borderline) | YES (borderline) | YES | YES (borderline) |
+
+Reasons:
+* (1) the eaves are a clearly rounded bolster, roughly a thick log of thatch, with round-ended gable verges; the ridge carries a visible roll. But the roll is a row of separate bundles with dark notches between them, so it reads as a crenellated crest rather than one smooth saddle, and the thatch surface is flat horizontal courses, not combed. Held on the letter.
+* (2) one small domed bump on the entrance-side slope with a window under it, below the ridge, no cheeks or gable wall. But the window is a flat pale-blue rectangle with square corners lying in the slope; the thatch does not sweep over it in a curve, and from the front it is small (about a window wide). It reads as a low hooded hatch, not a flowing eyebrow. Borderline on all seeds.
+* (3) smooth white/cream walls on every elevation, no frame members on the walls. Brown frames on windows and doors, a porch of dark posts, a stone-block plinth round the base, and exposed ceiling beams indoors are not wall framing. The wall is plain white; it does not read as earthen (no undulation, no texture).
+* (4) one raised bed with three flowers on each side of a paver path at the door, all three seeds. They are small and sparse (a single short bed each side), but they are flower beds along the path. A bench stands against the front wall on every seed.
+
+Images: `artifacts/hs_thatch/renders/thatch_1_front.jpg`, `_eyebrow`, `_garden`, `_interior`; the same four for `8102` and `21325`.
+
+Open:
+* All seeds: the eyebrow's window is a flat rectangle and the thatch does not curve over it; the bump is small (trait 2 borderline).
+* All seeds: the ridge roll is segmented into notched bundles, not a smooth roll (trait 1 borderline).
+* All seeds: the walls are flat white with no earthen character; reads as plaster (trait 3 held on the letter).
+* All seeds: the flower beds are two short boxes of three flowers; a thin garden (trait 4 borderline).
+
+Observed (not traits):
+* Long side wall (all seeds, front and eyebrow renders): a pale grey rectangular patch sits on the wall just under the eave, with a hard straight lower edge; it reads as a floating panel or a bad shadow.
+* Garden renders (8102, 21325): a dark lintel bar floats a little above the front window, detached from the frame. Seed 1's window has no such bar.
+* Garden renders (all seeds): small dark blocks hang under the eave ends at both gables.
+* Seed 8102 front/eyebrow: a barrel, a bucket and a tub stand against the long wall at the left, loose on the grass; the tub is large against the bucket. They are at the side, not the front.
+* The hanging lamp glow blows out the gable wall beside the door on all seeds.
+* Seed 1 interior: a chest fills the lower right corner and a bed the lower left; the camera is cramped against them. Seed 21325 interior: a wardrobe fills the left; both are close-up but readable.
+* Seed 1 front: the chimney is a thin pot on a block; on 21325 it is a small pipe, much slimmer than on 1 and 8102.
