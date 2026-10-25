@@ -111,3 +111,21 @@ flight per storey):
   `store`, which the programme does not ask for a bench.
 
 `tools/castle_occupancy_sweep.gd -- castle sky 0` reports 0 failures.
+
+## Yard store hatch and bare keep parlours (CASTLE-YARD-WINDOW)
+
+Norman, wizard and Japanese fortress 0 each reported `yard_general_store:
+planned window has no matching emitted aperture`. The store's counter hatch
+(`hatch: true` in `plan.windows`) is cut through the wall by `HouseBuilder` and
+logged with `opening_kind` "hatch", and `CastleInteriors` forwarded only
+"window" and "door" parts, so the hole was never in the castle part log.
+It now forwards hatches (as `kind` "window", `opening_kind` kept "hatch" so
+castle QA covers the hole) and `CastleOccupancyCheck` matches a planned hatch
+against an emitted hatch.
+
+Japanese fortress 0's keep parlour (344 m2, a sitting room) stood at 7-9%:
+`CastleRoomTopUp._fill` stopped at 30 tries, then every wall step was refused
+once the walls were full. A great room now gets one extra try per 8 m2, and the
+parlour/lounge steps end with rows of settles down the open floor
+(`along: axis`). `castle_occupancy_sweep -- fortress norman|wizard|japanese 0`
+all report 0 failures.
