@@ -201,11 +201,24 @@ static func _demote_unseated_guardrooms(plan: HousePlan, spec: HouseSpec) -> voi
 		# list), so every seat drawn up to this room's one table goes with it:
 		# a chair left standing with no table is the "seating" fault.
 		var mine := plan.furniture_of(room)
-		for index in range(plan.furniture.size() - 1, -1, -1):
+		var leaving: Array[Dictionary] = []
+		for index in range(plan.furniture.size()):
 			var piece: Dictionary = plan.furniture[index]
-			var hosted_seat: bool = mine.has(index) and int(piece.get("host", -1)) >= 0 				and PropCatalog.category(String(piece["key"])) == "seat"
+			var hosted_seat: bool = mine.has(index) and int(piece.get("host", -1)) >= 0 					and PropCatalog.category(String(piece["key"])) == "seat"
 			if index == table or int(piece.get("host", -1)) == table or hosted_seat:
-				plan.furniture.remove_at(index)
+				leaving.append(piece)
+		# One at a time, renumbering the host index of every piece after it: a
+		# bare remove_at left other rooms' seats pointing at the wrong table, or
+		# past the end of the list (the checks threw at seats 49 and 50).
+		for piece in leaving:
+			var at := -1
+			for index in range(plan.furniture.size()):
+				if is_same(plan.furniture[index], piece):
+					at = index
+					break
+			if at >= 0:
+				plan.furniture.remove_at(at)
+				HouseFurnishRepair.reindex_hosts(plan, at)
 		plan.rooms[room]["kind"] = &"watch_room"
 		if room < spec.program.size() and spec.program[room] == &"guardroom":
 			spec.program[room] = &"watch_room"

@@ -129,3 +129,12 @@ once the walls were full. A great room now gets one extra try per 8 m2, and the
 parlour/lounge steps end with rows of settles down the open floor
 (`along: axis`). `castle_occupancy_sweep -- fortress norman|wizard|japanese 0`
 all report 0 failures.
+
+## CASTLE-ELVEN-FORTRESS-SEATS: stale host indices (25 Oct)
+
+The furnish arrangement and walk checks threw out-of-bounds index errors at
+"seats 49-50" because `CastleKeepPlan._demote_unseated_guardrooms` and
+`CastleInteriors._settle_store_furniture` called bare `plan.furniture.remove_at`.
+Every later piece's `host` index then pointed at the wrong table or past the
+end of the list. Both now call `HouseFurnishRepair.reindex_hosts` after each
+removal. Elven fortress 0 (seed 9117): fails=0; `lane:castle-change` 706 checks pass.

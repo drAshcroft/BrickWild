@@ -281,6 +281,8 @@ static func _settle_store_furniture(plan: HousePlan, room: int) -> void:
 		if int(plan.furniture[index].get("room", -1)) == room \
 				and not PropCatalog.suits_room(String(plan.furniture[index]["key"]), &"store"):
 			plan.furniture.remove_at(index)
+			HouseFurnishRepair.reindex_hosts(plan, index)
+			index = mini(index, plan.furniture.size())
 		index -= 1
 
 
