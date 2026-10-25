@@ -413,10 +413,12 @@ static func add_stair(p: HousePlan, lower_room: int, upper_room: int,
 	# and temples use separate planners. Their stair work needs family-specific
 	# fixtures; sharing HousePlan alone does not make their circulation domestic.
 	if _uses_domestic_stairs(p):
-		if p.spec.trade == &"none":
+		if p.spec.trade == &"none" \
+				and p.domestic_layout.get("status", &"") == &"planned":
 			_add_domestic_stair(p, lower_room, upper_room, lower_storey, upper_storey)
 			return
-		# A trade keeps its own room partition, which may have no hall that
+		# A trade, or a style with no domestic programme (african, asian, mud_hut,
+		# pueblo, rich ... LHS-STAIRS), keeps its own room partition, which may have no hall that
 		# carries a human-scale flight. Try the climbable flight; if the
 		# partition cannot hold it, undo the attempt and keep the trade's
 		# legacy stair rather than a house with no way upstairs.
@@ -428,6 +430,7 @@ static func add_stair(p: HousePlan, lower_room: int, upper_room: int,
 		_add_domestic_stair(p, lower_room, upper_room, lower_storey, upper_storey)
 		if p.stairs.size() > stairs_before and bool(p.stairs.back().get("satisfied", false)):
 			return
+		print("DBGSTAIR ", p.spec.style, " w=", p.spec.width, " l=", p.spec.length, " ", p.stairs.back().get("reason", "") if p.stairs.size() > stairs_before else "none", " hall=", HouseGeometry.room_floor_rect(p, lower_room).size)
 		p.stairs.resize(stairs_before)
 		p.zones.resize(zones_before)
 		p.domestic_layout = layout_before
@@ -491,6 +494,24 @@ static func add_legacy_stair(p: HousePlan, lower_room: int, upper_room: int,
 	})
 
 
+## LHS-STAIRS: a plain, trade-less multistorey house whose style has no
+## household grammar keeps the legacy partition, so its hall is picked by
+## position. Those halls must be chosen so the domestic flight fits.
+static func hall_must_carry_stair(p: HousePlan) -> bool:
+	return not legacy_stairs_only and p.spec.storeys > 1 and p.spec.trade == &"none" 		and p.world_family == &"" and _is_plain_house_spec(p.spec) 		and not HouseSpec.STYLES.get(p.spec.style, {}).has("domestic_program")
+
+
+## Can this room hold the climbable flight plus a landing at each end?
+static func room_carries_stair(p: HousePlan, room: int) -> bool:
+	var run := float(p.spec.height) / tan(deg_to_rad(HouseGeometry.STAIR_PITCH_MAX)) + 0.02
+	var f: Rect2 = HouseGeometry.room_floor_rect(p, room)
+	var width := minf(HouseGeometry.STAIR_WIDTH_TARGET, minf(f.size.x, f.size.y) - HouseGeometry.PATH_MIN)
+	if width < HouseGeometry.STAIR_WIDTH_MIN - 0.001:
+		return false
+	var landing := maxf(HouseGeometry.STAIR_LANDING, width)
+	return maxf(f.size.x, f.size.y) >= run + 2.0 * landing + 0.05
+
+
 static func _is_plain_house_spec(spec: HouseSpec) -> bool:
 	if spec == null or spec.get_script() == null:
 		return false
@@ -516,8 +537,12 @@ static func _uses_domestic_stairs(p: HousePlan) -> bool:
 		# its stair: the human-scale flight, landings and guards apply to it.
 		return p.spec.storeys > 1
 	var style: Dictionary = HouseSpec.STYLES.get(p.spec.style, {})
-	return style.has("domestic_program") \
-		and p.domestic_layout.get("status", &"") == &"planned"
+	if not style.has("domestic_program"):
+		# LHS-STAIRS: a style without a household grammar still has a person
+		# climbing its stair. add_stair tries the climbable flight and undoes it
+		# for the legacy flight if the partition cannot hold it.
+		return p.spec.storeys > 1
+	return p.domestic_layout.get("status", &"") == &"planned"
 
 
 ## Place middle-storey hall doorways at the far ends of their true shared

@@ -20,6 +20,41 @@ extends RefCounted
 ## file tries to build it right, that file refuses to believe it did.
 
 static func plan(spec: HouseSpec, world_family: StringName = &"") -> HousePlan:
+	var rng_state: int = spec.rng.state if spec.rng != null else 0
+	var first_rooms: int = spec.room_count
+	var p: HousePlan = _plan_once(spec, world_family)
+	if not HousePlanLevels.hall_must_carry_stair(p) or _stairs_domestic(p):
+		return p
+	# LHS-STAIRS: a style with no household grammar partitions by splitting, and
+	# a cramped split can leave no hall that carries the human-scale flight.
+	# One room fewer makes the rest bigger; the fewest rooms (3) is the floor.
+	# The rng is rewound so the retry is the same plan minus a split; if that is
+	# not enough, a few other deterministic splits are tried at each count.
+	for variant in range(6):
+		for fewer in range(first_rooms - 1 if variant == 0 else first_rooms, 2, -1):
+			if spec.rng != null:
+				if variant == 0:
+					spec.rng.state = rng_state
+				else:
+					spec.rng.seed = spec.seed + variant * 7919
+			spec.room_count = fewer
+			var q: HousePlan = _plan_once(spec, world_family)
+			if _stairs_domestic(q):
+				return q
+	if spec.rng != null:
+		spec.rng.state = rng_state
+	spec.room_count = first_rooms
+	return _plan_once(spec, world_family)
+
+
+static func _stairs_domestic(p: HousePlan) -> bool:
+	for stair in p.stairs:
+		if int(stair.get("storey", 0)) >= 0 and not bool(stair.get("domestic_profile", false)):
+			return false
+	return true
+
+
+static func _plan_once(spec: HouseSpec, world_family: StringName = &"") -> HousePlan:
 	var p := HousePlan.new()
 	p.spec = spec
 	# Scope-aware room layouts must see the family before subdivision, just as

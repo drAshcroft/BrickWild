@@ -1029,12 +1029,18 @@ static func name_rooms(p: HousePlan, spec: HouseSpec) -> void:
 				and HouseGeometry.room_suits(p, preferred, hall_kind) \
 				and HouseGeometry.room_suits(p, preferred, &"hall"):
 			hall = preferred
-	for i in order:
-		if hall >= 0:
-			break
-		if HouseGeometry.room_suits(p, i, hall_kind) and HouseGeometry.room_suits(p, i, &"hall"):
-			hall = i
-			break
+	# LHS-STAIRS: a plain multistorey house without a household grammar must
+	# put its hall where the domestic flight and both landings fit.
+	var stair_hall: bool = HousePlanLevels.hall_must_carry_stair(p)
+	for pass_index in range(2 if stair_hall else 1):
+		for i in order:
+			if hall >= 0:
+				break
+			if pass_index == 0 and stair_hall and not HousePlanLevels.room_carries_stair(p, i):
+				continue
+			if HouseGeometry.room_suits(p, i, hall_kind) and HouseGeometry.room_suits(p, i, &"hall"):
+				hall = i
+				break
 	if hall < 0:
 		hall = _largest(p)
 	p.rooms[hall]["kind"] = &"hall"
