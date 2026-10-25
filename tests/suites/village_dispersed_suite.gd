@@ -38,6 +38,9 @@ const CASES := [
 const BODY_SHARE := Vector2(0.2, 0.6)
 const CLUSTERS := Vector2i(2, 5)
 const WELL_REACH := 3.0
+## VTER-DISPERSED-2: hamlets lie 150-400 m from their nearest neighbour
+## (Ushguli, Batad: two to four hundred metres).
+const SPACING_M := Vector2(150.0, 400.0)
 
 
 static func run() -> SuiteResult:
@@ -101,6 +104,23 @@ static func _case(res: SuiteResult, jobs: Array[Dictionary], name: String, force
 		res.fail("%s: %d hamlets, wants %d-%d" % [name, n, VillageDispersedForm.HAMLETS_MIN,
 			VillageDispersedForm.HAMLETS_MAX])
 		return
+	# --- spacing, and the link of each hamlet to the main one
+	for i in range(n):
+		var near := INF
+		for j in range(n):
+			if i != j:
+				near = minf(near, (plan.hamlets[i]["seat"] as Vector2).distance_to(plan.hamlets[j]["seat"]))
+		res.checked += 1
+		if near < SPACING_M.x or near > SPACING_M.y:
+			res.fail("%s: hamlet %d is %.0f m from its nearest neighbour, wants %.0f-%.0f" % [
+				name, i, near, SPACING_M.x, SPACING_M.y])
+		if bool(plan.hamlets[i]["main"]):
+			continue
+		var link: int = VillageDispersedForm.spine_of(plan, i)
+		res.checked += 1
+		if link < 0 or plan.roads[link]["class"] != &"track":
+			res.fail("%s: hamlet %d is reached by %s, not a cart track" % [name, i,
+				"nothing" if link < 0 else String(plan.roads[link]["class"])])
 	var houses: Array[int] = []
 	var placed: Array[int] = []
 	for _h in plan.hamlets:

@@ -707,7 +707,7 @@ gradient measures each house from its own hamlet's common; a farm's edge is
 its hamlet's ground. Every other rule is unchanged, and each change is a
 no-op for a plan without hamlets.
 
-Suite `vdispersed` (161 checks, ~5 min, most of it measuring the 19
+Suite `vdispersed` (180 checks, ~5 min, most of it measuring the 19
 buildings once): 60 farming people on Ushguli (real30), the synthetic
 valley, the spur (which derives `crest`; forced) and Rubanda (world90,
 labelled dispersed, high confidence).
@@ -722,13 +722,17 @@ labelled dispersed, high confidence).
 Every hamlet's well is walked to from every gate; every road is within its
 class's grade. The survey's dispersed sites read body_share 0.2-0.6.
 
-Not yet: the spines run straight up the fall-line, where real hamlet links
-(Ushguli's valley road, Batad's terrace paths) wind along the contour; the
-site is 260-360 m where real hamlets lie two to four hundred metres apart; a
-hamlet earns no shrine of its own (the programme earns one landmark); the
-tavern and the smithy keep their §6 addresses at the gates and often stand
-alone on the road; an enclosed dispersed village gets one enclosure round
-everything.
+**Second pass (VTER-DISPERSED-2).** The site is 320-400 m (230 m + 40 m per hamlet) and hamlet seats are 160 m apart
+(nearest neighbour measured 160-169 m on Ushguli, valley, spur and Rubanda; suite bound 150-400). The main hamlet's ring joins the through road with at least 9 m of street (else two junctions fall under 8 m); a hamlet's common stands where its whole 90 m ground is inside the site. The site base is tuned: 220/240/250 each broke a QA rule on one fixture (steps link, junction, church rank), 230 passes all four.
+Each other hamlet is joined by `_link_hamlet`: `VillageRoadRouter.route_across` (new `pin_last`
+pins both ends) in the frame of the line from a foot on the through road to the seat, at the
+track's 30 % cap, trying feet every 20 m within 200 m of the seat's x and keeping the shortest
+checked track (measured grade to 30 %). Only when no foot gives one does the old straight
+fall-line spine (steps where steep) remain. A link may pass no seat within 45 m. Fields follow
+a winding track's local direction. The suite checks spacing and that each hamlet's spine is a
+routed `track`.
+Not yet: a hamlet earns no shrine of its own; the tavern and the smithy keep their §6
+addresses at the gates; an enclosed dispersed village gets one enclosure round everything.
 
 ## A building on falling ground (VTER-HOUSE-SLOPE)
 
