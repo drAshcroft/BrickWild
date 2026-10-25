@@ -507,6 +507,7 @@ func _build_witch_hall_ceiling_ties(level: int, ceiling_y: float) -> void:
 		var span := short_span + end_bearing * 2.0
 		var size := Vector3(span, tie_h, 0.14) if across_x else Vector3(0.14, tie_h, span)
 		host("witch_hall_ceiling_ties_room%d" % room_index, level)
+		var placed: Array[float] = []
 		for tie_index in range(tie_count):
 			# WITCH-ROOF: under a 2.3 m wall the tie sits lower than the 2.22 m
 			# door heads, so a tie that lands on a door is slid along the hall
@@ -693,7 +694,6 @@ func _emit_floor_around_many(r: Rect2, holes: Array[Rect2], y0: float, t: float,
 			for hole in holes:
 				if hole.has_point(centre2):
 					in_hole = true
-		var placed: Array[float] = []
 					break
 			if in_hole:
 				continue
@@ -3671,6 +3671,12 @@ func _build_porch() -> void:
 	var w: float = float(door["width"]) + 1.1
 	var head: float = HouseGeometry.DOOR_H + 0.35
 	if spec.style == &"witch_hut":
+		# WITCH-ROOF: under a 2.3 m hut wall the canopy's high edge must still
+		# land below the wall plate (top at height - 0.02), so the slab is thin
+		# (3 cm), rises 0.15 m to the wall and its underside there is about 2.24 m,
+		# just over the 2.22 m door head.
+		var short_wall := spec.height < 2.59
+		head = minf(head, spec.height - 0.02 - 0.15 - 0.015)
 		# The witch canopy follows the actual entrance wall. Its step has the same
 		# asymmetric in-wall/outward footprint as HouseGeometry.porch_rect().
 		var normal: Vector2 = door["normal"]
@@ -3846,12 +3852,6 @@ func _roof_top_surface_near_flue(centre: Vector2, footprint: Vector2, radius: fl
 		var profile_normal_y := 0.0
 		if points.size() >= 3:
 			profile_normal_y = absf((points[1] - points[0]).cross(points[2] - points[0]).normalized().y)
-		# WITCH-ROOF: under a 2.3 m hut wall the canopy's high edge must still
-		# land below the wall plate (top at height - 0.02), so the slab is thin
-		# (3 cm), rises 0.15 m to the wall and its underside there is about 2.24 m,
-		# just over the 2.22 m door head.
-		var short_wall := spec.height < 2.59
-		head = minf(head, spec.height - 0.02 - 0.15 - 0.015)
 		var vertical_half := depth_half * profile_normal_y
 		var enters_neighbourhood := false
 		for point in points:
