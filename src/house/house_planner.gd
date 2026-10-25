@@ -46,6 +46,7 @@ static func plan(spec: HouseSpec, world_family: StringName = &"") -> HousePlan:
 	HousePlanRooms.refresh_domestic_metadata(p)
 	HousePlanFeatures.choose_hearth(p, spec)
 	HousePlanFeatures.choose_focus(p, spec)
+	HouseLonghall.prepare(p, spec)
 	_reserve_upper_flue(p, spec)
 	return p
 

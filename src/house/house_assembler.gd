@@ -127,6 +127,7 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 				props.add_child(opening["soot"])
 			else:
 				anchor.free()
+	_longhall_fire(props, plan)
 	var lights := LightKit.light_the_plan(plan)
 	var light_index := 0
 	for item_variant in plan.furniture:
@@ -144,6 +145,75 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 	if light_index != lights.get_child_count():
 		push_error("LightKit plan mapping mismatch: %d rows, %d nodes" % [light_index, lights.get_child_count()])
 	root.add_child(lights)
+
+
+## HS-LONGHALL: the fire on the hall floor -- ash and embers inside the kerb the
+## shell builds, crossed logs, a few flames and a warm light. A long hall is lit
+## by this fire; the louvre over it lets the smoke out.
+static func _longhall_fire(parent: Node3D, plan: HousePlan) -> void:
+	if not HouseLonghall.plan_applies(plan):
+		return
+	var kerb: Rect2 = plan.longhall["hearth"]
+	var c := kerb.get_center()
+	var fire := Node3D.new()
+	fire.name = "OpenHearthFire"
+	fire.position = Vector3(c.x, HouseGeometry.FLOOR_T + 0.03, c.y)
+	var ember := StandardMaterial3D.new()
+	ember.albedo_color = Color(0.09, 0.04, 0.02)
+	ember.emission_enabled = true
+	ember.emission = Color(0.85, 0.22, 0.04)
+	ember.emission_energy_multiplier = 0.9
+	var bed := MeshInstance3D.new()
+	bed.name = "Embers"
+	var bed_mesh := BoxMesh.new()
+	bed_mesh.size = Vector3(kerb.size.x - 0.5, 0.05, kerb.size.y - 0.5)
+	bed.mesh = bed_mesh
+	bed.material_override = ember
+	bed.position.y = 0.02
+	fire.add_child(bed)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.20, 0.12, 0.07)
+	wood.roughness = 0.95
+	for k in range(5):
+		var log := MeshInstance3D.new()
+		log.name = "Firewood_%d" % k
+		var log_mesh := CylinderMesh.new()
+		log_mesh.top_radius = 0.055
+		log_mesh.bottom_radius = 0.065
+		log_mesh.height = 0.78
+		log_mesh.radial_segments = 8
+		log.mesh = log_mesh
+		log.material_override = wood
+		log.rotation = Vector3(0.0, TAU * float(k) / 5.0 + 0.3, PI * 0.5 - 0.22)
+		log.position = Vector3(0.0, 0.09 + 0.03 * float(k % 2), 0.0)
+		fire.add_child(log)
+	var flame := StandardMaterial3D.new()
+	flame.albedo_color = Color(1.0, 0.55, 0.12)
+	flame.emission_enabled = true
+	flame.emission = Color(1.0, 0.45, 0.08)
+	flame.emission_energy_multiplier = 2.4
+	flame.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for k in range(4):
+		var tongue := MeshInstance3D.new()
+		tongue.name = "Flame_%d" % k
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.0
+		cone.bottom_radius = 0.13 - 0.02 * float(k % 2)
+		cone.height = 0.5 + 0.14 * float(k % 3)
+		cone.radial_segments = 7
+		tongue.mesh = cone
+		tongue.material_override = flame
+		var a := TAU * float(k) / 4.0 + 0.5
+		tongue.position = Vector3(cos(a) * 0.17, 0.18 + cone.height * 0.5, sin(a) * 0.17)
+		fire.add_child(tongue)
+	var light := OmniLight3D.new()
+	light.name = "FireLight"
+	light.light_color = Color(1.0, 0.58, 0.28)
+	light.light_energy = 2.2
+	light.omni_range = 8.0
+	light.position = Vector3(0.0, 0.75, 0.0)
+	fire.add_child(light)
+	parent.add_child(fire)
 
 
 ## These plaster-and-timber households share a restrained interior finish.

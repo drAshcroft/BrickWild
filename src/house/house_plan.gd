@@ -117,6 +117,12 @@ var columns: Array[Dictionary] = []
 ## reads this and downgrades exactly those complaints to warnings, so a real
 ## missing bed still fails.
 var compromises: Dictionary = {}
+## HS-LONGHALL: the open hall of a longhall -- {"room": int, "hearth": Rect2 (the
+## kerb of the fire on the hall's middle), "benches": [{"wall": int, "rect": Rect2}],
+## "ends": [room ids], "smoke": Vector2 (world XZ of the roof smoke hole)}. Empty
+## for every other plan (HouseLonghall.applies).
+var longhall: Dictionary = {}
+
 ## AUTHORED holes in the roof: a compluvium over an atrium, an oculus, an open
 ## court sky. One shared schema with the dormer openings the roof descriptor
 ## fits for itself (HOUSE-EXT-007):

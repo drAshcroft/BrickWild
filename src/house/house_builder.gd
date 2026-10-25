@@ -80,6 +80,7 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	_build_witch_cauldron_heat()
 	_build_hearth_breast()
 	_build_rugs()
+	_build_longhall_floor()
 	_build_han_features()
 	_build_vihara_features()
 	_build_vastu_features()
@@ -466,6 +467,9 @@ func _build_ceiling(any_roof := false, roofed := false) -> void:
 	var level: int = levels.max()
 	if _shaped_room(level) >= 0:
 		return
+	if HouseLonghall.plan_applies(plan):
+		_build_longhall_ceilings(level)
+		return
 	var r: Rect2 = HouseGeometry.storey_rect(plan, level).grow(-HouseGeometry.wall_thickness(spec) * 0.5)
 	var y := float(level + 1) * spec.height
 	tag("ceiling")
@@ -480,6 +484,174 @@ func _build_ceiling(any_roof := false, roofed := false) -> void:
 		if lower_level < level and lower_level + 1 in levels:
 			_build_domestic_ceiling_ties(lower_level,
 				float(lower_level + 1) * spec.height - SLAB_TUCK)
+
+
+# ------------------------------------------------------------- HS-LONGHALL
+
+## The longhall has a ceiling over its end rooms only. The hall between them is
+## open to the roof: no slab, no joists, the trusses and rafters are in sight
+## (_build_longhall_roof) and each end partition rises to the roof.
+func _build_longhall_ceilings(level: int) -> void:
+	var y := float(level + 1) * spec.height
+	var outer := HouseGeometry.storey_rect(plan, level).grow(-HouseGeometry.wall_thickness(spec) * 0.5)
+	var inner := HouseGeometry.interior_rect(spec, level)
+	for room in plan.longhall["ends"]:
+		var rect: Rect2 = plan.rooms[room]["rect"]
+		var x0 := outer.position.x if absf(rect.position.x - inner.position.x) < 0.01 else rect.position.x
+		var x1 := outer.end.x if absf(rect.end.x - inner.end.x) < 0.01 else rect.end.x
+		var z0 := outer.position.y if absf(rect.position.y - inner.position.y) < 0.01 else rect.position.y
+		var z1 := outer.end.y if absf(rect.end.y - inner.end.y) < 0.01 else rect.end.y
+		tag("ceiling")
+		host("ceiling", level)
+		component_box("ceiling", Vector3(x1 - x0, CEILING_T, z1 - z0),
+			Transform3D(Basis(), Vector3((x0 + x1) * 0.5, y + CEILING_T * 0.5, (z0 + z1) * 0.5)),
+			SURF_WALL)
+		host_end()
+
+
+## The fire on the hall's floor: a kerb of stones round a bed of ash (the flames,
+## logs and the light are the assembler's).
+func _build_longhall_floor() -> void:
+	if not HouseLonghall.plan_applies(plan):
+		return
+	var y0 := HouseGeometry.FLOOR_T
+	var kerb: Rect2 = plan.longhall["hearth"]
+	var stone := 0.22
+	var c := kerb.get_center()
+	tag("open_hearth")
+	host("open_hearth", 0)
+	component_box("hearth_ash", Vector3(kerb.size.x - stone * 1.6, 0.03, kerb.size.y - stone * 1.6),
+		Transform3D(Basis(), Vector3(c.x, y0 + 0.015, c.y)), SURF_TRIM)
+	for edge in [[Vector3(kerb.size.x, 0.16, stone), Vector2(0.0, -(kerb.size.y - stone) * 0.5)],
+			[Vector3(kerb.size.x, 0.16, stone), Vector2(0.0, (kerb.size.y - stone) * 0.5)],
+			[Vector3(stone, 0.16, kerb.size.y - stone * 2.0), Vector2(-(kerb.size.x - stone) * 0.5, 0.0)],
+			[Vector3(stone, 0.16, kerb.size.y - stone * 2.0), Vector2((kerb.size.x - stone) * 0.5, 0.0)]]:
+		var off: Vector2 = edge[1]
+		component_box("hearth_kerb", edge[0],
+			Transform3D(Basis(), Vector3(c.x + off.x, y0 + 0.08, c.y + off.y)), SURF_WALL)
+	host_end()
+
+
+## What a person standing in the hall sees overhead: arch-braced collar trusses
+## on posts, a ridge beam, two purlins and common rafters; a filled screen over
+## each end partition; and the louvre that stands over the smoke hole.
+func _build_longhall_roof(xf: Transform3D, span: float, along: float, rise: float,
+		faces: Array[PackedVector3Array]) -> void:
+	if not HouseLonghall.plan_applies(plan):
+		return
+	tag("longhall_roof")
+	var hall_rect: Rect2 = plan.rooms[int(plan.longhall["room"])]["rect"]
+	var cx := xf.origin.x
+	var z0 := hall_rect.position.x - cx
+	var z1 := hall_rect.end.x - cx
+	var smoke: Vector2 = plan.longhall["smoke"]
+	var smoke_z := smoke.x - cx
+	var smoke_x := (xf.affine_inverse() * Vector3(smoke.x, 0.0, smoke.y)).x
+	var hall_len := z1 - z0
+	var half := span * 0.5
+	var roof_half := (span + HouseGeometry.roof_span_out(spec) * 2.0) * 0.5
+	var wall_t := HouseGeometry.wall_thickness(spec)
+	_frame_top = rise
+	# The screens: the partition between the hall and an end room goes up to the roof.
+	host("longhall_screen", 0)
+	for sz in [z0, z1]:
+		var profile := RoofShape.wall_profile(faces, Vector2(-half, sz), Vector2(half, sz))
+		if profile.size() >= 3:
+			_roof_face(xf, profile, SURF_WALL, "longhall_screen", false, HouseGeometry.INNER_WALL_T)
+	host_end()
+	host("longhall_frame", 0)
+	var foot_x := half - wall_t * 0.5
+	var post_x := half - wall_t - 0.1
+	var collar_h := rise * 0.5
+	var clear := RoofShape.DEPTH * 0.5 + HouseGeometry.BEAM_W * 0.5 + 0.02
+	var collar_x := maxf(roof_half * (1.0 - (collar_h + clear) / rise), 0.4)
+	var bays := 2 * int(floor(hall_len / 2.0 / 2.4)) + 1
+	var stations: Array[float] = []
+	for i in range(1, bays):
+		stations.append(z0 + hall_len * float(i) / float(bays))
+	var depth := 0.17
+	for st in stations:
+		for side in [-1.0, 1.0]:
+			_longhall_member(xf, Vector2(side * foot_x, _under_rafter(foot_x, roof_half, rise)),
+				Vector2(0.0, _under_rafter(0.0, roof_half, rise)), st, 0.18, depth, "hall_truss_rafter")
+			_longhall_member(xf, Vector2(side * post_x, -1.45), Vector2(side * post_x, 0.0),
+				st, 0.2, depth, "hall_truss_post")
+			component_box("hall_truss_corbel", Vector3(0.3, 0.2, 0.26),
+				xf * Transform3D(Basis(), Vector3(side * (post_x + 0.02), -1.55, st)), SURF_WALL)
+			_longhall_member(xf, Vector2(side * post_x, -0.95),
+				Vector2(side * collar_x * 0.7, collar_h), st, 0.13, depth * 0.9, "hall_truss_brace")
+		_longhall_member(xf, Vector2(-collar_x, collar_h), Vector2(collar_x, collar_h), st,
+			0.16, depth, "hall_truss_collar")
+		_longhall_member(xf, Vector2(0.0, collar_h),
+			Vector2(0.0, _under_rafter(0.0, roof_half, rise)), st, 0.16, depth, "hall_truss_king")
+	# Ridge beam and purlins, the whole length of the hall.
+	var mid_z := (z0 + z1) * 0.5
+	component_box("hall_ridge_beam", Vector3(0.16, 0.2, hall_len - 0.2),
+		xf * Transform3D(Basis(), Vector3(0.0, _under_rafter(0.0, roof_half, rise) - 0.06, mid_z)),
+		SURF_TRIM)
+	for side in [-1.0, 1.0]:
+		var px := roof_half * 0.5
+		component_box("hall_purlin", Vector3(0.14, 0.16, hall_len - 0.2),
+			xf * Transform3D(Basis(), Vector3(side * px, _under_rafter(px, roof_half, rise) - 0.02, mid_z)),
+			SURF_TRIM)
+	# Common rafters between the trusses, left out round the smoke hole.
+	var rz := z0 + 0.35
+	while rz < z1 - 0.3:
+		var skip := absf(rz - smoke_z) < HouseLonghall.SMOKE_ALONG * 0.5 + 0.12
+		for st in stations:
+			skip = skip or absf(rz - st) < 0.14
+		if not skip:
+			for side in [-1.0, 1.0]:
+				_longhall_member(xf, Vector2(side * foot_x, _under_rafter(foot_x, roof_half, rise)),
+					Vector2(side * 0.14, _under_rafter(0.14, roof_half, rise)), rz, 0.1, 0.07, "hall_rafter")
+		rz += 0.6
+	host_end()
+	_build_longhall_louvre(xf, rise, roof_half, smoke_x, smoke_z)
+
+
+func _longhall_member(xf: Transform3D, a: Vector2, b: Vector2, z: float,
+		width: float, depth: float, role: String) -> void:
+	var d := b - a
+	var run := d.length()
+	if run < 0.05:
+		return
+	var mid := (a + b) * 0.5
+	component_box(role, Vector3(run, width, depth),
+		xf * Transform3D(Basis(Vector3(0, 0, 1), atan2(d.y, d.x)), Vector3(mid.x, mid.y, z)),
+		SURF_TRIM)
+
+
+## The smoke louvre: four posts round the hole, slatted sides, closed ends and a
+## little thatched hood, standing on the ridge.
+func _build_longhall_louvre(xf: Transform3D, rise: float, roof_half: float,
+		lx: float, lz: float) -> void:
+	host("smoke_louvre", 0)
+	var hw := HouseLonghall.SMOKE_ACROSS * 0.5
+	var hl := HouseLonghall.SMOKE_ALONG * 0.5
+	var base := rise - hw * rise / roof_half - 0.12
+	var hood_y := rise + HouseLonghall.LOUVRE_TOP - HouseLonghall.hood_extent()
+	var top := hood_y - 0.12
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			component_box("louvre_post", Vector3(0.1, top - base, 0.1),
+				xf * Transform3D(Basis(), Vector3(lx + sx * hw, (top + base) * 0.5, lz + sz * hl)),
+				SURF_TRIM)
+	for sx in [-1.0, 1.0]:
+		for k in range(4):
+			var y := rise + 0.04 + 0.2 * float(k)
+			component_box("louvre_slat", Vector3(0.26, 0.035, HouseLonghall.SMOKE_ALONG),
+				xf * Transform3D(Basis(Vector3(0, 0, 1), sx * 0.55), Vector3(lx + sx * hw, y, lz)),
+				SURF_TRIM)
+	for sz in [-1.0, 1.0]:
+		component_box("louvre_end", Vector3(HouseLonghall.SMOKE_ACROSS, top - rise + 0.1, 0.05),
+			xf * Transform3D(Basis(), Vector3(lx, (top + rise - 0.1) * 0.5, lz + sz * hl)),
+			SURF_TRIM)
+	for sx in [-1.0, 1.0]:
+		component_box("louvre_hood", Vector3(HouseLonghall.HOOD_W, HouseLonghall.HOOD_T,
+				HouseLonghall.SMOKE_ALONG + 0.5),
+			xf * Transform3D(Basis(Vector3(0, 0, 1), -sx * HouseLonghall.HOOD_TILT),
+				Vector3(lx + sx * hw * 0.78, hood_y, lz)), SURF_ROOF)
+	host_end()
 
 
 func _build_domestic_ceiling_ties(level: int, ceiling_y: float) -> void:
@@ -3142,6 +3314,8 @@ func _build_roof() -> void:
 		if not HouseGeometry.has_witch_roofcraft(spec, plan.world_family):
 			_build_bargeboards(xf, span, along, rise, verge_top, ridge_x)
 	_build_ridge_crown(xf, rise, ridge, ridge_x)
+	_build_longhall_roof(xf, span, along, rise, faces)
+	host("roof", _storeys() - 1)
 	_build_eaves_tails(xf, span, along, rise)
 	_build_dormers(xf, layout["dormers"])
 	_build_parapet(layout)

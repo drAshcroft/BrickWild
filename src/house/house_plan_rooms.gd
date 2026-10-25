@@ -18,6 +18,9 @@ static func subdivide(p: HousePlan, spec: HouseSpec) -> void:
 			for rect in custom:
 				p.rooms.append({"kind": &"hall", "rect": rect, "storey": 0})
 			return
+	# HS-LONGHALL: one long hall with a room at each end.
+	if HouseLonghall.applies(spec, p.world_family) and HouseLonghall.layout(p, spec):
+		return
 	var style: Dictionary = HouseSpec.STYLES.get(spec.style, {})
 	var domestic_family := not spec.has_method("room_program") \
 		and not spec.has_method("custom_room_rects") \

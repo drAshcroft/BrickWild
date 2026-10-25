@@ -442,6 +442,28 @@
   },
   {
    "family": "house",
+   "id": "house/longhall/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "longhall",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "longhall"
+  },
+  {
+   "family": "house",
    "id": "house/longhall/8102",
    "request": {
     "enclosure": "none",
@@ -455,6 +477,28 @@
     "schema": "brickwild.request",
     "schema_version": 1,
     "seed": "8102",
+    "storeys": 1,
+    "style": "longhall",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "longhall"
+  },
+  {
+   "family": "house",
+   "id": "house/longhall/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
     "storeys": 1,
     "style": "longhall",
     "water": "none",

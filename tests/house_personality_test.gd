@@ -102,7 +102,11 @@ func _check_tiling_and_shapes(plan: HousePlan, who: String) -> void:
 		return
 	var hall_rect: Rect2 = plan.rooms[hall[0]]["rect"]
 	var large_spine := plan.spec.width >= 12.0 and plan.spec.length >= 14.0
-	if large_spine:
+	if not plan.longhall.is_empty():
+		# HS-LONGHALL: the hall fills the whole depth between two end rooms.
+		if absf(hall_rect.size.y - inner.size.y) > 0.02 or hall_rect.size.x < inner.size.x * 0.45:
+			failures.append("%s longhall hall does not fill the depth between its end rooms" % who)
+	elif large_spine:
 		if absf(hall_rect.position.y - inner.position.y) > 0.02 \
 				or absf(hall_rect.size.y - inner.size.y) > 0.02 \
 				or hall_rect.size.x >= inner.size.x * 0.6:

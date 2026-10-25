@@ -882,6 +882,11 @@ static func roof_openings(plan: HousePlan) -> Array[Dictionary]:
 		var authored := _normalise_roof_opening(plan.roof_openings[i], i, plan)
 		if not authored.is_empty():
 			out.append(authored)
+	# HS-LONGHALL: the smoke hole over the hall's fire, derived from the roof.
+	if HouseLonghall.plan_applies(plan):
+		var smoke := HouseLonghall.smoke_opening(plan, roof_layout(plan)["transform"])
+		if not smoke.is_empty():
+			out.append(smoke)
 	for d in roof_layout(plan)["dormers"]:
 		out.append({"id": String(d["id"]), "kind": &"dormer",
 			"storey": int(d["storey"]), "face": int(d["face"]),
@@ -1390,6 +1395,8 @@ static func roof_top_above_walls(spec: HouseSpec, world_family: StringName = &""
 		top = maxf(top, parapet_top(spec))
 	if spec.eave_sweep:
 		top = maxf(top, SWEEP_UP)
+	if HouseLonghall.applies(spec, world_family):
+		top = maxf(top, rise + HouseLonghall.LOUVRE_TOP)
 	return top
 
 

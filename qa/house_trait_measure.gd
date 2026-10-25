@@ -10,6 +10,7 @@ extends RefCounted
 ## main-roof vertex), chimney_count, chimney_top, chimney_on_hearth_wall,
 ## chimney_clearance (m over the ridge), chimney_above_ridge, door_sheltered (a porch roof, posts and step all stand
 ## over the entrance door), porch_roof_count.
+## HS-LONGHALL keys are listed on `_longhall_keys`.
 
 
 static func make_spec(style: StringName, width: float, length: float, height: float,
@@ -25,8 +26,9 @@ static func make_spec(style: StringName, width: float, length: float, height: fl
 
 ## `tweak` (optional) runs on the generated plan before building: a negative
 ## control removes one trait there and the measure must notice.
-static func measure(spec: HouseSpec, p_seed: int, tweak := Callable()) -> Dictionary:
-	var plan := HouseGenerator.generate(spec, p_seed, false)
+static func measure(spec: HouseSpec, p_seed: int, tweak := Callable(),
+		furnished := false) -> Dictionary:
+	var plan := HouseGenerator.generate(spec, p_seed, furnished)
 	if tweak.is_valid():
 		tweak.call(plan)
 	var builder := HouseBuilder.new()
@@ -55,6 +57,7 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable()) -> Dictio
 	out["door_sheltered"] = _door_sheltered(plan, builder, roofs)
 	_farm_keys(plan, builder, out)
 	_town_keys(plan, out)
+	_longhall_keys(plan, builder, out)
 	return out
 
 
@@ -124,6 +127,133 @@ static func _town_keys(plan: HousePlan, out: Dictionary) -> void:
 	out["spine_storeys"] = reached
 	out["spine_landings"] = landings
 	out["spine_lit"] = lit
+
+
+## HS-LONGHALL keys (a furnished plan is needed for the benches):
+##   long_ratio          outer footprint, long side over short side
+##   hall_fraction       the hall's share of the interior floor
+##   hall_full_depth     the hall spans the whole interior depth ; hall_length (m)
+##   main_roofs          masses named "roof" (one storey under ONE main roof: 1)
+##   rooms_off_ends      rooms (not the hall) that overlap the hall's length
+##   end_sides           how many of the two ends carry a private room (0..2)
+##   private_kinds       kinds of the rooms at the ends
+##   hearth_gap          least distance (m) from the fire's kerb to a hall wall
+##   hearth_mid_offset   fire's offset from the hall's middle, share of its length
+##   hearth_kerb_count   kerb stones emitted (4) ; hearth_wall_fire: a wall hearth exists
+##   smoke_over_hearth   the roof opening's centre stands over the fire (<= 0.3 m)
+##   smoke_hole          a roof opening called longhall_smoke_hole was cut
+##   louvre_over_ridge   m the louvre's highest part stands over the ridge
+##   ceiling_over_hall   a ceiling slab covers part of the hall floor
+##   ceiling_over_ends   share of the end rooms' floor under a ceiling slab
+##   truss_count         principal trusses (collars) in view ; rafter_count ; has_ridge_beam
+##   bench_walls         how many long walls carry a bench (0..2)
+##   bench_front_len / bench_back_len   metres of bench on each long wall
+static func _longhall_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -> void:
+	var r := HouseGeometry.site_rect(plan.spec)
+	out["long_ratio"] = maxf(r.size.x, r.size.y) / minf(r.size.x, r.size.y)
+	var hall_rooms := plan.rooms_of(&"hall")
+	var hall_rect := Rect2()
+	if not hall_rooms.is_empty():
+		hall_rect = HouseGeometry.room_floor_rect(plan, hall_rooms[0])
+	var inner := HouseGeometry.interior_rect(plan.spec)
+	out["hall_fraction"] = hall_rect.get_area() / maxf(inner.get_area(), 0.01)
+	out["hall_full_depth"] = absf(hall_rect.size.y - inner.size.y) < 0.05
+	out["hall_length"] = hall_rect.size.x
+	var main_roofs := 0
+	for m in builder.mass_log:
+		if str(m.get("name", "")) == "roof":
+			main_roofs += 1
+	out["main_roofs"] = main_roofs
+	var off := 0
+	var west := false
+	var east := false
+	var kinds: Array = []
+	for i in range(plan.rooms.size()):
+		if not hall_rooms.is_empty() and i == hall_rooms[0]:
+			continue
+		var rr: Rect2 = plan.rooms[i]["rect"]
+		if rr.end.x <= hall_rect.position.x + 0.2:
+			west = true
+		elif rr.position.x >= hall_rect.end.x - 0.2:
+			east = true
+		else:
+			off += 1
+		kinds.append(str(plan.kind_of(i)))
+	out["rooms_off_ends"] = off
+	out["end_sides"] = int(west) + int(east)
+	out["private_kinds"] = kinds
+	# the fire
+	var kerb_rect: Rect2 = plan.longhall.get("hearth", Rect2())
+	out["hearth_gap"] = -INF
+	out["hearth_mid_offset"] = INF
+	if kerb_rect.has_area() and hall_rect.has_area():
+		out["hearth_gap"] = minf(minf(kerb_rect.position.x - hall_rect.position.x,
+			hall_rect.end.x - kerb_rect.end.x), minf(kerb_rect.position.y - hall_rect.position.y,
+			hall_rect.end.y - kerb_rect.end.y))
+		out["hearth_mid_offset"] = absf(kerb_rect.get_center().x - hall_rect.get_center().x) 			/ hall_rect.size.x
+	var kerbs := 0
+	var truss := 0
+	var rafters := 0
+	var ridge_beam := false
+	var ceilings: Array[Rect2] = []
+	var louvre_top := -INF
+	for part in builder.component_log:
+		var role := str(part.get("role", ""))
+		match role:
+			"hearth_kerb": kerbs += 1
+			"hall_truss_collar": truss += 1
+			"hall_rafter": rafters += 1
+			"hall_ridge_beam": ridge_beam = true
+			"ceiling":
+				var xf: Transform3D = part["xf"]
+				var a := HouseYard.part_aabb({"basis": xf.basis, "centre": xf.origin, "size": part["size"]})
+				ceilings.append(Rect2(a.position.x, a.position.z, a.size.x, a.size.z))
+			"louvre_hood", "louvre_post", "louvre_end":
+				var xf2: Transform3D = part["xf"]
+				var a2 := HouseYard.part_aabb({"basis": xf2.basis, "centre": xf2.origin, "size": part["size"]})
+				louvre_top = maxf(louvre_top, a2.position.y + a2.size.y)
+	out["hearth_kerb_count"] = kerbs
+	out["hearth_wall_fire"] = plan.hearth_room() >= 0
+	out["truss_count"] = truss
+	out["rafter_count"] = rafters
+	out["has_ridge_beam"] = ridge_beam
+	var over_hall := false
+	for c in ceilings:
+		over_hall = over_hall or c.grow(-0.05).intersects(hall_rect)
+	out["ceiling_over_hall"] = over_hall
+	var covered := 0.0
+	var ends_area := 0.0
+	for i in range(plan.rooms.size()):
+		if not hall_rooms.is_empty() and i == hall_rooms[0]:
+			continue
+		var fr := HouseGeometry.room_floor_rect(plan, i)
+		ends_area += fr.get_area()
+		for c in ceilings:
+			covered += c.intersection(fr).get_area()
+	out["ceiling_over_ends"] = covered / maxf(ends_area, 0.01)
+	out["smoke_hole"] = false
+	out["smoke_over_hearth"] = false
+	for op in builder.roof_opening_log:
+		if str(op["id"]) == "longhall_smoke_hole":
+			out["smoke_hole"] = true
+			var ctr: Vector3 = op["center"]
+			out["smoke_over_hearth"] = kerb_rect.has_area() 				and Vector2(ctr.x, ctr.z).distance_to(kerb_rect.get_center()) <= 0.3
+	out["louvre_over_ridge"] = louvre_top - (plan.spec.height * float(maxi(plan.spec.storeys, 1))
+		+ HouseGeometry.roof_rise(plan.spec)) if louvre_top > -INF else -INF
+	# the benches
+	var front_len := 0.0
+	var back_len := 0.0
+	for f in plan.furniture:
+		if str(f.get("key", "")) != "Bench" or hall_rooms.is_empty() or int(f.get("room", -1)) != hall_rooms[0]:
+			continue
+		var br: Rect2 = f["rect"]
+		if absf(br.position.y - hall_rect.position.y) < 0.12:
+			front_len += br.size.x
+		elif absf(br.end.y - hall_rect.end.y) < 0.12:
+			back_len += br.size.x
+	out["bench_front_len"] = front_len
+	out["bench_back_len"] = back_len
+	out["bench_walls"] = int(front_len > 0.0) + int(back_len > 0.0)
 
 
 ## HS-FARMHOUSE keys: the yard door, the byre, and the working props.

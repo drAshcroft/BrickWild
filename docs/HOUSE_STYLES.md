@@ -139,3 +139,72 @@ not headless): `_front` roof-on three-quarter, `_workroom` ground floor eye leve
 looking back at the stair opening.
 
 Reviewer tick: DONE 2026-10-24 (coordinator). Round 1: storeys/frontage YES, stair spine with landing and windows YES, beds above UNCLEAR (no bed in view). Round 2 (36f16b5, renders2 `_bedroom`): a bed upstairs reads plainly; ground office as work room. 3/3.
+
+## longhall (HS-LONGHALL)
+
+Traits: (1) the footprint is at least 2.5 times as long as it is wide, one
+storey under one main roof; (2) an open fire near the middle of the hall, with a
+smoke hole and louvre in the roof above it; (3) no ceiling over the hall, the
+trusses and rafters are in view from the floor; (4) benches along both long
+walls, private rooms only at the ends.
+
+Measured first (40 seeds, 8 x 10 m, one storey): ratio 1.25; the plan was a
+5-room front-hall grammar (the hall a 3.8 m band across the front, kitchen,
+store, workshop and bedroom stacked behind it); the hearth stood in the kitchen
+against a wall with a chimney; the whole storey was under one plaster ceiling;
+no benches; no smoke hole. Only "one storey under one main roof" held.
+
+Built (all in the plain `longhall`, no trade, no world family, no shop spec;
+`HouseLonghall` in `src/house/house_longhall.gd`, plan data in `plan.longhall`):
+- Size: `HouseGenerator.generate` calls `HouseLonghall.clamp_size` (pure
+  arithmetic, no draw): one storey, the long side on X, ratio at least 2.8 (the
+  trait asks 2.5), short side 5.5 to 8 m. The default 8 x 10 m request therefore
+  builds 15.4 x 5.5 m. The front door stands in the middle of a long wall.
+- Plan: `HousePlanRooms.subdivide` tiles the interior with the hall in the middle
+  (the whole depth, about half the floor) and a room at each end: the sleeping room
+  at one end (the end swaps with the seed's parity, as the ordinary layout
+  mirrors), the work room (front) and the store (back) at the other. Cooking is
+  shared in the hall (no kitchen room). The wall hearth, its focus and the
+  chimney are cancelled (`HouseLonghall.prepare`), as are dormers.
+- Fire: `hearth_kerb` stones round an ash bed on the hall floor, half way along
+  (builder, `_build_longhall_floor`); crossed logs, flames, embers and an omni
+  light are added by `HouseAssembler._longhall_fire`. A keep-clear "open hearth"
+  zone in `plan.zones` keeps furniture off it.
+- Smoke: a roof opening `longhall_smoke_hole` over the fire, derived in
+  `HouseGeometry.roof_openings` (never stored); a slatted louvre with a small
+  hood stands on it (`_build_longhall_louvre`). `roof_top_above_walls` and the
+  bound follow (`HouseLonghall.LOUVRE_TOP`).
+- Open roof: `_build_ceiling` ceils only the end rooms (`_build_longhall_ceilings`);
+  over the hall `_build_longhall_roof` emits arch-braced collar trusses on wall
+  posts and corbels, a ridge beam, two purlins and common rafters, and a screen
+  filling each end partition up to the roof. The chandelier a hall normally gets
+  is removed (nothing to hang from).
+- Benches: `HouseLonghall.prepare` reserves a strip along each long wall (keeping
+  out of every door's clear floor); `HouseLonghall.seat`, called after the
+  furnisher, stands real `Bench` props (rescaled 0.82 to 1.2) in the free runs,
+  seats toward the fire.
+
+Test: `tests/house_longhall_traits_test.gd` over the frozen requests
+`house/longhall/{1,8102,21325}` (8102 existed; 1 and 21325 added, all 8 x 10 m).
+Controls: a farmhouse of the same size, a ceiling put over the hall, the smoke
+hole moved off the fire, the fire pushed into a corner, the back-wall benches
+removed, a room put beside the hall, the hall made too short for any truss.
+Keys added to `HouseTraitMeasure.measure` (furnished plan needed for the
+benches: the new `furnished` argument): `long_ratio`, `main_roofs`,
+`hall_fraction`, `hall_full_depth`, `hall_length`, `rooms_off_ends`, `end_sides`,
+`private_kinds`, `hearth_gap`, `hearth_mid_offset`, `hearth_kerb_count`,
+`hearth_wall_fire`, `smoke_hole`, `smoke_over_hearth`, `louvre_over_ridge`,
+`ceiling_over_hall`, `ceiling_over_ends`, `truss_count`, `rafter_count`,
+`has_ridge_beam`, `bench_walls`, `bench_front_len`, `bench_back_len`.
+
+Renders for review: `artifacts/goal/HS-LONGHALL/renders/`
+(`tools/render_hs_longhall.gd`, not headless), per seed: `_exterior` roof-on
+three-quarter, `_louvre` the smoke louvre on the ridge, `_interior` eye level
+down the hall, `_roof` looking up into the open roof, `_plan` roof off from above.
+
+Known sides: the benches are warned by the furnishing check as "not at any table"
+(they stand at the walls, the table stands near the fire); the village programmer
+gives `longhall` to the norse culture, so a norse lot now holds a 15.4 x 5.5 m
+footprint for an 8 x 10 m request.
+
+Reviewer tick: OPEN
