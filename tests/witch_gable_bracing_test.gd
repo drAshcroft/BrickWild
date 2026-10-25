@@ -23,11 +23,8 @@ func _retained_stations(layout: Dictionary) -> Array[float]:
 	var result: Array[float] = []
 	var along := float(layout.get("along", 0.0))
 	var station_offset := along * 0.5 + HouseGeometry.BEAM_D * 0.5 - 0.01
-	var bay: Dictionary = layout.get("witch_bay", {})
 	for end_sign in [-1.0, 1.0]:
-		var station := float(end_sign) * station_offset
-		if bay.is_empty() or station < float(bay.get("along_lo", INF)) - 0.001 or station > float(bay.get("along_hi", -INF)) + 0.001:
-			result.append(station)
+		result.append(float(end_sign) * station_offset)
 	return result
 
 

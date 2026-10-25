@@ -3,7 +3,7 @@ extends SceneTree
 ## The yard must be planned around the authored door; role presence alone is not enough.
 
 const SIZES := [
-	{"id":"compact","width":7.0,"length":9.0,"height":2.6,"bay":false},
+	{"id":"compact","width":7.0,"length":9.0,"height":2.6},
 ]
 const SEEDS := [1, 8102, 21325]
 var failures: Array[String] = []
@@ -41,9 +41,6 @@ func _check_witch(size: Dictionary, seed_value: int) -> void:
 	var compact := bool(door.get("witch_compact_service_threshold", false))
 	if compact != (size.id == "compact"):
 		failures.append("%s service threshold used the wrong compact/Workshop grammar" % label)
-	var bay: Dictionary = HouseGeometry.roof_layout(plan).get("witch_bay", {})
-	if bool(size.bay) != not bay.is_empty():
-		failures.append("%s changed the separate structural Workshop bay eligibility" % label)
 	var shelter: Dictionary = {}
 	for piece in plan.yard_pieces:
 		if String(piece.get("role", "")) == "witch_work_shelter":

@@ -122,9 +122,6 @@ func _check_witch(size: Dictionary, seed: int) -> void:
 	# Plan/headroom and stay unchanged.
 	if not is_equal_approx(plan.spec.height, float(size.height)):
 		_fail("%s wall/headroom datum changed" % who)
-	# WITCH-SIZE: no hut is promoted into a Workshop bay any more.
-	if not layout.get("witch_bay", {}).is_empty():
-		_fail("%s gained a Workshop bay roof" % who)
 	# Build and compare named components against the committed mesh. This catches
 	# missing/reversed roof panels while the vertex seam checks above catch joins.
 	plan.spec.timber_frame = true
@@ -149,15 +146,14 @@ func _check_witch(size: Dictionary, seed: int) -> void:
 		var detached_failures := _end_rafter_mesh_failures(builder, layout, mesh, -0.03, "detached")
 		if not detached_failures.is_empty():
 			_fail("%s physically displaced 30 mm rafter still contacts or intrudes into roof: %s" % [who, detached_failures])
-		if _expected_end_station_count(layout) > 0:
-			var raised_contact_failures := _end_rafter_mesh_failures(builder, layout, mesh, 0.03, "contact")
-			if raised_contact_failures.is_empty():
-				_fail("%s same contact predicate accepted raised timber" % who)
-			else:
-				raised_negative_cases += 1
-			var penetration_failures := _end_rafter_mesh_failures(builder, layout, mesh, 0.03, "penetration")
-			if not penetration_failures.is_empty():
-				_fail("%s physically raised 30 mm rafter is not measured inside roof slab: %s" % [who, penetration_failures])
+		var raised_contact_failures := _end_rafter_mesh_failures(builder, layout, mesh, 0.03, "contact")
+		if raised_contact_failures.is_empty():
+			_fail("%s same contact predicate accepted raised timber" % who)
+		else:
+			raised_negative_cases += 1
+		var penetration_failures := _end_rafter_mesh_failures(builder, layout, mesh, 0.03, "penetration")
+		if not penetration_failures.is_empty():
+			_fail("%s physically raised 30 mm rafter is not measured inside roof slab: %s" % [who, penetration_failures])
 		else:
 			print("HALFHIP_NO_END_NEGATIVE %s: both actual end stations are replaced by the full-length service bay; zero end-rafter mesh is expected, so no raised negative is claimed for this case" % who)
 	mesh.clear_surfaces()
@@ -173,13 +169,10 @@ func _end_rafter_mesh_failures(builder: HouseBuilder, layout: Dictionary,
 	var expected := 0
 	var expected_stations: Array[float] = []
 	var along := float(layout["along"])
-	var bay: Dictionary = layout.get("witch_bay", {})
 	for end_sign in [-1.0, 1.0]:
 		var station := float(end_sign) * (along * 0.5 + HouseGeometry.BEAM_D * 0.5 - 0.01)
-		if bay.is_empty() or station < float(bay.get("along_lo", INF)) - 0.001 \
-				or station > float(bay.get("along_hi", -INF)) + 0.001:
-			expected += 1
-			expected_stations.append(station)
+		expected += 1
+		expected_stations.append(station)
 	for row in builder.component_log:
 		var role := String(row.get("role", ""))
 		if role == "witch_half_hip_end_rafter":
@@ -194,8 +187,7 @@ func _end_rafter_mesh_failures(builder: HouseBuilder, layout: Dictionary,
 	var row_ids := PackedStringArray()
 	for row in rows + hip_rows:
 		row_ids.append("%s/%s" % [row.get("role", ""), row.get("id", "")])
-	var bay_trace: Dictionary = layout.get("witch_bay", {})
-	print("HALFHIP_ROWS span=%.3f along=%.3f bay=[%.3f,%.3f] mode=%s expected_end_stations=%d expected_side_rows=%d actual_side_rows=%d actual_hip_rows=%d ids=%s" % [float(layout["span"]), along, float(bay_trace.get("along_lo", NAN)), float(bay_trace.get("along_hi", NAN)), mode, expected, expected_side_rows, rows.size(), hip_rows.size(), ",".join(row_ids)])
+	print("HALFHIP_ROWS span=%.3f along=%.3f mode=%s expected_end_stations=%d expected_side_rows=%d actual_side_rows=%d actual_hip_rows=%d ids=%s" % [float(layout["span"]), along, mode, expected, expected_side_rows, rows.size(), hip_rows.size(), ",".join(row_ids)])
 	for station in expected_stations:
 		var side_count := 0
 		for row in rows:
@@ -268,18 +260,6 @@ func _end_rafter_mesh_failures(builder: HouseBuilder, layout: Dictionary,
 			failures_out.append("%s raised emitted timber has no detected roof penetration (%d/%d samples)" % [row["id"], embedded_samples, upper_samples.size()])
 		test_mesh.clear_surfaces()
 	return failures_out
-
-
-func _expected_end_station_count(layout: Dictionary) -> int:
-	var along := float(layout["along"])
-	var bay: Dictionary = layout.get("witch_bay", {})
-	var count := 0
-	for end_sign in [-1.0, 1.0]:
-		var station := float(end_sign) * (along * 0.5 + HouseGeometry.BEAM_D * 0.5 - 0.01)
-		if bay.is_empty() or station < float(bay.get("along_lo", INF)) - 0.001 \
-				or station > float(bay.get("along_hi", -INF)) + 0.001:
-			count += 1
-	return count
 
 
 func _host_roof_normal_for_row(row: Dictionary, points: PackedVector3Array,

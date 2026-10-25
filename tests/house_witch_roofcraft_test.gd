@@ -50,18 +50,14 @@ func _check_witch(size: Dictionary, seed: int) -> void:
 	if not HouseGeometry.roof_has_thatch_roll(plan.spec, plan.world_family):
 		_fail("%s eligible built-in Witch did not receive physical thatch" % who)
 	var eaves := _components_exact(builder, "thatch_eave")
-	var service_eaves := _components_exact(builder, "thatch_eave_service")
 	var rolls := builder.components("thatch_roll_")
-	var bay: Dictionary = layout.get("witch_bay", {})
-	if (bay.is_empty() and eaves.size() != 2) or (not bay.is_empty() and (eaves.size() != 1 or service_eaves.size() != 1)) or rolls.is_empty():
-		_fail("%s exposed eave coverage main/service=%d/%d, ridge bundles=%d" % [who, eaves.size(), service_eaves.size(), rolls.size()])
+	if eaves.size() != 2 or rolls.is_empty():
+		_fail("%s exposed eave coverage eaves=%d, ridge bundles=%d" % [who, eaves.size(), rolls.size()])
 	var surface_map := {}
 	if not _components_match_committed_mesh(builder, mesh, surface_map):
 		_fail("%s named components do not resolve to their committed logical material slots" % who)
 	var roof_triangles := _main_roof_triangles(builder, mesh, surface_map, who)
 	_check_eave_contacts(builder, roof_triangles, layout, who)
-	if not bay.is_empty():
-		_check_service_eave_contact(builder, mesh, surface_map, layout, who)
 	_check_ridge_contacts(builder, mesh, roof_triangles, layout, who)
 	_check_bundles_clear_of_roof_cuts(plan, builder, layout, who)
 	_check_chimney(plan, builder, mesh, surface_map, who)
@@ -72,7 +68,6 @@ func _check_witch(size: Dictionary, seed: int) -> void:
 func _check_eave_contacts(builder: HouseBuilder, roof_triangles: PackedVector3Array,
 		layout: Dictionary, who: String) -> void:
 	var eaves := _components_exact(builder, "thatch_eave")
-	var bay: Dictionary = layout.get("witch_bay", {})
 	var roof_xf: Transform3D = layout["transform"]
 	var half_x: float = float(layout["span"]) * 0.5 + HouseGeometry.roof_span_out(builder.spec)
 	var faces: Array[PackedVector3Array] = layout["faces"]
@@ -108,9 +103,8 @@ func _check_eave_contacts(builder: HouseBuilder, roof_triangles: PackedVector3Ar
 		if _segment_hits(detached, contact + roof_xf.basis * normal * 0.002,
 				contact - roof_xf.basis * normal * 0.002):
 			_fail("%s actual 30 mm displaced eave mesh still touches its roof edge" % who)
-	var expected_main_sides := 2 if bay.is_empty() else 1
-	if seen_sides.size() != expected_main_sides:
-		_fail("%s emitted %d main-roof eaves; expected %d exposed high-roof side(s)" % [who, seen_sides.size(), expected_main_sides])
+	if seen_sides.size() != 2:
+		_fail("%s emitted %d main-roof eaves; expected 2 exposed sides" % [who, seen_sides.size()])
 
 
 func _components_exact(builder: HouseBuilder, role: String) -> Array[Dictionary]:
@@ -121,36 +115,6 @@ func _components_exact(builder: HouseBuilder, role: String) -> Array[Dictionary]
 	return result
 
 
-func _check_service_eave_contact(builder: HouseBuilder, mesh: ArrayMesh,
-		surface_map: Dictionary, layout: Dictionary, who: String) -> void:
-	var rows := _components_exact(builder, "thatch_eave_service")
-	if rows.size() != 1:
-		_fail("%s lower service roof has no single measured eave bundle" % who)
-		return
-	var actual_roof := _committed_role_triangles(builder, mesh, int(surface_map.get(ROOF_SURFACE, -1)), "witch_workshop_bay_roof")
-	var row: Dictionary = rows[0]
-	var support: Vector3 = row["points"][0]
-	if not _segment_hits(actual_roof, support - Vector3.UP * 0.02, support + Vector3.UP * 0.02):
-		_fail("%s service thatch eave lacks actual emitted shed-roof contact" % who)
-	var kit := MeshKit.new(1)
-	kit.slab_poly(row["points"], float(row["depth"]), 0, bool(row["vertical"]))
-	var eave_mesh: ArrayMesh = kit.commit()
-	var eave_triangles: PackedVector3Array = eave_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-	if not _segment_hits(eave_triangles, support - Vector3.UP * 0.02, support + Vector3.UP * 0.02):
-		_fail("%s service eave component mesh misses its roof-bearing edge" % who)
-	var moved: PackedVector3Array = row["points"].duplicate()
-	for index in range(moved.size()):
-		moved[index] += Vector3.UP * 0.03
-	var detached_kit := MeshKit.new(1)
-	detached_kit.slab_poly(moved, float(row["depth"]), 0, bool(row["vertical"]))
-	var detached_mesh: ArrayMesh = detached_kit.commit()
-	var detached_triangles: PackedVector3Array = detached_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-	if _segment_hits(detached_triangles, support - Vector3.UP * 0.002, support + Vector3.UP * 0.002):
-		_fail("%s physically raised service eave still touches its roof-bearing edge" % who)
-	eave_mesh.clear_surfaces()
-	detached_mesh.clear_surfaces()
-
-
 func _emitted_component_mesh(row: Dictionary, points_override := PackedVector3Array()) -> PackedVector3Array:
 	var points: PackedVector3Array = row["points"] if points_override.is_empty() else points_override
 	var kit := MeshKit.new(1)
@@ -159,34 +123,6 @@ func _emitted_component_mesh(row: Dictionary, points_override := PackedVector3Ar
 	var result: PackedVector3Array = emitted.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] if emitted.get_surface_count() > 0 else PackedVector3Array()
 	emitted.clear_surfaces()
 	return result
-
-
-func _committed_role_triangles(builder: HouseBuilder, mesh: ArrayMesh,
-		surface: int, role: String) -> PackedVector3Array:
-	if surface < 0 or surface >= mesh.get_surface_count():
-		return PackedVector3Array()
-	var kit := MeshKit.new(1)
-	for row in builder.component_log:
-		if String(row.get("role", "")) != role or String(row.get("form", "")) != "slab":
-			continue
-		kit.slab_poly(row["points"], float(row["depth"]), 0, bool(row["vertical"]))
-	var expected_mesh := kit.commit()
-	if expected_mesh.get_surface_count() == 0:
-		return PackedVector3Array()
-	var expected: PackedVector3Array = expected_mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-	var actual: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
-	if ComponentCheck.missing_triangles(actual, expected) != 0:
-		return PackedVector3Array()
-	var remaining := ComponentCheck.triangle_counts(expected)
-	var selected := PackedVector3Array()
-	for index in range(0, actual.size() - 2, 3):
-		var key := ComponentCheck.triangle_key(actual[index], actual[index + 1], actual[index + 2])
-		if int(remaining.get(key, 0)) <= 0:
-			continue
-		selected.append(actual[index]); selected.append(actual[index + 1]); selected.append(actual[index + 2])
-		remaining[key] = int(remaining[key]) - 1
-	expected_mesh.clear_surfaces()
-	return selected
 
 
 func _actual_surface_height_near(mesh: ArrayMesh, surface: int,
@@ -341,16 +277,13 @@ func _check_ridge_contacts(builder: HouseBuilder, mesh: ArrayMesh,
 func _check_bundles_clear_of_roof_cuts(plan: HousePlan, builder: HouseBuilder,
 		layout: Dictionary, who: String) -> void:
 	var authored_cuts: Array = HouseGeometry.roof_openings(plan).duplicate(true)
-	var bay: Dictionary = layout.get("witch_bay", {})
 	var roof_xf: Transform3D = layout["transform"]
 	for row in builder.component_log:
 		var role: String = String(row.get("role", ""))
-		if role != "thatch_eave" and role != "thatch_eave_service" and not role.begins_with("thatch_roll_"):
+		if role != "thatch_eave" and not role.begins_with("thatch_roll_"):
 			continue
 		var source: PackedVector3Array = row["points"]
 		var cuts: Array = authored_cuts.duplicate(true)
-		if role != "thatch_eave_service" and not bay.is_empty():
-			cuts.append({"polygon": bay["outline"]})
 		var lo_x := INF
 		var hi_x := -INF
 		var centre_z := 0.0
@@ -363,22 +296,13 @@ func _check_bundles_clear_of_roof_cuts(plan: HousePlan, builder: HouseBuilder,
 		var half_depth: float = float(row["depth"]) * 0.5
 		var lo_z := centre_z - half_depth
 		var hi_z := centre_z + half_depth
-		if role == "thatch_eave_service" and int(bay.get("axis", 0)) == 1:
-			lo_x -= half_depth
-			hi_x += half_depth
-			lo_z = INF
-			hi_z = -INF
-			for world_point in source:
-				var local: Vector3 = roof_xf.affine_inverse() * world_point
-				lo_z = minf(lo_z, local.z)
-				hi_z = maxf(hi_z, local.z)
 		var footprint := PackedVector2Array([
 			Vector2(lo_x, lo_z), Vector2(hi_x, lo_z),
 			Vector2(hi_x, hi_z), Vector2(lo_x, hi_z)])
 		for cut in cuts:
 			var polygon: PackedVector2Array = cut.get("polygon", PackedVector2Array())
 			if polygon.size() >= 3 and Poly.intersection_area(footprint, polygon) > 0.0001:
-				_fail("%s %s bundle overlaps an authored/dormer/bay roof opening" % [who, role])
+				_fail("%s %s bundle overlaps an authored/dormer roof opening" % [who, role])
 				break
 
 

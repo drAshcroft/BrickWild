@@ -33,10 +33,9 @@ static func run() -> SuiteResult:
 	_expect(res, bool(nav.get("ok", false)) and nav.get("unreached_rooms", []).is_empty()
 		and nav.get("unreachable_items", []).is_empty(),
 		"navigation failed: %s" % JSON.stringify(nav))
-	# OPEN (WITCH-SIZE follow-up): the generic Hall/Workshop/Bedroom plan of a
-	# 7 x 9 alchemist hut fails HouseFurnishCheck "against" (the Hall cooking
-	# workbench stands 1.10 m off its wall). It is not asserted here; the six
-	# trade-less huts are, in hwitchsize.
+	var furnish: Dictionary = HouseFurnishCheck.new().check(plan)
+	_expect(res, bool(furnish.get("ok", false)),
+		"HouseFurnishCheck failed: %s" % JSON.stringify(furnish.get("failures", [])))
 	res.note("rooms=3, nav=%s" % str(nav.get("ok", false)))
 	return res
 

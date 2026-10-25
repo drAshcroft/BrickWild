@@ -1208,7 +1208,7 @@ static func _witch_prep_leaves_water_space(plan: HousePlan, room: int, key: Stri
 
 static func _uses_witch_wall_prep(plan: HousePlan, key: String) -> bool:
 	return HouseFurnishingRecipes.is_ordinary_house(plan) \
-		and plan.spec.style == &"witch_hut" and plan.spec.trade == &"none" \
+		and plan.spec.style == &"witch_hut" \
 		and PropCatalog.category(key) == "workbench"
 
 

@@ -50,7 +50,6 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 		nav_report = _furnish_room(plan, spec, i, nav_report)
 	HouseFurnishRepair.relax(plan)
 	_audit_activity_groups(plan)
-	_bind_witchwork_cauldron_heat(plan)
 	# The existing Workbench Pot remains the prep vessel. A second, explicit
 	# structural record authorizes the actual model instance suspended over the
 	# native fireplace; the assembler must not invent one from a row count.
@@ -276,34 +275,6 @@ static func _set_activity_group(piece: Dictionary, step: Dictionary) -> void:
 	var near_anchor: String = String(step.get("near_anchor", ""))
 	if not near_anchor.is_empty():
 		piece["activity_host_anchor"] = near_anchor
-
-
-## Bind only the distinct Witchwork Cauldron in a real Workshop. The compact
-## Witch plan has no Workshop; its shared Hall station stays on the cooking
-## heat path and receives no independent flue setting.
-static func _bind_witchwork_cauldron_heat(plan: HousePlan) -> void:
-	plan.heat_settings.clear()
-	if plan.spec.style != &"witch_hut":
-		return
-	for room_index in range(plan.rooms.size()):
-		var room: Dictionary = plan.rooms[room_index]
-		if String(room.get("kind", "")).to_lower() != "workshop":
-			continue
-		var matches: Array[int] = []
-		for i in range(plan.furniture.size()):
-			var item: Dictionary = plan.furniture[i]
-			if String(item.get("key", "")) == "Cauldron" \
-					and int(item.get("room", -1)) == room_index \
-					and String(item.get("activity_group", "")) == "witchwork":
-				matches.append(i)
-		if matches.size() != 1:
-			continue
-		var station: Dictionary = plan.furniture[matches[0]]
-		station["heat_setting_id"] = "witchwork_cauldron"
-		plan.furniture[matches[0]] = station
-		plan.heat_settings.append({"id": "witchwork_cauldron", "room": room_index,
-			"storey": int(station.get("storey", plan.storey_of_room(room_index))),
-			"station_id": "witchwork_cauldron", "opening_id": "witchwork_cauldron_flue"})
 
 
 ## Repair may remove a required item, and a placement rule may fail before an
@@ -745,6 +716,16 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 		# With a bed in it the hall has no middle left to stand a table in, so
 		# the table goes against a wall -- which is what a one-room cottage
 		# does anyway.
+		# A trade hut's 3.6 m hall is crossed by three doors and carries the
+		# hearth, the cupboard and the prep bench on its walls. Measured: a
+		# table stood free, or against a wall, closes a door approach and the
+		# route repair leaves it one chair. The hall goes without a table, says
+		# so (plan.was_dropped), and the household eats at the prep bench.
+		if String(s["cat"]) == "table" and kind == &"hall" \
+				and HouseFurnishingRecipes.is_ordinary_house(plan) \
+				and spec.style == &"witch_hut" and spec.trade != &"none":
+			plan.note_compromise(room, "table")
+			continue
 		if sleeps_here and String(s["cat"]) == "table":
 			var wall_table: Dictionary = s.duplicate()
 			wall_table["rule"] = &"wall"
@@ -1160,6 +1141,9 @@ static func _recover_dining_pair(plan: HousePlan, room: int, blocked: Array[Rect
 		return
 	if plan.focus_room() == room and plan.focus_cat() == "table":
 		return # an altar or high table has its own authored seating contract
+	if plan.kind_of(room) == &"hall" and HouseFurnishingRecipes.is_ordinary_house(plan) \
+			and plan.spec.style == &"witch_hut" and plan.spec.trade != &"none":
+		return # a trade hut's hall gave its table up on purpose; see _furnish_room
 	var required := false
 	for step in HouseFurnishingRecipes.recipe_for_room(plan, room):
 		if step["cat"] == "table" and float(step["opt"]) >= 1.0 and step["rule"] == &"free":
