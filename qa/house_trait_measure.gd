@@ -58,6 +58,7 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable(),
 	_farm_keys(plan, builder, out)
 	_town_keys(plan, out)
 	_longhall_keys(plan, builder, out)
+	_rich_keys(plan, builder, out)
 	return out
 
 
@@ -127,6 +128,96 @@ static func _town_keys(plan: HousePlan, out: Dictionary) -> void:
 	out["spine_storeys"] = reached
 	out["spine_landings"] = landings
 	out["spine_lit"] = lit
+
+
+## HS-RICH keys (a furnished plan is needed for the seats):
+##   door_room_kind      kind of the room the front door opens into
+##   hall_holds_stair    that room is a hall AND the ground-to-first stair starts in it
+##                       (satisfied, foot landing and well inside the hall's floor)
+##   parlour_rooms / dining_rooms   ground rooms of kind parlour / dining_room
+##   parlour_seating     seat + bench pieces in the first ground parlour
+##   dining_tables / dining_chairs  table and seat pieces in the first ground dining room
+##   rooms_distinct      hall, parlour and dining room are three different rooms
+##   dining_table_elsewhere   a table stands in the hall or parlour as well
+##   trim_count          cornice_* and string_course components
+##   trim_worst          the largest distance (m) from any of them to the nearest
+##                       floor line or the eave (see `trim_off_level`)
+##   cornice_top_gap     m between the highest cornice part's top and the eave
+static func _rich_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -> void:
+	var door_room := plan.entrance_room()
+	out["door_room_kind"] = plan.kind_of(door_room) if door_room >= 0 else &""
+	var holds := false
+	if door_room >= 0 and plan.kind_of(door_room) == &"hall":
+		var hall_rect := HouseGeometry.room_floor_rect(plan, door_room)
+		for s in plan.stairs:
+			if int(s["a"]) != door_room or int(s["storey"]) != 0 or not bool(s.get("satisfied", true)):
+				continue
+			var foot := Rect2(s.get("foot_landing", Rect2()))
+			if foot.has_area() and hall_rect.has_point(foot.get_center()):
+				holds = true
+	out["hall_holds_stair"] = holds
+	var parlours: Array[int] = []
+	var dinings: Array[int] = []
+	for i in plan.rooms_on_storey(0):
+		if plan.kind_of(i) == &"parlour":
+			parlours.append(i)
+		elif plan.kind_of(i) == &"dining_room":
+			dinings.append(i)
+	out["parlour_rooms"] = parlours.size()
+	out["dining_rooms"] = dinings.size()
+	out["parlour_seating"] = _count_cats(plan, parlours[0], ["seat", "bench"]) if not parlours.is_empty() else 0
+	out["dining_tables"] = _count_cats(plan, dinings[0], ["table"]) if not dinings.is_empty() else 0
+	out["dining_chairs"] = _count_cats(plan, dinings[0], ["seat"]) if not dinings.is_empty() else 0
+	out["rooms_distinct"] = door_room >= 0 and not parlours.is_empty() and not dinings.is_empty() 		and door_room != parlours[0] and door_room != dinings[0] and parlours[0] != dinings[0]
+	var elsewhere := 0
+	if door_room >= 0:
+		elsewhere += _count_cats(plan, door_room, ["table"])
+	if not parlours.is_empty():
+		elsewhere += _count_cats(plan, parlours[0], ["table"])
+	out["dining_table_elsewhere"] = elsewhere > 0
+	out["component_log"] = builder.component_log
+	out["storey_height"] = plan.spec.height
+	var trim := trim_off_level(builder.component_log, plan.spec.height, plan.spec.storeys)
+	out["trim_count"] = trim["count"]
+	out["trim_worst"] = trim["worst"]
+	out["cornice_top_gap"] = trim["cornice_top_gap"]
+
+
+static func _count_cats(plan: HousePlan, room: int, cats: Array) -> int:
+	var n := 0
+	for f in plan.furniture_of(room):
+		if str(plan.furniture[f].get("cat", "")) in cats:
+			n += 1
+	return n
+
+
+## How far the ornament strays from the floor lines. A cornice or string-course
+## part is a box; its distance to a level is zero when the level lies inside its
+## height and the gap to its nearer face otherwise. The levels are the floors
+## (0, h, 2h ...) and the eave (storeys * h). Returns {count, worst,
+## cornice_top_gap} (the last: eave minus the highest cornice top, -INF when none).
+static func trim_off_level(log: Array, height: float, storeys: int) -> Dictionary:
+	var count := 0
+	var worst := 0.0
+	var top := -INF
+	for c in log:
+		var role := str(c.get("role", ""))
+		if not (role.begins_with("cornice") or role == "string_course"):
+			continue
+		var xf: Transform3D = c["xf"]
+		var size: Vector3 = c["size"]
+		var lo := xf.origin.y - size.y * 0.5
+		var hi := xf.origin.y + size.y * 0.5
+		var nearest := INF
+		for k in range(storeys + 1):
+			var level := height * float(k)
+			nearest = minf(nearest, 0.0 if lo <= level and level <= hi else minf(absf(lo - level), absf(hi - level)))
+		worst = maxf(worst, nearest)
+		count += 1
+		if role.begins_with("cornice"):
+			top = maxf(top, hi)
+	return {"count": count, "worst": worst,
+		"cornice_top_gap": height * float(storeys) - top if top > -INF else INF}
 
 
 ## HS-LONGHALL keys (a furnished plan is needed for the benches):

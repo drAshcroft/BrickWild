@@ -667,7 +667,8 @@ static func _household_seat_capacity(plan: HousePlan) -> int:
 		sleeping_rooms += plan.rooms_of(kind).size()
 	if sleeping_rooms == 0:
 		sleeping_rooms = 1
-	return clampi(sleeping_rooms * 2, 2, 8)
+	var laid := int(HouseSpec.STYLES.get(plan.spec.style, {}).get("dining_seats", 0))
+	return clampi(maxi(sleeping_rooms * 2, laid), 2, 8)
 
 
 static func _uses_native_domestic_fireplace(plan: HousePlan) -> bool:

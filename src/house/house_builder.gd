@@ -2317,15 +2317,20 @@ func _build_rich_cornice() -> void:
 	tag("cornice")
 	var level := _storeys() - 1
 	host("cornice", level)
-	var head: float = spec.height * float(level)
+	var head: float = spec.height * float(level + 1)   # the eave: the top of the top storey
 	var step: float = HouseGeometry.CORNICE_H / 3.0
 	var steps := [["cornice_bed", HouseGeometry.CORNICE_BED_OUT],
 		["cornice_corona", HouseGeometry.CORNICE_OUT],
 		["cornice_crown", HouseGeometry.CORNICE_CROWN_OUT]]
+	# Each step hangs from the eave line and runs down: the bed the full crown
+	# height, the corona two thirds, the crown one third. The profile is the same
+	# stack of three, and every part touches the eave (HS-RICH trait 3).
 	for i in steps.size():
-		var y0: float = head - HouseGeometry.CORNICE_H + step * float(i)
+		# Tops are staggered by 30 mm so the nested boxes share no top plane.
+		var top: float = head - 0.03 * float(steps.size() - 1 - i)
+		var bottom: float = head - step * float(steps.size() - i)
 		for run in HouseGeometry.shell_runs(plan, level):
-			_moulding(run, y0, step, float(steps[i][1]), String(steps[i][0]))
+			_moulding(run, bottom, top - bottom, float(steps[i][1]), String(steps[i][0]))
 	host_end()
 
 

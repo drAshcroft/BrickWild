@@ -470,7 +470,7 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 		return recipe
 	var parlour_is_sitting: bool = sitting_if_available and dines_elsewhere(plan, room)
 	if parlour_is_sitting:
-		recipe = _sitting_parlour_recipe()
+		recipe = _sitting_parlour_recipe(plan)
 	else:
 		recipe = recipe.duplicate(true)
 	# The merchant's townhouse office is a writing place, not a generic shop
@@ -684,7 +684,7 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 			# A household has one meal table. Other parlours are sitting rooms;
 			# other halls and dining rooms keep their non-meal pieces only.
 			if kind == &"parlour":
-				return _sitting_parlour_recipe()
+				return _sitting_parlour_recipe(plan)
 			var without_second_meal: Array = []
 			for step in tagged:
 				if String(step.get("cat", "")) in ["table", "seat", "bench"]:
@@ -705,13 +705,17 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 	return tagged
 
 
-static func _sitting_parlour_recipe() -> Array:
+static func _sitting_parlour_recipe(plan: HousePlan = null) -> Array:
 	var out: Array = SITTING_PARLOUR.duplicate(true)
 	for step in out:
 		var category: String = String(step.get("cat", ""))
 		if category in ["bench", "sconce"]:
 			step["group"] = "sitting"
 			step["opt"] = 1.0
+		# HS-RICH: a style row with `sitting_group` seats its parlour as a group,
+		# two settles, not the single bench of a cottage's best room.
+		if category == "bench" and plan != null 				and bool(HouseSpec.STYLES.get(plan.spec.style, {}).get("sitting_group", false)):
+			step["n"] = [2, 2]
 	return out
 
 

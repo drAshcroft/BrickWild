@@ -238,6 +238,11 @@ const STYLES := {
 		# of these is an ordinary house, whatever its name.
 		"cornice": 1.0, "string_courses": [1, 2], "pediments": 0.85,
 		"ridge_finial": 1.0, "min_storeys": 2,
+		# HS-RICH: a hall that holds the stair, then a parlour and a dining
+		# room of their own. Style constants, no random draw: one more room
+		# than the floor area asks for, and a table laid for four.
+		"domestic_program": [&"hall", &"kitchen", &"parlour", &"dining_room"],
+		"dining_seats": 4, "sitting_group": true,
 	},
 	&"mediterranean": {
 		"label": "Mediterranean House",

@@ -208,3 +208,61 @@ gives `longhall` to the norse culture, so a norse lot now holds a 15.4 x 5.5 m
 footprint for an 8 x 10 m request.
 
 Reviewer tick: DONE 2026-10-25 (coordinator): long narrow hall, central fire on a kerb under a ridge louvre, open trussed roof over the hall, benches on both long walls; 4/4 on seeds 1, 8102, 21325.
+
+## rich (HS-RICH)
+
+Traits: (1) the front door opens into a hall that holds the main stair; (2) a
+separate parlour (a seating group) and dining room (a table with at least four
+chairs); (3) every cornice and string-course component lies within 0.15 m of a
+floor line or the eave.
+
+Measured first (rich at the old fixture size 8 x 10 m, seeds 1..20 plus 8102 and
+21325, two storeys by `min_storeys`): (1) HELD. The door opened into the hall and
+the domestic stair started there (LHS-STAIRS, 3ae7d20). (2) MISSING. No room
+was a `dining_room`; the table stood in the hall with 2 chairs (4 on 2 of 20
+seeds, 6 on none); the parlour held ONE bench; 8 of 20 seeds had no fourth ground
+room at all. (3) MISSING in a way the old bound hid: the crown was hung from
+`spec.height * level`, the first-floor line, not the eave. A two-storey rich house
+had its cornice AND its string course both at 2.24..2.6 m on the ground-floor
+head, and no ornament at the real eave (5.2 m). The cornice sat within 0.15 m of
+a floor line by accident, so a pure distance test would have passed it; the
+measure also asks for the crown's top to stand at the eave (`cornice_top_gap`).
+
+Built, all style constants with no random draw (a row without the keys is
+untouched):
+* `rich` row: `domestic_program [hall kitchen parlour dining_room]` (beds go
+  above, as in the townhouse), `dining_seats 4`, `sitting_group true`.
+  `_is_style_signature(rich)` = parlour and dining_room, so the planner keeps
+  both before it drops optional rooms. `HouseFurnisher._household_seat_capacity`
+  lays at least `dining_seats` chairs. `_sitting_parlour_recipe(plan)` seats a
+  `sitting_group` parlour with two settles instead of one.
+* The default rich footprint is now 9 x 11 m (was 8 x 10): the domestic grammar
+  needs 6.0 m behind the entry hall for two rows of rooms and an 8 x 10 house
+  has 5.7 m, so hall + kitchen + parlour + dining room cannot all sit on the
+  ground floor. 9 x 11 holds the four rooms on 40 of 40 seeds (100..139). The three
+  frozen requests `house/rich/{1,8102,21325}` are 9 x 11 (the 8102 row was
+  8 x 10; `shop_shell/rich/8102` is a shop and unchanged).
+* `HouseBuilder._build_rich_cornice` now hangs the crown from the TOP storey's
+  eave (`height * storeys`), each of its three steps running down from the eave
+  (bed full height, corona two thirds, crown one third, tops staggered 30 mm so
+  no two boxes share a top plane; the `CORNICE_*` outs are unchanged, so the
+  bound is). Before, the stacked steps ended 0.24 m from the nearest level.
+
+Test: `tests/house_rich_traits_test.gd` over the frozen requests; keys
+`HouseTraitMeasure` `door_room_kind hall_holds_stair parlour_rooms dining_rooms
+parlour_seating dining_tables dining_chairs rooms_distinct dining_table_elsewhere
+trim_count trim_worst cornice_top_gap` and the static `trim_off_level(log,
+height, storeys)`. Controls: stair removed, stair not starting in the hall, the
+hall renamed, the dining room renamed to a parlour, parlour seating removed,
+chairs cut to two, the table removed, every trim part dropped 0.6 m, and a log
+with no trim.
+
+Known weakness, not chased: the dining room is a 2.8 to 3.3 m wide strip, and
+a long table fills it; and the upper storey names rooms from the landing outward
+(parlour, store, parlour, bedroom), so a rich house has one bedroom above.
+
+Renders for review: `artifacts/hs_rich/renders/` (`tools/render_hs_rich.gd`, not
+headless): `rich_<seed>_front` roof-on three-quarter, `_hall_stair`, `_parlour`,
+`_dining_room` at eye level, seeds 1, 8102, 21325.
+
+Reviewer: pending

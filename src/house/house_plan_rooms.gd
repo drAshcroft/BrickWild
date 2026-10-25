@@ -833,7 +833,9 @@ static func _compact_backness(kind: StringName, style: StringName) -> int:
 	if _is_style_signature(style, kind):
 		return 1
 	if kind == &"kitchen":
-		return 0
+		# HS-RICH: the formal rooms take the front, the service rooms the back
+		# wall (and the yard door); a rich house keeps its kitchen last.
+		return 4 if style == &"rich" else 0
 	if kind in [&"bedroom", &"guest_room", &"suite"]:
 		return 3
 	if kind in [&"store", &"records"]:
