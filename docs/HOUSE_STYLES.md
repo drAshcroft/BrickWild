@@ -207,4 +207,4 @@ Known sides: the benches are warned by the furnishing check as "not at any table
 gives `longhall` to the norse culture, so a norse lot now holds a 15.4 x 5.5 m
 footprint for an 8 x 10 m request.
 
-Reviewer tick: OPEN
+Reviewer tick: DONE 2026-10-25 (coordinator): long narrow hall, central fire on a kerb under a ridge louvre, open trussed roof over the hall, benches on both long walls; 4/4 on seeds 1, 8102, 21325.
