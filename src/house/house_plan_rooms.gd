@@ -6,6 +6,8 @@ const MIN_SPLIT := 0.36
 const MAX_SPLIT := 0.64
 const BASE_HOUSE_SPEC := preload("house_spec.gd")
 const DOMESTIC_KITCHEN_MIN_SIDE := 3.0
+## A hall sized exactly to its aspect limit fails the check on float rounding.
+const HALL_ASPECT_MARGIN := 0.02
 
 # --------------------------------------------------------------- subdivide
 
@@ -597,7 +599,7 @@ static func _fit_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: Rect2,
 	var wall_half := HouseGeometry.INNER_WALL_T * 0.5
 	var mirror: bool = posmod(spec.seed, 2) == 1
 	var hall_min_depth := maxf(float(HouseGeometry.MIN_SIDE.get(&"hall", 2.6)) + wall_half,
-		inner.size.x / HouseGeometry.ROOM_ASPECT_MAX + wall_half)
+		inner.size.x / HouseGeometry.aspect_max(&"hall") + wall_half + HALL_ASPECT_MARGIN)
 	# The common room must hold a useful household table group outside the
 	# entrance approach, rather than meeting the hall minimum by area alone.
 	if inner.size.y >= 8.0:
