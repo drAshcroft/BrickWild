@@ -53,11 +53,22 @@ func _check_witch_geometry(size: Dictionary, seed: int) -> void:
 	var profile_span := minf(plan.spec.width, plan.spec.length)
 	var profile_factor := 0.5
 	var profile_cap := clampf(profile_span * 0.52, 3.6, 5.6)
-	var expected_rise := minf(profile_span * pitch * profile_factor, profile_cap)
+	# WITCH-ROOF: wall at most 2.3 m, rise at least 1.55 x the wall (cap permitting).
+	var wall_h := float(plan.spec.height)
+	var expected_rise := minf(maxf(profile_span * pitch * profile_factor,
+		HouseGeometry.WITCH_MIN_RISE_RATIO * wall_h), profile_cap)
+	if wall_h > HouseGenerator.WITCH_MAX_WALL + 0.0001:
+		_fail("%s wall %.2f exceeds the 2.3 m hut wall" % [who, wall_h])
+	if float(layout["rise"]) < 1.5 * wall_h:
+		_fail("%s roof rise %.2f is under 1.5 x its wall %.2f" % [who, float(layout["rise"]), wall_h])
+	if plan.spec.jetty or plan.spec.dormers:
+		_fail("%s hut gained a jetty or dormers" % who)
+	if String(_roof_appearance(plan.spec)["kind"]) != "thatch":
+		_fail("%s roof is not rendered as thatch" % who)
 	if absf(float(layout["rise"]) - expected_rise) > 0.002:
 		_fail("%s rise no longer follows the capped roof-height contract" % who)
-	if not is_equal_approx(float(plan.spec.height), float(size.height)):
-		_fail("%s interior wall/headroom datum changed with roof styling" % who)
+	if not is_equal_approx(float(plan.spec.height), minf(float(size.height), HouseGenerator.WITCH_MAX_WALL)):
+		_fail("%s interior wall/headroom datum is not the clamped hut wall" % who)
 	if plan.world_family != &"":
 		_fail("%s ordinary Witch generation unexpectedly gained a world-family tag" % who)
 
@@ -149,3 +160,7 @@ func _check_custom_selector(spec: HouseSpec) -> void:
 
 func _fail(message: String) -> void:
 	failures.append(message)
+
+
+func _roof_appearance(spec: HouseSpec) -> Dictionary:
+	return ShellAssembler.house_roof_appearance(spec, &"")

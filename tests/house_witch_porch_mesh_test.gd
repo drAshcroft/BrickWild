@@ -209,8 +209,10 @@ func _check_case(fixture: Dictionary) -> void:
 		failures.append("%s: 20 mm outward-shifted ledger still passes wall bearing" % fixture["label"])
 	var face_sample := door_pos + normal * (wall_t + 0.03)
 	var face_heights := _heights_at(roof_surface, face_sample)
-	if face_heights.is_empty() or face_heights.min() < HouseGeometry.DOOR_H + 0.25:
-		failures.append("%s: actual roof underside leaves less than 25 cm above the door head" % fixture["label"])
+	# WITCH-ROOF: under the 2.3 m hut wall the canopy underside at the wall is
+	# about 2.24 m: at least 20 cm above the door leaf (DOOR_H), no longer 25 cm.
+	if face_heights.is_empty() or face_heights.min() < HouseGeometry.DOOR_H + 0.2:
+		failures.append("%s: actual roof underside leaves less than 20 cm above the door leaf" % fixture["label"])
 
 	var step_bounds: AABB = MassBuilder.component_aabb(step)
 	for post in posts:

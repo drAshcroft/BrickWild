@@ -18,6 +18,10 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 	# Fit its measured body above head height and below the ceiling; scoring
 	# and assembly receive that same scale, rather than just clamping light.
 	var ceiling := plan.spec.height - HouseGeometry.FLOOR_T - 0.03
+	# WITCH-ROOF: on a 2.3 m hut wall a fitted piece ends flush with the ceiling line,
+	# and the later "top > ceiling" checks then trip on float noise. Keep 1 cm off it.
+	if plan.spec.height < 2.4:
+		ceiling -= 0.01
 	var scale := 1.0
 	if PropCatalog.category(key) == "sconce":
 		scale = minf(1.0, maxf(0.1, ceiling - 1.7) / maxf(PropCatalog.height(key), 0.01))

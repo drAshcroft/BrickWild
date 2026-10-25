@@ -83,8 +83,10 @@ func _check_tie_support(plan: HousePlan, builder: HouseBuilder, shell: ArrayMesh
 	if absf(tie_top - ceiling_y) > 0.002:
 		failures.append("%s tie top does not meet the ceiling underside" % label)
 	var storey_floor_top := float(plan.storey_of_room(room_index)) * plan.spec.height + HouseGeometry.FLOOR_T
-	if tie_bottom - storey_floor_top < 2.18:
-		failures.append("%s tie drops below 2.18 m clearance over the finished storey floor" % label)
+	# WITCH-ROOF: a hut wall is at most 2.3 m, so a 0.14 m tie under the ceiling
+	# clears the finished floor by 2.04 m (it was 2.18 under the old 2.6 m wall).
+	if tie_bottom - storey_floor_top < 2.0:
+		failures.append("%s tie drops below 2.0 m clearance over the finished storey floor" % label)
 	var ceilings: Array = _roles(builder, "ceiling")
 	var supported_ceiling := false
 	for ceiling in ceilings:

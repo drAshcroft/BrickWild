@@ -90,17 +90,11 @@ static func house_materials(node: MeshInstance3D, spec: HouseSpec,
 
 
 ## Resolve rendered course parameters independently from structural roof metadata.
-## The Witch keeps its thatch spec for pitch and roofcraft geometry, while its
-## built-in exterior is rendered with dark slate courses to match its target.
+## WITCH-ROOF: the Witch hut renders as the thatch it is (the slate override that
+## matched the old concept board is gone).
 static func house_roof_appearance(spec: HouseSpec,
 		world_family: StringName = &"") -> Dictionary:
 	var kind: StringName = spec.roof_material
-	var script := spec.get_script() as Script
-	var built_in_witch := spec.style == &"witch_hut" and world_family == &"" \
-		and kind != &"earth" and script != null \
-		and script.resource_path.ends_with("/src/house/house_spec.gd")
-	if built_in_witch:
-		kind = &"slate"
 	var thatch := kind == &"thatch"
 	var course: float = 0.22 if kind == &"slate" else (0.38 if kind == &"tile" else 0.30)
 	var tile_width: float = 0.30 if kind == &"slate" else (0.26 if kind == &"tile" else 0.42)

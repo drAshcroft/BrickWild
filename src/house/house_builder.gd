@@ -508,18 +508,32 @@ func _build_witch_hall_ceiling_ties(level: int, ceiling_y: float) -> void:
 		var size := Vector3(span, tie_h, 0.14) if across_x else Vector3(0.14, tie_h, span)
 		host("witch_hall_ceiling_ties_room%d" % room_index, level)
 		for tie_index in range(tie_count):
-			var station := station_gap * float(tie_index + 1)
-			var center := room.position + room.size * 0.5
-			if across_x:
-				center.y = room.position.y + station
-			else:
-				center.x = room.position.x + station
-			var xf := Transform3D(Basis(), Vector3(center.x, ceiling_y - tie_h * 0.5, center.y))
-			if _witch_tie_conflicts_with_aperture(room, center, size,
-					across_x, ceiling_y - tie_h, ceiling_y, plan.doors + plan.windows,
-					wall_t, plan.storey_of_room(room_index), float(level) * spec.height):
-				continue
-			component_box("witch_hall_ceiling_tie", size, xf, SURF_TRIM)
+			# WITCH-ROOF: under a 2.3 m wall the tie sits lower than the 2.22 m
+			# door heads, so a tie that lands on a door is slid along the hall
+			# to the nearest clear station inside the 15 to 85 per cent run.
+			var base_station := station_gap * float(tie_index + 1)
+			for nudge in [0.0, 0.3, -0.3, 0.6, -0.6, 0.9, -0.9, 1.2, -1.2]:
+				var station: float = base_station + nudge
+				if station <= long_span * 0.16 or station >= long_span * 0.84:
+					continue
+				var too_close := false
+				for other in placed:
+					too_close = too_close or absf(other - station) < 0.6
+				if too_close:
+					continue
+				var center := room.position + room.size * 0.5
+				if across_x:
+					center.y = room.position.y + station
+				else:
+					center.x = room.position.x + station
+				var xf := Transform3D(Basis(), Vector3(center.x, ceiling_y - tie_h * 0.5, center.y))
+				if _witch_tie_conflicts_with_aperture(room, center, size,
+						across_x, ceiling_y - tie_h, ceiling_y, plan.doors + plan.windows,
+						wall_t, plan.storey_of_room(room_index), float(level) * spec.height):
+					continue
+				placed.append(station)
+				component_box("witch_hall_ceiling_tie", size, xf, SURF_TRIM)
+				break
 		host_end()
 
 
@@ -679,6 +693,7 @@ func _emit_floor_around_many(r: Rect2, holes: Array[Rect2], y0: float, t: float,
 			for hole in holes:
 				if hole.has_point(centre2):
 					in_hole = true
+		var placed: Array[float] = []
 					break
 			if in_hole:
 				continue
@@ -3677,7 +3692,7 @@ func _build_porch() -> void:
 		# exterior wall face and the planned porch end. The 2 cm inset exceeds
 		# this slope's 1.9 cm horizontal half-thickness.
 		var roof_edge_inset := 0.02
-		var roof_thickness := 0.10
+		var roof_thickness := 0.03 if short_wall else 0.10
 		var roof_rise: float = minf(0.42, maxf(spec.height - head - roof_thickness * 0.5 - 0.02, 0.0))
 		var porch_along: float = depth + 0.1 - HouseGeometry.wall_thickness(spec) - roof_edge_inset * 2.0
 		var roof_near: float = HouseGeometry.wall_thickness(spec) + roof_edge_inset
@@ -3690,7 +3705,9 @@ func _build_porch() -> void:
 		# flush against the exterior wall; this is a bearing joint, not a gap.
 		var roof_angle := atan2(roof_rise, porch_along)
 		var ledger_depth := 0.10
-		var ledger_height := 0.12
+		# Over a short hut wall only 8 cm of wall stands above the 2.22 m door
+		# head, so the ledger is a 3 cm batten sitting on that lintel strip.
+		var ledger_height := 0.03 if short_wall else 0.12
 		var ledger_outer := HouseGeometry.wall_thickness(spec) + ledger_depth
 		var ledger_top := head + roof_rise * (roof_far - ledger_outer) / porch_along
 		ledger_top -= roof_thickness * 0.5 / cos(roof_angle)
@@ -3829,6 +3846,12 @@ func _roof_top_surface_near_flue(centre: Vector2, footprint: Vector2, radius: fl
 		var profile_normal_y := 0.0
 		if points.size() >= 3:
 			profile_normal_y = absf((points[1] - points[0]).cross(points[2] - points[0]).normalized().y)
+		# WITCH-ROOF: under a 2.3 m hut wall the canopy's high edge must still
+		# land below the wall plate (top at height - 0.02), so the slab is thin
+		# (3 cm), rises 0.15 m to the wall and its underside there is about 2.24 m,
+		# just over the 2.22 m door head.
+		var short_wall := spec.height < 2.59
+		head = minf(head, spec.height - 0.02 - 0.15 - 0.015)
 		var vertical_half := depth_half * profile_normal_y
 		var enters_neighbourhood := false
 		for point in points:

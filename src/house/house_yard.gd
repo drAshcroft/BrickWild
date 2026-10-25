@@ -1152,6 +1152,13 @@ static func _witch_work_shelter(ctx: Dictionary, cell: Dictionary, gap: float) -
 		else minf(float(ctx["plan"].spec.height) - 0.12, 2.5)
 	var drop := 0.18 if threshold_layout else 0.28
 	var roof_thickness := 0.08
+	if float(ctx["plan"].spec.height) < 2.59:
+		# WITCH-ROOF: a hut wall is at most 2.3 m, so the work shelter hangs from the
+		# top of the wall and falls only 6 cm, or its far end would stand under
+		# the 2.1 m work clearance.
+		wall_y = float(ctx["plan"].spec.height) - 0.02
+		drop = 0.06
+		roof_thickness = 0.04
 	var props: Array = []
 	if not PropCatalog.known("Workbench") or not PropCatalog.known("Cauldron") \
 			or not PropCatalog.known("Pot_1") or not PropCatalog.known("Bucket_Wooden_1"):
@@ -1452,6 +1459,8 @@ static func _witch_shelter_module_parts(cell: Dictionary, prefix: String, center
 		roof_thickness: float) -> Array[Dictionary]:
 	var parts: Array[Dictionary] = []
 	var ledger_y := _witch_roof_under(cell, gap + 0.12, gap, depth, wall_y, drop, roof_thickness)
+	# WITCH-ROOF: under a 2.3 m hut wall only a 5 cm ledger fits above the door head.
+	var ledger_h := 0.05 if roof_thickness < 0.06 else 0.12
 	var post_d := gap + depth - 0.06
 	var post_y := _witch_roof_under(cell, post_d, gap, depth, wall_y, drop, roof_thickness)
 	# The work wing has continuous side returns that bear the eaves. Separate
@@ -1461,7 +1470,7 @@ static func _witch_shelter_module_parts(cell: Dictionary, prefix: String, center
 			parts.append(_part(cell, prefix + "_post", center_t + side * (width * 0.5 - 0.06),
 				post_d, 0.12, 0.12, 0.0, post_y, "trim"))
 	parts.append(_part(cell, prefix + "_ledger", center_t, gap + 0.06,
-		width, 0.12, ledger_y - 0.12, 0.12, "trim"))
+		width, 0.12, ledger_y - ledger_h, ledger_h, "trim"))
 	var out3 := Vector3((cell["out"] as Vector2).x, 0.0, (cell["out"] as Vector2).y)
 	var roof_frame := Basis(Vector3.UP.cross(out3), Vector3.UP, out3)
 	var roof := _part(cell, prefix + "_roof", center_t, gap + depth * 0.5,

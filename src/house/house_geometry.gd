@@ -617,6 +617,8 @@ static func window_area(win: Dictionary) -> float:
 
 # ---------------------------------------------------------------- envelope
 
+const WITCH_MIN_RISE_RATIO := 1.55
+
 static func roof_rise(spec: HouseSpec) -> float:
 	var raw := minf(spec.width, spec.length) * spec.roof_pitch * 0.5
 	if spec.style == &"witch_hut":
@@ -624,7 +626,8 @@ static func roof_rise(spec: HouseSpec) -> float:
 		# one enormous blank gable. This cap is in metres and leaves the locked
 		# wall envelope unchanged.
 		var span := minf(spec.width, spec.length)
-		return minf(raw, clampf(span * 0.52, 3.6, 5.6))
+		# WITCH-ROOF: short walls, high roof -- never less than 1.55 x the wall.
+		return minf(maxf(raw, WITCH_MIN_RISE_RATIO * spec.height), clampf(span * 0.52, 3.6, 5.6))
 	return raw
 
 

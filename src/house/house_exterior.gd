@@ -139,18 +139,22 @@ static func _opening_box(pos: Vector2, normal: Vector2, width: float,
 ## than the sill allows or that blocks a shutter or hood, nothing in the
 ## chimney. `bounds` is a measured world box. Empty when clear.
 static func facade_clear(plan: HousePlan, bounds: AABB) -> String:
+	# WITCH-ROOF: a reserved opening box stops 10 cm under the wall plate at most, so a
+	# 2.3 m hut wall can still carry a yard lean-to above its doors and windows.
 	for door in plan.doors:
 		if not door["exterior"] or HousePlan.record_storey(door) != 0:
 			continue
 		var reserved := _opening_box(door["pos"], door["normal"], float(door["width"]) + 1.1,
-			-0.1, HouseGeometry.DOOR_H + 0.25, 3.2, HouseGeometry.wall_thickness(plan.spec))
+			-0.1, minf(HouseGeometry.DOOR_H + 0.25, plan.spec.height - 0.1), 3.2,
+			HouseGeometry.wall_thickness(plan.spec))
 		if bounds.intersects(reserved):
 			return "blocks a door approach or porch"
 	for win in plan.windows:
 		var level := HousePlan.record_storey(win) * plan.spec.height
 		var width: float = win["width"] * (2.0 if plan.spec.window_shutters else 1.0) + 0.22
 		if bounds.intersects(_opening_box(win["pos"], win["normal"], width,
-			level + float(win["sill"]) - 0.1, level + float(win["head"]) + 0.25, 0.8,
+			level + float(win["sill"]) - 0.1,
+			level + minf(float(win["head"]) + 0.25, plan.spec.height - 0.1), 0.8,
 			HouseGeometry.wall_thickness(plan.spec))):
 			return "obstructs glazing, shutters or a window hood"
 	if plan.spec.chimney:

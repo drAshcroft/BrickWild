@@ -760,6 +760,14 @@ static func _clear_wall_mount_center(p: HousePlan, room: int, wall_index: int,
 	return best
 
 
+## WITCH-ROOF: a task torch hangs at SCONCE_HEIGHT unless the wall is so short (a
+## 2.3 m hut) that its measured body would clear the ceiling; then it hangs lower.
+static func _task_light_pivot(p: HousePlan) -> float:
+	var ceiling := p.spec.height - HouseGeometry.FLOOR_T - 0.03 - 0.01
+	var body_above_pivot := PropCatalog.floor_offset("Torch_Metal") + PropCatalog.height("Torch_Metal")
+	return minf(HouseGeometry.SCONCE_HEIGHT, ceiling - body_above_pivot)
+
+
 static func _wall_fixture_pose(key: String, wall: Dictionary, along: float,
 		base_height: float, scale: float) -> Dictionary:
 	var normal: Vector2 = wall["normal"]
@@ -1181,7 +1189,7 @@ static func _append_nearby_activity_light(p: HousePlan, room: int,
 						stations.append(mirrored_along)
 			for along in stations:
 				var pose := _wall_fixture_pose("Torch_Metal", wall, along,
-					HouseFurnishGeometry.storey_base(p, room) + HouseGeometry.SCONCE_HEIGHT, 1.0)
+					HouseFurnishGeometry.storey_base(p, room) + _task_light_pivot(p), 1.0)
 				var body := Rect2(pose["rect"])
 				var prep_distance := _rect_distance(body, prep_rect)
 				var support_distance := _rect_distance(body, support_rect)
@@ -1220,7 +1228,7 @@ static func _append_nearby_activity_light(p: HousePlan, room: int,
 		var wall: Dictionary = candidate["row"]
 		var along := float(candidate["along"])
 		var index := _append_wall_mount(p, room, wi, wall, candidate["span"], along,
-			"Torch_Metal", HouseGeometry.SCONCE_HEIGHT, group_name,
+			"Torch_Metal", _task_light_pivot(p), group_name,
 			anchor_id, "lights_activity", "task_light")
 		if index >= 0:
 			var intervals: Array = occupied_by_room[room].get(wi, [])
@@ -1243,7 +1251,7 @@ static func _activity_light_mirrors_sconce(p: HousePlan, room: int,
 	var along := Vector2(normal.y, -normal.x)
 	var existing_center := Rect2(existing["rect"]).get_center()
 	var pose := _wall_fixture_pose("Torch_Metal", wall, float(candidate["along"]),
-		HouseFurnishGeometry.storey_base(p, room) + HouseGeometry.SCONCE_HEIGHT, 1.0)
+		HouseFurnishGeometry.storey_base(p, room) + _task_light_pivot(p), 1.0)
 	var candidate_center := Rect2(pose["rect"]).get_center()
 	var anchors: Array[Vector2] = [HouseGeometry.room_floor_rect(p, room).get_center()]
 	if p.is_polygonal(room):

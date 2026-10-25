@@ -119,8 +119,8 @@ func _check_witch(size: Dictionary, seed: int) -> void:
 				lerpf(-f, f, float(iz) / 12.0))
 			if not is_finite(RoofShape.height_at(faces, point)):
 				_fail("%s roof plane union has an interior hole at %s" % [who, point])
-	# Plan/headroom and stay unchanged.
-	if not is_equal_approx(plan.spec.height, float(size.height)):
+	# WITCH-ROOF: the wall is the size's height clamped to the 2.3 m hut wall.
+	if not is_equal_approx(plan.spec.height, minf(float(size.height), HouseGenerator.WITCH_MAX_WALL)):
 		_fail("%s wall/headroom datum changed" % who)
 	# Build and compare named components against the committed mesh. This catches
 	# missing/reversed roof panels while the vertex seam checks above catch joins.

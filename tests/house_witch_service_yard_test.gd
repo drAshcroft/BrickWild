@@ -169,7 +169,7 @@ func _check_witch(size: Dictionary, seed_value: int) -> void:
 		if _witch_wing_walls_bear_roof(broken_wing):
 			failures.append("shortened wall negative control still passed roof-bearing contract")
 	if threshold_roof.size != Vector3.ZERO \
-				and threshold_roof.position.y < HouseGeometry.DOOR_H + 0.25 - 0.005:
+				and threshold_roof.position.y < minf(HouseGeometry.DOOR_H + 0.25, plan.spec.height - 0.1) - 0.005:
 		failures.append("%s shelter roof AABB enters the reserved door/window head zone (bottom %.3f m)" % [
 			label, threshold_roof.position.y])
 	var roles: Array[String] = []

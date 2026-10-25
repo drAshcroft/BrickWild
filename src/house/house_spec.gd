@@ -201,11 +201,15 @@ const STYLES := {
 		"roof_pitch": [1.2, 1.7], "porch": 1.0, "chimney": 1.0, "shutters": 0.6,
 		"roof_material": &"thatch", "pitch_reference": 8.0, "pitch_exponent": 0.8,
 		"wall": ["87684b", "73563e"], "trim": ["402a1b", "2f1f14"],
-		"roof": ["2B3034", "1E2227"], "floor": ["6c6250", "51493c"],
+		"roof": ["8a7648", "6f5d38"], "floor": ["6c6250", "51493c"],
 		"clutter": [0.75, 1.0],
 		"plinth": [0.25, 0.45], "roof_types": [&"gable"],
 		"framing": [&"arch_brace", &"square_panel"], "truss": [&"king_post"],
-		"jetty": 0.2, "dormers": 0.2, "bargeboards": 0.6, "stone_ground": 0.05,
+		# WITCH-ROOF: a hut has neither jetty nor dormers (0.0 keeps the draw order);
+		# a deep thatch eave and verge.
+		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.6, "stone_ground": 0.05,
+		# (A deeper eave than the ordinary 0.35 m breaks the rafter birdsmouth seat on
+		# the 0.2 m tie plate -- 0.42 already does; see docs/HOUSES.md WITCH-ROOF.)
 		"chimney_style": &"stepped", "pots": [1, 1],
 	},
 	&"rich": {
