@@ -109,11 +109,15 @@ bedrooms above on 40 of 40 seeds at 8 x 10 m), and the stair, landings and
 windows come from the domestic stair profile already in place. Three storeys also hold, tested at seeds 1, 8102 and
 21325.
 
-Known consequence: `min_storeys` also lifts trade townhouses to two storeys, so
-the `lane:house-furnish-fast` feng shui sweep seed 60002 (townhouse, alchemist,
-10 x 10.6, once one storey) now fails `sconce_pair` in the ground workshop (two
-lamps on walls 2 and 0). It is a furnisher pair-lamp weakness the new geometry
-exposes, not a changed check; left open for the furnisher owner.
+Consequence, fixed: `min_storeys` also lifts trade townhouses to two storeys, so the
+feng shui sweep seed 60002 (townhouse, alchemist, once one storey) failed `sconce_pair`
+in the ground workshop. Cause: the door swing cut one of the mirrored lamp stations
+(`_blocks_domestic_threshold`), so the furnisher found no pair anchor and hung the
+second lamp on another wall, while the check (which ignores the swing) still saw a
+pair that fitted. `HouseFurnishSurface.place_mounted` now keeps the one lamp and notes
+`sconce_pair:no_safe_mirrored_station` in every room of an ordinary house, as it already
+did for the hall. The check is unchanged. Round 2 renders (upper bedroom with its bed,
+per seed): `artifacts/goal/HS-TOWNHOUSE/renders2/` (`tools/render_hs_townhouse_beds.gd`).
 
 Test: `tests/house_townhouse_traits_test.gd` (58 checks) over the frozen requests
 `house/townhouse/{1,8102,21325}` (the 8102 row existed; 1 and 21325 added),
