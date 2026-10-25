@@ -54,7 +54,15 @@ lower than the 2.6 m eave) on two posts, with five hay bales. The `farmhouse`
 style groups become byre, cart, trough (three slots, replacing woodpile,
 cart, midden for a no-trade farmhouse; a farmer trade keeps its own recipe).
 Kinds present on all 40 seeds: hay, cart, trough, sacks. No fence is claimed.
-Hay shows in the pale wall tone: the yard parts have no straw colour.
+Hay is emitted on the roof (thatch) surface so it reads as straw; the trim
+material ignores vertex colour, so a tint was not possible. Round 2 (blind
+review round 1: byre 3/3, props NO, back door UNCLEAR): the cart is a built
+two-wheel farm cart with shafts and a hay load (`_farm_cart`, piece kind `cart`,
+group `farm_cart`) replacing the `Dungeon_Cart` box; the farm trough stands on
+four legs (no water inset: no surface takes a blue). No catalogue model for
+hay, barrow or trough exists. Renders2 frame the yard door with byre, cart
+and trough, and the kitchen view stands on the side away from the hearth.
+Round 2 renders: `artifacts/goal/HS-FARMHOUSE/renders2/`.
 
 Test: `tests/house_farmhouse_traits_test.gd` (31 checks) over the frozen
 requests `house/farmhouse/{1,8102,21325}`; controls: back door removed, yard
@@ -62,7 +70,7 @@ door moved to the front wall, byre removed, yard stripped to the byre alone.
 Keys added to `HouseTraitMeasure.measure`: `back_door_room`,
 `back_door_off_front`, `byre_*`, `yard_kinds`.
 
-Renders for review: `artifacts/goal/HS-FARMHOUSE/renders/` (`tools/render_hs_farmhouse.gd`,
+Renders for review: `artifacts/goal/HS-FARMHOUSE/renders/` (round 1; `tools/render_hs_farmhouse.gd` now writes renders2/,
 not headless): `_front` three-quarter, `_rear` three-quarter from the byre
 side, `_interior` eye level toward the kitchen's yard door (the hearth breast
 partly screens the door in some seeds).

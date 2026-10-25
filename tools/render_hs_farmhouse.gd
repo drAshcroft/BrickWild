@@ -7,7 +7,7 @@ func _init() -> void:
 	_build_stage()
 	await process_frame
 	_cam.current = true
-	var out := "res://artifacts/goal/HS-FARMHOUSE/renders"
+	var out := "res://artifacts/goal/HS-FARMHOUSE/renders2"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out))
 	for seed_value in [1, 8102, 21325]:
 		var spec := HouseSpec.new(seed_value)
@@ -30,33 +30,47 @@ func _init() -> void:
 		_cam.look_at(Vector3(dp.x, 2.0, dp.y), Vector3.UP)
 		_set_shot_lighting(atan2(n.x, n.y), 8.0)
 		await _save_review_image(out.path_join("farmhouse_%d_front.jpg" % seed_value))
-		# Rear three-quarter: from the byre's side, behind the house.
-		var centre := dp - n * 5.0
-		var side := tang
-		for pc in plan.yard_pieces:
-			if str(pc["kind"]) == "byre":
-				var rc: Rect2 = pc["rect"]
-				var off := rc.get_center() - centre
-				side = tang * signf(off.dot(tang)) if absf(off.dot(tang)) > 0.5 else tang
-		var back := centre - n * 10.0 + side * 10.0
-		_cam.fov = 52.0
-		_cam.position = Vector3(back.x, 5.5, back.y)
-		_cam.look_at(Vector3(centre.x + side.x * 2.0, 1.2, centre.y + side.y * 2.0 - n.y * 2.0), Vector3.UP)
-		_set_shot_lighting(atan2(-n.x, -n.y), 8.0)
-		await _save_review_image(out.path_join("farmhouse_%d_rear.jpg" % seed_value))
-		# Interior: stand at the far end of the kitchen, look at the yard door.
+		# Rear three-quarter framing the yard door and the props beside it.
 		for i in plan.doors.size():
 			var bd: Dictionary = plan.doors[i]
 			if i == plan.entrance() or not bd["exterior"]:
 				continue
 			var bn := Vector2(bd["normal"]).normalized()
 			var bp := Vector2(bd["pos"])
+			var bt := Vector2(bn.y, -bn.x)
+			var pts: Array[Vector2] = [bp]
+			for pc in plan.yard_pieces:
+				if str(pc["kind"]) in ["byre", "cart", "trough"]:
+					pts.append((pc["rect"] as Rect2).get_center())
+			var cen := Vector2.ZERO
+			for q in pts:
+				cen += q / float(pts.size())
+			var spread := 0.0
+			for q in pts:
+				spread = maxf(spread, q.distance_to(cen))
+			var house_c := Vector2(0.0, 0.0)
+			var outward := (cen - house_c).normalized()
+			var dir := (outward + bn * 0.9).normalized()
+			var cam2 := cen + dir * (3.5 + spread * 1.5)
+			_cam.fov = 58.0
+			_cam.position = Vector3(cam2.x, 2.8, cam2.y)
+			_cam.look_at(Vector3(cen.x, 0.8, cen.y), Vector3.UP)
+			var toward := dir
+			_set_shot_lighting(atan2(toward.x, toward.y), 8.0)
+			await _save_review_image(out.path_join("farmhouse_%d_rear.jpg" % seed_value))
+			# Interior: stand in the kitchen on the side away from the hearth.
 			var room: Rect2 = plan.rooms[int(bd["a"])]["rect"]
 			var depth := absf(bn.x) * room.size.x + absf(bn.y) * room.size.y
-			var e := bp - bn * (depth - 0.45) + Vector2(bn.y, -bn.x) * 0.2
-			_cam.fov = 70.0
+			var width := absf(bt.x) * room.size.x + absf(bt.y) * room.size.y
+			var hearth_dir := 0.0
+			if plan.hearth_room() == int(bd["a"]):
+				var hv: Vector2 = [Vector2(0, -1), Vector2(0, 1), Vector2(-1, 0), Vector2(1, 0)][plan.hearth_wall()]
+				hearth_dir = hv.dot(bt)
+			var lat := -signf(hearth_dir) if absf(hearth_dir) > 0.5 else 1.0
+			var e := bp - bn * (depth - 0.4) + bt * lat * (width * 0.3)
+			_cam.fov = 72.0
 			_cam.position = Vector3(e.x, 1.58, e.y)
-			_cam.look_at(Vector3(bp.x, 1.1, bp.y), Vector3.UP)
+			_cam.look_at(Vector3(bp.x, 1.2, bp.y), Vector3.UP)
 			_set_shot_lighting(atan2(bn.x, bn.y), 8.0)
 			await _save_review_image(out.path_join("farmhouse_%d_interior.jpg" % seed_value))
 			break

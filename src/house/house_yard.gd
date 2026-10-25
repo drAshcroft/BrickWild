@@ -56,7 +56,7 @@ const WITCH_WORK_APPROACH := 0.9
 ## and up to two when there is none.
 const STYLE_GROUPS := {
 	&"cottage": [&"washing_line", &"garden", &"flowers"],
-	&"farmhouse": [&"byre", &"cart", &"trough"],
+	&"farmhouse": [&"byre", &"farm_cart", &"trough"],
 	&"townhouse": [&"crates", &"rain_barrel"],
 	&"longhall": [&"woodpile", &"training"],
 	&"witch_hut": [&"witch_work_shelter", &"herb_bed", &"drying_line", &"mushrooms", &"midden"],
@@ -81,7 +81,7 @@ const TRADE_GROUPS := {
 const MAX_GROUPS := 3
 
 ## Built-piece kinds, for the check.
-const KINDS := ["fence", "woodpile", "washing_line", "midden", "leanto", "byre", "witch_work_lean_to", "trough",
+const KINDS := ["fence", "woodpile", "washing_line", "midden", "leanto", "byre", "cart", "witch_work_lean_to", "trough",
 	"signpost", "bed", "path"]
 
 const HERBS := ["Wild_Plant_7", "Wild_Fern_1", "Wild_Plant_1", "Nature_Flower_3_Clump", "Wild_Fern_1", "Wild_Plant_7"]
@@ -413,8 +413,12 @@ static func _group(ctx: Dictionary, name: StringName) -> Dictionary:
 			return _search(ctx, ["rear", "left", "right"], 0.0, [0.3, 0.8],
 				func(cell: Dictionary, gap: float) -> Dictionary: return _mushrooms(ctx, cell, gap))
 		&"trough":
+			var farm: bool = ctx["plan"].spec.style == &"farmhouse"
 			return _search(ctx, ["left", "right", "front"], 0.0, [0.35, 0.9],
-				func(cell: Dictionary, gap: float) -> Dictionary: return _trough(cell, gap))
+				func(cell: Dictionary, gap: float) -> Dictionary: return _trough(cell, gap, farm))
+		&"farm_cart":
+			return _search(ctx, ["left", "right", "rear", "front"], 0.0, [0.5, 1.2],
+				func(cell: Dictionary, gap: float) -> Dictionary: return _farm_cart(cell, gap))
 		&"byre":
 			return _search(ctx, ["left", "right", "rear"], _kitchen_anchor(ctx, 0.0), [0.0],
 				func(cell: Dictionary, gap: float) -> Dictionary: return _byre(cell))
@@ -1041,7 +1045,7 @@ static func _midden(cell: Dictionary, gap: float) -> Dictionary:
 
 
 ## The smith's quench trough: a long open box of boards.
-static func _trough(cell: Dictionary, gap: float) -> Dictionary:
+static func _trough(cell: Dictionary, gap: float, farm := false) -> Dictionary:
 	var l := 1.3
 	var w := 0.5
 	var h := 0.5
@@ -1052,7 +1056,34 @@ static func _trough(cell: Dictionary, gap: float) -> Dictionary:
 	parts.append(_part(cell, "trough_side", 0.0, d + w * 0.5 - 0.03, l, 0.06, 0.0, h, "trim"))
 	parts.append(_part(cell, "trough_end", -l * 0.5 + 0.03, d, 0.06, w - 0.12, 0.0, h, "trim"))
 	parts.append(_part(cell, "trough_end", l * 0.5 - 0.03, d, 0.06, w - 0.12, 0.0, h, "trim"))
+	if farm:
+		# A farm trough stands on four legs (HS-FARMHOUSE).
+		for lx in [-1.0, 1.0]:
+			for ld in [-1.0, 1.0]:
+				parts.append(_part(cell, "trough_leg", lx * (l * 0.5 - 0.08), d + ld * (w * 0.5 - 0.06),
+					0.1, 0.1, 0.0, 0.12, "trim"))
 	return {"pieces": [_piece("trough", "quench_trough", parts, str(cell["host"]))]}
+
+
+## HS-FARMHOUSE. A two-wheeled farm cart: bed, side boards, an octagonal wheel
+## either side of the bed, two shafts, and a load of hay.
+static func _farm_cart(cell: Dictionary, gap: float) -> Dictionary:
+	var parts: Array = []
+	var d := gap + 0.65
+	var out3 := Vector3((cell["out"] as Vector2).x, 0.0, (cell["out"] as Vector2).y)
+	parts.append(_part(cell, "cart_bed", 0.0, d, 1.9, 1.0, 0.38, 0.08, "trim"))
+	for side in [-1.0, 1.0]:
+		parts.append(_part(cell, "cart_side", 0.0, d + side * 0.47, 1.9, 0.06, 0.46, 0.3, "trim"))
+		parts.append(_part(cell, "cart_shaft", 1.9, d + side * 0.3, 1.9, 0.07, 0.4, 0.07, "trim"))
+		for turn in [0.0, PI * 0.25]:
+			var wheel := _part(cell, "cart_wheel", 0.0, d + side * 0.58, 0.8, 0.07, 0.0, 0.8, "trim")
+			wheel["basis"] = Basis(out3, turn)
+			wheel["centre"] = (wheel["centre"] as Vector3) + Vector3(0, 0.0, 0)
+			parts.append(wheel)
+	parts.append(_part(cell, "cart_end", -0.92, d, 0.06, 1.0, 0.46, 0.3, "trim"))
+	var load := _part(cell, "hay_load", 0.0, d, 1.5, 0.8, 0.46, 0.4, "roof")
+	parts.append(load)
+	return {"pieces": [_piece("cart", "farm_cart", parts, str(cell["host"]))]}
 
 
 ## The charcoal lean-to: two posts, a plank roof sloping away from the wall, and
@@ -1099,9 +1130,11 @@ static func _byre(cell: Dictionary) -> Dictionary:
 	roof["basis"] = Basis(tan3, -turn * slope)
 	parts.append(roof)
 	for i in 3:
-		parts.append(_part(cell, "hay_bale", -1.0 + float(i) * 0.95, 0.5, 0.8, 0.8, 0.0, 0.45, "wall"))
-	parts.append(_part(cell, "hay_bale", -0.55, 0.5, 0.8, 0.8, 0.45, 0.45, "wall"))
-	parts.append(_part(cell, "hay_bale", 0.4, 0.5, 0.8, 0.8, 0.45, 0.45, "wall"))
+		var bale := _part(cell, "hay_bale", -1.0 + float(i) * 0.95, 0.5, 0.8, 0.8, 0.0, 0.45, "roof")
+		parts.append(bale)
+	for t in [-0.55, 0.4]:
+		var top := _part(cell, "hay_bale", t, 0.5, 0.8, 0.8, 0.45, 0.45, "roof")
+		parts.append(top)
 	return {"pieces": [_piece("byre", "byre", parts, str(cell["host"]))]}
 
 

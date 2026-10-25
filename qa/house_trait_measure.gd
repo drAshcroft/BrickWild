@@ -94,6 +94,8 @@ static func _farm_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) 
 						kinds["hay"] = true
 			"trough":
 				kinds["trough"] = true
+			"cart":
+				kinds["cart"] = true
 			"fence":
 				kinds["fence"] = true
 	for prop in plan.yard:
