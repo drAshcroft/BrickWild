@@ -232,8 +232,10 @@ Built, all style constants with no random draw (a row without the keys is
 untouched):
 * `rich` row: `domestic_program [hall kitchen parlour dining_room]` (beds go
   above, as in the townhouse), `dining_seats 4`, `sitting_group true`.
-  `_is_style_signature(rich)` = parlour and dining_room, so the planner keeps
-  both before it drops optional rooms. `HouseFurnisher._household_seat_capacity`
+  `_compact_backness(kitchen)` is 4 for rich, so the formal rooms take the front
+  and the kitchen the back wall (without it the `poles sweep` back-door-on-kitchen
+  gate of `lane:house-plan-fast` fell from 20 to 19 of 24, one rich scholar house).
+  `HouseFurnisher._household_seat_capacity`
   lays at least `dining_seats` chairs. `_sitting_parlour_recipe(plan)` seats a
   `sitting_group` parlour with two settles instead of one.
 * The default rich footprint is now 9 x 11 m (was 8 x 10): the domestic grammar
@@ -264,5 +266,7 @@ a long table fills it; and the upper storey names rooms from the landing outward
 Renders for review: `artifacts/hs_rich/renders/` (`tools/render_hs_rich.gd`, not
 headless): `rich_<seed>_front` roof-on three-quarter, `_hall_stair`, `_parlour`,
 `_dining_room` at eye level, seeds 1, 8102, 21325.
+
+Fingerprint (`tools/fingerprint_houses.gd`, five older styles, HEAD worktree vs this tree): 130 lines, identical. `lane:house-exterior-fast` has one failure, `witch_hut/none rotated=false no exterior dressing`, that fails identically at HEAD (`hexterior` in the base worktree).
 
 Reviewer: pending
