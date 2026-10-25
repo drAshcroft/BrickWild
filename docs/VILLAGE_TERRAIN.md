@@ -1065,17 +1065,53 @@ church stands beyond 40 m of the body's hull (a planted grid's slot is
 behind the far street; a dispersed body is one hamlet). That is the survey's
 definition holding, not a missing church; PlaceCheck's rank reads them.
 
+### The church on very steep ground (VTER-PLACE-STEEP)
+
+Castelmezzano, Masouleh and Positano (street form, 90 m site) stood at
+0.25 / 0.33 / 0.33. Measured causes, in the order they bit:
+
+1. **The site had no room on the high side.** The through road runs along a
+   contour and left 20 m between itself and the site's high edge; a church
+   plot is 30 m deep, so every high frontage failed `_inside_site`. A street
+   village on ground that falls more than `HIGH_SIDE_GRADE` (10 %) of the
+   site's depth edge to edge is grown `HIGH_SIDE_GROW_M` (26 m) on its high
+   side (`VillageSitePlanner._grow_high_side`), once the through road is
+   fixed and before the form lays its streets and tracks (grown afterwards,
+   tracks dead-end at the old edge: vtplan `dead_ends`). Manarola (6.7 m across 90 m) and
+   Ushguli (7.1 m) stay as they were; a grow at a 3 m threshold dropped
+   Manarola's church from 0.75 to 0.5.
+2. **A church is not a house plot.** Its lot is `terraced` (the cliff test
+   gives way to the ground fit and `CHURCH_MAX_FALL`), but its mean slope
+   stays within a footpath's 60 % (`edge_ground`); the high-ground search
+   admits ground to `LANDMARK_PLOT_MAX` (60 %) not 35 %.
+3. **Fronting the common is worth a share of the relief, not a hillside**
+   (`LANDMARK_NEAR_COST_SHARE`, 0.4 of the house rows' relief): the
+   near-common bump was taken whenever it beat the median, which on
+   Castelmezzano was a 721 m knoll under a 736 m slope. A fixed 4 m moved
+   Hallstatt thorn-hamlet's church off its common (vtplan).
+4. **Stair streets are where the houses will stand**: `steps` joins the row
+   classes the slot is ranked against (Positano's slot read as high until
+   its stairs were counted).
+
+The hillside form keeps the search as it was (35 % plots, no stair rows, no
+terraced flag, the near-common rule unchanged): it has its own church
+terrace, and vhillside's Manarola failed otherwise.
+
+Street church rank (survey / PlaceCheck), before -> after: Castelmezzano
+0.25 -> 0.80 / 0.80, Masouleh 0.33 -> 0.78 / 0.78, Positano 0.33 -> 0.40 /
+0.44. All twelve real street villages are inside the world IQR 0.380-0.950.
+Ushguli's derived dispersed church (0.14, span 7 m) is VTER-DISPERSED-2's,
+not this ticket's: it reads the same at the commit before.
+
 ### Not yet
 
-* **the dispersed form's main hamlet** -- Monemvasia's main common lies on
-  48 % and its church low; Hallstatt's church sits below a spur among its
-  hamlet's houses. The main hamlet is seated where the through road's flank
-  is gentlest (VTER-FORM-DISPERSED), not on the hamlet's high or level
-  ground; these two derived plans fail `landmark_ground` (and Monemvasia
-  `common_ground`) in the sweep, though no suite fixture does;
-* **the church on the steepest hillsides** -- Masouleh, Castelmezzano and
-  Positano: the high ground is too steep for a church's 6 m terrace; a
-  hillside form with a terraced church plot (VTER-FORM-HILLSIDE) is the fix;
+* **the dispersed form's main hamlet** -- Monemvasia's main common still
+  lies on 50 % (`common_ground`; Hallstatt's church now passes, its hamlet's
+  span being under 3 m). `_main_x` scores every through-road vertex between
+  0.1 and 0.9 of the site at 0.6 or worse (sea and cliff north of the road
+  in this yaw), so a wider window does not help; the lever is the siting yaw
+  or the side of the road: VTER-DISPERSED-MAIN-SEAT;
+* ~~**the church on the steepest hillsides**~~ -- VTER-PLACE-STEEP, below;
 * **the mill at the valley floor** -- the race is graded and the rule
   checks the mill is low, but a `river` spec's water is still laid where the
   flat village lays it, not along the ground's drainage, so the mill is low
@@ -1083,7 +1119,7 @@ definition holding, not a missing church; PlaceCheck's rank reads them.
 * **the waterfront share** -- `WORLD_WATERFRONT_IQR` is read and checked by
   `vworld` but no planner aims at it yet (VTER-FORM-SHORE);
 * **woods** are the dresser's few far-side trees; a wooded steep slope as a
-  plan polygon is not made;
+  plan polygon is not made (VTER-WOOD-POLYGON, with the waterfront share);
 * **a crest village** -- the rank rule wants the church at or above the
   median where a crest or spur is among the houses; the compact ring on the
   summit with the church highest is VTER-FORM-CREST's.

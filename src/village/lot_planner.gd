@@ -1133,6 +1133,11 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 					# This reserved civic ground belongs to the native landmark;
 					# a fallback street frontage may use its own preliminary slot.
 					lot["landmark"] = true
+					# a church stands on its own terrace (CHURCH_MAX_FALL), so a
+					# steep pitch across its plot is held by the terrace walls the
+					# lot records, not refused as a house's cliff would be
+					if plan.ground != null and plan.spec.form != &"hillside":
+						lot["terraced"] = true
 				if not _lot_is_legal(plan, ctx, lot, job, gap):
 					continue
 				if _door_rise(lot) > VillageLotGround.DOOR_RISE_PREFERRED and not bool(job.get("door_ok", false)):
@@ -1601,6 +1606,10 @@ static func _site_clear(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 		return false
 	if plan.ground != null and not ground_clear(plan.ground, poly, not bool(lot.get("terraced", false))):
 		return false
+	# a terraced church plot is still no steeper on the mean than a footpath
+	# (PlaceCheck's `edge_ground`): the terrace holds a pitch, not a cliff
+	if plan.ground != null and bool(lot.get("terraced", false)) and bool(lot.get("landmark", false)) 			and float(plan.ground.under(poly)["slope_mean"]) > VillageSiteAnalysis.PATH_MAX:
+		return false
 	if plan.spec.purpose == &"mining":
 		# Leave the terminal workyard beyond the last through-road gateway.
 		for road in plan.roads:
@@ -1920,8 +1929,18 @@ const LANDMARK_HIGH_STEP_M := 5.0
 const LANDMARK_ROW_M := 14.0          ## a setback and half a house from the road
 const LANDMARK_SLOT_RANK := 0.65      ## the slot not clearly on the high side: go up
 const LANDMARK_HIGH_RELIEF_M := 1.0
+## The most height a church gives up to keep the common in front of it, as a
+## share of the house rows' relief.
+const LANDMARK_NEAR_COST_SHARE := 0.4
+## A church stands on its own terrace (CHURCH_MAX_FALL), not a house's stepped
+## plinth: ground steeper than a house plot's 35 % is still candidate ground for
+## it, up to a footpath's grade. The ground fit has the last word.
+const LANDMARK_PLOT_MAX := VillageSiteAnalysis.PATH_MAX
 const LANDMARK_NEAR_COMMON_M := 30.0
 const LANDMARK_ROW_CLASSES: Array[StringName] = [&"through", &"street", &"lane"]
+## A hillside has its own church terrace (VTER-FORM-HILLSIDE) and keeps the
+## search as it was: its stair streets are not rows, its plots are 35 % at most.
+const LANDMARK_ROW_CLASSES_STEEP: Array[StringName] = [&"through", &"street", &"lane", &"steps"]
 
 
 static func landmark_high_ground(plan: VillagePlan) -> Vector2:
@@ -1930,6 +1949,9 @@ static func landmark_high_ground(plan: VillagePlan) -> Vector2:
 	# a strand's slot is inland of its one row by construction: above it
 	if plan.spec.form == &"strand":
 		return Vector2.INF
+	var legacy: bool = plan.spec.form == &"hillside"
+	var row_classes: Array[StringName] = LANDMARK_ROW_CLASSES if legacy else LANDMARK_ROW_CLASSES_STEEP
+	var plot_max: float = VillageSiteAnalysis.PLOT_MAX if legacy else LANDMARK_PLOT_MAX
 	var g: VillageTerrain = plan.ground
 	var cc: Vector2 = VillageMeasure.common_centre(plan)
 	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
@@ -1942,7 +1964,7 @@ static func landmark_high_ground(plan: VillagePlan) -> Vector2:
 	var n := 0
 	var rows := PackedFloat64Array()
 	for road in plan.roads:
-		if not (road["class"] in LANDMARK_ROW_CLASSES):
+		if not (road["class"] in row_classes):
 			continue
 		var pts: PackedVector2Array = road["points"]
 		for k in range(pts.size() - 1):
@@ -1977,7 +1999,7 @@ static func landmark_high_ground(plan: VillagePlan) -> Vector2:
 			var p: Vector2 = cc + Vector2(i, j) * LANDMARK_HIGH_STEP_M
 			if p.distance_to(cc) > LANDMARK_HIGH_REACH_M or not inner.has_point(p):
 				continue
-			if Poly.contains_point(common, p) or g.slope_at(p) > VillageSiteAnalysis.PLOT_MAX 					or not ground_clear(g, Poly.from_rect(Rect2(p - Vector2(5, 5), Vector2(10, 10)))):
+			if Poly.contains_point(common, p) or g.slope_at(p) > plot_max 					or not ground_clear(g, Poly.from_rect(Rect2(p - Vector2(5, 5), Vector2(10, 10)))):
 				continue
 			var h: float = g.height_at(p)
 			if h > best_h:
@@ -1986,7 +2008,8 @@ static func landmark_high_ground(plan: VillagePlan) -> Vector2:
 			if h > near_h and VillageMeasure.point_to_poly(p, common) <= LANDMARK_NEAR_COMMON_M:
 				near_h = h
 				near = p
-	if near != Vector2.INF and near_h >= median:
+	# fronting the common is worth a few metres of height, not a hillside
+	if near != Vector2.INF and near_h >= median and (legacy or best_h - near_h <= LANDMARK_NEAR_COST_SHARE * (hi - lo)):
 		return near
 	return best
 

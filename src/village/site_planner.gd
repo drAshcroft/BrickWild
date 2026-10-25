@@ -230,6 +230,11 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 		out.site = Rect2(Vector2(out.site.position.x, out.site.position.y - STRAND_INLAND_GROW),
 			Vector2(out.site.size.x, out.site.size.y + STRAND_INLAND_GROW))
 
+	# on a steep hillside the site grows on its high side, for the church plot
+	# (VTER-PLACE-STEEP); the through road is already fixed, the field tracks
+	# and streets are laid to the grown edge
+	if ground != null and form == &"street":
+		_grow_high_side(out, ground)
 	# 2. the common and the form's characteristic road graph
 	match form:
 		&"green":
@@ -276,6 +281,45 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 			out.water.append(water)
 	out.water_crossings = VillageWaterPlan.crossings(out.water, out.roads)
 	return out
+
+
+## On a hillside the church goes up (VTER-PLACE), and a church plot is a
+## deep one: its lot is the building and the churchyard behind it
+## (LANDMARK_AREA). A road laid along a steep contour can leave less than
+## that between itself and the site's high edge, so that the ground the church
+## wants is outside the site and it stands mid-village (Masouleh, Castelmezzano,
+## Positano, VTER-PLACE-STEEP). When the ground at one edge of the site stands
+## HIGH_SIDE_GRADE of the site's depth above the other, the site is grown on that
+## side once the through road is fixed (as a strand's inland edge is), so the
+## streets and tracks laid after it reach the grown edge and the lot planner
+## gets honest ground to terrace a church on.
+const HIGH_SIDE_GROW_M := 26.0
+const HIGH_SIDE_GRADE := 0.10       ## mean fall edge to edge, as a share of the site's depth
+
+
+static func _grow_high_side(out: VillagePlan, ground: VillageTerrain) -> void:
+	var site: Rect2 = out.site
+	if site.size.y + HIGH_SIDE_GROW_M > SITE_MAX_SIDE:
+		return
+	var north := 0.0
+	var south := 0.0
+	var n := 0
+	var x := site.position.x + SITE_MARGIN_M
+	while x < site.end.x - SITE_MARGIN_M:
+		north += ground.height_at(Vector2(x, site.position.y + SITE_MARGIN_M))
+		south += ground.height_at(Vector2(x, site.end.y - SITE_MARGIN_M))
+		n += 1
+		x += 5.0
+	if n == 0:
+		return
+	var rise: float = (north - south) / float(n)
+	if absf(rise) < HIGH_SIDE_GRADE * site.size.y:
+		return
+	if rise > 0.0:
+		out.site = Rect2(Vector2(site.position.x, site.position.y - HIGH_SIDE_GROW_M),
+			Vector2(site.size.x, site.size.y + HIGH_SIDE_GROW_M))
+	else:
+		out.site = Rect2(site.position, Vector2(site.size.x, site.size.y + HIGH_SIDE_GROW_M))
 
 
 ## Lanes the form did not lay, added in a fixed order so a plan asked for N
