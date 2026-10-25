@@ -7,6 +7,7 @@ extends SceneTree
 
 const FIXTURE := "res://tests/fixtures/family_style_requests.json"
 const EAVE_MAX := 2.6
+const STACK_CLEAR_MIN := 0.9   # a stack must read as a chimney, not a nub
 var failures: Array[String] = []
 var checks := 0
 
@@ -48,6 +49,7 @@ func _check_case(c: Dictionary) -> void:
 	_expect(m["chimney_count"] == 1, "%s has exactly one chimney stack (got %d)" % [id, m["chimney_count"]])
 	_expect(m["chimney_on_hearth_wall"], "%s stack stands on the hearth wall" % id)
 	_expect(m["chimney_above_ridge"], "%s stack %.2f rises above ridge %.2f" % [id, m["chimney_top"], m["ridge_top"]])
+	_expect(m["chimney_clearance"] >= STACK_CLEAR_MIN, "%s stack clears the ridge by %.2f m >= %.1f" % [id, m["chimney_clearance"], STACK_CLEAR_MIN])
 	# (3) a sheltered door
 	_expect(m["door_sheltered"], "%s front door has a porch roof, posts and step" % id)
 
@@ -61,6 +63,8 @@ func _check_case(c: Dictionary) -> void:
 	_expect(mn["chimney_count"] != 1, "%s control: removing the chimney is noticed" % id)
 	var no_porch := func(plan: HousePlan) -> void: plan.spec.porch = false
 	var mp := HouseTraitMeasure.measure(_spec_of(req), seed_value, no_porch)
+	var farm := HouseTraitMeasure.measure(HouseTraitMeasure.make_spec(&"farmhouse", 8.0, 10.0, 2.6), seed_value)
+	_expect(farm["chimney_clearance"] < STACK_CLEAR_MIN, "%s control: an ordinary stack (farmhouse) fails the clearance floor" % id)
 	_expect(not mp["door_sheltered"], "%s control: removing the porch is noticed" % id)
 
 

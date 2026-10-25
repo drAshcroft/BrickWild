@@ -3954,6 +3954,7 @@ func _build_chimney() -> void:
 	# leaves the roof exactly as before, then climbs a further WITCH_STACK_EXTRA
 	# as a leaning, slightly twisted upper course (emitted below).
 	var witch_stack := HouseGeometry.uses_witch_asymmetric_roof(spec, plan.world_family)
+	top += HouseGeometry.stack_extra(spec)
 	var straight_top := top
 	if witch_stack:
 		top += WITCH_STACK_EXTRA

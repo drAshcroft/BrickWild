@@ -6,7 +6,7 @@ func _init() -> void:
 	_build_stage()
 	await process_frame
 	_cam.current = true
-	var out := "res://artifacts/goal/HS-COTTAGE/renders"
+	var out := "res://artifacts/goal/HS-COTTAGE/renders2"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out))
 	for seed_value in [1, 8102, 21325]:
 		var spec := HouseSpec.new(seed_value)
@@ -23,10 +23,10 @@ func _init() -> void:
 		var n := Vector2(door["normal"]).normalized()
 		var tang := Vector2(n.y, -n.x)
 		var dp := Vector2(door["pos"])
-		var eye2 := dp + n * 9.0 + tang * 6.0
-		_cam.fov = 50.0
-		_cam.position = Vector3(eye2.x, 5.0, eye2.y)
-		_cam.look_at(Vector3(dp.x, 2.0, dp.y), Vector3.UP)
+		var eye2 := dp + n * 11.0 + tang * 8.0
+		_cam.fov = 58.0
+		_cam.position = Vector3(eye2.x, 6.0, eye2.y)
+		_cam.look_at(Vector3(0.0, 3.0, 0.0), Vector3.UP)
 		_set_shot_lighting(atan2(n.x, n.y), 8.0)
 		await _save_review_image(out.path_join("cottage_%d_exterior.jpg" % seed_value))
 		var breast: Dictionary = HouseGeometry.hearth_breast(plan)
@@ -40,6 +40,15 @@ func _init() -> void:
 			_cam.look_at(Vector3(face.x, 0.95, face.y), Vector3.UP)
 			_set_shot_lighting(atan2(bn.x, bn.y), 8.0)
 			await _save_review_image(out.path_join("cottage_%d_interior.jpg" % seed_value))
+		if plan.spec.chimney:
+			var cc := HouseGeometry.chimney_center(plan)
+			var out_dir := cc.normalized() if cc.length() > 0.1 else Vector2.RIGHT
+			var ce := cc + out_dir * 10.0
+			_cam.fov = 55.0
+			_cam.position = Vector3(ce.x, 3.2, ce.y)
+			_cam.look_at(Vector3(cc.x, 4.2, cc.y), Vector3.UP)
+			_set_shot_lighting(atan2(out_dir.x, out_dir.y), 8.0)
+			await _save_review_image(out.path_join("cottage_%d_hearthwall.jpg" % seed_value))
 		building.queue_free()
 		await process_frame
 	quit(0)

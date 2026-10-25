@@ -8,7 +8,7 @@ extends RefCounted
 ##
 ## Keys: storeys, eave_top (wall top above the floor, m), ridge_top (highest
 ## main-roof vertex), chimney_count, chimney_top, chimney_on_hearth_wall,
-## chimney_above_ridge, door_sheltered (a porch roof, posts and step all stand
+## chimney_clearance (m over the ridge), chimney_above_ridge, door_sheltered (a porch roof, posts and step all stand
 ## over the entrance door), porch_roof_count.
 
 
@@ -45,6 +45,7 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable()) -> Dictio
 		var a: AABB = stacks[0]
 		out["chimney_top"] = a.position.y + a.size.y
 		out["chimney_on_hearth_wall"] = _on_hearth_wall(plan, a)
+	out["chimney_clearance"] = out["chimney_top"] - out["ridge_top"]
 	out["chimney_above_ridge"] = out["chimney_top"] > out["ridge_top"] + 0.05
 	var roofs := 0
 	for part in builder.component_log:

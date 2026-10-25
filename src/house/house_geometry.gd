@@ -1089,6 +1089,13 @@ const FINIAL_TOP := 0.22 + 0.55 * 0.5
 ## HouseBuilder.CHIMNEY_CLEAR + the crown slab + a flue pot. The chimney is the
 ## tallest thing on an ordinary house and the old bound missed all of it.
 const CHIMNEY_TOP := 0.6 + 0.18 + CHIMNEY_POT_H
+## HS-COTTAGE: a cottage stack stands this much higher above its roof exit, so it
+## reads as a chimney from any side (no random draw; a style constant).
+const COTTAGE_STACK_EXTRA := 0.7
+
+static func stack_extra(spec: HouseSpec) -> float:
+	return COTTAGE_STACK_EXTRA if spec.style == &"cottage" else 0.0
+
 ## The verge: how far past the roof's own end the boards, pendants and finial
 ## stand, and how far the board's foot kicks out past the eave. These are the
 ## numbers HouseBuilder._build_bargeboards emits with -- it reads them from
@@ -1373,7 +1380,7 @@ static func roof_top_above_walls(spec: HouseSpec, world_family: StringName = &""
 	if spec.bargeboards and spec.roof_type == &"gable" and not has_witch_roofcraft(spec, world_family):
 		top = maxf(top, rise + FINIAL_TOP)
 	if spec.chimney:
-		top = maxf(top, rise + CHIMNEY_TOP + (THATCH_ROLL_TOP if witch_roll else 0.0))
+		top = maxf(top, rise + CHIMNEY_TOP + stack_extra(spec) + (THATCH_ROLL_TOP if witch_roll else 0.0))
 	if spec.ridge_finial and ridge_half(spec, world_family) > 0.05:
 		top = maxf(top, rise + RIDGE_CAP_TOP + CROWN_BASE_H + CROWN_H)
 	if spec.parapet:
