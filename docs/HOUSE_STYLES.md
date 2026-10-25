@@ -138,4 +138,4 @@ not headless): `_front` roof-on three-quarter, `_workroom` ground floor eye leve
 `_stairfoot` the spine from the entry hall, `_landing` the upper landing
 looking back at the stair opening.
 
-Reviewer tick: OPEN
+Reviewer tick: DONE 2026-10-24 (coordinator). Round 1: storeys/frontage YES, stair spine with landing and windows YES, beds above UNCLEAR (no bed in view). Round 2 (36f16b5, renders2 `_bedroom`): a bed upstairs reads plainly; ground office as work room. 3/3.
