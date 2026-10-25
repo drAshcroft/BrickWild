@@ -64,7 +64,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"tree", "bridge", "windmill", "dungeon"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "placement", "cultureapi", "compactapi", "vworld", "vterrain", "vterrainlane", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
+const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "placement", "cultureapi", "compactapi", "vworld", "vrealism", "vterrain", "vterrainlane", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "sacredid", "vis009", "vis010", "vis016", "catalogcache",
@@ -168,7 +168,7 @@ const LANES: Dictionary = {
 	"lane:windmill": ["windmill", "wwalk"],
 	"lane:dungeon": ["dungeon"],
 	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi", "bwalk", "twalk", "chwalk", "kwalk"],
-	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "interior", "cvoxelqa", "library", "placement"],
+	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "vrealism", "interior", "cvoxelqa", "library", "placement"],
 	"lane:sweep": ORDER,
 }
 
@@ -468,6 +468,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_compact_suite.gd").run()
 		"vworld":
 			return preload("res://tests/suites/village_world_sample_suite.gd").run()
+		"vrealism":
+			return preload("res://tests/suites/village_realism_suite.gd").run()
 		"vshape":
 			return preload("res://tests/suites/village_shape_suite.gd").run()
 		"vterrain":
