@@ -1079,7 +1079,10 @@ static func _farm_cart(cell: Dictionary, gap: float) -> Dictionary:
 		parts.append(_part(cell, "cart_side", 0.0, d + side * 0.47, 1.9, 0.06, 0.46, 0.3, "trim"))
 		parts.append(_part(cell, "cart_shaft", 1.9, d + side * 0.3, 1.9, 0.07, 0.4, 0.07, "trim"))
 		for turn in [0.0, PI * 0.25]:
-			var wheel := _part(cell, "cart_wheel", 0.0, d + side * 0.58, 0.8, 0.07, 0.0, 0.8, "trim")
+			# The turned square is cut so its corners stay inside the 0.8 m
+			# axle-height box: at full size they dip 0.166 m below the ground.
+			var span := 0.8 if turn == 0.0 else 0.8 / sqrt(2.0)
+			var wheel := _part(cell, "cart_wheel", 0.0, d + side * 0.58, span, 0.07, 0.4 - span * 0.5, span, "trim")
 			wheel["basis"] = Basis(out3, turn)
 			wheel["centre"] = (wheel["centre"] as Vector3) + Vector3(0, 0.0, 0)
 			parts.append(wheel)
