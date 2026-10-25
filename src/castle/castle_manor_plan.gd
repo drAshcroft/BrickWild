@@ -349,7 +349,15 @@ static func tower_plan(spec: CastleSpec, id: String, centre: Vector3, opts := {}
 		"head": minf(hs.height - 0.2, 2.35)})
 	var previous := Rect2()
 	for level in range(levels - 1):
-		CastleKeepPlan._add_stair(plan, level, level + 1, previous)
+		# The flight that starts on the door's storey must leave the doorway
+		# clear (a first step in the door is a blocked entrance); only if no
+		# such place exists does it take the old, compromised one.
+		var count := plan.stairs.size()
+		if level == door_level:
+			var door_zone: Array[PackedVector2Array] = [_door_footprint(plan.doors[0])]
+			CastleKeepPlan._add_stair(plan, level, level + 1, previous, door_zone)
+		if plan.stairs.size() == count:
+			CastleKeepPlan._add_stair(plan, level, level + 1, previous)
 		if not plan.stairs.is_empty():
 			previous = plan.stairs[-1].upper_rect
 	# Windows on the facets that look away from the wing, one to a facet.
@@ -376,6 +384,32 @@ static func tower_plan(spec: CastleSpec, id: String, centre: Vector3, opts := {}
 			hs.program[level] = &"store"
 	CastleKeepPlan.furnish_minimum_programme(plan, hs)
 	return plan
+
+
+## The floor a door opens onto, as the turned rectangle the final mesh's door
+## rays cover: the doorway's width and 1.1 m into the room (the occupancy check
+## reaches 0.8 m past the door's centre line, across half its width less 0.12).
+static func _door_footprint(door: Dictionary) -> PackedVector2Array:
+	var inward := -Vector2(door["normal"]).normalized()
+	var across := Vector2(-inward.y, inward.x) * (float(door["width"]) * 0.5)
+	var pos := Vector2(door["pos"])
+	return PackedVector2Array([pos - across, pos + across,
+		pos + across + inward * 1.1, pos - across + inward * 1.1])
+
+
+## True when a flight that starts on the door's storey stands in the doorway.
+static func _door_blocked(plan: HousePlan) -> bool:
+	if plan.doors.is_empty():
+		return false
+	var door: Dictionary = plan.doors[0]
+	var zone := _door_footprint(door)
+	for stair in plan.stairs:
+		if int(stair.get("storey", -1)) != HousePlan.record_storey(door):
+			continue
+		for over in Geometry2D.intersect_polygons(Poly.from_rect(Rect2(stair["rect"])), zone):
+			if Poly.area(over) > 0.02:
+				return true
+	return false
 
 
 static func _tower_window(plan: HousePlan, level: int, wall: Dictionary) -> Dictionary:
@@ -446,24 +480,49 @@ static func sky_records(spec: CastleSpec) -> Dictionary:
 		var centre_xz := Vector2(pos.x, pos.z)
 		var desired := centre_xz.normalized() if centre_xz.length() > 0.1 else Vector2(0.0, -1.0)
 		var attach := pos.y + float(tower.height) * 0.58
+		# Every bridge that lands here is a way in. The door faces the first
+		# one unless its flights then have to cross the doorway: a hexagon this
+		# small seats a flight beside one facet and not beside another, so the
+		# best-separated heading that leaves the doorway clear is the one used.
+		var headings: Array[Vector2] = []
 		for bridge in bridges:
+			if bool(bridge.get("chord", false)):
+				continue # a chord leaves above the door and is not entered
 			var from_p: Vector3 = bridge.from
 			var to_p: Vector3 = bridge.to
 			var heading := Vector2(to_p.x - from_p.x, to_p.z - from_p.z).normalized()
 			if Vector2(from_p.x, from_p.z).distance_to(centre_xz) < radius + 0.8:
-				desired = heading
+				headings.append(heading)
 				attach = from_p.y
-				break
-			if Vector2(to_p.x, to_p.z).distance_to(centre_xz) < radius + 0.8:
-				desired = -heading
+			elif Vector2(to_p.x, to_p.z).distance_to(centre_xz) < radius + 0.8:
+				headings.append(-heading)
 				attach = to_p.y
-				break
+		if headings.is_empty():
+			headings.append(desired)
+		# The door that stands furthest from its neighbours' bridges: another
+		# bridge leaving a metre to one side throws its rib across the doorway.
+		var apart := {}
+		for heading in headings:
+			var gap := PI
+			for other in headings:
+				if other != heading:
+					gap = minf(gap, absf(angle_difference(heading.angle(), other.angle())))
+			apart[heading] = gap
+		headings.sort_custom(func(a: Vector2, b: Vector2) -> bool: return apart[a] > apart[b])
 		var id := "sky_tower_%d" % index
-		var opts := {"height": float(tower.height), "half": radius * cos(PI / 12.0),
-			"desired": desired, "window_dot": -1.0, "facet_facing": true,
-			"door_y": attach - pos.y - 1.1, "door_width": 1.0}
 		var box := AABB(Vector3(pos.x - radius, pos.y, pos.z - radius),
 			Vector3(radius * 2.0, float(tower.height), radius * 2.0))
-		_add(out, id, tower_plan(spec, id, pos, opts), box, 0.0)
+		var chosen: HousePlan = null
+		for heading in headings:
+			var opts := {"height": float(tower.height), "half": radius * cos(PI / 12.0),
+				"desired": heading, "window_dot": -1.0, "facet_facing": true,
+				"door_y": attach - pos.y - 1.1, "door_width": 1.0}
+			var trial := tower_plan(spec, id, pos, opts)
+			if chosen == null:
+				chosen = trial
+			if not _door_blocked(trial):
+				chosen = trial
+				break
+		_add(out, id, chosen, box, 0.0)
 		index += 1
 	return out

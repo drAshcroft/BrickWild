@@ -83,3 +83,31 @@ is the inner ring's tower furnishing: seating and seat_count in `store` and
 `guardroom` rooms, with out-of-range index errors in `HouseFurnishArrangementCheck`
 and `HouseFurnishWalkCheck` on the 49th and 50th seat. That is a furnishing
 class, not an access one. The elven castle's `chapel` "sparse" line is the same.
+
+## Sky castle towers (CASTLE-SKY-TOWERS)
+
+Sky castle 0 reported three blocked tower doors and a chair on nothing. Four
+separate causes, all in the sky towers' little hexagons (17 m2, a 2.4 x 1.0
+flight per storey):
+
+* **A flight starting on the door's storey stood in the doorway.** The first
+  steps of the door storey's flight are solid and a ray at floor + 0.15 hits
+  them. `CastleKeepPlan._add_stair` takes `hard`, polygons a flight may not
+  touch; `tower_plan` passes the turned door footprint (`_door_footprint`:
+  door width x 1.1 m inward) and only falls back to the old scored,
+  compromised place if none exists. `HouseGeometry.door_clear_rect` is an
+  axis-aligned sliver for a diagonal facet and cannot be used for this.
+* **`sky_records` picks the heading** (which bridge the door faces) among the
+  ring bridges that land on the tower, best-separated first, skipping any whose
+  flights would then stand in the doorway (`_door_blocked`).
+* **Skip-one chords leave `CHORD_LIFT` (3.2 m) above the ring bridges.** A chord
+  lands a few degrees beside a ring bridge, and its steeper rib crossed that
+  door's head. Lifted a doorway's height and more, it clears. Doors face ring
+  bridges only.
+* **The watch room.** `_demote_unseated_guardrooms` removed the table and "its"
+  chairs by host index, but the hosts were stale (index 4 for a table at 0), so
+  two chairs stayed with no table. It now removes every hosted seat in the room.
+  A demoted room that cannot seat a bench (the stair takes the storey) becomes a
+  `store`, which the programme does not ask for a bench.
+
+`tools/castle_occupancy_sweep.gd -- castle sky 0` reports 0 failures.

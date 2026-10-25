@@ -129,6 +129,10 @@ static func sky_towers(spec: CastleSpec) -> Array[Dictionary]:
 	return out
 
 
+## How far above the ring bridges a skip-one chord leaves its tower (metres).
+const CHORD_LIFT := 3.2
+
+
 ## Ring links plus skip-one chords: enough arched routes that the citadel reads
 ## as a suspended network, not a wall circuit parked on a mound.
 static func sky_bridges(spec: CastleSpec) -> Array[Dictionary]:
@@ -149,11 +153,17 @@ static func sky_bridges(spec: CastleSpec) -> Array[Dictionary]:
 			var br: float = brow["radius"]
 			var from_p := Vector3(ac.x, float(arow["bottom"]) + float(arow["height"]) * 0.58, ac.z) + dir * ar
 			var to_p := Vector3(bc.x, float(brow["bottom"]) + float(brow["height"]) * 0.58, bc.z) - dir * br
+			if step == 2:
+				# A skip-one chord leaves a doorway's height and more above the ring
+				# bridges: its steeper rib would otherwise cross the
+				# doorway of the ring bridge a few degrees beside it.
+				from_p.y += CHORD_LIFT
+				to_p.y += CHORD_LIFT
 			var rise: float = from_p.distance_to(to_p) * (0.18 if step == 1 else 0.28)
 			var lo := from_p.min(to_p)
 			var hi := from_p.max(to_p)
 			hi.y += rise + 0.45
-			out.append({"from": from_p, "to": to_p, "rise": rise,
+			out.append({"from": from_p, "to": to_p, "rise": rise, "chord": step == 2,
 				"aabb": AABB(lo - Vector3(0.5, 0.45, 0.5),
 					hi - lo + Vector3(1.0, 0.9, 1.0))})
 	return out
