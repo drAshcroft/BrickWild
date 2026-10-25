@@ -1703,3 +1703,31 @@ landing (below).
 * **cost** -- the walk export bakes and builds the village (11-15 s); the
   exporter does both once per SitePlan;
 * **the castle walk export** -- unchanged (`CastleWalkSources`, above).
+
+
+## The water form (VTER-FORM-WATER)
+
+Ganvie, Kampong Ayer: a fishing village standing in its shallows on piles,
+joined by boardwalks. `VillageWaterForm` (`src/village/forms/water_form.gd`)
+plans it, `VillageBoardwalk` lays the decks, `HousePiles` (`src/house/house_piles.gd`)
+gives a house its deck, bearers and posts below the floor, and
+`VillageWaterCheck` (`qa/village_water_check.gd`) judges the result.
+
+* The spec derives `water` on a drowned lagoon and plans it (no
+  `FORM_FALLBACK` entry; the table is now empty). The site and lot planners
+  treat `water` as the shore form's relatives.
+* Piers run off the shore street into the shallows; a far walk joins them.
+  Each is a `path` carrying `"boardwalk"` and crosses the water as a crossing
+  of kind `boardwalk`. Households on the pile lots ask their request for the
+  lot's water depth and a landing to the boardwalk (`BuildingRequest` fields).
+* On the lagoon fixture (suite `vwaterform`, ~12 m on a loaded host, 32
+  checks): 3 boardwalks, 12 houses on piles and 4 on land,
+  `over_water_share` 0.750; with the decks taken away 12 doors are unreached
+  (the control). A shore whose water deepens at once takes no pier: the plan is
+  the shore form, every building dry.
+* `hpiles` (218 checks, ~55 s) covers the house emitter alone: freeboard, deck
+  depth, pile count, feet below the bed.
+
+### Not yet
+Island fill edge to edge (Isola dei Pescatori) is not done: only the stilt
+and boardwalk half of the task is.

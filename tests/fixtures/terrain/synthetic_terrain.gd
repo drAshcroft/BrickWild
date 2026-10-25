@@ -33,9 +33,17 @@ extends RefCounted
 ##   island            cone h = max(-10, 40 - 0.16 * r), r from the centre: 40 m
 ##                     peak, 16 % flanks, sea floor at -10 m beyond r = 312.5;
 ##                     water_level 0 (a sea). Relief 50 m.
+##   lagoon            a shallow lagoon south of a gentle shore (VTER-FORM-WATER):
+##                     the shore line z_s = 20 + 10 sin(x / 70); land north of
+##                     it h = 0.6 + 0.03 (z_s - z) (3 %), the lagoon south of it
+##                     h = max(-2.6, 0.6 - 0.06 (z - z_s)): wet (h <= 0, the
+##                     level) from z_s + 10, the bed 2.6 m down from z_s + 53.
+##                     water_level 0. The 400 m form window is 42 % wet and the
+##                     450 m disc 46 %: the ground derives `water` (row 2), not
+##                     `shore` (row 1). Relief 0.6 + 0.03 * 430 + 2.6 = 16.1 m.
 
 const _NAMES := ["plane_5", "plane_15", "plane_30", "plane_50", "valley", "river_valley",
-	"spur", "crest", "saddle", "cliff_band", "lake_shore", "island"]
+	"spur", "crest", "saddle", "cliff_band", "lake_shore", "island", "lagoon"]
 
 
 static func names() -> PackedStringArray:
@@ -78,6 +86,13 @@ static func make(p_name: String, rect := Rect2(-400, -400, 800, 800), cell_m := 
 		"island":
 			water = 0.0
 			f = func(x: float, z: float) -> float: return maxf(-10.0, 40.0 - 0.16 * Vector2(x, z).length())
+		"lagoon":
+			water = 0.0
+			f = func(x: float, z: float) -> float:
+				var zs := 20.0 + 10.0 * sin(x / 70.0)
+				if z < zs:
+					return 0.6 + 0.03 * (zs - z)
+				return maxf(-2.6, 0.6 - 0.06 * (z - zs))
 		_:
 			push_error("synthetic_terrain: unknown landform '%s'" % p_name)
 			return VillageTerrain.flat(rect, 0.0, cell_m)

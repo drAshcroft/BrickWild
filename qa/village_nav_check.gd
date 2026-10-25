@@ -150,6 +150,9 @@ static func _grid_for_bounds(plan: VillagePlan, bounds: Rect2, cell_size: float)
 		grid.add_floor_poly(Poly.ribbon(crossing["points"],
 			(float(crossing["width"]) + VillageBuilder.BRIDGE_MARGIN) * 0.5),
 			0.275 if crossing["kind"] == &"bridge" else 0.14)
+	# a house on piles is reached over its landing (VTER-FORM-WATER)
+	for landing in VillageWaterForm.landings(plan):
+		grid.add_floor_poly(landing)
 	# The boundary is a real obstruction. Only its authored gateways and
 	# natural shore gaps are open; a plan must not walk through masonry.
 	if plan.spec.enclosure != &"none":
@@ -206,6 +209,11 @@ static func sources(plan: VillagePlan) -> Dictionary:
 			(float(crossing["width"]) + VillageBuilder.BRIDGE_MARGIN) * 0.5)
 		crossings.append(ribbon)
 		floor.append({"kind": "crossing", "id": crossings.size() - 1, "poly": ribbon})
+	# the landings of houses on piles: floor over the water, cut out of it and
+	# out of their buildings below (VTER-FORM-WATER)
+	var landings := VillageWaterForm.landings(plan)
+	for l in landings.size():
+		floor.append({"kind": "landing", "id": l, "poly": landings[l]})
 	for i in plan.props.size():
 		if plan.props[i].has("approach"):
 			floor.append({"kind": "approach", "id": i, "poly": plan.props[i]["approach"]})
@@ -220,12 +228,15 @@ static func sources(plan: VillagePlan) -> Dictionary:
 				court.append(Vector2(p.x, p.z))
 			solid = _minus(solid, [court])
 			floor.append({"kind": "court", "id": i, "poly": court})
+		solid = _minus(solid, landings)
 		for poly in solid:
 			obstacles.append({"kind": "building", "id": i, "poly": poly})
 		for poly in VillageMeasure.yard_polys(b):
 			obstacles.append({"kind": "yard", "id": i, "poly": poly})
+	var cutters: Array[PackedVector2Array] = crossings.duplicate()
+	cutters.append_array(landings)
 	for w in plan.water.size():
-		for poly in _minus([plan.water[w]["poly"]], crossings):
+		for poly in _minus([plan.water[w]["poly"]], cutters):
 			obstacles.append({"kind": "water", "id": w, "poly": poly})
 	if plan.spec.enclosure != &"none":
 		for e in plan.enclosure.size():

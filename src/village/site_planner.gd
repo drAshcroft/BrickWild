@@ -42,7 +42,7 @@ const ROAD_CLASSES := {
 ## The forms this planner knows. Everything else is VIL-006 and later.
 const FORMS_SUPPORTED: Array[StringName] = [&"street", &"green", &"crossroads",
 	&"round", &"strand", &"planted", &"gate",
-	&"dispersed", &"shore", &"valley", &"crest", &"hillside"]
+	&"dispersed", &"shore", &"valley", &"crest", &"hillside", &"water"]
 
 const SITE_MIN_SIDE := 90.0     ## below this a 6 m road, a common and a landmark do not fit
 const SITE_MAX_SIDE := 400.0    ## §9.1 "not a city"
@@ -135,7 +135,7 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
 	var ground: VillageTerrain = null
 	if sites_on_ground(spec):
 		# a shore village is turned to face its water (VTER-FORM-SHORE)
-		ground = (VillageShoreForm.site(spec) if spec.form == &"shore" else VillageSiting.site(spec))["ground"]
+		ground = (VillageShoreForm.site(spec) if spec.form in [&"shore", &"water"] else VillageSiting.site(spec))["ground"]
 	return _plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground, site_crop)
 
 
@@ -171,9 +171,15 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 		return VillageHillsideForm.plan(spec, extra_lanes, site_scale, ground, minimum_depth, site_crop)
 	# `shore` follows the ground's own shoreline; with none to follow it is a
 	# straight strand, laid as one below
-	var form: StringName = &"strand" if spec.form == &"shore" else spec.form
+	# (`water` is the shore form with boardwalks and pile lots in the shallows,
+	# VTER-FORM-WATER)
+	var form: StringName = &"strand" if spec.form in [&"shore", &"water"] else spec.form
 	if form != spec.form and ground != null and not spec.compact_display and not is_nan(ground.water_level_m):
-		var shore_plan := VillageShoreForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
+		var shore_plan: VillagePlan
+		if spec.form == &"water":
+			shore_plan = VillageWaterForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
+		else:
+			shore_plan = VillageShoreForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
 		if not shore_plan.shoreline.is_empty():
 			return shore_plan
 	out.site = site_rect(spec)

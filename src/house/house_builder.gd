@@ -86,6 +86,10 @@ func build(p_plan: HousePlan, with_roof := true) -> ArrayMesh:
 	# Falling ground: foundation, footings and entry steps, all below the
 	# floor. Nothing at all on flat ground (VTER-HOUSE-SLOPE).
 	HouseSlope.emit(self)
+	# Piles over water: the deck, bearers and posts below the floor. Nothing
+	# at all on the ground (VTER-FORM-WATER).
+	if HousePiles.on_piles(spec):
+		HousePiles.emit(self)
 	return commit()
 
 

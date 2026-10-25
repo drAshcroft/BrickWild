@@ -412,6 +412,11 @@ const CHURCH_MAX_FALL := 6.0
 
 
 static func _validate_ground(request: BuildingRequest, out: Array[Dictionary]) -> void:
+	# a house or shop on piles over water (VTER-FORM-WATER, HousePiles)
+	var piles: Array = HousePiles.refusal(request)
+	if not piles.is_empty():
+		out.append(_error(piles[0], piles[1], piles[2]))
+		return
 	var f: float = request.ground_fall_m
 	var deg: float = request.ground_downhill_deg
 	if not is_finite(f) or f < 0.0:

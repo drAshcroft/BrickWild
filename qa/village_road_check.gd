@@ -303,7 +303,7 @@ func _check_crossings(plan: VillagePlan) -> void:
 		if r < 0 or r >= plan.roads.size() or w < 0 or w >= plan.water.size():
 			failures.append("crossings: crossing %d has stale road/water indices" % index)
 			continue
-		var expected := &"ford" if plan.water[w]["kind"] == &"stream" else &"bridge"
+		var expected := VillageWaterPlan.crossing_kind(plan.roads[r], plan.water[w])
 		var points: PackedVector2Array = crossing.get("points", PackedVector2Array())
 		var width := float(crossing.get("width", 0.0))
 		if crossing.get("kind") != expected or points.size() < 2 or width + 0.01 < float(plan.roads[r]["width"]):

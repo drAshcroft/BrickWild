@@ -1567,6 +1567,12 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 	if spec.has_method("landmark_footprint"):
 		r = r.merge(spec.landmark_footprint())
 		top = maxf(top, spec.landmark_height())
+	if HousePiles.on_piles(spec):
+		# the deck and its piles are shell, down to the piles' feet
+		r = r.merge(HousePiles.platform_rect(plan))
+		var foot: float = HousePiles.foot_y(spec)
+		return AABB(Vector3(r.position.x, foot, r.position.y),
+			Vector3(r.size.x, top - foot, r.size.y))
 	return AABB(Vector3(r.position.x, 0.0, r.position.y),
 		Vector3(r.size.x, top, r.size.y))
 

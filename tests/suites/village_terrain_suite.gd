@@ -37,6 +37,8 @@ const SYNTH_EXPECT := {
 	"cliff_band": [0.0, 47.5, 0.0, 3.0, 15.0],
 	"lake_shore": [0.0, 0.0, 0.0, -0.08, 64.0],
 	"island": [100.0, 0.0, -0.16, 0.0, 50.0],
+	# on the land where the shore line's own slope is nil (x = 35 pi)
+	"lagoon": [109.956, -100.0, 0.0, -0.03, 16.1],
 }
 ## Relief (m) over the inner +-430 m, measured from the 90 m Mapzen DEM that
 ## `survey.py terrain` caches (OpenTopoData mapzen, nodes with |x|,|y| <= 430

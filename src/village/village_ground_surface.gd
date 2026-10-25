@@ -494,6 +494,9 @@ func pad_at(li: int, p: Vector2) -> float:
 func platform_of(bi: int) -> float:
 	var li: int = int(plan.buildings[bi].get("lot", -1))
 	if not _lots.has(li):
+		# a house on piles stands on its deck (VTER-FORM-WATER)
+		if li >= 0 and li < plan.lots.size() and plan.lots[li].has("piles"):
+			return float(plan.lots[li]["piles"]["deck_m"])
 		return NAN
 	return float(_lots[li]["r"]["platform_m"])
 

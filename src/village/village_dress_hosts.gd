@@ -28,6 +28,11 @@ static func dress_building(plan: VillagePlan, ctx: Dictionary, i: int) -> void:
 static func host_of(plan: VillagePlan, i: int) -> StringName:
 	var b: Dictionary = plan.buildings[i]
 	var request: BuildingRequest = b["request"]
+	# a house on piles stands in the water: its own facade pieces stand on its
+	# gallery, and there is no ground round it to dress (VTER-FORM-WATER)
+	var li: int = int(b.get("lot", -1))
+	if li >= 0 and li < plan.lots.size() and plan.lots[li].has("piles"):
+		return &""
 	match request.kind:
 		&"church", &"temple":
 			return &"church"

@@ -104,6 +104,9 @@ static func applies(plan: HousePlan) -> bool:
 		return false
 	if HouseGeometry.is_shaped(plan) or plan.has_court():
 		return false
+	# a house on piles stands over water: no ground round it for a yard
+	if HousePiles.on_piles(spec):
+		return false
 	return plan.entrance() >= 0
 
 

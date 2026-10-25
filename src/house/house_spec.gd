@@ -102,6 +102,14 @@ var period: int = 1200
 ## drawn from `rng`. See GroundFall and HouseSlope.
 var ground_fall: float = 0.0
 var ground_downhill_deg: float = 0.0
+## Standing on piles over water (VTER-FORM-WATER): `&""` the ground, or
+## `&"piles"`; the water's depth, the floor's height over the water (0: the
+## default) and the landing's reach from the entrance wall (0: the default).
+## Never drawn from `rng`. See HousePiles.
+var foundation: StringName = &""
+var pile_water: float = 0.0
+var pile_freeboard: float = 0.0
+var pile_deck: float = 0.0
 ## Optional explicit masonry thickness for non-house shells.  Castle plans
 ## carry their measured shell thickness here; the negative value preserves the
 ## historical material-derived default for ordinary houses.

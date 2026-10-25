@@ -833,6 +833,8 @@ func _check_edge_ground(plan: VillagePlan) -> void:
 	if g == null:
 		return
 	for i in range(plan.lots.size()):
+		if plan.lots[i].has("piles"):
+			continue # on piles, in the water by design (VTER-FORM-WATER)
 		var u: Dictionary = g.under(plan.lots[i]["poly"])
 		if float(u["dry_share"]) < 1.0:
 			failures.append("edge_ground: lot %d reaches onto standing water" % i)
@@ -866,6 +868,11 @@ static func building_heights(plan: VillagePlan, which: Array = []) -> PackedFloa
 ## hamlet stands forty metres further up the mountain.
 static func neighbours(plan: VillagePlan, i: int) -> Array:
 	var all: Array = range(plan.buildings.size())
+	# a building on the bank is ranked among the buildings on the bank: a house
+	# on piles stands over the water, not on the ground it would be read on
+	# (VTER-FORM-WATER)
+	if not _on_piles(plan, i):
+		all = all.filter(func(j: int) -> bool: return not _on_piles(plan, j))
 	if plan.hamlets.is_empty():
 		return all
 	var at: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[i]))
@@ -876,6 +883,11 @@ static func neighbours(plan: VillagePlan, i: int) -> Array:
 		if _hamlet_seat(plan, c, c) == seat:
 			out.append(j)
 	return out
+
+
+static func _on_piles(plan: VillagePlan, i: int) -> bool:
+	var li: int = int(plan.buildings[i].get("lot", -1))
+	return li >= 0 and li < plan.lots.size() and plan.lots[li].has("piles")
 
 
 ## The share of `hs` strictly below `h`: the survey's searchsorted rank.

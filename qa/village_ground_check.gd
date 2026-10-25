@@ -95,6 +95,8 @@ func check(plan: VillagePlan, scene: Node3D) -> Dictionary:
 		_terraces(plan, scene)
 		_water(plan)
 		_stairs(plan, scene)
+		# houses and boardwalks on piles (VTER-FORM-WATER)
+		VillageWaterCheck.ground(plan, scene, _probe, failures, stats)
 	return {"ok": failures.is_empty(), "failures": failures, "warnings": warnings,
 		"stats": stats}
 
@@ -158,7 +160,7 @@ func _yards(scene: Node3D) -> void:
 			local.y = float(row["y"])
 			var at: Vector3 = _to_scene(exterior as Node3D, scene) * local
 			var stand: float = at.y
-			if _probe != null and float(row["y"]) <= VillageAssembler.YARD_ON_DECK:
+			if _probe != null and float(row["y"]) <= VillageAssembler.YARD_ON_DECK 					and not b.get_meta(&"piles", false):
 				# on the yard, not a deck: the ground under it, measured
 				var radius := 0.0
 				if PropCatalog.known(key):
