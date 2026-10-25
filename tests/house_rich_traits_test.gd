@@ -55,9 +55,9 @@ func _check_case(c: Dictionary) -> void:
 	# (2) parlour and dining room of their own
 	_expect(m["parlour_rooms"] >= 1 and m["dining_rooms"] >= 1 and m["rooms_distinct"],
 		"%s hall, parlour and dining room are three rooms (parlours %d, dining %d)" % [id, m["parlour_rooms"], m["dining_rooms"]])
-	_expect(m["parlour_seating"] >= 2, "%s the parlour has a seating group (got %d pieces)" % [id, m["parlour_seating"]])
+	_expect(m["parlour_settles"] >= 1 and m["parlour_chairs"] >= 2, "%s the parlour has a seating group, a settle and 2 chairs (got %d, %d)" % [id, m["parlour_settles"], m["parlour_chairs"]])
 	_expect(m["dining_tables"] >= 1, "%s the dining room has a table (got %d)" % [id, m["dining_tables"]])
-	_expect(m["dining_chairs"] >= 4, "%s the dining room seats at least 4 (got %d)" % [id, m["dining_chairs"]])
+	_expect(m["dining_chairs"] >= 4, "%s the dining room has at least 4 chairs (Chair keys, got %d; stools %d)" % [id, m["dining_chairs"], m["dining_stools"]])
 	_expect(not m["dining_table_elsewhere"], "%s no second dining table in the hall or parlour" % id)
 	# (3) ornament on the floor lines
 	_expect(m["trim_count"] > 0, "%s emits cornice and string-course parts (got %d)" % [id, m["trim_count"]])
@@ -90,7 +90,18 @@ func _check_case(c: Dictionary) -> void:
 			if not (in_parlour and str(f.get("cat", "")) in ["seat", "bench"]):
 				keep.append(f)
 		plan.furniture = keep
-	_expect(_measure(req, no_sofa)["parlour_seating"] < 2, "%s control: a parlour without seating is noticed" % id)
+	var mn := _measure(req, no_sofa)
+	_expect(mn["parlour_settles"] < 1 and mn["parlour_chairs"] < 2, "%s control: a parlour without seating is noticed" % id)
+	var stools := func(plan: HousePlan) -> void:
+		for f in plan.furniture:
+			if plan.kind_of(int(f["room"])) == &"dining_room" and str(f.get("key", "")) == "Chair_1":
+				f["key"] = "Stool"
+	_expect(_measure(req, stools)["dining_chairs"] < 4, "%s control: stools in place of chairs are noticed" % id)
+	var no_chairs_in_group := func(plan: HousePlan) -> void:
+		for f in plan.furniture:
+			if plan.kind_of(int(f["room"])) == &"parlour" and str(f.get("key", "")) == "Chair_1":
+				f["key"] = "Stool"
+	_expect(_measure(req, no_chairs_in_group)["parlour_chairs"] < 2, "%s control: a parlour of settle and stools is noticed" % id)
 	var two_chairs := func(plan: HousePlan) -> void:
 		var keep: Array[Dictionary] = []
 		var seen := 0

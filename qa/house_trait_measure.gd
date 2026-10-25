@@ -135,7 +135,9 @@ static func _town_keys(plan: HousePlan, out: Dictionary) -> void:
 ##   hall_holds_stair    that room is a hall AND the ground-to-first stair starts in it
 ##                       (satisfied, foot landing and well inside the hall's floor)
 ##   parlour_rooms / dining_rooms   ground rooms of kind parlour / dining_room
-##   parlour_seating     seat + bench pieces in the first ground parlour
+##   parlour_seating     seat + bench pieces in the first ground parlour ; parlour_settles
+##                       (Bench) and parlour_chairs (Chair_1): a group is a settle with 2 chairs
+##   dining_stools       Stool pieces at the table (chairs are counted by key, not category)
 ##   dining_tables / dining_chairs  table and seat pieces in the first ground dining room
 ##   rooms_distinct      hall, parlour and dining room are three different rooms
 ##   dining_table_elsewhere   a table stands in the hall or parlour as well
@@ -166,8 +168,11 @@ static func _rich_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) 
 	out["parlour_rooms"] = parlours.size()
 	out["dining_rooms"] = dinings.size()
 	out["parlour_seating"] = _count_cats(plan, parlours[0], ["seat", "bench"]) if not parlours.is_empty() else 0
+	out["parlour_settles"] = _count_keys(plan, parlours[0], ["Bench"]) if not parlours.is_empty() else 0
+	out["parlour_chairs"] = _count_keys(plan, parlours[0], ["Chair_1"]) if not parlours.is_empty() else 0
 	out["dining_tables"] = _count_cats(plan, dinings[0], ["table"]) if not dinings.is_empty() else 0
-	out["dining_chairs"] = _count_cats(plan, dinings[0], ["seat"]) if not dinings.is_empty() else 0
+	out["dining_chairs"] = _count_keys(plan, dinings[0], ["Chair_1"]) if not dinings.is_empty() else 0
+	out["dining_stools"] = _count_keys(plan, dinings[0], ["Stool"]) if not dinings.is_empty() else 0
 	out["rooms_distinct"] = door_room >= 0 and not parlours.is_empty() and not dinings.is_empty() 		and door_room != parlours[0] and door_room != dinings[0] and parlours[0] != dinings[0]
 	var elsewhere := 0
 	if door_room >= 0:
@@ -181,6 +186,14 @@ static func _rich_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) 
 	out["trim_count"] = trim["count"]
 	out["trim_worst"] = trim["worst"]
 	out["cornice_top_gap"] = trim["cornice_top_gap"]
+
+
+static func _count_keys(plan: HousePlan, room: int, keys: Array) -> int:
+	var n := 0
+	for f in plan.furniture_of(room):
+		if str(plan.furniture[f].get("key", "")) in keys:
+			n += 1
+	return n
 
 
 static func _count_cats(plan: HousePlan, room: int, cats: Array) -> int:

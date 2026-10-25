@@ -57,7 +57,12 @@ static func _seating_probe(plan: HousePlan, room: int, table: Dictionary,
 		# leave the table with fewer seats than the contract requires.
 		# Choose the model for the whole set. A failed last chair must not silently
 		# turn one place into a stool while the other places remain tall chairs.
+		# HS-RICH: a style that lays a table for `dining_seats` has chairs at it,
+		# never stools; a table pose that cannot seat them is not chosen.
+		var chairs_only: bool = HouseSpec.STYLES.get(plan.spec.style, {}).has("dining_seats")
 		for seat_key in PropCatalog.of_category(seat_cat):
+			if chairs_only and String(seat_key) == "Stool":
+				continue
 			var occupied2: Array[Rect2] = blocked.duplicate()
 			var used2: Array[Rect2] = zones.duplicate()
 			var probe2 := HousePlan.new()

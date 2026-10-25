@@ -298,3 +298,7 @@ Observed (not traits):
 * Seed 1 front: no chimney visible, only two thin poles on the ridge and gable; 8102 has a very tall detached-looking stone stack; 21325 has a blank stone ground floor.
 * 21325 hall: a chandelier hangs low against the stair wall, and the stone-faced hall wall differs from the plaster of the other seeds.
 * No z-fighting or floating furniture otherwise seen.
+
+Round 2 (fixes after the 41e0ad3 review): seed 8102's dining table was laid with 4 STOOLS (the seat-set probe fell back to `Stool` when `Chair_1` did not fit that table pose; the earlier test counted any `seat`). A style with `dining_seats` now skips `Stool` in `_seating_probe`, and the test counts `Chair_1` keys (`dining_chairs`, with `dining_stools` reported). Plan chair counts, before: seed 1 4 chairs, 8102 4 stools / 0 chairs, 21325 4 chairs; after: 4 / 4 / 4 `Chair_1`. The parlour's two facing benches are replaced by a conversation group: one settle on the wall, a chair beside it and a chair on the end wall (`sitting_group` recipe; the test asks for 1 settle + 2 `Chair_1`, controls: seating removed, chairs turned to stools, dining stools). The review camera now stands in the room corner furthest from any piece (`_look_room`). Left alone: the grey runner on the tabletop is the measured `tableware` model, not a mis-scaled prop (not trivial). Parlour group remains modest: chair, settle, chair spread over a 5 x 3 m room.
+
+Reviewer: pending (re-review after the commit that carries this line)

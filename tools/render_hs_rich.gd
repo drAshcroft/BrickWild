@@ -46,13 +46,36 @@ func _init() -> void:
 			for i in plan.rooms_on_storey(0):
 				if plan.kind_of(i) != kind:
 					continue
-				_look_across(plan, HouseGeometry.room_floor_rect(plan, i), 0.0, "")
-				_cam.fov = 100.0
+				_look_room(plan, i)
 				await _save_review_image(out.path_join("rich_%d_%s.jpg" % [seed_value, kind]))
 				break
 		building.queue_free()
 		await process_frame
 	quit(0)
+
+
+## Eye height from the room corner that no piece of furniture stands within
+## 0.45 m of, looking at the middle of the room.
+func _look_room(plan: HousePlan, room: int) -> void:
+	var rr := HouseGeometry.room_floor_rect(plan, room)
+	var c := rr.get_center()
+	var best := rr.position + Vector2(0.4, 0.4)
+	var best_gap := -1.0
+	for corner in [rr.position + Vector2(0.4, 0.4), Vector2(rr.end.x - 0.4, rr.position.y + 0.4),
+			Vector2(rr.position.x + 0.4, rr.end.y - 0.4), rr.end - Vector2(0.4, 0.4)]:
+		var gap := 9.0
+		for f in plan.furniture_of(room):
+			var fr := Rect2(plan.furniture[f]["rect"])
+			if str(plan.furniture[f].get("cat", "")) in ["sconce", "candle", "tableware", "chandelier"]:
+				continue
+			gap = minf(gap, fr.grow(0.0).get_center().distance_to(corner) - maxf(fr.size.x, fr.size.y) * 0.5)
+		if gap > best_gap:
+			best_gap = gap
+			best = corner
+	_cam.fov = 85.0
+	_cam.position = Vector3(best.x, 1.58, best.y)
+	_cam.look_at(Vector3(c.x, 0.9, c.y), Vector3.UP)
+	_set_shot_lighting(atan2(c.x - best.x, c.y - best.y), 8.0)
 
 
 func _room_reach(r: Rect2, p: Vector2, dir: Vector2) -> float:

@@ -715,7 +715,18 @@ static func _sitting_parlour_recipe(plan: HousePlan = null) -> Array:
 		# HS-RICH: a style row with `sitting_group` seats its parlour as a group,
 		# two settles, not the single bench of a cottage's best room.
 		if category == "bench" and plan != null 				and bool(HouseSpec.STYLES.get(plan.spec.style, {}).get("sitting_group", false)):
-			step["n"] = [2, 2]
+			step["n"] = [1, 1]
+	# A conversation group: a settle on one wall and two chairs facing it.
+	if plan != null and bool(HouseSpec.STYLES.get(plan.spec.style, {}).get("sitting_group", false)):
+		var group: Array = [
+			{"cat": "bench", "rule": &"wall", "n": [1, 1], "opt": 1.0, "settle": true, "group": "sitting"},
+			{"cat": "seat", "rule": &"beside", "near_cat": "bench", "key": "Chair_1", "n": [1, 1], "opt": 1.0, "group": "sitting"},
+			{"cat": "seat", "rule": &"wall", "key": "Chair_1", "n": [1, 1], "opt": 1.0, "group": "sitting"}]
+		var rest: Array = []
+		for step in out:
+			if String(step.get("cat", "")) != "bench":
+				rest.append(step)
+		return group + rest
 	return out
 
 
