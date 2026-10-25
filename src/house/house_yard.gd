@@ -36,7 +36,7 @@ const APRON := {&"cottage": 2.6, &"farmhouse": 3.0, &"townhouse": 2.0,
 	# and an Asian house gives a slice of its own to the veranda. All three stay
 	# inside the 2 to 3 m the apron contract promises: a compound wants more
 	# ground, and a compound is what a walled village around it provides.
-	&"mediterranean": 2.4, &"asian": 2.9, &"african": 3.0,
+	&"mediterranean": 3.0, &"asian": 2.9, &"african": 3.0,
 	&"thatch_cottage": 2.6, &"mud_hut": 3.0}
 const DEFAULT_APRON := 2.5
 
@@ -63,7 +63,7 @@ const STYLE_GROUPS := {
 	# HOUSE-CULTURE. A yard says who lives here, and a household with no trade
 	# is judged on its kind of house instead -- water jars and a drying line in
 	# the sun, a dung midden and a cart in a compound, pots under the shade.
-	&"mediterranean": [&"garden", &"flowers", &"crates"],
+	&"mediterranean": [&"court", &"garden", &"flowers", &"crates"],
 	&"asian": [&"garden", &"crates", &"rain_barrel"],
 	&"african": [&"midden", &"crates", &"cart"],
 	&"thatch_cottage": [&"garden", &"washing_line", &"woodpile"],
@@ -81,7 +81,7 @@ const TRADE_GROUPS := {
 const MAX_GROUPS := 3
 
 ## Built-piece kinds, for the check.
-const KINDS := ["fence", "woodpile", "washing_line", "midden", "leanto", "byre", "cart", "witch_work_lean_to", "trough",
+const KINDS := ["court", "fence", "woodpile", "washing_line", "midden", "leanto", "byre", "cart", "witch_work_lean_to", "trough",
 	"signpost", "bed", "path"]
 
 const HERBS := ["Wild_Plant_7", "Wild_Fern_1", "Wild_Plant_1", "Nature_Flower_3_Clump", "Wild_Fern_1", "Wild_Plant_7"]
@@ -315,6 +315,8 @@ static func _group(ctx: Dictionary, name: StringName) -> Dictionary:
 	match name:
 		&"path":
 			return _path(ctx)
+		&"court":
+			return _court(ctx)
 		&"porch_pail":
 			return _porch_pail(ctx)
 		&"garden":
@@ -924,6 +926,80 @@ static func _fence_run(cell: Dictionary, t0: float, d0: float, t1: float, d1: fl
 			var st: float = run if along_t else 0.05
 			var sd: float = 0.05 if along_t else run
 			parts.append(_part(cell, "fence_rail", tc, dc, st, sd, y, 0.07, "trim"))
+
+
+## HS-MEDITERRANEAN: the walled court behind the house. Open to the sky, three
+## rendered walls (a rear wall and two returns continuing the house's side
+## walls outward, one return with a gateway), paved, entered by the house's
+## rear door. It is only built where the footprint allows: the shorter side of the house at least
+## COURT_MIN_SIDE and ground behind the rear wall for COURT_MIN_DEPTH clear.
+const COURT_MIN_SIDE := 7.0
+const COURT_MIN_DEPTH := 2.4
+const COURT_WALL_T := 0.3
+const COURT_WALL_H := 1.7
+const COURT_GATE := 1.2
+const COURT_PAVE_H := 0.04
+
+
+## How far a door that opens onto the court keeps clear (instead of the usual
+## 3.2 m): the court's rear wall stands about 2.7 m from the house.
+const COURT_DOOR_APPROACH := 2.0
+
+
+## Does the footprint allow a court, and is this a style that builds one?
+static func court_applies(plan: HousePlan) -> bool:
+	if not (&"court" in STYLE_GROUPS.get(plan.spec.style, [])):
+		return false
+	var site := HouseGeometry.site_rect(plan.spec)
+	return minf(site.size.x, site.size.y) >= COURT_MIN_SIDE and plan.entrance() >= 0
+
+
+## A door that is not the entrance and faces away from it, in a house that has
+## a court: it opens onto the court.
+static func opens_on_court(plan: HousePlan, door: Dictionary) -> bool:
+	var e := plan.entrance()
+	if e < 0 or not court_applies(plan) or door.get("front", false) or not door.get("exterior", false):
+		return false
+	return Vector2(door["normal"]).normalized().dot(Vector2(plan.doors[e]["normal"]).normalized()) < -0.5
+
+
+static func _court(ctx: Dictionary) -> Dictionary:
+	var p: HousePlan = ctx["plan"]
+	if not court_applies(p):
+		return {}
+	var made := _court_parts(ctx)
+	if made.is_empty() or not _group_reason(ctx, made).is_empty():
+		return {}
+	return made
+
+
+static func _court_parts(ctx: Dictionary) -> Dictionary:
+	var cell := _cell(ctx, "rear", 0.0)
+	var depth: float = float(cell["room"]) - 0.05
+	if depth < COURT_MIN_DEPTH + COURT_WALL_T:
+		return {}
+	var w: float = float(ctx["ext_l"])
+	var parts: Array = []
+	var wt := COURT_WALL_T
+	# The rear wall runs the full width and stands on the envelope's edge, so
+	# there is no way round it: the gateway is in one RETURN, on the side the
+	# yard's own rng chose, where the walk along the house's flank reaches it.
+	parts.append(_part(cell, "court_wall", 0.0, depth - wt * 0.5, 2.0 * w + 2.0 * wt, wt,
+		0.0, COURT_WALL_H, "wall"))
+	var run := depth - wt
+	var gate_side: float = ctx["side_pref"]
+	for sgn in [-1.0, 1.0]:
+		var t: float = float(sgn) * (w + wt * 0.5)
+		if float(sgn) != gate_side:
+			parts.append(_part(cell, "court_wall", t, run * 0.5, wt, run, 0.0, COURT_WALL_H, "wall"))
+			continue
+		# the gateway sits in the outer half, clear of the house's rear corner
+		var g0: float = run - COURT_GATE - 0.3
+		parts.append(_part(cell, "court_wall", t, g0 * 0.5, wt, g0, 0.0, COURT_WALL_H, "wall"))
+		parts.append(_part(cell, "court_wall", t, run - 0.15, wt, 0.3, 0.0, COURT_WALL_H, "wall"))
+	parts.append(_part(cell, "court_paving", 0.0, (depth - wt) * 0.5,
+		2.0 * w, depth - wt, 0.0, COURT_PAVE_H, "floor"))
+	return {"pieces": [_piece("court", "court", parts, "rear")], "props": []}
 
 
 ## A fenced kitchen garden: three sides of rails and the wall's side left open

@@ -251,7 +251,12 @@ const STYLES := {
 		# elevation is read from its shutters, its deep eave and its terrace
 		# wall, not from studs.
 		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
-		"roof_pitch": [0.5, 0.75], "porch": 0.35, "chimney": 0.45, "shutters": 0.9,
+		# HS-MEDITERRANEAN: the roof is LOW (0.32..0.44 is 18 to 24 degrees on
+		# the roof face, under the 25 the trait asks; the old 0.5..0.75 was 27
+		# to 36), the shade at the door is a loggia (the veranda, always) and
+		# not a porch pail's worth of porch, and the rear door opens on a walled
+		# court (HouseYard `court`). Same draws as before: only the numbers moved.
+		"roof_pitch": [0.32, 0.44], "porch": 0.0, "chimney": 0.45, "shutters": 0.9,
 		"wall": ["f2e8d4", "e0cfae"], "trim": ["2f6b63", "1d4a43"],
 		"roof": ["b4622f", "8d4722"], "floor": ["bcab89", "9c8a6b"],
 		"clutter": [0.35, 0.7],
@@ -261,7 +266,7 @@ const STYLES := {
 		"chimney_style": &"straight", "pots": [1, 2],
 		"roof_material": &"tile", "pitch_reference": 9.0,
 		"wall_t": 0.45, "culture": 1.0,
-		"parapet": 0.7, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"parapet": 0.7, "veranda": 1.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
 		"corner_piers": 0.0, "span_out": 0.55, "along_out": 0.45,
 	},
 	&"asian": {

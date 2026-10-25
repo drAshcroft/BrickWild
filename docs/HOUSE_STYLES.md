@@ -302,3 +302,74 @@ Observed (not traits):
 
 Round 2 (fixes after the 41e0ad3 review): seed 8102's dining table was laid with 4 STOOLS (the seat-set probe fell back to `Stool` when `Chair_1` did not fit that table pose; the earlier test counted any `seat`). A style with `dining_seats` now skips `Stool` in `_seating_probe`, and the test counts `Chair_1` keys (`dining_chairs`, with `dining_stools` reported). Plan chair counts, before: seed 1 4 chairs, 8102 4 stools / 0 chairs, 21325 4 chairs; after: 4 / 4 / 4 `Chair_1`. The parlour's two facing benches are replaced by a conversation group: one settle on the wall, a chair beside it and a chair on the end wall (`sitting_group` recipe; the test asks for 1 settle + 2 `Chair_1`, controls: seating removed, chairs turned to stools, dining stools). The review camera now stands in the room corner furthest from any piece (`_look_room`). Left alone: the grey runner on the tabletop is the measured `tableware` model, not a mis-scaled prop (not trivial). Parlour group remains modest: chair, settle, chair spread over a 5 x 3 m room.
 
+
+## mediterranean (HS-MEDITERRANEAN)
+
+Traits: (1) lime-rendered masonry (white or ochre) with wall reveals at least
+0.30 m deep; (2) a terracotta tile roof at 25 degrees or less, or a flat terrace
+with a parapet; (3) a loggia, pergola or covered terrace at the entry or garden
+side; (4) an open courtyard or roof terrace when the footprint allows (the
+threshold is recorded below).
+
+Measured first (8 x 10 m, one storey, seeds 1, 8102, 21325): (1) HELD. Cream to
+ochre `e8dabf` / `eee3cc` / `e6d8bb`, no timber, no stone ground floor, wall 0.45 m
+(`wall_t`), every window and exterior door jamb 0.49 m deep. (2) MISSING. The
+roof faces fell 27.1, 27.3 and 32.4 degrees (the row drew pitch 0.5 to 0.75); the
+terrace alternative held on one seed in three (`parapet` 0.7: seed 1 only). (3)
+MISSING. `veranda` was 0.0 and the porch 0.35: no seed had a covered entry
+except a small porch on seed 1. (4) MISSING. No court, no roof terrace, no walled
+ground at all; only the two-group yard (fenced kitchen bed, a few crates).
+
+Built (style constants, no random draw is added or moved; the row's draws are
+still taken):
+* Roof: `roof_pitch` [0.32, 0.44] (was [0.5, 0.75]). On the faces that is 17.5,
+  17.7 and 20.6 degrees on the three seeds; any seed stays under 25 because the
+  rise is measured over the run to the eave and the pitch cap is tan 25 = 0.466.
+  The `parapet` chance (0.7) is untouched; the test accepts either alternative.
+* Loggia: `veranda` 1.0 and `porch` 0.0 in the `mediterranean` row. The existing
+  veranda (deck, four posts, head beam, falling rooflet, `veranda_rect` already in
+  the bound) is the covered entry: 1.4 to 1.7 m deep over the entrance door.
+* Court: `HouseYard` group `court` (`_court`, a built piece of kind `court`), first
+  in the style's yard groups: a rendered rear wall and two returns that continue
+  the house's side walls outward (0.3 m thick, 1.7 m high), a gateway 1.2 m wide in
+  one return (on the side the yard's own rng prefers, because the rear wall stands
+  at the envelope's edge and nothing can walk round it), paving, open to the
+  sky, about 8 x 2.65 m (21 m2) on an 8 x 10 house. The mediterranean yard apron
+  is 3.0 m (was 2.4, still inside the 2 to 3 m contract) to hold it.
+* The rear door: `back_door` is `room_count >= 3` for mediterranean as it is for
+  the farmhouse (the draw is still taken), so the court is entered from the house.
+* Door approach: a door that opens onto the court (`HouseYard.opens_on_court`)
+  reserves 2.0 m (`COURT_DOOR_APPROACH`) in `HouseExterior.facade_clear`, not the
+  usual 3.2 m, because the court's own rear wall stands about 2.7 m out. Every
+  other door in every other house is unchanged.
+
+Threshold recorded: a court is built only when the house's shorter side is at
+least `HouseYard.COURT_MIN_SIDE` = 7.0 m, there is `COURT_MIN_DEPTH` = 2.4 m clear
+behind the rear wall, and the yard check finds the ground clear (so an 8 x 10 m
+house has one, a 6 x 8 m house has none and keeps the render, the low roof and the
+loggia). No roof terrace is built: the court is the open outdoor room.
+
+Test: `tests/house_mediterranean_traits_test.gd` (94 checks) over the frozen
+requests `house/mediterranean/{1,8102,21325}` (8102 existed; 1 and 21325 added, all
+8 x 10 m). Keys `HouseTraitMeasure` `wall_kind wall_rendered wall_thick reveal_min
+roof_angle_deg roof_tile roof_terracotta parapet_count terrace_roof low_tile_roof
+loggia_posts loggia_roofs loggia_beams loggia_covers_door loggia_depth
+court_expected court_min_side court_present court_inner_area court_wall_parts
+court_open court_gate court_rear_wall court_door` (the roof angle is the angle of each
+roof face's own plane, not of an edge: a hip face's edges are shallower than the face).
+Controls: timber frame, green wall, a 0.12 m wall (reveals), a steep roof, a slate
+roof, no veranda, the court removed, a roofed court, a court with no rear wall, no
+rear door; and the 6 x 8 m footprint with no court.
+
+Known sides: the loggia is the shared veranda emitter, so it reads as a timber
+verandah with a shed rooflet (teal posts and beam) more than a masonry arcade;
+the court is a plain paved room with no planting of its own (the garden group
+now stands beside the house); `lane:village-fast` was not run for the apron change
+(3.0 m for mediterranean lots).
+
+Renders for review: `artifacts/hs_mediterranean/renders/` (`tools/render_hs_mediterranean.gd`,
+not headless), per seed: `_front` roof-on three-quarter of the entrance side, `_rear`
+roof-on three-quarter of the court, `_loggia` eye level three metres out, `_court`
+eye level inside the court, `_interior` eye level through the rear door.
+
+Reviewer: pending

@@ -150,8 +150,11 @@ static func facade_clear(plan: HousePlan, bounds: AABB) -> String:
 	for door in plan.doors:
 		if not door["exterior"] or HousePlan.record_storey(door) != 0:
 			continue
+		# A door that opens onto a walled court has the court for its approach:
+		# its own walls stand beyond a shorter reach (HS-MEDITERRANEAN).
+		var reach := HouseYard.COURT_DOOR_APPROACH if HouseYard.opens_on_court(plan, door) else 3.2
 		var reserved := _opening_box(door["pos"], door["normal"], float(door["width"]) + 1.1,
-			-0.1, minf(HouseGeometry.DOOR_H + 0.25, plan.spec.height - 0.1), 3.2,
+			-0.1, minf(HouseGeometry.DOOR_H + 0.25, plan.spec.height - 0.1), reach,
 			HouseGeometry.wall_thickness(plan.spec))
 		if bounds.intersects(reserved):
 			return "blocks a door approach or porch"

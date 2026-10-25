@@ -10,7 +10,7 @@ extends RefCounted
 ## main-roof vertex), chimney_count, chimney_top, chimney_on_hearth_wall,
 ## chimney_clearance (m over the ridge), chimney_above_ridge, door_sheltered (a porch roof, posts and step all stand
 ## over the entrance door), porch_roof_count.
-## HS-LONGHALL keys are listed on `_longhall_keys`.
+## HS-LONGHALL keys are listed on `_longhall_keys`, HS-MEDITERRANEAN on `_med_keys`.
 
 
 static func make_spec(style: StringName, width: float, length: float, height: float,
@@ -59,6 +59,7 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable(),
 	_town_keys(plan, out)
 	_longhall_keys(plan, builder, out)
 	_rich_keys(plan, builder, out)
+	_med_keys(plan, builder, out)
 	return out
 
 
@@ -414,6 +415,150 @@ static func _farm_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) 
 	var list: Array = kinds.keys()
 	list.sort()
 	out["yard_kinds"] = list
+
+
+## HS-MEDITERRANEAN keys:
+##   wall_kind          "white" | "ochre" | "other" (the lime wash, from the wall colour)
+##   wall_rendered      masonry under render: no timber frame, no stone ground floor, white or ochre
+##   wall_thick         the wall (m); reveal_min the shallowest jamb (window and door) cut through it
+##   roof_angle_deg     steepest roof-face edge (from the roof_face_* slabs); roof_tile, roof_terracotta
+##   parapet_count      parapet components on the eave; terrace_roof: nearly flat and parapeted
+##   low_tile_roof      tile, terracotta, 25 degrees or less
+##   loggia_posts / loggia_roofs / loggia_beams   veranda_post / veranda_roof_* / veranda_beam
+##   loggia_covers_door the entrance door stands inside the veranda's footprint
+##   loggia_depth       how far it reaches out of the wall (m)
+##   court_present      a yard piece of kind "court"; court_expected (the footprint allows one)
+##   court_inner_area   the paved ground inside the walls (m2); court_wall_parts
+##   court_open         no roof, ceiling or part above COURT_WALL_H: open to the sky
+##   court_gate         the widest gap in a side return (m); court_rear_wall: a rear wall exists
+##   court_door         an exterior door that is not the entrance opens onto the court
+##   court_min_side     the footprint threshold (HouseYard.COURT_MIN_SIDE), recorded here
+static func _med_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -> void:
+	var spec := plan.spec
+	var c := spec.wall_color
+	var kind := "other"
+	if c.v >= 0.85 and c.s <= 0.12:
+		kind = "white"
+	elif c.v >= 0.75 and c.s >= 0.12 and c.s <= 0.5 and c.h >= 0.07 and c.h <= 0.14:
+		kind = "ochre"
+	out["wall_kind"] = kind
+	out["wall_rendered"] = not spec.timber_frame and not spec.stone_ground_floor and kind != "other"
+	out["wall_thick"] = HouseGeometry.wall_thickness(spec)
+	# the openings in the OUTER wall: every window, and the exterior doors (an
+	# interior door is cut through a 0.2 m partition and is not a reveal)
+	var reveal := INF
+	for part in builder.component_log:
+		if str(part.get("role", "")) != "opening_jamb":
+			continue
+		var host := str(part.get("host", ""))
+		if host.begins_with("door_"):
+			var di := int(host.substr(5))
+			if di < 0 or di >= plan.doors.size() or not bool(plan.doors[di].get("exterior", false)):
+				continue
+		var sz: Vector3 = part["size"]
+		reveal = minf(reveal, maxf(sz.x, sz.z))
+	out["reveal_min"] = reveal
+	# roof pitch, from the faces themselves
+	var angle := 0.0
+	for part in builder.component_log:
+		if not str(part.get("role", "")).begins_with("roof_face_"):
+			continue
+		# the plane's own fall: the angle of its normal from the vertical (an
+		# edge of a hip face is shallower than the face, so edges would undercount)
+		var pts: Array = part["points"]
+		var nrm := Vector3.ZERO
+		for i in range(1, pts.size() - 1):
+			nrm = (Vector3(pts[i]) - Vector3(pts[0])).cross(Vector3(pts[i + 1]) - Vector3(pts[0]))
+			if nrm.length() > 0.01:
+				break
+		if nrm.length() > 0.01:
+			angle = maxf(angle, rad_to_deg(acos(clampf(absf(nrm.normalized().y), 0.0, 1.0))))
+	out["roof_angle_deg"] = angle
+	out["roof_tile"] = spec.roof_material == &"tile"
+	var rc := spec.roof_color
+	out["roof_terracotta"] = rc.h >= 0.02 and rc.h <= 0.09 and rc.s >= 0.4 and rc.r > rc.g and rc.g > rc.b
+	var parapets := 0
+	var posts := 0
+	var roofs := 0
+	var beams := 0
+	for part in builder.component_log:
+		var role := str(part.get("role", ""))
+		if role == "parapet":
+			parapets += 1
+		elif role == "veranda_post":
+			posts += 1
+		elif role.begins_with("veranda_roof_"):
+			roofs += 1
+		elif role == "veranda_beam":
+			beams += 1
+	out["parapet_count"] = parapets
+	out["terrace_roof"] = parapets >= 4 and angle <= 8.0
+	out["low_tile_roof"] = out["roof_tile"] and out["roof_terracotta"] and angle <= 25.0
+	out["loggia_posts"] = posts
+	out["loggia_roofs"] = roofs
+	out["loggia_beams"] = beams
+	var vr := HouseGeometry.veranda_rect(plan)
+	var e := plan.entrance()
+	out["loggia_covers_door"] = vr.has_area() and e >= 0 and vr.grow(0.02).has_point(Vector2(plan.doors[e]["pos"]) 		+ Vector2(plan.doors[e]["normal"]) * 0.3)
+	out["loggia_depth"] = spec.veranda_depth if spec.veranda else 0.0
+	# the court
+	var site := HouseGeometry.site_rect(spec)
+	out["court_min_side"] = HouseYard.COURT_MIN_SIDE
+	out["court_expected"] = minf(site.size.x, site.size.y) >= HouseYard.COURT_MIN_SIDE
+	out["court_present"] = false
+	out["court_inner_area"] = 0.0
+	out["court_wall_parts"] = 0
+	out["court_open"] = false
+	out["court_gate"] = 0.0
+	out["court_rear_wall"] = false
+	out["court_door"] = false
+	if e < 0:
+		return
+	var n := Vector2(plan.doors[e]["normal"]).normalized()
+	var depth_x := absf(n.x) > absf(n.y)
+	for piece in plan.yard_pieces:
+		if str(piece["kind"]) != "court":
+			continue
+		out["court_present"] = true
+		var pave := Rect2()
+		var walls := 0
+		var open := true
+		var returns := {-1: 0.0, 1: 0.0}
+		for part in piece["parts"]:
+			var sz: Vector3 = part["size"]
+			var ctr: Vector3 = part["centre"]
+			var dd := sz.x if depth_x else sz.z
+			var dl := sz.z if depth_x else sz.x
+			var lat := ctr.z if depth_x else ctr.x
+			var role := str(part["role"])
+			if role == "court_paving":
+				pave = Rect2(Vector2(ctr.x - sz.x * 0.5, ctr.z - sz.z * 0.5), Vector2(sz.x, sz.z))
+				out["court_inner_area"] = sz.x * sz.z
+			elif role == "court_wall":
+				walls += 1
+				if ctr.y + sz.y * 0.5 > HouseYard.COURT_WALL_H + 0.01:
+					open = false
+				if dl > dd:
+					out["court_rear_wall"] = true
+				else:
+					returns[1 if lat > 0.0 else -1] += dd
+			else:
+				open = false
+			if str(part["surf"]) == "roof":
+				open = false
+		out["court_wall_parts"] = walls
+		out["court_open"] = open and pave.has_area()
+		var run: float = (pave.size.x if depth_x else pave.size.y)
+		out["court_gate"] = maxf(run - returns[-1], run - returns[1])
+		# a door that is not the entrance opens onto the court
+		var pr: Rect2 = piece["rect"]
+		for i in range(plan.doors.size()):
+			var d: Dictionary = plan.doors[i]
+			if i == e or not d.get("exterior", false) or bool(d.get("secret", false)):
+				continue
+			var dn := Vector2(d["normal"]).normalized()
+			if dn.dot(n) < -0.5 and pr.grow(0.1).has_point(Vector2(d["pos"]) + dn * 0.8):
+				out["court_door"] = true
 
 
 ## Highest roof vertex that belongs to the main roof (the porch roof is lower
