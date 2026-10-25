@@ -372,4 +372,32 @@ not headless), per seed: `_front` roof-on three-quarter of the entrance side, `_
 roof-on three-quarter of the court, `_loggia` eye level three metres out, `_court`
 eye level inside the court, `_interior` eye level through the rear door.
 
-Reviewer: pending
+Independent reviewer: fresh agent, from the renders of commit 82b461c (all 15 images opened). Judged only from `artifacts/hs_mediterranean/renders/mediterranean_<seed>_{front,rear,loggia,court,interior}.jpg`.
+
+| seed | (1) lime render, deep reveals | (2) low tile roof or parapeted terrace | (3) shaded outdoor room | (4) court / terrace |
+|---|---|---|---|---|
+| 1 | YES (borderline) | YES (hip roof inside a white parapet) | YES (borderline) | YES |
+| 8102 | YES (borderline) | YES (shallow gable) | YES (borderline) | YES |
+| 21325 | YES (borderline) | YES (shallow gable) | YES (borderline) | YES (interior view unusable) |
+
+Reasons:
+* (1) pale cream/white render, no timber frame, on all fronts. Reveals read on the court door and the court-side windows (shutters stand proud, frames recessed), but on the front windows the depth is modest and cannot be read as 0.30 m. A stone-block plinth runs round the whole ground floor (a visible stone course under the render), so "render, no stone" is true of the walls, not of the base.
+* (2) terracotta tiles with visible courses; 8102 and 21325 are shallow gables, seed 1 is a hip sitting inside a flat white parapet with an orange band (the parapet alternative also shows). Pitch looks low on all three.
+* (3) the loggia is four teal posts, a head beam and a small orange shed rooflet over a paved deck in front of the door. It is a covered entry, but it is a timber verandah, not a masonry loggia. The rooflet is short and sits inside the beam line (posts pass through it), so the shaded area is a strip about one door wide. Weak, held on the letter.
+* (4) a white walled paved court, about 2.7 m deep, open to the sky, with a gateway in one return, reached from the rear door (seeds 1 and 8102 show the door opening onto the paving; the seed 1 court frame shows the door at the far end). No planting, furniture or shade in it; a bare paved corridor. Held on the letter.
+
+Images: `artifacts/hs_mediterranean/renders/mediterranean_1_front.jpg`, `_rear`, `_loggia`, `_court`, `_interior`; the same five for `8102` and `21325`.
+
+Open:
+* All seeds: the loggia is a timber verandah with a small rooflet, not a masonry arcade; shade covers only a strip in front of the door (trait 3 borderline).
+* All seeds: the court is a narrow bare paved passage with nothing in it (no planting, table or pergola); it is an enclosure, not a lived outdoor room (trait 4 borderline).
+* All seeds: window reveals do not read as deep from the front; a stone plinth shows under the render (trait 1 borderline).
+* Seed 21325 interior: the camera sits inside or against a solid piece (teal slab above and below, a black block on the left, dithered cream strip); the frame shows nothing about the house. The interior view is not judgeable for this seed.
+* Seed 8102 interior: the frame is a doorway looking out to the court, not a room; it shows no furniture.
+
+Observed (not traits):
+* Rear renders (all seeds): the court's near rear wall seems to hover; its cast shadow lies far below and to the right of it, detached from its foot, and the wall's near end meets no gate post. Likely a wall at the envelope edge seen from above, but it reads as floating.
+* Front renders: the white parapet/eave band on seed 1 hides the roof from low angles; a bench stands against the front wall on all seeds, a blank stone plinth with no door-side landing.
+* Loggia renders: the rooflet's posts pierce it (the four posts pass through the orange slab); a small grey object floats in the gap between the post and eave at left in 8102 and 21325 (a distant prop seen through the gap, or a floating item).
+* Seed 1 interior: a very large hearth, table and bowl fill the frame; the bowl sits large against the table (prop scale).
+* Seed 1 and 21325 front: the hanging lamp glow at the left gable end is bright and blows out the wall.
