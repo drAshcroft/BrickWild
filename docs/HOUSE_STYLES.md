@@ -269,36 +269,36 @@ headless): `rich_<seed>_front` roof-on three-quarter, `_hall_stair`, `_parlour`,
 
 Fingerprint (`tools/fingerprint_houses.gd`, five older styles, HEAD worktree vs this tree): 130 lines, identical. `lane:house-exterior-fast` has one failure, `witch_hut/none rotated=false no exterior dressing`, that fails identically at HEAD (`hexterior` in the base worktree).
 
-Independent reviewer: fresh agent, from the renders of commit 41e0ad3 (2026-10-25). Judged only from `artifacts/hs_rich/renders/rich_<seed>_{front,hall_stair,parlour,dining_room}.jpg`.
+First review (354ff25, from the renders of 41e0ad3) failed seed 8102 trait 2 (dining room showed only two stools) and passed the parlour only on the letter.
+
+Independent re-review: fresh agent, from the renders of commit 41f66c2 (renders written 2026-10-25 10:46-10:47, after the 354ff25 review; all 12 images opened). Judged only from `artifacts/hs_rich/renders/rich_<seed>_{front,hall_stair,parlour,dining_room}.jpg`.
 
 | seed | (1) door hall holds stair | (2) parlour + dining room, 4+ chairs | (3) trim on floor lines / eave |
 |---|---|---|---|
-| 1 | YES | YES (borderline) | YES (borderline) |
-| 8102 | YES | NO | YES (borderline) |
-| 21325 | YES | YES (borderline) | YES (borderline) |
+| 1 | YES (borderline) | YES (parlour borderline) | YES (borderline) |
+| 8102 | YES | YES (parlour borderline) | YES (borderline) |
+| 21325 | YES | YES (parlour borderline) | YES (borderline) |
 
 Reasons:
-* (1) all three: the hall view shows a flight with rails rising from a floor with wall lights, windows and a chest or bench; the front door itself is not in any hall frame, only the porch in the exterior, so "door into the hall" is inferred from the porch position. Seed 1 stair is in a plain narrow hall; 8102 and 21325 are clear.
-* (2) seed 8102 MISS: the dining view shows a long laid table with two stools on one side and nothing else; no set of four chairs can be seen (the far side of the table is out of frame, and what is seated are stools, not chairs). Cannot tick what is not seen. Seed 1 and 21325: four chairs in a row along one side of the table, one table, a distinct room: tick. Borderline in all seeds: the parlour is two long bare benches facing each other down a corridor-like room (plus a cabinet on seeds 1 and 21325); it reads as a waiting passage, not a seating group of settles around a hearth. Seed 8102 parlour has no other furniture at all.
-* (3) a thin horizontal band at the eave under the gable and a string course at the first-floor line are plainly visible on all three fronts (21325 has the storey line on stone with a notched course). Borderline: both are thin flat bands; neither reads as a projecting cornice crown, and no band shows at the ground-floor head or above the plinth.
+* (1) the hall frames show a flight with rails in a hall with wall lights, windows and a chest; the front door itself is in no hall frame, only the porch on the front render, so "door opens into the hall" is inferred. Seed 1 is the weakest: a plain narrow corridor with the flight on the right, no chest or door in view.
+* (2) dining, all three seeds: one long table, four `Chair_1` chairs counted in the image (seed 1: three near side plus one at the far end; 8102: three near plus one far; 21325: three near plus one at the end by the window). The 8102 miss is fixed. Parlour, all three: a chair, a long bench and a high-backed settle in a 5 x 3 m room; they are recognisable seating but spread out along the walls, not facing, no hearth or rug, so it reads as scattered seating rather than a group. Held, weakly. Two distinct rooms in every seed (separate views, different furniture).
+* (3) a band at the eave under the gable and a string course at the first-floor line are visible on all three fronts (21325 stands the storey line on a notched stone course). Borderline: thin flat bands, not a projecting cornice crown.
 
 Images: `artifacts/hs_rich/renders/rich_1_front.jpg`, `rich_1_hall_stair.jpg`, `rich_1_parlour.jpg`, `rich_1_dining_room.jpg`; the same four for `8102` and `21325`.
 
 Open:
-* Seed 8102 dining room: only two stools in view, no four chairs visible (trait 2 not met by the image).
-* All seeds: the parlour has no recognisable seating group, only two bare benches; the trait is held on the letter, weakly on the look.
+* All seeds: the parlour is chair + bench + settle spread along the walls, not a facing group; trait 2 holds on a loose reading.
 * All seeds: the front door is not shown opening into the hall; trait 1 rests on the porch plus the hall view.
 * All seeds: the cornice is a plain thin band, not a visible crown.
 
 Observed (not traits):
-* Dining room and parlour are 2.8 to 3.3 m strips that read as corridors; the table fills the width and leaves one chair-width of walkway (seed 1, 21325).
-* Dining table: a long grey strip crosses the tabletop through the plate (seeds 1, 8102, 21325), reads as a mis-scaled runner or knife clipping the plate.
-* Parlour benches on the near side look cantilevered and oversized, a bench end overhanging past its legs (seeds 8102, 21325 right bench is two planks with a step).
-* 8102 and 21325 dining: a chair or barrel back clips the camera in the foreground; objects at the room edge crowd the door swing.
-* Seed 1 front: no chimney visible, only two thin poles on the ridge and gable; 8102 has a very tall detached-looking stone stack; 21325 has a blank stone ground floor.
-* 21325 hall: a chandelier hangs low against the stair wall, and the stone-faced hall wall differs from the plaster of the other seeds.
-* No z-fighting or floating furniture otherwise seen.
+* Parlour 21325: a large wooden post (a timber or newel) fills the left foreground and blocks a third of the frame; the camera stands against it.
+* Parlour 8102 and 1: the long bench's near end hangs past its pedestal, reading as cantilevered; 8102 also has a chest in the parlour.
+* Dining tables carry an oversized grey cooking pot and a grey strap that crosses the tabletop (all seeds).
+* Dining 1 and 8102: the timber-slat wall has open gaps that show the room beyond; the dining room is a narrow strip with a barrel in the corner.
+* Seed 1 front: no chimney, only two thin poles on the ridge; 8102 has a very tall stack standing off the gable; 21325 has a blank stone ground floor with a small stack.
+* 21325 hall: a chandelier hangs low over the stair, and the stone-faced hall wall differs from the plaster of seeds 1 and 8102.
+* No floating furniture or z-fighting seen.
 
 Round 2 (fixes after the 41e0ad3 review): seed 8102's dining table was laid with 4 STOOLS (the seat-set probe fell back to `Stool` when `Chair_1` did not fit that table pose; the earlier test counted any `seat`). A style with `dining_seats` now skips `Stool` in `_seating_probe`, and the test counts `Chair_1` keys (`dining_chairs`, with `dining_stools` reported). Plan chair counts, before: seed 1 4 chairs, 8102 4 stools / 0 chairs, 21325 4 chairs; after: 4 / 4 / 4 `Chair_1`. The parlour's two facing benches are replaced by a conversation group: one settle on the wall, a chair beside it and a chair on the end wall (`sitting_group` recipe; the test asks for 1 settle + 2 `Chair_1`, controls: seating removed, chairs turned to stools, dining stools). The review camera now stands in the room corner furthest from any piece (`_look_room`). Left alone: the grey runner on the tabletop is the measured `tableware` model, not a mis-scaled prop (not trivial). Parlour group remains modest: chair, settle, chair spread over a 5 x 3 m room.
 
-Reviewer: pending (re-review after 210d336)
