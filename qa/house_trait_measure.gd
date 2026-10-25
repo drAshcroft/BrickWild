@@ -53,7 +53,62 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable()) -> Dictio
 			roofs += 1
 	out["porch_roof_count"] = roofs
 	out["door_sheltered"] = _door_sheltered(plan, builder, roofs)
+	_farm_keys(plan, builder, out)
 	return out
+
+
+## HS-FARMHOUSE keys: the yard door, the byre, and the working props.
+static func _farm_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -> void:
+	var e := plan.entrance()
+	out["back_door_room"] = ""
+	out["back_door_off_front"] = false
+	for i in range(plan.doors.size()):
+		var d: Dictionary = plan.doors[i]
+		if i == e or not d.get("exterior", false) or bool(d.get("secret", false)):
+			continue
+		var kind := String(plan.rooms[int(d["a"])].get("kind", ""))
+		if kind in ["kitchen", "store"]:
+			out["back_door_room"] = kind
+			var front_n := Vector2(plan.doors[e]["normal"]).normalized() if e >= 0 else Vector2.ZERO
+			out["back_door_off_front"] = Vector2(d["normal"]).normalized().dot(front_n) < 0.5
+			break
+	var roofs := 0
+	var top := -INF
+	for part in builder.component_log:
+		if str(part.get("role", "")) == "byre_roof":
+			roofs += 1
+			var xf: Transform3D = part["xf"]
+			var a := HouseYard.part_aabb({"basis": xf.basis, "centre": xf.origin, "size": part["size"]})
+			top = maxf(top, a.position.y + a.size.y)
+	out["byre_roof_count"] = roofs
+	out["byre_roof_top"] = top
+	var r := HouseGeometry.site_rect(plan.spec).grow(0.3)
+	var attached := false
+	var kinds := {}
+	for piece in plan.yard_pieces:
+		match str(piece["kind"]):
+			"byre":
+				attached = attached or r.intersects(piece["rect"])
+				for part in piece["parts"]:
+					if str(part["role"]) == "hay_bale":
+						kinds["hay"] = true
+			"trough":
+				kinds["trough"] = true
+			"fence":
+				kinds["fence"] = true
+	for prop in plan.yard:
+		if str(prop.get("role", "")) == "cart":
+			kinds["cart"] = true
+		if str(prop.get("key", "")) in ["Bag", "Sack"]:
+			kinds["sacks"] = true
+	for prop in plan.exterior:
+		if str(prop.get("key", "")) in ["Bag", "Sack"]:
+			kinds["sacks"] = true
+	out["byre_attached"] = attached
+	out["byre_lower_than_eave"] = roofs > 0 and top < float(out["eave_top"]) - 0.05
+	var list: Array = kinds.keys()
+	list.sort()
+	out["yard_kinds"] = list
 
 
 ## Highest roof vertex that belongs to the main roof (the porch roof is lower

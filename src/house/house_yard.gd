@@ -56,7 +56,7 @@ const WITCH_WORK_APPROACH := 0.9
 ## and up to two when there is none.
 const STYLE_GROUPS := {
 	&"cottage": [&"washing_line", &"garden", &"flowers"],
-	&"farmhouse": [&"woodpile", &"cart", &"midden"],
+	&"farmhouse": [&"byre", &"cart", &"trough"],
 	&"townhouse": [&"crates", &"rain_barrel"],
 	&"longhall": [&"woodpile", &"training"],
 	&"witch_hut": [&"witch_work_shelter", &"herb_bed", &"drying_line", &"mushrooms", &"midden"],
@@ -81,7 +81,7 @@ const TRADE_GROUPS := {
 const MAX_GROUPS := 3
 
 ## Built-piece kinds, for the check.
-const KINDS := ["fence", "woodpile", "washing_line", "midden", "leanto", "witch_work_lean_to", "trough",
+const KINDS := ["fence", "woodpile", "washing_line", "midden", "leanto", "byre", "witch_work_lean_to", "trough",
 	"signpost", "bed", "path"]
 
 const HERBS := ["Wild_Plant_7", "Wild_Fern_1", "Wild_Plant_1", "Nature_Flower_3_Clump", "Wild_Fern_1", "Wild_Plant_7"]
@@ -133,6 +133,9 @@ static func plan(p: HousePlan) -> void:
 		# recipe takes precedence over the no-trade household craft shelter.
 		style = [&"herb_bed", &"drying_line", &"mushrooms", &"midden"]
 	var style_slots := 1 if not groups.is_empty() else 2
+	if p.spec.style == &"farmhouse" and p.spec.trade == &"none":
+		# HS-FARMHOUSE: byre with its hay, the cart and the trough are the yard.
+		style_slots = 3
 	if p.spec.style == &"witch_hut" and p.spec.trade == &"none":
 		style_slots = 3
 	var from_style: Array = style.slice(0, style_slots)
@@ -412,6 +415,9 @@ static func _group(ctx: Dictionary, name: StringName) -> Dictionary:
 		&"trough":
 			return _search(ctx, ["left", "right", "front"], 0.0, [0.35, 0.9],
 				func(cell: Dictionary, gap: float) -> Dictionary: return _trough(cell, gap))
+		&"byre":
+			return _search(ctx, ["left", "right", "rear"], _kitchen_anchor(ctx, 0.0), [0.0],
+				func(cell: Dictionary, gap: float) -> Dictionary: return _byre(cell))
 		&"leanto":
 			return _search(ctx, ["left", "right", "rear"], 0.0, [0.0],
 				func(cell: Dictionary, gap: float) -> Dictionary: return _leanto(cell))
@@ -1069,6 +1075,34 @@ static func _leanto(cell: Dictionary) -> Dictionary:
 	parts.append(_part(cell, "charcoal", 0.2, 0.55, 1.0, 0.6, 0.55, 0.3, "trim"))
 	parts.append(_part(cell, "charcoal", -0.55, 1.2, 0.5, 0.4, 0.0, 0.3, "trim"))
 	return {"pieces": [_piece("leanto", "charcoal_leanto", parts, str(cell["host"]))]}
+
+
+## HS-FARMHOUSE. The byre: an open-fronted lean-to built against the house wall
+## under a roof of its own, lower than the eaves and pitched away from the wall,
+## with hay stacked in it. Its posts stand at the front edge; the wall is the
+## back. The lean-to roof is thatch (surface "roof"), the hay the pale wall tone.
+static func _byre(cell: Dictionary) -> Dictionary:
+	var w := 3.4
+	var depth := 2.0
+	var high := 2.2
+	var drop := 0.4
+	var parts: Array = []
+	for side in [-1.0, 1.0]:
+		parts.append(_part(cell, "byre_post", side * (w * 0.5 - 0.06), depth - 0.06, 0.12, 0.12,
+			0.0, high - drop - 0.04, "trim"))
+	var tan3 := Vector3((cell["tan"] as Vector2).x, 0.0, (cell["tan"] as Vector2).y)
+	var out3 := Vector3((cell["out"] as Vector2).x, 0.0, (cell["out"] as Vector2).y)
+	var turn := signf(tan3.cross(out3).y)
+	var slope := atan2(drop, depth)
+	var roof := _part(cell, "byre_roof", 0.0, depth * 0.5 + 0.07, w, depth + 0.1,
+		high - drop * 0.5 - 0.06, 0.12, "roof")
+	roof["basis"] = Basis(tan3, -turn * slope)
+	parts.append(roof)
+	for i in 3:
+		parts.append(_part(cell, "hay_bale", -1.0 + float(i) * 0.95, 0.5, 0.8, 0.8, 0.0, 0.45, "wall"))
+	parts.append(_part(cell, "hay_bale", -0.55, 0.5, 0.8, 0.8, 0.45, 0.45, "wall"))
+	parts.append(_part(cell, "hay_bale", 0.4, 0.5, 0.8, 0.8, 0.45, 0.45, "wall"))
+	return {"pieces": [_piece("byre", "byre", parts, str(cell["host"]))]}
 
 
 ## A witch's covered processing station, attached to the service wall. The

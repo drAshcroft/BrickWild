@@ -142,6 +142,10 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	# a back door is only worth having when there is a room at the back to put
 	# it in, and something to go out to
 	spec.back_door = spec.room_count >= 3 and GeneratorRandom.chance(r, 0.55)
+	if spec.style == &"farmhouse":
+		# HS-FARMHOUSE: the farm's kitchen door onto the yard is a style
+		# invariant (the draw above is still consumed, so no later roll moves).
+		spec.back_door = spec.room_count >= 3
 
 	spec.wall_color = Color(s["wall"][0]).lerp(Color(s["wall"][1]), r.randf())
 	spec.trim_color = Color(s["trim"][0]).lerp(Color(s["trim"][1]), r.randf())
