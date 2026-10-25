@@ -124,6 +124,7 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 		spec.veranda = GeneratorRandom.chance(r, float(s.get("veranda", 0.0)))
 		spec.eave_sweep = GeneratorRandom.chance(r, float(s.get("eave_sweep", 0.0)))
 		spec.thatch_roll = GeneratorRandom.chance(r, float(s.get("thatch_roll", 0.0)))
+		spec.eyebrows = int(s.get("eyebrow", 0))
 		spec.corner_piers = GeneratorRandom.chance(r, float(s.get("corner_piers", 0.0)))
 		spec.veranda_depth = r.randf_range(VERANDA_DEPTH_RANGE[0], VERANDA_DEPTH_RANGE[1])
 		# A cone has no eave to stand a wall on: its skirt runs out to the plan

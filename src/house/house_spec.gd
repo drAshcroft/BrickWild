@@ -85,6 +85,7 @@ var veranda: bool = false          # a roofed open platform on the entrance wall
 var veranda_depth: float = 1.5     # how far the platform reaches out
 var eave_sweep: bool = false       # the eave flicks up at its four corners
 var thatch_roll: bool = false      # a combed ridge roll and a thick eave roll
+var eyebrows: int = 0              # HS-THATCH: eyebrow dormers swept out of the thatch (no draw; a style row number)
 var corner_piers: bool = false     # rounded mud-brick corners
 ## How far the roof oversails its walls. Negative means HouseGeometry's
 ## ordinary 0.35 m / 0.25 m, and the bound reads the resolved value from
@@ -315,14 +316,19 @@ const STYLES := {
 		# style has no bargeboards at all: a verge board is a thing that holds
 	# ON slates or tiles, and a thatcher finishes a gable by turning the reeds
 		# down and wiring them, not by nailing a board to the end of them.
-		"timber": 0.55, "studs": [1.0, 1.5], "braces": 0.5, "rail": 0.4,
+		# HS-THATCH: the walls are pale rendered cob and carry NO frame (timber,
+		# jetty and the stone ground floor are 0.0, so the same draws are consumed
+		# and no later roll moves); one eyebrow dormer is swept out of the thatch
+		# (`eyebrow`, read without a draw). Soft thatch: HouseGeometry.thatch_soft.
+		"timber": 0.0, "studs": [1.0, 1.5], "braces": 0.0, "rail": 0.0,
+		"eyebrow": 1,
 		"roof_pitch": [1.15, 1.5], "porch": 0.6, "chimney": 0.85, "shutters": 0.4,
 		"wall": ["efe7d3", "dbcfb4"], "trim": ["4a3826", "322518"],
 		"roof": ["bda25f", "8d7640"], "floor": ["8a7a5e", "6f6148"],
 		"clutter": [0.45, 0.8],
 		"plinth": [0.3, 0.55], "roof_types": [&"gable"],
 		"framing": [&"arch_brace", &"square_panel"], "truss": [&"king_post", &"collar_strut"],
-		"jetty": 0.25, "dormers": 0.2, "bargeboards": 0.0, "stone_ground": 0.1,
+		"jetty": 0.0, "dormers": 0.2, "bargeboards": 0.0, "stone_ground": 0.0,
 		"chimney_style": &"stepped", "pots": [1, 2],
 		"roof_material": &"thatch", "pitch_reference": 7.0,
 		"wall_t": 0.5, "culture": 1.0,

@@ -750,6 +750,28 @@
   },
   {
    "family": "house",
+   "id": "house/thatch_cottage/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "thatch_cottage",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "thatch_cottage"
+  },
+  {
+   "family": "house",
    "id": "house/thatch_cottage/8102",
    "request": {
     "enclosure": "none",
@@ -763,6 +785,28 @@
     "schema": "brickwild.request",
     "schema_version": 1,
     "seed": "8102",
+    "storeys": 1,
+    "style": "thatch_cottage",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "thatch_cottage"
+  },
+  {
+   "family": "house",
+   "id": "house/thatch_cottage/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
     "storeys": 1,
     "style": "thatch_cottage",
     "water": "none",

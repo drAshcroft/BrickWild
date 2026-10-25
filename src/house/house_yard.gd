@@ -66,7 +66,10 @@ const STYLE_GROUPS := {
 	&"mediterranean": [&"court", &"garden", &"flowers", &"crates"],
 	&"asian": [&"garden", &"crates", &"rain_barrel"],
 	&"african": [&"midden", &"crates", &"cart"],
-	&"thatch_cottage": [&"garden", &"washing_line", &"woodpile"],
+	# HS-THATCH: the front is a flower garden (two beds flanking the path to the
+	# door) and the kitchen garden goes behind; no washing line, woodpile or pail
+	# is allowed to stand at the front of a thatched cottage.
+	&"thatch_cottage": [&"front_beds", &"garden"],
 	&"mud_hut": [&"midden", &"herb_bed", &"mushrooms"],
 }
 const TRADE_GROUPS := {
@@ -150,7 +153,8 @@ static func plan(p: HousePlan) -> void:
 		# A porch pail is replaceable. It must not reserve the only measured
 		# service-side space before the required Witch work shelter is fitted.
 		wanted.append(style[0])
-	wanted.append(&"porch_pail")
+	if p.spec.style != &"thatch_cottage":
+		wanted.append(&"porch_pail")
 	for g in group_order:
 		if g not in wanted and wanted.size() < MAX_GROUPS + 2:
 			wanted.append(g)
@@ -339,6 +343,8 @@ static func _group(ctx: Dictionary, name: StringName) -> Dictionary:
 					return made if _group_within_threshold(ctx, made, 5.0) else {})
 		&"flowers":
 			return _flowers(ctx)
+		&"front_beds":
+			return _front_beds(ctx)
 		&"woodpile":
 			return _woodpile(ctx)
 		&"cart":
@@ -821,6 +827,68 @@ static func _flowers(ctx: Dictionary) -> Dictionary:
 		if _group_reason(ctx, probe).is_empty():
 			props.append(prop)
 	return {"props": props} if not props.is_empty() else {}
+
+
+## HS-THATCH: the cottage's front garden. A flower bed on each side of the
+## path to the door: an edged soil bed (a `bed` piece, boards and soil) with a
+## row of flower clumps standing on it. A side is skipped, not forced, when
+## the facade or the porch needs the ground.
+const FRONT_BED_W := 1.5
+const FRONT_BED_D := 0.8
+const FRONT_BED_KEYS := ["Nature_Flower_3_Clump", "Nature_Flower_5_Clump", "Nature_Flower_4_Clump"]
+
+
+static func _front_beds(ctx: Dictionary) -> Dictionary:
+	var door: Dictionary = ctx["door"]
+	var half_clear: float = float(door["width"]) * 0.5 + 0.75
+	var pieces: Array = []
+	var props: Array = []
+	var taken: Array[AABB] = []
+	for flip in [1.0, -1.0]:
+		for off in [0.0, 0.4, 0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2, 3.6, 4.0, 4.4]:
+			var s: float = ctx["door_u"] + flip * (half_clear + FRONT_BED_W * 0.5 + off)
+			var cell := _cell(ctx, "front", s)
+			var made := _front_bed(ctx, cell, 0.3)
+			if made.is_empty() or not _group_reason(ctx, made).is_empty():
+				continue
+			var clash := false
+			for part in made["pieces"][0]["parts"]:
+				for box in taken:
+					if part_aabb(part).grow(GAP).intersects(box):
+						clash = true
+			if clash:
+				continue
+			for part in made["pieces"][0]["parts"]:
+				taken.append(part_aabb(part))
+			pieces.append_array(made["pieces"])
+			props.append_array(made["props"])
+			break
+	return {"pieces": pieces, "props": props} if not pieces.is_empty() else {}
+
+
+static func _front_bed(ctx: Dictionary, cell: Dictionary, gap: float) -> Dictionary:
+	var w := FRONT_BED_W
+	var depth := FRONT_BED_D
+	if float(cell["room"]) < gap + depth + 0.3:
+		return {}
+	var d := gap + depth * 0.5
+	var parts: Array = []
+	parts.append(_part(cell, "bed_board", 0.0, gap + 0.03, w, 0.06, 0.0, 0.2, "trim"))
+	parts.append(_part(cell, "bed_board", 0.0, gap + depth - 0.03, w, 0.06, 0.0, 0.2, "trim"))
+	parts.append(_part(cell, "bed_board", -w * 0.5 + 0.03, d, 0.06, depth - 0.12, 0.0, 0.2, "trim"))
+	parts.append(_part(cell, "bed_board", w * 0.5 - 0.03, d, 0.06, depth - 0.12, 0.0, 0.2, "trim"))
+	parts.append(_part(cell, "bed_soil", 0.0, d, w - 0.12, depth - 0.12, 0.0, 0.17, "trim"))
+	var made := {"pieces": [_piece("bed", "flower_bed", parts, str(cell["host"]))], "props": []}
+	var rng: RandomNumberGenerator = ctx["rng"]
+	var base := rng.randi()
+	for i in 3:
+		var key: String = FRONT_BED_KEYS[(base + i) % FRONT_BED_KEYS.size()]
+		if not PropCatalog.known(key):
+			continue
+		var tt := -w * 0.5 + 0.3 + float(i) * (w - 0.6) / 2.0
+		var prop := make_prop(key, _w(cell, tt, d), float(i) * 2.1, _fit(key, 0.5), "bed_flowers", str(cell["host"]))
+		made["props"].append(_raised(prop, 0.17))
+	return made
 
 
 static func _crates(ctx: Dictionary, cell: Dictionary, gap: float) -> Dictionary:

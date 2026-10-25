@@ -10,7 +10,8 @@ extends RefCounted
 ## main-roof vertex), chimney_count, chimney_top, chimney_on_hearth_wall,
 ## chimney_clearance (m over the ridge), chimney_above_ridge, door_sheltered (a porch roof, posts and step all stand
 ## over the entrance door), porch_roof_count.
-## HS-LONGHALL keys are listed on `_longhall_keys`, HS-MEDITERRANEAN on `_med_keys`.
+## HS-LONGHALL keys are listed on `_longhall_keys`, HS-MEDITERRANEAN on `_med_keys`,
+## HS-THATCH on `_thatch_keys`.
 
 
 static func make_spec(style: StringName, width: float, length: float, height: float,
@@ -60,6 +61,7 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable(),
 	_longhall_keys(plan, builder, out)
 	_rich_keys(plan, builder, out)
 	_med_keys(plan, builder, out)
+	_thatch_keys(plan, builder, out)
 	return out
 
 
@@ -559,6 +561,266 @@ static func _med_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -
 			var dn := Vector2(d["normal"]).normalized()
 			if dn.dot(n) < -0.5 and pr.grow(0.1).has_point(Vector2(d["pos"]) + dn * 0.8):
 				out["court_door"] = true
+
+
+## HS-THATCH keys (all from the plan and the logs):
+##   wall_pale / wall_rendered   a pale wall, no timber frame, no stone ground floor
+##   frame_parts                 exposed frame components: timber, gable_tie, gable_member,
+##                               interior_frame_*, jetty* (a list of roles; empty is cob)
+##   eave_count / eave_form      thatch_eave rows and their form ("slab" soft, "box" hard)
+##   eave_points / eave_thick    profile points; the bundle's thickness (m) across the roof
+##   eave_turn_max               the sharpest turn (deg) of the eave outline
+##   roll_count / roll_points / roll_turn_max / roll_cover   ridge roll bundles, their
+##                               profile points, sharpest exposed turn, and the share of the
+##                               ridge length they span; roll_height above the ridge midplane
+##   eyebrow_count / eyebrow_glazing / eyebrow_width / eyebrow_rise / eyebrow_seated /
+##   eyebrow_below_ridge / eyebrow_faces_entrance / eyebrow_clear_of_chimney
+##   path_pavers / path_reaches_door
+##   flower_beds / flower_bed_sides / bed_flowers   front beds, the sides of the path they
+##                               stand on (-1, +1), flower props standing on beds
+##   front_roles                 the role of every prop and piece at the front but the
+##                               path and the flower beds (empty means no work yard)
+static func _thatch_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -> void:
+	var spec := plan.spec
+	var c := spec.wall_color
+	out["wall_pale"] = c.v >= 0.82 and c.s <= 0.22
+	out["wall_rendered"] = out["wall_pale"] and not spec.timber_frame and not spec.stone_ground_floor
+	var frame: Array[String] = []
+	for part in builder.component_log:
+		var role := str(part.get("role", ""))
+		if role == "timber" or role == "gable_tie" or role == "gable_member" \
+				or role.begins_with("interior_frame") or role.begins_with("jetty"):
+			if role not in frame:
+				frame.append(role)
+	out["frame_parts"] = frame
+	var layout := HouseGeometry.roof_layout(plan)
+	var xf: Transform3D = layout["transform"]
+	var inv := xf.affine_inverse()
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	var half_span: float = float(layout["span"]) * 0.5
+	# the eave bundles
+	var eaves: Array = []
+	for part in builder.component_log:
+		if str(part.get("role", "")) == "thatch_eave":
+			eaves.append(part)
+	out["eave_count"] = eaves.size()
+	out["eave_form"] = "none" if eaves.is_empty() else str(eaves[0]["form"])
+	var epts := 0
+	var thick := INF
+	var eturn := 0.0
+	for row in eaves:
+		if str(row["form"]) != "slab":
+			var sz: Vector3 = row["size"]
+			thick = minf(thick, minf(sz.x, sz.y))
+			eturn = maxf(eturn, 90.0)
+			epts = 4
+			continue
+		var loc := _local_profile(row["points"], inv)
+		epts = loc.size() if epts == 0 else mini(epts, loc.size())
+		var side := signf(_centroid(loc).x)
+		var y0 := RoofShape.height_at(faces, Vector2(side * half_span, 0.0))
+		var y1 := RoofShape.height_at(faces, Vector2(side * half_span - side * 0.1, 0.0))
+		var up := Vector2(-side * 0.1, y1 - y0).normalized()
+		var nrm := Vector2(up.y, -up.x)
+		var lo := INF
+		var hi := -INF
+		for p in loc:
+			lo = minf(lo, Vector2(p.x, p.y).dot(nrm))
+			hi = maxf(hi, Vector2(p.x, p.y).dot(nrm))
+		thick = minf(thick, hi - lo)
+		eturn = maxf(eturn, _max_turn(loc, faces, false))
+	out["eave_points"] = epts
+	out["eave_thick"] = thick if thick != INF else 0.0
+	out["eave_turn_max"] = eturn
+	# the ridge roll
+	var rolls: Array = []
+	for part in builder.component_log:
+		if str(part.get("role", "")).begins_with("thatch_roll_"):
+			rolls.append(part)
+	out["roll_count"] = rolls.size()
+	var rpts := 0
+	var rturn := 0.0
+	var zlo := INF
+	var zhi := -INF
+	var top := -INF
+	for row in rolls:
+		if str(row["form"]) != "slab":
+			rpts = 3
+			rturn = 120.0
+			continue
+		var loc := _local_profile(row["points"], inv)
+		rpts = loc.size() if rpts == 0 else mini(rpts, loc.size())
+		rturn = maxf(rturn, _max_turn(loc, faces, true))
+		var zc := loc[0].z
+		var hd := float(row["depth"]) * 0.5
+		zlo = minf(zlo, zc - hd)
+		zhi = maxf(zhi, zc + hd)
+		for p in loc:
+			top = maxf(top, p.y)
+	out["roll_points"] = rpts
+	out["roll_turn_max"] = rturn
+	var ridge_len := 2.0 * float(layout["ridge_half"])
+	out["roll_cover"] = (zhi - zlo) / ridge_len if ridge_len > 0.05 and zhi > zlo else 0.0
+	out["roll_height"] = top - RoofShape.height_at(faces, Vector2(0.0, 0.0)) if top > -INF else 0.0
+	# the eyebrow dormers
+	var hosts := {}
+	var glaze := 0
+	var width := 0.0
+	var rise := 0.0
+	var seated := true
+	var below := true
+	var ridge_top: float = float(layout["rise"]) + RoofShape.DEPTH * 0.5
+	var zs: Array[float] = []
+	var sides := {}
+	for part in builder.component_log:
+		var role := str(part.get("role", ""))
+		var host := str(part.get("host", ""))
+		if not host.begins_with("eyebrow_"):
+			continue
+		if role == "eyebrow_glazing":
+			glaze += 1
+		elif role == "eyebrow_hood":
+			hosts[host] = int(hosts.get(host, 0)) + 1
+			var loc := _local_profile(part["points"], inv)
+			var zl := INF
+			var zh := -INF
+			var side_e := signf(_centroid(loc).x)
+			# the mouth is the face toward the eave: half the slab's length out from its plane
+			var x_front: float = loc[0].x + side_e * float(part["depth"]) * 0.5
+			var surf_front := RoofShape.height_at(faces, Vector2(x_front, loc[0].z)) + RoofShape.DEPTH * 0.5
+			for i in range(loc.size()):
+				zl = minf(zl, loc[i].z)
+				zh = maxf(zh, loc[i].z)
+				if i >= loc.size() - 2:
+					# the two base vertices: on or under the roof surface (not floating), sunk a little
+					if loc[i].y - surf_front > 0.05 or loc[i].y - surf_front < -0.5:
+						seated = false
+				else:
+					rise = maxf(rise, loc[i].y - surf_front)
+					if loc[i].y > ridge_top:
+						below = false
+			width = maxf(width, zh - zl)
+			sides[signf(_centroid(loc).x)] = true
+			zs.append((zl + zh) * 0.5)
+	out["eyebrow_count"] = hosts.size()
+	out["eyebrow_glazing"] = glaze
+	out["eyebrow_width"] = width
+	out["eyebrow_rise"] = rise
+	out["eyebrow_seated"] = seated and not hosts.is_empty()
+	out["eyebrow_below_ridge"] = below and not hosts.is_empty()
+	var e := plan.entrance()
+	var faces_door := false
+	if e >= 0 and not zs.is_empty():
+		# near the door and on its side of the ridge: the slope the visitor looks up at
+		var dpos0 := Vector2(plan.doors[e]["pos"])
+		var dl := inv * Vector3(dpos0.x, xf.origin.y, dpos0.y)
+		var dn0 := Vector2(plan.doors[e]["normal"])
+		var lx := Vector2(xf.basis.x.x, xf.basis.x.z)
+		for i in range(zs.size()):
+			var sd: float = sides.keys()[mini(i, sides.size() - 1)]
+			var on_side := dn0.dot(lx) * sd > 0.3 if absf(dn0.dot(lx)) > 0.3 else dl.x * sd > 0.0
+			if on_side and absf(zs[i] - dl.z) <= 3.5:
+				faces_door = true
+	out["eyebrow_faces_entrance"] = faces_door
+	var clear := true
+	if spec.chimney:
+		var ch := HouseGeometry.chimney_center(plan)
+		var cs := HouseGeometry.chimney_size(spec)
+		var lc := inv * Vector3(ch.x, xf.origin.y, ch.y)
+		for zc in zs:
+			if absf(lc.z - zc) < cs * 0.5 + 0.7 and absf(lc.x) > half_span - 2.5:
+				clear = false
+	out["eyebrow_clear_of_chimney"] = clear
+	# the front garden
+	var pavers := 0
+	var paver_pts: Array[Vector2] = []
+	for part in builder.component_log:
+		if str(part.get("role", "")) == "path_paver":
+			pavers += 1
+			var cc: Vector3 = Transform3D(part["xf"]).origin
+			paver_pts.append(Vector2(cc.x, cc.z))
+	out["path_pavers"] = pavers
+	var reaches := false
+	var lat_sign := {}
+	var beds := 0
+	var flowers := 0
+	var other: Array[String] = []
+	if e >= 0:
+		var door: Dictionary = plan.doors[e]
+		var dpos := Vector2(door["pos"])
+		var dn2 := Vector2(door["normal"]).normalized()
+		var tang := Vector2(dn2.y, -dn2.x)
+		var nearest := INF
+		for pp in paver_pts:
+			nearest = minf(nearest, pp.distance_to(dpos + dn2 * 0.3))
+		var porch_r := HouseGeometry.porch_rect(plan)
+		if porch_r.has_area():
+			nearest = INF
+			for pp in paver_pts:
+				var dx := maxf(maxf(porch_r.position.x - pp.x, pp.x - porch_r.end.x), 0.0)
+				var dy := maxf(maxf(porch_r.position.y - pp.y, pp.y - porch_r.end.y), 0.0)
+				nearest = minf(nearest, Vector2(dx, dy).length())
+			reaches = nearest <= 0.8 and pavers >= 4
+		else:
+			reaches = nearest <= 1.4 and pavers >= 4
+		for piece in plan.yard_pieces:
+			var kind := str(piece["kind"])
+			if kind == "path":
+				continue
+			if kind == "bed" and str(piece["role"]) == "flower_bed" and str(piece["host"]) == "front":
+				beds += 1
+				var pc := Rect2(piece["rect"]).get_center()
+				lat_sign[signf((pc - dpos).dot(tang))] = true
+			elif str(piece["host"]) in ["front", "porch"]:
+				other.append(str(piece["role"]))
+		for prop in plan.yard:
+			if str(prop["host"]) not in ["front", "porch"]:
+				continue
+			if str(prop["role"]) == "bed_flowers":
+				flowers += 1
+			else:
+				other.append(str(prop["role"]))
+	out["path_reaches_door"] = reaches
+	out["flower_beds"] = beds
+	out["flower_bed_sides"] = lat_sign.size()
+	out["bed_flowers"] = flowers
+	out["front_roles"] = other
+
+
+static func _local_profile(points: PackedVector3Array, inv: Transform3D) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for p in points:
+		out.append(inv * Vector3(p))
+	return out
+
+
+static func _centroid(loc: Array[Vector3]) -> Vector3:
+	var c := Vector3.ZERO
+	for p in loc:
+		c += p
+	return c / float(maxi(loc.size(), 1))
+
+
+## The sharpest turn (degrees) at a vertex of a profile polygon in the roof's
+## (x, y) plane. `skip_buried` leaves out the vertices that lie at or under the
+## roof's top surface: the thatch's own seam with the slope is not an edge.
+static func _max_turn(loc: Array[Vector3], faces: Array[PackedVector3Array], skip_buried: bool) -> float:
+	var n := loc.size()
+	var worst := 0.0
+	for i in range(n):
+		var a := Vector2(loc[(i + n - 1) % n].x, loc[(i + n - 1) % n].y)
+		var b := Vector2(loc[i].x, loc[i].y)
+		var d := Vector2(loc[(i + 1) % n].x, loc[(i + 1) % n].y)
+		if skip_buried:
+			var surf := RoofShape.height_at(faces, Vector2(loc[i].x, loc[i].z)) + RoofShape.DEPTH * 0.5
+			if loc[i].y <= surf + 0.02:
+				continue
+		var v1 := b - a
+		var v2 := d - b
+		if v1.length() < 0.001 or v2.length() < 0.001:
+			continue
+		worst = maxf(worst, rad_to_deg(absf(v1.angle_to(v2))))
+	return worst
 
 
 ## Highest roof vertex that belongs to the main roof (the porch roof is lower

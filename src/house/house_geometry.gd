@@ -1285,6 +1285,124 @@ static func roof_has_thatch_roll(spec: HouseSpec, world_family: StringName = &""
 	return spec.thatch_roll or has_witch_roofcraft(spec, world_family)
 
 
+## HS-THATCH: the thatch is SOFT -- a rounded eave bolster and a saddle-shaped
+## ridge roll -- on the Witch hut (its own profile) and the thatched cottage.
+## Every other thatched style keeps its box eave and fin roll untouched.
+static func thatch_soft(spec: HouseSpec, world_family: StringName = &"") -> bool:
+	return roof_has_thatch_roll(spec, world_family) 		and (has_witch_roofcraft(spec, world_family) or spec.style == &"thatch_cottage")
+
+
+## The eave bolster of a soft cottage roof: an ellipse EAVE_ROLL_A along the
+## slope by EAVE_ROLL_B out of it (0.52 m through), centred EAVE_ROLL_IN in from
+## the roof's edge on the slab's mid-plane, so its outer reach stays inside the
+## edge and the plan bound loses nothing.
+const EAVE_ROLL_A := 0.34
+const EAVE_ROLL_B := 0.26
+const EAVE_ROLL_IN := 0.32
+const EAVE_ROLL_STEPS := 14
+## Saddle ridge roll: half-width of the crown, and how far the skirts flare
+## down the slope before they bury in the thatch.
+const RIDGE_ROLL_A := 0.28
+const RIDGE_ROLL_FLARE := 0.14
+
+## The eyebrow dormer (HS-THATCH): no walls and no gable; the thatch itself is
+## swept up over a low window as a half-barrel that comes out of the slope, its
+## mouth an arch with the window under the brow. Two arched slabs: a thin lip at
+## the front and the body behind it, which runs up the slope until the slope
+## swallows it. Both are level (their axis is horizontal), so the mouth is a
+## vertical arch whatever the pitch.
+const EYEBROW_HALF_W := [1.00, 0.92]
+const EYEBROW_RISE := [0.95, 0.85]
+const EYEBROW_LEN := [0.16, 1.60]
+const EYEBROW_UP := 0.95      # the lip, in from the roof edge (clear of the eave bolster)
+const EYEBROW_SINK := 0.07    # the arch's base is buried this far in the slab
+const EYEBROW_WIN_W := 1.10
+const EYEBROW_WIN_H := 0.46
+
+
+## Where the eyebrow dormers of `plan` stand, in the roof's local frame. Pure:
+## the builder consumes it and the measure re-derives nothing from it. Each
+## site: id, side (+-1 local x, the roof face), x (lip), z (along the ridge),
+## and the slope frame -- the unit slope tangent and surface normal in (x, y).
+## Chosen to face the entrance, clear of the chimney and of any real dormer.
+static func eyebrow_sites(plan: HousePlan, layout: Dictionary = {}) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var s := plan.spec
+	if s.eyebrows <= 0 or not thatch_soft(s, plan.world_family):
+		return out
+	if layout.is_empty():
+		layout = roof_layout(plan)
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	if faces.is_empty() or plan.has_court() or float(layout.get("ridge_half", 0.0)) <= 0.05:
+		return out
+	var xf: Transform3D = layout["transform"]
+	var along: float = layout["along"]
+	var hx: float = float(layout["span"]) * 0.5 + roof_span_out(s)
+	var e := plan.entrance()
+	var side := 1.0
+	var z_want := 0.0
+	if e >= 0:
+		var inv := xf.affine_inverse()
+		var door: Dictionary = plan.doors[e]
+		var dn := Vector2(door["normal"])
+		var lx := Vector2(xf.basis.x.x, xf.basis.x.z)
+		var dp := Vector2(door["pos"])
+		var dl := inv * Vector3(dp.x, xf.origin.y, dp.y)
+		z_want = dl.z
+		if absf(dn.dot(lx)) > 0.3:
+			side = 1.0 if dn.dot(lx) > 0.0 else -1.0
+		elif absf(dl.x) > 0.05:
+			# the door is in a gable end: the slope on the door's side of the
+			# ridge, and as near the door's end as the margin allows
+			side = signf(dl.x)
+	if not (layout["dormers"] as Array).is_empty():
+		side = 1.0   # the real dormers are on face 0 (-x)
+	var x_lip := side * (hx - EYEBROW_UP)
+	var m := _eyebrow_slope(faces, x_lip, 0.0, side)
+	var chimney := chimney_center(plan)
+	var stack_size := chimney_size(s) + CHIMNEY_BASE_EXTRA
+	var stack := Rect2(chimney - Vector2.ONE * (stack_size * 0.5 + 0.35), Vector2.ONE * (stack_size + 0.7))
+	var zmax := along * 0.5 - 1.1
+	var count := mini(s.eyebrows, 2)
+	var placed: Array[float] = []
+	for i in range(count):
+		var found := false
+		var want := clampf(z_want, -zmax, zmax) if i == 0 else (-signf(placed[0]) * 2.6 if not placed.is_empty() else 0.0)
+		for step in range(0, 13):
+			var shift := (float(step + 1) / 2) * 0.5 * (1.0 if step % 2 == 0 else -1.0)
+			var z := clampf(want + shift, -zmax, zmax)
+			var clash := false
+			for q in placed:
+				if absf(z - q) < 2.4:
+					clash = true
+			var lo := Vector3(x_lip, 0.0, z - EYEBROW_HALF_W[0] - 0.1)
+			var hi := Vector3(x_lip - side * (EYEBROW_LEN[0] + EYEBROW_LEN[1]), 0.0, z + EYEBROW_HALF_W[0] + 0.1)
+			var w0 := xf * lo
+			var w1 := xf * hi
+			var foot := Rect2(Vector2(minf(w0.x, w1.x), minf(w0.z, w1.z)),
+				Vector2(absf(w1.x - w0.x), absf(w1.z - w0.z)))
+			if s.chimney and foot.intersects(stack):
+				clash = true
+			if clash:
+				continue
+			placed.append(z)
+			out.append({"id": "eyebrow_%d" % i, "side": side, "x": x_lip, "z": z,
+				"tangent": m, "normal": Vector2(m.y, -m.x) * side})
+			found = true
+			break
+		if not found:
+			break
+	return out
+
+
+## The slope tangent (x, y) of the roof face on `side`: unit, pointing UP the
+## slope (toward the ridge).
+static func _eyebrow_slope(faces: Array[PackedVector3Array], x: float, z: float, side: float) -> Vector2:
+	var y0 := RoofShape.height_at(faces, Vector2(x, z))
+	var y1 := RoofShape.height_at(faces, Vector2(x - side * 0.1, z))
+	return Vector2(-side * 0.1, y1 - y0).normalized()
+
+
 static func roof_slab_top(spec: HouseSpec, world_family: StringName = &"") -> float:
 	# A cone has no ridge, so there is nothing to cap and no reeds to bundle
 	# along one. Promising a cap's height here anyway would leave the bound

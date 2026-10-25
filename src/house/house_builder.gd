@@ -2648,11 +2648,14 @@ func _build_thatch_roll(layout: Dictionary, authored: Array) -> void:
 	var rise: float = layout["rise"]
 	var faces: Array[PackedVector3Array] = layout["faces"]
 	var witch_roofcraft: bool = HouseGeometry.has_witch_roofcraft(spec, plan.world_family)
+	# HS-THATCH: the soft path (rounded eave, saddle roll) is the Witch hut's
+	# and the thatched cottage's; the cottage has its own profiles below.
+	var soft: bool = HouseGeometry.thatch_soft(spec, plan.world_family)
 	var roll_cuts: Array = authored.duplicate()
 	roll_cuts.append_array(layout.get("dormers", []))
 	var ew: float = HouseGeometry.THATCH_EAVE_W
 	for side in [-1.0, 1.0]:
-		if not witch_roofcraft:
+		if not soft:
 			component_box("thatch_eave", Vector3(ew, HouseGeometry.THATCH_EAVE_H, hy * 2.0),
 				xf * Transform3D(Basis(), Vector3(float(side) * (hx - ew * 0.5),
 				RoofShape.DEPTH * 0.5 - HouseGeometry.THATCH_EAVE_H * 0.5, 0.0)), SURF_ROOF)
@@ -2692,6 +2695,8 @@ func _build_thatch_roll(layout: Dictionary, authored: Array) -> void:
 					lerpf(inner_y, outer_y, 0.75) + shoulder_h, z),
 				Vector3(outer_x, outer_y, z),
 			])
+			if not witch_roofcraft:
+				eave_profile = _cottage_eave_bolster(float(side), hx, z, faces)
 			var eave_world := PackedVector3Array()
 			for profile_point in eave_profile:
 				eave_world.append(xf * profile_point)
@@ -2708,7 +2713,7 @@ func _build_thatch_roll(layout: Dictionary, authored: Array) -> void:
 	# the ends rather than off -ridge is what keeps a 14 m cottage's roll from
 	# hanging half a metre over the gable.
 	var rw: float = HouseGeometry.ROLL_W
-	if not witch_roofcraft:
+	if not soft:
 		var legacy_first: float = -ridge + HouseGeometry.ROLL_T * 0.5
 		var legacy_last: float = ridge - HouseGeometry.ROLL_T * 0.5
 		var legacy_count: int = maxi(int((legacy_last - legacy_first) / HouseGeometry.ROLL_PITCH) + 1, 1)
@@ -2764,13 +2769,54 @@ func _build_thatch_roll(layout: Dictionary, authored: Array) -> void:
 			var right_mid_face: PackedVector3Array = faces[0] if right_mid_x < ridge_x else faces[1]
 			var left_mid_y := _roof_top_surface_y(left_mid_face, faces, Vector2(left_mid_x, z)) + HouseGeometry.ROLL_H * 0.38
 			var right_mid_y := _roof_top_surface_y(right_mid_face, faces, Vector2(right_mid_x, z)) + HouseGeometry.ROLL_H * 0.38
-			_roof_face(xf, PackedVector3Array([
+			var roll_profile := PackedVector3Array([
 				Vector3(left_x, left_top, z), Vector3(left_mid_x, left_mid_y, z),
 				Vector3(ridge_x, RoofShape.height_at(faces, Vector2(ridge_x, z)) + HouseGeometry.ROLL_H, z),
-				Vector3(right_mid_x, right_mid_y, z), Vector3(right_x, right_top, z)]),
-				SURF_ROOF, "thatch_roll_%d" % roll_index, false, HouseGeometry.ROLL_T)
+				Vector3(right_mid_x, right_mid_y, z), Vector3(right_x, right_top, z)])
+			if not witch_roofcraft:
+				roll_profile = _cottage_ridge_saddle(ridge_x, z, faces)
+			_roof_face(xf, roll_profile, SURF_ROOF, "thatch_roll_%d" % roll_index, false, HouseGeometry.ROLL_T)
 			roll_index += 1
 	host_end()
+
+
+## HS-THATCH: the cottage's rolled eave. An ellipse in the roof's local (x, y)
+## plane -- EAVE_ROLL_A along the slope, EAVE_ROLL_B out of it -- centred on
+## the slab's mid-plane a little in from the edge, so the bundle is 0.52 m
+## through, round on every side, and stays inside the roof's plan bound.
+func _cottage_eave_bolster(side: float, hx: float, z: float,
+		faces: Array[PackedVector3Array]) -> PackedVector3Array:
+	var cx: float = side * (hx - HouseGeometry.EAVE_ROLL_IN)
+	var cy: float = RoofShape.height_at(faces, Vector2(cx, z))
+	var up := Vector2(-side * 0.1, RoofShape.height_at(faces, Vector2(cx - side * 0.1, z)) - cy).normalized()
+	var nrm := Vector2(up.y, -up.x) * side
+	var out := PackedVector3Array()
+	var steps: int = HouseGeometry.EAVE_ROLL_STEPS
+	for k in range(steps):
+		var a := TAU * float(k) / float(steps)
+		var p := Vector2(cx, cy) + up * (HouseGeometry.EAVE_ROLL_A * cos(a)) \
+			+ nrm * (HouseGeometry.EAVE_ROLL_B * sin(a))
+		out.append(Vector3(p.x, p.y, z))
+	return out
+
+
+## HS-THATCH: the cottage's ridge roll. A saddle: the crown is half an ellipse
+## ROLL_H high over the ridge, the skirts flare down the slopes to bury in the
+## thatch on both sides, so the roll sits ON the roof instead of hovering.
+func _cottage_ridge_saddle(ridge_x: float, z: float,
+		faces: Array[PackedVector3Array]) -> PackedVector3Array:
+	var a: float = HouseGeometry.RIDGE_ROLL_A
+	var flare: float = HouseGeometry.RIDGE_ROLL_FLARE
+	var apex: float = RoofShape.height_at(faces, Vector2(ridge_x, z))
+	var out := PackedVector3Array()
+	var rx: float = ridge_x + a + flare
+	out.append(Vector3(rx, RoofShape.height_at(faces, Vector2(rx, z)) + RoofShape.DEPTH * 0.5 - 0.04, z))
+	for k in range(9):
+		var t := PI * float(k) / 8.0
+		out.append(Vector3(ridge_x + a * cos(t), apex + HouseGeometry.ROLL_H * sin(t), z))
+	var lx: float = ridge_x - a - flare
+	out.append(Vector3(lx, RoofShape.height_at(faces, Vector2(lx, z)) + RoofShape.DEPTH * 0.5 - 0.04, z))
+	return out
 
 
 func _subtract_thatch_interval(ranges: Array[Vector2], cut: Vector2) -> Array[Vector2]:
@@ -3323,6 +3369,7 @@ func _build_roof() -> void:
 	host("roof", _storeys() - 1)
 	_build_eaves_tails(xf, span, along, rise)
 	_build_dormers(xf, layout["dormers"])
+	_build_eyebrows(layout)
 	_build_parapet(layout)
 	_build_eave_sweep(layout)
 	_build_thatch_roll(layout, authored)
@@ -3573,6 +3620,45 @@ func _build_dormers(xf: Transform3D, dormers: Array) -> void:
 			xf * Transform3D(Basis(), Vector3(front - 0.04, (win_top + win_bottom) * 0.5, z)))
 		component_box("dormer_mullion", Vector3(0.05, win_top - win_bottom, 0.055),
 			xf * Transform3D(Basis(), Vector3(front - 0.065, (win_top + win_bottom) * 0.5, z)), SURF_TRIM)
+		host("roof", _storeys() - 1)
+
+
+## HS-THATCH: the eyebrow dormer. There is no wall, cheek or gable: the thatch
+## is swept up over a low window as a half-barrel coming out of the slope
+## (HouseGeometry.EYEBROW_*): a thin arched lip and the body behind it, both
+## level, each buried EYEBROW_SINK under the slab at the lip. The window stands
+## in the mouth, under the brow. Hosted `eyebrow_N`.
+func _build_eyebrows(layout: Dictionary) -> void:
+	var sites := HouseGeometry.eyebrow_sites(plan, layout)
+	if sites.is_empty():
+		return
+	var xf: Transform3D = layout["transform"]
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	for site in sites:
+		host(String(site["id"]), _storeys() - 1)
+		var side: float = site["side"]
+		var z0: float = site["z"]
+		var x0: float = site["x"]
+		var y_base: float = RoofShape.height_at(faces, Vector2(x0, z0)) + RoofShape.DEPTH * 0.5 \
+			- HouseGeometry.EYEBROW_SINK
+		var behind := 0.0
+		for k in range(HouseGeometry.EYEBROW_RISE.size()):
+			var length: float = HouseGeometry.EYEBROW_LEN[k]
+			var xc: float = x0 - side * (behind + length * 0.5)
+			behind += length
+			var hw: float = HouseGeometry.EYEBROW_HALF_W[k]
+			var rise: float = HouseGeometry.EYEBROW_RISE[k]
+			var pts := PackedVector3Array()
+			for j in range(9):
+				var a := PI * float(j) / 8.0
+				pts.append(xf * Vector3(xc, y_base + rise * sin(a), z0 + hw * cos(a)))
+			pts.append(xf * Vector3(xc, y_base, z0 - hw))
+			pts.append(xf * Vector3(xc, y_base, z0 + hw))
+			component_slab("eyebrow_hood", pts, length, SURF_ROOF, false)
+		# the window, in the mouth, standing on the slope under the brow
+		var win_y: float = y_base + HouseGeometry.EYEBROW_SINK + 0.05 + HouseGeometry.EYEBROW_WIN_H * 0.5
+		_glazing_box("eyebrow_glazing", Vector3(0.05, HouseGeometry.EYEBROW_WIN_H, HouseGeometry.EYEBROW_WIN_W),
+			xf * Transform3D(Basis(), Vector3(x0 + side * 0.03, win_y, z0)))
 		host("roof", _storeys() - 1)
 
 

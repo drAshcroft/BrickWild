@@ -401,3 +401,72 @@ Observed (not traits):
 * Loggia renders: the rooflet's posts pierce it (the four posts pass through the orange slab); a small grey object floats in the gap between the post and eave at left in 8102 and 21325 (a distant prop seen through the gap, or a floating item).
 * Seed 1 interior: a very large hearth, table and bowl fill the frame; the bowl sits large against the table (prop scale).
 * Seed 1 and 21325 front: the hanging lamp glow at the left gable end is bright and blows out the wall.
+
+## thatch_cottage (HS-THATCH)
+
+Traits: (1) thatch eaves at least 0.4 m thick, soft-edged, with a combed ridge
+roll; (2) at least one eyebrow dormer swept out of the thatch; (3) pale rendered
+cob walls with no visible timber-frame components; (4) a front garden with flower
+beds and a path to the door, no work-yard props at the front.
+
+Measured first (8 x 10 m, one storey, seeds 1, 8102, 21325): (1) PARTLY. The
+eave was a plain box 0.45 m wide and 0.34 m high (hard edges, 90 degree corners,
+under the 0.4 m) and the ridge roll 19 triangular fins; the roll was combed but
+nothing was soft. (2) MISSING. `dormers` 0.2 and a dormer only ever stands on a
+house of two storeys or 12 m; a one-storey 10 m cottage never had one, and the
+real dormer is a gabled box with cheeks, not thatch. (3) PARTLY. Pale cream wall
+colour on all three, but `timber` 0.55 framed seeds 1 and 21325 (49 and 56 timber
+parts, gable ties and members, interior frame posts); seed 8102 was bare. (4)
+MISSING. Yard: path, the fenced kitchen bed (behind), a washing line, and the
+porch pail at the front; no flower bed anywhere.
+
+Built (style constants, no random draw added or moved):
+* Soft thatch: `HouseGeometry.thatch_soft()` (the Witch hut and `thatch_cottage`
+  only; cottage, farmhouse, longhall and african keep the box eave and fin roll,
+  unchanged). The cottage's eave is an ellipse 0.34 x 0.26 m (0.52 m through, 14
+  profile points) centred 0.32 m in from the roof edge, so its reach stays inside
+  the edge and the plan bound loses nothing; the ridge roll is a saddle (nine-point
+  half-ellipse crown 0.30 m over the ridge, skirts flared down both slopes and buried
+  in the thatch), 19 bundles spanning the whole ridge. The Witch hut keeps its own
+  profiles; its code path is the same.
+* Cob: the row's `timber`, `braces`, `rail`, `jetty` and `stone_ground` are 0.0 (the
+  draws are still taken).
+* Eyebrow dormer: `eyebrow` 1 in the row, read into `HouseSpec.eyebrows` with no draw.
+  `HouseGeometry.eyebrow_sites()` (pure) puts it on the slope on the door's side of the
+  ridge at the door's end (the entrance of this style is in a gable end), clear of the
+  chimney and of any real dormer. `HouseBuilder._build_eyebrows` emits it as host
+  `eyebrow_N`: a level half-barrel of thatch, 2.0 m wide and 0.95 m high at the mouth,
+  coming out of the slope (a thin arched lip and a body 1.6 m long behind it, buried in
+  the slope), with a dark window 1.1 x 0.46 m in the mouth under the brow. No cheeks,
+  no gable, no wall: the thatch is the dormer. It stays below the ridge.
+* Front garden: yard group `front_beds` (first in the style's groups, the kitchen
+  garden behind it): a flower bed (`bed` piece with boards and soil, three flower
+  clumps standing on it) on each side of the path, found by walking outward from the
+  path until clear (a facade bench stood exactly where the first bed would go on
+  all three seeds). The washing line and woodpile are no longer in the style's
+  groups and the porch pail is not planned for this style, so nothing of a work
+  yard stands at the front.
+
+Test: `tests/house_thatch_traits_test.gd` (94 checks) over the frozen requests
+`house/thatch_cottage/{1,8102,21325}` (8102 existed; 1 and 21325 added, all 8 x 10 m).
+Keys `HouseTraitMeasure` `wall_pale wall_rendered frame_parts eave_count eave_form
+eave_points eave_thick eave_turn_max roll_count roll_points roll_turn_max roll_cover
+roll_height eyebrow_count eyebrow_glazing eyebrow_width eyebrow_rise eyebrow_seated
+eyebrow_below_ridge eyebrow_faces_entrance eyebrow_clear_of_chimney path_pavers
+path_reaches_door flower_beds flower_bed_sides bed_flowers front_roles`. Softness is
+the sharpest turn of the profile outline (60 degrees at most; a box is 90); the buried
+vertices of the ridge saddle are left out. Controls: the same plan built as a
+`farmhouse` (box eave 0.34 m, fin roll, no eyebrow), `thatch_roll` off, eyebrows 0, a
+timber frame, a dark wall, the beds removed, a crate at the front, the path removed.
+
+Known sides: the interior still shows the exposed ceiling joists (not a wall frame);
+the stone plinth shows under the cob; the eyebrow reads best from the side, as a
+rounded bump with a window, and its window uses the same pale glazing as every other
+window; the eave roll is a smooth bolster, not individually combed layers.
+
+Renders for review: `artifacts/hs_thatch/renders/` (`tools/render_hs_thatch.gd`, not
+headless), per seed: `_front` roof-on three-quarter from the eyebrow's side, high;
+`_eyebrow` roof-on, lower and closer on the same side; `_garden` eye level from the
+road; `_interior` eye level in the entrance room, looking at the door.
+
+Reviewer: pending
