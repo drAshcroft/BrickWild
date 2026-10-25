@@ -446,7 +446,7 @@ func _check_legacy_thatch_control() -> void:
 		if String(row.get("form", "")) != "box":
 			_fail("legacy thatch Cottage eave changed from its baseline box")
 	var expected_flue_top: float = spec.height * float(maxi(spec.storeys, 1)) \
-		+ HouseGeometry.roof_rise(spec) + HouseBuilder.CHIMNEY_CLEAR
+		+ HouseGeometry.roof_rise(spec) + HouseBuilder.CHIMNEY_CLEAR 		+ HouseGeometry.stack_extra(spec)  # 80e52d2 (HS-COTTAGE) raised every cottage stack on purpose
 	var actual_flue_top := -INF
 	for part in builder.part_log:
 		if String(part.get("tag", "")) != "chimney" or String(part.get("kind", "")) != "box":
@@ -457,7 +457,7 @@ func _check_legacy_thatch_control() -> void:
 		actual_flue_top = maxf(actual_flue_top,
 			float(part["pos"].y) + float(part["size"].y) * 0.5)
 	if not is_finite(actual_flue_top) or absf(actual_flue_top - expected_flue_top) > 0.002:
-		_fail("legacy thatch Cottage chimney top moved from its baseline ridge + 0.6 m")
+		_fail("legacy thatch Cottage chimney top moved from its baseline ridge + 0.6 m + cottage stack_extra")
 	mesh.clear_surfaces()
 
 
