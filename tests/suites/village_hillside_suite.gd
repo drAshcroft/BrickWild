@@ -130,9 +130,7 @@ static func run() -> SuiteResult:
 ## The two real hillsides (HILLS-FIXTURES, HILLS-QA): the same four bands,
 ## every household housed and every requested building placed (the tavern
 ## included), every way inside its class's grade, the terraces and the stepped
-## cross-lanes laid, and the ROAD CHECK. VillageQA is not held here: the
-## common's fronts (Manarola, Masouleh), the lot density, the common's ground
-## and the edge run (Masouleh) are the open items in docs/VILLAGE_TERRAIN.md.
+## cross-lanes laid, the road check and VillageQA.
 static func _real(res: SuiteResult, jobs: Array[Dictionary], name: String) -> void:
 	var ground := VillageTerrain.from_file("res://tests/fixtures/terrain/%s.json" % name)
 	res.checked += 1
@@ -188,7 +186,18 @@ static func _real(res: SuiteResult, jobs: Array[Dictionary], name: String) -> vo
 		res.fail("%s hillside: road check: %s" % [name, "; ".join((roads["failures"] as Array).slice(0, 5))])
 	var no_pure := func(_p: VillagePlan) -> Array: return []
 	var qa := VillageQA.new().check(plan, {&"pure": no_pure}, false)
-	res.note("%s hillside: VillageQA open: %s" % [name, "; ".join(qa["failures"])])
+	res.checked += 1
+	if not qa["ok"]:
+		res.fail("%s hillside: village QA: %s" % [name, "; ".join((qa["failures"] as Array).slice(0, 5))])
+	# the through road's cap has teeth: a stair street (`stepped`) is let off it,
+	# and the same plan with the flag taken away fails the road check
+	if bool(plan.roads[0].get("stepped", false)):
+		plan.roads[0]["stepped"] = false
+		var cart := VillageRoadCheck.new().check(plan)
+		plan.roads[0]["stepped"] = true
+		res.checked += 1
+		if cart["ok"] or not (cart["failures"] as Array).any(func(f: String) -> bool: return f.begins_with("through_grade")):
+			res.fail("%s hillside: an over-cap through road without `stepped` passed the road check" % name)
 
 
 static func _spec(ground: VillageTerrain) -> VillageSpec:

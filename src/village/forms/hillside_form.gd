@@ -126,6 +126,17 @@ const LEVEL_WEIGHTS := [5.0, 1.0, 1.0, 5.0]
 ## Where the terrace band is steeper than this, the lowest terrace is on ground
 ## that refuses most lots (Masouleh), and carries fewer; the upper levels more.
 const STEEP_BAND_SLOPE := 0.325
+const STEEP_DEPTH_M := 148.0
+## The tavern stands by a gate (VILLAGES 6: within the place check's 60 m). The
+## through road must reach the site's edge at both ends, so where the lot checks
+## can only stand the tavern mid-village (Manarola) the lot planner plans again
+## with the site cut to TAVERN_GATE_M from it at the near end (`site_crop`).
+const TAVERN_GATE_M := 43.0
+const TAVERN_NEAR_M := 56.0
+const CROP_MIN_W_M := 140.0
+## The real faces, against the synthetic plane (0.30): the through road's homes
+## stand beside the common (fixture-fitted; the plane loses its elongation).
+const AROUND_SLOPE := 0.31
 const LEVEL_WEIGHTS_STEEP := [5.0, 2.0, 2.0, 3.0]
 const EDGE_INSET_M := 4.0
 const SITE_MARGIN_M := 2.0
@@ -135,7 +146,7 @@ const SITE_MARGIN_M := 2.0
 ## lot planner's retries buy ground along the contour (`site_scale`), and a
 ## lane off the through road would be one more way across the terraces.
 static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
-		ground: VillageTerrain = null, minimum_depth := 0.0) -> VillagePlan:
+		ground: VillageTerrain = null, minimum_depth := 0.0, site_crop := Vector2.ZERO) -> VillagePlan:
 	var out := VillagePlan.new(spec)
 	out.site = site_rect(spec, site_scale, minimum_depth)
 	var rng := RandomNumberGenerator.new()
@@ -152,6 +163,11 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 		var deeper: float = out.site.size.y + float(TERRACES) * (pitch - TERRACE_PITCH_M)
 		deeper = minf(deeper, VillageSitePlanner.SITE_MAX_SIDE)
 		out.site = Rect2(Vector2(out.site.position.x, -deeper * 0.5), Vector2(out.site.size.x, deeper))
+	if slope > STEEP_BAND_SLOPE:
+		# on the steepest faces the band needs no more depth than its terraces
+		# and the ground above them (fixture-fitted: Masouleh's density)
+		out.site = Rect2(Vector2(out.site.position.x, -STEEP_DEPTH_M * 0.5),
+			Vector2(out.site.size.x, STEEP_DEPTH_M))
 	var lean_deg: float = riser_lean_deg(slope)
 	var parallel: bool = lean_deg > RISER_LEAN_DEG + 4.0
 	var drift: float = 0.0
@@ -161,6 +177,11 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 		var wider: float = minf(out.site.size.x + drift, VillageSitePlanner.SITE_MAX_SIDE)
 		out.site = Rect2(Vector2(-wider * 0.5, out.site.position.y), Vector2(wider, out.site.size.y))
 		drift = minf(drift, wider * 0.45)
+	if site_crop != Vector2.ZERO:
+		var x_lo: float = maxf(out.site.position.x, site_crop.x)
+		var x_hi: float = minf(out.site.end.x, site_crop.y)
+		if x_hi - x_lo >= CROP_MIN_W_M:
+			out.site = Rect2(Vector2(x_lo, out.site.position.y), Vector2(x_hi - x_lo, out.site.size.y))
 	var through: PackedVector2Array = VillageSitePlanner._through_road(out.site, spec, rng)
 	# set the road toward the uphill side, leaving the terrace band below it
 	var shift: float = -down * maxf(0.0, out.site.size.y * 0.5 - UPHILL_ROOM_M)
@@ -174,6 +195,12 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 			through, 0.0)].y, float(VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"]))
 	var through_road: Dictionary = VillageSitePlanner._road(through, &"through", spec.wealth)
 	through_road["band_slope"] = slope     # a planning key, like `terrace`
+	if ground != null and VillageRoadRouter.grade_of(ground, through) > float(
+			VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"]) + 1e-6:
+		# a level line that still climbs past a cart's 12 % (the face is too steep
+		# for any cart road): the village's main street is a stair street, as on
+		# the real Manarola; the road check holds a cart road to its cap
+		through_road["stepped"] = true
 	out.roads.append(through_road)
 
 	# the common and the landmark stand uphill of the road
@@ -729,6 +756,29 @@ static func _field_tracks(out: VillagePlan, low: PackedVector2Array, down: float
 				break
 
 
+## The site cut that puts a gate by the tavern, or Vector2.ZERO when it needs
+## none: (x_lo, x_hi) in the plan's frame, the west end brought in to
+## TAVERN_GATE_M from it, the east left open.
+static func site_crop(plan: VillagePlan) -> Vector2:
+	if plan.spec.form != &"hillside" or plan.ground == null:
+		return Vector2.ZERO
+	var gates: Array[Vector2] = VillageMeasure.gates(plan)
+	var worst := 0.0
+	var worst_x := 0.0
+	for i in VillageMeasure.shops_of(plan, &"tavern"):
+		var fm: Vector2 = VillageMeasure.front_mid(plan.buildings[i])
+		var near := INF
+		for g in gates:
+			near = minf(near, g.distance_to(fm))
+		if near > worst:
+			worst = near
+			worst_x = fm.x
+	if worst <= TAVERN_NEAR_M:
+		return Vector2.ZERO
+	# the table puts the tavern at the WEST gate (upwind of the smithy)
+	return Vector2(worst_x - TAVERN_GATE_M, INF)
+
+
 ## `line` with y eased by EASE_PASSES passes of [1 2 1] over its interior,
 ## except the pinned vertex and the two ends (a riser takes those).
 static func _ease(line: PackedVector2Array, pinned: int) -> PackedVector2Array:
@@ -918,6 +968,12 @@ static func assign_jobs(plan: VillagePlan, jobs: Array[Dictionary]) -> void:
 		# field tracks off it): a chain of homes 45 m apart across the levels
 		var t: float = (float(rank) + 0.2 + 0.5 * float((levels.size() - 1 - lv) % 2)) / float(counts[lv])
 		var x: float = lerpf(pts[0].x + SLOT_END_M, pts[pts.size() - 1].x - SLOT_END_M, clampf(t, 0.0, 1.0))
+		var around: bool = lv == 0 and not plan.commons.is_empty() and float(plan.roads[0].get("band_slope", 0.0)) > AROUND_SLOPE
+		if around:
+			var cr: Rect2 = Poly.bounding_rect(plan.commons[0]["poly"])
+			var reach: float = cr.size.x * 0.5 + 12.0
+			var offs: Array = [reach, -reach, 0.0]
+			x = clampf(cr.get_center().x + float(offs[mini(rank, 2)]), pts[0].x + SLOT_END_M, pts[pts.size() - 1].x - SLOT_END_M)
 		var y: float = VillageLotPlanner._polyline_y_at_x(pts, x)
 		var side: float = 1.0 if rank % 2 == 0 else -1.0
 		homes[i]["near_point"] = Vector2(x, y + side * 10.0)

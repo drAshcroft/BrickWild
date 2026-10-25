@@ -225,6 +225,17 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			unplaced = finer_left
 			common_state = finer_common
 			break
+	# A hillside whose tavern the lot checks could only stand mid-village is
+	# cut short at the near end, so a gate stands by it (VillageHillsideForm.
+	# site_crop). Kept if everyone is still housed and the village no sparser.
+	var crop: Vector2 = VillageHillsideForm.site_crop(out) if unplaced <= 0 else Vector2.ZERO
+	if crop != Vector2.ZERO:
+		for widen in [1.0, 1.1, 1.2]:
+			var cut: VillagePlan = _replan(spec, jobs, int(accepted[0]), float(accepted[1]) * widen,
+				minimum_depth, shore_depth, false, crop)
+			if cut_measured(cut, jobs) <= 0 and _density(cut) >= _density(out) - 1e-6:
+				out = cut
+				break
 	_trim_lanes(out)
 	VillageDispersedForm.finish(out)
 	# Lot cutting can add service lanes, drop roads and add a mill race.
@@ -362,11 +373,12 @@ const FINE_WIDTH_STEPS: Array[float] = [1.05, 1.1, 1.15, 1.2, 1.25]
 ## `clear_head` keeps the field tracks off the eastern half, where
 ## `_place_manor` looks for the lord's lane.
 static func _replan(spec: VillageSpec, jobs: Array[Dictionary], lanes: int, scale: float,
-		minimum_depth: float, shore_depth: float, clear_head := false) -> VillagePlan:
-	var again: VillagePlan = VillageSitePlanner.plan(spec, lanes, scale, minimum_depth, shore_depth)
+		minimum_depth: float, shore_depth: float, clear_head := false,
+		site_crop := Vector2.ZERO) -> VillagePlan:
+	var again: VillagePlan = VillageSitePlanner.plan(spec, lanes, scale, minimum_depth, shore_depth, site_crop)
 	var retry_depth := _manor_site_depth(again, jobs)
 	if retry_depth > again.site.size.y + 0.001:
-		again = VillageSitePlanner.plan(spec, lanes, scale, maxf(minimum_depth, retry_depth), shore_depth)
+		again = VillageSitePlanner.plan(spec, lanes, scale, maxf(minimum_depth, retry_depth), shore_depth, site_crop)
 	if clear_head:
 		_drop_head_tracks(again)
 	return again

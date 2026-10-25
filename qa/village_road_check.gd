@@ -18,7 +18,7 @@ extends RefCounted
 ## polygons alone. `ascii_map()` draws the roads as `=`.
 
 const RULES: Array[StringName] = [&"connected", &"through", &"hierarchy", &"dead_ends",
-	&"width", &"bends", &"junctions", &"clear", &"crossings", &"gates"]
+	&"width", &"bends", &"junctions", &"clear", &"crossings", &"gates", &"through_grade"]
 const THROUGH_TO_COMMON := 15.0
 const DEAD_END_MAX := 40.0
 const WIDTH_TOL := 0.05
@@ -58,6 +58,21 @@ func _check_connected(plan: VillagePlan) -> void:
 	stats["road_components"] = parts
 	if parts != 1:
 		failures.append("connected: the roads are %d separate networks" % parts)
+
+
+## On given ground the through road is a cart road: no steeper than its class's
+## cap, unless the plan says it is a STAIR STREET (`stepped`: a hillside whose
+## face is too steep for any cart, Manarola's, Positano's). `grade_roads` never
+## re-classes road 0, so this is the only place the cap is held on it.
+func _check_through_grade(plan: VillagePlan) -> void:
+	if plan.ground == null:
+		return
+	var cap: float = float(VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"])
+	for r in plan.roads_of_class(&"through"):
+		var g: float = VillageRoadRouter.grade_of(plan.ground, plan.roads[r]["points"])
+		stats["through_grade"] = snappedf(g, 0.001)
+		if g > cap + 1e-6 and not bool(plan.roads[r].get("stepped", false)):
+			failures.append("through_grade: road %d climbs %.0f %%, a cart road's cap is %.0f %%" % [r, g * 100.0, cap * 100.0])
 
 
 func _check_through(plan: VillagePlan) -> void:

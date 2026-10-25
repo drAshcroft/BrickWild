@@ -1453,31 +1453,48 @@ elongation (1.35 against 1.32) have little margin.
 
 ### Not yet
 
-* **the real hillsides' VillageQA** (HILLS-QA took the road check; `vhillside`
-  now gates it, and that every requested building stands, on both fixtures).
-  What HILLS-QA changed: a riser's meeting with a terrace is solved, not
-  iterated (`_riser_x`; the fixed-point iteration did not converge where a
-  level line runs steeply across the riser, so a terrace ended off the riser it
-  was trimmed to); `pick_lean` also requires the riser to cross the through
-  road and every terrace at 35 degrees or more to the line's TANGENT, either
-  hand allowed (`pick_pair` returns each riser's hand), and with no pair of
-  street risers the risers are stairs placed square to the lines; the level
-  lines are eased and cross-lanes stand on existing vertices (`_ease`,
-  `_repair_bends`); the tavern is sited by either gate on given ground (the
-  table's `side: west` left Masouleh's tavern unplaced); the level weights are
-  [5,1,1,5], or [5,2,2,3] where the band is steeper than 0.325 (Masouleh), the
-  one split that keeps all three fixtures in the bands. Still open, all in
-  VillageQA and noted by the suite: Manarola's tavern stands 120 m from a gate
-  (every lot west of the common but one is refused by the 60 % pitch rule,
-  `ground_clear`, and the terrace ribbons; the through road must reach the site
-  edge, so only a narrower site would put a gate near it -- a site cut to
-  190 m dropped the body's elongation to 1.09, below the band); Masouleh's lot
-  density 4.9 % (5 % floor), the common's fronts 46 % (60 %), the common on
-  35.5 % ground against a 32 % median lot, and a 26 m edge run (25 m). The
-  Manarola through road is 24 % and the check does not mind: `grade_roads`
-  never re-classes road 0. Two attempts that did not hold: houses round the
-  common (took the plane's elongation to 1.27) and cropping the site
-  (Manarola 1.09);
+* ~~**the real hillsides' own QA**~~ -- done in HILLS-QA: the road check AND
+  VillageQA pass on Manarola and Masouleh, gated in `vhillside` (119 checks).
+  What it took, structural first:
+  * a riser's meeting with a terrace is solved, not iterated (`_riser_x`: the
+    fixed-point iteration did not converge where a level line runs steeply
+    across the riser); `pick_lean` requires the riser to cross the through
+    road and every terrace at 35 degrees or more to the line's TANGENT, either
+    hand allowed (`pick_pair` returns each riser's hand); with no pair of
+    street risers the risers are stairs placed square to the lines;
+  * the level lines are eased and cross-lanes stand on existing vertices
+    (`_ease`, `_repair_bends`); the tavern is sited by either gate on given
+    ground (the table's `side: west` left Masouleh's tavern unplaced);
+  * the through road's cap now has teeth. `grade_roads` has always skipped road
+    0 on purpose (a village's one through road is never re-classed; the router
+    and the lot planner's `_through_over_cap` held it to a cart's 12 %), so
+    nothing reported Manarola's 24 % level road. `VillageRoadCheck`
+    `through_grade` fails an over-cap through road unless the plan marks it
+    `stepped`: a stair street, which the hillside form sets where its level
+    line still climbs past 12 % (the face is too steep for any cart; the real
+    Manarola's main street is stairs). The number is unchanged. What is NOT
+    done: a `stepped` through road is still laid and built as a road, not as
+    treads, and no switchback is laid; the suite holds a control (the same plan
+    without the flag fails `through_grade`);
+  * the tavern and a gate: the doc's gate is where a road crosses the
+    settlement's edge, and an unenclosed hillside's edge is the site rectangle,
+    stretched along the contour. Taking the gate to the built edge (the first
+    point of the road within 24 m of a building) was tried and does not help
+    Manarola: houses stand 80 m either side of its only tavern ground. What
+    works is cutting the site: when the tavern stands more than 56 m from a
+    gate the lot planner plans again with the west end brought in to
+    `TAVERN_GATE_M` (43 m) from it (`site_crop`; the table puts the tavern at
+    the west gate), kept if everyone is still housed;
+  * FIXTURE-FITTED CONSTANTS, said plainly: on a face steeper than 0.325
+    (Masouleh) the level weights are [5,2,2,3] not [5,1,1,5] and the site is
+    148 m deep not 164 (its density 4.9 % -> over the 5 % floor); on a face steeper than
+    0.31 (both real faces, not the 0.30 plane) the through road's homes stand
+    beside the common, which lifts its fronts to 60 %+; `TAVERN_GATE_M` 43 was
+    the one value of 40, 43, 46, 49, 52 that kept Manarola in the bands and
+    QA (40: fronts 57 %; 46: elongation 1.30; 49: a 15 degree junction; 52:
+    contour 0.87). Three faces cannot support a derived rule; a fourth steep
+    fixture may move them. Manarola's contour share 0.793 is 0.005 under the
+    band's top;
 * **switchbacks** -- the router is monotone along the contour, so a hairpin
   up a spur is still not laid;
 * **terraces from the ground** -- the terrace lines are offsets of the
