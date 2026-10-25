@@ -159,6 +159,10 @@ var heat_settings: Array[Dictionary] = []
 ## HouseFurnisher stands the hearth against it, so the fire and the flue are
 ## never on different walls again.
 var hearth: Dictionary = {}
+## Small hand-made props that are not catalogue models (WITCH-PROPS): brooms,
+## each {kind, room, storey, base, axis_to_wall, length, rect, near}. Planned by
+## HouseWitchProps, dressed by HouseAssembler.
+var witch_props: Array[Dictionary] = []
 ## Floor the PLAN keeps clear, before anything is placed:
 ## [{"room": int, "rect": Rect2, "why": String}].
 ##

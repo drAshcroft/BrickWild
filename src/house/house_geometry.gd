@@ -947,6 +947,12 @@ const WITCH_RECESS_BACK_CLEAR := 0.12
 const WITCH_RECESS_FRONT_CLEAR := 0.08
 const WITCH_RECESS_SIDE_BUILDUP := 0.72
 const WITCH_RECESS_SEAT_Y := 0.14
+## The wood-burning stove (WITCH-PROPS) stands in a bay added beside the
+## Cauldron's alcove, on the same stone slab, and pipes into the breast header.
+const WITCH_STOVE_BAY := 0.62
+const WITCH_STOVE_SIZE := Vector3(0.50, 0.56, 0.46)
+const WITCH_STOVE_LEG := 0.07
+const WITCH_STOVE_PIPE_RADIUS := 0.055
 const WITCH_CAULDRON_LOWER_LOG := Vector3(0.075, 0.07, 0.40)
 const WITCH_CAULDRON_UPPER_LOG := Vector3(0.38, 0.056, 0.075)
 const WITCH_CAULDRON_LOG_SPREAD := 0.08625
@@ -984,7 +990,8 @@ static func hearth_mouth(plan: HousePlan) -> Dictionary:
 
 ## A structural surround authored alongside the actual hearth placement.
 ## Its outline keeps diagonal walls honest; rect is only the broad-phase bound.
-static func breast_for_hearth(plan: HousePlan, room: int, item: Dictionary, wall: int) -> Dictionary:
+static func breast_for_hearth(plan: HousePlan, room: int, item: Dictionary, wall: int,
+		stove_side := 0.0) -> Dictionary:
 	var host: Dictionary = room_walls(plan, room)[wall]
 	var normal: Vector2 = host["normal"]
 	var along: Vector2 = (Vector2(host["to"]) - Vector2(host["from"])).normalized()
@@ -994,6 +1001,22 @@ static func breast_for_hearth(plan: HousePlan, room: int, item: Dictionary, wall
 		var wall_point := Rect2(item["rect"]).get_center() \
 			- normal * (foot.y * 0.5 + WITCH_RECESS_BACK_CLEAR)
 		var recess_centre := wall_point + normal * size.y * 0.5
+		var stove := {}
+		if stove_side != 0.0:
+			# The bay grows the mouth on one side only. Offsets run along the
+			# breast's own x axis (Basis(UP, yaw)), the axis the builder uses.
+			var yaw_b := float(item["yaw"])
+			var axis := Vector2(cos(yaw_b), -sin(yaw_b))
+			var mouth_old := size.x - 0.42
+			recess_centre += axis * stove_side * WITCH_STOVE_BAY * 0.5
+			size.x += WITCH_STOVE_BAY
+			along = axis
+			var stove_x := stove_side * (mouth_old * 0.5 + WITCH_STOVE_BAY * 0.5)
+			var stove_centre: Vector2 = wall_point \
+				+ normal * (WITCH_STOVE_SIZE.z * 0.5 + 0.04) + axis * stove_x
+			stove = {"centre": stove_centre, "yaw": yaw_b, "side": stove_side,
+				"size": WITCH_STOVE_SIZE, "slab_y": WITCH_RECESS_SEAT_Y,
+				"pipe_radius": WITCH_STOVE_PIPE_RADIUS}
 		var recess_outline := PackedVector2Array([
 			recess_centre - along * size.x * 0.5 - normal * size.y * 0.5,
 			recess_centre + along * size.x * 0.5 - normal * size.y * 0.5,
@@ -1003,7 +1026,7 @@ static func breast_for_hearth(plan: HousePlan, room: int, item: Dictionary, wall
 			"storey": plan.storey_of_room(room), "wall": wall, "centre": recess_centre,
 			"normal": normal, "width": size.x, "depth": size.y,
 			"outline": recess_outline, "rect": Poly.bounding_rect(recess_outline),
-			"yaw": float(item["yaw"])}
+			"yaw": float(item["yaw"]), "stove": stove}
 	var centre: Vector2 = Rect2(item["rect"]).get_center() - normal * (foot.y * 0.5 + BREAST_DEPTH * 0.5)
 	var width := foot.x + 0.4
 	var outline := PackedVector2Array([centre - along * width * 0.5 - normal * BREAST_DEPTH * 0.5,

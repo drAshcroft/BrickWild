@@ -69,6 +69,7 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 					"key": "Pot_1", "purpose": "hearth_cooking",
 					"host": "ordinary_fireplace", "support": "iron_tripod"}
 				break
+	HouseWitchProps.plan_props(plan)
 
 
 ## Choose one room for the household's meal before room recipes run. This is a
