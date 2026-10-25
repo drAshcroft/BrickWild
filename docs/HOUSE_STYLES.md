@@ -269,4 +269,32 @@ headless): `rich_<seed>_front` roof-on three-quarter, `_hall_stair`, `_parlour`,
 
 Fingerprint (`tools/fingerprint_houses.gd`, five older styles, HEAD worktree vs this tree): 130 lines, identical. `lane:house-exterior-fast` has one failure, `witch_hut/none rotated=false no exterior dressing`, that fails identically at HEAD (`hexterior` in the base worktree).
 
-Reviewer: pending
+Independent reviewer: fresh agent, from the renders of commit 41e0ad3 (2026-10-25). Judged only from `artifacts/hs_rich/renders/rich_<seed>_{front,hall_stair,parlour,dining_room}.jpg`.
+
+| seed | (1) door hall holds stair | (2) parlour + dining room, 4+ chairs | (3) trim on floor lines / eave |
+|---|---|---|---|
+| 1 | YES | YES (borderline) | YES (borderline) |
+| 8102 | YES | NO | YES (borderline) |
+| 21325 | YES | YES (borderline) | YES (borderline) |
+
+Reasons:
+* (1) all three: the hall view shows a flight with rails rising from a floor with wall lights, windows and a chest or bench; the front door itself is not in any hall frame, only the porch in the exterior, so "door into the hall" is inferred from the porch position. Seed 1 stair is in a plain narrow hall; 8102 and 21325 are clear.
+* (2) seed 8102 MISS: the dining view shows a long laid table with two stools on one side and nothing else; no set of four chairs can be seen (the far side of the table is out of frame, and what is seated are stools, not chairs). Cannot tick what is not seen. Seed 1 and 21325: four chairs in a row along one side of the table, one table, a distinct room: tick. Borderline in all seeds: the parlour is two long bare benches facing each other down a corridor-like room (plus a cabinet on seeds 1 and 21325); it reads as a waiting passage, not a seating group of settles around a hearth. Seed 8102 parlour has no other furniture at all.
+* (3) a thin horizontal band at the eave under the gable and a string course at the first-floor line are plainly visible on all three fronts (21325 has the storey line on stone with a notched course). Borderline: both are thin flat bands; neither reads as a projecting cornice crown, and no band shows at the ground-floor head or above the plinth.
+
+Images: `artifacts/hs_rich/renders/rich_1_front.jpg`, `rich_1_hall_stair.jpg`, `rich_1_parlour.jpg`, `rich_1_dining_room.jpg`; the same four for `8102` and `21325`.
+
+Open:
+* Seed 8102 dining room: only two stools in view, no four chairs visible (trait 2 not met by the image).
+* All seeds: the parlour has no recognisable seating group, only two bare benches; the trait is held on the letter, weakly on the look.
+* All seeds: the front door is not shown opening into the hall; trait 1 rests on the porch plus the hall view.
+* All seeds: the cornice is a plain thin band, not a visible crown.
+
+Observed (not traits):
+* Dining room and parlour are 2.8 to 3.3 m strips that read as corridors; the table fills the width and leaves one chair-width of walkway (seed 1, 21325).
+* Dining table: a long grey strip crosses the tabletop through the plate (seeds 1, 8102, 21325), reads as a mis-scaled runner or knife clipping the plate.
+* Parlour benches on the near side look cantilevered and oversized, a bench end overhanging past its legs (seeds 8102, 21325 right bench is two planks with a step).
+* 8102 and 21325 dining: a chair or barrel back clips the camera in the foreground; objects at the room edge crowd the door swing.
+* Seed 1 front: no chimney visible, only two thin poles on the ridge and gable; 8102 has a very tall detached-looking stone stack; 21325 has a blank stone ground floor.
+* 21325 hall: a chandelier hangs low against the stair wall, and the stone-faced hall wall differs from the plaster of the other seeds.
+* No z-fighting or floating furniture otherwise seen.
