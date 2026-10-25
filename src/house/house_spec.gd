@@ -130,7 +130,9 @@ const STYLES := {
 		# A small household first: shared sleeping, cooking and sitting spaces.
 		"domestic_program": [&"hall", &"bedroom", &"kitchen", &"bedroom", &"store", &"parlour"],
 		"timber": 0.95, "studs": [0.95, 1.5], "braces": 0.8, "rail": 0.5,
-		"roof_pitch": [0.85, 1.2], "porch": 0.5, "chimney": 0.9, "shutters": 0.7,
+		"roof_pitch": [0.85, 1.2], "porch": 1.0, "chimney": 1.0, "shutters": 0.7,
+		# HS-COTTAGE: a sheltered door and a hearth stack are traits, not chances. 1.0
+		# still draws, so no later roll in the stream moves.
 		"roof_material": &"shingle", "pitch_reference": 7.0,
 		"wall": ["e6ddc8", "cfc3a8"], "trim": ["6b5236", "4a3826"],
 		"roof": ["6a4a34", "4e3626"], "floor": ["8a7a5e", "6f6148"],
