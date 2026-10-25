@@ -93,6 +93,20 @@ const RISER_SEARCH_STEP_M := 10.0
 const RISER_MIN_SEP_M := 70.0
 const RISER_PICK_GRADE := 0.295
 const RISER_LEAN_MAX_DEG := 60.0
+## A riser meets a terrace (and the through road) at least this far from its
+## line, measured on the line's real tangent: the road check wants 30 degrees
+## between any two ways at a junction, and a level line on a real face is not
+## parallel to the site's axis. A riser that cannot meet them squarely enough
+## is leaned the other way, or not at all.
+const JUNCTION_MIN_DEG := 35.0
+## How much a riser leaning against the form's chosen hand costs a candidate.
+const FLIP_COST_M := 40.0
+## The level lines are eased this many times ([1 2 1] on y) before anything is
+## joined to them: the router's lattice leaves bends the road check refuses.
+const EASE_PASSES := 3
+## The road check's bend rule (qa/village_road_check.gd), with a hair to spare.
+const BEND_DEG_PER_20M := 24.0
+const BEND_RADIUS_M := 12.1
 ## Where the terrace band's fall is read: the share of the terrace band's
 ## depth, sampled across the whole width.
 const BAND_SAMPLES := 6
@@ -108,7 +122,11 @@ const TRACK_LEAN_DEG := 15.0
 ## A home's slot stays this far in from its terrace end, clear of the riser.
 const SLOT_END_M := 18.0
 ## The homes each level carries, upper first (normalised; a level has one at least).
-const LEVEL_WEIGHTS := [3.0, 2.0, 2.0, 5.0]
+const LEVEL_WEIGHTS := [5.0, 1.0, 1.0, 5.0]
+## Where the terrace band is steeper than this, the lowest terrace is on ground
+## that refuses most lots (Masouleh), and carries fewer; the upper levels more.
+const STEEP_BAND_SLOPE := 0.325
+const LEVEL_WEIGHTS_STEEP := [5.0, 2.0, 2.0, 3.0]
 const EDGE_INSET_M := 4.0
 const SITE_MARGIN_M := 2.0
 
@@ -154,7 +172,9 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 		# cart's 12 % would cross the terraces below it on a real hillside.
 		through = _level(ground, out.site, through, through[VillageSitePlanner._vertex_near_x(
 			through, 0.0)].y, float(VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"]))
-	out.roads.append(VillageSitePlanner._road(through, &"through", spec.wealth))
+	var through_road: Dictionary = VillageSitePlanner._road(through, &"through", spec.wealth)
+	through_road["band_slope"] = slope     # a planning key, like `terrace`
+	out.roads.append(through_road)
 
 	# the common and the landmark stand uphill of the road
 	var common := _common(out, spec, through, -down, ground)
@@ -188,7 +208,7 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 			y = maxf(y, floor_y) if down > 0.0 else minf(y, floor_y)
 			line[i] = Vector2(line[i].x, clampf(y, out.site.position.y + SITE_MARGIN_M + 3.0,
 				out.site.end.y - SITE_MARGIN_M - 3.0))
-		terraces.append(line)
+		terraces.append(_ease(line, mid_i))
 	# The risers own the two ends. A terrace runs from where its end's riser
 	# stands at its height, so trim it there and keep every road's index. Each
 	# riser leans only as far as ITS ground asks (the least that keeps it a
@@ -204,6 +224,8 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 	x_top_e = pair[2]
 	var lean_w: float = pair[1]
 	var lean_e: float = pair[3]
+	dir_w = pair[4]
+	dir_e = pair[5]
 	var tan_w: float = tan(deg_to_rad(lean_w))
 	var tan_e: float = tan(deg_to_rad(lean_e))
 	var top_w: Vector2 = through[VillageSitePlanner._vertex_near_x(through, x_top_w)]
@@ -212,6 +234,10 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 	for k in range(terraces.size()):
 		var x0: float = _riser_x(terraces[k], top_w, dir_w, tan_w)
 		var x1: float = _riser_x(terraces[k], top_e, dir_e, tan_e)
+		if is_nan(x0):
+			x0 = terraces[k][0].x
+		if is_nan(x1):
+			x1 = terraces[k][terraces[k].size() - 1].x
 		terraces[k] = _trim_x(terraces[k], x0, x1)
 		terrace_roads.append(-1)
 		if terraces[k].size() >= 2:
@@ -239,7 +265,8 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 		for f in CROSS_SPOTS:
 			var upper: PackedVector2Array = terraces[k]
 			var lower: PackedVector2Array = terraces[k + 1]
-			var x: float = lerpf(cross_lo, cross_hi, float(f))
+			# on one of the terraces' own vertices, so no short segment is made
+			var x: float = _column_near(through, lerpf(cross_lo, cross_hi, float(f)))
 			var a: Vector2 = Vector2(x, VillageLotPlanner._polyline_y_at_x(upper, x))
 			var b: Vector2 = Vector2(x, VillageLotPlanner._polyline_y_at_x(lower, x))
 			if a.distance_to(b) < 4.0:
@@ -249,6 +276,11 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 			out.roads[terrace_roads[k]]["points"] = terraces[k]
 			out.roads[terrace_roads[k + 1]]["points"] = terraces[k + 1]
 			out.roads.append(VillageSitePlanner._road(PackedVector2Array([a, b]), &"steps", spec.wealth))
+
+	for k in range(terraces.size()):
+		if terrace_roads[k] >= 0:
+			terraces[k] = _repair_bends(out, terrace_roads[k], terraces[k])
+			out.roads[terrace_roads[k]]["points"] = terraces[k]
 
 	# way out to the fields above: tracks off the lowest terrace
 	_field_tracks(out, terraces[terraces.size() - 1], down, ground)
@@ -316,25 +348,56 @@ static func _level(ground: VillageTerrain, site: Rect2, along: PackedVector2Arra
 
 ## The least lean (degrees off the fall line) from `base_deg` up to the maximum
 ## at which a riser from `x_top` on the through road, through each terrace's
-## height, climbs no more than RISER_GRADE on `ground`.
+## height, climbs no more than `cap` on `ground` AND meets the through road and
+## every terrace at JUNCTION_MIN_DEG or more. Returns (lean, grade); the grade
+## is INF where no lean does.
 static func pick_lean(ground: VillageTerrain, through: PackedVector2Array,
-		terraces: Array[PackedVector2Array], x_top: float, dir: float, base_deg: float) -> Vector2:
+		terraces: Array[PackedVector2Array], x_top: float, dir: float, base_deg: float,
+		cap := RISER_PICK_GRADE) -> Vector2:
 	if ground == null:
 		return Vector2(base_deg, 0.0)
 	var top: Vector2 = through[VillageSitePlanner._vertex_near_x(through, x_top)]
 	var lean: float = base_deg
-	var last := 1e9
 	while lean <= RISER_LEAN_MAX_DEG + 1e-6:
 		var pts := PackedVector2Array([top])
 		var t: float = tan(deg_to_rad(lean))
+		var lines: Array[PackedVector2Array] = [through]
 		for line in terraces:
-			var x: float = top.x + dir * t * absf(VillageLotPlanner._polyline_y_at_x(line, top.x) - top.y)
+			var x: float = _riser_x(line, top, dir, t)
+			if is_nan(x):
+				pts.clear()
+				break
 			pts.append(Vector2(x, VillageLotPlanner._polyline_y_at_x(line, x)))
-		last = VillageRoadRouter.grade_of(ground, pts)
-		if last <= RISER_PICK_GRADE:
-			return Vector2(lean, last)
+			lines.append(line)
+		if pts.size() >= 2 and _squarely(pts, lines):
+			var g: float = VillageRoadRouter.grade_of(ground, pts)
+			if g <= cap:
+				return Vector2(lean, g)
 		lean += 3.0
-	return Vector2(RISER_LEAN_MAX_DEG, last)
+	return Vector2(RISER_LEAN_MAX_DEG, INF)
+
+
+## True when the riser `pts` (the through road's point, then one on each
+## terrace) crosses each of `lines` (the same order) at JUNCTION_MIN_DEG or more
+## to that line's tangent there.
+static func _squarely(pts: PackedVector2Array, lines: Array[PackedVector2Array]) -> bool:
+	for i in range(pts.size()):
+		var seg: Vector2 = (pts[i + 1] - pts[i]) if i + 1 < pts.size() else (pts[i] - pts[i - 1])
+		var line: PackedVector2Array = lines[i]
+		var x: float = pts[i].x
+		var tangent := Vector2(12.0, VillageLotPlanner._polyline_y_at_x(line, x + 6.0)
+			- VillageLotPlanner._polyline_y_at_x(line, x - 6.0))
+		var ang: float = rad_to_deg(absf(seg.angle_to(tangent)))
+		ang = minf(ang, 180.0 - ang)
+		if ang < JUNCTION_MIN_DEG:
+			return false
+		if i > 0 and i + 1 < pts.size():
+			var seg2: Vector2 = pts[i] - pts[i - 1]
+			var ang2: float = rad_to_deg(absf(seg2.angle_to(tangent)))
+			ang2 = minf(ang2, 180.0 - ang2)
+			if ang2 < JUNCTION_MIN_DEG:
+				return false
+	return true
 
 
 ## Where a riser from `top` (leaning `dir` * atan(`tan_lean`) off the fall line)
@@ -342,10 +405,30 @@ static func pick_lean(ground: VillageTerrain, through: PackedVector2Array,
 ## the top, solved from the line's actual height there (not its nominal pitch),
 ## so the terrace ends exactly on the riser it is trimmed to.
 static func _riser_x(line: PackedVector2Array, top: Vector2, dir: float, tan_lean: float) -> float:
+	# f(x) = dir * (x - top.x) - tan * |y(x) - top.y| is negative at the top and
+	# climbs as the riser leans away: the first x where it reaches zero is the
+	# meeting. (A fixed-point iteration does not converge where the terrace
+	# itself runs steeply across the riser's line, and then the terrace ends
+	# off the riser it is trimmed to.) NAN where the line never meets it.
+	var x_lo: float = line[0].x
+	var x_hi: float = line[line.size() - 1].x
+	var prev_x: float = top.x
+	var prev_f: float = -tan_lean * absf(VillageLotPlanner._polyline_y_at_x(line, top.x) - top.y)
+	if prev_f >= 0.0:
+		return top.x
+	var step := 1.0
 	var x: float = top.x
-	for _i in range(6):
-		x = top.x + dir * tan_lean * absf(VillageLotPlanner._polyline_y_at_x(line, x) - top.y)
-	return x
+	while true:
+		x += dir * step
+		if x < x_lo - 1e-6 or x > x_hi + 1e-6:
+			return NAN
+		var f: float = dir * (x - top.x) - tan_lean * absf(VillageLotPlanner._polyline_y_at_x(line, x) - top.y)
+		if f >= 0.0:
+			var t: float = -prev_f / (f - prev_f)
+			return lerpf(prev_x, x, t)
+		prev_x = x
+		prev_f = f
+	return NAN
 
 
 ## Where the two risers stand: any pair of tops along the road (a face is
@@ -353,8 +436,13 @@ static func _riser_x(line: PackedVector2Array, top: Vector2, dir: float, tan_lea
 ## takes every terrace with it, since a street must end on a street) with each
 ## riser a street, the terraces between them at least RISER_MIN_SEP_M long at
 ## the top and at the lowest level, and the widest such pair preferred (less a
-## little for lean). Returns [x_w, lean_w, x_e, lean_e]; with no ground, or no
-## pair that works, the site's two ends, as before.
+## little for lean). Each riser may lean either way (the form's hand is
+## preferred): a level line on a real face runs diagonally across the site, and
+## a riser square to it leans with it. With no such pair of STREETS the risers
+## are stairs (the real hillsides', Manarola's and Masouleh's): the pair that
+## meets every line squarely and leans least. Returns
+## [x_w, lean_w, x_e, lean_e, dir_w, dir_e]; with no ground, or no pair that
+## works, the site's two ends, as before.
 static func pick_pair(ground: VillageTerrain, site: Rect2, through: PackedVector2Array,
 		terraces: Array[PackedVector2Array], dir_w: float, dir_e: float, base_deg: float,
 		drop_y: float) -> Array:
@@ -362,7 +450,7 @@ static func pick_pair(ground: VillageTerrain, site: Rect2, through: PackedVector
 	var x_e0: float = site.end.x - RISER_INSET_M
 	if dir_e > 0.0:
 		x_e0 -= tan(deg_to_rad(base_deg)) * drop_y * 1.1
-	var fallback: Array = [x_w0, base_deg, x_e0, base_deg]
+	var fallback: Array = [x_w0, base_deg, x_e0, base_deg, dir_w, dir_e]
 	if ground == null:
 		return fallback
 	var xs := PackedFloat64Array()
@@ -372,31 +460,40 @@ static func pick_pair(ground: VillageTerrain, site: Rect2, through: PackedVector
 		x += RISER_SEARCH_STEP_M
 	if xs[xs.size() - 1] < site.end.x - RISER_INSET_M - 1e-6:
 		xs.append(site.end.x - RISER_INSET_M)
-	var west: Array[Vector3] = []
-	var east: Array[Vector3] = []
-	for xv in xs:
-		var rw: Vector2 = pick_lean(ground, through, terraces, xv, dir_w, base_deg)
-		if rw.y <= RISER_PICK_GRADE:
-			west.append(Vector3(xv, rw.x, 0.0))
-		var re: Vector2 = pick_lean(ground, through, terraces, xv, dir_e, base_deg)
-		if re.y <= RISER_PICK_GRADE:
-			east.append(Vector3(xv, re.x, 0.0))
-	var best: Array = fallback
-	var best_score := -INF
-	var edge_hi: float = site.end.x - EDGE_INSET_M
-	var edge_lo: float = site.position.x + EDGE_INSET_M
-	for w in west:
-		var bot_w: float = clampf(w.x + dir_w * tan(deg_to_rad(w.y)) * drop_y, edge_lo, edge_hi)
-		for e in east:
-			var bot_e: float = clampf(e.x + dir_e * tan(deg_to_rad(e.y)) * drop_y, edge_lo, edge_hi)
-			var sep: float = minf(e.x - w.x, bot_e - bot_w)
-			if sep < RISER_MIN_SEP_M:
-				continue
-			var score: float = sep - 0.3 * (w.y + e.y)
-			if score > best_score + 1e-9:
-				best_score = score
-				best = [w.x, w.y, e.x, e.y]
-	return best
+	for cap in [RISER_PICK_GRADE, INF]:
+		var west: Array[Vector3] = []   # (x, lean, dir)
+		var east: Array[Vector3] = []
+		for xv in xs:
+			for d in [dir_w, -dir_w]:
+				var rw: Vector2 = pick_lean(ground, through, terraces, xv, d, base_deg, cap)
+				if rw.y < INF:
+					west.append(Vector3(xv, rw.x, d))
+			for d in [dir_e, -dir_e]:
+				var re: Vector2 = pick_lean(ground, through, terraces, xv, d, base_deg, cap)
+				if re.y < INF:
+					east.append(Vector3(xv, re.x, d))
+		var best: Array = []
+		var best_score := -INF
+		var edge_hi: float = site.end.x - EDGE_INSET_M
+		var edge_lo: float = site.position.x + EDGE_INSET_M
+		for w in west:
+			var bot_w: float = clampf(w.x + w.z * tan(deg_to_rad(w.y)) * drop_y, edge_lo, edge_hi)
+			for e in east:
+				var bot_e: float = clampf(e.x + e.z * tan(deg_to_rad(e.y)) * drop_y, edge_lo, edge_hi)
+				var sep: float = minf(e.x - w.x, bot_e - bot_w)
+				if sep < RISER_MIN_SEP_M:
+					continue
+				var score: float = sep - 0.3 * (w.y + e.y)
+				if w.z != dir_w:
+					score -= FLIP_COST_M
+				if e.z != dir_e:
+					score -= FLIP_COST_M
+				if score > best_score + 1e-9:
+					best_score = score
+					best = [w.x, w.y, e.x, e.y, w.z, e.z]
+		if not best.is_empty():
+			return best
+	return fallback
 
 
 ## Where along the road a riser stands: the candidate top x in [x_a, x_b] whose
@@ -494,7 +591,7 @@ static func _common(out: VillagePlan, spec: VillageSpec, through: PackedVector2A
 		var k: float = -reach
 		while k <= reach + 0.01:
 			var cand: Rect2 = _common_at(out, through, side, site.get_center().x + k, width, height)
-			var fall: float = float(ground.under(Poly.from_rect(cand))["slope_mean"]) + 0.0003 * absf(k)
+			var fall: float = float(ground.under(Poly.from_rect(cand))["slope_mean"]) + 0.00008 * absf(k)
 			if fall < best - 1e-9:
 				best = fall
 				best_mid = site.get_center().x + k
@@ -632,6 +729,72 @@ static func _field_tracks(out: VillagePlan, low: PackedVector2Array, down: float
 				break
 
 
+## `line` with y eased by EASE_PASSES passes of [1 2 1] over its interior,
+## except the pinned vertex and the two ends (a riser takes those).
+static func _ease(line: PackedVector2Array, pinned: int) -> PackedVector2Array:
+	var out := line.duplicate()
+	for _pass in range(EASE_PASSES):
+		var prev := out.duplicate()
+		for i in range(1, out.size() - 1):
+			if i == pinned:
+				continue
+			out[i] = Vector2(prev[i].x, (prev[i - 1].y + 2.0 * prev[i].y + prev[i + 1].y) * 0.25)
+	return out
+
+
+## The x of `line`'s vertex nearest `x`.
+static func _column_near(line: PackedVector2Array, x: float) -> float:
+	var best: float = line[0].x
+	for p in line:
+		if absf(p.x - x) < absf(best - x):
+			best = p.x
+	return best
+
+
+## True where the road check's bend rule (turn per 20 m, bend radius) fails at
+## vertex `i` of `pts`.
+static func _bends_badly(pts: PackedVector2Array, i: int) -> bool:
+	var turns: PackedFloat32Array = Poly.turns(pts)
+	var run: float = (pts[i].distance_to(pts[i - 1]) + pts[i].distance_to(pts[i + 1])) / 2.0
+	var deg: float = rad_to_deg(absf(turns[i - 1]))
+	if deg <= 1.0:
+		return false
+	if deg * 20.0 / maxf(run, 0.01) > BEND_DEG_PER_20M:
+		return true
+	return Poly.bend_radius(pts[i - 1], pts[i], pts[i + 1]) < BEND_RADIUS_M
+
+
+## Terrace `r`'s bends eased where the road check would refuse them: the
+## vertices round a bad one (but not a junction, where another way is
+## attached) move halfway to their neighbours' middle, repeatedly.
+static func _repair_bends(out: VillagePlan, r: int, line: PackedVector2Array) -> PackedVector2Array:
+	var pts := line.duplicate()
+	for _round in range(60):
+		var bad := -1
+		for i in range(1, pts.size() - 1):
+			if _bends_badly(pts, i):
+				bad = i
+				break
+		if bad < 0:
+			break
+		for i in range(maxi(1, bad - 2), mini(pts.size() - 1, bad + 3)):
+			if _is_junction(out, r, pts[i]):
+				continue
+			var mid: Vector2 = (pts[i - 1] + pts[i + 1]) * 0.5
+			pts[i] = pts[i].lerp(Vector2(pts[i].x, mid.y), 0.5)
+	return pts
+
+
+static func _is_junction(out: VillagePlan, r: int, p: Vector2) -> bool:
+	for j in range(out.roads.size()):
+		if j == r:
+			continue
+		for q in out.roads[j]["points"]:
+			if q.distance_to(p) < 0.05:
+				return true
+	return false
+
+
 ## `points` cut to the x range [x0, x1], with the crossing points
 ## interpolated; fewer than two points means the range misses it.
 static func _trim_x(points: PackedVector2Array, x0: float, x1: float) -> PackedVector2Array:
@@ -684,6 +847,10 @@ static func assign_jobs(plan: VillagePlan, jobs: Array[Dictionary]) -> void:
 		return
 	var homes: Array[Dictionary] = []
 	for job in jobs:
+		var rq: BuildingRequest = job["request"]
+		if rq.kind == &"shop" and rq.purpose == &"tavern" and plan.ground != null:
+			# by a gate, at either end of the road (the table says the west one)
+			job["siting"] = {"road": &"through", "insists": true, "toward": &"gate"}
 		if job["class"] in [&"cottage", &"townhouse", &"farm"]:
 			homes.append(job)
 	if homes.is_empty():
@@ -709,6 +876,8 @@ static func assign_jobs(plan: VillagePlan, jobs: Array[Dictionary]) -> void:
 	# that keeps the body's span, elongation and contour share inside the steep
 	# sites' bands on the plane AND on Manarola and Masouleh
 	var weights: Array = LEVEL_WEIGHTS
+	if float(plan.roads[0].get("band_slope", 0.0)) > STEEP_BAND_SLOPE:
+		weights = LEVEL_WEIGHTS_STEEP
 	var total_w := 0.0
 	for j in range(levels.size()):
 		total_w += float(weights[mini(j, weights.size() - 1)])

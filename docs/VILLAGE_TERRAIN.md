@@ -1453,13 +1453,31 @@ elongation (1.35 against 1.32) have little margin.
 
 ### Not yet
 
-* **the real hillsides' own QA** -- the bands and the housing hold, but on
-  these two faces `VillageQA` and the road check still fail: the terraces are
-  re-classed to footpaths where a riser is stairs (small bends and 13-28
-  degree junctions), the lot density is 4.4-4.6 % (a 5 % floor; the site is
-  wide for twelve houses), the common stands on 35 % ground against a 31 %
-  median lot, and Manarola's level through road leaves its site on the west
-  and climbs 24 % (a cart road is 12 %). Only the bands are gated;
+* **the real hillsides' VillageQA** (HILLS-QA took the road check; `vhillside`
+  now gates it, and that every requested building stands, on both fixtures).
+  What HILLS-QA changed: a riser's meeting with a terrace is solved, not
+  iterated (`_riser_x`; the fixed-point iteration did not converge where a
+  level line runs steeply across the riser, so a terrace ended off the riser it
+  was trimmed to); `pick_lean` also requires the riser to cross the through
+  road and every terrace at 35 degrees or more to the line's TANGENT, either
+  hand allowed (`pick_pair` returns each riser's hand), and with no pair of
+  street risers the risers are stairs placed square to the lines; the level
+  lines are eased and cross-lanes stand on existing vertices (`_ease`,
+  `_repair_bends`); the tavern is sited by either gate on given ground (the
+  table's `side: west` left Masouleh's tavern unplaced); the level weights are
+  [5,1,1,5], or [5,2,2,3] where the band is steeper than 0.325 (Masouleh), the
+  one split that keeps all three fixtures in the bands. Still open, all in
+  VillageQA and noted by the suite: Manarola's tavern stands 120 m from a gate
+  (every lot west of the common but one is refused by the 60 % pitch rule,
+  `ground_clear`, and the terrace ribbons; the through road must reach the site
+  edge, so only a narrower site would put a gate near it -- a site cut to
+  190 m dropped the body's elongation to 1.09, below the band); Masouleh's lot
+  density 4.9 % (5 % floor), the common's fronts 46 % (60 %), the common on
+  35.5 % ground against a 32 % median lot, and a 26 m edge run (25 m). The
+  Manarola through road is 24 % and the check does not mind: `grade_roads`
+  never re-classes road 0. Two attempts that did not hold: houses round the
+  common (took the plane's elongation to 1.27) and cropping the site
+  (Manarola 1.09);
 * **switchbacks** -- the router is monotone along the contour, so a hairpin
   up a spur is still not laid;
 * **terraces from the ground** -- the terrace lines are offsets of the

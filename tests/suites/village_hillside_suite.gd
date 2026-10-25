@@ -127,12 +127,12 @@ static func run() -> SuiteResult:
 	return res
 
 
-## The two real hillsides (HILLS-FIXTURES): the same four bands, every
-## household housed, every way inside its class's grade, the terraces and the
-## stepped cross-lanes laid. The road check and VillageQA are NOT held here:
-## on this ground the terraces are re-classed to footpaths where a riser is
-## stairs, and their bends, junction angles, the lot density and the common's
-## ground are the open items in docs/VILLAGE_TERRAIN.md "The hillside form".
+## The two real hillsides (HILLS-FIXTURES, HILLS-QA): the same four bands,
+## every household housed and every requested building placed (the tavern
+## included), every way inside its class's grade, the terraces and the stepped
+## cross-lanes laid, and the ROAD CHECK. VillageQA is not held here: the
+## common's fronts (Manarola, Masouleh), the lot density, the common's ground
+## and the edge run (Masouleh) are the open items in docs/VILLAGE_TERRAIN.md.
 static func _real(res: SuiteResult, jobs: Array[Dictionary], name: String) -> void:
 	var ground := VillageTerrain.from_file("res://tests/fixtures/terrain/%s.json" % name)
 	res.checked += 1
@@ -160,8 +160,6 @@ static func _real(res: SuiteResult, jobs: Array[Dictionary], name: String) -> vo
 		res.fail("%s hillside: %d houses for %d households (unhoused %d)" % [
 			name, plan.buildings_of_kind(&"house").size(), spec.households,
 			spec.households - plan.buildings_of_kind(&"house").size()])
-	# not every requested building is placed on these faces (Masouleh has no
-	# room for its tavern): the households are what the form is held to
 	var terraces := 0
 	var steps := 0
 	for r in range(plan.roads.size()):
@@ -180,6 +178,17 @@ static func _real(res: SuiteResult, jobs: Array[Dictionary], name: String) -> vo
 	res.checked += 1
 	if steps < 4:
 		res.fail("%s hillside: %d stepped ways, wants at least 4" % [name, steps])
+	res.checked += 1
+	if plan.buildings.size() != VillageProgrammer.programme(spec).size():
+		res.fail("%s hillside: %d of %d requested buildings placed" % [
+			name, plan.buildings.size(), VillageProgrammer.programme(spec).size()])
+	var roads := VillageRoadCheck.new().check(plan)
+	res.checked += 1
+	if not roads["ok"]:
+		res.fail("%s hillside: road check: %s" % [name, "; ".join((roads["failures"] as Array).slice(0, 5))])
+	var no_pure := func(_p: VillagePlan) -> Array: return []
+	var qa := VillageQA.new().check(plan, {&"pure": no_pure}, false)
+	res.note("%s hillside: VillageQA open: %s" % [name, "; ".join(qa["failures"])])
 
 
 static func _spec(ground: VillageTerrain) -> VillageSpec:
