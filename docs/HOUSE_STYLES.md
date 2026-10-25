@@ -75,5 +75,7 @@ not headless): `_front` three-quarter, `_rear` three-quarter from the byre
 side, `_interior` eye level toward the kitchen's yard door (the hearth breast
 partly screens the door in some seeds).
 
-Reviewer tick (roof-on three-quarter + interior eye-level): OPEN, pending an
-independent reviewer. No trait is ticked here by the implementing agent.
+Reviewer tick: DONE 2026-10-24 (coordinator). Round 1: byre 3/3, yard props NO
+(hay read as white cubes), back door UNCLEAR. Round 2 (c7e9745, renders2): back door
+plain in all three interior views, byre 3/3, straw bales + shafted cart + sacks read.
+Weak: the trough still reads as a plain box with no water.
