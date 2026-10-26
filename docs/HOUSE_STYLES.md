@@ -815,4 +815,33 @@ vent hat); `_door` roof-on, lower and closer (wall thickness in the reveal, the 
 `_interior` eye level just inside the door, across the fire to the bed; `_vent` eye level beside
 the fire looking up the cone at the vent.
 
-Reviewer: pending
+Independent reviewer: fresh agent, from the renders of commit 35b76dd (all 12 images opened). Judged only from `artifacts/hs_roundhouse/renders/roundhouse_<seed>_{front,door,interior,vent}.jpg`. The interiors are FILTERED: the render tool drops the generic furnisher's props (CULTURE-FURNISH-VOCAB), so they show only the bed and the fire; missing furniture is not marked down.
+
+| seed | (1) one round room, thick walls | (2) conical thatch, apex vent | (3) central hearth |
+|---|---|---|---|
+| 1 | YES (borderline) | YES (borderline) | YES (borderline) |
+| 8102 | YES (borderline) | YES (borderline) | YES (borderline) |
+| 21325 | YES (borderline) | YES (borderline) | YES (borderline) |
+
+Reasons:
+* (1) every seed: the outline is a faceted ring that reads round from the front view, and the interior wall curves continuously. One room, no partitions seen. The door view shows the open door leaf and a reveal, but the wall thickness is only a modest edge beside the door; "thick" is plausible, not obvious.
+* (2) every seed: a clearly conical thatch roof (12 facets, banded courses) with a stepped collar and a small pavilion hat on four posts at the apex, with gaps under it for smoke. In the vent view the apex shows only a darker disc at the tip; an open hole is not legible from below.
+* (3) every seed: a stone-kerbed fire with logs and flames stands on the plank floor, away from the wall, beside the bed. The interior is a single angle, so that the fire is in the exact middle of the room and under the vent is inferred, not seen (the vent view does not include the fire).
+
+Images: `artifacts/hs_roundhouse/renders/roundhouse_1_front.jpg`, `_door`, `_interior`, `_vent`; the same four for `8102` and `21325`.
+
+Open:
+* All seeds: the apex opening is not visibly a hole from inside (a disc under the hat); trait 2's vent holds on the exterior hat and collar only.
+* All seeds: the fire's position relative to the vent and the room centre cannot be confirmed from any one image (trait 3 borderline).
+* All seeds: wall thickness is only modestly visible in the reveal (trait 1 borderline).
+* The three seeds are near-identical (same size, door, windows, bed, fire); they differ in thatch shading and rug position only.
+
+Observed (not traits):
+* Interior (all seeds): the bed is a carved European bedstead with white pillow and sheets, and it appears to hover over the floor with no visible legs; it reads as floating.
+* Interior: a red bordered rug cuts the right of the frame (1, 21325), placed differently on 8102.
+* Interior floor is plank over a stone skirting, not packed earth; the windows are glazed timber frames (European) on a mud hut.
+* The flames are flat orange cones, stiff and oversized beside the logs.
+* Exterior: the rafter-tail blocks under the eave are evenly spaced dark squares and read as dentils; the stone plinth steps at facet joints.
+* Exterior: the vent hat is a pavilion on posts, closer to a gazebo or cupola than a smoke vent, and tall for the cone.
+* Ground: flat green grass, no yard or path.
+* Vent view: only the roof underside is visible (a tunnel of banded facets); no sky through the vent, no fire or smoke below.
