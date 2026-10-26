@@ -57,6 +57,8 @@ const PIERS_MAX := 8
 ## Water the piles stand in: no deeper than this anywhere a pier or its lots
 ## will stand (HousePiles.MAX_WATER_M less a margin for the bed's carving).
 const DEEP_MAX := HousePiles.MAX_WATER_M - 0.5
+## ...and somewhere at least this deep: a bed the ground actually shows.
+const BED_SEEN_M := 0.5
 ## A pile lot's bed is read on this lattice; the carved bed is never above
 ## the water level less this (VillageGroundSurface._carve, BANK_SHELF).
 const BED_STEP := 2.0
@@ -191,16 +193,24 @@ static func _piers(out: VillagePlan, spec: VillageSpec) -> Array[PackedVector2Ar
 
 
 ## Is the water between `a` and `b` (and 12 m either side) within the piles'
-## range, and all of it on the ground's grid?
+## range, all of it on the ground's grid -- and is its bed SEEN: somewhere
+## under it at least BED_SEEN_M below the level? A DEM that reads the sea flat
+## at its surface (Manarola's 30 m grid: 0 m from the shore out) says nothing
+## of how deep it is, and a village does not drive piles into an unknown.
 static func _shallow(g: VillageTerrain, wl: float, a: Vector2, b: Vector2, bounds: Rect2) -> bool:
 	var n: int = maxi(1, int(ceil(a.distance_to(b) / 4.0)))
+	var deepest := 0.0
 	for k in range(n + 1):
 		var p := a.lerp(b, float(k) / float(n))
 		for dx in [-12.0, 0.0, 12.0]:
 			var q: Vector2 = p + Vector2(dx, 0.0)
-			if not bounds.has_point(q) or wl - g.height_at(q) > DEEP_MAX:
+			if not bounds.has_point(q):
 				return false
-	return true
+			var depth: float = wl - g.height_at(q)
+			if depth > DEEP_MAX:
+				return false
+			deepest = maxf(deepest, depth)
+	return deepest >= BED_SEEN_M
 
 
 ## The walk along the piers' far ends, on the shoreline's columns between the
