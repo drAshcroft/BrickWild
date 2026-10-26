@@ -799,7 +799,9 @@ static func _porch_pail(ctx: Dictionary) -> Dictionary:
 	for flip in [1.0, -1.0]:
 		var s: float = ctx["door_u"] + lean * flip * (w * 0.5 + 0.45)
 		var cell := _cell(ctx, "front", s)
-		var made := {"props": [_prop_at(cell, 0.0, 0.15, "Bucket_Wooden_1", 1.0, "porch_pail")]}
+		# HS-SAHEL-RESIDUE: a Sahel door has a clay water jar, not a wooden pail
+		var pail_key := "Dungeon_Pot2" if ctx["plan"].spec.sahel else "Bucket_Wooden_1"
+		var made := {"props": [_prop_at(cell, 0.0, 0.15, pail_key, 0.9 if ctx["plan"].spec.sahel else 1.0, "porch_pail")]}
 		made["props"][0]["host"] = "porch" if ctx["plan"].spec.porch else "front"
 		if _group_reason(ctx, made).is_empty():
 			return made
@@ -817,7 +819,10 @@ static func _path(ctx: Dictionary) -> Dictionary:
 	# Full walking-width pavers read as an approach, not a tiny scattering of
 	# stones. Built geometry also survives a public checkout without Wild art.
 	while d < float(cell["room"]) - 0.24:
-		var part := _part(cell, "path_paver", 0.0, d, 0.86, 0.46, 0.0, 0.045, "floor")
+		# HS-SAHEL-RESIDUE: a Sahel path is beaten earth slabs in the wall's own
+		# colour, not the floor slot's boards
+		var part := _part(cell, "path_paver", 0.0, d, 0.86, 0.46, 0.0, 0.045,
+			"wall" if (ctx["plan"] as HousePlan).spec.sahel else "floor")
 		var b := part_aabb(part)
 		var r := Rect2(Vector2(b.position.x, b.position.z), Vector2(b.size.x, b.size.z))
 		var on_porch: bool = porch.size.x > 0.0 and porch.grow(0.05).intersects(r)
@@ -910,7 +915,9 @@ static func _front_bed(ctx: Dictionary, cell: Dictionary, gap: float) -> Diction
 ## the engawa step across the gravel. It is the first yard group of the style
 ## and goes on the engawa side, so the main room looks out at it.
 const DRY_GARDEN_ROCKS := ["Wild_Rock_Medium_1", "Wild_Rock_Medium_2", "Wild_Rock_Medium_3"]
-const DRY_GARDEN_TREES := ["Wild_Pine_2", "Wild_Pine_3", "Nature_MapleTree_2"]
+## Maples, not pines: a tall Western conifer on the gravel edge cut across the
+## engawa screens and read as a European tree (HS-MINKA-RESIDUE).
+const DRY_GARDEN_TREES := ["Nature_MapleTree_4", "Nature_MapleTree_2", "Nature_MapleTree_4"]
 const DRY_GARDEN_STONES := ["Wild_RockPath_Round_Small_1", "Wild_RockPath_Round_Small_2", "Wild_RockPath_Round_Small_3"]
 
 
@@ -963,20 +970,36 @@ static func _engawa_garden(ctx: Dictionary) -> Dictionary:
 			made["props"].append(_prop_at(cell, float(at[0]), float(at[1]), rk, _fit(rk, 0.9 - float(i) * 0.12), "garden_rock"))
 		var tree: String = DRY_GARDEN_TREES[base % DRY_GARDEN_TREES.size()]
 		if PropCatalog.known(tree):
-			var tree_scale := _fit(tree, 1.8)
-			var tree_gap := minf(d0 + gd * 0.7, room - 0.25 - 1.8)
-			made["props"].append(_prop_at(cell, half_t * 0.7, tree_gap, tree, tree_scale, "garden_tree"))
-		# stepping stones from the engawa step out across the gravel
-		var ds := 0.3
-		var k := 0
-		while ds < d0 + gd - 0.2 and float(p.engawa["depth"]) + ds + 0.6 < room:
+			# a small maple at the far corner of the gravel, away from the
+			# screens, so it frames the garden instead of crossing the wall
+			var tree_scale := _fit(tree, 1.6)
+			var tree_gap := minf(d0 + gd * 0.8, room - 0.25 - 1.6)
+			made["props"].append(_prop_at(cell, half_t * 0.78, tree_gap, tree, tree_scale, "garden_tree"))
+		# stepping stones from the foot of the engawa's flight to the middle of
+		# the gravel, so the path joins the steps instead of ending in the grass
+		var foot: Vector2 = Vector2(p.engawa["step_base"]) + Vector2(p.engawa["step_dir"]) 			* (float(int(p.engawa["step_count"]) - 1) * HouseMinka.STEP_TREAD + 0.45) 			+ n * (float(p.engawa["depth"]) * 0.5)
+		var rel := foot - Vector2(cell["o"])
+		var a := Vector2(rel.dot(cell["tan"]), rel.dot(cell["out"]))
+		var z := Vector2(0.0, d0 + gd * 0.5)
+		var steps_n := maxi(2, int(a.distance_to(z) / 0.6))
+		for k in range(steps_n + 1):
+			var q := a.lerp(z, float(k) / float(steps_n))
+			if q.y + 0.4 > room:
+				continue
 			var sk: String = DRY_GARDEN_STONES[(base + k) % DRY_GARDEN_STONES.size()]
 			if PropCatalog.known(sk):
-				var jitter := (0.12 if k % 2 == 0 else -0.12)
-				var stone := _prop_at(cell, jitter, float(p.engawa["depth"]) + ds, sk, _fit(sk, 0.55), "garden_path")
-				made["props"].append(stone)
-			ds += 0.6
-			k += 1
+				made["props"].append(_prop_at(cell, q.x, q.y - 0.27, sk, _fit(sk, 0.55), "garden_path"))
+		# a stone the yard rules refuse (past the site, on a path) is dropped
+		# from the steps' end first; the garden itself is never given up for one
+		while not _group_reason(ctx, made).is_empty():
+			var first := -1
+			for pi in range(made["props"].size()):
+				if String(made["props"][pi]["role"]) == "garden_path":
+					first = pi
+					break
+			if first < 0:
+				break
+			made["props"].remove_at(first)
 		if _group_reason(ctx, made).is_empty():
 			return made
 	return {}

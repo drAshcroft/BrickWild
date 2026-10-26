@@ -183,6 +183,10 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	# the mud, not glazed timber casements. A style invariant, no draw.
 	if HouseRound.applies(spec, world_family):
 		spec.unglazed = true
+	# HS-MINKA-RESIDUE: likewise a minka's wall windows are lattices (the
+	# builder draws the bars), never glass. The engawa side keeps its screens.
+	if spec.engawa:
+		spec.unglazed = true
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y

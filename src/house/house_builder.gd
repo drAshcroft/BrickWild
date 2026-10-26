@@ -1562,14 +1562,18 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 	# The frame stands TRIM_TUCK proud into the opening, so its inner faces
 	# cover the wall's reveal and soffit instead of lying in their planes.
 	var tuck := TRIM_TUCK
+	# HS-SAHEL-RESIDUE: a window in a banco wall is a moulded mud reveal, not a
+	# dark timber box; the frame takes the wall's surface and its sill no lip
+	var mud_window: bool = spec.sahel and String(op["kind"]) == "window"
+	var frame_surf: int = SURF_WALL if mud_window else SURF_TRIM
 	for side in [-1.0, 1.0]:
 		var p: Vector2 = from + dir * (t + side * (w / 2.0 + jamb / 2.0 - tuck))
 		var xf := Transform3D(Basis(Vector3.UP, yaw),
 			Vector3(p.x, y_offset + (bottom + top) / 2.0, p.y))
-		component_box("opening_jamb", Vector3(jamb, top - bottom, thick + 0.04), xf, SURF_TRIM)
+		component_box("opening_jamb", Vector3(jamb, top - bottom, thick + 0.04), xf, frame_surf)
 	var head_xf := Transform3D(Basis(Vector3.UP, yaw),
 		Vector3(mid.x, y_offset + top + jamb / 2.0 - tuck, mid.y))
-	component_box("opening_head", Vector3(w + jamb * 2.0, jamb, thick + 0.04), head_xf, SURF_TRIM)
+	component_box("opening_head", Vector3(w + jamb * 2.0, jamb, thick + 0.04), head_xf, frame_surf)
 	if spec.style == &"witch_hut" and op["kind"] == "door" \
 			and bool(op.get("witch_service_door", false)):
 		_build_witch_service_door_hood(mid, normal, w, top, thick)
@@ -1580,7 +1584,8 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 	if bottom > 0.01:
 		var sill_xf := Transform3D(Basis(Vector3.UP, yaw),
 			Vector3(mid.x, y_offset + bottom - jamb / 2.0 + tuck, mid.y))
-		component_box("opening_sill", Vector3(w + jamb * 2.0, jamb, thick + 0.12), sill_xf, SURF_TRIM)
+		component_box("opening_sill", Vector3(w + jamb * 2.0, jamb, thick + (0.04 if mud_window else 0.12)),
+			sill_xf, frame_surf)
 		if op["kind"] == "window":
 			# Inset dark lattice glazing panel
 			var pane_xf := Transform3D(Basis(Vector3.UP, yaw),
@@ -1588,6 +1593,14 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 			# HS-SAHEL: an unglazed style leaves the aperture open
 			if not spec.unglazed:
 				_glazing_box("opening_glazing", Vector3(w, top - bottom, 0.04), pane_xf)
+			# HS-MINKA-RESIDUE: a minka's wall window is an open lattice of
+			# upright bars (renji-mado), not a glazed casement
+			if spec.engawa and spec.unglazed:
+				var lattice_n := maxi(3, int(w / 0.11))
+				for k in range(1, lattice_n):
+					var lp: Vector2 = from + dir * (t - w * 0.5 + w * float(k) / float(lattice_n))
+					component_box("window_lattice", Vector3(0.035, top - bottom, 0.05),
+						Transform3D(Basis(Vector3.UP, yaw), Vector3(lp.x, y_offset + (bottom + top) / 2.0, lp.y)), SURF_TRIM)
 
 			# Vertical timber mullions for wide windows (2-light / 3-light)
 			if spec.window_mullions and w >= 0.8 and not spec.unglazed:
@@ -3439,12 +3452,15 @@ func _build_round_roof_fittings(xf: Transform3D) -> void:
 		var collar_r := HouseRound.COLLAR_R
 		var collar_surface := apex * (1.0 - collar_r / eave_r) + RoofShape.DEPTH * 0.5
 		var collar_top := collar_surface + HouseRound.COLLAR_H - 0.08
-		var post_top := collar_top + 0.45
+		# HS-ROUNDHOUSE-RESIDUE: a taller gap under a smaller, flatter hat on
+		# slimmer posts, so the sky shows round it from the floor and it reads
+		# as a smoke hood, not a gazebo
+		var post_top := collar_top + HouseRound.HAT_CLEAR
 		for k in range(4):
 			var a2 := PI * 0.25 + TAU * float(k) / 4.0
 			var rp := collar_r - 0.05
 			var foot := apex * (1.0 - rp / eave_r) - 0.05
-			component_box("vent_post", Vector3(0.07, post_top - foot, 0.07),
+			component_box("vent_post", Vector3(0.05, post_top - foot, 0.05),
 				xf * Transform3D(Basis(), Vector3(cos(a2) * rp, (foot + post_top) * 0.5,
 					sin(a2) * rp)), SURF_TRIM)
 		var hat_y := post_top
@@ -3467,7 +3483,8 @@ func _build_round_roof_fittings(xf: Transform3D) -> void:
 		var facet := TAU / float(RoofShape.ROUND_CONE_SIDES)
 		var centre_a := -PI * 0.5 + roundf((a5 + PI * 0.5) / facet) * facet
 		var reach := tail_r * cos(facet * 0.5) / cos(a5 - centre_a)
-		component_box("eave_tail", Vector3(0.22, 0.09, 0.12),
+		# slim pole ends, longer than wide, not square dentils
+		component_box("eave_tail", Vector3(0.3, 0.06, 0.06),
 			xf * Transform3D(Basis(Vector3.UP, -centre_a),
 				Vector3(cos(a5) * reach, -0.05, sin(a5) * reach)), SURF_TRIM)
 
@@ -3503,6 +3520,23 @@ func _build_irimoya_hafu(xf: Transform3D, span: float, along: float, rise: float
 				Vector3(mid.x, mid.y, z + float(end_v) * (HAFU_BOARD_T * 0.5 - 0.02)))
 			component_box("hafu_board", Vector3((a - b).length(), HAFU_BOARD_W, HAFU_BOARD_T),
 				board, SURF_TRIM)
+		# HS-MINKA-RESIDUE: the hafu is a timber gable, not a blank wall: a
+		# tie beam across its foot and upright battens up to the barge boards
+		var half_w: float = absf(tri[1].x)
+		var y0: float = tri[1].y
+		var y1: float = tri[2].y
+		var face_z: float = z + float(end_v) * 0.02
+		component_box("hafu_beam", Vector3(half_w * 2.0 * 0.96, 0.1, 0.05),
+			xf * Transform3D(Basis(), Vector3(0.0, y0 + 0.08, face_z)), SURF_TRIM)
+		var x := 0.0
+		while x < half_w - 0.25:
+			var top: float = y0 + (y1 - y0) * (1.0 - x / half_w) - HAFU_BOARD_W - 0.04
+			var h: float = top - (y0 + 0.13)
+			if h > 0.12:
+				for sx in ([1.0] if x < 0.01 else [-1.0, 1.0]):
+					component_box("hafu_batten", Vector3(0.05, h, 0.04),
+						xf * Transform3D(Basis(), Vector3(float(sx) * x, y0 + 0.13 + h * 0.5, face_z)), SURF_TRIM)
+			x += 0.42
 
 
 func _emit_ridge_cap_segments(xf: Transform3D, rise: float,

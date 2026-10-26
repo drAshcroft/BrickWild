@@ -36,10 +36,12 @@ const VENT_R := 0.38
 const VENT_SIDES := 12
 const COLLAR_R := 0.62
 const COLLAR_H := 0.3
-const HAT_R := 0.95
-const HAT_H := 0.4
+const HAT_R := 0.75
+const HAT_H := 0.26
+## The clear gap between the collar's top and the hat (the smoke's way out).
+const HAT_CLEAR := 0.62
 ## Highest the vent stands above the apex of the cone (collar + posts + hat).
-const VENT_TOP := 0.7
+const VENT_TOP := 0.8
 
 
 static func applies(spec: HouseSpec, world_family: StringName = &"") -> bool:

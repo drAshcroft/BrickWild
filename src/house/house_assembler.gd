@@ -250,18 +250,29 @@ static func _longhall_fire(parent: Node3D, plan: HousePlan) -> void:
 	flame.emission = Color(1.0, 0.45, 0.08)
 	flame.emission_energy_multiplier = 2.4
 	flame.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	for k in range(4):
+	# HS-ROUNDHOUSE-RESIDUE: a hut's cooking fire is low, many small tongues
+	# leaning off the logs; the longhall keeps its four tall ones
+	var small: bool = not plan.roundhouse.is_empty()
+	var tongues := 7 if small else 4
+	for k in range(tongues):
 		var tongue := MeshInstance3D.new()
 		tongue.name = "Flame_%d" % k
 		var cone := CylinderMesh.new()
 		cone.top_radius = 0.0
-		cone.bottom_radius = 0.13 - 0.02 * float(k % 2)
-		cone.height = 0.5 + 0.14 * float(k % 3)
+		if small:
+			cone.bottom_radius = 0.07 - 0.015 * float(k % 2)
+			cone.height = 0.2 + 0.07 * float(k % 3)
+		else:
+			cone.bottom_radius = 0.13 - 0.02 * float(k % 2)
+			cone.height = 0.5 + 0.14 * float(k % 3)
 		cone.radial_segments = 7
 		tongue.mesh = cone
 		tongue.material_override = flame
-		var a := TAU * float(k) / 4.0 + 0.5
-		tongue.position = Vector3(cos(a) * 0.17, 0.18 + cone.height * 0.5, sin(a) * 0.17)
+		var a := TAU * float(k) / float(tongues) + 0.5
+		var r := (0.1 + 0.06 * float(k % 2)) if small else 0.17
+		tongue.position = Vector3(cos(a) * r, 0.16 + cone.height * 0.5, sin(a) * r)
+		if small:
+			tongue.rotation = Vector3(sin(a) * 0.25, 0.0, -cos(a) * 0.25)
 		fire.add_child(tongue)
 	var light := OmniLight3D.new()
 	light.name = "FireLight"

@@ -189,16 +189,27 @@ static func _frame(run: Dictionary, t: float, off: float, y: float) -> Transform
 static func _buttress(b: HouseBuilder, spec: HouseSpec, run: Dictionary, thick: float, t: float) -> void:
 	var face := thick * 0.5
 	var top := _top(spec) + 0.3
-	var foot_h := top * 0.62
-	# both blocks reach back into the wall by 0.1 m, so neither floats
+	var foot_h := top * 0.42
+	# every block reaches back into the wall by 0.1 m, so none floats.
+	# HS-SAHEL-RESIDUE: the taper is read in four set-backs, each narrower and
+	# shallower than the one below, not one step on a straight slab
 	var foot_d := BUTTRESS_OUT + 0.1
 	b.component_box("buttress", Vector3(BUTTRESS_W, foot_h, foot_d),
 		_frame(run, t, face + foot_d * 0.5 - 0.1, foot_h * 0.5), SURF_WALL)
-	var shaft_w := BUTTRESS_W * 0.72
-	var shaft_d := BUTTRESS_OUT * 0.62 + 0.1
-	var shaft_h := top - foot_h
+	var y := foot_h
+	var tiers := [[0.86, 0.78, 0.22], [0.72, 0.56, 0.18]]
+	for tier in tiers:
+		var tw: float = BUTTRESS_W * float(tier[0])
+		var td: float = BUTTRESS_OUT * float(tier[1]) + 0.1
+		var th: float = top * float(tier[2])
+		b.component_box("buttress_step", Vector3(tw, th, td),
+			_frame(run, t, face + td * 0.5 - 0.1, y + th * 0.5), SURF_WALL)
+		y += th
+	var shaft_w := BUTTRESS_W * 0.58
+	var shaft_d := BUTTRESS_OUT * 0.36 + 0.1
+	var shaft_h := top - y
 	b.component_box("buttress_top", Vector3(shaft_w, shaft_h, shaft_d),
-		_frame(run, t, face + shaft_d * 0.5 - 0.1, foot_h + shaft_h * 0.5), SURF_WALL)
+		_frame(run, t, face + shaft_d * 0.5 - 0.1, y + shaft_h * 0.5), SURF_WALL)
 
 
 static func _toron_rows(b: HouseBuilder, spec: HouseSpec, run: Dictionary, thick: float,
@@ -297,7 +308,8 @@ static func _entry(b: HouseBuilder, plan: HousePlan, spec: HouseSpec, e: int) ->
 				xf * Transform3D(Basis(), Vector3(x, ty, face + (pylon_out + PYLON_TORON) * 0.5 - 0.1)), SURF_TRIM)
 	# the relief frame: a strip each side of the door, a header over it, and a
 	# row of three raised blocks above the header
-	var rel_out := 0.09
+	# HS-SAHEL-RESIDUE: proud enough to cast a shadow (was 0.09 m)
+	var rel_out := 0.17
 	for s in [-1.0, 1.0]:
 		b.component_box("entry_relief", Vector3(RELIEF_STRIP, door_h + 0.22, rel_out + 0.1),
 			xf * Transform3D(Basis(), Vector3(float(s) * (dw * 0.5 + RELIEF_STRIP * 0.5),
@@ -309,3 +321,9 @@ static func _entry(b: HouseBuilder, plan: HousePlan, spec: HouseSpec, e: int) ->
 		var bx := (float(k) - 1.0) * (head_w / 3.0)
 		b.component_box("entry_relief", Vector3(head_w / 3.0 - 0.16, 0.2, rel_out + 0.04),
 			xf * Transform3D(Basis(), Vector3(bx, door_h + 0.22 + RELIEF_STRIP + 0.1, face + rel_out * 0.5 - 0.05)), SURF_WALL)
+	# raised bosses down each jamb strip, a hand proud of it
+	for s in [-1.0, 1.0]:
+		for k in range(3):
+			b.component_box("entry_relief_boss", Vector3(RELIEF_STRIP * 0.6, 0.14, 0.06),
+				xf * Transform3D(Basis(), Vector3(float(s) * (dw * 0.5 + RELIEF_STRIP * 0.5),
+					0.45 + float(k) * 0.55, face + rel_out + 0.03 - 0.05)), SURF_WALL)

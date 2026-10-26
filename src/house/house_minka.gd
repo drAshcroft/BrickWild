@@ -402,6 +402,22 @@ static func _emit_engawa(b: HouseBuilder, plan: HousePlan, spec: HouseSpec, rise
 	var depth := float(e["depth"])
 	b.component_box("engawa_deck", Vector3(along, t, depth),
 		Transform3D(basis, Vector3(c.x, t * 0.5, c.y)), SURF_FLOOR)
+	# HS-MINKA-RESIDUE: boards, not one slab. Dark joints run along the wall
+	# across the deck's top, a hair proud of it.
+	var joints := int(floor(depth / 0.13))
+	for j in range(1, joints):
+		var at_d := -depth * 0.5 + depth * float(j) / float(joints)
+		var jc := c + n * at_d
+		b.component_box("engawa_board_joint", Vector3(along, 0.004, 0.012),
+			Transform3D(basis, Vector3(jc.x, t + 0.002, jc.y)), SURF_TRIM)
+	# and under the deck's outer edge a continuous stone kerb from the ground,
+	# so the floor reads as standing on one stone platform, not on loose blocks
+	if rise > 0.0:
+		b._kit.surface(SURF_FLOOR).set_color(STONE)
+		var kerb_at := c + n * (depth * 0.5 - 0.17)
+		b.component_box("engawa_kerb", Vector3(along, rise, 0.26),
+			Transform3D(basis, Vector3(kerb_at.x, -rise * 0.5, kerb_at.y)), SURF_FLOOR)
+		b._kit.surface(SURF_FLOOR).set_color(Color.WHITE)
 	# the front edge beam and the posts' stone footings
 	var edge := c + n * (depth * 0.5)
 	b.component_box("engawa_edge", Vector3(along, 0.1, 0.08),

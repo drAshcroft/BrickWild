@@ -358,7 +358,9 @@ const STYLES := {
 		"roof_material": &"earth", "pitch_reference": 8.0,
 		"wall_t": 0.55, "culture": 1.0,
 		"parapet": 1.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
-		"corner_piers": 1.0, "span_out": 0.55, "along_out": 0.55,
+		# HS-SAHEL-RESIDUE: a banco roof stops a hand past the wall under its
+		# parapet; a 0.55 m slab overhang read as a lid.
+		"corner_piers": 1.0, "span_out": 0.2, "along_out": 0.2,
 		"sahel": true, "unglazed": true, "court_ranges": true,
 	},
 	&"thatch_cottage": {
