@@ -66,7 +66,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "placement", "cultureapi", "compactapi", "vworld", "vrealism", "vterrain", "vterrainlane", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
-	"temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
+	"crooked", "temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "sacredid", "vis009", "vis010", "vis016", "catalogcache",
 	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchsize", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad", "wunchecked",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
@@ -122,6 +122,8 @@ const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "plac
 ##   lane:sweep   ~40m   everything above; background it, do not wait on it
 ##   lane:tree    ~1m    anything in src/tree/, qa/tree_check.gd, tree_shapes
 ##   lane:bridge  ~1m    anything in src/bridge/, qa/bridge_check.gd
+##   lane:haunt          the October work (docs/haunted/): the crooked warp
+##                       and its contract, every kind once
 ##
 ## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 ## Lanes and bare suite names can be mixed; duplicates run once.
@@ -132,6 +134,7 @@ const LANES: Dictionary = {
 	"lane:geom-core": ["roofquick", "hroof", "hcomponent", "hsky", "hdoor", "hmesh", "metriccoords"],
 	"lane:geom-openings": ["hopening"],
 	"lane:geom-envelope": ["hbounds", "hjetty", "hmaterials"],
+	"lane:haunt": ["crooked"],
 	"lane:rich": ["hrich", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty"],
 	"lane:culture": ["hvernacular", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty", "hmaterials", "cultureapi"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
@@ -370,6 +373,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/castle_slope_suite.gd").run()
 		"hmesh":
 			return preload("res://tests/suites/house_mesh_integrity_suite.gd").run()
+		"crooked":
+			return preload("res://tests/suites/crooked_suite.gd").run()
 		"hopening":
 			return preload("res://tests/suites/house_roof_opening_suite.gd").run()
 		"hsky":

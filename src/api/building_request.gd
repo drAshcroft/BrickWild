@@ -66,6 +66,11 @@ var foundation: StringName = &""
 var pile_water_m: float = 0.0
 var pile_freeboard_m: float = 0.0
 var pile_deck_m: float = 0.0
+## How crooked, 0..1 (HNT-040): every storey leans its own way and the walls
+## kink at the floors. Zero is the building as built, not one vertex moved.
+## Applied after the family has built, to the mesh and the scene alike, so it
+## works for every kind but a village; see CrookedWarp.
+var jank: float = 0.0
 var _decode_errors: Array[Dictionary] = []
 
 const SCHEMA := "brickwild.request"
@@ -93,6 +98,8 @@ func to_dict() -> Dictionary:
 		out["ground_downhill_deg"] = ground_downhill_deg
 	if foundation != &"":
 		out["foundation"] = String(foundation)
+	if jank != 0.0:
+		out["jank"] = jank
 	for field in PILE_FIELDS:
 		if float(get(field)) != 0.0:
 			out[field] = float(get(field))
@@ -131,7 +138,7 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 			out._decode_errors.append(_field_error(field, "must be text"))
 		else:
 			out.set(field, StringName(data[field]))
-	for field in ["width", "length", "height", "storeys", "orientation", "period"]:
+	for field in ["width", "length", "height", "storeys", "orientation", "period", "jank"]:
 		if not data.has(field):
 			continue
 		var v: Variant = data[field]
@@ -255,6 +262,7 @@ func copy() -> BuildingRequest:
 	out.pile_deck_m = pile_deck_m
 	out.orientation = orientation
 	out.period = period
+	out.jank = jank
 	out._decode_errors = _decode_errors.duplicate(true)
 	return out
 
