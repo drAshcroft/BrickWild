@@ -815,6 +815,48 @@ village should turn such lots so the front faces uphill or across the slope.
 Suite: `hslope` (house, shop, church at 0 / 1.0 / 2.5 / 4.0 m, sideways and
 front-to-back). Pictures: `godot --path . --script res://tools/render_slopes.gd`.
 
+### On piles over water (VTER-FORM-WATER)
+
+The second foundation the request contract takes, beside a fall.
+`BuildingRequest.foundation` is `&""` (the ground; the default) or `&"piles"`,
+for a house or a shop (`src/house/house_piles.gd`, `HousePiles`). Three more
+fields, each 0 by default and left out of `to_dict()` then, so every request
+written before them reads and writes byte for byte the same:
+
+| field | meaning | default / range |
+|---|---|---|
+| `pile_water_m` | the water's depth under the house, surface to bed | 0 - `MAX_WATER_M` 4.0 m; deeper is REFUSED (`water_too_deep`) |
+| `pile_freeboard_m` | the floor's height over the water | 0 = 1.2 m; else 0.4 - 3.0 m |
+| `pile_deck_m` | how far the landing reaches out from the entrance wall's outer face | 0 = 1.5 m; at most 8 m |
+
+The floor never moves, as on a fall: local y = 0 is still the floor's
+underside, and it is now the top of a timber deck. The water's surface is at
+-freeboard, the bed at -freeboard - water, every post's foot 0.6 m into the
+bed. Under and round the house, host `piles`: `pile_deck` (disjoint
+rectangles, top at y = 0: the footprint grown by a 1 m GALLERY all round, the
+LANDING beyond it at the entrance, and whatever of the chimney's foot neither
+covers), `pile_bearer` (a beam per row of posts), `pile` (a grid no wider
+than 2.2 m) and `pile_ladder` (from the landing's edge down to the water,
+where a canoe ties up). A house on piles plans NO YARD (`HouseYard.applies`):
+there is no ground round it; its facade pieces stand on the gallery.
+`exterior_bounds` holds the platform and reaches down to the posts' feet.
+Refused, with their codes: piles under anything but a house or a shop
+(`unsupported_option`), piles on a fall (`unsupported_option`), an unknown
+foundation and a negative depth (`invalid_ground`), pile fields without
+piles (`unsupported_option`).
+
+Suite `hpiles` (218 checks, 76 s host): the contract and its refusals; `""`
+is vertex-identical to no field; the house on the ground is a subset of the
+pile house, triangle for triangle (the same plan built with the foundation
+switched off); every post runs from the bearers to 0.6 m under the bed;
+nothing of the platform stands above the floor; the deck is at y = 0 outside
+the door and the landing reaches `pile_deck_m`; every point of the deck is
+within a pile spacing of a post; no yard, every grounded facade piece on the
+deck; ComponentCheck; every vertex inside the bound; the plan's own nav check.
+House and shop, water 0.5 / 2.0 / 4.0 m, default and 2.0 m freeboard with a
+3.0 m landing. The five long-standing styles' fingerprint
+(`tools/fingerprint_houses.gd`) is identical before and after.
+
 ## The ground mesh (VTER-GROUND-MESH)
 
 With `plan.ground` the 3D village stands on its terrain: VillageBuilder
@@ -1805,27 +1847,98 @@ landing (below).
 
 ## The water form (VTER-FORM-WATER)
 
-Ganvie, Kampong Ayer: a fishing village standing in its shallows on piles,
-joined by boardwalks. `VillageWaterForm` (`src/village/forms/water_form.gd`)
-plans it, `VillageBoardwalk` lays the decks, `HousePiles` (`src/house/house_piles.gd`)
-gives a house its deck, bearers and posts below the floor, and
-`VillageWaterCheck` (`qa/village_water_check.gd`) judges the result.
+Rows 2 and 9 of the form rule, given their planner:
+`src/village/forms/water_form.gd`, `VillageWaterForm`, reached from
+`VillageSitePlanner._plan` by one dispatch beside the shore form's (and from
+`plan()` for the siting, which is the shore form's own); `water` is in
+`FORMS_SUPPORTED` and out of `FORM_FALLBACK`. Ganvié on Lake Nokoué (the world
+set's `over_water_share` 0.542), Kampong Ayer on the Brunei river (1.0): houses
+on piles, joined by boardwalks, reached from a street on the bank. Without
+terrain the form is never derived, so nothing flat changes (`thorn-hamlet` and
+`veld-070` exported before and after, `cmp` identical; the seven flat villages
+of `tools/fingerprint_village_ground.gd` and the house fingerprint identical).
 
-* The spec derives `water` on a drowned lagoon and plans it (no
-  `FORM_FALLBACK` entry; the table is now empty). The site and lot planners
-  treat `water` as the shore form's relatives.
-* Piers run off the shore street into the shallows; a far walk joins them.
-  Each is a `path` carrying `"boardwalk"` and crosses the water as a crossing
-  of kind `boardwalk`. Households on the pile lots ask their request for the
-  lot's water depth and a landing to the boardwalk (`BuildingRequest` fields).
-* On the lagoon fixture (suite `vwaterform`, ~12 m on a loaded host, 32
-  checks): 3 boardwalks, 12 houses on piles and 4 on land,
-  `over_water_share` 0.750; with the decks taken away 12 doors are unreached
-  (the control). A shore whose water deepens at once takes no pier: the plan is
-  the shore form, every building dry.
-* `hpiles` (218 checks, ~55 s) covers the house emitter alone: freeboard, deck
-  depth, pile count, feet below the bed.
+| Step | What |
+|---|---|
+| siting, shoreline, shore street, common, landmark | the shore form's, unchanged (`VillageShoreForm.plan`) |
+| piers | `_piers`: boardwalks square off the shore street on the shoreline's own columns, `PIER_SPACING` 40 m apart, nearest the common first, clear of the common (6 m) and of the street's other junctions (14 m) and 22 m inside the site's ends; one per 6 households, at least two (`piers_for`). Each runs out beyond the shoreline as far as a row of pile lots each side needs (`reach_for`: 12 m + 12.5 m a house, 30-90 m), and is laid only where the water under it and 12 m either side stays within `DEEP_MAX` (3.5 m) and where the ground SEES the bed: somewhere under it at least `BED_SEEN_M` 0.5 m below the level. A DEM that reads the sea flat at its surface says nothing of its depth -- Manarola's 30 m grid is 0 m from the shore out, and the first vtplan run drove piles into it for Thorn (which derives `water` there); now Thorn on Manarola is the shore form |
+| the far walk | a boardwalk along the piers' far ends (the shoreline plus the reach, held to the bend rule), so every boardwalk is a way through and none a dead end |
+| a boardwalk | a `path` road (1.2 m, verge 0.7) with `"boardwalk": true` and `"deck_m"` (the water level + `HousePiles.FREEBOARD_DEFAULT`): a footway in every check. Over the water it is a CROSSING of kind `boardwalk` (`VillageWaterPlan.crossing_kind`), its width the verged ribbon less the builder's bridge margin (`crossing_width`), so the deck the walk paints is the 2.6 m ribbon the lots front |
+| the site | grown seaward to the far walk + 6 m, and the ground's water re-read over it (`VillageGroundWater.add`) BEFORE the boardwalks are laid, so the shore trim never cuts them |
+| pile lots | `place_on_piles` (one hook in `VillageLotPlanner.cut_measured`): every household is offered the boardwalks first, as a house on piles measured once (`pile_job`: the request asked for piles, cached on the job's shared cache). `pile_lot_is_legal` (one hook at the top of `_lot_is_legal`): the lot fronts a boardwalk, lies WHOLLY on the ground's water (`wholly_wet`), inside the site, clear of every ribbon, common, lot and the landmark's ground, corners, walls inside, eaves off the carriageways, fire gaps; and the bed under it (read as the ground mesh will carve it: never above the level less 0.41 m) no deeper than the piles reach. The lot records `"piles"`: `deck_m`, `water_m` (snapped up to 0.25 m), `freeboard_m`, `bed_m`, `reach_m` and `landing` (the house's landing in plan: its width and gallery, from its wall to the lot's front, which is the boardwalk's deck edge). `_commit` asks the request for exactly that (`request_for`). What finds no pile lot stands on the bank, fronting the shore street |
+| the build | `VillageBuilder._water_on_terrain` hands every boardwalk crossing to `VillageBoardwalk.emit` instead of `_crossing`: `boardwalk_deck` (each ribbon less those before it, in convex pieces, so no two deck faces share a plane at a junction), `boardwalk_bearer`, `boardwalk_pile` (both edges every 2.2 m, into the bed) and `boardwalk_ramp` where a crossing lands on the bank (at most 12 %) |
+| standing | `VillageGroundSurface.platform_of` answers a pile lot's deck level, so the assembler sets the house there; its facade pieces stay on its gallery (`_ground_yard` skipped, the node marked `piles`); the dresser does not dress it (`VillageDressHosts.host_of` answers nothing) |
+| the walk | `VillageNavCheck.build_grid` and `sources` paint each landing as floor after the water (and cut it out of the water and the building outlines), as they do a crossing; VillageWalk exports the same ground, `kind: landing` |
 
+**What the checks learned.** `VillageLotCheck.tiling` and PlaceCheck's
+`edge_ground` let a pile lot stand in the water. PlaceCheck ranks a building
+on the bank among the buildings on the bank (`neighbours`): the houses in the
+water stand on piles, not on the lake bed the rank would read, and the mill on
+the bank came out "high" (rank 0.75) against twelve houses over the bed.
+`VillageRoadCheck` expects the boardwalk kind for a boardwalk's crossing.
+`VillageGroundCheck` judges a house on piles by its deck
+(`VillageWaterCheck.ground`): it stands at its deck level, no ground stands
+over the water under its footprint or its landing, and its piles' feet are
+under the ground there; no ground stands over the water under a boardwalk; a
+facade piece on a pile house is judged at its planned height on the gallery.
+`qa/village_water_check.gd`, `VillageWaterCheck.check`: every pile lot wholly
+wet, within the piles' range, on a boardwalk, its building asked for its
+piles and valid; every boardwalk over the water carried by a boardwalk
+crossing; nothing the dresser set down stands in the water (a boat excepted:
+the first run had seven barrels on the lake bed, from the house recipe's
+`wall` rule on pile lots); `over_water_share` (VillageShape, the survey's
+definition: a building is over water when half its footprint is).
+
+**The lagoon.** `tests/fixtures/terrain/synthetic_terrain.gd` `lagoon`: a
+gentle shore (3 %) on a sine-bent shoreline, a lagoon shelving 6 % to a 2.6 m
+bed; the 400 m form window is 42 % wet and the 450 m disc 46 %, so the ground
+derives `water` at row 2 (not `shore` at row 1). The world90 grids of Ganvié
+and Kampong Ayer cannot stand in for it: Ganvié's DEM reads its lagoon as land
+1-4 m high (its water level, the lowest cell + 0.5 m, is -9.5 m), and Kampong
+Ayer's river is one 90 m row of cells.
+
+Suite `vwaterform` (32 checks, 295 s host, ~12 m loaded; 67 s of it measuring the 16
+buildings once; `WATER_CASE=lagoon|lake_shore` runs one case, `WATER_DUMP=1`
+prints the plan). A fishing village of 50 on a lake:
+
+| Ground | Form | Boardwalks | On piles / on the bank | `over_water_share` | Deck parts / posts / ramps | Under the piles | QA |
+|---|---|---|---|---|---|---|---|
+| `lagoon` | water (derived) | 2 piers + the far walk, 3 crossings | 12 / 4 (church, smithy, tavern, mill) | **0.750** | 16 / 152 / 2 | ground at most 0.09 m under the water's surface; feet at least 0.69 m under the bed | VillageQA, VillageWaterCheck, VillageGroundCheck, ComponentCheck ok |
+| `lake_shore` (forced) | water, as the shore form | none: 3.5 m of water lies 44 m out | 0 / 16, all dry | 0.0 | - | - | VillageQA ok |
+
+Also checked: every door walked to from a gate (VillageNavCheck `arrive`)
+and every door `reachable` in VillageWalk's export, with one landing per pile
+house; with the boardwalk crossings taken away all 12 pile houses are
+unreached (the control); a pile house asked for no depth fails
+VillageWaterCheck (the control); the export writes form `water`, each
+boardwalk (`roads[].boardwalk.deck_m`), each pile lot (`lots[].piles`) and
+each pile request; the plan is pure; a water spec with no ground plans as the
+straight strand. The acceptance -- on a lagoon, houses on piles, a boardwalk
+walk graph connecting them, `over_water_share` over 0.5 -- reads 12 houses on
+piles, every door reached over the boardwalks, 0.750.
+
+**Not yet.**
+
+* **a pier that bends** -- piers are straight and square to the street; a
+  shore that shelves unevenly loses a pier rather than bending it into the
+  shallows. The far walk is the only boardwalk that follows the shore.
+* **the trades on piles** -- only households are offered the boardwalks; the
+  smithy, the tavern, the mill and the church stand on the bank (Ganvié's
+  market and church do stand in the water).
+* **canoes** -- the strand step's boats stand on the bank; the pile houses'
+  ladders reach the water but no canoe is moored there.
+* **`piers`** -- VillageShape still reports 0 (`survey.py` counts mapped
+  `man_made=pier` ways; the definition lives in both files and was not
+  changed here).
+* **real ground** -- no real grid in the set shows a lagoon at 90 m; on a
+  steep real shore (Manarola, Hallstatt) the form is the shore form.
+* **the house's own walk export** -- `BrickWild.navigation()` publishes no
+  `route_m` over a pile house's landing (its door is one FLOOR_T step down
+  to the deck); the village walk carries it.
+* **a bed under a house deeper than the grid shows** -- the piles' depth is
+  read from the terrain at 2 m under the lot; a pit between the grid's nodes
+  under a post would leave it short (the ground check reads the emitted mesh
+  and would say so).
 ## The island fill (VTER-ISLAND-FILL)
 
 Isola dei Pescatori: 33 buildings on a lake islet, the lanes one house wide,

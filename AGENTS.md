@@ -151,6 +151,8 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | a walk-QA pin, a walk rule, a stair rule, a z-fight budget | `walkpins` | ~1 m host, 40 checks |
 | the crest form: `src/village/forms/crest_form.gd`, the crest frame in `VillageSiting`, the crest hooks in the lot planner and the place/road checks | `vcrest` | ~5 m host (measures 16 buildings once, ~75 s); see docs/VILLAGE_TERRAIN.md "The crest form" |
 | buildings on falling ground: `core/ground_fall.gd`, `src/house/house_slope.gd`, the church terrace, the ground request fields | `hslope` | ~2.5 m host, 253 checks; see docs/VILLAGE_TERRAIN.md |
+| a house or shop on piles: `src/house/house_piles.gd`, the `foundation` / `pile_*` request fields | `hpiles` | 76 s host, 218 checks; see docs/VILLAGE_TERRAIN.md "On piles over water" |
+| the water form: `src/village/forms/water_form.gd`, `src/village/village_boardwalk.gd`, `qa/village_water_check.gd`, the `lagoon` fixture | `vwaterform` (`WATER_CASE=lagoon` for one case), then `lane:village-terrain` | 295 s host, ~12 m loaded, 32 checks; see docs/VILLAGE_TERRAIN.md "The water form" |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
 
