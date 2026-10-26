@@ -410,9 +410,38 @@ static func dines_elsewhere(plan: HousePlan, room: int) -> bool:
 ## temple and world recipes. The base recipe remains the authority for every
 ## other family. A compact domestic hall may also carry the kitchen when its
 ## planner says it has no separate kitchen bay.
+## A meeting hall too narrow to seat its table from both long sides
+## (SHOP-GUILDHALL-NARROW): a 1.10 m trestle with a 0.53 m bench either side
+## and PATH_MIN to each wall needs 3.56 m across; the guildhall's 3.22 m hall
+## left 0.55 and 0.64 m. Such a hall sets the table along a wall and seats the
+## open side only -- the way a narrow refectory is laid -- leaving a full aisle.
+static func narrow_meeting_hall(plan: HousePlan, room: int) -> bool:
+	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var across: float = minf(floor_rect.size.x, floor_rect.size.y)
+	var table: Vector2 = PropCatalog.footprint("Table_Large")
+	var bench: Vector2 = PropCatalog.footprint("Bench")
+	var need: float = minf(table.x, table.y) + 2.0 * (minf(bench.x, bench.y) + 0.04) \
+		+ 2.0 * HouseGeometry.PATH_MIN
+	return across < need
+
+
+static func narrow_meeting_hall_recipe(recipe: Array) -> Array:
+	var out: Array = []
+	for original: Dictionary in recipe:
+		var step: Dictionary = original.duplicate(true)
+		if String(step["cat"]) == "table":
+			step["rule"] = &"wall"
+		elif String(step["cat"]) == "bench":
+			step["n"] = [1, 1]
+		out.append(step)
+	return out
+
+
 static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := true) -> Array:
 	var kind: StringName = plan.kind_of(room)
 	var recipe: Array = RECIPES.get(kind, [])
+	if kind == &"meeting_hall" and narrow_meeting_hall(plan, room):
+		return narrow_meeting_hall_recipe(recipe)
 	if plan.spec.get_script() == BASE_HOUSE_SPEC and plan.world_family == &"" \
 			and plan.spec.trade == &"innkeeper" and kind == &"bedroom":
 		# Guest rooms retain both clothes storage and bedside support. These are
@@ -1180,7 +1209,11 @@ const SHOP_FITTINGS := {
 		{"cat": "alchemy", "rule": &"on", "n": [2, 4], "opt": 1.0},
 		{"cat": "alchemy", "rule": &"on", "n": [1, 2], "opt": 1.0, "room": "workshop"},
 	],
+	# a counter to sell remedies across, after the laboratory's own benches and
+	# fire: the blind review found no counter from the door (LIVE-SHOPS)
 	&"alchemist_laboratory": [
+		{"cat": "counter", "rule": &"wall", "n": [1, 1], "opt": 1.0,
+			"private_rng": true},
 		{"cat": "alchemy", "rule": &"on", "n": [2, 4], "host": "distributed", "opt": 1.0},
 	],
 	&"bathhouse": [

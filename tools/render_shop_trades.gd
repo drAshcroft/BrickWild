@@ -1,11 +1,14 @@
 extends "res://tools/render_shots.gd"
 ## LIVE-SHOPS phase 1: for each counter-trade case in family_style_requests.json,
-## render the exterior three-quarter view and an eye-level view from the customer
-## door looking in, and write the plan facts beside them.
+## render the exterior three-quarter view, an eye-level view from the customer
+## door looking in, and a plan view of the ground storey from above (roof off,
+## everything over 2.1 m cut away, each room named) so the back rooms -- the
+## work room and the store -- can be judged too (SHOP-STORE-VIEW). The plan
+## facts are written beside them.
 ##
 ## Must NOT be headless. Run:
 ##   godot --path . --script res://tools/render_shop_trades.gd [-- kind kind ...]
-## Output: artifacts/goal/LIVE-SHOPS/<kind>/{exterior,door_eye}.jpg and
+## Output: artifacts/goal/LIVE-SHOPS/<kind>/{exterior,door_eye,plan}.jpg and
 ## artifacts/goal/LIVE-SHOPS/plan_facts.json
 
 const FIXTURE := "res://tests/fixtures/family_style_requests.json"
@@ -15,6 +18,13 @@ const KINDS: Array[String] = ["apothecary", "alchemist_laboratory", "bakery", "b
 const WORK_CATS: Array[String] = ["workbench", "hearth", "anvil", "alchemy", "blade", "bench", "rack"]
 const STORAGE_CATS: Array[String] = ["storage", "barrel", "crate", "sack", "chest"]
 const NOT_WARES: Array[String] = ["counter", "chair", "stool", "light", "rug", "decor", "plant", "lamp", "candle"]
+## A store is a room NAMED for stock, holding stock, through a door from the
+## room the work is done in. The loose test (any kitchen, office or workshop
+## with a crate in it) proved nothing (SHOP-STORE-VIEW).
+const STORE_KINDS: Array[String] = ["store", "storeroom", "pantry", "cellar", "stock_room"]
+const WORK_ROOM_KINDS: Array[String] = ["workshop", "kitchen", "laboratory", "bakehouse"]
+const FLOOR_WORK_CATS: Array[String] = ["workbench", "hearth", "anvil"]
+const PLAN_CUT := 2.1   # the plan view sees everything below this, nothing above
 const EYE := 1.6
 const HALF_FOV := 40.0
 
@@ -41,11 +51,14 @@ func _init() -> void:
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
 		var ext_path := "%s/exterior.jpg" % dir
 		var eye_path := "%s/door_eye.jpg" % dir
+		var plan_path := "%s/plan.jpg" % dir
 		await _shoot_exterior(built, ext_path)
 		await _shoot_door_eye(built, plan, eye_path)
+		await _shoot_plan(built, plan, plan_path)
 		var row := _facts(c, plan)
 		row["images"] = {"exterior_three_quarter": ProjectSettings.globalize_path(ext_path),
-			"door_eye": ProjectSettings.globalize_path(eye_path)}
+			"door_eye": ProjectSettings.globalize_path(eye_path),
+			"plan_cutaway": ProjectSettings.globalize_path(plan_path)}
 		facts.append(row)
 		print("done ", kind)
 	var out := FileAccess.open(OUT + "/plan_facts.json", FileAccess.WRITE)
@@ -113,6 +126,108 @@ func _shoot_door_eye(built: GeneratedBuilding, plan: HousePlan, path: String) ->
 	await _save(ProjectSettings.globalize_path(path))
 	node.queue_free()
 	await process_frame
+
+
+## The ground storey from straight above, cut at PLAN_CUT: walls read as a
+## section, every counter, bench, shelf and crate below the cut shows, and each
+## room carries its plan name so a reviewer can say whether the room called
+## STORE holds stock and opens off the work room.
+func _shoot_plan(built: GeneratedBuilding, plan: HousePlan, path: String) -> void:
+	var node: Node3D = BrickWild.instantiate(built, true)
+	_root3d.add_child(node)
+	var ground := Rect2()
+	for i in plan.room_count():
+		if plan.storey_of_room(i) != 0:
+			continue
+		var r := HouseGeometry.room_floor_rect(plan, i)
+		ground = r if not ground.has_area() else ground.merge(r)
+	var labels := Node3D.new()
+	node.add_child(labels)
+	for i in plan.room_count():
+		if plan.storey_of_room(i) != 0:
+			continue
+		var c := HouseGeometry.room_floor_rect(plan, i).get_center()
+		var text := String(plan.kind_of(i)).to_upper().replace("_", " ")
+		if i == plan.entrance_room():
+			text += "\n(customer door)"
+		labels.add_child(_plan_label(text, Vector3(c.x, PLAN_CUT - 0.2, c.y), 64))
+	_plan_walls(labels, plan)
+	var door := _door_pose(plan)
+	var dp: Vector2 = door["pos"]
+	var dd: Vector2 = door["dir"]
+	labels.add_child(_plan_label("DOOR", Vector3(dp.x - dd.x * 0.5, PLAN_CUT - 0.2, dp.y - dd.y * 0.5), 40))
+	await process_frame
+	var aspect := float(SHOT.x) / float(SHOT.y)
+	_cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	_cam.size = maxf(ground.size.y, ground.size.x / aspect) * 1.1
+	_cam.near = 0.05
+	_cam.far = 60.0
+	_cam.position = Vector3(ground.get_center().x, PLAN_CUT, ground.get_center().y)
+	_cam.rotation = Vector3(-PI / 2.0, 0.0, 0.0)
+	_family = &"house"
+	_set_shot_lighting(0.6, 40.0)
+	var shadows := _key_light.shadow_enabled
+	_key_light.shadow_enabled = false # the storey above would shade the whole floor
+	await _save(ProjectSettings.globalize_path(path))
+	_key_light.shadow_enabled = shadows
+	_cam.projection = Camera3D.PROJECTION_PERSPECTIVE
+	node.queue_free()
+	await process_frame
+
+
+## Seen from straight above a wall is edge-on and vanishes, so the plan draws
+## each ground room's outline as a dark line and every door as a gap in it.
+func _plan_walls(parent: Node3D, plan: HousePlan) -> void:
+	var ink := StandardMaterial3D.new()
+	ink.albedo_color = Color(0.12, 0.10, 0.09)
+	ink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var gap := StandardMaterial3D.new()
+	gap.albedo_color = Color(0.93, 0.88, 0.74)
+	gap.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var y := PLAN_CUT - 0.35
+	for i in plan.room_count():
+		if plan.storey_of_room(i) != 0:
+			continue
+		var r := HouseGeometry.room_floor_rect(plan, i)
+		var t := 0.09
+		_plan_bar(parent, Vector3(r.get_center().x, y, r.position.y), Vector3(r.size.x + t, 0.02, t), ink)
+		_plan_bar(parent, Vector3(r.get_center().x, y, r.end.y), Vector3(r.size.x + t, 0.02, t), ink)
+		_plan_bar(parent, Vector3(r.position.x, y, r.get_center().y), Vector3(t, 0.02, r.size.y + t), ink)
+		_plan_bar(parent, Vector3(r.end.x, y, r.get_center().y), Vector3(t, 0.02, r.size.y + t), ink)
+	for d in plan.doors:
+		var a := int(d.get("a", -1))
+		if a >= 0 and plan.storey_of_room(a) != 0:
+			continue
+		var n: Vector2 = d["normal"]
+		var w := float(d.get("width", 0.9))
+		var size := Vector3(w, 0.02, 0.5) if absf(n.y) > absf(n.x) else Vector3(0.5, 0.02, w)
+		var pos: Vector2 = d["pos"]
+		_plan_bar(parent, Vector3(pos.x, y + 0.05, pos.y), size, gap)
+
+
+func _plan_bar(parent: Node3D, at: Vector3, size: Vector3, mat: Material) -> void:
+	var b := BoxMesh.new()
+	b.size = size
+	var m := MeshInstance3D.new()
+	m.mesh = b
+	m.material_override = mat
+	m.position = at
+	parent.add_child(m)
+
+
+func _plan_label(text: String, at: Vector3, size: int) -> Label3D:
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = size
+	l.pixel_size = 0.004
+	l.outline_size = 14
+	l.modulate = Color(0.08, 0.08, 0.1)
+	l.outline_modulate = Color(1, 1, 1)
+	l.no_depth_test = true
+	l.shaded = false
+	l.position = at
+	l.rotation = Vector3(-PI / 2.0, 0.0, 0.0)
+	return l
 
 
 # ------------------------------------------------------------------ facts
@@ -200,6 +315,7 @@ func _facts(c: Dictionary, plan: HousePlan) -> Dictionary:
 			if w == r or _joined(plan, r, w):
 				joined.append(w)
 		store_rooms.append({"room": r, "kind": s["room_kind"], "joined_to_work_rooms": joined})
+	var named := _named_stores(plan)
 	var counter_visible := false
 	for k in counters:
 		if bool(k["in_line_of_sight"]):
@@ -211,9 +327,47 @@ func _facts(c: Dictionary, plan: HousePlan) -> Dictionary:
 		"counter": {"present": not counters.is_empty(), "pieces": counters, "in_line_of_sight": counter_visible},
 		"wares_on_display": {"count_front_room": wares.size(), "visible_from_door": wares_visible.size(), "pieces": wares},
 		"staff_work_station": {"present": not stations.is_empty(), "pieces": stations},
-		"storage_off_work_area": {"present": store_rooms.any(func(s): return not (s["joined_to_work_rooms"] as Array).is_empty()),
+		"storage_off_work_area": {
+			"present": named.any(func(s): return int(s["stock"]) > 0 and not (s["joined_to_work_rooms"] as Array).is_empty()),
+			"named_store_rooms": named,
+			"loose_present": store_rooms.any(func(s): return not (s["joined_to_work_rooms"] as Array).is_empty()),
 			"storage_rooms": store_rooms, "pieces": storage},
 		"rooms": rooms}
+
+
+## Rooms where the trade is worked: a work-room kind, or any room holding a
+## floor-standing work fixture (a workbench, a fire, an anvil).
+func _work_rooms(plan: HousePlan) -> Array[int]:
+	var out: Array[int] = []
+	for i in plan.room_count():
+		var work := String(plan.kind_of(i)) in WORK_ROOM_KINDS
+		for fi in plan.furniture_of(i):
+			if String(PropCatalog.category(String(plan.furniture[fi]["key"]))) in FLOOR_WORK_CATS:
+				work = true
+		if work:
+			out.append(i)
+	return out
+
+
+## Every room named for stock, what stock it holds, and which work rooms it
+## opens off through an interior door.
+func _named_stores(plan: HousePlan) -> Array:
+	var work := _work_rooms(plan)
+	var out: Array = []
+	for i in plan.room_count():
+		if not String(plan.kind_of(i)) in STORE_KINDS:
+			continue
+		var stock := 0
+		for fi in plan.furniture_of(i):
+			if String(PropCatalog.category(String(plan.furniture[fi]["key"]))) in STORAGE_CATS:
+				stock += 1
+		var joined: Array = []
+		for w in work:
+			if w != i and _joined(plan, i, w):
+				joined.append({"room": w, "kind": String(plan.kind_of(w))})
+		out.append({"room": i, "kind": String(plan.kind_of(i)), "storey": plan.storey_of_room(i),
+			"stock": stock, "joined_to_work_rooms": joined})
+	return out
 
 
 func _joined(plan: HousePlan, a: int, b: int) -> bool:

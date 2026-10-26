@@ -189,3 +189,13 @@ Evidence: two renders per case by `tools/render_shop_trades.gd` (not headless): 
 - general_store: the plan has a workbench only in the office, so the reviewer's NO on station matches the plan.
 
 Misses are filed as open tasks: SHOP-<KIND>-TRAITS for each kind with a NO, and SHOP-STORE-VIEW for the storage room that no view shows.
+
+### Fixes after the review (2026-10-26)
+
+- **Trade wares** (`src/shop/shop_wares.gd`, called from `HouseAssembler.furnish`): small procedural goods set on the boards the plan already holds -- loaves, joints and hanging hams, jars and herb bunches, cloth bolts and hung lengths, cheeses and crocks, tankards, tools and horseshoes. It is dressing, not plan: no floor is taken, no plan record is added, so the walk and furnishing checks see the same plan. Each trade's station goes on the middle of its counter where the door sees it: the butcher's block and cleaver, the apothecary's alembic and mortar, the tailor's chalked cutting cloth and shears, the grocer's scales and ledger, the tapster's cask. Board heights are measured from the models' up-facing faces (stall board 0.82, arched shelf -0.42/0.12/0.64 from its mount, plain shelf 0.10).
+- **Bakery oven**: the bakery's fire is a catalogue cauldron; the assembler draws it as a domed brick oven with a glowing mouth on the same footprint.
+- **Alchemist laboratory**: a counter fitting (rule wall) after the laboratory's own benches.
+- **Plan view** (`plan.jpg`, `tools/render_shop_trades.gd`): the ground storey from straight above, orthographic, cut at 2.1 m (canopies and the storey above vanish), with each room outlined, every door a gap and every room named. It is the view that can show a store.
+- **Store fact, tightened**: `storage_off_work_area.present` now needs a room NAMED for stock (store, storeroom, pantry, cellar) that holds storage-category pieces and opens through an interior door off a work room (a workshop, kitchen or laboratory, or any room with a workbench, fire or anvil). The old loose answer is kept as `loose_present`.
+- Still open: the blacksmith and carpenter are workshop-front trades by contract (`ShopTradeSuite.IDENTITY` bans a smithy counter); their customer is served at the anvil or bench, so the review's "counter" point is a design disagreement, not a missing piece.
+- The stricter store fact, on the review cases (seed 8102): bakery, blacksmith, carpenter, general store, tavern and the alchemist each have a named store opening off a work room. The apothecary, butcher and tailor do not: every store opens off the sales floor or another store, never the workshop (SHOP-STORE-JOIN).
