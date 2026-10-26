@@ -112,6 +112,16 @@ var _base := {}
 var _terrain_name := ""
 var _filer_pid := -1
 var _filer_dry := false
+## A pin arrived while the filer was still running: file again when it ends.
+var _filer_again := false
+## The review the current building's pins belong to. Every pin is written the
+## moment it is confirmed (screenshot, jsonl line, rating block, todo), so a
+## crash or a closed window loses nothing; Save only adds the boxes and notes.
+var _review_id := ""
+var _review_time := ""
+## Pins keep the number they were given; a deleted pin's number is not reused,
+## so a todo already filed as WALK-<review>-<n> never changes meaning.
+var _pin_serial := 0
 
 var _dialog: PanelContainer
 var _dlg_kind: OptionButton
@@ -922,7 +932,7 @@ func _respawn() -> void:
 	if _placement.has("front"):
 		var front: Vector3 = _placement["front"]
 		spot = Vector3(door.x, 0, door.z) + front * 3.0
-		top = float(_placement["ray_top"])
+		top = float(_placement.get("ray_top", top))
 		_yaw = atan2(front.x, front.z)
 	var q := PhysicsRayQueryParameters3D.create(Vector3(spot.x, top, spot.z),
 		Vector3(spot.x, minf(-50.0, bounds.position.y - 50.0), spot.z))
@@ -1205,21 +1215,28 @@ func _confirm_pin() -> void:
 	pin["kind"] = PIN_KINDS[_dlg_kind.selected - 1]
 	pin["severity"] = SEVERITIES[_dlg_sev.selected]
 	pin["note"] = _dlg_note.text.strip_edges()
+	_pin_serial += 1
+	var n := _pin_serial
+	pin["n"] = n
+	pin["shot"] = "%s_%d.png" % [_review_id, n]
 	_pins.append(pin)
-	var n := _pins.size()
 	var marker := _make_marker(n)
 	marker.position = _building_root.to_global(pin["pos"])
 	_pins_root.add_child(marker)
 	pin["marker"] = marker
-	_pin_list.add_item(_pin_line(n, pin))
+	_pin_list.add_item(_pin_line(pin))
 	if PIN_FIELD.has(pin["kind"]):
 		(_checks[PIN_FIELD[pin["kind"]]] as CheckBox).button_pressed = true
-	_status.text = "Pinned %s. %d pins on this building." % [pin["kind"], n]
 	_close_dialog()
+	var err := _write_review()
+	if err != "":
+		_status.text = "Pin %d NOT saved: %s" % [n, err]
+	else:
+		_status.text = "Pin %d (%s) saved. %s" % [n, pin["kind"], _status.text]
 
 
-static func _pin_line(n: int, pin: Dictionary) -> String:
-	return "%d. [%s] %s — %s" % [n, pin.get("severity", "bug"), pin["kind"],
+static func _pin_line(pin: Dictionary) -> String:
+	return "%d. [%s] %s — %s" % [pin["n"], pin.get("severity", "bug"), pin["kind"],
 		pin["note"] if pin["note"] != "" else "(no note)"]
 
 
@@ -1266,7 +1283,7 @@ func _go_to_pin(i: int) -> void:
 	_yaw = pin["yaw"]
 	_pitch = pin["pitch"]
 	_apply_look()
-	_status.text = "At pin %d (fly mode on; F to walk)." % (i + 1)
+	_status.text = "At pin %d (fly mode on; F to walk)." % pin["n"]
 
 
 func _delete_pin() -> void:
@@ -1274,13 +1291,17 @@ func _delete_pin() -> void:
 	if sel.is_empty():
 		return
 	var i: int = sel[0]
-	(_pins[i]["marker"] as Node).queue_free()
+	var gone: Dictionary = _pins[i]
+	(gone["marker"] as Node).queue_free()
 	_pins.remove_at(i)
 	_pin_list.clear()
-	for j in _pins.size():
-		var pin: Dictionary = _pins[j]
-		(pin["marker"].get_child(1) as Label3D).text = str(j + 1)
-		_pin_list.add_item(_pin_line(j + 1, pin))
+	for pin in _pins:
+		_pin_list.add_item(_pin_line(pin))
+	var err := _write_review()
+	_status.text = ("Pin %d deleted from the review." % gone["n"]) if err == "" else ("Not saved: " + err)
+	if _file_todos.button_pressed:
+		_status.text += " A todo already filed for it stays: waterfree todos delete WALK-%s-%d" % [
+			_review_id.substr(0, 8), gone["n"]]
 
 
 func _clear_pins() -> void:
@@ -1288,6 +1309,9 @@ func _clear_pins() -> void:
 		(pin["marker"] as Node).queue_free()
 	_pins.clear()
 	_pin_list.clear()
+	_review_id = "%x%x" % [int(Time.get_unix_time_from_system() * 1000.0), randi()]
+	_review_time = Time.get_datetime_string_from_system(true) + "Z"
+	_pin_serial = 0
 
 
 # --- saving --------------------------------------------------------------
@@ -1338,8 +1362,8 @@ func _write_review() -> String:
 	var shot_dir := dir.path_join("walk_shots")
 	if DirAccess.make_dir_recursive_absolute(shot_dir) != OK:
 		return "cannot create " + shot_dir
-	var id := "%x%x" % [int(Time.get_unix_time_from_system() * 1000.0), randi()]
-	var stamp := Time.get_datetime_string_from_system(true) + "Z"
+	var id := _review_id
+	var stamp := _review_time
 	var req := _request
 	var rows: Array = []
 	var md := PackedStringArray()
@@ -1369,12 +1393,14 @@ func _write_review() -> String:
 		md.append("None.\n")
 	for i in _pins.size():
 		var pin: Dictionary = _pins[i]
-		var shot := "%s_%d.png" % [id, i + 1]
-		var img: Image = pin["image"]
-		if img.save_png(shot_dir.path_join(shot)) != OK:
-			return "cannot write screenshot " + shot
+		var shot: String = pin["shot"]
+		if not pin.get("shot_saved", false):
+			var img: Image = pin["image"]
+			if img.save_png(shot_dir.path_join(shot)) != OK:
+				return "cannot write screenshot " + shot
+			pin["shot_saved"] = true
 		var pin_note := String(pin["note"]).replace("<!--", "&lt;!--").replace("\n", " ")
-		md.append("%d. **%s** (%s) — %s\n" % [i + 1, pin["kind"], pin["severity"],
+		md.append("%d. **%s** (%s) — %s\n" % [pin["n"], pin["kind"], pin["severity"],
 			pin_note if pin_note != "" else "(no note)"])
 		md.append("   - at %s (building-local), normal %s, hit `%s`%s\n" % [
 			_v(pin["pos"]), _v(pin["normal"]), pin["part"],
@@ -1382,12 +1408,12 @@ func _write_review() -> String:
 		if pin["plan"] != "":
 			md.append("   - plan: %s\n" % pin["plan"])
 		md.append("   - camera %s looking %s\n" % [_v(pin["camera"]), _v(pin["look"])])
-		md.append("   - ![pin %d](walk_shots/%s)\n" % [i + 1, shot])
-		rows.append({"n": i + 1, "kind": pin["kind"], "severity": pin["severity"], "note": pin["note"],
+		md.append("   - ![pin %d](walk_shots/%s)\n" % [pin["n"], shot])
+		rows.append({"n": pin["n"], "kind": pin["kind"], "severity": pin["severity"], "note": pin["note"],
 			"pos": _a(pin["pos"]), "normal": _a(pin["normal"]), "part": pin["part"],
 			"room": pin["room"], "plan": pin["plan"], "camera": _a(pin["camera"]), "look": _a(pin["look"]),
 			"screenshot": "walk_shots/" + shot})
-	md.append("\n")
+	md.append("<!-- /human-walk %s -->\n\n" % id)
 
 	if not FileAccess.file_exists(rate_path):
 		var init := FileAccess.open(rate_path, FileAccess.WRITE)
@@ -1395,18 +1421,12 @@ func _write_review() -> String:
 			return "cannot create " + rate_path
 		init.store_string("# Human visual QA\n\nSaved by the local review page and the walk rig. Pretty means approval; the other checked boxes mean a visible problem.\n\n")
 		init.close()
-	var file := FileAccess.open(rate_path, FileAccess.READ_WRITE)
-	if file == null:
-		return "cannot open " + rate_path
-	file.seek_end()
-	file.store_string("".join(md))
-	file.close()
+	var err := _upsert_md(rate_path, id, "".join(md))
+	if err != "":
+		return err
 
 	var jsonl := dir.path_join("walk_pins.jsonl")
-	var mode := FileAccess.READ_WRITE if FileAccess.file_exists(jsonl) else FileAccess.WRITE
-	var jf := FileAccess.open(jsonl, mode)
-	if jf != null:
-		jf.seek_end()
+	if true:
 		var record := {"review_id": id, "time": stamp,
 			"request": req.to_dict(), "name": _building_name(),
 			"cutaway": _cutaway.button_pressed, "flags": flags,
@@ -1417,11 +1437,51 @@ func _write_review() -> String:
 			record["why"] = String(_base.get("why", ""))
 		if _terrain_name != "":
 			record["village_terrain"] = _terrain_name
-		jf.store_line(JSON.stringify(record))
-		jf.close()
+		err = _upsert_jsonl(jsonl, id, JSON.stringify(record))
+		if err != "":
+			return err
 	_status.text = "Saved %d pins to %s." % [_pins.size(), _rate_file.trim_prefix("res://")]
 	if _file_todos.button_pressed and not _pins.is_empty():
 		_status.text += " " + _launch_filer(id, jsonl)
+	return ""
+
+
+## Replace this review's block in the rating file, or append it. A block runs
+## from its `<!-- human-walk ID` marker to its `<!-- /human-walk ID -->` marker.
+static func _upsert_md(path: String, id: String, block: String) -> String:
+	var text := FileAccess.get_file_as_string(path)
+	var start := text.find("<!-- human-walk %s " % id)
+	var end_mark := "<!-- /human-walk %s -->" % id
+	if start >= 0 and text.find(end_mark, start) >= 0:
+		var end := text.find(end_mark, start) + end_mark.length()
+		while end < text.length() and text[end] == "\n":
+			end += 1
+		text = text.substr(0, start) + block + text.substr(end)
+	else:
+		text += block
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return "cannot write " + path
+	f.store_string(text)
+	f.close()
+	return ""
+
+
+## Replace this review's line in walk_pins.jsonl, or append it: one line per
+## review, however many times its pins were saved.
+static func _upsert_jsonl(path: String, id: String, line: String) -> String:
+	var keep := PackedStringArray()
+	if FileAccess.file_exists(path):
+		var needle := "\"review_id\":\"%s\"" % id
+		for l in FileAccess.get_file_as_string(path).split("\n"):
+			if l.strip_edges() != "" and not l.contains(needle):
+				keep.append(l)
+	keep.append(line)
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return "cannot write " + path
+	f.store_string("\n".join(keep) + "\n")
+	f.close()
 	return ""
 
 
@@ -1429,6 +1489,9 @@ func _write_review() -> String:
 ## not wait. _physics_process notices when the filer ends and shows its last
 ## log line. An autotest files with --dry-run.
 func _launch_filer(review_id: String, jsonl: String) -> String:
+	if _filer_pid > 0 and OS.is_process_running(_filer_pid):
+		_filer_again = true
+		return "Filing…"
 	var log_path := ProjectSettings.globalize_path(FILER_LOG)
 	DirAccess.make_dir_recursive_absolute(log_path.get_base_dir())
 	var args := PackedStringArray(["-I", ProjectSettings.globalize_path(FILER),
@@ -1450,6 +1513,9 @@ func _poll_filer() -> void:
 	var text := FileAccess.get_file_as_string(FILER_LOG).strip_edges()
 	var last := text.get_slice("\n", text.get_slice_count("\n") - 1) if text != "" else "no log line"
 	_status.text += " Filed: " + last.substr(20)
+	if _filer_again:
+		_filer_again = false
+		_launch_filer(_review_id, ProjectSettings.globalize_path(_rate_file).get_base_dir().path_join("walk_pins.jsonl"))
 
 
 static func _v(v: Vector3) -> String:
@@ -1502,6 +1568,7 @@ func _autotest(args: Dictionary) -> void:
 		_pin_at(_sv.size / 2.0)
 		if _dialog.visible:
 			_dlg_note.text = "autotest pin"
+			_filer_dry = true
 			_confirm_pin()
 			print("walk_qa: unchosen kind refused: ", _pins.is_empty(), " (", _dlg_warn.text, ")")
 			_dlg_kind.select(PIN_KINDS.find("door") + 1)
