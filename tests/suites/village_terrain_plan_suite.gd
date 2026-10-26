@@ -332,9 +332,18 @@ static func _lots_on_ground(res: SuiteResult, label: String, plan: VillagePlan, 
 				res.fail("%s: lot %d is on the %s" % [label, i, w["kind"]])
 	for r in range(plan.roads.size()):
 		var pts: PackedVector2Array = plan.roads[r]["points"]
+		# A boardwalk of the water form (VTER-FORM-WATER) is a pier: it runs out
+		# over the shallows on piles and its far end IS in the water, by design
+		# (docs/VILLAGE_TERRAIN.md "The water form"). Only a road carrying the
+		# water form's boardwalk flag, and only where a crossing of kind
+		# `boardwalk` carries it over that water, is let off; a bridge or a
+		# plain path ending in the water still fails.
+		var pier := VillageWaterForm.is_boardwalk(plan.roads[r])
 		for w in plan.water:
 			res.checked += 1
 			for p in [pts[0], pts[pts.size() - 1]]:
+				if pier and _boardwalk_carries(plan, r, p):
+					continue
 				if Poly.contains_point(w["poly"], p):
 					res.fail("%s: %s %d ends in the %s" % [label, plan.roads[r]["class"], r, w["kind"]])
 	for c in plan.water_crossings:
@@ -343,6 +352,10 @@ static func _lots_on_ground(res: SuiteResult, label: String, plan: VillagePlan, 
 		res.checked += 1
 		for p in [route[0], route[route.size() - 1]]:
 			var probe: Vector2 = p
+			# a pier head: the water form's boardwalk ends over its shallows
+			# by design, on the crossing that carries it
+			if c["kind"] == &"boardwalk":
+				continue
 			if Poly.contains_point(w, probe) and VillageMeasure.point_to_polyline(probe, plan.roads[int(c["road"])]["points"]) < 0.01:
 				var ends: PackedVector2Array = plan.roads[int(c["road"])]["points"]
 				if probe.distance_to(ends[0]) < 0.5 or probe.distance_to(ends[ends.size() - 1]) < 0.5:
@@ -365,6 +378,15 @@ static func _lots_on_ground(res: SuiteResult, label: String, plan: VillagePlan, 
 			res.checked += 1
 	res.note("%-24s lots: %d of %d on platforms, %d terrace walls, %d doors over 7 risers, most fall %.2f m (%.0f %% of its family's) | %s" % [
 		label, fitted, plan.buildings.size(), walls, high_doors, float(worst["fall"]), 100.0 * float(worst["share"]), bs])
+
+
+## True when `p`, an end of road `r`, lies on a crossing of kind `boardwalk`
+## that belongs to that road: a pier head on its decked piles.
+static func _boardwalk_carries(plan: VillagePlan, r: int, p: Vector2) -> bool:
+	for c in plan.water_crossings:
+		if int(c["road"]) == r and c["kind"] == &"boardwalk" 				and VillageMeasure.point_to_polyline(p, c["points"]) < 0.5:
+			return true
+	return false
 
 
 ## The world set's p10-p90 bands by relief class (docs/VILLAGE_TERRAIN.md
