@@ -47,7 +47,17 @@ func _check_case(c: Dictionary) -> void:
 	var req: Dictionary = c["request"]
 	var seed_value := int(req["seed"])
 	var id := str(c["id"])
-	var m := HouseTraitMeasure.measure(_spec_of(req), seed_value)
+	var held: Array = []
+	var m := HouseTraitMeasure.measure(_spec_of(req), seed_value, func(plan: HousePlan) -> void: held.append(plan))
+	# HS-MEDITERRANEAN-RESIDUE: no wall lamp hangs where the loggia rooflet cuts it
+	var plan0: HousePlan = held[0]
+	var veranda := HouseGeometry.veranda_rect(plan0)
+	var under: Array = []
+	for piece in plan0.exterior:
+		var b := HouseExterior.bounds_of(piece)
+		if bool(piece.get("mounted", false)) and veranda.has_area() 				and Rect2(Vector2(b.position.x, b.position.z), Vector2(b.size.x, b.size.z)).intersects(veranda.grow(-0.01)):
+			under.append(piece["key"])
+	_expect(veranda.has_area() and under.is_empty(), "%s no mounted piece hangs under the loggia roof (%s)" % [id, str(under)])
 	# (1) lime render, thick walls, deep reveals
 	_expect(m["wall_kind"] in ["white", "ochre"], "%s wall is lime white or ochre (%s)" % [id, m["wall_kind"]])
 	_expect(m["wall_rendered"], "%s is rendered masonry, not a frame or stone" % id)

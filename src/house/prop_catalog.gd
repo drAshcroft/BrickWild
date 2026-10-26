@@ -172,7 +172,9 @@ const PROPS := {
 	"Table_Plate": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
 	"Table_Fork": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
 	"Table_Spoon": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
-	"Pot_1_Lid": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
+	# Pot_1_Lid is the 0.54 m stock pot with its lid on: kitchen gear, not
+	# tableware. As tableware it sat on every dining table (HS-RICH-RESIDUE).
+	"Pot_1_Lid": {"cat": "cookware", "tags": [CORNER], "zone": 0.0, "affinity": {"away_from_doors": true}},
 	"Bottle_1": {"cat": "tableware", "tags": [ON_SURFACE], "zone": 0.0},
 	"Candle_1": {"cat": "candle", "tags": [ON_SURFACE, LIGHT], "zone": 0.0},
 	"CandleStick": {"cat": "candle", "tags": [ON_SURFACE, LIGHT], "zone": 0.0},

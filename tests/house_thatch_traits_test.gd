@@ -61,6 +61,9 @@ func _check_case(c: Dictionary) -> void:
 	_expect(m["roll_points"] >= 8 and m["roll_turn_max"] <= SOFT_TURN_MAX,
 		"%s ridge roll is rounded: %d profile points, sharpest exposed turn %.0f degrees" % [id, m["roll_points"], m["roll_turn_max"]])
 	_expect(m["roll_height"] >= 0.25, "%s roll stands %.2f m above the ridge" % [id, m["roll_height"]])
+	# the bolster hides the rafters: no tail hangs below it as a loose block
+	_expect(_floating_hoods(m).is_empty(), "%s window hoods rest on their heads (floating: %s)" % [id, str(_floating_hoods(m))])
+	_expect(_role_count(m, "eave_tail") == 0, "%s shows %d rafter tails under the thatch bolster" % [id, _role_count(m, "eave_tail")])
 	# (2) the eyebrow dormer
 	_expect(m["eyebrow_count"] >= 1, "%s has %d eyebrow dormer(s)" % [id, m["eyebrow_count"]])
 	_expect(m["eyebrow_glazing"] >= m["eyebrow_count"], "%s eyebrow has a window under its brow (%d panes)" % [id, m["eyebrow_glazing"]])
@@ -91,6 +94,7 @@ func _check_case(c: Dictionary) -> void:
 	_expect(mh["eave_turn_max"] > SOFT_TURN_MAX and mh["roll_turn_max"] > SOFT_TURN_MAX,
 		"%s control: a box eave and a fin roll are not soft (%.0f, %.0f degrees)" % [id, mh["eave_turn_max"], mh["roll_turn_max"]])
 	_expect(mh["eyebrow_count"] == 0, "%s control: the plain thatched style grows no eyebrow" % id)
+	_expect(_role_count(mh, "eave_tail") > 0, "%s control: a box eave keeps its rafter tails" % id)
 	var bare := func(plan: HousePlan) -> void:
 		plan.spec.thatch_roll = false
 	var mb := HouseTraitMeasure.measure(_spec_of(req), seed_value, bare)
@@ -144,3 +148,28 @@ func _expect(ok: bool, what: String) -> void:
 	checks += 1
 	if not ok:
 		failures.append(what)
+
+
+func _role_count(m: Dictionary, role: String) -> int:
+	var n := 0
+	for row in m.get("component_log", []):
+		if str(row.get("role", "")) == role:
+			n += 1
+	return n
+
+
+## Hosts whose dripstone hood does not rest on the window head under it (a gap
+## of more than 5 mm reads as a loose bar above the window).
+func _floating_hoods(m: Dictionary) -> Array:
+	var head_top := {}
+	for row in m.get("component_log", []):
+		if str(row.get("role", "")) == "opening_head":
+			head_top[row["host"]] = Transform3D(row["xf"]).origin.y + Vector3(row["size"]).y * 0.5
+	var out: Array = []
+	for row in m.get("component_log", []):
+		if str(row.get("role", "")) != "opening_hood":
+			continue
+		var bottom := Transform3D(row["xf"]).origin.y - Vector3(row["size"]).y * 0.5
+		if not head_top.has(row["host"]) or absf(bottom - float(head_top[row["host"]])) > 0.005:
+			out.append(row["host"])
+	return out

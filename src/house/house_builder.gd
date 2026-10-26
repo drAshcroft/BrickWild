@@ -1609,8 +1609,11 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 				# Recess the inside face into the wall to avoid a coplanar skin;
 				# keep the visible outside edge at exactly the same projection.
 				var hood_mid := mid + normal * (HouseGeometry.HOOD_PROJECTION + TRIM_TUCK) * 0.5
+				# Seated ON the head (top + jamb - tuck), not 2 cm above it: the
+				# gap read as a loose dark bar over every hooded window
+				# (HS-THATCH-RESIDUE).
 				var hood_xf := Transform3D(Basis(Vector3.UP, yaw),
-					Vector3(hood_mid.x, y_offset + top + jamb + 0.05, hood_mid.y))
+					Vector3(hood_mid.x, y_offset + top + jamb - tuck + 0.035, hood_mid.y))
 				component_box("opening_hood", Vector3(w + jamb * 2.4, 0.07, thick + HouseGeometry.HOOD_PROJECTION - TRIM_TUCK),
 					hood_xf, SURF_TRIM)
 
@@ -3681,6 +3684,10 @@ func _build_ridge_crown(xf: Transform3D, rise: float, ridge: float, ridge_x := 0
 
 func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float) -> void:
 	if spec.roof_type == &"flat" or (HouseRound.plan_applies(plan) and spec.roof_type == &"conical"):
+		return
+	# A thatch cottage's bolster hides its rafters: tails under it drew as loose
+	# dark blocks at both gable ends (HS-THATCH-RESIDUE).
+	if spec.style == &"thatch_cottage" and HouseGeometry.thatch_soft(spec, plan.world_family):
 		return
 	tag("eaves")
 	# Half a wall's span, plus the 0.15 m the tails always stood out, plus

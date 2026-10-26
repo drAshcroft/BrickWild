@@ -82,8 +82,15 @@ static func dress_exterior(root: Node3D, plan: HousePlan) -> void:
 		exterior.add_child(node)
 		_add_witch_cauldron_heat(node, p, plan)
 		if PropCatalog.has_tag(p["key"], PropCatalog.LIGHT):
-			exterior.add_child(LightKit.for_prop(p["key"], node.position,
-				node.rotation.y, float(p["scale"])))
+			# A facade lamp is a few centimetres off a pale wall: at the room
+			# sconce's energy it blew the wall out to a white disc in every
+			# daylight render (HS-MEDITERRANEAN-RESIDUE). It marks the door; it
+			# does not light the street.
+			var lamp := LightKit.for_prop(p["key"], node.position,
+				node.rotation.y, float(p["scale"]))
+			lamp.light_energy *= 0.35
+			lamp.omni_range *= 0.6
+			exterior.add_child(lamp)
 	# The yard's catalogue props, instantiated the same way as the facade
 	# pieces: this is the only place a model loads. Its built pieces are in the
 	# shell mesh (HouseBuilder._build_yard), not here.

@@ -310,6 +310,17 @@ Observed (not traits):
 
 Round 2 (fixes after the 41e0ad3 review): seed 8102's dining table was laid with 4 STOOLS (the seat-set probe fell back to `Stool` when `Chair_1` did not fit that table pose; the earlier test counted any `seat`). A style with `dining_seats` now skips `Stool` in `_seating_probe`, and the test counts `Chair_1` keys (`dining_chairs`, with `dining_stools` reported). Plan chair counts, before: seed 1 4 chairs, 8102 4 stools / 0 chairs, 21325 4 chairs; after: 4 / 4 / 4 `Chair_1`. The parlour's two facing benches are replaced by a conversation group: one settle on the wall, a chair beside it and a chair on the end wall (`sitting_group` recipe; the test asks for 1 settle + 2 `Chair_1`, controls: seating removed, chairs turned to stools, dining stools). The review camera now stands in the room corner furthest from any piece (`_look_room`). Left alone: the grey runner on the tabletop is the measured `tableware` model, not a mis-scaled prop (not trivial). Parlour group remains modest: chair, settle, chair spread over a 5 x 3 m room.
 
+Residue (HS-RICH-RESIDUE, 26 Oct). Defects fixed, each with a check:
+* The "oversized grey pot" on every dining table was `Pot_1_Lid`, a 0.54 m stock pot filed as `tableware`. It is `cookware` now. `house_rich_traits_test` asserts every `tableware` key is under 0.40 m across, with the stock pot as its control.
+* Detached or missing shadows in every review render: the tools pass a fixed 8 m reach from a camera 15-20 m out, so the shadow box ended before the building. `_set_shot_lighting` now floors the reach at the camera's distance to the subject plus 12 m. This is also the witch renders' detached shadow, and the thatch "pale grey panel" under the eave (the eave's shadow, cut off where the box ended).
+* The 21325 parlour camera against a post: `_look_room` scored furniture by centre distance minus half the longest side, and skipped sconces, which hang at eye height. It now takes the exact gap to each footprint and counts sconces.
+Recorded as intended, or not a defect:
+* Seed 1 has its chimney. It is an external stack on the far long wall (x = 4.875), out of the front camera. The two "poles" are the verge finial and the `ridge_crown` obelisk (the `ridge_finial` trait in docs/RICH_HOUSES.md).
+* The 8102 stack is the same external stack on the eave side. It rises 0.6 m past the ridge because the chimney rule measures from the ridge, not from the roof within 3 m. A lower eave-side stack is a chimney-rule change for every style. Not done here.
+* The cantilevered parlour bench is the `Bench` model: its plank oversails its two pedestals. With a ground shadow it reads as standing.
+* The grey strap across the dining table is part of the measured `Table` model (see Round 2).
+* Still borderline taste, left open: the parlour group has no rug or hearth focus; the cornice and string course are thin bands, not a projecting crown; the slatted dining wall shows gaps; the hall chandelier hangs low over the stair.
+
 
 ## mediterranean (HS-MEDITERRANEAN)
 
@@ -410,6 +421,17 @@ Observed (not traits):
 * Seed 1 interior: a very large hearth, table and bowl fill the frame; the bowl sits large against the table (prop scale).
 * Seed 1 and 21325 front: the hanging lamp glow at the left gable end is bright and blows out the wall.
 
+Residue (HS-MEDITERRANEAN-RESIDUE, 26 Oct). Defects fixed, each with a check where it is geometry:
+* The small grey object between the loggia posts was the entrance `Lantern_Wall`. It hung on the wall behind the veranda, half above the rooflet. `HouseExterior.conflict` now refuses a wall-mounted piece inside `HouseGeometry.veranda_rect`, so the lamp moves along the wall. On seed 1 no slot is left, and the house has no lamp. `house_mediterranean_traits_test` asserts no mounted piece is under the loggia roof.
+* The lamp glow that blew out the wall: a facade lamp now burns at 0.35 of a room sconce's energy and 0.6 of its range (`HouseAssembler`, exterior props). It marks the door; it does not light the wall.
+* The broken interior cameras (21325 inside a prop, 8102 a doorway): `_clear_spot` measured furniture by centre distance minus half the longest side, and counted upper-storey pieces. It now takes the exact gap to each ground-storey footprint.
+* The rear wall's detached shadow: the review render shadow box was too short (see HS-RICH residue above).
+Recorded as intended for now, not defects:
+* The loggia is the shared teal timber veranda emitter: a rooflet hung between posts that rise to a beam. A masonry arcade would be a new emitter.
+* The court is a bare paved enclosure, about 2.7 m deep. Planting, a seat or shade would be new yard pieces for the court.
+* The window reveals measure at least 0.30 m deep (`reveal_min`, held by the trait test). Their shallow look comes from the flat lighting.
+* Unchecked here: the 3.0 m mediterranean apron against village lots. That is `lane:village-fast`'s ground.
+
 ## thatch_cottage (HS-THATCH)
 
 Traits: (1) thatch eaves at least 0.4 m thick, soft-edged, with a combed ridge
@@ -507,6 +529,15 @@ Observed (not traits):
 * The hanging lamp glow blows out the gable wall beside the door on all seeds.
 * Seed 1 interior: a chest fills the lower right corner and a bed the lower left; the camera is cramped against them. Seed 21325 interior: a wardrobe fills the left; both are close-up but readable.
 * Seed 1 front: the chimney is a thin pot on a block; on 21325 it is a small pipe, much slimmer than on 1 and 8102.
+
+Residue (HS-THATCH-RESIDUE, 26 Oct). Defects fixed, each with a check:
+* The pale grey panel under the eave was not a part. No component lies there; `component_log` shows only the knee-wall strip above the wall head. It was the eave's shadow, cut off where the render tool's 8 m shadow box ended (fixed in `render_shots.gd`, see HS-RICH residue).
+* The dark lintel bar over the front window was the dripstone `opening_hood`. It sat 2 cm above the window head, `top + jamb + 0.05`, and so floated on every hooded window of every style. It now rests on the head. `house_thatch_traits_test` asserts every hood's underside meets its own head within 5 mm.
+* The small dark blocks under both gable eave ends were rafter tails (`eave_tail`) hanging below the thatch bolster. A soft-thatch `thatch_cottage` emits none now. The test asserts none, with the farmhouse-built control keeping its tails.
+* The lamp glare beside the door: see HS-MEDITERRANEAN residue (facade lamps dimmed).
+Recorded as intended:
+* The barrel, bucket and tub on the 8102 side wall are the household's service-wall props. They stand on the ground at the side, not the front, so trait 4 holds.
+* Borderline taste, still open: the ridge roll as separate bundles; the square eyebrow glazing under a hood that does not sweep; the cob reading as plaster; the short flower beds.
 
 
 ## asian -- the Japanese minka (HS-MINKA)

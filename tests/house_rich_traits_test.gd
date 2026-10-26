@@ -20,6 +20,7 @@ func _init() -> void:
 	_expect(cases.size() == 3, "fixture holds 3 house/rich requests, found %d" % cases.size())
 	for c in cases:
 		_check_case(c)
+	_check_tableware()
 	for f in failures:
 		printerr("FAIL " + f)
 	print("HS-RICH: %d checks, %d failures" % [checks, failures.size()])
@@ -144,3 +145,20 @@ func _expect(ok: bool, msg: String) -> void:
 	checks += 1
 	if not ok:
 		failures.append(msg)
+
+
+## HS-RICH-RESIDUE: what the dining recipe sets ON a table must be table-sized.
+## The 0.54 m stock pot (Pot_1_Lid) was filed as tableware and sat on every
+## dining table. Control: the same measure sees the stock pot as too big.
+const TABLEWARE_MAX := 0.40
+
+
+func _check_tableware() -> void:
+	var big: Array = []
+	for key in PropCatalog.of_category("tableware"):
+		var fp := PropCatalog.footprint(key)
+		if maxf(fp.x, fp.y) > TABLEWARE_MAX:
+			big.append(key)
+	_expect(big.is_empty(), "tableware is table-sized (over %.2f m: %s)" % [TABLEWARE_MAX, str(big)])
+	var pot := PropCatalog.footprint("Pot_1_Lid")
+	_expect(maxf(pot.x, pot.y) > TABLEWARE_MAX, "control: the stock pot measures over %.2f m" % TABLEWARE_MAX)

@@ -1511,6 +1511,12 @@ func _set_shot_lighting(yaw: float, reach := 0.0) -> void:
 		return
 	if reach <= 0.0:
 		reach = 120.0
+	# The review tools (render_hs_*, witch) pass a fixed 8 m reach from a camera
+	# 15-20 m out, so the shadow box ended short of the building and the shadow
+	# drew detached from its base (or not at all). The subject stands at the
+	# origin: never let the box stop short of it.
+	if _cam != null:
+		reach = maxf(reach, _cam.position.length() + 12.0)
 	_set_atmosphere(_atmosphere_name())
 	_key_light.rotation = Vector3(deg_to_rad(-float(_atmo["key_elevation"])),
 		yaw + deg_to_rad(_key_offset()), 0.0)

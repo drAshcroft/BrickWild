@@ -225,6 +225,14 @@ static func conflict(plan: HousePlan, p: Dictionary, placed: Array) -> String:
 	if deck.has_area() and Rect2(Vector2(bounds.position.x, bounds.position.z),
 			Vector2(bounds.size.x, bounds.size.z)).intersects(deck.grow(-0.01)):
 		return "stands on the engawa"
+	# HS-MEDITERRANEAN-RESIDUE: the veranda's rooflet is hung at lamp height,
+	# so a wall lamp behind it stood half above the rooflet, a loose grey
+	# bracket between the posts. A mounted piece hangs clear of the veranda.
+	var veranda := HouseGeometry.veranda_rect(plan)
+	if bool(p.get("mounted", false)) and veranda.has_area() \
+			and Rect2(Vector2(bounds.position.x, bounds.position.z),
+				Vector2(bounds.size.x, bounds.size.z)).intersects(veranda.grow(-0.01)):
+		return "hangs under the veranda roof"
 	for other in placed:
 		if bounds.grow(0.08).intersects(bounds_of(other)):
 			return "overlaps another exterior prop"

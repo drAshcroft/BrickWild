@@ -103,8 +103,12 @@ func _clear_spot(plan: HousePlan, fallback: Vector2, cands: Array) -> Vector2:
 	for c in cands:
 		var gap := 9.0
 		for f in plan.furniture:
-			gap = minf(gap, Rect2(f["rect"]).grow(0.0).get_center().distance_to(c)
-				- maxf(Rect2(f["rect"]).size.x, Rect2(f["rect"]).size.y) * 0.5)
+			# only this storey's furniture; an exact gap, not centre minus half
+			# the longest side (that put the 21325 eye inside a prop)
+			var fr_room := int(f.get("room", -1))
+			if fr_room < 0 or plan.storey_of_room(fr_room) != 0:
+				continue
+			gap = minf(gap, _rect_gap(Rect2(f["rect"]), c))
 		for prop in plan.yard:
 			gap = minf(gap, Rect2(prop["rect"]).get_center().distance_to(c) - 0.3)
 		if gap > best_gap:
@@ -120,3 +124,12 @@ func _save_review_image(path: String) -> Error:
 	await RenderingServer.frame_post_draw
 	var rendered: Image = _vp.get_texture().get_image()
 	return rendered.save_jpg(ProjectSettings.globalize_path(path), 0.94)
+
+
+## Signed gap from p to the rect: negative inside it.
+func _rect_gap(r: Rect2, p: Vector2) -> float:
+	var dx := maxf(r.position.x - p.x, p.x - r.end.x)
+	var dy := maxf(r.position.y - p.y, p.y - r.end.y)
+	if dx <= 0.0 and dy <= 0.0:
+		return maxf(dx, dy)
+	return Vector2(maxf(dx, 0.0), maxf(dy, 0.0)).length()

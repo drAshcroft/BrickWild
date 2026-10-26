@@ -66,9 +66,11 @@ func _look_room(plan: HousePlan, room: int) -> void:
 		var gap := 9.0
 		for f in plan.furniture_of(room):
 			var fr := Rect2(plan.furniture[f]["rect"])
-			if str(plan.furniture[f].get("cat", "")) in ["sconce", "candle", "tableware", "chandelier"]:
+			# a sconce hangs at eye height, so it counts; only what sits on a
+			# table or hangs from the ceiling is left out
+			if str(plan.furniture[f].get("cat", "")) in ["candle", "tableware", "chandelier"]:
 				continue
-			gap = minf(gap, fr.grow(0.0).get_center().distance_to(corner) - maxf(fr.size.x, fr.size.y) * 0.5)
+			gap = minf(gap, _rect_gap(fr, corner))
 		if gap > best_gap:
 			best_gap = gap
 			best = corner
@@ -104,3 +106,12 @@ func _save_review_image(path: String) -> Error:
 	await RenderingServer.frame_post_draw
 	var rendered: Image = _vp.get_texture().get_image()
 	return rendered.save_jpg(ProjectSettings.globalize_path(path), 0.94)
+
+
+## Signed gap from p to the rect: negative inside it.
+func _rect_gap(r: Rect2, p: Vector2) -> float:
+	var dx := maxf(r.position.x - p.x, p.x - r.end.x)
+	var dy := maxf(r.position.y - p.y, p.y - r.end.y)
+	if dx <= 0.0 and dy <= 0.0:
+		return maxf(dx, dy)
+	return Vector2(maxf(dx, 0.0), maxf(dy, 0.0)).length()
