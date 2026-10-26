@@ -113,6 +113,12 @@ render_mode cull_disabled;
 uniform vec4 floor_colour : source_color;
 uniform vec4 rug_colour : source_color;
 uniform bool stone_floor = false;
+// CULTURE-FURNISH-VOCAB: 0 planks or stone, 1 tatami, 2 packed earth
+uniform int floor_finish = 0;
+// the room floors it applies to: plan x0, z0, x1, z1, and the floor top's height
+uniform vec4 finish_rect = vec4(0.0);
+uniform float finish_top = 0.0;
+uniform vec4 finish_colour : source_color = vec4(0.5, 0.5, 0.5, 1.0);
 varying vec3 floor_pos;
 varying vec3 floor_normal;
 void vertex() {
@@ -122,9 +128,31 @@ void vertex() {
 void fragment() {
 	ALBEDO = floor_colour.rgb;
 	ROUGHNESS = 0.94;
+	bool in_plan = floor_finish != 0 && floor_pos.x > finish_rect.x && floor_pos.x < finish_rect.z
+		&& floor_pos.z > finish_rect.y && floor_pos.z < finish_rect.w;
+	bool in_rooms = in_plan && abs(floor_pos.y - finish_top) < 0.04 && (COLOR.g >= 0.5 || COLOR.r < 0.5);
 	// Metres, not the per-face 0..1 UV: a large hall must not have one
 	// enormous plank. Vertical faces in this shared slot use masonry courses.
-	if (floor_normal.y > 0.85) {
+	if (floor_normal.y > 0.85 && floor_finish == 1 && in_rooms) {
+		// tatami: 0.9 x 1.8 m mats in a running bond, a dark cloth border
+		// (heri) down each long edge and a fine weave across the mat
+		vec2 p = floor_pos.xz / vec2(0.9, 1.8);
+		p.x += mod(floor(p.y), 2.0) * 0.5;
+		vec2 f = fract(p);
+		vec2 aa = fwidth(p);
+		float heri = 1.0 - smoothstep(0.025, 0.035 + aa.x, min(f.x, 1.0 - f.x));
+		float butt = 1.0 - smoothstep(0.004, 0.008 + aa.y, min(f.y, 1.0 - f.y));
+		float weave = 0.95 + 0.05 * sin(floor_pos.z * 160.0);
+		float fade = 1.0 - clamp(max(aa.x, aa.y) * 4.0, 0.0, 1.0);
+		ALBEDO = mix(finish_colour.rgb * mix(1.0, weave, fade), vec3(0.10, 0.10, 0.09), heri * fade);
+		ALBEDO *= mix(1.0, 0.75, butt * fade);
+	} else if (floor_normal.y > 0.85 && floor_finish == 2 && in_rooms) {
+		// packed earth: no joints, a slow mottle
+		vec2 q = floor_pos.xz * 1.7;
+		float n = sin(q.x * 1.3 + sin(q.y * 0.7)) * sin(q.y * 1.1 + sin(q.x * 0.9));
+		ALBEDO = finish_colour.rgb * (0.92 + 0.08 * n);
+		ROUGHNESS = 1.0;
+	} else if (floor_normal.y > 0.85) {
 		vec2 p = floor_pos.xz / ((stone_floor || COLOR.g < 0.5) ? vec2(0.55) : vec2(0.20, 2.4));
 		p.y += mod(floor(p.x), 2.0) * 0.5;
 		vec2 cell = floor(p);
@@ -134,6 +162,12 @@ void fragment() {
 		float fade = 1.0 - clamp(max(aa.x, aa.y), 0.0, 1.0);
 		float tone = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
 		ALBEDO *= mix(1.0, (0.94 + tone * 0.12) * mix(0.68, 1.0, seam.x * seam.y), fade);
+	} else if (abs(floor_normal.y) < 0.5 && floor_finish == 2 && in_plan
+			&& floor_pos.y < finish_top + 1.2) {
+		// an earthen room has no stone skirting: the wall's foot is the same
+		// rendered earth as the floor, a shade darker
+		ALBEDO = finish_colour.rgb * 0.88;
+		ROUGHNESS = 1.0;
 	} else if (abs(floor_normal.y) < 0.5) {
 		// Chimneys and stone bases share this slot, but are masonry, not
 		// vertical floorboards. Keep their courses at an architectural scale.
@@ -146,7 +180,7 @@ void fragment() {
 		float fade = 1.0 - clamp(max(aa.x, aa.y), 0.0, 1.0);
 		ALBEDO *= mix(1.0, mix(0.72, 1.0, seam.x * seam.y), fade);
 	}
-	if (COLOR.r < 0.5) {
+	if (COLOR.r < 0.5 && !(floor_finish == 1 && in_plan)) {
 		vec2 edge = min(UV, vec2(1.0) - UV);
 		float border = step(0.055, min(edge.x, edge.y)) * (1.0 - step(0.09, min(edge.x, edge.y)));
 		// The nap is in metres: on the rug's own 0..1 UV a 10 m runner had

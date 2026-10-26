@@ -21,6 +21,8 @@ extends RefCounted
 ## Materials for the shell's four surfaces, in the builder's own order.
 const SURFACES := ["wall", "trim", "roof", "floor"]
 const BASE_HOUSE_SPEC := preload("house_spec.gd")
+const SHOP_WARES := preload("../shop/shop_wares.gd")
+const CULTURE := preload("house_culture_furnish.gd")
 
 
 ## Build the whole thing. `cutaway` leaves the roof off, which is the only way
@@ -51,6 +53,7 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 		shell.set_surface_override_material(HouseBuilder.SURF_WALL,
 			MaterialKit.plaster(plan.spec.wall_color, false,
 				{"hearth_stone_colour": Color(0.43, 0.40, 0.35, 1.0)}))
+	_culture_floor(shell, plan)
 	if plan.world_family != &"":
 		# a family of the wider world is built of its own things (EVAL-B04)
 		WorldAssembler.dress_house(shell, plan)
@@ -112,9 +115,18 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 	props.name = "Furniture"
 	root.add_child(props)
 	var witch_backing_added := false
-	for p in plan.furniture:
-		var node: Node3D = _instance(p)
+	# CULTURE-FURNISH-VOCAB: a minka, Sahel house or roundhouse shows its own
+	# stock for the same plan rows (house_culture_furnish.gd).
+	var looks: Dictionary = CULTURE.looks(plan)
+	for row_index in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[row_index]
+		var shift: Vector3 = CULTURE.host_shift(plan, row_index, looks) if not looks.is_empty() else Vector3.ZERO
+		if looks.has(row_index):
+			props.add_child(CULTURE.node_for(plan, p, String(looks[row_index]), shift))
+			continue
+		var node: Node3D = SHOP_WARES.oven_node(p) if SHOP_WARES.replaces(plan, p) else _instance(p)
 		if node != null:
+			node.position += shift
 			if _uses_domestic_finish(plan):
 				_finish_domestic_wood(node)
 			props.add_child(node)
@@ -127,6 +139,8 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 					witch_backing_added = true
 	_add_witch_stove(props, plan)
 	_add_witch_brooms(props, plan)
+	# a trade's own goods on the counters and shelves it already has (LIVE-SHOPS)
+	SHOP_WARES.dress(props, plan)
 	if builder != null and _uses_domestic_hearth_fire(plan):
 		var breast: Dictionary = HouseGeometry.hearth_breast(plan)
 		if not breast.is_empty():
@@ -161,6 +175,32 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 	if light_index != lights.get_child_count():
 		push_error("LightKit plan mapping mismatch: %d rows, %d nodes" % [light_index, lights.get_child_count()])
 	root.add_child(lights)
+
+
+## CULTURE-FURNISH-VOCAB: tatami in a minka, packed earth in a Sahel house or a
+## roundhouse, instead of the shared shader's planks (and no rug on tatami).
+static func _culture_floor(shell: MeshInstance3D, plan: HousePlan) -> void:
+	var finish := CULTURE.floor_finish(plan)
+	if finish == "planks" or shell.mesh == null 			or shell.mesh.get_surface_count() <= HouseBuilder.SURF_FLOOR:
+		return
+	var m := shell.get_surface_override_material(HouseBuilder.SURF_FLOOR) as ShaderMaterial
+	if m == null:
+		return
+	# the ground storey's rooms only: the stylobate, steps, engawa deck and court
+	# share this slot and keep their own stone and boards
+	var rooms := Rect2()
+	for i in range(plan.room_count()):
+		if plan.storey_of_room(i) != 0:
+			continue
+		var r := HouseGeometry.room_floor_rect(plan, i)
+		rooms = r if not rooms.has_area() else rooms.merge(r)
+	m = m.duplicate() as ShaderMaterial
+	m.set_shader_parameter("floor_finish", 1 if finish == "tatami" else 2)
+	m.set_shader_parameter("finish_colour", CULTURE.TATAMI if finish == "tatami" else CULTURE.EARTH)
+	m.set_shader_parameter("finish_rect", Vector4(rooms.position.x - 0.05, rooms.position.y - 0.05,
+		rooms.end.x + 0.05, rooms.end.y + 0.05))
+	m.set_shader_parameter("finish_top", HouseGeometry.FLOOR_T)
+	shell.set_surface_override_material(HouseBuilder.SURF_FLOOR, m)
 
 
 ## HS-LONGHALL: the fire on the hall floor -- ash and embers inside the kerb the
