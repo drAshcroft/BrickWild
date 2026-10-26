@@ -585,5 +585,32 @@ furnishing complaints, a table, a hearth, sparse halls at scales 0.75 to 1.9, an
 rule is fixed). The east_asian compact village is within 2 points of its
 limit with a house this wide.
 
-Reviewer: pending
+Independent reviewer: fresh agent, from the renders of commit 99925e6 (all 9 images opened). Judged only from `artifacts/hs_minka/renders/minka_<seed>_{front,engawa,interior}.jpg`.
+
+| seed | (1) raised floor on plinth, engawa | (2) irimoya roof, deep eaves | (3) sliding lattice screens | (4) main room faces the garden |
+|---|---|---|---|---|
+| 1 | YES | YES | YES | YES |
+| 8102 | YES | YES | YES | YES (borderline) |
+| 21325 | YES | YES | YES | YES (borderline) |
+
+Reasons:
+* (1) every seed: a timber deck runs the whole long side, under the eave, on posts, with a visible stone-block base course and stone footings below it, and stone steps at the deck end. The floor stands clearly above the grass. The plinth is a row of blocks with square footings, so it reads partly as piers; the deck is one plain slab with no board gaps.
+* (2) every seed: a hipped skirt all round, a steeper upper roof, and a pale gable triangle (hafu) with a barge board at the end; the eaves overhang far past the posts on the long side and the end. Reads as irimoya. The hafu is blank wall with no timber members.
+* (3) every seed: the engawa wall is lattice panels (frame, pale paper, grid of bars) in sliding pairs between the posts, some drawn pulled apart. No ordinary glazed window on that side. Plain glazed windows remain on other walls (seen from inside), which is correct.
+* (4) seed 1: the interior looks straight out through the opened screen onto the gravel garden, a rock and the grass; clear. Seed 8102: the opening is narrow and the table blocks the lower half; only a rock edge and a gravel sliver show in the gap. Seed 21325: the open gap shows a tree, a rock edge and grass; the gravel is hardly visible. The garden is seen, but only just, on those two.
+
+Images: `artifacts/hs_minka/renders/minka_1_front.jpg`, `_engawa`, `_interior`; the same three for `8102` and `21325`.
+
+Open:
+* 8102 and 21325 interior: the opening onto the garden is small in the frame and the garden is barely readable through it (trait 4 borderline).
+* All seeds: the plinth reads as separate footing blocks under a thin base course, not a continuous stone platform (trait 1 held on the letter).
+* All seeds: the hafu gable is blank, and the deck is one flat slab (known sides, not a trait miss).
+
+Observed (not traits):
+* Interior (all seeds): a large window frame fills the right or left edge of the frame and the sky shows blue through it; the camera is crowded by it. A glazed rectangular window with a deep sill is not a Japanese form.
+* Seed 8102 interior: a heavy plank trestle table with an iron pot, goblet, tankard and a wall torch; this reads as a medieval European tavern, not a minka. Seed 1 interior: an empty room with plank floor, no tatami, no furniture.
+* Garden trees: on 21325 and 8102 the tall pine stands on the gravel edge, its trunk cutting across the engawa wall; on 1 the maple stands in front of the plinth. They hide part of the screens. The conifer is also a Western form.
+* Seed 1 and 8102 front: the stepping-stone path ends in the grass to the right with no link to the steps; it floats as a short loose boardwalk.
+* Front renders: a red bench, barrel, bowl and a bundle of crates sit loose beside the end steps (21325 shows a barrel and a bowl standing on bare grass).
+* The dry garden is a flat rectangle with a thin wood border and a little raking; rocks sit on top of it. It reads as a sandbox, not a garden, but the intent is clear.
 
