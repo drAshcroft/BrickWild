@@ -108,19 +108,30 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 	out.site = site_rect(spec, site_scale)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("site|%d|%s" % [spec.seed, spec.form])
-	if ground != null:
-		out.ground = ground
-		out.site_anchor = ground.site_anchor
-		out.site_yaw = ground.site_yaw
 	var through: PackedVector2Array = VillageSitePlanner._through_road(out.site, spec, rng)
-	if ground != null:
-		through = VillageSitePlanner._route_through(through, out.site, ground)
-	out.roads.append(VillageSitePlanner._road(through, &"through", spec.wealth))
+	var routed: PackedVector2Array = through
 	var a: VillageSiteAnalysis = null
 	if ground != null:
+		routed = VillageSitePlanner._route_through(through, out.site, ground)
 		a = VillageSiteAnalysis.of(ground, out.site, ANALYSIS_CELL_M)
 		if not a.valid():
 			a = null
+		# VTER-DISPERSED-MAIN-SEAT: the main hamlet's common is always north
+		# of the through road. Where the ground south of it is much the
+		# gentler (Monemvasia: sea and cliff north in the siting's yaw), the
+		# frame is turned half round so that side is north.
+		var turned: VillageTerrain = _turned(ground, out, routed, a)
+		if turned != ground:
+			ground = turned
+			routed = VillageSitePlanner._route_through(through, out.site, ground)
+			a = VillageSiteAnalysis.of(ground, out.site, ANALYSIS_CELL_M)
+			if not a.valid():
+				a = null
+		out.ground = ground
+		out.site_anchor = ground.site_anchor
+		out.site_yaw = ground.site_yaw
+	through = routed
+	out.roads.append(VillageSitePlanner._road(through, &"through", spec.wealth))
 	var main := _main_hamlet(out, spec, through, _main_x(out, through, a))
 	out.hamlets.append({"seat": main["seat"], "common": 0, "spine": -1, "households": 0,
 		"shelf": _shelf(a, main["seat"]), "main": true})
@@ -186,6 +197,37 @@ static func site_rect(spec: VillageSpec, site_scale := 1.0) -> Rect2:
 ## middle half of the road whose ground just north of it (the common, the
 ## ring and the landmark) is gentlest, and nearest the middle on a tie.
 static func _main_x(out: VillagePlan, through: PackedVector2Array, a: VillageSiteAnalysis) -> float:
+	return _main_best(out, through, a, 1.0).x
+
+
+## The main seat's turn (VTER-DISPERSED-MAIN-SEAT): the north side's best
+## cost against the south side's; past TURN_MARGIN in the south's favour the
+## same ground is viewed with its yaw half a turn on. `ground` itself
+## otherwise, and always on a caller's own grid (no parent to resample).
+const TURN_MARGIN := 0.15
+static var _turn_cache := {}
+static func _turned(ground: VillageTerrain, out: VillagePlan, through: PackedVector2Array,
+		a: VillageSiteAnalysis) -> VillageTerrain:
+	if ground.parent == null or a == null:
+		return ground
+	var north: float = _main_best(out, through, a, 1.0).y
+	var south: float = _main_best(out, through, a, -1.0).y
+	if not (south < north - TURN_MARGIN):
+		return ground
+	var key := "%d|%d" % [ground.get_instance_id(), ground.parent.get_instance_id()]
+	if _turn_cache.has(key):
+		return _turn_cache[key][1]
+	var view: VillageTerrain = ground.parent.sited_view(ground.site_anchor,
+		fposmod(ground.site_yaw + PI, TAU), ground.bounds(), ground.cell_m)
+	if _turn_cache.size() >= 8:
+		_turn_cache.clear()
+	_turn_cache[key] = [ground, view]   # the source kept alive: its id stays its own
+	return view
+
+
+## (x, cost) of the best main seat on `side` of the through road (+1 north).
+static func _main_best(out: VillagePlan, through: PackedVector2Array, a: VillageSiteAnalysis,
+		side: float) -> Vector2:
 	var site: Rect2 = out.site
 	var best_x: float = 0.0
 	var best := INF
@@ -200,7 +242,7 @@ static func _main_x(out: VillagePlan, through: PackedVector2Array, a: VillageSit
 			var n := 0
 			for dy in [8.0, 18.0, 28.0, 38.0]:
 				for dx in [-12.0, 0.0, 12.0]:
-					var q: Vector2 = p + Vector2(dx, dy)
+					var q: Vector2 = p + Vector2(dx, dy * side)
 					var s: float = a.slope_at(q)
 					if is_nan(s):
 						continue
@@ -210,7 +252,7 @@ static func _main_x(out: VillagePlan, through: PackedVector2Array, a: VillageSit
 		if cost < best - 1e-9:
 			best = cost
 			best_x = p.x
-	return best_x
+	return Vector2(best_x, best)
 
 
 ## The street form's core at `x`: the common north of the through road with
