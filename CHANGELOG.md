@@ -6,7 +6,80 @@ projects consume that, never this working tree (`docs/RELEASES.md`).
 `BrickWild.API_VERSION` is a separate compatibility number; see `README.md`
 and `docs/PUBLIC_API_TRANSPORT.md`.
 
-## Unreleased
+## 0.1.5 - 2026-10-26
+
+Every house style has its own identity, buildings can be built crooked on
+purpose, and villages stand in water and fill islands. Tag `v0.1.5`.
+`API_VERSION` stays 2. The new request fields (`jank`, `foundation` and the
+three `pile_*` fields) are optional and left out of `to_dict()` at their
+defaults, so every older request reads and writes the same bytes.
+
+### Notable changes
+
+- **Crooked buildings** (HNT-040/041, `docs/haunted/`).
+  `BuildingRequest.jank`, 0..1, leans every storey its own way, and the walls
+  kink at the floor lines (`CrookedWarp`, `core/haunt/`). Floors stay level,
+  the shell stays closed, and props lean with their storey. The warp is applied
+  in `BrickWild.build_mesh` and `instantiate`, so it works for every kind but a
+  village. A village refuses it with `jank_unsupported`, and a value outside
+  0..1 is refused with `invalid_jank`. `describe_kind()` lists it as
+  "Crookedness". At 0 the building is the building as built, vertex for vertex.
+- **Each house style is its own house.** Every style has a trait test and an
+  independent review (`docs/HOUSES.md`, the HS-* rows):
+  - **cottage:** a porch and a chimney always; the stack stands 0.7 m higher.
+  - **farmhouse:** a kitchen yard door; an attached byre with hay, a built cart
+    and a trough.
+  - **townhouse:** at least two storeys, with work rooms below and beds above
+    on a stair spine.
+  - **longhall:** one long hall with end rooms; an open fire under a smoke
+    louvre, an open truss roof, and benches along both long walls.
+  - **rich:** a ground floor with a dining room and a parlour of their own;
+    the table is laid for four.
+  - **mediterranean:** a low terracotta roof (17-21 deg); a loggia at the
+    entry; a walled court behind.
+  - **asian**, now labelled "Japanese Minka": an irimoya roof; a raised floor
+    on a stone stylobate; an engawa; sliding lattice screens.
+  - **african**, now labelled "Sahel Courtyard House": a flat banco roof behind
+    a parapet; a walled court with flat-roofed ranges; buttresses and toron;
+    unglazed windows.
+  - **thatch_cottage:** soft thatch with a rounded eave and a ridge roll;
+    eyebrow dormers; cob without a frame; flower beds by the path.
+  - **roundhouse** and **pueblo:** see Renamed and Changed below.
+
+  Style ids are unchanged except `mud_hut`, which is kept as an alias.
+  Styles without a household grammar now get the domestic stair: 0 legacy
+  stairs in seeds 41000-41199, where there were 115.
+- **The Witch hut is small.** `HouseGenerator.clamp_witch_hut` brings any
+  `witch_hut` request down to at most 7 x 9 m, one storey, no cellar, and three
+  rooms (WITCH-SIZE). It has short 2.3 m walls under a high thatch roof with a
+  thatch roll, a cast-iron stove whose flue runs into the breast, and brooms.
+  The large and default huts are gone.
+- **Villages.**
+  - **The water form has a planner** (VTER-FORM-WATER). Houses and shops stand
+    on piles (`foundation: &"piles"`, `pile_water_m`, `pile_freeboard_m`,
+    `pile_deck_m`, all optional). Boardwalks join them, and pile lots front the
+    boardwalks. A pier is laid only where the ground shows a bed. The contract
+    is in `docs/VILLAGE_TERRAIN.md`, "On piles over water".
+  - **An island the programme fills becomes a village of its own**
+    (VTER-ISLAND-FILL): a ring quay, a spine from landing to landing, built
+    out to the water.
+  - **Hillsides** (HILLS-*): the hillside form passes VillageQA on Manarola,
+    Masouleh and Rocamadour. A stepped through road is built as treads and
+    walked.
+  - A valley common stands where the road's frontage has ground (Ushguli: 20 %
+    fronted, now 73 %). A church on very steep ground gets a terraced plot.
+    Dispersed hamlets are joined by routed cart tracks.
+  - A new scheduled gate, `vrealism`, measures generated villages against real
+    ones per stratum: 71 % in band against a 75 % bar.
+- **Churches and temples** (SACRED-*). A large Romanesque church always shows
+  a west tower. A large Byzantine dome stands over the west bay. The rotunda
+  has a door-level peristyle and a symmetric pier ring. The basilica has an
+  idol backdrop and blind-niche flanks. The ziggurat's god sits where the
+  stair foot can see him.
+- **Castles.** Elven bowed curtains cut out their towers and carry wall
+  stairs. Polygon corner galleries meet at slanted curtains. Sky-tower doors
+  are clear of flights. A yard store's service hatch is logged.
+
 
 
 ### Fixes
@@ -20,6 +93,14 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
   left the override at its default. BrickWild's own adapters always build a
   fresh spec, so nothing BrickWild generates changes. Pinned by
   `tests/house_wall_thickness_override_test.gd`, which fails on 0.1.4.
+
+- A hall sized exactly to its 3.4 aspect limit failed on float rounding, and
+  12.8 m wide plans fell back to legacy partitions. In seeds 41000-41199 there
+  are now 0 fallbacks.
+- The farmhouse cart wheel dipped 0.166 m below the ground, outside its
+  planned bound. It is cut to stay inside its axle box.
+- Castle furniture host indices are reindexed when rooms are demoted or
+  settled (elven fortress seats).
 
 ### Renamed
 
@@ -51,6 +132,56 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
   stair row with `"ladder": true`; the building plan export lists it as a stair
   with `"kind": "ladder"`.
 
+
+### Compatibility
+
+- **Same request, different house.** At the same seed, every house style
+  regenerates differently: its massing, rooms or furniture change. A
+  `witch_hut` request larger than 7 x 9 m, or taller than one storey, now gets
+  the clamped hut. Regenerate any cached houses, churches, temples and
+  castles.
+- **Request JSON is unchanged.** A request that sets neither `jank` nor
+  piles writes the same `to_dict()` bytes as in 0.1.4. `schema_version` stays
+  1.
+
+### Known issues
+
+- `vrealism` is 71 % in band against its 75 % bar. Six causes are filed as
+  VTER-REAL-*.
+- The castle occupancy items listed for 0.1.4 remain open
+  (`docs/CASTLE_INTERIOR_FOLLOWUPS.md`).
+- The warp has not been exercised on a hotel.
+
+### Lanes
+
+Run on this tree (26 Oct), one Godot at a time, on a loaded host. Times are
+host wall-clock.
+
+| Lane | Checks | Result | Time |
+|---|---|---|---|
+| `lane:haunt` | 2097 | pass | 283 s |
+| `lane:geom` | 9810 | pass | 569 s |
+| `lane:rich` | 4687 | pass | 334 s |
+| `lane:house-plan-fast` | 322 | pass, 34 warnings | 572 s |
+| `lane:house-furnish-fast` | 242 | pass | 500 s |
+| `lane:house-exterior-fast` | 4700 | pass | 592 s |
+| `lane:windmill` | 270 | pass | 52 s |
+| `lane:dungeon` | 432 | pass | 169 s |
+| `lane:church-change` | 5956 | pass, 11 warnings (16 in 0.1.4) | 264 s |
+| `lane:temple` | 3112 | pass, 0 warnings (4 in 0.1.4) | 631 s |
+| `lane:village-terrain` | 496 | pass | 227 s |
+| `lane:village-fast` | 47 | pass | 828 s |
+| `lane:castle-change` | 706 | pass | 1312 s |
+| `lane:api` | 802 | pass | 1360 s |
+| `tools/test_brick_wild_addon_installer.ps1` | 1052 files | pass | |
+
+The scheduled gates (`lane:scheduled`) were not run for this release.
+
+### Migration
+
+- Install from `releases/brick_wild-0.1.5/`. A consumer that sets none of the
+  new fields needs no change, but its houses will look different.
+- If a consumer pinned a large Witch hut, expect the 7 x 9 m hut.
 
 ## 0.1.4 - 2026-10-23
 
