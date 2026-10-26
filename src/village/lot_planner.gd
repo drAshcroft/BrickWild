@@ -276,6 +276,8 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	for job in jobs:
 		job.erase("around_common")
 	_trim_lanes(out)
+	# VTER-REAL-STREETNET: back streets round the rows, so the net has loops
+	_StreetNet.close(out)
 	VillageDispersedForm.finish(out)
 	# Lot cutting can add service lanes, drop roads and add a mill race.
 	# Store crossings only against these final road/water indices.
@@ -433,6 +435,22 @@ const RETRIES := [[2, 1.0], [4, 1.0], [6, 1.0], [8, 1.0], [10, 1.0], [12, 1.0],
 
 const MAX_EXTRA_LANES := 12
 const FINE_WIDTH_STEPS: Array[float] = [1.05, 1.1, 1.15, 1.2, 1.25]
+const _StreetNet := preload("res://src/village/village_street_net.gd")
+
+## VTER-REAL-FRONTAGE: on the ground's own forms a share of the houses and farms
+## turn off square to their street, as real ones turn to the contour, the view
+## or each other (real `frontage_aligned` p90 0.86-0.95; square everywhere is
+## 1.00). The turn is drawn from the seed and the lot's index -- a pure
+## function of the spec, no random draw -- and kept only where the turned
+## building still fits a lot widened for it, inside its setback band, with
+## every fire gap. VillageLotCheck's faces_road allows the declared turn.
+const TURN_FORMS: Array[StringName] = [&"hillside", &"dispersed", &"crest", &"shore", &"valley", &"water"]
+const TURN_CLASSES: Array[StringName] = [&"cottage", &"farm"]
+const TURN_SHARE := 0.45
+const TURN_MIN_DEG := 16.0
+const TURN_SPREAD_DEG := 6.0
+## Off for a probe that measures a plan without the turn.
+static var turn_enabled := true
 
 
 ## One site attempt: the form's roads plus `lanes` extra ones, `scale` wider
@@ -1208,6 +1226,7 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 						lot["terraced"] = true
 				if not _lot_is_legal(plan, ctx, lot, job, gap):
 					continue
+				lot = _turned(plan, ctx, spot, lot, frontage, lot_depth, setback, job, rule, gap)
 				if _door_rise(lot) > VillageLotGround.DOOR_RISE_PREFERRED and not bool(job.get("door_ok", false)):
 					if high_door.is_empty():
 						high_door = {"lot": lot, "d": float(spot["d"]), "mid": spot["mid"]}
@@ -1810,13 +1829,60 @@ static func _corner_blocked(plan: VillagePlan, ctx: Dictionary, lot: Dictionary)
 	return false
 
 
+## VTER-REAL-FRONTAGE: the turn this building is drawn, 0 for none.
+static func _turn_deg(plan: VillagePlan, job: Dictionary) -> float:
+	if not turn_enabled:
+		return 0.0
+	if plan.spec.compact_display or plan.spec.form not in TURN_FORMS \
+			or job["class"] not in TURN_CLASSES or bool(job.get("piles", false)):
+		return 0.0
+	var h: int = absi(hash([plan.spec.seed, plan.lots.size(), "turn"]))
+	if float(h % 1000) / 1000.0 >= TURN_SHARE:
+		return 0.0
+	var deg: float = TURN_MIN_DEG + float((h / 1000) % 100) / 100.0 * TURN_SPREAD_DEG
+	return deg if (h / 100000) % 2 == 0 else -deg
+
+
+## A legal square lot, or the same spot turned (`_turn_deg`) where the turned
+## building fits: the lot widened and deepened by what the turn sweeps, slid
+## either way along the road, inside its setback band, with its eaves inside
+## a fire gap of the lot. The square lot when nothing turned fits.
+static func _turned(plan: VillagePlan, ctx: Dictionary, spot: Dictionary, lot: Dictionary,
+		frontage: float, depth: float, setback: float, job: Dictionary, rule: Dictionary,
+		gap: float) -> Dictionary:
+	var deg: float = _turn_deg(plan, job)
+	if deg == 0.0 or bool(lot.get("landmark", false)) or lot.has("mill_race"):
+		return lot
+	var fp: Rect2 = job["footprint"]
+	var t: float = deg_to_rad(absf(deg))
+	var wide: float = fp.size.x * cos(t) + fp.size.y * sin(t) - fp.size.x
+	var deep: float = fp.size.y * cos(t) + fp.size.x * sin(t) - fp.size.y
+	for slide in [0.5, -0.5]:
+		var m: float = float(spot["m"]) + (wide + 0.05) * float(slide)
+		var turned: Dictionary = _make_lot(spot["e"], m, frontage + wide, depth + maxf(deep, 0.0), setback)
+		turned["yaw_deg"] = deg
+		var xf: Transform3D = _transform_for(turned, job)
+		var front: PackedVector2Array = turned["front"]
+		var d: Vector2 = (front[1] - front[0]).normalized()
+		var door3: Vector3 = xf * (job["placement"]["door"] as Vector3)
+		var dist: float = absf(d.cross(Vector2(door3.x, door3.z) - front[0]))
+		if dist < float(rule["set_min"]) or dist > float(rule["set_max"]):
+			continue
+		if not _poly_contains(Poly.offset(turned["poly"], gap + 0.05), Placement.world_rect(job["placement"], xf, false)):
+			continue
+		if _lot_is_legal(plan, ctx, turned, job, gap):
+			return turned
+	return lot
+
+
 ## The transform that puts the building on the lot: rotated so its local -Z
 ## points at the front edge, and translated so the front face of the measured
 ## footprint stands `setback` metres back from that edge, centred on it.
 static func _transform_for(lot: Dictionary, job: Dictionary) -> Transform3D:
 	var n: Vector2 = lot["normal"]
 	var setback: float = float(lot["setback"])
-	var yaw: float = atan2(n.x, n.y)
+	var turn: float = deg_to_rad(float(lot.get("yaw_deg", 0.0)))
+	var yaw: float = atan2(n.x, n.y) + turn
 	var basis := Basis(Vector3.UP, yaw)
 	var front: PackedVector2Array = lot["front"]
 	var mid: Vector2 = (front[0] + front[1]) * 0.5
@@ -1824,6 +1890,19 @@ static func _transform_for(lot: Dictionary, job: Dictionary) -> Transform3D:
 	var fp: Rect2 = job["footprint"]
 	var local := Vector3(fp.position.x + fp.size.x * 0.5, 0.0, fp.position.y)
 	var origin: Vector3 = Vector3(target.x, 0.0, target.y) - basis * local
+	if turn != 0.0:
+		# a turned building (VTER-REAL-FRONTAGE) is centred on its front edge
+		# and set back so its nearest corner keeps the setback
+		var d: Vector2 = (front[1] - front[0]).normalized()
+		var lo := INF
+		var hi := -INF
+		var near := INF
+		for p in Placement.world_rect(job["placement"], Transform3D(basis, origin), true):
+			lo = minf(lo, (p - mid).dot(d))
+			hi = maxf(hi, (p - mid).dot(d))
+			near = minf(near, (p - mid).dot(n))
+		var shift: Vector2 = -d * (lo + hi) * 0.5 + n * (setback - near)
+		origin += Vector3(shift.x, 0.0, shift.y)
 	return Transform3D(basis, origin)
 
 
@@ -1838,6 +1917,8 @@ static func _commit(plan: VillagePlan, lot: Dictionary, job: Dictionary, _rule: 
 		"landmark": bool(lot["landmark"]),
 		"class": job["class"],
 	}
+	if lot.has("yaw_deg"):
+		record["yaw_deg"] = float(lot["yaw_deg"])
 	var request: BuildingRequest = job["request"]
 	if lot.has("ground_fit"):
 		# VTER-LOTS: the lot's platform, its fall and the walls that hold it,

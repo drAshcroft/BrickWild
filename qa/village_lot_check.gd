@@ -118,7 +118,8 @@ func _check_faces_road(plan: VillagePlan) -> void:
 		var lot: Dictionary = plan.lots[int(b["lot"])]
 		var toward_road: Vector2 = -_inward(lot)
 		var deg: float = rad_to_deg(acos(clampf(VillageMeasure.front_dir(b).dot(toward_road), -1.0, 1.0)))
-		if deg > FACE_DEG + 0.5:
+		# a lot the planner turned (VTER-REAL-FRONTAGE) declares its turn
+		if deg > FACE_DEG + absf(float(lot.get("yaw_deg", 0.0))) + 0.5:
 			failures.append("faces_road: building %d looks %.0f degrees away from its road" % [i, deg])
 
 
