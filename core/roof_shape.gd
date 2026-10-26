@@ -38,6 +38,8 @@ static func faces(span: float, along: float, rise: float,
 		return out
 	if kind == &"conical":
 		return _cone(span, along, rise)
+	if kind == &"round_cone":
+		return _round_cone(span, rise)
 	if kind == &"irimoya":
 		return _irimoya(span, along, rise)
 	var h := span * 0.5
@@ -180,6 +182,27 @@ static func _cone(span: float, along: float, rise: float) -> Array[PackedVector3
 		for k in range(CONE_SIDES / 4):
 			var p := a.lerp(b, float(k) / float(CONE_SIDES / 4))
 			ring.append(Vector3(p.x, 0.0, p.y))
+	for i in range(ring.size()):
+		out.append(PackedVector3Array([ring[i], ring[(i + 1) % ring.size()],
+			Vector3(0.0, rise, 0.0)]))
+	return out
+
+
+## HS-ROUNDHOUSE: a cone over a CIRCLE. `ROUND_CONE_SIDES` facets from a ring of
+## radius span/2, whose first vertex is turned half a step so that a facet (not a
+## corner) is centred on -Z, the same turn as the wall ring beneath it. The ring
+## is not the rectangle's perimeter (see `_cone`): the walls under it are round,
+## so there is no corner to cover.
+const ROUND_CONE_SIDES := 12
+
+
+static func _round_cone(span: float, rise: float) -> Array[PackedVector3Array]:
+	var out: Array[PackedVector3Array] = []
+	var radius := span * 0.5
+	var ring := PackedVector3Array()
+	for k in range(ROUND_CONE_SIDES):
+		var a := -PI * 0.5 + (float(k) + 0.5) * TAU / float(ROUND_CONE_SIDES)
+		ring.append(Vector3(cos(a) * radius, 0.0, sin(a) * radius))
 	for i in range(ring.size()):
 		out.append(PackedVector3Array([ring[i], ring[(i + 1) % ring.size()],
 			Vector3(0.0, rise, 0.0)]))

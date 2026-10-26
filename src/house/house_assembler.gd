@@ -160,9 +160,10 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 ## shell builds, crossed logs, a few flames and a warm light. A long hall is lit
 ## by this fire; the louvre over it lets the smoke out.
 static func _longhall_fire(parent: Node3D, plan: HousePlan) -> void:
-	if not HouseLonghall.plan_applies(plan):
+	var open_fire := plan.open_fire()
+	if open_fire.is_empty() or not open_fire.has("hearth"):
 		return
-	var kerb: Rect2 = plan.longhall["hearth"]
+	var kerb: Rect2 = open_fire["hearth"]
 	var c := kerb.get_center()
 	var fire := Node3D.new()
 	fire.name = "OpenHearthFire"

@@ -20,6 +20,9 @@ static func subdivide(p: HousePlan, spec: HouseSpec) -> void:
 			for rect in custom:
 				p.rooms.append({"kind": &"hall", "rect": rect, "storey": 0})
 			return
+	# HS-ROUNDHOUSE: one round room.
+	if HouseRound.applies(spec, p.world_family) and HouseRound.layout(p, spec):
+		return
 	# HS-LONGHALL: one long hall with a room at each end.
 	if HouseLonghall.applies(spec, p.world_family) and HouseLonghall.layout(p, spec):
 		return

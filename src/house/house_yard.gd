@@ -37,7 +37,7 @@ const APRON := {&"cottage": 2.6, &"farmhouse": 3.0, &"townhouse": 2.0,
 	# inside the 2 to 3 m the apron contract promises: a compound wants more
 	# ground, and a compound is what a walled village around it provides.
 	&"mediterranean": 3.0, &"asian": 2.9, &"african": 3.0,
-	&"thatch_cottage": 2.6, &"mud_hut": 3.0}
+	&"thatch_cottage": 2.6, &"roundhouse": 3.0}
 const DEFAULT_APRON := 2.5
 
 ## A thing this low is a path, not an obstacle: it is walked over, and it may
@@ -72,7 +72,7 @@ const STYLE_GROUPS := {
 	# door) and the kitchen garden goes behind; no washing line, woodpile or pail
 	# is allowed to stand at the front of a thatched cottage.
 	&"thatch_cottage": [&"front_beds", &"garden"],
-	&"mud_hut": [&"midden", &"herb_bed", &"mushrooms"],
+	&"roundhouse": [&"midden", &"herb_bed", &"mushrooms"],
 }
 const TRADE_GROUPS := {
 	&"none": [],

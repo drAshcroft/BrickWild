@@ -721,3 +721,98 @@ Observed (not traits):
 * Water jars (blue-grey bowls) stand on bare grass at the right flank and a woven basket hangs against the wall in the rear view; the bucket in the entry views is a European wooden pail. A short plank path leads to the door and ends in the grass.
 * Ground: flat green grass, not sand or dry earth; the house does not sit in a Sahel setting.
 * Roof: the slab overhangs the walls widely and reads as a thick lid; the pinnacles stand close to the front parapet.
+
+
+## roundhouse -- the round hut, formerly `mud_hut` (HS-ROUNDHOUSE)
+
+The published style id is `roundhouse` (label "Roundhouse"). `mud_hut` is an ALIAS:
+`HouseSpec.style` is a property whose setter resolves it through
+`HouseSpec.STYLE_ALIASES` (`canonical_style`), `BuildingLibrary` accepts the old name in
+validation and labels, and a saved request that says `mud_hut` builds the same mesh as
+one that says `roundhouse` (the focused test compares them vertex for vertex through the
+public API). The option list shows only `roundhouse`. The rename is in `CHANGELOG.md`
+("Unreleased"). The village programmer never named `mud_hut`, so no village file changed.
+
+Traits (named by the user, 2026-10-24): (1) one round room with thick walls (door reveal
+at least 0.35 m); (2) a conical thatch roof with a vent at the apex; (3) a hearth at the
+centre of the floor, and a bed or mat at the wall.
+
+Measured first (8 x 10 m, one storey, seeds 1, 8102, 21325): (1) MISSING. Three
+rectangular rooms (hall, kitchen, parlour) in a square plan; walls 0.62 m thick (held). (2)
+HALF. A conical thatch roof existed, but over the plan's SQUARE (a cone on the rectangle's
+perimeter), with a ridge-less apex, no vent. (3) MISSING. The hearth was a breast built
+into a wall (`chimney_breast`) and the bed was in the front room; nothing on the floor's
+middle. The old hut also had rounded corner piers, a veranda (45 %) and a thatch eave roll,
+all of which belong to a rectangle.
+
+Built:
+* `HouseRound` (new, `src/house/house_round.gd`): the plan. A plain roundhouse (no trade,
+  not a shop or world family, one storey) is ONE room whose outline is a regular 12-gon
+  (`outline`), inside a ring of wall 0.62 m thick. It takes a circle of the width asked for,
+  8 to 10 m (`clamp_size`, no random draw). One door in the front facet, four small high
+  windows (0.5 m wide, sill 1.15 m) on the diagonal facets. A roundhouse that carries a trade
+  keeps the old square hut under its square cone (that path is unchanged).
+* Walls: the shell follows the room outline (the device the castle's drum towers use);
+  `HouseGeometry.shell_runs` lengthens each run of this ring so the outer faces meet, and the
+  plinth follows the ring.
+* Roof: `RoofShape._round_cone` (12 facets from a circular eave to one apex). The cone is
+  lowered by `HouseRound.eave_drop` so that the thatch rests on the outer edge of the wall head
+  and hangs past it, and is built that much taller so the apex stays where `roof_rise` puts
+  it. The apex vent is a roof opening `roundhouse_vent` (0.38 m radius), with a collar of
+  eight thatch bundles round it, four posts and a small hat over it, 0.45 m clear above the
+  collar so the smoke leaves between (`HouseBuilder._build_round_roof_fittings`). A ring of
+  rafter tails stands out of the eave. The corner piers, veranda and thatch roll are 0.0 in the
+  row.
+* Hearth: `plan.roundhouse` ("hearth" kerb Rect2 at the middle, "vent"). The builder draws the
+  same kerb of stones round ash that the longhall has; the assembler gives it logs, flames and
+  a light (`HousePlan.open_fire()` serves both). No chimney, no wall hearth, no focus in a wall.
+  A keep-clear zone surrounds it.
+* Bed: the furnisher's wall rule finds no facet of a round room that takes a bed, so
+  `HouseRound.seat` seats `Bed_Twin1` head to the wall on the rear, east or west facet (the
+  largest scale that fits, as close to the wall as it goes) and removes the chandelier (nothing
+  hangs from an open cone).
+
+Test: `tests/house_roundhouse_traits_test.gd` over `house/roundhouse/{1,8102,21325}` (8102
+existed as `mud_hut`; all 8 x 10 m). Keys in `HouseTraitMeasure._round_keys`. 141 checks, 0
+failures. Controls: the outline removed (square shell, four wall masses), a second room, a
+0.2 m wall, a gable roof, a shingle roof, the vent removed (no collar or hat either, nothing
+else moved), the fire moved to the wall, the kerb removed, a wall hearth, the bed removed, the
+bed moved to the middle, a cottage (the measure reads none of it onto another style), and a
+table across the door (the nav check must notice). The room also passes `HouseQA`, the nav
+check, and the walk grid is the circle (14.8 m2 walkable of 33.8 m2, not the 42.5 m2 box).
+
+Checks widened for a shaped plan, and why: `HouseQA._check_shell` expects the roof to begin
+at the wall head, and a roundhouse's cone begins `eave_drop` lower, by design;
+`VernacularHouseCheck` accepts the 12-facet round cone whose facets end round the vent, and
+does not ask a roundhouse to declare rectangular vocabulary; `house_exterior_suite` allows a
+round hut no exterior dressing or approach path (it records an omission: exterior recipes
+need a rectangular facade); `house_vernacular_suite` keeps one square-cone fixture as a
+smith's roundhouse.
+
+Lanes run on the change: `lane:geom` (11 suites, 9810 checks), `lane:house-plan-fast` (322),
+`lane:house-furnish-fast` (242), `lane:house-exterior-fast` (4720), `hbounds` (2317),
+`hvernacular` (191; only the 4 known witch_hut lines red, HVERN-WITCH-THATCH), `cultureapi`
+(20), `libraryquick` (104), `lane:api` (802), `vcompact` (12). `harchetype` has its known
+failures on other styles; roundhouse has 0 defects. `tools/fingerprint_houses.gd` against HEAD:
+is identical against HEAD (120 fingerprints; the fingerprint tool skips the new empty `roundhouse` plan field, as it does `longhall`).
+
+Known sides and open:
+* The INTERIOR FURNITURE is not narrowed (CULTURE-FURNISH-VOCAB). A furnished roundhouse
+  still gets a trestle table, chairs or stools, wall torches, chests and a plank floor; the bed
+  is the generic `Bed_Twin1` (a carved timber bedstead, no mat or straw). The review renders
+  keep ONLY the bed besides the fire, and say so.
+* No yard or exterior dressing (a shaped plan has no rectangular facade); the porch and pail
+  of other houses are absent.
+* Only 1.2 m2 of glass for 33.8 m2 of floor (a daylight WARNING, small high windows on
+  purpose).
+* The wall is plain; no relief, no painted band. The windows still carry a timber frame and
+  glass pane (European).
+* A request for 6.5 x 7.5 becomes an 8 m circle: a smaller hut would not take the bed.
+
+Renders for review: `artifacts/hs_roundhouse/renders/` (`tools/render_hs_roundhouse.gd`, not
+headless), per seed: `_front` roof-on three-quarter from the door side, high (round wall, cone,
+vent hat); `_door` roof-on, lower and closer (wall thickness in the reveal, the hanging eave);
+`_interior` eye level just inside the door, across the fire to the bed; `_vent` eye level beside
+the fire looking up the cone at the vent.
+
+Reviewer: pending

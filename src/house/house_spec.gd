@@ -12,7 +12,9 @@ var seed: int
 var rng: RandomNumberGenerator
 
 # ---- user-specified (never randomized) ----
-var style: StringName = &"cottage"
+var style: StringName = &"cottage":
+	set(value):
+		style = canonical_style(value)
 var trade: StringName = &"none"   # what the household does for a living
 var width: float = 8.0            # X, metres, outside face to outside face
 var length: float = 10.0          # Z
@@ -150,6 +152,11 @@ const TRADES := {
 	&"innkeeper": {"label": "Innkeeper", "room": &"parlour", "extra": ["table", "bench"]},
 	&"scholar": {"label": "Scholar", "room": &"parlour", "extra": ["bookcase", "lectern"]},
 }
+
+## Old names for styles that were renamed (HS-ROUNDHOUSE: `mud_hut` is the
+## `roundhouse`). The `style` property resolves through this, so an old request,
+## fixture or saved file builds the same house under the new name.
+const STYLE_ALIASES := {&"mud_hut": &"roundhouse"}
 
 const STYLES := {
 	&"cottage": {
@@ -363,11 +370,15 @@ const STYLES := {
 		"parapet": 0.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 1.0,
 		"corner_piers": 0.0, "span_out": 0.5, "along_out": 0.35,
 	},
-	&"mud_hut": {
-		"label": "Mud Hut",
-		# One room, very thick walls, one cone. There is nothing to put a
-		# window in that is not a hole through half a metre of mud, so the
-		# openings are small and high and the plan is nearly a square.
+	&"roundhouse": {
+		"label": "Roundhouse",
+		# HS-ROUNDHOUSE (was `mud_hut`): ONE ROUND room, very thick walls, one
+		# cone of thatch with a smoke vent at its apex, and the fire on the middle
+		# of the floor (HouseRound). There is nothing to put a window in that is
+		# not a hole through half a metre of mud, so the openings are small and
+		# high. The corner piers, veranda and thatch roll of the old square hut
+		# are 0.0: a round wall has no corner, no entrance wall to roof over and
+		# no rectangular eave to roll.
 		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
 		"roof_pitch": [1.05, 1.4], "porch": 0.0, "chimney": 0.0, "shutters": 0.0,
 		"wall": ["b98a5e", "94663d"], "trim": ["6b4527", "472c16"],
@@ -379,8 +390,8 @@ const STYLES := {
 		"chimney_style": &"straight", "pots": [1, 1],
 		"roof_material": &"thatch", "pitch_reference": 7.0,
 		"wall_t": 0.62, "culture": 1.0,
-		"parapet": 0.0, "veranda": 0.45, "eave_sweep": 0.0, "thatch_roll": 1.0,
-		"corner_piers": 1.0, "span_out": 0.8, "along_out": 0.7,
+		"parapet": 0.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"corner_piers": 0.0, "span_out": 0.6, "along_out": 0.6,
 	},
 	&"pueblo": {
 		"label": "Pueblo Adobe House",
@@ -414,6 +425,10 @@ const AREA_PER_ROOM := 15.0
 
 
 ## The lowest storey index: -cellars. Storeys run lowest_storey() .. storeys - 1.
+static func canonical_style(id: StringName) -> StringName:
+	return STYLE_ALIASES.get(id, id)
+
+
 func lowest_storey() -> int:
 	return -maxi(cellars, 0)
 

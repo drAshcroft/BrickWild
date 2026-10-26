@@ -512,10 +512,12 @@ func _build_longhall_ceilings(level: int) -> void:
 ## The fire on the hall's floor: a kerb of stones round a bed of ash (the flames,
 ## logs and the light are the assembler's).
 func _build_longhall_floor() -> void:
-	if not HouseLonghall.plan_applies(plan):
+	# HS-LONGHALL's fire, and HS-ROUNDHOUSE's: the same kerb of stones round ash.
+	var fire := plan.open_fire()
+	if fire.is_empty() or not fire.has("hearth"):
 		return
 	var y0 := HouseGeometry.FLOOR_T
-	var kerb: Rect2 = plan.longhall["hearth"]
+	var kerb: Rect2 = fire["hearth"]
 	var stone := 0.22
 	var c := kerb.get_center()
 	tag("open_hearth")
@@ -1080,7 +1082,9 @@ func _build_plinth() -> void:
 	if plinth_h <= 0.05 or (spec.stone_ground_floor and _storeys() > 1):
 		return
 	var thick: float = HouseGeometry.wall_thickness(spec) + HouseGeometry.PLINTH_EXTRA * 2.0
-	for run in HouseGeometry.exterior_runs(spec):
+	# HS-ROUNDHOUSE: the plinth follows the ring of wall, not the square round it.
+	var plinth_runs: Array[Dictionary] = HouseGeometry.shell_runs(plan, 0) 		if HouseRound.plan_applies(plan) else HouseGeometry.exterior_runs(spec)
+	for run in plinth_runs:
 		var from: Vector2 = run["from"]
 		var to: Vector2 = run["to"]
 		var normal: Vector2 = run["normal"]
@@ -1518,7 +1522,7 @@ static func _corner_ext(run: Dictionary, thick: float) -> float:
 			return thick / 2.0
 		&"left", &"right":
 			return -thick / 2.0
-	return 0.0
+	return float(run.get("ext", 0.0))
 
 
 func _wall_piece(from: Vector2, dir: Vector2, yaw: float, t0: float, t1: float,
@@ -3327,10 +3331,13 @@ func _build_roof() -> void:
 	# fills the small raised eave band on hip roofs, not just gable triangles.
 	var h := span * 0.5
 	var f := along * 0.5
-	for run in [[Vector2(-h, -f), Vector2(h, -f), Vector2(0, 1)],
+	var round_cone := HouseRound.plan_applies(plan) and spec.roof_type == &"conical"
+	# A cone over a round wall rests on the wall's outer edge (HouseRound.eave_drop):
+	# there is no gable or hip end to close.
+	for run in ([] if round_cone else [[Vector2(-h, -f), Vector2(h, -f), Vector2(0, 1)],
 			[Vector2(-h, f), Vector2(h, f), Vector2(0, -1)],
 			[Vector2(-h, -f), Vector2(-h, f), Vector2(1, 0)],
-			[Vector2(h, -f), Vector2(h, f), Vector2(-1, 0)]]:
+			[Vector2(h, -f), Vector2(h, f), Vector2(-1, 0)]]):
 		var run_from: Vector2 = run[0]
 		var run_to: Vector2 = run[1]
 		var run_inward: Vector2 = run[2]
@@ -3352,6 +3359,8 @@ func _build_roof() -> void:
 			_build_witch_gable_casement(xf, casement)
 
 	_build_irimoya_hafu(xf, span, along, rise)
+	if round_cone:
+		_build_round_roof_fittings(xf)
 
 	# One ridge length for the cap and the crown that may stand on it, so the
 	# two can never disagree about whether there IS a ridge.
@@ -3385,6 +3394,73 @@ func _build_roof() -> void:
 	_build_eave_sweep(layout)
 	_build_thatch_roll(layout, authored)
 	host_end()
+
+
+## HS-ROUNDHOUSE: what stands round the apex vent and on the eave of the cone.
+## A collar of thatch bundles stands up round the hole so rain runs off it and not
+## in; four posts carry a small hat over it, clear of the hole so smoke leaves
+## between them; and a ring of rafter tails stands out of the eave. `xf` is the
+## roof's frame (its origin is the plan centre at the eave's height).
+const ROUND_TAILS := 24
+
+func _build_round_roof_fittings(xf: Transform3D) -> void:
+	var layout := HouseGeometry.roof_layout(plan)
+	var apex: float = float(layout["rise"])
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	var eave_r: float = float(layout["span"]) * 0.5 + HouseGeometry.roof_span_out(spec)
+	tag("roundhouse")
+	if not plan.roundhouse.is_empty() and bool(plan.roundhouse.get("vent", false)):
+		host("roundhouse_vent", 0)
+		var sides := 8
+		for k in range(sides):
+			var a := TAU * float(k) / float(sides)
+			var radial := Vector2(cos(a), sin(a))
+			var r := HouseRound.COLLAR_R
+			# the thatch surface at the collar: the cone's own height there
+			var surface := RoofShape.height_at(faces, radial * r)
+			if not is_finite(surface):
+				surface = apex * (1.0 - r / eave_r)
+			surface += RoofShape.DEPTH * 0.5
+			component_box("vent_collar", Vector3(0.22, HouseRound.COLLAR_H, 0.5),
+				xf * Transform3D(Basis(Vector3.UP, -a),
+					Vector3(radial.x * r, surface + HouseRound.COLLAR_H * 0.5 - 0.08, radial.y * r)),
+				SURF_ROOF)
+		# the collar's top, then posts that stand in the thatch and rise a clear
+		# 0.45 m above it, and the hat on them: the smoke leaves between the two
+		var collar_r := HouseRound.COLLAR_R
+		var collar_surface := apex * (1.0 - collar_r / eave_r) + RoofShape.DEPTH * 0.5
+		var collar_top := collar_surface + HouseRound.COLLAR_H - 0.08
+		var post_top := collar_top + 0.45
+		for k in range(4):
+			var a2 := PI * 0.25 + TAU * float(k) / 4.0
+			var rp := collar_r - 0.05
+			var foot := apex * (1.0 - rp / eave_r) - 0.05
+			component_box("vent_post", Vector3(0.07, post_top - foot, 0.07),
+				xf * Transform3D(Basis(), Vector3(cos(a2) * rp, (foot + post_top) * 0.5,
+					sin(a2) * rp)), SURF_TRIM)
+		var hat_y := post_top
+		var hat_n := 8
+		for k in range(hat_n):
+			var a3 := TAU * float(k) / float(hat_n)
+			var a4 := TAU * float(k + 1) / float(hat_n)
+			_roof_face(xf, PackedVector3Array([
+				Vector3(cos(a3) * HouseRound.HAT_R, hat_y, sin(a3) * HouseRound.HAT_R),
+				Vector3(cos(a4) * HouseRound.HAT_R, hat_y, sin(a4) * HouseRound.HAT_R),
+				Vector3(0.0, hat_y + HouseRound.HAT_H, 0.0)]),
+				SURF_ROOF, "vent_cap_%d" % k)
+		host_end()
+	tag("eaves")
+	var tail_r := eave_r - 0.04
+	for k in range(ROUND_TAILS):
+		# the eave is a polygon: stand each tail on the facet under it, at the
+		# distance of that facet's line along the tail's own bearing
+		var a5 := -PI * 0.5 + (float(k) + 0.5) * TAU / float(ROUND_TAILS)
+		var facet := TAU / float(RoofShape.ROUND_CONE_SIDES)
+		var centre_a := -PI * 0.5 + roundf((a5 + PI * 0.5) / facet) * facet
+		var reach := tail_r * cos(facet * 0.5) / cos(a5 - centre_a)
+		component_box("eave_tail", Vector3(0.22, 0.09, 0.12),
+			xf * Transform3D(Basis(Vector3.UP, -centre_a),
+				Vector3(cos(a5) * reach, -0.05, sin(a5) * reach)), SURF_TRIM)
 
 
 ## HS-MINKA: the two hafu of an irimoya roof. Each is a vertical wall triangle
@@ -3598,7 +3674,7 @@ func _build_ridge_crown(xf: Transform3D, rise: float, ridge: float, ridge_x := 0
 
 
 func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float) -> void:
-	if spec.roof_type == &"flat":
+	if spec.roof_type == &"flat" or (HouseRound.plan_applies(plan) and spec.roof_type == &"conical"):
 		return
 	tag("eaves")
 	# Half a wall's span, plus the 0.15 m the tails always stood out, plus

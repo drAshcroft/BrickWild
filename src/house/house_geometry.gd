@@ -344,6 +344,17 @@ static func shell_runs(plan: HousePlan, level: int) -> Array[Dictionary]:
 			var shaped := polygon_runs(plan.outline_of(i), thick)
 			for run in shaped:
 				run["thickness"] = thick
+			# HS-ROUNDHOUSE: a ring of many short boxes is carried past its
+			# centre-line ends so the OUTER faces meet, not a wedge of air at every
+			# joint. Other shaped shells are left as they were.
+			if bool(plan.rooms[i].get("round_walls", false)):
+				var n := shaped.size()
+				for k in range(n):
+					var d0: Vector2 = (shaped[k]["to"] as Vector2) - (shaped[k]["from"] as Vector2)
+					var dp: Vector2 = (shaped[(k + n - 1) % n]["to"] as Vector2) - (shaped[(k + n - 1) % n]["from"] as Vector2)
+					var dn: Vector2 = (shaped[(k + 1) % n]["to"] as Vector2) - (shaped[(k + 1) % n]["from"] as Vector2)
+					var turn := maxf(absf(dp.angle_to(d0)), absf(d0.angle_to(dn)))
+					shaped[k]["ext"] = thick * 0.5 * tan(turn * 0.5)
 			return shaped
 	var rectangular := exterior_runs(plan.spec, 0 if plan.has_court() else level)
 	var thick := wall_thickness(plan.spec)
@@ -733,6 +744,14 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 				ridge_x, ridge_half)
 		else:
 			roof = RoofShape.asymmetric_gable(full_span, full_along, rise, ridge_x)
+	elif HouseRound.plan_applies(plan) and s.roof_type == &"conical":
+		# HS-ROUNDHOUSE: a true cone, lowered so its thatch rests on the outer edge
+		# of the wall head and built that much taller, so the apex stays where
+		# `roof_rise` says it is.
+		var drop := HouseRound.eave_drop(s, rise)
+		xf.origin.y -= drop
+		rise += drop
+		roof = RoofShape.faces(full_span, full_along, rise, &"round_cone")
 	else:
 		roof = RoofShape.faces(full_span, full_along, rise, s.roof_type)
 	var layout := {"transform": xf, "span": span, "along": along, "rise": rise,
@@ -882,6 +901,10 @@ static func roof_openings(plan: HousePlan) -> Array[Dictionary]:
 		var authored := _normalise_roof_opening(plan.roof_openings[i], i, plan)
 		if not authored.is_empty():
 			out.append(authored)
+	# HS-ROUNDHOUSE: the vent at the apex of the cone.
+	var vent := HouseRound.vent_opening(plan)
+	if not vent.is_empty():
+		out.append(vent)
 	# HS-LONGHALL: the smoke hole over the hall's fire, derived from the roof.
 	if HouseLonghall.plan_applies(plan):
 		var smoke := HouseLonghall.smoke_opening(plan, roof_layout(plan)["transform"])
@@ -1558,6 +1581,8 @@ static func roof_top_above_walls(spec: HouseSpec, world_family: StringName = &""
 		top = maxf(top, SWEEP_UP)
 	if HouseLonghall.applies(spec, world_family):
 		top = maxf(top, rise + HouseLonghall.LOUVRE_TOP)
+	if HouseRound.applies(spec, world_family) and spec.roof_type == &"conical":
+		top = maxf(top, rise + HouseRound.VENT_TOP)
 	return top
 
 

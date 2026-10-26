@@ -122,6 +122,13 @@ func _check_declared(plan: HousePlan, builder: HouseBuilder) -> void:
 	var row := _row(plan.spec)
 	if not row.has("culture"):
 		return
+	# HS-ROUNDHOUSE: a roundhouse's vocabulary is its plan, cone and vent, which
+	# HouseRound builds and tests/house_roundhouse_traits_test.gd measures; it asks
+	# for none of the rectangular pieces below. (A roundhouse that carries a trade
+	# is left to the rectangular planner, a square hut under a square cone.)
+	if plan.spec.style == &"roundhouse":
+		stats["declared_switches"] = 1
+		return
 	var asked := 0
 	for key in SWITCHES:
 		if float(row.get(key, 0.0)) > 0.0:
@@ -304,11 +311,27 @@ func _check_cone(plan: HousePlan, builder: HouseBuilder) -> void:
 		if not on_every or _has_point(PackedVector3Array(shared), p):
 			continue
 		shared.append(p)
-	var coned: bool = shared.size() == 1 and groups.size() == RoofShape.CONE_SIDES
+	# HS-ROUNDHOUSE: the cone over a round wall has its own facet count.
+	var cone_sides: int = RoofShape.ROUND_CONE_SIDES if HouseRound.plan_applies(plan) 		else RoofShape.CONE_SIDES
+	var coned: bool = shared.size() == 1 and groups.size() == cone_sides
+	if HouseRound.plan_applies(plan):
+		# the vent is a hole at the apex, so the facets end round it rather than on
+		# one point: each must still climb to the middle of the plan
+		coned = groups.size() == cone_sides
+		for face_points in groups.values():
+			var top := Vector3(0.0, -INF, 0.0)
+			for fp in PackedVector3Array(face_points):
+				if fp.y > top.y:
+					top = fp
+			if Vector2(top.x, top.z).length() > HouseRound.VENT_R + 0.1:
+				coned = false
+		if coned:
+			shared.clear()
+			shared.append(Vector3.ZERO)
 	if spec.roof_type == &"conical":
 		if not coned:
 			failures.append("cone: %d facets sharing %d points; a cone is %d facets on one"
-				% [groups.size(), shared.size(), RoofShape.CONE_SIDES])
+				% [groups.size(), shared.size(), cone_sides])
 		if not builder.components("ridge_cap").is_empty():
 			failures.append("cone: a ridge cap was laid across a point")
 		if not builder.components("ridge_crown").is_empty():

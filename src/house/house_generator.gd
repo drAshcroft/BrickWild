@@ -41,6 +41,7 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	spec.rng.seed = p_seed
 	clamp_witch_hut(spec)
 	HouseLonghall.clamp_size(spec)
+	HouseRound.clamp_size(spec)
 	spec.storeys = clampi(spec.storeys, 1, 3)
 	spec.cellars = clampi(spec.cellars, 0, 1)
 	var s: Dictionary = HouseSpec.STYLES[spec.style]
@@ -177,6 +178,7 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	if with_furniture:
 		HouseFurnisher.furnish(plan, spec)
 		HouseLonghall.seat(plan)
+		HouseRound.seat(plan)
 	# HouseFurnisher deliberately works from room IDs and legacy 2D rectangles.
 	# Stamp the explicit level on its records here so consumers can already
 	# distinguish stacked placements without changing that independent placer.

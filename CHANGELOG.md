@@ -6,6 +6,25 @@ projects consume that, never this working tree (`docs/RELEASES.md`).
 `BrickWild.API_VERSION` is a separate compatibility number; see `README.md`
 and `docs/PUBLIC_API_TRANSPORT.md`.
 
+## Unreleased
+
+### Renamed
+
+- **House style `mud_hut` is now `roundhouse`.** The published style id (the
+  `BuildingLibrary` option list, `BuildingRequest.style`, `HouseSpec.STYLES`)
+  is `roundhouse`, labelled "Roundhouse". `mud_hut` stays an ALIAS: a request,
+  saved file or `HouseSpec.style` that says `mud_hut` is accepted, resolves to
+  `roundhouse` (`HouseSpec.canonical_style`) and builds the same house as one
+  that says `roundhouse`. Nothing needs to change; new code should say
+  `roundhouse`.
+- **The roundhouse is round.** A plain roundhouse (no trade) is now ONE round
+  room: a twelve-sided floor inside a 0.62 m wall, a thatched cone over it with
+  a smoke vent at the apex, a fire on the middle of the floor and a bed at the
+  wall. It takes a circle of the width asked for, between 8 and 10 m, and one
+  storey. A roundhouse that carries a trade keeps the old square hut. The
+  corner piers, veranda and eave roll of the old hut are gone from the plain
+  one.
+
 ## 0.1.4 - 2026-10-23
 
 Villages can be planned on real ground. Buildings stand on falling ground,

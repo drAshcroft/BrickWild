@@ -254,6 +254,8 @@ static func options(kind: StringName, field: StringName) -> Array[Dictionary]:
 ## it. Empty when the kind or the id is unknown, so a caller printing a
 ## label never has to guard a dictionary lookup that would crash.
 static func option_label(kind: StringName, field: StringName, id: StringName) -> String:
+	if field == &"style" and kind in [&"house", &"shop"]:
+		id = HouseSpec.canonical_style(id)
 	for row in options(kind, field):
 		if row["id"] == id:
 			return String(row["label"])
@@ -480,6 +482,9 @@ static func _validate_options(request: BuildingRequest, out: Array[Dictionary]) 
 
 
 static func _has_option(kind: StringName, field: StringName, id: StringName) -> bool:
+	# HS-ROUNDHOUSE: a renamed house style is still accepted under its old name.
+	if field == &"style" and kind in [&"house", &"shop"]:
+		id = HouseSpec.canonical_style(id)
 	for row in options(kind, field):
 		if row["id"] == id:
 			return true

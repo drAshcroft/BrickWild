@@ -32,7 +32,7 @@ const WANTED_ROLES := [&"parapet", &"veranda_deck", &"veranda_post", &"veranda_b
 ## exists to hold THEM to their architecture, so it must not quietly grow a
 ## sixth row and then pass it by having no expectations for it.
 const CULTURE_STYLES: Array[StringName] = [&"mediterranean", &"asian", &"african",
-	&"thatch_cottage", &"mud_hut", &"pueblo"]
+	&"thatch_cottage", &"roundhouse", &"pueblo"]
 
 ## The styles that must keep emitting nothing from this vocabulary.
 const ORDINARY_STYLES: Array[StringName] = [&"cottage", &"farmhouse", &"townhouse",
@@ -51,9 +51,12 @@ const FORCED := [
 	{"style": &"african", "w": 10.0, "l": 12.0, "h": 2.8, "seed": 62004,
 		"on": ["corner_piers", "thatch_roll"], "roof": &"hipped",
 		"about": "rounded mud corners and combed thatch over a hip"},
-	{"style": &"mud_hut", "w": 7.0, "l": 8.0, "h": 2.4, "seed": 62005,
+	# HS-ROUNDHOUSE: a smith's roundhouse is not a plain one, so it stays the old
+	# SQUARE hut under a square cone: the one fixture that still lays a cone over
+	# four corners (the round hut has its own test).
+	{"style": &"roundhouse", "trade": &"smith", "w": 7.0, "l": 8.0, "h": 2.4, "seed": 62005,
 		"on": ["corner_piers", "thatch_roll"], "roof": &"conical",
-		"about": "a cone, rounded corners and an eave roll with no ridge to roll"},
+		"about": "a square cone, rounded corners and an eave roll with no ridge to roll"},
 	{"style": &"pueblo", "w": 10.0, "l": 12.0, "h": 2.8, "seed": 62006,
 		"on": ["parapet"], "roof": &"flat",
 		"about": "a level adobe roof behind a terrace parapet"},
@@ -291,8 +294,8 @@ static func _positive(res: SuiteResult) -> void:
 						"%s: Pueblo's flat roof is not plain earth" % who)
 	for style in CULTURE_STYLES:
 		res.checked += 1
-		if not kinds.has(&"conical") and style == &"mud_hut":
-			res.fail("mud_hut: the sweep never produced a cone")
+		if not kinds.has(&"conical") and style == &"roundhouse":
+			res.fail("roundhouse: the sweep never produced a cone")
 	if not kinds.has(&"conical"):
 		res.fail("the culture sweep never produced a conical roof")
 	res.note("  roof types swept: %s" % str(kinds.keys()))

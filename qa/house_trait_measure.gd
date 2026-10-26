@@ -11,7 +11,8 @@ extends RefCounted
 ## chimney_clearance (m over the ridge), chimney_above_ridge, door_sheltered (a porch roof, posts and step all stand
 ## over the entrance door), porch_roof_count.
 ## HS-LONGHALL keys are listed on `_longhall_keys`, HS-MEDITERRANEAN on `_med_keys`,
-## HS-THATCH on `_thatch_keys`, HS-MINKA on `_minka_keys`, HS-SAHEL on `_sahel_keys`.
+## HS-THATCH on `_thatch_keys`, HS-MINKA on `_minka_keys`, HS-SAHEL on `_sahel_keys`,
+## HS-ROUNDHOUSE on `_round_keys`.
 
 
 static func make_spec(style: StringName, width: float, length: float, height: float,
@@ -64,6 +65,7 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable(),
 	_thatch_keys(plan, builder, out)
 	_minka_keys(plan, builder, out)
 	_sahel_keys(plan, builder, out)
+	_round_keys(plan, builder, out)
 	return out
 
 
@@ -1377,3 +1379,178 @@ static func _hits_opening(on: Dictionary, runs: Array, openings: Array, margin: 
 			continue
 		return true
 	return false
+
+
+## HS-ROUNDHOUSE keys (the `roundhouse` style; false/zero for any plan that is not a
+## round hut):
+##   round_hut                   the plan is a round hut at all (HouseRound.plan_applies)
+##   round_rooms                 rooms in the plan (one)
+##   round_sides / round_ratio   the room outline: vertices, and its smallest over its
+##                               largest distance from the centroid (1.0 is a circle)
+##   round_wall_runs / round_wall_ratio   the emitted wall masses (`wall_*`): how many, and
+##                               the smallest over the largest distance of their centres
+##                               from the middle (a square shell gives 4 runs and about 0.7)
+##   door_reveal / door_count    wall thickness at the exterior door: the least depth of its
+##                               jambs, less the 0.04 m the frame stands proud
+##   cone_faces / cone_eave_ratio / cone_pitch_deg / cone_apex_off / cone_thatch
+##                               the roof: facets emitted, smallest over largest eave
+##                               radius, the facets' steepness, how far the highest roof
+##                               point is from the middle, and the roof is thatch
+##   vent_cut / vent_off / vent_area / vent_high   a hole cut in the roof (`roundhouse_vent`):
+##                               its distance from the middle, its area, and at the apex
+##   vent_collar / vent_collar_ring / vent_hat / vent_hat_clear   the collar round it, the
+##                               collar's evenness, the hat over it, and a gap to let smoke out
+##   hearth_kerb / hearth_dist / hearth_under_vent / wall_hearth / chimney_stack
+##                               the fire: kerb stones, its distance from the middle of the
+##                               floor, under the vent, and no fireplace in a wall or chimney
+##   bed_count / bed_gap / bed_at_wall / bed_clear_of_fire    a bed, how far its head is from
+##                               the nearest wall, and clear of the fire
+static func _round_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -> void:
+	out["round_hut"] = HouseRound.plan_applies(plan)
+	out["round_rooms"] = plan.room_count()
+	var poly := PackedVector2Array()
+	if plan.room_count() > 0 and plan.is_polygonal(0):
+		poly = plan.outline_of(0)
+	out["round_sides"] = poly.size()
+	var centre := Vector2.ZERO
+	for p in poly:
+		centre += p
+	centre /= maxf(float(poly.size()), 1.0)
+	var rmin := INF
+	var rmax := 0.0
+	for p2 in poly:
+		rmin = minf(rmin, p2.distance_to(centre))
+		rmax = maxf(rmax, p2.distance_to(centre))
+	out["round_ratio"] = rmin / rmax if poly.size() >= 3 and rmax > 0.0 else 0.0
+	# the emitted wall ring
+	var runs := 0
+	var wmin := INF
+	var wmax := 0.0
+	for mass in builder.mass_log:
+		if not str(mass["name"]).begins_with("wall_"):
+			continue
+		var box: AABB = mass["aabb"]
+		var d := Vector2(box.get_center().x, box.get_center().z).distance_to(centre)
+		runs += 1
+		wmin = minf(wmin, d)
+		wmax = maxf(wmax, d)
+	out["round_wall_runs"] = runs
+	out["round_wall_ratio"] = wmin / wmax if runs > 0 and wmax > 0.0 else 0.0
+	# the reveal of the door: its frame's depth less the 0.04 m it stands proud
+	var reveal := INF
+	var doors := 0
+	for row in builder.component_log:
+		if str(row.get("role", "")) == "opening_jamb" and str(row.get("host", "")).begins_with("door"):
+			reveal = minf(reveal, Vector3(row["size"]).z - 0.04)
+	for d2 in plan.doors:
+		if bool(d2.get("exterior", false)):
+			doors += 1
+	out["door_reveal"] = reveal if reveal < INF else 0.0
+	out["door_count"] = doors
+	# the cone
+	var faces := {}
+	var low := INF
+	var high := -INF
+	var apex := Vector2.ZERO
+	var eave_pts: Array[Vector2] = []
+	var pts: Array[Vector3] = []
+	for row2 in builder.component_log:
+		var role := str(row2.get("role", ""))
+		if not role.begins_with("roof_face_"):
+			continue
+		faces[role] = true
+		for p3 in PackedVector3Array(row2["points"]):
+			pts.append(p3)
+			low = minf(low, p3.y)
+			high = maxf(high, p3.y)
+	for p4 in pts:
+		if p4.y >= high - 0.02:
+			apex = Vector2(p4.x, p4.z)
+	for p5 in pts:
+		if p5.y <= low + 0.02:
+			eave_pts.append(Vector2(p5.x, p5.z))
+	var emin := INF
+	var emax := 0.0
+	for e in eave_pts:
+		emin = minf(emin, e.length())
+		emax = maxf(emax, e.length())
+	out["cone_faces"] = faces.size()
+	out["cone_eave_ratio"] = emin / emax if emax > 0.0 and eave_pts.size() >= 8 else 0.0
+	out["cone_apex_off"] = apex.length() if high > -INF else INF
+	out["cone_pitch_deg"] = rad_to_deg(atan2(high - low, emax)) if emax > 0.0 else 0.0
+	out["cone_thatch"] = plan.spec.roof_material == &"thatch"
+	# the vent, from the roof opening the builder cut
+	out["vent_cut"] = false
+	out["vent_off"] = INF
+	out["vent_area"] = 0.0
+	out["vent_high"] = false
+	var vent_c := Vector2.ZERO
+	for op in builder.roof_opening_log:
+		if str(op["id"]) != "roundhouse_vent":
+			continue
+		out["vent_cut"] = true
+		var oc: Vector3 = op["center"]
+		vent_c = Vector2(oc.x, oc.z)
+		out["vent_off"] = vent_c.length()
+		out["vent_area"] = Poly.area(op["polygon"])
+		out["vent_high"] = oc.y >= high - 0.6 and high > -INF
+	var collar_n := 0
+	var cmin := INF
+	var cmax := 0.0
+	var collar_top := -INF
+	for row3 in builder.component_log:
+		if str(row3.get("role", "")) != "vent_collar":
+			continue
+		collar_n += 1
+		var o: Vector3 = (row3["xf"] as Transform3D).origin
+		var rr := Vector2(o.x, o.z).distance_to(vent_c)
+		cmin = minf(cmin, rr)
+		cmax = maxf(cmax, rr)
+		collar_top = maxf(collar_top, MassBuilder.component_aabb(row3).end.y)
+	out["vent_collar"] = collar_n
+	out["vent_collar_ring"] = cmin / cmax if collar_n >= 3 and cmax > 0.0 else 0.0
+	var hat_n := 0
+	var hat_low := INF
+	for row4 in builder.component_log:
+		if str(row4.get("role", "")).begins_with("vent_cap_"):
+			hat_n += 1
+			for p6 in PackedVector3Array(row4["points"]):
+				hat_low = minf(hat_low, p6.y)
+	out["vent_hat"] = hat_n
+	out["vent_hat_clear"] = hat_n > 0 and collar_n > 0 and hat_low > collar_top + 0.15
+	# the fire
+	var kerb_n := 0
+	var ash := Vector2(INF, INF)
+	for row5 in builder.component_log:
+		var r5 := str(row5.get("role", ""))
+		if r5 == "hearth_kerb":
+			kerb_n += 1
+		elif r5 == "hearth_ash":
+			var ao: Vector3 = (row5["xf"] as Transform3D).origin
+			ash = Vector2(ao.x, ao.z)
+	out["hearth_kerb"] = kerb_n
+	out["hearth_dist"] = ash.distance_to(centre) if kerb_n > 0 and ash.x < INF else INF
+	out["hearth_under_vent"] = kerb_n > 0 and bool(out["vent_cut"]) and ash.distance_to(vent_c) <= 0.3
+	out["wall_hearth"] = plan.hearth_room() >= 0 or builder.has_mass("chimney_breast")
+	out["chimney_stack"] = builder.has_mass("chimney")
+	# the bed
+	var beds := 0
+	var gap := INF
+	var near_fire := false
+	var kerb: Rect2 = plan.open_fire().get("hearth", Rect2())
+	for f in plan.furniture:
+		if str(f.get("cat", "")) != "bed":
+			continue
+		beds += 1
+		var rect := Rect2(f["rect"])
+		for corner in Poly.from_rect(rect):
+			for a in range(poly.size()):
+				var wa: Vector2 = poly[a]
+				var wb: Vector2 = poly[(a + 1) % poly.size()]
+				gap = minf(gap, corner.distance_to(Geometry2D.get_closest_point_to_segment(corner, wa, wb)))
+		if kerb.has_area() and rect.intersects(kerb.grow(0.2)):
+			near_fire = true
+	out["bed_count"] = beds
+	out["bed_gap"] = gap if gap < INF else INF
+	out["bed_at_wall"] = beds > 0 and gap <= 0.15
+	out["bed_clear_of_fire"] = beds > 0 and not near_fire

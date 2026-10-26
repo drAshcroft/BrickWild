@@ -61,11 +61,17 @@ static func _plan_once(spec: HouseSpec, world_family: StringName = &"") -> House
 	# roof geometry and house features do later in the pipeline.
 	p.world_family = world_family
 	HousePlanRooms.subdivide(p, spec)
-	HousePlanRooms.name_rooms(p, spec)
-	HousePlanOpenings.place_doors(p, spec)
-	HousePlanOpenings.place_windows(p, spec)
-	HousePlanOpenings.glaze_remaining(p, spec)
-	demote_unlit(p)
+	var round_hut := HouseRound.plan_applies(p)
+	if round_hut:
+		# HS-ROUNDHOUSE: the facets of one ring take the door and windows; the
+		# rectangular fitters know nothing about an outline.
+		HouseRound.plan_openings(p, spec)
+	else:
+		HousePlanRooms.name_rooms(p, spec)
+		HousePlanOpenings.place_doors(p, spec)
+		HousePlanOpenings.place_windows(p, spec)
+		HousePlanOpenings.glaze_remaining(p, spec)
+		demote_unlit(p)
 	# HS-MINKA: the engawa side's sliding screens and the main room's opening
 	# onto it. Nothing at all for any style without an `engawa`.
 	HouseMinka.plan_engawa(p, spec)
@@ -82,9 +88,11 @@ static func _plan_once(spec: HouseSpec, world_family: StringName = &"") -> House
 	# Upper-floor naming and daylight repairs can change room kinds. Keep the
 	# programme annotations attached to what the finished plan actually is.
 	HousePlanRooms.refresh_domestic_metadata(p)
-	HousePlanFeatures.choose_hearth(p, spec)
-	HousePlanFeatures.choose_focus(p, spec)
+	if not round_hut:
+		HousePlanFeatures.choose_hearth(p, spec)
+		HousePlanFeatures.choose_focus(p, spec)
 	HouseLonghall.prepare(p, spec)
+	HouseRound.prepare(p, spec)
 	_reserve_upper_flue(p, spec)
 	return p
 

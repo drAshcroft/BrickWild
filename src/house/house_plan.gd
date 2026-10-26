@@ -122,6 +122,11 @@ var compromises: Dictionary = {}
 ## "ends": [room ids], "smoke": Vector2 (world XZ of the roof smoke hole)}. Empty
 ## for every other plan (HouseLonghall.applies).
 var longhall: Dictionary = {}
+## HS-ROUNDHOUSE: the round hut's fire and vent -- {"room": 0, "hearth": Rect2 (the
+## kerb of the fire on the middle of the floor), "smoke": Vector2 (world XZ of the
+## apex vent), "vent": bool, "sides": int}. Empty for every other plan
+## (HouseRound.plan_applies).
+var roundhouse: Dictionary = {}
 ## HS-MINKA: the engawa -- {"normal": Vector2 (out of the engawa-side wall),
 ## "line", "main_room": int, "rooms": [room ids on that wall], "rect": Rect2
 ## (the deck), "depth", "step_rect": Rect2, "step_count", "screens": int} --
@@ -338,6 +343,12 @@ func rooms_onto_court(ci: int) -> Array[int]:
 				out.append(room)
 				break
 	return out
+
+
+## The fire burning on the floor: a longhall's or a roundhouse's. Empty when the
+## plan has none. Both carry "hearth" (the kerb Rect2) and "room".
+func open_fire() -> Dictionary:
+	return longhall if not longhall.is_empty() else roundhouse
 
 
 ## Is any part of this plan open to the sky?
