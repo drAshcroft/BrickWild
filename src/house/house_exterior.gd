@@ -153,12 +153,18 @@ static func facade_clear(plan: HousePlan, bounds: AABB) -> String:
 		# A door that opens onto a walled court has the court for its approach:
 		# its own walls stand beyond a shorter reach (HS-MEDITERRANEAN).
 		var reach := HouseYard.COURT_DOOR_APPROACH if HouseYard.opens_on_court(plan, door) else 3.2
+		if bool(door.get("screen", false)):
+			# HS-MINKA: a screen door opens onto the engawa, which is built; the
+			# garden beyond its step is not the door's approach
+			reach = float(plan.engawa.get("depth", 1.2)) + 0.1
 		var reserved := _opening_box(door["pos"], door["normal"], float(door["width"]) + 1.1,
 			-0.1, minf(HouseGeometry.DOOR_H + 0.25, plan.spec.height - 0.1), reach,
 			HouseGeometry.wall_thickness(plan.spec))
 		if bounds.intersects(reserved):
 			return "blocks a door approach or porch"
 	for win in plan.windows:
+		if bool(win.get("screen", false)):
+			continue
 		var level := HousePlan.record_storey(win) * plan.spec.height
 		var width: float = win["width"] * (2.0 if plan.spec.window_shutters else 1.0) + 0.22
 		if bounds.intersects(_opening_box(win["pos"], win["normal"], width,
@@ -197,6 +203,11 @@ static func conflict(plan: HousePlan, p: Dictionary, placed: Array) -> String:
 	var why := facade_clear(plan, bounds)
 	if not why.is_empty():
 		return why
+	# HS-MINKA: the engawa is built ground along that wall; no piece stands on it
+	var deck := HouseMinka.deck_rect(plan)
+	if deck.has_area() and Rect2(Vector2(bounds.position.x, bounds.position.z),
+			Vector2(bounds.size.x, bounds.size.z)).intersects(deck.grow(-0.01)):
+		return "stands on the engawa"
 	for other in placed:
 		if bounds.grow(0.08).intersects(bounds_of(other)):
 			return "overlaps another exterior prop"

@@ -66,6 +66,9 @@ static func _plan_once(spec: HouseSpec, world_family: StringName = &"") -> House
 	HousePlanOpenings.place_windows(p, spec)
 	HousePlanOpenings.glaze_remaining(p, spec)
 	demote_unlit(p)
+	# HS-MINKA: the engawa side's sliding screens and the main room's opening
+	# onto it. Nothing at all for any style without an `engawa`.
+	HouseMinka.plan_engawa(p, spec)
 	if spec.storeys > 1:
 		HousePlanLevels.clone_upper_storeys(p, spec)
 		HousePlanLevels.move_beds_upstairs(p, spec)

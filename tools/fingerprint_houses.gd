@@ -63,7 +63,7 @@ func _plan_text(plan: HousePlan) -> String:
 		# A field added after the base checkout (HS-LONGHALL's `longhall`) is empty
 		# for every plan that does not use it; leave an empty one out so the two
 		# checkouts hash the same text.
-		if key == "longhall" and plan.get(key).is_empty():
+		if key in ["longhall", "engawa", "entry_steps"] and plan.get(key).is_empty():
 			continue
 		rows[key] = plan.get(key)
 	return ("%s" % var_to_str(rows)).md5_text()

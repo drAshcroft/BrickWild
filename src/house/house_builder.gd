@@ -461,7 +461,7 @@ func _build_ceiling(any_roof := false, roofed := false) -> void:
 	if not (roof_enabled or roofed) or plan.has_court() or plan.world_family != &"" \
 			or not plan.roof_openings.is_empty():
 		return
-	if not any_roof and spec.roof_type not in [&"gable", &"half_hipped", &"hipped"]:
+	if not any_roof and spec.roof_type not in [&"gable", &"half_hipped", &"hipped", &"irimoya"]:
 		return
 	var levels := _levels()
 	var level: int = levels.max()
@@ -1427,7 +1427,8 @@ func _openings_on(from: Vector2, to: Vector2, normal: Vector2, level := 0,
 			continue
 		out.append({"t": _along(from, to, d["pos"]), "w": float(d["width"]),
 			"bottom": maxf(interval[0], 0.0), "top": minf(interval[1], spec.height), "kind": "door",
-			"normal": normal, "witch_service_door": bool(d.get("witch_workshop_yard", false))})
+			"normal": normal, "witch_service_door": bool(d.get("witch_workshop_yard", false)),
+			"screen": bool(d.get("screen", false)), "open": bool(d.get("sliding", false))})
 	for w in plan.windows:
 		if _opening_storey(w) != level and _has_storey_metadata(w):
 			continue
@@ -1436,7 +1437,7 @@ func _openings_on(from: Vector2, to: Vector2, normal: Vector2, level := 0,
 		out.append({"t": _along(from, to, w["pos"]), "w": float(w["width"]),
 			"bottom": float(w["sill"]), "top": float(w["head"]),
 			"kind": "hatch" if w.get("hatch", false) else "window",
-			"normal": normal})
+			"normal": normal, "screen": bool(w.get("screen", false)), "open": false})
 	return out
 
 
@@ -1568,6 +1569,10 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 	if spec.style == &"witch_hut" and op["kind"] == "door" \
 			and bool(op.get("witch_service_door", false)):
 		_build_witch_service_door_hood(mid, normal, w, top, thick)
+	if bool(op.get("screen", false)):
+		# HS-MINKA: a sliding lattice screen fills this opening, not glass
+		HouseMinka.emit_screen(self, from, dir, yaw, t, w, bottom, top, thick, normal,
+			y_offset, bool(op.get("open", false)))
 	if bottom > 0.01:
 		var sill_xf := Transform3D(Basis(Vector3.UP, yaw),
 			Vector3(mid.x, y_offset + bottom - jamb / 2.0 + tuck, mid.y))
@@ -2477,6 +2482,7 @@ func _moulding_piece(from: Vector2, dir: Vector2, yaw: float, t0: float, t1: flo
 func _build_culture() -> void:
 	_build_corner_piers()
 	_build_veranda()
+	HouseMinka.emit(self)
 
 
 ## Rounded mud corners: a regular octagon standing on each corner of each
@@ -3342,6 +3348,8 @@ func _build_roof() -> void:
 		if not casement.is_empty():
 			_build_witch_gable_casement(xf, casement)
 
+	_build_irimoya_hafu(xf, span, along, rise)
+
 	# One ridge length for the cap and the crown that may stand on it, so the
 	# two can never disagree about whether there IS a ridge.
 	var ridge: float = HouseGeometry.ridge_half_for(spec, span, along, plan.world_family)
@@ -3374,6 +3382,39 @@ func _build_roof() -> void:
 	_build_eave_sweep(layout)
 	_build_thatch_roll(layout, authored)
 	host_end()
+
+
+## HS-MINKA: the two hafu of an irimoya roof. Each is a vertical wall triangle
+## standing on the top edge of the hipped skirt and closing the gable above it,
+## with a barge board hung along its two sloping edges. Nothing at all on any
+## other roof.
+const HAFU_T := 0.2
+const HAFU_BOARD_W := 0.3
+const HAFU_BOARD_T := 0.07
+
+func _build_irimoya_hafu(xf: Transform3D, span: float, along: float, rise: float) -> void:
+	if spec.roof_type != &"irimoya":
+		return
+	var full_span: float = span + HouseGeometry.roof_span_out(spec) * 2.0
+	var full_along: float = along + HouseGeometry.roof_along_out(spec) * 2.0
+	tag("irimoya")
+	for end_v in [-1.0, 1.0]:
+		var tri := RoofShape.irimoya_hafu(full_span, full_along, rise, float(end_v))
+		if tri.size() < 3:
+			continue
+		# the triangle's front face is flush with the end of the gable planes
+		var inward := Transform3D(Basis(), Vector3(0.0, 0.0, -float(end_v) * HAFU_T * 0.5))
+		_roof_face(xf * inward, tri, SURF_WALL, "irimoya_hafu", false, HAFU_T)
+		var z: float = tri[0].z
+		for side in [-1.0, 1.0]:
+			var a := Vector2(float(side) * tri[1].x, tri[1].y)
+			var b := Vector2(0.0, tri[2].y)
+			var mid: Vector2 = (a + b) * 0.5
+			var ang := atan2(b.y - a.y, b.x - a.x)
+			var board := xf * Transform3D(Basis(Vector3(0, 0, 1), ang),
+				Vector3(mid.x, mid.y, z + float(end_v) * (HAFU_BOARD_T * 0.5 - 0.02)))
+			component_box("hafu_board", Vector3((a - b).length(), HAFU_BOARD_W, HAFU_BOARD_T),
+				board, SURF_TRIM)
 
 
 func _emit_ridge_cap_segments(xf: Transform3D, rise: float,
@@ -4073,7 +4114,10 @@ func _build_yard() -> void:
 			if str(part["surf"]) == "floor":
 				surf = SURF_FLOOR
 				_kit.surface(surf).set_color(Color(1, 0, 1)) # Exterior paving, not timber or rug.
-			var row := component_box(str(part["role"]), part["size"], HouseYard.part_xform(part), surf)
+			# the yard stands on the GROUND, which is `floor_raise` under the floor
+			var part_xf := HouseYard.part_xform(part)
+			part_xf.origin.y -= HouseGeometry.floor_raise(spec)
+			var row := component_box(str(part["role"]), part["size"], part_xf, surf)
 			_kit.surface(surf).set_color(Color.WHITE)
 			row["piece"] = piece["id"]
 	host_end()

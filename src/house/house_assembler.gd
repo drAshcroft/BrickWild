@@ -56,6 +56,13 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 		WorldAssembler.dress_house(shell, plan)
 	root.add_child(shell)
 	furnish(root, plan, builder)
+	# HS-MINKA: the plan keeps the floor's underside at y = 0 with the ground
+	# `floor_raise` below it; lift the house (not its yard) so the ground is y = 0.
+	var raise := HouseGeometry.floor_raise(plan.spec)
+	if raise > 0.0:
+		for child in root.get_children():
+			if child is Node3D:
+				(child as Node3D).position.y += raise
 	dress_exterior(root, plan)
 	return root
 

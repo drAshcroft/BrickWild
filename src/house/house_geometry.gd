@@ -1421,6 +1421,22 @@ const PIER_R := 0.3
 const PIER_SIDES := 8
 
 
+## HS-MINKA: how far the floor stands above the ground it is built on. The
+## spec's own number, except on falling ground or over water, where the ground
+## model (HouseSlope, HousePiles) already says where the ground is.
+static func floor_raise(spec: Object) -> float:
+	var v: Variant = spec.get("floor_raise") if spec != null else null
+	if v == null or float(v) <= 0.0:
+		return 0.0
+	var fall: Variant = spec.get("ground_fall")
+	if fall != null and float(fall) > GroundFall.FLAT:
+		return 0.0
+	var foundation: Variant = spec.get("foundation")
+	if foundation != null and StringName(foundation) != &"":
+		return 0.0
+	return float(v)
+
+
 ## Head height of a veranda's roof where it meets the wall.
 static func veranda_head(spec: HouseSpec) -> float:
 	return minf(VERANDA_HEAD_MAX, maxf(2.0, spec.height - VERANDA_HEAD_CLEAR))
@@ -1475,6 +1491,10 @@ static func ridge_half_for(spec: HouseSpec, span: float, along: float,
 	var half: float = along * 0.5 + roof_along_out(spec)
 	if uses_witch_half_hip_roof(spec, world_family):
 		half = maxf(half - (span * 0.5 + roof_span_out(spec)) * (1.0 - RoofShape.HALF_HIP), 0.0)
+	elif spec.roof_type == &"irimoya":
+		# HS-MINKA: the ridge runs between the two hafu triangles, which stand
+		# in from the eave by the skirt's inset.
+		half = maxf(half - RoofShape.irimoya_inset(span + roof_span_out(spec) * 2.0), 0.0)
 	elif spec.roof_type != &"gable":
 		# Preserve the established generic hip and half-hip arithmetic exactly.
 		# In particular, a full hipped roof subtracts its entire half-span.
@@ -1599,7 +1619,7 @@ static func verge_overhang(spec: HouseSpec, world_family: StringName = &"",
 	var along_out := roof_along_out(spec)
 	if not spec.bargeboards or (not conservative_unknown_scope \
 			and has_witch_roofcraft(spec, world_family)) \
-			or spec.roof_type in [&"hipped", &"conical"]:
+			or spec.roof_type in [&"hipped", &"conical", &"irimoya"]:
 		return Vector2(span_out, along_out)
 	var top := site_rect(spec, maxi(spec.storeys - 1, 0))
 	var span: float = minf(top.size.x, top.size.y)
@@ -1698,7 +1718,8 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		pos = pos.max(Vector2.ONE * CORNICE_OUT)
 	var r: Rect2 = site_rect(spec, maxi(spec.storeys - 1, 0)).grow_individual(neg.x, neg.y, pos.x, pos.y)
 	r = r.merge(site_rect(spec).grow_individual(0, jetty_front_reach(spec), 0, 0))
-	for extra in [chimney_rect(plan), porch_rect(plan), veranda_rect(plan)]:
+	for extra in [chimney_rect(plan), porch_rect(plan), veranda_rect(plan),
+			HouseMinka.engawa_rect(plan), HouseMinka.steps_rect(plan)]:
 		if extra.size.x > 0.0:
 			r = r.merge(extra)
 	# The yard's BUILT pieces are emitted in the shell mesh, so the bound that
@@ -1721,8 +1742,9 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		var foot: float = HousePiles.foot_y(spec)
 		return AABB(Vector3(r.position.x, foot, r.position.y),
 			Vector3(r.size.x, top - foot, r.size.y))
-	return AABB(Vector3(r.position.x, 0.0, r.position.y),
-		Vector3(r.size.x, top, r.size.y))
+	var raise := floor_raise(spec)
+	return AABB(Vector3(r.position.x, -raise, r.position.y),
+		Vector3(r.size.x, top + raise, r.size.y))
 
 
 ## The YARD ENVELOPE: the shell footprint with its porch and chimney stack,
@@ -1734,7 +1756,8 @@ static func yard_rect(plan: HousePlan) -> Rect2:
 	# The veranda is shell, not yard, but it stands on the same ground and the
 	# yard's walk and its props both have to know where it is -- exactly as they
 	# do for the porch.
-	for extra in [chimney_rect(plan), porch_rect(plan), veranda_rect(plan)]:
+	for extra in [chimney_rect(plan), porch_rect(plan), veranda_rect(plan),
+			HouseMinka.engawa_rect(plan), HouseMinka.steps_rect(plan)]:
 		if extra.size.x > 0.0:
 			r = r.merge(extra)
 	return r.grow(HouseYard.apron(plan.spec))
@@ -1765,14 +1788,19 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 	if spec.veranda:
 		pad = maxf(pad, wall_thickness(spec) * 0.5
 			+ HouseGenerator.VERANDA_DEPTH_RANGE[1] + VERANDA_EAVE_OUT)
+	if HouseMinka.applies(spec):
+		# the engawa (depth, set on the long side) and the entry steps; the
+		# roof's eave covers the first and is already in `over`
+		pad = maxf(pad, spec.engawa_depth + HouseMinka.STEP_TREAD * 5.0)
 	# The yard's built pieces are in the mesh and lie inside the envelope: the
 	# apron beyond the shell, its porch and chimney stack.
 	if spec.exterior_props and not spec.has_method("room_program"):
 		pad += HouseYard.apron(spec)
 	r = r.grow(pad)
 	var top: float = maxf(total_height(spec), total_height(spec, &"__unknown_world_scope__"))
-	return AABB(Vector3(r.position.x, 0.0, r.position.y),
-		Vector3(r.size.x, top, r.size.y))
+	var raise := floor_raise(spec)
+	return AABB(Vector3(r.position.x, -raise, r.position.y),
+		Vector3(r.size.x, top + raise, r.size.y))
 
 
 ## Everything the house covers in plan, porch and chimney included.

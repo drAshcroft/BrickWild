@@ -202,6 +202,14 @@ Renders for review: `artifacts/goal/HS-LONGHALL/renders/`
 three-quarter, `_louvre` the smoke louvre on the ridge, `_interior` eye level
 down the hall, `_roof` looking up into the open roof, `_plan` roof off from above.
 
+Test result: `tests/house_minka_traits_test.gd` 106 checks, 0 failures. Lanes run on the
+change: `lane:geom` (11 suites, 9810 checks), `lane:house-exterior-fast` (4794), `lane:house-plan-fast`
+(322), `lane:house-furnish-fast` (242), `hvernacular`, `hbounds`, `cultureapi`, `vcompact`.
+`tools/fingerprint_houses.gd` (130 lines, five long-standing styles) is identical against HEAD.
+Two suites were changed for the new vocabulary: `qa/vernacular_house_check.gd` counts `engawa`
+as a vernacular switch, and `tests/suites/house_qa_suite.gd`'s poles sweep does not take a
+screen door for the back door; `qa/house_yard_check.gd` matches yard parts at `-floor_raise`.
+
 Known sides: the benches are warned by the furnishing check as "not at any table"
 (they stand at the walls, the table stands near the fire); the village programmer
 gives `longhall` to the norse culture, so a norse lot now holds a 15.4 x 5.5 m
@@ -499,3 +507,83 @@ Observed (not traits):
 * The hanging lamp glow blows out the gable wall beside the door on all seeds.
 * Seed 1 interior: a chest fills the lower right corner and a bed the lower left; the camera is cramped against them. Seed 21325 interior: a wardrobe fills the left; both are close-up but readable.
 * Seed 1 front: the chimney is a thin pot on a block; on 21325 it is a small pipe, much slimmer than on 1 and 8102.
+
+
+## asian -- the Japanese minka (HS-MINKA)
+
+The style key stays `asian` (no API break); its label is now `Japanese Minka` and
+its brief row in `docs/BUILDING_PERSONALITY_BRIEFS.md` says so.
+
+Traits: (1) the floor raised at least 0.4 m on a stone plinth, with an engawa
+(veranda) along at least one long side; (2) an irimoya (hip-and-gable) roof with
+eaves at least 0.9 m deep; (3) sliding lattice screens on the veranda side; (4) the
+main room opens onto the garden side.
+
+Measured first (8 x 10 m, one storey, seeds 1, 8102, 21325): (1) PARTLY. A masonry
+dwarf wall 0.75 to 0.93 m high stood round the walls, but the floor was at ground
+level (a door cut straight through the plinth), and the "veranda" was a 4-post
+shed-roof platform 1.5 m deep and 2 m wide on the ENTRANCE wall, at ground level,
+not along a long side. (2) MISSING. A plain hip (`hipped`), eave 0.95 m on the sides and
+0.85 m on the ends (it held the 0.9 m on the sides only), plus four swept-eave fins
+(a Chinese form). (3) MISSING. Ordinary 0.95 m glazed windows with mullions. (4)
+MISSING. The yard was a kitchen garden at the back, crates and a barrel; no room opened
+onto anything.
+
+Built (style row constants, no random draw added or moved; `asian` now takes the same
+draws as before with different values):
+* Irimoya roof: `RoofShape.faces(.., &"irimoya")`: four skirt planes (rising 0.2 of
+  the rise, inset 0.3 of the half-span on every side) and two steeper gable planes
+  above them; the two vertical hafu triangles are emitted by `HouseBuilder._build_irimoya_hafu`
+  (a wall slab and a barge board along each sloping edge). `HouseGeometry.ridge_half_for`
+  knows the ridge is shorter by the inset. Eaves: `span_out` 1.0, `along_out` 0.9 (0.9 is the least the trait allows, and a wider eave moved the east_asian compact village's common under its 70% standable share: 1.1 gave 66%, 1.4 gave 68%, 1.0 passes; see Open).
+  Swept-eave fins, the chimney and the entrance-wall veranda are off in the row.
+* Raised floor: `HouseSpec.floor_raise` (the plinth draw, 0.45 to 0.6 m; the dwarf wall
+  is gone). The floor's underside stays at local y = 0 as everywhere in the house
+  family; the ground is `floor_raise` BELOW it (same convention as `HouseSlope` and
+  `HousePiles`). `HouseMinka` emits a stone stylobate under every exterior wall, stone
+  steps (risers 0.17 or less) from every entry door to the ground, and the yard is
+  emitted `floor_raise` lower. `HouseAssembler.build` lifts the shell and furniture by
+  `floor_raise` so that the ground lands at the root's y = 0; the facade pieces and
+  yard props stand at y = 0. `HouseGeometry.floor_raise()` is 0 on falling ground or
+  piles. `exterior_bounds` reaches down to `-floor_raise`.
+* Engawa: `HouseMinka.plan_engawa` (after the windows) picks the long side (never the
+  entrance wall) whose room is the main room; a deck level with the floor, 0.8 m deep,
+  the full wall long, on posts with stone footings under a head beam, the roof eave
+  covering it; one flight of stone steps down to the ground off the end of the deck that is
+  farther from the front door, running along the wall (a flight out from the middle squared
+  every bound up to a deck 2 m deep).
+* Screens: the windows of the engawa side become sliding lattice screens (window records
+  with `screen: true`, sill 0, `balcony: true` so the planner's sill rule is unchanged);
+  the main room (parlour, else hall) gets a wide (1.5 to 2.4 m) `screen` + `sliding` door
+  onto the engawa, drawn with its panels pulled apart. A screen is a track, panels on two
+  lanes (frame, paper, a lattice of bars on both faces). The kitchen keeps its windows.
+* Garden: yard group `engawa_garden` (first in the style's groups): a `dry_garden` piece
+  (gravel, raked lines, a stone edge) with three rocks, a tree and stepping stones from the
+  engawa step, on the engawa side. `HouseExterior`/`HouseYard` know the engawa is built
+  ground (no facade piece or prop stands on it; a screen door's approach is the engawa).
+
+Test: `tests/house_minka_traits_test.gd` over the frozen requests `house/asian/{1,8102,21325}`
+(8102 existed; 1 and 21325 added, all 8 x 10 m). Keys in `HouseTraitMeasure._minka_keys`
+(see its header). Controls: floor on the ground, no engawa, a 2 m engawa stub, a plain hip,
+a plain gable, a 0.35 m eave, glazed windows in place of screens, the screens cut into the
+opposite wall, the screen door removed, the entrance room named as the main room, the garden
+removed.
+
+Known sides: the deck is one plank-textured slab (no board gaps); the gable (hafu) is plain
+wall colour with no timber members; the panels of a closed screen are drawn but do not
+animate; the interior has no tatami; the timber frame keeps the row's arch braces.
+
+Renders for review: `artifacts/hs_minka/renders/` (`tools/render_hs_minka.gd`, not
+headless), per seed: `_front` roof-on three-quarter from the engawa side, high; `_engawa`
+roof-on, lower and closer on the same side; `_interior` eye level in the main room, looking
+through its screen door onto the engawa and garden.
+
+Open: the red suites seen on the way (witch_hut `henvelope` and `hvernacular`, `harchetype`
+furnishing complaints for african/cottage/farmhouse/inn) are red on HEAD without this change
+(`henvelope` and `vcompact` compared on a HEAD worktree); `harchetype` (254 red lines over every style, known red; the asian lines are the same
+furnishing complaints, a table, a hearth, sparse halls at scales 0.75 to 1.9, and its `declared`
+rule is fixed). The east_asian compact village is within 2 points of its
+limit with a house this wide.
+
+Reviewer: pending
+

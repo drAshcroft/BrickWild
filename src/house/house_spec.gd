@@ -87,6 +87,14 @@ var eave_sweep: bool = false       # the eave flicks up at its four corners
 var thatch_roll: bool = false      # a combed ridge roll and a thick eave roll
 var eyebrows: int = 0              # HS-THATCH: eyebrow dormers swept out of the thatch (no draw; a style row number)
 var corner_piers: bool = false     # rounded mud-brick corners
+## HS-MINKA (no draw; style row numbers). The floor stands `floor_raise` metres
+## above the ground it is built on: local y = 0 stays the floor's underside, and
+## the ground, the yard and the entry steps are `floor_raise` BELOW it (the
+## assembler lifts the house by that much so the ground lands at the root's y =
+## 0). `engawa` is the long-side veranda at floor level, `engawa_depth` its reach.
+var floor_raise: float = 0.0
+var engawa: bool = false
+var engawa_depth: float = 1.2
 ## How far the roof oversails its walls. Negative means HouseGeometry's
 ## ordinary 0.35 m / 0.25 m, and the bound reads the resolved value from
 ## there, so a deep-eaved house cannot be looser than the eave it built.
@@ -271,24 +279,27 @@ const STYLES := {
 		"corner_piers": 0.0, "span_out": 0.55, "along_out": 0.45,
 	},
 	&"asian": {
-		"label": "Asian Timber House",
-		# A boarded shell standing clear of the wet ground, under one very
-		# deep roof whose corners flick up. The veranda and the eave sweep are
-		# not decoration on this style; they are the house, and a plan without
-		# them is a shed with a hat on.
+		"label": "Japanese Minka",
+		# HS-MINKA. A timber house standing on a stone plinth whose floor is
+		# raised clear of the ground (`raised_floor`: the plinth draw becomes the
+		# floor's height), under an irimoya roof -- a gable on a hipped skirt --
+		# whose deep eaves cover the engawa, the veranda that runs along one
+		# long side. The long side that carries it is fitted with sliding
+		# lattice screens and the main room opens through them onto the garden.
 		"timber": 0.85, "studs": [0.9, 1.3], "braces": 0.7, "rail": 0.8,
-		"roof_pitch": [0.95, 1.3], "porch": 0.0, "chimney": 0.15, "shutters": 0.0,
+		"roof_pitch": [0.8, 1.0], "porch": 0.0, "chimney": 0.0, "shutters": 0.0,
 		"wall": ["dccfab", "c2b189"], "trim": ["6b4a2f", "47301c"],
 		"roof": ["3f4a44", "2b3430"], "floor": ["a08a63", "857050"],
 		"clutter": [0.3, 0.65],
-		"plinth": [0.6, 0.95], "roof_types": [&"hipped"],
+		"plinth": [0.45, 0.6], "roof_types": [&"irimoya"],
 		"framing": [&"square_panel", &"arch_brace"], "truss": [&"king_post", &"queen_post"],
 		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
 		"chimney_style": &"straight", "pots": [1, 1],
 		"roof_material": &"tile", "pitch_reference": 8.0,
 		"wall_t": 0.3, "culture": 1.0,
-		"parapet": 0.0, "veranda": 1.0, "eave_sweep": 1.0, "thatch_roll": 0.0,
-		"corner_piers": 0.0, "span_out": 0.95, "along_out": 0.85,
+		"parapet": 0.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"corner_piers": 0.0, "span_out": 1.0, "along_out": 0.9,
+		"raised_floor": true, "engawa": 1.0, "engawa_depth": 0.8,
 	},
 	&"african": {
 		"label": "African Compound House",

@@ -122,6 +122,13 @@ var compromises: Dictionary = {}
 ## "ends": [room ids], "smoke": Vector2 (world XZ of the roof smoke hole)}. Empty
 ## for every other plan (HouseLonghall.applies).
 var longhall: Dictionary = {}
+## HS-MINKA: the engawa -- {"normal": Vector2 (out of the engawa-side wall),
+## "line", "main_room": int, "rooms": [room ids on that wall], "rect": Rect2
+## (the deck), "depth", "step_rect": Rect2, "step_count", "screens": int} --
+## and the stone steps of the entry doors, [{"door", "count", "normal",
+## "width", "base", "rect"}]. Both empty for every other plan (HouseMinka).
+var engawa: Dictionary = {}
+var entry_steps: Array[Dictionary] = []
 
 ## AUTHORED holes in the roof: a compluvium over an atrium, an oculus, an open
 ## court sky. One shared schema with the dormer openings the roof descriptor

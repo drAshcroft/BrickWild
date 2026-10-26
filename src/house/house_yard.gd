@@ -64,7 +64,9 @@ const STYLE_GROUPS := {
 	# is judged on its kind of house instead -- water jars and a drying line in
 	# the sun, a dung midden and a cart in a compound, pots under the shade.
 	&"mediterranean": [&"court", &"garden", &"flowers", &"crates"],
-	&"asian": [&"garden", &"crates", &"rain_barrel"],
+	# HS-MINKA: the garden is the engawa's: a dry garden of raked gravel, rocks
+	# and a tree, laid out in front of the veranda the main room opens onto.
+	&"asian": [&"engawa_garden", &"crates", &"rain_barrel"],
 	&"african": [&"midden", &"crates", &"cart"],
 	# HS-THATCH: the front is a flower garden (two beds flanking the path to the
 	# door) and the kitchen garden goes behind; no washing line, woodpile or pail
@@ -84,7 +86,7 @@ const TRADE_GROUPS := {
 const MAX_GROUPS := 3
 
 ## Built-piece kinds, for the check.
-const KINDS := ["court", "fence", "woodpile", "washing_line", "midden", "leanto", "byre", "cart", "witch_work_lean_to", "trough",
+const KINDS := ["dry_garden", "court", "fence", "woodpile", "washing_line", "midden", "leanto", "byre", "cart", "witch_work_lean_to", "trough",
 	"signpost", "bed", "path"]
 
 const HERBS := ["Wild_Plant_7", "Wild_Fern_1", "Wild_Plant_1", "Nature_Flower_3_Clump", "Wild_Fern_1", "Wild_Plant_7"]
@@ -345,6 +347,8 @@ static func _group(ctx: Dictionary, name: StringName) -> Dictionary:
 			return _flowers(ctx)
 		&"front_beds":
 			return _front_beds(ctx)
+		&"engawa_garden":
+			return _engawa_garden(ctx)
 		&"woodpile":
 			return _woodpile(ctx)
 		&"cart":
@@ -732,6 +736,16 @@ static func clear_reason(plan: HousePlan, env: Rect2, box: AABB) -> String:
 		Vector3(site.size.x, plan.spec.height * plan.spec.storeys, site.size.y))
 	if box.intersects(building.grow(-0.01)):
 		return "intersects the house wall"
+	# HS-MINKA: the engawa and the entry steps are built ground, even to a path
+	var deck := HouseMinka.deck_rect(plan)
+	if deck.has_area() and r.intersects(deck.grow(-0.01)):
+		return "stands on the engawa"
+	var steps := HouseMinka.steps_rect(plan)
+	if steps.has_area() and r.intersects(steps.grow(-0.01)):
+		return "stands on the entry steps"
+	var garden_steps := HouseMinka.garden_steps_rect(plan)
+	if garden_steps.has_area() and r.intersects(garden_steps.grow(-0.01)):
+		return "stands on the engawa steps"
 	if _is_flush(box):
 		return ""
 	var why := HouseExterior.facade_clear(plan, box)
@@ -889,6 +903,83 @@ static func _front_bed(ctx: Dictionary, cell: Dictionary, gap: float) -> Diction
 		var prop := make_prop(key, _w(cell, tt, d), float(i) * 2.1, _fit(key, 0.5), "bed_flowers", str(cell["host"]))
 		made["props"].append(_raised(prop, 0.17))
 	return made
+
+
+## HS-MINKA: the dry garden in front of the engawa. Raked gravel in a low
+## border, three rocks and a tree on it, and stepping stones from the foot of
+## the engawa step across the gravel. It is the first yard group of the style
+## and goes on the engawa side, so the main room looks out at it.
+const DRY_GARDEN_ROCKS := ["Wild_Rock_Medium_1", "Wild_Rock_Medium_2", "Wild_Rock_Medium_3"]
+const DRY_GARDEN_TREES := ["Wild_Pine_2", "Wild_Pine_3", "Nature_MapleTree_2"]
+const DRY_GARDEN_STONES := ["Wild_RockPath_Round_Small_1", "Wild_RockPath_Round_Small_2", "Wild_RockPath_Round_Small_3"]
+
+
+static func _engawa_garden(ctx: Dictionary) -> Dictionary:
+	var p: HousePlan = ctx["plan"]
+	if p.engawa.is_empty():
+		return {}
+	var n: Vector2 = p.engawa["normal"]
+	var region := ""
+	for r in ["left", "right", "rear", "front"]:
+		if _cell(ctx, r, 0.0)["out"].dot(n) > 0.9:
+			region = r
+	if region.is_empty():
+		return {}
+	var rng: RandomNumberGenerator = ctx["rng"]
+	# centred on the main room's screen door, so the garden is what it looks at
+	var door_s := 0.0
+	for d in p.doors:
+		if bool(d.get("screen", false)) and int(d["a"]) == int(p.engawa["main_room"]):
+			door_s = Vector2(d["pos"]).dot(_cell(ctx, region, 0.0)["tan"])
+	for sizing in [1.0, 0.8, 0.6]:
+		var cell := _cell(ctx, region, clampf(door_s, -float(ctx["ext_f"]) * 0.45, float(ctx["ext_f"]) * 0.45))
+		var d0: float = float(p.engawa["depth"]) + 0.35
+		var room: float = float(cell["room"])
+		var gd: float = (room - d0 - 0.15) * sizing
+		var half_t: float = minf(float(ctx["ext_f"]) - 0.4, 3.2) * sizing
+		if gd < 1.2 or half_t < 1.0:
+			continue
+		var parts: Array = []
+		var dm := d0 + gd * 0.5
+		# the gravel and its low stone border
+		parts.append(_part(cell, "garden_gravel", 0.0, dm, half_t * 2.0, gd, 0.0, 0.03, "wall"))
+		for side in [-1.0, 1.0]:
+			parts.append(_part(cell, "garden_edge", float(side) * (half_t + 0.04), dm, 0.08, gd + 0.16, 0.0, 0.1, "floor"))
+		parts.append(_part(cell, "garden_edge", 0.0, d0 + gd + 0.04, half_t * 2.0 + 0.16, 0.08, 0.0, 0.1, "floor"))
+		# raked lines along the wall
+		var d := d0 + 0.3
+		while d < d0 + gd - 0.2:
+			parts.append(_part(cell, "garden_rake", 0.0, d, half_t * 2.0 - 0.3, 0.03, 0.03, 0.012, "wall"))
+			d += 0.3
+		var made := {"pieces": [_piece("dry_garden", "garden", parts, str(cell["host"]))], "props": []}
+		var base := rng.randi()
+		# three rocks, one tree: off the stepping line, apart from each other
+		var spots := [[-half_t * 0.62, d0 + gd * 0.35], [half_t * 0.55, d0 + gd * 0.6], [-half_t * 0.3, d0 + gd * 0.82]]
+		for i in 3:
+			var rk: String = DRY_GARDEN_ROCKS[(base + i) % DRY_GARDEN_ROCKS.size()]
+			if not PropCatalog.known(rk):
+				continue
+			var at: Array = spots[i]
+			made["props"].append(_prop_at(cell, float(at[0]), float(at[1]), rk, _fit(rk, 0.9 - float(i) * 0.12), "garden_rock"))
+		var tree: String = DRY_GARDEN_TREES[base % DRY_GARDEN_TREES.size()]
+		if PropCatalog.known(tree):
+			var tree_scale := _fit(tree, 1.8)
+			var tree_gap := minf(d0 + gd * 0.7, room - 0.25 - 1.8)
+			made["props"].append(_prop_at(cell, half_t * 0.7, tree_gap, tree, tree_scale, "garden_tree"))
+		# stepping stones from the engawa step out across the gravel
+		var ds := 0.3
+		var k := 0
+		while ds < d0 + gd - 0.2 and float(p.engawa["depth"]) + ds + 0.6 < room:
+			var sk: String = DRY_GARDEN_STONES[(base + k) % DRY_GARDEN_STONES.size()]
+			if PropCatalog.known(sk):
+				var jitter := (0.12 if k % 2 == 0 else -0.12)
+				var stone := _prop_at(cell, jitter, float(p.engawa["depth"]) + ds, sk, _fit(sk, 0.55), "garden_path")
+				made["props"].append(stone)
+			ds += 0.6
+			k += 1
+		if _group_reason(ctx, made).is_empty():
+			return made
+	return {}
 
 
 static func _crates(ctx: Dictionary, cell: Dictionary, gap: float) -> Dictionary:

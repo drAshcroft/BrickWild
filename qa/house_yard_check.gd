@@ -67,19 +67,20 @@ static func known(plan: HousePlan, builder = null) -> Array[String]:
 			expected += 1
 			if builder == null:
 				continue
-			if not _logged(logged, piece, part):
+			if not _logged(logged, piece, part, HouseGeometry.floor_raise(plan.spec)):
 				out.append(_who("piece", piece) + ": known: part %s has no logged yard component" % part["role"])
 	if builder != null and logged.size() != expected:
 		out.append("yard: %d logged yard components for %d planned parts" % [logged.size(), expected])
 	return out
 
 
-static func _logged(rows: Array[Dictionary], piece: Dictionary, part: Dictionary) -> bool:
+static func _logged(rows: Array[Dictionary], piece: Dictionary, part: Dictionary, raise := 0.0) -> bool:
 	for row in rows:
 		if str(row["role"]) != str(part["role"]) or str(row.get("piece", "")) != str(piece["id"]):
 			continue
 		var xf: Transform3D = row["xf"]
-		if xf.origin.distance_to(part["centre"]) < 0.002 \
+		# a raised floor (HS-MINKA) stands the yard on the ground under it
+		if xf.origin.distance_to(Vector3(part["centre"]) - Vector3(0.0, raise, 0.0)) < 0.002 \
 				and (row["size"] as Vector3).distance_to(part["size"]) < 0.002:
 			return true
 	return false

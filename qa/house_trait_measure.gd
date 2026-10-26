@@ -11,7 +11,7 @@ extends RefCounted
 ## chimney_clearance (m over the ridge), chimney_above_ridge, door_sheltered (a porch roof, posts and step all stand
 ## over the entrance door), porch_roof_count.
 ## HS-LONGHALL keys are listed on `_longhall_keys`, HS-MEDITERRANEAN on `_med_keys`,
-## HS-THATCH on `_thatch_keys`.
+## HS-THATCH on `_thatch_keys`, HS-MINKA on `_minka_keys`.
 
 
 static func make_spec(style: StringName, width: float, length: float, height: float,
@@ -62,6 +62,7 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable(),
 	_rich_keys(plan, builder, out)
 	_med_keys(plan, builder, out)
 	_thatch_keys(plan, builder, out)
+	_minka_keys(plan, builder, out)
 	return out
 
 
@@ -862,3 +863,250 @@ static func _door_sheltered(plan: HousePlan, builder: HouseBuilder, roofs: int) 
 	var step: AABB = names["porch_step"]
 	var foot := Rect2(step.position.x, step.position.z, step.size.x, step.size.z).grow(0.05)
 	return foot.has_point(p) or foot.has_point(p + Vector2(door["normal"]).normalized() * 0.6)
+
+
+## HS-MINKA keys (only for the `asian` style; all from the plan and the logs):
+##   (1) the raised floor and the engawa
+##   plinth_rise            how far the stone stylobate stands below the floor's underside (m)
+##   plinth_runs            stylobate courses (one under each exterior wall)
+##   plinth_closed          the stylobate's top meets the floor on every run
+##   step_flights / step_riser_max / steps_reach_ground   the entry doors' stone steps
+##   engawa_present / engawa_length / engawa_depth / engawa_long_side / engawa_outside
+##   engawa_deck_top / floor_top   the deck's top against the floor's top (m)
+##   engawa_posts / engawa_beam   the posts and the head beam carried under the eave
+##   eave_over_engawa       how far the roof's eave reaches past the engawa's outer edge
+##   (2) the irimoya roof
+##   roof_faces / roof_hip_ends / skirt_angle / gable_angle / hafu_count / hafu_vertical /
+##   hafu_on_skirt / eave_side / eave_end / eave_depth
+##   (3) the sliding lattice screens
+##   screen_openings / screen_panels / screen_bars / screen_lanes / screen_wall_share /
+##   screen_off_wall / screen_tracks
+##   (4) the main room and the garden
+##   main_room_kind / main_screen_door / main_door_on_deck / main_touches_wall /
+##   garden_present / garden_rocks / garden_trees / garden_stones / garden_beyond_deck /
+##   garden_before_door
+static func _minka_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -> void:
+	var spec := plan.spec
+	if spec.style != &"asian":
+		return
+	var raise := HouseGeometry.floor_raise(spec)
+	var floor_top := HouseGeometry.FLOOR_T
+	var rows := {}
+	for row in builder.component_log:
+		var role := str(row.get("role", ""))
+		if not rows.has(role):
+			rows[role] = []
+		(rows[role] as Array).append(row)
+	# (1) plinth and steps
+	var low := 0.0
+	var high := -INF
+	var runs := 0
+	for row in rows.get("stylobate", []):
+		var a := MassBuilder.component_aabb(row)
+		low = minf(low, a.position.y)
+		high = maxf(high, a.end.y)
+		runs += 1
+	out["plinth_rise"] = -low
+	out["plinth_runs"] = runs
+	out["plinth_closed"] = runs >= 4 and absf(high) < 0.01
+	var riser_max := 0.0
+	var flights := 0
+	for s in plan.entry_steps:
+		flights += 1
+		riser_max = maxf(riser_max, (raise + floor_top) / float(maxi(int(s["count"]), 1)))
+	var step_low := 0.0
+	for row in rows.get("entry_step", []):
+		step_low = minf(step_low, MassBuilder.component_aabb(row).position.y)
+	out["step_flights"] = flights
+	out["step_riser_max"] = riser_max
+	out["steps_reach_ground"] = flights > 0 and absf(step_low - low) < 0.01
+	# the engawa
+	var long_x := spec.length >= spec.width
+	out["engawa_present"] = false
+	out["engawa_length"] = 0.0
+	out["engawa_depth"] = 0.0
+	out["engawa_long_side"] = false
+	out["engawa_outside"] = false
+	out["engawa_deck_top"] = -1.0
+	out["floor_top"] = floor_top
+	var deck_box := AABB()
+	var decks: Array = rows.get("engawa_deck", [])
+	if not decks.is_empty():
+		deck_box = MassBuilder.component_aabb(decks[0])
+		var along := maxf(deck_box.size.x, deck_box.size.z)
+		var depth := minf(deck_box.size.x, deck_box.size.z)
+		var deck_along_x := deck_box.size.x > deck_box.size.z
+		var c := deck_box.get_center()
+		out["engawa_present"] = true
+		out["engawa_length"] = along
+		out["engawa_depth"] = depth
+		# the deck runs the way the long walls run, and is at least most of their length
+		out["engawa_long_side"] = (deck_along_x != long_x) and along >= maxf(spec.width, spec.length) * 0.8
+		out["engawa_outside"] = absf(c.x) > spec.width * 0.5 if long_x else absf(c.z) > spec.length * 0.5
+		out["engawa_deck_top"] = deck_box.end.y
+	out["engawa_posts"] = (rows.get("engawa_post", []) as Array).size()
+	out["engawa_beam"] = (rows.get("engawa_beam", []) as Array).size()
+	# (2) the roof, from its own faces
+	var faces := 0
+	var hip_ends := 0
+	var skirt := INF
+	var gable := 0.0
+	var lowest_side := 0.0
+	var lowest_end := 0.0
+	var reach_engawa := 0.0
+	var wall_top := spec.height * float(maxi(spec.storeys, 1))
+	var n_eng := Vector2.ZERO
+	if not plan.engawa.is_empty():
+		n_eng = plan.engawa["normal"]
+	for row in builder.component_log:
+		if not str(row.get("role", "")).begins_with("roof_face_"):
+			continue
+		faces += 1
+		var pts: Array = row["points"]
+		var nrm := Vector3.ZERO
+		for i in range(1, pts.size() - 1):
+			nrm = (Vector3(pts[i]) - Vector3(pts[0])).cross(Vector3(pts[i + 1]) - Vector3(pts[0]))
+			if nrm.length() > 0.01:
+				break
+		if nrm.length() > 0.01:
+			nrm = nrm.normalized()
+			if nrm.y < 0.0:
+				nrm = -nrm
+			var ang := rad_to_deg(acos(clampf(nrm.y, 0.0, 1.0)))
+			var ridge_n := absf(nrm.z) if long_x else absf(nrm.x)
+			var across_n := absf(nrm.x) if long_x else absf(nrm.z)
+			if ridge_n > across_n:
+				hip_ends += 1
+			else:
+				skirt = minf(skirt, ang)
+				gable = maxf(gable, ang)
+		for p in pts:
+			var v := Vector3(p)
+			if v.y <= wall_top + 0.02:
+				lowest_side = maxf(lowest_side, absf(v.x) - spec.width * 0.5)
+				lowest_end = maxf(lowest_end, absf(v.z) - spec.length * 0.5)
+				if n_eng != Vector2.ZERO:
+					reach_engawa = maxf(reach_engawa, Vector2(v.x, v.z).dot(n_eng)
+						- (spec.width if absf(n_eng.x) > 0.5 else spec.length) * 0.5)
+	out["roof_faces"] = faces
+	out["roof_hip_ends"] = hip_ends
+	out["skirt_angle"] = skirt if skirt < INF else 0.0
+	out["gable_angle"] = gable
+	var hafus: Array = rows.get("irimoya_hafu", [])
+	var vertical := 0
+	var base_y := INF
+	for row in hafus:
+		var hp: Array = row["points"]
+		var hn := (Vector3(hp[1]) - Vector3(hp[0])).cross(Vector3(hp[2]) - Vector3(hp[0])).normalized()
+		if absf(hn.y) < 0.05:
+			vertical += 1
+		for p in hp:
+			base_y = minf(base_y, Vector3(p).y)
+	out["hafu_count"] = hafus.size()
+	out["hafu_vertical"] = vertical
+	out["hafu_on_skirt"] = base_y < INF and base_y > wall_top + 0.2
+	out["eave_side"] = lowest_side
+	out["eave_end"] = lowest_end
+	out["eave_depth"] = minf(lowest_side, lowest_end)
+	out["eave_over_engawa"] = reach_engawa - float(out["engawa_depth"])
+	# (3) the screens: rows by host
+	var hosts := {}
+	var lanes := {}
+	var panels := 0
+	var bars := 0
+	var tracks := 0
+	var off_wall := 0
+	var width_sum := 0.0
+	var line := float(plan.engawa.get("line", 0.0)) if not plan.engawa.is_empty() else 0.0
+	for row in builder.component_log:
+		var role := str(row.get("role", ""))
+		if not role.begins_with("screen_"):
+			continue
+		var host := str(row.get("host", ""))
+		hosts[host] = true
+		var cen := MassBuilder.component_aabb(row).get_center()
+		var along_n := (cen.x * n_eng.x + cen.z * n_eng.y) if n_eng != Vector2.ZERO else 0.0
+		if n_eng == Vector2.ZERO or absf(along_n - line * (n_eng.x + n_eng.y)) > 0.45:
+			off_wall += 1
+		if role == "screen_paper":
+			panels += 1
+			if not lanes.has(host):
+				lanes[host] = {}
+			lanes[host][snappedf(along_n, 0.02)] = true
+		elif role == "screen_kumiko":
+			bars += 1
+		elif role == "screen_track":
+			tracks += 1
+	var min_lanes := 99
+	for h in lanes:
+		min_lanes = mini(min_lanes, (lanes[h] as Dictionary).size())
+	for w in plan.windows:
+		if bool(w.get("screen", false)):
+			width_sum += float(w["width"])
+	for d in plan.doors:
+		if bool(d.get("screen", false)):
+			width_sum += float(d["width"])
+	var wall_len := spec.length if long_x else spec.width
+	out["screen_openings"] = hosts.size()
+	out["screen_panels"] = panels
+	out["screen_bars"] = bars
+	out["screen_tracks"] = tracks
+	out["screen_lanes"] = min_lanes if min_lanes < 99 else 0
+	out["screen_wall_share"] = width_sum / wall_len if hosts.size() > 0 else 0.0
+	out["screen_off_wall"] = off_wall
+	# (4) the main room and the garden
+	var main := int(plan.engawa.get("main_room", -1)) if not plan.engawa.is_empty() else -1
+	out["main_room_kind"] = String(plan.kind_of(main)) if main >= 0 else ""
+	out["main_screen_door"] = false
+	out["main_door_on_deck"] = false
+	out["main_touches_wall"] = false
+	var door_t := 0.0
+	var wall_t := HouseGeometry.wall_thickness(spec)
+	for d in plan.doors:
+		if bool(d.get("screen", false)) and int(d["a"]) == main and bool(d.get("exterior", false)) \
+				and Vector2(d["normal"]).dot(n_eng) > 0.9 and float(d["width"]) >= 1.5:
+			out["main_screen_door"] = true
+			var outside := Vector2(d["pos"]) + Vector2(d["normal"]) * (wall_t + 0.3)
+			out["main_door_on_deck"] = deck_box.has_volume() and Rect2(
+				Vector2(deck_box.position.x, deck_box.position.z),
+				Vector2(deck_box.size.x, deck_box.size.z)).grow(0.05).has_point(outside)
+			door_t = Vector2(d["pos"]).dot(Vector2(n_eng.y, -n_eng.x))
+	if main >= 0 and main < plan.rooms.size() and n_eng != Vector2.ZERO:
+		var rr: Rect2 = plan.rooms[main]["rect"]
+		var edge := (rr.end.x if n_eng.x > 0.0 else rr.position.x) if absf(n_eng.x) > 0.5 \
+			else (rr.end.y if n_eng.y > 0.0 else rr.position.y)
+		out["main_touches_wall"] = absf(edge - line) < 0.02
+	var rocks := 0
+	var trees := 0
+	var stones := 0
+	for prop in plan.yard:
+		match str(prop["role"]):
+			"garden_rock":
+				rocks += 1
+			"garden_tree":
+				trees += 1
+			"garden_path":
+				stones += 1
+	out["garden_rocks"] = rocks
+	out["garden_trees"] = trees
+	out["garden_stones"] = stones
+	out["garden_present"] = false
+	out["garden_beyond_deck"] = false
+	out["garden_before_door"] = false
+	var half_across := (spec.width if absf(n_eng.x) > 0.5 else spec.length) * 0.5
+	for piece in plan.yard_pieces:
+		if str(piece["kind"]) != "dry_garden" or n_eng == Vector2.ZERO:
+			continue
+		out["garden_present"] = true
+		var gr: Rect2 = piece["rect"]
+		var tan := Vector2(n_eng.y, -n_eng.x)
+		var near_edge := INF
+		var lo := INF
+		var hi := -INF
+		for corner in [gr.position, Vector2(gr.end.x, gr.position.y), gr.end, Vector2(gr.position.x, gr.end.y)]:
+			near_edge = minf(near_edge, Vector2(corner).dot(n_eng))
+			var tt := Vector2(corner).dot(tan)
+			lo = minf(lo, tt)
+			hi = maxf(hi, tt)
+		out["garden_beyond_deck"] = near_edge >= half_across + spec.engawa_depth - 0.01
+		out["garden_before_door"] = door_t >= lo and door_t <= hi

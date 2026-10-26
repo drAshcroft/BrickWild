@@ -315,7 +315,8 @@ static func _poles_sweep(res: SuiteResult, count: int) -> void:
 		houses += 1
 		var back := -1
 		for d in range(plan.doors.size()):
-			if plan.doors[d]["exterior"] and not plan.doors[d].get("front", false):
+			# a sliding screen door onto an engawa (HS-MINKA) is not the back door
+			if plan.doors[d]["exterior"] and not plan.doors[d].get("front", false) 					and not plan.doors[d].get("screen", false):
 				back = d
 		if back >= 0:
 			var kind: StringName = plan.kind_of(int(plan.doors[back]["a"]))

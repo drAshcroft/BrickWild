@@ -40,6 +40,8 @@ const SWITCHES := {
 	"eave_sweep": &"eave_sweep",
 	"thatch_roll": &"thatch_eave",
 	"corner_piers": &"corner_pier",
+	# HS-MINKA: the engawa is the minka's vocabulary (HouseMinka)
+	"engawa": &"engawa_deck",
 }
 
 ## How close a piece has to be to where it belongs, in metres. A millimetre is a

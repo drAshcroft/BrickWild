@@ -70,6 +70,13 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	# exterior architectural variety
 	var plinth_range: Array = s.get("plinth", [0.35, 0.55])
 	spec.plinth_height = r.randf_range(float(plinth_range[0]), float(plinth_range[1]))
+	# HS-MINKA: the plinth draw is the height the FLOOR is raised, and the
+	# wall then stands from the floor (no dwarf wall above it).
+	if bool(s.get("raised_floor", false)):
+		spec.floor_raise = spec.plinth_height
+		spec.plinth_height = 0.0
+	spec.engawa = float(s.get("engawa", 0.0)) >= 1.0
+	spec.engawa_depth = float(s.get("engawa_depth", 1.2))
 	spec.stone_ground_floor = spec.storeys > 1 and GeneratorRandom.chance(r, float(s.get("stone_ground", 0.15)))
 	spec.jetty = spec.storeys > 1 and GeneratorRandom.chance(r, float(s.get("jetty", 0.5)))
 	spec.jetty_depth = r.randf_range(0.24, 0.32)
