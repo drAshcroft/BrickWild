@@ -142,6 +142,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | `VillageSiteAnalysis` (slope classes, landforms, drainage, contours, level regions) | `vanalysis` | ~15 s host, 47 checks; see docs/VILLAGE_TERRAIN.md |
 | the world settlement set, `tools/settlements/` | `vworld` | seconds; see docs/SETTLEMENT_TESTSET.md |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
+| the crooked warp: `core/haunt/crooked_warp.gd`, `qa/crooked_check.gd`, `BuildingRequest.jank` | `lane:haunt` | 5 m host, 2097 checks (26 Oct; every kind but hotel, plus a sloped and a pile house) |
 | church shell, opening or roof geometry | `lane:church-change` | 20 s host |
 | windmill geometry, or anything in `src/windmill/`; the published windmill walk | `lane:windmill` | 295 s loaded host, 270 checks (185 -> 204 windmills + 66 wwalk, 22 Oct) |
 | anything in `src/dungeon/`, `qa/dungeon_room_check.gd` or the dungeon fixtures | `lane:dungeon` | 84 s host (14 Oct); see docs/DUNGEONS.md |
