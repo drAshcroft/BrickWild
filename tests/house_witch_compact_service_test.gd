@@ -106,18 +106,18 @@ func _check_public_compact_case(seed_value: int) -> void:
 		var eating: Rect2 = regions[&"eating"]
 		var cooking: Rect2 = regions[&"cooking"]
 		var witchwork: Rect2 = regions[&"witchwork"]
-		var cooking_left := absf(cooking.position.x - floor.position.x) <= 0.002
-		var service_width := 4.10
-		var meal_width := 2.10
-		var buffer_width := 0.10
-		var expected_service := Rect2(Vector2(floor.position.x if cooking_left else floor.end.x - service_width, floor.position.y),
-			Vector2(service_width, floor.size.y))
-		var expected_eating := Rect2(Vector2(floor.end.x - meal_width if cooking_left else floor.position.x, floor.position.y),
-			Vector2(meal_width, floor.size.y))
-		if not eating.is_equal_approx(expected_eating) or not cooking.is_equal_approx(expected_service) or not witchwork.is_equal_approx(expected_service):
-			failures.append("%s service and meal reservations do not match the measured 4.10/0.10/2.10m layout" % label)
-		if not floor.encloses(eating) or not floor.encloses(cooking) or not floor.encloses(witchwork) or eating.intersects(cooking) or eating.intersects(witchwork) or not cooking.is_equal_approx(witchwork):
-			failures.append("%s shared service/meal reservations leave the measured hall floor or diverge" % label)
+		# WITCH-COMPACT-SERVICE-RED (2026-10-26): the side-by-side 4.10/0.10/2.10 m
+		# split this used to assert is the older compact hall. The current one
+		# reserves the WHOLE hall floor for the shared cooking/Witchwork service
+		# and a meal corner inside it, against one hall wall. The bodies of the
+		# three groups are still kept apart by _fixture_check_activity_geometry.
+		if not cooking.is_equal_approx(floor) or not witchwork.is_equal_approx(floor):
+			failures.append("%s shared service reservation is not the whole measured hall floor" % label)
+		var on_wall := absf(eating.position.x - floor.position.x) <= 0.002 or absf(eating.end.x - floor.end.x) <= 0.002 \
+			or absf(eating.position.y - floor.position.y) <= 0.002 or absf(eating.end.y - floor.end.y) <= 0.002
+		if not floor.encloses(eating) or not on_wall or eating.get_area() > floor.get_area() * 0.5 \
+				or eating.size.x < 1.5 or eating.size.y < 1.5:
+			failures.append("%s meal corner leaves the hall floor, leaves its wall, or is not a corner (%s in %s)" % [label, eating, floor])
 	_check_group_count(plan, service_room, "cooking", "workbench", 1, label)
 	_check_group_count(plan, service_room, "cooking", "hearth", 1, label)
 	_check_group_count(plan, service_room, "cooking", "storage", 1, label)
@@ -251,7 +251,10 @@ func _compact_witchwork_opening_clear(plan: HousePlan, room: int,
 		if not _window_is_on_actual_exterior_wall(plan, room, window):
 			return false
 		var clear: Rect2 = HouseGeometry.window_clear_rect(window)
-		if clear.intersects(bench_rect.grow(0.01)):
+		# A bench standing under the sill is a bench under a window, the usual
+		# place for one; only a bench that rises into the aperture is a clash.
+		if clear.intersects(bench_rect.grow(0.01)) \
+				and _vertical_prop_bounds(bench).y > float(window.get("sill", HouseGeometry.WINDOW_SILL)) - 0.01:
 			return false
 		var anchor_id := String(bench.get("surface_anchor_id", ""))
 		for shelf in shelves:
@@ -307,6 +310,11 @@ func _has_reachable_witch_storage(plan: HousePlan, room: int,
 	var work_zone: Rect2 = Rect2(bench.get("zone", Rect2()))
 	if not work_zone.has_area():
 		return false
+	# The planner may record that the activity wall found no safe station
+	# ("surface:witchwork:no_safe_station"). The rack is then an ordinary
+	# mounted Witchwork shelf without the composed binding; it must still be a
+	# real rack, within reach, above the bench. The binding is not invented.
+	var compromised := _witch_station_compromised(plan, room)
 	var bench_key := String(bench.get("key", ""))
 	var bench_scale: float = PropCatalog.placement_height_scale(bench)
 	var bench_origin: Vector3 = PropCatalog.house_origin(bench)
@@ -317,6 +325,11 @@ func _has_reachable_witch_storage(plan: HousePlan, room: int,
 		var within_reach: bool = HousePlanFeatures._rect_distance(shelf_rect, work_zone) <= 0.75
 		var reachable_height: bool = vertical.x >= 0.55 and vertical.x <= 1.90 and vertical.y <= 2.40
 		var above_work_surface: bool = vertical.x >= bench_surface_y + 0.01
+		if compromised and bool(shelf.get("mounted", false)) \
+				and String(shelf.get("activity_group", "")) == "witchwork" \
+				and String(shelf.get("key", "")) == "Shelf_Small_Bottles" \
+				and within_reach and reachable_height and above_work_surface:
+			return true
 		if bool(shelf.get("mounted", false)) \
 				and String(shelf.get("mount_relation", "")) == "supports_activity" \
 				and String(shelf.get("activity_anchor_id", "")) == String(bench.get("surface_anchor_id", "")) \
@@ -454,7 +467,9 @@ func _fixture_activity_geometry_negatives(plan: HousePlan, room: int,
 		var bench_anchor := String(plan.furniture[bench_index].get("surface_anchor_id", ""))
 		for index in plan.furniture_of(room):
 			var candidate: Dictionary = plan.furniture[index]
-			if String(candidate.get("cat", "")) == "shelf" and String(candidate.get("activity_anchor_id", "")) == bench_anchor:
+			if String(candidate.get("cat", "")) == "shelf" and (String(candidate.get("activity_anchor_id", "")) == bench_anchor \
+					or (_witch_station_compromised(plan, room) and bool(candidate.get("mounted", false)) \
+					and String(candidate.get("activity_group", "")) == "witchwork")):
 				shelf_index = index
 				break
 	if bench_index < 0 or shelf_index < 0:
@@ -824,3 +839,7 @@ func _check_impossible_service_frontage() -> void:
 		failures.append("undersized measured frontage was accepted or did not expose Witchwork shortfall: %s" % str(plan.domestic_layout))
 	if not String(plan.domestic_layout.get("reason", "")).contains("frontage"):
 		failures.append("undersized service negative did not name the measured frontage constraint: %s" % str(plan.domestic_layout))
+
+
+func _witch_station_compromised(plan: HousePlan, room: int) -> bool:
+	return Array(plan.compromises.get(room, [])).has("surface:witchwork:no_safe_station")

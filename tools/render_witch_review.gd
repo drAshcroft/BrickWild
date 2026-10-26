@@ -46,6 +46,13 @@ func _init() -> void:
 		_cam.look_at(Vector3(0.0, (plan.spec.height + rise) * 0.55, 0.0), Vector3.UP)
 		_set_shot_lighting(atan2(n.x, n.y), 8.0)
 		await _save("%s/%s_exterior.png" % [out, id])
+		# WITCH-REVIEW-FOLLOWUPS: the far side too. A stack that leaves the
+		# roof on the slope away from the door is hidden by the high ridge.
+		var back_eye := dp - n * (span * 1.15) - tang * (span * 0.75)
+		_cam.position = Vector3(back_eye.x, 3.4 + span * 0.12, back_eye.y)
+		_cam.look_at(Vector3(0.0, (plan.spec.height + rise) * 0.55, 0.0), Vector3.UP)
+		_set_shot_lighting(atan2(-n.x, -n.y), 8.0)
+		await _save("%s/%s_exterior_back.png" % [out, id])
 
 		var shot := _interior_shot(plan)
 		_cam.fov = float(shot["fov"])

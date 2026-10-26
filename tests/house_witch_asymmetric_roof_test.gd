@@ -239,6 +239,16 @@ func _check_gable_infill(mesh: ArrayMesh, layout: Dictionary, plan: HousePlan, w
 			failures.append("%s original gable profile is missing at end %.0f" % [who, end_sign])
 
 
+func _ashlar_at(builder: HouseBuilder, point: Vector3) -> Dictionary:
+	for row in builder.component_log:
+		if String(row.get("role", "")) != "witch_ashlar":
+			continue
+		for p in PackedVector3Array(row["points"]):
+			if p.distance_to(point) <= 0.004:
+				return row
+	return {}
+
+
 func _check_rafter_bearings(builder: HouseBuilder, mesh: ArrayMesh, layout: Dictionary,
 		plan: HousePlan, who: String) -> void:
 	var rafters: Array[Dictionary] = []
@@ -314,24 +324,43 @@ func _check_rafter_bearings(builder: HouseBuilder, mesh: ArrayMesh, layout: Dict
 			failures.append("%s rafter foot misses analytic wall-plate birdsmouth seat" % who)
 		ridge_points.append(ridge_local)
 		var foot_underside := xf * Vector3(-size.x * 0.5 if not a_is_ridge else size.x * 0.5, -up_sign * size.y * 0.5, 0.0)
+		# WITCH-DEEP-EAVE: under a deep eave the foot stands over the plate and
+		# an ashlar post carries it down. The ashlar must meet the rafter's own
+		# lower corner, and its foot is then what must bear on the tie plate.
+		var bearing_point := foot_underside
+		var foot_on_plate := false
+		for tie in ties:
+			if _component_box_contains(tie, foot_underside):
+				foot_on_plate = true
+		if not foot_on_plate:
+			var ashlar := _ashlar_at(builder, foot_underside)
+			if ashlar.is_empty():
+				failures.append("%s rafter foot stands above the plate with no ashlar under its lower corner" % who)
+			else:
+				var pts: PackedVector3Array = ashlar["points"]
+				var low_a := inverse * pts[0]
+				var low_b := inverse * pts[1]
+				if absf(low_a.y - HouseGeometry.PLATE_H) > 0.002 or absf(low_b.y - HouseGeometry.PLATE_H) > 0.002 or maxf(absf(low_a.x), absf(low_b.x)) > wall_half + 0.001:
+					failures.append("%s ashlar foot is not on the tie plate top inside the wall" % who)
+				bearing_point = (pts[0] + pts[1]) * 0.5 - roof_xf.basis.y.normalized() * 0.001
 		var bearing_found := false
 		var bearing_triangle_found := false
 		for tie in ties:
-			if not _component_box_contains(tie, foot_underside):
+			if not _component_box_contains(tie, bearing_point):
 				continue
 			bearing_found = true
 			var tie_xf: Transform3D = tie["xf"]
 			var moved_tie := tie.duplicate(true)
 			var moved_xf: Transform3D = moved_tie["xf"]
 			var moved_local := inverse * moved_xf.origin
-			var actual_inset := wall_half - absf((inverse * foot_underside).x)
+			var actual_inset := wall_half - absf((inverse * bearing_point).x)
 			moved_local.x -= side * (actual_inset + 0.03)
 			moved_xf.origin = roof_xf * moved_local
 			moved_tie["xf"] = moved_xf
-			if _component_box_contains(moved_tie, foot_underside):
+			if _component_box_contains(moved_tie, bearing_point):
 				failures.append("%s translated wall-plate negative still reports rafter bearing" % who)
 			var tie_local := inverse * tie_xf.origin
-			var underside_local := inverse * foot_underside
+			var underside_local := inverse * bearing_point
 			var sample_x := underside_local.x - side * 0.08
 			var sample := roof_xf * Vector3(sample_x, tie_local.y, tie_local.z)
 			if _surface_segment_hits(mesh, 1, sample - Vector3.UP * 0.15, sample + Vector3.UP * 0.15):

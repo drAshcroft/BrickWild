@@ -175,6 +175,10 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	# invariant, and the vernacular check reads the flag to see it was asked for.
 	if HouseGeometry.has_witch_roofcraft(spec, world_family):
 		spec.thatch_roll = true
+	# WITCH-REVIEW-FOLLOWUPS: the hut's windows are shuttered holes. A style flag,
+	# no draw; the culture block above reads the same key for its own rows.
+	if spec.style == &"witch_hut":
+		spec.unglazed = bool(s.get("unglazed", false))
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y

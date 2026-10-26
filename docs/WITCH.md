@@ -50,3 +50,16 @@ No trait fails outright. Every tick is below a clean pass in these places:
 - Hard-edged dark rectangle across the ground at the bottom of the exterior frames (small cases, a band beginning at about y 685). It looks like a shadow-map extent edge, not a building defect.
 - A cauldron and fire stand outside under the awning in addition to the one in the hearth (small and tiny exteriors). Two cauldrons per hut. This may be intended.
 - No z-fighting seen. No object seen floating clear of a surface other than as noted above.
+
+## WITCH-REVIEW-FOLLOWUPS (2026-10-26)
+
+What became of each item in "Open" and "Observed" above.
+
+1. **Chimney "missing" on five huts.** Not missing: `hwitchflue` and the stack code (`HouseBuilder._build_chimney`) emit it on every hut. On those five it leaves the roof on the slope away from the door, and the high ridge hides a stack that stands 0.6 m clear of its own roof. `tools/render_witch_review.gd` now also writes `<case>_exterior_back.png`, the same three-quarter view from the opposite corner, so every hut shows its stack from at least one exterior view.
+2. **Rustic reads tidy.** The style row sets `"unglazed": true` (read by `HouseGenerator` for the witch, outside the culture block): the windows are shuttered holes, with no glass, mullion or stone hood. The small gable casement keeps its own light. The plaster between the timbers is still smooth; an irregular infill or a rougher wall material is the next step if the hut still reads as a cottage.
+3. **Second broom in the tiny huts.** Intended. `HouseWitchProps.plan_props` places one broom by the entrance door and a second by the stove. In a 5.5 x 7 hut the stove broom stands at the far end of the same room, so the camera sees both.
+4. **Awning clips the eave.** Open. See docs/HOUSES.md, WITCH-DEEP-EAVE: the shelter cannot both pass under the thatch's eave edge (2.18 m) and clear the service door head (2.22 m). It needs the shelter roof to start at the thatch edge, which is a change to the service-yard threshold contract.
+5. **Broom is a smooth cone.** `HouseWitchProps._add_twigs` lays 18 loose twigs over the flare, from the binding to just past the foot, splayed and of uneven length, in a darker straw. Fixed pattern, no randomness; the twigs stay inside the broom's plan rect.
+6. **Little variety between seeds.** Not addressed. small_1 and small_21325 share a plan; the clamp control is the 8102 hut by design.
+
+The deep eave (WITCH-DEEP-EAVE, 0.6 m on ashlar posts) also lands in the next render.

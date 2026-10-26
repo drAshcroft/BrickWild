@@ -435,10 +435,22 @@ func _end_rafter_plate_bearing_failures(builder: HouseBuilder, layout: Dictionar
 		# rafter's actual triangles must cross that same point.
 		var rafter_kit := MeshKit.new(1)
 		rafter_kit.slab_poly(points, float(rafter["depth"]), 0, false)
+		# WITCH-DEEP-EAVE: under a deep eave the strip's foot stands over the
+		# plate on an ashlar post. The ashlar must meet the strip's lower foot
+		# edge; the load path to the tie is then the ashlar's foot, sampled 2 cm
+		# inside its outer face rather than on the face itself.
+		var bearing_x := foot_local.x
+		var ashlar := _ashlar_under(builder, roof_xf, roof_inverse, foot_local)
+		if not ashlar.is_empty():
+			var ashlar_points: PackedVector3Array = ashlar["points"]
+			rafter_kit.slab_poly(ashlar_points, float(ashlar["depth"]), 0, false)
+			var ashlar_low := roof_inverse * ashlar_points[0]
+			var ashlar_inner := roof_inverse * ashlar_points[1]
+			bearing_x = ashlar_low.x + signf(ashlar_inner.x - ashlar_low.x) * 0.02
 		var rafter_mesh: ArrayMesh = rafter_kit.commit()
 		var rafter_triangles := MeshProbe.surface_triangles(null, rafter_mesh, 0)
 		var tie_top_local_y := tie_size.y * 0.5
-		var local_bearing := Vector2(foot_local.x, foot_local.z)
+		var local_bearing := Vector2(bearing_x, foot_local.z)
 		var bearing_samples: Array[Vector2] = []
 		for offset in [-0.04, -0.02, 0.0, 0.02, 0.04]:
 			bearing_samples.append(Vector2(local_bearing.x, local_bearing.y + offset))
@@ -491,6 +503,19 @@ func _end_rafter_plate_bearing_failures(builder: HouseBuilder, layout: Dictionar
 		negative_mesh.clear_surfaces()
 		tie_mesh.clear_surfaces()
 	return failures_out
+
+
+## The ashlar whose upper outer corner meets this strip's lower foot edge.
+func _ashlar_under(builder: HouseBuilder, roof_xf: Transform3D,
+		roof_inverse: Transform3D, foot_local: Vector3) -> Dictionary:
+	for row in builder.component_log:
+		if String(row.get("role", "")) != "witch_ashlar":
+			continue
+		var pts: PackedVector3Array = row["points"]
+		var corner := roof_inverse * pts[3]
+		if absf(corner.x - foot_local.x) <= 0.004 and absf(corner.y - foot_local.y) <= 0.004 and absf(corner.z - foot_local.z) <= 0.01:
+			return row
+	return {}
 
 
 func _triangle_present(triangles: Array, target: Array) -> bool:

@@ -3896,6 +3896,8 @@ func _witch_gable_frame(xf: Transform3D, span: float, along: float,
 		var right_rafter := _witch_rafter_points(right_a, ridge)
 		_witch_gable_member(xf, left_rafter[0], left_rafter[1], z, HouseGeometry.BEAM_W, "witch_rafter")
 		_witch_gable_member(xf, right_rafter[0], right_rafter[1], z, HouseGeometry.BEAM_W, "witch_rafter")
+		_witch_ashlar(xf, -1.0, left_a, ridge, z, 0.001)
+		_witch_ashlar(xf, 1.0, right_a, ridge, z, 0.001)
 		var collar_offset := HouseGeometry.BEAM_W * 0.9 * 0.5
 		var left_n := _witch_roof_up_normal(left_a, ridge)
 		var right_n := _witch_roof_up_normal(right_a, ridge)
@@ -3942,6 +3944,7 @@ func _emit_witch_half_hip_end_frame(xf: Transform3D, span: float, along: float,
 		])
 		_emit_witch_roof_support_strip(xf, faces[side_face_index], subject,
 			"witch_half_hip_end_rafter")
+		_witch_ashlar(xf, side, foot, Vector2(ridge_x, rise), station, 0.002)
 	# Each diagonal hip seam carries a timber under its actual hip plane. The
 	# clipped strips end on the shoulder and ridge edges, where the side rafters
 	# and ridge support meet them; no rectangular bar crosses either seam.
@@ -3999,6 +4002,40 @@ func _witch_rafter_foot(side: float, roof_half: float, wall_half: float,
 	var max_roof_x := wall_half - bearing_margin + normal.x * HouseGeometry.BEAM_W
 	var x := clampf(lerpf(eave_x, ridge_x, t), min_roof_x, max_roof_x)
 	return Vector2(x, _witch_roof_y(eave_x, 0.0, ridge_x, rise, x))
+
+
+## WITCH-DEEP-EAVE: the ashlar post under a gable rafter foot. A deep thatch
+## eave carries the roof plane well above the tie plate at the wall, so the
+## clamped birdsmouth seat (`_witch_rafter_foot`) leaves the rafter's lower
+## corner standing over the plate. The ashlar is a short vertical timber from
+## the plate top to the rafter underside, its top cut to the rafter's slope, so
+## the load still comes down on the plate. `foot` is the rafter's top-face foot
+## point on the roof plane; `clearance` is the member's air gap under the slab
+## (1 mm for a gable rafter, 2 mm for a half-hip strip). On an ordinary eave
+## the seat is already on the plate and nothing is emitted.
+func _witch_ashlar(xf: Transform3D, side: float, foot: Vector2, ridge: Vector2,
+		z: float, clearance: float) -> void:
+	var normal := _witch_roof_up_normal(foot, ridge)
+	var corner := foot - normal * HouseGeometry.BEAM_W - Vector2(0.0, RoofShape.DEPTH * 0.5 + clearance)
+	if corner.y - HouseGeometry.PLATE_H < WITCH_ASHLAR_MIN_GAP:
+		return
+	var direction := (ridge - foot).normalized()
+	if absf(direction.x) < 0.001:
+		return
+	var slope := direction.y / direction.x
+	var inner_x := corner.x - side * WITCH_ASHLAR_W
+	var inner_y := corner.y + (inner_x - corner.x) * slope
+	var points := PackedVector3Array([
+		xf * Vector3(corner.x, HouseGeometry.PLATE_H, z),
+		xf * Vector3(inner_x, HouseGeometry.PLATE_H, z),
+		xf * Vector3(inner_x, inner_y, z),
+		xf * Vector3(corner.x, corner.y, z),
+	])
+	component_slab("witch_ashlar", points, HouseGeometry.BEAM_D, SURF_TRIM, false)
+
+
+const WITCH_ASHLAR_W := 0.12
+const WITCH_ASHLAR_MIN_GAP := 0.01
 
 
 func _witch_roof_y(eave_x: float, eave_y: float, ridge_x: float, rise: float, x: float) -> float:

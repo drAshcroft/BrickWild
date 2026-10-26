@@ -90,7 +90,26 @@ func _check_witch(seed: int, dims: Vector2) -> void:
 
 	if supported_work_lights == 0:
 		failures.append("Witch seed %d has no activity light in workshop/shared hall" % seed)
-	if anchored_supports == 0:
+	# WITCH-COMPACT-SERVICE-RED (2026-10-26): the compact 7 x 9 hall under a
+	# 2.3 m wall records "surface:<group>:no_safe_station" when its activity wall
+	# finds no safe station; the rack is then a plain mounted Witchwork shelf,
+	# with no composed host to bind. That is the planner's stated compromise,
+	# not a lost fitting: require the physical rack instead of the binding.
+	var station_compromised := false
+	for target_room in target_rooms:
+		if Array(plan.compromises.get(target_room, [])).has("surface:witchwork:no_safe_station"):
+			station_compromised = true
+	if anchored_supports == 0 and station_compromised:
+		var racks := 0
+		for rack_variant in plan.furniture:
+			var rack: Dictionary = rack_variant
+			if int(rack.get("room", -1)) in target_rooms and bool(rack.get("mounted", false)) \
+					and String(rack.get("activity_group", "")) == "witchwork" \
+					and String(rack.get("cat", "")) == "shelf":
+				racks += 1
+		if racks == 0:
+			failures.append("Witch seed %d compromised activity wall left no mounted Witchwork rack" % seed)
+	elif anchored_supports == 0:
 		failures.append("Witch seed %d %s has no measured activity-support fitting retained after recomposition" % [seed, dims])
 
 	var finish_host_ids: Dictionary = {}

@@ -252,9 +252,15 @@ const STYLES := {
 		# WITCH-ROOF: a hut has neither jetty nor dormers (0.0 keeps the draw order);
 		# a deep thatch eave and verge.
 		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.6, "stone_ground": 0.05,
-		# (A deeper eave than the ordinary 0.35 m breaks the rafter birdsmouth seat on
-		# the 0.2 m tie plate -- 0.42 already does; see docs/HOUSES.md WITCH-ROOF.)
+		# WITCH-DEEP-EAVE: a deep thatch eave. The roof plane then stands well
+		# above the 0.2 m tie plate at the wall, so each gable rafter foot is
+		# carried down to the plate by an ashlar post (HouseBuilder._witch_ashlar).
+		"span_out": 0.6,
 		"chimney_style": &"stepped", "pots": [1, 1],
+		# WITCH-REVIEW-FOLLOWUPS: glazed, mullioned windows read as a tidy
+		# cottage. A hut's windows are shuttered holes (no glass, no mullion,
+		# no stone hood); the small gable casement keeps its own light.
+		"unglazed": true,
 	},
 	&"rich": {
 		"label": "Rich House",

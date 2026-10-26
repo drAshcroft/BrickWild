@@ -271,6 +271,51 @@ static func broom_node(rec: Dictionary, node_name: String) -> Node3D:
 	band_node.material_override = cord
 	band_node.transform = Transform3D(basis, base + axis * (BRISTLE_HEIGHT * 0.7))
 	root.add_child(band_node)
+	_add_twigs(root, basis, base, straw)
 	root.set_meta("foot", base)
 	root.set_meta("tip", base + axis * length)
 	return root
+
+
+## WITCH-REVIEW-FOLLOWUPS: a smooth cone read as "a cone on a stick". A ring of
+## loose twigs lies over the flare, each from the binding to just past the
+## cone's foot, splayed a little and of uneven length, in a darker straw. They
+## stay inside the cone's own footprint plus TWIG_SPLAY, so the broom's plan
+## rect (FOOT_DEPTH x FOOT_WIDTH) still holds it. No randomness: the pattern is
+## a fixed function of the twig index, so a broom is the same every build.
+const TWIG_COUNT := 18
+const TWIG_RADIUS := 0.0045
+const TWIG_SPLAY := 0.012
+
+static func _add_twigs(root: Node3D, basis: Basis, base: Vector3,
+		straw: StandardMaterial3D) -> void:
+	var twig_mat := StandardMaterial3D.new()
+	twig_mat.albedo_color = straw.albedo_color.darkened(0.25)
+	twig_mat.roughness = 1.0
+	var twig := CylinderMesh.new()
+	twig.top_radius = TWIG_RADIUS * 0.6
+	twig.bottom_radius = TWIG_RADIUS
+	twig.radial_segments = 4
+	twig.rings = 1
+	var top_y := BRISTLE_HEIGHT * 0.7
+	for i in TWIG_COUNT:
+		var angle := TAU * float(i) / float(TWIG_COUNT) + 0.21 * float(i % 3)
+		var radial := Vector3(cos(angle), 0.0, sin(angle))
+		var foot_r := BRISTLE_RADIUS + TWIG_SPLAY * float((i * 7) % 5) / 4.0
+		var top_local := radial * (HANDLE_RADIUS * 1.8) + Vector3.UP * top_y
+		var foot_local := radial * foot_r + Vector3.UP * TWIG_RADIUS
+		var a := base + basis * top_local
+		var b := base + basis * foot_local
+		var along := a - b
+		var length := along.length()
+		var y_axis := along / length
+		var x_axis := y_axis.cross(Vector3.FORWARD if absf(y_axis.z) < 0.9 else Vector3.RIGHT).normalized()
+		var z_axis := x_axis.cross(y_axis).normalized()
+		var mesh := twig.duplicate() as CylinderMesh
+		mesh.height = length
+		var node := MeshInstance3D.new()
+		node.name = "Twig%d" % i
+		node.mesh = mesh
+		node.material_override = twig_mat
+		node.transform = Transform3D(Basis(x_axis, y_axis, z_axis), (a + b) * 0.5)
+		root.add_child(node)
