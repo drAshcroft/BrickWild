@@ -1153,7 +1153,14 @@ not this ticket's: it reads the same at the commit before.
   span being under 3 m). `_main_x` scores every through-road vertex between
   0.1 and 0.9 of the site at 0.6 or worse (sea and cliff north of the road
   in this yaw), so a wider window does not help; the lever is the siting yaw
-  or the side of the road: VTER-DISPERSED-MAIN-SEAT;
+  or the side of the road: VTER-DISPERSED-MAIN-SEAT. Taken 2026-10-26:
+  `VillageDispersedForm._turned` scores the best seat on both sides of the
+  road and, when the south is cheaper by `TURN_MARGIN` (0.15), re-views the
+  caller's grid at yaw + 180 and plans there. Monemvasia's site plan turns
+  (170.6 -> 350.6) and its main common falls from 49.9 % to 26.7 %; Ushguli,
+  Rubanda, valley and spur keep their yaw. The lot plan and `common_ground`
+  on Monemvasia are NOT yet measured: the sweep timed out at 500 s on a
+  loaded host (it planned in 18-161 s before);
 * ~~**the church on the steepest hillsides**~~ -- VTER-PLACE-STEEP, below;
 * **the mill at the valley floor** -- the race is graded and the rule
   checks the mill is low, but a `river` spec's water is still laid where the
