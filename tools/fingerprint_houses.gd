@@ -60,6 +60,11 @@ func _plan_text(plan: HousePlan) -> String:
 		var key := String(prop["name"])
 		if not (int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE) or key == "spec":
 			continue
+		# A field added after the base checkout (HS-LONGHALL `longhall`, HS-ROUNDHOUSE `roundhouse`, HS-PUEBLO `terraces` and `ladders`) is empty
+		# for every plan that does not use it; leave an empty one out so the two
+		# checkouts hash the same text.
+		if key in ["longhall", "engawa", "entry_steps", "roundhouse", "terraces", "ladders"] and plan.get(key).is_empty():
+			continue
 		rows[key] = plan.get(key)
 	return ("%s" % var_to_str(rows)).md5_text()
 

@@ -56,6 +56,7 @@ static func plan(spec: ShopSpec) -> HousePlan:
 	if front >= 0:
 		_cut_shopfront(out, spec, front)
 		_light_workshops(out, spec)
+		_hold_the_fire_wall(out, spec, front)
 		_choose_focus(out, spec, front)
 		if spec.business == &"library":
 			_pin_library_focus_to_daylight(out, front)
@@ -459,31 +460,145 @@ static func _light_workshops(out: HousePlan, spec: ShopSpec) -> void:
 	for room in range(out.room_count()):
 		if out.kind_of(room) != &"workshop":
 			continue
-		var windows := out.windows_of(room)
-		if windows.is_empty():
+		_cross_light_workshop(out, spec, room)
+
+
+static func _cross_light_workshop(out: HousePlan, spec: ShopSpec, room: int) -> void:
+	var windows := out.windows_of(room)
+	if windows.is_empty():
+		return
+	var first := Vector2(out.windows[windows[0]].normal)
+	for index in windows:
+		if absf(Vector2(out.windows[index].normal).dot(first)) < 0.5:
+			return # already lit from two sides
+	var rect: Rect2 = out.rooms[room].rect
+	# The chimney wall was chosen, before this, for the clear run its fire
+	# needs. Light the workshop from another wall first, and glaze the
+	# chimney wall only if the fire still fits beside the new window: a
+	# smithy cross-lit through its forge's wall has no forge (shoptrade
+	# blacksmith 11x15 seed 8102; LIVE-SHOPS).
+	var walls: Array = HouseGeometry.room_walls(out, room)
+	var order: Array[int] = []
+	var fire_wall := out.hearth_wall() if out.hearth_room() == room else -1
+	for wi in range(walls.size()):
+		if wi != fire_wall:
+			order.append(wi)
+	if fire_wall >= 0:
+		order.append(fire_wall)
+	for wi in order:
+		var wall: Dictionary = walls[wi]
+		var normal := -Vector2(wall.normal)
+		if absf(normal.dot(first)) > 0.5:
 			continue
-		var first := Vector2(out.windows[windows[0]].normal)
-		var cross_lit := false
-		for index in windows:
-			if absf(Vector2(out.windows[index].normal).dot(first)) < 0.5:
-				cross_lit = true
-		if cross_lit:
+		var horizontal := absf(normal.y) > 0.5
+		var line: float = wall.from.y if horizontal else wall.from.x
+		if not HouseGeometry.is_exterior_edge(spec, 1 if horizontal else 0, line):
 			continue
-		var rect: Rect2 = out.rooms[room].rect
-		for wall in HouseGeometry.room_walls(out, room):
-			var normal := -Vector2(wall.normal)
-			if absf(normal.dot(first)) > 0.5:
-				continue
-			var horizontal := absf(normal.y) > 0.5
-			var line: float = wall.from.y if horizontal else wall.from.x
-			if not HouseGeometry.is_exterior_edge(spec, 1 if horizontal else 0, line):
-				continue
-			var side := {"normal": normal, "line": line,
-				"t0": rect.position.x if horizontal else rect.position.y,
-				"t1": rect.end.x if horizontal else rect.end.y}
-			HousePlanOpenings.windows_along(out, spec, room, side, INF, windows.size() + 1)
-			if out.windows_of(room).size() > windows.size():
-				break
+		var side := {"normal": normal, "line": line,
+			"t0": rect.position.x if horizontal else rect.position.y,
+			"t1": rect.end.x if horizontal else rect.end.y}
+		var had := out.windows.duplicate()
+		HousePlanOpenings.windows_along(out, spec, room, side, INF, windows.size() + 1)
+		if wi == fire_wall and HousePlanFeatures._clear_wall_run(out, room, wi) \
+				< HousePlanFeatures.hearth_run_needed(spec, out):
+			out.windows = had
+		if out.windows_of(room).size() > windows.size():
+			break
+
+
+## The fire comes before the workshop's own back door.
+##
+## A smithy's forge stands on the chimney wall, and the chimney wall is an
+## outside wall of the front room. On a small plan that wall can be left with
+## no stretch long enough for the fire: the house planner hangs the workshop's
+## back door at the corner nearer the street door, and the swing of that door
+## eats the last 0.85 m of the only outside wall -- the same wall that already
+## carries the room's one window beside the shopfront. The forge then has
+## nowhere to stand and the smithy loses its fire (shoptrade blacksmith 9x12
+## seed 1; LIVE-SHOPS).
+##
+## The plan owns the fire, so the plan gives way, not the door's landlord: the
+## interior door that crowds the fire wall is re-hung at the far end of its own
+## partition, and the hearth is elected again over the new spans. Nothing moves
+## unless the shop cannot hold its fire as drawn, so a shop that already works
+## keeps the plan it had.
+static func _hold_the_fire_wall(out: HousePlan, spec: ShopSpec, front: int) -> void:
+	if out.hearth_room() != front or out.hearth_wall() < 0:
+		return
+	var need := HousePlanFeatures.hearth_run_needed(spec, out)
+	var fire_wall := out.hearth_wall()
+	var fire: Dictionary = HouseGeometry.room_walls(out, front)[fire_wall]
+	var fire_horizontal := absf(Vector2(fire.normal).y) > 0.5
+	var fire_line: float = float(fire.from.y) if fire_horizontal else float(fire.from.x)
+	var span := HousePlanFeatures.clear_wall_span(out, front, fire_wall)
+	if span.y - span.x >= need:
+		return
+	for door_index in out.doors_of(front).duplicate():
+		var door: Dictionary = out.doors[door_index]
+		if bool(door.get("exterior", false)) or int(door.get("b", -1)) < 0:
+			continue
+		# A door in a wall ACROSS the fire wall is the one whose swing can take
+		# the end of it; a door in the fire wall's own stretch cannot be slid
+		# along it to help.
+		if (absf(Vector2(door.normal).y) > 0.5) == fire_horizontal:
+			continue
+		var across: float = float(door.pos.y) if fire_horizontal else float(door.pos.x)
+		if absf(across - fire_line) > HouseGeometry.DOOR_CLEAR + 0.6:
+			continue
+		var was := Vector2(door.pos)
+		if not _rehang_door_away_from(out, door_index, fire_line):
+			continue
+		HousePlanFeatures.choose_hearth(out, spec)
+		if out.hearth_room() == front and out.hearth_wall() >= 0:
+			var moved := HousePlanFeatures.clear_wall_span(out, front, out.hearth_wall())
+			if moved.y - moved.x >= need:
+				return
+		# This door was not the obstruction. Put it back and leave the plan
+		# exactly as the house planner drew it.
+		out.doors[door_index]["pos"] = was
+		HousePlanFeatures.choose_hearth(out, spec)
+
+
+## Re-hang an interior door at the end of its own partition furthest from
+## `away_from`, a coordinate measured along that partition's run. The move
+## keeps the door on the same two rooms and the same wall, and refuses when
+## the partition is too short or another door already holds that end.
+static func _rehang_door_away_from(out: HousePlan, door_index: int, away_from: float) -> bool:
+	var door: Dictionary = out.doors[door_index]
+	var edge := HousePlanOpenings.shared_edge(out, int(door["a"]), int(door["b"]))
+	if edge.is_empty():
+		return false
+	var runs_y: bool = Vector2(edge[0]).x > 0.5
+	var t0: float = float(edge[2])
+	var t1: float = float(edge[3])
+	var width: float = float(door["width"])
+	var margin: float = HouseGeometry.DOOR_CORNER_MARGIN + width * 0.5 + 0.01
+	if t1 - t0 < margin * 2.0:
+		return false
+	var at: float = float(door.pos.y) if runs_y else float(door.pos.x)
+	var across: float = float(door.pos.x) if runs_y else float(door.pos.y)
+	var towards_t1: bool = absf(t1 - away_from) > absf(away_from - t0)
+	var t: float = (t1 - margin) if towards_t1 else (t0 + margin)
+	if absf(t - at) < 0.01:
+		return false
+	# Another door already on this partition would share the stretch we are
+	# moving into.
+	for other_index in range(out.doors.size()):
+		if other_index == door_index:
+			continue
+		var other: Dictionary = out.doors[other_index]
+		if HousePlan.record_storey(other) != HousePlan.record_storey(door):
+			continue
+		if Vector2(other.normal).dot(Vector2(door.normal)) < 0.99:
+			continue
+		var other_at: float = float(other.pos.y) if runs_y else float(other.pos.x)
+		var other_across: float = float(other.pos.x) if runs_y else float(other.pos.y)
+		if absf(other_across - across) > 0.01:
+			continue
+		if absf(other_at - t) < (width + float(other.width)) * 0.5 + HouseGeometry.DOOR_CORNER_MARGIN:
+			return false
+	out.doors[door_index]["pos"] = Vector2(across, t) if runs_y else Vector2(t, across)
+	return true
 
 
 ## A reader starts with the book by the light. Pin the first lectern to a
@@ -692,10 +807,25 @@ static func _choose_focus(out: HousePlan, spec: ShopSpec, front: int) -> void:
 		facing = door_n
 		out.focus = HousePlanFeatures.focus_in_room(out, front, cat, facing, faces_door)
 		var depth: float = f.size.y if absf(door_n.y) > 0.5 else f.size.x
-		var pos: Vector2 = door_pos - door_n * (depth / 2.0)
+		# The middle of a shallow room is still the way in: a stall set there in
+		# a 3.6 m stable stood 0.75 m inside the strip a person walks through
+		# from the front door (CASTLE-CHANGE-17). The focus keeps its way in
+		# clear, and the furnisher pins the piece to that spot.
+		var back: float = maxf(depth / 2.0,
+			HouseGeometry.ENTRY_APPROACH + _focus_half_depth(choices))
+		var pos: Vector2 = door_pos - door_n * back
 		out.focus["pos"] = Vector2(clampf(pos.x, f.position.x + 1.0, f.end.x - 1.0),
 			clampf(pos.y, f.position.y + 1.0, f.end.y - 1.0))
 		return
 	elif out.hearth_room() == front and out.hearth_wall() >= 0:
 		facing = HouseGeometry.room_walls(out, front)[out.hearth_wall()]["normal"]
 	out.focus = HousePlanFeatures.focus_in_room(out, front, cat, facing, faces_door)
+
+
+## Half the depth of the deepest model of the focus category, so a shallow
+## room can stand the piece clear of its front door whichever key is chosen.
+static func _focus_half_depth(choices: Array[String]) -> float:
+	var deepest := 0.0
+	for key in choices:
+		deepest = maxf(deepest, PropCatalog.footprint(key).y)
+	return deepest * 0.5

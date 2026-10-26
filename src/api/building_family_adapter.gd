@@ -175,8 +175,11 @@ class PlanFamily extends BuildingFamilyAdapter:
 		return plan_quality_report(building.plan)
 
 	func footprint(building) -> Rect2:
-		return HouseGeometry.storey_rect(building.plan,
-			maxi(building.plan.spec.storeys - 1, 0)).grow(-HouseGeometry.wall_thickness(building.plan.spec))
+		# HS-PUEBLO: a stepped house stands on its ground storey; the storeys above
+		# are drawn in from it
+		var level: int = 0 if building.plan.spec.terraced else maxi(building.plan.spec.storeys - 1, 0)
+		return HouseGeometry.storey_rect(building.plan, level).grow(
+			-HouseGeometry.wall_thickness(building.plan.spec))
 
 	## `HousePlan.entrance()`'s own door position: the plan says where the
 	## front door is, and the builder cuts it there.
@@ -341,6 +344,16 @@ class ChurchFamily extends BuildingFamilyAdapter:
 		for d in ChurchGeometry.west_door_layout(church):
 			doors.append({"pos": Vector2(float(d.x), ChurchGeometry.west_door_z(church)),
 				"normal": Vector2(0.0, -1.0), "front": true})
+		# On falling ground the terrace is the floor outside the doors and its
+		# west flight is the way down (VTER-HOUSE-SLOPE). Flat: no key at all.
+		if GroundFall.of_spec(church) != null:
+			var builder := ChurchBuilder.new()
+			builder.build(church)
+			if not builder.terrace_flight.is_empty():
+				for door in doors:
+					var route: Array = [Vector3(door["pos"].x, 0.0, door["pos"].y)]
+					route.append_array(builder.terrace_flight["route"])
+					door["route"] = route
 		var focus: Array = []
 		var altar: Rect2 = altar_rect(church)
 		if altar.size.x > 0.0:
@@ -537,6 +550,14 @@ class WindmillFamily extends BuildingFamilyAdapter:
 
 	func build_mesh(building) -> ArrayMesh:
 		return WindmillBuilder.new().build(building.spec as WindmillSpec)
+
+	## The miller's own floor: the burr floor of a post mill, the ground floor of
+	## a tower, smock or paddle mill. A windpump is a lattice and publishes none.
+	func walk_sources(building) -> Dictionary:
+		return WindmillGeometry.walk_sources(building.spec as WindmillSpec)
+
+	func walk_frame(building) -> Dictionary:
+		return WindmillGeometry.walk_frame(building.spec as WindmillSpec)
 
 	func instantiate(building, _cutaway: bool) -> Node3D:
 		return WindmillAssembler.build(building.spec as WindmillSpec)
@@ -845,3 +866,15 @@ static func _copy_size_and_style(request: BuildingRequest, spec: RefCounted) -> 
 static func _copy_orientation_and_period(request: BuildingRequest, spec: RefCounted) -> void:
 	spec.set("orientation", request.orientation)
 	spec.set("period", request.period)
+	# Only the specs that declare the ground take it (house, shop, church,
+	# castle);
+	# validate() has already refused a fall for any other kind.
+	if "ground_fall" in spec:
+		spec.set("ground_fall", request.ground_fall_m)
+		spec.set("ground_downhill_deg", request.ground_downhill_deg)
+	# piles over water: houses and shops only (validate() refuses the rest)
+	if "foundation" in spec:
+		spec.set("foundation", request.foundation)
+		spec.set("pile_water", request.pile_water_m)
+		spec.set("pile_freeboard", request.pile_freeboard_m)
+		spec.set("pile_deck", request.pile_deck_m)

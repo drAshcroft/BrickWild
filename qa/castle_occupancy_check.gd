@@ -106,8 +106,83 @@ static func check(spec: CastleSpec, builder: CastleBuilder, mesh: ArrayMesh,
 			# is a generic family name such as "range", "wing" or "tower".
 			if id != "curtain":
 				_fail(out, id, "building window host has no occupied interior record")
+	for id in unreachable_ranges(builder):
+		_fail(out, id, "occupied range has no way in from the gate: every entrance opens onto another range")
 	out.ok = out.failures.is_empty()
 	return out
+
+
+## A body that walks in through the gate must be able to reach every occupied
+## range through the doors the plans actually record. An exterior door links its
+## range to the range whose footprint the doorway opens onto, or to the ward when
+## it opens onto open ground. A pair of ranges whose only doors open on each
+## other is sealed from the ward, and no single-range check sees it: each range
+## has an entrance and the entrances are the fault (bavarian 55x50 seed 3, where
+## the chapel's only way in was its own apse).
+##
+## A range with no exterior door of its own is an annex entered through its
+## host -- a wing jog, a range's internal bay -- and is not reported; the host
+## is. Mural towers and gate chambers are entered from the wall walk, which is
+## CastleRouteCheck's route, not the ward's.
+static func unreachable_ranges(builder: CastleBuilder) -> Array[String]:
+	var rows: Array[Dictionary] = []
+	for row in builder.interiors:
+		var plan: HousePlan = row.get("plan")
+		if plan == null or plan.spec == null or plan.rooms.is_empty():
+			continue
+		if not row.get("transform") is Transform3D:
+			continue
+		if bool(row.get("mural_tower", false)) or bool(row.get("gate_chamber", false)):
+			continue
+		rows.append(row)
+	var ways_in: Array = []
+	for i in rows.size():
+		var links: Array[int] = []
+		for door in (rows[i].plan as HousePlan).doors:
+			if not bool(door.get("exterior", false)) or bool(door.get("secret", false)):
+				continue
+			links.append(_range_opened_on(rows, i, door))
+		ways_in.append(links)
+	var reached := {}
+	for i in rows.size():
+		if (ways_in[i] as Array).has(-1):
+			reached[i] = true
+	var grew := true
+	while grew:
+		grew = false
+		for i in rows.size():
+			if reached.has(i):
+				continue
+			for host in ways_in[i]:
+				if int(host) >= 0 and reached.has(int(host)):
+					reached[i] = true
+					grew = true
+					break
+	var out: Array[String] = []
+	for i in rows.size():
+		if reached.has(i) or (ways_in[i] as Array).is_empty():
+			continue
+		out.append(String(rows[i].id))
+	return out
+
+
+## The index of the range the doorway opens onto, or -1 for the ward.
+static func _range_opened_on(rows: Array[Dictionary], from_index: int, door: Dictionary) -> int:
+	var row: Dictionary = rows[from_index]
+	var plan: HousePlan = row.plan
+	var xf: Transform3D = row.transform
+	var normal := Vector2(door.normal).normalized()
+	var half := HouseGeometry.wall_thickness(plan.spec) * 0.5
+	var local := Vector2(door.pos) + normal * (half + 0.6)
+	var world: Vector3 = xf * Vector3(local.x, 0.0, local.y)
+	var at := Vector2(world.x, world.z)
+	for j in rows.size():
+		if j == from_index:
+			continue
+		var b: AABB = rows[j].bounds
+		if Rect2(b.position.x, b.position.z, b.size.x, b.size.z).has_point(at):
+			return j
+	return -1
 
 
 static func _check_record(out: Dictionary, id: String, row: Dictionary,
@@ -158,7 +233,7 @@ static func _check_record(out: Dictionary, id: String, row: Dictionary,
 		var found := false
 		for part in builder.part_log:
 			if String(part.get("tag", "")) == id \
-					and String(part.get("opening_kind", "")) == "window" \
+					and String(part.get("opening_kind", "")) == ("hatch" if bool(window.get("hatch", false)) else "window") \
 					and _matches(opening, part):
 				found = true
 				break
@@ -475,3 +550,4 @@ static func _nearby(geometry: Dictionary, bounds: AABB) -> Array:
 
 static func _fail(out: Dictionary, id: String, reason: String) -> void:
 	out.failures.append("occupied_shells[%s]: %s" % [id, reason])
+

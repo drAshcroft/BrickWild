@@ -12,7 +12,9 @@ var seed: int
 var rng: RandomNumberGenerator
 
 # ---- user-specified (never randomized) ----
-var style: StringName = &"cottage"
+var style: StringName = &"cottage":
+	set(value):
+		style = canonical_style(value)
 var trade: StringName = &"none"   # what the household does for a living
 var width: float = 8.0            # X, metres, outside face to outside face
 var length: float = 10.0          # Z
@@ -85,7 +87,36 @@ var veranda: bool = false          # a roofed open platform on the entrance wall
 var veranda_depth: float = 1.5     # how far the platform reaches out
 var eave_sweep: bool = false       # the eave flicks up at its four corners
 var thatch_roll: bool = false      # a combed ridge roll and a thick eave roll
+var eyebrows: int = 0              # HS-THATCH: eyebrow dormers swept out of the thatch (no draw; a style row number)
 var corner_piers: bool = false     # rounded mud-brick corners
+## HS-MINKA (no draw; style row numbers). The floor stands `floor_raise` metres
+## above the ground it is built on: local y = 0 stays the floor's underside, and
+## the ground, the yard and the entry steps are `floor_raise` BELOW it (the
+## assembler lifts the house by that much so the ground lands at the root's y =
+## 0). `engawa` is the long-side veranda at floor level, `engawa_depth` its reach.
+var floor_raise: float = 0.0
+var engawa: bool = false
+var engawa_depth: float = 1.2
+## HS-SAHEL (no draw; style row flags). `sahel`: buttresses, toron beams and the
+## decorated entry (HouseSahel). `unglazed`: a window is an open aperture, with
+## no glass. `court_ranges`: the walled court has a flat-roofed range along each
+## side (HouseYard).
+var sahel: bool = false
+var unglazed: bool = false
+var court_ranges: bool = false
+## Parts of the Sahel vocabulary to leave out ("buttress", "toron", "entry"):
+## only the focused test's negative controls set it.
+var sahel_skip: PackedStringArray = PackedStringArray()
+## HS-PUEBLO (no draw; style row flags and the clamp in HousePueblo). `terraced`:
+## each upper storey is set back from the one below, the roof of every storey but
+## the last is a walkable terrace behind a parapet, a ladder climbs to each, and
+## the roof beams (vigas) stand out of the walls (HousePueblo). `small_openings`:
+## doors and windows are small and deep in the thick wall. `pueblo_skip` names parts
+## to leave out ("viga", "ladder", "terrace", "parapet", "gap"): only the focused
+## test's negative controls set it.
+var terraced: bool = false
+var small_openings: bool = false
+var pueblo_skip: PackedStringArray = PackedStringArray()
 ## How far the roof oversails its walls. Negative means HouseGeometry's
 ## ordinary 0.35 m / 0.25 m, and the bound reads the resolved value from
 ## there, so a deep-eaved house cannot be looser than the eave it built.
@@ -96,6 +127,20 @@ var material: StringName = &"timber" # timber | stone
 ## Site frame metadata. These do not participate in seeded plan generation.
 var orientation: float = 0.0
 var period: int = 1200
+## Falling ground (VTER-HOUSE-SLOPE): metres of fall across the footprint and
+## the downhill direction in the house's own frame (0 = toward the front, -Z;
+## 90 = toward +X). Zero is flat ground, and a flat house is untouched. Never
+## drawn from `rng`. See GroundFall and HouseSlope.
+var ground_fall: float = 0.0
+var ground_downhill_deg: float = 0.0
+## Standing on piles over water (VTER-FORM-WATER): `&""` the ground, or
+## `&"piles"`; the water's depth, the floor's height over the water (0: the
+## default) and the landing's reach from the entrance wall (0: the default).
+## Never drawn from `rng`. See HousePiles.
+var foundation: StringName = &""
+var pile_water: float = 0.0
+var pile_freeboard: float = 0.0
+var pile_deck: float = 0.0
 ## Optional explicit masonry thickness for non-house shells.  Castle plans
 ## carry their measured shell thickness here; the negative value preserves the
 ## historical material-derived default for ordinary houses.
@@ -118,13 +163,20 @@ const TRADES := {
 	&"scholar": {"label": "Scholar", "room": &"parlour", "extra": ["bookcase", "lectern"]},
 }
 
+## Old names for styles that were renamed (HS-ROUNDHOUSE: `mud_hut` is the
+## `roundhouse`). The `style` property resolves through this, so an old request,
+## fixture or saved file builds the same house under the new name.
+const STYLE_ALIASES := {&"mud_hut": &"roundhouse"}
+
 const STYLES := {
 	&"cottage": {
 		"label": "Cottage",
 		# A small household first: shared sleeping, cooking and sitting spaces.
 		"domestic_program": [&"hall", &"bedroom", &"kitchen", &"bedroom", &"store", &"parlour"],
 		"timber": 0.95, "studs": [0.95, 1.5], "braces": 0.8, "rail": 0.5,
-		"roof_pitch": [0.85, 1.2], "porch": 0.5, "chimney": 0.9, "shutters": 0.7,
+		"roof_pitch": [0.85, 1.2], "porch": 1.0, "chimney": 1.0, "shutters": 0.7,
+		# HS-COTTAGE: a sheltered door and a hearth stack are traits, not chances. 1.0
+		# still draws, so no later roll in the stream moves.
 		"roof_material": &"shingle", "pitch_reference": 7.0,
 		"wall": ["e6ddc8", "cfc3a8"], "trim": ["6b5236", "4a3826"],
 		"roof": ["6a4a34", "4e3626"], "floor": ["8a7a5e", "6f6148"],
@@ -163,6 +215,8 @@ const STYLES := {
 		"framing": [&"close_studding", &"saltire"], "truss": [&"queen_post", &"collar_strut"],
 		"jetty": 0.9, "dormers": 0.6, "bargeboards": 0.95, "stone_ground": 0.35,
 		"chimney_style": &"stepped", "pots": [1, 2],
+		# HS-TOWNHOUSE: tall and narrow, never one storey (style constant, no draw).
+		"min_storeys": 2, "beds_upstairs": true,
 	},
 	&"longhall": {
 		"label": "Long Hall",
@@ -182,17 +236,24 @@ const STYLES := {
 	},
 	&"witch_hut": {
 		"label": "Witch's Hut",
-		# A working room and records belong to the household's craft.
-		"domestic_program": [&"hall", &"bedroom", &"kitchen", &"workshop", &"records", &"store"],
+		# A hut is small (WITCH-SIZE): at most three rooms. The kitchen names
+		# the cooking, eating and brewing the main room carries (the planner
+		# merges it into the hall); then a sleeping room or nook. The compact
+		# planner adds the optional dry store as the third room.
+		"domestic_program": [&"hall", &"kitchen", &"bedroom"],
 		"timber": 0.8, "studs": [0.8, 1.4], "braces": 0.6, "rail": 0.5,
 		"roof_pitch": [1.2, 1.7], "porch": 1.0, "chimney": 1.0, "shutters": 0.6,
 		"roof_material": &"thatch", "pitch_reference": 8.0, "pitch_exponent": 0.8,
 		"wall": ["87684b", "73563e"], "trim": ["402a1b", "2f1f14"],
-		"roof": ["2B3034", "1E2227"], "floor": ["6c6250", "51493c"],
+		"roof": ["8a7648", "6f5d38"], "floor": ["6c6250", "51493c"],
 		"clutter": [0.75, 1.0],
 		"plinth": [0.25, 0.45], "roof_types": [&"gable"],
 		"framing": [&"arch_brace", &"square_panel"], "truss": [&"king_post"],
-		"jetty": 0.2, "dormers": 0.2, "bargeboards": 0.6, "stone_ground": 0.05,
+		# WITCH-ROOF: a hut has neither jetty nor dormers (0.0 keeps the draw order);
+		# a deep thatch eave and verge.
+		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.6, "stone_ground": 0.05,
+		# (A deeper eave than the ordinary 0.35 m breaks the rafter birdsmouth seat on
+		# the 0.2 m tie plate -- 0.42 already does; see docs/HOUSES.md WITCH-ROOF.)
 		"chimney_style": &"stepped", "pots": [1, 1],
 	},
 	&"rich": {
@@ -213,6 +274,11 @@ const STYLES := {
 		# of these is an ordinary house, whatever its name.
 		"cornice": 1.0, "string_courses": [1, 2], "pediments": 0.85,
 		"ridge_finial": 1.0, "min_storeys": 2,
+		# HS-RICH: a hall that holds the stair, then a parlour and a dining
+		# room of their own. Style constants, no random draw: one more room
+		# than the floor area asks for, and a table laid for four.
+		"domestic_program": [&"hall", &"kitchen", &"parlour", &"dining_room"],
+		"dining_seats": 4, "sitting_group": true,
 	},
 	&"mediterranean": {
 		"label": "Mediterranean House",
@@ -221,7 +287,12 @@ const STYLES := {
 		# elevation is read from its shutters, its deep eave and its terrace
 		# wall, not from studs.
 		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
-		"roof_pitch": [0.5, 0.75], "porch": 0.35, "chimney": 0.45, "shutters": 0.9,
+		# HS-MEDITERRANEAN: the roof is LOW (0.32..0.44 is 18 to 24 degrees on
+		# the roof face, under the 25 the trait asks; the old 0.5..0.75 was 27
+		# to 36), the shade at the door is a loggia (the veranda, always) and
+		# not a porch pail's worth of porch, and the rear door opens on a walled
+		# court (HouseYard `court`). Same draws as before: only the numbers moved.
+		"roof_pitch": [0.32, 0.44], "porch": 0.0, "chimney": 0.45, "shutters": 0.9,
 		"wall": ["f2e8d4", "e0cfae"], "trim": ["2f6b63", "1d4a43"],
 		"roof": ["b4622f", "8d4722"], "floor": ["bcab89", "9c8a6b"],
 		"clutter": [0.35, 0.7],
@@ -231,48 +302,58 @@ const STYLES := {
 		"chimney_style": &"straight", "pots": [1, 2],
 		"roof_material": &"tile", "pitch_reference": 9.0,
 		"wall_t": 0.45, "culture": 1.0,
-		"parapet": 0.7, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"parapet": 0.7, "veranda": 1.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
 		"corner_piers": 0.0, "span_out": 0.55, "along_out": 0.45,
 	},
 	&"asian": {
-		"label": "Asian Timber House",
-		# A boarded shell standing clear of the wet ground, under one very
-		# deep roof whose corners flick up. The veranda and the eave sweep are
-		# not decoration on this style; they are the house, and a plan without
-		# them is a shed with a hat on.
+		"label": "Japanese Minka",
+		# HS-MINKA. A timber house standing on a stone plinth whose floor is
+		# raised clear of the ground (`raised_floor`: the plinth draw becomes the
+		# floor's height), under an irimoya roof -- a gable on a hipped skirt --
+		# whose deep eaves cover the engawa, the veranda that runs along one
+		# long side. The long side that carries it is fitted with sliding
+		# lattice screens and the main room opens through them onto the garden.
 		"timber": 0.85, "studs": [0.9, 1.3], "braces": 0.7, "rail": 0.8,
-		"roof_pitch": [0.95, 1.3], "porch": 0.0, "chimney": 0.15, "shutters": 0.0,
+		"roof_pitch": [0.8, 1.0], "porch": 0.0, "chimney": 0.0, "shutters": 0.0,
 		"wall": ["dccfab", "c2b189"], "trim": ["6b4a2f", "47301c"],
 		"roof": ["3f4a44", "2b3430"], "floor": ["a08a63", "857050"],
 		"clutter": [0.3, 0.65],
-		"plinth": [0.6, 0.95], "roof_types": [&"hipped"],
+		"plinth": [0.45, 0.6], "roof_types": [&"irimoya"],
 		"framing": [&"square_panel", &"arch_brace"], "truss": [&"king_post", &"queen_post"],
 		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
 		"chimney_style": &"straight", "pots": [1, 1],
 		"roof_material": &"tile", "pitch_reference": 8.0,
 		"wall_t": 0.3, "culture": 1.0,
-		"parapet": 0.0, "veranda": 1.0, "eave_sweep": 1.0, "thatch_roll": 0.0,
-		"corner_piers": 0.0, "span_out": 0.95, "along_out": 0.85,
+		"parapet": 0.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"corner_piers": 0.0, "span_out": 1.0, "along_out": 0.9,
+		"raised_floor": true, "engawa": 1.0, "engawa_depth": 0.8,
 	},
 	&"african": {
-		"label": "African Compound House",
-		# Thick ochre daub over a rubble core, combed reed over it, and a
-		# shaded veranda to sit out the heat under. No chimney: the smoke
-		# leaves by the roof, which is why the hearth is in the middle of the
-		# floor and not against a wall.
+		"label": "Sahel Courtyard House",
+		# HS-SAHEL. A banco (sun-dried mud brick) house of the Sahel, as at
+		# Djenne: flat-roofed rooms, a level roof behind a parapet, thick mud walls
+		# stiffened by buttresses (pilasters) and bristling with toron -- the
+		# palm-wood stakes that stay in the wall so the plasterers can climb it every
+		# year -- and an entry set between two pinnacled pilasters, with a relief
+		# frame round the door. The rooms stand round a walled court (HouseYard
+		# `court`) whose sides are flat-roofed ranges. There is no chimney (the
+		# hearth is in the court) and no glass: a window is an open aperture.
+		# Only numbers moved: the same draws are consumed (roof type, veranda and
+		# thatch chances are rolled and are now 1.0 / 0.0).
 		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
-		"roof_pitch": [1.0, 1.35], "porch": 0.0, "chimney": 0.0, "shutters": 0.15,
+		"roof_pitch": [0.0, 0.0], "porch": 0.0, "chimney": 0.0, "shutters": 0.15,
 		"wall": ["c08a55", "9b6b3e"], "trim": ["5a3a22", "3b2514"],
-		"roof": ["ac8a44", "806229"], "floor": ["9c7a52", "7a5f3e"],
+		"roof": ["b58a58", "92704a"], "floor": ["9c7a52", "7a5f3e"],
 		"clutter": [0.5, 0.9],
-		"plinth": [0.3, 0.6], "roof_types": [&"hipped", &"conical"],
+		"plinth": [0.3, 0.6], "roof_types": [&"flat"],
 		"framing": [&"square_panel"], "truss": [&"king_post"],
 		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
 		"chimney_style": &"straight", "pots": [1, 1],
-		"roof_material": &"thatch", "pitch_reference": 8.0,
-		"wall_t": 0.5, "culture": 1.0,
-		"parapet": 0.6, "veranda": 0.75, "eave_sweep": 0.0, "thatch_roll": 1.0,
-		"corner_piers": 1.0, "span_out": 0.7, "along_out": 0.6,
+		"roof_material": &"earth", "pitch_reference": 8.0,
+		"wall_t": 0.55, "culture": 1.0,
+		"parapet": 1.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"corner_piers": 1.0, "span_out": 0.55, "along_out": 0.55,
+		"sahel": true, "unglazed": true, "court_ranges": true,
 	},
 	&"thatch_cottage": {
 		"label": "Thatched Cottage",
@@ -280,25 +361,34 @@ const STYLES := {
 		# style has no bargeboards at all: a verge board is a thing that holds
 	# ON slates or tiles, and a thatcher finishes a gable by turning the reeds
 		# down and wiring them, not by nailing a board to the end of them.
-		"timber": 0.55, "studs": [1.0, 1.5], "braces": 0.5, "rail": 0.4,
+		# HS-THATCH: the walls are pale rendered cob and carry NO frame (timber,
+		# jetty and the stone ground floor are 0.0, so the same draws are consumed
+		# and no later roll moves); one eyebrow dormer is swept out of the thatch
+		# (`eyebrow`, read without a draw). Soft thatch: HouseGeometry.thatch_soft.
+		"timber": 0.0, "studs": [1.0, 1.5], "braces": 0.0, "rail": 0.0,
+		"eyebrow": 1,
 		"roof_pitch": [1.15, 1.5], "porch": 0.6, "chimney": 0.85, "shutters": 0.4,
 		"wall": ["efe7d3", "dbcfb4"], "trim": ["4a3826", "322518"],
 		"roof": ["bda25f", "8d7640"], "floor": ["8a7a5e", "6f6148"],
 		"clutter": [0.45, 0.8],
 		"plinth": [0.3, 0.55], "roof_types": [&"gable"],
 		"framing": [&"arch_brace", &"square_panel"], "truss": [&"king_post", &"collar_strut"],
-		"jetty": 0.25, "dormers": 0.2, "bargeboards": 0.0, "stone_ground": 0.1,
+		"jetty": 0.0, "dormers": 0.2, "bargeboards": 0.0, "stone_ground": 0.0,
 		"chimney_style": &"stepped", "pots": [1, 2],
 		"roof_material": &"thatch", "pitch_reference": 7.0,
 		"wall_t": 0.5, "culture": 1.0,
 		"parapet": 0.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 1.0,
 		"corner_piers": 0.0, "span_out": 0.5, "along_out": 0.35,
 	},
-	&"mud_hut": {
-		"label": "Mud Hut",
-		# One room, very thick walls, one cone. There is nothing to put a
-		# window in that is not a hole through half a metre of mud, so the
-		# openings are small and high and the plan is nearly a square.
+	&"roundhouse": {
+		"label": "Roundhouse",
+		# HS-ROUNDHOUSE (was `mud_hut`): ONE ROUND room, very thick walls, one
+		# cone of thatch with a smoke vent at its apex, and the fire on the middle
+		# of the floor (HouseRound). There is nothing to put a window in that is
+		# not a hole through half a metre of mud, so the openings are small and
+		# high. The corner piers, veranda and thatch roll of the old square hut
+		# are 0.0: a round wall has no corner, no entrance wall to roof over and
+		# no rectangular eave to roll.
 		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
 		"roof_pitch": [1.05, 1.4], "porch": 0.0, "chimney": 0.0, "shutters": 0.0,
 		"wall": ["b98a5e", "94663d"], "trim": ["6b4527", "472c16"],
@@ -310,8 +400,8 @@ const STYLES := {
 		"chimney_style": &"straight", "pots": [1, 1],
 		"roof_material": &"thatch", "pitch_reference": 7.0,
 		"wall_t": 0.62, "culture": 1.0,
-		"parapet": 0.0, "veranda": 0.45, "eave_sweep": 0.0, "thatch_roll": 1.0,
-		"corner_piers": 1.0, "span_out": 0.8, "along_out": 0.7,
+		"parapet": 0.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"corner_piers": 0.0, "span_out": 0.6, "along_out": 0.6,
 	},
 	&"pueblo": {
 		"label": "Pueblo Adobe House",
@@ -330,6 +420,8 @@ const STYLES := {
 		"wall_t": 0.72, "culture": 1.0,
 		"parapet": 1.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
 		"corner_piers": 0.0, "span_out": 0.25, "along_out": 0.25,
+		# HS-PUEBLO: set-back terraces with ladders and vigas; small deep openings
+		"terraced": true, "small_openings": true,
 	},
 }
 
@@ -345,6 +437,10 @@ const AREA_PER_ROOM := 15.0
 
 
 ## The lowest storey index: -cellars. Storeys run lowest_storey() .. storeys - 1.
+static func canonical_style(id: StringName) -> StringName:
+	return STYLE_ALIASES.get(id, id)
+
+
 func lowest_storey() -> int:
 	return -maxi(cellars, 0)
 
@@ -372,7 +468,7 @@ func storey_indices() -> Array[int]:
 ## The width of the front door leaf. A dwelling's is HouseGeometry.DOOR_W;
 ## a shop's depends on what comes through it (ShopSpec.door_w, LAY-009).
 func front_door_width() -> float:
-	return HouseGeometry.DOOR_W
+	return HousePueblo.DOOR_W if small_openings else HouseGeometry.DOOR_W
 
 
 ## How many rooms an interior of this size can carry.

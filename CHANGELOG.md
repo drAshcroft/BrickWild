@@ -8,6 +8,170 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
 
 ## Unreleased
 
+### Renamed
+
+- **House style `mud_hut` is now `roundhouse`.** The published style id (the
+  `BuildingLibrary` option list, `BuildingRequest.style`, `HouseSpec.STYLES`)
+  is `roundhouse`, labelled "Roundhouse". `mud_hut` stays an ALIAS: a request,
+  saved file or `HouseSpec.style` that says `mud_hut` is accepted, resolves to
+  `roundhouse` (`HouseSpec.canonical_style`) and builds the same house as one
+  that says `roundhouse`. Nothing needs to change; new code should say
+  `roundhouse`.
+- **The roundhouse is round.** A plain roundhouse (no trade) is now ONE round
+  room: a twelve-sided floor inside a 0.62 m wall, a thatched cone over it with
+  a smoke vent at the apex, a fire on the middle of the floor and a bed at the
+  wall. It takes a circle of the width asked for, between 8 and 10 m, and one
+  storey. A roundhouse that carries a trade keeps the old square hut. The
+  corner piers, veranda and eave roll of the old hut are gone from the plain
+  one.
+
+### Changed
+
+- **The `pueblo` house is a stepped adobe house.** A plain pueblo (no trade) on
+  a footprint that can step is now two or three storeys, each set back from the
+  one below, with a walkable terrace behind a parapet on every roof, a ladder up
+  to each terrace (no stair inside; an upper room opens onto the terrace in
+  front of it), round roof beams standing out of every wall, and small deep
+  openings in its 0.72 m walls. A request for one storey on such a footprint is
+  given two. A pueblo that carries a trade, or a footprint too small to step,
+  keeps its old single block. `BrickWild.navigation` publishes each ladder as a
+  stair row with `"ladder": true`; the building plan export lists it as a stair
+  with `"kind": "ladder"`.
+
+## 0.1.4 - 2026-10-23
+
+Villages can be planned on real ground. Buildings stand on falling ground,
+and castles are furnished and their tower doors open onto the wall walk. Tag
+`v0.1.4`. `API_VERSION` stays 2. Every new field is optional, and a request
+without ground gives the same SitePlan bytes as 0.1.3 (see Compatibility).
+
+### Notable changes
+
+- **Villages on given ground** (`docs/VILLAGE_TERRAIN.md`). A site request
+  may carry a `brickwild.terrain` height grid, either as `terrain.height`
+  (inline, or a path beside the request) or as `--terrain <grid.json>` to
+  `tools/export_village_plan.gd`. The village is then planned on that ground:
+  - It is sited and turned on the grid (`site.anchor_m`, `site.yaw_deg`), and
+    its roads are routed by grade, with a `steps` class where a cart cannot
+    climb.
+  - The form follows the land. `shore`, `valley`, `crest`, `dispersed` and
+    `hillside` have their own planners; `water` is still planned as its
+    fallback, and the plan says so.
+  - Lots stand on platforms fitted to the fall, with cut, fill and terrace
+    walls. Every off-road lot gets an entry flight. The ground's water becomes
+    plan water, and bridges are fitted to their banks.
+  - The plan carries `ground` for the whole site, and a `ground` block on
+    every lot, building and road.
+  - `VillageGroundSurface` meshes the graded ground: pads, road beds, retaining
+    walls and banks.
+  - The village walk becomes 3D, with stairs as links.
+
+  Without terrain, nothing in the output changes.
+- **Buildings on falling ground.** `BuildingRequest.ground_fall_m` and
+  `ground_downhill_deg` (local frame; default 0 / 0, and left out of
+  `to_dict()` then). Houses and shops take up to two storeys of fall:
+  foundations, entry steps and a bank storey. A door above the ground
+  publishes its way down as `route_m`. A church stands on a terrace of up to
+  6 m. A castle stands on a revetted platform with a stepped talus, a filled
+  bailey and a gate flight, up to `CastleGeometry.SLOPE_MAX_FALL`. A fall
+  beyond a family's limit is refused with `ground_too_steep`, not clamped. A
+  sky citadel, and any family other than these four, refuses any fall.
+- **Castles.**
+  - Guard and hall tables are seated, sparse rooms are filled, and rooms are
+    lit (`CastleRoomTopUp`). A tower storey that cannot seat a table becomes a
+    watch room.
+  - The chapel has a bailey door, and every occupied range must be reachable
+    from the gate.
+  - Every mural tower door opens onto the wall walk at its own sill, on
+    polygon castles and on rect ones (bavarian, japanese, wizard).
+  - A corner tower's walker goes round its tower, not through its parapets.
+- **Windmills publish a walk.** `BrickWild.navigation()` walks the four
+  windmill types that have a room: the miller's floor, inside its drawn wall.
+- **Churches, temples, shops, the Witch hut.**
+  - Churches: a built reredos for large naves, wall props on the wall face,
+    and Gothic towers that end in spires.
+  - Temples: a framed gate for the rotunda.
+  - Shops: trade-identity contracts for the butcher, apothecary, tailor,
+    carpenter and smith. A small 9x12 m smithy keeps its forge when its back
+    door crowds the fire wall (`ShopPlanner._hold_the_fire_wall`).
+  - Witch hut: the large hut gets a framed entry hood and a tall, crooked
+    second stack.
+
+### Fixes
+
+- A royal or military hamlet with a round plan is no longer spread thin. The
+  round form's lane-free retry ladder (VIL-ROUND-17077, unreleased) housed the
+  seat by widening alone, so Thorn's royal hamlet of 30 was taken at 270 m and
+  4.2 % built, below the 5 % floor. When a widened plan is under the floor,
+  the planner now clears the seat's head at each narrower width first. The
+  result is 225 m and 5.1 %, as in 0.1.3, and round seed 17077 still keeps its
+  one entrance lane (`vforms` green).
+
+### Compatibility
+
+- **SitePlans without ground are unchanged.** Exported through the 0.1.3
+  release's own exporter and through 0.1.4, Thorn-hamlet, Wuunafu 60 + 6000
+  and Thaannafu 45 + 4000 are byte-identical. `schema_version` stays 1, and
+  the `walk` schema stays `brickwild.walk` v1.
+- **Same request, different interior.** Footprints, doors and lots do not
+  move, but regenerating at the same seed changes these:
+  - castle furnishing, tower doors and wall-walk copings;
+  - church and temple dressing;
+  - shop furnishing for the five trades above;
+  - the large Witch hut's massing.
+
+  Regenerate any cached copies.
+
+### Known issues
+
+- **Castle occupancy is not clean everywhere.**
+  `tools/castle_occupancy_sweep.gd` at castle index 0 still reports these:
+  - bavarian: corners 1 and 3, whose curtain route does not reach a wall
+    stair, plus the apse sanctuary furnishing (no table);
+  - polygon castles' blocked wall-walk routes (moorish 7, french 6);
+  - the elven curved curtain, which has no wall stair;
+  - sky tower doors and their watch rooms (sky 20).
+
+  The fortress tier is worse. See `docs/CASTLE_INTERIOR_FOLLOWUPS.md`.
+- The `water` terrain form has no planner yet. It is planned as its
+  `FORM_FALLBACK`.
+- Temple Rotunda arcade asymmetry: 4 warnings, as in 0.1.3.
+- `lane:church-change` carries 16 warnings, as in 0.1.3.
+
+### Lanes
+
+Run on this tree, on a loaded host. Times are host wall-clock. The rows
+marked * were rerun after the VIL-ROUND-DENSITY fix; the rest ran just
+before it, on a tree that differed only in that one planner branch.
+
+| Lane | Checks | Result | Time |
+|---|---|---|---|
+| `lane:api` * | 802 | pass | 816 s |
+| `lane:dungeon` | 432 | pass | 88 s |
+| `lane:village-fast` * | 47 | pass | 332 s |
+| `lane:village-terrain` * | 476 | pass | 84 s |
+| `vforms` * | 486 | pass | |
+| `dmvbrief` `dmvimplied` `dmvwalk` * | 308 | pass (1 failure before the fix) | 1170 s |
+| `lane:church-change` | 5940 | pass, 16 warnings | 143 s |
+| `lane:temple` | 3467 | pass, 4 warnings | 301 s |
+| `lane:castle-change` | 706 | pass | 855 s |
+| `lane:windmill` | 270 | pass | 32 s |
+| `lane:house-plan-fast` | 293 | pass, 34 warnings | 201 s |
+| `walk_navserver_test` (Wuunafu, Thaannafu) | 114 paths | all arrive | 39 s |
+
+`lane:castle-change` is green for the first time in a release. 0.1.3 shipped
+it with 17 failures. A cold editor import of a fresh worktree reports no
+SCRIPT ERROR.
+
+### Migration
+
+- Install from `releases/brick_wild-0.1.4/`. A consumer that does not pass
+  ground or a fall needs no change.
+- Dm_View and PaperFjord: pass a terrain grid to plan on real ground, and
+  read `ground` from the plan. Without it the plan is the 0.1.3 plan.
+- VoxelGames: `ground_fall_m` / `ground_downhill_deg` on a request place a
+  building on a slope. Its local y = 0 is the ground at the uphill edge.
+
 ## 0.1.3 - 2026-10-14
 
 Temples, churches and walled castles say where a person can walk; BrickWild

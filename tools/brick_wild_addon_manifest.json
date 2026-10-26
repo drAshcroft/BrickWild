@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "package_version": "0.1.3",
+  "package_version": "0.1.4",
   "metadata": [
     {
       "source": "packaging/brick_wild/plugin.cfg",
@@ -64,6 +64,10 @@
     {
       "source": "src/village",
       "destination": "families/village"
+    },
+    {
+      "source": "src/village/forms",
+      "destination": "families/village/forms"
     },
     {
       "source": "src/windmill",

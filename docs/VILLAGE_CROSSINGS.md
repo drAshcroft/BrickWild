@@ -35,3 +35,18 @@ Validation: 97 focused crossing checks, 201 water-plan checks and 752 enclosure
 checks pass. Render real bridge/ford references with
 `tools/render_village_crossings.gd` (without `--headless`); images are in
 `artifacts/p1p2_village/crossing_river.png` and `crossing_stream.png`.
+
+## On given ground (VTER-CROSSINGS)
+
+With `plan.ground` a bridge is no longer a level deck at the higher landing:
+`VillageBridge.measure(surface, crossing)` reads the finished ground and
+fits it -- deck over the higher landing, its underside 0.45 m over the highest
+water under the span, a ramp at each end no steeper than 12 %, and two
+`bridge_abutment` boxes (host `bridge<i>`) from the lowest ground under each
+end up to the deck. A ford stays level with the higher landing. The ground's
+own reach of water that is long and thin (at most 40 m wide, three times
+longer than wide, and not a lake clipped at the site edge) is plan water of
+kind `river` with its measured `width`, and the spec's river is not laid
+beside it. `VillageBridgeCheck` judges the result from the emitted mesh.
+Flat villages never reach this code; see "Bridges on the ground" in
+docs/VILLAGE_TERRAIN.md.

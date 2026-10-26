@@ -221,11 +221,44 @@ static func outer_land(plan: VillagePlan) -> void:
 				Vector2(site.size.x, depth)),
 			Rect2(Vector2(site.position.x, site.end.y),
 				Vector2(site.size.x, depth))])
+		if plan.ground != null:
+			_field_on_ground(plan, candidates, edge)
+			return
 		for candidate in candidates:
 			var poly := Poly.from_rect(candidate)
 			if VillageLotPlanner.overlap_area(poly, edge) <= VillageLotPlanner.AREA_EPS:
 				plan.fields.append({"poly": poly, "kind": &"pasture"})
 				break
+
+
+## On given ground (VTER-PLACE) the outer field goes to the GENTLEST of the
+## same candidates, dry, and no steeper than pasture; a `field` where the
+## plough goes (the dispersed form's FIELD_GENTLE), else `pasture`. None at
+## all where every candidate is too steep or wet: woods and rough grazing.
+## The track ends come first, as on flat ground (a field is reached by its
+## track: DressCheck `fields`); the two site bands only when no track end will do.
+static func _field_on_ground(plan: VillagePlan, candidates: Array[Rect2],
+		edge: PackedVector2Array) -> void:
+	var best := -1
+	var best_slope := INF
+	var bands_from: int = candidates.size() - 2
+	for k in range(candidates.size()):
+		if k == bands_from and best >= 0:
+			break
+		var poly := Poly.from_rect(candidates[k])
+		if VillageLotPlanner.overlap_area(poly, edge) > VillageLotPlanner.AREA_EPS:
+			continue
+		var u: Dictionary = plan.ground.under(poly)
+		var slope: float = float(u["slope_mean"])
+		if float(u["dry_share"]) < 1.0 or slope > VillageDispersedForm.FIELD_PASTURE:
+			continue
+		if slope < best_slope - 1e-6:
+			best = k
+			best_slope = slope
+	if best < 0:
+		return
+	plan.fields.append({"poly": Poly.from_rect(candidates[best]),
+		"kind": &"field" if best_slope <= VillageDispersedForm.FIELD_GENTLE else &"pasture"})
 
 
 static func wood(plan: VillagePlan, ctx: Dictionary) -> void:
@@ -270,6 +303,13 @@ static func make_context(plan: VillagePlan) -> Dictionary:
 		for yard_poly in VillageMeasure.yard_polys(b):
 			bounds.append(yard_poly)
 			boxes.append(Poly.bounding_rect(yard_poly))
+		# on given ground (VTER-LOTS), the entry flights, a church's terrace
+		# and a castle's talus are the building's too: nothing stands on them
+		var lot: Dictionary = plan.lots[int(b["lot"])] if int(b["lot"]) < plan.lots.size() else {}
+		if lot.has("ground_fit"):
+			for part in lot["ground_fit"].get("entry_parts", []):
+				bounds.append(part)
+				boxes.append(Poly.bounding_rect(part))
 		var d: Vector2 = VillageMeasure.door(b)
 		doors.append(Rect2(d - Vector2(VillageDressCatalog.DOOR_CLEAR, VillageDressCatalog.DOOR_CLEAR),
 			Vector2(VillageDressCatalog.DOOR_CLEAR, VillageDressCatalog.DOOR_CLEAR) * 2.0))

@@ -30,10 +30,14 @@ func check_placed(plan: HousePlan) -> void:
 		if not room_rect.grow(TOL).encloses(rect):
 			failures.append("placed: %s is partly in the wall" % HouseFurnishCheck.who(plan, f))
 		if plan.is_polygonal(int(p["room"])):
-			for corner in Poly.from_rect(rect):
-				if not Poly.contains_point(plan.outline_of(int(p["room"])), corner, TOL):
-					failures.append("placed: %s crosses a shaped room wall" % HouseFurnishCheck.who(plan, f))
-					break
+			# The piece is a turned rectangle, not its axis-aligned box: on a
+			# diagonal facet of a drum, an octagon or an apse the box pokes
+			# through the wall while the piece itself is square against it
+			# (CASTLE-CHANGE-17). Test the piece's own four corners.
+			var foot: Vector2 = PropCatalog.footprint(key) * float(p.get("scale", 1.0))
+			var turned := Poly.oriented_rect(rect.get_center(), foot, float(p["yaw"]))
+			if not Poly.encloses_corners(plan.outline_of(int(p["room"])), turned, TOL):
+				failures.append("placed: %s crosses a shaped room wall" % HouseFurnishCheck.who(plan, f))
 		# the size it claims must be the size the asset actually is
 		var want: Vector2 = PropCatalog.footprint_rotated(key, float(p["yaw"])) \
 			* float(p.get("scale", 1.0))

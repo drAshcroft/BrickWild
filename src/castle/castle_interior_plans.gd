@@ -117,7 +117,7 @@ static func hall_plan(spec: CastleSpec) -> HousePlan:
 	plan.focus = {"room": 0, "cat": "table",
 		"pos": dais.get_center() - up * (depth * HIGH_TABLE_SET_IN),
 		"facing": atan2(up.x, up.y), "faces_door": faces}
-	HouseFurnisher.furnish(plan, hs)
+	CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 
@@ -199,6 +199,14 @@ static func chapel_plan(spec: CastleSpec) -> HousePlan:
 	var lengthwise: bool = floor_rect.size.y >= floor_rect.size.x
 	var up := Vector2(0, 1) if lengthwise else Vector2(1, 0)
 	_hall_door(plan, floor_rect, up)
+	# An apse on the axial end wall stands exactly where `_hall_door` put the
+	# way in, so that door becomes the sanctuary arch and the pair is sealed
+	# from the ward (bavarian 55x50 seed 3). The way in then comes off the
+	# bailey, which is the chapel's own west face: enter at the side, altar
+	# and apse ahead down the nave.
+	var apse_on_front: bool = lengthwise and CastleGeometry.apse_radius(spec) > 0.0
+	if apse_on_front:
+		_bailey_door(plan, floor_rect, Vector2.LEFT)
 	# The chapel is the east range: its west face looks into the bailey.
 	_courtyard_windows(plan, floor_rect, Vector2.LEFT, hs)
 
@@ -246,7 +254,7 @@ static func chapel_plan(spec: CastleSpec) -> HousePlan:
 		aisle.size.x = sanctuary.position.x - aisle.position.x
 	plan.zones.append({"room": 0, "rect": aisle, "why": "chapel centre aisle"})
 	preload("castle_apse_plan.gd").connect_chapel(plan, spec)
-	HouseFurnisher.furnish(plan, hs)
+	CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 
@@ -446,6 +454,28 @@ static func _hall_spec(spec: CastleSpec, box: AABB) -> HouseSpec:
 ## A range narrower or shorter than this is masonry, not a room.
 const MIN_RANGE_SIDE := 3.0
 const MIN_RANGE_RUN := 5.0
+## The largest floor a RANGE's ordinary room may have before it must be
+## partitioned again. A range is a row of rooms, not one room per storey: the
+## sparse rule asks for a tenth of a room's floor in furniture, and the house
+## furnisher's wall-and-table steps dress 219.8 m2 to 11% while leaving a
+## 441.3 m2 parlour at 9% (bavarian ridge seed 8805, CASTLE-CHANGE-17). A
+## great hall is exempt: it is furnished by trestle rows down its middle, and
+## its dais and high table are not divisible.
+const MAX_RANGE_ROOM_AREA := 250.0
+
+
+## How many bays one storey of a range divides into, for the kind that leads
+## it. A hall goes by shape alone; every other room is also capped by area.
+static func _range_bays(floor_rect: Rect2, kind: StringName) -> int:
+	var by_shape: int = maxi(int(ceil(floor_rect.size.x
+		/ (floor_rect.size.y * HouseGeometry.aspect_max(kind)))), 1)
+	if kind in [&"great_hall", &"hall"]:
+		return by_shape
+	var by_area: int = maxi(int(ceil(floor_rect.size.x * floor_rect.size.y
+		/ MAX_RANGE_ROOM_AREA)), 1)
+	return maxi(by_shape, by_area)
+
+
 ## One rotated range of a ridge castle, in its own frame. `neighbours` is the
 ## count of ranges this one touches (its segment's two ends), used to place the
 ## doors that connect the chain.
@@ -481,8 +511,17 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	# corridor by every rule the house harness has, and rejecting it outright
 	# left the biggest ridge castles hollow. Divide it until each bay is a
 	# room-shaped room, and put a door through every partition.
-	var bays: int = maxi(int(ceil(floor_rect.size.x
-		/ (floor_rect.size.y * HouseGeometry.aspect_max(kind)))), 1)
+	#
+	# The storeys do not all divide alike. A great hall is allowed 6:1, so the
+	# 40.9 x 10.8 m hall of a bavarian ridge is ONE room; the parlours above it
+	# are told apart from a passage at 3.4:1 and capped by area besides, so the
+	# same bay is one 441 m2 room to them -- and two of those, one per upper
+	# storey, are what the sparse rule rightly called empty. The upper floors
+	# take their own, shorter bays. The hall itself stays whole: its dais, high
+	# table and axis are not divisible.
+	var bays: int = _range_bays(floor_rect, kind)
+	var upper_bays: int = bays if not is_hall or levels < 2 \
+		else _range_bays(floor_rect, &"parlour")
 	var bay_run: float = floor_rect.size.x / float(bays)
 	if bay_run < MIN_RANGE_RUN or bay_run * floor_rect.size.y \
 			< float(HouseGeometry.MIN_AREA[kind]):
@@ -492,26 +531,36 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	plan.doors = []
 	plan.windows = []
 	hs.program = []
+	var level_bays: Array[int] = []
+	var level_base: Array[int] = []
+	var rooms_below := 0
 	for level in range(levels):
-		for i in range(bays):
+		var here_bays: int = bays if level == 0 else upper_bays
+		level_bays.append(here_bays)
+		level_base.append(rooms_below)
+		rooms_below += here_bays
+	for level in range(levels):
+		var here: int = level_bays[level]
+		var run_here: float = floor_rect.size.x / float(here)
+		for i in range(here):
 			# The entrance-level principal bay remains the great hall. Above it,
 			# private rooms must sit at the end of a route, never between a stair
 			# and another occupied floor or bay.
 			var bay_kind: StringName = kind
 			if is_hall and level == 0 and i == 0:
 				bay_kind = &"great_hall"
-			elif i == 0 and not (bays == 1 and level == levels - 1):
+			elif i == 0 and not (here == 1 and level == levels - 1):
 				# This room leads to a later bay, or the stair above it. It is a
 				# public circulation room. Only a one-bay top floor is terminal.
 				bay_kind = &"parlour"
 			elif i > 0:
-				bay_kind = &"guest_room" if i == bays - 1 else &"parlour"
-			if bay_run * floor_rect.size.y < float(HouseGeometry.MIN_AREA[bay_kind]) \
-					or minf(bay_run, floor_rect.size.y) < float(HouseGeometry.MIN_SIDE[bay_kind]):
+				bay_kind = &"guest_room" if i == here - 1 else &"parlour"
+			if run_here * floor_rect.size.y < float(HouseGeometry.MIN_AREA[bay_kind]) \
+					or minf(run_here, floor_rect.size.y) < float(HouseGeometry.MIN_SIDE[bay_kind]):
 				bay_kind = kind
-			var room_index := level * bays + i
-			var room_rect := Rect2(Vector2(floor_rect.position.x + bay_run * float(i),
-				floor_rect.position.y), Vector2(bay_run, floor_rect.size.y))
+			var room_index: int = level_base[level] + i
+			var room_rect := Rect2(Vector2(floor_rect.position.x + run_here * float(i),
+				floor_rect.position.y), Vector2(run_here, floor_rect.size.y))
 			plan.rooms.append({"kind": bay_kind, "storey": level, "rect": room_rect})
 			hs.program.append(bay_kind)
 			var window_start := plan.windows.size()
@@ -519,11 +568,11 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 				band_height - 0.2)
 			for wi in range(window_start, plan.windows.size()):
 				plan.windows[wi]["storey"] = level
-		for i in range(1, bays):
-			var left_room := level * bays + i - 1
-			var right_room := level * bays + i
+		for i in range(1, here):
+			var left_room: int = level_base[level] + i - 1
+			var right_room: int = level_base[level] + i
 			plan.doors.append({"a": left_room, "b": right_room,
-				"pos": Vector2(floor_rect.position.x + bay_run * float(i),
+				"pos": Vector2(floor_rect.position.x + run_here * float(i),
 					floor_rect.get_center().y),
 				"normal": Vector2(1, 0), "width": HouseGeometry.INNER_DOOR_W,
 				"exterior": false, "front": false, "storey": level})
@@ -550,11 +599,13 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 			"width": HouseGeometry.INNER_DOOR_W, "exterior": true,
 			"front": false, "storey": 0})
 	# A real stair connects each occupied range floor. Room indices differ from
-	# storey indices when the range has more than one bay.
+	# storey indices when the range has more than one bay, and the storeys do
+	# not all have the same number of bays, so each floor's first room is read
+	# from its base rather than from `level * bays`.
 	var previous_stair := Rect2()
 	for level in range(levels - 1):
-		var lower_room := level * bays
-		var upper_room := (level + 1) * bays
+		var lower_room: int = level_base[level]
+		var upper_room: int = level_base[level + 1]
 		var stair := _ridge_add_stair(plan, level, level + 1,
 			lower_room, upper_room, previous_stair)
 		if not stair.is_empty():
@@ -633,7 +684,7 @@ static func ridge_range_plan(spec: CastleSpec, seg: Dictionary,
 	# describe.
 	plan.hearth = {"room": 0, "wall": 2}
 	hs.room_count = plan.rooms.size()
-	HouseFurnisher.furnish(plan, hs)
+	CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 
@@ -768,6 +819,22 @@ static func _hall_door(plan: HousePlan, floor_rect: Rect2, up: Vector2) -> void:
 	# append, not assign: a multi-bay range has already recorded the doors
 	# through its own partitions and this is one more way in, not the only one.
 	plan.doors.append({"a": 0, "b": -1, "pos": pos, "normal": -up,
+		"width": HouseGeometry.DOOR_W, "exterior": true, "front": true,
+		"storey": 0})
+
+
+## The way in off the ward, on a long wall, when the apse (or another annex)
+## already owns the axial end wall. Placed at the corner end of the wall,
+## `DOOR_CORNER_MARGIN` clear of it, so the pew rows keep their aisle: call it
+## before the windows, which split their run around a door on the same face.
+static func _bailey_door(plan: HousePlan, floor_rect: Rect2, normal: Vector2) -> void:
+	var margin := HouseGeometry.DOOR_CORNER_MARGIN + HouseGeometry.DOOR_W * 0.5
+	var along := floor_rect.position.y + margin if absf(normal.x) > 0.5 \
+		else floor_rect.position.x + margin
+	var pos := Vector2(floor_rect.position.x if normal.x < 0.0 else floor_rect.end.x, along) \
+		if absf(normal.x) > 0.5 else Vector2(along,
+			floor_rect.position.y if normal.y < 0.0 else floor_rect.end.y)
+	plan.doors.append({"a": 0, "b": -1, "pos": pos, "normal": normal,
 		"width": HouseGeometry.DOOR_W, "exterior": true, "front": true,
 		"storey": 0})
 

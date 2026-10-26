@@ -270,24 +270,31 @@ static func group_scale(spec: ChurchSpec) -> float:
 	return clampf(spec.width / 10.0, 1.0, GROUP_MAX_SCALE)
 
 
-## A reredos behind the altar: two tall hangings on the east wall either side of
-## the axis, in proportion to the nave's height, so the altar has a backdrop
-## rather than a bare, bright wall. Only on a wide nave with the height for it,
-## and off the axis, so the altar is seen in the gap between them.
+## Two tall hangings either side of the built reredos (ChurchGeometry.reredos_aabb),
+## on the east wall's own face, from the reredos cornice down to a little above
+## the step. A banner is WALL_MOUNTED: its position is its TOP and it hangs
+## below. (They used to be placed with their top at 1.45 m and their plane
+## 0.24 m inside the 0.36 m wall: nobody ever saw them.) None where the east
+## wall is an apse arch -- there is no wall to hang on.
 static func _dress_reredos(spec: ChurchSpec, out: Array[Dictionary], step_h: float,
-		altar_w: float) -> void:
-	if spec.height < BANNER_MIN_H or group_scale(spec) <= 1.0:
+		_altar_w: float) -> void:
+	var screen: AABB = ChurchGeometry.reredos_aabb(spec)
+	if screen.size.x <= 0.0:
 		return
 	var key: String = BANNERS[0]
 	var h: float = PropCatalog.height(key)
-	var k: float = clampf(spec.height * 0.22 / maxf(h, 0.1), 1.0, 3.2)
+	var top: float = screen.position.y + screen.size.y * 0.74
+	var bottom: float = step_h + 1.6
+	var k: float = clampf((top - bottom) / maxf(h, 0.1), 1.0, 3.2)
 	var half_w: float = PropCatalog.footprint(key).x * k * 0.5
-	var x: float = altar_w * 0.5 + half_w + 0.3
+	var x: float = screen.size.x * 0.5 + 0.4 + half_w
 	if x + half_w > _interior_half(spec):
 		return
-	var z: float = spec.length / 2.0 - 0.12
+	# the cloth is 0.06 m thick about its pivot: hang it just proud of the wall face
+	var z: float = spec.length / 2.0 - ChurchBuilder.NAVE_WALL_T \
+		- PropCatalog.footprint(key).y * k * 0.5 - 0.02
 	for side in [-1.0, 1.0]:
-		_put(out, key, Vector3(side * x, step_h + 1.3, z),
+		_put(out, key, Vector3(side * x, top, z),
 			PropCatalog.mount_yaw(key, Vector2(0.0, -1.0)), k, &"banner")
 
 
@@ -418,7 +425,10 @@ static func _dress_walls(spec: ChurchSpec, out: Array[Dictionary],
 	if spec.height < 2.6:
 		return
 	var l: float = spec.length
-	var x: float = spec.width / 2.0 - 0.12
+	# On the wall's inner FACE. These were at width/2 - 0.12, i.e. 0.24 m inside
+	# a 0.36 m wall: the cloth banners (0.06 m thick) were never seen and the
+	# torches showed only their tips (LIVE-SACRED, 20 Oct).
+	var x: float = spec.width / 2.0 - ChurchBuilder.NAVE_WALL_T
 	var n: int = clampi(int(l / SCONCE_BAY), 1, 12)
 	var y: float = minf(SCONCE_H, spec.height * 0.6)
 	var banner_y: float = clampf(spec.height * 0.72, 2.8, spec.height - 0.4)
@@ -430,7 +440,7 @@ static func _dress_walls(spec: ChurchSpec, out: Array[Dictionary],
 				PropCatalog.mount_yaw(SCONCE, inward), 1.0, &"light")
 			if i % 2 == 1 and spec.height >= BANNER_MIN_H:
 				var key: String = BANNERS[rng.randi_range(0, BANNERS.size() - 1)]
-				_put(out, key, Vector3(side * x, banner_y, z + PEW_PITCH),
+				_put(out, key, Vector3(side * (x - 0.04), banner_y, z + PEW_PITCH),
 					PropCatalog.mount_yaw(key, inward), 1.0, &"banner")
 
 

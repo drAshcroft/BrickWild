@@ -19,9 +19,61 @@ extends RefCounted
 ##   CHURCHYARD  the church has room
 ##   GRADIENT    the big houses are in the middle
 ##   FARMS       farms face the fields
+##
+## And seven about the GROUND (VTER-PLACE, docs/VILLAGE_TERRAIN.md "Placing
+## the programme on the ground"). Each is a no-op for a plan without ground,
+## so a flat village is judged exactly as before:
+##
+##   LANDMARK_GROUND  the church is not at the bottom of its village; on a
+##                    crest or spur it takes the high ground
+##   COMMON_GROUND    the common is on the most level ground the village has
+##   MILL_GROUND      the mill is low, at the water; its race runs along the contour
+##   MANOR_GROUND     the seat at a prominence or the head of the village
+##   FIELDS_GROUND    fields on gentle ground, pasture no steeper than a track
+##   WOOD_GROUND      the wood on the steepest ground offered to it
+##   EDGE_GROUND      no lot where the ground turns too steep or too wet
 
 const RULES: Array[StringName] = [&"common", &"landmark", &"well", &"tavern", &"stable",
-	&"smithy", &"mill", &"market", &"civic", &"manor", &"churchyard", &"gradient", &"farms"]
+	&"smithy", &"mill", &"market", &"civic", &"manor", &"churchyard", &"gradient", &"farms",
+	&"landmark_ground", &"common_ground", &"mill_ground", &"manor_ground", &"fields_ground",
+	&"wood_ground", &"edge_ground"]
+
+## The world set's own readings (tests/fixtures/settlements/world_settlements.json,
+## survey.py `measure()`; VillageShape ports the definitions): numpy's
+## linear percentiles over the sites that have the metric. `vworld` re-reads
+## the file and fails if these drift from it.
+##   worship_elev_pctile: the highest place of worship ranked among the body's
+##     own building heights, 61 of 109 sites (p10 0.188, median 0.724, p90 0.984)
+const WORLD_WORSHIP_ELEV_IQR := Vector2(0.380, 0.950)
+const WORLD_WORSHIP_ELEV_MEDIAN := 0.724
+##   worship_centrality: its distance from the body's centre over the body's radius
+const WORLD_WORSHIP_CENTRALITY_IQR := Vector2(0.307, 0.725)
+##   body_elev_pctile: the body's median height ranked in its disc, 109 sites
+const WORLD_BODY_ELEV_IQR := Vector2(0.389, 0.716)
+##   water_within_30m: the share of the body within 30 m of water, 109 sites
+const WORLD_WATERFRONT_IQR := Vector2(0.0, 0.099)
+## The ground rules' own thresholds.
+## Below this much fall across the buildings (p95 - p5 of their heights) the
+## ranks are noise: a church a metre above the houses is not "on the hill".
+const GROUND_RELIEF_MIN_M := 3.0
+## A church below the world's lower quartile is at the bottom of its village.
+const LANDMARK_RANK_MIN := 0.380        ## = WORLD_WORSHIP_ELEV_IQR.x
+## With a crest or a spur among the houses, the church takes it: at or above
+## the median house.
+const LANDMARK_RANK_CREST := 0.5
+const LANDMARK_CREST_REACH_M := 30.0   ## a crest/spur cell this near a lot is among the houses
+## The common no steeper than the median lot by more than this, or level.
+const COMMON_SLOPE_SLACK := 0.02
+## The mill in the lower half of its village; its race falling no more than
+## this along its length -- a leat follows the contour.
+const MILL_RANK_MAX := 0.5
+const RACE_FALL_MAX_M := 1.5
+## The seat at a prominence (at or above the median building) or at the head:
+## the outermost building of the village along its through road.
+const MANOR_RANK_MIN := 0.5
+const MANOR_HEAD_SHARE := 0.75
+## A wood candidate this much steeper than the one taken was passed over.
+const WOOD_SLOPE_SLACK := 0.03
 const FRONTED_SHARE := 0.6
 ## With only three buildings the two-metre perimeter samples are coarse: a
 ## complete round hamlet measures 59% while the next sample is already 63%.
@@ -75,38 +127,20 @@ func _check_common(plan: VillagePlan) -> void:
 		failures.append("common: the common is %.0f m2, wants %.0f" % [area, want])
 	# fronted: walk the perimeter, ask how much of it has a building's front
 	# within reach
-	# a building's front is its frontage: the front edge of its lot, on the
-	# road, which its door stands a setback behind
-	var fronts: Array[PackedVector2Array] = []
-	for b in plan.buildings:
-		var li: int = int(b["lot"])
-		if li >= 0 and li < plan.lots.size():
-			fronts.append(plan.lots[li]["front"])
-			# the church stands on the slot reserved to front the common,
-			# and its face to the common is the slot's own front edge
-			if bool(plan.lots[li].get("landmark", false)) and plan.landmark_site.has("front"):
-				fronts.append(plan.landmark_site["front"])
-	var samples := 0
-	var fronted := 0
-	var n: int = common.size()
-	for i in range(n):
-		var a: Vector2 = common[i]
-		var b2: Vector2 = common[(i + 1) % n]
-		var steps: int = maxi(int(a.distance_to(b2) / 2.0), 1)
-		for k in range(steps):
-			var p: Vector2 = a.lerp(b2, (float(k) + 0.5) / float(steps))
-			samples += 1
-			for f in fronts:
-				if p.distance_to(Geometry2D.get_closest_point_to_segment(p, f[0], f[1])) <= FRONTED_REACH:
-					fronted += 1
-					break
-	var share: float = float(fronted) / float(maxi(samples, 1))
+	var share: float = fronted_share(plan)
 	var wanted_share: float = FRONTED_SHARE_HAMLET \
 		if plan.spec.population < VillageSpec.HAMLET_POPULATION else FRONTED_SHARE
 	stats["common_fronted"] = snappedf(share, 0.01)
 	if plan.buildings.size() >= 3 and share < wanted_share:
-		failures.append("common: only %.0f%% of the common's edge has a house front near it, wants %.0f%%"
-			% [share * 100.0, wanted_share * 100.0])
+		var msg := "common: only %.0f%% of the common's edge has a house front near it, wants %.0f%%" \
+			% [share * 100.0, wanted_share * 100.0]
+		if plan.crest.is_empty():
+			failures.append(msg)
+		else:
+			# a crest village's houses front the ring street, which circles the
+			# summit; the church alone stands between it and the common
+			# (VTER-FORM-CREST): said, not failed
+			warnings.append(msg)
 	for i2 in range(plan.buildings.size()):
 		if VillageLotPlanner.overlap_area(VillageMeasure.bounds_poly(plan.buildings[i2]), common) > VillageLotPlanner.AREA_EPS:
 			failures.append("common: building %d stands on the common" % i2)
@@ -122,6 +156,50 @@ func _check_common(plan: VillagePlan) -> void:
 			continue
 		failures.append("common: %s stands on the common" % String(p2["key"]))
 		break
+
+
+## The share of the common's perimeter with a building's front within
+## FRONTED_REACH. A building's front is its frontage: the front edge of its lot,
+## on the road, which its door stands a setback behind. 0 with no common.
+static func fronted_share(plan: VillagePlan) -> float:
+	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
+	if common.is_empty():
+		return 0.0
+	var fronts: Array[PackedVector2Array] = []
+	for b in plan.buildings:
+		var li: int = int(b["lot"])
+		if li >= 0 and li < plan.lots.size():
+			fronts.append(plan.lots[li]["front"])
+			# the church stands on the slot reserved to front the common,
+			# and its face to the common is the slot's own front edge
+			if bool(plan.lots[li].get("landmark", false)) and plan.landmark_site.has("front"):
+				fronts.append(plan.landmark_site["front"])
+	return share_fronted(common, fronts)
+
+
+## The sample points of a common's perimeter, a metre or two apart.
+static func edge_samples(common: PackedVector2Array) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var n: int = common.size()
+	for i in range(n):
+		var a: Vector2 = common[i]
+		var b2: Vector2 = common[(i + 1) % n]
+		var steps: int = maxi(int(a.distance_to(b2) / 2.0), 1)
+		for k in range(steps):
+			out.append(a.lerp(b2, (float(k) + 0.5) / float(steps)))
+	return out
+
+
+## The share of `common`'s perimeter within FRONTED_REACH of one of `fronts`.
+static func share_fronted(common: PackedVector2Array, fronts: Array[PackedVector2Array]) -> float:
+	var samples: Array[Vector2] = edge_samples(common)
+	var fronted := 0
+	for p in samples:
+		for f in fronts:
+			if p.distance_to(Geometry2D.get_closest_point_to_segment(p, f[0], f[1])) <= FRONTED_REACH:
+				fronted += 1
+				break
+	return float(fronted) / float(maxi(samples.size(), 1))
 
 
 ## VILLAGES §7's recipe for the common, as the list of things that may stand
@@ -208,7 +286,11 @@ func _check_well(plan: VillagePlan) -> void:
 	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
 	for w in wells:
 		var pos: Vector2 = w["pos"]
-		if not common.is_empty() and not Poly.contains_point(common, pos):
+		# a dispersed village has a well on every hamlet's common
+		var on_common: bool = common.is_empty()
+		for c in plan.commons:
+			on_common = on_common or Poly.contains_point(c["poly"], pos)
+		if not on_common:
 			failures.append("well: the well at %v is off the common" % pos)
 		for i in range(plan.buildings.size()):
 			var d: float = VillageMeasure.point_to_poly(pos, VillageMeasure.bounds_poly(plan.buildings[i]))
@@ -216,10 +298,12 @@ func _check_well(plan: VillagePlan) -> void:
 				failures.append("well: building %d stands %.1fm from the well, wants %.0f" % [i, d, VillageLotPlanner.well_clearance(plan.spec)])
 				break
 		var pathed := false
-		for r in plan.roads_of_class(&"path"):
+		# on given ground a footway too steep for a path is steps (VTER-ROADS)
+		var footways: Array[int] = plan.roads_of_class(&"path") + plan.roads_of_class(&"steps")
+		for r in footways:
 			if VillageMeasure.point_to_polyline(pos, plan.roads[r]["points"]) <= 2.0:
 				pathed = true
-		if not pathed and not plan.roads_of_class(&"path").is_empty():
+		if not pathed and not footways.is_empty():
 			failures.append("well: no path reaches the well at %v" % pos)
 
 
@@ -540,6 +624,10 @@ func _check_churchyard(plan: VillagePlan) -> void:
 ## than convenient: a village that is nine farms and a smithy has no wealth
 ## gradient to have, and `farms` is the rule that judges where it put them.
 func _check_gradient(plan: VillagePlan) -> void:
+	# on a crest the wealth runs up the hill, not out from the common: the
+	# landmark_ground and highest-building rules say it (VTER-FORM-CREST)
+	if not plan.crest.is_empty():
+		return
 	var houses: Array[int] = []
 	for i in plan.buildings_of_kind(&"house"):
 		if (plan.buildings[i]["request"] as BuildingRequest).purpose != &"farmer":
@@ -552,7 +640,9 @@ func _check_gradient(plan: VillagePlan) -> void:
 	for i in houses:
 		var fp: Rect2 = plan.buildings[i]["placement"]["footprint"]
 		areas.append(fp.size.x * fp.size.y)
-		dists.append(VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[i])).distance_to(cc))
+		var at: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[i]))
+		# in a dispersed village, from its own hamlet's common
+		dists.append(at.distance_to(_hamlet_seat(plan, at, cc)))
 	var rho: float = VillageMeasure.spearman(areas, dists)
 	stats["gradient"] = snappedf(rho, 0.01)
 	var want: float = GRADIENT_MAX if houses.size() >= 8 else 0.0
@@ -568,6 +658,15 @@ func _check_farms(plan: VillagePlan) -> void:
 		if (b["request"] as BuildingRequest).purpose != &"farmer":
 			continue
 		var c: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(b))
+		var reach_rect: Rect2 = plan.site
+		if not plan.hamlets.is_empty():
+			# a dispersed village's farms stand in their hamlets, among their
+			# fields: the edge a farm is measured to is its own hamlet's ground
+			var seat: Vector2 = _hamlet_seat(plan, c, c)
+			for h in plan.hamlets:
+				if Vector2(h["seat"]) == seat:
+					edge = h["ground"]
+			reach_rect = Poly.bounding_rect(edge)
 		var d: float = VillageMeasure.point_to_poly(c, edge) if not Poly.contains_point(edge, c) else _to_boundary(edge, c)
 		# Thirty metres, or a share of the site on a village whose ground has
 		# grown to hold its farms -- measured on the site's SHORTER side.
@@ -576,7 +675,7 @@ func _check_farms(plan: VillagePlan) -> void:
 		# inside a farm can get, and scaling by it let a farm stand dead
 		# centre and pass.
 		var reach: float = maxf(FARM_TO_EDGE,
-			minf(plan.site.size.x, plan.site.size.y) * 0.4)
+			minf(reach_rect.size.x, reach_rect.size.y) * 0.4)
 		if d > reach:
 			failures.append("farms: farm %d stands %.0fm inside the edge, wants <= %.0f" % [i, d, reach])
 		# the yard is behind the house: its back (local +Z) toward the edge
@@ -587,6 +686,312 @@ func _check_farms(plan: VillagePlan) -> void:
 			# yard toward the village: the edge is what matters, the yard
 			# side is worth saying
 			warnings.append("farms: farm %d turns its yard away from the fields" % i)
+
+
+# ------------------------------------------------------------ on the ground
+
+## The church on the ground (VTER-PLACE): ranked among its village's
+## buildings by the height of the ground under each centre -- the survey's
+## `worship_elev_pctile`, over every building rather than the survey's body --
+## it stands at or above the world's lower quartile. When a crest or a spur
+## of the ground lies among the houses, it stands at or above the median
+## house: the village has a high place and the church took it. Read only where
+## the buildings stand on GROUND_RELIEF_MIN_M of fall or more.
+func _check_landmark_ground(plan: VillagePlan) -> void:
+	var g: VillageTerrain = plan.ground
+	if g == null or plan.buildings.size() < 3:
+		return
+	var lm := worship_index(plan)
+	if lm < 0:
+		return
+	var near := neighbours(plan, lm)
+	var hs := building_heights(plan, near)
+	var rank := rank_in(building_heights(plan, [lm])[0], hs)
+	var span := spread(hs)
+	stats["landmark_elev_rank"] = snappedf(rank, 0.001)
+	stats["ground_span_m"] = snappedf(span, 0.1)
+	if span < GROUND_RELIEF_MIN_M:
+		return
+	var crest := crest_among_lots(plan, near)
+	stats["landmark_crest"] = crest
+	var want: float = LANDMARK_RANK_CREST if crest else LANDMARK_RANK_MIN
+	var li: int = int(plan.buildings[lm]["lot"])
+	if rank < want - 1e-6 and li >= 0 and li < plan.lots.size() 			and bool(plan.lots[li].get("landmark_high_ground", false)):
+		# the planner sent it to the highest ground near the common a church
+		# can stand on (VillageLotPlanner.landmark_high_ground) and this is
+		# the nearest frontage it found there: the ground's answer, said aloud
+		warnings.append("landmark_ground: the %s stands at rank %.2f, as high as a church could stand near the common (wants >= %.2f)"
+			% [String(plan.buildings[lm]["kind"]), rank, want])
+	elif rank < want - 1e-6:
+		failures.append("landmark_ground: the %s stands at rank %.2f of its village's ground, wants >= %.2f%s"
+			% [String(plan.buildings[lm]["kind"]), rank, want,
+			" (a crest or spur lies among the houses)" if crest else " (the world's lower quartile)"])
+
+
+## The common on the most level ground the village has: no steeper than its
+## median lot (plus COMMON_SLOPE_SLACK), or level (LEVEL_MAX) outright.
+func _check_common_ground(plan: VillagePlan) -> void:
+	var g: VillageTerrain = plan.ground
+	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
+	if g == null or common.is_empty() or plan.lots.size() < 3:
+		return
+	var cs: float = float(g.under(common)["slope_mean"])
+	var ls := PackedFloat64Array()
+	var cc: Vector2 = VillageMeasure.centre(common)
+	for lot in plan.lots:
+		# a dispersed village's main common against its own hamlet's lots
+		var at: Vector2 = VillageMeasure.centre(lot["poly"])
+		if _hamlet_seat(plan, at, cc) == _hamlet_seat(plan, cc, cc):
+			ls.append(float(g.under(lot["poly"])["slope_mean"]))
+	if ls.size() < 3:
+		return
+	ls.sort()
+	var med: float = ls[ls.size() / 2]
+	stats["common_slope"] = snappedf(cs, 0.001)
+	stats["lot_slope_median"] = snappedf(med, 0.001)
+	var cap: float = maxf(VillageSiteAnalysis.LEVEL_MAX, med + COMMON_SLOPE_SLACK)
+	if cs > cap + 1e-6:
+		failures.append("common_ground: the common lies on %.1f %%, steeper than the village's median lot (%.1f %%)"
+			% [cs * 100.0, med * 100.0])
+
+
+## The mill at the water, low in its village, its race along the contour.
+func _check_mill_ground(plan: VillagePlan) -> void:
+	var g: VillageTerrain = plan.ground
+	if g == null:
+		return
+	for water in plan.water:
+		if water["kind"] != &"race":
+			continue
+		var host: int = int(water.get("host", -1))
+		var fall: float = float(g.under(water["poly"])["span_m"])
+		stats["race_fall_m"] = snappedf(fall, 0.01)
+		if fall > RACE_FALL_MAX_M + 1e-6:
+			failures.append("mill_ground: race host=%d falls %.1f m along its length, wants <= %.1f (along the contour)"
+				% [host, fall, RACE_FALL_MAX_M])
+		if host < 0 or host >= plan.buildings.size():
+			continue
+		var hs := building_heights(plan, neighbours(plan, host))
+		if spread(hs) < GROUND_RELIEF_MIN_M or hs.size() < 3:
+			continue
+		var rank := rank_in(building_heights(plan, [host])[0], hs)
+		stats["mill_elev_rank"] = snappedf(rank, 0.001)
+		if rank > MILL_RANK_MAX + 1e-6:
+			failures.append("mill_ground: the mill (building %d) stands at rank %.2f of its village's ground, wants <= %.2f (low, at the water)"
+				% [host, rank, MILL_RANK_MAX])
+
+
+## The seat at a prominence -- at or above its village's median building --
+## or at the head of the village: the outermost along the through road on its
+## side of the common.
+func _check_manor_ground(plan: VillagePlan) -> void:
+	var g: VillageTerrain = plan.ground
+	if g == null or plan.buildings.size() < 3:
+		return
+	var cc: Vector2 = VillageMeasure.common_centre(plan)
+	for i in plan.buildings_of_kind(&"castle"):
+		var hs := building_heights(plan, neighbours(plan, i))
+		if spread(hs) < GROUND_RELIEF_MIN_M:
+			continue
+		var rank := rank_in(building_heights(plan, [i])[0], hs)
+		var x: float = VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[i])).x - cc.x
+		var reach := 0.0
+		for j in range(plan.buildings.size()):
+			var xj: float = VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[j])).x - cc.x
+			if xj * x > 0.0:
+				reach = maxf(reach, absf(xj))
+		var head: bool = absf(x) >= reach * MANOR_HEAD_SHARE - 1e-6
+		stats["manor_elev_rank"] = snappedf(rank, 0.001)
+		if rank < MANOR_RANK_MIN - 1e-6 and not head:
+			failures.append("manor_ground: the seat (building %d) stands at rank %.2f of its village's ground and %.0f m along the road of %.0f: neither a prominence nor the head"
+				% [i, rank, absf(x), reach])
+
+
+## Fields on gentle ground: a `field` to FIELD_GENTLE, pasture to
+## FIELD_PASTURE, none on standing water (the dispersed form's own labels).
+func _check_fields_ground(plan: VillagePlan) -> void:
+	var g: VillageTerrain = plan.ground
+	if g == null:
+		return
+	for i in range(plan.fields.size()):
+		var f: Dictionary = plan.fields[i]
+		var u: Dictionary = g.under(f["poly"])
+		var kind: StringName = f.get("kind", &"field")
+		var cap: float = VillageDispersedForm.FIELD_GENTLE if kind == &"field" else VillageDispersedForm.FIELD_PASTURE
+		if float(u["dry_share"]) < 1.0:
+			failures.append("fields_ground: %s %d lies on standing water" % [String(kind), i])
+		elif float(u["slope_mean"]) > cap + 1e-6:
+			failures.append("fields_ground: %s %d lies on %.0f %%, wants <= %.0f %%"
+				% [String(kind), i, float(u["slope_mean"]) * 100.0, cap * 100.0])
+
+
+## The wood on the steepest ground offered to it: VillageEnclosurePlan's
+## candidates (beyond the far side of the common, and the four corners),
+## none of them steeper than the one it took by more than WOOD_SLOPE_SLACK.
+func _check_wood_ground(plan: VillagePlan) -> void:
+	if plan.ground == null or plan.spec.enclosure == &"none":
+		return
+	var derived: Dictionary = VillageEnclosurePlan.build(plan)
+	var offered: Array = VillageEnclosurePlan.wood_candidates(plan, derived["edge"])
+	if offered.is_empty():
+		return
+	var took: float = VillageEnclosurePlan.wood_slope(plan, derived["wood"])
+	var best: float = took
+	for c in offered:
+		best = maxf(best, VillageEnclosurePlan.wood_slope(plan, c))
+	stats["wood_slope"] = snappedf(took, 0.001)
+	if best > took + WOOD_SLOPE_SLACK:
+		failures.append("wood_ground: the wood stands on %.0f %% where %.0f %% was offered"
+			% [took * 100.0, best * 100.0])
+
+
+## The edge stops where the ground turns too steep or too wet: no lot on
+## standing water, none steeper on the mean than a footpath (PATH_MAX).
+func _check_edge_ground(plan: VillagePlan) -> void:
+	var g: VillageTerrain = plan.ground
+	if g == null:
+		return
+	for i in range(plan.lots.size()):
+		if plan.lots[i].has("piles"):
+			continue # on piles, in the water by design (VTER-FORM-WATER)
+		var u: Dictionary = g.under(plan.lots[i]["poly"])
+		if float(u["dry_share"]) < 1.0:
+			failures.append("edge_ground: lot %d reaches onto standing water" % i)
+		elif float(u["slope_mean"]) > VillageSiteAnalysis.PATH_MAX:
+			failures.append("edge_ground: lot %d lies on %.0f %%, past a footpath's %.0f %%"
+				% [i, float(u["slope_mean"]) * 100.0, VillageSiteAnalysis.PATH_MAX * 100.0])
+
+
+## The first church or temple, or -1.
+static func worship_index(plan: VillagePlan) -> int:
+	for i in range(plan.buildings.size()):
+		if plan.buildings[i]["kind"] in [&"church", &"temple"]:
+			return i
+	return -1
+
+
+## The ground's height under each building's footprint centre, in building
+## order; only the buildings `which` names when it is given.
+static func building_heights(plan: VillagePlan, which: Array = []) -> PackedFloat64Array:
+	var hs := PackedFloat64Array()
+	var g: VillageTerrain = plan.terrain()
+	for i in (which if not which.is_empty() else range(plan.buildings.size())):
+		var c: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[i]))
+		hs.append(g.height_at(c) if g != null else 0.0)
+	return hs
+
+
+## The buildings building `i` is ranked among: the whole village, or in a
+## dispersed village its own hamlet (the nearest seat, as `gradient` reads it)
+## -- a hamlet's church is not at the bottom of its village because another
+## hamlet stands forty metres further up the mountain.
+static func neighbours(plan: VillagePlan, i: int) -> Array:
+	var all: Array = range(plan.buildings.size())
+	# a building on the bank is ranked among the buildings on the bank: a house
+	# on piles stands over the water, not on the ground it would be read on
+	# (VTER-FORM-WATER)
+	if not _on_piles(plan, i):
+		all = all.filter(func(j: int) -> bool: return not _on_piles(plan, j))
+	if plan.hamlets.is_empty():
+		return all
+	var at: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[i]))
+	var seat: Vector2 = _hamlet_seat(plan, at, at)
+	var out: Array = []
+	for j in all:
+		var c: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(plan.buildings[j]))
+		if _hamlet_seat(plan, c, c) == seat:
+			out.append(j)
+	return out
+
+
+static func _on_piles(plan: VillagePlan, i: int) -> bool:
+	var li: int = int(plan.buildings[i].get("lot", -1))
+	return li >= 0 and li < plan.lots.size() and plan.lots[li].has("piles")
+
+
+## The share of `hs` strictly below `h`: the survey's searchsorted rank.
+static func rank_in(h: float, hs: PackedFloat64Array) -> float:
+	if hs.is_empty():
+		return 0.0
+	var below := 0
+	for x in hs:
+		if x < h:
+			below += 1
+	return float(below) / hs.size()
+
+
+## p95 - p5 of `hs`, nearest rank: how much fall the village stands on.
+static func spread(hs: PackedFloat64Array) -> float:
+	if hs.size() < 2:
+		return 0.0
+	var s := hs.duplicate()
+	s.sort()
+	var n := s.size()
+	return s[mini(n - 1, int(round(0.95 * (n - 1))))] - s[int(round(0.05 * (n - 1)))]
+
+
+## Whether a crest or spur cell of the plan's ground lies within
+## LANDMARK_CREST_REACH_M of the lot of a building `which` names (every lot
+## when it is empty).
+static func crest_among_lots(plan: VillagePlan, which: Array = []) -> bool:
+	if plan.ground == null or plan.lots.is_empty():
+		return false
+	var a := VillageSiteAnalysis.of(plan.ground, plan.site)
+	if not a.valid():
+		return false
+	var polys: Array[PackedVector2Array] = []
+	if which.is_empty():
+		for lot in plan.lots:
+			polys.append(lot["poly"])
+	else:
+		for i in which:
+			var li: int = int(plan.buildings[i]["lot"])
+			if li >= 0 and li < plan.lots.size():
+				polys.append(plan.lots[li]["poly"])
+	var boxes: Array[Rect2] = []
+	for poly in polys:
+		boxes.append(Poly.bounding_rect(poly).grow(LANDMARK_CREST_REACH_M))
+	for idx in range(a.cell_count()):
+		var cls: StringName = a.class_of(idx)
+		if cls != VillageSiteAnalysis.CREST and cls != VillageSiteAnalysis.SPUR:
+			continue
+		var p: Vector2 = a.cell_center(idx)
+		for k in range(boxes.size()):
+			if boxes[k].has_point(p) and VillageMeasure.point_to_poly(p, polys[k]) <= LANDMARK_CREST_REACH_M:
+				return true
+	return false
+
+
+## How the plan's programme lies on its ground, in one line: for the sweep.
+## Empty for a plan without ground.
+static func ground_reading(plan: VillagePlan) -> String:
+	if plan.ground == null:
+		return ""
+	var c := VillagePlaceCheck.new()
+	c.check(plan)
+	var s: Dictionary = c.stats
+	var bits: Array[String] = []
+	for k in ["landmark_elev_rank", "landmark_crest", "ground_span_m", "common_slope", "lot_slope_median",
+			"manor_elev_rank", "mill_elev_rank", "race_fall_m", "wood_slope"]:
+		if s.has(k):
+			bits.append("%s=%s" % [k, str(s[k])])
+	for f in c.failures:
+		if String(f).contains("_ground:"):
+			bits.append("FAIL " + String(f))
+	return " ".join(bits)
+
+
+## The seat (common centre) of the hamlet nearest `p` in a dispersed village;
+## `otherwise` for every other form.
+static func _hamlet_seat(plan: VillagePlan, p: Vector2, otherwise: Vector2) -> Vector2:
+	var best := otherwise
+	var best_d := INF
+	for h in plan.hamlets:
+		var d: float = p.distance_to(h["seat"])
+		if d < best_d:
+			best_d = d
+			best = h["seat"]
+	return best
 
 
 static func _to_boundary(poly: PackedVector2Array, p: Vector2) -> float:

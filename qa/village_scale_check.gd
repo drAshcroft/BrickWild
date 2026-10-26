@@ -117,6 +117,12 @@ func _check_density(plan: VillagePlan) -> void:
 	for b in plan.buildings:
 		built += Poly.area(VillageMeasure.bounds_poly(b))
 	var site: float = plan.site.size.x * plan.site.size.y
+	# a dispersed village is its hamlets, not the fields between them: the
+	# whole settlement's buildings over the whole settlement's own ground
+	if not plan.hamlets.is_empty():
+		site = 0.0
+		for h in plan.hamlets:
+			site += Poly.area(h["ground"])
 	var d: float = built / maxf(site, 1.0)
 	var minimum: float = DENSITY_MIN_HAMLET if plan.spec.population < VillageSpec.HAMLET_POPULATION else DENSITY_MIN
 	var maximum: float = VillageSitePlanner.density_max(plan.spec)
@@ -160,6 +166,8 @@ func _check_pure(plan: VillagePlan) -> void:
 	twin.enclosure_kept_fraction = spec.enclosure_kept_fraction
 	twin.terrain_envelope = spec.terrain_envelope.duplicate(true)
 	twin.requested_site_m = spec.requested_site_m
+	# the ground is an input too: a sited village is planned on it (VTER-SITING)
+	twin.terrain = spec.terrain
 	twin.generate(spec.seed)
 	var again: VillagePlan = VillageLotPlanner.plan(twin)
 	if not plan.equals(again):

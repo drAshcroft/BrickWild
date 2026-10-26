@@ -41,6 +41,8 @@ static func mill_race(plan: VillagePlan, placement: Dictionary, xf: Transform3D)
 	var centre := Poly.bounding_rect(walls).get_center()
 	var forward3: Vector3 = xf.basis * Vector3(0, 0, -1)
 	var forward := Vector2(forward3.x, forward3.z)
+	var best := {}
+	var best_fall := INF
 	for edge in walls.size():
 		var a := walls[edge]
 		var b := walls[(edge + 1) % walls.size()]
@@ -69,7 +71,7 @@ static func mill_race(plan: VillagePlan, placement: Dictionary, xf: Transform3D)
 						shore = closest
 				# A broad coastal bank can need a longer leat than a streamside
 				# mill. It still reserves real, clear ground for its entire run.
-				var reach := maxf(14.0, plan.site.size.y * 0.35) if water["kind"] == &"coast" else 14.0
+				var reach := maxf(14.0, plan.site.size.y * 0.35) if water["kind"] in [&"coast", &"lake"] else 14.0
 				if distance > reach or (shore - wall).dot(normal) < 0.3:
 					continue
 				var flow := (shore - wheel).normalized()
@@ -85,8 +87,18 @@ static func mill_race(plan: VillagePlan, placement: Dictionary, xf: Transform3D)
 				var race: PackedVector2Array = union[0]
 				if not _race_clear(plan, race, walls):
 					continue
-				return {"kind": &"race", "poly": race, "source": wi,
+				var found := {"kind": &"race", "poly": race, "source": wi,
 					"wheel": wheel, "normal": normal, "wall": wall}
+				if plan.ground == null:
+					return found
+				# on given ground (VTER-PLACE) a leat follows the contour: the
+				# race whose ground falls least along it, none past the cap
+				var fall: float = float(plan.ground.under(race)["span_m"])
+				if fall < best_fall - 1e-6:
+					best_fall = fall
+					best = found
+	if not best.is_empty() and best_fall <= VillagePlaceCheck.RACE_FALL_MAX_M:
+		return best
 	return {}
 
 
@@ -117,7 +129,9 @@ static func build(spec: VillageSpec, site: Rect2,
 	if spec == null or spec.water == &"none":
 		return {"water": water, "crossings": []}
 	match spec.water:
-		&"coast":
+		&"coast", &"lake":
+			# A lake shore is laid as a coast is: standing water along one
+			# edge, with its own kind so a reader can tell the two apart.
 			# Keep a usable dry bank between the winding road and the shore.
 			# Thirty percent consumed that bank on 90m sites, leaving no legal
 			# mill or service yard despite plenty of unused land inland.
@@ -128,7 +142,7 @@ static func build(spec: VillageSpec, site: Rect2,
 			var shore_y := site.position.y if spec.form == &"gate" else site.end.y - depth
 			water.append({"poly": Poly.from_rect(Rect2(
 				Vector2(site.position.x + SITE_MARGIN, shore_y),
-				Vector2(site.size.x - SITE_MARGIN * 2.0, depth))), "kind": &"coast"})
+				Vector2(site.size.x - SITE_MARGIN * 2.0, depth))), "kind": spec.water})
 		&"pond":
 			water.append({"poly": _pond(site, commons, roads), "kind": &"pond"})
 		&"stream", &"river":
@@ -247,10 +261,27 @@ static func crossings(water: Array[Dictionary], roads: Array[Dictionary]) -> Arr
 			for buffer in buffers:
 				for route in _wet_routes(points, buffer):
 					out.append({"road": r, "water": w, "water_kind": water[w]["kind"],
-						"kind": &"ford" if water[w]["kind"] == &"stream" else &"bridge",
-						"points": route, "width": float(road["width"]),
+						"kind": crossing_kind(road, water[w]),
+						"points": route, "width": crossing_width(road),
 						"pos": route[route.size() / 2]})
 	return out
+
+
+## A ford through a stream, a bridge over anything else -- and a boardwalk on
+## piles where the road is one (VTER-FORM-WATER, VillageWaterForm).
+static func crossing_kind(road: Dictionary, water: Dictionary) -> StringName:
+	if bool(road.get("boardwalk", false)):
+		return &"boardwalk"
+	return &"ford" if water["kind"] == &"stream" else &"bridge"
+
+
+## A crossing carries its road's width; a boardwalk's deck is the road's whole
+## verged ribbon (the crossing is widened by the builder's BRIDGE_MARGIN), so
+## the lots it fronts meet its edge.
+static func crossing_width(road: Dictionary) -> float:
+	if bool(road.get("boardwalk", false)):
+		return float(road["width"]) + 2.0 * float(road["verge"]) - VillageBuilder.BRIDGE_MARGIN
+	return float(road["width"])
 
 
 static func _wet_routes(points: PackedVector2Array, poly: PackedVector2Array) -> Array[PackedVector2Array]:

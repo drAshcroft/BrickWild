@@ -3,8 +3,6 @@ extends SceneTree
 
 const SIZES := [
 	{"name": "small", "width": 7.0, "length": 9.0, "height": 2.6},
-	{"name": "default", "width": 9.0, "length": 12.0, "height": 2.6},
-	{"name": "large", "width": 17.0, "length": 18.0, "height": 2.8},
 ]
 const SEEDS := [1, 8102, 21325]
 const CUSTOM_SPEC := preload("res://tests/fixtures/witch_custom_house_spec.gd")
@@ -50,76 +48,29 @@ func _check_witch_geometry(size: Dictionary, seed: int) -> void:
 	var pitch := float(plan.spec.roof_pitch)
 	if pitch < 1.05 * pitch_scale - 0.0001 or pitch > 1.4 * pitch_scale + 0.0001:
 		_fail("%s generated pitch escaped the revised Witch range" % who)
-	var high_core := HouseGeometry.witch_high_core_rect(plan)
+	# WITCH-SIZE: a hut has no service wing, so only the shared roof_rise()
+	# profile exists (the raised high core went with the 9 x 12 / 17 x 18 huts).
 	var profile_span := minf(plan.spec.width, plan.spec.length)
 	var profile_factor := 0.5
-	if high_core.has_area():
-		profile_span = minf(high_core.size.x, high_core.size.y)
-		profile_factor = 0.64
-	var expected_rise := minf(profile_span * pitch * profile_factor,
-		clampf(profile_span * 0.52, 3.6, 5.6))
+	var profile_cap := clampf(profile_span * 0.52, 3.6, 5.6)
+	# WITCH-ROOF: wall at most 2.3 m, rise at least 1.55 x the wall (cap permitting).
+	var wall_h := float(plan.spec.height)
+	var expected_rise := minf(maxf(profile_span * pitch * profile_factor,
+		HouseGeometry.WITCH_MIN_RISE_RATIO * wall_h), profile_cap)
+	if wall_h > HouseGenerator.WITCH_MAX_WALL + 0.0001:
+		_fail("%s wall %.2f exceeds the 2.3 m hut wall" % [who, wall_h])
+	if float(layout["rise"]) < 1.5 * wall_h:
+		_fail("%s roof rise %.2f is under 1.5 x its wall %.2f" % [who, float(layout["rise"]), wall_h])
+	if plan.spec.jetty or plan.spec.dormers:
+		_fail("%s hut gained a jetty or dormers" % who)
+	if String(_roof_appearance(plan.spec)["kind"]) != "thatch":
+		_fail("%s roof is not rendered as thatch" % who)
 	if absf(float(layout["rise"]) - expected_rise) > 0.002:
 		_fail("%s rise no longer follows the capped roof-height contract" % who)
-	if not is_equal_approx(float(plan.spec.height), float(size.height)):
-		_fail("%s interior wall/headroom datum changed with roof styling" % who)
+	if not is_equal_approx(float(plan.spec.height), minf(float(size.height), HouseGenerator.WITCH_MAX_WALL)):
+		_fail("%s interior wall/headroom datum is not the clamped hut wall" % who)
 	if plan.world_family != &"":
 		_fail("%s ordinary Witch generation unexpectedly gained a world-family tag" % who)
-	_check_public_bay_profile(size, seed, who)
-
-
-func _check_public_bay_profile(size: Dictionary, seed: int, who: String) -> void:
-	var public_spec := HouseSpec.new(seed)
-	public_spec.style = &"witch_hut"
-	public_spec.width = float(size["width"])
-	public_spec.length = float(size["length"])
-	public_spec.height = float(size["height"])
-	var public_plan := HouseGenerator.generate(public_spec, seed, true)
-	if public_plan == null:
-		_fail("%s public furnished Witch plan did not generate" % who)
-		return
-	var layout: Dictionary = HouseGeometry.roof_layout(public_plan)
-	var bay: Dictionary = layout.get("witch_bay", {})
-	if String(size["name"]) == "small":
-		if not bay.is_empty():
-			_fail("%s small public Witch unexpectedly entered the high-core bay roof path" % who)
-		return
-	if bay.is_empty():
-		_fail("%s public Witch lost its measured service-bay roof" % who)
-		return
-	var span := float(layout.get("span", 0.0))
-	var rise := float(layout.get("rise", 0.0))
-	var cap := clampf(span * 0.52, 3.6, 5.6)
-	var expected_rise := minf(span * public_plan.spec.roof_pitch * 0.64, cap)
-	if span <= 0.0 or absf(rise - expected_rise) > 0.002:
-		_fail("%s public high-core rise escaped its measured-span profile and metre cap" % who)
-	if rise > cap + 0.001:
-		_fail("%s public high-core rise exceeded its existing metre cap" % who)
-	var seam_fall := float(bay.get("join_y", NAN)) - float(bay.get("eave_y", NAN))
-	if not is_finite(seam_fall) or seam_fall < 0.45 - 0.002:
-		_fail("%s raised roof lost the measured lower-bay seam fall" % who)
-	if float(bay.get("minimum_clearance", 0.0)) < 2.30 - 0.002:
-		_fail("%s raised roof reduced measured service-bay headroom below 2.30 m" % who)
-	var builder := HouseBuilder.new()
-	var shell: ArrayMesh = builder.build(public_plan, true)
-	var planned_bounds := HouseGeometry.exterior_bounds(public_plan).grow(0.025)
-	if not planned_bounds.encloses(shell.get_aabb()):
-		_fail("%s raised public roof escapes its measured planned shell bounds" % who)
-	shell.clear_surfaces()
-	var projection := absf(float(bay.get("inner", NAN)) - float(bay.get("outer", NAN)))
-	if not is_finite(projection):
-		_fail("%s raised roof lost the measured bay projection" % who)
-	# The higher join moves the bay inner station inward. Pin the actual
-	# after-profile values, and make the baseline reduction explicit.
-	if seed == 8102 and String(size["name"]) == "default":
-		if rise / span < 0.66 or rise / span > 0.70:
-			_fail("%s default reference roof ratio missed candidate compact-gable range 0.66-0.70" % who)
-		if absf(projection - 4.932) > 0.03:
-			_fail("%s default service roof missed measured 4.932 m projection" % who)
-	if seed == 8102 and String(size["name"]) == "large":
-		if rise / span < 0.39 or rise / span > 0.44:
-			_fail("%s large reference roof ratio missed candidate compact-gable range 0.39-0.44" % who)
-		if absf(projection - 6.751) > 0.03:
-			_fail("%s large service roof missed measured 6.751 m projection" % who)
 
 
 func _check_generation_scope() -> void:
@@ -209,3 +160,7 @@ func _check_custom_selector(spec: HouseSpec) -> void:
 
 func _fail(message: String) -> void:
 	failures.append(message)
+
+
+func _roof_appearance(spec: HouseSpec) -> Dictionary:
+	return ShellAssembler.house_roof_appearance(spec, &"")

@@ -124,7 +124,7 @@ static func primary(spec: CastleSpec, with_towers := true) -> Dictionary:
 				restore_daylight(out[kind], curtain_boxes(spec))
 				blind_rooms_to_stores(plan)
 				if furnish_keep:
-					HouseFurnisher.furnish(plan, plan.spec)
+					CastleRoomTopUp.furnish(plan, plan.spec)
 				else:
 					CastleKeepPlan.furnish_minimum_programme(plan, plan.spec)
 			elif yaw != 0.0:
@@ -267,6 +267,23 @@ static func blind_rooms_to_stores(plan: HousePlan) -> void:
 			plan.rooms[index]["kind"] = &"store"
 			if index < plan.spec.program.size():
 				plan.spec.program[index] = &"store"
+			_settle_store_furniture(plan, index)
+
+
+## A room demoted to a store keeps the furniture it was dressed with as a
+## guardroom, and a guardroom may hang an outdoor lantern. A store may not: the
+## arrangement rule calls it an outdoor fitting in a domestic room (french
+## chateau fortress, ring 1). The piece has no place on a store floor and no
+## indoor twin of its category to be swapped for, so it comes out.
+static func _settle_store_furniture(plan: HousePlan, room: int) -> void:
+	var index := plan.furniture.size() - 1
+	while index >= 0:
+		if int(plan.furniture[index].get("room", -1)) == room \
+				and not PropCatalog.suits_room(String(plan.furniture[index]["key"]), &"store"):
+			plan.furniture.remove_at(index)
+			HouseFurnishRepair.reindex_hosts(plan, index)
+			index = mini(index, plan.furniture.size())
+		index -= 1
 
 
 ## A habitable room that lost every window to a neighbour gets one on its
@@ -437,11 +454,14 @@ static func emit(owner: CastleBuilder, row: Dictionary) -> void:
 	var transform: Transform3D = row.transform
 	for part in builder.part_log:
 		var opening_kind := String(part.get("opening_kind", ""))
-		if not opening_kind in ["window", "door"]:
+		# A shop's service hatch is a window-sized hole the shell really cuts;
+		# castle QA reads it as a window (CASTLE-YARD-WINDOW) while the record
+		# keeps `opening_kind` "hatch" so the occupancy check can tell it.
+		if not opening_kind in ["window", "door", "hatch"]:
 			continue
 		var imported: Dictionary = part.duplicate(true)
 		var facing := (transform.basis * Vector3(part.facing)).normalized()
-		imported.kind = opening_kind
+		imported.kind = "window" if opening_kind == "hatch" else opening_kind
 		imported.pos = transform * Vector3(part.pos)
 		imported.facing = facing
 		imported.rot_y = atan2(facing.x, facing.z)

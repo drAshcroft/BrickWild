@@ -90,7 +90,7 @@ static func generate(spec: CastleSpec, with_furniture := false) -> HousePlan:
 	for level in range(n - 1):
 		_add_stair(plan, level, level + 1, outline)
 	if with_furniture:
-		HouseFurnisher.furnish(plan, hs)
+		CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 

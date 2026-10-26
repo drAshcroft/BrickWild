@@ -22,6 +22,15 @@ const VERANDA_DEPTH_RANGE := [1.35, 1.85]
 ## A more compact roof rise is selected only for the exact built-in Witch
 ## archetype; other uses of the Witch style row keep its historical pitch.
 const WITCH_ROOF_PITCH_RANGE := [1.05, 1.4]
+## A hut is small (WITCH-SIZE): a witch_hut footprint is at most 7 x 9 m (the
+## short side 7, the long side 9, in whichever orientation was asked for) and
+## one storey, clamped the way CastleGenerator clamps against CastleGeometry.
+const WITCH_MAX_SHORT := 7.0
+const WITCH_MAX_LONG := 9.0
+const WITCH_MAX_STOREYS := 1
+const WITCH_MAX_ROOMS := 3
+## WITCH-ROOF: short walls (floor to eave wall plate) under a high roof.
+const WITCH_MAX_WALL := 2.3
 
 
 ## Generate the spec's derived fields, then plan and furnish. Returns the plan,
@@ -30,6 +39,11 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 		world_family: StringName = &"") -> HousePlan:
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
+	clamp_witch_hut(spec)
+	HouseLonghall.clamp_size(spec)
+	HouseRound.clamp_size(spec)
+	# HS-PUEBLO: a footprint that can step is at least two storeys. No draw.
+	HousePueblo.clamp_size(spec, world_family)
 	spec.storeys = clampi(spec.storeys, 1, 3)
 	spec.cellars = clampi(spec.cellars, 0, 1)
 	var s: Dictionary = HouseSpec.STYLES[spec.style]
@@ -59,6 +73,13 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	# exterior architectural variety
 	var plinth_range: Array = s.get("plinth", [0.35, 0.55])
 	spec.plinth_height = r.randf_range(float(plinth_range[0]), float(plinth_range[1]))
+	# HS-MINKA: the plinth draw is the height the FLOOR is raised, and the
+	# wall then stands from the floor (no dwarf wall above it).
+	if bool(s.get("raised_floor", false)):
+		spec.floor_raise = spec.plinth_height
+		spec.plinth_height = 0.0
+	spec.engawa = float(s.get("engawa", 0.0)) >= 1.0
+	spec.engawa_depth = float(s.get("engawa_depth", 1.2))
 	spec.stone_ground_floor = spec.storeys > 1 and GeneratorRandom.chance(r, float(s.get("stone_ground", 0.15)))
 	spec.jetty = spec.storeys > 1 and GeneratorRandom.chance(r, float(s.get("jetty", 0.5)))
 	spec.jetty_depth = r.randf_range(0.24, 0.32)
@@ -113,6 +134,7 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 		spec.veranda = GeneratorRandom.chance(r, float(s.get("veranda", 0.0)))
 		spec.eave_sweep = GeneratorRandom.chance(r, float(s.get("eave_sweep", 0.0)))
 		spec.thatch_roll = GeneratorRandom.chance(r, float(s.get("thatch_roll", 0.0)))
+		spec.eyebrows = int(s.get("eyebrow", 0))
 		spec.corner_piers = GeneratorRandom.chance(r, float(s.get("corner_piers", 0.0)))
 		spec.veranda_depth = r.randf_range(VERANDA_DEPTH_RANGE[0], VERANDA_DEPTH_RANGE[1])
 		# A cone has no eave to stand a wall on: its skirt runs out to the plan
@@ -124,14 +146,44 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 		# skyline. The style table sets both as invariants rather than chances.
 		if spec.style == &"pueblo":
 			spec.parapet = true
+		# HS-SAHEL: style flags, no draw
+		spec.sahel = bool(s.get("sahel", false))
+		spec.unglazed = bool(s.get("unglazed", false))
+		spec.court_ranges = bool(s.get("court_ranges", false))
+		if spec.sahel:
+			spec.parapet = true
+		# HS-PUEBLO: style flags, no draw. A stepped house has no stone hoods over
+		# its windows (a European piece on mud), and its roof and terraces are laid
+		# flush with the walls but for a hand (HousePueblo.OVERSAIL), so a ladder can
+		# lean on the wall under the parapet.
+		spec.small_openings = bool(s.get("small_openings", false)) and HousePueblo.plain(spec, world_family)
+		if spec.terraced:
+			spec.jetty = false
+			spec.window_hoods = false
+			spec.parapet = true
+			spec.roof_span_out = HousePueblo.roof_out()
+			spec.roof_along_out = HousePueblo.roof_out()
+
+	# HVERN-WITCH-THATCH: the witch hut's thatch (WITCH-ROOF) always carries the eave
+	# bolster and the ridge roll, so the spec DECLARES it. No draw: it is a style
+	# invariant, and the vernacular check reads the flag to see it was asked for.
+	if HouseGeometry.has_witch_roofcraft(spec, world_family):
+		spec.thatch_roll = true
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y
 	spec.room_count = HouseSpec.rooms_for(area)
+	if spec.style == &"witch_hut":
+		spec.room_count = mini(spec.room_count, WITCH_MAX_ROOMS)
 	spec.program = _program_for(spec)
 	# a back door is only worth having when there is a room at the back to put
 	# it in, and something to go out to
 	spec.back_door = spec.room_count >= 3 and GeneratorRandom.chance(r, 0.55)
+	if spec.style == &"farmhouse" or spec.style == &"mediterranean" or spec.style == &"african":
+		# HS-FARMHOUSE: the farm's kitchen door onto the yard is a style
+		# invariant (the draw above is still consumed, so no later roll moves).
+		# HS-MEDITERRANEAN, HS-SAHEL: the same door opens on the walled court.
+		spec.back_door = spec.room_count >= 3
 
 	spec.wall_color = Color(s["wall"][0]).lerp(Color(s["wall"][1]), r.randf())
 	spec.trim_color = Color(s["trim"][0]).lerp(Color(s["trim"][1]), r.randf())
@@ -144,6 +196,8 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	var plan: HousePlan = HousePlanner.plan(spec, world_family)
 	if with_furniture:
 		HouseFurnisher.furnish(plan, spec)
+		HouseLonghall.seat(plan)
+		HouseRound.seat(plan)
 	# HouseFurnisher deliberately works from room IDs and legacy 2D rectangles.
 	# Stamp the explicit level on its records here so consumers can already
 	# distinguish stacked placements without changing that independent placer.
@@ -157,6 +211,21 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	HousePlanFeatures.compose_wall_hosts(plan, spec)
 	HouseExterior.dress(plan)
 	return plan
+
+
+## WITCH-SIZE: a witch_hut is clamped to 7 x 9 m and one storey. Any other
+## style is left alone; a request already inside the bound is unchanged.
+static func clamp_witch_hut(spec: HouseSpec) -> void:
+	if spec == null or spec.style != &"witch_hut":
+		return
+	var along_x: bool = spec.width >= spec.length
+	var long_side: float = minf(maxf(spec.width, spec.length), WITCH_MAX_LONG)
+	var short_side: float = minf(minf(spec.width, spec.length), WITCH_MAX_SHORT)
+	spec.width = long_side if along_x else short_side
+	spec.length = short_side if along_x else long_side
+	spec.storeys = mini(spec.storeys, WITCH_MAX_STOREYS)
+	spec.height = minf(spec.height, WITCH_MAX_WALL)
+	spec.cellars = 0
 
 
 ## The final roof type is drawn later, so establish the pitch exception from

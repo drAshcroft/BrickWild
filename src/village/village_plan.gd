@@ -66,7 +66,7 @@ var enclosure_kept_fraction: float = 1.0
 var gate_crossings: Array[Dictionary] = []
 
 ## A water body on the site. {"poly": PackedVector2Array, "kind": StringName
-## ("pond"/"stream"/"river"/"coast")}
+## ("pond"/"stream"/"river"/"coast"/"lake")}
 var water: Array[Dictionary] = []
 
 ## Persistent bridges and fords, after the final roads have been trimmed.
@@ -87,6 +87,41 @@ var props: Array[Dictionary] = []
 ## Trees, hedges and ground cover. {"key": String, "pos": Vector2,
 ## "canopy": float, "trunk": float}
 var plants: Array[Dictionary] = []
+
+## The ground in the plan's own frame (VTER-SITING), or null for a flat plan.
+## When `spec.terrain` is given the site planner places the village on it --
+## `site_anchor` and `site_yaw` say where: a plan point p stands on the
+## caller's ground at `site_anchor + p.rotated(site_yaw)` -- and `ground` is
+## that ground resampled into the plan's frame, so every reading of a plan
+## point (`ground.height_at(p)`, `profile`, `under`) needs no transform.
+var ground: VillageTerrain = null
+var site_anchor := Vector2.ZERO
+var site_yaw := 0.0     ## radians, counter-clockwise from the caller's +X in its own (x, y)
+
+## The hamlets of a `dispersed` village (VillageDispersedForm), empty for
+## every other form: {"seat", "common", "spine", "households", "shelf",
+## "main", "ground"}. The first is the main hamlet, on the through road.
+var hamlets: Array[Dictionary] = []
+## The shoreline a `shore` village follows (VillageShoreForm): (x, y) per
+## column in the plan's frame, water on +y. Empty for every other form.
+var shoreline := PackedVector2Array()
+
+## A `crest` village's summit, ring and church bearing (VillageCrestForm);
+## empty for every other form.
+var crest: Dictionary = {}
+
+## An island village's island (VillageIslandForm, VTER-ISLAND-FILL): {"area_m2",
+## "ring_scale" (the ring's x scale, 1 = at the shore), "landings" (the spine's
+## two ends)}; empty for every other form.
+var island: Dictionary = {}
+
+
+## The ground readings of this plan are taken on: `ground` when the village
+## was sited, else the spec's own (null when flat).
+func terrain() -> VillageTerrain:
+	if ground != null:
+		return ground
+	return spec.terrain if spec != null else null
 
 
 func _init(p_spec: VillageSpec = null) -> void:
@@ -154,6 +189,8 @@ func equals(other: VillagePlan) -> bool:
 		return false
 	if site != other.site:
 		return false
+	if not site_anchor.is_equal_approx(other.site_anchor) or not is_equal_approx(site_yaw, other.site_yaw):
+		return false
 	if not _value_equal(landmark_site, other.landmark_site):
 		return false
 	return (
@@ -169,6 +206,10 @@ func equals(other: VillagePlan) -> bool:
 		and _array_of_dict_equal(fields, other.fields)
 		and _array_of_dict_equal(props, other.props)
 		and _array_of_dict_equal(plants, other.plants)
+		and _array_of_dict_equal(hamlets, other.hamlets)
+		and _poly_equal(shoreline, other.shoreline)
+		and crest == other.crest
+		and _value_equal(island, other.island)
 	)
 
 
@@ -193,8 +234,14 @@ static func _spec_equal(a: VillageSpec, b: VillageSpec) -> bool:
 		and _value_equal(a.kept_buildings, b.kept_buildings)
 		and is_equal_approx(a.enclosure_kept_fraction, b.enclosure_kept_fraction)
 		and _value_equal(a.terrain_envelope, b.terrain_envelope)
+		and _terrain_key(a) == _terrain_key(b)
 		and is_equal_approx(a.requested_site_m, b.requested_site_m)
 	)
+
+
+## The ground's fingerprint, or "" for a flat (terrain-less) spec.
+static func _terrain_key(s: VillageSpec) -> String:
+	return s.terrain.fingerprint() if s.terrain != null else ""
 
 
 static func _array_of_dict_equal(a: Array, b: Array) -> bool:

@@ -347,6 +347,7 @@ func build(p_spec: ChurchSpec) -> ArrayMesh:
 	preload("church_roofs.gd").emit(spec, _kit, mass_log, _roof_volumes)
 	_build_stave_skirt()
 	_build_stave_finials()
+	_build_terrace()
 
 	# The masons are finished; the parish moves in. The dressing is prop
 	# PLACEMENTS rather than geometry, so it costs the mesh nothing and
@@ -2060,12 +2061,118 @@ func _build_floor() -> void:
 		box(Vector3(step.size.x, h, step.size.y),
 			Vector3(step.get_center().x, ChurchGeometry.FLOOR_LIFT + h / 2.0,
 				step.get_center().y), SURF_TRIM)
+	_build_reredos()
+
+
+## A dark ground, pale carved panels, frames, mouldings and a cross: a reredos
+## the eye finds from the west door of a 46 m nave (LIVE-SACRED). The ground is
+## the dark opening slot and the rest the trim slot, so the church keeps its
+## four surfaces (the sweep requires exactly that) and nothing new is painted.
+## Every piece is a named component inside ChurchGeometry.reredos_aabb.
+## Same-facing fronts stand at distinct depths, backs run into the wall and the
+## foot into the step, so no two faces fight.
+func _build_reredos() -> void:
+	var box_a: AABB = ChurchGeometry.reredos_aabb(spec)
+	if box_a.size.x <= 0.0:
+		return
+	tag("reredos")
+	var W: float = box_a.size.x
+	var H: float = box_a.size.y
+	var y0: float = box_a.position.y
+	var back: float = box_a.end.z   # inside the wall
+	# [role, x0, x1, y0, y1 (fractions of W and H), front depth, surface]
+	var pieces: Array = [
+		["reredos_ground", -0.485, -0.22, 0.0, 0.75, 0.05, SURF_OPEN],
+		["reredos_ground", -0.22, 0.22, 0.0, 0.87, 0.05, SURF_OPEN],
+		["reredos_ground", 0.22, 0.485, 0.0, 0.75, 0.05, SURF_OPEN],
+		["reredos_panel", -0.15, 0.15, 0.19, 0.82, 0.08, SURF_TRIM],
+		["reredos_panel", -0.42, -0.20, 0.19, 0.66, 0.08, SURF_TRIM],
+		["reredos_panel", 0.20, 0.42, 0.19, 0.66, 0.08, SURF_TRIM],
+		["reredos_post", -0.495, -0.46, 0.0, 0.76, 0.11, SURF_TRIM],
+		["reredos_post", -0.19, -0.155, 0.0, 0.88, 0.11, SURF_TRIM],
+		["reredos_post", 0.155, 0.19, 0.0, 0.88, 0.11, SURF_TRIM],
+		["reredos_post", 0.46, 0.495, 0.0, 0.76, 0.11, SURF_TRIM],
+		["reredos_predella", -0.5, 0.5, 0.16, 0.19, 0.13, SURF_TRIM],
+		["reredos_cornice", -0.5, -0.18, 0.74, 0.78, 0.13, SURF_TRIM],
+		["reredos_cornice", 0.18, 0.5, 0.74, 0.78, 0.13, SURF_TRIM],
+		["reredos_cornice", -0.25, 0.25, 0.865, 0.90, 0.13, SURF_TRIM],
+		["reredos_cross", -0.0175, 0.0175, 0.895, 1.0, 0.11, SURF_TRIM],
+		["reredos_cross", -0.07, 0.07, 0.935, 0.96, 0.13, SURF_TRIM],
+	]
+	for p in pieces:
+		var x0: float = float(p[1]) * W
+		var x1: float = float(p[2]) * W
+		var ya: float = y0 + float(p[3]) * H
+		var yb: float = y0 + float(p[4]) * H
+		var front: float = box_a.end.z - ChurchGeometry.REREDOS_EMBED - float(p[5])
+		var size := Vector3(x1 - x0, yb - ya, back - front)
+		var centre := Vector3((x0 + x1) * 0.5, (ya + yb) * 0.5, (front + back) * 0.5)
+		component_box(String(p[0]), size, Transform3D(Basis(), centre), int(p[6]))
 
 
 # ------------------------------------------------------------ St Basil's
 
 ## Podium: two stone courses reaching past the outermost chapel, so the whole
 ## cluster stands on one raised platform. The door is lifted onto it.
+## Falling ground (VTER-HOUSE-SLOPE): the church stands on a TERRACE. Its
+## floor stays at y = 0, the ground at the uphill edge; a rectangle round
+## every mass that stands on the ground, TERRACE_MARGIN wider, is held up by a
+## coursed retaining wall down to the ground and paved over, and the west door
+## is reached by a flight from the terrace's front edge. Nothing on flat
+## ground: `terrace_flight` stays empty and the mesh is unchanged.
+const TERRACE_MARGIN := 1.2
+const TERRACE_WALL_T := 0.6
+const TERRACE_TOP := -0.03
+const TERRACE_PAVING_T := 0.12
+var terrace_rect := Rect2()
+var terrace_flight: Dictionary = {}
+
+
+func _build_terrace() -> void:
+	terrace_rect = Rect2()
+	terrace_flight = {}
+	var g := GroundFall.of_spec(spec)
+	if g == null:
+		return
+	var first := true
+	for m in mass_log:
+		var a: AABB = m["aabb"]
+		if a.position.y > 0.05:
+			continue
+		var fr := Rect2(Vector2(a.position.x, a.position.z), Vector2(a.size.x, a.size.z))
+		terrace_rect = fr if first else terrace_rect.merge(fr)
+		first = false
+	if first:
+		return
+	terrace_rect = terrace_rect.grow(TERRACE_MARGIN)
+	tag("terrace")
+	host("terrace", 0)
+	var r := terrace_rect.grow(-TERRACE_WALL_T * 0.5)
+	var c := GroundFall.corners(r)
+	for i in 4:
+		g.emit_run(self, "terrace_wall", c[i], c[(i + 1) % 4], TERRACE_WALL_T,
+			TERRACE_TOP, SURF_STONE, TERRACE_WALL_T * 0.5)
+	var inner := terrace_rect.grow(-TERRACE_WALL_T)
+	var y := TERRACE_TOP - TERRACE_PAVING_T * 0.5
+	var paving := PackedVector3Array()
+	for p2 in GroundFall.corners(inner):
+		paving.append(Vector3(p2.x, y, p2.y))
+	component_slab("terrace_paving", paving, TERRACE_PAVING_T, SURF_STONE, true)
+	host_end()
+	var doors := ChurchGeometry.west_door_layout(spec)
+	var door_w := 1.4
+	if not doors.is_empty():
+		door_w = maxf(float(doors[0]["width"]), 1.4)
+	var outer := Vector2(0.0, terrace_rect.position.y)
+	var blocked: Array[Rect2] = [terrace_rect.grow(-0.01)]
+	terrace_flight = g.plan_flight(outer, Vector2(0.0, -1.0), door_w, TERRACE_TOP,
+		Rect2(), blocked)
+	if not terrace_flight.is_empty():
+		host("entry_west", 0)
+		g.emit_flight(self, terrace_flight, SURF_STONE, TERRACE_TOP)
+		host_end()
+
+
 func _build_podium() -> void:
 	var ph: float = ChurchGeometry.podium_height(spec)
 	if ph <= 0.0:

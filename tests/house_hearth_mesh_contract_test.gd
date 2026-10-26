@@ -20,7 +20,6 @@ func _init() -> void:
 		{"style": &"farmhouse", "seed": 7441},
 		{"style": &"cottage", "seed": 7441},
 		{"style": &"witch_hut", "seed": 7441},
-		{"style": &"witch_hut", "seed": 1, "width": 9.0, "length": 12.0},
 	]:
 		_check_ordinary_fixture(fixture)
 	_check_solid_compatibility()

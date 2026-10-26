@@ -32,9 +32,7 @@ static func shared_edge(p: HousePlan, i: int, j: int) -> Array:
 ## Doors on a spanning tree from the hall, expanding through public rooms
 ## first so bedrooms and stores end up as leaves.
 static func _place_witch_workshop_yard_door(p: HousePlan, spec: HouseSpec) -> void:
-	var bay := HouseGeometry.witch_workshop_bay(p)
-	if bay.is_empty():
-		bay = HouseGeometry.witch_compact_service_threshold(p)
+	var bay := HouseGeometry.witch_compact_service_threshold(p)
 	if bay.is_empty():
 		return
 	var room := int(bay.room)
@@ -206,6 +204,8 @@ static func add_inner_door(p: HousePlan, a: int, b: int, edge: Array) -> void:
 
 static func _inner_door_width(p: HousePlan) -> float:
 	# Leave room for the frame tuck around a 0.9 m clear carrying route.
+	if p.spec.small_openings:
+		return HousePueblo.DOOR_W
 	return 0.95 if HousePlanLevels._is_plain_house_spec(p.spec) else HouseGeometry.INNER_DOOR_W
 
 
@@ -213,7 +213,7 @@ static func _set_domestic_door_head(p: HousePlan, door: Dictionary) -> void:
 	if HousePlanLevels._is_plain_house_spec(p.spec) and not door.has("head"):
 		# Opening heights are measured from the storey datum; people stand on
 		# the floor slab. Preserve 2.1 m above that finished surface.
-		door["head"] = minf(p.spec.height - 0.06, HouseGeometry.FLOOR_T + 2.1)
+		door["head"] = minf(p.spec.height - 0.06, HouseGeometry.FLOOR_T + HousePueblo.door_h(p.spec))
 
 
 ## The front door, on the hall's own stretch of the front wall.
@@ -244,13 +244,6 @@ static func _place_front_door(p: HousePlan, spec: HouseSpec, hall: int) -> void:
 		w = HouseGeometry.DOOR_W
 	var m: float = HouseGeometry.DOOR_CORNER_MARGIN + w / 2.0
 	var x: float = clampf(rect.get_center().x, rect.position.x + m, rect.end.x - m)
-	# In the compact Alchemist side Hall, the cooking and meal groups use the
-	# long west wall. Keep the entrance lane beside the service partition so
-	# both wall work and the dining group can stay out of its approach.
-	if spec.style == &"witch_hut" and spec.trade == &"alchemist" \
-			and bool(p.domestic_layout.get("witch_alchemist_side_hall", false)) \
-			and p.kind_of(room) == &"hall":
-		x = rect.end.x - m
 	p.doors.append({"a": room, "b": -1, "pos": Vector2(x, inner.position.y),
 		"normal": Vector2(0, -1), "width": w, "exterior": true, "front": true,
 		"storey": p.storey_of_room(room)})
@@ -267,7 +260,7 @@ static func _place_back_door(p: HousePlan, spec: HouseSpec) -> void:
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var front: int = p.entrance()
 	var fx: float = inner.get_center().x
-	var fw: float = HouseGeometry.DOOR_W
+	var fw: float = HousePueblo.door_w(spec)
 	if front >= 0:
 		fx = float(p.doors[front]["pos"].x)
 		fw = float(p.doors[front]["width"])
@@ -277,7 +270,7 @@ static func _place_back_door(p: HousePlan, spec: HouseSpec) -> void:
 			var rect: Rect2 = p.rooms[i]["rect"]
 			if absf(rect.end.y - inner.end.y) > 0.01:
 				continue
-			var w: float = HouseGeometry.DOOR_W
+			var w: float = HousePueblo.door_w(spec)
 			var m: float = HouseGeometry.DOOR_CORNER_MARGIN + w / 2.0
 			if rect.size.x < m * 2.0:
 				continue
@@ -375,7 +368,7 @@ static func _squeeze_window(p: HousePlan, room: int, side: Dictionary) -> bool:
 	# full size first, then a narrow one. A small room whose only outside wall
 	# has the front door in it can still take a slit of a window, and a slit is
 	# worth having: the alternative is a room with no daylight at all.
-	for width in [HouseGeometry.WINDOW_W, HouseGeometry.WINDOW_NARROW]:
+	for width in [HouseGeometry.win_w(p.spec), HouseGeometry.win_narrow(p.spec)]:
 		var half: float = width / 2.0
 		var t0: float = float(side["t0"]) + half + 0.1
 		var t1: float = float(side["t1"]) - half - 0.1
@@ -388,8 +381,8 @@ static func _squeeze_window(p: HousePlan, room: int, side: Dictionary) -> bool:
 			if _crowds(p, pos, normal, width, p.storey_of_room(room)):
 				continue
 			p.windows.append({"room": room, "pos": pos, "normal": normal,
-				"width": width, "sill": HouseGeometry.WINDOW_SILL,
-				"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H,
+				"width": width, "sill": HouseGeometry.win_sill(p.spec),
+				"head": HouseGeometry.win_sill(p.spec) + HouseGeometry.win_h(p.spec),
 				"storey": p.storey_of_room(room)})
 			return true
 	return false
@@ -426,24 +419,24 @@ static func windows_along(p: HousePlan, spec: HouseSpec, room: int, side: Dictio
 	var t0: float = float(side["t0"]) + HouseGeometry.WINDOW_CORNER_MARGIN
 	var t1: float = float(side["t1"]) - HouseGeometry.WINDOW_CORNER_MARGIN
 	var run: float = t1 - t0
-	if run < HouseGeometry.WINDOW_W:
+	var win_w: float = HouseGeometry.win_w(spec)
+	if run < win_w:
 		return
-	var pitch: float = HouseGeometry.WINDOW_W + HouseGeometry.WINDOW_MIN_GAP
+	var pitch: float = win_w + HouseGeometry.WINDOW_MIN_GAP
 	var fits: int = clampi(int(run / pitch) + 1, 1, 4)
 	for k in range(fits):
 		if p.windows_of(room).size() >= cap:
 			return
 		var f: float = 0.5 if fits == 1 else float(k) / float(fits - 1)
-		var t: float = lerpf(t0 + HouseGeometry.WINDOW_W / 2.0,
-			t1 - HouseGeometry.WINDOW_W / 2.0, f)
+		var t: float = lerpf(t0 + win_w / 2.0, t1 - win_w / 2.0, f)
 		var pos: Vector2 = Vector2(line, t) if absf(normal.x) > 0.5 else Vector2(t, line)
 		if _clashes_with_door(p, pos, normal, p.storey_of_room(room)):
 			continue
 		if _clashes_with_window(p, pos, normal, p.storey_of_room(room)):
 			continue
 		p.windows.append({"room": room, "pos": pos, "normal": normal,
-			"width": HouseGeometry.WINDOW_W, "sill": HouseGeometry.WINDOW_SILL,
-			"head": HouseGeometry.WINDOW_SILL + HouseGeometry.WINDOW_H,
+			"width": win_w, "sill": HouseGeometry.win_sill(spec),
+			"head": HouseGeometry.win_sill(spec) + HouseGeometry.win_h(spec),
 			"storey": p.storey_of_room(room)})
 		var got := 0.0
 		for wi in p.windows_of(room):
@@ -461,7 +454,7 @@ static func _clashes_with_door(p: HousePlan, pos: Vector2, normal: Vector2,
 				HousePlan.record_storey(d), storey):
 			continue
 		var gap: float = (d["pos"] - pos).length()
-		if gap < (float(d["width"]) + HouseGeometry.WINDOW_W) / 2.0 + 0.3:
+		if gap < (float(d["width"]) + HouseGeometry.win_w(p.spec)) / 2.0 + 0.3:
 			return true
 	return false
 
@@ -472,7 +465,7 @@ static func _clashes_with_window(p: HousePlan, pos: Vector2, normal: Vector2,
 		if not _same_wall(w["pos"], w["normal"], pos, normal,
 				HousePlan.record_storey(w), storey):
 			continue
-		if (w["pos"] - pos).length() < HouseGeometry.WINDOW_W + HouseGeometry.WINDOW_MIN_GAP - 0.05:
+		if (w["pos"] - pos).length() < HouseGeometry.win_w(p.spec) + HouseGeometry.WINDOW_MIN_GAP - 0.05:
 			return true
 	return false
 

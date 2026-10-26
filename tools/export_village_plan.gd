@@ -44,6 +44,16 @@ extends SceneTree
 ## carries `population_implied`, `population_civic` and, per building,
 ## `serves` ("visible" or "implied").
 ##
+## The caller may pass the GROUND (docs/VILLAGE_TERRAIN.md): a
+## `brickwild.terrain` height grid as `terrain.height` in the request (inline,
+## or a path relative to the request), or `--terrain <grid.json>`. It must
+## cover the planned site. The plan then carries `ground` (the whole site) and
+## a `ground` block on every lot, building and road: how high, how much fall,
+## how steep, which way down. With it the village is also PLANNED on it
+## (VTER-SITING, VTER-ROADS): placed and turned on the grid (`site.anchor_m`,
+## `site.yaw_deg`) and its roads laid by grade. Without it the output is
+## byte-identical to before.
+##
 ## Exit codes: 0 written, 2 usage or I/O, 3 refused (cannot satisfy).
 ##
 ## Scope, deliberately: no mesh, no props-as-geometry, no assets. This is the
@@ -66,7 +76,7 @@ func _init() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var opts: Dictionary = _options(args)
 	if not opts.has("request") or not opts.has("out"):
-		printerr("usage: --request <in.json> --out <out.json> [--population <people>] [--implied-population <people>]")
+		printerr("usage: --request <in.json> --out <out.json> [--population <people>] [--implied-population <people>] [--terrain <grid.json>]")
 		quit(2)
 		return
 	var text: String = _read(opts["request"])
@@ -97,11 +107,21 @@ func _init() -> void:
 		printerr("SiteRequest refused: %s" % "; ".join(brief_errors))
 		quit(3)
 		return
+	var ground: VillageTerrain = terrain_from_request(request,
+		String(opts["request"]).get_base_dir(), String(opts.get("terrain", "")))
+	if ground != null and not ground.valid():
+		printerr("SiteRequest refused: terrain %s" % "; ".join(ground.errors()))
+		quit(3)
+		return
+	spec.terrain = ground
 	if not spec.valid():
 		printerr("SiteRequest does not map to a village: %s" % ", ".join(spec.errors()))
 		quit(3)
 		return
 	spec.generate(spec.seed)
+	var intent_note := form_intent_note(spec)
+	if not intent_note.is_empty():
+		notes.append(intent_note)
 	var plan: VillagePlan = VillageLotPlanner.plan(spec)
 	if plan.roads.is_empty():
 		printerr("SiteRequest refused: no roads could be planned for form '%s'" % String(spec.form))
@@ -125,7 +145,18 @@ func _init() -> void:
 			", ".join(unplaced_labels(programme, plan)), plan.site.size.x, plan.site.size.y])
 		quit(3)
 		return
+	if ground != null and not covers_plan(ground, plan):
+		var b: Rect2 = ground.bounds()
+		printerr("SiteRequest refused: terrain covers [%.1f, %.1f]-[%.1f, %.1f] m, the planned site needs [%.1f, %.1f]-[%.1f, %.1f] m" % [
+			b.position.x, b.position.y, b.end.x, b.end.y,
+			plan.site.position.x, plan.site.position.y, plan.site.end.x, plan.site.end.y])
+		quit(3)
+		return
 	var out: Dictionary = site_plan(plan, request)
+	if ground != null:
+		if plan.ground != null:
+			notes.append(siting_note(plan))
+		notes.append(ground_note(out))
 	out["notes"] = notes
 	for note in notes:
 		print("  note: %s" % note)
@@ -287,6 +318,10 @@ static func spec_from_request(request: Dictionary, raw: String = "",
 	out.upkeep = float(request.get("upkeep", 1.0))
 	var terrain: Dictionary = request.get("terrain", {})
 	out.terrain_envelope = terrain.duplicate(true)
+	# the height grid is read into `spec.terrain`, never echoed: a 400 m site
+	# at 1 m is 160 000 numbers
+	if out.terrain_envelope.has("height"):
+		out.terrain_envelope["height"] = "brickwild.terrain"
 	out.requested_site_m = float(request.get("site_m", SITE_MAX_M))
 	var built: Dictionary = request.get("buildings", {}).duplicate(true)
 	for word in BUILT_WORDS:
@@ -442,6 +477,17 @@ static func _settle_form(spec: VillageSpec, notes: Array[String],
 			return
 	spec.purpose = was_purpose
 	spec.generate(spec.seed)
+
+
+## With ground, the spec derives its form from the land
+## (VillageSpec._derive_form_on_ground); a form with no planner yet is planned
+## as its VillageSpec.FORM_FALLBACK, and this says so, as _settle_form says
+## when it changes a form. "" when the planned form is the derived one.
+static func form_intent_note(spec: VillageSpec) -> String:
+	if spec.terrain == null or spec.form_intent == spec.form or spec.form_intent == &"":
+		return ""
+	return "the ground derives the '%s' form, which has no planner yet; planned as '%s' (form_intent keeps '%s')" % [
+		String(spec.form_intent), String(spec.form), String(spec.form_intent)]
 
 
 ## The population at which VillageSpec.FORMS forces the `gate` row.
@@ -631,7 +677,211 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 	if request.has("implied_population"):
 		out["population_implied"] = plan.spec.implied_population
 		out["population_civic"] = plan.spec.civic_population()
+	if plan.spec.terrain != null:
+		# the form the ground derived, beside the form planned; only with
+		# ground, so a flat request's bytes never change
+		out["form_intent"] = String(plan.spec.form_intent)
+		_add_ground(out, plan)
+	if not plan.crest.is_empty():
+		# a crest village's summit and ring (VillageCrestForm); no other form has one
+		var c: Dictionary = plan.crest
+		out["crest"] = {"summit_m": [_n(c["summit"].x), _n(c["summit"].y)], "ring_radius_m": _n(c["radius"]),
+			"approaches": int(c["approaches"])}
+	if not plan.hamlets.is_empty():
+		# a dispersed village's hamlets (VillageDispersedForm); no other form
+		# has any, so no other plan's bytes change
+		var hamlets: Array = []
+		for i in range(plan.hamlets.size()):
+			var h: Dictionary = plan.hamlets[i]
+			var seat: Vector2 = h["seat"]
+			hamlets.append({"seat_m": [_n(seat.x), _n(seat.y)], "common": int(h["common"]),
+				"spine_road": VillageDispersedForm.spine_of(plan, i), "households": int(h["households"]),
+				"main": bool(h["main"]), "ground_m2": _n(Poly.area(h["ground"]))})
+		out["hamlets"] = hamlets
+	if not plan.shoreline.is_empty():
+		# a shore village's shoreline (VillageShoreForm); no other form has one
+		var line: Array = []
+		for p in plan.shoreline:
+			line.append([_n(p.x), _n(p.y)])
+		out["shoreline_m"] = line
+	if not plan.island.is_empty():
+		# an island village's island (VillageIslandForm); no other plan has one
+		var landings: Array = []
+		for p in (plan.island["landings"] as PackedVector2Array):
+			landings.append([_n(p.x), _n(p.y)])
+		out["island"] = {"area_m2": _n(float(plan.island["area_m2"])), "ring_scale": _n(float(plan.island["ring_scale"])),
+			"landings_m": landings}
 	return out
+
+
+## The ground the caller gave, read under everything the plan placed. Only
+## called with terrain, so a flat request's bytes never change.
+##
+## A village sited on its ground (VTER-SITING) is written in its OWN frame,
+## like every plan: the site centred on the origin, the through road west to
+## east. `site.anchor_m` and `site.yaw_deg` place that frame on the caller's
+## grid -- a plan point (x, z) stands at anchor + (x cos yaw - z sin yaw,
+## x sin yaw + z cos yaw) in the grid's own (x, z) -- and every `ground`
+## reading below is the caller's ground at that place. The `ground` block
+## describes the caller's grid as given (origin, cells, fingerprint).
+static func _add_ground(out: Dictionary, plan: VillagePlan) -> void:
+	var t: VillageTerrain = plan.terrain()
+	var given: VillageTerrain = t.parent if t.parent != null else t
+	out["ground"] = {"schema": VillageTerrain.SCHEMA, "schema_version": VillageTerrain.SCHEMA_VERSION,
+		"source": given.source, "origin_m": [_n(given.origin.x), _n(given.origin.y)], "cell_m": _n(given.cell_m),
+		"cols": given.cols, "rows": given.rows, "min_m": _n(given.min_height()), "max_m": _n(given.max_height()),
+		"relief_m": _n(given.relief()), "site": _ground(t.under(_rect_poly(plan.site))),
+		"water_level_m": null if is_nan(given.water_level_m) else _n(given.water_level_m),
+		"fingerprint": given.fingerprint()}
+	if plan.ground != null:
+		out["site"]["anchor_m"] = [_n(plan.site_anchor.x), _n(plan.site_anchor.y)]
+		out["site"]["yaw_deg"] = _n(rad_to_deg(plan.site_yaw))
+		out["site"]["frame"] = "plan point p stands on the given ground at anchor_m + p rotated by yaw_deg (x toward z)"
+	for i in range(plan.lots.size()):
+		out["lots"][i]["ground"] = _ground(t.under(plan.lots[i]["poly"]))
+		if plan.lots[i].has("ground_fit"):
+			out["lots"][i]["platform"] = _platform(plan.lots[i]["ground_fit"])
+		if plan.lots[i].has("piles"):
+			# on piles over the water (VTER-FORM-WATER): the deck, the water's
+			# depth, and the landing from the house to its boardwalk
+			var piles: Dictionary = plan.lots[i]["piles"]
+			out["lots"][i]["piles"] = {"deck_m": _n(float(piles["deck_m"])),
+				"water_m": _n(float(piles["water_m"])), "freeboard_m": _n(float(piles["freeboard_m"])),
+				"landing_m": _points(piles["landing"])}
+	for i in range(plan.buildings.size()):
+		var b: Dictionary = plan.buildings[i]
+		var corners: PackedVector2Array = Placement.world_rect(b["placement"], b["transform"], true)
+		var g: Dictionary = _ground(t.under(corners))
+		var door: Vector3 = b["door"]
+		g["door_m"] = _n(t.height_at(Vector2(door.x, door.z)))
+		var lot: Dictionary = plan.lots[int(b["lot"])]
+		if lot.has("ground_fit"):
+			# where the building stands (VTER-LOTS): its floor on the lot's
+			# platform, the fall its request carries and which way
+			var fit: Dictionary = lot["ground_fit"]
+			g["platform_m"] = _n(float(fit["platform_m"]))
+			g["fall_m"] = _n(float(fit["fall_m"]))
+			g["downhill_deg"] = _n(float(fit["downhill_deg"]))
+			g["door_rise_m"] = _n(float(fit["door_rise_m"]))
+		if lot.has("piles"):
+			g["platform_m"] = _n(float(lot["piles"]["deck_m"]))
+			g["on_piles"] = true
+		out["buildings"][i]["ground"] = g
+	for w in range(plan.water.size()):
+		if bool(plan.water[w].get("ground", false)):
+			out["water"][w]["source"] = "ground"
+	for r in range(plan.roads.size()):
+		var pts: PackedVector2Array = plan.roads[r]["points"]
+		var pr: Dictionary = t.profile(pts)
+		var at: Array = []
+		for p in pts:
+			at.append(_n(t.height_at(p)))
+		out["roads"][r]["ground"] = {"points_m": at, "length_m": _n(pr["length_m"]),
+			"rise_m": _n(pr["rise_m"]), "fall_m": _n(pr["fall_m"]), "grade_max": _n(pr["grade_max"])}
+		if VillageWaterForm.is_boardwalk(plan.roads[r]):
+			out["roads"][r]["boardwalk"] = {"deck_m": _n(float(plan.roads[r]["deck_m"]))}
+	for i in range(plan.commons.size()):
+		out["commons"][i]["ground"] = _ground(t.under(plan.commons[i]["poly"]))
+
+
+## A lot's platform (VTER-LOTS, VillageLotGround.record): the level the
+## building's floor stands at, the fall its request carries (local direction,
+## and in the plan's frame), how much is cut and filled under it, what it puts
+## on the ground outside its walls (entry flights, a terrace, a talus), and
+## the terrace walls along the lot's edge -- for a consumer that grades the
+## ground (VTER-GROUND-MESH): inside the lot the ground is the platform uphill
+## of the building and GroundFall's plane from it downhill.
+static func _platform(fit: Dictionary) -> Dictionary:
+	var walls: Array = []
+	for w in fit["terraces"]:
+		walls.append({"points_m": _points(w["points"]), "height_m": _n(float(w["height_m"])),
+			"holds": String(w["holds"])})
+	var parts: Array = []
+	for p in fit.get("entry_parts", []):
+		parts.append(_points(p))
+	var down: Vector2 = fit["downhill"]
+	return {"platform_m": _n(float(fit["platform_m"])), "fall_m": _n(float(fit["fall_m"])),
+		"downhill_deg": _n(float(fit["downhill_deg"])), "downhill": [_n(down.x), _n(down.y)],
+		"natural_fall_m": _n(float(fit["natural_m"])), "slope": _n(float(fit["slope"])),
+		"cut_m": _n(float(fit["cut_m"])), "fill_m": _n(float(fit["fill_m"])),
+		"door_rise_m": _n(float(fit["door_rise_m"])), "ground_parts_m": parts, "terrace_walls": walls}
+
+
+## One `under()` reading, snapped.
+static func _ground(u: Dictionary) -> Dictionary:
+	if u.is_empty():
+		return {}
+	return {"min_m": _n(u["min_m"]), "max_m": _n(u["max_m"]), "mean_m": _n(u["mean_m"]),
+		"span_m": _n(u["span_m"]), "slope_max": _n(u["slope_max"]), "slope_mean": _n(u["slope_mean"]),
+		"dry_share": _n(u["dry_share"]),
+		"low_m": [_n(u["low_m"][0]), _n(u["low_m"][1])], "high_m": [_n(u["high_m"][0]), _n(u["high_m"][1])]}
+
+
+## Whether the caller's grid covers the planned site where it stands: the
+## site's four corners carried onto the grid by the siting, or the site itself
+## for a plan laid out flat.
+static func covers_plan(ground: VillageTerrain, plan: VillagePlan) -> bool:
+	if plan.ground == null:
+		return ground.covers(plan.site)
+	var b := ground.bounds().grow(0.01)
+	for p in _rect_poly(plan.site):
+		if not b.has_point(plan.site_anchor + p.rotated(plan.site_yaw)):
+			return false
+	return true
+
+
+## Where the village was put on its ground, in one line.
+static func siting_note(plan: VillagePlan) -> String:
+	return "siting: the village stands at (%.1f, %.1f) m on the given ground, its through road turned %.1f degrees from east, laid by grade (through road and lanes to %d %%, streets, tracks and paths to %d %%, steeper as steps)" % [
+		plan.site_anchor.x, plan.site_anchor.y, rad_to_deg(plan.site_yaw),
+		roundi(100.0 * float(VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"])),
+		roundi(100.0 * float(VillageSitePlanner.ROAD_CLASSES[&"path"]["grade_max"]))]
+
+
+## The ground under a building larger than this is called out in the notes.
+const GROUND_FALL_NOTE_M := 1.5
+
+
+## Where the flat plan and the given ground disagree most, in one line.
+static func ground_note(out: Dictionary) -> String:
+	var steep := 0
+	var worst := 0.0
+	var worst_id := ""
+	for b in out["buildings"]:
+		var span: float = float(b["ground"].get("span_m", 0.0))
+		if span > GROUND_FALL_NOTE_M:
+			steep += 1
+		if span > worst:
+			worst = span
+			worst_id = String(b["building_id"])
+	return "terrain: %.1f m of relief under the site; %d of %d buildings stand on more than %.1f m of fall (most: %s, %.1f m). %s; buildings[].ground says where to cut, fill or step" % [
+		float(out["ground"]["site"].get("span_m", 0.0)), steep, (out["buildings"] as Array).size(),
+		GROUND_FALL_NOTE_M, worst_id, worst,
+		"The roads follow the ground" if (out["site"] as Dictionary).has("anchor_m") else "The plan is laid out flat"]
+
+
+## The request's ground, or null for none. `--terrain` wins over the request's
+## own `terrain.height`; a relative path is read beside the request.
+static func terrain_from_request(request: Dictionary, base_dir: String, terrain_arg: String) -> VillageTerrain:
+	if not terrain_arg.is_empty():
+		return VillageTerrain.from_file(terrain_arg)
+	var terrain: Variant = request.get("terrain", {})
+	if not terrain is Dictionary or not (terrain as Dictionary).has("height"):
+		return null
+	var h: Variant = terrain["height"]
+	if h is Dictionary:
+		return VillageTerrain.from_dict(h, base_dir)
+	if h is String:
+		var path: String = h
+		if path.is_relative_path() and not base_dir.is_empty():
+			path = base_dir.path_join(path)
+		return VillageTerrain.from_file(path)
+	# neither a grid nor a path: from_dict names what is wrong
+	return VillageTerrain.from_dict({})
+
+
+static func _rect_poly(r: Rect2) -> PackedVector2Array:
+	return PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
 
 
 static func _roads(plan: VillagePlan) -> Array:

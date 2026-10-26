@@ -14,11 +14,12 @@ const LONG_SEAT_OVERHANG := 0.3
 ## How deep into a room the approach to a door is kept clear of tables and
 ## other free-standing pieces, beyond the swing itself, and how far either
 ## side of the leaf. A table a hand's breadth past the swing still meets you
-## as you come in (walk QA, 6 Oct).
-const DOOR_APPROACH := 1.6
+## as you come in (walk QA, 6 Oct). The plan uses the same strip to stand a
+## free focus back from the entrance, so it lives in HouseGeometry.
+const DOOR_APPROACH := HouseGeometry.ENTRY_APPROACH
 const DOOR_APPROACH_SIDE := 0.3
 ## Match the domestic bed-door QA margin for the compact Alchemist's side Hall.
-const COMPACT_ALCHEMIST_BED_DOOR_GAP := 0.4
+const WITCH_BED_DOOR_GAP := 0.4
 ## Clear floor kept round a table before another table may stand there: a
 ## seat's depth and its pull-back space.
 const TABLE_GAP := 1.1
@@ -56,7 +57,12 @@ static func _seating_probe(plan: HousePlan, room: int, table: Dictionary,
 		# leave the table with fewer seats than the contract requires.
 		# Choose the model for the whole set. A failed last chair must not silently
 		# turn one place into a stool while the other places remain tall chairs.
+		# HS-RICH: a style that lays a table for `dining_seats` has chairs at it,
+		# never stools; a table pose that cannot seat them is not chosen.
+		var chairs_only: bool = HouseSpec.STYLES.get(plan.spec.style, {}).has("dining_seats")
 		for seat_key in PropCatalog.of_category(seat_cat):
+			if chairs_only and String(seat_key) == "Stool":
+				continue
 			var occupied2: Array[Rect2] = blocked.duplicate()
 			var used2: Array[Rect2] = zones.duplicate()
 			var probe2 := HousePlan.new()
@@ -187,10 +193,10 @@ static func initial_blocked(plan: HousePlan, room: int) -> Array[Rect2]:
 	return out
 
 
-static func _is_compact_witch_alchemist(plan: HousePlan) -> bool:
-	return HouseFurnishingRecipes.is_ordinary_house(plan) \
-		and plan.spec.style == &"witch_hut" and plan.spec.trade == &"alchemist" \
-		and bool(plan.domestic_layout.get("witch_alchemist_side_hall", false))
+## Any ordinary witch hut (WITCH-SIZE): a bed keeps its door-swing gap, so a
+## 5.5 x 7 hut does not put its double bed beside the bedroom door.
+static func _is_witch_hut(plan: HousePlan) -> bool:
+	return HouseFurnishingRecipes.is_ordinary_house(plan) and plan.spec.style == &"witch_hut"
 
 
 static func _bed_candidate_clears_door_gaps(plan: HousePlan, room: int, body: Rect2) -> bool:
@@ -198,7 +204,7 @@ static func _bed_candidate_clears_door_gaps(plan: HousePlan, room: int, body: Re
 		var door: Dictionary = plan.doors[door_index]
 		for side in [-1.0, 1.0]:
 			if body.intersects(HouseGeometry.door_clear_rect(door, side).grow(
-					COMPACT_ALCHEMIST_BED_DOOR_GAP)):
+					WITCH_BED_DOOR_GAP)):
 				return false
 	return true
 
@@ -229,6 +235,7 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 		choices = [exact_key]
 	else:
 		choices = PropCatalog.of_category_for_room(cat, plan.kind_of(room))
+		choices = HouseFurnishingRecipes.shop_key_choices(plan, room, choices) # LIVE-SHOPS
 	if choices.is_empty():
 		return
 	var key: String = choices[r.randi_range(0, choices.size() - 1)]
@@ -247,6 +254,7 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 	var original_blocked_count: int = blocked.size()
 	var borrowed_band_count := _borrow_activity_band(plan, room,
 		String(step.get("group", "")), blocked)
+	borrowed_band_count += HouseFurnishingRecipes.borrow_serving_place(plan, room, step, blocked) # LIVE-SHOPS
 	var witch_trace: bool = bool(plan.domestic_layout.get("_witch_placement_trace", false)) and HouseFurnishingRecipes.is_ordinary_house(plan) and plan.spec.style == &"witch_hut" and plan.spec.trade == &"none" and String(step.get("group", "")) in ["cooking", "witchwork", "eating", "sleep"]
 	if witch_trace:
 		print("WITCH_STEP_BEGIN room=", room, " category=", cat, " key=", key, " group=", step.get("group", ""), " rule=", rule, " blocked=", blocked.size(), " zones=", zones.size(), " blocked_rects=", str(blocked), " usezones=", str(zones))
@@ -761,7 +769,7 @@ static func _place_witchwork_book_on_support(plan: HousePlan, room: int,
 							if clash:
 								continue
 							piece["rect"] = rect
-							piece["zone"] = Rect2()
+							HouseFurnishGeometry.set_zone(piece, Rect2())
 							plan.furniture.append(piece)
 							return
 
@@ -1205,7 +1213,7 @@ static func _witch_prep_leaves_water_space(plan: HousePlan, room: int, key: Stri
 
 static func _uses_witch_wall_prep(plan: HousePlan, key: String) -> bool:
 	return HouseFurnishingRecipes.is_ordinary_house(plan) \
-		and plan.spec.style == &"witch_hut" and plan.spec.trade == &"none" \
+		and plan.spec.style == &"witch_hut" \
 		and PropCatalog.category(key) == "workbench"
 
 
@@ -1396,14 +1404,15 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 						try_cand["pos"] = seated
 						var tending: Rect2 = try_cand["zone"]
 						tending.position += n * (HouseGeometry.WITCH_RECESS_FRONT_CLEAR + 0.02)
-						try_cand["zone"] = tending
+						HouseFurnishGeometry.set_zone(try_cand, tending)
 					if HouseFurnishingRecipes.uses_bedside_pair(plan) \
 							and PropCatalog.category(key) == "bed" \
 							and String(step.get("group", "")) == "sleep":
-						try_cand["zone"] = HouseFurnishGeometry.ordinary_sleep_access_zone(
-							Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
-							float(try_cand["yaw"]))
-					if _is_compact_witch_alchemist(plan) and plan.kind_of(room) == &"bedroom" \
+						HouseFurnishGeometry.set_zone(try_cand,
+							HouseFurnishGeometry.ordinary_sleep_access_zone(
+								Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
+								float(try_cand["yaw"])))
+					if _is_witch_hut(plan) and plan.kind_of(room) == &"bedroom" \
 							and PropCatalog.category(key) == "bed" \
 							and String(step.get("group", "")) == "sleep" \
 							and not _bed_candidate_clears_door_gaps(plan, room, Rect2(try_cand["rect"])):
@@ -1415,7 +1424,15 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 						# would be inside the masonry.
 						var z0: Rect2 = try_cand["zone"]
 						var c0: Vector2 = Rect2(try_cand["rect"]).get_center()
-						try_cand["zone"] = Rect2(c0 * 2.0 - z0.get_center() - z0.size / 2.0, z0.size)
+						var strip0: PackedVector2Array = try_cand.get("zone_strip",
+							PackedVector2Array())
+						HouseFurnishGeometry.set_zone(try_cand,
+							Rect2(c0 * 2.0 - z0.get_center() - z0.size / 2.0, z0.size))
+						var mirrored := PackedVector2Array()
+						for corner in strip0:
+							mirrored.append(c0 * 2.0 - corner)
+						if not mirrored.is_empty():
+							try_cand["zone_strip"] = mirrored
 					if hearth_only >= 0:
 						var breast := HouseGeometry.breast_for_hearth(plan, room, try_cand, wi)
 						if not _breast_fits(plan, room, breast, floor_rect, blocked, zones):
@@ -1509,9 +1526,10 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 							if HouseFurnishingRecipes.is_ordinary_house(plan) \
 									and PropCatalog.category(key) == "bed" \
 									and String(step.get("group", "")) == "sleep":
-								try_cand["zone"] = HouseFurnishGeometry.ordinary_sleep_access_zone(
-									Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
-									float(try_cand["yaw"]))
+								HouseFurnishGeometry.set_zone(try_cand,
+									HouseFurnishGeometry.ordinary_sleep_access_zone(
+										Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
+										float(try_cand["yaw"])))
 							if HouseFurnishGeometry.fits(plan, room, try_cand, floor_rect, blocked, zones, extra):
 								cand = try_cand
 								break
@@ -1993,7 +2011,7 @@ static func place_row(plan: HousePlan, room: int, step: Dictionary,
 						# not one bench of a row would ever fit. Pews in a
 						# chapel are the case the row rule was written for
 						# (INT-001) and could not do until this line.
-						cand["zone"] = Rect2()
+						HouseFurnishGeometry.set_zone(cand, Rect2())
 						if not HouseFurnishGeometry.fits(plan, room, cand, floor_rect, blocked, zones, extra):
 							break
 						try_row.append(cand)
@@ -2053,7 +2071,7 @@ static func place_row(plan: HousePlan, room: int, step: Dictionary,
 		return
 	var row_group: String = "%d_%s_%d" % [room, cat, plan.furniture.size()]
 	for cand in best_row:
-		cand["zone"] = best_zone
+		HouseFurnishGeometry.set_zone(cand, best_zone)
 		cand["row"] = row_group
 		if bool(step.get("free_standing", false)):
 			cand["free_standing"] = true
@@ -2103,9 +2121,14 @@ static func place_free(plan: HousePlan, room: int, key: String,
 	# approach to every door, and only if the room has nowhere else for it is
 	# it allowed back in -- and then it says so, so the check can tell a
 	# cramped room's compromise from a careless placement. The focus piece is
-	# the exception: a counter that faces the shop door is MEANT to meet you.
+	# the exception to the other doors -- a counter that faces the shop door is
+	# MEANT to meet you -- but the way in through the front door is a walk, not
+	# a place to stand: the plan stands it back by that strip and the placer
+	# keeps its body out of it (CASTLE-CHANGE-17).
 	var approach: Array[Rect2] = []
-	if not _is_focus_piece(plan, room, key):
+	if _is_focus_piece(plan, room, key):
+		approach = entrance_approach(plan, room)
+	else:
 		approach = door_approaches(plan, room)
 	var with_approach: Array[Rect2] = extra.duplicate()
 	with_approach.append_array(approach)
@@ -2161,6 +2184,17 @@ static func door_approaches(plan: HousePlan, room: int) -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	for d in plan.doors_of(room):
 		out.append_array(door_approach_rects(plan.doors[d]))
+	return out
+
+
+## The way in through the building's front door, when it opens into this room.
+## The room's focus may meet you at the swing, but nothing its plan arranged
+## around stands IN the walk through the door.
+static func entrance_approach(plan: HousePlan, room: int) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var entrance := plan.entrance()
+	if entrance >= 0 and int(plan.doors[entrance].get("a", -1)) == room:
+		out = door_approach_rects(plan.doors[entrance])
 	return out
 
 
@@ -2286,7 +2320,8 @@ static func _free_at_scale(plan: HousePlan, room: int, key: String, yaw: float,
 			cand["pos"] = Vector3(centre.x, 0.0, centre.y)
 			cand["rect"] = Rect2(centre - foot / 2.0, foot)
 			if has_zone:
-				cand["zone"] = HouseFurnishGeometry.zone_rect(key, cand["rect"], yaw)
+				HouseFurnishGeometry.set_zone(cand,
+					HouseFurnishGeometry.zone_rect(key, cand["rect"], yaw))
 			if not HouseFurnishGeometry.fits(plan, room, cand, floor_rect, blocked, zones, extra):
 				continue
 			cand["focus_point"] = focus
@@ -2368,8 +2403,11 @@ static func _place_corner(plan: HousePlan, room: int, key: String,
 ## Seats at a table, facing it, with pull-back space behind them.
 static func place_around(plan: HousePlan, room: int, key: String,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator,
-		want_row := false, preferred_sides: Array = []) -> void:
-	var host: int = _find_host(plan, room, ["table", "workbench", "counter"], want_row)
+		want_row := false, preferred_sides: Array = [], forced_host := -1) -> void:
+	# A caller that is seating one particular table names it; otherwise the
+	# host is the least-seated table in the room.
+	var host: int = forced_host if forced_host >= 0 \
+		else _find_host(plan, room, ["table", "workbench", "counter"], want_row)
 	if host < 0:
 		return
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
@@ -2525,9 +2563,11 @@ static func _find_host(plan: HousePlan, room: int, cats: Array,
 ## for a kitchen table and wrong for anything with a front and a back. Nobody
 ## sits between the high table and the hall. (CAS-010)
 ##
-## The bench stands on its own feet -- no `host` -- because it is not drawn up
-## to the table and pushed back in again: it is where the lord sits, the walk
-## has to reach it, and a body crossing the dais has to go round it.
+## The bench is not drawn up to the table and pushed back in again: it is
+## where the lord sits, the walk has to reach it, and a body crossing the dais
+## has to go round it. It is still that table's seat, and carries the table as
+## its `host`: without the link the walk QA's seat count reads a high table
+## with the lord behind it as a table that seats nobody (seat_count, 14 Oct).
 static func _place_behind(plan: HousePlan, room: int, key: String,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
 	var host: int = _find_host(plan, room, ["table", "workbench", "counter"], false, true)
@@ -2560,4 +2600,6 @@ static func _place_behind(plan: HousePlan, room: int, key: String,
 		if score > best_score:
 			best_score = score
 			best = cand
+	if not best.is_empty():
+		best["host"] = host
 	HouseFurnishGeometry.commit(plan, room, best, blocked, zones)

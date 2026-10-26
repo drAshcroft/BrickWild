@@ -64,16 +64,24 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"tree", "bridge", "windmill", "dungeon"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["library", "placement", "cultureapi", "compactapi", "vground", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
+const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "placement", "cultureapi", "compactapi", "vworld", "vrealism", "vterrain", "vterrainlane", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
-	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "vis009", "vis010", "vis016", "catalogcache",
-	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad", "wunchecked",
+	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "sacredid", "vis009", "vis010", "vis016", "catalogcache",
+	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchsize", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad", "wunchecked",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
+	"cslope",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
 	"wld001_riad_14", "wld001_riad_19", "wld001_palazzo_07",
 	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
 	"dmvbrief", "dmvimplied", "dmvwalk", "bwalk", "twalk", "chwalk", "kwalk", "kwalk2",
+	"wwalk",
+	"vtplan", "vhillside", "vislandfill",
+	"vcrossterrain",
+	"vdispersed",
+	"vshore",
+	"vvalley",
+	"vcrest",
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest", "cas013",
 	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015", "cground",
@@ -130,7 +138,7 @@ const LANES: Dictionary = {
 	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
 	"lane:assets": ["assets", "props", "hassembly"],
 	"lane:shop-trade": ["shoptrade", "sarchetype"],
-	"lane:house-plan-fast": ["houseqaplan", "hmultistory", "hwitchcompact"],
+	"lane:house-plan-fast": ["houseqaplan", "hmultistory", "hwitchcompact", "hwitchsize"],
 	"lane:house-furnish-fast": ["houseqafurnishfast", "hassembly", "walkpins"],
 	"lane:house-furnish-rules": ["houseqafurnishfast"],
 	"lane:house-exterior-fast": ["hexterior", "hassembly", "hwitchflue"],
@@ -138,6 +146,12 @@ const LANES: Dictionary = {
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
 	"lane:palace-change": ["palace"],
 	"lane:village-fast": ["vquick", "vcompact", "compactapi", "vground"],
+	# Bounded terrain gate: one village on each of plane_30, lake_shore,
+	# cliff_band, Manarola, Masouleh and Monpazier, with the five terrain rules
+	# (grades, fall, the stair walk, wet ground, siting) and one failing
+	# control per rule. Under the five-minute host cap; the fuller suites stay
+	# vtplan, vstepswalk, vterrain and vanalysis.
+	"lane:village-terrain": ["vterrainlane"],
 	"lane:village-appearance-fast": ["vdecoration", "vdecorationapi", "vappearance"],
 	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cmotteaccess", "kwalk"],
 	"lane:motte-change": ["cmotteplan", "cmotteaccess", "coccupancy"],
@@ -145,16 +159,16 @@ const LANES: Dictionary = {
 	"lane:castle": ["castle", "cnormals", "cmassing", "clandmark", "cvoxelqa", "ctowerplan", "cmotteplan", "cmotteaccess", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried", "cterrace"],
 	"lane:church-change": ["churchroof", "churchchange", "sacredseq", "chwalk"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
-	"lane:temple": ["temple", "rite", "twalk", "sacredseq"],
+	"lane:temple": ["temple", "rite", "twalk", "sacredseq", "sacredid"],
 	# Same assertions as `temple`, split so no process nears the 300 s cap.
 	"lane:temple-contract": ["temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras"],
 	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "wunchecked", "matkit"],
 	"lane:tree": ["tree"],
 	"lane:bridge": ["bridge"],
-	"lane:windmill": ["windmill"],
+	"lane:windmill": ["windmill", "wwalk"],
 	"lane:dungeon": ["dungeon"],
 	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi", "bwalk", "twalk", "chwalk", "kwalk"],
-	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "interior", "cvoxelqa", "library", "placement"],
+	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "vrealism", "interior", "cvoxelqa", "library", "placement"],
 	"lane:sweep": ORDER,
 }
 
@@ -195,6 +209,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/castle_navigation_suite.gd").run_more()
 		"twalk":
 			return preload("res://tests/suites/temple_walk_suite.gd").run()
+		"wwalk":
+			return preload("res://tests/suites/windmill_walk_suite.gd").run()
 		"vnativeqa":
 			return preload("res://tests/suites/village_native_qa_suite.gd").run()
 		"vwater":
@@ -211,6 +227,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/church_load_suite.gd").run()
 		"sacredseq":
 			return preload("res://tests/suites/sacred_sequence_suite.gd").run()
+		"sacredid":
+			return preload("res://tests/suites/sacred_identity_suite.gd").run()
 		"churchchange":
 			return preload("res://tests/suites/church_change_suite.gd").run()
 		"vis016":
@@ -344,6 +362,12 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/witchwork_cauldron_flue_suite.gd").run()
 		"hcomponent":
 			return preload("res://tests/suites/house_component_suite.gd").run()
+		"hslope":
+			return preload("res://tests/suites/house_slope_suite.gd").run()
+		"hpiles":
+			return preload("res://tests/suites/house_piles_suite.gd").run()
+		"cslope":
+			return preload("res://tests/suites/castle_slope_suite.gd").run()
 		"hmesh":
 			return preload("res://tests/suites/house_mesh_integrity_suite.gd").run()
 		"hopening":
@@ -372,6 +396,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return HouseQASuite.run()
 		"houseqacore":
 			return HouseQASuite.run(false, &"core")
+		"hwitchsize":
+			return preload("res://tests/suites/house_witch_size_suite.gd").run()
 		"hwitchcompact":
 			return preload("res://tests/suites/house_witch_compact_suite.gd").run()
 		"houseqaplan":
@@ -440,8 +466,42 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_quick_suite.gd").run()
 		"vcompact":
 			return preload("res://tests/suites/village_compact_suite.gd").run()
+		"vworld":
+			return preload("res://tests/suites/village_world_sample_suite.gd").run()
+		"vrealism":
+			return preload("res://tests/suites/village_realism_suite.gd").run()
+		"vshape":
+			return preload("res://tests/suites/village_shape_suite.gd").run()
+		"vterrain":
+			return preload("res://tests/suites/village_terrain_suite.gd").run()
+		"vterrainlane":
+			return preload("res://tests/suites/village_terrain_lane_suite.gd").run()
+		"vanalysis":
+			return preload("res://tests/suites/village_site_analysis_suite.gd").run()
+		"vtplan":
+			return preload("res://tests/suites/village_terrain_plan_suite.gd").run()
+		"vhillside":
+			return preload("res://tests/suites/village_hillside_suite.gd").run()
+		"vcrossterrain":
+			return preload("res://tests/village_crossterrain_test.gd").run()
+		"vcrest":
+			return preload("res://tests/suites/village_crest_suite.gd").run()
+		"vdispersed":
+			return preload("res://tests/suites/village_dispersed_suite.gd").run()
+		"vshore":
+			return preload("res://tests/suites/village_shore_suite.gd").run()
+		"vwaterform":
+			return preload("res://tests/suites/village_water_form_suite.gd").run()
+		"vislandfill":
+			return preload("res://tests/suites/village_island_suite.gd").run()
+		"vvalley":
+			return preload("res://tests/suites/village_valley_suite.gd").run()
 		"vground":
 			return preload("res://tests/village_ground_test.gd").run()
+		"vgroundterrain":
+			return preload("res://tests/village_ground_test.gd").run_terrain()
+		"vstepswalk":
+			return preload("res://tests/suites/village_steps_walk_suite.gd").run()
 		"vdecoration":
 			return preload("res://tests/village_decoration_test.gd").run()
 		"vdecorationapi":
@@ -547,7 +607,7 @@ static func _run_one(key: String) -> SuiteResult:
 		"wld019":
 			return preload("res://tests/suites/vastu_suite.gd").run()
 		"wunchecked":
-			return load("res://tests/suites/world_unchecked_subkinds_suite.gd").run()
+			return WorldArchetypeSuite.run_subkinds()
 		"wld001_domus":
 			return preload("res://tests/suites/world_courtyard_suite.gd").run_kind(&"domus")
 		"wld001_riad":

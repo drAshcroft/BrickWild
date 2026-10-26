@@ -112,6 +112,17 @@ static func _temple(res: SuiteResult, c: Dictionary, req: BuildingRequest, built
 	hidden.mass_log.append({"name": "control_veil", "aabb": AABB(
 		Vector3(-1.5, 0.0, mid), Vector3(3.0, 80.0, 0.3))})
 	_must_fail(res, id + " [veil hides idol]", TempleRiteCheck.new().check(spec, hidden), "sightline")
+	# 1b. SACRED-ZIGGURAT-FOCUS: a ziggurat's stair and terraces are no longer
+	# exempt from the sightline, so a stair wall raised across the axis must fail
+	if spec.form == &"ziggurat":
+		var walled_stair := TempleBuilder.new()
+		walled_stair.build(spec)
+		var summit: Rect2 = TempleGeometry.terrace_rect(spec, spec.terraces - 1)
+		walled_stair.mass_log.append({"name": "stair_wall_control", "aabb": AABB(
+			Vector3(-1.5, 0.0, (eye.y + summit.position.y) / 2.0),
+			Vector3(3.0, TempleGeometry.terrace_top(spec) + 4.0, 0.3))})
+		_must_fail(res, id + " [stair wall hides idol]",
+			TempleRiteCheck.new().check(spec, walled_stair), "sightline")
 	# 2. a file of columns shoulder to shoulder across the hall breaks the walk
 	if spec.form != &"rotunda":
 		var fresh := BrickWild.generate(req).spec as TempleSpec

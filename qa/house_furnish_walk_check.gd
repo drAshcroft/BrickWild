@@ -41,6 +41,9 @@ const LAMP_ROOM := 30.0
 const BEDSIDE_GAP := 0.35
 ## A bed's clearance from a door's own swing.
 const BED_DOOR_GAP := 0.4
+## A passage is never wider than this. A long room wider than it is a hall,
+## a gallery or a barn floor, and people keep their things in those.
+const CORRIDOR_MAX_WIDTH := 3.0
 ## Rooms people eat in: a table there with nobody at it is a sideboard.
 const EATING := [&"hall", &"dining_room", &"mess", &"great_hall", &"guardroom", &"lounge"]
 
@@ -223,9 +226,17 @@ func check_seat_count(plan: HousePlan) -> void:
 
 
 ## A corridor is for walking; its emptiness is the point.
+##
+## Length alone is not the test. The ridge castle's great hall is 38 m by
+## 10.8 m, and 38 / 10.8 = 3.5 by ratio, but nobody clears a 10.8 m span to
+## walk down it. A passage is narrow first and long second.
 static func _corridor(rect: Rect2) -> bool:
 	var lo := minf(rect.size.x, rect.size.y)
-	return lo < 2.6 or maxf(rect.size.x, rect.size.y) > lo * 3.5
+	if lo < 2.6:
+		return true
+	if lo > CORRIDOR_MAX_WIDTH:
+		return false
+	return maxf(rect.size.x, rect.size.y) > lo * 3.5
 
 
 func check_sparse(plan: HousePlan) -> void:

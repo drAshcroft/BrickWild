@@ -287,6 +287,79 @@ static func door_h(spec: WindmillSpec) -> float:
 	return minf(spec.door_h, maxf(spec.height * 0.78, 1.4))
 
 
+# ------------------------------------------------------------- the walk inside
+
+## Whether there is a room to walk in. A windpump is a lattice of posts and
+## bracing with no wall to be inside of; the other four carry a miller's floor.
+##
+## The floor is ONE storey, the mill's own: the burr floor a post mill climbs to,
+## and the ground floor of a tower, smock or paddle mill. A mill has no second
+## room to walk to, and its ladder or internal stair is a way up to this floor
+## from outside the building, not a link between two of its storeys -- which is
+## why the returned frame carries no links.
+static func walkable(spec: WindmillSpec) -> bool:
+	return spec.mill_type != &"windpump"
+
+
+## The miller's floor, as outlines a navigation baker can union:
+## {storey: {"floor": [...], "obstacles": [...]}}, in the mill's own frame.
+## Empty for a windpump, and the default for a family that publishes no walk.
+##
+## The floor stops at the wall's inner face: the drawn drum's faces stand at
+## `r * cos(PI / sides)` from the axis, so the floor's own vertices are that
+## apothem less the wall, turned back into a circumradius. A square burr's
+## boarding stands `base_r + board_proud` out, and the boards are the wall.
+static func walk_sources(spec: WindmillSpec) -> Dictionary:
+	if not walkable(spec):
+		return {}
+	var y: float = floor_y(spec)
+	var floor: Array[PackedVector2Array] = []
+	if is_square(spec):
+		var half: float = spec.base_r + board_proud(spec) - wall_thickness(spec)
+		floor.append(Poly.from_rect(Rect2(-half, -half, half * 2.0, half * 2.0)))
+	else:
+		var band: Dictionary = drum_band(spec, y + 0.05)
+		var sides_n: int = int(band["sides"])
+		var half_angle: float = PI / float(maxi(sides_n, 3))
+		var apothem: float = float(band["r0"]) * cos(half_angle)
+		var inner: float = maxf(apothem - wall_thickness(spec), 0.3) / cos(half_angle)
+		var ring := PackedVector2Array()
+		for i in range(sides_n):
+			var angle: float = drum_start(sides_n) + TAU * float(i) / float(sides_n)
+			ring.append(Vector2(cos(angle), sin(angle)) * inner)
+		floor.append(ring)
+	var obstacles: Array[PackedVector2Array] = []
+	return {0: {"floor": floor, "obstacles": obstacles}}
+
+
+## The floor's height and its door. The door is the one the builder cuts, at
+## the face that looks down -Z (turned off the axis on a post mill, where the
+## ladder is).
+static func walk_frame(spec: WindmillSpec) -> Dictionary:
+	if not walkable(spec):
+		return {}
+	var y: float = floor_y(spec)
+	var outward := Vector2(0.0, -1.0)
+	var at := Vector2.ZERO
+	if is_square(spec):
+		var yaw := Basis(Vector3.UP, spec.body_yaw)
+		var normal: Vector3 = yaw * Vector3.FORWARD
+		at = Vector2(normal.x, normal.z) * (spec.base_r + board_proud(spec)) \
+			+ Vector2(spec.door_offset_x, 0.0)
+		outward = Vector2(normal.x, normal.z).normalized()
+	else:
+		var face: Dictionary = wall_face(spec, -PI * 0.5, y + door_h(spec) * 0.5)
+		var point: Vector3 = face["point"]
+		var normal: Vector3 = face["normal"]
+		at = Vector2(point.x, point.z)
+		outward = Vector2(normal.x, normal.z).normalized()
+	return {
+		"floor_y": {0: y},
+		"links": [],
+		"doors": [{"pos": at, "normal": outward, "front": true}],
+	}
+
+
 # ------------------------------------------------------------------- the cap
 
 ## A cap is a little wider than the curb it turns on -- it has to overhang it

@@ -309,7 +309,7 @@ static func _strand_bank(plan: VillagePlan, ctx: Dictionary) -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	var walk: WalkGrid = ctx["strand_walk"]
 	for water in plan.water:
-		if water["kind"] != &"coast":
+		if water["kind"] not in [&"coast", &"lake"]:
 			continue
 		# The working strand includes rear yards within the documented
 		# eighteen-metre bank reach, not only the water polygon's corners.
@@ -418,7 +418,7 @@ static func _edge_band(plan: VillagePlan, rng: RandomNumberGenerator,
 		var wobble: float = 0.5 + 0.5 * sin(float(k) * 0.23 + p3)
 		depth = lerpf(depth, 0.5 + wobble * maxf(band - 0.5, 1.0), 0.6)
 		var p: Vector2 = along + inward * depth + jitter
-		if plan.spec.form == &"strand" and not site.has_point(p):
+		if plan.spec.form in [&"strand", &"shore", &"water"] and not site.has_point(p):
 			# A long shore site gives the inward vector little depth near its
 			# far corners. Jitter must not discard several clear edge stations
 			# in a row. Offer the same inner band; normal plant checks still

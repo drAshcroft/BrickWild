@@ -40,6 +40,8 @@ const SWITCHES := {
 	"eave_sweep": &"eave_sweep",
 	"thatch_roll": &"thatch_eave",
 	"corner_piers": &"corner_pier",
+	# HS-MINKA: the engawa is the minka's vocabulary (HouseMinka)
+	"engawa": &"engawa_deck",
 }
 
 ## How close a piece has to be to where it belongs, in metres. A millimetre is a
@@ -107,6 +109,17 @@ func _check_european(plan: HousePlan, builder: HouseBuilder) -> void:
 	if _row(plan.spec).has("culture"):
 		return
 	var leaked := _vocabulary(builder)
+	if plan.spec.thatch_roll:
+		# HVERN-WITCH-THATCH: the witch hut's thatch roll is declared on its spec
+		# (HouseGenerator), so its eave and ridge pieces were asked for. _check_thatch
+		# still holds them to the two-eave / ridge-roll vocabulary. Every other piece
+		# of the vocabulary is still a leak.
+		var kept: Array[Dictionary] = []
+		for row in leaked:
+			var role := String(row.get("role", ""))
+			if role != "thatch_eave" and not role.begins_with("thatch_roll_"):
+				kept.append(row)
+		leaked = kept
 	if not leaked.is_empty():
 		failures.append("european: %s is not a vernacular style but emitted %d culture components"
 			% [String(plan.spec.style), leaked.size()])
@@ -119,6 +132,13 @@ func _check_european(plan: HousePlan, builder: HouseBuilder) -> void:
 func _check_declared(plan: HousePlan, builder: HouseBuilder) -> void:
 	var row := _row(plan.spec)
 	if not row.has("culture"):
+		return
+	# HS-ROUNDHOUSE: a roundhouse's vocabulary is its plan, cone and vent, which
+	# HouseRound builds and tests/house_roundhouse_traits_test.gd measures; it asks
+	# for none of the rectangular pieces below. (A roundhouse that carries a trade
+	# is left to the rectangular planner, a square hut under a square cone.)
+	if plan.spec.style == &"roundhouse":
+		stats["declared_switches"] = 1
 		return
 	var asked := 0
 	for key in SWITCHES:
@@ -147,6 +167,15 @@ func _check_parapet(plan: HousePlan, builder: HouseBuilder) -> void:
 		return
 	var level: int = maxi(int(spec.storeys) - 1, 0)
 	var runs: int = HouseGeometry.shell_runs(plan, level).size()
+	if HousePueblo.applies(spec):
+		# HS-PUEBLO: the terraces below the roof have parapets of their own (the focused
+		# test counts them); this rule is about the roof's, which stands on its eave
+		var roof_y := float(spec.storeys) * spec.height + HouseGeometry.PARAPET_BASE
+		var roof_rows: Array[Dictionary] = []
+		for row in rows:
+			if absf(MassBuilder.component_aabb(row).position.y - roof_y) < 0.03:
+				roof_rows.append(row)
+		rows = roof_rows
 	if rows.size() < runs:
 		failures.append("parapet: %d pieces for %d elevations" % [rows.size(), runs])
 	# The wall reaches the eave and stops there. The roof's own oversail is
@@ -302,11 +331,27 @@ func _check_cone(plan: HousePlan, builder: HouseBuilder) -> void:
 		if not on_every or _has_point(PackedVector3Array(shared), p):
 			continue
 		shared.append(p)
-	var coned: bool = shared.size() == 1 and groups.size() == RoofShape.CONE_SIDES
+	# HS-ROUNDHOUSE: the cone over a round wall has its own facet count.
+	var cone_sides: int = RoofShape.ROUND_CONE_SIDES if HouseRound.plan_applies(plan) 		else RoofShape.CONE_SIDES
+	var coned: bool = shared.size() == 1 and groups.size() == cone_sides
+	if HouseRound.plan_applies(plan):
+		# the vent is a hole at the apex, so the facets end round it rather than on
+		# one point: each must still climb to the middle of the plan
+		coned = groups.size() == cone_sides
+		for face_points in groups.values():
+			var top := Vector3(0.0, -INF, 0.0)
+			for fp in PackedVector3Array(face_points):
+				if fp.y > top.y:
+					top = fp
+			if Vector2(top.x, top.z).length() > HouseRound.VENT_R + 0.1:
+				coned = false
+		if coned:
+			shared.clear()
+			shared.append(Vector3.ZERO)
 	if spec.roof_type == &"conical":
 		if not coned:
 			failures.append("cone: %d facets sharing %d points; a cone is %d facets on one"
-				% [groups.size(), shared.size(), RoofShape.CONE_SIDES])
+				% [groups.size(), shared.size(), cone_sides])
 		if not builder.components("ridge_cap").is_empty():
 			failures.append("cone: a ridge cap was laid across a point")
 		if not builder.components("ridge_crown").is_empty():

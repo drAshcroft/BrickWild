@@ -384,9 +384,39 @@ static func aisle_aabb(spec: ChurchSpec, side: float, ring := 0) -> AABB:
 ## The crossing: where nave and transept meet, and what a dome or lantern
 ## tower is centred on. Without a transept it falls at the nave centre.
 static func crossing_center_z(spec: ChurchSpec) -> float:
+	if spec.dome_west:
+		return west_dome_center_z(spec)
 	if octagon_crossing(spec):
 		return octagon_center_z(spec)
 	return transept_center_z(spec) if spec.transept else 0.0
+
+
+## SACRED-BYZANTINE-DOME: the dome of a large Byzantine church stands over the
+## first bay behind the narthex, its pendentive course just inside the west wall,
+## so a visitor at the door approach sees it over the gable. An east dome is
+## hidden behind a 24 m nave from any ground eye point.
+const WEST_DOME_MARGIN := 0.6
+const ENTRY_EYE_HEIGHT := 1.6
+const ENTRY_APPROACH := 20.0     # metres west of the narthex front
+const ENTRY_VIEW_MARGIN := 3.0   # shell crown above the grazing sight line
+
+
+static func west_dome_center_z(spec: ChurchSpec) -> float:
+	return -spec.length / 2.0 + spec.dome_radius + 0.3 + WEST_DOME_MARGIN
+
+
+## The exterior entry eye: on the nave axis, ENTRY_APPROACH west of the narthex.
+static func entry_eye(spec: ChurchSpec) -> Vector3:
+	var front: float = -spec.length / 2.0 - (narthex_depth(spec) if spec.narthex else 0.0)
+	return Vector3(0.0, ENTRY_EYE_HEIGHT, front - ENTRY_APPROACH)
+
+
+## Apex height at which the dome just clears the west gable peak from the entry eye.
+static func entry_view_min_apex(spec: ChurchSpec) -> float:
+	var eye: Vector3 = entry_eye(spec)
+	var gable_z: float = -spec.length / 2.0
+	var slope: float = (nave_ridge_height(spec) - eye.y) / (gable_z - eye.z)
+	return eye.y + slope * (crossing_center_z(spec) - eye.z) + ENTRY_VIEW_MARGIN
 
 
 ## The crossing tower stands on the crossing BAY: nave width across, transept
@@ -480,6 +510,11 @@ static func dome_shell_rise(spec: ChurchSpec) -> float:
 		&"octagonal":
 			return spec.dome_radius * 1.05
 	return spec.dome_radius            # hemisphere
+
+
+## Top of the dome SHELL, before any lantern: the part a ray test must see.
+static func dome_crown_height(spec: ChurchSpec) -> float:
+	return dome_base_height(spec) + pendentive_height(spec) + spec.dome_drum_height 		+ dome_shell_rise(spec)
 
 
 static func dome_apex_height(spec: ChurchSpec) -> float:
@@ -1444,6 +1479,30 @@ static func chancel_step_rect(spec: ChurchSpec) -> Rect2:
 	var z_west: float = spec.length / 2.0 - CHANCEL_STEP_DEPTH - chancel_extra(spec)
 	return Rect2(Vector2(-spec.width / 2.0 + inset, z_west),
 		Vector2(spec.width - inset * 2.0, z_east - z_west))
+
+
+## The reredos: a built, painted and gilded screen on the east wall behind the
+## high altar of a wide nave (LIVE-SACRED). At 46 m the altar group alone is a
+## speck against a bare pale wall; the screen is what the eye finds from the
+## door. Its plan depth fits in front of the wall and behind the altar's back.
+## Only where the east wall is solid (no apse arch) and the nave is wide and
+## tall enough to carry the bigger altar group; an empty AABB otherwise.
+const REREDOS_DEPTH := 0.13   # moulding face to wall face
+const REREDOS_EMBED := 0.03   # its back runs into the wall, so no seam shows
+const REREDOS_SINK := 0.02    # its foot runs into the chancel step
+
+static func reredos_aabb(spec: ChurchSpec) -> AABB:
+	if spec.apse or spec.hero != &"" or spec.width <= 10.0 or spec.height < 8.0:
+		return AABB()
+	var step: Rect2 = chancel_step_rect(spec)
+	if step.size.x <= 0.0:
+		return AABB()
+	var w: float = clampf(spec.width * 0.42, 4.0, 7.2)
+	var h: float = clampf(spec.height * 0.44, 4.5, 11.0)
+	var wall_face: float = spec.length / 2.0 - ChurchBuilder.NAVE_WALL_T
+	var foot: float = FLOOR_LIFT + CHANCEL_STEP_H - REREDOS_SINK
+	return AABB(Vector3(-w / 2.0, foot, wall_face - REREDOS_DEPTH),
+		Vector3(w, h, REREDOS_DEPTH + REREDOS_EMBED))
 
 
 ## Walls are `ChurchBuilder.NAVE_WALL_T` thick; the walk's rooms start inside them.

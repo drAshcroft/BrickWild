@@ -408,10 +408,14 @@ static func _check_programme_earned_kinds_sweep(res: SuiteResult) -> void:
 
 ## Maps every non-house request in `reqs` back to the programme `kind`
 ## vocabulary `earned_kinds()` uses, by family and business/purpose.
-## `shrine` vs `church` are told apart by the request's height (the shrine's
-## small envelope is 6 m, the full church's 12 m); `manor` is the only
-## castle a village programme requests; the second `shop(&"tavern")` request
-## (§4: "apothecary, second tavern") is told apart from the first by order.
+## `shrine` vs `church` are told apart by the request's FOOTPRINT (the
+## shrine's small envelope is 6 x 10 m and its brief variant at most 10 x 16;
+## the full church is 10 x 20). Height cannot tell them apart: the programme
+## raises a shrine's request above the tallest roof so the landmark is not
+## lost in the skyline, and a raised shrine then measures taller than a house
+## without becoming a church. `manor` is the only castle a village programme
+## requests; the second `shop(&"tavern")` request (§4: "apothecary, second
+## tavern") is told apart from the first by order.
 static func _earned_kinds_of(reqs: Array[BuildingRequest]) -> Dictionary:
 	var out := {}
 	var tavern_seen := false
@@ -420,7 +424,7 @@ static func _earned_kinds_of(reqs: Array[BuildingRequest]) -> Dictionary:
 			&"house":
 				continue
 			&"church":
-				out[&"church" if r.height > 8.0 else &"shrine"] = true
+				out[&"shrine" if r.length <= 16.0 else &"church"] = true
 			&"temple":
 				out[&"temple"] = true
 			&"castle":

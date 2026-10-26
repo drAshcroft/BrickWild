@@ -65,6 +65,9 @@ const KIND_ROWS := {
 		"length": {"min": 22.0, "max": 100.0, "step": 1.0, "value": 44.0},
 		"height": {"min": 6.0, "max": 26.0, "step": 0.5, "value": 12.0},
 	},
+	# A `witch_hut` is small: HouseGenerator.clamp_witch_hut brings any request
+	# down to at most 7 x 9 m (short x long side) and one storey, whatever these
+	# slider limits allow. Every other house style takes the full envelope.
 	&"house": {
 		"label": "House", "size_label": "House", "height_label": "Ceiling (m)",
 		"style_label": "Style", "purpose_label": "Trade",
@@ -251,6 +254,8 @@ static func options(kind: StringName, field: StringName) -> Array[Dictionary]:
 ## it. Empty when the kind or the id is unknown, so a caller printing a
 ## label never has to guard a dictionary lookup that would crash.
 static func option_label(kind: StringName, field: StringName, id: StringName) -> String:
+	if field == &"style" and kind in [&"house", &"shop"]:
+		id = HouseSpec.canonical_style(id)
 	for row in options(kind, field):
 		if row["id"] == id:
 			return String(row["label"])
@@ -363,6 +368,7 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 				"storeys must be between %d and %d for a %s." % [
 					int(limits2["min"]), int(limits2["max"]), String(request.kind)]))
 	_validate_options(request, out)
+	_validate_ground(request, out)
 	if request.material not in [&"stone", &"timber"]:
 		out.append(_error(&"invalid_material", &"material", "Shell material must be stone or timber."))
 	if request.kind == &"village":
@@ -398,6 +404,55 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 	return out
 
 
+## Falling ground (VTER-HOUSE-SLOPE). A house or shop stands on up to two
+## storeys of fall, a church on a terrace up to CHURCH_MAX_FALL, a castle on a
+## revetted platform up to CastleGeometry.SLOPE_MAX_FALL; none on
+## ground steeper than 1 in 2 across its footprint. A fall beyond that is
+## REFUSED, not clamped: a clamped building would float over its own downhill
+## edge, and a village planner that is told why can terrace or move the lot.
+const CHURCH_MAX_FALL := 6.0
+
+
+static func _validate_ground(request: BuildingRequest, out: Array[Dictionary]) -> void:
+	# a house or shop on piles over water (VTER-FORM-WATER, HousePiles)
+	var piles: Array = HousePiles.refusal(request)
+	if not piles.is_empty():
+		out.append(_error(piles[0], piles[1], piles[2]))
+		return
+	var f: float = request.ground_fall_m
+	var deg: float = request.ground_downhill_deg
+	if not is_finite(f) or f < 0.0:
+		out.append(_error(&"invalid_ground", &"ground_fall_m",
+			"ground_fall_m must be a finite number of metres, 0 or more."))
+		return
+	if not is_finite(deg):
+		out.append(_error(&"invalid_ground", &"ground_downhill_deg",
+			"ground_downhill_deg must be a finite angle in degrees."))
+		return
+	if f <= 0.0:
+		return
+	if request.kind not in [&"house", &"shop", &"church", &"castle"]:
+		out.append(_error(&"unsupported_option", &"ground_fall_m",
+			"ground_fall_m is only available for houses, shops, churches and castles."))
+		return
+	# A castle stands on a revetted platform (VTER-CASTLE-SLOPE) -- except a
+	# sky citadel, which stands on its own floating rock.
+	if request.kind == &"castle" and request.style == &"sky" \
+			and CastleSpec.tier_for(request.width, request.length) in [&"castle", &"fortress"]:
+		out.append(_error(&"unsupported_option", &"ground_fall_m",
+			"A sky citadel stands on its own floating rock, not on the ground."))
+		return
+	var ceiling: float = HouseSlope.max_fall(request.height)
+	if request.kind == &"church":
+		ceiling = CHURCH_MAX_FALL
+	elif request.kind == &"castle":
+		ceiling = CastleGeometry.SLOPE_MAX_FALL
+	var why := GroundFall.refusal(f, request.width, request.length, deg, ceiling)
+	if not why.is_empty():
+		out.append(_error(&"ground_too_steep", &"ground_fall_m",
+			"A %s cannot stand here: %s" % [String(request.kind), why]))
+
+
 ## The style and the purpose, against the same option lists `describe()`
 ## publishes -- so anything offered can be built and anything built was
 ## offered.
@@ -427,6 +482,9 @@ static func _validate_options(request: BuildingRequest, out: Array[Dictionary]) 
 
 
 static func _has_option(kind: StringName, field: StringName, id: StringName) -> bool:
+	# HS-ROUNDHOUSE: a renamed house style is still accepted under its old name.
+	if field == &"style" and kind in [&"house", &"shop"]:
+		id = HouseSpec.canonical_style(id)
 	for row in options(kind, field):
 		if row["id"] == id:
 			return true

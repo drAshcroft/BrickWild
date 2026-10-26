@@ -20,10 +20,12 @@ static func candidate(key: String, centre: Vector2, yaw: float,
 		zone_depth_override := -1.0) -> Dictionary:
 	var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw) * scale
 	var rect := Rect2(centre - foot / 2.0, foot)
+	var strip := zone_strip(key, rect, yaw, zone_side, zone_depth_override)
 	var placement := {
 		"key": key, "pos": Vector3(centre.x, 0.0, centre.y), "yaw": yaw,
-		"rect": rect, "zone": zone_rect(key, rect, yaw, zone_side, zone_depth_override), "host": -1,
+		"rect": rect, "zone": Poly.bounding_rect(strip), "zone_strip": strip, "host": -1,
 		"cat": PropCatalog.category(key), "mounted": false, "scale": scale,
+		"zone_side": zone_side,
 	}
 	if zone_depth_override > 0.0:
 		placement["zone_depth_override"] = zone_depth_override
@@ -41,9 +43,23 @@ static func candidate(key: String, centre: Vector2, yaw: float,
 ## the wrong side of a chair reports the whole room as unusable.
 static func zone_rect(key: String, rect: Rect2, yaw: float, side := 1.0,
 		depth_override := -1.0) -> Rect2:
+	var strip := zone_strip(key, rect, yaw, side, depth_override)
+	if strip.is_empty():
+		return Rect2()
+	# Bound all four corners of the rotated strip. Bounding just two opposite
+	# corners with an absolute tangent can collapse a diagonal use zone.
+	return Poly.bounding_rect(strip)
+
+
+## The four corners of the floor a person needs to use the piece, in plan.
+## `zone_rect` is their bounding box; a room that is a polygon has to test the
+## strip itself, because the box of a strip across a diagonal covers floor the
+## strip does not (a drum keep's wall furniture, CASTLE-CHANGE-17).
+static func zone_strip(key: String, rect: Rect2, yaw: float, side := 1.0,
+		depth_override := -1.0) -> PackedVector2Array:
 	var depth: float = depth_override if depth_override > 0.0 else PropCatalog.zone_depth(key)
 	if depth <= 0.0:
-		return Rect2()
+		return PackedVector2Array()
 	var cat: String = PropCatalog.category(key)
 	var facing: Vector2 = HouseFurnishScore._facing_of(yaw)
 	var dir: Vector2 = facing
@@ -58,11 +74,9 @@ static func zone_rect(key: String, rect: Rect2, yaw: float, side := 1.0,
 	var out: float = raw.x * 0.5 if cat == "bed" else raw.y * 0.5
 	var width: float = raw.y if cat == "bed" else raw.x
 	var span := Vector2(dir.y, -dir.x) * width * 0.5
-	# Bound all four corners of the rotated strip. Bounding just two opposite
-	# corners with an absolute tangent can collapse a diagonal use zone.
-	return Poly.bounding_rect(PackedVector2Array([
+	return PackedVector2Array([
 		c + dir * out - span, c + dir * out + span,
-		c + dir * (out + depth) + span, c + dir * (out + depth) - span]))
+		c + dir * (out + depth) + span, c + dir * (out + depth) - span])
 
 
 ## Does this candidate fit: inside the room, clear of everything already
@@ -70,7 +84,12 @@ static func zone_rect(key: String, rect: Rect2, yaw: float, side := 1.0,
 static func fits(plan: HousePlan, room: int, cand: Dictionary, floor_rect: Rect2, blocked: Array[Rect2],
 		zones: Array[Rect2], extra: Array[Rect2], ignore := Rect2()) -> bool:
 	var rect: Rect2 = cand["rect"]
-	if not floor_rect.grow(0.01).encloses(rect):
+	# The bounding box of a polygonal room is not its floor. A piece stood
+	# against a diagonal facet has a turned box that projects outside it while
+	# the piece itself stands on the room's floor; the corner test at the end
+	# is the one that decides. Testing the box here rejected every wall
+	# candidate in a drum, an octagon or an apse (CASTLE-CHANGE-17).
+	if not plan.is_polygonal(room) and not floor_rect.grow(0.01).encloses(rect):
 		return false
 	if not clears_domestic_entry(plan, room, rect):
 		return false
@@ -93,7 +112,7 @@ static func fits(plan: HousePlan, room: int, cand: Dictionary, floor_rect: Rect2
 	if zone.size.x > 0.0:
 		# the zone may overlap another zone -- two people can share a gangway --
 		# but it may not be inside a wall or under other furniture
-		if not floor_rect.grow(0.02).encloses(zone):
+		if not plan.is_polygonal(room) and not floor_rect.grow(0.02).encloses(zone):
 			return false
 		for b2 in blocked:
 			if b2 in cand.get("zone_passages", []):
@@ -103,11 +122,53 @@ static func fits(plan: HousePlan, room: int, cand: Dictionary, floor_rect: Rect2
 	# Polygon corner tests are pure and substantially dearer than rectangle
 	# rejection. Only candidates clear of every inexpensive obstruction need
 	# the exact same outline tests; no accepted candidate or RNG draw changes.
-	if not inside_outline(plan, room, rect):
+	# The corners tested are the PIECE's, not the axis-aligned box it needs:
+	# on a diagonal facet the box is wider than the piece, so boxing it out of
+	# the room rejects every wall candidate on a drum, an octagon or an apse,
+	# and those rooms take no wall furniture at all (CASTLE-CHANGE-17).
+	if not inside_candidate(plan, room, cand):
 		return false
-	if zone.size.x > 0.0 and not inside_outline(plan, room, zone):
+	if zone.size.x > 0.0 and not zone_on_floor(plan, room, cand):
 		return false
 	return true
+
+
+## Is the piece's use zone on the room's floor? A polygon tests the strip the
+## placer actually reserved; a rectangle has already been enclosed above.
+static func zone_on_floor(plan: HousePlan, room: int, cand: Dictionary) -> bool:
+	if not plan.is_polygonal(room):
+		return true
+	var strip: PackedVector2Array = cand.get("zone_strip", PackedVector2Array())
+	if strip.is_empty():
+		var zone: Rect2 = cand.get("zone", Rect2())
+		if not zone.has_area():
+			return true
+		strip = Poly.from_rect(zone)
+	return Poly.encloses_corners(plan.outline_of(room), strip, 0.01)
+
+
+## Replace a candidate's use zone with a plain rectangle: a shared row aisle,
+## a trimmed sleep access, a tending space. `zone_strip` is what the polygon
+## test walks, so it must move with the rectangle; a caller that sets `zone`
+## alone leaves the exact test looking at the old floor.
+static func set_zone(cand: Dictionary, zone: Rect2) -> void:
+	cand["zone"] = zone
+	cand["zone_strip"] = Poly.from_rect(zone) if zone.has_area() else PackedVector2Array()
+
+
+## Are the piece's own four corners inside the room? True for a room that is a
+## plain rectangle; for a polygonal one the candidate's turned rectangle is
+## tested, not its axis-aligned envelope.
+static func inside_candidate(plan: HousePlan, room: int, cand: Dictionary) -> bool:
+	if not plan.is_polygonal(room):
+		return true
+	var key := String(cand.get("key", ""))
+	if key == "":
+		return inside_outline(plan, room, Rect2(cand["rect"]))
+	var foot: Vector2 = PropCatalog.footprint(key) * float(cand.get("scale", 1.0))
+	var turned := Poly.oriented_rect(Rect2(cand["rect"]).get_center(), foot,
+		float(cand.get("yaw", 0.0)))
+	return Poly.encloses_corners(plan.outline_of(room), turned, 0.01)
 
 
 ## Are all four corners of `rect` inside the room being furnished? True when

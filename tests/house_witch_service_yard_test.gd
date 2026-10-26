@@ -3,9 +3,7 @@ extends SceneTree
 ## The yard must be planned around the authored door; role presence alone is not enough.
 
 const SIZES := [
-	{"id":"compact","width":7.0,"length":9.0,"height":2.6,"bay":false},
-	{"id":"default","width":9.0,"length":12.0,"height":2.6,"bay":true},
-	{"id":"large","width":17.0,"length":18.0,"height":2.8,"bay":true},
+	{"id":"compact","width":7.0,"length":9.0,"height":2.6},
 ]
 const SEEDS := [1, 8102, 21325]
 var failures: Array[String] = []
@@ -43,9 +41,6 @@ func _check_witch(size: Dictionary, seed_value: int) -> void:
 	var compact := bool(door.get("witch_compact_service_threshold", false))
 	if compact != (size.id == "compact"):
 		failures.append("%s service threshold used the wrong compact/Workshop grammar" % label)
-	var bay: Dictionary = HouseGeometry.roof_layout(plan).get("witch_bay", {})
-	if bool(size.bay) != not bay.is_empty():
-		failures.append("%s changed the separate structural Workshop bay eligibility" % label)
 	var shelter: Dictionary = {}
 	for piece in plan.yard_pieces:
 		if String(piece.get("role", "")) == "witch_work_shelter":
@@ -174,7 +169,7 @@ func _check_witch(size: Dictionary, seed_value: int) -> void:
 		if _witch_wing_walls_bear_roof(broken_wing):
 			failures.append("shortened wall negative control still passed roof-bearing contract")
 	if threshold_roof.size != Vector3.ZERO \
-				and threshold_roof.position.y < HouseGeometry.DOOR_H + 0.25 - 0.005:
+				and threshold_roof.position.y < minf(HouseGeometry.DOOR_H + 0.25, plan.spec.height - 0.1) - 0.005:
 		failures.append("%s shelter roof AABB enters the reserved door/window head zone (bottom %.3f m)" % [
 			label, threshold_roof.position.y])
 	var roles: Array[String] = []

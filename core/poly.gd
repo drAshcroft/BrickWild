@@ -200,6 +200,44 @@ static func from_rect(rect: Rect2) -> PackedVector2Array:
 	return p
 
 
+## The four corners of a `size` rectangle turned by `yaw` about `centre`.
+## The convention is the one every furniture record uses: a turn about Y maps
+## the piece's local +X to (cos, -sin) in plan coordinates and its local +Z to
+## (sin, cos). Corners come back in a ring, so edge tests can walk them.
+static func oriented_rect(centre: Vector2, size: Vector2, yaw: float) -> PackedVector2Array:
+	var along: Vector2 = Vector2(cos(yaw), -sin(yaw)) * size.x * 0.5
+	var across: Vector2 = Vector2(sin(yaw), cos(yaw)) * size.y * 0.5
+	return PackedVector2Array([
+		centre - along - across, centre + along - across,
+		centre + along + across, centre - along + across])
+
+
+## Is the turned rectangle `corners` wholly inside `poly`?
+##
+## Every corner inside is enough for a convex room, but not for a concave one:
+## a notch or an apse can pass between the corners of a piece that is really
+## standing in the wall. So no edge of the polygon may cut across an edge of
+## the piece, and touching a wall (a collinear edge) is not a crossing.
+static func encloses_corners(poly: PackedVector2Array, corners: PackedVector2Array,
+		eps := 1e-6) -> bool:
+	if poly.size() < 3 or corners.size() < 3:
+		return false
+	for p in corners:
+		if not contains_point(poly, p, eps):
+			return false
+	var n: int = poly.size()
+	var m: int = corners.size()
+	for i in range(n):
+		var a: Vector2 = poly[i]
+		var b: Vector2 = poly[(i + 1) % n]
+		if a.distance_squared_to(b) <= eps * eps:
+			continue
+		for j in range(m):
+			if _segments_cross(a, b, corners[j], corners[(j + 1) % m], eps):
+				return false
+	return true
+
+
 # ----------------------------------------------------------------- internals
 
 static func _on_segment(a: Vector2, b: Vector2, p: Vector2, eps: float) -> bool:

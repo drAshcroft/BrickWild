@@ -7,7 +7,7 @@ func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	for dims in [Vector2(7.0, 9.0), Vector2(9.0, 12.0), Vector2(17.0, 18.0)]:
+	for dims in [Vector2(7.0, 9.0)]:
 		for seed in [1, 8102, 21325]:
 			_check_witch(seed, dims)
 	_check_scope_controls()
@@ -19,7 +19,7 @@ func _run() -> void:
 		printerr(failure)
 	quit(1)
 
-func _plan(trade: StringName, seed: int, dims := Vector2(9.0, 12.0)) -> HousePlan:
+func _plan(trade: StringName, seed: int, dims := Vector2(7.0, 9.0)) -> HousePlan:
 	var spec := HouseSpec.new()
 	spec.style = &"witch_hut"
 	spec.trade = trade
@@ -92,8 +92,6 @@ func _check_witch(seed: int, dims: Vector2) -> void:
 		failures.append("Witch seed %d has no activity light in workshop/shared hall" % seed)
 	if anchored_supports == 0:
 		failures.append("Witch seed %d %s has no measured activity-support fitting retained after recomposition" % [seed, dims])
-	if dims.x >= 17.0 and seed == 21325:
-		_check_large_workshop_rack(plan)
 
 	var finish_host_ids: Dictionary = {}
 	for host_variant in plan.wall_hosts:
@@ -315,54 +313,6 @@ func _check_shared_hall_host_groups(plan: HousePlan, hall: int, who: String) -> 
 				if minf(shelf_top, other_top) - maxf(shelf_bottom, other_bottom) > 0.015:
 					failures.append("%s Witchwork rack intersects its bench or hosted potion in measured 3D bounds" % who)
 
-func _check_large_workshop_rack(plan: HousePlan) -> void:
-	var workshop := -1
-	for room in plan.room_count():
-		if plan.kind_of(room) == &"workshop":
-			workshop = room
-			break
-	if workshop < 0:
-		failures.append("large seed 21325 has no workshop for the ingredient-rack contract")
-		return
-	var bench: Dictionary = {}
-	var bench_index := -1
-	var rack: Dictionary = {}
-	var rack_index := -1
-	for index in plan.furniture_of(workshop):
-		var item: Dictionary = plan.furniture[index]
-		if String(item.get("cat", "")) == "workbench" and String(item.get("activity_group", "")) == "witchwork":
-			bench = item
-			bench_index = index
-		if String(item.get("key", "")) == "Shelf_Small_Bottles" and String(item.get("activity_group", "")) == "witchwork":
-			if String(item.get("mount_relation", "")) == "supports_activity":
-				rack = item
-				rack_index = index
-	if bench.is_empty() or rack.is_empty():
-		failures.append("large seed 21325 lacks a bound ingredient rack at its actual Witchwork bench")
-		return
-	if String(rack.get("activity_anchor_id", "")) == "" or String(rack.get("wall_host_id", "")) == "":
-		failures.append("large seed 21325 rack has no derived activity and wall-host binding")
-	if not bool(rack.get("mounted", false)):
-		failures.append("large seed 21325 Witchwork rack is not mounted")
-	var bench_zone := Rect2(bench.get("zone", Rect2()))
-	var rack_body := Rect2(rack.get("rect", Rect2()))
-	var dx := maxf(maxf(rack_body.position.x - bench_zone.end.x, bench_zone.position.x - rack_body.end.x), 0.0)
-	var dz := maxf(maxf(rack_body.position.y - bench_zone.end.y, bench_zone.position.y - rack_body.end.y), 0.0)
-	if Vector2(dx, dz).length() > 1.9:
-		failures.append("large seed 21325 ingredient rack is not within measured workbench reach")
-	var rack_vertical := _measured_body_vertical_span(rack)
-	for index in plan.furniture_of(workshop):
-		if index == rack_index:
-			continue
-		var item: Dictionary = plan.furniture[index]
-		if index != bench_index and int(item.get("host", -1)) != bench_index:
-			continue
-		if not rack_body.intersects(Rect2(item.get("rect", Rect2()))):
-			continue
-		var other_vertical := _measured_body_vertical_span(item)
-		if minf(rack_vertical.y, other_vertical.y) - maxf(rack_vertical.x, other_vertical.x) > 0.015:
-			failures.append("large seed 21325 ingredient rack intersects its bench or a potion in measured 3D bounds")
-
 func _measured_body_vertical_span(item: Dictionary) -> Vector2:
 	var key := String(item.get("key", ""))
 	var origin := PropCatalog.house_origin(item)
@@ -383,8 +333,8 @@ func _check_scope_controls() -> void:
 		var custom := CUSTOM_SPEC.new() as HouseSpec
 		custom.style = &"witch_hut"
 		custom.trade = &"none"
-		custom.width = 9.0
-		custom.length = 12.0
+		custom.width = 7.0
+		custom.length = 9.0
 		custom.height = 2.6
 		custom.storeys = 1
 		_clear_derived_witch_finish_hosts(custom_plan)

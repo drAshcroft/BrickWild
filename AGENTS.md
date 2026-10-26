@@ -26,6 +26,10 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 # fixed structural cases and selected real voxel QA
 godot --headless --path . --script res://tests/run_all.gd -- lane:castle-change
 godot --headless --path . --script res://tests/run_all.gd -- lane:plan
+# bounded terrain gate: villages on plane_30, lake_shore, cliff_band, Manarola,
+# Masouleh and Monpazier; road grades, lot fall, the stair walk, wet ground and
+# siting, each with a failing control (docs/VILLAGE_TERRAIN.md)
+godot --headless --path . --script res://tests/run_all.gd -- lane:village-terrain
 godot --headless --path . --script res://tests/run_all.gd -- lane:church-change
 # which form of which castle is still solid or unreachable (build + occupancy + routes
 # per plan, minutes per case; see docs/CASTLE_INTERIOR_FOLLOWUPS.md)
@@ -125,17 +129,28 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | rich-house trim, its bound, its rules | `lane:rich` | see docs/RICH_HOUSES.md |
 | prop code or assembly | `lane:assets-fast` | 40 s host |
 | anything under `assets/props/` or `catalog.json` | rebuild catalogue, then `lane:assets` | required exception: over 5 m |
+| a castle on falling ground (`src/castle/castle_slope.gd`, `SLOPE_*`) | `cslope`, then `lane:castle-change` | ~4 m host |
 | castle geometry and openings | `lane:castle-change` | 310 s host (1 Oct; over the 5 m gate under load) |
 | temple geometry | `lane:temple` | 52 s host; with `lane:church-change`, tree and bridge, 230 s together |
 | village site, lots, plan rules | `lane:village-fast` | 2.5 m host, green, 10 checks |
+| `qa/village_shape.gd` or `survey.py` `measure()` | `vshape`, then `tools/shape_parity.gd` + `tools/settlements/shape_parity.py` | see docs/SETTLEMENT_TESTSET.md |
+| `VillageTerrain`, the exporter's `ground` output | `vterrain` | ~70 s host, 74+ checks; see docs/VILLAGE_TERRAIN.md |
+| village planning on given ground: siting, road grades, lot fall, the stair walk, wet ground | `lane:village-terrain` | 196 s host, 148 s body (23 Oct), 476 checks; six fixtures and six failing controls; see docs/VILLAGE_TERRAIN.md |
+| the village ground mesh: `VillageGroundSurface`, `VillageBuilder` on terrain, `VillageGroundCheck` | `vground`, then `vgroundterrain` | ~6 m loaded host for the terrain cases; see docs/VILLAGE_TERRAIN.md |
+| `VillageBridge`, a bridge on given ground, the ground's river (`VillageGroundWater`), `qa/village_bridge_check.gd` | `vcrossterrain`, then `tests/village_crossings_test.gd` as a script | ~40 s host, 24 checks; see docs/VILLAGE_TERRAIN.md |
+| stair streets, access flights, the 3D village walk: `VillageAccessSteps`, `VillageWalk3D`, `VillageWalk` on terrain | `vstepswalk`, then `vgroundterrain` | ~14 m loaded host, 91 checks (Manarola, Positano, Masouleh's stepped through road); see docs/VILLAGE_TERRAIN.md "Steps and the 3D walk" |
+| `VillageSiteAnalysis` (slope classes, landforms, drainage, contours, level regions) | `vanalysis` | ~15 s host, 47 checks; see docs/VILLAGE_TERRAIN.md |
+| the world settlement set, `tools/settlements/` | `vworld` | seconds; see docs/SETTLEMENT_TESTSET.md |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | church shell, opening or roof geometry | `lane:church-change` | 20 s host |
-| windmill geometry, or anything in `src/windmill/` | `lane:windmill` | 52 s host, 185 checks |
+| windmill geometry, or anything in `src/windmill/`; the published windmill walk | `lane:windmill` | 295 s loaded host, 270 checks (185 -> 204 windmills + 66 wwalk, 22 Oct) |
 | anything in `src/dungeon/`, `qa/dungeon_room_check.gd` or the dungeon fixtures | `lane:dungeon` | 84 s host (14 Oct); see docs/DUNGEONS.md |
 | `BuildingLibrary` rows, the family adapters, `BuildingRequest` factories | `lane:api` | ~10 m host; `libraryquick` alone is ~3.5 m and catches an unpublished kind |
 | church or castle dressing, props placed in them | `dressingquick` | under 5 m host |
 | the dwellings the generator must furnish | `harchetype` | 2.5 m host (5 m on 7 Oct; red with the walk rules until the furnisher catches up, see docs/WALK_PINS.md) |
 | a walk-QA pin, a walk rule, a stair rule, a z-fight budget | `walkpins` | ~1 m host, 40 checks |
+| the crest form: `src/village/forms/crest_form.gd`, the crest frame in `VillageSiting`, the crest hooks in the lot planner and the place/road checks | `vcrest` | ~5 m host (measures 16 buildings once, ~75 s); see docs/VILLAGE_TERRAIN.md "The crest form" |
+| buildings on falling ground: `core/ground_fall.gd`, `src/house/house_slope.gd`, the church terrace, the ground request fields | `hslope` | ~2.5 m host, 253 checks; see docs/VILLAGE_TERRAIN.md |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
 

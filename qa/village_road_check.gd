@@ -18,7 +18,7 @@ extends RefCounted
 ## polygons alone. `ascii_map()` draws the roads as `=`.
 
 const RULES: Array[StringName] = [&"connected", &"through", &"hierarchy", &"dead_ends",
-	&"width", &"bends", &"junctions", &"clear", &"crossings", &"gates"]
+	&"width", &"bends", &"junctions", &"clear", &"crossings", &"gates", &"through_grade"]
 const THROUGH_TO_COMMON := 15.0
 const DEAD_END_MAX := 40.0
 const WIDTH_TOL := 0.05
@@ -60,6 +60,21 @@ func _check_connected(plan: VillagePlan) -> void:
 		failures.append("connected: the roads are %d separate networks" % parts)
 
 
+## On given ground the through road is a cart road: no steeper than its class's
+## cap, unless the plan says it is a STAIR STREET (`stepped`: a hillside whose
+## face is too steep for any cart, Manarola's, Positano's). `grade_roads` never
+## re-classes road 0, so this is the only place the cap is held on it.
+func _check_through_grade(plan: VillagePlan) -> void:
+	if plan.ground == null:
+		return
+	var cap: float = float(VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"])
+	for r in plan.roads_of_class(&"through"):
+		var g: float = VillageRoadRouter.grade_of(plan.ground, plan.roads[r]["points"])
+		stats["through_grade"] = snappedf(g, 0.001)
+		if g > cap + 1e-6 and not bool(plan.roads[r].get("stepped", false)):
+			failures.append("through_grade: road %d climbs %.0f %%, a cart road's cap is %.0f %%" % [r, g * 100.0, cap * 100.0])
+
+
 func _check_through(plan: VillagePlan) -> void:
 	var through: Array[int] = plan.roads_of_class(&"through")
 	if through.is_empty() or through.size() > 2:
@@ -69,19 +84,46 @@ func _check_through(plan: VillagePlan) -> void:
 		var pts: PackedVector2Array = plan.roads[r]["points"]
 		var a: Vector2 = pts[0]
 		var b: Vector2 = pts[pts.size() - 1]
-		var sa: int = VillageMeasure.boundary_side(plan.site, a)
-		var sb: int = VillageMeasure.boundary_side(plan.site, b)
+		var sa: int = _end_side(plan, r, a)
+		var sb: int = _end_side(plan, r, b)
 		if sa < 0 or sb < 0:
 			failures.append("through: road %d does not reach the edge of the site at both ends" % r)
 		elif sa == sb:
 			failures.append("through: road %d comes in and goes out on the same side" % r)
 		var common: PackedVector2Array = VillageMeasure.common_poly(plan)
-		if not common.is_empty():
+		# a crest village's through road passes at the hill's foot and its
+		# approach climbs to the common (VTER-FORM-CREST): not near it
+		if not common.is_empty() and plan.crest.is_empty():
 			var near := INF
 			for p in common:
 				near = minf(near, VillageMeasure.point_to_polyline(p, pts))
 			if near > THROUGH_TO_COMMON:
 				failures.append("through: road %d passes %.0fm from the common, wants %.0f" % [r, near, THROUGH_TO_COMMON])
+
+
+## An island village's through road runs from one landing to another, both
+## ends at the shore (side 4): two landings, as far apart as the island is
+## long, are two sides. Nowhere else may a road leave twice by the water.
+func _two_landings(plan: VillagePlan, side: int, a: Vector2, b: Vector2) -> bool:
+	return side == 4 and not plan.island.is_empty() 		and a.distance_to(b) >= 0.5 * maxf(plan.site.size.x, plan.site.size.y)
+
+
+## Which side of the site a through road's end leaves by: the site's own
+## edge (0-3), or, on given ground, the shore of the ground's own water
+## (VTER-LOTS: a road that ran into a lake is cut back to it; its end is a
+## landing, its own side, 4); -1 when neither.
+func _end_side(plan: VillagePlan, r: int, p: Vector2) -> int:
+	var side: int = VillageMeasure.boundary_side(plan.site, p)
+	if side < 0 and _at_shore(plan, r, p):
+		return 4
+	return side
+
+
+func _at_shore(plan: VillagePlan, r: int, p: Vector2) -> bool:
+	if plan.ground == null:
+		return false
+	var road: Dictionary = plan.roads[r]
+	return VillageGroundWater.on_shore(plan, p, float(road["width"]) * 0.5 + float(road["verge"]) 		+ VillageGroundWater.SHORE_GAP + VillageGroundWater.SHORE_EPS)
 
 
 ## Where an endpoint of `road` lands: on another road of one of `classes`,
@@ -132,7 +174,7 @@ func _check_hierarchy(plan: VillagePlan) -> void:
 						and not _endpoint_on_common(plan, p):
 						failures.append("hierarchy: lane %d ends at %v on nothing -- a lane joins a street or ends at a lot" % [r, p])
 				&"street":
-					if not _endpoint_on(plan, r, p, [&"street", &"through"]):
+					if not _endpoint_on(plan, r, p, [&"street", &"through"]) and not _at_shore(plan, r, p):
 						failures.append("hierarchy: street %d ends at %v off the through road and every street" % [r, p])
 
 
@@ -142,11 +184,11 @@ func _check_dead_ends(plan: VillagePlan) -> void:
 		var pts: PackedVector2Array = road["points"]
 		var cls: StringName = road["class"]
 		for p in [pts[0], pts[pts.size() - 1]]:
-			if VillageMeasure.on_boundary(plan.site, p):
+			if VillageMeasure.on_boundary(plan.site, p) or _at_shore(plan, r, p):
 				continue
-			if _endpoint_on(plan, r, p, [&"through", &"street", &"lane", &"track", &"path"]):
+			if _endpoint_on(plan, r, p, [&"through", &"street", &"lane", &"track", &"path", &"steps"]):
 				continue
-			if cls in [&"lane", &"path"] and _endpoint_on_common(plan, p):
+			if cls in [&"lane", &"path", &"steps"] and _endpoint_on_common(plan, p):
 				continue
 			# a dead end: only a short lane ending at a lot may
 			if cls != &"lane":
@@ -268,7 +310,7 @@ func _check_crossings(plan: VillagePlan) -> void:
 		if r < 0 or r >= plan.roads.size() or w < 0 or w >= plan.water.size():
 			failures.append("crossings: crossing %d has stale road/water indices" % index)
 			continue
-		var expected := &"ford" if plan.water[w]["kind"] == &"stream" else &"bridge"
+		var expected := VillageWaterPlan.crossing_kind(plan.roads[r], plan.water[w])
 		var points: PackedVector2Array = crossing.get("points", PackedVector2Array())
 		var width := float(crossing.get("width", 0.0))
 		if crossing.get("kind") != expected or points.size() < 2 or width + 0.01 < float(plan.roads[r]["width"]):

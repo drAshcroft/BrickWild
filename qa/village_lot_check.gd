@@ -61,6 +61,8 @@ func _check_tiling(plan: VillagePlan) -> void:
 				var req: BuildingRequest = plan.buildings[host]["request"]
 				if req.kind == &"shop" and req.purpose == &"bakery":
 					continue # the mill's own working water occupies its service yard
+			if plan.lots[i].has("piles") and w["kind"] != &"race":
+				continue # a pile lot stands in the water (VTER-FORM-WATER)
 			if VillageLotPlanner.overlap_area(a, w["poly"]) > VillageLotPlanner.AREA_EPS:
 				failures.append("tiling: lot %d is cut into the %s" % [i, String(w["kind"])])
 

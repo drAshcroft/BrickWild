@@ -92,6 +92,14 @@ func _check_mast(plan: HousePlan, builder: PagodaBuilder, failures: Array[String
 
 func _check_plan(plan: HousePlan, failures: Array[String]) -> void:
 	var expected := int(plan.world_meta.get("side_count", 0))
+	# The sub-kind names its own footprint. Without this rule an octagonal
+	# pagoda silently built square passes every remaining tier and stair
+	# measurement, and the published geometry is a promise the plan never keeps.
+	var by_kind := {&"square_pagoda": 4, &"octagonal_pagoda": 8,
+		&"dodecagonal_pagoda": 12}
+	if by_kind.has(plan.world_subkind) and expected != int(by_kind[plan.world_subkind]):
+		failures.append("kind: %s needs %d sides, plan says %d"
+			% [String(plan.world_subkind), int(by_kind[plan.world_subkind]), expected])
 	if expected not in [4, 8, 12] or plan.rooms.is_empty():
 		failures.append("plan: pagoda requires a square, octagonal or 12-sided room")
 		return

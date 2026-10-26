@@ -698,6 +698,10 @@ static func _check_vertical_shell(plan: HousePlan, builder: HouseBuilder) -> Arr
 			# The shallow courtyard ring meets the wall head at its inner eave;
 			# only slab depth extends below that support line.
 			expected_bottom = top_wall - 0.12
+		if HouseRound.plan_applies(plan) and plan.spec.roof_type == &"conical":
+			# The thatch rests on the outer edge of the wall head and hangs past it.
+			expected_bottom = top_wall - HouseRound.eave_drop(plan.spec,
+				HouseGeometry.roof_rise(plan.spec)) - RoofShape.DEPTH * 0.5
 		if absf(roof_bottom - expected_bottom) > 0.15:
 			out.append("shell: roof begins at Y %.2f, expected wall band %.2f" % [roof_bottom, expected_bottom])
 	return out

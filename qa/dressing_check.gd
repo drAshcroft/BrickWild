@@ -93,6 +93,12 @@ func _inside(props: Array, bounds: Rect2, height: float, label: String) -> void:
 			if top < MOUNT_MIN:
 				fail("%s: %s reaches only %.2fm, which is not on a wall"
 					% [label, key, top])
+			# ...and it may not hang through the floor. The church reredos
+			# banners had their top at 1.45 m and 3.8 m of cloth below it
+			# (LIVE-SACRED, 20 Oct); a top-only rule passed them.
+			var foot: float = pos.y + PropCatalog.floor_offset(key) * s
+			if foot < -0.05:
+				fail("%s: %s hangs %.2fm below the floor" % [label, key, -foot])
 
 
 ## No two solid pieces occupy the same floor at the same height.

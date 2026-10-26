@@ -6,8 +6,6 @@ const ROOF_SURFACE := 2
 const WALL_SURFACE := 0
 const SIZES := [
 	{"name": "small", "width": 7.0, "length": 9.0, "height": 2.6},
-	{"name": "default", "width": 9.0, "length": 12.0, "height": 2.6},
-	{"name": "large", "width": 17.0, "length": 18.0, "height": 2.8},
 ]
 const SEEDS := [1, 8102, 21325]
 const CUSTOM_SPEC := preload("res://tests/fixtures/witch_custom_house_spec.gd")
@@ -70,14 +68,13 @@ func _check_witch_case(size: Dictionary, seed: int) -> void:
 	var rise := float(layout["rise"])
 	var d := minf(half * 0.28, (half - absf(ridge_x)) * 0.55)
 	var transform: Transform3D = layout["transform"]
-	var roof_probe_z := _uncut_roof_z(layout)
-	if not is_finite(roof_probe_z):
-		failures.append("Witch %s seed %d has no uncut main-roof station for slope probes" % [size.name, seed])
-		roof_probe_z = 0.0 # keep both actual-plane rays and the remaining frame probes active
 	var left_run := absf(ridge_x + half)
 	var right_run := absf(half - ridge_x)
 	var shallow_x := ridge_x - d if left_run > right_run else ridge_x + d
 	var steep_x := ridge_x + d if left_run > right_run else ridge_x - d
+	# A witch hut has one plain gable roof (WITCH-SIZE deleted the service bay),
+	# so the centre of the ridge is on the main planes.
+	var roof_probe_z := 0.0
 	var shallow_probe := transform * Vector3(shallow_x, 0.0, roof_probe_z)
 	var steep_probe := transform * Vector3(steep_x, 0.0, roof_probe_z)
 	var roof_top := float(transform.origin.y) + rise + 1.0
@@ -85,11 +82,19 @@ func _check_witch_case(size: Dictionary, seed: int) -> void:
 	var steep_y := _surface_height(mesh, ROOF_SURFACE, Vector2(steep_probe.x, steep_probe.z), roof_top)
 	if not is_finite(shallow_y) or not is_finite(steep_y) or shallow_y < steep_y + 0.12:
 		failures.append("Witch %s seed %d emitted roof does not show unequal slopes (%.3f / %.3f)" % [size.name, seed, shallow_y, steep_y])
+	# The ridge is the plane, but the emitted roof surface at the ridge is the
+	# plane plus whatever cap or thatch bundle HouseGeometry.roof_slab_top()
+	# promises stands on it -- 0.30 m of reed bundle on a Witch roof, 0.22 m of
+	# ridge cap otherwise. A vertical ray at one station lands on a bundle or on
+	# the seam between two of them, so both readings are legal; the bound is the
+	# promise, not a chosen one of the two.
 	var peak := transform * Vector3(ridge_x, 0.0, 0.0)
 	var peak_y := _surface_height(mesh, ROOF_SURFACE, Vector2(peak.x, peak.z), roof_top)
-	if not is_finite(peak_y) or peak_y < float(transform.origin.y) + rise - 0.45 \
-			or peak_y > float(transform.origin.y) + rise + 0.25:
-		failures.append("Witch %s seed %d emitted ridge peak is not on its specified roof plane: %.3f" % [size.name, seed, peak_y])
+	var peak_plane := float(transform.origin.y) + rise
+	var peak_ceiling := peak_plane + HouseGeometry.roof_slab_top(plan.spec, plan.world_family)
+	if not is_finite(peak_y) or peak_y < peak_plane - 0.45 or peak_y > peak_ceiling + 0.02:
+		failures.append("Witch %s seed %d emitted ridge peak is not on its specified roof plane: %.3f outside [%.3f, %.3f]" % [
+			size.name, seed, peak_y, peak_plane - 0.45, peak_ceiling + 0.02])
 	_check_gable_infill(mesh, layout, plan, "%s seed %d" % [size.name, seed])
 	_check_ridge_crown(builder, layout, "%s seed %d" % [size.name, seed])
 	_check_rafter_bearings(builder, mesh, layout, plan, "%s seed %d" % [size.name, seed])
@@ -157,28 +162,10 @@ func _check_symmetric_control(size: Dictionary, style: StringName, trade: String
 	mesh.clear_surfaces()
 
 
-func _uncut_roof_z(layout: Dictionary) -> float:
-	var along := float(layout.get("along", 0.0))
-	var half := along * 0.5
-	var bay: Dictionary = layout.get("witch_bay", {})
-	for candidate in [0.0, -half * 0.5, half * 0.5, -half + 0.12, half - 0.12]:
-		if absf(candidate) > half - 0.04:
-			continue
-		if bay.is_empty() or candidate < float(bay.get("along_lo", INF)) - 0.04 or candidate > float(bay.get("along_hi", -INF)) + 0.04:
-			return float(candidate)
-	return NAN
-
-
+## The two along-stations of the gable frames, one at each end.
 func _retained_gable_stations(layout: Dictionary) -> Array[float]:
-	var result: Array[float] = []
 	var station_offset := float(layout.get("along", 0.0)) * 0.5 + HouseGeometry.BEAM_D * 0.5 - 0.01
-	var bay: Dictionary = layout.get("witch_bay", {})
-	var roof_faces: Array[PackedVector3Array] = layout["faces"]
-	for end_sign in [-1.0, 1.0]:
-		var station := float(end_sign) * station_offset
-		if bay.is_empty() or station < float(bay.get("along_lo", INF)) - 0.001 or station > float(bay.get("along_hi", -INF)) + 0.001:
-			result.append(station)
-	return result
+	return [-station_offset, station_offset]
 
 
 func _surface_height(mesh: ArrayMesh, surface: int, xz: Vector2, top_y: float) -> float:
@@ -241,44 +228,15 @@ func _check_gable_infill(mesh: ArrayMesh, layout: Dictionary, plan: HousePlan, w
 	var half_along := float(layout["along"]) * 0.5
 	var ridge_x := float(layout["ridge_x"])
 	var rise := float(layout["rise"])
-	var bay: Dictionary = layout.get("witch_bay", {})
-	var roof_faces: Array[PackedVector3Array] = layout["faces"]
 	for end_sign in [-1.0, 1.0]:
 		var local_z := float(end_sign) * half_along
 		var outside_z := local_z + float(end_sign) * 0.5
 		var inside_z := local_z - float(end_sign) * 0.5
-		var cut_end := not bay.is_empty() and local_z >= float(bay.get("along_lo", INF)) - 0.001 and local_z <= float(bay.get("along_hi", -INF)) + 0.001
-		if not cut_end:
-			var original_y := rise * 0.56
-			var original_outside := transform * Vector3(ridge_x, original_y, outside_z)
-			var original_inside := transform * Vector3(ridge_x, original_y, inside_z)
-			if not _surface_segment_hits(mesh, WALL_SURFACE, original_outside, original_inside):
-				failures.append("%s original gable profile is missing outside the bay at end %.0f" % [who, end_sign])
-			continue
-		var axis := int(bay.get("axis", 0))
-		var outer := float(bay["outer"])
-		var inner := float(bay["inner"])
-		var local_x := (outer + inner) * 0.5
-		var local_point := Vector2(local_x, local_z) if axis == 0 else Vector2(local_z, local_x)
-		var host_under := RoofShape.height_at(roof_faces, local_point) - RoofShape.DEPTH * 0.5
-		var span_t := clampf((local_x - outer) / (inner - outer), 0.0, 1.0)
-		var shed_under := lerpf(float(bay["eave_y"]), float(bay["join_y"]), span_t) - RoofShape.DEPTH * 0.5
-		if not is_finite(host_under) or host_under <= shed_under + 0.10:
-			failures.append("%s cut gable station %.3f has no measurable upper infill band" % [who, local_z])
-			continue
-		var lower_y := minf(shed_under - 0.035, maxf(0.025, shed_under * 0.5))
-		if lower_y <= 0.0:
-			failures.append("%s cut gable station %.3f has no lower wall segment beneath shed" % [who, local_z])
-			continue
-		var low_a := transform * Vector3(local_x, lower_y, outside_z)
-		var low_b := transform * Vector3(local_x, lower_y, inside_z)
-		if not _surface_segment_hits(mesh, WALL_SURFACE, low_a, low_b):
-			failures.append("%s supported lower shed-section gable infill is missing at end %.0f" % [who, end_sign])
-		var upper_y := (shed_under + host_under) * 0.5
-		var high_a := transform * Vector3(local_x, upper_y, outside_z)
-		var high_b := transform * Vector3(local_x, upper_y, inside_z)
-		if _surface_segment_hits(mesh, WALL_SURFACE, high_a, high_b):
-			failures.append("%s floating original gable infill remains above shed underside at end %.0f" % [who, end_sign])
+		var original_y := rise * 0.56
+		var original_outside := transform * Vector3(ridge_x, original_y, outside_z)
+		var original_inside := transform * Vector3(ridge_x, original_y, inside_z)
+		if not _surface_segment_hits(mesh, WALL_SURFACE, original_outside, original_inside):
+			failures.append("%s original gable profile is missing at end %.0f" % [who, end_sign])
 
 
 func _check_rafter_bearings(builder: HouseBuilder, mesh: ArrayMesh, layout: Dictionary,
@@ -335,8 +293,12 @@ func _check_rafter_bearings(builder: HouseBuilder, mesh: ArrayMesh, layout: Dict
 		var normal := Vector2(-slope_dir.y, slope_dir.x)
 		if normal.y < 0.0:
 			normal = -normal
-		var plate_center_y := HouseGeometry.PLATE_H * 0.5
-		var seat_plane_y := plate_center_y + RoofShape.DEPTH * 0.5 + normal.y * HouseGeometry.BEAM_W
+		# The rafter's lower face lands on the TOP of the tie plate with the
+		# 2 mm clearance _witch_rafter_foot() measures, and the roof slab's own
+		# depth is carried above that. Seating it on the plate's centre, as this
+		# fixture used to, sinks the rafter a hand's depth into the plate.
+		var seat_plane_y := HouseGeometry.PLATE_H + RoofShape.DEPTH * 0.5 + 0.002 \
+			+ normal.y * HouseGeometry.BEAM_W
 		var seat_t := clampf(seat_plane_y / rise, 0.0, 1.0)
 		var bearing_margin := 0.02
 		var min_roof_x := -wall_half + bearing_margin + normal.x * HouseGeometry.BEAM_W

@@ -30,7 +30,15 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 	root.name = "Village"
 	var ground := MeshInstance3D.new()
 	ground.name = "Ground"
-	ground.mesh = ground_mesh(plan)
+	var builder := VillageBuilder.new()
+	ground.mesh = builder.build(plan)
+	var surface := VillageGroundSurface.of(plan)
+	if surface != null:
+		# the named walls, for VillageGroundCheck (VTER-GROUND-MESH)
+		var rows: Array = []
+		for row in builder.component_log:
+			rows.append({"role": String(row["role"]), "host": String(row["host"]), "id": String(row["id"])})
+		ground.set_meta(&"components", rows)
 	ShellAssembler.surface_materials(ground,
 		BuildingFamilyAdapter.colours(plan.spec))
 	_ground_finish(ground)
@@ -48,7 +56,18 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 			continue
 		node.name = "%s_%d" % [String(b["kind"]), i]
 		node.transform = b["transform"]
+		if surface != null:
+			# on given ground the building's floor is its lot's platform
+			var platform := surface.platform_of(i)
+			if not is_nan(platform):
+				node.transform.origin.y = platform
 		_record_stands(node, built)
+		var lot_i: int = int(b.get("lot", -1))
+		if lot_i >= 0 and lot_i < plan.lots.size() and plan.lots[lot_i].has("piles"):
+			# on piles: its facade pieces stand on its own deck (VTER-FORM-WATER)
+			node.set_meta(&"piles", true)
+		elif surface != null:
+			_ground_yard(node, surface)
 		_apply_building_appearance(node, built, plan.spec)
 		houses.add_child(node)
 	_dressing(root, plan)
@@ -67,6 +86,39 @@ static func _record_stands(node: Node3D, built: GeneratedBuilding) -> void:
 		rows.append({"id": String(row.get("id", "")), "key": String(row.get("key", "")),
 			"y": float((row["pos"] as Vector3).y), "mounted": bool(row.get("mounted", false))})
 	node.set_meta(&"stands", rows)
+
+
+## On given ground (VTER-GROUND-MESH) a house's yard and facade models were
+## planned on its flat floor (y = 0), and its ground falls away downhill of
+## the door: each one standing on the floor is set down on the village's
+## finished ground under it instead -- the lowest ground under its footprint,
+## so its downhill edge is on the ground -- and its `stands` row follows it.
+## A model up on a deck or a porch (planned above the floor) stays there.
+const YARD_ON_DECK := 0.05
+
+
+static func _ground_yard(node: Node3D, surface: VillageGroundSurface) -> void:
+	var exterior := node.get_node_or_null("Exterior") as Node3D
+	var rows: Array = node.get_meta(&"stands", [])
+	if exterior == null or rows.is_empty():
+		return
+	var xf: Transform3D = node.transform * exterior.transform
+	for row in rows:
+		var key: String = String(row.get("key", ""))
+		if bool(row.get("mounted", false)) or PropCatalog.has_tag(key, PropCatalog.WALL_MOUNTED) \
+				or PropCatalog.has_tag(key, PropCatalog.CEILING) or float(row["y"]) > YARD_ON_DECK:
+			continue
+		var model := exterior.get_node_or_null(String(row.get("id", ""))) as Node3D
+		if model == null:
+			continue
+		var stood: Vector3 = xf * Vector3(model.position.x, float(row["y"]), model.position.z)
+		var radius := 0.0
+		if PropCatalog.known(key):
+			var size: Vector3 = PropCatalog.size(key)
+			radius = 0.5 * maxf(size.x, size.z) * absf(model.scale.x)
+		var ground := surface.stand_height(Vector2(stood.x, stood.z), radius)
+		model.position.y += ground - stood.y
+		row["y"] = float(row["y"]) + ground - stood.y
 
 
 ## Paint only the architectural shell of each generated building. Surface 0 is
@@ -236,6 +288,7 @@ static func plant_sink(t: Dictionary) -> float:
 ## `built` are already in the ground mesh -- `VillageBuilder` raised them --
 ## so they are skipped here rather than loaded twice.
 static func _dressing(root: Node3D, plan: VillagePlan) -> void:
+	var surface := VillageGroundSurface.of(plan)
 	var props := Node3D.new()
 	props.name = "Props"
 	root.add_child(props)
@@ -253,6 +306,8 @@ static func _dressing(root: Node3D, plan: VillagePlan) -> void:
 		# a wall torch hangs at its recorded elevation; the rest stand on the ground
 		at.y = float(p["elevation"]) if p.has("elevation") \
 			else VillageBuilder.ground_height(plan, p["pos"])
+		if surface != null and not p.has("elevation"):
+			at.y = surface.stand_height(p["pos"], VillageBuilder.prop_radius(p))
 		if not bool(p.get("built", false)):
 			var node: Node3D = _model(key, at, yaw)
 			if node != null:

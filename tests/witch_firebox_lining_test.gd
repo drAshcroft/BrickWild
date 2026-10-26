@@ -34,7 +34,7 @@ func _init() -> void:
 				return
 			seeds = [selected]
 	for seed_value in seeds:
-		for size in [Vector2(7, 9), Vector2(9, 12), Vector2(17, 18)]:
+		for size in [Vector2(7, 9)]:
 			_check_case(size, seed_value)
 	for failure in failures:
 		printerr("FAIL ", failure)
@@ -120,8 +120,45 @@ func _check_case(size: Vector2, seed_value: int) -> void:
 		if specialist.has("soot"):
 			specialist["soot"].free()
 		prop.free()
+	_check_stove_and_brooms(plan, builder, assembled, label)
 	assembled.free()
 	print("WITCH_RECESS_CASE ", label, " checks=", checks, " failures=", failures.size())
+
+## WITCH-PROPS: one stove piped into the breast, a Cauldron beside it, two brooms
+## standing on the floor with the handle touching a wall.
+func _check_stove_and_brooms(plan: HousePlan, builder: HouseBuilder, assembled: Node3D,
+		label: String) -> void:
+	var breast := HouseGeometry.hearth_breast(plan)
+	_expect(not Dictionary(breast.get("stove", {})).is_empty(), label + " breast lost its stove record")
+	var stoves := assembled.find_children("WitchWoodStove", "Node3D", true, false)
+	_expect(stoves.size() == 1, label + " needs exactly one wood stove, found %d" % stoves.size())
+	if stoves.size() == 1:
+		var stove: Node3D = stoves[0]
+		var mouth := HouseGeometry.hearth_mouth(plan)
+		_expect(float(stove.get_meta("flue_top_y")) >= float(mouth["top"]) + 0.05,
+			label + " stove pipe stops short of the breast header")
+		_expect(stove.find_child("StoveFluePipe", true, false) != null, label + " stove has no flue pipe")
+		var rec: Dictionary = breast["stove"]
+		var floor_y: float = float(breast["storey"]) * plan.spec.height + float(rec["slab_y"])
+		_expect(absf(stove.position.y - floor_y) < 0.001, label + " stove does not rest on the slab")
+	var cauldrons := 0
+	for item in plan.furniture:
+		if item["key"] == "Cauldron":
+			cauldrons += 1
+	_expect(cauldrons >= 1, label + " lost its Cauldron")
+	var brooms := assembled.find_children("WitchBroom_*", "Node3D", true, false)
+	_expect(brooms.size() >= 2, label + " needs two brooms, found %d" % brooms.size())
+	var whys := {}
+	for broom in brooms:
+		whys[String(broom.get_meta("why"))] = true
+		var foot: Vector3 = broom.get_meta("foot")
+		var tip: Vector3 = broom.get_meta("tip")
+		var floor_y2 := float(plan.witch_props[0]["floor_y"])
+		_expect(absf(foot.y - floor_y2) < 0.03, label + " broom foot is off the floor")
+		_expect(tip.y > foot.y + 1.0, label + " broom is not standing")
+	_expect(whys.has("door") and whys.has("stove"), label + " broom set lacks door/stove: %s" % [whys.keys()])
+	var tria := HouseQA.check_furniture_floor(plan, builder)
+	_expect(tria.is_empty(), label + " furniture floor after props: %s" % [tria])
 
 func _check_vessel(plan: HousePlan, builder: HouseBuilder, cooking: Dictionary,
 		prop: Node3D, label: String) -> void:
@@ -131,9 +168,13 @@ func _check_vessel(plan: HousePlan, builder: HouseBuilder, cooking: Dictionary,
 	_collect_vertices(prop, Transform3D.IDENTITY, vertices)
 	_expect(_vertices_inside_mouth(vertices, builder, plan),
 		label + " actual imported vessel crosses its masonry opening")
+	# The stove bay widens the mouth on one side; "sideways" means away from it.
+	var stove_rec: Dictionary = HouseGeometry.hearth_breast(plan).get("stove", {})
+	var yaw_b: float = float(HouseGeometry.hearth_breast(plan)["yaw"])
+	var away := -Vector2(cos(yaw_b), -sin(yaw_b)) * float(stove_rec.get("side", -1.0))
 	var sideways := vertices.duplicate()
 	for index in sideways.size():
-		sideways[index] += Vector3(0.0, 0.0, 0.25)
+		sideways[index] += Vector3(away.x, 0.0, away.y) * 0.25
 	_expect(not _vertices_inside_mouth(sideways, builder, plan),
 		label + " moved assembled mesh escaped opening clearance")
 	var lowest := INF
@@ -157,7 +198,7 @@ func _check_vessel(plan: HousePlan, builder: HouseBuilder, cooking: Dictionary,
 		label + " lifted vessel escaped the recess predicate")
 	displaced = cooking.duplicate(true)
 	var normal: Vector2 = HouseGeometry.hearth_breast(plan)["normal"]
-	var tangent := Vector2(normal.y, -normal.x)
+	var tangent := away
 	displaced["pos"] += Vector3(tangent.x, 0, tangent.y) * 0.25
 	displaced["rect"].position += tangent * 0.25
 	_expect(not HouseQA._hearth_recess_vessel_fits(plan, builder, displaced),

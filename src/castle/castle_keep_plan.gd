@@ -107,7 +107,7 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 	var top_walls := HouseGeometry.room_walls(plan, levels - 1)
 	plan.hearth = {"room": levels - 1, "wall": _facing_wall(top_walls, Vector2(1, 0))}
 	if with_furniture:
-		HouseFurnisher.furnish(plan, hs)
+		CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 
@@ -118,6 +118,17 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 ## and at most one placement attempt per required category.
 ## Rooms wider than this furnish their guardroom table against a wall.
 const WIDE_ROOM_AREA := 24.0
+
+## What a watch room keeps: somewhere to sit the watch, the arms rack, the
+## post's stores and a light. Placed under the ordinary rules, with the room's
+## own door, stair and window reservations.
+const WATCH_ROOM := [
+	{"cat": "bench", "rule": &"wall"},
+	{"cat": "stand", "key": "WeaponStand", "rule": &"wall"},
+	{"cat": "chest", "rule": &"wall"},
+	{"cat": "storage", "rule": &"wall"},
+	{"cat": "sconce", "rule": &"mounted"},
+]
 
 
 static func furnish_minimum_programme(plan: HousePlan, spec: HouseSpec) -> void:
@@ -154,6 +165,105 @@ static func furnish_minimum_programme(plan: HousePlan, spec: HouseSpec) -> void:
 			if has_table and not has_seat:
 				HouseFurnishPlacement.place_one(plan, spec, room, "seat", &"around",
 					blocked, zones, rng, {"opt": 1.0})
+	# The minimum names each room truly; the walk QA also wants its tables laid
+	# for two and a large room not left bare. CastleRoomTopUp does both under
+	# the same placement rules, keeping only what leaves a room no worse.
+	CastleRoomTopUp.apply(plan, spec)
+	# A table nobody can sit at is not a dining table. A mural tower's storey
+	# often cannot take one -- the stair owns the long side a chair is drawn up
+	# to -- so the post becomes the watch room it is. Measured from the
+	# placements above, not guessed from the floor area.
+	_demote_unseated_guardrooms(plan, spec)
+
+
+## A guardroom whose table holds nobody has an unusable table in it: an 11.8 m2
+## tower storey with a stair across it takes a 2.85 m table but no chair beside
+## it. Plan the post as a watch room instead -- a bench, an arms rack, stores
+## and a light, and no dining table -- and say so in the room's own kind, so the
+## programme, sparse, lamp and seat rules all judge what the room really is.
+static func _demote_unseated_guardrooms(plan: HousePlan, spec: HouseSpec) -> void:
+	for room in range(plan.room_count()):
+		if plan.kind_of(room) != &"guardroom":
+			continue
+		var table := -1
+		for index in plan.furniture_of(room):
+			var piece: Dictionary = plan.furniture[index]
+			if PropCatalog.category(String(piece["key"])) == "table" \
+					and not bool(piece.get("mounted", false)) \
+					and String(piece.get("row", "")) == "":
+				table = index
+				break
+		# A trestle row seats itself with benches and is judged elsewhere.
+		if table < 0 or CastleRoomTopUp._holds_at(plan, room, table) >= 2:
+			continue
+		# Take the table and the one chair that came with it out of the room.
+		# A seat's host index can be stale by now (earlier removals shift the
+		# list), so every seat drawn up to this room's one table goes with it:
+		# a chair left standing with no table is the "seating" fault.
+		var mine := plan.furniture_of(room)
+		var leaving: Array[Dictionary] = []
+		for index in range(plan.furniture.size()):
+			var piece: Dictionary = plan.furniture[index]
+			var hosted_seat: bool = mine.has(index) and int(piece.get("host", -1)) >= 0 					and PropCatalog.category(String(piece["key"])) == "seat"
+			if index == table or int(piece.get("host", -1)) == table or hosted_seat:
+				leaving.append(piece)
+		# One at a time, renumbering the host index of every piece after it: a
+		# bare remove_at left other rooms' seats pointing at the wrong table, or
+		# past the end of the list (the checks threw at seats 49 and 50).
+		for piece in leaving:
+			var at := -1
+			for index in range(plan.furniture.size()):
+				if is_same(plan.furniture[index], piece):
+					at = index
+					break
+			if at >= 0:
+				plan.furniture.remove_at(at)
+				HouseFurnishRepair.reindex_hosts(plan, at)
+		plan.rooms[room]["kind"] = &"watch_room"
+		if room < spec.program.size() and spec.program[room] == &"guardroom":
+			spec.program[room] = &"watch_room"
+		_dress_watch_room(plan, spec, room)
+		# A storey the stair takes whole has no wall for a bench. It is not a
+		# watch room then, but the store the stair leaves it as.
+		var benched := false
+		for index in plan.furniture_of(room):
+			benched = benched or PropCatalog.category(String(plan.furniture[index]["key"])) == "bench"
+		if not benched:
+			plan.rooms[room]["kind"] = &"store"
+			if room < spec.program.size():
+				spec.program[room] = &"store"
+
+
+## The watch room's furniture. In the smallest tower storey -- 11.8 m2 in a
+## hexagon, with a 2.4 x 1.0 stair across it -- the bench and a cupboard stand
+## and the arms rack, a metre deep, does not; the pieces are placed in the
+## WATCH_ROOM order and a piece that does not fit is simply absent. Each one is
+## judged against the room's own walk and taken back out if it closes floor the
+## room had.
+static func _dress_watch_room(plan: HousePlan, spec: HouseSpec, room: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.seed) ^ 0x57_41_54_43
+	var blocked: Array[Rect2] = HouseFurnishPlacement.initial_blocked(plan, room)
+	var zones: Array[Rect2] = []
+	for index in plan.furniture_of(room):
+		var piece: Dictionary = plan.furniture[index]
+		if bool(piece.get("mounted", false)):
+			continue
+		blocked.append(Rect2(piece["rect"]))
+		var zone: Rect2 = piece.get("zone", Rect2())
+		if zone.size != Vector2.ZERO:
+			zones.append(zone)
+	var walk := CastleRoomTopUp.room_walk_faults(plan, room)
+	var mark := plan.furniture.size()
+	for step in WATCH_ROOM:
+		var row: Dictionary = step.duplicate()
+		row["opt"] = 1.0
+		row["wall_only"] = String(step["rule"]) == "wall"
+		HouseFurnishPlacement.place_one(plan, spec, room, String(step["cat"]),
+			StringName(step["rule"]), blocked, zones, rng, row)
+	while plan.furniture.size() > mark \
+			and CastleRoomTopUp.room_walk_faults(plan, room) > walk:
+		plan.furniture.resize(plan.furniture.size() - 1)
 
 
 static func _facing_wall(walls: Array[Dictionary], inward: Vector2) -> int:
@@ -175,11 +285,26 @@ static func _windows(plan: HousePlan, level: int) -> void:
 	var blind := _facing_wall(walls, Vector2(0, 1) if walls.size() > 4 else Vector2(-1, 0))
 	var head := minf(CastleInteriorPlans.WINDOW_SILL + CastleInteriorPlans.WINDOW_H,
 		plan.spec.height - 0.2)
+	# FEW AND TALL, the same rule the rectangular keep follows, measured along
+	# the perimeter instead of counted per wall. A fourteen-sided drum 15 m
+	# across has facets 3.5 m long; a window at the middle of every one leaves
+	# a metre of wall on either side of it, which is less than a chest or a
+	# cupboard stands on, and the only clean facets are the ones the stair
+	# takes. The battered keep's 187 m2 parlour could then take no wall piece
+	# at all, and failed "sparse" at 1% (CASTLE-CHANGE-17). One window every
+	# keep pitch leaves whole facets of wall on a small drum, and still puts
+	# one on every facet of a large one.
+	var across := 0.0
+	var last := -INF
 	for wi in range(walls.size()):
-		if plan.kind_of(level) == &"lords_chamber" and wi == blind:
-			continue
 		var wall: Dictionary = walls[wi]
 		var length := Vector2(wall.from).distance_to(wall.to)
+		var centre := across + length * 0.5
+		across += length
+		if plan.kind_of(level) == &"lords_chamber" and wi == blind:
+			continue
+		if centre - last < CastleInteriorPlans.KEEP_WINDOW_PITCH:
+			continue
 		var width := minf(CastleInteriorPlans.WINDOW_W,
 			length - 2.0 * HouseGeometry.WINDOW_CORNER_MARGIN)
 		if width < COMPACT_FACET_WINDOW_MIN:
@@ -198,11 +323,15 @@ static func _windows(plan: HousePlan, level: int) -> void:
 				"pos": Vector2(wall.from).lerp(wall.to, (float(i) + 0.5) / float(count)),
 				"normal": -Vector2(wall.normal), "width": width,
 				"sill": CastleInteriorPlans.WINDOW_SILL, "head": head, "storey": level})
+		last = centre
 
 
 ## A common footprint touches a real wall on either landing and fits BOTH
 ## floors. Sampling against polygon faces avoids placing stairs in AABB corners.
-static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()) -> void:
+## `hard` are polygons the flight may not touch at all (a sky tower's door, whose
+## threshold the final mesh must keep clear); `soft` penalties still apply.
+static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2(),
+		hard: Array[PackedVector2Array] = []) -> void:
 	var floor := HouseGeometry.room_floor_rect(plan, upper)
 	var run := minf(2.4, maxf(HouseGeometry.PATH_MIN, maxf(floor.size.x, floor.size.y) - 0.3))
 	var width := minf(1.0, maxf(HouseGeometry.PATH_MIN, minf(floor.size.x, floor.size.y) - 0.3))
@@ -228,6 +357,12 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 				if not _inside(plan, lower, rect) or not _inside(plan, upper, rect):
 					continue
 				if avoid.size.x > 0.0 and rect.intersects(avoid, true):
+					continue
+				var in_doorway := false
+				for zone in hard:
+					for over in Geometry2D.intersect_polygons(Poly.from_rect(rect), zone):
+						in_doorway = in_doorway or Poly.area(over) > 0.02
+				if in_doorway:
 					continue
 				var score := centre.distance_to(front)
 				if HousePlanLevels.hits_any(rect, wells):

@@ -56,6 +56,13 @@ static func build(plan: HousePlan, cutaway := false) -> Node3D:
 		WorldAssembler.dress_house(shell, plan)
 	root.add_child(shell)
 	furnish(root, plan, builder)
+	# HS-MINKA: the plan keeps the floor's underside at y = 0 with the ground
+	# `floor_raise` below it; lift the house (not its yard) so the ground is y = 0.
+	var raise := HouseGeometry.floor_raise(plan.spec)
+	if raise > 0.0:
+		for child in root.get_children():
+			if child is Node3D:
+				(child as Node3D).position.y += raise
 	dress_exterior(root, plan)
 	return root
 
@@ -111,6 +118,8 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 				if not backing.is_empty():
 					props.add_child(backing["soot"])
 					witch_backing_added = true
+	_add_witch_stove(props, plan)
+	_add_witch_brooms(props, plan)
 	if builder != null and _uses_domestic_hearth_fire(plan):
 		var breast: Dictionary = HouseGeometry.hearth_breast(plan)
 		if not breast.is_empty():
@@ -127,6 +136,7 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 				props.add_child(opening["soot"])
 			else:
 				anchor.free()
+	_longhall_fire(props, plan)
 	var lights := LightKit.light_the_plan(plan)
 	var light_index := 0
 	for item_variant in plan.furniture:
@@ -144,6 +154,76 @@ static func furnish(root: Node3D, plan: HousePlan, builder: HouseBuilder = null)
 	if light_index != lights.get_child_count():
 		push_error("LightKit plan mapping mismatch: %d rows, %d nodes" % [light_index, lights.get_child_count()])
 	root.add_child(lights)
+
+
+## HS-LONGHALL: the fire on the hall floor -- ash and embers inside the kerb the
+## shell builds, crossed logs, a few flames and a warm light. A long hall is lit
+## by this fire; the louvre over it lets the smoke out.
+static func _longhall_fire(parent: Node3D, plan: HousePlan) -> void:
+	var open_fire := plan.open_fire()
+	if open_fire.is_empty() or not open_fire.has("hearth"):
+		return
+	var kerb: Rect2 = open_fire["hearth"]
+	var c := kerb.get_center()
+	var fire := Node3D.new()
+	fire.name = "OpenHearthFire"
+	fire.position = Vector3(c.x, HouseGeometry.FLOOR_T + 0.03, c.y)
+	var ember := StandardMaterial3D.new()
+	ember.albedo_color = Color(0.09, 0.04, 0.02)
+	ember.emission_enabled = true
+	ember.emission = Color(0.85, 0.22, 0.04)
+	ember.emission_energy_multiplier = 0.9
+	var bed := MeshInstance3D.new()
+	bed.name = "Embers"
+	var bed_mesh := BoxMesh.new()
+	bed_mesh.size = Vector3(kerb.size.x - 0.5, 0.05, kerb.size.y - 0.5)
+	bed.mesh = bed_mesh
+	bed.material_override = ember
+	bed.position.y = 0.02
+	fire.add_child(bed)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.20, 0.12, 0.07)
+	wood.roughness = 0.95
+	for k in range(5):
+		var log := MeshInstance3D.new()
+		log.name = "Firewood_%d" % k
+		var log_mesh := CylinderMesh.new()
+		log_mesh.top_radius = 0.055
+		log_mesh.bottom_radius = 0.065
+		log_mesh.height = 0.78
+		log_mesh.radial_segments = 8
+		log.mesh = log_mesh
+		log.material_override = wood
+		log.rotation = Vector3(0.0, TAU * float(k) / 5.0 + 0.3, PI * 0.5 - 0.22)
+		log.position = Vector3(0.0, 0.09 + 0.03 * float(k % 2), 0.0)
+		fire.add_child(log)
+	var flame := StandardMaterial3D.new()
+	flame.albedo_color = Color(1.0, 0.55, 0.12)
+	flame.emission_enabled = true
+	flame.emission = Color(1.0, 0.45, 0.08)
+	flame.emission_energy_multiplier = 2.4
+	flame.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for k in range(4):
+		var tongue := MeshInstance3D.new()
+		tongue.name = "Flame_%d" % k
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.0
+		cone.bottom_radius = 0.13 - 0.02 * float(k % 2)
+		cone.height = 0.5 + 0.14 * float(k % 3)
+		cone.radial_segments = 7
+		tongue.mesh = cone
+		tongue.material_override = flame
+		var a := TAU * float(k) / 4.0 + 0.5
+		tongue.position = Vector3(cos(a) * 0.17, 0.18 + cone.height * 0.5, sin(a) * 0.17)
+		fire.add_child(tongue)
+	var light := OmniLight3D.new()
+	light.name = "FireLight"
+	light.light_color = Color(1.0, 0.58, 0.28)
+	light.light_energy = 2.2
+	light.omni_range = 8.0
+	light.position = Vector3(0.0, 0.75, 0.0)
+	fire.add_child(light)
+	parent.add_child(fire)
 
 
 ## These plaster-and-timber households share a restrained interior finish.
@@ -1386,6 +1466,111 @@ static func _instance(p: Dictionary, centred := true) -> Node3D:
 	return node
 
 
+
+
+## The Witch's wood-burning stove (WITCH-PROPS): a cast-iron box on four feet
+## standing on the alcove's stone slab, a hinged door with a mica pane, and a
+## flue pipe that rises into the breast header, where the masonry flue takes it
+## up through the roof. Built from the plan's `stove` record, never invented.
+static func _witch_iron() -> StandardMaterial3D:
+	var iron := StandardMaterial3D.new()
+	iron.albedo_color = Color(0.075, 0.085, 0.09)
+	iron.metallic = 0.55
+	iron.roughness = 0.72
+	return iron
+
+
+static func _add_witch_stove(props: Node3D, plan: HousePlan) -> void:
+	if plan.spec.style != &"witch_hut":
+		return
+	var breast: Dictionary = HouseGeometry.hearth_breast(plan)
+	var stove: Dictionary = breast.get("stove", {})
+	if stove.is_empty():
+		return
+	var size: Vector3 = stove["size"]
+	var leg: float = HouseGeometry.WITCH_STOVE_LEG
+	var base_y: float = float(breast["storey"]) * plan.spec.height + float(stove["slab_y"])
+	var c: Vector2 = stove["centre"]
+	var root := Node3D.new()
+	root.name = "WitchWoodStove"
+	root.position = Vector3(c.x, base_y, c.y)
+	root.rotation.y = float(stove["yaw"])
+	var iron := _witch_iron()
+	var body_h := size.y - leg
+	# local +z is toward the room, -z toward the wall (as the breast boxes).
+	_stove_box(root, "StoveBody", Vector3(size.x, body_h, size.z), Vector3(0.0, leg + body_h * 0.5, 0.0), iron)
+	_stove_box(root, "StoveTopPlate", Vector3(size.x + 0.04, 0.03, size.z + 0.04),
+		Vector3(0.0, size.y + 0.015, 0.0), iron)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_stove_box(root, "StoveFoot", Vector3(0.05, leg, 0.05),
+				Vector3(sx * (size.x * 0.5 - 0.04), leg * 0.5, sz * (size.z * 0.5 - 0.04)), iron)
+	var door_z := size.z * 0.5 + 0.008
+	_stove_box(root, "StoveDoor", Vector3(size.x * 0.62, body_h * 0.55, 0.016),
+		Vector3(0.0, leg + body_h * 0.42, door_z), iron)
+	var mica := StandardMaterial3D.new()
+	mica.albedo_color = Color(0.95, 0.45, 0.12)
+	mica.emission_enabled = true
+	mica.emission = Color(1.0, 0.32, 0.04)
+	mica.emission_energy_multiplier = 1.6
+	_stove_box(root, "StoveMica", Vector3(size.x * 0.3, body_h * 0.22, 0.01),
+		Vector3(0.0, leg + body_h * 0.45, door_z + 0.011), mica)
+	_stove_box(root, "StoveHandle", Vector3(0.02, 0.09, 0.03),
+		Vector3(size.x * 0.24, leg + body_h * 0.30, door_z + 0.02), iron)
+	# The pipe rises from a collar on the top plate, along the back, into the
+	# breast header: its top is inside the masonry, which carries the flue.
+	var pipe_r: float = float(stove["pipe_radius"])
+	var mouth := HouseGeometry.hearth_mouth(plan)
+	var pipe_top: float = float(mouth["top"]) + 0.12 - float(stove["slab_y"])
+	var pipe_bottom: float = size.y + 0.03
+	var pipe := CylinderMesh.new()
+	pipe.top_radius = pipe_r
+	pipe.bottom_radius = pipe_r
+	pipe.height = pipe_top - pipe_bottom
+	var pipe_node := MeshInstance3D.new()
+	pipe_node.name = "StoveFluePipe"
+	pipe_node.mesh = pipe
+	pipe_node.material_override = iron
+	pipe_node.position = Vector3(0.0, pipe_bottom + pipe.height * 0.5, -size.z * 0.5 + pipe_r + 0.06)
+	root.add_child(pipe_node)
+	var collar := CylinderMesh.new()
+	collar.top_radius = pipe_r * 1.35
+	collar.bottom_radius = pipe_r * 1.35
+	collar.height = 0.04
+	var collar_node := MeshInstance3D.new()
+	collar_node.name = "StovePipeCollar"
+	collar_node.mesh = collar
+	collar_node.material_override = iron
+	collar_node.position = Vector3(0.0, pipe_bottom + 0.02, pipe_node.position.z)
+	root.add_child(collar_node)
+	root.set_meta("plan_role", "witch_wood_stove")
+	root.set_meta("flue_top_y", base_y + pipe_top)
+	props.add_child(root)
+
+
+static func _stove_box(parent: Node3D, node_name: String, size: Vector3, pos: Vector3,
+		material: Material) -> void:
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	var node := MeshInstance3D.new()
+	node.name = node_name
+	node.mesh = mesh
+	node.material_override = material
+	node.position = pos
+	parent.add_child(node)
+
+
+## Brooms are plan records (`plan.witch_props`): a handle leaning on a wall
+## with a bound bristle cone on the floor. The assembler only dresses them.
+static func _add_witch_brooms(props: Node3D, plan: HousePlan) -> void:
+	if plan.spec.style != &"witch_hut":
+		return
+	var index := 0
+	for rec in plan.witch_props:
+		if String(rec.get("kind", "")) != "broom":
+			continue
+		props.add_child(HouseWitchProps.broom_node(rec, "WitchBroom_%d" % index))
+		index += 1
 
 
 ## Cast iron retains its imported relief without the polished pale-metal finish.

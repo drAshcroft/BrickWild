@@ -6,6 +6,13 @@ extends RefCounted
 
 const DEPTH := 0.24
 const HALF_HIP := 0.62
+## HS-MINKA, the irimoya (hip-and-gable) roof: a gable on top of a hipped skirt.
+## The skirt climbs only IRIMOYA_SHOULDER of the rise and in from the eave by
+## IRIMOYA_INSET of the half-span, so it is the shallower of the two planes; the
+## gable above it is steeper and ends in a vertical triangle (the hafu) that
+## stands on the skirt's top edge.
+const IRIMOYA_SHOULDER := 0.2
+const IRIMOYA_INSET := 0.3
 
 ## A cone is not a pyramid: it has no ridge to cap and no two planes meeting
 ## at an apex ridge, only a ring of facets running to a single point. Mud-brick
@@ -31,6 +38,10 @@ static func faces(span: float, along: float, rise: float,
 		return out
 	if kind == &"conical":
 		return _cone(span, along, rise)
+	if kind == &"round_cone":
+		return _round_cone(span, rise)
+	if kind == &"irimoya":
+		return _irimoya(span, along, rise)
 	var h := span * 0.5
 	var f := along * 0.5
 	var cut := rise if kind == &"gable" else (rise * HALF_HIP if kind == &"half_hipped" else 0.0)
@@ -52,6 +63,51 @@ static func faces(span: float, along: float, rise: float,
 			out.append(PackedVector3Array([Vector3(-w, cut, end_v * f),
 				Vector3(w, cut, end_v * f), Vector3(0, rise, end_v * ridge)]))
 	return out
+
+
+## How far the irimoya skirt's top edge stands in from the eave on BOTH axes
+## (the skirt falls the same way all round), given the roof's full span.
+static func irimoya_inset(span: float) -> float:
+	return span * 0.5 * IRIMOYA_INSET
+
+
+## The irimoya's four skirt planes and two gable planes (six faces, in that
+## order: skirt -X, +X, -Z, +Z, then gable -X, +X). The vertical hafu triangle
+## above each end of the skirt is a wall, not a face: see `irimoya_hafu`.
+static func _irimoya(span: float, along: float, rise: float) -> Array[PackedVector3Array]:
+	var out: Array[PackedVector3Array] = []
+	var h := span * 0.5
+	var f := along * 0.5
+	var inset := irimoya_inset(span)
+	var hs := h - inset
+	var fs := f - inset
+	if hs <= 0.1 or fs <= 0.1:
+		return faces(span, along, rise, &"hipped")
+	var c := rise * IRIMOYA_SHOULDER
+	for side in [-1.0, 1.0]:
+		out.append(PackedVector3Array([Vector3(side * h, 0, -f), Vector3(side * h, 0, f),
+			Vector3(side * hs, c, fs), Vector3(side * hs, c, -fs)]))
+	for end_v in [-1.0, 1.0]:
+		out.append(PackedVector3Array([Vector3(-h, 0, end_v * f), Vector3(h, 0, end_v * f),
+			Vector3(hs, c, end_v * fs), Vector3(-hs, c, end_v * fs)]))
+	for side in [-1.0, 1.0]:
+		out.append(PackedVector3Array([Vector3(side * hs, c, -fs), Vector3(side * hs, c, fs),
+			Vector3(0, rise, fs), Vector3(0, rise, -fs)]))
+	return out
+
+
+## The vertical triangle (hafu) closing the gable of an irimoya at one end
+## (`end_v` -1 or +1), in the roof's local frame. Empty when the roof fell back
+## to a plain hip.
+static func irimoya_hafu(span: float, along: float, rise: float, end_v: float) -> PackedVector3Array:
+	var inset := irimoya_inset(span)
+	var hs := span * 0.5 - inset
+	var fs := along * 0.5 - inset
+	if hs <= 0.1 or fs <= 0.1:
+		return PackedVector3Array()
+	var c := rise * IRIMOYA_SHOULDER
+	return PackedVector3Array([Vector3(-hs, c, end_v * fs), Vector3(hs, c, end_v * fs),
+		Vector3(0, rise, end_v * fs)])
 
 
 ## Two roof planes meet an off-centre ridge. This is a pitched gable with
@@ -126,6 +182,27 @@ static func _cone(span: float, along: float, rise: float) -> Array[PackedVector3
 		for k in range(CONE_SIDES / 4):
 			var p := a.lerp(b, float(k) / float(CONE_SIDES / 4))
 			ring.append(Vector3(p.x, 0.0, p.y))
+	for i in range(ring.size()):
+		out.append(PackedVector3Array([ring[i], ring[(i + 1) % ring.size()],
+			Vector3(0.0, rise, 0.0)]))
+	return out
+
+
+## HS-ROUNDHOUSE: a cone over a CIRCLE. `ROUND_CONE_SIDES` facets from a ring of
+## radius span/2, whose first vertex is turned half a step so that a facet (not a
+## corner) is centred on -Z, the same turn as the wall ring beneath it. The ring
+## is not the rectangle's perimeter (see `_cone`): the walls under it are round,
+## so there is no corner to cover.
+const ROUND_CONE_SIDES := 12
+
+
+static func _round_cone(span: float, rise: float) -> Array[PackedVector3Array]:
+	var out: Array[PackedVector3Array] = []
+	var radius := span * 0.5
+	var ring := PackedVector3Array()
+	for k in range(ROUND_CONE_SIDES):
+		var a := -PI * 0.5 + (float(k) + 0.5) * TAU / float(ROUND_CONE_SIDES)
+		ring.append(Vector3(cos(a) * radius, 0.0, sin(a) * radius))
 	for i in range(ring.size()):
 		out.append(PackedVector3Array([ring[i], ring[(i + 1) % ring.size()],
 			Vector3(0.0, rise, 0.0)]))

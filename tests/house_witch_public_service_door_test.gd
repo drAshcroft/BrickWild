@@ -83,8 +83,6 @@ func _check_public_case(row: Dictionary) -> void:
 	else:
 		if plan.kind_of(room) != &"workshop":
 			failures.append("%s: service threshold is not hosted by the real Workshop room" % id)
-		if not HouseGeometry.witch_workshop_bay(plan).is_empty() and not bool(plan.rooms[room].get("witch_service_wing", false)):
-			failures.append("%s: Workshop door host is outside the marked lower-roof service rooms" % id)
 	var reached := HouseExterior.reached_doors(plan, true)
 	if not reached.has(door_index):
 		failures.append("%s: a human-sized yard route cannot reach the marked service door" % id)
@@ -143,9 +141,7 @@ func _threshold_diagnostic(plan: HousePlan) -> Dictionary:
 			positions.append(plan.doors[index]["pos"])
 		return {"eligible_anchor": true, "authored_marker_count": authored.size(),
 			"authored_positions": positions}
-	var bay := HouseGeometry.witch_workshop_bay(plan)
-	if bay.is_empty():
-		bay = HouseGeometry.witch_compact_service_threshold(plan)
+	var bay := HouseGeometry.witch_compact_service_threshold(plan)
 	if bay.is_empty():
 		return {"eligible_anchor": false, "reason": "no supported Workshop/shared-Hall threshold descriptor"}
 	var normal: Vector2 = bay.normal

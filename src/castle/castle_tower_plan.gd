@@ -146,7 +146,7 @@ static func generate(source: CastleSpec, with_furniture := true) -> HousePlan:
 	# (CastleManorPlan.jog_records), not part of this plan.
 
 	if with_furniture:
-		HouseFurnisher.furnish(plan, hs)
+		CastleRoomTopUp.furnish(plan, hs)
 	return plan
 
 

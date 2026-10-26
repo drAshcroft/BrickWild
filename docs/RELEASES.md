@@ -39,12 +39,12 @@ different commit under an existing version is refused: bump the version.
 ```
 releases/                       git-ignored (it holds the licensed packs)
   .gdignore                     this project's Godot never imports it
-  LATEST                        brick_wild-0.1.3
+  LATEST                        brick_wild-0.1.4
   current/                      junction to the newest verified release
-  brick_wild-0.1.3/
+  brick_wild-0.1.4/
     addons/brick_wild/          for projects that EMBED BrickWild (read-only)
     install.ps1                 standalone installer for that tree
-    brick_wild-0.1.3.zip        the addon, Godot Asset Library layout
+    brick_wild-0.1.4.zip        the addon, Godot Asset Library layout
     project/                    for tools that RUN BrickWild
     release.json                commit, date, file count, verification
     build.log                   the Godot output of the verification
@@ -55,7 +55,7 @@ releases/                       git-ignored (it holds the licensed packs)
 **Embedding the addon** (VoxelGames). Install from the release, not the repo:
 
 ```powershell
-C:\Projects\BrickWild\releases\brick_wild-0.1.3\install.ps1 -TargetProject C:\path\to\game
+C:\Projects\BrickWild\releases\brick_wild-0.1.4\install.ps1 -TargetProject C:\path\to\game
 godot --headless --path C:\path\to\game --editor --quit    # register class_name
 ```
 
@@ -68,7 +68,7 @@ own staging script; upgrading is changing that one string.
 frozen project instead of the repository:
 
 ```
-godot --headless --path C:/Projects/BrickWild/releases/brick_wild-0.1.3/project \
+godot --headless --path C:/Projects/BrickWild/releases/brick_wild-0.1.4/project \
     --script res://tools/export_village_plan.gd -- ...
 ```
 
@@ -80,6 +80,21 @@ tool that should follow the newest verified release automatically.
 Delete its folder. Nothing else refers to it except a consumer pinned to it.
 Do not edit files inside a release; `install.ps1` refuses a release whose
 files no longer match their recorded hashes.
+
+### 0.1.1 and 0.1.2 bind a stale class (RELEASE-SNAPSHOT-SHADOW)
+
+Their frozen `project/.godot/global_script_class_cache.cfg` resolves
+`HouseFurnisher` and `HouseNavCheck` to the render snapshot archived under
+`project/visualQA/styles/house/townhouse/renders/nav_inventory_restart56/sources/`
+— copies taken before `72ae848`, so a tool that runs those projects gets a
+furnisher without the witchwork cauldron binding and the later shop, castle and
+walk rules. The snapshot was renamed to `.gd.txt` in the source at `72ae848`.
+
+`brick_wild-0.1.3` binds the real classes, as does every later release (the source
+fix is in their commits): `res://src/house/house_furnisher.gd`, `res://qa/house_nav_check.gd`; measured
+2026-10-22 from each release's own cache. **Do not pin a consumer at 0.1.1 or
+0.1.2**; move it to 0.1.3 or later. The two old releases are left as they are:
+they are frozen, and editing a release in place is what `install.ps1` refuses.
 
 ## The addon manifest
 

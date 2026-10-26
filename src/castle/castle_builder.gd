@@ -34,6 +34,9 @@ const SURFACES := 6
 const BATTER_STEPS := 4
 const EAVE := 0.5              # roof overhang past the wall it caps
 const SLIT_BAY := 4.5          # metres of wall per arrow slit
+## Clear coping kept either side of a tower doorway on the wall walk, beyond
+## the body's own measured reach.
+const DOOR_GAP_MARGIN := 0.3
 
 var spec: CastleSpec
 var _roof_faces: Array[PackedVector3Array] = []
@@ -52,6 +55,11 @@ var _dress_used := false
 var _planned_interiors := {}
 const Interiors = preload("castle_interiors.gd")
 const KeepPlan = preload("castle_keep_plan.gd")
+const Slope = preload("castle_slope.gd")
+## Falling ground (VTER-CASTLE-SLOPE): the platform's plan outline and the
+## flight from its edge to the ground at the entrance. Empty on flat ground.
+var slope_outline := PackedVector2Array()
+var slope_flight: Dictionary = {}
 
 
 func build(p_spec: CastleSpec) -> ArrayMesh:
@@ -68,6 +76,8 @@ func build(p_spec: CastleSpec) -> ArrayMesh:
 	_yards.clear()
 	_skin_used = false
 	_dress_used = false
+	slope_outline = PackedVector2Array()
+	slope_flight = {}
 	_planned_interiors = Interiors.primary(spec)
 	total_height = spec.height
 
@@ -111,6 +121,9 @@ func _dressed() -> ArrayMesh:
 	if CastleGeometry.is_enclosed(spec):
 		yard_report = CastleFurnisher.yard_report(spec, prop_log, interiors,
 			{"ranges": _yard_ranges, "well": _yard_well, "yards": _yards})
+	# On falling ground the whole castle, its yard and its props stand on a
+	# revetted platform; on flat ground this emits nothing.
+	Slope.emit(self)
 	_keep_surface_slots()
 	var mesh: ArrayMesh = commit()
 	return _elevate_sky(mesh) if CastleGeometry.is_sky(spec) else mesh
@@ -1051,7 +1064,16 @@ func _build_wall_stairs() -> void:
 		var bounds := AABB()
 		var first := true
 		for piece in preload("castle_access_geometry.gd").pieces(stair):
-			var surface := SURF_TRIM if "rail" in String(piece.role) else SURF_STONE
+			# A stair makes its top landing on the coping it serves. Its guards
+			# stand on the landing's edges, and an edge that has been laid over
+			# the walkway itself is masonry in the middle of the walk: the
+			# coping is the floor there, with no drop to guard.
+			var role := String(piece.role)
+			if ("rail" in role or "guard_post" in role) \
+					and _in_walkway(Vector2(piece.xf.origin.x, piece.xf.origin.z),
+						int(stair.ring)):
+				continue
+			var surface := SURF_TRIM if "rail" in role else SURF_STONE
 			var row := component_box(piece.role, piece.size, piece.xf, surface)
 			bounds = component_aabb(row) if first else bounds.merge(component_aabb(row))
 			first = false
@@ -1061,6 +1083,48 @@ func _build_wall_stairs() -> void:
 		mass_log.back()["footprint"] = stair.poly
 		host_end()
 		index += 1
+
+
+## Whether a point stands where people walk: the coping of the ring, or the
+## deck of a mural tower's gallery. A stair's guard rail or post standing here
+## is masonry across the way it guards.
+func _in_walkway(point: Vector2, ring: int) -> bool:
+	if _on_walk_band(point, ring):
+		return true
+	for row in _planned_interiors.values():
+		if not bool(row.get("mural_tower", false)):
+			continue
+		for span in row.get("walk_gallery", []):
+			var a: Vector2 = span.a
+			var b: Vector2 = span.b
+			if a.distance_to(b) < 0.03:
+				continue
+			# The whole deck is walkway, not just its centreline: a gallery is
+			# 1.4 m wide and its own parapet guards the drop on one side.
+			if Geometry2D.get_closest_point_to_segment(point, a, b).distance_to(point) \
+					<= float(span.get("width", 1.4)) * 0.5 + 0.1:
+				return true
+	return false
+
+
+## Whether a point stands on a ring's wall walk, over the coping itself.
+func _on_walk_band(point: Vector2, ring: int) -> bool:
+	if not CastleGeometry.is_enclosed(spec):
+		return false
+	var thickness: float = CastleGeometry.wall_thickness(spec, ring)
+	for seg in CastleGeometry.wall_segments(spec, ring):
+		var mid: Vector2 = (Vector2(seg.a) + Vector2(seg.b)) * 0.5
+		var outward := Vector2(seg.outward.x, seg.outward.z).normalized()
+		var local := Vector2(point) - mid
+		# The run's a/b lie on the OUTER face and the wall reaches inward, so the
+		# inward distance from that face is the negative of the outward dot. Read
+		# the other way round it only ever found walks on the +x and +z sides.
+		var across := -local.dot(outward)
+		if absf(local.dot(Vector2(-outward.y, outward.x))) <= float(seg.length) * 0.5 \
+				and across >= -CastleGeometry.WALK_LIP \
+				and across <= thickness + CastleGeometry.WALK_LIP:
+			return true
+	return false
 
 
 ## No slot narrower than a passage between a ward building and the curtain.
@@ -1647,15 +1711,136 @@ func _wall_run(seg: Dictionary, r: int) -> void:
 		CastleGeometry.segment_aabb(spec, r, seg))
 
 	# wall walk and merlons, following the run's own top face
-	var walk: Vector3 = inner + outward * (t / 2.0) + Vector3(0.0, h + CastleGeometry.PARAPET_RISE / 2.0, 0.0)
-	box(Vector3(run, CastleGeometry.PARAPET_RISE, t + 2.0 * CastleGeometry.WALK_LIP), walk, SURF_TRIM, yaw)
+	var coping: float = h + CastleGeometry.PARAPET_RISE
+	var gaps := _walk_door_gaps(inner, outward, run_axis, run, t, coping)
+	var walk_axis: Vector3 = inner + outward * (t / 2.0)
+	for span in _walk_spans(gaps, run, coping):
+		var u0 := float(span.u0)
+		var u1 := float(span.u1)
+		box(Vector3(u1 - u0, CastleGeometry.PARAPET_RISE,
+				t + 2.0 * CastleGeometry.WALK_LIP),
+			walk_axis + run_axis * ((u0 + u1) * 0.5)
+				+ Vector3(0.0, float(span.top) - CastleGeometry.PARAPET_RISE * 0.5, 0.0),
+			SURF_TRIM, yaw)
 	if spec.battlements:
 		var edge: Vector3 = inner + outward * (t - spec.merlon_h * 0.35)
-		var along := Vector3(cos(yaw), 0.0, -sin(yaw)) * (run / 2.0)
-		_crenellate_run(edge - along, edge + along, h + CastleGeometry.PARAPET_RISE,
-			spec.merlon_h * 0.7, yaw, SURF_TRIM)
+		if gaps.is_empty():
+			var along := run_axis * (run / 2.0)
+			_crenellate_run(edge - along, edge + along, coping,
+				spec.merlon_h * 0.7, yaw, SURF_TRIM)
+		else:
+			# A merlon cannot stand on the lowered threshold strip in front of
+			# a doorway: it would hang a step above the walk it belongs to.
+			for span in _walk_spans(gaps, run, coping):
+				if bool(span.lowered) or float(span.u1) - float(span.u0) < 0.5:
+					continue
+				_crenellate_run(edge + run_axis * float(span.u0),
+					edge + run_axis * float(span.u1), coping,
+					spec.merlon_h * 0.7, yaw, SURF_TRIM)
 	_run_slits(seg, r, loops, emb)
 	total_height = maxf(total_height, h + CastleGeometry.PARAPET_RISE + spec.merlon_h)
+
+
+## The walk slab runs the whole segment and its end therefore reaches into the
+## corner tower that closes the segment. Where a raised tower door opens onto
+## that walk, the slab must stop at the door's own threshold: a slab drawn across
+## a doorway either stands a quarter metre proud of it or seals it outright.
+## Each gap is the stretch of the run the door's aperture occupies, with the
+## walking surface the door itself declares.
+func _walk_door_gaps(inner: Vector3, outward: Vector3, run_axis: Vector3, run: float,
+		t: float, coping: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if not CastleGeometry.is_enclosed(spec):
+		return out
+	var inner_xz := Vector2(inner.x, inner.z)
+	var axis := Vector2(run_axis.x, run_axis.z)
+	var across := Vector2(outward.x, outward.z)
+	# The strip a walk slab actually covers, in the run's own (along, across)
+	# coordinates; the lip overhangs each face by WALK_LIP.
+	var strip := Rect2(Vector2(-run * 0.5, -CastleGeometry.WALK_LIP),
+		Vector2(run, t + 2.0 * CastleGeometry.WALK_LIP))
+	# The walk reaches INWARD from the run's outer face, and that face is one
+	# wall thickness out from `inner`.
+	var outer_xz := inner_xz + across * t
+	for row in _planned_interiors.values():
+		if not bool(row.get("mural_tower", false)) \
+				or bool(row.get("ground_entry", false)):
+			continue
+		var plan: HousePlan = row.get("plan")
+		if plan == null or plan.spec == null:
+			continue
+		var origin: Vector3 = row.transform.origin
+		for door in plan.doors:
+			if not bool(door.get("exterior", false)):
+				continue
+			var room := int(door.get("a", 0))
+			if room < 0 or room >= plan.rooms.size():
+				continue
+			var at: Vector2 = Vector2(origin.x, origin.z) + Vector2(door.pos)
+			var normal := Vector2(door.normal).normalized()
+			var tangent := Vector2(-normal.y, normal.x)
+			var thickness := float(plan.rooms[room].get("wall_thickness",
+				HouseGeometry.wall_thickness(plan.spec)))
+			var half_width := float(door.get("width", 1.2)) * 0.5 + 0.12
+			var reach := thickness * 0.5 + 0.2
+			# Outward, a traveller stands on the threshold a full reach beyond
+			# the emitted door, which is itself half a wall out from the plan's
+			# point. A door facing ALONG the run (a rect corner tower's) meets
+			# the slab's end inside that reach and nowhere else.
+			var reach_out := thickness * 1.5 + 0.2
+			var door_box := Rect2()
+			for corner_index in 4:
+				var along := half_width if corner_index & 1 else -half_width
+				var deep := reach_out if corner_index & 2 else -reach
+				var corner: Vector2 = at + tangent * along + normal * deep
+				var local := corner - inner_xz
+				# measured inward from the OUTER face, which is where the strip
+				# starts and where a slab's lip overhangs
+				var inward := -(corner - outer_xz).dot(across)
+				var point := Vector2(local.dot(axis), inward)
+				door_box = Rect2(point, Vector2.ZERO) if corner_index == 0 \
+					else door_box.expand(point)
+			if not strip.intersects(door_box):
+				continue
+			# The doorway is measured over the reach of a traveller's body, so
+			# the threshold strip must hold a margin beyond that footprint: a
+			# coping ending exactly on the last sampled metre still reads as a
+			# sill standing proud of the door it serves.
+			var u0 := maxf(door_box.position.x - DOOR_GAP_MARGIN, -run * 0.5)
+			var u1 := minf(door_box.position.x + door_box.size.x + DOOR_GAP_MARGIN,
+				run * 0.5)
+			if u1 - u0 < 0.05:
+				continue
+			# The storey's own floor is the threshold: a worker steps from the
+			# walk onto it, never up onto a quarter-metre of coping first.
+			var floor_y := float(int(door.get("storey", 0))) * plan.spec.height \
+				+ HouseGeometry.FLOOR_T
+			out.append({"u0": u0, "u1": u1, "top": minf(floor_y, coping)})
+	return out
+
+
+## Split a run into walking spans, one per stretch between doorways. A span's
+## `top` is the walking surface; `lowered` marks the threshold strip in front of
+## a doorway, which cannot carry merlons.
+static func _walk_spans(gaps: Array, run: float, coping: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var marks: Array = gaps.duplicate()
+	marks.sort_custom(func(a, b): return float(a.u0) < float(b.u0))
+	var cursor := -run * 0.5
+	for mark in marks:
+		var u0 := clampf(float(mark.u0), -run * 0.5, run * 0.5)
+		var u1 := clampf(float(mark.u1), -run * 0.5, run * 0.5)
+		if u1 - u0 < 0.01:
+			continue
+		if u0 > cursor + 0.01:
+			out.append({"u0": cursor, "u1": u0, "top": coping, "lowered": false})
+		out.append({"u0": maxf(u0, cursor), "u1": u1,
+			"top": minf(coping, float(mark.top)),
+			"lowered": float(mark.top) < coping - 0.01})
+		cursor = maxf(cursor, u1)
+	if run * 0.5 > cursor + 0.01:
+		out.append({"u0": cursor, "u1": run * 0.5, "top": coping, "lowered": false})
+	return out
 
 
 ## Elven curtains bow between the original polygon vertices. Sampling includes
@@ -1670,7 +1855,7 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 	var a: Vector2 = seg["a"]
 	var b: Vector2 = seg["b"]
 	var outward: Vector2 = Vector2(float(seg["outward"].x), float(seg["outward"].z))
-	var sagitta: float = run * 0.16
+	var sagitta: float = CastleGeometry.bow_sagitta(run)
 	var slit_y: float = h * 0.62
 	var slit_h := minf(1.5, h * 0.24)
 	var slit_w := 0.32
@@ -1696,7 +1881,7 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 	var distances := PackedFloat32Array([0.0])
 	for i in range(unique_ts.size()):
 		var f: float = unique_ts[i]
-		var p: Vector2 = a.lerp(b, f) + outward * (4.0 * sagitta * f * (1.0 - f))
+		var p: Vector2 = a.lerp(b, f) + outward * (CastleGeometry.bow_offset(sagitta, f) - t * 0.5)
 		pts.append(Vector3(p.x, 0.0, p.y))
 		if i > 0:
 			distances.append(distances[i - 1] + pts[i - 1].distance_to(pts[i]))
@@ -1710,20 +1895,24 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 				break
 		var distance: float = distances[index]
 		openings.append(Rect2(distance - slit_w * 0.5, wall_band.x, slit_w, wall_band.y))
-	var wall_bounds := _kit.curved_wall(pts, h, tb, t, SURF_STONE, openings)
+	var cut_fn := func(_lo: float, hi: float) -> Array:
+		if _tag != "curtain" or not CastleGeometry.is_enclosed(spec):
+			return []
+		return _curtain_cuts(hi, 0.04)
+	var wall_bounds := _kit.curved_wall(pts, h, tb, t, SURF_STONE, openings, 0.0, cut_fn)
 	_log_mass("wall_%d_%s" % [r, String(seg["name"])], wall_bounds)
 
 	# A bowed wall walk is a second shallow curved shell, not a box on the chord.
 	var walk_h: float = CastleGeometry.PARAPET_RISE
-	_kit.curved_wall(pts, walk_h, t + 2.0 * CastleGeometry.WALK_LIP, t + 2.0 * CastleGeometry.WALK_LIP, SURF_TRIM, [], h)
+	_kit.curved_wall(pts, walk_h, t + 2.0 * CastleGeometry.WALK_LIP, t + 2.0 * CastleGeometry.WALK_LIP, SURF_TRIM, [], h, cut_fn)
 	if spec.battlements:
 		var mw: float = CastleGeometry.merlon_width(spec)
 		var pitch: float = mw + CastleGeometry.MERLON_GAP
 		var count: int = int(run / pitch)
 		for i in range(count):
 			var f: float = (float(i) + 0.5) / float(count)
-			var p: Vector2 = a.lerp(b, f) + outward * (4.0 * sagitta * f * (1.0 - f))
-			var derivative: Vector2 = (b - a) + outward * (4.0 * sagitta * (1.0 - 2.0 * f))
+			var p: Vector2 = a.lerp(b, f) + outward * (CastleGeometry.bow_offset(sagitta, f) - t * 0.5)
+			var derivative: Vector2 = (b - a) + outward * CastleGeometry.bow_slope(sagitta, f)
 			var tangent := derivative.normalized()
 			var face_yaw := atan2(tangent.y, tangent.x) + PI * 0.5
 			_emit_merlon(Vector3(mw, spec.merlon_h, t + 0.3),
@@ -1731,8 +1920,8 @@ func _curved_wall_run(seg: Dictionary, r: int) -> void:
 
 	for center_t in slit_t:
 		var f: float = center_t
-		var p: Vector2 = a.lerp(b, f) + outward * (4.0 * sagitta * f * (1.0 - f))
-		var derivative: Vector2 = (b - a) + outward * (4.0 * sagitta * (1.0 - 2.0 * f))
+		var p: Vector2 = a.lerp(b, f) + outward * (CastleGeometry.bow_offset(sagitta, f) - t * 0.5)
+		var derivative: Vector2 = (b - a) + outward * CastleGeometry.bow_slope(sagitta, f)
 		var tangent := derivative.normalized()
 		var normal := Vector2(tangent.y, -tangent.x)
 		var thick: float = lerpf(tb, t, slit_y / h)
@@ -2381,22 +2570,33 @@ func _wall_top(a: AABB, outward: Vector3, top_thick: float) -> void:
 	var cx: float = walk if axis == 0 else a.position.x + a.size.x / 2.0
 	var cz: float = a.position.z + a.size.z / 2.0 if axis == 0 else walk
 	var coping: float = top_thick + 2.0 * CastleGeometry.WALK_LIP
-	box(Vector3(coping if axis == 0 else run, CastleGeometry.PARAPET_RISE,
-			run if axis == 0 else coping),
-		Vector3(cx, a.size.y + CastleGeometry.PARAPET_RISE / 2.0, cz), SURF_TRIM)
-	if not spec.battlements:
-		return
+	var coping_top: float = a.size.y + CastleGeometry.PARAPET_RISE
+	var run_axis := Vector3(0.0, 0.0, 1.0) if axis == 0 else Vector3(1.0, 0.0, 0.0)
+	# A rect castle's curtain is courses, not runs, so it never met the polygon
+	# path's doorway notch: a raised tower door here had the whole coping drawn
+	# across it. Build the run frame the polygon path uses - `inner` on the
+	# wall's inner face, the run centred on zero - and notch it the same way.
+	var walk_centre := Vector3(cx, 0.0, cz)
+	var inner_point: Vector3 = walk_centre - outward * (top_thick / 2.0)
+	var gaps := _walk_door_gaps(inner_point, outward, run_axis, run, top_thick, coping_top)
 	var edge: float = inner + outward[axis] * (top_thick - spec.merlon_h * 0.35)
-	var from_p: Vector3
-	var to_p: Vector3
-	if axis == 0:
-		from_p = Vector3(edge, 0.0, a.position.z)
-		to_p = Vector3(edge, 0.0, a.position.z + a.size.z)
-	else:
-		from_p = Vector3(a.position.x, 0.0, edge)
-		to_p = Vector3(a.position.x + a.size.x, 0.0, edge)
-	_crenellate(from_p, to_p, a.size.y + CastleGeometry.PARAPET_RISE,
-		spec.merlon_h * 0.7, SURF_TRIM)
+	var edge_point: Vector3 = Vector3(edge, 0.0, cz) if axis == 0 \
+		else Vector3(cx, 0.0, edge)
+	for span in _walk_spans(gaps, run, coping_top):
+		var u0 := float(span.u0)
+		var u1 := float(span.u1)
+		if u1 - u0 < 0.01:
+			continue
+		var mid: Vector3 = walk_centre + run_axis * ((u0 + u1) * 0.5)
+		box(Vector3(coping if axis == 0 else u1 - u0, CastleGeometry.PARAPET_RISE,
+				u1 - u0 if axis == 0 else coping),
+			Vector3(mid.x, float(span.top) - CastleGeometry.PARAPET_RISE / 2.0, mid.z),
+			SURF_TRIM)
+		# A merlon cannot stand on the lowered threshold strip before a doorway.
+		if not spec.battlements or bool(span.lowered) or u1 - u0 < 0.5:
+			continue
+		_crenellate(edge_point + run_axis * u0, edge_point + run_axis * u1,
+			coping_top, spec.merlon_h * 0.7, SURF_TRIM)
 
 
 ## Arrow slits down the outer face of a wall run. The face is battered, so the
@@ -2530,7 +2730,7 @@ func _mural_landing(row: Dictionary) -> void:
 		var deck_width := float(span.width)
 		var deck_size := Vector3(delta.length(), 0.22, deck_width)
 		var mid := (a + b) * 0.5
-		var walk_y := float(row.walk_y)
+		var walk_y := y if bool(span.get("sill", false)) else float(row.walk_y)
 		var deck_point := Vector3(mid.x, walk_y - 0.11,
 			(a.y + b.y) * 0.5)
 		var yaw := atan2(-delta.y, delta.x)
@@ -2552,8 +2752,13 @@ func _mural_landing(row: Dictionary) -> void:
 				side = -side
 			var rail_width := 0.16
 			var rail_height := 0.62
-			var rail_start := a + delta.normalized() * (0.8 if bool(span.get("open_start", false)) else 0.0)
-			var rail_end := b - delta.normalized() * (0.8 if bool(span.get("open_end", false)) else 0.0)
+			# A parapet that reaches the joint where the gallery turns stands
+			# across the walker's way round. Hold it back from every joint by
+			# its own lateral offset, so its end can never meet the next span's
+			# centreline; an open end keeps the wider arrival gap.
+			var joint_inset := deck_width * 0.5 - rail_width * 0.5
+			var rail_start := a + delta.normalized() * (0.8 if bool(span.get("open_start", false)) else joint_inset)
+			var rail_end := b - delta.normalized() * (0.8 if bool(span.get("open_end", false)) else joint_inset)
 			var rail_mid := (rail_start + rail_end) * 0.5
 			var rail_length := rail_start.distance_to(rail_end)
 			if rail_length < 0.1:
@@ -2719,6 +2924,42 @@ func _emit_merlon(size: Vector3, pos: Vector3, surf: int, yaw := 0.0) -> void:
 ## An AABB emitted as a box, which is how nearly every castle mass is drawn.
 func _box_aabb(a: AABB, surf: int) -> void:
 	box(a.size, a.position + a.size / 2.0, surf)
+
+
+## The plan polygons a curtain course reaching `top_y` must not enter: every
+## mural tower's room outline, and above the walk the arrival landing and galleries.
+func _curtain_cuts(top_y: float, overlap := 0.0) -> Array[PackedVector2Array]:
+	var cuts: Array[PackedVector2Array] = []
+	for row in _planned_interiors.values():
+		if not bool(row.get("mural_tower", false)):
+			continue
+		var plan: HousePlan = row.plan
+		var origin: Vector3 = row.transform.origin
+		var hole := PackedVector2Array()
+		for point in plan.outline_of(0):
+			hole.append(point + Vector2(origin.x, origin.z))
+		cuts.append(hole)
+		# The walkway's merlons may stand across a perfectly cut tower door.
+		# Reserve the full authored arrival landing above its walking surface.
+		if top_y > float(row.walk_y) + 0.05 and row.walk_landing.has_area():
+			cuts.append_array(_shrunk(Poly.from_rect(row.walk_landing), overlap))
+			for span in row.get("walk_gallery", []):
+				var a: Vector2 = span.a
+				var b: Vector2 = span.b
+				var tangent := (b - a).normalized()
+				var side := Vector2(-tangent.y, tangent.x) * float(span.width) * 0.5
+				cuts.append_array(_shrunk(PackedVector2Array([a + side, b + side, b - side, a - side]), overlap))
+	return cuts
+
+
+## `poly` drawn in by `overlap`, so the curtain's walk laps a deck's edge instead of
+## meeting it on a hairline the walk grid reads as a crack (CASTLE-ELVEN-TOWERS).
+static func _shrunk(poly: PackedVector2Array, overlap: float) -> Array[PackedVector2Array]:
+	if overlap <= 0.0:
+		return [poly]
+	var out: Array[PackedVector2Array] = []
+	out.assign(Geometry2D.offset_polygon(poly, -overlap))
+	return out
 
 
 ## Curtains terminate at occupied tower rooms. The old complete wall boxes

@@ -42,8 +42,8 @@ func _init() -> void:
 func _spec(style: StringName) -> HouseSpec:
 	var spec := HouseSpec.new()
 	spec.style = style
-	spec.width = 9.0
-	spec.length = 12.0
+	spec.width = 7.0
+	spec.length = 9.0
 	spec.height = 2.6
 	spec.storeys = 1
 	spec.exterior_props = false
@@ -124,21 +124,14 @@ func _check_frame_clearance(plan: HousePlan, builder: HouseBuilder, light: Dicti
 			role_counts[role] = int(role_counts.get(role, 0)) + 1
 			support_vertices.append_array(_component_vertices(row))
 	var layout: Dictionary = HouseGeometry.roof_layout(plan)
-	var bay: Dictionary = layout.get("witch_bay", {})
 	var roof_xf: Transform3D = layout["transform"]
 	var light_xf: Transform3D = light["xf"]
 	var local_center: Vector3 = roof_xf.affine_inverse() * light_xf.origin
 	var station: float = signf(local_center.z) * (float(layout["along"]) * 0.5 + HouseGeometry.BEAM_D * 0.5 - 0.01)
-	var bay_covers_station := not bay.is_empty() and station >= float(bay.get("along_lo", INF)) \
-		and station <= float(bay.get("along_hi", -INF))
-	print("Witch casement frame roles=", role_counts,
-		" front_station=", station, " bay_along=[", bay.get("along_lo", "none"), ", ",
-		bay.get("along_hi", "none"), "] covers=", bay_covers_station)
-	if support_vertices.is_empty() and not bay_covers_station:
-		_fail("no gable frame exists at the casement station and no measured Workshop bay explains it")
-		return
+	print("Witch casement frame roles=", role_counts, " front_station=", station)
 	if support_vertices.is_empty():
-		return # the Workshop roof occupies this measured end-frame station
+		_fail("no gable frame exists at the casement station")
+		return
 	var size: Vector3 = light["size"]
 	for x_fraction in [-0.35, 0.0, 0.35]:
 		for y_fraction in [-0.35, 0.0, 0.35]:

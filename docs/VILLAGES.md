@@ -302,6 +302,14 @@ wealth and the household, and every request is sent through
 bounds afterwards, never from the requested envelope, for the same reason
 the massing check reads `mass_log` and not the spec.
 
+**On given ground** (VTER-LOTS, [VILLAGE_TERRAIN.md](VILLAGE_TERRAIN.md)
+"Lots on the ground") each lot also stands on a platform: the building is
+asked for the fall under it (`ground_fall_m`, `ground_downhill_deg`), a
+fall its family does not take refuses the lot, its entry steps stay on its
+own lot or verge, a lot with its door high over the ground is taken last,
+back yards shorten with the slope, and the ground's own lake or sea is plan
+water. A flat plan is untouched.
+
 ---
 
 ## 6. Arrangement: where things go and why
@@ -636,6 +644,13 @@ village is the building most in need of being *looked at*.
 | **gradient** | the big houses are in the middle | Spearman correlation of house floor area with distance to the common's centre ≤ −0.3 |
 | **farms outside** | farms face the fields | every `farmer` house is within 30 m of the enclosure and its yard side faces outward |
 
+Seven more read the GROUND, and only when the plan has it (`plan.ground`;
+VTER-PLACE): `landmark_ground`, `common_ground`, `mill_ground`,
+`manor_ground`, `fields_ground`, `wood_ground`, `edge_ground`. A flat
+village is judged exactly as above. Their sentences, measurements and the
+world-set numbers they read are in docs/VILLAGE_TERRAIN.md, "Placing the
+programme on the ground".
+
 ### 9.5 `VillageNavCheck` — can a person walk it?
 
 Implemented as `qa/village_nav_check.gd` (VIL-016), on the same `WalkGrid`
@@ -851,6 +866,14 @@ road frontage and counts rising with population under the former form
 fallback. Those historical counts do not certify the newly retained forms;
 VIL-017's native form matrix and VIL-020's archetype matrix supply that
 acceptance.
+
+**The ground** (VIL-TERRAIN-READ). A caller with real terrain passes a
+`brickwild.terrain` height grid, as `terrain.height` in the request or with
+`--terrain <grid.json>`; the plan then carries how the ground lies under
+every lot, building, road and common. The planners do not use it yet, and
+without it the output is byte-identical. See
+[VILLAGE_TERRAIN.md](VILLAGE_TERRAIN.md). Real settlements to compare
+against are in [SETTLEMENT_TESTSET.md](SETTLEMENT_TESTSET.md).
 
 ## 10b. Walking: the `walk` key and `BrickWild.navigation()`
 

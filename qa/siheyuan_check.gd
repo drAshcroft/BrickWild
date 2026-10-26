@@ -29,6 +29,8 @@ func check(plan: HousePlan, supplied_builder: HouseBuilder = null) -> Dictionary
 	_check_mirrored_wings(plan, failures, stats)
 	_check_verandah(plan, failures, stats)
 	_check_courts_in_line(plan, failures)
+	_check_court_count(plan, failures, stats)
+	_check_court_access(plan, failures, stats)
 	_check_emitted_court_sky(plan, builder, failures)
 	return {"ok": failures.is_empty(), "failures": failures,
 		"warnings": court_report.get("warnings", []), "stats": stats,
@@ -217,7 +219,68 @@ func _check_courts_in_line(plan: HousePlan, failures: Array[String]) -> void:
 			failures.append("courts_in_line: courts overlap or are not ordered from front to back")
 
 
-func _check_emitted_court_sky(plan: HousePlan, builder: HouseBuilder,
+## The published sub-kind names its court count. A two-court compound that
+## carries one court is the scholar's compound with a longer wall, and a
+## one-court compound with two is a different building than the caller asked
+## for; neither may pass under the sub-kind's name.
+static func _check_court_count(plan: HousePlan, failures: Array[String],
+		stats: Dictionary) -> void:
+	var want := 2 if String(plan.world_subkind) == "two_court_compound" else 1
+	if plan.courts.size() != want:
+		failures.append("courts: %s requires %d court(s), plan has %d"
+			% [String(plan.world_subkind), want, plan.courts.size()])
+	stats["required_courts"] = want
+
+
+## A court is a room outdoors: ranges must stand on it and at least one must
+## open onto it. Without this a second rectangle appended behind the hall is
+## accepted as a court even though no door reaches it and no wall faces it --
+## a sealed yard, or an empty strip between two roofs.
+static func _check_court_access(plan: HousePlan, failures: Array[String],
+		stats: Dictionary) -> void:
+	var doored := 0
+	for ci in range(plan.courts.size()):
+		var touching := 0
+		var opening := 0
+		for room in range(plan.room_count()):
+			if not _touches_court(plan, room, ci):
+				continue
+			touching += 1
+			if _opens_onto_court(plan, room, ci):
+				opening += 1
+		stats["court_%d_rooms" % ci] = touching
+		if touching == 0:
+			failures.append("courts: no room stands on court %d" % ci)
+		elif opening == 0:
+			failures.append("courts: %d rooms stand on court %d and not one opens onto it"
+				% [touching, ci])
+		else:
+			doored += 1
+	stats["courts_joined"] = doored
+
+
+## Does the room's floor meet court `ci`? Same geometry as CourtCheck's ring
+## rule, kept here because this asks for one named court rather than any.
+static func _touches_court(plan: HousePlan, room: int, ci: int) -> bool:
+	if HousePlan.record_storey(plan.courts[ci]) > plan.storey_of_room(room):
+		return false
+	var floor: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	return floor.grow(HouseGeometry.WALL_T + 0.1).intersects(Rect2(plan.courts[ci]["rect"]))
+
+
+## Does one of the room's doors open into court `ci`?
+static func _opens_onto_court(plan: HousePlan, room: int, ci: int) -> bool:
+	var outline := plan.court_outline(ci)
+	for d in plan.doors_of(room):
+		var door: Dictionary = plan.doors[d]
+		var outside: Vector2 = Vector2(door["pos"]) \
+			+ Vector2(door["normal"]) * (HouseGeometry.WALL_T + 0.05)
+		if Poly.contains_point(outline, outside, 0.01):
+			return true
+	return false
+
+
+static func _check_emitted_court_sky(plan: HousePlan, builder: HouseBuilder,
 		failures: Array[String]) -> void:
 	for mass in builder.mass_log:
 		var name := String(mass.get("name", ""))

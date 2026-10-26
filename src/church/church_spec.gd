@@ -13,6 +13,11 @@ var length: float = 20.0    # nave length (Z), before tower/apse additions
 var height: float = 12.0    # wall height to eaves, meters
 var orientation: float = 0.0
 var period: int = 1200
+## Falling ground (VTER-HOUSE-SLOPE): metres of fall across the requested
+## width x length and the downhill direction (0 = toward the west front, -Z;
+## 90 = toward +X). Zero is flat. The builder answers with a terrace.
+var ground_fall: float = 0.0
+var ground_downhill_deg: float = 0.0
 
 # ---- derived from seed + style ----
 var variant_name: String
@@ -55,6 +60,7 @@ var dome_shape: StringName       # &"hemisphere", &"onion", &"octagonal"
 var dome_radius: float
 var dome_drum_height: float      # vertical drum the dome springs from
 var dome_lantern: bool
+var dome_west: bool              # the dome stands over the WEST bay, so the entry sees it (SACRED-BYZANTINE-DOME)
 var half_domes: bool             # buttressing half-domes east/west, Byzantine
 var exedrae: bool                # small semi-domed niches flanking the half-domes
 var ambulatory: bool             # aisle carried around the apse
@@ -90,7 +96,10 @@ const STYLES := {
 		"tower": 0.9, "spire": 0.6, "apse": 0.8, "transept": 0.75,
 		"aisles": [1, 2], "buttresses": 1.0, "windows": &"pointed",
 		"rose": 0.65, "clerestory": 0.8, "door": [&"portal"],
-		"towers_roof": [&"spire", &"pyramid"],
+		# Every Gothic tower ends in a true spire (LIVE-SACRED, 20 Oct): the low
+		# pyramid cap left a small Gothic church with two squat domed towers and
+		# no Gothic silhouette. Two entries keep the generator's random draw.
+		"towers_roof": [&"spire", &"spire"],
 		# Notre-Dame / Cologne / Chartres: flyers, twin towers, chapels.
 		"twin_towers": 0.8, "flying": 0.9, "crossing_tower": 0.3,
 		"dome": 0.0, "dome_shapes": [], "ambulatory": 0.7,

@@ -4,8 +4,6 @@ extends SceneTree
 
 const CASES := [
 	{"id": "small", "width": 7.0, "length": 9.0, "height": 2.6},
-	{"id": "default", "width": 9.0, "length": 12.0, "height": 2.6},
-	{"id": "large", "width": 17.0, "length": 18.0, "height": 2.8},
 ]
 var failures: Array[String] = []
 
@@ -25,11 +23,8 @@ func _retained_stations(layout: Dictionary) -> Array[float]:
 	var result: Array[float] = []
 	var along := float(layout.get("along", 0.0))
 	var station_offset := along * 0.5 + HouseGeometry.BEAM_D * 0.5 - 0.01
-	var bay: Dictionary = layout.get("witch_bay", {})
 	for end_sign in [-1.0, 1.0]:
-		var station := float(end_sign) * station_offset
-		if bay.is_empty() or station < float(bay.get("along_lo", INF)) - 0.001 or station > float(bay.get("along_hi", -INF)) + 0.001:
-			result.append(station)
+		result.append(float(end_sign) * station_offset)
 	return result
 
 
@@ -110,7 +105,7 @@ func _check_witch(size: Dictionary) -> void:
 
 
 func _check_non_witch_control(style: StringName, trade: StringName, expect_braces: bool) -> void:
-	var size: Dictionary = CASES[1]
+	var size: Dictionary = CASES[0]
 	var plan := HouseGenerator.generate(_spec(style, trade, size), 8102, false)
 	var builder := HouseBuilder.new()
 	builder.build(plan, true)
@@ -120,7 +115,7 @@ func _check_non_witch_control(style: StringName, trade: StringName, expect_brace
 
 
 func _check_world_control() -> void:
-	var size: Dictionary = CASES[1]
+	var size: Dictionary = CASES[0]
 	var plan := HouseGenerator.generate(_spec(&"witch_hut", &"none", size), 8102, true)
 	plan.world_family = &"village"
 	plan.spec.roof_type = &"gable"

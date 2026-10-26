@@ -238,6 +238,47 @@ static func rotunda_portal_depth(spec: TempleSpec) -> float:
 	return clampf(spec.wall_t * 0.55, 0.30, 0.48)
 
 
+## SACRED-ROTUNDA-PERISTYLE: a door-level ring of columns round the drum, so the
+## colonnade reads from the ground and not as a clerestory over a blank wall.
+## The two columns nearest the axis frame the door: their clear bay is the
+## forecourt width, so a procession walks between them.
+const ROTUNDA_PERISTYLE_GAP := 1.3
+const ROTUNDA_PERISTYLE_BEAM := 0.3
+const ROTUNDA_PERISTYLE_SLAB := 0.18
+
+
+static func rotunda_peristyle_radius(spec: TempleSpec) -> float:
+	return rotunda_outer_radius(spec) + ROTUNDA_PERISTYLE_GAP + spec.column_r * 1.2
+
+
+## Furthest reach of the plinths from the drum centre.
+static func rotunda_peristyle_extent(spec: TempleSpec) -> float:
+	return rotunda_peristyle_radius(spec) + spec.column_r * 1.2
+
+
+static func rotunda_peristyle_column_height(spec: TempleSpec) -> float:
+	return rotunda_lower_drum_height(spec) - ROTUNDA_PERISTYLE_BEAM \
+		- ROTUNDA_PERISTYLE_SLAB - COLUMN_CAP * spec.column_r
+
+
+## Column centres (x, z), front-left door column first, going round the back
+## to the front-right door column. Mirror symmetric about the gate axis.
+static func rotunda_peristyle_columns(spec: TempleSpec) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	if spec.form != &"rotunda":
+		return out
+	var radius: float = rotunda_peristyle_radius(spec)
+	var door_x: float = (GATE_W + 1.2) * 0.5 + 0.15 + spec.column_r * 1.2
+	var a0: float = asin(clampf(door_x / radius, 0.0, 0.95))
+	var spacing: float = maxf(spec.column_r * 7.0, 3.0)
+	var count: int = clampi(roundi((TAU - 2.0 * a0) * radius / spacing) + 1, 8, 40)
+	var step: float = (TAU - 2.0 * a0) / float(count - 1)
+	for k in range(count):
+		var phi: float = a0 + step * float(k)
+		out.append(Vector2(sin(phi) * radius, -cos(phi) * radius))
+	return out
+
+
 static func rotunda_front_projection(spec: TempleSpec) -> float:
 	# The cornice front is 0.045 m past the surround's nominal depth.
 	return maxf(0.45, rotunda_portal_depth(spec) + 0.05)
@@ -618,7 +659,12 @@ static func sanctum_rect(spec: TempleSpec) -> Rect2:
 		# The summit god and the chamber altar share one axis. Anchor the
 		# chamber's dais below that real summit, not at the base's rear wall.
 		var summit := terrace_rect(spec, maxi(spec.terraces - 1, 0))
-		var end := summit.end.y - 0.5
+		# SACRED-ZIGGURAT-FOCUS: the god stands at the FRONT of the summit, so
+		# the summit's own front edge no longer hides him from the stair foot.
+		# The chamber dais is anchored beneath him (terrace 0 is solid under
+		# the whole mountain), so altar then idol still run in order.
+		var end := minf(summit.end.y - 0.5, ziggurat_idol_limit(spec) + spec.idol_width * 0.7)
+		end = maxf(end, summit.position.y + 0.5 + spec.idol_width * 1.4)
 		d = minf(d, end - h.position.y)
 		return Rect2(Vector2(h.position.x, end - d), Vector2(h.size.x, d))
 	var x: float = h.position.x
@@ -1296,6 +1342,28 @@ static func terrace_top(spec: TempleSpec) -> float:
 	return terrace_height(spec) * float(spec.terraces)
 
 
+## The furthest back (largest z) the summit god's CENTRE may stand and still be
+## seen from the stair foot (SACRED-ZIGGURAT-FOCUS). The sightline runs from the
+## eye at the foot to the god's upper half and must pass over the front edge of
+## every terrace; each edge caps how far back the target can be. A margin keeps
+## the god clear by a hand rather than grazing the stone.
+static func ziggurat_idol_limit(spec: TempleSpec) -> float:
+	var eye_z: float = sight_point(spec).y
+	var eye_h := 1.65
+	var target_h: float = terrace_top(spec) + spec.idol_height * 0.7
+	var limit := INF
+	for level in range(maxi(spec.terraces, 1)):
+		var edge_z: float = terrace_rect(spec, level).position.y
+		var edge_h: float = terrace_height(spec) * float(level + 1) + 0.15
+		if edge_h <= eye_h or target_h <= edge_h:
+			continue
+		# line height at the edge >= edge_h  <=>  front_z - eye_z <= this
+		var reach: float = (target_h - eye_h) * (edge_z - eye_z) / (edge_h - eye_h)
+		limit = minf(limit, eye_z + reach)
+	# the ray ends on the god's front face, half a width ahead of the centre
+	return limit - 0.15 + spec.idol_width * 0.5 + 0.05
+
+
 ## The great stairs up the front of a ziggurat: TWO flights, one either side of
 ## the doorway, climbing the outside of the mountain to the summit shrine.
 ##
@@ -1340,7 +1408,8 @@ static func forecourt_rect(spec: TempleSpec) -> Rect2:
 	var r: Rect2 = site_rect(spec)
 	if spec.form == &"rotunda":
 		var outer_radius: float = rotunda_outer_radius(spec)
-		var outer_arrival: float = outer_radius + rotunda_front_projection(spec)
+		var outer_arrival: float = maxf(outer_radius + rotunda_front_projection(spec),
+			rotunda_peristyle_extent(spec))
 		var w: float = GATE_W + 1.2
 		if spec.obelisks:
 			var obelisk_x: float = absf(obelisk_center(spec, 1.0).x)
@@ -1446,8 +1515,12 @@ static func obelisk_center(spec: TempleSpec, side: float) -> Vector2:
 	if spec.form == &"pylon":
 		gate_half = pylon_gate_width(spec) / 2.0
 		lateral_offset = 2.2
+	var front_z: float = r.position.y
+	if spec.form == &"rotunda":
+		# stand beyond the peristyle, not among its columns
+		front_z = -rotunda_peristyle_extent(spec)
 	return Vector2(side * (gate_half + lateral_offset),
-		r.position.y - maxf(1.2, oh * 0.07 + 0.7))
+		front_z - maxf(1.2, oh * 0.07 + 0.7))
 
 
 # -------------------------------------------------------------- the floor
@@ -1724,8 +1797,8 @@ static func plan_extent(spec: TempleSpec) -> Rect2:
 	if spec.form == &"ziggurat":
 		e = e.merge(stair_rect(spec))
 	if spec.form == &"rotunda":
-		var extent_radius: float = rotunda_outer_radius(spec) \
-			+ rotunda_front_projection(spec)
+		var extent_radius: float = maxf(rotunda_outer_radius(spec) \
+			+ rotunda_front_projection(spec), rotunda_peristyle_extent(spec))
 		e = Rect2(Vector2(-extent_radius, -extent_radius),
 			Vector2(extent_radius * 2.0, extent_radius * 2.0))
 		e = e.merge(forecourt_rect(spec))

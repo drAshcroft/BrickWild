@@ -21,24 +21,54 @@ static func build(plan: VillagePlan, edge_band: float = EDGE_BAND) -> Dictionary
 	for f in plan.fields:
 		if _overlap_area(f["poly"], edge) <= EPS:
 			fields.append(f)
+	var wood: Vector2 = _preferred_wood(plan)
+	var offered: Array[Vector2] = wood_candidates(plan, edge)
+	if not offered.is_empty():
+		wood = offered[0]
+		# on given ground (VTER-PLACE) the wood takes the steepest ground offered
+		# to it -- woods stand where nobody ploughs; the first wins a tie, so on
+		# level ground the flat village's choice stands
+		if plan.ground != null:
+			var steepest: float = wood_slope(plan, wood)
+			for c in offered:
+				var s: float = wood_slope(plan, c)
+				if s > steepest + 1e-6:
+					steepest = s
+					wood = c
+	return {"hull": hull, "edge": edge, "gates": gates, "crossings": crossings,
+		"fields": fields, "wood": wood}
+
+
+static func _preferred_wood(plan: VillagePlan) -> Vector2:
 	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
-	var preferred: Vector2 = plan.site.get_center() + Vector2(0.0, -plan.site.size.y * 0.42)
 	if not common.is_empty():
-		preferred = VillageMeasure.centre(common) + Vector2(0.0, -plan.site.size.y * 0.45)
-	var wood: Vector2 = preferred
-	var wood_candidates: Array[Vector2] = [preferred,
-		Vector2(plan.site.position.x + 3.0, plan.site.position.y + 3.0),
-		Vector2(plan.site.end.x - 3.0, plan.site.position.y + 3.0),
-		Vector2(plan.site.position.x + 3.0, plan.site.end.y - 3.0),
-		Vector2(plan.site.end.x - 3.0, plan.site.end.y - 3.0)]
-	for candidate in wood_candidates:
+		return VillageMeasure.centre(common) + Vector2(0.0, -plan.site.size.y * 0.45)
+	return plan.site.get_center() + Vector2(0.0, -plan.site.size.y * 0.42)
+
+
+## Where the far-side wood may stand, in order of preference: beyond the far
+## side of the common, then the site's four corners; each on the site,
+## outside `edge` and clear of the water by 4 m.
+static func wood_candidates(plan: VillagePlan, edge: PackedVector2Array) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for candidate: Vector2 in [_preferred_wood(plan),
+			Vector2(plan.site.position.x + 3.0, plan.site.position.y + 3.0),
+			Vector2(plan.site.end.x - 3.0, plan.site.position.y + 3.0),
+			Vector2(plan.site.position.x + 3.0, plan.site.end.y - 3.0),
+			Vector2(plan.site.end.x - 3.0, plan.site.end.y - 3.0)]:
 		var wet := plan.water.any(func(water: Dictionary) -> bool:
 			return Poly.contains_point(water["poly"], candidate) or VillageMeasure.point_to_poly(candidate, water["poly"]) < 4.0)
 		if plan.site.has_point(candidate) and not Poly.contains_point(edge, candidate) and not wet:
-			wood = candidate
-			break
-	return {"hull": hull, "edge": edge, "gates": gates, "crossings": crossings,
-		"fields": fields, "wood": wood}
+			out.append(candidate)
+	return out
+
+
+## The ground's mean slope over the wood's few trees (a 12 m square about
+## `p`); 0 without ground.
+static func wood_slope(plan: VillagePlan, p: Vector2) -> float:
+	if plan.ground == null:
+		return 0.0
+	return float(plan.ground.under(Poly.from_rect(Rect2(p - Vector2(6.0, 6.0), Vector2(12.0, 12.0))))["slope_mean"])
 
 static func _lot_hull(plan: VillagePlan) -> PackedVector2Array:
 	var pts := PackedVector2Array()

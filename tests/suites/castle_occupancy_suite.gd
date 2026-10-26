@@ -111,7 +111,7 @@ static func check_fixture(result: SuiteResult, spec: CastleSpec,
 		"clean README motte reports a room below the floor fraction")
 	_expect(result, Occupancy.check(spec, builder, mesh, geometry).failures == clean.failures,
 		"occupancy controls retained stale failures after restoration")
-	_sanctuary_contract(result, spec, builder, mesh)
+	_sanctuary_contract(result, spec, builder, mesh, geometry)
 
 
 static func _inventory_contract(result: SuiteResult) -> void:
@@ -160,7 +160,7 @@ static func _inventory_contract(result: SuiteResult) -> void:
 
 
 static func _sanctuary_contract(result: SuiteResult, spec: CastleSpec,
-		builder: CastleBuilder, mesh: ArrayMesh) -> void:
+		builder: CastleBuilder, mesh: ArrayMesh, geometry: Dictionary) -> void:
 	var row := {}
 	for candidate in builder.interiors:
 		if String(candidate.id) == "apse":
@@ -193,6 +193,30 @@ static func _sanctuary_contract(result: SuiteResult, spec: CastleSpec,
 	_expect(result, int(stripped.removed) > 0 \
 			and _contains(floorless.failures, "occupied_shells[apse]: room 0 has no emitted floor"),
 		"sanctuary floor removal escaped the emitted-room check")
+	# The chapel's way in must be from the ward. Take the bailey door away and
+	# the only doors left are the sanctuary arch and the apse's own: the pair
+	# then opens onto nothing but each other (bavarian 55x50 seed 3).
+	var chapel := {}
+	for candidate in builder.interiors:
+		if String(candidate.id) == "chapel":
+			chapel = candidate
+	_expect(result, not chapel.is_empty(), "README chapel has no nave to seal from the ward")
+	if chapel.is_empty():
+		return
+	var nave: HousePlan = chapel.plan
+	var doors := nave.doors.duplicate(true)
+	nave.doors.assign(nave.doors.filter(func(d: Dictionary) -> bool:
+		return not bool(d.get("front", false))))
+	var sealed := Occupancy.check(spec, builder, mesh, geometry)
+	_expect(result, _contains(sealed.failures,
+		"occupied_shells[chapel]: occupied range has no way in from the gate"),
+		"chapel whose only door opens on its own apse escaped the ward route check")
+	_expect(result, _contains(sealed.failures,
+		"occupied_shells[apse]: occupied range has no way in from the gate"),
+		"apse sealed behind the chapel escaped the ward route check")
+	nave.doors.assign(doors)
+	_expect(result, Occupancy.unreachable_ranges(builder).is_empty(),
+		"restoring the chapel door did not restore the ward route")
 
 
 static func _with_landing(mesh: ArrayMesh, row: Dictionary, room: int) -> ArrayMesh:

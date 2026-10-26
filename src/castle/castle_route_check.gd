@@ -153,6 +153,15 @@ static func _wall_stair_route(stair: Dictionary, triangles: Array, spec: CastleS
 		var inward := -Vector2(segment.outward.x, segment.outward.z)
 		var offset := inward * CastleGeometry.wall_thickness(spec, ring) * 0.5
 		var at := Geometry2D.get_closest_point_to_segment(endpoint, Vector2(segment.a) + offset, Vector2(segment.b) + offset)
+		if spec.curved_edges:
+			# An elven curtain's walk is on the bowed centreline, not the chord.
+			var line := CastleGeometry.bowed_centreline(spec, ring, segment, 64)
+			var closest := INF
+			for i in range(line.size() - 1):
+				var c := Geometry2D.get_closest_point_to_segment(endpoint, line[i], line[i + 1])
+				if c.distance_squared_to(endpoint) < closest:
+					closest = c.distance_squared_to(endpoint)
+					at = c
 		if at.distance_squared_to(endpoint) < best:
 			best = at.distance_squared_to(endpoint)
 			coping = at

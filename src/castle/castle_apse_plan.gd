@@ -90,14 +90,30 @@ static func connect_chapel(plan: HousePlan, spec: CastleSpec) -> void:
 		return
 	var rect := HouseGeometry.room_floor_rect(plan, 0)
 	var point := Vector2(rect.get_center().x, rect.position.y)
+	var ways_in := exterior_doors(plan)
 	for door in plan.doors:
 		if Vector2(door.pos).distance_to(point) < 0.01:
-			# The chapel's own entrance already stands on this wall. It is also
-			# the way through to the apse, whose doorway is 2.3 m: a standard
+			# A door already stands on this wall. It is the sanctuary arch now,
+			# not the way in: the apse's own doorway is 2.3 m, so a standard
 			# 2.02 m leaf left masonry across the upper part of the passage.
 			door["head"] = maxf(float(door.get("head", HouseGeometry.DOOR_H)), 2.3)
 			door["sill"] = minf(float(door.get("sill", 0.0)), 0.0)
+			door["connects_to"] = "apse"
+			# The apse is entered from the chapel and the chapel from the apse;
+			# with this door as the entrance the pair is sealed from the ward.
+			# The chapel keeps its bailey door as the way in.
+			if ways_in > 1:
+				door["front"] = false
 			return
 	plan.doors.append({"a": 0, "b": -1, "pos": point, "normal": Vector2(0, -1),
 		"width": HouseGeometry.DOOR_W, "exterior": true, "front": false,
 		"storey": 0, "sill": 0.0, "head": 2.3, "connects_to": "apse"})
+
+
+## How many ways a body may enter this plan: its exterior, non-secret doors.
+static func exterior_doors(plan: HousePlan) -> int:
+	var count := 0
+	for door in plan.doors:
+		if bool(door.get("exterior", false)) and not bool(door.get("secret", false)):
+			count += 1
+	return count
