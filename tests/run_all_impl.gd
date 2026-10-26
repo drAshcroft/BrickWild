@@ -76,7 +76,7 @@ const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "plac
 	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
 	"dmvbrief", "dmvimplied", "dmvwalk", "bwalk", "twalk", "chwalk", "kwalk", "kwalk2",
 	"wwalk",
-	"vtplan", "vhillside",
+	"vtplan", "vhillside", "vislandfill",
 	"vcrossterrain",
 	"vdispersed",
 	"vshore",
@@ -492,6 +492,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_shore_suite.gd").run()
 		"vwaterform":
 			return preload("res://tests/suites/village_water_form_suite.gd").run()
+		"vislandfill":
+			return preload("res://tests/suites/village_island_suite.gd").run()
 		"vvalley":
 			return preload("res://tests/suites/village_valley_suite.gd").run()
 		"vground":

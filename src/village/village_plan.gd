@@ -110,6 +110,11 @@ var shoreline := PackedVector2Array()
 ## empty for every other form.
 var crest: Dictionary = {}
 
+## An island village's island (VillageIslandForm, VTER-ISLAND-FILL): {"area_m2",
+## "ring_scale" (the ring's x scale, 1 = at the shore), "landings" (the spine's
+## two ends)}; empty for every other form.
+var island: Dictionary = {}
+
 
 ## The ground readings of this plan are taken on: `ground` when the village
 ## was sited, else the spec's own (null when flat).
@@ -204,6 +209,7 @@ func equals(other: VillagePlan) -> bool:
 		and _array_of_dict_equal(hamlets, other.hamlets)
 		and _poly_equal(shoreline, other.shoreline)
 		and crest == other.crest
+		and _value_equal(island, other.island)
 	)
 
 

@@ -298,8 +298,12 @@ func generate(p_seed: int) -> void:
 		form = &"planted"
 		form_intent = form
 	elif terrain != null and terrain.valid():
-		form_intent = _derive_form_on_ground(read_ground(terrain, form_window_m()),
-			population, purpose, water, culture)
+		var read := read_ground(terrain, form_window_m())
+		if not read.is_empty():
+			# an island the programme fills is the water form's own case
+			# (VTER-ISLAND-FILL): it outranks the window being mostly wet
+			read["island_fits"] = VillageIslandForm.fits_ground(terrain, households)
+		form_intent = _derive_form_on_ground(read, population, purpose, water, culture)
 		form = FORM_FALLBACK.get(form_intent, form_intent)
 	else:
 		form = _derive_form(population, purpose, culture)
@@ -367,6 +371,7 @@ func form_window_m() -> float:
 ##
 ##   | # | the ground (read_ground) and the spec              | form      |
 ##   |---|----------------------------------------------------|-----------|
+##   | 0 | an enclosed island the programme fills             | water     |
 ##   | 1 | window wet_share >= FORM_DROWNED                   | shore     |
 ##   | 2 | ground within FORM_WATER_M wet >= FORM_WATER_ROUND | water     |
 ##   | 3 | centre_tpi >= FORM_CREST_TPI_M and                 | crest     |
@@ -393,6 +398,8 @@ static func _derive_form_on_ground(g: Dictionary, p_population: int, p_purpose: 
 		p_water: StringName, p_culture: StringName) -> StringName:
 	if g.is_empty():
 		return _derive_form(p_population, p_purpose, p_culture)
+	if bool(g.get("island_fits", false)):
+		return &"water"
 	if float(g["wet_share"]) >= FORM_DROWNED:
 		return &"shore"
 	if float(g["wide_wet_share"]) >= FORM_WATER_ROUND:

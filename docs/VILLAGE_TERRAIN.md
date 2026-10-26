@@ -269,6 +269,7 @@ First row that holds wins:
 
 | # | the ground and the spec | form |
 |---|---|---|
+| 0 | an enclosed island within 320 m that the programme fills (`VillageIslandForm.fits_ground`: 0.7 to 4 times the ground the households need, a ring fits it; VTER-ISLAND-FILL, below) | water |
 | 1 | half the window is wet (`FORM_DROWNED` 0.5): the DEM drowns the site, it stands at the edge | shore |
 | 2 | ≥ 40 % of the ground within 450 m is wet (`FORM_WATER_ROUND`) | water |
 | 3 | the centre ≥ 9 m over its 30–150 m ring and over ≥ 75 % of the ground within 350 m | crest |
@@ -1825,6 +1826,93 @@ gives a house its deck, bearers and posts below the floor, and
 * `hpiles` (218 checks, ~55 s) covers the house emitter alone: freeboard, deck
   depth, pile count, feet below the bed.
 
+## The island fill (VTER-ISLAND-FILL)
+
+Isola dei Pescatori: 33 buildings on a lake islet, the lanes one house wide,
+the whole island the village. `VillageIslandForm`
+(`src/village/forms/island_form.gd`) is the island case of `water`;
+`VillageIslandCheck` (`qa/village_island_check.gd`) judges it.
+
+* **When.** Row 0 of the form rule: an ENCLOSED island (a dry component of
+  the caller's grid on an 8 m lattice that touches no edge of the grid, within
+  320 m of the centre, and its bounding box a margin inside the grid) whose
+  area is 0.7 to 4 times what the households need (`needed_m2`: 300 m2 a
+  building and 600 m2 of common and churchyard) and whose widest inscribed
+  circle holds a ring (`QUAY_INSET` + `BEND_R`). The form stays `water`; the
+  island ground is a different plan of it, as the lagoon is. Anything else
+  (a hamlet on a big islet: row 1's `shore`; the 19 ha cone; the real Isola
+  on the 90 m DEM) is exactly what it was.
+* **The frame.** Origin at the island's pole (its centroid where that is
+  nearly as far from the water), +x along its long axis (`site`).
+* **The ring.** A closed street of eight arcs, the shore pulled in by 4.5 m,
+  its long axis shortened until its frontage is `CAPACITY` (1.6) times what the
+  buildings need, then OPENED by a circle of 47.5 to 50.5 m
+  (`Geometry2D.offset_polygon` by -R then +R): the road check's 25 degrees in
+  20 m is a 46 m radius, so the pointed end of an island is cut off by a curve
+  a street can take, and an island narrower than the opening is not an island
+  village (`inscribed_m`). The first ring that leaves every vertex inside the
+  rule keeps.
+* **The spine.** The through road, along x from a landing at one end of the
+  island to the landing at the other, crossing the ring at two of its
+  vertices. The walk enters at the landings (`VillageMeasure.gates`). The
+  site ends exactly at the landings.
+* **The common** beside the spine at the middle, a path to it, the landmark's
+  slot across the spine. Houses stand on both sides of the ring and the spine;
+  where the ring is drawn in from the shore they stand on its outer side too.
+* **Water.** `VillageGroundWater.polygons` reads the sea as polygons and DROPS
+  THE HOLE of a ring of water (its doc says so: "an island inside a lake is
+  read as lake"). An island wholly inside its site would be read as lake, every
+  road on it "wet from end to end" and taken up. The site therefore ends at the
+  landings, the island's two ends touch its short sides, and the sea falls in
+  two pieces, north and south.
+* **The check** (`VillageIslandCheck`): the ring's arcs join end to end, the
+  spine runs from shore to shore as far apart as the island is long, nothing
+  is on the water, and 85 % of the island's dry ground is within 30 m of a
+  building (`reach_share`, read on the caller's own grid so it reads a plan
+  sited any other way). `VillageRoadCheck` takes two landings, side 4 twice,
+  far apart, as two sides for an island plan (`plan.island`), and nowhere else.
+
+On the islet (`SYNTH.make("islet")`: 350 x 120 m, 2.6 ha dry above the freeboard, the real Isola's
+size; 89 people, fishing, as the survey records it; suite `vislandfill`):
+
+| | form off (the water form as it was) | island form |
+|---|---|---|
+| form | shore (row 1: the window is mostly wet) | water, island |
+| buildings placed, first attempt | 4 of 29 | 29 of 29 |
+| buildings placed, the whole retry ladder | 14 of 29 (607 s) | 29 of 29 |
+| VillageQA | 6 houses for 21 households; density 4.8 %; through road leaves twice by the same side; 2 doors unreached | ok |
+| island within 30 m of a building | 0.28 (first attempt) | 0.97 |
+| ring inside the shore (mean) | - | 14.0 m |
+| `body_hull_ha` | 0.50 (real Pescatori 0.81) | 0.73 |
+| `nn_median_m` | 19.2 (real 12.3) | 13.0 |
+| `coverage` / `compactness` / `elongation` | 0.33 / 0.45 / 4.0 (real 0.81 / 0.64 / 2.1) | 0.38 / 0.28 / 5.8 |
+| `setback_median_m` | 5.5 (real 0.9) | 5.7 |
+| `water_within_30m` | 0.64 (real 0.58) | 0.35 |
+
+The suite (`vislandfill`, 32 checks, 984 s on a loaded host: 147 s measuring
+the 29 buildings, 307 s planning, 229 s building and assembling the mesh): the
+derivation and its four refusals; the plan sited along the island; the check;
+VillageQA; every door walked to from a landing, and the spine cut to a stub
+strands 25; the exporter's `island` block; components, the assembled mesh and
+`VillageGroundCheck`; the controls (east half of the buildings taken away: the
+island reached 0.51 and `fill` fails; a ring arc taken up: `ring` fails; the
+form off: no island plan, 0.28 reached); purity.
+
 ### Not yet
-Island fill edge to edge (Isola dei Pescatori) is not done: only the stilt
-and boardwalk half of the task is.
+* **The 90 m DEM does not hold the real Isola.** `world90/isola_dei_pescatori`
+  smears the 3.5 ha island into 19 ha (one 1 m step of lake and one of land are
+  the whole signal), so it is 21 times what 89 people need (limit 4) and keeps the
+  water form's shore plan. The form works on any grid that shows the island as
+  it is (the islet is on 8 m cells).
+* **Density.** The village is the right size (hull 0.73 ha against the real
+  0.81) but not the real shape: the real island is built in lanes one house
+  wide, setback 0.9 m, `compactness` 0.64, `elongation` 2.1; ours has houses
+  5.7 m back from the quay and the island's length shortened by 0.9 only, so
+  `elongation` stays 5.8. A quay of townhouse-class lots (0 to 1 m setback) and
+  cross lanes between the long sides would bring them in.
+* **Strand dressing.** A fishing village's `strand` step
+  (`VillageDressHosts.dress_place(plan, ctx, &"strand")`) took 190 of the
+  plan's 307 s on the islet's 310 x 123 m site (a per-step timing,
+  `tools/probe_island_dress.gd`); it builds the whole site's walk grid
+  (`VillageNavCheck.reached_grid`) for the step and again for each shore piece
+  it places, and the cost is the site's area. Not read further here.

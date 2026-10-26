@@ -101,6 +101,13 @@ func _check_through(plan: VillagePlan) -> void:
 				failures.append("through: road %d passes %.0fm from the common, wants %.0f" % [r, near, THROUGH_TO_COMMON])
 
 
+## An island village's through road runs from one landing to another, both
+## ends at the shore (side 4): two landings, as far apart as the island is
+## long, are two sides. Nowhere else may a road leave twice by the water.
+func _two_landings(plan: VillagePlan, side: int, a: Vector2, b: Vector2) -> bool:
+	return side == 4 and not plan.island.is_empty() 		and a.distance_to(b) >= 0.5 * maxf(plan.site.size.x, plan.site.size.y)
+
+
 ## Which side of the site a through road's end leaves by: the site's own
 ## edge (0-3), or, on given ground, the shore of the ground's own water
 ## (VTER-LOTS: a road that ran into a lake is cut back to it; its end is a

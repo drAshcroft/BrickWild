@@ -135,7 +135,11 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
 	var ground: VillageTerrain = null
 	if sites_on_ground(spec):
 		# a shore village is turned to face its water (VTER-FORM-SHORE)
-		ground = (VillageShoreForm.site(spec) if spec.form in [&"shore", &"water"] else VillageSiting.site(spec))["ground"]
+		# (an island village is turned along its island, VTER-ISLAND-FILL)
+		if spec.form == &"water" and VillageIslandForm.fits(spec):
+			ground = VillageIslandForm.site(spec)["ground"]
+		else:
+			ground = (VillageShoreForm.site(spec) if spec.form in [&"shore", &"water"] else VillageSiting.site(spec))["ground"]
 	return _plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground, hill)
 
 
@@ -176,7 +180,9 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 	var form: StringName = &"strand" if spec.form in [&"shore", &"water"] else spec.form
 	if form != spec.form and ground != null and not spec.compact_display and not is_nan(ground.water_level_m):
 		var shore_plan: VillagePlan
-		if spec.form == &"water":
+		if spec.form == &"water" and VillageIslandForm.fits(spec):
+			shore_plan = VillageIslandForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
+		elif spec.form == &"water":
 			shore_plan = VillageWaterForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
 		else:
 			shore_plan = VillageShoreForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)

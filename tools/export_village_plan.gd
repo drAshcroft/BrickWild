@@ -704,6 +704,13 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		for p in plan.shoreline:
 			line.append([_n(p.x), _n(p.y)])
 		out["shoreline_m"] = line
+	if not plan.island.is_empty():
+		# an island village's island (VillageIslandForm); no other plan has one
+		var landings: Array = []
+		for p in (plan.island["landings"] as PackedVector2Array):
+			landings.append([_n(p.x), _n(p.y)])
+		out["island"] = {"area_m2": _n(float(plan.island["area_m2"])), "ring_scale": _n(float(plan.island["ring_scale"])),
+			"landings_m": landings}
 	return out
 
 
