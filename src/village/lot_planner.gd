@@ -225,17 +225,56 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			unplaced = finer_left
 			common_state = finer_common
 			break
+	# A hillside (VillageHillsideForm) is planned in the plane's profile first.
+	# Where VillageQA finds a fault in it, the form's other profiles are tried --
+	# the through road's homes beside the common, the shallow site (one row of
+	# lots less below the lowest terrace) -- and the one with the fewest faults is
+	# kept, if it still houses everyone. Not a slope threshold: Manarola (band
+	# slope 0.319) and Masouleh (0.330) are 0.011 apart and want different ones.
+	var hill := {}
+	var around := false
+	if unplaced <= 0 and spec.form == &"hillside" and out.ground != null:
+		var faults: int = _faults(out)
+		for profile in HILL_PROFILES:
+			if faults <= 0:
+				break
+			for job in jobs:
+				job["around_common"] = bool(profile["around"])
+			var variant: VillagePlan = _replan(spec, jobs, int(accepted[0]), float(accepted[1]),
+				minimum_depth, shore_depth, false, {"shallow": profile["shallow"]})
+			if cut_measured(variant, jobs) > 0:
+				continue
+			var variant_faults: int = _faults(variant)
+			if variant_faults < faults:
+				out = variant
+				faults = variant_faults
+				hill = {"shallow": profile["shallow"]}
+				around = bool(profile["around"])
+		for job in jobs:
+			job["around_common"] = around
 	# A hillside whose tavern the lot checks could only stand mid-village is
 	# cut short at the near end, so a gate stands by it (VillageHillsideForm.
-	# site_crop). Kept if everyone is still housed and the village no sparser.
-	var crop: Vector2 = VillageHillsideForm.site_crop(out) if unplaced <= 0 else Vector2.ZERO
-	if crop != Vector2.ZERO:
-		for widen in [1.0, 1.1, 1.2]:
-			var cut: VillagePlan = _replan(spec, jobs, int(accepted[0]), float(accepted[1]) * widen,
-				minimum_depth, shore_depth, false, crop)
+	# site_crop): the gate distance, from the place check's reach down, whose plan
+	# has the least `_faults` (the first to have none), still housing everyone and
+	# no sparser than the plan it cuts.
+	if unplaced <= 0 and VillageHillsideForm.site_crop(out, 0.0) != Vector2.ZERO:
+		var best_faults: int = _faults(out)
+		var best: VillagePlan = out
+		var gate_m: float = VillageHillsideForm.TAVERN_NEAR_M - VillageHillsideForm.GATE_STEP_M
+		while gate_m >= VillageHillsideForm.GATE_MIN_M and best_faults > 0:
+			var cut_hill: Dictionary = hill.duplicate()
+			cut_hill["crop"] = VillageHillsideForm.site_crop(out, gate_m)
+			var cut: VillagePlan = _replan(spec, jobs, int(accepted[0]), float(accepted[1]),
+				minimum_depth, shore_depth, false, cut_hill)
 			if cut_measured(cut, jobs) <= 0 and _density(cut) >= _density(out) - 1e-6:
-				out = cut
-				break
+				var cut_faults: int = _faults(cut)
+				if cut_faults < best_faults:
+					best = cut
+					best_faults = cut_faults
+			gate_m -= VillageHillsideForm.GATE_STEP_M
+		out = best
+	for job in jobs:
+		job.erase("around_common")
 	_trim_lanes(out)
 	VillageDispersedForm.finish(out)
 	# Lot cutting can add service lanes, drop roads and add a mill race.
@@ -252,6 +291,35 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	VillageDresser.dress(out)
 	VillageDispersedForm.dress_hamlets(out)
 	return out
+
+
+## What a hillside plan's re-plans are compared by, less is better: VillageQA's
+## faults (no per-building checks, no twins) a hundred each, and each of the steep
+## sites' bands (VillageHillsideForm.BAND_*) the body misses one. The QA contract
+## outranks the survey's realism. The `edge` fault is not counted: it reads the
+## props, which the dresser places after this.
+static func _faults(plan: VillagePlan) -> int:
+	var no_pure := func(_p: VillagePlan) -> Array: return []
+	var faults := 0
+	for f in VillageQA.new().check(plan, {&"pure": no_pure}, false)["failures"] as Array:
+		if not String(f).begins_with("edge:"):
+			faults += FAULT_WEIGHT
+	if plan.spec.form == &"hillside":
+		faults += VillageHillsideForm.band_faults(plan)
+	return faults
+
+
+const FAULT_WEIGHT := 100
+
+
+## The hillside form's profiles after the plane's, in the order they are tried:
+## the through road's homes beside the common (`around`), and the shallow site
+## (VillageHillsideForm.LEVEL_WEIGHTS_SHALLOW).
+const HILL_PROFILES := [
+	{"around": true, "shallow": false},
+	{"around": true, "shallow": true},
+	{"around": false, "shallow": true},
+]
 
 
 ## A brief's great-tomb or ziggurat is a castle mass but never the seat
@@ -374,11 +442,11 @@ const FINE_WIDTH_STEPS: Array[float] = [1.05, 1.1, 1.15, 1.2, 1.25]
 ## `_place_manor` looks for the lord's lane.
 static func _replan(spec: VillageSpec, jobs: Array[Dictionary], lanes: int, scale: float,
 		minimum_depth: float, shore_depth: float, clear_head := false,
-		site_crop := Vector2.ZERO) -> VillagePlan:
-	var again: VillagePlan = VillageSitePlanner.plan(spec, lanes, scale, minimum_depth, shore_depth, site_crop)
+		hill := {}) -> VillagePlan:
+	var again: VillagePlan = VillageSitePlanner.plan(spec, lanes, scale, minimum_depth, shore_depth, hill)
 	var retry_depth := _manor_site_depth(again, jobs)
 	if retry_depth > again.site.size.y + 0.001:
-		again = VillageSitePlanner.plan(spec, lanes, scale, maxf(minimum_depth, retry_depth), shore_depth, site_crop)
+		again = VillageSitePlanner.plan(spec, lanes, scale, maxf(minimum_depth, retry_depth), shore_depth, hill)
 	if clear_head:
 		_drop_head_tracks(again)
 	return again

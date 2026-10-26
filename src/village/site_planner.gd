@@ -131,12 +131,12 @@ const JUNCTION_EPS := 0.5       ## two road vertices this close are the same jun
 ## grade, and every other road is graded and re-classed by what it climbs.
 ## Without terrain none of that runs and the plan is the flat plan exactly.
 static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
-		minimum_depth := 0.0, shore_depth := 0.0, site_crop := Vector2.ZERO) -> VillagePlan:
+		minimum_depth := 0.0, shore_depth := 0.0, hill := {}) -> VillagePlan:
 	var ground: VillageTerrain = null
 	if sites_on_ground(spec):
 		# a shore village is turned to face its water (VTER-FORM-SHORE)
 		ground = (VillageShoreForm.site(spec) if spec.form in [&"shore", &"water"] else VillageSiting.site(spec))["ground"]
-	return _plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground, site_crop)
+	return _plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground, hill)
 
 
 ## The form's layout with the ground ignored: what the siting scores.
@@ -153,7 +153,7 @@ static func sites_on_ground(spec: VillageSpec) -> bool:
 
 static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 		minimum_depth: float, shore_depth: float, ground: VillageTerrain,
-		site_crop := Vector2.ZERO) -> VillagePlan:
+		hill := {}) -> VillagePlan:
 	var out := VillagePlan.new(spec)
 	if spec == null or not spec.valid():
 		push_error("VillageSitePlanner: invalid spec")
@@ -168,7 +168,7 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 	if spec.form == &"valley" and not spec.compact_display:
 		return VillageValleyForm.plan(spec, extra_lanes, site_scale, minimum_depth, ground)
 	if spec.form == &"hillside" and not spec.compact_display:
-		return VillageHillsideForm.plan(spec, extra_lanes, site_scale, ground, minimum_depth, site_crop)
+		return VillageHillsideForm.plan(spec, extra_lanes, site_scale, ground, minimum_depth, hill)
 	# `shore` follows the ground's own shoreline; with none to follow it is a
 	# straight strand, laid as one below
 	# (`water` is the shore form with boardwalks and pile lots in the shallows,

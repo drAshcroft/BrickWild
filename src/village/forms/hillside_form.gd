@@ -119,34 +119,57 @@ const CROSS_SPOTS := [0.4, 0.6]
 const TRACK_SPOTS := [0.18, 0.82]
 const UPHILL_TRACK_SPOTS := [0.08, 0.2, 0.8, 0.92]
 const TRACK_LEAN_DEG := 15.0
+## A track leaves the through road no nearer than the road check's JUNCTION_APART
+## to where the common's path joins it: two junctions a metre apart are one
+## junction cut badly (Rocamadour: a track 0.6 m from the path, 18 degrees to it).
+const TRACK_CLEAR_M := 8.0
 ## A home's slot stays this far in from its terrace end, clear of the riser.
 const SLOT_END_M := 18.0
 ## The homes each level carries, upper first (normalised; a level has one at least).
 const LEVEL_WEIGHTS := [5.0, 1.0, 1.0, 5.0]
-## Where the terrace band is steeper than this, the lowest terrace is on ground
-## that refuses most lots (Masouleh), and carries fewer; the upper levels more.
-const STEEP_BAND_SLOPE := 0.325
-const STEEP_DEPTH_M := 148.0
+## The SHALLOW profile (HILLS-GENERAL): one row of lots less below the lowest
+## terrace than the plane keeps (two rows, DEPTH_MIN_M). The lowest terrace then
+## has a row of lots to its name where it had two, so it carries two homes fewer
+## and the two terraces between carry one more each. The lot planner takes the
+## profile where the plane's profile leaves VillageQA a fault and the shallow one
+## leaves fewer (`VillageLotPlanner._hill_variant`), not by a slope: Manarola
+## (band slope 0.319) wants the plane's, Masouleh (0.330) the shallow one.
+const LEVEL_WEIGHTS_SHALLOW := [5.0, 2.0, 2.0, 3.0]
+## One row of lots below a terrace: a lot 14 m deep and the site's margin.
+const LOT_ROW_M := 16.0
 ## The tavern stands by a gate (VILLAGES 6: within the place check's 60 m). The
 ## through road must reach the site's edge at both ends, so where the lot checks
 ## can only stand the tavern mid-village (Manarola) the lot planner plans again
-## with the site cut to TAVERN_GATE_M from it at the near end (`site_crop`).
-const TAVERN_GATE_M := 43.0
+## with the site cut to a gate distance from it at the near end (`site_crop`):
+## from TAVERN_NEAR_M less a step down to GATE_MIN_M, the first whose plan
+## VillageQA finds fewer faults in (a gate closer than a lot and its yard is no
+## gate by the tavern at all).
 const TAVERN_NEAR_M := 56.0
+const GATE_STEP_M := 4.0
+const GATE_MIN_M := 28.0
 const CROP_MIN_W_M := 140.0
-## The real faces, against the synthetic plane (0.30): the through road's homes
-## stand beside the common (fixture-fitted; the plane loses its elongation).
-const AROUND_SLOPE := 0.31
-const LEVEL_WEIGHTS_STEEP := [5.0, 2.0, 2.0, 3.0]
+## The real steep sites' p10-p90 bands (world_settlements.json, the 46 sites with
+## a median slope of 8 % or more; docs/SETTLEMENT_TESTSET.md), measured with
+## VillageShape. The form is held to them by `vhillside`, and the lot planner
+## counts a miss as a fault when it compares its profiles and gate cuts.
+const BAND_ELONGATION := Vector2(1.32, 4.88)
+const BAND_CONTOUR := Vector2(0.389, 0.798)
+const BAND_SPAN_M := Vector2(14.4, 73.0)
+const BAND_STEPS := Vector2(0.0, 46.5)
+## Homes beside the common at most (a fourth adds no frontage), and how far
+## beyond its short edges the first stands: half its width and one lot's front.
+const AROUND_MAX := 3
+const AROUND_LOT_FRONT_M := 12.0
 const EDGE_INSET_M := 4.0
 const SITE_MARGIN_M := 2.0
 
 
 ## The whole site plan of a hillside village. `extra_lanes` is ignored: the
 ## lot planner's retries buy ground along the contour (`site_scale`), and a
-## lane off the through road would be one more way across the terraces.
+## lane off the through road would be one more way across the terraces. `hill`
+## is the lot planner's re-plan: {"crop": Vector2 (x_lo, x_hi), "shallow": bool}.
 static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
-		ground: VillageTerrain = null, minimum_depth := 0.0, site_crop := Vector2.ZERO) -> VillagePlan:
+		ground: VillageTerrain = null, minimum_depth := 0.0, hill := {}) -> VillagePlan:
 	var out := VillagePlan.new(spec)
 	out.site = site_rect(spec, site_scale, minimum_depth)
 	var rng := RandomNumberGenerator.new()
@@ -163,11 +186,10 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 		var deeper: float = out.site.size.y + float(TERRACES) * (pitch - TERRACE_PITCH_M)
 		deeper = minf(deeper, VillageSitePlanner.SITE_MAX_SIDE)
 		out.site = Rect2(Vector2(out.site.position.x, -deeper * 0.5), Vector2(out.site.size.x, deeper))
-	if slope > STEEP_BAND_SLOPE:
-		# on the steepest faces the band needs no more depth than its terraces
-		# and the ground above them (fixture-fitted: Masouleh's density)
-		out.site = Rect2(Vector2(out.site.position.x, -STEEP_DEPTH_M * 0.5),
-			Vector2(out.site.size.x, STEEP_DEPTH_M))
+	var shallow: bool = bool(hill.get("shallow", false))
+	if shallow:
+		var less: float = minf(out.site.size.y, DEPTH_MIN_M) - LOT_ROW_M
+		out.site = Rect2(Vector2(out.site.position.x, -less * 0.5), Vector2(out.site.size.x, less))
 	var lean_deg: float = riser_lean_deg(slope)
 	var parallel: bool = lean_deg > RISER_LEAN_DEG + 4.0
 	var drift: float = 0.0
@@ -177,6 +199,7 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 		var wider: float = minf(out.site.size.x + drift, VillageSitePlanner.SITE_MAX_SIDE)
 		out.site = Rect2(Vector2(-wider * 0.5, out.site.position.y), Vector2(wider, out.site.size.y))
 		drift = minf(drift, wider * 0.45)
+	var site_crop: Vector2 = hill.get("crop", Vector2.ZERO)
 	if site_crop != Vector2.ZERO:
 		var x_lo: float = maxf(out.site.position.x, site_crop.x)
 		var x_hi: float = minf(out.site.end.x, site_crop.y)
@@ -195,6 +218,7 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 			through, 0.0)].y, float(VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"]))
 	var through_road: Dictionary = VillageSitePlanner._road(through, &"through", spec.wealth)
 	through_road["band_slope"] = slope     # a planning key, like `terrace`
+	through_road["shallow"] = shallow
 	if ground != null and VillageRoadRouter.grade_of(ground, through) > float(
 			VillageSitePlanner.ROAD_CLASSES[&"through"]["grade_max"]) + 1e-6:
 		# a level line that still climbs past a cart's 12 % (the face is too steep
@@ -314,7 +338,7 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 	if ground != null:
 		# and the way up to the fields above the village, off the through road
 		# clear of the common: on ground this steep, the only streets that climb
-		_field_tracks(out, through, -down, ground, UPHILL_TRACK_SPOTS)
+		_field_tracks(out, through, -down, ground, UPHILL_TRACK_SPOTS, [join])
 	var ground_shore := false
 	if ground != null:
 		VillageSitePlanner.grade_roads(out)
@@ -714,12 +738,14 @@ static func _riser(out: VillagePlan, through: PackedVector2Array,
 ## stays a track there (the steeper the face, the further off the fall line),
 ## and a spot where none does has no track.
 static func _field_tracks(out: VillagePlan, low: PackedVector2Array, down: float,
-		ground: VillageTerrain = null, spots: Array = TRACK_SPOTS) -> void:
+		ground: VillageTerrain = null, spots: Array = TRACK_SPOTS, keep_clear: Array[Vector2] = []) -> void:
 	if low.size() < 2:
 		return
 	for f in spots:
 		var x: float = lerpf(low[0].x + CROSS_CLEAR_M, low[low.size() - 1].x - CROSS_CLEAR_M, float(f))
 		var start := Vector2(x, VillageLotPlanner._polyline_y_at_x(low, x))
+		if _near_any(start, keep_clear, TRACK_CLEAR_M):
+			continue
 		var side: float = 1.0 if f < 0.5 else -1.0
 		var leans: Array = [TRACK_LEAN_DEG]
 		if ground != null:
@@ -756,10 +782,42 @@ static func _field_tracks(out: VillagePlan, low: PackedVector2Array, down: float
 				break
 
 
+## How many of the steep sites' bands the plan's body misses (none measured counts
+## as a miss).
+static func band_faults(plan: VillagePlan) -> int:
+	var m: Dictionary = VillageShape.measure(plan)
+	var misses := 0
+	for row in [["elongation", BAND_ELONGATION], ["street_contour_share", BAND_CONTOUR],
+			["elev_span_m", BAND_SPAN_M], ["steps_ways", BAND_STEPS]]:
+		var v: Variant = m.get(row[0])
+		var band: Vector2 = row[1]
+		if v == null or float(v) < band.x or float(v) > band.y:
+			misses += 1
+	return misses
+
+
+## True when a hillside's common is fronted by less of its edge than the place
+## check wants: the through road's homes then stand beside it.
+static func common_wants_homes(plan: VillagePlan) -> bool:
+	if plan.spec.form != &"hillside" or plan.ground == null or plan.commons.is_empty():
+		return false
+	var want: float = VillagePlaceCheck.FRONTED_SHARE
+	if plan.spec.population < VillageSpec.HAMLET_POPULATION:
+		want = VillagePlaceCheck.FRONTED_SHARE_HAMLET
+	return plan.buildings.size() >= 3 and VillagePlaceCheck.fronted_share(plan) < want
+
+
+static func _near_any(p: Vector2, points: Array[Vector2], within: float) -> bool:
+	for q in points:
+		if p.distance_to(q) < within:
+			return true
+	return false
+
+
 ## The site cut that puts a gate by the tavern, or Vector2.ZERO when it needs
 ## none: (x_lo, x_hi) in the plan's frame, the west end brought in to
-## TAVERN_GATE_M from it, the east left open.
-static func site_crop(plan: VillagePlan) -> Vector2:
+## `gate_m` from it, the east left open. (gate_m 0: only whether a cut is wanted.)
+static func site_crop(plan: VillagePlan, gate_m: float) -> Vector2:
 	if plan.spec.form != &"hillside" or plan.ground == null:
 		return Vector2.ZERO
 	var gates: Array[Vector2] = VillageMeasure.gates(plan)
@@ -776,7 +834,7 @@ static func site_crop(plan: VillagePlan) -> Vector2:
 	if worst <= TAVERN_NEAR_M:
 		return Vector2.ZERO
 	# the table puts the tavern at the WEST gate (upwind of the smithy)
-	return Vector2(worst_x - TAVERN_GATE_M, INF)
+	return Vector2(worst_x - gate_m, INF)
 
 
 ## `line` with y eased by EASE_PASSES passes of [1 2 1] over its interior,
@@ -922,12 +980,13 @@ static func assign_jobs(plan: VillagePlan, jobs: Array[Dictionary]) -> void:
 		return
 	# how many homes each level carries (LEVEL_WEIGHTS: the road and the lowest
 	# terrace, the longest lines of frontage with the most ground behind them, the
-	# most), every level at least one. Measured, not derived: it is the split
-	# that keeps the body's span, elongation and contour share inside the steep
-	# sites' bands on the plane AND on Manarola and Masouleh
+	# most), every level at least one; the shallow profile has one row of lots less
+	# below the lowest terrace and its weights say so (LEVEL_WEIGHTS_SHALLOW). The
+	# split that keeps the body's span, elongation and contour share inside the
+	# steep sites' bands on the plane, Manarola, Masouleh and Rocamadour
 	var weights: Array = LEVEL_WEIGHTS
-	if float(plan.roads[0].get("band_slope", 0.0)) > STEEP_BAND_SLOPE:
-		weights = LEVEL_WEIGHTS_STEEP
+	if bool(plan.roads[0].get("shallow", false)):
+		weights = LEVEL_WEIGHTS_SHALLOW
 	var total_w := 0.0
 	for j in range(levels.size()):
 		total_w += float(weights[mini(j, weights.size() - 1)])
@@ -968,12 +1027,12 @@ static func assign_jobs(plan: VillagePlan, jobs: Array[Dictionary]) -> void:
 		# field tracks off it): a chain of homes 45 m apart across the levels
 		var t: float = (float(rank) + 0.2 + 0.5 * float((levels.size() - 1 - lv) % 2)) / float(counts[lv])
 		var x: float = lerpf(pts[0].x + SLOT_END_M, pts[pts.size() - 1].x - SLOT_END_M, clampf(t, 0.0, 1.0))
-		var around: bool = lv == 0 and not plan.commons.is_empty() and float(plan.roads[0].get("band_slope", 0.0)) > AROUND_SLOPE
+		var around: bool = lv == 0 and not plan.commons.is_empty() and bool(homes[i].get("around_common", false))
 		if around:
 			var cr: Rect2 = Poly.bounding_rect(plan.commons[0]["poly"])
-			var reach: float = cr.size.x * 0.5 + 12.0
+			var reach: float = cr.size.x * 0.5 + AROUND_LOT_FRONT_M
 			var offs: Array = [reach, -reach, 0.0]
-			x = clampf(cr.get_center().x + float(offs[mini(rank, 2)]), pts[0].x + SLOT_END_M, pts[pts.size() - 1].x - SLOT_END_M)
+			x = clampf(cr.get_center().x + float(offs[mini(rank, AROUND_MAX - 1)]), pts[0].x + SLOT_END_M, pts[pts.size() - 1].x - SLOT_END_M)
 		var y: float = VillageLotPlanner._polyline_y_at_x(pts, x)
 		var side: float = 1.0 if rank % 2 == 0 else -1.0
 		homes[i]["near_point"] = Vector2(x, y + side * 10.0)

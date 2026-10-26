@@ -127,32 +127,7 @@ func _check_common(plan: VillagePlan) -> void:
 		failures.append("common: the common is %.0f m2, wants %.0f" % [area, want])
 	# fronted: walk the perimeter, ask how much of it has a building's front
 	# within reach
-	# a building's front is its frontage: the front edge of its lot, on the
-	# road, which its door stands a setback behind
-	var fronts: Array[PackedVector2Array] = []
-	for b in plan.buildings:
-		var li: int = int(b["lot"])
-		if li >= 0 and li < plan.lots.size():
-			fronts.append(plan.lots[li]["front"])
-			# the church stands on the slot reserved to front the common,
-			# and its face to the common is the slot's own front edge
-			if bool(plan.lots[li].get("landmark", false)) and plan.landmark_site.has("front"):
-				fronts.append(plan.landmark_site["front"])
-	var samples := 0
-	var fronted := 0
-	var n: int = common.size()
-	for i in range(n):
-		var a: Vector2 = common[i]
-		var b2: Vector2 = common[(i + 1) % n]
-		var steps: int = maxi(int(a.distance_to(b2) / 2.0), 1)
-		for k in range(steps):
-			var p: Vector2 = a.lerp(b2, (float(k) + 0.5) / float(steps))
-			samples += 1
-			for f in fronts:
-				if p.distance_to(Geometry2D.get_closest_point_to_segment(p, f[0], f[1])) <= FRONTED_REACH:
-					fronted += 1
-					break
-	var share: float = float(fronted) / float(maxi(samples, 1))
+	var share: float = fronted_share(plan)
 	var wanted_share: float = FRONTED_SHARE_HAMLET \
 		if plan.spec.population < VillageSpec.HAMLET_POPULATION else FRONTED_SHARE
 	stats["common_fronted"] = snappedf(share, 0.01)
@@ -181,6 +156,50 @@ func _check_common(plan: VillagePlan) -> void:
 			continue
 		failures.append("common: %s stands on the common" % String(p2["key"]))
 		break
+
+
+## The share of the common's perimeter with a building's front within
+## FRONTED_REACH. A building's front is its frontage: the front edge of its lot,
+## on the road, which its door stands a setback behind. 0 with no common.
+static func fronted_share(plan: VillagePlan) -> float:
+	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
+	if common.is_empty():
+		return 0.0
+	var fronts: Array[PackedVector2Array] = []
+	for b in plan.buildings:
+		var li: int = int(b["lot"])
+		if li >= 0 and li < plan.lots.size():
+			fronts.append(plan.lots[li]["front"])
+			# the church stands on the slot reserved to front the common,
+			# and its face to the common is the slot's own front edge
+			if bool(plan.lots[li].get("landmark", false)) and plan.landmark_site.has("front"):
+				fronts.append(plan.landmark_site["front"])
+	return share_fronted(common, fronts)
+
+
+## The sample points of a common's perimeter, a metre or two apart.
+static func edge_samples(common: PackedVector2Array) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var n: int = common.size()
+	for i in range(n):
+		var a: Vector2 = common[i]
+		var b2: Vector2 = common[(i + 1) % n]
+		var steps: int = maxi(int(a.distance_to(b2) / 2.0), 1)
+		for k in range(steps):
+			out.append(a.lerp(b2, (float(k) + 0.5) / float(steps)))
+	return out
+
+
+## The share of `common`'s perimeter within FRONTED_REACH of one of `fronts`.
+static func share_fronted(common: PackedVector2Array, fronts: Array[PackedVector2Array]) -> float:
+	var samples: Array[Vector2] = edge_samples(common)
+	var fronted := 0
+	for p in samples:
+		for f in fronts:
+			if p.distance_to(Geometry2D.get_closest_point_to_segment(p, f[0], f[1])) <= FRONTED_REACH:
+				fronted += 1
+				break
+	return float(fronted) / float(maxi(samples.size(), 1))
 
 
 ## VILLAGES §7's recipe for the common, as the list of things that may stand

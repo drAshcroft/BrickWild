@@ -138,7 +138,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | village planning on given ground: siting, road grades, lot fall, the stair walk, wet ground | `lane:village-terrain` | 196 s host, 148 s body (23 Oct), 476 checks; six fixtures and six failing controls; see docs/VILLAGE_TERRAIN.md |
 | the village ground mesh: `VillageGroundSurface`, `VillageBuilder` on terrain, `VillageGroundCheck` | `vground`, then `vgroundterrain` | ~6 m loaded host for the terrain cases; see docs/VILLAGE_TERRAIN.md |
 | `VillageBridge`, a bridge on given ground, the ground's river (`VillageGroundWater`), `qa/village_bridge_check.gd` | `vcrossterrain`, then `tests/village_crossings_test.gd` as a script | ~40 s host, 24 checks; see docs/VILLAGE_TERRAIN.md |
-| stair streets, access flights, the 3D village walk: `VillageAccessSteps`, `VillageWalk3D`, `VillageWalk` on terrain | `vstepswalk`, then `vgroundterrain` | ~5.5 m loaded host, 84 checks (Manarola, Positano); see docs/VILLAGE_TERRAIN.md "Steps and the 3D walk" |
+| stair streets, access flights, the 3D village walk: `VillageAccessSteps`, `VillageWalk3D`, `VillageWalk` on terrain | `vstepswalk`, then `vgroundterrain` | ~14 m loaded host, 91 checks (Manarola, Positano, Masouleh's stepped through road); see docs/VILLAGE_TERRAIN.md "Steps and the 3D walk" |
 | `VillageSiteAnalysis` (slope classes, landforms, drainage, contours, level regions) | `vanalysis` | ~15 s host, 47 checks; see docs/VILLAGE_TERRAIN.md |
 | the world settlement set, `tools/settlements/` | `vworld` | seconds; see docs/SETTLEMENT_TESTSET.md |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |

@@ -1493,17 +1493,20 @@ the plane did not need, the real ground did:
 | the common stands on the flattest part of the road's middle 80 % | the place check wants it no steeper than the median lot |
 | households per level 3:2:2:5, staggered from the lowest level up (`LEVEL_WEIGHTS`) | measured: the split that keeps span, elongation and contour share in band on the plane AND both fixtures; equal shares failed one or the other |
 
-| Measure | plane_30 | Manarola | Masouleh | Steep sites p10-p90 |
-|---|---|---|---|---|
-| street_contour_share | 0.611 | **0.737** | **0.516** | 0.389-0.798 |
-| elevation span, m | 34.4 | **14.7** | **17.5** | 14.4-73.0 |
-| steps ways | 4 | **6** | **6** | 0-46.5 |
-| elongation | 1.35 | **2.92** | **4.48** | 1.32-4.88 |
-| households unhoused | 0 | 0 | 0 | -- |
+| Measure | plane_30 | Manarola | Masouleh | Rocamadour | Steep sites p10-p90 |
+|---|---|---|---|---|---|
+| street_contour_share | 0.611 | **0.766** | **0.794** | **0.616** | 0.389-0.798 |
+| elevation span, m | 27.6 | **18.9** | **22.8** | **27.0** | 14.4-73.0 |
+| steps ways | 4 | **6** | **6** | **6** | 0-46.5 |
+| elongation | 1.42 | **1.67** | **1.56** | **1.61** | 1.32-4.88 |
+| households unhoused | 0 | 0 | 0 | 0 | -- |
+| profile | plain | plain, gate 48 m | shallow | plain | -- |
 
-Suite `vhillside` (111 checks; ~10 min host, Masouleh alone ~5 min in the suite) holds the four bands, the housing and the grade
-caps on all three. Span on Manarola (14.7 against a 14.4 floor) and the plane's
-elongation (1.35 against 1.32) have little margin.
+Suite `vhillside` (148 checks; 11.5 min loaded host, Manarola, Masouleh and
+Rocamadour at 190, 160 and 100 s) holds the four bands, the housing, the grade
+caps, the road check and VillageQA on the plane and the three real faces.
+Masouleh's contour share (0.794 against 0.798) and the plane's elongation (1.42
+against 1.32) have little margin.
 
 ### Not yet
 
@@ -1526,29 +1529,69 @@ elongation (1.35 against 1.32) have little margin.
     `through_grade` fails an over-cap through road unless the plan marks it
     `stepped`: a stair street, which the hillside form sets where its level
     line still climbs past 12 % (the face is too steep for any cart; the real
-    Manarola's main street is stairs). The number is unchanged. What is NOT
-    done: a `stepped` through road is still laid and built as a road, not as
-    treads, and no switchback is laid; the suite holds a control (the same plan
-    without the flag fails `through_grade`);
+    Manarola's main street is stairs). The number is unchanged. HILLS-GENERAL
+    builds it as the stair street it is: `VillageGroundSurface` gives the bed of
+    a `steps` road OR a `stepped` one its treads, so the builder dresses them
+    (`stair_tread`, host `road<i>`), `VillageGroundCheck._stairs` holds them and
+    `VillageWalk3D` bakes them (`vstepswalk`, `_stepped_case`, Masouleh as a
+    hillside, asserts the `stepped` road has treads and stair stones and walks it). No
+    switchback is laid; the suite holds a control (the same plan without the flag
+    fails `through_grade`);
   * the tavern and a gate: the doc's gate is where a road crosses the
     settlement's edge, and an unenclosed hillside's edge is the site rectangle,
-    stretched along the contour. Taking the gate to the built edge (the first
-    point of the road within 24 m of a building) was tried and does not help
-    Manarola: houses stand 80 m either side of its only tavern ground. What
-    works is cutting the site: when the tavern stands more than 56 m from a
-    gate the lot planner plans again with the west end brought in to
-    `TAVERN_GATE_M` (43 m) from it (`site_crop`; the table puts the tavern at
-    the west gate), kept if everyone is still housed;
-  * FIXTURE-FITTED CONSTANTS, said plainly: on a face steeper than 0.325
-    (Masouleh) the level weights are [5,2,2,3] not [5,1,1,5] and the site is
-    148 m deep not 164 (its density 4.9 % -> over the 5 % floor); on a face steeper than
-    0.31 (both real faces, not the 0.30 plane) the through road's homes stand
-    beside the common, which lifts its fronts to 60 %+; `TAVERN_GATE_M` 43 was
-    the one value of 40, 43, 46, 49, 52 that kept Manarola in the bands and
-    QA (40: fronts 57 %; 46: elongation 1.30; 49: a 15 degree junction; 52:
-    contour 0.87). Three faces cannot support a derived rule; a fourth steep
-    fixture may move them. Manarola's contour share 0.793 is 0.005 under the
-    band's top;
+    stretched along the contour. Taking the gate to the built edge was tried and
+    does not help Manarola: houses stand 80 m either side of its only tavern
+    ground. What works is cutting the site (see HILLS-GENERAL below).
+* ~~**the fixture-fitted constants**~~ -- HILLS-GENERAL. HILLS-QA passed on
+  Manarola and Masouleh with four numbers fitted to those two faces (level weights
+  [5,2,2,3] and a 148 m site on a face over 0.325, the through road's homes beside
+  the common over 0.31, `TAVERN_GATE_M` 43, the only one of 40..52 that passed).
+  They are replaced by rules; each rule, and what was tried and did not hold:
+
+  | was | now | derivation |
+  |---|---|---|
+  | `TAVERN_GATE_M` = 43 | a ladder: from `TAVERN_NEAR_M` (56 m, the place check's reach less a lot) down in `GATE_STEP_M` (4 m) to `GATE_MIN_M` (28 m), the site cut to that gate distance from the tavern; the plan with the least `_faults`, the first with none | a gate nearer than a lot and its yard is no gate by the tavern; the plan decides, not a number. Manarola: 48 m (52 m leaves its contour share at 0.87) |
+  | homes beside the common over slope 0.31 | when `VillagePlaceCheck.fronted_share` of the plain plan is under the floor (60 %, hamlet 55 %), the lot planner plans again with the through road's homes at the common's short edges (`HILL_PROFILES`, `around_common`); at `common_wants_homes` false nothing changes | what the place check asks of the common is what decides it; Manarola needs none now |
+  | 148 m site over slope 0.325 | the SHALLOW profile: `DEPTH_MIN_M` less `LOT_ROW_M` (164 - 16 = 148): one row of lots less below the lowest terrace | the plane keeps two rows of lots below its lowest terrace (32 m); ground that refuses most of a row (Masouleh's 12 % buildable under the lowest terrace) keeps one |
+  | level weights [5,2,2,3] over 0.325 | `LEVEL_WEIGHTS_SHALLOW`, with the shallow profile | the lowest terrace has one row where it had two: 5 -> 3 homes, the two terraces between take the two |
+  | the slope thresholds 0.31 and 0.325 | the profiles are tried in `HILL_PROFILES` order (plain, around, around + shallow, shallow) and the plan with the fewest `_faults` is kept (VillageQA faults at 100, the steep sites' bands `BAND_*` missed at 1) | the band slopes the form reads IN the plan, on the sited ground, are 0.319 (Manarola) and 0.330 (Masouleh): 0.011 apart, and they want different profiles. No smooth rule of slope separates them |
+
+  What was tried and did not hold, so the next hand does not: homes in
+  proportion to the metres a home can stand on (plane and Manarola pass, Masouleh
+  has a 12.9 m span against a 14.4 floor); sliding the whole band along the fall
+  line to the row with most buildable metres (`pick_row`; it chose the site's far
+  edge and squeezed the lowest terrace); whole lot rows below the lowest terrace
+  by the fall they stand on (Manarola 1.88 rows, Masouleh 1.82: floor or round
+  gives them the same, and Manarola fails at 148 m); the ground under each row
+  (Manarola .44/.22/.10 buildable, Masouleh .12/.30/.48: no pattern). The two
+  profiles are still two named constant sets; what is measured is which one a
+  site gets.
+
+  The third steep real site: **Rocamadour** (real30, band slope 0.422), in `vhillside`
+  with Manarola and Masouleh: VillageQA clean, the four bands (contour 0.616,
+  span 27.0 m, elongation 1.61, 6 steps), 12/12 housed, the plain profile, no
+  cut. It failed the road check at first on a junction the form made: a field
+  track off the through road 0.6 m from where the common's path joins it (and
+  18 degrees to it). `TRACK_CLEAR_M` keeps a track a junction-apart (8 m) from
+  that join. Sites that do NOT yet pass, planned as hillsides by
+  `tools/hills_probe.gd`: **Monemvasia** (real30, 0.254): the common fronted
+  50 % (60 % wanted) and on 46 % ground against lots at 31 %; **Positano** and
+  **Castelmezzano** (0.534, 0.428): no smithy (every lot on the through road is
+  refused, a fall of 3 to 4.5 m against the 2.6 m a house stands on), density 3 to
+  4 %, a 15 degree junction; **Eze**: density 3.8 %, a 400 m site; **Hallstatt**:
+  no smithy or tavern. Filed as HILLS-STEEP.
+
+  The hillside on the 3D walk: the `stepped` through road is walked end to end
+  (`vstepswalk`, `_stepped_case`: Masouleh, a path from gate 0 to gate 1 that
+  climbs the bed's rise, treads and stair stones named). The rest of a hillside
+  on the walk is not there yet: planned and built on Manarola, Masouleh or
+  Rocamadour, 4 to 14 of its 16 doors are off the gates' island, and the cross-lanes
+  (`steps`, laid straight down the fall line) are steeper than a stair can be
+  (going 0.20 to 0.25 m against the check's 0.28 m: a stair of 0.15 m risers
+  tops out at a 54 % grade, the class allows 100 %). Without the treads on the
+  through road the same plan also had a navigation vertex 0.33 m off the ground.
+  Filed as HILLS-STAIRS (cross-lanes at a stair's grade, which is the switchback
+  question in small).
 * **switchbacks** -- the router is monotone along the contour, so a hairpin
   up a spur is still not laid;
 * **terraces from the ground** -- the terrace lines are offsets of the
@@ -1567,7 +1610,7 @@ branch (`street-none-none mesh=e5da7c34d26d909e`, ...).
 
 | Piece | Where |
 |---|---|
-| stair street treads | `VillageGroundSurface.treads_of` (pure, static), `road_bed(i)["treads"]`, `_tread_regions`; `bed_at` is stepped on a `steps` road |
+| stair street treads | `VillageGroundSurface.treads_of` (pure, static), `road_bed(i)["treads"]`, `_tread_regions`; `bed_at` is stepped on a `steps` road or a hillside's `stepped` through road |
 | stair stone | `VillageBuilder._stairs`: `stair_tread`, `stair_riser` (host `road<i>`, `lot<i>_steps`), `stair_cheek` |
 | a lot's way in | `src/village/village_access_steps.gd`, `VillageAccessSteps.plan` (from `VillageLotPlanner.plan_measured`, before the dresser) -> `lots[i].ground_fit.access` |
 | a house's flights in the plan | `lots[i].ground_fit.entry_flights` (`VillageAccessSteps.entry_flights`, from `HouseSlope.flights` kept by `VillageLotGround._house_parts` as `flight_rows`) |
@@ -1696,7 +1739,7 @@ hold and every tread of an access flight is in the MESH at its level (5 cm),
 no riser over 0.18 m, no inner stair-street tread under 0.28 m, and each has
 its `stair_tread` component.
 
-`vstepswalk` (84 checks, ~5.5 min loaded): 50 people, seed 4242, the green form
+`vstepswalk` (91 checks since HILLS-GENERAL, ~14 min loaded, 8 min of it the hillside's plan; 84 checks and ~5.5 min before): 50 people, seed 4242, the green form
 (the one with stair streets on both), on Manarola and Positano (real30). The
 ground and its components (`ComponentCheck`) and the whole `VillageGroundCheck`;
 the walk read back out of JSON; one island; NavigationServer3D paths from the

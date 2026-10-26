@@ -29,14 +29,14 @@ const SEED := 4242
 const TERRACES := 3
 ## The real hillsides, forced to the form (Manarola derives `shore`, Masouleh
 ## `hillside`; both are planned here as the hillside they climb).
-const REAL_FIXTURES := ["real30/manarola", "real30/masouleh"]
+const REAL_FIXTURES := ["real30/manarola", "real30/masouleh", "real30/rocamadour"]
 
 ## The real steep sites' p10-p90 bands (world_settlements.json, 46 sites with
 ## a median slope of 8 % or more). Recorded in docs/SETTLEMENT_TESTSET.md.
-const BAND_ELONGATION := Vector2(1.32, 4.88)
-const BAND_CONTOUR := Vector2(0.389, 0.798)
-const BAND_SPAN_M := Vector2(14.4, 73.0)
-const BAND_STEPS := Vector2(0.0, 46.5)
+const BAND_ELONGATION := VillageHillsideForm.BAND_ELONGATION
+const BAND_CONTOUR := VillageHillsideForm.BAND_CONTOUR
+const BAND_SPAN_M := VillageHillsideForm.BAND_SPAN_M
+const BAND_STEPS := VillageHillsideForm.BAND_STEPS
 
 
 static func run() -> SuiteResult:

@@ -335,7 +335,7 @@ func _bed_of(i: int, greater: Array[int]) -> Dictionary:
 	for k in range(h.size()):
 		h[k] += offset[k]
 	var bed := {"stations": st, "s": s, "h": h, "class": road["class"], "width": float(road["width"])}
-	if road["class"] == &"steps" and st.size() >= 2:
+	if (road["class"] == &"steps" or bool(road.get("stepped", false))) and st.size() >= 2:
 		bed["treads"] = treads_of(s, h)
 	return bed
 
