@@ -55,10 +55,23 @@ The walker collides with the architecture's own mesh, and with every prop
 when "Solid furniture" is ticked. A door you cannot get through is a real
 finding. So is a chandelier that hits you in the face.
 
-A pin asks for a kind (collision, window, door, roof, wall, floor/stair,
-furniture, other) and a note. Collision, window, door and roof pins tick the
+A pin asks for a kind, a severity and a note. The kind list opens on
+"choose..." and will not pin until you pick one: collision, door, window,
+stair / floor, roof, wall, furniture / prop, lighting, floating / gap,
+z-fight / texture, missing / wrong for the style, ground / terrain, other.
+(Before 26 Oct it opened on "collision", so every old pin says collision.)
+Severity is blocker (cannot walk on; P1), bug (plainly wrong; P2, the default)
+or polish (looks off; P3). Collision, window, door and roof pins tick the
 matching rating box. Pins show as numbered red balls through walls. The list
 can jump back to a pin's viewpoint or delete it.
+
+Below the seed, the sidebar carries the request's extras, each shown only for
+the kinds that accept it: **Jank** (0-1, `BuildingRequest.jank`, every kind
+but a village), **Ground fall** in metres with the downhill direction (house,
+shop, church, castle; the rig's ground plane tilts to match) and
+**Foundation** ground / piles with the water depth (house, shop; the ground
+drops to the bed and the water is drawn at its surface). The saved reopen
+command carries every one of them.
 
 **Save & next kind** or **Save & new seed** appends to `visualqa/HumanRate.md`,
 under a `<!-- human-walk ID kind -->` marker. The web page ignores that marker.
@@ -79,4 +92,82 @@ Smoke test without a person (writes to a scratch file, not HumanRate.md):
 
 ```
 godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed=8102 --walk=140 --autoshot=res://artifacts/walk_qa/shot.png --autopin --rate-file=res://artifacts/walk_qa/rate.md
+```
+
+## Bug walks
+
+After a sprint, walk what the sprint touched and pin what is wrong. Every
+pin becomes a todo in the backlog.
+
+```powershell
+.\visualqa\walk.ps1 -Tour sprint_2026_10_26
+# or: godot --path . res://visualqa/walk/walk_qa.tscn -- --tour=sprint_2026_10_26
+```
+
+A tour is `visualqa/tours/<name>.json`: a list of request dicts (anything
+`BuildingRequest.from_dict` takes -- kind, style, purpose, seed, width,
+jank, ground_fall_m, foundation, ...), each with an optional `"why"`. The
+sidebar shows `Stop i / n -- why`. **Save & next stop** saves and builds the
+next stop; **Skip this stop** moves on without saving; **Save & new seed**
+stays on the stop with another seed. `--stop=5` starts at stop 5. Write a new
+tour per sprint; `sprint_2026_10_26.json` is the shops, the witch hut, the
+minka / Sahel / roundhouse / rich / mediterranean / thatch styles, a house on
+falling ground, one on piles, a crooked one and a windmill.
+
+**What gets filed.** With "File pins as todos" ticked (the default; `--no-file`
+unticks it), Save starts `tools/file_walk_bugs.py` for that review in the
+background and the status line says `Filed: filed N, skipped M...` when it
+ends (its log is `artifacts/walk_bugs/filer.log`). Each pin becomes one
+waterfree todo:
+
+- key `WALK-<first 8 of review_id>-<pin n>`; an existing key is skipped, so
+  filing twice files nothing twice;
+- priority from severity: blocker P1, bug P2, polish P3 (old pins: P2);
+  phase `bug-walk`;
+- title `<building>: <kind> -- <note>`; the description carries the note,
+  kind, severity, tour stop, room, part hit, plan records, building-local
+  position, camera, screenshot path, the request JSON and the reopen command;
+- a target file only where the kind makes it obvious (furniture in a house or
+  shop -> `house_furnisher.gd`, a door or window -> `house_plan_openings.gd`,
+  ground under piles / on a slope -> `house_piles.gd` / `house_slope.gd`).
+
+**Re-file, or look first.**
+
+```powershell
+python -I tools/file_walk_bugs.py --dry-run                     # every review, nothing filed
+python -I tools/file_walk_bugs.py --dry-run --no-lookup         # same, without asking waterfree which keys exist
+python -I tools/file_walk_bugs.py --review 1a17a33a             # one review (an id prefix is enough)
+python -I tools/file_walk_bugs.py --since 2026-10-26T00:00:00Z  # everything walked since
+python -I tools/file_walk_bugs.py --pins artifacts/walk_qa/walk_pins.jsonl --dry-run
+```
+
+The 109 pins from 3-7 Oct have NOT been filed. Each one says "collision"
+whatever it was. File them only if you want them; `--dry-run` shows the list.
+
+The jsonl record keeps its old shape and adds fields: `severity` per pin, and
+`reopen`, `tour`, `stop`, `why`, `village_terrain` per review.
+
+## Villages on real ground
+
+```powershell
+.\visualqa\walk.ps1 --village-terrain=manarola --seed=1
+```
+
+Plans a 40-person village on `tests/fixtures/terrain/<name>.json` (or
+`real30/<name>.json`; `limone_sul_garda`, `varennes`, `masouleh`, ...) the way
+the `vgroundterrain` suite does (`VillageSpec.terrain`, `VillageLotPlanner`,
+`VillageAssembler`), makes every mesh solid and puts you outside the first
+building's door, facing it. The rig's flat ground is put away; you walk the
+village's own ground, terraces and steps. It takes about a minute and a half.
+Pins carry the village-local position and the part hit; there is no house plan,
+so no room or plan records. "Save & new seed" plans the same ground again with
+another seed. The request field cannot carry a terrain, so the reopen command
+is `--village-terrain=<name> --seed=<n>`, not the request JSON.
+
+Smoke test of the tour, the dialog and the filer (`--autopin` first proves an
+unchosen kind is refused, then pins a polish door and runs the filer with
+`--dry-run`):
+
+```
+godot --path . res://visualqa/walk/walk_qa.tscn -- --tour=sprint_2026_10_26 --stop=19 --walk=140 --autoshot=res://artifacts/walk_qa/shot.png --autopin --rate-file=res://artifacts/walk_qa/rate.md
 ```

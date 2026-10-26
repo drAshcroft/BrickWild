@@ -1,12 +1,20 @@
 # Walk QA: walk through one generated building and pin problems.
 #   .\visualqa\walk.ps1
 #   .\visualqa\walk.ps1 --kind=castle --seed=9118 --style=crusader
+#   .\visualqa\walk.ps1 -Tour sprint_2026_10_26          # a bug walk: visualqa/tours/<name>.json
+#   .\visualqa\walk.ps1 --village-terrain=manarola       # a village on real ground
 #
 # Tolerant of new code: if any script is newer than Godot's class registry
 # (a new class_name another task just added), the editor is run once headless
 # to register it before the rig starts. Otherwise every BrickWild script fails
 # with "Identifier not declared".
-param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest)
+# No param() block: a positional parameter would swallow '--kind=...'.
+$Tour = ''
+$Rest = @()
+for ($i = 0; $i -lt $args.Count; $i++) {
+    if ($args[$i] -eq '-Tour' -and $i + 1 -lt $args.Count) { $Tour = $args[$i + 1]; $i++ }
+    else { $Rest += [string]$args[$i] }
+}
 $godot = 'C:\Projects\godot\Godot_v4.5.2-stable_mono_win64\Godot_v4.5.2-stable_mono_win64.exe'
 $root = Split-Path -Parent $PSScriptRoot
 $cache = Join-Path $root '.godot\global_script_class_cache.cfg'
@@ -25,4 +33,7 @@ if ($stale) {
         ForEach-Object { Write-Host $_ }
     if (Test-Path $cache) { (Get-Item $cache).LastWriteTimeUtc = [DateTime]::UtcNow }
 }
-& $godot --path $root res://visualqa/walk/walk_qa.tscn -- @Rest
+$userArgs = @()
+if ($Tour -ne '') { $userArgs += "--tour=$Tour" }
+if ($Rest) { $userArgs += $Rest }
+& $godot --path $root res://visualqa/walk/walk_qa.tscn -- @userArgs
