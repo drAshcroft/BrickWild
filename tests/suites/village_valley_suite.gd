@@ -37,16 +37,17 @@ const CASES := [
 	["river_valley", &""],
 	["valley", &""],
 	["world90/gangotri", &""],
+	["real30/ushguli", &""],
 ]
 ## Derive valley (with a river in the spec) and are NOT cases, each for a stated
-## reason (docs/VILLAGE_TERRAIN.md "The valley form", Not yet). Since VTER-PLACE
-## the church goes to high ground near the common, which on the steep sides
-## leaves the common's edge unfronted (QA `common`, 60 %): world90/vermont (57 %,
-## and a lot-parts conflict), real30/ushguli (23 %), world90/lake_argyle (40 %,
-## elongation 2.14), world90/lugar_de_guene (43 %; its road bows 48 m with the
-## river's bend, elongation 1.39). world90/balan houses 16 of 19 on a uniform
-## 13 % hillside its 90 m grid shows no floor in; world90/rocamadour's gorge
-## drops 18 % along the river, over a cart's 12 %.
+## reason (docs/VILLAGE_TERRAIN.md "The valley form", VTER-VALLEY-REAL):
+## world90/balan (hand label valley; houses 19 of 19 and fronts its common, but
+## its uniform 13 % hillside gives a body of 8 buildings, elongation 2.5),
+## world90/lake_argyle (hand label dispersed; the hill row is 30-55 % and the
+## bank row a river strip, so a 76 m stretch has no lot and the body splits,
+## elongation 2.7), world90/rocamadour (hand label hillside; the gorge drops
+## 18 % along the river, over a cart's 12 %: switchbacks, 17 of 19 housed),
+## world90/vermont and world90/lugar_de_guene (see Not yet).
 ## VALLEY_CASE=<fixture> runs any of them.
 ## Over three, with the survey's high-relief median (2.71) under it and its p90 (4.72) over.
 const ELONGATION_MIN := 3.0

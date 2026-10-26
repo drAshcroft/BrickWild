@@ -282,6 +282,7 @@ static func _intents(res: SuiteResult, measured: Array, ground: Dictionary) -> v
 	var labelled_hm := 0
 	var confusion := {}
 	var intents := {}
+	var valley_sites: Array[String] = []
 	for i in range(measured.size()):
 		var s: Dictionary = measured[i]
 		if not ground.has(s["name"]):
@@ -302,6 +303,8 @@ static func _intents(res: SuiteResult, measured: Array, ground: Dictionary) -> v
 		with_ground += 1
 		var intent := String(spec.form_intent)
 		intents[intent] = int(intents.get(intent, 0)) + 1
+		if intent == "valley":
+			valley_sites.append("%s (label %s, water %s)" % [s["name"], m.get("label_form", "-"), spec.water])
 		res.checked += 1
 		if not (spec.form_intent in VillageSpec.FORM_VOCABULARY) or not (spec.form in VillageSitePlanner.FORMS_SUPPORTED):
 			res.fail("%s: intent '%s' planned as '%s', outside the vocabulary or the planners"
@@ -332,6 +335,7 @@ static func _intents(res: SuiteResult, measured: Array, ground: Dictionary) -> v
 	var ik := intents.keys()
 	ik.sort()
 	res.note("  form_intent counts: %s" % ", ".join(ik.map(func(k): return "%s %d" % [k, intents[k]])))
+	res.note("  derive valley: %s" % ", ".join(valley_sites))
 	var keys := confusion.keys()
 	keys.sort_custom(func(a, b): return confusion[a] > confusion[b] or (confusion[a] == confusion[b] and a < b))
 	for k in keys:

@@ -1220,7 +1220,7 @@ identical).
 | ways up | `_lanes`: 3-6 (+ half the retry's extra lanes), 40 m apart, off the hill side of the road, square to it, leaning along the valley (never under 35 degrees to the road, the junction rule) as far as the grade needs: a `lane` (12 %, 36 m) where possible, else a `track` (30 %) to the site's edge, else steps |
 | households | `assign_jobs` (lot planner hook): houses, cottages and farms each get a slot, four round the common (its two ends on the hill side, two across the road), the rest evenly along the road, sides alternating; each is cut the lot nearest its slot. Left alone the lot planner fills outward from the common into a blob |
 
-Suite `vvalley` (452 checks, ~4 min, 106 s of it measuring the 19 buildings
+Suite `vvalley` (606 checks with Ushguli, ~4 min, 106 s of it measuring the 19 buildings
 once; `VALLEY_CASE=<fixture>` runs one, `VALLEY_DUMP=1` prints buildings and
 roads): a farming village of 60 on a river. Checks: the ground derives
 valley and plans as itself; the river is plan water, no road in it, no
@@ -1235,7 +1235,8 @@ the road, every road within its class's grade; **elongation over 3** and
 |---|---|---|---|---|---|---|
 | river_valley | 297x139 | 19/19 | 5.93 | 0.600 | 0 % / - / 29 % | ok |
 | valley | 297x139 | 19/19 | 6.50 | 0.600 | 0 % / - / 29 % | ok |
-| Gangotri (world90) | 400x139 | 19/19 | 6.14 | 0.583 | 11 % / 12 % / 29 % | ok |
+| Gangotri (world90) | 297x139 | 19/19 | 5.13 | 0.625 | 5 % / 7 % / - (steps 50 %) | ok |
+| Ushguli (real30) | 386x139 | 19/19 | 3.20 | 0.600 | 10 % / 10 % / 27 % | ok |
 
 After VTER-PLACE and VTER-FORM-SHORE merged (the church goes to the high ground
 near the common; the mill's race may fall 1.5 m) the suite was re-fitted: the
@@ -1258,14 +1259,27 @@ Not yet:
   along the frame, over a cart's 12 % (the same missing switchbacks as above);
   where the river bends out of the straight frame the road leaves it (Lugar
   de Guene: 20-219 m, median 33);
-* **the common's fronting on steep sides** -- world90/vermont (57 %),
-  real30/ushguli (23 %), world90/lake_argyle (40 %; elongation 2.14),
-  world90/lugar_de_guene (43 %; elongation 1.39, a bent river): the church goes
-  to the high ground (VTER-PLACE) and the neighbours the slots ask for beside
-  the common do not stand on that ground. A common on the river side of the
-  road (a green on the bank, the church across the road) is the likely fix;
-* **a 90 m grid with no floor in it** -- world90/balan houses 16 of 19 on a
-  uniform 13 % hillside; its siting falls back to the standard score;
+* **the common's fronting on steep sides** -- fixed for Ushguli (20 % -> 73 %,
+  VTER-VALLEY-REAL): the common's x was the gentlest ground *behind* it only
+  (the dispersed form's `_main_x`); `_common_x` also reads the road's frontage
+  on both sides of it, 30 m either way, so its neighbours have ground. world90/
+  vermont (57 %) and world90/lugar_de_guene (a bent river, elongation 1.39) have
+  not been re-measured;
+* **a 90 m grid with no floor in it** -- world90/balan (hand label *valley*:
+  the derivation is right, the planner is not) housed 16 of 19. The river is not
+  seen, so the road was routed by grade in the street form's half-depth band and
+  stood 26 m off the site's middle; the farm rule (a farm within 40 % of the
+  depth of the site's edge) found no ground on either side. `_route` now keeps
+  the unseen-river road to a 14 m band with four times the dislike of leaving
+  its seed: 19/19 housed, common 73 %. It stays out of `CASES`: the survey's
+  main body (45 m links) is 8 of 19, elongation 2.5, filed as VTER-VALLEY-THIN;
+* **Lake Argyle** (hand label *dispersed*) derives valley with a river forced
+  into the spec: the hill row is 30-55 %, the bank row a river strip, one
+  76 m stretch has no legal lot and the body splits (elongation 2.7-2.9).
+  **Rocamadour** (label *hillside*) is the gorge above. A `level_share`
+  floor on the valley row (Balan 0.06, Gangotri 0.10, Argyle 0.17) cannot tell
+  them from the valley-labelled Haldenstein (0.30) and Batad (hillside, 0.07);
+  `vworld` now notes which sites derive valley with their label and water;
 * the road is often straight on a flat floor (the router prefers it);
 * lots on the river side exist only where the bank row is 14 m or more;
 * a lake spec with no lake in the site gets a river ribbon.
