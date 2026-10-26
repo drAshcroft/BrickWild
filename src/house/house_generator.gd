@@ -86,9 +86,15 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	spec.roof_material = StringName(s.get("roof_material", &"shingle"))
 	# A style row may ask for a thicker wall than a timber frame needs. It is
 	# set BEFORE planning so the interior, the openings and the emitted
-	# masonry are all measured against the same wall.
-	var wall_t := float(s.get("wall_t", 0.0))
-	spec.wall_thickness_override = wall_t if wall_t > 0.0 else -1.0
+	# masonry are all measured against the same wall. A thickness the CALLER
+	# set on the spec wins over the style's: it is an authoring choice (a thin
+	# card shell for a printed display), and overwriting it silently moved
+	# every such caller's measured footprint inward by the difference.
+	# BrickWild's own adapters build a fresh spec (override -1), so for them
+	# this is the same line as before.
+	if spec.wall_thickness_override <= 0.0:
+		var wall_t := float(s.get("wall_t", 0.0))
+		spec.wall_thickness_override = wall_t if wall_t > 0.0 else -1.0
 	spec.roof_span_out = float(s.get("span_out", -1.0))
 	spec.roof_along_out = float(s.get("along_out", -1.0))
 	var roof_types: Array = s.get("roof_types", [&"gable", &"half_hipped"])
