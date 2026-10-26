@@ -266,7 +266,19 @@ try {
             @(Get-ChildItem -LiteralPath $incoming -File)) {
         $file.IsReadOnly = $true
     }
-    Rename-Item -LiteralPath $incoming -NewName $releaseId
+    # Windows can hold a handle on 200 MB of freshly copied files (the virus
+    # scanner, the indexer) for a few seconds: the rename is then "access
+    # denied" although nothing is wrong. Wait it out rather than fail a
+    # release that has already verified (0.1.5 stopped here once).
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            Rename-Item -LiteralPath $incoming -NewName $releaseId -ErrorAction Stop
+            break
+        } catch {
+            if ($attempt -ge 12) { throw }
+            Start-Sleep -Seconds 5
+        }
+    }
     if ($verified) {
         [IO.File]::WriteAllText((Join-Path $OutputRoot 'LATEST'), "$releaseId`n", $utf8NoBom)
         # Repoint the junction. Directory.Delete without recursion removes the
