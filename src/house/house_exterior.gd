@@ -55,9 +55,14 @@ static func dress(plan: HousePlan) -> void:
 			recipe = [["Pot_1", 1.5, service, "water"], ["Pot_1", 1.1, service, "storage"]]
 		if s.sahel and not trade_recipe:
 			# HS-SAHEL: no wall lantern, bench or barrel (a European household's
-			# kit); the water jars, a bucket and the pot of the store stand by the wall.
+			# kit); the water jars and the pot of the store stand by the wall. The
+			# third is a tall clay jar, not a wooden pail (HS-SAHEL-RESIDUE).
 			recipe = [["Pot_1", 1.5, service, "water"], ["Pot_1", 1.1, service, "storage"],
-				["Bucket_Wooden_1", 1.0, service, "water"]]
+				["Dungeon_Pot2", 0.9, service, "water"]]
+		if s.engawa and not trade_recipe:
+			# HS-MINKA-RESIDUE: no iron wall lantern, painted bench or barrel by the
+			# steps; a water pot and a wooden bucket by the kitchen wall.
+			recipe = [["Pot_1", 1.3, service, "water"], ["Bucket_Wooden_1", 1.0, service, "water"]]
 	for item in recipe:
 		var key: String = item[0]
 		var scale: float = item[1]

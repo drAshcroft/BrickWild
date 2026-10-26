@@ -179,6 +179,10 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	# no draw; the culture block above reads the same key for its own rows.
 	if spec.style == &"witch_hut":
 		spec.unglazed = bool(s.get("unglazed", false))
+	# HS-ROUNDHOUSE-RESIDUE: a round hut's small high windows are holes through
+	# the mud, not glazed timber casements. A style invariant, no draw.
+	if HouseRound.applies(spec, world_family):
+		spec.unglazed = true
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y

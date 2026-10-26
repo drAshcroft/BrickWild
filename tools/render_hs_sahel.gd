@@ -7,9 +7,8 @@ extends "res://tools/render_shots.gd"
 ##   _entry     eye level, three metres out: the pinnacles and the relief frame
 ##   _court     eye level inside the court, looking back at the house
 ##   _interior  eye level inside, looking through the rear door onto the court
-## The house is built UNFURNISHED (generate(..., false)): the furnisher has no
-## Sahel prop vocabulary yet, and a trestle table, torches and goblets would
-## contradict the culture shown. The rooms are shown bare.
+## The house is furnished in its own stock (CULTURE-FURNISH-VOCAB: low table and
+## stools, rope bed, banco shelves, jars, baskets, grinding stone, clay lamps).
 ## Output: artifacts/hs_sahel/renders/
 func _init() -> void:
 	_build_stage()
@@ -22,7 +21,7 @@ func _init() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out))
 	for seed_value in [1, 8102, 21325]:
 		var spec := HouseTraitMeasure.make_spec(&"african", 8.0, 10.0, 2.6, 1)
-		var plan: HousePlan = HouseGenerator.generate(spec, seed_value, false)
+		var plan: HousePlan = HouseGenerator.generate(spec, seed_value, true)
 		var building: Node3D = HouseAssembler.build(plan, false)
 		_root3d.add_child(building)
 		await process_frame

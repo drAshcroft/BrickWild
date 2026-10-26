@@ -8,11 +8,9 @@ extends "res://tools/render_shots.gd"
 ##   _interior  eye level just inside the door, looking across the central hearth
 ##              to the bed at the wall
 ##   _vent      eye level beside the fire, looking up the cone to the vent
-## Only the bed is left in the room. The furnisher has no culture vocabulary yet
-## (task CULTURE-FURNISH-VOCAB): its trestle table, stools, chests, torches and
-## goblets are European and are NOT shown as the roundhouse's. The bed is the one
-## piece the trait names, and the model is the generic Bed_Twin1. The fire's
-## stones, ash, logs and flames are the roundhouse's own.
+##   _hearthvent  low by the wall, wide, the fire and the apex vent in one frame
+## The room is fully furnished in the roundhouse's own stock (CULTURE-FURNISH-VOCAB:
+## a straw pallet on the floor, a plank chest, low table and stools, clay lamps).
 ## Output: artifacts/hs_roundhouse/renders/
 func _init() -> void:
 	_build_stage()
@@ -26,12 +24,8 @@ func _init() -> void:
 	for seed_value in [1, 8102, 21325]:
 		var spec := HouseTraitMeasure.make_spec(&"roundhouse", 8.0, 10.0, 2.6, 1)
 		var plan: HousePlan = HouseGenerator.generate(spec, seed_value, true)
-		# the bed only: nothing the furnisher chose from a European vocabulary
-		var kept: Array[Dictionary] = []
-		for f in plan.furniture:
-			if str(f.get("cat", "")) == "bed":
-				kept.append(f)
-		plan.furniture = kept
+		# fully furnished: the assembler shows the roundhouse's own stock
+		# (CULTURE-FURNISH-VOCAB), so nothing is filtered out any more
 		var building: Node3D = HouseAssembler.build(plan, false)
 		_root3d.add_child(building)
 		await process_frame
@@ -63,7 +57,8 @@ func _init() -> void:
 		# beyond (or beside) it
 		var bed_at := Vector2.ZERO
 		for f in plan.furniture:
-			bed_at = Rect2(f["rect"]).get_center()
+			if str(f.get("cat", "")) == "bed":
+				bed_at = Rect2(f["rect"]).get_center()
 		var inside := dp - n * 1.5
 		_cam.fov = 85.0
 		_cam.position = Vector3(inside.x, 1.55, inside.y)
@@ -79,6 +74,15 @@ func _init() -> void:
 		_cam.look_at(Vector3(0.0, 6.5, 0.0), Vector3.UP)
 		_set_shot_lighting(atan2(-n.x, -n.y), 8.0)
 		await _save_review_image(out.path_join("roundhouse_%d_vent.jpg" % seed_value))
+
+		# HS-ROUNDHOUSE-RESIDUE: the fire and the vent in one frame, from low by
+		# the wall, wide, aimed up the room's axis: the hearth is under the apex
+		var by_wall := -bed_at.normalized() * (HouseRound.apothem(plan.spec) - 0.7) 			if bed_at.length() > 0.1 else Vector2(2.8, 0.0)
+		_cam.fov = 100.0
+		_cam.position = Vector3(by_wall.x, 0.9, by_wall.y)
+		_cam.look_at(Vector3(0.0, 2.9, 0.0), Vector3.UP)
+		_set_shot_lighting(atan2(-n.x, -n.y), 8.0)
+		await _save_review_image(out.path_join("roundhouse_%d_hearthvent.jpg" % seed_value))
 		building.queue_free()
 		await process_frame
 	quit(0)
