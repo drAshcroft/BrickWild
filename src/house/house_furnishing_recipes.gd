@@ -470,7 +470,7 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 		return recipe
 	var parlour_is_sitting: bool = sitting_if_available and dines_elsewhere(plan, room)
 	if parlour_is_sitting:
-		recipe = _sitting_parlour_recipe()
+		recipe = _sitting_parlour_recipe(plan)
 	else:
 		recipe = recipe.duplicate(true)
 	# The merchant's townhouse office is a writing place, not a generic shop
@@ -647,8 +647,7 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 			{"cat": "bucket", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
 			{"cat": "cookware", "rule": &"on", "host_category": "workbench", "n": [1, 1], "opt": 1.0, "group": "cooking"},
 		]
-		if compact_shared_heat or uses_native_domestic_fireplace(plan) \
-				or bool(plan.domestic_layout.get("witch_alchemist_side_hall", false)):
+		if compact_shared_heat or uses_native_domestic_fireplace(plan):
 			# These Hall cooking contracts require a measured preparation vessel.
 			# The cookware catalogue also contains a metal bucket, which does not
 			# meet the authored pot role of the compact Alchemist household.
@@ -685,7 +684,7 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 			# A household has one meal table. Other parlours are sitting rooms;
 			# other halls and dining rooms keep their non-meal pieces only.
 			if kind == &"parlour":
-				return _sitting_parlour_recipe()
+				return _sitting_parlour_recipe(plan)
 			var without_second_meal: Array = []
 			for step in tagged:
 				if String(step.get("cat", "")) in ["table", "seat", "bench"]:
@@ -706,13 +705,28 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 	return tagged
 
 
-static func _sitting_parlour_recipe() -> Array:
+static func _sitting_parlour_recipe(plan: HousePlan = null) -> Array:
 	var out: Array = SITTING_PARLOUR.duplicate(true)
 	for step in out:
 		var category: String = String(step.get("cat", ""))
 		if category in ["bench", "sconce"]:
 			step["group"] = "sitting"
 			step["opt"] = 1.0
+		# HS-RICH: a style row with `sitting_group` seats its parlour as a group,
+		# two settles, not the single bench of a cottage's best room.
+		if category == "bench" and plan != null 				and bool(HouseSpec.STYLES.get(plan.spec.style, {}).get("sitting_group", false)):
+			step["n"] = [1, 1]
+	# A conversation group: a settle on one wall and two chairs facing it.
+	if plan != null and bool(HouseSpec.STYLES.get(plan.spec.style, {}).get("sitting_group", false)):
+		var group: Array = [
+			{"cat": "bench", "rule": &"wall", "n": [1, 1], "opt": 1.0, "settle": true, "group": "sitting"},
+			{"cat": "seat", "rule": &"beside", "near_cat": "bench", "key": "Chair_1", "n": [1, 1], "opt": 1.0, "group": "sitting"},
+			{"cat": "seat", "rule": &"wall", "key": "Chair_1", "n": [1, 1], "opt": 1.0, "group": "sitting"}]
+		var rest: Array = []
+		for step in out:
+			if String(step.get("cat", "")) != "bench":
+				rest.append(step)
+		return group + rest
 	return out
 
 

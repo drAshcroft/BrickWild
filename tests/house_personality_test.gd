@@ -23,6 +23,9 @@ var failures: Array[String] = []
 func _init() -> void:
 	for style in STYLES:
 		for scale in SCALES:
+			# WITCH-SIZE: a hut is small; it has no default or large case.
+			if style == &"witch_hut" and scale["name"] != "small":
+				continue
 			for seed in SEEDS:
 				_check_case({"style": style, "w": scale["w"], "l": scale["l"], "h": scale["h"],
 					"seed": seed, "scale": scale["name"], "signature": STYLES[style]})
@@ -67,9 +70,6 @@ func _check_case(row: Dictionary) -> void:
 			failures.append("%s kitchen does not touch the rear service wall" % who)
 	if row["style"] == &"longhall" and plan.domestic_layout.get("hall_role") != &"communal_hall":
 		failures.append("%s presents the communal hall as a small entry hall" % who)
-	if row["style"] == &"witch_hut" and row["scale"] == "large" \
-			and not plan.has_kind(&"records"):
-		failures.append("%s large witch hut has no records or dry herb storage activity" % who)
 	if row["scale"] == "large":
 		for bedroom in plan.rooms_of(&"bedroom"):
 			var bed_rect: Rect2 = plan.rooms[bedroom]["rect"]
@@ -81,7 +81,11 @@ func _check_case(row: Dictionary) -> void:
 func _check_tiling_and_shapes(plan: HousePlan, who: String) -> void:
 	var inner := HouseGeometry.interior_rect(plan.spec)
 	var area := 0.0
-	for i in range(plan.rooms.size()):
+	# HS-TOWNHOUSE: a townhouse is now two or three storeys (min_storeys 2), and
+	# upper storeys repeat the ground partition. The tiling contract is per
+	# storey, so judge the ground floor, not the sum of every floor.
+	var ground: Array = plan.rooms_on_storey(0)
+	for i in ground:
 		var rect: Rect2 = plan.rooms[i]["rect"]
 		area += rect.get_area()
 		if not inner.grow(0.02).encloses(rect):
@@ -90,7 +94,9 @@ func _check_tiling_and_shapes(plan: HousePlan, who: String) -> void:
 			failures.append("%s room %d is too small for %s" % [who, i, plan.kind_of(i)])
 		if HouseGeometry.room_aspect(plan, i) > HouseGeometry.aspect_max(plan.kind_of(i)):
 			failures.append("%s room %d is a corridor-shaped %s" % [who, i, plan.kind_of(i)])
-		for j in range(i + 1, plan.rooms.size()):
+		for j in ground:
+			if j <= i:
+				continue
 			var overlap: Rect2 = rect.intersection(plan.rooms[j]["rect"])
 			if overlap.size.x > 0.02 and overlap.size.y > 0.02:
 				failures.append("%s rooms %d and %d overlap" % [who, i, j])
@@ -102,7 +108,11 @@ func _check_tiling_and_shapes(plan: HousePlan, who: String) -> void:
 		return
 	var hall_rect: Rect2 = plan.rooms[hall[0]]["rect"]
 	var large_spine := plan.spec.width >= 12.0 and plan.spec.length >= 14.0
-	if large_spine:
+	if not plan.longhall.is_empty():
+		# HS-LONGHALL: the hall fills the whole depth between two end rooms.
+		if absf(hall_rect.size.y - inner.size.y) > 0.02 or hall_rect.size.x < inner.size.x * 0.45:
+			failures.append("%s longhall hall does not fill the depth between its end rooms" % who)
+	elif large_spine:
 		if absf(hall_rect.position.y - inner.position.y) > 0.02 \
 				or absf(hall_rect.size.y - inner.size.y) > 0.02 \
 				or hall_rect.size.x >= inner.size.x * 0.6:
@@ -387,7 +397,7 @@ func _check_negative_control() -> void:
 func _check_determinism() -> void:
 	for row in [
 		{"style": &"cottage", "w": 9.0, "l": 12.0, "h": 2.6, "seed": 8102},
-		{"style": &"witch_hut", "w": 17.0, "l": 18.0, "h": 2.8, "seed": 21325},
+		{"style": &"witch_hut", "w": 7.0, "l": 9.0, "h": 2.6, "seed": 21325},
 	]:
 		var a := HouseGenerator.generate(_spec(row), int(row["seed"]), false)
 		var b := HouseGenerator.generate(_spec(row), int(row["seed"]), false)

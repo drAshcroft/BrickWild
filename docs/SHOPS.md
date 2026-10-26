@@ -110,3 +110,82 @@ anvils, workbenches, tables, seats, shelves, food crates, storage, books, and
 banners, so the initial slice does not duplicate assets. There is no suitable
 horse model in the currently imported catalogue: stables therefore read
 through stall furniture, feed/tack storage, and clear working circulation.
+
+## LIVE-SHOPS review: four-point checklist (2026-10-24)
+
+Scope: the counter trades in `tests/fixtures/family_style_requests.json` (seed 8102, default envelope). Civic kinds are out of scope.
+
+Checklist: (1) a counter visible from the customer door; (2) wares of that trade on display; (3) a staff work station; (4) a storage room or store off the work area.
+
+Evidence: two renders per case by `tools/render_shop_trades.gd` (not headless): an exterior three-quarter view and an eye-level view (1.6 m, 80 degree fov, roof off) from the customer door looking along the inward door normal. Plan facts are in `artifacts/goal/LIVE-SHOPS/plan_facts.json`. The reviewer saw the images only, blind to the plan facts. The reviewer's NOs stand as recorded; none is softened.
+
+| kind | counter | wares | station | store | reviewer notes |
+|---|---|---|---|---|---|
+| apothecary | YES (canopied stall counter, red banner) | YES (shelves of small dark jars) | NO (no still or mortar bench seen) | UNCLEAR | market-stall shop; exterior generic half-timber |
+| alchemist_laboratory | NO (empty room) | NO | UNCLEAR (one cauldron at right edge) | UNCLEAR | mostly bare floor and wall; trade not readable |
+| bakery | YES | NO (apples, cauldron, empty cabinets; no bread) | NO (no oven or hearth) | UNCLEAR | reads as a generic grocer |
+| blacksmith | NO (door view faces a blank wall) | NO (empty shelf) | YES (anvil on stump) | UNCLEAR | strong station, no counter or goods |
+| butcher | YES | NO (no meat; empty cabinets) | NO (no cutting block) | UNCLEAR | trade not readable |
+| carpenter | NO | NO (empty shelf) | YES (long trestle workbench) | UNCLEAR |  |
+| general_store | YES | YES (barrels, carrot crates, shelves) | NO | UNCLEAR | best match |
+| tailor | YES | NO (no cloth, bolts or garments) | NO (no sewing table or loom) | UNCLEAR | reads as a general store |
+| tavern | YES (bar and stools) | YES (barrels, goblet) | NO (no hearth or kitchen visible) | UNCLEAR | reads as a tavern |
+| inn | YES | YES (mug, bottle, bar) | UNCLEAR (pots, no hearth) | UNCLEAR | near identical to restaurant and tavern; no beds visible |
+| restaurant | YES | UNCLEAR (drinks only) | UNCLEAR | UNCLEAR | indistinguishable from inn |
+
+### Images and plan facts per case
+
+**apothecary**: `artifacts/goal/LIVE-SHOPS/apothecary/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/apothecary/door_eye.jpg`
+
+- Plan: front=sales_floor; counter present=True, in line of sight=True; wares on front floor 12, in line of sight 2 (Cabinet, Shelf_Small_Bottles); stations: alchemy@sales_floor, alchemy@workshop, workbench@workshop; storage rooms: store, workshop
+
+**alchemist_laboratory**: `artifacts/goal/LIVE-SHOPS/alchemist_laboratory/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/alchemist_laboratory/door_eye.jpg`
+
+- Plan: front=laboratory; counter present=False, in line of sight=False; wares on front floor 6, in line of sight 0 (none); stations: alchemy@laboratory, hearth@laboratory, workbench@laboratory, workbench@office; storage rooms: office, store
+
+**bakery**: `artifacts/goal/LIVE-SHOPS/bakery/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/bakery/door_eye.jpg`
+
+- Plan: front=sales_floor; counter present=True, in line of sight=True; wares on front floor 12, in line of sight 2 (Cauldron, Shelf_Arch); stations: hearth@kitchen, hearth@sales_floor, workbench@kitchen, workbench@workshop; storage rooms: kitchen, store
+
+**blacksmith**: `artifacts/goal/LIVE-SHOPS/blacksmith/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/blacksmith/door_eye.jpg`
+
+- Plan: front=workshop; counter present=False, in line of sight=False; wares on front floor 4, in line of sight 2 (Anvil_Log, Shelf_Simple); stations: anvil@workshop, hearth@workshop, workbench@office; storage rooms: office, store
+
+**butcher**: `artifacts/goal/LIVE-SHOPS/butcher/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/butcher/door_eye.jpg`
+
+- Plan: front=sales_floor; counter present=True, in line of sight=True; wares on front floor 11, in line of sight 4 (Cabinet, Shelf_Arch, Shelf_Simple); stations: blade@sales_floor, blade@workshop, workbench@workshop; storage rooms: store, workshop
+
+**carpenter**: `artifacts/goal/LIVE-SHOPS/carpenter/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/carpenter/door_eye.jpg`
+
+- Plan: front=workshop; counter present=True, in line of sight=False; wares on front floor 6, in line of sight 2 (Bench, Torch_Metal); stations: bench@workshop, rack@workshop, workbench@workshop; storage rooms: sales_floor, store
+
+**general_store**: `artifacts/goal/LIVE-SHOPS/general_store/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/general_store/door_eye.jpg`
+
+- Plan: front=sales_floor; counter present=True, in line of sight=True; wares on front floor 12, in line of sight 3 (Barrel_Holder, FarmCrate_Carrot, Shelf_Small_Bottles); stations: workbench@office; storage rooms: office, store
+
+**tailor**: `artifacts/goal/LIVE-SHOPS/tailor/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/tailor/door_eye.jpg`
+
+- Plan: front=sales_floor; counter present=True, in line of sight=True; wares on front floor 12, in line of sight 5 (Cabinet, Crate_Wooden, Key_Metal, Shelf_Arch, Shelf_Simple); stations: rack@sales_floor, workbench@workshop; storage rooms: store, workshop
+
+**tavern**: `artifacts/goal/LIVE-SHOPS/tavern/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/tavern/door_eye.jpg`
+
+- Plan: front=dining_room; counter present=True, in line of sight=True; wares on front floor 9, in line of sight 4 (Barrel_Apples, Stool, Table_Large); stations: hearth@kitchen, workbench@kitchen, workbench@office; storage rooms: kitchen, office, store
+
+**inn**: `artifacts/goal/LIVE-SHOPS/inn/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/inn/door_eye.jpg`
+
+- Plan: front=dining_room; counter present=True, in line of sight=True; wares on front floor 9, in line of sight 4 (Bottle_1, Stool, Table_Large); stations: hearth@kitchen, workbench@kitchen; storage rooms: guest_room, kitchen, store
+
+**restaurant**: `artifacts/goal/LIVE-SHOPS/restaurant/exterior.jpg`, `artifacts/goal/LIVE-SHOPS/restaurant/door_eye.jpg`
+
+- Plan: front=dining_room; counter present=True, in line of sight=True; wares on front floor 9, in line of sight 4 (Bottle_1, Stool, Table_Large); stations: hearth@kitchen, workbench@kitchen, workbench@office; storage rooms: kitchen, office, store
+
+### Where plan and image disagree
+
+- The plan says every case has a work station and storage joined to a work room. The door view cannot show a back room, so every `store` is UNCLEAR from these views. The plan's store test is loose (any store, kitchen, office or workshop room holding storage-category props), so it does not prove a store either. See SHOP-STORE-VIEW.
+- Stations the reviewer could not see exist in back rooms (bakery hearth and workbench in the kitchen; butcher blade and workbench in the workshop; tailor workbench in the workshop; tavern, inn and restaurant hearth in the kitchen). The plan satisfies the station trait there; the images do not show it. The reviewer's NO stands as a miss of the visible evidence.
+- The plan lists wares on the front floor for every case, but the reviewer found none of the trade's goods in bakery, butcher and tailor: the props are generic (apples, empty cabinets). The plan's wares count is every non-seating prop, not trade-specific.
+- The bakery, butcher, tailor and apothecary counters are present and in line of sight in the plan, and the reviewer saw them. The alchemist_laboratory and blacksmith have no counter in the plan, and the carpenter's counter is out of line of sight: plan and reviewer agree.
+- Inn and restaurant read as the same room as the tavern; the plan has the same dining_room, bar and kitchen for all three. Beds sit in guest rooms the door view does not show.
+- general_store: the plan has a workbench only in the office, so the reviewer's NO on station matches the plan.
+
+Misses are filed as open tasks: SHOP-<KIND>-TRAITS for each kind with a NO, and SHOP-STORE-VIEW for the storage room that no view shows.

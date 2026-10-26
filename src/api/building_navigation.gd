@@ -198,6 +198,26 @@ static func _stairs(plan: HousePlan, meshes: Dictionary) -> Array:
 			"width_m": _n(float(stair.get("width", 0.0))),
 			"linked": lower_on.distance_to(lower) <= LINK_REACH and upper_on.distance_to(upper) <= LINK_REACH,
 		})
+	# HS-PUEBLO: a ladder to a terrace links the ground at its foot (outside the house on
+	# the ground storey) to the landing on the terrace, as a stair does two storeys
+	for ladder in plan.ladders:
+		var llo: int = int(ladder["storey"])
+		var lhi: int = int(ladder["to_storey"])
+		if not meshes.has(llo) or not meshes.has(lhi):
+			continue
+		var foot: Vector2 = Rect2(ladder["foot"]).get_center()
+		var top: Vector2 = Rect2(ladder["top"]).get_center()
+		var foot_on: Vector2 = NavBake.closest_point(meshes[llo], foot)
+		var top_on: Vector2 = NavBake.closest_point(meshes[lhi], top)
+		out.append({
+			"from_storey": llo,
+			"to_storey": lhi,
+			"lower_m": [_n(foot_on.x), _n(0.0 if llo == 0 else floor_y(plan, llo)), _n(foot_on.y)],
+			"upper_m": [_n(top_on.x), _n(floor_y(plan, lhi)), _n(top_on.y)],
+			"width_m": _n(HousePueblo.LADDER_W),
+			"ladder": true,
+			"linked": foot_on.distance_to(foot) <= LINK_REACH and top_on.distance_to(top) <= LINK_REACH,
+		})
 	return out
 
 

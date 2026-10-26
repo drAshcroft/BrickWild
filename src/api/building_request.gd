@@ -52,6 +52,25 @@ var upkeep: float = 1.0
 ## `ground_too_steep`; other kinds refuse any fall with `unsupported_option`.
 var ground_fall_m: float = 0.0
 var ground_downhill_deg: float = 0.0
+## What a house or shop stands on (VTER-FORM-WATER): `&""` the ground (the
+## default), or `&"piles"` -- posts through shallow water, a timber deck and a
+## landing at the entrance (HousePiles). With piles, local y = 0 is still the
+## floor's underside, and it is now the deck's top: the water's surface is
+## `pile_freeboard_m` below it (0: HousePiles.FREEBOARD_DEFAULT), the bed
+## `pile_water_m` below that (at most HousePiles.MAX_WATER_M, else refused with
+## `water_too_deep`), and the landing reaches `pile_deck_m` out from the
+## entrance wall (0: HousePiles.DECK_DEFAULT) -- in a village, to the boardwalk
+## the house fronts. Piles exclude a fall. All four are left out of to_dict()
+## at their defaults, so every request written before them is byte-identical.
+var foundation: StringName = &""
+var pile_water_m: float = 0.0
+var pile_freeboard_m: float = 0.0
+var pile_deck_m: float = 0.0
+## How crooked, 0..1 (HNT-040): every storey leans its own way and the walls
+## kink at the floors. Zero is the building as built, not one vertex moved.
+## Applied after the family has built, to the mesh and the scene alike, so it
+## works for every kind but a village; see CrookedWarp.
+var jank: float = 0.0
 var _decode_errors: Array[Dictionary] = []
 
 const SCHEMA := "brickwild.request"
@@ -77,7 +96,17 @@ func to_dict() -> Dictionary:
 		out["ground_fall_m"] = ground_fall_m
 	if ground_downhill_deg != 0.0:
 		out["ground_downhill_deg"] = ground_downhill_deg
+	if foundation != &"":
+		out["foundation"] = String(foundation)
+	if jank != 0.0:
+		out["jank"] = jank
+	for field in PILE_FIELDS:
+		if float(get(field)) != 0.0:
+			out[field] = float(get(field))
 	return out
+
+
+const PILE_FIELDS: Array[String] = ["pile_water_m", "pile_freeboard_m", "pile_deck_m"]
 
 
 func to_json() -> String:
@@ -102,14 +131,14 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 	var kinds: Variant = data.get("kind", "")
 	if kinds is String and StringName(kinds) in BuildingLibrary.kinds():
 		out = BuildingLibrary.defaults(StringName(kinds), 0) if out._decode_errors.is_empty() else out
-	for field in ["kind", "style", "purpose", "material", "water", "enclosure"]:
+	for field in ["kind", "style", "purpose", "material", "water", "enclosure", "foundation"]:
 		if not data.has(field):
 			continue
 		if not data[field] is String and not data[field] is StringName:
 			out._decode_errors.append(_field_error(field, "must be text"))
 		else:
 			out.set(field, StringName(data[field]))
-	for field in ["width", "length", "height", "storeys", "orientation", "period"]:
+	for field in ["width", "length", "height", "storeys", "orientation", "period", "jank"]:
 		if not data.has(field):
 			continue
 		var v: Variant = data[field]
@@ -124,7 +153,7 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 			out.compact_display = data["compact_display"]
 		else:
 			out._decode_errors.append(_field_error("compact_display", "must be a boolean"))
-	for field in ["decoration_level", "upkeep", "ground_fall_m", "ground_downhill_deg"]:
+	for field in ["decoration_level", "upkeep", "ground_fall_m", "ground_downhill_deg"] + PILE_FIELDS:
 		if not data.has(field):
 			continue
 		var value: Variant = data[field]
@@ -227,8 +256,13 @@ func copy() -> BuildingRequest:
 	out.upkeep = upkeep
 	out.ground_fall_m = ground_fall_m
 	out.ground_downhill_deg = ground_downhill_deg
+	out.foundation = foundation
+	out.pile_water_m = pile_water_m
+	out.pile_freeboard_m = pile_freeboard_m
+	out.pile_deck_m = pile_deck_m
 	out.orientation = orientation
 	out.period = period
+	out.jank = jank
 	out._decode_errors = _decode_errors.duplicate(true)
 	return out
 

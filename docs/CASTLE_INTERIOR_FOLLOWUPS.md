@@ -4,7 +4,15 @@ The original findings date from INT-007 on 2026-09-13. Plans now exist for
 ridge ranges, tower houses and motte keeps. Their existence did not establish
 complete castle occupancy: the independent inventory added on 2 October found
 whole missing interiors and windows above the rooms actually represented.
-The broad CASTLE-INTERIOR-FORMS task remains open.
+
+**CASTLE-INTERIOR-FORMS closed 23 October 2026.** The three forms in its
+title are planned and pinned (`castlechange`, `ctowerhouse`, `cmotteaccess`,
+`cmotteroute`); `lane:castle-change` passed 7 suites, 706 checks, 0 failures
+on `terrain-villages` c226f53. What is still red belongs to other forms and
+has its own task: `CASTLE-CURVED-CURTAIN-ROUTES`, `CASTLE-ELVEN-TOWERS`,
+`CASTLE-SKY-TOWERS`, `CASTLE-YARD-WINDOW` (see the 22 October inventory at
+the end). The scheduled castle sweeps and the roof-on/off renders were not
+run for the close; they are the pre-merge `lane:scheduled` gate.
 
 ## Status after the 6 October 2026 pass (CASTLE-INTERIOR-FORMS)
 
@@ -43,7 +51,7 @@ Found and fixed on the way (each one made a whole family read red):
 - `tower_door_sill`: a 5.7 m storey could not hold a 2.6 m door above a 4 m
   sill; the head went through the ceiling.
 
-Still open (this is why the task stays pending). `tools/castle_occupancy_sweep.gd`
+Open at the time (superseded by the 22 October inventory below). `tools/castle_occupancy_sweep.gd`
 reproduces every line below; the counts are from the canonical grid at the
 pass's last full sweep:
 
@@ -378,4 +386,9 @@ report `yard_general_store: planned window has no matching emitted aperture`;
 `japanese` fortress also reports the keep's 344 m2 parlour as sparse; `sky`
 fortress is clean at this index.
 
-Each class below is a chunk of CASTLE-INTERIOR-FORMS with its own acceptance.
+Each remaining class is now a standalone task with its own acceptance:
+class 3 is `CASTLE-CURVED-CURTAIN-ROUTES` and `CASTLE-ELVEN-TOWERS` (the
+elven `access_routes[gate_N]` lines are the same stranded curtain), class 4
+is `CASTLE-SKY-TOWERS`, and the yard store window and the bare Japanese
+parlour are `CASTLE-YARD-WINDOW`. Classes 1 and 2 are fixed
+(`CIF-STORE-FURNITURE`, `CASTLE-RECT-DOOR-THRESHOLDS`).

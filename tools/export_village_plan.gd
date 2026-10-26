@@ -704,6 +704,13 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		for p in plan.shoreline:
 			line.append([_n(p.x), _n(p.y)])
 		out["shoreline_m"] = line
+	if not plan.island.is_empty():
+		# an island village's island (VillageIslandForm); no other plan has one
+		var landings: Array = []
+		for p in (plan.island["landings"] as PackedVector2Array):
+			landings.append([_n(p.x), _n(p.y)])
+		out["island"] = {"area_m2": _n(float(plan.island["area_m2"])), "ring_scale": _n(float(plan.island["ring_scale"])),
+			"landings_m": landings}
 	return out
 
 
@@ -734,6 +741,13 @@ static func _add_ground(out: Dictionary, plan: VillagePlan) -> void:
 		out["lots"][i]["ground"] = _ground(t.under(plan.lots[i]["poly"]))
 		if plan.lots[i].has("ground_fit"):
 			out["lots"][i]["platform"] = _platform(plan.lots[i]["ground_fit"])
+		if plan.lots[i].has("piles"):
+			# on piles over the water (VTER-FORM-WATER): the deck, the water's
+			# depth, and the landing from the house to its boardwalk
+			var piles: Dictionary = plan.lots[i]["piles"]
+			out["lots"][i]["piles"] = {"deck_m": _n(float(piles["deck_m"])),
+				"water_m": _n(float(piles["water_m"])), "freeboard_m": _n(float(piles["freeboard_m"])),
+				"landing_m": _points(piles["landing"])}
 	for i in range(plan.buildings.size()):
 		var b: Dictionary = plan.buildings[i]
 		var corners: PackedVector2Array = Placement.world_rect(b["placement"], b["transform"], true)
@@ -749,6 +763,9 @@ static func _add_ground(out: Dictionary, plan: VillagePlan) -> void:
 			g["fall_m"] = _n(float(fit["fall_m"]))
 			g["downhill_deg"] = _n(float(fit["downhill_deg"]))
 			g["door_rise_m"] = _n(float(fit["door_rise_m"]))
+		if lot.has("piles"):
+			g["platform_m"] = _n(float(lot["piles"]["deck_m"]))
+			g["on_piles"] = true
 		out["buildings"][i]["ground"] = g
 	for w in range(plan.water.size()):
 		if bool(plan.water[w].get("ground", false)):
@@ -761,6 +778,8 @@ static func _add_ground(out: Dictionary, plan: VillagePlan) -> void:
 			at.append(_n(t.height_at(p)))
 		out["roads"][r]["ground"] = {"points_m": at, "length_m": _n(pr["length_m"]),
 			"rise_m": _n(pr["rise_m"]), "fall_m": _n(pr["fall_m"]), "grade_max": _n(pr["grade_max"])}
+		if VillageWaterForm.is_boardwalk(plan.roads[r]):
+			out["roads"][r]["boardwalk"] = {"deck_m": _n(float(plan.roads[r]["deck_m"]))}
 	for i in range(plan.commons.size()):
 		out["commons"][i]["ground"] = _ground(t.under(plan.commons[i]["poly"]))
 

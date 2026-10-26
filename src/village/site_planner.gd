@@ -42,7 +42,7 @@ const ROAD_CLASSES := {
 ## The forms this planner knows. Everything else is VIL-006 and later.
 const FORMS_SUPPORTED: Array[StringName] = [&"street", &"green", &"crossroads",
 	&"round", &"strand", &"planted", &"gate",
-	&"dispersed", &"shore", &"valley", &"crest", &"hillside"]
+	&"dispersed", &"shore", &"valley", &"crest", &"hillside", &"water"]
 
 const SITE_MIN_SIDE := 90.0     ## below this a 6 m road, a common and a landmark do not fit
 const SITE_MAX_SIDE := 400.0    ## §9.1 "not a city"
@@ -131,12 +131,16 @@ const JUNCTION_EPS := 0.5       ## two road vertices this close are the same jun
 ## grade, and every other road is graded and re-classed by what it climbs.
 ## Without terrain none of that runs and the plan is the flat plan exactly.
 static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
-		minimum_depth := 0.0, shore_depth := 0.0) -> VillagePlan:
+		minimum_depth := 0.0, shore_depth := 0.0, hill := {}) -> VillagePlan:
 	var ground: VillageTerrain = null
 	if sites_on_ground(spec):
 		# a shore village is turned to face its water (VTER-FORM-SHORE)
-		ground = (VillageShoreForm.site(spec) if spec.form == &"shore" else VillageSiting.site(spec))["ground"]
-	return _plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
+		# (an island village is turned along its island, VTER-ISLAND-FILL)
+		if spec.form == &"water" and VillageIslandForm.fits(spec):
+			ground = VillageIslandForm.site(spec)["ground"]
+		else:
+			ground = (VillageShoreForm.site(spec) if spec.form in [&"shore", &"water"] else VillageSiting.site(spec))["ground"]
+	return _plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground, hill)
 
 
 ## The form's layout with the ground ignored: what the siting scores.
@@ -152,7 +156,8 @@ static func sites_on_ground(spec: VillageSpec) -> bool:
 
 
 static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
-		minimum_depth: float, shore_depth: float, ground: VillageTerrain) -> VillagePlan:
+		minimum_depth: float, shore_depth: float, ground: VillageTerrain,
+		hill := {}) -> VillagePlan:
 	var out := VillagePlan.new(spec)
 	if spec == null or not spec.valid():
 		push_error("VillageSitePlanner: invalid spec")
@@ -167,12 +172,20 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 	if spec.form == &"valley" and not spec.compact_display:
 		return VillageValleyForm.plan(spec, extra_lanes, site_scale, minimum_depth, ground)
 	if spec.form == &"hillside" and not spec.compact_display:
-		return VillageHillsideForm.plan(spec, extra_lanes, site_scale, ground, minimum_depth)
+		return VillageHillsideForm.plan(spec, extra_lanes, site_scale, ground, minimum_depth, hill)
 	# `shore` follows the ground's own shoreline; with none to follow it is a
 	# straight strand, laid as one below
-	var form: StringName = &"strand" if spec.form == &"shore" else spec.form
+	# (`water` is the shore form with boardwalks and pile lots in the shallows,
+	# VTER-FORM-WATER)
+	var form: StringName = &"strand" if spec.form in [&"shore", &"water"] else spec.form
 	if form != spec.form and ground != null and not spec.compact_display and not is_nan(ground.water_level_m):
-		var shore_plan := VillageShoreForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
+		var shore_plan: VillagePlan
+		if spec.form == &"water" and VillageIslandForm.fits(spec):
+			shore_plan = VillageIslandForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
+		elif spec.form == &"water":
+			shore_plan = VillageWaterForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
+		else:
+			shore_plan = VillageShoreForm.plan(spec, extra_lanes, site_scale, minimum_depth, shore_depth, ground)
 		if not shore_plan.shoreline.is_empty():
 			return shore_plan
 	out.site = site_rect(spec)
@@ -223,6 +236,11 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 		out.site = Rect2(Vector2(out.site.position.x, out.site.position.y - STRAND_INLAND_GROW),
 			Vector2(out.site.size.x, out.site.size.y + STRAND_INLAND_GROW))
 
+	# on a steep hillside the site grows on its high side, for the church plot
+	# (VTER-PLACE-STEEP); the through road is already fixed, the field tracks
+	# and streets are laid to the grown edge
+	if ground != null and form == &"street":
+		_grow_high_side(out, ground)
 	# 2. the common and the form's characteristic road graph
 	match form:
 		&"green":
@@ -269,6 +287,45 @@ static func _plan(spec: VillageSpec, extra_lanes: int, site_scale: float,
 			out.water.append(water)
 	out.water_crossings = VillageWaterPlan.crossings(out.water, out.roads)
 	return out
+
+
+## On a hillside the church goes up (VTER-PLACE), and a church plot is a
+## deep one: its lot is the building and the churchyard behind it
+## (LANDMARK_AREA). A road laid along a steep contour can leave less than
+## that between itself and the site's high edge, so that the ground the church
+## wants is outside the site and it stands mid-village (Masouleh, Castelmezzano,
+## Positano, VTER-PLACE-STEEP). When the ground at one edge of the site stands
+## HIGH_SIDE_GRADE of the site's depth above the other, the site is grown on that
+## side once the through road is fixed (as a strand's inland edge is), so the
+## streets and tracks laid after it reach the grown edge and the lot planner
+## gets honest ground to terrace a church on.
+const HIGH_SIDE_GROW_M := 26.0
+const HIGH_SIDE_GRADE := 0.10       ## mean fall edge to edge, as a share of the site's depth
+
+
+static func _grow_high_side(out: VillagePlan, ground: VillageTerrain) -> void:
+	var site: Rect2 = out.site
+	if site.size.y + HIGH_SIDE_GROW_M > SITE_MAX_SIDE:
+		return
+	var north := 0.0
+	var south := 0.0
+	var n := 0
+	var x := site.position.x + SITE_MARGIN_M
+	while x < site.end.x - SITE_MARGIN_M:
+		north += ground.height_at(Vector2(x, site.position.y + SITE_MARGIN_M))
+		south += ground.height_at(Vector2(x, site.end.y - SITE_MARGIN_M))
+		n += 1
+		x += 5.0
+	if n == 0:
+		return
+	var rise: float = (north - south) / float(n)
+	if absf(rise) < HIGH_SIDE_GRADE * site.size.y:
+		return
+	if rise > 0.0:
+		out.site = Rect2(Vector2(site.position.x, site.position.y - HIGH_SIDE_GROW_M),
+			Vector2(site.size.x, site.size.y + HIGH_SIDE_GROW_M))
+	else:
+		out.site = Rect2(site.position, Vector2(site.size.x, site.size.y + HIGH_SIDE_GROW_M))
 
 
 ## Lanes the form did not lay, added in a fixed order so a plan asked for N
@@ -417,7 +474,7 @@ const ROUTE_BAND := 0.5
 ## needs its road at a fixed place beside its common (round, planted) routes
 ## through that place instead of shifting a routed road off its contour.
 static func _route_through(seed: PackedVector2Array, site: Rect2, ground: VillageTerrain,
-		pin := -1, pin_y := 0.0) -> PackedVector2Array:
+		pin := -1, pin_y := 0.0, band_m := -1.0, deviate_scale := 1.0) -> PackedVector2Array:
 	var half_road: float = float(ROAD_CLASSES[&"through"]["width"]) * 0.5 \
 		+ float(ROAD_CLASSES[&"through"]["verge"])
 	var lo: float = site.position.y + half_road + SITE_MARGIN_M
@@ -428,6 +485,8 @@ static func _route_through(seed: PackedVector2Array, site: Rect2, ground: Villag
 	# site's depth either side is a hillside's worth of contour, and the
 	# router's cost grows with the band
 	var band: float = maxf(15.0, ROUTE_BAND * site.size.y)
+	if band_m > 0.0:
+		band = band_m   # a terrace keeps to its own corridor (VillageHillsideForm)
 	var seed_lo := INF
 	var seed_hi := -INF
 	for p in seed:
@@ -447,7 +506,7 @@ static func _route_through(seed: PackedVector2Array, site: Rect2, ground: Villag
 		ys.append(clampf(p.y, lo, hi))
 	var h := func(along: float, across: float) -> float: return ground.height_at(Vector2(along, across))
 	var routed := VillageRoadRouter.route_across(h, xs, ys, lo, hi,
-		float(ROAD_CLASSES[&"through"]["grade_max"]), ground.water_level_m, pin, pin_y)
+		float(ROAD_CLASSES[&"through"]["grade_max"]), ground.water_level_m, pin, pin_y, deviate_scale)
 	var out := PackedVector2Array()
 	for i in range(seed.size()):
 		out.append(Vector2(xs[i], routed[i]))

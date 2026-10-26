@@ -103,6 +103,15 @@ func _rasterize() -> void:
 	_grids.clear()
 	for level in _levels():
 		var bounds := HouseGeometry.storey_rect(_plan, level)
+		# HS-PUEBLO: a terrace lies outside the storey above it, and the first
+		# ladder's foot outside the house
+		var extra := HousePueblo.walk_floor(_plan, level)
+		if not extra.is_empty():
+			if level >= int(_plan.spec.storeys):
+				bounds = extra[0]
+			for r in extra:
+				bounds = bounds.merge(r)
+			bounds = bounds.grow(0.2)
 		var grid := WalkGrid.new()
 		grid.setup(bounds, HouseGeometry.NAV_CELL)
 		_grids[level] = grid
@@ -118,6 +127,10 @@ func _rasterize() -> void:
 			_grids[level].add_floor_poly(_plan.outline_of(i))
 		else:
 			_grids[level].add_floor(HouseGeometry.room_floor_rect(_plan, i))
+	for level3 in _levels():
+		if _grids.has(level3):
+			for r in HousePueblo.walk_floor(_plan, level3):
+				_grids[level3].add_floor(r)
 	# A court is FLOOR. You walk out of the hall into the yard and across it to
 	# the kitchen door, and a walk that stopped at the threshold would report
 	# every range round a courtyard as unreachable (GEO-003).
@@ -202,6 +215,28 @@ func _flood_storeys(inside: Vector2, start_level := 0) -> void:
 			if not seeds.has(other):
 				seeds[other] = there.get_center()
 				pending.append(other)
+		# HS-PUEBLO: a ladder is walked both ways, from its foot to its head
+		for ladder in _plan.ladders:
+			var llo: int = int(ladder["storey"])
+			var lhi: int = int(ladder["to_storey"])
+			var lother := -999
+			var lhere: Rect2
+			var lthere: Rect2
+			if llo == level and _grids.has(lhi):
+				lother = lhi
+				lhere = Rect2(ladder["foot"])
+				lthere = Rect2(ladder["top"])
+			elif lhi == level and _grids.has(llo):
+				lother = llo
+				lhere = Rect2(ladder["top"])
+				lthere = Rect2(ladder["foot"])
+			else:
+				continue
+			if not grid.reached(lhere):
+				continue
+			if not seeds.has(lother):
+				seeds[lother] = lthere.get_center()
+				pending.append(lother)
 		if level == start_level:
 			_grid = grid
 	for level in _levels():

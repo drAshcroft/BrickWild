@@ -269,6 +269,7 @@ First row that holds wins:
 
 | # | the ground and the spec | form |
 |---|---|---|
+| 0 | an enclosed island within 320 m that the programme fills (`VillageIslandForm.fits_ground`: 0.7 to 4 times the ground the households need, a ring fits it; VTER-ISLAND-FILL, below) | water |
 | 1 | half the window is wet (`FORM_DROWNED` 0.5): the DEM drowns the site, it stands at the edge | shore |
 | 2 | ≥ 40 % of the ground within 450 m is wet (`FORM_WATER_ROUND`) | water |
 | 3 | the centre ≥ 9 m over its 30–150 m ring and over ≥ 75 % of the ground within 350 m | crest |
@@ -518,8 +519,8 @@ as flights, not ramps.
 * ~~**the real hillsides' contour share**~~ -- mostly done in
   VTER-FORM-HILLSIDE: the form's terraces are contour streets and its risers
   keep non-contour length in the denominator, so the 30 % plane reads 0.739
-  inside the steep sites' band. The real fixtures have not been measured yet
-  (see "The hillside form", Not yet);
+  inside the steep sites' band, and Manarola (0.737) and Masouleh (0.516)
+  since HILLS-FIXTURES (see "On the real hillsides");
 * ~~graded service lanes~~ -- done in VTER-LOTS: a steep one is not laid;
 * **a tavern near a gate on a stretched site** -- Èze and Hallstatt stretch
   to 270-315 m to house everyone, and the tavern's 60 m from a gate goes;
@@ -707,7 +708,7 @@ gradient measures each house from its own hamlet's common; a farm's edge is
 its hamlet's ground. Every other rule is unchanged, and each change is a
 no-op for a plan without hamlets.
 
-Suite `vdispersed` (161 checks, ~5 min, most of it measuring the 19
+Suite `vdispersed` (180 checks, ~5 min, most of it measuring the 19
 buildings once): 60 farming people on Ushguli (real30), the synthetic
 valley, the spur (which derives `crest`; forced) and Rubanda (world90,
 labelled dispersed, high confidence).
@@ -722,13 +723,17 @@ labelled dispersed, high confidence).
 Every hamlet's well is walked to from every gate; every road is within its
 class's grade. The survey's dispersed sites read body_share 0.2-0.6.
 
-Not yet: the spines run straight up the fall-line, where real hamlet links
-(Ushguli's valley road, Batad's terrace paths) wind along the contour; the
-site is 260-360 m where real hamlets lie two to four hundred metres apart; a
-hamlet earns no shrine of its own (the programme earns one landmark); the
-tavern and the smithy keep their §6 addresses at the gates and often stand
-alone on the road; an enclosed dispersed village gets one enclosure round
-everything.
+**Second pass (VTER-DISPERSED-2).** The site is 320-400 m (230 m + 40 m per hamlet) and hamlet seats are 160 m apart
+(nearest neighbour measured 160-169 m on Ushguli, valley, spur and Rubanda; suite bound 150-400). The main hamlet's ring joins the through road with at least 9 m of street (else two junctions fall under 8 m); a hamlet's common stands where its whole 90 m ground is inside the site. The site base is tuned: 220/240/250 each broke a QA rule on one fixture (steps link, junction, church rank), 230 passes all four.
+Each other hamlet is joined by `_link_hamlet`: `VillageRoadRouter.route_across` (new `pin_last`
+pins both ends) in the frame of the line from a foot on the through road to the seat, at the
+track's 30 % cap, trying feet every 20 m within 200 m of the seat's x and keeping the shortest
+checked track (measured grade to 30 %). Only when no foot gives one does the old straight
+fall-line spine (steps where steep) remain. A link may pass no seat within 45 m. Fields follow
+a winding track's local direction. The suite checks spacing and that each hamlet's spine is a
+routed `track`.
+Not yet: a hamlet earns no shrine of its own; the tavern and the smithy keep their §6
+addresses at the gates; an enclosed dispersed village gets one enclosure round everything.
 
 ## A building on falling ground (VTER-HOUSE-SLOPE)
 
@@ -809,6 +814,48 @@ village should turn such lots so the front faces uphill or across the slope.
 
 Suite: `hslope` (house, shop, church at 0 / 1.0 / 2.5 / 4.0 m, sideways and
 front-to-back). Pictures: `godot --path . --script res://tools/render_slopes.gd`.
+
+### On piles over water (VTER-FORM-WATER)
+
+The second foundation the request contract takes, beside a fall.
+`BuildingRequest.foundation` is `&""` (the ground; the default) or `&"piles"`,
+for a house or a shop (`src/house/house_piles.gd`, `HousePiles`). Three more
+fields, each 0 by default and left out of `to_dict()` then, so every request
+written before them reads and writes byte for byte the same:
+
+| field | meaning | default / range |
+|---|---|---|
+| `pile_water_m` | the water's depth under the house, surface to bed | 0 - `MAX_WATER_M` 4.0 m; deeper is REFUSED (`water_too_deep`) |
+| `pile_freeboard_m` | the floor's height over the water | 0 = 1.2 m; else 0.4 - 3.0 m |
+| `pile_deck_m` | how far the landing reaches out from the entrance wall's outer face | 0 = 1.5 m; at most 8 m |
+
+The floor never moves, as on a fall: local y = 0 is still the floor's
+underside, and it is now the top of a timber deck. The water's surface is at
+-freeboard, the bed at -freeboard - water, every post's foot 0.6 m into the
+bed. Under and round the house, host `piles`: `pile_deck` (disjoint
+rectangles, top at y = 0: the footprint grown by a 1 m GALLERY all round, the
+LANDING beyond it at the entrance, and whatever of the chimney's foot neither
+covers), `pile_bearer` (a beam per row of posts), `pile` (a grid no wider
+than 2.2 m) and `pile_ladder` (from the landing's edge down to the water,
+where a canoe ties up). A house on piles plans NO YARD (`HouseYard.applies`):
+there is no ground round it; its facade pieces stand on the gallery.
+`exterior_bounds` holds the platform and reaches down to the posts' feet.
+Refused, with their codes: piles under anything but a house or a shop
+(`unsupported_option`), piles on a fall (`unsupported_option`), an unknown
+foundation and a negative depth (`invalid_ground`), pile fields without
+piles (`unsupported_option`).
+
+Suite `hpiles` (218 checks, 76 s host): the contract and its refusals; `""`
+is vertex-identical to no field; the house on the ground is a subset of the
+pile house, triangle for triangle (the same plan built with the foundation
+switched off); every post runs from the bearers to 0.6 m under the bed;
+nothing of the platform stands above the floor; the deck is at y = 0 outside
+the door and the landing reaches `pile_deck_m`; every point of the deck is
+within a pile spacing of a post; no yard, every grounded facade piece on the
+deck; ComponentCheck; every vertex inside the bound; the plan's own nav check.
+House and shop, water 0.5 / 2.0 / 4.0 m, default and 2.0 m freeboard with a
+3.0 m landing. The five long-standing styles' fingerprint
+(`tools/fingerprint_houses.gd`) is identical before and after.
 
 ## The ground mesh (VTER-GROUND-MESH)
 
@@ -1061,17 +1108,53 @@ church stands beyond 40 m of the body's hull (a planted grid's slot is
 behind the far street; a dispersed body is one hamlet). That is the survey's
 definition holding, not a missing church; PlaceCheck's rank reads them.
 
+### The church on very steep ground (VTER-PLACE-STEEP)
+
+Castelmezzano, Masouleh and Positano (street form, 90 m site) stood at
+0.25 / 0.33 / 0.33. Measured causes, in the order they bit:
+
+1. **The site had no room on the high side.** The through road runs along a
+   contour and left 20 m between itself and the site's high edge; a church
+   plot is 30 m deep, so every high frontage failed `_inside_site`. A street
+   village on ground that falls more than `HIGH_SIDE_GRADE` (10 %) of the
+   site's depth edge to edge is grown `HIGH_SIDE_GROW_M` (26 m) on its high
+   side (`VillageSitePlanner._grow_high_side`), once the through road is
+   fixed and before the form lays its streets and tracks (grown afterwards,
+   tracks dead-end at the old edge: vtplan `dead_ends`). Manarola (6.7 m across 90 m) and
+   Ushguli (7.1 m) stay as they were; a grow at a 3 m threshold dropped
+   Manarola's church from 0.75 to 0.5.
+2. **A church is not a house plot.** Its lot is `terraced` (the cliff test
+   gives way to the ground fit and `CHURCH_MAX_FALL`), but its mean slope
+   stays within a footpath's 60 % (`edge_ground`); the high-ground search
+   admits ground to `LANDMARK_PLOT_MAX` (60 %) not 35 %.
+3. **Fronting the common is worth a share of the relief, not a hillside**
+   (`LANDMARK_NEAR_COST_SHARE`, 0.4 of the house rows' relief): the
+   near-common bump was taken whenever it beat the median, which on
+   Castelmezzano was a 721 m knoll under a 736 m slope. A fixed 4 m moved
+   Hallstatt thorn-hamlet's church off its common (vtplan).
+4. **Stair streets are where the houses will stand**: `steps` joins the row
+   classes the slot is ranked against (Positano's slot read as high until
+   its stairs were counted).
+
+The hillside form keeps the search as it was (35 % plots, no stair rows, no
+terraced flag, the near-common rule unchanged): it has its own church
+terrace, and vhillside's Manarola failed otherwise.
+
+Street church rank (survey / PlaceCheck), before -> after: Castelmezzano
+0.25 -> 0.80 / 0.80, Masouleh 0.33 -> 0.78 / 0.78, Positano 0.33 -> 0.40 /
+0.44. All twelve real street villages are inside the world IQR 0.380-0.950.
+Ushguli's derived dispersed church (0.14, span 7 m) is VTER-DISPERSED-2's,
+not this ticket's: it reads the same at the commit before.
+
 ### Not yet
 
-* **the dispersed form's main hamlet** -- Monemvasia's main common lies on
-  48 % and its church low; Hallstatt's church sits below a spur among its
-  hamlet's houses. The main hamlet is seated where the through road's flank
-  is gentlest (VTER-FORM-DISPERSED), not on the hamlet's high or level
-  ground; these two derived plans fail `landmark_ground` (and Monemvasia
-  `common_ground`) in the sweep, though no suite fixture does;
-* **the church on the steepest hillsides** -- Masouleh, Castelmezzano and
-  Positano: the high ground is too steep for a church's 6 m terrace; a
-  hillside form with a terraced church plot (VTER-FORM-HILLSIDE) is the fix;
+* **the dispersed form's main hamlet** -- Monemvasia's main common still
+  lies on 50 % (`common_ground`; Hallstatt's church now passes, its hamlet's
+  span being under 3 m). `_main_x` scores every through-road vertex between
+  0.1 and 0.9 of the site at 0.6 or worse (sea and cliff north of the road
+  in this yaw), so a wider window does not help; the lever is the siting yaw
+  or the side of the road: VTER-DISPERSED-MAIN-SEAT;
+* ~~**the church on the steepest hillsides**~~ -- VTER-PLACE-STEEP, below;
 * **the mill at the valley floor** -- the race is graded and the rule
   checks the mill is low, but a `river` spec's water is still laid where the
   flat village lays it, not along the ground's drainage, so the mill is low
@@ -1079,7 +1162,7 @@ definition holding, not a missing church; PlaceCheck's rank reads them.
 * **the waterfront share** -- `WORLD_WATERFRONT_IQR` is read and checked by
   `vworld` but no planner aims at it yet (VTER-FORM-SHORE);
 * **woods** are the dresser's few far-side trees; a wooded steep slope as a
-  plan polygon is not made;
+  plan polygon is not made (VTER-WOOD-POLYGON, with the waterfront share);
 * **a crest village** -- the rank rule wants the church at or above the
   median where a crest or spur is among the houses; the compact ring on the
   summit with the church highest is VTER-FORM-CREST's.
@@ -1180,7 +1263,7 @@ identical).
 | ways up | `_lanes`: 3-6 (+ half the retry's extra lanes), 40 m apart, off the hill side of the road, square to it, leaning along the valley (never under 35 degrees to the road, the junction rule) as far as the grade needs: a `lane` (12 %, 36 m) where possible, else a `track` (30 %) to the site's edge, else steps |
 | households | `assign_jobs` (lot planner hook): houses, cottages and farms each get a slot, four round the common (its two ends on the hill side, two across the road), the rest evenly along the road, sides alternating; each is cut the lot nearest its slot. Left alone the lot planner fills outward from the common into a blob |
 
-Suite `vvalley` (452 checks, ~4 min, 106 s of it measuring the 19 buildings
+Suite `vvalley` (606 checks with Ushguli, ~4 min, 106 s of it measuring the 19 buildings
 once; `VALLEY_CASE=<fixture>` runs one, `VALLEY_DUMP=1` prints buildings and
 roads): a farming village of 60 on a river. Checks: the ground derives
 valley and plans as itself; the river is plan water, no road in it, no
@@ -1195,7 +1278,8 @@ the road, every road within its class's grade; **elongation over 3** and
 |---|---|---|---|---|---|---|
 | river_valley | 297x139 | 19/19 | 5.93 | 0.600 | 0 % / - / 29 % | ok |
 | valley | 297x139 | 19/19 | 6.50 | 0.600 | 0 % / - / 29 % | ok |
-| Gangotri (world90) | 400x139 | 19/19 | 6.14 | 0.583 | 11 % / 12 % / 29 % | ok |
+| Gangotri (world90) | 297x139 | 19/19 | 5.13 | 0.625 | 5 % / 7 % / - (steps 50 %) | ok |
+| Ushguli (real30) | 386x139 | 19/19 | 3.20 | 0.600 | 10 % / 10 % / 27 % | ok |
 
 After VTER-PLACE and VTER-FORM-SHORE merged (the church goes to the high ground
 near the common; the mill's race may fall 1.5 m) the suite was re-fitted: the
@@ -1218,14 +1302,27 @@ Not yet:
   along the frame, over a cart's 12 % (the same missing switchbacks as above);
   where the river bends out of the straight frame the road leaves it (Lugar
   de Guene: 20-219 m, median 33);
-* **the common's fronting on steep sides** -- world90/vermont (57 %),
-  real30/ushguli (23 %), world90/lake_argyle (40 %; elongation 2.14),
-  world90/lugar_de_guene (43 %; elongation 1.39, a bent river): the church goes
-  to the high ground (VTER-PLACE) and the neighbours the slots ask for beside
-  the common do not stand on that ground. A common on the river side of the
-  road (a green on the bank, the church across the road) is the likely fix;
-* **a 90 m grid with no floor in it** -- world90/balan houses 16 of 19 on a
-  uniform 13 % hillside; its siting falls back to the standard score;
+* **the common's fronting on steep sides** -- fixed for Ushguli (20 % -> 73 %,
+  VTER-VALLEY-REAL): the common's x was the gentlest ground *behind* it only
+  (the dispersed form's `_main_x`); `_common_x` also reads the road's frontage
+  on both sides of it, 30 m either way, so its neighbours have ground. world90/
+  vermont (57 %) and world90/lugar_de_guene (a bent river, elongation 1.39) have
+  not been re-measured;
+* **a 90 m grid with no floor in it** -- world90/balan (hand label *valley*:
+  the derivation is right, the planner is not) housed 16 of 19. The river is not
+  seen, so the road was routed by grade in the street form's half-depth band and
+  stood 26 m off the site's middle; the farm rule (a farm within 40 % of the
+  depth of the site's edge) found no ground on either side. `_route` now keeps
+  the unseen-river road to a 14 m band with four times the dislike of leaving
+  its seed: 19/19 housed, common 73 %. It stays out of `CASES`: the survey's
+  main body (45 m links) is 8 of 19, elongation 2.5, filed as VTER-VALLEY-THIN;
+* **Lake Argyle** (hand label *dispersed*) derives valley with a river forced
+  into the spec: the hill row is 30-55 %, the bank row a river strip, one
+  76 m stretch has no legal lot and the body splits (elongation 2.7-2.9).
+  **Rocamadour** (label *hillside*) is the gorge above. A `level_share`
+  floor on the valley row (Balan 0.06, Gangotri 0.10, Argyle 0.17) cannot tell
+  them from the valley-labelled Haldenstein (0.30) and Batad (hillside, 0.07);
+  `vworld` now notes which sites derive valley with their label and water;
 * the road is often straight on a flat floor (the router prefers it);
 * lots on the river side exist only where the bank row is 14 m or more;
 * a lake spec with no lake in the site gets a river ribbon.
@@ -1423,12 +1520,121 @@ holds these four bands against the form, checks all three terraces are
 streets with a house fronting each, the two risers and four cross-lanes, and
 that every household is housed.
 
+### On the real hillsides (HILLS-FIXTURES)
+
+The same form, 50 people, seed 4242, forced to `hillside` on `real30/manarola`
+and `real30/masouleh` (Manarola derives `shore`, Masouleh `hillside`). What
+the plane did not need, the real ground did:
+
+| Change | Why |
+|---|---|
+| siting scores a SLOPE (`VillageSiting` `hill` term, hillside only): the 40th percentile of the lattice's cross-site fall against 22 % | the standard score takes the flattest ground, and Manarola was sited on a 5 % shelf (span 3.8 m) |
+| the through road and the terraces are LEVEL lines (`_level`: the router's DP over the ground's height measured from the seed's, the seed column pinned) | routed at the cart's 12 % and re-routed per terrace, the three ran together onto one least-grade line on a curved face and crossed each other |
+| terrace pitch grows on gentle ground (`TERRACE_RISE_M` 6 m, 30-44 m) and the site deepens with it | Manarola's body slope is 14 %: 30 m gave a 9 m span |
+| risers: the pair of tops (`pick_pair`) and each lean (`pick_lean`) are chosen so the riser really is a street on THIS ground; where the face is steeper than the plane's the pair lean the SAME way (parallel) and the site widens by the drift | a street must end on a street: one riser that is stairs re-classes every terrace to a footpath (`grade_roads`), and the contour share is then measured on the through road alone (1.0) |
+| field tracks: on given ground each spot takes the least lean, either side, whose track really is one (`_field_tracks`), and four more leave the through road UPHILL | on 35-45 % ground a street that climbs at 30 % is 40-50 degrees off the contour, the only non-contour street the metric can see |
+| the common stands on the flattest part of the road's middle 80 % | the place check wants it no steeper than the median lot |
+| households per level 3:2:2:5, staggered from the lowest level up (`LEVEL_WEIGHTS`) | measured: the split that keeps span, elongation and contour share in band on the plane AND both fixtures; equal shares failed one or the other |
+
+| Measure | plane_30 | Manarola | Masouleh | Rocamadour | Steep sites p10-p90 |
+|---|---|---|---|---|---|
+| street_contour_share | 0.611 | **0.766** | **0.794** | **0.616** | 0.389-0.798 |
+| elevation span, m | 27.6 | **18.9** | **22.8** | **27.0** | 14.4-73.0 |
+| steps ways | 4 | **6** | **6** | **6** | 0-46.5 |
+| elongation | 1.42 | **1.67** | **1.56** | **1.61** | 1.32-4.88 |
+| households unhoused | 0 | 0 | 0 | 0 | -- |
+| profile | plain | plain, gate 48 m | shallow | plain | -- |
+
+Suite `vhillside` (148 checks; 11.5 min loaded host, Manarola, Masouleh and
+Rocamadour at 190, 160 and 100 s) holds the four bands, the housing, the grade
+caps, the road check and VillageQA on the plane and the three real faces.
+Masouleh's contour share (0.794 against 0.798) and the plane's elongation (1.42
+against 1.32) have little margin.
+
 ### Not yet
 
-* **the real hillsides** -- the form has not been measured on Masouleh,
-  Castelmezzano or the world90 sites yet; on their 40-60 % ground the risers
-  and terraces will pass to `steps` through `grade_roads`, and the terraces
-  may then lose their frontage (the crest's ring has the same open item);
+* ~~**the real hillsides' own QA**~~ -- done in HILLS-QA: the road check AND
+  VillageQA pass on Manarola and Masouleh, gated in `vhillside` (119 checks).
+  What it took, structural first:
+  * a riser's meeting with a terrace is solved, not iterated (`_riser_x`: the
+    fixed-point iteration did not converge where a level line runs steeply
+    across the riser); `pick_lean` requires the riser to cross the through
+    road and every terrace at 35 degrees or more to the line's TANGENT, either
+    hand allowed (`pick_pair` returns each riser's hand); with no pair of
+    street risers the risers are stairs placed square to the lines;
+  * the level lines are eased and cross-lanes stand on existing vertices
+    (`_ease`, `_repair_bends`); the tavern is sited by either gate on given
+    ground (the table's `side: west` left Masouleh's tavern unplaced);
+  * the through road's cap now has teeth. `grade_roads` has always skipped road
+    0 on purpose (a village's one through road is never re-classed; the router
+    and the lot planner's `_through_over_cap` held it to a cart's 12 %), so
+    nothing reported Manarola's 24 % level road. `VillageRoadCheck`
+    `through_grade` fails an over-cap through road unless the plan marks it
+    `stepped`: a stair street, which the hillside form sets where its level
+    line still climbs past 12 % (the face is too steep for any cart; the real
+    Manarola's main street is stairs). The number is unchanged. HILLS-GENERAL
+    builds it as the stair street it is: `VillageGroundSurface` gives the bed of
+    a `steps` road OR a `stepped` one its treads, so the builder dresses them
+    (`stair_tread`, host `road<i>`), `VillageGroundCheck._stairs` holds them and
+    `VillageWalk3D` bakes them (`vstepswalk`, `_stepped_case`, Masouleh as a
+    hillside, asserts the `stepped` road has treads and stair stones and walks it). No
+    switchback is laid; the suite holds a control (the same plan without the flag
+    fails `through_grade`);
+  * the tavern and a gate: the doc's gate is where a road crosses the
+    settlement's edge, and an unenclosed hillside's edge is the site rectangle,
+    stretched along the contour. Taking the gate to the built edge was tried and
+    does not help Manarola: houses stand 80 m either side of its only tavern
+    ground. What works is cutting the site (see HILLS-GENERAL below).
+* ~~**the fixture-fitted constants**~~ -- HILLS-GENERAL. HILLS-QA passed on
+  Manarola and Masouleh with four numbers fitted to those two faces (level weights
+  [5,2,2,3] and a 148 m site on a face over 0.325, the through road's homes beside
+  the common over 0.31, `TAVERN_GATE_M` 43, the only one of 40..52 that passed).
+  They are replaced by rules; each rule, and what was tried and did not hold:
+
+  | was | now | derivation |
+  |---|---|---|
+  | `TAVERN_GATE_M` = 43 | a ladder: from `TAVERN_NEAR_M` (56 m, the place check's reach less a lot) down in `GATE_STEP_M` (4 m) to `GATE_MIN_M` (28 m), the site cut to that gate distance from the tavern; the plan with the least `_faults`, the first with none | a gate nearer than a lot and its yard is no gate by the tavern; the plan decides, not a number. Manarola: 48 m (52 m leaves its contour share at 0.87) |
+  | homes beside the common over slope 0.31 | when `VillagePlaceCheck.fronted_share` of the plain plan is under the floor (60 %, hamlet 55 %), the lot planner plans again with the through road's homes at the common's short edges (`HILL_PROFILES`, `around_common`); at `common_wants_homes` false nothing changes | what the place check asks of the common is what decides it; Manarola needs none now |
+  | 148 m site over slope 0.325 | the SHALLOW profile: `DEPTH_MIN_M` less `LOT_ROW_M` (164 - 16 = 148): one row of lots less below the lowest terrace | the plane keeps two rows of lots below its lowest terrace (32 m); ground that refuses most of a row (Masouleh's 12 % buildable under the lowest terrace) keeps one |
+  | level weights [5,2,2,3] over 0.325 | `LEVEL_WEIGHTS_SHALLOW`, with the shallow profile | the lowest terrace has one row where it had two: 5 -> 3 homes, the two terraces between take the two |
+  | the slope thresholds 0.31 and 0.325 | the profiles are tried in `HILL_PROFILES` order (plain, around, around + shallow, shallow) and the plan with the fewest `_faults` is kept (VillageQA faults at 100, the steep sites' bands `BAND_*` missed at 1) | the band slopes the form reads IN the plan, on the sited ground, are 0.319 (Manarola) and 0.330 (Masouleh): 0.011 apart, and they want different profiles. No smooth rule of slope separates them |
+
+  What was tried and did not hold, so the next hand does not: homes in
+  proportion to the metres a home can stand on (plane and Manarola pass, Masouleh
+  has a 12.9 m span against a 14.4 floor); sliding the whole band along the fall
+  line to the row with most buildable metres (`pick_row`; it chose the site's far
+  edge and squeezed the lowest terrace); whole lot rows below the lowest terrace
+  by the fall they stand on (Manarola 1.88 rows, Masouleh 1.82: floor or round
+  gives them the same, and Manarola fails at 148 m); the ground under each row
+  (Manarola .44/.22/.10 buildable, Masouleh .12/.30/.48: no pattern). The two
+  profiles are still two named constant sets; what is measured is which one a
+  site gets.
+
+  The third steep real site: **Rocamadour** (real30, band slope 0.422), in `vhillside`
+  with Manarola and Masouleh: VillageQA clean, the four bands (contour 0.616,
+  span 27.0 m, elongation 1.61, 6 steps), 12/12 housed, the plain profile, no
+  cut. It failed the road check at first on a junction the form made: a field
+  track off the through road 0.6 m from where the common's path joins it (and
+  18 degrees to it). `TRACK_CLEAR_M` keeps a track a junction-apart (8 m) from
+  that join. Sites that do NOT yet pass, planned as hillsides by
+  `tools/hills_probe.gd`: **Monemvasia** (real30, 0.254): the common fronted
+  50 % (60 % wanted) and on 46 % ground against lots at 31 %; **Positano** and
+  **Castelmezzano** (0.534, 0.428): no smithy (every lot on the through road is
+  refused, a fall of 3 to 4.5 m against the 2.6 m a house stands on), density 3 to
+  4 %, a 15 degree junction; **Eze**: density 3.8 %, a 400 m site; **Hallstatt**:
+  no smithy or tavern. Filed as HILLS-STEEP.
+
+  The hillside on the 3D walk: the `stepped` through road is walked end to end
+  (`vstepswalk`, `_stepped_case`: Masouleh, a path from gate 0 to gate 1 that
+  climbs the bed's rise, treads and stair stones named). The rest of a hillside
+  on the walk is not there yet: planned and built on Manarola, Masouleh or
+  Rocamadour, 4 to 14 of its 16 doors are off the gates' island, and the cross-lanes
+  (`steps`, laid straight down the fall line) are steeper than a stair can be
+  (going 0.20 to 0.25 m against the check's 0.28 m: a stair of 0.15 m risers
+  tops out at a 54 % grade, the class allows 100 %). Without the treads on the
+  through road the same plan also had a navigation vertex 0.33 m off the ground.
+  Filed as HILLS-STAIRS (cross-lanes at a stair's grade, which is the switchback
+  question in small).
 * **switchbacks** -- the router is monotone along the contour, so a hairpin
   up a spur is still not laid;
 * **terraces from the ground** -- the terrace lines are offsets of the
@@ -1447,7 +1653,7 @@ branch (`street-none-none mesh=e5da7c34d26d909e`, ...).
 
 | Piece | Where |
 |---|---|
-| stair street treads | `VillageGroundSurface.treads_of` (pure, static), `road_bed(i)["treads"]`, `_tread_regions`; `bed_at` is stepped on a `steps` road |
+| stair street treads | `VillageGroundSurface.treads_of` (pure, static), `road_bed(i)["treads"]`, `_tread_regions`; `bed_at` is stepped on a `steps` road or a hillside's `stepped` through road |
 | stair stone | `VillageBuilder._stairs`: `stair_tread`, `stair_riser` (host `road<i>`, `lot<i>_steps`), `stair_cheek` |
 | a lot's way in | `src/village/village_access_steps.gd`, `VillageAccessSteps.plan` (from `VillageLotPlanner.plan_measured`, before the dresser) -> `lots[i].ground_fit.access` |
 | a house's flights in the plan | `lots[i].ground_fit.entry_flights` (`VillageAccessSteps.entry_flights`, from `HouseSlope.flights` kept by `VillageLotGround._house_parts` as `flight_rows`) |
@@ -1576,7 +1782,7 @@ hold and every tread of an access flight is in the MESH at its level (5 cm),
 no riser over 0.18 m, no inner stair-street tread under 0.28 m, and each has
 its `stair_tread` component.
 
-`vstepswalk` (84 checks, ~5.5 min loaded): 50 people, seed 4242, the green form
+`vstepswalk` (91 checks since HILLS-GENERAL, ~14 min loaded, 8 min of it the hillside's plan; 84 checks and ~5.5 min before): 50 people, seed 4242, the green form
 (the one with stair streets on both), on Manarola and Positano (real30). The
 ground and its components (`ComponentCheck`) and the whole `VillageGroundCheck`;
 the walk read back out of JSON; one island; NavigationServer3D paths from the
@@ -1637,3 +1843,189 @@ landing (below).
 * **cost** -- the walk export bakes and builds the village (11-15 s); the
   exporter does both once per SitePlan;
 * **the castle walk export** -- unchanged (`CastleWalkSources`, above).
+
+
+## The water form (VTER-FORM-WATER)
+
+Rows 2 and 9 of the form rule, given their planner:
+`src/village/forms/water_form.gd`, `VillageWaterForm`, reached from
+`VillageSitePlanner._plan` by one dispatch beside the shore form's (and from
+`plan()` for the siting, which is the shore form's own); `water` is in
+`FORMS_SUPPORTED` and out of `FORM_FALLBACK`. Ganvié on Lake Nokoué (the world
+set's `over_water_share` 0.542), Kampong Ayer on the Brunei river (1.0): houses
+on piles, joined by boardwalks, reached from a street on the bank. Without
+terrain the form is never derived, so nothing flat changes (`thorn-hamlet` and
+`veld-070` exported before and after, `cmp` identical; the seven flat villages
+of `tools/fingerprint_village_ground.gd` and the house fingerprint identical).
+
+| Step | What |
+|---|---|
+| siting, shoreline, shore street, common, landmark | the shore form's, unchanged (`VillageShoreForm.plan`) |
+| piers | `_piers`: boardwalks square off the shore street on the shoreline's own columns, `PIER_SPACING` 40 m apart, nearest the common first, clear of the common (6 m) and of the street's other junctions (14 m) and 22 m inside the site's ends; one per 6 households, at least two (`piers_for`). Each runs out beyond the shoreline as far as a row of pile lots each side needs (`reach_for`: 12 m + 12.5 m a house, 30-90 m), and is laid only where the water under it and 12 m either side stays within `DEEP_MAX` (3.5 m) and where the ground SEES the bed: somewhere under it at least `BED_SEEN_M` 0.5 m below the level. A DEM that reads the sea flat at its surface says nothing of its depth -- Manarola's 30 m grid is 0 m from the shore out, and the first vtplan run drove piles into it for Thorn (which derives `water` there); now Thorn on Manarola is the shore form |
+| the far walk | a boardwalk along the piers' far ends (the shoreline plus the reach, held to the bend rule), so every boardwalk is a way through and none a dead end |
+| a boardwalk | a `path` road (1.2 m, verge 0.7) with `"boardwalk": true` and `"deck_m"` (the water level + `HousePiles.FREEBOARD_DEFAULT`): a footway in every check. Over the water it is a CROSSING of kind `boardwalk` (`VillageWaterPlan.crossing_kind`), its width the verged ribbon less the builder's bridge margin (`crossing_width`), so the deck the walk paints is the 2.6 m ribbon the lots front |
+| the site | grown seaward to the far walk + 6 m, and the ground's water re-read over it (`VillageGroundWater.add`) BEFORE the boardwalks are laid, so the shore trim never cuts them |
+| pile lots | `place_on_piles` (one hook in `VillageLotPlanner.cut_measured`): every household is offered the boardwalks first, as a house on piles measured once (`pile_job`: the request asked for piles, cached on the job's shared cache). `pile_lot_is_legal` (one hook at the top of `_lot_is_legal`): the lot fronts a boardwalk, lies WHOLLY on the ground's water (`wholly_wet`), inside the site, clear of every ribbon, common, lot and the landmark's ground, corners, walls inside, eaves off the carriageways, fire gaps; and the bed under it (read as the ground mesh will carve it: never above the level less 0.41 m) no deeper than the piles reach. The lot records `"piles"`: `deck_m`, `water_m` (snapped up to 0.25 m), `freeboard_m`, `bed_m`, `reach_m` and `landing` (the house's landing in plan: its width and gallery, from its wall to the lot's front, which is the boardwalk's deck edge). `_commit` asks the request for exactly that (`request_for`). What finds no pile lot stands on the bank, fronting the shore street |
+| the build | `VillageBuilder._water_on_terrain` hands every boardwalk crossing to `VillageBoardwalk.emit` instead of `_crossing`: `boardwalk_deck` (each ribbon less those before it, in convex pieces, so no two deck faces share a plane at a junction), `boardwalk_bearer`, `boardwalk_pile` (both edges every 2.2 m, into the bed) and `boardwalk_ramp` where a crossing lands on the bank (at most 12 %) |
+| standing | `VillageGroundSurface.platform_of` answers a pile lot's deck level, so the assembler sets the house there; its facade pieces stay on its gallery (`_ground_yard` skipped, the node marked `piles`); the dresser does not dress it (`VillageDressHosts.host_of` answers nothing) |
+| the walk | `VillageNavCheck.build_grid` and `sources` paint each landing as floor after the water (and cut it out of the water and the building outlines), as they do a crossing; VillageWalk exports the same ground, `kind: landing` |
+
+**What the checks learned.** `VillageLotCheck.tiling` and PlaceCheck's
+`edge_ground` let a pile lot stand in the water. PlaceCheck ranks a building
+on the bank among the buildings on the bank (`neighbours`): the houses in the
+water stand on piles, not on the lake bed the rank would read, and the mill on
+the bank came out "high" (rank 0.75) against twelve houses over the bed.
+`VillageRoadCheck` expects the boardwalk kind for a boardwalk's crossing.
+`VillageGroundCheck` judges a house on piles by its deck
+(`VillageWaterCheck.ground`): it stands at its deck level, no ground stands
+over the water under its footprint or its landing, and its piles' feet are
+under the ground there; no ground stands over the water under a boardwalk; a
+facade piece on a pile house is judged at its planned height on the gallery.
+`qa/village_water_check.gd`, `VillageWaterCheck.check`: every pile lot wholly
+wet, within the piles' range, on a boardwalk, its building asked for its
+piles and valid; every boardwalk over the water carried by a boardwalk
+crossing; nothing the dresser set down stands in the water (a boat excepted:
+the first run had seven barrels on the lake bed, from the house recipe's
+`wall` rule on pile lots); `over_water_share` (VillageShape, the survey's
+definition: a building is over water when half its footprint is).
+
+**The lagoon.** `tests/fixtures/terrain/synthetic_terrain.gd` `lagoon`: a
+gentle shore (3 %) on a sine-bent shoreline, a lagoon shelving 6 % to a 2.6 m
+bed; the 400 m form window is 42 % wet and the 450 m disc 46 %, so the ground
+derives `water` at row 2 (not `shore` at row 1). The world90 grids of Ganvié
+and Kampong Ayer cannot stand in for it: Ganvié's DEM reads its lagoon as land
+1-4 m high (its water level, the lowest cell + 0.5 m, is -9.5 m), and Kampong
+Ayer's river is one 90 m row of cells.
+
+Suite `vwaterform` (32 checks, 295 s host, ~12 m loaded; 67 s of it measuring the 16
+buildings once; `WATER_CASE=lagoon|lake_shore` runs one case, `WATER_DUMP=1`
+prints the plan). A fishing village of 50 on a lake:
+
+| Ground | Form | Boardwalks | On piles / on the bank | `over_water_share` | Deck parts / posts / ramps | Under the piles | QA |
+|---|---|---|---|---|---|---|---|
+| `lagoon` | water (derived) | 2 piers + the far walk, 3 crossings | 12 / 4 (church, smithy, tavern, mill) | **0.750** | 16 / 152 / 2 | ground at most 0.09 m under the water's surface; feet at least 0.69 m under the bed | VillageQA, VillageWaterCheck, VillageGroundCheck, ComponentCheck ok |
+| `lake_shore` (forced) | water, as the shore form | none: 3.5 m of water lies 44 m out | 0 / 16, all dry | 0.0 | - | - | VillageQA ok |
+
+Also checked: every door walked to from a gate (VillageNavCheck `arrive`)
+and every door `reachable` in VillageWalk's export, with one landing per pile
+house; with the boardwalk crossings taken away all 12 pile houses are
+unreached (the control); a pile house asked for no depth fails
+VillageWaterCheck (the control); the export writes form `water`, each
+boardwalk (`roads[].boardwalk.deck_m`), each pile lot (`lots[].piles`) and
+each pile request; the plan is pure; a water spec with no ground plans as the
+straight strand. The acceptance -- on a lagoon, houses on piles, a boardwalk
+walk graph connecting them, `over_water_share` over 0.5 -- reads 12 houses on
+piles, every door reached over the boardwalks, 0.750.
+
+**Not yet.**
+
+* **a pier that bends** -- piers are straight and square to the street; a
+  shore that shelves unevenly loses a pier rather than bending it into the
+  shallows. The far walk is the only boardwalk that follows the shore.
+* **the trades on piles** -- only households are offered the boardwalks; the
+  smithy, the tavern, the mill and the church stand on the bank (Ganvié's
+  market and church do stand in the water).
+* **canoes** -- the strand step's boats stand on the bank; the pile houses'
+  ladders reach the water but no canoe is moored there.
+* **`piers`** -- VillageShape still reports 0 (`survey.py` counts mapped
+  `man_made=pier` ways; the definition lives in both files and was not
+  changed here).
+* **real ground** -- no real grid in the set shows a lagoon at 90 m; on a
+  steep real shore (Manarola, Hallstatt) the form is the shore form.
+* **the house's own walk export** -- `BrickWild.navigation()` publishes no
+  `route_m` over a pile house's landing (its door is one FLOOR_T step down
+  to the deck); the village walk carries it.
+* **a bed under a house deeper than the grid shows** -- the piles' depth is
+  read from the terrain at 2 m under the lot; a pit between the grid's nodes
+  under a post would leave it short (the ground check reads the emitted mesh
+  and would say so).
+## The island fill (VTER-ISLAND-FILL)
+
+Isola dei Pescatori: 33 buildings on a lake islet, the lanes one house wide,
+the whole island the village. `VillageIslandForm`
+(`src/village/forms/island_form.gd`) is the island case of `water`;
+`VillageIslandCheck` (`qa/village_island_check.gd`) judges it.
+
+* **When.** Row 0 of the form rule: an ENCLOSED island (a dry component of
+  the caller's grid on an 8 m lattice that touches no edge of the grid, within
+  320 m of the centre, and its bounding box a margin inside the grid) whose
+  area is 0.7 to 4 times what the households need (`needed_m2`: 300 m2 a
+  building and 600 m2 of common and churchyard) and whose widest inscribed
+  circle holds a ring (`QUAY_INSET` + `BEND_R`). The form stays `water`; the
+  island ground is a different plan of it, as the lagoon is. Anything else
+  (a hamlet on a big islet: row 1's `shore`; the 19 ha cone; the real Isola
+  on the 90 m DEM) is exactly what it was.
+* **The frame.** Origin at the island's pole (its centroid where that is
+  nearly as far from the water), +x along its long axis (`site`).
+* **The ring.** A closed street of eight arcs, the shore pulled in by 4.5 m,
+  its long axis shortened until its frontage is `CAPACITY` (1.6) times what the
+  buildings need, then OPENED by a circle of 47.5 to 50.5 m
+  (`Geometry2D.offset_polygon` by -R then +R): the road check's 25 degrees in
+  20 m is a 46 m radius, so the pointed end of an island is cut off by a curve
+  a street can take, and an island narrower than the opening is not an island
+  village (`inscribed_m`). The first ring that leaves every vertex inside the
+  rule keeps.
+* **The spine.** The through road, along x from a landing at one end of the
+  island to the landing at the other, crossing the ring at two of its
+  vertices. The walk enters at the landings (`VillageMeasure.gates`). The
+  site ends exactly at the landings.
+* **The common** beside the spine at the middle, a path to it, the landmark's
+  slot across the spine. Houses stand on both sides of the ring and the spine;
+  where the ring is drawn in from the shore they stand on its outer side too.
+* **Water.** `VillageGroundWater.polygons` reads the sea as polygons and DROPS
+  THE HOLE of a ring of water (its doc says so: "an island inside a lake is
+  read as lake"). An island wholly inside its site would be read as lake, every
+  road on it "wet from end to end" and taken up. The site therefore ends at the
+  landings, the island's two ends touch its short sides, and the sea falls in
+  two pieces, north and south.
+* **The check** (`VillageIslandCheck`): the ring's arcs join end to end, the
+  spine runs from shore to shore as far apart as the island is long, nothing
+  is on the water, and 85 % of the island's dry ground is within 30 m of a
+  building (`reach_share`, read on the caller's own grid so it reads a plan
+  sited any other way). `VillageRoadCheck` takes two landings, side 4 twice,
+  far apart, as two sides for an island plan (`plan.island`), and nowhere else.
+
+On the islet (`SYNTH.make("islet")`: 350 x 120 m, 2.6 ha dry above the freeboard, the real Isola's
+size; 89 people, fishing, as the survey records it; suite `vislandfill`):
+
+| | form off (the water form as it was) | island form |
+|---|---|---|
+| form | shore (row 1: the window is mostly wet) | water, island |
+| buildings placed, first attempt | 4 of 29 | 29 of 29 |
+| buildings placed, the whole retry ladder | 14 of 29 (607 s) | 29 of 29 |
+| VillageQA | 6 houses for 21 households; density 4.8 %; through road leaves twice by the same side; 2 doors unreached | ok |
+| island within 30 m of a building | 0.28 (first attempt) | 0.97 |
+| ring inside the shore (mean) | - | 14.0 m |
+| `body_hull_ha` | 0.50 (real Pescatori 0.81) | 0.73 |
+| `nn_median_m` | 19.2 (real 12.3) | 13.0 |
+| `coverage` / `compactness` / `elongation` | 0.33 / 0.45 / 4.0 (real 0.81 / 0.64 / 2.1) | 0.38 / 0.28 / 5.8 |
+| `setback_median_m` | 5.5 (real 0.9) | 5.7 |
+| `water_within_30m` | 0.64 (real 0.58) | 0.35 |
+
+The suite (`vislandfill`, 32 checks, 984 s on a loaded host: 147 s measuring
+the 29 buildings, 307 s planning, 229 s building and assembling the mesh): the
+derivation and its four refusals; the plan sited along the island; the check;
+VillageQA; every door walked to from a landing, and the spine cut to a stub
+strands 25; the exporter's `island` block; components, the assembled mesh and
+`VillageGroundCheck`; the controls (east half of the buildings taken away: the
+island reached 0.51 and `fill` fails; a ring arc taken up: `ring` fails; the
+form off: no island plan, 0.28 reached); purity.
+
+### Not yet
+* **The 90 m DEM does not hold the real Isola.** `world90/isola_dei_pescatori`
+  smears the 3.5 ha island into 19 ha (one 1 m step of lake and one of land are
+  the whole signal), so it is 21 times what 89 people need (limit 4) and keeps the
+  water form's shore plan. The form works on any grid that shows the island as
+  it is (the islet is on 8 m cells).
+* **Density.** The village is the right size (hull 0.73 ha against the real
+  0.81) but not the real shape: the real island is built in lanes one house
+  wide, setback 0.9 m, `compactness` 0.64, `elongation` 2.1; ours has houses
+  5.7 m back from the quay and the island's length shortened by 0.9 only, so
+  `elongation` stays 5.8. A quay of townhouse-class lots (0 to 1 m setback) and
+  cross lanes between the long sides would bring them in.
+* **Strand dressing.** A fishing village's `strand` step
+  (`VillageDressHosts.dress_place(plan, ctx, &"strand")`) took 190 of the
+  plan's 307 s on the islet's 310 x 123 m site (a per-step timing,
+  `tools/probe_island_dress.gd`); it builds the whole site's walk grid
+  (`VillageNavCheck.reached_grid`) for the step and again for each shore piece
+  it places, and the cost is the site's area. Not read further here.

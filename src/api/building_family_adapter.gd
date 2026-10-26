@@ -175,8 +175,11 @@ class PlanFamily extends BuildingFamilyAdapter:
 		return plan_quality_report(building.plan)
 
 	func footprint(building) -> Rect2:
-		return HouseGeometry.storey_rect(building.plan,
-			maxi(building.plan.spec.storeys - 1, 0)).grow(-HouseGeometry.wall_thickness(building.plan.spec))
+		# HS-PUEBLO: a stepped house stands on its ground storey; the storeys above
+		# are drawn in from it
+		var level: int = 0 if building.plan.spec.terraced else maxi(building.plan.spec.storeys - 1, 0)
+		return HouseGeometry.storey_rect(building.plan, level).grow(
+			-HouseGeometry.wall_thickness(building.plan.spec))
 
 	## `HousePlan.entrance()`'s own door position: the plan says where the
 	## front door is, and the builder cuts it there.
@@ -869,3 +872,9 @@ static func _copy_orientation_and_period(request: BuildingRequest, spec: RefCoun
 	if "ground_fall" in spec:
 		spec.set("ground_fall", request.ground_fall_m)
 		spec.set("ground_downhill_deg", request.ground_downhill_deg)
+	# piles over water: houses and shops only (validate() refuses the rest)
+	if "foundation" in spec:
+		spec.set("foundation", request.foundation)
+		spec.set("pile_water", request.pile_water_m)
+		spec.set("pile_freeboard", request.pile_freeboard_m)
+		spec.set("pile_deck", request.pile_deck_m)

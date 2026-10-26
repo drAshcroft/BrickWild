@@ -335,7 +335,7 @@ func _bed_of(i: int, greater: Array[int]) -> Dictionary:
 	for k in range(h.size()):
 		h[k] += offset[k]
 	var bed := {"stations": st, "s": s, "h": h, "class": road["class"], "width": float(road["width"])}
-	if road["class"] == &"steps" and st.size() >= 2:
+	if (road["class"] == &"steps" or bool(road.get("stepped", false))) and st.size() >= 2:
 		bed["treads"] = treads_of(s, h)
 	return bed
 
@@ -494,6 +494,9 @@ func pad_at(li: int, p: Vector2) -> float:
 func platform_of(bi: int) -> float:
 	var li: int = int(plan.buildings[bi].get("lot", -1))
 	if not _lots.has(li):
+		# a house on piles stands on its deck (VTER-FORM-WATER)
+		if li >= 0 and li < plan.lots.size() and plan.lots[li].has("piles"):
+			return float(plan.lots[li]["piles"]["deck_m"])
 		return NAN
 	return float(_lots[li]["r"]["platform_m"])
 

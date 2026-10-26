@@ -36,8 +36,8 @@ const APRON := {&"cottage": 2.6, &"farmhouse": 3.0, &"townhouse": 2.0,
 	# and an Asian house gives a slice of its own to the veranda. All three stay
 	# inside the 2 to 3 m the apron contract promises: a compound wants more
 	# ground, and a compound is what a walled village around it provides.
-	&"mediterranean": 2.4, &"asian": 2.9, &"african": 3.0,
-	&"thatch_cottage": 2.6, &"mud_hut": 3.0}
+	&"mediterranean": 3.0, &"asian": 2.9, &"african": 3.0,
+	&"thatch_cottage": 2.6, &"roundhouse": 3.0}
 const DEFAULT_APRON := 2.5
 
 ## A thing this low is a path, not an obstacle: it is walked over, and it may
@@ -56,18 +56,23 @@ const WITCH_WORK_APPROACH := 0.9
 ## and up to two when there is none.
 const STYLE_GROUPS := {
 	&"cottage": [&"washing_line", &"garden", &"flowers"],
-	&"farmhouse": [&"woodpile", &"cart", &"midden"],
+	&"farmhouse": [&"byre", &"farm_cart", &"trough"],
 	&"townhouse": [&"crates", &"rain_barrel"],
 	&"longhall": [&"woodpile", &"training"],
 	&"witch_hut": [&"witch_work_shelter", &"herb_bed", &"drying_line", &"mushrooms", &"midden"],
 	# HOUSE-CULTURE. A yard says who lives here, and a household with no trade
 	# is judged on its kind of house instead -- water jars and a drying line in
 	# the sun, a dung midden and a cart in a compound, pots under the shade.
-	&"mediterranean": [&"garden", &"flowers", &"crates"],
-	&"asian": [&"garden", &"crates", &"rain_barrel"],
-	&"african": [&"midden", &"crates", &"cart"],
-	&"thatch_cottage": [&"garden", &"washing_line", &"woodpile"],
-	&"mud_hut": [&"midden", &"herb_bed", &"mushrooms"],
+	&"mediterranean": [&"court", &"garden", &"flowers", &"crates"],
+	# HS-MINKA: the garden is the engawa's: a dry garden of raked gravel, rocks
+	# and a tree, laid out in front of the veranda the main room opens onto.
+	&"asian": [&"engawa_garden", &"crates", &"rain_barrel"],
+	&"african": [&"court", &"crates", &"cart"],
+	# HS-THATCH: the front is a flower garden (two beds flanking the path to the
+	# door) and the kitchen garden goes behind; no washing line, woodpile or pail
+	# is allowed to stand at the front of a thatched cottage.
+	&"thatch_cottage": [&"front_beds", &"garden"],
+	&"roundhouse": [&"midden", &"herb_bed", &"mushrooms"],
 }
 const TRADE_GROUPS := {
 	&"none": [],
@@ -81,7 +86,7 @@ const TRADE_GROUPS := {
 const MAX_GROUPS := 3
 
 ## Built-piece kinds, for the check.
-const KINDS := ["fence", "woodpile", "washing_line", "midden", "leanto", "witch_work_lean_to", "trough",
+const KINDS := ["dry_garden", "court", "fence", "woodpile", "washing_line", "midden", "leanto", "byre", "cart", "witch_work_lean_to", "trough",
 	"signpost", "bed", "path"]
 
 const HERBS := ["Wild_Plant_7", "Wild_Fern_1", "Wild_Plant_1", "Nature_Flower_3_Clump", "Wild_Fern_1", "Wild_Plant_7"]
@@ -103,6 +108,9 @@ static func applies(plan: HousePlan) -> bool:
 	if not spec.exterior_props or spec.has_method("room_program"):
 		return false
 	if HouseGeometry.is_shaped(plan) or plan.has_court():
+		return false
+	# a house on piles stands over water: no ground round it for a yard
+	if HousePiles.on_piles(spec):
 		return false
 	return plan.entrance() >= 0
 
@@ -133,6 +141,9 @@ static func plan(p: HousePlan) -> void:
 		# recipe takes precedence over the no-trade household craft shelter.
 		style = [&"herb_bed", &"drying_line", &"mushrooms", &"midden"]
 	var style_slots := 1 if not groups.is_empty() else 2
+	if p.spec.style == &"farmhouse" and p.spec.trade == &"none":
+		# HS-FARMHOUSE: byre with its hay, the cart and the trough are the yard.
+		style_slots = 3
 	if p.spec.style == &"witch_hut" and p.spec.trade == &"none":
 		style_slots = 3
 	var from_style: Array = style.slice(0, style_slots)
@@ -144,7 +155,8 @@ static func plan(p: HousePlan) -> void:
 		# A porch pail is replaceable. It must not reserve the only measured
 		# service-side space before the required Witch work shelter is fitted.
 		wanted.append(style[0])
-	wanted.append(&"porch_pail")
+	if p.spec.style != &"thatch_cottage":
+		wanted.append(&"porch_pail")
 	for g in group_order:
 		if g not in wanted and wanted.size() < MAX_GROUPS + 2:
 			wanted.append(g)
@@ -309,6 +321,8 @@ static func _group(ctx: Dictionary, name: StringName) -> Dictionary:
 	match name:
 		&"path":
 			return _path(ctx)
+		&"court":
+			return _court(ctx)
 		&"porch_pail":
 			return _porch_pail(ctx)
 		&"garden":
@@ -331,6 +345,10 @@ static func _group(ctx: Dictionary, name: StringName) -> Dictionary:
 					return made if _group_within_threshold(ctx, made, 5.0) else {})
 		&"flowers":
 			return _flowers(ctx)
+		&"front_beds":
+			return _front_beds(ctx)
+		&"engawa_garden":
+			return _engawa_garden(ctx)
 		&"woodpile":
 			return _woodpile(ctx)
 		&"cart":
@@ -410,8 +428,15 @@ static func _group(ctx: Dictionary, name: StringName) -> Dictionary:
 			return _search(ctx, ["rear", "left", "right"], 0.0, [0.3, 0.8],
 				func(cell: Dictionary, gap: float) -> Dictionary: return _mushrooms(ctx, cell, gap))
 		&"trough":
+			var farm: bool = ctx["plan"].spec.style == &"farmhouse"
 			return _search(ctx, ["left", "right", "front"], 0.0, [0.35, 0.9],
-				func(cell: Dictionary, gap: float) -> Dictionary: return _trough(cell, gap))
+				func(cell: Dictionary, gap: float) -> Dictionary: return _trough(cell, gap, farm))
+		&"farm_cart":
+			return _search(ctx, ["left", "right", "rear", "front"], 0.0, [0.5, 1.2],
+				func(cell: Dictionary, gap: float) -> Dictionary: return _farm_cart(cell, gap))
+		&"byre":
+			return _search(ctx, ["left", "right", "rear"], _kitchen_anchor(ctx, 0.0), [0.0],
+				func(cell: Dictionary, gap: float) -> Dictionary: return _byre(cell))
 		&"leanto":
 			return _search(ctx, ["left", "right", "rear"], 0.0, [0.0],
 				func(cell: Dictionary, gap: float) -> Dictionary: return _leanto(cell))
@@ -711,6 +736,16 @@ static func clear_reason(plan: HousePlan, env: Rect2, box: AABB) -> String:
 		Vector3(site.size.x, plan.spec.height * plan.spec.storeys, site.size.y))
 	if box.intersects(building.grow(-0.01)):
 		return "intersects the house wall"
+	# HS-MINKA: the engawa and the entry steps are built ground, even to a path
+	var deck := HouseMinka.deck_rect(plan)
+	if deck.has_area() and r.intersects(deck.grow(-0.01)):
+		return "stands on the engawa"
+	var steps := HouseMinka.steps_rect(plan)
+	if steps.has_area() and r.intersects(steps.grow(-0.01)):
+		return "stands on the entry steps"
+	var garden_steps := HouseMinka.garden_steps_rect(plan)
+	if garden_steps.has_area() and r.intersects(garden_steps.grow(-0.01)):
+		return "stands on the engawa steps"
 	if _is_flush(box):
 		return ""
 	var why := HouseExterior.facade_clear(plan, box)
@@ -806,6 +841,145 @@ static func _flowers(ctx: Dictionary) -> Dictionary:
 		if _group_reason(ctx, probe).is_empty():
 			props.append(prop)
 	return {"props": props} if not props.is_empty() else {}
+
+
+## HS-THATCH: the cottage's front garden. A flower bed on each side of the
+## path to the door: an edged soil bed (a `bed` piece, boards and soil) with a
+## row of flower clumps standing on it. A side is skipped, not forced, when
+## the facade or the porch needs the ground.
+const FRONT_BED_W := 1.5
+const FRONT_BED_D := 0.8
+const FRONT_BED_KEYS := ["Nature_Flower_3_Clump", "Nature_Flower_5_Clump", "Nature_Flower_4_Clump"]
+
+
+static func _front_beds(ctx: Dictionary) -> Dictionary:
+	var door: Dictionary = ctx["door"]
+	var half_clear: float = float(door["width"]) * 0.5 + 0.75
+	var pieces: Array = []
+	var props: Array = []
+	var taken: Array[AABB] = []
+	for flip in [1.0, -1.0]:
+		for off in [0.0, 0.4, 0.8, 1.2, 1.6, 2.0, 2.4, 2.8, 3.2, 3.6, 4.0, 4.4]:
+			var s: float = ctx["door_u"] + flip * (half_clear + FRONT_BED_W * 0.5 + off)
+			var cell := _cell(ctx, "front", s)
+			var made := _front_bed(ctx, cell, 0.3)
+			if made.is_empty() or not _group_reason(ctx, made).is_empty():
+				continue
+			var clash := false
+			for part in made["pieces"][0]["parts"]:
+				for box in taken:
+					if part_aabb(part).grow(GAP).intersects(box):
+						clash = true
+			if clash:
+				continue
+			for part in made["pieces"][0]["parts"]:
+				taken.append(part_aabb(part))
+			pieces.append_array(made["pieces"])
+			props.append_array(made["props"])
+			break
+	return {"pieces": pieces, "props": props} if not pieces.is_empty() else {}
+
+
+static func _front_bed(ctx: Dictionary, cell: Dictionary, gap: float) -> Dictionary:
+	var w := FRONT_BED_W
+	var depth := FRONT_BED_D
+	if float(cell["room"]) < gap + depth + 0.3:
+		return {}
+	var d := gap + depth * 0.5
+	var parts: Array = []
+	parts.append(_part(cell, "bed_board", 0.0, gap + 0.03, w, 0.06, 0.0, 0.2, "trim"))
+	parts.append(_part(cell, "bed_board", 0.0, gap + depth - 0.03, w, 0.06, 0.0, 0.2, "trim"))
+	parts.append(_part(cell, "bed_board", -w * 0.5 + 0.03, d, 0.06, depth - 0.12, 0.0, 0.2, "trim"))
+	parts.append(_part(cell, "bed_board", w * 0.5 - 0.03, d, 0.06, depth - 0.12, 0.0, 0.2, "trim"))
+	parts.append(_part(cell, "bed_soil", 0.0, d, w - 0.12, depth - 0.12, 0.0, 0.17, "trim"))
+	var made := {"pieces": [_piece("bed", "flower_bed", parts, str(cell["host"]))], "props": []}
+	var rng: RandomNumberGenerator = ctx["rng"]
+	var base := rng.randi()
+	for i in 3:
+		var key: String = FRONT_BED_KEYS[(base + i) % FRONT_BED_KEYS.size()]
+		if not PropCatalog.known(key):
+			continue
+		var tt := -w * 0.5 + 0.3 + float(i) * (w - 0.6) / 2.0
+		var prop := make_prop(key, _w(cell, tt, d), float(i) * 2.1, _fit(key, 0.5), "bed_flowers", str(cell["host"]))
+		made["props"].append(_raised(prop, 0.17))
+	return made
+
+
+## HS-MINKA: the dry garden in front of the engawa. Raked gravel in a low
+## border, three rocks and a tree on it, and stepping stones from the foot of
+## the engawa step across the gravel. It is the first yard group of the style
+## and goes on the engawa side, so the main room looks out at it.
+const DRY_GARDEN_ROCKS := ["Wild_Rock_Medium_1", "Wild_Rock_Medium_2", "Wild_Rock_Medium_3"]
+const DRY_GARDEN_TREES := ["Wild_Pine_2", "Wild_Pine_3", "Nature_MapleTree_2"]
+const DRY_GARDEN_STONES := ["Wild_RockPath_Round_Small_1", "Wild_RockPath_Round_Small_2", "Wild_RockPath_Round_Small_3"]
+
+
+static func _engawa_garden(ctx: Dictionary) -> Dictionary:
+	var p: HousePlan = ctx["plan"]
+	if p.engawa.is_empty():
+		return {}
+	var n: Vector2 = p.engawa["normal"]
+	var region := ""
+	for r in ["left", "right", "rear", "front"]:
+		if _cell(ctx, r, 0.0)["out"].dot(n) > 0.9:
+			region = r
+	if region.is_empty():
+		return {}
+	var rng: RandomNumberGenerator = ctx["rng"]
+	# centred on the main room's screen door, so the garden is what it looks at
+	var door_s := 0.0
+	for d in p.doors:
+		if bool(d.get("screen", false)) and int(d["a"]) == int(p.engawa["main_room"]):
+			door_s = Vector2(d["pos"]).dot(_cell(ctx, region, 0.0)["tan"])
+	for sizing in [1.0, 0.8, 0.6]:
+		var cell := _cell(ctx, region, clampf(door_s, -float(ctx["ext_f"]) * 0.45, float(ctx["ext_f"]) * 0.45))
+		var d0: float = float(p.engawa["depth"]) + 0.35
+		var room: float = float(cell["room"])
+		var gd: float = (room - d0 - 0.15) * sizing
+		var half_t: float = minf(float(ctx["ext_f"]) - 0.4, 3.2) * sizing
+		if gd < 1.2 or half_t < 1.0:
+			continue
+		var parts: Array = []
+		var dm := d0 + gd * 0.5
+		# the gravel and its low stone border
+		parts.append(_part(cell, "garden_gravel", 0.0, dm, half_t * 2.0, gd, 0.0, 0.03, "wall"))
+		for side in [-1.0, 1.0]:
+			parts.append(_part(cell, "garden_edge", float(side) * (half_t + 0.04), dm, 0.08, gd + 0.16, 0.0, 0.1, "floor"))
+		parts.append(_part(cell, "garden_edge", 0.0, d0 + gd + 0.04, half_t * 2.0 + 0.16, 0.08, 0.0, 0.1, "floor"))
+		# raked lines along the wall
+		var d := d0 + 0.3
+		while d < d0 + gd - 0.2:
+			parts.append(_part(cell, "garden_rake", 0.0, d, half_t * 2.0 - 0.3, 0.03, 0.03, 0.012, "wall"))
+			d += 0.3
+		var made := {"pieces": [_piece("dry_garden", "garden", parts, str(cell["host"]))], "props": []}
+		var base := rng.randi()
+		# three rocks, one tree: off the stepping line, apart from each other
+		var spots := [[-half_t * 0.62, d0 + gd * 0.35], [half_t * 0.55, d0 + gd * 0.6], [-half_t * 0.3, d0 + gd * 0.82]]
+		for i in 3:
+			var rk: String = DRY_GARDEN_ROCKS[(base + i) % DRY_GARDEN_ROCKS.size()]
+			if not PropCatalog.known(rk):
+				continue
+			var at: Array = spots[i]
+			made["props"].append(_prop_at(cell, float(at[0]), float(at[1]), rk, _fit(rk, 0.9 - float(i) * 0.12), "garden_rock"))
+		var tree: String = DRY_GARDEN_TREES[base % DRY_GARDEN_TREES.size()]
+		if PropCatalog.known(tree):
+			var tree_scale := _fit(tree, 1.8)
+			var tree_gap := minf(d0 + gd * 0.7, room - 0.25 - 1.8)
+			made["props"].append(_prop_at(cell, half_t * 0.7, tree_gap, tree, tree_scale, "garden_tree"))
+		# stepping stones from the engawa step out across the gravel
+		var ds := 0.3
+		var k := 0
+		while ds < d0 + gd - 0.2 and float(p.engawa["depth"]) + ds + 0.6 < room:
+			var sk: String = DRY_GARDEN_STONES[(base + k) % DRY_GARDEN_STONES.size()]
+			if PropCatalog.known(sk):
+				var jitter := (0.12 if k % 2 == 0 else -0.12)
+				var stone := _prop_at(cell, jitter, float(p.engawa["depth"]) + ds, sk, _fit(sk, 0.55), "garden_path")
+				made["props"].append(stone)
+			ds += 0.6
+			k += 1
+		if _group_reason(ctx, made).is_empty():
+			return made
+	return {}
 
 
 static func _crates(ctx: Dictionary, cell: Dictionary, gap: float) -> Dictionary:
@@ -911,6 +1085,132 @@ static func _fence_run(cell: Dictionary, t0: float, d0: float, t1: float, d1: fl
 			var st: float = run if along_t else 0.05
 			var sd: float = 0.05 if along_t else run
 			parts.append(_part(cell, "fence_rail", tc, dc, st, sd, y, 0.07, "trim"))
+
+
+## HS-MEDITERRANEAN: the walled court behind the house. Open to the sky, three
+## rendered walls (a rear wall and two returns continuing the house's side
+## walls outward, one return with a gateway), paved, entered by the house's
+## rear door. It is only built where the footprint allows: the shorter side of the house at least
+## COURT_MIN_SIDE and ground behind the rear wall for COURT_MIN_DEPTH clear.
+const COURT_MIN_SIDE := 7.0
+const COURT_MIN_DEPTH := 2.4
+const COURT_WALL_T := 0.3
+const COURT_WALL_H := 1.7
+const COURT_GATE := 1.2
+const COURT_PAVE_H := 0.04
+
+
+## How far a door that opens onto the court keeps clear (instead of the usual
+## 3.2 m): the court's rear wall stands about 2.7 m from the house.
+const COURT_DOOR_APPROACH := 2.0
+
+
+## Does the footprint allow a court, and is this a style that builds one?
+static func court_applies(plan: HousePlan) -> bool:
+	if not (&"court" in STYLE_GROUPS.get(plan.spec.style, [])):
+		return false
+	var site := HouseGeometry.site_rect(plan.spec)
+	return minf(site.size.x, site.size.y) >= COURT_MIN_SIDE and plan.entrance() >= 0
+
+
+## A door that is not the entrance and faces away from it, in a house that has
+## a court: it opens onto the court.
+static func opens_on_court(plan: HousePlan, door: Dictionary) -> bool:
+	var e := plan.entrance()
+	if e < 0 or not court_applies(plan) or door.get("front", false) or not door.get("exterior", false):
+		return false
+	return Vector2(door["normal"]).normalized().dot(Vector2(plan.doors[e]["normal"]).normalized()) < -0.5
+
+
+static func _court(ctx: Dictionary) -> Dictionary:
+	var p: HousePlan = ctx["plan"]
+	if not court_applies(p):
+		return {}
+	var made := _court_parts(ctx)
+	if made.is_empty() or not _group_reason(ctx, made).is_empty():
+		return {}
+	return made
+
+
+static func _court_parts(ctx: Dictionary) -> Dictionary:
+	var cell := _cell(ctx, "rear", 0.0)
+	var depth: float = float(cell["room"]) - 0.05
+	if depth < COURT_MIN_DEPTH + COURT_WALL_T:
+		return {}
+	var w: float = float(ctx["ext_l"])
+	var parts: Array = []
+	var wt := COURT_WALL_T
+	# The rear wall runs the full width and stands on the envelope's edge, so
+	# there is no way round it: the gateway is in one RETURN, on the side the
+	# yard's own rng chose, where the walk along the house's flank reaches it.
+	parts.append(_part(cell, "court_wall", 0.0, depth - wt * 0.5, 2.0 * w + 2.0 * wt, wt,
+		0.0, COURT_WALL_H, "wall"))
+	var run := depth - wt
+	if p_ranges(ctx):
+		return _court_ranges(cell, depth, w, parts, float(ctx["side_pref"]))
+	var gate_side: float = ctx["side_pref"]
+	for sgn in [-1.0, 1.0]:
+		var t: float = float(sgn) * (w + wt * 0.5)
+		if float(sgn) != gate_side:
+			parts.append(_part(cell, "court_wall", t, run * 0.5, wt, run, 0.0, COURT_WALL_H, "wall"))
+			continue
+		# the gateway sits in the outer half, clear of the house's rear corner
+		var g0: float = run - COURT_GATE - 0.3
+		parts.append(_part(cell, "court_wall", t, g0 * 0.5, wt, g0, 0.0, COURT_WALL_H, "wall"))
+		parts.append(_part(cell, "court_wall", t, run - 0.15, wt, 0.3, 0.0, COURT_WALL_H, "wall"))
+	parts.append(_part(cell, "court_paving", 0.0, (depth - wt) * 0.5,
+		2.0 * w, depth - wt, 0.0, COURT_PAVE_H, "floor"))
+	return {"pieces": [_piece("court", "court", parts, "rear")], "props": []}
+
+
+## HS-SAHEL: the rooms round the court. The court's two sides are flat-roofed
+## ranges of banco, `RANGE_DEPTH` deep and as long as the court, each a tall
+## outer wall, a roof slab with a parapet along its outer edge and its end, and
+## a stout pier at its free corner; the side that faces the court is open (a
+## shaded bay), so the house's rear door never opens onto a wall. The rear wall
+## is the court's fourth side; the gateway is in one range's outer wall.
+const RANGE_DEPTH := 1.7
+const RANGE_WALL_H := 2.3
+const RANGE_SLAB_T := 0.22
+const RANGE_PARAPET_H := 0.3
+const RANGE_PARAPET_T := 0.2
+const RANGE_PIER := 0.3
+
+
+static func p_ranges(ctx: Dictionary) -> bool:
+	var p: HousePlan = ctx["plan"]
+	return p.spec.court_ranges
+
+
+static func _court_ranges(cell: Dictionary, depth: float, w: float, parts: Array,
+		gate_side: float) -> Dictionary:
+	var wt := COURT_WALL_T
+	var run := depth - wt
+	# the rear wall is the first part, whole; the ranges take the two sides
+	for sgn in [-1.0, 1.0]:
+		var s := float(sgn)
+		var t_out := s * (w + wt * 0.5)
+		if s != gate_side:
+			parts.append(_part(cell, "court_range_wall", t_out, run * 0.5, wt, run, 0.0, RANGE_WALL_H, "wall"))
+		else:
+			# the gateway is in this range's outer wall, at its rear end, where the
+			# walk along the house's flank reaches it; a lintel of banco closes it
+			var g0: float = run - COURT_GATE - 0.3
+			parts.append(_part(cell, "court_range_wall", t_out, g0 * 0.5, wt, g0, 0.0, RANGE_WALL_H, "wall"))
+			parts.append(_part(cell, "court_range_wall", t_out, run - 0.15, wt, 0.3, 0.0, RANGE_WALL_H, "wall"))
+		var t_slab := s * (w + wt - (RANGE_DEPTH + wt) * 0.5)
+		parts.append(_part(cell, "court_range_roof", t_slab, run * 0.5, RANGE_DEPTH + wt, run,
+			RANGE_WALL_H, RANGE_SLAB_T, "wall"))
+		var y_p := RANGE_WALL_H + RANGE_SLAB_T
+		parts.append(_part(cell, "court_range_parapet", s * (w + wt - RANGE_PARAPET_T * 0.5), run * 0.5,
+			RANGE_PARAPET_T, run, y_p, RANGE_PARAPET_H, "wall"))
+		parts.append(_part(cell, "court_range_parapet", t_slab, run - RANGE_PARAPET_T * 0.5,
+			RANGE_DEPTH + wt, RANGE_PARAPET_T, y_p, RANGE_PARAPET_H, "wall"))
+		parts.append(_part(cell, "court_range_pier", s * (w - RANGE_DEPTH + RANGE_PIER * 0.5),
+			run - RANGE_PIER * 0.5, RANGE_PIER, RANGE_PIER, 0.0, RANGE_WALL_H, "wall"))
+	parts.append(_part(cell, "court_paving", 0.0, (depth - wt) * 0.5,
+		2.0 * w, depth - wt, 0.0, COURT_PAVE_H, "floor"))
+	return {"pieces": [_piece("court", "court", parts, "rear")], "props": []}
 
 
 ## A fenced kitchen garden: three sides of rails and the wall's side left open
@@ -1035,7 +1335,7 @@ static func _midden(cell: Dictionary, gap: float) -> Dictionary:
 
 
 ## The smith's quench trough: a long open box of boards.
-static func _trough(cell: Dictionary, gap: float) -> Dictionary:
+static func _trough(cell: Dictionary, gap: float, farm := false) -> Dictionary:
 	var l := 1.3
 	var w := 0.5
 	var h := 0.5
@@ -1046,7 +1346,37 @@ static func _trough(cell: Dictionary, gap: float) -> Dictionary:
 	parts.append(_part(cell, "trough_side", 0.0, d + w * 0.5 - 0.03, l, 0.06, 0.0, h, "trim"))
 	parts.append(_part(cell, "trough_end", -l * 0.5 + 0.03, d, 0.06, w - 0.12, 0.0, h, "trim"))
 	parts.append(_part(cell, "trough_end", l * 0.5 - 0.03, d, 0.06, w - 0.12, 0.0, h, "trim"))
+	if farm:
+		# A farm trough stands on four legs (HS-FARMHOUSE).
+		for lx in [-1.0, 1.0]:
+			for ld in [-1.0, 1.0]:
+				parts.append(_part(cell, "trough_leg", lx * (l * 0.5 - 0.08), d + ld * (w * 0.5 - 0.06),
+					0.1, 0.1, 0.0, 0.12, "trim"))
 	return {"pieces": [_piece("trough", "quench_trough", parts, str(cell["host"]))]}
+
+
+## HS-FARMHOUSE. A two-wheeled farm cart: bed, side boards, an octagonal wheel
+## either side of the bed, two shafts, and a load of hay.
+static func _farm_cart(cell: Dictionary, gap: float) -> Dictionary:
+	var parts: Array = []
+	var d := gap + 0.65
+	var out3 := Vector3((cell["out"] as Vector2).x, 0.0, (cell["out"] as Vector2).y)
+	parts.append(_part(cell, "cart_bed", 0.0, d, 1.9, 1.0, 0.38, 0.08, "trim"))
+	for side in [-1.0, 1.0]:
+		parts.append(_part(cell, "cart_side", 0.0, d + side * 0.47, 1.9, 0.06, 0.46, 0.3, "trim"))
+		parts.append(_part(cell, "cart_shaft", 1.9, d + side * 0.3, 1.9, 0.07, 0.4, 0.07, "trim"))
+		for turn in [0.0, PI * 0.25]:
+			# The turned square is cut so its corners stay inside the 0.8 m
+			# axle-height box: at full size they dip 0.166 m below the ground.
+			var span := 0.8 if turn == 0.0 else 0.8 / sqrt(2.0)
+			var wheel := _part(cell, "cart_wheel", 0.0, d + side * 0.58, span, 0.07, 0.4 - span * 0.5, span, "trim")
+			wheel["basis"] = Basis(out3, turn)
+			wheel["centre"] = (wheel["centre"] as Vector3) + Vector3(0, 0.0, 0)
+			parts.append(wheel)
+	parts.append(_part(cell, "cart_end", -0.92, d, 0.06, 1.0, 0.46, 0.3, "trim"))
+	var load := _part(cell, "hay_load", 0.0, d, 1.5, 0.8, 0.46, 0.4, "roof")
+	parts.append(load)
+	return {"pieces": [_piece("cart", "farm_cart", parts, str(cell["host"]))]}
 
 
 ## The charcoal lean-to: two posts, a plank roof sloping away from the wall, and
@@ -1071,6 +1401,36 @@ static func _leanto(cell: Dictionary) -> Dictionary:
 	return {"pieces": [_piece("leanto", "charcoal_leanto", parts, str(cell["host"]))]}
 
 
+## HS-FARMHOUSE. The byre: an open-fronted lean-to built against the house wall
+## under a roof of its own, lower than the eaves and pitched away from the wall,
+## with hay stacked in it. Its posts stand at the front edge; the wall is the
+## back. The lean-to roof is thatch (surface "roof"), the hay the pale wall tone.
+static func _byre(cell: Dictionary) -> Dictionary:
+	var w := 3.4
+	var depth := 2.0
+	var high := 2.2
+	var drop := 0.4
+	var parts: Array = []
+	for side in [-1.0, 1.0]:
+		parts.append(_part(cell, "byre_post", side * (w * 0.5 - 0.06), depth - 0.06, 0.12, 0.12,
+			0.0, high - drop - 0.04, "trim"))
+	var tan3 := Vector3((cell["tan"] as Vector2).x, 0.0, (cell["tan"] as Vector2).y)
+	var out3 := Vector3((cell["out"] as Vector2).x, 0.0, (cell["out"] as Vector2).y)
+	var turn := signf(tan3.cross(out3).y)
+	var slope := atan2(drop, depth)
+	var roof := _part(cell, "byre_roof", 0.0, depth * 0.5 + 0.07, w, depth + 0.1,
+		high - drop * 0.5 - 0.06, 0.12, "roof")
+	roof["basis"] = Basis(tan3, -turn * slope)
+	parts.append(roof)
+	for i in 3:
+		var bale := _part(cell, "hay_bale", -1.0 + float(i) * 0.95, 0.5, 0.8, 0.8, 0.0, 0.45, "roof")
+		parts.append(bale)
+	for t in [-0.55, 0.4]:
+		var top := _part(cell, "hay_bale", t, 0.5, 0.8, 0.8, 0.45, 0.45, "roof")
+		parts.append(top)
+	return {"pieces": [_piece("byre", "byre", parts, str(cell["host"]))]}
+
+
 ## A witch's covered processing station, attached to the service wall. The
 ## wall carries the back edge; the enclosed service wing has its own bearing roof.
 ## Measured cauldron, pot, bucket and workbench are laid out as a use sequence,
@@ -1085,6 +1445,13 @@ static func _witch_work_shelter(ctx: Dictionary, cell: Dictionary, gap: float) -
 		else minf(float(ctx["plan"].spec.height) - 0.12, 2.5)
 	var drop := 0.18 if threshold_layout else 0.28
 	var roof_thickness := 0.08
+	if float(ctx["plan"].spec.height) < 2.59:
+		# WITCH-ROOF: a hut wall is at most 2.3 m, so the work shelter hangs from the
+		# top of the wall and falls only 6 cm, or its far end would stand under
+		# the 2.1 m work clearance.
+		wall_y = float(ctx["plan"].spec.height) - 0.02
+		drop = 0.06
+		roof_thickness = 0.04
 	var props: Array = []
 	if not PropCatalog.known("Workbench") or not PropCatalog.known("Cauldron") \
 			or not PropCatalog.known("Pot_1") or not PropCatalog.known("Bucket_Wooden_1"):
@@ -1385,6 +1752,8 @@ static func _witch_shelter_module_parts(cell: Dictionary, prefix: String, center
 		roof_thickness: float) -> Array[Dictionary]:
 	var parts: Array[Dictionary] = []
 	var ledger_y := _witch_roof_under(cell, gap + 0.12, gap, depth, wall_y, drop, roof_thickness)
+	# WITCH-ROOF: under a 2.3 m hut wall only a 5 cm ledger fits above the door head.
+	var ledger_h := 0.05 if roof_thickness < 0.06 else 0.12
 	var post_d := gap + depth - 0.06
 	var post_y := _witch_roof_under(cell, post_d, gap, depth, wall_y, drop, roof_thickness)
 	# The work wing has continuous side returns that bear the eaves. Separate
@@ -1394,7 +1763,7 @@ static func _witch_shelter_module_parts(cell: Dictionary, prefix: String, center
 			parts.append(_part(cell, prefix + "_post", center_t + side * (width * 0.5 - 0.06),
 				post_d, 0.12, 0.12, 0.0, post_y, "trim"))
 	parts.append(_part(cell, prefix + "_ledger", center_t, gap + 0.06,
-		width, 0.12, ledger_y - 0.12, 0.12, "trim"))
+		width, 0.12, ledger_y - ledger_h, ledger_h, "trim"))
 	var out3 := Vector3((cell["out"] as Vector2).x, 0.0, (cell["out"] as Vector2).y)
 	var roof_frame := Basis(Vector3.UP.cross(out3), Vector3.UP, out3)
 	var roof := _part(cell, prefix + "_roof", center_t, gap + depth * 0.5,

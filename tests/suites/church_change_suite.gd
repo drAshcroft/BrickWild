@@ -75,6 +75,8 @@ static func run() -> SuiteResult:
 	_negative_controls(res)
 	_nave_intrusion(res)
 	_tower_crowns(res)
+	_romanesque_large_front(res)
+	_byzantine_large_dome(res)
 	return res
 
 
@@ -344,3 +346,160 @@ static func _expect(res: SuiteResult, ok: bool, message: String) -> void:
 	res.checked += 1
 	if not ok:
 		res.fail(message)
+
+
+## SACRED-ROMANESQUE-LARGE: the frozen large Romanesque (16 x 48 x 24, seed
+## 21325) was a plain gabled box from the front. It must hold a west tower or
+## an apse in its mass_log, and that mass must be unoccluded from the front
+## three-quarter camera of tools/render_sacred_exterior.gd (yaw -0.55). The
+## test casts rays from that camera to a grid on the mass's two visible faces
+## against every OTHER logged mass. A control puts a wall in front of it.
+static func _romanesque_large_front(res: SuiteResult) -> void:
+	for seed_v in [21325, 1, 8102, 9, 77]:
+		var spec := ChurchSpec.new()
+		spec.style = &"romanesque"
+		spec.width = 16.0
+		spec.length = 48.0
+		spec.height = 24.0
+		ChurchGenerator.generate(spec, seed_v)
+		var builder := ChurchBuilder.new()
+		builder.build(spec)
+		var who := "Romanesque large seed=%d" % seed_v
+		var frac := _front_visible_fraction(builder.mass_log, "tower")
+		_expect(res, frac >= 0.6,
+			"%s: west tower visible from the front 3/4 on %.0f%% of its faces" % [who, frac * 100.0])
+		if seed_v == 21325:
+			_expect(res, spec.tower and spec.west_towers == 1 and spec.width == 16.0
+					and spec.length == 48.0 and spec.height == 24.0,
+				"%s: tower present and the pinned dimensions unchanged" % who)
+			var walled: Array = builder.mass_log.duplicate()
+			var tw: AABB = _mass_aabb(builder.mass_log, "tower")
+			walled.append({"name": "control_wall", "aabb": AABB(
+				Vector3(tw.position.x - 30.0, 0.0, tw.position.z - 8.0),
+				Vector3(60.0, 80.0, 1.0))})
+			_expect(res, _front_visible_fraction(walled, "tower") < 0.05,
+				"%s: occlusion control (a wall in front) must hide the tower" % who)
+
+
+## SACRED-BYZANTINE-DOME: a large Byzantine church's dome crown must be in a
+## clear sight line from the exterior entry eye (1.6 m, on the axis, at the
+## door approach). Occluders are every logged mass except the dome's own
+## pendentive and drum, plus the nave roof up to its ridge. Controls: a raised
+## west gable, and the dome back over the east crossing, must both fail.
+static func _byzantine_large_dome(res: SuiteResult) -> void:
+	for seed_v in [21325, 1, 8102, 9, 77]:
+		var spec := ChurchSpec.new()
+		spec.style = &"byzantine"
+		spec.width = 16.0
+		spec.length = 48.0
+		spec.height = 24.0
+		ChurchGenerator.generate(spec, seed_v)
+		var who := "Byzantine large seed=%d" % seed_v
+		if not spec.dome:
+			_expect(res, false, "%s: no dome" % who)
+			continue
+		var builder := ChurchBuilder.new()
+		builder.build(spec)
+		var crown := Vector3(0.0, ChurchGeometry.dome_crown_height(spec),
+			ChurchGeometry.crossing_center_z(spec))
+		var eye: Vector3 = ChurchGeometry.entry_eye(spec)
+		var occluders := _dome_occluders(spec, builder.mass_log)
+		_expect(res, not _any_hit(eye, crown, occluders),
+			"%s: dome crown unobstructed from the entry eye" % who)
+		if seed_v == 21325:
+			_expect(res, spec.width == 16.0 and spec.length == 48.0 and spec.height == 24.0,
+				"%s: pinned dimensions unchanged" % who)
+			var raised: Array = occluders.duplicate()
+			raised.append(AABB(Vector3(-spec.width / 2.0, 0.0, -spec.length / 2.0 - 0.5),
+				Vector3(spec.width, crown.y + 4.0, 0.5)))
+			_expect(res, _any_hit(eye, crown, raised),
+				"%s: control (raised west gable) must hide the dome" % who)
+			spec.dome_west = false
+			var east := ChurchBuilder.new()
+			east.build(spec)
+			var east_crown := Vector3(0.0, ChurchGeometry.dome_crown_height(spec),
+				ChurchGeometry.crossing_center_z(spec))
+			_expect(res, _any_hit(eye, east_crown, _dome_occluders(spec, east.mass_log)),
+				"%s: control (dome back over the east crossing) must hide the dome" % who)
+
+
+static func _dome_occluders(spec: ChurchSpec, log: Array) -> Array:
+	var out: Array = []
+	for row in log:
+		if String(row["name"]) in ["pendentive", "dome_drum"]:
+			continue
+		out.append(row["aabb"])
+	out.append(AABB(Vector3(-spec.width / 2.0, spec.height, -spec.length / 2.0),
+		Vector3(spec.width, ChurchGeometry.nave_ridge_height(spec) - spec.height, spec.length)))
+	return out
+
+
+static func _any_hit(a: Vector3, b: Vector3, boxes: Array) -> bool:
+	for box in boxes:
+		if _segment_hits(a, b, box):
+			return true
+	return false
+
+
+static func _mass_aabb(log: Array, mass_name: String) -> AABB:
+	for row in log:
+		if String(row["name"]) == mass_name:
+			return row["aabb"]
+	return AABB()
+
+
+static func _front_visible_fraction(log: Array, mass_name: String) -> float:
+	var target: AABB = _mass_aabb(log, mass_name)
+	if target.size == Vector3.ZERO:
+		return 0.0
+	var whole: AABB = log[0]["aabb"]
+	for row in log:
+		whole = whole.merge(row["aabb"])
+	var c: Vector3 = whole.get_center()
+	var radius: float = maxf(whole.size.length() * 0.5, 1.0)
+	var yaw := -0.55
+	var cam: Vector3 = c + Vector3(sin(yaw) * radius * 2.3, radius * 0.38, -cos(yaw) * radius * 2.3)
+	var seen := 0
+	var total := 0
+	var inset := 0.05
+	for face in 2:  # the west (-Z) face and the -X face face the camera
+		for iu in 5:
+			for iv in 5:
+				var u: float = 0.1 + 0.8 * iu / 4.0
+				var v: float = 0.1 + 0.8 * iv / 4.0
+				var p: Vector3
+				if face == 0:
+					p = target.position + Vector3(target.size.x * u, target.size.y * v, -inset)
+				else:
+					p = target.position + Vector3(-inset, target.size.y * v, target.size.z * u)
+				total += 1
+				var hit := false
+				for row in log:
+					if String(row["name"]) == mass_name:
+						continue
+					if _segment_hits(cam, p, row["aabb"]):
+						hit = true
+						break
+				if not hit:
+					seen += 1
+	return float(seen) / float(total)
+
+
+static func _segment_hits(a: Vector3, b: Vector3, box: AABB) -> bool:
+	var t0 := 0.0
+	var t1 := 1.0
+	var d: Vector3 = b - a
+	for axis in 3:
+		var lo: float = box.position[axis]
+		var hi: float = box.end[axis]
+		if absf(d[axis]) < 1e-9:
+			if a[axis] < lo or a[axis] > hi:
+				return false
+		else:
+			var ta: float = (lo - a[axis]) / d[axis]
+			var tb: float = (hi - a[axis]) / d[axis]
+			t0 = maxf(t0, minf(ta, tb))
+			t1 = minf(t1, maxf(ta, tb))
+			if t0 > t1:
+				return false
+	return true

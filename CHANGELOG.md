@@ -8,6 +8,7 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
 
 ## Unreleased
 
+
 ### Fixes
 
 - **A caller's wall thickness survives `HouseGenerator.generate`.** Since
@@ -19,6 +20,37 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
   left the override at its default. BrickWild's own adapters always build a
   fresh spec, so nothing BrickWild generates changes. Pinned by
   `tests/house_wall_thickness_override_test.gd`, which fails on 0.1.4.
+
+### Renamed
+
+- **House style `mud_hut` is now `roundhouse`.** The published style id (the
+  `BuildingLibrary` option list, `BuildingRequest.style`, `HouseSpec.STYLES`)
+  is `roundhouse`, labelled "Roundhouse". `mud_hut` stays an ALIAS: a request,
+  saved file or `HouseSpec.style` that says `mud_hut` is accepted, resolves to
+  `roundhouse` (`HouseSpec.canonical_style`) and builds the same house as one
+  that says `roundhouse`. Nothing needs to change; new code should say
+  `roundhouse`.
+- **The roundhouse is round.** A plain roundhouse (no trade) is now ONE round
+  room: a twelve-sided floor inside a 0.62 m wall, a thatched cone over it with
+  a smoke vent at the apex, a fire on the middle of the floor and a bed at the
+  wall. It takes a circle of the width asked for, between 8 and 10 m, and one
+  storey. A roundhouse that carries a trade keeps the old square hut. The
+  corner piers, veranda and eave roll of the old hut are gone from the plain
+  one.
+
+### Changed
+
+- **The `pueblo` house is a stepped adobe house.** A plain pueblo (no trade) on
+  a footprint that can step is now two or three storeys, each set back from the
+  one below, with a walkable terrace behind a parapet on every roof, a ladder up
+  to each terrace (no stair inside; an upper room opens onto the terrace in
+  front of it), round roof beams standing out of every wall, and small deep
+  openings in its 0.72 m walls. A request for one storey on such a footprint is
+  given two. A pueblo that carries a trade, or a footprint too small to step,
+  keeps its old single block. `BrickWild.navigation` publishes each ladder as a
+  stair row with `"ladder": true`; the building plan export lists it as a stair
+  with `"kind": "ladder"`.
+
 
 ## 0.1.4 - 2026-10-23
 

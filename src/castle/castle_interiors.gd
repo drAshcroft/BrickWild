@@ -281,6 +281,8 @@ static func _settle_store_furniture(plan: HousePlan, room: int) -> void:
 		if int(plan.furniture[index].get("room", -1)) == room \
 				and not PropCatalog.suits_room(String(plan.furniture[index]["key"]), &"store"):
 			plan.furniture.remove_at(index)
+			HouseFurnishRepair.reindex_hosts(plan, index)
+			index = mini(index, plan.furniture.size())
 		index -= 1
 
 
@@ -452,11 +454,14 @@ static func emit(owner: CastleBuilder, row: Dictionary) -> void:
 	var transform: Transform3D = row.transform
 	for part in builder.part_log:
 		var opening_kind := String(part.get("opening_kind", ""))
-		if not opening_kind in ["window", "door"]:
+		# A shop's service hatch is a window-sized hole the shell really cuts;
+		# castle QA reads it as a window (CASTLE-YARD-WINDOW) while the record
+		# keeps `opening_kind` "hatch" so the occupancy check can tell it.
+		if not opening_kind in ["window", "door", "hatch"]:
 			continue
 		var imported: Dictionary = part.duplicate(true)
 		var facing := (transform.basis * Vector3(part.facing)).normalized()
-		imported.kind = opening_kind
+		imported.kind = "window" if opening_kind == "hatch" else opening_kind
 		imported.pos = transform * Vector3(part.pos)
 		imported.facing = facing
 		imported.rot_y = atan2(facing.x, facing.z)

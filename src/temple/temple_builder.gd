@@ -322,6 +322,7 @@ func _build_walls() -> void:
 		_build_rotunda_upper_arcade(t, h)
 		_gate_void(-TempleGeometry.rotunda_outer_radius(spec) + t * 0.5)
 		_build_rotunda_gate_surround()
+		_build_rotunda_peristyle()
 		return
 	var runs := [
 		{"name": "wall_left", "rect": Rect2(Vector2(r.position.x, side_start_y),
@@ -557,9 +558,17 @@ func _build_rotunda_upper_arcade(thickness: float, roof_y: float) -> void:
 	var gate_half: float = atan((TempleGeometry.GATE_W * 0.5 + pier_w * 0.55) / radius)
 	var portal_half: float = maxf(TempleGeometry.rotunda_gate_panel_half_angle(spec), gate_half)
 	var used_panels: Dictionary = {}
+	# SACRED-ROTUNDA-FOCUS: the snap used to run pier by pier, so the first pier
+	# to claim a contested panel decided the second's and the ring came out
+	# lop-sided (piers 04/10 or 04/13 had no twin across the axis). Each pier
+	# now claims its panel AND the panel's mirror for its own mirror pier, so
+	# the ring is symmetric about the gate axis by construction.
+	var mirrored_ok: bool = count % 2 == 0 and panel_count % 2 == 0
+	var chosen: Dictionary = {}
 	for i in range(count):
+		if chosen.has(i):
+			continue
 		var target_angle: float = -PI + (float(i) + 0.5) * step
-		var angle: float = 0.0
 		var nearest_panel: int = -1
 		var nearest_delta: float = INF
 		for panel_index in range(panel_count):
@@ -567,14 +576,30 @@ func _build_rotunda_upper_arcade(thickness: float, roof_y: float) -> void:
 			var relative: float = wrapf(candidate + PI * 0.5 + PI, 0.0, TAU) - PI
 			if absf(relative) <= portal_half or used_panels.has(panel_index):
 				continue
+			if mirrored_ok and used_panels.has(posmod(panel_count / 2 - panel_index - 1, panel_count)):
+				continue
+			# a pier whose own mirror is itself (on the gate axis) may only
+			# stand on a panel that is its own mirror, or it has no twin
+			if mirrored_ok and posmod(count / 2 - i - 1, count) == i 					and posmod(panel_count / 2 - panel_index - 1, panel_count) != panel_index:
+				continue
 			var delta: float = absf(wrapf(candidate - target_angle + PI, 0.0, TAU) - PI)
 			if delta < nearest_delta:
 				nearest_delta = delta
 				nearest_panel = panel_index
-				angle = candidate
 		if nearest_panel < 0:
 			continue
 		used_panels[nearest_panel] = true
+		chosen[i] = nearest_panel
+		if mirrored_ok:
+			var twin_panel: int = posmod(panel_count / 2 - nearest_panel - 1, panel_count)
+			var twin_pier: int = posmod(count / 2 - i - 1, count)
+			used_panels[twin_panel] = true
+			if twin_pier != i and not chosen.has(twin_pier):
+				chosen[twin_pier] = twin_panel
+	for i in range(count):
+		if not chosen.has(i):
+			continue
+		var angle: float = -PI + (float(chosen[i]) + 0.5) * panel_step
 		var center := Vector3(cos(angle) * radius, lower + band_h * 0.5,
 			sin(angle) * radius)
 		var size := Vector3(pier_w, band_h, thickness * 0.90)
@@ -583,6 +608,83 @@ func _build_rotunda_upper_arcade(thickness: float, roof_y: float) -> void:
 		component_box("rotunda_arcade_pier", size, xf, SURF_STONE)
 		host_end()
 		_log_mass("rotunda_arcade_pier_%02d" % i, _rotated_box_bounds(size, xf))
+
+
+## SACRED-ROTUNDA-PERISTYLE: columns on the ground round the drum, an
+## architrave over each bay and a flat ceiling slab tying it back to the drum.
+## The two columns nearest the axis flank the door; no beam or slab crosses
+## the door bay, so the procession lane stays open.
+func _build_rotunda_peristyle() -> void:
+	var cols: Array[Vector2] = TempleGeometry.rotunda_peristyle_columns(spec)
+	var h: float = TempleGeometry.rotunda_peristyle_column_height(spec)
+	if cols.size() < 8 or h < 1.8:
+		return
+	_build_rotunda_peristyle_paving()
+	tag("column")
+	var r: float = spec.column_r
+	var cap: float = TempleGeometry.COLUMN_CAP * r
+	var beam_h: float = TempleGeometry.ROTUNDA_PERISTYLE_BEAM
+	var slab_t: float = TempleGeometry.ROTUNDA_PERISTYLE_SLAB
+	for i in range(cols.size()):
+		var c: Vector2 = cols[i]
+		box(Vector3(r * 2.4, 0.22, r * 2.4), Vector3(c.x, 0.11, c.y), SURF_STONE)
+		_kit.drum(Vector3(c.x, 0.22, c.y), r, r * 0.86, h - 0.22, SURF_STONE, 12)
+		_kit.drum(Vector3(c.x, h, c.y), r * 1.25, r * 1.1, cap, SURF_TRIM, 12)
+		_log_mass("rotunda_peristyle_column_%02d" % i,
+			AABB(Vector3(c.x - r * 1.2, 0.0, c.y - r * 1.2),
+				Vector3(r * 2.4, h + cap, r * 2.4)))
+	tag("structure")
+	var arch_y: float = h + cap + beam_h * 0.5
+	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
+	host("rotunda_peristyle")
+	for i in range(cols.size() - 1):
+		var a: Vector2 = cols[i]
+		var b: Vector2 = cols[i + 1]
+		var delta: Vector2 = b - a
+		var asize := Vector3(delta.length() + r * 0.9, beam_h, r * 1.6)
+		var xf := Transform3D(Basis(Vector3.UP, atan2(-delta.y, delta.x)),
+			Vector3((a.x + b.x) * 0.5, arch_y, (a.y + b.y) * 0.5))
+		# a component row, not a mass: the ring architrave is one too, and a
+		# bare AABB of a skewed beam would "overlap" its neighbours
+		component_box("rotunda_peristyle_architrave", asize, xf, SURF_TRIM)
+		# the ceiling bay: out to the architrave, back to the drum face
+		var half: float = atan2(delta.length() * 0.5, a.length())
+		var inner: float = outer / cos(half) - 0.01
+		var pa: Vector2 = a.normalized() * inner
+		var pb: Vector2 = b.normalized() * inner
+		var y: float = h + cap + beam_h + slab_t * 0.5
+		var quad := PackedVector3Array([
+			Vector3(a.x, y, a.y), Vector3(b.x, y, b.y),
+			Vector3(pb.x, y, pb.y), Vector3(pa.x, y, pa.y)])
+		component_slab("rotunda_peristyle_ceiling", quad, slab_t, SURF_STONE)
+	host_end()
+
+
+## The stylobate: a ring of paving from the drum to the column plinths, so the
+## columns stand on something. It stops short of the door bay, which the
+## forecourt paves. Logged as one floor mass, as the perimeter wings are.
+func _build_rotunda_peristyle_paving() -> void:
+	var outer: float = TempleGeometry.rotunda_outer_radius(spec)
+	var reach: float = TempleGeometry.rotunda_peristyle_extent(spec)
+	var t: float = 0.2
+	var door_half: float = (TempleGeometry.GATE_W + 1.2) * 0.5
+	var segments := 48
+	tag("floor")
+	host("rotunda_peristyle_paving")
+	for k in range(segments):
+		var a0: float = TAU * float(k) / float(segments)
+		var a1: float = TAU * float(k + 1) / float(segments)
+		var mid: float = (a0 + a1) * 0.5
+		if cos(mid) > 0.0 and absf(sin(mid)) * reach < door_half + 0.4:
+			continue # the door bay: the forecourt paves it
+		var quad := PackedVector3Array()
+		for p in [Vector2(sin(a0), -cos(a0)) * outer, Vector2(sin(a1), -cos(a1)) * outer,
+				Vector2(sin(a1), -cos(a1)) * reach, Vector2(sin(a0), -cos(a0)) * reach]:
+			quad.append(Vector3(p.x, -t * 0.5 + 0.001, p.y))
+		component_slab("rotunda_peristyle_paving", quad, t, SURF_STONE)
+	host_end()
+	_log_mass("floor_rotunda_peristyle", AABB(Vector3(-reach, -t + 0.001, -reach),
+		Vector3(reach * 2.0, t, reach * 2.0)))
 
 
 ## A shallow stone surround gives the -Z entry a legible classical face.
@@ -933,12 +1035,31 @@ func _build_idol() -> void:
 		component_box("basilica_apse_focal_plinth", plinth_size,
 			Transform3D(Basis.IDENTITY, plinth_center), SURF_STONE)
 		host_end()
+	# SACRED-BASILICA-FOCUS: in a long hall the god is a small shape at the far
+	# end of a dark or glowing nave, and lost either way. A backdrop panel just
+	# behind him gives the eye an edge to find: pale cult trim behind a dark
+	# monolith, a dark panel behind a figure that stood against a lit wall.
+	var halo: bool = spec.form == &"basilica" or spec.form == &"pylon"
+	var pale_halo: bool = halo and spec.idol_kind == &"monolith"
+	if halo:
+		var hh: float = h * 1.25
+		var hw2: float = minf(w * 1.5, w + 2.0) if spec.form == &"pylon" else w * 1.15
+		_kit.oriented_box(Vector3(hw2, hh, 0.16),
+			Transform3D(Basis.IDENTITY, Vector3(c.x, c.y + hh * 0.5, c.z + w * 0.5 + 0.22)),
+			SURF_TRIM if pale_halo else SURF_DARK)
 	match spec.idol_kind:
 		&"monolith":
 			# a leaning slab, unworked, older than the temple round it
-			_kit.oriented_box(Vector3(w, h, w * 0.32),
-				Transform3D(Basis(Vector3(0, 0, 1), 0.05), Vector3(c.x, c.y + h / 2.0, c.z)),
-				SURF_STONE)
+			# SACRED-ROTUNDA-FOCUS: the void cult's stone is near-black, so a
+			# stone slab vanished against the drum. The slab is the cult's
+			# lighter trim hue, with a dark rune cut down its face, so it
+			# separates from the wall behind it in tone and has a mark to read.
+			var slab := Transform3D(Basis(Vector3(0, 0, 1), 0.05),
+				Vector3(c.x, c.y + h / 2.0, c.z))
+			_kit.oriented_box(Vector3(w, h, w * 0.32), slab, SURF_DARK if pale_halo else SURF_TRIM)
+			_kit.oriented_box(Vector3(w * 0.12, h * 0.62, w * 0.04),
+				Transform3D(slab.basis, slab.origin + slab.basis * Vector3(0, h * 0.04, -w * 0.17)),
+				SURF_TRIM if pale_halo else SURF_DARK)
 			box(Vector3(w * 1.3, 0.3, w * 0.7), Vector3(c.x, c.y + 0.15, c.z), SURF_TRIM)
 		&"figure":
 			# legs, body, arms, and a head too small for them
@@ -1704,6 +1825,14 @@ func _build_order() -> void:
 				continue
 			_clerestory(normal, face, mid, runs_z, r, minf(bay * 0.3, 1.4),
 				clampf(h * 0.2, 1.0, 3.2), h * 0.66)
+			# SACRED-BASILICA-FOCUS: the flank used to be a row of identical
+			# pilasters over bare wall. Each bay now carries a blind niche
+			# below its light: a trim frame with a dark recess, so the flank
+			# reads as an arcaded order rather than a shed wall.
+			if spec.form == &"basilica":
+				_flank_niche(normal, face, mid, runs_z, r, bay - pw - 0.5,
+					podium + 0.7, h * 0.66 - clampf(h * 0.2, 1.0, 3.2) * 0.5 - 0.4,
+					"basilica_flank_niche_%d_%d" % [wall, i])
 
 	# raking cornices: each gable end becomes a pediment framed top and bottom
 	var has_nave_bearings: bool = TempleGeometry.basilica_has_nave_bearings(spec)
@@ -1808,6 +1937,24 @@ func _pilaster(normal: Vector3, face: float, s: float, runs_z: bool, r: Rect2,
 func _order_pilaster_box(role: String, size: Vector3, position: Vector3, surface: int) -> void:
 	component_box(role, size, Transform3D(Basis(), position), surface)
 	_log_part("box", position, size)
+
+
+## One blind niche on a flank: a trim frame standing 0.08 m proud with a dark
+## recess in front of it, between two pilasters and below the clerestory light.
+func _flank_niche(normal: Vector3, face: float, s: float, runs_z: bool, r: Rect2,
+		w: float, y0: float, y1: float, role: String) -> void:
+	if w < 0.8 or y1 - y0 < 1.2:
+		return
+	var c: Vector3 = _on_wall(normal, face, s, runs_z, r)
+	var sz := func(ww: float, yy: float, d: float) -> Vector3:
+		return Vector3(d, yy, ww) if runs_z else Vector3(ww, yy, d)
+	var cy: float = (y0 + y1) * 0.5
+	host(role)
+	component_box("basilica_flank_niche_frame", sz.call(w, y1 - y0, 0.08),
+		Transform3D(Basis(), c + normal * 0.04 + Vector3(0.0, cy, 0.0)), SURF_TRIM)
+	component_box("basilica_flank_niche_recess", sz.call(w - 0.4, y1 - y0 - 0.4, 0.04),
+		Transform3D(Basis(), c + normal * 0.10 + Vector3(0.0, cy, 0.0)), SURF_DARK)
+	host_end()
 
 
 ## A clerestory light: a dark opening on the outer face with a stone sill and

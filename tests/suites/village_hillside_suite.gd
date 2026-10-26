@@ -20,19 +20,23 @@ extends RefCounted
 ##              the form is forced and the twin derives its own)
 ##
 ## One 50-person plan, seed 4242, on the synthetic 30 % plane -- the fixture
-## the lane also gates on grades, dry ground and siting.
+## the lane also gates on grades, dry ground and siting -- then the same plan on
+## real30/manarola and real30/masouleh (HILLS-FIXTURES).
 
 const SYNTH := preload("res://tests/fixtures/terrain/synthetic_terrain.gd")
 const POPULATION := 50
 const SEED := 4242
 const TERRACES := 3
+## The real hillsides, forced to the form (Manarola derives `shore`, Masouleh
+## `hillside`; both are planned here as the hillside they climb).
+const REAL_FIXTURES := ["real30/manarola", "real30/masouleh", "real30/rocamadour"]
 
 ## The real steep sites' p10-p90 bands (world_settlements.json, 46 sites with
 ## a median slope of 8 % or more). Recorded in docs/SETTLEMENT_TESTSET.md.
-const BAND_ELONGATION := Vector2(1.32, 4.88)
-const BAND_CONTOUR := Vector2(0.389, 0.798)
-const BAND_SPAN_M := Vector2(14.4, 73.0)
-const BAND_STEPS := Vector2(0.0, 46.5)
+const BAND_ELONGATION := VillageHillsideForm.BAND_ELONGATION
+const BAND_CONTOUR := VillageHillsideForm.BAND_CONTOUR
+const BAND_SPAN_M := VillageHillsideForm.BAND_SPAN_M
+const BAND_STEPS := VillageHillsideForm.BAND_STEPS
 
 
 static func run() -> SuiteResult:
@@ -117,8 +121,83 @@ static func run() -> SuiteResult:
 	res.checked += 1
 	if not qa["ok"]:
 		res.fail("plane_30 hillside: village QA: " + "; ".join((qa["failures"] as Array).slice(0, 5)))
+	for name in REAL_FIXTURES:
+		_real(res, jobs, name)
 	res.note("total %.1f s" % ((Time.get_ticks_msec() - t0) / 1000.0))
 	return res
+
+
+## The two real hillsides (HILLS-FIXTURES, HILLS-QA): the same four bands,
+## every household housed and every requested building placed (the tavern
+## included), every way inside its class's grade, the terraces and the stepped
+## cross-lanes laid, the road check and VillageQA.
+static func _real(res: SuiteResult, jobs: Array[Dictionary], name: String) -> void:
+	var ground := VillageTerrain.from_file("res://tests/fixtures/terrain/%s.json" % name)
+	res.checked += 1
+	if ground == null or not ground.valid():
+		res.fail("%s: the fixture does not read" % name)
+		return
+	var spec := _spec(ground)
+	var t1 := Time.get_ticks_msec()
+	var plan := VillageLotPlanner.plan_measured(spec, jobs)
+	res.checked += 1
+	if plan.ground == null or plan.roads.is_empty():
+		res.fail("%s: the hillside village was not sited" % name)
+		return
+	var m := VillageShape.measure(plan)
+	res.note("%s hillside: contour %s, span %s m, elongation %s, steps %s, houses %d/%d (%.1f s)" % [
+		name, str(m.get("street_contour_share")), str(m.get("elev_span_m")), str(m.get("elongation")),
+		str(m.get("steps_ways")), plan.buildings_of_kind(&"house").size(), spec.households,
+		(Time.get_ticks_msec() - t1) / 1000.0])
+	_band(res, "elongation", m.get("elongation"), BAND_ELONGATION, name)
+	_band(res, "street_contour_share", m.get("street_contour_share"), BAND_CONTOUR, name)
+	_band(res, "elev_span_m", m.get("elev_span_m"), BAND_SPAN_M, name)
+	_band(res, "steps_ways", m.get("steps_ways"), BAND_STEPS, name)
+	res.checked += 1
+	if plan.buildings_of_kind(&"house").size() != spec.households:
+		res.fail("%s hillside: %d houses for %d households (unhoused %d)" % [
+			name, plan.buildings_of_kind(&"house").size(), spec.households,
+			spec.households - plan.buildings_of_kind(&"house").size()])
+	var terraces := 0
+	var steps := 0
+	for r in range(plan.roads.size()):
+		var road: Dictionary = plan.roads[r]
+		if road.has("terrace"):
+			terraces += 1
+		if road["class"] == &"steps":
+			steps += 1
+		res.checked += 1
+		if float(VillageRoadRouter.grade_of(plan.ground, road["points"])) > float(
+				VillageSitePlanner.ROAD_CLASSES[road["class"]]["grade_max"]) + 1e-6 				and r != 0:
+			res.fail("%s hillside: %s %d climbs past its class's cap" % [name, String(road["class"]), r])
+	res.checked += 1
+	if terraces != TERRACES:
+		res.fail("%s hillside: %d terrace ways, wants %d" % [name, terraces, TERRACES])
+	res.checked += 1
+	if steps < 4:
+		res.fail("%s hillside: %d stepped ways, wants at least 4" % [name, steps])
+	res.checked += 1
+	if plan.buildings.size() != VillageProgrammer.programme(spec).size():
+		res.fail("%s hillside: %d of %d requested buildings placed" % [
+			name, plan.buildings.size(), VillageProgrammer.programme(spec).size()])
+	var roads := VillageRoadCheck.new().check(plan)
+	res.checked += 1
+	if not roads["ok"]:
+		res.fail("%s hillside: road check: %s" % [name, "; ".join((roads["failures"] as Array).slice(0, 5))])
+	var no_pure := func(_p: VillagePlan) -> Array: return []
+	var qa := VillageQA.new().check(plan, {&"pure": no_pure}, false)
+	res.checked += 1
+	if not qa["ok"]:
+		res.fail("%s hillside: village QA: %s" % [name, "; ".join((qa["failures"] as Array).slice(0, 5))])
+	# the through road's cap has teeth: a stair street (`stepped`) is let off it,
+	# and the same plan with the flag taken away fails the road check
+	if bool(plan.roads[0].get("stepped", false)):
+		plan.roads[0]["stepped"] = false
+		var cart := VillageRoadCheck.new().check(plan)
+		plan.roads[0]["stepped"] = true
+		res.checked += 1
+		if cart["ok"] or not (cart["failures"] as Array).any(func(f: String) -> bool: return f.begins_with("through_grade")):
+			res.fail("%s hillside: an over-cap through road without `stepped` passed the road check" % name)
 
 
 static func _spec(ground: VillageTerrain) -> VillageSpec:
@@ -130,12 +209,12 @@ static func _spec(ground: VillageTerrain) -> VillageSpec:
 	return s
 
 
-static func _band(res: SuiteResult, key: String, value: Variant, band: Vector2) -> void:
+static func _band(res: SuiteResult, key: String, value: Variant, band: Vector2, name := "plane_30") -> void:
 	res.checked += 1
 	if value == null:
-		res.fail("plane_30 hillside: no %s" % key)
+		res.fail("%s hillside: no %s" % [name, key])
 		return
 	var v := float(value)
 	if v < band.x or v > band.y:
-		res.fail("plane_30 hillside: %s is %s, outside the steep sites' p10-p90 band %.3f-%.3f" % [
-			key, str(value), band.x, band.y])
+		res.fail("%s hillside: %s is %s, outside the steep sites' p10-p90 band %.3f-%.3f" % [
+			name, key, str(value), band.x, band.y])

@@ -6,8 +6,6 @@ const ROOF_SURFACE := 2
 const WALL_SURFACE := 0
 const SIZES := [
 	{"name": "small", "width": 7.0, "length": 9.0, "height": 2.6},
-	{"name": "default", "width": 9.0, "length": 12.0, "height": 2.6},
-	{"name": "large", "width": 17.0, "length": 18.0, "height": 2.8},
 ]
 const SEEDS := [1, 8102, 21325]
 const CUSTOM_SPEC := preload("res://tests/fixtures/witch_custom_house_spec.gd")
@@ -74,14 +72,9 @@ func _check_witch_case(size: Dictionary, seed: int) -> void:
 	var right_run := absf(half - ridge_x)
 	var shallow_x := ridge_x - d if left_run > right_run else ridge_x + d
 	var steep_x := ridge_x + d if left_run > right_run else ridge_x - d
-	# The lower service roof answers for the eave strip only; a slope probe is
-	# still on the main planes wherever the probe X is outside the shed's own
-	# cut outline. Ask the outline rather than the along-span, because the bay
-	# can now run the whole eave and leave no along-station free of it.
-	var roof_probe_z := _uncut_roof_z(layout, [shallow_x, steep_x])
-	if not is_finite(roof_probe_z):
-		failures.append("Witch %s seed %d has no uncut main-roof station for slope probes" % [size.name, seed])
-		roof_probe_z = 0.0 # keep both actual-plane rays and the remaining frame probes active
+	# A witch hut has one plain gable roof (WITCH-SIZE deleted the service bay),
+	# so the centre of the ridge is on the main planes.
+	var roof_probe_z := 0.0
 	var shallow_probe := transform * Vector3(shallow_x, 0.0, roof_probe_z)
 	var steep_probe := transform * Vector3(steep_x, 0.0, roof_probe_z)
 	var roof_top := float(transform.origin.y) + rise + 1.0
@@ -169,38 +162,10 @@ func _check_symmetric_control(size: Dictionary, style: StringName, trade: String
 	mesh.clear_surfaces()
 
 
-## The along-station at which every one of `probe_x` still stands on the MAIN
-## roof planes. A station inside the lower service roof's cut outline is a shed
-## station, not a main-roof one, and a vertical ray there measures the shed.
-func _uncut_roof_z(layout: Dictionary, probe_x: Array) -> float:
-	var along := float(layout.get("along", 0.0))
-	var half := along * 0.5
-	var bay: Dictionary = layout.get("witch_bay", {})
-	var outline: PackedVector2Array = bay.get("outline", PackedVector2Array())
-	for candidate in [0.0, -half * 0.5, half * 0.5, -half + 0.12, half - 0.12]:
-		if absf(candidate) > half - 0.04:
-			continue
-		var cut := false
-		if outline.size() >= 3:
-			for x in probe_x:
-				if Geometry2D.is_point_in_polygon(Vector2(float(x), float(candidate)), outline):
-					cut = true
-					break
-		if not cut:
-			return float(candidate)
-	return NAN
-
-
+## The two along-stations of the gable frames, one at each end.
 func _retained_gable_stations(layout: Dictionary) -> Array[float]:
-	var result: Array[float] = []
 	var station_offset := float(layout.get("along", 0.0)) * 0.5 + HouseGeometry.BEAM_D * 0.5 - 0.01
-	var bay: Dictionary = layout.get("witch_bay", {})
-	var roof_faces: Array[PackedVector3Array] = layout["faces"]
-	for end_sign in [-1.0, 1.0]:
-		var station := float(end_sign) * station_offset
-		if bay.is_empty() or station < float(bay.get("along_lo", INF)) - 0.001 or station > float(bay.get("along_hi", -INF)) + 0.001:
-			result.append(station)
-	return result
+	return [-station_offset, station_offset]
 
 
 func _surface_height(mesh: ArrayMesh, surface: int, xz: Vector2, top_y: float) -> float:
@@ -263,81 +228,15 @@ func _check_gable_infill(mesh: ArrayMesh, layout: Dictionary, plan: HousePlan, w
 	var half_along := float(layout["along"]) * 0.5
 	var ridge_x := float(layout["ridge_x"])
 	var rise := float(layout["rise"])
-	var bay: Dictionary = layout.get("witch_bay", {})
-	var roof_faces: Array[PackedVector3Array] = layout["faces"]
 	for end_sign in [-1.0, 1.0]:
 		var local_z := float(end_sign) * half_along
 		var outside_z := local_z + float(end_sign) * 0.5
 		var inside_z := local_z - float(end_sign) * 0.5
-		var cut_end := not bay.is_empty() and local_z >= float(bay.get("along_lo", INF)) - 0.001 and local_z <= float(bay.get("along_hi", -INF)) + 0.001
-		if not cut_end:
-			var original_y := rise * 0.56
-			var original_outside := transform * Vector3(ridge_x, original_y, outside_z)
-			var original_inside := transform * Vector3(ridge_x, original_y, inside_z)
-			if not _surface_segment_hits(mesh, WALL_SURFACE, original_outside, original_inside):
-				failures.append("%s original gable profile is missing outside the bay at end %.0f" % [who, end_sign])
-			continue
-		var axis := int(bay.get("axis", 0))
-		if axis != 0:
-			# The outboard gable closure is emitted for an eave-parallel shed
-			# only (_build_witch_bay_outboard_gables), so this end station has
-			# nothing of the kind to measure.
-			return
-		var outer := float(bay["outer"])
-		var inner := float(bay["inner"])
-		var eave_y := float(bay["eave_y"])
-		var join_y := float(bay["join_y"])
-		# The end wall starts at the measured shell corner on the service side
-		# and runs to the high core's wall, exactly as the builder locates it.
-		var service_normal: Vector2 = Vector2(bay["normal"]).normalized()
-		var corner_x := NAN
-		for run_variant in HouseGeometry.exterior_runs(plan.spec, 0):
-			var end_run: Dictionary = run_variant
-			if absf((end_run["normal"] as Vector2).dot(service_normal)) > 0.10:
-				continue
-			var run_from: Vector2 = end_run["from"]
-			var run_to: Vector2 = end_run["to"]
-			var corner := run_from if run_from.dot(service_normal) >= run_to.dot(service_normal) else run_to
-			var local_corner := transform.affine_inverse() * Vector3(corner.x, transform.origin.y, corner.y)
-			if signf(local_corner.z) != end_sign:
-				continue
-			corner_x = local_corner.x
-		if not is_finite(corner_x):
-			failures.append("%s cut end %.0f has no measured service-side shell corner" % [who, end_sign])
-			continue
-		var cross_lo := minf(corner_x, inner)
-		var cross_hi := maxf(corner_x, inner)
-		# The cut gable's end wall is a real wall up to the HIGHER of the two
-		# roof undersides at that station -- the main plane's where the high
-		# roof reaches, the shed plane's over the service wing -- and there is
-		# no wall above it at all. Where the shed is the higher plane the band
-		# between is closed by the measured closure panel; where the main plane
-		# is higher it is the removed gable, which the shed replaces. Both are
-		# the same statement about the wall's top edge, so one probe per
-		# station tests both.
-		var tested := 0
-		for step in range(6, 20):
-			var local_x := lerpf(cross_lo, cross_hi, float(step) / 20.0)
-			var host_y := RoofShape.height_at(roof_faces, Vector2(local_x, local_z))
-			var host_under := maxf(0.0, host_y - RoofShape.DEPTH * 0.5) if is_finite(host_y) else 0.0
-			var span_t := clampf((local_x - outer) / (inner - outer), 0.0, 1.0)
-			var shed_under := lerpf(eave_y, join_y, span_t) - RoofShape.DEPTH * 0.5
-			var wall_top := maxf(host_under, shed_under)
-			if wall_top < 0.05:
-				continue # the overhanging eave band: no end wall stands here
-			tested += 1
-			if not _surface_segment_hits(mesh, WALL_SURFACE,
-					transform * Vector3(local_x, wall_top - 0.02, outside_z),
-					transform * Vector3(local_x, wall_top - 0.02, inside_z)):
-				failures.append("%s end wall is open 20 mm below its roof seam (%.3f, x %.3f) at end %.0f" % [
-					who, wall_top, local_x, end_sign])
-			if _surface_segment_hits(mesh, WALL_SURFACE,
-					transform * Vector3(local_x, wall_top + 0.06, outside_z),
-					transform * Vector3(local_x, wall_top + 0.06, inside_z)):
-				failures.append("%s wall infill stands above its roof seam (%.3f, x %.3f) at end %.0f" % [
-					who, wall_top, local_x, end_sign])
-		if tested < 3:
-			failures.append("%s cut end %.0f exposed only %d measurable end-wall stations" % [who, end_sign, tested])
+		var original_y := rise * 0.56
+		var original_outside := transform * Vector3(ridge_x, original_y, outside_z)
+		var original_inside := transform * Vector3(ridge_x, original_y, inside_z)
+		if not _surface_segment_hits(mesh, WALL_SURFACE, original_outside, original_inside):
+			failures.append("%s original gable profile is missing at end %.0f" % [who, end_sign])
 
 
 func _check_rafter_bearings(builder: HouseBuilder, mesh: ArrayMesh, layout: Dictionary,

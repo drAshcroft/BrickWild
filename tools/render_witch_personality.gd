@@ -606,7 +606,7 @@ func _render_exterior(plan: HousePlan, request: BuildingRequest, case_id: String
 	if not service_wing.is_empty():
 		framing_bounds = HouseGeometry.exterior_bounds(plan)
 		radius = maxf(framing_bounds.size.length() * 0.5, 2.0)
-		var core := HouseGeometry.witch_high_core_rect(plan)
+		var core := Rect2() # WITCH-SIZE: a hut has no high core beside a service wing
 		if core.has_area():
 			var roof_layout := HouseGeometry.roof_layout(plan)
 			var roof_transform: Transform3D = roof_layout.get("transform", Transform3D.IDENTITY)

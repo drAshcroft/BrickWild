@@ -138,10 +138,11 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | village planning on given ground: siting, road grades, lot fall, the stair walk, wet ground | `lane:village-terrain` | 196 s host, 148 s body (23 Oct), 476 checks; six fixtures and six failing controls; see docs/VILLAGE_TERRAIN.md |
 | the village ground mesh: `VillageGroundSurface`, `VillageBuilder` on terrain, `VillageGroundCheck` | `vground`, then `vgroundterrain` | ~6 m loaded host for the terrain cases; see docs/VILLAGE_TERRAIN.md |
 | `VillageBridge`, a bridge on given ground, the ground's river (`VillageGroundWater`), `qa/village_bridge_check.gd` | `vcrossterrain`, then `tests/village_crossings_test.gd` as a script | ~40 s host, 24 checks; see docs/VILLAGE_TERRAIN.md |
-| stair streets, access flights, the 3D village walk: `VillageAccessSteps`, `VillageWalk3D`, `VillageWalk` on terrain | `vstepswalk`, then `vgroundterrain` | ~5.5 m loaded host, 84 checks (Manarola, Positano); see docs/VILLAGE_TERRAIN.md "Steps and the 3D walk" |
+| stair streets, access flights, the 3D village walk: `VillageAccessSteps`, `VillageWalk3D`, `VillageWalk` on terrain | `vstepswalk`, then `vgroundterrain` | ~14 m loaded host, 91 checks (Manarola, Positano, Masouleh's stepped through road); see docs/VILLAGE_TERRAIN.md "Steps and the 3D walk" |
 | `VillageSiteAnalysis` (slope classes, landforms, drainage, contours, level regions) | `vanalysis` | ~15 s host, 47 checks; see docs/VILLAGE_TERRAIN.md |
 | the world settlement set, `tools/settlements/` | `vworld` | seconds; see docs/SETTLEMENT_TESTSET.md |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
+| the crooked warp: `core/haunt/crooked_warp.gd`, `qa/crooked_check.gd`, `BuildingRequest.jank` | `lane:haunt` | 5 m host, 2097 checks (26 Oct; every kind but hotel, plus a sloped and a pile house) |
 | church shell, opening or roof geometry | `lane:church-change` | 20 s host |
 | windmill geometry, or anything in `src/windmill/`; the published windmill walk | `lane:windmill` | 295 s loaded host, 270 checks (185 -> 204 windmills + 66 wwalk, 22 Oct) |
 | anything in `src/dungeon/`, `qa/dungeon_room_check.gd` or the dungeon fixtures | `lane:dungeon` | 84 s host (14 Oct); see docs/DUNGEONS.md |
@@ -151,6 +152,8 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | a walk-QA pin, a walk rule, a stair rule, a z-fight budget | `walkpins` | ~1 m host, 40 checks |
 | the crest form: `src/village/forms/crest_form.gd`, the crest frame in `VillageSiting`, the crest hooks in the lot planner and the place/road checks | `vcrest` | ~5 m host (measures 16 buildings once, ~75 s); see docs/VILLAGE_TERRAIN.md "The crest form" |
 | buildings on falling ground: `core/ground_fall.gd`, `src/house/house_slope.gd`, the church terrace, the ground request fields | `hslope` | ~2.5 m host, 253 checks; see docs/VILLAGE_TERRAIN.md |
+| a house or shop on piles: `src/house/house_piles.gd`, the `foundation` / `pile_*` request fields | `hpiles` | 76 s host, 218 checks; see docs/VILLAGE_TERRAIN.md "On piles over water" |
+| the water form: `src/village/forms/water_form.gd`, `src/village/village_boardwalk.gd`, `qa/village_water_check.gd`, the `lagoon` fixture | `vwaterform` (`WATER_CASE=lagoon` for one case), then `lane:village-terrain` | 295 s host, ~12 m loaded, 32 checks; see docs/VILLAGE_TERRAIN.md "The water form" |
 | exhaustive church sweep | `lane:church` | scheduled separately; runtime not yet bounded |
 | nothing in particular; you are batching several finished tasks | `lane:sweep` | ~40 m, background it |
 

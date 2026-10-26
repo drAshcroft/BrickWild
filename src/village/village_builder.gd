@@ -1132,7 +1132,10 @@ func _water_on_terrain(plan: VillagePlan) -> void:
 				_surface.water_sheet(sw, SURF_WATER, over)
 	_emit_tris(over)
 	for index in plan.water_crossings.size():
-		_crossing(plan.water_crossings[index], index)
+		if plan.water_crossings[index]["kind"] != &"boardwalk":
+			_crossing(plan.water_crossings[index], index)
+	# boardwalks on piles over the shallows (VTER-FORM-WATER)
+	VillageBoardwalk.emit(self, plan)
 
 
 ## The edge on given ground: each run cut into EDGE_PIECE pieces, each piece

@@ -717,7 +717,7 @@ func arc_ribbon(from_p: Vector3, to_p: Vector3, rise: float, thickness: float,
 ## step. The returned bounds include the widest, battered course.
 func curved_wall(points: PackedVector3Array, height: float, base_thickness: float,
 		top_thickness: float, surf: int, openings: Array[Rect2] = [],
-		base_y := 0.0) -> AABB:
+		base_y := 0.0, cuts_at := Callable()) -> AABB:
 	if points.size() < 2 or height <= 0.0:
 		return AABB()
 	var count := points.size()
@@ -739,6 +739,22 @@ func curved_wall(points: PackedVector3Array, height: float, base_thickness: floa
 	var bounds := AABB()
 	var first := true
 	var st: SurfaceTool = _sts[surf]
+	# Joint offsets: where two sampled segments meet, both faces are mitred on
+	# the bisector, so a bend leaves neither a wedge crack nor an overlap.
+	var seg_normal: Array[Vector2] = []
+	for i in range(count - 1):
+		var d2 := Vector2(points[i + 1].x - points[i].x, points[i + 1].z - points[i].z)
+		seg_normal.append(Vector2(d2.y, -d2.x).normalized() if d2.length_squared() > 1e-10 else Vector2.ZERO)
+	var joint: Array[Vector2] = []
+	for i in range(count):
+		var n0: Vector2 = seg_normal[maxi(i - 1, 0)]
+		var n1: Vector2 = seg_normal[mini(i, count - 2)]
+		var bis := n0 + n1
+		if bis.length_squared() < 1e-8 or n0 == Vector2.ZERO or n1 == Vector2.ZERO:
+			joint.append(n1 if n1 != Vector2.ZERO else n0)
+		else:
+			bis = bis.normalized()
+			joint.append(bis / maxf(bis.dot(n1), 0.5))
 	for i in range(count - 1):
 		var delta := points[i + 1] - points[i]
 		var tangent := Vector2(delta.x, delta.z).normalized()
@@ -768,12 +784,39 @@ func curved_wall(points: PackedVector3Array, height: float, base_thickness: floa
 			var p0 := Vector2(points[i].x, points[i].z)
 			var p1 := Vector2(points[i + 1].x, points[i + 1].z)
 			var half := thick * 0.5
-			var outside0 := p0 + outward * half
-			var outside1 := p1 + outward * half
-			var inside0 := p0 - outward * half
-			var inside1 := p1 - outward * half
+			var outside0 := p0 + joint[i] * half
+			var outside1 := p1 + joint[i + 1] * half
+			var inside0 := p0 - joint[i] * half
+			var inside1 := p1 - joint[i + 1] * half
 			var lo := y0 + base_y
 			var hi := y1 + base_y
+			# `cuts_at(lo, hi)` returns convex plan polygons the course must not
+			# enter (a tower's room): that part of the course is rebuilt as
+			# prisms of whatever the cut leaves.
+			if cuts_at.is_valid():
+				var cuts: Array = cuts_at.call(lo, hi)
+				if not cuts.is_empty():
+					var footprint := PackedVector2Array([outside0, outside1, inside1, inside0])
+					var pieces: Array[PackedVector2Array] = [footprint]
+					var cut_any := false
+					for cut in cuts:
+						var remaining: Array[PackedVector2Array] = []
+						for piece in pieces:
+							if Poly.intersection_area(piece, cut) > 0.000001:
+								cut_any = true
+								remaining.append_array(RoofShape.subtract(piece, cut))
+							else:
+								remaining.append(piece)
+						pieces = remaining
+					if cut_any:
+						for piece in pieces:
+							var ring := PackedVector3Array()
+							for corner in piece:
+								ring.append(Vector3(corner.x, (lo + hi) * 0.5, corner.y))
+								bounds = AABB(ring[ring.size() - 1], Vector3.ZERO) if first 									else bounds.expand(ring[ring.size() - 1])
+								first = false
+							slab_poly(ring, hi - lo, surf, true)
+						continue
 			var outer_a := Vector3(outside0.x, lo, outside0.y)
 			var outer_b := Vector3(outside1.x, lo, outside1.y)
 			var outer_c := Vector3(outside1.x, hi, outside1.y)

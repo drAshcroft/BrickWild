@@ -170,17 +170,17 @@ procession; Focus = focal visibility from the entry image. The slug is
 
 | Id | Identity | Entry | Congregation | Focus (entry image) | Verdict |
 |---|---|---|---|---|---|
-| romanesque_small_1 | partly: round apse, lombard pilasters, but square windows and the west tower ends in stepped blocks and bare posts | door in tower base, straight nave, pews to the rail | two pew blocks either side of the aisle, empty chancel (brief) | altar and candles clear at the end of the aisle, apse lights above | needs_changes: tower crown reads unfinished (todo SACRED-TOWER-CROWN) |
+| romanesque_small_1 | partly: round apse, lombard pilasters, but square windows and the west tower ends in stepped blocks and bare posts | door in tower base, straight nave, pews to the rail | two pew blocks either side of the aisle, empty chancel (brief) | altar and candles clear at the end of the aisle, apse lights above | needs_changes: tower crown reads unfinished (todo SACRED-TOWER-CROWN). **Re-ticked 2026-10-24 on ed96101: approved; cornice and pyramidal cap seated, no stepped blocks or posts** |
 | romanesque_default_8102 | partly: tower, apse, gable porch read Romanesque; flat uncapped tower | door, aisle, apse | pews both sides, empty chancel | altar visible under the chancel arch | accepted |
-| romanesque_large_21325 | no: a 24 m gabled box, pilasters and two tiny slit windows, no tower, no apse visible from the front | door in a blank gable, then the nave | FIXED 14 Oct: two benches abreast either side of a 1.5 m aisle, 33 rows, cross-aisles | FIXED 20 Oct: a built reredos (dark ground, pale panels, frames, cross, 6.7 x 10.6 m) on the east wall behind the altar, red banners either side on the wall face; reads at once from the door | needs_changes: interior and focus accepted; the exterior is still a plain gabled box |
-| romanesque_default_1 | partly: as small/1, with a row of tall lights on the flank | door, aisle, apse | pews both sides | altar and candles clear | needs_changes: same tower crown fault (SACRED-TOWER-CROWN) |
+| romanesque_large_21325 | no: a 24 m gabled box, pilasters and two tiny slit windows, no tower, no apse visible from the front | door in a blank gable, then the nave | FIXED 14 Oct: two benches abreast either side of a 1.5 m aisle, 33 rows, cross-aisles | FIXED 20 Oct: a built reredos (dark ground, pale panels, frames, cross, 6.7 x 10.6 m) on the east wall behind the altar, red banners either side on the wall face; reads at once from the door | FIXED 24 Oct (SACRED-ROMANESQUE-LARGE): the dice gave this seed no tower, so `ChurchGenerator._ensure_west_front_mass` now guarantees a single west tower (0.55 of the width, 1.7 of the wall height, hipped cap) on any Romanesque 14 m wide or more; the apse is east and the nave hides it, so the tower is the front mass. `churchchange` casts rays from the front 3/4 camera at the tower faces (visible fraction >= 0.6, with a wall-in-front control). Render: artifacts/goal/SACRED-ROMANESQUE-LARGE/after. needs an independent reviewer tick |
+| romanesque_default_1 | partly: as small/1, with a row of tall lights on the flank | door, aisle, apse | pews both sides | altar and candles clear | needs_changes: same tower crown fault (SACRED-TOWER-CROWN). **Re-ticked 2026-10-24 on ed96101: approved; crown seated** |
 | gothic_small_1 | yes, 20 Oct: the twin towers now end in octagonal spires with crockets and finials (every Gothic tower draws `spire`); round chevet, pointed lights | portal in the west front, aisle, apse | pews both sides | altar and candles clear, three apse lights | accepted |
 | gothic_default_8102 | yes: twin octagonal spires, flying buttresses, clerestory | portal, aisle between piers | pews both sides, aisles beyond the piers empty | altar clear at the end | accepted (design-board gaps in the section above stand) |
 | gothic_large_21325 | yes: tall twin towers, flyer arcade, glazed clerestory | portal, long aisle | pews from the first bay, aisles empty | altar small but readable, apse arch above it | accepted |
 | gothic_default_1 | yes: single tapering spire, flyers on the east bays | portal in tower base, aisle | pews both sides | altar and candles clear | accepted |
 | byzantine_small_1 | yes: dome on a drum over a gabled cross-body, low apse | door, aisle, apse | pews both sides | altar clear, apse arch frames it | accepted: partly Byzantine, the dome sits over a basilican body |
 | byzantine_default_8102 | yes: as small, with pilasters | door, aisle | pews both sides | altar clear | accepted |
-| byzantine_large_21325 | partly: dome pushed to the east end of a long barn body, flat flank | door in a blank gable, aisle | Orthodox standing worship: open floor intentional, 14 wall stalls | 20 Oct: reredos (an iconostasis-like screen) and banners behind the altar group; the focus reads from the door | needs_changes: dome not visible from the entry; focus, seating and altar accepted |
+| byzantine_large_21325 | partly: dome pushed to the east end of a long barn body, flat flank | door in a blank gable, aisle | Orthodox standing worship: open floor intentional, 14 wall stalls | 20 Oct: reredos (an iconostasis-like screen) and banners behind the altar group; the focus reads from the door | FIXED 24 Oct (SACRED-BYZANTINE-DOME): from 1.6 m on the axis a 24 m nave and its ridge hide any dome east of centre, so `ChurchGenerator._ensure_entry_dome` moves the dome of a domed Byzantine 14 m wide or more over the west bay (`spec.dome_west`, `ChurchGeometry.west_dome_center_z`), drops the transept and half-domes, and grows the drum until the shell crown clears the west gable peak on the sight line from `ChurchGeometry.entry_eye` (20 m west of the narthex). `churchchange` ray-tests five seeds, with a raised-gable control and an east-dome control. Render: artifacts/goal/SACRED-BYZANTINE-DOME/after/church_byzantine_large_21325__approach.jpg (also __front). needs an independent reviewer tick |
 | byzantine_default_1 | yes | door, aisle | pews both sides | altar clear | accepted |
 | nordic_stave_small_1 | yes, 14 Oct stave pass: tarred dark boards, steep shingle roofs, a three-tier tower of shingled hips ending in a needle spire with crossed boards, a covered svalgang along the flanks, dragon heads on the ridge ends. Still a west tower on a plain nave (no stepped nave roofs, no ridge turret) | door at the foot of the tower, aisle | pews both sides | altar clear in a dark plank hall | accepted: reads as a Scandinavian timber church, not a Borgund copy |
 | nordic_stave_default_8102 | yes: as small | as small | pews both sides | altar clear at the end of a long dark hall (dim) | accepted |
@@ -190,10 +190,10 @@ procession; Focus = focal visibility from the entry image. The slug is
 | renaissance_default_8102 | partly: dome, lantern, twin stepped tower crowns, round-headed lights | door, aisle | pews both sides | altar clear | accepted |
 | renaissance_large_21325 | partly: rose window, dome and a lean-to roof read Italian; flank is a long blank wall | door, long aisle | FIXED 14 Oct: 112 pews in two-abreast blocks to the chancel step, cross-aisle every eighth row | altar group on its step, scaled, candelabra and candles read at the end of the aisle | accepted (seating and focus; exterior as before) |
 | renaissance_default_1 | partly: dome and lantern, stepped tower | door, aisle | pews both sides | altar clear | accepted |
-| russian_small_1 | partly: one squat onion dome, round chevet; no cluster of domes, no kokoshniki | door in tower base, aisle | pews both sides | altar clear | needs_changes: floating blocks on the nave walls (SACRED-RUSSIAN-FLOATING-BLOCKS) and the tower crown fault |
-| russian_default_8102 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
+| russian_small_1 | partly: one squat onion dome, round chevet; no cluster of domes, no kokoshniki | door in tower base, aisle | pews both sides | altar clear | needs_changes: floating blocks on the nave walls (SACRED-RUSSIAN-FLOATING-BLOCKS) and the tower crown fault. **Re-ticked 2026-10-24 on ed96101: approved; slab, lantern and onion seated, turrets attached, no floating blocks** |
+| russian_default_8102 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above. **Re-ticked 2026-10-24 on ed96101: approved; crown seated, no floating blocks** |
 | russian_large_21325 | partly: one onion dome on a box, two half-round buttress turrets | door, aisle | Orthodox standing worship: open floor intentional, wall stalls only | 20 Oct: reredos and banners behind the altar group, readable from the door; no floating blocks in the nave (fixed 14 Oct under SACRED-RUSSIAN-FLOATING-BLOCKS, re-reviewed 20 Oct) | accepted (identity partly, as renaissance) |
-| russian_default_1 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above |
+| russian_default_1 | partly: as small | door, aisle | pews both sides | altar clear | needs_changes: both defects as above. **Re-ticked 2026-10-24 on ed96101: approved; crown seated, no floating blocks** |
 
 ### Temples
 
@@ -373,6 +373,45 @@ move from z = -28 to about z = -1.5 (and terrace 1 from -34 to about -24),
 i.e. upper terraces set back more at the front than at the sides, with the
 stair flights re-run to the new summit edge. Then the terrace exemption can be
 removed from the sightline rule. That is a reshaping of the form, left open.
+
+### Ziggurat focus, fixed (24 October 2026, SACRED-ZIGGURAT-FOCUS)
+
+The god no longer stands at the back of the summit. `TempleGeometry.ziggurat_idol_limit`
+finds the furthest-back centre from which the eye at the stair foot (1.65 m) still
+clears the front edge of every terrace and sees the idol's upper half; the sanctum
+(chamber dais, altar) is anchored under that point, so gate, altar, idol still run
+in order. `TempleRiteCheck` no longer exempts `terrace*` and `stair*` masses from
+the sightline for a ziggurat. Measured with `tools/sacred_sequence_report.gd`:
+`sightline_blockers` 0 for small/1, default/21325 and large/21325 (axis run 7.5 /
+8.4 / 17.2 m, procession 6.08 m). Idol apex is unchanged (9.6 / 13.5 / 23.4 m), so
+the god shows ABOVE the summit's front edge as a small silhouette, not a full
+figure: entry renders in `artifacts/goal/SACRED-ZIGGURAT-FOCUS/renders`. A negative
+control (`stair_wall_control`, a wall across the axis between the foot and the
+summit) is in `sacred_sequence_suite` and must fail on `sightline`. The "open
+failure 1" above is closed; legibility at large size (a ~5 percent silhouette) stays
+modest and is the next lever if a taller idol is wanted.
+
+### Rotunda void monolith, fixed (24 October 2026, SACRED-ROTUNDA-FOCUS)
+
+Cause: the void cult's stone is `2f3138`/`1b1d22` and the monolith was a SURF_STONE
+slab, so it was the same tone as the drum behind it. In the old entry image
+(`artifacts/goal/SACRED-ROTUNDA-FOCUS/before/temple_rotunda_void_small_8102__entry.jpg`)
+nothing stands above the altar: the monolith is simply absent. The slab is now the
+cult's lighter trim hue (`46506b`) with a black rune cut down its face
+(`TempleBuilder._build_idol`, `&"monolith"`). After
+(`.../after/temple_rotunda_void_small_8102__entry.jpg`): a pale blue-slate slab,
+about 1.3 altar-widths wide, rises from the altar to above the drum wall line,
+lighter than the near-black brick on both sides (a clear value step) with a
+vertical black rune as an internal silhouette. It is the largest, brightest mass on
+the axis. No geometry moved, so the sightline numbers are unchanged.
+
+Rotunda symmetry warning (4 cases): explained and fixed, not a cult exception.
+`rotunda_arcade_pier_04` and `_10` (or `_04`/`_13` on the large rotundas) had no
+twin because the pier-to-drum-panel snap in `_build_rotunda_upper_arcade` ran pier
+by pier: the first pier to claim a contested panel changed what its mirror could
+get. Each pier now claims its panel and the panel's mirror for its mirror pier, and a pier
+on the gate axis (the portal one, the rear one) may only stand on an axis panel, else
+it is left out. `lane:temple`: 3028 checks, 0 failures, 0 warnings (was 4 warnings).
 
 ### Tallies after this pass
 
@@ -634,3 +673,96 @@ Renders: 72 matrix images + 3 controls, exit 0
 (`render_matrix.log`, `render_control_*.log`). Unlabelled answers:
 `answers.json`; join: `joined.json`; key: `key.json` (do not read before the
 verdicts). Images are not committed (artifacts is gitignored).
+
+## Basilica focus and flank (SACRED-BASILICA-FOCUS, 2026-10-24)
+
+Changed in `TempleBuilder` only; the pinned request (26 x 44 x 12, seed 1) is unchanged.
+
+* **Idol backdrop** (`_build_idol`, basilica and pylon): a panel 0.16 m thick just
+  behind the god. Pale cult trim behind a monolith (the monolith itself turns
+  dark with a trim rune, the reverse of the rotunda), a dark panel behind a
+  figure. Traits per case: `basilica/void/large/21325` - a dark slab framed by a
+  pale arch at the end of the axis; `pylon/blood/large/21325` - the figure
+  stands against a dark panel instead of dissolving into the red doorway.
+  Sightline is unchanged (0 blockers; the panel is behind the idol, unlogged).
+  Honest limit: the void hall remains dark, and the idol is small at 80 m; the
+  gain is an edge to find, not a bright god.
+* **Flank marker** (`_flank_niche`, basilica eave walls): `basilica_flank_niche_<wall>_<bay>`
+  hosts, each a trim frame (`basilica_flank_niche_frame`) and a dark recess
+  (`basilica_flank_niche_recess`) below the clerestory light, between the
+  pilasters. In the component log; visible in the side render
+  (`artifacts/goal/SACRED-BASILICA-FOCUS/after/`). The roof is still a low
+  dark slab. An independent reviewer has NOT yet ticked the render.
+* Receipts: `lane:temple` 3028 / 0 / 0; `lane:church-change` 5941 / 0 / 12 (the known opening warnings).
+
+## Rotunda and pylon identity as a trait checklist (SACRED-IDENTITY, 2026-10-24)
+
+The qwen 7B naming test ("what building is this?") was noisy and flipped with
+no change to the building, so it no longer judges identity. Each family now
+carries a short checklist, measured from `mass_log` / `component_log` by
+`qa/sacred_identity_check.gd` and asserted by `sacredid`
+(`tests/suites/sacred_identity_suite.gd`, in `lane:temple`) on all twelve frozen
+rotunda and pylon requests in `sacred_sequence_requests.json`.
+
+| family | trait | measured as |
+|---|---|---|
+| rotunda | round drum plan | >= 12 `wall_rotunda_NN` panels, centres on one radius (spread < 12 % of outer, inside the outer radius), largest angular gap <= 70 deg (the door) |
+| rotunda | dome or ring roof | a full-circle `rotunda_drum_crown` revolve at the drum top, outer radius >= the wall, inner radius > 0.5 m and < 90 % of outer: an open ring |
+| rotunda | ring colonnade at the door | >= 8 `rotunda_arcade_pier_NN` on one circle, mirrored about the axis, at least one pier within 40 deg either side of the door, and >= 8 inner `column_N` on one ring |
+| pylon | twin battered towers flanking the gate | `pylon_0`/`pylon_1` mirror twins on the front line, gap >= the gate width, 1.2 x the wall height or more, and each tower's `pylon_battered_face` slabs are < 90 % of their foot area at the top (measured about 0.46) |
+| pylon | hypostyle hall behind the gate | >= 4 `column_N` in >= 2 rows and >= 2 files, all behind the towers' back edge, not standing on one circle |
+
+Controls (a measure that cannot fail is not a measure): for every trait on every
+case the same measure runs on logs with that trait's rows deleted and must
+fail; and a rotunda measured as a pylon, and a pylon as a rotunda, must miss
+every trait of the other.
+
+Result: all 12 cases carry all their traits; 78 checks, 0 failures. No trait
+was missed, so there is no miss list. Writing the controls found two real
+holes in the first draft of the hypostyle measure (it passed a rotunda's inner
+column ring because it looked only at row/file counts; and it passed with no
+towers at all), both closed above.
+
+### Independent exterior read of the traits (24 Oct)
+
+A fresh reviewer, given only the checklist and the 24 front/side renders
+(`artifacts/goal/SACRED-IDENTITY/renders/`, 6 rotunda and 6 pylon cases), ticked:
+
+* Rotunda: round drum 6/6, ring roof with open centre 6/6 (no dome anywhere),
+  **ring colonnade at the door 0/6**. The piers are a ring of square piers on
+  the upper drum above a solid wall; the door is a pier-framed gap (small) or
+  a pedimented aedicule (large) with no column ring at door level. The
+  measure passes (the piers are mirrored and flank the door in plan); the eye
+  reads a clerestory ring. Listed as a MISS, not softened: the fix would be a
+  door-level peristyle, which is a design change for a later task.
+* Pylon: twin battered towers flanking the gate 6/6. Hypostyle hall 0/6 clear
+  (blood/large gives a hint of posts under the roof edge): an exterior render
+  cannot show a hall under a flat roof. The plan measure (columns in a grid
+  behind the towers) is the evidence; the entry views in the matrix show it
+  from inside.
+
+Receipts: `lane:temple` 3106 checks / 0 failures / 0 warnings (`artifacts/goal/SACRED-IDENTITY/lane2.log`).
+
+## LIVE-SACRED close-out (2026-10-24)
+
+All six sub-tasks done (676e5e6, 41f0414, 15b30ad, 5e92c0b, ecfaa49, ed96101). The five rows that cited since-fixed defects were re-rendered once on ed96101 with `tools/render_sacred_exterior.gd` (front, side, entry, cutaway; `artifacts/goal/LIVE-SACRED/`) and re-ticked above. Open findings have their own tasks: SACRED-ROTUNDA-PERISTYLE (ring colonnade 0/6 from outside) and TEMPLE-STAIR-TEST-STALE.
+
+## SACRED-ROTUNDA-PERISTYLE (25 October 2026)
+
+The 0/6 ring-colonnade miss is addressed by a door-level peristyle:
+`TempleBuilder._build_rotunda_peristyle`, geometry in
+`TempleGeometry.rotunda_peristyle_*`. A ring of columns stands on the ground
+1.3 m outside the drum (plinth to just under the upper arcade), with an
+architrave over each bay, a flat ceiling slab tying each bay back to the drum,
+and a paved stylobate ring (`floor_rotunda_peristyle`, the one mass that lets
+the columns pass `no_gaps`). The two columns nearest the axis frame the door;
+the bay between them is the forecourt width (4.4 m) and nothing crosses it.
+The forecourt, `plan_extent` and the obelisk positions follow the peristyle
+extent, so the published footprint and approach reach the real arrival edge.
+Architraves are component rows, not masses (as the inner ring's are): a
+skewed beam's AABB overlaps its neighbours and the drum. `sacredid`'s
+colonnade trait now also measures the ring (>= 8 columns on one circle outside
+the drum, on the ground, below the drum top, mirrored, door bay >= gate
+width) with a second removal control. Renders:
+`artifacts/goal/SACRED-ROTUNDA-PERISTYLE/renders/` (six cases x front, side,
+rear, entry). The reviewer tick is the coordinator's.

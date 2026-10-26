@@ -129,6 +129,10 @@ static func sky_towers(spec: CastleSpec) -> Array[Dictionary]:
 	return out
 
 
+## How far above the ring bridges a skip-one chord leaves its tower (metres).
+const CHORD_LIFT := 3.2
+
+
 ## Ring links plus skip-one chords: enough arched routes that the citadel reads
 ## as a suspended network, not a wall circuit parked on a mound.
 static func sky_bridges(spec: CastleSpec) -> Array[Dictionary]:
@@ -149,11 +153,17 @@ static func sky_bridges(spec: CastleSpec) -> Array[Dictionary]:
 			var br: float = brow["radius"]
 			var from_p := Vector3(ac.x, float(arow["bottom"]) + float(arow["height"]) * 0.58, ac.z) + dir * ar
 			var to_p := Vector3(bc.x, float(brow["bottom"]) + float(brow["height"]) * 0.58, bc.z) - dir * br
+			if step == 2:
+				# A skip-one chord leaves a doorway's height and more above the ring
+				# bridges: its steeper rib would otherwise cross the
+				# doorway of the ring bridge a few degrees beside it.
+				from_p.y += CHORD_LIFT
+				to_p.y += CHORD_LIFT
 			var rise: float = from_p.distance_to(to_p) * (0.18 if step == 1 else 0.28)
 			var lo := from_p.min(to_p)
 			var hi := from_p.max(to_p)
 			hi.y += rise + 0.45
-			out.append({"from": from_p, "to": to_p, "rise": rise,
+			out.append({"from": from_p, "to": to_p, "rise": rise, "chord": step == 2,
 				"aabb": AABB(lo - Vector3(0.5, 0.45, 0.5),
 					hi - lo + Vector3(1.0, 0.9, 1.0))})
 	return out
@@ -853,6 +863,57 @@ static func climb_aabb(spec: CastleSpec) -> AABB:
 
 static func wall_height(spec: CastleSpec, r: int) -> float:
 	return spec.height * (INNER_HEIGHT_RATIO if r > 0 else 1.0)
+
+
+## The bow of an elven (curved) curtain. Its middle stands `bow_sagitta(run)`
+## proud of the chord, but it leaves each corner tower along the chord (the
+## fourth power of a sine), so the curtain does not sweep across the windows a
+## tower turns towards its neighbour and a wall stair can stand against the
+## flat of it. `f` runs 0..1 from the first tower to the second.
+const BOW_RATIO := 0.16
+const BOW_POWER := 4.0
+
+
+static func bow_sagitta(run: float) -> float:
+	return run * BOW_RATIO
+
+
+## Outward offset of the curtain's centreline from the chord at `f`.
+static func bow_offset(sagitta: float, f: float) -> float:
+	return sagitta * pow(maxf(sin(PI * clampf(f, 0.0, 1.0)), 0.0), BOW_POWER)
+
+
+## d(offset)/df, for the tangent: chord vector plus outward * this.
+static func bow_slope(sagitta: float, f: float) -> float:
+	var sine := maxf(sin(PI * clampf(f, 0.0, 1.0)), 0.0)
+	return sagitta * BOW_POWER * pow(sine, BOW_POWER - 1.0) * cos(PI * f) * PI
+
+
+## The bowed curtain's centreline for a wall segment, `steps` + 1 points. As on
+## a straight run the polygon edge is the OUTER face at the corners, so the
+## centreline stands half a wall thickness inside the bow.
+static func bowed_centreline(spec: CastleSpec, r: int, seg: Dictionary, steps := 32) -> PackedVector2Array:
+	var a: Vector2 = seg["a"]
+	var b: Vector2 = seg["b"]
+	var outward := Vector2(float(seg["outward"].x), float(seg["outward"].z))
+	var sagitta := bow_sagitta(float(seg["length"]))
+	var out := PackedVector2Array()
+	for i in range(steps + 1):
+		var f := float(i) / float(steps)
+		out.append(a.lerp(b, f) + outward * (bow_offset(sagitta, f) - wall_thickness(spec, r) * 0.5))
+	return out
+
+
+## Does masonry of an elven curtain segment stand within `reach` of the plan
+## point? (The straight `segment_aabb` is the chord's box, not the bowed wall.)
+static func bowed_wall_near(spec: CastleSpec, r: int, seg: Dictionary, point: Vector2,
+		reach: float) -> bool:
+	var line := bowed_centreline(spec, r, seg)
+	var limit := wall_base_thickness(spec, r) * 0.5 + reach
+	for i in range(line.size() - 1):
+		if point.distance_to(Geometry2D.get_closest_point_to_segment(point, line[i], line[i + 1])) < limit:
+			return true
+	return false
 
 
 static func wall_thickness(spec: CastleSpec, r: int) -> float:

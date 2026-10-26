@@ -197,13 +197,41 @@ static func _demote_unseated_guardrooms(plan: HousePlan, spec: HouseSpec) -> voi
 		if table < 0 or CastleRoomTopUp._holds_at(plan, room, table) >= 2:
 			continue
 		# Take the table and the one chair that came with it out of the room.
-		for index in range(plan.furniture.size() - 1, -1, -1):
-			if index == table or int(plan.furniture[index].get("host", -1)) == table:
-				plan.furniture.remove_at(index)
+		# A seat's host index can be stale by now (earlier removals shift the
+		# list), so every seat drawn up to this room's one table goes with it:
+		# a chair left standing with no table is the "seating" fault.
+		var mine := plan.furniture_of(room)
+		var leaving: Array[Dictionary] = []
+		for index in range(plan.furniture.size()):
+			var piece: Dictionary = plan.furniture[index]
+			var hosted_seat: bool = mine.has(index) and int(piece.get("host", -1)) >= 0 					and PropCatalog.category(String(piece["key"])) == "seat"
+			if index == table or int(piece.get("host", -1)) == table or hosted_seat:
+				leaving.append(piece)
+		# One at a time, renumbering the host index of every piece after it: a
+		# bare remove_at left other rooms' seats pointing at the wrong table, or
+		# past the end of the list (the checks threw at seats 49 and 50).
+		for piece in leaving:
+			var at := -1
+			for index in range(plan.furniture.size()):
+				if is_same(plan.furniture[index], piece):
+					at = index
+					break
+			if at >= 0:
+				plan.furniture.remove_at(at)
+				HouseFurnishRepair.reindex_hosts(plan, at)
 		plan.rooms[room]["kind"] = &"watch_room"
 		if room < spec.program.size() and spec.program[room] == &"guardroom":
 			spec.program[room] = &"watch_room"
 		_dress_watch_room(plan, spec, room)
+		# A storey the stair takes whole has no wall for a bench. It is not a
+		# watch room then, but the store the stair leaves it as.
+		var benched := false
+		for index in plan.furniture_of(room):
+			benched = benched or PropCatalog.category(String(plan.furniture[index]["key"])) == "bench"
+		if not benched:
+			plan.rooms[room]["kind"] = &"store"
+			if room < spec.program.size():
+				spec.program[room] = &"store"
 
 
 ## The watch room's furniture. In the smallest tower storey -- 11.8 m2 in a
@@ -300,7 +328,10 @@ static func _windows(plan: HousePlan, level: int) -> void:
 
 ## A common footprint touches a real wall on either landing and fits BOTH
 ## floors. Sampling against polygon faces avoids placing stairs in AABB corners.
-static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()) -> void:
+## `hard` are polygons the flight may not touch at all (a sky tower's door, whose
+## threshold the final mesh must keep clear); `soft` penalties still apply.
+static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2(),
+		hard: Array[PackedVector2Array] = []) -> void:
 	var floor := HouseGeometry.room_floor_rect(plan, upper)
 	var run := minf(2.4, maxf(HouseGeometry.PATH_MIN, maxf(floor.size.x, floor.size.y) - 0.3))
 	var width := minf(1.0, maxf(HouseGeometry.PATH_MIN, minf(floor.size.x, floor.size.y) - 0.3))
@@ -326,6 +357,12 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 				if not _inside(plan, lower, rect) or not _inside(plan, upper, rect):
 					continue
 				if avoid.size.x > 0.0 and rect.intersects(avoid, true):
+					continue
+				var in_doorway := false
+				for zone in hard:
+					for over in Geometry2D.intersect_polygons(Poly.from_rect(rect), zone):
+						in_doorway = in_doorway or Poly.area(over) > 0.02
+				if in_doorway:
 					continue
 				var score := centre.distance_to(front)
 				if HousePlanLevels.hits_any(rect, wells):

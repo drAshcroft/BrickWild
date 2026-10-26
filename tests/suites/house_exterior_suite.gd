@@ -19,7 +19,11 @@ static func run() -> SuiteResult:
 				s.storeys = 2 if style == &"townhouse" else 1
 				var plan := HouseGenerator.generate(s, 4413, false)
 				var who := "%s/%s rotated=%s" % [style, trade, rotated]
-				_expect(res, not plan.exterior.is_empty(), who + " no exterior dressing")
+				# HS-ROUNDHOUSE: a round hut is a shaped plan; exterior recipes need a
+				# rectangular facade and say so in `exterior_omissions`.
+				_expect(res, not plan.exterior.is_empty()
+					or (HouseRound.plan_applies(plan) and not plan.exterior_omissions.is_empty()),
+					who + " no exterior dressing")
 				for error in HouseExterior.check(plan):
 					res.fail(who + ": " + error)
 				var before := var_to_str(plan.exterior)
@@ -138,7 +142,8 @@ static func _yard(res: SuiteResult) -> void:
 				for piece in plan.yard_pieces:
 					if piece["kind"] == "path":
 						path_parts += piece["parts"].size()
-				_expect(res, not plan.yard.is_empty() and path_parts > 0,
+				_expect(res, (not plan.yard.is_empty() and path_parts > 0)
+					or HouseRound.plan_applies(plan),
 					who + " has no procedural approach or porch pail")
 				var builder := HouseBuilder.new()
 				builder.build(plan, true)

@@ -93,7 +93,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	# every request is generated and measured ONCE; the retries below only
 	# redo the geometry
 	var minimum_depth := maxf(_landmark_site_depth(out, jobs), _manor_site_depth(out, jobs))
-	var shore_depth := _strand_row_depth(jobs) if spec.form in [&"strand", &"shore"] else 0.0
+	var shore_depth := _strand_row_depth(jobs) if spec.form in [&"strand", &"shore", &"water"] else 0.0
 	if minimum_depth > out.site.size.y or shore_depth > 0.0:
 		out = VillageSitePlanner.plan(spec, 0, 1.0, minimum_depth, shore_depth)
 	# every household gets a lot (VIL-006 "housed"): when the form's own
@@ -120,7 +120,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			break
 		# These authored forms deliberately ignore generic extra lanes. Do
 		# not recut an identical site six times before trying more frontage.
-		if spec.form in [&"strand", &"shore", &"planted", &"round"] \
+		if spec.form in [&"strand", &"shore", &"water", &"planted", &"round"] \
 				and is_equal_approx(float(attempt[1]), previous_scale):
 			continue
 		previous_scale = float(attempt[1])
@@ -225,6 +225,56 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			unplaced = finer_left
 			common_state = finer_common
 			break
+	# A hillside (VillageHillsideForm) is planned in the plane's profile first.
+	# Where VillageQA finds a fault in it, the form's other profiles are tried --
+	# the through road's homes beside the common, the shallow site (one row of
+	# lots less below the lowest terrace) -- and the one with the fewest faults is
+	# kept, if it still houses everyone. Not a slope threshold: Manarola (band
+	# slope 0.319) and Masouleh (0.330) are 0.011 apart and want different ones.
+	var hill := {}
+	var around := false
+	if unplaced <= 0 and spec.form == &"hillside" and out.ground != null:
+		var faults: int = _faults(out)
+		for profile in HILL_PROFILES:
+			if faults <= 0:
+				break
+			for job in jobs:
+				job["around_common"] = bool(profile["around"])
+			var variant: VillagePlan = _replan(spec, jobs, int(accepted[0]), float(accepted[1]),
+				minimum_depth, shore_depth, false, {"shallow": profile["shallow"]})
+			if cut_measured(variant, jobs) > 0:
+				continue
+			var variant_faults: int = _faults(variant)
+			if variant_faults < faults:
+				out = variant
+				faults = variant_faults
+				hill = {"shallow": profile["shallow"]}
+				around = bool(profile["around"])
+		for job in jobs:
+			job["around_common"] = around
+	# A hillside whose tavern the lot checks could only stand mid-village is
+	# cut short at the near end, so a gate stands by it (VillageHillsideForm.
+	# site_crop): the gate distance, from the place check's reach down, whose plan
+	# has the least `_faults` (the first to have none), still housing everyone and
+	# no sparser than the plan it cuts.
+	if unplaced <= 0 and VillageHillsideForm.site_crop(out, 0.0) != Vector2.ZERO:
+		var best_faults: int = _faults(out)
+		var best: VillagePlan = out
+		var gate_m: float = VillageHillsideForm.TAVERN_NEAR_M - VillageHillsideForm.GATE_STEP_M
+		while gate_m >= VillageHillsideForm.GATE_MIN_M and best_faults > 0:
+			var cut_hill: Dictionary = hill.duplicate()
+			cut_hill["crop"] = VillageHillsideForm.site_crop(out, gate_m)
+			var cut: VillagePlan = _replan(spec, jobs, int(accepted[0]), float(accepted[1]),
+				minimum_depth, shore_depth, false, cut_hill)
+			if cut_measured(cut, jobs) <= 0 and _density(cut) >= _density(out) - 1e-6:
+				var cut_faults: int = _faults(cut)
+				if cut_faults < best_faults:
+					best = cut
+					best_faults = cut_faults
+			gate_m -= VillageHillsideForm.GATE_STEP_M
+		out = best
+	for job in jobs:
+		job.erase("around_common")
 	_trim_lanes(out)
 	VillageDispersedForm.finish(out)
 	# Lot cutting can add service lanes, drop roads and add a mill race.
@@ -241,6 +291,35 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	VillageDresser.dress(out)
 	VillageDispersedForm.dress_hamlets(out)
 	return out
+
+
+## What a hillside plan's re-plans are compared by, less is better: VillageQA's
+## faults (no per-building checks, no twins) a hundred each, and each of the steep
+## sites' bands (VillageHillsideForm.BAND_*) the body misses one. The QA contract
+## outranks the survey's realism. The `edge` fault is not counted: it reads the
+## props, which the dresser places after this.
+static func _faults(plan: VillagePlan) -> int:
+	var no_pure := func(_p: VillagePlan) -> Array: return []
+	var faults := 0
+	for f in VillageQA.new().check(plan, {&"pure": no_pure}, false)["failures"] as Array:
+		if not String(f).begins_with("edge:"):
+			faults += FAULT_WEIGHT
+	if plan.spec.form == &"hillside":
+		faults += VillageHillsideForm.band_faults(plan)
+	return faults
+
+
+const FAULT_WEIGHT := 100
+
+
+## The hillside form's profiles after the plane's, in the order they are tried:
+## the through road's homes beside the common (`around`), and the shallow site
+## (VillageHillsideForm.LEVEL_WEIGHTS_SHALLOW).
+const HILL_PROFILES := [
+	{"around": true, "shallow": false},
+	{"around": true, "shallow": true},
+	{"around": false, "shallow": true},
+]
 
 
 ## A brief's great-tomb or ziggurat is a castle mass but never the seat
@@ -362,11 +441,12 @@ const FINE_WIDTH_STEPS: Array[float] = [1.05, 1.1, 1.15, 1.2, 1.25]
 ## `clear_head` keeps the field tracks off the eastern half, where
 ## `_place_manor` looks for the lord's lane.
 static func _replan(spec: VillageSpec, jobs: Array[Dictionary], lanes: int, scale: float,
-		minimum_depth: float, shore_depth: float, clear_head := false) -> VillagePlan:
-	var again: VillagePlan = VillageSitePlanner.plan(spec, lanes, scale, minimum_depth, shore_depth)
+		minimum_depth: float, shore_depth: float, clear_head := false,
+		hill := {}) -> VillagePlan:
+	var again: VillagePlan = VillageSitePlanner.plan(spec, lanes, scale, minimum_depth, shore_depth, hill)
 	var retry_depth := _manor_site_depth(again, jobs)
 	if retry_depth > again.site.size.y + 0.001:
-		again = VillageSitePlanner.plan(spec, lanes, scale, maxf(minimum_depth, retry_depth), shore_depth)
+		again = VillageSitePlanner.plan(spec, lanes, scale, maxf(minimum_depth, retry_depth), shore_depth, hill)
 	if clear_head:
 		_drop_head_tracks(again)
 	return again
@@ -675,7 +755,10 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 					job["near_point"] = Poly.bounding_rect(inn_poly).get_center()
 					break
 		var allowed := _open_roads(plan, [landmark_lane, manor_lane])
-		var got: float = _place_on_road(plan, ctx, job, allowed, floor_for)
+		# a water village offers its households the boardwalks first, on piles
+		var got: float = VillageWaterForm.place_on_piles(plan, ctx, job, allowed, floor_for)
+		if got < 0.0:
+			got = _place_on_road(plan, ctx, job, allowed, floor_for)
 		if got < 0.0 and req.kind == &"shop" and req.purpose == &"bakery":
 			if _place_pond_mill(plan, ctx, job, allowed):
 				got = 0.0
@@ -1118,6 +1201,11 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 					# This reserved civic ground belongs to the native landmark;
 					# a fallback street frontage may use its own preliminary slot.
 					lot["landmark"] = true
+					# a church stands on its own terrace (CHURCH_MAX_FALL), so a
+					# steep pitch across its plot is held by the terrace walls the
+					# lot records, not refused as a house's cliff would be
+					if plan.ground != null and plan.spec.form != &"hillside":
+						lot["terraced"] = true
 				if not _lot_is_legal(plan, ctx, lot, job, gap):
 					continue
 				if _door_rise(lot) > VillageLotGround.DOOR_RISE_PREFERRED and not bool(job.get("door_ok", false)):
@@ -1409,7 +1497,10 @@ static func _through_crossing(plan: VillagePlan) -> Vector2:
 static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 		job: Dictionary, gap: float) -> bool:
 	var poly: PackedVector2Array = lot["poly"]
-	if plan.spec.form in [&"strand", &"shore"] and job["class"] not in [&"church", &"manor"]:
+	# a house on piles over a boardwalk (VTER-FORM-WATER) has its own rules
+	if bool(job.get("piles", false)):
+		return VillageWaterForm.pile_lot_is_legal(plan, ctx, lot, job, gap)
+	if plan.spec.form in [&"strand", &"shore", &"water"] and job["class"] not in [&"church", &"manor"]:
 		# the strand's one row stands on the water side of its road; a shore
 		# street has houses on both sides (VTER-FORM-SHORE): the seaward row
 		# on the bank, the landward row behind the street
@@ -1582,6 +1673,10 @@ static func _site_clear(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 	if not _inside_site(plan.site, poly):
 		return false
 	if plan.ground != null and not ground_clear(plan.ground, poly, not bool(lot.get("terraced", false))):
+		return false
+	# a terraced church plot is still no steeper on the mean than a footpath
+	# (PlaceCheck's `edge_ground`): the terrace holds a pitch, not a cliff
+	if plan.ground != null and bool(lot.get("terraced", false)) and bool(lot.get("landmark", false)) 			and float(plan.ground.under(poly)["slope_mean"]) > VillageSiteAnalysis.PATH_MAX:
 		return false
 	if plan.spec.purpose == &"mining":
 		# Leave the terminal workyard beyond the last through-road gateway.
@@ -1761,6 +1856,10 @@ static func _commit(plan: VillagePlan, lot: Dictionary, job: Dictionary, _rule: 
 			fit["parts"].get("flight_rows", []), xf, float(ground_record["platform_m"]))
 		record["ground_fit"] = ground_record
 		request = VillageLotGround.request_for(request, fit["reading"])
+	if lot.has("piles"):
+		# VTER-FORM-WATER: on piles over the water, asked for its depth and landing
+		record["piles"] = lot["piles"]
+		request = VillageWaterForm.request_for(job, lot["piles"])
 	plan.lots.append(record)
 	var door: Vector3 = job["placement"]["door"]
 	plan.buildings.append({
@@ -1807,7 +1906,7 @@ static func _add_landmark_lane(plan: VillagePlan) -> int:
 	if plan.spec.compact_display and rect.position.y > start_y:
 		# Keep the service lane's verge inside the compact site's civic end.
 		end_y = minf(end_y, plan.site.end.y - lane_half)
-	if plan.spec.form in [&"strand", &"shore"] and rect.position.y < start_y:
+	if plan.spec.form in [&"strand", &"shore", &"water"] and rect.position.y < start_y:
 		# The church's measured frontage is wider than the reserved slot.
 		# Give it the full legal dead-end length, measured from its junction;
 		# adding forty metres behind the slot made an overlong access road.
@@ -1857,7 +1956,7 @@ static func _place_landmark(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 		var dir: Vector2 = e["dir"]
 		var want_t: float = 0.0
 		var t: float
-		if plan.spec.form in [&"strand", &"shore"] and absf(dir.y) > 1e-6:
+		if plan.spec.form in [&"strand", &"shore", &"water"] and absf(dir.y) > 1e-6:
 			# Align the south end of the measured frontage with the slot's
 			# common-facing edge; the full edge then stays inland of the common.
 			want_t = (rect.end.y - frontage * 0.5 - origin.y) / dir.y
@@ -1898,8 +1997,18 @@ const LANDMARK_HIGH_STEP_M := 5.0
 const LANDMARK_ROW_M := 14.0          ## a setback and half a house from the road
 const LANDMARK_SLOT_RANK := 0.65      ## the slot not clearly on the high side: go up
 const LANDMARK_HIGH_RELIEF_M := 1.0
+## The most height a church gives up to keep the common in front of it, as a
+## share of the house rows' relief.
+const LANDMARK_NEAR_COST_SHARE := 0.4
+## A church stands on its own terrace (CHURCH_MAX_FALL), not a house's stepped
+## plinth: ground steeper than a house plot's 35 % is still candidate ground for
+## it, up to a footpath's grade. The ground fit has the last word.
+const LANDMARK_PLOT_MAX := VillageSiteAnalysis.PATH_MAX
 const LANDMARK_NEAR_COMMON_M := 30.0
 const LANDMARK_ROW_CLASSES: Array[StringName] = [&"through", &"street", &"lane"]
+## A hillside has its own church terrace (VTER-FORM-HILLSIDE) and keeps the
+## search as it was: its stair streets are not rows, its plots are 35 % at most.
+const LANDMARK_ROW_CLASSES_STEEP: Array[StringName] = [&"through", &"street", &"lane", &"steps"]
 
 
 static func landmark_high_ground(plan: VillagePlan) -> Vector2:
@@ -1908,6 +2017,9 @@ static func landmark_high_ground(plan: VillagePlan) -> Vector2:
 	# a strand's slot is inland of its one row by construction: above it
 	if plan.spec.form == &"strand":
 		return Vector2.INF
+	var legacy: bool = plan.spec.form == &"hillside"
+	var row_classes: Array[StringName] = LANDMARK_ROW_CLASSES if legacy else LANDMARK_ROW_CLASSES_STEEP
+	var plot_max: float = VillageSiteAnalysis.PLOT_MAX if legacy else LANDMARK_PLOT_MAX
 	var g: VillageTerrain = plan.ground
 	var cc: Vector2 = VillageMeasure.common_centre(plan)
 	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
@@ -1920,7 +2032,7 @@ static func landmark_high_ground(plan: VillagePlan) -> Vector2:
 	var n := 0
 	var rows := PackedFloat64Array()
 	for road in plan.roads:
-		if not (road["class"] in LANDMARK_ROW_CLASSES):
+		if not (road["class"] in row_classes):
 			continue
 		var pts: PackedVector2Array = road["points"]
 		for k in range(pts.size() - 1):
@@ -1955,7 +2067,7 @@ static func landmark_high_ground(plan: VillagePlan) -> Vector2:
 			var p: Vector2 = cc + Vector2(i, j) * LANDMARK_HIGH_STEP_M
 			if p.distance_to(cc) > LANDMARK_HIGH_REACH_M or not inner.has_point(p):
 				continue
-			if Poly.contains_point(common, p) or g.slope_at(p) > VillageSiteAnalysis.PLOT_MAX 					or not ground_clear(g, Poly.from_rect(Rect2(p - Vector2(5, 5), Vector2(10, 10)))):
+			if Poly.contains_point(common, p) or g.slope_at(p) > plot_max 					or not ground_clear(g, Poly.from_rect(Rect2(p - Vector2(5, 5), Vector2(10, 10)))):
 				continue
 			var h: float = g.height_at(p)
 			if h > best_h:
@@ -1964,7 +2076,8 @@ static func landmark_high_ground(plan: VillagePlan) -> Vector2:
 			if h > near_h and VillageMeasure.point_to_poly(p, common) <= LANDMARK_NEAR_COMMON_M:
 				near_h = h
 				near = p
-	if near != Vector2.INF and near_h >= median:
+	# fronting the common is worth a few metres of height, not a hillside
+	if near != Vector2.INF and near_h >= median and (legacy or best_h - near_h <= LANDMARK_NEAR_COST_SHARE * (hi - lo)):
 		return near
 	return best
 

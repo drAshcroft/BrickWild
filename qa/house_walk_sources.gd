@@ -14,6 +14,10 @@ static func levels_of(plan: HousePlan) -> Array[int]:
 		lowest = int(plan.spec.lowest_storey())
 	for level in range(lowest, clampi(int(plan.spec.storeys), 1, plan.spec.max_storeys())):
 		out.append(level)
+	# HS-PUEBLO: the topmost roof of a stepped house is a terrace people walk on
+	for terrace in plan.terraces:
+		if not out.has(int(terrace["storey"])):
+			out.append(int(terrace["storey"]))
 	return out
 
 
@@ -39,6 +43,13 @@ static func sources(plan: HousePlan) -> Dictionary:
 		var level := HousePlan.record_storey(d)
 		if out.has(level) and not bool(d.get("secret", false)):
 			out[level]["floor"].append(Poly.from_rect(door_gap(d)))
+	# HS-PUEBLO: the terraces, the doorways through the thick wall onto them and the
+	# ground at the foot of the first ladder (HousePueblo.walk_floor, one list for
+	# this and for the check)
+	if not plan.terraces.is_empty():
+		for level in out:
+			for r in HousePueblo.walk_floor(plan, level):
+				out[level]["floor"].append(Poly.from_rect(r))
 	var dais_room: int = plan.dais_room()
 	if dais_room >= 0 and dais_room < plan.room_count() and plan.dais_rise() > WalkGrid.MAX_STEP:
 		var level := HousePlan.record_storey(plan.rooms[dais_room])

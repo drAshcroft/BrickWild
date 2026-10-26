@@ -32,7 +32,7 @@ const WANTED_ROLES := [&"parapet", &"veranda_deck", &"veranda_post", &"veranda_b
 ## exists to hold THEM to their architecture, so it must not quietly grow a
 ## sixth row and then pass it by having no expectations for it.
 const CULTURE_STYLES: Array[StringName] = [&"mediterranean", &"asian", &"african",
-	&"thatch_cottage", &"mud_hut", &"pueblo"]
+	&"thatch_cottage", &"roundhouse", &"pueblo"]
 
 ## The styles that must keep emitting nothing from this vocabulary.
 const ORDINARY_STYLES: Array[StringName] = [&"cottage", &"farmhouse", &"townhouse",
@@ -51,9 +51,12 @@ const FORCED := [
 	{"style": &"african", "w": 10.0, "l": 12.0, "h": 2.8, "seed": 62004,
 		"on": ["corner_piers", "thatch_roll"], "roof": &"hipped",
 		"about": "rounded mud corners and combed thatch over a hip"},
-	{"style": &"mud_hut", "w": 7.0, "l": 8.0, "h": 2.4, "seed": 62005,
+	# HS-ROUNDHOUSE: a smith's roundhouse is not a plain one, so it stays the old
+	# SQUARE hut under a square cone: the one fixture that still lays a cone over
+	# four corners (the round hut has its own test).
+	{"style": &"roundhouse", "trade": &"smith", "w": 7.0, "l": 8.0, "h": 2.4, "seed": 62005,
 		"on": ["corner_piers", "thatch_roll"], "roof": &"conical",
-		"about": "a cone, rounded corners and an eave roll with no ridge to roll"},
+		"about": "a square cone, rounded corners and an eave roll with no ridge to roll"},
 	{"style": &"pueblo", "w": 10.0, "l": 12.0, "h": 2.8, "seed": 62006,
 		"on": ["parapet"], "roof": &"flat",
 		"about": "a level adobe roof behind a terrace parapet"},
@@ -291,8 +294,8 @@ static func _positive(res: SuiteResult) -> void:
 						"%s: Pueblo's flat roof is not plain earth" % who)
 	for style in CULTURE_STYLES:
 		res.checked += 1
-		if not kinds.has(&"conical") and style == &"mud_hut":
-			res.fail("mud_hut: the sweep never produced a cone")
+		if not kinds.has(&"conical") and style == &"roundhouse":
+			res.fail("roundhouse: the sweep never produced a cone")
 	if not kinds.has(&"conical"):
 		res.fail("the culture sweep never produced a conical roof")
 	res.note("  roof types swept: %s" % str(kinds.keys()))
@@ -336,11 +339,25 @@ static func _ordinary_houses_stay_ordinary(res: SuiteResult) -> void:
 			builder.build(plan)
 			var who := "%s/%d storeys seed=%d" % [String(style), storeys, s.seed]
 			var leaked: Array = VernacularHouseCheck._vocabulary(builder)
+			# HVERN-WITCH-THATCH: the witch hut's thatch (WITCH-ROOF) is the one declared
+			# exception: its spec asks for the thatch roll and ONLY that, and the roll pieces
+			# are the only vocabulary it may emit. Any other style, or any other piece, is
+			# a leak exactly as before.
+			var declared_thatch: bool = HouseGeometry.has_witch_roofcraft(plan.spec)
+			if declared_thatch:
+				_expect(res, plan.spec.thatch_roll,
+					"%s: the witch thatch roll is not declared on its spec" % who)
+				var kept: Array = []
+				for row in leaked:
+					var role := String(row.get("role", ""))
+					if role != "thatch_eave" and not role.begins_with("thatch_roll_"):
+						kept.append(row)
+				leaked = kept
 			_expect(res, leaked.is_empty(),
 				"%s: emitted %d vernacular components" % [who, leaked.size()])
 			_expect(res, not plan.spec.parapet and not plan.spec.veranda
-					and not plan.spec.eave_sweep and not plan.spec.thatch_roll
-					and not plan.spec.corner_piers,
+					and not plan.spec.eave_sweep and not plan.spec.corner_piers
+					and (declared_thatch or not plan.spec.thatch_roll),
 				"%s: the generator switched the culture vocabulary on for an ordinary style" % who)
 			var report: Dictionary = VernacularHouseCheck.new().check(plan, builder)
 			_expect(res, bool(report["ok"]), "%s: %s" % [who, str(report["failures"])])

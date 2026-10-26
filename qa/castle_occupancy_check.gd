@@ -233,7 +233,7 @@ static func _check_record(out: Dictionary, id: String, row: Dictionary,
 		var found := false
 		for part in builder.part_log:
 			if String(part.get("tag", "")) == id \
-					and String(part.get("opening_kind", "")) == "window" \
+					and String(part.get("opening_kind", "")) == ("hatch" if bool(window.get("hatch", false)) else "window") \
 					and _matches(opening, part):
 				found = true
 				break

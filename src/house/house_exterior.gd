@@ -49,6 +49,15 @@ static func dress(plan: HousePlan) -> void:
 			["Bench", 0.8, 0, "entrance_seat"],
 			["Pot_1", 1.2, service, "storage"], ["Barrel", 1.0, service, "storage"],
 			["Bucket_Wooden_1", 1.0, service, "water"]]
+		if s.terraced and not trade_recipe:
+			# HS-PUEBLO: no wall lantern, bench or barrel (a European household's
+			# kit): two water jars stand against the wall, clear of the ladder.
+			recipe = [["Pot_1", 1.5, service, "water"], ["Pot_1", 1.1, service, "storage"]]
+		if s.sahel and not trade_recipe:
+			# HS-SAHEL: no wall lantern, bench or barrel (a European household's
+			# kit); the water jars, a bucket and the pot of the store stand by the wall.
+			recipe = [["Pot_1", 1.5, service, "water"], ["Pot_1", 1.1, service, "storage"],
+				["Bucket_Wooden_1", 1.0, service, "water"]]
 	for item in recipe:
 		var key: String = item[0]
 		var scale: float = item[1]
@@ -61,6 +70,12 @@ static func dress(plan: HousePlan) -> void:
 		var walls: Array[int] = [int(item[2])]
 		if int(item[2]) != 0:
 			walls.append(1)
+		elif s.style == &"witch_hut" and s.trade == &"none":
+			# HEXT-WITCH-DRESSING: the compact 7 m hut front (WITCH-SIZE/WITCH-ROOF) is
+			# door, two shuttered windows and the reserved approach, with no clear run
+			# left for a lamp or a bench. The arrival pieces then stand on a side wall
+			# rather than vanish and leave the hut with no dressing at all.
+			walls.append_array([2, 3, 1])
 		for wall in walls:
 			for fraction in [0.22, 0.78, 0.38, 0.62, 0.5, 0.12, 0.88]:
 				var placement := _candidate(plan, key, scale, wall, fraction, item[3])
@@ -139,20 +154,41 @@ static func _opening_box(pos: Vector2, normal: Vector2, width: float,
 ## than the sill allows or that blocks a shutter or hood, nothing in the
 ## chimney. `bounds` is a measured world box. Empty when clear.
 static func facade_clear(plan: HousePlan, bounds: AABB) -> String:
+	# WITCH-ROOF: a reserved opening box stops 10 cm under the wall plate at most, so a
+	# 2.3 m hut wall can still carry a yard lean-to above its doors and windows.
 	for door in plan.doors:
 		if not door["exterior"] or HousePlan.record_storey(door) != 0:
 			continue
+		# A door that opens onto a walled court has the court for its approach:
+		# its own walls stand beyond a shorter reach (HS-MEDITERRANEAN).
+		var reach := HouseYard.COURT_DOOR_APPROACH if HouseYard.opens_on_court(plan, door) else 3.2
+		if bool(door.get("screen", false)):
+			# HS-MINKA: a screen door opens onto the engawa, which is built; the
+			# garden beyond its step is not the door's approach
+			reach = float(plan.engawa.get("depth", 1.2)) + 0.1
 		var reserved := _opening_box(door["pos"], door["normal"], float(door["width"]) + 1.1,
-			-0.1, HouseGeometry.DOOR_H + 0.25, 3.2, HouseGeometry.wall_thickness(plan.spec))
+			-0.1, minf(HouseGeometry.DOOR_H + 0.25, plan.spec.height - 0.1), reach,
+			HouseGeometry.wall_thickness(plan.spec))
 		if bounds.intersects(reserved):
 			return "blocks a door approach or porch"
 	for win in plan.windows:
+		if bool(win.get("screen", false)):
+			continue
 		var level := HousePlan.record_storey(win) * plan.spec.height
 		var width: float = win["width"] * (2.0 if plan.spec.window_shutters else 1.0) + 0.22
 		if bounds.intersects(_opening_box(win["pos"], win["normal"], width,
-			level + float(win["sill"]) - 0.1, level + float(win["head"]) + 0.25, 0.8,
+			level + float(win["sill"]) - 0.1,
+			level + minf(float(win["head"]) + 0.25, plan.spec.height - 0.1), 0.8,
 			HouseGeometry.wall_thickness(plan.spec))):
 			return "obstructs glazing, shutters or a window hood"
+	# HS-PUEBLO: the ground in front of the first ladder, and the wall it leans on
+	for ladder in plan.ladders:
+		if int(ladder["storey"]) != 0:
+			continue
+		var lx := float(ladder["x"])
+		var ly := float(ladder["wall_y"])
+		if bounds.intersects(AABB(Vector3(lx - 0.8, -0.1, ly - 1.4), Vector3(1.6, plan.spec.height * 2.0, 1.45))):
+			return "blocks the foot of a ladder"
 	if plan.spec.chimney:
 		var c := HouseGeometry.chimney_center(plan)
 		var size := HouseGeometry.chimney_size(plan.spec) + HouseGeometry.CHIMNEY_BASE_EXTRA + 0.12
@@ -184,6 +220,11 @@ static func conflict(plan: HousePlan, p: Dictionary, placed: Array) -> String:
 	var why := facade_clear(plan, bounds)
 	if not why.is_empty():
 		return why
+	# HS-MINKA: the engawa is built ground along that wall; no piece stands on it
+	var deck := HouseMinka.deck_rect(plan)
+	if deck.has_area() and Rect2(Vector2(bounds.position.x, bounds.position.z),
+			Vector2(bounds.size.x, bounds.size.z)).intersects(deck.grow(-0.01)):
+		return "stands on the engawa"
 	for other in placed:
 		if bounds.grow(0.08).intersects(bounds_of(other)):
 			return "overlaps another exterior prop"

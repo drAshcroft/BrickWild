@@ -65,6 +65,9 @@ const KIND_ROWS := {
 		"length": {"min": 22.0, "max": 100.0, "step": 1.0, "value": 44.0},
 		"height": {"min": 6.0, "max": 26.0, "step": 0.5, "value": 12.0},
 	},
+	# A `witch_hut` is small: HouseGenerator.clamp_witch_hut brings any request
+	# down to at most 7 x 9 m (short x long side) and one storey, whatever these
+	# slider limits allow. Every other house style takes the full envelope.
 	&"house": {
 		"label": "House", "size_label": "House", "height_label": "Ceiling (m)",
 		"style_label": "Style", "purpose_label": "Trade",
@@ -251,6 +254,8 @@ static func options(kind: StringName, field: StringName) -> Array[Dictionary]:
 ## it. Empty when the kind or the id is unknown, so a caller printing a
 ## label never has to guard a dictionary lookup that would crash.
 static func option_label(kind: StringName, field: StringName, id: StringName) -> String:
+	if field == &"style" and kind in [&"house", &"shop"]:
+		id = HouseSpec.canonical_style(id)
 	for row in options(kind, field):
 		if row["id"] == id:
 			return String(row["label"])
@@ -302,6 +307,9 @@ static func describe(kind: StringName) -> Dictionary:
 	out["api_version"] = API_VERSION
 	out["styles"] = options(kind, &"style")
 	out["purposes"] = options(kind, &"purpose")
+	if CrookedWarp.supports(kind):
+		out["jank"] = {"min": 0.0, "max": 1.0, "value": 0.0}
+		out["jank_label"] = "Crookedness"
 	if kind == &"village":
 		out["waters"] = options(kind, &"water")
 		out["enclosures"] = options(kind, &"enclosure")
@@ -353,6 +361,12 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 	if not is_finite(request.orientation):
 		out.append(_error(&"invalid_orientation", &"orientation",
 			"orientation must be a finite yaw in radians."))
+	if not is_finite(request.jank) or request.jank < 0.0 or request.jank > 1.0:
+		out.append(_error(&"invalid_jank", &"jank",
+			"jank must be a number from 0 (plumb) to 1 (as crooked as it goes)."))
+	elif request.jank > 0.0 and not CrookedWarp.supports(request.kind):
+		out.append(_error(&"jank_unsupported", &"jank",
+			"A %s cannot be crooked as one piece; leave jank at 0." % String(request.kind)))
 	if not known:
 		return out
 	var row: Dictionary = KIND_ROWS[request.kind]
@@ -409,6 +423,11 @@ const CHURCH_MAX_FALL := 6.0
 
 
 static func _validate_ground(request: BuildingRequest, out: Array[Dictionary]) -> void:
+	# a house or shop on piles over water (VTER-FORM-WATER, HousePiles)
+	var piles: Array = HousePiles.refusal(request)
+	if not piles.is_empty():
+		out.append(_error(piles[0], piles[1], piles[2]))
+		return
 	var f: float = request.ground_fall_m
 	var deg: float = request.ground_downhill_deg
 	if not is_finite(f) or f < 0.0:
@@ -472,6 +491,9 @@ static func _validate_options(request: BuildingRequest, out: Array[Dictionary]) 
 
 
 static func _has_option(kind: StringName, field: StringName, id: StringName) -> bool:
+	# HS-ROUNDHOUSE: a renamed house style is still accepted under its old name.
+	if field == &"style" and kind in [&"house", &"shop"]:
+		id = HouseSpec.canonical_style(id)
 	for row in options(kind, field):
 		if row["id"] == id:
 			return true

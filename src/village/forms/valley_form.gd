@@ -95,6 +95,12 @@ const COMMON_CLEAR_M := 12.0      ## a lane's foot this far from the common's x 
 const COMMON_ASPECT := 1.8        ## the common's width over its depth, squared: wide and shallow
 const COMMON_WIDTH_MIN := 18.0
 const COMMON_DEPTH_MIN := 8.0
+const COMMON_FRONTAGE_DX := [-30.0, -20.0, -10.0, 0.0, 10.0, 20.0, 30.0]
+const COMMON_FRONTAGE_WEIGHT := 1.0
+const UNFOUND_BAND_M := 14.0     ## the routed road's band either side of its seed when the river is not read
+const UNFOUND_DEVIATE := 4.0      ## and its dislike of leaving the seed, over the street form's
+const ROW_DEPTHS := [8.0, 14.0, 20.0]  ## a house's row, off the road's line
+const SIDE_MARGIN := 0.08            ## the other row must be this much gentler to be taken
 
 
 static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
@@ -126,7 +132,7 @@ static func plan(spec: VillageSpec, extra_lanes := 0, site_scale := 1.0,
 		if not a.valid():
 			a = null
 	# the core: a common lying along the road, the landmark behind it
-	_core(out, spec, through, VillageDispersedForm._main_x(out, through, a))
+	_core(out, spec, through, _common_x(out, through, a))
 	_lanes(out, spec, through, lane_count(spec) + extra_lanes / 2)
 	var ground_shore := false
 	if ground != null:
@@ -375,7 +381,12 @@ static func _road_line(site: Rect2, valley: Dictionary, seeded: PackedVector2Arr
 static func _route(seeded: PackedVector2Array, site: Rect2, ground: VillageTerrain,
 		valley: Dictionary) -> PackedVector2Array:
 	if not bool(valley["found"]):
-		return VillageSitePlanner._route_through(seeded, site, ground)
+		# no river to follow (a grid whose valley it cannot show): the road
+		# keeps near the middle of the site, where a farm beside it meets the
+		# farm rule's reach to the edge -- a grade-routed road left to wander
+		# the street form's half-depth band stood 28 m off the middle on
+		# Balan's uniform hillside and the farms had no ground (VTER-VALLEY-REAL)
+		return VillageSitePlanner._route_through(seeded, site, ground, -1, 0.0, UNFOUND_BAND_M, UNFOUND_DEVIATE)
 	var road_half: float = float(VillageSitePlanner.ROAD_CLASSES[&"through"]["width"]) * 0.5 \
 		+ float(VillageSitePlanner.ROAD_CLASSES[&"through"]["verge"])
 	var lo: float = site.position.y + road_half + VillageSitePlanner.SITE_MARGIN_M
@@ -493,6 +504,51 @@ static func _median(v: PackedFloat64Array, window: int) -> PackedFloat64Array:
 
 # ------------------------------------------------------------------- the core
 
+## Where along the road the common stands: the middle half of the road where
+## the ground round it is gentlest -- not only the hill behind it (the dispersed
+## form's reading) but the road's frontage on both sides at its ends, where its
+## neighbours stand (`assign_jobs`), and the bank row across the road. On a
+## steep side a common over a gentle patch with a cliff beside it is fronted by
+## nothing (VTER-VALLEY-REAL: Ushguli, QA `common`).
+static func _common_x(out: VillagePlan, through: PackedVector2Array, a: VillageSiteAnalysis) -> float:
+	if a == null:
+		return VillageDispersedForm._main_x(out, through, a)
+	var site: Rect2 = out.site
+	var best_x: float = 0.0
+	var best := INF
+	for i in range(1, through.size() - 1):
+		var p: Vector2 = through[i]
+		var t: float = (p.x - site.position.x) / site.size.x
+		if t < 0.3 or t > 0.7:
+			continue
+		var cost: float = 0.1 * absf(p.x - site.get_center().x) / (site.size.x * 0.5)
+		var sum := 0.0
+		var n := 0
+		for dy in [8.0, 18.0, 28.0, 38.0]:
+			for dx in [-12.0, 0.0, 12.0]:
+				var s: float = a.slope_at(p + Vector2(dx, dy))
+				if not is_nan(s):
+					sum += s
+					n += 1
+		var hill: float = sum / maxf(n, 1)
+		# the neighbours: the road's two sides along the common and beyond its ends
+		sum = 0.0
+		n = 0
+		for dx in COMMON_FRONTAGE_DX:
+			for dy in [-12.0, 12.0]:
+				var q: Vector2 = p + Vector2(dx, dy)
+				var s2: float = a.slope_at(q)
+				if is_nan(s2):
+					continue
+				sum += s2 + (1.0 if a.wet_at(q) else 0.0)
+				n += 1
+		cost += hill + COMMON_FRONTAGE_WEIGHT * sum / maxf(n, 1)
+		if cost < best - 1e-9:
+			best = cost
+			best_x = p.x
+	return best_x
+
+
 ## The common as a widening of the road: long and shallow, lying along the
 ## through road on its hill side, so the body keeps to the road's frontage
 ## and the lots across the road, at the common's ends and the landmark behind
@@ -579,14 +635,44 @@ static func assign_jobs(plan: VillagePlan, jobs: Array[Dictionary]) -> void:
 		spread.append(x)
 	spread.sort_custom(func(a: float, b: float) -> bool:
 		return absf(a - centre_x) < absf(b - centre_x))
+	var a: VillageSiteAnalysis = null
+	if plan.ground != null:
+		a = VillageSiteAnalysis.of(plan.ground, site, ANALYSIS_CELL_M)
+		if not a.valid():
+			a = null
 	for x in spread:
-		slots.append({"x": x, "side": side})
+		# the row the ground favours; the alternating side where the two are alike
+		var pick := side
+		if a != null:
+			var sy0: float = VillageLotPlanner._polyline_y_at_x(through, x)
+			var here: float = _row_cost(a, x, sy0, side)
+			var there: float = _row_cost(a, x, sy0, -side)
+			if there + SIDE_MARGIN < here:
+				pick = -side
+		slots.append({"x": x, "side": pick})
 		side = -side
 	for i in range(n):
 		var sx: float = slots[i]["x"]
 		var sy: float = VillageLotPlanner._polyline_y_at_x(through, sx)
 		homes[i]["near_point"] = Vector2(sx, sy + float(slots[i]["side"]) * SLOT_OFFSET_M)
 		homes[i]["siting"] = VillageLotPlanner.SITING_DEFAULT
+
+
+## How hard the ground is to build on in the row `side` of the road at `x`
+## (+1 the hill side, -1 the river bank): mean slope over the house's depth,
+## wet ground counted as a cliff.
+static func _row_cost(a: VillageSiteAnalysis, x: float, road_y: float, side: float) -> float:
+	var sum := 0.0
+	var n := 0
+	for dy in ROW_DEPTHS:
+		var q := Vector2(x, road_y + side * float(dy))
+		var s: float = a.slope_at(q)
+		if is_nan(s):
+			sum += 1.0
+		else:
+			sum += s + (1.0 if a.wet_at(q) else 0.0)
+		n += 1
+	return sum / float(n)
 
 
 # ------------------------------------------------------------------- the lanes

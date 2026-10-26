@@ -38,6 +38,9 @@ extends RefCounted
 const COVER_TARGET := HouseFurnishWalkCheck.SPARSE_MIN + 0.008
 ## Most pieces one room's sparse top-up may try.
 const MAX_TRIES := 30
+## A great room gets more: wall pieces cover little of a 344 m2 parlour, and 30
+## of them left it at 7% (CASTLE-YARD-WINDOW). One extra try per this many m2.
+const TRIES_PER_AREA := 8.0
 
 ## Every furnishing complaint is judged except the two whose wording carries
 ## the measure this pass changes ("with 3% of it furnished", "lit by 1"): a
@@ -373,8 +376,14 @@ static func _fill_steps(kind: StringName) -> Array:
 			# and only wall storage is left, which leaves a great drum parlour
 			# under the sparse rule's share with nowhere to sit at all: a
 			# settle along the wall is what the room is for (CASTLE-CHANGE-17).
+			# A great drum or keep parlour runs out of wall long before it
+			# reaches the sparse share (344 m2 stood at 9% with every wall
+			# step refused): the last step is rows of settles down the open
+			# floor, the nave's pews in a sitting room (CASTLE-YARD-WINDOW).
+			var settles := {"cat": "bench", "rule": &"row", "n": [4, 12], "min_n": 2,
+				"pitch": 0.0, "aisle": 1.2, "seat_clearance": 0.0, "along": "axis", "opt": 0.5}
 			return [{"cat": "bookcase", "rule": &"wall"}, {"cat": "bench", "rule": &"wall"},
-				table_set] + stores
+				table_set] + stores + [settles, settles]
 		&"bedroom", &"guest_room", &"lords_chamber", &"suite":
 			return [{"cat": "chest", "rule": &"wall"}, {"cat": "storage", "rule": &"wall"},
 				{"cat": "bookcase", "rule": &"wall"}, table_set]
@@ -396,7 +405,7 @@ static func _fill(plan: HousePlan, spec: HouseSpec, room: int, blocked: Array[Re
 	var tries := 0
 	var refused := {}
 	var i := 0
-	while floor_cover(plan, room) / area < COVER_TARGET and tries < MAX_TRIES \
+	while floor_cover(plan, room) / area < COVER_TARGET and tries < MAX_TRIES + int(area / TRIES_PER_AREA) \
 			and refused.size() < steps.size():
 		var index := i % steps.size()
 		i += 1

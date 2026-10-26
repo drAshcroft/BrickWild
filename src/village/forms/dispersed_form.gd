@@ -55,7 +55,21 @@ const QUOTA_MIN := 3
 const QUOTA_SECOND := 5
 ## Seats this far apart: two hamlets' houses, each within about 25 m of its
 ## well, stay further apart than the survey's 45 m linkage.
-const HAMLET_SEP_M := 110.0
+const HAMLET_SEP_M := 160.0
+## A link passes no hamlet's seat nearer than this: its houses would string along it.
+const HAMLET_PASS_M := 45.0
+## The link track (VTER-DISPERSED-2): routed from the through road to the
+## seat at the track's own grade cap, trying a foot every LINK_FOOT_STEP_M
+## along the road within LINK_FOOT_REACH_M of the seat's x, across a band of
+## LINK_BAND_M either side of the straight line.
+const LINK_FOOT_STEP_M := 20.0
+const LINK_FOOT_REACH_M := 200.0
+const LINK_BAND_M := 70.0
+const LINK_MIN_M := 40.0
+## The ring's two joins to the through road are at least this long (junctions 8 m apart fail the road check).
+const RING_JOIN_MIN_M := 9.0
+## A foot keeps this far from the end of any other road (the junction spacing is 8 m).
+const LINK_JUNCTION_CLEAR_M := 14.0
 const HAMLET_GROUND_M := 90.0
 const SEAT_RADIUS_M := 30.0
 ## A seat whose ground is on average steeper than a house plot
@@ -79,10 +93,10 @@ const FIELD_GENTLE := 0.15
 const FIELD_PASTURE := 0.30
 const FIELD_CLEAR := 3.0
 const FIELD_FROM_SEAT_M := 40.0
-const SITE_BASE_M := 200.0
+const SITE_BASE_M := 230.0
 const SITE_PER_HAMLET_M := 40.0
-const SITE_MIN_M := 260.0
-const SITE_MAX_M := 360.0
+const SITE_MIN_M := 320.0
+const SITE_MAX_M := 400.0
 
 
 ## The whole site plan of a dispersed village. `extra_lanes` is ignored: the
@@ -250,6 +264,21 @@ static func _ring(out: VillagePlan, spec: VillageSpec, through: PackedVector2Arr
 		return -INF
 	var west := centre + Vector2(-arc_radius, 0.0)
 	var east := centre + Vector2(arc_radius, 0.0)
+	# a join shorter than the junction spacing would put two junctions closer
+	# than the road check allows (the ring's first bend, the through road):
+	# take the next vertex out along the road
+	var tries := 0
+	while through[ia].distance_to(west) < RING_JOIN_MIN_M and tries < 6:
+		ia = VillageSitePlanner._vertex_outside_x(through, through[ia].x - 1.0, -1.0)
+		tries += 1
+		if ia < 0:
+			return -INF
+	tries = 0
+	while through[ib].distance_to(east) < RING_JOIN_MIN_M and tries < 6:
+		ib = VillageSitePlanner._vertex_outside_x(through, through[ib].x + 1.0, 1.0)
+		tries += 1
+		if ib < 0:
+			return -INF
 	if west.x < site.position.x + VillageSitePlanner.SITE_MARGIN_M \
 			or east.x > site.end.x - VillageSitePlanner.SITE_MARGIN_M:
 		return -INF
@@ -332,6 +361,11 @@ static func _seat_candidates(out: VillagePlan, a: VillageSiteAnalysis, strict :=
 static func _secondary_hamlet(out: VillagePlan, spec: VillageSpec, through: PackedVector2Array,
 		seat: Vector2, a: VillageSiteAnalysis) -> Dictionary:
 	var site: Rect2 = out.site
+	var linked := _link_hamlet(out, spec, through, seat, a)
+	if not linked.is_empty():
+		return linked
+	# No cart track reaches the seat: the straight way up the fall line,
+	# which is a stair where it is steep (steps only where nothing else reaches).
 	# The spine leaves the through road square to the frame, at the seat's
 	# own x: the road runs along the frame's X (on a hillside, the contour),
 	# so the spine is the way straight up or down the slope -- a stair where
@@ -398,6 +432,136 @@ static func _secondary_hamlet(out: VillagePlan, spec: VillageSpec, through: Pack
 	return {}
 
 
+## The hamlet at `seat` joined to the through road by a track that follows the
+## ground (VTER-DISPERSED-2): `VillageRoadRouter.route_across` in the frame of
+## the line from a foot on the road to the seat, both ends pinned, laid at the
+## track's own grade cap; of the feet tried, the shortest track whose measured
+## grade is within the cap and that crosses nothing. The common stands beside
+## the track's last metres. {} when no foot gives a track (the caller falls
+## back to a stair up the fall line), or without ground.
+static func _link_hamlet(out: VillagePlan, spec: VillageSpec, through: PackedVector2Array,
+		seat: Vector2, a: VillageSiteAnalysis) -> Dictionary:
+	if out.ground == null:
+		return {}
+	var cap: float = float(VillageSitePlanner.ROAD_CLASSES[&"track"]["grade_max"])
+	var width: float = float(VillageSitePlanner.ROAD_CLASSES[&"track"]["width"])
+	var best := PackedVector2Array()
+	var best_len := INF
+	var inner: Rect2 = out.site.grow(-VillageSitePlanner.SITE_MARGIN_M - width)
+	# the feet, nearest the seat first: a track is never shorter than its chord,
+	# so the search stops at the first foot whose chord passes the best track
+	var feet: Array[Vector2] = []
+	var k := -int(LINK_FOOT_REACH_M / LINK_FOOT_STEP_M)
+	while k <= int(LINK_FOOT_REACH_M / LINK_FOOT_STEP_M):
+		var fx: float = seat.x + k * LINK_FOOT_STEP_M
+		k += 1
+		if fx < inner.position.x or fx > inner.end.x:
+			continue
+		var foot := Vector2(fx, VillageLotPlanner._polyline_y_at_x(through, fx))
+		if foot.distance_to(seat) >= LINK_MIN_M and not _near_junction(out, foot):
+			feet.append(foot)
+	feet.sort_custom(func(p: Vector2, q: Vector2) -> bool:
+		var dp: float = p.distance_to(seat)
+		var dq: float = q.distance_to(seat)
+		if not is_equal_approx(dp, dq):
+			return dp < dq
+		return p.x < q.x)
+	for foot in feet:
+		if foot.distance_to(seat) >= best_len:
+			break
+		var pts: PackedVector2Array = _route_link(out.ground, foot, seat, inner, cap)
+		if pts.size() < 2:
+			continue
+		var length := 0.0
+		for i in range(pts.size() - 1):
+			length += pts[i].distance_to(pts[i + 1])
+		if length >= best_len - 1e-9:
+			continue
+		if VillageRoadRouter.grade_of(out.ground, pts) > cap + 1e-6:
+			continue
+		if _blocked(out, Poly.ribbon(pts, width * 0.5 + 1.0), pts, true):
+			continue
+		best = pts
+		best_len = length
+	if best.is_empty():
+		return {}
+	var last: Vector2 = best[best.size() - 1]
+	var dir: Vector2 = (last - best[best.size() - 2]).normalized()
+	var n := Vector2(-dir.y, dir.x)
+	var off: float = width * 0.5 + COMMON_GAP + COMMON_SIDE * 0.5
+	var sides: Array[float] = [1.0, -1.0]
+	if a != null:
+		var s1: float = a.slope_at(last + n * off)
+		var s2: float = a.slope_at(last - n * off)
+		if not is_nan(s1) and not is_nan(s2) and s2 < s1:
+			sides = [-1.0, 1.0]
+	for s in sides:
+		var cc: Vector2 = last + n * s * off
+		# the hamlet's ground is whole inside the site (a farm is measured to its edge)
+		if not out.site.grow(-HAMLET_GROUND_M * 0.5 + 2.0).has_point(cc):
+			continue
+		var apart := true
+		for h in out.hamlets:
+			if cc.distance_to(h["seat"]) < HAMLET_SEP_M:
+				apart = false
+		if not apart:
+			continue
+		var poly := _square(cc, dir, COMMON_SIDE)
+		if _blocked(out, poly, PackedVector2Array(), false):
+			continue
+		out.roads.append(VillageSitePlanner._road(best, &"track", spec.wealth))
+		var spine_index: int = out.roads.size() - 1
+		out.commons.append({"poly": poly, "kind": &"common"})
+		var walk: Vector2 = (cc - last).normalized()
+		out.roads.append(VillageSitePlanner._road(PackedVector2Array([last, cc - walk * 1.9]),
+			&"path", spec.wealth))
+		return {"seat": cc, "common": out.commons.size() - 1, "spine": spine_index,
+			"households": 0, "shelf": _shelf(a, cc), "main": false}
+	return {}
+
+
+## Whether `p` lies within the junction spacing of any end of a road already
+## planned, or of a bend of the through road: a foot there would make a second
+## junction too near the first.
+static func _near_junction(out: VillagePlan, p: Vector2) -> bool:
+	for r in range(1, out.roads.size()):
+		var pts: PackedVector2Array = out.roads[r]["points"]
+		if pts[0].distance_to(p) < LINK_JUNCTION_CLEAR_M or pts[pts.size() - 1].distance_to(p) < LINK_JUNCTION_CLEAR_M:
+			return true
+	return false
+
+
+## The least-cost line from `from` to `to` at grade `cap`, in the frame whose
+## axis is the straight line between them; both ends fixed. Empty when the
+## ends are too near for a column or the band leaves `inner`.
+static func _route_link(ground: VillageTerrain, from: Vector2, to: Vector2, inner: Rect2,
+		cap: float) -> PackedVector2Array:
+	var total: float = from.distance_to(to)
+	var cols := int(round(total / VillageRoadRouter.COLUMN_M)) + 1
+	if cols < 3:
+		return PackedVector2Array()
+	var u: Vector2 = (to - from) / total
+	var v := Vector2(-u.y, u.x)
+	var xs := PackedFloat64Array()
+	var seed := PackedFloat64Array()
+	for i in range(cols):
+		xs.append(total * float(i) / float(cols - 1))
+		seed.append(0.0)
+	var h := func(along: float, across: float) -> float:
+		return ground.height_at(from + u * along + v * across)
+	var offs := VillageRoadRouter.route_across(h, xs, seed, -LINK_BAND_M, LINK_BAND_M, cap,
+		ground.water_level_m, 0, 0.0, 1.0, true)
+	var out := PackedVector2Array()
+	for i in range(cols):
+		var p: Vector2 = from + u * xs[i] + v * offs[i]
+		if i > 0 and i < cols - 1 and not inner.has_point(p):
+			return PackedVector2Array()
+		out.append(p)
+	out[0] = from
+	out[cols - 1] = to
+	return out
+
+
 ## Whether `poly` (a spine's ribbon, or a common) would stand on what is
 ## already planned: a common, the landmark slot, a road other than the
 ## through road (`spine` true: the spine's own first metres leave the
@@ -432,7 +596,7 @@ static func _blocked(out: VillagePlan, poly: PackedVector2Array, line: PackedVec
 	if spine:
 		# nor pass through another hamlet: its houses would string along it
 		for h in out.hamlets:
-			if VillageMeasure.point_to_polyline(h["seat"], line) < HAMLET_SEP_M * 0.4:
+			if VillageMeasure.point_to_polyline(h["seat"], line) < HAMLET_PASS_M:
 				return true
 	return false
 
@@ -623,12 +787,13 @@ static func finish(plan: VillagePlan) -> void:
 		if road["class"] != &"track":
 			continue
 		var pts: PackedVector2Array = road["points"]
-		var dir: Vector2 = (pts[pts.size() - 1] - pts[0]).normalized()
-		var n := Vector2(-dir.y, dir.x)
 		var off: float = float(road["width"]) * 0.5 + FIELD_CLEAR + FIELD_SIZE.y * 0.5
 		for k in range(1, pts.size() - 1):
 			if pts[k].distance_to(h["seat"]) < FIELD_FROM_SEAT_M:
 				continue
+			# a winding link: the field lies along the track here, not along its chord
+			var dir: Vector2 = (pts[k + 1] - pts[k - 1]).normalized()
+			var n := Vector2(-dir.y, dir.x)
 			for s in [1.0, -1.0]:
 				var c: Vector2 = pts[k] + n * s * off
 				var poly := _rect_along(c, dir, FIELD_SIZE)

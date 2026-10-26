@@ -6,6 +6,8 @@ const MIN_SPLIT := 0.36
 const MAX_SPLIT := 0.64
 const BASE_HOUSE_SPEC := preload("house_spec.gd")
 const DOMESTIC_KITCHEN_MIN_SIDE := 3.0
+## A hall sized exactly to its aspect limit fails the check on float rounding.
+const HALL_ASPECT_MARGIN := 0.02
 
 # --------------------------------------------------------------- subdivide
 
@@ -18,6 +20,12 @@ static func subdivide(p: HousePlan, spec: HouseSpec) -> void:
 			for rect in custom:
 				p.rooms.append({"kind": &"hall", "rect": rect, "storey": 0})
 			return
+	# HS-ROUNDHOUSE: one round room.
+	if HouseRound.applies(spec, p.world_family) and HouseRound.layout(p, spec):
+		return
+	# HS-LONGHALL: one long hall with a room at each end.
+	if HouseLonghall.applies(spec, p.world_family) and HouseLonghall.layout(p, spec):
+		return
 	var style: Dictionary = HouseSpec.STYLES.get(spec.style, {})
 	var domestic_family := not spec.has_method("room_program") \
 		and not spec.has_method("custom_room_rects") \
@@ -101,37 +109,6 @@ static func _domestic_layout(p: HousePlan, spec: HouseSpec) -> Dictionary:
 	var trade_room: StringName = HouseSpec.TRADES.get(spec.trade, {}).get("room", &"")
 	if trade_room != &"" and wanted >= 3 and kinds.has(trade_room):
 		required.append(trade_room)
-	# The compact Witch Alchemist keeps a direct Hall door to the bedroom and
-	# workshop, but moves those doors onto separate stations along the Hall's
-	# long side. Its front-to-back alternative crowds a two-seat meal group.
-	if _compact_witch_alchemist_side_hall_case(spec, wanted, kinds, inner):
-		var sidehall_attempt := _fit_compact_witch_alchemist_side_hall(p, spec, inner)
-		if bool(sidehall_attempt.get("ok", false)):
-			var sidehall_rooms: Array[Dictionary] = sidehall_attempt["rooms"]
-			for row in sidehall_rooms:
-				var kind: StringName = row["kind"]
-				if kind == &"hall":
-					row["domestic_role"] = &"living_hall"
-					row["domestic_functions"] = [&"entry", &"circulation", &"dining", &"common_living", &"cooking"]
-					row["meal_room"] = true
-					row["shared_cooking"] = true
-				elif kind == &"bedroom":
-					row["domestic_role"] = &"sleeping"
-					row["domestic_functions"] = [&"sleeping"]
-				else:
-					row["domestic_role"] = &"workshop"
-					row["domestic_functions"] = [&"workshop"]
-				row["domestic_layout_storey"] = 0
-			return {"ok": true, "rooms": sidehall_rooms, "provenance": {
-				"status": &"planned", "style": spec.style,
-				"requested_rooms": requested, "planned_rooms": sidehall_rooms.size(),
-				"ground_activities": kinds.duplicate(), "merged_activities": [&"kitchen"],
-				"capacity_expanded": false, "omitted_rooms": maxi(requested - sidehall_rooms.size(), 0),
-				"omitted_activities": [], "rejected_candidates": rejected,
-				"reason": "compact Alchemist Hall runs beside a split Workshop and private Bedroom; cooking stays in the Hall",
-				"mirror": false, "hall_role": &"living_hall", "shared_cooking": true,
-				"witch_alchemist_side_hall": true}}
-
 	if _compact_witch_service_case(spec, wanted, kinds, inner):
 		var shared_attempt := _fit_compact_witch_shared_hall_candidate(p, spec, inner)
 		if not bool(shared_attempt.get("ok", false)):
@@ -164,45 +141,9 @@ static func _domestic_layout(p: HousePlan, spec: HouseSpec) -> Dictionary:
 			"mirror": bool(shared_attempt["mirror"]), "hall_role": &"living_hall",
 			"shared_cooking": true, "shared_witchwork": true, "merged_into": &"hall"}}
 
-	# The default Witch uses a real side service wing inside the requested site.
-	# Hall and private bedroom form the taller core; kitchen and Workshop share
-	# the opposite strip under one lower roof. The compact shared-Hall fallback
-	# above is untouched.
-	if _witch_default_ell_case(p, spec, wanted, kinds):
-		var ell_attempt := _fit_witch_default_ell_candidate(p, spec, inner)
-		if bool(ell_attempt.get("ok", false)):
-			var ell_rooms: Array[Dictionary] = ell_attempt["rooms"]
-			for row in ell_rooms:
-				var kind: StringName = row["kind"]
-				if kind == &"hall":
-					row["domestic_role"] = &"living_hall"
-					row["domestic_functions"] = [&"entry", &"circulation", &"dining", &"common_living"]
-					row["meal_room"] = true
-					row["shared_cooking"] = false
-				elif kind == &"bedroom":
-					row["domestic_role"] = &"sleeping"
-					row["domestic_functions"] = [&"sleeping"]
-				else:
-					row["domestic_role"] = _activity_role(kind)
-					row["domestic_functions"] = [_activity_role(kind)]
-				if kind in [&"kitchen", &"workshop"]:
-					row["witch_service_wing"] = true
-				row["domestic_layout_storey"] = 0
-			return {"ok": true, "rooms": ell_rooms, "provenance": {
-				"status": &"planned", "style": spec.style,
-				"requested_rooms": requested, "planned_rooms": ell_rooms.size(),
-				"ground_activities": [&"hall", &"kitchen", &"bedroom", &"workshop"],
-				"merged_activities": [], "capacity_expanded": false,
-				"omitted_rooms": maxi(requested - ell_rooms.size(), 0),
-				"omitted_activities": [&"records", &"store"],
-				"rejected_candidates": rejected, "reason": "Hall and sleeping room form the high core; kitchen and Workshop share the lower service wing",
-				"mirror": bool(ell_attempt["mirror"]), "hall_role": &"living_hall",
-				"shared_cooking": false, "witch_working_ell": true}}
-
 	while candidate.size() >= required.size():
 		var compact_shared: bool = kitchen_merged and _compact_shared_cooking_square(spec, inner, candidate)
 		var attempt: Dictionary
-		var used_large_spine := large_grammar
 		if compact_shared:
 			attempt = _fit_compact_shared_cooking_candidate(p, spec, inner, candidate)
 		else:
@@ -221,28 +162,11 @@ static func _domestic_layout(p: HousePlan, spec: HouseSpec) -> Dictionary:
 					rejected.append({"activities": candidate.duplicate(), "reason": spine_reason,
 						"resolution": "fit the same activities behind a front hall"})
 					attempt = front_attempt
-					used_large_spine = false
 				else:
 					attempt["reason"] = spine_reason + "; front hall: " \
 						+ String(front_attempt.get("reason", "did not fit"))
 		if bool(attempt.get("ok", false)):
 			var rooms: Array[Dictionary] = attempt["rooms"]
-			if used_large_spine and p.world_family == &"" and _ordinary_domestic_no_trade(spec) \
-					and spec.get_script() == BASE_HOUSE_SPEC and spec.style == &"witch_hut" \
-					and spec.roof_material == &"thatch":
-				var work_rect := Rect2()
-				for candidate_room in rooms:
-					if candidate_room["kind"] == &"workshop":
-						work_rect = candidate_room["rect"]
-						break
-				var inner_left := absf(work_rect.position.x - inner.position.x) < 0.02
-				var inner_right := absf(work_rect.end.x - inner.end.x) < 0.02
-				if inner_left or inner_right:
-					for wing_room in rooms:
-						var wing_rect: Rect2 = wing_room["rect"]
-						if (inner_left and absf(wing_rect.position.x - inner.position.x) < 0.02) \
-								or (inner_right and absf(wing_rect.end.x - inner.end.x) < 0.02):
-							wing_room["witch_service_wing"] = true
 			var has_kitchen := candidate.has(&"kitchen")
 			var shared_cooking := kitchen_merged or not has_kitchen
 			var satisfied_activities: Array[StringName] = candidate.duplicate()
@@ -489,120 +413,8 @@ static func _compact_witch_service_case(spec: HouseSpec, wanted: int,
 		and inner.size.x <= 7.5 and inner.size.y <= 9.0
 
 
-static func _compact_witch_alchemist_side_hall_case(spec: HouseSpec, wanted: int,
-		kinds: Array[StringName], inner: Rect2) -> bool:
-	return spec != null and spec.get_script() == BASE_HOUSE_SPEC \
-		and spec.style == &"witch_hut" and spec.trade == &"alchemist" \
-		and not spec.has_method("room_program") and not spec.has_method("custom_room_rects") \
-		and not spec.has_method("landmark_footprint") \
-		and spec.storeys == 1 and spec.cellars == 0 and wanted == 3 \
-		and kinds.size() == 3 and kinds.has(&"hall") and kinds.has(&"workshop") \
-		and kinds.has(&"bedroom") and inner.size.x >= 6.35 and inner.size.y >= 7.6
-
-
-static func _fit_compact_witch_alchemist_side_hall(p: HousePlan, spec: HouseSpec,
-		inner: Rect2) -> Dictionary:
-	var hall_width := 3.0
-	var service_width := inner.size.x - hall_width
-	var split_y := inner.position.y + inner.size.y * 0.5
-	var rooms: Array[Dictionary] = [
-		{"kind": &"hall", "rect": Rect2(inner.position, Vector2(hall_width, inner.size.y)), "storey": 0},
-		{"kind": &"workshop", "rect": Rect2(Vector2(inner.position.x + hall_width, inner.position.y), Vector2(service_width, inner.size.y * 0.5)), "storey": 0},
-		{"kind": &"bedroom", "rect": Rect2(Vector2(inner.position.x + hall_width, split_y), Vector2(service_width, inner.size.y * 0.5)), "storey": 0},
-	]
-	return _validate_domestic_rooms(p, inner, rooms, false)
-
-
 static func _large_domestic_grammar(spec: HouseSpec) -> bool:
 	return spec != null and spec.width >= 12.0 and spec.length >= 14.0
-
-
-static func _witch_default_ell_case(p: HousePlan, spec: HouseSpec, wanted: int,
-		kinds: Array[StringName]) -> bool:
-	if p == null or spec == null or p.world_family != &"" \
-			or not _ordinary_domestic_no_trade(spec):
-		return false
-	if spec.get_script() != BASE_HOUSE_SPEC or spec.style != &"witch_hut" \
-			or spec.has_method("room_program") or spec.has_method("custom_room_rects") \
-			or spec.has_method("landmark_footprint") or spec.storeys != 1 or spec.cellars != 0 \
-			or spec.roof_material != &"thatch" \
-			or minf(spec.width, spec.length) < HouseGeometry.WITCH_WORKSHOP_MIN_SITE_SPAN \
-			or _large_domestic_grammar(spec) \
-			or wanted < 4 or kinds.size() < 4:
-		return false
-	var inner := HouseGeometry.interior_rect(spec)
-	if _compact_witch_service_case(spec, wanted, kinds, inner) \
-			or inner.size.y <= inner.size.x:
-		return false # the lower service run must stay parallel to the established main ridge
-	# The compact shared-Hall branch is handled first. This branch only applies
-	# while the domestic grammar still names the four core Witch rooms. A generic
-	# layout that can place more than those four has enough capacity to keep its
-	# established side-room programme and does not need the service ell.
-	for core in [&"hall", &"bedroom", &"kitchen", &"workshop"]:
-		if kinds.find(core) < 0 or kinds.find(core) >= 4:
-			return false
-	var generic_capacity := 0
-	for count in range(mini(wanted, kinds.size()), 3, -1):
-		var attempt := _fit_domestic_candidate(p, spec, inner, kinds.slice(0, count))
-		if bool(attempt.get("ok", false)):
-			generic_capacity = count
-			break
-	return generic_capacity <= 4
-
-
-static func _fit_witch_default_ell_candidate(p: HousePlan, spec: HouseSpec,
-		inner: Rect2) -> Dictionary:
-	var wall_half: float = HouseGeometry.INNER_WALL_T * 0.5
-	var core_width_min := maxf(_domestic_min_side(spec, &"hall"),
-		_domestic_min_side(spec, &"bedroom")) + wall_half
-	var wing_width_min := maxf(_domestic_min_side(spec, &"kitchen"),
-		_domestic_min_side(spec, &"workshop")) + wall_half
-	if inner.size.x < core_width_min + wing_width_min:
-		return {"ok": false, "reason": "Witch service ell cannot fit the minimum clear widths for the core and working rooms"}
-	# Allocate the side-to-side span in proportion to the actual room minima.
-	# The 9 x 12 request lands near its previous 52/48 division, while nearby
-	# supported widths scale with the room programme instead of a fixed size.
-	var core_width := inner.size.x * core_width_min / (core_width_min + wing_width_min)
-	var wing_width := inner.size.x - core_width
-	var core_clear_width := core_width - wall_half
-	var wing_clear_width := wing_width - wall_half
-	var front_clear_depth := maxf(_room_required_depth(spec, &"hall", core_clear_width),
-		_room_required_depth(spec, &"kitchen", wing_clear_width))
-	var rear_clear_depth := maxf(_room_required_depth(spec, &"bedroom", core_clear_width),
-		_room_required_depth(spec, &"workshop", wing_clear_width))
-	var front_depth_min := front_clear_depth + wall_half
-	var rear_depth_min := rear_clear_depth + wall_half
-	if inner.size.y < front_depth_min + rear_depth_min:
-		return {"ok": false, "reason": "Witch service ell cannot fit the minimum clear depths for the front and rear rooms"}
-	# Keep the established deeper private rear row when the site permits it;
-	# increase the entry row only when measured room minima require it.
-	var row_depth := maxf(inner.size.y * 0.40, front_depth_min)
-	if inner.size.y - row_depth < rear_depth_min:
-		row_depth = inner.size.y - rear_depth_min
-	if row_depth < front_depth_min or inner.size.y - row_depth < rear_depth_min:
-		return {"ok": false, "reason": "Witch service ell depth split violates a room's measured usable minimum"}
-	var mirror: bool = posmod(spec.seed, 2) == 1
-	var wing_x := inner.position.x if mirror else inner.end.x - wing_width
-	var core_x := wing_x + wing_width if mirror else inner.position.x
-	var hall := {"kind": &"hall", "rect": Rect2(Vector2(core_x, inner.position.y),
-		Vector2(core_width, row_depth)), "storey": 0}
-	var kitchen := {"kind": &"kitchen", "rect": Rect2(Vector2(wing_x, inner.position.y),
-		Vector2(wing_width, row_depth)), "storey": 0, "witch_service_wing": true}
-	var bedroom := {"kind": &"bedroom", "rect": Rect2(Vector2(core_x, inner.position.y + row_depth),
-		Vector2(core_width, inner.size.y - row_depth)), "storey": 0}
-	var workshop := {"kind": &"workshop", "rect": Rect2(Vector2(wing_x, inner.position.y + row_depth),
-		Vector2(wing_width, inner.size.y - row_depth)), "storey": 0, "witch_service_wing": true}
-	return _validate_domestic_rooms(p, inner, [hall, kitchen, bedroom, workshop], mirror)
-
-
-static func _room_required_depth(spec: HouseSpec, kind: StringName,
-		clear_width: float) -> float:
-	if clear_width <= 0.0:
-		return INF
-	var min_side := _domestic_min_side(spec, kind)
-	var min_area := float(HouseGeometry.MIN_AREA.get(kind, 4.0))
-	var max_aspect := HouseGeometry.aspect_max(kind)
-	return maxf(min_side, maxf(clear_width / max_aspect, min_area / clear_width))
 
 
 ## Compact Witch plans merge the kitchen and workshop room programmes into
@@ -790,7 +602,7 @@ static func _fit_domestic_candidate(p: HousePlan, spec: HouseSpec, inner: Rect2,
 	var wall_half := HouseGeometry.INNER_WALL_T * 0.5
 	var mirror: bool = posmod(spec.seed, 2) == 1
 	var hall_min_depth := maxf(float(HouseGeometry.MIN_SIDE.get(&"hall", 2.6)) + wall_half,
-		inner.size.x / HouseGeometry.ROOM_ASPECT_MAX + wall_half)
+		inner.size.x / HouseGeometry.aspect_max(&"hall") + wall_half + HALL_ASPECT_MARGIN)
 	# The common room must hold a useful household table group outside the
 	# entrance approach, rather than meeting the hall minimum by area alone.
 	if inner.size.y >= 8.0:
@@ -1024,7 +836,9 @@ static func _compact_backness(kind: StringName, style: StringName) -> int:
 	if _is_style_signature(style, kind):
 		return 1
 	if kind == &"kitchen":
-		return 0
+		# HS-RICH: the formal rooms take the front, the service rooms the back
+		# wall (and the yard door); a rich house keeps its kitchen last.
+		return 4 if style == &"rich" else 0
 	if kind in [&"bedroom", &"guest_room", &"suite"]:
 		return 3
 	if kind in [&"store", &"records"]:
@@ -1220,12 +1034,18 @@ static func name_rooms(p: HousePlan, spec: HouseSpec) -> void:
 				and HouseGeometry.room_suits(p, preferred, hall_kind) \
 				and HouseGeometry.room_suits(p, preferred, &"hall"):
 			hall = preferred
-	for i in order:
-		if hall >= 0:
-			break
-		if HouseGeometry.room_suits(p, i, hall_kind) and HouseGeometry.room_suits(p, i, &"hall"):
-			hall = i
-			break
+	# LHS-STAIRS: a plain multistorey house without a household grammar must
+	# put its hall where the domestic flight and both landings fit.
+	var stair_hall: bool = HousePlanLevels.hall_must_carry_stair(p)
+	for pass_index in range(2 if stair_hall else 1):
+		for i in order:
+			if hall >= 0:
+				break
+			if pass_index == 0 and stair_hall and not HousePlanLevels.room_carries_stair(p, i):
+				continue
+			if HouseGeometry.room_suits(p, i, hall_kind) and HouseGeometry.room_suits(p, i, &"hall"):
+				hall = i
+				break
 	if hall < 0:
 		hall = _largest(p)
 	p.rooms[hall]["kind"] = &"hall"

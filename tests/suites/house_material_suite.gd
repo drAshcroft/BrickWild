@@ -60,15 +60,16 @@ static func _check_witch_roof_visual(res: SuiteResult) -> void:
 	var palette: Array = style["roof"]
 	_expect(res, style["roof_material"] == &"thatch" and witch.roof_material == &"thatch",
 		"Witch style no longer retains structural thatch metadata")
-	_expect(res, palette == ["2B3034", "1E2227"], "Witch roof palette is not dark slate")
+	# WITCH-ROOF: the hut is thatched; the dark-slate palette matched the old concept board.
+	_expect(res, palette == ["8a7648", "6f5d38"], "Witch roof palette is not thatch-toned")
 	var visual := ShellAssembler.house_roof_appearance(witch)
-	_expect(res, witch.roof_material == &"thatch", "Witch visual roof override changed structural roof metadata")
-	_expect(res, visual["kind"] == &"slate" and is_equal_approx(visual["course"], 0.22)
-		and is_equal_approx(visual["tile_width"], 0.30) and not bool(visual["thatch"])
-		and not bool(visual["witch_thatch"]), "built-in Witch roof does not resolve to slate course material")
+	_expect(res, witch.roof_material == &"thatch", "Witch visual roof changed structural roof metadata")
+	_expect(res, visual["kind"] == &"thatch" and is_equal_approx(visual["course"], 0.30)
+		and is_equal_approx(visual["tile_width"], 0.42) and bool(visual["thatch"])
+		and bool(visual["witch_thatch"]), "built-in Witch roof does not resolve to the Witch thatch material")
 	var world_witch := ShellAssembler.house_roof_appearance(witch, &"mediterranean")
 	_expect(res, world_witch["kind"] == &"thatch" and bool(world_witch["thatch"])
-		and not bool(world_witch["witch_thatch"]), "world-family Witch roof entered the slate visual override")
+		and not bool(world_witch["witch_thatch"]), "world-family Witch roof entered the Witch thatch treatment")
 	var custom := CUSTOM_WITCH_SPEC.new() as HouseSpec
 	custom.style = &"witch_hut"
 	custom.roof_material = &"thatch"

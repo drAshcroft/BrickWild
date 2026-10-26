@@ -13,9 +13,18 @@ extends RefCounted
 ##     Ground mesh, and the houses' entry flights)
 ##   the same plan writes the same bytes
 ##   control: without the access flights the same bake strands doors
+##
+## And a hillside's `stepped` through road (`_stepped_case`): built with treads
+## and stair stones, and the 3D walk climbs it from one gate to the other.
+## Nothing else about the hillside form on the walk is asked here: its steep
+## cross-lanes (a stair's going under 0.28 m) and the doors off them are the
+## open items in docs/VILLAGE_TERRAIN.md.
 
 const VTP := preload("res://tests/suites/village_terrain_plan_suite.gd")
 const CASES := [["real30/manarola", &"green"], ["real30/positano", &"green"]]
+## The stair street the hillside form makes of a through road too steep for a cart
+## (HILLS-GENERAL): Masouleh planned as a hillside, its `stepped` through road.
+const STEPPED_CASES := ["real30/masouleh"]
 const ARRIVE := 0.05
 const VERTICAL := 0.1
 const SAMPLE := 0.25
@@ -30,6 +39,8 @@ static func run() -> SuiteResult:
 	res.note("measured %d buildings once in %.1f s" % [jobs.size(), (Time.get_ticks_msec() - t0) / 1000.0])
 	for c in CASES:
 		_case(res, jobs, c[0], c[1])
+	for g in STEPPED_CASES:
+		_stepped_case(res, jobs, g)
 	res.note("total %.1f s" % ((Time.get_ticks_msec() - t0) / 1000.0))
 	return res
 
@@ -236,6 +247,93 @@ static func _case(res: SuiteResult, jobs: Array[Dictionary], ground_name: String
 			walk["doors"].size() - stranded.size(), walk["doors"].size(), arrived, walk["doors"].size(), climbed,
 			vworst, pworst, sworst, samples, strict, chord, control])
 	scene.free()
+
+
+## A hillside's `stepped` through road, built and walked. The plan is the
+## hillside form on the ground; the road is checked to have treads in its bed and
+## stair stones in the mesh (host `road<i>`), and NavigationServer3D finds a path
+## from the first gate to the second along it that climbs the bed's rise.
+static func _stepped_case(res: SuiteResult, jobs: Array[Dictionary], ground_name: String) -> void:
+	var label := "%s/hillside (stepped through road)" % ground_name
+	var plan := VillageLotPlanner.plan_measured(VTP.spec_for(&"hillside", VTP.terrain(ground_name)), jobs)
+	res.checked += 1
+	var through: Array[int] = plan.roads_of_class(&"through")
+	if plan.ground == null or through.is_empty() or not bool(plan.roads[through[0]].get("stepped", false)):
+		res.fail("%s: the plan has no `stepped` through road" % label)
+		return
+	var road: int = through[0]
+	var builder := VillageBuilder.new()
+	var mesh := builder.build(plan)
+	var bed: Dictionary = VillageGroundSurface.of(plan).road_bed(road)
+	var named := 0
+	for row in builder.components("stair_tread"):
+		if String(row["host"]) == "road%d" % road:
+			named += 1
+	var treads: Array = bed.get("treads", [])
+	var h: PackedFloat32Array = bed["h"]
+	var h_lo := INF
+	var h_hi := -INF
+	for v in h:
+		h_lo = minf(h_lo, v)
+		h_hi = maxf(h_hi, v)
+	var rise: float = h_hi - h_lo
+	res.checked += 1
+	if treads.size() < 2 or named < treads.size() - 1:
+		res.fail("%s: road %d is `stepped` but has %d treads and %d stair stones" % [label, road, treads.size(), named])
+	res.checked += 1
+	if rise < 1.0:
+		res.fail("%s: the through road's bed ranges %.2f m, not a stair street" % [label, rise])
+	var comp: Dictionary = ComponentCheck.check(builder, mesh)
+	res.checked += 1
+	if not comp["ok"]:
+		res.fail("%s: the stairs' components differ from their triangles: %s" % [label, str(comp.get("failures", comp)).left(300)])
+	var walk: Dictionary = JSON.parse_string(JSON.stringify(VillageWalk.projection(plan, "c"), "", true))
+	res.checked += 1
+	if not walk.has("navmesh_3d") or (walk["navmesh_3d"]["polygons"] as Array).is_empty() or walk["gates"].size() < 2:
+		res.fail("%s: no 3D navigation mesh or fewer than two gates" % label)
+		return
+	var m3 := _mesh(walk["navmesh_3d"])
+	var map := NavigationServer3D.map_create()
+	NavigationServer3D.map_set_cell_size(map, VillageWalk3D.CELL)
+	NavigationServer3D.map_set_cell_height(map, VillageWalk3D.CELL_HEIGHT)
+	NavigationServer3D.map_set_merge_rasterizer_cell_scale(map, float(walk["navmesh_3d"]["merge_rasterizer_cell_scale"]))
+	NavigationServer3D.map_set_use_async_iterations(map, false)
+	NavigationServer3D.map_set_active(map, true)
+	var region := NavigationServer3D.region_create()
+	NavigationServer3D.region_set_use_async_iterations(region, false)
+	NavigationServer3D.region_set_map(region, map)
+	NavigationServer3D.region_set_navigation_mesh(region, VillageWalk3D.to_navigation_mesh(m3))
+	var link_rids: Array[RID] = []
+	for link in m3["links"]:
+		var rid := NavigationServer3D.link_create()
+		NavigationServer3D.link_set_map(rid, map)
+		NavigationServer3D.link_set_bidirectional(rid, true)
+		NavigationServer3D.link_set_start_position(rid, link["from"])
+		NavigationServer3D.link_set_end_position(rid, link["to"])
+		link_rids.append(rid)
+	NavigationServer3D.map_force_update(map)
+	var from := _v3(walk["gates"][0]["nav_3d_m"])
+	var to := _v3(walk["gates"][1]["nav_3d_m"])
+	var path := NavigationServer3D.map_get_path(map, from, to, true)
+	var lo := INF
+	var hi := -INF
+	for p in path:
+		lo = minf(lo, p.y)
+		hi = maxf(hi, p.y)
+	for rid in link_rids:
+		NavigationServer3D.free_rid(rid)
+	NavigationServer3D.free_rid(region)
+	NavigationServer3D.free_rid(map)
+	res.checked += 1
+	if path.is_empty() or path[path.size() - 1].distance_to(to) > ARRIVE:
+		res.fail("%s: NavigationServer3D finds no path along the stair street from gate 0 to gate 1 (ends %s)" % [
+			label, str(path[path.size() - 1]) if not path.is_empty() else "nowhere"])
+	res.checked += 1
+	if hi - lo < rise * 0.8:
+		res.fail("%s: the path climbs %.2f m, the bed ranges %.2f" % [label, hi - lo, rise])
+	res.note("%s: road %d %.0f m long, ranges %.1f m in %d treads (%d stair stones); gate to gate %d path points, climbs %.1f m" % [
+		label, road, float(bed["s"][bed["s"].size() - 1]), rise, treads.size(), named, path.size(), hi - lo])
+	VillageGroundSurface.forget()
 
 
 ## Doors whose 3D point is off the gates' island when the plan has no access

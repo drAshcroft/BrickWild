@@ -62,7 +62,11 @@ static func build(plan: VillagePlan, cutaway := false) -> Node3D:
 			if not is_nan(platform):
 				node.transform.origin.y = platform
 		_record_stands(node, built)
-		if surface != null:
+		var lot_i: int = int(b.get("lot", -1))
+		if lot_i >= 0 and lot_i < plan.lots.size() and plan.lots[lot_i].has("piles"):
+			# on piles: its facade pieces stand on its own deck (VTER-FORM-WATER)
+			node.set_meta(&"piles", true)
+		elif surface != null:
 			_ground_yard(node, surface)
 		_apply_building_appearance(node, built, plan.spec)
 		houses.add_child(node)

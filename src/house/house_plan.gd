@@ -117,6 +117,32 @@ var columns: Array[Dictionary] = []
 ## reads this and downgrades exactly those complaints to warnings, so a real
 ## missing bed still fails.
 var compromises: Dictionary = {}
+## HS-LONGHALL: the open hall of a longhall -- {"room": int, "hearth": Rect2 (the
+## kerb of the fire on the hall's middle), "benches": [{"wall": int, "rect": Rect2}],
+## "ends": [room ids], "smoke": Vector2 (world XZ of the roof smoke hole)}. Empty
+## for every other plan (HouseLonghall.applies).
+var longhall: Dictionary = {}
+## HS-ROUNDHOUSE: the round hut's fire and vent -- {"room": 0, "hearth": Rect2 (the
+## kerb of the fire on the middle of the floor), "smoke": Vector2 (world XZ of the
+## apex vent), "vent": bool, "sides": int}. Empty for every other plan
+## (HouseRound.plan_applies).
+var roundhouse: Dictionary = {}
+## HS-MINKA: the engawa -- {"normal": Vector2 (out of the engawa-side wall),
+## "line", "main_room": int, "rooms": [room ids on that wall], "rect": Rect2
+## (the deck), "depth", "step_rect": Rect2, "step_count", "screens": int} --
+## and the stone steps of the entry doors, [{"door", "count", "normal",
+## "width", "base", "rect"}]. Both empty for every other plan (HouseMinka).
+var engawa: Dictionary = {}
+var entry_steps: Array[Dictionary] = []
+## HS-PUEBLO: the walkable roofs of a stepped house and the ladders that climb to
+## them (HousePueblo). `terraces` is [{"storey": k, "rect": Rect2 (the floor inside
+## the parapet), "roof": bool (the top roof)}], a terrace of storey k lying on the
+## roof of storey k-1. `ladders` is [{"storey": k-1, "to_storey": k, "x", "wall_y",
+## "rect" (the ladder's body), "foot" (where a person stands to climb), "top" (the
+## landing on the terrace), "normal"}]. Both empty for every other plan.
+var terraces: Array[Dictionary] = []
+var ladders: Array[Dictionary] = []
+
 ## AUTHORED holes in the roof: a compluvium over an atrium, an oculus, an open
 ## court sky. One shared schema with the dormer openings the roof descriptor
 ## fits for itself (HOUSE-EXT-007):
@@ -153,6 +179,10 @@ var heat_settings: Array[Dictionary] = []
 ## HouseFurnisher stands the hearth against it, so the fire and the flue are
 ## never on different walls again.
 var hearth: Dictionary = {}
+## Small hand-made props that are not catalogue models (WITCH-PROPS): brooms,
+## each {kind, room, storey, base, axis_to_wall, length, rect, near}. Planned by
+## HouseWitchProps, dressed by HouseAssembler.
+var witch_props: Array[Dictionary] = []
 ## Floor the PLAN keeps clear, before anything is placed:
 ## [{"room": int, "rect": Rect2, "why": String}].
 ##
@@ -323,6 +353,12 @@ func rooms_onto_court(ci: int) -> Array[int]:
 	return out
 
 
+## The fire burning on the floor: a longhall's or a roundhouse's. Empty when the
+## plan has none. Both carry "hearth" (the kerb Rect2) and "room".
+func open_fire() -> Dictionary:
+	return longhall if not longhall.is_empty() else roundhouse
+
+
 ## Is any part of this plan open to the sky?
 func has_court() -> bool:
 	return not courts.is_empty()
@@ -436,6 +472,16 @@ func door_graph(has_keys := true, include_secret := true) -> Dictionary:
 			for y in onto:
 				if x != y:
 					g[x].append(y)
+	# HS-PUEBLO: the rooms of a stepped house are reached from the outside, by a
+	# ladder to the terrace their door opens onto. The way in is the front door's
+	# room, and the terrace is a place outdoors, so each such room joins it directly.
+	if not ladders.is_empty():
+		var entry := entrance_room()
+		if entry >= 0:
+			for d in doors:
+				if bool(d.get("terrace", false)) and int(d["a"]) >= 0:
+					g[entry].append(int(d["a"]))
+					g[int(d["a"])].append(entry)
 	for stair in stairs:
 		# A rejected stair is retained as plan provenance so the checker can
 		# explain why vertical circulation failed. It is not a connection.

@@ -20,19 +20,68 @@ extends RefCounted
 ## file tries to build it right, that file refuses to believe it did.
 
 static func plan(spec: HouseSpec, world_family: StringName = &"") -> HousePlan:
+	var rng_state: int = spec.rng.state if spec.rng != null else 0
+	var first_rooms: int = spec.room_count
+	var p: HousePlan = _plan_once(spec, world_family)
+	if not HousePlanLevels.hall_must_carry_stair(p) or _stairs_domestic(p):
+		return p
+	# LHS-STAIRS: a style with no household grammar partitions by splitting, and
+	# a cramped split can leave no hall that carries the human-scale flight.
+	# One room fewer makes the rest bigger; the fewest rooms (3) is the floor.
+	# The rng is rewound so the retry is the same plan minus a split; if that is
+	# not enough, a few other deterministic splits are tried at each count.
+	for variant in range(6):
+		for fewer in range(first_rooms - 1 if variant == 0 else first_rooms, 2, -1):
+			if spec.rng != null:
+				if variant == 0:
+					spec.rng.state = rng_state
+				else:
+					spec.rng.seed = spec.seed + variant * 7919
+			spec.room_count = fewer
+			var q: HousePlan = _plan_once(spec, world_family)
+			if _stairs_domestic(q):
+				return q
+	if spec.rng != null:
+		spec.rng.state = rng_state
+	spec.room_count = first_rooms
+	return _plan_once(spec, world_family)
+
+
+static func _stairs_domestic(p: HousePlan) -> bool:
+	for stair in p.stairs:
+		if int(stair.get("storey", 0)) >= 0 and not bool(stair.get("domestic_profile", false)):
+			return false
+	return true
+
+
+static func _plan_once(spec: HouseSpec, world_family: StringName = &"") -> HousePlan:
 	var p := HousePlan.new()
 	p.spec = spec
 	# Scope-aware room layouts must see the family before subdivision, just as
 	# roof geometry and house features do later in the pipeline.
 	p.world_family = world_family
 	HousePlanRooms.subdivide(p, spec)
-	HousePlanRooms.name_rooms(p, spec)
-	HousePlanOpenings.place_doors(p, spec)
-	HousePlanOpenings.place_windows(p, spec)
-	HousePlanOpenings.glaze_remaining(p, spec)
-	demote_unlit(p)
-	if spec.storeys > 1:
+	var round_hut := HouseRound.plan_applies(p)
+	if round_hut:
+		# HS-ROUNDHOUSE: the facets of one ring take the door and windows; the
+		# rectangular fitters know nothing about an outline.
+		HouseRound.plan_openings(p, spec)
+	else:
+		HousePlanRooms.name_rooms(p, spec)
+		HousePlanOpenings.place_doors(p, spec)
+		HousePlanOpenings.place_windows(p, spec)
+		HousePlanOpenings.glaze_remaining(p, spec)
+		demote_unlit(p)
+	# HS-MINKA: the engawa side's sliding screens and the main room's opening
+	# onto it. Nothing at all for any style without an `engawa`.
+	HouseMinka.plan_engawa(p, spec)
+	if HousePueblo.applies(spec):
+		# HS-PUEBLO: each storey stands back from the one below and is reached by
+		# a ladder to the terrace in front of it, not by a stair inside.
+		HousePueblo.plan_upper(p, spec)
+	elif spec.storeys > 1:
 		HousePlanLevels.clone_upper_storeys(p, spec)
+		HousePlanLevels.move_beds_upstairs(p, spec)
 	# More than a storey of fall: the downhill side stands a storey clear of
 	# the ground, and the house gets a bank storey there (HouseSlope band 3).
 	if HouseSlope.band(spec) >= 3:
@@ -43,8 +92,11 @@ static func plan(spec: HouseSpec, world_family: StringName = &"") -> HousePlan:
 	# Upper-floor naming and daylight repairs can change room kinds. Keep the
 	# programme annotations attached to what the finished plan actually is.
 	HousePlanRooms.refresh_domestic_metadata(p)
-	HousePlanFeatures.choose_hearth(p, spec)
-	HousePlanFeatures.choose_focus(p, spec)
+	if not round_hut:
+		HousePlanFeatures.choose_hearth(p, spec)
+		HousePlanFeatures.choose_focus(p, spec)
+	HouseLonghall.prepare(p, spec)
+	HouseRound.prepare(p, spec)
 	_reserve_upper_flue(p, spec)
 	return p
 

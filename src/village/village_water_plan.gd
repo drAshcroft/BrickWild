@@ -261,10 +261,27 @@ static func crossings(water: Array[Dictionary], roads: Array[Dictionary]) -> Arr
 			for buffer in buffers:
 				for route in _wet_routes(points, buffer):
 					out.append({"road": r, "water": w, "water_kind": water[w]["kind"],
-						"kind": &"ford" if water[w]["kind"] == &"stream" else &"bridge",
-						"points": route, "width": float(road["width"]),
+						"kind": crossing_kind(road, water[w]),
+						"points": route, "width": crossing_width(road),
 						"pos": route[route.size() / 2]})
 	return out
+
+
+## A ford through a stream, a bridge over anything else -- and a boardwalk on
+## piles where the road is one (VTER-FORM-WATER, VillageWaterForm).
+static func crossing_kind(road: Dictionary, water: Dictionary) -> StringName:
+	if bool(road.get("boardwalk", false)):
+		return &"boardwalk"
+	return &"ford" if water["kind"] == &"stream" else &"bridge"
+
+
+## A crossing carries its road's width; a boardwalk's deck is the road's whole
+## verged ribbon (the crossing is widened by the builder's BRIDGE_MARGIN), so
+## the lots it fronts meet its edge.
+static func crossing_width(road: Dictionary) -> float:
+	if bool(road.get("boardwalk", false)):
+		return float(road["width"]) + 2.0 * float(road["verge"]) - VillageBuilder.BRIDGE_MARGIN
+	return float(road["width"])
 
 
 static func _wet_routes(points: PackedVector2Array, poly: PackedVector2Array) -> Array[PackedVector2Array]:

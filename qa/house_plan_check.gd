@@ -280,6 +280,16 @@ func _check_entrance(plan: HousePlan) -> void:
 			continue
 		if not d["exterior"]:
 			continue
+		if bool(d.get("terrace", false)):
+			# HS-PUEBLO: a door of an upper room onto the terrace in front of it, on
+			# that storey's own front wall
+			exteriors += 1
+			var tier := HouseGeometry.interior_rect(plan.spec, HousePlan.record_storey(d))
+			if absf(Vector2(d["pos"]).y - tier.position.y) > TOL or Vector2(d["normal"]).y > -0.5 					or Vector2(d["pos"]).x < tier.position.x - TOL or Vector2(d["pos"]).x > tier.end.x + TOL:
+				failures.append("way in: terrace door at %v is not on its storey's front wall" % Vector2(d["pos"]))
+			if d["b"] != -1 or bool(d.get("front", false)):
+				failures.append("way in: a terrace door is not the front door and leads outdoors")
+			continue
 		var entry_level: int = 0
 		if plan.spec is KeepSpec or plan.spec is CastleTowerPlan.TowerSpec:
 			entry_level = plan.spec.entry_storey
@@ -438,6 +448,11 @@ func _check_stairs(plan: HousePlan) -> void:
 					or not lower.size.is_equal_approx(upper.size):
 				failures.append("stairs: stair %d landings must share one vertical stairwell" % si)
 		pairs[lo] = true
+	# HS-PUEBLO: a ladder to the terrace in front of a stepped storey is its way up
+	for ladder in plan.ladders:
+		var llo: int = int(ladder.get("storey", 0))
+		if int(ladder.get("to_storey", llo + 1)) == llo + 1 and llo + 1 <= wanted:
+			pairs[llo] = true
 	for lo in range(lowest, wanted - 1):
 		if not pairs.has(lo):
 			failures.append("stairs: no transition from storey %d to %d" % [lo, lo + 1])

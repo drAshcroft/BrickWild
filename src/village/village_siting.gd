@@ -70,6 +70,13 @@ const VALLEY_SECTION_M := 60.0
 const VALLEY_STEP_M := 4.0
 const VALLEY_FLAT_M := 0.3
 const W_CENTRE := 1.0               ## per 400 m
+## A hillside village stands on a SLOPE (HILLS-FIXTURES): the terraces drop
+## across the frame's Y, so the mean fall across the site is scored against
+## the least a terraced village shows (the survey's steep sites: a house
+## spread of 14 m or more over the 90 m the terraces span). Only for the
+## `hillside` form; every other form's score is untouched.
+const W_HILL := 12.0
+const HILL_FALL_MIN := 0.22
 
 static var _cache := {}
 static var _order: Array[String] = []
@@ -216,7 +223,8 @@ static func _samples(flat: VillagePlan) -> Dictionary:
 				long.append(Vector2(cx + (p.x - cx) * ROAD_STRETCH, p.y))
 			pts = long
 		roads.append(pts)
-	return {"lattice": lattice, "spacing": site.size / float(LATTICE - 1), "common": common, "roads": roads}
+	return {"lattice": lattice, "spacing": site.size / float(LATTICE - 1), "common": common, "roads": roads,
+		"hill": flat.spec != null and flat.spec.form == &"hillside"}
 
 
 static func _score(t: VillageTerrain, samples: Dictionary, anchor: Vector2, yaw: float,
@@ -275,7 +283,26 @@ static func _score(t: VillageTerrain, samples: Dictionary, anchor: Vector2, yaw:
 		common_ex += maxf(0.0, sl - COMMON_FREE)
 		if sl > VillageSiteAnalysis.PATH_MAX or (not is_nan(wl) and t.height_at(q) <= wl):
 			common_bad += 1
+	var hill := 0.0
+	if bool(samples.get("hill", false)):
+		# the fall across the site (per metre along Y), read at the 40th
+		# percentile of the lattice's cross edges so one cliff band, or one
+		# shelf, in a flat site does not pass for a slope
+		var drops := PackedFloat64Array()
+		var sum := 0.0
+		for j in range(LATTICE - 1):
+			for i in range(LATTICE):
+				var d := (hs[j * LATTICE + i] - hs[(j + 1) * LATTICE + i]) / maxf(spacing.y, 0.01)
+				drops.append(d)
+				sum += d
+		var sign := 1.0 if sum >= 0.0 else -1.0
+		for k in range(drops.size()):
+			drops[k] = drops[k] * sign
+		drops.sort()
+		var fall := drops[int(float(drops.size()) * 0.4)]
+		hill = W_HILL * maxf(0.0, HILL_FALL_MIN - fall) / HILL_FALL_MIN
 	var terms := {
+		"hill": hill,
 		"cliff": W_CLIFF * float(cliff) / maxf(edges, 1),
 		"wet": W_WET * (VALLEY_WET if valley else 1.0) * float(wet) / maxf(lattice.size(), 1),
 		"steep": W_STEEP * float(steep) / maxf(edges, 1),

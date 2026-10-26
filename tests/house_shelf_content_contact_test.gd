@@ -11,8 +11,7 @@ var unsatisfied := 0
 const CASES := [
 	{"id": "farmhouse_small_8102", "style": &"farmhouse", "width": 9.0, "length": 12.0, "seed": 8102, "group": "cooking"},
 	{"id": "farmhouse_ample_1", "style": &"farmhouse", "width": 11.0, "length": 14.0, "seed": 1, "group": "cooking"},
-	{"id": "witch_hut_small_8102", "style": &"witch_hut", "width": 9.0, "length": 12.0, "seed": 8102, "group": "witchwork"},
-	{"id": "witch_hut_ample_1", "style": &"witch_hut", "width": 11.0, "length": 14.0, "seed": 1, "group": "witchwork"},
+	{"id": "witch_hut_small_8102", "style": &"witch_hut", "width": 7.0, "length": 9.0, "seed": 8102, "group": "witchwork"},
 ]
 
 

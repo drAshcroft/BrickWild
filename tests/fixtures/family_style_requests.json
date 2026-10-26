@@ -310,6 +310,28 @@
   },
   {
    "family": "house",
+   "id": "house/farmhouse/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "farmhouse",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "farmhouse"
+  },
+  {
+   "family": "house",
    "id": "house/farmhouse/8102",
    "request": {
     "enclosure": "none",
@@ -329,6 +351,50 @@
     "width": 8.0
    },
    "row": "farmhouse"
+  },
+  {
+   "family": "house",
+   "id": "house/farmhouse/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "farmhouse",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "farmhouse"
+  },
+  {
+   "family": "house",
+   "id": "house/townhouse/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "townhouse",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "townhouse"
   },
   {
    "family": "house",
@@ -354,6 +420,50 @@
   },
   {
    "family": "house",
+   "id": "house/townhouse/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "townhouse",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "townhouse"
+  },
+  {
+   "family": "house",
+   "id": "house/longhall/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "longhall",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "longhall"
+  },
+  {
+   "family": "house",
    "id": "house/longhall/8102",
    "request": {
     "enclosure": "none",
@@ -376,7 +486,7 @@
   },
   {
    "family": "house",
-   "id": "house/rich/8102",
+   "id": "house/longhall/21325",
    "request": {
     "enclosure": "none",
     "height": 2.6,
@@ -388,13 +498,101 @@
     "purpose": "none",
     "schema": "brickwild.request",
     "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "longhall",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "longhall"
+  },
+  {
+   "family": "house",
+   "id": "house/rich/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 11.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "rich",
+    "water": "none",
+    "width": 9.0
+   },
+   "row": "rich"
+  },
+  {
+   "family": "house",
+   "id": "house/rich/8102",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 11.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
     "seed": "8102",
     "storeys": 1,
     "style": "rich",
     "water": "none",
-    "width": 8.0
+    "width": 9.0
    },
    "row": "rich"
+  },
+  {
+   "family": "house",
+   "id": "house/rich/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 11.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "rich",
+    "water": "none",
+    "width": 9.0
+   },
+   "row": "rich"
+  },
+  {
+   "family": "house",
+   "id": "house/mediterranean/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "mediterranean",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "mediterranean"
   },
   {
    "family": "house",
@@ -420,6 +618,50 @@
   },
   {
    "family": "house",
+   "id": "house/mediterranean/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "mediterranean",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "mediterranean"
+  },
+  {
+   "family": "house",
+   "id": "house/asian/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "asian",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "asian"
+  },
+  {
+   "family": "house",
    "id": "house/asian/8102",
    "request": {
     "enclosure": "none",
@@ -439,6 +681,50 @@
     "width": 8.0
    },
    "row": "asian"
+  },
+  {
+   "family": "house",
+   "id": "house/asian/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "asian",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "asian"
+  },
+  {
+   "family": "house",
+   "id": "house/african/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "african",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "african"
   },
   {
    "family": "house",
@@ -464,6 +750,116 @@
   },
   {
    "family": "house",
+   "id": "house/african/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "african",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "african"
+  },
+  {
+   "family": "house",
+   "id": "house/cottage/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "cottage",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "cottage"
+  },
+  {
+   "family": "house",
+   "id": "house/cottage/8102",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "8102",
+    "storeys": 1,
+    "style": "cottage",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "cottage"
+  },
+  {
+   "family": "house",
+   "id": "house/cottage/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "cottage",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "cottage"
+  },
+  {
+   "family": "house",
+   "id": "house/thatch_cottage/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "thatch_cottage",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "thatch_cottage"
+  },
+  {
+   "family": "house",
    "id": "house/thatch_cottage/8102",
    "request": {
     "enclosure": "none",
@@ -486,7 +882,51 @@
   },
   {
    "family": "house",
-   "id": "house/mud_hut/8102",
+   "id": "house/thatch_cottage/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "thatch_cottage",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "thatch_cottage"
+  },
+  {
+   "family": "house",
+   "id": "house/roundhouse/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 1,
+    "style": "roundhouse",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "roundhouse"
+  },
+  {
+   "family": "house",
+   "id": "house/roundhouse/8102",
    "request": {
     "enclosure": "none",
     "height": 2.6,
@@ -500,11 +940,55 @@
     "schema_version": 1,
     "seed": "8102",
     "storeys": 1,
-    "style": "mud_hut",
+    "style": "roundhouse",
     "water": "none",
     "width": 8.0
    },
-   "row": "mud_hut"
+   "row": "roundhouse"
+  },
+  {
+   "family": "house",
+   "id": "house/roundhouse/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 1,
+    "style": "roundhouse",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "roundhouse"
+  },
+  {
+   "family": "house",
+   "id": "house/pueblo/1",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "1",
+    "storeys": 3,
+    "style": "pueblo",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "pueblo"
   },
   {
    "family": "house",
@@ -521,7 +1005,29 @@
     "schema": "brickwild.request",
     "schema_version": 1,
     "seed": "8102",
-    "storeys": 1,
+    "storeys": 3,
+    "style": "pueblo",
+    "water": "none",
+    "width": 8.0
+   },
+   "row": "pueblo"
+  },
+  {
+   "family": "house",
+   "id": "house/pueblo/21325",
+   "request": {
+    "enclosure": "none",
+    "height": 2.6,
+    "kind": "house",
+    "length": 10.0,
+    "material": "timber",
+    "orientation": 0.0,
+    "period": 1200,
+    "purpose": "none",
+    "schema": "brickwild.request",
+    "schema_version": 1,
+    "seed": "21325",
+    "storeys": 3,
     "style": "pueblo",
     "water": "none",
     "width": 8.0
@@ -882,7 +1388,7 @@
   },
   {
    "family": "shop_shell",
-   "id": "shop_shell/mud_hut/8102",
+   "id": "shop_shell/roundhouse/8102",
    "request": {
     "enclosure": "none",
     "height": 2.8,
@@ -896,11 +1402,11 @@
     "schema_version": 1,
     "seed": "8102",
     "storeys": 1,
-    "style": "mud_hut",
+    "style": "roundhouse",
     "water": "none",
     "width": 11.0
    },
-   "row": "mud_hut"
+   "row": "roundhouse"
   },
   {
    "family": "shop_shell",

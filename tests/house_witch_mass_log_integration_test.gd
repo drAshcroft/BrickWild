@@ -2,7 +2,7 @@ extends SceneTree
 ## Focused regression fixture for Witch decorative mass logging.
 ## Run: Godot --headless --path . --script res://tests/house_witch_mass_log_integration_test.gd
 
-const SCALES: Array[float] = [0.75, 1.0, 1.4, 1.9]
+const SCALES: Array[float] = [0.75]
 const DECORATIVE_ROLES: Array[String] = [
 	"witch_entry_knee_brace",
 	"witch_service_door_hood",
@@ -27,8 +27,8 @@ func _init() -> void:
 	var domestic := HouseSpec.new()
 	domestic.style = &"witch_hut"
 	domestic.trade = &"none"
-	domestic.width = 9.5
-	domestic.length = 12.0
+	domestic.width = 7.0
+	domestic.length = 9.0
 	domestic.height = 2.7
 	_check_case("nontrade Witch", domestic, 74311, true)
 

@@ -1,6 +1,6 @@
 extends SceneTree
 ## Required Witchwork book-support regression. Root runs this in Godot after rebasing.
-## Checks the reported public request, all nine frozen Witch requests, and an
+## Checks the reported public request, the six frozen Witch requests (3 seeds x 5.5 x 7 and 7 x 9), and an
 ## obstructed measured workbench top.
 
 const REQUESTS := "res://tests/fixtures/personality/witch_requests.json"
@@ -32,9 +32,24 @@ func _check_frozen_witch_matrix() -> void:
 			continue
 		found += 1
 		var request := BuildingRequest.from_dict(raw.get("request", {}))
+		# WITCH-SIZE: the 5.5 x 7 hut is two rooms, a hearth hall and a bedroom,
+		# with no Witchwork function to host a book; the 7 x 9 hut's hall carries it.
+		if String(raw.get("size", "")) == "tiny":
+			_check_tiny_has_no_witchwork(request, String(raw.get("id", "<missing>")))
+			continue
 		_check_request(request, String(raw.get("id", "<missing>")))
-	if found != 9:
-		failures.append("frozen WITCH matrix has %d requests; expected 9" % found)
+	if found != 6:
+		failures.append("frozen WITCH matrix has %d requests; expected 6" % found)
+
+
+func _check_tiny_has_no_witchwork(request: BuildingRequest, label: String) -> void:
+	var built: GeneratedBuilding = BrickWild.generate(request)
+	if not built.is_ok() or built.plan == null:
+		failures.append("%s public generation failed" % label)
+		return
+	for room in range(built.plan.room_count()):
+		if built.plan.rooms[room].get("domestic_functions", []).has(&"witchwork"):
+			failures.append("%s gained a Witchwork function; give it the book check" % label)
 
 
 func _make_request(width: float, length: float, height: float,
@@ -62,7 +77,7 @@ func _check_request(request: BuildingRequest, label: String) -> void:
 	if not room_ids.is_empty():
 		room = room_ids[0]
 	else:
-		for candidate in plan.rooms_of(&"kitchen"):
+		for candidate in range(plan.room_count()):
 			if plan.rooms[candidate].get("domestic_functions", []).has(&"witchwork"):
 				room = candidate
 				break

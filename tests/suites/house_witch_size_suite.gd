@@ -1,0 +1,78 @@
+extends RefCounted
+## WITCH-SIZE: a hut is small. A witch_hut request is clamped to 7 x 9 m and one
+## storey, plans at most three rooms, and is furnished and walkable. The frozen
+## fixture is 3 seeds x 2 sizes plus one oversize request as the clamp control.
+
+const FIXTURE := "res://tests/fixtures/personality/witch_requests.json"
+const SEEDS := [1, 8102, 21325]
+
+static func run() -> SuiteResult:
+	var res := SuiteResult.new("Witch hut is small")
+	var rows := _cases()
+	var huts := 0
+	var controls := 0
+	for row in rows:
+		var role := String(row.get("role", ""))
+		if role != "witch" and role != "clamp_control":
+			continue
+		var q: Dictionary = row["request"]
+		var who := String(row["id"])
+		var request := BuildingRequest.house(int(q["seed"]), &"witch_hut", &"none",
+			float(q["width"]), float(q["length"]), float(q["height"]), int(q["storeys"]))
+		var generated: GeneratedBuilding = BrickWild.generate(request)
+		_expect(res, generated.is_ok() and generated.plan != null,
+			"%s: public generation failed: %s" % [who, JSON.stringify(generated.errors)])
+		if not generated.is_ok() or generated.plan == null:
+			continue
+		var plan: HousePlan = generated.plan
+		var spec: HouseSpec = plan.spec
+		var long_side := maxf(spec.width, spec.length)
+		var short_side := minf(spec.width, spec.length)
+		_expect(res, long_side <= HouseGenerator.WITCH_MAX_LONG + 0.001
+			and short_side <= HouseGenerator.WITCH_MAX_SHORT + 0.001 and spec.storeys == 1,
+			"%s: hut is %.2f x %.2f m, %d storeys" % [who, spec.width, spec.length, spec.storeys])
+		_expect(res, plan.room_count() <= 3,
+			"%s: %d rooms (max 3)" % [who, plan.room_count()])
+		if role == "clamp_control":
+			controls += 1
+			_expect(res, is_equal_approx(spec.width, 7.0) and is_equal_approx(spec.length, 9.0),
+				"%s: oversize 17 x 18 came out %.2f x %.2f, not 7 x 9" % [who, spec.width, spec.length])
+			continue
+		huts += 1
+		# an in-bound request is unchanged
+		_expect(res, is_equal_approx(spec.width, float(q["width"]))
+			and is_equal_approx(spec.length, float(q["length"])),
+			"%s: in-bound request moved to %.2f x %.2f" % [who, spec.width, spec.length])
+		var nav: Dictionary = HouseNavCheck.new().check(plan)
+		_expect(res, bool(nav.get("ok", false)), "%s: nav failed: %s" % [who, JSON.stringify(nav)])
+		var furnish: Dictionary = HouseFurnishCheck.new().check(plan)
+		_expect(res, bool(furnish.get("ok", false)),
+			"%s: HouseFurnishCheck failed: %s" % [who, JSON.stringify(furnish.get("failures", []))])
+	_expect(res, huts == 6 and controls == 1,
+		"fixture must hold 6 huts and 1 clamp control; found %d and %d" % [huts, controls])
+	# the style programme itself is at most three rooms
+	var program: Array = HouseSpec.STYLES[&"witch_hut"]["domestic_program"]
+	_expect(res, program.size() <= 3, "witch_hut domestic_program has %d rooms" % program.size())
+	# a trade hut is clamped too
+	var trade := BrickWild.generate(BuildingRequest.house(21118, &"witch_hut", &"alchemist",
+		17.0, 18.0, 2.8, 2))
+	if trade.is_ok() and trade.plan != null:
+		_expect(res, trade.plan.room_count() <= 3 and trade.plan.spec.storeys == 1
+			and maxf(trade.plan.spec.width, trade.plan.spec.length) <= 9.001,
+			"alchemist hut not clamped: %d rooms, %.1f x %.1f" % [trade.plan.room_count(),
+			trade.plan.spec.width, trade.plan.spec.length])
+	# negative control: another style is not clamped
+	var cottage := BrickWild.generate(BuildingRequest.house(8102, &"cottage", &"none", 17.0, 18.0, 2.8, 2))
+	_expect(res, cottage.is_ok() and cottage.plan != null and cottage.plan.spec.width > 9.0,
+		"clamp leaked to a cottage")
+	res.note("huts=%d clamp controls=%d" % [huts, controls])
+	return res
+
+static func _cases() -> Array:
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(FIXTURE))
+	return parsed["cases"] if parsed is Dictionary else []
+
+static func _expect(res: SuiteResult, condition: bool, message: String) -> void:
+	res.checked += 1
+	if not condition:
+		res.fail(message)
