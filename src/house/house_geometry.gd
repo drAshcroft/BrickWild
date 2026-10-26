@@ -798,7 +798,15 @@ static func roof_layout(plan: HousePlan) -> Dictionary:
 	# Where a dormer can sit on a slope is RoofShape's question, not this
 	# file's: the hotel asks it too, and asking it twice is how one of them
 	# ends up with dormers a metre above their own roof (ROOF-AUDIT-001).
-	var seat := RoofShape.dormer_seat(half, rise, -span * 0.5 * 0.62, dw)
+	# HVERN-WITCH-THATCH: face 0 runs from the eave at -half up to the ridge at
+	# +ridge_x. On an off-axis ridge that slope is rise / (half + ridge_x), not
+	# rise / half, so the seat is asked in the slope's own frame (the ridge as its
+	# origin) and its X values shifted back. ridge_x is 0 for every other roof,
+	# which leaves those seats bit for bit what they were.
+	var seat := RoofShape.dormer_seat(half + ridge_x, rise, -span * 0.5 * 0.62 - ridge_x, dw)
+	if ridge_x != 0.0 and bool(seat["fits"]):
+		for key in ["front", "side_x", "peak_x", "cheek_x"]:
+			seat[key] = float(seat[key]) + ridge_x
 	if not bool(seat["fits"]):
 		rejections.append(_dormer_reject("", 0.0, &"no_seat",
 			"pitch %.3f over half-span %.2f leaves no usable dormer face" % [rise / half, half]))

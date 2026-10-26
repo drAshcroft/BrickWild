@@ -339,11 +339,25 @@ static func _ordinary_houses_stay_ordinary(res: SuiteResult) -> void:
 			builder.build(plan)
 			var who := "%s/%d storeys seed=%d" % [String(style), storeys, s.seed]
 			var leaked: Array = VernacularHouseCheck._vocabulary(builder)
+			# HVERN-WITCH-THATCH: the witch hut's thatch (WITCH-ROOF) is the one declared
+			# exception: its spec asks for the thatch roll and ONLY that, and the roll pieces
+			# are the only vocabulary it may emit. Any other style, or any other piece, is
+			# a leak exactly as before.
+			var declared_thatch: bool = HouseGeometry.has_witch_roofcraft(plan.spec)
+			if declared_thatch:
+				_expect(res, plan.spec.thatch_roll,
+					"%s: the witch thatch roll is not declared on its spec" % who)
+				var kept: Array = []
+				for row in leaked:
+					var role := String(row.get("role", ""))
+					if role != "thatch_eave" and not role.begins_with("thatch_roll_"):
+						kept.append(row)
+				leaked = kept
 			_expect(res, leaked.is_empty(),
 				"%s: emitted %d vernacular components" % [who, leaked.size()])
 			_expect(res, not plan.spec.parapet and not plan.spec.veranda
-					and not plan.spec.eave_sweep and not plan.spec.thatch_roll
-					and not plan.spec.corner_piers,
+					and not plan.spec.eave_sweep and not plan.spec.corner_piers
+					and (declared_thatch or not plan.spec.thatch_roll),
 				"%s: the generator switched the culture vocabulary on for an ordinary style" % who)
 			var report: Dictionary = VernacularHouseCheck.new().check(plan, builder)
 			_expect(res, bool(report["ok"]), "%s: %s" % [who, str(report["failures"])])

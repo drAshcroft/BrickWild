@@ -109,6 +109,17 @@ func _check_european(plan: HousePlan, builder: HouseBuilder) -> void:
 	if _row(plan.spec).has("culture"):
 		return
 	var leaked := _vocabulary(builder)
+	if plan.spec.thatch_roll:
+		# HVERN-WITCH-THATCH: the witch hut's thatch roll is declared on its spec
+		# (HouseGenerator), so its eave and ridge pieces were asked for. _check_thatch
+		# still holds them to the two-eave / ridge-roll vocabulary. Every other piece
+		# of the vocabulary is still a leak.
+		var kept: Array[Dictionary] = []
+		for row in leaked:
+			var role := String(row.get("role", ""))
+			if role != "thatch_eave" and not role.begins_with("thatch_roll_"):
+				kept.append(row)
+		leaked = kept
 	if not leaked.is_empty():
 		failures.append("european: %s is not a vernacular style but emitted %d culture components"
 			% [String(plan.spec.style), leaked.size()])

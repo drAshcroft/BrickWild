@@ -164,6 +164,12 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 			spec.roof_span_out = HousePueblo.roof_out()
 			spec.roof_along_out = HousePueblo.roof_out()
 
+	# HVERN-WITCH-THATCH: the witch hut's thatch (WITCH-ROOF) always carries the eave
+	# bolster and the ridge roll, so the spec DECLARES it. No draw: it is a style
+	# invariant, and the vernacular check reads the flag to see it was asked for.
+	if HouseGeometry.has_witch_roofcraft(spec, world_family):
+		spec.thatch_roll = true
+
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y
 	spec.room_count = HouseSpec.rooms_for(area)
