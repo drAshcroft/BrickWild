@@ -70,6 +70,134 @@ static func wood_slope(plan: VillagePlan, p: Vector2) -> float:
 		return 0.0
 	return float(plan.ground.under(Poly.from_rect(Rect2(p - Vector2(6.0, 6.0), Vector2(12.0, 12.0))))["slope_mean"])
 
+## Woods as plan polygons (VTER-WOOD-POLYGON): on given ground, the steep
+## slopes nobody ploughs or builds on. A WOOD_CELL_M lattice over the site; a
+## cell is wood where its ground is dry and on the mean at least WOOD_SLOPE_MIN
+## (past a pasture's 30 %, VillageDispersedForm.FIELD_PASTURE) and under
+## WOOD_SLOPE_MAX (past 45 degrees it is bare rock), outside the
+## settlement's edge, and clear of every lot, field, common, water and road by
+## WOOD_CLEAR_M. Four-connected runs of WOOD_MIN_CELLS or more become one wood:
+## {"kind": &"wood", "poly" (the outline; a lot or road inside a wood's run is
+## left in it only when no cell of it is wood), "area_m2", "slope_mean"}.
+## Empty without ground. Pure, and nothing in the plan is written: the
+## dresser's far-side trees are unchanged; the exporter writes `woods`.
+const WOOD_CELL_M := 12.0
+const WOOD_SLOPE_MIN := 0.30
+const WOOD_SLOPE_MAX := 1.0
+const WOOD_CLEAR_M := 3.0
+const WOOD_MIN_CELLS := 6
+static func woods(plan: VillagePlan) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if plan == null or plan.ground == null:
+		return out
+	var g: VillageTerrain = plan.ground
+	var edge: PackedVector2Array = plan.enclosure if plan.enclosure.size() >= 3 else build(plan)["edge"]
+	var blocks: Array[PackedVector2Array] = []
+	for list in [plan.lots, plan.fields, plan.commons, plan.water]:
+		for row in list:
+			blocks.append(row["poly"])
+	var nx := int(floor(plan.site.size.x / WOOD_CELL_M))
+	var ny := int(floor(plan.site.size.y / WOOD_CELL_M))
+	if nx < 1 or ny < 1:
+		return out
+	var half := WOOD_CELL_M * 0.5
+	var reach: float = half * sqrt(2.0) + WOOD_CLEAR_M
+	var wood := PackedByteArray()
+	wood.resize(nx * ny)
+	var slope := PackedFloat32Array()
+	slope.resize(nx * ny)
+	for j in range(ny):
+		for i in range(nx):
+			var cell := Rect2(plan.site.position + Vector2(i, j) * WOOD_CELL_M, Vector2(WOOD_CELL_M, WOOD_CELL_M))
+			var c := cell.get_center()
+			if edge.size() >= 3 and (Poly.contains_point(edge, c) or VillageMeasure.point_to_poly(c, edge) < half):
+				continue
+			var u: Dictionary = g.under(Poly.from_rect(cell))
+			var us: float = float(u["slope_mean"])
+			if float(u["dry_share"]) < 1.0 or us < WOOD_SLOPE_MIN or us > WOOD_SLOPE_MAX:
+				continue
+			var clear := true
+			for b in blocks:
+				if Poly.contains_point(b, c) or VillageMeasure.point_to_poly(c, b) < reach:
+					clear = false
+					break
+			if clear:
+				for road in plan.roads:
+					var pts: PackedVector2Array = road["points"]
+					var keep: float = float(road["width"]) * 0.5 + reach
+					for k in range(pts.size() - 1):
+						if c.distance_to(Geometry2D.get_closest_point_to_segment(c, pts[k], pts[k + 1])) < keep:
+							clear = false
+							break
+					if not clear:
+						break
+			if clear:
+				wood[j * nx + i] = 1
+				slope[j * nx + i] = float(u["slope_mean"])
+	var seen := PackedByteArray()
+	seen.resize(nx * ny)
+	for start in range(nx * ny):
+		if wood[start] == 0 or seen[start] != 0:
+			continue
+		var cells: Array[int] = []
+		var stack: Array[int] = [start]
+		seen[start] = 1
+		while not stack.is_empty():
+			var k: int = stack.pop_back()
+			cells.append(k)
+			var ci: int = k % nx
+			var cj: int = k / nx
+			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var ni: int = ci + d.x
+				var nj: int = cj + d.y
+				if ni < 0 or nj < 0 or ni >= nx or nj >= ny:
+					continue
+				var nk: int = nj * nx + ni
+				if wood[nk] != 0 and seen[nk] == 0:
+					seen[nk] = 1
+					stack.append(nk)
+		if cells.size() < WOOD_MIN_CELLS:
+			continue
+		cells.sort()
+		# row runs, then one union: the outline of the run's squares
+		var pieces: Array[PackedVector2Array] = []
+		var s := 0.0
+		var r := 0
+		while r < cells.size():
+			var e := r
+			while e + 1 < cells.size() and cells[e + 1] == cells[e] + 1 and cells[e + 1] / nx == cells[r] / nx:
+				e += 1
+			var p0: Vector2 = plan.site.position + Vector2(cells[r] % nx, cells[r] / nx) * WOOD_CELL_M
+			pieces.append(Poly.from_rect(Rect2(p0, Vector2((e - r + 1) * WOOD_CELL_M, WOOD_CELL_M))))
+			for q in range(r, e + 1):
+				s += slope[cells[q]]
+			r = e + 1
+		var outline: PackedVector2Array = pieces[0]
+		var rest: Array[PackedVector2Array] = pieces.slice(1)
+		# runs touch only rows apart; merge row by row until nothing joins
+		var guard := 0
+		while not rest.is_empty() and guard < cells.size() * 2:
+			guard += 1
+			var joined := false
+			for q in range(rest.size()):
+				var merged: Array[PackedVector2Array] = Geometry2D.merge_polygons(outline, rest[q])
+				var outers: Array[PackedVector2Array] = []
+				for m in merged:
+					if not Geometry2D.is_polygon_clockwise(m):
+						outers.append(m)
+				if outers.size() == 1:
+					outline = outers[0]
+					rest.remove_at(q)
+					joined = true
+					break
+			if not joined:
+				break
+		out.append({"kind": &"wood", "poly": outline,
+			"area_m2": float(cells.size()) * WOOD_CELL_M * WOOD_CELL_M,
+			"slope_mean": s / float(cells.size())})
+	return out
+
+
 static func _lot_hull(plan: VillagePlan) -> PackedVector2Array:
 	var pts := PackedVector2Array()
 	for lot in plan.lots:

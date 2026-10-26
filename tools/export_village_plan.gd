@@ -682,6 +682,11 @@ static func site_plan(plan: VillagePlan, request: Dictionary) -> Dictionary:
 		# ground, so a flat request's bytes never change
 		out["form_intent"] = String(plan.spec.form_intent)
 		_add_ground(out, plan)
+		# woods on the steep ground nobody ploughs (VTER-WOOD-POLYGON); only
+		# where there are any, so ground without steep slopes is unchanged
+		var woods: Array[Dictionary] = VillageEnclosurePlan.woods(plan)
+		if not woods.is_empty():
+			out["woods"] = _polys(woods, "kind")
 	if not plan.crest.is_empty():
 		# a crest village's summit and ring (VillageCrestForm); no other form has one
 		var c: Dictionary = plan.crest

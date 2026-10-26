@@ -1161,8 +1161,15 @@ not this ticket's: it reads the same at the commit before.
   only where the water is the ground's own (VTER-FORM-VALLEY);
 * **the waterfront share** -- `WORLD_WATERFRONT_IQR` is read and checked by
   `vworld` but no planner aims at it yet (VTER-FORM-SHORE);
-* **woods** are the dresser's few far-side trees; a wooded steep slope as a
-  plan polygon is not made (VTER-WOOD-POLYGON, with the waterfront share);
+* ~~**woods** as plan polygons~~ -- `VillageEnclosurePlan.woods(plan)`
+  (VTER-WOOD-POLYGON): on given ground, 12 m cells outside the edge, dry, on
+  30-100 % (past pasture, short of bare rock), 3 m clear of every lot, field,
+  common, water and road; four-connected runs of 6 cells or more, each one
+  polygon. The exporter writes them as `woods` (only on ground, only when
+  there are any). Site plans with a stand-in edge, before the 100 % cap:
+  Monemvasia 4 woods 5.8 ha (its first on 113 %, which the cap now leaves out), Ushguli 4 / 1.5 ha,
+  Rubanda 2 / 2.4 ha. The dresser still plants only its few far-side trees;
+  trees in the polygons are a dresser change, not made;
 * **a crest village** -- the rank rule wants the church at or above the
   median where a crest or spur is among the houses; the compact ring on the
   summit with the church highest is VTER-FORM-CREST's.
@@ -2046,12 +2053,27 @@ form off: no island plan, 0.28 reached); purity.
   the whole signal), so it is 21 times what 89 people need (limit 4) and keeps the
   water form's shore plan. The form works on any grid that shows the island as
   it is (the islet is on 8 m cells).
+  A 30 m grid does not either (VTER-ISLAND-DEM, 2026-10-26):
+  `real30/isola_dei_pescatori` (`survey.py terrain --source srtm30m --half 450`,
+  water level 191.5 as world90's) shows the island as a blob of 30 m cells
+  15 m high at its middle (SRTM is a surface model: roofs and trees), and
+  `describe` reads 9.15 ha, 9.8 times what 21 households need. Raising the
+  level or eroding one cell still leaves 4.5-5.8 ha (over the limit of 4); only
+  a level tuned to the answer (197.5 m) gives 3.6 ha. The fixture is kept for
+  the next try: a 10 m DTM (not SRTM), or the island's OSM outline.
 * **Density.** The village is the right size (hull 0.73 ha against the real
   0.81) but not the real shape: the real island is built in lanes one house
   wide, setback 0.9 m, `compactness` 0.64, `elongation` 2.1; ours has houses
   5.7 m back from the quay and the island's length shortened by 0.9 only, so
   `elongation` stays 5.8. A quay of townhouse-class lots (0 to 1 m setback) and
   cross lanes between the long sides would bring them in.
+  Measured 2026-10-26 (site plan only, the islet): `CAPACITY` is NOT the lever.
+  At every capacity from 0.8 to 1.6 `fit_scale` lands on 0.90 and the ring is
+  162 x 96 m with 719 m of frontage (need 302-603): below 0.90 the bend rule's
+  opening (`BEND_R`) leaves no ring, so the bisection stops there. The ring
+  itself is elongation ~1.7; the 5.8 is the lots, which run on out along the
+  spine's two arms beyond the ring to the landings (310 m). The levers are in
+  the lot planner: no lots on the spine outside the ring, and a quay setback.
 * **Strand dressing.** A fishing village's `strand` step
   (`VillageDressHosts.dress_place(plan, ctx, &"strand")`) took 190 of the
   plan's 307 s on the islet's 310 x 123 m site (a per-step timing,
