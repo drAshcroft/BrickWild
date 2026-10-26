@@ -134,6 +134,14 @@ var roundhouse: Dictionary = {}
 ## "width", "base", "rect"}]. Both empty for every other plan (HouseMinka).
 var engawa: Dictionary = {}
 var entry_steps: Array[Dictionary] = []
+## HS-PUEBLO: the walkable roofs of a stepped house and the ladders that climb to
+## them (HousePueblo). `terraces` is [{"storey": k, "rect": Rect2 (the floor inside
+## the parapet), "roof": bool (the top roof)}], a terrace of storey k lying on the
+## roof of storey k-1. `ladders` is [{"storey": k-1, "to_storey": k, "x", "wall_y",
+## "rect" (the ladder's body), "foot" (where a person stands to climb), "top" (the
+## landing on the terrace), "normal"}]. Both empty for every other plan.
+var terraces: Array[Dictionary] = []
+var ladders: Array[Dictionary] = []
 
 ## AUTHORED holes in the roof: a compluvium over an atrium, an oculus, an open
 ## court sky. One shared schema with the dormer openings the roof descriptor
@@ -464,6 +472,16 @@ func door_graph(has_keys := true, include_secret := true) -> Dictionary:
 			for y in onto:
 				if x != y:
 					g[x].append(y)
+	# HS-PUEBLO: the rooms of a stepped house are reached from the outside, by a
+	# ladder to the terrace their door opens onto. The way in is the front door's
+	# room, and the terrace is a place outdoors, so each such room joins it directly.
+	if not ladders.is_empty():
+		var entry := entrance_room()
+		if entry >= 0:
+			for d in doors:
+				if bool(d.get("terrace", false)) and int(d["a"]) >= 0:
+					g[entry].append(int(d["a"]))
+					g[int(d["a"])].append(entry)
 	for stair in stairs:
 		# A rejected stair is retained as plan provenance so the checker can
 		# explain why vertical circulation failed. It is not a connection.

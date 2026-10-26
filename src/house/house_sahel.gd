@@ -203,34 +203,55 @@ static func _buttress(b: HouseBuilder, spec: HouseSpec, run: Dictionary, thick: 
 
 static func _toron_rows(b: HouseBuilder, spec: HouseSpec, run: Dictionary, thick: float,
 		ops: Array, buttresses: Array, band: Array, zone: Array) -> void:
+	# a stake through a buttress reaches farther, so it stays proud of it
+	var reach_of := func(t: float) -> float:
+		var reach := TORON_OUT
+		for bt in buttresses:
+			if absf(t - float(bt)) < BUTTRESS_W * 0.5:
+				reach = TORON_OUT + BUTTRESS_OUT * 0.62
+		return reach
+	for level in range(maxi(spec.storeys, 1)):
+		var y := spec.height * float(level + 1) - TORON_BELOW_TOP
+		stake_row(b, "toron", run, thick, ops, y, TORON_W, TORON_SPACING, 0.55, 0.45,
+			reach_of, zone, band)
+
+
+## One row of wooden stakes through a wall, along a run at the height `y`, and the
+## single place a row of projecting wall timbers is laid out: the Sahel's toron and
+## the Pueblo's vigas (HousePueblo) are the same device at two sizes. A stake is a
+## square-ended timber of side `size`, 0.2 m of it inside the wall and `reach_of(t)`
+## out of the outer face, one every `spacing` from `start` to `end_margin` short of
+## the run's end. It may stand above an opening but never across its frame: `ops`
+## are the run's openings, {t, w, top}. `zone` and `band` are [t0, t1] (zone: no
+## stakes inside it; band: stakes only inside it). Returns the stakes laid.
+static func stake_row(b: HouseBuilder, role: String, run: Dictionary, thick: float,
+		ops: Array, y: float, size: float, spacing: float, start: float, end_margin: float,
+		reach_of: Callable, zone: Array, band: Array, surf := SURF_TRIM) -> int:
 	var from: Vector2 = run["from"]
 	var length := from.distance_to(Vector2(run["to"]))
 	var face := thick * 0.5
-	for level in range(maxi(spec.storeys, 1)):
-		var y := spec.height * float(level + 1) - TORON_BELOW_TOP
-		var t := 0.55
-		while t < length - 0.45:
-			var blocked := false
-			# a stake may stand above an opening, but not cross its frame
-			for op in ops:
-				if absf(t - float(op["t"])) < float(op["w"]) * 0.5 + 0.3 + TORON_W 						and float(op["top"]) + 0.15 > y - TORON_W * 0.5:
-					blocked = true
-					break
-			# the entry's own toron are on its pilasters
-			if zone.size() == 2 and t > float(zone[0]) and t < float(zone[1]):
+	var laid := 0
+	var t := start
+	while t < length - end_margin:
+		var blocked := false
+		# a stake may stand above an opening, but not cross its frame
+		for op in ops:
+			if absf(t - float(op["t"])) < float(op["w"]) * 0.5 + 0.3 + size 					and float(op["top"]) + 0.15 > y - size * 0.5:
 				blocked = true
-			if band.size() == 2 and (t < float(band[0]) or t > float(band[1])):
-				blocked = true
-			if not blocked:
-				var reach := TORON_OUT
-				for bt in buttresses:
-					if absf(t - float(bt)) < BUTTRESS_W * 0.5:
-						reach = TORON_OUT + BUTTRESS_OUT * 0.62
-				# the stake runs through the wall (0.2 m of it inside) and out
-				var len := reach + 0.2
-				b.component_box("toron", Vector3(TORON_W, TORON_W, len),
-					_frame(run, t, face + len * 0.5 - 0.2, y), SURF_TRIM)
-			t += TORON_SPACING
+				break
+		# the entry's own toron are on its pilasters
+		if zone.size() == 2 and t > float(zone[0]) and t < float(zone[1]):
+			blocked = true
+		if band.size() == 2 and (t < float(band[0]) or t > float(band[1])):
+			blocked = true
+		if not blocked:
+			# the stake runs through the wall (0.2 m of it inside) and out
+			var len: float = float(reach_of.call(t)) + 0.2
+			b.component_box(role, Vector3(size, size, len),
+				_frame(run, t, face + len * 0.5 - 0.2, y), surf)
+			laid += 1
+		t += spacing
+	return laid
 
 
 ## The decorated entry: two pinnacled pilasters and a relief frame round the door.

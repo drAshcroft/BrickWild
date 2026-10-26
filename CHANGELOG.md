@@ -25,6 +25,19 @@ and `docs/PUBLIC_API_TRANSPORT.md`.
   corner piers, veranda and eave roll of the old hut are gone from the plain
   one.
 
+### Changed
+
+- **The `pueblo` house is a stepped adobe house.** A plain pueblo (no trade) on
+  a footprint that can step is now two or three storeys, each set back from the
+  one below, with a walkable terrace behind a parapet on every roof, a ladder up
+  to each terrace (no stair inside; an upper room opens onto the terrace in
+  front of it), round roof beams standing out of every wall, and small deep
+  openings in its 0.72 m walls. A request for one storey on such a footprint is
+  given two. A pueblo that carries a trade, or a footprint too small to step,
+  keeps its old single block. `BrickWild.navigation` publishes each ladder as a
+  stair row with `"ladder": true`; the building plan export lists it as a stair
+  with `"kind": "ladder"`.
+
 ## 0.1.4 - 2026-10-23
 
 Villages can be planned on real ground. Buildings stand on falling ground,

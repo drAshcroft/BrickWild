@@ -2490,6 +2490,7 @@ func _build_culture() -> void:
 	_build_veranda()
 	HouseMinka.emit(self)
 	HouseSahel.emit(self)
+	HousePueblo.emit(self)
 
 
 ## Rounded mud corners: a regular octagon standing on each corner of each
@@ -2599,6 +2600,11 @@ func _eave_half_y(layout: Dictionary) -> float:
 ## exactly the roof the styles that ask for it are given.
 func _build_parapet(layout: Dictionary) -> void:
 	if not spec.parapet:
+		return
+	# HS-PUEBLO: the roof of a stepped house is a terrace, parapeted like the rest
+	# (HousePueblo), open at the head of its ladder
+	if HousePueblo.applies(spec) and plan.world_family == &"" and not HouseGeometry.is_shaped(plan):
+		HousePueblo.emit_roof_parapet(self)
 		return
 	tag("parapet")
 	host("parapet", _storeys() - 1)

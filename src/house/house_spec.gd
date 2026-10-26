@@ -107,6 +107,16 @@ var court_ranges: bool = false
 ## Parts of the Sahel vocabulary to leave out ("buttress", "toron", "entry"):
 ## only the focused test's negative controls set it.
 var sahel_skip: PackedStringArray = PackedStringArray()
+## HS-PUEBLO (no draw; style row flags and the clamp in HousePueblo). `terraced`:
+## each upper storey is set back from the one below, the roof of every storey but
+## the last is a walkable terrace behind a parapet, a ladder climbs to each, and
+## the roof beams (vigas) stand out of the walls (HousePueblo). `small_openings`:
+## doors and windows are small and deep in the thick wall. `pueblo_skip` names parts
+## to leave out ("viga", "ladder", "terrace", "parapet", "gap"): only the focused
+## test's negative controls set it.
+var terraced: bool = false
+var small_openings: bool = false
+var pueblo_skip: PackedStringArray = PackedStringArray()
 ## How far the roof oversails its walls. Negative means HouseGeometry's
 ## ordinary 0.35 m / 0.25 m, and the bound reads the resolved value from
 ## there, so a deep-eaved house cannot be looser than the eave it built.
@@ -410,6 +420,8 @@ const STYLES := {
 		"wall_t": 0.72, "culture": 1.0,
 		"parapet": 1.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
 		"corner_piers": 0.0, "span_out": 0.25, "along_out": 0.25,
+		# HS-PUEBLO: set-back terraces with ladders and vigas; small deep openings
+		"terraced": true, "small_openings": true,
 	},
 }
 
@@ -456,7 +468,7 @@ func storey_indices() -> Array[int]:
 ## The width of the front door leaf. A dwelling's is HouseGeometry.DOOR_W;
 ## a shop's depends on what comes through it (ShopSpec.door_w, LAY-009).
 func front_door_width() -> float:
-	return HouseGeometry.DOOR_W
+	return HousePueblo.DOOR_W if small_openings else HouseGeometry.DOOR_W
 
 
 ## How many rooms an interior of this size can carry.

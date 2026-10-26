@@ -845,3 +845,120 @@ Observed (not traits):
 * Exterior: the vent hat is a pavilion on posts, closer to a gazebo or cupola than a smoke vent, and tall for the cone.
 * Ground: flat green grass, no yard or path.
 * Vent view: only the roof underside is visible (a tunnel of banded facets); no sky through the vent, no fire or smoke below.
+
+## pueblo -- the stepped adobe house (HS-PUEBLO)
+
+The published style id stays `pueblo` (label "Pueblo Adobe House"). The word names a living
+architectural tradition, the Rio Grande pueblos of Taos, Acoma and their neighbours. What is
+built is a fictional household's house in that manner, not a claim about one people; the forms
+below are the ones the tradition is known for, and nothing is added for effect.
+
+Traits (named by the user, 2026-10-24): (1) two or more stepped levels, each upper room set
+back from the one below; (2) a ladder or stair reaches each roof terrace, and the terraces are
+walkable in the nav check; (3) vigas (roof beams) project from the walls below the parapet; (4)
+small doors and windows in thick adobe walls; flat roofs with parapets.
+
+Measured first (8 x 10 m, 2.6 m storeys, seeds 1, 8102, 21325; the frozen row asked for one
+storey, and two storeys were measured as well): (1) MISSING. Every storey stood on the whole
+footprint (an upper storey was a clone of the ground partition, joined to it by an interior
+stair); at the frozen size there was only one. (2) MISSING. The flat roof was a parapeted slab
+with no way up (`docs/PUEBLO_HOUSES.md`: "roof access is not part of the plan vocabulary"); no
+ladder, no terrace, nothing for the nav check to walk. (3) MISSING. No beam ends anywhere on the
+walls. (4) HALF. The wall was 0.72 m thick (reveals 0.76 m), the roof level earth and the parapet
+on every elevation (held); but the doors were the ordinary 0.95 m by 2.1 m and the windows the
+ordinary 0.95 m by 1.05 m (1.0 m2), as in a timber cottage.
+
+Built:
+* `HousePueblo` (new, `src/house/house_pueblo.gd`). A plain pueblo (no trade, not a shop or a
+  world family) on a footprint that can step is TERRACED: `clamp_size` (no random draw) gives it
+  two storeys at least and three at most, as many as its footprint carries (the top storey must
+  have a clear floor 2.6 m across and 9 m2). The front of each storey stands 2.4 m behind the one
+  below, and one side is drawn in 1.3 m, the side alternating. The hook is one function:
+  `HouseGeometry.site_rect(spec, level)` returns the storey's rectangle (`tier_outer`), so the
+  floors, wall runs, nav grids, roof layout, window fitter and tiling check all follow. A footprint
+  too small to step (a 5 x 6 m pueblo) and a pueblo with a trade keep the single block they had.
+* Terraces. The part of the roof of storey k-1 the storey above does not cover is a TERRACE: an
+  earth deck (`terrace` components, 0.12 m thick, logged as `terrace_k_i` masses) behind a parapet
+  0.3 m thick and 0.62 m high on its open edges (`parapet_rects`); the top roof is a terrace too,
+  with the style's flat roof laid with a 0.04 m oversail so no face is coplanar with a wall.
+  `HousePlan.terraces` holds the floor of each inside its parapet.
+* Ladders. Each terrace has a ladder up the front wall of the storey below (`ladder_rail`,
+  `ladder_rung`; two rails 0.55 m apart, a rung every 0.3 m, the rails standing 0.85 m above the
+  parapet). The parapet is open at its head. It stands on the side of the wall away from the door
+  that wall has, clear of every window (a window it would cover is taken out and the room
+  re-glazed). There is NO stair inside: a storey is one room (its whole interior), or on a large
+  footprint up to six cut by equal cuts (`split_tier`, a room to each 24 m2, no side under 3.5 m; at
+  most two bedrooms, the rest stores), and the room on the front wall nearest the ladder opens by a
+  door (`terrace: true`) onto the terrace in front of it, the others through it. `HousePlan.ladders` holds the
+  ladders (foot and head landings, body).
+* The walk. `HouseNavCheck` walks a ladder from foot to head as it walks a stair; `HousePueblo.walk_floor`
+  is the one list of floor beyond the rooms (terraces, the doorways through the thick wall onto
+  them, and the ground at the foot of the first ladder), read by the check and by
+  `HouseWalkSources.sources`; the top roof is storey N of `levels_of`. `HousePlan.door_graph`
+  joins the front door's room to each terrace-door room, `HousePlanCheck` takes a ladder as the
+  way up, and `BrickWild.navigation` publishes each ladder as a stair link (`"ladder": true`).
+  `tools/export_building_plan.gd` lists each as a stair row (`"kind": "ladder"`).
+* Vigas. A row of beam ends (`viga`, 0.17 m square, 0.55 m out of the wall face, 0.2 m inside it,
+  every 0.95 m) 0.34 m under the roof or terrace of every storey on every wall, clear of every
+  opening and of the ladders. `HouseSahel.stake_row` is the one function that lays a row of
+  projecting wall timbers; the Sahel's toron now call it (their rows are unchanged).
+* Small openings (`small_openings` in the row, `HouseGeometry.win_w/win_h/win_sill`): windows 0.6 m
+  by 0.65 m, sill 1.1 m; doors 0.8 m wide and 1.72 m clear height. The dripstone hood is dropped
+  (a European piece on mud).
+* Exterior kit: the European wall lantern, bench and barrel are not set against a terraced
+  pueblo (as for the Sahel); two water jars are. A ladder's foot is reserved in
+  `HouseExterior.facade_clear`, which the yard shares.
+
+Test: `tests/house_pueblo_traits_test.gd` over `house/pueblo/{1,8102,21325}` (the frozen row had
+only 8102, at one storey; all three are now 8 x 10 m, three storeys). Keys in
+`HouseTraitMeasure._pueblo_keys`. 154 checks, 0 failures. Controls: the setback removed (upper
+walls on the whole footprint), the ladders left out of the mesh (nothing else moves), the ladders
+removed from the plan (the walk must not reach the terraces or the rooms on them), a parapet across
+the head of a ladder, terraces with no deck and no parapet, the vigas removed (nothing else), the
+parapets removed (nothing else), ordinary-sized openings, a gable roof, a 0.2 m wall, a
+mediterranean house (the measure reads none of it onto another style). Scope checks: storeys 1, 2
+and 3 asked on 8 x 10 m, a 15.2 x 19 m pueblo (three storeys, several upper rooms, all reached),
+three asked on 7 x 8 m (given two), a 5 x 6 m pueblo (not stepped, still small-openinged), a
+smith's pueblo (not stepped). The public paths too: the generated building's published walk has
+the three ladders as linked stair rows, its footprint is the ground storey's, and its plan
+export validates.
+
+Checks widened, and why: `VernacularHouseCheck._check_parapet` measures the roof's own parapet (the
+terraces' are counted by the focused test); `HousePlanCheck` knows a terrace door and a ladder as the
+way to an upper storey; `HouseNavCheck` and `HouseWalkSources` walk ladders and terraces.
+
+Lanes run on the change: `lane:geom` (11 suites, 9810 checks), `lane:house-plan-fast` (322; 34
+warnings), `lane:house-furnish-fast` (242), `lane:house-exterior-fast` (4700), `hbounds` (2317),
+`hcomponent` (1759), `hvernacular` (211; only the 4 known witch_hut lines red, HVERN-WITCH-THATCH),
+`cultureapi` (20), `libraryquick placementquick bwalk` (254), `walkpins` (50), and the HS-SAHEL,
+HS-ROUNDHOUSE, HS-MINKA, HS-THATCH, HS-MEDITERRANEAN and HS-RICH traits tests (127, 141, 106, 94, 94, 67;
+the Sahel's toron rows now go through `HouseSahel.stake_row` and did not move).
+`harchetype`: 235 failures against 238 at HEAD, and every archetype has the same number of defective
+scales (`pueblo_home`: 4 scales, 4 defects before and after; the lines differ, all of them furnisher
+lines, none about the terraces). `tools/fingerprint_houses.gd` against HEAD: identical (128 fingerprints
+of the five long-standing styles; the tool now also skips the new empty `terraces` and `ladders` plan
+fields, as it does `longhall`).
+
+Known sides and open:
+* The three frozen seeds differ only on the ground floor and in colour: the upper storeys, ladders and
+  vigas are a function of the footprint (no random draw), so the three exteriors look alike from the
+  front. A seeded variation of the setbacks would be a new task.
+* The INTERIOR FURNITURE is not narrowed (CULTURE-FURNISH-VOCAB). A furnished pueblo still gets a
+  trestle table, wall torches and a plank floor; the review renders are built UNFURNISHED and show
+  the rooms bare. The plank floor and the timber frame round each window and door are generic.
+* A viga is a square-ended box (0.17 m), not a round log; there are no canales (water spouts), no
+  parapet notch for them, and no corner buttress.
+* An upper storey is one room unless the footprint is large (then up to six); the ground floor keeps
+  the ordinary planner's rooms. No kiva, no plaza or shared court, no hornos (the outdoor oven).
+* Ladders are exterior only. A request for a stair or a hatch inside is not offered.
+* A shop in the pueblo style (`shop_shell/pueblo/8102`) and a pueblo that carries a trade stay a single block.
+
+Renders for review: `artifacts/hs_pueblo/renders/` (`tools/render_hs_pueblo.gd`, not headless), per
+seed: `_front` roof-on three-quarter of the entrance side (the three set-back storeys, parapets,
+vigas, ladders); `_side` three-quarter from the drawn-in side and the back; `_ladder` eye level on
+the ground (the ladder up the front wall, the vigas, small door and windows); `_terrace` eye level on
+the first terrace (the next storey's door, the ladder to the roof above); `_roof` on the top roof, at
+the head of the last ladder; `_interior` eye level inside the first upper room, looking at its door
+onto the terrace.
+
+Reviewer: pending

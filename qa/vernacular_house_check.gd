@@ -156,6 +156,15 @@ func _check_parapet(plan: HousePlan, builder: HouseBuilder) -> void:
 		return
 	var level: int = maxi(int(spec.storeys) - 1, 0)
 	var runs: int = HouseGeometry.shell_runs(plan, level).size()
+	if HousePueblo.applies(spec):
+		# HS-PUEBLO: the terraces below the roof have parapets of their own (the focused
+		# test counts them); this rule is about the roof's, which stands on its eave
+		var roof_y := float(spec.storeys) * spec.height + HouseGeometry.PARAPET_BASE
+		var roof_rows: Array[Dictionary] = []
+		for row in rows:
+			if absf(MassBuilder.component_aabb(row).position.y - roof_y) < 0.03:
+				roof_rows.append(row)
+		rows = roof_rows
 	if rows.size() < runs:
 		failures.append("parapet: %d pieces for %d elevations" % [rows.size(), runs])
 	# The wall reaches the eave and stops there. The roof's own oversail is

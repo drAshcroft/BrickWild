@@ -75,7 +75,11 @@ static func _plan_once(spec: HouseSpec, world_family: StringName = &"") -> House
 	# HS-MINKA: the engawa side's sliding screens and the main room's opening
 	# onto it. Nothing at all for any style without an `engawa`.
 	HouseMinka.plan_engawa(p, spec)
-	if spec.storeys > 1:
+	if HousePueblo.applies(spec):
+		# HS-PUEBLO: each storey stands back from the one below and is reached by
+		# a ladder to the terrace in front of it, not by a stair inside.
+		HousePueblo.plan_upper(p, spec)
+	elif spec.storeys > 1:
 		HousePlanLevels.clone_upper_storeys(p, spec)
 		HousePlanLevels.move_beds_upstairs(p, spec)
 	# More than a storey of fall: the downhill side stands a storey clear of

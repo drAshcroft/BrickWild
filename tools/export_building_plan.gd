@@ -101,6 +101,20 @@ static func building_plan(site: Dictionary, building_id: String) -> Dictionary:
 		stairs.append({"stair_id": "%s/st-%03d" % [building_id, i],
 			"between": [_room_id(plan, building_id, s["a"]), _room_id(plan, building_id, s["b"])],
 			"from_storey": s["storey"], "to_storey": s["to_storey"], "width_m": _n(s["width"])})
+	# HS-PUEBLO: a ladder to a terrace is the way up to the room whose door opens onto
+	# it. From the ground it starts at the front door's room (you go out of it and round
+	# to the foot); higher up, at the room of the storey below
+	for i in range(plan.ladders.size()):
+		var ladder: Dictionary = plan.ladders[i]
+		var lo := int(ladder["storey"])
+		var upper_room := HousePueblo.terrace_room(plan, int(ladder["to_storey"]))
+		var lower_room := plan.entrance_room() if lo == 0 else HousePueblo.terrace_room(plan, lo)
+		if upper_room < 0 or lower_room < 0:
+			continue
+		stairs.append({"stair_id": "%s/st-%03d" % [building_id, plan.stairs.size() + i],
+			"between": [_room_id(plan, building_id, lower_room), _room_id(plan, building_id, upper_room)],
+			"kind": "ladder", "from_storey": lo, "to_storey": int(ladder["to_storey"]),
+			"width_m": _n(HousePueblo.LADDER_W)})
 	for i in range(plan.furniture.size()):
 		var f: Dictionary = plan.furniture[i]
 		var position: Vector3 = xf * f["pos"]

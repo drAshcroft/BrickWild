@@ -49,6 +49,10 @@ static func dress(plan: HousePlan) -> void:
 			["Bench", 0.8, 0, "entrance_seat"],
 			["Pot_1", 1.2, service, "storage"], ["Barrel", 1.0, service, "storage"],
 			["Bucket_Wooden_1", 1.0, service, "water"]]
+		if s.terraced and not trade_recipe:
+			# HS-PUEBLO: no wall lantern, bench or barrel (a European household's
+			# kit): two water jars stand against the wall, clear of the ladder.
+			recipe = [["Pot_1", 1.5, service, "water"], ["Pot_1", 1.1, service, "storage"]]
 		if s.sahel and not trade_recipe:
 			# HS-SAHEL: no wall lantern, bench or barrel (a European household's
 			# kit); the water jars, a bucket and the pot of the store stand by the wall.
@@ -177,6 +181,14 @@ static func facade_clear(plan: HousePlan, bounds: AABB) -> String:
 			level + minf(float(win["head"]) + 0.25, plan.spec.height - 0.1), 0.8,
 			HouseGeometry.wall_thickness(plan.spec))):
 			return "obstructs glazing, shutters or a window hood"
+	# HS-PUEBLO: the ground in front of the first ladder, and the wall it leans on
+	for ladder in plan.ladders:
+		if int(ladder["storey"]) != 0:
+			continue
+		var lx := float(ladder["x"])
+		var ly := float(ladder["wall_y"])
+		if bounds.intersects(AABB(Vector3(lx - 0.8, -0.1, ly - 1.4), Vector3(1.6, plan.spec.height * 2.0, 1.45))):
+			return "blocks the foot of a ladder"
 	if plan.spec.chimney:
 		var c := HouseGeometry.chimney_center(plan)
 		var size := HouseGeometry.chimney_size(plan.spec) + HouseGeometry.CHIMNEY_BASE_EXTRA + 0.12

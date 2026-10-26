@@ -265,6 +265,9 @@ const SLEEPING := [&"bedroom", &"guest_room", &"suite", &"lords_chamber", &"roya
 
 ## Outer footprint of the house at wall-top level.
 static func site_rect(spec: HouseSpec, level := 0) -> Rect2:
+	# HS-PUEBLO: each storey of a stepped house stands back from the one below
+	if level > 0 and spec.terraced:
+		return HousePueblo.tier_outer(spec, level)
 	var r := Rect2(Vector2(-spec.width / 2.0, -spec.length / 2.0),
 		Vector2(spec.width, spec.length))
 	# A single front cantilever: every upper level shares the same envelope.
@@ -599,6 +602,25 @@ static func door_threshold(door: Dictionary, side: float) -> Vector2:
 
 
 # ----------------------------------------------------------------- windows
+
+## The window a house is given, width, height and sill. The ordinary house's are
+## the constants above; a style that asks for small, deep openings (HS-PUEBLO,
+## `small_openings`) is given small windows set high in the wall.
+static func win_w(spec: HouseSpec) -> float:
+	return HousePueblo.WIN_W if spec.small_openings else WINDOW_W
+
+
+static func win_h(spec: HouseSpec) -> float:
+	return HousePueblo.WIN_H if spec.small_openings else WINDOW_H
+
+
+static func win_sill(spec: HouseSpec) -> float:
+	return HousePueblo.WIN_SILL if spec.small_openings else WINDOW_SILL
+
+
+static func win_narrow(spec: HouseSpec) -> float:
+	return HousePueblo.WIN_NARROW if spec.small_openings else WINDOW_NARROW
+
 
 ## World plan segment a window occupies, as a thin rectangle on the wall face.
 static func window_rect(win: Dictionary) -> Rect2:
@@ -1747,6 +1769,9 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		pos = pos.max(Vector2.ONE * HouseSahel.reach(spec))
 	var r: Rect2 = site_rect(spec, maxi(spec.storeys - 1, 0)).grow_individual(neg.x, neg.y, pos.x, pos.y)
 	r = r.merge(site_rect(spec).grow_individual(0, jetty_front_reach(spec), 0, 0))
+	if HousePueblo.applies(spec):
+		# HS-PUEBLO: the vigas and the ladders stand out of the walls of every storey
+		r = r.merge(site_rect(spec).grow(HousePueblo.reach()))
 	for extra in [chimney_rect(plan), porch_rect(plan), veranda_rect(plan),
 			HouseMinka.engawa_rect(plan), HouseMinka.steps_rect(plan)]:
 		if extra.size.x > 0.0:
@@ -1761,6 +1786,9 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 	var top: float = total_height(spec, plan.world_family)
 	if HouseSahel.applies(spec):
 		top = maxf(top, HouseSahel.top_height(spec))
+	if HousePueblo.applies(spec):
+		# the rails of the ladder to the top roof stand above its parapet
+		top = maxf(top, HousePueblo.top_height(spec))
 	# A landmark declares the storybook elevation it stands in front of its
 	# walls (balconies, entrance canopy, cornices, cupolas), so those parts
 	# are planned exterior rather than leakage.
@@ -1809,10 +1837,15 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 		over = over.max(Vector2.ONE * CORNICE_OUT)
 	if HouseSahel.applies(spec):
 		over = over.max(Vector2.ONE * HouseSahel.reach(spec))
+	if spec.style == &"pueblo":
+		# HS-PUEBLO: the ground storey's vigas, a stepped house's ladders and decks
+		over = over.max(Vector2.ONE * HousePueblo.reach())
 	# The front is known, but a spec alone cannot say which wall is the front
 	# once the entrance moves, so the jetty reach is applied all round.
 	var all_round: float = maxf(maxf(over.x, over.y), jetty_front_reach(spec))
 	var r: Rect2 = site_rect(spec, maxi(spec.storeys - 1, 0)).grow(all_round)
+	if spec.style == &"pueblo":
+		r = r.merge(site_rect(spec).grow(all_round))
 	var pad := 0.0
 	if spec.chimney:
 		pad = maxf(pad, chimney_size(spec) + maxf(CHIMNEY_BASE_EXTRA, 0.22))
@@ -1833,6 +1866,8 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 	var top: float = maxf(total_height(spec), total_height(spec, &"__unknown_world_scope__"))
 	if HouseSahel.applies(spec):
 		top = maxf(top, HouseSahel.top_height(spec))
+	if spec.style == &"pueblo":
+		top = maxf(top, HousePueblo.top_height(spec))
 	var raise := floor_raise(spec)
 	return AABB(Vector3(r.position.x, -raise, r.position.y),
 		Vector3(r.size.x, top + raise, r.size.y))

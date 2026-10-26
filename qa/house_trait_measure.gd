@@ -12,7 +12,7 @@ extends RefCounted
 ## over the entrance door), porch_roof_count.
 ## HS-LONGHALL keys are listed on `_longhall_keys`, HS-MEDITERRANEAN on `_med_keys`,
 ## HS-THATCH on `_thatch_keys`, HS-MINKA on `_minka_keys`, HS-SAHEL on `_sahel_keys`,
-## HS-ROUNDHOUSE on `_round_keys`.
+## HS-ROUNDHOUSE on `_round_keys`, HS-PUEBLO on `_pueblo_keys`.
 
 
 static func make_spec(style: StringName, width: float, length: float, height: float,
@@ -66,6 +66,7 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable(),
 	_minka_keys(plan, builder, out)
 	_sahel_keys(plan, builder, out)
 	_round_keys(plan, builder, out)
+	_pueblo_keys(plan, builder, out)
 	return out
 
 
@@ -1554,3 +1555,349 @@ static func _round_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary)
 	out["bed_gap"] = gap if gap < INF else INF
 	out["bed_at_wall"] = beds > 0 and gap <= 0.15
 	out["bed_clear_of_fire"] = beds > 0 and not near_fire
+
+
+## HS-PUEBLO keys (the `pueblo` style; every one false/zero for a house that is not a
+## stepped pueblo):
+##   pueblo                      the plan is a stepped pueblo at all (spec.terraced)
+##   (1) stepped storeys, from the wall masses (`wall_<side>_<k>`) and the rooms
+##   tier_count / tier_inside / tier_front_step (least m the front of a storey stands behind
+##   the one below) / tier_side_step (least of the larger side drawn in) / tier_area_ratio
+##   (largest storey area over the one below) / tier_set_back (two or more storeys, each
+##   inside and smaller than the one below, its front behind the one below)
+##   upper_rooms / upper_rooms_set_back   rooms above the ground, each inside the clear floor
+##   of the storey below and smaller than the rooms below it
+##   (2) ladders and terraces
+##   terrace_levels              the storeys that have a terrace (a roof to walk on)
+##   ladder_count / ladders_reach_all   a ladder per terrace whose rails run from the floor
+##   it leaves to over the parapet of the terrace it reaches
+##   ladder_climbable            every rung gap is 0.36 m or less, six rungs or more
+##   ladder_on_wall / ladder_clear   rails lean on the wall they climb and stand across none
+##   of its openings
+##   ladder_head_open            the parapet is open at the head of every ladder
+##   nav_ok / terraces_walkable / terrace_walk_share / upper_rooms_reached   the walk check:
+##   no failure, every terrace floor walked (least share of it reached), every upper room
+##   reached (by the terrace its door opens onto)
+##   terrace_doors               doors of upper rooms onto a terrace
+##   (3) vigas
+##   viga_count / viga_tiers / viga_walls / viga_reach / viga_section / viga_wood /
+##   viga_inside / viga_clear / viga_below (m under the roof surface they carry) /
+##   viga_gap_min / viga_gap_max (between neighbours on a wall)
+##   (4) small deep openings and flat parapeted roofs
+##   door_w_max / door_h_max / win_w_max / win_h_max / win_area_max / win_sill_min /
+##   opening_share / small_openings (against the thresholds on the test)
+##   parapet_each_terrace (every terrace has a parapet standing on its deck, the roof
+##   included); parapet_h (least height); terraces_decked (earth under every terrace
+##   floor: a deck, or the roof itself under the top one)
+static func _pueblo_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -> void:
+	var spec := plan.spec
+	var h := spec.height
+	out["pueblo"] = spec.style == &"pueblo" and spec.terraced
+	# only a pueblo is measured (the walk check below is not free)
+	if spec.style != &"pueblo":
+		return
+	var rows := {}
+	for row in builder.component_log:
+		var role := str(row.get("role", ""))
+		if not rows.has(role):
+			rows[role] = []
+		(rows[role] as Array).append(row)
+	var thick := HouseGeometry.wall_thickness(spec)
+	# ---- (1) the storeys, from the wall masses
+	var tiers := {}
+	for m in builder.mass_log:
+		var nm := str(m.get("name", ""))
+		if not nm.begins_with("wall_"):
+			continue
+		var bits := nm.split("_")
+		var level := int(bits[2]) if bits.size() >= 3 else 0
+		var a: AABB = m["aabb"]
+		var r := Rect2(Vector2(a.position.x, a.position.z), Vector2(a.size.x, a.size.z))
+		tiers[level] = r if not tiers.has(level) else (tiers[level] as Rect2).merge(r)
+	var lv: Array = tiers.keys()
+	lv.sort()
+	var inside := true
+	var front_min := INF
+	var side_min := INF
+	var ratio_max := 0.0
+	for i in range(1, lv.size()):
+		var lo: Rect2 = tiers[lv[i - 1]]
+		var up: Rect2 = tiers[lv[i]]
+		if not lo.grow(0.05).encloses(up):
+			inside = false
+		front_min = minf(front_min, up.position.y - lo.position.y)
+		side_min = minf(side_min, maxf(up.position.x - lo.position.x, lo.end.x - up.end.x))
+		ratio_max = maxf(ratio_max, up.get_area() / maxf(lo.get_area(), 0.001))
+	out["tier_count"] = lv.size()
+	out["tier_inside"] = lv.size() >= 2 and inside
+	out["tier_front_step"] = front_min if lv.size() >= 2 else 0.0
+	out["tier_side_step"] = side_min if lv.size() >= 2 else 0.0
+	out["tier_area_ratio"] = ratio_max if lv.size() >= 2 else 1.0
+	out["tier_set_back"] = lv.size() >= 2 and inside and front_min >= 1.5 and ratio_max <= 0.9
+	var upper := 0
+	var upper_ok := true
+	for i in range(plan.room_count()):
+		var st := HousePlan.record_storey(plan.rooms[i])
+		if st < 1:
+			continue
+		upper += 1
+		var below := HouseGeometry.interior_rect(spec, st - 1)
+		var rr := Rect2(plan.rooms[i]["rect"])
+		var below_area := 0.0
+		for j in range(plan.room_count()):
+			if HousePlan.record_storey(plan.rooms[j]) == st - 1:
+				below_area += Rect2(plan.rooms[j]["rect"]).get_area()
+		# a storey over a lower one is inside it and smaller than it
+		if not below.grow(0.05).encloses(rr) or rr.get_area() >= below_area * 0.95:
+			upper_ok = false
+	out["upper_rooms"] = upper
+	out["upper_rooms_set_back"] = upper > 0 and upper_ok
+	# ---- (2) ladders, terraces and the walk
+	var levels_t := {}
+	for t in plan.terraces:
+		levels_t[int(t["storey"])] = true
+	out["terrace_levels"] = levels_t.size()
+	var rails: Array = rows.get("ladder_rail", [])
+	var rungs: Array = rows.get("ladder_rung", [])
+	out["ladder_count"] = rails.size() / 2
+	var served := 0
+	var climbable := rails.size() > 0
+	var on_wall := rails.size() > 0
+	var clear := rails.size() > 0
+	var openings: Array = []
+	for d in plan.doors:
+		if bool(d.get("exterior", false)):
+			var dl := float(HousePlan.record_storey(d)) * h
+			openings.append([Vector2(d["pos"]), Vector2(d["normal"]), float(d["width"]) * 0.5,
+				dl, dl + float(d.get("head", HouseGeometry.DOOR_H))])
+	for w in plan.windows:
+		var wl := float(HousePlan.record_storey(w)) * h
+		openings.append([Vector2(w["pos"]), Vector2(w["normal"]), float(w["width"]) * 0.5,
+			wl + float(w["sill"]), wl + float(w["head"])])
+	for k in levels_t:
+		var walk := Rect2()
+		for t in plan.terraces:
+			if int(t["storey"]) == int(k):
+				walk = Rect2(t["rect"])
+				break
+		var foot_y := 0.0 if int(k) <= 1 else float(int(k) - 1) * h + HouseGeometry.FLOOR_T
+		var head_y := float(k) * h + HouseGeometry.FLOOR_T + HouseGeometry.PARAPET_H + 0.3
+		for row in rails:
+			var a := MassBuilder.component_aabb(row)
+			var cx := a.get_center().x
+			if cx < walk.position.x - 0.1 or cx > walk.end.x + 0.1 or a.position.y > foot_y + 0.1 \
+					or a.end.y < head_y:
+				continue
+			served += 1
+			# this ladder: the rungs between its rails, which stand HousePueblo.LADDER_W apart
+			var ys: Array[float] = []
+			for rg in rungs:
+				var ra := MassBuilder.component_aabb(rg)
+				if absf(ra.get_center().x - (cx + HousePueblo.LADDER_W * 0.5)) < 0.05 \
+						and absf(ra.get_center().z - a.get_center().z) < 0.1 \
+						and ra.get_center().y >= a.position.y and ra.get_center().y <= a.end.y:
+					ys.append(ra.get_center().y)
+			ys.sort()
+			var gap_max := (ys[0] - a.position.y) if not ys.is_empty() else INF
+			for i in range(1, ys.size()):
+				gap_max = maxf(gap_max, ys[i] - ys[i - 1])
+			if ys.size() < 6 or gap_max > 0.36:
+				climbable = false
+			var runs: Array = HouseGeometry.shell_runs(plan, int(k) - 1)
+			var on := _on_wall(a, runs, thick, 0.2)
+			if on.is_empty() or float(on["inner"]) > 0.3 or float(on["inner"]) < -0.01:
+				on_wall = false
+			elif _hits_opening(on, runs, openings, 0.0, a.position.y, a.end.y):
+				clear = false
+			break
+	out["ladders_reach_all"] = levels_t.size() > 0 and served == levels_t.size()
+	out["ladder_climbable"] = climbable
+	out["ladder_on_wall"] = on_wall
+	out["ladder_clear"] = clear
+	# the parapet is open at the head of a ladder: no parapet part stands in the
+	# line of the wall across the width of the ladder, at the height just under its top
+	var head_open := rails.size() > 0
+	for row in rails:
+		var a := MassBuilder.component_aabb(row)
+		var rail_x := a.get_center().x
+		for pr in rows.get("parapet", []):
+			var pa := MassBuilder.component_aabb(pr)
+			if pa.position.y < a.end.y - 0.9 and pa.end.y > a.end.y - 1.4 \
+					and pa.position.x < rail_x + 0.1 and pa.end.x > rail_x - 0.1 \
+					and pa.position.z < a.end.z + 0.3 and pa.end.z > a.position.z:
+				head_open = false
+	out["ladder_head_open"] = head_open
+	var nav := HouseNavCheck.new()
+	var rep := nav.check(plan)
+	out["nav_ok"] = bool(rep["ok"])
+	var share_min := 1.0 if not plan.terraces.is_empty() else 0.0
+	for t in plan.terraces:
+		var grid: WalkGrid = nav._grids.get(int(t["storey"]), null)
+		if grid == null:
+			share_min = 0.0
+			continue
+		# the walk grid keeps a person a body's width from every edge
+		var tr := Rect2(t["rect"]).grow(-0.4)
+		var seen := 0
+		var total := 0
+		var px := tr.position.x
+		while px <= tr.end.x + 0.001:
+			var pz := tr.position.y
+			while pz <= tr.end.y + 0.001:
+				total += 1
+				if grid.reached(Rect2(Vector2(px - 0.08, pz - 0.08), Vector2.ONE * 0.16)):
+					seen += 1
+				pz += 0.2
+			px += 0.2
+		share_min = minf(share_min, float(seen) / maxf(float(total), 1.0))
+	out["terrace_walk_share"] = share_min
+	out["terraces_walkable"] = not plan.terraces.is_empty() and share_min >= 0.9
+	var reached_rooms := upper > 0
+	for i in range(plan.room_count()):
+		var st2 := HousePlan.record_storey(plan.rooms[i])
+		if st2 >= 1 and not (nav._grids.has(st2) and (nav._grids[st2] as WalkGrid).reached(
+				HouseGeometry.room_floor_rect(plan, i))):
+			reached_rooms = false
+	out["upper_rooms_reached"] = reached_rooms
+	var tdoors := 0
+	for d in plan.doors:
+		if bool(d.get("terrace", false)):
+			tdoors += 1
+	out["terrace_doors"] = tdoors
+	# ---- (3) vigas
+	var vigas: Array = rows.get("viga", [])
+	out["viga_count"] = vigas.size()
+	var vwalls := {}
+	var vlevels := {}
+	var vreach := INF
+	var vsection := 0.0
+	var vwood := true
+	var vinside := true
+	var vclear := true
+	var vbelow := INF
+	var by_wall := {}
+	var runs_by := {}
+	for row in vigas:
+		var a := MassBuilder.component_aabb(row)
+		var level := clampi(int(floor(a.get_center().y / h)), 0, maxi(spec.storeys, 1) - 1)
+		if not runs_by.has(level):
+			runs_by[level] = HouseGeometry.shell_runs(plan, level)
+		var runs: Array = runs_by[level]
+		var on := _on_wall(a, runs, thick, 0.45)
+		if on.is_empty():
+			continue
+		var key := "%d:%d" % [level, int(on["run"])]
+		vwalls[key] = true
+		vlevels[level] = true
+		if not by_wall.has(key):
+			by_wall[key] = []
+		(by_wall[key] as Array).append((float(on["t0"]) + float(on["t1"])) * 0.5)
+		vreach = minf(vreach, float(on["reach"]))
+		var dims := [a.size.x, a.size.y, a.size.z]
+		dims.sort()
+		vsection = maxf(vsection, float(dims[1]))
+		if int(row["surface"]) != HouseBuilder.SURF_TRIM:
+			vwood = false
+		if float(on["inner"]) > -0.1:
+			vinside = false
+		if _hits_opening(on, runs, openings, 0.0, a.position.y, a.end.y):
+			vclear = false
+		vbelow = minf(vbelow, float(level + 1) * h + HouseGeometry.FLOOR_T - a.end.y)
+	var gap_min := INF
+	var gap_max := 0.0
+	for key in by_wall:
+		var ts: Array = by_wall[key]
+		ts.sort()
+		for i in range(1, ts.size()):
+			var gap := float(ts[i]) - float(ts[i - 1])
+			gap_min = minf(gap_min, gap)
+			gap_max = maxf(gap_max, gap)
+	out["viga_tiers"] = vlevels.size()
+	out["viga_walls"] = vwalls.size()
+	out["viga_reach"] = vreach if not vwalls.is_empty() else 0.0
+	out["viga_section"] = vsection
+	out["viga_wood"] = vigas.size() > 0 and vwood
+	out["viga_inside"] = vigas.size() > 0 and vinside
+	out["viga_clear"] = vigas.size() > 0 and vclear
+	out["viga_below"] = vbelow if not vwalls.is_empty() else 0.0
+	out["viga_gap_min"] = gap_min if not by_wall.is_empty() else 0.0
+	out["viga_gap_max"] = gap_max
+	# ---- (4) small deep openings
+	var dw := 0.0
+	var dh := 0.0
+	for d in plan.doors:
+		dw = maxf(dw, float(d["width"]))
+		dh = maxf(dh, float(d.get("head", HouseGeometry.DOOR_H)) - HouseGeometry.FLOOR_T)
+	var ww := 0.0
+	var wh := 0.0
+	var wa := 0.0
+	var sill := INF
+	var aperture := 0.0
+	for w in plan.windows:
+		var wd := float(w["width"])
+		var hh := float(w["head"]) - float(w["sill"])
+		ww = maxf(ww, wd)
+		wh = maxf(wh, hh)
+		wa = maxf(wa, wd * hh)
+		sill = minf(sill, float(w["sill"]))
+		aperture += wd * hh
+	for d in plan.doors:
+		if bool(d.get("exterior", false)):
+			aperture += float(d["width"]) * (float(d.get("head", HouseGeometry.DOOR_H)) - HouseGeometry.FLOOR_T)
+	var wall_area := 0.0
+	for level in range(maxi(spec.storeys, 1)):
+		for run in HouseGeometry.shell_runs(plan, level):
+			wall_area += Vector2(run["from"]).distance_to(Vector2(run["to"])) * h
+	out["door_w_max"] = dw
+	out["door_h_max"] = dh
+	out["win_w_max"] = ww
+	out["win_h_max"] = wh
+	out["win_area_max"] = wa
+	out["win_sill_min"] = sill if not plan.windows.is_empty() else 0.0
+	out["opening_share"] = aperture / maxf(wall_area, 0.001)
+	out["small_openings"] = not plan.windows.is_empty() and dw <= 0.85 and dh <= 1.9 \
+		and wa <= 0.5 and wh <= 0.8 and sill >= 1.0
+	# parapeted flat roofs: every terrace has a parapet standing on its deck
+	var para: Array = rows.get("parapet", [])
+	var each := not plan.terraces.is_empty()
+	var ph := INF
+	var ks := {}
+	for t in plan.terraces:
+		ks[int(t["storey"])] = true
+	for k in ks:
+		var deck := float(k) * h + HouseGeometry.FLOOR_T
+		var n := 0
+		for pr in para:
+			var pa := MassBuilder.component_aabb(pr)
+			if absf(pa.position.y - deck) < 0.03:
+				n += 1
+				ph = minf(ph, pa.size.y)
+		if n < 3:
+			each = false
+	out["parapet_each_terrace"] = each
+	out["parapet_h"] = ph if each else 0.0
+	# decks: the earth under every terrace, the roof itself under the top one
+	var surfaces: Array = []
+	for rk in rows:
+		if str(rk) == "terrace" or str(rk).begins_with("roof_face_"):
+			surfaces.append_array(rows[rk])
+	var decked := not plan.terraces.is_empty()
+	for t in plan.terraces:
+		var top_y := float(int(t["storey"])) * h + HouseGeometry.FLOOR_T
+		var dr := Rect2(t["rect"]).grow(-0.1)
+		var qx := dr.position.x
+		while qx <= dr.end.x + 0.001:
+			var qz := dr.position.y
+			while qz <= dr.end.y + 0.001:
+				var under := false
+				for sr in surfaces:
+					var sa := MassBuilder.component_aabb(sr)
+					if absf(sa.end.y - top_y) < 0.03 and qx >= sa.position.x and qx <= sa.end.x \
+							and qz >= sa.position.z and qz <= sa.end.z:
+						under = true
+						break
+				if not under:
+					decked = false
+				qz += 0.25
+			qx += 0.25
+	out["terraces_decked"] = decked

@@ -42,6 +42,8 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	clamp_witch_hut(spec)
 	HouseLonghall.clamp_size(spec)
 	HouseRound.clamp_size(spec)
+	# HS-PUEBLO: a footprint that can step is at least two storeys. No draw.
+	HousePueblo.clamp_size(spec, world_family)
 	spec.storeys = clampi(spec.storeys, 1, 3)
 	spec.cellars = clampi(spec.cellars, 0, 1)
 	var s: Dictionary = HouseSpec.STYLES[spec.style]
@@ -150,6 +152,17 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 		spec.court_ranges = bool(s.get("court_ranges", false))
 		if spec.sahel:
 			spec.parapet = true
+		# HS-PUEBLO: style flags, no draw. A stepped house has no stone hoods over
+		# its windows (a European piece on mud), and its roof and terraces are laid
+		# flush with the walls but for a hand (HousePueblo.OVERSAIL), so a ladder can
+		# lean on the wall under the parapet.
+		spec.small_openings = bool(s.get("small_openings", false)) and HousePueblo.plain(spec, world_family)
+		if spec.terraced:
+			spec.jetty = false
+			spec.window_hoods = false
+			spec.parapet = true
+			spec.roof_span_out = HousePueblo.roof_out()
+			spec.roof_along_out = HousePueblo.roof_out()
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y
