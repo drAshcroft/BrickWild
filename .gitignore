@@ -54,3 +54,5 @@ scratch/*.json
 /visualqa/styles/church/gothic/renders
 /visualqa/styles/house/cottage/renders
 /visualqa/styles/house
+/Godot/
+/%SystemDrive%/
