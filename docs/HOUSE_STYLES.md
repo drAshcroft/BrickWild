@@ -693,4 +693,31 @@ the gateway); `_entry` eye level three metres from the door (pinnacles, relief f
 `_court` eye level inside the court looking back at the house; `_interior` eye level inside, looking
 through the rear door onto the court.
 
-Reviewer: pending
+Independent reviewer: fresh agent, from the renders of commit d15b731 (all 15 images opened). Judged only from `artifacts/hs_sahel/renders/sahel_<seed>_{front,rear,entry,court,interior}.jpg`. Interiors are unfurnished on purpose (CULTURE-FURNISH-VOCAB), not marked down.
+
+| seed | (1) flat banco rooms round a court | (2) tapering buttresses | (3) projecting toron | (4) decorated entry |
+|---|---|---|---|---|
+| 1 | YES (borderline) | YES (borderline) | YES | YES (borderline) |
+| 8102 | YES (borderline) | YES (borderline) | YES | YES (borderline) |
+| 21325 | YES (borderline) | YES (borderline) | YES | YES (borderline) |
+
+Reasons:
+* (1) every seed: flat earthen roof with a parapet, no thatch, earth-coloured walls on a stone base course; a paved court with a low outer wall and two flat-roofed ranges flanking it (rear and court views). But the "rooms round a court" are the house on one side and two open-fronted roofed bays; the ranges show no door or room, so it reads as a walled forecourt with lean-to shelters more than rooms on several sides.
+* (2) every seed: vertical earthen piers stand against the long walls and beside the door, rising to the eave. They step in once near the top (entry view, 8102 and 21325) but are otherwise straight-sided slabs, so the taper is slight. On seed 1 the long-wall buttresses are seen only at a glancing angle in the front view.
+* (3) every seed: rows of dark square stakes stand out from the wall under the roof edge, and on the door pilasters (entry view); clear in the court view too. They are square, not round.
+* (4) every seed: two tall pilasters with stepped, pinnacled tops beside the door, and a lintel with a row of small blocks over it; clearly more elaborate than the windows. The relief frame beside the jambs is faint, and from the front view alone the door is a plain dark slot between two thick piers.
+
+Images: `artifacts/hs_sahel/renders/sahel_1_front.jpg`, `_rear`, `_entry`, `_court`, `_interior`; the same five for `8102` and `21325`.
+
+Open:
+* All seeds: the court is not enclosed by rooms; the two ranges are open bays with no door or interior, so trait 1 holds on the letter only.
+* All seeds: the buttress taper is slight (one step), and the relief frame round the door is hard to see (traits 2 and 4 borderline).
+* The three seeds are near-identical in massing and layout; they differ mostly in window position.
+
+Observed (not traits):
+* Interior (8102, 21325): the camera is pressed against a huge window frame that fills most of the image and shows only sky and a blank wall; nothing of the court is readable. Seed 1 interior shows a bare room with a plank floor over a stone skirting, not packed earth.
+* Windows: the dark thick frames and sills are timber-box forms that read slightly European on a mud wall.
+* Court view (8102, 21325): a lone stepped column stands in front of the wall in the middle of the frame (the free pier of a range, seen close); it looks like a floating post.
+* Water jars (blue-grey bowls) stand on bare grass at the right flank and a woven basket hangs against the wall in the rear view; the bucket in the entry views is a European wooden pail. A short plank path leads to the door and ends in the grass.
+* Ground: flat green grass, not sand or dry earth; the house does not sit in a Sahel setting.
+* Roof: the slab overhangs the walls widely and reads as a thick lid; the pinnacles stand close to the front parapet.
