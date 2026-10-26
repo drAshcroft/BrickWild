@@ -1300,6 +1300,15 @@ Not yet:
 
 * **steep real gorges and bends** -- world90/rocamadour's river drops 18 %
   along the frame, over a cart's 12 % (the same missing switchbacks as above);
+  re-measured 2026-10-26 (VTER-VALLEY-GORGE): the through road now reads 11 %,
+  inside its cap; what fails is 17 of 19 placed (12 houses for 14 households)
+  and a stair way's clearance. `_way`'s last resort was a stair straight up the
+  side (83 %, a 0.18 m going); it now leans like a track until it climbs no more
+  than `STAIR_CAP` 0.45, and with none there is no way (Rocamadour: 42 %). A
+  derivation rule was tried and does not separate the gorge: the window's floor
+  fall (the lowest ground per column and per row at 20 m, the lesser mean fall)
+  reads Rocamadour 0.06, under Gangotri's peers and far under labelled-hillside
+  Castelmezzano 0.29 and Masouleh 0.18; not kept;
   where the river bends out of the straight frame the road leaves it (Lugar
   de Guene: 20-219 m, median 33);
 * **the common's fronting on steep sides** -- fixed for Ushguli (20 % -> 73 %,
@@ -1635,6 +1644,26 @@ against 1.32) have little margin.
   through road the same plan also had a navigation vertex 0.33 m off the ground.
   Filed as HILLS-STAIRS (cross-lanes at a stair's grade, which is the switchback
   question in small).
+
+  HILLS-STAIRS, 2026-10-26 (cross-lanes done; risers and the walk not): a
+  cross-lane is laid straight down only where its stair's shallowest inner tread
+  is `CROSS_GOING_M` (0.30 m) or more, measured by `VillageHillsideForm.stair_going`
+  -- the bed `VillageGroundSurface` would lay (2 m stations, smoothed, level with
+  each street's bed inside its 3 m ribbon, the step eased over `JUNCTION_TAPER`),
+  then `treads_of`. The ground's `grade_of` is NOT the measure: it samples at the
+  grid's cell, and the eased step at each junction makes the stair steeper there
+  than the face (a lane reading 0.43 laid 0.20 m goings). Otherwise `_cross_foot`
+  takes the nearest column of the terrace below, outward first, that gives the
+  treads and meets both lines at 35 degrees; the next gap's lane starts at that
+  foot and leans back -- a zigzag with one junction per terrace. Road layout on
+  Manarola, Masouleh and Rocamadour: every cross-lane at 0.30 m or more (was 0.25
+  at worst). Manarola with lots: 12/12 housed, road check and VillageQA clean.
+  Still short: the end RISERS, where `pick_pair` finds no street pair and
+  `grade_roads` makes stairs of them (0.20 m goings on all three faces).
+  Requiring a stair-legal riser in `pick_pair` (a third pass) changed Manarola's
+  pair, broke a bend on the common's path, and still left 0.20 m (a riser bends
+  at each terrace). The 3D walk on the hillside (`vstepswalk` `_case`, then the
+  hillside in its CASES) has not been re-run.
 * **switchbacks** -- the router is monotone along the contour, so a hairpin
   up a spur is still not laid;
 * **terraces from the ground** -- the terrace lines are offsets of the

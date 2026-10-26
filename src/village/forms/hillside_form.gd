@@ -115,6 +115,9 @@ const RISER_INSET_M := 8.0
 const CROSS_CLEAR_M := 14.0
 ## Where the cross-lanes stand across the terrace band, as a fraction of it.
 const CROSS_SPOTS := [0.4, 0.6]
+## A cross-lane's shallowest inner tread, as the ground surface lays it, at least
+## this (VillageGroundCheck.STAIR_GOING_MIN 0.28 and a little to spare).
+const CROSS_GOING_M := 0.30
 ## Where the field tracks leave the lowest terrace.
 const TRACK_SPOTS := [0.18, 0.82]
 const UPHILL_TRACK_SPOTS := [0.08, 0.2, 0.8, 0.92]
@@ -312,21 +315,36 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
 	for t in terraces:
 		cross_lo = maxf(cross_lo, t[0].x + CROSS_CLEAR_M)
 		cross_hi = minf(cross_hi, t[t.size() - 1].x - CROSS_CLEAR_M)
+	# On given ground a lane too steep for a stair (HILLS-STAIRS) leans off the
+	# fall line to a column of the terrace below where it is not; the next gap's
+	# lane starts where this one ends (one junction), leaning back the other way:
+	# the switchback in small.
+	var foot_x: Array[float] = []
+	var hands: Array[float] = []
+	for f in CROSS_SPOTS:
+		# on one of the terraces' own vertices, so no short segment is made
+		foot_x.append(_column_near(through, lerpf(cross_lo, cross_hi, float(f))))
+		hands.append(-1.0 if float(f) < 0.5 else 1.0)   # outward first
 	for k in range(terraces.size() - 1):
-		for f in CROSS_SPOTS:
+		for fi in range(CROSS_SPOTS.size()):
 			var upper: PackedVector2Array = terraces[k]
 			var lower: PackedVector2Array = terraces[k + 1]
-			# on one of the terraces' own vertices, so no short segment is made
-			var x: float = _column_near(through, lerpf(cross_lo, cross_hi, float(f)))
+			var x: float = foot_x[fi]
 			var a: Vector2 = Vector2(x, VillageLotPlanner._polyline_y_at_x(upper, x))
-			var b: Vector2 = Vector2(x, VillageLotPlanner._polyline_y_at_x(lower, x))
+			var xb: float = x
+			if ground != null:
+				xb = _cross_foot(ground, through, upper, lower, a, cross_lo, cross_hi, hands[fi])
+			var b: Vector2 = Vector2(xb, VillageLotPlanner._polyline_y_at_x(lower, xb))
 			if a.distance_to(b) < 4.0:
 				continue
+			if xb != x:
+				hands[fi] = signf(x - xb)   # the next one leans back
 			terraces[k] = _insert_at_x(terraces[k], x)
-			terraces[k + 1] = _insert_at_x(terraces[k + 1], x)
+			terraces[k + 1] = _insert_at_x(terraces[k + 1], xb)
 			out.roads[terrace_roads[k]]["points"] = terraces[k]
 			out.roads[terrace_roads[k + 1]]["points"] = terraces[k + 1]
 			out.roads.append(VillageSitePlanner._road(PackedVector2Array([a, b]), &"steps", spec.wealth))
+			foot_x[fi] = xb
 
 	for k in range(terraces.size()):
 		if terrace_roads[k] >= 0:
@@ -848,6 +866,110 @@ static func _ease(line: PackedVector2Array, pinned: int) -> PackedVector2Array:
 				continue
 			out[i] = Vector2(prev[i].x, (prev[i - 1].y + 2.0 * prev[i].y + prev[i + 1].y) * 0.25)
 	return out
+
+
+## Where a stepped cross-lane from `a` on `upper` meets `lower`: straight down
+## (a.x) when its stair's treads are deep enough there, else the column of
+## `through` (the terraces share its columns) in [lo, hi] nearest a.x, `hand`'s
+## side first, whose stair is, and which meets both lines at JUNCTION_MIN_DEG
+## or more. With none, the column whose stair is least shallow.
+static func _cross_foot(ground: VillageTerrain, through: PackedVector2Array,
+		upper: PackedVector2Array, lower: PackedVector2Array, a: Vector2,
+		lo: float, hi: float, hand: float) -> float:
+	var best_x: float = a.x
+	var best_go: float = -INF
+	var cands: Array[float] = [a.x]
+	var cols: Array[float] = []
+	for p in through:
+		if p.x >= lo - 1e-6 and p.x <= hi + 1e-6 and absf(p.x - a.x) > 1e-3:
+			cols.append(p.x)
+	cols.sort_custom(func(u: float, v: float) -> bool:
+		var du: float = absf(u - a.x) + (0.0 if signf(u - a.x) == hand else 0.5)
+		var dv: float = absf(v - a.x) + (0.0 if signf(v - a.x) == hand else 0.5)
+		return du < dv)
+	cands.append_array(cols)
+	var lines: Array[PackedVector2Array] = [upper, lower]
+	for xb in cands:
+		var b := Vector2(xb, VillageLotPlanner._polyline_y_at_x(lower, xb))
+		var pts := PackedVector2Array([a, b])
+		if xb != a.x and not _squarely(pts, lines):
+			continue
+		var go: float = stair_going(ground, a, b, upper, lower)
+		if go >= CROSS_GOING_M:
+			return xb
+		if go > best_go:
+			best_go = go
+			best_x = xb
+	return best_x
+
+
+## The shallowest inner tread of a stair from `a` to `b` between two street
+## beds, as `VillageGroundSurface` would lay it: the ground's height every
+## STATION, smoothed; level with the line's bed (its height where the stair
+## meets it) inside each street's ribbon, the step to the ground eased over
+## JUNCTION_TAPER outside it; then `treads_of`. A lane on a 54 % face is too
+## steep for 0.15 m risers on 0.28 m goings, and the eased step at a junction
+## makes it steeper there than the face's grade says.
+static func stair_going(ground: VillageTerrain, a: Vector2, b: Vector2,
+		upper: PackedVector2Array, lower: PackedVector2Array) -> float:
+	var length: float = a.distance_to(b)
+	var n: int = maxi(2, int(ceil(length / VillageGroundSurface.STATION)))
+	var raw := PackedFloat32Array()
+	var s := PackedFloat32Array()
+	var inside := PackedInt32Array()
+	var half: float = float(VillageSitePlanner.ROAD_CLASSES[&"street"]["width"]) * 0.5 \
+		+ float(VillageSitePlanner.ROAD_CLASSES[&"street"]["verge"])
+	for m in range(n + 1):
+		var p: Vector2 = a.lerp(b, float(m) / float(n))
+		s.append(length * float(m) / float(n))
+		raw.append(ground.height_at(p))
+		var hit := -1
+		if _dist_to_line(p, upper) <= half:
+			hit = 0
+		elif _dist_to_line(p, lower) <= half:
+			hit = 1
+		inside.append(hit)
+	var h := PackedFloat32Array()
+	h.resize(raw.size())
+	for k in range(raw.size()):
+		var sum := 0.0
+		var cnt := 0
+		for m in range(maxi(0, k - VillageGroundSurface.SMOOTH_STATIONS), mini(raw.size(), k + VillageGroundSurface.SMOOTH_STATIONS + 1)):
+			sum += raw[m]
+			cnt += 1
+		h[k] = sum / float(cnt)
+	var beds := [h[0], h[h.size() - 1]]
+	var offset := PackedFloat32Array()
+	offset.resize(h.size())
+	offset.fill(0.0)
+	for k in range(h.size() - 1):
+		for pair in [[k, k + 1], [k + 1, k]]:
+			var i: int = pair[0]
+			var j: int = pair[1]
+			if inside[i] < 0 or inside[j] >= 0:
+				continue
+			var delta: float = float(beds[inside[i]]) - h[i]
+			for m in range(h.size()):
+				var away: float = (s[m] - s[j]) * (1.0 if j > i else -1.0)
+				if inside[m] >= 0 and away < 0.0:
+					offset[m] += delta
+				elif away >= 0.0 and away < VillageGroundSurface.JUNCTION_TAPER:
+					offset[m] += delta * (1.0 - away / VillageGroundSurface.JUNCTION_TAPER)
+	for k in range(h.size()):
+		h[k] += offset[k]
+	var ts: Array[Dictionary] = VillageGroundSurface.treads_of(s, h)
+	var go := INF
+	for k in range(1, ts.size() - 1):
+		if float(ts[k]["s0"]) > 0.0 and float(ts[k]["s1"]) < length:
+			go = minf(go, float(ts[k]["s1"]) - float(ts[k]["s0"]))
+	return go
+
+
+static func _dist_to_line(p: Vector2, line: PackedVector2Array) -> float:
+	var d := INF
+	for i in range(line.size() - 1):
+		d = minf(d, p.distance_to(Geometry2D.get_closest_point_to_segment(p, line[i], line[i + 1])))
+	return d
 
 
 ## The x of `line`'s vertex nearest `x`.

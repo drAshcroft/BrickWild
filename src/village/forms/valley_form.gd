@@ -77,6 +77,10 @@ const LANE_PITCH_M := 40.0
 const LANE_LENGTH_M := 36.0
 const LANE_CAP := 0.12
 const TRACK_CAP := 0.30
+## Past a track's grade a way up is a stair, leaning as a track does until it
+## climbs no more than this: 0.15 m risers on 0.30 m goings (VillageGroundCheck
+## wants 0.28), less the coarse grid's under-reading (VTER-VALLEY-GORGE)
+const STAIR_CAP := 0.45
 ## A way leans along the valley in steps, never so far that it meets the road
 ## at under the road check's junction angle (30 degrees) with a margin
 const WAY_LEAN_STEP_DEG := 5.0
@@ -744,7 +748,8 @@ static func _way(out: VillagePlan, through: PackedVector2Array, idx: int) -> Dic
 	var ground: VillageTerrain = out.ground
 	# [class, length (0: to the edge), grade cap, largest lean]
 	for plan_row in [[&"lane", LANE_LENGTH_M, LANE_CAP, WAY_LEAN_MAX_LANE_DEG],
-			[&"track", 0.0, TRACK_CAP - WAY_MARGIN, WAY_LEAN_MAX_DEG]]:
+			[&"track", 0.0, TRACK_CAP - WAY_MARGIN, WAY_LEAN_MAX_DEG],
+			[&"steps", 0.0, STAIR_CAP, WAY_LEAN_MAX_DEG]]:
 		var cls: StringName = plan_row[0]
 		var leans: Array[float] = [0.0]
 		var step := WAY_LEAN_STEP_DEG
@@ -770,11 +775,9 @@ static func _way(out: VillagePlan, through: PackedVector2Array, idx: int) -> Dic
 				g = VillageRoadRouter.grade_of(ground, stub)
 			if g <= float(plan_row[2]):
 				return {"points": stub, "class": cls}
-	# no cart or mule grade at any lean: a stair straight to the edge
-	var end2: Vector2 = VillageDispersedForm._ray_to_edge(start, square, site)
-	if start.distance_to(end2) < VillageSitePlanner.LANE_MIN_LENGTH:
-		return {}
-	return {"points": PackedVector2Array([start, end2]), "class": &"steps"}
+	# no cart, mule or stair grade at any lean: no way up here (a stair laid
+	# straight up a gorge's side climbed 83 % at Rocamadour, a 0.18 m going)
+	return {}
 
 
 ## How far a ray from `start` along `dir` runs inside the site, short of its
