@@ -95,6 +95,16 @@ var corner_piers: bool = false     # rounded mud-brick corners
 var floor_raise: float = 0.0
 var engawa: bool = false
 var engawa_depth: float = 1.2
+## HS-SAHEL (no draw; style row flags). `sahel`: buttresses, toron beams and the
+## decorated entry (HouseSahel). `unglazed`: a window is an open aperture, with
+## no glass. `court_ranges`: the walled court has a flat-roofed range along each
+## side (HouseYard).
+var sahel: bool = false
+var unglazed: bool = false
+var court_ranges: bool = false
+## Parts of the Sahel vocabulary to leave out ("buttress", "toron", "entry"):
+## only the focused test's negative controls set it.
+var sahel_skip: PackedStringArray = PackedStringArray()
 ## How far the roof oversails its walls. Negative means HouseGeometry's
 ## ordinary 0.35 m / 0.25 m, and the bound reads the resolved value from
 ## there, so a deep-eaved house cannot be looser than the eave it built.
@@ -302,24 +312,31 @@ const STYLES := {
 		"raised_floor": true, "engawa": 1.0, "engawa_depth": 0.8,
 	},
 	&"african": {
-		"label": "African Compound House",
-		# Thick ochre daub over a rubble core, combed reed over it, and a
-		# shaded veranda to sit out the heat under. No chimney: the smoke
-		# leaves by the roof, which is why the hearth is in the middle of the
-		# floor and not against a wall.
+		"label": "Sahel Courtyard House",
+		# HS-SAHEL. A banco (sun-dried mud brick) house of the Sahel, as at
+		# Djenne: flat-roofed rooms, a level roof behind a parapet, thick mud walls
+		# stiffened by buttresses (pilasters) and bristling with toron -- the
+		# palm-wood stakes that stay in the wall so the plasterers can climb it every
+		# year -- and an entry set between two pinnacled pilasters, with a relief
+		# frame round the door. The rooms stand round a walled court (HouseYard
+		# `court`) whose sides are flat-roofed ranges. There is no chimney (the
+		# hearth is in the court) and no glass: a window is an open aperture.
+		# Only numbers moved: the same draws are consumed (roof type, veranda and
+		# thatch chances are rolled and are now 1.0 / 0.0).
 		"timber": 0.0, "studs": [1.0, 1.4], "braces": 0.0, "rail": 0.0,
-		"roof_pitch": [1.0, 1.35], "porch": 0.0, "chimney": 0.0, "shutters": 0.15,
+		"roof_pitch": [0.0, 0.0], "porch": 0.0, "chimney": 0.0, "shutters": 0.15,
 		"wall": ["c08a55", "9b6b3e"], "trim": ["5a3a22", "3b2514"],
-		"roof": ["ac8a44", "806229"], "floor": ["9c7a52", "7a5f3e"],
+		"roof": ["b58a58", "92704a"], "floor": ["9c7a52", "7a5f3e"],
 		"clutter": [0.5, 0.9],
-		"plinth": [0.3, 0.6], "roof_types": [&"hipped", &"conical"],
+		"plinth": [0.3, 0.6], "roof_types": [&"flat"],
 		"framing": [&"square_panel"], "truss": [&"king_post"],
 		"jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
 		"chimney_style": &"straight", "pots": [1, 1],
-		"roof_material": &"thatch", "pitch_reference": 8.0,
-		"wall_t": 0.5, "culture": 1.0,
-		"parapet": 0.6, "veranda": 0.75, "eave_sweep": 0.0, "thatch_roll": 1.0,
-		"corner_piers": 1.0, "span_out": 0.7, "along_out": 0.6,
+		"roof_material": &"earth", "pitch_reference": 8.0,
+		"wall_t": 0.55, "culture": 1.0,
+		"parapet": 1.0, "veranda": 0.0, "eave_sweep": 0.0, "thatch_roll": 0.0,
+		"corner_piers": 1.0, "span_out": 0.55, "along_out": 0.55,
+		"sahel": true, "unglazed": true, "court_ranges": true,
 	},
 	&"thatch_cottage": {
 		"label": "Thatched Cottage",

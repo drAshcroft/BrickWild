@@ -11,7 +11,7 @@ extends RefCounted
 ## chimney_clearance (m over the ridge), chimney_above_ridge, door_sheltered (a porch roof, posts and step all stand
 ## over the entrance door), porch_roof_count.
 ## HS-LONGHALL keys are listed on `_longhall_keys`, HS-MEDITERRANEAN on `_med_keys`,
-## HS-THATCH on `_thatch_keys`, HS-MINKA on `_minka_keys`.
+## HS-THATCH on `_thatch_keys`, HS-MINKA on `_minka_keys`, HS-SAHEL on `_sahel_keys`.
 
 
 static func make_spec(style: StringName, width: float, length: float, height: float,
@@ -63,6 +63,7 @@ static func measure(spec: HouseSpec, p_seed: int, tweak := Callable(),
 	_med_keys(plan, builder, out)
 	_thatch_keys(plan, builder, out)
 	_minka_keys(plan, builder, out)
+	_sahel_keys(plan, builder, out)
 	return out
 
 
@@ -1110,3 +1111,269 @@ static func _minka_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary)
 			hi = maxf(hi, tt)
 		out["garden_beyond_deck"] = near_edge >= half_across + spec.engawa_depth - 0.01
 		out["garden_before_door"] = door_t >= lo and door_t <= hi
+
+
+## HS-SAHEL keys (the `african` style; every one false/zero for any other style):
+##   sahel                       the style is measured at all
+##   roof_flat / roof_earth      the roof faces lie level (<= 3 degrees), earth over banco
+##   banco_walls                 unrendered earthen walls, not framed, >= 0.45 m thick
+##   room_count                  rooms in the plan
+##   sahel_court_present / sahel_court_open / sahel_court_door / sahel_court_rear_wall /
+##   sahel_court_gate            the court behind the house (HouseYard `court`)
+##   court_range_sides / court_range_roofs / court_range_flat / court_range_open /
+##   court_sides                 the flat-roofed ranges down its sides; sides = house + ranges + wall
+##   buttress_count / buttress_walls / buttress_reach (m past the wall face, smallest) /
+##   buttress_height_frac (smallest, of the wall) / buttress_clear (none on an opening)
+##   toron_count / toron_walls / toron_reach / toron_wood / toron_clear / toron_inside
+##   glazing_count / window_count / open_windows
+##   entry_pinnacles / entry_flank (one each side of the door) / entry_above_parapet /
+##   entry_relief_count / entry_relief_frames_door
+static func _sahel_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary) -> void:
+	var spec := plan.spec
+	out["sahel"] = spec.sahel
+	var rows := {}
+	for row in builder.component_log:
+		var role := str(row.get("role", ""))
+		if not rows.has(role):
+			rows[role] = []
+		(rows[role] as Array).append(row)
+	var wall_top := spec.height * float(maxi(spec.storeys, 1))
+	out["roof_flat"] = spec.roof_type == &"flat" and float(out["roof_angle_deg"]) <= 3.0 \
+		and (rows.get("roof_face_0", []) as Array).size() > 0
+	out["roof_earth"] = spec.roof_material == &"earth"
+	var c := spec.wall_color
+	var earthen := c.h >= 0.04 and c.h <= 0.13 and c.s >= 0.25 and c.v <= 0.85
+	var thick := HouseGeometry.wall_thickness(spec)
+	out["banco_walls"] = earthen and not spec.timber_frame and not spec.stone_ground_floor \
+		and spec.material != &"stone" and thick >= 0.45
+	out["room_count"] = plan.room_count()
+	out["glazing_count"] = (rows.get("opening_glazing", []) as Array).size()
+	out["window_count"] = plan.windows.size()
+	out["open_windows"] = plan.windows.size() > 0 and (rows.get("opening_glazing", []) as Array).is_empty()
+	# openings, as intervals on their wall: [pos, normal, half width, bottom, top]
+	var openings: Array = []
+	for d in plan.doors:
+		if bool(d.get("exterior", false)):
+			openings.append([Vector2(d["pos"]), Vector2(d["normal"]), float(d["width"]) * 0.5, 0.0, HouseGeometry.DOOR_H])
+	for w in plan.windows:
+		openings.append([Vector2(w["pos"]), Vector2(w["normal"]), float(w["width"]) * 0.5, float(w["sill"]), float(w["head"])])
+	var runs := HouseGeometry.shell_runs(plan, 0)
+	# (2) buttresses
+	var walls := {}
+	var reach := INF
+	var frac := INF
+	var clear := true
+	var buttress_n := (rows.get("buttress", []) as Array).size()
+	for row in rows.get("buttress", []):
+		var on := _on_wall(MassBuilder.component_aabb(row), runs, thick)
+		if on.is_empty():
+			clear = false
+			continue
+		walls[on["run"]] = true
+		reach = minf(reach, float(on["reach"]))
+		if _hits_opening(on, runs, openings, 0.0, -INF, INF):
+			clear = false
+	for row in rows.get("buttress_top", []):
+		frac = minf(frac, MassBuilder.component_aabb(row).end.y / wall_top)
+	out["buttress_count"] = buttress_n
+	out["buttress_walls"] = walls.size()
+	out["buttress_reach"] = reach if buttress_n > 0 else 0.0
+	out["buttress_height_frac"] = frac if buttress_n > 0 else 0.0
+	out["buttress_clear"] = clear and buttress_n > 0
+	# (3) toron
+	var t_walls := {}
+	var t_reach := INF
+	var t_clear := true
+	var t_wood := true
+	var t_inside := true
+	var t_count := 0
+	for row in rows.get("toron", []):
+		var a := MassBuilder.component_aabb(row)
+		var on := _on_wall(a, runs, thick, 0.45)
+		if on.is_empty():
+			continue
+		t_count += 1
+		t_walls[on["run"]] = int(t_walls.get(on["run"], 0)) + 1
+		t_reach = minf(t_reach, float(on["reach"]))
+		if int(row["surface"]) != HouseBuilder.SURF_TRIM:
+			t_wood = false
+		if _hits_opening(on, runs, openings, 0.0, a.position.y, a.end.y):
+			t_clear = false
+		# the stake begins inside the wall, as a stake that stays in the mud does
+		if float(on["inner"]) > -0.1:
+			t_inside = false
+	var wall_count := 0
+	for k in t_walls:
+		if int(t_walls[k]) >= 3:
+			wall_count += 1
+	out["toron_count"] = t_count
+	out["toron_walls"] = wall_count
+	out["toron_reach"] = t_reach if t_count > 0 else 0.0
+	out["toron_wood"] = t_count > 0 and t_wood
+	out["toron_clear"] = t_count > 0 and t_clear
+	out["toron_inside"] = t_count > 0 and t_inside
+	# (4) the decorated entry
+	var e := plan.entrance()
+	var tips: Array = rows.get("entry_pinnacle_tip", [])
+	out["entry_pinnacles"] = tips.size()
+	out["entry_flank"] = false
+	out["entry_above_parapet"] = false
+	out["entry_relief_count"] = (rows.get("entry_relief", []) as Array).size()
+	out["entry_relief_frames_door"] = false
+	if e >= 0:
+		var d: Dictionary = plan.doors[e]
+		var n := Vector2(d["normal"]).normalized()
+		var tang := Vector2(n.y, -n.x)
+		var dp := Vector2(d["pos"])
+		var half_door := float(d["width"]) * 0.5
+		var sides := {}
+		var parapet_top := wall_top + HouseGeometry.PARAPET_BASE + HouseGeometry.PARAPET_H
+		var tip_top := -INF
+		for row in tips:
+			var a := MassBuilder.component_aabb(row)
+			var ctr := Vector2(a.get_center().x, a.get_center().z)
+			var lat := (ctr - dp).dot(tang)
+			if absf((ctr - dp).dot(n)) < 1.2 and absf(lat) > half_door:
+				sides[signf(lat)] = true
+			tip_top = maxf(tip_top, a.end.y)
+		out["entry_flank"] = sides.size() == 2
+		out["entry_above_parapet"] = tip_top > parapet_top + 0.2
+		# the frame: a raised strip beside each jamb, and a header above the door
+		var jambs := {}
+		var header := false
+		for row in rows.get("entry_relief", []):
+			var a := MassBuilder.component_aabb(row)
+			var ctr := Vector2(a.get_center().x, a.get_center().z)
+			var lat := (ctr - dp).dot(tang)
+			if a.size.y > HouseGeometry.DOOR_H * 0.9 and absf(absf(lat) - half_door) < 0.4:
+				jambs[signf(lat)] = true
+			if a.position.y > HouseGeometry.DOOR_H * 0.9 and a.size.y < 0.4 and absf(lat) < half_door + 0.3:
+				header = true
+		out["entry_relief_frames_door"] = jambs.size() == 2 and header
+	# (1) the rooms round the court
+	out["court_range_roofs"] = 0
+	out["court_range_sides"] = 0
+	out["court_range_flat"] = false
+	out["court_range_open"] = false
+	out["court_sides"] = 0
+	out["sahel_court_present"] = false
+	out["sahel_court_door"] = false
+	out["sahel_court_gate"] = 0.0
+	out["sahel_court_rear_wall"] = false
+	out["sahel_court_open"] = false
+	if e < 0:
+		return
+	var n2 := Vector2(plan.doors[e]["normal"]).normalized()
+	var depth_x := absf(n2.x) > absf(n2.y)
+	for piece in plan.yard_pieces:
+		if str(piece["kind"]) != "court":
+			continue
+		out["sahel_court_present"] = true
+		var pr: Rect2 = piece["rect"]
+		var mid := pr.get_center().y if depth_x else pr.get_center().x
+		var half_w := (pr.size.y if depth_x else pr.size.x) * 0.5
+		var sides := {}
+		var roofs := 0
+		var flat := true
+		var open := true
+		var run := 0.0
+		var wall_len := {-1.0: 0.0, 1.0: 0.0}
+		var rear := false
+		var sky := true
+		for part in piece["parts"]:
+			var role := str(part["role"])
+			var sz: Vector3 = part["size"]
+			var ctr: Vector3 = part["centre"]
+			var lat := (ctr.z if depth_x else ctr.x) - mid
+			var dd := sz.x if depth_x else sz.z
+			var dl := sz.z if depth_x else sz.x
+			if role == "court_paving":
+				run = dd
+			elif role == "court_range_roof":
+				roofs += 1
+				sides[signf(lat)] = true
+				if sz.y > 0.3 or ctr.y < 2.0:
+					flat = false
+			elif role == "court_range_wall":
+				wall_len[signf(lat)] += dd
+			elif role == "court_wall" and dl > half_w * 1.6:
+				rear = true
+			if role in ["court_wall", "court_range_wall"] and absf(lat) < half_w - 1.9 and dl < dd:
+				open = false      # a wall standing in the open middle of the court
+			if str(part["surf"]) == "roof":
+				sky = false
+		out["court_range_roofs"] = roofs
+		out["court_range_sides"] = sides.size()
+		out["court_range_flat"] = roofs >= 2 and flat
+		out["court_range_open"] = open
+		out["sahel_court_rear_wall"] = rear
+		out["sahel_court_open"] = sky and run > 0.0
+		out["sahel_court_gate"] = maxf(run - wall_len[-1.0], run - wall_len[1.0])
+		# the house is the fourth side only if a room opens onto the court
+		var house_side := 0
+		for i in range(plan.doors.size()):
+			var dr: Dictionary = plan.doors[i]
+			if i == e or not dr.get("exterior", false) or bool(dr.get("secret", false)):
+				continue
+			var dn := Vector2(dr["normal"]).normalized()
+			if dn.dot(n2) < -0.5 and pr.grow(0.1).has_point(Vector2(dr["pos"]) + dn * 0.8):
+				out["sahel_court_door"] = true
+				house_side = 1
+		out["court_sides"] = house_side + sides.size() + (1 if rear else 0)
+
+
+## Where a box stands on the shell: {"run", "reach" (m its far face stands past
+## the wall's outer face), "inner" (its near face past the outer face; negative
+## is inside the wall), "t0", "t1" (along the run)}, or {} when it is on none.
+## `slack` is how far inside the wall line the box's centre may be.
+static func _on_wall(a: AABB, runs: Array, thick: float, slack := 0.0) -> Dictionary:
+	var best := {}
+	var best_gap := INF
+	for ri in range(runs.size()):
+		var run: Dictionary = runs[ri]
+		var from: Vector2 = run["from"]
+		var to: Vector2 = run["to"]
+		var dir: Vector2 = (to - from).normalized()
+		var nrm: Vector2 = run["normal"]
+		var face := thick * 0.5
+		var lo := INF
+		var hi := -INF
+		var t0 := INF
+		var t1 := -INF
+		for sx in [0.0, 1.0]:
+			for sz in [0.0, 1.0]:
+				var p := Vector2(a.position.x + a.size.x * sx, a.position.z + a.size.z * sz) - from
+				lo = minf(lo, p.dot(nrm))
+				hi = maxf(hi, p.dot(nrm))
+				t0 = minf(t0, p.dot(dir))
+				t1 = maxf(t1, p.dot(dir))
+		var centre := (lo + hi) * 0.5
+		if centre < -slack or centre > face + 1.0 or t1 < 0.0 or t0 > from.distance_to(to):
+			continue
+		var gap := absf(lo - face)
+		if gap < best_gap:
+			best_gap = gap
+			best = {"run": ri, "reach": hi - face, "inner": lo - face, "t0": t0, "t1": t1}
+	return best
+
+
+## Does a box on a wall (from `_on_wall`) stand across an opening in that wall?
+## `y0`/`y1` limit the test to the opening's height range when given.
+static func _hits_opening(on: Dictionary, runs: Array, openings: Array, margin: float,
+		y0: float, y1: float) -> bool:
+	var run: Dictionary = runs[int(on["run"])]
+	var from: Vector2 = run["from"]
+	var dir: Vector2 = (Vector2(run["to"]) - from).normalized()
+	for op in openings:
+		if absf(Vector2(op[1]).dot(Vector2(run["normal"]))) < 0.9:
+			continue
+		var rel: Vector2 = Vector2(op[0]) - from
+		if absf(rel.dot(Vector2(run["normal"]))) > 0.8:
+			continue
+		var t := rel.dot(dir)
+		if float(on["t1"]) + margin < t - float(op[2]) or float(on["t0"]) - margin > t + float(op[2]):
+			continue
+		if y1 < INF and (y1 < float(op[3]) or y0 > float(op[4])):
+			continue
+		return true
+	return false

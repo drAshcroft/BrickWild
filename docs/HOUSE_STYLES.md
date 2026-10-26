@@ -614,3 +614,83 @@ Observed (not traits):
 * Front renders: a red bench, barrel, bowl and a bundle of crates sit loose beside the end steps (21325 shows a barrel and a bowl standing on bare grass).
 * The dry garden is a flat rectangle with a thin wood border and a little raking; rocks sit on top of it. It reads as a sandbox, not a garden, but the intent is clear.
 
+
+
+## african -- the Sahel courtyard house (HS-SAHEL)
+
+The style key stays `african` (no API break); its label is now `Sahel Courtyard House`
+and its brief row in `docs/BUILDING_PERSONALITY_BRIEFS.md` says so. It is a fictional
+household in the manner of Djenne and the Mopti region, not a claim about one people.
+
+Traits: (1) flat-roofed banco (mud-brick) rooms arranged round an inner court; (2)
+buttressed walls; (3) projecting toron beams on the outer walls; (4) a decorated entry.
+
+Measured first (8 x 10 m, one storey, seeds 1, 8102, 21325): (1) MISSING. A hip
+(seed 1) or a cone (8102, 21325) of combed thatch with a roll along the eave, on walls
+0.5 m thick with rounded corner piers (kept); parapet on seed 1 only; the yard was a
+path, a midden and crates; no court. The shaded veranda (0.75 chance) was on 21325. (2)
+MISSING. Only the four corner piers. (3) MISSING. (4) MISSING. Glazed, mullioned windows
+and a dripstone hood on a third of the seeds (a European window set into a mud wall).
+
+Built (style row constants and flags, no random draw added or moved):
+* Flat banco roof: `roof_types [flat]`, `roof_material earth`, pitch 0, parapet 1.0
+  (and the generator makes it invariant for a `sahel` row), thatch roll 0, veranda 0,
+  eave 0.55 m. Walls 0.55 m thick, the corner piers stay.
+* Court: the `african` yard now leads with `court` (HouseYard, the group HS-MEDITERRANEAN
+  built) instead of the midden; the rear door is invariant (`back_door`) so the rooms
+  open onto it. `court_ranges` makes the court's two sides flat-roofed ranges
+  (`HouseYard._court_ranges`): a 2.3 m outer wall, a 0.22 m roof slab 1.7 m wide with a
+  parapet round its outer edge and end, and a stout pier at its free corner; the court side
+  is open (a shaded bay). The rear wall is whole; the gateway is in the outer wall of one
+  range, at its rear end, where the walk along the flank reaches it. The house is the
+  fourth side. The ranges are open bays, NOT furnished rooms: nothing is planned inside them.
+* Buttresses, toron, entry: `HouseSahel` (new, `src/house/house_sahel.gd`), called from
+  `HouseBuilder._build_culture`. Buttresses: a 0.55 m foot (0.42 m off the wall, 62 % of the
+  height) and a narrower shaft up to the parapet's inside, spaced about 2.6 m on a wall,
+  never within 0.3 m of a door or window, not on the entry's flanks, and not on the
+  part of the court wall that the ranges stand against. Toron: 0.09 m square wood stakes
+  0.4 m past the wall (0.2 m inside it) every 0.55 m in a row 0.32 m under the roof edge,
+  on all four walls, clear of every opening and of the entry, lengthened to 0.67 m where one
+  passes through a buttress. Entry: two pilasters (0.62 m wide, a hand past the eave) with two
+  steps in the shaft, a cap and a tip, rising 0.9 m above the parapet, three toron through each, and a raised relief
+  frame (a strip beside each jamb, a header, three blocks above it).
+* Windows are open apertures (`unglazed`: no pane, mullion or hood; the frame, sill and the
+  row's shutter chance stay). The exterior dressing of a `sahel` house is water jars (`Pot_1`)
+  and a bucket: no wall lantern, bench or barrel.
+* Exterior bound: `HouseGeometry.exterior_bounds` and `spec_bounds` know the pilasters'
+  reach and the pinnacle's height (`HouseSahel.reach`, `top_height`).
+
+Test: `tests/house_sahel_traits_test.gd` over the frozen requests `house/african/{1,8102,21325}`
+(8102 existed; 1 and 21325 added, all 8 x 10 m). Keys in `HouseTraitMeasure._sahel_keys`
+(see its header). 127 checks, 0 failures. Controls: a gable roof, a timber-framed wall, a
+0.2 m wall, the court removed, the ranges removed, a deep range slab, a roofed court, the rear
+door removed, glazing put back, then buttresses, toron and the entry each removed alone
+(`HouseSpec.sahel_skip`, set only by the test) with the other two required to survive, and a
+mediterranean house (the measure reads none of this onto another style).
+
+Lanes run on the change: `lane:geom` (11 suites, 9810 checks), `lane:house-exterior-fast` + `hbounds` (4 suites, 7095),
+`lane:house-plan-fast` (322), `lane:house-furnish-fast` (242), `hvernacular` (191; only the 4 known witch_hut lines red, HVERN-WITCH-THATCH), `cultureapi` (20), `vcompact` (12).
+`tools/fingerprint_houses.gd` (130 lines, the five long-standing styles) is identical against HEAD.
+
+Known sides and open:
+* The INTERIOR FURNITURE is not narrowed. The furnisher has no style vocabulary: a furnished
+  `african` house still gets a trestle table and chairs, wall torches, a chandelier, goblets, mugs and
+  a workbench (European stock), and the floor is planks over a stone skirting, not packed earth. The
+  review renders are therefore of the UNFURNISHED house (`generate(.., false)`): the rooms are
+  bare. A Sahel interior needs props the catalogue does not have (mats, low stools, clay pots, a
+  grain jar) and a furnisher row; it is not part of these four traits.
+* The walls are one colour; no plaster relief or hand marks. The toron are square, not round.
+* On a wall with a door and two windows (seed 1's front and back) no buttress fits between the
+  openings, so seed 1 has buttresses on its two long walls only; the entry's pilasters stand on the front.
+* The ranges are open bays: they have no door, no floor of their own and no room inside.
+* A `saharan` village (`programmer.gd`) now gets this house; its court needs the lot to leave
+  the apron (3 m) behind the house, as before for the mediterranean.
+
+Renders for review: `artifacts/hs_sahel/renders/` (`tools/render_hs_sahel.gd`, not headless),
+per seed: `_front` roof-on three-quarter of the entry side (flat roof and parapet, buttresses, toron,
+the pinnacled entry); `_rear` roof-on three-quarter from behind and above (the court, its two ranges,
+the gateway); `_entry` eye level three metres from the door (pinnacles, relief frame, toron);
+`_court` eye level inside the court looking back at the house; `_interior` eye level inside, looking
+through the rear door onto the court.
+
+Reviewer: pending

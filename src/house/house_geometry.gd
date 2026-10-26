@@ -1716,6 +1716,10 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		# stands on, so it is planned exterior and not leakage.
 		neg = neg.max(Vector2.ONE * CORNICE_OUT)
 		pos = pos.max(Vector2.ONE * CORNICE_OUT)
+	if HouseSahel.applies(spec):
+		# HS-SAHEL: the entry's pilasters stand a hand past the eave
+		neg = neg.max(Vector2.ONE * HouseSahel.reach(spec))
+		pos = pos.max(Vector2.ONE * HouseSahel.reach(spec))
 	var r: Rect2 = site_rect(spec, maxi(spec.storeys - 1, 0)).grow_individual(neg.x, neg.y, pos.x, pos.y)
 	r = r.merge(site_rect(spec).grow_individual(0, jetty_front_reach(spec), 0, 0))
 	for extra in [chimney_rect(plan), porch_rect(plan), veranda_rect(plan),
@@ -1730,6 +1734,8 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		for piece in plan.yard_pieces:
 			r = r.merge(piece["rect"])
 	var top: float = total_height(spec, plan.world_family)
+	if HouseSahel.applies(spec):
+		top = maxf(top, HouseSahel.top_height(spec))
 	# A landmark declares the storybook elevation it stands in front of its
 	# walls (balconies, entrance canopy, cornices, cupolas), so those parts
 	# are planned exterior rather than leakage.
@@ -1776,6 +1782,8 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 		over = over.max(Vector2.ONE * QUOIN_OUT)
 	if spec.cornice:
 		over = over.max(Vector2.ONE * CORNICE_OUT)
+	if HouseSahel.applies(spec):
+		over = over.max(Vector2.ONE * HouseSahel.reach(spec))
 	# The front is known, but a spec alone cannot say which wall is the front
 	# once the entrance moves, so the jetty reach is applied all round.
 	var all_round: float = maxf(maxf(over.x, over.y), jetty_front_reach(spec))
@@ -1798,6 +1806,8 @@ static func spec_bounds(spec: HouseSpec) -> AABB:
 		pad += HouseYard.apron(spec)
 	r = r.grow(pad)
 	var top: float = maxf(total_height(spec), total_height(spec, &"__unknown_world_scope__"))
+	if HouseSahel.applies(spec):
+		top = maxf(top, HouseSahel.top_height(spec))
 	var raise := floor_raise(spec)
 	return AABB(Vector3(r.position.x, -raise, r.position.y),
 		Vector3(r.size.x, top + raise, r.size.y))

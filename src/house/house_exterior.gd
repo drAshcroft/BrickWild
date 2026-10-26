@@ -49,6 +49,11 @@ static func dress(plan: HousePlan) -> void:
 			["Bench", 0.8, 0, "entrance_seat"],
 			["Pot_1", 1.2, service, "storage"], ["Barrel", 1.0, service, "storage"],
 			["Bucket_Wooden_1", 1.0, service, "water"]]
+		if s.sahel and not trade_recipe:
+			# HS-SAHEL: no wall lantern, bench or barrel (a European household's
+			# kit); the water jars, a bucket and the pot of the store stand by the wall.
+			recipe = [["Pot_1", 1.5, service, "water"], ["Pot_1", 1.1, service, "storage"],
+				["Bucket_Wooden_1", 1.0, service, "water"]]
 	for item in recipe:
 		var key: String = item[0]
 		var scale: float = item[1]

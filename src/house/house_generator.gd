@@ -143,6 +143,12 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 		# skyline. The style table sets both as invariants rather than chances.
 		if spec.style == &"pueblo":
 			spec.parapet = true
+		# HS-SAHEL: style flags, no draw
+		spec.sahel = bool(s.get("sahel", false))
+		spec.unglazed = bool(s.get("unglazed", false))
+		spec.court_ranges = bool(s.get("court_ranges", false))
+		if spec.sahel:
+			spec.parapet = true
 
 	var inner: Rect2 = HouseGeometry.interior_rect(spec)
 	var area: float = inner.size.x * inner.size.y
@@ -153,10 +159,10 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	# a back door is only worth having when there is a room at the back to put
 	# it in, and something to go out to
 	spec.back_door = spec.room_count >= 3 and GeneratorRandom.chance(r, 0.55)
-	if spec.style == &"farmhouse" or spec.style == &"mediterranean":
+	if spec.style == &"farmhouse" or spec.style == &"mediterranean" or spec.style == &"african":
 		# HS-FARMHOUSE: the farm's kitchen door onto the yard is a style
 		# invariant (the draw above is still consumed, so no later roll moves).
-		# HS-MEDITERRANEAN: the same door opens on the walled court.
+		# HS-MEDITERRANEAN, HS-SAHEL: the same door opens on the walled court.
 		spec.back_door = spec.room_count >= 3
 
 	spec.wall_color = Color(s["wall"][0]).lerp(Color(s["wall"][1]), r.randf())

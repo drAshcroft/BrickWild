@@ -1581,10 +1581,12 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 			# Inset dark lattice glazing panel
 			var pane_xf := Transform3D(Basis(Vector3.UP, yaw),
 				Vector3(mid.x, y_offset + (bottom + top) / 2.0, mid.y))
-			_glazing_box("opening_glazing", Vector3(w, top - bottom, 0.04), pane_xf)
+			# HS-SAHEL: an unglazed style leaves the aperture open
+			if not spec.unglazed:
+				_glazing_box("opening_glazing", Vector3(w, top - bottom, 0.04), pane_xf)
 
 			# Vertical timber mullions for wide windows (2-light / 3-light)
-			if spec.window_mullions and w >= 0.8:
+			if spec.window_mullions and w >= 0.8 and not spec.unglazed:
 				if w >= 1.35:
 					for mside in [-1.0, 1.0]:
 						var mp: Vector2 = from + dir * (t + mside * (w / 3.0))
@@ -1597,7 +1599,7 @@ func _opening_trim(from: Vector2, dir: Vector2, yaw: float, t: float, w: float,
 					component_box("opening_mullion", Vector3(HouseGeometry.MULLION_W, top - bottom, thick + 0.06), mxf, SURF_TRIM)
 
 			# Dripstone hood moulding over window head
-			if spec.window_hoods:
+			if spec.window_hoods and not spec.unglazed:
 				# A dripstone projects OUTSIDE. A symmetric box also put a
 				# second hood indoors, through the shoulder space of wall stairs.
 				# Recess the inside face into the wall to avoid a coplanar skin;
@@ -2483,6 +2485,7 @@ func _build_culture() -> void:
 	_build_corner_piers()
 	_build_veranda()
 	HouseMinka.emit(self)
+	HouseSahel.emit(self)
 
 
 ## Rounded mud corners: a regular octagon standing on each corner of each

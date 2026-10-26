@@ -67,7 +67,7 @@ const STYLE_GROUPS := {
 	# HS-MINKA: the garden is the engawa's: a dry garden of raked gravel, rocks
 	# and a tree, laid out in front of the veranda the main room opens onto.
 	&"asian": [&"engawa_garden", &"crates", &"rain_barrel"],
-	&"african": [&"midden", &"crates", &"cart"],
+	&"african": [&"court", &"crates", &"cart"],
 	# HS-THATCH: the front is a flower garden (two beds flanking the path to the
 	# door) and the kitchen garden goes behind; no washing line, woodpile or pail
 	# is allowed to stand at the front of a thatched cottage.
@@ -1146,6 +1146,8 @@ static func _court_parts(ctx: Dictionary) -> Dictionary:
 	parts.append(_part(cell, "court_wall", 0.0, depth - wt * 0.5, 2.0 * w + 2.0 * wt, wt,
 		0.0, COURT_WALL_H, "wall"))
 	var run := depth - wt
+	if p_ranges(ctx):
+		return _court_ranges(cell, depth, w, parts, float(ctx["side_pref"]))
 	var gate_side: float = ctx["side_pref"]
 	for sgn in [-1.0, 1.0]:
 		var t: float = float(sgn) * (w + wt * 0.5)
@@ -1156,6 +1158,56 @@ static func _court_parts(ctx: Dictionary) -> Dictionary:
 		var g0: float = run - COURT_GATE - 0.3
 		parts.append(_part(cell, "court_wall", t, g0 * 0.5, wt, g0, 0.0, COURT_WALL_H, "wall"))
 		parts.append(_part(cell, "court_wall", t, run - 0.15, wt, 0.3, 0.0, COURT_WALL_H, "wall"))
+	parts.append(_part(cell, "court_paving", 0.0, (depth - wt) * 0.5,
+		2.0 * w, depth - wt, 0.0, COURT_PAVE_H, "floor"))
+	return {"pieces": [_piece("court", "court", parts, "rear")], "props": []}
+
+
+## HS-SAHEL: the rooms round the court. The court's two sides are flat-roofed
+## ranges of banco, `RANGE_DEPTH` deep and as long as the court, each a tall
+## outer wall, a roof slab with a parapet along its outer edge and its end, and
+## a stout pier at its free corner; the side that faces the court is open (a
+## shaded bay), so the house's rear door never opens onto a wall. The rear wall
+## is the court's fourth side; the gateway is in one range's outer wall.
+const RANGE_DEPTH := 1.7
+const RANGE_WALL_H := 2.3
+const RANGE_SLAB_T := 0.22
+const RANGE_PARAPET_H := 0.3
+const RANGE_PARAPET_T := 0.2
+const RANGE_PIER := 0.3
+
+
+static func p_ranges(ctx: Dictionary) -> bool:
+	var p: HousePlan = ctx["plan"]
+	return p.spec.court_ranges
+
+
+static func _court_ranges(cell: Dictionary, depth: float, w: float, parts: Array,
+		gate_side: float) -> Dictionary:
+	var wt := COURT_WALL_T
+	var run := depth - wt
+	# the rear wall is the first part, whole; the ranges take the two sides
+	for sgn in [-1.0, 1.0]:
+		var s := float(sgn)
+		var t_out := s * (w + wt * 0.5)
+		if s != gate_side:
+			parts.append(_part(cell, "court_range_wall", t_out, run * 0.5, wt, run, 0.0, RANGE_WALL_H, "wall"))
+		else:
+			# the gateway is in this range's outer wall, at its rear end, where the
+			# walk along the house's flank reaches it; a lintel of banco closes it
+			var g0: float = run - COURT_GATE - 0.3
+			parts.append(_part(cell, "court_range_wall", t_out, g0 * 0.5, wt, g0, 0.0, RANGE_WALL_H, "wall"))
+			parts.append(_part(cell, "court_range_wall", t_out, run - 0.15, wt, 0.3, 0.0, RANGE_WALL_H, "wall"))
+		var t_slab := s * (w + wt - (RANGE_DEPTH + wt) * 0.5)
+		parts.append(_part(cell, "court_range_roof", t_slab, run * 0.5, RANGE_DEPTH + wt, run,
+			RANGE_WALL_H, RANGE_SLAB_T, "wall"))
+		var y_p := RANGE_WALL_H + RANGE_SLAB_T
+		parts.append(_part(cell, "court_range_parapet", s * (w + wt - RANGE_PARAPET_T * 0.5), run * 0.5,
+			RANGE_PARAPET_T, run, y_p, RANGE_PARAPET_H, "wall"))
+		parts.append(_part(cell, "court_range_parapet", t_slab, run - RANGE_PARAPET_T * 0.5,
+			RANGE_DEPTH + wt, RANGE_PARAPET_T, y_p, RANGE_PARAPET_H, "wall"))
+		parts.append(_part(cell, "court_range_pier", s * (w - RANGE_DEPTH + RANGE_PIER * 0.5),
+			run - RANGE_PIER * 0.5, RANGE_PIER, RANGE_PIER, 0.0, RANGE_WALL_H, "wall"))
 	parts.append(_part(cell, "court_paving", 0.0, (depth - wt) * 0.5,
 		2.0 * w, depth - wt, 0.0, COURT_PAVE_H, "floor"))
 	return {"pieces": [_piece("court", "court", parts, "rear")], "props": []}
