@@ -961,4 +961,32 @@ the first terrace (the next storey's door, the ladder to the roof above); `_roof
 the head of the last ladder; `_interior` eye level inside the first upper room, looking at its door
 onto the terrace.
 
-Reviewer: pending
+Independent reviewer: fresh agent, from the renders of commit 9a5f905 (all 18 images opened). Judged only from `artifacts/hs_pueblo/renders/pueblo_<seed>_{front,side,ladder,terrace,roof,interior}.jpg`. The interiors are UNFURNISHED on purpose (CULTURE-FURNISH-VOCAB), so they are not marked down for bare rooms.
+
+| seed | (1) stepped terraces, each set back | (2) ladder up to walkable roofs | (3) projecting vigas | (4) small deep openings, parapeted flat roofs |
+|---|---|---|---|---|
+| 1 | YES | YES | YES | YES (borderline) |
+| 8102 | YES | YES | YES | YES (borderline) |
+| 21325 | YES | YES | YES | YES (borderline) |
+
+Reasons:
+* (1) every seed: three storeys, each set back from the one below. The front and side views show the front stepped back at each level, and the drawn-in side as well, so the mass is a stair of blocks with an open terrace in front of each upper room.
+* (2) every seed: a separate ladder rises to each of the three roof levels, and each ladder head stands in a gap in the parapet. The terrace view shows a broad flat deck you could stand on, with a low parapet and the next storey's door. The roof view shows the top deck with the ladder head in a parapet gap. In the ground-level view the lowest ladder crosses in front of the second storey's window, and its head is not legible from the ground (borderline, not a miss).
+* (3) every seed: rows of dark square-ended beam ends stand out of every wall below the parapet line, on the front, the long side and the ladder-side walls. Seen close, they are clearly projecting boxes.
+* (4) every seed: the windows are small and square with a timber frame, and the door is narrow. Parapets are on every terrace and on the top roof. "Deep" is borderline: the reveal reads as a thick wall in the interior views (a deep sill, a doorway through a thick wall), but from outside the frames look flush-ish and the wall thickness is only modest at the door.
+
+Images: `artifacts/hs_pueblo/renders/pueblo_1_front.jpg`, `_side`, `_ladder`, `_terrace`, `_roof`, `_interior`; the same six for `8102` and `21325`.
+
+Open:
+* All seeds: trait 4's "deep" is not obvious from outside; it holds from the interior and the door reveal only (borderline).
+* All seeds: the lowest ladder's head cannot be seen from the ground view, and it crosses the second storey's window in that view (trait 2 borderline on that view only; the front view shows it reaching the terrace).
+* The three seeds are near-identical from the front and side (the known side above): they differ only in window placement on the ground floor (21325 has two windows on the long wall, the others none), jar placement, and colour shade.
+
+Observed (not traits):
+* Vigas are square-ended boxes, not round logs, and are oversized in the close view (the nearest one is a fist-thick block); there are no canales (water spouts).
+* Interior (all seeds): a large dark recess in the left wall, framed like a deep window with a wide sill, is odd in scale next to the door; the plank floor over a stone skirting and the timber frames round the doors and windows are generic, not adobe. The bare room is expected (unfurnished).
+* Ladders are plain two-rail timber with no lashing and reach well above the parapet; the head gap in each parapet is a plain notch.
+* The stone plinth is a thin band that does not step with the terraces; the doorstep path is a few loose slabs.
+* Two blue-grey water jars beside the house (seed 1, 8102 and 21325 front/side) are at ground level and read fine; one sits half under the plinth edge in the side view.
+* Ground: flat green grass, no yard, no plaza, no kiva, no horno.
+* No floating objects, z-fighting or clipping were seen in any view; no camera was blocked.
