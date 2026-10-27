@@ -1771,7 +1771,9 @@ func _walk_door_gaps(inner: Vector3, outward: Vector3, run_axis: Vector3, run: f
 			continue
 		var origin: Vector3 = row.transform.origin
 		for door in plan.doors:
-			if not bool(door.get("exterior", false)):
+			# the foot door opens on the ward, not the wall walk
+			if not bool(door.get("exterior", false)) \
+					or String(door.get("route", "")) == "courtyard":
 				continue
 			var room := int(door.get("a", 0))
 			if room < 0 or room >= plan.rooms.size():

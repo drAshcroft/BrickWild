@@ -420,6 +420,20 @@ class CastleFamily extends BuildingFamilyAdapter:
 		if porch.size.x > 0.0:
 			return Vector3(porch.get_center().x,
 				minf(porch.size.y - 0.2, HouseGeometry.DOOR_H) * 0.5, porch.position.z)
+		if CastleGeometry.is_tower_house(castle):
+			# A tower house has no gatehouse: its door is the raised doorway of
+			# the shaft, on the outer face of its front wall (CASTLE-WALK-ACCESS:
+			# placement returned the origin, so nobody could spawn at the door).
+			var shaft: HousePlan = CastleTowerPlan.generate(castle, false)
+			if shaft.spec != null and shaft.entrance() >= 0:
+				var entry: Dictionary = shaft.doors[shaft.entrance()]
+				var centre := CastleGeometry.tower_house_aabb(castle).get_center()
+				var wall := float(shaft.rooms[int(entry.a)].get("wall_thickness",
+					HouseGeometry.wall_thickness(shaft.spec)))
+				var out_xz := Vector2(centre.x, centre.z) + Vector2(entry.pos) \
+					+ Vector2(entry.normal) * wall
+				return Vector3(out_xz.x, CastleGeometry.tower_door_sill(castle)
+					+ CastleGeometry.tower_door_height(castle) * 0.5, out_xz.y)
 		var g: AABB = CastleGeometry.gatehouse_aabb(castle, 0)
 		return Vector3(0.0, g.size.y / 2.0, g.position.z)
 

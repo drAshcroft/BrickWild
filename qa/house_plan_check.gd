@@ -290,6 +290,18 @@ func _check_entrance(plan: HousePlan) -> void:
 			if d["b"] != -1 or bool(d.get("front", false)):
 				failures.append("way in: a terrace door is not the front door and leads outdoors")
 			continue
+		if bool(d.get("foot_exit", false)):
+			# CASTLE-WALK-ACCESS: a tower entered up on the wall walk also opens on
+			# the ward at its foot, so the storeys below the doorway have a way out.
+			# Not the front door, on storey 0, on the room outline.
+			exteriors += 1
+			if HousePlan.record_storey(d) != 0 or d.get("front", false) or d["b"] != -1:
+				failures.append("way in: a foot door is on storey %d, is the front door, or leads to room %d" % [HousePlan.record_storey(d), d["b"]])
+			var foot_room := int(d.get("a", -1))
+			if foot_room < 0 or foot_room >= plan.room_count() or not plan.is_polygonal(foot_room) \
+					or not _on_outline(plan.outline_of(foot_room), d["pos"]):
+				failures.append("way in: foot door at %v is not on an exterior wall" % Vector2(d["pos"]))
+			continue
 		var entry_level: int = 0
 		if plan.spec is KeepSpec or plan.spec is CastleTowerPlan.TowerSpec:
 			entry_level = plan.spec.entry_storey
@@ -860,7 +872,9 @@ func _check_stair_line(plan: HousePlan) -> void:
 		if rect.size.x <= 0.0:
 			continue
 		var gap := stair_wall_gap(plan, stair)
-		if gap > STAIR_WALL_TOL:
+		# a castle shaft too small for a flight and its landings against a wall
+		# says so (CASTLE-WALK-ACCESS): standing free beats walking into the wall
+		if gap > STAIR_WALL_TOL and not bool(stair.get("free_standing", false)):
 			failures.append("stair_line: stair %d stands %.2fm off every wall of room %d (%s)"
 				% [si, gap, room, String(plan.kind_of(room))])
 		if front < 0 or int(plan.doors[front]["a"]) != room:

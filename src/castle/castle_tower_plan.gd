@@ -240,13 +240,15 @@ static func _add_stairs(plan: HousePlan, levels: int) -> void:
 			minf(upper_box.size.x, upper_box.size.y))
 		var run := minf(STAIR_RUN, maxf(0.8, min_side * 0.35))
 		var width := minf(STAIR_WIDTH, maxf(0.55, min_side * 0.22))
-		var best := Rect2()
-		var best_score := -INF
 		var entry := plan.doors[plan.entrance()]
 		var door_line := HousePlanLevels.door_line(plan, int(entry["storey"]), entry)
 		var walls := HouseGeometry.room_walls(plan, level)
 		walls.append_array(HouseGeometry.room_walls(plan, level + 1))
-		for size in [Vector2(run, width), Vector2(width, run)]:
+		var wells: Array[Rect2] = HousePlanLevels.arriving_wells(plan, level)
+		var arrivals := CastleKeepPlan.arrival_floors(plan, level)
+		var sizes: Array[Vector2] = [Vector2(run, width), Vector2(width, run)]
+		var along_walls: Array[Rect2] = []
+		for size in sizes:
 			for wall in walls:
 				var normal: Vector2 = wall["normal"]
 				var support: float = (absf(normal.x) * size.x + absf(normal.y) * size.y) * 0.5
@@ -256,31 +258,67 @@ static func _add_stairs(plan: HousePlan, levels: int) -> void:
 				var samples := maxi(int(length / 0.12), 1)
 				for step in range(samples + 1):
 					var centre: Vector2 = from.lerp(to, float(step) / float(samples)) + normal * support
-					var candidate := Rect2(centre - size * 0.5, size)
-					if not _inside(lower, candidate) or not _inside(upper, candidate):
-						continue
-					if level == int(entry["storey"]) and _overlap(candidate, door_line):
-						continue
-					var score: float = centre.distance_to(Vector2(entry["pos"]))
-					for prior in plan.stairs:
-						if int(prior["b"]) == level or int(prior["a"]) == level + 1:
-							if candidate.intersects(Rect2(prior["rect"])):
-								score -= 1000.0
-							else:
-								score += centre.distance_to(Rect2(prior["rect"]).get_center())
-					if score > best_score:
-						best = candidate
-						best_score = score
-		if best.size.x <= 0.0:
+					along_walls.append(Rect2(centre - size * 0.5, size))
+		var open := CastleKeepPlan.wall_touching_rects(walls, sizes)
+		var pick := _pick_flight(plan, level, along_walls, lower, upper, entry,
+			door_line, wells, arrivals, false)
+		if pick.is_empty() or pick["landings"].is_empty():
+			# No flight against a wall lets its walker off on floor: look across
+			# the room for one that does (WALK-1a17b2b3-3: the stair climbed to a
+			# blank wall).
+			var found := _pick_flight(plan, level, open, lower, upper, entry,
+				door_line, wells, arrivals, true)
+			if found.is_empty():
+				# The shaft is too small for a flight and its landings against
+				# any wall: the flight stands free, and says so.
+				found = _pick_flight(plan, level, CastleKeepPlan.open_rects(upper_box, sizes),
+					lower, upper, entry, door_line, wells, arrivals, true)
+				if not found.is_empty():
+					found["free_standing"] = true
+			if not found.is_empty():
+				pick = found
+		if pick.is_empty():
 			# The absence is explicit. HousePlanCheck will report the missing
 			# storey transition instead of claiming a stair in solid masonry.
 			continue
-		var footprint := best
+		var footprint: Rect2 = pick["rect"]
 		plan.stairs.append({"a": level, "b": level + 1, "storey": level,
 			"to_storey": level + 1, "pos": footprint.get_center(),
 			"lower_pos": footprint.get_center(), "upper_pos": footprint.get_center(),
 			"rect": footprint, "lower_rect": footprint, "upper_rect": footprint,
-			"width": width, "run": run})
+			"width": width, "run": run, "free_standing": bool(pick.get("free_standing", false))}.merged(pick["landings"]))
+
+
+static func _pick_flight(plan: HousePlan, level: int, candidates: Array[Rect2],
+		lower: PackedVector2Array, upper: PackedVector2Array, entry: Dictionary,
+		door_line: Rect2, wells: Array[Rect2], arrivals: Array[Rect2],
+		landed_only: bool) -> Dictionary:
+	var best := {}
+	var best_score := -INF
+	for candidate in candidates:
+		if not _inside(lower, candidate) or not _inside(upper, candidate):
+			continue
+		if level == int(entry["storey"]) and _overlap(candidate, door_line):
+			continue
+		var centre := candidate.get_center()
+		var score: float = centre.distance_to(Vector2(entry["pos"]))
+		# The top step lets off onto floor, not into the wall.
+		var landings := CastleKeepPlan.stair_landings(plan, level, level + 1,
+			candidate, wells, arrivals)
+		if landed_only and landings.is_empty():
+			continue
+		if not landings.is_empty():
+			score += 5000.0
+		for prior in plan.stairs:
+			if int(prior["b"]) == level or int(prior["a"]) == level + 1:
+				if candidate.intersects(Rect2(prior["rect"])):
+					score -= 1000.0
+				else:
+					score += centre.distance_to(Rect2(prior["rect"]).get_center())
+		if score > best_score:
+			best = {"rect": candidate, "landings": landings}
+			best_score = score
+	return best
 
 
 static func _inside(outline: PackedVector2Array, rect: Rect2) -> bool:

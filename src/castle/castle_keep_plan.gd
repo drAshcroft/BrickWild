@@ -335,16 +335,10 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 	var floor := HouseGeometry.room_floor_rect(plan, upper)
 	var run := minf(2.4, maxf(HouseGeometry.PATH_MIN, maxf(floor.size.x, floor.size.y) - 0.3))
 	var width := minf(1.0, maxf(HouseGeometry.PATH_MIN, minf(floor.size.x, floor.size.y) - 0.3))
-	var front := Vector2(plan.doors[plan.entrance()].pos)
-	var best := Rect2()
-	var best_score := -INF
 	var walls := HouseGeometry.room_walls(plan, upper)
 	walls.append_array(HouseGeometry.room_walls(plan, lower))
 	var sizes: Array[Vector2] = [Vector2(run, width), Vector2(width, run)]
-	# The flight arriving on `lower` from below: standing in its well, this one
-	# would climb out of that flight's solid foot -- the hotel's "stairway to
-	# nowhere" (WALK-QA, 6 Oct), which every shaped keep repeated floor on floor.
-	var wells: Array[Rect2] = HousePlanLevels.arriving_wells(plan, lower)
+	var along_walls: Array[Rect2] = []
 	for size in sizes:
 		for wall in walls:
 			var normal := Vector2(wall.normal)
@@ -353,42 +347,161 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 			var samples := maxi(int(length / 0.2), 1)
 			for step in range(samples + 1):
 				var centre := Vector2(wall.from).lerp(wall.to, float(step) / float(samples)) + normal * support
-				var rect := Rect2(centre - size * 0.5, size)
-				if not _inside(plan, lower, rect) or not _inside(plan, upper, rect):
-					continue
-				if avoid.size.x > 0.0 and rect.intersects(avoid, true):
-					continue
-				var in_doorway := false
-				for zone in hard:
-					for over in Geometry2D.intersect_polygons(Poly.from_rect(rect), zone):
-						in_doorway = in_doorway or Poly.area(over) > 0.02
-				if in_doorway:
-					continue
-				var score := centre.distance_to(front)
-				if HousePlanLevels.hits_any(rect, wells):
-					score -= 2000.0
-				if avoid.size.x > 0.0:
-					score += centre.distance_to(avoid.get_center())
-				if lower == int(plan.doors[plan.entrance()].a) \
-						and _overlap(rect, HousePlanLevels.door_line(plan, lower, plan.doors[plan.entrance()])):
-					score -= 1000.0
-				for door in plan.doors:
-					if HousePlan.record_storey(door) == lower:
-						if _overlap(rect, HouseGeometry.door_clear_rect(door, -1.0)):
-							score -= 1000.0
-				if score > best_score:
-					best = rect
-					best_score = score
+				along_walls.append(Rect2(centre - size * 0.5, size))
+	var pick := _pick_stair(plan, lower, upper, along_walls, avoid, hard, false)
+	if float(pick.get("climb", 0.0)) == 0.0 and plan.is_polygonal(upper):
+		# No flight against a wall lets its walker off on floor (a tower's small
+		# hexagon, a slender keep): look across the whole room for one that does
+		# (WALK-1a17b2b3-3, stairs into the wall).
+		var open := wall_touching_rects(walls, sizes)
+		var found := _pick_stair(plan, lower, upper, open, avoid, hard, true)
+		if float(found.get("climb", 0.0)) != 0.0:
+			pick = found
+		else:
+			# The room is too small for a flight and its landings against any
+			# wall (a 12-gon of 7.7 m): the flight stands free, and says so.
+			found = _pick_stair(plan, lower, upper, open_rects(floor, sizes), avoid,
+				hard, true)
+			if float(found.get("climb", 0.0)) != 0.0:
+				pick = found
+				pick["free_standing"] = true
+	var best: Rect2 = pick.get("rect", Rect2())
 	if best.size.x <= 0.0:
 		return # Missing transition remains a QA failure, never invented floor.
-	if best_score < -100.0:
+	if float(pick.score) < -100.0:
 		plan.note_compromise(lower, "stair")
 	var centre := best.get_center()
-	plan.stairs.append({"a": lower, "b": upper,
+	var record := {"a": lower, "b": upper,
 		"storey": lower, "to_storey": upper,
 		"pos": centre, "lower_pos": centre, "upper_pos": centre,
 		"rect": best, "lower_rect": best, "upper_rect": best,
-		"width": width, "run": run})
+		"width": width, "run": run}
+	if float(pick.climb) != 0.0:
+		record.merge(pick.landings)
+	if bool(pick.get("free_standing", false)):
+		record["free_standing"] = true
+	plan.stairs.append(record)
+
+
+## Rects of each size that touch a wall at one corner, anywhere in the room: a
+## flight in a polygon's interior that still "stands against a wall" in the
+## sense of the plan check's `stair_line` (a corner within STAIR_WALL_TOL).
+static func wall_touching_rects(walls: Array, sizes: Array[Vector2]) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for size in sizes:
+		var offsets: Array[Vector2] = [Vector2.ZERO, Vector2(size.x, 0.0),
+			Vector2(0.0, size.y), size]
+		for wall in walls:
+			var from: Vector2 = wall["from"]
+			var to: Vector2 = wall["to"]
+			var samples := maxi(int(from.distance_to(to) / 0.1), 1)
+			for step in range(samples + 1):
+				# a hair inside the wall: a corner exactly on the outline is not 'inside'
+				var point := from.lerp(to, float(step) / float(samples)) + Vector2(wall["normal"]) * 0.03
+				for offset in offsets:
+					out.append(Rect2(point - offset, size))
+	return out
+
+
+## Rects of each size on a 0.2 m grid across the whole floor: a flight that
+## stands free of every wall. Taken only when no flight against a wall lets its
+## walker off on floor (see `_add_stair`).
+static func open_rects(floor: Rect2, sizes: Array[Vector2], pitch := 0.2) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for size in sizes:
+		var x := floor.position.x
+		while x <= floor.end.x - size.x + 0.001:
+			var z := floor.position.y
+			while z <= floor.end.y - size.y + 0.001:
+				out.append(Rect2(Vector2(x, z), size))
+				z += pitch
+			x += pitch
+	return out
+
+
+## The best of `candidates` for a flight from `lower` to `upper`: {rect, score,
+## climb, landings}. A flight with landings at both ends always beats one
+## without; with `landed_only` the others are not considered at all.
+static func _pick_stair(plan: HousePlan, lower: int, upper: int,
+		candidates: Array[Rect2], avoid: Rect2, hard: Array[PackedVector2Array],
+		landed_only: bool) -> Dictionary:
+	var front := Vector2(plan.doors[plan.entrance()].pos)
+	# The flight arriving on `lower` from below: standing in its well, this one
+	# would climb out of that flight's solid foot -- the hotel's "stairway to
+	# nowhere" (WALK-QA, 6 Oct), which every shaped keep repeated floor on floor.
+	var wells: Array[Rect2] = HousePlanLevels.arriving_wells(plan, lower)
+	# Where the flight below lets its walker off, on this storey's floor: the new
+	# flight must not stand across it.
+	var arrivals := arrival_floors(plan, lower)
+	var best := {"rect": Rect2(), "score": -INF, "climb": 0.0, "landings": {}}
+	for rect in candidates:
+		var centre := rect.get_center()
+		if not _inside(plan, lower, rect) or not _inside(plan, upper, rect):
+			continue
+		if avoid.size.x > 0.0 and rect.intersects(avoid, true):
+			continue
+		var in_doorway := false
+		for zone in hard:
+			for over in Geometry2D.intersect_polygons(Poly.from_rect(rect), zone):
+				in_doorway = in_doorway or Poly.area(over) > 0.02
+		if in_doorway:
+			continue
+		var landings := stair_landings(plan, lower, upper, rect, wells, arrivals)
+		if landed_only and landings.is_empty():
+			continue
+		var score := centre.distance_to(front)
+		if not landings.is_empty():
+			score += 5000.0
+		if HousePlanLevels.hits_any(rect, wells):
+			score -= 2000.0
+		if avoid.size.x > 0.0:
+			score += centre.distance_to(avoid.get_center())
+		if lower == int(plan.doors[plan.entrance()].a) 				and _overlap(rect, HousePlanLevels.door_line(plan, lower, plan.doors[plan.entrance()])):
+			score -= 1000.0
+		for door in plan.doors:
+			if HousePlan.record_storey(door) == lower:
+				if _overlap(rect, HouseGeometry.door_clear_rect(door, -1.0)):
+					score -= 1000.0
+		if score > float(best.score):
+			best = {"rect": rect, "score": score,
+				"climb": float(landings.get("climb", 0.0)), "landings": landings}
+	return best
+
+
+## Which way a flight laid on `rect` climbs so that its foot has floor on
+## `lower` and its top step lets the walker off onto floor of `upper`, as
+## {climb, foot_landing, head_landing}; empty when neither end will do. `wells`
+## are the holes of flights arriving on `lower`, `arrivals` the floor the
+## flight below lets its walker off on; the new flight stands on neither.
+static func stair_landings(plan: HousePlan, lower: int, upper: int, rect: Rect2,
+		wells: Array[Rect2], arrivals: Array[Rect2]) -> Dictionary:
+	var lower_poly := HouseGeometry.room_floor_poly(plan, lower)
+	var upper_poly := HouseGeometry.room_floor_poly(plan, upper)
+	var landing_width := minf(rect.size.x, rect.size.y)
+	for dir in [1.0, -1.0]:
+		var foot := HouseGeometry.stair_approach(rect, dir)
+		var head := HouseGeometry.stair_approach(rect, -dir, landing_width)
+		if _poly_holds(lower_poly, foot) and _poly_holds(upper_poly, head) 				and not HousePlanLevels.hits_any(head, wells) 				and not HousePlanLevels.hits_any(foot, wells) 				and not HousePlanLevels.hits_any(rect, arrivals) 				and not HousePlanLevels.hits_any(head, arrivals):
+			return {"climb": dir, "foot_landing": foot, "head_landing": head}
+	return {}
+
+
+## The floor the flights into storey `storey` let their walkers off on.
+static func arrival_floors(plan: HousePlan, storey: int) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for prior in plan.stairs:
+		if int(prior.get("to_storey", -1)) == storey and prior.has("head_landing"):
+			out.append(Rect2(prior["head_landing"]))
+	return out
+
+
+static func _poly_holds(poly: PackedVector2Array, rect: Rect2) -> bool:
+	if poly.size() < 3 or not rect.has_area():
+		return false
+	for point in Poly.from_rect(rect):
+		if not Poly.contains_point(poly, point, 0.02):
+			return false
+	return true
 
 
 static func _inside(plan: HousePlan, room: int, rect: Rect2) -> bool:

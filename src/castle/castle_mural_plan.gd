@@ -18,6 +18,11 @@ const COMPACT_STOREY := 2.3
 static var _geometry_cache := {}
 
 
+## A talus steeper than this flares the tower's foot over a ground door (the
+## battered Crusader seed 9250 fails door clearance), so only the raised one is cut.
+const FOOT_DOOR_BATTER_MAX := 0.06
+
+
 static func records(spec: CastleSpec, geometry_only := false) -> Dictionary:
 	if geometry_only:
 		# Pure in the spec, asked for repeatedly by the stair planner.
@@ -135,6 +140,17 @@ static func _add(out: Dictionary, spec: CastleSpec, ring: int, centre: Vector3,
 		if access.is_empty():
 			return
 	plan.doors.append(access.door)
+	# A tower entered from the wall walk has storeys BELOW the doorway; with one
+	# way in, up on the coping, whoever stands in them has no way out
+	# (WALK-1a17b2b3-6: "no exit for this weird tower"). Give it a second door
+	# onto the ward, at the foot, wherever a facet faces the ward clear.
+	if raised and not ground and entry > 0 and not id.contains("_gate_") \
+			and spec.batter <= FOOT_DOOR_BATTER_MAX:
+		var foot := _ground_door(plan, spec, ring, centre)
+		if not foot.is_empty():
+			foot.door["front"] = false
+			foot.door["foot_exit"] = true
+			plan.doors.append(foot.door)
 	if geometry_only:
 		var access_row := {"id": id, "plan": plan, "bounds": bounds,
 			"transform": Transform3D(Basis.IDENTITY, centre), "mural_tower": true,
