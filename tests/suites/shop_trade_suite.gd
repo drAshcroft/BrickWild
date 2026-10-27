@@ -86,6 +86,7 @@ static func run() -> SuiteResult:
 		res.fail("a general store passes as a bakery")
 	_run_store(res)
 	_run_trades(res)
+	_run_traits(res)
 	_run_walk_furnish(res)
 	return res
 
@@ -662,6 +663,79 @@ static func _two_doors(plan: HousePlan, a: int, b: int) -> bool:
 		if _door_neighbours(plan, mid).has(b):
 			return true
 	return false
+
+
+## What the blind door-eye review judged (SHOP-<KIND>-TRAITS): from the street
+## door, the trade's serving place is in view, and the trade's goods are laid on
+## a board in view. The serving place is the counter of a counter trade, the
+## anvil or bench of a work-front trade (the customer is served AT the work, so
+## the checklist's "counter" is that piece) and the alchemist's counter.
+const TRAIT_TRADES: Array[StringName] = [&"butcher", &"apothecary", &"tailor",
+	&"alchemist_laboratory"]
+const BOARD_CATS: Array[String] = ["counter", "shelf", "rack", "workbench", "anvil", "bench", "hearth"]
+
+
+static func trait_serving_cat(business: StringName) -> String:
+	return WORK_FRONT_TRADES.get(business, "counter")
+
+
+## Rule names: serving (the place is not in the door's view), wares (no board
+## in view, or the trade has no goods drawn).
+static func traits_contract(plan: HousePlan, business: StringName) -> Array[String]:
+	var out: Array[String] = []
+	var cat := trait_serving_cat(business)
+	if ShopSightline.seen_of(plan, cat).is_empty():
+		out.append("serving: the %s is not in the door's view" % cat)
+	if not (preload("res://src/shop/shop_wares.gd")).TRADES.has(business):
+		out.append("wares: %s has no goods drawn" % business)
+	var pose := ShopSightline.door_pose(plan)
+	var boards := 0
+	for f in plan.furniture_of(plan.entrance_room()):
+		var p: Dictionary = plan.furniture[f]
+		if String(PropCatalog.category(String(p["key"]))) in BOARD_CATS 				and ShopSightline.sees(plan, pose, p):
+			boards += 1
+	if boards == 0:
+		out.append("wares: no board for the goods is in the door's view")
+	return out
+
+
+static func _run_traits(res: SuiteResult) -> void:
+	for business in TRAIT_TRADES:
+		for size in SIZES:
+			for seed_ in TRADE_SEEDS:
+				var label := "traits %s %dx%d seed %d" % [business, int(size.x), int(size.y), seed_]
+				var plan := _make(business, size, seed_)
+				res.checked += 1
+				for failure in traits_contract(plan, business):
+					res.fail("%s: %s" % [label, failure])
+	# controls: the serving place taken away, then turned from the door's view
+	for business in TRAIT_TRADES:
+		var plan2 := _make(business, SIZES[1], TRADE_SEEDS[0])
+		var front := plan2.entrance_room()
+		var cat := trait_serving_cat(business)
+		var saved := plan2.furniture
+		plan2.furniture = _without_in(plan2, [cat], front, front)
+		var found := traits_contract(plan2, business)
+		plan2.furniture = saved
+		res.checked += 1
+		if not found.any(func(f: String) -> bool: return f.begins_with("serving")):
+			res.fail("traits %s: serving place removed and the 'serving' rule did not fail" % business)
+		var pose := ShopSightline.door_pose(plan2)
+		var hidden: Array[Dictionary] = []
+		for p in plan2.furniture:
+			var copy: Dictionary = p.duplicate(true)
+			copy["host"] = -1
+			if int(p["room"]) == front and String(PropCatalog.category(String(p["key"]))) == cat 					and not p.get("mounted", false):
+				# swung to the door's own wall, far outside its field of view
+				var side: Vector2 = Vector2(pose["dir"]).orthogonal() * 20.0
+				copy["rect"] = Rect2(Rect2(p["rect"]).position + side, Rect2(p["rect"]).size)
+			hidden.append(copy)
+		plan2.furniture = hidden
+		var found2 := traits_contract(plan2, business)
+		plan2.furniture = saved
+		res.checked += 1
+		if not found2.any(func(f: String) -> bool: return f.begins_with("serving")):
+			res.fail("traits %s: serving place out of view and the 'serving' rule did not fail" % business)
 
 
 ## The five other trades over their frozen matrix, each with its controls.

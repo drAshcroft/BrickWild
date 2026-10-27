@@ -235,7 +235,7 @@ const BUSINESSES := {
 		"max_rooms": 1, "door_w": 2.0, "focus": {"cat": "counter", "faces_door": true}},
 	&"alchemist_laboratory": {"label": "Alchemist Laboratory",
 		"rooms": [&"laboratory", &"store", &"office"], "max_rooms": 3,
-		"door_w": 1.2, "focus": {}},
+		"door_w": 1.2, "focus": {"cat": "counter", "faces_door": true}},
 	&"bathhouse": {"label": "Bathhouse",
 		"rooms": [&"changing_room", &"bath_hall", &"staff_room"], "max_rooms": 3,
 		"door_w": 1.2, "focus": {}},

@@ -1212,8 +1212,6 @@ const SHOP_FITTINGS := {
 	# a counter to sell remedies across, after the laboratory's own benches and
 	# fire: the blind review found no counter from the door (LIVE-SHOPS)
 	&"alchemist_laboratory": [
-		{"cat": "counter", "rule": &"wall", "n": [1, 1], "opt": 1.0,
-			"private_rng": true},
 		{"cat": "alchemy", "rule": &"on", "n": [2, 4], "host": "distributed", "opt": 1.0},
 	],
 	&"bathhouse": [

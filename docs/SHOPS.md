@@ -203,3 +203,12 @@ Misses are filed as open tasks: SHOP-<KIND>-TRAITS for each kind with a NO, and 
 ### Walk-pin clearances (SHOP-WALK-FURNISH, 2026-10-27)
 
 A shop is walked by strangers. `HouseFurnishGeometry.fits` (shops only) now keeps clear the walk through every door (leaf width, 1.6 m deep at the street door, 1.1 m at an inner one) and the 0.6 m keeper's stance behind a `hatch` window; the plan's own focus piece and the smith's hearth/anvil are exempt. `place_mounted` will not hang a fitting through a floor piece (a bench or counter is the intended host and is exempt; 8 cm tolerance). `HouseFurnishPhysicalCheck.check_shop_clearance` (inside `doorway`) judges both; `ShopTradeSuite._run_walk_furnish` sweeps 11 trades x seeds 1, 8102 x african/rich/townhouse at 11 x 14 with three failing controls.
+
+### Serving place and wares in the door's view (SHOP-ALCHEMIST_LABORATORY-TRAITS, -BLACKSMITH-TRAITS, -CARPENTER-TRAITS, 2026-10-27)
+
+The checklist's "counter" is the trade's SERVING PLACE: the counter of a counter trade, and for a work-front trade the piece the customer is served at (the smith's anvil, the carpenter's bench). That settles the design disagreement: a smithy still has no counter (`IDENTITY` bans it), but its anvil must stand in the door's view, and so must the carpenter's workbench.
+
+- `qa/shop_sightline.gd` (`ShopSightline`): the door-eye rule as code (80 degree view from just inside the street door; a 1.5 m piece hides what is behind it). `tools/render_shop_trades.gd` keeps its own copy for the facts file.
+- Alchemist laboratory: the focus is now `{counter, faces_door}` (it was `{}`), so the planner puts a counter in the laboratory facing the door first; the old `SHOP_FITTINGS` counter (a wall rule that landed at the edge of the view, or not at all at 9 x 12) is gone.
+- Carpenter: the focus workbench `faces_door` (it was false and stood out of view in five of six cases).
+- `ShopTradeSuite._run_traits` (`traits_contract`: rules `serving`, `wares`): six trades x 3 footprints x 2 seeds, plus two controls per trade (the serving place removed; the serving place moved out of view). On the old code the carpenter failed `serving` in 5 of 6 cases and the alchemist had no counter at 9 x 12 seed 1.
