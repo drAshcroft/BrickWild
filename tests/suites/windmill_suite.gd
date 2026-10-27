@@ -59,6 +59,27 @@ static func _negative_controls(res: SuiteResult) -> void:
 		_expect(res, _has_rule(rep, "swept"),
 			"post s%d: a burr's corner in the sail plane passed the swept rule (%s)."
 				% [sd, rep["failures"]])
+	# a paddle wheel whose boards float inside the rim, tilted (the old bucket
+	# transform) must fail the wheel rule; the real one must not
+	for sd in [1, 8102]:
+		var spec := _spec(&"paddle", 12.0, 6.0, 12.0, sd)
+		var builder := WindmillBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		var ok_rep: Dictionary = WindmillCheck.new().check(spec, mesh, builder)
+		_expect(res, not _has_rule(ok_rep, "wheel"),
+			"paddle s%d: a joined radial wheel failed the wheel rule (%s)." % [sd, ok_rep["failures"]])
+		var axle: Vector3 = WindmillGeometry.axle_point(spec)
+		for row in builder.component_log:
+			if String(row["role"]) == "wheel_bucket":
+				var xf: Transform3D = row["xf"]
+				var dir: Vector3 = (xf.origin - axle).normalized()
+				var ab: float = atan2(dir.y, dir.x)
+				row["size"] = Vector3(0.12, 0.42, spec.wheel_width)
+				row["xf"] = Transform3D(Basis(Vector3(0, 0, 1), ab) * Basis(Vector3.RIGHT, 0.22),
+					axle + dir * spec.wheel_r * 0.78)
+		var rep2: Dictionary = WindmillCheck.new().check(spec, mesh, builder)
+		_expect(res, _has_rule(rep2, "wheel"),
+			"paddle s%d: floating tilted paddles passed the wheel rule (%s)." % [sd, rep2["failures"]])
 	# a burr stood off its own sail plane (the old generator's 3-13 degrees)
 	for sd in [1, 8102]:
 		var spec := _spec(&"post", 12.0, 6.0, 12.0, sd)

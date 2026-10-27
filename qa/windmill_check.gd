@@ -510,6 +510,7 @@ func _check_wheel(spec: WindmillSpec, _mesh: ArrayMesh, _m: Dictionary,
 	var wheel: AABB = _masses(builder, ["wheel"])
 	if wheel == AABB():
 		return          # `rotor` already said a polder mill has no wheel
+	_check_paddles(spec, builder)
 	var bed: float = -spec.race_depth
 	var water: float = WindmillGeometry.water_level(spec)
 	if wheel.position.y < bed - 0.01:
@@ -518,6 +519,55 @@ func _check_wheel(spec: WindmillSpec, _mesh: ArrayMesh, _m: Dictionary,
 	if wheel.position.y > water:
 		_fail(&"wheel", "the wheel clears the water by %.2f m, so the current has nothing to push."
 			% (wheel.position.y - water))
+
+
+## Every paddle is JOINED to the rim and lies RADIAL: its outer end reaches the
+## rim's circle (within PADDLE_JOIN), its long axis points along the spoke from
+## the axle, and its plane contains the axle (no tilt out of the wheel's plane,
+## thin axis tangential). A plank tilted off the rim or turned tangent floats.
+const PADDLE_JOIN := 0.08
+const PADDLE_ANGLE_TOL := 0.03
+
+
+func _check_paddles(spec: WindmillSpec, builder: WindmillBuilder) -> void:
+	var axle: Vector3 = WindmillGeometry.axle_point(spec)
+	var n := 0
+	var worst_gap := 0.0
+	var worst_angle := 0.0
+	for row in builder.component_log:
+		if String(row["role"]) != "wheel_bucket":
+			continue
+		n += 1
+		var xf: Transform3D = row["xf"]
+		var size: Vector3 = row["size"]
+		var radial: Vector3 = xf.origin - axle
+		radial.z = 0.0
+		radial = radial.normalized()
+		var long_axis: Vector3 = xf.basis.x.normalized()
+		var thin_axis: Vector3 = xf.basis.y.normalized()
+		var axle_axis: Vector3 = xf.basis.z.normalized()
+		# the blade's tip: the end of its long axis farthest from the axle
+		var tip: float = 0.0
+		for sgn in [-1.0, 1.0]:
+			var q: Vector3 = xf.origin + long_axis * sgn * size.x * 0.5 - axle
+			tip = maxf(tip, Vector2(q.x, q.y).length())
+		worst_gap = maxf(worst_gap, absf(tip - spec.wheel_r))
+		var ang: float = maxf(maxf(
+			acos(clampf(absf(long_axis.dot(radial)), 0.0, 1.0)),
+			acos(clampf(absf(axle_axis.dot(Vector3.BACK)), 0.0, 1.0))),
+			absf(asin(clampf(thin_axis.z, -1.0, 1.0))))
+		worst_angle = maxf(worst_angle, ang)
+	stats["paddle_gap"] = worst_gap
+	stats["paddle_angle"] = worst_angle
+	if n != maxi(spec.wheel_buckets, 6):
+		_fail(&"wheel", "the wheel drew %d paddles; the spec promised %d."
+			% [n, maxi(spec.wheel_buckets, 6)])
+	if worst_gap > PADDLE_JOIN:
+		_fail(&"wheel", "a paddle's tip stands %.2f m off the rim, so it floats."
+			% worst_gap)
+	if worst_angle > PADDLE_ANGLE_TOL:
+		_fail(&"wheel", "a paddle is turned %.1f degrees off the radial, so its plane misses the axle."
+			% rad_to_deg(worst_angle))
 
 
 ## The mesh is inside the box the spec promised.

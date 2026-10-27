@@ -583,6 +583,10 @@ static func burr_roof_rise(spec: WindmillSpec) -> float:
 
 
 const BURR_ROOF_OVERHANG := 0.16
+## A paddle wheel's blades run from this fraction of the rim's radius out to the
+## rim and a hand's breadth past its centre-line, where they are joined to it.
+const PADDLE_INNER := 0.7
+const PADDLE_PROUD := 0.06
 
 
 ## The radius of the stage's outer edge and its rail: behind the sail plane, so

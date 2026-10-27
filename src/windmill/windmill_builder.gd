@@ -720,11 +720,16 @@ func _scoop_wheel() -> void:
 	for i3 in range(n):
 		var ab: float = TAU * float(i3) / float(n)
 		var dir := Vector3(cos(ab), sin(ab), 0.0)
-		# A bucket is a board standing in the plane of the wheel, so the current
-		# pushes its whole face rather than an edge of it.
-		component_box("wheel_bucket", Vector3(0.12, 0.42, spec.wheel_width),
-			Transform3D(Basis(Vector3(0, 0, 1), ab) * Basis(Vector3.RIGHT, 0.22),
-				axle + dir * r * 0.78), SURF_TRIM)
+		# A paddle is a board standing RADIAL: long along the spoke, thin across
+		# it, as wide as the wheel along the axle, so its plane contains the axle
+		# and the current pushes its whole face. Its outer end meets the rim
+		# (it was a short plank lying tangent and tilted off the rim, floating
+		# inside the wheel and turned the wrong way).
+		var inner: float = r * WindmillGeometry.PADDLE_INNER
+		var span: float = r + WindmillGeometry.PADDLE_PROUD - inner
+		component_box("wheel_bucket", Vector3(span, 0.1, spec.wheel_width),
+			Transform3D(Basis(Vector3(0, 0, 1), ab), axle + dir * (inner + span * 0.5)),
+			SURF_TRIM)
 	_beam(axle + Vector3(0, 0, -half - 0.4), axle + Vector3(0, 0, half + 0.4),
 		0.28, 0.28, SURF_TRIM, "wheel_axle")
 	_log_mass("wheel", AABB(axle - Vector3(r, r, half + 0.4), Vector3(r * 2.0, r * 2.0,
