@@ -284,20 +284,33 @@ func _post_body() -> void:
 		Transform3D(Basis(Vector3.UP, atan2(door_dir.x, door_dir.z)),
 			door_dir * (r - spec.wall_t * 0.5) + Vector3(0.0, floor - 0.06, 0.0)), SURF_WALL)
 	component_box("burr_deck", Vector3(r * 2.0, 0.22, r * 2.0),
-		Transform3D(Basis(), Vector3(0.0, floor + h - 0.11, 0.0)), SURF_WALL)
+		Transform3D(y, Vector3(0.0, floor + h - 0.11, 0.0)), SURF_WALL)
 	_log_mass("burr", AABB(Vector3(-r, floor, -r), Vector3(r * 2.0, h, r * 2.0)))
 
-	# A post mill's roof is a single pitch and it drains towards the tail, so
-	# the tailpole is not standing under a gutter.
+	# A post mill's roof is a gable whose ridge runs fore and aft, along the
+	# windshaft, as the roofs of the real ones do: two pitches over the sides
+	# and a boarded triangle closing the front and the back. (It was one sloped
+	# plate over a flat-topped box, with an open wedge at each side -- the piece
+	# on the roof nobody could name.)
 	var eave: float = floor + h + 0.02
-	var roof := PackedVector3Array([
-		y * Vector3(-r - 0.14, eave + 0.55, -r - 0.14),
-		y * Vector3(r + 0.14, eave + 0.55, -r - 0.14),
-		y * Vector3(r + 0.14, eave, r + 0.14),
-		y * Vector3(-r - 0.14, eave, r + 0.14)])
-	component_slab("burr_roof", roof, 0.18, SURF_SAIL, false)
-	_log_mass("burr_roof", AABB(Vector3(-r - 0.2, eave, -r - 0.2),
-		Vector3((r + 0.2) * 2.0, 0.6, (r + 0.2) * 2.0)))
+	var ov: float = WindmillGeometry.BURR_ROOF_OVERHANG
+	var rise: float = WindmillGeometry.burr_roof_rise(spec)
+	var rf: float = r + ov
+	var ridge_a: Vector3 = Vector3(0.0, eave + rise, -rf)
+	var ridge_b: Vector3 = Vector3(0.0, eave + rise, rf)
+	for sgn in [-1.0, 1.0]:
+		var pitch := PackedVector3Array([
+			y * ridge_a, y * ridge_b,
+			y * Vector3(sgn * rf, eave, rf), y * Vector3(sgn * rf, eave, -rf)])
+		component_slab("burr_roof", pitch, 0.14, SURF_SAIL, false)
+	for zs in [-1.0, 1.0]:
+		var gz: float = zs * (r - spec.wall_t * 0.5)
+		var gable := PackedVector3Array([
+			y * Vector3(-r, eave - 0.02, gz), y * Vector3(r, eave - 0.02, gz),
+			y * Vector3(0.0, eave + rise * (r / rf), gz)])
+		component_slab("burr_gable", gable, spec.wall_t, SURF_WALL, true)
+	_log_mass("burr_roof", AABB(Vector3(-rf, eave, -rf),
+		Vector3(rf * 2.0, rise + 0.1, rf * 2.0)))
 
 
 ## A windpump's body: four legs and `braces` bays of X-bracing. It is the only

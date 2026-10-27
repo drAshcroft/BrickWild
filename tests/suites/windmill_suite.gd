@@ -59,6 +59,18 @@ static func _negative_controls(res: SuiteResult) -> void:
 		_expect(res, _has_rule(rep, "swept"),
 			"post s%d: a burr's corner in the sail plane passed the swept rule (%s)."
 				% [sd, rep["failures"]])
+	# a burr stood off its own sail plane (the old generator's 3-13 degrees)
+	for sd in [1, 8102]:
+		var spec := _spec(&"post", 12.0, 6.0, 12.0, sd)
+		_expect(res, absf(spec.body_yaw) < 0.001,
+			"post s%d: the generator stood the burr %.2f rad off its sails." % [sd, spec.body_yaw])
+		spec.body_yaw = 0.15
+		var builder := WindmillBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		var rep: Dictionary = WindmillCheck.new().check(spec, mesh, builder)
+		_expect(res, _has_rule(rep, "turns"),
+			"post s%d: a burr turned off its sails passed the turns rule (%s)."
+				% [sd, rep["failures"]])
 	for mill_type in [&"tower", &"smock"]:
 		var spec := _spec(mill_type, 12.0, 6.0, 12.0, 1)
 		spec.sail_r = spec.curb_y * 0.3          # vanes of 0.6 x the height

@@ -37,6 +37,10 @@ extends RefCounted
 ##   SWEPT       the DISC the rotor sweeps, not just its sails as drawn, clears
 ##               every wall, door, rail, deck, leg and boom of the body by
 ##               SWEPT_CLEAR. Only the shaft and gear that drive it may touch
+##   TURNS       a post mill is one machine on one post: its boarded burr, deck
+##               and roof are square to the plane its sails turn in, because
+##               it is the burr that is turned into the wind and the sails turn
+##               with it. A burr stood a few degrees off its own sails leans
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {..}}
 
@@ -82,7 +86,7 @@ const SWEPT_STEP := 0.25
 
 const RULES: Array[StringName] = [&"standing", &"rotor", &"clearance",
 	&"cap_clear", &"winding", &"access", &"entry", &"gear", &"wheel", &"envelope",
-	&"solid", &"facing", &"component", &"openings", &"proportion", &"swept"]
+	&"solid", &"facing", &"component", &"openings", &"proportion", &"swept", &"turns"]
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -641,6 +645,45 @@ func _check_proportion(spec: WindmillSpec, _mesh: ArrayMesh, m: Dictionary,
 ## Every logged body part is sampled (boxes through their volume, slabs and
 ## rings through their edges) plus the drum's own surface, which is not a
 ## component. A part that drives the rotor is exempt, and only that part.
+## Every boarded part of a post mill's burr lies square to the sail plane
+## (rotation about Y a multiple of a quarter turn; the unturned frame IS the
+## sail plane's). Measured off the component log, on boxes and on slab edges.
+func _check_turns(spec: WindmillSpec, _mesh: ArrayMesh, _m: Dictionary,
+		builder: WindmillBuilder) -> void:
+	if spec.mill_type != &"post" or builder == null:
+		return
+	var worst := 0.0
+	var worst_role := ""
+	for row in builder.component_log:
+		var role := String(row["role"])
+		if not role.begins_with("burr_") and role != "door_sill":
+			continue
+		var offs: Array[float] = []
+		if row.has("xf"):
+			var ax: Vector3 = (row["xf"] as Transform3D).basis * Vector3.RIGHT
+			offs.append(ax.x)
+			offs.append(ax.z)
+		elif row.has("points"):
+			var pts: PackedVector3Array = row["points"]
+			for i in range(pts.size()):
+				var e: Vector3 = pts[(i + 1) % pts.size()] - pts[i]
+				if Vector2(e.x, e.z).length() > 0.05:
+					offs.append(e.x)
+					offs.append(e.z)
+		else:
+			continue
+		for k in range(0, offs.size(), 2):
+			var ang: float = atan2(offs[k + 1], offs[k])
+			var off: float = absf(fposmod(ang + PI * 0.25, PI * 0.5) - PI * 0.25)
+			if off > worst:
+				worst = off
+				worst_role = role
+	stats["burr_skew"] = worst
+	if worst > 0.03:
+		_fail(&"turns", ("the %s stands %.1f degrees off the plane the sails turn in; a post "
+			+ "mill's burr and its rotor are one machine.") % [worst_role, rad_to_deg(worst)])
+
+
 func _check_swept(spec: WindmillSpec, _mesh: ArrayMesh, _m: Dictionary,
 		builder: WindmillBuilder) -> void:
 	if spec.mill_type == &"paddle" or builder == null:

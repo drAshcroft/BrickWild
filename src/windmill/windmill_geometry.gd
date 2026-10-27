@@ -577,6 +577,14 @@ static func burr_front(spec: WindmillSpec) -> float:
 	return spec.base_r * (absf(cos(spec.body_yaw)) + absf(sin(spec.body_yaw))) 		+ board_proud(spec) + DOOR_STEP_REACH
 
 
+## How far a post mill's gabled roof ridge stands above its eaves.
+static func burr_roof_rise(spec: WindmillSpec) -> float:
+	return (spec.base_r + BURR_ROOF_OVERHANG) * 0.62
+
+
+const BURR_ROOF_OVERHANG := 0.16
+
+
 ## The radius of the stage's outer edge and its rail: behind the sail plane, so
 ## the rotor sweeps in front of the miller's rail and not through it.
 static func stage_ring_r(spec: WindmillSpec) -> float:
@@ -801,6 +809,8 @@ static func envelope(spec: WindmillSpec) -> AABB:
 	var axle: Vector3 = axle_point(spec)
 	var top: float = maxf(body_top(spec) + 0.3, floor_y(spec) + spec.height)
 	top = maxf(top, axle.y + spec.sail_r + 0.2)
+	if spec.mill_type == &"post":
+		top = maxf(top, floor_y(spec) + spec.height + 0.05 + burr_roof_rise(spec) + 0.1)
 	if has_gallery(spec):
 		# a gallery carries a rail, and the rail is the highest thing on the mill
 		# short of its own sails

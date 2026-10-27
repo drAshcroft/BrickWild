@@ -121,12 +121,12 @@ static func _post(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictionar
 	spec.curb_y = spec.burr_y + spec.height
 	spec.stage_y = spec.burr_y + 0.5
 	spec.stage_arc = TAU * 0.78
-	# the burr is stood off the wind, so its ladder, its door and its tailpole
-	# all sit wherever the miller last turned it
-	# Not far: the door is in the burr's front wall, and the placement contract
-	# puts the door on the footprint's -Z edge, which a wall turned further than
-	# about 12 degrees is no longer (its corner stands out past it).
-	spec.body_yaw = rng.randf_range(0.05, 0.22) * (1.0 if GeneratorRandom.chance(rng, 0.5) else -1.0)
+	# The burr is square to its sails. A post mill turns as ONE machine -- burr,
+	# roof, tail and rotor on the same post -- so which way it faces is the
+	# placement's rotation, never an offset between the body and the sails. (A
+	# burr drawn 3-13 degrees off the sail plane leaned in every render, and
+	# its unturned deck and sails stuck out of it.)
+	spec.body_yaw = 0.0
 	# The door is in the burr's front wall, in the middle: the stair runs along
 	# that wall to whichever side leads away from the sails.
 	spec.door_offset_x = 0.0
