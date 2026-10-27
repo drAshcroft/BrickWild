@@ -1570,6 +1570,88 @@ static func _relocate_compact_witch_workwall_window(p: HousePlan, room: int) -> 
 	return true
 
 
+## The furnisher, not the planner, chooses where the Witchwork bench stands:
+## any legal station in the band, so the planned (band-centre) pose is only a
+## guess. A bench top (slab + 0.895 m) rises above the 0.95 m sill, so a hall
+## light over the bench that was actually placed is glass behind a bench and
+## leaves the rack no wall above it. Called with the real bench, before its rack
+## is placed: each such light moves to another exterior wall of the hall,
+## clear of the bench, the hearth breast and wall (the stove bay is added there
+## once the room is finished), and everything already standing or mounted.
+static func clear_compact_witch_windows_of_bench(p: HousePlan, room: int,
+		bench_rect: Rect2) -> bool:
+	if not _is_compact_witch_shared_hall(p, room) or not bench_rect.has_area():
+		return false
+	var walls := HouseGeometry.room_walls(p, room)
+	var breast := _compact_witch_hearth_breast_rect(p, room)
+	var tall: Array[Rect2] = []
+	var mounted: Array[Rect2] = []
+	for fi in p.furniture_of(room):
+		var piece: Dictionary = p.furniture[fi]
+		var body := Rect2(piece.get("rect", Rect2()))
+		if bool(piece.get("mounted", false)):
+			mounted.append(body.grow(0.1))
+		elif PropCatalog.placement_height(piece) + HouseGeometry.FLOOR_T > HouseGeometry.WINDOW_SILL - 0.01:
+			tall.append(body.grow(0.01))
+	var moved_any := false
+	for window_index in p.windows_of(room):
+		var original: Dictionary = p.windows[window_index].duplicate(true)
+		var clear_now := HouseGeometry.window_clear_rect(original)
+		if not clear_now.intersects(bench_rect.grow(0.01)):
+			continue
+		var width := float(original.get("width", HouseGeometry.WINDOW_W))
+		var saved: Dictionary = p.windows[window_index]
+		p.windows.remove_at(window_index)
+		var best: Dictionary = {}
+		for wall_variant in walls:
+			var wall: Dictionary = wall_variant
+			var wall_inward: Vector2 = Vector2(wall.get("normal", Vector2.ZERO)).normalized()
+			var wall_outward := -wall_inward
+			var from: Vector2 = wall.get("from", Vector2.ZERO)
+			var to: Vector2 = wall.get("to", Vector2.ZERO)
+			var normal_axis := 0 if absf(wall_inward.x) > 0.5 else 1
+			var line_value := from.x if normal_axis == 0 else from.y
+			if not HouseGeometry.is_exterior_edge(p.spec, normal_axis, line_value):
+				continue
+			if p.hearth_room() == room and int(wall.get("index", -2)) == p.hearth_wall():
+				continue
+			var wall_axis := (to - from).normalized()
+			var run := from.distance_to(to)
+			var lo := width * 0.5 + 0.1
+			var hi := run - width * 0.5 - 0.1
+			if hi < lo:
+				continue
+			var steps := maxi(ceili((hi - lo) / 0.08), 1)
+			for station in range(steps + 1):
+				var offset := lo + (hi - lo) * float(station) / float(steps)
+				var pos := from + wall_axis * offset
+				if HousePlanOpenings._crowds(p, pos, wall_outward, width,
+						HousePlan.record_storey(original)):
+					continue
+				var candidate: Dictionary = original.duplicate(true)
+				candidate["pos"] = pos
+				candidate["normal"] = wall_outward
+				var clear: Rect2 = HouseGeometry.window_clear_rect(candidate)
+				var opening: Rect2 = HouseGeometry.window_rect(candidate)
+				var blocked_here := clear.intersects(bench_rect.grow(0.01)) 					or (breast.has_area() and opening.intersects(breast.grow(0.01)))
+				for body in tall:
+					blocked_here = blocked_here or clear.intersects(body)
+				for body in mounted:
+					blocked_here = blocked_here or opening.intersects(body)
+				if blocked_here:
+					continue
+				best = candidate
+				break
+			if not best.is_empty():
+				break
+		if best.is_empty():
+			p.windows.insert(window_index, saved)
+			continue
+		p.windows.insert(window_index, best)
+		moved_any = true
+	return moved_any
+
+
 ## The planned bench pose is also the opening-clearance datum. Keeping this in
 ## one helper prevents the service-window move from drifting away from the
 ## same measured workwall pose used by the earlier workwall relocation.

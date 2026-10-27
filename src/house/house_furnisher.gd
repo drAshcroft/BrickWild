@@ -916,6 +916,10 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 			for placed in range(piece_from, plan.furniture.size()):
 				plan.furniture[placed]["must"] = must
 				_set_activity_group(plan.furniture[placed], step)
+				if String(step.get("group", "")) == "witchwork" 						and String(step.get("cat", "")) == "workbench":
+					# the bench is down: a light behind it moves before its rack is hung
+					HousePlanFeatures.clear_compact_witch_windows_of_bench(plan, room,
+						Rect2(plan.furniture[placed].get("rect", Rect2())))
 				if HouseFurnishingRecipes.uses_bedside_pair(plan) \
 						and String(step.get("cat", "")) == "bed":
 					_reserve_sleep_access_clearance(plan, room, zones)
