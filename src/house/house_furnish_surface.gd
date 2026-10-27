@@ -166,6 +166,10 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 			var mount_pose := HousePlanFeatures._wall_fixture_pose(key, wall, wall_along,
 				HouseFurnishGeometry.storey_base(plan, room) + y, scale)
 			var mount_body: Rect2 = Rect2(mount_pose["rect"])
+			# SHOP-WALK-FURNISH: a shelf may not hang through the cabinet below it
+			if HouseFurnishGeometry.is_shop_plan(plan) and not HouseFurnishGeometry.shop_mount_clear(
+					plan, room, mount_body, float(mount_pose["bottom"]), float(mount_pose["top"])):
+				continue
 			var breast := HouseGeometry.hearth_breast(plan)
 			if not breast.is_empty() and int(breast["room"]) == room \
 					and Poly.intersection_area(Poly.from_rect(mount_body), breast["outline"]) > 0.002:

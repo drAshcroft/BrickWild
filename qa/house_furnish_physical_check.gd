@@ -127,6 +127,7 @@ func check_supported(plan: HousePlan) -> void:
 
 ## Nothing may stand where a door needs to swing, on either side of it.
 func check_doorways(plan: HousePlan) -> void:
+	check_shop_clearance(plan)
 	for f in range(plan.furniture.size()):
 		var p: Dictionary = plan.furniture[f]
 		if p.get("mounted", false) or p["host"] >= 0:
@@ -160,6 +161,34 @@ func check_doorways(plan: HousePlan) -> void:
 					else:
 						failures.append(msg)
 					break
+
+
+## SHOP-WALK-FURNISH: in a shop, no floor piece stands in the walk through any
+## door or in the keeper's stance behind the serving hatch (the plan's own
+## focus may face the door). Walk pins WALK-1a17afb7-2 and WALK-1a17af8e-1.
+func check_shop_clearance(plan: HousePlan) -> void:
+	if not HouseFurnishGeometry.is_shop_plan(plan):
+		return
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		if p.get("mounted", false) or int(p["host"]) >= 0:
+			continue
+		var why := HouseFurnishGeometry.shop_keep_clear_hit(plan, int(p["room"]),
+			Rect2(p["rect"]), String(p.get("cat", PropCatalog.category(String(p["key"])))))
+		if why != "":
+			failures.append("shop clear: %s stands in %s" % [HouseFurnishCheck.who(plan, f), why])
+	# a fitting hung through the body of something standing below it
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		if p.get("mounted", false) or int(p["host"]) >= 0:
+			continue
+		var level := HousePlan.record_storey(p)
+		var top: float = HouseGeometry.FLOOR_T + PropCatalog.placement_height(p) + float(level) * plan.spec.height
+		var hit := HouseFurnishGeometry.shop_hangs_over(plan, int(p["room"]), Rect2(p["rect"]), top,
+			String(p.get("cat", PropCatalog.category(String(p["key"])))))
+		if hit >= 0:
+			failures.append("shop clear: %s runs into %s hung above it"
+				% [HouseFurnishCheck.who(plan, f), HouseFurnishCheck.who(plan, hit)])
 
 
 static func _approach_applies(plan: HousePlan, p: Dictionary) -> bool:

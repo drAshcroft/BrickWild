@@ -86,7 +86,101 @@ static func run() -> SuiteResult:
 		res.fail("a general store passes as a bakery")
 	_run_store(res)
 	_run_trades(res)
+	_run_walk_furnish(res)
 	return res
+
+
+## SHOP-WALK-FURNISH (26 Oct walk pins): the 11 counter trades x seeds 1 and
+## 8102 at the walk's 11 x 14 m footprint, in the two styles that were pinned
+## plus the plain townhouse. No floor piece may stand in the walk through any
+## door or the keeper's stance at the serving hatch, and no fitting may hang
+## through the body of the piece below it. Each rule has a failing control.
+const WALK_TRADES: Array[StringName] = [&"apothecary", &"alchemist_laboratory", &"bakery",
+	&"blacksmith", &"butcher", &"carpenter", &"general_store", &"tailor", &"tavern",
+	&"inn", &"restaurant"]
+const WALK_STYLES: Array[StringName] = [&"african", &"rich", &"townhouse"]
+
+
+static func _walk_plan(business: StringName, style: StringName, seed_: int) -> HousePlan:
+	var spec := ShopSpec.new()
+	spec.business = business
+	spec.style = style
+	spec.width = 11.0
+	spec.length = 14.0
+	spec.height = 2.8
+	return ShopGenerator.generate(spec, seed_)
+
+
+static func walk_clearance(plan: HousePlan) -> Array:
+	var physical := HouseFurnishPhysicalCheck.new()
+	physical.check_shop_clearance(plan)
+	return physical.failures
+
+
+static func _run_walk_furnish(res: SuiteResult) -> void:
+	var door_control := 0
+	var hatch_control := 0
+	var hung_control := 0
+	for style in WALK_STYLES:
+		for business in WALK_TRADES:
+			for seed_ in [1, 8102]:
+				var label := "walk %s %s seed %d" % [style, business, seed_]
+				var plan := _walk_plan(business, style, seed_)
+				res.checked += 1
+				for failure in walk_clearance(plan):
+					res.fail("%s: %s" % [label, failure])
+				# controls, once per kind of defect, on the first shop that can take one
+				if hatch_control == 0:
+					var zone := _hatch_zone(plan)
+					if zone.size.x > 0.0:
+						hatch_control = 1
+						_control(res, plan, label + " hatch control", "serving hatch",
+							_crate_at(plan, int(zone["room"]), Rect2(zone["rect"])))
+				if door_control == 0:
+					var entry := plan.entrance()
+					if entry >= 0:
+						door_control = 1
+						var door: Dictionary = plan.doors[entry]
+						var at := Vector2(door["pos"]) - Vector2(door["normal"]) * 0.9
+						_control(res, plan, label + " door control", "door",
+							_crate_at(plan, int(door["a"]), Rect2(at - Vector2(0.3, 0.3), Vector2(0.6, 0.6))))
+				if hung_control == 0:
+					for i in plan.furniture.size():
+						var item: Dictionary = plan.furniture[i]
+						if bool(item.get("mounted", false)) and PropCatalog.category(String(item["key"])) == "shelf":
+							hung_control = 1
+							var box := HouseFurnishGeometry.mounted_box(item)
+							var rect: Rect2 = box["rect"]
+							_control(res, plan, label + " hung control", "hung above",
+								_crate_at(plan, int(item["room"]), rect, 2.2))
+							break
+
+
+static func _hatch_zone(plan: HousePlan) -> Dictionary:
+	for room in plan.room_count():
+		for zone in HouseFurnishGeometry.shop_keep_clear(plan, room):
+			if String(zone["why"]).contains("hatch"):
+				return {"room": room, "rect": zone["rect"], "size": Rect2(zone["rect"]).size}
+	return {"size": Vector2.ZERO}
+
+
+## A tall crate record added to the plan, the check run, the record removed.
+static func _crate_at(plan: HousePlan, room: int, rect: Rect2, height_scale := -1.0) -> Dictionary:
+	var rec := HouseFurnishGeometry.candidate("Crate_Metal", rect.get_center(), 0.0)
+	rec["room"] = room
+	rec["storey"] = 0
+	if height_scale > 0.0:
+		rec["height_scale"] = height_scale
+	return rec
+
+
+static func _control(res: SuiteResult, plan: HousePlan, label: String, word: String, rec: Dictionary) -> void:
+	plan.furniture.append(rec)
+	var found := walk_clearance(plan)
+	plan.furniture.pop_back()
+	res.checked += 1
+	if not found.any(func(f: String) -> bool: return f.contains(word)):
+		res.fail("%s: a crate put in the %s passed the clearance check" % [label, word])
 
 
 ## The general store, judged as a store: goods on show, a counter, stock behind.

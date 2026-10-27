@@ -93,6 +93,8 @@ static func fits(plan: HousePlan, room: int, cand: Dictionary, floor_rect: Rect2
 		return false
 	if not clears_domestic_entry(plan, room, rect):
 		return false
+	if is_shop_plan(plan) and (shop_keep_clear_hit(plan, room, rect, String(cand.get("cat", ""))) != "" 			or shop_hangs_over(plan, room, rect, storey_base(plan, room) + HouseGeometry.FLOOR_T + PropCatalog.placement_height(cand), String(cand.get("cat", ""))) >= 0):
+		return false
 	for b in blocked:
 		# a seat tucked under its own table overlaps it on purpose, so the
 		# table is passed in as the one rectangle this placement may share
@@ -205,6 +207,115 @@ static func clears_domestic_entry(plan: HousePlan, room: int, rect: Rect2) -> bo
 			+ normal * side * HouseFurnishPlacement.DOOR_APPROACH
 		var overlap := rect.intersection(Rect2(start.min(finish), (finish - start).abs()))
 		if overlap.size.x > 0.005 and overlap.size.y > 0.005:
+			return false
+	return true
+
+
+## SHOP-WALK-FURNISH. A shop is walked by strangers, so two things stay open
+## that a house leaves to its owner: the walk through every door (the leaf's
+## own width, 1.6 m deep at the street door and 1.1 m at an inner one) and the stance behind the
+## shopfront hatch where the keeper serves. A crate in either is the first
+## thing a customer meets (walk pin WALK-1a17afb7-2, african apothecary).
+const HATCH_STANCE := 0.6
+## An inner door's walk is shorter than the street door's: a small shop has
+## three doors in its front room and still has to show its goods.
+const INTERIOR_WALK := 1.1
+
+static func is_shop_plan(plan: HousePlan) -> bool:
+	return plan.spec != null and "business" in plan.spec
+
+
+## [{rect, why}] of the floor a shop keeps clear in `room`.
+static func shop_keep_clear(plan: HousePlan, room: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for d in plan.doors_of(room):
+		var door: Dictionary = plan.doors[d]
+		for side in [-1.0, 1.0]:
+			var n: Vector2 = Vector2(door["normal"]) * side
+			var along := Vector2(n.y, -n.x).abs()
+			var half: Vector2 = along * float(door["width"]) * 0.5
+			var a: Vector2 = Vector2(door["pos"]) - half
+			var depth: float = HouseFurnishPlacement.DOOR_APPROACH if bool(door.get("exterior", false)) 				else INTERIOR_WALK
+			var b: Vector2 = Vector2(door["pos"]) + half + n * depth
+			out.append({"rect": Rect2(a.min(b), (b - a).abs()), "why": "the walk through door %d" % d})
+	for w in plan.windows_of(room):
+		var win: Dictionary = plan.windows[w]
+		if not bool(win.get("hatch", false)):
+			continue
+		var n: Vector2 = -Vector2(win["normal"])
+		var along := Vector2(n.y, -n.x).abs()
+		var half: Vector2 = along * float(win["width"]) * 0.5
+		var a: Vector2 = Vector2(win["pos"]) - half
+		var b: Vector2 = Vector2(win["pos"]) + half + n * HATCH_STANCE
+		out.append({"rect": Rect2(a.min(b), (b - a).abs()), "why": "the stance at serving hatch %d" % w})
+	return out
+
+
+## "" if a floor piece of category `cat` standing on `rect` keeps the doors
+## and the serving hatch clear, otherwise what it stands in. The plan's own
+## focus (the counter the shop is arranged around) may face the door.
+static func shop_keep_clear_hit(plan: HousePlan, room: int, rect: Rect2, cat: String) -> String:
+	if cat != "" and cat == plan.focus_cat() and room == plan.focus_room():
+		return ""
+	# the smith's forge and anvil are worked in the open front of the shop
+	if cat in ["hearth", "anvil"] and plan.spec.business == &"blacksmith":
+		return ""
+	var whys: PackedStringArray = []
+	for zone in shop_keep_clear(plan, room):
+		var over: Rect2 = Rect2(zone["rect"]).intersection(rect)
+		if over.size.x > 0.03 and over.size.y > 0.03:
+			whys.append(String(zone["why"]))
+	return " and ".join(whys)
+
+
+## The 3D box of a wall-mounted piece, as assembly stands it.
+static func mounted_box(item: Dictionary) -> Dictionary:
+	var key := String(item.get("key", ""))
+	var scale := float(item.get("scale", 1.0))
+	var yaw := float(item.get("yaw", 0.0)) + PropCatalog.face_offset(key)
+	var origin := PropCatalog.house_origin(item)
+	var centre := PropCatalog.plan_centre(key, origin, yaw, scale)
+	var size := PropCatalog.footprint_rotated(key, yaw) * scale
+	var bottom: float = origin.y + PropCatalog.floor_offset(key) * PropCatalog.placement_height_scale(item)
+	return {"rect": Rect2(centre - size * 0.5, size), "bottom": bottom,
+		"top": bottom + PropCatalog.placement_height(item)}
+
+
+## A shelf is hung OVER a bench or a counter on purpose, and the wares stand
+## under it; anything else it must clear by this much.
+const HUNG_OVER_OK: Array[String] = ["workbench", "counter"]
+const HUNG_CLEAR := 0.08
+
+
+## Does a floor piece of category `cat` on `rect` reaching up to `top` run into
+## a fitting hung on the wall of `room`? Returns the fitting's index or -1.
+static func shop_hangs_over(plan: HousePlan, room: int, rect: Rect2, top: float, cat := "") -> int:
+	if cat in HUNG_OVER_OK:
+		return -1
+	for i in plan.furniture_of(room):
+		var item: Dictionary = plan.furniture[i]
+		if not bool(item.get("mounted", false)) or not item.has("pos"):
+			continue
+		var box := mounted_box(item)
+		var over: Rect2 = Rect2(box["rect"]).intersection(rect)
+		if over.size.x > 0.03 and over.size.y > 0.03 				and minf(top, float(box["top"])) - maxf(HouseGeometry.FLOOR_T, float(box["bottom"])) > HUNG_CLEAR:
+			return i
+	return -1
+
+
+## The mirror of the above, for a fitting about to be hung: is any floor piece
+## (other than a bench or counter) in the box it would fill?
+static func shop_mount_clear(plan: HousePlan, room: int, body: Rect2, bottom: float, top: float) -> bool:
+	for i in plan.furniture_of(room):
+		var item: Dictionary = plan.furniture[i]
+		if bool(item.get("mounted", false)) or int(item.get("host", -1)) >= 0:
+			continue
+		if String(item.get("cat", PropCatalog.category(String(item["key"])))) in HUNG_OVER_OK:
+			continue
+		if not body.intersects(Rect2(item["rect"])):
+			continue
+		var item_top: float = float(HousePlan.record_storey(item)) * plan.spec.height 			+ HouseGeometry.FLOOR_T + PropCatalog.placement_height(item)
+		if minf(top, item_top) - maxf(bottom, HouseGeometry.FLOOR_T) > HUNG_CLEAR:
 			return false
 	return true
 
