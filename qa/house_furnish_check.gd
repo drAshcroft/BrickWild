@@ -103,7 +103,8 @@ const GROUPS := {
 		"bed_window", "table_focus", "sconce_pair", "shelf_over",
 		"chandelier_over", "corner_clutter", "focus", "bed_door", "front_door"],
 	"walk": ["tuck", "pull_out", "table_band", "seat_kinds", "seat_count", "sparse",
-		"lamps", "worktop", "bedside", "stowage", "corridor"],
+		"lamps", "worktop", "bedside", "stowage", "corridor", "bed_room", "seat_facing",
+		"free_storage"],
 }
 
 ## Every rule, in the order it runs, by the name its messages carry. A family
@@ -114,7 +115,8 @@ const RULES: Array[StringName] = [&"placed", &"vertical", &"supported", &"doorwa
 	&"bed_window", &"table_focus", &"sconce_pair", &"shelf_over",
 	&"chandelier_over", &"corner_clutter", &"focus",
 	&"tuck", &"pull_out", &"table_band", &"seat_kinds", &"seat_count", &"sparse",
-	&"lamps", &"worktop", &"bedside", &"stowage", &"corridor", &"bed_door", &"front_door"]
+	&"lamps", &"worktop", &"bedside", &"stowage", &"corridor", &"bed_door", &"front_door",
+	&"bed_room", &"seat_facing", &"free_storage"]
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -184,6 +186,9 @@ func _rule_handlers(report: Dictionary) -> Dictionary:
 		&"corridor": walk.check_corridor,
 		&"bed_door": walk.check_bed_door,
 		&"front_door": walk.check_front_door,
+		&"bed_room": walk.check_bed_room,
+		&"seat_facing": walk.check_seat_facing,
+		&"free_storage": walk.check_free_storage,
 	}
 
 

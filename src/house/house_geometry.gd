@@ -238,7 +238,22 @@ static func room_suits(plan: HousePlan, i: int, kind: StringName) -> bool:
 			and maxf(f.size.x, f.size.y) <= 3.0
 	if f.size.x * f.size.y < float(MIN_AREA.get(kind, 4.0)):
 		return false
+	if kind == &"bedroom" and plan.rooms[i].get("narrow_bed", false):
+		return minf(f.size.x, f.size.y) >= NARROW_BEDROOM_SIDE
 	return minf(f.size.x, f.size.y) >= float(MIN_SIDE.get(kind, 1.6))
+
+
+## HOUSE-RICH-ROOM-USE: a house with no room of 3.3 m may still sleep in a long
+## room this wide (a twin bed, its nightstand and a walkway beside it). Only
+## HousePlanLevels._ensure_a_bed grants it, by marking the room `narrow_bed`.
+const NARROW_BEDROOM_SIDE := 2.8
+
+
+static func narrow_bedroom_fits(plan: HousePlan, i: int) -> bool:
+	var f: Rect2 = room_floor_rect(plan, i)
+	return minf(f.size.x, f.size.y) >= NARROW_BEDROOM_SIDE \
+		and maxf(f.size.x, f.size.y) >= 4.0 \
+		and f.size.x * f.size.y >= float(MIN_AREA.get(&"bedroom", 4.0))
 
 ## Rooms people live in. A store room needs neither a window nor a chair.
 const HABITABLE := [&"hall", &"kitchen", &"bedroom", &"workshop", &"parlour",

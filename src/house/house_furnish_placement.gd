@@ -5,6 +5,8 @@ extends RefCounted
 ## These bounds keep a large hall from turning a placement search into a
 ## quarter million floor probes.
 const WALL_ESSENTIAL := ["bed", "hearth", "bookcase", "nightstand", "chest"]
+## Storage that is never stood free of a wall in an ordinary house.
+const FREE_STORAGE_REFUSED := ["storage", "chest", "bookcase"]
 const PROBE_STEP := 0.12
 const MAX_PROBES := 128
 ## How far a seat may run past the side of the table it is drawn up to before
@@ -309,7 +311,11 @@ static func place_one(plan: HousePlan, spec: HouseSpec, room: int, cat: String,
 					and String(step.get("group", "")) == "sleep" \
 					and cat == "chest" \
 					and String(step.get("near_anchor", "")) != "head_end"
-				if not required_cooking_store and not required_sleep_storage:
+				# HOUSE-RICH-ROOM-USE: a cupboard no wall would take is left out, not
+				# stood in the middle of the floor, where it is the thing everybody
+				# walks round (a rich landing, 26 Oct). Workbenches may still stand out.
+				var stray_storage: bool = HouseFurnishingRecipes.is_ordinary_house(plan) 					and cat in FREE_STORAGE_REFUSED
+				if not required_cooking_store and not required_sleep_storage and not stray_storage:
 					# no wall will take it. A workbench can stand out in the room --
 					# a bed cannot, which is what WALL_ESSENTIAL is for -- and the
 					# placement records that it did, so the check that wants a wall
@@ -607,6 +613,20 @@ static func _restore_borrowed_blocks(blocked: Array[Rect2], original_count: int,
 ## Place a piece beside an earlier activity component. The relation is measured
 ## from the host and candidate bounds, then subjected to the ordinary overlap
 ## and use-zone test; it cannot waive clearance.
+## A seat with its back to a wall: the floor it needs is in front of it.
+static func _zone_in_front(cand: Dictionary) -> void:
+	var z0: Rect2 = cand["zone"]
+	var c0: Vector2 = Rect2(cand["rect"]).get_center()
+	var strip0: PackedVector2Array = cand.get("zone_strip", PackedVector2Array())
+	HouseFurnishGeometry.set_zone(cand,
+		Rect2(c0 * 2.0 - z0.get_center() - z0.size / 2.0, z0.size))
+	var mirrored := PackedVector2Array()
+	for corner in strip0:
+		mirrored.append(c0 * 2.0 - corner)
+	if not mirrored.is_empty():
+		cand["zone_strip"] = mirrored
+
+
 static func _place_beside(plan: HousePlan, room: int, key: String,
 		step: Dictionary, blocked: Array[Rect2], zones: Array[Rect2]) -> void:
 	var wanted_cat: String = String(step.get("near_cat", ""))
@@ -685,8 +705,14 @@ static func _place_beside(plan: HousePlan, room: int, key: String,
 		if not aligned.is_empty():
 			HouseFurnishGeometry.commit(plan, room, aligned, blocked, zones)
 		return
+	# HOUSE-RICH-ROOM-USE: a chair beside a settle is a second place on the same
+	# row. It faces the way the settle faces (into the room) and keeps its legroom
+	# in front; trying the four yaws in a fixed order put it with its back to the
+	# room and its knees to the plaster.
+	var companion: bool = String(step.get("cat", "")) == "seat" 		and wanted_cat in ["bench", "seat"]
+	var yaws: Array = [float(host.get("yaw", 0.0))] if companion 		else [0.0, PI / 2.0, PI, PI * 1.5]
 	for scale in HouseFurnishGeometry.scales(key):
-		for yaw in [0.0, PI / 2.0, PI, PI * 1.5]:
+		for yaw in yaws:
 			var probe := HouseFurnishGeometry.candidate(key, host_center, float(yaw), 1.0, float(scale))
 			var candidate_rect := Rect2(probe["rect"])
 			if head_dir != Vector2.ZERO:
@@ -700,6 +726,8 @@ static func _place_beside(plan: HousePlan, room: int, key: String,
 			for offset in offsets:
 				var center := host_center + offset
 				var candidate := HouseFurnishGeometry.candidate(key, center, float(yaw), 1.0, float(scale))
+				if companion and bool(host.get("settle", false)):
+					_zone_in_front(candidate)
 				if HouseFurnishGeometry.fits(plan, room, candidate,
 						HouseGeometry.room_floor_rect(plan, room), blocked, zones, []):
 					HouseFurnishGeometry.commit(plan, room, candidate, blocked, zones)
@@ -1422,17 +1450,7 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 						# floor it needs is in FRONT of it, for the legs, not the
 						# pull-back space behind a chair at a table, which here
 						# would be inside the masonry.
-						var z0: Rect2 = try_cand["zone"]
-						var c0: Vector2 = Rect2(try_cand["rect"]).get_center()
-						var strip0: PackedVector2Array = try_cand.get("zone_strip",
-							PackedVector2Array())
-						HouseFurnishGeometry.set_zone(try_cand,
-							Rect2(c0 * 2.0 - z0.get_center() - z0.size / 2.0, z0.size))
-						var mirrored := PackedVector2Array()
-						for corner in strip0:
-							mirrored.append(c0 * 2.0 - corner)
-						if not mirrored.is_empty():
-							try_cand["zone_strip"] = mirrored
+						_zone_in_front(try_cand)
 					if hearth_only >= 0:
 						var breast := HouseGeometry.breast_for_hearth(plan, room, try_cand, wi)
 						if not _breast_fits(plan, room, breast, floor_rect, blocked, zones):

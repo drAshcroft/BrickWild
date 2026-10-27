@@ -361,16 +361,31 @@ static func _ensure_a_bed(p: HousePlan) -> void:
 		if p.storey_of_room(a) != p.storey_of_room(b):
 			return p.storey_of_room(a) > p.storey_of_room(b)
 		return HouseGeometry.room_area(p, a) > HouseGeometry.room_area(p, b))
-	for i in order:
-		if i == start or p.kind_of(i) == &"hall":
-			continue
-		if not HouseGeometry.room_suits(p, i, &"bedroom"):
-			continue
-		var was: StringName = p.kind_of(i)
-		p.rooms[i]["kind"] = &"bedroom"
-		if _privacy_holds(p, start):
-			return
-		p.rooms[i]["kind"] = was
+	# HOUSE-RICH-ROOM-USE: the second tier. A rich house's upper rows are 2.7 to
+	# 2.9 m deep, so no room cleared the 3.3 m bedroom side and nothing was left
+	# to sleep in but the hall, where the furnisher then dropped a bed. A long
+	# narrow room that still holds a bed and its walkway
+	# (HouseGeometry.NARROW_BEDROOM_SIDE) is a bedroom; a bed in the hall is not.
+	for tier in range(2):
+		for i in order:
+			if i == start or p.kind_of(i) == &"hall":
+				continue
+			var narrow: bool = tier == 1
+			if narrow:
+				if HouseGeometry.room_suits(p, i, &"bedroom") \
+						or not HouseGeometry.narrow_bedroom_fits(p, i):
+					continue
+				p.rooms[i]["narrow_bed"] = true
+			elif not HouseGeometry.room_suits(p, i, &"bedroom"):
+				continue
+			var was: StringName = p.kind_of(i)
+			p.rooms[i]["kind"] = &"bedroom"
+			if narrow:
+				HousePlanOpenings.open_up_privacy(p)
+			if _privacy_holds(p, start):
+				return
+			p.rooms[i]["kind"] = was
+			p.rooms[i].erase("narrow_bed")
 
 
 ## Can every room still be reached without crossing somewhere somebody sleeps?

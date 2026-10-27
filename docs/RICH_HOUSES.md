@@ -204,3 +204,24 @@ existing seed" measured rather than asserted.
 per square metre, and the odd walkable-but-cut-off pocket. Those are the same
 documented compromises every other archetype reports at that scale, and they
 are reported rather than quietened.
+## Room use (HOUSE-RICH-ROOM-USE)
+
+The 26 Oct bug walk (rich house seed 1) found a bed in the entrance hall, no bed
+in any bedroom, a cupboard stood out in the walkway and chairs facing the plaster.
+Four roots, four fixes:
+
+* **No room could sleep.** The rich ground floor is four rows (hall, parlour,
+  dining room, store) and the upper floors clone it, so the upper rows are 2.7 to
+  2.9 m deep, under the 3.3 m bedroom side. The plan had no bedroom, and the
+  furnisher's "a hall that is also the bedroom" fallback put the bed in the entrance
+  hall. `HousePlanLevels._ensure_a_bed` now has a second tier: a long room at least
+  `HouseGeometry.NARROW_BEDROOM_SIDE` (2.8 m) wide may be a bedroom, marked
+  `narrow_bed` on the room so `room_suits` agrees. The tier only runs when the whole
+  house has no sleeping room, so no house that already sleeps changes its plan.
+* **Chairs beside a settle** were tried at yaw 0, pi/2, pi, 3pi/2 in that order
+  (`_place_beside`), so two of the four faced the wall. A seat beside a bench or
+  seat now takes the host's yaw and keeps its legroom in front.
+* **A cupboard no wall would take** was stood free in the middle of the floor.
+  `FREE_STORAGE_REFUSED`: an ordinary house leaves it out.
+* Rules in `HouseFurnishWalkCheck`: `bed_room`, `seat_facing`, `free_storage`.
+  `walkpins` holds a fixture for each and furnishes seeds 1, 8102 and 21325.

@@ -22,6 +22,10 @@ extends RefCounted
 ##   BED_DOOR     a bed is not right beside the door (feng shui, and sense)
 ##   FRONT_DOOR   nothing at all stands in the way in through the front door;
 ##                no "the room had nowhere else for it"
+##   BED_ROOM     a bed stands in a room people sleep in; the hall of a house
+##                with an upstairs that can sleep is not one (HOUSE-RICH-ROOM-USE)
+##   SEAT_FACING  a chair that is not drawn up to a table does not face a wall
+##   FREE_STORAGE a cupboard, chest or bookcase is against a wall or not there
 ##
 ## Every rule fails on a pinned building; tests/suites/walk_pin_suite.gd holds
 ## the fixtures that prove it.
@@ -385,6 +389,63 @@ func check_bed_door(plan: HousePlan) -> void:
 					failures.append("bed_door: the %s lies right beside door %d"
 						% [HouseFurnishCheck.who(plan, f), d])
 					break
+
+
+## A bed in the entrance hall of a house that has an upstairs room able to take
+## it (rich house seed 1, 26 Oct: the plan had no bedroom, the furnisher laid
+## the bed in the hall). A one-room hovel, a hall with nowhere else, or a shop
+## with its own programme is exempt: the plan could not do better.
+func check_bed_room(plan: HousePlan) -> void:
+	if not HouseFurnishingRecipes.is_ordinary_house(plan) or int(plan.spec.storeys) <= 1:
+		return
+	var could_sleep := -1
+	for i in range(plan.room_count()):
+		if plan.storey_of_room(i) > 0 and plan.kind_of(i) != &"hall" 				and (HouseGeometry.room_suits(plan, i, &"bedroom")
+				or HouseGeometry.narrow_bedroom_fits(plan, i)):
+			could_sleep = i
+			break
+	if could_sleep < 0:
+		return
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(String(p["key"])) != "bed":
+			continue
+		if not plan.kind_of(int(p["room"])) in HouseGeometry.SLEEPING:
+			failures.append("bed_room: the %s is in a %s, not a bedroom (room %d could sleep)"
+				% [HouseFurnishCheck.who(plan, f), String(plan.kind_of(int(p["room"]))), could_sleep])
+
+
+## How far ahead of a chair is the wall it would be sat facing.
+const SEAT_FACING_REACH := 0.35
+
+
+func check_seat_facing(plan: HousePlan) -> void:
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		if PropCatalog.category(String(p["key"])) != "seat" or int(p.get("host", -1)) >= 0 				or p.get("mounted", false):
+			continue
+		var room: int = int(p["room"])
+		if plan.is_polygonal(room):
+			continue
+		var rect := Rect2(p["rect"])
+		var facing: Vector2 = HouseFurnishScore._facing_of(float(p["yaw"]))
+		var half: float = (absf(facing.x) * rect.size.x + absf(facing.y) * rect.size.y) * 0.5
+		var ahead: Vector2 = rect.get_center() + facing * (half + SEAT_FACING_REACH)
+		if not HouseGeometry.room_floor_rect(plan, room).has_point(ahead):
+			failures.append("seat_facing: the %s faces the wall, with nothing to sit at"
+				% HouseFurnishCheck.who(plan, f))
+
+
+## A stray cupboard in the middle of the floor is what the walk pins call
+## "in the walkway"; the furnisher leaves it out instead.
+func check_free_storage(plan: HousePlan) -> void:
+	if not HouseFurnishingRecipes.is_ordinary_house(plan):
+		return
+	for f in range(plan.furniture.size()):
+		var p: Dictionary = plan.furniture[f]
+		if bool(p.get("free_standing", false)) 				and String(p.get("cat", "")) in HouseFurnishPlacement.FREE_STORAGE_REFUSED:
+			failures.append("free_storage: the %s stands out in the room, in the walkway"
+				% HouseFurnishCheck.who(plan, f))
 
 
 func check_front_door(plan: HousePlan) -> void:

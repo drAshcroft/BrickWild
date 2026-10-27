@@ -25,6 +25,7 @@ static func run() -> SuiteResult:
 	_corridor(res, domus)
 	_stairs(res)
 	_zfight(res)
+	_rich_room_use(res)
 	return res
 
 
@@ -465,6 +466,58 @@ const ZFIGHT_BUDGET := {
 	"church/romanesque": 12,
 	"windmill/tower": 40,
 }
+
+
+## HOUSE-RICH-ROOM-USE (walk pins 1a17b25f-1,3,4,5, rich house seed 1): a bed in
+## the entrance hall, a cupboard out in the walkway, a chair facing the wall.
+## Each rule fails on a hand-made fixture and is silent on the same room put
+## right; then the three pinned seeds are furnished for real and held to them.
+static func _rich_room_use(res: SuiteResult) -> void:
+	var rich := _bare(&"house", &"rich")
+	if rich == null:
+		res.fail("the rich house no longer generates")
+		return
+	var hall := _room(rich, &"hall")
+	var bedroom := _room(rich, &"bedroom")
+	res.checked += 1
+	if bedroom < 0:
+		res.fail("bed_room: the rich house has no bedroom for the household to sleep in")
+		bedroom = 1      # the fixtures below still need a second room
+	var hr := HouseGeometry.room_floor_rect(rich, hall)
+	_put(rich, hall, "Bed_Twin1", hr.get_center())
+	_expect(res, rich, "bed_room", true, "a bed in the entrance hall")
+	var br := HouseGeometry.room_floor_rect(rich, bedroom)
+	_put(rich, bedroom, "Bed_Twin1", br.get_center())
+	_expect(res, rich, "bed_room", false, "a bed in the bedroom")
+	var at := Vector2(hr.get_center().x, hr.position.y + 0.45)
+	_put(rich, hall, "Chair_1", at, 0.0)
+	_expect(res, rich, "seat_facing", true, "a chair facing the wall with nothing to sit at")
+	_put(rich, hall, "Chair_1", at, PI)
+	_expect(res, rich, "seat_facing", false, "the same chair facing the room")
+	var cab := _put(rich, hall, "Cabinet", hr.get_center(), 0.0)
+	rich.furniture[cab]["free_standing"] = true
+	_expect(res, rich, "free_storage", true, "a cupboard stood out in the middle of the floor")
+	_put(rich, hall, "Cabinet", hr.get_center(), 0.0)
+	_expect(res, rich, "free_storage", false, "a cupboard that the room took against its wall")
+	for seed in [1, 8102, 21325]:
+		var req := BrickWild.default_request(&"house", seed)
+		req.style = &"rich"
+		var plan := BrickWild.generate(req).plan as HousePlan
+		res.checked += 1
+		if plan == null:
+			res.fail("rich house seed %d does not generate" % seed)
+			continue
+		var beds := 0
+		for p in plan.furniture:
+			if PropCatalog.category(String(p["key"])) == "bed":
+				beds += 1
+		res.checked += 1
+		if beds == 0:
+			res.fail("rich house seed %d: no bed anywhere" % seed)
+		for rule in ["bed_room", "seat_facing", "free_storage"]:
+			res.checked += 1
+			for said in _said(plan, rule):
+				res.fail("rich house seed %d: %s" % [seed, said])
 
 
 static func _zfight(res: SuiteResult) -> void:
