@@ -30,8 +30,11 @@ static func describe_kind(kind: StringName) -> Dictionary:
 
 
 ## A valid request for a kind, filled from that kind's own default envelope.
-static func default_request(kind: StringName, p_seed: int = 0) -> BuildingRequest:
-	return BuildingLibrary.defaults(kind, p_seed)
+## With `style`, the site that style needs to be itself (a wizard's tower is
+## tall and narrow; BuildingLibrary.STYLE_SITES).
+static func default_request(kind: StringName, p_seed: int = 0,
+		style: StringName = &"") -> BuildingRequest:
+	return BuildingLibrary.defaults(kind, p_seed, style)
 
 
 ## The word for one option id, for a caller that has to print it.

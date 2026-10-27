@@ -88,6 +88,9 @@ var _save_seed: Button
 var _skip: Button
 var _file_todos: CheckBox
 var _tour_label: Label
+const SITE_FIELDS: Array[StringName] = [&"width", &"length", &"height"]
+## width / length / height spin boxes, by field.
+var _site := {}
 var _jank_row: Control
 var _jank: HSlider
 var _jank_value: Label
@@ -243,18 +246,24 @@ func _build_ui() -> void:
 	grid.columns = 2
 	box.add_child(grid)
 	_kind_opt = _grid_option(grid, "Kind")
-	_kind_opt.item_selected.connect(func(_i): _fill_options())
+	_kind_opt.item_selected.connect(func(_i):
+		_off_tour()
+		_fill_options())
 	_style_label = Label.new()
 	_style_label.text = "Style"
 	grid.add_child(_style_label)
 	_style_opt = OptionButton.new()
 	_style_opt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_style_opt.item_selected.connect(func(_i):
+		_off_tour()
+		_apply_site())
 	grid.add_child(_style_opt)
 	_purpose_label = Label.new()
 	_purpose_label.text = "Purpose"
 	grid.add_child(_purpose_label)
 	_purpose_opt = OptionButton.new()
 	_purpose_opt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_purpose_opt.item_selected.connect(func(_i): _off_tour())
 	grid.add_child(_purpose_opt)
 	var seed_label := Label.new()
 	seed_label.text = "Seed"
@@ -378,6 +387,22 @@ func _grid_option(grid: GridContainer, text: String) -> OptionButton:
 ## Jank, ground fall and foundation: each row shows only for the kinds whose
 ## request accepts it, so the sidebar never offers a request that is refused.
 func _build_request_extras(box: VBoxContainer) -> void:
+	# the site: every kind takes one, and some styles need their own (a
+	# wizard's tower is tall and narrow), so it is always on the sidebar
+	var size_row := HBoxContainer.new()
+	box.add_child(size_row)
+	for f in SITE_FIELDS:
+		var l := Label.new()
+		l.text = String(f).left(1).to_upper()
+		l.tooltip_text = String(f)
+		size_row.add_child(l)
+		var spin := SpinBox.new()
+		spin.tooltip_text = "%s (m)" % f
+		spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		spin.value_changed.connect(func(_v): _off_tour())
+		size_row.add_child(spin)
+		_site[f] = spin
+
 	var jank_row := HBoxContainer.new()
 	_jank_row = jank_row
 	box.add_child(jank_row)
@@ -599,6 +624,10 @@ func _set_ui(args: Dictionary) -> void:
 	_fill_options()
 	_select_meta(_style_opt, String(args.get("style", "")))
 	_select_meta(_purpose_opt, String(args.get("purpose", "")))
+	_apply_site()
+	for f in SITE_FIELDS:
+		if args.has(String(f)):
+			(_site[f] as SpinBox).set_value_no_signal(float(args[String(f)]))
 	_seed_spin.value = int(args.get("seed", "1"))
 	_cutaway.button_pressed = args.has("cutaway")
 	_jank.value = clampf(float(args.get("jank", "0")), 0.0, 1.0)
@@ -632,6 +661,34 @@ func _fill_options() -> void:
 	_jank_row.visible = d.has("jank")
 	_fall_row.visible = _kind() in FALL_KINDS
 	_found_row.visible = _kind() in PILE_KINDS
+	_apply_site()
+
+
+## The site the kind and the chosen style want, inside the kind's own ranges
+## (BuildingLibrary.defaults with a style gives a wizard's tower its tower).
+func _apply_site() -> void:
+	var d := BrickWild.describe_kind(_kind())
+	var style: StringName = _style_opt.get_item_metadata(_style_opt.selected) \
+		if _style_opt.item_count > 0 else &""
+	var r := BrickWild.default_request(_kind(), 0, style)
+	for f in SITE_FIELDS:
+		var spin: SpinBox = _site[f]
+		var range_row: Dictionary = d.get(String(f), {})
+		spin.min_value = float(range_row.get("min", 0.0))
+		spin.max_value = float(range_row.get("max", 400.0))
+		spin.step = float(range_row.get("step", 0.5))
+		spin.set_value_no_signal(float(r.get(f)))
+
+
+## A hand change of kind, style, purpose or size leaves the tour: the review
+## is no longer that stop, so it is not recorded or reopened as one. Save &
+## next stop goes back to the tour where it was left.
+func _off_tour() -> void:
+	if _base.is_empty():
+		return
+	_base = {}
+	_tour_label.text = "Off the tour (left at stop %d / %d). Save & next stop resumes it." % [
+		_tour_i + 1, _tour.size()]
 
 
 static func _select_meta(opt: OptionButton, id: String) -> void:
@@ -652,7 +709,9 @@ func _request_from_ui() -> BuildingRequest:
 		req.style = _style_opt.get_item_metadata(_style_opt.selected)
 	if _purpose_opt.item_count > 0:
 		req.purpose = _purpose_opt.get_item_metadata(_purpose_opt.selected)
-	req.jank = snappedf(_jank.value, 0.01) if _jank_row.visible else 0.0
+	for f in SITE_FIELDS:
+		req.set(f, (_site[f] as SpinBox).value)
+	req.jank =snappedf(_jank.value, 0.01) if _jank_row.visible else 0.0
 	req.ground_fall_m = 0.0
 	req.ground_downhill_deg = 0.0
 	req.foundation = &""
@@ -688,6 +747,8 @@ func _reopen_command(req: BuildingRequest) -> String:
 		parts.append("--style=%s" % req.style)
 	if String(req.purpose) != "":
 		parts.append("--purpose=%s" % req.purpose)
+	parts.append("--width=%s --length=%s --height=%s" % [
+		_num(req.width), _num(req.length), _num(req.height)])
 	if req.jank > 0.0:
 		parts.append("--jank=%s" % _num(req.jank))
 	if req.ground_fall_m > 0.0:
@@ -875,6 +936,9 @@ func _enter_stop(i: int, over := {}) -> void:
 		"foundation": _base.get("foundation", ""), "water": str(_base.get("pile_water_m", 1.0))}
 	if _base.get("cutaway", false):
 		ui["cutaway"] = ""
+	for f in SITE_FIELDS:
+		if _base.has(String(f)):
+			ui[String(f)] = str(_base[String(f)])
 	ui.merge(over, true)
 	_set_ui(ui)
 	_tour_label.text = "Stop %d / %d — %s" % [i + 1, _tour.size(),
@@ -905,11 +969,13 @@ func _set_buttons(on: bool) -> void:
 
 
 ## Every prop gets the architecture's kind of collision, so furniture that
-## blocks a door or a stair is felt, not only seen.
+## blocks a door or a stair is felt, not only seen. Planting (a village's
+## "Plants": clover, grass, flowers) is walked through, so it stays soft; the
+## walk pins "these should not have colliders" (7 Oct and 26 Oct) were this.
 static func _solidify(root: Node3D) -> void:
 	for node in root.find_children("*", "MeshInstance3D", true, false):
 		var mi := node as MeshInstance3D
-		if mi.mesh == null:
+		if mi.mesh == null or _under(mi, root, &"Plants"):
 			continue
 		var has_body := false
 		for c in mi.get_children():
@@ -917,6 +983,15 @@ static func _solidify(root: Node3D) -> void:
 				has_body = true
 		if not has_body:
 			mi.create_trimesh_collision()
+
+
+static func _under(node: Node, root: Node, group_name: StringName) -> bool:
+	var p := node.get_parent()
+	while p != null and p != root:
+		if p.name == group_name:
+			return true
+		p = p.get_parent()
+	return false
 
 
 ## Outside the front door, facing it. Every family puts its entrance on its
@@ -932,6 +1007,11 @@ func _respawn() -> void:
 	if _placement.has("front"):
 		var front: Vector3 = _placement["front"]
 		spot = Vector3(door.x, 0, door.z) + front * 3.0
+		if door == Vector3.ZERO:
+			# no door in the placement (a castle tower house): stand off the
+			# footprint on the front side, not on top of the building
+			var c := bounds.get_center()
+			spot = Vector3(c.x, 0, c.z) + front * (maxf(bounds.size.x, bounds.size.z) * 0.5 + 4.0)
 		top = float(_placement.get("ray_top", top))
 		_yaw = atan2(front.x, front.z)
 	var q := PhysicsRayQueryParameters3D.create(Vector3(spot.x, top, spot.z),
@@ -1309,6 +1389,11 @@ func _clear_pins() -> void:
 		(pin["marker"] as Node).queue_free()
 	_pins.clear()
 	_pin_list.clear()
+	# a new building is a new review: the boxes and notes start empty, or one
+	# building's ticks are recorded against the next
+	for f in FIELDS:
+		(_checks[f] as CheckBox).button_pressed = false
+	_notes.text = ""
 	_review_id = "%x%x" % [int(Time.get_unix_time_from_system() * 1000.0), randi()]
 	_review_time = Time.get_datetime_string_from_system(true) + "Z"
 	_pin_serial = 0

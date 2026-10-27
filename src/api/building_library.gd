@@ -274,7 +274,19 @@ static func field_label(kind: StringName, field: StringName) -> String:
 ## A valid request for a kind, filled from the envelope's own default values.
 ## One place decides what "a house, please" means, and it is the same place
 ## the range check reads, so a default can never be out of its own range.
-static func defaults(kind: StringName, p_seed: int = 0) -> BuildingRequest:
+## The site a style needs before it can be itself. A wizard's tower is a tower
+## house, and CastleGenerator turns a tower house back into a plain rect on an
+## enclosed tier or on a site not twice as tall as it is wide, so the castle
+## default site (55 x 50 x 18) gave a purple Norman castle (walk pin
+## WALK-1a17b7f6-1). Only styles that need it are listed.
+const STYLE_SITES := {
+	&"castle": {&"wizard": {"width": 10.0, "length": 10.0, "height": 28.0}},
+}
+
+
+## The default request for a kind; with `style`, that style and the site it
+## needs (STYLE_SITES), so `defaults(&"castle", seed, &"wizard")` is a tower.
+static func defaults(kind: StringName, p_seed: int = 0, style: StringName = &"") -> BuildingRequest:
 	if not KIND_ROWS.has(kind):
 		return null
 	var row: Dictionary = KIND_ROWS[kind]
@@ -289,6 +301,12 @@ static func defaults(kind: StringName, p_seed: int = 0) -> BuildingRequest:
 	out.style = style_options[0]["id"] if not style_options.is_empty() else &""
 	var purpose_options: Array[Dictionary] = options(kind, &"purpose")
 	out.purpose = purpose_options[0]["id"] if not purpose_options.is_empty() else &""
+	if style != &"":
+		out.style = style
+		var sites: Dictionary = STYLE_SITES.get(kind, {})
+		var site: Dictionary = sites.get(style, {})
+		for field in site:
+			out.set(field, float(site[field]))
 	return out
 
 
