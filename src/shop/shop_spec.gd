@@ -226,7 +226,7 @@ const BUSINESSES := {
 	&"tailor": {"label": "Tailor", "rooms": [&"sales_floor", &"workshop", &"store"],
 		"door_w": 1.0, "front_open": {"width": 1.4}, "focus": {"cat": "counter", "faces_door": true}},
 	&"carpenter": {"label": "Carpenter", "rooms": [&"workshop", &"sales_floor", &"store"],
-		"door_w": 1.2, "focus": {"cat": "workbench", "faces_door": false}},
+		"door_w": 1.2, "focus": {"cat": "workbench", "faces_door": true}},
 	&"town_hall": {"label": "Town Hall", "rooms": [&"council_chamber", &"office", &"records", &"store"],
 		"door_w": 1.2, "focus": {"cat": "table", "faces_door": false}},
 	&"guildhall": {"label": "Guildhall", "rooms": [&"meeting_hall", &"office", &"records", &"store"],

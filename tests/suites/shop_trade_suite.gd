@@ -671,7 +671,7 @@ static func _two_doors(plan: HousePlan, a: int, b: int) -> bool:
 ## anvil or bench of a work-front trade (the customer is served AT the work, so
 ## the checklist's "counter" is that piece) and the alchemist's counter.
 const TRAIT_TRADES: Array[StringName] = [&"butcher", &"apothecary", &"tailor",
-	&"alchemist_laboratory", &"blacksmith"]
+	&"alchemist_laboratory", &"blacksmith", &"carpenter"]
 const BOARD_CATS: Array[String] = ["counter", "shelf", "rack", "workbench", "anvil", "bench", "hearth"]
 
 
