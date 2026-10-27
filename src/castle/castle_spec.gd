@@ -290,6 +290,7 @@ const STYLES := {
 		"label": "Edwardian",
 		# Beaumaris and Caernarfon: drum towers, twin-towered gatehouse, and
 		# where there is room, a ring of walls inside a ring of walls.
+		"concentric": 0.13,
 		"tower_shape": &"round", "tower_roof": [&"cone", &"flat"],
 		"keep_shape": [&"shell", &"round"], "battlements": 1.0, "batter": 0.05,
 		"side_towers": [1, 2], "gate_towers": 0.95, "barbican": 0.6,
@@ -386,7 +387,7 @@ const STYLES := {
 		"plan_kind": &"polygon", "curved_edges": true,
 		"tower_shape": &"round", "tower_roof": [&"cone", &"flat"],
 		"keep_shape": [&"round", &"shell"], "battlements": 0.0, "batter": 0.01,
-		"side_towers": [0, 1], "gate_towers": 0.2, "barbican": 0.0,
+		"side_towers": [0, 1], "gate_towers": 0.0, "barbican": 0.0,
 		"roof_pitch": [0.35, 0.65], "windows": &"arched", "dormers": 0.0,
 		"stone": ["c7d1c2", "9eae98"], "roof": ["51695d", "354a42"],
 		"chimneys": [0], "wings": [1], "merlon_profile": &"block",

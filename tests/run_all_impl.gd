@@ -68,7 +68,7 @@ const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "plac
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"crooked", "temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "sacredid", "vis009", "vis010", "vis016", "catalogcache",
-	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchsize", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad", "wunchecked",
+	"houseqafurnish", "houseqafurnishfast", "houseqafull", "hwitchcompact", "hwitchsize", "hwitchflue", "castlechange", "coccupancy", "cmotteroute", "ckeepstair", "cbergfried", "cidentity", "cterrace", "chimeji", "barracks100", "barracksquick", "librarybiz", "libraryreg", "library100", "prison", "palace", "markethall", "wld001_domus", "wld001_riad", "wunchecked",
 	"wld001_palazzo", "wld001_domus_07", "wld001_domus_10",
 	"cslope",
 	"wld001_domus_14", "wld001_domus_19", "wld001_riad_07", "wld001_riad_10",
@@ -156,7 +156,7 @@ const LANES: Dictionary = {
 	# vtplan, vstepswalk, vterrain and vanalysis.
 	"lane:village-terrain": ["vterrainlane"],
 	"lane:village-appearance-fast": ["vdecoration", "vdecorationapi", "vappearance"],
-	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cmotteaccess", "kwalk"],
+	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cidentity", "cmotteaccess", "kwalk"],
 	"lane:motte-change": ["cmotteplan", "cmotteaccess", "coccupancy"],
 	"lane:castle-spot": ["castlechange", "chimeji"],
 	"lane:castle": ["castle", "cnormals", "cmassing", "clandmark", "cvoxelqa", "ctowerplan", "cmotteplan", "cmotteaccess", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried", "cterrace"],
@@ -319,6 +319,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/castle_forebuilding_suite.gd").run()
 		"cbergfried":
 			return preload("res://tests/suites/castle_bergfried_suite.gd").run()
+		"cidentity":
+			return preload("res://tests/suites/castle_identity_suite.gd").run()
 		"cas013":
 			return preload("res://tests/suites/castle_curved_suite.gd").run()
 		"cterrace":

@@ -118,6 +118,13 @@ static func generate(spec: CastleSpec, p_seed: int) -> void:
 	spec.ward_gap = 0.0
 	if spec.tier == &"fortress" and spec.plan_kind != &"motte_bailey":
 		_fit_inner_ward(spec, r)
+	# A concentric style (Beaumaris, Caernarfon) is a ring inside a ring even
+	# at the castle tier: the second enceinte is what tells an Edwardian
+	# layout from a single-ring polygon such as the elven hall (CASTLE-STYLE-
+	# IDENTITY). The gap is fixed, not drawn, so no other decision moves; a
+	# site with no room for two rings falls back to one, as a fortress does.
+	if spec.tier == &"castle" and s.has("concentric") 			and spec.plan_kind in [&"rect", &"polygon"]:
+		force_inner_ward(spec, minf(spec.width, spec.length) * float(s["concentric"]))
 	if spec.plan_kind == &"terraced" and enclosed:
 		spec.terrace_rise = maxf(spec.terrace_rise, 3.0)
 		force_inner_ward(spec, minf(spec.width, spec.length) * 0.16)
