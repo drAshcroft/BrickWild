@@ -114,6 +114,14 @@ Each is a statement somebody who has looked at windmills would make out loud:
   sails that pass it.
 - `gear` — a windpump's rod runs from its crank down to its pump.
 - `wheel` — a polder mill's wheel stands in its own water and off its own bed.
+- `swept` — the DISC the rotor sweeps (radius `sail_r`, as thick as the sails,
+  plus 0.2 m each way) holds no wall, door step, rail, deck, lattice leg or
+  boom. Only the shaft, gear and rod that drive it may reach in. Boxes are
+  sampled through their volume, the drum through `radius_at`. The stage's rail
+  stands `STAGE_SETBACK` behind the sail plane; a post mill's plane stands past
+  its yawed burr's corner (`burr_front`); a windpump's fan is carried forward
+  of the lattice (`fan_reach`). `faulty_windmill_rotor_builder.gd` is the
+  failing control.
 - `envelope`, `solid`, `facing`, `component` — the shared four.
 
 Two measurement notes, because they are the difference between a check and a

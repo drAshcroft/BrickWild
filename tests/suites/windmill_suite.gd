@@ -38,6 +38,27 @@ static func _negative_controls(res: SuiteResult) -> void:
 		_expect(res, _has_rule(rep, "openings"),
 			"%s: openings placed on the bounding circle passed the openings rule (%s)."
 				% [mill_type, rep["failures"]])
+	# the 26 Oct walk: a rail in the sail plane, a gearbox in the fan's disc, and
+	# a post mill's sail plane left where a square burr turned off the axis
+	# pokes its corner through it
+	for mill_type in [&"tower", &"smock", &"windpump"]:
+		var spec := _spec(mill_type, 12.0, 6.0, 12.0, 1)
+		var faulty: WindmillBuilder = preload("res://tests/fixtures/faulty_windmill_rotor_builder.gd").new()
+		var mesh: ArrayMesh = faulty.build(spec)
+		var rep: Dictionary = WindmillCheck.new().check(spec, mesh, faulty)
+		_expect(res, _has_rule(rep, "swept"),
+			"%s: a rotor sweeping through its own body passed the swept rule (%s)."
+				% [mill_type, rep["failures"]])
+	for sd in [1, 8102]:
+		var spec := _spec(&"post", 12.0, 6.0, 12.0, sd)
+		spec.body_yaw = 0.55
+		spec.stage_r = spec.base_r + 0.35
+		var builder := WindmillBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		var rep: Dictionary = WindmillCheck.new().check(spec, mesh, builder)
+		_expect(res, _has_rule(rep, "swept"),
+			"post s%d: a burr's corner in the sail plane passed the swept rule (%s)."
+				% [sd, rep["failures"]])
 	for mill_type in [&"tower", &"smock"]:
 		var spec := _spec(mill_type, 12.0, 6.0, 12.0, 1)
 		spec.sail_r = spec.curb_y * 0.3          # vanes of 0.6 x the height

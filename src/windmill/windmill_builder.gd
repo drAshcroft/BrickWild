@@ -466,25 +466,26 @@ func _stage() -> void:
 	tag("stage")
 	host("stage")
 	var start: float = -PI * 0.5 - spec.stage_arc * 0.5
+	var ring: float = WindmillGeometry.stage_ring_r(spec)
 	var inner: float = WindmillGeometry.stage_inner_r(spec)
 	var thickness: float = 0.14
-	_kit.balcony_ring(spec.stage_r, WindmillGeometry.STAGE_WIDTH, spec.stage_y,
+	_kit.balcony_ring(ring, WindmillGeometry.STAGE_WIDTH, spec.stage_y,
 		spec.stage_arc, SURF_WALL, Vector2.ZERO, start, thickness, 14)
-	component_note("stage_deck", "ring", SURF_WALL, {"radius": spec.stage_r,
+	component_note("stage_deck", "ring", SURF_WALL, {"radius": ring,
 		"width": WindmillGeometry.STAGE_WIDTH, "y": spec.stage_y,
 		"arc": spec.stage_arc, "start": start, "thickness": thickness,
-		"aabb": _ring_aabb(spec.stage_r, spec.stage_y, thickness, start, spec.stage_arc)})
-	_log_mass("stage", _ring_aabb(spec.stage_r, spec.stage_y, thickness, start,
+		"aabb": _ring_aabb(ring, spec.stage_y, thickness, start, spec.stage_arc)})
+	_log_mass("stage", _ring_aabb(ring, spec.stage_y, thickness, start,
 		spec.stage_arc))
 	# the brackets under it, back to the mill: a stage is held up, not floating
 	var posts: int = 7
 	for i in range(posts):
 		var a: float = start + spec.stage_arc * float(i) / float(posts - 1)
 		var out: Vector3 = Vector3(cos(a), 0.0, sin(a))
-		_beam(out * (spec.stage_r - 0.04) + Vector3(0.0, spec.stage_y, 0.0),
+		_beam(out * (ring - 0.04) + Vector3(0.0, spec.stage_y, 0.0),
 			out * maxf(inner - 0.1, 0.2) + Vector3(0.0, spec.stage_y - 0.75, 0.0),
 			0.1, 0.1, SURF_TRIM, "stage_bracket")
-	_rail(spec.stage_r, spec.stage_y, start, spec.stage_arc, posts, "stage_rail")
+	_rail(ring, spec.stage_y, start, spec.stage_arc, posts, "stage_rail")
 
 
 ## The gallery: a walk right round the curb, which is where a cap mill's miller
@@ -608,7 +609,7 @@ func _fan() -> void:
 		# is what turns its face into the wind instead of its edge. Pitching it
 		# about the fan's normal instead lifts the whole blade out of the disc,
 		# and a fan of blades that are not in the disc is not a fan.
-		var pitch: Basis = basis * Basis(Vector3.UP, a) * Basis(Vector3.RIGHT, 0.26)
+		var pitch: Basis = basis * Basis(Vector3.BACK, a) * Basis(Vector3.RIGHT, 0.26)
 		component_box("fan_blade", Vector3(rim - hub, rim * 0.17, 0.05),
 			Transform3D(pitch, (at + out) * 0.5), SURF_TRIM)
 	# The rim is a ring of joined segments, so the fan reads as a DISC. Studs at
@@ -740,7 +741,8 @@ func _windpump_gear() -> void:
 	var basis: Basis = WindmillGeometry.head_basis(spec)
 	var axle: Vector3 = WindmillGeometry.axle_point(spec)
 	var star: float = WindmillGeometry.star_radius(spec)
-	var hub: Vector3 = axle + basis * Vector3(0.0, 0.0, -(star + spec.head_r * 0.3))
+	# behind the fan, between it and the tower, where the shaft's gear lives
+	var hub: Vector3 = axle + basis * Vector3(0.0, 0.0, star + spec.head_r * 0.3)
 	# the star wheel, teeth and all
 	_toothed_wheel(hub, basis * Vector3.BACK, star, spec.star_teeth, 0.1, SURF_TRIM,
 		"star_wheel")
@@ -759,10 +761,10 @@ func _windpump_gear() -> void:
 	component_box("pump", Vector3(0.7, spec.pump_h, 0.7), Transform3D(Basis(),
 		pump + Vector3(0.0, spec.pump_h * 0.5, 0.0)), SURF_WALL)
 	component_box("pump_spout", Vector3(0.42, 0.3, 1.5), Transform3D(
-		Basis(Vector3.UP, PI * 0.25),
-		pump + Vector3(-0.5, spec.discharge_h - 0.6, -0.45)), SURF_TRIM)
+		Basis(Vector3.UP, -PI * 0.25),
+		pump + Vector3(-0.5, spec.discharge_h - 0.6, 0.45)), SURF_TRIM)
 	component_box("pump_spout_leg", Vector3(0.2, spec.discharge_h - 0.6, 0.2),
-		Transform3D(Basis(), pump + Vector3(-0.05, (spec.discharge_h - 0.6) * 0.5, -0.05)),
+		Transform3D(Basis(), pump + Vector3(-0.05, (spec.discharge_h - 0.6) * 0.5, 0.05)),
 		SURF_TRIM)
 	_log_mass("gear", _points_aabb([hub, pinion, pin, pump]).grow(0.6))
 	_log_mass("pump", AABB(pump - Vector3(0.35, 0.0, 0.35),

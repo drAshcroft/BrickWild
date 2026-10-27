@@ -125,6 +125,12 @@ static func _post(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictionar
 	# which side is whichever the burr was last turned. It cannot stand further
 	# out than that: the ladder's FOOT is what clears the sails, not its top.
 	spec.door_offset_x = spec.base_r * 0.25 * (1.0 if spec.body_yaw >= 0.0 else -1.0)
+	# The burr is square and has been turned off the axis, so its front corner
+	# stands further out than its wall does. The sail plane is in the world's
+	# frame, and it has to stand beyond that corner (and the door's step and the
+	# boarding on it) or the sails turn through the wall.
+	spec.stage_r = maxf(spec.stage_r, WindmillGeometry.burr_front(spec)
+		+ WindmillGeometry.BURR_SAIL_GAP)
 	spec.ladder = true
 	spec.ladder_w = rng.randf_range(0.62, 0.85)
 	spec.ladder_offset = WindmillGeometry.ladder_offset_for(spec)
@@ -235,7 +241,9 @@ static func _stage_and_stock(spec: WindmillSpec, rng: RandomNumberGenerator, row
 		spec.stage_arc = 0.0
 		return
 	var stand: float = rng.randf_range(float(band[0]), float(band[1]))
-	spec.stage_r = face_r + maxf(stand, WindmillGeometry.CAP_CLEAR)
+	# the plane the sails sweep stands the stage's setback beyond the stage, so
+	# the rail the miller holds is not in the sails' path
+	spec.stage_r = face_r + maxf(stand, WindmillGeometry.CAP_CLEAR) 		+ WindmillGeometry.STAGE_SETBACK
 	# the deck sits a step under the shaft, which is where a miller works
 	var shaft_above: float = WindmillGeometry.cap_height_for(spec.cap, spec.curb_r) * 0.28
 	spec.stage_y = spec.curb_y + shaft_above - 0.95

@@ -29,6 +29,9 @@ extends RefCounted
 ##               the circle round it or the box round that
 ##   PROPORTION  a tower or smock mill's sails span at least
 ##               SPAN_PER_HEIGHT_MIN of its height; less reads as toy vanes
+##   SWEPT       the DISC the rotor sweeps, not just its sails as drawn, clears
+##               every wall, door, rail, deck, leg and boom of the body by
+##               SWEPT_CLEAR. Only the shaft and gear that drive it may touch
 ##
 ## report = {"ok": bool, "failures": [..], "warnings": [..], "stats": {..}}
 
@@ -51,9 +54,20 @@ const LADDER_TOL := 0.06
 const OPENING_PROUD_MAX := 0.045
 const OPENING_SUNK_MAX := 0.004
 
+## How far clear of every body part the rotor's swept disc must stand. A sail
+## that grazes a rail is a sail that snaps it, and a sail that clears it by a
+## finger is one a walker sees go through it.
+const SWEPT_CLEAR := 0.2
+## The parts that drive the rotor, and so legitimately reach into its hub: the
+## shaft it turns on, the gear and rod it drives, the boom behind a fan.
+const SWEPT_DRIVE: Array[String] = ["sail_", "whorl", "windshaft", "fan_", "star_wheel",
+	"pinion", "crank_pin", "pump_rod", "vane_arm"]
+## Grid step for sampling the volume of a body part.
+const SWEPT_STEP := 0.25
+
 const RULES: Array[StringName] = [&"standing", &"rotor", &"clearance",
 	&"cap_clear", &"winding", &"access", &"gear", &"wheel", &"envelope",
-	&"solid", &"facing", &"component", &"openings", &"proportion"]
+	&"solid", &"facing", &"component", &"openings", &"proportion", &"swept"]
 
 var failures: Array[String] = []
 var warnings: Array[String] = []
@@ -173,7 +187,9 @@ static func rotor_points(spec: WindmillSpec, builder: WindmillBuilder) -> Array[
 			for p in row["points"]:
 				out.append(p)
 			continue
-		for corner2 in _corners(MassBuilder.component_aabb(row)):
+		# a box's own eight corners: its AABB's corners stand out past a blade
+		# that is turned across the disc, and would read as a longer rotor
+		for corner2 in _row_points(row, 99.0):
 			out.append(corner2)
 	return out
 
@@ -454,6 +470,125 @@ func _check_proportion(spec: WindmillSpec, _mesh: ArrayMesh, m: Dictionary,
 	if ratio < WindmillGeometry.SPAN_PER_HEIGHT_MIN:
 		_fail(&"proportion", "the sails span %.2f m on a %.2f m tower (%.2f of its height; at least %.2f): toy vanes on a tall drum."
 			% [float(m["rotor_reach"]) * 2.0, tall, ratio, WindmillGeometry.SPAN_PER_HEIGHT_MIN])
+
+
+## The rotor's swept disc clears the body. The rotor is a flat wheel of radius
+## `sail_r` about the shaft; whatever lies inside that wheel, thickened by the
+## depth of the sails and `SWEPT_CLEAR` each way, is in the sails' path as they
+## turn -- whichever way they happen to be pointing in the pose drawn.
+## Every logged body part is sampled (boxes through their volume, slabs and
+## rings through their edges) plus the drum's own surface, which is not a
+## component. A part that drives the rotor is exempt, and only that part.
+func _check_swept(spec: WindmillSpec, _mesh: ArrayMesh, _m: Dictionary,
+		builder: WindmillBuilder) -> void:
+	if spec.mill_type == &"paddle" or builder == null:
+		return
+	var axle: Vector3 = WindmillGeometry.axle_point(spec)
+	var normal: Vector3 = Vector3.BACK
+	if spec.mill_type == &"windpump":
+		normal = WindmillGeometry.head_basis(spec) * Vector3.BACK
+	var lo := INF
+	var hi := -INF
+	for row in builder.component_log:
+		var role := String(row["role"])
+		if not (role.begins_with("sail_") or role == "fan_blade" or role == "fan_rim"):
+			continue
+		for p in _row_points(row, 99.0):
+			var a: float = (p - axle).dot(normal)
+			lo = minf(lo, a)
+			hi = maxf(hi, a)
+	if lo > hi:
+		return
+	var worst := INF
+	var worst_role := ""
+	for row in builder.component_log:
+		var role2 := String(row["role"])
+		if _is_drive(role2):
+			continue
+		for q in _row_points(row, SWEPT_STEP):
+			var sep: float = _swept_gap(q, axle, normal, lo, hi, spec.sail_r)
+			if sep < worst:
+				worst = sep
+				worst_role = role2
+	if WindmillGeometry.is_round(spec) or spec.mill_type == &"smock":
+		for k in range(13):
+			var y: float = lerpf(WindmillGeometry.floor_y(spec), spec.curb_y, float(k) / 12.0)
+			var radius: float = WindmillGeometry.radius_at(spec, y)
+			for j in range(32):
+				var ang: float = TAU * float(j) / 32.0
+				var sep2: float = _swept_gap(Vector3(cos(ang) * radius, y, sin(ang) * radius),
+					axle, normal, lo, hi, spec.sail_r)
+				if sep2 < worst:
+					worst = sep2
+					worst_role = "drum"
+	stats["swept_gap"] = worst
+	if worst < SWEPT_CLEAR - 0.001:
+		_fail(&"swept", "the rotor's disc comes within %.2f m of the %s; it needs %.2f m."
+			% [worst, worst_role, SWEPT_CLEAR])
+
+
+## How far `p` stands outside the rotor's slab: along the shaft past its sails,
+## or out past the tips, whichever is the shorter way clear. Negative inside.
+static func _swept_gap(p: Vector3, axle: Vector3, normal: Vector3, lo: float,
+		hi: float, rim: float) -> float:
+	var d: Vector3 = p - axle
+	var a: float = d.dot(normal)
+	var rr: float = sqrt(maxf(d.length_squared() - a * a, 0.0))
+	return maxf(maxf(lo - a, a - hi), rr - rim)
+
+
+static func _is_drive(role: String) -> bool:
+	for prefix in SWEPT_DRIVE:
+		if role.begins_with(prefix):
+			return true
+	return false
+
+
+## Points on, and inside, what a logged component occupies: a box through its
+## volume on a grid of about `step`, a slab through its polygon (both faces),
+## a ring through its two edges. Anything the log has no shape for gives none.
+static func _row_points(row: Dictionary, step: float) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	var form := String(row["form"])
+	if form == "box":
+		var xf: Transform3D = row["xf"]
+		var size: Vector3 = row["size"]
+		var n := Vector3i(clampi(int(ceil(size.x / step)) + 1, 2, 24),
+			clampi(int(ceil(size.y / step)) + 1, 2, 24),
+			clampi(int(ceil(size.z / step)) + 1, 2, 24))
+		for i in range(n.x):
+			for j in range(n.y):
+				for k in range(n.z):
+					out.append(xf * Vector3(
+						(float(i) / float(n.x - 1) - 0.5) * size.x,
+						(float(j) / float(n.y - 1) - 0.5) * size.y,
+						(float(k) / float(n.z - 1) - 0.5) * size.z))
+	elif form == "slab":
+		var pts: PackedVector3Array = row["points"]
+		if pts.size() < 3:
+			return out
+		var axis := Vector3.UP
+		if not bool(row["vertical"]):
+			axis = (pts[1] - pts[0]).cross(pts[2] - pts[0]).normalized()
+		var off: Vector3 = axis * (float(row["depth"]) * 0.5)
+		var mid := Vector3.ZERO
+		for p in pts:
+			mid += p
+		mid /= float(pts.size())
+		for p2 in pts:
+			for t in [0.0, 0.5, 1.0]:
+				var on: Vector3 = mid.lerp(p2, t)
+				out.append(on + off)
+				out.append(on - off)
+	elif form == "ring" and row.has("radius"):
+		var radius: float = float(row["radius"])
+		for k2 in range(25):
+			var ang: float = float(row.get("start", 0.0)) + float(row["arc"]) * float(k2) / 24.0
+			var dir := Vector3(cos(ang), 0.0, sin(ang))
+			for rad in [radius, radius - float(row["width"])]:
+				for dy in [-1.0, 1.0]:
+					out.append(dir * rad + Vector3(0.0, float(row["y"]) + dy * float(row["thickness"]) * 0.5, 0.0))
+	return out
 
 
 # ------------------------------------------------------------------ lookups

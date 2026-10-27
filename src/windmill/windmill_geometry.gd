@@ -31,6 +31,11 @@ const WALL_T := 0.45
 ## A stage is a walkway: how far it reaches in from the sail plane towards the
 ## mill, and how high its rail stands.
 const STAGE_WIDTH := 0.6
+## How far the stage's outer rail stands BEHIND the sail plane. The sails sweep
+## the plane `stage_r` out from the axis, and a rail standing in that plane is a
+## rail every sail hits as it comes round: half the stock's depth, the 0.2 m
+## the `swept` rule asks for, and the rail post's own half-width.
+const STAGE_SETBACK := 0.45
 const DOOR_W := 1.05
 const DOOR_H := 2.15
 const GALLERY_WIDTH := 0.5
@@ -76,6 +81,12 @@ const SIDES_BURR := 4
 const FAN_TILT := [0.16, 0.28]
 ## ... and how far down the tilted shaft its fan sits from the pivot.
 const HEAD_REACH := 0.55
+## How far clear of the lattice the fan's disc stands, plus a share of the
+## fan's radius, because a bigger fan has deeper, more steeply pitched blades.
+const FAN_GAP := 0.35
+const FAN_GAP_PER_RADIUS := 0.025
+## Half the section of a lattice leg, and the brace outside it.
+const LATTICE_HALF := 0.1
 
 
 static func row(spec: WindmillSpec) -> Dictionary:
@@ -428,13 +439,43 @@ static func axle_point(spec: WindmillSpec) -> Vector3:
 			# through the burr's front wall, a little above its own floor
 			return Vector3(0.0, floor_y(spec) + spec.height * 0.62, -spec.stage_r)
 		&"windpump":
-			return head_basis(spec) * Vector3(0.0, spec.head_r * HEAD_REACH, 0.0) \
+			var seat: Vector3 = head_basis(spec) * Vector3(0.0, spec.head_r * HEAD_REACH, 0.0) \
 				+ Vector3(0.0, top_y(spec), 0.0)
+			seat.z -= fan_reach(spec, seat)
+			return seat
 		&"paddle":
 			return wheel_axle(spec)
 	# a mill that stands and is turned by its cap: the shaft emerges from the
 	# cap's front, a little below its crown
 	return Vector3(0.0, top_y(spec) + spec.cap_h * 0.28, -spec.stage_r)
+
+
+## How far the fan stands out in FRONT of the tower's head. The fan is a disc
+## as wide as the span asked for and its axle is a few centimetres above the
+## collar, so on the axis it would be a disc through the head, the lattice and
+## the gear. It is carried forward on its shaft until, at every height it
+## reaches, the disc stands `fan_gap` clear of the front of the lattice (which
+## flares to `base_r` at the ground) and of the collar -- measured square to the
+## fan's own tilted plane, because that plane leans back towards the tower
+## below the axle.
+static func fan_reach(spec: WindmillSpec, seat: Vector3) -> float:
+	var t: float = spec.tilt
+	var ct: float = cos(t)
+	var st: float = sin(t)
+	var gap: float = FAN_GAP + spec.sail_r * FAN_GAP_PER_RADIUS
+	var need: float = seat.z
+	var samples: int = 24
+	for k in range(samples + 1):
+		var y: float = lerpf(0.0, top_y(spec), float(k) / float(samples))
+		var dy: float = y - seat.y
+		if absf(dy) > spec.sail_r + gap:
+			continue
+		var front: float = -(radius_at(spec, y) + LATTICE_HALF)
+		need = minf(need, front + (dy * st - gap) / ct)
+	# the collar and the head platform on top of the lattice
+	var head: float = -maxf(spec.curb_r * 1.1, spec.head_r * HEAD_REACH + 0.2)
+	need = minf(need, head + ((top_y(spec) - seat.y) * st - gap) / ct)
+	return seat.z - need
 
 
 ## A windpump's head turns about a collar on top of the lattice, and its axle
@@ -450,6 +491,8 @@ static func head_origin(spec: WindmillSpec) -> Vector3:
 
 ## The plane the sails sweep in, as a Z. The stock's outer face.
 static func sail_plane(spec: WindmillSpec) -> float:
+	if spec.mill_type == &"windpump":
+		return axle_point(spec).z      # the fan stands out in front of its head
 	return -spec.stage_r
 
 
@@ -522,9 +565,31 @@ static func stage_y(spec: WindmillSpec) -> float:
 	return spec.stage_y
 
 
+## How far the sail plane stands beyond the nearest thing on a post mill's
+## front: half the stock's depth, the 0.2 m the `swept` rule asks for, and a
+## margin for the boarding's own relief.
+const BURR_SAIL_GAP := 0.45
+## How far a post mill's door step stands proud of its wall, from the face.
+const DOOR_STEP_REACH := 0.5
+
+
+## How far in front of the axis (towards -Z, the sail plane's side) a post
+## mill's burr reaches. The burr is a square turned off the axis by `body_yaw`,
+## so its front corner stands `base_r * (|cos| + |sin|)` out, not `base_r`; and
+## the door's step stands out of the wall that is no longer square to the sails.
+static func burr_front(spec: WindmillSpec) -> float:
+	return spec.base_r * (absf(cos(spec.body_yaw)) + absf(sin(spec.body_yaw))) 		+ board_proud(spec) + DOOR_STEP_REACH
+
+
+## The radius of the stage's outer edge and its rail: behind the sail plane, so
+## the rotor sweeps in front of the miller's rail and not through it.
+static func stage_ring_r(spec: WindmillSpec) -> float:
+	return spec.stage_r - STAGE_SETBACK
+
+
 ## Where the stage's deck ends, towards the mill.
 static func stage_inner_r(spec: WindmillSpec) -> float:
-	return spec.stage_r - STAGE_WIDTH
+	return stage_ring_r(spec) - STAGE_WIDTH
 
 
 ## A stock ladder stands beside the mill so the sails pass it. This is how far
@@ -641,12 +706,12 @@ static func crank_pin(spec: WindmillSpec) -> Vector3:
 	var basis := head_basis(spec)
 	var axle: Vector3 = axle_point(spec)
 	return axle + basis * Vector3(0.0, -star_radius(spec),
-		-(star_radius(spec) + spec.head_r * 0.3))
+		star_radius(spec) + spec.head_r * 0.3)
 
 
 ## The pump a windpump exists to drive, and the spout its water leaves by.
 static func pump_point(spec: WindmillSpec) -> Vector3:
-	return Vector3(spec.base_r * 0.9, 0.0, -spec.base_r * 0.9)
+	return Vector3(spec.base_r * 0.9, 0.0, spec.base_r * 0.9)
 
 
 # ----------------------------------------------------------------- the envelope
@@ -675,7 +740,7 @@ static func envelope(spec: WindmillSpec) -> AABB:
 		# a gallery carries a rail, and the rail is the highest thing on the mill
 		# short of its own sails
 		top = maxf(top, spec.curb_y + RAIL_H + 0.15)
-	var back: float = spec.base_r + 0.4
+	var back: float = maxf(spec.base_r + 0.4, spec.mound_r + 0.2)
 	# the mound is wider than the mill standing on it, and it is at the front
 	var front: float = minf(sail_plane(spec) - 0.45, -spec.mound_r - 0.2)
 	if has_tail(spec):
@@ -684,7 +749,8 @@ static func envelope(spec: WindmillSpec) -> AABB:
 	if spec.mill_type == &"windpump":
 		# the head turns, so it has no tailpole; what it has instead is a boom
 		# behind the fan and a pump and spout at the foot in front of it
-		front = minf(front, pump_point(spec).z - spec.base_r - 0.7)
+		front = minf(front, axle.z - spec.sail_r * tan(spec.tilt) - spec.sail_r * 0.05 - 0.5)
+		back = maxf(back, pump_point(spec).z + 2.0)
 		back = maxf(back, axle.z + spec.tail + 0.5)
 	var bottom: float = -0.3
 	if spec.mill_type == &"paddle":
