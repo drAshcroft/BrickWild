@@ -7,8 +7,8 @@ extends MassBuilder
 ##
 ##   tower / smock   a drum with a batter, a cap that turns on a curb, a stage
 ##                   on the front, and a windshaft out through the cap
-##   post            a box on a stick, a mound under the stick, a ladder up to
-##                   a door that stands clear of the sails
+##   post            a box on a stick, a mound under the stick, a stair up to
+##                   a door in a side wall, clear of the sails
 ##   windpump        a lattice tower, a fan of blades, a vane, and a rod from
 ##                   the star wheel down to a pump
 ##   paddle          a tower, a scoop wheel in a race, and no sails at all
@@ -34,6 +34,8 @@ const SAIL_BARS := 5
 ## the opening never fights the masonry it is cut into.
 const OPENING_LIFT := 0.012
 const CLOTH_T := 0.045
+## The course of wall over a doorway's head, which is what the lintel sits in.
+const LINTEL_H := 0.3
 const RAIL_T := 0.07
 ## A tower mill's slit window.
 const WINDOW_W := 0.26
@@ -57,7 +59,9 @@ func build(p_spec: WindmillSpec) -> ArrayMesh:
 			_lattice_body()
 	_openings()
 	_cap_or_head()
-	if WindmillGeometry.has_stage(spec):
+	# a post mill has no stage: its sails are reefed from the ground, and the
+	# stair runs out along the wall where a stage's deck would be
+	if WindmillGeometry.has_stage(spec) and spec.mill_type != &"post":
 		_stage()
 	if WindmillGeometry.has_gallery(spec):
 		_gallery()
@@ -66,7 +70,7 @@ func build(p_spec: WindmillSpec) -> ArrayMesh:
 	if spec.cranked:
 		_windpump_gear()
 	if spec.ladder:
-		_stock_ladder()
+		_stair()
 	total_height = WindmillGeometry.envelope(spec).end.y
 	return commit_named()
 
@@ -125,45 +129,43 @@ func _trestle() -> void:
 		Vector3(spread * 2.0, top, spread * 2.0)))
 
 
-## A paddle mill's race: a stone channel cut in front of it, with the water in
+## A paddle mill's race: a stone channel cut behind it, with the water in
 ## it. The wheel is an UNDERSHOT wheel, so the current has to arrive along the
 ## floor of the channel and push its buckets round from below.
 func _race() -> void:
 	tag("race")
 	host("race")
 	var r: Rect2 = WindmillGeometry.race_rect(spec)
-	var near: float = r.end.y
-	var far: float = r.position.y
+	var near: float = r.position.y
+	var far: float = r.end.y
 	var depth: float = spec.race_depth
-	var bed := Vector3(spec.race_w, 0.3, near - far)
+	var bed := Vector3(spec.race_w, 0.3, far - near)
 	component_box("race_bed", bed,
 		Transform3D(Basis(), Vector3(0.0, -depth - 0.15, (near + far) * 0.5)), SURF_WALL)
 	for side in [-1.0, 1.0]:
-		var kerb := Vector3(0.4, depth + 0.45, near - far)
+		var kerb := Vector3(0.4, depth + 0.45, far - near)
 		component_box("race_kerb", kerb, Transform3D(Basis(),
 			Vector3(side * (spec.race_w * 0.5 + 0.2), -depth * 0.5 + 0.225,
 				(near + far) * 0.5)), SURF_WALL)
 	# the undershot lip the current comes over
 	component_box("race_sill", Vector3(spec.race_w, 0.34, 0.5), Transform3D(Basis(),
-		Vector3(0.0, -depth + 0.17, near - 0.3)), SURF_WALL)
+		Vector3(0.0, -depth + 0.17, near + 0.3)), SURF_WALL)
 	# the sluice that lets the water in, at the far end
 	for side2 in [-1.0, 1.0]:
 		component_box("sluice_post", Vector3(0.32, depth + 1.5, 0.32),
-			Transform3D(Basis(), Vector3(side2 * spec.race_w * 0.5, 0.4, far + 0.2)),
+			Transform3D(Basis(), Vector3(side2 * spec.race_w * 0.5, 0.4, far - 0.2)),
 			SURF_WALL)
 	component_box("sluice_beam", Vector3(spec.race_w + 0.6, 0.3, 0.36),
-		Transform3D(Basis(), Vector3(0.0, 1.28, far + 0.2)), SURF_WALL)
+		Transform3D(Basis(), Vector3(0.0, 1.28, far - 0.2)), SURF_WALL)
 	# and the water itself
 	var level: float = WindmillGeometry.water_level(spec)
 	var water := PackedVector3Array([
 		Vector3(-spec.race_w * 0.5, level, near), Vector3(spec.race_w * 0.5, level, near),
 		Vector3(spec.race_w * 0.5, level, far), Vector3(-spec.race_w * 0.5, level, far)])
 	component_slab("race_water", water, 0.02, SURF_WATER, false)
-	_log_mass("race", AABB(Vector3(-spec.race_w * 0.7, -depth, far),
-		Vector3(spec.race_w * 1.4, depth + 0.5, near - far)))
+	_log_mass("race", AABB(Vector3(-spec.race_w * 0.7, -depth, near),
+		Vector3(spec.race_w * 1.4, depth + 0.5, far - near)))
 
-
-# ----------------------------------------------------------------- the bodies
 
 ## A masonry drum with a batter, which is a tower mill and a polder mill alike.
 func _drum_body() -> void:
@@ -171,7 +173,7 @@ func _drum_body() -> void:
 	host("body")
 	var t: float = spec.wall_t
 	var box := _tapered_drum(0.0, spec.base_r, spec.curb_r, spec.curb_y, t,
-		SURF_WALL, WindmillGeometry.sides(spec))
+		SURF_WALL, WindmillGeometry.sides(spec), true)
 	_log_mass("tower", box)
 	# the curb the cap turns on: a ring of iron, proud of the wall
 	_kit.balcony_ring(spec.curb_r + 0.12, 0.24, spec.curb_y, TAU, SURF_TRIM,
@@ -187,7 +189,7 @@ func _smock_body() -> void:
 	tag("body")
 	host("body")
 	var stump := _tapered_drum(0.0, spec.base_r, spec.base_r * 0.96, spec.stump_h,
-		spec.wall_t, SURF_WALL, WindmillGeometry.SIDES_ROUND)
+		spec.wall_t, SURF_WALL, WindmillGeometry.SIDES_ROUND, true)
 	_log_mass("stump", stump)
 	host("frame")
 	var frame := _tapered_drum(spec.stump_h, spec.base_r * 0.96, spec.curb_r,
@@ -235,20 +237,52 @@ func _post_body() -> void:
 	var h: float = spec.height
 	var r: float = spec.base_r
 	var courses: int = maxi(int(h / 0.45), 2)
+	var door_dir: Vector3 = WindmillGeometry.door_normal(spec)
+	var door_w: float = WindmillGeometry.door_w(spec)
+	var door_h: float = WindmillGeometry.door_h(spec)
+	var head: float = door_h + LINTEL_H
 	for face in range(4):
 		var dir: Vector3 = y * [Vector3.BACK, Vector3.RIGHT,
 			Vector3.FORWARD, Vector3.LEFT][face]
 		var face_yaw: float = atan2(dir.x, dir.z)
 		var at: Vector3 = Vector3(0.0, floor, 0.0) + dir * (r - spec.wall_t * 0.5)
-		component_box("burr_wall", Vector3(r * 2.0, h, spec.wall_t),
-			Transform3D(Basis(Vector3.UP, face_yaw), at + Vector3(0.0, h * 0.5, 0.0)),
-			SURF_WALL)
+		var has_door: bool = dir.dot(door_dir) > 0.99
+		var wall_basis := Basis(Vector3.UP, face_yaw)
+		if not has_door:
+			component_box("burr_wall", Vector3(r * 2.0, h, spec.wall_t),
+				Transform3D(wall_basis, at + Vector3(0.0, h * 0.5, 0.0)), SURF_WALL)
+		else:
+			# the door's wall is cut: a jamb each side of the doorway, and a
+			# lintel course over it
+			var side: Vector3 = wall_basis * Vector3.RIGHT
+			var jamb: float = r - door_w * 0.5
+			for sgn in [-1.0, 1.0]:
+				component_box("burr_wall", Vector3(jamb, h, spec.wall_t),
+					Transform3D(wall_basis, at + side * sgn * (door_w * 0.5 + jamb * 0.5)
+						+ Vector3(0.0, h * 0.5, 0.0)), SURF_WALL)
+			component_box("burr_wall", Vector3(door_w, h - head, spec.wall_t),
+				Transform3D(wall_basis, at + Vector3(0.0, head + (h - head) * 0.5, 0.0)),
+				SURF_WALL)
 		# the boarding lines, which are what make a burr read as boards
 		for board in range(1, courses):
+			var by: float = h * float(board) / float(courses)
+			if has_door and by < head:
+				# the doorway interrupts the boards: two lengths, either side
+				var side2: Vector3 = wall_basis * Vector3.RIGHT
+				var jamb2: float = r * 1.03 - door_w * 0.5
+				for sgn2 in [-1.0, 1.0]:
+					component_box("burr_board", Vector3(jamb2, 0.05, spec.wall_t * 1.25),
+						Transform3D(wall_basis, at + side2 * sgn2 * (door_w * 0.5 + jamb2 * 0.5)
+							+ Vector3(0.0, by, 0.0)), SURF_TRIM)
+				continue
 			component_box("burr_board", Vector3(r * 2.06, 0.05, spec.wall_t * 1.25),
-				Transform3D(Basis(Vector3.UP, face_yaw),
-					at + Vector3(0.0, h * float(board) / float(courses), 0.0)),
-				SURF_TRIM)
+				Transform3D(wall_basis, at + Vector3(0.0, by, 0.0)), SURF_TRIM)
+	# the floor the miller stands on, and the sill that carries it through the door
+	component_box("burr_floor", Vector3((r - spec.wall_t) * 2.0, 0.12,
+		(r - spec.wall_t) * 2.0), Transform3D(y, Vector3(0.0, floor - 0.06, 0.0)), SURF_WALL)
+	component_box("door_sill", Vector3(door_w, 0.12, spec.wall_t + 0.2),
+		Transform3D(Basis(Vector3.UP, atan2(door_dir.x, door_dir.z)),
+			door_dir * (r - spec.wall_t * 0.5) + Vector3(0.0, floor - 0.06, 0.0)), SURF_WALL)
 	component_box("burr_deck", Vector3(r * 2.0, 0.22, r * 2.0),
 		Transform3D(Basis(), Vector3(0.0, floor + h - 0.11, 0.0)), SURF_WALL)
 	_log_mass("burr", AABB(Vector3(-r, floor, -r), Vector3(r * 2.0, h, r * 2.0)))
@@ -377,16 +411,11 @@ func _openings() -> void:
 	var floor: float = WindmillGeometry.floor_y(spec)
 	var h: float = WindmillGeometry.door_h(spec)
 	if spec.mill_type == &"windpump":
-		# a lattice has no wall to cut: its door stands flat at the foot
-		_door({"point": y * Vector3(spec.door_offset_x, 0.0, -spec.base_r)
-				+ Vector3(0.0, floor + h * 0.5, 0.0),
-			"normal": y * Vector3.FORWARD, "up": Vector3.UP}, floor)
+		# a lattice has no wall to cut and nothing to shut: it has no door. A
+		# door standing in an open lattice was a thing a walker could walk round.
 		return
-	var face: Dictionary = WindmillGeometry.wall_face(spec, -PI * 0.5, floor + h * 0.5)
-	if WindmillGeometry.is_square(spec):
-		# A post mill's door is off the axis, because its ladder is, and a
-		# ladder under the sails is a ladder the miller cannot climb.
-		face["point"] = (face["point"] as Vector3) + y * Vector3(spec.door_offset_x, 0.0, 0.0)
+	var face: Dictionary = WindmillGeometry.wall_face(spec, WindmillGeometry.door_angle(spec),
+		floor + h * 0.5)
 	_door(face, floor)
 	if spec.windows <= 0:
 		return
@@ -416,10 +445,12 @@ func _window(face: Dictionary, w: float, h: float) -> void:
 			Transform3D(along, c + up * s * (h * 0.5 + 0.04) + n * 0.05), SURF_WALL)
 
 
-## One door, on the wall face it belongs to: a painted board leaf with iron
-## strap hinges and a ring, a frame round it, and a step up to it. A dark
-## rectangle on a wall read as a hole or a poster; a leaf with boards and
-## hinges reads as a door from as far off as anybody walks up to one.
+## One door, on the wall face it belongs to: a doorway the wall is really cut
+## away for (`_cut_drum`, or the post mill's own boarding), a frame round it, a
+## leaf standing open back against the inside of the wall, and a step up to the
+## sill. Boards, hinge straps and a ring on the leaf are what make it a door
+## from as far off as anybody walks up to one -- but the leaf stands OPEN. A
+## leaf painted across the opening is a wall.
 func _door(face: Dictionary, floor: float) -> void:
 	var w: float = WindmillGeometry.door_w(spec)
 	var h: float = WindmillGeometry.door_h(spec)
@@ -428,33 +459,32 @@ func _door(face: Dictionary, floor: float) -> void:
 	var c: Vector3 = face["point"]
 	var side: Vector3 = up.cross(n).normalized()
 	var along := Basis(side, up, n)
-	# the leaf, painted, lifted off the wall it hangs in
-	_quad_opening(c, n, up, w, h, SURF_SAIL, "door")
-	# the joints between its boards
-	var boards: int = 4
-	for b in range(1, boards):
-		var x: float = -w * 0.5 + w * float(b) / float(boards)
-		component_box("door_board_joint", Vector3(0.03, h - 0.06, 0.012),
-			Transform3D(along, c + side * x + n * (OPENING_LIFT + 0.016)), SURF_DARK)
-	# two strap hinges and a ring, which is what makes boards a door
-	for hy in [-0.3, 0.3]:
-		component_box("door_hinge", Vector3(w * 0.72, 0.07, 0.025),
-			Transform3D(along, c + side * (-w * 0.13) + up * (h * hy)
-				+ n * (OPENING_LIFT + 0.03)), SURF_TRIM)
-	component_box("door_ring", Vector3(0.1, 0.1, 0.05),
-		Transform3D(along, c + side * (w * 0.36) + n * (OPENING_LIFT + 0.04)), SURF_TRIM)
 	# the frame: a lintel and two jambs, proud of the wall and leaning with it
 	for s in [-1.0, 1.0]:
 		component_box("door_jamb", Vector3(0.16, h, 0.22),
 			Transform3D(along, c + side * s * (w * 0.5 + 0.08)), SURF_WALL)
 	component_box("door_lintel", Vector3(w + 0.52, 0.2, 0.22),
 		Transform3D(along, c + up * (h * 0.5 + 0.1)), SURF_WALL)
-	# and the step up to it, level, on the ground in front of the sill
+	# The leaf, open: hinged at one jamb and swung in, flat to a line through the
+	# hinge that runs straight back into the room. It stands clear of the way in.
 	var flat: Vector3 = Vector3(n.x, 0.0, n.z).normalized()
+	var leaf_t: float = 0.05
+	var hinge: Vector3 = c + side * (w * 0.5 - leaf_t * 0.5) - flat * (spec.wall_t + 0.04)
+	var leaf_xf := Transform3D(Basis(Vector3.UP, atan2(flat.x, flat.z)),
+		hinge - flat * (w * 0.5) + Vector3(0.0, 0.0, 0.0))
+	component_box("door_leaf", Vector3(leaf_t, h - 0.06, w * 0.92), leaf_xf, SURF_SAIL)
+	for hy in [-0.3, 0.3]:
+		component_box("door_hinge", Vector3(leaf_t + 0.04, 0.07, w * 0.5),
+			Transform3D(leaf_xf.basis, leaf_xf.origin + Vector3(0.0, h * hy, 0.0)
+				+ flat * (w * 0.2)), SURF_TRIM)
+	component_box("door_ring", Vector3(leaf_t + 0.06, 0.1, 0.1),
+		Transform3D(leaf_xf.basis, leaf_xf.origin - flat * (w * 0.35)), SURF_TRIM)
+	# and the step up to it, level, on the ground in front of the sill
 	var foot: Vector3 = c - up * (h * 0.5)
-	component_box("door_step", Vector3(w + 0.5, 0.14, 0.5), Transform3D(
-		Basis(Vector3.UP, atan2(flat.x, flat.z)),
-		Vector3(foot.x, floor + 0.07, foot.z) + flat * 0.2), SURF_WALL)
+	if not spec.ladder:
+		component_box("door_step", Vector3(w + 0.5, 0.14, 0.5), Transform3D(
+			Basis(Vector3.UP, atan2(flat.x, flat.z)),
+			Vector3(foot.x, floor + 0.07, foot.z) + flat * 0.2), SURF_WALL)
 
 
 # ------------------------------------------------------ the stage and gallery
@@ -771,45 +801,69 @@ func _windpump_gear() -> void:
 		Vector3(0.7, spec.pump_h, 0.7)))
 
 
-# ------------------------------------------------------------ the stock ladder
+# --------------------------------------------------------------- the stair
 
-## The stock ladder: from the mound up to the door.
-##
-## Its FOOT stands well to one side, outside the sails, because a miller who
-## climbed into them would not come back; its TOP is at the door, in the middle
-## of the burr's front wall. So it leans across in plan on its way up -- which
-## is exactly what a stock ladder looks like from the far side of a mound, and
-## why they are always photographed from behind.
-func _stock_ladder() -> void:
+## A post mill's way in: a landing at the door's own sill, and one straight
+## flight down from it to the ground. The sails sweep the plane just in front of
+## the burr, so the flight does not climb out towards them: it runs ALONG the
+## front wall, between the wall and the sail plane, towards the side that leads
+## away from the sails. A stock ladder up to a door is a thing a miller does
+## twice a day; a person walking into the building needs treads and risers they
+## can step, and a landing wide enough to turn on. Pinned as "is this supposed
+## to be stairs?" (the 26 Oct walk, 1a17afe6-4).
+func _stair() -> void:
 	tag("access")
 	host("access")
-	var foot: float = WindmillGeometry.ladder_foot_y(spec)
-	var top: float = WindmillGeometry.floor_y(spec)
-	var z_near: float = -spec.base_r
-	var z_far: float = -WindmillGeometry.ladder_run_for(spec)
-	var half: float = spec.ladder_w * 0.5
-	var foot_x: float = spec.ladder_offset
-	var head_x: float = spec.door_offset_x + half * 0.6
-	for side in [-1.0, 1.0]:
-		_beam(Vector3(foot_x + side * half, foot, z_far),
-			Vector3(head_x + side * half * 0.6, top + WindmillGeometry.DOOR_H * 0.1,
-				z_near + 0.1), 0.12, 0.16, SURF_WALL, "ladder_rail")
-	var rungs: int = maxi(int((top - foot) / 0.34), 3)
-	for i in range(rungs):
-		var t: float = float(i) / float(rungs - 1)
-		var y: float = lerpf(foot + 0.12, top - 0.1, t)
-		var z: float = lerpf(z_far + 0.2, z_near + 0.15, t)
-		var x: float = lerpf(foot_x, head_x, t)
-		var wide: float = half * (1.0 - t * 0.4)
-		_beam(Vector3(x - wide, y, z), Vector3(x + wide, y, z), 0.07, 0.07,
-			SURF_WALL, "ladder_rung")
-	# a handrail down the outboard side, climbed in a gale
-	_beam(Vector3(foot_x + half, foot + WindmillGeometry.RAIL_H, z_far),
-		Vector3(head_x + half * 0.6, top + WindmillGeometry.RAIL_H * 0.6,
-			z_near + 0.1), 0.07, 0.07, SURF_TRIM, "ladder_rail_post")
-	var lo := Vector3(minf(foot_x, head_x) - half, foot, z_far)
-	var hi := Vector3(maxf(foot_x, head_x) + half, top + 0.4, z_near + 0.1)
-	_log_mass("ladder", AABB(lo, hi - lo))
+	var floor: float = WindmillGeometry.floor_y(spec)
+	var n: Vector3 = WindmillGeometry.door_normal(spec)
+	var dir: Vector3 = WindmillGeometry.stair_dir(spec)
+	var width: float = WindmillGeometry.stair_width(spec)
+	var risers: int = WindmillGeometry.stair_risers(spec)
+	var riser: float = floor / float(risers)
+	var tread: float = WindmillGeometry.STAIR_TREAD
+	var land_basis := Basis(Vector3.UP, atan2(n.x, n.z))
+	var run_basis := Basis(Vector3.UP, atan2(dir.x, dir.z))
+	var across: Vector3 = run_basis * Vector3.RIGHT
+	var edge: Vector3 = WindmillGeometry.stair_edge(spec)
+	var foot_edge: Vector3 = edge + dir * float(risers - 1) * tread
+	# the landing, level with the sill, on a post at each outer corner
+	var centre: Vector3 = WindmillGeometry.landing_centre(spec)
+	var landing_w: float = WindmillGeometry.landing_width(spec)
+	var depth: float = WindmillGeometry.LANDING_DEPTH
+	component_box("landing", Vector3(landing_w, 0.12, depth), Transform3D(land_basis,
+		centre + Vector3(0.0, floor - 0.06, 0.0)), SURF_WALL)
+	for sgn in [-1.0, 1.0]:
+		var corner: Vector3 = centre + (land_basis * Vector3.RIGHT) * sgn * (landing_w * 0.5 - 0.08) 			+ n * (depth * 0.5 - 0.08)
+		_beam(corner, corner + Vector3(0.0, floor - 0.12, 0.0), 0.14, 0.14, SURF_WALL,
+			"landing_post")
+	# the treads, a riser apart, with a stringer under each side of them
+	for j in range(1, risers):
+		var y: float = floor - float(j) * riser
+		component_box("stair_tread", Vector3(width, 0.07, tread + 0.04), Transform3D(run_basis,
+			edge + dir * (float(j) - 0.5) * tread + Vector3(0.0, y - 0.035, 0.0)), SURF_WALL)
+	var line_top: float = floor - 0.5 * riser          # the treads' own line
+	var line_foot: float = 0.5 * riser
+	for sgn2 in [-1.0, 1.0]:
+		var off: Vector3 = across * sgn2 * (width * 0.5 + 0.04)
+		_beam(edge + off + Vector3(0.0, line_top - 0.15, 0.0),
+			foot_edge + off + Vector3(0.0, maxf(line_foot - 0.15, 0.1), 0.0), 0.08, 0.3,
+			SURF_WALL, "stair_stringer")
+		# a rail on each side, because there is a drop beside every tread; it
+		# runs parallel to the treads' line, a hand's height above it
+		_beam(edge + off + Vector3(0.0, line_top + WindmillGeometry.RAIL_H, 0.0),
+			foot_edge + off + Vector3(0.0, line_foot + WindmillGeometry.RAIL_H, 0.0),
+			0.06, 0.06, SURF_TRIM, "stair_rail")
+		for k in range(0, risers, 4):
+			var base: Vector3 = edge + off + dir * float(k) * tread
+			var yb: float = floor - (float(k) + 0.5) * riser
+			_beam(base + Vector3(0.0, yb, 0.0),
+				base + Vector3(0.0, yb + WindmillGeometry.RAIL_H, 0.0), 0.06, 0.06,
+				SURF_TRIM, "stair_rail_post")
+	var foot: Vector3 = WindmillGeometry.stair_foot(spec)
+	var lo := Vector3(minf(centre.x, foot.x) - width, 0.0, minf(centre.z, foot.z) - width)
+	var hi := Vector3(maxf(centre.x, foot.x) + width, floor + WindmillGeometry.RAIL_H,
+		maxf(centre.z, foot.z) + width)
+	_log_mass("stair", AABB(lo, hi - lo))
 
 
 # ------------------------------------------------------------------ primitives
@@ -881,25 +935,100 @@ func _toothed_wheel(centre: Vector3, axis: Vector3, radius: float, teeth: int,
 ## -Z. The openings are placed on exactly this surface by
 ## `WindmillGeometry.wall_face`, and the two must agree.
 func _tapered_drum(base_y: float, base_r: float, top_r: float, height: float,
-		thickness: float, surf: int, sides: int) -> AABB:
+		thickness: float, surf: int, sides: int, with_door := false) -> AABB:
 	var centre := Vector3(0.0, base_y, 0.0)
 	var start: float = WindmillGeometry.drum_start(sides)
 	var outer := PackedVector2Array([Vector2(base_r, 0.0), Vector2(top_r, height)])
 	var inner_r0: float = maxf(base_r - thickness, 0.05)
 	var inner_r1: float = maxf(top_r - thickness, 0.05)
-	_kit.revolve(outer, centre, surf, sides, TAU, start)
-	# the same profile run downwards, which is what turns its normals inward
-	_kit.revolve(PackedVector2Array([Vector2(inner_r1, height),
-		Vector2(inner_r0, 0.0)]), centre, surf, sides, TAU, start)
-	_kit.revolve(PackedVector2Array([Vector2(top_r, height),
-		Vector2(inner_r1, height)]), centre, surf, sides, TAU, start)
-	_kit.revolve(PackedVector2Array([Vector2(base_r, 0.0),
-		Vector2(inner_r0, 0.0)]), centre, surf, sides, TAU, start)
+	if with_door and WindmillGeometry.walkable(spec):
+		_cut_drum(centre, base_r, top_r, inner_r0, inner_r1, height, surf, sides, start)
+	else:
+		_kit.revolve(outer, centre, surf, sides, TAU, start)
+		# the same profile run downwards, which is what turns its normals inward
+		_kit.revolve(PackedVector2Array([Vector2(inner_r1, height),
+			Vector2(inner_r0, 0.0)]), centre, surf, sides, TAU, start)
+		_kit.revolve(PackedVector2Array([Vector2(top_r, height),
+			Vector2(inner_r1, height)]), centre, surf, sides, TAU, start)
+		_kit.revolve(PackedVector2Array([Vector2(base_r, 0.0),
+			Vector2(inner_r0, 0.0)]), centre, surf, sides, TAU, start)
 	var r: float = maxf(base_r, top_r)
 	var aabb := AABB(Vector3(-r, base_y, -r), Vector3(r * 2.0, height, r * 2.0))
 	component_note("wall", "revolve", surf, {"profile": outer, "center": centre,
 		"segments": sides, "start": start, "thickness": thickness, "aabb": aabb})
 	return aabb
+
+
+## The same drum with its door CUT: the one face the door is in is left out of
+## the lower band of wall, up to a course above the door's head, and filled
+## with jamb panels either side and a lintel panel over. A drum whose door is a
+## painted rectangle on an unbroken wall has no way in -- and a walker finds
+## that out in a second (the 26 Oct walk, pin 1a17afdf-1).
+func _cut_drum(centre: Vector3, base_r: float, top_r: float, inner_r0: float,
+		inner_r1: float, height: float, surf: int, sides: int, start: float) -> void:
+	var step: float = TAU / float(sides)
+	var facet: int = posmod(int(round((WindmillGeometry.door_angle(spec) - start) / step
+		- 0.5)), sides)
+	var cut_h: float = minf(WindmillGeometry.door_h(spec) + LINTEL_H, height)
+	var t: float = cut_h / maxf(height, 0.001)
+	var out_cut: float = lerpf(base_r, top_r, t)
+	var in_cut: float = lerpf(inner_r0, inner_r1, t)
+	# the lower band: every face but the door's, outside and in
+	var from: float = start + step * float(facet + 1)
+	var arc: float = TAU - step
+	_kit.revolve(PackedVector2Array([Vector2(base_r, 0.0), Vector2(out_cut, cut_h)]),
+		centre, surf, sides - 1, arc, from, Vector2.ONE, false)
+	_kit.revolve(PackedVector2Array([Vector2(in_cut, cut_h), Vector2(inner_r0, 0.0)]),
+		centre, surf, sides - 1, arc, from, Vector2.ONE, false)
+	_kit.revolve(PackedVector2Array([Vector2(base_r, 0.0), Vector2(inner_r0, 0.0)]),
+		centre, surf, sides - 1, arc, from, Vector2.ONE, false)
+	# the upper band: all round
+	_kit.revolve(PackedVector2Array([Vector2(out_cut, cut_h), Vector2(top_r, height)]),
+		centre, surf, sides, TAU, start)
+	_kit.revolve(PackedVector2Array([Vector2(inner_r1, height), Vector2(in_cut, cut_h)]),
+		centre, surf, sides, TAU, start)
+	_kit.revolve(PackedVector2Array([Vector2(top_r, height), Vector2(inner_r1, height)]),
+		centre, surf, sides, TAU, start)
+	_door_panels(centre.y, cut_h)
+
+
+## The panels that close the cut face round the doorway: a jamb either side, and
+## a lintel course over the opening. Each is a slab laid in the face's own
+## plane, as thick as the wall, its outer side exactly on the face.
+func _door_panels(base_y: float, cut_h: float) -> void:
+	var w: float = WindmillGeometry.door_w(spec)
+	var h: float = WindmillGeometry.door_h(spec)
+	var lo: Dictionary = WindmillGeometry.wall_face(spec, WindmillGeometry.door_angle(spec),
+		base_y)
+	var hi: Dictionary = WindmillGeometry.wall_face(spec, WindmillGeometry.door_angle(spec),
+		base_y + cut_h)
+	var mid: Dictionary = WindmillGeometry.wall_face(spec, WindmillGeometry.door_angle(spec),
+		base_y + h)
+	var a: float = float(lo["angle"])
+	var tangent := Vector3(-sin(a), 0.0, cos(a))
+	var normal: Vector3 = lo["normal"]
+	# a wall's thickness is measured across its face, not along the radius it is
+	# swept from, so it is a little under `wall_t` on a polygon of this many sides
+	var depth: float = spec.wall_t * cos(PI / float(WindmillGeometry.drum_band(spec,
+		base_y + 0.05)["sides"]))
+	var inset: Vector3 = -normal * (depth * 0.5)
+	var half_lo: float = float(lo["width"]) * 0.5
+	var half_hi: float = float(hi["width"]) * 0.5
+	var p0: Vector3 = lo["point"]
+	var p1: Vector3 = hi["point"]
+	var pm: Vector3 = mid["point"]
+	for side in [-1.0, 1.0]:
+		_panel("door_jamb_wall", PackedVector3Array([
+			p0 + tangent * side * half_lo + inset, p0 + tangent * side * w * 0.5 + inset,
+			p1 + tangent * side * w * 0.5 + inset, p1 + tangent * side * half_hi + inset]),
+			depth)
+	_panel("door_lintel_wall", PackedVector3Array([
+		pm + tangent * -w * 0.5 + inset, pm + tangent * w * 0.5 + inset,
+		p1 + tangent * w * 0.5 + inset, p1 + tangent * -w * 0.5 + inset]), depth)
+
+
+func _panel(role: String, poly: PackedVector3Array, depth: float) -> void:
+	component_slab(role, poly, depth, SURF_WALL, false)
 
 
 ## An opening: a dark quad laid on the wall it is cut in, lifted a millimetre

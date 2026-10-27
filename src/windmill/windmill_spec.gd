@@ -58,9 +58,8 @@ var burr_y: float = 0.0
 ## Which way round the body faces. A post mill turns its whole burr into the
 ## wind, so this is off the axis: the tail goes wherever the wind is not.
 var body_yaw: float = 0.0
-## Where the door sits across the front wall. Zero for a mill whose front wall
-## is symmetric; off the axis for a post mill, whose ladder has to stand
-## clear of its own sails.
+## Where the door sits across its wall, off the wall's middle. Zero for every
+## mill the generator makes.
 var door_offset_x: float = 0.0
 var curb_y: float = 12.0
 var wall_t: float = 0.5
@@ -101,11 +100,11 @@ var mound_r: float = 0.0
 var mound_h: float = 0.0
 var trestle: bool = false     ## a timber trestle instead of a mound
 
-## The way up. A stock ladder is offset sideways so the sails pass it.
+## The way up: a post mill's stair, from the ground to the door in its side wall.
+## `ladder_w` is the stair's width. The flight's own length follows from how
+## high the floor stands (`WindmillGeometry.stair_risers`).
 var ladder: bool = false
-var ladder_w: float = 0.7
-var ladder_offset: float = 1.2
-var ladder_run: float = 3.0
+var ladder_w: float = 1.0
 
 ## A windpump's tower: bays of X-braced lattice.
 var braces: int = 6
@@ -161,13 +160,13 @@ const TYPES := {
 	},
 	&"post": {
 		"label": "Post mill",
-		# A timber burr on one post, on a mound, with a ladder up to the door
+		# A timber burr on one post, on a mound, with a stair up to the door
 		# and a long tailpole to turn it. The whole body leans into the wind.
 		"turns": &"body", "on": &"mound",
 		"body_r": [1.9, 3.0], "height": [2.6, 4.2], "batter": [1.0, 1.0],
 		"stage": [0.55, 0.95], "cap": [&"none"],
 		"sails": [4, 6], "tail": [1.6, 2.6], "fantail": false,
-		"span": [0.85, 1.25], "detail": "Low, square and perched, with the ladder to one side",
+		"span": [0.85, 1.25], "detail": "Low, square and perched, with the stair to one side",
 		# tarred weatherboarding, which is what a burr was, always
 		"walls": ["2b2723", "3a332b", "57493a"],
 		"trim": "1f1b17", "sail": "e4dcc6", "dark": "0d0b09",

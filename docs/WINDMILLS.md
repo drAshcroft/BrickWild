@@ -52,7 +52,34 @@ emerges from the cap's front wall and the stocks go on from there, so a mill who
 sail circle ran *inside* its own cap could not turn at all. This is what fixes
 the stage, and therefore the whole upper silhouette.
 
-**The ladder stands clear of the sails.** A post mill's stock ladder is off the
+**A person can walk in.** The first four constraints are the miller's; this one
+is the visitor's, and it was missing until the 26 Oct walk. A door is a hole in
+a wall, not a rectangle painted on one, and the way up to it is treads a person
+steps. So: a tower, smock or polder mill's door is CUT (`_cut_drum` leaves the
+door's face out of the lower band of wall and closes it with jamb and lintel
+panels), the leaf stands open inside, and the smock's door is at the foot of its
+stump (`STUMP_H` is 2.7-3.4 m, taller than the door; the miller's floor is the
+ground) rather than three metres up on the frame. A polder mill's wheel and race
+are BEHIND it (`wheel_axle`, `race_rect`, `race_site`), because they stood in
+front of the door and a wheel is not a thing to walk through. A windpump has no
+door: a door in an open lattice is a door a walker walks round.
+
+**The post mill's stair runs along the wall, between the wall and the sails.**
+The old stock ladder was drawn in the world's frame while the burr stood turned
+off it, so it never met the door. Now the door is in the front wall's middle, a
+1.2 m landing stands level with the sill, and a straight flight (`STAIR_RISE`
+0.2, `STAIR_TREAD` 0.3, 1 m wide with a rail each side) leaves the landing's edge
+along the wall towards whichever side leads away from the sail plane
+(`stair_dir`). `DOOR_STEP_REACH` (1.45 m) keeps the sail plane past the landing
+and rail, so nothing of the stair is ever in the rotor's path. Its length
+follows from how high the floor stands, so a tall post is a long stair, not a
+steep one. There is no stage on a post mill (the deck stood where the landing
+is), no trestle (its legs stand where the flight runs) and the burr is turned at
+most 0.22 rad off the axis, so the door is still on the footprint's -Z edge the
+placement contract names. The stair is published beside the placement
+(`stair_site`), as the polder mill's race is.
+
+**Why the ladder was off the axis.** A post mill's stock ladder was off the
 axis because a ladder under the sails is a ladder the miller cannot climb — and
 that is also why a post mill's **door** is off the axis. The door follows the
 ladder; the ladder follows the sails.
@@ -110,8 +137,18 @@ Each is a statement somebody who has looked at windmills would make out loud:
   cap crosses that plane in the mesh.
 - `winding` — something reaches out behind the mill to turn it; a post mill's
   tail carries the wheel that does the turning; a fantail mill drew a fantail.
-- `access` — a post mill's ladder reaches its own door and stands clear of the
-  sails that pass it.
+- `access` — a post mill's stair is a stair: a landing level with the sill,
+  risers at most 0.23 m, treads at least 0.25 m deep, 0.9 m wide.
+- `entry` — a person walks in. `WindmillGeometry.approach_path` names the way
+  (from the ground outside, over the sill, into the room; a post mill's from the
+  stair's foot) and the check walks it on the drawn mesh, on three lines (the
+  middle and 0.3 m either side): each step up at most the walk rig's 0.4 m, a
+  body's height of air above, nothing across the line, and the walk ends on the
+  miller's floor. `faulty_windmill_entry_builder.gd` (a doorway left uncut, a
+  stair without treads) is the failing control, driven from the `wwalk` suite,
+  which also walks seed 1 of all five types. Why the room checks never saw it:
+  `wwalk` measured the published room and `access` measured the ladder's
+  bounding box; nothing walked from the ground to the room.
 - `gear` — a windpump's rod runs from its crank down to its pump.
 - `wheel` — a polder mill's wheel stands in its own water and off its own bed.
 - `swept` — the DISC the rotor sweeps (radius `sail_r`, as thick as the sails,

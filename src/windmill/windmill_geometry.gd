@@ -50,9 +50,16 @@ const TIP_CLEAR := 0.6
 ## emerges from the cap's front wall and the stocks go on from there, so this
 ## is a real clearance and not a fudge factor.
 const CAP_CLEAR := 0.35
-## A stock ladder runs up beside the mill, so the sails pass it. This is how far
-## outside the sail's own breadth it has to stand.
-const LADDER_CLEAR := 0.3
+## A post mill's stair is one straight flight at its door, and it is walked: a
+## riser a person steps, a tread a foot lands on, a landing to turn on at the
+## door. The flight stands on the burr's side, away from the sails.
+const STAIR_RISE := 0.2
+const STAIR_TREAD := 0.3
+const LANDING_DEPTH := 1.2
+## How far past the door's own sill the miller's way in is walked from, and how
+## far into the room: the approach `WindmillCheck`'s `entry` rule follows.
+const APPROACH_OUT := 2.6
+const APPROACH_IN := 1.0
 
 ## A cap mill's sail span against the height of the tower carrying it. The
 ## generator holds a tower or smock mill's span to at least SPAN_PER_HEIGHT of
@@ -62,8 +69,9 @@ const LADDER_CLEAR := 0.3
 const SPAN_PER_HEIGHT := 0.9
 const SPAN_PER_HEIGHT_MAX := 1.5
 const SPAN_PER_HEIGHT_MIN := 0.8
-## A smock mill's brick stump, under its timber frame.
-const STUMP_H := [1.4, 3.2]
+## A smock mill's brick stump, under its timber frame. The miller's door is cut
+## in the stump, at the ground, so the stump stands taller than the door.
+const STUMP_H := [2.7, 3.4]
 
 ## A post mill's post cannot be so short that a miller would not climb it.
 const POST_MIN := 1.9
@@ -131,9 +139,10 @@ static func top_y(spec: WindmillSpec) -> float:
 	return spec.curb_y
 
 
-## The body's floor. Zero on a mill that stands on the ground, a stump's height
-## on a smock mill, and the top of the mound and post on a post mill -- which is
-## the number every other rule about a post mill is really about.
+## The body's floor. Zero on a mill that stands on the ground (a smock mill's
+## miller walks in at the foot of its stump) and the top of the mound and post
+## on a post mill -- which is the number every other rule about a post mill is
+## really about.
 static func floor_y(spec: WindmillSpec) -> float:
 	return spec.burr_y
 
@@ -151,11 +160,6 @@ static func ground_under(spec: WindmillSpec) -> float:
 ## whose race is a channel CUT INTO it -- so its mill is not dug in, it dug.
 static func footing_y(spec: WindmillSpec) -> float:
 	return -spec.race_depth if spec.mill_type == &"paddle" else 0.0
-
-## How far out from the mill's axis the ladder's foot stands. The mound has to
-## be wide enough to carry it, so the generator asks this before it chooses one.
-static func ladder_foot_radius(spec: WindmillSpec) -> float:
-	return Vector2(spec.ladder_offset, spec.base_r + spec.ladder_run).length()
 
 
 ## The body's radius at a height: a straight batter from the ground's radius to
@@ -295,7 +299,10 @@ static func wall_distance(spec: WindmillSpec, p: Vector3) -> float:
 
 
 static func door_h(spec: WindmillSpec) -> float:
-	return minf(spec.door_h, maxf(spec.height * 0.78, 1.4))
+	var h: float = minf(spec.door_h, maxf(spec.height * 0.78, 1.4))
+	if spec.mill_type == &"smock":
+		h = minf(h, spec.stump_h - 0.45)        # the door is cut in the stump
+	return h
 
 
 # ------------------------------------------------------------- the walk inside
@@ -305,7 +312,7 @@ static func door_h(spec: WindmillSpec) -> float:
 ##
 ## The floor is ONE storey, the mill's own: the burr floor a post mill climbs to,
 ## and the ground floor of a tower, smock or paddle mill. A mill has no second
-## room to walk to, and its ladder or internal stair is a way up to this floor
+## room to walk to, and its stair is a way up to this floor
 ## from outside the building, not a link between two of its storeys -- which is
 ## why the returned frame carries no links.
 static func walkable(spec: WindmillSpec) -> bool:
@@ -343,31 +350,18 @@ static func walk_sources(spec: WindmillSpec) -> Dictionary:
 	return {0: {"floor": floor, "obstacles": obstacles}}
 
 
-## The floor's height and its door. The door is the one the builder cuts, at
-## the face that looks down -Z (turned off the axis on a post mill, where the
-## ladder is).
+## The floor's height and its door: the one the builder cuts, where
+## `door_point` says it is.
 static func walk_frame(spec: WindmillSpec) -> Dictionary:
 	if not walkable(spec):
 		return {}
-	var y: float = floor_y(spec)
-	var outward := Vector2(0.0, -1.0)
-	var at := Vector2.ZERO
-	if is_square(spec):
-		var yaw := Basis(Vector3.UP, spec.body_yaw)
-		var normal: Vector3 = yaw * Vector3.FORWARD
-		at = Vector2(normal.x, normal.z) * (spec.base_r + board_proud(spec)) \
-			+ Vector2(spec.door_offset_x, 0.0)
-		outward = Vector2(normal.x, normal.z).normalized()
-	else:
-		var face: Dictionary = wall_face(spec, -PI * 0.5, y + door_h(spec) * 0.5)
-		var point: Vector3 = face["point"]
-		var normal: Vector3 = face["normal"]
-		at = Vector2(point.x, point.z)
-		outward = Vector2(normal.x, normal.z).normalized()
+	var at: Vector3 = door_point(spec)
+	var normal: Vector3 = door_normal(spec)
 	return {
-		"floor_y": {0: y},
+		"floor_y": {0: floor_y(spec)},
 		"links": [],
-		"doors": [{"pos": at, "normal": outward, "front": true}],
+		"doors": [{"pos": Vector2(at.x, at.z),
+			"normal": Vector2(normal.x, normal.z).normalized(), "front": true}],
 	}
 
 
@@ -569,8 +563,10 @@ static func stage_y(spec: WindmillSpec) -> float:
 ## front: half the stock's depth, the 0.2 m the `swept` rule asks for, and a
 ## margin for the boarding's own relief.
 const BURR_SAIL_GAP := 0.45
-## How far a post mill's door step stands proud of its wall, from the face.
-const DOOR_STEP_REACH := 0.5
+## How far a post mill's landing and stair stand out of its front wall, from the
+## face: the landing's depth and a rail beside it. The sail plane stands past
+## this, so the stair runs between the wall and the sails and never into them.
+const DOOR_STEP_REACH := 1.45
 
 
 ## How far in front of the axis (towards -Z, the sail plane's side) a post
@@ -592,43 +588,108 @@ static func stage_inner_r(spec: WindmillSpec) -> float:
 	return stage_ring_r(spec) - STAGE_WIDTH
 
 
-## A stock ladder stands beside the mill so the sails pass it. This is how far
-## off the axis it has to be, and it is not a free choice: a ladder inside the
-## sail's own circle is a ladder the sails hit.
-static func ladder_offset_for(spec: WindmillSpec) -> float:
-	return maxf(spec.stage_r + spec.sail_width * 0.5 + LADDER_CLEAR,
-		spec.base_r + spec.ladder_w * 0.5 + LADDER_CLEAR)
-
-
 # ------------------------------------------------------------- openings and access
 
-## Where the door is: on the front wall, at the height the floor stands at.
-## A post mill's door is off the axis, because its ladder is, and the ladder has
-## to be off the axis so the sails clear it.
+## Which way the door looks, in plan. Every mill's door is on its front (-Z),
+## the side `BrickWild.placement` calls the front -- a post mill's front wall is
+## turned with its burr -- except a polder mill's, which has the wheel and its
+## race behind it instead, so nothing stands between the door and the road.
+static func door_angle(spec: WindmillSpec) -> float:
+	if is_square(spec):
+		var n: Vector3 = _post_door_normal(spec)
+		return atan2(n.z, n.x)
+	return -PI * 0.5
+
+
+static func _post_door_normal(spec: WindmillSpec) -> Vector3:
+	return Basis(Vector3.UP, spec.body_yaw) * Vector3.FORWARD
+
+
+## The door's outward normal, level. A lattice has no door; it keeps the front.
+static func door_normal(spec: WindmillSpec) -> Vector3:
+	if spec.mill_type == &"windpump":
+		return Vector3.FORWARD
+	if is_square(spec):
+		return _post_door_normal(spec)
+	var face: Dictionary = wall_face(spec, door_angle(spec),
+		floor_y(spec) + door_h(spec) * 0.5)
+	var n: Vector3 = face["normal"]
+	return Vector3(n.x, 0.0, n.z).normalized()
+
+
+## Where the door is: on its wall face, at the height the floor stands at.
 static func door_point(spec: WindmillSpec) -> Vector3:
-	# A post mill's whole burr turns into the wind, so its door is on a wall
-	# that is no longer square to anything. This is where that door actually
-	# ends up -- and it is the only place a caller wanting to walk up to it can
-	# be sent. The rotation is about Y alone, which is what the builder does.
-	var here: Vector3 = Basis(Vector3.UP, spec.body_yaw) \
-		* Vector3(spec.door_offset_x, 0.0, -spec.base_r)
-	return here + Vector3(0.0, floor_y(spec) + door_h(spec) * 0.5, 0.0)
+	if spec.mill_type == &"windpump":
+		return Vector3(0.0, door_h(spec) * 0.5, -spec.base_r)
+	var face: Dictionary = wall_face(spec, door_angle(spec),
+		floor_y(spec) + door_h(spec) * 0.5)
+	return face["point"]
 
 
-## The stock ladder, in plan: its own width, standing beside the mill.
-static func ladder_rect(spec: WindmillSpec) -> Rect2:
-	var half: float = spec.ladder_w * 0.5
-	return Rect2(Vector2(spec.ladder_offset - half, -spec.base_r - spec.ladder_run),
-		Vector2(spec.ladder_w, spec.ladder_run))
+## Risers in a post mill's stair: the climb from the ground to the burr floor,
+## in steps a person takes. The landing is the last of them.
+static func stair_risers(spec: WindmillSpec) -> int:
+	return maxi(int(ceil(floor_y(spec) / STAIR_RISE - 0.001)), 1)
 
 
-## How far out in front of the mill's own face the ladder's foot stands. A
-## stock ladder is steep -- a miller climbs it twice a day -- and this is what
-## keeps it steep instead of letting it lie down on the mound.
-static func ladder_run_for(spec: WindmillSpec) -> float:
-	return spec.base_r + spec.ladder_run
+## The stair's width: a person's two shoulders and a hand on a rail.
+static func stair_width(spec: WindmillSpec) -> float:
+	return maxf(spec.ladder_w, 0.9)
 
 
+## The way the flight runs: along the front wall, to whichever side leads AWAY
+## from the sail plane (the burr is turned off the axis, so one side is nearer
+## the sails than the other).
+static func stair_dir(spec: WindmillSpec) -> Vector3:
+	var along: Vector3 = Basis(Vector3.UP, spec.body_yaw) * Vector3.RIGHT
+	return along if along.z >= 0.0 else -along
+
+
+## The landing: as wide as the door and a shoulder either side of it.
+static func landing_width(spec: WindmillSpec) -> float:
+	return door_w(spec) + 0.6
+
+
+## The landing's middle, on the ground in plan.
+static func landing_centre(spec: WindmillSpec) -> Vector3:
+	var at: Vector3 = door_point(spec)
+	return Vector3(at.x, 0.0, at.z) + door_normal(spec) * (LANDING_DEPTH * 0.5)
+
+
+## Where the flight leaves the landing, on the ground in plan: the landing's
+## side edge, half a landing deep out from the wall.
+static func stair_edge(spec: WindmillSpec) -> Vector3:
+	return landing_centre(spec) + stair_dir(spec) * (landing_width(spec) * 0.5)
+
+
+## The flight's foot, on the ground in plan.
+static func stair_foot(spec: WindmillSpec) -> Vector3:
+	return stair_edge(spec) + stair_dir(spec) * float(stair_risers(spec) - 1) * STAIR_TREAD
+
+
+## The way a person walks in, in plan: from outside the door across its sill and
+## into the room. A post mill's way in starts at the stair's foot. The heights
+## are NOT here -- the check finds them in the mesh, which is the point.
+static func approach_path(spec: WindmillSpec) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	if not walkable(spec):
+		return out
+	var at: Vector3 = door_point(spec)
+	var door := Vector3(at.x, 0.0, at.z)
+	var n: Vector3 = door_normal(spec)
+	var inside: float = APPROACH_IN
+	if is_square(spec):
+		out.append(stair_foot(spec) + stair_dir(spec) * 0.8)
+		out.append(stair_foot(spec))
+		out.append(stair_edge(spec))
+		out.append(landing_centre(spec))
+	else:
+		out.append(door + n * APPROACH_OUT)
+		var band: Dictionary = drum_band(spec, floor_y(spec) + 0.05)
+		inside = minf(inside, float(band["r0"]) * 0.45)
+	out.append(door)
+	out.append(door - n * inside)
+	return out
 
 
 # ------------------------------------------------------------------ the tail
@@ -659,13 +720,15 @@ static func tail_reach_ratio(spec: WindmillSpec) -> float:
 # ------------------------------------------------------------- the polder wheel
 
 ## A paddle mill's wheel is a rotor turned by water instead of wind, and it
-## lives at the mill's foot on the front side, standing in its own race.
+## lives at the mill's foot on the BACK side, standing in its own race. The door
+## is on the front; a wheel and a channel in front of it left a door no one
+## could walk up to (the 26 Oct walk, 1a17b028-2).
 ## The wheel stands clear of the bed and dips its buckets into the flow. An
 ## undershot wheel works because the current pushes them round, and one that
 ## stood on the bed would be a waterwheel nobody bothered to build.
 static func wheel_axle(spec: WindmillSpec) -> Vector3:
 	return Vector3(0.0, spec.wheel_r - spec.race_depth * 0.75,
-		-spec.base_r - spec.wheel_width * 0.5 - 0.35)
+		spec.base_r + spec.wheel_width * 0.5 + 0.35)
 
 
 ## How much of the wheel stands under water. An undershot wheel works because
@@ -675,10 +738,11 @@ static func water_level(spec: WindmillSpec) -> float:
 	return -spec.race_depth * 0.30
 
 
-## The channel the wheel turns in, in plan: the near end is at the wheel.
+## The channel the wheel turns in, in plan: the near end is at the wheel, and the
+## channel runs on behind the mill.
 static func race_rect(spec: WindmillSpec) -> Rect2:
 	var half: float = spec.race_w * 0.5
-	return Rect2(Vector2(-half, wheel_axle(spec).z - spec.race_len),
+	return Rect2(Vector2(-half, wheel_axle(spec).z),
 		Vector2(spec.race_w, spec.race_len))
 
 
@@ -724,7 +788,8 @@ static func envelope(spec: WindmillSpec) -> AABB:
 	# Every member is a beam, and a beam is a little longer than the gap it
 	# spans, so the envelope carries a half-metre of tolerance for its ends.
 	var half_x: float = spec.sail_r + spec.sail_width * 0.5 + 0.2
-	half_x = maxf(half_x, absf(spec.ladder_offset) + spec.ladder_w + 0.2)
+	if spec.ladder:
+		half_x = maxf(half_x, absf(stair_foot(spec).x) + stair_width(spec) + 0.2)
 	half_x = maxf(half_x, spec.cap_r + 0.2)
 	half_x = maxf(half_x, spec.base_r + GALLERY_WIDTH + 0.3)
 	half_x = maxf(half_x, spec.mound_r + 0.2)
@@ -741,6 +806,8 @@ static func envelope(spec: WindmillSpec) -> AABB:
 		# short of its own sails
 		top = maxf(top, spec.curb_y + RAIL_H + 0.15)
 	var back: float = maxf(spec.base_r + 0.4, spec.mound_r + 0.2)
+	if spec.ladder:
+		back = maxf(back, stair_foot(spec).z + stair_width(spec) + 0.2)
 	# the mound is wider than the mill standing on it, and it is at the front
 	var front: float = minf(sail_plane(spec) - 0.45, -spec.mound_r - 0.2)
 	if has_tail(spec):
@@ -754,7 +821,8 @@ static func envelope(spec: WindmillSpec) -> AABB:
 		back = maxf(back, axle.z + spec.tail + 0.5)
 	var bottom: float = -0.3
 	if spec.mill_type == &"paddle":
-		front = minf(front, race_rect(spec).position.y - 0.4)
+		front = minf(front, -spec.base_r - 0.8)         # the door, its frame and step
+		back = maxf(back, race_rect(spec).end.y + 0.4)
 		bottom = minf(bottom, -spec.race_depth - 0.35)
 	return AABB(Vector3(-half_x, bottom, front),
 		Vector3(half_x * 2.0, top - bottom, back - front))
@@ -768,8 +836,8 @@ static func body_top(spec: WindmillSpec) -> float:
 	return spec.curb_y + spec.cap_h
 
 
-## A post mill's mound is a truncated cone, so what the ladder's foot stands on
-## depends on how far out it is. This is that slope.
+## A post mill's mound is a truncated cone, so what stands on it depends on how
+## far out it is. This is that slope.
 static func mound_height_at(spec: WindmillSpec, radius: float) -> float:
 	if spec.mound_h <= 0.0:
 		return 0.0
@@ -779,20 +847,13 @@ static func mound_height_at(spec: WindmillSpec, radius: float) -> float:
 	return spec.mound_h * (1.0 - t)
 
 
-## Where the ladder's foot stands: on the mound it climbs, or on the ground.
-static func ladder_foot_y(spec: WindmillSpec) -> float:
-	if not spec.ladder:
-		return 0.0
-	return mound_height_at(spec, ladder_foot_radius(spec))
-
-
 ## The plan a lot planner must keep: the mill's own body.
 ##
-## A polder mill's RACE is not in here. It is a channel cut into the ground in
-## front of the door, so folding it in would drag this rectangle's -Z edge away
-## from the door it is supposed to be the front of -- and the door contract is
-## worth more than the convenience. `race_site()` is published beside the
-## placement instead, which is where a lot finds out about it.
+## A polder mill's RACE is not in here. It is a channel cut into the ground
+## behind the mill, and the door contract is worth more than the convenience of
+## folding it in. `race_site()` is published beside the placement instead, which
+## is where a lot finds out about it. A post mill's STAIR is not either: it
+## runs out along the front wall, so `stair_site()` is published the same way.
 static func site_rect(spec: WindmillSpec) -> Rect2:
 	if is_square(spec):
 		# a post mill's burr is square and stands at its own yaw, so its plan is
@@ -822,8 +883,25 @@ static func race_site(spec: WindmillSpec) -> Rect2:
 	if spec.mill_type != &"paddle":
 		return Rect2()
 	var race: Rect2 = race_rect(spec)
-	return Rect2(Vector2(race.position.x, race.position.y - 0.5),
-		Vector2(spec.race_w, race.size.y + 0.5))
+	return Rect2(race.position, Vector2(spec.race_w, race.size.y + 0.5))
+
+
+## The ground a post mill's stair needs and the footprint does not hold: the
+## landing in front of the door and the flight along the wall. Empty for every
+## other mill. A neighbour built into it leaves the door no way up to.
+static func stair_site(spec: WindmillSpec) -> Rect2:
+	if not spec.ladder:
+		return Rect2()
+	var reach: float = stair_width(spec) * 0.5 + 0.2
+	var across: Vector3 = stair_dir(spec).cross(Vector3.UP) * reach
+	var out := Rect2()
+	var started := false
+	for end in [landing_centre(spec), stair_edge(spec), stair_foot(spec)]:
+		for sgn in [-1.0, 1.0]:
+			var p := Vector2(end.x + across.x * sgn, end.z + across.z * sgn)
+			out = Rect2(p, Vector2.ZERO) if not started else out.expand(p)
+			started = true
+	return out
 
 
 # --------------------------------------------------------- the generator's clamp

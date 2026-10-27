@@ -98,15 +98,18 @@ static func _tower(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictiona
 
 # ------------------------------------------------------------------- the post
 
-## A timber burr on one post, on a mound, with a ladder up to a door the ladder
-## is standing beside rather than under.
+## A timber burr on one post, on a mound, with a stair along its front wall up to
+## the door.
 static func _post(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictionary) -> void:
 	spec.curb_r = spec.base_r        # a square burr has no batter
 	spec.cap = &"none"
 	spec.cap_r = 0.0
 	spec.cap_h = 0.0
 	spec.gallery = false
-	spec.trestle = GeneratorRandom.chance(rng, 0.4)
+	# Always a mound: a trestle's legs splay out round the burr, and the stair
+	# runs along the front wall right through them. (`trestle` and the builder's
+	# frame stay for a caller that asks, but the generator no longer draws one.)
+	spec.trestle = false
 	# The mound or the trestle is what makes it a post mill rather than a box on
 	# a stick, and it is also the ground the sails have to clear.
 	spec.mound_h = 0.0 if spec.trestle else rng.randf_range(0.7, WindmillGeometry.MOUND_MAX)
@@ -120,11 +123,13 @@ static func _post(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictionar
 	spec.stage_arc = TAU * 0.78
 	# the burr is stood off the wind, so its ladder, its door and its tailpole
 	# all sit wherever the miller last turned it
-	spec.body_yaw = rng.randf_range(-0.55, 0.55) * (1.0 if GeneratorRandom.chance(rng, 0.5) else -1.0)
-	# The door is in the burr's front WALL, a quarter of the way to one side --
-	# which side is whichever the burr was last turned. It cannot stand further
-	# out than that: the ladder's FOOT is what clears the sails, not its top.
-	spec.door_offset_x = spec.base_r * 0.25 * (1.0 if spec.body_yaw >= 0.0 else -1.0)
+	# Not far: the door is in the burr's front wall, and the placement contract
+	# puts the door on the footprint's -Z edge, which a wall turned further than
+	# about 12 degrees is no longer (its corner stands out past it).
+	spec.body_yaw = rng.randf_range(0.05, 0.22) * (1.0 if GeneratorRandom.chance(rng, 0.5) else -1.0)
+	# The door is in the burr's front wall, in the middle: the stair runs along
+	# that wall to whichever side leads away from the sails.
+	spec.door_offset_x = 0.0
 	# The burr is square and has been turned off the axis, so its front corner
 	# stands further out than its wall does. The sail plane is in the world's
 	# frame, and it has to stand beyond that corner (and the door's step and the
@@ -132,11 +137,8 @@ static func _post(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictionar
 	spec.stage_r = maxf(spec.stage_r, WindmillGeometry.burr_front(spec)
 		+ WindmillGeometry.BURR_SAIL_GAP)
 	spec.ladder = true
-	spec.ladder_w = rng.randf_range(0.62, 0.85)
-	spec.ladder_offset = WindmillGeometry.ladder_offset_for(spec)
-	spec.ladder_run = rng.randf_range(1.6, 2.8)
-	spec.mound_r = maxf(spec.base_r * 2.4,
-		WindmillGeometry.ladder_foot_radius(spec) + 0.7)
+	spec.ladder_w = rng.randf_range(0.95, 1.2)
+	spec.mound_r = spec.base_r * 2.4
 	spec.tail = spec.base_r * rng.randf_range(float(row["tail"][0]), float(row["tail"][1]))
 	spec.tail_drop = rng.randf_range(0.14, 0.26)
 	spec.tailwheel_r = clampf(spec.base_r * 0.22, 0.34, 0.7)
@@ -149,7 +151,7 @@ static func _post(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictionar
 static func _smock(spec: WindmillSpec, rng: RandomNumberGenerator, row: Dictionary) -> void:
 	spec.stump_h = rng.randf_range(float(WindmillGeometry.STUMP_H[0]),
 		float(WindmillGeometry.STUMP_H[1]))
-	spec.burr_y = spec.stump_h
+	spec.burr_y = 0.0        # the miller walks in at the foot of the stump
 	spec.curb_r = spec.base_r * rng.randf_range(float(row["batter"][0]), float(row["batter"][1]))
 	spec.cap = GeneratorRandom.pick(rng, row["cap"])
 	spec.cap_r = WindmillGeometry.cap_radius_for(spec.curb_r)

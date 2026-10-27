@@ -571,14 +571,20 @@ class WindmillFamily extends BuildingFamilyAdapter:
 	func door(building) -> Vector3:
 		return WindmillGeometry.door_point(building.spec as WindmillSpec)
 
-	## A polder mill needs a race in front of its door, and the footprint cannot
-	## be the one to say so: the race is a channel cut into the ground, and
-	## folding it in would drag the footprint's front edge away from the door it
-	## is supposed to be the front of. Published here instead, which is where a
-	## lot already looks for ground a building needs.
+	## A polder mill needs a race behind it, and a post mill a stair along its
+	## front wall, and the footprint cannot be the one to say so: folding them in
+	## would drag the footprint's front edge away from the door it is supposed to
+	## be the front of. Published here instead, which is where a lot already
+	## looks for ground a building needs.
 	func placement_metadata(building, _bounds: AABB) -> Dictionary:
+		var out := {}
 		var race: Rect2 = WindmillGeometry.race_site(building.spec as WindmillSpec)
-		return {"race": race} if race.size != Vector2.ZERO else {}
+		if race.size != Vector2.ZERO:
+			out["race"] = race
+		var stair: Rect2 = WindmillGeometry.stair_site(building.spec as WindmillSpec)
+		if stair.size != Vector2.ZERO:
+			out["stair"] = stair
+		return out
 
 # ------------------------------------------------ the buildings of the world
 

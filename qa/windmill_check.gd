@@ -15,8 +15,13 @@ extends RefCounted
 ##               it, so the rotor can turn at all
 ##   WINDING     something reaches out behind the mill to turn it, and a post
 ##               mill's tail carries the wheel that does the turning
-##   ACCESS      a post mill's ladder reaches its own door and stands clear of
-##               the sails that pass it
+##   ACCESS      a post mill's stair is a stair: risers a person steps, treads a
+##               foot lands on, a landing at the door's own sill
+##   ENTRY       a person walks in. From the ground outside, along the way
+##               `WindmillGeometry.approach_path` names, every step up is one
+##               a person takes, nothing blocks the body, and the walk ends on
+##               the miller's floor. A door painted on a solid wall, a stair
+##               with a missing tread, a door behind a wheel all fail here
 ##   GEAR        a windpump's rod runs from its crank to its pump
 ##   WHEEL       a polder mill's wheel stands in its own water and off its bed
 ##   ENVELOPE    the mesh is inside the box the spec promised
@@ -44,8 +49,18 @@ const ROTOR_TOL := 0.03
 const CLOTH_DEPTH_MAX := 0.35
 ## How deep a member may sit below the ground before the mill is dug in.
 const GROUND_TOL := 0.35
-## A ladder this close to the sails' own breadth is a ladder the sails hit.
-const LADDER_TOL := 0.06
+## The walker's own numbers, from the human walk rig (`visualqa/walk/walk_qa.gd`:
+## STEP 0.4, RADIUS 0.28, BODY_H 1.75): the tallest step it will climb, the
+## height of the body that must not meet a wall, and how far to either side of
+## the line of the walk a person's shoulders reach.
+const WALK_STEP := 0.4
+const WALK_BODY := 1.75
+const WALK_SIDE := 0.3
+## The way in is sampled this finely along its length.
+const WALK_SAMPLE := 0.1
+## The tallest riser, and the shallowest tread, a stair may have.
+const STAIR_RISE_MAX := 0.23
+const STAIR_TREAD_MIN := 0.25
 
 ## How far an opening may stand off the wall it is cut in, and how far it may
 ## sink into it. An opening is lifted a centimetre or two off the masonry so
@@ -66,7 +81,7 @@ const SWEPT_DRIVE: Array[String] = ["sail_", "whorl", "windshaft", "fan_", "star
 const SWEPT_STEP := 0.25
 
 const RULES: Array[StringName] = [&"standing", &"rotor", &"clearance",
-	&"cap_clear", &"winding", &"access", &"gear", &"wheel", &"envelope",
+	&"cap_clear", &"winding", &"access", &"entry", &"gear", &"wheel", &"envelope",
 	&"solid", &"facing", &"component", &"openings", &"proportion", &"swept"]
 
 var failures: Array[String] = []
@@ -300,33 +315,170 @@ func _check_winding(spec: WindmillSpec, _mesh: ArrayMesh, _m: Dictionary,
 		_fail(&"winding", "a post mill's tail carries no winding wheel, so nothing turns it.")
 
 
-## A post mill's ladder reaches its own door and stands clear of the sails.
+## A post mill's stair is a stair: a landing level with the sill, treads at
+## most a riser apart and deep enough for a foot, wide enough for a person.
 func _check_access(spec: WindmillSpec, _mesh: ArrayMesh, _m: Dictionary,
 		builder: WindmillBuilder) -> void:
 	if not spec.ladder:
 		return
-	var ladder: AABB = _masses(builder, ["ladder"])
-	if ladder == AABB():
-		_fail(&"access", "a post mill with a ladder promised drew no ladder.")
+	var treads: Array[Dictionary] = builder.components("stair_tread")
+	var landing: Array[Dictionary] = builder.components("landing")
+	if treads.is_empty() or landing.is_empty():
+		_fail(&"access", "a post mill with a stair promised drew no treads or no landing.")
 		return
-	# A stock ladder has two ends and both matter. Its FOOT stands well outside
-	# the sails, because a miller who climbed into them would not come back; its
-	# TOP is in the burr's own wall at the door. So it leans across in plan, and
-	# checking its nearest point -- which is the one at the door -- proves
-	# nothing at all about the sails.
 	var sill: float = WindmillGeometry.floor_y(spec)
-	if ladder.end.y < sill - 0.15:
-		_fail(&"access", "the stock ladder stops %.2f m below the door sill."
-			% (sill - ladder.end.y))
-	var foot: float = maxf(absf(ladder.position.x), absf(ladder.end.x))
-	var sweep: float = spec.stage_r + spec.sail_width * 0.5
-	if foot < sweep - LADDER_TOL:
-		_fail(&"access", "the ladder's foot stands %.2f m off the axis and the sails sweep to %.2f m."
-			% [foot, sweep])
-	var head: float = minf(absf(ladder.position.x), absf(ladder.end.x))
-	if head > spec.base_r + spec.ladder_w:
-		_fail(&"access", "the ladder's top stops %.2f m off the axis, short of the burr it is for."
-			% head)
+	var landing_top: float = MassBuilder.component_aabb(landing[0]).end.y
+	if absf(landing_top - sill) > 0.03:
+		_fail(&"access", "the landing stands %.2f m from the door sill's own height."
+			% absf(landing_top - sill))
+	var tops: Array[float] = [landing_top]
+	var shallowest := INF
+	var narrowest := INF
+	for row in treads:
+		var box: AABB = MassBuilder.component_aabb(row)
+		tops.append(box.end.y)
+		var size: Vector3 = row["size"]
+		shallowest = minf(shallowest, size.z)
+		narrowest = minf(narrowest, size.x)
+	tops.sort()
+	tops.reverse()
+	var worst: float = tops[tops.size() - 1]        # the lowest tread above the ground
+	for i in range(tops.size() - 1):
+		worst = maxf(worst, tops[i] - tops[i + 1])
+	if worst > STAIR_RISE_MAX:
+		_fail(&"access", "the stair's tallest riser is %.2f m; a person steps %.2f m."
+			% [worst, STAIR_RISE_MAX])
+	if shallowest < STAIR_TREAD_MIN:
+		_fail(&"access", "a tread is %.2f m deep; a foot needs %.2f m." % [shallowest,
+			STAIR_TREAD_MIN])
+	if narrowest < 0.9:
+		_fail(&"access", "the stair is %.2f m wide; two shoulders and a hand want 0.9 m."
+			% narrowest)
+	stats["stair_riser"] = worst
+
+
+## A person walks in. The way in is the one the geometry names
+## (`WindmillGeometry.approach_path`), walked a step at a time on the mesh that
+## was drawn: at each point the highest upward-facing surface within a step of
+## where the last one was is the ground, a body's height of air must stand above
+## it, and nothing may stand across the line between one point and the next.
+## Three lines are walked, the middle one and one a shoulder to each side. The
+## walk must end on the miller's own floor. Pinned by the 26 Oct walk: a tower
+## with no way in, a smock door three metres up, a door behind the wheel.
+func _check_entry(spec: WindmillSpec, mesh: ArrayMesh, _m: Dictionary,
+		_builder: WindmillBuilder) -> void:
+	if not WindmillGeometry.walkable(spec):
+		return
+	var path: Array[Vector3] = WindmillGeometry.approach_path(spec)
+	if path.size() < 2:
+		_fail(&"entry", "the mill names no way in.")
+		return
+	var lo := Vector3(INF, -1.0, INF)
+	var hi := Vector3(-INF, WindmillGeometry.floor_y(spec) + WALK_BODY + 1.5, -INF)
+	for p in path:
+		lo.x = minf(lo.x, p.x - 1.0)
+		lo.z = minf(lo.z, p.z - 1.0)
+		hi.x = maxf(hi.x, p.x + 1.0)
+		hi.z = maxf(hi.z, p.z + 1.0)
+	var near: Array = _corridor_triangles(mesh, lo, hi)
+	var line_count := 0
+	for side in [0.0, -WALK_SIDE, WALK_SIDE]:
+		var why: String = _walk_in(spec, path, near, side)
+		line_count += 1
+		if why != "":
+			_fail(&"entry", "%s (walking %s)." % [why, "the middle" if side == 0.0
+				else ("to the left" if side < 0.0 else "to the right")])
+			return
+	stats["entry_lines"] = line_count
+
+
+## The triangles that stand within the corridor's box: [[a, b, c, normal.y], ...].
+static func _corridor_triangles(mesh: ArrayMesh, lo: Vector3, hi: Vector3) -> Array:
+	var out: Array = []
+	for s in range(mesh.get_surface_count()):
+		var vs: PackedVector3Array = mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]
+		var i := 0
+		while i + 2 < vs.size():
+			var a: Vector3 = vs[i]
+			var b: Vector3 = vs[i + 1]
+			var c: Vector3 = vs[i + 2]
+			i += 3
+			if maxf(a.x, maxf(b.x, c.x)) < lo.x or minf(a.x, minf(b.x, c.x)) > hi.x \
+					or maxf(a.z, maxf(b.z, c.z)) < lo.z or minf(a.z, minf(b.z, c.z)) > hi.z \
+					or maxf(a.y, maxf(b.y, c.y)) < lo.y or minf(a.y, minf(b.y, c.y)) > hi.y:
+				continue
+			# Godot's front faces are clockwise: the outward normal of (a, b, c)
+			# is (c - a) x (b - a), and the floor is what faces up
+			var n: Vector3 = (c - a).cross(b - a)
+			if n.length_squared() < 1e-12:
+				continue
+			out.append([a, b, c, n.normalized().y])
+	return out
+
+
+## The walk along one line. "" when it reaches the floor, else why it did not.
+func _walk_in(spec: WindmillSpec, path: Array[Vector3], tris: Array, side: float) -> String:
+	var floor: float = WindmillGeometry.floor_y(spec)
+	var y: float = NAN
+	var travelled := 0.0
+	var prev := Vector3.ZERO
+	var first := true
+	for k in range(path.size() - 1):
+		var dir: Vector3 = path[k + 1] - path[k]
+		var length: float = dir.length()
+		if length < 0.001:
+			continue
+		dir /= length
+		var lateral := Vector3(-dir.z, 0.0, dir.x) * side
+		var count: int = int(ceil(length / WALK_SAMPLE))
+		for j in range(count + (1 if k == path.size() - 2 else 0)):
+			var here: Vector3 = path[k] + dir * minf(float(j) * WALK_SAMPLE, length) + lateral
+			if first:
+				y = _ground_at(tris, Vector3(here.x, 3.0, here.z), 3.5, 0.0)
+				first = false
+			else:
+				y = _ground_at(tris, Vector3(here.x, y + WALK_STEP + 0.01, here.z),
+					WALK_STEP * 2.0 + 0.02, y - WALK_STEP)
+				if is_nan(y):
+					return "there is no footing a step from the last, %.1f m along the way in" % travelled
+				# the body: no part of the mill across the line from the last point
+				for hy in [WALK_STEP + 0.05, 1.0, WALK_BODY - 0.15]:
+					var a := Vector3(prev.x, prev.y + hy, prev.z)
+					var b := Vector3(here.x, y + hy, here.z)
+					for t in tris:
+						if Geometry3D.segment_intersects_triangle(a, b, t[0], t[1], t[2]) != null:
+							return "something stands across the way in, %.1f m along it, %.2f m up" % [travelled, y + hy]
+				# and air over the head
+				var up_from := Vector3(here.x, y + WALK_STEP + 0.05, here.z)
+				var up_to := Vector3(here.x, y + WALK_BODY, here.z)
+				for t2 in tris:
+					if Geometry3D.segment_intersects_triangle(up_from, up_to, t2[0], t2[1], t2[2]) != null:
+						return "a body does not fit under what stands over the way in, %.1f m along it, at (%.2f, %.2f, %.2f)" % [travelled, here.x, y, here.z]
+			travelled += WALK_SAMPLE
+			prev = Vector3(here.x, y, here.z)
+	if is_nan(y) or absf(y - floor) > 0.15:
+		return "the way in ends at %.2f m and the miller's floor stands at %.2f m" % [y, floor]
+	return ""
+
+
+## The highest ground within reach below `from`: an upward-facing triangle's
+## surface under the point, or the level ground at 0, whichever is higher and
+## not below `lowest`. NAN where there is none.
+static func _ground_at(tris: Array, from: Vector3, reach: float, lowest: float) -> float:
+	var best: float = 0.0 if (0.0 >= lowest and 0.0 <= from.y) else NAN
+	var to := from + Vector3.DOWN * reach
+	for t in tris:
+		if float(t[3]) < 0.5:
+			continue
+		var hit: Variant = Geometry3D.segment_intersects_triangle(from, to, t[0], t[1], t[2])
+		if hit == null:
+			continue
+		var hy: float = (hit as Vector3).y
+		if hy < lowest:
+			continue
+		if is_nan(best) or hy > best:
+			best = hy
+	return best
 
 
 ## A windpump's rod runs from its crank down to its pump.
@@ -435,6 +587,16 @@ func _check_openings(spec: WindmillSpec, _mesh: ArrayMesh, _m: Dictionary,
 	var count := 0
 	for row in builder.component_log:
 		var role := String(row["role"])
+		if role == "door_jamb" and String(row["form"]) == "box":
+			# the doorway is cut, so the door is its frame: a jamb is centred on
+			# the face it stands in
+			count += 1
+			var jd: float = WindmillGeometry.wall_distance(spec, (row["xf"] as Transform3D).origin)
+			if jd > worst_out:
+				worst_out = jd
+				worst_role = role
+			worst_in = minf(worst_in, jd)
+			continue
 		if role != "door" and role != "window":
 			continue
 		if String(row["form"]) != "slab":

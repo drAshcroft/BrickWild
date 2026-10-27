@@ -10,6 +10,16 @@ extends RefCounted
 ## The negative control publishes the same floor WITHOUT the wall's thickness
 ## taken off, and requires the wall measure to fire; a suite that accepts a
 ## floor drawn through the wall is not measuring the wall.
+##
+## And the published door is a door a person gets through. On seed 1 of all five
+## types the mesh that was drawn is walked from the ground outside to the
+## miller's floor (`WindmillCheck`'s `entry` rule: steps of at most the walk
+## rig's, the body's height of air, no wall across the way). The 26 Oct walk
+## found a tower with no way in, a smock door three metres up, a polder door
+## behind its wheel, a post mill's ladder and a door in an open lattice, while
+## this suite passed: it measured the room and never walked to it. The control
+## draws the same mills with the doorway uncut and the stair without treads, and
+## requires the walk to fail.
 
 ## [type, sail span, body, height, seed]: two of every type, small and large.
 const CASES := [
@@ -35,6 +45,8 @@ static func run() -> SuiteResult:
 		_check_mill(result, BuildingRequest.windmill(c[4], c[0], c[1], c[2], c[3]))
 	_check_lattice(result)
 	_negative_control(result)
+	_walk_in(result)
+	_walk_in_control(result)
 	return result
 
 
@@ -101,6 +113,58 @@ static func _check_mill(result: SuiteResult, request: BuildingRequest) -> void:
 	result.checked += 1
 	if JSON.stringify(again) != JSON.stringify(nav):
 		result.fail("%s does not bake the same walk twice" % label)
+
+
+## Seed 1 of every type, the way the walk rig builds it: a person walks from the
+## ground to the floor, and a windpump has no door to walk to.
+static func _walk_in(result: SuiteResult) -> void:
+	for mill_type in [&"tower", &"smock", &"post", &"windpump", &"paddle"]:
+		var building: GeneratedBuilding = BrickWild.generate(
+			BuildingRequest.windmill(1, mill_type))
+		var spec: WindmillSpec = building.spec as WindmillSpec
+		var builder := WindmillBuilder.new()
+		var mesh: ArrayMesh = builder.build(spec)
+		var report: Dictionary = WindmillCheck.new().check(spec, mesh, builder)
+		result.checked += 1
+		for failure in report["failures"]:
+			if String(failure).begins_with("entry:") or String(failure).begins_with("access:"):
+				result.fail("%s seed 1: %s" % [mill_type, failure])
+		if mill_type == &"windpump":
+			result.checked += 1
+			if not builder.components("door").is_empty() 					or not builder.components("door_jamb").is_empty():
+				result.fail("windpump seed 1 draws a door in an open lattice")
+			continue
+		result.checked += 1
+		if int(report["stats"].get("entry_lines", 0)) != 3:
+			result.fail("%s seed 1: the way in was not walked on three lines" % mill_type)
+		# the door a nav consumer is sent to is the one in the wall
+		var door: Dictionary = BrickWild.navigation(building).get("doors", [{}])[0]
+		var at := Vector3(float(door.door_m[0]), 0.0, float(door.door_m[2]))
+		var cut: Vector3 = WindmillGeometry.door_point(spec)
+		result.checked += 1
+		if Vector2(at.x, at.z).distance_to(Vector2(cut.x, cut.z)) > 0.05:
+			result.fail("%s seed 1: the published door is not the one cut in the wall" % mill_type)
+
+
+## The control: the same seed-1 mills with the doorway left uncut and a stair
+## with no treads. The walk must fail every one.
+static func _walk_in_control(result: SuiteResult) -> void:
+	for mill_type in [&"tower", &"smock", &"post", &"paddle"]:
+		var building: GeneratedBuilding = BrickWild.generate(
+			BuildingRequest.windmill(1, mill_type))
+		var spec: WindmillSpec = building.spec as WindmillSpec
+		var faulty: WindmillBuilder = preload(
+			"res://tests/fixtures/faulty_windmill_entry_builder.gd").new()
+		var mesh: ArrayMesh = faulty.build(spec)
+		var report: Dictionary = WindmillCheck.new().check(spec, mesh, faulty)
+		var caught := false
+		for failure in report["failures"]:
+			if String(failure).begins_with("entry:"):
+				caught = true
+		result.checked += 1
+		if not caught:
+			result.fail("%s seed 1: a mill with no way in passed the entry walk (%s)"
+				% [mill_type, report["failures"]])
 
 
 ## A windpump is posts and bracing: there is no inside, and it must say so.

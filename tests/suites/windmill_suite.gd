@@ -200,8 +200,8 @@ static func _public_api(res: SuiteResult) -> void:
 		# published beside the placement -- and every other mill has none.
 		var race: Rect2 = place.get("race", Rect2())
 		if mill_type == &"paddle":
-			_expect(res, race.size != Vector2.ZERO and race.position.y < fp.position.y,
-				"%s: no race was published in front of the door." % mill_type)
+			_expect(res, race.size != Vector2.ZERO and race.position.y >= fp.end.y - 1.0,
+				"%s: no race was published behind the mill, away from its door." % mill_type)
 		else:
 			_expect(res, race.size == Vector2.ZERO,
 				"%s: published a race it does not have." % mill_type)
