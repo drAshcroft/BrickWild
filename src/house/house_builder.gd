@@ -3409,7 +3409,7 @@ func _build_roof() -> void:
 	_build_ridge_crown(xf, rise, ridge, ridge_x)
 	_build_longhall_roof(xf, span, along, rise, faces)
 	host("roof", _storeys() - 1)
-	_build_eaves_tails(xf, span, along, rise)
+	_build_eaves_tails(xf, span, along, rise, faces)
 	_build_dormers(xf, layout["dormers"])
 	_build_eyebrows(layout)
 	_build_parapet(layout)
@@ -3716,8 +3716,15 @@ func _build_ridge_crown(xf: Transform3D, rise: float, ridge: float, ridge_x := 0
 	host_end()
 
 
-func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float) -> void:
-	if spec.roof_type == &"flat" or (HouseRound.plan_applies(plan) and spec.roof_type == &"conical"):
+## How far a rafter tail's top is driven up into the roof slab above it.
+const EAVE_TAIL_SEAT := 0.03
+
+
+func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float,
+		faces: Array = []) -> void:
+	# No roof face, no rafter to end (HOUSE-EAVE-FLOAT): a level or failed roof
+	# draws no tails, or they stand round the wall head in the air.
+	if rise <= 0.001 or spec.roof_type == &"flat" or (HouseRound.plan_applies(plan) and spec.roof_type == &"conical"):
 		return
 	# A thatch cottage's bolster hides its rafters: tails under it drew as loose
 	# dark blocks at both gable ends (HS-THATCH-RESIDUE).
@@ -3735,8 +3742,15 @@ func _build_eaves_tails(xf: Transform3D, span: float, along: float, rise: float)
 		var ex: float = float(side) * (half + HouseGeometry.EAVE_TAIL_OUT + extra)
 		for i in range(count + 1):
 			var ez: float = -along / 2.0 + float(i) * (along / float(count))
+			# Seat the tail IN the slab: its top a hair above the roof's underside
+			# where it stands, not a fixed -5 mm that left it 9 mm to 5 cm below
+			# the slab on a steep or deepened eave.
+			var ey := -0.05
+			var under := RoofShape.height_at(faces, Vector2(ex, ez)) if not faces.is_empty() else NAN
+			if not is_nan(under):
+				ey = under - RoofShape.DEPTH * 0.5 + EAVE_TAIL_SEAT - 0.045
 			component_box("eave_tail", Vector3(0.12, 0.09, 0.22),
-				xf * Transform3D(Basis(), Vector3(ex, -0.05, ez)), SURF_TRIM)
+				xf * Transform3D(Basis(), Vector3(ex, ey, ez)), SURF_TRIM)
 
 
 func _build_dormers(xf: Transform3D, dormers: Array) -> void:

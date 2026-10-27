@@ -55,7 +55,7 @@ extends RefCounted
 ##                  (post, tower, smock, farm windpump, Dutch polder mill)
 const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props", "church", "normals", "massing", "blueprint", "landmark",
 	"churchroof", "ctroof", "stoneshell", "cwalk", "cplanshell", "ctowerplan", "ctowerhouse", "cmotteplan", "cmotteaccess", "cforms", "crangeplan", "caperture", "cshop", "psconce", "ckfurnish", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "castle", "cnormals", "cmassing", "cwater", "clandmark", "voxelqa", "cvoxelqa", "dressing", "interior",
-	"roofprobe", "hroof", "hexterior", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "walkpins", "houseqa", "hmultistory", "hrich", "harchetype", "court",
+	"roofprobe", "hroof", "hexterior", "hcomponent", "heavefloat", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "henvelope", "house", "assets", "hassembly", "walkpins", "houseqa", "hmultistory", "hrich", "harchetype", "court",
 	"hvernacular",
 	"shop", "sarchetype", "shoptrade",
 	"hotel", "hotelroof", "hlandmark",
@@ -128,7 +128,7 @@ const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "plac
 ## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 ## Lanes and bare suite names can be mixed; duplicates run once.
 const LANES: Dictionary = {
-	"lane:geom": ["roofquick", "hroof", "hcomponent", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "hmesh", "metriccoords"],
+	"lane:geom": ["roofquick", "hroof", "hcomponent", "heavefloat", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "hmesh", "metriccoords"],
 	# Same coverage in three bounded processes when the combined lane exceeds
 	# the five-minute host cap. Keep lane:geom as the complete batch selector.
 	"lane:geom-core": ["roofquick", "hroof", "hcomponent", "hsky", "hdoor", "hmesh", "metriccoords"],
@@ -144,7 +144,7 @@ const LANES: Dictionary = {
 	"lane:house-plan-fast": ["houseqaplan", "hmultistory", "hwitchcompact", "hwitchsize"],
 	"lane:house-furnish-fast": ["houseqafurnishfast", "hassembly", "walkpins"],
 	"lane:house-furnish-rules": ["houseqafurnishfast"],
-	"lane:house-exterior-fast": ["hexterior", "hassembly", "hwitchflue"],
+	"lane:house-exterior-fast": ["hexterior", "heavefloat", "hassembly", "hwitchflue"],
 	"lane:assets-fast": ["props", "hassembly"],
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
 	"lane:palace-change": ["palace"],
@@ -369,6 +369,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/witchwork_cauldron_flue_suite.gd").run()
 		"hcomponent":
 			return preload("res://tests/suites/house_component_suite.gd").run()
+		"heavefloat":
+			return preload("res://tests/suites/house_eave_float_suite.gd").run()
 		"hslope":
 			return preload("res://tests/suites/house_slope_suite.gd").run()
 		"hpiles":

@@ -19,6 +19,16 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	# the style's roofing, as a house of the same style has it: no draw, and
 	# only the roof material reads it
 	spec.roof_material = StringName(style.get("roof_material", &"shingle"))
+	# A style whose only roof is level (african, pueblo) has pitch 0: left a
+	# gable, it emitted no roof face, a NaN ridge and a row of rafter tails
+	# standing in the air round the wall head (HOUSE-EAVE-FLOAT). Said as the
+	# house generator says it, with no draw, so no other shop moves.
+	var shop_roofs: Array = style.get("roof_types", [])
+	if shop_roofs.size() == 1 and StringName(shop_roofs[0]) == &"flat":
+		spec.roof_type = &"flat"
+		spec.parapet = float(style.get("parapet", 0.0)) >= 1.0
+		spec.roof_span_out = float(style.get("span_out", -1.0))
+		spec.roof_along_out = float(style.get("along_out", -1.0))
 	spec.porch = r.randf() < float(style["porch"])
 	spec.chimney = r.randf() < float(style["chimney"])
 	# a smithy or a bakehouse is its fire: the flue is not a dice roll
