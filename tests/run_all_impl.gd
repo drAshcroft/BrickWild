@@ -76,7 +76,7 @@ const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "plac
 	"wld001_palazzo_10", "wld001_palazzo_14", "wld001_palazzo_19",
 	"dmvbrief", "dmvimplied", "dmvwalk", "bwalk", "twalk", "chwalk", "kwalk", "kwalk2",
 	"wwalk",
-	"vtplan", "vhillside", "vislandfill",
+	"vtplan", "vhillside", "vislandfill", "wgridfill",
 	"vcrossterrain",
 	"vdispersed",
 	"vshore",
@@ -148,7 +148,7 @@ const LANES: Dictionary = {
 	"lane:assets-fast": ["props", "hassembly"],
 	"lane:library-change": ["shop", "librarybiz", "libraryreg"],
 	"lane:palace-change": ["palace"],
-	"lane:village-fast": ["vquick", "vcompact", "compactapi", "vground"],
+	"lane:village-fast": ["vquick", "vcompact", "compactapi", "vground", "wgridfill"],
 	# Bounded terrain gate: one village on each of plane_30, lake_shore,
 	# cliff_band, Manarola, Masouleh and Monpazier, with the five terrain rules
 	# (grades, fall, the stair walk, wet ground, siting) and one failing
@@ -505,6 +505,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_water_form_suite.gd").run()
 		"vislandfill":
 			return preload("res://tests/suites/village_island_suite.gd").run()
+		"wgridfill":
+			return preload("res://tests/suites/walk_grid_fill_suite.gd").run()
 		"vvalley":
 			return preload("res://tests/suites/village_valley_suite.gd").run()
 		"vground":

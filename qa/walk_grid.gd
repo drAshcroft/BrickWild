@@ -348,7 +348,97 @@ func _fill(rect: Rect2, value: int, level := 0.0) -> void:
 					_level[x * nz + z] = level
 
 
+## A cell counts as covered when its centre is inside the polygon
+## (`Poly.contains_point`, boundary included). Scanline, not a point test per
+## cell: a road ribbon or a water outline has hundreds of vertices and a site
+## has hundreds of thousands of cells, and the point test per cell took 15 s to
+## paint a walk grid of a 310 x 123 m site (VILLAGE-DRESS-STRAND-COST).
+## It makes exactly the cells `_fill_poly_exact` makes: inside by the same
+## crossing parity at the same centre, and on the boundary by the same
+## `Poly._on_segment` test, which only a cell that a sample of an edge falls in
+## can pass (samples are half a cell apart, a centre within 1e-6 of the edge is
+## nearer than half a cell to one of them, and so is the nearest centre to it).
 func _fill_poly(poly: PackedVector2Array, value: int, level := 0.0) -> void:
+	var n: int = poly.size()
+	if n < 3:
+		return
+	var bounds: Rect2 = Poly.bounding_rect(poly)
+	if bounds.size.x <= 0.0 or bounds.size.y <= 0.0:
+		return
+	var x0: int = clampi(int(floor((bounds.position.x - origin.x) / cell)), 0, nx - 1)
+	var x1: int = clampi(int(ceil((bounds.end.x - origin.x) / cell)), 0, nx - 1)
+	var z0: int = clampi(int(floor((bounds.position.y - origin.y) / cell)), 0, nz - 1)
+	var z1: int = clampi(int(ceil((bounds.end.y - origin.y) / cell)), 0, nz - 1)
+	if n < 8 or (x1 - x0 + 1) * (z1 - z0 + 1) < 400:
+		_fill_poly_exact(poly, value, level)
+		return
+	var eps := 1e-6
+	for i in range(n):
+		var len0: float = poly[i].distance_to(poly[(i + 1) % n])
+		if len0 > eps and eps * maxf(len0, 1.0) / len0 + eps > cell * 0.25:
+			_fill_poly_exact(poly, value, level)       # a sliver edge: its boundary band is not thin
+			return
+	var xs: Array[float] = []
+	for z in range(z0, z1 + 1):
+		var py: float = world_of(x0, z).y
+		xs.clear()
+		var j: int = n - 1
+		for i in range(n):
+			var a: Vector2 = poly[i]
+			var b: Vector2 = poly[j]
+			if (a.y > py) != (b.y > py):
+				xs.append(a.x + (py - a.y) * (b.x - a.x) / (b.y - a.y))
+			j = i
+		if xs.size() % 2 != 0:
+			for x in range(x0, x1 + 1):         # parity unsure: the point test
+				if Poly.contains_point(poly, world_of(x, z)):
+					_free[x * nz + z] = value
+					if value == 1:
+						_level[x * nz + z] = level
+			continue
+		xs.sort()
+		# inside where the crossings to the right of the centre are odd in number:
+		# [xs[0], xs[1]), [xs[2], xs[3]), ...
+		for m in range(0, xs.size(), 2):
+			var xa: int = _first_centre_at(xs[m], z, x0, x1)
+			var xb: int = _first_centre_at(xs[m + 1], z, xa, x1)
+			for x in range(xa, xb):
+				_free[x * nz + z] = value
+				if value == 1:
+					_level[x * nz + z] = level
+	# the boundary: a centre on an edge is in, whatever the parity says
+	for i in range(n):
+		var a: Vector2 = poly[i]
+		var b: Vector2 = poly[(i + 1) % n]
+		var len: float = a.distance_to(b)
+		if a.distance_squared_to(b) <= eps * eps:
+			continue
+		var steps: int = maxi(1, int(ceil(len / (cell * 0.5))))
+		for k in range(steps + 1):
+			var q: Vector2 = a.lerp(b, float(k) / float(steps))
+			var cx: int = int(round((q.x - origin.x) / cell - 0.5))
+			var cz: int = int(round((q.y - origin.y) / cell - 0.5))
+			if cx < x0 or cx > x1 or cz < z0 or cz > z1:
+				continue
+			if Poly._on_segment(a, b, world_of(cx, cz), eps):
+				_free[cx * nz + cz] = value
+				if value == 1:
+					_level[cx * nz + cz] = level
+
+
+## The first x in [lo, hi] whose cell centre (as `world_of` rounds it) is not left
+## of `at`; hi + 1 when none is.
+func _first_centre_at(at: float, z: int, lo: int, hi: int) -> int:
+	var x: int = clampi(int(floor((at - origin.x) / cell)) - 1, lo, hi + 1)
+	while x > lo and world_of(x - 1, z).x >= at:
+		x -= 1
+	while x <= hi and world_of(x, z).x < at:
+		x += 1
+	return x
+
+
+## The point test per cell: what `_fill_poly` is held to (qa/walk_grid_fill_check.gd).
+func _fill_poly_exact(poly: PackedVector2Array, value: int, level := 0.0) -> void:
 	if poly.size() < 3:
 		return
 	var bounds: Rect2 = Poly.bounding_rect(poly)
