@@ -160,6 +160,8 @@ buildings[].ground says where to cut, fill or step
 That is `thorn-hamlet` on Limone sul Garda's real ground: its through road
 falls 44 m over 226 m at a steepest grade of 48 %.
 
+**The contract.** Dm_View's C1 site contract carries this as Amendment A1 (PROPOSED 2026-10-28, branch `vter-c1-contract` in C:/Projects/Dm_View, commit 62afb8b; `docs/contracts/c1-site.md`): `terrain.height` or `--terrain` in, the `ground` blocks and `walk.navmesh_3d` out, all optional, no schema bump, first complete in BrickWild 0.1.5 (0.1.4 lacks piles and boardwalk). A plan without `ground` is flat and a consumer keeps its median pad. The Dm_View owner has yet to merge it.
+
 ## For VoxelGames
 
 What changes now, without waiting for terrain-aware planning:
