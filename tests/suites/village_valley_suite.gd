@@ -38,6 +38,7 @@ const CASES := [
 	["valley", &""],
 	["world90/gangotri", &""],
 	["real30/ushguli", &""],
+	["world90/rocamadour", &""],
 ]
 ## Derive valley (with a river in the spec) and are NOT cases, each for a stated
 ## reason (docs/VILLAGE_TERRAIN.md "The valley form", VTER-VALLEY-REAL):
@@ -45,8 +46,7 @@ const CASES := [
 ## its uniform 13 % hillside gives a body of 8 buildings, elongation 2.5),
 ## world90/lake_argyle (hand label dispersed; the hill row is 30-55 % and the
 ## bank row a river strip, so a 76 m stretch has no lot and the body splits,
-## elongation 2.7), world90/rocamadour (hand label hillside; the gorge drops
-## 18 % along the river, over a cart's 12 %: switchbacks, 17 of 19 housed),
+## elongation 2.7), and
 ## world90/vermont and world90/lugar_de_guene (see Not yet).
 ## VALLEY_CASE=<fixture> runs any of them.
 ## Over three, with the survey's high-relief median (2.71) under it and its p90 (4.72) over.

@@ -448,7 +448,18 @@ func _check_paths(plan: VillagePlan) -> void:
 	for r in paths:
 		var pts: PackedVector2Array = plan.roads[r]["points"]
 		for k in range(pts.size() - 1):
-			var wide: float = _grid.clearance_along(pts[k], pts[k + 1], 3.0)
+			var from: Vector2 = pts[k]
+			var to: Vector2 = pts[k + 1]
+			# a ribbon's end is a flat cap: the cells beside its last point are
+			# off it, however wide the way. A dead end is measured to a cell
+			# short of its tip (a stair up to the site's edge, VTER-VALLEY-GORGE).
+			var seg_len: float = from.distance_to(to)
+			if seg_len > _grid.cell * 4.0:
+				if k == 0:
+					from = from.move_toward(to, _grid.cell)
+				if k == pts.size() - 2:
+					to = to.move_toward(from, _grid.cell)
+			var wide: float = _grid.clearance_along(from, to, 3.0)
 			if wide < PATH_WIDTH:
 				pinched.append("%s %d (%.1fm)" % [String(plan.roads[r]["class"]), r, wide])
 				break

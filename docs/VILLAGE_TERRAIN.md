@@ -1312,17 +1312,19 @@ no way is laid there today (`plan.water_crossings` is empty).
 
 Not yet:
 
-* **steep real gorges and bends** -- world90/rocamadour's river drops 18 %
-  along the frame, over a cart's 12 % (the same missing switchbacks as above);
-  re-measured 2026-10-26 (VTER-VALLEY-GORGE): the through road now reads 11 %,
-  inside its cap; what fails is 17 of 19 placed (12 houses for 14 households)
-  and a stair way's clearance. `_way`'s last resort was a stair straight up the
-  side (83 %, a 0.18 m going); it now leans like a track until it climbs no more
-  than `STAIR_CAP` 0.45, and with none there is no way (Rocamadour: 42 %). A
-  derivation rule was tried and does not separate the gorge: the window's floor
-  fall (the lowest ground per column and per row at 20 m, the lesser mean fall)
-  reads Rocamadour 0.06, under Gangotri's peers and far under labelled-hillside
-  Castelmezzano 0.29 and Masouleh 0.18; not kept;
+* **steep real gorges and bends** -- SOLVED for world90/rocamadour (now a
+  vvalley case; VTER-VALLEY-GORGE, 2026-10-27), by two roots and no switchback:
+  (1) the retry ladder jumped 1.0 -> 1.3 and a 1.3-wide Rocamadour has an 18 %
+  through road, skipped as over its cap, so the village stayed at 297 m and 17
+  of 19 placed; `cut_measured`'s caller now tries the `FINE_WIDTH_STEPS`
+  (1.05..1.25) when a wide step was skipped for the cap and people are left
+  unplaced (1.05 houses all 19, through 11 %). (2) A stair that runs to the
+  site's edge ends in a flat ribbon cap, and `_check_paths` read the last cell
+  beside its tip as 0.0 m clear; a dead end is now measured a cell short of its
+  tip. A derivation rule was tried and does not separate the gorge: the window's floor
+  fall reads Rocamadour 0.06 against Castelmezzano 0.29 and Masouleh 0.18, and
+  read_ground (slope_p75, median, rank, relief) does not either (Gangotri has
+  p75 0.81 and is a passing valley case); not kept;
   where the river bends out of the straight frame the road leaves it (Lugar
   de Guene: 20-219 m, median 33);
 * **the common's fronting on steep sides** -- fixed for Ushguli (20 % -> 73 %,

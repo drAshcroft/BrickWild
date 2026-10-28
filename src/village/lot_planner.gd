@@ -115,6 +115,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 		attempts = []
 		for scale in [1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.6, 2.0, 2.5, 3.0, 3.5]:
 			attempts.append([0, scale])
+	var over_cap_skipped := false
 	for attempt in attempts:
 		if unplaced <= 0 and bool(common_state["ready"]):
 			break
@@ -126,6 +127,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 		previous_scale = float(attempt[1])
 		var again: VillagePlan = _replan(spec, jobs, int(attempt[0]), float(attempt[1]), minimum_depth, shore_depth)
 		if _through_over_cap(again) and not _through_over_cap(out):
+			over_cap_skipped = true
 			continue
 		var left: int = cut_measured(again, jobs)
 		var next_common := _round_common_state(again)
@@ -137,6 +139,25 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 			unplaced = left
 			common_state = next_common
 			accepted = attempt
+	# A wide step the ground's through road cannot take (Rocamadour: 1.3 is a
+	# gorge road at 18 %, over a cart's 12 %) is skipped, and the ladder has no
+	# step between 1.0 and it. The narrower widths are tried before the
+	# village is left short (VTER-VALLEY-GORGE: 1.05 houses all nineteen).
+	if unplaced > 0 and over_cap_skipped:
+		for scale in FINE_WIDTH_STEPS:
+			if scale <= float(accepted[1]):
+				continue
+			var between: VillagePlan = _replan(spec, jobs, int(accepted[0]), scale, minimum_depth, shore_depth)
+			if _through_over_cap(between):
+				continue
+			var between_left: int = cut_measured(between, jobs)
+			if between_left < unplaced:
+				out = between
+				unplaced = between_left
+				common_state = _round_common_state(between)
+				accepted = [int(accepted[0]), scale]
+			if unplaced <= 0:
+				break
 	# A seat castle that is still unplaced is not short of ground. Its lot is
 	# ninety metres across on the lean, and the field tracks fifty apart cut
 	# every candidate (the gate form drops them for the same reason). Clear
