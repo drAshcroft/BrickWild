@@ -645,6 +645,15 @@ Observed (not traits):
 * Front renders: a red bench, barrel, bowl and a bundle of crates sit loose beside the end steps (21325 shows a barrel and a bowl standing on bare grass).
 * The dry garden is a flat rectangle with a thin wood border and a little raking; rocks sit on top of it. It reads as a sandbox, not a garden, but the intent is clear.
 
+Residue (HS-MINKA-RESIDUE, 26 Oct; e1c8dfc, e36a74f, eee61dd). This supersedes the "Known sides" and "Observed" notes above.
+* Furniture and floor: a furnished minka now gets its own set: chabudai, zabuton, futon, tansu, one tokonoma and andon lamps. The ground-storey rooms take a tatami floor finish. This is the culture LOOK in `src/house/house_culture_furnish.gd` (CULTURE-FURNISH-VOCAB, see below). Plan rows are unchanged.
+* Windows: an engawa house is `spec.unglazed`. Its wall windows are open renji lattices (`window_lattice` bars), not glazed sashes with sills.
+* Hafu: it has a tie beam and battens. The engawa deck shows board joints and stands on a continuous stone kerb (`engawa_kerb`), so it no longer reads as separate footings.
+* Garden: the tree is a maple at the far corner, not a conifer across the screens. The stepping stones run from the foot of the engawa flight to the gravel. The loose bench, barrel and lantern by the steps are gone; the exterior recipe gives a water pot and a bucket.
+* Still open: the dry garden is a flat bordered rectangle. The interior camera in `tools/render_hs_minka.gd` still frames the garden opening small (`tools/render_culture_interiors.gd` has a better clear-spot picker). Not done for furniture: no irori (the minka keeps a wall fireplace), upper-storey floors stay planks, and the kitchen Workbench and wall shelves keep catalogue models.
+
+Culture furnishing (CULTURE-FURNISH-VOCAB, 26 Oct, e1c8dfc; applies to asian, african, roundhouse houses, not to shops or world families). `HouseAssembler` asks `house_culture_furnish.gd` what each plan row LOOKS like at assembly time. It never changes the row, so the furnish and nav results are exactly the plan's. The deny list (trestle table, goblet, tankard, chandelier, torch, plank floor) is judged on the assembled tree in `tests/culture_furnish_test.gd`. A look is fitted to the real room outline, not the row's bounding rect, by `fit_in_wall()`. On a round plan the rect corners lie outside the wall (CULTURE-ROUND-TABLE-CLIP, 27 Oct). Caveat at close (26 Oct): `HouseFurnishCheck` is red on 6 of 9 frozen culture requests. The complaints are plan-level and predate the look: hall has no table while the parlour dines, Workbench off its wall, sparse kitchen, stowage, bed_door. These are the known `harchetype` reds, and the test reports them as WARN.
+
 
 
 ## african -- the Sahel courtyard house (HS-SAHEL)
@@ -752,6 +761,12 @@ Observed (not traits):
 * Water jars (blue-grey bowls) stand on bare grass at the right flank and a woven basket hangs against the wall in the rear view; the bucket in the entry views is a European wooden pail. A short plank path leads to the door and ends in the grass.
 * Ground: flat green grass, not sand or dry earth; the house does not sit in a Sahel setting.
 * Roof: the slab overhangs the walls widely and reads as a thick lid; the pinnacles stand close to the front parapet.
+
+Residue (HS-SAHEL-RESIDUE, 26-28 Oct; e1c8dfc, e36a74f, eee61dd and a 28 Oct commit). This supersedes the notes above.
+* Done: earth floor and Sahel furniture (culture look, see the minka section), with no stone skirting inside. Buttresses step back in four stages (`buttress`, `buttress_step` x2, `buttress_top`). The entry relief stands 0.17 m proud with bosses. Window frames are mud reveals (SURF_WALL, no sill lip). The roof slab overhangs the wall by 0.2 m (was 0.55). The pail is a clay jar and the path is earth slabs. The interior camera uses `_clear_spot`.
+* Court range roofs get a between pier wherever the door approach and window drip rules allow (`HouseYard` RANGE_SPAN 1.8 m), so a slab does not rest on one lone end post. `court_range_span` is measured in the trait test; old code spans 2.35 m. The pier beside the rear door is dropped by the yard's own approach rule.
+* REJECTED, ranges as rooms: a court-side front wall with a doorway was tried and reverted. The court is about 3 m deep. The rear door's 2 m approach plus the rear windows' 0.8 m drip zone leave wall stubs of 0.25-1.15 m on one side only, and these read as piers again. Doing it needs a deeper court (a bigger lot apron) or ranges whose doors face the house door.
+* Still open: toron are square (`component_box` emits boxes only; the stake is 9 cm). The three seeds are near-identical.
 
 
 ## roundhouse -- the round hut, formerly `mud_hut` (HS-ROUNDHOUSE)
@@ -876,6 +891,12 @@ Observed (not traits):
 * Exterior: the vent hat is a pavilion on posts, closer to a gazebo or cupola than a smoke vent, and tall for the cone.
 * Ground: flat green grass, no yard or path.
 * Vent view: only the roof underside is visible (a tunnel of banded facets); no sky through the vent, no fire or smoke below.
+
+Residue (HS-ROUNDHOUSE-RESIDUE, 26-28 Oct; e1c8dfc, e36a74f, eee61dd and a 28 Oct commit). This supersedes the notes above.
+* Done: the bed is a straw pallet on a low plank frame, and `tests/culture_furnish_test.gd` checks that it stands on the floor. Windows are open holes (`spec.unglazed` when `HouseRound.applies`). The floor is packed earth. Review renders are furnished and add `_hearthvent` (fire and apex in one frame).
+* Vent hat: smaller and flatter (HAT_R 0.75, HAT_H 0.26) on slimmer posts, with a 0.62 m smoke gap (HAT_CLEAR; VENT_TOP 0.8). Eave tails are slim poles, not square dentils. The roundhouse fire is seven low leaning tongues; the longhall keeps its own.
+* Plinth and water-table moulding are carried past each facet end in proportion to their own thickness (`HouseBuilder._corner_ext`), so the outer faces meet. The trait test checks it; old code misses by 3.9 mm.
+* Still open, as design calls: from the floor the vent still reads as a disc. A hat over a hole cannot show sky; to fix it, drop the hat or raise it clear of the cone. There is no yard or path, because the exterior recipes need a rectangular facade. The three seeds are near-identical.
 
 ## pueblo -- the stepped adobe house (HS-PUEBLO)
 
@@ -1021,3 +1042,8 @@ Observed (not traits):
 * Two blue-grey water jars beside the house (seed 1, 8102 and 21325 front/side) are at ground level and read fine; one sits half under the plinth edge in the side view.
 * Ground: flat green grass, no yard, no plaza, no kiva, no horno.
 * No floating objects, z-fighting or clipping were seen in any view; no camera was blocked.
+
+Residue (HS-PUEBLO-RESIDUE, 26-28 Oct). This supersedes the shop line in "Known sides and open" above.
+* The 26 Oct bug walk (WALK-1a17afce-1) found that a pueblo shop walked as "the same house as the Sahel". A pueblo shop, trade or tiny house is not terraced (`HousePueblo.applies` is false), and it used to get no pueblo parts. `HousePueblo.emit` now lays vigas on it: 0.17 m beams, against the Sahel's 0.09 m toron plus buttresses and pinnacles. The exterior bound grows by `HousePueblo.reach()`. Control: the Sahel smith has 0 vigas, and old code had 0 on the pueblo smith too.
+* Still open, as design calls: shops need stepped massing, which needs a trade-aware terraced planner. Vigas are square and there are no canales (`component_box` emits boxes only). The plinth does not step with the terraces. Opening depth reads only from inside. A water jar sits against the plinth edge.
+* Not a defect: the ladder that seems to cross a window is the perspective of a set-back storey. The two do not overlap.

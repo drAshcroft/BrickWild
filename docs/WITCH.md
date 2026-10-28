@@ -1,6 +1,8 @@
 # Witch hut
 
-Notes on the witch house style. This file currently holds the independent visual review only.
+Notes on the witch house style: the independent visual review and what came of it. Size, wall, roof and eave rules are in `docs/HOUSES.md` ("The witch hut is small").
+
+Props: a procedural cast-iron box stove (`WitchWoodStove`) set on the hearth recess slab, with its bay added after furnishing (`HouseWitchProps.add_stove_bay`); a catalogue Cauldron beside it; two procedural brooms. The brooms are procedural because the owned broom models (TFP_Broom_01/02, TEM_Broom_01) are under the Unity Asset Store EULA and must never reach a public repo.
 
 ## WITCH-REVIEW (2026-10-25)
 
@@ -74,3 +76,10 @@ A walker said the thatch "does not make sense: thatch has round corners and a br
 - **Brushed ends.** `thatch_brush`: sawn reed ends 0.07 to 0.20 m long hang under every eave and verge edge at a 0.14 m pitch, lengths from a fixed low-discrepancy sequence (`HouseGeometry.brush_length`), so no two neighbours match and the edge is not a dentil course.
 
 `ThatchFormCheck` (`qa/thatch_form_check.gd`, run by `hwitchsize` on every hut) measures all four; its controls are the old hump, the old tent and a thatched cottage (soft eave and saddle but no verge roll or brush). `tools/render_witch_thatch.gd` renders the gable, side, eave and apex close-ups (`THATCH_TAG=name` prefixes the files in `artifacts/witch_followups/thatch/`). Blind review from the walk camera is still the user's; the renders show round eaves and verges and a ragged edge. Known: where the two verge rolls meet at the apex they cross as two cylinders and make a small round knob above the ridge; it reads as a thatcher's finial, not a spike.
+
+## Still open (2026-10-28)
+
+- Seed variety (FOLLOWUPS item 6): small_1 and small_21325 share a plan. The clamp control is the 8102 hut by design.
+- Rustic: the windows are now unglazed, but the plaster infill is still smooth. A rougher infill is the next step if the hut still reads as a cottage.
+- WITCH-THATCH-FORM: the blind review from the walk camera is still the user's to do.
+- `harchetype` has no `witch_hut` row of its own. Its nearest case is `alchemist` (style `witch_hut`, trade alchemist). The trade-less hut's stove, cauldron and brooms are proved by `witch_firebox_lining_test`, `hwitchcompact` and `hwitchsize`, not by harchetype.

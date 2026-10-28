@@ -791,3 +791,589 @@ Re-open: `godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed
    - camera (-0.85, 1.58, -11.83) looking (0.12, 0.25, 0.96)
    - ![pin 1](walk_shots/1a113f97860b8a160d1_1.png)
 
+<!-- human-walk 1a17a4d4878f601b119 house -->
+## Walk — House: witch_hut / none, seed 1 — 2026-10-26T22:20:47Z
+
+Building: Copperwell Steading · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.6,"jank":0.9,"kind":"house","length":12.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"none","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"witch_hut","water":"none","width":9.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=house --seed=1 --style=witch_hut --purpose=none --jank=0.9`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [x] roof problems
+
+### Pins (1)
+
+1. **roof** (bug) — hovering blocks
+   - at (3.71, 2.25, -3.67) (building-local), normal (0.00, 0.09, -1.00), hit `Shell`
+   - camera (3.84, 1.58, -7.17) looking (-0.03, 0.19, 0.98)
+   - ![pin 1](walk_shots/1a17a4d4878f601b119_1.png)
+
+<!-- human-walk 1a17a52f2f52bd9a39f house -->
+## Walk — House: witch_hut / none, seed 62994 — 2026-10-26T22:26:58Z
+
+Building: Millstonewell House · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.6,"jank":0.9,"kind":"house","length":12.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"none","schema":"brickwild.request","schema_version":1,"seed":"62994","storeys":1,"style":"witch_hut","water":"none","width":9.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=house --seed=62994 --style=witch_hut --purpose=none --jank=0.9`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [x] roof problems
+
+### Pins (2)
+
+1. **collision** (bug) — collision between patio and roof
+   - at (3.62, 2.23, -4.72) (building-local), normal (-0.00, -0.05, -1.00), hit `Shell`
+   - camera (3.17, 1.58, -6.59) looking (0.22, 0.32, 0.92)
+   - ![pin 1](walk_shots/1a17a52f2f52bd9a39f_1.png)
+2. **roof** (bug) — what is this?  I think it is supposed to be something with thatch, but does not make sense.  thatch has round corners and a brush end
+   - at (-4.12, 2.76, -4.71) (building-local), normal (-0.50, -0.87, 0.00), hit `Shell`
+   - camera (-4.96, 1.58, -6.35) looking (0.39, 0.54, 0.75)
+   - ![pin 2](walk_shots/1a17a52f2f52bd9a39f_2.png)
+
+<!-- human-walk 1a17a53cb7c3411d43d shop -->
+## Walk — Shop: cottage / bakery, seed 1 — 2026-10-26T22:27:54Z
+
+Building: Fox on Market Row · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.8,"kind":"shop","length":14.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"bakery","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"cottage","water":"none","width":11.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=2 --kind=shop --seed=1 --style=cottage --purpose=bakery`
+
+Tour: sprint_2026_10_26, stop 2 / 22 — shop wares: oven, bread racks, counter
+
+- [ ] pretty
+- [ ] collisions
+- [ ] window problems
+- [ ] door problems
+- [x] roof problems
+
+### Pins (1)
+
+1. **roof** (bug) — same floating roof things
+   - at (-5.67, 2.70, -7.10) (building-local), normal (0.00, -1.00, 0.00), hit `Shell`
+   - camera (-5.74, 1.58, -9.41) looking (0.03, 0.44, 0.90)
+   - ![pin 1](walk_shots/1a17a53cb7c3411d43d_1.png)
+
+<!-- human-walk 1a17a563bd6bda10403 church -->
+## Walk — Church: russian / , seed 1 — 2026-10-26T22:30:34Z
+
+Building: Grey Ninian-in-the-Wold · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":12.0,"jank":0.3,"kind":"church","length":22.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"russian","water":"none","width":10.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=3 --kind=church --seed=1 --style=russian --jank=0.3`
+
+Tour: sprint_2026_10_26, stop 3 / 22 — shop wares: the block and the hanging rail
+
+- [ ] pretty
+- [x] collisions
+- [x] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (4)
+
+1. **lighting** (bug) — light sticking out of a window
+   - at (-4.77, 2.44, -7.99) (building-local), normal (-1.00, -0.02, 0.00), hit `Shell`
+   - camera (-9.85, 1.58, -9.65) looking (0.94, 0.16, 0.31)
+   - ![pin 1](walk_shots/1a17a563bd6bda10403_1.png)
+2. **window** (bug) — gap all aroung the window
+   - at (1.50, 0.50, 8.35) (building-local), normal (0.64, -0.59, 0.49), hit `Dressing/Cauldron/Cauldron`
+   - camera (7.53, 1.58, 7.32) looking (-0.97, -0.17, 0.17)
+   - ![pin 2](walk_shots/1a17a563bd6bda10403_2.png)
+3. **collision** (bug) — something sticking out the wall here
+   - at (4.94, 2.63, -4.03) (building-local), normal (0.07, 0.03, 1.00), hit `Dressing/@Node3D@3823/Torch_Metal`
+   - camera (7.09, 1.58, -3.00) looking (-0.83, 0.40, -0.40)
+   - ![pin 3](walk_shots/1a17a563bd6bda10403_3.png)
+4. **furniture / prop** (bug) — whats with the ropes in the church entrances?
+   - at (3.22, 0.00, -12.30) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`
+   - camera (0.87, 1.60, -16.17) looking (0.49, -0.33, 0.81)
+   - ![pin 4](walk_shots/1a17a563bd6bda10403_4.png)
+
+<!-- human-walk 1a17a581a8b52680ca1 shop -->
+## Walk — Shop: cottage / blacksmith, seed 1 — 2026-10-26T22:32:36Z
+
+Building: Fox on Market Row · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.8,"kind":"shop","length":14.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"blacksmith","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"cottage","water":"none","width":11.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=4 --kind=shop --seed=1 --style=cottage --purpose=blacksmith`
+
+Tour: sprint_2026_10_26, stop 4 / 22 — shop wares: bolts, cutting table, dummy
+
+- [ ] pretty
+- [ ] collisions
+- [ ] window problems
+- [x] door problems
+- [ ] roof problems
+
+### Pins (1)
+
+1. **door** (bug) — there is only one door on a giant house
+   - at (-0.89, 1.27, -6.82) (building-local), normal (-1.00, 0.00, 0.00), hit `Shell`
+   - plan: windows[1] (0.97 m away)
+   - camera (-1.47, 1.72, -8.08) looking (0.40, -0.31, 0.86)
+   - ![pin 1](walk_shots/1a17a581a8b52680ca1_1.png)
+
+<!-- human-walk 1a17af8e3ccd02529bf shop -->
+## Walk — Shop: rich / apothecary, seed 1 — 2026-10-27T01:28:14Z
+
+Building: Fox on Market Row · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.8,"kind":"shop","length":14.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"apothecary","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"rich","water":"none","width":11.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=shop --seed=1 --style=rich --purpose=apothecary`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (1)
+
+1. **collision** (polish) — misaligned and collition between the shelf and dresser
+   - at (-4.76, 1.11, -5.50) (building-local), normal (0.00, 1.00, 0.00), hit `Furniture/Cabinet/Cabinet`, room: sales_floor #0 (storey 0)
+   - plan: furniture[8] Cabinet
+   - camera (-2.64, 1.72, -6.09) looking (-0.93, -0.27, 0.26)
+   - ![pin 1](walk_shots/1a17af8e3ccd02529bf_1.png)
+<!-- /human-walk 1a17af8e3ccd02529bf -->
+
+<!-- human-walk 1a17afb7cea2a7a9ef5 shop -->
+## Walk — Shop: african / apothecary, seed 1 — 2026-10-27T01:31:04Z
+
+Building: Bell on Market Row · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.8,"kind":"shop","length":14.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"apothecary","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"african","water":"none","width":11.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=shop --seed=1 --style=african --purpose=apothecary`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [x] roof problems
+
+### Pins (2)
+
+1. **roof** (bug) — floating beams
+   - at (-5.50, 2.50, -6.89) (building-local), normal (-1.00, 0.00, 0.00), hit `Shell`
+   - camera (-6.17, 1.58, -8.59) looking (0.33, 0.45, 0.83)
+   - ![pin 1](walk_shots/1a17afb7cea2a7a9ef5_1.png)
+2. **furniture / prop** (blocker) — box right in front of door and the dispensor window
+   - at (-0.40, 0.52, -5.78) (building-local), normal (0.08, 0.00, 1.00), hit `Furniture/@Node3D@1511/Crate_Metal`, room: sales_floor #0 (storey 0)
+   - plan: furniture[13] Crate_Metal, windows[7] (0.91 m away)
+   - camera (-2.18, 1.72, -4.80) looking (0.75, -0.51, -0.42)
+   - ![pin 2](walk_shots/1a17afb7cea2a7a9ef5_2.png)
+<!-- /human-walk 1a17afb7cea2a7a9ef5 -->
+
+<!-- human-walk 1a17afcec5f5edef665 shop -->
+## Walk — Shop: pueblo / apothecary, seed 1 — 2026-10-27T01:32:38Z
+
+Building: Bell on Market Row · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.8,"kind":"shop","length":14.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"apothecary","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"pueblo","water":"none","width":11.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=shop --seed=1 --style=pueblo --purpose=apothecary`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [ ] door problems
+- [x] roof problems
+
+### Pins (1)
+
+1. **missing / wrong for the style** (bug) — this is the same house as the sahel
+   - at (-5.50, 2.42, -6.60) (building-local), normal (-1.00, 0.00, 0.00), hit `Shell`
+   - camera (-7.97, 1.58, -8.24) looking (0.49, -0.10, 0.86)
+   - ![pin 1](walk_shots/1a17afcec5f5edef665_1.png)
+<!-- /human-walk 1a17afcec5f5edef665 -->
+
+<!-- human-walk 1a17afdf8d68c5bba38 windmill -->
+## Walk — Windmill: tower / , seed 1 — 2026-10-27T01:33:47Z
+
+Building: Rook Mill · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":12.0,"kind":"windmill","length":6.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"tower","water":"none","width":12.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=windmill --seed=1 --style=tower`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (1)
+
+1. **door** (bug) — there is no inside or way inside
+   - at (-0.43, 0.97, -2.87) (building-local), normal (0.00, 0.09, -1.00), hit `Shell`
+   - camera (-0.03, 1.58, -4.78) looking (-0.20, -0.30, 0.93)
+   - ![pin 1](walk_shots/1a17afdf8d68c5bba38_1.png)
+<!-- /human-walk 1a17afdf8d68c5bba38 -->
+
+<!-- human-walk 1a17afe6f8098c4a6c6 windmill -->
+## Walk — Windmill: post / , seed 1 — 2026-10-27T01:34:17Z
+
+Building: Hollow Green Mill · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":12.0,"kind":"windmill","length":6.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"post","water":"none","width":12.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=windmill --seed=1 --style=post`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (4)
+
+1. **collision** (bug) — windmill collides with door, wall, railing and everything else.  angled for some reason
+   - at (-0.05, 5.22, -3.78) (building-local), normal (0.00, 0.00, -1.00), hit `Shell`
+   - camera (-2.31, 1.58, -7.62) looking (0.39, 0.63, 0.67)
+   - ![pin 1](walk_shots/1a17afe6f8098c4a6c6_1.png)
+2. **floating / gap** (bug) — is this supposed to be a balcony? it is janky and messy
+   - at (-3.59, 3.35, 0.24) (building-local), normal (-1.00, 0.00, 0.00), hit `Shell`
+   - camera (-5.61, 2.06, 0.88) looking (0.81, 0.52, -0.26)
+   - ![pin 2](walk_shots/1a17afe6f8098c4a6c6_2.png)
+3. **roof** (bug) — what is this?
+   - at (2.46, 6.79, 2.92) (building-local), normal (0.00, -1.00, 0.00), hit `Shell`
+   - camera (4.30, 1.58, 6.39) looking (-0.28, 0.80, -0.53)
+   - ![pin 3](walk_shots/1a17afe6f8098c4a6c6_3.png)
+4. **stair / floor** (bug) — is this supposed to be stairs?
+   - at (3.35, 1.14, -4.54) (building-local), normal (-0.58, 0.00, -0.82), hit `Shell`
+   - camera (4.69, 1.58, -8.31) looking (-0.33, -0.11, 0.94)
+   - ![pin 4](walk_shots/1a17afe6f8098c4a6c6_4.png)
+<!-- /human-walk 1a17afe6f8098c4a6c6 -->
+
+<!-- human-walk 1a17b003df1dc34f9cd windmill -->
+## Walk — Windmill: smock / , seed 1 — 2026-10-27T01:36:15Z
+
+Building: Fenner End Mill · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":12.0,"kind":"windmill","length":6.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"smock","water":"none","width":12.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=windmill --seed=1 --style=smock`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (1)
+
+1. **stair / floor** (bug) — how does the user get to the door? no stairs
+   - at (-0.31, 3.42, -2.62) (building-local), normal (0.00, 0.10, -1.00), hit `Shell`
+   - camera (-4.20, 1.58, -5.84) looking (0.72, 0.34, 0.60)
+   - ![pin 1](walk_shots/1a17b003df1dc34f9cd_1.png)
+<!-- /human-walk 1a17b003df1dc34f9cd -->
+
+<!-- human-walk 1a17b00f6c498023895 windmill -->
+## Walk — Windmill: windpump / , seed 1 — 2026-10-27T01:37:03Z
+
+Building: Rook Mill · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":12.0,"kind":"windmill","length":6.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"windpump","water":"none","width":12.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=windmill --seed=1 --style=windpump`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (3)
+
+1. **door** (bug) — door to nowhere?  why is this door here.  the windmill has no walls.  if a door is here, it needs to be mesh like the walls
+   - at (-0.43, 1.29, -2.02) (building-local), normal (0.00, 0.00, -1.00), hit `Shell`
+   - camera (1.39, 1.58, -5.19) looking (-0.50, -0.08, 0.86)
+   - ![pin 1](walk_shots/1a17b00f6c498023895_1.png)
+2. **roof** (bug) — what is this? it is just sticking out
+   - at (0.94, 3.03, -2.66) (building-local), normal (0.00, -1.00, 0.00), hit `Shell`
+   - camera (-3.47, 1.58, -4.54) looking (0.88, 0.29, 0.38)
+   - ![pin 2](walk_shots/1a17b00f6c498023895_2.png)
+3. **collision** (bug) — windmill is colliding with the whole tower and in the wrong place
+   - at (-1.29, 11.88, 0.23) (building-local), normal (-1.00, 0.00, 0.00), hit `Shell`
+   - camera (-5.31, 1.58, 2.28) looking (0.36, 0.92, -0.18)
+   - ![pin 3](walk_shots/1a17b00f6c498023895_3.png)
+<!-- /human-walk 1a17b00f6c498023895 -->
+
+<!-- human-walk 1a17b0289c42f066502 windmill -->
+## Walk — Windmill: paddle / , seed 1 — 2026-10-27T01:38:46Z
+
+Building: Thistle Bridge Mill · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":12.0,"kind":"windmill","length":6.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"paddle","water":"none","width":12.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=windmill --seed=1 --style=paddle`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (2)
+
+1. **floating / gap** (bug) — these are maybe a waterwheel?  they are rotated the wrong direction, not attached to the circle and floating
+   - at (-1.72, 0.83, -3.98) (building-local), normal (-0.69, 0.69, -0.22), hit `Shell`
+   - camera (-2.80, 1.58, -6.47) looking (0.38, -0.27, 0.88)
+   - ![pin 1](walk_shots/1a17b0289c42f066502_1.png)
+2. **collision** (bug) — door is impossible to reach
+   - at (-0.11, 1.25, -2.89) (building-local), normal (0.00, 0.06, -1.00), hit `Shell`
+   - camera (-0.70, 1.58, -8.14) looking (0.11, -0.06, 0.99)
+   - ![pin 2](walk_shots/1a17b0289c42f066502_2.png)
+<!-- /human-walk 1a17b0289c42f066502 -->
+
+<!-- human-walk 1a17b049a269f39372b village -->
+## Walk — Village: english / farming, seed 1 — 2026-10-27T01:41:01Z
+
+Building: Wolfmarch Green · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":1.0,"kind":"village","length":35.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"farming","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"english","water":"none","width":40.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=village --seed=1 --style=english --purpose=farming`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (2)
+
+1. **furniture / prop** (polish) — what is this???
+   - at (-24.97, 1.15, -36.26) (building-local), normal (0.76, 0.23, 0.61), hit `Ground`
+   - camera (-22.81, 1.60, -34.98) looking (-0.85, -0.18, -0.50)
+   - ![pin 1](walk_shots/1a17b049a269f39372b_1.png)
+2. **collision** (polish) — these should not have a collision mesh
+   - at (-23.55, 0.00, -33.65) (building-local), normal (0.00, 1.00, 0.00), hit `Ground`
+   - camera (-23.43, 1.90, -34.21) looking (-0.06, -0.96, 0.28)
+   - ![pin 2](walk_shots/1a17b049a269f39372b_2.png)
+<!-- /human-walk 1a17b049a269f39372b -->
+
+<!-- human-walk 1a17b25f99128ae172 house -->
+## Walk — House: rich / none, seed 1 — 2026-10-27T02:17:28Z
+
+Building: Larkspurmill Steading · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.6,"kind":"house","length":12.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"none","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"rich","water":"none","width":9.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=house --seed=1 --style=rich --purpose=none`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (5)
+
+1. **furniture / prop** (polish) — beds do not go in the entrance room. couches, card tables, entrace stuff
+   - at (-0.06, 0.57, -4.59) (building-local), normal (0.00, 1.00, 0.00), hit `Furniture/Bed_Twin1/Bed_Twin1`, room: hall #0 (storey 0)
+   - plan: furniture[0] Bed_Twin1
+   - camera (-3.19, 1.72, -4.07) looking (0.93, -0.34, -0.16)
+   - ![pin 1](walk_shots/1a17b25f99128ae172_1.png)
+2. **z-fight / texture** (bug) — z order problem
+   - at (1.45, 2.66, -2.13) (building-local), normal (0.00, 0.00, -1.00), hit `Shell`, room: hall #0 (storey 0), kitchen #1 (storey 0), parlour #5 (storey 1), store #6 (storey 1)
+   - camera (3.15, 4.32, -3.35) looking (-0.64, -0.62, 0.46)
+   - ![pin 2](walk_shots/1a17b25f99128ae172_2.png)
+3. **collision** (bug) — in the walk way
+   - at (0.17, 3.24, -4.16) (building-local), normal (1.00, 0.00, -0.00), hit `Furniture/@Node3D@3124/Cabinet`, room: hall #0 (storey 0), parlour #5 (storey 1)
+   - plan: furniture[44] Cabinet
+   - camera (1.38, 4.32, -4.41) looking (-0.74, -0.66, 0.15)
+   - ![pin 3](walk_shots/1a17b25f99128ae172_3.png)
+4. **furniture / prop** (bug) — chair facing wall.  why is there a chair here?
+   - at (-1.93, 3.22, -5.58) (building-local), normal (0.00, 1.00, 0.00), hit `Furniture/@Node3D@3115/Chair_1`, room: hall #0 (storey 0), parlour #5 (storey 1)
+   - plan: furniture[35] Chair_1, windows[8] (0.91 m away)
+   - camera (-2.75, 4.32, -3.91) looking (0.38, -0.51, -0.77)
+   - ![pin 4](walk_shots/1a17b25f99128ae172_4.png)
+5. **furniture / prop** (bug) — no beds in the rooms
+   - at (2.17, 2.72, 3.93) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`, room: kitchen #1 (storey 0), store #6 (storey 1)
+   - camera (3.16, 4.32, 0.51) looking (-0.25, -0.41, 0.88)
+   - ![pin 5](walk_shots/1a17b25f99128ae172_5.png)
+<!-- /human-walk 1a17b25f99128ae172 -->
+
+<!-- human-walk 1a17b2a685be747ef1a house -->
+## Walk — House: roundhouse / none, seed 1 — 2026-10-27T02:22:19Z
+
+Building: Hollowhollow Steading · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":2.6,"kind":"house","length":12.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"none","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"roundhouse","water":"none","width":9.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=house --seed=1 --style=roundhouse --purpose=none`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (1)
+
+1. **collision** (bug) — table clipped through the wall
+   - at (-2.01, 0.45, -3.06) (building-local), normal (0.00, 1.00, 0.00), hit `Furniture/Culture_low_table/@MeshInstance3D@3197`, room: hall #0 (storey 0)
+   - plan: furniture[2] Table_Large
+   - camera (0.32, 1.72, -3.07) looking (-0.88, -0.48, 0.01)
+   - ![pin 1](walk_shots/1a17b2a685be747ef1a_1.png)
+<!-- /human-walk 1a17b2a685be747ef1a -->
+
+<!-- human-walk 1a17b2b30152ad5c511 castle -->
+## Walk — Castle: norman / , seed 1 — 2026-10-27T02:23:10Z
+
+Building: Thorncliffe Tower · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":18.0,"kind":"castle","length":50.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"norman","water":"none","width":55.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=castle --seed=1 --style=norman`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (6)
+
+1. **z-fight / texture** (bug) — flicker
+   - at (9.29, 18.25, -20.40) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`
+   - camera (10.89, 19.85, -21.67) looking (-0.62, -0.62, 0.49)
+   - ![pin 1](walk_shots/1a17b2b30152ad5c511_1.png)
+2. **z-fight / texture** (bug) — flicker
+   - at (13.93, 18.25, 22.53) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`
+   - camera (13.96, 19.85, 22.29) looking (-0.02, -0.99, 0.14)
+   - ![pin 2](walk_shots/1a17b2b30152ad5c511_2.png)
+3. **stair / floor** (bug) — stairs into the wall
+   - at (15.57, 17.40, 26.66) (building-local), normal (0.00, 1.00, 0.00), hit `Shell`
+   - camera (15.72, 19.85, 24.07) looking (-0.04, -0.69, 0.73)
+   - ![pin 3](walk_shots/1a17b2b30152ad5c511_3.png)
+4. **stair / floor** (bug) — table right in the walkway
+   - at (13.90, 15.44, 24.97) (building-local), normal (0.00, 1.00, 0.00), hit `tower_0_corner_3/Furniture/@Node3D@3349/Table_Large`
+   - camera (15.72, 17.91, 25.67) looking (-0.58, -0.78, -0.22)
+   - ![pin 4](walk_shots/1a17b2b30152ad5c511_4.png)
+5. **furniture / prop** (bug) — why are these here?  what are the solders doing?
+   - at (13.61, 8.18, 24.31) (building-local), normal (0.00, 1.00, 0.00), hit `tower_0_corner_3/Furniture/@Node3D@3347/Table_Large`
+   - camera (13.19, 8.97, 22.97) looking (0.26, -0.49, 0.83)
+   - ![pin 5](walk_shots/1a17b2b30152ad5c511_5.png)
+6. **door** (bug) — no exit for this weird tower
+   - at (12.32, 1.41, 22.46) (building-local), normal (0.00, 0.00, 1.00), hit `Shell`
+   - camera (11.90, 1.72, 25.50) looking (0.14, -0.10, -0.99)
+   - ![pin 6](walk_shots/1a17b2b30152ad5c511_6.png)
+<!-- /human-walk 1a17b2b30152ad5c511 -->
+
+<!-- human-walk 1a17b2f263ee1d3b876 castle -->
+## Walk — Castle: edwardian / , seed 1 — 2026-10-27T02:27:29Z
+
+Building: Greywatch Keep · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":18.0,"kind":"castle","length":50.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"edwardian","water":"none","width":55.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=castle --seed=1 --style=edwardian`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (1)
+
+1. **furniture / prop** (bug) — no fire
+   - at (-16.13, 0.60, 8.10) (building-local), normal (1.00, 0.00, 0.00), hit `Shell`
+   - camera (-13.11, 1.72, 9.59) looking (-0.85, -0.31, -0.42)
+   - ![pin 1](walk_shots/1a17b2f263ee1d3b876_1.png)
+<!-- /human-walk 1a17b2f263ee1d3b876 -->
+
+<!-- human-walk 1a17b45849232be97e8 castle -->
+## Walk — Castle: elven / , seed 1 — 2026-10-27T02:51:55Z
+
+Building: Greywatch Keep · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":18.0,"kind":"castle","length":50.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"elven","water":"none","width":55.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=castle --seed=1 --style=elven`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (1)
+
+1. **missing / wrong for the style** (bug) — all of the castles have been the exact same layout.   elven hall is nothing like it was speced to be
+   - at (-0.25, 1.88, 3.23) (building-local), normal (0.00, 0.00, -1.00), hit `Shell`
+   - camera (0.50, 1.58, -1.42) looking (-0.16, 0.06, 0.99)
+   - ![pin 1](walk_shots/1a17b45849232be97e8_1.png)
+<!-- /human-walk 1a17b45849232be97e8 -->
+
+<!-- human-walk 1a17b7f6b85a72097d1 castle -->
+## Walk — Castle: wizard / , seed 1 — 2026-10-27T03:55:10Z
+
+Building: Ironfell Keep · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":18.0,"kind":"castle","length":50.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"wizard","water":"none","width":55.0}`
+
+Re-open: `.\visualqa\walk.ps1 --tour=sprint_2026_10_26 --stop=1 --kind=castle --seed=1 --style=wizard`
+
+Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and the jar shelves
+
+- [ ] pretty
+- [x] collisions
+- [ ] window problems
+- [x] door problems
+- [x] roof problems
+
+### Pins (1)
+
+1. **missing / wrong for the style** (bug) — same thing here.  making it purple does not make it into a wizard tower.  it must makes it purple
+   - at (8.36, 2.95, -17.48) (building-local), normal (-1.00, 0.00, 0.00), hit `Shell`
+   - camera (3.65, 1.58, -15.99) looking (0.92, 0.27, -0.29)
+   - ![pin 1](walk_shots/1a17b7f6b85a72097d1_1.png)
+<!-- /human-walk 1a17b7f6b85a72097d1 -->
+

@@ -213,3 +213,18 @@ The checklist's "counter" is the trade's SERVING PLACE: the counter of a counter
 - Carpenter: the focus workbench `faces_door` (it was false and stood out of view in five of six cases).
 - `ShopTradeSuite._run_traits` (`traits_contract`: rules `serving`, `wares`): six trades x 3 footprints x 2 seeds, plus two controls per trade (the serving place removed; the serving place moved out of view). On the old code the carpenter failed `serving` in 5 of 6 cases and the alchemist had no counter at 9 x 12 seed 1.
 - Blacksmith: no planner change. The anvil is the focus and already faces the door, so it is the serving place and is in view at every footprint and seed; the review's missing counter is answered by the rule above (no counter is added, `IDENTITY` still bans one). The suite now holds it there.
+
+### Plan rules from the walk and the review (2026-10-14 to 2026-10-27)
+
+These are `ShopPlanner` post-passes and furnishing overlays. Each one has a failing control in `shoptrade` or `sarchetype`.
+
+- **Store joined to the work room** (SHOP-STORE-JOIN). The house planner hangs every leaf off the first public room it touches, so a store could open only off the sales floor. `_join_store_to_work_room` cuts an inner door where a work room and a store share a usable wall and no store already opens off a work room. Palace, prison, thieves' den, barracks and market hall are exempt. `store_join_contract`: old code failed on apothecary, butcher and tailor (seed 8102).
+- **Yard door on a large shop** (SHOP-SECOND-DOOR, walk pin WALK-1a17a581-1). `YARD_DOOR_ROOMS` = 5 (about 75 m2: 9 x 12 shops have 5 rooms, 11 x 14 have 6). Such a shop with a work room and no non-street door gets one by `_cut_yard_door`. It goes on a store that opens off the work room, or else on the work room. A side wall is preferred, at the end farthest from the street door. Windows give way. The same five businesses are exempt. This also removed two blacksmith `workbench_daylight` failures from `sarchetype` (33 -> 31).
+- **Narrow meeting hall** (SHOP-GUILDHALL-NARROW). To seat a meeting table from both long sides, a hall needs the table depth + 2 x (bench + 0.04) + 2 x `PATH_MIN`, which is 3.56 m. The guildhall's hall was 3.22 m. A narrower hall gets the table on a wall and one bench on the open side (`HouseFurnishingRecipes.narrow_meeting_hall`). Do not shrink `PATH_MIN` to make the table fit.
+- **Palace banners** (SHOP-PALACE-BANNER). The banners are placed after the furnisher has hung its sconces, and those sconces are mirrored about a rear door, not about the throne. The banner station search therefore ignores sconces. Doors, windows and other mounted pieces still veto a station. Sconces under a banner are re-hung beyond the pair, mirrored about the throne, or dropped: lighting is optional, the axis is not. Before the fix, seed 8102 had no banners. A blocked-wall control checks this.
+
+### Still open (2026-10-28)
+
+- The blind re-review of the 2026-10-26 re-renders was never done: the local vision model timed out. This affects apothecary, bakery, butcher, general store, tailor and tavern. Until a fresh reviewer looks, their YES ticks in this file are the implementer's, not independent ones.
+- Tailor: no dress form. It would need floor space. The station is the cutting cloth and shears on the counter.
+- Tavern: its station is the kitchen hearth. The door view cannot see the kitchen; `plan.jpg` can.

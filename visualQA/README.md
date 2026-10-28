@@ -73,8 +73,15 @@ shop, church, castle; the rig's ground plane tilts to match) and
 drops to the bed and the water is drawn at its surface). The saved reopen
 command carries every one of them.
 
-**Save & next kind** or **Save & new seed** appends to `visualqa/HumanRate.md`,
-under a `<!-- human-walk ID kind -->` marker. The web page ignores that marker.
+**A pin is saved the moment you confirm it**: its screenshot, the review's line
+in `walk_pins.jsonl`, its block in `visualqa/HumanRate.md` and (if ticked) its
+todo. A crash or a closed window loses nothing. Deleting a pin rewrites the
+review; a todo already filed for it stays (the status line prints the delete
+command). Pins keep their number; a deleted number is not reused.
+**Save & next kind** / **Save & new seed** only add the boxes and notes to the
+same review and move on. The review sits under `<!-- human-walk ID kind -->` ...
+`<!-- /human-walk ID -->` markers and is rewritten in place, so the file holds
+one block and the jsonl one line per building. The web page ignores the markers.
 Each review records:
 
 - the request as JSON, and a command line that reopens the same building;
@@ -115,7 +122,7 @@ minka / Sahel / roundhouse / rich / mediterranean / thatch styles, a house on
 falling ground, one on piles, a crooked one and a windmill.
 
 **What gets filed.** With "File pins as todos" ticked (the default; `--no-file`
-unticks it), Save starts `tools/file_walk_bugs.py` for that review in the
+unticks it), every confirmed pin (and Save) starts `tools/file_walk_bugs.py` for that review in the
 background and the status line says `Filed: filed N, skipped M...` when it
 ends (its log is `artifacts/walk_bugs/filer.log`). Each pin becomes one
 waterfree todo:

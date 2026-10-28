@@ -765,4 +765,21 @@ colonnade trait now also measures the ring (>= 8 columns on one circle outside
 the drum, on the ground, below the drum top, mirrored, door bay >= gate
 width) with a second removal control. Renders:
 `artifacts/goal/SACRED-ROTUNDA-PERISTYLE/renders/` (six cases x front, side,
-rear, entry). The reviewer tick is the coordinator's.
+rear, entry). Ticked 2026-10-25 by coordinator review of the six front
+renders (2bf68d5): a ground-standing column ring reads as a peristyle, door
+bay between two columns; ring colonnade at the door 6/6.
+
+## Status of the open review items (2026-10-28)
+
+* SACRED-ROMANESQUE-LARGE and SACRED-BYZANTINE-DOME: both ticked 2026-10-24 by
+  coordinator review of their `after/` renders (west tower with hipped cap
+  unoccluded from the front; dome and drum windows clear the west gable from
+  the entry eye). The "needs an independent reviewer tick" in their rows above
+  is superseded.
+* TEMPLE-STAIR-TEST-STALE (27c502b, 2026-10-25): the basilica DOES publish an
+  approach since 40e2601 (`TempleGeometry.basilica_approach_rect`). The test
+  now asserts that approach is real, on the axis and joins the gate; it no
+  longer asserts "an ordinary basilica has no approach".
+* Still open: the basilica flank niches (above) have no independent tick; the
+  pylon hypostyle cannot be read from an exterior render (plan measure only);
+  the void basilica hall stays dark.

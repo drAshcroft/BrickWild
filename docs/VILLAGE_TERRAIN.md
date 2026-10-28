@@ -239,8 +239,8 @@ Decisions worth knowing:
   real 30 m grids.
 
 Class shares inside ±400 m of the twelve real 30 m grids (`vanalysis` notes;
-Hallstatt with the lake the grid records at 503 m, which its fixture does not
-carry as `water_level_m`):
+Hallstatt with the lake the grid records at 503 m, which its fixture now
+carries as `water_level_m`, since VTER-ANALYSIS, 2026-10-16):
 
 | Site | Reading |
 |---|---|
@@ -249,6 +249,11 @@ carry as `water_level_m`):
 | Satemin, Giethoorn | flat 100 % |
 | Castelmezzano, Masouleh, Èze | open_slope 93–96 % |
 | Rocamadour | open_slope 68 %, flat 20 %, valley_floor 8 %, crest 3 % |
+
+`spur` appears on none of the twelve real grids: the ridge test (both sides
+30 m off at least 3 m lower) is tuned on the synthetic spur and is rarely met
+on real 30 m ground. Left as it is (2026-10-16) until a planner relies on the
+class; tune it then, against a real spur site.
 
 ## The form: derived from the ground (VTER-FORM-DERIVE)
 
