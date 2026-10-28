@@ -6,12 +6,13 @@ class HillsideProbe:
 		return VillageHillsideForm._dist_to_line(p, line)
 
 const VTP := preload("res://tests/suites/village_terrain_plan_suite.gd")
+const VALLEY := preload("res://tests/suites/village_valley_suite.gd")
 
 
 func _init() -> void:
 	var jobs: Array[Dictionary] = VillageLotPlanner.measure_all(VillageProgrammer.programme(VTP.spec_for(&"street", null)))
 	for name in OS.get_cmdline_user_args():
-		var plan := VillageLotPlanner.plan_measured(VTP.spec_for(&"hillside", VTP.terrain("real30/" + name)), jobs)
+		var plan := VillageLotPlanner.plan_measured(VTP.spec_for(&"hillside", VALLEY.terrain(("world90/" if name == "rocamadour" else "real30/") + name)), jobs)
 		print("== %s" % name)
 		for i in plan.roads.size():
 			var r: Dictionary = plan.roads[i]
@@ -21,25 +22,6 @@ func _init() -> void:
 			for k in range(1, ts.size() - 1):
 				go = minf(go, float(ts[k]["s1"]) - float(ts[k]["s0"]))
 			var pts: PackedVector2Array = r["points"]
-			if OS.get_environment("PRED") != "" and i in [5, 6]:
-				var lines: Array[PackedVector2Array] = [plan.roads[0]["points"], plan.roads[2]["points"], plan.roads[3]["points"], plan.roads[4]["points"]]
-				var rp := PackedVector2Array([pts[0]])
-				for q in range(pts.size()):
-					for ln in lines:
-						pass
-				print("   riser pts ", pts)
-				# the vertices where it meets each line
-				var picks := PackedVector2Array()
-				for ln in lines:
-					var bd := INF
-					var bp := Vector2.ZERO
-					for pt in pts:
-						var d := HillsideProbe.dist(pt, ln)
-						if d < bd:
-							bd = d
-							bp = pt
-					picks.append(bp)
-				print("   meets ", picks, " pred going ", VillageHillsideForm._riser_going(plan.ground, picks, lines))
 			if OS.get_environment("SHORT") != "" and i in [5, 6]:
 				var sv: PackedFloat32Array = bed["s"]
 				for k in range(1, ts.size() - 1):

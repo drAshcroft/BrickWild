@@ -1716,6 +1716,45 @@ against 1.32) have little margin.
   steep one. Real fix is a per-stretch lean (each hop to the next terrace picks its
   own foot, as `_cross_foot` does, and the terrace ends follow) -- a rework of
   `_riser` and `pick_pair`, with `vhillside` (11 min) and `vrealism` to re-run.
+  HILLS-STAIRS, 2026-10-28 (second pass: why the west riser is 0.20 m, and the
+  per-hop rework tried; code NOT kept, it is `docs/HILLS_STAIRS_RISER_FEET.diff.txt`,
+  apply with `git apply` to hillside_form.gd; probes `tools/probe_hills_site.gd`,
+  `tools/probe_hills_roads.gd -- manarola masouleh rocamadour`):
+  - **The 0.20 is the first 8 m, not the face.** `VillageGroundSurface._bed_of` levels a
+    stair's first stations to the bed of the street it leaves (here the stepped through
+    road, ribbon half 4.5 m, not a street's 3 m) at the station where it leaves the
+    ribbon, and eases the step over JUNCTION_TAPER (8 m). On Manarola's west riser that
+    step is 3.2 m (the through's bed at the leaving station, which on a 20 % stepped road
+    is metres along it from the riser's start, is 2.4-3.2 m above the ground under the
+    riser): +0.3-0.4 of grade on a 0.40 face = goings of 0.20-0.25 over s = 6-10 m. Every
+    tread after the first 10 m is 0.30+.
+  - `stair_going` (the model `_cross_foot` uses) was wrong for a riser in four ways, all
+    fixed in the diff and then predicting 0.25 against a built 0.20: it levelled to the
+    ground under the stair's end (not the street's own bed, smoothed along itself and in
+    treads when stepped); it took every street for 3 m of half-width (the through is 4.5,
+    and a terrace whose end is a stair is re-classed `path`, 1.3, by `grade_roads`' "a
+    street ends on a street" cascade); it took the bed at the stair's end, not at the
+    station where the stair leaves the ribbon. The cross-lanes are legal under the old
+    model because they meet terraces, whose bed is the ground.
+  - **Per-hop feet do not reach 0.35 m on Manarola's first hop** (best predicted 0.25 with
+    the foot moved up to 44 m along the terrace and the turn up to 40 degrees): a hop that
+    leans further than the face needs still has a 3 m step to make in the first 8 m.
+  - **A top further along the through road does** (scan of every x_top, 10 m apart, per-hop
+    predicted goings): x = -17 .. 63 on Manarola give 0.35-0.70 on every hop, e.g. the pair
+    (-17, 53), 70 m apart. Taking such a pair (a `_stair_legal` pass in `pick_pair`)
+    gave Manarola's two risers 0.35 and 0.35 but pulled them together: terraces of 41-51 m
+    (113 before), the site retried at 280 m, Masouleh's terrace re-classed `steps` and its
+    east riser 0.20 (was 0.25). Not kept.
+  - **Left, and the two ways on:** (1) make the bed ease a stair leaves by longer than
+    JUNCTION_TAPER when the step is large (a stair street's taper = step / 0.35, in
+    `_bed_of`; it changes the ground mesh wherever a stair meets a bed it is 1 m off, so a
+    fingerprint of the village ground first), or (2) let the riser start from the through
+    road where its bed is within about 1 m of the ground and widen the terrace trim to
+    keep them 100 m (the terraces and the common move with it). The 5 of 16 doors off the
+    gates' island on Manarola (b-001/002/004/010/012) are untouched: they stand beside the
+    stepped through road, whose treads the navmesh joins to the pads one riser apart; the
+    walk probe's `reachable_3d` names no seam. `vstepswalk` `_case` on the hillside is
+    still 7 failures of 44.
 * **switchbacks** -- the router is monotone along the contour, so a hairpin
   up a spur is still not laid;
 * **terraces from the ground** -- the terrace lines are offsets of the

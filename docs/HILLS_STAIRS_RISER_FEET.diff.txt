@@ -1,0 +1,370 @@
+diff --git a/src/village/forms/hillside_form.gd b/src/village/forms/hillside_form.gd
+index 3e8eeae..782586a 100644
+--- a/src/village/forms/hillside_form.gd
++++ b/src/village/forms/hillside_form.gd
+@@ -115,9 +115,19 @@ const RISER_INSET_M := 8.0
+ const CROSS_CLEAR_M := 14.0
+ ## Where the cross-lanes stand across the terrace band, as a fraction of it.
+ const CROSS_SPOTS := [0.4, 0.6]
++## two cross-lanes at least this far apart, or one
++const CROSS_MIN_SEP_M := 12.0
+ ## A cross-lane's shallowest inner tread, as the ground surface lays it, at least
+ ## this (VillageGroundCheck.STAIR_GOING_MIN 0.28 and a little to spare).
+ const CROSS_GOING_M := 0.30
++## A riser is laid hop by hop (HILLS-STAIRS): each hop from one street to the next leans
++## off the fall line as far as its own ground asks, until its stair's shallowest inner
++## tread is this deep (a 0.30 m going reads 0.25 and 0.30 by turns; ask for 0.35). It may
++## move its foot this far along the lower street, and turn this much from the hop above.
++const RISER_GOING_M := 0.35
++const RISER_FOOT_SHIFT_M := 24.0
++const RISER_FOOT_STEP_M := 2.0
++const RISER_HOP_TURN_DEG := 22.0
+ ## Where the field tracks leave the lowest terrace.
+ const TRACK_SPOTS := [0.18, 0.82]
+ const UPHILL_TRACK_SPOTS := [0.08, 0.2, 0.8, 0.92]
+@@ -273,7 +283,8 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
+ 	var dir_w: float = 1.0
+ 	var dir_e: float = 1.0 if parallel else -1.0
+ 	var pair: Array = pick_pair(ground, out.site, through, terraces, dir_w, dir_e, lean_deg,
+-		absf(terraces[terraces.size() - 1][terraces[terraces.size() - 1].size() / 2].y - through[through.size() / 2].y))
++		absf(terraces[terraces.size() - 1][terraces[terraces.size() - 1].size() / 2].y - through[through.size() / 2].y),
++		bool(through_road.get("stepped", false)))
+ 	x_top_w = pair[0]
+ 	x_top_e = pair[2]
+ 	var lean_w: float = pair[1]
+@@ -285,9 +296,11 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
+ 	var top_w: Vector2 = through[VillageSitePlanner._vertex_near_x(through, x_top_w)]
+ 	var top_e: Vector2 = through[VillageSitePlanner._vertex_near_x(through, x_top_e)]
+ 	var terrace_roads: Array[int] = []
++	var feet_w: Array[float] = riser_feet(ground, out.site, through, terraces, top_w, dir_w, tan_w, bool(through_road.get("stepped", false)))
++	var feet_e: Array[float] = riser_feet(ground, out.site, through, terraces, top_e, dir_e, tan_e, bool(through_road.get("stepped", false)))
+ 	for k in range(terraces.size()):
+-		var x0: float = _riser_x(terraces[k], top_w, dir_w, tan_w)
+-		var x1: float = _riser_x(terraces[k], top_e, dir_e, tan_e)
++		var x0: float = feet_w[k]
++		var x1: float = feet_e[k]
+ 		if is_nan(x0):
+ 			x0 = terraces[k][0].x
+ 		if is_nan(x1):
+@@ -301,8 +314,8 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
+ 			road["terrace"] = k
+ 			out.roads.append(road)
+ 	# the two end risers, through every terrace end on their way
+-	_riser(out, through, terraces, 0.0, x_top_w, dir_w, tan_w)
+-	_riser(out, through, terraces, 1.0, x_top_e, dir_e, tan_e)
++	_riser(out, through, terraces, 0.0, x_top_w, dir_w, tan_w, feet_w)
++	_riser(out, through, terraces, 1.0, x_top_e, dir_e, tan_e, feet_e)
+ 	for k in range(terraces.size()):
+ 		if terrace_roads[k] >= 0:
+ 			out.roads[terrace_roads[k]]["points"] = terraces[k]
+@@ -323,10 +336,17 @@ static func plan(spec: VillageSpec, _extra_lanes := 0, site_scale := 1.0,
+ 	var hands: Array[float] = []
+ 	for f in CROSS_SPOTS:
+ 		# on one of the terraces' own vertices, so no short segment is made
+-		foot_x.append(_column_near(through, lerpf(cross_lo, cross_hi, float(f))))
++		var col: float = _column_near(through, lerpf(cross_lo, cross_hi, float(f)))
++		# a narrow band (risers close together) leaves room for one lane, not two on top of each other
++		for earlier in foot_x:
++			if not is_nan(earlier) and absf(earlier - col) < CROSS_MIN_SEP_M:
++				col = NAN
++		foot_x.append(col)
+ 		hands.append(-1.0 if float(f) < 0.5 else 1.0)   # outward first
+ 	for k in range(terraces.size() - 1):
+ 		for fi in range(CROSS_SPOTS.size()):
++			if is_nan(foot_x[fi]):
++				continue
+ 			var upper: PackedVector2Array = terraces[k]
+ 			var lower: PackedVector2Array = terraces[k + 1]
+ 			var x: float = foot_x[fi]
+@@ -514,7 +534,7 @@ static func _riser_x(line: PackedVector2Array, top: Vector2, dir: float, tan_lea
+ ## works, the site's two ends, as before.
+ static func pick_pair(ground: VillageTerrain, site: Rect2, through: PackedVector2Array,
+ 		terraces: Array[PackedVector2Array], dir_w: float, dir_e: float, base_deg: float,
+-		drop_y: float) -> Array:
++		drop_y: float, through_stepped := false) -> Array:
+ 	var x_w0: float = site.position.x + RISER_INSET_M
+ 	var x_e0: float = site.end.x - RISER_INSET_M
+ 	if dir_e > 0.0:
+@@ -532,39 +552,138 @@ static func pick_pair(ground: VillageTerrain, site: Rect2, through: PackedVector
+ 	for cap in [RISER_PICK_GRADE, INF]:
+ 		var west: Array[Vector3] = []   # (x, lean, dir)
+ 		var east: Array[Vector3] = []
++		var stair_ok := {}              # (x, lean, dir) -> a riser of this kind lays 0.35 m goings
+ 		for xv in xs:
+ 			for d in [dir_w, -dir_w]:
+ 				var rw: Vector2 = pick_lean(ground, through, terraces, xv, d, base_deg, cap)
+ 				if rw.y < INF:
+ 					west.append(Vector3(xv, rw.x, d))
++					stair_ok[Vector3(xv, rw.x, d)] = _stair_legal(ground, site, through, terraces, xv, d, rw, through_stepped)
+ 			for d in [dir_e, -dir_e]:
+ 				var re: Vector2 = pick_lean(ground, through, terraces, xv, d, base_deg, cap)
+ 				if re.y < INF:
+ 					east.append(Vector3(xv, re.x, d))
++					stair_ok[Vector3(xv, re.x, d)] = _stair_legal(ground, site, through, terraces, xv, d, re, through_stepped)
+ 		var best: Array = []
+ 		var best_score := -INF
+-		var edge_hi: float = site.end.x - EDGE_INSET_M
+-		var edge_lo: float = site.position.x + EDGE_INSET_M
+-		for w in west:
+-			var bot_w: float = clampf(w.x + w.z * tan(deg_to_rad(w.y)) * drop_y, edge_lo, edge_hi)
+-			for e in east:
+-				var bot_e: float = clampf(e.x + e.z * tan(deg_to_rad(e.y)) * drop_y, edge_lo, edge_hi)
+-				var sep: float = minf(e.x - w.x, bot_e - bot_w)
+-				if sep < RISER_MIN_SEP_M:
++		# a riser whose stair lays 0.35 m goings is kept to the ones that do (HILLS-STAIRS),
++		# then, with none of those 70 m apart, to any
++		for legal_only in [true, false]:
++			var edge_hi: float = site.end.x - EDGE_INSET_M
++			var edge_lo: float = site.position.x + EDGE_INSET_M
++			for w in west:
++				if legal_only and not stair_ok[w]:
+ 					continue
+-				var score: float = sep - 0.3 * (w.y + e.y)
+-				if w.z != dir_w:
+-					score -= FLIP_COST_M
+-				if e.z != dir_e:
+-					score -= FLIP_COST_M
+-				if score > best_score + 1e-9:
+-					best_score = score
+-					best = [w.x, w.y, e.x, e.y, w.z, e.z]
++				var bot_w: float = clampf(w.x + w.z * tan(deg_to_rad(w.y)) * drop_y, edge_lo, edge_hi)
++				for e in east:
++					if legal_only and not stair_ok[e]:
++						continue
++					var bot_e: float = clampf(e.x + e.z * tan(deg_to_rad(e.y)) * drop_y, edge_lo, edge_hi)
++					var sep: float = minf(e.x - w.x, bot_e - bot_w)
++					if sep < RISER_MIN_SEP_M:
++						continue
++					var score: float = sep - 0.3 * (w.y + e.y)
++					if w.z != dir_w:
++						score -= FLIP_COST_M
++					if e.z != dir_e:
++						score -= FLIP_COST_M
++					if score > best_score + 1e-9:
++						best_score = score
++						best = [w.x, w.y, e.x, e.y, w.z, e.z]
++			if not best.is_empty():
++				break
+ 		if not best.is_empty():
+ 			return best
+ 	return fallback
+ 
+ 
++## Where a riser from `top` meets each terrace, hop by hop. On the plane (or with no
++## ground) each is where the straight lean from the top reaches the terrace (`_riser_x`);
++## on given ground a hop leans on from the foot of the hop above, further off the fall line
++## where its own ground asks, until the stair it makes -- as VillageGroundSurface lays the
++## bed (`stair_going`) -- has RISER_GOING_M treads: the nearest foot along the terrace that
++## does, outward (the lean's side) first, meeting both streets at JUNCTION_MIN_DEG and
++## turning no more than RISER_HOP_TURN_DEG from the hop above. With none, the foot whose
++## stair is least shallow. NAN for a terrace the riser never reaches.
++static var last_go := PackedFloat32Array()
++static func riser_feet(ground: VillageTerrain, site: Rect2, through: PackedVector2Array,
++		terraces: Array[PackedVector2Array], top: Vector2, dir: float, tan_lean: float,
++		through_stepped := false) -> Array[float]:
++	var feet: Array[float] = []
++	last_go = PackedFloat32Array()
++	var prev: Vector2 = top
++	var prev_line: PackedVector2Array = through
++	var prev_dir := Vector2.ZERO
++	var first := true
++	var lo: float = site.position.x + EDGE_INSET_M
++	var hi: float = site.end.x - EDGE_INSET_M
++	for line in terraces:
++		var nominal: float = _riser_x(line, top if ground == null else prev, dir, tan_lean)
++		if ground == null or is_nan(nominal) or line.size() < 2:
++			feet.append(nominal)
++			if not is_nan(nominal):
++				prev = Vector2(nominal, VillageLotPlanner._polyline_y_at_x(line, nominal))
++				prev_line = line
++			continue
++		var best_x: float = nominal
++		var best_go: float = -INF
++		var shifts: Array[float] = [0.0]
++		var d: float = RISER_FOOT_STEP_M
++		while d <= RISER_FOOT_SHIFT_M + 1e-6:
++			shifts.append(d * dir)      # outward: more lean
++			shifts.append(-d * dir)
++			d += RISER_FOOT_STEP_M
++		var lines: Array[PackedVector2Array] = [prev_line, line]
++		for sh in shifts:
++			var x: float = nominal + sh
++			if x < maxf(line[0].x, lo) - 1e-6 or x > minf(line[line.size() - 1].x, hi) + 1e-6:
++				continue
++			var b := Vector2(x, VillageLotPlanner._polyline_y_at_x(line, x))
++			if prev.distance_to(b) < 4.0:
++				continue
++			var hop: Vector2 = (b - prev).normalized()
++			if prev_dir != Vector2.ZERO and rad_to_deg(absf(hop.angle_to(prev_dir))) > RISER_HOP_TURN_DEG:
++				continue
++			if not _squarely(PackedVector2Array([prev, b]), lines):
++				continue
++			var go: float = stair_going(ground, prev, b, prev_line, line, first and through_stepped, &"through" if first else &"path", &"path")
++			if go >= RISER_GOING_M:
++				best_x = x
++				best_go = go
++				break
++			if go > best_go + 1e-9:
++				best_go = go
++				best_x = x
++		if OS.get_environment("HF_DEBUG") != "":
++			print("hop from %s nominal %.1f chosen %.1f going %.2f" % [prev, nominal, best_x, best_go])
++		feet.append(best_x)
++		last_go.append(best_go)
++		var foot := Vector2(best_x, VillageLotPlanner._polyline_y_at_x(line, best_x))
++		prev_dir = (foot - prev).normalized()
++		prev = foot
++		prev_line = line
++		first = false
++	return feet
++
++
++## Whether a riser from the through road at `x_top`, leaning `lean` (a Vector2 of degrees and
++## grade from pick_lean), is a street (grade at most RISER_PICK_GRADE, no treads to judge)
++## or a stair whose every hop lays RISER_GOING_M goings (riser_feet).
++static func _stair_legal(ground: VillageTerrain, site: Rect2, through: PackedVector2Array,
++		terraces: Array[PackedVector2Array], x_top: float, dir: float, lean_grade: Vector2,
++		through_stepped: bool) -> bool:
++	if lean_grade.y <= RISER_PICK_GRADE:
++		return true
++	var top: Vector2 = through[VillageSitePlanner._vertex_near_x(through, x_top)]
++	riser_feet(ground, site, through, terraces, top, dir, tan(deg_to_rad(lean_grade.x)), through_stepped)
++	if last_go.is_empty():
++		return false
++	for g in last_go:
++		if g < RISER_GOING_M - 1e-3:
++			return false
++	return true
++
++
+ ## Where along the road a riser stands: the candidate top x in [x_a, x_b] whose
+ ## riser climbs least steeply with the least lean (a face is steeper in some
+ ## places than others, and a riser that cannot be a street takes the terraces
+@@ -730,7 +849,7 @@ static func _reserve_landmark(out: VillagePlan, spec: VillageSpec, common: Rect2
+ ## under a street's cap. `end` 0 is the west end, 1 the east.
+ static func _riser(out: VillagePlan, through: PackedVector2Array,
+ 		terraces: Array[PackedVector2Array], end: float, x_top: float, inward: float,
+-		lean: float) -> void:   # `lean` is the tangent of the lean angle
++		lean: float, feet: Array[float] = []) -> void:   # `lean` is the tangent of the lean angle
+ 	if terraces.is_empty() or terraces[terraces.size() - 1].size() < 2:
+ 		return
+ 	var idx: int = VillageSitePlanner._vertex_near_x(through, x_top)
+@@ -741,6 +860,8 @@ static func _riser(out: VillagePlan, through: PackedVector2Array,
+ 		var e: int = 0 if end < 0.5 else t.size() - 1
+ 		var p: Vector2 = t[e]
+ 		var want_x: float = top.x + inward * lean * absf(p.y - top.y)
++		if k < feet.size() and not is_nan(feet[k]):
++			want_x = feet[k]   # the hop's own foot (riser_feet), where the end was trimmed
+ 		want_x = clampf(want_x, out.site.position.x + EDGE_INSET_M, out.site.end.x - EDGE_INSET_M)
+ 		t[e] = Vector2(want_x, p.y)
+ 		terraces[k] = t
+@@ -911,20 +1032,23 @@ static func _cross_foot(ground: VillageTerrain, through: PackedVector2Array,
+ ## steep for 0.15 m risers on 0.28 m goings, and the eased step at a junction
+ ## makes it steeper there than the face's grade says.
+ static func stair_going(ground: VillageTerrain, a: Vector2, b: Vector2,
+-		upper: PackedVector2Array, lower: PackedVector2Array) -> float:
++		upper: PackedVector2Array, lower: PackedVector2Array, upper_stepped := false,
++		upper_class := &"street", lower_class := &"street") -> float:
+ 	var length: float = a.distance_to(b)
+ 	var n: int = maxi(2, int(ceil(length / VillageGroundSurface.STATION)))
+ 	var raw := PackedFloat32Array()
+ 	var s := PackedFloat32Array()
+ 	var inside := PackedInt32Array()
+-	var half: float = float(VillageSitePlanner.ROAD_CLASSES[&"street"]["width"]) * 0.5 \
+-		+ float(VillageSitePlanner.ROAD_CLASSES[&"street"]["verge"])
++	var half: float = float(VillageSitePlanner.ROAD_CLASSES[lower_class]["width"]) * 0.5 \
++		+ float(VillageSitePlanner.ROAD_CLASSES[lower_class]["verge"])
++	var upper_half: float = float(VillageSitePlanner.ROAD_CLASSES[upper_class]["width"]) * 0.5 \
++		+ float(VillageSitePlanner.ROAD_CLASSES[upper_class]["verge"])
+ 	for m in range(n + 1):
+ 		var p: Vector2 = a.lerp(b, float(m) / float(n))
+ 		s.append(length * float(m) / float(n))
+ 		raw.append(ground.height_at(p))
+ 		var hit := -1
+-		if _dist_to_line(p, upper) <= half:
++		if _dist_to_line(p, upper) <= upper_half:
+ 			hit = 0
+ 		elif _dist_to_line(p, lower) <= half:
+ 			hit = 1
+@@ -938,7 +1062,9 @@ static func stair_going(ground: VillageTerrain, a: Vector2, b: Vector2,
+ 			sum += raw[m]
+ 			cnt += 1
+ 		h[k] = sum / float(cnt)
+-	var beds := [h[0], h[h.size() - 1]]
++	# the bed each street lays where the stair meets it is the street's own (smoothed along
++	# ITSELF, a stepped one in treads), not the ground under the stair's end: the two differ
++	# by metres where a contour street crosses a spur (Manarola's west riser, 2.4 m)
+ 	var offset := PackedFloat32Array()
+ 	offset.resize(h.size())
+ 	offset.fill(0.0)
+@@ -948,7 +1074,10 @@ static func stair_going(ground: VillageTerrain, a: Vector2, b: Vector2,
+ 			var j: int = pair[1]
+ 			if inside[i] < 0 or inside[j] >= 0:
+ 				continue
+-			var delta: float = float(beds[inside[i]]) - h[i]
++			# the bed of the street at the station where the stair leaves its ribbon
++			var edge_p: Vector2 = a.lerp(b, s[i] / length)
++			var target: float = _line_bed(ground, upper, edge_p, upper_stepped) if inside[i] == 0 				else _line_bed(ground, lower, edge_p)
++			var delta: float = target - h[i]
+ 			for m in range(h.size()):
+ 				var away: float = (s[m] - s[j]) * (1.0 if j > i else -1.0)
+ 				if inside[m] >= 0 and away < 0.0:
+@@ -957,6 +1086,9 @@ static func stair_going(ground: VillageTerrain, a: Vector2, b: Vector2,
+ 					offset[m] += delta * (1.0 - away / VillageGroundSurface.JUNCTION_TAPER)
+ 	for k in range(h.size()):
+ 		h[k] += offset[k]
++	if OS.get_environment("HF_PROF") != "" and absf(a.x - float(OS.get_environment("HF_PROF"))) < 0.2:
++		for k in range(mini(h.size(), 14)):
++			print("   model s %.1f raw %.2f h %.2f inside %d off %.2f" % [s[k], raw[k], h[k], inside[k], offset[k]])
+ 	var ts: Array[Dictionary] = VillageGroundSurface.treads_of(s, h)
+ 	var go := INF
+ 	for k in range(1, ts.size() - 1):
+@@ -965,6 +1097,48 @@ static func stair_going(ground: VillageTerrain, a: Vector2, b: Vector2,
+ 	return go
+ 
+ 
++## The height of the bed `VillageGroundSurface` lays on the street `line` at the point `p`:
++## the ground every STATION along the street, smoothed over SMOOTH_STATIONS either side,
++## read at the station nearest `p`; a `stepped` street's in treads (its bed_at).
++static func _line_bed(ground: VillageTerrain, line: PackedVector2Array, p: Vector2, stepped := false) -> float:
++	var st := PackedVector2Array([line[0]])
++	var s := PackedFloat32Array([0.0])
++	var run := 0.0
++	for k in range(1, line.size()):
++		var n: int = maxi(1, int(ceil(line[k - 1].distance_to(line[k]) / VillageGroundSurface.STATION)))
++		for m in range(1, n + 1):
++			st.append(line[k - 1].lerp(line[k], float(m) / float(n)))
++			s.append(run + line[k - 1].distance_to(line[k]) * float(m) / float(n))
++		run += line[k - 1].distance_to(line[k])
++	var raw := PackedFloat32Array()
++	for q in st:
++		raw.append(ground.height_at(q))
++	var h := PackedFloat32Array()
++	h.resize(raw.size())
++	for k in range(raw.size()):
++		var sum := 0.0
++		var cnt := 0
++		for m in range(maxi(0, k - VillageGroundSurface.SMOOTH_STATIONS), mini(raw.size(), k + VillageGroundSurface.SMOOTH_STATIONS + 1)):
++			sum += raw[m]
++			cnt += 1
++		h[k] = sum / float(cnt)
++	var best := INF
++	var out: float = h[0]
++	var at := 0.0
++	for k in range(st.size() - 1):
++		var d: Vector2 = st[k + 1] - st[k]
++		var len2: float = d.length_squared()
++		var t: float = 0.0 if len2 < 1e-12 else clampf((p - st[k]).dot(d) / len2, 0.0, 1.0)
++		var dist: float = p.distance_squared_to(st[k] + d * t)
++		if dist < best:
++			best = dist
++			out = lerpf(h[k], h[k + 1], t)
++			at = lerpf(s[k], s[k + 1], t)
++	if stepped and st.size() >= 2:
++		return VillageGroundSurface.tread_height(VillageGroundSurface.treads_of(s, h), at)
++	return out
++
++
+ static func _dist_to_line(p: Vector2, line: PackedVector2Array) -> float:
+ 	var d := INF
+ 	for i in range(line.size() - 1):
