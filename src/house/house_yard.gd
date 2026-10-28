@@ -1245,7 +1245,6 @@ static func _court_ranges(ctx: Dictionary, cell: Dictionary, depth: float, w: fl
 			var at := run - RANGE_PIER * 0.5 - (run - RANGE_PIER) * float(piers - k) / float(piers)
 			var pier := _part(cell, "court_range_pier", s * (w - RANGE_DEPTH + RANGE_PIER * 0.5),
 				at, RANGE_PIER, RANGE_PIER, 0.0, RANGE_WALL_H, "wall")
-			print("PIERWHY ", clear_reason(ctx["plan"], ctx["env"], part_aabb(pier)), " ", part_aabb(pier))
 			if k < piers and not clear_reason(ctx["plan"], ctx["env"], part_aabb(pier)).is_empty():
 				continue
 			parts.append(pier)
