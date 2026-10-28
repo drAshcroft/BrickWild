@@ -1967,6 +1967,65 @@ static func _in_door_line(plan: HousePlan, room: int, item: Dictionary) -> bool:
 	return false
 
 
+## SHOP-ARCHETYPE-RED: how many beds the best dark wall of a room can hold in
+## ONE row under the rules place_row applies to a ward or dormitory (not on a
+## lit wall, out of every door line, a door swing and its gap away, one aisle
+## deep in front, clear of `extra_blocked`). The planner asks this of a room
+## whose fire it is about to set, so a fixture that is placed before the beds
+## cannot eat the only wall they could stand on.
+static func bed_row_capacity(plan: HousePlan, room: int,
+		extra_blocked: Array[Rect2] = [], aisle := 1.0) -> int:
+	var choices: Array[String] = PropCatalog.of_category("bed")
+	if choices.is_empty():
+		return 0
+	var key: String = choices[0]
+	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var extra: Array[Rect2] = _window_blocks(plan, room, key)
+	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
+	var best := 0
+	for sc in HouseFurnishGeometry.scales(key):
+		for wi in range(walls.size()):
+			if HouseFurnishSpatialCheck.fs_wall_lit(plan, room, wi):
+				continue
+			var n: Vector2 = walls[wi]["normal"]
+			var yaw: float = HouseFurnishGeometry.yaw_facing(n)
+			var foot: Vector2 = PropCatalog.footprint_rotated(key, yaw) * sc
+			var along := Vector2(n.y, -n.x).abs()
+			var span: float = along.x * foot.x + along.y * foot.y
+			var depth: float = absf(n.x) * foot.x + absf(n.y) * foot.y
+			var a2: Vector2 = walls[wi]["from"]
+			var run: float = (Vector2(walls[wi]["to"]) - a2).length()
+			var out: float = depth / 2.0 + HouseGeometry.WALL_GAP
+			var step := 0.05
+			var run_start := -1.0
+			var t := span / 2.0
+			while t <= run - span / 2.0 + 0.0001:
+				var cand: Dictionary = HouseFurnishGeometry.candidate(key,
+					a2 + along * t + n * out, yaw, 1.0, sc)
+				var rect: Rect2 = cand["rect"]
+				var ok: bool = floor_rect.grow(0.01).encloses(rect) 					and not _in_door_line(plan, room, cand) 					and _bed_candidate_clears_door_gaps(plan, room, rect)
+				if ok:
+					var lane := rect.expand(rect.get_center() + n * (depth / 2.0 + aisle))
+					for b in extra_blocked:
+						if b.intersects(lane):
+							ok = false
+							break
+				if ok:
+					for e in extra:
+						if e.intersects(rect):
+							ok = false
+							break
+				if ok:
+					if run_start < 0.0:
+						run_start = t
+					var count := int((t - run_start + 0.001) / (span + 0.3)) + 1
+					best = maxi(best, count)
+				else:
+					run_start = -1.0
+				t += step
+	return best
+
+
 static func place_row(plan: HousePlan, room: int, step: Dictionary,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
 	var cat: String = String(step["cat"])

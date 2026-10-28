@@ -58,6 +58,7 @@ static func plan(spec: ShopSpec) -> HousePlan:
 		_light_workshops(out, spec)
 		_hold_the_fire_wall(out, spec, front)
 		_choose_focus(out, spec, front)
+		_keep_the_bed_wall(out, front)
 		if spec.business == &"library":
 			_pin_library_focus_to_daylight(out, front)
 	if spec.business == &"prison":
@@ -928,12 +929,66 @@ static func _cut_shopfront(out: HousePlan, spec: ShopSpec, front: int) -> void:
 		"storey": 0})
 
 
+## A ward or dormitory is a row of beds on a dark wall, and the fire is placed
+## BEFORE the beds: stood at the middle of its wall it can take the end of the
+## only dark wall a row could use (hospice at 0.7: ward 7.0 x 9.6 m, both lit
+## walls windowed, both dark walls carrying a door, the cauldron's tending
+## strip left the south wall room for one bed). Where the fire as chosen
+## leaves the room no two-bed row, it is slid along its own wall to the
+## nearest stretch that does. A room that already has its row is untouched.
+static func _keep_the_bed_wall(out: HousePlan, front: int) -> void:
+	if out.kind_of(front) not in [&"ward", &"dormitory"]:
+		return
+	if String(out.focus.get("cat", "")) != "hearth" or int(out.focus.get("room", -1)) != front:
+		return
+	var wi: int = out.hearth_wall()
+	if wi < 0 or out.hearth_room() != front:
+		return
+	var wall: Dictionary = HouseGeometry.room_walls(out, front)[wi]
+	var n: Vector2 = wall["normal"]
+	var horizontal: bool = absf(n.y) > 0.5
+	var from: Vector2 = wall["from"]
+	var here: Vector2 = out.focus["pos"]
+	if HouseFurnishPlacement.bed_row_capacity(out, front, [fire_strip(out, here, n)]) >= 2:
+		return
+	var current: float = here.x if horizontal else here.y
+	var best_at := INF
+	for span in HousePlanFeatures.clear_wall_spans(out, front, wi):
+		if span.y - span.x < 1.2:
+			continue
+		var at: float = span.x + 0.6
+		while at <= span.y - 0.6 + 0.0001:
+			if absf(at - current) < absf(best_at - current):
+				var pos := Vector2(at, from.y) if horizontal else Vector2(from.x, at)
+				if HouseFurnishPlacement.bed_row_capacity(out, front, [fire_strip(out, pos, n)]) >= 2:
+					best_at = at
+			at += 0.1
+	if is_finite(best_at):
+		out.focus["pos"] = Vector2(best_at, from.y) if horizontal else Vector2(from.x, best_at)
+
+
+## The floor a hearth takes: its widest footprint plus the strip in front of it
+## a person tends it from, on the room side of its wall.
+static func fire_strip(out: HousePlan, pos: Vector2, inward: Vector2) -> Rect2:
+	var w := 0.0
+	var d := 0.0
+	for key in PropCatalog.of_category("hearth"):
+		var foot: Vector2 = PropCatalog.footprint(key)
+		w = maxf(w, foot.x)
+		d = maxf(d, foot.y)
+	var half := Vector2(absf(inward.y) * (w / 2.0 + 0.1) + absf(inward.x) * (d + 0.9) / 2.0,
+		absf(inward.x) * (w / 2.0 + 0.1) + absf(inward.y) * (d + 0.9) / 2.0)
+	var centre: Vector2 = pos + inward * ((d + 0.9) / 2.0)
+	return Rect2(centre - half, half * 2.0)
+
+
 ## The business's focus replaces the house's fire as what the plan is
 ## arranged around: the counter, the anvil, the bar, in the front room. A
 ## focus that must face the door is backed to the wall opposite the entrance
 ## (a wall piece) or stood in the middle of the floor looking at it (a free
 ## one); one that need not is backed to the front room's best lit wall, which
 ## is where a bench wants to be anyway.
+
 static func _choose_focus(out: HousePlan, spec: ShopSpec, front: int) -> void:
 	var want: Dictionary = spec.focus()
 	if want.is_empty():

@@ -154,7 +154,31 @@ static func run_int013() -> SuiteResult:
 		res.checked += 1
 		if not negative.any(func(row: String) -> bool: return row.contains(expected)):
 			res.fail("%s negative control: removing %s escaped the defining check" % [String(business), expected])
+	_ward_fire_control(res)
 	return res
+
+
+## SHOP-ARCHETYPE-RED. The hospice at 0.7 (ward 7.0 x 9.6 m, lit walls north
+## and east, a door on each dark wall) lost its only two-bed row to the fire
+## stood at the middle of its wall. The planner now slides the fire; this
+## proves the old placement FAILS the bed-row rule (capacity under two) and
+## the planned one passes it.
+static func _ward_fire_control(res: SuiteResult) -> void:
+	var plan := ShopGenerator.generate(_int013_spec(&"hospice", 0.7), 71390)
+	var ward := _int013_contract_room(plan, &"hospice")
+	var wi := plan.hearth_wall()
+	res.checked += 1
+	if ward < 0 or wi < 0 or plan.hearth_room() != ward:
+		res.fail("ward fire control: the 0.7 hospice has no fire in its ward")
+		return
+	var inward: Vector2 = HouseGeometry.room_walls(plan, ward)[wi]["normal"]
+	var old_pos: Vector2 = HousePlanFeatures.focus_on_wall(plan, ward, wi, "hearth", false)["pos"]
+	var old_cap := HouseFurnishPlacement.bed_row_capacity(plan, ward, [ShopPlanner.fire_strip(plan, old_pos, inward)])
+	var new_cap := HouseFurnishPlacement.bed_row_capacity(plan, ward, [ShopPlanner.fire_strip(plan, Vector2(plan.focus["pos"]), inward)])
+	if old_cap >= 2:
+		res.fail("ward fire control: the fire at the middle of its wall no longer fails the two-bed rule (%d)" % old_cap)
+	if new_cap < 2:
+		res.fail("ward fire control: the planned fire leaves the ward %d beds in a row" % new_cap)
 
 
 ## Bounded secret-door contract. Three footprints are checked once each, then
