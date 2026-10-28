@@ -68,6 +68,7 @@ static func plan(spec: ShopSpec) -> HousePlan:
 		_plan_thieves_den(out)
 	_open_up_lodging(out)
 	_join_store_to_work_room(out, spec)
+	_cut_yard_door(out, spec)
 	return out
 
 
@@ -105,6 +106,129 @@ static func _join_store_to_work_room(out: HousePlan, spec: ShopSpec) -> void:
 				best = [w, s, edge]
 	if not best.is_empty():
 		HousePlanOpenings.add_inner_door(out, best[0], best[1], best[2])
+
+
+## A shop of this many rooms (15 m2 of interior each, so 75 m2 and up) is a
+## working yard's worth of business: goods and fuel come in by a door that is
+## not the customers'. The 11 x 14 m shops of the walk are 6 rooms; the 9 x 12
+## m ones are 5.
+const YARD_DOOR_ROOMS := 5
+
+
+## SHOP-SECOND-DOOR (walk pin WALK-1a17a581-1, "only one door on a giant
+## house"). The house planner's back door is a 70 percent draw, wants a store
+## or kitchen on the rear wall and ignores the work room. A large shop with no
+## door but the street's gets a yard door on a store that opens off its work
+## room, or on the work room itself (a side wall by
+## preference, then the rear), at the end of the wall farthest from the street
+## door. Windows it lands on give way, as for the shopfront hatch.
+static func _cut_yard_door(out: HousePlan, spec: ShopSpec) -> void:
+	if spec.business in [&"palace", &"prison", &"thieves_den", &"barracks", &"market_hall"] \
+		or spec.room_count < YARD_DOOR_ROOMS:
+		return
+	var work: Array[int] = []
+	for i in out.rooms_on_storey(0):
+		if out.kind_of(i) in WORK_ROOM_KINDS:
+			work.append(i)
+	if work.is_empty():
+		return
+	# a yard door the work room already has, or has through its store
+	for w in work:
+		for di in out.doors_of(w):
+			var d: Dictionary = out.doors[di]
+			var other := int(d["b"]) if int(d["a"]) == w else int(d["a"])
+			if bool(d.get("exterior", false)):
+				if not bool(d.get("front", false)):
+					return
+			elif other >= 0 and out.kind_of(other) in STORE_ROOM_KINDS:
+				for dj in out.doors_of(other):
+					var e: Dictionary = out.doors[dj]
+					if bool(e.get("exterior", false)) and not bool(e.get("front", false)):
+						return
+	var inner: Rect2 = HouseGeometry.interior_rect(spec)
+	var width: float = HousePueblo.door_w(spec)
+	var m: float = HouseGeometry.DOOR_CORNER_MARGIN + width * 0.5
+	var street: Vector2 = Vector2(out.doors[out.entrance()]["pos"]) if out.entrance() >= 0 else inner.get_center()
+	# A store that opens off the work room is the better host: goods and fuel
+	# come in by it, and a smithy's or joiner's floor keeps the walk-clear
+	# metres of door for the fire and the bench.
+	var hosts: Array[int] = []
+	var store_hosts := {}
+	for w in work:
+		for di in out.doors_of(w):
+			var d: Dictionary = out.doors[di]
+			var other := int(d["b"]) if int(d["a"]) == w else int(d["a"])
+			if not bool(d.get("exterior", false)) and other >= 0 and out.kind_of(other) in STORE_ROOM_KINDS \
+		and out.storey_of_room(other) == 0 and not hosts.has(other):
+				hosts.append(other)
+				store_hosts[other] = true
+	for w in work:
+		hosts.append(w)
+	var best := {}
+	var best_score := -INF
+	for w in hosts:
+		var r: Rect2 = out.rooms[w]["rect"]
+		# [normal, wall line, lo, hi] for each wall the room shares with the outside
+		var walls: Array = []
+		if absf(r.position.x - inner.position.x) < 0.01:
+			walls.append([Vector2(-1, 0), inner.position.x, r.position.y, r.end.y, 1.0])
+		if absf(r.end.x - inner.end.x) < 0.01:
+			walls.append([Vector2(1, 0), inner.end.x, r.position.y, r.end.y, 1.0])
+		if absf(r.end.y - inner.end.y) < 0.01:
+			walls.append([Vector2(0, 1), inner.end.y, r.position.x, r.end.x, 0.0])
+		for wall in walls:
+			var normal: Vector2 = wall[0]
+			var line: float = wall[1]
+			var lo: float = float(wall[2]) + m
+			var hi: float = float(wall[3]) - m
+			if hi < lo:
+				continue
+			# the end farthest from the street door, then the middle, then the nearer end
+			var along_street: float = street.y if absf(normal.x) > 0.5 else street.x
+			var ends: Array = [lo, hi]
+			ends.sort_custom(func(a: float, b: float) -> bool: return absf(a - along_street) > absf(b - along_street))
+			ends.insert(1, (lo + hi) * 0.5)
+			for t in ends:
+				var pos: Vector2 = Vector2(line, t) if absf(normal.x) > 0.5 else Vector2(t, line)
+				if _yard_door_clear(out, spec, pos, normal, width):
+					var score: float = (100.0 if store_hosts.has(w) else 0.0) + float(wall[4]) * 10.0 + absf(t - along_street) + float(wall[3]) - float(wall[2])
+					if score > best_score:
+						best_score = score
+						best = {"room": w, "pos": pos, "normal": normal}
+					break
+	if best.is_empty():
+		return
+	var pos: Vector2 = best["pos"]
+	var normal: Vector2 = best["normal"]
+	var keep: Array[Dictionary] = []
+	for win in out.windows:
+		if HousePlan.record_storey(win) == 0 and absf(Vector2(win["normal"]).x) == absf(normal.x) 				and (Vector2(win["pos"]) - pos).length() < (float(win["width"]) + width) * 0.5 + 0.15 \
+		and not bool(win.get("hatch", false)):
+			continue
+		keep.append(win)
+	out.windows = keep
+	var door := {"a": int(best["room"]), "b": -1, "pos": pos, "normal": normal,
+		"width": width, "exterior": true, "front": false, "storey": 0, "yard": true}
+	HousePlanOpenings._set_domestic_door_head(out, door)
+	out.doors.append(door)
+
+
+## Is there room for a yard door at `pos`: clear of every other door, of the
+## chimney flue, and of the street wall's hatch?
+static func _yard_door_clear(out: HousePlan, spec: ShopSpec, pos: Vector2, normal: Vector2,
+		width: float) -> bool:
+	if HousePlanner.flue_blocks(out, pos, normal, 0):
+		return false
+	var opening := HouseGeometry.door_opening_rect(spec, {"pos": pos, "normal": normal, "width": width})
+	for d in out.doors:
+		if HousePlan.record_storey(d) != 0:
+			continue
+		# an inner door within a metre of the line the yard door opens onto
+		if (Vector2(d["pos"]) - pos).length() < (float(d["width"]) + width) * 0.5 + 0.5:
+			return false
+		if HouseGeometry.door_opening_rect(spec, d).grow(0.1).intersects(opening):
+			return false
+	return true
 
 
 ## Keep the street-facing shop ordinary. The only route from it into the

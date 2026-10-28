@@ -89,6 +89,7 @@ static func run() -> SuiteResult:
 	_run_traits(res)
 	_run_walk_furnish(res)
 	_run_store_join(res)
+	_run_yard_door(res)
 	return res
 
 
@@ -1019,3 +1020,91 @@ static func work_front_contract(plan: HousePlan, business: StringName) -> Array[
 	# 5. identity
 	out.append_array(_identity(plan, business))
 	return out
+
+
+## SHOP-SECOND-DOOR (walk pin WALK-1a17a581-1, "only one door on a giant
+## house"): a shop of YARD_DOOR_ROOMS rooms or more has a door besides the
+## street's on its work room, or on a store that opens off it.
+const YARD_ROOMS := 5   # ShopPlanner.YARD_DOOR_ROOMS, restated so the rule can judge an old planner
+
+
+static func yard_door_contract(plan: HousePlan) -> Array[String]:
+	var out: Array[String] = []
+	if plan.spec.room_count < YARD_ROOMS:
+		return out
+	var work: Array[int] = []
+	for i in plan.rooms_on_storey(0):
+		if plan.kind_of(i) in JOIN_WORK_KINDS:
+			work.append(i)
+	if work.is_empty():
+		return out
+	for w in work:
+		var rooms: Array[int] = [w]
+		for d in plan.doors:
+			if bool(d.get("exterior", false)):
+				continue
+			var a := int(d["a"])
+			var b := int(d["b"])
+			if (a == w or b == w) and plan.kind_of(b if a == w else a) in JOIN_STORE_KINDS:
+				rooms.append(b if a == w else a)
+		for d in plan.doors:
+			if bool(d.get("exterior", false)) and not bool(d.get("front", false)) and int(d["a"]) in rooms:
+				return out
+	out.append("yard: a %d-room shop has no door but the street's on its work room" % plan.spec.room_count)
+	return out
+
+
+static func _run_yard_door(res: SuiteResult) -> void:
+	var cases: Array = []
+	for business in WALK_TRADES:
+		for seed_ in [1, 8102]:
+			cases.append([business, &"townhouse", seed_])
+	# the walk pin: a cottage smithy, seed 1, 11 x 14 m
+	cases.append([&"blacksmith", &"cottage", 1])
+	cases.append([&"blacksmith", &"african", 1])
+	var controlled := 0
+	var walk_controlled := 0
+	for c in cases:
+		var plan := _walk_plan(c[0], c[1], c[2])
+		var label := "yard door %s %s seed %d" % [c[1], c[0], c[2]]
+		res.checked += 1
+		for failure in yard_door_contract(plan):
+			res.fail("%s: %s" % [label, failure])
+		for failure in walk_clearance(plan):
+			res.fail("%s: %s" % [label, failure])
+		var doors: Array[Dictionary] = plan.doors.duplicate(true)
+		var yard := -1
+		var kept: Array[Dictionary] = []
+		for i in doors.size():
+			var d: Dictionary = doors[i]
+			if bool(d.get("exterior", false)) and not bool(d.get("front", false)):
+				yard = i
+				continue
+			kept.append(d)
+		if yard < 0:
+			continue
+		# control 1: take the yard door out and the rule must fail
+		if plan.spec.room_count >= YARD_ROOMS and _has_join_work_room(plan):
+			plan.doors = kept
+			controlled += 1
+			res.checked += 1
+			if yard_door_contract(plan).is_empty():
+				res.fail("%s: control -- the yard door removed and the rule did not fail" % label)
+			plan.doors = doors
+		# control 2: a crate across the yard door fails the walk through it
+		if walk_controlled == 0:
+			var door: Dictionary = doors[yard]
+			var at := Vector2(door["pos"]) - Vector2(door["normal"]) * 0.9
+			walk_controlled = 1
+			_control(res, plan, label + " yard walk control", "door",
+				_crate_at(plan, int(door["a"]), Rect2(at - Vector2(0.3, 0.3), Vector2(0.6, 0.6))))
+	res.checked += 1
+	if controlled == 0:
+		res.fail("yard door: no shop had a yard door to take out as a control")
+
+
+static func _has_join_work_room(plan: HousePlan) -> bool:
+	for i in plan.rooms_on_storey(0):
+		if plan.kind_of(i) in JOIN_WORK_KINDS:
+			return true
+	return false
