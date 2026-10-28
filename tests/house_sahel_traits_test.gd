@@ -71,6 +71,8 @@ func _check_case(c: Dictionary) -> void:
 	_expect(m["court_range_sides"] == 2 and m["court_range_roofs"] >= 2, "%s court has a range down each side" % id)
 	_expect(m["court_range_flat"], "%s court ranges are flat-roofed" % id)
 	_expect(m["court_range_open"], "%s court middle is open (the ranges face it)" % id)
+	_expect(m["court_range_span"] > 0.0 and m["court_range_span"] <= 1.8,
+		"%s no range roof spans more than 1.8 m of open front between piers (%.2f)" % [id, m["court_range_span"]])
 	_expect(m["sahel_court_door"], "%s rear door opens onto the court" % id)
 	_expect(m["sahel_court_gate"] >= 1.0, "%s court has a gateway %.2f m wide" % [id, m["sahel_court_gate"]])
 	_expect(m["court_sides"] >= 4, "%s court is bounded on 4 sides (house, two ranges, wall): %d" % [id, m["court_sides"]])

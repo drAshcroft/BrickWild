@@ -1258,6 +1258,7 @@ static func _sahel_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary)
 	out["court_range_sides"] = 0
 	out["court_range_flat"] = false
 	out["court_range_open"] = false
+	out["court_range_span"] = 0.0
 	out["court_sides"] = 0
 	out["sahel_court_present"] = false
 	out["sahel_court_door"] = false
@@ -1281,6 +1282,8 @@ static func _sahel_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary)
 		var open := true
 		var run := 0.0
 		var wall_len := {-1.0: 0.0, 1.0: 0.0}
+		var roof_ext := {}      # side -> [near end, far end] of the range roof along the depth
+		var piers := {}         # side -> depth centres of the range piers
 		var rear := false
 		var sky := true
 		for part in piece["parts"]:
@@ -1297,6 +1300,13 @@ static func _sahel_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary)
 				sides[signf(lat)] = true
 				if sz.y > 0.3 or ctr.y < 2.0:
 					flat = false
+				var dc := ctr.x if depth_x else ctr.z
+				var ext: Array = roof_ext.get(signf(lat), [dc - dd * 0.5, dc + dd * 0.5])
+				roof_ext[signf(lat)] = [minf(ext[0], dc - dd * 0.5), maxf(ext[1], dc + dd * 0.5)]
+			elif role == "court_range_pier":
+				var pl: Array = piers.get(signf(lat), [])
+				pl.append((ctr.x if depth_x else ctr.z))
+				piers[signf(lat)] = pl
 			elif role == "court_range_wall":
 				wall_len[signf(lat)] += dd
 			elif role == "court_wall" and dl > half_w * 1.6:
@@ -1309,6 +1319,22 @@ static func _sahel_keys(plan: HousePlan, builder: HouseBuilder, out: Dictionary)
 		out["court_range_sides"] = sides.size()
 		out["court_range_flat"] = roofs >= 2 and flat
 		out["court_range_open"] = open
+		# the longest stretch of a range's open front the roof slab spans between
+		# supports (the house wall, a pier, the pier at the far end), on the better
+		# supported side: the rear door's approach keeps a between pier off the
+		# range it opens beside, by the yard's own rule
+		var gap := 99.0
+		for side in roof_ext:
+			var side_gap := 0.0
+			var pts: Array = [float(roof_ext[side][0])]
+			var pl2: Array = piers.get(side, [])
+			pl2.sort()
+			for pc in pl2:
+				side_gap = maxf(side_gap, float(pc) - 0.15 - float(pts[-1]))
+				pts = [float(pc) + 0.15]
+			side_gap = maxf(side_gap, float(roof_ext[side][1]) - float(pts[-1]))
+			gap = minf(gap, side_gap)
+		out["court_range_span"] = 0.0 if roof_ext.is_empty() else gap
 		out["sahel_court_rear_wall"] = rear
 		out["sahel_court_open"] = sky and run > 0.0
 		out["sahel_court_gate"] = maxf(run - wall_len[-1.0], run - wall_len[1.0])

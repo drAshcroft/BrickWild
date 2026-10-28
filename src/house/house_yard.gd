@@ -1176,7 +1176,7 @@ static func _court_parts(ctx: Dictionary) -> Dictionary:
 		0.0, COURT_WALL_H, "wall"))
 	var run := depth - wt
 	if p_ranges(ctx):
-		return _court_ranges(cell, depth, w, parts, float(ctx["side_pref"]))
+		return _court_ranges(ctx, cell, depth, w, parts, float(ctx["side_pref"]))
 	var gate_side: float = ctx["side_pref"]
 	for sgn in [-1.0, 1.0]:
 		var t: float = float(sgn) * (w + wt * 0.5)
@@ -1204,6 +1204,7 @@ const RANGE_SLAB_T := 0.22
 const RANGE_PARAPET_H := 0.3
 const RANGE_PARAPET_T := 0.2
 const RANGE_PIER := 0.3
+const RANGE_SPAN := 1.8         # the longest stretch of open range front between supports
 
 
 static func p_ranges(ctx: Dictionary) -> bool:
@@ -1211,7 +1212,7 @@ static func p_ranges(ctx: Dictionary) -> bool:
 	return p.spec.court_ranges
 
 
-static func _court_ranges(cell: Dictionary, depth: float, w: float, parts: Array,
+static func _court_ranges(ctx: Dictionary, cell: Dictionary, depth: float, w: float, parts: Array,
 		gate_side: float) -> Dictionary:
 	var wt := COURT_WALL_T
 	var run := depth - wt
@@ -1235,8 +1236,19 @@ static func _court_ranges(cell: Dictionary, depth: float, w: float, parts: Array
 			RANGE_PARAPET_T, run, y_p, RANGE_PARAPET_H, "wall"))
 		parts.append(_part(cell, "court_range_parapet", t_slab, run - RANGE_PARAPET_T * 0.5,
 			RANGE_DEPTH + wt, RANGE_PARAPET_T, y_p, RANGE_PARAPET_H, "wall"))
-		parts.append(_part(cell, "court_range_pier", s * (w - RANGE_DEPTH + RANGE_PIER * 0.5),
-			run - RANGE_PIER * 0.5, RANGE_PIER, RANGE_PIER, 0.0, RANGE_WALL_H, "wall"))
+		# a pier at the free corner and, when the range is long, one between: a
+		# slab on one end post reads as a lid on a floating stick (HS-SAHEL-RESIDUE)
+		# (a between pier that would stand in a door's approach or a window's drip
+		# zone is left out: that stretch is open ground by rule)
+		var piers := int(ceil(run / RANGE_SPAN))
+		for k in range(1, piers + 1):
+			var at := run - RANGE_PIER * 0.5 - (run - RANGE_PIER) * float(piers - k) / float(piers)
+			var pier := _part(cell, "court_range_pier", s * (w - RANGE_DEPTH + RANGE_PIER * 0.5),
+				at, RANGE_PIER, RANGE_PIER, 0.0, RANGE_WALL_H, "wall")
+			print("PIERWHY ", clear_reason(ctx["plan"], ctx["env"], part_aabb(pier)), " ", part_aabb(pier))
+			if k < piers and not clear_reason(ctx["plan"], ctx["env"], part_aabb(pier)).is_empty():
+				continue
+			parts.append(pier)
 	parts.append(_part(cell, "court_paving", 0.0, (depth - wt) * 0.5,
 		2.0 * w, depth - wt, 0.0, COURT_PAVE_H, "floor"))
 	return {"pieces": [_piece("court", "court", parts, "rear")], "props": []}
