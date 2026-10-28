@@ -1680,6 +1680,28 @@ against 1.32) have little margin.
   pair, broke a bend on the common's path, and still left 0.20 m (a riser bends
   at each terrace). The 3D walk on the hillside (`vstepswalk` `_case`, then the
   hillside in its CASES) has not been re-run.
+
+  HILLS-STAIRS, 2026-10-28 (`tools/probe_hills_walk.gd -- manarola`: `_case` on
+  the hillside, 188 s; `tools/probe_hills_roads.gd`: every road's class, grade and
+  shallowest tread). `_case` on Manarola's hillside fails 7 of 44: two open seams
+  (0.15 m of a 0.51 m step at (-8.1, 16.5)) and 16 seam samples; `road5` (the west
+  riser) treads of 0.20-0.25 m; "components claim surface 3, mesh has 10"; 5 of 16
+  doors off the gates' island (`b-001/002/004/010/012`, all beside the stepped
+  through road) and no 3D path to them; one path 0.131 m off the mesh. The east
+  riser and every cross-lane are at 0.30-0.45 m. What was tried on the west riser
+  and did NOT hold (reverted): a stair pass in `pick_pair` (cap INF, each stretch
+  of the riser between two lines measured by `stair_going`, `going` >= 0.30 or
+  0.35) -- the prediction matches the built bed (pred 0.20, built 0.20 on the
+  riser as planned) but on Manarola the stair-legal (x, lean) candidates are 8 of
+  ~46 and no two are RISER_MIN_SEP_M (70 m) apart; at 40 m a pair is found for some
+  profiles, and the plan the ladder keeps (another profile) still takes the old
+  pair; Masouleh's east riser got worse (0.25 -> 0.20) and Rocamadour's west stays
+  at 0.20. A going of 0.30 m reads 0.25 and 0.30 by turns (the bed is read every
+  5 cm), so the figure to ask is >= 0.35. The grade is not the cause (Manarola's
+  riser is 0.45 on average): the first stretch from the stepped through road is the
+  steep one. Real fix is a per-stretch lean (each hop to the next terrace picks its
+  own foot, as `_cross_foot` does, and the terrace ends follow) -- a rework of
+  `_riser` and `pick_pair`, with `vhillside` (11 min) and `vrealism` to re-run.
 * **switchbacks** -- the router is monotone along the contour, so a hairpin
   up a spur is still not laid;
 * **terraces from the ground** -- the terrace lines are offsets of the
