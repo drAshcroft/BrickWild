@@ -467,6 +467,12 @@ static func _witch_shelter_covers_threshold(shelter: Dictionary, door: Dictionar
 		footprint = Rect2(Vector2(bounds.position.x, bounds.position.z),
 			Vector2(bounds.size.x, bounds.size.z))
 		break
+	# The thatch roofs the strip between the wall and the shelter roof.
+	var clearance: Dictionary = shelter.get("work_clearance", {})
+	var edge := float(clearance.get("thatch_edge", 0.0))
+	if edge > 0.0 and clearance.has("out"):
+		footprint = footprint.merge(Rect2(footprint.position - Vector2(clearance["out"]) * edge,
+			footprint.size))
 	return footprint.grow(0.05).has_point(body)
 
 
@@ -1594,18 +1600,27 @@ static func _witch_work_shelter(ctx: Dictionary, cell: Dictionary, gap: float) -
 			"width": float(layout.get("width", 4.9)), "wall_y": wall_y, "drop": drop})
 	var parts: Array = []
 	var roof_rects: Dictionary = {}
+	var thatch_edge := 0.0
+	var out_world: Vector2 = cell["out"]
 	for module in modules:
 		var prefix := String(module["prefix"])
+		# WITCH-REVIEW-FOLLOWUPS 4: the shelter roof starts at the thatch's edge
+		# and the thatch itself covers the strip against the wall.
+		var edge := _witch_thatch_edge(ctx, cell, float(module["center"]),
+			float(module["width"]), depth)
+		thatch_edge = maxf(thatch_edge, edge)
 		var module_parts := _witch_shelter_module_parts(cell, prefix, float(module["center"]),
 			float(module["width"]), gap, depth, float(module["wall_y"]),
-			float(module["drop"]), roof_thickness)
+			float(module["drop"]), roof_thickness, edge)
 		parts.append_array(module_parts)
 		for part in module_parts:
 			if String(part.get("role", "")) != prefix + "_roof":
 				continue
 			var bounds: AABB = part_aabb(part)
-			roof_rects[prefix] = Rect2(Vector2(bounds.position.x, bounds.position.z),
+			var rect := Rect2(Vector2(bounds.position.x, bounds.position.z),
 				Vector2(bounds.size.x, bounds.size.z))
+			# the thatch roofs the strip between the wall and the shelter roof
+			roof_rects[prefix] = rect.merge(Rect2(rect.position - out_world * edge, rect.size))
 	if threshold_layout and not bool(ctx["witch_compact_service_threshold"]):
 		# Timber returns and a closed yard-facing wall turn the measured station
 		# roof into a shed. The entry gap faces the actual door approach through
@@ -1635,6 +1650,10 @@ static func _witch_work_shelter(ctx: Dictionary, cell: Dictionary, gap: float) -
 					var d0 := run.x + float(segment) * side_step
 					var d1 := d0 + side_step
 					var bearing_y := _witch_roof_under(cell, d1, gap, depth, wall_y, drop, roof_thickness)
+					# under the thatch the return stops at the thatch's underside
+					var under_thatch := _witch_thatch_bottom(ctx, cell, side_t, (d0 + d1) * 0.5)
+					if not is_nan(under_thatch):
+						bearing_y = minf(bearing_y, under_thatch - 0.005)
 					parts.append(_part(cell, "witch_work_wing_wall", side_t,
 						(d0 + d1) * 0.5, wall_thickness, side_step + 0.005,
 						0.0, bearing_y - 0.008, "trim"))
@@ -1729,7 +1748,7 @@ static func _witch_work_shelter(ctx: Dictionary, cell: Dictionary, gap: float) -
 	piece["work_clearance"] = {"origin": cell["o"], "out": cell["out"],
 		"tangent": cell["tan"], "gap": gap, "depth": depth, "wall_y": wall_y,
 		"drop": drop, "roof_thickness": roof_thickness,
-		"required_headroom": WITCH_WORK_CLEARANCE, "approach_size": WITCH_WORK_APPROACH,
+		"thatch_edge": thatch_edge, "required_headroom": WITCH_WORK_CLEARANCE, "approach_size": WITCH_WORK_APPROACH,
 		"roof_rect": threshold_rect, "threshold_roof_rect": threshold_rect,
 		"prep_roof_rect": prep_roof, "brew_roof_rect": brew_roof}
 	# Every item is checked against the others with its measured assembled bounds.
@@ -1771,9 +1790,15 @@ static func _witch_work_shelter(ctx: Dictionary, cell: Dictionary, gap: float) -
 
 
 static func _witch_shelter_module_parts(cell: Dictionary, prefix: String, center_t: float,
-		width: float, gap: float, depth: float, wall_y: float, drop: float,
-		roof_thickness: float) -> Array[Dictionary]:
+		width: float, gap0: float, depth0: float, wall_y0: float, drop0: float,
+		roof_thickness: float, thatch_edge := 0.0) -> Array[Dictionary]:
 	var parts: Array[Dictionary] = []
+	# Start the roof at the thatch edge, on the same plane: the roof now begins
+	# `thatch_edge` out from the wall, so it is that much shorter and lower.
+	var gap := gap0 + thatch_edge
+	var depth := depth0 - thatch_edge
+	var wall_y := wall_y0 - drop0 * (thatch_edge / depth0)
+	var drop := drop0 * (depth / depth0)
 	var ledger_y := _witch_roof_under(cell, gap + 0.12, gap, depth, wall_y, drop, roof_thickness)
 	# WITCH-ROOF: under a 2.3 m hut wall only a 5 cm ledger fits above the door head.
 	var ledger_h := 0.05 if roof_thickness < 0.06 else 0.12
@@ -1785,8 +1810,11 @@ static func _witch_shelter_module_parts(cell: Dictionary, prefix: String, center
 		for side in [-1.0, 1.0]:
 			parts.append(_part(cell, prefix + "_post", center_t + side * (width * 0.5 - 0.06),
 				post_d, 0.12, 0.12, 0.0, post_y, "trim"))
-	parts.append(_part(cell, prefix + "_ledger", center_t, gap + 0.06,
-		width, 0.12, ledger_y - ledger_h, ledger_h, "trim"))
+	# Against the thatch's edge the roof bears on the thatch itself, and a ledger
+	# there would stand in the door's reserved approach.
+	if thatch_edge <= 0.0:
+		parts.append(_part(cell, prefix + "_ledger", center_t, gap + 0.06,
+			width, 0.12, ledger_y - ledger_h, ledger_h, "trim"))
 	var out3 := Vector3((cell["out"] as Vector2).x, 0.0, (cell["out"] as Vector2).y)
 	var roof_frame := Basis(Vector3.UP.cross(out3), Vector3.UP, out3)
 	var roof := _part(cell, prefix + "_roof", center_t, gap + depth * 0.5,
@@ -1950,6 +1978,40 @@ static func _cell_rect(cell: Dictionary, local: Rect2) -> Rect2:
 		lo = lo.min(point)
 		hi = hi.max(point)
 	return Rect2(lo, hi - lo)
+
+
+## World height of the house roof's mid-plane over cell point (t, d), or NAN
+## beyond the roof's edge.
+static func _witch_thatch_mid(ctx: Dictionary, cell: Dictionary, t: float, d: float) -> float:
+	if not ctx.has("witch_roof_layout"):
+		ctx["witch_roof_layout"] = HouseGeometry.roof_layout(ctx["plan"])
+	var layout: Dictionary = ctx["witch_roof_layout"]
+	var w: Vector2 = _w(cell, t, d)
+	var local: Vector3 = (layout["transform"] as Transform3D).affine_inverse() * Vector3(w.x, 0.0, w.y)
+	var h := RoofShape.height_at(layout["faces"], Vector2(local.x, local.z))
+	if is_nan(h):
+		return NAN
+	return (layout["transform"] as Transform3D).origin.y + h
+
+
+static func _witch_thatch_bottom(ctx: Dictionary, cell: Dictionary, t: float, d: float) -> float:
+	return _witch_thatch_mid(ctx, cell, t, d) - RoofShape.DEPTH * 0.5
+
+
+## How far out from the wall the thatch reaches along a module's span, capped
+## so that a real roof bay is left past it.
+static func _witch_thatch_edge(ctx: Dictionary, cell: Dictionary, center_t: float,
+		width: float, depth: float) -> float:
+	var edge := 0.0
+	for k in range(5):
+		var t := center_t + (float(k) / 4.0 - 0.5) * width
+		var d := 0.0
+		while d < depth - 0.8 and not is_nan(_witch_thatch_mid(ctx, cell, t, d + 0.02)):
+			d += 0.02
+		edge = maxf(edge, d)
+	if edge > 0.0:
+		edge += 0.02
+	return edge
 
 
 static func _witch_roof_under(cell: Dictionary, d: float, gap: float, depth: float,

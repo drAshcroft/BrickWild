@@ -11,6 +11,7 @@ static func run() -> SuiteResult:
 	var rows := _cases()
 	var huts := 0
 	var controls := 0
+	var awning_control_done := false
 	for row in rows:
 		var role := String(row.get("role", ""))
 		if role != "witch" and role != "clamp_control":
@@ -33,6 +34,27 @@ static func run() -> SuiteResult:
 			"%s: hut is %.2f x %.2f m, %d storeys" % [who, spec.width, spec.length, spec.storeys])
 		_expect(res, plan.room_count() <= 3,
 			"%s: %d rooms (max 3)" % [who, plan.room_count()])
+		# WITCH-REVIEW-FOLLOWUPS 4: the work shelter's roof stops at the thatch edge
+		var awning: Dictionary = WitchAwningCheck.check(plan)
+		_expect(res, bool(awning["ok"]) and int(awning["checked"]) <= 2,
+			"%s: the work shelter roof runs into the thatch at %d samples (worst %.3f m)" % [who,
+			awning["intrusions"].size(), _worst(awning)])
+		if not awning_control_done and int(awning["checked"]) > 0:
+			awning_control_done = true
+			# control: hang the same roof from the wall again and the check must fire
+			for piece in plan.yard_pieces:
+				if String(piece.get("kind", "")) != "witch_work_lean_to":
+					continue
+				var edge := float(piece["work_clearance"]["thatch_edge"])
+				_expect(res, edge > 0.3, "%s: no thatch edge recorded on the shelter" % who)
+				for part in piece["parts"]:
+					if String(part["role"]).ends_with("_roof"):
+						var back := Vector3(piece["work_clearance"]["out"].x, 0.0,
+							piece["work_clearance"]["out"].y)
+						part["centre"] -= back * edge * 0.5
+						part["size"] += Vector3(0.0, 0.0, edge) if absf(back.z) > 0.5 else Vector3(edge, 0.0, 0.0)
+			_expect(res, not bool(WitchAwningCheck.check(plan)["ok"]),
+				"%s: a shelter roof hung from the wall passed the awning check" % who)
 		if role == "clamp_control":
 			controls += 1
 			_expect(res, is_equal_approx(spec.width, 7.0) and is_equal_approx(spec.length, 9.0),
@@ -67,6 +89,12 @@ static func run() -> SuiteResult:
 		"clamp leaked to a cottage")
 	res.note("huts=%d clamp controls=%d" % [huts, controls])
 	return res
+
+static func _worst(awning: Dictionary) -> float:
+	var worst := 0.0
+	for row in awning["intrusions"]:
+		worst = maxf(worst, float(row["inside"]))
+	return worst
 
 static func _cases() -> Array:
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(FIXTURE))
