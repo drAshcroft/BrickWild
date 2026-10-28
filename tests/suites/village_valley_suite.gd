@@ -38,6 +38,7 @@ const CASES := [
 	["valley", &""],
 	["world90/gangotri", &""],
 	["real30/ushguli", &""],
+	["world90/balan", &""],
 	["world90/rocamadour", &""],
 ]
 ## Derive valley (with a river in the spec) and are NOT cases, each for a stated

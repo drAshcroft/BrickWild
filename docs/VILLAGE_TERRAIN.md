@@ -1336,11 +1336,25 @@ Not yet:
 * **a 90 m grid with no floor in it** -- world90/balan (hand label *valley*:
   the derivation is right, the planner is not) housed 16 of 19. The river is not
   seen, so the road was routed by grade in the street form's half-depth band and
-  stood 26 m off the site's middle; the farm rule (a farm within 40 % of the
-  depth of the site's edge) found no ground on either side. `_route` now keeps
-  the unseen-river road to a 14 m band with four times the dislike of leaving
-  its seed: 19/19 housed, common 73 %. It stays out of `CASES`: the survey's
-  main body (45 m links) is 8 of 19, elongation 2.5, filed as VTER-VALLEY-THIN;
+  stood 26 m off the site's middle; `_route` now keeps the unseen-river road to a
+  14 m band with four times the dislike of leaving its seed: 19/19 housed, common
+  73 %. VTER-VALLEY-THIN / VTER-USHGULI-ELONGATION found the real cause of its gap
+  (x = 43..127) and of Ushguli's slide to 2.81 (it had been 3.20): **the farm rule**.
+  The lot planner (and `VillagePlaceCheck._check_farms`) keep a farm's walls within
+  40 % of the site's shorter side of the edge (55 m of 138); a valley's road runs
+  along the middle of the site with the river on one side, so on the river side the
+  lot is wet and on the hill side the farm stands 60-66 m from the edge. Of the
+  fourteen strung slots the middle ones had no legal lot (probe: `tools/probe_valley_slots.gd`,
+  45 spots refused by `_purpose_clear`, the rest by water, lanes and lots) and each farm took
+  the nearest legal frontage, 60-300 m away, at the two ends. The slots were never the
+  problem and neither was the ground. `VillageLotPlanner.farm_reach(form, shorter)` is
+  now the one number both read: 0.5 of the shorter side for a valley (the whole ribbon is
+  its outer band), 0.4 for every other form. Ushguli 2.81 -> 7.71, Balan 2.58 -> 6.83;
+  both are in `CASES`. vrealism is identical (166 of 207). **Left:** a valley is now a
+  straight line, elongation 6-8 against the survey's p90 of 4.72 (a slot span of 0.4 of
+  the site brought them to 4.5-5.4 but moved five realism cells, because Cayumba and
+  Haldenstein derive the valley form: not kept). A valley wants its households in a
+  ribbon with some thickness, not 14 slots in one row;
 * **Lake Argyle** (hand label *dispersed*) derives valley with a river forced
   into the spec: the hill row is 30-55 %, the bank row a river strip, one
   76 m stretch has no legal lot and the body splits (elongation 2.7-2.9).
