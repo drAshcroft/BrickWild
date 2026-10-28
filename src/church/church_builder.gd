@@ -12,6 +12,9 @@ const SURF_STONE := 0
 const SURF_TRIM := 1
 const SURF_ROOF := 2
 const SURF_OPEN := 3
+## How far a glazed pane laps into the masonry round its throat, so no slot
+## is left between the glass and the stone.
+const PANE_LAP := 0.02
 const SURF_ACCENT := 4
 const SURF_WOOD := SURF_STONE
 
@@ -2412,7 +2415,7 @@ func _build_clerestory() -> void:
 			# so glazing cannot disguise an uncut masonry host.
 			_kit.surface(SURF_OPEN).set_color(Color.BLACK)
 			component_box("clerestory_pane",
-				Vector3(width - 0.08, height - 0.08, 0.025),
+				Vector3(width + PANE_LAP * 2.0, height + PANE_LAP * 2.0, 0.025),
 				xf.translated_local(Vector3(0, 0, -NAVE_WALL_T + 0.035)), SURF_OPEN)
 			_kit.surface(SURF_OPEN).set_color(Color.WHITE)
 			# Two stone spandrels fill the rectangular cut above its pointed
@@ -2526,7 +2529,11 @@ func window(pos: Vector3, face: float, w: float, h: float, style: StringName,
 				Vector3(0, 0, -NAVE_WALL_T + 0.035))
 			host("glazing_%s_%d" % [_tag, part_log.size()])
 			_kit.surface(SURF_OPEN).set_color(Color.BLACK)
-			component_box("window_pane", Vector3(w - 0.08, h - 0.08, 0.025),
+			# The pane laps PANE_LAP into the stone on every side. It was 4 cm
+			# SHORTER than the throat, a clear slot all round it through which
+			# the outside showed (walk pin 1a17a563-2, CHURCH-WINDOW-GAP).
+			component_box("window_pane",
+				Vector3(w + PANE_LAP * 2.0, h + PANE_LAP * 2.0, 0.025),
 				glass, SURF_OPEN)
 			_kit.surface(SURF_OPEN).set_color(Color.WHITE)
 			host_end()

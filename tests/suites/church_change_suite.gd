@@ -73,6 +73,7 @@ static func run() -> SuiteResult:
 	var route_elapsed := (Time.get_ticks_msec() - route_start) / 1000.0
 	res.note("entrance routes %.2fs" % route_elapsed)
 	_negative_controls(res)
+	_glazing_gaps(res)
 	_nave_intrusion(res)
 	_tower_crowns(res)
 	_romanesque_large_front(res)
@@ -340,6 +341,55 @@ static func _negative_controls(res: SuiteResult) -> void:
 	builder.mass_log.clear()
 	var report: Dictionary = MassingCheck.new().check(spec, builder)
 	_expect(res, not report["ok"], "missing-mass control was not detected")
+
+
+## CHURCH-WINDOW-GAP (walk pin 1a17a563-2): a through window's glazed pane was
+## 4 cm smaller than the throat cut for it, leaving a slot of daylight all
+## round. Every pane must cover its throat; the control shrinks the panes by
+## the old 4 cm and must be seen. jank cannot open the slot (the warp is one
+## continuous shear over the whole shell), so the unwarped builder is measured.
+static func pane_gaps(builder: ChurchBuilder, shrink := 0.0) -> Array[String]:
+	var out: Array[String] = []
+	var panes: Array[Dictionary] = []
+	for c in builder.component_log:
+		if c["role"] == "window_pane":
+			panes.append(c)
+	var checked := 0
+	for t in builder.part_log:
+		if t["kind"] != "window" or t.get("aperture", "") != "through" 				or t["tag"] == "clerestory" or t["size"].x <= 0.0:
+			continue
+		var pos: Vector3 = t["pos"]
+		for c in panes:
+			var origin: Vector3 = (c["xf"] as Transform3D).origin
+			# the pane stands at the window's height, a wall's depth behind its face
+			if absf(origin.y - pos.y) > 0.001 					or Vector2(origin.x - pos.x, origin.z - pos.z).length() > 0.6:
+				continue
+			var size: Vector3 = c["size"]
+			if size.x - shrink < t["size"].x - 0.001 or size.y - shrink < t["size"].y - 0.001:
+				out.append("%s window at (%.2f, %.2f, %.2f): pane %.3f x %.3f inside a %.3f x %.3f throat" % [
+					t["tag"], pos.x, pos.y, pos.z, size.x - shrink,
+					size.y - shrink, t["size"].x, t["size"].y])
+			checked += 1
+			break
+	if checked == 0:
+		out.append("no pane matched a through window")
+	return out
+
+
+static func _glazing_gaps(res: SuiteResult) -> void:
+	var request := BuildingRequest.church(1, &"russian", 10.0, 22.0, 12.0)
+	request.jank = 0.3
+	var specs: Array[ChurchSpec] = [BrickWild.generate(request).spec]
+	for row in [[&"romanesque", 3], [&"nordic_stave", 8], [&"byzantine", 3]]:
+		specs.append(TestSweep.spec_at(row[0], row[1]))
+	for spec in specs:
+		var builder := ChurchBuilder.new()
+		builder.build(spec)
+		var gaps := pane_gaps(builder)
+		_expect(res, gaps.is_empty(), "glazing gap: %s" % (gaps[0] if not gaps.is_empty() else ""))
+		if spec == specs[0]:
+			_expect(res, not pane_gaps(builder, 0.08).is_empty(),
+				"pane-gap control (panes 4 cm short all round) was not detected")
 
 
 static func _expect(res: SuiteResult, ok: bool, message: String) -> void:
