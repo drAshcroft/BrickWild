@@ -503,6 +503,16 @@ static func walk_floor(plan: HousePlan, level: int) -> Array[Rect2]:
 static func emit(b: HouseBuilder) -> void:
 	var plan: HousePlan = b.plan
 	var spec: HouseSpec = plan.spec
+	if spec.style == &"pueblo" and not applies(spec) and plan.world_family == &"" 			and not HouseGeometry.is_shaped(plan) and not plan.has_court() 			and not "viga" in spec.pueblo_skip:
+		# a shop, a trade house or a footprint too small to step is not terraced, but
+		# it is still a pueblo: the roof beams stand out of its walls, at the beam's
+		# size (not the Sahel's toron). HS-PUEBLO-RESIDUE (a pueblo apothecary was
+		# walked as "the same house as the Sahel")
+		b.tag("viga")
+		b.host("viga", 0)
+		_emit_vigas(b, plan, spec)
+		b.host_end()
+		return
 	if not applies(spec) or plan.world_family != &"" or HouseGeometry.is_shaped(plan) or plan.has_court():
 		return
 	if not "terrace" in spec.pueblo_skip:

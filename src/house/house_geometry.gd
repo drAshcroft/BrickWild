@@ -1807,8 +1807,9 @@ static func exterior_bounds(plan: HousePlan) -> AABB:
 		pos = pos.max(Vector2.ONE * HouseSahel.reach(spec))
 	var r: Rect2 = site_rect(spec, maxi(spec.storeys - 1, 0)).grow_individual(neg.x, neg.y, pos.x, pos.y)
 	r = r.merge(site_rect(spec).grow_individual(0, jetty_front_reach(spec), 0, 0))
-	if HousePueblo.applies(spec):
+	if HousePueblo.applies(spec) or spec.style == &"pueblo":
 		# HS-PUEBLO: the vigas and the ladders stand out of the walls of every storey
+		# (a shop's or a small house's vigas too: HousePueblo.emit)
 		r = r.merge(site_rect(spec).grow(HousePueblo.reach()))
 	for extra in [chimney_rect(plan), porch_rect(plan), veranda_rect(plan),
 			HouseMinka.engawa_rect(plan), HouseMinka.steps_rect(plan)]:

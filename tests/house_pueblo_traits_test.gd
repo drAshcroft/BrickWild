@@ -185,8 +185,16 @@ func _check_scope() -> void:
 	var smith_spec := HouseTraitMeasure.make_spec(&"pueblo", 8.0, 10.0, 2.6, 2)
 	smith_spec.trade = &"smith"
 	var smith := HouseTraitMeasure.measure(smith_spec, 8102)
-	_expect(not smith["pueblo"] and smith["ladder_count"] == 0 and smith["viga_count"] == 0,
-		"a smith's pueblo is not stepped and has no ladders or vigas")
+	_expect(not smith["pueblo"] and smith["ladder_count"] == 0,
+		"a smith's pueblo is not stepped and has no ladders")
+	# ...but it is still a pueblo: beam ends the size of a beam stand out of its walls,
+	# so it is not read as the Sahel's house (HS-PUEBLO-RESIDUE)
+	_expect(smith["viga_count"] >= 12 and smith["viga_section"] >= 0.12 and smith["viga_walls"] >= 4,
+		"a smith's pueblo has vigas (%d, %.2f m across, on %d walls)" % [smith["viga_count"], smith["viga_section"], smith["viga_walls"]])
+	var smith_sahel_spec := HouseTraitMeasure.make_spec(&"african", 8.0, 10.0, 2.6, 2)
+	smith_sahel_spec.trade = &"smith"
+	_expect(HouseTraitMeasure.measure(smith_sahel_spec, 8102)["viga_count"] == 0,
+		"control: a smith's Sahel house has no vigas")
 	# the key and the label stay
 	_expect(HouseSpec.STYLES.has(&"pueblo") and str(HouseSpec.STYLES[&"pueblo"]["label"]) == "Pueblo Adobe House",
 		"the style key stays `pueblo`, the label `Pueblo Adobe House`")
