@@ -166,6 +166,8 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 ## spot is scored down; the search still takes it when the room offers nothing
 ## better, and the walk check remains the judge of the result.
 const BAND_W := 10.0
+## How far a diner's seat stands out from the table before its pull-out floor.
+const SEAT_DEPTH := 0.65
 
 
 static func _band_crowding(plan: HousePlan, room: int, cand: Dictionary) -> int:
@@ -200,9 +202,21 @@ static func _band_crowding(plan: HousePlan, room: int, cand: Dictionary) -> int:
 				continue
 			# a seat of another table brings its own pull-out floor with it
 			var body := Rect2(q["rect"])
+			var seat_zone: Rect2 = q.get("zone", Rect2())
 			if HouseFurnishWalkCheck._is_seat(String(q["key"])):
 				body = body.grow(HouseFurnishWalkCheck.SEAT_BAND)
+				if seat_zone.has_area():
+					body = body.merge(seat_zone)
 			var overlap := band.intersection(body)
+			# The candidate's own diners sit in that strip and pull out beyond
+			# them: a seat of ANOTHER table whose pull-out floor reaches the
+			# strip's far side shares floor with them (pull_out "shares").
+			if HouseFurnishWalkCheck._is_seat(String(q["key"])):
+				overlap = band.grow_individual(
+					SEAT_DEPTH if across.x > 0.0 else 0.0,
+					SEAT_DEPTH if across.x <= 0.0 else 0.0,
+					SEAT_DEPTH if across.x > 0.0 else 0.0,
+					SEAT_DEPTH if across.x <= 0.0 else 0.0).intersection(body)
 			if overlap.size.x > 0.1 and overlap.size.y > 0.1:
 				crowded += 1
 	return crowded

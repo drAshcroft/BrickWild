@@ -1965,12 +1965,14 @@ static func place_row(plan: HousePlan, room: int, step: Dictionary,
 	if cat == "bed" and bool(step.get("avoid_door_lines", false)) 			and not step.has("door_gap_hard"):
 		var before := plan.furniture.size()
 		var saved_state := r.state
+		var saved_compromises: Dictionary = plan.compromises.duplicate(true)
 		var hard := step.duplicate()
 		hard["door_gap_hard"] = true
 		place_row(plan, room, hard, blocked, zones, r)
 		if plan.furniture.size() > before:
 			return
 		r.state = saved_state
+		plan.compromises = saved_compromises
 	var choices: Array[String] = PropCatalog.of_category(cat)
 	if choices.is_empty():
 		return

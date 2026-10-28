@@ -62,6 +62,7 @@ static func plan(spec: ShopSpec) -> HousePlan:
 			_pin_library_focus_to_daylight(out, front)
 	if spec.business == &"prison":
 		_plan_prison_access(out)
+		_walk_the_cellar_stair(out)
 	if spec.business == &"market_hall" and front >= 0:
 		_plan_market_colonnade(out, front)
 	if spec.business == &"thieves_den":
@@ -70,6 +71,27 @@ static func plan(spec: ShopSpec) -> HousePlan:
 	_join_store_to_work_room(out, spec)
 	_cut_yard_door(out, spec)
 	return out
+
+
+## SHOP-ARCHETYPE-RED. The house planner digs a prison's cellar with the legacy
+## 2.4 m flight, which over a 2.9 m drop is a ladder: no step count, no head
+## landing, no rails. Re-lay each cellar stair as the walkable flight a keep
+## gets (CastleKeepPlan.walkable_flight), on the domestic rail profile; where
+## no flight fits the legacy record stays and the check says so.
+static func _walk_the_cellar_stair(plan: HousePlan) -> void:
+	for i in range(plan.stairs.size()):
+		var old: Dictionary = plan.stairs[i]
+		if int(old.get("storey", 0)) >= 0 or bool(old.get("domestic_profile", false)):
+			continue
+		var kept: Array[Dictionary] = plan.stairs.duplicate()
+		plan.stairs.remove_at(i)
+		var flight := CastleKeepPlan.walkable_flight(plan, int(old["a"]), int(old["b"]),
+			int(old["storey"]), int(old["to_storey"]))
+		if flight.is_empty() or not flight.has("head_landing"):
+			plan.stairs.assign(kept)
+			continue
+		flight["domestic_profile"] = true
+		plan.stairs.insert(i, flight)
 
 
 ## The rooms a trade is worked in, and the rooms its stock is kept in.

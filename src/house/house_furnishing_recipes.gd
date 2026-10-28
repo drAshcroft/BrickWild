@@ -49,6 +49,10 @@ const SHOP_FLOOR_SHARE := 0.13
 const SHOP_SHARE_BY_KIND := {&"office": 0.18}
 const SHOP_COMPOSITION_MIN_AREA := 20.0
 const SHOP_COMPOSITION_MAX_PIECES := 22
+## A room several times the size the piece counts were written for (a 200 m2
+## office in a hospice stretched to 20 x 26 m, SHOP-ARCHETYPE-RED) gets those
+## counts and the piece cap once more for each SHOP_COMPOSITION_BIG_AREA it has.
+const SHOP_COMPOSITION_BIG_AREA := 80.0
 const SHOP_COMPOSITION := {
 	&"sales_floor": {
 		# a bread table and the flour, the proving bins in the corners
@@ -123,6 +127,7 @@ const SHOP_COMPOSITION := {
 			{"cat": "chest", "rule": &"wall", "fp": 0.96, "max": 4},
 			{"cat": "storage", "rule": &"wall", "fp": 0.49, "max": 4},
 			{"cat": "crate", "rule": &"corner", "fp": 0.76, "max": 3},
+			{"cat": "sconce", "rule": &"mounted", "fp": 0.0, "light": true, "max": 3},
 		],
 	},
 	&"records": {
@@ -225,20 +230,22 @@ static func shop_composition_steps(plan: HousePlan, room: int) -> Array:
 	# they apply to a small sales floor too; the floor share is for big rooms.
 	var share_applies: bool = area >= SHOP_COMPOSITION_MIN_AREA
 	var target: float = area * float(SHOP_SHARE_BY_KIND.get(kind, SHOP_FLOOR_SHARE))
+	var big := maxi(1, ceili(area / SHOP_COMPOSITION_BIG_AREA))
+	var max_pieces := SHOP_COMPOSITION_MAX_PIECES * big
 	var counts: Array[int] = []
 	counts.resize(candidates.size())
 	counts.fill(0)
 	var have := 0.0
 	var pieces := 0
 	var progressed := true
-	while share_applies and have < target and pieces < SHOP_COMPOSITION_MAX_PIECES and progressed:
+	while share_applies and have < target and pieces < max_pieces and progressed:
 		progressed = false
 		for i in range(candidates.size()):
-			if have >= target or pieces >= SHOP_COMPOSITION_MAX_PIECES:
+			if have >= target or pieces >= max_pieces:
 				break
 			if bool(candidates[i].get("light", false)) or candidates[i].has("per_area"):
 				continue # lights and wall goods are scaled to the room below
-			if counts[i] >= int(candidates[i]["max"]):
+			if counts[i] >= int(candidates[i]["max"]) * big:
 				continue
 			counts[i] += 1
 			have += float(candidates[i]["fp"])
@@ -248,13 +255,13 @@ static func shop_composition_steps(plan: HousePlan, room: int) -> Array:
 	for j in range(candidates.size()):
 		if candidates[j].has("per_area"):
 			counts[j] = clampi(int(ceil(area / float(candidates[j]["per_area"]))), 1,
-				int(candidates[j]["max"]))
+				int(candidates[j]["max"]) * big)
 		elif bool(candidates[j].get("light", false)):
 			if not share_applies:
 				continue
 			# a standing light for each LAMP_AREA of floor the walls and tables
 			# cannot be counted on to light (one is assumed from the base recipe; a free spot may be refused)
-			counts[j] = clampi(int(ceil(area / 35.0)) - 1, 0, int(candidates[j]["max"]))
+			counts[j] = clampi(int(ceil(area / 35.0)) - 1, 0, int(candidates[j]["max"]) * big)
 		if counts[j] <= 0:
 			continue
 		# a wall may refuse a piece; whatever fits is kept

@@ -970,6 +970,7 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 	if dais_open:
 		blocked.append(plan.dais_rect())
 	_ensure_seating(plan, room, blocked, zones, r)
+	_pair_the_lone_chair(plan, room, blocked, zones)
 	_ensure_light(plan, room, r)
 	var passable := _keep_the_room_passable(plan, room, blocked, zones, before_room_nav)
 	_keep_the_stair_foot_reachable(plan, room, blocked, zones)
@@ -1136,6 +1137,39 @@ static func _sorted_nav_values(values: Array) -> Array:
 ## to chance or to a tight corner. So the room is checked once at the end: if
 ## there is a table and no seat, one more seat is attempted, and if even that
 ## will not go in, the table comes out and the plan says so.
+## SHOP-ARCHETYPE-RED. A shop room's table can come out of the dice with one
+## chair (the overlay's seats rolled out, the base recipe's single seat went to
+## it), and a desk of 2.8 m with one chair is what HouseFurnishWalkCheck calls
+## seat_count. Draw a second chair up to any free table that has exactly one.
+## Shops only, on a private stream; where nothing fits the table is left as it
+## was and the check says so.
+static func _pair_the_lone_chair(plan: HousePlan, room: int, blocked: Array[Rect2],
+		zones: Array[Rect2]) -> void:
+	if not plan.spec is ShopSpec:
+		return
+	var seat_keys: Array = PropCatalog.of_category("seat")
+	if seat_keys.is_empty():
+		return
+	var local_rng := RandomNumberGenerator.new()
+	local_rng.seed = hash("lone chair|%d|%d" % [plan.spec.seed, room])
+	for t in plan.furniture_of(room).duplicate():
+		var table: Dictionary = plan.furniture[t]
+		if PropCatalog.category(String(table["key"])) != "table" or table.get("mounted", false) 				or String(table.get("row", "")) != "":
+			continue
+		var seats := 0
+		for f in plan.furniture_of(room):
+			if int(plan.furniture[f].get("host", -1)) == t 					and PropCatalog.category(String(plan.furniture[f]["key"])) == "seat":
+				seats += 1
+		if seats != 1:
+			continue
+		var before := plan.furniture.size()
+		for key in seat_keys:
+			HouseFurnishPlacement.place_around(plan, room, key, blocked, zones, local_rng,
+				false, [], t)
+			if plan.furniture.size() > before:
+				break
+
+
 static func _ensure_seating(plan: HousePlan, room: int, blocked: Array[Rect2],
 		zones: Array[Rect2], r: RandomNumberGenerator) -> void:
 	if plan.kind_of(room) == &"sanctuary":

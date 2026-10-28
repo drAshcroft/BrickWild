@@ -456,6 +456,18 @@ static func _windows(plan: HousePlan, level: int) -> void:
 ## threshold the final mesh must keep clear); `soft` penalties still apply.
 static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2(),
 		hard: Array[PackedVector2Array] = []) -> void:
+	var record := walkable_flight(plan, lower, upper, lower, upper, avoid, hard)
+	if not record.is_empty():
+		plan.stairs.append(record)
+
+
+## The flight record `_add_stair` appends, or {} when no flight fits. `lower`
+## and `upper` are rooms; `lower_storey` / `upper_storey` are their storeys
+## (a keep numbers both alike, a shop cellar does not). Shops share it for a
+## cellar stair (SHOP-ARCHETYPE-RED).
+static func walkable_flight(plan: HousePlan, lower: int, upper: int,
+		lower_storey: int, upper_storey: int, avoid := Rect2(),
+		hard: Array[PackedVector2Array] = []) -> Dictionary:
 	var floor := HouseGeometry.room_floor_rect(plan, upper)
 	var cap := maxf(HouseGeometry.PATH_MIN, maxf(floor.size.x, floor.size.y) - 0.3)
 	var width := minf(1.0, maxf(HouseGeometry.PATH_MIN, minf(floor.size.x, floor.size.y) - 0.3))
@@ -489,12 +501,12 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 			break
 	var best: Rect2 = pick.get("rect", Rect2())
 	if best.size.x <= 0.0:
-		return # Missing transition remains a QA failure, never invented floor.
+		return {} # Missing transition remains a QA failure, never invented floor.
 	if float(pick.score) < -100.0:
 		plan.note_compromise(lower, "stair")
 	var centre := best.get_center()
 	var record := {"a": lower, "b": upper,
-		"storey": lower, "to_storey": upper,
+		"storey": lower_storey, "to_storey": upper_storey,
 		"pos": centre, "lower_pos": centre, "upper_pos": centre,
 		"rect": best, "lower_rect": best, "upper_rect": best,
 		"width": width, "run": run}
@@ -506,7 +518,7 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 		record.merge(pick.landings)
 	if bool(pick.get("free_standing", false)):
 		record["free_standing"] = true
-	plan.stairs.append(record)
+	return record
 
 
 ## One run length's best flight: against a wall, then anywhere in a polygon
@@ -591,10 +603,10 @@ static func _pick_stair(plan: HousePlan, lower: int, upper: int,
 	# The flight arriving on `lower` from below: standing in its well, this one
 	# would climb out of that flight's solid foot -- the hotel's "stairway to
 	# nowhere" (WALK-QA, 6 Oct), which every shaped keep repeated floor on floor.
-	var wells: Array[Rect2] = HousePlanLevels.arriving_wells(plan, lower)
+	var wells: Array[Rect2] = HousePlanLevels.arriving_wells(plan, plan.storey_of_room(lower))
 	# Where the flight below lets its walker off, on this storey's floor: the new
 	# flight must not stand across it.
-	var arrivals := arrival_floors(plan, lower)
+	var arrivals := arrival_floors(plan, plan.storey_of_room(lower))
 	var best := {"rect": Rect2(), "score": -INF, "climb": 0.0, "landings": {}}
 	for rect in candidates:
 		var centre := rect.get_center()
