@@ -1548,7 +1548,11 @@ static func _corner_ext(run: Dictionary, thick: float) -> float:
 			return thick / 2.0
 		&"left", &"right":
 			return -thick / 2.0
-	return float(run.get("ext", 0.0))
+	# a ring run's carry is set for the wall's own thickness; a course that stands
+	# proud of the wall (the plinth, its moulding) is carried in proportion, or its
+	# outer faces miss at every joint by a step (HS-ROUNDHOUSE-RESIDUE)
+	var wall_t := float(run.get("thickness", thick))
+	return float(run.get("ext", 0.0)) * (thick / wall_t if wall_t > 0.001 else 1.0)
 
 
 func _wall_piece(from: Vector2, dir: Vector2, yaw: float, t0: float, t1: float,

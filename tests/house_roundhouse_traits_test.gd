@@ -226,6 +226,22 @@ func _check_harness(id: String, req: Dictionary, sd: int) -> void:
 		if not HouseFurnishGeometry.inside_candidate(plan, 0, f):
 			inside = false
 	_expect(inside, "%s every floor piece stands inside the outline" % id)
+	# the plinth and its moulding stand proud of the wall; each ring run is carried
+	# past its ends for THAT thickness, so the outer faces meet at every facet joint
+	# (a carry set for the wall alone leaves a step of 4 mm to 1 cm)
+	var steps_ok := true
+	var worst := 0.0
+	var thick_wall := HouseGeometry.wall_thickness(plan.spec)
+	for run in HouseGeometry.shell_runs(plan, 0):
+		for proud in [HouseGeometry.PLINTH_EXTRA * 2.0, HouseGeometry.PLINTH_EXTRA * 2.0 + 0.04]:
+			var tp: float = thick_wall + proud
+			# the carry that makes the OUTER face meet the next run's grows with the
+			# thickness: carry(tp) / carry(wall) = tp / wall
+			var want := float(run.get("ext", 0.0)) * tp / thick_wall
+			var miss := absf(HouseBuilder._corner_ext(run, tp) - want)
+			worst = maxf(worst, miss)
+			steps_ok = steps_ok and miss < 0.0001
+	_expect(steps_ok, "%s plinth courses meet at every facet joint (worst miss %.4f m)" % [id, worst])
 	# the nav check does see an obstruction: a table across the door shuts the room
 	var blocked := HouseGenerator.generate(_spec_of(req), sd, true)
 	var door: Dictionary = blocked.doors[0]
