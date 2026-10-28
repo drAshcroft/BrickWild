@@ -981,6 +981,69 @@ func _emit_stairs() -> void:
 			_emit_stair_guards(index, footprint, from_level, climb)
 
 
+## A newel (spiral) stair: wedge treads wound round a central post, each a named
+## component so exterior/component QA sees it, with a rail round the open well
+## on the upper floor and posts along the free outer edge (CASTLE-NEWEL-STAIR).
+func _emit_newel(index: int, stair: Dictionary, from_level: int) -> void:
+	var steps := maxi(4, int(stair.get("steps", 18)))
+	var riser := spec.height / float(steps)
+	var base_y := float(from_level) * spec.height
+	if bool(stair.get("domestic_profile", false)):
+		base_y += HouseGeometry.FLOOR_T
+	var c: Vector2 = stair["centre"]
+	var hub := float(stair.get("hub", HouseNewel.HUB))
+	host("stair_%d" % index, from_level)
+	for s in range(steps):
+		var top := base_y + riser * float(s + 1)
+		var y := top - HouseNewel.TREAD_THICK * 0.5
+		var poly := HouseNewel.step_polygon(stair, s)
+		var points := PackedVector3Array()
+		for p in poly:
+			points.append(Vector3(p.x, y, p.y))
+		component_slab("newel_tread", points, HouseNewel.TREAD_THICK, SURF_FLOOR)
+		var lo := Vector2(INF, INF)
+		var hi := Vector2(-INF, -INF)
+		for p in poly:
+			lo = lo.min(p)
+			hi = hi.max(p)
+		_log_mass("stair_%d_step_%d" % [index, s], AABB(
+			Vector3(lo.x, top - HouseNewel.TREAD_THICK, lo.y),
+			Vector3(hi.x - lo.x, HouseNewel.TREAD_THICK, hi.y - lo.y)), base_y)
+		if s % 2 == 1:
+			var outer: Vector2 = c + (poly[1] + poly[2] - c * 2.0) * 0.5 				- (poly[1] + poly[2] - c * 2.0).normalized() * 0.05
+			component_box("newel_guard_post", Vector3(HouseGeometry.STAIR_GUARD_THICKNESS,
+				0.9, HouseGeometry.STAIR_GUARD_THICKNESS),
+				Transform3D(Basis.IDENTITY, Vector3(outer.x, top + 0.45, outer.y)), SURF_TRIM)
+	var post := Vector3(hub * 2.0, spec.height, hub * 2.0)
+	var post_at := Vector3(c.x, base_y + spec.height * 0.5, c.y)
+	component_box("newel_post", post, Transform3D(Basis.IDENTITY, post_at), SURF_TRIM)
+	_log_mass("stair_%d_post" % index, AABB(post_at - post * 0.5, post), base_y)
+	# The hole in the upper floor is the whole square well: rail it on the three
+	# sides that are not the head landing.
+	var rect := Rect2(stair["rect"])
+	var floor_y := base_y + spec.height
+	var head_south := Rect2(stair["head_landing"]).get_center().y > rect.get_center().y
+	var t := HouseGeometry.STAIR_GUARD_THICKNESS
+	var edge := HouseGeometry.STAIR_GUARD_EDGE_OFFSET
+	var sides: Array = [
+		["x", rect.position.y + edge, true], ["x", rect.end.y - edge, true],
+		["z", rect.position.x + edge, true], ["z", rect.end.x - edge, true]]
+	for side in sides:
+		if side[0] == "x":
+			if (side[1] > rect.get_center().y) == head_south:
+				continue # the head landing's side stays open
+			for h_off: float in [0.9, 0.46]:
+				component_box("stair_well_rail_top" if h_off > 0.5 else "stair_well_rail_mid",
+					Vector3(rect.size.x, t, t), Transform3D(Basis.IDENTITY,
+					Vector3(rect.get_center().x, floor_y + h_off, side[1])), SURF_TRIM)
+		else:
+			for h_off: float in [0.9, 0.46]:
+				component_box("stair_well_rail_top" if h_off > 0.5 else "stair_well_rail_mid",
+					Vector3(t, t, rect.size.y), Transform3D(Basis.IDENTITY,
+					Vector3(side[1], floor_y + h_off, rect.get_center().y)), SURF_TRIM)
+	host_end()
+
+
 ## The open long edges of a domestic flight are guarded at both heights. These
 ## are real emitted components, hosted to the stair, so exterior/component QA
 ## can compare their log with the triangles that were built.

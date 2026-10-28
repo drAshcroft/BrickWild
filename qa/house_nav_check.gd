@@ -173,6 +173,15 @@ func _rasterize() -> void:
 		var size: Vector2 = column.get("size", Vector2.ZERO)
 		if size.x > 0.0 and size.y > 0.0:
 			_grids[level].add_obstacle(Rect2(pos - size * 0.5, size))
+	# The well of a newel stair is post and wedges on the floor it rises from,
+	# and an open hole in the one it reaches: no one crosses it either side.
+	for stair in _plan.stairs:
+		if not HouseNewel.is_newel(stair) or not bool(stair.get("satisfied", true)):
+			continue
+		var well := Rect2(stair["rect"])
+		for level4 in [int(stair.get("storey", 0)), int(stair.get("to_storey", 1))]:
+			if _grids.has(level4):
+				_grids[level4].add_obstacle(well)
 	var breast := HouseGeometry.hearth_breast(_plan)
 	if not breast.is_empty() and _grids.has(int(breast["storey"])):
 		_grids[int(breast["storey"])].add_obstacle_poly(breast["outline"])

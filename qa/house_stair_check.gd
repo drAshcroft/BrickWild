@@ -50,6 +50,9 @@ static func _steps(st: Dictionary) -> int:
 
 
 static func _pitch(plan: HousePlan, si: int, st: Dictionary, out: Array[String]) -> void:
+	if HouseNewel.is_newel(st):
+		_newel_pitch(plan, si, st, out)
+		return
 	var r := Rect2(st["lower_rect"])
 	var h := plan.spec.height
 	var run := maxf(r.size.x, r.size.y)
@@ -60,6 +63,24 @@ static func _pitch(plan: HousePlan, si: int, st: Dictionary, out: Array[String])
 			or pitch > PITCH_MAX:
 		out.append("stair_pitch: stair %d rises %.2fm a step on a %.2fm going (2R+G %.2f, %.0f deg) -- too steep to climb"
 			% [si, riser, going, 2.0 * riser + going, pitch])
+
+
+## A newel stair is climbed along its walking line, two thirds of the way out
+## along the tread (HouseNewel): the pitch and the going are measured there, and
+## the tread must be wide enough to stand on.
+static func _newel_pitch(plan: HousePlan, si: int, st: Dictionary, out: Array[String]) -> void:
+	var h := plan.spec.height
+	var steps := _steps(st)
+	var riser := h / steps
+	var going := HouseNewel.line_length(st) / steps
+	var pitch := HouseNewel.pitch(h, st)
+	if riser > RISER_MAX + 0.005 or going < GOING_MIN - 0.005 or 2.0 * riser + going > STRIDE_MAX + 0.01 			or pitch > PITCH_MAX:
+		out.append("stair_pitch: stair %d (newel) rises %.2fm a step on a %.2fm going (2R+G %.2f, %.0f deg) -- too steep to climb"
+			% [si, riser, going, 2.0 * riser + going, pitch])
+	if float(st["radius"]) - float(st.get("hub", HouseNewel.HUB)) < HouseNewel.TREAD_MIN - 0.005:
+		out.append("stair_pitch: stair %d (newel) has a %.2fm tread, narrower than a foot and a half"
+			% [si, float(st["radius"]) - float(st.get("hub", HouseNewel.HUB))])
+
 
 
 static func _head(plan: HousePlan, si: int, st: Dictionary, out: Array[String]) -> void:
@@ -74,6 +95,9 @@ static func _head(plan: HousePlan, si: int, st: Dictionary, out: Array[String]) 
 
 
 static func _headroom(plan: HousePlan, si: int, st: Dictionary, out: Array[String]) -> void:
+	if HouseNewel.is_newel(st):
+		_newel_headroom(plan, si, st, out)
+		return
 	var r := Rect2(st["lower_rect"])
 	var h := plan.spec.height
 	var along_x := r.size.x > r.size.y
@@ -108,7 +132,39 @@ static func _headroom(plan: HousePlan, si: int, st: Dictionary, out: Array[Strin
 				% [HouseFurnishCheck.who(plan, fi), y0 - tread, si])
 
 
+## Fittings over a newel: a fitting standing within the well is measured against
+## the treads that wind over its spot (a turn and a half passes over most of it
+## twice), and may not hang within 2 m above one.
+static func _newel_headroom(plan: HousePlan, si: int, st: Dictionary, out: Array[String]) -> void:
+	var r := Rect2(st["lower_rect"])
+	var h := plan.spec.height
+	var steps := _steps(st)
+	for fi in plan.furniture.size():
+		var f: Dictionary = plan.furniture[fi]
+		if HousePlan.record_storey(f) not in [int(st["storey"]), int(st.get("to_storey", 0))]:
+			continue
+		var key := String(f["key"])
+		var scale := float(f.get("scale", 1.0))
+		var yaw := float(f.get("yaw", 0.0)) + PropCatalog.face_offset(key)
+		var origin := PropCatalog.house_origin(f)
+		var centre := PropCatalog.plan_centre(key, origin, yaw, scale)
+		var footprint := PropCatalog.footprint_rotated(key, yaw) * scale
+		var over := Rect2(centre - footprint * 0.5, footprint).intersection(r)
+		if not over.has_area():
+			continue
+		var y0: float = origin.y + PropCatalog.floor_offset(key) * PropCatalog.placement_height_scale(f)
+		for s in HouseNewel.steps_over(st, over.get_center()):
+			var tread := h * float(s + 1) / steps + int(st["storey"]) * h
+			if y0 < tread + HEADROOM:
+				out.append("stair_headroom: %s is %.2fm above the stair %d tread under it"
+					% [HouseFurnishCheck.who(plan, fi), y0 - tread, si])
+				break
+
+
 static func _guard(plan: HousePlan, si: int, st: Dictionary, builder: MassBuilder, out: Array[String]) -> void:
+	if HouseNewel.is_newel(st):
+		_newel_emitted(si, st, builder, out)
+		return
 	var rails := 0
 	for row in builder.component_log:
 		if String(row.get("host", "")) == "stair_%d" % si and "rail" in String(row.get("role", "")):
@@ -127,6 +183,24 @@ static func _guard(plan: HousePlan, si: int, st: Dictionary, builder: MassBuilde
 	if open > rails:
 		out.append("stair_guard: stair %d has %d open side(s) over a %.1fm drop and %d rail(s)"
 			% [si, open, plan.spec.height, rails])
+
+
+## The mesh holds every wedge tread the plan says, and the well has a rail.
+static func _newel_emitted(si: int, st: Dictionary, builder: MassBuilder, out: Array[String]) -> void:
+	var treads := 0
+	var rails := 0
+	for row in builder.component_log:
+		if String(row.get("host", "")) != "stair_%d" % si:
+			continue
+		if String(row.get("role", "")) == "newel_tread":
+			treads += 1
+		elif "rail" in String(row.get("role", "")):
+			rails += 1
+	if treads < _steps(st):
+		out.append("stair_newel: stair %d (newel) emitted %d wedge treads of its %d steps"
+			% [si, treads, _steps(st)])
+	if rails == 0:
+		out.append("stair_guard: stair %d (newel) has no rail round its well" % si)
 
 
 ## The approach rule alone, for one stair: the furnisher asks it while it works, so

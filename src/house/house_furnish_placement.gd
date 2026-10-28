@@ -192,6 +192,17 @@ static func initial_blocked(plan: HousePlan, room: int) -> Array[Rect2]:
 				out.append(Rect2(stair["upper_rect"]))
 			elif stair.has("rect"):
 				out.append(Rect2(stair["rect"]))
+		# A newel's walker steps on and off by its landings, outside the well.
+		if HouseNewel.is_newel(stair):
+			# The well takes so much of a tight tower that a bench would otherwise
+			# be pushed into the way in from the door.
+			if int(stair.get("a", -1)) == room or int(stair.get("b", -1)) == room:
+				for d2 in plan.doors_of(room):
+					out.append_array(door_approach_rects(plan.doors[d2]))
+			if int(stair.get("a", -1)) == room and stair.has("foot_landing"):
+				out.append(Rect2(stair["foot_landing"]))
+			if int(stair.get("b", -1)) == room and stair.has("head_landing"):
+				out.append(Rect2(stair["head_landing"]))
 	return out
 
 

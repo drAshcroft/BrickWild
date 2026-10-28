@@ -185,11 +185,29 @@ than climbing into a wall (stair_head outranks pitch). A square keep's flights
 come from `HousePlanLevels.add_stair`; one that would climb into the far wall
 is re-planned by `_add_stair`, with the entrance doorway kept clear.
 
-Not solved: a tower or keep under about 5 m clear cannot take a walkable
-straight flight (56 to 70 degrees today). Those need a newel (spiral) stair,
-which a one-rectangle `HousePlan` stair cannot draw. The check reports only
-what the room could have done better: `CastleWalkAccessCheck
-.avoidable_pitch_failures`.
+Newel stairs (CASTLE-NEWEL-STAIR). A tower or keep under about 5 m clear
+cannot take a walkable straight flight (56 to 70 degrees), so
+`CastleKeepPlan._add_stair` falls back to `newel_flight`: a square well of
+side 2 x radius (1.1, 1.0 or 0.95 m), wedge treads round a post (`HouseNewel`,
+`kind: &"newel"`, `centre`, `radius`, `hub`, `sweep`, `spin`, `steps`). The
+sweep is the shortest of 360/540/720/900 degrees that keeps the walking line
+(two thirds out along the tread) at 41 degrees or less with 2R + G inside the
+0.70 m stride: a 3.6 m storey takes one turn, the 6.75 m bergfried keep two.
+After a whole number of turns the walker leaves on the side he entered, after a
+half more on the far side. The flight above stands on the same well (one
+column through the tower); a candidate well must leave a person a way from every
+door to the foot (`_newel_passable`) and may not stand in a doorway on any
+storey. `rect` is the well, so rect-based code still works; `foot_landing` /
+`head_landing` are 0.7 m strips. `HouseBuilder._emit_newel` emits one
+`newel_tread` component per step plus `newel_post`, guard posts and the upper
+well rails (host `stair_<n>`); `HouseStairCheck` measures pitch along the
+walking line and counts treads and rails; the nav grid treats the well as an
+obstruction and walks between landings (`HouseWalkSources.stair_rect`).
+`CastleWalkAccessCheck.pitch_failures` reports every steep flight, not just the
+avoidable ones. Not solved: a 3.83 m octagon with 4.7 m storeys (edwardian
+`tower_1_*`) has no well that leaves the way open and keeps a straight ladder;
+`CastleTowerPlan._add_stairs` (the tower house) and the ridge/manor stairs do
+not use it.
 
 `HouseFurnishSurface.place_mounted` now skips a wall fitting whose recorded
 body (the footprint `HouseStairCheck` measures, not the mount pose) touches a

@@ -35,6 +35,16 @@ static func run() -> SuiteResult:
 	_clean(result, CastleWalkAccessCheck.avoidable_pitch_failures(edwardian_rows), "edwardian 1 stair pitch")
 	_clean(result, CastleWalkAccessCheck.headroom_failures(rows), "norman 1 stair headroom")
 	_clean(result, CastleWalkAccessCheck.headroom_failures(edwardian_rows), "edwardian 1 stair headroom")
+	# --- CASTLE-NEWEL-STAIR: no flight at all is a ladder. The 4.7 m mural towers
+	# and the slender keep were 56-70 degrees; they take a newel stair now.
+	_clean(result, CastleWalkAccessCheck.pitch_failures(rows), "norman 1 tower flights climbable")
+	_clean(result, CastleWalkAccessCheck.pitch_failures(norman_keep.values()), "norman 1 keep flights climbable")
+	# (edwardian 1's 3.83 m octagons with 4.7 m storeys still hold a straight flight:
+	# a 1.9 m well pinches the way shut there; see CASTLE-NEWEL-STAIR in the todo.)
+	_want(result, CastleWalkAccessCheck.newel_count(rows) > 0,
+		"norman 1 mural towers drew no newel stair")
+	_want(result, CastleWalkAccessCheck.newel_count(norman_keep.values()) > 0,
+		"the norman 1 keep drew no newel stair")
 	# --- the wizard tower house, and a norman one with a jog
 	var wiz := BrickWild.generate(BrickWild.default_request(&"castle", 1, &"wizard"))
 	var wiz_plan: HousePlan = CastleTowerPlan.generate(wiz.spec as CastleSpec, false)
@@ -60,7 +70,22 @@ static func run() -> SuiteResult:
 	else:
 		_want(result, not CastleWalkAccessCheck.avoidable_pitch_failures([ladder]).is_empty(),
 			"a 2.4 m flight up a 3.6 m storey in a roomy tower was accepted")
+	var straight := _newel_variant(rows, "straight")
+	if straight.is_empty():
+		_want(result, false, "no newel tower to draw a straight ladder in")
+	else:
+		_want(result, not CastleWalkAccessCheck.pitch_failures([straight]).is_empty(),
+			"a straight flight in the newel's square well was accepted")
+	var flat := _newel_variant(rows, "half_turn")
+	if not flat.is_empty():
+		_want(result, not CastleWalkAccessCheck.pitch_failures([flat]).is_empty(),
+			"a newel turned only half way up a storey was accepted")
 	var crossed := _table_across(rows)
+	if crossed.is_empty():
+		# a newel tower's two landings are one place: the control needs a straight pair
+		crossed = _table_across(edwardian_rows)
+	if crossed.is_empty():
+		crossed = _table_between_landings(rows)
 	if crossed.is_empty():
 		_want(result, false, "no tower storey to put a table across")
 	else:
@@ -134,6 +159,31 @@ static func _table_across(rows: Array) -> Dictionary:
 	return {}
 
 
+## The newel towers have one landing a floor, so the control draws two: a head
+## landing and a foot landing 3 m apart in a tower room, a table between them.
+static func _table_between_landings(rows: Array) -> Dictionary:
+	for row in rows:
+		var plan: HousePlan = row.plan
+		if plan == null or plan.room_count() < 2:
+			continue
+		var room := 1
+		var floor := HouseGeometry.room_floor_rect(plan, room)
+		if minf(floor.size.x, floor.size.y) > CastleKeepPlan.WALKWAY_ROOM_MAX:
+			continue
+		var c := floor.get_center()
+		var copy := HousePlan.new()
+		copy.spec = plan.spec
+		copy.rooms = plan.rooms
+		copy.doors = []
+		copy.stairs = [
+			{"b": room, "head_landing": Rect2(c + Vector2(-1.8, -0.4), Vector2(0.7, 0.8))},
+			{"a": room, "foot_landing": Rect2(c + Vector2(1.1, -0.4), Vector2(0.7, 0.8))}]
+		copy.furniture = [{"key": "Table_Large", "rect": Rect2(c - Vector2(0.6, 0.6), Vector2(1.2, 1.2)),
+			"room": room, "storey": room, "host": -1, "mounted": false, "cat": "table"}]
+		return {"id": "crossed", "plan": copy}
+	return {}
+
+
 ## A copy of the first roomy tower plan with every flight cut back to the old
 ## 2.4 m run: a ladder where the room could have had a stair.
 static func _short_flights(rows: Array) -> Dictionary:
@@ -161,6 +211,32 @@ static func _short_flights(rows: Array) -> Dictionary:
 			cut.erase("steps")
 			copy.stairs.append(cut)
 		return {"id": "ladder", "plan": copy}
+	return {}
+
+
+## A copy of the first newel tower with its flights drawn the wrong way: as
+## straight flights in the same wells ("straight"), or as newels turned only a
+## half circle ("half_turn"), both too steep for a person to climb.
+static func _newel_variant(rows: Array, how: String) -> Dictionary:
+	for row in rows:
+		var plan: HousePlan = row.plan
+		if plan == null or plan.stairs.is_empty() or not HouseNewel.is_newel(plan.stairs[0]):
+			continue
+		var copy := HousePlan.new()
+		copy.spec = plan.spec
+		copy.rooms = plan.rooms
+		copy.doors = plan.doors
+		copy.stairs = []
+		for st in plan.stairs:
+			var cut: Dictionary = st.duplicate(true)
+			if how == "straight":
+				for key in ["kind", "centre", "radius", "hub", "sweep", "spin", "steps"]:
+					cut.erase(key)
+				cut["run"] = float(cut["rect"].size.x)
+			else:
+				cut["sweep"] = 180.0
+			copy.stairs.append(cut)
+		return {"id": how, "plan": copy}
 	return {}
 
 

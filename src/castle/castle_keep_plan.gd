@@ -456,7 +456,7 @@ static func _windows(plan: HousePlan, level: int) -> void:
 ## threshold the final mesh must keep clear); `soft` penalties still apply.
 static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2(),
 		hard: Array[PackedVector2Array] = []) -> void:
-	var record := walkable_flight(plan, lower, upper, lower, upper, avoid, hard)
+	var record := walkable_flight(plan, lower, upper, lower, upper, avoid, hard, true)
 	if not record.is_empty():
 		plan.stairs.append(record)
 
@@ -467,7 +467,7 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 ## cellar stair (SHOP-ARCHETYPE-RED).
 static func walkable_flight(plan: HousePlan, lower: int, upper: int,
 		lower_storey: int, upper_storey: int, avoid := Rect2(),
-		hard: Array[PackedVector2Array] = []) -> Dictionary:
+		hard: Array[PackedVector2Array] = [], allow_newel := false) -> Dictionary:
 	var floor := HouseGeometry.room_floor_rect(plan, upper)
 	var cap := maxf(HouseGeometry.PATH_MIN, maxf(floor.size.x, floor.size.y) - 0.3)
 	var width := minf(1.0, maxf(HouseGeometry.PATH_MIN, minf(floor.size.x, floor.size.y) - 0.3))
@@ -478,7 +478,7 @@ static func walkable_flight(plan: HousePlan, lower: int, upper: int,
 	# ladder (CASTLE-STAIR-PITCH). Try the walkable run first where the room
 	# is long enough for it and its landings, else the old 2.4 m run. A room
 	# under about 5 m cannot take a walkable straight flight at all: those
-	# towers and keeps need a newel stair, which the plan cannot yet draw.
+	# towers and keeps take a newel stair (HouseNewel, newel_flight) instead.
 	var walkable := plan.spec.height / tan(deg_to_rad(PITCH_TARGET))
 	var runs: Array[float] = []
 	# A shorter run that is still too steep gains nothing and only crowds the
@@ -499,6 +499,13 @@ static func walkable_flight(plan: HousePlan, lower: int, upper: int,
 		pick = _pick_run(plan, lower, upper, run, width, floor, walls, avoid, hard)
 		if float(pick.get("climb", 0.0)) != 0.0:
 			break
+	# A room that cannot take a walkable straight flight takes a newel (spiral)
+	# stair where one fits: real towers do (CASTLE-NEWEL-STAIR).
+	if allow_newel and (float(pick.get("climb", 0.0)) == 0.0 or run < walkable - 0.01):
+		var newel := newel_flight(plan, lower, upper, lower_storey, upper_storey,
+			avoid, hard)
+		if not newel.is_empty():
+			return newel
 	var best: Rect2 = pick.get("rect", Rect2())
 	if best.size.x <= 0.0:
 		return {} # Missing transition remains a QA failure, never invented floor.
@@ -521,12 +528,83 @@ static func walkable_flight(plan: HousePlan, lower: int, upper: int,
 	return record
 
 
+## A newel stair for `lower` -> `upper`: a square well of side 2 * radius, the
+## widest radius that fits with floor at both ends (HouseNewel). {} when none.
+static func newel_flight(plan: HousePlan, lower: int, upper: int,
+		lower_storey: int, upper_storey: int, avoid := Rect2(),
+		hard: Array[PackedVector2Array] = []) -> Dictionary:
+	var floor := HouseGeometry.room_floor_rect(plan, upper)
+	var walls := HouseGeometry.room_walls(plan, upper)
+	walls.append_array(HouseGeometry.room_walls(plan, lower))
+	var steps := ceili(plan.spec.height / WALKABLE_RISER)
+	# A tower's newel is one column: the flight above stands on the well of the one
+	# below, with the same post, so the walker steps off the last tread onto the
+	# landing he steps onto the first of the next from.
+	for prior in plan.stairs:
+		if HouseNewel.is_newel(prior) and int(prior.get("to_storey", -1)) == lower_storey 				and int(prior.get("b", -1)) == lower:
+			var column := Rect2(prior["rect"])
+			if _inside(plan, lower, column) and _inside(plan, upper, column):
+				var sweep := float(prior["sweep"])
+				var turn := float(prior["climb"])
+				if not is_equal_approx(fposmod(sweep, 360.0), 0.0):
+					turn = -turn # it left on the far side: the next flight begins there
+				var same := stair_landings(plan, lower, upper, column, [], [], sweep, turn)
+				if not same.is_empty():
+					return _newel_record(plan, lower, upper, lower_storey, upper_storey,
+						column, float(prior["radius"]), same, sweep)
+	for radius in HouseNewel.RADII:
+		var side := radius * 2.0
+		if side > minf(floor.size.x, floor.size.y) or radius - HouseNewel.HUB < HouseNewel.TREAD_MIN:
+			continue
+		# The shortest sweep (a whole or half number of turns) whose walking line
+		# is gentle enough yet whose going keeps 2R + G inside the stride.
+		var sweep := 0.0
+		for candidate in HouseNewel.SWEEPS:
+			if HouseNewel.climbable(plan.spec.height, steps, radius, candidate):
+				sweep = candidate
+				break
+		if sweep == 0.0:
+			continue
+		var pick := _pick_run(plan, lower, upper, side, side, floor, walls, avoid,
+			hard, sweep)
+		if float(pick.get("climb", 0.0)) == 0.0:
+			continue
+		if float(pick.score) < -100.0:
+			plan.note_compromise(lower, "stair")
+		var record := _newel_record(plan, lower, upper, lower_storey, upper_storey,
+			pick.rect, radius, pick.landings, sweep)
+		if bool(pick.get("free_standing", false)):
+			record["free_standing"] = true
+		return record
+	return {}
+
+
+static func _newel_record(plan: HousePlan, lower: int, upper: int,
+		lower_storey: int, upper_storey: int, well: Rect2, radius: float,
+		landings: Dictionary, sweep: float) -> Dictionary:
+	var centre := well.get_center()
+	var record := {"a": lower, "b": upper,
+		"storey": lower_storey, "to_storey": upper_storey,
+		"pos": centre, "lower_pos": centre, "upper_pos": centre,
+		"rect": well, "lower_rect": well, "upper_rect": well,
+		"width": radius - HouseNewel.HUB, "kind": HouseNewel.KIND,
+		"centre": centre, "radius": radius, "hub": HouseNewel.HUB,
+		"sweep": sweep, "spin": 1.0,
+		"steps": ceili(plan.spec.height / WALKABLE_RISER)}
+	record.merge(landings)
+	record["run"] = HouseNewel.line_length(record)
+	return record
+
+
 ## One run length's best flight: against a wall, then anywhere in a polygon
 ## that lets its walker off on floor, and standing free in the room.
 static func _pick_run(plan: HousePlan, lower: int, upper: int, run: float, width: float,
 		floor: Rect2, walls: Array[Dictionary], avoid: Rect2,
-		hard: Array[PackedVector2Array]) -> Dictionary:
+		hard: Array[PackedVector2Array], newel_sweep := 0.0) -> Dictionary:
+	var newel := newel_sweep > 0.0
 	var sizes: Array[Vector2] = [Vector2(run, width), Vector2(width, run)]
+	if newel:
+		sizes = [Vector2(run, width)] # a square well
 	var along_walls: Array[Rect2] = []
 	for size in sizes:
 		for wall in walls:
@@ -537,20 +615,20 @@ static func _pick_run(plan: HousePlan, lower: int, upper: int, run: float, width
 			for step in range(samples + 1):
 				var centre := Vector2(wall.from).lerp(wall.to, float(step) / float(samples)) + normal * support
 				along_walls.append(Rect2(centre - size * 0.5, size))
-	var pick := _pick_stair(plan, lower, upper, along_walls, avoid, hard, false)
-	if float(pick.get("climb", 0.0)) == 0.0 and plan.is_polygonal(upper):
+	var pick := _pick_stair(plan, lower, upper, along_walls, avoid, hard, false, newel_sweep)
+	if float(pick.get("climb", 0.0)) == 0.0 and (newel or plan.is_polygonal(upper)):
 		# No flight against a wall lets its walker off on floor (a tower's small
 		# hexagon, a slender keep): look across the whole room for one that does
 		# (WALK-1a17b2b3-3, stairs into the wall).
 		var open := wall_touching_rects(walls, sizes)
-		var found := _pick_stair(plan, lower, upper, open, avoid, hard, true)
+		var found := _pick_stair(plan, lower, upper, open, avoid, hard, true, newel_sweep)
 		if float(found.get("climb", 0.0)) != 0.0:
 			pick = found
 		else:
 			# The room is too small for a flight and its landings against any
 			# wall (a 12-gon of 7.7 m): the flight stands free, and says so.
 			found = _pick_stair(plan, lower, upper, open_rects(floor, sizes), avoid,
-				hard, true)
+				hard, true, newel_sweep)
 			if float(found.get("climb", 0.0)) != 0.0:
 				pick = found
 				pick["free_standing"] = true
@@ -598,7 +676,7 @@ static func open_rects(floor: Rect2, sizes: Array[Vector2], pitch := 0.2) -> Arr
 ## without; with `landed_only` the others are not considered at all.
 static func _pick_stair(plan: HousePlan, lower: int, upper: int,
 		candidates: Array[Rect2], avoid: Rect2, hard: Array[PackedVector2Array],
-		landed_only: bool) -> Dictionary:
+		landed_only: bool, newel_sweep := 0.0) -> Dictionary:
 	var front := Vector2(plan.doors[plan.entrance()].pos)
 	# The flight arriving on `lower` from below: standing in its well, this one
 	# would climb out of that flight's solid foot -- the hotel's "stairway to
@@ -620,7 +698,9 @@ static func _pick_stair(plan: HousePlan, lower: int, upper: int,
 				in_doorway = in_doorway or Poly.area(over) > 0.02
 		if in_doorway:
 			continue
-		var landings := stair_landings(plan, lower, upper, rect, wells, arrivals)
+		if newel_sweep > 0.0 and _well_blocks_a_door(plan, rect):
+			continue
+		var landings := stair_landings(plan, lower, upper, rect, wells, arrivals, newel_sweep)
 		if landed_only and landings.is_empty():
 			continue
 		var score := centre.distance_to(front)
@@ -636,10 +716,47 @@ static func _pick_stair(plan: HousePlan, lower: int, upper: int,
 			if HousePlan.record_storey(door) == lower:
 				if _overlap(rect, HouseGeometry.door_clear_rect(door, -1.0)):
 					score -= 1000.0
-		if score > float(best.score):
+		if score > float(best.score) and (newel_sweep <= 0.0 or landings.is_empty()
+				or _newel_passable(plan, lower, rect, landings)):
 			best = {"rect": rect, "score": score,
 				"climb": float(landings.get("climb", 0.0)), "landings": landings}
 	return best
+
+
+## Can a person walk from each door of the tower to the foot of a newel well in
+## `rect`, and from its head round to the next? The well is an obstruction, and in
+## a 3.8 m octagon its corner can pinch the way shut against a chamfered wall.
+static func _newel_passable(plan: HousePlan, room: int, rect: Rect2,
+		landings: Dictionary) -> bool:
+	var poly := HouseGeometry.room_floor_poly(plan, room)
+	var grid := WalkGrid.new()
+	grid.setup(Poly.bounding_rect(poly).grow(0.3), HouseGeometry.NAV_CELL)
+	grid.add_floor_poly(poly)
+	for door in plan.doors:
+		grid.add_floor(HouseWalkSources.door_gap(door))
+	grid.add_obstacle(rect)
+	grid.build(HouseGeometry.PERSON_RADIUS)
+	var foot := Rect2(landings["foot_landing"])
+	var head := Rect2(landings["head_landing"])
+	if not grid.flood_from(foot.get_center()) or not grid.reached(head):
+		return false
+	for door in plan.doors:
+		if not bool(door.get("exterior", false)) and int(door.get("b", -1)) < 0:
+			continue
+		var inside: Vector2 = Vector2(door["pos"]) - Vector2(door["normal"]) 			* (HouseGeometry.wall_thickness(plan.spec) * 0.5 + 0.2)
+		if poly.size() >= 3 and Poly.contains_point(poly, inside, 0.0) 				and not grid.reached(Rect2(inside - Vector2.ONE * 0.1, Vector2.ONE * 0.2)):
+			return false
+	return true
+
+
+## A newel well is one column through every storey: it may not stand in front of
+## a door on any of them.
+static func _well_blocks_a_door(plan: HousePlan, rect: Rect2) -> bool:
+	for door in plan.doors:
+		for side in [-1.0, 1.0]:
+			if rect.intersects(HouseGeometry.door_clear_rect(door, side)):
+				return true
+	return false
 
 
 ## Which way a flight laid on `rect` climbs so that its foot has floor on
@@ -648,13 +765,24 @@ static func _pick_stair(plan: HousePlan, lower: int, upper: int,
 ## are the holes of flights arriving on `lower`, `arrivals` the floor the
 ## flight below lets its walker off on; the new flight stands on neither.
 static func stair_landings(plan: HousePlan, lower: int, upper: int, rect: Rect2,
-		wells: Array[Rect2], arrivals: Array[Rect2]) -> Dictionary:
+		wells: Array[Rect2], arrivals: Array[Rect2], newel_sweep := 0.0,
+		only_dir := 0.0) -> Dictionary:
 	var lower_poly := HouseGeometry.room_floor_poly(plan, lower)
 	var upper_poly := HouseGeometry.room_floor_poly(plan, upper)
 	var landing_width := minf(rect.size.x, rect.size.y)
 	for dir in [1.0, -1.0]:
+		if only_dir != 0.0 and dir != only_dir:
+			continue
 		var foot := HouseGeometry.stair_approach(rect, dir)
 		var head := HouseGeometry.stair_approach(rect, -dir, landing_width)
+		if newel_sweep > 0.0:
+			# A newel's walker steps on and off a square well: a person's width of
+			# floor each, on the SAME side after a full turn, the opposite one
+			# after a turn and a half.
+			foot = HouseGeometry.stair_approach(rect, dir, HouseNewel.FOOT_DEPTH)
+			head = HouseGeometry.stair_approach(rect,
+				dir if is_equal_approx(fposmod(newel_sweep, 360.0), 0.0) else -dir,
+				HouseNewel.HEAD_DEPTH)
 		if _poly_holds(lower_poly, foot) and _poly_holds(upper_poly, head) 				and not HousePlanLevels.hits_any(head, wells) 				and not HousePlanLevels.hits_any(foot, wells) 				and not HousePlanLevels.hits_any(rect, arrivals) 				and not HousePlanLevels.hits_any(head, arrivals):
 			return {"climb": dir, "foot_landing": foot, "head_landing": head}
 	return {}

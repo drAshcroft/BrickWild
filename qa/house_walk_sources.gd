@@ -79,6 +79,10 @@ static func _layer() -> Dictionary:
 
 
 static func stair_rect(stair: Dictionary, upper: bool) -> Rect2:
+	# A newel's walker enters and leaves by its landings; the well between is
+	# post and wedges, an obstruction (CASTLE-NEWEL-STAIR).
+	if HouseNewel.is_newel(stair) and stair.has("head_landing") and stair.has("foot_landing"):
+		return Rect2(stair["head_landing"] if upper else stair["foot_landing"])
 	var key := "upper_rect" if upper else "lower_rect"
 	if stair.has(key):
 		return Rect2(stair[key])

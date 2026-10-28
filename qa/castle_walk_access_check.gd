@@ -74,6 +74,35 @@ static func avoidable_pitch_failures(rows: Array) -> Array[String]:
 	return out
 
 
+## EVERY `stair_pitch` of the rows' plans, avoidable or not (CASTLE-NEWEL-STAIR).
+## A tight tower storey takes a newel stair (HouseNewel), so no flight in a castle
+## tower or keep may be steeper than a person climbs; `avoidable_pitch_failures`
+## alone would let the 4.7 m tower's 60 degree ladder through.
+static func pitch_failures(rows: Array) -> Array[String]:
+	var out: Array[String] = []
+	for row in rows:
+		var plan: HousePlan = row.plan
+		if plan == null or plan.spec == null or plan.stairs.is_empty():
+			continue
+		for failure in HouseStairCheck.check(plan):
+			if String(failure).begins_with("stair_pitch:"):
+				out.append("%s: %s" % [row.id, failure])
+	return out
+
+
+## How many flights of the rows' plans are newel stairs.
+static func newel_count(rows: Array) -> int:
+	var n := 0
+	for row in rows:
+		var plan: HousePlan = row.plan
+		if plan == null:
+			continue
+		for st in plan.stairs:
+			if HouseNewel.is_newel(st):
+				n += 1
+	return n
+
+
 ## `stair_headroom` of every row's plan: a lamp, shelf or rack hung over a tread.
 static func headroom_failures(rows: Array) -> Array[String]:
 	var out: Array[String] = []

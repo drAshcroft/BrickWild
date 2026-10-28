@@ -670,6 +670,10 @@ static func room_walk_faults(plan: HousePlan, room: int) -> int:
 		targets.append(plan.dais_rect())
 		grows.append(0.0)
 	for stair in plan.stairs:
+		# the post and wedges of a newel are not floor on either storey it joins
+		if HouseNewel.is_newel(stair) and level in [int(stair.get("storey", 0)),
+				int(stair.get("to_storey", -999))]:
+			grid.add_obstacle(Rect2(stair["rect"]))
 		if int(stair.get("a", -1)) == room and int(stair.get("storey", 0)) == level:
 			targets.append(HouseWalkSources.stair_rect(stair, false))
 			grows.append(0.0)
