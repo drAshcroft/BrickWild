@@ -30,12 +30,24 @@ extends RefCounted
 const SYNTH := preload("res://tests/fixtures/terrain/synthetic_terrain.gd")
 const EXPORTER := preload("res://tools/export_village_plan.gd")
 const WORLD90 := "res://tests/fixtures/terrain/world90/isola_dei_pescatori.json"
+## The real island's own outline (OpenStreetMap way 8013628) over a dome: an 8 m
+## grid that shows the 2.7 ha island as it is (VTER-ISLAND-DEM,
+## tools/settlements/osm_island_terrain.py). The heights are a profile; the
+## shore is real.
+const OSM10 := "res://tests/fixtures/terrain/osm10/isola_dei_pescatori.json"
 ## The survey's own spec for Isola dei Pescatori: 89 people, fishing, a coast.
 const POPULATION := 89
 const SEED := 4242
 ## The ring's mean distance inside the shore, at most: it stands at the shore,
 ## not floating inland of it.
 const RING_GAP_MAX := 24.0
+## The village's shape, against the survey record cu_isola_dei_pescatori
+## (VTER-ISLAND-DENSE): elongation 2.1 (the spine's arms to the landings had
+## made it 5.8), compactness 0.64 (was 0.28), hull 0.81 ha (0.73). Bounds with
+## room either side of the real figure, not a fit to it.
+const ELONGATION_MAX := 3.0
+const COMPACTNESS_MIN := 0.5
+const HULL_HA := Vector2(0.55, 1.1)
 
 
 static func run() -> SuiteResult:
@@ -46,6 +58,7 @@ static func run() -> SuiteResult:
 	res.note("measured %d buildings once in %.1f s" % [jobs.size(), (Time.get_ticks_msec() - t0) / 1000.0])
 	_derive(res)
 	_islet(res, jobs)
+	_osm(res)
 	_off(res, jobs)
 	_pure(res)
 	res.note("total %.1f s" % ((Time.get_ticks_msec() - t0) / 1000.0))
@@ -105,6 +118,43 @@ static func _derive(res: SuiteResult) -> void:
 		res.fail("derive: the lagoon has an island")
 
 
+# ------------------------------------------------------------------------ the real island
+
+## Isola dei Pescatori on its own outline. The grid shows the island as it is
+## (2.5 ha, 0.7-4 times what 89 people need: the 30 m SRTM and the 90 m DEM read
+## 9 and 19 ha), and the island form still refuses it, for one reason only: its
+## widest inscribed circle (44 m) is narrower than the ring's opening
+## (QUAY_INSET + BEND_R = 52 m), the road check's bend rule. Whether a lane may
+## bend that sharply on a 90 m wide island is a rule decision (VTER-ISLAND-DEM,
+## docs/VILLAGE_TERRAIN.md "The island fill"); this holds the refusal to its
+## reason, so a change that fits the island, or one that refuses it for another
+## cause, is seen.
+static func _osm(res: SuiteResult) -> void:
+	var name := "osm10"
+	var ground: VillageTerrain = VillageTerrain.from_file(OSM10)
+	res.checked += 1
+	if ground == null or not ground.valid():
+		res.fail("%s: the fixture does not read" % name)
+		return
+	var spec := spec_for(ground)
+	var d := VillageIslandForm.describe(ground)
+	res.checked += 3
+	if d.is_empty():
+		res.fail("%s: no island in the grid" % name)
+		return
+	var ratio: float = float(d["area_m2"]) / VillageIslandForm.needed_m2(spec.households)
+	if ratio < VillageIslandForm.FILL_MIN or ratio > VillageIslandForm.FILL_MAX:
+		res.fail("%s: the island is %.1f times what %d households need, wants %.1f to %.1f (the area is the real island's)" % [
+			name, ratio, spec.households, VillageIslandForm.FILL_MIN, VillageIslandForm.FILL_MAX])
+	var wide: float = VillageIslandForm.QUAY_INSET + VillageIslandForm.BEND_R
+	if VillageIslandForm.fits(spec) != (float(d["inscribed_m"]) >= wide):
+		res.fail("%s: fits %s with an inscribed circle of %.0f m against the ring's %.1f m" % [
+			name, VillageIslandForm.fits(spec), float(d["inscribed_m"]), wide])
+	res.note("%s: %.2f ha (%.1f times the need), inscribed %.0f m of the ring's %.1f m: %s" % [
+		name, float(d["area_m2"]) / 10000.0, ratio, float(d["inscribed_m"]), wide,
+		"an island village" if VillageIslandForm.fits(spec) else "refused for width, planned as '%s'" % spec.form_intent])
+
+
 # ------------------------------------------------------------------------ islet
 
 static func _islet(res: SuiteResult, jobs: Array[Dictionary]) -> void:
@@ -145,6 +195,16 @@ static func _islet(res: SuiteResult, jobs: Array[Dictionary]) -> void:
 	res.checked += 1
 	if plan.buildings.size() < jobs.size():
 		res.fail("%s: %d of %d buildings placed" % [name, plan.buildings.size(), jobs.size()])
+
+	# --- its shape: built round the ring, not strung out along the spine
+	var shape := VillageShape.measure(plan)
+	res.checked += 3
+	if float(shape.get("elongation", 99.0)) > ELONGATION_MAX:
+		res.fail("%s: elongation %.2f, wants at most %.1f (the real island's 2.1)" % [name, float(shape.get("elongation", 99.0)), ELONGATION_MAX])
+	if float(shape.get("compactness", 0.0)) < COMPACTNESS_MIN:
+		res.fail("%s: compactness %.2f, wants at least %.1f (the real island's 0.64)" % [name, float(shape.get("compactness", 0.0)), COMPACTNESS_MIN])
+	if float(shape.get("body_hull_ha", 0.0)) < HULL_HA.x or float(shape.get("body_hull_ha", 0.0)) > HULL_HA.y:
+		res.fail("%s: body hull %.2f ha, wants %.2f to %.2f (the real island's 0.81)" % [name, float(shape.get("body_hull_ha", 0.0)), HULL_HA.x, HULL_HA.y])
 
 	# --- the village's own QA
 	var t1 := Time.get_ticks_msec()

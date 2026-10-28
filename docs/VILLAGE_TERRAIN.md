@@ -2086,28 +2086,47 @@ form off: no island plan, 0.28 reached); purity.
   it is (the islet is on 8 m cells).
   A 30 m grid does not either (VTER-ISLAND-DEM, 2026-10-26):
   `real30/isola_dei_pescatori` (`survey.py terrain --source srtm30m --half 450`,
-  water level 191.5 as world90's) shows the island as a blob of 30 m cells
-  15 m high at its middle (SRTM is a surface model: roofs and trees), and
-  `describe` reads 9.15 ha, 9.8 times what 21 households need. Raising the
-  level or eroding one cell still leaves 4.5-5.8 ha (over the limit of 4); only
-  a level tuned to the answer (197.5 m) gives 3.6 ha. The fixture is kept for
-  the next try: a 10 m DTM (not SRTM), or the island's OSM outline.
-* **Density.** The village is the right size (hull 0.73 ha against the real
-  0.81) but not the real shape: the real island is built in lanes one house
-  wide, setback 0.9 m, `compactness` 0.64, `elongation` 2.1; ours has houses
-  5.7 m back from the quay and the island's length shortened by 0.9 only, so
-  `elongation` stays 5.8. A quay of townhouse-class lots (0 to 1 m setback) and
-  cross lanes between the long sides would bring them in.
-  Measured 2026-10-26 (site plan only, the islet): `CAPACITY` is NOT the lever.
-  At every capacity from 0.8 to 1.6 `fit_scale` lands on 0.90 and the ring is
-  162 x 96 m with 719 m of frontage (need 302-603): below 0.90 the bend rule's
-  opening (`BEND_R`) leaves no ring, so the bisection stops there. The ring
-  itself is elongation ~1.7; the 5.8 is the lots, which run on out along the
-  spine's two arms beyond the ring to the landings (310 m). The levers are in
-  the lot planner: no lots on the spine outside the ring, and a quay setback.
-* **Strand dressing.** A fishing village's `strand` step
-  (`VillageDressHosts.dress_place(plan, ctx, &"strand")`) took 190 of the
-  plan's 307 s on the islet's 310 x 123 m site (a per-step timing,
-  `tools/probe_island_dress.gd`); it builds the whole site's walk grid
-  (`VillageNavCheck.reached_grid`) for the step and again for each shore piece
-  it places, and the cost is the site's area. Not read further here.
+  water level 191.5 as world90's) reads 9.15 ha (SRTM is a surface model: roofs
+  and trees), 9.8 times what 21 households need. Raising the level or eroding a
+  cell still leaves 4.5-5.8 ha.
+  **VTER-ISLAND-DEM, 2026-10-28: the island's own outline.**
+  `tests/fixtures/terrain/osm10/isola_dei_pescatori.json` is an 8 m grid
+  (`tools/settlements/osm_island_terrain.py`) whose land mask is OpenStreetMap
+  way 8013628 (the outline is kept beside it, ODbL); the heights are a dome of
+  0.6-2.6 m over the 191.5 m lake and a bed falling away, a profile and not a
+  measurement. It reads 2.5 ha, 0.7-4 times the need as it should. And the island
+  form STILL refuses it, now for one reason: the island is 88 m across at its
+  widest (`inscribed_m` 44) and a ring needs `QUAY_INSET + BEND_R` = 52 m, the
+  opening of the road check's bend rule (25 degrees in 20 m). The real lanes
+  bend sharper than that. Whether a narrow island may have a tighter ring
+  (a smaller `BEND_R` here and the road check's bend allowed on an island plan) is
+  a rule decision and is left open; `vislandfill` holds the fixture to this
+  reason (area in range, refused for width) so either change is seen.
+* **Density (VTER-ISLAND-DENSE, 2026-10-28).** Two things had kept the village a
+  row. (1) `_lot_is_legal` allowed a house on a `water`-form plan only on the
+  THROUGH road (the strand's one row, the lagoon's boardwalk): on the island all
+  29 buildings stood on the spine and its arms to the landings and the 719 m of
+  ring frontage had none. An island plan (`plan.island`) now takes lots on every
+  road. (2) By the common's distance the spine's arms are still the nearest
+  frontage after the middle, so `_place_on_road` takes them LAST on an island
+  plan (the spine outside the ring's x-extent), and `lot_rule` gives an island's
+  houses and shops the quay rule `ISLAND_RULE` (setback 0.2-2.5 m, use 0.6, fire
+  0.6, yard 0.8; the real island is built to its lanes). On the islet: elongation
+  5.9 to 1.8 (real 2.1), compactness 0.28 to 0.80 (0.64), hull 0.73 to 0.80 ha
+  (0.81), 29 of 29 placed, island reached 0.93, road check, island check and
+  VillageQA clean; suite `vislandfill` gates elongation <= 3, compactness >= 0.5
+  and the hull. Not moved: `setback_median_m` 5.9 (real 0.9; it is read from the
+  road CENTRE LINE, and the spine is a 6 m through road with verges), `coverage`
+  0.28 (0.81) and `water_within_30m` 0.28 (0.58): the buildings are the same
+  size, the island 0.8 ha, so the rest of the ring is unbuilt ground.
+* **Strand dressing (VILLAGE-DRESS-STRAND-COST, 2026-10-28).** A fishing
+  village's `strand` step took 190 of the islet plan's 307 s. Not the distance
+  transform (1.5 s of 90 s in six `reached_grid` calls) but `WalkGrid._fill_poly`:
+  a `Poly.contains_point` per cell of every polygon's bounding box (road ribbons,
+  lots, the water outline). It is a scanline now (the same parity at the same
+  centres, the boundary by the same `Poly._on_segment` at the cells an edge's
+  half-cell samples fall in), the old loop kept as `_fill_poly_exact`. The plan
+  takes 50 s, `vislandfill` 206 s (984 s). Suite `wgridfill` (in `lane:village-fast`):
+  252 polygons painted both ways to identical cells and levels, and the scanline at
+  least 5x faster (measured 270-380x). `fingerprint_village_ground`: the five cases
+  the base finished are identical, strand-coast-hedge included.

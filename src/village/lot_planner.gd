@@ -45,6 +45,9 @@ const LOT_RULES := {
 	&"monument":  {"set_min": 6.0, "set_max": 20.0, "use": 10.0, "fire": 6.0, "depth_k": 4.0, "yard": 3.0},
 }
 
+## Lots on an island village's quay (VillageIslandForm.fits).
+const ISLAND_RULE := {"set_min": 0.2, "set_max": 2.5, "use": 0.6, "fire": 0.6, "yard": 0.8}
+
 ## A terrace -- townhouses allowed to touch -- is §5's one exception to the
 ## fire gap, and it is only offered to a rich, planted village. Neither
 ## `street` nor `green` is planted, so in everything this planner can
@@ -954,10 +957,23 @@ static func terraces_allowed(spec: VillageSpec) -> bool:
 	return spec != null and spec.wealth >= TERRACE_MIN_WEALTH and spec.form == TERRACE_FORM
 
 
+## True when the spec's ground is an island the programme fills (the island form).
+static func _on_island(spec: VillageSpec) -> bool:
+	return spec.terrain != null and spec.form == &"water" and VillageIslandForm.fits(spec)
+
+
 ## Effective public lot rules for a native compact display. Architecture is
 ## still measured at full size; only unbuilt yards and clearances differ.
 static func lot_rule(cls: StringName, spec: VillageSpec) -> Dictionary:
 	var rule: Dictionary = LOT_RULES.get(cls, LOT_RULES[&"cottage"])
+	if spec != null and cls in [&"townhouse", &"shop", &"cottage"] and _on_island(spec):
+		# The island village is built out to its quay (VTER-ISLAND-DENSE): the real
+		# Isola dei Pescatori's houses stand 0.9 m back, side by side, in lanes one
+		# house wide. The compact display's rule, which leaves the shell and the
+		# eaves their full size, is the same ask.
+		rule = rule.duplicate()
+		rule.merge(ISLAND_RULE, true)
+		return rule
 	if spec == null or not spec.compact_display:
 		return rule
 	rule = rule.duplicate()
@@ -1215,6 +1231,24 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 				if int(a["green_gap"]) != int(b["green_gap"]):
 					return int(a["green_gap"]) > int(b["green_gap"])
 				return float(a["d"]) < float(b["d"]))
+	if not plan.island.is_empty() and StringName(site.get("road", &"")) == &"":
+		# An island village is round its ring (VTER-ISLAND-DENSE): the spine's two
+		# arms, which run out of the ring to the landings, are the last frontage
+		# taken. By the common's distance alone they took 20 of the 29 houses, and
+		# the village was a row 270 m long (elongation 5.9; the real island 2.1).
+		var ring_x := Vector2(INF, -INF)
+		for r in plan.roads_of_class(&"street"):
+			for p in plan.roads[r]["points"]:
+				ring_x = Vector2(minf(ring_x.x, p.x), maxf(ring_x.y, p.x))
+		var inside: Array = []
+		var arms: Array = []
+		for spot in ordered:
+			var mx: float = (spot["mid"] as Vector2).x
+			if plan.roads[int(spot["e"]["road"])]["class"] == &"through" and (mx < ring_x.x or mx > ring_x.y):
+				arms.append(spot)
+			else:
+				inside.append(spot)
+		ordered = inside + arms
 	for spots in [ordered]:
 		# the gradient floor: no household nearer the common than a bigger one
 		if floor_d > 0.0:
@@ -1540,7 +1574,10 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 	# a house on piles over a boardwalk (VTER-FORM-WATER) has its own rules
 	if bool(job.get("piles", false)):
 		return VillageWaterForm.pile_lot_is_legal(plan, ctx, lot, job, gap)
-	if plan.spec.form in [&"strand", &"shore", &"water"] and job["class"] not in [&"church", &"manor"]:
+	# (an island village is built round its ring as well as along its spine:
+	# VTER-ISLAND-DENSE)
+	if plan.spec.form in [&"strand", &"shore", &"water"] and plan.island.is_empty() \
+			and job["class"] not in [&"church", &"manor"]:
 		# the strand's one row stands on the water side of its road; a shore
 		# street has houses on both sides (VTER-FORM-SHORE): the seaward row
 		# on the bank, the landward row behind the street
