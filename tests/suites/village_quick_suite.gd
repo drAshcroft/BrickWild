@@ -45,6 +45,7 @@ static func run() -> SuiteResult:
 	else:
 		_check_width_mutation(res, mutation_plan)
 	_check_site_controls(res, street_site, street_spec)
+	_check_strand_approach(res)
 	return res
 
 
@@ -126,3 +127,32 @@ static func _check_site_controls(res: SuiteResult, plan: VillagePlan, spec: Vill
 		res.fail("site controls: the street plan has no path to strip of its verge")
 	elif not "path verge 0.00 != 0.70" in VillageSiteSuite._judge(bare, spec):
 		res.fail("a path with no verge escaped the verge check")
+
+
+## VTER-STALE-COMMON-PATH: the strand's approach path to the common starts on
+## the through road. A through road with no vertex at x = 0 (an odd column
+## count) used to get a path from (0, y of the nearest vertex), floating off
+## the road, and a second path from the well-path pass: two networks. Failing
+## control: the same path moved back to x = 0 is off the road.
+static func _check_strand_approach(res: SuiteResult) -> void:
+	var spec := _spec(3, 40, &"fishing", 0.4)
+	var out := VillagePlan.new(spec)
+	out.site = Rect2(Vector2(-40.0, -30.0), Vector2(80.0, 60.0))
+	out.ground = VillageTerrain.new()
+	out.roads.append(VillageSitePlanner._road(PackedVector2Array(
+		[Vector2(-40.0, 0.0), Vector2(-5.0, 2.0), Vector2(5.0, -2.0), Vector2(40.0, 0.0)]), &"through", spec.wealth))
+	VillageSitePlanner._plan_strand(out, spec, out.roads[0]["points"])
+	var paths: Array[int] = out.roads_of_class(&"path")
+	res.checked += 1
+	if paths.size() != 1:
+		res.fail("strand approach: %d path roads, wanted the one approach" % paths.size())
+		return
+	var pts: PackedVector2Array = out.roads[paths[0]]["points"]
+	var through: PackedVector2Array = out.roads[0]["points"]
+	res.checked += 1
+	if not VillageSitePlanner._on_polyline(pts[0], through):
+		res.fail("strand approach starts at %s, off the through road" % str(pts[0]))
+	# the control: the old start, on the column x = 0, is off this road
+	res.checked += 1
+	if VillageSitePlanner._on_polyline(Vector2(0.0, pts[0].y), through):
+		res.fail("strand approach control: x = 0 is on the road, the case does not discriminate")

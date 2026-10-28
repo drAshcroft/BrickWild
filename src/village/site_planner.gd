@@ -623,7 +623,7 @@ static func _well_path(out: VillagePlan) -> void:
 		return
 	var well: Vector2 = VillageMeasure.centre(out.commons[0]["poly"])
 	for r in feet:
-		if VillageMeasure.point_to_polyline(well, out.roads[r]["points"]) <= 1.9:
+		if VillageMeasure.point_to_polyline(well, out.roads[r]["points"]) <= 1.9 + 1e-3:
 			return
 	var join := Vector2.INF
 	for road in out.roads:
@@ -819,16 +819,18 @@ static func _plan_strand(out: VillagePlan, spec: VillageSpec,
 		Vector2(site.size.x - 8.0, water_height))
 	out.water.append({"poly": Poly.from_rect(water_rect), "kind": &"coast"})
 	var anchor_y: float = shifted[0].y
+	var anchor_x: float = shifted[0].x
 	var anchor_dx: float = absf(shifted[0].x - site.get_center().x)
 	for p in shifted:
 		var dx: float = absf(p.x - site.get_center().x)
 		if dx < anchor_dx:
 			anchor_dx = dx
 			anchor_y = p.y
+			anchor_x = p.x
 	var common_y: float = anchor_y + 4.5
 	var common := Rect2(Vector2(site.get_center().x - 9.0, common_y), Vector2(18.0, 10.0))
 	out.commons.append({"poly": Poly.from_rect(common), "kind": &"common"})
-	var approach := _road(PackedVector2Array([Vector2(0.0, anchor_y),
+	var approach := _road(PackedVector2Array([Vector2(anchor_x, anchor_y),
 		common.get_center() - Vector2(0.0, 1.9)]), &"path", spec.wealth)
 	out.roads.append(approach)
 	# The landmark can occupy the inland civic plot without creating a
