@@ -130,6 +130,33 @@ func _clear(props: Array, label: String) -> void:
 			return   # one report per building; the rest would be the same news
 
 
+## A wall-mounted piece hangs on solid wall: no fitting or banner across a
+## window or an arch (walk-QA 26 Oct, a torch burning in a window).
+##
+## `bands` are strips of wall as {"x0", "x1", "holes"}: a piece whose x falls in
+## [x0, x1] is judged against `holes`, (z, y) rectangles in the wall's plane.
+## Its extent comes from the catalogue (`size`, `centre`), not from the placer.
+func mounted_clear(props: Array, bands: Array, label: String) -> void:
+	for p in props:
+		var key: String = String(p["key"])
+		if Rect2(p["rect"]).size.x > 0.0:
+			continue   # stands on the floor
+		var pos: Vector3 = p["pos"]
+		if pos.y < MOUNT_MIN and String(p["kind"]) != "banner":
+			continue
+		for band in bands:
+			if pos.x < float(band["x0"]) or pos.x > float(band["x1"]):
+				continue
+			checked += 1
+			var sz: Vector3 = PropCatalog.size(key)
+			var yc: float = pos.y + PropCatalog.centre_offset(key).y
+			var box := Rect2(pos.z - sz.x * 0.5, yc - sz.y * 0.5, sz.x, sz.y)
+			for h in band["holes"]:
+				if box.grow(-0.02).intersects(h):
+					fail("%s: %s at z %.2f, y %.2f hangs across an opening" % [label, key, pos.z, pos.y])
+					break
+
+
 ## How far a standing piece's measured box may run into masonry before it is
 ## buried rather than merely set against a wall, and how far it may sink.
 const EMBED_TOL := 0.08

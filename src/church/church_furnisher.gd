@@ -432,16 +432,23 @@ static func _dress_walls(spec: ChurchSpec, out: Array[Dictionary],
 	var n: int = clampi(int(l / SCONCE_BAY), 1, 12)
 	var y: float = minf(SCONCE_H, spec.height * 0.6)
 	var banner_y: float = clampf(spec.height * 0.72, 2.8, spec.height - 0.4)
+	var holes: Array[Rect2] = wall_openings(spec)
 	for i in range(n):
 		var z: float = lerpf(-l / 2.0 + 1.2, l / 2.0 - 1.2, (float(i) + 0.5) / float(n))
 		for side in [-1.0, 1.0]:
 			var inward := Vector2(-side, 0.0)
-			_put(out, SCONCE, Vector3(side * x, y, z),
-				PropCatalog.mount_yaw(SCONCE, inward), 1.0, &"light")
+			# a fitting hangs on solid wall: moved off a window or arch, or left out
+			var zs: float = clear_wall_z(SCONCE, y, z, holes, -l / 2.0 + 0.6, l / 2.0 - 0.6)
+			if not is_nan(zs):
+				_put(out, SCONCE, Vector3(side * x, y, zs),
+					PropCatalog.mount_yaw(SCONCE, inward), 1.0, &"light")
 			if i % 2 == 1 and spec.height >= BANNER_MIN_H:
 				var key: String = BANNERS[rng.randi_range(0, BANNERS.size() - 1)]
-				_put(out, key, Vector3(side * (x - 0.04), banner_y, z + PEW_PITCH),
-					PropCatalog.mount_yaw(key, inward), 1.0, &"banner")
+				var zb: float = clear_wall_z(key, banner_y, z + PEW_PITCH, holes,
+					-l / 2.0 + 0.6, l / 2.0 - 0.6)
+				if not is_nan(zb):
+					_put(out, key, Vector3(side * (x - 0.04), banner_y, zb),
+						PropCatalog.mount_yaw(key, inward), 1.0, &"banner")
 
 
 ## Lamps hung over the aisle, where a tall nave has the height for them.
@@ -502,6 +509,10 @@ static func _dress_aisles(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 	var ah: float = ChurchGeometry.aisle_height(spec, ring)
 	var y: float = minf(2.0, ah * 0.6)
 	var n: int = clampi(int((zr.y - zr.x) / SCONCE_BAY), 1, 8)
+	var aisle_holes: Array[Rect2] = []
+	for w in ChurchGeometry.hero_aisle_windows(spec) + ChurchGeometry.aisle_bay_windows(spec, ring):
+		aisle_holes.append(Rect2(float(w["z"]) - float(w["width"]) / 2.0,
+			float(w["y"]) - float(w["height"]) / 2.0, float(w["width"]), float(w["height"])))
 	for side in [-1.0, 1.0]:
 		var cx: float = ChurchGeometry.aisle_center_x(spec, side, ring)
 		var outer: float = cx + side * (spec.aisle_width / 2.0 - 0.12)
@@ -509,7 +520,9 @@ static func _dress_aisles(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 		var yaw: float = PropCatalog.mount_yaw(SCONCE, inward)
 		for i in range(n):
 			var z: float = lerpf(zr.x + 1.0, zr.y - 1.0, (float(i) + 0.5) / float(n))
-			_put(out, SCONCE, Vector3(outer, y, z), yaw, 1.0, &"light")
+			z = clear_wall_z(SCONCE, y, z, aisle_holes, zr.x + 0.4, zr.y - 0.4)
+			if not is_nan(z):
+				_put(out, SCONCE, Vector3(outer, y, z), yaw, 1.0, &"light")
 		if spec.aisle_width >= 1.6:
 			_put(out, "Dungeon_Chest", Vector3(cx, 0.0, zr.x + 1.0),
 				PropCatalog.yaw_facing(inward), 1.0, &"store")
@@ -547,6 +560,10 @@ static func _dress_west_end(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 		for door in ChurchGeometry.west_door_layout(spec):
 			reach = maxf(reach, absf(float(door.x)) + float(door.width) * 0.5)
 		route = Rect2(-reach - 0.4, -spec.length, (reach + 0.4) * 2.0, spec.length * 2.0)
+	# A single west tower IS the entrance: nobody keeps a crate and a coil of rope
+	# in the way in (walk-QA 26 Oct, "ropes in the church entrances").
+	if spec.west_towers == 1:
+		return
 	for side in ChurchGeometry.west_tower_sides(spec):
 		var tower: AABB = ChurchGeometry.tower_aabb(spec, side)
 		var room := Rect2(tower.position.x + inset, tower.position.z + inset,
@@ -569,6 +586,55 @@ static func _dress_west_end(spec: ChurchSpec, out: Array[Dictionary]) -> void:
 
 
 # ------------------------------------------------------------------ shared
+
+## How far a mounted piece keeps from the edge of an opening.
+const HOLE_MARGIN := 0.25
+
+
+## The openings in a nave side wall as (z, y) rectangles: lower lights,
+## clerestory lights and arcade arches. Both walls carry the same profile.
+static func wall_openings(spec: ChurchSpec) -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	for w in ChurchGeometry.nave_bay_windows(spec):
+		out.append(Rect2(float(w["z"]) - float(w["width"]) / 2.0,
+			float(w["y"]) - float(w["height"]) / 2.0, float(w["width"]), float(w["height"])))
+	for w in ChurchGeometry.clerestory_windows(spec):
+		var p: Vector3 = w["pos"]
+		if p.x > 0.0:
+			out.append(Rect2(p.z - float(w["width"]) / 2.0, p.y - float(w["height"]) / 2.0,
+				float(w["width"]), float(w["height"])))
+	for w in ChurchGeometry.nave_arcade_openings(spec, spec.height):
+		out.append(Rect2(float(w["u"]) - float(w["width"]) / 2.0, 0.0,
+			float(w["width"]), float(w["height"])))
+	return out
+
+
+## The z nearest `z` at which a mounted `key` at height `y` stands on solid wall:
+## clear of every hole by HOLE_MARGIN, inside [lo, hi]. NAN when there is none.
+static func clear_wall_z(key: String, y: float, z: float, holes: Array[Rect2],
+		lo: float, hi: float) -> float:
+	var sz: Vector3 = PropCatalog.size(key)
+	var half: float = sz.x * 0.5 + HOLE_MARGIN
+	var y0: float = y + PropCatalog.centre_offset(key).y - sz.y * 0.5 - HOLE_MARGIN
+	var y1: float = y0 + sz.y + HOLE_MARGIN * 2.0
+	var tries: Array[float] = [z]
+	for h in holes:
+		if h.end.y > y0 and h.position.y < y1:
+			tries.append(h.position.x - half)
+			tries.append(h.end.x + half)
+	tries.sort_custom(func(a: float, b: float) -> bool: return absf(a - z) < absf(b - z))
+	for c in tries:
+		if c < lo or c > hi:
+			continue
+		var free := true
+		for h in holes:
+			if h.end.y > y0 and h.position.y < y1 					and c + half > h.position.x + 1e-4 and c - half < h.end.x - 1e-4:
+				free = false
+				break
+		if free:
+			return c
+	return NAN
+
 
 ## Where the altar stands: on the axis, set back from the east wall. It stays
 ## INSIDE the nave even when there is an apse -- the apse drum springs from the

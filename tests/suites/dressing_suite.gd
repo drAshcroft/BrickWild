@@ -32,6 +32,7 @@ static func run() -> SuiteResult:
 static func run_quick() -> SuiteResult:
 	var res := SuiteResult.new("dressing (quick)")
 	_churches(res, true)
+	_church_openings_case(res)
 	_gothic_chevet(res)
 	_castles(res, true)
 	_negative_control(res)
@@ -236,6 +237,7 @@ static func _churches(res: SuiteResult, quick: bool) -> void:
 			check.check(props, _church_bounds(spec), builder.total_height, label)
 			check.embedded(props, _solid_triangles(mesh), label)
 			_want(check, props, CHURCH_WANTS, label)
+			_church_wall(check, spec, props, label)
 			# the one piece of floor a church exists to be walked down
 			var nave := Rect2(Vector2(-spec.width / 2.0 + 0.15, -spec.length / 2.0 + 0.15),
 				Vector2(spec.width - 0.3, spec.length - 0.3))
@@ -244,6 +246,57 @@ static func _churches(res: SuiteResult, quick: bool) -> void:
 				Rect2(Vector2(-0.4, altar_z - 1.4), Vector2(0.8, 0.8)),
 				label, "west door to the altar")
 			_report(res, check)
+
+
+## Mounted pieces hang on solid wall, and nothing is stored in the way in.
+static func _church_wall(check: DressingCheck, spec: ChurchSpec, props: Array, label: String) -> void:
+	var bands: Array = [{"x0": spec.width / 2.0 - 0.8, "x1": spec.width / 2.0 + 0.8,
+			"holes": ChurchFurnisher.wall_openings(spec)},
+		{"x0": -spec.width / 2.0 - 0.8, "x1": -spec.width / 2.0 + 0.8,
+			"holes": ChurchFurnisher.wall_openings(spec)}]
+	check.mounted_clear(props, bands, label)
+	if spec.tower and spec.west_towers == 1:
+		var tower: AABB = ChurchGeometry.tower_aabb(spec, ChurchGeometry.west_tower_sides(spec)[0])
+		var plan := Rect2(tower.position.x, tower.position.z, tower.size.x, tower.size.z)
+		for p in props:
+			check.checked += 1
+			if p["kind"] in [&"store", &"rope"] and plan.has_point(Vector2(p["pos"].x, p["pos"].z)):
+				check.fail("%s: %s stored in the entrance tower" % [label, p["key"]])
+
+
+## The 26 Oct walk, Grey Ninian-in-the-Wold: a Russian church, seed 1, torches
+## burned in the nave windows and a crate and rope sat in the entrance.
+## The control hangs a torch in a window and must be called out.
+static func _church_openings_case(res: SuiteResult) -> void:
+	var spec := ChurchSpec.new()
+	spec.style = &"russian"
+	spec.width = 10.0
+	spec.length = 22.0
+	spec.height = 12.0
+	ChurchGenerator.generate(spec, 1)
+	var builder := ChurchBuilder.new()
+	builder.build(spec)
+	var check := DressingCheck.new()
+	_church_wall(check, spec, builder.prop_log, "russian pin 1")
+	_report(res, check)
+	var holes: Array[Rect2] = ChurchFurnisher.wall_openings(spec)
+	res.checked += 1
+	if holes.is_empty():
+		res.fail("russian pin 1: the church has no nave windows to hang clear of")
+		return
+	var h: Rect2 = holes[0]
+	var bad := PropCatalog.placement("Torch_Metal",
+		Vector3(spec.width / 2.0 - 0.3, h.get_center().y, h.get_center().x), 0.0, 1.0, &"light")
+	var probe := DressingCheck.new()
+	probe.mounted_clear([bad], [{"x0": spec.width / 2.0 - 0.8, "x1": spec.width / 2.0 + 0.8,
+		"holes": holes}], "control")
+	res.checked += 1
+	if probe.failures.is_empty():
+		res.fail("control: a torch hung in a window was not called out")
+	res.checked += 1
+	if ChurchFurnisher.clear_wall_z("Torch_Metal", h.get_center().y, h.get_center().x, holes,
+			-spec.length / 2.0, spec.length / 2.0) == h.get_center().x:
+		res.fail("clear_wall_z left a torch in the middle of a window")
 
 
 static func _castles(res: SuiteResult, quick: bool) -> void:
