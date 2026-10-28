@@ -879,11 +879,36 @@ func _emit_floor_around_many(r: Rect2, holes: Array[Rect2], y0: float, t: float,
 			var centre := Vector3(centre2.x, y0 + t / 2.0, centre2.y)
 			# emitted tucked like the whole slab; logged as planned
 			var tucked := p.intersection(r.grow(-SLAB_TUCK))
+			# An edge on a hole (the stairwell) is tucked too: a partition
+			# usually stands on that line, and a slab edge flush with the wall
+			# face z-fights it (WALK-ZFIGHT, rich house seed 1, hall/kitchen).
+			tucked = _tuck_from_holes(tucked, holes, r)
 			box(Vector3(tucked.size.x, t + drop, tucked.size.y),
 				Vector3(tucked.get_center().x, y0 + (t - drop) / 2.0, tucked.get_center().y),
 				SURF_FLOOR)
 			_log_mass("floor_%d_%d" % [level, emitted], AABB(centre - size / 2.0, size), y0)
 			emitted += 1
+
+
+## Pull each edge of `cell` that lies on a hole back by SLAB_TUCK, into the slab.
+static func _tuck_from_holes(cell: Rect2, holes: Array[Rect2], bounds: Rect2) -> Rect2:
+	var lo := cell.position
+	var hi := cell.end
+	for hole in holes:
+		var h := bounds.intersection(hole)
+		if not h.has_area():
+			continue
+		if h.position.y < hi.y - 0.0001 and h.end.y > lo.y + 0.0001:
+			if absf(hi.x - h.position.x) < 0.0001 + SLAB_TUCK:
+				hi.x -= SLAB_TUCK
+			if absf(lo.x - h.end.x) < 0.0001 + SLAB_TUCK:
+				lo.x += SLAB_TUCK
+		if h.position.x < hi.x - 0.0001 and h.end.x > lo.x + 0.0001:
+			if absf(hi.y - h.position.y) < 0.0001 + SLAB_TUCK:
+				hi.y -= SLAB_TUCK
+			if absf(lo.y - h.end.y) < 0.0001 + SLAB_TUCK:
+				lo.y += SLAB_TUCK
+	return Rect2(lo, hi - lo)
 
 
 func _stair_opening(level: int) -> Rect2:

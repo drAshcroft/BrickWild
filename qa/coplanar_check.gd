@@ -126,6 +126,18 @@ const GATE_AREA := 0.01
 
 static func visible(mesh: ArrayMesh, where: String, closed := true) -> Array[String]:
 	var out: Array[String] = []
+	for f in visible_findings(mesh, closed):
+		var s: Vector2i = f["surfaces"]
+		var at: Vector3 = f["at"]
+		out.append("coplanar: %s surfaces %d/%d fight over %.3f m2 at (%.2f, %.2f, %.2f)"
+			% [where, s.x, s.y, f["area"], at.x, at.y, at.z])
+	return out
+
+
+## The findings `visible` words, as the dictionaries `find` returns, so a caller
+## can ask WHERE (a walk pin) rather than only how many.
+static func visible_findings(mesh: ArrayMesh, closed := true) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
 	if mesh == null:
 		return out
 	var wind: Winding = Winding.new(mesh) if closed else null
@@ -135,9 +147,7 @@ static func visible(mesh: ArrayMesh, where: String, closed := true) -> Array[Str
 			continue
 		if wind != null and absf(wind.at(Vector3(f["at"]) + Vector3(f["normal"]) * 0.003)) >= 0.5:
 			continue
-		var at: Vector3 = f["at"]
-		out.append("coplanar: %s surfaces %d/%d fight over %.3f m2 at (%.2f, %.2f, %.2f)"
-			% [where, s.x, s.y, f["area"], at.x, at.y, at.z])
+		out.append(f)
 	return out
 
 

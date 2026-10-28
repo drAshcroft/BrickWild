@@ -465,7 +465,22 @@ const ZFIGHT_BUDGET := {
 	"temple/basilica": 12,
 	"church/romanesque": 12,
 	"windmill/tower": 40,
+	# WALK-ZFIGHT (26 Oct walk): the rich house was unbudgeted and showed five,
+	# the norman castle showed 151 (116 after the deck lift); both now ratcheted.
+	"house/rich": 0,
+	"castle/norman": 116,
 }
+
+## Where the 26 Oct walk saw z-fighting that the budget above did not name:
+## [kind, style, seed, pin position, pin normal]. A visible overlap within
+## ZFIGHT_PIN_RADIUS of the pin, facing the way the pin's normal faces, is a
+## failure whatever the building's total.
+const ZFIGHT_PINS := [
+	["castle", "norman", 1, Vector3(9.287, 18.25, -20.4), Vector3.UP],
+	["castle", "norman", 1, Vector3(13.927, 18.25, 22.527), Vector3.UP],
+	["house", "rich", 1, Vector3(1.451, 2.662, -2.13), Vector3(0, 0, -1)],
+]
+const ZFIGHT_PIN_RADIUS := 1.5
 
 
 ## HOUSE-RICH-ROOM-USE (walk pins 1a17b25f-1,3,4,5, rich house seed 1): a bed in
@@ -520,7 +535,29 @@ static func _rich_room_use(res: SuiteResult) -> void:
 				res.fail("rich house seed %d: %s" % [seed, said])
 
 
+static func _zfight_pins(res: SuiteResult) -> void:
+	var meshes := {}
+	for pin in ZFIGHT_PINS:
+		var key := "%s/%s/%d" % [pin[0], pin[1], pin[2]]
+		if not meshes.has(key):
+			var req := BrickWild.default_request(StringName(pin[0]), int(pin[2]))
+			req.style = StringName(pin[1])
+			meshes[key] = CoplanarCheck.visible_findings(
+				BrickWild.build_mesh(BrickWild.generate(req)), false)
+		res.checked += 1
+		var near := 0
+		for f in meshes[key]:
+			var at: Vector3 = f["at"]
+			if at.distance_to(pin[3]) <= ZFIGHT_PIN_RADIUS and (f["normal"] as Vector3).dot(pin[4]) > 0.9:
+				near += 1
+		print("zfight pin %s at %s: %d overlaps" % [key, pin[3], near])
+		if near > 0:
+			res.fail("zfight pin: %s shows %d visible overlaps within %.1f m of %s"
+				% [key, near, ZFIGHT_PIN_RADIUS, pin[3]])
+
+
 static func _zfight(res: SuiteResult) -> void:
+	_zfight_pins(res)
 	for id in ZFIGHT_BUDGET:
 		var req := BrickWild.default_request(StringName(id.get_slice("/", 0)), 1)
 		req.style = StringName(id.get_slice("/", 1))

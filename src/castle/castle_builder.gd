@@ -28,6 +28,12 @@ const SURF_WATER := 4
 const SURF_GROUND := 4
 const SURF_DRESS := 5
 const SURFACES := 6
+## A trim deck (the coping, tower access landing, gallery, joint pad, gate gallery) ends in
+## the same walking plane as the stone it meets: the tower floor, the coping, a
+## wall stair landing. Equal planes in two material slots z-fight (WALK-ZFIGHT,
+## castle norman seed 1). The deck stands this much proud, past CoplanarCheck's
+## PLANE_TOL, a step nobody can feel.
+const DECK_LIFT := 0.006
 
 ## Steps a battered wall or tower is emitted in. More steps is a smoother
 ## talus; four reads as masonry courses rather than as a ramp.
@@ -1174,7 +1180,7 @@ func _close_curtain_slivers() -> void:
 				for piece in Geometry2D.intersect_polygons(rect, lip[0]):
 					var pts := PackedVector3Array()
 					for p in piece:
-						pts.append(Vector3(p.x, ground + h + CastleGeometry.PARAPET_RISE * 0.5, p.y))
+						pts.append(Vector3(p.x, ground + h + CastleGeometry.PARAPET_RISE * 0.5 + DECK_LIFT, p.y))
 					component_slab("curtain_fill_coping", pts, CastleGeometry.PARAPET_RISE, SURF_TRIM)
 			var side := "back" if dir.y > 0.0 else ("front" if dir.y < 0.0 else ("east" if dir.x > 0.0 else "west"))
 			_log_mass("wall_%d_fill_%s_%s" % [ring, name, side], AABB(fill.position,
@@ -1346,7 +1352,7 @@ func _build_gate_chamber(gate: AABB, ring: int, passage_h: float, row: Dictionar
 		var area: Rect2 = rect
 		component_box("gate_access_gallery", Vector3(area.size.x, 0.22, area.size.y),
 			Transform3D(Basis.IDENTITY, Vector3(area.get_center().x,
-				float(row.walk_y) - 0.11, area.get_center().y)), SURF_TRIM)
+				float(row.walk_y) - 0.11 + DECK_LIFT, area.get_center().y)), SURF_TRIM)
 	var support: Vector2 = row.support
 	var support_h := float(row.walk_y) - 0.22
 	component_box("gate_gallery_pier", Vector3(0.8, support_h, 0.8),
@@ -1720,7 +1726,7 @@ func _wall_run(seg: Dictionary, r: int) -> void:
 		box(Vector3(u1 - u0, CastleGeometry.PARAPET_RISE,
 				t + 2.0 * CastleGeometry.WALK_LIP),
 			walk_axis + run_axis * ((u0 + u1) * 0.5)
-				+ Vector3(0.0, float(span.top) - CastleGeometry.PARAPET_RISE * 0.5, 0.0),
+				+ Vector3(0.0, float(span.top) - CastleGeometry.PARAPET_RISE * 0.5 + DECK_LIFT, 0.0),
 			SURF_TRIM, yaw)
 	if spec.battlements:
 		var edge: Vector3 = inner + outward * (t - spec.merlon_h * 0.35)
@@ -2592,7 +2598,7 @@ func _wall_top(a: AABB, outward: Vector3, top_thick: float) -> void:
 		var mid: Vector3 = walk_centre + run_axis * ((u0 + u1) * 0.5)
 		box(Vector3(coping if axis == 0 else u1 - u0, CastleGeometry.PARAPET_RISE,
 				u1 - u0 if axis == 0 else coping),
-			Vector3(mid.x, float(span.top) - CastleGeometry.PARAPET_RISE / 2.0, mid.z),
+			Vector3(mid.x, float(span.top) - CastleGeometry.PARAPET_RISE / 2.0 + DECK_LIFT, mid.z),
 			SURF_TRIM)
 		# A merlon cannot stand on the lowered threshold strip before a doorway.
 		if not spec.battlements or bool(span.lowered) or u1 - u0 < 0.5:
@@ -2720,7 +2726,7 @@ func _mural_landing(row: Dictionary) -> void:
 	var floor_y := HousePlan.record_storey(door) * plan.spec.height + HouseGeometry.FLOOR_T
 	var y := minf(floor_y, float(row.walk_y))
 	var size := Vector3(rect.size.x, 0.22, rect.size.y)
-	var point := Vector3(rect.get_center().x, y - size.y * 0.5, rect.get_center().y)
+	var point := Vector3(rect.get_center().x, y - size.y * 0.5 + DECK_LIFT, rect.get_center().y)
 	host(row.id)
 	component_box("tower_access_landing", size, Transform3D(Basis.IDENTITY, point), SURF_TRIM)
 	for span in row.get("walk_gallery", []):
@@ -2733,7 +2739,7 @@ func _mural_landing(row: Dictionary) -> void:
 		var deck_size := Vector3(delta.length(), 0.22, deck_width)
 		var mid := (a + b) * 0.5
 		var walk_y := y if bool(span.get("sill", false)) else float(row.walk_y)
-		var deck_point := Vector3(mid.x, walk_y - 0.11,
+		var deck_point := Vector3(mid.x, walk_y - 0.11 + DECK_LIFT,
 			(a.y + b.y) * 0.5)
 		var yaw := atan2(-delta.y, delta.x)
 		component_box("tower_access_gallery", deck_size,
@@ -2784,7 +2790,7 @@ func _mural_landing(row: Dictionary) -> void:
 		var joint: Vector2 = spans[index].a
 		var pad := maxf(float(spans[index].width), float(spans[index - 1].width))
 		component_box("tower_access_gallery", Vector3(pad, 0.22, pad),
-			Transform3D(Basis.IDENTITY, Vector3(joint.x, float(row.walk_y) - 0.11, joint.y)),
+			Transform3D(Basis.IDENTITY, Vector3(joint.x, float(row.walk_y) - 0.11 + DECK_LIFT, joint.y)),
 			SURF_TRIM)
 	host_end()
 	_log_part("tower_access_landing", point, size)
