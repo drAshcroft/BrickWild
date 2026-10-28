@@ -62,7 +62,15 @@ static func pylon_reach(spec: HouseSpec) -> float:
 ## How far anything of the style stands past the wall's outer face (the exterior
 ## bound reads it): the toron that run through the pilasters, a little past them.
 static func reach(spec: HouseSpec) -> float:
-	return pylon_reach(spec) + PYLON_TORON
+	return maxf(pylon_reach(spec) + PYLON_TORON, buttress_toron_reach())
+
+
+## How far a toron that runs through a buttress stands past the wall's outer face
+## (see `_toron_rows`). The pilasters' reach is set by the eave and can be the
+## shorter of the two, so the bound has to name this one too: it left the
+## buttress timbers 0.2 m outside the planned exterior (HOUSE-ENVELOPE-RED).
+static func buttress_toron_reach() -> float:
+	return TORON_OUT + BUTTRESS_OUT * 0.62
 
 
 static func emit(b: HouseBuilder) -> void:
@@ -219,7 +227,7 @@ static func _toron_rows(b: HouseBuilder, spec: HouseSpec, run: Dictionary, thick
 		var reach := TORON_OUT
 		for bt in buttresses:
 			if absf(t - float(bt)) < BUTTRESS_W * 0.5:
-				reach = TORON_OUT + BUTTRESS_OUT * 0.62
+				reach = buttress_toron_reach()
 		return reach
 	for level in range(maxi(spec.storeys, 1)):
 		var y := spec.height * float(level + 1) - TORON_BELOW_TOP

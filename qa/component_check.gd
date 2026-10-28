@@ -46,12 +46,13 @@ static func check(builder: MassBuilder, mesh: ArrayMesh) -> Dictionary:
 			kit.slab_poly(row["points"], float(row["depth"]), 0,
 				bool(row["vertical"]), PackedInt32Array(row.get("open_edges", PackedInt32Array())))
 	for surf in isolated:
-		if int(surf) >= mesh.get_surface_count():
+		var at := logical_surface(mesh, int(surf))
+		if at < 0:
 			failures.append("components claim surface %d, mesh has %d"
 				% [surf, mesh.get_surface_count()])
 			continue
 		var want_arrays: Array = (isolated[surf] as MeshKit).commit().surface_get_arrays(0)
-		var have_arrays: Array = mesh.surface_get_arrays(int(surf))
+		var have_arrays: Array = mesh.surface_get_arrays(at)
 		var want: PackedVector3Array = _triangle_vertices(want_arrays)
 		var have: PackedVector3Array = _triangle_vertices(have_arrays)
 		var missing := missing_triangles(have, want)
@@ -60,6 +61,23 @@ static func check(builder: MassBuilder, mesh: ArrayMesh) -> Dictionary:
 				% [surf, missing])
 	return {"ok": failures.is_empty(), "failures": failures,
 		"checked": checked, "unverified": unverified}
+
+
+## The position in `mesh` of the surface a builder calls slot `logical`, or -1.
+## A committed mesh omits an empty slot, so the survivors after it move down; a
+## builder that names them `material_slot:N` (MeshKit.commit_named) says which
+## is which. Without names the slot is the position.
+static func logical_surface(mesh: ArrayMesh, logical: int) -> int:
+	var named := false
+	for s in range(mesh.get_surface_count()):
+		var name := mesh.surface_get_name(s)
+		if name.begins_with("material_slot:"):
+			named = true
+			if int(name.trim_prefix("material_slot:")) == logical:
+				return s
+	if named:
+		return -1
+	return logical if logical >= 0 and logical < mesh.get_surface_count() else -1
 
 
 ## Expand indexed surfaces into the triangle stream used by the renderer.

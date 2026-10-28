@@ -479,8 +479,12 @@ static func check_exterior_geometry(plan: HousePlan, builder: HouseBuilder) -> A
 static func check_jetty_geometry(plan: HousePlan, mesh: ArrayMesh) -> Array[String]:
 	var errors: Array[String] = []
 	var s := plan.spec
-	var vertices: PackedVector3Array = mesh.surface_get_arrays(HouseBuilder.SURF_FLOOR)[Mesh.ARRAY_VERTEX]
-	var walls := _mesh_triangles(mesh, HouseBuilder.SURF_WALL)
+	var floor_surface := ComponentCheck.logical_surface(mesh, HouseBuilder.SURF_FLOOR)
+	if floor_surface < 0:
+		errors.append("jetty_floor: the mesh has no floor surface to measure the storeys' jetty from")
+		return errors
+	var vertices: PackedVector3Array = mesh.surface_get_arrays(floor_surface)[Mesh.ARRAY_VERTEX]
+	var walls := _mesh_triangles(mesh, ComponentCheck.logical_surface(mesh, HouseBuilder.SURF_WALL))
 	for level in range(1, s.storeys):
 		var found := INF
 		for v in vertices:

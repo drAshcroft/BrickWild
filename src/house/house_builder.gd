@@ -416,11 +416,12 @@ func begin(surface_count: int) -> void:
 
 
 func commit() -> ArrayMesh:
-	# A world plan is dressed slot by slot, and a roof-off cutaway omits the
-	# roof surface ahead of the floor; name the survivors. Ordinary houses
-	# are left exactly as they were.
-	emitted_mesh = commit_named() if plan != null and plan.world_family != &"" \
-		else super.commit()
+	# Any house can lose a slot ahead of the floor: a roof-off cutaway with no
+	# glazing (an asian conical roof) omits the roof surface, and the floor then
+	# commits as surface 2. Name the survivors so a reader finds the floor by
+	# its slot. A house that lost nothing is left exactly as it was: the names
+	# are only written when a populated slot has moved.
+	emitted_mesh = commit_named()
 	return emitted_mesh
 
 
