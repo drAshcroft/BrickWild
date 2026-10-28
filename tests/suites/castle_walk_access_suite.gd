@@ -25,6 +25,16 @@ static func run() -> SuiteResult:
 	_clean(result, CastleWalkAccessCheck.hall_fire_failures(edwardian), "edwardian 1 hall")
 	_clean(result, CastleWalkAccessCheck.walkway_failures(edwardian.values()
 		.filter(func(r): return bool(r.get("mural_tower", false)))), "edwardian 1 tower walkways")
+	# --- CASTLE-STAIR-PITCH: as gentle as the room allows, nothing over a tread
+	var edwardian_rows := edwardian.values()
+	# the bergfried keep of norman seed 1: slender, 3.8 m clear, and once a stair into a wall
+	var norman_keep: Dictionary = preload("res://src/castle/castle_interiors.gd").primary(norman)
+	_clean(result, CastleWalkAccessCheck.stair_head_failures(norman_keep.values()), "norman 1 keep stairs")
+	_clean(result, CastleWalkAccessCheck.headroom_failures(norman_keep.values()), "norman 1 keep headroom")
+	_clean(result, CastleWalkAccessCheck.avoidable_pitch_failures(rows), "norman 1 stair pitch")
+	_clean(result, CastleWalkAccessCheck.avoidable_pitch_failures(edwardian_rows), "edwardian 1 stair pitch")
+	_clean(result, CastleWalkAccessCheck.headroom_failures(rows), "norman 1 stair headroom")
+	_clean(result, CastleWalkAccessCheck.headroom_failures(edwardian_rows), "edwardian 1 stair headroom")
 	# --- the wizard tower house, and a norman one with a jog
 	var wiz := BrickWild.generate(BrickWild.default_request(&"castle", 1, &"wizard"))
 	var wiz_plan: HousePlan = CastleTowerPlan.generate(wiz.spec as CastleSpec, false)
@@ -35,11 +45,21 @@ static func run() -> SuiteResult:
 	_clean(result, CastleWalkAccessCheck.stair_head_failures(
 		[{"id": "tower_house", "plan": CastleTowerPlan.generate(norman_house, false)}]),
 		"norman tower house stairs")
+	for house in [{"id": "wizard", "plan": CastleTowerPlan.generate(wiz.spec as CastleSpec)},
+			{"id": "norman", "plan": CastleTowerPlan.generate(norman_house)}]:
+		_clean(result, CastleWalkAccessCheck.headroom_failures([house]),
+			"%s tower house headroom" % house.id)
 
 	# --- controls: each wrong answer is refused
 	var walled := _walled_row(wiz_plan)
 	_want(result, not CastleWalkAccessCheck.stair_head_failures([walled]).is_empty(),
 		"a stair into a wall was accepted")
+	var ladder := _short_flights(edwardian_rows)
+	if ladder.is_empty():
+		_want(result, false, "no roomy tower to draw a ladder flight in")
+	else:
+		_want(result, not CastleWalkAccessCheck.avoidable_pitch_failures([ladder]).is_empty(),
+			"a 2.4 m flight up a 3.6 m storey in a roomy tower was accepted")
 	var crossed := _table_across(rows)
 	if crossed.is_empty():
 		_want(result, false, "no tower storey to put a table across")
@@ -111,6 +131,36 @@ static func _table_across(rows: Array) -> Dictionary:
 			copy.furniture = [{"key": "Table_Large", "rect": rect, "room": room, "storey": room,
 				"host": -1, "mounted": false, "cat": "table"}]
 			return {"id": "crossed", "plan": copy}
+	return {}
+
+
+## A copy of the first roomy tower plan with every flight cut back to the old
+## 2.4 m run: a ladder where the room could have had a stair.
+static func _short_flights(rows: Array) -> Dictionary:
+	for row in rows:
+		if not bool(row.get("mural_tower", false)):
+			continue
+		var plan: HousePlan = row.plan
+		var roomy := plan.stairs.size() > 0 and plan.stairs.any(func(st: Dictionary) -> bool:
+			var floor := HouseGeometry.room_floor_rect(plan, int(st["b"]))
+			return maxf(floor.size.x, floor.size.y) - 0.3 - CastleKeepPlan.LANDING_ALLOWANCE >= plan.spec.height / tan(deg_to_rad(CastleKeepPlan.PITCH_TARGET)))
+		if not roomy:
+			continue
+		var copy := HousePlan.new()
+		copy.spec = plan.spec
+		copy.rooms = plan.rooms
+		copy.doors = plan.doors
+		copy.stairs = []
+		for st in plan.stairs:
+			var cut: Dictionary = st.duplicate(true)
+			var r := Rect2(st["rect"])
+			var along_x := r.size.x > r.size.y
+			var short := Rect2(r.position, Vector2(2.4, r.size.y) if along_x else Vector2(r.size.x, 2.4))
+			for key in ["rect", "lower_rect", "upper_rect"]:
+				cut[key] = short
+			cut.erase("steps")
+			copy.stairs.append(cut)
+		return {"id": "ladder", "plan": copy}
 	return {}
 
 

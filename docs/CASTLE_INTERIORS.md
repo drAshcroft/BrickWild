@@ -172,3 +172,27 @@ A great hall needs 3.0 m clear (`MIN_HALL_SIDE`); the generator once allowed a
 (edwardian seed 1, pin WALK-1a17b2f2-1). `CastleGeometry.HALL_W_MIN` (4.4 m)
 is now the narrowest hall range, so a hall range is always a great hall and a
 great hall always has its hearth (`CastleWalkAccessCheck.hall_fire_failures`).
+
+## Stair pitch and fittings over treads (CASTLE-STAIR-PITCH)
+
+`HouseStairCheck` wants a flight no steeper than 42 degrees with a 0.22 m
+riser at most. A straight flight therefore needs a run of the storey height
+over tan 42 (4.0 m for a 3.6 m storey) plus a 1.0 m head landing and a 0.3 m
+foot. `CastleKeepPlan._add_stair` tries that walkable run first (and records
+`steps` = storey over 0.2 m) wherever the room is long enough, then the old
+2.4 m run, then 2.0 and 1.6 m so a slender keep's flight lands on floor rather
+than climbing into a wall (stair_head outranks pitch). A square keep's flights
+come from `HousePlanLevels.add_stair`; one that would climb into the far wall
+is re-planned by `_add_stair`, with the entrance doorway kept clear.
+
+Not solved: a tower or keep under about 5 m clear cannot take a walkable
+straight flight (56 to 70 degrees today). Those need a newel (spiral) stair,
+which a one-rectangle `HousePlan` stair cannot draw. The check reports only
+what the room could have done better: `CastleWalkAccessCheck
+.avoidable_pitch_failures`.
+
+`HouseFurnishSurface.place_mounted` now skips a wall fitting whose recorded
+body (the footprint `HouseStairCheck` measures, not the mount pose) touches a
+non-domestic flight leaving the room or the well of the one arriving in it. A
+watch room made by demoting a guardroom drops the outdoor Lantern_Wall the
+guardroom was allowed, and tops its lights up to what the room wants.

@@ -7,6 +7,40 @@ extends RefCounted
 const HANG_CLEAR := 0.45
 const ACTIVITY_TASK_LIGHT_REACH := 1.9
 
+## How far a fitting keeps off a castle flight.
+const FLIGHT_MOUNT_CLEAR := 0.15
+
+
+## The footprint HouseStairCheck measures for a fitting recorded at `pos` (a point
+## on the wall): its model origin and turned centre, not the mount pose.
+static func _recorded_body(key: String, pos: Vector2, yaw: float, scale: float) -> Rect2:
+	var origin := PropCatalog.house_origin({"key": key, "pos": Vector3(pos.x, 0.0, pos.y),
+		"yaw": yaw, "scale": scale})
+	var model_yaw := yaw + PropCatalog.face_offset(key)
+	var footprint := PropCatalog.footprint_rotated(key, model_yaw) * scale
+	var centre := PropCatalog.plan_centre(key, origin, model_yaw, scale)
+	return Rect2(centre - footprint * 0.5, footprint)
+
+
+## Is this fitting's body beside a flight that climbs out of `room`, or the well
+## of one that arrives in it? The treads rise to the next floor along the whole
+## run, so a mount there has no headroom. Domestic flights are left to their own
+## rules (zones and the stair check).
+static func _over_a_flight(plan: HousePlan, room: int, body: Rect2) -> bool:
+	for stair in plan.stairs:
+		if bool(stair.get("domestic_profile", false)):
+			continue
+		# the flight leaving this room, and the well of the one arriving in it
+		var rect := Rect2()
+		if int(stair.get("a", -1)) == room:
+			rect = Rect2(stair.get("lower_rect", stair.get("rect", Rect2())))
+		elif int(stair.get("b", -1)) == room:
+			rect = Rect2(stair.get("upper_rect", stair.get("rect", Rect2())))
+		if rect.has_area() and rect.grow(FLIGHT_MOUNT_CLEAR).intersects(body):
+			return true
+	return false
+
+
 ## A shelf, rack or sconce on a wall, above the furniture already there.
 static func place_mounted(plan: HousePlan, room: int, key: String,
 		r: RandomNumberGenerator, activity_group := "") -> void:
@@ -166,6 +200,12 @@ static func place_mounted(plan: HousePlan, room: int, key: String,
 			var mount_pose := HousePlanFeatures._wall_fixture_pose(key, wall, wall_along,
 				HouseFurnishGeometry.storey_base(plan, room) + y, scale)
 			var mount_body: Rect2 = Rect2(mount_pose["rect"])
+			# A flight climbing this room's wall puts its upper treads under
+			# anything hung there (CASTLE-STAIR-PITCH: a Torch_Metal over a
+			# tower-house tread, stair_headroom). Judged by the body the record
+			# will have, which is where HouseStairCheck measures it.
+			if _over_a_flight(plan, room, _recorded_body(key, pos, mount_yaw, scale)):
+				continue
 			# SHOP-WALK-FURNISH: a shelf may not hang through the cabinet below it
 			if HouseFurnishGeometry.is_shop_plan(plan) and not HouseFurnishGeometry.shop_mount_clear(
 					plan, room, mount_body, float(mount_pose["bottom"]), float(mount_pose["top"])):

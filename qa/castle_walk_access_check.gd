@@ -14,6 +14,9 @@ extends RefCounted
 ##   walkway      no table (or its chairs) across the way from where the flight
 ##                below lets a walker off to the foot of the next, in a tight
 ##                tower storey (CASTLE-FURNISH-WALK, WALK-1a17b2b3-4)
+##   stair_pitch  a flight is as gentle as the room allows: wherever the room is
+##                long enough for a walkable run the plan draws one, and nothing
+##                hangs over a tread (CASTLE-STAIR-PITCH)
 ##   hall_fire    a castle's great hall has a hearth (WALK-1a17b2f2-1)
 ##
 ## Each takes plain rows ({id, plan, mural_tower, ground_entry}) or a door and
@@ -45,6 +48,42 @@ static func walkway_failures(rows: Array) -> Array[String]:
 			for index in CastleKeepPlan.walkway_blockers(plan, room):
 				out.append("%s: %s stands across the way through room %d (%s)"
 					% [row.id, String(plan.furniture[index]["key"]), room, String(plan.kind_of(room))])
+	return out
+
+
+## Steep flights that did not have to be: HouseStairCheck's `stair_pitch` on a
+## flight whose room could have taken the walkable run. A tight tower storey
+## (under about 5 m across) cannot, and is not reported here.
+static func avoidable_pitch_failures(rows: Array) -> Array[String]:
+	var out: Array[String] = []
+	var rx := RegEx.create_from_string("stair ([0-9]+) ")
+	for row in rows:
+		var plan: HousePlan = row.plan
+		if plan == null or plan.spec == null or plan.stairs.is_empty():
+			continue
+		var walkable := plan.spec.height / tan(deg_to_rad(CastleKeepPlan.PITCH_TARGET))
+		for failure in HouseStairCheck.check(plan):
+			if not String(failure).begins_with("stair_pitch:"):
+				continue
+			var hit := rx.search(String(failure))
+			var st: Dictionary = plan.stairs[int(hit.get_string(1))]
+			var floor := HouseGeometry.room_floor_rect(plan, int(st["b"]))
+			if maxf(floor.size.x, floor.size.y) - 0.3 - CastleKeepPlan.LANDING_ALLOWANCE >= walkable:
+				out.append("%s: %s (room %d could take a %.1f m run)" % [row.id, failure,
+					int(st["b"]), walkable])
+	return out
+
+
+## `stair_headroom` of every row's plan: a lamp, shelf or rack hung over a tread.
+static func headroom_failures(rows: Array) -> Array[String]:
+	var out: Array[String] = []
+	for row in rows:
+		var plan: HousePlan = row.plan
+		if plan == null or plan.spec == null or plan.stairs.is_empty():
+			continue
+		for failure in HouseStairCheck.check(plan):
+			if String(failure).begins_with("stair_headroom:"):
+				out.append("%s: %s" % [row.id, failure])
 	return out
 
 

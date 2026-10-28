@@ -103,7 +103,20 @@ static func generate(spec: CastleSpec, with_furniture := true) -> HousePlan:
 		if shaped:
 			_add_stair(plan, level, level + 1)
 		else:
+			var before := plan.stairs.size()
 			HousePlanLevels.add_stair(plan, level, level + 1, level, level + 1)
+			# The house planner can leave a slender keep's flight climbing into
+			# the far wall; this planner knows to land its walker on floor.
+			if plan.stairs.size() == before + 1 and _climbs_into_wall(plan, plan.stairs[-1]):
+				var kept: Dictionary = plan.stairs.pop_back()
+				var hard: Array[PackedVector2Array] = []
+				# the flight that starts on the doorway's storey leaves it clear
+				if level == entry_level:
+					hard.append(_door_footprint(plan.doors[0]))
+				var count := plan.stairs.size()
+				_add_stair(plan, level, level + 1, Rect2(), hard)
+				if plan.stairs.size() == count:
+					plan.stairs.append(kept)
 	var top_walls := HouseGeometry.room_walls(plan, levels - 1)
 	plan.hearth = {"room": levels - 1, "wall": _facing_wall(top_walls, Vector2(1, 0))}
 	if with_furniture:
@@ -226,6 +239,17 @@ static func _demote_unseated_guardrooms(plan: HousePlan, spec: HouseSpec) -> voi
 		plan.rooms[room]["kind"] = &"watch_room"
 		if room < spec.program.size() and spec.program[room] == &"guardroom":
 			spec.program[room] = &"watch_room"
+		# A guardroom may hang an outdoor lantern; a watch room may not (the
+		# arrangement rule calls it an outdoor fitting in a domestic room), so
+		# what does not suit the post comes out and the post is dressed afresh.
+		var unsuited: Array[int] = []
+		for index in plan.furniture_of(room):
+			if not PropCatalog.suits_room(String(plan.furniture[index]["key"]), &"watch_room"):
+				unsuited.append(index)
+		unsuited.reverse()
+		for index in unsuited:
+			plan.furniture.remove_at(index)
+			HouseFurnishRepair.reindex_hosts(plan, index)
 		_dress_watch_room(plan, spec, room)
 		# whatever still stands on the walkway between the flights goes
 		var in_the_way := walkway_blockers(plan, room)
@@ -247,6 +271,13 @@ static func _demote_unseated_guardrooms(plan: HousePlan, spec: HouseSpec) -> voi
 
 ## How much of each end of a walkway is left to the wall: a flight's landing
 ## sits against the wall and its bench or chest is meant to be there.
+const PITCH_TARGET := 41.0   # degrees; HouseStairCheck.PITCH_MAX is 42
+const MIN_RUN := 2.4
+const SHORT_RUNS: Array[float] = [2.0, 1.6]
+## What a long flight needs of its room besides the run: the head landing and a
+## foot to stand on. The plan check asks the same of the room it judges.
+const LANDING_ALLOWANCE := 1.3
+const WALKABLE_RISER := 0.2
 const WALKWAY_ENDS := 0.6
 ## Half a person, and a little: what must stay clear either side of the line.
 const WALKWAY_HALF := 0.4
@@ -345,6 +376,15 @@ static func _dress_watch_room(plan: HousePlan, spec: HouseSpec, room: int) -> vo
 		row["wall_only"] = String(step["rule"]) == "wall"
 		HouseFurnishPlacement.place_one(plan, spec, room, String(step["cat"]),
 			StringName(step["rule"]), blocked, zones, rng, row)
+	# A big post wants a pair of lights (a guardroom's lantern used to make the
+	# second before it was demoted and stripped of outdoor fittings).
+	var missing := CastleRoomTopUp._lights_wanted(plan, room) - CastleRoomTopUp._lights(plan, room)
+	for extra in range(maxi(missing, 0)):
+		var count := plan.furniture.size()
+		HouseFurnishPlacement.place_one(plan, spec, room, "sconce", &"mounted",
+			blocked, zones, rng, {"opt": 1.0})
+		if plan.furniture.size() == count:
+			break
 	while plan.furniture.size() > mark \
 			and CastleRoomTopUp.room_walk_faults(plan, room) > walk:
 		plan.furniture.resize(plan.furniture.size() - 1)
@@ -417,10 +457,63 @@ static func _windows(plan: HousePlan, level: int) -> void:
 static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2(),
 		hard: Array[PackedVector2Array] = []) -> void:
 	var floor := HouseGeometry.room_floor_rect(plan, upper)
-	var run := minf(2.4, maxf(HouseGeometry.PATH_MIN, maxf(floor.size.x, floor.size.y) - 0.3))
+	var cap := maxf(HouseGeometry.PATH_MIN, maxf(floor.size.x, floor.size.y) - 0.3)
 	var width := minf(1.0, maxf(HouseGeometry.PATH_MIN, minf(floor.size.x, floor.size.y) - 0.3))
 	var walls := HouseGeometry.room_walls(plan, upper)
 	walls.append_array(HouseGeometry.room_walls(plan, lower))
+	# The run a person can climb: the storey's height over the steepest pitch
+	# HouseStairCheck allows. A 3.6 m storey on a 2.4 m run is 56 degrees, a
+	# ladder (CASTLE-STAIR-PITCH). Try the walkable run first where the room
+	# is long enough for it and its landings, else the old 2.4 m run. A room
+	# under about 5 m cannot take a walkable straight flight at all: those
+	# towers and keeps need a newel stair, which the plan cannot yet draw.
+	var walkable := plan.spec.height / tan(deg_to_rad(PITCH_TARGET))
+	var runs: Array[float] = []
+	# A shorter run that is still too steep gains nothing and only crowds the
+	# floor, so the walkable run is tried whole or not at all.
+	if walkable <= cap:
+		runs.append(walkable)
+	runs.append(minf(MIN_RUN, cap))
+	# A slender keep (3.8 m clear) cannot take 2.4 m of flight with a landing
+	# beyond it. A steeper flight that lets its walker off on floor beats a
+	# gentler one that climbs into a wall (stair_head).
+	for shorter in SHORT_RUNS:
+		if shorter < runs[-1] - 0.05:
+			runs.append(shorter)
+	var pick := {}
+	var run := runs[-1]
+	for attempt in range(runs.size()):
+		run = runs[attempt]
+		pick = _pick_run(plan, lower, upper, run, width, floor, walls, avoid, hard)
+		if float(pick.get("climb", 0.0)) != 0.0:
+			break
+	var best: Rect2 = pick.get("rect", Rect2())
+	if best.size.x <= 0.0:
+		return # Missing transition remains a QA failure, never invented floor.
+	if float(pick.score) < -100.0:
+		plan.note_compromise(lower, "stair")
+	var centre := best.get_center()
+	var record := {"a": lower, "b": upper,
+		"storey": lower, "to_storey": upper,
+		"pos": centre, "lower_pos": centre, "upper_pos": centre,
+		"rect": best, "lower_rect": best, "upper_rect": best,
+		"width": width, "run": run}
+	# A walkable run is climbed in steps a person can take: the storey over a
+	# 0.2 m riser, not the ten the plan check assumes unless told.
+	if run >= walkable - 0.01:
+		record["steps"] = ceili(plan.spec.height / WALKABLE_RISER)
+	if float(pick.climb) != 0.0:
+		record.merge(pick.landings)
+	if bool(pick.get("free_standing", false)):
+		record["free_standing"] = true
+	plan.stairs.append(record)
+
+
+## One run length's best flight: against a wall, then anywhere in a polygon
+## that lets its walker off on floor, and standing free in the room.
+static func _pick_run(plan: HousePlan, lower: int, upper: int, run: float, width: float,
+		floor: Rect2, walls: Array[Dictionary], avoid: Rect2,
+		hard: Array[PackedVector2Array]) -> Dictionary:
 	var sizes: Array[Vector2] = [Vector2(run, width), Vector2(width, run)]
 	var along_walls: Array[Rect2] = []
 	for size in sizes:
@@ -449,23 +542,7 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 			if float(found.get("climb", 0.0)) != 0.0:
 				pick = found
 				pick["free_standing"] = true
-	var best: Rect2 = pick.get("rect", Rect2())
-	if best.size.x <= 0.0:
-		return # Missing transition remains a QA failure, never invented floor.
-	if float(pick.score) < -100.0:
-		plan.note_compromise(lower, "stair")
-	var centre := best.get_center()
-	var record := {"a": lower, "b": upper,
-		"storey": lower, "to_storey": upper,
-		"pos": centre, "lower_pos": centre, "upper_pos": centre,
-		"rect": best, "lower_rect": best, "upper_rect": best,
-		"width": width, "run": run}
-	if float(pick.climb) != 0.0:
-		record.merge(pick.landings)
-	if bool(pick.get("free_standing", false)):
-		record["free_standing"] = true
-	plan.stairs.append(record)
-
+	return pick
 
 
 ## Rects of each size that touch a wall at one corner, anywhere in the room: a
@@ -578,6 +655,26 @@ static func arrival_floors(plan: HousePlan, storey: int) -> Array[Rect2]:
 		if int(prior.get("to_storey", -1)) == storey and prior.has("head_landing"):
 			out.append(Rect2(prior["head_landing"]))
 	return out
+
+
+## The floor a doorway needs: its width and 1.1 m into the room.
+static func _door_footprint(door: Dictionary) -> PackedVector2Array:
+	var inward := -Vector2(door["normal"]).normalized()
+	var across := Vector2(-inward.y, inward.x) * (float(door["width"]) * 0.5)
+	var pos := Vector2(door["pos"])
+	return PackedVector2Array([pos - across, pos + across,
+		pos + across + inward * 1.1, pos - across + inward * 1.1])
+
+
+## Does this flight let its walker off into a wall? HouseStairCheck's stair_head
+## rule, asked of a record at plan time.
+static func _climbs_into_wall(plan: HousePlan, stair: Dictionary) -> bool:
+	var rect := Rect2(stair.get("lower_rect", stair.get("rect", Rect2())))
+	var head := Rect2(stair.get("head_landing", Rect2()))
+	if not head.has_area():
+		head = HouseGeometry.stair_approach(rect, -HouseGeometry.stair_climb(plan, stair),
+			minf(rect.size.x, rect.size.y))
+	return not _poly_holds(HouseGeometry.room_floor_poly(plan, int(stair["b"])), head)
 
 
 static func _poly_holds(poly: PackedVector2Array, rect: Rect2) -> bool:
