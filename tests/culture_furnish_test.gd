@@ -26,6 +26,12 @@ func _init() -> void:
 				n += 1
 				_check_case(str(c["id"]), c["request"], style)
 		_expect(n == 3, "fixture holds 3 house/%s requests, found %d" % [style, n])
+	# the 26 Oct walk pin (WALK-1a17b2a6-1): a 9 x 12 roundhouse, seed 1, had its
+	# low table through the curved wall; the other widths and seeds ring it round
+	for w in [9.0, 10.0]:
+		for sd in [1, 2, 8102]:
+			var rq := {"width": w, "length": 12.0, "height": 2.6, "storeys": 1, "seed": sd}
+			_check_case("round_wall/%d/%d" % [int(w), sd], rq, &"roundhouse")
 	_control()
 	for w in warnings:
 		print("WARN " + w)
@@ -111,6 +117,15 @@ func _check_case(id: String, req: Dictionary, style: StringName) -> void:
 		if not mounted and not hosted:
 			var foot := Rect2(box.position.x, box.position.z, box.size.x, box.size.z)
 			_expect(rect.grow(0.03).encloses(foot), "%s row %d %s inside its rect (%s in %s)" % [id, i, look, foot, rect])
+		# A round hall's wall is the real outline, not its bounding rect: the
+		# look's footprint (axis-aligned, so its box is exact) must lie inside it.
+		var room_i := int(row.get("room", 0))
+		if not mounted and not hosted and plan.is_polygonal(room_i):
+			var corners := PackedVector2Array([Vector2(box.position.x, box.position.z),
+				Vector2(box.end.x, box.position.z), Vector2(box.end.x, box.end.z),
+				Vector2(box.position.x, box.end.z)])
+			_expect(Poly.encloses_corners(plan.outline_of(room_i), corners, 0.01),
+				"%s row %d %s inside the curved wall (%s)" % [id, i, look, foot_str(box)])
 		if not mounted and not hosted:
 			_expect(absf(box.position.y - pos.y) < 0.02, "%s row %d %s stands on the floor (bottom %.3f, floor %.3f)" % [id, i, look, box.position.y, pos.y])
 		if hosted:
@@ -157,6 +172,10 @@ func _walk(n: Node, xf: Transform3D, acc):
 			var r = _walk(c, xf * (c as Node3D).transform, out)
 			out = r
 	return out
+
+
+func foot_str(b: AABB) -> String:
+	return "x %.2f..%.2f z %.2f..%.2f" % [b.position.x, b.end.x, b.position.z, b.end.z]
 
 
 func _expect(ok: bool, what: String) -> void:

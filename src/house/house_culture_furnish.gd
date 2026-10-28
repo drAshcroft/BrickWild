@@ -72,6 +72,10 @@ const EXTENT := {
 	"banco_shelf": Vector2(1.3, 0.42),
 }
 
+## Looks hung on a wall or the ceiling by their pos, not stood on the floor.
+const MOUNTED_LOOKS: Array[String] = ["wall_andon", "clay_lamp_wall", "paper_lantern",
+	"clay_lamp_hanging"]
+
 const TATAMI := Color(0.70, 0.64, 0.42)
 const EARTH := Color(0.50, 0.37, 0.25)
 
@@ -151,7 +155,9 @@ static func host_shift(plan: HousePlan, i: int, looks_by_row: Dictionary) -> Vec
 	if top <= 0.0:
 		top = _tansu_height(row, key)
 	var hr := Rect2(row["rect"])
-	var hc := hr.get_center()
+	var fit := fit_in_wall(plan, row, look)
+	var hc: Vector2 = fit["c"]
+	hr.size *= float(fit["k"])
 	var ext: Vector2 = EXTENT.get(look, Vector2(99.0, 99.0))
 	var half := (Vector2(ext.x, ext.y) if hr.size.x >= hr.size.y else Vector2(ext.y, ext.x)) * 0.5
 	half = Vector2(minf(half.x, hr.size.x * 0.5), minf(half.y, hr.size.y * 0.5)) - Vector2(0.08, 0.08)
@@ -293,19 +299,78 @@ static func _jar(parent: Node3D, r: float, h: float, at: Vector3, mat: String) -
 ## The scene node for row `p` taking `look`. Plan coordinates, like
 ## HouseAssembler._instance (the assembler lifts the house afterwards).
 static func node_for(plan: HousePlan, p: Dictionary, look: String, shift: Vector3) -> Node3D:
+	var f := fit_in_wall(plan, p, look)
+	return _build(plan, p, look, shift, f["c"], float(f["k"]))
+
+
+## A look is drawn inside its row's rect, but on a ROUND (polygonal) hall the
+## rect is only the bounding box of the piece and the wall is the curve: a low
+## table or a chest at the edge of the ring pokes through it. Walk the look in
+## toward the middle of the room, then shrink it, until its real footprint is
+## inside the room's outline. Returns {"c": Vector2 centre, "k": float scale};
+## the row's own centre and 1.0 when the room is a plain rectangle or the look
+## already stands inside.
+static func fit_in_wall(plan: HousePlan, p: Dictionary, look: String) -> Dictionary:
+	var rect := Rect2(p["rect"])
+	var out := {"c": rect.get_center(), "k": 1.0}
+	var room := int(p.get("room", 0))
+	if not plan.is_polygonal(room) or bool(p.get("mounted", false)) or look in MOUNTED_LOOKS 			or PropCatalog.has_tag(String(p.get("key", "")), PropCatalog.ON_SURFACE):
+		return out
+	var outline: PackedVector2Array = plan.outline_of(room)
+	var middle := Poly.bounding_rect(outline).get_center()
+	var c: Vector2 = out["c"]
+	var k := 1.0
+	for i in range(40):
+		var node := _build(plan, p, look, Vector3.ZERO, c, k)
+		var fp := footprint(node)
+		node.free()
+		var corners := PackedVector2Array([fp.position, Vector2(fp.end.x, fp.position.y),
+			fp.end, Vector2(fp.position.x, fp.end.y)])
+		if Poly.encloses_corners(outline, corners, 0.01):
+			break
+		var d := middle - c
+		if d.length() > 0.04:
+			c += d.normalized() * 0.04
+		if i % 4 == 3:
+			k = maxf(0.5, k * 0.93)
+	out["c"] = c
+	out["k"] = k
+	return out
+
+
+## The look's footprint on the floor plan (every part is an axis-aligned
+## primitive hung straight off the root).
+static func footprint(node: Node3D) -> Rect2:
+	var fp := Rect2()
+	var first := true
+	for ch in node.get_children():
+		if not (ch is MeshInstance3D) or (ch as MeshInstance3D).mesh == null:
+			continue
+		var b: AABB = (ch as MeshInstance3D).mesh.get_aabb()
+		var r := Rect2(node.position.x + ((ch as Node3D).position.x + b.position.x) * node.scale.x,
+			node.position.z + ((ch as Node3D).position.z + b.position.z) * node.scale.z,
+			b.size.x * node.scale.x, b.size.z * node.scale.z)
+		fp = r if first else fp.merge(r)
+		first = false
+	return fp
+
+
+static func _build(plan: HousePlan, p: Dictionary, look: String, shift: Vector3,
+		fit_c: Vector2, fit_k: float) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Culture_" + look
 	root.set_meta("plan_key", String(p.get("key", "")))
 	root.set_meta("culture_look", look)
 	var rect := Rect2(p["rect"])
 	var pos: Vector3 = p["pos"]
-	var c := rect.get_center()
+	var c := fit_c
 	var yaw := float(p.get("yaw", 0.0))
 	# local frame: x along the rect's long side, the look is axis-aligned
 	var sx := rect.size.x
 	var sz := rect.size.y
 	var into := Vector3(-sin(yaw), 0.0, -cos(yaw))   # a mounted piece's body is this way
 	root.position = Vector3(c.x, pos.y, c.y) + shift
+	root.scale = Vector3(fit_k, 1.0, fit_k)
 	var long_x := sx >= sz
 	var L := maxf(sx, sz)
 	var W := minf(sx, sz)
