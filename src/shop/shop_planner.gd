@@ -67,7 +67,44 @@ static func plan(spec: ShopSpec) -> HousePlan:
 	if spec.business == &"thieves_den":
 		_plan_thieves_den(out)
 	_open_up_lodging(out)
+	_join_store_to_work_room(out, spec)
 	return out
+
+
+## The rooms a trade is worked in, and the rooms its stock is kept in.
+const WORK_ROOM_KINDS: Array[StringName] = [&"workshop", &"kitchen", &"laboratory", &"bakehouse"]
+const STORE_ROOM_KINDS: Array[StringName] = [&"store", &"storeroom", &"pantry", &"stock_room"]
+
+
+## SHOP-STORE-JOIN. The house planner hangs every leaf off the first public
+## room that touches it, so an apothecary's, butcher's or tailor's store can
+## open only off the sales floor while the workshop that fills it has no door
+## to it: stock is then carried out through the shop. Where a work room and a
+## store touch along a usable wall and nothing joins them, cut that door. A
+## shop with no touching pair is left as it is.
+static func _join_store_to_work_room(out: HousePlan, spec: ShopSpec) -> void:
+	if spec.business in [&"palace", &"prison", &"thieves_den", &"barracks", &"market_hall"]:
+		return
+	var need: float = HousePlanOpenings._inner_door_width(out) + HouseGeometry.DOOR_CORNER_MARGIN * 2.0
+	var best := []
+	var best_run := 0.0
+	for w in out.rooms_on_storey(0):
+		if not out.kind_of(w) in WORK_ROOM_KINDS:
+			continue
+		for s in out.rooms_on_storey(0):
+			if not out.kind_of(s) in STORE_ROOM_KINDS:
+				continue
+			if HousePlanOpenings._door_between(out, w, s):
+				return   # a store already opens off a work room
+			var edge: Array = HousePlanOpenings.shared_edge(out, w, s)
+			if edge.is_empty():
+				continue
+			var run: float = float(edge[3]) - float(edge[2])
+			if run >= need and run > best_run:
+				best_run = run
+				best = [w, s, edge]
+	if not best.is_empty():
+		HousePlanOpenings.add_inner_door(out, best[0], best[1], best[2])
 
 
 ## Keep the street-facing shop ordinary. The only route from it into the

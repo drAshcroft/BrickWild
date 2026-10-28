@@ -88,7 +88,69 @@ static func run() -> SuiteResult:
 	_run_trades(res)
 	_run_traits(res)
 	_run_walk_furnish(res)
+	_run_store_join(res)
 	return res
+
+
+const JOIN_WORK_KINDS: Array[StringName] = [&"workshop", &"kitchen", &"laboratory", &"bakehouse"]
+const JOIN_STORE_KINDS: Array[StringName] = [&"store", &"storeroom", &"pantry", &"stock_room"]
+
+
+## SHOP-STORE-JOIN: where a work room and a store touch along a wall a door
+## fits in, one store opens off the work room. (The plan facts in
+## tools/render_shop_trades.gd read "storage off the work area" the same way.)
+## The control takes the work-room door out again and the rule must fail.
+static func store_join_contract(plan: HousePlan) -> Array[String]:
+	var out: Array[String] = []
+	var need: float = HousePlanOpenings._inner_door_width(plan) + HouseGeometry.DOOR_CORNER_MARGIN * 2.0
+	var touching := false
+	for w in plan.rooms_on_storey(0):
+		if not plan.kind_of(w) in JOIN_WORK_KINDS:
+			continue
+		for st in plan.rooms_on_storey(0):
+			if not plan.kind_of(st) in JOIN_STORE_KINDS:
+				continue
+			var edge := HousePlanOpenings.shared_edge(plan, w, st)
+			if edge.is_empty() or float(edge[3]) - float(edge[2]) < need:
+				continue
+			touching = true
+			if HousePlanOpenings._door_between(plan, w, st):
+				return out
+	if touching:
+		out.append("store: a store touches the work room but nothing opens between them")
+	return out
+
+
+static func _run_store_join(res: SuiteResult) -> void:
+	var controlled := 0
+	for business in WALK_TRADES:
+		for seed_ in [1, 8102]:
+			var plan := _walk_plan(business, &"townhouse", seed_)
+			var label := "store join %s seed %d" % [business, seed_]
+			res.checked += 1
+			for failure in store_join_contract(plan):
+				res.fail("%s: %s" % [label, failure])
+			# control: cut every work-room/store door; where one existed the rule must fail
+			var doors: Array[Dictionary] = plan.doors.duplicate(true)
+			var kept: Array[Dictionary] = []
+			var cut := false
+			for d in plan.doors:
+				var a := int(d["a"])
+				var b := int(d["b"])
+				if not bool(d.get("exterior", false)) and a >= 0 and b >= 0 						and ((plan.kind_of(a) in JOIN_WORK_KINDS and plan.kind_of(b) in JOIN_STORE_KINDS) 						or (plan.kind_of(b) in JOIN_WORK_KINDS and plan.kind_of(a) in JOIN_STORE_KINDS)):
+					cut = true
+					continue
+				kept.append(d)
+			if cut:
+				plan.doors = kept
+				controlled += 1
+				res.checked += 1
+				if store_join_contract(plan).is_empty():
+					res.fail("%s: control -- the work-room/store door removed and the rule did not fail" % label)
+				plan.doors = doors
+	res.checked += 1
+	if controlled == 0:
+		res.fail("store join: no shop had a work-room/store door to take out as a control")
 
 
 ## SHOP-WALK-FURNISH (26 Oct walk pins): the 11 counter trades x seeds 1 and
