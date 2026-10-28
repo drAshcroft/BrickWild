@@ -30,7 +30,7 @@ const SWEEP := 360.0
 ## The sweeps a plan may choose, shortest first: a turn, a turn and a half, two
 ## turns, two and a half (a 6.75 m keep storey needs two).
 const SWEEPS: Array[float] = [360.0, 540.0, 720.0, 900.0]
-const RADII: Array[float] = [1.1, 1.0, 0.95]
+const RADII: Array[float] = [1.1, 1.0, 0.95, 0.9, 0.85]
 ## The narrowest tread (outer edge to the post) a person can climb.
 const TREAD_MIN := 0.6
 const TREAD_THICK := 0.16

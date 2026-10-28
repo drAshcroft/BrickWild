@@ -236,6 +236,13 @@ static func _add_stairs(plan: HousePlan, levels: int) -> void:
 		var upper := HouseGeometry.room_floor_poly(plan, level + 1)
 		var lower_box := Poly.bounding_rect(lower)
 		var upper_box := Poly.bounding_rect(upper)
+		# A storey of 4.7 to 5 m needs 5.4 to 5.8 m of straight flight to be walked
+		# at 41 degrees, and a tower's shaft has 1.8 m: it takes a newel stair
+		# (HouseNewel), one column through every level, where one fits.
+		var newel := CastleKeepPlan.newel_flight(plan, level, level + 1, level, level + 1)
+		if not newel.is_empty():
+			plan.stairs.append(newel)
+			continue
 		var min_side := minf(minf(lower_box.size.x, lower_box.size.y),
 			minf(upper_box.size.x, upper_box.size.y))
 		var run := minf(STAIR_RUN, maxf(0.8, min_side * 0.35))

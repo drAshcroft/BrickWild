@@ -627,8 +627,8 @@ static func _pick_run(plan: HousePlan, lower: int, upper: int, run: float, width
 		else:
 			# The room is too small for a flight and its landings against any
 			# wall (a 12-gon of 7.7 m): the flight stands free, and says so.
-			found = _pick_stair(plan, lower, upper, open_rects(floor, sizes), avoid,
-				hard, true, newel_sweep)
+			found = _pick_stair(plan, lower, upper, open_rects(floor, sizes, 0.2, newel),
+				avoid, hard, true, newel_sweep)
 			if float(found.get("climb", 0.0)) != 0.0:
 				pick = found
 				pick["free_standing"] = true
@@ -658,12 +658,21 @@ static func wall_touching_rects(walls: Array, sizes: Array[Vector2]) -> Array[Re
 ## Rects of each size on a 0.2 m grid across the whole floor: a flight that
 ## stands free of every wall. Taken only when no flight against a wall lets its
 ## walker off on floor (see `_add_stair`).
-static func open_rects(floor: Rect2, sizes: Array[Vector2], pitch := 0.2) -> Array[Rect2]:
+static func open_rects(floor: Rect2, sizes: Array[Vector2], pitch := 0.2,
+		centred := false) -> Array[Rect2]:
 	var out: Array[Rect2] = []
 	for size in sizes:
 		var x := floor.position.x
+		var z0 := floor.position.y
+		if centred:
+			# A grid laid out from the room's centre, so a room and its mirror
+			# image offer mirrored candidates (a newel well fits one or the other
+			# way round only if both are tried; CASTLE-NEWEL-STAIR).
+			var spare := floor.size - size
+			x = floor.position.x + fposmod(spare.x * 0.5, pitch)
+			z0 = floor.position.y + fposmod(spare.y * 0.5, pitch)
 		while x <= floor.end.x - size.x + 0.001:
-			var z := floor.position.y
+			var z := z0
 			while z <= floor.end.y - size.y + 0.001:
 				out.append(Rect2(Vector2(x, z), size))
 				z += pitch
@@ -752,9 +761,20 @@ static func _newel_passable(plan: HousePlan, room: int, rect: Rect2,
 ## A newel well is one column through every storey: it may not stand in front of
 ## a door on any of them.
 static func _well_blocks_a_door(plan: HousePlan, rect: Rect2) -> bool:
+	var well := Poly.from_rect(rect)
 	for door in plan.doors:
-		for side in [-1.0, 1.0]:
-			if rect.intersects(HouseGeometry.door_clear_rect(door, side)):
+		# The footprint is a true quadrilateral inward of the door. (door_clear_rect
+		# is an axis-aligned box and is wrong for a door on a chamfer: it covers
+		# the room at one of an octagon's corners and a sliver at the opposite,
+		# so a tower and its mirror image would not offer the same wells.)
+		var inward := -Vector2(door["normal"]).normalized()
+		var across := Vector2(-inward.y, inward.x) * (float(door["width"]) * 0.5)
+		var pos := Vector2(door["pos"])
+		var deep := inward * HouseGeometry.DOOR_CLEAR
+		var zone := PackedVector2Array([pos - across, pos + across,
+			pos + across + deep, pos - across + deep])
+		for over in Geometry2D.intersect_polygons(well, zone):
+			if Poly.area(over) > 0.02:
 				return true
 	return false
 

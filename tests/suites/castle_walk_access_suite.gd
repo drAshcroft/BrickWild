@@ -39,8 +39,12 @@ static func run() -> SuiteResult:
 	# and the slender keep were 56-70 degrees; they take a newel stair now.
 	_clean(result, CastleWalkAccessCheck.pitch_failures(rows), "norman 1 tower flights climbable")
 	_clean(result, CastleWalkAccessCheck.pitch_failures(norman_keep.values()), "norman 1 keep flights climbable")
-	# (edwardian 1's 3.83 m octagons with 4.7 m storeys still hold a straight flight:
-	# a 1.9 m well pinches the way shut there; see CASTLE-NEWEL-STAIR in the todo.)
+	# edwardian 1: 3.83 m octagons with 4.7 m storeys take a 1.8 m newel well, set
+	# clear of a door on a chamfer as well as of one on a flat
+	_clean(result, CastleWalkAccessCheck.pitch_failures(edwardian_rows), "edwardian 1 flights climbable")
+	_clean(result, CastleWalkAccessCheck.stair_head_failures(edwardian_rows), "edwardian 1 stairs")
+	_want(result, CastleWalkAccessCheck.newel_count(edwardian_rows) > 0,
+		"edwardian 1 towers drew no newel stair")
 	_want(result, CastleWalkAccessCheck.newel_count(rows) > 0,
 		"norman 1 mural towers drew no newel stair")
 	_want(result, CastleWalkAccessCheck.newel_count(norman_keep.values()) > 0,
@@ -55,8 +59,14 @@ static func run() -> SuiteResult:
 	_clean(result, CastleWalkAccessCheck.stair_head_failures(
 		[{"id": "tower_house", "plan": CastleTowerPlan.generate(norman_house, false)}]),
 		"norman tower house stairs")
-	for house in [{"id": "wizard", "plan": CastleTowerPlan.generate(wiz.spec as CastleSpec)},
-			{"id": "norman", "plan": CastleTowerPlan.generate(norman_house)}]:
+	# CASTLE-NEWEL-STAIR: a tower house's 5 m storeys were 69-70 degree ladders
+	var house_rows := [{"id": "wizard", "plan": CastleTowerPlan.generate(wiz.spec as CastleSpec)},
+			{"id": "norman", "plan": CastleTowerPlan.generate(norman_house)},
+			{"id": "edwardian", "plan": CastleTowerPlan.generate(_tower_house(&"edwardian", 12.0, 30.0, 2))}]
+	_clean(result, CastleWalkAccessCheck.pitch_failures(house_rows), "tower house flights climbable")
+	_clean(result, CastleWalkAccessCheck.stair_head_failures(house_rows), "tower house newel stairs")
+	_want(result, CastleWalkAccessCheck.newel_count(house_rows) > 0, "tower houses drew no newel stair")
+	for house in house_rows:
 		_clean(result, CastleWalkAccessCheck.headroom_failures([house]),
 			"%s tower house headroom" % house.id)
 
