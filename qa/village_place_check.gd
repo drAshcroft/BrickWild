@@ -674,8 +674,8 @@ func _check_farms(plan: VillagePlan) -> void:
 		# (VIL-012), so a long thin site's width says nothing about how far
 		# inside a farm can get, and scaling by it let a farm stand dead
 		# centre and pass.
-		var reach: float = maxf(FARM_TO_EDGE,
-			minf(reach_rect.size.x, reach_rect.size.y) * 0.4)
+		var reach: float = VillageLotPlanner.farm_reach(plan.spec.form,
+			minf(reach_rect.size.x, reach_rect.size.y))
 		if d > reach:
 			failures.append("farms: farm %d stands %.0fm inside the edge, wants <= %.0f" % [i, d, reach])
 		# the yard is behind the house: its back (local +Z) toward the edge

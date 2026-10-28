@@ -66,6 +66,12 @@ const LANE_HALF := 1.25 + 0.5   ## a lane's carriageway half-width plus its verg
 const SMITHY_CLEAR := 12.0      ## the smithy from the church and the tavern (VILLAGES 6)
 const STABLE_TO_INN := 20.0     ## a stable belongs beside the inn it serves
 const FARM_TO_EDGE := 30.0     ## farms belong to the outer band, measured at their walls
+## ...or this share of the site's shorter side (a village grown to hold its farms).
+const FARM_REACH_SHARE := 0.4
+## A valley's through road runs along the middle of its site, the river on one side of it
+## and the hill on the other, so the nearest edge of the ground its farms stand on is half
+## the site away: the outer band is the whole of a ribbon this deep (VTER-USHGULI-ELONGATION).
+const FARM_REACH_SHARE_VALLEY := 0.5
 const WELL_CLEAR := 6.0        ## keep the communal well clear of the full emitted bounds
 const BACK_TO_FRONT_CLEAR := 8.0 ## a near doorway must not stare into a neighbour's back wall
 const MINE_END_WORKYARD := 18.0  ## leave working ground beyond the village's final gateway
@@ -1134,6 +1140,14 @@ const SITING := {
 const SITING_DEFAULT := {"toward": &"common"}
 
 
+## How far inside the edge of its ground a farm may stand: thirty metres, or a share of the
+## site's SHORTER side on a village whose ground has grown to hold its farms. The place check
+## reads the same number, so the planner steers by what is measured.
+static func farm_reach(form: StringName, shorter_side: float) -> float:
+	var share: float = FARM_REACH_SHARE_VALLEY if form == &"valley" else FARM_REACH_SHARE
+	return maxf(FARM_TO_EDGE, shorter_side * share)
+
+
 ## The siting rule for one request. Shops answer to their business; everything
 ## else to its lot class.
 static func siting_of(request: BuildingRequest, cls: StringName) -> Dictionary:
@@ -1812,7 +1826,7 @@ static func _purpose_clear(plan: VillagePlan, lot: Dictionary, job: Dictionary,
 	if req.kind == &"house" and req.purpose == &"farmer":
 		# Measure the transformed walls, not the road frontage.
 		var farm_centre := Poly.bounding_rect(Placement.world_rect(job["placement"], xf, true)).get_center()
-		var reach: float = maxf(FARM_TO_EDGE, minf(plan.site.size.x, plan.site.size.y) * 0.4)
+		var reach: float = farm_reach(plan.spec.form, minf(plan.site.size.x, plan.site.size.y))
 		if _to_edge(plan.site, farm_centre) > reach:
 			return false
 	if req.kind == &"shop" and req.purpose == &"stable":

@@ -42,8 +42,6 @@ const CASES := [
 ]
 ## Derive valley (with a river in the spec) and are NOT cases, each for a stated
 ## reason (docs/VILLAGE_TERRAIN.md "The valley form", VTER-VALLEY-REAL):
-## world90/balan (hand label valley; houses 19 of 19 and fronts its common, but
-## its uniform 13 % hillside gives a body of 8 buildings, elongation 2.5),
 ## world90/lake_argyle (hand label dispersed; the hill row is 30-55 % and the
 ## bank row a river strip, so a 76 m stretch has no lot and the body splits,
 ## elongation 2.7), and
@@ -69,6 +67,7 @@ static func run() -> SuiteResult:
 		VillageProgrammer.programme(spec_for(null)))
 	res.note("measured %d buildings once in %.1f s" % [jobs.size(), (Time.get_ticks_msec() - t0) / 1000.0])
 	_flat(res)
+	_farm_reach(res)
 	# VALLEY_CASE=<fixture> runs that one fixture, in CASES or not
 	var only := OS.get_environment("VALLEY_CASE")
 	if only != "":
@@ -280,6 +279,21 @@ static func _flat(res: SuiteResult) -> void:
 	res.checked += 1
 	if not (&"valley" in VillageSitePlanner.FORMS_SUPPORTED):
 		res.fail("flat: valley is not a supported form")
+
+
+## A valley's through road runs along the middle of its site, so a farm beside it is half the
+## site from the edge: the valley's outer band is the half, every other form's the 0.4 it was.
+## (A valley farm beyond 40 % of the depth had no ground on either bank: Ushguli, Balan.)
+static func _farm_reach(res: SuiteResult) -> void:
+	res.checked += 1
+	if VillageLotPlanner.farm_reach(&"valley", 138.0) < 68.0:
+		res.fail("farm reach: a valley farm 62 m from a 138 m site's edge is refused (%.1f)" % VillageLotPlanner.farm_reach(&"valley", 138.0))
+	res.checked += 1
+	if not is_equal_approx(VillageLotPlanner.farm_reach(&"street", 138.0), 138.0 * 0.4):
+		res.fail("farm reach: another form's reach moved (%.1f)" % VillageLotPlanner.farm_reach(&"street", 138.0))
+	res.checked += 1
+	if not is_equal_approx(VillageLotPlanner.farm_reach(&"valley", 40.0), 30.0):
+		res.fail("farm reach: a small site keeps the thirty metres")
 
 
 ## The same spec on the same ground twice, the siting cache cleared between.
