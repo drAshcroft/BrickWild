@@ -53,6 +53,7 @@ static func run() -> SuiteResult:
 	for case in CASES:
 		_case(res, jobs, case[0], case[1])
 	_pure(res)
+	_main_seat(res)
 	res.note("total %.1f s" % ((Time.get_ticks_msec() - t0) / 1000.0))
 	return res
 
@@ -253,3 +254,35 @@ static func _pure(res: SuiteResult) -> void:
 	res.checked += 1
 	if a.hamlets.size() != b.hamlets.size() or a.hamlets.is_empty():
 		res.fail("pure: the hamlets differ or are missing")
+
+
+## VTER-DISPERSED-MAIN-SEAT: Monemvasia has the sea and the cliff north of
+## its through road in the sited yaw; the main common must take the other
+## side (the frame turned half round), not lie on half-steep ground as it
+## did (49.9 %, against lots at 29 %). The site plan alone: the lot plan of
+## this rock is minutes, and PlaceCheck's common_ground reads these numbers.
+const MAIN_COMMON_SLOPE_MAX := 0.35
+
+
+static func _main_seat(res: SuiteResult) -> void:
+	var ground := terrain("real30/monemvasia")
+	res.checked += 1
+	if ground == null or not ground.valid():
+		res.fail("main seat: real30/monemvasia does not read")
+		return
+	var plan := VillageSitePlanner.plan(spec_for(ground))
+	res.checked += 1
+	if plan.hamlets.is_empty() or plan.ground == null:
+		res.fail("main seat: monemvasia is not planned dispersed")
+		return
+	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
+	res.checked += 1
+	if common.is_empty():
+		res.fail("main seat: the main hamlet has no common")
+		return
+	var cs: float = float(plan.ground.under(common)["slope_mean"])
+	res.checked += 1
+	if cs > MAIN_COMMON_SLOPE_MAX:
+		res.fail("main seat: monemvasia's main common lies on %.1f %%, wants under %.0f %%" % [
+			cs * 100.0, MAIN_COMMON_SLOPE_MAX * 100.0])
+	res.note("main seat: monemvasia common on %.1f %% (yaw %.1f)" % [cs * 100.0, rad_to_deg(plan.ground.site_yaw)])
