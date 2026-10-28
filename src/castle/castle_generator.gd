@@ -281,7 +281,7 @@ static func refit(spec: CastleSpec) -> void:
 				CastleGeometry.tower_height(spec, CastleGeometry.inner_ring(spec)) * 1.2)
 	spec.hall_w = minf(spec.hall_w, b.size.x * 0.3)
 	spec.hall_l = minf(spec.hall_l, CastleGeometry.max_range_length(spec))
-	spec.hall = spec.hall_l >= 4.0 and spec.hall_w >= 3.5
+	spec.hall = spec.hall_l >= 4.0 and spec.hall_w >= CastleGeometry.HALL_W_MIN
 	spec.chapel = spec.chapel and spec.hall 			and b.size.x > spec.hall_w * 2.0 + CastleGeometry.BAILEY_CLEAR * 2.0
 	spec.gate_width = minf(spec.gate_width, CastleGeometry.max_gate_width(spec, 0))
 	_fit_inner_gate_forebuilding(spec)
@@ -446,11 +446,12 @@ static func _fit_bailey_buildings(spec: CastleSpec, r: RandomNumberGenerator) ->
 		spec.keep_l = 0.0
 		spec.keep_height = 0.0
 
-	spec.hall_w = clampf(b.size.x * r.randf_range(0.18, 0.26), 3.5, b.size.x * 0.3)
+	spec.hall_w = clampf(b.size.x * r.randf_range(0.18, 0.26), CastleGeometry.HALL_W_MIN,
+		b.size.x * 0.3)
 	spec.hall_l = clampf(b.size.y * r.randf_range(0.3, 0.5), 4.0,
 		CastleGeometry.max_range_length(spec))
 	spec.hall_height = spec.height * r.randf_range(0.7, 0.95)
-	spec.hall = spec.hall_l >= 4.0 and spec.hall_w >= 3.5
+	spec.hall = spec.hall_l >= 4.0 and spec.hall_w >= CastleGeometry.HALL_W_MIN
 	# The chapel mirrors the hall on the far side, so the bailey has to be wide
 	# enough for both plus a courtyard between them.
 	spec.chapel = spec.hall and GeneratorRandom.chance(r, 0.6) \

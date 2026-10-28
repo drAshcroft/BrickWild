@@ -152,3 +152,23 @@ chapel pews, measured stable floor pockets, and secondary placement preferences.
 The same handoff separately records 169 normals warnings: 141 outside-opening
 probes against mass bounds and 28 reports covering 56 degenerate roof triangles.
 Their physical causes remain a separate pending investigation.
+
+## The way through a tight tower storey (CASTLE-FURNISH-WALK)
+
+A mural tower storey 4.7 m across is a landing between two flights. The
+guardroom recipe's trestle table and chairs filled the floor between where the
+flight below lets a walker off and the foot of the next one, with 0.5 m left to
+squeeze past (walk pin WALK-1a17b2b3-4). `CastleKeepPlan.walkway_blockers(plan,
+room)` names the floor pieces on that straight way (arrival landing or inward
+door to the next foot or door, 0.6 m at each wall end spared, 0.4 m of
+shoulder each side; rooms wider than 6 m have floor to go round and are not
+asked). `_demote_unseated_guardrooms` now also demotes a guardroom whose table
+is one of them: it becomes the watch room it is, and anything still in the way
+is removed. `CastleWalkAccessCheck.walkway_failures` asks the same question of
+the finished plans, and its suite hands it a table across the way.
+
+A great hall needs 3.0 m clear (`MIN_HALL_SIDE`); the generator once allowed a
+3.5 m hall range, which with 0.6 m walls is a 2.3 m passage with no hearth
+(edwardian seed 1, pin WALK-1a17b2f2-1). `CastleGeometry.HALL_W_MIN` (4.4 m)
+is now the narrowest hall range, so a hall range is always a great hall and a
+great hall always has its hearth (`CastleWalkAccessCheck.hall_fire_failures`).

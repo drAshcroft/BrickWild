@@ -193,8 +193,12 @@ static func _demote_unseated_guardrooms(plan: HousePlan, spec: HouseSpec) -> voi
 					and String(piece.get("row", "")) == "":
 				table = index
 				break
-		# A trestle row seats itself with benches and is judged elsewhere.
-		if table < 0 or CastleRoomTopUp._holds_at(plan, room, table) >= 2:
+		# A trestle row seats itself with benches and is judged elsewhere. A
+		# table seats two where the walker needs the floor goes too: a 4.7 m
+		# tower storey is a landing between two flights, and a table with its
+		# chairs across it leaves 0.5 m to squeeze past (CASTLE-FURNISH-WALK).
+		if table < 0 or (CastleRoomTopUp._holds_at(plan, room, table) >= 2
+				and not walkway_blockers(plan, room).has(table)):
 			continue
 		# Take the table and the one chair that came with it out of the room.
 		# A seat's host index can be stale by now (earlier removals shift the
@@ -223,6 +227,13 @@ static func _demote_unseated_guardrooms(plan: HousePlan, spec: HouseSpec) -> voi
 		if room < spec.program.size() and spec.program[room] == &"guardroom":
 			spec.program[room] = &"watch_room"
 		_dress_watch_room(plan, spec, room)
+		# whatever still stands on the walkway between the flights goes
+		var in_the_way := walkway_blockers(plan, room)
+		in_the_way.sort()
+		in_the_way.reverse()
+		for index in in_the_way:
+			plan.furniture.remove_at(index)
+			HouseFurnishRepair.reindex_hosts(plan, index)
 		# A storey the stair takes whole has no wall for a bench. It is not a
 		# watch room then, but the store the stair leaves it as.
 		var benched := false
@@ -232,6 +243,79 @@ static func _demote_unseated_guardrooms(plan: HousePlan, spec: HouseSpec) -> voi
 			plan.rooms[room]["kind"] = &"store"
 			if room < spec.program.size():
 				spec.program[room] = &"store"
+
+
+## How much of each end of a walkway is left to the wall: a flight's landing
+## sits against the wall and its bench or chest is meant to be there.
+const WALKWAY_ENDS := 0.6
+## Half a person, and a little: what must stay clear either side of the line.
+const WALKWAY_HALF := 0.4
+## A room wider than this has floor to walk round a table on; only the tight
+## ones (a tower storey, 4.7 m across) make the straight way the only way.
+const WALKWAY_ROOM_MAX := 6.0
+
+
+## The pieces of floor furniture standing on the way a person takes through a
+## room: from where the flight below lets them off (or the door they came in
+## by) to the foot of the flight above (or the door out), the end that is against
+## the wall left aside. A tower storey is a landing, not a room to dine in.
+## Indices into `plan.furniture`; the check and the furnisher both ask this.
+static func walkway_blockers(plan: HousePlan, room: int) -> Array[int]:
+	var starts: Array[Vector2] = []
+	var ends: Array[Vector2] = []
+	var floor := HouseGeometry.room_floor_rect(plan, room)
+	if minf(floor.size.x, floor.size.y) > WALKWAY_ROOM_MAX:
+		return []
+	for st in plan.stairs:
+		if int(st.get("b", -1)) == room and Rect2(st.get("head_landing", Rect2())).has_area():
+			starts.append(Rect2(st["head_landing"]).get_center())
+		if int(st.get("a", -1)) == room and Rect2(st.get("foot_landing", Rect2())).has_area():
+			ends.append(Rect2(st["foot_landing"]).get_center())
+	for door in plan.doors:
+		if int(door.get("a", -1)) == room and bool(door.get("exterior", false)):
+			var inward := Vector2(door["pos"]) - Vector2(door["normal"]) * 0.8
+			starts.append(inward)
+			ends.append(inward)
+	var out: Array[int] = []
+	for index in plan.furniture_of(room):
+		var piece: Dictionary = plan.furniture[index]
+		if bool(piece.get("mounted", false)) or not PropCatalog.blocks_floor(String(piece["key"])):
+			continue
+		var rect := Rect2(piece["rect"]).grow(WALKWAY_HALF)
+		for from in starts:
+			for to in ends:
+				var span := from.distance_to(to)
+				if span < 2.0 * WALKWAY_ENDS + 0.5:
+					continue
+				var way := (to - from) / span
+				var a := from + way * WALKWAY_ENDS
+				var b := to - way * WALKWAY_ENDS
+				if _segment_hits(rect, a, b):
+					if not out.has(index):
+						out.append(index)
+	return out
+
+
+static func _segment_hits(rect: Rect2, a: Vector2, b: Vector2) -> bool:
+	var lo := 0.0
+	var hi := 1.0
+	var d := b - a
+	for axis in 2:
+		var origin := a[axis]
+		var delta := d[axis]
+		var near := rect.position[axis]
+		var far := rect.end[axis]
+		if absf(delta) < 0.000001:
+			if origin < near or origin > far:
+				return false
+			continue
+		var t0 := (near - origin) / delta
+		var t1 := (far - origin) / delta
+		lo = maxf(lo, minf(t0, t1))
+		hi = minf(hi, maxf(t0, t1))
+		if lo > hi:
+			return false
+	return true
 
 
 ## The watch room's furniture. In the smallest tower storey -- 11.8 m2 in a
@@ -381,6 +465,7 @@ static func _add_stair(plan: HousePlan, lower: int, upper: int, avoid := Rect2()
 	if bool(pick.get("free_standing", false)):
 		record["free_standing"] = true
 	plan.stairs.append(record)
+
 
 
 ## Rects of each size that touch a wall at one corner, anywhere in the room: a

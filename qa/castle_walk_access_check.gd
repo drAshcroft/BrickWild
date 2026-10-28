@@ -11,6 +11,10 @@ extends RefCounted
 ##                whoever stands in its lower rooms has no way out
 ##   placement    `BrickWild.placement(...).door` is the real entrance, on or
 ##                beside the building, not the origin
+##   walkway      no table (or its chairs) across the way from where the flight
+##                below lets a walker off to the foot of the next, in a tight
+##                tower storey (CASTLE-FURNISH-WALK, WALK-1a17b2b3-4)
+##   hall_fire    a castle's great hall has a hearth (WALK-1a17b2f2-1)
 ##
 ## Each takes plain rows ({id, plan, mural_tower, ground_entry}) or a door and
 ## a box, so a fixture can hand it a wrong answer and see it refused.
@@ -26,6 +30,32 @@ static func stair_head_failures(rows: Array) -> Array[String]:
 		for failure in HouseStairCheck.check(plan):
 			if String(failure).begins_with("stair_head:"):
 				out.append("%s: %s" % [row.id, failure])
+	return out
+
+
+## Floor furniture standing across a tight room's way from the arrival to the
+## next flight.
+static func walkway_failures(rows: Array) -> Array[String]:
+	var out: Array[String] = []
+	for row in rows:
+		var plan: HousePlan = row.plan
+		if plan == null or plan.spec == null or plan.stairs.is_empty():
+			continue
+		for room in plan.room_count():
+			for index in CastleKeepPlan.walkway_blockers(plan, room):
+				out.append("%s: %s stands across the way through room %d (%s)"
+					% [row.id, String(plan.furniture[index]["key"]), room, String(plan.kind_of(room))])
+	return out
+
+
+## A hall range that is a great hall has a fire on its long wall.
+static func hall_fire_failures(rows: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	if not rows.has("hall"):
+		return out
+	var plan: HousePlan = rows["hall"].plan
+	if plan != null and plan.spec != null and plan.kind_of(0) == &"great_hall" and plan.hearth.is_empty():
+		out.append("hall: a great hall with no hearth")
 	return out
 
 

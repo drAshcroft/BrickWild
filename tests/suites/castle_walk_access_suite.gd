@@ -17,6 +17,14 @@ static func run() -> SuiteResult:
 	_want(result, rows.size() >= 4, "norman seed 1 produced %d tower plans" % rows.size())
 	_clean(result, CastleWalkAccessCheck.stair_head_failures(rows), "norman 1 tower stairs")
 	_clean(result, CastleWalkAccessCheck.tower_exit_failures(rows, norman), "norman 1 tower exits")
+	_clean(result, CastleWalkAccessCheck.walkway_failures(rows), "norman 1 tower walkways")
+	# --- edwardian seed 1: a 3.5 m hall range was a passage with no fire
+	var edwardian := _edwardian_rows(1)
+	_want(result, edwardian.has("hall") and edwardian["hall"].plan.kind_of(0) == &"great_hall",
+		"edwardian seed 1 has no great hall")
+	_clean(result, CastleWalkAccessCheck.hall_fire_failures(edwardian), "edwardian 1 hall")
+	_clean(result, CastleWalkAccessCheck.walkway_failures(edwardian.values()
+		.filter(func(r): return bool(r.get("mural_tower", false)))), "edwardian 1 tower walkways")
 	# --- the wizard tower house, and a norman one with a jog
 	var wiz := BrickWild.generate(BrickWild.default_request(&"castle", 1, &"wizard"))
 	var wiz_plan: HousePlan = CastleTowerPlan.generate(wiz.spec as CastleSpec, false)
@@ -32,6 +40,17 @@ static func run() -> SuiteResult:
 	var walled := _walled_row(wiz_plan)
 	_want(result, not CastleWalkAccessCheck.stair_head_failures([walled]).is_empty(),
 		"a stair into a wall was accepted")
+	var crossed := _table_across(rows)
+	if crossed.is_empty():
+		_want(result, false, "no tower storey to put a table across")
+	else:
+		_want(result, not CastleWalkAccessCheck.walkway_failures([crossed]).is_empty(),
+			"a table across the way between two flights was accepted")
+	var cold: Dictionary = edwardian["hall"].plan.hearth.duplicate()
+	edwardian["hall"].plan.hearth = {}
+	_want(result, not CastleWalkAccessCheck.hall_fire_failures(edwardian).is_empty(),
+		"a great hall with no hearth was accepted")
+	edwardian["hall"].plan.hearth = cold
 	var blind := _blind_row(rows)
 	if blind.is_empty():
 		_want(result, false, "no raised tower to build the no-exit control from")
@@ -48,6 +67,51 @@ static func run() -> SuiteResult:
 
 static func _norman(seed: int) -> CastleSpec:
 	return BrickWild.generate(_request(&"norman", seed, NORMAN_SITE)).spec as CastleSpec
+
+
+static func _edwardian_rows(seed: int) -> Dictionary:
+	var spec := BrickWild.generate(_request(&"edwardian", seed, NORMAN_SITE)).spec as CastleSpec
+	return preload("res://src/castle/castle_interiors.gd").primary(spec)
+
+
+## A copy of the first tower storey that has a flight each way, with a trestle
+## table laid across the middle of it.
+static func _table_across(rows: Array) -> Dictionary:
+	for row in rows:
+		var plan: HousePlan = row.plan
+		for room in plan.room_count():
+			var floor := HouseGeometry.room_floor_rect(plan, room)
+			var arrives := false
+			var leaves := false
+			for st in plan.stairs:
+				arrives = arrives or int(st.get("b", -1)) == room
+				leaves = leaves or int(st.get("a", -1)) == room
+			if not (arrives and leaves) or minf(floor.size.x, floor.size.y) > CastleKeepPlan.WALKWAY_ROOM_MAX:
+				continue
+			var copy := HousePlan.new()
+			copy.spec = plan.spec
+			copy.rooms = plan.rooms
+			copy.doors = plan.doors
+			copy.stairs = plan.stairs
+			# a table across the line between a flight's landing and the next foot
+			var rect := Rect2()
+			for st in plan.stairs:
+				if int(st.get("b", -1)) != room or not Rect2(st.get("head_landing", Rect2())).has_area():
+					continue
+				var head := Rect2(st["head_landing"]).get_center()
+				for out in plan.stairs:
+					if int(out.get("a", -1)) != room or not Rect2(out.get("foot_landing", Rect2())).has_area():
+						continue
+					var foot := Rect2(out["foot_landing"]).get_center()
+					if head.distance_to(foot) >= 2.2:
+						var mid := (head + foot) * 0.5
+						rect = Rect2(mid - Vector2(0.6, 0.6), Vector2(1.2, 1.2))
+			if not rect.has_area():
+				continue
+			copy.furniture = [{"key": "Table_Large", "rect": rect, "room": room, "storey": room,
+				"host": -1, "mounted": false, "cat": "table"}]
+			return {"id": "crossed", "plan": copy}
+	return {}
 
 
 static func _request(style: StringName, seed: int, site: Vector3) -> BuildingRequest:

@@ -17,6 +17,10 @@ extends RefCounted
 
 # ---- joints, in metres ----
 const RANGE_LAP := 0.4       # interior range lapping the wall it stands against
+## The narrowest hall range there is: 0.6 m walls either side leave the 3.0 m a
+## great hall needs (CastleInteriorPlans.MIN_HALL_SIDE). A 3.5 m range was planned as
+## a passage with no fire (CASTLE-FURNISH-WALK, Greywatch Keep).
+const HALL_W_MIN := 4.4
 const WING_LAP := 0.4        # manor wing lapping the range it meets
 const GATE_LAP := 0.3        # barbican lapping the gatehouse
 
