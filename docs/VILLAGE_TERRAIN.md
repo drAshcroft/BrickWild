@@ -2188,3 +2188,54 @@ form off: no island plan, 0.28 reached); purity.
   252 polygons painted both ways to identical cells and levels, and the scanline at
   least 5x faster (measured 270-380x). `fingerprint_village_ground`: the five cases
   the base finished are identical, strand-coast-hedge included.
+
+## Visual check (2026-10-28)
+
+VTER-VISUAL, the agent half. A village planned and built on each real ground
+(population 40, seed 1, form chosen by the planner, the way
+`visualqa/walk --village-terrain` does it), one overview and one eye-height
+view along the longest road. Tool: `tools/render_village_terrain_visual.gd`
+(not headless); full-size images in `artifacts/vter_visual/`. Each strip below
+is: the site's cell on the real contact sheet (`docs/images/settlements/`),
+the overview, the street.
+
+| Site | Form chosen | Buildings | Real sheet class |
+|---|---|---|---|
+| Manarola | water | 12 | cliff_coast_terraces, hillside, slope 27 % |
+| Hallstatt | dispersed | 11 | lake_strip_under_mountain, shore, slope 43 % |
+| Monpazier | planted | 12 | bastide_grid, planted, slope 5.7 % |
+
+![Manarola: sheet, overview, street](images/vter_visual/manarola_compare.jpg)
+![Hallstatt: sheet, overview, street](images/vter_visual/hallstatt_compare.jpg)
+![Monpazier: sheet, overview, street](images/vter_visual/monpazier_compare.jpg)
+
+What reads right: the ground carries the village. Roads follow the fall of the
+land, Hallstatt's lots sit on platforms with retaining walls and entry stairs,
+its street climbs a cliff with a church above it; Monpazier's streets form a
+rectangular grid round a green and a church, which is what a bastide is. The
+road bed, verge and house plinths agree with the mesh; no house floats.
+
+What reads wrong, plainly:
+
+* Every site looks like the same Norman timber village. There is no regional
+  palette or form of house, and the density is nothing like the real sheet:
+  Manarola is a packed stack on a cliff, Hallstatt a continuous lake strip,
+  Monpazier a dense walled grid. Here: 11-12 houses with lawn between them
+  (task VTER-VISUAL-CHARACTER).
+* The ground ends at the site edge in a slab or a vertical skirt on the flat
+  render stage, and the water is a flat rectangle (Hallstatt's lake is not
+  drawn at all). The hillside context is missing (VTER-VISUAL-SURROUND).
+* The automated 3D walk (probe `tools/probe_village_walk3d.gd`, the
+  `vstepswalk` case with the green form on the three grounds): 15 of 16 doors
+  are on the gates' island and have a path on every site (Monpazier 16/16
+  paths); the unreachable one is Manarola c/b-001, Hallstatt c/b-001, Monpazier
+  c/b-003. Hallstatt and Monpazier also show one open 0.13 m / 0.20 m seam
+  (VTER-VISUAL-DOOR-ISLAND). Climb on Hallstatt: 22.8 m, riser max 0.150.
+  Monpazier has no stair street, so the suite's stair checks do not apply
+  there; its component-count line is part of the same task.
+* The vision model (`waterfree vision look`, moondream) returned an empty
+  answer on these images; the judgements above are from reading the renders.
+
+The human walk is task VTER-VISUAL-WALK:
+`.\visualqa\walk.ps1 --village-terrain=manarola --seed=1` (and `hallstatt`,
+`monpazier`).
