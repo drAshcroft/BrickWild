@@ -19,8 +19,51 @@ static func run() -> SuiteResult:
 	_row(res)
 	_grid(res)
 	_plane(res)
+	_resolution(res)
 	_contour(res)
 	return res
+
+
+## VTER-REAL-VERTICAL: a plan on a sited view of a 90 m grid is read at the
+## grid's own resolution. One 90 m cell holds a 6 m rise (6.7 % across the
+## cell, 3.3 % as np.gradient of the nodes). The view's own gradient (the old
+## reading, 5 m cells) finds the 6.7 % edge; Ground reads the node field.
+## A turned plane keeps its 20 %, so the frame rotation is right.
+static func _resolution(res: SuiteResult) -> void:
+	# nodes are at x = -360, -270 ... 0, 90 ...: put the rise between 0 and 90
+	var rise := VillageTerrain.from_sampler(func(x: float, _z: float) -> float:
+			return 6.0 if x > 45.0 else 0.0, Rect2(-360, -360, 720, 720), 90.0)
+	var cell := 0.0
+	for c in range(rise.cols - 1):
+		var d := absf(float(rise.heights[c + 1]) - float(rise.heights[c]))
+		cell = maxf(cell, d)
+	res.checked += 1
+	if cell < 3.0:
+		res.fail("resolution control: the fixture holds no rise in one cell (%.2f m)" % cell)
+		return
+	var view := rise.sited_view(Vector2(20, 0), 0.0, Rect2(-60, -60, 120, 120), 5.0)
+	var g := VillageShape.Ground.new(view)
+	var worst_view := 0.0
+	var worst_dem := 0.0
+	for x in [-5.0, 0.0, 10.0, 25.0, 40.0]:
+		var p := Vector2(x, 0.0)
+		worst_view = maxf(worst_view, view.slope_at(p) * 100.0)
+		worst_dem = maxf(worst_dem, g.grad(Vector2(p.x, -p.y)).length() * 100.0)
+	res.checked += 1
+	if worst_view < 6.0:
+		res.fail("resolution control: the view's own gradient reads %.1f %%, the 90 m cell edge is 6.7 %%" % worst_view)
+	res.checked += 1
+	if worst_dem > 0.6 * worst_view or worst_dem < 2.5:
+		res.fail("resolution control: the DEM-resolution slope is %.1f %% against the view's %.1f %% (want the node gradient, ~3.3 %%)" % [worst_dem, worst_view])
+	# a turned plane: 20 % either way
+	var plane := _plane_ground()
+	var pv := plane.sited_view(Vector2(5, -7), 0.7, Rect2(-60, -60, 120, 120), 5.0)
+	var pg := VillageShape.Ground.new(pv)
+	res.checked += 1
+	var gv := pg.grad(Vector2(3.0, 4.0))
+	var s20 := gv.length() * 100.0
+	if absf(s20 - 20.0) > 0.5 or absf(gv.x - 0.2 * cos(0.7)) > 0.005 or absf(gv.y - 0.2 * sin(0.7)) > 0.005:
+		res.fail("resolution: a turned 20 %% plane reads %.2f %%" % s20)
 
 
 # ------------------------------------------------------------------ fixtures

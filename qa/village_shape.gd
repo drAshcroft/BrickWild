@@ -470,12 +470,27 @@ class Ground:
 	var gx := PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
 	var gy := PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
 	var _sorted := PackedFloat64Array()
+	## VTER-REAL-VERTICAL: a plan sited on a caller's grid is measured on a
+	## resampled view (5 m cells). A gradient read on the view finds a 90 m
+	## cell's own edge (a 2 m rise is 2.2 % over the cell and 5-7 % at a node
+	## step), where the real stock reads np.gradient of the DEM nodes (the
+	## 2-cell span). `dem` is that source grid (null: terrain is its own
+	## source), and grad() reads ITS node gradient, turned into the village frame.
+	var dem: VillageTerrain = null
+	var _dgx := PackedFloat64Array()
+	var _dgy := PackedFloat64Array()
 
 	func _init(t: VillageTerrain) -> void:
 		if t == null or not t.valid():
 			_sorted = z.duplicate()
 			return
 		terrain = t
+		var root := t
+		while root.parent != null:
+			root = root.parent
+		if root != t and root.valid() and root.cols >= 3 and root.rows >= 3:
+			dem = root
+			_node_gradient(root)
 		nx = t.cols
 		ny = t.rows
 		step = t.cell_m
@@ -493,6 +508,23 @@ class Ground:
 				gy[k * nx + c] = _diff(z, k * nx + c, k, ny, nx)
 		_sorted = z.duplicate()
 		_sorted.sort()
+
+	## np.gradient of the source grid's nodes, in its own row-major (+Y south) order.
+	func _node_gradient(r: VillageTerrain) -> void:
+		_dgx.resize(r.cols * r.rows)
+		_dgy.resize(r.cols * r.rows)
+		for k in range(r.rows):
+			for c in range(r.cols):
+				var i := k * r.cols + c
+				_dgx[i] = _diff_h(r.heights, i, c, r.cols, 1, r.cell_m)
+				_dgy[i] = _diff_h(r.heights, i, k, r.rows, r.cols, r.cell_m)
+
+	static func _diff_h(f: PackedFloat32Array, i: int, at: int, count: int, stride: int, h: float) -> float:
+		if at == 0:
+			return (f[i + stride] - f[i]) / h
+		if at == count - 1:
+			return (f[i] - f[i - stride]) / h
+		return (f[i + stride] - f[i - stride]) / (2.0 * h)
 
 	## np.gradient along one axis: central inside, one-sided at the ends.
 	func _diff(f: PackedFloat64Array, i: int, at: int, count: int, stride: int) -> float:
@@ -513,6 +545,26 @@ class Ground:
 	func grad(p: Vector2) -> Vector2:
 		if terrain == null:
 			return Vector2.ZERO
+		if dem != null:
+			# survey point -> village point -> source grid point; the node
+			# gradient there, turned back into the village frame, north up
+			var q := terrain.to_parent(Vector2(p.x, -p.y))
+			var fx := clampf((q.x - dem.origin.x) / dem.cell_m, 0.0, dem.cols - 1.001)
+			var fy := clampf((q.y - dem.origin.y) / dem.cell_m, 0.0, dem.rows - 1.001)
+			var j0 := int(fx)
+			var i0 := int(fy)
+			var tx := fx - j0
+			var ty := fy - i0
+			var n := i0 * dem.cols + j0
+			var w00 := (1 - tx) * (1 - ty)
+			var w10 := tx * (1 - ty)
+			var w01 := (1 - tx) * ty
+			var w11 := tx * ty
+			var gp := Vector2(
+				_dgx[n] * w00 + _dgx[n + 1] * w10 + _dgx[n + dem.cols] * w01 + _dgx[n + dem.cols + 1] * w11,
+				_dgy[n] * w00 + _dgy[n + 1] * w10 + _dgy[n + dem.cols] * w01 + _dgy[n + dem.cols + 1] * w11)
+			var gv := gp.rotated(-terrain.site_yaw)
+			return Vector2(gv.x, -gv.y)
 		return Vector2(_bil(gx, p), _bil(gy, p))
 
 	func _bil(field: PackedFloat64Array, p: Vector2) -> float:
