@@ -737,9 +737,26 @@ static func _furnish_room(plan: HousePlan, spec: HouseSpec, room: int,
 	if spec is ShopSpec and (spec as ShopSpec).business == &"barracks":
 		var room_area := HouseGeometry.room_area(plan, room)
 		if kind == &"dormitory" and room_area >= 150.0:
-			steps.append({"cat": "bed", "rule": &"row", "n": [4, 6], "min_n": 4,
+			# beside the first bed row, ahead of the footlockers: the lockers
+			# are one per pair of beds and must not take the wall a row needs
+			var second_row := {"cat": "bed", "rule": &"row", "n": [4, 6], "min_n": 4,
 				"pitch": 0.0, "aisle": 1.0, "along": "wall",
-				"avoid_window_walls": true, "avoid_door_lines": true, "opt": 1.0})
+				"avoid_window_walls": true, "avoid_door_lines": true, "opt": 1.0}
+			var first_bed := -1
+			for i in range(steps.size()):
+				if String(steps[i]["cat"]) == "bed":
+					first_bed = i
+					break
+			if first_bed >= 0:
+				steps.insert(first_bed + 1, second_row)
+			else:
+				steps.append(second_row)
+			# up to twelve sleepers: a locker for every pair of them
+			for i in range(steps.size()):
+				if String(steps[i]["cat"]) == "chest":
+					var lockers: Dictionary = (steps[i] as Dictionary).duplicate()
+					lockers["n"] = [6, 8]
+					steps[i] = lockers
 		if kind == &"armoury" and room_area >= 150.0:
 			steps.append({"cat": "stand", "key": "WeaponStand", "rule": &"row",
 				"n": [2, 4], "min_n": 2, "pitch": 0.0, "aisle": 0.9,

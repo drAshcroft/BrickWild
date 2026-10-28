@@ -34,75 +34,81 @@ const BENCH_SEAT_PITCH := 0.65 # metres per usable place along the measured benc
 static func run() -> SuiteResult:
 	var res := SuiteResult.new("shop archetypes")
 	for business in REQUIRED:
-		var spec := ShopSpec.new()
-		spec.business = business
-		spec.style = &"longhall" if business in [&"blacksmith", &"stable", &"carpenter", &"library", &"prison"] else &"townhouse"
-		spec.width = 14.0
-		spec.length = 18.0
-		if business in [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]:
-			spec.width = 20.0
-			spec.length = 26.0
-		if business == &"thieves_den":
-			spec.width = 30.0
-			spec.length = 24.0
-		if business == &"barracks":
-			spec.width = 18.0
-			spec.length = 28.0
-		if business == &"library":
-			spec.width = 18.0
-			spec.length = 28.0
-		if business == &"prison":
-			spec.width = 15.8
-			spec.length = 22.0
-		spec.height = 2.9
-		var plan := ShopGenerator.generate(spec, 33000 + absi(String(business).hash()) % 900)
-		var builder := HouseBuilder.new()
-		builder.build(plan)
-		res.checked += 1
-		var wants_rooms: Array = []
-		var wants_cats: Array = []
-		var wants = REQUIRED[business]
-		if wants is Dictionary:
-			wants_rooms = wants["rooms"]
-			wants_cats = wants["cats"]
-		else:
-			wants_rooms = [wants[0]]
-			wants_cats = wants.slice(1)
-		for kind in wants_rooms:
-			if not plan.has_kind(StringName(kind)):
-				res.fail("%s has no defining %s room" % [String(business), kind])
-		if business == &"prison":
-			var cells := 0
-			var oubliettes := 0
-			for room in range(plan.room_count()):
-				if plan.storey_of_room(room) == 0 and plan.kind_of(room) == &"cell": cells += 1
-				if plan.kind_of(room) == &"oubliette": oubliettes += 1
-			if cells < 3 or oubliettes != 1:
-				res.fail("prison archetype lacks at least three cells and one oubliette")
-			if not _has_key(plan, "WeaponStand"):
-				res.fail("prison archetype lacks a WeaponStand")
-		for cat in wants_cats:
-			if not _has_category(plan, String(cat)):
-				res.fail("%s has no defining %s fitting" % [String(business), cat])
-		if business in [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]:
-			for contract_failure in _int013_failures(plan, business):
-				res.fail("%s: %s" % [String(business), contract_failure])
-		if business == &"thieves_den":
-			for contract_failure in _thieves_den_failures(plan):
-				res.fail("thieves_den: %s" % contract_failure)
-		var report: Dictionary = HouseQA.new().check(plan, builder)
-		for failure in report["failures"]:
-			res.fail("%s: %s" % [String(business), failure])
-		for warning in report["warnings"]:
-			res.warn("%s: %s" % [String(business), warning])
-		for failure2 in shopfront_rules(spec, plan, builder):
-			res.fail("%s: %s" % [String(business), failure2])
-		if business == &"market_hall":
-			_market_hall_contract(res, plan, builder)
+		_check_business(res, business)
 	if REQUIRED.has(&"barracks"):
 		_check_barracks(res)
 	_check_lodging(res)
 	return res
+
+
+## One business of the sarchetype sweep, so a tool can run and report them one
+## at a time (tools/probe_sarchetype.gd).
+static func _check_business(res: SuiteResult, business) -> void:
+	var spec := ShopSpec.new()
+	spec.business = business
+	spec.style = &"longhall" if business in [&"blacksmith", &"stable", &"carpenter", &"library", &"prison"] else &"townhouse"
+	spec.width = 14.0
+	spec.length = 18.0
+	if business in [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]:
+		spec.width = 20.0
+		spec.length = 26.0
+	if business == &"thieves_den":
+		spec.width = 30.0
+		spec.length = 24.0
+	if business == &"barracks":
+		spec.width = 18.0
+		spec.length = 28.0
+	if business == &"library":
+		spec.width = 18.0
+		spec.length = 28.0
+	if business == &"prison":
+		spec.width = 15.8
+		spec.length = 22.0
+	spec.height = 2.9
+	var plan := ShopGenerator.generate(spec, 33000 + absi(String(business).hash()) % 900)
+	var builder := HouseBuilder.new()
+	builder.build(plan)
+	res.checked += 1
+	var wants_rooms: Array = []
+	var wants_cats: Array = []
+	var wants = REQUIRED[business]
+	if wants is Dictionary:
+		wants_rooms = wants["rooms"]
+		wants_cats = wants["cats"]
+	else:
+		wants_rooms = [wants[0]]
+		wants_cats = wants.slice(1)
+	for kind in wants_rooms:
+		if not plan.has_kind(StringName(kind)):
+			res.fail("%s has no defining %s room" % [String(business), kind])
+	if business == &"prison":
+		var cells := 0
+		var oubliettes := 0
+		for room in range(plan.room_count()):
+			if plan.storey_of_room(room) == 0 and plan.kind_of(room) == &"cell": cells += 1
+			if plan.kind_of(room) == &"oubliette": oubliettes += 1
+		if cells < 3 or oubliettes != 1:
+			res.fail("prison archetype lacks at least three cells and one oubliette")
+		if not _has_key(plan, "WeaponStand"):
+			res.fail("prison archetype lacks a WeaponStand")
+	for cat in wants_cats:
+		if not _has_category(plan, String(cat)):
+			res.fail("%s has no defining %s fitting" % [String(business), cat])
+	if business in [&"alchemist_laboratory", &"bathhouse", &"hospice", &"school"]:
+		for contract_failure in _int013_failures(plan, business):
+			res.fail("%s: %s" % [String(business), contract_failure])
+	if business == &"thieves_den":
+		for contract_failure in _thieves_den_failures(plan):
+			res.fail("thieves_den: %s" % contract_failure)
+	var report: Dictionary = HouseQA.new().check(plan, builder)
+	for failure in report["failures"]:
+		res.fail("%s: %s" % [String(business), failure])
+	for warning in report["warnings"]:
+		res.warn("%s: %s" % [String(business), warning])
+	for failure2 in shopfront_rules(spec, plan, builder):
+		res.fail("%s: %s" % [String(business), failure2])
+	if business == &"market_hall":
+		_market_hall_contract(res, plan, builder)
 
 
 ## INT-013's focused contract. Three measured footprints check the room

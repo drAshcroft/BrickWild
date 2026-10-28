@@ -1012,7 +1012,8 @@ const RECIPES := {
 	],
 	&"royal_chamber": [
 		{"cat": "bed", "rule": &"wall", "n": [1, 1], "opt": 1.0},
-		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 0.9},
+		# the sleeper's clothes chest is not a roll of the dice (stowage)
+		{"cat": "chest", "rule": &"wall", "n": [1, 1], "opt": 1.0},
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 2], "opt": 0.9},
 	],
 	&"guest_room": [
@@ -1024,7 +1025,8 @@ const RECIPES := {
 		{"cat": "bed", "rule": &"row", "n": [4, 6], "min_n": 4, "pitch": 0.0,
 			"aisle": 1.0, "along": "wall", "avoid_window_walls": true,
 			"avoid_door_lines": true, "opt": 1.0},
-		{"cat": "chest", "rule": &"wall", "n": [0, 2], "opt": 0.55},
+		# a footlocker holds two sleepers' clothes (stowage): one per pair of beds
+		{"cat": "chest", "rule": &"wall", "n": [3, 6], "opt": 1.0},
 		{"cat": "sconce", "rule": &"mounted", "n": [2, 3], "opt": 0.9},
 	],
 	&"armoury": [
@@ -1064,7 +1066,7 @@ const RECIPES := {
 		{"cat": "sconce", "rule": &"mounted", "n": [1, 1], "opt": 0.9},
 	],
 	&"cell": [
-		{"cat": "cage", "key": "Cage_Small", "rule": &"wall", "n": [1, 1], "opt": 1.0},
+		{"cat": "cage", "key": "Cage_Small", "rule": &"corner", "n": [1, 1], "opt": 1.0},
 	],
 	&"reading_room": [
 		{"cat": "hearth", "rule": &"wall", "n": [1, 1], "opt": 1.0},
@@ -1161,7 +1163,10 @@ const RECIPES := {
 		{"cat": "bed", "rule": &"row", "n": [2, 6], "min_n": 2,
 			"pitch": 0.0, "aisle": 1.0, "along": "wall", "avoid_window_walls": true,
 			"avoid_door_lines": true, "opt": 1.0},
-		{"cat": "nightstand", "rule": &"wall", "n": [0, 2], "opt": 0.6},
+		# No nightstand: 'wall' left it 2.5 m from the nearest bed of a row
+		# (bedside) and 'beside' a row bed misplaced it. Linen chests instead.
+		# patients' linen and clothes: one chest per pair of beds (stowage)
+		{"cat": "chest", "rule": &"wall", "n": [3, 5], "opt": 1.0},
 	],
 	&"dispensary": [
 		{"cat": "bookcase", "rule": &"wall", "n": [1, 1], "opt": 1.0},

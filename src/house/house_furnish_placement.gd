@@ -1959,6 +1959,18 @@ static func _in_door_line(plan: HousePlan, room: int, item: Dictionary) -> bool:
 static func place_row(plan: HousePlan, room: int, step: Dictionary,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator) -> void:
 	var cat: String = String(step["cat"])
+	# SHOP-ARCHETYPE-RED: a row of beds (dormitory, ward) keeps the door-swing
+	# gap too, as a hard pass first; a room that cannot lay any row that way
+	# gets the old search back, so no room is left without its beds.
+	if cat == "bed" and bool(step.get("avoid_door_lines", false)) 			and not step.has("door_gap_hard"):
+		var before := plan.furniture.size()
+		var saved_state := r.state
+		var hard := step.duplicate()
+		hard["door_gap_hard"] = true
+		place_row(plan, room, hard, blocked, zones, r)
+		if plan.furniture.size() > before:
+			return
+		r.state = saved_state
 	var choices: Array[String] = PropCatalog.of_category(cat)
 	if choices.is_empty():
 		return
@@ -2044,6 +2056,8 @@ static func place_row(plan: HousePlan, room: int, step: Dictionary,
 						var centre: Vector2 = a2 + along * t + n * out
 						var cand: Dictionary = HouseFurnishGeometry.candidate(key, centre, yaw, 1.0, sc)
 						if bool(step.get("avoid_door_lines", false)) and _in_door_line(plan, room, cand):
+							break
+						if step.has("door_gap_hard") 								and not _bed_candidate_clears_door_gaps(plan, room, Rect2(cand["rect"])):
 							break
 						# A ROW SHARES ONE AISLE, and that aisle is its use
 						# zone -- it is assigned below, once the row is known.
@@ -2426,7 +2440,9 @@ static func _place_corner(plan: HousePlan, room: int, key: String,
 				var off := Vector2(dir.x * sign_x, dir.y * sign_z) * (float(slide) * 0.25)
 				var cand: Dictionary = HouseFurnishGeometry.candidate(key, corners[ci] + off, 0.0,
 					1.0, 1.0, -1.0, zone_depth_override)
-				if HouseFurnishGeometry.fits(plan, room, cand, floor_rect, blocked, zones, extra):
+				# a corner slid into the strip beside a table is the diners' floor
+				# (table_band), not a corner: leave the piece out instead
+				if HouseFurnishGeometry.fits(plan, room, cand, floor_rect, blocked, zones, extra) 						and HouseFurnishScore._band_intrusion(plan, room, cand) == 0:
 					found = cand
 					slid = float(slide)
 					break

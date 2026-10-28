@@ -77,7 +77,8 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 		# a counter or a cauldron has no wishes of its own, but it may still
 		# be the piece the plan is arranged around
 		return _pin_bonus(plan, room, cand) \
-			- BAND_W * _band_crowding(plan, room, cand)
+			- BAND_W * _band_crowding(plan, room, cand) \
+			- BAND_W * _band_intrusion(plan, room, cand)
 	var rect: Rect2 = cand["rect"]
 	var c: Vector2 = rect.get_center()
 	# Only these preferences inspect a wall. Free-standing tables ask about
@@ -155,7 +156,8 @@ static func _affinity(plan: HousePlan, room: int, cand: Dictionary) -> float:
 	if String(aff.get("face", "")) == "focus":
 		score += _broadside_bonus(plan, room, rect)
 	return score + _pin_bonus(plan, room, cand) \
-		- BAND_W * _band_crowding(plan, room, cand)
+		- BAND_W * _band_crowding(plan, room, cand) \
+		- BAND_W * _band_intrusion(plan, room, cand)
 
 
 ## Nothing but a seat stands in the strip along a table's long side, the floor a
@@ -188,11 +190,54 @@ static func _band_crowding(plan: HousePlan, room: int, cand: Dictionary) -> int:
 			continue
 		for f in plan.furniture_of(room):
 			var q: Dictionary = plan.furniture[f]
-			if HouseFurnishWalkCheck._is_seat(String(q["key"])) \
-					or HouseFurnishWalkCheck._is_table(String(q["key"])) \
-					or not HouseFurnishWalkCheck._on_floor(q):
+			# The candidate has no seats yet, so every seat already in the room
+			# sits at ANOTHER table, and so does every other table: a second
+			# mess table 2.7 m from the first put its benches in the first's
+			# pull-out floor (pull_out, barracks scale 1.4). A mounted piece
+			# takes no floor.
+			if not HouseFurnishWalkCheck._on_floor(q) \
+					and not HouseFurnishWalkCheck._is_table(String(q["key"])):
 				continue
-			var overlap := band.intersection(Rect2(q["rect"]))
+			# a seat of another table brings its own pull-out floor with it
+			var body := Rect2(q["rect"])
+			if HouseFurnishWalkCheck._is_seat(String(q["key"])):
+				body = body.grow(HouseFurnishWalkCheck.SEAT_BAND)
+			var overlap := band.intersection(body)
+			if overlap.size.x > 0.1 and overlap.size.y > 0.1:
+				crowded += 1
+	return crowded
+
+
+## The other half of _band_crowding (SHOP-ARCHETYPE-RED): a piece placed AFTER
+## its room's table must not stand in the strip beside that table either --
+## the prison guardroom's floor candelabrum did, on the diners' side.
+static func _band_intrusion(plan: HousePlan, room: int, cand: Dictionary) -> int:
+	var key := String(cand["key"])
+	if HouseFurnishWalkCheck._is_seat(key) or HouseFurnishWalkCheck._is_table(key) \
+			or cand.get("mounted", false) or not PropCatalog.blocks_floor(key):
+		return 0
+	var body: Rect2 = cand["rect"]
+	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
+	var crowded := 0
+	for t in plan.furniture_of(room):
+		var tp: Dictionary = plan.furniture[t]
+		if not HouseFurnishWalkCheck._is_table(String(tp["key"])) or tp.get("mounted", false):
+			continue
+		var rect: Rect2 = tp["rect"]
+		var along_y := rect.size.x < rect.size.y
+		for side in [-1.0, 1.0]:
+			var band: Rect2
+			if along_y:
+				band = Rect2(Vector2(rect.position.x - HouseFurnishWalkCheck.SEAT_BAND
+					if side < 0 else rect.end.x, rect.position.y),
+					Vector2(HouseFurnishWalkCheck.SEAT_BAND, rect.size.y))
+			else:
+				band = Rect2(Vector2(rect.position.x, rect.position.y
+					- HouseFurnishWalkCheck.SEAT_BAND if side < 0 else rect.end.y),
+					Vector2(rect.size.x, HouseFurnishWalkCheck.SEAT_BAND))
+			if not floor_rect.intersects(band.grow(-HouseFurnishWalkCheck.TOL)):
+				continue
+			var overlap := band.intersection(body)
 			if overlap.size.x > 0.1 and overlap.size.y > 0.1:
 				crowded += 1
 	return crowded
