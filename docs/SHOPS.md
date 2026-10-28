@@ -228,3 +228,18 @@ These are `ShopPlanner` post-passes and furnishing overlays. Each one has a fail
 - The blind re-review of the 2026-10-26 re-renders was never done: the local vision model timed out. This affects apothecary, bakery, butcher, general store, tailor and tavern. Until a fresh reviewer looks, their YES ticks in this file are the implementer's, not independent ones.
 - Tailor: no dress form. It would need floor space. The station is the cutting cloth and shears on the counter.
 - Tavern: its station is the kitchen hearth. The door view cannot see the kitchen; `plan.jpg` can.
+
+### Blind review (2026-10-28), VISUAL-BLIND-REVIEWS
+
+Fresh `tools/render_shop_trades.gd` renders from current code, judged from the door-eye image and the four-point checklist above (counter, wares, station, store) before reading any implementer note. Images: `artifacts/renders/visualqa/blind_review_20261028/shop_<kind>.jpg`. `waterfree vision` ran (small model) but described every shop as a bedroom or living room with beds and books; it is not usable as a second opinion on these.
+
+| kind | verdict | visible reason |
+|---|---|---|
+| apothecary | PARTLY | canopied counter, shelves of small dark jars and green and red bottles read as potions; no still, mortar or bench seen; store not visible |
+| bakery | YES | loaves in bowls and on wall shelves, loaf at a clay dome oven in view; reads as a bakery |
+| butcher | PARTLY | red meat shapes on shelves and hung red joints at the far counter read as meat, but nothing says butcher over a red-stocked shop: no block, hooks or cleaver; store not visible |
+| general_store | YES | barrels, carrot crates, jars, cheese, scales on the counter, herbs; best match |
+| tailor | YES | hanging cloth strips in many colours, stacked folded bolts on counter and shelf; no sewing table or form |
+| tavern | PARTLY | bar with bottle and plate, stools, a cask; reads as a drinking room, but the door view shows no hearth or kitchen and the far counter holds one orb |
+
+The 2026-10-26 YES ticks for bakery, general store and tailor now stand independently; the others keep a concrete defect (backlog tasks SHOP-BLIND-*). The store (point 4) is still not seen in any door view.

@@ -783,3 +783,11 @@ bay between two columns; ring colonnade at the door 6/6.
 * Still open: the basilica flank niches (above) have no independent tick; the
   pylon hypostyle cannot be read from an exterior render (plan measure only);
   the void basilica hall stays dark.
+
+### Blind review (2026-10-28), VISUAL-BLIND-REVIEWS
+
+Fresh `render_sacred_exterior.gd` renders (side and entry) of `temple/basilica/blood/default/1/pinned-barn` and `temple/basilica/void/large/21325`, judged from the images and the open-item list only. Images: `artifacts/renders/visualqa/blind_review_20261028/temple_basilica_*__side.jpg` and `__entry.jpg`. `waterfree vision` was not run (unreliable earlier the same day, see SHOPS.md).
+
+* Flank niches: PARTLY. The blood flank has a rhythm of pilasters with tall red-framed dark recesses over small upper windows and a clerestory: it no longer reads as a blank barn wall. But the recesses are flat dark rectangles with no depth cue or content, so they read as windows, not niches. The void flank is a plainer grid of tall dark slots under small dark squares, nearly flat and monochrome grey.
+* Void hall too dark: NO (still too dark). From the entry the braziers and a central runner lead the eye and the columns are legible, but the far arch is a black slot and no idol or altar can be made out. The blood hall by comparison shows its idol, a throne dais and red light at the end of the axis. Filed as TEMPLE-BLIND-VOIDDARK and TEMPLE-BLIND-NICHEDEPTH.
+

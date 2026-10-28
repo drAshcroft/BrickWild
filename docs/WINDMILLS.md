@@ -192,3 +192,8 @@ godot --path . --script res://tools/render_windmills.gd
 → `artifacts/renders/windmills/`, a portrait per type plus rear views (the tail
 and fantail are behind the mill) and two close-ups (a windpump's head, a polder
 mill's wheel).
+## Blind review: the post mill (2026-10-28), VISUAL-BLIND-REVIEWS
+
+Re-rendered with `render_windmills.gd -- post` (seed 551, current code) and judged from the image alone against what a post mill is (a whole timber body on one post, turned by a tail pole, a stair to the door, sails on the front). Image: `artifacts/renders/visualqa/blind_review_20261028/windmill_post.png`. `waterfree vision` was not run on it (the model had shown itself unreliable on the same day).
+
+Verdict: PARTLY. Visible: a boxed board body with a gabled roof, a ladder to a door, sails at the front, and a tail pole behind. Not visible: the central post is a short stub under the body with no trestle, crosstrees or quarter-bars, so the box reads as perched on a mound rather than carried by a post; the tail pole ends in a small cog on a hair-thin vertical wire that reads as a stray stick; the roof is pale blue-grey against dark boards. The sails were seen only edge-on, so their lattice cannot be judged from this angle. Filed as WIND-BLIND-POSTSUPPORT.

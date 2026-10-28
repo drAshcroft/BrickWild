@@ -363,3 +363,20 @@ that it IS concentric at full size.
 - https://en.wikipedia.org/wiki/Caerphilly_Castle
 - https://en.wikipedia.org/wiki/Dover_Castle
 - https://en.wikipedia.org/wiki/Mont-Saint-Michel_Abbey
+
+## Blind review of style identity (2026-10-28), VISUAL-BLIND-REVIEWS
+
+Question (CASTLE-STYLE-IDENTITY): can a reader tell the styles apart and name each identity from one exterior? Fresh renders by `tools/render_blind_castles.gd` (seed 8102, 40 x 55 x 14, castle tier, one three-quarter view), judged against the identity lines in `docs/BUILDING_PERSONALITY_BRIEFS.md` and `CastleSpec.STYLES` only. Images: `artifacts/renders/visualqa/blind_review_20261028/castle_<style>.jpg`. `waterfree vision` gave a generic "white castle with blue roofs" for the chateau, then timed out on the next image; no discrimination, not usable.
+
+| style | verdict | visible reason |
+|---|---|---|
+| norman | YES | square corner towers with flat/pyramid caps, one dominant square keep, plain slit walls |
+| edwardian | PARTLY | drum towers with cones and a round keep, but a single ring at this seed (no concentric layering visible) and it looks like the chateau and bavarian |
+| crusader | YES | low flat-topped crenellated drums, stepped battered talus on every wall, square keep; strongest identity |
+| french_chateau | NO | same blue conical drums as edwardian; no dormers, steep ranges or chimney stacks visible; the hall is a plain gable. Not distinguishable from edwardian |
+| bavarian | PARTLY | purple cones and one very tall slender tower give a romantic skyline, but otherwise the chateau layout recoloured; no spire fineness |
+| japanese | YES | stacked dark tiered roofs on every tower and a stepped keep read as pagoda; walls are plain white boxes, no stone base |
+| moorish (extra) | PARTLY | sandstone colour and terracotta roofs set it apart; shape is Norman-like square towers with merlon stubs; no court arcade visible from outside |
+| elven (extra) | YES | curved wavy curtain walls and tall pointed green cones; unmistakable |
+
+Overall: four of eight read at once; edwardian, french_chateau and bavarian blur into one family of white drum towers under cones.
