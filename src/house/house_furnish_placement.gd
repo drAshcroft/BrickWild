@@ -201,6 +201,13 @@ static func _is_witch_hut(plan: HousePlan) -> bool:
 	return HouseFurnishingRecipes.is_ordinary_house(plan) and plan.spec.style == &"witch_hut"
 
 
+## HOUSE-BED-DOOR-GAP: the houses whose beds keep a door-swing gap -- ordinary
+## houses and the innkeeper's guest rooms (HouseSpec itself, no world family).
+static func _bed_keeps_door_gap(plan: HousePlan) -> bool:
+	return plan.spec != null and plan.spec.get_script() == HouseFurnishingRecipes.BASE_HOUSE_SPEC \
+		and plan.world_family == &""
+
+
 static func _bed_candidate_clears_door_gaps(plan: HousePlan, room: int, body: Rect2) -> bool:
 	for door_index in plan.doors_of(room):
 		var door: Dictionary = plan.doors[door_index]
@@ -1281,6 +1288,22 @@ static func _domestic_prep_scales(key: String) -> Array[float]:
 static func _place_against_wall(plan: HousePlan, room: int, key: String,
 		blocked: Array[Rect2], zones: Array[Rect2], r: RandomNumberGenerator,
 		step: Dictionary = {}) -> void:
+	# HOUSE-BED-DOOR-GAP: the bed's gap to a door is a soft affinity in the
+	# score, which a tight wall can lose (townhouse 2-storey seed 32102). An
+	# ordinary house's sleeping bed first looks only among spots that clear every
+	# door's swing plus WITCH_BED_DOOR_GAP; when none does, the RNG is put back
+	# and the old, soft search runs, so a room that cannot do better is unchanged.
+	if _bed_keeps_door_gap(plan) and not _is_witch_hut(plan) \
+			and PropCatalog.category(key) == "bed" and String(step.get("group", "")) == "sleep" \
+			and not step.has("door_gap_hard"):
+		var before := plan.furniture.size()
+		var saved_state := r.state
+		var hard := step.duplicate()
+		hard["door_gap_hard"] = true
+		_place_against_wall(plan, room, key, blocked, zones, r, hard)
+		if plan.furniture.size() > before:
+			return
+		r.state = saved_state
 	var floor_rect: Rect2 = HouseGeometry.room_floor_rect(plan, room)
 	var walls: Array[Dictionary] = HouseGeometry.room_walls(plan, room)
 	var best: Dictionary = {}
@@ -1440,7 +1463,8 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 							HouseFurnishGeometry.ordinary_sleep_access_zone(
 								Rect2(try_cand["zone"]), Rect2(try_cand["rect"]),
 								float(try_cand["yaw"])))
-					if _is_witch_hut(plan) and plan.kind_of(room) == &"bedroom" \
+					if ((_is_witch_hut(plan) and plan.kind_of(room) == &"bedroom") \
+							or step.has("door_gap_hard")) \
 							and PropCatalog.category(key) == "bed" \
 							and String(step.get("group", "")) == "sleep" \
 							and not _bed_candidate_clears_door_gaps(plan, room, Rect2(try_cand["rect"])):
