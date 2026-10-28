@@ -2730,13 +2730,16 @@ func _build_thatch_roll(layout: Dictionary, authored: Array) -> void:
 					lerpf(inner_y, outer_y, 0.75) + shoulder_h, z),
 				Vector3(outer_x, outer_y, z),
 			])
-			if not witch_roofcraft:
-				eave_profile = _cottage_eave_bolster(float(side), hx, z, faces)
+			# WITCH-THATCH-FORM: the hut's eave is the same round bundle as the
+			# cottage's, not the five-point hump it had (a square-cut edge).
+			eave_profile = _cottage_eave_bolster(float(side), hx, z, faces)
 			var eave_world := PackedVector3Array()
 			for profile_point in eave_profile:
 				eave_world.append(xf * profile_point)
 			component_slab("thatch_eave", eave_world, eave_range.y - eave_range.x,
 				SURF_ROOF, false)
+	if witch_roofcraft:
+		_build_witch_thatch_edges(layout, roll_cuts)
 	var ridge: float = HouseGeometry.ridge_half_for(spec, float(layout["span"]),
 		float(layout["along"]), plan.world_family)
 	if ridge <= 0.05:
@@ -2808,11 +2811,85 @@ func _build_thatch_roll(layout: Dictionary, authored: Array) -> void:
 				Vector3(left_x, left_top, z), Vector3(left_mid_x, left_mid_y, z),
 				Vector3(ridge_x, RoofShape.height_at(faces, Vector2(ridge_x, z)) + HouseGeometry.ROLL_H, z),
 				Vector3(right_mid_x, right_mid_y, z), Vector3(right_x, right_top, z)])
-			if not witch_roofcraft:
-				roll_profile = _cottage_ridge_saddle(ridge_x, z, faces)
+			# WITCH-THATCH-FORM: a saddle, not the five-point tent whose apex
+			# stood as a sharp spike at the gable.
+			roll_profile = _cottage_ridge_saddle(ridge_x, z, faces)
 			_roof_face(xf, roll_profile, SURF_ROOF, "thatch_roll_%d" % roll_index, false, HouseGeometry.ROLL_T)
 			roll_index += 1
 	host_end()
+
+
+## WITCH-THATCH-FORM: the hut's thatch has round edges and a brushed end.
+## (1) A rolled bundle runs up each gable rake (`thatch_verge`, an ellipse in the
+## plane across the rake, centred its own half-width in from the verge so it
+## stays inside the roof's plan). (2) The sawn reed ends hang a hand's breadth
+## below every eave and verge edge (`thatch_brush`, alternating lengths).
+## A half-hipped hut keeps its hips as they were: no rake, no bundle.
+func _build_witch_thatch_edges(layout: Dictionary, _roll_cuts: Array) -> void:
+	var xf: Transform3D = layout["transform"]
+	var hx: float = _eave_half_x(layout)
+	var hy: float = _eave_half_y(layout)
+	var faces: Array[PackedVector3Array] = layout["faces"]
+	var ridge_x: float = float(layout.get("ridge_x", 0.0))
+	var half_hip := HouseGeometry.uses_witch_half_hip_roof(spec, plan.world_family)
+	var brush_index := 0
+	var half_depth := RoofShape.DEPTH * 0.5
+	# the brushed ends, along each eave
+	var step := HouseGeometry.THATCH_BRUSH_PITCH
+	var count := maxi(int(floor(hy * 2.0 / step)), 1)
+	for side in [-1.0, 1.0]:
+		var edge_x: float = float(side) * (hx - HouseGeometry.THATCH_BRUSH_IN)
+		for k in range(count):
+			var z := -hy + (float(k) + 0.5) * (hy * 2.0 / float(count))
+			var top := RoofShape.height_at(faces, Vector2(edge_x, z))
+			if is_nan(top):
+				continue
+			var length := HouseGeometry.brush_length(k)
+			component_box("thatch_brush#%d" % brush_index,
+				Vector3(HouseGeometry.THATCH_BRUSH_W, length + 0.02, step * 0.92),
+				xf * Transform3D(Basis(), Vector3(edge_x, top - half_depth - length * 0.5 + 0.01, z)),
+				SURF_ROOF)
+			brush_index += 1
+	if half_hip:
+		return
+	# the rolled verges
+	var rake_in := HouseGeometry.VERGE_ROLL_A
+	for end in [-1.0, 1.0]:
+		var z: float = float(end) * (hy - rake_in)
+		for side in [-1.0, 1.0]:
+			var x_eave: float = float(side) * (hx - HouseGeometry.EAVE_ROLL_IN)
+			var y_eave := RoofShape.height_at(faces, Vector2(x_eave, z))
+			var y_ridge := RoofShape.height_at(faces, Vector2(ridge_x, z))
+			if is_nan(y_eave) or is_nan(y_ridge):
+				continue
+			var a := Vector3(x_eave, y_eave + 0.06, z)
+			var b := Vector3(ridge_x, y_ridge + 0.06, z)
+			var along := b - a
+			var length := along.length()
+			var dir := along / length
+			var nrm := Vector3(-dir.y, dir.x, 0.0) * (1.0 if dir.x > 0.0 else -1.0)
+			var mid := (a + b) * 0.5
+			var ring := PackedVector3Array()
+			for k in range(HouseGeometry.EAVE_ROLL_STEPS):
+				var t := TAU * float(k) / float(HouseGeometry.EAVE_ROLL_STEPS)
+				ring.append(xf * (mid + Vector3(0.0, 0.0, 1.0) * (HouseGeometry.VERGE_ROLL_A * cos(t))
+					+ nrm * (HouseGeometry.VERGE_ROLL_B * sin(t))))
+			component_slab("thatch_verge", ring, length, SURF_ROOF, false)
+			# brushed ends along the rake
+			var pieces := maxi(int(floor(length / step)), 1)
+			for k in range(pieces):
+				var f := (float(k) + 0.5) / float(pieces)
+				var rx := lerpf(x_eave, ridge_x, f)
+				var rz: float = float(end) * (hy - HouseGeometry.THATCH_BRUSH_IN)
+				var rtop := RoofShape.height_at(faces, Vector2(rx, rz))
+				if is_nan(rtop):
+					continue
+				var rlen := HouseGeometry.brush_length(k)
+				component_box("thatch_brush#%d" % brush_index,
+					Vector3(step * 0.92, rlen + 0.02, HouseGeometry.THATCH_BRUSH_W),
+					xf * Transform3D(Basis(), Vector3(rx, rtop - half_depth - rlen * 0.5 + 0.01, rz)),
+					SURF_ROOF)
+				brush_index += 1
 
 
 ## HS-THATCH: the cottage's rolled eave. An ellipse in the roof's local (x, y)

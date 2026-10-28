@@ -63,3 +63,14 @@ What became of each item in "Open" and "Observed" above.
 6. **Little variety between seeds.** Not addressed. small_1 and small_21325 share a plan; the clamp control is the 8102 hut by design.
 
 The deep eave (WITCH-DEEP-EAVE, 0.6 m on ashlar posts) also lands in the next render.
+
+## WITCH-THATCH-FORM (2026-10-27)
+
+A walker said the thatch "does not make sense: thatch has round corners and a brush end". Seen from the walk camera the hut had a five-point faceted eave hump, a tent-shaped ridge roll whose apex stood up as a spike at each gable, and flat square-cut verges with nothing on the rakes. `HouseBuilder._build_thatch_roll` and the new `_build_witch_thatch_edges` now give it:
+
+- **Round eaves.** The Witch eave is the cottage's elliptical bundle (`_cottage_eave_bolster`, 14 vertices, no corner over 26 degrees), not the hump.
+- **Saddle ridge.** The ridge roll is the cottage saddle (`_cottage_ridge_saddle`), crown turn 22.5 degrees, not the tent.
+- **Rolled verges.** `thatch_verge`: an ellipse (`VERGE_ROLL_A/B`) run up each of the four gable rakes, centred its own half-width in from the verge so it stays inside the roof's plan. A half-hipped hut has no rakes and gets none.
+- **Brushed ends.** `thatch_brush`: sawn reed ends 0.07 to 0.20 m long hang under every eave and verge edge at a 0.14 m pitch, lengths from a fixed low-discrepancy sequence (`HouseGeometry.brush_length`), so no two neighbours match and the edge is not a dentil course.
+
+`ThatchFormCheck` (`qa/thatch_form_check.gd`, run by `hwitchsize` on every hut) measures all four; its controls are the old hump, the old tent and a thatched cottage (soft eave and saddle but no verge roll or brush). `tools/render_witch_thatch.gd` renders the gable, side, eave and apex close-ups (`THATCH_TAG=name` prefixes the files in `artifacts/witch_followups/thatch/`). Blind review from the walk camera is still the user's; the renders show round eaves and verges and a ragged edge. Known: where the two verge rolls meet at the apex they cross as two cylinders and make a small round knob above the ridge; it reads as a thatcher's finial, not a spike.

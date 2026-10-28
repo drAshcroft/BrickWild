@@ -1368,6 +1368,21 @@ const EAVE_ROLL_A := 0.34
 const EAVE_ROLL_B := 0.26
 const EAVE_ROLL_IN := 0.32
 const EAVE_ROLL_STEPS := 14
+## WITCH-THATCH-FORM: the rolled verge (ellipse across the rake) and the brushed
+## reed ends that hang under every eave and verge edge.
+const VERGE_ROLL_A := 0.24
+const VERGE_ROLL_B := 0.17
+const THATCH_BRUSH_PITCH := 0.14
+const THATCH_BRUSH_IN := 0.05
+const THATCH_BRUSH_W := 0.07
+const THATCH_BRUSH_LONG := 0.2
+const THATCH_BRUSH_SHORT := 0.07
+
+
+## Reed ends are cut to no length: a fixed low-discrepancy sequence, so the same
+## hut always has the same edge and no two neighbours match.
+static func brush_length(k: int) -> float:
+	return THATCH_BRUSH_SHORT + (THATCH_BRUSH_LONG - THATCH_BRUSH_SHORT) * fposmod(float(k) * 0.7548776662, 1.0)
 ## Saddle ridge roll: half-width of the crown, and how far the skirts flare
 ## down the slope before they bury in the thatch.
 const RIDGE_ROLL_A := 0.28
