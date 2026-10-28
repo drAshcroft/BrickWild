@@ -29,7 +29,38 @@ static func run() -> SuiteResult:
 		_check_prop(res, row)
 	_check_palisade_run(res)
 	_check_determinism(res)
+	_check_true_scale(res)
 	return res
+
+
+## A hay rick is about two metres high and two across. The first one was a 3.4 m
+## egg that read as a pear (walk pins 7 and 26 Oct), so the real-world ceiling is
+## a rule, the dressing table reserves what the prop emits, and the old size is
+## the failing control.
+const RICK_MAX_HEIGHT := 2.6
+const RICK_MAX_WIDTH := 2.6
+
+
+static func _check_true_scale(res: SuiteResult) -> void:
+	var verdict := func(box: AABB) -> String:
+		if box.size.y > RICK_MAX_HEIGHT or box.size.x > RICK_MAX_WIDTH or box.size.z > RICK_MAX_WIDTH:
+			return "%.1f m wide and %.1f m high" % [maxf(box.size.x, box.size.z), box.size.y]
+		return ""
+	var props := PropKit.new(MeshKit.new(SURFACES), STONE, WOOD, ROOF, DARK)
+	var box: AABB = props.haystack(Vector3.ZERO)
+	res.checked += 1
+	var why: String = verdict.call(box)
+	if why != "":
+		res.fail("a haystack stands %s; a rick is about 2 m" % why)
+	var reserved: Vector2 = VillageDressCatalog.BUILT["haystack"]["size"]
+	res.checked += 1
+	if reserved.x < box.size.x - 0.01 or reserved.x > box.size.x + 0.3:
+		res.fail("the dressing table reserves %.2f m for a haystack that emits %.2f m"
+			% [reserved.x, box.size.x])
+	var old: AABB = PropKit.new(MeshKit.new(SURFACES), STONE, WOOD, ROOF, DARK) 		.haystack(Vector3.ZERO, 1.4, 2.6)
+	res.checked += 1
+	if (verdict.call(old) as String) == "":
+		res.fail("control: the 2.8 m, 3.4 m high haystack was not called too big")
 
 
 ## Each prop, as [name, callable, expected slack]. The slack is the overhang a

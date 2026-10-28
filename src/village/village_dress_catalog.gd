@@ -176,7 +176,7 @@ const BUILT := {
 	"well": {"size": Vector2(2.1, 2.1), "zone": 1.0},
 	"signpost": {"size": Vector2(0.8, 0.8), "zone": 0.0},
 	"lamp_post": {"size": Vector2(0.6, 0.6), "zone": 0.0, "light": true},
-	"haystack": {"size": Vector2(2.8, 2.8), "zone": 0.0},
+	"haystack": {"size": Vector2(2.2, 2.2), "zone": 0.0},
 	"boat": {"size": Vector2(1.6, 4.4), "zone": 0.8},
 	"drying_rack": {"size": Vector2(1.6, 3.0), "zone": 0.8},
 	"mill_wheel": {"size": Vector2(3.8, 0.8), "zone": 0.0},

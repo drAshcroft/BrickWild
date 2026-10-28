@@ -26,6 +26,10 @@ extends RefCounted
 ## placed. This is the same discipline `MassBuilder` keeps for buildings, and
 ## `PropKitSuite` reads the mesh back to prove it holds.
 
+## A hay rick: radius and height of the drum (the pole adds 0.25 m).
+const HAYSTACK_RADIUS := 1.1
+const HAYSTACK_HEIGHT := 2.0
+
 var _kit: MeshKit
 ## Which surface each material is: the masonry of a well head, the timber of
 ## a post, the thatch or shingle of a little roof, and the iron and shadow of
@@ -167,21 +171,23 @@ func fence_gate(at: Vector3, yaw := 0.0, width := 1.6, height := 1.5) -> AABB:
 
 # ------------------------------------------------------------------ the farm
 
-## A haystack: a revolved dome on a low ring of loose straw, with the pole it
-## was built round poking out of the top.
-func haystack(at: Vector3, radius := 1.4, height := 2.6) -> AABB:
+## A haystack: a rick, a straight-sided drum of straw under a cone cap, with
+## the pole it was built round poking a hand's breadth out of the top. A hay
+## rick is about two metres high; the first one here was a 3.4 m egg with a
+## 1.4 m radius that read as a pear (walk pins 7 and 26 Oct, Wolfmarch Green).
+func haystack(at: Vector3, radius := HAYSTACK_RADIUS, height := HAYSTACK_HEIGHT) -> AABB:
 	_begin()
 	var profile := PackedVector2Array([
-		Vector2(radius * 0.86, 0.0),
-		Vector2(radius, height * 0.28),
-		Vector2(radius * 0.88, height * 0.55),
-		Vector2(radius * 0.55, height * 0.82),
+		Vector2(radius * 0.94, 0.0),
+		Vector2(radius, height * 0.12),
+		Vector2(radius, height * 0.5),
+		Vector2(radius * 0.8, height * 0.62),
+		Vector2(radius * 0.42, height * 0.84),
 		Vector2(0.0, height),
 	])
 	_kit.revolve(profile, at, _roof, 14)
 	_round(at, radius, height)
-	_box(Vector3(0.1, height * 0.28, 0.1),
-		at + Vector3(0.0, height + height * 0.1, 0.0), _wood, 0.0)
+	_box(Vector3(0.06, 0.3, 0.06), at + Vector3(0.0, height + 0.1, 0.0), _wood, 0.0)
 	return _end()
 
 
