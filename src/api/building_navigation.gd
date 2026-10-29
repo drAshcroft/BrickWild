@@ -47,7 +47,7 @@ static func of(building) -> Dictionary:
 			polygons.append(Array(p))
 		storeys.append({"storey": level, "floor_y_m": _n(floor_y(plan, level)),
 			"navmesh": {"vertices_m": vertices, "polygons": polygons, "area_m2": _n(NavBake.area(mesh))}})
-	return {
+	return _finite_only({
 		"schema": SCHEMA,
 		"schema_version": SCHEMA_VERSION,
 		"supported": true,
@@ -57,7 +57,7 @@ static func of(building) -> Dictionary:
 		"stairs": _stairs(plan, meshes),
 		"doors": _doors(plan, meshes),
 		"furniture": _furniture(plan, meshes),
-	}
+	})
 
 
 ## A family that is not a HousePlan: its adapter's walk sources, baked the same
@@ -128,7 +128,7 @@ static func _of_family(building) -> Dictionary:
 		var use: Vector2 = NavBake.closest_point(meshes[level], f["pos"])
 		focus.append({"item": i, "key": String(f["key"]), "room": -1, "storey": level,
 			"use_m": [_n(use.x), _n(float(floor_ys.get(level, 0.0))), _n(use.y)]})
-	return {
+	return _finite_only({
 		"schema": SCHEMA,
 		"schema_version": SCHEMA_VERSION,
 		"supported": true,
@@ -138,7 +138,48 @@ static func _of_family(building) -> Dictionary:
 		"stairs": stairs,
 		"doors": doors,
 		"furniture": focus,
-	}
+	})
+
+
+## BG-014: a walk never carries a non-finite number. A row whose point is inf
+## or NaN (the storey's mesh baked to nothing, so there was no nearest point)
+## is dropped, and `omitted` says which row and why, so a consumer can tell
+## "no such door" from "a door we could not place". `omitted` is absent when
+## nothing was dropped; a storey with an empty mesh is named there too.
+static func _finite_only(data: Dictionary) -> Dictionary:
+	var omitted: Array = []
+	for storey in data["storeys"]:
+		if storey["navmesh"]["polygons"].is_empty():
+			omitted.append({"kind": "storeys", "storey": int(storey["storey"]),
+				"reason": "the floor navigation mesh baked to no polygons"})
+	for kind in ["stairs", "doors", "furniture"]:
+		var kept: Array = []
+		var rows: Array = data[kind]
+		for i in rows.size():
+			if is_finite_value(rows[i]):
+				kept.append(rows[i])
+			else:
+				omitted.append({"kind": kind, "index": i, "storey": int(rows[i].get("storey", rows[i].get("from_storey", -1))),
+					"reason": "no finite point on the storey's walk mesh (the mesh baked to no polygons)"})
+		data[kind] = kept
+	if not omitted.is_empty():
+		data["omitted"] = omitted
+	return data
+
+
+## True when every number inside `v` (numbers, arrays, dictionaries) is finite.
+static func is_finite_value(v) -> bool:
+	if v is float:
+		return is_finite(v)
+	if v is Array:
+		for x in v:
+			if not is_finite_value(x):
+				return false
+	elif v is Dictionary:
+		for k in v:
+			if not is_finite_value(v[k]):
+				return false
+	return true
 
 
 ## The height a person stands at on a storey: the slab's top.

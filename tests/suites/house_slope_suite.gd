@@ -17,6 +17,7 @@ extends RefCounted
 ##   every exterior door is reachable: within a riser of the ground, or down
 ##     a flight whose risers, treads and foot GroundFall's rules accept, and
 ##     the walk export publishes that route; the plan's own nav check passes
+##   BG-014: five sloped townhouses publish finite walks; a poisoned walk is swept
 ##   more than a storey of fall gives the house a bank storey with its own
 ##     door on the downhill wall
 
@@ -30,6 +31,7 @@ static func run() -> SuiteResult:
 	_contract(res)
 	for kind in [&"house", &"shop", &"church"]:
 		_family(res, kind)
+	_walk_finite(res)
 	return res
 
 
@@ -319,6 +321,68 @@ static func _church_doors(res: SuiteResult, label: String, g: GroundFall,
 		res.fail("%s: the west flight is not in the walk export" % label)
 	res.note("%s: terrace rise %.2f m at the west front, %d steps %s" % [label, rise,
 		(f["steps"] as Array).size(), f["direction"]])
+
+
+# ------------------------------------------- BG-014: a walk is always finite
+
+## Five Wuunafu townhouses on 0.5 to 0.75 m of fall (VoxelGames BG-014, 0.1.5):
+## the copied request params, not the site file. b-019 and b-020 once baked a
+## ground storey to no polygons -- a stair obstruction a centimetre off the floor
+## edge -- and published every inside_m and use_m as inf.
+const WALK_CASES := {
+	"b-015": {"downhill": 345.0, "fall": 0.75, "width": 11.5, "length": 15.0, "seed": 3310524424, "purpose": "none"},
+	"b-019": {"downhill": 195.0, "fall": 0.5, "width": 10.2, "length": 13.2, "seed": 3310524428, "purpose": "none"},
+	"b-020": {"downhill": 315.0, "fall": 0.75, "width": 9.8, "length": 12.8, "seed": 3310524429, "purpose": "none"},
+	"b-021": {"downhill": 240.0, "fall": 0.75, "width": 9.5, "length": 12.3, "seed": 3310524430, "purpose": "none"},
+	"b-022": {"downhill": 210.0, "fall": 0.75, "width": 9.2, "length": 11.9, "seed": 3310524431, "purpose": "none"},
+}
+
+
+static func _walk_finite(res: SuiteResult) -> void:
+	for key in WALK_CASES:
+		var c: Dictionary = WALK_CASES[key]
+		var req := BuildingRequest.from_dict({"schema": "brickwild.request", "schema_version": 1,
+			"kind": "house", "style": "townhouse", "material": "timber", "enclosure": "none",
+			"water": "none", "period": 1200, "orientation": 0.0, "height": 2.6, "storeys": 2,
+			"purpose": c["purpose"], "seed": str(c["seed"]), "width": c["width"], "length": c["length"],
+			"ground_fall_m": c["fall"], "ground_downhill_deg": c["downhill"]})
+		var b: GeneratedBuilding = BrickWild.generate(req)
+		var walk: Dictionary = BrickWild.navigation(b)
+		res.checked += 1
+		if not walk.get("supported", false) or not BuildingNavigation.is_finite_value(walk):
+			res.fail("%s: the published walk carries a non-finite number" % key)
+		res.checked += 1
+		if walk.has("omitted"):
+			res.fail("%s: the walk dropped rows it should have placed: %s" % [key, walk["omitted"]])
+		for storey in walk.get("storeys", []):
+			res.checked += 1
+			if storey["navmesh"]["polygons"].is_empty():
+				res.fail("%s: storey %d baked to no polygons" % [key, int(storey["storey"])])
+		res.checked += 1
+		if (walk.get("furniture", []) as Array).is_empty():
+			res.fail("%s: no furniture row survived" % key)
+	# the failing controls
+	var ctl := BuildingRequest.from_dict({"schema": "brickwild.request", "schema_version": 1,
+		"kind": "house", "style": "townhouse", "material": "timber", "enclosure": "none",
+		"water": "none", "period": 1200, "orientation": 0.0, "height": 2.6, "storeys": 2,
+		"purpose": "none", "seed": "3310524428", "width": 10.2, "length": 13.2,
+		"ground_fall_m": 0.5, "ground_downhill_deg": 195.0})
+	var building: GeneratedBuilding = BrickWild.generate(ctl)
+	var src: Dictionary = HouseWalkSources.sources(building.plan)
+	res.checked += 1
+	if not NavBake._bake_once(src[0]["floor"], src[0]["obstacles"], BuildingNavigation.AGENT_RADIUS)["polygons"].is_empty():
+		res.fail("control: b-019's ground storey no longer defeats a plain bake, so the retry guards nothing; find the case that does")
+	var good: Dictionary = BrickWild.navigation(building)
+	var poisoned: Dictionary = good.duplicate(true)
+	poisoned["doors"][0]["inside_m"] = [INF, 0.0, INF]
+	res.checked += 1
+	if BuildingNavigation.is_finite_value(poisoned):
+		res.fail("control: is_finite_value passed a walk with an inf point")
+	var swept: Dictionary = BuildingNavigation._finite_only(poisoned)
+	res.checked += 1
+	if not BuildingNavigation.is_finite_value(swept) or not swept.has("omitted") 			or swept["doors"].size() != good["doors"].size() - 1:
+		res.fail("control: an injected inf door was not dropped and reported")
+	res.note("BG-014: %d sloped townhouses publish finite walks; the control poisons a door and sees it omitted" % WALK_CASES.size())
 
 
 # ------------------------------------------------------------------ helpers

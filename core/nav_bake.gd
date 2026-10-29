@@ -16,9 +16,46 @@ const PLACES := 0.001
 const CELL := 0.01
 ## How far every floor outline is grown before the union.
 const WELD := 0.01
+## BG-014: when the baker's convex partition fails on a floor that has area
+## (it returns no polygons at all), the obstructions are grown by these amounts
+## in turn and the bake is tried again. A stair or a wall-hugging item that
+## stops a centimetre short of a floor edge leaves a sliver the partition
+## cannot triangulate; a couple of centimetres of growth closes it.
+const RETRY_GROW := [0.02, 0.05, 0.1]
 
 
 static func bake(floor: Array[PackedVector2Array], obstacles: Array[PackedVector2Array],
+		radius: float) -> Dictionary:
+	var mesh: Dictionary = _bake_once(floor, obstacles, radius)
+	if not mesh["polygons"].is_empty() or obstacles.is_empty() or not _has_area(floor):
+		return mesh
+	for grow in RETRY_GROW:
+		var grown: Array[PackedVector2Array] = []
+		for poly in obstacles:
+			if poly.size() < 3:
+				continue
+			for g in Geometry2D.offset_polygon(_wound(poly), grow):
+				if not Geometry2D.is_polygon_clockwise(g):
+					grown.append(g)
+		mesh = _bake_once(floor, grown, radius)
+		if not mesh["polygons"].is_empty():
+			return mesh
+	return mesh
+
+
+static func _has_area(floor: Array[PackedVector2Array]) -> bool:
+	for poly in floor:
+		if poly.size() >= 3 and absf(Poly.area(poly)) > 4.0 * radius_floor():
+			return true
+	return false
+
+
+## A floor smaller than a person's footprint is allowed to bake to nothing.
+static func radius_floor() -> float:
+	return HouseGeometry.PERSON_RADIUS * HouseGeometry.PERSON_RADIUS
+
+
+static func _bake_once(floor: Array[PackedVector2Array], obstacles: Array[PackedVector2Array],
 		radius: float) -> Dictionary:
 	var source := NavigationMeshSourceGeometryData2D.new()
 	# The baker unions outlines by the non-zero rule, so two overlapping
