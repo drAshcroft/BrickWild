@@ -2263,9 +2263,9 @@ What reads wrong, plainly:
   Manarola is a packed stack on a cliff, Hallstatt a continuous lake strip,
   Monpazier a dense walled grid. Here: 11-12 houses with lawn between them
   (task VTER-VISUAL-CHARACTER).
-* The ground ends at the site edge in a slab or a vertical skirt on the flat
-  render stage, and the water is a flat rectangle (Hallstatt's lake is not
-  drawn at all). The hillside context is missing (VTER-VISUAL-SURROUND).
+* (Fixed in the renders by VTER-VISUAL-SURROUND, below.) The ground ended at
+  the site edge in a slab or a vertical skirt on the flat render stage, and the
+  water was a flat rectangle (Hallstatt's lake was not drawn at all).
 * The automated 3D walk (probe `tools/probe_village_walk3d.gd`, the
   `vstepswalk` case with the green form on the three grounds): first run, 15
   of 16 doors on the gates' island on each site (Manarola c/b-001, Hallstatt
@@ -2277,6 +2277,43 @@ What reads wrong, plainly:
 The human walk is task VTER-VISUAL-WALK:
 `.\visualqa\walk.ps1 --village-terrain=manarola --seed=1` (and `hallstatt`,
 `monpazier`).
+
+### The ground and water round the site (VTER-VISUAL-SURROUND)
+
+Decided: the built ground mesh is NOT extended past the site. VoxelGames and
+Dm_View own the terrain round a village, and a mesh past the site would overlap
+theirs. The render stage draws the context instead
+(`tools/vter_surround.gd`, called by `tools/render_village_terrain_visual.gd`;
+`git diff src/ core/ qa/` is empty):
+
+* the parent grid (`plan.ground.parent`, mapped by `to_parent`) beyond the site
+  as a separate mesh, a ring of cells out to 2.4 km, 2.5 m cells at the site
+  edge growing outward. Its height is the BUILT edge height at the site edge,
+  easing to the fixture's over 40 m, so it meets the built ground without a
+  crack. Colour: desaturated, greyer where steep, easing to haze with distance.
+* water at `water_level_m` over the context cells where the grid lies at or
+  below it (a 0.25 m band, so Manarola's sea at 0.0 and Hallstatt's lake at
+  503 m both come out), the shore being where the grid crosses the level.
+  Those cells are sunk 2.5 m below the level as a bed. The built water inside
+  the site is given the same material, so it reads as one sea.
+* the skirt is removed from the DISPLAYED model only: triangles whose three
+  vertices lie on one site edge line (both faces of each wall quad). The mesh
+  the builder returns, and every check on it, still has its skirt.
+* the stage's earth plane, at y = 0, is moved to the lowest context height
+  (it was 500 m under Hallstatt).
+
+![Manarola: overview, street](images/vter_visual/manarola_surround.jpg)
+![Hallstatt: overview, street](images/vter_visual/hallstatt_surround.jpg)
+![Monpazier: overview, street](images/vter_visual/monpazier_surround.jpg)
+
+Now: ground continues past the site on all three, Manarola's sea and Hallstatt's
+lake are shaped by the grid, and no slab or wall shows at the edge. Monpazier's
+context is nearly flat farmland in haze (84 m of relief over the whole grid), so
+it reads as ground, not as hills. The `*_compare.jpg` strips above are the
+before. Known: the 30 m source grid gives the Manarola shoreline a stair-step
+edge; a faint rectangle of the built sea still shows against the context sea.
+A full three-site render takes 5-8 minutes loaded (Hallstatt ~4 m); the
+renderer once segfaulted at exit on a three-site run, one site at a time is safe.
 
 ### The three stranded doors (VTER-VISUAL-DOOR-ISLAND)
 

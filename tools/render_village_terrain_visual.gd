@@ -9,6 +9,7 @@ extends "res://tools/render_shots.gd"
 ## form), seed 1, so the walk and the picture are of the same village.
 
 const VISUAL_OUT := "res://artifacts/vter_visual"
+const Surround := preload("res://tools/vter_surround.gd")
 
 
 func _init() -> void:
@@ -34,6 +35,14 @@ func _init() -> void:
 			continue
 		var model := VillageAssembler.build(plan)
 		_root3d.add_child(model)
+		# the ground beyond the site and the water, drawn by the stage (VTER-VISUAL-SURROUND)
+		var surround := Surround.build(plan, model)
+		for node in surround["nodes"]:
+			_root3d.add_child(node)
+		var stage_floor := _stage_floor()
+		if stage_floor != null:
+			stage_floor.position.y = float(surround["floor_y"]) - 1.0
+		print("VISUAL_SURROUND ", site, " water_tris=", surround.get("water_tris", 0), " floor_y=", surround["floor_y"])
 		var focus := Vector3.ZERO
 		var lo := Vector2(1e9, 1e9)
 		var hi := Vector2(-1e9, -1e9)
@@ -73,6 +82,10 @@ func _init() -> void:
 			_cam.look_at(t, Vector3.UP)
 			await _shoot("%s/%s_street.jpg" % [VISUAL_OUT, site])
 		model.queue_free()
+		for node in surround["nodes"]:
+			node.queue_free()
+		if stage_floor != null:
+			stage_floor.position.y = 0.0
 		await process_frame
 	quit()
 
@@ -83,3 +96,12 @@ func _shoot(path: String) -> void:
 		await RenderingServer.frame_post_draw
 	_vp.get_texture().get_image().save_jpg(path, 0.9)
 	print("VISUAL_SHOT ", path)
+
+
+## The stage's big earth plane, which sits at y = 0: on a 500 m lake it is far
+## below the village, so the surround's own floor height stands in for it.
+func _stage_floor() -> MeshInstance3D:
+	for c in _root3d.get_children():
+		if c is MeshInstance3D and (c as MeshInstance3D).mesh is PlaneMesh:
+			return c
+	return null
