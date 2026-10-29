@@ -291,7 +291,63 @@ Kept: `house_nav_hosted_floor_test`, `room_local_nav_guard_test`,
 
 Decision (owner, 2026-10-28): triage, do not restore wholesale. A removed
 fixture comes back only if no current suite fails when its rule is broken.
-The work is LIVE-FIXTURE-TRIAGE; record each fixture's outcome here.
+The work was LIVE-FIXTURE-TRIAGE. Outcome, one row per fixture:
+
+Method. Every removed script was first run unchanged against today's code
+(`artifacts/fixture_triage/run/*.log`). Then, for each rule, one scratch edit
+of the source that violates exactly that rule was run against the candidate
+current suites (`artifacts/fixture_triage/brk_*.log`) and reverted (`git diff`
+of src, qa, core and tools empty afterwards). "Control" means the restored
+fixture itself failed under the same scratch break
+(`artifacts/fixture_triage/ctl_*.log`, `brk_*_ctl*.log`). Restored fixtures run
+through `tests/suites/native_fixture_suite.gd`, which runs each script in its
+own Godot process and passes on exit code 0. They are named suites (`nfgeom`,
+`nftempleshort`, `nftemple`, `nfchurchshort`, `nfchurch`, `nfhouse`,
+`nfhouseslow`) in `EXTRA`, placed in lanes (see below) and gathered in
+`lane:native-fixtures`. They were orphans because no suite or lane named
+them: a native `tests/*.gd` script is run by hand, so a script nothing
+references is invisible to every lane.
+
+| Fixture | Rule it guarded | Verdict | Evidence |
+|---|---|---|---|
+| `walk_floor_edge_test` | WalkGrid closes a shared floor edge by 0.05 mm, never a 1 mm crack | RESTORED (`nfgeom`) | EPS 0.00005 -> 0.01: `poly` fails (2). Seam closing removed: `poly` and `wgridfill` PASS, fixture fails 2 (`brk_walkfloor*.log`) |
+| `mesh_support_closed_edge_test` | MeshProbe floor support is a closed set: edges and vertices count, 1 mm beyond and wrong height do not | RESTORED (`nfgeom`) | too strict (edge test `< 0.001`): `rite` fails 60, guarded. Too loose (tolerance 0.5 m): `rite` and `twalk` PASS, fixture fails 36 (`brk_meshsup*.log`) |
+| `meshkit_open_edge_mapping_test` | `slab_poly(open_edges)` indices map to the caller's original boundary segments | RESTORED (`nfgeom`) | open edges ignored: `lane:geom-core` + `lane:church-change` (11 suites, 12409 checks) PASS, fixture fails 2 (`brk_openedge*.log`) |
+| `temple_ground_entry_contract_test` | Ziggurat ground paving and two-metre headroom at the first chamber | RESTORED (`nftempleshort`) | `terrace_height` x0.5: `temple_ziggurat`, `temple_pylon`, `twalk` pass; `rite` fails 4 on an unrelated no_overlap rule; fixture fails 40 (`brk_temple.log`, `brk_ground_ctl.log`) |
+| `pylon_native_architecture_test` | Pylon: paired battered towers, open court depth, hypostyle roof and sky slots, torch bearings | RESTORED (`nftemple`) | tower depth 0.5 m and court depth 1.0 m: `temple_pylon` (1166 checks) PASSES; fixture fails 255 (`brk_pylon_ctl.log`) |
+| `rotunda_native_architecture_test` | Rotunda open arcade: published bounds, dome bearing, oculus, pier removal controls | RESTORED, UPDATED (`nftemple`) | red on today's code: SACRED-ROTUNDA-PERISTYLE widened `plan_extent`, so the bounds formula was updated. Finding: size-0 peristyle geometry stands 21.6 mm outside `plan_extent` (10.3776 against 10.356), absorbed by a 3 cm tolerance. Control: peristyle extent narrowed, fixture fails (`ctl_rotunda_native_architecture_test.log`) |
+| `church_arcade_contract_test` | A 0.56 m wide body at 0.1, 0.8 and 1.7 m passes every aisle arcade opening, one and two ring | RESTORED (`nfchurch`, ~5 min) | arcade opening top lowered: `chwalk`, `churchaperture`, `sacredseq`, `church`, `normals` pass; `massing` fails on chapel `size_match` only; fixture fails 42 (`brk_church*.log`, `brk_arcade_ctl.log`) |
+| `sacred_render_selector_test` | `tools/render_sacred_acceptance.gd` selects the frozen 234 requests, 702 images | RESTORED (`nfchurchshort`) | no suite references the tool (grep of tests/ and qa/). Control: default views cut to one, fixture fails (`ctl_sacred_render_selector_test.log`) |
+| `house_personality_camera_test` | `tools/render_witch_personality.gd` camera body is clear of furniture and reachable; a whole-room blocker is refused | RESTORED (`nfhouseslow`) | no suite references the tool. Control: obstruction and reachability tests removed, fixture fails (`ctl_camera2.log`). Removing only the obstruction test is NOT caught: reachability also refuses the blocker |
+| `upper_flight_approach_test` | `HouseStairCheck._approach` finds a measured Cabinet blocking the upper flight's arrival-to-foot route | RESTORED (`nfhouse`) | check skips storeys above 0: `walkpins` (77 checks) PASSES, fixture fails (`brk_upper*.log`) |
+| `house_hearth_mesh_contract_test` | Ordinary fireplace breast: every logged part is emitted, the mouth reaches its wall, mutants are caught | RESTORED (`nfhouse`) | `hearth_lintel` not emitted: `hexterior`, `hcomponent`, `hwitchflue` pass and `houseqacore` reports no lintel complaint; fixture fails (`brk_hearth*.log`, `ctl_house_hearth_mesh_contract_test.log`) |
+| `domestic_hearth_flue_scope_test` | A selected native fireplace forces its real flue; specialist scopes keep their own chimney draw | RESTORED (`nfhouse`) | forcing removed: `hexterior`, `hwitchflue`, `hcomponent` pass; `houseqacore` (503 s, baseline red with 107 failures) cannot be told from noise; fixture fails (`ctl_domestic_hearth_flue_scope_test.log`) |
+| `domestic_hearth_flue_trace_test` | Requested ordinary hearths against emitted flue masses | RESTORED (`nfhouseslow`) | same break as flue scope; fixture fails (`ctl_domestic_hearth_flue_trace_test.log`) |
+| `domestic_hearth_tending_test` | Plan-owned, reachable "hearth tending" zone for ordinary cottages and farmhouses only | RESTORED (`nfhouseslow`) | no suite or check names the zone (grep of tests/ and qa/). `reserve_domestic_hearth_tending` made a no-op, fixture fails (`ctl_domestic_hearth_tending_test.log`) |
+| `house_clothes_storage_test` | Clothes storage is a separate usable closed piece (Cabinet front, a shelf is not storage, a blocked lid is not storage) | RESTORED (`nfhouse`) | bedside and stowage checks fire in `houseqacore` today, but the blocked-lid and miniature-chest controls exist only here. Lid-overlap test removed, fixture fails (`ctl_house_clothes_storage_test.log`) |
+| `domestic_groups_fixture` | Recipe groups (cooking, sleep, eating) are mandatory in the domestic recipes and never leak into shop or keep recipes | RESTORED, UPDATED (`nfhouse`) | red on one point: a ShopSpec kitchen now reads `SHOP_KITCHEN`, so the scope check expects that row. Control: shop branch disabled, fixture fails (`ctl_domestic_groups_fixture.log`) |
+| `temple_circular_public_api_focus` | Public API contract of a Gothic church, a Basilica and a Rotunda | LEFT DELETED, guarded by `libraryquick` | the script only calls `LibrarySuite._check_family`, `_check_contract` and `_check_documents` on three requests; `libraryquick` runs the same functions on every kind (structural proof, no scratch break) |
+| `house_activity_groups_test`, `house_activity_coverage_test` | Generated ordinary houses satisfy their activity groups (cooking hearth, eating table and seat, sleep) | LEFT DELETED, stale and red; family guarded by the houseqa programme checks | both fail on today's code because they count a hearth as a furniture role, and the hearth is plan-owned (`HouseGeometry.hearth_breast`, see `qa/house_furnish_programme_check.gd`). `houseqacore` reports the same families today: 11 `programme: hall has no table`, 3 `worktop`, 3 `stowage`, 3 `bedside`, 12 `seat_count` (`brk_hearth2.log`). `house_activity_coverage_test` has no assertions, it prints a report |
+| `house_sleep_surface_fallback_test`, `house_surface_host_test` | Sleep shelf bound to a host; measured fittings; mantel inside the logged mass | LEFT DELETED, stale and red | same hearth-as-furniture staleness (`cooking is missing authored source role hearth (0/1)`); `hearth_mantel protrudes beyond the logged breast mass` follows from the mantel slab added later. Guarded in part by the `houseqacore` bedside, lamp and sparse checks |
+| `house_threshold_test` | Domestic stairs are human scale or recorded infeasible | LEFT DELETED, guarded by `walkpins` and houseqa `HouseStairCheck` | fails 3 on today's code (stair body sweep, trade control). The same rules fire in `houseqacore` (`stair_pitch`, `stair_head`, `stair_guard`, `stair_approach`) and `walkpins._stairs` pins them with controls |
+| `townhouse_office_recipe_test` | Seed 8102 townhouse office: writing group, three shelf groups, chair and prop pair | LEFT DELETED, stale and red | its exact-seed expectations moved ("small invented an office", 0 shelf groups); `TOWNHOUSE_OFFICE_ACTIVITY` is still in `house_furnishing_recipes.gd` but nothing asserts it by name |
+| `witch_cauldron_heat_test` | Every Cauldron placement gets one matching heat cue (embers, flame cores, warmth) | LEFT DELETED, stale and red | cue count equals Cauldron count; the failing step matches cue to placement by prop-root name and one indoor cue no longer matches. `hexterior` names `EmberBed`, `FlameCore` and `CauldronWarmth` |
+| `sacred_structural_contract_test` | Emitted apertures, bearing and routes with removal controls (church and temple) | LEFT DELETED in parts, stale and red | 38 failures of three kinds: Nordic side walls "not on timber slot 5 alone", Byzantine crossing span hosts renamed `nave_bay_*`, ziggurat "no column-supported beam course". Bearing removal controls live on in `rite` (`temple_qa.gd` `without_*`; the closed-edge break above made it fail 60), apertures in `churchaperture`, routes in `chwalk` and `twalk` |
+| `test_visualqa_organizer.py` | Python organiser of the visual QA sheets | NOT TRIAGED | a Python unit test of a tool, not a native fixture; out of scope |
+
+Counts: 16 restored (2 of them updated), 1 guarded and left deleted, 8 left
+deleted as stale and red with their rule family guarded in part, 1 out of
+scope. The 8 stale ones are the residual: LIVE-FIXTURE-RESIDUAL asks for a
+rewrite of each against today's plan-owned hearth and shop recipes.
+
+Gate. `lane:native-fixtures` ran 7 groups, 16 fixtures (`artifacts/fixture_triage/gate_native.log`): 6 groups green; `nfhouseslow` had one transient Windows fast-fail (exit -1073740791) in `domestic_hearth_tending_test` after 42 s, and passed standalone (`tend_rerun.log`) and as a group on rerun (`gate_slow2.log`, 3 of 3). If it recurs, suspect the nested process, not the fixture.
+
+Lane placement of the restored groups (`EXTRA` keys in
+`tests/run_all_impl.gd`): `nfgeom` in `lane:geom` and `lane:geom-core`
+(seconds); `nftempleshort` in `lane:temple`; `nfchurchshort` in
+`lane:church-change`; `nfhouse` in `lane:dress`; `nftemple`, `nfchurch` and
+`nfhouseslow` in `lane:scheduled` (90 to 300 s each); all of them in
+`lane:native-fixtures`.
 
 ## Open at close
 

@@ -144,6 +144,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | the crooked warp: `core/haunt/crooked_warp.gd`, `qa/crooked_check.gd`, `BuildingRequest.jank` | `lane:haunt` | 5 m host, 2097 checks (26 Oct; every kind but hotel, plus a sloped and a pile house) |
 | church shell, opening or roof geometry | `lane:church-change` | 20 s host |
+| one of the restored native fixtures (walk floor edge, mesh closed edge, Pylon, Rotunda, church arcade, hearth, flue, clothes, camera; docs/LIVE_TASKS_HISTORY.md) | `lane:native-fixtures` (groups `nfgeom`, `nftempleshort`, `nftemple`, `nfchurchshort`, `nfchurch`, `nfhouse`, `nfhouseslow`) | seconds for `nfgeom`; `nfchurch` ~5 m; whole lane ~20 m, background it |
 | windmill geometry, or anything in `src/windmill/`; the published windmill walk | `lane:windmill` | 295 s loaded host, 270 checks (185 -> 204 windmills + 66 wwalk, 22 Oct) |
 | anything in `src/dungeon/`, `qa/dungeon_room_check.gd` or the dungeon fixtures | `lane:dungeon` | 84 s host (14 Oct); see docs/DUNGEONS.md |
 | `BuildingLibrary` rows, the family adapters, `BuildingRequest` factories | `lane:api` | ~10 m host; `libraryquick` alone is ~3.5 m and catches an unpublished kind |

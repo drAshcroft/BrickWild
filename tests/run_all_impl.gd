@@ -85,7 +85,8 @@ const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "plac
 	"varchetype_thorpe", "varchetype_thorpe_0_07", "varchetype_green_village", "varchetype_ford", "varchetype_mill_village",
 	"varchetype_strand", "varchetype_pine_hold", "varchetype_mine_camp", "varchetype_pilgrims_rest", "cas013",
 	"varchetype_lords_village", "varchetype_market_town", "varchetype_blight", "varchetype_cap", "wld003", "wld011", "wld014", "wld015", "wld016", "int021", "vis015", "cground",
-	"runnererror", "runnerfail", "int012", "int013", "thievesden100", "cnormaldiag", "dressingquick"]
+	"runnererror", "runnerfail", "int012", "int013", "thievesden100", "cnormaldiag", "dressingquick",
+	"nfgeom", "nftempleshort", "nftemple", "nfchurchshort", "nfchurch", "nfhouse", "nfhouseslow"]
 
 ## LANES -- the suites worth running for a given KIND OF EDIT.
 ##
@@ -128,17 +129,17 @@ const EXTRA: Array[String] = ["hslope", "hpiles", "vwaterform", "library", "plac
 ## Usage: godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 ## Lanes and bare suite names can be mixed; duplicates run once.
 const LANES: Dictionary = {
-	"lane:geom": ["roofquick", "hroof", "hcomponent", "heavefloat", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "hmesh", "metriccoords"],
+	"lane:geom": ["nfgeom", "roofquick", "hroof", "hcomponent", "heavefloat", "hopening", "hsky", "hdoor", "hbounds", "hjetty", "hmaterials", "hmesh", "metriccoords"],
 	# Same coverage in three bounded processes when the combined lane exceeds
 	# the five-minute host cap. Keep lane:geom as the complete batch selector.
-	"lane:geom-core": ["roofquick", "hroof", "hcomponent", "hsky", "hdoor", "hmesh", "metriccoords"],
+	"lane:geom-core": ["nfgeom", "roofquick", "hroof", "hcomponent", "hsky", "hdoor", "hmesh", "metriccoords"],
 	"lane:geom-openings": ["hopening"],
 	"lane:geom-envelope": ["hbounds", "hjetty", "hmaterials"],
 	"lane:haunt": ["crooked"],
 	"lane:rich": ["hrich", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty"],
 	"lane:culture": ["hvernacular", "hbounds", "hcomponent", "hopening", "henvelope", "hjetty", "hmaterials", "cultureapi"],
 	"lane:plan": ["house", "houseqaplan", "hmultistory"],
-	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype"],
+	"lane:dress": ["houseqafurnish", "hexterior", "hassembly", "harchetype", "nfhouse"],
 	"lane:assets": ["assets", "props", "hassembly"],
 	"lane:shop-trade": ["shoptrade", "sarchetype"],
 	"lane:house-plan-fast": ["houseqaplan", "hmultistory", "hwitchcompact", "hwitchsize"],
@@ -160,9 +161,9 @@ const LANES: Dictionary = {
 	"lane:motte-change": ["cmotteplan", "cmotteaccess", "coccupancy"],
 	"lane:castle-spot": ["castlechange", "chimeji"],
 	"lane:castle": ["castle", "cnormals", "cmassing", "clandmark", "cvoxelqa", "ctowerplan", "cmotteplan", "cmotteaccess", "cforms", "caccess", "cforebuilding", "cgateaccess", "cgatestairs", "cbergfried", "cterrace"],
-	"lane:church-change": ["churchroof", "churchchange", "sacredseq", "chwalk"],
+	"lane:church-change": ["churchroof", "churchchange", "sacredseq", "chwalk", "nfchurchshort"],
 	"lane:church": ["church", "normals", "massing", "churchaperture", "churchload"],
-	"lane:temple": ["temple", "rite", "twalk", "sacredseq", "sacredid"],
+	"lane:temple": ["temple", "rite", "twalk", "sacredseq", "sacredid", "nftempleshort"],
 	# Same assertions as `temple`, split so no process nears the 300 s cap.
 	"lane:temple-contract": ["temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras"],
 	"lane:world": ["wld001", "wld002", "wld003", "wld004", "wld005", "wld006", "wld007", "wld009", "wld010", "wld011", "wld012", "wld013", "wld017", "wld018", "wunchecked", "matkit"],
@@ -171,7 +172,10 @@ const LANES: Dictionary = {
 	"lane:windmill": ["windmill", "wwalk"],
 	"lane:dungeon": ["dungeon"],
 	"lane:api": ["libraryquick", "placementquick", "poly", "windmill", "cultureapi", "compactapi", "bwalk", "twalk", "chwalk", "kwalk"],
-	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "vrealism", "interior", "cvoxelqa", "library", "placement"],
+	"lane:scheduled": ["dressingquick", "dressing", "hlandmark", "hotel", "court", "wld001", "vlot", "vcheck", "vformslayout", "vrealism", "interior", "cvoxelqa", "library", "placement", "nftemple", "nfchurch", "nfhouseslow"],
+	# The restored native fixtures (LIVE-FIXTURE-TRIAGE), every group. The slow
+	# groups (nftemple, nfchurch, nfhouseslow) are also in lane:scheduled.
+	"lane:native-fixtures": ["nfgeom", "nftempleshort", "nftemple", "nfchurchshort", "nfchurch", "nfhouse", "nfhouseslow"],
 	"lane:sweep": ORDER,
 }
 
@@ -253,6 +257,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return LibrarySuite.run()
 		"placement":
 			return PlacementSuite.run()
+		"nfgeom", "nftempleshort", "nftemple", "nfchurchshort", "nfchurch", "nfhouse", "nfhouseslow":
+			return preload("res://tests/suites/native_fixture_suite.gd").run(key)
 		"libraryquick":
 			return LibrarySuite.run_quick()
 		"placementquick":
