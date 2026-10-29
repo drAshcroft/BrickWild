@@ -156,6 +156,11 @@ const FORM_VALLEY_SIDES := 0.25     ## p75 dry slope: steep sides
 const FORM_VALLEY_RANK := 0.55      ## the centre lies in the lower part of its ground
 const FORM_DROWNED := 0.5           ## the window this wet: the ground is the water's edge
 const FORM_WATER_ROUND := 0.4       ## the wider ground this wet: water all round
+## A farming village stands back from the water (VTER-REAL-WATERFRONT, owner
+## decision 2026-10-28): for these purposes rows 1, 2 and 4 of the form table
+## are skipped and the water becomes a well, an oasis or a field edge. Only a
+## fishing (or harbour, trade) economy takes the shore or water form.
+const FORM_INLAND_PURPOSES: Array[StringName] = [&"farming", &"forest"]
 const FORM_DISPERSED_POP := 150     ## a farming hill people under this scatters
 const FORM_DISPERSED_REGIONS := 3   ## or this many separate level shelves to farm from
 ## Reading the ground for the form (read_ground): the analysis cell, the
@@ -400,8 +405,8 @@ func form_window_m() -> float:
 ##   | # | the ground (read_ground) and the spec              | form      |
 ##   |---|----------------------------------------------------|-----------|
 ##   | 0 | an enclosed island the programme fills             | water     |
-##   | 1 | window wet_share >= FORM_DROWNED                   | shore     |
-##   | 2 | ground within FORM_WATER_M wet >= FORM_WATER_ROUND | water     |
+##   | 1 | window wet_share >= FORM_DROWNED (not farming/forest) | shore  |
+##   | 2 | ground within FORM_WATER_M wet >= FORM_WATER_ROUND (same) | water |
 ##   | 3 | centre_tpi >= FORM_CREST_TPI_M and                 | crest     |
 ##   |   |   centre_rank >= FORM_CREST_RANK                   |           |
 ##   | 4 | water coast/lake, wet ground <= FORM_SHORE_REACH_M | shore     |
@@ -428,13 +433,14 @@ static func _derive_form_on_ground(g: Dictionary, p_population: int, p_purpose: 
 		return _derive_form(p_population, p_purpose, p_culture)
 	if bool(g.get("island_fits", false)):
 		return &"water"
-	if float(g["wet_share"]) >= FORM_DROWNED:
+	var inland: bool = p_purpose in FORM_INLAND_PURPOSES
+	if not inland and float(g["wet_share"]) >= FORM_DROWNED:
 		return &"shore"
-	if float(g["wide_wet_share"]) >= FORM_WATER_ROUND:
+	if not inland and float(g["wide_wet_share"]) >= FORM_WATER_ROUND:
 		return &"water"
 	if float(g["centre_tpi"]) >= FORM_CREST_TPI_M and float(g["centre_rank"]) >= FORM_CREST_RANK:
 		return &"crest"
-	if p_water in [&"coast", &"lake"] and float(g["water_far_m"]) <= FORM_SHORE_REACH_M:
+	if not inland and p_water in [&"coast", &"lake"] and float(g["water_far_m"]) <= FORM_SHORE_REACH_M:
 		return &"shore"
 	if p_water in [&"river", &"lake"] and float(g["slope_p75"]) >= FORM_VALLEY_SIDES \
 			and float(g["centre_rank"]) < FORM_VALLEY_RANK:

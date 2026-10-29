@@ -75,8 +75,30 @@ static func run() -> SuiteResult:
 	_coverage(res, sites, measured, ground)
 	_specs(res, measured)
 	_intents(res, measured, ground)
+	_economy_stands_back(res)
 	_place_targets(res, sites)
 	return res
+
+
+## VTER-REAL-WATERFRONT (owner decision 2026-10-28): a farming village stands
+## back from the water; only a fishing economy takes the shore or water form.
+## The control is the same ground read with the economy changed.
+static func _economy_stands_back(res: SuiteResult) -> void:
+	var wet := {"wet_share": 0.6, "wide_wet_share": 0.6, "centre_tpi": 0.0, "centre_rank": 0.5,
+		"water_far_m": 10.0, "slope_p75": 0.05, "slope_median": 0.03, "level_regions": 1}
+	var shore := {"wet_share": 0.1, "wide_wet_share": 0.1, "centre_tpi": 0.0, "centre_rank": 0.5,
+		"water_far_m": 120.0, "slope_p75": 0.05, "slope_median": 0.03, "level_regions": 1}
+	for purpose in [&"farming", &"forest"]:
+		for g in [wet, shore]:
+			res.checked += 1
+			var f := VillageSpec._derive_form_on_ground(g, 60, purpose, &"coast", &"english")
+			if f in [&"shore", &"water"]:
+				res.fail("a %s village on wet ground took the %s form; it stands back from the water" % [purpose, f])
+	res.checked += 2
+	if VillageSpec._derive_form_on_ground(wet, 60, &"fishing", &"coast", &"english") != &"shore":
+		res.fail("control: a fishing village on a drowned window must take the shore form")
+	if VillageSpec._derive_form_on_ground(shore, 60, &"fishing", &"coast", &"english") != &"shore":
+		res.fail("control: a fishing coast village with water 120 m off must take the shore form")
 
 
 ## VTER-PLACE: the targets VillagePlaceCheck reads from the

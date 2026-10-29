@@ -277,10 +277,10 @@ First row that holds wins:
 | # | the ground and the spec | form |
 |---|---|---|
 | 0 | an enclosed island within 320 m that the programme fills (`VillageIslandForm.fits_ground`: 0.7 to 4 times the ground the households need, a ring fits it; VTER-ISLAND-FILL, below) | water |
-| 1 | half the window is wet (`FORM_DROWNED` 0.5): the DEM drowns the site, it stands at the edge | shore |
-| 2 | ≥ 40 % of the ground within 450 m is wet (`FORM_WATER_ROUND`) | water |
+| 1 | half the window is wet (`FORM_DROWNED` 0.5): the DEM drowns the site, it stands at the edge (not for a farming or forest economy, see below) | shore |
+| 2 | ≥ 40 % of the ground within 450 m is wet (`FORM_WATER_ROUND`); not for farming or forest | water |
 | 3 | the centre ≥ 9 m over its 30–150 m ring and over ≥ 75 % of the ground within 350 m | crest |
-| 4 | water `coast` or `lake`, and wet ground within 350 m of the centre | shore |
+| 4 | water `coast` or `lake`, and wet ground within 350 m of the centre; not for farming or forest | shore |
 | 5 | water `river` or `lake`, p75 dry slope ≥ 0.25 (steep sides), centre below 55 % of its ground | valley |
 | 6 | median dry slope ≥ 0.17, purpose farming/forest, and population < 150 or ≥ 3 separate level shelves | dispersed |
 | 7 | median dry slope ≥ 0.17 | hillside |
@@ -289,6 +289,8 @@ First row that holds wins:
 | 10 | water `coast`, purpose fishing | shore |
 | 11 | purpose crossroads | crossroads |
 | 12 | anything else (market on level ground included) | planted |
+
+**The economy rule (VTER-REAL-WATERFRONT, owner decision 2026-10-28).** A farming village stands back from the water. For purpose `farming` or `forest` (`VillageSpec.FORM_INLAND_PURPOSES`) rows 1, 2 and 4 are skipped and the ground falls through to crest, valley, dispersed, hillside or planted; the water becomes a well, an oasis or a field edge. Only a fishing economy (row 9, 10) or an island fill (row 0) takes the shore or water form, in every stratum. Checked by `_economy_stands_back` in the vworld suite, with fishing controls.
 
 Population enters only at row 6. On level ground the survey's real villages
 read `planted` at every size from 12 people to 500; the flat rule's `gate` at

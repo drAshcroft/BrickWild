@@ -254,3 +254,33 @@ Each cell: generated median (real p10-p90, in/LOW/HIGH). `-` : fewer than 5 real
 | `worship_centrality` | 0.44 [0.42-0.52] (0.23-1.05) in | 0.75 [0.63-0.99] (0.15-0.81) UNSURE | 0.69 [0.57-0.99] (0.17-0.99) in | 0.92 [0.69-1.06] (0.07-0.73) UNSURE | 0.56 [0.43-1.00] (0.23-0.81) UNSURE | 0.64 [0.44-0.87] (0.13-0.75) UNSURE | 0.56 [0.43-1.04] (0.23-0.95) UNSURE | 0.51 [0.44-0.61] (0.23-0.79) in | 0.99 [0.60-1.48] (0.42-1.53) in |
 | `worship_elev_pctile` | 0.75 [0.69-0.93] (0.05-0.98) in | 0.87 [0.73-0.93] (0.28-0.97) in | 0.93 [0.62-0.94] (0.20-0.98) in | 0.88 [0.81-0.94] (0.56-0.97) in | 0.86 [0.73-0.92] (0.05-0.96) in | 0.70 [0.62-0.88] (0.43-0.94) in | 0.93 [0.88-0.94] (0.00-0.77) HIGH | 0.88 [0.63-0.94] (0.22-1.00) in | 0.88 [0.47-0.94] (0.00-1.00) in |
 <!-- realism:end -->
+
+## Farming stands back; the shore back row costs two shore fixtures (VTER-REAL-WATERFRONT, 2026-10-29)
+
+Kept: `VillageSpec.FORM_INLAND_PURPOSES` (farming, forest) skips the shore and
+water rows of the form table (owner decision). The realism gate plans every
+site with water as `fishing` (`_plan`: farming only where `water == none`), so
+the rule is silent there: gate unchanged at 122 in / 60 unsure, all water cells
+as before (coast, arid, polar, lowland `water_within_30m` HIGH).
+
+Tried and not kept: `SEAWARD_SHARE` 0.4 -> 0.25 with the rule, 42 plans cached
+and judged (`tools/judge_cache.gd`, base = the vertical2 cache): 120 in / 61
+unsure / 26 out -> 123 / 67 / 17, no `in` cell went decisively out.
+`water_within_30m` median [90 % interval], real p10-p90: coast HIGH 0.40
+[0.38-0.44] -> UNSURE 0.31 [0.25-0.38] (0-0.27); polar HIGH 0.49 -> UNSURE 0.46
+[0.25-0.67] (0-0.27); lowland HIGH 0.47 -> UNSURE 0.31; arid stays HIGH 0.50
+[0.36-0.60] (0-0.07). In cells that became unsure: lake compactness, island
+dead_end_ratio and frontage_aligned, arid worship_centrality. Why not kept:
+`vshore` goes red (151 checks, 4 failures: real30/hallstatt street spread 36.7 m
+and density 3.4 %, world90/perast corners leave the grid and spread 22 m) where
+0.4 is green (145 checks). The 0.25 cap leaves the landward row short of
+houses, so the lot planner grows `site_scale` and the frame widens. 0.3 by arithmetic does not
+bind below 16 lots (cap is 6 seaward of 16, as 0.4 reaches), so there is no
+middle value. Needed: a second landward row (or a back lane) in the shore form
+before the cap can drop.
+
+Arid is a harness fact: Bakel, Zýgi and Vijayapuri North sit on a lake or coast,
+so the gate plans them as `fishing` (Bakel as a `water` form), and fishing
+rightly takes the water. The arid p90 of 0.07 is only reachable by letting the
+gate pick `farming` for them, or by a stand-off for fishing in arid climates;
+that is an owner decision, not made here.
