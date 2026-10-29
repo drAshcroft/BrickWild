@@ -140,15 +140,16 @@ func build(plan: VillagePlan) -> ArrayMesh:
 ## must still colour its remaining streams by their authored material slot.
 func commit() -> ArrayMesh:
 	var mesh := ArrayMesh.new()
-	var slots := {}
 	for surface in SURFACES:
 		var before := mesh.get_surface_count()
 		_kit.surface(surface).commit(mesh)
 		if mesh.get_surface_count() > before:
 			mesh.surface_set_name(before, "material_slot:%d" % surface)
-			slots[surface] = before
-	for row in component_log:
-		row["surface"] = slots.get(int(row["surface"]), -1)
+	# a component's `surface` stays the LOGICAL slot, which is what the named
+	# surfaces carry and what ComponentCheck looks up. It was the surface's
+	# position in the mesh, which is the slot only when every slot before it is
+	# present: a village without water has its stone at position 3, slot 4
+	# (VTER-VISUAL-DOOR-ISLAND, Monpazier "components claim surface 3, mesh has 10").
 	return mesh
 
 
@@ -922,10 +923,24 @@ func _terrace_walls(plan: VillagePlan) -> void:
 				# an access flight's edge is held by its own cheeks, and a
 				# level way in is left open
 				if _surface.kind_of(_surface.region_at((a + b) * 0.5 - n * 0.05)) == VillageGroundSurface.K_STAIR \
-						or _in_gate(plan, (a + b) * 0.5):
+						or _in_gate(plan, (a + b) * 0.5) or _in_entry_flight(plan, (a + b) * 0.5):
 					continue
 				_wall_panel("terrace_wall", a, b, n)
 		host_end()
+
+
+## Whether plan point p stands on a house's entry flight (its landing or a
+## tread): a terrace or road retaining wall panel there would stand across
+## the way down from the door, a wall the walk cannot pass (VTER-VISUAL-DOOR-
+## ISLAND, Monpazier c/b-003: three panels of road 0's retaining wall over the
+## landing's front).
+static func _in_entry_flight(plan: VillagePlan, p: Vector2) -> bool:
+	for lot in plan.lots:
+		for f in lot.get("ground_fit", {}).get("entry_flights", []):
+			for t in f["treads"]:
+				if Geometry2D.is_point_in_polygon(p, t["poly"]):
+					return true
+	return false
 
 
 ## The retaining walls of the road beds: along each road's verge, wherever
@@ -955,7 +970,7 @@ func _retaining_walls(plan: VillagePlan) -> void:
 					continue
 				var step := maxf(absf(_surface.height_in(mine, a) - _surface.height_in(there, a)),
 					absf(_surface.height_in(mine, b) - _surface.height_in(there, b)))
-				if step <= VillageLotGround.TERRACE_MIN or _in_gate(plan, mid):
+				if step <= VillageLotGround.TERRACE_MIN or _in_gate(plan, mid) or _in_entry_flight(plan, mid):
 					continue
 				if not opened:
 					host("road%d" % i)

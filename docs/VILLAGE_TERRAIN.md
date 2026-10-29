@@ -2267,16 +2267,48 @@ What reads wrong, plainly:
   render stage, and the water is a flat rectangle (Hallstatt's lake is not
   drawn at all). The hillside context is missing (VTER-VISUAL-SURROUND).
 * The automated 3D walk (probe `tools/probe_village_walk3d.gd`, the
-  `vstepswalk` case with the green form on the three grounds): 15 of 16 doors
-  are on the gates' island and have a path on every site (Monpazier 16/16
-  paths); the unreachable one is Manarola c/b-001, Hallstatt c/b-001, Monpazier
-  c/b-003. Hallstatt and Monpazier also show one open 0.13 m / 0.20 m seam
-  (VTER-VISUAL-DOOR-ISLAND). Climb on Hallstatt: 22.8 m, riser max 0.150.
-  Monpazier has no stair street, so the suite's stair checks do not apply
-  there; its component-count line is part of the same task.
+  `vstepswalk` case with the green form on the three grounds): first run, 15
+  of 16 doors on the gates' island on each site (Manarola c/b-001, Hallstatt
+  c/b-001, Monpazier c/b-003). Fixed by VTER-VISUAL-DOOR-ISLAND, below; all 16
+  of 16 now, and Hallstatt and Monpazier are cases of `vstepswalk`.
 * The vision model (`waterfree vision look`, moondream) returned an empty
   answer on these images; the judgements above are from reading the renders.
 
 The human walk is task VTER-VISUAL-WALK:
 `.\visualqa\walk.ps1 --village-terrain=manarola --seed=1` (and `hallstatt`,
 `monpazier`).
+
+### The three stranded doors (VTER-VISUAL-DOOR-ISLAND)
+
+Three causes, one per site, none a check being wrong:
+
+* **A step the baker will not take** (Manarola c/b-001, Hallstatt c/b-001).
+  The agent climbs 0.24 m, a "level" way in is a step of up to 0.2 m, but
+  Recast's ledge filter reads a step of most of the climb with a slope beside
+  it as a ledge and the erosion takes the strip either side: the pad is a
+  31-92 polygon island 0.5-1 m from the road. `VillageWalk3D.stitch_links`
+  joins each such island to the nearest floor of another within 1.1 m in
+  plan and 0.3 m in height, unless the line crosses an obstacle (wall,
+  building, tread); links are `kind: "gap"`, `building_id: ""`. A flight is
+  wider and higher than that, so the failing control (access flights off)
+  still strands 3-7 doors per site.
+* **A retaining wall across an entry flight** (Monpazier c/b-003). Road 0's
+  retaining wall ran over the landing of a door's flight; `VillageBuilder`
+  skipped panels at a level way in and at an access flight but not at an entry
+  flight. It now skips a terrace or retaining panel whose middle is on any
+  entry flight's landing or tread (`_in_entry_flight`).
+* **"components claim surface 3, mesh has 10"** (Monpazier). Not the stairs:
+  `VillageBuilder.commit` rewrote each component's `surface` to its POSITION
+  in the mesh, but `ComponentCheck` looks up the named LOGICAL slot. They are
+  the same only when no earlier slot is empty; a village without water has its
+  stone at position 3, slot 4. Components now keep the logical slot.
+
+`vstepswalk` has Hallstatt and Monpazier (182 checks); Monpazier has no stair
+street, only access flights (`street: false`). Probes: `tools/probe_door_island.gd`
+(the stranded door, its links, island and wall rows), `tools/probe_seam.gd`.
+
+Open (VTER-GROUND-SEAM): one seam sample in Hallstatt is open 0.13 m of a
+0.98 m step at plan (-6.4, 8.0), and one sample in each of Hallstatt (0.10 m) and
+Monpazier (0.20 m, (-36.7, 20.9)) has two ground layers. They are listed as
+`known` ceilings in the suite's CASES (a warning each; a fixed one must be
+taken off the list, a second one fails).

@@ -66,7 +66,7 @@ static func _add_3d(plan: VillagePlan, city_id: String, out: Dictionary) -> void
 		polygons.append(Array(poly))
 	var links: Array = []
 	for link in m3["links"]:
-		links.append({"kind": link["kind"], "building_id": "%s/b-%03d" % [city_id, int(link["building"])],
+		links.append({"kind": link["kind"], "building_id": ("%s/b-%03d" % [city_id, int(link["building"])]) if int(link["building"]) >= 0 else "",
 			"door": int(link["door"]), "from_m": _triple(link["from"]), "to_m": _triple(link["to"]),
 			"bidirectional": true})
 	out["navmesh_3d"] = {

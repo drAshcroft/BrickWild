@@ -140,10 +140,12 @@ static func bake(plan: VillagePlan, opts: Dictionary = {}) -> Dictionary:
 	var inserted := refine_edges(out, index, faces)
 	out = canonical(out["vertices"], out["polygons"])
 	out["links"] = entry_links(plan, out)
+	var stitched := stitch_links(out, obstacles)
+	(out["links"] as Array).append_array(stitched)
 	out["stats"] = {"faces": faces.size() / 3, "obstacles": obstacles.size(),
 		"snap_worst_m": snappedf(moved, PLACES), "snapped_beside": beside, "pitched": pitched,
 		"overlaps_removed": removed, "overfull_edges": overfull_edges(out), "triangles": triangles,
-		"edge_vertices_added": inserted,
+		"edge_vertices_added": inserted, "gap_links": stitched.size(),
 		"polygons": (out["polygons"] as Array).size(), "ms": (Time.get_ticks_usec() - t0) / 1000.0}
 	return out
 
@@ -218,6 +220,107 @@ static func entry_pitch(route: Array) -> Dictionary:
 	var top := nosing - down * (going * 0.5)
 	var low := nosing + down * s_foot
 	return {"from": Vector3(low.x, foot.y, low.y), "to": Vector3(top.x, landing.y, top.y)}
+
+
+## A step the baker would not take. The agent climbs MAX_CLIMB (0.24 m) but
+## Recast's ledge filter reads a step of most of that, with a slope beside it,
+## as a ledge, and the erosion takes a strip of floor either side: a pad that
+## stands 0.2 m above its verge, or a landing 0.2 m above its apron, is an
+## island 0.5-1 m from the floor it is a step from (VTER-VISUAL-DOOR-ISLAND,
+## Manarola c/b-001, Hallstatt c/b-001). A LINK joins each such island to the
+## nearest floor of another within GAP_REACH in plan and GAP_RISE in height,
+## where nothing stands between: never across a wall, a building or a tread.
+## Joined islands count as one for the next round. A flight, a river or a
+## wall is wider or higher than that, so a stranded door still shows.
+const GAP_REACH := 1.1
+const GAP_RISE := 0.3
+const GAP_SAMPLE := 0.25
+
+
+static func stitch_links(mesh: Dictionary, obstacles: Array[PackedVector2Array]) -> Array:
+	var out: Array = []
+	var verts: PackedVector3Array = mesh["vertices"]
+	var polygons: Array = mesh["polygons"]
+	# the boundary samples of every polygon edge nothing else shares
+	var count := {}
+	for poly in polygons:
+		for k in poly.size():
+			var a: int = poly[k]
+			var b: int = poly[(k + 1) % poly.size()]
+			var key := Vector2i(mini(a, b), maxi(a, b))
+			count[key] = int(count.get(key, 0)) + 1
+	var samples: Array = []
+	var grid := {}
+	for i in polygons.size():
+		var poly: PackedInt32Array = polygons[i]
+		for k in poly.size():
+			var a: int = poly[k]
+			var b: int = poly[(k + 1) % poly.size()]
+			if int(count[Vector2i(mini(a, b), maxi(a, b))]) != 1:
+				continue
+			var n := maxi(1, int(ceil(verts[a].distance_to(verts[b]) / GAP_SAMPLE)))
+			for m in range(0, n + 1):
+				var pt := verts[a].lerp(verts[b], float(m) / float(n))
+				var cell := Vector2i(floori(pt.x / GAP_REACH), floori(pt.z / GAP_REACH))
+				if not grid.has(cell):
+					grid[cell] = []
+				(grid[cell] as Array).append(samples.size())
+				samples.append({"p": pt, "poly": i})
+	for _round in range(8):
+		var isl := islands({"vertices": verts, "polygons": polygons, "links": (mesh.get("links", []) as Array) + out})
+		var best := {}
+		var best_d := {}
+		for si in samples.size():
+			var s: Dictionary = samples[si]
+			var mine: int = isl[int(s["poly"])]
+			var c := Vector2i(floori(s["p"].x / GAP_REACH), floori(s["p"].z / GAP_REACH))
+			for dx in range(-1, 2):
+				for dz in range(-1, 2):
+					for oi in grid.get(Vector2i(c.x + dx, c.y + dz), []):
+						var o: Dictionary = samples[oi]
+						if isl[int(o["poly"])] == mine:
+							continue
+						var q: Vector3 = o["p"]
+						var p: Vector3 = s["p"]
+						if absf(q.y - p.y) > GAP_RISE:
+							continue
+						var d := Vector2(p.x, p.z).distance_to(Vector2(q.x, q.z))
+						if d > GAP_REACH or d >= float(best_d.get(mine, INF)):
+							continue
+						if _walled(p, q, obstacles):
+							continue
+						best_d[mine] = d
+						best[mine] = {"a": p, "b": q, "ia": mine, "ib": isl[int(o["poly"])]}
+		if best.is_empty():
+			break
+		var joined := {}
+		for mine in best:
+			var link: Dictionary = best[mine]
+			# one link per pair of islands, the shortest
+			var ia: int = link["ia"]
+			var ib: int = link["ib"]
+			var pair := Vector2i(mini(ia, ib), maxi(ia, ib))
+			if joined.has(pair):
+				continue
+			joined[pair] = true
+			var a3: Vector3 = link["a"]
+			var b3: Vector3 = link["b"]
+			out.append({"kind": "gap", "building": -1, "door": -1,
+				"from": a3 if a3.y <= b3.y else b3, "to": b3 if a3.y <= b3.y else a3})
+	return out
+
+
+## Whether the plan line p-q crosses an obstacle (sampled every 0.1 m).
+static func _walled(p: Vector3, q: Vector3, obstacles: Array[PackedVector2Array]) -> bool:
+	var a := Vector2(p.x, p.z)
+	var b := Vector2(q.x, q.z)
+	var n := maxi(1, int(ceil(a.distance_to(b) / 0.1)))
+	for m in range(1, n):
+		var at := a.lerp(b, float(m) / float(n))
+		for poly in obstacles:
+			if Geometry2D.is_point_in_polygon(at, poly):
+				return true
+	return false
 
 
 ## The pitch of a lot's access flight, from the ground before its first

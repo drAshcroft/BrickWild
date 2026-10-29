@@ -1,8 +1,8 @@
 extends RefCounted
 ## The village walk in 3D on real hillsides (VTER-STEPS-NAV), read the way a
 ## consumer reads it: the `walk` key out of JSON, handed to Godot's own
-## NavigationServer3D. Manarola and Positano (real30), 50 people, the green
-## form (each has stair streets: Manarola one, Positano two).
+## NavigationServer3D. Manarola, Positano, Hallstatt and Monpazier (real30), 50 people, the green
+## form (Manarola one stair street, Positano two, Hallstatt one; Monpazier none, only access flights).
 ##
 ##   the stairs: every `steps` road and access flight is stepped in the
 ##     emitted ground and named (VillageGroundCheck, `stairs` and the rest)
@@ -21,7 +21,16 @@ extends RefCounted
 ## open items in docs/VILLAGE_TERRAIN.md.
 
 const VTP := preload("res://tests/suites/village_terrain_plan_suite.gd")
-const CASES := [["real30/manarola", &"green"], ["real30/positano", &"green"]]
+## [ground, form, options]. Options: "street" false where the village has no stair street (only
+## access flights, as Monpazier's bastide), and "known" for ground-seam
+## defects open under VTER-GROUND-SEAM, each a CEILING: a regression past it,
+## or a fixed one still listed, is a failure.
+const CASES := [
+	["real30/manarola", &"green", {}],
+	["real30/positano", &"green", {}],
+	["real30/hallstatt", &"green", {"known": {"open": 1, "layers": 1}}],
+	["real30/monpazier", &"green", {"street": false, "known": {"layers": 1}}],
+]
 ## The stair street the hillside form makes of a through road too steep for a cart
 ## (HILLS-GENERAL): Masouleh planned as a hillside, its `stepped` through road.
 const STEPPED_CASES := ["real30/masouleh"]
@@ -38,14 +47,14 @@ static func run() -> SuiteResult:
 		VillageProgrammer.programme(VTP.spec_for(&"street", null)))
 	res.note("measured %d buildings once in %.1f s" % [jobs.size(), (Time.get_ticks_msec() - t0) / 1000.0])
 	for c in CASES:
-		_case(res, jobs, c[0], c[1])
+		_case(res, jobs, c[0], c[1], c[2])
 	for g in STEPPED_CASES:
 		_stepped_case(res, jobs, g)
 	res.note("total %.1f s" % ((Time.get_ticks_msec() - t0) / 1000.0))
 	return res
 
 
-static func _case(res: SuiteResult, jobs: Array[Dictionary], ground_name: String, form: StringName) -> void:
+static func _case(res: SuiteResult, jobs: Array[Dictionary], ground_name: String, form: StringName, opts: Dictionary = {}) -> void:
 	var label := "%s/%s" % [ground_name, form]
 	var t0 := Time.get_ticks_msec()
 	var plan := VillageLotPlanner.plan_measured(VTP.spec_for(form, VTP.terrain(ground_name)), jobs)
@@ -71,14 +80,30 @@ static func _case(res: SuiteResult, jobs: Array[Dictionary], ground_name: String
 	var report: Dictionary = check.check(plan, scene)
 	var st: Dictionary = report["stats"]
 	res.checked += 1
+	var known: Dictionary = opts.get("known", {})
+	var seen := {}
 	for f in (report["failures"] as Array).slice(0, 8):
+		var kind := ""
+		if "are open by more than" in String(f):
+			kind = "open"
+		elif "two ground layers more than" in String(f):
+			kind = "layers"
+		var count := int(String(f).get_slice(": ", 1).get_slice(" ", 0))
+		if kind != "" and known.has(kind) and count <= int(known[kind]):
+			seen[kind] = true
+			res.warn("%s: known ground seam (VTER-GROUND-SEAM, ceiling %d): %s" % [label, int(known[kind]), f])
+			continue
 		res.fail("%s: %s" % [label, f])
+	for kind in known:
+		res.checked += 1
+		if not seen.has(kind):
+			res.fail("%s: the known ground-seam defect '%s' is gone; take it off the case's `known` list" % [label, kind])
 	res.checked += 1
 	var streets := 0
 	for i in plan.roads.size():
 		if VillageGroundSurface.of(plan).road_bed(i).has("treads"):
 			streets += 1
-	if streets == 0 or builder.components("stair_tread").is_empty():
+	if (streets == 0 and bool(opts.get("street", true))) or builder.components("stair_tread").is_empty():
 		res.fail("%s: no stair street was built (%d steps roads, %d tread stones)" % [label, streets,
 			builder.components("stair_tread").size()])
 	res.checked += 1
